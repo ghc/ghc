@@ -20,7 +20,7 @@ module TcForeign
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
-			  ExtName(..), isDynamic, MonoBinds(..),
+			  ExtName(Dynamic), isDynamicExtName, MonoBinds(..),
 			  OutPat(..), ForKind(..)
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
@@ -82,7 +82,7 @@ isForeignImport (ForeignDecl _ k _ dyn _ _) =
 
 -- exports a binding
 isForeignExport :: ForeignDecl name -> Bool
-isForeignExport (ForeignDecl _ FoExport _ ext_nm _ _) = not (isDynamic ext_nm)
+isForeignExport (ForeignDecl _ FoExport _ ext_nm _ _) = not (isDynamicExtName ext_nm)
 isForeignExport _				      = False
 
 \end{code}
@@ -131,7 +131,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
    in
    case splitFunTys t_ty of
      (arg_tys, res_ty) ->
-        checkForeignImport (isDynamic ext_nm) (not isUnsafe) ty arg_tys res_ty `thenTc_`
+        checkForeignImport (isDynamicExtName ext_nm) (not isUnsafe) ty arg_tys res_ty `thenTc_`
 	let i = (mkVanillaId nm ty) in
 	returnTc (i, (ForeignDecl i imp_exp undefined ext_nm cconv src_loc))
 

@@ -12,27 +12,26 @@ module WwLib (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( coreExprType )
-import Id		( Id, idType, mkSysLocal, getIdDemandInfo, setIdDemandInfo,
+import CoreUtils	( exprType, mkInlineMe )
+import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			  isOneShotLambda, setOneShotLambda,
                           mkWildId, setIdInfo
 			)
 import IdInfo		( CprInfo(..), noCprInfo, vanillaIdInfo )
-import Const		( Con(..), DataCon )
-import DataCon		( isExistentialDataCon, dataConArgTys )
-import Demand		( Demand(..) )
+import DataCon		( DataCon, splitProductType )
+import Demand		( Demand(..), wwLazy, wwPrim )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
 import Type		( isUnLiftedType, 
-			  splitForAllTys, splitFunTys, 
+			  splitForAllTys, splitFunTys,  isAlgType,
 			  splitAlgTyConApp_maybe, splitNewType_maybe,
 			  mkTyConApp, mkFunTys,
 			  Type
 			)
 import TyCon            ( isNewTyCon, isProductTyCon, TyCon )
 import BasicTypes	( NewOrData(..), Arity )
-import Var              ( TyVar, IdOrTyVar )
+import Var              ( TyVar, Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, 
                           mapUs, UniqSM )
 import Util		( zipWithEqual, zipEqual, lengthExceeds )
@@ -187,11 +186,8 @@ worthSplitting :: [Demand]
 	       -> Bool	-- True <=> the wrapper would not be an identity function
 worthSplitting ds result_bot = any worth_it ds
 	-- We used not to split if the result is bottom.
-	-- [Justification:  there's no efficiency to be gained, 
-	--  and (worse) the wrapper body may not look like a wrapper
-	--  body to getWorkerIdAndCons]
-	-- But now (a) we don't have getWorkerIdAndCons, and
-	-- (b) it's sometimes bad not to make a wrapper.  Consider
+	-- [Justification:  there's no efficiency to be gained.]
+	-- But it's sometimes bad not to make a wrapper.  Consider
 	--	fw = \x# -> let x = I# x# in case e of
 	--					p1 -> error_fn x
 	--					p2 -> error_fn x
@@ -225,24 +221,25 @@ allAbsent ds = all absent ds
 mkWwBodies :: Type				-- Type of original function
 	   -> Arity				-- Arity of original function
 	   -> [Demand]				-- Strictness of original function
+	   -> Bool				-- True <=> function returns bottom
 	   -> [Bool]				-- One-shot-ness of the function
 	   -> CprInfo                           -- Result of CPR analysis 
-	   -> UniqSM ([IdOrTyVar],		-- Worker args
+	   -> UniqSM ([Demand],			-- Demands for worker (value) args
 		      Id -> CoreExpr,		-- Wrapper body, lacking only the worker Id
 		      CoreExpr -> CoreExpr)	-- Worker body, lacking the original function rhs
 
-mkWwBodies fun_ty arity demands one_shots cpr_info
-  = WARN(    not (lengthExceeds demands (arity-1)) 
-	  || not (lengthExceeds one_shots (arity-1)),
-          text "mkWrapper" <+> ppr fun_ty <+> ppr arity <+> ppr (take arity demands) <+> ppr (take arity one_shots) )
-    mkWWargs fun_ty arity demands one_shots	`thenUs` \ (wrap_args, wrap_fn_args,   work_fn_args, res_ty) ->
-    mkWWstr wrap_args				`thenUs` \ (work_args, wrap_fn_str,    work_fn_str) ->
-    mkWWcpr res_ty cpr_info      		`thenUs` \ (wrap_fn_cpr,    work_fn_cpr,  cpr_res_ty) ->
-    mkWWfixup cpr_res_ty work_args		`thenUs` \ (wrap_fn_fixup,  work_fn_fixup) ->
+mkWwBodies fun_ty arity demands res_bot one_shots cpr_info
+  = mkWWargs fun_ty arity demands' res_bot one_shots'	`thenUs` \ (wrap_args, wrap_fn_args,   work_fn_args, res_ty) ->
+    mkWWstr wrap_args					`thenUs` \ (work_dmds, wrap_fn_str,    work_fn_str) ->
+    mkWWcpr res_ty cpr_info      			`thenUs` \ (wrap_fn_cpr,    work_fn_cpr,  cpr_res_ty) ->
+    mkWWfixup cpr_res_ty work_dmds			`thenUs` \ (final_work_dmds, wrap_fn_fixup,  work_fn_fixup) ->
 
-    returnUs (work_args,
-	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . wrap_fn_fixup . Var,
+    returnUs (final_work_dmds,
+	      mkInlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . wrap_fn_fixup . Var,
 	      work_fn_fixup . work_fn_str . work_fn_cpr . work_fn_args)
+  where
+    demands'   = demands   ++ repeat wwLazy
+    one_shots' = one_shots ++ repeat False
 \end{code}
 
 
@@ -279,52 +276,60 @@ Now we'll see that fw has arity 1, and will arity expand
 the \x to get what we want.
 
 \begin{code}
--- mkWWargs is driven off the function type.  
+-- mkWWargs is driven off the function type and arity.
 -- It chomps bites off foralls, arrows, newtypes
 -- and keeps repeating that until it's satisfied the supplied arity
 
-mkWWargs :: Type -> Arity
-	 -> [Demand] -> [Bool]			-- Both these will in due course be derived
+mkWWargs :: Type -> Arity 
+	 -> [Demand] -> Bool -> [Bool]		-- Both these will in due course be derived
 						-- from the type.  The [Bool] is True for a one-shot arg.
-	 -> UniqSM  ([IdOrTyVar],		-- Wrapper args
+						-- ** Both are infinite, extended with neutral values if necy **
+	 -> UniqSM  ([Var],		-- Wrapper args
 		     CoreExpr -> CoreExpr,	-- Wrapper fn
 		     CoreExpr -> CoreExpr,	-- Worker fn
 		     Type)			-- Type of wrapper body
 
-mkWWargs fun_ty arity demands one_shots
-  | arity == 0
-  = returnUs ([], id, id, fun_ty)
-
-  | otherwise
+mkWWargs fun_ty arity demands res_bot one_shots
+  | (res_bot || arity > 0) && (not (null tyvars) || n_arg_tys > 0)
+	-- If the function returns bottom, we feel free to 
+	-- build lots of wrapper args:
+	--	  \x. let v=E in \y. bottom
+	--	= \xy. let v=E in bottom
   = getUniquesUs n_args		`thenUs` \ wrap_uniqs ->
     let
       val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
     in
-    mkWWargs body_rep_ty 
+    mkWWargs new_fun_ty
 	     (arity - n_args) 
 	     (drop n_args demands)
+	     res_bot
 	     (drop n_args one_shots)	`thenUs` \ (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
 
     returnUs (wrap_args ++ more_wrap_args,
-	      mkLams wrap_args . wrap_coerce_fn . wrap_fn_args,
-	      work_fn_args . work_coerce_fn . applyToVars wrap_args,
+	      mkLams wrap_args . wrap_fn_args,
+	      work_fn_args . applyToVars wrap_args,
 	      res_ty)
   where
     (tyvars, tau)      	= splitForAllTys fun_ty
     (arg_tys, body_ty) 	= splitFunTys tau
     n_arg_tys		= length arg_tys
-    n_args		= arity `min` n_arg_tys
-    (wrap_coerce_fn, work_coerce_fn, body_rep_ty) 
-	| n_arg_tys == n_args		-- All arg_tys used up
-	= case splitNewType_maybe body_ty of
-		Just rep_ty -> (Note (Coerce body_ty rep_ty), Note (Coerce rep_ty body_ty), rep_ty)
-		Nothing     -> ASSERT2( n_args /= 0, text "mkWWargs" <+> ppr arity <+> ppr fun_ty )
-			       (id, id, body_ty)
-	| otherwise			-- Leftover arg-tys
-	= (id, id, mkFunTys (drop n_args arg_tys) body_ty)
+    n_args		| res_bot   = n_arg_tys 
+			| otherwise = arity `min` n_arg_tys
+    new_fun_ty		| n_args == n_arg_tys = body_ty
+			| otherwise  	      = mkFunTys (drop n_args arg_tys) body_ty
 
-applyToVars :: [IdOrTyVar] -> CoreExpr -> CoreExpr
+mkWWargs fun_ty arity demands res_bot one_shots
+  = case splitNewType_maybe fun_ty of
+	Nothing     -> returnUs ([], id, id, fun_ty)
+	Just rep_ty -> mkWWargs rep_ty arity demands res_bot one_shots	`thenUs` \ (wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
+		       returnUs (wrap_args,
+				 Note (Coerce fun_ty rep_ty) . wrap_fn_args,
+				 work_fn_args . Note (Coerce rep_ty fun_ty),
+				 res_ty)
+
+
+applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
 mk_wrap_arg uniq ty dmd one_shot 
@@ -342,8 +347,8 @@ mk_wrap_arg uniq ty dmd one_shot
 %************************************************************************
 
 \begin{code}
-mkWWfixup res_ty work_args
-  | null work_args && isUnLiftedType res_ty 
+mkWWfixup res_ty work_dmds
+  | null work_dmds && isUnLiftedType res_ty 
  	-- Horrid special case.  If the worker would have no arguments, and the
 	-- function returns a primitive type value, that would make the worker into
 	-- an unboxed value.  We box it by passing a dummy void argument, thus:
@@ -356,11 +361,12 @@ mkWWfixup res_ty work_args
     let
 	    void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
     in
-    returnUs (\ call_to_worker -> App call_to_worker (Var realWorldPrimId),
+    returnUs ([wwPrim],		
+	      \ call_to_worker -> App call_to_worker (Var realWorldPrimId),
 	      \ worker_body    -> Lam void_arg worker_body)
 
   | otherwise
-  = returnUs (id, id)
+  = returnUs (work_dmds, id, id)
 \end{code}
 
 
@@ -371,9 +377,9 @@ mkWWfixup res_ty work_args
 %************************************************************************
 
 \begin{code}
-mkWWstr :: [IdOrTyVar]				-- Wrapper args; have their demand info on them
+mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
 						-- *Includes type variables*
-        -> UniqSM ([IdOrTyVar],			-- Worker args
+        -> UniqSM ([Demand],			-- Demand on worker (value) args
 		   CoreExpr -> CoreExpr,	-- Wrapper body, lacking the worker call
 						-- and without its lambdas 
 						-- This fn adds the unboxing, and makes the
@@ -384,7 +390,7 @@ mkWWstr :: [IdOrTyVar]				-- Wrapper args; have their demand info on them
 
 mkWWstr wrap_args
   = mk_ww_str wrap_args		`thenUs` \ (work_args, wrap_fn, work_fn) ->
-    returnUs ( work_args,
+    returnUs ( [idDemandInfo v | v <- work_args, isId v],
 	       \ wrapper_body -> wrap_fn (mkVarApps wrapper_body work_args),
 	       \ worker_body  -> mkLams work_args (work_fn worker_body))
 
@@ -401,7 +407,7 @@ mk_ww_str (arg : ds)
     returnUs (arg : worker_args, wrap_fn, work_fn)
 
   | otherwise
-  = case getIdDemandInfo arg of
+  = case idDemandInfo arg of
 
 	-- Absent case
       WwLazy True ->
@@ -463,7 +469,11 @@ mkWWcpr :: Type                              -- function body type
 mkWWcpr body_ty NoCPRInfo 
     = returnUs (id, id, body_ty)      -- Must be just the strictness transf.
 
-mkWWcpr body_ty (CPRInfo cpr_args)
+mkWWcpr body_ty ReturnsCPR
+    | not (isAlgType body_ty)
+    = WARN( True, text "mkWWcpr: non-algebraic body type" <+> ppr body_ty )
+      returnUs (id, id, body_ty)
+
     | n_con_args == 1 && isUnLiftedType con_arg_ty1
 	-- Special case when there is a single result of unlifted type
     = getUniquesUs 2			`thenUs` \ [work_uniq, arg_uniq] ->
@@ -472,7 +482,7 @@ mkWWcpr body_ty (CPRInfo cpr_args)
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
       in
       returnUs (\ wkr_call -> Case wkr_call arg       [(DEFAULT, [], mkConApp data_con (map Type tycon_arg_tys ++ [Var arg]))],
-		\ body     -> Case body     work_wild [(DataCon data_con, [arg], Var arg)],
+		\ body     -> Case body     work_wild [(DataAlt data_con, [arg], Var arg)],
 		con_arg_ty1)
 
     | otherwise		-- The general case
@@ -481,48 +491,17 @@ mkWWcpr body_ty (CPRInfo cpr_args)
         (wrap_wild : work_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : body_ty : con_arg_tys)
 	arg_vars		       = map Var args
 	ubx_tup_con		       = unboxedTupleCon n_con_args
-	ubx_tup_ty		       = coreExprType ubx_tup_app
+	ubx_tup_ty		       = exprType ubx_tup_app
 	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
         con_app			       = mkConApp data_con    (map Type tycon_arg_tys ++ arg_vars)
       in
-      returnUs (\ wkr_call -> Case wkr_call wrap_wild [(DataCon ubx_tup_con, args, con_app)],
-		\ body     -> Case body     work_wild [(DataCon data_con,    args, ubx_tup_app)],
+      returnUs (\ wkr_call -> Case wkr_call wrap_wild [(DataAlt ubx_tup_con, args, con_app)],
+		\ body     -> Case body     work_wild [(DataAlt data_con,    args, ubx_tup_app)],
 		ubx_tup_ty)
     where
       (tycon, tycon_arg_tys, data_con, con_arg_tys) = splitProductType "mkWWcpr" body_ty
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
-
-
-splitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
-  -- For a tiresome reason, the type might not look like a product type
-  -- This happens when compiling the compiler!  The module Name
-  -- imports {-# SOURCE #-} TyCon and Id
-  -- 	data Name = Name NameSort Unique OccName Provenance
-  --    data NameSort = WiredInId Module Id | ...
-  -- So Name does not look recursive (because Id is imported via a hi-boot file,
-  -- which says nothing about Id's rep) but actually it is, because Ids have Names.
-  -- Modules that *import* Name have a more complete view, see that Name is recursive,
-  -- and therefore that it isn't a ProductType.  This conflicts with the CPR info
-  -- in exports from Name that say "do CPR".
-  --
-  -- Arguably we should regard Name as a product anyway because it isn't recursive
-  -- via products all the way... but we don't have that info to hand, and even if
-  -- we did this case might *still* arise.
-
-  -- 
-  -- So we hack our way out for now, by trusting the pragma that said "do CPR"
-  -- that means we can't use splitProductType_maybe
-
-splitProductType fname ty
-   = case splitAlgTyConApp_maybe ty of
-	Just (tycon, tycon_args, (con:other_cons))
-	  | null other_cons && not (isExistentialDataCon con)
-	  -> WARN( not (isProductTyCon tycon),
-		   text "splitProductType hack: I happened!" <+> ppr ty )
-	     (tycon, tycon_args, con, dataConArgTys con tycon_args)
-	     
-	other -> pprPanic (fname ++ ": not a product") (ppr ty)
 \end{code}
 
 
@@ -555,7 +534,7 @@ mk_unpk_case DataType arg unpk_args boxing_con boxing_tycon body
 	-- A data type
   = Case (Var arg) 
 	 (sanitiseCaseBndr arg)
-	 [(DataCon boxing_con, unpk_args, body)]
+	 [(DataAlt boxing_con, unpk_args, body)]
 
 sanitiseCaseBndr :: Id -> Id
 -- The argument we are scrutinising has the right type to be
@@ -575,7 +554,7 @@ mk_pk_let NewType arg boxing_con con_tys unpk_args body
     (unpk_arg:other_args) = unpk_args
 
 mk_pk_let DataType arg boxing_con con_tys unpk_args body
-  = Let (NonRec arg (Con (DataCon boxing_con) con_args)) body
+  = Let (NonRec arg (mkConApp boxing_con con_args)) body
   where
     con_args = map Type con_tys ++ map Var unpk_args
 

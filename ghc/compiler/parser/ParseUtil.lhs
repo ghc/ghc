@@ -25,6 +25,7 @@ module ParseUtil (
 	, checkPatterns		-- [HsExp] -> P [HsPat]
 	-- , checkExpr		-- HsExp -> P HsExp
 	, checkValDef		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+	, checkValSig		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 
 	
 	-- some built-in names (all :: RdrName)
@@ -54,7 +55,7 @@ import RdrHsSyn
 import RdrName
 import CallConv
 import PrelMods 	( pRELUDE_Name, mkUbxTupNameStr, mkTupNameStr )
-import OccName  	( dataName, tcName, varName, tvName, setOccNameSpace, occNameFS )
+import OccName  	( dataName, tcName, varName, tvName, setOccNameSpace, occNameUserString )
 import CmdLineOpts 	( opt_NoImplicitPrelude )
 import StringBuffer 	( lexemeToString )
 import FastString	( unpackFS )
@@ -318,17 +319,26 @@ checkValDef
 	-> Maybe RdrNameHsType
 	-> RdrNameGRHSs
 	-> SrcLoc
-	-> P RdrNameMonoBinds
+	-> P RdrBinding
 
 checkValDef lhs opt_sig grhss loc
  = case isFunLhs lhs [] of
 	   Just (f,inf,es) -> 
 		checkPatterns es `thenP` \ps ->
-		returnP (FunMonoBind f inf [Match [] ps opt_sig grhss] loc)
+		returnP (RdrValBinding (FunMonoBind f inf [Match [] ps opt_sig grhss] loc))
 
            Nothing ->
 		checkPattern lhs `thenP` \lhs ->
-		returnP (PatMonoBind lhs grhss loc)
+		returnP (RdrValBinding (PatMonoBind lhs grhss loc))
+
+checkValSig
+	:: RdrNameHsExpr
+	-> RdrNameHsType
+	-> SrcLoc
+	-> P RdrBinding
+checkValSig (HsVar v) ty loc = returnP (RdrSig (Sig v ty loc))
+checkValSig other     ty loc = parseError "Type signature given for an expression"
+
 
 -- A variable binding is parsed as an RdrNamePatBind.
 
@@ -359,12 +369,15 @@ mkRecConstrOrUpdate exp fs@(_:_)
 mkRecConstrOrUpdate _ _
   = parseError "Empty record update"
 
--- supplying the ext_name in a foreign decl is optional ; if it
+-- Supplying the ext_name in a foreign decl is optional ; if it
 -- isn't there, the Haskell name is assumed. Note that no transformation
 -- of the Haskell name is then performed, so if you foreign export (++),
--- it's external name will be "++". Too bad.
+-- it's external name will be "++". Too bad; it's important because we don't
+-- want z-encoding (e.g. names with z's in them shouldn't be doubled)
+-- (This is why we use occNameUserString.)
 mkExtName :: Maybe ExtName -> RdrName -> ExtName
-mkExtName Nothing rdrNm = ExtName (occNameFS (rdrNameOcc rdrNm)) Nothing
+mkExtName Nothing rdrNm = ExtName (_PK_ (occNameUserString (rdrNameOcc rdrNm)))
+				  Nothing
 mkExtName (Just x) _    = x
 
 -----------------------------------------------------------------------------

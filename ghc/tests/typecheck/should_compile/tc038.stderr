@@ -1,2 +1,2 @@
 __export ShouldSucceed f;
-1 f :: __forall [a] => {PrelNum.Num a} -> {PrelBase.Eq a} -> [a] -> [a] ;
+1 f :: __forall [a] => {PrelNum.Num a} -> [a] -> [a] ;

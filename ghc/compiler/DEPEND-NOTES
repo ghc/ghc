@@ -18,20 +18,27 @@ then
 then
 	Type (loop DataCon.DataCon, loop Subst.substTy)
 then
-	DataCon, TysPrim, Unify, PprType
+	TysPrim (Type), PprEnv (loop DataCon.DataCon, Type)
+then
+	Unify, PprType (PprEnv)
+then
+	Literal (TysPrim, PprType), DataCon
 then
 	InstEnv (Unify)
 then
-	IdInfo (loop CoreRules.CoreRules) 
 	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId)
 then
-	PrimOp (PprType, TysWiredIn, IdInfo.StrictnessInfo)
+	PrimOp (PprType, TysWiredIn)
+then
+	IdInfo (loop CoreSyn.CoreRules, loop CoreUnfold.Unfolding) 
 then
 	Const (PrimOp.PrimOp, TysWiredIn.stringTy)
 then
 	Id (Const.Con(..)), CoreSyn
 then
-	CoreUtils (loop PprCore.pprCoreExpr), CoreFVs
+	CoreFVs, PprCore
+then
+	CoreUtils (PprCore.pprCoreExpr, CoreFVs.exprFreeVars)
 then	
 	OccurAnal (ThinAir.noRepStrs -- an awkward dependency)
 then

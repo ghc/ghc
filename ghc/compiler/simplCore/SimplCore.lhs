@@ -25,15 +25,15 @@ import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareRuleBase, 
 import CoreUnfold
 import PprCore		( pprCoreBindings )
 import OccurAnal	( occurAnalyseBinds )
-import CoreUtils	( exprIsTrivial, coreExprType )
+import CoreUtils	( exprIsTrivial, etaReduceExpr )
 import Simplify		( simplTopBinds, simplExpr )
-import SimplUtils	( etaCoreExpr, findDefault, simplBinders )
+import SimplUtils	( findDefault, simplBinders )
 import SimplMonad
-import Const		( Con(..), Literal(..), literalType, mkMachInt )
+import Literal		( Literal(..), literalType, mkMachInt )
 import ErrUtils		( dumpIfSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( Id, mkSysLocal, mkVanillaId, isBottomingId,
+import Id		( Id, mkSysLocal, mkVanillaId, isBottomingId, isDataConWrapId,
 			  idType, setIdType, idName, idInfo, setIdNoDiscard
 			)
 import VarEnv
@@ -63,7 +63,6 @@ import Unique		( Unique, Uniquable(..),
 			  ratioTyConKey
 		        )
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply, uniqFromSupply )
-import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
 import Util		( mapAccumL )
 import SrcLoc		( noSrcLoc )
 import Bag
@@ -107,11 +106,8 @@ core2core core_todos binds rules
 		  "Grand total simplifier statistics"
 		  (pprSimplCount stats)
 
-	-- Do the post-simplification business
-	post_simpl_binds <- doPostSimplification ps_us processed_binds
-
 	-- Return results
-	return (post_simpl_binds, filter orphanRule better_rules)
+	return (processed_binds, filter orphanRule better_rules)
    
 
 doCorePasses stats us binds irs []
@@ -127,7 +123,7 @@ doCorePass us binds rb (CoreDoSimplify sw_chkr) = _scc_ "Simplify"      simplify
 doCorePass us binds rb CoreCSE		        = _scc_ "CommonSubExpr" noStats (cseProgram binds)
 doCorePass us binds rb CoreLiberateCase	        = _scc_ "LiberateCase"  noStats (liberateCase binds)
 doCorePass us binds rb CoreDoFloatInwards       = _scc_ "FloatInwards"  noStats (floatInwards binds)
-doCorePass us binds rb CoreDoFullLaziness       = _scc_ "FloatOutwards" noStats (floatOutwards us binds)
+doCorePass us binds rb (CoreDoFloatOutwards f)  = _scc_ "FloatOutwards" noStats (floatOutwards f us binds)
 doCorePass us binds rb CoreDoStaticArgs	        = _scc_ "StaticArgs"    noStats (doStaticArgs us binds)
 doCorePass us binds rb CoreDoStrictness	        = _scc_ "Stranal"       noStats (saBinds binds)
 doCorePass us binds rb CoreDoWorkerWrapper      = _scc_ "WorkWrap"      noStats (wwTopBinds us binds)
@@ -173,8 +169,11 @@ simplRules us rules binds
 
 	return better_rules
   where
-    black_list_all v = True 		-- This stops all inlining
-    sw_chkr any = SwBool False		-- A bit bogus
+    black_list_all v = not (isDataConWrapId v)
+		-- This stops all inlining except the
+		-- wrappers for data constructors
+
+    sw_chkr any = SwBool False			-- A bit bogus
 
 	-- Boringly, we need to gather the in-scope set.
 	-- Typically this thunk won't even be force, but the test in
@@ -200,7 +199,7 @@ simpl_arg e
 -- Otherwise we don't match when given an argument like
 --	(\a. h a a)
   = simplExpr e 	`thenSmpl` \ e' ->
-    returnSmpl (etaCoreExpr e')
+    returnSmpl (etaReduceExpr e')
 \end{code}
 
 %************************************************************************
@@ -320,287 +319,3 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
       where
   	  (us1, us2) = splitUniqSupply us
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{PostSimplification}
-%*									*
-%************************************************************************
-
-Several tasks are performed by the post-simplification pass
-
-1.  Make the representation of NoRep literals explicit, and
-    float their bindings to the top level.  We only do the floating
-    part for NoRep lits inside a lambda (else no gain).  We need to
-    take care with	let x = "foo" in e
-    that we don't end up with a silly binding
-			let x = y in e
-    with a floated "foo".  What a bore.
-    
-4. Do eta reduction for lambda abstractions appearing in:
-	- the RHS of case alternatives
-	- the body of a let
-
-   These will otherwise turn into local bindings during Core->STG;
-   better to nuke them if possible.  (In general the simplifier does
-   eta expansion not eta reduction, up to this point.  It does eta
-   on the RHSs of bindings but not the RHSs of case alternatives and
-   let bodies)
-
-
-------------------- NOT DONE ANY MORE ------------------------
-[March 98] Indirections are now elimianted by the occurrence analyser
-1.  Eliminate indirections.  The point here is to transform
-	x_local = E
-	x_exported = x_local
-    ==>
-	x_exported = E
-
-[Dec 98] [Not now done because there is no penalty in the code
-	  generator for using the former form]
-2.  Convert
-	case x of {...; x' -> ...x'...}
-    ==>
-	case x of {...; _  -> ...x... }
-    See notes in SimplCase.lhs, near simplDefault for the reasoning here.
---------------------------------------------------------------
-
-Special case
-~~~~~~~~~~~~
-
-NOT ENABLED AT THE MOMENT (because the floated Ids are global-ish
-things, and we need local Ids for non-floated stuff):
-
-  Don't float stuff out of a binder that's marked as a bottoming Id.
-  Reason: it doesn't do any good, and creates more CAFs that increase
-  the size of SRTs.
-
-eg.
-
-	f = error "string"
-
-is translated to
-
-	f' = unpackCString# "string"
-	f = error f'
-
-hence f' and f become CAFs.  Instead, the special case for
-tidyTopBinding below makes sure this comes out as
-
-	f = let f' = unpackCString# "string" in error f'
-
-and we can safely ignore f as a CAF, since it can only ever be entered once.
-
-
-
-\begin{code}
-doPostSimplification :: UniqSupply -> [CoreBind] -> IO [CoreBind]
-doPostSimplification us binds_in
-  = do
-	beginPass "Post-simplification pass"
-	let binds_out = initPM us (postSimplTopBinds binds_in)
-	endPass "Post-simplification pass" opt_D_verbose_core2core binds_out
-
-postSimplTopBinds :: [CoreBind] -> PostM [CoreBind]
-postSimplTopBinds binds
-  = mapPM postSimplTopBind binds	`thenPM` \ binds' ->
-    returnPM (bagToList (unionManyBags binds'))
-
-postSimplTopBind :: CoreBind -> PostM (Bag CoreBind)
-postSimplTopBind (NonRec bndr rhs)
-  | isBottomingId bndr		-- Don't lift out floats for bottoming Ids
-				-- See notes above
-  = getFloatsPM (postSimplExpr rhs)	`thenPM` \ (rhs', floats) ->
-    returnPM (unitBag (NonRec bndr (foldrBag Let rhs' floats)))
-
-postSimplTopBind bind
-  = getFloatsPM (postSimplBind bind)	`thenPM` \ (bind', floats) ->
-    returnPM (floats `snocBag` bind')
-
-postSimplBind (NonRec bndr rhs)
-  = postSimplExpr rhs		`thenPM` \ rhs' ->
-    returnPM (NonRec bndr rhs')
-
-postSimplBind (Rec pairs)
-  = mapPM postSimplExpr rhss	`thenPM` \ rhss' ->
-    returnPM (Rec (bndrs `zip` rhss'))
-  where
-    (bndrs, rhss) = unzip pairs
-\end{code}
-
-
-Expressions
-~~~~~~~~~~~
-\begin{code}
-postSimplExpr (Var v)   = returnPM (Var v)
-postSimplExpr (Type ty) = returnPM (Type ty)
-
-postSimplExpr (App fun arg)
-  = postSimplExpr fun	`thenPM` \ fun' ->
-    postSimplExpr arg	`thenPM` \ arg' ->
-    returnPM (App fun' arg')
-
-postSimplExpr (Con (Literal lit) args)
-  = ASSERT( null args )
-    litToRep lit	`thenPM` \ (lit_ty, lit_expr) ->
-    getInsideLambda	`thenPM` \ in_lam ->
-    if in_lam && not (exprIsTrivial lit_expr) then
-	-- It must have been a no-rep literal with a
-	-- non-trivial representation; and we're inside a lambda;
-	-- so float it to the top
-	addTopFloat lit_ty lit_expr	`thenPM` \ v ->
-	returnPM (Var v)
-    else
-	returnPM lit_expr
-
-postSimplExpr (Con con args)
-  = mapPM postSimplExpr args	`thenPM` \ args' ->
-    returnPM (Con con args')
-
-postSimplExpr (Lam bndr body)
-  = insideLambda bndr		$
-    postSimplExpr body		`thenPM` \ body' ->
-    returnPM (Lam bndr body')
-
-postSimplExpr (Let bind body)
-  = postSimplBind bind		`thenPM` \ bind' ->
-    postSimplExprEta body	`thenPM` \ body' ->
-    returnPM (Let bind' body')
-
-postSimplExpr (Note note body)
-  = postSimplExpr body		`thenPM` \ body' ->
-	-- Do *not* call postSimplExprEta here
-	-- We don't want to turn f = \x -> coerce t (\y -> f x y)
-	-- into 		 f = \x -> coerce t (f x)
-	-- because then f has a lower arity.
-	-- This is not only bad in general, it causes the arity to 
-	-- not match the [Demand] on an Id, 
-	-- which confuses the importer of this module.
-    returnPM (Note note body')
-
-postSimplExpr (Case scrut case_bndr alts)
-  = postSimplExpr scrut			`thenPM` \ scrut' ->
-    mapPM ps_alt alts			`thenPM` \ alts' ->
-    returnPM (Case scrut' case_bndr alts')
-  where
-    ps_alt (con,bndrs,rhs) = postSimplExprEta rhs	`thenPM` \ rhs' ->
-			     returnPM (con, bndrs, rhs')
-
-postSimplExprEta e = postSimplExpr e	`thenPM` \ e' ->
-		     returnPM (etaCoreExpr e')
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[coreToStg-lits]{Converting literals}
-%*									*
-%************************************************************************
-
-Literals: the NoRep kind need to be de-no-rep'd.
-We always replace them with a simple variable, and float a suitable
-binding out to the top level.
-
-\begin{code}
-litToRep :: Literal -> PostM (Type, CoreExpr)
-
-litToRep (NoRepStr s ty)
-  = returnPM (ty, rhs)
-  where
-    rhs = if (any is_NUL (_UNPK_ s))
-
-	  then	 -- Must cater for NULs in literal string
-		mkApps (Var unpackCString2Id)
-		       [mkLit (MachStr s),
-		      	mkLit (mkMachInt (toInteger (_LENGTH_ s)))]
-
-	  else	-- No NULs in the string
-		App (Var unpackCStringId) (mkLit (MachStr s))
-
-    is_NUL c = c == '\0'
-\end{code}
-
-If an Integer is small enough (Haskell implementations must support
-Ints in the range $[-2^29+1, 2^29-1]$), wrap it up in @int2Integer@;
-otherwise, wrap with @addr2Integer@.
-
-\begin{code}
-litToRep (NoRepInteger i integer_ty)
-  = returnPM (integer_ty, rhs)
-  where
-    rhs | i >= tARGET_MIN_INT &&	-- Small enough, so start from an Int
-	  i <= tARGET_MAX_INT
-	= Con (DataCon smallIntegerDataCon) [Con (Literal (mkMachInt i)) []]
-  
-  	| otherwise 			-- Big, so start from a string
-	= App (Var addr2IntegerId) (Con (Literal (MachStr (_PK_ (show i)))) [])
-
-
-litToRep (NoRepRational r rational_ty)
-  = postSimplExpr (mkLit (NoRepInteger (numerator   r) integer_ty))	`thenPM` \ num_arg ->
-    postSimplExpr (mkLit (NoRepInteger (denominator r) integer_ty))	`thenPM` \ denom_arg ->
-    returnPM (rational_ty, mkConApp ratio_data_con [Type integer_ty, num_arg, denom_arg])
-  where
-    (ratio_data_con, integer_ty)
-      = case (splitAlgTyConApp_maybe rational_ty) of
-	  Just (tycon, [i_ty], [con])
-	    -> ASSERT(isIntegerTy i_ty && getUnique tycon == ratioTyConKey)
-	       (con, i_ty)
-
-	  _ -> (panic "ratio_data_con", panic "integer_ty")
-
-litToRep other_lit = returnPM (literalType other_lit, mkLit other_lit)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{The monad}
-%*									*
-%************************************************************************
-
-\begin{code}
-type PostM a =  Bool				-- True <=> inside a *value* lambda
-	     -> (UniqSupply, Bag CoreBind)	-- Unique supply and Floats in 
-	     -> (a, (UniqSupply, Bag CoreBind))
-
-initPM :: UniqSupply -> PostM a -> a
-initPM us m
-  = case m False {- not inside lambda -} (us, emptyBag) of 
-	(result, _) -> result
-
-returnPM v in_lam usf = (v, usf)
-thenPM m k in_lam usf = case m in_lam usf of
-			 	  (r, usf') -> k r in_lam usf'
-
-mapPM f []     = returnPM []
-mapPM f (x:xs) = f x		`thenPM` \ r ->
-		 mapPM f xs	`thenPM` \ rs ->
-		 returnPM (r:rs)
-
-insideLambda :: CoreBndr -> PostM a -> PostM a
-insideLambda bndr m in_lam usf | isId bndr = m True   usf
-			       | otherwise = m in_lam usf
-
-getInsideLambda :: PostM Bool
-getInsideLambda in_lam usf = (in_lam, usf)
-
-getFloatsPM :: PostM a -> PostM (a, Bag CoreBind)
-getFloatsPM m in_lam (us, floats)
-  = let
-	(a, (us', floats')) = m in_lam (us, emptyBag)
-    in
-    ((a, floats'), (us', floats))
-
-addTopFloat :: Type -> CoreExpr -> PostM Id
-addTopFloat lit_ty lit_rhs in_lam (us, floats)
-  = let
-        (us1, us2) = splitUniqSupply us
-	uniq	   = uniqFromSupply us1
-        lit_id     = mkSysLocal SLIT("lf") uniq lit_ty
-    in
-    (lit_id, (us2, floats `snocBag` NonRec lit_id lit_rhs))
-\end{code}
-
-

@@ -31,7 +31,6 @@ import StgSyn
 
 import CmdLineOpts	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
-import Const		( Con(..) )
 import Id		( Id, mkSysLocal, idType, idName )
 import Module		( Module )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
@@ -40,7 +39,7 @@ import Type		( splitForAllTys, splitTyConApp_maybe )
 import TyCon		( isFunTyCon )
 import VarSet
 import UniqSet
-import Name		( isLocallyDefinedName )
+import Name		( isLocallyDefined )
 import Util		( removeDups )
 import Outputable	
 
@@ -108,7 +107,7 @@ stgMassageForProfiling mod_name us stg_binds
     ----------
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
-    do_top_rhs binder (StgRhsClosure _ bi srt fv u [] (StgSCC cc (StgCon (DataCon con) args _)))
+    do_top_rhs binder (StgRhsClosure _ bi srt fv u [] (StgSCC cc (StgConApp con args)))
       | not (isSccCountCostCentre cc)
 	-- Trivial _scc_ around nothing but static data
 	-- Eliminate _scc_ ... and turn into StgRhsCon
@@ -174,11 +173,16 @@ stgMassageForProfiling mod_name us stg_binds
     ------
     do_expr :: StgExpr -> MassageM StgExpr
 
+    do_expr (StgLit l) = returnMM (StgLit l)
+
     do_expr (StgApp fn args)
       = boxHigherOrderArgs (StgApp fn) args
 
-    do_expr (StgCon con args res_ty)
-      = boxHigherOrderArgs (\args -> StgCon con args res_ty) args
+    do_expr (StgConApp con args)
+      = boxHigherOrderArgs (\args -> StgConApp con args) args
+
+    do_expr (StgPrimApp con args res_ty)
+      = boxHigherOrderArgs (\args -> StgPrimApp con args res_ty) args
 
     do_expr (StgSCC cc expr)	-- Ha, we found a cost centre!
       = collectCC cc		`thenMM_`
@@ -301,23 +305,20 @@ boxHigherOrderArgs almost_expr args
     returnMM (foldr (mk_stg_let currentCCS) (almost_expr new_args) let_bindings)
   where
     ---------------
-    do_arg ids bindings atom@(StgConArg _) = returnMM (bindings, atom)
 
-    do_arg ids bindings atom@(StgVarArg old_var)
-      = let
-	    var_type = idType old_var
+    do_arg ids bindings arg@(StgVarArg old_var)
+	|  (not (isLocallyDefined old_var) || elemVarSet old_var ids)
+	&& isFunType var_type
+      =     -- make a trivial let-binding for the top-level function
+	getUniqueMM		`thenMM` \ uniq ->
+	let
+	    new_var = mkSysLocal SLIT("sf") uniq var_type
 	in
-	if ( not (isLocallyDefinedName (idName old_var)) ||
-	     elemVarSet old_var ids ) && isFunType var_type
-	then
-	    -- make a trivial let-binding for the top-level function
-	    getUniqueMM		`thenMM` \ uniq ->
-	    let
-		new_var = mkSysLocal SLIT("sf") uniq var_type
-	    in
-	    returnMM ( (new_var, old_var) : bindings, StgVarArg new_var )
-	else
-	    returnMM (bindings, atom)
+	returnMM ( (new_var, old_var) : bindings, StgVarArg new_var )
+      where
+	var_type = idType old_var
+
+    do_arg ids bindings arg = returnMM (bindings, arg)
 
     ---------------
     mk_stg_let :: CostCentreStack -> (Id, Id) -> StgExpr -> StgExpr

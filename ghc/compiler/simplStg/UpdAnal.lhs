@@ -18,7 +18,7 @@ import StgSyn
 import VarEnv
 import VarSet
 import Id		( mkSysLocal,
-			  getIdUpdateInfo, setIdUpdateInfo, idType,
+			  idUpdateInfo, setIdUpdateInfo, idType,
 			  externallyVisibleId,
 			  Id
 			)
@@ -128,7 +128,7 @@ lookup v
 		Nothing -> unknownClosure
 
   | otherwise
-  = const (case updateInfoMaybe (getIdUpdateInfo v) of
+  = const (case updateInfoMaybe (idUpdateInfo v) of
 		Nothing   -> unknownClosure
 		Just spec -> convertUpdateSpec spec)
 \end{code}
@@ -205,7 +205,7 @@ data structure, or something else that we know nothing about.
 udData :: [StgArg] -> CaseBoundVars -> AbVal
 udData vs cvs
 	= \p -> (null_IdEnv, getrefs p local_ids noRefs, bottom)
-	where local_ids = [ lookup v | (StgVarArg v) <- vs, v `notCaseBound` cvs ]
+	where local_ids = [ lookup v | StgVarArg v <- vs, v `notCaseBound` cvs ]
 \end{code}
 
 %-----------------------------------------------------------------------------
@@ -230,9 +230,11 @@ ud :: StgExpr			-- Expression to be analysed
    -> IdEnvClosure			-- Current environment
    -> (StgExpr, AbVal)		-- (New expression, abstract value)
 
-ud e@(StgCon  _ vs _) cvs p = (e, udData vs cvs)
-ud e@(StgSCC lab a)  cvs p = ud a cvs p =: \(a', abval_a) ->
-                                 (StgSCC lab a', abval_a)
+ud e@(StgLit _)		  cvs p = (e, udData [] cvs)
+ud e@(StgConApp  _ vs)    cvs p = (e, udData vs cvs)
+ud e@(StgPrimApp  _ vs _) cvs p = (e, udData vs cvs)
+ud e@(StgSCC lab a)	  cvs p = ud a cvs p =: \(a', abval_a) ->
+                                  (StgSCC lab a', abval_a)
 \end{code}
 
 Here is application. The first thing to do is analyse the head, and
@@ -403,7 +405,7 @@ udBinding (StgRec ve) cvs p
 	  (v,(v,rhs'), abval)
 
     collectfv (_, StgRhsClosure _ _ _ fv _ _ _) = fv
-    collectfv (_, StgRhsCon _ con args)       = [ v | (StgVarArg v) <- args ]
+    collectfv (_, StgRhsCon _ con args)       = [ v | StgVarArg v <- args ]
 \end{code}
 
 %-----------------------------------------------------------------------------

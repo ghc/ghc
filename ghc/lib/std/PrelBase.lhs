@@ -98,6 +98,42 @@ default ()		-- Double isn't available yet
 
 %*********************************************************
 %*							*
+\subsection{DEBUGGING STUFF}
+%*  (for use when compiling PrelBase itself doesn't work)
+%*							*
+%*********************************************************
+
+\begin{code}
+{-		
+data  Bool  =  False | True
+data Ordering = LT | EQ | GT 
+data Char = C# Char#
+type  String = [Char]
+data Int = I# Int#
+data  ()  =  ()
+-- data [] a = MkNil
+
+not True = False
+(&&) True True = True
+otherwise = True
+
+build = error "urk"
+foldr = error "urk"
+
+unpackCString#  :: Addr# -> [Char]
+unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
+unpackAppendCString# :: Addr# -> [Char] -> [Char]
+unpackNBytes#      :: Addr# -> Int#   -> [Char]
+unpackNBytes# a b = error "urk"
+unpackCString# a = error "urk"
+unpackFoldrCString# a = error "urk"
+unpackAppendCString# a = error "urk"
+-}
+\end{code}
+
+
+%*********************************************************
+%*							*
 \subsection{Standard classes @Eq@, @Ord@}
 %*							*
 %*********************************************************
@@ -106,8 +142,11 @@ default ()		-- Double isn't available yet
 class  Eq a  where
     (==), (/=)		:: a -> a -> Bool
 
-    x /= y		=  not (x == y)
-    x == y		= not  (x /= y)
+--    x /= y		= not (x == y)
+--    x == y		= not (x /= y)
+--    x /= y		=  True
+    (/=) x y            = not  ((==) x y)
+    x == y		=  True
 
 class  (Eq a) => Ord a  where
     compare             :: a -> a -> Ordering
@@ -166,8 +205,11 @@ class  Monad m  where
 data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
 			  -- to avoid weird names like con2tag_[]#
 
+
 instance (Eq a) => Eq [a]  where
+{-
     {-# SPECIALISE instance Eq [Char] #-}
+-}
     []     == []     = True	
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False			
@@ -175,7 +217,9 @@ instance (Eq a) => Eq [a]  where
     xs     /= ys     = if (xs == ys) then False else True
 
 instance (Ord a) => Ord [a] where
+{-
     {-# SPECIALISE instance Ord [Char] #-}
+-}
     a <  b  = case compare a b of { LT -> True;  EQ -> False; GT -> False }
     a <= b  = case compare a b of { LT -> True;  EQ -> True;  GT -> False }
     a >= b  = case compare a b of { LT -> False; EQ -> True;  GT -> True  }
@@ -262,8 +306,7 @@ augment g xs = g (:) xs
 
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
-{-# INLINE map #-}
-map f xs = build (\c n -> foldr (mapFB c f) n xs)
+map = mapList
 
 -- Note eta expanded
 mapFB c f x ys = c (f x) ys
@@ -273,6 +316,7 @@ mapList _ []     = []
 mapList f (x:xs) = f x : mapList f xs
 
 {-# RULES
+"map"	    forall f xs.	map f xs		= build (\c n -> foldr (mapFB c f) n xs)
 "mapFB"	    forall c f g.	mapFB (mapFB c f) g	= mapFB c (f.g) 
 "mapList"   forall f.		foldr (mapFB (:) f) []	= mapList f
  #-}
@@ -284,8 +328,11 @@ mapList f (x:xs) = f x : mapList f xs
 ----------------------------------------------
 \begin{code}
 (++) :: [a] -> [a] -> [a]
-{-# INLINE (++) #-}
-xs ++ ys = augment (\c n -> foldr c n xs) ys
+(++) = append
+
+{-# RULES
+  "++"	forall xs ys. (++) xs ys = augment (\c n -> foldr c n xs) ys
+ #-}
 
 append :: [a] -> [a] -> [a]
 append []     ys = ys
@@ -566,8 +613,7 @@ unpacking the strings of error messages.
 
 \begin{code}
 unpackCString#  :: Addr# -> [Char]
-{-# INLINE unpackCString# #-}
-unpackCString# a = build (unpackFoldrCString# a)
+unpackCString# a = unpackCStringList# a
 
 unpackCStringList#  :: Addr# -> [Char]
 unpackCStringList# addr 
@@ -614,6 +660,7 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
 	    ch -> unpack (C# ch : acc) (i# -# 1#)
 
 {-# RULES
+"unpack"	 forall a   . unpackCString# a		   = build (unpackFoldrCString# a)
 "unpack-list"    forall a   . unpackFoldrCString# a (:) [] = unpackCStringList# a
 "unpack-append"  forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
@@ -621,4 +668,5 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
 -- 	unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
+
 \end{code}

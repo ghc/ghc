@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.30 1999/10/25 13:21:16 sof Exp $
+% $Id: CgExpr.lhs,v 1.31 2000/03/23 17:45:19 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -40,9 +40,8 @@ import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
 import DataCon		( DataCon, dataConTyCon )
-import Const		( Con(..) )
 import IdInfo		( ArityInfo(..) )
-import PrimOp		( primOpOutOfLine, 
+import PrimOp		( primOpOutOfLine, ccallMayGC,
 			  getPrimOpResultInfo, PrimOp(..), PrimOpResultInfo(..)
 			)
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
@@ -85,11 +84,9 @@ cgExpr (StgApp fun args) = cgTailCall fun args
 %********************************************************
 
 \begin{code}
-cgExpr (StgCon (DataCon con) args res_ty)
+cgExpr (StgConApp con args)
   = getArgAmodes args `thenFC` \ amodes ->
-    cgReturnDataCon con amodes (all zero_size args)
-  where
-    zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
+    cgReturnDataCon con amodes
 \end{code}
 
 Literals are similar to constructors; they return by putting
@@ -97,9 +94,8 @@ themselves in an appropriate register and returning to the address on
 top of the stack.
 
 \begin{code}
-cgExpr (StgCon (Literal lit) args res_ty)
-  = ASSERT( null args )
-    performPrimReturn (text "literal" <+> ppr lit) (CLit lit)
+cgExpr (StgLit lit)
+  = performPrimReturn (text "literal" <+> ppr lit) (CLit lit)
 \end{code}
 
 
@@ -113,19 +109,21 @@ Here is where we insert real live machine instructions.
 
 NOTE about _ccall_GC_:
 
-A _ccall_GC_ is treated as an out-of-line primop for the case
-expression code, because we want a proper stack frame on the stack
-when we perform it.  When we get here, however, we need to actually
-perform the call, so we treat it as an inline primop.
+A _ccall_GC_ is treated as an out-of-line primop (returns True
+for primOpOutOfLine) so that when we see the call in case context
+	case (ccall ...) of { ... }
+we get a proper stack frame on the stack when we perform it.  When we
+get in a tail-call position, however, we need to actually perform the
+call, so we treat it as an inline primop.
 
 \begin{code}
-cgExpr (StgCon (PrimOp op@(CCallOp _ _ may_gc@True _)) args res_ty)
+cgExpr (StgPrimApp op@(CCallOp ccall) args res_ty)
   = primRetUnboxedTuple op args res_ty
 
 -- tagToEnum# is special: we need to pull the constructor out of the table,
 -- and perform an appropriate return.
 
-cgExpr (StgCon (PrimOp TagToEnumOp) [arg] res_ty) 
+cgExpr (StgPrimApp TagToEnumOp [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
     getArgAmode arg `thenFC` \amode ->
 	-- save the tag in a temporary in case amode overlaps
@@ -150,7 +148,7 @@ cgExpr (StgCon (PrimOp TagToEnumOp) [arg] res_ty)
 	(Just (tycon,_)) = splitTyConApp_maybe res_ty
 
 
-cgExpr x@(StgCon (PrimOp op) args res_ty)
+cgExpr x@(StgPrimApp op args res_ty)
   | primOpOutOfLine op = tailCallPrimOp op args
   | otherwise
   = ASSERT(op /= SeqOp) -- can't handle SeqOp
@@ -283,12 +281,9 @@ cgRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along so a binding can be set up
 
 cgRhs name (StgRhsCon maybe_cc con args)
-  = getArgAmodes args		`thenFC` \ amodes ->
-    buildDynCon name maybe_cc con amodes (all zero_size args)
-				`thenFC` \ idinfo ->
+  = getArgAmodes args				`thenFC` \ amodes ->
+    buildDynCon name maybe_cc con amodes	`thenFC` \ idinfo ->
     returnFC (name, idinfo)
-  where
-    zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
 
 cgRhs name (StgRhsClosure cc bi srt@(NoSRT) fvs upd_flag args body)
   = mkRhsClosure name cc bi srt fvs upd_flag args body
@@ -445,7 +440,7 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
     	    	 (StgRhsCon cc con args)
   = cgLetNoEscapeClosure binder cc stgArgOcc{-safe-} NoSRT full_live_in_rhss rhs_eob_info maybe_cc_slot rec
 	[] 	--No args; the binder is data structure, not a function
-	(StgCon (DataCon con) args (idType binder))
+	(StgConApp con args)
 \end{code}
 
 Little helper for primitives that return unboxed tuples.
@@ -478,5 +473,4 @@ primRetUnboxedTuple op args res_ty
       temp_amodes        = zipWith CTemp temp_uniqs prim_reps
     in
     returnUnboxedTuple temp_amodes (absC (COpStmt temp_amodes op arg_temps []))
-
 \end{code}

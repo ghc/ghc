@@ -14,7 +14,7 @@ import HsSyn		( HsDecl(..), InstDecl(..),
 			  andMonoBindList
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
-import TcHsSyn		( TcMonoBinds,
+import TcHsSyn		( TcMonoBinds, mkHsConApp,
 			  maybeBoxedPrimType
 			)
 
@@ -40,7 +40,7 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
 import Class		( classBigSig, Class )
 import Var		( idName, idType, Id, TyVar )
-import DataCon		( isNullaryDataCon, splitProductType_maybe, dataConId )
+import DataCon		( isNullaryDataCon, splitProductType_maybe )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
 import Module		( ModuleName )
@@ -327,7 +327,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 
 	origin			= InstanceDeclOrigin
 
-        (class_tyvars, sc_theta, sc_sel_ids, op_items) = classBigSig clas
+        (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
 	dm_ids = [dm_id | (_, dm_id, _) <- op_items]
 
@@ -439,13 +439,12 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		  (HsLitOut (HsString msg) stringTy)
 
 	  | otherwise	-- The common case
-	  = foldl HsApp (TyApp (HsVar (dataConId dict_constr)) inst_tys')
-			       (map HsVar (sc_dict_ids ++ meth_ids))
+	  = mkHsConApp dict_constr inst_tys' (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application
 		-- We do this rather than generate an HsCon directly, because
 		-- it means that the special cases (e.g. dictionary with only one
-		-- member) are dealt with by the common MkId.mkDataConId code rather
+		-- member) are dealt with by the common MkId.mkDataConWrapId code rather
 		-- than needing to be repeated here.
 
 	  where

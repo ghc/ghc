@@ -233,7 +233,8 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
     bindLocatedLocalsRn (text "a binding group") mbinders_w_srclocs
     $ \ new_mbinders ->
     let
-	binder_set  = mkNameSet new_mbinders
+	binder_set    = mkNameSet new_mbinders
+	binder_occ_fm = listToFM [(nameOccName x,x) | x <- new_mbinders]
 
 	   -- Weed out the fixity declarations that do not
 	   -- apply to any of the binders in this group.
@@ -242,9 +243,6 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
 	forLocalBind (FixSig sig@(FixitySig name _ _ )) =
 	    isJust (lookupFM binder_occ_fm (rdrNameOcc name))
 	forLocalBind _ = True
-
-	binder_occ_fm = listToFM [(nameOccName x,x) | x <- new_mbinders]
-
     in
 	-- Rename the signatures
     renameSigs False binder_set

@@ -73,8 +73,11 @@ codeGen mod_name imported_modules cost_centre_info fe_binders
 					 cost_centre_info
 
 	abstractC = mkAbstractCs [ init_stuff, 
-				   datatype_stuff,
-				   code_stuff ]
+				   code_stuff,
+				   datatype_stuff]
+		-- Put datatype_stuff after code_stuff, because the
+		-- datatype closure table (for enumeration types)
+		-- to (say) PrelBase_True_closure, which is defined in code_stuff
 
 	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
@@ -221,9 +224,7 @@ cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
 	-- the Id is passed along for setting up a binding...
 
 cgTopRhs bndr (StgRhsCon cc con args)
-  = forkStatics (cgTopRhsCon bndr con args (all zero_size args))
-  where
-    zero_size atom = getPrimRepSize (getArgPrimRep atom) == 0
+  = forkStatics (cgTopRhsCon bndr con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
   = ASSERT(null fvs) -- There should be no free variables

@@ -33,8 +33,8 @@ module StgSyn (
 
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
 	getArgPrimRep,
-	isLitLitArg,
-	stgArity,
+	isLitLitArg, isDynArg, isStgTypeArg,
+	stgArity, stgArgType,
 	collectFinalStgBinders
 
 #ifdef DEBUG
@@ -45,9 +45,11 @@ module StgSyn (
 #include "HsVersions.h"
 
 import CostCentre	( CostCentreStack, CostCentre )
-import Id		( idPrimRep, Id )
-import Const		( Con(..), DataCon, Literal,
-			  conPrimRep, isLitLitLit )
+import Id		( Id, idName, idPrimRep, idType )
+import Name		( isDynName )
+import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
+import DataCon		( DataCon, isDynDataCon, isNullaryDataCon )
+import PrimOp		( PrimOp )
 import PrimRep		( PrimRep(..) )
 import Outputable
 import Type             ( Type )
@@ -80,15 +82,29 @@ data GenStgBinding bndr occ
 \begin{code}
 data GenStgArg occ
   = StgVarArg	occ
-  | StgConArg   Con		-- A literal or nullary data constructor
+  | StgLitArg   Literal
+  | StgTypeArg  Type		-- For when we want to preserve all type info
 \end{code}
 
 \begin{code}
-getArgPrimRep (StgVarArg  local) = idPrimRep local
-getArgPrimRep (StgConArg  con)	 = conPrimRep con
+getArgPrimRep (StgVarArg local) = idPrimRep local
+getArgPrimRep (StgLitArg lit)	= literalPrimRep lit
 
-isLitLitArg (StgConArg (Literal x)) = isLitLitLit x
-isLitLitArg _		            = False
+isLitLitArg (StgLitArg lit) = isLitLitLit lit
+isLitLitArg _		    = False
+
+isStgTypeArg (StgTypeArg _) = True
+isStgTypeArg other	    = False
+
+isDynArg :: StgArg -> Bool
+	-- Does this argument refer to something in a DLL?
+isDynArg (StgVarArg v)   = isDynName (idName v)
+isDynArg (StgLitArg lit) = isLitLitLit lit
+
+stgArgType :: StgArg -> Type
+	-- Very half baked becase we have lost the type arguments
+stgArgType (StgVarArg v)   = idType v
+stgArgType (StgLitArg lit) = literalType lit
 \end{code}
 
 %************************************************************************
@@ -119,31 +135,28 @@ type GenStgLiveVars occ = UniqSet occ
 data GenStgExpr bndr occ
   = StgApp
 	occ		-- function
-	[GenStgArg occ]	-- arguments
-
-    -- NB: a literal is: StgApp <lit-atom> [] ...
+	[GenStgArg occ]	-- arguments; may be empty
 \end{code}
 
 %************************************************************************
 %*									*
-\subsubsection{@StgCon@ and @StgPrim@---saturated applications}
+\subsubsection{@StgConApp@ and @StgPrimApp@---saturated applications}
 %*									*
 %************************************************************************
 
 There are a specialised forms of application, for
 constructors, primitives, and literals.
 \begin{code}
-  | StgCon			-- always saturated
-	Con
-	[GenStgArg occ]
+  | StgLit	Literal
+  
+  | StgConApp	DataCon
+		[GenStgArg occ]	-- Saturated
 
-	Type			-- Result type; this is needed for primops, where
-				-- we need to know the result type so that we can
-				-- assign result registers.
-
+  | StgPrimApp	PrimOp
+		[GenStgArg occ]	-- Saturated
+		Type		-- Result type; we need to know the result type
+				-- so that we can assign result registers.
 \end{code}
-These forms are to do ``inline versions,'' as it were.
-An example might be: @f x = x:[]@.
 
 %************************************************************************
 %*									*
@@ -586,14 +599,15 @@ instance (Outputable bndr, Outputable bdee, Ord bdee)
 pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
 
 pprStgArg (StgVarArg var) = ppr var
-pprStgArg (StgConArg con) = ppr con
+pprStgArg (StgLitArg con) = ppr con
+pprStgARg (StgTypeArg ty) = char '@' <+> ppr ty
 \end{code}
 
 \begin{code}
 pprStgExpr :: (Outputable bndr, Outputable bdee, Ord bdee)
 	   => GenStgExpr bndr bdee -> SDoc
 -- special case
-pprStgExpr (StgApp func []) = ppr func
+pprStgExpr (StgLit lit)     = ppr lit
 
 -- general case
 pprStgExpr (StgApp func args)
@@ -602,8 +616,11 @@ pprStgExpr (StgApp func args)
 \end{code}
 
 \begin{code}
-pprStgExpr (StgCon con args _)
+pprStgExpr (StgConApp con args)
   = hsep [ ppr con, brackets (interppSP args)]
+
+pprStgExpr (StgPrimApp op args _)
+  = hsep [ ppr op, brackets (interppSP args)]
 
 pprStgExpr (StgLam _ bndrs body)
   =sep [ char '\\' <+> ppr bndrs <+> ptext SLIT("->"),

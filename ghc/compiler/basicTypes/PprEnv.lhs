@@ -10,13 +10,13 @@ module PprEnv (
 
 	initPprEnv,
 
-	pCon, pBndr, pOcc, pSCC, 
+	pBndr, pOcc, pSCC, 
 	pTy, pTyVarO
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Const ( Con )
+import {-# SOURCE #-} DataCon ( DataCon )
 
 import Var		( Id, TyVar )
 import CostCentre	( CostCentre )
@@ -33,7 +33,6 @@ import Outputable
 \begin{code}
 data PprEnv bndr
   = PE	{
-	pCon :: Con        -> SDoc,
 	pSCC :: CostCentre -> SDoc,
 
 	pTyVarO :: TyVar -> SDoc,	-- to print tyvar occurrences
@@ -53,8 +52,7 @@ data BindingSite = LambdaBind | CaseBind | LetBind
 
 \begin{code}
 initPprEnv
-	:: Maybe (Con -> SDoc)
-	-> Maybe (CostCentre -> SDoc)
+	:: Maybe (CostCentre -> SDoc)
 	-> Maybe (TyVar -> SDoc)
 	-> Maybe (Type -> SDoc)
 	-> Maybe (BindingSite -> bndr -> SDoc)
@@ -64,9 +62,8 @@ initPprEnv
 -- you can specify all the printers individually; if
 -- you don't specify one, you get bottom
 
-initPprEnv p c tvo ty bndr occ
-  = PE (demaybe p)
-       (demaybe c)
+initPprEnv c tvo ty bndr occ
+  = PE (demaybe c)
        (demaybe tvo)
        (demaybe ty)
        (demaybe bndr)

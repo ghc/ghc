@@ -16,7 +16,7 @@ import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports,
 
 import HsSyn	( HsModule(..), HsDecl(..), TyClDecl(..),
 		  IE(..), ieName, 
-		  ForeignDecl(..), ForKind(..), isDynamic,
+		  ForeignDecl(..), ForKind(..), isDynamicExtName,
 		  FixitySig(..), Sig(..), ImportDecl(..),
 		  collectTopBinders
 		)
@@ -334,7 +334,7 @@ fixitiesFromLocalDecls gbl_env decls
     getFixities acc (FixD fix)
       = fix_decl acc fix
 
-    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ _ _))
+    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ _ _ _))
       = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
     getFixities acc other_decl

@@ -255,7 +255,7 @@ tcSimplify str local_tvs wanted_lie
 
       -- We're infering (not checking) the type, and 
       -- the inst constrains a local type variable
-      | isDict inst  = DontReduce	    	-- Dicts
+      | isDict inst  = DontReduceUnlessConstant	-- Dicts
       | otherwise    = ReduceMe AddToIrreds	-- Lits and Methods
 \end{code}
 
@@ -405,7 +405,10 @@ data WhatToDo
  = ReduceMe		  -- Try to reduce this
 	NoInstanceAction  -- What to do if there's no such instance
 
- | DontReduce		  -- Return as irreducible
+ | DontReduce		  	-- Return as irreducible 
+
+ | DontReduceUnlessConstant	-- Return as irreducible unless it can
+				-- be reduced to a constant in one step
 
  | Free			  -- Return as free
 
@@ -652,7 +655,11 @@ reduce stack try_me wanted state@(avails, frees, irreds)
 
 
     ;
-    DontReduce ->    -- It's irreducible (or at least should not be reduced)
+
+    DontReduce -> add_to_irreds
+    ;
+
+    DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
         -- See if the inst can be reduced to a constant in one step
 	lookupInst wanted	  `thenNF_Tc` \ lookup_result ->
 	case lookup_result of

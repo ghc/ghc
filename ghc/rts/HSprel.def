@@ -1,8 +1,8 @@
 ; list of entry points that the RTS imports from
 ; the Prelude.
 EXPORTS
-PrelBase_False_static_closure
-PrelBase_True_static_closure
+PrelBase_False_closure
+PrelBase_True_closure
 PrelBase_Czh_con_info DATA
 PrelBase_Czh_static_info DATA
 PrelBase_Izh_con_info DATA
@@ -21,8 +21,8 @@ PrelStable_StablePtr_con_info DATA
 PrelStable_StablePtr_static_info DATA
 PrelPack_unpackCString_closure
 PrelException_stackOverflow_closure
-PrelException_PutFullMVar_static_closure
-PrelException_BlockedOnDeadMVar_static_closure
-PrelException_NonTermination_static_closure
+PrelException_PutFullMVar_closure
+PrelException_BlockedOnDeadMVar_closure
+PrelException_NonTermination_closure
 __init_Prelude
 __init_PrelMain

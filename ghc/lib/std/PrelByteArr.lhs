@@ -32,8 +32,12 @@ import PrelGHC
 data Ix ix => ByteArray ix      	= ByteArray	   ix ix ByteArray#
 data Ix ix => MutableByteArray s ix     = MutableByteArray ix ix (MutableByteArray# s)
 
-instance CCallable (MutableByteArray s ix)
 instance CCallable (ByteArray ix)
+instance CCallable (MutableByteArray RealWorld ix)
+	-- Note the RealWorld!  You can only ccall with MutableByteArray args
+	-- which are in the real world.  When this was missed out, the result
+	-- was that a CCallOpId had a free tyvar, and since the compiler doesn't
+	-- expect that it didn't get zonked or substituted.  Bad news.
 
 instance Eq (MutableByteArray s ix) where
 	MutableByteArray _ _ arr1# == MutableByteArray _ _ arr2#

@@ -13,8 +13,9 @@ import StgSyn
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag, foldBag )
 import Id		( Id, idType )
 import VarSet
-import DataCon		( DataCon, dataConArgTys, dataConType )
-import Const		( literalType, conType, Literal )
+import DataCon		( DataCon, dataConArgTys, dataConRepType )
+import PrimOp		( primOpType )
+import Literal		( literalType, Literal )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc )
 import ErrUtils		( ErrMsg, Message, addErrLocHdrLine, pprBagOfErrors, dontAddErrLoc )
@@ -67,7 +68,7 @@ lintStgBindings whodunnit binds
 
 \begin{code}
 lintStgArg :: StgArg -> LintM (Maybe Type)
-lintStgArg (StgConArg con) = returnL (Just (conType con))
+lintStgArg (StgLitArg lit) = returnL (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
 
 lintStgVar v  = checkInScope v	`thenL_`
@@ -130,11 +131,13 @@ lintStgRhs (StgRhsCon _ con args)
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
   where
-    con_ty = dataConType con
+    con_ty = dataConRepType con
 \end{code}
 
 \begin{code}
 lintStgExpr :: StgExpr -> LintM (Maybe Type)	-- Nothing if error found
+
+lintStgExpr (StgLit l) = returnL (Just (literalType l))
 
 lintStgExpr e@(StgApp fun args)
   = lintStgVar fun		`thenMaybeL` \ fun_ty  ->
@@ -143,13 +146,21 @@ lintStgExpr e@(StgApp fun args)
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp fun_ty arg_tys (mkFunAppMsg fun_ty arg_tys e)
 
-lintStgExpr e@(StgCon con args _)
+lintStgExpr e@(StgConApp con args)
   = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
     case maybe_arg_tys of
       Nothing 	    -> returnL Nothing
       Just arg_tys  -> checkFunApp con_ty arg_tys (mkFunAppMsg con_ty arg_tys e)
   where
-    con_ty = conType con
+    con_ty = dataConRepType con
+
+lintStgExpr e@(StgPrimApp op args _)
+  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
+    case maybe_arg_tys of
+      Nothing 	    -> returnL Nothing
+      Just arg_tys  -> checkFunApp op_ty arg_tys (mkFunAppMsg op_ty arg_tys e)
+  where
+    op_ty = primOpType op
 
 lintStgExpr (StgLam _ bndrs _)
   = addErrL (ptext SLIT("Unexpected StgLam") <+> ppr bndrs)	`thenL_`
@@ -178,8 +189,8 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
     (trace (showSDoc (ppr e)) $ 
 	-- we only allow case of tail-call or primop.
     (case scrut of
-	StgApp _ _ -> returnL ()
-	StgCon _ _ _ -> returnL ()
+	StgApp _ _    -> returnL ()
+	StgConApp _ _ -> returnL ()
 	other -> addErrL (mkCaseOfCaseMsg e))   `thenL_`
 
     addInScopeVars [bndr] (lintStgAlts alts scrut_ty)

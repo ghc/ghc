@@ -22,7 +22,7 @@ module RnIfaces (
 import CmdLineOpts	( opt_NoPruneDecls, opt_IgnoreIfacePragmas )
 import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
-			  ForeignDecl(..), ForKind(..), isDynamic,
+			  ForeignDecl(..), ForKind(..), isDynamicExtName,
 			  FixitySig(..), RuleDecl(..),
 			  isClassOpSig, Deprecation(..)
 			)
@@ -678,51 +678,47 @@ moudule is; that is, what it must record in its interface file as the
 things it uses.  It records:
 
 \begin{itemize}
-\item	anything reachable from its body code
-\item	any module exported with a @module Foo@.
+\item	(a) anything reachable from its body code
+\item	(b) any module exported with a @module Foo@
+\item   (c) anything reachable from an exported item
 \end{itemize}
-%
-Why the latter?  Because if @Foo@ changes then this module's export list
+
+Why (b)?  Because if @Foo@ changes then this module's export list
 will change, so we must recompile this module at least as far as
 making a new interface file --- but in practice that means complete
 recompilation.
 
-What about this? 
+Why (c)?  Consider this:
 \begin{verbatim}
 	module A( f, g ) where	|	module B( f ) where
 	  import B( f )		|	  f = h 3
 	  g = ...		|	  h = ...
 \end{verbatim}
 
-Should we record @B.f@ in @A@'s usages?  In fact we don't.  Certainly,
-if anything about @B.f@ changes than anyone who imports @A@ should be
-recompiled; they'll get an early exit if they don't use @B.f@.
-However, even if @B.f@ doesn't change at all, @B.h@ may do so, and
-this change may not be reflected in @f@'s version number.  So there
-are two things going on when compiling module @A@:
+Here, @B.f@ isn't used in A.  Should we nevertheless record @B.f@ in
+@A@'s usages?  Our idea is that we aren't going to touch A.hi if it is
+*identical* to what it was before.  If anything about @B.f@ changes
+than anyone who imports @A@ should be recompiled in case they use
+@B.f@ (they'll get an early exit if they don't).  So, if anything
+about @B.f@ changes we'd better make sure that something in A.hi
+changes, and the convenient way to do that is to record the version
+number @B.f@ in A.hi in the usage list.  If B.f changes that'll force a
+complete recompiation of A, which is overkill but it's the only way to 
+write a new, slightly different, A.hi.
 
-\begin{enumerate}
-\item	Are @A.o@ and @A.hi@ correct?  Then we can bale out early.
-\item	Should modules that import @A@ be recompiled?
-\end{enumerate}
+But the example is tricker.  Even if @B.f@ doesn't change at all,
+@B.h@ may do so, and this change may not be reflected in @f@'s version
+number.  But with -O, a module that imports A must be recompiled if
+@B.h@ changes!  So A must record a dependency on @B.h@.  So we treat
+the occurrence of @B.f@ in the export list *just as if* it were in the
+code of A, and thereby haul in all the stuff reachable from it.
 
-For (1) it is slightly harmful to record @B.f@ in @A@'s usages,
-because a change in @B.f@'s version will provoke full recompilation of
-@A@, producing an identical @A.o@, and @A.hi@ differing only in its
-usage-version of @B.f@ (and this usage-version info isn't used by any
-importer).
+[NB: If B was compiled with -O, but A isn't, we should really *still*
+haul in all the unfoldings for B, in case the module that imports A *is*
+compiled with -O.  I think this is the case.]
 
-For (2), because of the tricky @B.h@ question above, we ensure that
-@A.hi@ is touched (even if identical to its previous version) if A's
-recompilation was triggered by an imported @.hi@ file date change.
-Given that, there's no need to record @B.f@ in @A@'s usages.
-
-On the other hand, if @A@ exports @module B@, then we {\em do} count
-@module B@ among @A@'s usages, because we must recompile @A@ to ensure
-that @A.hi@ changes appropriately.
-
-HOWEVER, we *do* record the usage
-	import B <n> :: ;
+Even if B is used at all we get a usage line for B
+	import B <n> :: ... ;
 in A.hi, to record the fact that A does import B.  This is used to decide
 to look to look for B.hi rather than B.hi-boot when compiling a module that
 imports A.  This line says that A imports B, but uses nothing in it.
@@ -733,7 +729,7 @@ getImportVersions :: ModuleName			-- Name of this module
 		  -> ExportEnv			-- Info about exports 
 		  -> RnMG (VersionInfo Name)	-- Version info for these names
 
-getImportVersions this_mod (ExportEnv export_avails _ export_all_mods)
+getImportVersions this_mod (ExportEnv _ _ export_all_mods)
   = getIfacesRn					`thenRn` \ ifaces ->
     let
 	mod_map   = iImpModInfo ifaces
@@ -813,6 +809,8 @@ getSlurped
     returnRn (iSlurp ifaces)
 
 recordSlurp maybe_version avail
+-- Nothing	for locally defined names
+-- Just version for imported names
   = getIfacesRn 	`thenRn` \ ifaces@(Ifaces { iSlurp  = slurped_names,
 					            iVSlurp = imp_names }) ->
     let
@@ -856,7 +854,7 @@ getDeclBinders new_name (TyClD (TySynonym tycon _ _ src_loc))
   = new_name tycon src_loc		`thenRn` \ tycon_name ->
     returnRn (Just (AvailTC tycon_name [tycon_name]))
 
-getDeclBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ _ _ _ src_loc))
+getDeclBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ _ _ _ _ src_loc))
   = new_name cname src_loc			`thenRn` \ class_name ->
 
 	-- Record the names for the class ops
@@ -890,17 +888,17 @@ getDeclBinders new_name (RuleD _) = returnRn Nothing
 
 binds_haskell_name (FoImport _) _   = True
 binds_haskell_name FoLabel      _   = True
-binds_haskell_name FoExport  ext_nm = isDynamic ext_nm
+binds_haskell_name FoExport  ext_nm = isDynamicExtName ext_nm
 
 ----------------
-getConFieldNames new_name (ConDecl con _ _ (RecCon fielddecls) src_loc : rest)
+getConFieldNames new_name (ConDecl con _ _ _ (RecCon fielddecls) src_loc : rest)
   = mapRn (\n -> new_name n src_loc) (con:fields)	`thenRn` \ cfs ->
     getConFieldNames new_name rest			`thenRn` \ ns  -> 
     returnRn (cfs ++ ns)
   where
     fields = concat (map fst fielddecls)
 
-getConFieldNames new_name (ConDecl con _ _ condecl src_loc : rest)
+getConFieldNames new_name (ConDecl con _ _ _ condecl src_loc : rest)
   = new_name con src_loc		`thenRn` \ n ->
     (case condecl of
       NewCon _ (Just f) -> 
@@ -925,11 +923,11 @@ and the dict fun of an instance decl, because both of these have
 bindings of their own elsewhere.
 
 \begin{code}
-getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ tname dname snames src_loc))
-  = new_name dname src_loc		    	    	`thenRn` \ datacon_name ->
-    new_name tname src_loc		        	`thenRn` \ tycon_name ->
-    sequenceRn [new_name n src_loc | n <- snames]	`thenRn` \ scsel_names ->
-    returnRn (tycon_name : datacon_name : scsel_names)
+getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ tname dname dwname snames src_loc))
+  = sequenceRn [new_name n src_loc | n <- (tname : dname : dwname : snames)]
+
+getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _))
+  = sequenceRn [new_name wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
 
 getDeclSysBinders new_name other_decl
   = returnRn []

@@ -29,10 +29,11 @@ import RnEnv		( availName, availsToNameSet,
 			)
 import Module           ( Module, ModuleName, mkSearchPath, mkThisModule )
 import Name		( Name, isLocallyDefined, NamedThing(..), getSrcLoc,
-			  nameOccName, nameUnique, isUserImportedExplicitlyName,
+			  nameOccName, nameUnique, 
+			  isUserImportedExplicitlyName, isUserImportedName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
 			)
-import OccName		( occNameFlavour )
+import OccName		( occNameFlavour, isValOcc )
 import Id		( idType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import NameSet
@@ -98,6 +99,7 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
     else
     let
   	Just (export_env, gbl_env, fixity_env, global_avail_env) = maybe_stuff
+        ExportEnv export_avails _ _ = export_env
     in
 
 	-- RENAME THE SOURCE
@@ -108,10 +110,15 @@ rename this_mod@(HsModule mod_name vers _ imports local_decls mod_deprec loc)
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
     let
-	real_source_fvs = implicit_fvs `plusFV` source_fvs
+	real_source_fvs = implicit_fvs `plusFV` source_fvs `plusFV` export_fvs
 		-- It's important to do the "plus" this way round, so that
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
+
+		-- The export_fvs make the exported names look just as if they
+		-- occurred in the source program.  For the reasoning, see the
+		-- comments with RnIfaces.getImportVersions
+	export_fvs = mkNameSet (map availName export_avails)
     in
     slurpImpDecls real_source_fvs	`thenRn` \ rn_imp_decls ->
     let
@@ -424,7 +431,7 @@ vars of the source program, and extracts from the decl the gate names.
 getGates source_fvs (SigD (IfaceSig _ ty _ _))
   = extractHsTyNames ty
 
-getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _))
+getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _ _))
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		       (map getTyVarName tvs)
      `addOneToNameSet` cls)
@@ -454,13 +461,13 @@ getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _))
 		       (map getTyVarName tvs)
     `addOneToNameSet` tycon
   where
-    get (ConDecl n tvs ctxt details _)
+    get (ConDecl n _ tvs ctxt details _)
 	| n `elemNameSet` source_fvs
 		-- If the constructor is method, get fvs from all its fields
 	= delListFromNameSet (get_details details `plusFV` 
 		  	      extractHsCtxtTyNames ctxt)
 			     (map getTyVarName tvs)
-    get (ConDecl n tvs ctxt (RecCon fields) _)
+    get (ConDecl n _ tvs ctxt (RecCon fields) _)
 		-- Even if the constructor isn't mentioned, the fields
 		-- might be, as selectors.  They can't mention existentially
 		-- bound tyvars (typechecker checks for that) so no need for 
@@ -526,12 +533,28 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_name
 	-- Now, a use of C implies a use of T,
 	-- if C was brought into scope by T(..) or T(C)
 	really_used_names = used_names `unionNameSets`
-	  mkNameSet [ availName avail	
-		    | sub_name <- nameSetToList used_names,
-	              let avail = case lookupNameEnv avail_env sub_name of
-			    Just avail -> avail
-		            Nothing -> WARN( True, text "reportUnusedName: not in avail_env" <+> ppr sub_name )
-				       Avail sub_name
+	  mkNameSet [ availName parent_avail
+		    | sub_name <- nameSetToList used_names
+		    , isValOcc (getOccName sub_name)
+
+			-- Usually, every used name will appear in avail_env, but there 
+			-- is one time when it doesn't: tuples and other built in syntax.  When you
+			-- write (a,b) that gives rise to a *use* of "(,)", so that the
+			-- instances will get pulled in, but the tycon "(,)" isn't actually
+			-- in scope.  Hence the isValOcc filter.
+			--
+			-- Also, (-x) gives rise to an implicit use of 'negate'; similarly, 
+			--   3.5 gives rise to an implcit use of :%
+			-- hence the isUserImportedName filter on the warning
+		      
+		    , let parent_avail 
+			    = case lookupNameEnv avail_env sub_name of
+				Just avail -> avail
+				Nothing -> WARN( isUserImportedName sub_name,
+						 text "reportUnusedName: not in avail_env" <+> ppr sub_name )
+					   Avail sub_name
+		      
+		    , case parent_avail of { AvailTC _ _ -> True; other -> False }
 		    ]
 
 	defined_names = mkNameSet (concat (rdrEnvElts gbl_env))

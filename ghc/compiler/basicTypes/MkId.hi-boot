@@ -1,6 +1,6 @@
 _interface_ MkId 1
 _exports_
-MkId mkDataConId mkPrimitiveId ;
+MkId mkDataConId mkDataConWrapId ;
 _declarations_
-1 mkDataConId   _:_ DataCon.DataCon -> Var.Id ;;
-1 mkPrimitiveId _:_ PrimOp.PrimOp -> Var.Id ;;
+1 mkDataConId     _:_ Name.Name -> DataCon.DataCon -> Var.Id ;;
+1 mkDataConWrapId _:_ DataCon.DataCon -> Var.Id ;;

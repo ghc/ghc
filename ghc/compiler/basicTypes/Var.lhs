@@ -5,7 +5,7 @@ s%
 
 \begin{code}
 module Var (
-	Var, IdOrTyVar, VarDetails,		-- Abstract
+	Var, VarDetails,		-- Abstract
 	varName, varUnique, varInfo, varType,
 	setVarName, setVarUnique, setVarType, setVarOcc,
 
@@ -61,8 +61,6 @@ strictness).  The essential info about different kinds of @Vars@ is
 in its @VarDetails@.
 
 \begin{code}
-type IdOrTyVar = Var
-
 data Var
   = Var {
 	varName    :: Name,

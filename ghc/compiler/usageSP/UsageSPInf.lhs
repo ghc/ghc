@@ -26,8 +26,7 @@ import Type             ( UsageAnn(..),
                           splitUsForAllTys, substUsTy,
                           mkFunTy, mkForAllTy )
 import TyCon            ( tyConArgVrcs_maybe, isFunTyCon )
-import DataCon          ( dataConType )
-import Const            ( Con(..), Literal(..), literalType )
+import Literal          ( Literal(..), literalType )
 import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )
 import IdInfo           ( setLBVarInfo, LBVarInfo(..) )
 import Id               ( mayHaveNoBinding, isExportedId )
@@ -222,17 +221,16 @@ usgInfCE ve e0@(Var v) | isTyVar v
                  emptyUConSet,
                  unitMS v')
 
-usgInfCE ve e0@(Con (Literal lit) args)
-  = ASSERT( null args )
-    do u1 <- newVarUSMM (Left e0)
+usgInfCE ve e0@(Lit lit)
+  = do u1 <- newVarUSMM (Left e0)
        return (e0,
                mkUsgTy u1 (literalType lit),
                emptyUConSet,
                emptyMS)
 
-usgInfCE ve (Con DEFAULT _)
-  = panic "usgInfCE: DEFAULT"
-
+{-  ------------------------------------
+	No Con form now; we rely on usage information in the constructor itself
+	
 usgInfCE ve e0@(Con con args)
   = -- constant or primop.  guaranteed saturated.
     do let (ey1s,e1s) = span isTypeArg args
@@ -252,7 +250,7 @@ usgInfCE ve e0@(Con con args)
                  unionUCSs (h3s ++ h4s),
                  foldl plusMS emptyMS f3s)
 
-  where dataConTys c u y1s
+  whered ataConTys c u y1s
         -- compute argtys of a datacon
           = let cTy        = annotMany (dataConType c)  -- extra (sigma) annots later replaced
                 (y2us,y2u) = splitFunTys (applyTys cTy y1s)
@@ -260,6 +258,8 @@ usgInfCE ve e0@(Con con args)
                              -- not an arrow type.
                 reUsg      = mkUsgTy u . unUsgTy
              in (map reUsg y2us, reUsg y2u)
+--------------------------------------------  -}
+
 
 usgInfCE ve e0@(App ea (Type yb))
   = do (ea1,ya1u,ha1,fa1) <- usgInfCE ve ea

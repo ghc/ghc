@@ -8,13 +8,16 @@ module DataCon (
 	DataCon,
 	ConTag, fIRST_TAG,
 	mkDataCon,
-	dataConType, dataConSig, dataConName, dataConTag, dataConTyCon,
+	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
 	dataConArgTys, dataConOrigArgTys,
-	dataConRawArgTys, dataConAllRawArgTys,
-	dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
-	dataConNumFields, dataConNumInstArgs, dataConId, dataConRepStrictness,
-	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
-	isExistentialDataCon, splitProductType_maybe,
+	dataConRepArgTys,
+	dataConFieldLabels, dataConStrictMarks, 
+	dataConSourceArity, dataConRepArity,
+	dataConNumInstArgs, dataConId, dataConWrapId, dataConRepStrictness,
+	isNullaryDataCon, isTupleCon, isUnboxedTupleCon, isDynDataCon,
+	isExistentialDataCon, 
+
+	splitProductType_maybe, splitProductType,
 
 	StrictnessMark(..), 	-- Representation visible to MkId only
 	markedStrict, notMarkedStrict, markedUnboxed, maybeMarkedUnboxed
@@ -27,15 +30,14 @@ import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 import CmdLineOpts	( opt_DictsStrict )
 import TysPrim
 import Type		( Type, ThetaType, TauType, ClassContext,
-			  mkSigmaTy, mkFunTys, mkTyConApp, 
+			  mkForAllTys, mkFunTys, mkTyConApp, 
 			  mkTyVarTys, mkDictTy,
 			  splitAlgTyConApp_maybe, classesToPreds
 			)
-import PprType
 import TyCon		( TyCon, tyConDataCons, isDataTyCon, isProductTyCon,
-			  isTupleTyCon, isUnboxedTupleTyCon )
+			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( classTyCon )
-import Name		( Name, NamedThing(..), nameUnique, isLocallyDefined )
+import Name		( Name, NamedThing(..), nameUnique, isDynName, isLocallyDefined )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
 import BasicTypes	( Arity )
@@ -43,11 +45,30 @@ import Demand		( Demand, wwStrict, wwLazy )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
+import PprType		()	-- Instances
 import UniqSet
 import Maybes		( maybeToBool )
 import Maybe
 import Util		( assoc )
 \end{code}
+
+
+Stuff about data constructors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every constructor, C, comes with a 
+
+  *wrapper*, called C, whose type is exactly what it looks like
+	in the source program. It is an ordinary function,
+	and it gets a top-level binding like any other function
+
+  *worker*, called $wC, which is the actual data constructor.
+	Its type may be different to C, because:
+		- useless dict args are dropped
+		- strict args may be flattened
+	It does not have a binding.
+
+  The worker is very like a primop, in that it has no binding,
+
 
 
 %************************************************************************
@@ -68,7 +89,7 @@ data DataCon
 	--
 	--	data Eq a => T a = forall b. Ord b => MkT a [b]
 
-	dcType   :: Type,	-- Type of the constructor 
+	dcRepType   :: Type,	-- Type of the constructor 
 				-- 	forall ab . Ord b => a -> [b] -> MkT a
 				-- (this is *not* of the constructor Id: 
 				--  see notes after this data type declaration)
@@ -92,32 +113,39 @@ data DataCon
 	dcOrigArgTys :: [Type],		-- Original argument types
 					-- (before unboxing and flattening of
 					--  strict fields)
-	dcRepArgTys :: [Type],		-- Constructor Argument types
+
+	dcRepArgTys :: [Type],		-- Final, representation argument types, after unboxing and flattening,
+					-- and including existential dictionaries
+
 	dcTyCon  :: TyCon,		-- Result tycon 
 
 	-- Now the strictness annotations and field labels of the constructor
 	dcUserStricts :: [StrictnessMark], 
 		-- Strictness annotations, as placed on the data type defn,
 		-- in the same order as the argument types;
-		-- length = dataConNumFields dataCon
+		-- length = dataConSourceArity dataCon
 
 	dcRealStricts :: [StrictnessMark],
 		-- Strictness annotations as deduced by the compiler.  May
-		-- include some MarkedUnboxed fields that are MarkedStrict
-		-- in dcUserStricts.
-		-- length = dataConNumFields dataCon
+		-- include some MarkedUnboxed fields that are merely MarkedStrict
+		-- in dcUserStricts.  Also includes the existential dictionaries.
+		-- length = length dcExTheta + dataConSourceArity dataCon
 
 	dcFields  :: [FieldLabel],
 		-- Field labels for this constructor, in the
 		-- same order as the argument types; 
 		-- length = 0 (if not a record) or dataConSourceArity.
 
-	-- Finally, the curried function that corresponds to the constructor
-	-- 	mkT :: forall a b. (Eq a, Ord b) => a -> [b] -> T a
-	--	mkT = /\ab. \deq dord p qs. Con MkT [a, b, dord, p, qs]
-	-- This unfolding is built in MkId.mkDataConId
+	-- Finally, the curried worker function that corresponds to the constructor
+	-- It doesn't have an unfolding; the code generator saturates these Ids
+	-- and allocates a real constructor when it finds one.
+	--
+	-- An entirely separate wrapper function is built in TcTyDecls
 
-	dcId :: Id			-- The corresponding Id
+	dcId :: Id,		-- The corresponding worker Id
+				-- Takes dcRepArgTys as its arguments
+
+	dcWrapId :: Id		-- The wrapper Id
   }
 
 type ConTag = Int
@@ -126,7 +154,7 @@ fIRST_TAG :: ConTag
 fIRST_TAG =  1	-- Tags allocated from here for real constructors
 \end{code}
 
-The dcType field contains the type of the representation of a contructor
+The dcRepType field contains the type of the representation of a contructor
 This may differ from the type of the contructor *Id* (built
 by MkId.mkDataConId) for two reasons:
 	a) the constructor Id may be overloaded, but the dictionary isn't stored
@@ -207,11 +235,13 @@ mkDataCon :: Name
 	  -> [TyVar] -> ClassContext
 	  -> [TyVar] -> ClassContext
 	  -> [TauType] -> TyCon
-	  -> Id
+	  -> Id -> Id
 	  -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta orig_arg_tys tycon id
+mkDataCon name arg_stricts fields 
+	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon 
+	  work_id wrap_id
   = ASSERT(length arg_stricts == length orig_arg_tys)
 	-- The 'stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
@@ -224,12 +254,12 @@ mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta orig_arg_tys t
 		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
 		  dcRealStricts = all_stricts, dcUserStricts = user_stricts,
-		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcType = ty,
-		  dcId = id}
+		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
+		  dcId = work_id, dcWrapId = wrap_id}
 
     (real_arg_stricts, strict_arg_tyss) 
 	= unzip (zipWith (unbox_strict_arg_ty tycon) arg_stricts orig_arg_tys)
-    rep_arg_tys = concat strict_arg_tyss
+    rep_arg_tys = [mkDictTy cls tys | (cls,tys) <- ex_theta] ++ concat strict_arg_tyss
 	
     ex_dict_stricts = map mk_dict_strict_mark ex_theta
 	-- Add a strictness flag for the existential dictionary arguments
@@ -237,10 +267,11 @@ mkDataCon name arg_stricts fields tyvars theta ex_tyvars ex_theta orig_arg_tys t
     user_stricts    = ex_dict_stricts ++ arg_stricts
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
-    ty  = mkSigmaTy (tyvars ++ ex_tyvars) 
-	            (classesToPreds ex_theta)
-	            (mkFunTys rep_arg_tys 
-			(mkTyConApp tycon (mkTyVarTys tyvars)))
+    ty  = mkForAllTys (tyvars ++ ex_tyvars) 
+	              (mkFunTys rep_arg_tys result_ty)
+		-- NB: the existential dict args are already in rep_arg_tys
+
+    result_ty = mkTyConApp tycon (mkTyVarTys tyvars)
 
 mk_dict_strict_mark (clas,tys)
   | opt_DictsStrict &&
@@ -259,12 +290,14 @@ dataConTag  = dcTag
 dataConTyCon :: DataCon -> TyCon
 dataConTyCon = dcTyCon
 
-dataConType :: DataCon -> Type
-dataConType = dcType
+dataConRepType :: DataCon -> Type
+dataConRepType = dcRepType
 
 dataConId :: DataCon -> Id
 dataConId = dcId
 
+dataConWrapId :: DataCon -> Id
+dataConWrapId = dcWrapId
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
@@ -272,9 +305,22 @@ dataConFieldLabels = dcFields
 dataConStrictMarks :: DataCon -> [StrictnessMark]
 dataConStrictMarks = dcRealStricts
 
+-- Number of type-instantiation arguments
+-- All the remaining arguments of the DataCon are (notionally)
+-- stored in the DataCon, and are matched in a case expression
+dataConNumInstArgs (MkData {dcTyVars = tyvars}) = length tyvars
+
 dataConSourceArity :: DataCon -> Arity
 	-- Source-level arity of the data constructor
 dataConSourceArity dc = length (dcOrigArgTys dc)
+
+-- dataConRepArity gives the number of actual fields in the
+-- {\em representation} of the data constructor.  This may be more than appear
+-- in the source code; the extra ones are the existentially quantified
+-- dictionaries
+dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
+
+isNullaryDataCon con  = dataConRepArity con == 0
 
 dataConRepStrictness :: DataCon -> [Demand]
 	-- Give the demands on the arguments of a 
@@ -302,48 +348,31 @@ dataConArgTys :: DataCon
 	      -> [Type]		-- Needs arguments of these types
 				-- NB: these INCLUDE the existentially quantified dict args
 				--     but EXCLUDE the data-decl context which is discarded
+				-- It's all post-flattening etc; this is a representation type
 
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars, 
-		       dcExTyVars = ex_tyvars, dcExTheta = ex_theta}) inst_tys
- = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) 
-       ([mkDictTy cls tys | (cls,tys) <- ex_theta] ++ arg_tys)
+		       dcExTyVars = ex_tyvars}) inst_tys
+ = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
 \end{code}
 
 These two functions get the real argument types of the constructor,
-without substituting for any type variables.  dataConAllRawArgTys is
-like dataConRawArgTys except that the existential dictionary arguments
-are included.  dataConOrigArgTys is the same, but returns the types
-written by the programmer.
+without substituting for any type variables.    
+
+dataConOrigArgTys returns the arg types of the wrapper, excluding all dictionary args.
+
+dataConRepArgTys retuns the arg types of the worker, including all dictionaries, and
+after any flattening has been done.
 
 \begin{code}
 dataConOrigArgTys :: DataCon -> [Type]
 dataConOrigArgTys dc = dcOrigArgTys dc
 
-dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
-dataConRawArgTys dc = dcRepArgTys dc
-
-dataConAllRawArgTys :: DataCon -> [TauType]
-dataConAllRawArgTys con = 
-  [mkDictTy cls tys | (cls,tys) <- dcExTheta con] ++ dcRepArgTys con
+dataConRepArgTys :: DataCon -> [TauType]
+dataConRepArgTys dc = dcRepArgTys dc
 \end{code}
 
-dataConNumFields gives the number of actual fields in the
-{\em representation} of the data constructor.  This may be more than appear
-in the source code; the extra ones are the existentially quantified
-dictionaries
 
 \begin{code}
--- Number of type-instantiation arguments
--- All the remaining arguments of the DataCon are (notionally)
--- stored in the DataCon, and are matched in a case expression
-dataConNumInstArgs (MkData {dcTyVars = tyvars}) = length tyvars
-
-dataConNumFields (MkData {dcExTheta = theta, dcRepArgTys = arg_tys})
-  = length theta + length arg_tys
-
-isNullaryDataCon con
-  = dataConNumFields con == 0 -- function of convenience
-
 isTupleCon :: DataCon -> Bool
 isTupleCon (MkData {dcTyCon = tc}) = isTupleTyCon tc
 	
@@ -352,6 +381,9 @@ isUnboxedTupleCon (MkData {dcTyCon = tc}) = isUnboxedTupleTyCon tc
 
 isExistentialDataCon :: DataCon -> Bool
 isExistentialDataCon (MkData {dcExTyVars = tvs}) = not (null tvs)
+
+isDynDataCon :: DataCon -> Bool
+isDynDataCon con = isDynName (dataConName con)
 \end{code}
 
 
@@ -371,7 +403,6 @@ splitProductType_maybe
 
 	-- Returns (Just ...) for any 
 	--	single-constructor
-	--	non-recursive type
 	--	not existentially quantified
 	-- type whether a data type or a new type
 	--
@@ -382,13 +413,14 @@ splitProductType_maybe
 splitProductType_maybe ty
   = case splitAlgTyConApp_maybe ty of
 	Just (tycon,ty_args,[data_con]) 
-	   | isProductTyCon tycon  		-- Checks for non-recursive, non-existential
-	   -> Just (tycon, ty_args, data_con, data_con_arg_tys)
-	   where
-	      data_con_arg_tys = map (substTy (mkTyVarSubst (dcTyVars data_con) ty_args)) 
-				     (dcRepArgTys data_con)
+	   | isProductTyCon tycon  		-- Includes check for non-existential
+	   -> Just (tycon, ty_args, data_con, dataConArgTys data_con ty_args)
 	other -> Nothing
 
+splitProductType str ty
+  = case splitProductType_maybe ty of
+	Just stuff -> stuff
+	Nothing    -> pprPanic (str ++ ": not a product") (ppr ty)
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The tycon is imported, and the field is marked '! !', or
@@ -408,6 +440,7 @@ unbox_strict_arg_ty tycon strict_mark ty
 	MarkedStrict      -> opt_UnboxStrictFields && 
 			     isLocallyDefined tycon &&
 			     maybeToBool maybe_product &&
+			     not (isRecursiveTyCon tycon) &&
 			     isDataTyCon arg_tycon
 	-- We can't look through newtypes in arguments (yet)
   = (MarkedUnboxed con arg_tys, arg_tys)

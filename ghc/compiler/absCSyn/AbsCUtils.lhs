@@ -22,14 +22,14 @@ module AbsCUtils (
 import AbsCSyn
 import Digraph		( stronglyConnComp, SCC(..) )
 import DataCon		( fIRST_TAG, ConTag )
-import Const		( literalPrimRep, mkMachWord )
+import Literal		( literalPrimRep, mkMachWord )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )
 import UniqSupply	( uniqFromSupply, uniqsFromSupply, splitUniqSupply, 
 			  UniqSupply )
 import CmdLineOpts      ( opt_ProduceC, opt_EmitCExternDecls )
 import Maybes		( maybeToBool )
-import PrimOp		( PrimOp(..) )
+import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import Panic		( panic )
 
 infixr 9 `thenFlt`
@@ -329,17 +329,16 @@ flatAbsC (CSwitch discrim alts deflt)
       = flatAbsC absC	`thenFlt` \ (alt_heres, alt_tops) ->
 	returnFlt ( (tag, alt_heres), alt_tops )
 
-flatAbsC stmt@(COpStmt results td@(CCallOp _ _ _ _) args vol_regs)
+flatAbsC stmt@(COpStmt results (CCallOp ccall) args vol_regs)
   | isCandidate && maybeToBool opt_ProduceC
   = returnFlt (stmt, tdef)
   where
     (isCandidate, isDyn) =
-      case td of 
-        CCallOp (Right _) _ _ _      -> (True, True)
-	CCallOp (Left _) is_asm _ _  -> (opt_EmitCExternDecls && not is_asm, False)
-        _			     -> (False, False)
+      case ccall of 
+        CCall (DynamicTarget _) _ _ _      -> (True, True)
+	CCall (StaticTarget _) is_asm _ _  -> (opt_EmitCExternDecls && not is_asm, False)
 
-    tdef = CCallTypedef isDyn td results args
+    tdef = CCallTypedef isDyn ccall results args
 
 flatAbsC stmt@(CSimultaneous abs_c)
   = flatAbsC abs_c		`thenFlt` \ (stmts_here, tops) ->

@@ -10,8 +10,8 @@ module Specialise ( specProgram ) where
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_spec, opt_D_dump_rules )
 import Id		( Id, idName, idType, mkTemplateLocals, mkUserLocal,
-			  getIdSpecialisation, setIdNoDiscard, isExportedId,
-			  modifyIdInfo
+			  idSpecialisation, setIdNoDiscard, isExportedId,
+			  modifyIdInfo, idUnfolding
 			)
 import IdInfo		( zapSpecPragInfo )
 import VarSet
@@ -28,7 +28,8 @@ import Var		( TyVar, mkSysTyVar, setVarUnique )
 import VarSet
 import VarEnv
 import CoreSyn
-import CoreUtils	( coreExprType, applyTypeToArgs )
+import CoreUtils	( applyTypeToArgs )
+import CoreUnfold	( certainlyWillInline )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
 import CoreLint		( beginPass, endPass )
 import PprCore		( pprCoreRules )
@@ -598,7 +599,7 @@ specProgram us binds
 		      specBind emptySubst bind uds	`thenSM` \ (bind', uds') ->
 		      returnSM (bind' ++ binds', uds')
 
-dump_specs var = pprCoreRules var (getIdSpecialisation var)
+dump_specs var = pprCoreRules var (idSpecialisation var)
 \end{code}
 
 %************************************************************************
@@ -623,10 +624,7 @@ specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 ---------------- First the easy cases --------------------
 specExpr subst (Type ty) = returnSM (Type (substTy subst ty), emptyUDs)
 specExpr subst (Var v)   = returnSM (specVar subst v,         emptyUDs)
-
-specExpr subst e@(Con con args)
-  = mapAndCombineSM (specExpr subst) args	`thenSM` \ (args', uds) ->
-    returnSM (Con con args', uds)
+specExpr subst (Lit lit) = returnSM (Lit lit, 		      emptyUDs)
 
 specExpr subst (Note note body)
   = specExpr subst body 	`thenSM` \ (body', uds) ->
@@ -787,6 +785,9 @@ specDefn subst calls (fn, rhs)
   |  n_tyvars == length rhs_tyvars	-- Rhs of fn's defn has right number of big lambdas
   && n_dicts  <= length rhs_bndrs	-- and enough dict args
   && not (null calls_for_me)		-- And there are some calls to specialise
+  && not (certainlyWillInline fn)	-- And it's not small
+					-- If it's small, it's better just to inline
+					-- it than to construct lots of specialisations
   =   -- Specialise the body of the function
     specExpr subst rhs					`thenSM` \ (rhs', rhs_uds) ->
 
@@ -828,7 +829,7 @@ specDefn subst calls (fn, rhs)
 
     ----------------------------------------------------------
 	-- Specialise to one particular call pattern
-    spec_call :: ([Maybe Type], ([DictExpr], IdOrTyVarSet))	-- Call instance
+    spec_call :: ([Maybe Type], ([DictExpr], VarSet))		-- Call instance
               -> SpecM ((Id,CoreExpr),				-- Specialised definition
 	                UsageDetails, 				-- Usage details from specialised body
                 	([CoreBndr], [CoreExpr], CoreExpr))	-- Info for the Id's SpecEnv
@@ -908,7 +909,7 @@ data UsageDetails
 	calls     :: !CallDetails
     }
 
-type DictBind = (CoreBind, IdOrTyVarSet)
+type DictBind = (CoreBind, VarSet)
 	-- The set is the free vars of the binding
 	-- both tyvars and dicts
 
@@ -917,13 +918,13 @@ type DictExpr = CoreExpr
 emptyUDs = MkUD { dict_binds = emptyBag, calls = emptyFM }
 
 type ProtoUsageDetails = ([DictBind],
-			  [(Id, [Maybe Type], ([DictExpr], IdOrTyVarSet))]
+			  [(Id, [Maybe Type], ([DictExpr], VarSet))]
 			 )
 
 ------------------------------------------------------------			
 type CallDetails  = FiniteMap Id CallInfo
 type CallInfo     = FiniteMap [Maybe Type]			-- Nothing => unconstrained type argument
-		              ([DictExpr], IdOrTyVarSet)	-- Dict args and the vars of the whole
+		              ([DictExpr], VarSet)		-- Dict args and the vars of the whole
 								-- call (including tyvars)
 								-- [*not* include the main id itself, of course]
 	-- The finite maps eliminate duplicates

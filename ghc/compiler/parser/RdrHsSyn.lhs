@@ -53,7 +53,7 @@ module RdrHsSyn (
 	extractPatsTyVars, 
 	extractRuleBndrsTyVars,
  
-	mkOpApp, mkClassDecl, mkClassOpSig,
+	mkOpApp, mkClassDecl, mkClassOpSig, mkConDecl,
 
 	cvBinds,
 	cvMonoBindsAndSigs,
@@ -65,7 +65,7 @@ module RdrHsSyn (
 
 import HsSyn
 import Name		( mkClassTyConOcc, mkClassDataConOcc )
-import OccName		( mkClassTyConOcc, mkClassDataConOcc, 
+import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc
                       	)
 import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc )
@@ -202,15 +202,17 @@ tycon and datacon corresponding to the class, by deriving them from the
 name of the class itself.  This saves recording the names in the interface
 file (which would be equally good).
 
-Similarly for mkClassOpSig and default-method names.
+Similarly for mkConDecl, mkClassOpSig and default-method names.
   
 \begin{code}
 mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
-  = ClassDecl cxt cname tyvars fds sigs mbinds prags tname dname sc_sel_names loc
+  = ClassDecl cxt cname tyvars fds sigs mbinds prags tname dname dwname sc_sel_names loc
   where
-    cls_occ = rdrNameOcc cname
-    dname   = mkRdrUnqual (mkClassDataConOcc cls_occ)
-    tname   = mkRdrUnqual (mkClassTyConOcc   cls_occ)
+    cls_occ  = rdrNameOcc cname
+    data_occ = mkClassDataConOcc cls_occ
+    dname    = mkRdrUnqual data_occ
+    dwname   = mkRdrUnqual (mkWorkerOcc data_occ)
+    tname    = mkRdrUnqual (mkClassTyConOcc   cls_occ)
     sc_sel_names = [ mkRdrUnqual (mkSuperDictSelOcc n cls_occ) 
 		   | n <- [1..length cxt]]
       -- We number off the superclass selectors, 1, 2, 3 etc so that we 
@@ -225,6 +227,11 @@ mkClassOpSig has_default_method op ty loc
   = ClassOpSig op dm_rn has_default_method ty loc
   where
     dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
+
+mkConDecl cname ex_vars cxt details loc
+  = ConDecl cname wkr_name ex_vars cxt details loc
+  where
+    wkr_name = mkRdrUnqual (mkWorkerOcc (rdrNameOcc cname))
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a variable,

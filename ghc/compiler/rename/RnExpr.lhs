@@ -177,20 +177,21 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 				Just ty -> extractHsTyRdrNames ty
 	tyvars_in_pats = extractPatsTyVars pats
 	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
-	doc            = text "a pattern type-signature"
+	doc_sig        = text "a pattern type-signature"
+	doc_pats       = text "in a pattern match"
     in
-    bindTyVarsFVRn doc (map UserTyVar forall_tyvars)	$ \ sig_tyvars ->
+    bindTyVarsFVRn doc_sig (map UserTyVar forall_tyvars)	$ \ sig_tyvars ->
 
 	-- Note that we do a single bindLocalsRn for all the
 	-- matches together, so that we spot the repeated variable in
 	--	f x x = 1
-    bindLocalsFVRn doc (collectPatsBinders pats) $ \ new_binders ->
+    bindLocalsFVRn doc_pats (collectPatsBinders pats) $ \ new_binders ->
 
     mapFvRn rnPat pats			`thenRn` \ (pats', pat_fvs) ->
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
     (case maybe_rhs_sig of
 	Nothing -> returnRn (Nothing, emptyFVs)
-	Just ty | opt_GlasgowExts -> rnHsType doc ty	`thenRn` \ (ty', ty_fvs) ->
+	Just ty | opt_GlasgowExts -> rnHsType doc_sig ty	`thenRn` \ (ty', ty_fvs) ->
 				     returnRn (Just ty', ty_fvs)
 		| otherwise	  -> addErrRn (patSigErr ty)	`thenRn_`
 				     returnRn (Nothing, emptyFVs)
@@ -347,13 +348,13 @@ rnExpr section@(SectionR op expr)
     checkSectionPrec "right" section op' expr'	`thenRn_`
     returnRn (SectionR op' expr', fvs_op `plusFV` fvs_expr)
 
-rnExpr (CCall fun args may_gc is_casm fake_result_ty)
+rnExpr (HsCCall fun args may_gc is_casm fake_result_ty)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
   = lookupImplicitOccRn ccallableClass_RDR	`thenRn` \ cc ->
     lookupImplicitOccRn creturnableClass_RDR	`thenRn` \ cr ->
     lookupImplicitOccRn ioDataCon_RDR		`thenRn` \ io ->
     rnExprs args				`thenRn` \ (args', fvs_args) ->
-    returnRn (CCall fun args' may_gc is_casm fake_result_ty, 
+    returnRn (HsCCall fun args' may_gc is_casm fake_result_ty, 
 	      fvs_args `addOneFV` cc `addOneFV` cr `addOneFV` io)
 
 rnExpr (HsSCC lbl expr)

@@ -31,11 +31,11 @@ module VarEnv (
 import {-# SOURCE #-}	CoreSyn( CoreExpr )
 import {-# SOURCE #-}	TypeRep( Type )
 
-import IdInfo	( OccInfo )
-import OccName	( TidyOccEnv, emptyTidyOccEnv )
-import Var	( Var, Id, IdOrTyVar )
-import UniqFM
-import Util	( zipEqual )
+import BasicTypes ( OccInfo )
+import OccName	  ( TidyOccEnv, emptyTidyOccEnv )
+import Var	  ( Var, Id )
+import UniqFM  
+import Util	  ( zipEqual )
 \end{code}
 
 
@@ -49,7 +49,7 @@ When tidying up print names, we keep a mapping of in-scope occ-names
 (the TidyOccEnv) and a Var-to-Var of the current renamings.
 
 \begin{code}
-type TidyEnv = (TidyOccEnv, VarEnv IdOrTyVar)
+type TidyEnv = (TidyOccEnv, VarEnv Var)
 emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
 \end{code}
 
@@ -93,14 +93,14 @@ lookupSubstEnv (SE s _) v = lookupVarEnv s v
 extendSubstEnv :: SubstEnv -> Var -> SubstResult -> SubstEnv
 extendSubstEnv (SE s nt) v r = SE (extendVarEnv s v r) (noTys r nt)
 
-mkSubstEnv :: [IdOrTyVar] -> [SubstResult] -> SubstEnv
+mkSubstEnv :: [Var] -> [SubstResult] -> SubstEnv
 mkSubstEnv bs vs = extendSubstEnvList emptySubstEnv bs vs
 
-extendSubstEnvList :: SubstEnv -> [IdOrTyVar] -> [SubstResult] -> SubstEnv
+extendSubstEnvList :: SubstEnv -> [Var] -> [SubstResult] -> SubstEnv
 extendSubstEnvList env	       []     []     = env
 extendSubstEnvList (SE env nt) (b:bs) (r:rs) = extendSubstEnvList (SE (extendVarEnv env b r) (noTys r nt)) bs rs
 
-delSubstEnv :: SubstEnv -> IdOrTyVar -> SubstEnv
+delSubstEnv :: SubstEnv -> Var -> SubstEnv
 delSubstEnv (SE s nt) v = SE (delVarEnv s v) nt
 \end{code}
 

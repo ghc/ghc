@@ -19,7 +19,7 @@ import Id		( Id )
 import DsMonad
 import DsUtils
 
-import Const		( mkMachInt, Literal(..) )
+import Literal		( mkMachInt, Literal(..) )
 import PrimRep          ( PrimRep(IntRep) )
 import Maybes		( catMaybes )
 import Type		( Type, isUnLiftedType )

@@ -43,7 +43,7 @@ module MachMisc (
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
 import CLabel           ( CLabel, isAsmTemp )
-import Const		( mkMachInt, Literal(..) )
+import Literal		( mkMachInt, Literal(..) )
 import MachRegs		( stgReg, callerSaves, RegLoc(..),
 			  Imm(..), Reg(..), 
 			  MachRegsAddr(..)

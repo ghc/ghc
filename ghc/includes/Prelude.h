@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.10 1999/12/20 10:34:33 simonpj Exp $
+ * $Id: Prelude.h,v 1.11 2000/03/23 17:45:31 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,14 +13,14 @@
 #ifdef COMPILING_RTS
 
 #ifdef COMPILER
-extern DLL_IMPORT const StgClosure PrelBase_Z91Z93_static_closure;
-extern DLL_IMPORT const StgClosure PrelBase_Z40Z41_static_closure;
-extern DLL_IMPORT const StgClosure PrelBase_True_static_closure;
-extern DLL_IMPORT const StgClosure PrelBase_False_static_closure;
+extern DLL_IMPORT const StgClosure PrelBase_Z91Z93_closure;
+extern DLL_IMPORT const StgClosure PrelBase_Z40Z41_closure;
+extern DLL_IMPORT const StgClosure PrelBase_True_closure;
+extern DLL_IMPORT const StgClosure PrelBase_False_closure;
 extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
 extern DLL_IMPORT const StgClosure PrelException_stackOverflow_closure;
 extern DLL_IMPORT const StgClosure PrelException_heapOverflow_closure;
-extern DLL_IMPORT const StgClosure PrelException_NonTermination_static_closure;
+extern DLL_IMPORT const StgClosure PrelException_NonTermination_closure;
 extern const StgClosure PrelMain_mainIO_closure;
 
 extern DLL_IMPORT const StgInfoTable PrelBase_Czh_static_info;
@@ -44,13 +44,13 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
  * module these names are defined in.
  */
 
-#define Nil_closure            PrelBase_ZMZN_static_closure
-#define Unit_closure           PrelBase_Z0T_static_closure
-#define True_closure           PrelBase_True_static_closure
-#define False_closure          PrelBase_False_static_closure
+#define Nil_closure            PrelBase_ZMZN_closure
+#define Unit_closure           PrelBase_Z0T_closure
+#define True_closure           PrelBase_True_closure
+#define False_closure          PrelBase_False_closure
 #define stackOverflow_closure  PrelException_stackOverflow_closure
 #define heapOverflow_closure   PrelException_heapOverflow_closure
-#define NonTermination_closure PrelException_NonTermination_static_closure
+#define NonTermination_closure PrelException_NonTermination_closure
 #define Czh_static_info        PrelBase_Czh_static_info
 #define Izh_static_info        PrelBase_Izh_static_info
 #define Fzh_static_info        PrelFloat_Fzh_static_info

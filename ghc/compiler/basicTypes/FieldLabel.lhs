@@ -19,7 +19,8 @@ import Unique           ( Uniquable(..) )
 data FieldLabel
   = FieldLabel	Name	        -- Also used as the Name of the field selector Id
 		Type		-- Type of the field; may have free type variables that
-				-- are the tyvar of the constructor
+				-- are the tyvars of its parent *data* constructor, and
+				-- those will be the same as the tyvars of its parent *type* constructor
 				-- e.g.  data T a = MkT { op1 :: a -> a, op2 :: a -> Int }
 				-- The type in the FieldLabel for op1 will be simply (a->a).
 

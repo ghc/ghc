@@ -13,7 +13,7 @@ module CSE (
 import CmdLineOpts	( opt_D_dump_cse, opt_D_verbose_core2core )
 import Id		( Id, idType )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig )
-import Const		( isBoxedDataCon )
+import DataCon		( isUnboxedTupleCon )
 import Type		( splitTyConApp_maybe )
 import CoreSyn
 import VarEnv	
@@ -132,19 +132,15 @@ tryForCSE env expr     = case lookupCSEnv env expr' of
 		       where
 	 	         expr' = cseExpr env expr
 
-
 cseExpr :: CSEnv -> CoreExpr -> CoreExpr
+cseExpr env (Type t)		   = Type t
+cseExpr env (Lit lit)		   = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
-cseExpr env (App f (Type t)) 	   = App (cseExpr env f) (Type t)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
-cseExpr env expr@(Con con args)    = case lookupCSEnv env expr of
-				       Just id  -> Var id
-				       Nothing  -> Con con [tryForCSE env arg | arg <- args]
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
 cseExpr env (Lam b e)	     	   = Lam b (cseExpr env e)
 cseExpr env (Let bind e)    	   = let (env1, bind') = cseBind env bind
 				     in Let bind' (cseExpr env1 e)
-cseExpr env (Type t)		   = Type t
 cseExpr env (Case scrut bndr alts) = Case scrut' bndr (cseAlts env scrut' bndr alts)
 				   where
 				     scrut' = tryForCSE env scrut
@@ -162,19 +158,23 @@ cseAlts env new_scrut bndr alts
 								-- map: new_scrut -> bndr
 
     arg_tys = case splitTyConApp_maybe (idType bndr) of
-		Just (_, arg_tys) -> map Type arg_tys
+		Just (_, arg_tys) -> arg_tys
 		other		  -> pprPanic "cseAlts" (ppr bndr)
 
-    cse_alt (con, args, rhs)
-	| null args || not (isBoxedDataCon con) = (con, args, cseExpr alt_env rhs)
+    cse_alt (DataAlt con, args, rhs)
+	| not (null args || isUnboxedTupleCon con)
 		-- Don't try CSE if there are no args; it just increases the number
 		-- of live vars.  E.g.
 		--	case x of { True -> ....True.... }
 		-- Don't replace True by x!  
 		-- Hence the 'null args', which also deal with literals and DEFAULT
 		-- And we can't CSE on unboxed tuples
-	| otherwise
-	= (con, args, cseExpr (extendCSEnv alt_env con_target (Con con (arg_tys ++ (map varToCoreExpr args)))) rhs)
+	= (DataAlt con, args, tryForCSE new_env rhs)
+	where
+	  new_env = extendCSEnv alt_env con_target (mkAltExpr (DataAlt con) args arg_tys)
+
+    cse_alt (con, args, rhs)
+	= (con, args, tryForCSE alt_env rhs)
 \end{code}
 
 

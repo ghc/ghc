@@ -98,10 +98,6 @@ satExpr var@(Var v)
 
 satExpr lit@(Lit _) = returnSAT lit
 
-satExpr e@(Con con types args)
-  = mapSAT satAtom args	    `thenSAT_`
-    returnSAT e
-
 satExpr e@(Prim prim ty args)
   = mapSAT satAtom args	    `thenSAT_`
     returnSAT e

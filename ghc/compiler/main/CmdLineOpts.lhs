@@ -116,7 +116,6 @@ module CmdLineOpts (
 	opt_UF_KeenessFactor,
 	opt_UF_CheapOp,
 	opt_UF_DearOp,
-	opt_UF_NoRepLit,
 
 	-- misc opts
 	opt_CompilingPrelude,
@@ -207,7 +206,7 @@ data CoreToDo		-- These are diff core-to-core passes,
 			-- Each run of the simplifier can take a different
 			-- set of simplifier-specific flags.
   | CoreDoFloatInwards
-  | CoreDoFullLaziness
+  | CoreDoFloatOutwards Bool	-- True <=> float lambdas to top level
   | CoreLiberateCase
   | CoreDoPrintCore
   | CoreDoStaticArgs
@@ -235,6 +234,7 @@ data SimplifierSwitch
   = MaxSimplifierIterations Int
   | SimplInlinePhase Int
   | DontApplyRules
+  | NoCaseOfCase
   | SimplLetToCase
 \end{code}
 
@@ -426,17 +426,16 @@ opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")
 opt_SimplPedanticBottoms	= lookUp SLIT("-fpedantic-bottoms")
 
 -- Unfolding control
-opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (30::Int)
-opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (30::Int)
+opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (45::Int)
+opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45::Int)
 opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
 opt_UF_ScrutConDiscount		= lookup_def_int "-funfolding-con-discount"	   (2::Int)
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
 opt_UF_PrimArgDiscount		= lookup_def_int "-funfolding-prim-discount"	   (1::Int)
-opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (2.0::Float)
+opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.0::Float)
 
-opt_UF_CheapOp  = ( 0 :: Int)	-- Only one instruction; and the args are charged for
+opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)
-opt_UF_NoRepLit = ( 20 :: Int)	-- Strings can be pretty big
 			
 opt_ProduceS  			= lookup_str "-S="
 opt_ReportCompile               = lookUp SLIT("-freport-compile")
@@ -480,7 +479,8 @@ classifyOpts = sep argv [] [] -- accumulators...
 			   simpl_sep opts defaultSimplSwitches core_td stg_td
 
 	  "-ffloat-inwards"  -> CORE_TD(CoreDoFloatInwards)
-	  "-ffull-laziness"  -> CORE_TD(CoreDoFullLaziness)
+	  "-ffloat-outwards"      -> CORE_TD(CoreDoFloatOutwards False)
+	  "-ffloat-outwards-full" -> CORE_TD(CoreDoFloatOutwards True)
 	  "-fliberate-case"  -> CORE_TD(CoreLiberateCase)
 	  "-fcse"  	     -> CORE_TD(CoreCSE)
 	  "-fprint-core"     -> CORE_TD(CoreDoPrintCore)
@@ -533,6 +533,7 @@ matchSimplSw opt
   = firstJust	[ matchSwInt  opt "-fmax-simplifier-iterations"		MaxSimplifierIterations
 		, matchSwInt  opt "-finline-phase"			SimplInlinePhase
 		, matchSwBool opt "-fno-rules"				DontApplyRules
+		, matchSwBool opt "-fno-case-of-case"			NoCaseOfCase
 		, matchSwBool opt "-flet-to-case"			SimplLetToCase
 		]
 
@@ -568,10 +569,11 @@ tagOf_SimplSwitch (SimplInlinePhase _)		= ILIT(1)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(2)
 tagOf_SimplSwitch DontApplyRules		= ILIT(3)
 tagOf_SimplSwitch SimplLetToCase		= ILIT(4)
+tagOf_SimplSwitch NoCaseOfCase			= ILIT(5)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
-lAST_SIMPL_SWITCH_TAG = 4
+lAST_SIMPL_SWITCH_TAG = 5
 \end{code}
 
 %************************************************************************

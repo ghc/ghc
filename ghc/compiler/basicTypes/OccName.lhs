@@ -14,12 +14,12 @@ module OccName (
 	OccName, 	-- Abstract, instance of Outputable
 	pprOccName, 
 
-	mkSrcOccFS, mkSysOcc, mkSysOccFS, mkSrcVarOcc, mkKindOccFS,
+	mkSrcOccFS, mkSysOcc, mkSysOccFS, mkCCallOcc, mkSrcVarOcc, mkKindOccFS,
 	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
 	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
 	
-	isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc,
+	isTvOcc, isUvOcc, isDataOcc, isDataSymOcc, isSymOcc, isIPOcc, isValOcc,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, occNameFlavour, 
 	setOccNameSpace,
@@ -162,12 +162,19 @@ already encoded
 
 \begin{code}
 mkSysOcc :: NameSpace -> EncodedString -> OccName
-mkSysOcc occ_sp str = ASSERT( alreadyEncoded str )
+mkSysOcc occ_sp str = ASSERT2( alreadyEncoded str, text str )
 		      OccName occ_sp (_PK_ str)
 
 mkSysOccFS :: NameSpace -> EncodedFS -> OccName
 mkSysOccFS occ_sp fs = ASSERT2( alreadyEncodedFS fs, ppr fs )
 		       OccName occ_sp fs
+
+mkCCallOcc :: EncodedString -> OccName
+-- This version of mkSysOcc doesn't check that the string is already encoded,
+-- because it will be something like "{__ccall f dyn Int# -> Int#}" 
+-- This encodes a lot into something that then parses like an Id.
+-- But then alreadyEncoded complains about the braces!
+mkCCallOcc str = OccName varName (_PK_ str)
 
 -- Kind constructors get a speical function.  Uniquely, they are not encoded,
 -- so that they have names like '*'.  This means that *even in interface files*
@@ -225,13 +232,17 @@ isTvOcc other              = False
 isUvOcc (OccName UvName _) = True
 isUvOcc other              = False
 
+isValOcc (OccName VarName  _) = True
+isValOcc (OccName DataName _) = True
+isValOcc other		      = False
+
 -- Data constructor operator (starts with ':', or '[]')
 -- Pretty inefficient!
 isDataSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
 isDataSymOcc other		  = False
 
 isDataOcc (OccName DataName _) = True
-isDataOcc oter		       = False
+isDataOcc other		       = False
 
 -- Any operator (data constructor or variable)
 -- Pretty inefficient!
@@ -446,6 +457,10 @@ alreadyEncoded :: String -> Bool
 alreadyEncoded s = all ok s
 		 where
 		   ok '_' = True
+		   ok ' ' = True		-- This is a bit of a lie; if we really wanted spaces
+						-- in names we'd have to encode them.  But we do put
+						-- spaces in ccall "occurrences", and we don't want to
+						-- reject them here
 		   ok ch  = ISALPHANUM ch
 
 alreadyEncodedFS :: FAST_STRING -> Bool

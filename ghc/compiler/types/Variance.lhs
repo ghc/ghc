@@ -15,7 +15,7 @@ import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( mkDictTy )
 import TyCon            ( TyCon, ArgVrcs, tyConKind, tyConArity, tyConDataCons, tyConTyVars,
                           tyConArgVrcs_maybe, getSynTyConDefn, isSynTyCon, isAlgTyCon )
-import DataCon          ( dataConRawArgTys, dataConSig )
+import DataCon          ( dataConRepArgTys )
 
 import FiniteMap
 import Var              ( TyVar )
@@ -78,14 +78,12 @@ calcTyConArgVrcs tycons
     tcaoIter oi tc | isAlgTyCon tc
       = let cs        = tyConDataCons tc
             vs        = tyConTyVars tc
-	    argtys    = concatMap dataConRawArgTys cs
-            exdicttys = concatMap ((\ (_,_,_,exth,_,_) -> map (uncurry mkDictTy) exth)
-                                   . dataConSig) cs
+	    argtys    = concatMap dataConRepArgTys cs
 	    myfao tc  = lookupWithDefaultFM oi (expectJust "tcaoIter(Alg)" $
                                                   tyConArgVrcs_maybe tc)
                                                tc
                         -- we use the already-computed result for tycons not in this SCC
-        in  map (\v -> anyVrc (\ty -> vrcInTy myfao v ty) (exdicttys ++ argtys))
+        in  map (\v -> anyVrc (\ty -> vrcInTy myfao v ty) argtys)
                 vs
 
     tcaoIter oi tc | isSynTyCon tc

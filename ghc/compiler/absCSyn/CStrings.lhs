@@ -2,6 +2,7 @@ This module deals with printing C string literals
 
 \begin{code}
 module CStrings(
+	CLabelString, isCLabelString,
 	cSEP, pp_cSEP,
 
 	stringToC, charToC, pprFSInCStyle,
@@ -10,23 +11,33 @@ module CStrings(
 
 #include "HsVersions.h"
 
-import Char	( ord, chr )
+import Char	( ord, chr, isAlphaNum )
 import Outputable
 \end{code}
 
 
 \begin{code}
+type CLabelString = FAST_STRING		-- A C label, completely unencoded
+
+isCLabelString :: CLabelString -> Bool	-- Checks to see if this is a valid C label
+isCLabelString lbl 
+  = all ok (_UNPK_ lbl)
+  where
+    ok c = isAlphaNum c || c == '_' || c == '.'
+	-- The '.' appears in e.g. "foo.so" in the 
+	-- module part of a ExtName.  Maybe it should be separate
+
 cSEP    = SLIT("_")	-- official C separator
 pp_cSEP = char '_'
+\end{code}
 
-stringToC   :: String -> String
-charToC, charToEasyHaskell :: Char -> String
-
+\begin{code}
 pprFSInCStyle :: FAST_STRING -> SDoc
 pprFSInCStyle fs = doubleQuotes (text (stringToC (_UNPK_ fs)))
 
--- stringToC: the hassle is what to do w/ strings like "ESC 0"...
-
+stringToC   :: String -> String
+-- Convert a string to the form required by C in a C literal string
+-- Tthe hassle is what to do w/ strings like "ESC 0"...
 stringToC ""  = ""
 stringToC [c] = charToC c
 stringToC (c:cs)
@@ -45,6 +56,8 @@ stringToC (c:cs)
 		| c == '\v' = "\\v"
 		| otherwise = '\\' : (octify (ord c))
 
+charToC :: Char -> String
+-- Convert a character to the form reqd in a C character literal
 charToC c = if (c >= ' ' && c <= '~')	-- non-portable...
 	    then case c of
 		  '\'' -> "\\'"
@@ -60,8 +73,8 @@ charToC c = if (c >= ' ' && c <= '~')	-- non-portable...
 		  _    -> [c]
 	    else '\\' : (octify (ord c))
 
--- really: charToSimpleHaskell
-
+charToEasyHaskell :: Char -> String
+-- Convert a character to the form reqd in a Haskell character literal
 charToEasyHaskell c
   = if (c >= 'a' && c <= 'z')
     || (c >= 'A' && c <= 'Z')

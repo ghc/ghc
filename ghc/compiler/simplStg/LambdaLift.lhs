@@ -11,7 +11,7 @@ module LambdaLift ( liftProgram ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
-import Id		( mkVanillaId, idType, setIdArity, Id )
+import Id		( mkVanillaId, idType, setIdArityInfo, Id )
 import VarSet
 import VarEnv
 import IdInfo		( exactArity )
@@ -144,7 +144,9 @@ liftExpr :: StgExpr
 	 -> LiftM (StgExpr, LiftInfo)
 
 
-liftExpr expr@(StgCon con args _) = returnLM (expr, emptyLiftInfo)
+liftExpr expr@(StgLit _) 	 = returnLM (expr, emptyLiftInfo)
+liftExpr expr@(StgConApp _ _)	 = returnLM (expr, emptyLiftInfo)
+liftExpr expr@(StgPrimApp _ _ _) = returnLM (expr, emptyLiftInfo)
 
 liftExpr expr@(StgApp v args)
   = lookUp v		`thenLM` \ ~(sc, sc_args) ->	-- NB the ~.  We don't want to
@@ -442,7 +444,7 @@ newSupercombinator :: Type
 
 newSupercombinator ty arity mod ci us idenv
   = mkVanillaId (mkTopName uniq mod SLIT("_ll")) ty
-    `setIdArity` exactArity arity
+    `setIdArityInfo` exactArity arity
 	-- ToDo: rm the setIdArity?  Just let subsequent stg-saturation pass do it?
   where
     uniq = uniqFromSupply us

@@ -27,7 +27,6 @@ module StgStats ( showStgStats ) where
 
 import StgSyn
 
-import Const		( Con(..) )
 import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList, FiniteMap )
 import Id (Id)
 \end{code}
@@ -149,20 +148,11 @@ statRhs top (b, StgRhsClosure cc bi srt fv u args body)
 \begin{code}
 statExpr :: StgExpr -> StatEnv
 
-statExpr (StgApp _ _)
-  = countOne Applications
-
-statExpr (StgCon (DataCon _) as _)
-  = countOne ConstructorApps
-
-statExpr (StgCon (PrimOp _) as _)
-  = countOne PrimitiveApps
-
-statExpr (StgCon (Literal _) as _)
-  = countOne Literals
-
-statExpr (StgSCC l e)
-  = statExpr e
+statExpr (StgApp _ _)	    = countOne Applications
+statExpr (StgLit _)	    = countOne Literals
+statExpr (StgConApp _ _)    = countOne ConstructorApps
+statExpr (StgPrimApp _ _ _) = countOne PrimitiveApps
+statExpr (StgSCC l e) 	    = statExpr e
 
 statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
   = statBinding False{-not top-level-} binds	`combineSE`

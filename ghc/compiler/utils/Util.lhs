@@ -15,11 +15,14 @@ module Util (
 
 	-- general list processing
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
-        zipLazy, stretchZipEqual,
+        zipLazy, stretchZipWith,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, lengthExceeds, isSingleton, only,
 	snocView,
 	isIn, isn'tIn,
+
+	-- for-loop
+	nTimes,
 
 	-- association lists
 	assoc, assocUsing, assocDefault, assocDefaultUsing,
@@ -104,6 +107,21 @@ mapEager f (x:xs) = f x			`thenEager` \ y ->
 
 %************************************************************************
 %*									*
+\subsection{A for loop}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- Compose a function with itself n times.  (nth rather than twice)
+nTimes :: Int -> (a -> a) -> (a -> a)
+nTimes 0 _ = id
+nTimes 1 f = f
+nTimes n f = f . nTimes (n-1) f
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection[Utils-lists]{General list processing}
 %*									*
 %************************************************************************
@@ -154,13 +172,16 @@ zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
 
 
 \begin{code}
-stretchZipEqual :: (a -> b -> Maybe a) -> [a] -> [b] -> [a]
--- (stretchZipEqual f xs ys) stretches ys to "fit" the places where f returns a Just
+stretchZipWith :: (a -> Bool) -> b -> (a->b->c) -> [a] -> [b] -> [c]
+-- (stretchZipWith p z f xs ys) stretches ys by inserting z in 
+-- the places where p returns *True*
 
-stretchZipEqual f [] [] = []
-stretchZipEqual f (x:xs) (y:ys) = case f x y of
-				    Just x' -> x' : stretchZipEqual f xs ys
-				    Nothing -> x  : stretchZipEqual f xs (y:ys)
+stretchZipWith p z f [] ys = []
+stretchZipWith p z f (x:xs) ys
+  | p x       = f x z : stretchZipWith p z f xs ys
+  | otherwise = case ys of
+		  []     -> []
+		  (y:ys) -> f x y : stretchZipWith p z f xs ys
 \end{code}
 
 

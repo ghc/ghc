@@ -13,14 +13,13 @@ module StgVarInfo ( setStgVarInfo ) where
 
 import StgSyn
 
-import Id		( setIdArity, getIdArity, setIdOccInfo, Id )
+import Id		( setIdArityInfo, idArity, setIdOccInfo, Id )
 import VarSet
 import VarEnv
 import Var
-import Const		( Con(..) )
 import IdInfo		( ArityInfo(..), OccInfo(..), 
 			  setInlinePragInfo )
-import PrimOp		( PrimOp(..) )
+import PrimOp		( PrimOp(..), ccallMayGC )
 import TysWiredIn       ( isForeignObjTy )
 import Maybes		( maybeToBool, orElse )
 import Name		( isLocallyDefined )
@@ -129,7 +128,7 @@ varsTopBinds (bind:binds)
 			StgNonRec binder rhs -> [(binder,rhs)]
 			StgRec pairs         -> pairs
 
-    binders' = [ binder `setIdArity` ArityExactly (rhsArity rhs) 
+    binders' = [ binder `setIdArityInfo` ArityExactly (rhsArity rhs) 
 	       | (binder, rhs) <- pairs
 	       ]
 
@@ -212,13 +211,8 @@ to do it before the SRT pass to save the SRT entries associated with
 any top-level PAPs.
 
 \begin{code}
-isPAP (StgApp f args) 
-  = case getIdArity f of
-	   ArityExactly n -> n > n_args
-	   ArityAtLeast n -> n > n_args
-	   _              -> False
-   where n_args = length args
-isPAP _ = False
+isPAP (StgApp f args) = idArity f > length args
+isPAP _ 	      = False
 \end{code}
 
 \begin{code}
@@ -232,10 +226,10 @@ varsAtoms atoms
   = mapAndUnzipLne var_atom atoms	`thenLne` \ (args', fvs_lists) ->
     returnLne (args', unionFVInfos fvs_lists)
   where
-    var_atom a@(StgConArg _) = returnLne (a, emptyFVInfo)
     var_atom a@(StgVarArg v)
       = lookupVarLne v	`thenLne` \ (v', how_bound) ->
 	returnLne (StgVarArg v', singletonFVInfo v' how_bound stgArgOcc)
+    var_atom a = returnLne (a, emptyFVInfo)
 \end{code}
 
 %************************************************************************
@@ -272,12 +266,17 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
+varsExpr (StgLit l)	 = returnLne (StgLit l, emptyFVInfo, emptyVarSet)
+
 varsExpr (StgApp f args) = varsApp Nothing f args
 
-varsExpr (StgCon con args res_ty)
-  = getVarsLiveInCont		`thenLne` \ live_in_cont ->
-    varsAtoms args		`thenLne` \ (args', args_fvs) ->
-    returnLne (StgCon con args' res_ty, args_fvs, getFVSet args_fvs)
+varsExpr (StgConApp con args)
+  = varsAtoms args		`thenLne` \ (args', args_fvs) ->
+    returnLne (StgConApp con args', args_fvs, getFVSet args_fvs)
+
+varsExpr (StgPrimApp op args res_ty)
+  = varsAtoms args		`thenLne` \ (args', args_fvs) ->
+    returnLne (StgPrimApp op args' res_ty, args_fvs, getFVSet args_fvs)
 
 varsExpr (StgSCC cc expr)
   = varsExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
@@ -302,9 +301,10 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
 	 -- in the alts to achieve the desired effect.
 	mb_live_across_case =
 	  case scrut of
-	    StgCon (PrimOp (CCallOp _ _ True{- _ccall_GC_ -} _)) args _ ->
-	         Just (foldl findLiveArgs emptyVarSet args)
-	    _ -> Nothing
+	    StgPrimApp (CCallOp ccall)  args _
+		|  ccallMayGC ccall
+	        -> Just (foldl findLiveArgs emptyVarSet args)
+	    _   -> Nothing
 
 	-- don't consider the default binder as being 'live in alts',
 	-- since this is from the point of view of the case expr, where
@@ -413,10 +413,10 @@ call. This only an issue
 
 \begin{code}
 findLiveArgs :: StgLiveVars -> StgArg -> StgLiveVars
-findLiveArgs lvs (StgConArg _) = lvs
 findLiveArgs lvs (StgVarArg x) 
    | isForeignObjTy (idType x) = extendVarSet lvs x
    | otherwise		       = lvs
+findLiveArgs lvs arg	       = lvs
 \end{code}
 
 
@@ -440,42 +440,35 @@ varsApp maybe_thunk_body f args
     let
 	n_args		 = length args
 	not_letrec_bound = not (isLetrecBound how_bound)
-	f_arity          = getIdArity f'
+	f_arity          = idArity f'	-- Will have an exact arity by now
 	fun_fvs	 	 = singletonFVInfo f' how_bound fun_occ
 
 	fun_occ 
-	  | not_letrec_bound
-	  = NoStgBinderInfo		-- Uninteresting variable
-
-	  | otherwise			-- Letrec bound; must have its arity
-	  = case f_arity of
-	      ArityExactly arity
-		| n_args == 0 -> stgFakeFunAppOcc   -- Function Application
-						    -- with no arguments.
-						    -- used by the lambda lifter.
-		| arity > n_args -> stgUnsatOcc	    -- Unsaturated
+	  | not_letrec_bound = NoStgBinderInfo		-- Uninteresting variable
+		
+		-- Otherwise it is letrec bound; must have its arity
+	  | n_args == 0 = stgFakeFunAppOcc	-- Function Application
+						-- with no arguments.
+						-- used by the lambda lifter.
+	  | f_arity > n_args = stgUnsatOcc	-- Unsaturated
 
 
-		| arity == n_args &&
-		  maybeToBool maybe_thunk_body ->   -- Exactly saturated,
-						    -- and rhs of thunk
-			case maybe_thunk_body of
-				Just Updatable   -> stgStdHeapOcc
-				Just SingleEntry -> stgNoUpdHeapOcc
-				other		 -> panic "varsApp"
+	  | f_arity == n_args &&
+	    maybeToBool maybe_thunk_body   	-- Exactly saturated,
+						-- and rhs of thunk
+	  = case maybe_thunk_body of
+		Just Updatable   -> stgStdHeapOcc
+		Just SingleEntry -> stgNoUpdHeapOcc
+		other		 -> panic "varsApp"
 
-		| otherwise ->  stgNormalOcc
+	  | otherwise =  stgNormalOcc
 				-- Record only that it occurs free
 
 	myself = unitVarSet f'
 
-	fun_escs | not_letrec_bound = emptyVarSet	-- Only letrec-bound escapees are interesting
-		 | otherwise	    = case f_arity of	-- Letrec bound, so must have its arity
-				        ArityExactly arity
-				          | arity == n_args -> emptyVarSet
-					  	-- Function doesn't escape
-					  | otherwise -> myself
-						-- Inexact application; it does escape
+	fun_escs | not_letrec_bound  = emptyVarSet	-- Only letrec-bound escapees are interesting
+		 | f_arity == n_args = emptyVarSet  	-- Function doesn't escape
+		 | otherwise 	     = myself		-- Inexact application; it does escape
 
 	-- At the moment of the call:
 
@@ -591,7 +584,7 @@ vars_let let_no_escape bind body
 			StgRec pairs         -> map fst pairs
 
     mk_binding bind_lvs (binder,rhs)
-	= (binder `setIdArity` ArityExactly (stgArity rhs),
+	= (binder `setIdArityInfo` ArityExactly (stgArity rhs),
 	   LetrecBound  False		-- Not top level
 			live_vars
 	  )
@@ -834,7 +827,7 @@ rhsArity (StgRhsCon _ _ _)              = 0
 rhsArity (StgRhsClosure _ _ _ _ _ args _) = length args
 
 zapArity :: Id -> Id
-zapArity id = id `setIdArity` UnknownArity
+zapArity id = id `setIdArityInfo` UnknownArity
 \end{code}
 
 

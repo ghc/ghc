@@ -13,19 +13,19 @@ module StrictAnal ( saBinds ) where
 
 import CmdLineOpts	( opt_D_dump_stranal, opt_D_dump_simpl_stats,  opt_D_verbose_core2core )
 import CoreSyn
-import Id		( idType, setIdStrictness,
-			  getIdDemandInfo, setIdDemandInfo,
+import Id		( idType, setIdStrictness, setInlinePragma, 
+			  idDemandInfo, setIdDemandInfo, isBottomingId,
 			  Id
 			)
-import IdInfo		( mkStrictnessInfo )
+import IdInfo		( InlinePragInfo(..) )
 import CoreLint		( beginPass, endPass )
-import Type		( repType, splitFunTys )
+import Type		( splitRepFunTys )
 import ErrUtils		( dumpIfSet )
 import SaAbsInt
 import SaLib
-import Demand		( isStrict )
+import Demand		( Demand, wwStrict, isStrict, isLazy )
 import UniqSupply       ( UniqSupply )
-import Util		( zipWith4Equal )
+import Util		( zipWith3Equal, stretchZipWith )
 import Outputable
 \end{code}
 
@@ -148,7 +148,7 @@ saTopBind :: StrictEnv -> AbsenceEnv
 	  -> SaM (StrictEnv, AbsenceEnv, CoreBind)
 
 saTopBind str_env abs_env (NonRec binder rhs)
-  = saExpr str_env abs_env rhs 	`thenSa` \ new_rhs ->
+  = saExpr minDemand str_env abs_env rhs 	`thenSa` \ new_rhs ->
     let
 	str_rhs = absEval StrAnal rhs str_env
 	abs_rhs = absEval AbsAnal rhs abs_env
@@ -159,10 +159,9 @@ saTopBind str_env abs_env (NonRec binder rhs)
 		-- See notes on Let case in SaAbsInt.lhs
 
 	new_binder
-	  = addStrictnessInfoToId
+	  = addStrictnessInfoToTopId
 		widened_str_rhs widened_abs_rhs
 		binder
-		rhs
 
 	  -- Augment environments with a mapping of the
 	  -- binder to its abstract values, computed by absEval
@@ -179,14 +178,25 @@ saTopBind str_env abs_env (Rec pairs)
 		      -- fixpoint returns widened values
       	new_str_env = growAbsValEnvList str_env (binders `zip` str_rhss)
       	new_abs_env = growAbsValEnvList abs_env (binders `zip` abs_rhss)
-	new_binders = zipWith4Equal "saTopBind" addStrictnessInfoToId
-				    str_rhss abs_rhss binders rhss
+	new_binders = zipWith3Equal "saTopBind" addStrictnessInfoToTopId
+				    str_rhss abs_rhss binders
     in
-    mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
+    mapSa (saExpr minDemand new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
     let
 	new_pairs   = new_binders `zip` new_rhss
     in
     returnSa (new_str_env, new_abs_env, Rec new_pairs)
+
+-- Top level divergent bindings are marked NOINLINE
+-- This avoids fruitless inlining of top level error functions
+addStrictnessInfoToTopId str_val abs_val bndr
+  = if isBottomingId new_id then
+	new_id `setInlinePragma` IMustNotBeINLINEd False Nothing
+		-- This is a NOINLINE pragma
+    else
+	new_id
+  where
+    new_id = addStrictnessInfoToId str_val abs_val bndr
 \end{code}
 
 %************************************************************************
@@ -199,49 +209,84 @@ saTopBind str_env abs_env (Rec pairs)
 environment.
 
 \begin{code}
-saExpr :: StrictEnv -> AbsenceEnv -> CoreExpr -> SaM CoreExpr
+saExpr :: Demand -> StrictEnv -> AbsenceEnv -> CoreExpr -> SaM CoreExpr
+	-- The demand is the least demand we expect on the
+	-- expression.  WwStrict is the least, because we're only
+	-- interested in the expression at all if it's being evaluated,
+	-- but the demand may be more.  E.g.
+	--	f E
+	-- where f has strictness u(LL), will evaluate E with demand u(LL)
 
-saExpr _ _ e@(Var _)	= returnSa e
-saExpr _ _ e@(Con  _ _)	= returnSa e
-saExpr _ _ e@(Type _)	= returnSa e
+minDemand = wwStrict 
+minDemands = repeat minDemand
 
-saExpr str_env abs_env (Lam bndr body)
+-- When we find an application, do the arguments
+-- with demands gotten from the function
+saApp str_env abs_env (fun, args)
+  = sequenceSa sa_args				`thenSa` \ args' ->
+    saExpr minDemand str_env abs_env fun	`thenSa` \ fun'  -> 
+    returnSa (mkApps fun' args')
+  where
+    arg_dmds = case fun of
+		 Var var -> case lookupAbsValEnv str_env var of
+				Just (AbsApproxFun ds _) | length ds >= length args 
+					-> ds ++ minDemands
+				other   -> minDemands
+		 other -> minDemands
+
+    sa_args = stretchZipWith isTypeArg (error "saApp:dmd") 
+			     sa_arg args arg_dmds 
+	-- The arg_dmds are for value args only, we need to skip
+	-- over the type args when pairing up with the demands
+	-- Hence the stretchZipWith
+
+    sa_arg arg dmd = saExpr dmd' str_env abs_env arg
+		   where
+			-- Bring arg demand up to minDemand
+			dmd' | isLazy dmd = minDemand
+			     | otherwise  = dmd
+
+saExpr _ _ _ e@(Var _)	= returnSa e
+saExpr _ _ _ e@(Lit _)	= returnSa e
+saExpr _ _ _ e@(Type _)	= returnSa e
+
+saExpr dmd str_env abs_env (Lam bndr body)
   =	-- Don't bother to set the demand-info on a lambda binder
 	-- We do that only for let(rec)-bound functions
-    saExpr str_env abs_env body	`thenSa` \ new_body ->
+    saExpr minDemand str_env abs_env body	`thenSa` \ new_body ->
     returnSa (Lam bndr new_body)
 
-saExpr str_env abs_env (App fun arg)
-  = saExpr str_env abs_env fun	`thenSa` \ new_fun ->
-    saExpr str_env abs_env arg	`thenSa` \ new_arg ->
-    returnSa (App new_fun new_arg)
+saExpr dmd str_env abs_env e@(App fun arg)
+  = saApp str_env abs_env (collectArgs e)
 
-saExpr str_env abs_env (Note note expr)
-  = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
+saExpr dmd str_env abs_env (Note note expr)
+  = saExpr dmd str_env abs_env expr	`thenSa` \ new_expr ->
     returnSa (Note note new_expr)
 
-saExpr str_env abs_env (Case expr case_bndr alts)
-  = saExpr str_env abs_env expr		`thenSa` \ new_expr  ->
-    mapSa sa_alt alts			`thenSa` \ new_alts  ->
+saExpr dmd str_env abs_env (Case expr case_bndr alts)
+  = saExpr minDemand str_env abs_env expr	`thenSa` \ new_expr  ->
+    mapSa sa_alt alts				`thenSa` \ new_alts  ->
     let
-	new_case_bndr = addDemandInfoToCaseBndr str_env abs_env alts case_bndr
+	new_case_bndr = addDemandInfoToCaseBndr dmd str_env abs_env alts case_bndr
     in
     returnSa (Case new_expr new_case_bndr new_alts)
   where
     sa_alt (con, binders, rhs)
-      = saExpr str_env abs_env rhs  `thenSa` \ new_rhs ->
+      = saExpr dmd str_env abs_env rhs  `thenSa` \ new_rhs ->
 	let
 	    new_binders = map add_demand_info binders
 	    add_demand_info bndr | isTyVar bndr = bndr
-			  	 | otherwise	= addDemandInfoToId str_env abs_env rhs bndr
+			  	 | otherwise	= addDemandInfoToId dmd str_env abs_env rhs bndr
 	in
 	tickCases new_binders	    `thenSa_` -- stats
 	returnSa (con, new_binders, new_rhs)
 
-saExpr str_env abs_env (Let (NonRec binder rhs) body)
+saExpr dmd str_env abs_env (Let (NonRec binder rhs) body)
   =	-- Analyse the RHS in the environment at hand
-    saExpr str_env abs_env rhs  `thenSa` \ new_rhs  ->
     let
+	-- Find the demand on the RHS
+	rhs_dmd = findDemand dmd str_env abs_env body binder
+
 	-- Bind this binder to the abstract value of the RHS; analyse
 	-- the body of the `let' in the extended environment.
       	str_rhs_val  	= absEval StrAnal rhs str_env
@@ -259,14 +304,14 @@ saExpr str_env abs_env (Let (NonRec binder rhs) body)
 	-- to record DemandInfo/StrictnessInfo in the binder.
 	new_binder = addStrictnessInfoToId
 			widened_str_rhs widened_abs_rhs
-			(addDemandInfoToId str_env abs_env body binder)
-			rhs
+			(binder `setIdDemandInfo` rhs_dmd)
     in
-    tickLet new_binder			`thenSa_` -- stats
-    saExpr new_str_env new_abs_env body	`thenSa` \ new_body ->
+    tickLet new_binder				`thenSa_` -- stats
+    saExpr rhs_dmd str_env abs_env rhs		`thenSa` \ new_rhs  ->
+    saExpr dmd new_str_env new_abs_env body	`thenSa` \ new_body ->
     returnSa (Let (NonRec new_binder new_rhs) new_body)
 
-saExpr str_env abs_env (Let (Rec pairs) body)
+saExpr dmd str_env abs_env (Let (Rec pairs) body)
   = let
 	(binders,rhss) = unzip pairs
 	str_vals       = fixpoint StrAnal binders rhss str_env
@@ -275,10 +320,9 @@ saExpr str_env abs_env (Let (Rec pairs) body)
       	new_str_env    = growAbsValEnvList str_env (binders `zip` str_vals)
       	new_abs_env    = growAbsValEnvList abs_env (binders `zip` abs_vals)
     in
-    saExpr new_str_env new_abs_env body		`thenSa` \ new_body ->
-    mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
+    saExpr dmd new_str_env new_abs_env body			`thenSa` \ new_body ->
+    mapSa (saExpr minDemand new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
     let
---	new_binders      = addDemandInfoToIds new_str_env new_abs_env body binders
 -- 		DON'T add demand info in a Rec!
 --		a) it's useless: we can't do let-to-case
 --		b) it's incorrect.  Consider
@@ -290,8 +334,8 @@ saExpr str_env abs_env (Let (Rec pairs) body)
 --		   deciding that y is absent, which is plain wrong!
 --		It's much easier simply not to do this.
 
-	improved_binders = zipWith4Equal "saExpr" addStrictnessInfoToId
-				         str_vals abs_vals binders rhss
+	improved_binders = zipWith3Equal "saExpr" addStrictnessInfoToId
+				         str_vals abs_vals binders
 
       	new_pairs   = improved_binders `zip` new_rhss
     in
@@ -321,46 +365,23 @@ addStrictnessInfoToId
 	:: AbsVal 		-- Abstract strictness value
 	-> AbsVal		-- Ditto absence
 	-> Id 			-- The id
-	-> CoreExpr	-- Its RHS
 	-> Id			-- Augmented with strictness
 
-addStrictnessInfoToId str_val abs_val binder body
-  = binder `setIdStrictness` mkStrictnessInfo strictness
-  where
-    arg_tys = collect_arg_tys (idType binder)
-    strictness = findStrictness arg_tys str_val abs_val
-
-    collect_arg_tys ty
-	| null arg_tys = []
-	| otherwise    = arg_tys ++ collect_arg_tys res_ty
-	where
-	  (arg_tys, res_ty) = splitFunTys (repType ty)
-    -- repType looks through for-alls and new-types.  And since we look on the
-    -- type info, we aren't confused by INLINE prags.
-    -- In particular, foldr is marked INLINE,
-    -- but we still want it to be strict in its third arg, so that
-    --	foldr k z (case e of p -> build g) 
-    -- gets transformed to
-    --	case e of p -> foldr k z (build g)
-    -- [foldr is only inlined late in compilation, after strictness analysis]
+addStrictnessInfoToId str_val abs_val binder
+  = binder `setIdStrictness` findStrictness binder str_val abs_val
 \end{code}
 
 \begin{code}
-addDemandInfoToId :: StrictEnv -> AbsenceEnv
+addDemandInfoToId :: Demand -> StrictEnv -> AbsenceEnv
 		  -> CoreExpr 	-- The scope of the id
 		  -> Id
 		  -> Id			-- Id augmented with Demand info
 
-addDemandInfoToId str_env abs_env expr binder
-  = binder `setIdDemandInfo` (findDemand str_env abs_env expr binder)
+addDemandInfoToId dmd str_env abs_env expr binder
+  = binder `setIdDemandInfo` (findDemand dmd str_env abs_env expr binder)
 
-addDemandInfoToCaseBndr str_env abs_env alts binder
-  = binder `setIdDemandInfo` (findDemandAlts str_env abs_env alts binder)
-
-addDemandInfoToIds :: StrictEnv -> AbsenceEnv -> CoreExpr -> [Id] -> [Id]
-
-addDemandInfoToIds str_env abs_env expr binders
-  = map (addDemandInfoToId str_env abs_env expr) binders
+addDemandInfoToCaseBndr dmd str_env abs_env alts binder
+  = binder `setIdDemandInfo` (findDemandAlts dmd str_env abs_env alts binder)
 \end{code}
 
 %************************************************************************
@@ -419,7 +440,7 @@ tick_demanded var (tot, demanded)
   | isTyVar var = (tot, demanded)
   | otherwise
   = (tot + 1,
-     if (isStrict (getIdDemandInfo var))
+     if (isStrict (idDemandInfo var))
      then demanded + 1
      else demanded)
 
@@ -448,8 +469,13 @@ tickLet    var  = panic "OMIT_STRANAL_STATS: tickLet"
 mapSa	      :: (a -> SaM b) -> [a] -> SaM [b]
 
 mapSa f []     = returnSa []
-mapSa f (x:xs)
-  = f x		`thenSa` \ r  ->
-    mapSa f xs	`thenSa` \ rs ->
-    returnSa (r:rs)
+mapSa f (x:xs) = f x		`thenSa` \ r  ->
+		 mapSa f xs	`thenSa` \ rs ->
+		 returnSa (r:rs)
+
+sequenceSa :: [SaM a] -> SaM [a]
+sequenceSa []     = returnSa []
+sequenceSa (m:ms) = m		  `thenSa` \ r ->
+		    sequenceSa ms `thenSa` \ rs ->
+		    returnSa (r:rs)
 \end{code}

@@ -7,14 +7,16 @@ import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
 import HsTypes		( mkHsForAllTy, mkHsUsForAllTy )
 import HsCore
-import Const		( Literal(..), mkMachInt_safe )
+import Literal		( Literal(..), mkMachInt, mkMachInt64, mkMachWord, mkMachWord64 )
 import BasicTypes	( Fixity(..), FixityDirection(..), 
 			  NewOrData(..), Version
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
+import CallConv         ( cCallConv )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind, UsageAnn(..) )
 import IdInfo           ( ArityInfo, exactArity, CprInfo(..), InlinePragInfo(..) )
+import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
@@ -23,14 +25,13 @@ import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..
 			) 
 import Bag		( emptyBag, unitBag, snocBag )
 import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
-import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
+import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual, mkRdrNameWkr )
 import Name		( OccName, Provenance )
 import OccName          ( mkSysOccFS,
 			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
 			  EncodedFS 
 			)
 import Module           ( ModuleName, mkSysModuleFS )			
-import PrelMods         ( mkTupNameStr, mkUbxTupNameStr )
 import PrelInfo         ( mkTupConRdrName, mkUbxTupConRdrName )
 import SrcLoc		( SrcLoc )
 import Maybes
@@ -95,6 +96,9 @@ import Ratio ( (%) )
  '__bot'	{ ITbottom }
  '__integer'	{ ITinteger_lit }
  '__float'	{ ITfloat_lit }
+ '__word'	{ ITword_lit }
+ '__int64'	{ ITint64_lit }
+ '__word64'	{ ITword64_lit }
  '__rational'	{ ITrational_lit }
  '__addr'	{ ITaddr_lit }
  '__litlit'	{ ITlit_lit }
@@ -112,8 +116,8 @@ import Ratio ( (%) )
  '__U'		{ ITunfold $$ }
  '__S'		{ ITstrict $$ }
  '__R'		{ ITrules }
+ '__M'		{ ITcprinfo }
  '__D'		{ ITdeprecated }
- '__M'		{ ITcprinfo $$ }
 
  '..'		{ ITdotdot }  			-- reserved symbols
  '::'		{ ITdcolon }
@@ -405,15 +409,15 @@ constrs1	:  constr		{ [$1] }
 		|  constr '|' constrs1	{ $1 : $3 }
 
 constr		:: { RdrNameConDecl }
-constr		:  src_loc ex_stuff data_name batypes		{ mkConDecl $3 $2 (VanillaCon $4) $1 }
-		|  src_loc ex_stuff data_name '{' fields1 '}'	{ mkConDecl $3 $2 (RecCon $5)     $1 }
+constr		:  src_loc ex_stuff data_name batypes		{ mk_con_decl $3 $2 (VanillaCon $4) $1 }
+		|  src_loc ex_stuff data_name '{' fields1 '}'	{ mk_con_decl $3 $2 (RecCon $5)     $1 }
                 -- We use "data_fs" so as to include ()
 
 newtype_constr	:: { [RdrNameConDecl] {- Empty if handwritten abstract -} }
 newtype_constr	:  					{ [] }
-		| src_loc '=' ex_stuff data_name atype	{ [mkConDecl $4 $3 (NewCon $5 Nothing) $1] }
+		| src_loc '=' ex_stuff data_name atype	{ [mk_con_decl $4 $3 (NewCon $5 Nothing) $1] }
 		| src_loc '=' ex_stuff data_name '{' var_name '::' atype '}'
-							{ [mkConDecl $4 $3 (NewCon $8 (Just $6)) $1] }
+							{ [mk_con_decl $4 $3 (NewCon $8 (Just $6)) $1] }
 
 ex_stuff :: { ([HsTyVar RdrName], RdrNameContext) }
 ex_stuff	:                                       { ([],[]) }
@@ -662,7 +666,7 @@ id_info		:: { [HsIdInfo RdrName] }
 id_info_item	:: { HsIdInfo RdrName }
 		: '__A' INTEGER			{ HsArity (exactArity (fromInteger $2)) }
 		| '__U' inline_prag core_expr	{ HsUnfold $2 $3 }
-		| '__M'				{ HsCprInfo $1 }
+		| '__M'				{ HsCprInfo }
 		| '__S'				{ HsStrictness (HsStrictnessInfo $1) }
 		| '__C'                         { HsNoCafRefs }
 		| '__P' qvar_name 		{ HsWorker $2 }
@@ -683,8 +687,7 @@ core_expr	: '\\' core_bndrs '->' core_expr	{ foldr UfLam $4 $2 }
 		| '__letrec' '{' rec_binds '}'		
 		  'in' core_expr			{ UfLet (UfRec $3) $6 }
 
-		| con_or_primop '{' core_args '}'	{ UfCon $1 $3 }
-                | '__litlit' STRING atype               { UfCon (UfLitLitCon $2 $3) [] }
+                | '__litlit' STRING atype               { UfLitLit $2 $3 }
 
                 | '__inline_me' core_expr               { UfNote UfInlineMe $2 }
                 | '__inline_call' core_expr             { UfNote UfInlineCall $2 }
@@ -706,7 +709,6 @@ core_args	:: { [UfExpr RdrName] }
 
 core_aexpr      :: { UfExpr RdrName }              -- Atomic expressions
 core_aexpr      : qvar_name				        { UfVar $1 }
-
                 | qdata_name                                    { UfVar $1 }
 			-- This one means that e.g. "True" will parse as 
 			-- (UfVar True_Id) rather than (UfCon True_Con []).
@@ -717,13 +719,29 @@ core_aexpr      : qvar_name				        { UfVar $1 }
 			-- If you want to get a UfCon, then use the
 			-- curly-bracket notation (True {}).
 
-		| core_lit		 { UfCon (UfLitCon $1) [] }
-		| '(' core_expr ')'	 { $2 }
-		| '(' comma_exprs2 ')'	 { UfTuple (mkTupConRdrName (length $2)) $2 }
-		| '(#' comma_exprs0 '#)' { UfTuple (mkUbxTupConRdrName (length $2)) $2 }
-
 -- This one is dealt with by qdata_name: see above comments
 --		| '('  ')'	 	 { UfTuple (mkTupConRdrName 0) [] }
+
+		| core_lit		 { UfLit $1 }
+		| '(' core_expr ')'	 { $2 }
+
+			-- Tuple construtors are for the *worker* of the tuple
+			-- Going direct saves needless messing about 
+		| '(' comma_exprs2 ')'	 { UfTuple (mkRdrNameWkr (mkTupConRdrName (length $2))) $2 }
+		| '(#' comma_exprs0 '#)' { UfTuple (mkRdrNameWkr (mkUbxTupConRdrName (length $2))) $2 }
+
+                | '{' '__ccall' ccall_string type '}'       
+                           { let
+                                 (is_dyn, is_casm, may_gc) = $2
+
+			         target | is_dyn    = DynamicTarget (error "CCall dyn target bogus unique")
+					| otherwise = StaticTarget $3
+
+	                         ccall = CCall target is_casm may_gc cCallConv
+ 	                     in
+			     UfCCall ccall $4
+			   }
+
 
 comma_exprs0    :: { [UfExpr RdrName] }	-- Zero or more
 comma_exprs0	: {- empty -}			{ [ ] }
@@ -733,15 +751,6 @@ comma_exprs0	: {- empty -}			{ [ ] }
 comma_exprs2	:: { [UfExpr RdrName] }	-- Two or more
 comma_exprs2	: core_expr ',' core_expr			{ [$1,$3] }
 		| core_expr ',' comma_exprs2			{ $1 : $3 }
-
-con_or_primop   :: { UfCon RdrName }
-con_or_primop   : qdata_name                    { UfDataCon $1 }
-                | qvar_name			{ UfPrimOp $1 }
-                | '__ccall' ccall_string      { let
-						(is_dyn, is_casm, may_gc) = $1
-					        in
-						UfCCallOp $2 is_dyn is_casm may_gc
-						}
 
 rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
 		:						{ [] }
@@ -754,12 +763,12 @@ core_alts	:: { [UfAlt RdrName] }
 core_alt        :: { UfAlt RdrName }
 core_alt	: core_pat '->' core_expr	{ (fst $1, snd $1, $3) }
 
-core_pat	:: { (UfCon RdrName, [RdrName]) }
-core_pat	: core_lit			{ (UfLitCon  $1, []) }
-		| '__litlit' STRING atype	{ (UfLitLitCon $2 $3, []) }
-		| qdata_name core_pat_names	{ (UfDataCon $1, $2) }
-		| '(' comma_var_names1 ')' 	{ (UfDataCon (mkTupConRdrName (length $2)), $2) }
-		| '(#' comma_var_names1 '#)'	{ (UfDataCon (mkUbxTupConRdrName (length $2)), $2) }
+core_pat	:: { (UfConAlt RdrName, [RdrName]) }
+core_pat	: core_lit			{ (UfLitAlt  $1, []) }
+		| '__litlit' STRING atype	{ (UfLitLitAlt $2 $3, []) }
+		| qdata_name core_pat_names	{ (UfDataAlt $1, $2) }
+		| '(' comma_var_names1 ')' 	{ (UfDataAlt (mkTupConRdrName (length $2)), $2) }
+		| '(#' comma_var_names1 '#)'	{ (UfDataAlt (mkUbxTupConRdrName (length $2)), $2) }
 		| '__DEFAULT'			{ (UfDefault, []) }
 		| '(' core_pat ')'		{ $2 }
 
@@ -780,22 +789,14 @@ comma_var_names1 : var_name					{ [$1] }
 		 | var_name ',' comma_var_names1		{ $1 : $3 }
 
 core_lit	:: { Literal }
-core_lit	: integer			{ mkMachInt_safe $1 }
+core_lit	: integer			{ mkMachInt $1 }
 		| CHAR				{ MachChar $1 }
 		| STRING			{ MachStr $1 }
-		| '__string' STRING		{ NoRepStr $2 (panic "NoRepStr type") }
 		| rational			{ MachDouble $1 }
+		| '__word' integer		{ mkMachWord $2 }
+		| '__word64' integer		{ mkMachWord64 $2 }
+		| '__int64' integer		{ mkMachInt64 $2 }
 		| '__float' rational		{ MachFloat $2 }
-
-		| '__integer' integer		{ NoRepInteger  $2 (panic "NoRepInteger type") 
-							-- The type checker will add the types
-						}
-
-		| '__rational' integer integer	{ NoRepRational ($2 % $3) 
-				  		   (panic "NoRepRational type")
-							-- The type checker will add the type
-						}
-
 		| '__addr' integer		{ MachAddr $2 }
 
 integer		:: { Integer }
@@ -868,5 +869,5 @@ data IfaceStuff = PIface 	EncodedFS{-.hi module name-} ParsedIface
 		| PRules	[RdrNameRuleDecl]
 		| PDeprecs	[RdrNameDeprecation]
 
-mkConDecl name (ex_tvs, ex_ctxt) details loc = ConDecl name ex_tvs ex_ctxt details loc
+mk_con_decl name (ex_tvs, ex_ctxt) details loc = mkConDecl name ex_tvs ex_ctxt details loc
 }

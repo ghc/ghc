@@ -25,15 +25,15 @@ module IdInfo (
 	exactArity, atLeastArity, unknownArity, hasArity,
 	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
 
-	-- Strictness
-	StrictnessInfo(..),				-- Non-abstract
-	mkStrictnessInfo,
-	noStrictnessInfo, strictnessInfo,
-	ppStrictnessInfo, setStrictnessInfo, 
-	isBottomingStrictness, appIsBottom,
+	-- Strictness; imported from Demand
+	StrictnessInfo(..),
+	mkStrictnessInfo, noStrictnessInfo,
+	ppStrictnessInfo,isBottomingStrictness, appIsBottom,
+
+	strictnessInfo, setStrictnessInfo, 	
 
         -- Worker
-        WorkerInfo, workerExists, 
+        WorkerInfo(..), workerExists, wrapperArity, workerId,
         workerInfo, setWorkerInfo, ppWorkerInfo,
 
 	-- Unfolding
@@ -47,8 +47,9 @@ module IdInfo (
 	inlinePragInfo, setInlinePragInfo, pprInlinePragInfo,
 
 	-- Occurrence info
-	OccInfo(..), InsideLam, OneBranch, insideLam, notInsideLam, oneBranch, notOneBranch,
-	occInfo, setOccInfo, isFragileOccInfo,
+	OccInfo(..), isFragileOccInfo,
+	InsideLam, OneBranch, insideLam, notInsideLam, oneBranch, notOneBranch,
+	occInfo, setOccInfo, 
 
 	-- Specialisation
 	specInfo, setSpecInfo,
@@ -72,12 +73,17 @@ module IdInfo (
 
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding, hasUnfolding, seqUnfolding )
 import {-# SOURCE #-} CoreSyn	 ( CoreExpr, CoreRules, emptyCoreRules, isEmptyCoreRules, seqRules )
-import {-# SOURCE #-} Const	 ( Con )
 
+import PrimOp	 	( PrimOp )
 import Var              ( Id )
-import VarSet		( IdOrTyVarSet )
+import BasicTypes	( OccInfo(..), isFragileOccInfo, seqOccInfo,
+			  InsideLam, insideLam, notInsideLam, 
+			  OneBranch, oneBranch, notOneBranch,
+			  Arity
+			)
+import DataCon		( DataCon )
 import FieldLabel	( FieldLabel )
-import Demand		( Demand, isStrict, isLazy, wwLazy, pprDemands, seqDemand, seqDemands )
+import Demand		-- Lots of stuff
 import Outputable	
 import Maybe            ( isJust )
 
@@ -135,12 +141,12 @@ seqIdInfo (IdInfo {}) = ()
 
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
-  = seqFlavour (flavourInfo info) 	`seq`
-    seqArity (arityInfo info)		`seq`
-    seqDemand (demandInfo info)		`seq`
-    seqRules (specInfo info)		`seq`
-    seqStrictness (strictnessInfo info)	`seq`
-    seqWorker (workerInfo info)		`seq`
+  = seqFlavour (flavourInfo info) 		`seq`
+    seqArity (arityInfo info)			`seq`
+    seqDemand (demandInfo info)			`seq`
+    seqRules (specInfo info)			`seq`
+    seqStrictnessInfo (strictnessInfo info)	`seq`
+    seqWorker (workerInfo info)			`seq`
 
 --    seqUnfolding (unfoldingInfo info)	`seq`
 -- Omitting this improves runtimes a little, presumably because
@@ -179,7 +185,6 @@ setNoDiscardInfo  info = case flavourInfo info of
 zapSpecPragInfo   info = case flavourInfo info of
 				SpecPragmaId -> info { flavourInfo = VanillaId }
 				other	     -> info
-
 \end{code}
 
 
@@ -193,7 +198,7 @@ mkIdInfo flv = IdInfo {
 		    arityInfo		= UnknownArity,
 		    demandInfo		= wwLazy,
 		    specInfo		= emptyCoreRules,
-		    workerInfo		= Nothing,
+		    workerInfo		= NoWorker,
 		    strictnessInfo	= NoStrictnessInfo,
 		    unfoldingInfo	= noUnfolding,
 		    updateInfo		= NoUpdateInfo,
@@ -214,18 +219,26 @@ mkIdInfo flv = IdInfo {
 
 \begin{code}
 data IdFlavour
-  = VanillaId 				-- Most Ids are like this
-  | ConstantId Con			-- The Id for a constant (data constructor or primop)
-  | RecordSelId FieldLabel		-- The Id for a record selector
-  | SpecPragmaId			-- Don't discard these
-  | NoDiscardId				-- Don't discard these either
+  = VanillaId 			-- Most Ids are like this
+  | DataConId DataCon		-- The Id for a data constructor *worker*
+  | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
+				-- [the only reasons we need to know is so that
+				--  a) we can  suppress printing a definition in the interface file
+				--  b) when typechecking a pattern we can get from the
+				--     Id back to the data con]
+  | PrimOpId PrimOp		-- The Id for a primitive operator
+  | RecordSelId FieldLabel	-- The Id for a record selector
+  | SpecPragmaId		-- Don't discard these
+  | NoDiscardId			-- Don't discard these either
 
 ppFlavourInfo :: IdFlavour -> SDoc
-ppFlavourInfo VanillaId       = empty
-ppFlavourInfo (ConstantId _)  = ptext SLIT("[Constr]")
-ppFlavourInfo (RecordSelId _) = ptext SLIT("[RecSel]")
-ppFlavourInfo SpecPragmaId    = ptext SLIT("[SpecPrag]")
-ppFlavourInfo NoDiscardId     = ptext SLIT("[NoDiscard]")
+ppFlavourInfo VanillaId         = empty
+ppFlavourInfo (DataConId _)     = ptext SLIT("[DataCon]")
+ppFlavourInfo (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
+ppFlavourInfo (PrimOpId _)    	= ptext SLIT("[PrimOp]")
+ppFlavourInfo (RecordSelId _) 	= ptext SLIT("[RecSel]")
+ppFlavourInfo SpecPragmaId    	= ptext SLIT("[SpecPrag]")
+ppFlavourInfo NoDiscardId     	= ptext SLIT("[NoDiscard]")
 
 seqFlavour :: IdFlavour -> ()
 seqFlavour f = f `seq` ()
@@ -256,11 +269,11 @@ besides the code-generator need arity info!)
 data ArityInfo
   = UnknownArity	-- No idea
 
-  | ArityExactly Int	-- Arity is exactly this.  We use this when importing a
+  | ArityExactly Arity	-- Arity is exactly this.  We use this when importing a
 			-- function; it's already been compiled and we know its
 			-- arity for sure.
 
-  | ArityAtLeast Int	-- Arity is this or greater.  We attach this arity to 
+  | ArityAtLeast Arity	-- Arity is this or greater.  We attach this arity to 
 			-- functions in the module being compiled.  Their arity
 			-- might increase later in the compilation process, if
 			-- an extra lambda floats up to the binding site.
@@ -272,7 +285,7 @@ exactArity   = ArityExactly
 atLeastArity = ArityAtLeast
 unknownArity = UnknownArity
 
-arityLowerBound :: ArityInfo -> Int
+arityLowerBound :: ArityInfo -> Arity
 arityLowerBound UnknownArity     = 0
 arityLowerBound (ArityAtLeast n) = n
 arityLowerBound (ArityExactly n) = n
@@ -317,115 +330,6 @@ instance Show InlinePragInfo where
 
 %************************************************************************
 %*									*
-\subsection{Occurrence information}
-%*									*
-%************************************************************************
-
-\begin{code}
-data OccInfo 
-  = NoOccInfo
-
-  | IAmDead		-- Marks unused variables.  Sometimes useful for
-			-- lambda and case-bound variables.
-
-  | OneOcc InsideLam
-
- 	   OneBranch
-
-  | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
-			-- in a group of recursive definitions
-
-seqOccInfo :: OccInfo -> ()
-seqOccInfo (OneOcc in_lam once) = in_lam `seq` once `seq` ()
-seqOccInfo occ			= ()
-
-type InsideLam = Bool	-- True <=> Occurs inside a non-linear lambda
-			-- Substituting a redex for this occurrence is
-			-- dangerous because it might duplicate work.
-insideLam    = True
-notInsideLam = False
-
-type OneBranch = Bool	-- True <=> Occurs in only one case branch
-			--	so no code-duplication issue to worry about
-oneBranch    = True
-notOneBranch = False
-
-isFragileOccInfo :: OccInfo -> Bool
-isFragileOccInfo (OneOcc _ _) = True
-isFragileOccInfo other	      = False
-\end{code}
-
-\begin{code}
-instance Outputable OccInfo where
-  -- only used for debugging; never parsed.  KSW 1999-07
-  ppr NoOccInfo  			  	  = empty
-  ppr IAmALoopBreaker 				  = ptext SLIT("_Kx")
-  ppr IAmDead					  = ptext SLIT("_Kd")
-  ppr (OneOcc inside_lam one_branch) | inside_lam = ptext SLIT("_Kl")
-				     | one_branch = ptext SLIT("_Ks")
-				     | otherwise  = ptext SLIT("_Ks*")
-
-instance Show OccInfo where
-  showsPrec p occ = showsPrecSDoc p (ppr occ)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[strictness-IdInfo]{Strictness info about an @Id@}
-%*									*
-%************************************************************************
-
-We specify the strictness of a function by giving information about
-each of the ``wrapper's'' arguments (see the description about
-worker/wrapper-style transformations in the PJ/Launchbury paper on
-unboxed types).
-
-The list of @Demands@ specifies: (a)~the strictness properties of a
-function's arguments; and (b)~the type signature of that worker (if it
-exists); i.e. its calling convention.
-
-Note that the existence of a worker function is now denoted by the Id's
-workerInfo field.
-
-\begin{code}
-data StrictnessInfo
-  = NoStrictnessInfo
-
-  | StrictnessInfo [Demand] 
-		   Bool		-- True <=> the function diverges regardless of its arguments
-				-- Useful for "error" and other disguised variants thereof.  
-				-- BUT NB: f = \x y. error "urk"
-				-- 	   will have info  SI [SS] True
-				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
-
-seqStrictness :: StrictnessInfo -> ()
-seqStrictness (StrictnessInfo ds b) = b `seq` seqDemands ds
-seqStrictness other		    = ()
-\end{code}
-
-\begin{code}
-mkStrictnessInfo :: ([Demand], Bool) -> StrictnessInfo
-
-mkStrictnessInfo (xs, is_bot)
-  | all isLazy xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
-  | otherwise		        = StrictnessInfo xs is_bot
-
-noStrictnessInfo       = NoStrictnessInfo
-
-isBottomingStrictness (StrictnessInfo _ bot) = bot
-isBottomingStrictness NoStrictnessInfo       = False
-
--- appIsBottom returns true if an application to n args would diverge
-appIsBottom (StrictnessInfo ds bot)   n = bot && (n >= length ds)
-appIsBottom  NoStrictnessInfo	      n	= False
-
-ppStrictnessInfo NoStrictnessInfo = empty
-ppStrictnessInfo (StrictnessInfo wrapper_args bot)
-  = hsep [ptext SLIT("__S"), pprDemands wrapper_args bot]
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection[worker-IdInfo]{Worker info about an @Id@}
 %*									*
 %************************************************************************
@@ -441,24 +345,31 @@ There might not be a worker, even for a strict function, because:
 
 \begin{code}
 
-type WorkerInfo = Maybe Id
-
-{- UNUSED:
-mkWorkerInfo :: Id -> WorkerInfo
-mkWorkerInfo wk_id = Just wk_id
--}
+data WorkerInfo = NoWorker
+		| HasWorker Id Arity
+	-- The Arity is the arity of the *wrapper* at the moment of the
+	-- w/w split. It had better be the same as the arity of the wrapper
+	-- at the moment it is spat into the interface file.
+	-- This Arity just lets us make a (hopefully redundant) sanity check
 
 seqWorker :: WorkerInfo -> ()
-seqWorker (Just id) = id `seq` ()
-seqWorker Nothing   = ()
+seqWorker (HasWorker id _) = id `seq` ()
+seqWorker NoWorker	   = ()
 
-ppWorkerInfo Nothing      = empty
-ppWorkerInfo (Just wk_id) = ptext SLIT("__P") <+> ppr wk_id
+ppWorkerInfo NoWorker            = empty
+ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("__P") <+> ppr wk_id
 
-noWorkerInfo = Nothing
+noWorkerInfo = NoWorker
 
 workerExists :: WorkerInfo -> Bool
-workerExists = isJust
+workerExists NoWorker        = False
+workerExists (HasWorker _ _) = True
+
+workerId :: WorkerInfo -> Id
+workerId (HasWorker id _) = id
+
+wrapperArity :: WorkerInfo -> Arity
+wrapperArity (HasWorker _ a) = a
 \end{code}
 
 
@@ -553,41 +464,25 @@ also CPRs.
 \begin{code}
 data CprInfo
   = NoCPRInfo
+  | ReturnsCPR	-- Yes, this function returns a constructed product
+		-- Implicitly, this means "after the function has been applied
+		-- to all its arguments", so the worker/wrapper builder in 
+		-- WwLib.mkWWcpr checks that that it is indeed saturated before
+		-- making use of the CPR info
 
-  | CPRInfo [CprInfo] 
-
--- e.g. const 5 == CPRInfo [NoCPRInfo]
---              == __M(-)
---      \x -> (5,
---              (x,
---               5,
---               x)
---            ) 
---            CPRInfo [CPRInfo [NoCPRInfo], 
---                     CPRInfo [NoCprInfo,
---                              CPRInfo [NoCPRInfo],
---                              NoCPRInfo]
---                    ]
---            __M((-)(-(-)-)-)
+	-- We used to keep nested info about sub-components, but
+	-- we never used it so I threw it away
 \end{code}
 
 \begin{code}
 seqCpr :: CprInfo -> ()
-seqCpr (CPRInfo cs) = seqCprs cs
-seqCpr NoCPRInfo    = ()
-
-seqCprs [] = ()
-seqCprs (c:cs) = seqCpr c `seq` seqCprs cs
-
+seqCpr ReturnsCPR = ()
+seqCpr NoCPRInfo  = ()
 
 noCprInfo       = NoCPRInfo
 
-ppCprInfo NoCPRInfo = empty
-ppCprInfo c@(CPRInfo _)
-  = hsep [ptext SLIT("__M"), ppCprInfo' c]
-    where
-    ppCprInfo' NoCPRInfo      = char '-'
-    ppCprInfo' (CPRInfo args) = parens (hcat (map ppCprInfo' args))
+ppCprInfo NoCPRInfo  = empty
+ppCprInfo ReturnsCPR = ptext SLIT("__M")
 
 instance Outputable CprInfo where
     ppr = ppCprInfo

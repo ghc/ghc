@@ -33,24 +33,24 @@ import CgMonad
 
 import CgUsages		( getHpRelOffset, getSpRelOffset, getRealSp )
 import CgStackery	( freeStackSlots, addFreeSlots )
-import CLabel		( mkStaticClosureLabel, mkClosureLabel,
+import CLabel		( mkClosureLabel,
 			  mkBitmapLabel, pprCLabel )
 import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
 import BitSet		( mkBS, emptyBS )
 import PrimRep		( isFollowableRep, getPrimRepSize )
 import DataCon		( DataCon, dataConName )
-import Id		( Id, idPrimRep, idType )
+import Id		( Id, idPrimRep, idType, isDataConWrapId )
 import Type		( typePrimRep )
 import VarEnv
 import VarSet		( varSetElems )
-import Const		( Con(..), Literal )
+import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool )
 import Name		( isLocallyDefined, isWiredInName, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
 #endif
 import PrimRep          ( PrimRep(..) )
-import StgSyn		( StgArg, StgLiveVars, GenStgArg(..) )
+import StgSyn		( StgArg, StgLiveVars, GenStgArg(..), isStgTypeArg )
 import Unique           ( Unique, Uniquable(..) )
 import UniqSet		( elementOfUniqSet )
 import Util		( zipWithEqual, sortLt )
@@ -252,8 +252,13 @@ I {\em think} all looking-up is done through @getCAddrMode(s)@.
 getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
 
 getCAddrModeAndInfo id
-  | not (isLocallyDefined name) || isWiredInName name
-    {- Why the "isWiredInName"?
+  | not (isLocallyDefined name) || isDataConWrapId id
+	-- Why the isDataConWrapId?  Because CoreToStg changes a call to 
+	-- a nullary constructor worker fn to a call to its wrapper,
+	-- which may not  be defined until later
+
+    {- 		-- OLD: the unpack stuff isn't injected now Jan 2000
+	Why the "isWiredInName"?
 	Imagine you are compiling PrelBase.hs (a module that
 	supplies some of the wired-in values).  What can
 	happen is that the compiler will inject calls to
@@ -342,6 +347,9 @@ getVolatileRegs vars
 getArgAmodes :: [StgArg] -> FCode [CAddrMode]
 getArgAmodes [] = returnFC []
 getArgAmodes (atom:atoms)
+  | isStgTypeArg atom 
+  = getArgAmodes atoms
+  | otherwise
   = getArgAmode  atom  `thenFC` \ amode ->
     getArgAmodes atoms `thenFC` \ amodes ->
     returnFC ( amode : amodes )
@@ -349,43 +357,7 @@ getArgAmodes (atom:atoms)
 getArgAmode :: StgArg -> FCode CAddrMode
 
 getArgAmode (StgVarArg var) = getCAddrMode var		-- The common case
-
-getArgAmode (StgConArg (DataCon con))
-     {- Why does this case differ from StgVarArg?
-	Because the program might look like this:
-		data Foo a = Empty | Baz a
-		f a x = let c = Empty! a
-			in h c
-	Now, when we go Core->Stg, we drop the type applications, 
-	so we can inline c, giving
-		f x = h Empty
-	Now we are referring to Empty as an argument (rather than in an STGCon), 
-	so we'll look it up with getCAddrMode.  We want to return an amode for
-	the static closure that we make for nullary constructors.  But if we blindly
-	go ahead with getCAddrMode we end up looking in the environment, and it ain't there!
-
-	This special case used to be in getCAddrModeAndInfo, but it doesn't work there.
-	Consider:
-		f a x = Baz a x
-	If the constructor Baz isn't inlined we simply want to treat it like any other
-	identifier, with a top level definition.  We don't want to spot that it's a constructor.
-
-	In short 
-		StgApp con args
-	and
-		StgCon con args
-	are treated differently; the former is a call to a bog standard function while the
-	latter uses the specially-labelled, pre-defined info tables etc for the constructor.
-
-	The way to think of this case in getArgAmode is that
-		SApp f Empty
-	is really
-		App f (StgCon Empty [])
-     -}
-  = returnFC (CLbl (mkStaticClosureLabel (dataConName con)) PtrRep)
-
-
-getArgAmode (StgConArg (Literal lit)) = returnFC (CLit lit)
+getArgAmode (StgLitArg lit) = returnFC (CLit lit)
 \end{code}
 
 %************************************************************************

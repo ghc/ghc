@@ -157,11 +157,11 @@ doIt (core_cmds, stg_cmds)
 
 	--------------------------  Main Core-language transformations ----------------
     _scc_     "Core2Core"
-    core2core core_cmds desugared rules			>>= \ (simplified, imp_rule_ids) ->
+    core2core core_cmds desugared rules			>>= \ (simplified, orphan_rules) ->
 
 	-- Do the final tidy-up
     tidyCorePgm tidy_uniqs this_mod
-		simplified imp_rule_ids			>>= \ (tidy_binds, tidy_imp_rule_ids) -> 
+		simplified orphan_rules			>>= \ (tidy_binds, tidy_orphan_rules) -> 
 
 
 	--------------------------  Convert to STG code -------------------------------
@@ -189,7 +189,7 @@ doIt (core_cmds, stg_cmds)
 --	thoroughout code generation
 
     ifaceDecls if_handle local_tycons local_classes inst_info
-	       final_ids tidy_binds imp_rule_ids deprecations	>>
+	       final_ids tidy_binds tidy_orphan_rules deprecations	>>
     endIface if_handle						>>
 	    -- We are definitely done w/ interface-file stuff at this point:
 	    -- (See comments near call to "startIface".)
@@ -208,7 +208,9 @@ doIt (core_cmds, stg_cmds)
 	--------------------------  Code output -------------------------------
     show_pass "CodeOutput" 				>>
     _scc_     "CodeOutput"
-    codeOutput this_mod c_code h_code abstractC ncg_uniqs	>>
+    codeOutput this_mod local_tycons local_classes stg_binds2
+	       c_code h_code abstractC 
+	       ncg_uniqs				>>
 
 
 	--------------------------  Final report -------------------------------
@@ -332,7 +334,7 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
-    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ _ _)
+    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ _ _ _)
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))

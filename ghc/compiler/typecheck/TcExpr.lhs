@@ -13,7 +13,7 @@ import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			  mkMonoBind, nullMonoBinds
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds,
+import TcHsSyn		( TcExpr, TcRecordBinds, mkHsConApp,
 			  mkHsTyApp, mkHsLet, maybeBoxedPrimType
 			)
 
@@ -50,7 +50,7 @@ import Id		( idType, recordSelectorFieldLabel,
 			  isRecordSelector,
 			  Id, mkVanillaId
 			)
-import DataCon		( dataConFieldLabels, dataConSig, dataConId,
+import DataCon		( dataConFieldLabels, dataConSig, 
 			  dataConStrictMarks, StrictnessMark(..)
 			)
 import Name		( Name, getName )
@@ -354,7 +354,7 @@ arg/result types); unify them with the args/result; and store them for
 later use.
 
 \begin{code}
-tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
+tcMonoExpr (HsCCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
   = 	-- Get the callable and returnable classes.
     tcLookupClassByKey cCallableClassKey	`thenNF_Tc` \ cCallableClass ->
     tcLookupClassByKey cReturnableClassKey	`thenNF_Tc` \ cReturnableClass ->
@@ -390,8 +390,7 @@ tcMonoExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
 	-- constraints on the argument and result types.
     mapNF_Tc new_arg_dict (zipEqual "tcMonoExpr:CCall" args arg_tys)	`thenNF_Tc` \ ccarg_dicts_s ->
     newClassDicts result_origin [(cReturnableClass, [result_ty])]	`thenNF_Tc` \ (ccres_dict, _) ->
-    returnTc (HsApp (HsVar (dataConId ioDataCon) `TyApp` [result_ty])
-		    (CCall lbl args' may_gc is_asm result_ty),
+    returnTc (mkHsConApp ioDataCon [result_ty] [HsCCall lbl args' may_gc is_asm result_ty],
 		      -- do the wrapping in the newtype constructor here
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie)
 \end{code}
@@ -480,11 +479,11 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
     let
 	(_, record_ty) = splitFunTys con_tau
     in
-	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty ) )
     unifyTauTy res_ty record_ty          `thenTc_`
 
 	-- Check that the record bindings match the constructor
+	-- con_name is syntactically constrained to be a data constructor
     tcLookupDataCon con_name	`thenTc` \ (data_con, _, _) ->
     let
 	bad_fields = badFields rbinds data_con

@@ -18,14 +18,14 @@ module FloatIn ( floatInwards ) where
 
 import CmdLineOpts	( opt_D_verbose_core2core )
 import CoreSyn
+import CoreUtils	( exprIsValue, exprIsDupable )
 import CoreLint		( beginPass, endPass )
-import Const		( isDataCon )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
 import Id		( isOneShotLambda )
 import Var		( Id, idType, isTyVar )
 import Type		( isUnLiftedType )
 import VarSet
-import Util		( zipEqual )
+import Util		( zipEqual, zipWithEqual )
 import Outputable
 \end{code}
 
@@ -141,16 +141,7 @@ fiExpr to_drop (_, AnnVar v) = mkCoLets' to_drop (Var v)
 fiExpr to_drop (_, AnnType ty) = ASSERT( null to_drop )
 				 Type ty
 
-fiExpr to_drop (_, AnnCon c args)
-   | isDataCon c	-- Don't float into the args of a data construtor;
-			-- the simplifier will float straight back out
-   = mkCoLets' to_drop (Con c (map (fiExpr []) args))
-
-   | otherwise
-   = mkCoLets' drop_here (Con c args')
-   where
-     (drop_here : arg_drops) = sepBindsByDropPoint (map freeVarsOf args) to_drop
-     args'	 	     = zipWith fiExpr arg_drops args
+fiExpr to_drop (_, AnnLit lit) = Lit lit
 \end{code}
 
 Applications: we do float inside applications, mainly because we
@@ -161,7 +152,7 @@ pull out any silly ones.
 fiExpr to_drop (_,AnnApp fun arg)
   = mkCoLets' drop_here (App (fiExpr fun_drop fun) (fiExpr arg_drop arg))
   where
-    [drop_here, fun_drop, arg_drop] = sepBindsByDropPoint [freeVarsOf fun, freeVarsOf arg] to_drop
+    [drop_here, fun_drop, arg_drop] = sepBindsByDropPoint False [freeVarsOf fun, freeVarsOf arg] to_drop
 \end{code}
 
 We are careful about lambdas: 
@@ -265,7 +256,7 @@ fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
 	-- No point in floating in only to float straight out again
 	-- Ditto ok-for-speculation unlifted RHSs
 
-    [shared_binds, rhs_binds, body_binds] = sepBindsByDropPoint [rhs_fvs, final_body_fvs] to_drop
+    [shared_binds, rhs_binds, body_binds] = sepBindsByDropPoint False [rhs_fvs, final_body_fvs] to_drop
 
     new_to_drop = body_binds ++				-- the bindings used only in the body
 		  [(NonRec id rhs', rhs_fvs')] ++ 	-- the new binding itself
@@ -301,7 +292,7 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
     get_extras (rhs_fvs, rhs) | noFloatIntoRhs rhs = rhs_fvs
 			      | otherwise	   = emptyVarSet
 
-    (shared_binds:body_binds:rhss_binds) = sepBindsByDropPoint (final_body_fvs:rhss_fvs) to_drop
+    (shared_binds:body_binds:rhss_binds) = sepBindsByDropPoint False (final_body_fvs:rhss_fvs) to_drop
 
     new_to_drop = -- the bindings used only in the body
 		  body_binds ++
@@ -329,12 +320,20 @@ alternatives/default [default FVs always {\em first}!].
 
 \begin{code}
 fiExpr to_drop (_, AnnCase scrut case_bndr alts)
-  = mkCoLets' drop_here (Case (fiExpr scrut_drops scrut) case_bndr
-			      (zipWith fi_alt alts_drops alts))
+  = mkCoLets' drop_here1 $
+    mkCoLets' drop_here2 $
+    Case (fiExpr scrut_drops scrut) case_bndr
+	 (zipWith fi_alt alts_drops_s alts)
   where
-    (drop_here : scrut_drops : alts_drops) = sepBindsByDropPoint (scrut_fvs : alts_fvs) to_drop
-    scrut_fvs = freeVarsOf scrut
-    alts_fvs  = map alt_fvs alts
+	-- Float into the scrut and alts-considered-together just like App
+    [drop_here1, scrut_drops, alts_drops] = sepBindsByDropPoint False [scrut_fvs, all_alts_fvs] to_drop
+
+	-- Float into the alts with the is_case flag set
+    (drop_here2 : alts_drops_s)           = sepBindsByDropPoint True alts_fvs alts_drops
+
+    scrut_fvs    = freeVarsOf scrut
+    alts_fvs     = map alt_fvs alts
+    all_alts_fvs = unionVarSets alts_fvs
     alt_fvs (con, args, rhs) = foldl delVarSet (freeVarsOf rhs) (case_bndr:args)
 				-- Delete case_bndr and args from free vars of rhs 
 				-- to get free vars of alt
@@ -351,8 +350,8 @@ noFloatIntoRhs (AnnLam b _)   	    = not (isId b && isOneShotLambda b)
 	-- If x is used only in the error case join point, j, we must float the
 	-- boxing constructor into it, else we box it every time which is very bad
 	-- news indeed.
-noFloatIntoRhs (AnnCon con _)       = isDataCon con
-noFloatIntoRhs other	            = False
+
+noFloatIntoRhs rhs = exprIsValue (deAnnotate' rhs)	-- We'd just float rigt back out again...
 \end{code}
 
 
@@ -379,7 +378,8 @@ We have to maintain the order on these drop-point-related lists.
 
 \begin{code}
 sepBindsByDropPoint
-    :: [FreeVarsSet]	    -- One set of FVs per drop point
+    :: Bool		    -- True <=> is case expression
+    -> [FreeVarsSet]	    -- One set of FVs per drop point
     -> FloatingBinds 	    -- Candidate floaters
     -> [FloatingBinds]      -- FIRST one is bindings which must not be floated
 			    -- inside any drop point; the rest correspond
@@ -391,38 +391,60 @@ sepBindsByDropPoint
 -- a binding (let x = E in B) might have a specialised version of
 -- x (say x') stored inside x, but x' isn't free in E or B.
 
-sepBindsByDropPoint drop_pts []
+type DropBox = (FreeVarsSet, FloatingBinds)
+
+sepBindsByDropPoint is_case drop_pts []
   = [] : [[] | p <- drop_pts]	-- cut to the chase scene; it happens
 
-sepBindsByDropPoint drop_pts floaters
+sepBindsByDropPoint is_case drop_pts floaters
   = go floaters (map (\fvs -> (fvs, [])) (emptyVarSet : drop_pts))
   where
-    go :: FloatingBinds -> [(FreeVarsSet, FloatingBinds)] -> [FloatingBinds]
+    go :: FloatingBinds -> [DropBox] -> [FloatingBinds]
 	-- The *first* one in the argument list is the drop_here set
 	-- The FloatingBinds in the lists are in the reverse of
 	-- the normal FloatingBinds order; that is, they are the right way round!
 
     go [] drop_boxes = map (reverse . snd) drop_boxes
 
-    go (bind_w_fvs@(bind, bind_fvs) : binds) drop_boxes
-	= go binds (insert drop_boxes (drop_here : used_in_flags))
-		-- insert puts the find in box whose True flag comes first
+    go (bind_w_fvs@(bind, bind_fvs) : binds) drop_boxes@(here_box : fork_boxes)
+	= go binds new_boxes
 	where
+	  -- "here" means the group of bindings dropped at the top of the fork
+
 	  (used_here : used_in_flags) = [ any (`elemVarSet` fvs) (bindersOf bind)
 					| (fvs, drops) <- drop_boxes]
 
-	  drop_here = used_here || not (exactlyOneTrue used_in_flags)
+	  drop_here = used_here || not can_push
 
-	  insert ((fvs,drops) : drop_boxes) (True : _)
-		= ((fvs `unionVarSet` bind_fvs, bind_w_fvs:drops) : drop_boxes)
-	  insert (drop_box : drop_boxes) (False : others)
-		= drop_box : insert drop_boxes others
-	  insert _ _ = panic "sepBindsByDropPoint"	-- Should never happen
+		-- For case expressions we duplicate the binding if it is
+		-- reasonably small, and if it is not used in all the RHSs
+		-- This is good for situations like
+		--	let x = I# y in
+		--	case e of
+		--	  C -> error x
+		-- 	  D -> error x
+		--	  E -> ...not mentioning x...
 
-exactlyOneTrue :: [Bool] -> Bool
-exactlyOneTrue flags = case [() | True <- flags] of
-			[_]   -> True
-			other -> False
+	  n_alts      = length used_in_flags
+	  n_used_alts = length [() | True <- used_in_flags]
+
+	  can_push = n_used_alts == 1		-- Used in just one branch
+		   || (is_case && 		-- We are looking at case alternatives
+		       n_used_alts > 1 && 	-- It's used in more than one
+		       n_used_alts < n_alts &&	-- ...but not all
+		       bindIsDupable bind)	-- and we can duplicate the binding
+
+	  new_boxes | drop_here = (insert here_box : fork_boxes)
+		    | otherwise = (here_box : new_fork_boxes)
+
+	  new_fork_boxes = zipWithEqual "FloatIn.sepBinds" insert_maybe fork_boxes used_in_flags
+
+	  insert :: DropBox -> DropBox
+	  insert (fvs,drops) = (fvs `unionVarSet` bind_fvs, bind_w_fvs:drops)
+
+	  insert_maybe box True  = insert box
+	  insert_maybe box False = box
+
 
 floatedBindsFVs :: FloatingBinds -> FreeVarsSet
 floatedBindsFVs binds = unionVarSets (map snd binds)
@@ -430,4 +452,7 @@ floatedBindsFVs binds = unionVarSets (map snd binds)
 mkCoLets' :: FloatingBinds -> CoreExpr -> CoreExpr
 mkCoLets' to_drop e = foldl (flip (Let . fst)) e to_drop
 	-- Remember to_drop is in *reverse* dependency order
+
+bindIsDupable (Rec prs)    = all (exprIsDupable . snd) prs
+bindIsDupable (NonRec b r) = exprIsDupable r
 \end{code}

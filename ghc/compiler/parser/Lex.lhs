@@ -145,6 +145,9 @@ data Token
   | ITbottom
   | ITinteger_lit 
   | ITfloat_lit
+  | ITword_lit
+  | ITword64_lit
+  | ITint64_lit
   | ITrational_lit
   | ITaddr_lit
   | ITlit_lit
@@ -158,8 +161,8 @@ data Token
   | ITunfold InlinePragInfo
   | ITstrict ([Demand], Bool)
   | ITrules
+  | ITcprinfo
   | ITdeprecated
-  | ITcprinfo (CprInfo)
   | IT__scc
   | ITsccAllCafs
 
@@ -311,6 +314,9 @@ ghcExtensionKeywordsFM = listToUFM $
 	("__bot",		ITbottom),
 	("__integer",		ITinteger_lit),
 	("__float",		ITfloat_lit),
+	("__int64",		ITint64_lit),
+	("__word",		ITword_lit),
+	("__word64",		ITword64_lit),
 	("__rational",		ITrational_lit),
 	("__addr",		ITaddr_lit),
 	("__litlit",		ITlit_lit),
@@ -574,8 +580,8 @@ lexToken cont glaexts buf =
 			lex_demand cont (stepOnUntil (not . isSpace) 
 		                        (stepOnBy# buf 3#)) -- past __S
 	   	    'M'# -> 
-			lex_cpr cont (stepOnUntil (not . isSpace) 
-		                     (stepOnBy# buf 3#)) -- past __M
+			cont ITcprinfo (stepOnBy# buf 3#)	-- past __M
+
 	   	    's'# -> 
 			case prefixMatch (stepOnBy# buf 3#) "cc" of
 		               Just buf' -> lex_scc cont (stepOverLexeme buf')
@@ -799,23 +805,6 @@ lex_demand cont buf =
    = case read_em [] buf of
       (stuff, rest) -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
 
-lex_cpr cont buf = 
- case read_em [] buf of { (cpr_inf,buf') -> 
-   ASSERT ( null (tail cpr_inf) )
-   cont (ITcprinfo $ head cpr_inf) buf'
- }
- where
-   -- code snatched from lex_demand above
-  read_em acc buf = 
-   case currentChar# buf of
-    '-'# -> read_em (NoCPRInfo : acc) (stepOn buf)
-    '('# -> do_unpack acc (stepOn buf)
-    ')'# -> (reverse acc, stepOn buf)
-    _    -> (reverse acc, buf)
-
-  do_unpack acc buf
-   = case read_em [] buf of
-      (stuff, rest) -> read_em ((CPRInfo stuff)  : acc) rest
 
 ------------------
 lex_scc cont buf =

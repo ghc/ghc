@@ -20,7 +20,7 @@ and the classes
 
 #include "../includes/ieee-flpt.h"
 
-module PrelFloat where
+module PrelFloat( module PrelFloat, Float#, Double# )  where
 
 import {-# SOURCE #-} PrelErr
 import PrelBase

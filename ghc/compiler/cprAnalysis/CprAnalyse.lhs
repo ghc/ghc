@@ -9,18 +9,17 @@ module CprAnalyse ( cprAnalyse ) where
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_cpranal )
 import CoreLint		( beginPass, endPass )
 import CoreSyn
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprIsValue )
 import CoreUnfold	( maybeUnfoldingTemplate )
 import Var		( Var, Id, TyVar, idType, varName, varType )
-import Id               ( setIdCprInfo, getIdCprInfo, getIdUnfolding, getIdArity,
+import Id               ( setIdCprInfo, idCprInfo, idArity,
 			  isBottomingId )
-import IdInfo           ( CprInfo(..), arityLowerBound )
+import IdInfo           ( CprInfo(..) )
 import VarEnv
-import Type             ( Type, splitFunTys, splitFunTy_maybe, splitForAllTys, splitNewType_maybe )
-import TyCon            ( isProductTyCon, isNewTyCon, isUnLiftedTyCon )
-import DataCon          ( dataConTyCon, splitProductType_maybe, dataConRawArgTys )
-import Const            ( Con(DataCon), isDataCon, isWHNFCon )
-import Util		( zipEqual, zipWithEqual )
+import Type             ( Type, splitFunTys, splitFunTy_maybe, splitForAllTys )
+import TyCon            ( isNewTyCon, isUnLiftedTyCon )
+import DataCon          ( dataConTyCon )
+import Util		( zipEqual, zipWithEqual, nTimes, mapAccumL )
 import Outputable
 
 import UniqFM (ufmToList)
@@ -88,9 +87,12 @@ functions by an abstract constant function.
 
 \begin{code}
 data AbsVal = Top                -- Not a constructed product
+
 	    | Fun AbsVal         -- A function that takes an argument 
 				 -- and gives AbsVal as result. 
-            | Tuple [AbsVal]     -- A constructed product of values
+
+            | Tuple 		 -- A constructed product of values
+
             | Bot                -- Bot'tom included for convenience
                                  -- we could use appropriate Tuple Vals
      deriving (Eq,Show)
@@ -101,12 +103,10 @@ isFun _       = False
 
 -- For pretty debugging
 instance Outputable AbsVal where
-  ppr Top    	                = ptext SLIT("Top")
-  ppr (Fun r)                   = ptext SLIT("Fun->") <> (parens.ppr) r
-  ppr (Tuple la)  	        = ptext SLIT("Tuple ") <> text "[" <> 
-                                  (hsep (punctuate comma (map ppr la))) <>
-                                  text "]"
-  ppr Bot   	                = ptext SLIT("Bot")
+  ppr Top    	= ptext SLIT("Top")
+  ppr (Fun r)	= ptext SLIT("Fun->") <> (parens.ppr) r
+  ppr Tuple     = ptext SLIT("Tuple ")
+  ppr Bot       = ptext SLIT("Bot")
 
 
 -- lub takes the lowest upper bound of two abstract values, standard.
@@ -115,7 +115,7 @@ lub Bot a = a
 lub a Bot = a
 lub Top a = Top
 lub a Top = Top
-lub (Tuple l) (Tuple r) = Tuple (zipWithEqual "CPR: lub" lub l r)
+lub Tuple Tuple 	= Tuple
 lub (Fun l) (Fun r)     = Fun (lub l r)
 lub l r = panic "CPR Analysis tried to take the lub of a function and a tuple"
 
@@ -152,15 +152,7 @@ cprAnalyse binds
     }
   where
     do_prog :: [CoreBind] -> [CoreBind]
-    do_prog binds
-	= snd $ foldl analBind (initCPREnv, []) binds
-        where
-        analBind :: (CPREnv, [CoreBind]) -> CoreBind -> (CPREnv, [CoreBind])
-	analBind (rho,done_binds) bind 
-	    = (extendVarEnvList rho env, done_binds ++ [bind'])
-	      where
-	      (env, bind') = cprAnalTopBind rho bind
-
+    do_prog binds = snd $ mapAccumL cprAnalBind initCPREnv binds
 \end{code}
 
 The cprAnal functions take binds/expressions and an environment which 
@@ -168,29 +160,37 @@ gives CPR info for visible ids and returns a new bind/expression
 with ids decorated with their CPR info.
  
 \begin{code}
--- Return environment updated with info from this binding 
-cprAnalTopBind :: CPREnv -> CoreBind -> ([(Var, AbsVal)], CoreBind)
-cprAnalTopBind rho (NonRec v e) 
-    = ([(v', e_absval')], NonRec v' e_pluscpr)
-      where
-      (e_pluscpr, e_absval) = cprAnalExpr rho e
-      (v', e_absval')       = pinCPR v e e_absval
+-- Return environment extended with info from this binding 
+cprAnalBind :: CPREnv -> CoreBind -> (CPREnv, CoreBind)
+cprAnalBind rho (NonRec b e) 
+  = (extendVarEnv rho b absval, NonRec b' e')
+  where
+    (e', absval) = cprAnalRhs rho e
+    b' = setIdCprInfo b (absToCprInfo absval)
 
--- When analyzing mutually recursive bindings the iterations to find
--- a fixpoint is bounded by the number of bindings in the group.
--- for simplicity we just iterate that number of times.      
-cprAnalTopBind rho (Rec bounders) 
-    = (map (\(b,e) -> (b, lookupVarEnv_NF fin_rho b)) fin_bounders',
-       Rec fin_bounders')
-      where
-      init_rho = rho `extendVarEnvList`  (zip binders (repeat Bot))
-      binders = map fst bounders
+cprAnalBind rho (Rec prs)
+  = (final_rho, Rec (map do_pr prs))
+  where
+    do_pr (b,e) = (b', e') 
+		where
+		  b'           = setIdCprInfo b (absToCprInfo absval)
+		  (e', absval) = cprAnalRhs final_rho e
 
-      (fin_rho, fin_bounders) = nTimes (length bounders) 
-				       do_one_pass 
-				       (init_rho, bounders)
-      fin_bounders' = map (\(b,e) -> (fst $ pinCPR b e (lookupVarEnv_NF fin_rho b), e))
-                      fin_bounders
+	-- When analyzing mutually recursive bindings the iterations to find
+	-- a fixpoint is bounded by the number of bindings in the group.
+	-- for simplicity we just iterate that number of times.      
+    final_rho = nTimes (length prs) do_one_pass init_rho
+    init_rho  = rho `extendVarEnvList` [(b,Bot) | (b,e) <- prs]
+
+    do_one_pass :: CPREnv -> CPREnv
+    do_one_pass rho = foldl (\ rho (b,e) -> extendVarEnv rho b (snd (cprAnalRhs rho e)))
+			    rho prs
+
+cprAnalRhs :: CPREnv -> CoreExpr -> (CoreExpr, AbsVal)
+cprAnalRhs rho e
+  = case cprAnalExpr rho e of
+	(e_pluscpr, e_absval) -> (e_pluscpr, pinCPR e e_absval)
+
 
 cprAnalExpr :: CPREnv -> CoreExpr -> (CoreExpr, AbsVal)
 
@@ -204,43 +204,10 @@ cprAnalExpr rho e@(Var v)
     | isBottomingId v = (e, Bot)
     | otherwise       = (e, case lookupVarEnv rho v of
                              Just a_val -> a_val
-			     Nothing    -> cpr_prag_a_val)
-    where
-    ids_inf   = (cprInfoToAbs.getIdCprInfo) v
-    ids_arity = (arityLowerBound.getIdArity) v
-    cpr_prag_a_val = case ids_inf of
-                       Top -> -- if we can inline this var, and its a constructor app
-            		      -- then analyse the unfolding
-                              case (maybeUnfoldingTemplate.getIdUnfolding) v of
-                                Just e | isCon e ->  snd $ cprAnalExpr rho e 
-                                zz_other         -> Top
-                       zz_other -> -- Unfortunately,  cprinfo doesn't store the # of args
-		                   nTimes ids_arity Fun ids_inf
+			     Nothing    -> getCprAbsVal v)
 
--- Return constructor with decorated arguments.  If constructor 
--- has product type then this is a manifest constructor (hooray!)
-cprAnalExpr rho (Con con args)
-    = (Con con args_cpr, 
-       -- If we are a product with 0 args we must be void(like)
-       -- We can't create an unboxed tuple with 0 args for this
-       -- and since Void has only one, constant value it should 
-       -- just mean returning a pointer to a pre-existing cell. 
-       -- So we won't really gain from doing anything fancy
-       -- and we treat this case as Top.
-       if    isConProdType con
-          && length args > 0
-         then Tuple args_aval_filt_funs
-         else Top)
-    where 
-      anal_con_args = map (cprAnalExpr rho) args 
-      args_cpr      = map fst anal_con_args
-
-      args_aval_filt_funs = if (not.isDataCon) con then
-			       map snd anal_con_args
-			    else
-			       map (ifApply isFun (const Top)) $ 
-			        map snd $ 
-				filter (not.isTypeArg.fst) anal_con_args  
+-- Literals are unboxed
+cprAnalExpr rho (Lit l) = (Lit l, Top)
 
 -- For apps we don't care about the argument's abs val.  This
 -- app will return a constructed product if the function does. We strip
@@ -248,17 +215,21 @@ cprAnalExpr rho (Con con args)
 -- or it is already Top or Bot.
 cprAnalExpr rho (App fun arg@(Type _))
     = (App fun_cpr arg, fun_res)  
-      where 
+    where 
       (fun_cpr, fun_res)  = cprAnalExpr rho fun 
 
 cprAnalExpr rho (App fun arg) 
-    = (App fun_cpr arg_cpr, if fun_res==Top || fun_res==Bot 
-                            then fun_res 
-                            else res_res)
-      where 
+    = (App fun_cpr arg_cpr, res_res)
+    where 
       (fun_cpr, fun_res)  = cprAnalExpr rho fun 
       (arg_cpr, _)        = cprAnalExpr rho arg
-      Fun res_res         = fun_res
+      res_res		  = case fun_res of
+				Fun res_res -> res_res
+				Top 	    -> Top
+				Bot	    -> Bot
+				Tuple	    -> WARN( True, ppr (App fun arg) ) Top
+						-- This really should not happen!
+
 
 -- Map arguments to Top (we aren't constructing them)
 -- Return the abstract value of the body, since functions 
@@ -269,26 +240,11 @@ cprAnalExpr rho (Lam b body) | isTyVar b = (Lam b body_cpr, body_aval)
       where 
       (body_cpr, body_aval) = cprAnalExpr (extendVarEnv rho b Top) body
 
-cprAnalExpr rho (Let (NonRec binder rhs) body) 
-    = (Let (NonRec binder' rhs_cpr) body_cpr, body_aval)
-      where 
-      (rhs_cpr, rhs_aval) = cprAnalExpr rho rhs
-      (binder', rhs_aval') = pinCPR binder rhs_cpr rhs_aval
-      (body_cpr, body_aval) = cprAnalExpr (extendVarEnv rho binder rhs_aval') body
-
-cprAnalExpr rho (Let (Rec bounders) body) 
-    = (Let (Rec fin_bounders) body_cpr, body_aval) 
-      where 
-      (rhs_rho, fin_bounders) = nTimes 
-				(length bounders) 
-				do_one_pass 
-				(init_rho, bounders)
-
-      (body_cpr, body_aval) = cprAnalExpr rhs_rho  body
-
-      init_rho = rho `extendVarEnvList` zip binders (repeat Bot)
-      binders = map fst bounders
-
+cprAnalExpr rho (Let bind body)
+    = (Let bind' body', body_aval)
+    where 
+      (rho', bind') = cprAnalBind rho bind
+      (body', body_aval) = cprAnalExpr rho' body
 
 cprAnalExpr rho (Case scrut bndr alts)
     = (Case scrut_cpr bndr alts_cpr, alts_aval)
@@ -304,7 +260,6 @@ cprAnalExpr rho (Note n exp)
 cprAnalExpr rho (Type t) 
     = (Type t, Top)
 
-
 cprAnalCaseAlts :: CPREnv -> [CoreAlt] -> ([CoreAlt], AbsVal)
 cprAnalCaseAlts rho alts
     = foldl anal_alt ([], Bot) alts
@@ -316,31 +271,20 @@ cprAnalCaseAlts rho alts
 		  rho' = rho `extendVarEnvList` (zip binds (repeat Top))
 
 
--- Does one analysis pass through a list of mutually recursive bindings.
-do_one_pass :: (CPREnv, [(CoreBndr,CoreExpr)]) -> (CPREnv, [(CoreBndr,CoreExpr)])
-do_one_pass  (i_rho,bounders)
-    = foldl anal_bind (i_rho, []) bounders
-       where
-         anal_bind (c_rho, done) (b,e) = (modifyVarEnv (const e_absval') c_rho b, 
-					  done ++ [(b,e')])
-              where (e', e_absval) = cprAnalExpr c_rho e
-                    e_absval' = snd (pinCPR b e e_absval)                     
-
-
 -- take a binding pair and the abs val calculated from the rhs and
 -- calculate a new absval taking into account sufficient manifest
 -- lambda condition 
 -- Also we pin the var's CPR property to it.  A var only has the CPR property if
 -- it is a function
 
-pinCPR :: Var -> CoreExpr -> AbsVal -> (Var, AbsVal)
-pinCPR v e av = case av of
+pinCPR :: CoreExpr -> AbsVal -> AbsVal
+pinCPR e av = case av of
                     -- is v a function with insufficent lambdas?
-                 Fun _ | length argtys /= length val_binders ->  
+                 Fun _ | n_fun_tys av /= length val_binders ->  
                       -- argtys must be greater than val_binders.  So stripped_exp
 		      -- has a function type.  The head of this expr can't be lambda 
 		      -- a note, because we stripped them off before.  It can't be a 
-		      -- Con because it has a function type.  It can't be a Type. 
+		      -- constructor because it has a function type.  It can't be a Type. 
 		      -- If its an app, let or case then there is work to get the 
 		      -- and we can't do anything because we may lose laziness. *But*
 		      -- if its a var (i.e. a function name) then we are fine.  Note 
@@ -353,109 +297,37 @@ pinCPR v e av = case av of
 		      -- if isVar stripped_exp then
                       --    (addCpr av, av)
 		      -- else
-			    (addCpr Top, Top)
-		 Tuple _ -> 
-                      -- not a function.
-                      -- Pin NoInfo to v. If v appears in the interface file then an 
-		      -- importing module will check to see if it has an unfolding
-		      -- with a constructor at its head (WHNF).  If it does it will re-analyse
-                      -- the folding.  I could do the check here, but I don't know if
-                      -- the current unfolding info is final. 
-		      (addCpr Top,
-                       -- Retain CPR info if it has a constructor
-                       -- at its head, and thus will be inlined and simplified by
-                       -- case of a known constructor
-		       if isCon e then av else Top)
-		 _ -> (addCpr av, av)
+			    Top
+
+		 Tuple | exprIsValue e -> av
+		       | otherwise     -> Top
+			-- If the rhs is a value, and returns a constructed product,
+			-- it will be inlined at usage sites, so we give it a Tuple absval
+			-- If it isn't a value, we won't inline it (code/work dup worries), so
+			-- we discard its absval.
+
+		 _ -> av
     where
-    -- func to pin CPR info on a var
-    addCpr :: AbsVal -> Var
-    addCpr = (setIdCprInfo v).absToCprInfo
+      n_fun_tys :: AbsVal -> Int
+      n_fun_tys (Fun av) = 1 + n_fun_tys av
+      n_fun_tys other    = 0
 
-    -- Split argument types and result type from v's type
-    (_, argtys, _) = (splitTypeToFunArgAndRes.varType) v 
-
-    -- val_binders are the explicit lambdas at the head of the expression
-    (_, val_binders, _) = collectTyAndValBinders e -- collectBindersIgnoringNotes e'
-
+	-- val_binders are the explicit lambdas at the head of the expression
+	-- Don't get confused by inline pragamas
+      val_binders = filter isId (fst (collectBindersIgnoringNotes e))
 
 absToCprInfo :: AbsVal -> CprInfo
-absToCprInfo (Tuple args) = CPRInfo $ map absToCprInfo args 
-absToCprInfo (Fun r)      = absToCprInfo r
-absToCprInfo _            = NoCPRInfo
+absToCprInfo Tuple   = ReturnsCPR
+absToCprInfo (Fun r) = absToCprInfo r
+absToCprInfo _       = NoCPRInfo
 
 -- Cpr Info doesn't store the number of arguments a function has,  so the caller
 -- must take care to add the appropriate number of Funs.
-cprInfoToAbs :: CprInfo -> AbsVal
-cprInfoToAbs NoCPRInfo = Top
-cprInfoToAbs (CPRInfo args) = Tuple $ map cprInfoToAbs args
-
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Utilities}
-%*									*
-%************************************************************************
-
-
-Now we define a couple of functions that split up types, they should
-be moved to Type.lhs if it is agreed that they are doing something
-that is sensible.
-
-\begin{code}
-
--- Split a function type into forall tyvars, argument types and result type.
--- If the type isn't a function type then tyvars and argument types will be
--- empty lists.
-
--- Experimental,  look through new types.  I have given up on this for now,
--- if the target of a function is a new type which is a function (see monadic
--- functions for examples) we could look into these.  However,  it turns out that 
--- the (necessary) coercions in the code stop the beneficial simplifications.
-splitTypeToFunArgAndRes :: Type -> ([TyVar], [Type], Type) 
-splitTypeToFunArgAndRes ty = (tyvars, argtys, resty)
-    where (tyvars, funty) = splitForAllTys ty
-          (argtys, resty) = splitFunTysIgnoringNewTypes funty
---          (argtys, resty) = splitFunTys funty
-
--- splitFunTys, modified to keep searching through newtypes.
--- Should move to Type.lhs if it is doing something sensible.
-
-splitFunTysIgnoringNewTypes :: Type -> ([Type], Type)
-splitFunTysIgnoringNewTypes ty = split ty
-  where
-    split ty = case splitNewType_maybe res of
-		 Nothing     -> (args, res)
-		 Just rep_ty -> (args ++ args', res')
-			     where
-				(args', res') = split rep_ty
-	     where
-		(args, res) = splitFunTys ty
-
-
--- Is this the constructor for a product type (i.e. algebraic, single constructor) 
--- NB: isProductTyCon replies 'False' for unboxed tuples
-isConProdType :: Con -> Bool
-isConProdType (DataCon con) = isProductTyCon . dataConTyCon $ con 
-isConProdType _ = False
-
--- returns True iff head of expression is a constructor
--- Should I look through notes? I think so ...
-isCon :: CoreExpr -> Bool
-isCon (Con c _) = isWHNFCon c  -- is this the right test?
-isCon (Note _ e) = isCon e
-isCon _         = False
-
--- Compose a function with itself n times.  (nth rather than twice)
--- This must/should be in a library somewhere,  but where!
-nTimes :: Int -> (a -> a) -> (a -> a)
-nTimes 0 _ = id
-nTimes 1 f = f
-nTimes n f = f . nTimes (n-1) f
-
--- Only apply f to argument if it satisfies p
-ifApply :: (a -> Bool) -> (a -> a) -> (a -> a)
-ifApply p f x = if p x then f x else x
-
+getCprAbsVal v = case idCprInfo v of
+			NoCPRInfo -> Top
+			ReturnsCPR -> nTimes arity Fun Tuple
+	       where
+		 arity = idArity v
+	-- Imported (non-nullary) constructors will have the CPR property
+	-- in their IdInfo, so no need to look at their unfolding
 \end{code}

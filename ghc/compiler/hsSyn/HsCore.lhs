@@ -13,7 +13,7 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 \begin{code}
 module HsCore (
 	UfExpr(..), UfAlt, UfBinder(..), UfNote(..),
-	UfBinding(..), UfCon(..),
+	UfBinding(..), UfConAlt(..),
 	HsIdInfo(..), HsStrictnessInfo(..),
 	IfaceSig(..), UfRuleBody(..)
     ) where
@@ -24,10 +24,11 @@ module HsCore (
 import HsTypes		( HsType, pprParendHsType )
 
 -- others:
-import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo, CprInfo )
+import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo )
 import CoreSyn		( CoreBndr, CoreExpr )
 import Demand		( Demand )
-import Const		( Literal )
+import Literal		( Literal )
+import PrimOp		( CCall, pprCCallOp )
 import Type		( Kind )
 import CostCentre
 import SrcLoc		( SrcLoc )
@@ -44,30 +45,27 @@ import Outputable
 data UfExpr name
   = UfVar 	name
   | UfType      (HsType name)
-  | UfCon 	(UfCon name) [UfExpr name]
   | UfTuple 	name [UfExpr name]		-- Type arguments omitted
   | UfLam 	(UfBinder name)	  (UfExpr name)
   | UfApp 	(UfExpr name) (UfExpr name)
   | UfCase	(UfExpr name) name [UfAlt name]
   | UfLet	(UfBinding name)  (UfExpr name)
   | UfNote	(UfNote name) (UfExpr name)
+  | UfLit	Literal
+  | UfLitLit	FAST_STRING (HsType name)
+  | UfCCall	CCall (HsType name)
 
 data UfNote name = UfSCC CostCentre
 	         | UfCoerce (HsType name)
 	         | UfInlineCall
 	         | UfInlineMe
 
-type UfAlt name = (UfCon name, [name], UfExpr name)
+type UfAlt name = (UfConAlt name, [name], UfExpr name)
 
-data UfCon name = UfDefault
- 		| UfDataCon name
-		| UfLitCon Literal
-		| UfLitLitCon FAST_STRING (HsType name)
-	        | UfPrimOp name
- 	 	| UfCCallOp FAST_STRING	   -- callee
-			    Bool	   -- True => dynamic (first arg is fun. pointer)
-			    Bool	   -- True <=> casm, rather than ccall
-			    Bool	   -- True <=> might cause GC
+data UfConAlt name = UfDefault
+ 		   | UfDataAlt name
+		   | UfLitAlt Literal
+		   | UfLitLitAlt FAST_STRING (HsType name)
 
 data UfBinding name
   = UfNonRec	(UfBinder name)
@@ -89,10 +87,12 @@ data UfBinder name
 \begin{code}
 instance Outputable name => Outputable (UfExpr name) where
     ppr (UfVar v) = ppr v
-    ppr (UfType ty) = char '@' <+> pprParendHsType ty
+    ppr (UfLit l) = ppr l
 
-    ppr (UfCon c as)
-      = hsep [text "UfCon", ppr c, ppr as]
+    ppr (UfLitLit l ty) = ppr l
+    ppr (UfCCall cc ty) = pprCCallOp cc
+
+    ppr (UfType ty) = char '@' <+> pprParendHsType ty
 
     ppr (UfTuple c as) = parens (hsep (punctuate comma (map ppr as)))
 
@@ -119,18 +119,11 @@ instance Outputable name => Outputable (UfExpr name) where
     ppr (UfNote note body)
       = hsep [ptext SLIT("_NOTE_ [ToDo]>"), ppr body]
 
-instance Outputable name => Outputable (UfCon name) where
+instance Outputable name => Outputable (UfConAlt name) where
     ppr UfDefault	   = text "DEFAULT"
-    ppr (UfLitCon l)       = ppr l
-    ppr (UfLitLitCon l ty) = ppr l
-    ppr (UfDataCon d)	   = ppr d
-    ppr (UfPrimOp p)	   = ppr p
-    ppr (UfCCallOp str is_dyn is_casm can_gc)
-      =	hcat [before, ptext str, after]
-      where
-	    before = (if is_dyn then ptext SLIT("_dyn_") else empty) <>
-		     ptext (if is_casm then SLIT("_casm_ ``") else SLIT("_ccall_ "))
-	    after  = if is_casm then text "'' " else space
+    ppr (UfLitAlt l)       = ppr l
+    ppr (UfLitLitAlt l ty) = ppr l
+    ppr (UfDataAlt d)	   = ppr d
 
 instance Outputable name => Outputable (UfBinder name) where
     ppr (UfValBinder name ty)  = hsep [ppr name, dcolon, ppr ty]
@@ -163,7 +156,7 @@ data HsIdInfo name
   | HsUpdate		UpdateInfo
   | HsSpecialise	(UfRuleBody name)
   | HsNoCafRefs
-  | HsCprInfo           CprInfo
+  | HsCprInfo
   | HsWorker		name		-- Worker, if any
 
 instance Outputable name => Outputable (HsIdInfo name) where

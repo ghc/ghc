@@ -182,6 +182,7 @@ andMonoBindList binds
     loop2 acc (b:bs) = loop2 (acc `AndMonoBinds` b) bs
 \end{code}
 
+
 \begin{code}
 instance (Outputable id, Outputable pat) =>
 		Outputable (MonoBinds id pat) where
@@ -260,7 +261,6 @@ data Sig name
 
   | DeprecSig	(Deprecation name)	-- DEPRECATED
 		SrcLoc
-
 
 data FixitySig name  = FixitySig name Fixity SrcLoc
 

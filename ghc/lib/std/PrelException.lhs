@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.13 2000/03/16 17:27:13 simonmar Exp $
+% $Id: PrelException.lhs,v 1.14 2000/03/23 17:45:31 simonpj Exp $
 %
 % (c) The GRAP/AQUA Project, Glasgow University, 1998
 %
@@ -137,6 +137,8 @@ course.
 
 \begin{code}
 ioError         :: IOError -> IO a 
-ioError err	=  throw (IOException err)
+ioError err	=  IO $ \s -> throw (IOException err) s
+	-- (ioError e) isn't an exception; we only throw
+	-- the exception when applied to a world
 \end{code}
 

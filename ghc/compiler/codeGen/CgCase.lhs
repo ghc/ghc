@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.37 2000/01/13 14:33:57 hwloidl Exp $
+% $Id: CgCase.lhs,v 1.38 2000/03/23 17:45:19 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -49,12 +49,11 @@ import CLabel		( CLabel, mkVecTblLabel, mkReturnPtLabel,
 import ClosureInfo	( mkLFArgument )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( CostCentre )
-import CoreSyn		( isDeadBinder )
-import Id		( Id, idPrimRep )
+import Id		( Id, idPrimRep, isDeadBinder )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, ConTag,
-			  isUnboxedTupleCon, dataConType )
+			  isUnboxedTupleCon )
 import VarSet		( varSetElems )
-import Const		( Con(..), Literal )
+import Literal		( Literal )
 import PrimOp		( primOpOutOfLine, PrimOp(..) )
 import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 			)
@@ -150,7 +149,7 @@ mkBuiltinUnique, because that occasionally clashes with some
 temporaries generated for _ccall_GC, amongst others (see CgExpr.lhs).
 
 \begin{code}
-cgCase (StgCon (PrimOp op) args res_ty)
+cgCase (StgPrimApp op args res_ty)
          live_in_whole_case live_in_alts bndr srt (StgAlgAlts ty alts deflt)
   | isEnumerationTyCon tycon
   = getArgAmodes args `thenFC` \ arg_amodes ->
@@ -197,7 +196,7 @@ cgCase (StgCon (PrimOp op) args res_ty)
 Special case #2: inline PrimOps.
 
 \begin{code}
-cgCase (StgCon (PrimOp op) args res_ty) 
+cgCase (StgPrimApp op args res_ty) 
 	live_in_whole_case live_in_alts bndr srt alts
   | not (primOpOutOfLine op)
   =

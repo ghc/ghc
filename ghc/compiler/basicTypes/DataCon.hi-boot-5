@@ -1,5 +1,5 @@
 __interface DataCon 1 0 where
-__export DataCon DataCon dataConType isExistentialDataCon ;
+__export DataCon DataCon dataConRepType isExistentialDataCon ;
 1 data DataCon ;
-1 dataConType :: DataCon -> TypeRep.Type ;
+1 dataConRepType :: DataCon -> TypeRep.Type ;
 1 isExistentialDataCon :: DataCon -> PrelBase.Bool ;

@@ -10,7 +10,7 @@ Definitions for: @TyDecl@ and @ConDecl@, @ClassDecl@,
 module HsDecls (
 	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
 	DefaultDecl(..), ForeignDecl(..), ForKind(..),
-	ExtName(..), isDynamic,
+	ExtName(..), isDynamicExtName, extNameStatic,
 	ConDecl(..), ConDetails(..), BangType(..),
 	IfaceSig(..),  SpecDataSig(..), 
 	hsDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls
@@ -31,6 +31,7 @@ import Var		( TyVar )
 -- others:
 import PprType
 import {-# SOURCE #-} FunDeps ( pprFundeps )
+import CStrings		( CLabelString )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
@@ -84,9 +85,9 @@ hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 #endif
 
 tyClDeclName :: TyClDecl name pat -> name
-tyClDeclName (TyData _ _ name _ _ _ _ _)        = name
-tyClDeclName (TySynonym name _ _ _)             = name
-tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _ _) = name
+tyClDeclName (TyData _ _ name _ _ _ _ _)            = name
+tyClDeclName (TySynonym name _ _ _)                 = name
+tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _ _ _) = name
 \end{code}
 
 \begin{code}
@@ -136,8 +137,9 @@ data TyClDecl name pat
 		[Sig name]		-- methods' signatures
 		(MonoBinds name pat)	-- default methods
 		(ClassPragmas name)
-		name name [name]	-- The names of the tycon, datacon, and superclass selectors
-					-- for this class.  These are filled in as the ClassDecl is made.
+		name name name [name]	-- The names of the tycon, datacon wrapper, datacon worker,
+					-- and superclass selectors for this class.
+					-- These are filled in as the ClassDecl is made.
 		SrcLoc
 \end{code}
 
@@ -145,10 +147,10 @@ data TyClDecl name pat
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl _ _ _ _ _ _ _ _ _ _ _ <- decls],
-    length [() | TyData DataType _ _ _ _ _ _ _ <- decls],
-    length [() | TyData NewType  _ _ _ _ _ _ _ <- decls],
-    length [() | TySynonym _ _ _ _	       <- decls])
+ = (length [() | ClassDecl _ _ _ _ _ _ _ _ _ _ _ _ <- decls],
+    length [() | TyData DataType _ _ _ _ _ _ _     <- decls],
+    length [() | TyData NewType  _ _ _ _ _ _ _     <- decls],
+    length [() | TySynonym _ _ _ _	           <- decls])
 
 isDataDecl, isSynDecl, isClassDecl :: TyClDecl name pat -> Bool
 
@@ -158,8 +160,8 @@ isSynDecl other		      = False
 isDataDecl (TyData _ _ _ _ _ _ _ _) = True
 isDataDecl other		    = False
 
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ _ _) = True
-isClassDecl other		 	    = False
+isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ _ _ _) = True
+isClassDecl other		 	        = False
 \end{code}
 
 \begin{code}
@@ -180,7 +182,7 @@ instance (Outputable name, Outputable pat)
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-    ppr (ClassDecl context clas tyvars fds sigs methods pragmas _ _ _ src_loc)
+    ppr (ClassDecl context clas tyvars fds sigs methods pragmas _ _ _ _ src_loc)
       | null sigs	-- No "where" part
       = top_matter
 
@@ -236,7 +238,11 @@ instance (Outputable name)
 
 \begin{code}
 data ConDecl name
-  = ConDecl 	name			-- Constructor name
+  = ConDecl 	name			-- Constructor name; this is used for the
+					-- DataCon itself, and for the user-callable wrapper Id
+
+		name			-- Name of the constructor's 'worker Id'
+					-- Filled in as the ConDecl is built
 
 		[HsTyVar name]		-- Existentially quantified type variables
 		(HsContext name)	-- ...and context
@@ -268,7 +274,7 @@ data BangType name
 
 \begin{code}
 instance (Outputable name) => Outputable (ConDecl name) where
-    ppr (ConDecl con tvs cxt con_details  loc)
+    ppr (ConDecl con _ tvs cxt con_details  loc)
       = sep [pprForAll tvs, pprHsContext cxt, ppr_con_details con con_details]
 
 ppr_con_details con (InfixCon ty1 ty2)
@@ -394,11 +400,18 @@ data ForKind
 
 data ExtName
  = Dynamic 
- | ExtName FAST_STRING (Maybe FAST_STRING)
+ | ExtName CLabelString 	-- The external name of the foreign thing,
+	   (Maybe CLabelString)	-- and optionally its DLL or module name
+				-- Both of these are completely unencoded; 
+				-- we just print them as they are
 
-isDynamic :: ExtName -> Bool
-isDynamic Dynamic = True
-isDynamic _	  = False
+isDynamicExtName :: ExtName -> Bool
+isDynamicExtName Dynamic = True
+isDynamicExtName _	 = False
+
+extNameStatic :: ExtName -> CLabelString
+extNameStatic (ExtName f _) = f
+extNameStatic Dynamic	    = panic "staticExtName: Dynamic - shouldn't ever happen."
 
 
 instance Outputable ExtName where

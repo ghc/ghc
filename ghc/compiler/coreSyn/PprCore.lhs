@@ -18,16 +18,17 @@ module PprCore (
 
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
-import Id		( idType, idInfo, getInlinePragma, getIdDemandInfo, getIdOccInfo, Id )
+import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
+			  idInfo, idInlinePragma, idDemandInfo, idOccInfo
+			)
 import Var		( isTyVar )
-import IdInfo		( IdInfo,
+import IdInfo		( IdInfo, megaSeqIdInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
 			  cprInfo, ppCprInfo, lbvarInfo,
 			  workerInfo, ppWorkerInfo
 			)
-import Const		( Con(..), DataCon )
 import DataCon		( isTupleCon, isUnboxedTupleCon )
 import PprType		( pprParendType, pprTyVarBndr )
 import PprEnv
@@ -63,8 +64,8 @@ pprParendExpr   :: CoreExpr   -> SDoc
 
 pprCoreBindings = pprTopBinds pprCoreEnv
 pprCoreBinding  = pprTopBind pprCoreEnv
-pprCoreExpr     = ppr_expr pprCoreEnv
-pprParendExpr   = ppr_parend_expr pprCoreEnv
+pprCoreExpr     = ppr_noparend_expr pprCoreEnv
+pprParendExpr   = ppr_parend_expr   pprCoreEnv
 
 pprCoreEnv = initCoreEnv pprCoreBinder
 \end{code}
@@ -86,7 +87,7 @@ instance Outputable b => Outputable (Bind b) where
     ppr bind = ppr_bind pprGenericEnv bind
 
 instance Outputable b => Outputable (Expr b) where
-    ppr expr = ppr_expr pprGenericEnv expr
+    ppr expr = ppr_noparend_expr pprGenericEnv expr
 
 pprGenericEnv :: Outputable b => PprEnv b
 pprGenericEnv = initCoreEnv (\site -> ppr)
@@ -102,7 +103,6 @@ pprGenericEnv = initCoreEnv (\site -> ppr)
 \begin{code}
 initCoreEnv pbdr
   = initPprEnv
-	(Just ppr)			-- Constants
 	(Just pprCostCentreCore)	-- Cost centres
 
 	(Just ppr) 		-- tyvar occs
@@ -122,7 +122,7 @@ initCoreEnv pbdr
 pprTopBinds pe binds = vcat (map (pprTopBind pe) binds)
 
 pprTopBind pe (NonRec binder expr)
- = sep [ppr_binding_pe pe (binder,expr)] $$ text ""
+ = ppr_binding_pe pe (binder,expr) $$ text ""
 
 pprTopBind pe (Rec binds)
   = vcat [ptext SLIT("Rec {"),
@@ -142,73 +142,72 @@ ppr_bind pe (Rec binds)  	  = vcat (map pp binds)
 ppr_binding_pe :: PprEnv b -> (b, Expr b) -> SDoc
 ppr_binding_pe pe (val_bdr, expr)
   = sep [pBndr pe LetBind val_bdr, 
-	 nest 2 (equals <+> ppr_expr pe expr)]
+	 nest 2 (equals <+> ppr_noparend_expr pe expr)]
 \end{code}
 
 \begin{code}
-ppr_parend_expr pe expr
-  | no_parens = ppr_expr pe expr
-  | otherwise = parens (ppr_expr pe expr)
-  where
-    no_parens = case expr of
-	 	  Var _     	     -> True
-		  Con con []	     -> True
-		  Con (DataCon dc) _ -> isTupleCon dc
-		  _	             -> False
+ppr_parend_expr   pe expr = ppr_expr parens pe expr
+ppr_noparend_expr pe expr = ppr_expr noParens pe expr
+
+noParens :: SDoc -> SDoc
+noParens pp = pp
 \end{code}
 
 \begin{code}
-ppr_expr :: PprEnv b -> Expr b -> SDoc
+ppr_expr :: (SDoc -> SDoc) -> PprEnv b -> Expr b -> SDoc
+	-- The function adds parens in context that need
+	-- an atomic value (e.g. function args)
 
-ppr_expr pe (Type ty)  = ptext SLIT("TYPE") <+> ppr ty	-- Wierd
+ppr_expr add_par pe (Type ty)  = add_par (ptext SLIT("TYPE") <+> ppr ty)	-- Wierd
+	           
+ppr_expr add_par pe (Var name) = pOcc pe name
+ppr_expr add_par pe (Lit lit)  = ppr lit
 
-ppr_expr pe (Var name) = pOcc pe name
-
-ppr_expr pe (Con con [])
-  = ppr con	-- Nullary constructors too
-
-ppr_expr pe (Con (DataCon dc) args)
-	-- Drop the type arguments and print in (a,b,c) notation
-  | isTupleCon dc
-  = parens (sep (punctuate comma (map (ppr_arg pe) (dropWhile isTypeArg args))))
-  | isUnboxedTupleCon dc
-  = text "(# " <> 
-    hsep (punctuate comma (map (ppr_arg pe) (dropWhile isTypeArg args))) <>
-    text " #)"
-
-ppr_expr pe (Con con args)
-  = pCon pe con <+> (braces $ sep (map (ppr_arg pe) args))
-
-ppr_expr pe expr@(Lam _ _)
+ppr_expr add_par pe expr@(Lam _ _)
   = let
 	(bndrs, body) = collectBinders expr
     in
+    add_par $
     hang (ptext SLIT("\\") <+> sep (map (pBndr pe LambdaBind) bndrs) <+> arrow)
-	 4 (ppr_expr pe body)
+	 4 (ppr_noparend_expr pe body)
 
-ppr_expr pe expr@(App fun arg)
-  = let
-	(final_fun, final_args)      = go fun [arg]
-	go (App fun arg) args_so_far = go fun (arg:args_so_far)
-	go fun		 args_so_far = (fun, args_so_far)
+ppr_expr add_par pe expr@(App fun arg)
+  = case collectArgs expr of { (fun, args) -> 
+    let
+	pp_args     = sep (map (ppr_arg pe) args)
+	val_args    = dropWhile isTypeArg args	 -- Drop the type arguments for tuples
+	pp_tup_args = sep (punctuate comma (map (ppr_arg pe) val_args))
     in
-    hang (ppr_parend_expr pe final_fun) 4 (sep (map (ppr_arg pe) final_args))
+    case fun of
+	Var f -> case isDataConId_maybe f of
+			-- Notice that we print the *worker*
+			-- for tuples in paren'd format.
+		   Just dc | saturated && isTupleCon dc	       -> parens pp_tup_args
+			   | saturated && isUnboxedTupleCon dc -> text "(#" <+> pp_tup_args <+> text "#)"
+		   other				       -> add_par (hang (pOcc pe f) 4 pp_args)
+	      where
+		saturated   = length val_args == idArity f
 
-ppr_expr pe (Case expr var [(con,args,rhs)])
-  = sep [sep [ptext SLIT("case") <+> ppr_expr pe expr,
+	other -> add_par (hang (ppr_parend_expr pe fun) 4 pp_args)
+    }
+
+ppr_expr add_par pe (Case expr var [(con,args,rhs)])
+  = add_par $
+    sep [sep [ptext SLIT("case") <+> ppr_noparend_expr pe expr,
 	      hsep [ptext SLIT("of"),
 		    ppr_bndr var,
 		    char '{',
 		    ppr_case_pat pe con args
 	  ]],
-	 ppr_expr pe rhs,
+	 ppr_noparend_expr pe rhs,
 	 char '}'
     ]
   where
     ppr_bndr = pBndr pe CaseBind
 
-ppr_expr pe (Case expr var alts)
-  = sep [sep [ptext SLIT("case") <+> ppr_expr pe expr,
+ppr_expr add_par pe (Case expr var alts)
+  = add_par $
+    sep [sep [ptext SLIT("case") <+> ppr_noparend_expr pe expr,
 	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
 	 nest 4 (sep (punctuate semi (map ppr_alt alts))),
 	 char '}'
@@ -217,41 +216,45 @@ ppr_expr pe (Case expr var alts)
     ppr_bndr = pBndr pe CaseBind
  
     ppr_alt (con, args, rhs) = hang (ppr_case_pat pe con args)
-			            4 (ppr_expr pe rhs)
+			            4 (ppr_noparend_expr pe rhs)
 
 -- special cases: let ... in let ...
 -- ("disgusting" SLPJ)
 
-ppr_expr pe (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
-  = vcat [
+ppr_expr add_par pe (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
+  = add_par $
+    vcat [
       hsep [ptext SLIT("let {"), pBndr pe LetBind val_bdr, equals],
-      nest 2 (ppr_expr pe rhs),
+      nest 2 (ppr_noparend_expr pe rhs),
       ptext SLIT("} in"),
-      ppr_expr pe body ]
+      ppr_noparend_expr pe body ]
 
-ppr_expr pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
-  = hang (ptext SLIT("let {"))
+ppr_expr add_par pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
+  = add_par
+    (hang (ptext SLIT("let {"))
 	  2 (hsep [hang (hsep [pBndr pe LetBind val_bdr, equals])
-			   4 (ppr_expr pe rhs),
+			   4 (ppr_noparend_expr pe rhs),
        ptext SLIT("} in")])
-    $$
-    ppr_expr pe expr
+     $$
+     ppr_noparend_expr pe expr)
 
 -- general case (recursive case, too)
-ppr_expr pe (Let bind expr)
-  = sep [hang (ptext keyword) 2 (ppr_bind pe bind),
-	 hang (ptext SLIT("} in ")) 2 (ppr_expr pe expr)]
+ppr_expr add_par pe (Let bind expr)
+  = add_par $
+    sep [hang (ptext keyword) 2 (ppr_bind pe bind),
+	 hang (ptext SLIT("} in ")) 2 (ppr_noparend_expr pe expr)]
   where
     keyword = case bind of
 		Rec _      -> SLIT("__letrec {")
 		NonRec _ _ -> SLIT("let {")
 
-ppr_expr pe (Note (SCC cc) expr)
-  = sep [pSCC pe cc, ppr_expr pe expr]
+ppr_expr add_par pe (Note (SCC cc) expr)
+  = add_par (sep [pSCC pe cc, ppr_noparend_expr pe expr])
 
 #ifdef DEBUG
-ppr_expr pe (Note (Coerce to_ty from_ty) expr)
- = getPprStyle $ \ sty ->
+ppr_expr add_par pe (Note (Coerce to_ty from_ty) expr)
+ = add_par $
+   getPprStyle $ \ sty ->
    if debugStyle sty && not (ifaceStyle sty) then
       sep [ptext SLIT("__coerce") <+> sep [pTy pe to_ty, pTy pe from_ty],
 	   ppr_parend_expr pe expr]
@@ -259,25 +262,26 @@ ppr_expr pe (Note (Coerce to_ty from_ty) expr)
       sep [hsep [ptext SLIT("__coerce"), pTy pe to_ty],
 	          ppr_parend_expr pe expr]
 #else
-ppr_expr pe (Note (Coerce to_ty from_ty) expr)
-  = sep [sep [ptext SLIT("__coerce"), nest 4 (pTy pe to_ty)],
+ppr_expr add_par pe (Note (Coerce to_ty from_ty) expr)
+  = add_par $
+    sep [sep [ptext SLIT("__coerce"), nest 4 (pTy pe to_ty)],
 	 ppr_parend_expr pe expr]
 #endif
 
-ppr_expr pe (Note InlineCall expr)
-  = ptext SLIT("__inline_call") <+> ppr_parend_expr pe expr
+ppr_expr add_par pe (Note InlineCall expr)
+  = add_par (ptext SLIT("__inline_call") <+> ppr_parend_expr pe expr)
 
-ppr_expr pe (Note InlineMe expr)
-  = ptext SLIT("__inline_me") <+> ppr_parend_expr pe expr
+ppr_expr add_par pe (Note InlineMe expr)
+  = add_par $ ptext SLIT("__inline_me") <+> ppr_parend_expr pe expr
 
-ppr_expr pe (Note (TermUsg u) expr)
-  = \ sty ->
+ppr_expr add_par pe (Note (TermUsg u) expr)
+  = getPprStyle $ \ sty ->
     if ifaceStyle sty then
-      ppr_expr pe expr sty
+      ppr_expr add_par pe expr
     else
-      (ppr u <+> ppr_expr pe expr) sty
+      add_par (ppr u <+> ppr_noparend_expr pe expr)
 
-ppr_case_pat pe con@(DataCon dc) args
+ppr_case_pat pe con@(DataAlt dc) args
   | isTupleCon dc
   = parens (hsep (punctuate comma (map ppr_bndr args))) <+> arrow
   | isUnboxedTupleCon dc
@@ -289,7 +293,7 @@ ppr_case_pat pe con@(DataCon dc) args
     ppr_bndr = pBndr pe CaseBind
 
 ppr_case_pat pe con args
-  = pCon pe con <+> hsep (map ppr_bndr args) <+> arrow
+  = ppr con <+> hsep (map ppr_bndr args) <+> arrow
   where
     ppr_bndr = pBndr pe CaseBind
 
@@ -334,8 +338,11 @@ pprTypedBinder binder
 	-- printing interfaces, because we get \ x::(a->b) y::(c->d) -> ...
 
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
-pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdOccInfo id) <+> 
-				      ppr (getIdDemandInfo id)) <+> ppr (lbvarInfo (idInfo id))
+pprIdBndr id = ppr id <+> 
+	       (megaSeqIdInfo (idInfo id) `seq`
+			-- Useful for poking on black holes
+	        ifPprDebug (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
+				      ppr (idDemandInfo id)) <+> ppr (idLBVarInfo id))
 \end{code}
 
 

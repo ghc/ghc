@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.28 2000/03/16 12:37:06 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.29 2000/03/23 17:45:17 simonpj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -39,17 +39,13 @@ module AbsCSyn {- (
 
 import {-# SOURCE #-} ClosureInfo ( ClosureInfo )
 
-#if  ! OMIT_NATIVE_CODEGEN
-import {-# SOURCE #-} MachMisc
-#endif
-
 import CLabel
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, spRelToInt )
 import CostCentre       ( CostCentre, CostCentreStack )
-import Const		( mkMachInt, Literal(..) )
+import Literal		( mkMachInt, Literal(..) )
 import PrimRep		( PrimRep(..) )
-import PrimOp           ( PrimOp )
+import PrimOp           ( PrimOp, CCall )
 import Unique           ( Unique )
 import StgSyn		( SRT(..) )
 import TyCon		( TyCon )
@@ -167,7 +163,7 @@ stored in a mixed type location.)
        compiling 'foreign import dynamic's)
     -}
   | CCallTypedef Bool {- True => use "typedef"; False => use "extern"-}
-  		 PrimOp{-CCallOp-} [CAddrMode] [CAddrMode]
+  		 CCall [CAddrMode] [CAddrMode]
 
   -- *** the next three [or so...] are DATA (those above are CODE) ***
 

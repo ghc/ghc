@@ -12,7 +12,7 @@ module CoreLint (
 
 #include "HsVersions.h"
 
-import IO	( hPutStr, hPutStrLn, stderr )
+import IO	( hPutStr, hPutStrLn, stderr, stdout )
 
 import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
@@ -20,9 +20,10 @@ import CoreFVs		( idFreeVars )
 import CoreUtils	( exprOkForSpeculation )
 
 import Bag
-import Const		( Con(..), DataCon, conType, conOkForApp, conOkForAlt )
-import Id		( mayHaveNoBinding )
-import Var		( IdOrTyVar, Id, TyVar, idType, tyVarKind, isTyVar, isId )
+import Literal		( Literal, literalType )
+import DataCon		( DataCon, dataConRepType )
+import Id		( mayHaveNoBinding, isDeadBinder )
+import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId )
 import VarSet
 import Subst		( mkTyVarSubst, substTy )
 import Name		( isLocallyDefined, getSrcLoc )
@@ -71,7 +72,7 @@ endPass pass_name dump_flag binds
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
 	if opt_D_show_passes then
-	   hPutStrLn stderr ("    Result size = " ++ show (coreBindsSize binds))
+	   hPutStrLn stdout ("    Result size = " ++ show (coreBindsSize binds))
 	 else
 	   return ()
 
@@ -162,7 +163,7 @@ We use this to check all unfoldings that come in from interfaces
 
 \begin{code}
 lintUnfolding :: SrcLoc
-	      -> [IdOrTyVar]		-- Treat these as in scope
+	      -> [Var]		-- Treat these as in scope
 	      -> CoreExpr
 	      -> Maybe Message		-- Nothing => OK
 
@@ -220,6 +221,7 @@ lintSingleBinding rec_flag (binder,rhs)
 lintCoreExpr :: CoreExpr -> LintM Type
 
 lintCoreExpr (Var var) = checkIdInScope var `seqL` returnL (idType var)
+lintCoreExpr (Lit lit) = returnL (literalType lit)
 
 lintCoreExpr (Note (Coerce to_ty from_ty) expr)
   = lintCoreExpr expr 	`thenL` \ expr_ty ->
@@ -242,11 +244,6 @@ lintCoreExpr (Let (Rec pairs) body)
     addLoc (BodyOfLetRec bndrs) (lintCoreExpr body)
   where
     bndrs = map fst pairs
-
-lintCoreExpr e@(Con con args)
-  = addLoc (AnExpr e)	$
-    checkL (conOkForApp con) (mkConAppMsg e)	`seqL`
-    lintCoreArgs (conType con) args
 
 lintCoreExpr e@(App fun arg)
   = lintCoreExpr fun 	`thenL` \ ty ->
@@ -410,10 +407,16 @@ lintCoreAlt scrut_ty alt@(DEFAULT, args, rhs)
   = checkL (null args) (mkDefaultArgsMsg args)	`seqL`
     lintCoreExpr rhs
 
-lintCoreAlt scrut_ty alt@(con, args, rhs)
-  = addLoc (CaseAlt alt) (
+lintCoreAlt scrut_ty alt@(LitAlt lit, args, rhs)
+  = checkL (null args) (mkDefaultArgsMsg args)	`seqL`
+    checkTys lit_ty scrut_ty
+	     (mkBadPatMsg lit_ty scrut_ty)	`seqL`
+    lintCoreExpr rhs
+  where
+    lit_ty = literalType lit
 
-    checkL (conOkForAlt con) (mkConAltMsg con)	`seqL`
+lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
+  = addLoc (CaseAlt alt) (
 
     mapL (\arg -> checkL (not (isUnboxedTupleType (idType arg))) 
 			(mkUnboxedTupleMsg arg)) args `seqL`
@@ -425,8 +428,8 @@ lintCoreAlt scrut_ty alt@(con, args, rhs)
 	-- This code is remarkably compact considering what it does!
 	-- NB: args must be in scope here so that the lintCoreArgs line works.
     case splitTyConApp_maybe scrut_ty of { Just (tycon, tycon_arg_tys) ->
-	lintTyApps (conType con) tycon_arg_tys	`thenL` \ con_type ->
-	lintCoreArgs con_type (map mk_arg args)	`thenL` \ con_result_ty ->
+	lintTyApps (dataConRepType con) tycon_arg_tys	`thenL` \ con_type ->
+	lintCoreArgs con_type (map mk_arg args)		`thenL` \ con_result_ty ->
 	checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty)
     }						`seqL`
 
@@ -445,7 +448,7 @@ lintCoreAlt scrut_ty alt@(con, args, rhs)
 %************************************************************************
 
 \begin{code}
-lintBinder :: IdOrTyVar -> LintM ()
+lintBinder :: Var -> LintM ()
 lintBinder v = nopL
 -- ToDo: lint its type
 
@@ -539,24 +542,24 @@ addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs
   = m (extra_loc:loc) scope errs
 
-addInScopeVars :: [IdOrTyVar] -> LintM a -> LintM a
+addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars ids m loc scope errs
   = m loc (scope `unionVarSet` mkVarSet ids) errs
 \end{code}
 
 \begin{code}
-checkIdInScope :: IdOrTyVar -> LintM ()
+checkIdInScope :: Var -> LintM ()
 checkIdInScope id 
   = checkInScope (ptext SLIT("is out of scope")) id
 
-checkBndrIdInScope :: IdOrTyVar -> IdOrTyVar -> LintM ()
+checkBndrIdInScope :: Var -> Var -> LintM ()
 checkBndrIdInScope binder id 
   = checkInScope msg id
     where
      msg = ptext SLIT("is out of scope inside info for") <+> 
 	   ppr binder
 
-checkInScope :: SDoc -> IdOrTyVar -> LintM ()
+checkInScope :: SDoc -> Var -> LintM ()
 checkInScope loc_msg var loc scope errs
   |  isLocallyDefined var 
   && not (var `elemVarSet` scope)
@@ -618,21 +621,12 @@ pp_binder b = hsep [ppr b, dcolon, ppr (idType b)]
 ------------------------------------------------------
 --	Messages for case expressions
 
-mkConAppMsg :: CoreExpr -> Message
-mkConAppMsg e
-  = hang (text "Application of newtype constructor:")
-	 4 (ppr e)
-
-mkConAltMsg :: Con -> Message
-mkConAltMsg con
-  = text "PrimOp in case pattern:" <+> ppr con
-
 mkNullAltsMsg :: CoreExpr -> Message
 mkNullAltsMsg e 
   = hang (text "Case expression with no alternatives:")
 	 4 (ppr e)
 
-mkDefaultArgsMsg :: [IdOrTyVar] -> Message
+mkDefaultArgsMsg :: [Var] -> Message
 mkDefaultArgsMsg args 
   = hang (text "DEFAULT case with binders")
 	 4 (ppr args)
@@ -669,7 +663,6 @@ mkBadPatMsg con_result_ty scrut_ty
 ------------------------------------------------------
 --	Other error messages
 
-mkAppMsg :: Type -> Type -> Message
 mkAppMsg fun arg
   = vcat [ptext SLIT("Argument value doesn't match argument type:"),
 	      hang (ptext SLIT("Fun type:")) 4 (ppr fun),

@@ -231,5 +231,6 @@ data DsMatchKind
   | DoBindMatch
   | ListCompMatch
   | LetMatch
+  | RecUpdMatch
   deriving ()
 \end{code}

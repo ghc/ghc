@@ -1,3 +1,7 @@
+-- If you're testing on a Win32 box, be aware that
+-- line termination conventions differ (and that
+-- io013 uses /dev/null, which is also unix centric.)
+
 import IO -- 1.3
 
 main = do

@@ -10,7 +10,13 @@ module Demand(
 	wwLazy, wwStrict, wwUnpackData, wwUnpackNew, wwPrim, wwEnum, 
 	isStrict, isLazy, isPrim,
 
-	pprDemands, seqDemand, seqDemands
+	pprDemands, seqDemand, seqDemands,
+
+	StrictnessInfo(..),	
+	mkStrictnessInfo,
+	noStrictnessInfo,
+	ppStrictnessInfo, seqStrictnessInfo,
+	isBottomingStrictness, appIsBottom,
      ) where
 
 #include "HsVersions.h"
@@ -134,49 +140,71 @@ instance Outputable Demand where
 
 instance Show Demand where
     showsPrec p d = showsPrecSDoc p (ppr d)
+
+-- Reading demands is done in Lex.lhs
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection[strictness-IdInfo]{Strictness info about an @Id@}
+%*									*
+%************************************************************************
+
+We specify the strictness of a function by giving information about
+each of the ``wrapper's'' arguments (see the description about
+worker/wrapper-style transformations in the PJ/Launchbury paper on
+unboxed types).
+
+The list of @Demands@ specifies: (a)~the strictness properties of a
+function's arguments; and (b)~the type signature of that worker (if it
+exists); i.e. its calling convention.
+
+Note that the existence of a worker function is now denoted by the Id's
+workerInfo field.
+
 \begin{code}
-{-	------------------- OMITTED NOW -------------------------------
-	-- Reading demands is done in Lex.lhs
-	-- Also note that the (old) code here doesn't take proper
-	-- account of the 'B' suffix for bottoming functions
+data StrictnessInfo
+  = NoStrictnessInfo
 
-#ifdef REALLY_HASKELL_1_3
+  | StrictnessInfo [Demand] 	-- Demands on the arguments.
 
-instance Read Demand where
-    readList str = read_em [] str
+		   Bool		-- True <=> the function diverges regardless of its arguments
+				-- Useful for "error" and other disguised variants thereof.  
+				-- BUT NB: f = \x y. error "urk"
+				-- 	   will have info  SI [SS] True
+				-- but still (f) and (f 2) are not bot; only (f 3 2) is bot
 
-instance Show Demand where
-    showsPrec p d = showsPrecSDoc p (ppr d)
+	-- NOTA BENE: if the arg demands are, say, [S,L], this means that
+	-- 	(f bot) is not necy bot, only (f bot x) is bot
+	-- We simply cannot express accurately the strictness of a function
+	-- like		f = \x -> case x of (a,b) -> \y -> ...
+	-- The up-side is that we don't need to restrict the strictness info
+	-- to the visible arity of the function.
 
-#else
+seqStrictnessInfo :: StrictnessInfo -> ()
+seqStrictnessInfo (StrictnessInfo ds b) = b `seq` seqDemands ds
+seqStrictnessInfo other		        = ()
+\end{code}
 
-instance Text Demand where
-    readList str  = read_em [] str
-    showsPrec p d = showsPrecSDoc p (ppr d)
-#endif
+\begin{code}
+mkStrictnessInfo :: ([Demand], Bool) -> StrictnessInfo
 
-readDemands :: String -> 
+mkStrictnessInfo (xs, is_bot)
+  | all isLazy xs && not is_bot	= NoStrictnessInfo		-- Uninteresting
+  | otherwise		        = StrictnessInfo xs is_bot
 
-read_em acc ('L' : xs)	= read_em (WwLazy   False : acc) xs
-read_em acc ('A' : xs)	= read_em (WwLazy   True  : acc) xs
-read_em acc ('S' : xs)	= read_em (WwStrict : acc) xs
-read_em acc ('P' : xs)	= read_em (WwPrim : acc) xs
-read_em acc ('E' : xs)	= read_em (WwEnum : acc) xs
-read_em acc (')' : xs)	= [(reverse acc, xs)]
-read_em acc ( 'U'  : '(' : xs) = do_unpack DataType True  acc xs
-read_em acc ( 'u'  : '(' : xs) = do_unpack DataType False acc xs
-read_em acc ( 'N'  : '(' : xs) = do_unpack NewType  True  acc xs
-read_em acc ( 'n'  : '(' : xs) = do_unpack NewType  False acc xs
-read_em acc rest	= [(reverse acc, rest)]
+noStrictnessInfo = NoStrictnessInfo
 
-do_unpack new_or_data wrapper_unpacks acc xs
-	  = case (read_em [] xs) of
-	      [(stuff, rest)] -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
-	      _ -> pprPanic "Demand.do_unpack:" (ppr acc <+> dcolon <> text xs)
+isBottomingStrictness (StrictnessInfo _ bot) = bot
+isBottomingStrictness NoStrictnessInfo       = False
 
--------------------- END OF OMISSION ------------------------------  -}
+-- appIsBottom returns true if an application to n args would diverge
+appIsBottom (StrictnessInfo ds bot)   n = bot && (n >= length ds)
+appIsBottom  NoStrictnessInfo	      n	= False
+
+ppStrictnessInfo NoStrictnessInfo = empty
+ppStrictnessInfo (StrictnessInfo wrapper_args bot)
+  = hsep [ptext SLIT("__S"), pprDemands wrapper_args bot]
 \end{code}
 

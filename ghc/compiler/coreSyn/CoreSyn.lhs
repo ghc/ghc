@@ -5,16 +5,18 @@
 
 \begin{code}
 module CoreSyn (
-	Expr(..), Alt, Bind(..), Arg(..), Note(..),
+	Expr(..), Alt, Bind(..), AltCon(..), Arg, Note(..),
 	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
 	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg,
 
-	mkLets, mkLams,
+	mkLets, mkLams, 
 	mkApps, mkTyApps, mkValApps, mkVarApps,
-	mkLit, mkStringLit, mkStringLitFS, mkConApp, mkPrimApp, mkNote,
+	mkLit, mkIntLitInt, mkIntLit, 
+	mkStringLit, mkStringLitFS, mkConApp, 
+ 	mkAltExpr,
 	bindNonRec, mkIfThenElse, varToCoreExpr,
 
-	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isDeadBinder, isTyVar, isId,
+	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isTyVar, isId,
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
 	collectArgs, collectBindersIgnoringNotes,
 	coreExprCc,
@@ -29,7 +31,7 @@ module CoreSyn (
 	coreBindsSize,
 
 	-- Annotated expressions
-	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate,
+	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate, deAnnotate',
 
 	-- Core rules
 	CoreRules(..), 	-- Representation needed by friends
@@ -41,13 +43,15 @@ module CoreSyn (
 #include "HsVersions.h"
 
 import TysWiredIn	( boolTy, stringTy, nilDataCon )
-import CostCentre	( CostCentre, isDupdCC, noCostCentre )
-import Var		( Var, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
+import CostCentre	( CostCentre, noCostCentre )
+import Var		( Var, Id, TyVar, isTyVar, isId, idType )
 import VarEnv
-import Id		( mkWildId, getIdOccInfo, idInfo )
+import Id		( mkWildId, idOccInfo, idInfo )
 import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
 import IdInfo		( OccInfo(..), megaSeqIdInfo )
-import Const	        ( Con(..), DataCon, Literal(MachStr), mkMachInt, PrimOp )
+import Literal	        ( Literal(MachStr), mkMachInt )
+import PrimOp		( PrimOp )
+import DataCon		( DataCon, dataConId )
 import TysWiredIn	( trueDataCon, falseDataCon )
 import ThinAir		( unpackCStringId, unpackCString2Id, addr2IntegerId )
 import VarSet
@@ -67,9 +71,7 @@ infixl 8 `App`	-- App brackets to the left
 
 data Expr b	-- "b" for the type of binders, 
   = Var	  Id
-  | Con   Con [Arg b]		-- Guaranteed saturated
-				-- The Con can be a DataCon, Literal, PrimOP
-				-- but cannot be DEFAULT
+  | Lit   Literal
   | App   (Expr b) (Arg b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
@@ -81,9 +83,12 @@ data Expr b	-- "b" for the type of binders,
 
 type Arg b = Expr b		-- Can be a Type
 
-type Alt b = (Con, [b], Expr b)
-	-- (DEFAULT, [], rhs) is the default alternative
-	-- The Con can be a Literal, DataCon, or DEFAULT, but cannot be PrimOp
+type Alt b = (AltCon, [b], Expr b)	-- (DEFAULT, [], rhs) is the default alternative
+
+data AltCon = DataAlt DataCon
+	    | LitAlt  Literal
+	    | DEFAULT
+	 deriving (Eq, Ord)
 
 data Bind b = NonRec b (Expr b)
 	      | Rec [(b, (Expr b))]
@@ -118,7 +123,7 @@ but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
 \begin{code}
 data CoreRules 
   = Rules [CoreRule]
-	  IdOrTyVarSet		-- Locally-defined free vars of RHSs
+	  VarSet		-- Locally-defined free vars of RHSs
 
 type RuleName = FAST_STRING
 
@@ -138,11 +143,33 @@ emptyCoreRules = Rules [] emptyVarSet
 isEmptyCoreRules :: CoreRules -> Bool
 isEmptyCoreRules (Rules rs _) = null rs
 
-rulesRhsFreeVars :: CoreRules -> IdOrTyVarSet
+rulesRhsFreeVars :: CoreRules -> VarSet
 rulesRhsFreeVars (Rules _ fvs) = fvs
 
 rulesRules :: CoreRules -> [CoreRule]
 rulesRules (Rules rules _) = rules
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The main data type}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- The Ord is needed for the FiniteMap used in the lookForConstructor
+-- in SimplEnv.  If you declared that lookForConstructor *ignores*
+-- constructor-applications with LitArg args, then you could get
+-- rid of this Ord.
+
+instance Outputable AltCon where
+  ppr (DataAlt dc) = ppr dc
+  ppr (LitAlt lit) = ppr lit
+  ppr DEFAULT      = ptext SLIT("__DEFAULT")
+
+instance Show AltCon where
+  showsPrec p con = showsPrecSDoc p (ppr con)
 \end{code}
 
 
@@ -155,7 +182,7 @@ rulesRules (Rules rules _) = rules
 The common case
 
 \begin{code}
-type CoreBndr = IdOrTyVar
+type CoreBndr = Var
 type CoreExpr = Expr CoreBndr
 type CoreArg  = Arg  CoreBndr
 type CoreBind = Bind CoreBndr
@@ -185,7 +212,7 @@ type TaggedAlt  t = Alt  (Tagged t)
 mkApps    :: Expr b -> [Arg b]  -> Expr b
 mkTyApps  :: Expr b -> [Type]   -> Expr b
 mkValApps :: Expr b -> [Expr b] -> Expr b
-mkVarApps :: CoreExpr -> [IdOrTyVar] -> CoreExpr
+mkVarApps :: Expr b -> [Var] -> Expr b
 
 mkApps    f args = foldl App		  	   f args
 mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
@@ -193,14 +220,17 @@ mkValApps f args = foldl (\ e a -> App e a)	   f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 
 mkLit         :: Literal -> Expr b
-mkStringLit   :: String  -> Expr b
-mkStringLitFS :: FAST_STRING  -> Expr b
+mkIntLit      :: Integer -> Expr b
+mkIntLitInt   :: Int     -> Expr b
+mkStringLit   :: String  -> Expr b	-- Makes a [Char] literal
+mkStringLitFS :: FAST_STRING  -> Expr b -- Makes a [Char] literal
 mkConApp      :: DataCon -> [Arg b] -> Expr b
-mkPrimApp     :: PrimOp  -> [Arg b] -> Expr b
 
-mkLit lit	  = Con (Literal lit) []
-mkConApp con args = Con (DataCon con) args
-mkPrimApp op args = Con (PrimOp op)   args
+mkLit lit	  = Lit lit
+mkConApp con args = mkApps (Var (dataConId con)) args
+
+mkIntLit    n = Lit (mkMachInt n)
+mkIntLitInt n = Lit (mkMachInt (toInteger n))
 
 mkStringLit str	= mkStringLitFS (_PK_ str)
 
@@ -208,17 +238,17 @@ mkStringLitFS str
   | any is_NUL (_UNPK_ str)
   = 	 -- Must cater for NULs in literal string
     mkApps (Var unpackCString2Id)
-		[mkLit (MachStr str),
-		 mkLit (mkMachInt (toInteger (_LENGTH_ str)))]
+		[Lit (MachStr str),
+		 mkIntLitInt (_LENGTH_ str)]
 
   | otherwise
   =	-- No NULs in the string
-    App (Var unpackCStringId) (mkLit (MachStr str))
+    App (Var unpackCStringId) (Lit (MachStr str))
 
   where
     is_NUL c = c == '\0'
 
-varToCoreExpr :: CoreBndr -> CoreExpr
+varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isId v    = Var v
                 | otherwise = Type (mkTyVarTy v)
 \end{code}
@@ -249,37 +279,21 @@ bindNonRec bndr rhs body
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
   = Case guard (mkWildId boolTy) 
-	 [ (DataCon trueDataCon,  [], then_expr),
-	   (DataCon falseDataCon, [], else_expr) ]
+	 [ (DataAlt trueDataCon,  [], then_expr),
+	   (DataAlt falseDataCon, [], else_expr) ]
 \end{code}
 
-mkNote removes redundant coercions, and SCCs where possible
 
 \begin{code}
-mkNote :: Note -> Expr b -> Expr b
-mkNote (Coerce to_ty1 from_ty1) (Note (Coerce to_ty2 from_ty2) expr)
- = ASSERT( from_ty1 == to_ty2 )
-   mkNote (Coerce to_ty1 from_ty2) expr
-
-mkNote (SCC cc1) expr@(Note (SCC cc2) _)
-  | isDupdCC cc1	-- Discard the outer SCC provided we don't need
-  = expr		-- to track its entry count
-
-mkNote note@(SCC cc1) expr@(Lam x e)	-- Move _scc_ inside lambda
-  = Lam x (mkNote note e)
-
--- Drop trivial InlineMe's
-mkNote InlineMe expr@(Con _ _) = expr
-mkNote InlineMe expr@(Var v)   = expr
-
--- Slide InlineCall in around the function
---	No longer necessary I think (SLPJ Apr 99)
--- mkNote InlineCall (App f a) = App (mkNote InlineCall f) a
--- mkNote InlineCall (Var v)   = Note InlineCall (Var v)
--- mkNote InlineCall expr      = expr
-
-mkNote note expr = Note note expr
+mkAltExpr :: AltCon -> [CoreBndr] -> [Type] -> CoreExpr
+	-- This guy constructs the value that the scrutinee must have
+	-- when you are in one particular branch of a case
+mkAltExpr (DataAlt con) args inst_tys
+  = mkConApp con (map Type inst_tys ++ map varToCoreExpr args)
+mkAltExpr (LitAlt lit) [] []
+  = Lit lit
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -301,12 +315,6 @@ rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
 rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | (_,_,e) <- alts]
-
-isDeadBinder :: CoreBndr -> Bool
-isDeadBinder bndr | isId bndr = case getIdOccInfo bndr of
-					IAmDead -> True
-					other	-> False
-		  | otherwise = False	-- TyVars count as not dead
 
 flattenBinds :: [Bind b] -> [(b, Expr b)]	-- Get all the lhs/rhs pairs
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
@@ -421,7 +429,7 @@ valArgCount (other  : args) = 1 + valArgCount args
 \begin{code}
 seqExpr :: CoreExpr -> ()
 seqExpr (Var v)       = v `seq` ()
-seqExpr (Con c as)    = seqExprs as
+seqExpr (Lit lit)     = lit `seq` ()
 seqExpr (App f a)     = seqExpr f `seq` seqExpr a
 seqExpr (Lam b e)     = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)     = seqBind b `seq` seqExpr e
@@ -465,17 +473,18 @@ exprSize :: CoreExpr -> Int
 	-- A measure of the size of the expressions
 	-- It also forces the expression pretty drastically as a side effect
 exprSize (Var v)       = varSize v 
-exprSize (Con c as)    = c `seq` exprsSize as
+exprSize (Lit lit)     = 1
 exprSize (App f a)     = exprSize f + exprSize a
 exprSize (Lam b e)     = varSize b + exprSize e
 exprSize (Let b e)     = bindSize b + exprSize e
 exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0  as
 exprSize (Note n e)    = exprSize e
-exprSize (Type t)      = seqType t `seq` 1
+exprSize (Type t)      = seqType t `seq`
+			 1
 
 exprsSize = foldr ((+) . exprSize) 0 
 
-varSize :: IdOrTyVar -> Int
+varSize :: Var -> Int
 varSize b | isTyVar b = 1
 	  | otherwise = seqType (idType b)		`seq`
 			megaSeqIdInfo (idInfo b) 	`seq`
@@ -503,7 +512,7 @@ type AnnExpr bndr annot = (annot, AnnExpr' bndr annot)
 
 data AnnExpr' bndr annot
   = AnnVar	Id
-  | AnnCon	Con [AnnExpr bndr annot]
+  | AnnLit	Literal
   | AnnLam	bndr (AnnExpr bndr annot)
   | AnnApp	(AnnExpr bndr annot) (AnnExpr bndr annot)
   | AnnCase	(AnnExpr bndr annot) bndr [AnnAlt bndr annot]
@@ -511,7 +520,7 @@ data AnnExpr' bndr annot
   | AnnNote	Note (AnnExpr bndr annot)
   | AnnType	Type
 
-type AnnAlt bndr annot = (Con, [bndr], AnnExpr bndr annot)
+type AnnAlt bndr annot = (AltCon, [bndr], AnnExpr bndr annot)
 
 data AnnBind bndr annot
   = AnnNonRec bndr (AnnExpr bndr annot)
@@ -520,21 +529,22 @@ data AnnBind bndr annot
 
 \begin{code}
 deAnnotate :: AnnExpr bndr annot -> Expr bndr
+deAnnotate (_, e) = deAnnotate' e
 
-deAnnotate (_, AnnType	t)          = Type t
-deAnnotate (_, AnnVar	v)          = Var v
-deAnnotate (_, AnnCon	con args)   = Con con (map deAnnotate args)
-deAnnotate (_, AnnLam	binder body)= Lam binder (deAnnotate body)
-deAnnotate (_, AnnApp	fun arg)    = App (deAnnotate fun) (deAnnotate arg)
-deAnnotate (_, AnnNote	note body)  = Note note (deAnnotate body)
+deAnnotate' (AnnType t)           = Type t
+deAnnotate' (AnnVar  v)           = Var v
+deAnnotate' (AnnLit  lit)         = Lit lit
+deAnnotate' (AnnLam  binder body) = Lam binder (deAnnotate body)
+deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
+deAnnotate' (AnnNote note body)   = Note note (deAnnotate body)
 
-deAnnotate (_, AnnLet bind body)
+deAnnotate' (AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)
   where
     deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
     deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
-deAnnotate (_, AnnCase scrut v alts)
+deAnnotate' (AnnCase scrut v alts)
   = Case (deAnnotate scrut) v (map deAnnAlt alts)
   where
     deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)

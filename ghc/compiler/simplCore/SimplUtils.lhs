@@ -7,9 +7,13 @@
 module SimplUtils (
 	simplBinder, simplBinders, simplIds,
 	transformRhs,
-	etaCoreExpr, 
 	mkCase, findAlt, findDefault,
-	mkCoerce
+
+	-- The continuation type
+	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
+	pushArgs, discardCont, countValArgs, countArgs,
+	analyseCont, discardInline
+
     ) where
 
 #include "HsVersions.h"
@@ -17,16 +21,16 @@ module SimplUtils (
 import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
+import CoreUnfold	( isValueUnfolding )
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap, exprEtaExpandArity )
-import Subst		( substBndrs, substBndr, substIds )
-import Id		( Id, idType, getIdArity, isId, idName,
-			  getIdOccInfo,
-			  getIdDemandInfo, mkId, idInfo
+import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity )
+import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, lookupIdSubst )
+import Id		( Id, idType, isId, idName, 
+			  idOccInfo, idUnfolding,
+			  idDemandInfo, mkId, idInfo
 			)
 import IdInfo		( arityLowerBound, setOccInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
-import Const		( Con(..) )
 import Name		( isLocalName, setNameUnique )
 import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType,
@@ -35,10 +39,243 @@ import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType,
 import TysPrim		( statePrimTyCon )
 import Var		( setVarUnique )
 import VarSet
+import VarEnv		( SubstEnv, SubstResult(..) )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import Util		( zipWithEqual, mapAccumL )
 import Outputable
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{The continuation data type}
+%*									*
+%************************************************************************
+
+\begin{code}
+data SimplCont		-- Strict contexts
+  = Stop OutType		-- Type of the result
+
+  | CoerceIt OutType			-- The To-type, simplified
+	     SimplCont
+
+  | InlinePlease			-- This continuation makes a function very
+	     SimplCont			-- keen to inline itelf
+
+  | ApplyTo  DupFlag 
+	     InExpr SubstEnv		-- The argument, as yet unsimplified, 
+	     SimplCont			-- and its subst-env
+
+  | Select   DupFlag 
+	     InId [InAlt] SubstEnv	-- The case binder, alts, and subst-env
+	     SimplCont
+
+  | ArgOf    DupFlag		-- An arbitrary strict context: the argument 
+  	     			-- 	of a strict function, or a primitive-arg fn
+				-- 	or a PrimOp
+	     OutType		-- The type of the expression being sought by the context
+				--	f (error "foo") ==> coerce t (error "foo")
+				-- when f is strict
+				-- We need to know the type t, to which to coerce.
+	     (OutExpr -> SimplM OutExprStuff)	-- What to do with the result
+
+instance Outputable SimplCont where
+  ppr (Stop _)        		     = ptext SLIT("Stop")
+  ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
+  ppr (ArgOf   dup _ _)   	     = ptext SLIT("ArgOf...") <+> ppr dup
+  ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
+				       (nest 4 (ppr alts)) $$ ppr cont
+  ppr (CoerceIt ty cont)	     = (ptext SLIT("CoerceIt") <+> ppr ty) $$ ppr cont
+  ppr (InlinePlease cont)	     = ptext SLIT("InlinePlease") $$ ppr cont
+
+data DupFlag = OkToDup | NoDup
+
+instance Outputable DupFlag where
+  ppr OkToDup = ptext SLIT("ok")
+  ppr NoDup   = ptext SLIT("nodup")
+
+contIsDupable :: SimplCont -> Bool
+contIsDupable (Stop _)       		 = True
+contIsDupable (ApplyTo  OkToDup _ _ _)   = True
+contIsDupable (ArgOf    OkToDup _ _)     = True
+contIsDupable (Select   OkToDup _ _ _ _) = True
+contIsDupable (CoerceIt _ cont)          = contIsDupable cont
+contIsDupable (InlinePlease cont)	 = contIsDupable cont
+contIsDupable other			 = False
+
+pushArgs :: SubstEnv -> [InExpr] -> SimplCont -> SimplCont
+pushArgs se []         cont = cont
+pushArgs se (arg:args) cont = ApplyTo NoDup arg se (pushArgs se args cont)
+
+discardCont :: SimplCont	-- A continuation, expecting
+	    -> SimplCont	-- Replace the continuation with a suitable coerce
+discardCont (Stop to_ty) = Stop to_ty
+discardCont cont	 = CoerceIt to_ty (Stop to_ty)
+			 where
+			   to_ty = contResultType cont
+
+contResultType :: SimplCont -> OutType
+contResultType (Stop to_ty)	     = to_ty
+contResultType (ArgOf _ to_ty _)     = to_ty
+contResultType (ApplyTo _ _ _ cont)  = contResultType cont
+contResultType (CoerceIt _ cont)     = contResultType cont
+contResultType (InlinePlease cont)   = contResultType cont
+contResultType (Select _ _ _ _ cont) = contResultType cont
+
+countValArgs :: SimplCont -> Int
+countValArgs (ApplyTo _ (Type ty) se cont) = countValArgs cont
+countValArgs (ApplyTo _ val_arg   se cont) = 1 + countValArgs cont
+countValArgs other			   = 0
+
+countArgs :: SimplCont -> Int
+countArgs (ApplyTo _ arg se cont) = 1 + countArgs cont
+countArgs other			  = 0
+\end{code}
+
+
+Comment about analyseCont
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to avoid inlining an expression where there can't possibly be
+any gain, such as in an argument position.  Hence, if the continuation
+is interesting (eg. a case scrutinee, application etc.) then we
+inline, otherwise we don't.  
+
+Previously some_benefit used to return True only if the variable was
+applied to some value arguments.  This didn't work:
+
+	let x = _coerce_ (T Int) Int (I# 3) in
+	case _coerce_ Int (T Int) x of
+		I# y -> ....
+
+we want to inline x, but can't see that it's a constructor in a case
+scrutinee position, and some_benefit is False.
+
+Another example:
+
+dMonadST = _/\_ t -> :Monad (g1 _@_ t, g2 _@_ t, g3 _@_ t)
+
+....  case dMonadST _@_ x0 of (a,b,c) -> ....
+
+we'd really like to inline dMonadST here, but we *don't* want to
+inline if the case expression is just
+
+	case x of y { DEFAULT -> ... }
+
+since we can just eliminate this case instead (x is in WHNF).  Similar
+applies when x is bound to a lambda expression.  Hence
+contIsInteresting looks for case expressions with just a single
+default case.
+
+\begin{code}
+analyseCont :: InScopeSet -> SimplCont
+	    -> ([Bool],		-- Arg-info flags; one for each value argument
+		Bool,		-- Context of the result of the call is interesting
+		Bool)		-- There was an InlinePlease 
+
+analyseCont in_scope cont 
+  = case cont of
+	-- The "lone-variable" case is important.  I spent ages
+	-- messing about with unsatisfactory varaints, but this is nice.
+	-- The idea is that if a variable appear all alone
+	--	as an arg of lazy fn, or rhs	Stop
+	-- 	as scrutinee of a case		Select
+	--	as arg of a strict fn		ArgOf
+	-- then we should not inline it (unless there is some other reason,
+	-- e.g. is is the sole occurrence).  
+	-- Why not?  At least in the case-scrutinee situation, turning
+	--	case x of y -> ...
+	-- into
+	--	let y = (a,b) in ...
+	-- is bad if the binding for x will remain.
+	--
+	-- Another example: I discovered that strings
+	-- were getting inlined straight back into applications of 'error'
+	-- because the latter is strict.
+	--	s = "foo"
+	--	f = \x -> ...(error s)...
+
+	-- Fundamentally such contexts should not ecourage inlining becuase
+	-- the context can ``see'' the unfolding of the variable (e.g. case or a RULE)
+	-- so there's no gain.
+	--
+	-- However, even a type application isn't a lone variable.  Consider
+	--	case $fMonadST @ RealWorld of { :DMonad a b c -> c }
+	-- We had better inline that sucker!  The case won't see through it.
+
+      (Stop _)           	  -> boring_result		-- Don't inline a lone variable
+      (Select _ _ _ _ _) 	  -> boring_result		-- Ditto
+      (ArgOf _ _ _)      	  -> boring_result		-- Ditto
+      (ApplyTo _ (Type _) _ cont) -> analyse_ty_app cont
+      other		 	  -> analyse_app cont
+  where
+    boring_result = ([], False, False)
+
+		-- For now, I'm treating not treating a variable applied to types as
+		-- "lone". The motivating example was
+		--	f = /\a. \x. BIG
+		--	g = /\a. \y.  h (f a)
+		-- There's no advantage in inlining f here, and perhaps
+		-- a significant disadvantage.
+    analyse_ty_app (Stop _)			= boring_result
+    analyse_ty_app (ArgOf _ _ _)      		= boring_result
+    analyse_ty_app (Select _ _ _ _ _) 		= ([], True, False)	-- See the $fMonadST example above
+    analyse_ty_app (ApplyTo _ (Type _) _ cont)	= analyse_ty_app cont
+    analyse_ty_app cont				= analyse_app cont
+
+    analyse_app (InlinePlease cont)  
+	= case analyse_app cont of
+		 (infos, icont, inline) -> (infos, icont, True)
+
+    analyse_app (ApplyTo _ arg subst cont) 
+	| isValArg arg = case analyse_app cont of
+			   (infos, icont, inline) -> (analyse_arg subst arg : infos, icont, inline)
+	| otherwise    = analyse_app cont
+
+    analyse_app cont = ([], interesting_call_context cont, False)
+
+	-- An argument is interesting if it has *some* structure
+	-- We are here trying to avoid unfolding a function that
+	-- is applied only to variables that have no unfolding
+	-- (i.e. they are probably lambda bound): f x y z
+	-- There is little point in inlining f here.
+    analyse_arg :: SubstEnv -> InExpr -> Bool
+    analyse_arg subst (Var v)	        = case lookupIdSubst (mkSubst in_scope subst) v of
+						DoneId v' _ -> isValueUnfolding (idUnfolding v')
+						other	    -> False
+    analyse_arg subst (Type _)	        = False
+    analyse_arg subst (App fn (Type _)) = analyse_arg subst fn
+    analyse_arg subst (Note _ a)	= analyse_arg subst a
+    analyse_arg subst other	        = True
+
+    interesting_call_context (Stop _)	     		 = False
+    interesting_call_context (InlinePlease _)	         = True
+    interesting_call_context (Select _ _ _ _ _)          = True
+    interesting_call_context (CoerceIt _ cont)           = interesting_call_context cont
+    interesting_call_context (ApplyTo _ (Type _) _ cont) = interesting_call_context cont
+    interesting_call_context (ApplyTo _ _	 _ _)    = True
+    interesting_call_context (ArgOf _ _ _)		 = True
+	-- If this call is the arg of a strict function, the context
+	-- is a bit interesting.  If we inline here, we may get useful
+	-- evaluation information to avoid repeated evals: e.g.
+	--	x + (y * z)
+	-- Here the contIsInteresting makes the '*' keener to inline,
+	-- which in turn exposes a constructor which makes the '+' inline.
+	-- Assuming that +,* aren't small enough to inline regardless.
+	--
+	-- It's also very important to inline in a strict context for things
+	-- like
+	--		foldr k z (f x)
+	-- Here, the context of (f x) is strict, and if f's unfolding is
+	-- a build it's *great* to inline it here.  So we must ensure that
+	-- the context for (f x) is not totally uninteresting.
+
+
+discardInline :: SimplCont -> SimplCont
+discardInline (InlinePlease cont)  = cont
+discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
+discardInline cont		   = cont
+\end{code}
+
 
 
 %************************************************************************
@@ -254,7 +491,7 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
 		-- the occurrences of x' will be just the occurrences originaly
 		-- pinned on x.
-	    poly_info = vanillaIdInfo `setOccInfo` getIdOccInfo var
+	    poly_info = vanillaIdInfo `setOccInfo` idOccInfo var
 
 	    poly_id   = mkId poly_name poly_ty poly_info
 	in
@@ -326,16 +563,16 @@ tryEtaExpansion rhs
 
     bind_z_arg (arg, trivial_arg) 
 	| trivial_arg = returnSmpl (Nothing, arg)
-        | otherwise   = newId (coreExprType arg)	$ \ z ->
+        | otherwise   = newId (exprType arg)	$ \ z ->
 			returnSmpl (Just (NonRec z arg), Var z)
 
-	-- Note: I used to try to avoid the coreExprType call by using
+	-- Note: I used to try to avoid the exprType call by using
 	-- the type of the binder.  But this type doesn't necessarily
 	-- belong to the same substitution environment as this rhs;
 	-- and we are going to make extra term binders (y_bndrs) from the type
 	-- which will be processed with the rhs substitution environment.
 	-- This only went wrong in a mind bendingly complicated case.
-    (potential_extra_arg_tys, inner_ty) = splitFunTys (coreExprType body)
+    (potential_extra_arg_tys, inner_ty) = splitFunTys (exprType body)
 	
     y_tys :: [InType]
     y_tys  = take no_extras_wanted potential_extra_arg_tys
@@ -374,57 +611,6 @@ tryEtaExpansion rhs
 --	    other -> 0
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{Eta reduction}
-%*									*
-%************************************************************************
-
-@etaCoreExpr@ trys an eta reduction at the top level of a Core Expr.
-
-e.g.	\ x y -> f x y	===>  f
-
-It is used
--- OLD
---	a) Before constructing an Unfolding, to 
---	   try to make the unfolding smaller;
-	b) In tidyCoreExpr, which is done just before converting to STG.
-
-But we only do this if 
-	i) It gets rid of a whole lambda, not part.
-	   The idea is that lambdas are often quite helpful: they indicate
-	   head normal forms, so we don't want to chuck them away lightly.
-
--- OLD: in core2stg we want to do this even if the result isn't trivial
---	ii) It exposes a simple variable or a type application; in short
---	    it exposes a "trivial" expression. (exprIsTrivial)
-
-\begin{code}
-etaCoreExpr :: CoreExpr -> CoreExpr
-		-- ToDo: we should really check that we don't turn a non-bottom
-		-- lambda into a bottom variable.  Sigh
-
-etaCoreExpr expr@(Lam bndr body)
-  = check (reverse binders) body
-  where
-    (binders, body) = collectBinders expr
-
-    check [] body
-	| not (any (`elemVarSet` body_fvs) binders)
-	= body			-- Success!
-	where
-	  body_fvs = exprFreeVars body
-
-    check (b : bs) (App fun arg)
-	|  (varToCoreExpr b `cheapEqExpr` arg)
-	= check bs fun
-
-    check _ _ = expr	-- Bale out
-
-etaCoreExpr expr = expr		-- The common case
-\end{code}
-	
 
 %************************************************************************
 %*									*
@@ -503,13 +689,10 @@ mkCase scrut case_bndr alts
   = tick (CaseIdentity case_bndr)		`thenSmpl_`
     returnSmpl scrut
   where
-    identity_alt (DEFAULT, [], Var v)	     = v == case_bndr
-    identity_alt (con, args, Con con' args') = con == con' && 
-					       and (zipWithEqual "mkCase" 
-							cheapEqExpr 
-							(map Type arg_tys ++ map varToCoreExpr args)
-							args')
-    identity_alt other			     = False
+    identity_alt (DEFAULT, [], Var v)     = v == case_bndr
+    identity_alt (DataAlt con, args, rhs) = cheapEqExpr rhs
+					  		(mkConApp con (map Type arg_tys ++ map varToCoreExpr args))
+    identity_alt other		          = False
 
     arg_tys = case splitTyConApp_maybe (idType case_bndr) of
 		Just (tycon, arg_tys) -> arg_tys
@@ -531,7 +714,7 @@ findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null alts && null args )
 findDefault (alt : alts) 	        = case findDefault alts of 
 					    (alts', deflt) -> (alt : alts', deflt)
 
-findAlt :: Con -> [CoreAlt] -> CoreAlt
+findAlt :: AltCon -> [CoreAlt] -> CoreAlt
 findAlt con alts
   = go alts
   where
@@ -541,14 +724,4 @@ findAlt con alts
 
     matches (DEFAULT, _, _) = True
     matches (con1, _, _)    = con == con1
-\end{code}
-
-
-\begin{code}
-mkCoerce :: Type -> CoreExpr -> CoreExpr
-mkCoerce to_ty expr
-  | to_ty == from_ty = expr
-  | otherwise	     = Note (Coerce to_ty from_ty) expr
-  where
-    from_ty = coreExprType expr
 \end{code}

@@ -191,17 +191,32 @@ instance  Enum Char  where
     fromEnum = ord
 
     {-# INLINE enumFrom #-}
-    enumFrom (C# x) = build (\ c n -> eftCharFB c n (ord# x) 255#)
+    enumFrom (C# x) = eftChar (ord# x) 255#
 	-- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
-    enumFromTo (C# x) (C# y) = build (\ c n -> eftCharFB c n (ord# x) (ord# y))
-
+    enumFromTo (C# x) (C# y) = eftChar (ord# x) (ord# y)
+    
     {-# INLINE enumFromThen #-}
-    enumFromThen (C# x1) (C# x2) = build (\ c n -> efdCharFB c n (ord# x1) (ord# x2))
-
+    enumFromThen (C# x1) (C# x2) = efdChar (ord# x1) (ord# x2)
+    
     {-# INLINE enumFromThenTo #-}
-    enumFromThenTo (C# x1) (C# x2) (C# y) = build (\ c n -> efdtCharFB c n (ord# x1) (ord# x2) (ord# y))
+    enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
+
+eftChar  = eftCharList
+efdChar  = efdCharList
+efdtChar = efdtCharList
+
+
+{-# RULES
+"eftChar"	forall x y.	eftChar x y	  = build (\c n -> eftCharFB c n x y)
+"efdChar"	forall x1 x2.	efdChar x1 x2	  = build (\ c n -> efdCharFB c n x1 x2)
+"efdtChar"	forall x1 x2 l.	efdtChar x1 x2 l  = build (\ c n -> efdtCharFB c n x1 x2 l)
+"eftCharList"	eftCharFB  (:) [] = eftCharList
+"efdCharList"	efdCharFB  (:) [] = efdCharList
+"efdtCharList"	efdtCharFB (:) [] = efdtCharList
+ #-}
+
 
 -- We can do better than for Ints because we don't
 -- have hassles about arithmetic overflow at maxBound
@@ -263,13 +278,6 @@ go_dn_char_list x delta lim
   where
     go_dn x | x <# lim  = []
 	    | otherwise	= C# (chr# x) : go_dn (x +# delta)
-
-
-{-# RULES
-"eftCharList"	eftCharFB  (:) [] = eftCharList
-"efdCharList"	efdCharFB  (:) [] = efdCharList
-"efdtCharList"	efdtCharFB (:) [] = efdtCharList
- #-}
 \end{code}
 
 
@@ -303,17 +311,32 @@ instance  Enum Int  where
     fromEnum x = x
 
     {-# INLINE enumFrom #-}
-    enumFrom (I# x) = build (\ c n -> eftIntFB c n x 2147483647#)
+    enumFrom (I# x) = eftInt x 2147483647#
 	-- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
-    enumFromTo (I# x) (I# y) = build (\ c n -> eftIntFB c n x y)
+    enumFromTo (I# x) (I# y) = eftInt x y
 
     {-# INLINE enumFromThen #-}
-    enumFromThen (I# x1) (I# x2) = build (\ c n -> efdIntFB c n x1 x2)
+    enumFromThen (I# x1) (I# x2) = efdInt x1 x2
 
     {-# INLINE enumFromThenTo #-}
-    enumFromThenTo (I# x1) (I# x2) (I# y) = build (\ c n -> efdtIntFB c n x1 x2 y)
+    enumFromThenTo (I# x1) (I# x2) (I# y) = efdtInt x1 x2 y
+
+eftInt 	= eftIntList
+efdInt 	= efdIntList
+efdtInt = efdtIntList
+
+{-# RULES
+"eftInt"	forall x y.	eftInt x y	 = build (\ c n -> eftIntFB c n x y)
+"efdInt"	forall x1 x2.	efdInt x1 x2	 = build (\ c n -> efdIntFB c n x1 x2)
+"efdtInt"	forall x1 x2 l.	efdtInt x1 x2 l	 = build (\ c n -> efdtIntFB c n x1 x2 l)
+
+"eftIntList"	eftIntFB  (:) [] = eftIntList
+"efdIntList"	efdIntFB  (:) [] = efdIntList
+"efdtIntList"	efdtIntFB (:) [] = efdtIntList
+ #-}
+
 
 {-# INLINE eftIntFB #-}
 eftIntFB c n x y | x ># y    = n	
@@ -384,12 +407,5 @@ go_dn_int_list x delta lim
   where
     go_dn x | x <# lim  = [I# x]
 	    | otherwise = I# x : go_dn (x +# delta)
-
-
-{-# RULES
-"eftIntList"	eftIntFB  (:) [] = eftIntList
-"efdIntList"	efdIntFB  (:) [] = efdIntList
-"efdtIntList"	efdtIntFB (:) [] = efdtIntList
- #-}
 \end{code}
 

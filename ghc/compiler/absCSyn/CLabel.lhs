@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.31 2000/03/16 12:37:06 simonmar Exp $
+% $Id: CLabel.lhs,v 1.32 2000/03/23 17:45:17 simonpj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -18,7 +18,6 @@ module CLabel (
 	mkStaticConEntryLabel,
 	mkRednCountsLabel,
 	mkConInfoTableLabel,
-	mkStaticClosureLabel,
 	mkStaticInfoTableLabel,
 	mkApEntryLabel,
 	mkApInfoTableLabel,
@@ -143,9 +142,6 @@ data IdLabelInfo
 data DataConLabelInfo
   = ConEntry		-- the only kind of entry pt for constructors
   | ConInfoTbl		-- corresponding info table
-
-  | StaticClosure	-- Static constructor closure
-			-- e.g., nullary constructor
   | StaticConEntry  	-- static constructor entry point
   | StaticInfoTbl   	-- corresponding info table
   deriving (Eq, Ord)
@@ -201,7 +197,6 @@ mkFastEntryLabel      	id arity	= ASSERT(arity > 0)
 
 mkRednCountsLabel     	id		= IdLabel id  RednCounts
 
-mkStaticClosureLabel	con		= DataConLabel con StaticClosure
 mkStaticInfoTableLabel  con		= DataConLabel con StaticInfoTbl
 mkConInfoTableLabel     con		= DataConLabel con ConInfoTbl
 mkConEntryLabel	      	con		= DataConLabel con ConEntry
@@ -328,7 +323,6 @@ labelType (DataConLabel _ info) =
   case info of
      ConInfoTbl    -> InfoTblType
      StaticInfoTbl -> InfoTblType
-     StaticClosure -> ClosureType
      _		   -> CodeType
 
 labelType _        = DataType
@@ -379,7 +373,6 @@ internal names. <type> is one of the following:
 	 dflt			Default case alternative
 	 btm			Large bitmap vector
 	 closure		Static closure
-	 static_closure		Static closure (???)
 	 con_entry		Dynamic Constructor entry code
 	 con_info		Dynamic Constructor info table
 	 static_entry		Static Constructor entry code
@@ -492,7 +485,6 @@ ppIdFlavor x = pp_cSEP <>
 
 ppConFlavor x = pp_cSEP <>
 	     	(case x of
-		       StaticClosure   	-> ptext SLIT("static_closure")
 		       ConEntry	    	-> ptext SLIT("con_entry")
 		       ConInfoTbl    	-> ptext SLIT("con_info")
 		       StaticConEntry  	-> ptext SLIT("static_entry")

@@ -1,7 +1,8 @@
 
 tcfail010.hs:3:
     Ambiguous type variable(s) `t' in the constraint `Num [t]'
-    arising from use of `+' at tcfail010.hs:3
+    arising from the literal `2' at tcfail010.hs:3
+    In the second argument of `+', namely `2'
     In the right-hand side of a lambda abstraction: z + 2
 
 Compilation had errors

@@ -19,14 +19,12 @@ module CoreUnfold (
 	noUnfolding, mkTopUnfolding, mkUnfolding, mkCompulsoryUnfolding, seqUnfolding,
 	mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
-	isEvaldUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
+	isEvaldUnfolding, isValueUnfolding, isCheapUnfolding, isCompulsoryUnfolding,
 	hasUnfolding, hasSomeUnfolding,
 
 	couldBeSmallEnoughToInline, 
-	certainlySmallEnoughToInline, 
+	certainlyWillInline, 
 	okToUnfoldInHiFile,
-
-	calcUnfoldingGuidance, 
 
 	callSiteInline, blackListed
     ) where
@@ -39,7 +37,7 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 			  opt_UF_FunAppDiscount,
 			  opt_UF_PrimArgDiscount,
 			  opt_UF_KeenessFactor,
-			  opt_UF_CheapOp, opt_UF_DearOp, opt_UF_NoRepLit,
+			  opt_UF_CheapOp, opt_UF_DearOp,
 			  opt_UnfoldCasms, opt_PprStyle_Debug,
 			  opt_D_dump_inlinings
 			)
@@ -47,22 +45,22 @@ import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import BinderInfo	( )
-import CoreUtils	( coreExprType, exprIsTrivial, exprIsValue, exprIsCheap )
-import Id		( Id, idType, idUnique, isId, getIdWorkerInfo,
-			  getIdSpecialisation, getInlinePragma, getIdUnfolding,
-			  isConstantId_maybe
+import CoreUtils	( exprIsValue, exprIsCheap, exprIsBottom, exprIsTrivial )
+import Id		( Id, idType, idFlavour, idUnique, isId, idWorkerInfo,
+			  idSpecialisation, idInlinePragma, idUnfolding,
+			  isPrimOpId_maybe
 			)
 import VarSet
 import Name		( isLocallyDefined )
-import Const		( Con(..), isLitLitLit, isWHNFCon )
-import PrimOp		( PrimOp(..), primOpIsDupable )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), insideLam, workerExists )
+import Literal		( isLitLitLit )
+import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
+import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), insideLam, workerExists )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe, isUnLiftedType )
-import Const		( isNoRepLit )
 import Unique		( Unique, buildIdKey, augmentIdKey )
 import Maybes		( maybeToBool )
 import Bag
+import List		( maximumBy )
 import Util		( isIn, lengthExceeds )
 import Outputable
 
@@ -81,7 +79,7 @@ import GlaExts		( fromInt )
 data Unfolding
   = NoUnfolding
 
-  | OtherCon [Con]		-- It ain't one of these
+  | OtherCon [AltCon]		-- It ain't one of these
 				-- (OtherCon xs) also indicates that something has been evaluated
 				-- and hence there's no point in re-evaluating it.
 				-- OtherCon [] is used even for non-data-type values
@@ -100,11 +98,12 @@ data Unfolding
 					--	if you inline this in more than one place
 		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
 					--	this variable
+		Bool			-- exprIsBottom template (cached)
 		UnfoldingGuidance	-- Tells about the *size* of the template.
 
 seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding e top b1 b2 g)
-  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` seqGuidance g
+seqUnfolding (CoreUnfolding e top b1 b2 b3 g)
+  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` seqGuidance g
 seqUnfolding other = ()
 \end{code}
 
@@ -112,48 +111,63 @@ seqUnfolding other = ()
 noUnfolding = NoUnfolding
 mkOtherCon  = OtherCon
 
-mkTopUnfolding expr = mkUnfolding True expr
+mkTopUnfolding cpr_info expr = mkUnfolding True {- Top level -} cpr_info expr
 
-mkUnfolding top_lvl expr
+mkUnfolding top_lvl cpr_info expr
   = CoreUnfolding (occurAnalyseGlobalExpr expr)
 		  top_lvl
 		  (exprIsCheap expr)
 		  (exprIsValue expr)
-		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
+		  (exprIsBottom expr)
+		  (calcUnfoldingGuidance opt_UF_CreationThreshold cpr_info expr)
+	-- Sometimes during simplification, there's a large let-bound thing	
+	-- which has been substituted, and so is now dead; so 'expr' contains
+	-- two copies of the thing while the occurrence-analysed expression doesn't
+	-- Nevertheless, we don't occ-analyse before computing the size because the
+	-- size computation bales out after a while, whereas occurrence analysis does not.
+	--
+	-- This can occasionally mean that the guidance is very pessimistic;
+	-- it gets fixed up next round
 
 mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
   = CompulsoryUnfolding (occurAnalyseGlobalExpr expr)
 
 unfoldingTemplate :: Unfolding -> CoreExpr
-unfoldingTemplate (CoreUnfolding expr _ _ _ _) = expr
-unfoldingTemplate (CompulsoryUnfolding expr)   = expr
+unfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = expr
+unfoldingTemplate (CompulsoryUnfolding expr)     = expr
 unfoldingTemplate other = panic "getUnfoldingTemplate"
 
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
-maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _) = Just expr
-maybeUnfoldingTemplate (CompulsoryUnfolding expr)   = Just expr
-maybeUnfoldingTemplate other 			    = Nothing
+maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = Just expr
+maybeUnfoldingTemplate (CompulsoryUnfolding expr)     = Just expr
+maybeUnfoldingTemplate other 			      = Nothing
 
 otherCons (OtherCon cons) = cons
 otherCons other		  = []
 
+isValueUnfolding :: Unfolding -> Bool
+	-- Returns False for OtherCon
+isValueUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
+isValueUnfolding other			            = False
+
 isEvaldUnfolding :: Unfolding -> Bool
-isEvaldUnfolding (OtherCon _)		          = True
-isEvaldUnfolding (CoreUnfolding _ _ _ is_evald _) = is_evald
-isEvaldUnfolding other			          = False
+	-- Returns True for OtherCon
+isEvaldUnfolding (OtherCon _)		            = True
+isEvaldUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
+isEvaldUnfolding other			            = False
 
 isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _) = is_cheap
-isCheapUnfolding other				  = False
+isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _ _) = is_cheap
+isCheapUnfolding other				    = False
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CompulsoryUnfolding _) = True
 isCompulsoryUnfolding other		      = False
 
 hasUnfolding :: Unfolding -> Bool
-hasUnfolding (CoreUnfolding _ _ _ _ _) = True
-hasUnfolding (CompulsoryUnfolding _)   = True
-hasUnfolding other 	 	       = False
+hasUnfolding (CoreUnfolding _ _ _ _ _ _) = True
+hasUnfolding (CompulsoryUnfolding _)     = True
+hasUnfolding other 	 	         = False
 
 hasSomeUnfolding :: Unfolding -> Bool
 hasSomeUnfolding NoUnfolding = False
@@ -198,12 +212,31 @@ instance Outputable UnfoldingGuidance where
 \begin{code}
 calcUnfoldingGuidance
 	:: Int		    	-- bomb out if size gets bigger than this
+	-> CprInfo		-- CPR info for this RHS
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
-calcUnfoldingGuidance bOMB_OUT_SIZE expr
+calcUnfoldingGuidance bOMB_OUT_SIZE cpr_info expr
   = case collect_val_bndrs expr of { (inline, val_binders, body) ->
     let
 	n_val_binders = length val_binders
+
+--	max_inline_size = n_val_binders+2
+	-- The idea is that if there is an INLINE pragma (inline is True)
+	-- and there's a big body, we give a size of n_val_binders+2.  This
+	-- This is just enough to fail the no-size-increase test in callSiteInline,
+	--   so that INLINE things don't get inlined into entirely boring contexts,
+	--   but no more.
+
+-- Experimental thing commented in for now
+        max_inline_size = case cpr_info of
+			NoCPRInfo  -> n_val_binders + 2
+			ReturnsCPR -> n_val_binders + 1
+
+	-- However, the wrapper for a CPR'd function is particularly good to inline,
+	-- even in a boring context, because we may get to do update in place:
+	--	let x = case y of { I# y# -> I# (y# +# 1#) }
+	-- Hence the case on cpr_info
+
     in
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
@@ -213,8 +246,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 		-- have an UnfoldIfGoodArgs guidance
 	| inline     -> UnfoldIfGoodArgs n_val_binders
 					 (map (const 0) val_binders)
-					 (n_val_binders + 2) 0
-				-- See comments with final_size below
+					 max_inline_size 0
 
       SizeIs size cased_args scrut_discount
 	-> UnfoldIfGoodArgs
@@ -225,43 +257,17 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	where        
 	    boxed_size    = I# size
 
-	    final_size | inline     = 0	-- Trying very agresssive inlining of INLINE things.
-					-- Reason: we don't want to call the un-inlined version,
-					--	   because its body is awful
-					-- boxed_size `min` (n_val_binders + 2)	-- Trying "+2" again...
+	    final_size | inline     = boxed_size `min` max_inline_size
 		       | otherwise  = boxed_size
-		-- The idea is that if there is an INLINE pragma (inline is True)
-		-- and there's a big body, we give a size of n_val_binders+1.  This
-		-- This is enough to pass the no-size-increase test in callSiteInline,
-		--   but no more.
-		-- I tried n_val_binders+2, to just defeat the test, on the grounds that
-		--   we don't want to inline an INLINE thing into a totally boring context,
-		--   but I found that some wrappers (notably one for a join point) weren't
-		--   getting inlined, and that was terrible.  In that particular case, the
-		--   call site applied the wrapper to realWorld#, so if we made that an 
-		--   "interesting" value the inlining would have happened... but it was
-		--   simpler to inline wrappers a little more eagerly instead.
-		--
-		-- Sometimes, though, an INLINE thing is smaller than n_val_binders+2.
+
+		-- Sometimes an INLINE thing is smaller than n_val_binders+2.
 		-- A particular case in point is a constructor, which has size 1.
 		-- We want to inline this regardless, hence the `min`
 
-	    discount_for b 
-		| num_cases == 0 = 0
-		| is_fun_ty  	 = num_cases * opt_UF_FunAppDiscount
-		| is_data_ty 	 = num_cases * opt_UF_ScrutConDiscount
-		| otherwise  	 = num_cases * opt_UF_PrimArgDiscount
-		where
-		  num_cases	      = foldlBag (\n b' -> if b==b' then n+1 else n) 0 cased_args
-					-- Count occurrences of b in cased_args
-		  arg_ty	      = idType b
-		  is_fun_ty	      = maybeToBool (splitFunTy_maybe arg_ty)
-		  (is_data_ty, tycon) = case (splitAlgTyConApp_maybe (idType b)) of
-					  Nothing       -> (False, panic "discount")
-					  Just (tc,_,_) -> (True,  tc)
+	    discount_for b = foldlBag (\acc (b',n) -> if b==b' then acc+n else acc) 
+				      0 cased_args
 	}
   where
-
     collect_val_bndrs e = go False [] e
 	-- We need to be a bit careful about how we collect the
 	-- value binders.  In ptic, if we see 
@@ -291,13 +297,11 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
     size_up (Note _ body)     = size_up body	-- Notes cost nothing
 
     size_up (App fun (Type t))  = size_up fun
-    size_up (App fun arg)       = size_up_app fun [arg]
+    size_up (App fun arg)     = size_up_app fun [arg]
 
-    size_up (Con con args) = foldr (addSize . nukeScrutDiscount . size_up) 
-				   (size_up_con con args)
-				   args
+    size_up (Lit lit) = sizeOne
 
-    size_up (Lam b e) | isId b    = size_up e `addSizeN` 1
+    size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
 		      | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
@@ -314,38 +318,92 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
       where
 	rhs_size = foldr (addSize . size_up . snd) sizeZero pairs
 
-    size_up (Case scrut _ alts)
-      = nukeScrutDiscount (size_up scrut)		`addSize`
-	arg_discount scrut				`addSize`
-	foldr (addSize . size_up_alt) sizeZero alts	
-	  `addSizeN` 1  -- charge one for the case itself.
+	-- We want to make wrapper-style evaluation look cheap, so that
+	-- when we inline a wrapper it doesn't make call site (much) bigger
+	-- Otherwise we get nasty phase ordering stuff: 
+	--	f x = g x x
+	--	h y = ...(f e)...
+	-- If we inline g's wrapper, f looks big, and doesn't get inlined
+	-- into h; if we inline f first, while it looks small, then g's 
+	-- wrapper will get inlined later anyway.  To avoid this nasty
+	-- ordering difference, we make (case a of (x,y) -> ...) look free.
+    size_up (Case (Var v) _ [alt]) 
+	| v `elem` top_args
+	= size_up_alt alt `addSize` SizeIs 0# (unitBag (v, 1)) 0#
+		-- Good to inline if an arg is scrutinised, because
+		-- that may eliminate allocation in the caller
+		-- And it eliminates the case itself
+	| otherwise	
+	= size_up_alt alt
 
--- Just charge for the alts that exist, not the ones that might exist
---	`addSizeN`
---	case (splitAlgTyConApp_maybe (coreExprType scrut)) of
---	      	Nothing       -> 1
---	      	Just (tc,_,_) -> tyConFamilySize tc
+	-- Scrutinising one of the argument variables,
+	-- with more than one alternative
+    size_up (Case (Var v) _ alts)
+	| v `elem` top_args
+	= alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
+		    (foldr1 maxSize alt_sizes)
+	where
+	  v_in_args = v `elem` top_args
+	  alt_sizes = map size_up_alt alts
+
+	  alts_size (SizeIs tot tot_disc tot_scrut)		-- Size of all alternatives
+		    (SizeIs max max_disc max_scrut)		-- Size of biggest alternative
+	 	= SizeIs tot (unitBag (v, I# (1# +# tot -# max)) `unionBags` max_disc) max_scrut
+			-- If the variable is known, we produce a discount that
+			-- will take us back to 'max', the size of rh largest alternative
+			-- The 1+ is a little discount for reduced allocation in the caller
+
+	  alts_size tot_size _ = tot_size
+
+
+    size_up (Case e _ alts) = nukeScrutDiscount (size_up e) `addSize` 
+			      foldr (addSize . size_up_alt) sizeZero alts
+	  	-- We don't charge for the case itself
+		-- It's a strict thing, and the price of the call
+		-- is paid by scrut.  Also consider
+		--	case f x of DEFAULT -> e
+		-- This is just ';'!  Don't charge for it.
 
     ------------ 
-    size_up_app (App fun arg) args   = size_up_app fun (arg:args)
+    size_up_app (App fun arg) args   
+	| isTypeArg arg		     = size_up_app fun args
+	| otherwise		     = size_up_app fun (arg:args)
     size_up_app fun 	      args   = foldr (addSize . nukeScrutDiscount . size_up) 
 					     (size_up_fun fun args)
 					     args
 
 	-- A function application with at least one value argument
 	-- so if the function is an argument give it an arg-discount
+	--
 	-- Also behave specially if the function is a build
+	--
 	-- Also if the function is a constant Id (constr or primop)
-	-- compute discounts as if it were actually a Con; in the early
-	-- stages these constructors and primops may not yet be inlined
-    size_up_fun (Var fun) args | idUnique fun == buildIdKey   = buildSize
-    			       | idUnique fun == augmentIdKey = augmentSize
-    			       | fun `is_elem` top_args	      = scrutArg fun `addSize` fun_size
-			       | otherwise		      = fun_size
-			  where
-			    fun_size = case isConstantId_maybe fun of
-					     Just con -> size_up_con con args
-					     Nothing  -> sizeOne
+	-- compute discounts specially
+    size_up_fun (Var fun) args
+      | idUnique fun == buildIdKey   = buildSize
+      | idUnique fun == augmentIdKey = augmentSize
+      | otherwise 
+      = case idFlavour fun of
+	  DataConId dc -> conSizeN (valArgCount args)
+
+	  PrimOpId op  -> primOpSize op (valArgCount args)
+			  -- foldr addSize (primOpSize op) (map arg_discount args)
+			  -- At one time I tried giving an arg-discount if a primop 
+			  -- is applied to one of the function's arguments, but it's
+			  -- not good.  At the moment, any unlifted-type arg gets a
+			  -- 'True' for 'yes I'm evald', so we collect the discount even
+			  -- if we know nothing about it.  And just having it in a primop
+			  -- doesn't help at all if we don't know something more.
+
+	  other	       -> fun_discount fun `addSizeN` 
+			  (1 + length (filter (not . exprIsTrivial) args))
+				-- The 1+ is for the function itself
+				-- Add 1 for each non-trivial arg;
+				-- the allocation cost, as in let(rec)
+				-- Slight hack here: for constructors the args are almost always
+				--	trivial; and for primops they are almost always prim typed
+				-- 	We should really only count for non-prim-typed args in the
+				--	general case, but that seems too much like hard work
 
     size_up_fun other args = size_up other
 
@@ -354,42 +412,26 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 	    -- Don't charge for args, so that wrappers look cheap
 
     ------------
-    size_up_con (Literal lit) args | isNoRepLit lit = sizeN opt_UF_NoRepLit
-			           | otherwise      = sizeOne
-
-    size_up_con (DataCon dc) args = conSizeN (valArgCount args)
-			     
-    size_up_con (PrimOp op) args = foldr addSize (sizeN op_cost) (map arg_discount args)
-		-- Give an arg-discount if a primop is applies to
-		-- one of the function's arguments
-      where
-	op_cost | primOpIsDupable op = opt_UF_CheapOp
-		| otherwise 	     = opt_UF_DearOp
-
 	-- We want to record if we're case'ing, or applying, an argument
-    arg_discount (Var v) | v `is_elem` top_args = scrutArg v
-    arg_discount other			        = sizeZero
-
-    ------------
-    is_elem :: Id -> [Id] -> Bool
-    is_elem = isIn "size_up_scrut"
+    fun_discount v | v `elem` top_args = SizeIs 0# (unitBag (v, opt_UF_FunAppDiscount)) 0#
+    fun_discount other			  = sizeZero
 
     ------------
 	-- These addSize things have to be here because
 	-- I don't want to give them bOMB_OUT_SIZE as an argument
 
-    addSizeN TooBig          _ = TooBig
+    addSizeN TooBig          _      = TooBig
     addSizeN (SizeIs n xs d) (I# m)
-      | n_tot -# d <# bOMB_OUT_SIZE = SizeIs n_tot xs d
-      | otherwise 		    = TooBig
+      | n_tot ># bOMB_OUT_SIZE	    = TooBig
+      | otherwise 		    = SizeIs n_tot xs d
       where
 	n_tot = n +# m
     
     addSize TooBig _ = TooBig
     addSize _ TooBig = TooBig
     addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
-      | (n_tot -# d_tot) <# bOMB_OUT_SIZE = SizeIs n_tot xys d_tot
-      | otherwise 			  = TooBig
+      | n_tot ># bOMB_OUT_SIZE = TooBig
+      | otherwise 	       = SizeIs n_tot xys d_tot
       where
 	n_tot = n1 +# n2
 	d_tot = d1 +# d2
@@ -401,20 +443,34 @@ Code for manipulating sizes
 \begin{code}
 
 data ExprSize = TooBig
-	      | SizeIs Int#	-- Size found
-		       (Bag Id)	-- Arguments cased herein
-		       Int#	-- Size to subtract if result is scrutinised 
-				-- by a case expression
+	      | SizeIs Int#		-- Size found
+		       (Bag (Id,Int))	-- Arguments cased herein, and discount for each such
+		       Int#		-- Size to subtract if result is scrutinised 
+					-- by a case expression
+
+isTooBig TooBig = True
+isTooBig _      = False
+
+maxSize TooBig         _ 				  = TooBig
+maxSize _              TooBig				  = TooBig
+maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
+					      | otherwise = s2
 
 sizeZero     	= SizeIs 0# emptyBag 0#
 sizeOne      	= SizeIs 1# emptyBag 0#
 sizeTwo      	= SizeIs 2# emptyBag 0#
 sizeN (I# n) 	= SizeIs n  emptyBag 0#
 conSizeN (I# n) = SizeIs 1# emptyBag (n +# 1#)
-	-- Treat constructors as size 1, that unfoldAlways responsds 'False'
-	-- when asked about 'x' when x is bound to (C 3#).
-	-- This avoids gratuitous 'ticks' when x itself appears as an
-	-- atomic constructor argument.
+	-- Treat constructors as size 1; we are keen to expose them
+	-- (and we charge separately for their args).  We can't treat
+	-- them as size zero, else we find that (I# x) has size 1,
+	-- which is the same as a lone variable; and hence 'v' will 
+	-- always be replaced by (I# x), where v is bound to I# x.
+
+primOpSize op n_args
+ | not (primOpIsDupable op) = sizeN opt_UF_DearOp
+ | not (primOpOutOfLine op) = sizeZero			-- These are good to inline
+ | otherwise	      	    = sizeOne
 
 buildSize = SizeIs (-2#) emptyBag 4#
 	-- We really want to inline applications of build
@@ -428,10 +484,12 @@ augmentSize = SizeIs (-2#) emptyBag 4#
 	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
 	-- e plus ys. The -2 accounts for the \cn 
 						
-scrutArg v	= SizeIs 0# (unitBag v) 0#
-
 nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
 nukeScrutDiscount TooBig	  = TooBig
+
+-- When we return a lambda, give a discount if it's used (applied)
+lamScrutDiscount  (SizeIs n vs d) = case opt_UF_FunAppDiscount of { I# d -> SizeIs n vs d }
+lamScrutDiscount TooBig	 	  = TooBig
 \end{code}
 
 
@@ -470,13 +528,26 @@ use'' on the other side.  Can be overridden w/ flaggery.
 Just the same as smallEnoughToInline, except that it has no actual arguments.
 
 \begin{code}
-couldBeSmallEnoughToInline :: UnfoldingGuidance -> Bool
-couldBeSmallEnoughToInline UnfoldNever = False
-couldBeSmallEnoughToInline other       = True
+couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
+couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold NoCPRInfo rhs of
+						UnfoldNever -> False
+						other	    -> True
 
-certainlySmallEnoughToInline :: UnfoldingGuidance -> Bool
-certainlySmallEnoughToInline UnfoldNever		   = False
-certainlySmallEnoughToInline (UnfoldIfGoodArgs _ _ size _) = size <= opt_UF_UseThreshold
+certainlyWillInline :: Id -> Bool
+	-- Sees if the Id is pretty certain to inline	
+certainlyWillInline v
+  = case idUnfolding v of
+
+	CoreUnfolding _ _ _ is_value _ (UnfoldIfGoodArgs n_vals _ size _)
+	   ->    is_value 
+	      && size - (n_vals +1) <= opt_UF_UseThreshold
+	      && not never_inline
+
+	other -> False
+  where
+    never_inline = case idInlinePragma v of
+			IMustNotBeINLINEd False Nothing -> True
+			other			        -> False
 \end{code}
 
 @okToUnfoldInHifile@ is used when emitting unfolding info into an interface
@@ -495,10 +566,10 @@ okToUnfoldInHiFile :: CoreExpr -> Bool
 okToUnfoldInHiFile e = opt_UnfoldCasms || go e
  where
     -- Race over an expression looking for CCalls..
-    go (Var _)                = True
-    go (Con (Literal lit) _)  = not (isLitLitLit lit)
-    go (Con (PrimOp op) args) = okToUnfoldPrimOp op && all go args
-    go (Con con args)         = all go args -- might be litlits in here
+    go (Var v)                = case isPrimOpId_maybe v of
+				  Just op -> okToUnfoldPrimOp op
+				  Nothing -> True
+    go (Lit lit)	      = not (isLitLitLit lit)
     go (App fun arg)          = go fun && go arg
     go (Lam _ body)           = go body
     go (Let binds body)       = and (map go (body :rhssOfBind binds))
@@ -507,8 +578,8 @@ okToUnfoldInHiFile e = opt_UnfoldCasms || go e
     go (Type _)		      = True
 
     -- ok to unfold a PrimOp as long as it's not a _casm_
-    okToUnfoldPrimOp (CCallOp _ is_casm _ _) = not is_casm
-    okToUnfoldPrimOp _                       = True
+    okToUnfoldPrimOp (CCallOp ccall) = not (ccallIsCasm ccall)
+    okToUnfoldPrimOp _               = True
 \end{code}
 
 
@@ -529,6 +600,11 @@ and occurs exactly once or
 If the thing is in WHNF, there's no danger of duplicating work, 
 so we can inline if it occurs once, or is small
 
+NOTE: we don't want to inline top-level functions that always diverge.
+It just makes the code bigger.  Tt turns out that the convenient way to prevent
+them inlining is to give them a NOINLINE pragma, which we do in 
+StrictAnal.addStrictnessInfoToTopId
+
 \begin{code}
 callSiteInline :: Bool			-- True <=> the Id is black listed
 	       -> Bool			-- 'inline' note at call site
@@ -540,15 +616,15 @@ callSiteInline :: Bool			-- True <=> the Id is black listed
 
 
 callSiteInline black_listed inline_call occ id arg_infos interesting_cont
-  = case getIdUnfolding id of {
+  = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon _  -> Nothing ;
 	CompulsoryUnfolding unf_template | black_listed -> Nothing 
 					 | otherwise 	-> Just unf_template ;
-		-- Primops have compulsory unfoldings, but
+		-- Constructors have compulsory unfoldings, but
 		-- may have rules, in which case they are 
 		-- black listed till later
-	CoreUnfolding unf_template is_top is_cheap _ guidance ->
+	CoreUnfolding unf_template is_top is_cheap _ is_bot guidance ->
 
     let
 	result | yes_or_no = Just unf_template
@@ -556,13 +632,16 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 
 	n_val_args  = length arg_infos
 
+	ok_inside_lam = is_cheap || is_bot	-- I'm experimenting with is_cheap
+						-- instead of is_value
+
  	yes_or_no 
 	  | black_listed = False
 	  | otherwise    = case occ of
 				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
 				IAmALoopBreaker      -> False
-				OneOcc in_lam one_br -> (not in_lam || is_cheap) && consider_safe in_lam True  one_br
-				NoOccInfo	     -> is_cheap 		 && consider_safe True   False False
+				OneOcc in_lam one_br -> (not in_lam || ok_inside_lam) && consider_safe in_lam True  one_br
+				NoOccInfo	     -> ok_inside_lam 		      && consider_safe True   False False
 
 	consider_safe in_lam once once_in_one_branch
 		-- consider_safe decides whether it's a good idea to inline something,
@@ -570,11 +649,25 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 		-- once_in_one_branch = True means there's a unique textual occurrence
 	  | inline_call  = True
 
-	  | once_in_one_branch	-- Be very keen to inline something if this is its unique occurrence; that
-				-- gives a good chance of eliminating the original binding for the thing.
-				-- The only time we hold back is when substituting inside a lambda;
-				-- then if the context is totally uninteresting (not applied, not scrutinised)
-				-- there is no point in substituting because it might just increase allocation.
+	  | once_in_one_branch
+		-- Be very keen to inline something if this is its unique occurrence:
+		--
+		--   a) Inlining gives a good chance of eliminating the original 
+		--	binding (and hence the allocation) for the thing.  
+		--	(Provided it's not a top level binding, in which case the 
+		--	 allocation costs nothing.)
+		--
+		--   b) Inlining a function that is called only once exposes the 
+		--	body function to the call site.
+		--
+		-- The only time we hold back is when substituting inside a lambda;
+		-- then if the context is totally uninteresting (not applied, not scrutinised)
+		-- there is no point in substituting because it might just increase allocation,
+		-- by allocating the function itself many times
+		--
+		-- Note: there used to be a '&& not top_level' in the guard above,
+		--	 but that stopped us inlining top-level functions used only once,
+		--	 which is stupid
 	  = not in_lam || not (null arg_infos) || interesting_cont
 
 	  | otherwise
@@ -592,7 +685,7 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 
 		  where
 		    some_benefit = or arg_infos || really_interesting_cont || 
-		    		 (not is_top && (once || (n_vals_wanted > 0 && enough_args)))
+		    		   (not is_top && (once || (n_vals_wanted > 0 && enough_args)))
 		    	-- If it occurs more than once, there must be something interesting 
 		    	-- about some argument, or the result context, to make it worth inlining
 		    	--
@@ -610,9 +703,9 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 		    really_interesting_cont | n_val_args <  n_vals_wanted = False	-- Too few args
 		    			    | n_val_args == n_vals_wanted = interesting_cont
 		    			    | otherwise		          = True	-- Extra args
-	    	-- really_interesting_cont tells if the result of the
-	    	-- call is in an interesting context.
-	    	
+		    	-- really_interesting_cont tells if the result of the
+		    	-- call is in an interesting context.
+
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
 		    discount     = computeDiscount n_vals_wanted arg_discounts res_discount 
 						 arg_infos really_interesting_cont
@@ -625,7 +718,9 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 				   text "occ info:" <+> ppr occ,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
-				   text "is cheap" <+> ppr is_cheap,
+				   text "is cheap:" <+> ppr is_cheap,
+				   text "is bottom:" <+> ppr is_bot,
+				   text "is top-level:"    <+> ppr is_top,
 				   text "guidance" <+> ppr guidance,
 				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO",
 				   if yes_or_no then
@@ -703,29 +798,15 @@ blackListed :: IdSet 		-- Used in transformation rules
 -- place that the inline phase number is looked at.
 
 blackListed rule_vars Nothing		-- Last phase
-  = \v -> case getInlinePragma v of
+  = \v -> case idInlinePragma v of
 		IMustNotBeINLINEd False Nothing -> True		-- An unconditional NOINLINE pragma
 		other				-> False
-
-blackListed rule_vars (Just 0)
--- Phase 0: used for 'no imported inlinings please'
--- This prevents wrappers getting inlined which in turn is bad for full laziness
--- NEW: try using 'not a wrapper' rather than 'not imported' in this phase.
--- This allows a little more inlining, which seems to be important, sometimes.
--- For example PrelArr.newIntArr gets better.
-  = \v -> -- workerExists (getIdWorkerInfo v) || normal_case rule_vars 0 v
-	  -- True	-- Try going back to no inlinings at all
-			-- BUT: I found that there is some advantage in doing 
-			-- local inlinings first.  For example in fish/Main.hs
-			-- it's advantageous to inline scale_vec2 before inlining
-			-- wrappers from PrelNum that make it look big.
-	  not (isLocallyDefined v) || normal_case rule_vars 0 v		-- This seems best at the moment
 
 blackListed rule_vars (Just phase)
   = \v -> normal_case rule_vars phase v
 
 normal_case rule_vars phase v 
-  = case getInlinePragma v of
+  = case idInlinePragma v of
 	NoInlinePragInfo -> has_rules
 
 	IMustNotBeINLINEd from_INLINE Nothing
@@ -737,7 +818,7 @@ normal_case rule_vars phase v
 	  | otherwise   -> phase < threshold || has_rules
   where
     has_rules =  v `elemVarSet` rule_vars
-	      || not (isEmptyCoreRules (getIdSpecialisation v))
+	      || not (isEmptyCoreRules (idSpecialisation v))
 \end{code}
 
 

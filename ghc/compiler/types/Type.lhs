@@ -29,14 +29,16 @@ module Type (
 
 	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
 
-	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, splitFunTysN,
+	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, splitFunTys, splitFunTysN,
 	funResultTy, funArgTy, zipFunTys,
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
 	splitAlgTyConApp_maybe, splitAlgTyConApp, 
 	mkDictTy, mkPredTy, splitPredTy_maybe, splitDictTy_maybe, isDictTy,
 
-	mkSynTy, isSynTy, deNoteType, repType, splitNewType_maybe,
+	mkSynTy, isSynTy, deNoteType, 
+
+	repType, splitRepFunTys, splitNewType_maybe, typePrimRep,
 
         UsageAnn(..), mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
         mkUsForAllTy, mkUsForAllTys, splitUsForAllTys, substUsTy,
@@ -52,7 +54,6 @@ module Type (
 
 	-- Lifting and boxity
 	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
-	typePrimRep,
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -78,12 +79,12 @@ import TypeRep
 
 -- Other imports:
 
-import {-# SOURCE #-}	DataCon( DataCon, dataConType )
+import {-# SOURCE #-}	DataCon( DataCon, dataConRepType )
 import {-# SOURCE #-}	PprType( pprType, pprPred )	-- Only called in debug messages
 import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
-import Var	( TyVar, IdOrTyVar, UVar,
+import Var	( TyVar, Var, UVar,
 		  tyVarKind, tyVarName, setTyVarName, isId, idType,
 		)
 import VarEnv
@@ -234,6 +235,10 @@ mkFunTy arg res = FunTy arg res
 
 mkFunTys :: [Type] -> Type -> Type
 mkFunTys tys ty = foldr FunTy ty tys
+
+splitFunTy :: Type -> (Type, Type)
+splitFunTy (FunTy arg res) = (arg, res)
+splitFunTy (NoteTy _ ty)   = splitFunTy ty
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
 splitFunTy_maybe (FunTy arg res) = Just (arg, res)
@@ -418,6 +423,8 @@ The reason is that we then get better (shorter) type signatures in
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 
+		Representation types
+		~~~~~~~~~~~~~~~~~~~~
 
 repType looks through 
 	(a) for-alls, and
@@ -431,6 +438,12 @@ repType (NoteTy _ ty)     		  = repType ty
 repType (ForAllTy _ ty)   		  = repType ty
 repType (TyConApp tc tys) | isNewTyCon tc = repType (new_type_rep tc tys)
 repType other_ty	  		  = other_ty
+
+
+typePrimRep :: Type -> PrimRep
+typePrimRep ty = case splitTyConApp_maybe (repType ty) of
+		   Just (tc, ty_args) -> tyConPrimRep tc
+		   other	      -> PtrRep
 
 splitNewType_maybe :: Type -> Maybe Type
 -- Find the representation of a newtype, if it is one
@@ -449,8 +462,15 @@ new_type_rep :: TyCon -> [Type] -> Type
 -- Looks through one layer only
 new_type_rep tc tys 
   = ASSERT( isNewTyCon tc )
-    case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
+    case splitFunTy_maybe (applyTys (dataConRepType (head (tyConDataCons tc))) tys) of
 	Just (rep_ty, _) -> rep_ty
+
+splitRepFunTys :: Type -> ([Type], Type)
+-- Like splitFunTys, but looks through newtypes and for-alls
+splitRepFunTys ty = split [] (repType ty)
+  where
+    split args (FunTy arg res)  = split (arg:args) (repType res)
+    split args ty               = (reverse args, ty)
 \end{code}
 
 
@@ -609,7 +629,7 @@ splitForAllTys ty = case splitUsgTy_maybe ty of
 it is given a type variable or a term variable.
 
 \begin{code}
-mkPiType :: IdOrTyVar -> Type -> Type	-- The more polymorphic version doesn't work...
+mkPiType :: Var -> Type -> Type		-- The more polymorphic version doesn't work...
 mkPiType v ty | isId v    = mkFunTy (idType v) ty
 	      | otherwise = mkForAllTy v ty
 \end{code}
@@ -941,11 +961,6 @@ isNewType ty = case splitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
 					      isNewTyCon tc
 			other		   -> False
-
-typePrimRep :: Type -> PrimRep
-typePrimRep ty = case splitTyConApp_maybe (repType ty) of
-		   Just (tc, ty_args) -> tyConPrimRep tc
-		   other	      -> PtrRep
 \end{code}
 
 

@@ -10,7 +10,7 @@ module Name (
 
 	-- The Name type
 	Name,					-- Abstract
-	mkLocalName, mkImportedLocalName, mkSysLocalName, 
+	mkLocalName, mkImportedLocalName, mkSysLocalName, mkCCallName,
 	mkTopName, mkIPName,
 	mkDerivedName, mkGlobalName, mkKnownKeyGlobal,
 	mkWiredInIdName,   mkWiredInTyConName,
@@ -21,8 +21,8 @@ module Name (
 	tidyTopName, 
 	nameOccName, nameModule, setNameOcc, nameRdrName, setNameModule,
 
-	isUserExportedName, isUserImportedExplicitlyName, nameSrcLoc,
-	isLocallyDefinedName,
+	isUserExportedName, isUserImportedName, isUserImportedExplicitlyName, nameSrcLoc,
+	isLocallyDefinedName, isDynName,
 
 	isSystemName, isLocalName, isGlobalName, isExternallyVisibleName,
 	
@@ -43,7 +43,7 @@ import {-# SOURCE #-} Var   ( Id, setIdName )
 import {-# SOURCE #-} TyCon ( TyCon, setTyConName )
 
 import OccName		-- All of it
-import Module		( Module, moduleName, pprModule, mkVanillaModule )
+import Module		( Module, moduleName, pprModule, mkVanillaModule, isDynamicModule )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_PprStyle_NoPrags, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 
@@ -117,6 +117,12 @@ mkKnownKeyGlobal (rdr_name, uniq)
 mkSysLocalName :: Unique -> UserFS -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
 				n_occ = mkSrcVarOcc fs, n_prov = systemProvenance }
+
+mkCCallName :: Unique -> EncodedString -> Name
+	-- The encoded string completely describes the ccall
+mkCCallName uniq str =  Name { n_uniq = uniq, n_sort = Local, 
+			       n_occ = mkCCallOcc str, 
+			       n_prov = NonLocalDef ImplicitImport True }
 
 mkTopName :: Unique -> Module -> FAST_STRING -> Name
 	-- Make a top-level name; make it Global if top-level
@@ -409,6 +415,14 @@ isUserExportedName other			           = False
 
 isUserImportedExplicitlyName (Name { n_prov = NonLocalDef (UserImport _ _ explicit) _ }) = explicit
 isUserImportedExplicitlyName other			           			 = False
+
+isUserImportedName (Name { n_prov = NonLocalDef (UserImport _ _ _) _ }) = True
+isUserImportedName other			           		= False
+
+isDynName :: Name -> Bool
+	-- Does this name come from a DLL?
+isDynName nm = not (isLocallyDefinedName nm) && 
+	       isDynamicModule (nameModule nm)
 
 nameSrcLoc name = provSrcLoc (n_prov name)
 

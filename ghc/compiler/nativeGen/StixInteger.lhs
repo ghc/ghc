@@ -18,7 +18,7 @@ import MachMisc
 import MachRegs
 
 import AbsCSyn		hiding (spRel) -- bits and bobs..
-import Const		( Literal(..) )
+import Literal		( Literal(..) )
 import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )

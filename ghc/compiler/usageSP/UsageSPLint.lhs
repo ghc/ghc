@@ -22,8 +22,9 @@ import CoreSyn
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( UsageAnn(..), isUsgTy, tyUsg )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
-import Var              ( IdOrTyVar, varType, idInfo )
-import IdInfo           ( LBVarInfo(..), lbvarInfo )
+import Var              ( Var, varType )
+import Id		( idLBVarInfo )
+import IdInfo           ( LBVarInfo(..) )
 import SrcLoc           ( noSrcLoc )
 import ErrUtils         ( Message, ghcExit )
 import Util             ( zipWithEqual )
@@ -265,9 +266,9 @@ already since they are imported and not changeable.
 First, the various kinds of worsenings we can have:
 
 \begin{code}
-data WorseErr = WorseVar  IdOrTyVar IdOrTyVar  -- variable gets worse
+data WorseErr = WorseVar  Var Var  -- variable gets worse
               | WorseTerm CoreExpr  CoreExpr   -- term gets worse
-              | WorseLam  IdOrTyVar IdOrTyVar  -- lambda gets worse
+              | WorseLam  Var Var  -- lambda gets worse
 
 instance Outputable WorseErr where
   ppr (WorseVar v0 v)  = ptext SLIT("Identifier:") <+> ppr v0 <+> dcolon
@@ -313,10 +314,7 @@ checkBind _            _              = panic "UsageSPLint.checkBind"
 checkCE :: CoreExpr -> CoreExpr -> Bag WorseErr
 
 checkCE (Var _)               (Var _)                = emptyBag
-
-checkCE (Con _ args)          (Con _ args')          = unionManyBags $
-                                                         zipWithEqual "UsageSPLint.checkCE:Con"
-                                                           checkCE args args'
+checkCE (Lit _)               (Lit _)                = emptyBag
 
 checkCE (App e arg)           (App e' arg')          = (checkCE e e')
                                                        `unionBags` (checkCE arg arg')
@@ -358,7 +356,7 @@ checkCE t                     t'                     = pprPanic "usageSPLint.che
 
 -- does binder change from Once to Many?
 -- notice we only check the top-level annotation; this is all that's necessary.  KSW 1999-04.
-checkVar :: IdOrTyVar -> IdOrTyVar -> Bag WorseErr
+checkVar :: Var -> Var -> Bag WorseErr
 checkVar v v' | isTyVar v       = emptyBag
               | not (isUsgTy y) = emptyBag  -- if initially no annot, definitely OK
               | otherwise       = checkUsg u u' (WorseVar v v')
@@ -368,9 +366,9 @@ checkVar v v' | isTyVar v       = emptyBag
         u' = tyUsg y'
 
 -- does lambda change from Once to Many?
-checkLamVar :: IdOrTyVar -> IdOrTyVar -> Bag WorseErr
+checkLamVar :: Var -> Var -> Bag WorseErr
 checkLamVar v v' | isTyVar v = emptyBag
-                 | otherwise = case ((lbvarInfo . idInfo) v, (lbvarInfo . idInfo) v') of
+                 | otherwise = case (idLBVarInfo v, idLBVarInfo v') of
                                  (NoLBVarInfo    , _              ) -> emptyBag
                                  (IsOneShotLambda, IsOneShotLambda) -> emptyBag
                                  (IsOneShotLambda, NoLBVarInfo    ) -> unitBag (WorseLam v v')

@@ -2,7 +2,7 @@ __export ShouldSucceed Eq2{deq foo} f;
 instance {Eq2 PrelBase.Int} = zdfEq2Int;
 instance __forall [a] => {Eq2 a} -> {Eq2 [a]} = zdfEq2ZMZN;
 1 class Eq2 a where {deq :: a -> a -> PrelBase.Bool; foo :: a -> a} ;
-1 f :: __forall [t] => {PrelNum.Num t} -> {Eq2 [t]} -> [t] -> PrelBase.Bool ;
+1 f :: __forall [t] => {Eq2 [t]} -> {PrelNum.Num t} -> [t] -> PrelBase.Bool ;
 1 zddmdeq :: __forall [a] => {Eq2 a} -> a -> a -> PrelBase.Bool ;
 1 zddmfoo :: __forall [a] => {Eq2 a} -> a -> a ;
 1 zdfEq2Int :: {Eq2 PrelBase.Int} ;

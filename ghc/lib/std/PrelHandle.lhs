@@ -63,7 +63,6 @@ The @Handle@ and @Handle__@ types are defined in @IOBase@.
 
 \begin{code}
 {-# INLINE newHandle   #-}
-{-# INLINE withHandle #-}
 newHandle     :: Handle__ -> IO Handle
 
 -- Use MVars for concurrent Haskell
@@ -99,6 +98,7 @@ but we might want to revisit this in the future --SDM ].
 
 \begin{code}
 withHandle :: Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
+{-# INLINE withHandle #-}
 withHandle (Handle h) act = do
    h_ <- takeMVar h
    (h',v)  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
@@ -106,6 +106,7 @@ withHandle (Handle h) act = do
    return v
 
 withHandle_ :: Handle -> (Handle__ -> IO a) -> IO a
+{-# INLINE withHandle_ #-}
 withHandle_ (Handle h) act = do
    h_ <- takeMVar h
    v  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
@@ -113,6 +114,7 @@ withHandle_ (Handle h) act = do
    return v
    
 withHandle__ :: Handle -> (Handle__ -> IO Handle__) -> IO ()
+{-# INLINE withHandle__ #-}
 withHandle__ (Handle h) act = do
    h_ <- takeMVar h
    h'  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)

@@ -19,10 +19,9 @@ import DsMonad		-- the monadery used in the desugarer
 import DsUtils
 
 import CmdLineOpts	( opt_FoldrBuildOn )
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType )
 import Id		( idType )
 import Var              ( Id, TyVar )
-import Const		( Con(..) )
 import PrelInfo		( foldrId, buildId )
 import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTyVar, alphaTy )
@@ -109,7 +108,7 @@ deListComp :: [TypecheckedStmt] -> CoreExpr -> DsM CoreExpr
 
 deListComp [ReturnStmt expr] list	-- Figure 7.4, SLPJ, p 135, rule C above
   = dsExpr expr			`thenDs` \ core_expr ->
-    returnDs (mkConsExpr (coreExprType core_expr) core_expr list)
+    returnDs (mkConsExpr (exprType core_expr) core_expr list)
 
 deListComp (GuardStmt guard locn : quals) list	-- rule B above
   = dsExpr guard       		`thenDs` \ core_guard ->
@@ -124,12 +123,12 @@ deListComp (LetStmt binds : quals) list
 deListComp (BindStmt pat list1 locn : quals) core_list2 -- rule A' above
   = dsExpr list1		    `thenDs` \ core_list1 ->
     let
-	u3_ty@u1_ty = coreExprType core_list1	-- two names, same thing
+	u3_ty@u1_ty = exprType core_list1	-- two names, same thing
 
 	-- u1_ty is a [alpha] type, and u2_ty = alpha
 	u2_ty = outPatType pat
 
-	res_ty = coreExprType core_list2
+	res_ty = exprType core_list2
 	h_ty   = u1_ty `mkFunTy` res_ty
     in
     newSysLocalsDs [h_ty, u1_ty, u2_ty, u3_ty]	`thenDs` \ [h, u1, u2, u3] ->
@@ -144,8 +143,8 @@ deListComp (BindStmt pat list1 locn : quals) core_list2 -- rule A' above
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
 	rhs = Lam u1 $
-	      Case (Var u1) u1 [(DataCon nilDataCon,  [], 	core_list2),
-			        (DataCon consDataCon, [u2, u3], core_match)]
+	      Case (Var u1) u1 [(DataAlt nilDataCon,  [], 	core_list2),
+			        (DataAlt consDataCon, [u2, u3], core_match)]
     in
     returnDs (Let (Rec [(h, rhs)]) letrec_body)
 \end{code}

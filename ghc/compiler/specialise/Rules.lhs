@@ -14,7 +14,6 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
-import Const		( Con(..), Literal(..) )
 import OccurAnal	( occurAnalyseExpr, tagBinders, UsageDetails )
 import BinderInfo	( markMany )
 import CoreFVs		( exprFreeVars, idRuleVars, ruleSomeLhsFreeVars )
@@ -25,8 +24,8 @@ import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
 			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
 			  unBindSubst, bindSubstList, unBindSubstList, substInScope
 			)
-import Id		( Id, getIdUnfolding, zapLamIdInfo, 
-			  getIdSpecialisation, setIdSpecialisation,
+import Id		( Id, idUnfolding, zapLamIdInfo, 
+			  idSpecialisation, setIdSpecialisation,
 			  setIdNoDiscard, maybeModifyIdInfo, modifyIdInfo
 			) 
 import IdInfo		( setSpecInfo, specInfo )
@@ -220,7 +219,7 @@ zapOccInfo bndr | isTyVar bndr = bndr
 \end{code}
 
 \begin{code}
-type Matcher result =  IdOrTyVarSet		-- Template variables
+type Matcher result =  VarSet			-- Template variables
 	     	    -> (Subst -> Maybe result)	-- Continuation if success
 		    -> Subst  -> Maybe result	-- Substitution so far -> result
 -- The *SubstEnv* in these Substs apply to the TEMPLATE only 
@@ -253,9 +252,9 @@ match (Var v1) e2 tpl_vars kont subst
 
 	other -> match_fail
 
-match (Con c1 es1) (Con c2 es2) tpl_vars kont subst
-  | c1 == c2
-  = matches es1 es2 tpl_vars kont subst
+match (Lit lit1) (Lit lit2) tpl_vars kont subst
+  | lit1 == lit2
+  = kont subst
 
 match (App f1 a1) (App f2 a2) tpl_vars kont subst
   = match f1 f2 tpl_vars (match a1 a2 tpl_vars kont) subst
@@ -325,7 +324,7 @@ match e1 (Var v2) tpl_vars kont subst
   | isCheapUnfolding unfolding
   = match e1 (unfoldingTemplate unfolding) tpl_vars kont subst
   where
-    unfolding = getIdUnfolding v2
+    unfolding = idUnfolding v2
 
 
 -- We can't cope with lets in the template
@@ -439,7 +438,7 @@ addIdSpecialisations id spec_stuff
   = setIdSpecialisation id new_rules
   where
     rule_name = _PK_ ("SPEC " ++ showSDoc (ppr id))
-    new_rules = foldr add (getIdSpecialisation id) spec_stuff
+    new_rules = foldr add (idSpecialisation id) spec_stuff
     add (vars, args, rhs) rules = addRule id rules (Rule rule_name vars args rhs)
 \end{code}
 
@@ -462,12 +461,12 @@ pprProtoCoreRule (ProtoCoreRule _ fn rule) = pprCoreRule (Just fn) rule
 
 lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 lookupRule in_scope fn args
-  = case getIdSpecialisation fn of
+  = case idSpecialisation fn of
 	Rules rules _ -> matchRules in_scope rules args
 
 orphanRule :: ProtoCoreRule -> Bool
 -- An "orphan rule" is one that is defined in this 
--- module, but of ran *imported* function.  We need
+-- module, but for an *imported* function.  We need
 -- to track these separately when generating the interface file
 orphanRule (ProtoCoreRule local fn _)
   = local && not (isLocallyDefined fn)
@@ -533,5 +532,5 @@ add_rule (ProtoCoreRule _ id rule)
 	-- Find *all* the free Ids of the LHS, not just
 	-- locally defined ones!!
 
-addRuleToId id rule = setIdSpecialisation id (addRule id (getIdSpecialisation id) rule)
+addRuleToId id rule = setIdSpecialisation id (addRule id (idSpecialisation id) rule)
 \end{code}

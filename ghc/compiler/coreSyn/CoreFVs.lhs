@@ -15,9 +15,9 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idFreeTyVars, getIdSpecialisation )
+import Id		( Id, idFreeTyVars, idSpecialisation )
 import VarSet
-import Var		( IdOrTyVar, isId )
+import Var		( Var, isId )
 import Name		( isLocallyDefined )
 import Type		( tyVarsOfType, Type )
 import Util		( mapAndUnzip )
@@ -38,30 +38,30 @@ So far as type variables are concerned, it only finds tyvars that are
 but not those that are free in the type of variable occurrence.
 
 \begin{code}
-exprFreeVars :: CoreExpr -> IdOrTyVarSet	-- Find all locally-defined free Ids or tyvars
+exprFreeVars :: CoreExpr -> VarSet	-- Find all locally-defined free Ids or tyvars
 exprFreeVars = exprSomeFreeVars isLocallyDefined
 
-exprsFreeVars :: [CoreExpr] -> IdOrTyVarSet
+exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
 
 exprSomeFreeVars :: InterestingVarFun 	-- Says which Vars are interesting
 		 -> CoreExpr
-		 -> IdOrTyVarSet
+		 -> VarSet
 exprSomeFreeVars fv_cand e = expr_fvs e fv_cand emptyVarSet
 
 exprsSomeFreeVars :: InterestingVarFun 	-- Says which Vars are interesting
 		  -> [CoreExpr]
-		  -> IdOrTyVarSet
+		  -> VarSet
 exprsSomeFreeVars fv_cand = foldr (unionVarSet . exprSomeFreeVars fv_cand) emptyVarSet
 
-type InterestingVarFun = IdOrTyVar -> Bool	-- True <=> interesting
+type InterestingVarFun = Var -> Bool	-- True <=> interesting
 \end{code}
 
 
 \begin{code}
 type FV = InterestingVarFun 
-	  -> IdOrTyVarSet	-- In scope
-	  -> IdOrTyVarSet	-- Free vars
+	  -> VarSet		-- In scope
+	  -> VarSet		-- Free vars
 
 union :: FV -> FV -> FV
 union fv1 fv2 fv_cand in_scope = fv1 fv_cand in_scope `unionVarSet` fv2 fv_cand in_scope
@@ -75,7 +75,7 @@ noVars fv_cand in_scope = emptyVarSet
 -- is a little weird.  The reason is that the former is more efficient,
 -- but the latter is more fine grained, and a makes a difference when
 -- a variable mentions itself one of its own rule RHSs
-oneVar :: IdOrTyVar -> FV
+oneVar :: Var -> FV
 oneVar var fv_cand in_scope
   = foldVarSet add_rule_var var_itself_set (idRuleVars var)
   where
@@ -84,7 +84,7 @@ oneVar var fv_cand in_scope
     add_rule_var var set | keep_it fv_cand in_scope var = extendVarSet set var
 			 | otherwise			= set
 
-someVars :: IdOrTyVarSet -> FV
+someVars :: VarSet -> FV
 someVars vars fv_cand in_scope
   = filterVarSet (keep_it fv_cand in_scope) vars
 
@@ -111,7 +111,7 @@ expr_fvs :: CoreExpr -> FV
 
 expr_fvs (Type ty) 	 = someVars (tyVarsOfType ty)
 expr_fvs (Var var) 	 = oneVar var
-expr_fvs (Con con args)  = foldr (union . expr_fvs) noVars args
+expr_fvs (Lit lit)	 = noVars
 expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
@@ -133,17 +133,17 @@ expr_fvs (Let (Rec pairs) body)
 
 
 \begin{code}
-idRuleVars ::Id -> IdOrTyVarSet
-idRuleVars id = rulesRhsFreeVars (getIdSpecialisation id)
+idRuleVars ::Id -> VarSet
+idRuleVars id = rulesRhsFreeVars (idSpecialisation id)
 
-idFreeVars :: Id -> IdOrTyVarSet
+idFreeVars :: Id -> VarSet
 idFreeVars id = idRuleVars id `unionVarSet` idFreeTyVars id
 
-rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> IdOrTyVarSet
+rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> VarSet
 rulesSomeFreeVars interesting (Rules rules _)
   = foldr (unionVarSet . ruleSomeFreeVars interesting) emptyVarSet rules
 
-ruleSomeFreeVars :: InterestingVarFun -> CoreRule -> IdOrTyVarSet
+ruleSomeFreeVars :: InterestingVarFun -> CoreRule -> VarSet
 ruleSomeFreeVars interesting (BuiltinRule _) = noFVs
 ruleSomeFreeVars interesting (Rule _ tpl_vars tpl_args rhs)
   = rule_fvs interesting emptyVarSet
@@ -151,7 +151,7 @@ ruleSomeFreeVars interesting (Rule _ tpl_vars tpl_args rhs)
     rule_fvs = addBndrs tpl_vars $
 	       foldr (union . expr_fvs) (expr_fvs rhs) tpl_args
 
-ruleSomeLhsFreeVars :: InterestingVarFun -> CoreRule -> IdOrTyVarSet
+ruleSomeLhsFreeVars :: InterestingVarFun -> CoreRule -> VarSet
 ruleSomeLhsFreeVars fn (BuiltinRule _) = noFVs
 ruleSomeLhsFreeVars fn (Rule _ tpl_vars tpl_args rhs)
   = foldl delVarSet (exprsSomeFreeVars fn tpl_args) tpl_vars
@@ -168,8 +168,8 @@ The free variable pass annotates every node in the expression with its
 NON-GLOBAL free variables and type variables.
 
 \begin{code}
-type CoreBindWithFVs = AnnBind Id IdOrTyVarSet
-type CoreExprWithFVs = AnnExpr Id IdOrTyVarSet
+type CoreBindWithFVs = AnnBind Id VarSet
+type CoreExprWithFVs = AnnExpr Id VarSet
 	-- Every node annotated with its free variables,
 	-- both Ids and TyVars
 
@@ -180,7 +180,7 @@ noFVs    = emptyVarSet
 aFreeVar = unitVarSet
 unionFVs = unionVarSet
 
-filters :: IdOrTyVar -> IdOrTyVarSet -> IdOrTyVarSet
+filters :: Var -> VarSet -> VarSet
 
 -- (b `filters` s) removes the binder b from the free variable set s,
 -- but *adds* to s
@@ -235,11 +235,7 @@ freeVars (Var v)
     fvs | isLocallyDefined v = aFreeVar v
 	| otherwise	     = noFVs
 
-freeVars (Con con args)
-  = (foldr (unionFVs . freeVarsOf) noFVs args2, AnnCon con args2)
-  where
-    args2 = map freeVars args
-
+freeVars (Lit lit) = (noFVs, AnnLit lit)
 freeVars (Lam b body)
   = (b `filters` freeVarsOf body', AnnLam b body')
   where

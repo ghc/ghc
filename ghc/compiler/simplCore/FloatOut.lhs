@@ -11,12 +11,12 @@ module FloatOut ( floatOutwards ) where
 #include "HsVersions.h"
 
 import CoreSyn
+import CoreUtils	( mkSCC )
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_stats )
 import ErrUtils		( dumpIfSet )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id, idType )
-import Const		( isWHNFCon )
 import VarEnv
 import CoreLint		( beginPass, endPass )
 import PprCore
@@ -77,13 +77,15 @@ type FloatBinds    = [FloatBind]
 %************************************************************************
 
 \begin{code}
-floatOutwards :: UniqSupply -> [CoreBind] -> IO [CoreBind]
+floatOutwards :: Bool 		-- True <=> float lambdas to top level
+	      -> UniqSupply 
+	      -> [CoreBind] -> IO [CoreBind]
 
-floatOutwards us pgm
+floatOutwards float_lams us pgm
   = do {
-	beginPass "Float out";
+	beginPass float_msg ;
 
-	let { annotated_w_levels = setLevels pgm us ;
+	let { annotated_w_levels = setLevels float_lams pgm us ;
 	      (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
 	    } ;
 
@@ -97,10 +99,13 @@ floatOutwards us pgm
 			int ntlets, ptext SLIT(" Lets floated elsewhere; from "),
 			int lams,   ptext SLIT(" Lambda groups")]);
 
-	endPass "Float out" 
+	endPass float_msg
 	 	opt_D_verbose_core2core		{- no specific flag for dumping float-out -} 
 		(concat binds_s')
     }
+  where
+    float_msg | float_lams = "Float out (floating lambdas too)"
+	      | otherwise  = "Float out (not floating lambdas)"
 
 floatTopBind bind@(NonRec _ _)
   = case (floatBind emptyVarEnv tOP_LEVEL bind) of { (fs, floats, bind', _) ->
@@ -200,9 +205,7 @@ floatRhs env lvl arg
 
 floatExpr env _ (Var v)	     = (zeroStats, [], Var v)
 floatExpr env _ (Type ty)    = (zeroStats, [], Type ty)
-floatExpr env lvl (Con con as) 
-  = case floatList (floatRhs env lvl) as of { (stats, floats, as') ->
-    (stats, floats, Con con as') }
+floatExpr env _ (Lit lit)    = (zeroStats, [], Lit lit)
 	  
 floatExpr env lvl (App e a)
   = case (floatExpr env lvl e) of { (fse, floats_e, e') ->
@@ -250,17 +253,10 @@ floatExpr env lvl (Note note@(SCC cc) expr)
       = [ (level, ann_bind floater) | (level, floater) <- defn_groups ]
       where
 	ann_bind (NonRec binder rhs)
-	  = NonRec binder (ann_rhs rhs)
+	  = NonRec binder (mkSCC dupd_cc rhs)
 
 	ann_bind (Rec pairs)
-	  = Rec [(binder, ann_rhs rhs) | (binder, rhs) <- pairs]
-
-	ann_rhs (Lam arg e)     = Lam arg (ann_rhs e)
-	ann_rhs rhs@(Con con _) | isWHNFCon con = rhs	-- no point in scc'ing WHNF data
-	ann_rhs rhs	        = Note (SCC dupd_cc) rhs
-
-	-- Note: Nested SCC's are preserved for the benefit of
-	--       cost centre stack profiling (Durham)
+	  = Rec [(binder, mkSCC dupd_cc rhs) | (binder, rhs) <- pairs]
 
 -- At one time I tried the effect of not float anything out of an InlineMe,
 -- but it sometimes works badly.  For example, consider PrelArr.done.  It

@@ -108,9 +108,6 @@ data HsExpr id pat
 				-- direct from the components
 		Bool		-- boxed?
 
-  | HsCon DataCon		-- TRANSLATION; a saturated constructor application
-	  [Type]
-	  [HsExpr id pat]
 
 	-- Record construction
   | RecordCon	id				-- The constructor
@@ -126,9 +123,9 @@ data HsExpr id pat
 		(HsRecordBinds id pat)
 
   | RecordUpdOut (HsExpr id pat)	-- TRANSLATION
-		 Type		-- Type of *result* record (may differ from
+		 Type			-- Type of *result* record (may differ from
 						-- type of input record)
-		 [id]				-- Dicts needed for construction
+		 [id]			-- Dicts needed for construction
 		 (HsRecordBinds id pat)
 
   | ExprWithTySig			-- signature binding
@@ -140,7 +137,7 @@ data HsExpr id pat
 		(HsExpr id pat)		-- (typechecked, of course)
 		(ArithSeqInfo id pat)
 
-  | CCall	FAST_STRING	-- call into the C world; string is
+  | HsCCall	FAST_STRING	-- call into the C world; string is
 		[HsExpr id pat]	-- the C function; exprs are the
 				-- arguments to pass.
 		Bool		-- True <=> might cause Haskell
@@ -315,10 +312,6 @@ ppr_expr (ExplicitTuple exprs True)
 ppr_expr (ExplicitTuple exprs False)
   = ptext SLIT("(#") <> sep (punctuate comma (map ppr_expr exprs)) <> ptext SLIT("#)")
 
-ppr_expr (HsCon con_id tys args)
-  = ppr con_id <+> sep (map pprParendType tys ++
-		        map pprParendExpr args)
-
 ppr_expr (RecordCon con_id rbinds)
   = pp_rbinds (ppr con_id) rbinds
 ppr_expr (RecordConOut data_con con rbinds)
@@ -342,7 +335,7 @@ ppr_expr EWildPat = char '_'
 ppr_expr (ELazyPat e) = char '~' <> pprParendExpr e
 ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
 
-ppr_expr (CCall fun args _ is_asm result_ty)
+ppr_expr (HsCCall fun args _ is_asm result_ty)
   = hang (if is_asm
 	  then ptext SLIT("_casm_ ``") <> ptext fun <> ptext SLIT("''")
 	  else ptext SLIT("_ccall_") <+> ptext fun)

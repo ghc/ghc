@@ -1,3 +1,0 @@
-__interface Const 1 0 where
-__export Const Con ;
-1 data Con ;

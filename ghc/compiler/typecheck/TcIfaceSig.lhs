@@ -18,29 +18,29 @@ import TcMonoType	( tcHsType, tcHsTypeKind,
 			)
 import TcEnv		( ValueEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetValueEnv,
-			  tcLookupTyConByKey, tcLookupValueMaybe,
+			  tcLookupValueMaybe,
 			  explicitLookupValue, badCon, badPrimOp, valueEnvIds
 			)
 import TcType		( TcKind, kindToTcKind )
 
 import RnHsSyn		( RenamedHsDecl )
 import HsCore
-import CallConv		( cCallConv )
-import Const		( Con(..), Literal(..) )
+import Literal		( Literal(..) )
 import CoreSyn
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
-import PrimOp		( PrimOp(..) )
+import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 
 import Id		( Id, mkId, mkVanillaId,
-			  isDataConId_maybe
+			  isDataConWrapId_maybe
 			)
+import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
-import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, unUsgTy )
-import Var		( IdOrTyVar, mkTyVar, tyVarKind )
+import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, splitFunTys, unUsgTy )
+import Var		( mkTyVar, tyVarKind )
 import VarEnv
 import Name		( Name, NamedThing(..), isLocallyDefined )
 import Unique		( rationalTyConKey )
@@ -87,7 +87,7 @@ tcIdInfo unf_env in_scope_vars name ty info info_ins
     tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)
     tcPrag info (HsUpdate upd)  = returnTc (info `setUpdateInfo` upd)
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
-    tcPrag info (HsCprInfo cpr_info)     = returnTc (info `setCprInfo` cpr_info)
+    tcPrag info HsCprInfo       = returnTc (info `setCprInfo`	 ReturnsCPR)
 
     tcPrag info (HsUnfold inline_prag expr)
 	= tcPragExpr unf_env name in_scope_vars expr 	`thenNF_Tc` \ maybe_expr' ->
@@ -96,7 +96,7 @@ tcIdInfo unf_env in_scope_vars name ty info info_ins
 		-- is never inspected; so the typecheck doesn't even happen
 		unfold_info = case maybe_expr' of
 				Nothing    -> noUnfolding
-				Just expr' -> mkTopUnfolding expr' 
+				Just expr' -> mkTopUnfolding (cprInfo info) expr' 
 		info1 = info `setUnfoldingInfo` unfold_info
 		info2 = info1 `setInlinePragInfo` inline_prag
 	  in
@@ -115,12 +115,12 @@ tcWorkerInfo unf_env ty info worker_name
   = pprPanic "Worker with no arity info" (ppr worker_name)
  
   | otherwise
-  = uniqSMToTcM (mkWrapper ty arity demands cpr_info) `thenNF_Tc` \ wrap_fn ->
+  = uniqSMToTcM (mkWrapper ty arity demands res_bot cpr_info) `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on unf_env too eagerly!
 	info' = case explicitLookupValue unf_env worker_name of
-			Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
-                                               `setWorkerInfo`     Just worker_id
+			Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding cpr_info (wrap_fn worker_id)
+                                               `setWorkerInfo`     HasWorker worker_id arity
 
     			Nothing        -> pprTrace "tcWorkerInfo failed:" (ppr worker_name) info
     in
@@ -131,9 +131,9 @@ tcWorkerInfo unf_env ty info worker_name
       arity_info = arityInfo info
       arity      = arityLowerBound arity_info
       cpr_info   = cprInfo info
-      demands    = case strictnessInfo info of
-			StrictnessInfo d _ -> d
-			_                  -> take arity (repeat wwLazy)	-- Noncommittal
+      (demands, res_bot)    = case strictnessInfo info of
+			 	StrictnessInfo d r -> (d,r)
+				_                  -> (take arity (repeat wwLazy),False)	-- Noncommittal
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check
@@ -200,17 +200,26 @@ tcCoreExpr (UfVar name)
   = tcVar name 	`thenTc` \ id ->
     returnTc (Var id)
 
-tcCoreExpr (UfCon con args) 
-  = mapTc tcCoreExpr args	`thenTc` \ args' ->
-    tcUfCon con args'
+tcCoreExpr (UfLit lit)
+  = returnTc (Lit lit)
+
+-- The dreaded lit-lits are also similar, except here the type
+-- is read in explicitly rather than being implicit
+tcCoreExpr (UfLitLit lit ty)
+  = tcHsType ty		`thenTc` \ ty' ->
+    returnTc (Lit (MachLitLit lit ty'))
+
+tcCoreExpr (UfCCall cc ty)
+  = tcHsType ty 	`thenTc` \ ty' ->
+    tcGetUnique		`thenNF_Tc` \ u ->
+    returnTc (Var (mkCCallOpId u cc ty'))
 
 tcCoreExpr (UfTuple name args) 
-  = 	-- See notes with tcUfCon (UfDataCon ...)
-    tcVar name			`thenTc` \ con_id ->
+  = tcVar name			`thenTc` \ con_id ->
     mapTc tcCoreExpr args	`thenTc` \ args' ->
     let
 	-- Put the missing type arguments back in
-	con_args = map (Type . unUsgTy . coreExprType) args' ++ args'
+	con_args = map (Type . unUsgTy . exprType) args' ++ args'
     in
     returnTc (mkApps (Var con_id) con_args)
 
@@ -227,7 +236,7 @@ tcCoreExpr (UfApp fun arg)
 tcCoreExpr (UfCase scrut case_bndr alts) 
   = tcCoreExpr scrut					`thenTc` \ scrut' ->
     let
-	scrut_ty = coreExprType scrut'
+	scrut_ty = exprType scrut'
 	case_bndr' = mkVanillaId case_bndr scrut_ty
     in
     tcExtendGlobalValEnv [case_bndr']	$
@@ -253,63 +262,13 @@ tcCoreExpr (UfNote note expr)
     case note of
 	UfCoerce to_ty -> tcHsType to_ty	`thenTc` \ to_ty' ->
 			  returnTc (Note (Coerce (unUsgTy to_ty')
-                                                 (unUsgTy (coreExprType expr'))) expr')
+                                                 (unUsgTy (exprType expr'))) expr')
 	UfInlineCall   -> returnTc (Note InlineCall expr')
 	UfInlineMe     -> returnTc (Note InlineMe   expr')
 	UfSCC cc       -> returnTc (Note (SCC cc)   expr')
 
 tcCoreNote (UfSCC cc)   = returnTc (SCC cc)
 tcCoreNote UfInlineCall = returnTc InlineCall 
-
-
-----------------------------------
-tcUfCon (UfLitCon lit) args
-  = ASSERT( null args)
-    tcUfLit lit		`thenTc` \ lit ->
-    returnTc (Con (Literal lit) [])
-
--- The dreaded lit-lits are also similar, except here the type
--- is read in explicitly rather than being implicit
-tcUfCon (UfLitLitCon lit ty) args
-  = ASSERT( null args )
-    tcHsType ty		`thenTc` \ ty' ->
-    returnTc (Con (Literal (MachLitLit lit ty')) [])
-
--- Primops are reverse-engineered
--- into applications of their Ids.  In this way, any
--- RULES that apply to the Id will work when this thing is unfolded.
--- It's a bit of a hack, but it works nicely
--- Can't do it for datacons, because the data con Id doesn't necessarily
--- have the same type as the data con (existentials)
-
-tcUfCon (UfPrimOp name)  args = tcVar name		`thenTc` \ op_id ->
-				returnTc (mkApps (Var op_id) args)
-
-tcUfCon (UfDataCon name) args
-  = tcVar name		`thenTc` \ con_id ->
-    case isDataConId_maybe con_id of
-	Just con -> returnTc (mkConApp con args)
-	Nothing  -> failWithTc (badCon name)
-
-tcUfCon (UfCCallOp str is_dyn casm gc) args
-  | is_dyn    = tcGetUnique `thenNF_Tc` \ u ->
-	        returnTc (Con (PrimOp (CCallOp (Right u) casm gc cCallConv)) args)
-  | otherwise = returnTc (Con (PrimOp (CCallOp (Left str) casm gc cCallConv)) args)
-
-----------------------------------
-tcUfLit (NoRepRational lit _)
-  =	-- rationalTy isn't built in so, we have to construct it
-	-- (the "ty" part of the incoming literal is simply bottom)
-    tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
-    let
-	rational_ty  = mkSynTy rational_tycon []
-    in
-    returnTc (NoRepRational lit rational_ty)
-
--- Similarly for integers and strings, except that they are wired in
-tcUfLit (NoRepInteger lit _) = returnTc (NoRepInteger lit integerTy)
-tcUfLit (NoRepStr lit _)     = returnTc (NoRepStr lit stringTy)
-tcUfLit other_lit	     = returnTc other_lit
 \end{code}
 
 \begin{code}
@@ -359,24 +318,24 @@ tcCoreAlt scrut_ty (UfDefault, names, rhs)
     tcCoreExpr rhs		`thenTc` \ rhs' ->
     returnTc (DEFAULT, [], rhs')
   
-tcCoreAlt scrut_ty (UfLitCon lit, names, rhs)
+tcCoreAlt scrut_ty (UfLitAlt lit, names, rhs)
   = ASSERT( null names )
     tcCoreExpr rhs		`thenTc` \ rhs' ->
-    returnTc (Literal lit, [], rhs')
+    returnTc (LitAlt lit, [], rhs')
 
-tcCoreAlt scrut_ty (UfLitLitCon str ty, names, rhs)
+tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
   = ASSERT( null names )
     tcCoreExpr rhs		`thenTc` \ rhs' ->
     tcHsType ty			`thenTc` \ ty' ->
-    returnTc (Literal (MachLitLit str ty'), [], rhs')
+    returnTc (LitAlt (MachLitLit str ty'), [], rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcCoreAlt scrut_ty (UfDataCon con_name, names, rhs)
+tcCoreAlt scrut_ty (UfDataAlt con_name, names, rhs)
   = tcVar con_name		`thenTc` \ con_id ->
     let
-	con			= case isDataConId_maybe con_id of
+	con			= case isDataConWrapId_maybe con_id of
 					Just con -> con
 					Nothing  -> pprPanic "tcCoreAlt" (ppr con_id)
 
@@ -401,7 +360,7 @@ tcCoreAlt scrut_ty (UfDataCon con_name, names, rhs)
     tcExtendTyVarEnv ex_tyvars'			$
     tcExtendGlobalValEnv arg_ids		$
     tcCoreExpr rhs					`thenTc` \ rhs' ->
-    returnTc (DataCon con, ex_tyvars' ++ arg_ids, rhs')
+    returnTc (DataAlt con, ex_tyvars' ++ arg_ids, rhs')
 \end{code}
 
 \begin{code}

@@ -38,10 +38,10 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
-import Const		( Literal(..), Con(..) )
+import Literal		( Literal )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, 
 			  dataConStrictMarks, dataConId, splitProductType_maybe
@@ -59,7 +59,7 @@ import TysPrim		( intPrimTy,
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon,
 			  stringTy,
-			  unitDataCon, unitTy,
+			  unitDataConId, unitTy,
                           charTy, charDataCon, 
                           intTy, intDataCon,
 			  floatTy, floatDataCon, 
@@ -271,7 +271,7 @@ mkCoPrimCaseMatchResult var match_alts
 	returnDs (Case (Var var) var (alts ++ [(DEFAULT, [], fail)]))
 
     mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
-					       returnDs (Literal lit, [], body)
+					       returnDs (LitAlt lit, [], body)
 
 
 mkCoAlgCaseMatchResult :: Id					-- Scrutinee
@@ -315,7 +315,7 @@ mkCoAlgCaseMatchResult var match_alts
 	= body_fn fail		`thenDs` \ body ->
 	  rebuildConArgs con args (dataConStrictMarks con) body 
 				`thenDs` \ (body', real_args) ->
-	  returnDs (DataCon con, real_args, body')
+	  returnDs (DataAlt con, real_args, body')
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -349,7 +349,7 @@ rebuildConArgs con (arg:args) (str:stricts) body
 		    ASSERT( pack_con == pack_con1 )
 		    newSysLocalsDs con_arg_tys 		`thenDs` \ unpacked_args ->
 		    returnDs (
-			 mkDsLet (NonRec arg (Con (DataCon pack_con) 
+			 mkDsLet (NonRec arg (mkConApp pack_con 
 				   	          (map Type tycon_args ++
 				        	   map Var  unpacked_args))) body', 
 			 unpacked_args ++ real_args
@@ -411,7 +411,7 @@ mkSelectorBinds (VarPat v) val_expr
 
 mkSelectorBinds pat val_expr
   | length binders == 1 || is_simple_pat pat
-  = newSysLocalDs (coreExprType val_expr)	`thenDs` \ val_var ->
+  = newSysLocalDs (exprType val_expr)	`thenDs` \ val_var ->
 
 	-- For the error message we don't use mkErrorAppDs to avoid
 	-- duplicating the string literal each time
@@ -441,7 +441,7 @@ mkSelectorBinds pat val_expr
   where
     binders	= collectTypedPatBinders pat
     local_tuple = mkTupleExpr binders
-    tuple_ty    = coreExprType local_tuple
+    tuple_ty    = exprType local_tuple
 
     mk_bind scrut_var msg_var bndr_var
     -- (mk_bind sv bv) generates
@@ -473,7 +473,7 @@ throw out any usage annotation on the outside of an Id.
 \begin{code}
 mkTupleExpr :: [Id] -> CoreExpr
 
-mkTupleExpr []	 = mkConApp unitDataCon []
+mkTupleExpr []	 = Var unitDataConId
 mkTupleExpr [id] = Var id
 mkTupleExpr ids	 = mkConApp (tupleCon (length ids))
 			    (map (Type . unUsgTy . idType) ids ++ [ Var i | i <- ids ])
@@ -502,7 +502,7 @@ mkTupleSelector [var] should_be_the_same_var scrut_var scrut
 
 mkTupleSelector vars the_var scrut_var scrut
   = ASSERT( not (null vars) )
-    Case scrut scrut_var [(DataCon (tupleCon (length vars)), vars, Var the_var)]
+    Case scrut scrut_var [(DataAlt (tupleCon (length vars)), vars, Var the_var)]
 \end{code}
 
 
@@ -589,13 +589,13 @@ mkFailurePair expr
   = newFailLocalDs (unitTy `mkFunTy` ty)	`thenDs` \ fail_fun_var ->
     newSysLocalDs unitTy			`thenDs` \ fail_fun_arg ->
     returnDs (NonRec fail_fun_var (Lam fail_fun_arg expr),
-	      App (Var fail_fun_var) (mkConApp unitDataCon []))
+	      App (Var fail_fun_var) (Var unitDataConId))
 
   | otherwise
   = newFailLocalDs ty 		`thenDs` \ fail_var ->
     returnDs (NonRec fail_var expr, Var fail_var)
   where
-    ty = coreExprType expr
+    ty = exprType expr
 \end{code}
 
 

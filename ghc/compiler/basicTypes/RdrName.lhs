@@ -12,7 +12,7 @@ module RdrName (
 	mkRdrUnqual, mkRdrQual,
 	mkSrcUnqual, mkSrcQual, 
 	mkSysUnqual, mkSysQual,
-	mkPreludeQual, qualifyRdrName,
+	mkPreludeQual, qualifyRdrName, mkRdrNameWkr,
 	dummyRdrVarName, dummyRdrTcName,
 
 	-- Destruction
@@ -26,7 +26,7 @@ import OccName	( NameSpace, tcName,
 		  OccName,
 		  mkSysOccFS,
 		  mkSrcOccFS, mkSrcVarOcc,
-		  isDataOcc, isTvOcc
+		  isDataOcc, isTvOcc, mkWorkerOcc
 		)
 import Module   ( ModuleName, pprModuleName,
 		  mkSysModuleFS, mkSrcModuleFS
@@ -97,6 +97,9 @@ mkPreludeQual sp mod n = RdrName (Qual mod) (mkSrcOccFS sp n)
 qualifyRdrName :: ModuleName -> RdrName -> RdrName
 	-- Sets the module name of a RdrName, even if it has one already
 qualifyRdrName mod (RdrName _ occ) = RdrName (Qual mod) occ
+
+mkRdrNameWkr :: RdrName -> RdrName 	-- Worker-ify it
+mkRdrNameWkr (RdrName qual occ) = RdrName qual (mkWorkerOcc occ)
 \end{code}
 
 \begin{code}

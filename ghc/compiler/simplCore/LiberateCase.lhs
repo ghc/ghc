@@ -11,7 +11,7 @@ module LiberateCase ( liberateCase ) where
 import CmdLineOpts	( opt_D_verbose_core2core, opt_LiberateCaseThreshold )
 import CoreLint		( beginPass, endPass )
 import CoreSyn
-import CoreUnfold	( calcUnfoldingGuidance, couldBeSmallEnoughToInline )
+import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
 import VarEnv
 import Maybes
@@ -208,8 +208,7 @@ libCaseBind env (Rec pairs)
 	--
 	-- [May 98: all this is now handled by SimplCore.tidyCore]
 
-    rhs_small_enough rhs
-      = couldBeSmallEnoughToInline (calcUnfoldingGuidance lIBERATE_BOMB_SIZE rhs)
+    rhs_small_enough rhs = couldBeSmallEnoughToInline lIBERATE_BOMB_SIZE rhs
 
     lIBERATE_BOMB_SIZE = bombOutSize env
 \end{code}
@@ -224,9 +223,9 @@ libCase :: LibCaseEnv
 	-> CoreExpr
 
 libCase env (Var v)		= libCaseId env v
+libCase env (Lit lit)		= Lit lit
 libCase env (Type ty)		= Type ty
 libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
-libCase env (Con con args)      = Con con (map (libCase env) args)
 libCase env (Note note body)    = Note note (libCase env body)
 
 libCase env (Lam binder body)

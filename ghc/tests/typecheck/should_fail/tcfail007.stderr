@@ -1,7 +1,8 @@
 
 tcfail007.hs:3:
     No instance for `Num Bool'
-    arising from use of `+' at tcfail007.hs:3
+    arising from the literal `1' at tcfail007.hs:3
+    In the second argument of `+', namely `1'
     In the right-hand side of an equation for `n': x + 1
 
 Compilation had errors

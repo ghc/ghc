@@ -18,7 +18,6 @@ import TcHsSyn		( TypecheckedPat, TypecheckedMatch )
 import DsHsSyn		( outPatType )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
-import CoreUtils	( coreExprType )
 import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
@@ -136,6 +135,12 @@ pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
 	, id
 	)
 
+    pp_match RecUpdMatch pats
+      = (hang (ptext SLIT("in a record-update construct"))
+	   4 (ppr_pats pats)
+	, id
+	)
+
     pp_match PatBindMatch pats
       = ( hang (ptext SLIT("in a pattern binding"))
 	    4 (ppr_pats pats)
@@ -172,6 +177,7 @@ separator (FunMatch _)    = SLIT("=")
 separator (CaseMatch)     = SLIT("->") 
 separator (LambdaMatch)   = SLIT("->") 
 separator (PatBindMatch)  = panic "When is this used?"
+separator (RecUpdMatch)   = panic "When is this used?"
 separator (DoBindMatch)   = SLIT("<-")  
 separator (ListCompMatch) = SLIT("<-")  
 separator (LetMatch)      = SLIT("=")
@@ -185,7 +191,7 @@ ppr_incomplete_pats kind (pats,constraints) =
 	                      sep (map ppr_constraint constraints)]
     
 
-ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`not_elem`"), ppr pats]
+ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`notElem`"), ppr pats]
 
 ppr_eqn prefixF kind (EqnInfo _ _ pats _) = prefixF (ppr_shadow_pats kind pats)
 \end{code}

@@ -52,6 +52,8 @@ import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
 import Unique		( Uniquable(..) )
 import UniqFM		( lookupUFM )
+import ErrUtils		( Message )
+import CStrings		( isCLabelString )
 import Maybes		( maybeToBool, catMaybes )
 import Util
 \end{code}
@@ -163,7 +165,7 @@ rnDecl (TyClD (TySynonym name tyvars ty src_loc))
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 
 rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
-               tname dname snames src_loc))
+               tname dname dwname snames src_loc))
   = pushSrcLocRn src_loc $
 
     lookupBndrRn cname					`thenRn` \ cname' ->
@@ -177,6 +179,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	-- I can't work up the energy to do it more beautifully
     mkImportedGlobalFromRdrName tname			`thenRn` \ tname' ->
     mkImportedGlobalFromRdrName dname			`thenRn` \ dname' ->
+    mkImportedGlobalFromRdrName dwname			`thenRn` \ dwname' ->
     mapRn mkImportedGlobalFromRdrName snames		`thenRn` \ snames' ->
 
 	-- Tyvars scope over bindings and context
@@ -216,7 +219,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 
     ASSERT(isNoClassPragmas pragmas)
     returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (fixs' ++ sigs') mbinds'
-			       NoClassPragmas tname' dname' snames' src_loc),
+			       NoClassPragmas tname' dname' dwname' snames' src_loc),
 	      sig_fvs	`plusFV`
 	      fix_fvs	`plusFV`
 	      cxt_fvs	`plusFV`
@@ -362,6 +365,10 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
   = pushSrcLocRn src_loc $
     lookupOccRn name		        `thenRn` \ name' ->
     let 
+	ok_ext_nm Dynamic 		 = True
+	ok_ext_nm (ExtName nm (Just mb)) = isCLabelString nm && isCLabelString mb
+	ok_ext_nm (ExtName nm Nothing)   = isCLabelString nm
+
 	fvs1 = case imp_exp of
 		FoImport _ | not isDyn	-> emptyFVs
 		FoLabel    		-> emptyFVs
@@ -371,12 +378,13 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
 			   | otherwise  -> mkNameSet [name']
 		_ -> emptyFVs
     in
-    rnHsSigType fo_decl_msg ty		        `thenRn` \ (ty', fvs2) ->
+    checkRn (ok_ext_nm ext_nm) (badExtName ext_nm)	`thenRn_`
+    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs2) ->
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
 	      fvs1 `plusFV` fvs2)
  where
   fo_decl_msg = ptext SLIT("a foreign declaration")
-  isDyn	      = isDynamic ext_nm
+  isDyn	      = isDynamicExtName ext_nm
 \end{code}
 
 %*********************************************************
@@ -447,17 +455,21 @@ rnDerivs (Just clss)
 
 \begin{code}
 conDeclName :: RdrNameConDecl -> (RdrName, SrcLoc)
-conDeclName (ConDecl n _ _ _ l) = (n,l)
+conDeclName (ConDecl n _ _ _ _ l) = (n,l)
 
 rnConDecl :: RdrNameConDecl -> RnMS (RenamedConDecl, FreeVars)
-rnConDecl (ConDecl name tvs cxt details locn)
+rnConDecl (ConDecl name wkr tvs cxt details locn)
   = pushSrcLocRn locn $
     checkConName name			`thenRn_` 
     lookupBndrRn name			`thenRn` \ new_name ->
+
+    mkImportedGlobalFromRdrName wkr	`thenRn` \ new_wkr ->
+	-- See comments with ClassDecl
+
     bindTyVarsFVRn doc tvs 		$ \ new_tyvars ->
     rnContext doc cxt			`thenRn` \ (new_context, cxt_fvs) ->
     rnConDetails doc locn details	`thenRn` \ (new_details, det_fvs) -> 
-    returnRn (ConDecl new_name new_tyvars new_context new_details locn,
+    returnRn (ConDecl new_name new_wkr new_tyvars new_context new_details locn,
 	      cxt_fvs `plusFV` det_fvs)
   where
     doc = text "the definition of data constructor" <+> quotes (ppr name)
@@ -738,8 +750,8 @@ rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ (expr', fvs) ->
 				  returnRn (HsUnfold inline expr', fvs)
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity, emptyFVs)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update, emptyFVs)
-rnIdInfo (HsNoCafRefs)		= returnRn (HsNoCafRefs, emptyFVs)
-rnIdInfo (HsCprInfo cpr_info)	= returnRn (HsCprInfo cpr_info, emptyFVs)
+rnIdInfo HsNoCafRefs		= returnRn (HsNoCafRefs, emptyFVs)
+rnIdInfo HsCprInfo		= returnRn (HsCprInfo, emptyFVs)
 rnIdInfo (HsSpecialise rule_body) = rnRuleBody rule_body
 				    `thenRn` \ (rule_body', fvs) ->
 				    returnRn (HsSpecialise rule_body', fvs)
@@ -762,10 +774,16 @@ rnCoreExpr (UfVar v)
   = lookupOccRn v 	`thenRn` \ v' ->
     returnRn (UfVar v', unitFV v')
 
-rnCoreExpr (UfCon con args) 
-  = rnUfCon con			`thenRn` \ (con', fvs1) ->
-    mapFvRn rnCoreExpr args	`thenRn` \ (args', fvs2) ->
-    returnRn (UfCon con' args', fvs1 `plusFV` fvs2)
+rnCoreExpr (UfLit l)
+  = returnRn (UfLit l, emptyFVs)
+
+rnCoreExpr (UfLitLit l ty)
+  = rnHsType (text "litlit") ty	`thenRn` \ (ty', fvs) ->
+    returnRn (UfLitLit l ty', fvs)
+
+rnCoreExpr (UfCCall cc ty)
+  = rnHsPolyType (text "ccall") ty	`thenRn` \ (ty', fvs) ->
+    returnRn (UfCCall cc ty', fvs)
 
 rnCoreExpr (UfTuple con args) 
   = lookupOccRn con		`thenRn` \ con' ->
@@ -853,23 +871,16 @@ rnNote UfInlineMe   = returnRn (UfInlineMe, emptyFVs)
 rnUfCon UfDefault
   = returnRn (UfDefault, emptyFVs)
 
-rnUfCon (UfDataCon con)
+rnUfCon (UfDataAlt con)
   = lookupOccRn con		`thenRn` \ con' ->
-    returnRn (UfDataCon con', unitFV con')
+    returnRn (UfDataAlt con', unitFV con')
 
-rnUfCon (UfLitCon lit)
-  = returnRn (UfLitCon lit, emptyFVs)
+rnUfCon (UfLitAlt lit)
+  = returnRn (UfLitAlt lit, emptyFVs)
 
-rnUfCon (UfLitLitCon lit ty)
+rnUfCon (UfLitLitAlt lit ty)
   = rnHsPolyType (text "litlit") ty		`thenRn` \ (ty', fvs) ->
-    returnRn (UfLitLitCon lit ty', fvs)
-
-rnUfCon (UfPrimOp op)
-  = lookupOccRn op		`thenRn` \ op' ->
-    returnRn (UfPrimOp op', emptyFVs)
-
-rnUfCon (UfCCallOp str is_dyn casm gc)
-  = returnRn (UfCCallOp str is_dyn casm gc, emptyFVs)
+    returnRn (UfLitLitAlt lit ty', fvs)
 \end{code}
 
 %*********************************************************
@@ -972,4 +983,8 @@ badRuleVar name var
   = sep [ptext SLIT("Rule") <+> ptext name <> colon,
 	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
 		ptext SLIT("does not appear on left hand side")]
+
+badExtName :: ExtName -> Message
+badExtName ext_nm
+  = sep [quotes (ppr ext_nm) <+> ptext SLIT("is not a valid C identifier")]
 \end{code}

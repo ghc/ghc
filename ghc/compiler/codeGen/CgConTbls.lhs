@@ -14,14 +14,13 @@ import CgMonad
 import StgSyn		( SRT(..) )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
-import CLabel		( mkConEntryLabel, mkStaticClosureLabel	)
+import CLabel		( mkConEntryLabel )
 import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			  mkConLFInfo, ClosureInfo
 			)
 import CostCentre	( dontCareCCS )
 import FiniteMap	( fmToList, FiniteMap )
-import DataCon		( DataCon, dataConName, dataConAllRawArgTys )
-import Const		( Con(..) )
+import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
 import Name		( getOccString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
@@ -58,12 +57,9 @@ Static occurrences of the constructor
 macro: @STATIC_INFO_TABLE@.
 \end{description}
 
-For zero-arity constructors, \tr{con}, we also generate a static closure:
 
-\begin{description}
-\item[@_closure@:]
-A single static copy of the (zero-arity) constructor itself.
-\end{description}
+For zero-arity constructors, \tr{con}, we NO LONGER generate a static closure;
+it's place is taken by the top level defn of the constructor.
 
 For charlike and intlike closures there is a fixed array of static
 closures predeclared.
@@ -115,8 +111,7 @@ genConInfo comp_info tycon data_con
   = mkAbstractCs [
 		  CSplitMarker,
 		  closure_code,
-    	    	  static_code,
-		  closure_maybe]
+    	    	  static_code]
 	-- Order of things is to reduce forward references
   where
     (closure_info, body_code) = mkConCodeAndInfo data_con
@@ -144,26 +139,15 @@ genConInfo comp_info tycon data_con
 
     cost_centre  = mkCCostCentreStack dontCareCCS -- not worried about static data costs
 
-    -- For zero-arity data constructors, or, more accurately,
-    -- 	 those which only have VoidRep args (or none):
-    -- 	We make the closure too (not just info tbl), so that we can share
-    --  one copy throughout.
-    closure_maybe = if not zero_arity_con then
-		    	AbsCNop
-		    else
-		    	CStaticClosure  closure_label		-- Label for closure
-					static_ci		-- Info table
-					cost_centre
-					[{-No args!  A slight lie for constrs 
-					   with VoidRep args-}]
-
     zero_size arg_ty = getPrimRepSize (typePrimRep arg_ty) == 0
 
-    zero_arity_con   = all zero_size arg_tys
+    zero_arity_con   = isNullaryDataCon data_con
+	-- We used to check that all the arg-sizes were zero, but we don't
+	-- really have any constructors with only zero-size args, and it's
+	-- just one more thing to go wrong.
 
-    arg_tys	    = dataConAllRawArgTys  data_con
+    arg_tys	    = dataConRepArgTys  data_con
     entry_label     = mkConEntryLabel      con_name
-    closure_label   = mkStaticClosureLabel con_name
     con_name	    = dataConName data_con
 \end{code}
 
@@ -173,7 +157,7 @@ mkConCodeAndInfo :: DataCon		-- Data constructor
 
 mkConCodeAndInfo con
   = let
-	arg_tys = dataConAllRawArgTys con
+	arg_tys = dataConRepArgTys con
 
 	(closure_info, arg_things)
 		= layOutDynCon con typePrimRep arg_tys

@@ -24,7 +24,7 @@ module TysWiredIn (
 	doubleTy,
 	isDoubleTy,
 	doubleTyCon,
-	falseDataCon,
+	falseDataCon, falseDataConId,
 	floatDataCon,
 	floatTy,
 	isFloatTy,
@@ -34,7 +34,6 @@ module TysWiredIn (
 	intTy,
 	intTyCon,
 	isIntTy,
-	inIntRange,
 
 	integerTy,
 	integerTyCon,
@@ -49,7 +48,7 @@ module TysWiredIn (
 
 	-- tuples
 	mkTupleTy,
-	tupleTyCon, tupleCon, unitTyCon, unitDataCon, pairTyCon, pairDataCon,
+	tupleTyCon, tupleCon, unitTyCon, unitDataConId, pairTyCon, 
 
 	-- unboxed tuples
 	mkUnboxedTupleTy,
@@ -58,7 +57,7 @@ module TysWiredIn (
 
 	stablePtrTyCon,
 	stringTy,
-	trueDataCon,
+	trueDataCon, trueDataConId,
 	unitTy,
 	voidTy,
 	wordDataCon,
@@ -75,7 +74,7 @@ module TysWiredIn (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId( mkDataConId )
+import {-# SOURCE #-} MkId( mkDataConId, mkDataConWrapId )
 
 -- friends:
 import PrelMods
@@ -84,8 +83,8 @@ import TysPrim
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module, mkPrelModule )
-import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, dataName )
-import DataCon		( DataCon, StrictnessMark(..),  mkDataCon )
+import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, mkWorkerOcc, dataName )
+import DataCon		( DataCon, StrictnessMark(..),  mkDataCon, dataConId )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, ArgVrcs, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
 import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
@@ -137,15 +136,25 @@ pcSynTyCon key mod str kind arity tyvars expansion argvrcs  -- this fun never us
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
 	  -> [TyVar] -> ClassContext -> [TauType] -> TyCon -> DataCon
-pcDataCon key mod str tyvars context arg_tys tycon
+-- The unique is the first of two free uniques;
+-- the first is used for the datacon itself and the worker; 
+-- the second is used for the wrapper.
+pcDataCon wrap_key mod str tyvars context arg_tys tycon
   = data_con
   where
-    data_con = mkDataCon name 
+    data_con = mkDataCon wrap_name 
 		[ NotMarkedStrict | a <- arg_tys ]
 		[ {- no labelled fields -} ]
-		tyvars context [] [] arg_tys tycon id
-    name = mkWiredInIdName key mod (mkSrcOccFS dataName str) id
-    id   = mkDataConId data_con
+		tyvars context [] [] arg_tys tycon work_id wrap_id
+
+    work_occ  = mkWorkerOcc wrap_occ
+    work_key  = incrUnique wrap_key
+    work_name = mkWiredInIdName work_key mod work_occ work_id
+    work_id   = mkDataConId work_name data_con
+    
+    wrap_occ  = mkSrcOccFS dataName str
+    wrap_name = mkWiredInIdName wrap_key mod wrap_occ wrap_id
+    wrap_id   = mkDataConWrapId data_con
 \end{code}
 
 %************************************************************************
@@ -193,8 +202,7 @@ mk_tuple arity = (tycon, tuple_con)
 unitTyCon = tupleTyCon 0
 pairTyCon = tupleTyCon 2
 
-unitDataCon = tupleCon 0
-pairDataCon = tupleCon 2
+unitDataConId = dataConId (tupleCon 0)
 \end{code}
 
 %************************************************************************
@@ -282,14 +290,6 @@ isIntTy ty
   = case (splitAlgTyConApp_maybe ty) of
 	Just (tycon, [], _) -> getUnique tycon == intTyConKey
 	_		    -> False
-
-inIntRange :: Integer -> Bool	-- Tells if an integer lies in the legal range of Ints
-inIntRange i = (min_int <= i) && (i <= max_int)
-
-max_int, min_int :: Integer
-max_int = toInteger maxInt  
-min_int = toInteger minInt
-
 \end{code}
 
 \begin{code}
@@ -526,6 +526,9 @@ boolTyCon = pcTyCon EnumType NonRecursive boolTyConKey
 
 falseDataCon = pcDataCon falseDataConKey pREL_BASE SLIT("False") [] [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConKey	 pREL_BASE SLIT("True")  [] [] [] boolTyCon
+
+falseDataConId = dataConId falseDataCon
+trueDataConId  = dataConId trueDataCon
 \end{code}
 
 %************************************************************************

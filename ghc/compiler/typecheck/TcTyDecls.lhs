@@ -7,7 +7,7 @@
 module TcTyDecls (
 	tcTyDecl, kcTyDecl, 
 	tcConDecl,
-	mkDataBinds
+	mkImplicitDataBinds
     ) where
 
 #include "HsVersions.h"
@@ -17,7 +17,7 @@ import HsSyn		( MonoBinds(..),
 			  andMonoBindList
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl )
-import TcHsSyn		( TcMonoBinds )
+import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope, 
@@ -31,11 +31,11 @@ import TcUnify		( unifyKind )
 
 import Class		( Class )
 import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
-			  dataConFieldLabels, dataConId,
+			  dataConFieldLabels, dataConId, dataConWrapId,
 			  markedStrict, notMarkedStrict, markedUnboxed
 			)
-import MkId		( mkDataConId, mkRecordSelId, mkNewTySelId )
-import Id		( getIdUnfolding )
+import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
+import Id		( idUnfolding )
 import CoreUnfold	( unfoldingTemplate )
 import FieldLabel
 import Var		( Id, TyVar )
@@ -78,7 +78,7 @@ kcTyDecl (TyData _ context tycon_name tyvar_names con_decls _ _ src_loc)
     mapTc kcConDecl con_decls			`thenTc_`
     returnTc ()
 
-kcConDecl (ConDecl _ ex_tvs ex_ctxt details loc)
+kcConDecl (ConDecl _ _ ex_tvs ex_ctxt details loc)
   = tcAddSrcLoc loc			(
     tcExtendTyVarScope ex_tvs		( \ tyvars -> 
     tcContext ex_ctxt			`thenTc_`
@@ -167,14 +167,16 @@ tcTyDecl is_rec rec_vrcs (TyData data_or_new context tycon_name tyvar_names con_
 \begin{code}
 tcConDecl :: TyCon -> [TyVar] -> [(Class,[Type])] -> RenamedConDecl -> TcM s DataCon
 
-tcConDecl tycon tyvars ctxt (ConDecl name ex_tvs ex_ctxt details src_loc)
+tcConDecl tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_ctxt details src_loc)
   = tcAddSrcLoc src_loc			$
     tcExtendTyVarScope ex_tvs		$ \ ex_tyvars -> 
     tcContext ex_ctxt			`thenTc` \ ex_theta ->
-    let ex_ctxt' = classesOfPreds ex_theta in
-    tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_ctxt' details
+    let 
+	ex_ctxt' = classesOfPreds ex_theta
+    in
+    tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_ctxt' details
 
-tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
+tc_con_decl_help tycon tyvars ctxt name wkr_name ex_tyvars ex_theta details
   = case details of
 	VanillaCon btys    -> tc_datacon btys
 	InfixCon bty1 bty2 -> tc_datacon [bty1,bty2]
@@ -231,8 +233,9 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
 		      	   tyvars (thinContext arg_tys ctxt)
 			   ex_tyvars' ex_theta'
 		      	   arg_tys
-		      	   tycon data_con_id
-	   data_con_id = mkDataConId data_con
+		      	   tycon data_con_id data_con_wrap_id
+	   data_con_id      = mkDataConId wkr_name data_con
+	   data_con_wrap_id = mkDataConWrapId data_con
 	in
 	returnNF_Tc data_con
 
@@ -263,31 +266,32 @@ get_pty (Unpacked ty) = ty
 %************************************************************************
 
 \begin{code}
-mkDataBinds :: [TyCon] -> TcM s ([Id], TcMonoBinds)
-mkDataBinds [] = returnTc ([], EmptyMonoBinds)
-mkDataBinds (tycon : tycons) 
-  | isSynTyCon tycon = mkDataBinds tycons
-  | otherwise	     = mkDataBinds_one tycon	`thenTc` \ (ids1, b1) ->
-		       mkDataBinds tycons	`thenTc` \ (ids2, b2) ->
+mkImplicitDataBinds :: [TyCon] -> TcM s ([Id], TcMonoBinds)
+mkImplicitDataBinds [] = returnTc ([], EmptyMonoBinds)
+mkImplicitDataBinds (tycon : tycons) 
+  | isSynTyCon tycon = mkImplicitDataBinds tycons
+  | otherwise	     = mkImplicitDataBinds_one tycon	`thenTc` \ (ids1, b1) ->
+		       mkImplicitDataBinds tycons	`thenTc` \ (ids2, b2) ->
 		       returnTc (ids1++ids2, b1 `AndMonoBinds` b2)
 
-mkDataBinds_one tycon
+mkImplicitDataBinds_one tycon
   = mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
     let
-	data_ids = map dataConId data_cons ++ sel_ids
+	unf_ids = sel_ids ++ data_con_wrapper_ids
+	all_ids = map dataConId data_cons ++ unf_ids 
 
 	-- For the locally-defined things
-	-- we need to turn the unfoldings inside the Ids into bindings,
-	binds | isLocallyDefined tycon
-	      = [ CoreMonoBind data_id (unfoldingTemplate (getIdUnfolding data_id))
-		| data_id <- data_ids, isLocallyDefined data_id
-		]
-	      | otherwise
-	      = []
+	-- we need to turn the unfoldings inside the selector Ids into bindings,
+	-- and build bindigns for the constructor wrappers
+	binds | isLocallyDefined tycon = idsToMonoBinds unf_ids
+	      | otherwise	       = EmptyMonoBinds
     in	
-    returnTc (data_ids, andMonoBindList binds)
+    returnTc (all_ids, binds)
   where
     data_cons = tyConDataCons tycon
+
+    data_con_wrapper_ids = map dataConWrapId data_cons
+
     fields = [ (con, field) | con   <- data_cons,
 			      field <- dataConFieldLabels con
 	     ]
@@ -307,25 +311,11 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
 	-- data type use the same type variables
   = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
-    returnTc selector_id
+    returnTc (mkRecordSelId tycon first_field_label)
   where
     field_ty   = fieldLabelType first_field_label
     field_name = fieldLabelName first_field_label
     other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
-    (tyvars, _, _, _, _, _) = dataConSig first_con
-    data_ty  = mkTyConApp tycon (mkTyVarTys tyvars)
-    -- tyvars of first_con may be free in field_ty
-    -- Now build the selector
-
-    selector_ty :: Type
-    selector_ty  = mkForAllTys tyvars $	
-		   mkFunTy data_ty $
-		   field_ty
-      
-    selector_id :: Id
-    selector_id 
-      | isNewTyCon tycon    = mkNewTySelId  first_field_label selector_ty
-      | otherwise	    = mkRecordSelId first_field_label selector_ty
 \end{code}
 
 

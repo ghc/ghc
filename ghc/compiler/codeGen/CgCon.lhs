@@ -37,7 +37,7 @@ import Constants	( mAX_INTLIKE, mIN_INTLIKE, mIN_UPD_SIZE )
 import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
 			  mkUnboxedTupleReturnCode )
-import CLabel		( mkClosureLabel, mkStaticClosureLabel )
+import CLabel		( mkClosureLabel )
 import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 			  layOutDynCon, layOutDynClosure,
 			  layOutStaticClosure, closureSize
@@ -45,12 +45,12 @@ import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import DataCon		( DataCon, dataConName, dataConTag, dataConTyCon,
-			  isUnboxedTupleCon )
-import MkId		( mkDataConId )
+			  isUnboxedTupleCon, isNullaryDataCon, isDynDataCon, dataConId, dataConWrapId
+			)
 import Id		( Id, idName, idType, idPrimRep )
 import Name		( nameModule, isLocallyDefinedName )
 import Module		( isDynamicModule )
-import Const		( Con(..), Literal(..), isLitLitLit )
+import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import Unique		( Uniquable(..) )
@@ -68,10 +68,9 @@ import Panic		( assertPanic, trace )
 cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> DataCon		-- Id
 	    -> [StgArg]		-- Args
-	    -> Bool		-- All zero-size args (see buildDynCon)
 	    -> FCode (Id, CgIdInfo)
-cgTopRhsCon id con args all_zero_size_args
-  = ASSERT(not (any_litlit_args || dynamic_con_or_args))
+cgTopRhsCon id con args
+  = ASSERT(not dynamic_con_or_args)	-- checks for litlit args too
     (
 	-- LAY IT OUT
     getArgAmodes args		`thenFC` \ amodes ->
@@ -101,26 +100,7 @@ cgTopRhsCon id con args all_zero_size_args
     top_ccc = mkCCostCentreStack dontCareCCS -- because it's static data
 
     -- stuff needed by the assert pred only.
-    any_litlit_args     = any isLitLitArg args
-    dynamic_con_or_args = dynamic_con || any (isDynamic) args
-
-    dynamic_con = isDynName (dataConName con)
-
-    isDynName nm = 
-      not (isLocallyDefinedName nm) && 
-      isDynamicModule (nameModule nm)
-
-     {-
-      Do any of the arguments refer to something in a DLL?
-     -}
-    isDynamic (StgVarArg v) = isDynName (idName v)
-    isDynamic (StgConArg c) =
-      case c of
-        DataCon dc -> isDynName (dataConName dc)
-	Literal	l  -> isLitLitLit l  -- all bets are off if it is.
-	_	   -> False
-
-
+    dynamic_con_or_args = isDynDataCon con || any isDynArg args
 \end{code}
 
 %************************************************************************
@@ -137,13 +117,17 @@ buildDynCon :: Id		-- Name of the thing to which this constr will
 				-- current CCS if currentOrSubsumedCCS
 	    -> DataCon		-- The data constructor
 	    -> [CAddrMode]	-- Its args
-	    -> Bool		-- True <=> all args (if any) are
-				-- of "zero size" (i.e., VoidRep);
-				-- The reason we don't just look at the
-				-- args is that we may be in a "knot", and
-				-- premature looking at the args will cause
-				-- the compiler to black-hole!
 	    -> FCode CgIdInfo	-- Return details about how to find it
+
+-- We used to pass a boolean indicating whether all the
+-- args were of size zero, so we could use a static
+-- construtor; but I concluded that it just isn't worth it.
+-- Now I/O uses unboxed tuples there just aren't any constructors
+-- with all size-zero args.
+--
+-- The reason for having a separate argument, rather than looking at
+-- the addr modes of the args is that we may be in a "knot", and
+-- premature looking at the args will cause the compiler to black-hole!
 \end{code}
 
 First we deal with the case of zero-arity constructors.  Now, they
@@ -155,9 +139,9 @@ which have exclusively size-zero (VoidRep) args, we generate no code
 at all.
 
 \begin{code}
-buildDynCon binder cc con args all_zero_size_args@True
+buildDynCon binder cc con []
   = returnFC (stableAmodeIdInfo binder
-				(CLbl (mkStaticClosureLabel (dataConName con)) PtrRep)
+				(CLbl (mkClosureLabel (idName (dataConWrapId con))) PtrRep)
     				(mkConLFInfo con))
 \end{code}
 
@@ -177,7 +161,7 @@ which is guaranteed in range.
 Because of this, we use can safely return an addressing mode.
 
 \begin{code}
-buildDynCon binder cc con [arg_amode] all_zero_size_args@False
+buildDynCon binder cc con [arg_amode]
 
   | maybeCharLikeCon con
   = absC (CAssign temp_amode (CCharLike arg_amode))	`thenC`
@@ -188,8 +172,8 @@ buildDynCon binder cc con [arg_amode] all_zero_size_args@False
   where
     (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
 
-    in_range_int_lit (CLit (MachInt val _)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
-    in_range_int_lit other_amode	    = False
+    in_range_int_lit (CLit (MachInt val)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
+    in_range_int_lit other_amode	  = False
 
     tycon = dataConTyCon con
 \end{code}
@@ -197,7 +181,7 @@ buildDynCon binder cc con [arg_amode] all_zero_size_args@False
 Now the general case.
 
 \begin{code}
-buildDynCon binder ccs con args all_zero_size_args@False
+buildDynCon binder ccs con args
   = allocDynClosure closure_info use_cc blame_cc amodes_w_offsets `thenFC` \ hp_off ->
     returnFC (heapIdInfo binder hp_off lf_info)
   where
@@ -283,9 +267,9 @@ bindUnboxedTupleComponents args
 Note: it's the responsibility of the @cgReturnDataCon@ caller to be
 sure the @amodes@ passed don't conflict with each other.
 \begin{code}
-cgReturnDataCon :: DataCon -> [CAddrMode] -> Bool -> Code
+cgReturnDataCon :: DataCon -> [CAddrMode] -> Code
 
-cgReturnDataCon con amodes all_zero_size_args
+cgReturnDataCon con amodes
   = getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_sp sequel) ->
 
     case sequel of
@@ -315,7 +299,7 @@ cgReturnDataCon con amodes all_zero_size_args
 	-- If the sequel is an update frame, we might be able to
 	-- do update in place...
       UpdateCode
-	|  not all_zero_size_args      -- no nullary constructors, please
+	|  not (isNullaryDataCon con)  -- no nullary constructors, please
 	&& not (maybeCharLikeCon con)  -- no chars please (these are all static)
 	&& not (any isFollowableRep (map getAmodeRep amodes))
 					-- no ptrs please (generational gc...)
@@ -394,17 +378,14 @@ cgReturnDataCon con amodes all_zero_size_args
 
 		-- This Id is also used to get a unique for a
 		-- temporary variable, if the closure is a CHARLIKE.
-		-- funilly enough, this makes the unique always come
+		-- funnily enough, this makes the unique always come
 		-- out as '54' :-)
-	  buildDynCon (mkDataConId con) currentCCS 
-		con amodes all_zero_size_args
-						`thenFC` \ idinfo ->
-	  idInfoToAmode PtrRep idinfo		`thenFC` \ amode ->
+	  buildDynCon (dataConId con) currentCCS con amodes	`thenFC` \ idinfo ->
+	  idInfoToAmode PtrRep idinfo				`thenFC` \ amode ->
 
 
 		-- RETURN
 	  profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
 	  -- could use doTailCall here.
 	  performReturn (move_to_reg amode node) return
-
 \end{code}

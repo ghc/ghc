@@ -17,7 +17,7 @@ import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType, mkInlineMe, mkSCC )
 import TcHsSyn		( TypecheckedMonoBinds )
 import DsMonad
 import DsGRHSs		( dsGuarded )
@@ -127,13 +127,13 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
 	core_binds = [Rec (addLocalInlines exports inlines core_prs)]
 
 	tup_expr      = mkTupleExpr locals
-	tup_ty	      = coreExprType tup_expr
+	tup_ty	      = exprType tup_expr
 	poly_tup_expr = mkLams all_tyvars $ mkLams dicts $
 		        mkDsLets core_binds tup_expr
 	locals        = [local | (_, _, local) <- exports]
 	local_tys     = map idType locals
     in
-    newSysLocalDs (coreExprType poly_tup_expr)		`thenDs` \ poly_tup_id ->
+    newSysLocalDs (exprType poly_tup_expr)		`thenDs` \ poly_tup_id ->
     let
 	dict_args = map Var dicts
 
@@ -165,7 +165,7 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
 
 \begin{code}
 mkInline :: Bool -> CoreExpr -> CoreExpr
-mkInline True  body = Note InlineMe body
+mkInline True  body = mkInlineMe body
 mkInline False body = body
 
 addLocalInlines :: [(a, Id, Id)] -> NameSet -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
@@ -206,16 +206,16 @@ addAutoScc :: AutoScc		-- if needs be, decorate toplevs?
 addAutoScc (TopLevelAddSccs auto_scc_fn) pair@(bndr, core_expr) 
  | do_auto_scc && worthSCC core_expr
      = getModuleDs `thenDs` \ mod ->
-       returnDs (bndr, Note (SCC (mkAutoCC top_bndr mod NotCafCC)) core_expr)
+       returnDs (bndr, mkSCC (mkAutoCC top_bndr mod NotCafCC) core_expr)
  where do_auto_scc = isJust maybe_auto_scc
        maybe_auto_scc = auto_scc_fn bndr
        (Just top_bndr) = maybe_auto_scc
+
 addAutoScc _ pair
      = returnDs pair
 
-worthSCC (Note (SCC _) _) = False
-worthSCC (Con _ _)        = False
-worthSCC core_expr        = True
+noUserSCC (Note (SCC _) _) = False
+worthSCC core_expr         = True
 \end{code}
 
 If profiling and dealing with a dict binding,

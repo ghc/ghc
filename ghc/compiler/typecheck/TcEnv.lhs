@@ -33,7 +33,7 @@ module TcEnv(
 #include "HsVersions.h"
 
 import HsTypes	( HsTyVar, getTyVarName )
-import Id	( mkUserLocal, isDataConId_maybe )
+import Id	( mkUserLocal, isDataConWrapId_maybe )
 import MkId 	( mkSpecPragmaId )
 import Var	( TyVar, Id, setVarName,
 		  idType, lazySetIdInfo, idInfo, tyVarKind, UVar,
@@ -89,7 +89,7 @@ type TcIdSet = IdSet
 tcLookupDataCon :: Name -> TcM s (DataCon, [TcType], TcType)
 tcLookupDataCon con_name
   = tcLookupValue con_name		`thenNF_Tc` \ con_id ->
-    case isDataConId_maybe con_id of {
+    case isDataConWrapId_maybe con_id of {
 	Nothing -> failWithTc (badCon con_id);
  	Just data_con ->
 

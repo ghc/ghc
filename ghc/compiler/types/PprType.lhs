@@ -242,7 +242,7 @@ ppr_dict env ctxt (clas, tys) = ppr clas <+>
 \end{code}
 
 \begin{code}
-pprTyEnv = initPprEnv b b (Just ppr) b (Just (\site -> pprTyVarBndr)) b
+pprTyEnv = initPprEnv b (Just ppr) b (Just (\site -> pprTyVarBndr)) b
   where
     b = panic "PprType:init_ppr_env"
 \end{code}

@@ -24,11 +24,11 @@ import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
-import Const		( Con(..), Literal(..) )
-import Id		( isSpecPragmaId, isOneShotLambda, setOneShotLambda, 
-			  getIdOccInfo, setIdOccInfo,
+import Literal		( Literal(..) )
+import Id		( isSpecPragmaId, isDataConId, isOneShotLambda, setOneShotLambda, 
+			  idOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo,
-			  getIdSpecialisation, 
+			  idSpecialisation, 
 			  idType, idUnique, Id
 			)
 import IdInfo		( OccInfo(..), insideLam, copyIdInfo )
@@ -451,14 +451,14 @@ reOrderRec env (CyclicSCC (bind : binds))
 	  not (isExportedId bndr)  = 3		-- Practically certain to be inlined
 	| inlineCandidate bndr rhs = 3		-- Likely to be inlined
 	| not_fun_ty (idType bndr) = 2		-- Data types help with cases
-	| not (isEmptyCoreRules (getIdSpecialisation bndr)) = 1
+	| not (isEmptyCoreRules (idSpecialisation bndr)) = 1
 		-- Avoid things with specialisations; we'd like
 		-- to take advantage of them in the subsequent bindings
 	| otherwise = 0
 
     inlineCandidate :: Id -> CoreExpr -> Bool
     inlineCandidate id (Note InlineMe _) = True
-    inlineCandidate id rhs	         = case getIdOccInfo id of
+    inlineCandidate id rhs	         = case idOccInfo id of
 						OneOcc _ _ -> True
 						other	   -> False
 
@@ -551,35 +551,7 @@ If we aren't careful we duplicate the (expensive x) call!
 Constructors are rather like lambdas in this way.
 
 \begin{code}
-	-- For NoRep literals we have to report an occurrence of
-	-- the things which tidyCore will later add, so that when
-	-- we are compiling the very module in which those thin-air Ids
-	-- are defined we have them in scope!
-occAnal env expr@(Con (Literal lit) args)
-  = ASSERT( null args )
-    (mk_lit_uds lit, expr)
-  where
-    mk_lit_uds (NoRepStr _ _)     = try noRepStrIds
-    mk_lit_uds (NoRepInteger _ _) = try noRepIntegerIds
-    mk_lit_uds lit		  = emptyDetails
-
-    try vs = foldr add emptyDetails vs
-    add v uds | isCandidate env v = extendVarEnv uds v funOccZero
-	      | otherwise	  = uds
-
-occAnal env (Con con args)
-  = case occAnalArgs env args of { (arg_uds, args') ->
-    let	
-	-- We mark the free vars of the argument of a constructor as "many"
-	-- This means that nothing gets inlined into a constructor argument
-	-- position, which is what we want.  Typically those constructor
-	-- arguments are just variables, or trivial expressions.
-	final_arg_uds    = case con of
-				DataCon _ -> mapVarEnv markMany arg_uds
-				other	  -> arg_uds
-    in
-    (final_arg_uds, Con con args')
-    }
+occAnal env expr@(Lit lit) = (emptyDetails, expr)
 \end{code}
 
 \begin{code}
@@ -699,7 +671,16 @@ occAnalApp env (Var fun, args)
 		| fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
 		| fun_uniq == foldrIdKey    = appSpecial env 3 [False,True] args
 		| fun_uniq == runSTRepIdKey = appSpecial env 2 [True]	 args
+
+		| isDataConId fun	    = case occAnalArgs env args of
+						(arg_uds, args') -> (mapVarEnv markMany arg_uds, args')
+						   -- We mark the free vars of the argument of a constructor as "many"
+						   -- This means that nothing gets inlined into a constructor argument
+						   -- position, which is what we want.  Typically those constructor
+						   -- arguments are just variables, or trivial expressions.
+
 		| otherwise		    = occAnalArgs env args
+
 
 occAnalApp env (fun, args)
   = case occAnal (zapCtxt env) fun of		{ (fun_uds, fun') ->
@@ -863,7 +844,7 @@ setBinderOcc usage bndr
   = -- Don't use local usage info for visible-elsewhere things
     -- BUT *do* erase any IAmALoopBreaker annotation, because we're
     -- about to re-generate it and it shouldn't be "sticky"
-    case getIdOccInfo bndr of
+    case idOccInfo bndr of
 	NoOccInfo -> bndr
 	other     -> setIdOccInfo bndr NoOccInfo
 			  
@@ -879,7 +860,7 @@ markBinderInsideLambda bndr
   = bndr
 
   | otherwise
-  = case getIdOccInfo bndr of
+  = case idOccInfo bndr of
 	OneOcc _ once -> bndr `setIdOccInfo` OneOcc insideLam once
 	other         -> bndr
 

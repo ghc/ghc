@@ -2,10 +2,10 @@ __export ShouldSucceed PriorityQueue{empty single insert meld splitMin} SeqView{
 1 check :: __forall [q :: (* -> *)] => {PriorityQueue q} -> (__forall [a] => {PrelBase.Ord a} -> q a) -> PrelIOBase.IO PrelBase.Z0T ;
 1 class PriorityQueue q :: (* -> *) where {empty :: __forall [a] => {PrelBase.Ord a} -> q a; single :: __forall [a] => {PrelBase.Ord a} -> a -> q a; insert = :: __forall [a] => {PrelBase.Ord a} -> a -> q a -> q a; meld :: __forall [a] => {PrelBase.Ord a} -> q a -> q a -> q a; splitMin :: __forall [a] => {PrelBase.Ord a} -> q a -> SeqView q a} ;
 1 data SeqView t :: (* -> *) a = Null |  Cons a (t a) ;
-1 insertMany :: __forall [q :: (* -> *) a] => {PrelBase.Ord a} -> {PriorityQueue q} -> [a] -> q a -> q a ;
+1 insertMany :: __forall [q :: (* -> *) a] => {PriorityQueue q} -> {PrelBase.Ord a} -> [a] -> q a -> q a ;
 1 out :: __forall [a] => {PrelNum.Num a} -> [a] -> PrelIOBase.IO PrelBase.Z0T ;
-1 pqSort :: __forall [a t :: (* -> *)] => {PriorityQueue t} -> {PrelBase.Ord a} -> t a -> [a] -> [a] ;
-1 toOrderedList :: __forall [t :: (* -> *) a] => {PrelBase.Ord a} -> {PriorityQueue t} -> t a -> [a] ;
+1 pqSort :: __forall [a t :: (* -> *)] => {PrelBase.Ord a} -> {PriorityQueue t} -> t a -> [a] -> [a] ;
+1 toOrderedList :: __forall [t :: (* -> *) a] => {PriorityQueue t} -> {PrelBase.Ord a} -> t a -> [a] ;
 1 zddmempty :: __forall [q :: (* -> *)] => {PriorityQueue q} -> (__forall [a] => {PrelBase.Ord a} -> q a) ;
 1 zddminsert :: __forall [q :: (* -> *)] => {PriorityQueue q} -> (__forall [a] => {PrelBase.Ord a} -> a -> q a -> q a) ;
 1 zddmmeld :: __forall [q :: (* -> *)] => {PriorityQueue q} -> (__forall [a] => {PrelBase.Ord a} -> q a -> q a -> q a) ;

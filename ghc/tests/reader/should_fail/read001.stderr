@@ -30,16 +30,27 @@ f _
   ((n+42))
     = y
 expr a b c d
-       = ((((...) + (...))
-	   + (case ... of
+       = ((((((((a + (: a b)) + (a : b)) + (((1 - 'c') - "abc") - 1.293))
+	      + ((\ x y z -> x) 42))
+	     + ((9 *)))
+	    + ((* 8)))
+	   + (case x of
 		Prelude.[]
-		  | ... -> ...
-		  | ... -> ...
-		  | ... -> ...
+		  | null x -> 99
+		  | otherwise -> 98
+		  | True -> 97
 		  where
-		      ...))
+		      null x = False))
 	  + ([z | z <- c, isSpace z]))
-	 + (let y = ... in ((...) + (...)) + ([..., ... .. ...]))
+	 + (let y = foo
+	    in
+	      (((((((y + [1, 2, 3, 4]) + (4, 3, 2, 1))
+		   + (4 :: {- implicit forall -} (Num a) => a))
+		  + (if 42 == 42.0 then 1 else 4))
+		 + ([1 .. ]))
+		+ ([2, 4 .. ]))
+	       + ([3 .. 5]))
+	      + ([4, 8 .. 999]))
 mat a b c d
       | foof a b = d
       | foof a c = d

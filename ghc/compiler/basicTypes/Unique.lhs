@@ -30,6 +30,8 @@ module Unique (
 	initTyVarUnique,
 	initTidyUniques,
 
+	isTupleKey,
+
 	-- now all the built-in Uniques (and functions to make them)
 	-- [the Oh-So-Wonderful Haskell module system wins again...]
 	mkAlphaTyVarUnique,
@@ -235,6 +237,8 @@ getKey		:: Unique -> Int#		-- for Var
 
 incrUnique	:: Unique -> Unique
 deriveUnique	:: Unique -> Int -> Unique
+
+isTupleKey	:: Unique -> Bool
 \end{code}
 
 
@@ -429,9 +433,20 @@ mkPreludeTyConUnique i		= mkUnique '3' i
 mkTupleTyConUnique a		= mkUnique '4' a
 mkUbxTupleTyConUnique a		= mkUnique '5' a
 
-mkPreludeDataConUnique i	= mkUnique '6' i -- must be alphabetic
-mkTupleDataConUnique a		= mkUnique '7' a -- ditto (*may* be used in C labels)
-mkUbxTupleDataConUnique a	= mkUnique '8' a
+-- Data constructor keys occupy *two* slots.  The first is used for the
+-- data constructor itself and its wrapper function (the function that
+-- evaluates arguments as necessary and calls the worker). The second is
+-- used for the worker function (the function that builds the constructor
+-- representation).
+
+mkPreludeDataConUnique i	= mkUnique '6' (2*i)	-- Must be alphabetic
+mkTupleDataConUnique a		= mkUnique '7' (2*a)	-- ditto (*may* be used in C labels)
+mkUbxTupleDataConUnique a	= mkUnique '8' (2*a)
+
+-- This one is used for a tiresome reason
+-- to improve a consistency-checking error check in the renamer
+isTupleKey u = case unpkUnique u of
+		(tag,_) -> tag == '4' || tag == '5' || tag == '7' || tag == '8'
 
 mkPrimOpIdUnique op		= mkUnique '9' op
 mkPreludeMiscIdUnique i		= mkUnique '0' i
@@ -557,24 +572,24 @@ threadIdPrimTyConKey			= mkPreludeTyConUnique 70
 %************************************************************************
 
 \begin{code}
-addrDataConKey				= mkPreludeDataConUnique  1
-charDataConKey				= mkPreludeDataConUnique  2
-consDataConKey				= mkPreludeDataConUnique  3
-doubleDataConKey			= mkPreludeDataConUnique  4
-falseDataConKey				= mkPreludeDataConUnique  5
-floatDataConKey				= mkPreludeDataConUnique  6
-intDataConKey				= mkPreludeDataConUnique  7
-smallIntegerDataConKey			= mkPreludeDataConUnique 12
-largeIntegerDataConKey			= mkPreludeDataConUnique 13
-foreignObjDataConKey			= mkPreludeDataConUnique 14
-nilDataConKey				= mkPreludeDataConUnique 15
-ratioDataConKey				= mkPreludeDataConUnique 16
-stablePtrDataConKey			= mkPreludeDataConUnique 17
-stableNameDataConKey			= mkPreludeDataConUnique 18
-trueDataConKey				= mkPreludeDataConUnique 34
-wordDataConKey				= mkPreludeDataConUnique 35
-stDataConKey				= mkPreludeDataConUnique 40
-ioDataConKey				= mkPreludeDataConUnique 42
+addrDataConKey				= mkPreludeDataConUnique  0
+charDataConKey				= mkPreludeDataConUnique  1
+consDataConKey				= mkPreludeDataConUnique  2
+doubleDataConKey			= mkPreludeDataConUnique  3
+falseDataConKey				= mkPreludeDataConUnique  4
+floatDataConKey				= mkPreludeDataConUnique  5
+intDataConKey				= mkPreludeDataConUnique  6
+smallIntegerDataConKey			= mkPreludeDataConUnique  7
+largeIntegerDataConKey			= mkPreludeDataConUnique  8
+foreignObjDataConKey			= mkPreludeDataConUnique  9
+nilDataConKey				= mkPreludeDataConUnique 10
+ratioDataConKey				= mkPreludeDataConUnique 11
+stablePtrDataConKey			= mkPreludeDataConUnique 12
+stableNameDataConKey			= mkPreludeDataConUnique 13
+trueDataConKey				= mkPreludeDataConUnique 14
+wordDataConKey				= mkPreludeDataConUnique 15
+stDataConKey				= mkPreludeDataConUnique 16
+ioDataConKey				= mkPreludeDataConUnique 17
 \end{code}
 
 %************************************************************************

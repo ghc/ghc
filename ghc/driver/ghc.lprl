@@ -495,7 +495,7 @@ $Osuffix    = '';	# default: use the normal suffix for that kind of output
 $HiSuffix   = 'hi';
 $HiSuffix_prelude = '';
 $CompilingPrelude=0;
-$Do_recomp_chkr = 0;	# don't use the recompilatio checker unless asked
+$Do_recomp_chkr = 1;	# Use the recompilation checker by default
 $Do_cc	    = -1;   # a MAGIC indeterminate value; will be set to 1 or 0.
 $Do_as	    = 1;
 
@@ -726,24 +726,17 @@ sub setupOptimiseFlags {
 		'-fno-rules',		# Similarly, don't apply any rules until after full laziness
 					# Notably, list fusion can prevent floating.
 
+		'-fno-case-of-case',	# Don't do case-of-case transformations.
+					# This makes full laziness work better
+
 		'-fmax-simplifier-iterations2',
 	  ']',
 
 	# Specialisation is best done before full laziness
 	# so that overloaded functions have all their dictionary lambdas manifest
 	($Oopt_DoSpecialise) ? ( $Oopt_DoSpecialise, ) : (),
-	'-ffull-laziness',
+	'-ffloat-outwards',
 	'-ffloat-inwards',
-
-#	'-fsimplify',
-#	  '[', 
-#		# Run the simplifier before specialising, so that overloaded functions
-#		# look like 		f = \d -> ...
-#		# (Full laziness may lift out something hiding the \d
-#		'-finline-phase1',
-#		'-fmax-simplifier-iterations1',
-#	  ']',
-
 
 	'-fsimplify',
 	  '[', 
@@ -766,9 +759,16 @@ sub setupOptimiseFlags {
 		# before strictness analysis runs
 
 		'-finline-phase2',
-	  	$Oopt_MaxSimplifierIterations,	
+		'-fmax-simplifier-iterations2',
 	  ']',
 
+
+	'-fsimplify',
+	  '[', 
+		'-fmax-simplifier-iterations2',
+		# No -finline-phase: allow all Ids to be inlined now
+		# This gets foldr inlined before strictness analysis
+	  ']',
 
 	'-fstrictness',
 	'-fcpr-analyse',
@@ -780,11 +780,18 @@ sub setupOptimiseFlags {
 		# No -finline-phase: allow all Ids to be inlined now
 	  ']',
 
-	'-ffull-laziness',	# nofib/spectral/hartel/wang doubles in speed if you
+	'-ffloat-outwards',	# nofib/spectral/hartel/wang doubles in speed if you
 				# do full laziness late in the day.  It only happens
 				# after fusion and other stuff, so the early pass doesn't
 				# catch it.  For the record, the redex is 
 				#	f_el22 (f_el21 r_midblock)
+
+# Leave out lambda lifting for now
+#	'-fsimplify',	# Tidy up results of full laziness
+#	  '[', 
+#		'-fmax-simplifier-iterations2',
+#	  ']',
+#	'-ffloat-outwards-full',	
 
 	# We want CSE to follow the final full-laziness pass, because it may
 	# succeed in commoning up things floated out by full laziness.
@@ -1096,14 +1103,14 @@ sub setupLinkOpts {
           ,'-u', "${uscore}PrelAddr_I64zh_con_info"
           ,'-u', "${uscore}PrelAddr_W64zh_con_info"
           ,'-u', "${uscore}PrelStable_StablePtr_con_info"
-          ,'-u', "${uscore}PrelBase_False_static_closure"
-          ,'-u', "${uscore}PrelBase_True_static_closure"
+          ,'-u', "${uscore}PrelBase_False_closure"
+          ,'-u', "${uscore}PrelBase_True_closure"
           ,'-u', "${uscore}PrelPack_unpackCString_closure"
           ,'-u', "${uscore}PrelException_stackOverflow_closure"
           ,'-u', "${uscore}PrelException_heapOverflow_closure"
-          ,'-u', "${uscore}PrelException_NonTermination_static_closure"
-          ,'-u', "${uscore}PrelException_PutFullMVar_static_closure"
-          ,'-u', "${uscore}PrelException_BlockedOnDeadMVar_static_closure"
+          ,'-u', "${uscore}PrelException_NonTermination_closure"
+          ,'-u', "${uscore}PrelException_PutFullMVar_closure"
+          ,'-u', "${uscore}PrelException_BlockedOnDeadMVar_closure"
           ,'-u', "${uscore}__init_Prelude"
           ,'-u', "${uscore}__init_PrelMain"
 	));
@@ -1668,23 +1675,12 @@ sub runHscAndProcessInterfaces {
 	# Tell the C compiler and assembler not to run
 	$do_cc = 0; $do_as = 0;
 
-	# Update dependency info, touch both object file and 
-	# interface file, so that the following invariant is
-        # maintained:
-	#
-	#   a dependent module's interface file should after recompilation
-        #   checking be newer than the interface files of its imports. 
-        #
-  	# That is, if module A's interface file changes, then module B
-	# (which import from A) needs to be checked.
-        # If A's change does not affect B, which causes the compiler to bail
-	# out early, we still need to touch the interface file of B. The reason
-        # for this is that B may export A's interface.
+	# Update dependency info, by touching the object file
+	# This records in the file system that the work of
+	# recompiling this module has been done
 	#
 	&run_something("touch $ofile_target",
 		       "Touch $ofile_target,  to propagate dependencies") if $HscOut ne '-N=';
-	&run_something("touch $hifile_target", 
-		       "Touch $hifile_target,  to propagate dependencies") if $ProduceHi =~ /-nohifile=/ ;
 
     } else {	
 
@@ -3218,8 +3214,8 @@ arg: while($_ = $Args[0]) {
 
     # ---------------
 
-    /^-fasm-(.*)$/  && do { $HscOut = '-S='; next arg; }; # force using nativeGen
-    /^-fvia-[cC]$/	    && do { $HscOut = '-C='; next arg; }; # force using C compiler
+    /^-fasm-(.*)$/  	&& do { $HscOut = '-S='; next arg; }; # force using nativeGen
+    /^-fvia-[cC]$/	&& do { $HscOut = '-C='; next arg; }; # force using C compiler
 
     # ---------------
 

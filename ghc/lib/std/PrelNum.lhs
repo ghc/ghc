@@ -384,10 +384,21 @@ instance  Enum Integer  where
     {-# INLINE enumFromThen #-}
     {-# INLINE enumFromTo #-}
     {-# INLINE enumFromThenTo #-}
-    enumFrom x             = build (\c _ -> enumDeltaIntegerFB 	 c   x 1)
-    enumFromThen x y       = build (\c _ -> enumDeltaIntegerFB 	 c   x (y-x))
-    enumFromTo x lim	   = build (\c n -> enumDeltaToIntegerFB c n x 1     lim)
-    enumFromThenTo x y lim = build (\c n -> enumDeltaToIntegerFB c n x (y-x) lim)
+    enumFrom x             = efdInteger  x 1
+    enumFromThen x y       = efdInteger  x (y-x)
+    enumFromTo x lim	   = efdtInteger x 1     lim
+    enumFromThenTo x y lim = efdtInteger x (y-x) lim
+
+
+efdInteger  = enumDeltaIntegerList
+efdtInteger = enumDeltaToIntegerList
+
+{-# RULES
+"efdInteger"		forall x y.  efdInteger x y	    = build (\c _ -> enumDeltaIntegerFB c x y)
+"efdtInteger"		forall x y l.efdtInteger x y l	    = build (\c n -> enumDeltaToIntegerFB c n x y l)
+"enumDeltaInteger" 	enumDeltaIntegerFB   (:)    = enumDeltaIntegerList
+"enumDeltaToInteger" 	enumDeltaToIntegerFB (:) [] = enumDeltaToIntegerList
+ #-}
 
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
 enumDeltaIntegerFB c x d = x `c` enumDeltaIntegerFB c (x+d) d
@@ -421,10 +432,6 @@ dn_list x delta lim = go (x::Integer)
 			go x | x < lim   = []
 			     | otherwise = x : go (x+delta)
 
-{-# RULES
-"enumDeltaInteger" 	enumDeltaIntegerFB   (:)    = enumDeltaIntegerList
-"enumDeltaToInteger" 	enumDeltaToIntegerFB (:) [] = enumDeltaToIntegerList
- #-}
 \end{code}
 
 

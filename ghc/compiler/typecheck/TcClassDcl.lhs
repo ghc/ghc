@@ -4,7 +4,7 @@
 \section[TcClassDcl]{Typechecking class declarations}
 
 \begin{code}
-module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2, 
+module TcClassDcl ( kcClassDecl, tcClassDecl1, tcClassDecls2, mkImplicitClassBinds,
 		    tcMethodBind, checkFromThisClass
 		  ) where
 
@@ -23,7 +23,7 @@ import RnHsSyn		( RenamedTyClDecl, RenamedClassPragmas,
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  RenamedContext, RenamedHsDecl, RenamedSig
 			)
-import TcHsSyn		( TcMonoBinds )
+import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
 import TcEnv		( TcId, ValueEnv, TcTyThing(..), tcAddImportedIdInfo,
@@ -38,14 +38,15 @@ import TcMonoType	( tcHsType, tcHsTopType, tcExtendTopTyVarScope,
 			)
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
 import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcTyVarBndr, tcGetTyVar )
+import TcInstUtil	( classDataCon )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import FieldLabel	( firstFieldLabelTag )
 import Bag		( unionManyBags, bagToList )
 import Class		( mkClass, classBigSig, classSelIds, Class, ClassOpItem )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
-import MkId		( mkDictSelId, mkDataConId, mkDefaultMethodId )
-import DataCon		( mkDataCon, notMarkedStrict )
-import Id		( Id, setInlinePragma, getIdUnfolding, idType, idName )
+import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
+import DataCon		( mkDataCon, dataConId, dataConWrapId, notMarkedStrict )
+import Id		( Id, setInlinePragma, idUnfolding, idType, idName )
 import CoreUnfold	( unfoldingTemplate )
 import IdInfo
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
@@ -109,7 +110,7 @@ Death to "ExpandingDicts".
 \begin{code}
 kcClassDecl (ClassDecl	context class_name
 			tyvar_names fundeps class_sigs def_methods pragmas
-			tycon_name datacon_name sc_sel_names src_loc)
+			_ _ _ _ src_loc)
   =         -- CHECK ARITY 1 FOR HASKELL 1.4
     checkTc (opt_GlasgowExts || length tyvar_names == 1)
 	    (classArityErr class_name)		`thenTc_`
@@ -141,7 +142,7 @@ kcClassDecl (ClassDecl	context class_name
 tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods pragmas 
-			tycon_name datacon_name sc_sel_names src_loc)
+			tycon_name datacon_name datacon_wkr_name sc_sel_names src_loc)
   = 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupTy class_name				`thenTc` \ (class_kind, _, AClass rec_class) ->
     tcExtendTopTyVarScope class_kind tyvar_names	$ \ tyvars _ ->
@@ -182,9 +183,10 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 		      	   [{-No context-}]
 			   [{-No existential tyvars-}] [{-Or context-}]
 			   dict_component_tys
-		      	   tycon dict_con_id
+		      	   tycon dict_con_id dict_wrap_id
 
-	dict_con_id = mkDataConId dict_con
+	dict_con_id  = mkDataConId datacon_wkr_name dict_con
+	dict_wrap_id = mkDataConWrapId dict_con
 
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcClassDecl1: argvrcs:" $
                                                          ppr tycon_name)
@@ -342,7 +344,7 @@ tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
 	     -> NF_TcM s (LIE, TcMonoBinds)
 
 tcClassDecl2 (ClassDecl context class_name
-			tyvar_names _ class_sigs default_binds pragmas _ _ _ src_loc)
+			tyvar_names _ class_sigs default_binds pragmas _ _ _ _ src_loc)
 
   | not (isLocallyDefined class_name)
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)
@@ -350,20 +352,27 @@ tcClassDecl2 (ClassDecl context class_name
   | otherwise	-- It is locally defined
   = recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds)) $ 
     tcAddSrcLoc src_loc		     		          $
-
-	-- Get the relevant class
     tcLookupClass class_name				`thenNF_Tc` \ clas ->
-    let
-	-- The selector binds are already in the selector Id's unfoldings
-	sel_binds = [ CoreMonoBind sel_id (unfoldingTemplate (getIdUnfolding sel_id))
-		    | sel_id <- classSelIds clas
-		    ]
-    in
-	-- Generate bindings for the default methods
-    tcDefaultMethodBinds clas default_binds class_sigs		`thenTc` \ (const_insts, meth_binds) ->
+    tcDefaultMethodBinds clas default_binds class_sigs
+\end{code}
 
-    returnTc (const_insts,
-	      meth_binds `AndMonoBinds` andMonoBindList sel_binds)
+\begin{code}
+mkImplicitClassBinds :: [Class] -> NF_TcM s ([Id], TcMonoBinds)
+mkImplicitClassBinds classes
+  = returnNF_Tc (concat cls_ids_s, andMonoBindList binds_s)
+	-- The selector binds are already in the selector Id's unfoldings
+  where
+    (cls_ids_s, binds_s) = unzip (map mk_implicit classes)
+
+    mk_implicit clas = (all_cls_ids, binds)
+		     where
+			dict_con    = classDataCon clas
+			all_cls_ids = dataConId dict_con : cls_ids
+			cls_ids     = dataConWrapId dict_con : classSelIds clas
+
+			-- The wrapper and selectors get bindings, the worker does not
+			binds | isLocallyDefined clas = idsToMonoBinds cls_ids
+			      | otherwise	      = EmptyMonoBinds
 \end{code}
 
 %************************************************************************

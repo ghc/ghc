@@ -9,22 +9,21 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidance )
+import CoreUnfold	( Unfolding, certainlyWillInline )
 import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core, 
                           opt_D_dump_worker_wrapper
 			)
 import CoreLint		( beginPass, endPass )
-import CoreUtils	( coreExprType, exprEtaExpandArity )
-import Const		( Con(..) )
+import CoreUtils	( exprType, exprArity, exprEtaExpandArity, mkInlineMe )
 import DataCon		( DataCon )
 import MkId		( mkWorkerId )
-import Id		( Id, idType, getIdStrictness, setIdArity, isOneShotLambda,
-			  setIdStrictness, getIdDemandInfo, getInlinePragma,
-			  setIdWorkerInfo, getIdCprInfo )
+import Id		( Id, idType, idStrictness, setIdArityInfo, isOneShotLambda,
+			  setIdStrictness, idDemandInfo, idInlinePragma, 
+			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import VarSet
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
-			  CprInfo(..), exactArity, InlinePragInfo(..)
+			  CprInfo(..), exactArity, InlinePragInfo(..), WorkerInfo(..)
 			)
 import Demand           ( Demand, wwLazy )
 import SaLib
@@ -125,17 +124,13 @@ wwBind (Rec pairs)
 annotations that can be used. Remember it is @wwBind@ that does the
 matching by looking for strict arguments of the correct type.
 @wwExpr@ is a version that just returns the ``Plain'' Tree.
-???????????????? ToDo
 
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
 wwExpr e@(Type _)   = returnUs e
 wwExpr e@(Var _)    = returnUs e
-
-wwExpr e@(Con con args)
- = mapUs wwExpr args	`thenUs` \ args' ->
-   returnUs (Con con args')
+wwExpr e@(Lit _)    = returnUs e
 
 wwExpr (Lam binder expr)
   = wwExpr expr			`thenUs` \ new_expr ->
@@ -194,34 +189,47 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW non_rec fn_id rhs
-  | (non_rec &&		-- Don't split if its non-recursive and small
-     certainlySmallEnoughToInline (calcUnfoldingGuidance opt_UF_CreationThreshold rhs)
+  | non_rec
+    && certainlyWillInline fn_id
 	-- No point in worker/wrappering something that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)
 	-- from being re-done.
-    )
+	--
+	-- OUT OF DATE NOTE:
+	--   In this case we add an INLINE pragma to the RHS.  Why?
+	--   Because consider
+	--	  f = \x -> g x x
+	--	  g = \yz -> ...		-- And g is strict
+	--   Then f is small, so we don't w/w it.  But g is big, and we do, so
+	--   g's wrapper will get inlined in f's RHS, which makes f look big now.
+	--   So f doesn't get inlined, but it is strict and we have failed to w/w it.
+	-- It's out of date because now wrappers look very cheap 
+	-- even when they are inlined.
+  = returnUs [ (fn_id, rhs) ]
 
-  || arity == 0		-- Don't split if it's not a function
-  || never_inline fn_id
-
-  || not (do_strict_ww || do_cpr_ww || do_coerce_ww)
+  | not (do_strict_ww || do_cpr_ww || do_coerce_ww)
   = returnUs [ (fn_id, rhs) ]
 
   | otherwise		-- Do w/w split
-  = mkWwBodies fun_ty arity wrap_dmds one_shots cpr_info	`thenUs` \ (work_args, wrap_fn, work_fn) ->
-    getUniqueUs							`thenUs` \ work_uniq ->
+  = mkWwBodies fun_ty arity wrap_dmds result_bot one_shots cpr_info	`thenUs` \ (work_demands, wrap_fn, work_fn) ->
+    getUniqueUs								`thenUs` \ work_uniq ->
     let
-	work_rhs     = work_fn rhs
-	work_demands = [getIdDemandInfo v | v <- work_args, isId v]
-	proto_work_id   	 = mkWorkerId work_uniq fn_id (coreExprType work_rhs) 
+	work_rhs      = work_fn rhs
+	proto_work_id = mkWorkerId work_uniq fn_id (exprType work_rhs) 
+			`setInlinePragma` inline_prag
+
 	work_id | has_strictness = proto_work_id `setIdStrictness` mkStrictnessInfo (work_demands, result_bot)
 		| otherwise	 = proto_work_id
 
+	wrap_arity = exprArity wrap_rhs		-- Might be greater than the current visible arity
+						-- if the function returns bottom
+						
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdStrictness`      wrapper_strictness
-                         `setIdWorkerInfo`	Just work_id
-			 `setIdArity`		exactArity arity
+                         `setIdWorkerInfo`	HasWorker work_id wrap_arity
+			 `setIdArityInfo`	exactArity wrap_arity
+			 `setInlinePragma`	NoInlinePragInfo	-- Put it on the worker instead
 		-- Add info to the wrapper:
 		--	(a) we want to set its arity
 		-- 	(b) we want to pin on its revised strictness info
@@ -234,38 +242,44 @@ tryWW non_rec fn_id rhs
     arity  = exprEtaExpandArity rhs
 
 	-- Don't split something which is marked unconditionally NOINLINE
-    never_inline fn_id = case getInlinePragma fn_id of
-				IMustNotBeINLINEd False Nothing -> True
-				other			        -> False
+    inline_prag  = idInlinePragma fn_id
 
-    strictness_info     		  = getIdStrictness fn_id
-    StrictnessInfo arg_demands result_bot = strictness_info
-    has_strictness			  = case strictness_info of
-						StrictnessInfo _ _ -> True
-						other		   -> False
-			
-    do_strict_ww = has_strictness && worthSplitting wrap_dmds result_bot
+    strictness_info           = idStrictness fn_id
+    has_strictness	      = case strictness_info of
+					StrictnessInfo _ _ -> True
+					NoStrictnessInfo   -> False
+    (arg_demands, result_bot) = case strictness_info of
+					StrictnessInfo d r -> (d,  r)
+					NoStrictnessInfo   -> ([], False)
 
-	-- NB: There maybe be more items in arg_demands than arity, because
-	-- the strictness info is semantic and looks through InlineMe and Scc Notes, 
-	-- whereas arity does not
-    demands_for_visible_args = take arity arg_demands
-    remaining_arg_demands    = drop arity arg_demands
+    wrap_dmds = setUnpackStrategy arg_demands
+    do_strict_ww = WARN( has_strictness && not result_bot && arity < length arg_demands && worthSplitting wrap_dmds result_bot, 
+			 text "Insufficient arity" <+> ppr fn_id <+> ppr arity <+> ppr arg_demands )
+		    (result_bot || arity >= length arg_demands)	-- Only if there's enough visible arity
+		 &&						-- (else strictness info isn't valid)
+								-- 
+		    worthSplitting wrap_dmds result_bot		-- And it's useful
+	-- worthSplitting returns False for an empty list of demands,
+	-- and hence do_strict_ww is False if arity is zero
+	-- Also it's false if there is no strictness (arg_demands is [])
 
-    wrap_dmds | has_strictness = setUnpackStrategy demands_for_visible_args
-	      | otherwise      = take arity (repeat wwLazy)
-
-    wrapper_strictness | has_strictness = mkStrictnessInfo (wrap_dmds ++ remaining_arg_demands, result_bot)
+    wrapper_strictness | has_strictness = mkStrictnessInfo (wrap_dmds, result_bot)
 	               | otherwise      = noStrictnessInfo
 
 	-------------------------------------------------------------
-    cpr_info  = getIdCprInfo fn_id
-    do_cpr_ww = case cpr_info of
-			CPRInfo _ -> True
-			other	  -> False
+    cpr_info  = idCprInfo fn_id
+    do_cpr_ww = arity > 0 &&
+		case cpr_info of
+			ReturnsCPR -> True
+			other	   -> False
 
 	-------------------------------------------------------------
     do_coerce_ww = check_for_coerce arity fun_ty
+	-- We are willing to do a w/w even if the arity is zero.
+	--	x = coerce t E
+	-- ==>
+	--	x' = E
+	--	x  = coerce t x'
 
 	-------------------------------------------------------------
     one_shots = get_one_shots rhs
@@ -312,11 +326,12 @@ the function and the name of its worker, and we want to make its body (the wrapp
 mkWrapper :: Type		-- Wrapper type
 	  -> Int		-- Arity
 	  -> [Demand]		-- Wrapper strictness info
+	  -> Bool		-- Function returns bottom
 	  -> CprInfo            -- Wrapper cpr info
 	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
 
-mkWrapper fun_ty arity demands cpr_info
-  = mkWwBodies fun_ty arity demands noOneShotInfo cpr_info	`thenUs` \ (_, wrap_fn, _) ->
+mkWrapper fun_ty arity demands res_bot cpr_info
+  = mkWwBodies fun_ty arity demands res_bot noOneShotInfo cpr_info	`thenUs` \ (_, wrap_fn, _) ->
     returnUs wrap_fn
 
 noOneShotInfo = repeat False

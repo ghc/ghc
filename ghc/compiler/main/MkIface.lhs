@@ -22,7 +22,7 @@ import TcInstUtil	( InstInfo(..) )
 
 import CmdLineOpts
 import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId,
-			  getIdSpecialisation
+			  idSpecialisation
 			)
 import Var		( isId )
 import VarSet
@@ -33,11 +33,11 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo, InlinePragInfo(..), inli
 			  cafInfo, ppCafInfo, specInfo,
 			  cprInfo, ppCprInfo, pprInlinePragInfo,
 			  occInfo, OccInfo(..),
-			  workerExists, workerInfo, ppWorkerInfo
+			  workerExists, workerInfo, ppWorkerInfo, WorkerInfo(..)
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
-import CoreUnfold	( calcUnfoldingGuidance, okToUnfoldInHiFile, couldBeSmallEnoughToInline )
+import CoreUnfold	( okToUnfoldInHiFile, couldBeSmallEnoughToInline )
 import Module		( moduleString, pprModule, pprModuleName )
 import Name		( isLocallyDefined, isWiredInName, nameRdrName, nameModule,
 			  Name, NamedThing(..)
@@ -214,7 +214,9 @@ ifaceFixities if_hdl fixities
 
 ifaceRules :: Handle -> [ProtoCoreRule] -> IdSet -> IO ()
 ifaceRules if_hdl rules emitted
-  | null orphan_rule_pretties && null local_id_pretties
+  |  opt_OmitInterfacePragmas 	-- Don't emit rules if we are suppressing
+				-- interface pragmas
+  || (null orphan_rule_pretties && null local_id_pretties)
   = return ()
   | otherwise
   = printForIface if_hdl (vcat [
@@ -229,9 +231,10 @@ ifaceRules if_hdl rules emitted
 			    ]
     local_id_pretties = [ pprCoreRule (Just fn) rule
  		        | fn <- varSetElems emitted, 
-			  rule <- rulesRules (getIdSpecialisation fn),
+			  rule <- rulesRules (idSpecialisation fn),
 			  all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
 				-- Spit out a rule only if all its lhs free vars are emitted
+				-- This is a good reason not to do it when we emit the Id itself
 		        ]
 
 ifaceDeprecations :: Handle -> [Deprecation Name] -> IO ()
@@ -359,7 +362,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     work_info     = workerInfo core_idinfo
     has_worker    = workerExists work_info
     wrkr_pretty   = ppWorkerInfo work_info
-    Just work_id  = work_info
+    HasWorker work_id wrap_arity = work_info
 
 
     ------------  Occ info  --------------
@@ -384,7 +387,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 		  rhs_is_small		 &&	-- Small enough
 		  okToUnfoldInHiFile rhs 	-- No casms etc
 
-    rhs_is_small = couldBeSmallEnoughToInline (calcUnfoldingGuidance opt_UF_HiFileThreshold rhs)
+    rhs_is_small = couldBeSmallEnoughToInline opt_UF_HiFileThreshold rhs
 
     ------------  Specialisations --------------
     spec_info   = specInfo core_idinfo
@@ -410,12 +413,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     ------------ Sanity checking --------------
 	-- The arity of a wrapper function should match its strictness,
 	-- or else an importing module will get very confused indeed.
-	-- [later: actually all that is necessary is for strictness to exceed arity]
-    arity_matches_strictness
-	= not has_worker ||
-	  case strict_info of
-	    StrictnessInfo ds _ -> length ds >= arityLowerBound arity_info
-	    other		-> True
+    arity_matches_strictness = not has_worker || 
+			       wrap_arity == arityLowerBound arity_info
     
 interestingId id = isId id && isLocallyDefined id &&
 		   not (omitIfaceSigForId id)

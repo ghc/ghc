@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.71 2000/02/14 11:59:27 sewardj Exp $
+# $Id: Makefile,v 1.72 2000/03/23 17:45:17 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -44,6 +44,10 @@ ifeq ($(GhcWithNativeCodeGen),YES)
 DIRS += nativeGen
 else
 SRC_HC_OPTS += -DOMIT_NATIVE_CODEGEN
+ifeq ($(GhcWithIlx),YES)
+DIRS += ilxGen
+SRC_HC_OPTS += -DILX
+endif
 endif
 
 

@@ -22,7 +22,7 @@ import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds,
 import TcMonad
 import Inst		( Inst, emptyLIE, plusLIE )
 import TcBinds		( tcTopBindsAndThen )
-import TcClassDcl	( tcClassDecls2 )
+import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
 			  getEnvTyCons, getEnvClasses, tcLookupValueMaybe,
@@ -38,7 +38,7 @@ import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcInstUtil	( buildInstanceEnvs, classDataCon, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
-import TcTyDecls	( mkDataBinds )
+import TcTyDecls	( mkImplicitDataBinds )
 import TcType		( TcType, typeToTcType,
 			  TcKind, kindToTcKind,
 			  newTyVarTy
@@ -51,7 +51,6 @@ import Id		( Id, idType )
 import Module           ( pprModuleName )
 import Name		( Name, nameUnique, isLocallyDefined, NamedThing(..) )
 import TyCon		( TyCon, tyConKind )
-import DataCon		( dataConId )
 import Class		( Class, classSelIds, classTyCon )
 import Type		( mkTyConApp, mkForAllTy,
 			  boxedTypeKind, getTyVar, Type )
@@ -178,7 +177,8 @@ tcModule rn_name_supply fixities
 	    local_tycons  = filter isLocallyDefined tycons
 	    local_classes = filter isLocallyDefined classes
     	in
-    	mkDataBinds tycons		`thenTc` \ (data_ids, data_binds) ->
+    	mkImplicitDataBinds tycons		`thenTc`    \ (data_ids, imp_data_binds) ->
+    	mkImplicitClassBinds classes		`thenNF_Tc` \ (cls_ids,  imp_cls_binds) ->
     	
     	-- Extend the global value environment with 
     	--	(a) constructors
@@ -187,14 +187,12 @@ tcModule rn_name_supply fixities
     	-- 	(d) default-method ids... where? I can't see where these are
 	--	    put into the envt, and I'm worried that the zonking phase
 	--	    will find they aren't there and complain.
-    	tcExtendGlobalValEnv data_ids				$
-    	tcExtendGlobalValEnv (concat (map classSelIds classes))	$
+    	tcExtendGlobalValEnv data_ids		$
+    	tcExtendGlobalValEnv cls_ids		$
 
 	-- Extend the TyCon envt with the tycons corresponding to
-	-- the classes, and the global value environment with the
-	-- corresponding data cons.
+	-- the classes.
 	--  They are mentioned in types in interface files.
-    	tcExtendGlobalValEnv (map (dataConId . classDataCon) classes)		$
         tcExtendTypeEnv [ (getName tycon, (kindToTcKind (tyConKind tycon), Nothing, ATyCon tycon))
 		        | clas <- classes,
 			  let tycon = classTyCon clas
@@ -230,7 +228,7 @@ tcModule rn_name_supply fixities
 		-- Second pass over class and instance declarations,
 		-- to compile the bindings themselves.
 	tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
-	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
+	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_dm_binds) ->
 	tcRules decls			`thenNF_Tc` \ (lie_rules,     rules) ->
 
 
@@ -260,10 +258,11 @@ tcModule rn_name_supply fixities
 	    -- Backsubstitution.    This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
 	let
-	    all_binds = data_binds 		`AndMonoBinds` 
+	    all_binds = imp_data_binds 		`AndMonoBinds` 
+			imp_cls_binds		`AndMonoBinds` 
 			val_binds		`AndMonoBinds`
 		        inst_binds		`AndMonoBinds`
-		        cls_binds		`AndMonoBinds`
+		        cls_dm_binds		`AndMonoBinds`
 		        const_inst_binds	`AndMonoBinds`
 			foe_binds
 	in

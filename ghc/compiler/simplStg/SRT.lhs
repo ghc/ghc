@@ -9,9 +9,9 @@ bindings have no CAF references, and record the fact in their IdInfo.
 \begin{code}
 module SRT where
 
-import Id       ( Id, setIdCafInfo, getIdCafInfo, externallyVisibleId,
-		  idAppIsBottom
+import Id       ( Id, setIdCafInfo, idCafInfo, externallyVisibleId,
 		)
+import CoreUtils( idAppIsBottom )
 import IdInfo 	( CafInfo(..) )
 import StgSyn
 
@@ -223,7 +223,12 @@ srtExpr rho (cont,lne) off e@(StgApp f args) = (e, global_refs, [], off)
 		getGlobalRefs rho (StgVarArg f:args) `unionUniqSets`
 		lookupPossibleLNE lne f
 
-srtExpr rho (cont,lne) off e@(StgCon con args ty) =
+srtExpr rho (cont,lne) off e@(StgLit l) = (e, cont, [], off)
+
+srtExpr rho (cont,lne) off e@(StgConApp con args) =
+   (e, cont `unionUniqSets` getGlobalRefs rho args, [], off)
+
+srtExpr rho (cont,lne) off e@(StgPrimApp op args ty) =
    (e, cont `unionUniqSets` getGlobalRefs rho args, [], off)
 
 srtExpr rho c@(cont,lne) off (StgCase scrut live1 live2 uniq _{-srt-} alts) =
@@ -445,11 +450,12 @@ globalRefArg rho (StgVarArg id)
 
   | otherwise =
     case lookupUFM rho id of {
-	Just _ -> [id];			-- can't look at the caf_info yet...
-        Nothing ->
+	Just _ -> [id];			-- Can't look at the caf_info yet...
+        Nothing ->			-- but we will look it up and filter later
+					-- in maybeHaveCafRefs
 
     if externallyVisibleId id 
-	then case getIdCafInfo id of
+	then case idCafInfo id of
 		MayHaveCafRefs -> [id]
 		NoCafRefs      -> []
 	else []

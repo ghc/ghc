@@ -155,7 +155,7 @@ tcAddDeclCtxt decl thing_inside
   where
      (name, loc, thing)
 	= case decl of
-	    (ClassDecl _ name _ _ _ _ _ _ _ _ loc) -> (name, loc, "class")
+	    (ClassDecl _ name _ _ _ _ _ _ _ _ _ loc) -> (name, loc, "class")
 	    (TySynonym name _ _ loc)	         -> (name, loc, "type synonym")
 	    (TyData NewType  _ name _ _ _ _ loc) -> (name, loc, "data type")
 	    (TyData DataType _ name _ _ _ _ loc) -> (name, loc, "newtype")
@@ -206,7 +206,7 @@ getTyBinding1 (TyData _ _ name tyvars _ _ _ _)
 		       Nothing,  
 		       ATyCon (error "ATyCon: data")))
 
-getTyBinding1 (ClassDecl _ name tyvars _ _ _ _ _ _ _ _)
+getTyBinding1 (ClassDecl _ name tyvars _ _ _ _ _ _ _ _ _)
  = mapNF_Tc kcHsTyVar tyvars		`thenNF_Tc` \ arg_kinds ->
    returnNF_Tc (name, (foldr mkArrowKind boxedTypeKind arg_kinds, 
 		       Just (length tyvars), 
@@ -271,7 +271,7 @@ Edges in Type/Class decls
 
 mk_cls_edges :: RenamedTyClDecl -> Maybe (RenamedTyClDecl, Unique, [Unique])
 
-mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _ _ _ _)
+mk_cls_edges decl@(ClassDecl ctxt name _ _ _ _ _ _ _ _ _ _)
   = Just (decl, getUnique name, map (getUnique . get_clas) ctxt)
 mk_cls_edges other_decl
   = Nothing
@@ -287,7 +287,7 @@ mk_edges decl@(TyData _ ctxt name _ condecls derivs _ _)
 mk_edges decl@(TySynonym name _ rhs _)
   = (decl, getUnique name, uniqSetToList (get_ty rhs))
 
-mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _ _ _ _)
+mk_edges decl@(ClassDecl ctxt name _ _ sigs _ _ _ _ _ _ _)
   = (decl, getUnique name, uniqSetToList (get_ctxt ctxt `unionUniqSets`
 				         get_sigs sigs))
 
@@ -304,7 +304,7 @@ get_deriv (Just clss) = unionManyUniqSets (map set_name clss)
 get_cons cons = unionManyUniqSets (map get_con cons)
 
 ----------------------------------------------------
-get_con (ConDecl _ _ ctxt details _) 
+get_con (ConDecl _ _ _ ctxt details _) 
   = get_ctxt ctxt `unionUniqSets` get_con_details details
 
 ----------------------------------------------------

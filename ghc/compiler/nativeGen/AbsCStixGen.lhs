@@ -23,13 +23,13 @@ import SMRep		( fixedItblSize,
 			)
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
-                          mkClosureTblLabel, mkStaticClosureLabel,
+                          mkClosureTblLabel, mkClosureLabel
 			  moduleRegdLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
 			)
-import Const		( Literal(..) )
+import Literal		( Literal(..) )
 import Maybes	    	( maybeToBool )
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
@@ -41,6 +41,7 @@ import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
 import Panic		( panic )
 import TyCon		( tyConDataCons )
+import DataCon		( dataConWrapId )
 import BitSet 		( intBS )
 import Name             ( NamedThing(..) )
 
@@ -147,7 +148,7 @@ Here we handle top-level things, like @CCodeBlock@s and
  gentopcode stmt@(CClosureTbl tycon)
   = returnUs [ StSegment TextSegment
              , StLabel (mkClosureTblLabel tycon)
-             , StData DataPtrRep (map (StCLbl . mkStaticClosureLabel . getName) 
+             , StData DataPtrRep (map (StCLbl . mkClosureLabel . getName . dataConWrapId) 
                                       (tyConDataCons tycon) )
              ]
 
@@ -391,8 +392,8 @@ Now the if statement.  Almost *all* flow of control are of this form.
 				Nothing -> gencode alt_code
 				Just dc -> mkIfThenElse discrim tag alt_code dc
 
-      [(tag1@(MachInt i1 _), alt_code1),
-       (tag2@(MachInt i2 _), alt_code2)]
+      [(tag1@(MachInt i1), alt_code1),
+       (tag2@(MachInt i2), alt_code2)]
 	| deflt_is_empty && i1 == 0 && i2 == 1
 	-> mkIfThenElse discrim tag1 alt_code1 alt_code2
 	| deflt_is_empty && i1 == 1 && i2 == 0
@@ -448,7 +449,7 @@ be tuned.)
 
  intTag :: Literal -> Integer
  intTag (MachChar c)  = toInteger (ord c)
- intTag (MachInt i _) = i
+ intTag (MachInt i) = i
  intTag _ = panic "intTag"
 
  fltTag :: Literal -> Rational
@@ -492,9 +493,9 @@ be tuned.)
     	floating = isFloatingRep (getAmodeRep am)
     	choices = length alts
 
-    	(x@(MachChar _),_)  `leAlt` (y,_) = intTag x <= intTag y
-    	(x@(MachInt _ _),_) `leAlt` (y,_) = intTag x <= intTag y
-    	(x,_)               `leAlt` (y,_) = fltTag x <= fltTag y
+    	(x@(MachChar _),_) `leAlt` (y,_) = intTag x <= intTag y
+    	(x@(MachInt _), _) `leAlt` (y,_) = intTag x <= intTag y
+    	(x,_)              `leAlt` (y,_) = fltTag x <= fltTag y
 
 \end{code}
 

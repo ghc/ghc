@@ -18,7 +18,7 @@ import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy, unitTy )
 import Panic		( panic )
 \end{code}
 
-Note: If @outPatType@ doesn't bear a strong resemblance to @coreExprType@,
+Note: If @outPatType@ doesn't bear a strong resemblance to @exprType@,
 then something is wrong.
 \begin{code}
 outPatType :: TypecheckedPat -> Type

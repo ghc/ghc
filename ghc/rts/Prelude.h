@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.5 2000/03/16 17:27:13 simonmar Exp $
+ * $Id: Prelude.h,v 1.6 2000/03/23 17:45:32 simonpj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -15,16 +15,16 @@
  */
 
 #ifndef INTERPRETER
-extern DLL_IMPORT const StgClosure PrelBase_True_static_closure;
-extern DLL_IMPORT const StgClosure PrelBase_False_static_closure;
+extern DLL_IMPORT const StgClosure PrelBase_True_closure;
+extern DLL_IMPORT const StgClosure PrelBase_False_closure;
 extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
 extern DLL_IMPORT const StgClosure PrelException_stackOverflow_closure;
 extern DLL_IMPORT const StgClosure PrelException_heapOverflow_closure;
 extern const StgClosure PrelMain_mainIO_closure;
 
-extern DLL_IMPORT const StgClosure PrelException_PutFullMVar_static_closure;
-extern DLL_IMPORT const StgClosure PrelException_BlockedOnDeadMVar_static_closure;
-extern DLL_IMPORT const StgClosure PrelException_NonTermination_static_closure;
+extern DLL_IMPORT const StgClosure PrelException_PutFullMVar_closure;
+extern DLL_IMPORT const StgClosure PrelException_BlockedOnDeadMVar_closure;
+extern DLL_IMPORT const StgClosure PrelException_NonTermination_closure;
 
 extern DLL_IMPORT const StgInfoTable PrelBase_Czh_static_info;
 extern DLL_IMPORT const StgInfoTable PrelBase_Izh_static_info;
@@ -43,13 +43,13 @@ extern DLL_IMPORT const StgInfoTable PrelAddr_W64zh_con_info;
 extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_static_info;
 extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 
-#define True_closure           (&PrelBase_True_static_closure)
-#define False_closure          (&PrelBase_False_static_closure)
+#define True_closure           (&PrelBase_True_closure)
+#define False_closure          (&PrelBase_False_closure)
 #define stackOverflow_closure  (&PrelException_stackOverflow_closure)
 #define heapOverflow_closure   (&PrelException_heapOverflow_closure)
-#define PutFullMVar_closure    (&PrelException_PutFullMVar_static_closure)
-#define BlockedOnDeadMVar_closure (&PrelException_BlockedOnDeadMVar_static_closure)
-#define NonTermination_closure (&PrelException_NonTermination_static_closure)
+#define PutFullMVar_closure    (&PrelException_PutFullMVar_closure)
+#define BlockedOnDeadMVar_closure (&PrelException_BlockedOnDeadMVar_closure)
+#define NonTermination_closure (&PrelException_NonTermination_closure)
 #define Czh_static_info        (&PrelBase_Czh_static_info)
 #define Izh_static_info        (&PrelBase_Izh_static_info)
 #define Fzh_static_info        (&PrelFloat_Fzh_static_info)
@@ -74,14 +74,14 @@ extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 /* We need indirections to the Prelude stuff, because we can't link
  * these symbols statically.
  */
-extern const StgClosure *ind_True_static_closure;
-extern const StgClosure *ind_False_static_closure;
+extern const StgClosure *ind_True_closure;
+extern const StgClosure *ind_False_closure;
 extern const StgClosure *ind_unpackCString_closure;
 extern const StgClosure *ind_stackOverflow_closure;
 extern const StgClosure *ind_heapOverflow_closure;
-extern const StgClosure *ind_PutFullMVar_static_closure;
-extern const StgClosure *ind_BlockedOnDeadMVar_static_closure;
-extern const StgClosure *ind_NonTermination_static_closure;
+extern const StgClosure *ind_PutFullMVar_closure;
+extern const StgClosure *ind_BlockedOnDeadMVar_closure;
+extern const StgClosure *ind_NonTermination_closure;
 
 extern const StgInfoTable *ind_Czh_static_info;
 extern const StgInfoTable *ind_Izh_static_info;
@@ -100,13 +100,13 @@ extern const StgInfoTable *ind_W64zh_con_info;
 extern const StgInfoTable *ind_StablePtr_static_info;
 extern const StgInfoTable *ind_StablePtr_con_info;
 
-#define True_closure           ind_True_static_closure
-#define False_closure          ind_False_static_closure
+#define True_closure           ind_True_closure
+#define False_closure          ind_False_closure
 #define stackOverflow_closure  ind_stackOverflow_closure
 #define heapOverflow_closure   ind_heapOverflow_closure
-#define PutFullMVar_closure    ind_PutFullMVar_static_closure
-#define BlockedOnDeadMVar_closure ind_BlockedOnDeadMVar_static_closure
-#define NonTermination_closure ind_NonTermination_static_closure
+#define PutFullMVar_closure    ind_PutFullMVar_closure
+#define BlockedOnDeadMVar_closure ind_BlockedOnDeadMVar_closure
+#define NonTermination_closure ind_NonTermination_closure
 #define Czh_static_info        ind_Czh_static_info
 #define Izh_static_info        ind_Izh_static_info
 #define Fzh_static_info        ind_Fzh_static_info

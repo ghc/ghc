@@ -6,6 +6,7 @@
 \begin{code}
 module DsCCall 
 	( dsCCall
+	, mkCCall
 	, unboxArg
 	, boxResult
 	,  wrapUnboxedValue
@@ -21,23 +22,25 @@ import DsMonad
 import DsUtils
 
 import TcHsSyn		( maybeBoxedPrimType )
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType )
 import Id		( Id, mkWildId )
-import Const		( Con(..) )
+import MkId		( mkCCallOpId )
 import Maybes		( maybeToBool )
 import PrelInfo		( packStringForCId )
-import PrimOp		( PrimOp(..) )
-import DataCon		( DataCon, dataConId, splitProductType_maybe )
+import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
+import DataCon		( DataCon, splitProductType_maybe )
 import CallConv
 import Type		( isUnLiftedType, splitAlgTyConApp_maybe, mkFunTys,
-			  splitTyConApp_maybe, Type
+			  splitTyConApp_maybe, tyVarsOfType, mkForAllTys, Type
 			)
 import TysPrim		( byteArrayPrimTy, realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
-import TysWiredIn	( unitDataCon, stringTy,
+import TysWiredIn	( unitDataConId, stringTy,
 			  unboxedPairDataCon,
 			  mkUnboxedTupleTy, unboxedTupleCon
 			)
+import Unique		( Unique )
+import VarSet		( varSetElems )
 import Outputable
 \end{code}
 
@@ -89,21 +92,36 @@ dsCCall lbl args may_gc is_asm result_ty
 
     mapAndUnzipDs unboxArg args	`thenDs` \ (unboxed_args, arg_wrappers) ->
     boxResult result_ty		`thenDs` \ (final_result_ty, res_wrapper) ->
-
+    getUniqueDs			`thenDs` \ uniq ->
     let
-	val_args   = Var old_s : unboxed_args
-	final_args = Type inst_ty : val_args
-
-	-- A CCallOp has type (forall a. a), so we must instantiate
-	-- it at the full type, including the state argument
-	inst_ty = mkFunTys (map coreExprType val_args) final_result_ty
-
-	the_ccall_op = CCallOp (Left lbl) is_asm may_gc cCallConv
- 	the_prim_app = mkPrimApp the_ccall_op final_args
-
-	the_body = foldr ($) (res_wrapper the_prim_app) arg_wrappers
+	val_args     = Var old_s : unboxed_args
+	the_ccall    = CCall (StaticTarget lbl) is_asm may_gc cCallConv
+ 	the_prim_app = mkCCall uniq the_ccall val_args final_result_ty
+	the_body     = foldr ($) (res_wrapper the_prim_app) arg_wrappers
     in
     returnDs (Lam old_s the_body)
+
+mkCCall :: Unique -> CCall 
+	-> [CoreExpr] 	-- Args
+	-> Type 	-- Result type
+	-> CoreExpr
+-- Construct the ccall.  The only tricky bit is that the ccall Id should have
+-- no free vars, so if any of the arg tys do we must give it a polymorphic type.
+-- 	[I forget *why* it should have no free vars!]
+-- For example:
+--	mkCCall ... [s::StablePtr (a->b), x::Addr, c::Char]
+--
+-- Here we build a ccall thus
+--	(ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
+--			a b s x c
+mkCCall uniq the_ccall val_args res_ty
+  = mkApps (mkVarApps (Var the_ccall_id) tyvars) val_args
+  where
+    arg_tys = map exprType val_args
+    body_ty = (mkFunTys arg_tys res_ty)
+    tyvars  = varSetElems (tyVarsOfType body_ty)
+    ty 	    = mkForAllTys tyvars body_ty
+    the_ccall_id = mkCCallOpId uniq the_ccall ty
 \end{code}
 
 \begin{code}
@@ -144,7 +162,7 @@ unboxArg arg
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[l_var, r_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
-	      \ body -> Case arg case_bndr [(DataCon data_con,vars,body)]
+	      \ body -> Case arg case_bndr [(DataAlt data_con,vars,body)]
     )
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
@@ -152,14 +170,14 @@ unboxArg arg
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalDs the_prim_arg_ty	`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
-	      \ body -> Case arg case_bndr [(DataCon box_data_con,[prim_arg],body)]
+	      \ body -> Case arg case_bndr [(DataAlt box_data_con,[prim_arg],body)]
     )
 
   | otherwise
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
-    arg_ty = coreExprType arg
+    arg_ty = exprType arg
 
     maybe_boxed_prim_arg_ty = maybeBoxedPrimType arg_ty
     (Just (box_data_con, the_prim_arg_ty)) = maybe_boxed_prim_arg_ty
@@ -203,8 +221,8 @@ boxResult result_ty
 	the_pair = mkConApp unboxedPairDataCon
 			    [Type realWorldStatePrimTy, Type result_ty, 
 			     Var prim_state_id, 
-			     Con (DataCon unitDataCon) []]
-	the_alt  = (DataCon (unboxedTupleCon 1), [prim_state_id], the_pair)
+			     Var unitDataConId]
+	the_alt  = (DataAlt (unboxedTupleCon 1), [prim_state_id], the_pair)
 	scrut_ty = mkUnboxedTupleTy 1 [realWorldStatePrimTy]
     in
     returnDs (scrut_ty, \prim_app -> Case prim_app (mkWildId scrut_ty) [the_alt]
@@ -224,7 +242,7 @@ boxResult result_ty
 	the_pair   = mkConApp unboxedPairDataCon
 				[Type realWorldStatePrimTy, Type result_ty, 
 				 Var prim_state_id, the_result]
-	the_alt    = (DataCon unboxedPairDataCon, [prim_state_id, prim_result_id], the_pair)
+	the_alt    = (DataAlt unboxedPairDataCon, [prim_state_id, prim_result_id], the_pair)
     in
     returnDs (ccall_res_type, \prim_app -> Case prim_app case_bndr [the_alt]
     )
@@ -255,10 +273,10 @@ wrapUnboxedValue ty
   | (maybeToBool maybe_product_type) &&				-- Data type
     (null data_con_arg_tys)
   =
-    let unit = dataConId unitDataCon
+    let 
 	scrut_ty = mkUnboxedTupleTy 1 [realWorldStatePrimTy]
     in
-    returnDs (scrut_ty, unit, mkConApp unitDataCon [])
+    returnDs (scrut_ty, unitDataConId, Var unitDataConId)
 
   | otherwise
   = pprPanic "boxResult: " (ppr ty)

@@ -72,6 +72,17 @@ tcRule (RuleDecl name sig_tvs vars lhs rhs src_loc)
 	-- Gather the template variables and tyvars
     let
 	tpl_ids = map instToId (bagToList lhs_dicts) ++ ids
+
+	-- IMPORTANT!  We *quantify* over any dicts that appear in the LHS
+	-- Reason: 
+	--	a) The particular dictionary isn't important, because its value
+	--	   depends only on the type
+	--		e.g	gcd Int $fIntegralInt
+	--         Here we'd like to match against (gcd Int any_d) for any 'any_d'
+	--
+	--	b) We'd like to make available the dictionaries bound 
+	--	   on the LHS in the RHS, so quantifying over them is good
+	--	   See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
     in
 
 	-- Gather type variables to quantify over

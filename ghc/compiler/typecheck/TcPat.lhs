@@ -35,7 +35,7 @@ import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
 			)
-import Id		( Id, idType, isDataConId_maybe )
+import Id		( Id, idType, isDataConWrapId_maybe )
 import Type		( Type, isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
 import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
@@ -394,7 +394,7 @@ tcOverloadedLitPat pat lit over_lit pat_ty
 tcConstructor pat con_name pat_ty
   = 	-- Check that it's a constructor
     tcLookupValue con_name		`thenNF_Tc` \ con_id ->
-    case isDataConId_maybe con_id of {
+    case isDataConWrapId_maybe con_id of {
 	Nothing -> failWithTc (badCon con_id);
  	Just data_con ->
 

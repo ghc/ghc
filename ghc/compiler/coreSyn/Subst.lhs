@@ -44,15 +44,17 @@ import Type		( ThetaType, PredType(..), ClassContext,
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
-import Id		( idType, setIdType, getIdOccInfo, zapFragileIdInfo )
+import Id		( idType, setIdType, idOccInfo, zapFragileIdInfo )
 import Name		( isLocallyDefined )
 import IdInfo		( IdInfo, isFragileOccInfo,
 			  specInfo, setSpecInfo, 
-			  workerExists, workerInfo, setWorkerInfo, WorkerInfo
+			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
 			)
+import BasicTypes	( OccInfo(..) )
 import UniqSupply	( UniqSupply, uniqFromSupply, splitUniqSupply )
-import Var		( Var, IdOrTyVar, Id, TyVar, isTyVar )
+import Var		( Var, Id, TyVar, isTyVar )
 import Outputable
+import PprCore		()	-- Instances
 import Util		( mapAccumL, foldl2, seqList, ($!) )
 \end{code}
 
@@ -96,6 +98,10 @@ The general plan about the substitution and in-scope set for Ids is as follows
 * substId adds a binding (DoneVar new_id occ) to the substitution if 
 	EITHER the Id's unique has changed
 	OR     the Id has interesting occurrence information
+  So in effect you can only get to interesting occurrence information
+  by looking up the *old* Id; it's not really attached to the new id
+  at all.
+
   Note, though that the substitution isn't necessarily extended
   if the type changes.  Why not?  Because of the next point:
 
@@ -162,18 +168,28 @@ lookupIdSubst :: Subst -> Id -> SubstResult
 -- Does the lookup in the in-scope set too
 lookupIdSubst (Subst in_scope env) v
   = case lookupSubstEnv env v of
-	Just (DoneId v' occ) -> case lookupVarEnv in_scope v' of
-				  Just v'' -> DoneId v'' occ
-				  Nothing  -> DoneId v' occ
+	Just (DoneId v' occ) -> DoneId (lookupInScope in_scope v') occ
 	Just res	     -> res
-	Nothing  	     -> DoneId v' (getIdOccInfo v')
+	Nothing  	     -> DoneId v' (idOccInfo v')
+				-- We don't use DoneId for LoopBreakers, so the idOccInfo is
+				-- very important!  If isFragileOccInfo returned True for
+				-- loop breakers we could avoid this call, but at the expense
+				-- of adding more to the substitution, and building new Ids
+				-- in substId a bit more often than really necessary
 			     where
-				    v' = case lookupVarEnv in_scope v of
-					   Just v' -> v'
-					   Nothing -> v
+				    v' = lookupInScope in_scope v
 
-lookupInScope :: Subst -> Var -> Maybe Var
-lookupInScope (Subst in_scope _) v = lookupVarEnv in_scope v
+lookupInScope :: InScopeSet -> Var -> Var
+-- It's important to look for a fixed point
+-- When we see (case x of y { I# v -> ... })
+-- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder).
+-- When we lookup up an occurrence of x, we map to y, but then
+-- we want to look up y in case it has acquired more evaluation information by now.
+lookupInScope in_scope v 
+  = case lookupVarEnv in_scope v of
+	Just v' | v == v'   -> v'	-- Reached a fixed point
+		| otherwise -> lookupInScope in_scope v'
+	Nothing		    -> v
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _) = v `elemVarEnv` in_scope
@@ -363,7 +379,7 @@ substExpr subst expr
 		    DoneEx e'      -> e'
 
     go (Type ty)      = Type (go_ty ty)
-    go (Con con args) = Con con (map go args)
+    go (Lit lit)      = Lit lit
     go (App fun arg)  = App (go fun) (go arg)
     go (Note note e)  = Note (go_note note) (go e)
 
@@ -403,12 +419,12 @@ When we hit a binder we may need to
   (c) give it a new unique to avoid name clashes
 
 \begin{code}
-substBndr :: Subst -> IdOrTyVar -> (Subst, IdOrTyVar)
+substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
   | isTyVar bndr  = substTyVar subst bndr
   | otherwise     = substId    subst bndr
 
-substBndrs :: Subst -> [IdOrTyVar] -> (Subst, [IdOrTyVar])
+substBndrs :: Subst -> [Var] -> (Subst, [Var])
 substBndrs subst bndrs = mapAccumL substBndr subst bndrs
 
 
@@ -424,7 +440,7 @@ substId subst@(Subst in_scope env) old_id
   = (Subst (in_scope `add_in_scope` new_id) new_env, new_id)
   where
     id_ty    = idType old_id
-    occ_info = getIdOccInfo old_id
+    occ_info = idOccInfo old_id
 
        -- id1 has its type zapped
     id1 |  noTypeSubst env
@@ -511,17 +527,17 @@ substWorker :: Subst -> WorkerInfo -> WorkerInfo
 	-- Seq'ing on the returned WorkerInfo is enough to cause all the 
 	-- substitutions to happen completely
 
-substWorker subst Nothing
-  = Nothing
-substWorker subst (Just w)
+substWorker subst NoWorker
+  = NoWorker
+substWorker subst (HasWorker w a)
   = case lookupSubst subst w of
-	Nothing -> Just w
-	Just (DoneId w1 _)     -> Just w1
-	Just (DoneEx (Var w1)) -> Just w1
+	Nothing		       -> HasWorker w a
+	Just (DoneId w1 _)     -> HasWorker w1 a
+	Just (DoneEx (Var w1)) -> HasWorker w1 a
 	Just (DoneEx other)    -> WARN( True, text "substWorker: DoneEx" <+> ppr w )
-				  Nothing	-- Worker has got substituted away altogether
-	Just (ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w )
-				  Nothing	-- Ditto
+				  NoWorker	-- Worker has got substituted away altogether
+	Just (ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
+				  NoWorker	-- Ditto
 			
 substRules :: Subst -> CoreRules -> CoreRules
 	-- Seq'ing on the returned CoreRules is enough to cause all the 

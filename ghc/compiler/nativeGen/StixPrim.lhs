@@ -16,9 +16,9 @@ import AbsCSyn 		hiding ( spRel )
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import Constants	( uF_UPDATEE )
 import SMRep		( fixedHdrSize )
-import Const		( Literal(..) )
+import Literal		( Literal(..) )
 import CallConv		( cCallConv )
-import PrimOp		( PrimOp(..) )
+import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import UniqSupply	( returnUs, thenUs, UniqSM )
 import Constants	( mIN_INTLIKE )
@@ -213,7 +213,7 @@ primCode [] (WriteByteArrayOp pk) [obj, ix, v]
 
 \begin{code}
 --primCode lhs (CCallOp fn is_asm may_gc) rhs
-primCode lhs (CCallOp (Left fn) is_asm may_gc cconv) rhs
+primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"
   | may_gc = error "ERROR: Native code generator can't handle _ccall_GC_\n"
   | otherwise
@@ -377,7 +377,7 @@ amodeToStix (CCharLike x)
   where
     off = StPrim IntMulOp [amodeToStix x, StInt (toInteger charLikeSize)]
 
-amodeToStix (CIntLike (CLit (MachInt i _)))
+amodeToStix (CIntLike (CLit (MachInt i)))
   = StLitLbl ((<>) (ptext SLIT("INTLIKE_closure+")) (int off))
   where
     off = intLikeSize * (fromInteger (i - mIN_INTLIKE))
@@ -390,7 +390,7 @@ amodeToStix (CLit core)
       MachChar c     -> StInt (toInteger (ord c))
       MachStr s	     -> StString s
       MachAddr a     -> StInt a
-      MachInt i _    -> StInt (toInteger i)
+      MachInt i      -> StInt (toInteger i)
       MachLitLit s _ -> {-trace (_UNPK_ s ++ "\n")-} (litLitToStix (_UNPK_ s))
       MachFloat d    -> StDouble d
       MachDouble d   -> StDouble d

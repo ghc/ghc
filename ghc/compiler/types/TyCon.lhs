@@ -10,6 +10,7 @@ module TyCon(
 	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
 	isEnumerationTyCon, isTupleTyCon, isUnboxedTupleTyCon,
+	isRecursiveTyCon,
 
 	mkAlgTyCon,
 	mkFunTyCon,
@@ -276,17 +277,16 @@ isDataTyCon other = False
 isNewTyCon (AlgTyCon {algTyConFlavour = NewType}) = True 
 isNewTyCon other			          = False
 
--- A "product" tycon is 
---	non-recursive 
---	has one constructor, 
+-- A "product" tycon
+--	has *one* constructor, 
 --	is *not* existential
---	is *not* an unboxed tuple
--- whether DataType or NewType
-isProductTyCon (AlgTyCon {dataCons = [data_con], algTyConRec = NonRecursive}) 
-  = not (isExistentialDataCon data_con)
-isProductTyCon (TupleTyCon { tyConBoxed = boxed }) 
-  = boxed
-isProductTyCon other = False
+-- but
+--	may be  DataType or NewType, 
+-- 	may be  unboxed or not, 
+--	may be  recursive or not
+isProductTyCon (AlgTyCon {dataCons = [data_con]}) = not (isExistentialDataCon data_con)
+isProductTyCon (TupleTyCon {}) 			  = True
+isProductTyCon other				  = False
 
 isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
@@ -300,6 +300,9 @@ isTupleTyCon other = False
 
 isUnboxedTupleTyCon (TupleTyCon {tyConBoxed = False}) = True
 isUnboxedTupleTyCon other = False
+
+isRecursiveTyCon (AlgTyCon {algTyConRec = Recursive}) = True
+isRecursiveTyCon other				      = False
 \end{code}
 
 \begin{code}

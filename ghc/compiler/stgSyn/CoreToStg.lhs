@@ -17,28 +17,31 @@ module CoreToStg ( topCoreBindsToStg ) where
 import CoreSyn		-- input
 import StgSyn		-- output
 
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
-import Id		( Id, mkSysLocal, idType, getIdStrictness, idUnique, isExportedId, mkVanillaId,
-			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo, setIdType
+import Id		( Id, mkSysLocal, idType, idStrictness, idUnique, isExportedId, mkVanillaId,
+			  externallyVisibleId, setIdUnique, idName, 
+			  idDemandInfo, idArity, setIdType, idFlavour
 			)
 import Var		( Var, varType, modifyIdInfo )
-import IdInfo		( setDemandInfo, StrictnessInfo(..) )
+import IdInfo		( setDemandInfo, StrictnessInfo(..), IdFlavour(..) )
 import UsageSPUtils     ( primOpUsgTys )
-import DataCon		( DataCon, dataConName, dataConId )
+import DataCon		( DataCon, dataConName, isDynDataCon, dataConWrapId )
 import Demand		( Demand, isStrict, wwStrict, wwLazy )
 import Name	        ( Name, nameModule, isLocallyDefinedName, setNameUnique )
 import Module		( isDynamicModule )
-import Const	        ( Con(..), Literal(..), isLitLitLit, conStrictness, isWHNFCon )
+import Literal	        ( Literal(..) )
 import VarEnv
-import PrimOp		( PrimOp(..), primOpUsg, primOpSig )
+import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..), primOpUsg )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
-                          UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType, seqType )
+                          UsageAnn(..), tyUsg, applyTy, mkUsgTy, repType, seqType,
+			  splitRepFunTys, mkFunTys
+			)
 import TysPrim		( intPrimTy )
 import UniqSupply	-- all of it, really
 import Util		( lengthExceeds )
-import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
+import BasicTypes	( TopLevelFlag(..), isNotTopLevel, Arity )
 import CmdLineOpts	( opt_D_verbose_stg2stg, opt_UsageSPOn )
 import UniqSet		( emptyUniqSet )
 import Maybes
@@ -154,7 +157,7 @@ isOnceTy ty
       UsVar uv -> pprPanic "CoreToStg: unexpected uvar annot:" (ppr uv)
 
 bdrDem :: Id -> RhsDemand
-bdrDem id = mkDem (getIdDemandInfo id) (isOnceTy (idType id))
+bdrDem id = mkDem (idDemandInfo id) (isOnceTy (idType id))
 
 safeDem, onceDem :: RhsDemand
 safeDem = RhsDemand False False  -- always safe to use this
@@ -221,7 +224,7 @@ topCoreBindsToStg us core_binds
 coreBindToStg :: TopLevelFlag -> StgEnv -> CoreBind -> UniqSM (StgFloatBind, StgEnv)
 
 coreBindToStg top_lev env (NonRec binder rhs)
-  = coreExprToStgFloat env rhs dem			`thenUs` \ (floats, stg_rhs) ->
+  = coreExprToStgFloat env rhs			`thenUs` \ (floats, stg_rhs) ->
     case (floats, stg_rhs) of
 	([], StgApp var []) | not (isExportedId binder)
 		     -> returnUs (NoBindF, extendVarEnv env binder var)
@@ -236,18 +239,17 @@ coreBindToStg top_lev env (NonRec binder rhs)
   where
     dem = bdrDem binder
 
+
 coreBindToStg top_lev env (Rec pairs)
   = newLocalIds top_lev env binders	`thenUs` \ (env', binders') ->
     mapUs (do_rhs env') pairs		`thenUs` \ stg_rhss ->
     returnUs (RecF (binders' `zip` stg_rhss), env')
   where
     binders = map fst pairs
-    do_rhs env (bndr,rhs) = coreExprToStgFloat env rhs dem	`thenUs` \ (floats, stg_expr) ->
+    do_rhs env (bndr,rhs) = coreExprToStgFloat env rhs		`thenUs` \ (floats, stg_expr) ->
 			    mkStgBinds floats stg_expr		`thenUs` \ stg_expr' ->
 				-- NB: stg_expr' might still be a StgLam (and we want that)
-			    returnUs (exprToRhs dem top_lev stg_expr')
-			  where
-			    dem = bdrDem bndr
+			    returnUs (exprToRhs (bdrDem bndr) top_lev stg_expr')
 \end{code}
 
 
@@ -299,18 +301,13 @@ exprToRhs dem _ (StgLam _ bndrs body)
   constructors (ala C++ static class constructors) which will
   then be run at load time to fix up static closures.
 -}
-exprToRhs dem toplev (StgCon (DataCon con) args _)
+exprToRhs dem toplev (StgConApp con args)
   | isNotTopLevel toplev ||
     (not is_dynamic  &&
-     all  (not.is_lit_lit) args)  = StgRhsCon noCCS con args
+     all (not . isLitLitArg) args)
+  = StgRhsCon noCCS con args
  where
-  is_dynamic = isDynCon con || any (isDynArg) args
-
-  is_lit_lit (StgVarArg _) = False
-  is_lit_lit (StgConArg x) =
-     case x of
-       Literal l -> isLitLitLit l
-       _         -> False
+  is_dynamic = isDynDataCon con || any (isDynArg) args
 
 exprToRhs dem _ expr
   = upd `seq` 
@@ -324,22 +321,6 @@ exprToRhs dem _ expr
   where
     upd = if isOnceDem dem then SingleEntry else Updatable
 				-- HA!  Paydirt for "dem"
-
-isDynCon :: DataCon -> Bool
-isDynCon con = isDynName (dataConName con)
-
-isDynArg :: StgArg -> Bool
-isDynArg (StgVarArg v)   = isDynName (idName v)
-isDynArg (StgConArg con) =
-  case con of
-    DataCon dc -> isDynCon dc
-    Literal l  -> isLitLitLit l
-    _          -> False
-
-isDynName :: Name -> Bool
-isDynName nm = 
-      not (isLocallyDefinedName nm) && 
-      isDynamicModule (nameModule nm)
 \end{code}
 
 
@@ -366,14 +347,19 @@ coreArgToStg :: StgEnv -> (CoreArg,RhsDemand) -> UniqSM ([StgFloatBind], StgArg)
 -- This is where we arrange that a non-trivial argument is let-bound
 
 coreArgToStg env (arg,dem)
-  = coreExprToStgFloat env arg dem		`thenUs` \ (floats, arg') ->
+  = coreExprToStgFloat env arg		`thenUs` \ (floats, arg') ->
     case arg' of
-	StgCon con [] _ -> returnUs (floats, StgConArg con)
-	StgApp v []	-> returnUs (floats, StgVarArg v)
-	other		-> newStgVar arg_ty	`thenUs` \ v ->
-			   returnUs ([NonRecF v arg' dem floats], StgVarArg v)
+	StgApp v []	 -> returnUs (floats, StgVarArg v)
+	StgLit lit	 -> returnUs (floats, StgLitArg lit)
+
+	StgConApp con [] -> returnUs (floats, StgVarArg (dataConWrapId con))
+		-- A nullary constructor can be replaced with
+		-- a ``call'' to its wrapper
+
+	other		 -> newStgVar arg_ty	`thenUs` \ v ->
+			    returnUs ([NonRecF v arg' dem floats], StgVarArg v)
   where
-    arg_ty = coreExprType arg
+    arg_ty = exprType arg
 \end{code}
 
 
@@ -384,9 +370,9 @@ coreArgToStg env (arg,dem)
 %************************************************************************
 
 \begin{code}
-coreExprToStg :: StgEnv -> CoreExpr -> RhsDemand -> UniqSM StgExpr
-coreExprToStg env expr dem
-  = coreExprToStgFloat env expr dem	`thenUs` \ (binds,stg_expr) ->
+coreExprToStg :: StgEnv -> CoreExpr -> UniqSM StgExpr
+coreExprToStg env expr
+  = coreExprToStgFloat env expr 	`thenUs` \ (binds,stg_expr) ->
     mkStgBinds binds stg_expr		`thenUs` \ stg_expr' ->
     deStgLam stg_expr'
 \end{code}
@@ -399,41 +385,40 @@ coreExprToStg env expr dem
 
 \begin{code}
 coreExprToStgFloat :: StgEnv -> CoreExpr 
-		   -> RhsDemand
 		   -> UniqSM ([StgFloatBind], StgExpr)
--- Transform an expression to STG. The demand on the expression is
--- given by RhsDemand, and is solely used ot figure out the usage
--- of constructor args: if the constructor is used once, then so are
--- its arguments.  The strictness info in RhsDemand isn't used.
-
--- The StgExpr returned *can* be an StgLam
+-- Transform an expression to STG.  The 'floats' are
+-- any bindings we had to create for function arguments.
 \end{code}
 
 Simple cases first
 
 \begin{code}
-coreExprToStgFloat env (Var var) dem
-  = returnUs ([], mkStgApp (stgLookup env var) [])
+coreExprToStgFloat env (Var var)
+  = mkStgApp env var [] (idType var)	`thenUs` \ app -> 
+    returnUs ([], app)
 
-coreExprToStgFloat env (Let bind body) dem
+coreExprToStgFloat env (Lit lit)
+  = returnUs ([], StgLit lit)
+
+coreExprToStgFloat env (Let bind body)
   = coreBindToStg NotTopLevel env bind	`thenUs` \ (new_bind, new_env) ->
-    coreExprToStgFloat new_env body dem	`thenUs` \ (floats, stg_body) ->
+    coreExprToStgFloat new_env body	`thenUs` \ (floats, stg_body) ->
     returnUs (new_bind:floats, stg_body)
 \end{code}
 
 Convert core @scc@ expression directly to STG @scc@ expression.
 
 \begin{code}
-coreExprToStgFloat env (Note (SCC cc) expr) dem
-  = coreExprToStg env expr dem  `thenUs` \ stg_expr ->
+coreExprToStgFloat env (Note (SCC cc) expr)
+  = coreExprToStg env expr	`thenUs` \ stg_expr ->
     returnUs ([], StgSCC cc stg_expr)
 
-coreExprToStgFloat env (Note other_note expr) dem
-  = coreExprToStgFloat env expr dem
+coreExprToStgFloat env (Note other_note expr)
+  = coreExprToStgFloat env expr
 \end{code}
 
 \begin{code}
-coreExprToStgFloat env expr@(Type _) dem
+coreExprToStgFloat env expr@(Type _)
   = pprPanic "coreExprToStgFloat: tyarg unexpected:" $ ppr expr
 \end{code}
 
@@ -445,20 +430,18 @@ coreExprToStgFloat env expr@(Type _) dem
 %************************************************************************
 
 \begin{code}
-coreExprToStgFloat env expr@(Lam _ _) dem
+coreExprToStgFloat env expr@(Lam _ _)
   = let
-	expr_ty		= coreExprType expr
+	expr_ty		= exprType expr
 	(binders, body) = collectBinders expr
 	id_binders      = filter isId binders
-        body_dem        = trace "coreExprToStg: approximating body_dem in Lam"
-                          safeDem
     in
     if null id_binders then	-- It was all type/usage binders; tossed
-	coreExprToStgFloat env body dem
+	coreExprToStgFloat env body
     else
 	-- At least some value binders
     newLocalIds NotTopLevel env id_binders	`thenUs` \ (env', binders') ->
-    coreExprToStgFloat env' body body_dem	`thenUs` \ (floats, stg_body) ->
+    coreExprToStgFloat env' body		`thenUs` \ (floats, stg_body) ->
     mkStgBinds floats stg_body			`thenUs` \ stg_body' ->
 
     case stg_body' of
@@ -479,9 +462,9 @@ coreExprToStgFloat env expr@(Lam _ _) dem
 %************************************************************************
 
 \begin{code}
-coreExprToStgFloat env expr@(App _ _) dem
+coreExprToStgFloat env expr@(App _ _)
   = let
-        (fun,rads,_,ss)       = collect_args expr
+        (fun,rads,ty,ss)      = collect_args expr
         ads                   = reverse rads
 	final_ads | null ss   = ads
 		  | otherwise = zap ads	-- Too few args to satisfy strictness info
@@ -494,20 +477,21 @@ coreExprToStgFloat env expr@(App _ _) dem
 
 	-- Now deal with the function
     case (fun, stg_args) of
-      (Var fun_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
+      (Var fn_id, _) -> 	-- A function Id, so do an StgApp; it's ok if
 				-- there are no arguments.
-			    returnUs (arg_floats, 
-				      mkStgApp (stgLookup env fun_id) stg_args)
+			    mkStgApp env fn_id stg_args	ty	`thenUs` \ app -> 
+			    returnUs (arg_floats, app)
 
       (non_var_fun, []) -> 	-- No value args, so recurse into the function
 			    ASSERT( null arg_floats )
-			    coreExprToStgFloat env non_var_fun dem
+			    coreExprToStgFloat env non_var_fun
 
       other ->	-- A non-variable applied to things; better let-bind it.
-		newStgVar (coreExprType fun)		`thenUs` \ fun_id ->
-                coreExprToStgFloat env fun onceDem	`thenUs` \ (fun_floats, stg_fun) ->
-		returnUs (NonRecF fun_id stg_fun onceDem fun_floats : arg_floats,
-			  mkStgApp fun_id stg_args)
+		newStgVar (exprType fun)		`thenUs` \ fn_id ->
+                coreExprToStgFloat env fun 		`thenUs` \ (fun_floats, stg_fun) ->
+		mkStgApp env fn_id stg_args ty		`thenUs` \ app -> 
+		returnUs (NonRecF fn_id stg_fun onceDem fun_floats : arg_floats,
+			  app)
 
   where
 	-- Collect arguments and demands (*in reverse order*)
@@ -540,63 +524,14 @@ coreExprToStgFloat env expr@(App _ _) dem
     collect_args (Var v)
 	= (Var v, [], idType v, stricts)
 	where
-	  stricts = case getIdStrictness v of
+	  stricts = case idStrictness v of
 			StrictnessInfo demands _ -> demands
 			other			 -> repeat wwLazy
 
-    collect_args fun = (fun, [], coreExprType fun, repeat wwLazy)
+    collect_args fun = (fun, [], exprType fun, repeat wwLazy)
 
     -- "zap" nukes the strictness info for a partial application 
     zap ads = [(arg, RhsDemand False once) | (arg, RhsDemand _ once) <- ads]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[coreToStg-con]{Constructors and primops}
-%*									*
-%************************************************************************
-
-For data constructors, the demand on an argument is the demand on the
-constructor as a whole (see module UsageSPInf).  For primops, the
-demand is derived from the type of the primop.
-
-If usage inference is off, we simply make all bindings updatable for
-speed.
-
-\begin{code}
-coreExprToStgFloat env expr@(Con con args) dem
-  = let 
-	expr_ty     = coreExprType expr
-        (stricts,_) = conStrictness con
-        onces = case con of
-                    DEFAULT   -> panic "coreExprToStgFloat: DEFAULT"
-		 
-                    Literal _ -> ASSERT( null args' {-'cpp-} ) []
-		 
-                    DataCon c -> repeat (isOnceDem dem)
-		 			-- HA!  This is the sole reason we propagate
-		 			-- dem all the way down 
-		 
-                    PrimOp  p -> let tyargs      = map (\ (Type ty) -> ty) $
-                                                       takeWhile isTypeArg args
-                                     (arg_tys,_) = primOpUsgTys p tyargs
-                                 in  ASSERT( length arg_tys == length args' {-'cpp-} )
-                                     -- primops always fully applied, so == not >=
-                                     map isOnceTy arg_tys
-
-	dems' = zipWith mkDem stricts onces
-        args' = filter isValArg args
-    in
-    coreArgsToStg env (zip args' dems')                  `thenUs` \ (arg_floats, stg_atoms) ->
-
-	-- YUK YUK: must unique if present
-    (case con of
-       PrimOp (CCallOp (Right _) a b c) -> getUniqueUs   `thenUs` \ u ->
-                                           returnUs (PrimOp (CCallOp (Right u) a b c))
-       _                                -> returnUs con
-    )                                                     `thenUs` \ con' ->
-
-    returnUs (arg_floats, mkStgCon con' stg_atoms expr_ty)
 \end{code}
 
 
@@ -606,82 +541,10 @@ coreExprToStgFloat env expr@(Con con args) dem
 %*									*
 %************************************************************************
 
-First, two special cases.  We mangle cases involving 
-		par# and seq#
-inthe scrutinee.
-
-Up to this point, seq# will appear like this:
-
-	  case seq# e of
-		0# -> seqError#
-		_  -> <stuff>
-
-This code comes from an unfolding for 'seq' in Prelude.hs.
-The 0# branch is purely to bamboozle the strictness analyser.
-For example, if <stuff> is strict in x, and there was no seqError#
-branch, the strictness analyser would conclude that the whole expression
-was strict in x, and perhaps evaluate x first -- but that would be a DISASTER.
-
-Now that the evaluation order is safe, we translate this into
-
-	  case e of
-		_ -> ...
-
-This used to be done in the post-simplification phase, but we need
-unfoldings involving seq# to appear unmangled in the interface file,
-hence we do this mangling here.
-
-Similarly, par# has an unfolding in PrelConc.lhs that makes it show
-up like this:
-
-    	case par# e of
-    	  0# -> rhs
-    	  _  -> parError#
-
-
-    ==>
-    	case par# e of
-    	  _ -> rhs
-
-fork# isn't handled like this - it's an explicit IO operation now.
-The reason is that fork# returns a ThreadId#, which gets in the
-way of the above scheme.  And anyway, IO is the only guaranteed
-way to enforce ordering  --SDM.
-
-
 \begin{code}
-coreExprToStgFloat env 
-	(Case scrut@(Con (PrimOp SeqOp) [Type ty, e]) bndr alts) dem
-  = coreExprToStgFloat env (Case e new_bndr [(DEFAULT,[],default_rhs)]) dem
-  where 
-    (other_alts, maybe_default) = findDefault alts
-    Just default_rhs	        = maybe_default
-    new_bndr 			= setIdType bndr ty
-	-- NB:  SeqOp :: forall a. a -> Int#
-	-- So bndr has type Int# 
-	-- But now we are going to scrutinise the SeqOp's argument directly,
-	-- so we must change the type of the case binder to match that
-	-- of the argument expression e.  We can get this type from the argument
-	-- type of the SeqOp.
-
-coreExprToStgFloat env 
-	(Case scrut@(Con (PrimOp ParOp) args) bndr alts) dem
-  | maybeToBool maybe_default
-  = coreExprToStgFloat env scrut (bdrDem bndr)	`thenUs` \ (binds, scrut') ->
-    newEvaldLocalId env bndr			`thenUs` \ (env', bndr') ->
-    coreExprToStg env' default_rhs dem 		`thenUs` \ default_rhs' ->
-    returnUs (binds, mkStgCase scrut' bndr' (StgPrimAlts (idType bndr') [] (StgBindDefault default_rhs')))
-  where
-    (other_alts, maybe_default) = findDefault alts
-    Just default_rhs		= maybe_default
-\end{code}
-
-Now for normal case expressions...
-
-\begin{code}
-coreExprToStgFloat env (Case scrut bndr alts) dem
-  = coreExprToStgFloat env scrut (bdrDem bndr)	`thenUs` \ (binds, scrut') ->
-    newEvaldLocalId env bndr			`thenUs` \ (env', bndr') ->
+coreExprToStgFloat env (Case scrut bndr alts)
+  = coreExprToStgFloat env scrut		`thenUs` \ (binds, scrut') ->
+    newLocalId NotTopLevel env bndr		`thenUs` \ (env', bndr') ->
     alts_to_stg env' (findDefault alts)		`thenUs` \ alts' ->
     returnUs (binds, mkStgCase scrut' bndr' alts')
   where
@@ -699,23 +562,23 @@ coreExprToStgFloat env (Case scrut bndr alts) dem
 	mapUs (alg_alt_to_stg env) alts		`thenUs` \ alts' ->
 	returnUs (mkStgAlgAlts scrut_ty alts' deflt')
 
-    alg_alt_to_stg env (DataCon con, bs, rhs)
+    alg_alt_to_stg env (DataAlt con, bs, rhs)
 	  = newLocalIds NotTopLevel env (filter isId bs)	`thenUs` \ (env', stg_bs) -> 
-	    coreExprToStg env' rhs dem  		 	`thenUs` \ stg_rhs ->
+	    coreExprToStg env' rhs	  		 	`thenUs` \ stg_rhs ->
 	    returnUs (con, stg_bs, [ True | b <- stg_bs ]{-bogus use mask-}, stg_rhs)
 		-- NB the filter isId.  Some of the binders may be
 		-- existential type variables, which STG doesn't care about
 
-    prim_alt_to_stg env (Literal lit, args, rhs)
+    prim_alt_to_stg env (LitAlt lit, args, rhs)
 	  = ASSERT( null args )
-	    coreExprToStg env rhs dem   `thenUs` \ stg_rhs ->
+	    coreExprToStg env rhs	`thenUs` \ stg_rhs ->
 	    returnUs (lit, stg_rhs)
 
     default_to_stg env Nothing
       = returnUs StgNoDefault
 
     default_to_stg env (Just rhs)
-      = coreExprToStg env rhs dem   `thenUs` \ stg_rhs ->
+      = coreExprToStg env rhs	`thenUs` \ stg_rhs ->
 	returnUs (StgBindDefault stg_rhs)
 		-- The binder is used for prim cases and not otherwise
 		-- (hack for old code gen)
@@ -731,13 +594,6 @@ coreExprToStgFloat env (Case scrut bndr alts) dem
 There's not anything interesting we can ASSERT about \tr{var} if it
 isn't in the StgEnv. (WDP 94/06)
 
-\begin{code}
-stgLookup :: StgEnv -> Id -> Id
-stgLookup env var = case (lookupVarEnv env var) of
-		      Nothing  -> var
-		      Just var -> var
-\end{code}
-
 Invent a fresh @Id@:
 \begin{code}
 newStgVar :: Type -> UniqSM Id
@@ -748,22 +604,6 @@ newStgVar ty
 \end{code}
 
 \begin{code}
-{- 	Now redundant, I believe
--- we overload the demandInfo field of an Id to indicate whether the Id is definitely
--- evaluated or not (i.e. whether it is a case binder).  This can be used to eliminate
--- some redundant cases (c.f. dataToTag# above).
-
-newEvaldLocalId env id
-  = getUniqueUs			`thenUs` \ uniq ->
-    let
-      id'     = modifyIdInfo (`setDemandInfo` wwStrict) (setIdUnique id uniq)
-      new_env = extendVarEnv env id id'
-    in
-    returnUs (new_env, id')
--}
-
-newEvaldLocalId env id = newLocalId NotTopLevel env id
-
 newLocalId TopLevel env id
   -- Don't clone top-level binders.  MkIface relies on their
   -- uniques staying the same, so it can snaffle IdInfo off the
@@ -809,23 +649,64 @@ newLocalIds top_lev env (b:bs)
 \begin{code}
 mkStgAlgAlts  ty alts deflt = seqType ty `seq` StgAlgAlts  ty alts deflt
 mkStgPrimAlts ty alts deflt = seqType ty `seq` StgPrimAlts ty alts deflt
-mkStgCon con args ty	    = seqType ty `seq` StgCon con args ty
 mkStgLam ty bndrs body	    = seqType ty `seq` StgLam ty bndrs body
 
-mkStgApp :: Id -> [StgArg] -> StgExpr
-mkStgApp fn args = fn `seq` StgApp fn args
-	-- Force the lookup
+mkStgApp :: StgEnv -> Id -> [StgArg] -> Type -> UniqSM StgExpr
+	-- The type is the type of the entire application
+mkStgApp env fn args ty
+ = case idFlavour fn_alias of
+      DataConId dc 
+	-> saturate fn_alias args ty	$ \ args' ty' ->
+	   returnUs (StgConApp dc args')
+
+      PrimOpId (CCallOp (CCall (DynamicTarget _) a b c))
+		-- Sigh...make a guaranteed unique name for a dynamic ccall
+	-> saturate fn_alias args ty	$ \ args' ty' ->
+	   getUniqueUs   		`thenUs` \ u ->
+           returnUs (StgPrimApp (CCallOp (CCall (DynamicTarget u) a b c)) args' ty')
+
+      PrimOpId op 
+	-> saturate fn_alias args ty	$ \ args' ty' ->
+	   returnUs (StgPrimApp op args' ty')
+
+      other -> returnUs (StgApp fn_alias args)
+			-- Force the lookup
+  where
+    fn_alias = case (lookupVarEnv env fn) of	-- In case it's been cloned
+		      Nothing  -> fn
+		      Just fn' -> fn'
+
+saturate :: Id -> [StgArg] -> Type -> ([StgArg] -> Type -> UniqSM StgExpr) -> UniqSM StgExpr
+saturate fn args ty thing_inside
+  | excess_arity == 0	-- Saturated, so nothing to do
+  = thing_inside args ty
+
+  | otherwise	-- An unsaturated constructor or primop; eta expand it
+  = ASSERT2( excess_arity > 0 && excess_arity <= length extra_arg_tys, 
+	     ppr fn <+> ppr args <+> ppr excess_arity )
+    mapUs newStgVar extra_arg_tys 				`thenUs` \ arg_vars ->
+    thing_inside (args ++ map StgVarArg arg_vars) final_res_ty  `thenUs` \ body ->
+    returnUs (StgLam ty arg_vars body)
+  where
+    fn_arity		= idArity fn
+    excess_arity	= fn_arity - length args
+    (arg_tys, res_ty)	= splitRepFunTys ty
+    extra_arg_tys	= take excess_arity arg_tys
+    final_res_ty	= mkFunTys (drop excess_arity arg_tys) res_ty
 \end{code}
 
 \begin{code}
--- Stg doesn't have a lambda *expression*, 
-deStgLam (StgLam ty bndrs body) = mkStgLamExpr ty bndrs body
-deStgLam expr		        = returnUs expr
-
-mkStgLamExpr ty bndrs body
+-- Stg doesn't have a lambda *expression*
+deStgLam (StgLam ty bndrs body) 
+	-- Try for eta reduction
   = ASSERT( not (null bndrs) )
-    newStgVar ty		`thenUs` \ fn ->
-    returnUs (StgLet (StgNonRec fn lam_closure) (mkStgApp fn []))
+    case eta body of
+	Just e  -> 	-- Eta succeeded
+		    returnUs e		
+
+	Nothing -> 	-- Eta failed, so let-bind the lambda
+		    newStgVar ty		`thenUs` \ fn ->
+		    returnUs (StgLet (StgNonRec fn lam_closure) (StgApp fn []))
   where
     lam_closure = StgRhsClosure noCCS
 				stgArgOcc
@@ -834,6 +715,52 @@ mkStgLamExpr ty bndrs body
 				ReEntrant 	-- binders is non-empty
 				bndrs
 				body
+
+    eta (StgApp f args)
+	| n_remaining >= 0 &&
+	  and (zipWith ok bndrs last_args) &&
+	  notInExpr bndrs remaining_expr
+	= Just remaining_expr
+	where
+	  remaining_expr = StgApp f remaining_args
+	  (remaining_args, last_args) = splitAt n_remaining args
+	  n_remaining = length args - length bndrs
+
+    eta (StgLet bind@(StgNonRec b r) body)
+	| notInRhs bndrs r = case eta body of
+				Just e -> Just (StgLet bind e)
+				Nothing -> Nothing
+
+    eta _ = Nothing
+
+    ok bndr (StgVarArg arg) = bndr == arg
+    ok bndr other	    = False
+
+deStgLam expr = returnUs expr
+
+
+--------------------------------------------------
+notInExpr :: [Id] -> StgExpr -> Bool
+notInExpr vs (StgApp f args) 		   = notInId vs f && notInArgs vs args
+notInExpr vs (StgLet (StgNonRec b r) body) = notInRhs vs r && notInExpr vs body
+notInExpr vs other			   = False	-- Safe
+
+notInRhs :: [Id] -> StgRhs -> Bool
+notInRhs vs (StgRhsCon _ _ args) 	     = notInArgs vs args
+notInRhs vs (StgRhsClosure _ _ _ _ _ _ body) = notInExpr vs body
+	-- Conservative: we could delete the binders from vs, but
+	-- cloning means this will never help
+
+notInArgs :: [Id] -> [StgArg] -> Bool
+notInArgs vs args = all ok args
+		  where
+		    ok (StgVarArg v) = notInId vs v
+		    ok (StgLitArg l) = True
+
+notInId :: [Id] -> Id -> Bool
+notInId vs v = not (v `elem` vs)
+
+
 
 mkStgBinds :: [StgFloatBind] 
 	   -> StgExpr		-- *Can* be a StgLam 
@@ -895,9 +822,9 @@ mk_stg_let bndr rhs dem floats body
     bndr_rep_ty = repType (idType bndr)
     is_strict   = isStrictDem dem
     is_whnf     = case rhs of
-		    StgCon _ _ _ -> True
-		    StgLam _ _ _ -> True
-		    other	 -> False
+		    StgConApp _ _ -> True
+		    StgLam _ _ _  -> True
+		    other	  -> False
 
 -- Split at the first strict binding
 splitFloats fs@(NonRecF _ _ dem _ : _) 
@@ -907,7 +834,80 @@ splitFloats (f : fs) = case splitFloats fs of
 		  	     (fs_out, fs_in) -> (f : fs_out, fs_in)
 
 splitFloats [] = ([], [])
+\end{code}
 
+
+Making an STG case
+~~~~~~~~~~~~~~~~~~
+
+First, two special cases.  We mangle cases involving 
+		par# and seq#
+inthe scrutinee.
+
+Up to this point, seq# will appear like this:
+
+	  case seq# e of
+		0# -> seqError#
+		_  -> <stuff>
+
+This code comes from an unfolding for 'seq' in Prelude.hs.
+The 0# branch is purely to bamboozle the strictness analyser.
+For example, if <stuff> is strict in x, and there was no seqError#
+branch, the strictness analyser would conclude that the whole expression
+was strict in x, and perhaps evaluate x first -- but that would be a DISASTER.
+
+Now that the evaluation order is safe, we translate this into
+
+	  case e of
+		_ -> ...
+
+This used to be done in the post-simplification phase, but we need
+unfoldings involving seq# to appear unmangled in the interface file,
+hence we do this mangling here.
+
+Similarly, par# has an unfolding in PrelConc.lhs that makes it show
+up like this:
+
+    	case par# e of
+    	  0# -> rhs
+    	  _  -> parError#
+
+
+    ==>
+    	case par# e of
+    	  _ -> rhs
+
+fork# isn't handled like this - it's an explicit IO operation now.
+The reason is that fork# returns a ThreadId#, which gets in the
+way of the above scheme.  And anyway, IO is the only guaranteed
+way to enforce ordering  --SDM.
+
+
+\begin{code}
+-- Discard alernatives in case (par# ..) of 
+mkStgCase scrut@(StgPrimApp ParOp _ _) bndr
+	  (StgPrimAlts ty _ deflt@(StgBindDefault _))
+  = StgCase scrut bOGUS_LVs bOGUS_LVs bndr noSRT (StgPrimAlts ty [] deflt)
+
+mkStgCase (StgPrimApp SeqOp [scrut] _) bndr 
+	  (StgPrimAlts _ _ deflt@(StgBindDefault rhs))
+  = mkStgCase scrut_expr new_bndr (StgAlgAlts scrut_ty [] (StgBindDefault rhs))
+  where
+    new_alts | isUnLiftedType scrut_ty = WARN( True, text "mkStgCase" ) StgPrimAlts scrut_ty [] deflt
+	     | otherwise	       = StgAlgAlts  scrut_ty [] deflt
+    scrut_ty = stgArgType scrut
+    new_bndr = setIdType bndr scrut_ty
+	-- NB:  SeqOp :: forall a. a -> Int#
+	-- So bndr has type Int# 
+	-- But now we are going to scrutinise the SeqOp's argument directly,
+	-- so we must change the type of the case binder to match that
+	-- of the argument expression e.
+
+    scrut_expr = case scrut of
+		   StgVarArg v -> StgApp v []
+		   -- Others should not happen because 
+		   -- seq of a value should have disappeared
+		   StgLitArg l -> WARN( True, text "seq on" <+> ppr l ) StgLit l
 
 mkStgCase scrut bndr alts
   = ASSERT( case scrut of { StgLam _ _ _ -> False; other -> True } )

@@ -118,13 +118,13 @@ length l                =  len l 0#
 -- elements that satisfy the predicate; i.e.,
 -- filter p xs = [ x | x <- xs, p x]
 filter :: (a -> Bool) -> [a] -> [a]
-{-# INLINE filter #-}
-filter p xs = build (\c n -> foldr (filterFB c p) n xs)
+filter = filterList
 
 filterFB c p x r | p x       = x `c` r
 		 | otherwise = r
 
 {-# RULES
+"filter"	forall p xs.	filter p xs = build (\c n -> foldr (filterFB c p) n xs)
 "filterFB"	forall c p q.	filterFB (filterFB c p) q = filterFB c (\x -> p x && q x)
 "filterList" 	forall p.	foldr (filterFB (:) p) [] = filterList p
  #-}
@@ -186,28 +186,28 @@ scanr1 _ []             =  errorEmptyList "scanr1"
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
 iterate :: (a -> a) -> a -> [a]
-{-# INLINE iterate #-}
-iterate f x = build (\c _n -> iterateFB c f x)
+iterate = iterateList
 
 iterateFB c f x = x `c` iterateFB c f (f x)
 
 iterateList f x =  x : iterateList f (f x)
 
 {-# RULES
-"iterate" 	iterateFB (:) = iterateList
+"iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
+"iterateFB" 			iterateFB (:) = iterateList
  #-}
 
 
 -- repeat x is an infinite list, with x the value of every element.
 repeat :: a -> [a]
-{-# INLINE repeat #-}
-repeat x = build (\c _n -> repeatFB c x)
+repeat = repeatList
 
 repeatFB c x = xs where xs = x `c` xs
 repeatList x = xs where xs = x :   xs
 
 {-# RULES
-"repeat" 	repeatFB (:) = repeatList
+"repeat"	forall x. repeat x	= build (\c _n -> repeatFB c x)
+"repeatFB" 		  repeatFB (:)	= repeatList
  #-}
 
 -- replicate n x is a list of length n with x the value of every element
@@ -491,8 +491,7 @@ tuples are in the List library
 \begin{code}
 ----------------------------------------------
 zip :: [a] -> [b] -> [(a,b)]
-{-# INLINE zip #-}
-zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
+zip = zipList
 
 zipFB c x y r = (x,y) `c` r
 
@@ -502,7 +501,8 @@ zipList (a:as) (b:bs) = (a,b) : zipList as bs
 zipList _      _      = []
 
 {-# RULES
-"zipList"	foldr2 (zipFB (:)) [] = zipList
+"zip"		forall xs ys. zip xs ys	= build (\c n -> foldr2 (zipFB c) n xs ys)
+"zipList"	foldr2 (zipFB (:)) []   = zipList
  #-}
 \end{code}
 
@@ -525,8 +525,8 @@ zip3 _      _      _      = []
 \begin{code}
 ----------------------------------------------
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-{-# INLINE zipWith #-}
-zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
+zipWith = zipWithList
+
 
 zipWithFB c f x y r = (x `f` y) `c` r
 
@@ -535,7 +535,8 @@ zipWithList f (a:as) (b:bs) = f a b : zipWithList f as bs
 zipWithList _ _      _      = []
 
 {-# RULES
-"zipWithList"	forall f. foldr2 (zipWithFB (:) f) [] = zipWithList f
+"zipWith"	forall f xs ys.	zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
+"zipWithList"	forall f. 	foldr2 (zipWithFB (:) f) [] = zipWithList f
   #-}
 \end{code}
 

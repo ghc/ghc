@@ -25,8 +25,8 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
 #include "HsVersions.h"
 
 import CoreSyn
-import Const            ( Con(..), Literal(..) )
-import Var              ( IdOrTyVar, varName, varType, setVarType, mkUVar )
+import Literal          ( Literal(..) )
+import Var              ( Var, varName, varType, setVarType, mkUVar )
 import Id               ( mayHaveNoBinding, isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
@@ -180,11 +180,11 @@ usage info in its type that must at all costs be preserved.  This is
 assumed true (exactly) of all imported ids.
 
 \begin{code}
-hasLocalDef :: IdOrTyVar -> Bool
+hasLocalDef :: Var -> Bool
 hasLocalDef var = isLocallyDefined var
                   && not (mayHaveNoBinding var)
 
-hasUsgInfo :: IdOrTyVar -> Bool
+hasUsgInfo :: Var -> Bool
 hasUsgInfo var = (not . isLocallyDefined) var
 \end{code}
 
@@ -209,8 +209,8 @@ genAnnotBind :: (MungeFlags -> Type -> AnnotM flexi Type)  -- type-altering func
              -> CoreBind                          -- original CoreBind
              -> AnnotM flexi
                        (CoreBind,                 -- annotated CoreBind
-                        [IdOrTyVar],              -- old variables, to be mapped to...
-                        [IdOrTyVar])              -- ... new variables
+                        [Var],              -- old variables, to be mapped to...
+                        [Var])              -- ... new variables
 
 genAnnotBind f g (NonRec v1 e1) = do { v1' <- genAnnotVar f v1
                                      ; e1' <- genAnnotCE f g e1
@@ -230,7 +230,7 @@ genAnnotCE :: (MungeFlags -> Type -> AnnotM flexi Type)  -- type-altering functi
            -> AnnotM flexi CoreExpr                -- yields new expression
 
 genAnnotCE mungeType mungeTerm = go
-  where go e0@(Var v) | isTyVar v    = return e0  -- arises, e.g., as tyargs of Con
+  where go e0@(Var v) | isTyVar v    = return e0  -- arises, e.g., as tyargs of constructor
                                                   -- (no it doesn't: (Type (TyVar tyvar))
                       | otherwise    = do { mv' <- lookupAnnVar v
                                           ; v'  <- case mv' of
@@ -239,10 +239,8 @@ genAnnotCE mungeType mungeTerm = go
                                           ; return (Var v')
                                           }
 
-        go (Con c args)              = -- we know it's saturated
-                                       do { args' <- mapM go args
-                                          ; return (Con c args')
-                                          }
+        go (Lit l)                   = -- we know it's saturated
+                                       return (Lit l)
 
         go (App e arg)               = do { e' <- go e
                                           ; arg' <- go arg
@@ -320,8 +318,8 @@ genAnnotCE mungeType mungeTerm = go
 
 
 genAnnotVar :: (MungeFlags -> Type -> AnnotM flexi Type)
-            -> IdOrTyVar
-            -> AnnotM flexi IdOrTyVar
+            -> Var
+            -> AnnotM flexi Var
 
 genAnnotVar mungeType v | isTyVar v = return v
                         | otherwise = do { vty' <- mungeType (sigVarTyMF v) (varType v)
@@ -551,8 +549,8 @@ variable mapping, along with some general state.
 
 \begin{code}
 newtype AnnotM flexi a = AnnotM (   flexi                     -- UniqSupply etc
-                                  -> VarEnv IdOrTyVar         -- unannotated to annotated variables
-                                  -> (a,flexi,VarEnv IdOrTyVar))
+                                  -> VarEnv Var         -- unannotated to annotated variables
+                                  -> (a,flexi,VarEnv Var))
 unAnnotM (AnnotM f) = f
 
 instance Monad (AnnotM flexi) where
@@ -563,17 +561,17 @@ instance Monad (AnnotM flexi) where
 initAnnotM :: fl -> AnnotM fl a -> (a,fl)
 initAnnotM fl m = case (unAnnotM m) fl emptyVarEnv of { (r,fl',_) -> (r,fl') }
 
-withAnnVar :: IdOrTyVar -> IdOrTyVar -> AnnotM fl a -> AnnotM fl a
+withAnnVar :: Var -> Var -> AnnotM fl a -> AnnotM fl a
 withAnnVar v v' m = AnnotM (\ us ve -> let ve'          = extendVarEnv ve v v'
                                            (r,us',_)    = (unAnnotM m) us ve'
                                        in  (r,us',ve))
 
-withAnnVars :: [IdOrTyVar] -> [IdOrTyVar] -> AnnotM fl a -> AnnotM fl a
+withAnnVars :: [Var] -> [Var] -> AnnotM fl a -> AnnotM fl a
 withAnnVars vs vs' m = AnnotM (\ us ve -> let ve'          = plusVarEnv ve (zipVarEnv vs vs')
                                               (r,us',_)    = (unAnnotM m) us ve'
                                           in  (r,us',ve))
 
-lookupAnnVar :: IdOrTyVar -> AnnotM fl (Maybe IdOrTyVar)
+lookupAnnVar :: Var -> AnnotM fl (Maybe Var)
 lookupAnnVar var = AnnotM (\ us ve -> (lookupVarEnv ve var,
                                        us,
                                        ve))
@@ -602,8 +600,7 @@ newVarUs e = getUniqueUs `thenUs` \ u ->
              returnUs (UsVar uv)
 {- #ifdef DEBUG
              let src = case e of
-                         Left (Con (Literal _) _) -> "literal"
-                         Left (Con _           _) -> "primop"
+                         Left (Lit _) -> "literal"
                          Left (Lam v e)           -> "lambda: " ++ showSDoc (ppr v)
                          Left _                   -> "unknown"
                          Right s                  -> s

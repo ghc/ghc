@@ -64,7 +64,7 @@ import MkId		-- Ditto
 
 import PrelMods		-- Prelude module names
 import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName )
-import DataCon		( DataCon )
+import DataCon		( DataCon, dataConId, dataConWrapId )
 import PrimRep		( PrimRep(..) )
 import TysPrim		-- TYPES
 import TysWiredIn
@@ -108,7 +108,7 @@ builtinNames
 	, listToBag (map getName wiredInIds)
 
 		-- PrimOps
-	, listToBag (map (getName . mkPrimitiveId) allThePrimOps)
+	, listToBag (map (getName . mkPrimOpId) allThePrimOps)
 
  		-- Thin-air ids
 	, listToBag thinAirIdNames
@@ -123,8 +123,11 @@ builtinNames
 getTyConNames :: TyCon -> Bag Name
 getTyConNames tycon
     = getName tycon `consBag` 
-      listToBag (map getName (tyConDataCons tycon))
+      unionManyBags (map get_data_con_names (tyConDataCons tycon))
 	-- Synonyms return empty list of constructors
+    where
+      get_data_con_names dc = listToBag [getName (dataConId dc),	-- Worker
+					 getName (dataConWrapId dc)]	-- Wrapper
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make

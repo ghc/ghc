@@ -14,13 +14,25 @@ types that
 
 \begin{code}
 module BasicTypes(
-	Version, Arity, 
+	Version,
+
+	Arity, 
+
 	Unused, unused,
+
 	Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, negateFixity, negatePrecedence,
+
 	NewOrData(..), 
+
 	RecFlag(..), isRec, isNonRec,
-	TopLevelFlag(..), isTopLevel, isNotTopLevel
+
+	TopLevelFlag(..), isTopLevel, isNotTopLevel,
+
+	OccInfo(..), seqOccInfo, isFragileOccInfo,
+	InsideLam, insideLam, notInsideLam,
+	OneBranch, oneBranch, notOneBranch
+
    ) where
 
 #include "HsVersions.h"
@@ -151,3 +163,64 @@ isNonRec :: RecFlag -> Bool
 isNonRec Recursive    = False
 isNonRec NonRecursive = True
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Occurrence information}
+%*									*
+%************************************************************************
+
+This data type is used exclusively by the simplifier, but it appears in a
+SubstResult, which is currently defined in VarEnv, which is pretty near
+the base of the module hierarchy.  So it seemed simpler to put the
+defn of OccInfo here, safely at the bottom
+
+\begin{code}
+data OccInfo 
+  = NoOccInfo
+
+  | IAmDead		-- Marks unused variables.  Sometimes useful for
+			-- lambda and case-bound variables.
+
+  | OneOcc InsideLam
+
+ 	   OneBranch
+
+  | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
+			-- in a group of recursive definitions
+
+seqOccInfo :: OccInfo -> ()
+seqOccInfo (OneOcc in_lam once) = in_lam `seq` once `seq` ()
+seqOccInfo occ			= ()
+
+type InsideLam = Bool	-- True <=> Occurs inside a non-linear lambda
+			-- Substituting a redex for this occurrence is
+			-- dangerous because it might duplicate work.
+insideLam    = True
+notInsideLam = False
+
+type OneBranch = Bool	-- True <=> Occurs in only one case branch
+			--	so no code-duplication issue to worry about
+oneBranch    = True
+notOneBranch = False
+
+isFragileOccInfo :: OccInfo -> Bool
+isFragileOccInfo (OneOcc _ _) = True
+isFragileOccInfo other	      = False
+\end{code}
+
+\begin{code}
+instance Outputable OccInfo where
+  -- only used for debugging; never parsed.  KSW 1999-07
+  ppr NoOccInfo  			  	  = empty
+  ppr IAmALoopBreaker 				  = ptext SLIT("_Kx")
+  ppr IAmDead					  = ptext SLIT("_Kd")
+  ppr (OneOcc inside_lam one_branch) | inside_lam = ptext SLIT("_Kl")
+				     | one_branch = ptext SLIT("_Ks")
+				     | otherwise  = ptext SLIT("_Ks*")
+
+instance Show OccInfo where
+  showsPrec p occ = showsPrecSDoc p (ppr occ)
+\end{code}
+

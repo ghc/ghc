@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.27 2000/03/02 22:51:30 lewie Exp $
+$Id: Parser.y,v 1.28 2000/03/23 17:45:22 simonpj Exp $
 
 Haskell grammar.
 
@@ -381,9 +381,8 @@ decls 	:: { [RdrBinding] }
 	| {- empty -}			{ [] }
 
 decl 	:: { RdrBinding }
-	: signdecl			{ $1 }
- 	| fixdecl			{ $1 }
-	| valdef			{ RdrValBinding $1 }
+	: fixdecl			{ $1 }
+	| valdef			{ $1 }
 	| '{-# INLINE'   srcloc opt_phase qvar '#-}'	{ RdrSig (InlineSig $4 $3 $2) }
 	| '{-# NOINLINE' srcloc opt_phase qvar '#-}'	{ RdrSig (NoInlineSig $4 $3 $2) }
 	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
@@ -422,29 +421,12 @@ fixdecl :: { RdrBinding }
 							    (Fixity $3 $2) $1))
 					    | n <- $4 ] }
 
-signdecl :: { RdrBinding }
-	: vars srcloc '::' sigtype	{ foldr1 RdrAndBindings 
-					      [ RdrSig (Sig n $4 $2) | n <- $1 ] }
-
 sigtype :: { RdrNameHsType }
-	: ctype			{ mkHsForAllTy Nothing [] $1 }
+	: ctype				{ mkHsForAllTy Nothing [] $1 }
 
-{-
-  ATTENTION: Dirty Hackery Ahead! If the second alternative of vars is var
-  instead of qvar, we get another shift/reduce-conflict. Consider the
-  following programs:
-  
-     { (+) :: ... }          only var
-     { (+) x y  = ... }      could (incorrectly) be qvar
-  
-  We re-use expressions for patterns, so a qvar would be allowed in patterns
-  instead of a var only (which would be correct). But deciding what the + is,
-  would require more lookahead. So let's check for ourselves...
--}
-
-vars	:: { [RdrName] }
-	: vars ',' var			{ $3 : $1 }
-	| qvar				{ [ $1 ] }
+sig_vars :: { [RdrName] }
+	 : sig_vars ',' var		{ $3 : $1 }
+	 | var				{ [ $1 ] }
 
 -----------------------------------------------------------------------------
 -- Transformation Rules
@@ -583,9 +565,9 @@ constrs :: { [RdrNameConDecl] }
 
 constr :: { RdrNameConDecl }
 	: srcloc forall context constr_stuff
-		{ ConDecl (fst $4) $2 $3 (snd $4) $1 }
+		{ mkConDecl (fst $4) $2 $3 (snd $4) $1 }
 	| srcloc forall constr_stuff
-		{ ConDecl (fst $3) $2 [] (snd $3) $1 }
+		{ mkConDecl (fst $3) $2 [] (snd $3) $1 }
 
 forall :: { [RdrNameHsTyVar] }
 	: 'forall' tyvars '.'		{ $2 }
@@ -600,9 +582,9 @@ constr_stuff :: { (RdrName, RdrNameConDetails) }
 	| con '{' fielddecls '}' 	{ ($1, RecCon (reverse $3)) }
 
 newconstr :: { RdrNameConDecl }
-	: srcloc conid atype	{ ConDecl $2 [] [] (NewCon $3 Nothing) $1 }
+	: srcloc conid atype	{ mkConDecl $2 [] [] (NewCon $3 Nothing) $1 }
 	| srcloc conid '{' var '::' type '}'
-				{ ConDecl $2 [] [] (NewCon $6 (Just $4)) $1 }
+				{ mkConDecl $2 [] [] (NewCon $6 (Just $4)) $1 }
 
 scontype :: { (RdrName, [RdrNameBangType]) }
 	: btype				{% splitForConApp $1 [] }
@@ -625,7 +607,7 @@ fielddecls :: { [([RdrName],RdrNameBangType)] }
 	| fielddecl			{ [$1] }
 
 fielddecl :: { ([RdrName],RdrNameBangType) }
-	: vars '::' stype		{ (reverse $1, $3) }
+	: sig_vars '::' stype		{ (reverse $1, $3) }
 
 stype :: { RdrNameBangType }
 	: ctype				{ Unbanged $1 }	
@@ -644,9 +626,32 @@ dclasses :: { [RdrName] }
 -----------------------------------------------------------------------------
 -- Value definitions
 
-valdef :: { RdrNameMonoBinds }
-	: infixexp {-ToDo: opt_sig-} srcloc rhs	
-					{% checkValDef $1 Nothing $3 $2 }
+{- There's an awkward overlap with a type signature.  Consider
+	f :: Int -> Int = ...rhs...
+   Then we can't tell whether it's a type signature or a value
+   definition with a result signature until we see the '='.
+   So we have to inline enough to postpone reductions until we know.
+-}
+
+{-
+  ATTENTION: Dirty Hackery Ahead! If the second alternative of vars is var
+  instead of qvar, we get another shift/reduce-conflict. Consider the
+  following programs:
+  
+     { (^^) :: Int->Int ; }          Type signature; only var allowed
+
+     { (^^) :: Int->Int = ... ; }    Value defn with result signature;
+				     qvar allowed (because of instance decls)
+  
+  We can't tell whether to reduce var to qvar until after we've read the signatures.
+-}
+
+valdef :: { RdrBinding }
+	: infixexp srcloc opt_sig rhs		{% checkValDef $1 $3 $4 $2 }
+	| infixexp srcloc '::' sigtype		{% checkValSig $1 $4 $2 }
+	| var ',' sig_vars srcloc '::' sigtype	{ foldr1 RdrAndBindings 
+							 [ RdrSig (Sig n $6 $4) | n <- $1:$3 ]
+						}
 
 rhs	:: { RdrNameGRHSs }
 	: '=' srcloc exp wherebinds	{ GRHSs (unguardedRHS $3 $2) 
@@ -658,8 +663,7 @@ gdrhs :: { [RdrNameGRHS] }
 	| gdrh				{ [$1] }
 
 gdrh :: { RdrNameGRHS }
-	: '|' srcloc quals '=' exp  	{ GRHS (reverse 
-						  (ExprStmt $5 $2 : $3)) $2 }
+	: '|' srcloc quals '=' exp  	{ GRHS (reverse (ExprStmt $5 $2 : $3)) $2 }
 
 -----------------------------------------------------------------------------
 -- Expressions
@@ -685,10 +689,10 @@ exp10 :: { RdrNameHsExpr }
 	| '-' fexp				{ NegApp $2 (error "NegApp") }
   	| srcloc 'do' stmtlist			{ HsDo DoStmt $3 $1 }
 
-	| '_ccall_'    ccallid aexps0		{ CCall $2 $3 False False cbot }
-	| '_ccall_GC_' ccallid aexps0		{ CCall $2 $3 True  False cbot }
-	| '_casm_'     CLITLIT aexps0		{ CCall $2 $3 False True  cbot }
-	| '_casm_GC_'  CLITLIT aexps0		{ CCall $2 $3 True  True  cbot }
+	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 False False cbot }
+	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 True  False cbot }
+	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 False True  cbot }
+	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 True  True  cbot }
 
         | '_scc_' STRING exp    		{ if opt_SccProfilingOn
 							then HsSCC $2 $3
@@ -795,7 +799,7 @@ alt 	:: { RdrNameMatch }
 
 opt_sig :: { Maybe RdrNameHsType }
 	: {- empty -}			{ Nothing }
-	| '::' type			{ Just $2 }
+	| '::' sigtype			{ Just $2 }
 
 opt_asig :: { Maybe RdrNameHsType }
 	: {- empty -}			{ Nothing }
@@ -881,7 +885,11 @@ var 	:: { RdrName }
 
 qvar 	:: { RdrName }
 	: qvarid		{ $1 }
-	| '(' qvarsym ')'	{ $2 }
+	| '(' varsym ')'	{ $2 }
+	| '(' qvarsym1 ')'	{ $2 }
+-- We've inlined qvarsym here so that the decision about
+-- whether it's a qvar or a var can be postponed until
+-- *after* we see the close paren.
 
 ipvar	:: { RdrName }
 	: IPVARID		{ (mkSrcUnqual ipName (tailFS $1)) }

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.39 1999/11/02 15:05:44 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.40 2000/03/23 17:45:19 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -67,7 +67,7 @@ import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject,
 import CgRetConv	( assignRegs )
 import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			  mkInfoTableLabel,
-			  mkConInfoTableLabel, mkStaticClosureLabel, 
+			  mkConInfoTableLabel, 
 			  mkCAFBlackHoleInfoTableLabel, 
 			  mkSECAFBlackHoleInfoTableLabel, 
 			  mkStaticInfoTableLabel, mkStaticConEntryLabel,
@@ -79,7 +79,7 @@ import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
-import Id		( Id, idType, getIdArity )
+import Id		( Id, idType, idArityInfo )
 import DataCon		( DataCon, dataConTag, fIRST_TAG,
 			  isNullaryDataCon, isTupleCon, dataConName
 			)
@@ -258,7 +258,7 @@ mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
-  = case getIdArity id of
+  = case idArityInfo id of
       ArityExactly 0	-> LFThunk (idType id)
 				TopLevel True{-no fvs-}
 				True{-updatable-} NonStandardThunk
@@ -300,10 +300,8 @@ closurePtrsSize (MkClosureInfo _ _ sm_rep)
 
 -- not exported:
 sizes_from_SMRep :: SMRep -> (Int,Int)
-sizes_from_SMRep (GenericRep       ptrs nonptrs _)   = (ptrs, nonptrs)
-sizes_from_SMRep (StaticRep        ptrs nonptrs _)   = (ptrs, nonptrs)
-sizes_from_SMRep ConstantRep                         = (0, 0)
-sizes_from_SMRep BlackHoleRep			     = (0, 0)
+sizes_from_SMRep (GenericRep _ ptrs nonptrs _)   = (ptrs, nonptrs)
+sizes_from_SMRep BlackHoleRep			 = (0, 0)
 \end{code}
 
 Computing slop size.  WARNING: this looks dodgy --- it has deep
@@ -341,16 +339,15 @@ slopSize cl_info@(MkClosureInfo _ lf_info sm_rep)
 
 computeSlopSize :: Int -> SMRep -> Bool -> Int
 
-computeSlopSize tot_wds (StaticRep _ _ _) True		-- Updatable
+computeSlopSize tot_wds (GenericRep _ _ _ _) True		-- Updatable
   = max 0 (mIN_UPD_SIZE - tot_wds)
-computeSlopSize tot_wds (StaticRep _ _ _) False
-  = 0					-- non updatable, non-heap object
-computeSlopSize tot_wds (GenericRep _ _ _) True		-- Updatable
-  = max 0 (mIN_UPD_SIZE - tot_wds)
-computeSlopSize tot_wds (GenericRep _ _ _) False
-  = max 0 (mIN_SIZE_NonUpdHeapObject - tot_wds)
-computeSlopSize tot_wds ConstantRep _
-  = 0
+
+computeSlopSize tot_wds (GenericRep True _ _ _) False	-- Non updatable
+  = 0							-- Static
+
+computeSlopSize tot_wds (GenericRep False _ _ _) False	-- Non updatable
+  = max 0 (mIN_SIZE_NonUpdHeapObject - tot_wds)		-- Dynamic
+
 computeSlopSize tot_wds BlackHoleRep _			-- Updatable
   = max 0 (mIN_UPD_SIZE - tot_wds)
 \end{code}
@@ -376,7 +373,7 @@ layOutDynClosure name kind_fn things lf_info
   where
     (tot_wds,		 -- #ptr_wds + #nonptr_wds
      ptr_wds,		 -- #ptr_wds
-     things_w_offsets) = mkVirtHeapOffsets sm_rep kind_fn things
+     things_w_offsets) = mkVirtHeapOffsets kind_fn things
     sm_rep = chooseDynSMRep lf_info tot_wds ptr_wds
 \end{code}
 
@@ -407,25 +404,26 @@ layOutStaticNoFVClosure.
 \begin{code}
 layOutStaticClosure name kind_fn things lf_info
   = (MkClosureInfo name lf_info 
-	(StaticRep ptr_wds (tot_wds - ptr_wds) closure_type),
+	(GenericRep is_static ptr_wds (tot_wds - ptr_wds) closure_type),
      things_w_offsets)
   where
     (tot_wds,		 -- #ptr_wds + #nonptr_wds
      ptr_wds,		 -- #ptr_wds
-     things_w_offsets) = mkVirtHeapOffsets (StaticRep bot bot bot) kind_fn things
+     things_w_offsets) = mkVirtHeapOffsets kind_fn things
 
     -- constructors with no pointer fields will definitely be NOCAF things.
     -- this is a compromise until we can generate both kinds of constructor
     -- (a normal static kind and the NOCAF_STATIC kind).
-    closure_type = case lf_info of
-			LFCon _ _ | ptr_wds == 0 -> CONSTR_NOCAF
-			_ -> getStaticClosureType lf_info
+    closure_type = getClosureType is_static tot_wds ptr_wds lf_info
+    is_static    = True
 
     bot = panic "layoutStaticClosure"
 
 layOutStaticNoFVClosure :: Name -> LambdaFormInfo -> ClosureInfo
 layOutStaticNoFVClosure name lf_info
-  = MkClosureInfo name lf_info (StaticRep 0 0 (getStaticClosureType lf_info))
+  = MkClosureInfo name lf_info (GenericRep is_static 0 0 (getClosureType is_static 0 0 lf_info))
+  where
+    is_static = True
 \end{code}
 
 %************************************************************************
@@ -442,55 +440,45 @@ chooseDynSMRep
 
 chooseDynSMRep lf_info tot_wds ptr_wds
   = let
-	 nonptr_wds = tot_wds - ptr_wds
-	 closure_type = getClosureType tot_wds ptr_wds nonptr_wds lf_info
+	 is_static    = False
+	 nonptr_wds   = tot_wds - ptr_wds
+	 closure_type = getClosureType is_static tot_wds ptr_wds lf_info
     in
-    case lf_info of
-	LFTuple _ True -> ConstantRep
-	LFCon _ True   -> ConstantRep
-	_	       -> GenericRep ptr_wds nonptr_wds closure_type	
-
-getStaticClosureType :: LambdaFormInfo -> ClosureType
-getStaticClosureType lf_info =
-    case lf_info of
-        LFCon con True            -> CONSTR_NOCAF
-	LFCon con False           -> CONSTR
-  	LFReEntrant _ _ _ _ _ _   -> FUN
-	LFTuple _ _	          -> CONSTR
-	LFThunk _ _ _ _ (SelectorThunk _) _ _ -> THUNK_SELECTOR
-	LFThunk _ _ _ True  _ _ _ -> THUNK
-	LFThunk _ _ _ False _ _ _ -> FUN
-	_                         -> panic "getClosureType"
+    GenericRep is_static ptr_wds nonptr_wds closure_type	
 
 -- we *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of
 -- messing around with update frames and PAPs.  We set the closure type
 -- to FUN_STATIC in this case.
 
-getClosureType :: Int -> Int -> Int -> LambdaFormInfo -> ClosureType
-getClosureType tot_wds ptrs nptrs lf_info =
-    case lf_info of
-        LFCon con True       -> CONSTR_NOCAF
+getClosureType :: Bool -> Int -> Int -> LambdaFormInfo -> ClosureType
+getClosureType is_static tot_wds ptr_wds lf_info
+  = case lf_info of
+	LFCon con zero_arity
+		| is_static && ptr_wds == 0	       -> CONSTR_NOCAF
+		| specialised_rep mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n
+		| otherwise			       -> CONSTR
 
-	LFCon con False 
-		| tot_wds > 0 && tot_wds <= mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n ptrs nptrs
-		| otherwise -> CONSTR
+	LFTuple _ zero_arity
+		| is_static && ptr_wds == 0	       -> CONSTR_NOCAF
+		| specialised_rep mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n
+		| otherwise			       -> CONSTR
 
   	LFReEntrant _ _ _ _ _ _
-		| tot_wds > 0 && tot_wds <= mAX_SPEC_FUN_SIZE -> FUN_p_n ptrs nptrs
-		| otherwise -> FUN
-
-	LFTuple _ _
-		| tot_wds > 0 && tot_wds <= mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n ptrs nptrs
-		| otherwise -> CONSTR
+		| specialised_rep mAX_SPEC_FUN_SIZE -> FUN_p_n
+		| otherwise			    -> FUN
 
 	LFThunk _ _ _ _ (SelectorThunk _) _ _ -> THUNK_SELECTOR
 
 	LFThunk _ _ _ _ _ _ _
-		| tot_wds > 0 && tot_wds <= mAX_SPEC_THUNK_SIZE -> THUNK_p_n ptrs nptrs
-		| otherwise -> THUNK
+		| specialised_rep mAX_SPEC_THUNK_SIZE -> THUNK_p_n
+		| otherwise			      -> THUNK
 
-	_                    -> panic "getClosureType"
+	_ -> panic "getClosureType"
+  where
+    specialised_rep max_size =  not is_static
+			     && tot_wds > 0
+			     && tot_wds <= max_size
 \end{code}
 
 %************************************************************************
@@ -504,8 +492,8 @@ smaller offsets than the unboxed things, and furthermore, the offsets in
 the result list
 
 \begin{code}
-mkVirtHeapOffsets :: SMRep	-- Representation to be used by storage manager
-	  -> (a -> PrimRep)	-- To be able to grab kinds;
+mkVirtHeapOffsets :: 
+	  (a -> PrimRep)	-- To be able to grab kinds;
 				--  	w/ a kind, we can find boxedness
 	  -> [a]		-- Things to make offsets for
 	  -> (Int,		-- *Total* number of words allocated
@@ -516,7 +504,7 @@ mkVirtHeapOffsets :: SMRep	-- Representation to be used by storage manager
 
 -- First in list gets lowest offset, which is initial offset + 1.
 
-mkVirtHeapOffsets sm_rep kind_fun things
+mkVirtHeapOffsets kind_fun things
   = let (ptrs, non_ptrs)    	      = separateByPtrFollowness kind_fun things
     	(wds_of_ptrs, ptrs_w_offsets) = mapAccumL computeOffset 0 ptrs
 	(tot_wds, non_ptrs_w_offsets) = mapAccumL computeOffset wds_of_ptrs non_ptrs
@@ -712,7 +700,10 @@ blackHoleOnEntry :: ClosureInfo -> Bool
 -- Single-entry ones have no fvs to plug, and we trust they don't form part 
 -- of a loop.
 
-blackHoleOnEntry (MkClosureInfo _ _ (StaticRep _ _ _)) = False
+blackHoleOnEntry (MkClosureInfo _ _ rep) 
+  | isStaticRep rep 
+  = False
+	-- Never black-hole a static closure
 
 blackHoleOnEntry (MkClosureInfo _ lf_info _)
   = case lf_info of
@@ -969,24 +960,17 @@ infoTableLabelFromCI (MkClosureInfo id lf_info rep)
 
 mkConInfoPtr :: DataCon -> SMRep -> CLabel
 mkConInfoPtr con rep
-  = case rep of
-      StaticRep _ _ _ -> mkStaticInfoTableLabel  name
-      _		      -> mkConInfoTableLabel     name
+  | isStaticRep rep = mkStaticInfoTableLabel  name
+  | otherwise	    = mkConInfoTableLabel     name
   where
     name = dataConName con
 
 mkConEntryPtr :: DataCon -> SMRep -> CLabel
 mkConEntryPtr con rep
-  = case rep of
-      StaticRep _ _ _ -> mkStaticConEntryLabel (dataConName con)
-      _		      -> mkConEntryLabel       (dataConName con)
+  | isStaticRep rep = mkStaticConEntryLabel (dataConName con)
+  | otherwise       = mkConEntryLabel       (dataConName con)
   where
     name = dataConName con
-
-closureLabelFromCI (MkClosureInfo name _ rep) 
-	| isConstantRep rep
-	= mkStaticClosureLabel name
-	-- This case catches those pesky static closures for nullary constructors
 
 closureLabelFromCI (MkClosureInfo id _ other_rep)   = mkClosureLabel id
 

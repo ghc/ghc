@@ -5,7 +5,7 @@
 
 \begin{code}
 module Maybes (
---	Maybe(..), -- no, it's in 1.3
+	Maybe2(..), Maybe3(..),
 	MaybeErr(..),
 
 	orElse, 
@@ -33,6 +33,18 @@ import Maybe( catMaybes, mapMaybe )
 
 
 infixr 4 `orElse`
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[Maybe2,3 types]{The @Maybe2@ and @Maybe3@ types}
+%*									*
+%************************************************************************
+
+\begin{code}
+data Maybe2 a b   = Just2 a b   | Nothing2  deriving (Eq,Show)
+data Maybe3 a b c = Just3 a b c | Nothing3  deriving (Eq,Show)
 \end{code}
 
 
@@ -173,3 +185,4 @@ returnMaB v = Succeeded v
 failMaB :: err -> MaybeErr val err
 failMaB e = Failed e
 \end{code}
+

@@ -19,16 +19,16 @@ import Rules		( ProtoCoreRule(..) )
 import UsageSPInf       ( doUsageSPInf )
 import VarEnv
 import VarSet
-import Var		( Id, IdOrTyVar )
+import Var		( Id, Var )
 import Id		( idType, idInfo, idName, 
 			  mkVanillaId, mkId, exportWithOrigOccName,
-			  getIdStrictness, setIdStrictness,
-			  getIdDemandInfo, setIdDemandInfo,
+			  idStrictness, setIdStrictness,
+			  idDemandInfo, setIdDemandInfo,
 			) 
 import IdInfo		( specInfo, setSpecInfo, 
 			  inlinePragInfo, setInlinePragInfo, InlinePragInfo(..),
 			  setUnfoldingInfo, setDemandInfo,
-			  workerInfo, setWorkerInfo
+			  workerInfo, setWorkerInfo, WorkerInfo(..)
 			)
 import Demand		( wwLazy )
 import Name		( getOccName, tidyTopName, mkLocalName, isLocallyDefined )
@@ -102,8 +102,11 @@ tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
 	 -> (TidyEnv, CoreBind)
 tidyBind maybe_mod env (NonRec bndr rhs)
   = let
-	(env', bndr') = tidy_bndr maybe_mod env env bndr
-	rhs'	      = tidyExpr env rhs
+	(env', bndr') = tidy_bndr maybe_mod env' env bndr
+	rhs'	      = tidyExpr env' rhs
+	-- We use env' when tidying the RHS even though it's not
+	-- strictly necessary; it makes the code pretty hard to read
+	-- if we don't!
     in
     (env', NonRec bndr' rhs')
 
@@ -123,7 +126,7 @@ tidyBind maybe_mod env (Rec pairs)
   (env', Rec (zip bndrs' rhss'))
 
 tidyExpr env (Type ty)	     = Type (tidyType env ty)
-tidyExpr env (Con con args)  = Con con (map (tidyExpr env) args)
+tidyExpr env (Lit lit)	     = Lit lit
 tidyExpr env (App f a)       = App (tidyExpr env f) (tidyExpr env a)
 tidyExpr env (Note n e)      = Note (tidyNote env n) (tidyExpr env e)
 
@@ -168,11 +171,11 @@ tidy_bndr Nothing    env_idinfo env var = tidyBndr      env            var
 %************************************************************************
 
 \begin{code}
-tidyBndr :: TidyEnv -> IdOrTyVar -> (TidyEnv, IdOrTyVar)
+tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var | isTyVar var = tidyTyVar env var
 		 | otherwise   = tidyId    env var
 
-tidyBndrs :: TidyEnv -> [IdOrTyVar] -> (TidyEnv, [IdOrTyVar])
+tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 tidyId :: TidyEnv -> Id -> (TidyEnv, Id)
@@ -185,8 +188,8 @@ tidyId env@(tidy_env, var_env) id
 	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkVanillaId name' ty'
-			    `setIdStrictness` getIdStrictness id
-			    `setIdDemandInfo` getIdDemandInfo id
+			    `setIdStrictness` idStrictness id
+			    `setIdDemandInfo` idDemandInfo id
 			-- NB: This throws away the IdInfo of the Id, which we
 			-- no longer need.  That means we don't need to
 			-- run over it with env, nor renumber it.
@@ -235,8 +238,8 @@ tidyIdInfo env info
     info4 = info3 `setDemandInfo`    wwLazy		-- I don't understand why...
 
     info5 = case workerInfo info of
-		Nothing -> info4
-		Just w  -> info4 `setWorkerInfo` Just (tidyVarOcc env w)
+		NoWorker -> info4
+		HasWorker w a  -> info4 `setWorkerInfo` HasWorker (tidyVarOcc env w) a
 
 tidyProtoRules :: TidyEnv -> [ProtoCoreRule] -> [ProtoCoreRule]
 tidyProtoRules env rules

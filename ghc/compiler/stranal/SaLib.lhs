@@ -19,6 +19,7 @@ module SaLib (
 #include "HsVersions.h"
 
 import Id		( Id )
+import Type		( Type )
 import CoreSyn		( CoreExpr )
 import VarEnv
 import IdInfo		( StrictnessInfo(..) )
@@ -58,9 +59,8 @@ data AbsVal
 			    --    AbsProd [AbsBot, ..., AbsBot]
 
   | AbsFun	    	    -- An abstract function, with the given:
-	    Id		    -- argument
-	    CoreExpr	    -- body
-	    AbsValEnv	    -- and environment
+	    Type	   	 -- Type of the *argument* to the function
+	    (AbsVal -> AbsVal)	-- The function
 
   | AbsApproxFun	    -- This is used to represent a coarse
 	    [Demand]	    -- approximation to a function value.  It's an
@@ -81,12 +81,9 @@ instance Outputable AbsVal where
     ppr AbsTop = ptext SLIT("AbsTop")
     ppr AbsBot = ptext SLIT("AbsBot")
     ppr (AbsProd prod) = hsep [ptext SLIT("AbsProd"), ppr prod]
-    ppr (AbsFun arg body env)
-      = hsep [ptext SLIT("AbsFun{"), ppr arg,
-	       ptext SLIT("???"), -- text "}{env:", ppr (keysFM env `zip` eltsFM env),
-	       char '}' ]
+    ppr (AbsFun bndr_ty body) = ptext SLIT("AbsFun")
     ppr (AbsApproxFun demands val)
-      = hsep [ptext SLIT("AbsApprox "), hcat (map ppr demands), ppr val]
+      = ptext SLIT("AbsApprox") <+> brackets (interpp'SP demands) <+> ppr val
 \end{code}
 
 %-----------

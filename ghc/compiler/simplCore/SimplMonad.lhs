@@ -9,11 +9,6 @@ module SimplMonad (
 	OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
 	OutExprStuff, OutStuff,
 
-	-- The continuation type
-	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
-	contIsInteresting, pushArgs, discardCont, countValArgs, countArgs,
-	contArgs, contIsInline, discardInline,
-
 	-- The monad
 	SimplM,
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
@@ -50,12 +45,11 @@ module SimplMonad (
 
 #include "HsVersions.h"
 
-import Const		( Con(DEFAULT) )
-import Id		( Id, mkSysLocal, getIdUnfolding )
+import Id		( Id, mkSysLocal, idUnfolding, isDataConWrapId )
 import IdInfo		( InlinePragInfo(..) )
 import Demand		( Demand )
 import CoreSyn
-import CoreUnfold	( isCompulsoryUnfolding )
+import CoreUnfold	( isCompulsoryUnfolding, isEvaldUnfolding )
 import PprCore		()	-- Instances
 import Rules		( RuleBase )
 import CostCentre	( CostCentreStack, subsumedCCS )
@@ -64,9 +58,9 @@ import Var		( TyVar )
 import VarEnv
 import VarSet
 import qualified Subst
-import Subst		( Subst, emptySubst, mkSubst,
-			  substTy, substEnv, substExpr,
-			  InScopeSet, substInScope, isInScope, lookupInScope
+import Subst		( Subst, emptySubst, mkSubst, 
+			  substTy, substEnv, 
+			  InScopeSet, substInScope, isInScope
 			)
 import Type             ( Type, TyVarSubst, applyTy )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
@@ -82,7 +76,7 @@ import Maybes		( expectJust )
 import Util		( zipWithEqual )
 import Outputable
 
-infixr 9  `thenSmpl`, `thenSmpl_`
+infixr 0  `thenSmpl`, `thenSmpl_`
 \end{code}
 
 %************************************************************************
@@ -109,184 +103,12 @@ type OutAlt	= CoreAlt
 type OutArg	= CoreArg
 
 type SwitchChecker = SimplifierSwitch -> SwitchResult
-\end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{The continuation data type}
-%*									*
-%************************************************************************
-
-\begin{code}
 type OutExprStuff = OutStuff (InScopeSet, OutExpr)
 type OutStuff a   = ([OutBind], a)
 	-- We return something equivalent to (let b in e), but
 	-- in pieces to avoid the quadratic blowup when floating 
 	-- incrementally.  Comments just before simplExprB in Simplify.lhs
-
-data SimplCont		-- Strict contexts
-  = Stop OutType		-- Type of the result
-
-  | CoerceIt OutType			-- The To-type, simplified
-	     SimplCont
-
-  | InlinePlease			-- This continuation makes a function very
-	     SimplCont			-- keen to inline itelf
-
-  | ApplyTo  DupFlag 
-	     InExpr SubstEnv		-- The argument, as yet unsimplified, 
-	     SimplCont			-- and its subst-env
-
-  | Select   DupFlag 
-	     InId [InAlt] SubstEnv	-- The case binder, alts, and subst-env
-	     SimplCont
-
-  | ArgOf    DupFlag		-- An arbitrary strict context: the argument 
-  	     			-- 	of a strict function, or a primitive-arg fn
-				-- 	or a PrimOp
-	     OutType		-- The type of the expression being sought by the context
-				--	f (error "foo") ==> coerce t (error "foo")
-				-- when f is strict
-				-- We need to know the type t, to which to coerce.
-	     (OutExpr -> SimplM OutExprStuff)	-- What to do with the result
-
-instance Outputable SimplCont where
-  ppr (Stop _)        		     = ptext SLIT("Stop")
-  ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
-  ppr (ArgOf   dup _ _)   	     = ptext SLIT("ArgOf...") <+> ppr dup
-  ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
-				       (nest 4 (ppr alts)) $$ ppr cont
-  ppr (CoerceIt ty cont)	     = (ptext SLIT("CoerceIt") <+> ppr ty) $$ ppr cont
-  ppr (InlinePlease cont)	     = ptext SLIT("InlinePlease") $$ ppr cont
-
-data DupFlag = OkToDup | NoDup
-
-instance Outputable DupFlag where
-  ppr OkToDup = ptext SLIT("ok")
-  ppr NoDup   = ptext SLIT("nodup")
-
-contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop _)       		 = True
-contIsDupable (ApplyTo  OkToDup _ _ _)   = True
-contIsDupable (ArgOf    OkToDup _ _)     = True
-contIsDupable (Select   OkToDup _ _ _ _) = True
-contIsDupable (CoerceIt _ cont)          = contIsDupable cont
-contIsDupable (InlinePlease cont)	 = contIsDupable cont
-contIsDupable other			 = False
-
-contArgs :: InScopeSet -> SimplCont -> ([OutExpr], SimplCont)
-	-- Get the arguments from the continuation
-	-- Apply the appropriate substitution first;
-	-- this is done lazily and typically only the bit at the top is used
-contArgs in_scope (ApplyTo _ e s cont)
-  = case contArgs in_scope cont of
-	(args, result) -> (substExpr (mkSubst in_scope s) e : args, result)
-contArgs in_scope result_cont	
-   = ([], result_cont)
-
-contIsInline :: SimplCont -> Bool
-contIsInline (InlinePlease cont) = True
-contIsInline other		 = False
-
-discardInline :: SimplCont -> SimplCont
-discardInline (InlinePlease cont)  = cont
-discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
-discardInline cont		   = cont
-\end{code}
-
-
-Comment about contIsInteresting
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to avoid inlining an expression where there can't possibly be
-any gain, such as in an argument position.  Hence, if the continuation
-is interesting (eg. a case scrutinee, application etc.) then we
-inline, otherwise we don't.  
-
-Previously some_benefit used to return True only if the variable was
-applied to some value arguments.  This didn't work:
-
-	let x = _coerce_ (T Int) Int (I# 3) in
-	case _coerce_ Int (T Int) x of
-		I# y -> ....
-
-we want to inline x, but can't see that it's a constructor in a case
-scrutinee position, and some_benefit is False.
-
-Another example:
-
-dMonadST = _/\_ t -> :Monad (g1 _@_ t, g2 _@_ t, g3 _@_ t)
-
-....  case dMonadST _@_ x0 of (a,b,c) -> ....
-
-we'd really like to inline dMonadST here, but we *don't* want to
-inline if the case expression is just
-
-	case x of y { DEFAULT -> ... }
-
-since we can just eliminate this case instead (x is in WHNF).  Similar
-applies when x is bound to a lambda expression.  Hence
-contIsInteresting looks for case expressions with just a single
-default case.
-
-\begin{code}
-contIsInteresting :: SimplCont -> Bool
-contIsInteresting (Select _ _ alts _ _)       = not (just_default alts)
-contIsInteresting (CoerceIt _ cont)           = contIsInteresting cont
-contIsInteresting (ApplyTo _ (Type _) _ cont) = contIsInteresting cont
-contIsInteresting (ApplyTo _ _	      _ _)    = True
-
-contIsInteresting (ArgOf _ _ _)		      = False
-	-- If this call is the arg of a strict function, the context
-	-- is a bit interesting.  If we inline here, we may get useful
-	-- evaluation information to avoid repeated evals: e.g.
-	--	x + (y * z)
-	-- Here the contIsInteresting makes the '*' keener to inline,
-	-- which in turn exposes a constructor which makes the '+' inline.
-	-- Assuming that +,* aren't small enough to inline regardless.
-	--
-	-- HOWEVER, I put this back to False when I discovered that strings
-	-- were getting inlined straight back into applications of 'error'
-	-- because the latter is strict.
-	--	s = "foo"
-	--	f = \x -> ...(error s)...
-
-contIsInteresting (InlinePlease _)	      = True
-contIsInteresting other		              = False
-
-just_default [(DEFAULT,_,_)] = True	-- See notes below for why we look
-just_default alts	     = False	-- for this special case
-\end{code}
-
-
-\begin{code}
-pushArgs :: SubstEnv -> [InExpr] -> SimplCont -> SimplCont
-pushArgs se []         cont = cont
-pushArgs se (arg:args) cont = ApplyTo NoDup arg se (pushArgs se args cont)
-
-discardCont :: SimplCont	-- A continuation, expecting
-	    -> SimplCont	-- Replace the continuation with a suitable coerce
-discardCont (Stop to_ty) = Stop to_ty
-discardCont cont	 = CoerceIt to_ty (Stop to_ty)
-			 where
-			   to_ty = contResultType cont
-
-contResultType :: SimplCont -> OutType
-contResultType (Stop to_ty)	     = to_ty
-contResultType (ArgOf _ to_ty _)     = to_ty
-contResultType (ApplyTo _ _ _ cont)  = contResultType cont
-contResultType (CoerceIt _ cont)     = contResultType cont
-contResultType (InlinePlease cont)   = contResultType cont
-contResultType (Select _ _ _ _ cont) = contResultType cont
-
-countValArgs :: SimplCont -> Int
-countValArgs (ApplyTo _ (Type ty) se cont) = countValArgs cont
-countValArgs (ApplyTo _ val_arg   se cont) = 1 + countValArgs cont
-countValArgs other			   = 0
-
-countArgs :: SimplCont -> Int
-countArgs (ApplyTo _ arg se cont) = 1 + countArgs cont
-countArgs other			  = 0
 \end{code}
 
 
@@ -745,27 +567,16 @@ environment seems like wild overkill.
 \begin{code}
 switchOffInlining :: SimplM a -> SimplM a
 switchOffInlining m env us sc
-  = m (env { seBlackList = \v -> not (isCompulsoryUnfolding (getIdUnfolding v)) &&
+  = m (env { seBlackList = \v -> not (isCompulsoryUnfolding (idUnfolding v)) &&
+				 not (isDataConWrapId v) &&
 				 ((v `isInScope` subst) || not (isLocallyDefined v))
 	   }) us sc
-	-- Black list anything that is in scope or imported.
-	-- The in-scope thing arranges *not* to black list inlinings that are
-	-- completely inside the switch-off-inlining block.
-	-- This allows simplification to proceed un-hindered inside the block.
-	--
-	-- At one time I had an exception for constant Ids (constructors, primops)
-	--		      && (old_black_list v || not (isConstantId v ))
-	-- because (a) some don't have bindings, so we never want not to inline them
-	--	   (b) their defns are very seldom big, so there's no size penalty
-	--	       to inline them
-	-- But that failed because if we inline (say) [] in build's rhs, then
-	-- the exported thing doesn't match rules
-	--
-	-- But we must inline primops (which have compulsory unfoldings) in the
-	-- last phase of simplification, because they don't have bindings.
-	-- The simplifier now *never* inlines blacklisted things (even if they
-	-- have compulsory unfoldings) so we must not black-list compulsory
-	-- unfoldings inside INLINE prags.
+	
+	-- Inside inlinings, black list anything that is in scope or imported.
+	-- except for things that must be unfolded (Compulsory)
+	-- and data con wrappers.  The latter is a hack, like the one in
+	-- SimplCore.simplRules, to make wrappers inline in rule LHSs.  We
+	-- may as well do the same here.
   where
     subst	   = seSubst env
     old_black_list = seBlackList env

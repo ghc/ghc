@@ -9,7 +9,7 @@ Other modules should access this info through ClosureInfo.
 \begin{code}
 module SMRep (
 	SMRep(..), ClosureType(..),
-	isConstantRep, isStaticRep,
+	isStaticRep,
 	fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize,
         fixedItblSize, pprSMRep
 
@@ -68,31 +68,28 @@ import GlaExts		( Int(..), Int#, (<#), (==#), (<#), (>#) )
 \begin{code}
 data SMRep
      -- static closure have an extra static link field at the end.
-  = StaticRep
-	Int		-- # ptr words (useful for interpreter, debugger, etc)
-	Int		-- # non-ptr words
-	ClosureType     -- closure type
-
-  | GenericRep		-- GC routines consult sizes in info tbl
+  = GenericRep		-- GC routines consult sizes in info tbl
+	Bool		-- True <=> This is a static closure.  Affects how 
+			-- 	    we garbage-collect it
 	Int		-- # ptr words
 	Int		-- # non-ptr words
 	ClosureType	-- closure type
 
-  | ConstantRep		-- CONSTR with zero-arity
-
   | BlackHoleRep
 
-data ClosureType
+data ClosureType	-- Corresponds 1-1 with the varieties of closures
+			-- implemented by the RTS.  Compare with ghc/includes/ClosureTypes.h
     = CONSTR
-    | CONSTR_p_n Int Int
+    | CONSTR_p_n	-- The p_n variants have more efficient GC, but we
+			-- only provide them for dynamically-allocated closures
+			-- (We could do them for static ones, but we don't)
     | CONSTR_NOCAF
     | FUN
-    | FUN_p_n Int Int
+    | FUN_p_n
     | THUNK
-    | THUNK_p_n Int Int
+    | THUNK_p_n
     | THUNK_SELECTOR
   deriving (Eq,Ord)
-
 \end{code}
 
 Size of a closure header.
@@ -140,76 +137,62 @@ tickyItblSize | opt_DoTickyProfiling = tICKY_ITBL_SIZE
 \end{code}
 
 \begin{code}
-isConstantRep, isStaticRep :: SMRep -> Bool
-isConstantRep ConstantRep     = True
-isConstantRep other 	      = False
-
-isStaticRep (StaticRep _ _ _) = True
-isStaticRep _		      = False
+isStaticRep :: SMRep -> Bool
+isStaticRep (GenericRep is_static _ _ _) = is_static
+isStaticRep BlackHoleRep	         = False
 \end{code}
 
 \begin{code}
-{- ToDo: needed? -}
-instance Text SMRep where
-    showsPrec d rep
-      = showString (case rep of
-	   StaticRep _ _ _   	                 -> "STATIC"
-	   GenericRep _ _ _   	                 -> ""
-	   ConstantRep				 -> "")
-
 instance Outputable SMRep where
     ppr rep = pprSMRep rep
 
 pprSMRep :: SMRep -> SDoc
-pprSMRep (GenericRep _ _ t) 	= pprClosureType t
-pprSMRep (StaticRep _ _ t)  	= pprClosureType t <> ptext SLIT("_STATIC")
-pprSMRep ConstantRep        	= ptext SLIT("CONSTR_NOCAF_STATIC")
-pprSMRep BlackHoleRep       	= ptext SLIT("BLACKHOLE")
+pprSMRep (GenericRep True  ptrs nptrs clo_ty) = pprClosureType clo_ty ptrs nptrs <> ptext SLIT("_STATIC")
+pprSMRep (GenericRep False ptrs nptrs clo_ty) = pprClosureType clo_ty ptrs nptrs
 
-pprClosureType CONSTR	   	= ptext SLIT("CONSTR")
-pprClosureType (CONSTR_p_n p n) = ptext SLIT("CONSTR_") <> int p <> char '_' <> int n
-pprClosureType CONSTR_NOCAF	= ptext SLIT("CONSTR_NOCAF")
-pprClosureType FUN		= ptext SLIT("FUN")
-pprClosureType (FUN_p_n p n)	= ptext SLIT("FUN_") <> int p <> char '_' <> int n
-pprClosureType THUNK		= ptext SLIT("THUNK")
-pprClosureType (THUNK_p_n p n)  = ptext SLIT("THUNK_") <> int p <> char '_' <> int n
-pprClosureType THUNK_SELECTOR   = ptext SLIT("THUNK_SELECTOR")
+pprClosureType CONSTR	      p n = ptext SLIT("CONSTR")
+pprClosureType CONSTR_p_n     p n = ptext SLIT("CONSTR_") <> int p <> char '_' <> int n
+pprClosureType CONSTR_NOCAF   p n = ptext SLIT("CONSTR_NOCAF")
+pprClosureType FUN	      p n = ptext SLIT("FUN")
+pprClosureType FUN_p_n        p n = ptext SLIT("FUN_") <> int p <> char '_' <> int n
+pprClosureType THUNK	      p n = ptext SLIT("THUNK")
+pprClosureType THUNK_p_n      p n = ptext SLIT("THUNK_") <> int p <> char '_' <> int n
+pprClosureType THUNK_SELECTOR p n = ptext SLIT("THUNK_SELECTOR")
 
 #ifndef OMIT_NATIVE_CODEGEN
 getSMRepClosureTypeInt :: SMRep -> Int
-getSMRepClosureTypeInt (GenericRep _ _ t) =
-  case t of
-    CONSTR 	   -> cONSTR
-    CONSTR_p_n 1 0 -> cONSTR_1_0
-    CONSTR_p_n 0 1 -> cONSTR_0_1
-    CONSTR_p_n 2 0 -> cONSTR_2_0
-    CONSTR_p_n 1 1 -> cONSTR_1_1
-    CONSTR_p_n 0 2 -> cONSTR_0_2
-    CONSTR_NOCAF   -> panic "getClosureTypeInt: CONSTR_NOCAF"
-    FUN    	   -> fUN
-    FUN_p_n 1 0    -> fUN_1_0
-    FUN_p_n 0 1    -> fUN_0_1
-    FUN_p_n 2 0    -> fUN_2_0
-    FUN_p_n 1 1    -> fUN_1_1
-    FUN_p_n 0 2    -> fUN_0_2
-    THUNK  	   -> tHUNK
-    THUNK_p_n 1 0  -> tHUNK_1_0
-    THUNK_p_n 0 1  -> tHUNK_0_1
-    THUNK_p_n 2 0  -> tHUNK_2_0
-    THUNK_p_n 1 1  -> tHUNK_1_1
-    THUNK_p_n 0 2  -> tHUNK_0_2
-    THUNK_SELECTOR -> tHUNK_SELECTOR
-getSMRepClosureTypeInt (StaticRep _ _ t) =
-  case t of
-    CONSTR 	   -> cONSTR_STATIC
-    CONSTR_NOCAF   -> cONSTR_NOCAF_STATIC
-    FUN    	   -> fUN_STATIC
-    THUNK  	   -> tHUNK_STATIC
-    THUNK_SELECTOR -> panic "getClosureTypeInt: THUNK_SELECTOR_STATIC"
+getSMRepClosureTypeInt (GenericRep False _ _ CONSTR)     = cONSTR
+getSMRepClosureTypeInt (GenericRep False 1 0 CONSTR_p_n) = cONSTR_1_0
+getSMRepClosureTypeInt (GenericRep False 0 1 CONSTR_p_n) = cONSTR_0_1
+getSMRepClosureTypeInt (GenericRep False 2 0 CONSTR_p_n) = cONSTR_2_0
+getSMRepClosureTypeInt (GenericRep False 1 1 CONSTR_p_n) = cONSTR_1_1
+getSMRepClosureTypeInt (GenericRep False 0 2 CONSTR_p_n) = cONSTR_0_2
 
-getSMRepClosureTypeInt ConstantRep = cONSTR_NOCAF_STATIC
+getSMRepClosureTypeInt (GenericRep False _ _ FUN)     = fUN
+getSMRepClosureTypeInt (GenericRep False 1 0 FUN_p_n) = fUN_1_0
+getSMRepClosureTypeInt (GenericRep False 0 1 FUN_p_n) = fUN_0_1
+getSMRepClosureTypeInt (GenericRep False 2 0 FUN_p_n) = fUN_2_0
+getSMRepClosureTypeInt (GenericRep False 1 1 FUN_p_n) = fUN_1_1
+getSMRepClosureTypeInt (GenericRep False 0 2 FUN_p_n) = fUN_0_2
+
+getSMRepClosureTypeInt (GenericRep False _ _ THUNK)     = tHUNK
+getSMRepClosureTypeInt (GenericRep False 1 0 THUNK_p_n) = tHUNK_1_0
+getSMRepClosureTypeInt (GenericRep False 0 1 THUNK_p_n) = tHUNK_0_1
+getSMRepClosureTypeInt (GenericRep False 2 0 THUNK_p_n) = tHUNK_2_0
+getSMRepClosureTypeInt (GenericRep False 1 1 THUNK_p_n) = tHUNK_1_1
+getSMRepClosureTypeInt (GenericRep False 0 2 THUNK_p_n) = tHUNK_0_2
+
+getSMRepClosureTypeInt (GenericRep False _ _ THUNK_SELECTOR) =  tHUNK_SELECTOR
+
+getSMRepClosureTypeInt (GenericRep True _ _ CONSTR)       = cONSTR_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ CONSTR_NOCAF) = cONSTR_NOCAF_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ FUN)          = fUN_STATIC
+getSMRepClosureTypeInt (GenericRep True _ _ THUNK)        = tHUNK_STATIC
 
 getSMRepClosureTypeInt BlackHoleRep = bLACKHOLE
+
+getSMRepClosureTypeInt rep = pprPanic "getSMRepClosureTypeInt:" (pprSMRep rep)
+
 
 -- Just the ones we need:
 

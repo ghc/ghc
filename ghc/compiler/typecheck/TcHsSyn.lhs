@@ -22,8 +22,9 @@ module TcHsSyn (
 	TypecheckedGRHSs, TypecheckedGRHS,
 	TypecheckedRecordBinds, TypecheckedDictBinds,
 
-	mkHsTyApp, mkHsDictApp,
+	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
+	idsToMonoBinds,
 
 	-- re-exported from TcEnv
 	TcId, tcInstId,
@@ -40,8 +41,8 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idName, idType, setIdType, omitIfaceSigForId, isIP, Id )
-import DataCon	( DataCon, splitProductType_maybe )	
+import Id	( idName, idType, idUnfolding, setIdType, omitIfaceSigForId, isIP, Id )
+import DataCon	( DataCon, dataConWrapId, splitProductType_maybe )	
 import TcEnv	( tcLookupValueMaybe, tcExtendGlobalValEnv, tcGetValueEnv,
 		  ValueEnv, TcId, tcInstId
 		)
@@ -57,6 +58,7 @@ import Var	( TyVar )
 import VarEnv	( TyVarEnv, emptyVarEnv, extendVarEnvList )
 import VarSet	( isEmptyVarSet )
 import CoreSyn  ( Expr )
+import CoreUnfold( unfoldingTemplate )
 import BasicTypes ( RecFlag(..) )
 import Bag
 import UniqFM
@@ -123,6 +125,14 @@ mkHsDictLam dicts expr = DictLam dicts expr
 
 mkHsLet EmptyMonoBinds expr = expr
 mkHsLet mbinds	       expr = HsLet (MonoBind mbinds [] Recursive) expr
+
+mkHsConApp data_con tys args = foldl HsApp (HsVar (dataConWrapId data_con) `mkHsTyApp` tys) args
+
+idsToMonoBinds :: [Id] -> TcMonoBinds 
+idsToMonoBinds ids
+  = andMonoBindList [ CoreMonoBind id (unfoldingTemplate (idUnfolding id))
+		    | id <- ids
+		    ]
 \end{code}
 
 %************************************************************************
@@ -433,11 +443,6 @@ zonkExpr (ExplicitTuple exprs boxed)
   = mapNF_Tc zonkExpr exprs  	`thenNF_Tc` \ new_exprs ->
     returnNF_Tc (ExplicitTuple new_exprs boxed)
 
-zonkExpr (HsCon data_con tys exprs)
-  = mapNF_Tc zonkTcTypeToType tys	`thenNF_Tc` \ new_tys ->
-    mapNF_Tc zonkExpr exprs		`thenNF_Tc` \ new_exprs ->
-    returnNF_Tc (HsCon data_con new_tys new_exprs)
-
 zonkExpr (RecordConOut data_con con_expr rbinds)
   = zonkExpr con_expr	`thenNF_Tc` \ new_con_expr ->
     zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
@@ -460,10 +465,10 @@ zonkExpr (ArithSeqOut expr info)
     zonkArithSeq info	`thenNF_Tc` \ new_info ->
     returnNF_Tc (ArithSeqOut new_expr new_info)
 
-zonkExpr (CCall fun args may_gc is_casm result_ty)
+zonkExpr (HsCCall fun args may_gc is_casm result_ty)
   = mapNF_Tc zonkExpr args 	`thenNF_Tc` \ new_args ->
     zonkTcTypeToType result_ty	`thenNF_Tc` \ new_result_ty ->
-    returnNF_Tc (CCall fun new_args may_gc is_casm new_result_ty)
+    returnNF_Tc (HsCCall fun new_args may_gc is_casm new_result_ty)
 
 zonkExpr (HsSCC lbl expr)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->

@@ -26,11 +26,11 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			)
 
 import Constants	( mIN_UPD_SIZE )
-import CallConv		( CallConv, callConvAttribute, cCallConv )
+import CallConv		( CallConv, callConvAttribute )
 import CLabel		( externallyVisibleCLabel, mkErrorStdEntryLabel,
 			  needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
-			  mkStaticClosureLabel,
+			  mkClosureLabel,
 			  CLabel, CLabelType(..), labelType, labelDynamic
 			)
 
@@ -40,12 +40,12 @@ import CostCentre	( pprCostCentreDecl, pprCostCentreStackDecl )
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
 import CStrings		( stringToC )
 import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
-import Const		( Literal(..) )
+import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
 import Name		( NamedThing(..) )
-import DataCon		( DataCon{-instance NamedThing-} )
+import DataCon		( DataCon{-instance NamedThing-}, dataConWrapId )
 import Maybes		( maybeToBool, catMaybes )
-import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..) )
+import PrimOp		( primOpNeedsWrapper, pprPrimOp, PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( isFloatingRep, PrimRep(..), getPrimRepSize, showPrimRep )
 import SMRep		( pprSMRep )
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
@@ -176,8 +176,8 @@ pprAbsC (CSwitch discrim [(tag,alt_code)] deflt) c -- only one alt
 		 do_if_stmt discrim tag alt_code dc c
 
 -- What problem is the re-ordering trying to solve ?
-pprAbsC (CSwitch discrim [(tag1@(MachInt i1 _), alt_code1),
-			      (tag2@(MachInt i2 _), alt_code2)] deflt) c
+pprAbsC (CSwitch discrim [(tag1@(MachInt i1), alt_code1),
+			  (tag2@(MachInt i2), alt_code2)] deflt) c
   | empty_deflt && ((i1 == 0 && i2 == 1) || (i1 == 1 && i2 == 0))
   = if (i1 == 0) then
 	do_if_stmt discrim tag1 alt_code1 alt_code2 c
@@ -213,8 +213,8 @@ pprAbsC (CSwitch discrim alts deflt) c -- general case
     -- Costs for addressing header of switch and cond. branching        -- HWL
     switch_head_cost = addrModeCosts discrim Rhs + (Cost (0, 1, 0, 0, 0))
 
-pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _ _) args vol_regs) _
-  = pprCCall op args results vol_regs
+pprAbsC stmt@(COpStmt results (CCallOp ccall) args vol_regs) _
+  = pprCCall ccall args results vol_regs
 
 pprAbsC stmt@(COpStmt results op args vol_regs) _
   = let
@@ -284,7 +284,7 @@ pprAbsC (CCallProfCtrMacro op as) _
 pprAbsC (CCallProfCCMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
-pprAbsC stmt@(CCallTypedef is_tdef op@(CCallOp op_str is_asm may_gc cconv) results args) _
+pprAbsC stmt@(CCallTypedef is_tdef (CCall op_str is_asm may_gc cconv) results args) _
   =  hsep [ ptext (if is_tdef then SLIT("typedef") else SLIT("extern"))
 	  , ccall_res_ty
 	  , fun_nm
@@ -327,8 +327,8 @@ pprAbsC stmt@(CCallTypedef is_tdef op@(CCallOp op_str is_asm may_gc cconv) resul
 
      ccall_fun_ty = 
         case op_str of
-	  Right u -> ptext SLIT("_ccall_fun_ty") <> ppr u
-	  Left x  -> ptext x
+	  DynamicTarget u -> ptext SLIT("_ccall_fun_ty") <> ppr u
+	  StaticTarget x  -> ptext x
 
      ccall_res_ty = 
        case non_void_results of
@@ -505,7 +505,7 @@ pprAbsC stmt@(CClosureTbl tycon) _
 	ptext SLIT("CLOSURE_TBL") <> 
 	   lparen <> pprCLabel (mkClosureTblLabel tycon) <> rparen :
 	punctuate comma (
-	   map (pp_closure_lbl . mkStaticClosureLabel . getName) (tyConDataCons tycon)
+	   map (pp_closure_lbl . mkClosureLabel . getName . dataConWrapId) (tyConDataCons tycon)
 	)
    ) $$ ptext SLIT("};")
 
@@ -637,18 +637,13 @@ ppr_vol_regs (r:rs)
     (($$) ((<>) (ptext SLIT("CALLER_SAVE_"))    pp_reg) more_saves,
      ($$) ((<>) (ptext SLIT("CALLER_RESTORE_")) pp_reg) more_restores)
 
--- pp_basic_{saves,restores}: The BaseReg, SpA, SuA, SpB, SuB, Hp and
+-- pp_basic_{saves,restores}: The BaseReg, Sp, Su, Hp and
 -- HpLim (see StgRegs.lh) may need to be saved/restored around CCalls,
 -- depending on the platform.  (The "volatile regs" stuff handles all
 -- other registers.)  Just be *sure* BaseReg is OK before trying to do
 -- anything else. The correct sequence of saves&restores are
 -- encoded by the CALLER_*_SYSTEM macros.
-pp_basic_saves
-  = vcat
-       [ ptext SLIT("CALLER_SAVE_Base")
-       , ptext SLIT("CALLER_SAVE_SYSTEM")
-       ]
-
+pp_basic_saves    = ptext SLIT("CALLER_SAVE_SYSTEM")
 pp_basic_restores = ptext SLIT("CALLER_RESTORE_SYSTEM")
 \end{code}
 
@@ -690,10 +685,10 @@ do_if_stmt discrim tag alt_code deflt c
   = case tag of
       -- This special case happens when testing the result of a comparison.
       -- We can just avoid some redundant clutter in the output.
-      MachInt n _ | n==0 -> ppr_if_stmt (pprAmode discrim)
+      MachInt n | n==0 -> ppr_if_stmt (pprAmode discrim)
 				      deflt alt_code
 				      (addrModeCosts discrim Rhs) c
-      other              -> let
+      other            -> let
 			       cond = hcat [ pprAmode discrim
 					   , ptext SLIT(" == ")
 					   , tcast
@@ -707,10 +702,9 @@ do_if_stmt discrim tag alt_code deflt c
 				-- in C (when minInt is a number not a constant
 				--  expression which evaluates to it.)
 				-- 
-			       tcast =
-			         case other of
-				   MachInt _ signed | signed    -> ptext SLIT("(I_)")
-				   _ -> empty
+			       tcast = case other of
+					   MachInt _  -> ptext SLIT("(I_)")
+					   _ 	      -> empty
 			    in
 			    ppr_if_stmt cond
 					 alt_code deflt
@@ -783,7 +777,7 @@ Amendment to the above: if we can GC, we have to:
   that the runtime check that PerformGC is being used sensibly will work.
 
 \begin{code}
-pprCCall op@(CCallOp op_str is_asm may_gc cconv) args results vol_regs
+pprCCall (CCall op_str is_asm may_gc cconv) args results vol_regs
   = vcat [
       char '{',
       declare_local_vars,   -- local var for *result*
@@ -829,17 +823,17 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv) args results vol_regs
     ccall_fun_ty = 
        ptext SLIT("_ccall_fun_ty") <>
        case op_str of
-         Right u -> ppr u
-	 _       -> empty
+         DynamicTarget u -> ppr u
+	 _     		 -> empty
 
     (declare_local_vars, local_vars, assign_results)
       = ppr_casm_results non_void_results
 
-    (Left asm_str) = op_str
+    (StaticTarget asm_str) = op_str
     is_dynamic = 
        case op_str of
-         Left _ -> False
-	 _      -> True
+         StaticTarget _  -> False
+	 DynamicTarget _ -> True
 
     casm_str = if is_asm then _UNPK_ asm_str else ccall_str
 
@@ -1201,9 +1195,9 @@ pp_liveness :: Liveness -> SDoc
 pp_liveness lv = 
    case lv of
 	LvLarge lbl  -> char '&' <> pprCLabel lbl
-	LvSmall mask
-	   | bitmap_int == (minBound :: Int) -> int (bitmap_int+1) <> text "-1"
-	   | otherwise -> int bitmap_int
+	LvSmall mask	-- Avoid gcc bug when printing minInt
+	   | bitmap_int == minInt -> int (bitmap_int+1) <> text "-1"
+	   | otherwise		  -> int bitmap_int
          where
 	   bitmap_int = intBS mask
 \end{code}
@@ -1621,7 +1615,7 @@ floatToWord (CLit (MachFloat r))
 	arr <- newFloatArray ((0::Int),0)
 	writeFloatArray arr 0 (fromRational r)
 	i <- readIntArray arr 0
-	return (CLit (MachInt (toInteger i) True))
+	return (CLit (MachInt (toInteger i)))
     )
 
 doubleToWords :: CAddrMode -> [CAddrMode]
@@ -1632,8 +1626,8 @@ doubleToWords (CLit (MachDouble r))
 	writeDoubleArray arr 0 (fromRational r)
 	i1 <- readIntArray arr 0
 	i2 <- readIntArray arr 1
-	return [ CLit (MachInt (toInteger i1) True)
-	       , CLit (MachInt (toInteger i2) True)
+	return [ CLit (MachInt (toInteger i1))
+	       , CLit (MachInt (toInteger i2))
 	       ]
     )
   | otherwise				-- doubles are 1 word
@@ -1641,6 +1635,6 @@ doubleToWords (CLit (MachDouble r))
 	arr <- newDoubleArray ((0::Int),0)
 	writeDoubleArray arr 0 (fromRational r)
 	i <- readIntArray arr 0
-	return [ CLit (MachInt (toInteger i) True) ]
+	return [ CLit (MachInt (toInteger i)) ]
     )
 \end{code}

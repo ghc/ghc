@@ -39,7 +39,7 @@ module Inst (
 import HsSyn	( HsLit(..), HsExpr(..) )
 import RnHsSyn	( RenamedArithSeqInfo, RenamedHsExpr, RenamedPat )
 import TcHsSyn	( TcExpr, TcId, 
-		  mkHsTyApp, mkHsDictApp, mkHsDictLam, zonkId
+		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
 import TcEnv	( TcIdSet, tcLookupValueByKey, tcLookupTyConByKey )
@@ -69,13 +69,14 @@ import Subst	( emptyInScopeSet, mkSubst,
 		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
 		)
 import TyCon	( TyCon )
+import Literal	( inIntRange )
 import Var	( TyVar )
 import VarEnv	( lookupVarEnv, TidyEnv,
 		  lookupSubstEnv, SubstResult(..)
 		)
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
-import TysWiredIn ( intDataCon, isIntTy, inIntRange,
+import TysWiredIn ( intDataCon, isIntTy,
 		    floatDataCon, isFloatTy,
 		    doubleDataCon, isDoubleTy,
 		    integerTy, isIntegerTy
@@ -452,7 +453,7 @@ newOverloadedLit orig (OverloadedIntegral i) ty
   where
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     integer_lit    = HsLitOut (HsInt i) integerTy
-    int_lit        = HsCon intDataCon [] [intprim_lit]
+    int_lit        = mkHsConApp intDataCon [] [intprim_lit]
 
 newOverloadedLit orig lit ty		-- The general case
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
@@ -710,7 +711,7 @@ lookupInst inst@(LitInst u (OverloadedIntegral i) ty loc)
     in_int_range   = inIntRange i
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     integer_lit    = HsLitOut (HsInt i) integerTy
-    int_lit        = HsCon intDataCon [] [intprim_lit]
+    int_lit        = mkHsConApp intDataCon [] [intprim_lit]
 
 -- similar idea for overloaded floating point literals: if the literal is
 -- *definitely* a float or a double, generate the real thing here.
@@ -721,7 +722,7 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty loc)
   | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
 
   | otherwise 
-	  = tcLookupValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
+  = tcLookupValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
 
 	-- The type Rational isn't wired in so we have to conjure it up
     tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
@@ -734,9 +735,9 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty loc)
 
   where
     floatprim_lit  = HsLitOut (HsFloatPrim f) floatPrimTy
-    float_lit      = HsCon floatDataCon [] [floatprim_lit]
+    float_lit      = mkHsConApp floatDataCon [] [floatprim_lit]
     doubleprim_lit = HsLitOut (HsDoublePrim f) doublePrimTy
-    double_lit     = HsCon doubleDataCon [] [doubleprim_lit]
+    double_lit     = mkHsConApp doubleDataCon [] [doubleprim_lit]
 
 -- there are no `instances' of functional dependencies or implicit params
 

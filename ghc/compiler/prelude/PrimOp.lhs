@@ -11,13 +11,15 @@ module PrimOp (
 
 	commutableOp,
 
-	primOpOutOfLine, primOpNeedsWrapper, primOpStrictness,
+	primOpOutOfLine, primOpNeedsWrapper, 
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 	primOpHasSideEffects,
 
 	getPrimOpResultInfo,  PrimOpResultInfo(..),
 
-	pprPrimOp
+	pprPrimOp,
+
+	CCall(..), CCallTarget(..), ccallMayGC, ccallIsCasm, pprCCallOp
     ) where
 
 #include "HsVersions.h"
@@ -26,7 +28,7 @@ import PrimRep		-- most of it
 import TysPrim
 import TysWiredIn
 
-import Demand		( Demand, wwLazy, wwPrim, wwStrict )
+import Demand		( Demand, wwLazy, wwPrim, wwStrict, StrictnessInfo(..) )
 import Var		( TyVar, Id )
 import CallConv		( CallConv, pprCallConv )
 import PprType		( pprParendType )
@@ -199,83 +201,9 @@ data PrimOp
     | MakeStablePtrOp
     | DeRefStablePtrOp
     | EqStablePtrOp
-\end{code}
 
-A special ``trap-door'' to use in making calls direct to C functions:
-\begin{code}
-    | CCallOp	(Either 
-		    FAST_STRING    -- Left fn => An "unboxed" ccall# to `fn'.
-		    Unique)        -- Right u => first argument (an Addr#) is the function pointer
-				   --   (unique is used to generate a 'typedef' to cast
-				   --    the function pointer if compiling the ccall# down to
-				   --    .hc code - can't do this inline for tedious reasons.)
-				    
-		Bool		    -- True <=> really a "casm"
-		Bool		    -- True <=> might invoke Haskell GC
-		CallConv	    -- calling convention to use.
-
-    -- (... to be continued ... )
-\end{code}
-
-The ``type'' of @CCallOp foo [t1, ... tm] r@ is @t1 -> ... tm -> r@.
-(See @primOpInfo@ for details.)
-
-Note: that first arg and part of the result should be the system state
-token (which we carry around to fool over-zealous optimisers) but
-which isn't actually passed.
-
-For example, we represent
-\begin{pseudocode}
-((ccall# foo [StablePtr# a, Int] Float) sp# i#) :: (Float, IoWorld)
-\end{pseudocode}
-by
-\begin{pseudocode}
-Case
-  ( Prim
-      (CCallOp "foo" [Universe#, StablePtr# a, Int#] FloatPrimAndUniverse False)
-       -- :: Universe# -> StablePtr# a -> Int# -> FloatPrimAndUniverse
-      []
-      [w#, sp# i#]
-  )
-  (AlgAlts [ ( FloatPrimAndIoWorld,
-		 [f#, w#],
-		 Con (TupleCon 2) [Float, IoWorld] [F# f#, World w#]
-	       ) ]
-	     NoDefault
-  )
-\end{pseudocode}
-
-Nota Bene: there are some people who find the empty list of types in
-the @Prim@ somewhat puzzling and would represent the above by
-\begin{pseudocode}
-Case
-  ( Prim
-      (CCallOp "foo" [alpha1, alpha2, alpha3] alpha4 False)
-       -- :: /\ alpha1, alpha2 alpha3, alpha4.
-       --       alpha1 -> alpha2 -> alpha3 -> alpha4
-      [Universe#, StablePtr# a, Int#, FloatPrimAndIoWorld]
-      [w#, sp# i#]
-  )
-  (AlgAlts [ ( FloatPrimAndIoWorld,
-		 [f#, w#],
-		 Con (TupleCon 2) [Float, IoWorld] [F# f#, World w#]
-	       ) ]
-	     NoDefault
-  )
-\end{pseudocode}
-
-But, this is a completely different way of using @CCallOp@.  The most
-major changes required if we switch to this are in @primOpInfo@, and
-the desugarer. The major difficulty is in moving the HeapRequirement
-stuff somewhere appropriate.  (The advantage is that we could simplify
-@CCallOp@ and record just the number of arguments with corresponding
-simplifications in reading pragma unfoldings, the simplifier,
-instantiation (etc) of core expressions, ... .  Maybe we should think
-about using it this way?? ADR)
-
-\begin{code}
-    -- (... continued from above ... )
-
+    -- Foreign calls
+    | CCallOp CCall
     -- Operation to test two closure addresses for equality (yes really!)
     -- BLAME ALASTAIR REID FOR THIS!  THE REST OF US ARE INNOCENT!
     | ReallyUnsafePtrEqualityOp
@@ -542,7 +470,6 @@ tagOf_PrimOp StableNameToIntOp		      = ILIT(229)
 tagOf_PrimOp MakeStablePtrOp		      = ILIT(230)
 tagOf_PrimOp DeRefStablePtrOp		      = ILIT(231)
 tagOf_PrimOp EqStablePtrOp		      = ILIT(232)
-tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(233)
 tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(234)
 tagOf_PrimOp SeqOp			      = ILIT(235)
 tagOf_PrimOp ParOp			      = ILIT(236)
@@ -573,7 +500,6 @@ tagOf_PrimOp DataToTagOp		      = ILIT(260)
 tagOf_PrimOp TagToEnumOp		      = ILIT(261)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
---panic# "tagOf_PrimOp: pattern-match"
 
 instance Eq PrimOp where
     op1 == op2 = tagOf_PrimOp op1 _EQ_ tagOf_PrimOp op2
@@ -596,7 +522,7 @@ instance Show PrimOp where
 
 An @Enum@-derived list would be better; meanwhile... (ToDo)
 \begin{code}
-allThePrimOps
+allThePrimOps		-- Except CCall, which is really a family of primops
   = [	CharGtOp,
 	CharGeOp,
 	CharEqOp,
@@ -930,42 +856,45 @@ integerCompare name = mkGenPrimOp name [] two_Integer_tys intPrimTy
 Not all primops are strict!
 
 \begin{code}
-primOpStrictness :: PrimOp -> ([Demand], Bool)
-	-- See IdInfo.StrictnessInfo for discussion of what the results
-	-- **NB** as a cheap hack, to avoid having to look up the PrimOp's arity,
-	-- the list of demands may be infinite!
-	-- Use only the ones you ned.
+primOpStrictness :: Arity -> PrimOp -> StrictnessInfo
+	-- See Demand.StrictnessInfo for discussion of what the results
+	-- The arity should be the arity of the primop; that's why
+	-- this function isn't exported.
 
-primOpStrictness SeqOp            = ([wwStrict], False)
+primOpStrictness arity SeqOp            = StrictnessInfo [wwStrict] False
 	-- Seq is strict in its argument; see notes in ConFold.lhs
 
-primOpStrictness ParOp            = ([wwLazy], False)
-	-- But Par is lazy, to avoid that the sparked thing
+primOpStrictness arity ParOp            = StrictnessInfo [wwLazy] False
+	-- Note that Par is lazy to avoid that the sparked thing
 	-- gets evaluted strictly, which it should *not* be
 
-primOpStrictness ForkOp		  = ([wwLazy, wwPrim], False)
+primOpStrictness arity ForkOp		= StrictnessInfo [wwLazy, wwPrim] False
 
-primOpStrictness NewArrayOp       = ([wwPrim, wwLazy, wwPrim], False)
-primOpStrictness WriteArrayOp     = ([wwPrim, wwPrim, wwLazy, wwPrim], False)
+primOpStrictness arity NewArrayOp       = StrictnessInfo [wwPrim, wwLazy, wwPrim] False
+primOpStrictness arity WriteArrayOp     = StrictnessInfo [wwPrim, wwPrim, wwLazy, wwPrim] False
 
-primOpStrictness NewMutVarOp	  = ([wwLazy, wwPrim], False)
-primOpStrictness WriteMutVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
+primOpStrictness arity NewMutVarOp	= StrictnessInfo [wwLazy, wwPrim] False
+primOpStrictness arity WriteMutVarOp	= StrictnessInfo [wwPrim, wwLazy, wwPrim] False
 
-primOpStrictness PutMVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
+primOpStrictness arity PutMVarOp	= StrictnessInfo [wwPrim, wwLazy, wwPrim] False
 
-primOpStrictness CatchOp	  = ([wwLazy, wwLazy, wwPrim], False)
-primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
-primOpStrictness BlockAsyncExceptionsOp    = ([wwLazy], False)
-primOpStrictness UnblockAsyncExceptionsOp  = ([wwLazy], False)
+primOpStrictness arity CatchOp	 		= StrictnessInfo [wwLazy, wwLazy, wwPrim] False
+	-- Catch is actually strict in its first argument
+	-- but we don't want to tell the strictness
+	-- analyser about that!
 
-primOpStrictness MkWeakOp	  = ([wwLazy, wwLazy, wwLazy, wwPrim], False)
-primOpStrictness MakeStableNameOp = ([wwLazy, wwPrim], False)
-primOpStrictness MakeStablePtrOp  = ([wwLazy, wwPrim], False)
+primOpStrictness arity RaiseOp	  		= StrictnessInfo [wwLazy] True	-- NB: True => result is bottom
+primOpStrictness arity BlockAsyncExceptionsOp   = StrictnessInfo [wwLazy] False
+primOpStrictness arity UnblockAsyncExceptionsOp = StrictnessInfo [wwLazy] False
 
-primOpStrictness DataToTagOp      = ([wwLazy], False)
+primOpStrictness arity MkWeakOp		= StrictnessInfo [wwLazy, wwLazy, wwLazy, wwPrim] False
+primOpStrictness arity MakeStableNameOp = StrictnessInfo [wwLazy, wwPrim] False
+primOpStrictness arity MakeStablePtrOp  = StrictnessInfo [wwLazy, wwPrim] False
+
+primOpStrictness arity DataToTagOp      = StrictnessInfo [wwLazy] False
 
 	-- The rest all have primitive-typed arguments
-primOpStrictness other		  = (repeat wwPrim, False)
+primOpStrictness arity other		= StrictnessInfo (replicate arity wwPrim) False
 \end{code}
 
 %************************************************************************
@@ -1935,24 +1864,6 @@ primOpInfo NoFollowOp	-- noFollow# :: a -> Int#
 
 %************************************************************************
 %*									*
-\subsubsection[PrimOp-IO-etc]{PrimOpInfo for C calls, and I/O-ish things}
-%*									*
-%************************************************************************
-
-\begin{code}
-primOpInfo (CCallOp _ _ _ _)
-     = mkGenPrimOp SLIT("ccall#") [alphaTyVar] [] alphaTy
-
-{-
-primOpInfo (CCallOp _ _ _ _ arg_tys result_ty)
-  = mkGenPrimOp SLIT("ccall#") [] arg_tys result_tycon tys_applied
-  where
-    (result_tycon, tys_applied, _) = splitAlgTyConApp result_ty
--}
-\end{code}
-
-%************************************************************************
-%*									*
 \subsubsection[PrimOp-tag]{PrimOpInfo for @dataToTag#@ and @tagToEnum#@}
 %*									*
 %************************************************************************
@@ -1973,7 +1884,7 @@ primOpInfo TagToEnumOp
   = mkGenPrimOp SLIT("tagToEnum#") [alphaTyVar] [intPrimTy] alphaTy
 
 #ifdef DEBUG
-primOpInfo op = panic ("primOpInfo:"++ show (I# (tagOf_PrimOp op)))
+primOpInfo op = pprPanic "primOpInfo:" (ppr op)
 #endif
 \end{code}
 
@@ -1989,49 +1900,52 @@ perform a heap check or they block.
 \begin{code}
 primOpOutOfLine op
   = case op of
-    	TakeMVarOp    		  -> True
-	PutMVarOp     		  -> True
-	DelayOp       		  -> True
-	WaitReadOp    		  -> True
-	WaitWriteOp   		  -> True
-	CatchOp	      		  -> True
-	RaiseOp	      		  -> True
-	BlockAsyncExceptionsOp    -> True
-	UnblockAsyncExceptionsOp  -> True
-	NewArrayOp    		  -> True
-	NewByteArrayOp _ 	  -> True
-	IntegerAddOp    	  -> True
-	IntegerSubOp    	  -> True
-	IntegerMulOp    	  -> True
-	IntegerGcdOp    	  -> True
-	IntegerDivExactOp    	  -> True
-	IntegerQuotOp    	  -> True
-	IntegerRemOp    	  -> True
-	IntegerQuotRemOp    	  -> True
-	IntegerDivModOp    	  -> True
-	Int2IntegerOp		  -> True
-	Word2IntegerOp  	  -> True
-	Addr2IntegerOp		  -> True
-	Word64ToIntegerOp         -> True
-	Int64ToIntegerOp          -> True
-	FloatDecodeOp		  -> True
-	DoubleDecodeOp		  -> True
-	MkWeakOp		  -> True
-	FinalizeWeakOp		  -> True
-	MakeStableNameOp	  -> True
-	MakeForeignObjOp	  -> True
-	NewMutVarOp		  -> True
-	NewMVarOp		  -> True
-	ForkOp			  -> True
-	KillThreadOp		  -> True
-	YieldOp			  -> True
-	CCallOp _ _ may_gc@True _ -> True	-- _ccall_GC_
-	  -- the next one doesn't perform any heap checks,
+    	TakeMVarOp    		     -> True
+	PutMVarOp     		     -> True
+	DelayOp       		     -> True
+	WaitReadOp    		     -> True
+	WaitWriteOp   		     -> True
+	CatchOp	      		     -> True
+	RaiseOp	      		     -> True
+	BlockAsyncExceptionsOp       -> True
+	UnblockAsyncExceptionsOp     -> True
+	NewArrayOp    		     -> True
+	NewByteArrayOp _ 	     -> True
+	IntegerAddOp    	     -> True
+	IntegerSubOp    	     -> True
+	IntegerMulOp    	     -> True
+	IntegerGcdOp    	     -> True
+	IntegerDivExactOp    	     -> True
+	IntegerQuotOp    	     -> True
+	IntegerRemOp    	     -> True
+	IntegerQuotRemOp    	     -> True
+	IntegerDivModOp    	     -> True
+	Int2IntegerOp		     -> True
+	Word2IntegerOp  	     -> True
+	Addr2IntegerOp		     -> True
+	Word64ToIntegerOp            -> True
+	Int64ToIntegerOp             -> True
+	FloatDecodeOp		     -> True
+	DoubleDecodeOp		     -> True
+	MkWeakOp		     -> True
+	FinalizeWeakOp		     -> True
+	MakeStableNameOp	     -> True
+	MakeForeignObjOp	     -> True
+	NewMutVarOp		     -> True
+	NewMVarOp		     -> True
+	ForkOp			     -> True
+	KillThreadOp		     -> True
+	YieldOp			     -> True
+
+	UnsafeThawArrayOp            -> True
+	  -- UnsafeThawArrayOp doesn't perform any heap checks,
 	  -- but it is of such an esoteric nature that
 	  -- it is done out-of-line rather than require
 	  -- the NCG to implement it.
-	UnsafeThawArrayOp       -> True
-	_           		-> False
+
+	CCallOp ccall -> ccallMayGC ccall
+
+	other -> False
 \end{code}
 
 
@@ -2084,10 +1998,8 @@ duplicate into different case branches.  See CoreUtils.exprIsDupable.
 \begin{code}
 primOpIsDupable :: PrimOp -> Bool
 	-- See comments with CoreUtils.exprIsDupable
-primOpIsDupable (CCallOp _ _ might_gc _) = not might_gc
-	-- If the ccall can't GC then the call is pretty cheap, and
-	-- we're happy to duplicate
-primOpIsDupable op		         = not (primOpOutOfLine op)
+	-- We say it's dupable it isn't implemented by a C call with a wrapper
+primOpIsDupable op = not (primOpNeedsWrapper op)
 \end{code}
 
 
@@ -2166,9 +2078,7 @@ primOpHasSideEffects ParAtRelOp		= True
 primOpHasSideEffects ParAtForNowOp	= True
 primOpHasSideEffects CopyableOp		= True  -- Possibly not.  ASP 
 primOpHasSideEffects NoFollowOp		= True  -- Possibly not.  ASP
-
--- CCall
-primOpHasSideEffects (CCallOp	_ _ _ _) = True
+primOpHasSideEffects (CCallOp _) 	= True
 
 primOpHasSideEffects other = False
 \end{code}
@@ -2179,7 +2089,7 @@ any live variables that are stored in caller-saves registers.
 \begin{code}
 primOpNeedsWrapper :: PrimOp -> Bool
 
-primOpNeedsWrapper (CCallOp _ _ _ _)    = True
+primOpNeedsWrapper (CCallOp _) 		= True
 
 primOpNeedsWrapper Integer2IntOp    	= True
 primOpNeedsWrapper Integer2WordOp    	= True
@@ -2266,15 +2176,20 @@ primOpOcc op = case (primOpInfo op) of
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)
+-- It also gives arity, strictness info
 
-primOpSig :: PrimOp -> ([TyVar],[Type],Type)
+primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, StrictnessInfo)
 primOpSig op
-  = case (primOpInfo op) of
-      Monadic   occ ty -> ([],     [ty],    ty    )
-      Dyadic    occ ty -> ([],     [ty,ty], ty    )
-      Compare   occ ty -> ([],     [ty,ty], boolTy)
-      GenPrimOp occ tyvars arg_tys res_ty
-                       -> (tyvars, arg_tys, res_ty)
+  = (tyvars, arg_tys, res_ty, arity, primOpStrictness arity op)
+  where
+    arity = length arg_tys
+    (tyvars, arg_tys, res_ty)
+      = case (primOpInfo op) of
+	  Monadic   occ ty -> ([],     [ty],    ty    )
+	  Dyadic    occ ty -> ([],     [ty,ty], ty    )
+	  Compare   occ ty -> ([],     [ty,ty], boolTy)
+	  GenPrimOp occ tyvars arg_tys res_ty
+                           -> (tyvars, arg_tys, res_ty)
 
 -- primOpUsg is like primOpSig but the types it yields are the
 -- appropriate sigma (i.e., usage-annotated) types,
@@ -2343,7 +2258,7 @@ primOpUsg op
       CopyableOp           -> mangle [mkZ               ] mkR
       NoFollowOp           -> mangle [mkZ               ] mkR
 
-      CCallOp _ _ _ _      -> mangle [                  ] mkM
+      CCallOp _ 	   -> mangle [                  ] mkM
 
       -- Things with no Haskell pointers inside: in actuality, usages are
       -- irrelevant here (hence it doesn't matter that some of these
@@ -2360,8 +2275,7 @@ primOpUsg op
         mkP          = mkUsgTy UsOnce  -- unpointed argument
         mkR          = mkUsgTy UsMany  -- unpointed result
   
-        (tyvars, arg_tys, res_ty)
-                     = primOpSig op
+        (tyvars, arg_tys, res_ty, _, _) = primOpSig op
 
         nomangle     = (tyvars, map mkP arg_tys, mkR res_ty)
 
@@ -2388,6 +2302,8 @@ data PrimOpResultInfo
 -- be out of line, or the code generator won't work.
 
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
+getPrimOpResultInfo (CCallOp _)
+  = ReturnsAlg unboxedPairTyCon
 getPrimOpResultInfo op
   = case (primOpInfo op) of
       Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
@@ -2400,12 +2316,6 @@ getPrimOpResultInfo op
 			Nothing -> panic "getPrimOpResultInfo"
 			Just (tc,_,_) -> ReturnsAlg tc
 	   other -> ReturnsPrim other
-
-isCompareOp :: PrimOp -> Bool
-isCompareOp op
-  = case primOpInfo op of
-      Compare _ _ -> True
-      _	    	  -> False
 \end{code}
 
 The commutable ops are those for which we will try to move constants
@@ -2458,8 +2368,55 @@ Output stuff:
 \begin{code}
 pprPrimOp  :: PrimOp -> SDoc
 
-pprPrimOp (CCallOp fun is_casm may_gc cconv)
-  = let
+pprPrimOp (CCallOp ccall) = pprCCallOp ccall
+pprPrimOp other_op
+  = getPprStyle $ \ sty ->
+    if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
+	ptext SLIT("PrelGHC.") <> pprOccName occ
+    else
+	pprOccName occ
+  where
+    occ = primOpOcc other_op
+\end{code}
+
+
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{CCalls}
+%*									*
+%************************************************************************
+
+A special ``trap-door'' to use in making calls direct to C functions:
+\begin{code}
+data CCall
+  =  CCall	CCallTarget
+		Bool		-- True <=> really a "casm"
+		Bool		-- True <=> might invoke Haskell GC
+		CallConv	-- calling convention to use.
+
+data CCallTarget
+  = StaticTarget  FAST_STRING   -- An "unboxed" ccall# to `fn'.
+  | DynamicTarget Unique	-- First argument (an Addr#) is the function pointer
+				--   (unique is used to generate a 'typedef' to cast
+				--    the function pointer if compiling the ccall# down to
+				--    .hc code - can't do this inline for tedious reasons.)
+
+ccallMayGC :: CCall -> Bool
+ccallMayGC (CCall _ _ may_gc _) = may_gc
+
+ccallIsCasm :: CCall -> Bool
+ccallIsCasm (CCall _ c_asm _ _) = c_asm
+\end{code}
+
+\begin{code}
+pprCCallOp (CCall fun is_casm may_gc cconv)
+  = hcat [ ifPprDebug callconv
+	 , text "__", ppr_dyn
+         , text before , ppr_fun , after]
+  where
         callconv = text "{-" <> pprCallConv cconv <> text "-}"
 
 	before
@@ -2472,27 +2429,11 @@ pprPrimOp (CCallOp fun is_casm may_gc cconv)
 	  | is_casm   = text "''"
 	  | otherwise = empty
 	  
-	ppr_dyn =
-	  case fun of
-	    Right _ -> text "dyn_"
-	    _	    -> empty
+	ppr_dyn = case fun of
+		    DynamicTarget _ -> text "dyn_"
+		    _	   	    -> empty
 
-	ppr_fun =
-	 case fun of
-	   Right _ -> text "\"\""
-	   Left fn -> ptext fn
-	 
-    in
-    hcat [ ifPprDebug callconv
-	 , text "__", ppr_dyn
-         , text before , ppr_fun , after]
-
-pprPrimOp other_op
-  = getPprStyle $ \ sty ->
-   if ifaceStyle sty then	-- For interfaces Print it qualified with PrelGHC.
-	ptext SLIT("PrelGHC.") <> pprOccName occ
-   else
-	pprOccName occ
-  where
-    occ = primOpOcc other_op
+	ppr_fun = case fun of
+		     DynamicTarget _ -> text "\"\""
+		     StaticTarget fn -> ptext fn
 \end{code}

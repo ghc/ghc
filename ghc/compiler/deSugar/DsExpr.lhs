@@ -29,28 +29,32 @@ import DsListComp	( dsListComp )
 import DsUtils		( mkErrorAppDs, mkDsLets, mkConsExpr, mkNilExpr )
 import Match		( matchWrapper, matchSimply )
 
-import CoreUtils	( coreExprType )
+import CoreUtils	( exprType )
 import CostCentre	( mkUserCC )
 import FieldLabel	( FieldLabel )
 import Id		( Id, idType, recordSelectorFieldLabel )
-import Const		( Con(..) )
 import DataCon		( DataCon, dataConId, dataConTyCon, dataConArgTys, dataConFieldLabels )
-import Const		( mkMachInt, Literal(..), mkStrLit )
-import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
+import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, addr2IntegerId )
 import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
+import Literal		( Literal(..), inIntRange )
 import Type		( splitFunTys, mkTyConApp,
-			  splitAlgTyConApp, splitTyConApp_maybe, isNotUsgTy, unUsgTy,
+			  splitAlgTyConApp, splitAlgTyConApp_maybe, splitTyConApp_maybe, 
+			  isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
 import TysWiredIn	( tupleCon, unboxedTupleCon,
 			  listTyCon, mkListTy,
-			  charDataCon, charTy, stringTy
+			  charDataCon, charTy, stringTy,
+			  smallIntegerDataCon, isIntegerTy
 			)
 import BasicTypes	( RecFlag(..) )
 import Maybes		( maybeToBool )
+import Unique		( Uniquable(..), ratioTyConKey )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
+
+import Ratio 		( numerator, denominator )
 \end{code}
 
 
@@ -98,7 +102,7 @@ dsLet (MonoBind (AbsBinds [] [] binder_triples inlines
     `thenDs` \ error_expr ->
     matchSimply rhs PatBindMatch pat body' error_expr
   where
-    result_ty = coreExprType body
+    result_ty = exprType body
 
 -- Ordinary case for bindings
 dsLet (MonoBind binds sigs is_rec) body
@@ -137,8 +141,6 @@ ToDo: put in range checks for when converting ``@i@''
 For numeric literals, we try to detect there use at a standard type
 (@Int@, @Float@, etc.) are directly put in the right constructor.
 [NB: down with the @App@ conversion.]
-Otherwise, we punt, putting in a @NoRep@ Core literal (where the
-representation decisions are delayed)...
 
 See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
@@ -157,9 +159,6 @@ dsExpr (HsLitOut (HsString s) _)
 
 
 -- "_" => build (\ c n -> c 'c' n)	-- LATER
-
--- otherwise, leave it as a NoRepStr;
--- the Core-to-STG pass will wrap it in an application of "unpackCStringId".
 
 dsExpr (HsLitOut (HsString str) _)
   = returnDs (mkStringLitFS str)
@@ -190,22 +189,31 @@ dsExpr (HsLitOut (HsLitLit str) ty)
 			(hcat [ptext str, text "; type: ", ppr ty])
 
 dsExpr (HsLitOut (HsInt i) ty)
-  = returnDs (mkLit (NoRepInteger i ty))
+  = returnDs (mkIntegerLit i)
+
 
 dsExpr (HsLitOut (HsFrac r) ty)
-  = returnDs (mkLit (NoRepRational r ty))
+  = returnDs (mkConApp ratio_data_con [Type integer_ty,
+				       mkIntegerLit (numerator r),
+				       mkIntegerLit (denominator r)])
+  where
+    (ratio_data_con, integer_ty)
+      = case (splitAlgTyConApp_maybe ty) of
+	  Just (tycon, [i_ty], [con])
+	    -> ASSERT(isIntegerTy i_ty && getUnique tycon == ratioTyConKey)
+	       (con, i_ty)
+
+	  _ -> (panic "ratio_data_con", panic "integer_ty")
+
+
 
 -- others where we know what to do:
 
-dsExpr (HsLitOut (HsIntPrim i) _)
-  | (i >= toInteger minInt && i <= toInteger maxInt) 
-  = returnDs (mkLit (mkMachInt i))
-  | otherwise
-  = error ("ERROR: Int constant " ++ show i ++ out_of_range_msg)
+dsExpr (HsLitOut (HsIntPrim i) _) 
+  = returnDs (mkIntLit i)
 
 dsExpr (HsLitOut (HsFloatPrim f) _)
   = returnDs (mkLit (MachFloat f))
-    -- ToDo: range checking needed!
 
 dsExpr (HsLitOut (HsDoublePrim d) _)
   = returnDs (mkLit (MachDouble d))
@@ -266,7 +274,7 @@ dsExpr (SectionL expr op)
   = dsExpr op						`thenDs` \ core_op ->
     -- for the type of y, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
     in
     dsExpr expr				`thenDs` \ x_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
@@ -280,7 +288,7 @@ dsExpr (SectionR op expr)
   = dsExpr op			`thenDs` \ core_op ->
     -- for the type of x, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
     in
     dsExpr expr				`thenDs` \ y_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
@@ -289,7 +297,7 @@ dsExpr (SectionR op expr)
     returnDs (bindNonRec y_id y_core $
 	      Lam x_id (mkApps core_op [Var x_id, Var y_id]))
 
-dsExpr (CCall lbl args may_gc is_asm result_ty)
+dsExpr (HsCCall lbl args may_gc is_asm result_ty)
   = mapDs dsExpr args		`thenDs` \ core_args ->
     dsCCall lbl core_args may_gc is_asm result_ty
 	-- dsCCall does all the unboxification, etc.
@@ -397,21 +405,8 @@ dsExpr (ExplicitTuple expr_list boxed)
     returnDs (mkConApp ((if boxed 
 			    then tupleCon 
 			    else unboxedTupleCon) (length expr_list))
-	    	(map (Type . unUsgTy . coreExprType) core_exprs ++ core_exprs))
+	    	(map (Type . unUsgTy . exprType) core_exprs ++ core_exprs))
                 -- the above unUsgTy is *required* -- KSW 1999-04-07
-
-dsExpr (HsCon con_id [ty] [arg])
-  | isNewTyCon tycon
-  = dsExpr arg		     `thenDs` \ arg' ->
-    returnDs (Note (Coerce result_ty (unUsgTy (coreExprType arg'))) arg')
-  where
-    result_ty = mkTyConApp tycon [ty]
-    tycon     = dataConTyCon con_id
-
-dsExpr (HsCon con_id tys args)
-  = mapDs dsExpr args	 	  `thenDs` \ args2  ->
-    ASSERT( all isNotUsgTy tys )
-    returnDs (mkConApp con_id (map Type tys ++ args2))
 
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->
@@ -463,7 +458,7 @@ constructor @C@, setting all of @C@'s fields to bottom.
 dsExpr (RecordConOut data_con con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
-	(arg_tys, _) = splitFunTys (coreExprType con_expr')
+	(arg_tys, _) = splitFunTys (exprType con_expr')
 
 	mk_arg (arg_ty, lbl)
 	  = case [rhs | (sel_id,rhs,_) <- rbinds,
@@ -501,36 +496,29 @@ Then we translate as follows:
 	  other	       -> recUpdError "M.lhs/230"
 \end{verbatim}
 It's important that we use the constructor Ids for @T1@, @T2@ etc on the
-RHSs, and do not generate a Core @Con@ directly, because the constructor
+RHSs, and do not generate a Core constructor application directly, because the constructor
 might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
 dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
-  = dsExpr record_expr	 	`thenDs` \ record_expr' ->
+  = getSrcLocDs		`thenDs` \ src_loc ->
+    dsExpr record_expr	 	`thenDs` \ record_expr' ->
 
 	-- Desugar the rbinds, and generate let-bindings if
 	-- necessary so that we don't lose sharing
 
     let
-	ds_rbind (sel_id, rhs, pun_flag)
-	  = dsExpr rhs		 		`thenDs` \ rhs' ->
-	    returnDs (recordSelectorFieldLabel sel_id, rhs')
-    in
-    mapDs ds_rbind rbinds			`thenDs` \ rbinds' ->
-    let
-	record_in_ty		   = coreExprType record_expr'
+	record_in_ty		   = exprType record_expr'
 	(tycon, in_inst_tys, cons) = splitAlgTyConApp record_in_ty
 	(_,     out_inst_tys, _)   = splitAlgTyConApp record_out_ty
 	cons_to_upd  	 	   = filter has_all_fields cons
 
-	-- initial_args are passed to every constructor
-	initial_args		= map Type out_inst_tys ++ map Var dicts
-		
 	mk_val_arg field old_arg_id 
-	  = case [rhs | (f, rhs) <- rbinds', field == f] of
+	  = case [rhs | (sel_id, rhs, _) <- rbinds, 
+			field == recordSelectorFieldLabel sel_id] of
 	      (rhs:rest) -> ASSERT(null rest) rhs
-	      []	 -> Var old_arg_id
+	      []	 -> HsVar old_arg_id
 
 	mk_alt con
 	  = newSysLocalsDs (dataConArgTys con in_inst_tys)	`thenDs` \ arg_ids ->
@@ -538,25 +526,28 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
 					(dataConFieldLabels con) arg_ids
-		rhs = mkApps (mkApps (Var (dataConId con)) initial_args) val_args
+		rhs = foldl HsApp (DictApp (TyApp (HsVar (dataConId con)) 
+						  out_inst_tys)
+					   dicts)
+				  val_args
 	    in
-	    returnDs (DataCon con, arg_ids, rhs)
-
-	mk_default
-	  | length cons_to_upd == length cons 
-	  = returnDs []
-	  | otherwise			    
-	  = mkErrorAppDs rEC_UPD_ERROR_ID record_out_ty ""	`thenDs` \ err ->
-	    returnDs [(DEFAULT, [], err)]
+	    returnDs (mkSimpleMatch [ConPat con record_in_ty [] [] (map VarPat arg_ids)]
+				    rhs
+				    (Just record_out_ty)
+				    src_loc)
     in
 	-- Record stuff doesn't work for existentials
     ASSERT( all (not . isExistentialDataCon) cons )
 
-    newSysLocalDs record_in_ty	`thenDs` \ case_bndr ->
-    mapDs mk_alt cons_to_upd	`thenDs` \ alts ->
-    mk_default			`thenDs` \ deflt ->
+	-- It's important to generate the match with matchWrapper,
+	-- and the right hand sides with applications of the wrapper Id
+	-- so that everything works when we are doing fancy unboxing on the
+	-- constructor aguments.
+    mapDs mk_alt cons_to_upd				`thenDs` \ alts ->
+    matchWrapper RecUpdMatch alts "record update"	`thenDs` \ ([discrim_var], matching_code) ->
 
-    returnDs (Case record_expr' case_bndr (alts ++ deflt))
+    returnDs (bindNonRec discrim_var record_expr' matching_code)
+
   where
     has_all_fields :: DataCon -> Bool
     has_all_fields con_id 
@@ -595,8 +586,6 @@ dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
 dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
 #endif
 
-out_of_range_msg			   -- ditto
-  = " out of range: [" ++ show minInt ++ ", " ++ show maxInt ++ "]\n"
 \end{code}
 
 %--------------------------------------------------------------------
@@ -629,12 +618,12 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 				   rest 
 				   (App (App (Var fail_id) 
 					     (Type b_ty))
-					     (mkLit (mkStrLit msg stringTy))))
+					     (mkStringLit msg)))
     
 	go (ExprStmt expr locn : stmts)
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    let
-		(_, a_ty) = splitAppTy (coreExprType expr2)  -- Must be of form (m a)
+		(_, a_ty) = splitAppTy (exprType expr2)  -- Must be of form (m a)
 	    in
 	    if null stmts then
 		returnDs expr2
@@ -652,7 +641,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = putSrcLocDs locn $
 	    dsExpr expr 	   `thenDs` \ expr2 ->
 	    let
-		(_, a_ty)  = splitAppTy (coreExprType expr2) -- Must be of form (m a)
+		(_, a_ty)  = splitAppTy (exprType expr2) -- Must be of form (m a)
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
                                    (HsLitOut (HsString (_PK_ msg)) stringTy)
 	        msg = ASSERT2( isNotUsgTy a_ty, ppr a_ty )
@@ -688,5 +677,15 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 var_pat (WildPat _) = True
 var_pat (VarPat _) = True
 var_pat _ = False
+\end{code}
+
+\begin{code}
+mkIntegerLit :: Integer -> CoreExpr
+mkIntegerLit i
+  | inIntRange i  	-- Small enough, so start from an Int
+  = mkConApp smallIntegerDataCon [mkIntLit i]
+
+  | otherwise 		-- Big, so start from a string
+  = App (Var addr2IntegerId) (Lit (MachStr (_PK_ (show i))))
 \end{code}
 

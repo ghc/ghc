@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.8 2000/01/12 15:15:17 simonmar Exp $
+ * $Id: Regs.h,v 1.9 2000/03/23 17:45:31 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -610,6 +610,8 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
   CALLER_SAVE_D2				\
   CALLER_SAVE_L1
 
+     /* Save Base last, since the others may
+	be addressed relative to it */
 #define CALLER_SAVE_SYSTEM			\
   CALLER_SAVE_Sp				\
   CALLER_SAVE_Su				\
@@ -621,7 +623,8 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
   CALLER_SAVE_SparkHd				\
   CALLER_SAVE_SparkTl				\
   CALLER_SAVE_SparkBase				\
-  CALLER_SAVE_SparkLim
+  CALLER_SAVE_SparkLim                          \
+  CALLER_SAVE_Base
 
 #define CALLER_RESTORE_USER			\
   CALLER_RESTORE_R1				\
@@ -640,6 +643,8 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
   CALLER_RESTORE_D2				\
   CALLER_RESTORE_L1
 
+     /* Restore Base first, since the others may
+	be addressed relative to it */
 #define CALLER_RESTORE_SYSTEM			\
   CALLER_RESTORE_Base				\
   CALLER_RESTORE_Sp				\
