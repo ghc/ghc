@@ -178,6 +178,7 @@ moduleNameToModule mn
 -- A string may refer to more than one TyThing (eg. a constructor,
 -- and type constructor), so we return a list of all the possible TyThings.
 
+#ifdef GHCI
 cmInfoThing :: CmState -> DynFlags -> String 
 	-> IO (CmState, PrintUnqualified, [TyThing])
 cmInfoThing cmstate dflags id
@@ -186,6 +187,7 @@ cmInfoThing cmstate dflags id
    where 
      CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
      unqual = getUnqual pcs hit icontext
+#endif
 
 -----------------------------------------------------------------------------
 -- cmRunStmt:  Run a statement/expr.
