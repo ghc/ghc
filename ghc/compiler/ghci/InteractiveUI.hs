@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.77 2001/06/18 09:09:28 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.78 2001/06/27 11:17:47 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -113,8 +113,8 @@ helpText = "\
 \"
  --ToDo   :add <filename>     add a module to the current set\n\ 
 
-interactiveUI :: CmState -> Maybe FilePath -> [LibrarySpec] -> IO ()
-interactiveUI cmstate mod cmdline_libs = do
+interactiveUI :: CmState -> [FilePath] -> [LibrarySpec] -> IO ()
+interactiveUI cmstate paths cmdline_libs = do
    hFlush stdout
    hSetBuffering stdout NoBuffering
 
@@ -124,9 +124,9 @@ interactiveUI cmstate mod cmdline_libs = do
    linkPackages cmdline_libs pkgs
 
    (cmstate, ok, mods) <-
-   	case mod of
-	     Nothing  -> return (cmstate, True, [])
-	     Just m -> cmLoadModule cmstate m
+   	case paths of
+	     [] -> return (cmstate, True, [])
+	     _  -> cmLoadModule cmstate paths
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
    Readline.initialize
@@ -146,7 +146,7 @@ interactiveUI cmstate mod cmdline_libs = do
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
 
-   startGHCi runGHCi GHCiState{ target = mod,
+   startGHCi runGHCi GHCiState{ targets = paths,
 			        cmstate = cmstate,
 			        options = [] }
    return ()
@@ -360,7 +360,14 @@ help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
 addModule :: String -> GHCi ()
-addModule _ = throwDyn (InstallationError ":add not implemented")
+addModule path = do
+  state <- getGHCiState
+  dflags <- io (getDynFlags)
+  io (revertCAFs)			-- always revert CAFs on load/add.
+  let new_targets = path : targets state 
+  (cmstate1, ok, mods) <- io (cmLoadModule (cmstate state) new_targets)
+  setGHCiState state{ cmstate = cmstate1, targets = new_targets }
+  modulesLoadedMsg ok mods
 
 setContext :: String -> GHCi ()
 setContext ""
@@ -431,20 +438,20 @@ loadModule' path = do
   state <- getGHCiState
   dflags <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
-  setGHCiState state{ cmstate = cmstate1, target = Nothing }
+  setGHCiState state{ cmstate = cmstate1, targets = [] }
   io (revertCAFs)			-- always revert CAFs on load.
-  (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
-  setGHCiState state{ cmstate = cmstate2, target = Just path }
+  (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 [path])
+  setGHCiState state{ cmstate = cmstate2, targets = [path] }
   modulesLoadedMsg ok mods
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
   state <- getGHCiState
-  case target state of
-   Nothing -> io (putStr "no current target\n")
-   Just path
+  case targets state of
+   [] -> io (putStr "no current target\n")
+   paths
       -> do io (revertCAFs)		-- always revert CAFs on reload.
-	    (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) path)
+	    (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) paths)
             setGHCiState state{ cmstate=new_cmstate }
 	    modulesLoadedMsg ok mods
 
@@ -574,7 +581,7 @@ newPackages new_pkgs = do
   state <- getGHCiState
   dflags <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
-  setGHCiState state{ cmstate = cmstate1, target = Nothing }
+  setGHCiState state{ cmstate = cmstate1, targets = [] }
 
   io $ do
     pkgs <- getPackageInfo
@@ -588,7 +595,7 @@ newPackages new_pkgs = do
 
 data GHCiState = GHCiState
      { 
-	target         :: Maybe FilePath,
+	targets        :: [FilePath],
 	cmstate        :: CmState,
 	options        :: [GHCiOption]
      }
@@ -750,7 +757,7 @@ loadClassified (Right dll_unadorned)
         if    maybe_errmsg == nullPtr
          then return ()
          else do str <- peekCString maybe_errmsg
-                 throwDyn (CmdLineError ("can't find .o or .so/.DLL for: " 
+                 throwDyn (CmdLineError ("can't load .so/.DLL for: " 
                                        ++ dll_unadorned ++ " (" ++ str ++ ")" ))
 
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec
