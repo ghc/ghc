@@ -21,9 +21,6 @@ module Data.STRef.Lazy (
  ) where
 
 import Control.Monad.ST.Lazy
-#ifdef __HUGS__
-import Hugs.LazyST as ST
-#else
 import qualified Data.STRef as ST
 import qualified Control.Monad.ST as ST
 
@@ -36,5 +33,3 @@ newSTRef   = strictToLazyST . ST.newSTRef
 readSTRef  = strictToLazyST . ST.readSTRef
 writeSTRef r a = strictToLazyST (ST.writeSTRef r a)
 modifySTRef r f = strictToLazyST (ST.modifySTRef r f)
-
-#endif  /* __HUGS__ */

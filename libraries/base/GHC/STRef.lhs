@@ -39,10 +39,6 @@ writeSTRef (STRef var#) val = ST $ \s1# ->
     case writeMutVar# var# val s1#      of { s2# ->
     (# s2#, () #) }
 
--- |Mutate the contents of an 'STRef'
-modifySTRef :: STRef s a -> (a -> a) -> ST s ()
-modifySTRef ref f = readSTRef ref >>= writeSTRef ref . f
-
 -- Just pointer equality on mutable references:
 instance Eq (STRef s a) where
     STRef v1# == STRef v2# = sameMutVar# v1# v2#

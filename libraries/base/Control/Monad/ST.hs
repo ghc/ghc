@@ -37,6 +37,14 @@ import Data.Dynamic
 
 #ifdef __HUGS__
 import Hugs.ST
+import qualified Hugs.LazyST as LazyST
+
+fixST :: (a -> ST s a) -> ST s a
+fixST f = LazyST.lazyToStrictST (LazyST.fixST (LazyST.strictToLazyST . f))
+
+unsafeInterleaveST :: ST s a -> ST s a
+unsafeInterleaveST =
+    LazyST.lazyToStrictST . LazyST.unsafeInterleaveST . LazyST.strictToLazyST
 #endif
 
 #ifdef __GLASGOW_HASKELL__

@@ -24,6 +24,7 @@ module Data.STRef (
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
+import GHC.ST
 import GHC.STRef
 #endif
 
@@ -35,3 +36,7 @@ import Data.Dynamic
 
 #include "Dynamic.h"
 INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
+
+-- |Mutate the contents of an 'STRef'
+modifySTRef :: STRef s a -> (a -> a) -> ST s ()
+modifySTRef ref f = writeSTRef ref . f =<< readSTRef ref

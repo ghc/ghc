@@ -28,18 +28,18 @@ module Control.Monad.ST.Lazy (
 	RealWorld,
 	stToIO,
 
-#ifndef __HUGS__
 	-- * Converting between strict and lazy 'ST'
 	strictToLazyST, lazyToStrictST
-#endif
     ) where
 
 import Prelude
 
 import Control.Monad.Fix
 
-#ifdef __GLASGOW_HASKELL__
+import Control.Monad.ST (RealWorld)
 import qualified Control.Monad.ST as ST
+
+#ifdef __GLASGOW_HASKELL__
 import qualified GHC.ST
 import GHC.Base
 import Control.Monad
@@ -118,10 +118,10 @@ lazyToStrictST (ST m) = GHC.ST.ST $ \s ->
 
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST
+#endif
 
 unsafeIOToST :: IO a -> ST s a
 unsafeIOToST = strictToLazyST . ST.unsafeIOToST
 
 stToIO :: ST RealWorld a -> IO a
 stToIO = ST.stToIO . lazyToStrictST
-#endif
