@@ -23,7 +23,7 @@ import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Name		( mkWiredInIdName, Module )
 import Type		
-import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, TyVar )
+import TyVar		( openAlphaTyVar, openAlphaTyVars, alphaTyVar, betaTyVar, TyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}
@@ -125,10 +125,14 @@ unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty
 	(mk_inline_unfolding template)
   where
-    ty = mkForAllTys [alphaTyVar,betaTyVar] (mkFunTy alphaTy betaTy)
-    [x] = mkTemplateLocals [alphaTy]
-    template = mkLam [alphaTyVar,betaTyVar] [x] (
-		  Note (Coerce betaTy alphaTy) (Var x))
+     (alphaTyVar:betaTyVar:_) = openAlphaTyVars
+     alphaTy  = mkTyVarTy alphaTyVar
+     betaTy   = mkTyVarTy betaTyVar
+     ty = mkForAllTys [alphaTyVar,betaTyVar] (mkFunTy alphaTy betaTy)
+     [x] = mkTemplateLocals [alphaTy]
+     template = mkLam [alphaTyVar,betaTyVar] [x] $
+ 	       Note (Coerce betaTy alphaTy) (Var x)
+
 \end{code}
 
 We want \tr{GHCbase.trace} to be wired in
