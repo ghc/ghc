@@ -1047,11 +1047,11 @@ pprInstr g@(GCMP sz src1 src2)
              hcat [gtab, text "fcompp ; fstsw %ax ; sahf ; popl %eax"])
 
 pprInstr g@(GABS sz src dst)
-   = pprG g bogus
+   = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
 pprInstr g@(GNEG sz src dst)
-   = pprG g bogus
+   = pprG g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
 pprInstr g@(GSQRT sz src dst)
-   = pprG g bogus
+   = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt ; ", gpop dst 1])
 
 pprInstr g@(GADD sz src1 src2 dst)
    = pprG g (hcat [gtab, gpush src1 0, 
