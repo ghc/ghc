@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsExternal.h,v 1.2 2004/08/13 13:09:29 simonmar Exp $
+ * $Id: RtsExternal.h,v 1.3 2004/08/21 12:47:17 panne Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -52,6 +52,10 @@ extern StgInt    isFloatNegativeZero(StgFloat f);
 /* Suspending/resuming threads around foreign calls */
 extern StgInt        suspendThread ( StgRegTable * );
 extern StgRegTable * resumeThread  ( StgInt );
+
+/* Creating and destroying an adjustor thunk */
+extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
+extern void   freeHaskellFunctionPtr(void* ptr);
 
 /* -----------------------------------------------------------------------------
    Storage manager stuff exported

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.24 2004/08/13 13:09:27 simonmar Exp $
+ * $Id: Rts.h,v 1.25 2004/08/21 12:47:17 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -173,13 +173,7 @@ extern void      __decodeFloat  (MP_INT *man, I_ *_exp, StgFloat flt);
 #include "DNInvoke.h"
 #endif
 
-/* Creating and destroying an adjustor thunk and initialising the whole
-   adjustor thunk machinery. I cannot make myself create a separate .h file
-   for these three (sof.) 
-   
-*/
-extern void*   createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
-extern void    freeHaskellFunctionPtr(void* ptr);
+/* Initialising the whole adjustor thunk machinery. */
 extern rtsBool initAdjustor(void);
 
 extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
