@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hs,v 1.2 2002/02/13 12:12:08 simonmar Exp $
+-- $Id: Posix.hs,v 1.3 2002/02/13 14:26:01 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -323,6 +323,9 @@ foreign import ccall unsafe "utime"
 foreign import ccall unsafe "write" 
    c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
+foreign import ccall unsafe "unlink"
+   c_unlink :: CString -> IO CInt
+
 #ifndef mingw32_TARGET_OS
 foreign import ccall unsafe "fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
@@ -353,9 +356,6 @@ foreign import ccall unsafe "tcsetattr"
 
 foreign import ccall unsafe "uname"
    c_uname :: Ptr CUtsname -> IO CInt
-
-foreign import ccall unsafe "unlink"
-   c_unlink :: CString -> IO CInt
 
 foreign import ccall unsafe "waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
