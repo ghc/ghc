@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.3 2000/10/16 15:16:59 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.4 2000/10/17 11:50:20 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -8,24 +8,41 @@
 -----------------------------------------------------------------------------
 
 module DriverPipeline (
+
+	-- interfaces for the batch-mode driver
    GhcMode(..), getGhcMode, v_GhcMode,
    genPipeline, runPipeline,
-   preprocess,
+
+	-- interfaces for the compilation manager (interpreted/batch-mode)
+   preprocess, compile,
+
+	-- batch-mode linking interface
    doLink,
   ) where
 
 #include "HsVersions.h"
 
+import CmSummarise
+import CmLink
 import DriverState
 import DriverUtil
 import DriverMkDepend
+import DriverPhases
 import DriverFlags
+import Finder
 import TmpFiles
+import HscTypes
+import UniqFM
+import Outputable
+import Module
+import ErrUtils
+import CmdLineOpts
 import Config
 import Util
-import CmdLineOpts
 import Panic
 
+import Directory
+import System
 import IOExts
 import Posix
 import Exception
@@ -134,7 +151,7 @@ genPipeline todo stop_flag filename
    -- for a .hc file, or if the -C flag is given, we need to force lang to HscC
     real_lang 
 	| suffix == "hc"  = HscC
-	| todo == StopBefore HCc && lang /= HscC && haskellish = HscC
+	| todo == StopBefore HCc && haskellish = HscC
 	| otherwise = lang
 
    let
@@ -423,7 +440,7 @@ run_phase Hsc	basename suff input_fn output_fn
 
    -- build a bogus ModSummary to pass to hscMain.
 	let summary = ModSummary {
-			ms_loc = SourceOnly (error "no mod") input_fn,
+			ms_location = error "no loc",
 			ms_ppsource = Just (loc, error "no fingerprint"),
 			ms_imports = error "no imports"
 		     }
@@ -435,14 +452,15 @@ run_phase Hsc	basename suff input_fn output_fn
 
 	case result of {
 
-	    HscErrs pcs errs warns -> do
-		mapM (printSDoc PprForUser) warns
-		mapM (printSDoc PprForUser) errs
-		throwDyn (PhaseFailed "hsc" (ExitFailure 1));
+	    HscErrs pcs errs warns -> do {
+		printErrorsAndWarnings errs warns
+		throwDyn (PhaseFailed "hsc" (ExitFailure 1)) };
 
-	    HscOk details maybe_iface maybe_stub_h maybe_stub_c pcs warns -> do
+	    HscOK details maybe_iface maybe_stub_h maybe_stub_c pcs warns -> do
 
-	mapM (printSDoc PprForUser) warns
+	pprBagOfWarnings warns
+
+   -- get the module name
 
    -- generate the interface file
 	case iface of
@@ -450,40 +468,22 @@ run_phase Hsc	basename suff input_fn output_fn
 	     do run_something "Touching object file" ("touch " ++ o_file)
 		return False
 
-	   Just iface ->
+	   Just iface -> do
+		-- discover the filename for the .hi file in a roundabout way
+		let mod = md_id details
+		locn <- mkHomeModule mod basename input_fn
+		let hifile = hi_file locn
+		-- write out the interface file here...
+		return ()		
 
-  -- Deal with stubs
-	let stub_h = basename ++ "_stub.h"
-	let stub_c = basename ++ "_stub.c"
-
-  -- copy the .stub_h file into the current dir if necessary
-	case maybe_stub_h of
-	   Nothing -> return ()
-	   Just tmp_stub_h -> do
-	      	run_something "Copy stub .h file"
-				("cp " ++ tmp_stub_h ++ ' ':stub_h)
-	
-			-- #include <..._stub.h> in .hc file
-		addCmdlineHCInclude tmp_stub_h	-- hack
-
-  -- copy the .stub_c file into the current dir, and compile it, if necessary
-	case maybe_stub_c of
-	   Nothing -> return ()
-	   Just tmp_stub_c -> do  -- copy the _stub.c file into the current dir
-		run_something "Copy stub .c file" 
-		    (unwords [ 
-			"rm -f", stub_c, "&&",
-			"echo \'#include \""++stub_h++"\"\' >"++stub_c, " &&",
-			"cat", tmp_stub_c, ">> ", stub_c
-			])
-
-			-- compile the _stub.c file w/ gcc
-		pipeline <- genPipeline (StopBefore Ln) "" stub_c
-		runPipeline pipeline stub_c False{-no linking-} False{-no -o option-}
-
-		add ld_inputs (basename++"_stub.o")
+    -- deal with stubs
+	maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
+	case stub_o of
+		Nothing -> return ()
+		Just stub_o -> add ld_inputs stub_o
 
 	return True
+    }
 
 -----------------------------------------------------------------------------
 -- Cc phase
@@ -703,3 +703,120 @@ preprocess filename =
   ASSERT(haskellish_file filename) 
   do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
+
+-----------------------------------------------------------------------------
+-- Compile a single module.
+--
+-- This is the interface between the compilation manager and the
+-- compiler proper (hsc), where we deal with tedious details like
+-- reading the OPTIONS pragma from the source file, and passing the
+-- output of hsc through the C compiler.
+
+compile :: Finder                  -- to find modules
+        -> ModSummary              -- summary, including source
+        -> Maybe ModIFace          -- old interface, if available
+        -> HomeSymbolTable         -- for home module ModDetails          
+        -> PersistentCompilerState -- persistent compiler state
+        -> IO CompResult
+
+compile finder summary old_iface hst pcs = do 
+   verb <- readIORef verbose
+   when verb (hPutStrLn stderr ("compile: compiling " ++ 
+				name_of_summary summary))
+
+   init_dyn_flags <- readIORef v_InitDynFlags
+   writeIORef v_DynFlags init_dyn_flags
+   
+   let input_fn = case ms_ppsource summary of
+			Just (ppsource, fingerprint) -> ppsource
+			Nothing -> hs_file (ms_location summary)
+
+   when verb (hPutStrLn stderr ("compile: input file " ++ input_fn))
+
+   opts <- getOptionsFromSource input_fn
+   processArgs dynamic_flags opts []
+   dyn_flags <- readIORef v_DynFlags
+
+   output_fn <- case hsc_lang of
+		    HscAsm         -> newTempName (phaseInputExt As)
+		    HscC           -> newTempName (phaseInputExt HCc)
+        	    HscJava        -> newTempName "java" -- ToDo
+		    HscInterpreter -> return (error "no output file")
+
+   -- run the compiler
+   hsc_result <- hscMain dyn_flags summary old_iface output_fn hst pcs
+
+   case hsc_result of {
+      HscErrs pcs errs warns -> return (CompErrs pcs errs warns);
+
+      HscOK details maybe_iface 
+	maybe_stub_h maybe_stub_c maybe_interpreted_code pcs warns -> do
+	   
+	   -- if no compilation happened, bail out early
+	   case maybe_iface of {
+		Nothing -> return (CompOK details Nothing pcs warns);
+		Just iface -> do
+
+	   let (basename, _) = splitFilename (hs_file (ms_location summary))
+	   maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
+	   stub_unlinked <- case maybe_stub_o of
+				Nothing -> []
+				Just stub_o -> [ DotO stub_o ]
+
+	   hs_unlinked <-
+	     case hsc_lang of
+
+		-- in interpreted mode, just return the compiled code
+		-- as our "unlinked" object.
+		HscInterpreter -> 
+		    case maybe_interpreted_code of
+			Just code -> return (Trees code)
+			Nothing   -> panic "compile: no interpreted code"
+
+		-- we're in batch mode: finish the compilation pipeline.
+		_other -> do pipe <- genPipeline (StopBefore Ln) "" output_fn
+			     o_file <- runPipeline pipe output_fn False False
+			     return [ DotO o_file ]
+
+	   let linkable = LM (moduleName (ms_mod summary)) 
+				(hs_unlinked ++ stub_unlinked)
+
+	   return (CompOK details (Just (iface, linkable)) pcs warns)
+          }
+   }
+
+-----------------------------------------------------------------------------
+-- stub .h and .c files (for foreign export support)
+
+dealWithStubs basename maybe_stub_h maybe_stub_c
+
+ = do	let stub_h = basename ++ "_stub.h"
+	let stub_c = basename ++ "_stub.c"
+
+  -- copy the .stub_h file into the current dir if necessary
+	case maybe_stub_h of
+	   Nothing -> return ()
+	   Just tmp_stub_h -> do
+	      	run_something "Copy stub .h file"
+				("cp " ++ tmp_stub_h ++ ' ':stub_h)
+	
+			-- #include <..._stub.h> in .hc file
+		addCmdlineHCInclude tmp_stub_h	-- hack
+
+  -- copy the .stub_c file into the current dir, and compile it, if necessary
+	case maybe_stub_c of
+	   Nothing -> return Nothing
+	   Just tmp_stub_c -> do  -- copy the _stub.c file into the current dir
+		run_something "Copy stub .c file" 
+		    (unwords [ 
+			"rm -f", stub_c, "&&",
+			"echo \'#include \""++stub_h++"\"\' >"++stub_c, " &&",
+			"cat", tmp_stub_c, ">> ", stub_c
+			])
+
+			-- compile the _stub.c file w/ gcc
+		pipeline <- genPipeline (StopBefore Ln) "" stub_c
+		stub_o <- runPipeline pipeline stub_c False{-no linking-} 
+				False{-no -o option-}
+
+		return (Just stub_o)
