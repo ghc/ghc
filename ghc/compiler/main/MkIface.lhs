@@ -5,7 +5,7 @@
 
 \begin{code}
 module MkIface ( 
-	completeIface, writeIface, 
+	mkFinalIface,
 	pprModDetails, pprIface, pprUsage
   ) where
 
@@ -20,12 +20,14 @@ import BasicTypes	( Fixity(..), NewOrData(..),
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
+			  ModuleLocation(..), 
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  TyThing(..), DFunId, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
 			  lookupVersion,
 			)
+import CmStaticInfo	( GhciMode(..) )
 
 import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo,
@@ -34,22 +36,27 @@ import Id		( idType, idInfo, isImplicitId, idCgInfo,
 import DataCon		( StrictnessMark(..), dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import CoreSyn		( CoreRule(..) )
+import CoreFVs		( ruleLhsFreeNames )
 import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import PprCore		( pprIdCoreRule )
-import Name		( getName, nameModule, toRdrName, isGlobalName, Name, NamedThing(..) )
+import Name		( getName, nameModule, toRdrName, isGlobalName, 
+			  nameIsLocalOrFrom, Name, NamedThing(..) )
 import NameEnv
+import NameSet
 import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyConGenIds,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, isClassTyCon
 			)
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
-import Type		( splitSigmaTy, tidyTopType, deNoteType )
+import Type		( splitSigmaTy, tidyTopType, deNoteType, namesOfType )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
-import Util		( sortLt )
+import Util		( sortLt, unJust )
+import ErrUtils		( dumpIfSet_dyn )
 
+import Monad		( when )
 import IO		( IOMode(..), openFile, hClose )
 \end{code}
 
@@ -61,25 +68,78 @@ import IO		( IOMode(..), openFile, hClose )
 %************************************************************************
 
 \begin{code}
-completeIface :: Maybe ModIface		-- The old interface, if we have it
-	      -> ModIface		-- The new one, minus the decls and versions
-	      -> ModDetails		-- The ModDetails for this module
-	      -> (ModIface, Maybe SDoc)	-- The new one, complete with decls and versions
-					-- The SDoc is a debug document giving differences
-					-- Nothing => no change
 
-	-- NB: 'Nothing' means that even the usages havn't changed, so there's no
-	--     need to write a new interface file.  But even if the usages have
-	--     changed, the module version may not have.
-completeIface maybe_old_iface new_iface mod_details
-  = addVersionInfo maybe_old_iface (new_iface { mi_decls = new_decls })
+
+
+mkFinalIface :: GhciMode
+	     -> DynFlags
+	     -> ModuleLocation
+	     -> Maybe ModIface		-- The old interface, if we have it
+	     -> ModIface		-- The new one, minus the decls and versions
+	     -> ModDetails		-- The ModDetails for this module
+	     -> IO ModIface		-- The new one, complete with decls and versions
+-- mkFinalIface 
+--	a) completes the interface
+--	b) writes it out to a file if necessary
+
+mkFinalIface ghci_mode dflags location 
+	     maybe_old_iface new_iface new_details
+  = do	{ 
+		-- Add the new declarations, and the is-orphan flag
+	  let iface_w_decls = new_iface { mi_decls = new_decls,
+					  mi_orphan = orphan_mod }
+
+		-- Add version information
+	; let (final_iface, maybe_diffs) = addVersionInfo maybe_old_iface iface_w_decls
+
+		-- Write the interface file, if necessary
+	; when (must_write_hi_file maybe_diffs)
+	       (writeIface hi_file_path final_iface)
+
+		-- Debug printing
+	; write_diffs dflags final_iface maybe_diffs
+
+	; return final_iface }
+
   where
-     new_decls   = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
-     inst_dcls   = map ifaceInstance (md_insts mod_details)
-     ty_cls_dcls = foldNameEnv ifaceTyCls [] (md_types mod_details)
-     rule_dcls   = map ifaceRule (md_rules mod_details)
+     must_write_hi_file Nothing      = False
+     must_write_hi_file (Just diffs) = ghci_mode /= Interactive
+		-- We must write a new .hi file if there are some changes
+		-- and we're not in interactive mode
+		-- maybe_diffs = 'Nothing' means that even the usages havn't changed, 
+		--     so there's no need to write a new interface file.  But even if 
+		--     the usages have changed, the module version may not have.
+
+     hi_file_path = unJust "mkFinalIface" (ml_hi_file location)
+     new_decls    = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
+     inst_dcls    = map ifaceInstance (md_insts new_details)
+     ty_cls_dcls  = foldNameEnv ifaceTyCls [] (md_types new_details)
+     rule_dcls    = map ifaceRule (md_rules new_details)
+     orphan_mod   = isOrphanModule (mi_module new_iface) new_details
+
+write_diffs dflags new_iface Nothing
+  = do when (dopt Opt_D_dump_hi_diffs dflags) (printDump (text "INTERFACE UNCHANGED"))
+       dumpIfSet_dyn dflags Opt_D_dump_hi "UNCHANGED FINAL INTERFACE" (pprIface new_iface)
+
+write_diffs dflags new_iface (Just sdoc_diffs)
+  = do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "INTERFACE HAS CHANGED" sdoc_diffs
+       dumpIfSet_dyn dflags Opt_D_dump_hi "NEW FINAL INTERFACE" (pprIface new_iface)
 \end{code}
 
+\begin{code}
+isOrphanModule this_mod (ModDetails {md_insts = insts, md_rules = rules})
+  = any orphan_inst insts || any orphan_rule rules
+  where
+    orphan_inst dfun_id = no_locals (namesOfType (dfun_head_type dfun_id))
+    orphan_rule rule    = no_locals (ruleLhsFreeNames rule)
+    no_locals names     = isEmptyNameSet (filterNameSet (nameIsLocalOrFrom this_mod) names)
+    dfun_head_type dfun	= case splitSigmaTy (idType dfun) of
+				(_,_,head_ty) -> head_ty
+	-- The 'dfun_head_type' is because of
+	--	instance Foo a => Baz T where ...
+	-- The decl is an orphan if Baz and T are both not locally defined,
+	--	even if Foo *is* locally defined
+\end{code}
 
 \begin{code}
 ifaceTyCls :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]

@@ -11,7 +11,8 @@ module CoreFVs (
 	exprSomeFreeVars, exprsSomeFreeVars,
 
 	idRuleVars, idFreeVars, idFreeTyVars,
-	ruleSomeFreeVars, ruleSomeLhsFreeVars, ruleRhsFreeVars,
+	ruleSomeFreeVars, ruleRhsFreeVars,
+	ruleLhsFreeNames, ruleLhsFreeIds, 
 
 	CoreExprWithFVs,	-- = AnnExpr Id VarSet
 	CoreBindWithFVs,	-- = AnnBind Id VarSet
@@ -22,10 +23,11 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idType, isLocalId, hasNoBinding, idSpecialisation )
+import Id		( Id, idType, idSpecialisation )
+import NameSet
 import VarSet
-import Var		( Var, isId, isLocalVar )
-import Type		( tyVarsOfType )
+import Var		( Var, isId, isLocalVar, varName )
+import Type		( tyVarsOfType, namesOfType )
 import Util		( mapAndUnzip )
 import Outputable
 \end{code}
@@ -140,6 +142,61 @@ expr_fvs (Let (Rec pairs) body)
 \end{code}
 
 
+%************************************************************************
+%*									*
+\section{Free names}
+%*									*
+%************************************************************************
+
+exprFreeNames finds the free *names* of an expression, notably
+including the names of type constructors (which of course do not show
+up in exprFreeVars).  Similarly ruleLhsFreeNames.  The latter is used
+when deciding whethera rule is an orphan.  In particular, suppose that
+T is defined in this module; we want to avoid declaring that a rule like
+	fromIntegral T = fromIntegral_T
+is an orphan.  Of course it isn't, an declaring it an orphan would
+make the whole module an orphan module, which is bad.
+
+\begin{code}
+ruleLhsFreeNames :: IdCoreRule -> NameSet
+ruleLhsFreeNames (fn, BuiltinRule _) = unitNameSet (varName fn)
+ruleLhsFreeNames (fn, Rule _ tpl_vars tpl_args rhs)
+  = addOneToNameSet (exprsFreeNames tpl_args `del_binders` tpl_vars) (varName fn)
+
+exprFreeNames :: CoreExpr -> NameSet
+exprFreeNames (Var v) 	= unitNameSet (varName v)
+exprFreeNames (Lit _) 	= emptyNameSet
+exprFreeNames (Type ty) = namesOfType ty
+exprFreeNames (App e1 e2) = exprFreeNames e1 `unionNameSets` exprFreeNames e2
+exprFreeNames (Lam v e)   = exprFreeNames e `delFromNameSet` varName v
+exprFreeNames (Note n e)  = exprFreeNames e
+
+exprFreeNames (Let (NonRec b r) e) = (exprFreeNames e `delFromNameSet` varName b)
+				     `unionNameSets` exprFreeNames r
+
+exprFreeNames (Let (Rec prs) e) = (exprsFreeNames rs `unionNameSets` exprFreeNames e)
+				  `del_binders` bs
+				where
+				  (bs, rs) = unzip prs
+
+exprFreeNames (Case e b as) = exprFreeNames e `unionNameSets` 
+			      (unionManyNameSets (map altFreeNames as) `delFromNameSet` varName b)
+
+-- Helpers
+altFreeNames (_,bs,r) = exprFreeNames r `del_binders` bs
+
+exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
+
+del_binders :: NameSet -> [Var] -> NameSet
+del_binders names bndrs = foldl (\s b -> delFromNameSet s (varName b)) names bndrs
+\end{code}
+
+%************************************************************************
+%*									*
+\section[freevars-everywhere]{Attaching free variables to every sub-expression}
+%*									*
+%************************************************************************
+
 
 \begin{code}
 rulesSomeFreeVars :: InterestingVarFun -> CoreRules -> VarSet
@@ -161,10 +218,12 @@ ruleSomeFreeVars interesting (Rule _ tpl_vars tpl_args rhs)
     rule_fvs = addBndrs tpl_vars $
 	       foldr (union . expr_fvs) (expr_fvs rhs) tpl_args
 
-ruleSomeLhsFreeVars :: InterestingVarFun -> CoreRule -> VarSet
-ruleSomeLhsFreeVars fn (BuiltinRule _) = noFVs
-ruleSomeLhsFreeVars fn (Rule _ tpl_vars tpl_args rhs)
-  = foldl delVarSet (exprsSomeFreeVars fn tpl_args) tpl_vars
+ruleLhsFreeIds :: CoreRule -> VarSet
+-- This finds all the free Ids on the LHS of the rule
+-- *including* imported ids
+ruleLhsFreeIds (BuiltinRule _) = noFVs
+ruleLhsFreeIds (Rule _ tpl_vars tpl_args rhs)
+  = foldl delVarSet (exprsSomeFreeVars isId tpl_args) tpl_vars
 \end{code}
 
 

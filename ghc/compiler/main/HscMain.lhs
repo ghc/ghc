@@ -38,7 +38,7 @@ import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( vanillaSyntaxMap, knownKeyNames )
-import MkIface		( completeIface, writeIface, pprIface )
+import MkIface		( mkFinalIface )
 import TcModule
 import InstEnv		( emptyInstEnv )
 import Desugar
@@ -355,32 +355,6 @@ hscRecomp ghci_mode dflags have_object
                             maybe_stub_h_filename maybe_stub_c_filename
       			    maybe_bcos)
       	  }}}}}}}
-
-
-
-mkFinalIface ghci_mode dflags location 
-	maybe_old_iface new_iface new_details
- = case completeIface maybe_old_iface new_iface new_details of
-
-      (new_iface, Nothing) -- no change in the interfacfe
-         -> do when (dopt Opt_D_dump_hi_diffs dflags)
-                    (printDump (text "INTERFACE UNCHANGED"))
-               dumpIfSet_dyn dflags Opt_D_dump_hi
-                             "UNCHANGED FINAL INTERFACE" (pprIface new_iface)
-	       return new_iface
-
-      (new_iface, Just sdoc_diffs)
-         -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "INTERFACE HAS CHANGED" 
-                                    sdoc_diffs
-               dumpIfSet_dyn dflags Opt_D_dump_hi "NEW FINAL INTERFACE" 
-                                    (pprIface new_iface)
-
-               -- Write the interface file, if not in interactive mode
-               when (ghci_mode /= Interactive) 
-                    (writeIface (unJust "hscRecomp:hi" (ml_hi_file location))
-                                new_iface)
-               return new_iface
-
 
 myParseModule dflags src_filename
  = do --------------------------  Parser  ----------------

@@ -14,7 +14,7 @@ import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation,
 			  RdrNameStmt
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
-			  extractHsTyNames, RenamedStmt,
+			  RenamedStmt,
 			  instDeclFVs, tyClDeclFVs, ruleDeclFVs
 			)
 
@@ -27,7 +27,7 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 			  closeDecls,
 			  RecompileRequired, outOfDate, recompileRequired
 			)
-import RnHiFiles	( readIface, removeContext, loadInterface,
+import RnHiFiles	( readIface, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			)
 import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
@@ -41,7 +41,7 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
 			  moduleEnvElts
 			)
-import Name		( Name, nameIsLocalOrFrom, nameModule )
+import Name		( Name, nameModule )
 import NameEnv
 import NameSet
 import RdrName		( foldRdrEnv, isQual )
@@ -60,7 +60,7 @@ import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable,
 			  VersionInfo(..), ImportVersion, IsExported,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 			  GlobalRdrEnv, GlobalRdrElt(..), pprGlobalRdrEnv,
-			  AvailEnv, GenAvailInfo(..), AvailInfo, Avails,
+			  AvailEnv, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
 			  Deprecations(..),
 			  LocalRdrEnv
@@ -275,13 +275,12 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 	my_exports = groupAvails this_module export_avails
 	
 	final_decls = rn_local_decls ++ rn_imp_decls
-	is_orphan   = any (isOrphanDecl this_module) rn_local_decls
 
 	mod_iface = ModIface {	mi_module   = this_module,
 				mi_version  = initialVersionInfo,
 				mi_usages   = my_usages,
 				mi_boot	    = False,
-				mi_orphan   = is_orphan,
+				mi_orphan   = panic "is_orphan",
 				mi_exports  = my_exports,
 				mi_globals  = gbl_env,
 				mi_fixities = fixities,
@@ -305,35 +304,6 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
     mod_name = moduleName this_module
 \end{code}
 
-\begin{code}
-isOrphanDecl this_mod (InstD (InstDecl inst_ty _ _ _ _))
-  = not (foldNameSet ((||) . nameIsLocalOrFrom this_mod) False 
-		     (extractHsTyNames (removeContext inst_ty)))
-	-- The 'removeContext' is because of
-	--	instance Foo a => Baz T where ...
-	-- The decl is an orphan if Baz and T are both not locally defined,
-	--	even if Foo *is* locally defined
-
-isOrphanDecl this_mod (RuleD (HsRule _ _ _ lhs _ _))
-  = check lhs
-  where
-	-- At the moment we just check for common LHS forms
-	-- Expand as necessary.  Getting it wrong just means
-	-- more orphans than necessary
-    check (HsVar v)   	  = not (nameIsLocalOrFrom this_mod v)
-    check (HsApp f a) 	  = check f && check a
-    check (HsLit _)   	  = False
-    check (HsOverLit _)	  = False
-    check (OpApp l o _ r) = check l && check o && check r
-    check (NegApp e)      = check e
-    check (HsPar e)	  = check e
-    check (SectionL e o)  = check e && check o
-    check (SectionR o e)  = check e && check o
-
-    check other	      	  = True 	-- Safe fall through
-
-isOrphanDecl _ _  = False
-\end{code}
 
 
 %*********************************************************

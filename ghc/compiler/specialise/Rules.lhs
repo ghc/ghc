@@ -17,7 +17,7 @@ module Rules (
 
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseRule )
-import CoreFVs		( exprFreeVars, ruleRhsFreeVars, ruleSomeLhsFreeVars )
+import CoreFVs		( exprFreeVars, ruleRhsFreeVars, ruleLhsFreeIds )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
@@ -487,8 +487,8 @@ extendRuleBase (RuleBase rule_ids rule_fvs) (id, rule)
 		   Nothing  -> emptyCoreRules
 		   Just id' -> idSpecialisation id'
     
-    lhs_fvs = ruleSomeLhsFreeVars isId rule
-	-- Find *all* the free Ids of the LHS, not just
+    lhs_fvs = ruleLhsFreeIds rule
+	-- Finds *all* the free Ids of the LHS, not just
 	-- locally defined ones!!
 
 pprRuleBase :: RuleBase -> SDoc

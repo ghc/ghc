@@ -14,12 +14,11 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
-import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars, 
-			  ruleSomeLhsFreeVars )
+import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import CoreLint		( showPass, endPass )
 import VarEnv
 import VarSet
-import Var		( Id, Var, varName )
+import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
 			  idSpecialisation, idUnique, 
 			  mkVanillaGlobal, isLocalId, isImplicitId,
@@ -27,7 +26,7 @@ import Id		( idType, idInfo, idName, isExportedId,
 			) 
 import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
-		  	  localiseName, isGlobalName, isLocalName
+		  	  localiseName, isGlobalName
 			)
 import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
@@ -228,22 +227,10 @@ findExternalRules binds orphan_rules ext_ids
  		   | id <- bindersOfBinds binds,
 		     id `elemVarEnv` ext_ids,
 		     rule <- rulesRules (idSpecialisation id),
-		     not (isBuiltinRule rule),
+		     not (isBuiltinRule rule)
 			-- We can't print builtin rules in interface files
 			-- Since they are built in, an importing module
 			-- will have access to them anyway
-
-			-- Sept 00: I've disabled this test.  It doesn't stop 
-			-- many, if any, rules from coming out, and to make it
-			-- work properly we need to add ????
-			--	(put it back in for now)
-		     isEmptyVarSet (ruleSomeLhsFreeVars (isLocalName . varName) rule)
-
-				-- Spit out a rule only if none of its LHS free
-				-- vars are LocalName things i.e. things that
-				-- aren't visible to importing modules This is a
-				-- good reason not to do it when we emit the Id
-				-- itself
 		 ]
 \end{code}
 
