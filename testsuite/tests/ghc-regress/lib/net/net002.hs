@@ -1,4 +1,4 @@
--- $Id: net002.hs,v 1.4 2003/01/09 16:13:48 simonmar Exp $
+-- $Id: net002.hs,v 1.5 2005/01/17 09:57:24 simonmar Exp $
 -- http://www.bagley.org/~doug/shootout/
 -- Haskell echo/client server
 -- written by Brian Gregor
@@ -20,6 +20,7 @@ module Main where
 import Network.Socket
 
 import System.IO
+import System.IO.Error
 import Control.Concurrent
 import System.Environment 	( getArgs )
 import System.Exit 		( exitFailure )
