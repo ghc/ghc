@@ -69,7 +69,12 @@ module FiniteMap (
 #endif
     ) where
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(SpecLoop)
+#else
+import {-# SOURCE #-} Name
+#endif
+
 #if __GLASGOW_HASKELL__ >= 202
 import GlaExts
 #endif

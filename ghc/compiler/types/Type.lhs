@@ -42,12 +42,18 @@ module Type (
     ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking
 IMPORT_DELOOPER(TyLoop)
 --IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
+#else
+import {-# SOURCE #-} Id ( Id, dataConArgTys )
+import {-# SOURCE #-} TysPrim ( voidTy )
+import {-# SOURCE #-} TysWiredIn ( tupleTyCon )
+#endif
 
 -- friends:
-import Class	( classSig, classOpLocalType, GenClass{-instances-} )
+import Class	( classSig, classOpLocalType, GenClass{-instances-}, SYN_IE(Class) )
 import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
 import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTyConSingleCon,
 		  isPrimTyCon, isAlgTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
