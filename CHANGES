@@ -1,8 +1,8 @@
 Changes in version 0.2:
 
-  * The [...] markup for typewriter-text has been changed to @...@.
+  * The [...] markup for typewriter font has been changed to @...@.
 
-  * Module attributes introduced (see the documentation).
+  * Module attributes introduced (see the documentation for details).
 
   * {- ... -} style comments may now be used for documentation annotations
 
@@ -11,5 +11,7 @@ Changes in version 0.2:
   * Existential constructors and rank-N types are now groked by the parser
 
   * Some type rendering cleaned up
+
+  * `abc' is accepted as well as 'abc' to markup an identifier
 
   * Several bugs fixed, and error messages improved.
