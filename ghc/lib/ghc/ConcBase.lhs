@@ -148,8 +148,9 @@ virtual time, so we start ticking in real time.  (The granularity is
 the effective resolution of the context switch timer, so it is
 affected by the RTS -C option.)
 
-@threadWait@ delays rescheduling of a thread until input on the
+@threadWaitRead@ delays rescheduling of a thread until input on the
 specified file descriptor is available for reading (just like select).
+@threadWaitWrite@ is similar, but for writing on a file descriptor.
 
 \begin{code}
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()

@@ -103,7 +103,7 @@ PROJECTNAME PROJECTVERSION PROJECTPATCHLEVEL
 
 TOP_PWD
 
-bindir libdir datadir
+bindir libdir libexecdir datadir
 
 CURRENT_DIR TMPDIR
 
@@ -132,10 +132,13 @@ $TargetPlatform = $TARGETPLATFORM;
 $TopPwd	           = "${TOP_PWD}";
 $InstBinDirGhc     = "${bindir}";
 $InstLibDirGhc     = "${libdir}";
-$InstLibexecDirGhc = "${libexecdir}";
+#
+# Normally the same as InstLibDirGhc, but we accommodate
+# for it being separate.
+#
+$InstLibExecDirGhc = "${libexecdir}";
 $InstDataDirGhc    = "${datadir}";
-$InstSysLibDir     = ( $INSTALLING ) ? "${InstLibDirGhc}/hslibs" : 
-			"$TopPwd/hslibs";
+$InstSysLibDir     = ( $INSTALLING ) ? "${InstLibDirGhc}/hslibs" : "$TopPwd/hslibs";
 
 $Status  = 0; # just used for exit() status
 $Verbose = '';
@@ -177,7 +180,7 @@ if ( ! $ENV{'REAL_SHELL'} ) {
 
 @Files_to_tidy = (); # files we nuke in the case of abnormal termination
 
-$Unlit = ( $INSTALLING ) ? "$InstLibexecDirGhc/unlit"
+$Unlit = ( $INSTALLING ) ? "$InstLibExecDirGhc/unlit"
 			 : "$TopPwd/${CURRENT_DIR}/${GHC_UNLIT}";
 
 $Cp   = $CP;
@@ -193,11 +196,11 @@ $HsCpp	 = # but this is re-set to "cat" (after options) if -cpp not seen
 
 @HsCpp_flags	= ();
 $genSPECS_flag	= '';		# See ../utils/hscpp/hscpp.prl
-$HsC	 = ( $INSTALLING ) ? "$InstLibexecDirGhc/hsc"
+$HsC	 = ( $INSTALLING ) ? "$InstLibExecDirGhc/hsc"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_HSC}";
 
 # For PVM fiends only
-$SysMan	 = ( $INSTALLING ) ? "$InstLibexecDirGhc/SysMan"
+$SysMan	 = ( $INSTALLING ) ? "$InstLibExecDirGhc/SysMan"
 			   : "$TopPwd/${CURRENT_DIR}/${GHC_SYSMAN}";
 
 @Unlit_flags	= ();

@@ -18,7 +18,6 @@ module GlaExts
         -- (an instance of ST):
 	PrimIO,
         ST, RealWorld,
-        module Monad,   -- ST is an instance
 
 	thenPrimIO,     -- 
         returnPrimIO, 

@@ -300,7 +300,7 @@ sub printNewItemVersion {
 
     } elsif ($idecl ne $Decl{"old:$item"})  {	# Old decl differs from new decl
 	local($odecl) = $Decl{"old:$item"};
-	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odecl\nNew: $idecl\n";}
+	if ($show_hi_diffs) {print STDERR "changed: $item\nOld: $odeclNew: $idecl";}
 	print $hifile  "$mod_version ";		# Use module version
 
     } elsif (! defined($OldVersion{"$item"}) ) {

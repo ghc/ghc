@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 1997/03/24 04:33:30 sof Exp $
+# $Id: Makefile,v 1.6 1997/05/19 06:02:14 sof Exp $
 
 TOP=..
 CURRENT_DIR=ghc/driver
@@ -57,7 +57,7 @@ SCRIPT_SUBST_VARS := \
 ifeq "$(BIN_DIST)" "1"
 SCRIPT_PREFIX_FILES=prefix.txt
 else
-SCRIPT_SUBST_VARS += libdir datadir bindir TOP_PWD
+SCRIPT_SUBST_VARS += libdir libexecdir datadir bindir TOP_PWD
 endif
 
 all :: $(DYN_LOADABLE_BITS)
