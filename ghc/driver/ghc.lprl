@@ -773,8 +773,10 @@ sub setupOptimiseFlags {
 		# No -finline-phase: allow all Ids to be inlined now
 	  ']',
 
+	'-fcse',	# CSE must immediately follow a simplification pass, because it relies
+			# on the no-shadowing invariant.  See comments at the top of CSE.lhs
+		 
 	'-ffloat-inwards',
-	'-fcse',
 
 # Case-liberation for -O2.  This should be after
 # strictness analysis and the simplification which follows it.
