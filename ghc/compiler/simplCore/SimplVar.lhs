@@ -22,10 +22,11 @@ import Constants	( uNFOLDING_USE_THRESHOLD,
 			)
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UfExpr, RdrName, UnfoldingGuidance(..), SimpleUnfolding(..),
-			  FormSummary,
-			  okToInline, smallEnoughToInline )
-import BinderInfo	( BinderInfo, noBinderInfo )
+import CoreUnfold	( Unfolding(..), UfExpr, RdrName, UnfoldingGuidance(..), 
+			  SimpleUnfolding(..),
+			  FormSummary, whnfOrBottom,
+			  smallEnoughToInline )
+import BinderInfo	( BinderInfo, noBinderInfo, okToInline )
 
 import CostCentre	( CostCentre, isCurrentCostCentre )
 import Id		( idType, getIdInfo, getIdUnfolding, getIdSpecialisation,
@@ -132,7 +133,7 @@ completeVar env var args result_ty
     sw_chkr		      = getSwitchChecker env
     essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
     is_case_scrutinee	      = switchIsOn sw_chkr SimplCaseScrutinee
-    ok_to_inline	      = okToInline form occ_info small_enough
+    ok_to_inline	      = okToInline (whnfOrBottom form) small_enough occ_info 
     small_enough	      = smallEnoughToInline arg_evals is_case_scrutinee guidance
     arg_evals		      = [is_evald arg | arg <- args, isValArg arg]
 
