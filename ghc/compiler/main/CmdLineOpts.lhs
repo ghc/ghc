@@ -41,6 +41,7 @@ module CmdLineOpts (
 	opt_D_dump_cpranal,
 	opt_D_dump_worker_wrapper,
 	opt_D_dump_tc,
+        opt_D_dump_usagesp,
 	opt_D_show_passes,
 	opt_D_show_rn_trace,
 	opt_D_show_rn_imports,
@@ -50,6 +51,7 @@ module CmdLineOpts (
 	opt_D_verbose_stg2stg,
 	opt_DictsStrict,
 	opt_DoCoreLinting,
+        opt_DoUSPLinting,
 	opt_DoStgLinting,
 	opt_DoSemiTagging,
 	opt_DoEtaReduction,
@@ -58,6 +60,7 @@ module CmdLineOpts (
 	opt_EnsureSplittableC,
 	opt_FoldrBuildOn,
 	opt_UnboxStrictFields,
+        opt_UsageSPOn,
 	opt_GlasgowExts,
 	opt_GranMacros,
 	opt_HiMap,
@@ -180,6 +183,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoSpecialising
   | CoreDoFoldrBuildWorkerWrapper
   | CoreDoFoldrBuildWWAnal
+  | CoreDoUSPInf
   | CoreDoCPResult 
 \end{code}
 
@@ -315,6 +319,7 @@ opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
 opt_D_dump_worker_wrapper	= lookUp  SLIT("-ddump-workwrap")
 opt_D_dump_cpranal	        = lookUp  SLIT("-ddump-cpranalyse")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
+opt_D_dump_usagesp              = lookUp  SLIT("-ddump-usagesp")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
 opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
 opt_D_show_rn_imports		= lookUp  SLIT("-dshow-rn-imports")
@@ -326,8 +331,10 @@ opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")
 opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
+opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
+opt_DoUSPLinting		= lookUp  SLIT("-dusagesp-lint")
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
@@ -425,7 +432,8 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fworker-wrapper" -> CORE_TD(CoreDoWorkerWrapper)
 	  "-fspecialise"     -> CORE_TD(CoreDoSpecialising)
 	  "-ffoldr-build-worker-wrapper"  -> CORE_TD(CoreDoFoldrBuildWorkerWrapper)
-	  "-ffoldr-build-ww-anal"         -> CORE_TD(CoreDoFoldrBuildWWAnal)
+	  "-ffoldr-build-ww-anal"  -> CORE_TD(CoreDoFoldrBuildWWAnal)
+	  "-fusagesp"        -> CORE_TD(CoreDoUSPInf)
 	  "-fcpr-analyse"    -> CORE_TD(CoreDoCPResult)
 
 	  "-fstg-static-args" -> STG_TD(StgDoStaticArgs)
