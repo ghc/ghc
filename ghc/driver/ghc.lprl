@@ -2789,6 +2789,9 @@ arg: while($_ = $Args[0]) {
 			    if ( $syslib eq 'posix') {
 				$syslib='ghc';
 				goto again;
+			    } elsif ( $syslib eq 'ghc' && $TargetName =~ /-solaris2$/ ) {
+				# needed for Berkeley socket/nwork stuff.
+				push(@SysLibrary, '-lnsl');
 			    }
 			    next arg; };
 
@@ -2966,7 +2969,10 @@ arg: while($_ = $Args[0]) {
     /^-fshow-import-specs/
 		    && do { push(@HsC_flags, $_); next arg; };
 
-    /^-fwarn-(.*)$/      && do { push(@HsC_flags, $_);   next arg; };
+    /^-fsignatures-required/      
+    		    && do { push(@HsC_flags, $_); next arg; };
+
+    /^-fwarn-(.*)$/      && do { push(@HsC_flags, $_); next arg; };
 
     /^-fno-(.*)$/   && do { push(@HsC_antiflags, "-f$1");
 			    &squashHscFlag("-f$1");
@@ -2974,7 +2980,7 @@ arg: while($_ = $Args[0]) {
 
     /^-W$/	    && do { push(@HsC_flags, @MinusWOpts); next arg; };
     /^-Wall$/	    && do { push(@HsC_flags, @MinusWallOpts); next arg; };
-    /^-Wnot$/       && do { foreach (@Hsc_flags) {
+    /^(-Wnot|w)$/   && do { foreach (@Hsc_flags) {
 				/^-fwarn-(.*)$/ && do { $_=''; };
 			    };
 			    push(@HsC_antiflags, @StandardWarnings);
