@@ -334,19 +334,27 @@ dmdFix top_lvl sigs orig_pairs
 	 -> [(Id,CoreExpr)] 		
 	 -> (SigEnv, DmdEnv, [(Id,CoreExpr)])
     loop n sigs pairs
-      | all (same_sig sigs sigs') bndrs 
+      | found_fixpoint
       = (sigs', lazy_fv, pairs')
 		-- Note: use pairs', not pairs.   pairs' is the result of 
 		-- processing the RHSs with sigs (= sigs'), whereas pairs 
 		-- is the result of processing the RHSs with the *previous* 
 		-- iteration of sigs.
-      | n >= 10       = pprTrace "dmdFix loop" (ppr n <+> (vcat 
+
+      | n >= 10  = pprTrace "dmdFix loop" (ppr n <+> (vcat 
 				[ text "Sigs:" <+> ppr [(id,lookup sigs id, lookup sigs' id) | (id,_) <- pairs],
 				  text "env:" <+> ppr (ufmToList sigs),
 				  text "binds:" <+> pprCoreBinding (Rec pairs)]))
-			      (emptySigEnv, emptyDmdEnv, orig_pairs)	-- Safe output
+			      (emptySigEnv, lazy_fv, orig_pairs)	-- Safe output
+			-- The lazy_fv part is really important!  orig_pairs has no strictness
+			-- info, including nothing about free vars.  But if we have
+			--	letrec f = ....y..... in ...f...
+			-- where 'y' is free in f, we must record that y is mentioned, 
+			-- otherwise y will get recorded as absent altogether
+
       | otherwise    = loop (n+1) sigs' pairs'
       where
+	found_fixpoint = all (same_sig sigs sigs') bndrs 
 		-- Use the new signature to do the next pair
 		-- The occurrence analyser has arranged them in a good order
 		-- so this can significantly reduce the number of iterations needed
