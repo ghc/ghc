@@ -240,8 +240,10 @@ sub mangle_command_line_args {
 
 	} elsif ( /^-D(.*)/ ) { # recognized wherever they occur
 	    push(@Defines, $_);
-	} elsif ( /^-i(.*)/ ) { # ditto
-	    $Import_dirs .= ":$1";
+	} elsif ( /^-i$/ ) {
+	    $Import_dirs = ''; # import path cleared!
+	} elsif ( /^-i(.*)/ ) {
+	    $Import_dirs = "$1:$Import_dirs";
 	} elsif ( /^-I/ ) {
 	    $Include_dirs .= " $_";
 	} elsif ( /^-syslib$/ ) {
