@@ -17,7 +17,7 @@ module InteractiveUI (
 import qualified GHC
 import GHC		( Session, verbosity, dopt, DynFlag(..),
 			  mkModule, pprModule, Type, Module, SuccessFlag(..),
-			  TyThing(..), Name )
+			  TyThing(..), Name, LoadHowMuch(..) )
 import Outputable
 
 -- following all needed for :info... ToDo: remove
@@ -645,7 +645,7 @@ addModule files = do
   targets <- mapM (io . GHC.guessTarget) files
   session <- getSession
   io (mapM_ (GHC.addTarget session) targets)
-  ok <- io (GHC.load session Nothing)
+  ok <- io (GHC.load session LoadAllTargets)
   afterLoad ok session
 
 changeDirectory :: String -> GHCi ()
@@ -655,7 +655,7 @@ changeDirectory dir = do
   when (not (null graph)) $
 	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
   io (GHC.setTargets session [])
-  io (GHC.load session Nothing)
+  io (GHC.load session LoadAllTargets)
   setContextAfterLoad []
   io (GHC.workingDirectoryChanged session)
   dir <- expandPath dir
@@ -713,7 +713,7 @@ loadModule' files = do
 
   -- unload first
   io (GHC.setTargets session [])
-  io (GHC.load session Nothing)
+  io (GHC.load session LoadAllTargets)
 
   -- expand tildes
   files <- mapM expandPath files
@@ -725,7 +725,7 @@ loadModule' files = do
   -- as a ToDo for now.
 
   io (GHC.setTargets session targets)
-  ok <- io (GHC.load session Nothing)
+  ok <- io (GHC.load session LoadAllTargets)
   afterLoad ok session
 
 
@@ -733,12 +733,12 @@ reloadModule :: String -> GHCi ()
 reloadModule "" = do
   io (revertCAFs)		-- always revert CAFs on reload.
   session <- getSession
-  ok <- io (GHC.load session Nothing)
+  ok <- io (GHC.load session LoadAllTargets)
   afterLoad ok session
 reloadModule m = do
   io (revertCAFs)		-- always revert CAFs on reload.
   session <- getSession
-  ok <- io (GHC.load session (Just (mkModule m)))
+  ok <- io (GHC.load session (LoadUpTo (mkModule m)))
   afterLoad ok session
 
 afterLoad ok session = do

@@ -13,7 +13,8 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC		( Session, DynFlags(..), GhcMode(..), HscTarget(..) )
+import GHC		( Session, DynFlags(..), GhcMode(..), HscTarget(..),
+			  LoadHowMuch(..) )
 import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
@@ -354,7 +355,7 @@ doMake sess []    = throwDyn (UsageError "no input files")
 doMake sess srcs  = do 
     targets <- mapM GHC.guessTarget srcs
     GHC.setTargets sess targets
-    ok_flag <- GHC.load sess Nothing
+    ok_flag <- GHC.load sess LoadAllTargets
     when (failed ok_flag) (exitWith (ExitFailure 1))
     return ()
 

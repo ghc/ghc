@@ -193,7 +193,7 @@ data Target = Target TargetId (Maybe (StringBuffer,ClockTime))
 data TargetId
   = TargetModule Module	   -- ^ A module name: search for the file
   | TargetFile   FilePath  -- ^ A filename: parse it to find the module name.
-
+  deriving Eq
 
 pprTarget :: Target -> SDoc
 pprTarget (Target id _) = pprTargetId id

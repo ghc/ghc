@@ -22,16 +22,18 @@ module GHC (
 	setMsgHandler,
 
 	-- * Targets
-	Target(..),
+	Target(..), TargetId(..),
 	setTargets,
 	getTargets,
 	addTarget,
+	removeTarget,
 	guessTarget,
 	
 	-- * Loading\/compiling the program
 	depanal,
-	load, SuccessFlag(..),		-- also does depanal
+	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
 	workingDirectoryChanged,
+	checkModule, CheckedModule(..),
 
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..),
@@ -96,19 +98,22 @@ import GHC.Exts		( unsafeCoerce# )
 import IfaceSyn		( IfaceDecl )
 #endif
 
+import HsSyn		( HsModule, LHsBinds )
 import Type		( Kind, Type, dropForAlls )
 import Id		( Id, idType )
 import TyCon		( TyCon )
 import Class		( Class )
 import DataCon		( DataCon )
 import Name		( Name )
+import RdrName		( RdrName )
 import NameEnv		( nameEnvElts )
+import SrcLoc		( Located )
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
 import Packages		( isHomePackage )
 import Finder
-import HscMain		( newHscEnv )
+import HscMain		( newHscEnv, hscFileCheck, HscResult(..) )
 import HscTypes
 import DynFlags
 import StaticFlags
@@ -117,19 +122,20 @@ import Module
 import FiniteMap
 import Panic
 import Digraph
-import ErrUtils		( showPass )
+import ErrUtils		( showPass, Messages )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer(..), hGetStringBuffer, lexemeToString )
 import Outputable
 import SysTools		( cleanTempFilesExcept )
-import BasicTypes	( SuccessFlag(..), succeeded )
+import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Maybes		( orElse, expectJust, mapCatMaybes )
 
 import Directory        ( getModificationTime, doesFileExist )
 import Maybe		( isJust, isNothing, fromJust )
 import Maybes		( expectJust )
 import List		( partition, nub )
+import qualified List
 import Monad		( unless, when, foldM )
 import System		( exitWith, ExitCode(..) )
 import Time		( ClockTime )
@@ -265,13 +271,17 @@ setTargets s targets = modifySession s (\h -> h{ hsc_targets = targets })
 getTargets :: Session -> IO [Target]
 getTargets s = withSession s (return . hsc_targets)
 
--- Add another target, or update an existing target with new content.
+-- | Add another target
 addTarget :: Session -> Target -> IO ()
 addTarget s target
   = modifySession s (\h -> h{ hsc_targets = target : hsc_targets h })
 
--- Remove a target
--- removeTarget :: Session -> Module -> IO ()
+-- | Remove a target
+removeTarget :: Session -> TargetId -> IO ()
+removeTarget s target_id
+  = modifySession s (\h -> h{ hsc_targets = filter (hsc_targets h) })
+  where
+   filter targets = [ t | t@(Target id _) <- targets, id /= target_id ]
 
 -- Attempts to guess what Target a string refers to.  This function implements
 -- the --make/GHCi command-line syntax for filenames: 
@@ -299,22 +309,6 @@ guessTarget file
 -- -----------------------------------------------------------------------------
 -- Loading the program
 
--- | The result of load.
-data LoadResult
-  = LoadOk	Errors	-- ^ all specified targets were loaded successfully.
-  | LoadFailed  Errors	-- ^ not all modules were loaded.
-
-type Errors = [String]
-
-{-
-data ErrMsg = ErrMsg { 
-	errMsgSeverity  :: Severity,  -- warning, error, etc.
-	errMsgSpans     :: [SrcSpan],
-	errMsgShortDoc  :: Doc,
-	errMsgExtraInfo :: Doc
-	}
--}
-
 -- Perform a dependency analysis starting from the current targets
 -- and update the session with the new module graph.
 depanal :: Session -> [Module] -> IO ()
@@ -335,12 +329,32 @@ depanal (Session ref) excluded_mods = do
   graph <- downsweep hsc_env old_graph excluded_mods
   writeIORef ref hsc_env{ hsc_mod_graph=graph }
 
+{-
+-- | The result of load.
+data LoadResult
+  = LoadOk	Errors	-- ^ all specified targets were loaded successfully.
+  | LoadFailed  Errors	-- ^ not all modules were loaded.
+
+type Errors = [String]
+
+data ErrMsg = ErrMsg { 
+	errMsgSeverity  :: Severity,  -- warning, error, etc.
+	errMsgSpans     :: [SrcSpan],
+	errMsgShortDoc  :: Doc,
+	errMsgExtraInfo :: Doc
+	}
+-}
+
+data LoadHowMuch
+   = LoadAllTargets
+   | LoadUpTo Module
+   | LoadDependenciesOf Module
 
 -- | Try to load the program.  If a Module is supplied, then just
 -- attempt to load up to this target.  If no Module is supplied,
 -- then try to load all targets.
-load :: Session -> Maybe Module -> IO SuccessFlag
-load s@(Session ref) maybe_mod
+load :: Session -> LoadHowMuch -> IO SuccessFlag
+load s@(Session ref) how_much
    = do 
 	-- Dependency analysis first.  Note that this fixes the module graph:
 	-- even if we don't get a fully successful upsweep, the full module
@@ -414,9 +428,27 @@ load s@(Session ref) maybe_mod
 	-- This graph should be cycle-free.
 	-- If we're restricting the upsweep to a portion of the graph, we
 	-- also want to retain everything that is still stable.
-        let full_mg, partial_mg :: [SCC ModSummary]
+        let full_mg :: [SCC ModSummary]
 	    full_mg    = topSortModuleGraph False mod_graph Nothing
-	    partial_mg = topSortModuleGraph False mod_graph maybe_mod
+
+	    maybe_top_mod = case how_much of
+				LoadUpTo m           -> Just m
+			  	LoadDependenciesOf m -> Just m
+			  	_		     -> Nothing
+
+	    partial_mg0 :: [SCC ModSummary]
+	    partial_mg0 = topSortModuleGraph False mod_graph maybe_top_mod
+
+	    -- LoadDependenciesOf m: we want the upsweep to stop just
+	    -- short of the specified module (unless the specified module
+	    -- is stable).
+	    partial_mg
+		| LoadDependenciesOf mod <- how_much
+		= ASSERT( case last partial_mg0 of 
+			    AcyclicSCC ms -> ms_mod ms == mod; _ -> False )
+		  List.init partial_mg0
+		| otherwise
+		= partial_mg0
 
 	    stable_mg = 
 		[ AcyclicSCC ms
@@ -539,6 +571,41 @@ discardProg hsc_env
 -- cleaning up.  The preprocessed file *might* be the same as the
 -- source file, but that doesn't do any harm.
 ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
+
+-- -----------------------------------------------------------------------------
+-- Check module
+
+data CheckedModule = 
+  CheckedModule { parsedSource      :: ParsedSource,
+		  typecheckedSource :: Maybe TypecheckedSource
+	        }
+
+type ParsedSource  = Located (HsModule RdrName)
+type TypecheckedSource = (LHsBinds Id, GlobalRdrEnv)
+
+-- | This is the way to get access to parsed and typechecked source code
+-- for a module.  'checkModule' loads all the dependencies of the specified
+-- module in the Session, and then attempts to typecheck the module.  If
+-- successful, it returns the abstract syntax for the module.
+checkModule :: Session -> Module -> (Messages -> IO ()) 
+	-> IO (Maybe CheckedModule)
+checkModule session@(Session ref) mod msg_act = do
+	-- load up the dependencies first
+   r <- load session (LoadDependenciesOf mod)
+   if (failed r) then return Nothing else do
+
+	-- now parse & typecheck the module
+   hsc_env <- readIORef ref   
+   let mg  = hsc_mod_graph hsc_env
+   case [ ms | ms <- mg, ms_mod ms == mod ] of
+	[] -> return Nothing
+	(ms:_) -> do 
+	   r <- hscFileCheck hsc_env msg_act ms
+	   case r of
+		HscFail -> 
+		   return Nothing
+		HscChecked parsed tcd -> 
+		   return (Just (CheckedModule parsed tcd)   )
 
 -----------------------------------------------------------------------------
 -- Unloading

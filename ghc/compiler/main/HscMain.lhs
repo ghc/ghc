@@ -8,7 +8,7 @@
 module HscMain ( 
 	HscResult(..),
 	hscMain, newHscEnv, hscCmmFile, 
-	hscBufferCheck, hscFileCheck,
+	hscFileCheck,
 #ifdef GHCI
 	hscStmt, hscTcExpr, hscKcType,
 	hscGetInfo, GetInfoResult,
@@ -44,14 +44,14 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 
 import Module		( emptyModuleEnv )
 import RdrName		( RdrName )
-import HsSyn		( HsModule )
+import HsSyn		( HsModule, LHsBinds )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lexer		( P(..), ParseResult(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( tcRnModule, tcRnExtCore )
-import TcRnTypes	( TcGblEnv )
+import TcRnTypes	( TcGblEnv(..) )
 import TcIface		( typecheckIface )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
@@ -138,7 +138,7 @@ data HscResult
    = HscFail
 
    -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked (Located (HsModule RdrName)) (Maybe TcGblEnv)
+   | HscChecked (Located (HsModule RdrName)) (Maybe (LHsBinds Id, GlobalRdrEnv))
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -212,14 +212,17 @@ hscNoRecomp hsc_env msg_act mod_summary
 hscRecomp hsc_env msg_act mod_summary
 	  have_object maybe_checked_iface
  = case ms_hsc_src mod_summary of
-     HsSrcFile -> do { front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
-    		     ; hscBackEnd hsc_env mod_summary maybe_checked_iface front_res }
+     HsSrcFile -> do 
+	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
+	hscBackEnd hsc_env mod_summary maybe_checked_iface front_res
 
-     HsBootFile -> do { front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
-		      ; hscBootBackEnd hsc_env mod_summary maybe_checked_iface front_res }
+     HsBootFile -> do
+	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
+	hscBootBackEnd hsc_env mod_summary maybe_checked_iface front_res
 
-     ExtCoreFile -> do { front_res <- hscCoreFrontEnd hsc_env msg_act mod_summary
-    		       ; hscBackEnd hsc_env mod_summary maybe_checked_iface front_res }
+     ExtCoreFile -> do
+	front_res <- hscCoreFrontEnd hsc_env msg_act mod_summary
+	hscBackEnd hsc_env mod_summary maybe_checked_iface front_res
 
 hscCoreFrontEnd hsc_env msg_act mod_summary = do {
  	    -------------------
@@ -290,6 +293,38 @@ hscFileFrontEnd hsc_env msg_act mod_summary = do {
 	}}}}}
 
 ------------------------------
+
+hscFileCheck :: HscEnv -> MessageAction -> ModSummary -> IO HscResult
+hscFileCheck hsc_env msg_act mod_summary = do {
+ 	    -------------------
+ 	    -- PARSE
+ 	    -------------------
+	; let hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
+	      hspp_buf  = ms_hspp_buf  mod_summary
+
+	; maybe_parsed <- myParseModule (hsc_dflags hsc_env) hspp_file hspp_buf
+
+	; case maybe_parsed of {
+      	     Left err -> do { msg_act (unitBag err, emptyBag)
+			    ; return HscFail } ;
+      	     Right rdr_module -> do {
+
+ 	    -------------------
+ 	    -- RENAME and TYPECHECK
+ 	    -------------------
+	  (tc_msgs, maybe_tc_result) 
+		<- _scc_ "Typecheck-Rename" 
+		   tcRnModule hsc_env (ms_hsc_src mod_summary) rdr_module
+
+	; msg_act tc_msgs
+	; case maybe_tc_result of {
+      	     Nothing -> return (HscChecked rdr_module Nothing);
+      	     Just tc_result -> return (HscChecked rdr_module 
+					(Just (tcg_binds tc_result,
+					       tcg_rdr_env tc_result)))
+	}}}}    
+
+------------------------------
 hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
 -- For hs-boot files, there's no code generation to do
 
@@ -321,7 +356,7 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
   = do 	{ 	-- OMITTED: 
 		-- ; seqList imported_modules (return ())
 
-	  let one_shot  = isOneShot (ghcMode (hsc_dflags hsc_env))
+	  let one_shot  = isOneShot (ghcMode dflags)
 	      dflags    = hsc_dflags hsc_env
 
  	    -------------------
@@ -413,44 +448,6 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
       			    maybe_bcos)
       	 }
 
-
-hscFileCheck hsc_env msg_act hspp_file = do {
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env)  hspp_file Nothing
-
-	; case maybe_parsed of {
-      	     Left err -> do { msg_act (unitBag err, emptyBag) ;
-			    ; return HscFail ;
-			    };
-      	     Right rdr_module -> hscBufferTypecheck hsc_env rdr_module msg_act
-	}}
-
-
--- Perform static/dynamic checks on the source code in a StringBuffer
--- This is a temporary solution: it'll read in interface files lazily, whereas
--- we probably want to use the compilation manager to load in all the modules
--- in a project.
-hscBufferCheck :: HscEnv -> StringBuffer -> MessageAction -> IO HscResult
-hscBufferCheck hsc_env buffer msg_act = do
-	let loc  = mkSrcLoc (mkFastString "*edit*") 1 0
-        showPass (hsc_dflags hsc_env) "Parser"
-	case unP parseModule (mkPState buffer loc (hsc_dflags hsc_env)) of
-		PFailed span err -> do
-		   msg_act (emptyBag, unitBag (mkPlainErrMsg span err))
-		   return HscFail
-		POk _ rdr_module -> do
-		   hscBufferTypecheck hsc_env rdr_module msg_act
-
-hscBufferTypecheck hsc_env rdr_module msg_act = do
-	(tc_msgs, maybe_tc_result) <- {-# SCC "Typecheck-Rename" #-}
-					tcRnModule hsc_env HsSrcFile rdr_module
-	msg_act tc_msgs
-	case maybe_tc_result of
-	    Nothing  -> return (HscChecked rdr_module Nothing)
-				-- space leak on rdr_module!
-	    Just r -> return (HscChecked rdr_module (Just r))
 
 
 hscCodeGen dflags 
