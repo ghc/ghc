@@ -1,8 +1,9 @@
 
-tcfail065.hs:28:0:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `x1' is unified with another quantified type variable `x'
-    When trying to generalise the type inferred for `setX'
-	Signature type:     forall x1 x2. x2 -> X x1 -> X x1
-	Type to generalise: forall x2. x2 -> X x1 -> X x1
-    In the instance declaration for `HasX (X x)'
+tcfail065.hs:29:19:
+    Couldn't match the rigid variable `x' against the rigid variable `x1'
+      `x' is bound by the instance declaration at tcfail065.hs:28:0
+      `x1' is bound by the type signature for `setX'
+      Expected type: x
+      Inferred type: x1
+    In the first argument of `X', namely `x'
+    In the definition of `setX': setX x (X _) = X x

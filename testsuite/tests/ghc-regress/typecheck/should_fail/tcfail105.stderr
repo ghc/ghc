@@ -1,6 +1,5 @@
 
-tcfail105.hs:8:0:
-    All of the type variables in the constraint `Monad m' are already in scope
-	(at least one must be universally quantified here)
-    When checking the data constructor: (Monad m) => M {unM :: m (S m t a)}
+tcfail105.hs:8:26:
+    Can't combine named fields with locally-quantified type variables or context
+    In the declaration of data constructor M
     In the data type declaration for `M'

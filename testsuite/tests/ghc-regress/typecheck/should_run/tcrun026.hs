@@ -4,6 +4,8 @@
 --	panic: tcSplitTyConApp forall x{-r6S-} :: *.
 --				Main.L{-rr-} x{-r6S-}
 
+-- GHC 6.3: this is now an error (can do subsumption in patterns)
+
 module Main where
 
 newtype FA c = FA (forall x . c x)

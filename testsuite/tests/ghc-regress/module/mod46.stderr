@@ -1,5 +1,5 @@
 
 mod46.hs:4:0:
     No instance for (Eq T)
-      arising from the instance declaration at mod46.hs:4:0
+      arising from the superclasses of an instance declaration at mod46.hs:4:0
     In the instance declaration for `Ord T'

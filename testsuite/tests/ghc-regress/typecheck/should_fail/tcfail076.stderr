@@ -1,9 +1,11 @@
 
-tcfail076.hs:18:63:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `res' escapes
-	It is mentioned in the environment:
-	  cont :: a -> m res (bound at tcfail076.hs:18:36)
-    In the first argument of `KContT', namely `(\ cont' -> cont a)'
-    In a lambda abstraction: \ a -> KContT (\ cont' -> cont a)
-    In the first argument of `f', namely `(\ a -> KContT (\ cont' -> cont a))'
+tcfail076.hs:18:81:
+    Couldn't match the rigid variable `res' against the rigid variable `res1'
+      `res' is bound by the polymorphic type `forall res. (a -> m res) -> m res'
+			  at tcfail076.hs:18:63-87
+      `res1' is bound by the polymorphic type `forall res. (a -> m res) -> m res'
+			   at tcfail076.hs:18:27-95
+      Expected type: m res
+      Inferred type: m res1
+    In the application `cont a'
+    In a lambda abstraction: \ cont' -> cont a

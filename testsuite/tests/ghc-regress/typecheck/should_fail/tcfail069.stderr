@@ -1,7 +1,7 @@
 
-tcfail069.hs:20:9:
-    Couldn't match `[a]' against `(t, t1)'
-	Expected type: [a]
-	Inferred type: (t, t1)
-    In the scrutinee of a case expression: (list1, list2)
-    In the case expression: case (list1, list2) of [] -> error "foo"
+tcfail069.hs:21:6:
+    Couldn't match `([Int], [Int])' against `[a]'
+      Expected type: ([Int], [Int])
+      Inferred type: [a]
+    When checking the pattern: []
+    In a case alternative: [] -> error "foo"

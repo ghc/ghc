@@ -1,4 +1,2 @@
 
-tcfail095.hs:9:0:
-    Top-level bindings for unlifted types aren't allowed: x = 1#
-    When generalising the type(s) for `x'
+tcfail095.hs:1:0: Top-level bindings for unlifted types aren't allowed: x = 1#

@@ -1,8 +1,8 @@
 
 tcfail072.hs:23:12:
-    Ambiguous type variable `q' in the top-level constraint:
-      `Ord q' arising from use of `g' at tcfail072.hs:23:12
-
-tcfail072.hs:23:12:
     Ambiguous type variable `p' in the top-level constraint:
       `Ord p' arising from use of `g' at tcfail072.hs:23:12
+
+tcfail072.hs:23:12:
+    Ambiguous type variable `q' in the top-level constraint:
+      `Ord q' arising from use of `g' at tcfail072.hs:23:12

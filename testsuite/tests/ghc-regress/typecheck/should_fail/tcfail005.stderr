@@ -1,6 +1,6 @@
 
 tcfail005.hs:3:8:
-    Couldn't match `[a]' against `(t, t1)'
-	Expected type: [a]
-	Inferred type: (t, t1)
+    Couldn't match `[a]' against `(a1, b)'
+      Expected type: [a]
+      Inferred type: (a1, b)
     In a pattern binding: (h : i) = (1, 'a')

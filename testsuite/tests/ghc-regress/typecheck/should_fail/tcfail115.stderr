@@ -1,21 +1,21 @@
 
-tcfail115.hs:18:29:
-    Couldn't match kind `(#)' against `??'
-    When matching types `(# Int, Int #) :: (#)' and `t :: ??'
-      Expected type: (# Int, Int #)
-      Inferred type: t
-    In a case alternative: r -> r
-
-tcfail115.hs:21:18:
+tcfail115.hs:18:24:
     Couldn't match kind `??' against `(#)'
-    When matching types `t :: ??' and `(# Int, Int #) :: (#)'
+    When matching the kinds of `t :: ??' and `(# Int, Int #) :: (#)'
       Expected type: t
       Inferred type: (# Int, Int #)
-    In the application `t x'
+    In a case alternative: r -> r
+
+tcfail115.hs:21:25:
+    Couldn't match kind `??' against `(#)'
+    When matching the kinds of `t :: ??' and `(# Int, Int #) :: (#)'
+      Expected type: t
+      Inferred type: (# Int, Int #)
+    When checking the pattern: _
 
 tcfail115.hs:24:23:
     Couldn't match kind `(#)' against `??'
-    When matching types `(# Int, Int #) :: (#)' and `t :: ??'
+    When matching the kinds of `(# Int, Int #) :: (#)' and `t :: ??'
       Expected type: (# Int, Int #)
       Inferred type: t
     In the expression: r :: (# Int, Int #)

@@ -1,8 +1,8 @@
 
-tcfail038.hs:8:10:
-    Conflicting definitions for `/='
+tcfail038.hs:7:10:
+    Conflicting definitions for `=='
     In the bindings in an instance declaration
 
-tcfail038.hs:9:10:
-    Conflicting definitions for `=='
+tcfail038.hs:8:10:
+    Conflicting definitions for `/='
     In the bindings in an instance declaration

@@ -1,61 +1,43 @@
 
-tcfail068.hs:13:8:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `s' escapes
+tcfail068.hs:14:8:
+    Couldn't match the rigid variable `s' against the rigid variable `s1'
+      `s' is bound by the type signature for `itgen'
+      `s1' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
+			 at tcfail068.hs:(13,8)-(14,30)
+      Expected type: GHC.ST.ST s1 (IndTree s a)
+      Inferred type: GHC.ST.ST s1 (STArray s1 i e)
+    In the application `newSTArray ((1, 1), n) x'
     In the first argument of `runST', namely `(newSTArray ((1, 1), n) x)'
-    In the definition of `itgen': itgen n x = runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:18:8:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `s' escapes
-	It is mentioned in the environment:
-	  arr :: IndTree s a (bound at tcfail068.hs:17:10)
+tcfail068.hs:19:8:
+    Couldn't match the rigid variable `s' against the rigid variable `s1'
+      `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
+			at tcfail068.hs:(18,8)-(21,18)
+      `s1' is bound by the type signature for `itiap'
+      Expected type: GHC.ST.ST s (IndTree s1 a)
+      Inferred type: GHC.ST.ST s1 (IndTree s1 a)
+    In the expression:
+	(readSTArray arr i) >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr))
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
-    In the definition of `itiap':
-	itiap i f arr
-		= runST ((readSTArray arr i)
-			 >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
 
-tcfail068.hs:24:28:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `s' escapes
-	It is mentioned in the environment:
-	  itrapsnd :: Int -> Int -> GHC.ST.ST s (IndTree s a) (bound at tcfail068.hs:29:8)
-	  itrap' :: Int -> Int -> GHC.ST.ST s (IndTree s a) (bound at tcfail068.hs:26:8)
-	  arr :: IndTree s a (bound at tcfail068.hs:24:22)
+tcfail068.hs:24:34:
+    Couldn't match the rigid variable `s' against the rigid variable `s1'
+      `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
+			at tcfail068.hs:24:28-44
+      `s1' is bound by the type signature for `itrap'
+      Expected type: GHC.ST.ST s (IndTree s1 a)
+      Inferred type: GHC.ST.ST s1 (IndTree s1 a)
+    In the application `itrap' i k'
     In the first argument of `runST', namely `(itrap' i k)'
-    In the definition of `itrap':
-	itrap ((i, k), (j, l)) f arr
-		= runST (itrap' i k)
-		where
-		    itrapsnd i k
-			       = if i > j then return arr else ((readSTArray arr (i, k)) >>= (\ val -> ...))
-		    itrap' i k
-			     = if k > l then return arr else ((itrapsnd i k) >> (itrap' i (k + 1)))
 
-tcfail068.hs:36:39:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `s' escapes
-	It is mentioned in the environment:
-	  itrapstatesnd :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
-	    (bound at tcfail068.hs:41:8)
-	  itrapstate' :: Int -> Int -> c -> GHC.ST.ST s (c, IndTree s b)
-	    (bound at tcfail068.hs:38:8)
-	  arr :: IndTree s b (bound at tcfail068.hs:36:33)
+tcfail068.hs:36:45:
+    Couldn't match the rigid variable `s' against the rigid variable `s1'
+      `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
+			at tcfail068.hs:36:39-62
+      `s1' is bound by the type signature for `itrapstate'
+      Expected type: GHC.ST.ST s (c, IndTree s1 b)
+      Inferred type: GHC.ST.ST s1 (c, IndTree s1 b)
+    In the application `itrapstate' i k s'
     In the first argument of `runST', namely `(itrapstate' i k s)'
-    In the definition of `itrapstate':
-	itrapstate ((i, k), (j, l)) f c d s arr
-		     = runST (itrapstate' i k s)
-		     where
-			 itrapstatesnd i k s
-					 = if i > j then
-					       return (s, arr)
-					   else
-					       ((readSTArray arr (i, k)) >>= (\ val -> ...))
-			 itrapstate' i k s
-				       = if k > l then
-					     return (s, arr)
-					 else
-					     ((itrapstatesnd i k s) >>= (\ (s, arr) -> ...))

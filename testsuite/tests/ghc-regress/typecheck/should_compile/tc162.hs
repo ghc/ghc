@@ -5,6 +5,9 @@
 -- in the pattern matching compiler, so they are a bit
 -- tricky.
 
+-- GHC 6.3: these are back to failures, because we no longer do 
+-- 	    type subsumption in pattern-matching
+
 module ShouldCompile where
 
 newtype Bug s a = Bug a
