@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.81 2001/07/19 22:08:07 sof Exp $
+dnl $Id: aclocal.m4,v 1.82 2001/07/23 22:52:33 ken Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -280,7 +280,9 @@ AC_SUBST(YaccCmd)
 
 dnl *** Checking for ar and its arguments + whether we need ranlib.
 dnl
-dnl ArCmd and RANLIB are AC_SUBST'ed
+dnl ArCmd, ArSupportsInput and RANLIB are AC_SUBST'ed
+dnl On Digital UNIX, we test for the -Z (compress) and
+dnl -input (take list of files from external file) flags.
 dnl 
 AC_DEFUN(FPTOOLS_PROG_AR_AND_RANLIB,
 [AC_PATH_PROG(ArCmd,ar)
@@ -288,7 +290,10 @@ if test -z "$ArCmd"; then
     echo "You don't seem to have ar in your PATH...I have no idea how to make a library"
     exit 1;
 fi
-if $ArCmd clqs conftest.a >/dev/null 2>/dev/null; then
+if $ArCmd clqsZ conftest.a >/dev/null 2>/dev/null; then
+    ArCmd="$ArCmd clqsZ"
+    NeedRanLib=''
+elif $ArCmd clqs conftest.a >/dev/null 2>/dev/null; then
     ArCmd="$ArCmd clqs"
     NeedRanLib=''
 elif $ArCmd cqs conftest.a >/dev/null 2>/dev/null; then
@@ -310,6 +315,14 @@ fi
 rm -rf conftest*
 test -n "$ArCmd" && test -n "$verbose" && echo "        setting ArCmd to $ArCmd"
 AC_SUBST(ArCmd)
+if $ArCmd conftest.a -input /dev/null >/dev/null 2>/dev/null; then
+    ArSupportsInput='-input'
+else
+    ArSupportsInput=''
+fi
+rm -rf conftest*
+test -n "$ArSupportsInput" && test -n "$verbose" && echo "        setting ArSupportsInput to $ArSupportsInput"
+AC_SUBST(ArSupportsInput)
 if test -z "$NeedRanLib"; then
     RANLIB=':'
     test -n "$verbose" && echo "        setting RANLIB to $RANLIB"

@@ -658,6 +658,7 @@ FLEX_LIB		=
 # Other standard (ha!) Unix utilities
 
 AR			= @ArCmd@
+ArSupportsInput		= @ArSupportsInput@
 # Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
 BASH                    = /usr/local/bin/bash
 #

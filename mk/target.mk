@@ -418,11 +418,22 @@ ifneq "$(way)" "u"
 
 SRC_HC_OPTS += -split-objs
 
+ifeq "$(ArSupportsInput)" ""
 define BUILD_LIB
 $(RM) $@
 (echo $(STUBOBJS); $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o') | xargs ar q $@
 $(RANLIB) $@
 endef
+else
+define BUILD_LIB
+$(RM) $@
+echo $(STUBOBJS) > $@.list
+$(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' >> $@.list
+$(AR) $(AR_OPTS) $@ $(ArSupportsInput) $@.list
+$(RM) $@.list
+$(RANLIB) $@
+endef
+endif
 
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
