@@ -209,6 +209,7 @@ GhcLibWays=p
 endif
 
 # Option flags to pass to GHC when it's compiling prelude modules
+# *and* standard library modules (std) *and* modules in hslibs
 # Typically these are things like -O or -dcore-lint
 # The ones that are *essential* are wired into ghc/lib/Makefile
 #
