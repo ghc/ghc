@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.24 2000/08/16 15:29:34 rrt Exp $
+ * $Id: ClosureMacros.h,v 1.25 2000/08/17 15:19:17 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -116,7 +116,7 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 #endif
 
 
-#ifdef HAVE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
+#ifdef ENABLE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
    extern int is_heap_alloced(const void* x);
 #  define HEAP_ALLOCED(x)  (is_heap_alloced(x))
 #else
@@ -137,8 +137,8 @@ extern void* DATA_SECTION_END_MARKER_DECL;
    LOOKS_LIKE_STATIC() 
        - distinguishes between static and heap allocated data.
  */
-#if defined(HAVE_WIN32_DLL_SUPPORT) && !defined(INTERPRETER)
-                                       /* definitely do not enable for mingw DietHEP */
+#if defined(ENABLE_WIN32_DLL_SUPPORT) && !defined(INTERPRETER)
+            /* definitely do not enable for mingw DietHEP */
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
 
 /* Tiresome predicates needed to check for pointers into the closure tables */

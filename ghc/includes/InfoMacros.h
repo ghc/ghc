@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.12 2000/05/26 10:14:33 sewardj Exp $
+ * $Id: InfoMacros.h,v 1.13 2000/08/17 15:19:17 rrt Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -609,7 +609,7 @@ typedef vec_info_8 StgPolyInfoTable;
    to distinguish these kinds of references.
    (ToDo: fill in a more precise href.)
 */
-#ifdef HAVE_WIN32_DLL_SUPPORT /* mingw DietHEP doesn't seem to care either way */
+#ifdef ENABLE_WIN32_DLL_SUPPORT /* mingw DietHEP doesn't seem to care either way */
 #define DLL_SRT_ENTRY(x) ((StgClosure*)(((char*)&DLL_IMPORT_DATA_VAR(x)) + 1))
 #else
 #define DLL_SRT_ENTRY(x) no-can-do
