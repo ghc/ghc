@@ -1,45 +1,30 @@
+/* -------- Global things --------- */
+
 BODY { 
   background-color: #ffffff;
   color: #000000;
   font-family: sans-serif;
   } 
 
-TD.topbar {
-  background-color: #000099;
-  padding: 5px
-  }
+A:link    { color: #0000e0; text-decoration: none }
+A:visited { color: #0000a0; text-decoration: none }
+A:hover   { background-color: #e0e0ff; text-decoration: none }
 
-TD.title {
-  color: #ffffff;
-  padding-left: 10px;
-  width: 100%
-  }
+TABLE.vanilla {
+  width: 100%;
+  border-width: 0px;
+  /* I can't seem to specify cellspacing or cellpadding properly using CSS... */
+}
 
-TD.topbut {
-  padding-left: 5px;
-  padding-right: 5px;
-  border-left-width: 1px;
-  border-left-color: #ffffff;
-  border-left-style: solid;
-  white-space: nowrap;
-  }
-TD.topbut A:link {
-  color: #ffffff
-  }
-TD.topbut A:visited {
-  color: #ffff00
-  }
-TD.topbut A:hover {
-  background-color: #6060ff;
-  }
-TD.topbut:hover {
-  background-color: #6060ff
-  }
+TD {
+  border-width: 0px;
+}
 
-TD.modulebar { 
-  background-color: #0077dd;
-  padding: 5px
-  }
+TABLE.narrow {
+  border-width: 0px;
+}
+
+/* --------- Documentation elements ---------- */
 
 TD.children {
   padding-left: 25px;
@@ -59,12 +44,11 @@ TD.decl {
   vertical-align: top;
   }
 
-TD.condecl  { padding-left: 10px }
 TD.recfield { padding-left: 20px }
 
 TD.doc  { 
   padding-top: 2px;
-  padding-left: 10px
+  padding-left: 10px;
   }
 
 TD.ndoc  { 
@@ -74,31 +58,14 @@ TD.ndoc  {
 TD.rdoc  { 
   padding: 2px;
   padding-left: 10px;
+  width: 100%;
   }
 
 TD.body  { 
   padding-left: 10px
   }
 
-A:link    { color: #0000e0; text-decoration: none }
-A:visited { color: #0000a0; text-decoration: none }
-A:hover   { background-color: #e0e0ff; text-decoration: none }
-
-TD.botbar {
-  background-color: #000099;
-  color: #ffffff;
-  padding: 5px
-  }
-TD.botbar A:link {
-  color: #ffffff;
-  text-decoration: underline
-  }
-TD.botbar A:visited {
-  color: #ffff00
-  }
-TD.botbar A:hover {
-  background-color: #6060ff
-  }
+/* ------- Section Headings ------- */
 
 TD.section1 {
   padding-top: 15px;
@@ -123,6 +90,7 @@ TD.section4 {
   font-size: 100%
   }
 
+/* -------------- The title bar at the top of the page */
 
 TD.infohead {
   color: #ffffff;
@@ -136,3 +104,66 @@ TD.infoval {
   padding-right: 10px;
   text-align: left;
 }
+
+TD.topbar {
+  background-color: #000099;
+  padding: 5px;
+}
+
+TD.title {
+  color: #ffffff;
+  padding-left: 10px;
+  width: 100%
+  }
+
+TD.topbut {
+  padding-left: 5px;
+  padding-right: 5px;
+  border-left-width: 1px;
+  border-left-color: #ffffff;
+  border-left-style: solid;
+  white-space: nowrap;
+  }
+
+TD.topbut A:link {
+  color: #ffffff
+  }
+
+TD.topbut A:visited {
+  color: #ffff00
+  }
+
+TD.topbut A:hover {
+  background-color: #6060ff;
+  }
+
+TD.topbut:hover {
+  background-color: #6060ff
+  }
+
+TD.modulebar { 
+  background-color: #0077dd;
+  padding: 5px;
+  border-top-width: 1px;
+  border-top-color: #ffffff;
+  border-top-style: solid;
+  }
+
+/* --------- The page footer --------- */
+
+TD.botbar {
+  background-color: #000099;
+  color: #ffffff;
+  padding: 5px
+  }
+TD.botbar A:link {
+  color: #ffffff;
+  text-decoration: underline
+  }
+TD.botbar A:visited {
+  color: #ffff00
+  }
+TD.botbar A:hover {
+  background-color: #6060ff
+  }
+
