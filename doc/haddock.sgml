@@ -230,7 +230,7 @@
 	<listitem>
 	  <para>Output documentation in SGML DocBook format.  NOTE: at
 	  time of writing this is only partially implemented and
-	  doens't work.</para>
+	  doesn't work.</para>
 	</listitem>
       </varlistentry>
 
@@ -509,7 +509,7 @@ f  :: Int      -- ^ The 'Int' argument
 </programlisting>
 
 	<para>NOTE: this feature isn't implemented in Haddock
-	0.1.</para>
+	0.2.</para>
       </section>
     </section>
 
