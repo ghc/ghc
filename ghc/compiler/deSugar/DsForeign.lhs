@@ -519,7 +519,8 @@ fexportEntry mod_nm c_nm helper args res_ty cc isDyn = (header_bits, c_bits)
   -}
   (proto_args, real_args)
     = case cc of
-	CCallConv | isDyn -> ( text "a0" : text "a_" : mkCArgNames 1 (tail args)
+	CCallConv | isDyn -> ( text "a0" : text "original_return_addr" 
+                                         : mkCArgNames 1 (tail args)
 			     , head args : addrTy : tail args)
         other		  -> (mkCArgNames 0 args, args)
 
