@@ -663,7 +663,7 @@ mk_OSBI_ref offw rep base idx
 
 
 doIndexOffForeignObjOp maybe_post_read_cast rep res addr idx
-   = mkBasicIndexedRead fixedHdrSize maybe_post_read_cast rep res addr idx
+   = mkBasicIndexedRead 0 maybe_post_read_cast rep res (mkDerefOff WordRep addr fixedHdrSize) idx
 
 doIndexOffAddrOp maybe_post_read_cast rep res addr idx
    = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr idx
