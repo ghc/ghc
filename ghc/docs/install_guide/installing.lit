@@ -1,5 +1,5 @@
 %
-% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/install_guide/Attic/installing.lit,v 1.1 1996/01/08 20:25:19 partain Exp $
+% $Header: /srv/cvs/cvs.haskell.org/fptools/ghc/docs/install_guide/Attic/installing.lit,v 1.2 1996/06/27 15:57:32 partain Exp $
 %
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
@@ -12,7 +12,7 @@ University of Glasgow\\
 Glasgow, Scotland\\
 G12 8QQ\\
 \\
-Email: glasgow-haskell-\{request,bugs\}\@dcs.glasgow.ac.uk}
+Email: glasgow-haskell-\{users,bugs\}-request\@dcs.glasgow.ac.uk}
 \maketitle
 \begin{rawlatex}
 \tableofcontents

@@ -17,7 +17,8 @@ AC_INIT(STARTUP.in)
 #
 # Prepare to generate the following header files
 #
-AC_CONFIG_HEADER(ghc/includes/config.h literate/config.h)
+AC_CONFIG_HEADER(ghc/includes/config.h)
+# and  literate/config.h ???
 # ToDo !!!!!!!!!!!!!!!!
 #
 # No, we don't do `--srcdir'...
@@ -27,15 +28,16 @@ if test x"$srcdir" != 'x.' ; then
 fi
 
 # -------------------------------------------------------------------------
-dnl ** choose what blobs to build (ghc,haggis,happy,nofib,????)
+dnl ** choose what blobs to build (ghc,hslibs,haggis,happy,nofib,????)
 
 # set to the name for the dir if doing it, otherwise empty
 DoingGHC='ghc'
+DoingHsLibs=''
 DoingNoFib=''
 DoingHappy=''
 DoingHaggis=''
+DoingLiterate=''
 # the following are not normally changed
-DoingLiterate='literate'
 DoingMkWorld='mkworld'
 DoingGlaFpUtils='glafp-utils'
 
@@ -48,7 +50,7 @@ AC_ARG_ENABLE(ghc,
 **********************************************************************
 
 First, select *which* of the tools you want to build,
-with --{enable,disable}-{ghc,nofib,happy,haggis}.
+with --{enable,disable}-{ghc,hslibs,nofib,happy,haggis}.
 (The default is: only GHC (Glasgow Haskell compiler).)
 
 Second, you may set one of a few applies-in-all-cases options.
@@ -91,6 +93,26 @@ if test "xxx$DoingGHC" = 'xxx' ; then
 #   ghc_includes_config_h=''
 fi
 
+AC_ARG_ENABLE(hslibs,
+   [--enable-hslibs   build suite of Haskell libraries],
+   [case "$enableval" in
+        yes) DoingHsLibs='hslibs'
+             ;;
+        no)  DoingHsLibs=''
+             ;;
+        *)   echo "I don't understand this option: --enable-hslibs=$enableval"
+             exit 1
+             ;;
+    esac])
+if test "xxx$DoingHsLibs" = 'xxxhslibs' -a \( ! -d hslibs \) ; then
+    DoingHsLibs=''
+    echo 'Doing --disable-hslibs, as there is no hslibs directory'
+fi
+hslibs_mkworld_site_hslibs_jm='hslibs/mkworld/site-hslibs.jm'
+if test "xxx$DoingHsLibs" = 'xxx' ; then
+    hslibs_mkworld_site_hslibs_jm=''
+fi
+
 AC_ARG_ENABLE(nofib,
    [--enable-nofib    build NoFib suite as part of Glasgow FP tools],
    [case "$enableval" in
@@ -128,7 +150,7 @@ if test "xxx$DoingHappy" = 'xxxhappy' -a \( ! -d happy \) ; then
 fi
 
 AC_ARG_ENABLE(haggis,
-   [--disable-haggis  build Haggis GUI toolkit as part of Glasgow FP tools],
+   [--enable-haggis   build Haggis GUI toolkit as part of Glasgow FP tools],
    [case "$enableval" in
         yes) DoingHaggis='haggis'
              ;;
@@ -194,6 +216,7 @@ if test "xxx$DoingGlaFpUtils" = 'xxxglafp-utils' -a \( ! -d glafp-utils \) ; the
 fi
 
 AC_SUBST(DoingGHC)
+AC_SUBST(DoingHsLibs)
 AC_SUBST(DoingNoFib)
 AC_SUBST(DoingHappy)
 AC_SUBST(DoingHaggis)
@@ -207,7 +230,7 @@ dnl ** choose host(/target/build) platform
 # Partly stolen from GCC "configure".
 #
 if test "x$target" = xNONE ; then
-    if test "x$nonopt" != xNONE; then
+    if test "x$nonopt" != xNONE ; then
         target=$nonopt
     else
         # This way of testing the result of a command substitution is
@@ -217,8 +240,7 @@ if test "x$target" = xNONE ; then
         else
             echo 'Config.guess failed to determine the host type.  You need \
 to specify one.' 1>&2
-            if [ -r config.status ]
-            then
+            if test -r config.status ; then
                 tail +2 config.status 1>&2
             fi
             exit 1
@@ -254,7 +276,7 @@ fi
 # We also record the architecture, vendor, and operating system (OS)
 # separately.
 case $HostPlatform in
-alpha-dec-osf1* | alpha-dec-osf2*)
+alpha-dec-osf[[1234]]*)
 	HostPlatform=alpha-dec-osf1 # canonicalise for our purposes
 	TargetPlatform=alpha-dec-osf1 # this will work for now... (hack)
 	BuildPlatform=alpha-dec-osf1 #hack
@@ -272,7 +294,7 @@ hppa1.1-hp-hpux*)
         HostVendor_CPP='hp'
         HostOS_CPP='hpux'
         ;;
-i386-*-linuxaout*)
+i[[3456]]86-*-linuxaout*)
 	HostPlatform=i386-unknown-linuxaout # hack again
 	TargetPlatform=i386-unknown-linuxaout
 	BuildPlatform=i386-unknown-linuxaout
@@ -281,16 +303,7 @@ i386-*-linuxaout*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linuxaout'
         ;;
-i486-*-linuxaout*)
-	HostPlatform=i386-unknown-linuxaout # hack again: NB: name for arch is *i386*!
-	TargetPlatform=i386-unknown-linuxaout
-	BuildPlatform=i386-unknown-linuxaout
-        HostPlatform_CPP='i386_unknown_linuxaout'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linuxaout'
-        ;;
-i386-*-linux*)
+i[[3456]]86-*-linux*)
 	HostPlatform=i386-unknown-linux # hack again
 	TargetPlatform=i386-unknown-linux
 	BuildPlatform=i386-unknown-linux
@@ -299,40 +312,25 @@ i386-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
-i486-*-linux*)
-	HostPlatform=i386-unknown-linux # hack again: NB: name for arch is *i386*!
-	TargetPlatform=i386-unknown-linux
-	BuildPlatform=i386-unknown-linux
-        HostPlatform_CPP='i386_unknown_linux'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='linux'
-        ;;
-i386-*-freebsd*)
+i[[3456]]86-*-freebsd*)
+	HostPlatform=i386-unknown-freebsd # hack again
+	TargetPlatform=i386-unknown-freebsd
+	BuildPlatform=i386-unknown-freebsd
         HostPlatform_CPP='i386_unknown_freebsd'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd'
         ;;
-i486-*-freebsd*)
-        HostPlatform_CPP='i386_unknown_freebsd'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='freebsd'
-        ;;
-i386-*-netbsd*)
+i[[3456]]86-*-netbsd*)
+	HostPlatform=i386-unknown-netbsd # hack again
+	TargetPlatform=i386-unknown-netbsd
+	BuildPlatform=i386-unknown-netbsd
         HostPlatform_CPP='i386_unknown_netbsd'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='netbsd'
         ;;
-i486-*-netbsd*)
-        HostPlatform_CPP='i386_unknown_netbsd'
-        HostArch_CPP='i386'
-        HostVendor_CPP='unknown'
-        HostOS_CPP='netbsd'
-        ;;
-i386-*-solaris2*)
+i[[3456]]86-*-solaris2*)
 	HostPlatform=i386-unknown-solaris2 # hack again
 	TargetPlatform=i386-unknown-solaris2
 	BuildPlatform=i386-unknown-solaris2
@@ -353,7 +351,7 @@ m68k-next-nextstep3)
         HostVendor_CPP='next'
         HostOS_CPP='nextstep3'
         ;;
-i386-next-nextstep3)
+i[[3456]]86-next-nextstep3)
 	HostPlatform=i386-next-nextstep3 # hack again
 	TargetPlatform=i386-next-nextstep3
 	BuildPlatform=i386-next-nextstep3
@@ -617,6 +615,10 @@ if test -z "$YaccCmd"; then
     fi
 fi
 
+dnl ** Find lex command (lex or flex) and library (-ll or -lfl)
+#
+AC_PROG_LEX
+
 #--------------------------------------------------------------
 WithHc='haskell-compiler-unspecified'
 WithHcType='HC_UNSPECIFIED'
@@ -689,14 +691,37 @@ esac
 AC_SUBST(WithHc)
 AC_SUBST(WithHcType)
 
+dnl ** Possibly use something else instead of 'gcc'.
+WhatGccIsCalled=gcc
+AC_ARG_WITH(gcc,
+   [--with-gcc=<gcc command>
+	Use a different command instead of 'gcc' for the GNU C compiler.],
+   [HaveGcc=YES; WhatGccIsCalled="$withval"])
+AC_SUBST(WhatGccIsCalled)
+
+dnl ** Choose which make to use (default 'make -r')
+MakeCmd='make -r'
+AC_ARG_WITH(make,
+   [ 
+--with-make=<make command> 
+	Use an alternate command instead of 'make'.  This is useful
+	when GNU make is required (for instance when the default make
+	supplied by the system won't work, as is the case on FreeBSD
+	and NetBSD).  You probably want to include the '-r' flag with
+	make, to exclude implicit suffix rules.],
+   [MakeCmd="$withval"]) 
+AC_SUBST(MakeCmd)
+
 dnl ** possibly choose a different tmpdir (default /tmp)
 # let the user decide where the best tmpdir is
 # /tmp is the default; /usr/tmp is sometimes a good choice.
 # Very site-specific.
 TmpDir='/tmp'
 AC_ARG_WITH(tmpdir,
-   [--with-tmpdir=<temp directory> Use an alternative directory for
-temporary files (presumably because /tmp is too small).],
+   [
+--with-tmpdir=<temp directory> 
+	Use an alternative directory for temporary files (presumably
+	because /tmp is too small).],
    [TmpDir="$withval"])
 AC_SUBST(TmpDir)
 
@@ -707,8 +732,9 @@ HcMaxHeapWasSet='NO'
 HcMaxHeap='0'
 AC_ARG_WITH(max-heap,
    [
---with-max-heap=<heap size, e.g., 32m> Do all Haskell compilations
-with a heap of this size.  (If you've got it, flaunt it.)],
+--with-max-heap=<heap size, e.g., 32m> 
+	Do all Haskell compilations with a heap of this size.  (If
+	you've got it, flaunt it.)],
    [HcMaxHeapWasSet='YES'
     HcMaxHeap="$withval"])
 AC_SUBST(HcMaxHeapWasSet)
@@ -769,6 +795,9 @@ elif $ArCmd clq conftest.a >/dev/null 2>/dev/null; then
 elif $ArCmd cq conftest.a >/dev/null 2>/dev/null; then
     ArCmd="$ArCmd cq"
     NeedRanLib='YES'
+elif $ArCmd cq conftest.a 2>&1 | grep 'no archive members specified' >/dev/null 2>/dev/null; then
+    ArCmd="$ArCmd cq"
+    NeedRanLib='YES'
 else
     echo "I can't figure out how to use your $ArCmd"
     exit 1
@@ -814,21 +843,6 @@ AC_STRUCT_TIMEZONE
 dnl ** determine the type of signal()
 #
 AC_TYPE_SIGNAL
-#
-dnl ** decide whether or not flex lexers need to be linked with -lfl
-#
-AC_CHECK_LIB(fl,yywrap,
-    FlexLibAvailable='YES',
-    FlexLibAvailable='NO')
-AC_SUBST(FlexLibAvailable)
-#
-dnl ** Decide whether or not lex lexers need to be linked with -ll
-# (Linux, for example, does not have "lex", only "flex")
-#
-AC_CHECK_LIB(l,yywrap,
-    LexLibAvailable='YES',
-    LexLibAvailable='NO')
-AC_SUBST(LexLibAvailable)
 #
 dnl ** check for specific library functions that we are interested in
 #
@@ -1047,224 +1061,226 @@ AC_ARG_ENABLE(gc-du,
              ;;
     esac])
 
-dnl  some seds only allow 99 commands, meaning no more
-dnl  than 99 AC_SUBSTs.  AARRGGHH!!
-dnl AC_ARG_ENABLE(user-way-a,
-dnl    [--enable-user-way-a    build for \`user way a' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_a='YES'
-dnl              ;;
-dnl         no)  GhcBuild_a='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-a=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-b,
-dnl    [--enable-user-way-b    build for \`user way b' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_b='YES'
-dnl              ;;
-dnl         no)  GhcBuild_b='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-b=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-c,
-dnl    [--enable-user-way-c    build for \`user way c' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_c='YES'
-dnl              ;;
-dnl         no)  GhcBuild_c='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-c=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-d,
-dnl    [--enable-user-way-d    build for \`user way d' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_d='YES'
-dnl              ;;
-dnl         no)  GhcBuild_d='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-d=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-e,
-dnl    [--enable-user-way-e    build for \`user way e' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_e='YES'
-dnl              ;;
-dnl         no)  GhcBuild_e='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-e=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-f,
-dnl    [--enable-user-way-f    build for \`user way f' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_f='YES'
-dnl              ;;
-dnl         no)  GhcBuild_f='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-f=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-g,
-dnl    [--enable-user-way-g    build for \`user way g' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_g='YES'
-dnl              ;;
-dnl         no)  GhcBuild_g='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-g=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-h,
-dnl    [--enable-user-way-h    build for \`user way h' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_h='YES'
-dnl              ;;
-dnl         no)  GhcBuild_h='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-h=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-i,
-dnl    [--enable-user-way-i    build for \`user way i' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_i='YES'
-dnl              ;;
-dnl         no)  GhcBuild_i='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-i=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-j,
-dnl    [--enable-user-way-j    build for \`user way j' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_j='YES'
-dnl              ;;
-dnl         no)  GhcBuild_j='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-j=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-k,
-dnl    [--enable-user-way-k    build for \`user way k' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_k='YES'
-dnl              ;;
-dnl         no)  GhcBuild_k='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-k=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-l,
-dnl    [--enable-user-way-l    build for \`user way l' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_l='YES'
-dnl              ;;
-dnl         no)  GhcBuild_l='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-l=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-m,
-dnl    [--enable-user-way-m    build for \`user way m' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_m='YES'
-dnl              ;;
-dnl         no)  GhcBuild_m='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-m=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-n,
-dnl    [--enable-user-way-n    build for \`user way n' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_n='YES'
-dnl              ;;
-dnl         no)  GhcBuild_n='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-n=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-o,
-dnl    [--enable-user-way-o    build for \`user way o' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_o='YES'
-dnl              ;;
-dnl         no)  GhcBuild_o='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-o=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-A,
-dnl    [--enable-user-way-A    build for \`user way A' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_A='YES'
-dnl              ;;
-dnl         no)  GhcBuild_A='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-A=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-dnl AC_ARG_ENABLE(user-way-B,
-dnl    [--enable-user-way-B    build for \`user way B' (mostly for implementors)],
-dnl    [case "$enableval" in
-dnl         yes) GhcBuild_B='YES'
-dnl              ;;
-dnl         no)  GhcBuild_B='NO'
-dnl              ;;
-dnl         *)   echo "I don't understand this option: --enable-user-way-B=$enableval"
-dnl              exit 1
-dnl              ;;
-dnl     esac])
-dnl 
-AC_SUBST(GhcBuild_normal)
-AC_SUBST(GhcBuild_p)
-AC_SUBST(GhcBuild_t)
-AC_SUBST(GhcBuild_u)
-AC_SUBST(GhcBuild_mc)
-AC_SUBST(GhcBuild_mr)
-AC_SUBST(GhcBuild_mt)
-AC_SUBST(GhcBuild_mp)
-AC_SUBST(GhcBuild_mg)
-AC_SUBST(GhcBuild_2s)
-AC_SUBST(GhcBuild_1s)
-AC_SUBST(GhcBuild_du)
+AC_ARG_ENABLE(user-way-a,
+   [--enable-user-way-a    build for \`user way a' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_a='YES'
+             ;;
+        no)  GhcBuild_a='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-a=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-b,
+   [--enable-user-way-b    build for \`user way b' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_b='YES'
+             ;;
+        no)  GhcBuild_b='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-b=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-c,
+   [--enable-user-way-c    build for \`user way c' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_c='YES'
+             ;;
+        no)  GhcBuild_c='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-c=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-d,
+   [--enable-user-way-d    build for \`user way d' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_d='YES'
+             ;;
+        no)  GhcBuild_d='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-d=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-e,
+   [--enable-user-way-e    build for \`user way e' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_e='YES'
+             ;;
+        no)  GhcBuild_e='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-e=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-f,
+   [--enable-user-way-f    build for \`user way f' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_f='YES'
+             ;;
+        no)  GhcBuild_f='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-f=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-g,
+   [--enable-user-way-g    build for \`user way g' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_g='YES'
+             ;;
+        no)  GhcBuild_g='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-g=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-h,
+   [--enable-user-way-h    build for \`user way h' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_h='YES'
+             ;;
+        no)  GhcBuild_h='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-h=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-i,
+   [--enable-user-way-i    build for \`user way i' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_i='YES'
+             ;;
+        no)  GhcBuild_i='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-i=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-j,
+   [--enable-user-way-j    build for \`user way j' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_j='YES'
+             ;;
+        no)  GhcBuild_j='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-j=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-k,
+   [--enable-user-way-k    build for \`user way k' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_k='YES'
+             ;;
+        no)  GhcBuild_k='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-k=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-l,
+   [--enable-user-way-l    build for \`user way l' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_l='YES'
+             ;;
+        no)  GhcBuild_l='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-l=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-m,
+   [--enable-user-way-m    build for \`user way m' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_m='YES'
+             ;;
+        no)  GhcBuild_m='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-m=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-n,
+   [--enable-user-way-n    build for \`user way n' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_n='YES'
+             ;;
+        no)  GhcBuild_n='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-n=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-o,
+   [--enable-user-way-o    build for \`user way o' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_o='YES'
+             ;;
+        no)  GhcBuild_o='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-o=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-A,
+   [--enable-user-way-A    build for \`user way A' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_A='YES'
+             ;;
+        no)  GhcBuild_A='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-A=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(user-way-B,
+   [--enable-user-way-B    build for \`user way B' (mostly for implementors)],
+   [case "$enableval" in
+        yes) GhcBuild_B='YES'
+             ;;
+        no)  GhcBuild_B='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-user-way-B=$enableval"
+             exit 1
+             ;;
+    esac])
+
+dnl We do not use AC_SUBST to communicate the GhcBuild_* info,
+dnl as some seds (notably OSF) only allow 99 commands (!!!).
+dnl We will do the equivalent by a HACK further down.
+
+dnl AC_SUBST(GhcBuild_normal)
+dnl AC_SUBST(GhcBuild_p)
+dnl AC_SUBST(GhcBuild_t)
+dnl AC_SUBST(GhcBuild_u)
+dnl AC_SUBST(GhcBuild_mc)
+dnl AC_SUBST(GhcBuild_mr)
+dnl AC_SUBST(GhcBuild_mt)
+dnl AC_SUBST(GhcBuild_mp)
+dnl AC_SUBST(GhcBuild_mg)
+dnl AC_SUBST(GhcBuild_2s)
+dnl AC_SUBST(GhcBuild_1s)
+dnl AC_SUBST(GhcBuild_du)
 dnl AC_SUBST(GhcBuild_a)
 dnl AC_SUBST(GhcBuild_b)
 dnl AC_SUBST(GhcBuild_c)
@@ -1291,7 +1307,7 @@ dnl ** which Haskell compiler to bootstrap GHC with?
 # first, the defaults...
 WithGhcHc='haskell-compiler-unspecified'
 WithGhcHcType='HC_UNSPECIFIED'
-GhcBuilderVersion='26'
+GhcBuilderVersion='28'
 
 AC_ARG_WITH(hc-for-ghc,
    [
@@ -1534,9 +1550,100 @@ AC_ARG_ENABLE(ghci,
     esac])
 AC_SUBST(BuildGHCI)
 
+# Here, by HACK means, we dump all the GhcBuild_ info
+# into a file.  See comment above.
+rm -f ghc/mkworld/buildinfo.jm
+echo creating ghc/mkworld/buildinfo.jm
+cat > ghc/mkworld/buildinfo.jm <<EOF
+XCOMM ** DO NOT EDIT! **
+XCOMM This file is obliterated every time 'configure' is run!
+
+EOF
+for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
+    eval "yy=\$GhcBuild_$xx"
+    echo "#ifndef GhcBuild_$xx"     >> ghc/mkworld/buildinfo.jm
+    echo "#define GhcBuild_$xx $yy" >> ghc/mkworld/buildinfo.jm
+    echo "#endif"		    >> ghc/mkworld/buildinfo.jm
+done
+
 # here ends a very big if DoingGHC = 'ghc' ...
 fi
 
+# -------------------------------------------------------------------------
+dnl
+dnl * `HsLibs' CONFIGURATION STUFF
+
+if test "xxx$DoingHsLibs" = 'xxxhslibs' ; then
+# a very big "if"!
+
+dnl ** which Haskell compiler to use on hslibs?
+WithHsLibsHc='haskell-compiler-unspecified'
+WithHsLibsHcType='HC_UNSPECIFIED'
+
+AC_ARG_WITH(hc-for-hslibs,
+   [
+*******************************************************************
+** \`HsLibs' HASKELL LIBRARIES OPTIONS:
+
+The Haskell compiler to compile the Haskell Libraries suite; this
+option, if used, overrides --with-hc=<...>:
+
+    --with-hc-for-hslibs=<Haskell compiler>
+          ghc*     => Glasgow Haskell invoked by the name given
+                      and you want to use it un-installed ("in-place").],
+   [case "$withval" in
+        ghc* | glhc* )
+                WithHsLibsHc=$withval
+                ;;
+        in-place )
+                WithHsLibsHc='IN-PLACE'
+                ;;
+        *)      echo "I don't understand this option: --with-hc-for-hslibs=$withval"
+                exit 1
+                ;;
+    esac])
+
+# make sure that what they said makes sense.... set WithHsLibsHcType
+case $WithHsLibsHc in
+    haskell-compiler-unspecified ) # maybe they said something earlier...
+	    if test $WithHc = 'haskell-compiler-unspecified' ; then
+		echo "Neither --with-hc nor --with-hc-for-hslibs was properly set"
+		exit 1
+	    fi
+	    ;;
+    ghc* | glhc* )
+	    WithHsLibsHcType='HC_GLASGOW_GHC'
+            AC_CHECK_PROG(have_ghc_hslibs,$WithHsLibsHc,$ac_dir/$ac_word)
+            if test -z "$have_ghc_hslibs"; then
+                echo "Can't find Glasgow Haskell to compile HsLibs with: $WithHsLibsHc"
+		exit 1
+            fi
+            ;;
+    IN-PLACE) WithHsLibsHcType='HC_GLASGOW_GHC'
+	    ;;
+esac
+AC_SUBST(WithHsLibsHc)
+AC_SUBST(WithHsLibsHcType)
+
+# Here, by HACK means, we dump all the GhcBuild_ info
+# into a file.  See comment above.
+rm -f hslibs/mkworld/buildinfo.jm
+echo creating hslibs/mkworld/buildinfo.jm
+cat > hslibs/mkworld/buildinfo.jm <<EOF
+XCOMM ** DO NOT EDIT! **
+XCOMM This file is obliterated every time 'configure' is run!
+
+EOF
+dnl Do not really know what to put here:
+dnl for xx in normal p t u mc mr mt mp mg 2s 1s du a b c d e f g h i j k l m n o A B ; do
+dnl     eval "yy=\$GhcBuild_$xx"
+dnl    echo "#ifndef GhcBuild_$xx"     >> ghc/mkworld/buildinfo.jm
+dnl    echo "#define GhcBuild_$xx $yy" >> ghc/mkworld/buildinfo.jm
+dnl    echo "#endif"		    >> ghc/mkworld/buildinfo.jm
+dnl done
+
+# here ends a very big if DoingHsLibs = 'hslibs' ...
+fi
 #
 # -------------------------------------------------------------------------
 dnl
@@ -1816,8 +1923,7 @@ fi
 IncludeRealNoFibTests='YES'	# defaults
 IncludeSpectralNoFibTests='YES'
 IncludeImaginaryNoFibTests='YES'
-IncludePENDINGNoFibTests='NO'
-IncludeUNUSEDNoFibTests='NO'
+IncludeSpecialiseNoFibTests='NO'
 IncludeGHC_ONLYNoFibTests='NO'
 IncludePRIVATENoFibTests='NO'
 IncludeParallelNoFibTests='NO'
@@ -1830,15 +1936,13 @@ only if using GHC):
 
 --enable-all-tests    do *all* tests],
    [case "$enableval" in
-        yes) IncludePENDINGNoFibTests='YES'
-	     IncludeUNUSEDNoFibTests='YES'
-	     IncludeGHC_ONLYNoFibTests='YES'
+        yes) IncludeGHC_ONLYNoFibTests='YES'
+	     IncludeSpecialiseNoFibTests='YES'
 	     IncludePRIVATENoFibTests='YES'
 	     IncludeParallelNoFibTests='YES'
              ;;
-        no) IncludePENDINGNoFibTests='NO'
-	     IncludeUNUSEDNoFibTests='NO'
-	     IncludeGHC_ONLYNoFibTests='NO'
+        no)  IncludeGHC_ONLYNoFibTests='NO'
+	     IncludeSpecialiseNoFibTests='NO'
 	     IncludePRIVATENoFibTests='NO'
 	     IncludeParallelNoFibTests='NO'
 
@@ -1892,30 +1996,6 @@ AC_ARG_ENABLE(real-tests,
              ;;
     esac])
 
-AC_ARG_ENABLE(PENDING-tests,
-   [--enable-PENDING-tests    include PENDING tests],
-   [case "$enableval" in
-        yes) IncludePENDINGNoFibTests='YES'
-             ;;
-        no)  IncludePENDINGNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-PENDING-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
-AC_ARG_ENABLE(UNUSED-tests,
-   [--enable-UNUSED-tests     include UNUSED tests],
-   [case "$enableval" in
-        yes) IncludeUNUSEDNoFibTests='YES'
-             ;;
-        no)  IncludeUNUSEDNoFibTests='NO'
-             ;;
-        *)   echo "I don't understand this option: --enable-UNUSED-tests=$enableval"
-             exit 1
-             ;;
-    esac])
-
 AC_ARG_ENABLE(GHC-ONLY-tests,
    [--enable-GHC-ONLY-tests   include GHC_ONLY tests],
    [case "$enableval" in
@@ -1924,6 +2004,18 @@ AC_ARG_ENABLE(GHC-ONLY-tests,
         no)  IncludeGHC_ONLYNoFibTests='NO'
              ;;
         *)   echo "I don't understand this option: --enable-GHC-ONLY-tests=$enableval"
+             exit 1
+             ;;
+    esac])
+
+AC_ARG_ENABLE(specialise-tests,
+   [--enable-specialise-tests  include specialisation tests],
+   [case "$enableval" in
+        yes) IncludeSpecialiseNoFibTests='YES'
+             ;;
+        no)  IncludeSpecialiseNoFibTests='NO'
+             ;;
+        *)   echo "I don't understand this option: --enable-specialise-tests=$enableval"
              exit 1
              ;;
     esac])
@@ -1953,15 +2045,31 @@ AC_ARG_ENABLE(parallel-tests,
              ;;
     esac])
 
-AC_SUBST(IncludeRealNoFibTests)
-AC_SUBST(IncludeSpectralNoFibTests)
-AC_SUBST(IncludeImaginaryNoFibTests)
-AC_SUBST(IncludePENDINGNoFibTests)
-AC_SUBST(IncludeUNUSEDNoFibTests)
-AC_SUBST(IncludeGHC_ONLYNoFibTests)
-AC_SUBST(IncludeSpecialiseNoFibTests)
-AC_SUBST(IncludePRIVATENoFibTests)
-AC_SUBST(IncludeParallelNoFibTests)
+dnl not AC_SUBSTd because of 99-command seds (sigh)
+dnl (See what follows instead)
+dnl AC_SUBST(IncludeRealNoFibTests)
+dnl AC_SUBST(IncludeSpectralNoFibTests)
+dnl AC_SUBST(IncludeImaginaryNoFibTests)
+dnl AC_SUBST(IncludeGHC_ONLYNoFibTests)
+dnl AC_SUBST(IncludeSpecialiseNoFibTests)
+dnl AC_SUBST(IncludePRIVATENoFibTests)
+dnl AC_SUBST(IncludeParallelNoFibTests)
+
+# Here, by HACK means, we dump all the Include*NoFibTests info
+# into a file.  See comment above.
+rm -f nofib/mkworld/buildinfo.jm
+echo creating nofib/mkworld/buildinfo.jm
+cat > nofib/mkworld/buildinfo.jm <<EOF
+XCOMM ** DO NOT EDIT! **
+XCOMM This file is obliterated every time 'configure' is run!
+
+EOF
+for xx in Real Spectral Imaginary GHC_ONLY Specialise PRIVATE Parallel ; do
+    eval "yy=\$Include${xx}NoFibTests"
+    echo "#ifndef Include${xx}NoFibTests"     >> nofib/mkworld/buildinfo.jm
+    echo "#define Include${xx}NoFibTests $yy" >> nofib/mkworld/buildinfo.jm
+    echo "#endif"			      >> nofib/mkworld/buildinfo.jm
+done
 
 # here ends a very big if DoingNoFib = 'nofib' ...
 fi
@@ -1972,7 +2080,7 @@ dnl * extract non-header files with substitution (end)
 #
 AC_SUBST(MkWorldSetup)
 
-AC_OUTPUT(Makefile STARTUP mkworld/site.jm mkworld/platform.h mkworld/config.h $ghc_mkworld_site_ghc_jm $ghc_includes_platform_h $nofib_mkworld_site_nofib_jm)
+AC_OUTPUT(Makefile STARTUP mkworld/site.jm mkworld/platform.h mkworld/config.h $ghc_mkworld_site_ghc_jm $ghc_includes_platform_h $hslibs_mkworld_site_hslibs_jm $nofib_mkworld_site_nofib_jm)
 
 echo '************************************************'
 echo '*** NOW DO: sh < STARTUP'

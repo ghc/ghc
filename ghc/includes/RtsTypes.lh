@@ -70,43 +70,6 @@ typedef W_ TIME;
 typedef GLOBAL_TASK_ID PROC;
 #endif
 
-#if defined(GRAN) || defined(PAR)
-/* Granularity event types for output */
-enum gran_event_types {
-    GR_START = 0, GR_STARTQ, 
-    GR_STEALING, GR_STOLEN, GR_STOLENQ, 
-    GR_FETCH, GR_REPLY, GR_BLOCK, GR_RESUME, GR_RESUMEQ,
-    GR_SCHEDULE, GR_DESCHEDULE,
-    GR_END,
-    SP_SPARK, SP_SPARKAT, SP_USED, SP_PRUNED, SP_EXPORTED, SP_ACQUIRED,
-    GR_TERMINATE,
-    GR_EVENT_MAX
-};
-
-#endif
-
-#ifdef GRAN
-
-typedef struct spark
-{
-  struct spark *prev, *next;
-  P_ node;
-  I_ name, global;
-} *sparkq;
-
-typedef struct event {
-  PROC proc;            /* Processor id */
-  PROC creator;         /* Processor id of PE that created the event */
-  EVTTYPE evttype;      /* Event type */
-  TIME time;            /* Time at which event happened */
-  P_ tso;               /* Associated TSO, if relevant, Nil_closure otherwise*/
-  P_ node;              /* Associated node, if relevant, Nil_closure otherwise*/
-  sparkq spark;         /* Associated SPARK, if relevant, NULL otherwise */
-  struct event *next;
-  } *eventq;
-
-#endif
-
 \end{code}
 
 A cost centre is represented by a pointer to a static structure
@@ -124,24 +87,32 @@ typedef struct cc {
     char *module;           	/* name of module in which _scc_ occurs */
     char *group;           	/* name of group  in which _scc_ occurs */
 
-    char is_subsumed;		/* '\0' => *not* a CAF or dict cc	*/
-				/* 'C'  => *is* a CAF cc		*/
-				/* 'D'  => *is* a dictionary cc		*/
+    char is_subsumed;		/* 'B'  => *not* a CAF/dict/sub cc	*/
+				/* 'S'  => *is* a subsumed cc		*/
+				/* 'c'  => *is* a CAF cc		*/
+				/* 'd'  => *is* a dictionary cc		*/
+				/* IS_CAF_OR_DICT tests for lowercase bit */
 
     /* Statistics Gathered */
 
     W_ scc_count;          	/* no of scc expression instantiations	*/
     W_ sub_scc_count;      	/* no of scc's set inside this cc	*/
-    W_ cafcc_count;        	/* no of scc expression instantiations	*/
     W_ sub_cafcc_count;    	/* no of scc's set inside this cc	*/
+    W_ sub_dictcc_count;    	/* no of scc's set inside this cc	*/
 
+#if defined(PROFILING_DETAIL_COUNTS)
     W_ thunk_count;		/* no of {thunk,function,PAP} enters 	*/
     W_ function_count;		/*    in this cost centre		*/
     W_ pap_count;
+    W_ mem_allocs;		/* no of allocations 			*/
+
+    W_ subsumed_fun_count;	/* no of functions subsumed		*/
+    W_ subsumed_caf_count;	/* no of caf/dict funs subsumed		*/
+    W_ caffun_subsumed;		/* no of subsumes from this caf/dict    */
+#endif
 
     W_ time_ticks;         	/* no of timer interrupts -- current interval */
     W_ prev_ticks;         	/* no of timer interrupts -- previous intervals */
-    W_ mem_allocs;		/* no of allocations 			*/
     W_ mem_alloc;		/* no of words allocated (excl CC_HDR)	*/
 
     /* Heap Profiling by Cost Centre */
@@ -149,6 +120,12 @@ typedef struct cc {
     W_ selected;		/* is this cost centre selected */
 
 } *CostCentre;
+
+#if defined(PROFILING_DETAIL_COUNTS)
+#define INIT_CC_STATS	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#else
+#define INIT_CC_STATS	0,0,0,0,0,0,0,0
+#endif
 
 #endif /* defined(PROFILING) || defined(CONCURRENT) */
 \end{code}

@@ -254,7 +254,8 @@ register void *_procedure __asm__("$27");
 \begin{code}
 #if i386_TARGET_ARCH
 
-#ifdef solaris2_TARGET_OS
+/* *not* a good way to do this (WDP 96/05) */
+#if defined(solaris2_TARGET_OS) || defined(linux_TARGET_OS)
 #define MINI_INTERPRET_END   "miniInterpretEnd"
 #else
 #define MINI_INTERPRET_END   "_miniInterpretEnd"

@@ -69,8 +69,22 @@ but unfortunately, we have to cater to ANSI C as well.)
     do {SaveAllStgRegs(); PerformGC(args); RestoreAllStgRegs();} while(0)
 #define DO_STACKOVERFLOW(headroom,args)	    \
     do {SaveAllStgRegs(); StackOverflow(headroom,args); RestoreAllStgRegs();} while(0)
+
+#if defined(GRAN)
+
+#define DO_YIELD(args)   DO_GRAN_YIELD(args)
+#define DO_GRAN_YIELD(liveness)		    \
+    do {SaveAllStgRegs(); Yield(liveness); RestoreAllStgRegs();} while(0)
+
+#define DO_PERFORM_RESCHEDULE(liveness_mask,reenter)		    \
+    do {SaveAllStgRegs(); PerformReschedule(liveness_mask,reenter); RestoreAllStgRegs();} while(0)
+
+#else
+
 #define DO_YIELD(args)		    \
     do {SaveAllStgRegs(); Yield(args); RestoreAllStgRegs();} while(0)
+
+#endif   /* GRAN */
 
 \end{code}
 
@@ -168,11 +182,34 @@ extern void callWrapper_safe(STG_NO_ARGS);
 void PerformGC_wrapper PROTO((W_));
 void StackOverflow_wrapper PROTO((W_, W_));
 void Yield_wrapper PROTO((W_));
+#  ifdef GRAN
+void PerformReschedule_wrapper PROTO((W_, W_));
+void GranSimAllocate_wrapper PROTO((I_, P_, W_));
+void GranSimUnallocate_wrapper PROTO((I_, P_, W_));
+void GranSimFetch_wrapper PROTO((P_));
+void GranSimExec_wrapper PROTO((W_, W_, W_, W_, W_));
+#  endif
 #endif
 
 #define DO_GC(args)			PerformGC_wrapper(args)
 #define DO_STACKOVERFLOW(headroom,args) StackOverflow_wrapper(headroom,args)
+
+#  ifdef GRAN
+
+#define DO_YIELD(args)   DO_GRAN_YIELD(args)
+#define DO_GRAN_YIELD(liveness)			Yield_wrapper(liveness)
+
+#define DO_PERFORMRESCHEDULE(liveness, always_reenter_node) PerformReschedule_wrapper(liveness, always_reenter_node)
+#define DO_GRANSIMALLOCATE(n, node, liveness)   GranSimAllocate_wrapper(n, node, liveness)
+#define DO_GRANSIMUNALLOCATE(n, node, liveness) GranSimUnallocate_wrapper(n, node, liveness)
+#define DO_GRANSIMFETCH(node)                   GranSimFetch_wrapper(node)
+#define DO_GRANSIMEXEC(arith,branch,load,store,floats) GranSimExec_wrapper(arith,branch,load,store,floats)
+
+#  else
+
 #define DO_YIELD(args)			Yield_wrapper(args)
+
+#  endif
 
 #endif /* __GNUC__ && __STG_GCC_REGS__ */
 \end{code}
@@ -377,7 +414,7 @@ gets whatever it's after.
 
 #define WRAPPER_NAME(f) /*nothing*/
 
-#ifdef solaris2_TARGET_OS
+#if defined(solaris2_TARGET_OS) || defined(linux_TARGET_OS)
 #define REAL_NAME(f)   #f
 #else
 #define REAL_NAME(f)   "_" #f
@@ -566,7 +603,6 @@ gets whatever it's after.
 %************************************************************************
 
 \begin{code}
-
 #if sparc_TARGET_ARCH
 
 #define MAGIC_CALL_SETUP	\
@@ -577,6 +613,11 @@ gets whatever it's after.
 	"\tstd %i2,[%fp-32]\n" 	\
 	"\tstd %i4,[%fp-24]");
 
+/* We leave nothing to chance here; we have seen
+   GCC stick "unwanted" code in the branch delay
+   slot, causing mischief (WDP 96/05)
+*/
+#ifdef GRAN
 #define MAGIC_CALL		\
     __asm__ volatile (		\
         "ld [%%fp-40],%%o5\n"	\
@@ -590,6 +631,21 @@ gets whatever it's after.
     __asm__ volatile (		\
 	"std %f0,[%fp-40]\n"	\
     	"\tstd %o0,[%fp-32]");
+#else
+#define MAGIC_CALL		\
+    __asm__ volatile (		\
+        "ld [%%fp-40],%%o5\n"	\
+    	"\tld [%%fp-36],%%o0\n" \
+    	"\tld [%%fp-32],%%o1\n" \
+    	"\tld [%%fp-28],%%o2\n" \
+    	"\tld [%%fp-24],%%o3\n" \
+    	"\tld [%%fp-20],%%o4\n"	\
+	"\tcall %%o5\n"		\
+	"\tnop\n"		\
+	"\tstd %%f0,[%%fp-40]\n"\
+    	"\tstd %%o0,[%%fp-32]"  \
+	: : : "%o0", "%o1", "%o2", "%o3", "%o4", "%o5", "%f0", "%g1", "%g2", "%g3", "%g4", "memory");
+#endif
 
 #define MAGIC_RETURN		\
     __asm__ volatile (		\

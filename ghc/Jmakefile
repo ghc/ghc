@@ -1,7 +1,5 @@
 #define IHaveSubdirs
 
-MsubNeededHere( ./glue_TAGS_files )
-
 /* order in SUBDIRS is not supposed to be important but ...
 	"compiler" must be before "lib", because we use
 	the compiler just built to compile pieces of "lib".
@@ -38,10 +36,3 @@ SUBDIRS = includes \
 whoami::
 	@echo using a \`$(BUILDPLATFORM)\' host to build a Haskell compiler to run on a
 	@echo \`$(HOSTPLATFORM)\' host that will generate \`C\' target code
-
-fulltags : ./glue_TAGS_files
-	$(RM) ./TAGS
-	./glue_TAGS_files `find . -type f -name TAGS -print`
-
-/* this line makes sure perl gets picked up from the right place */
-MsubProgramScriptTarget(PerlCmd,./glue_TAGS_files,./glue_TAGS_files.prl,,)

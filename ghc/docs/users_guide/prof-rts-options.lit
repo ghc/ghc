@@ -64,10 +64,10 @@ The heap space profile may be broken down by different criteria:
 \item[\tr{-hG}:] cost centre group which produced the closure.
 \item[\tr{-hD}:] closure description --- a string describing the closure.
 \item[\tr{-hY}:] closure type --- a string describing the closure's type.
-\item[\tr{-hT<ints>,<start>}:] the time interval the closure was
-created. \tr{<ints>} specifies the no. of interval bands plotted
-(default 18) and \tr{<start>} the number of seconds after which the
-reported intervals start (default 0.0).
+%\item[\tr{-hT<ints>,<start>}:] the time interval the closure was
+%created. \tr{<ints>} specifies the no. of interval bands plotted
+%(default 18) and \tr{<start>} the number of seconds after which the
+%reported intervals start (default 0.0).
 \end{description}
 By default all live closures in the heap are profiled, but particular
 closures of interest can be selected (see below). 
@@ -107,14 +107,14 @@ Selects closures which are of one of the specified closure kinds.
 Valid closure kinds are \tr{CON} (constructor), \tr{FN} (manifest
 function), \tr{PAP} (partial application), \tr{BH} (black hole) and
 \tr{THK} (thunk).
-\item[\tr{-a<age>}:]
-\index{-a<age> RTS option (profiling)}
-Selects closures which have survived \pl{<age>} complete intervals.
+%\item[\tr{-a<age>}:]
+%\index{-a<age> RTS option (profiling)}
+%Selects closures which have survived \pl{<age>} complete intervals.
 \end{description}
 The space occupied by a closure will be reported in the heap profile
 if the closure satisfies the following logical expression:
 \begin{display}
-([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) and [-a]
+([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) %and [-a]
 \end{display}
 where a particular option is true if the closure (or its attached cost
 centre) is selected by the option (or the option is not specified).

@@ -362,13 +362,13 @@ Here is our ``crib sheet'' for converting 1.2 I/O to 1.3.  In most cases,
 it's really easy.
 \begin{enumerate}
 \item
-Change \tr{readChan stdin} to \tr{hGetContents stdin}.
+Change \tr{readChan stdin} to \tr{getContents}.
 \item
 Change \tr{appendChan stdout} to \tr{putStr}, which is equivalent to
 \tr{hPutStr stdout}.
 Change \tr{appendChan stderr} to \tr{hPutStr stderr}.
 \item
-You need to \tr{import LibSystem} if you used @getArgs@, @getEnv@,
+You need to \tr{import System} if you used @getArgs@, @getEnv@,
 or @getProgName@.
 \item
 Assuming continuation-style @Dialogue@ code, change \tr{... exit done $}
@@ -377,6 +377,36 @@ to \tr{... >>}.  Change \tr{... exit $ \ foo ->} to \tr{... >>= \ foo ->}.
 If you had any functions named \tr{(>>)}, \tr{(>>=)}, or \tr{return},
 change them to something else.
 \end{enumerate}
+
+Also:
+1.3 I/O all the way.
+\tr{Dialogue} usually turns into \tr{IO ()}.
+Use of \tr{StatusFile} request: rewrite (no equivalent exists).
+Add \tr{import Ratio} if you use \tr{Rationals} at all.
+Ditto: \tr{import Complex} if you use complex numbers.
+Ditto: \tr{import Array} if you use arrays.  Also: note that
+Arrays now use ordinary pairs, rather than a separate \tr{Assoc} type.
+May be easier to do:
+infix 1 =:
+(=:) a b = (a,b)
+and switch := to =:
+This can happen: \tr{LiteralInt.leStringToInt}; add spaces.
+For \tr{minInt}/\tr{maxInt}, \tr{minChar}/\tr{maxChar} (???)
+use the \tr{Bounded} class methods, \tr{minBound} and \tr{maxBound}.
+Replace class \tr{Text} with \tr{Show}; on rare occasions,
+you may need to do something for \tr{Read}, too.
+The functions \tr{ord} and \tr{chr} have been replaced by
+the class methods \tr{fromEnum} and \tr{toEnum}, respectively.
+The changes, however, can lead to ambiguous overloading.
+Need \tr{import IO} for anything interesting.
+What was called \tr{handle} is now called \tr{catch}.
+New keyword: \tr{do}.
+Other clashes: e.g., \tr{seq}, \tr{fail}.
+\tr{readDec} no longer exists; use ???.
+Type of \tr{fail} changed?
+\tr{(a `op` b) c = ...} is bogus.
+`failWith x' now `fail x'
+`fail x' now `fail (userError x)'
 
 %************************************************************************
 %*                                                                      *
@@ -444,10 +474,10 @@ The error type is called \tr{IOError13}, rather than \tr{IOError}
 so...)  You probably shouldn't be messing with \tr{IOError} much,
 anyway.
 
-Some of the 1.3 I/O code, notably the Extremely Cool \tr{LibPosix}
+Some of the 1.3 I/O code, notably the Extremely Cool \tr{Posix}
 stuff, is relatively untested.  Go for it, but be wary...
-\index{LibPosix bugs}
-\index{bugs, LibPosix}
+\index{Posix library bugs}
+\index{bugs, Posix library}
 
 %************************************************************************
 %*									*
@@ -470,7 +500,7 @@ required) and put into \tr{Lib*} interfaces (import required).
 
 GHC~0.26 still provides the I/O functions via \tr{Prelude.hi} (no
 import required).  Ignore the ``June draft'' pleadings for
-\tr{import LibIO}, and you'll be fine.
+\tr{import IO}, and you'll be fine.
 
 {\em There is no guarantee that the final 1.3 proposal will look
 anything like the current DRAFT.}  It ain't a standard until the fat
@@ -557,11 +587,11 @@ with \tr{-fhaskell-1.3}...)
 
 To subvert the above process, you need only provide
 a @mainPrimIO :: PrimIO ()@ of your own
-(in a module named \tr{Main}).  Do {\em not} use a \tr{-fhaskell-1.3} flag!
+(in a module named \tr{GHCmain}).  Do {\em not} use a \tr{-fhaskell-1.3} flag!
 
 Here's a little example, stolen from Alastair Reid:
 \begin{verbatim}
-module Main ( mainPrimIO ) where
+module GHCmain ( mainPrimIO ) where
 
 import PreludeGlaST
 

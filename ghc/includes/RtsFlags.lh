@@ -31,14 +31,14 @@ struct GC_FLAGS {
 	            2 set: details of minor collections
 		    4 set: details of major collections, except marking
 		    8 set: ditto, but marking this time
-		   16 set: GC of MallocPtrs
+		   16 set: GC of ForeignObjs
 		   32 set: GC of Concurrent things
 	    */
-#define DEBUG_TRACE_MINOR_GC	2
-#define DEBUG_TRACE_MAJOR_GC	4
-#define DEBUG_TRACE_MARKING	8
-#define DEBUG_TRACE_MALLOCPTRS 16
-#define DEBUG_TRACE_CONCURRENT 32
+#define DEBUG_TRACE_MINOR_GC	 2
+#define DEBUG_TRACE_MAJOR_GC	 4
+#define DEBUG_TRACE_MARKING	 8
+#define DEBUG_TRACE_FOREIGNOBJS 16
+#define DEBUG_TRACE_CONCURRENT  32
 
     rtsBool lazyBlackHoling;
     rtsBool doSelectorsAtGC;
@@ -86,6 +86,13 @@ struct PROFILING_FLAGS {
 # define DESCRchar 'D'
 # define TYPEchar  'Y'
 # define TIMEchar  'T'
+
+    char *ccSelector;
+    char *modSelector;
+    char *grpSelector;
+    char *descrSelector;
+    char *typeSelector;
+    char *kindSelector;
 };
 #endif
 
@@ -113,6 +120,83 @@ struct PAR_FLAGS {
 
 #ifdef GRAN
 struct GRAN_FLAGS {
+    rtsBool granSimStats;  /* Full .gr profile (rtsTrue) or only END events? */
+    rtsBool granSimStats_suppressed; /* No .gr profile at all */
+    rtsBool granSimStats_Binary;
+    rtsBool granSimStats_Sparks;
+    rtsBool granSimStats_Heap;
+    rtsBool labelling;
+    W_	    packBufferSize;
+    W_	    packBufferSize_internal;
+
+    I_ proc;                      /* number of processors */
+    I_ max_fishes;                /* max number of spark or thread steals */
+    TIME time_slice;              /* max time slice of one reduction thread */
+
+    /* Communication Cost Variables -- set in main program */
+    W_ gran_latency;              /* Latency for single packet */
+    W_ gran_additional_latency;   /* Latency for additional packets */
+    W_ gran_fetchtime;            
+    W_ gran_lunblocktime;         /* Time for local unblock */
+    W_ gran_gunblocktime;         /* Time for global unblock */
+    W_ gran_mpacktime;            /* Cost of creating a packet */     
+    W_ gran_munpacktime;	  /* Cost of receiving a packet */    
+    W_ gran_mtidytime;		  /* Cost of cleaning up after send */
+
+    W_ gran_threadcreatetime;     /* Thread creation costs */
+    W_ gran_threadqueuetime;      /* Cost of adding a thread to the running/runnable queue */
+    W_ gran_threaddescheduletime; /* Cost of descheduling a thread */
+    W_ gran_threadscheduletime;   /* Cost of scheduling a thread */
+    W_ gran_threadcontextswitchtime;  /* Cost of context switch  */
+
+    /* Instruction Costs */
+    W_ gran_arith_cost;        /* arithmetic instructions (+,i,< etc) */
+    W_ gran_branch_cost;       /* branch instructions */ 
+    W_ gran_load_cost;         /* load into register */
+    W_ gran_store_cost;        /* store into memory */
+    W_ gran_float_cost;        /* floating point operations */
+
+    W_ gran_heapalloc_cost;    /* heap allocation costs */
+
+    /* Overhead for granularity control mechanisms */
+    /* overhead per elem of spark queue */
+    W_ gran_pri_spark_overhead;
+    /* overhead per elem of thread queue */
+    W_ gran_pri_sched_overhead;
+
+    /* GrAnSim-Light: This version puts no bound on the number of
+         processors but in exchange doesn't model communication costs
+         (all communication is 0 cost). Mainly intended to show maximal
+         degree of parallelism in the program (*not* to simulate the
+         execution on a real machine). */
+   
+    rtsBool Light;
+
+    rtsBool DoFairSchedule ;        /* fair scheduling alg? default: unfair */
+    rtsBool DoReScheduleOnFetch ;   /* async. communication? */
+    rtsBool DoStealThreadsFirst;    /* prefer threads over sparks when stealing */
+    rtsBool SimplifiedFetch;        /* fast but inaccurate fetch modelling */
+    rtsBool DoAlwaysCreateThreads;  /* eager thread creation */
+    rtsBool DoGUMMFetching;         /* bulk fetching */
+    rtsBool DoThreadMigration;      /* allow to move threads */
+    I_      FetchStrategy;          /* what to do when waiting for data */
+    rtsBool PreferSparksOfLocalNodes; /* prefer local over global sparks */
+    rtsBool DoPrioritySparking;     /* sparks sorted by priorities */
+    rtsBool DoPriorityScheduling;   /* threads sorted by priorities */
+    I_      SparkPriority;          /* threshold for cut-off mechanism */
+    I_      SparkPriority2;
+    rtsBool RandomPriorities;
+    rtsBool InversePriorities;
+    rtsBool IgnorePriorities;
+    I_      ThunksToPack;           /* number of thunks in packet + 1 */ 
+    rtsBool RandomSteal;            /* steal spark/thread from random proc */
+    rtsBool NoForward;              /* no forwarding of fetch messages */
+    rtsBool PrintFetchMisses;       /* print number of fetch misses */
+
+    W_	    debug;
+    rtsBool event_trace;
+    rtsBool event_trace_all;
+   
 };
 #endif /* GRAN */
 

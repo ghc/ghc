@@ -1,29 +1,19 @@
 /* stuff to have before we get going */
 MsubNeededHere(ghc)
-#if BuildDataParallelHaskell == YES
-MsubNeededHere(dphc)
-#endif
-LitStuffNeededHere(depend)
+UnlitNeededHere(depend)
 InfoStuffNeededHere(docs)
 
 DYN_LOADABLE_BITS = \
-	ghc-asm-sparc.prl \
-	ghc-asm-solaris.prl \
-	ghc-asm-m68k.prl \
 	ghc-asm.prl \
-	ghc-asm-alpha.prl \
-	ghc-asm-hppa.prl \
-	ghc-asm-mips.prl \
+	ghc-recomp.prl \
+	ghc-iface.prl \
 	ghc-consist.prl \
 	ghc-split.prl
 
 /* Literate-pgmming suffix rules used herein */
-LitSuffixRule(.lprl,.prl)
+UnlitSuffixRule(.lprl,.prl)
 
 MsubMakefileDependentProgramScriptTarget(PerlCmd,ghc,ghc.prl,/*no flags*/,/*Makefile*/)
-#if BuildDataParallelHaskell == YES
-MsubMakefileDependentProgramScriptTarget(PerlCmd,dphc,dphc.prl,,/*Makefile*/)
-#endif
 AllTarget( $(DYN_LOADABLE_BITS) )
 
 /* installation is hackish: because we may want to install w/ a diff name */
@@ -35,13 +25,6 @@ InstallMsubbedScriptTarget(PerlCmd,ghc-v-temp-name,ghc.prl,$(INSTBINDIR_GHC))
 install::
 	$(MV) $(INSTBINDIR_GHC)/ghc-v-temp-name $(INSTBINDIR_GHC)/$(GHC_DRIVER_INST_NAME)
 	$(RM) $(INSTBINDIR_GHC)/ghc-v-temp-name
-
-#if BuildDataParallelHaskell == YES
-InstallMsubbedScriptTarget(PerlCmd,dphc-v-temp-name,dphc.prl,$(INSTBINDIR_GHC))
-install::
-	$(MV) $(INSTBINDIR_GHC)/dphc-v-temp-name $(INSTBINDIR_GHC)/dphc
-	$(RM) $(INSTBINDIR_GHC)/dphc-v-temp-name
-#endif /* DPH */
 
 dyn_loadable_bits : $(DYN_LOADABLE_BITS)
 
@@ -60,5 +43,3 @@ ClearTagsFile()
 
 DYN_LOADABLE_LPRLS = $(DYN_LOADABLE_BITS:.prl=.lprl)
 PerlTagsTarget( ghc.lprl $(DYN_LOADABLE_LPRLS) )
-
-LitDocRootTargetWithNamedOutput(driver,lit,driver-standalone)

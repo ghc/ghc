@@ -85,7 +85,7 @@ extern StgScanFun _ScanLink_MuTuple;
 extern StgScanFun _ScanLink_PI;
 #endif
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 extern StgScanFun _ScanLink_RBH_2_1;
 extern StgScanFun _ScanLink_RBH_3_1;
 extern StgScanFun _ScanLink_RBH_3_3;
@@ -117,10 +117,11 @@ extern StgScanFun _ScanMove_RBH_11;
 extern StgScanFun _ScanMove_RBH_12;
 
 extern StgScanFun _ScanMove_RBH_S;
+#endif /* PAR || GRAN */
 
-#else
-extern StgScanFun _ScanLink_MallocPtr;
-#endif /* PAR */
+#if !defined(PAR) || defined(GRAN)
+extern StgScanFun _ScanLink_ForeignObj;
+#endif
 
 extern StgScanFun _ScanLink_BH_N;
 extern StgScanFun _ScanLink_BH_U;
@@ -158,7 +159,7 @@ extern StgScanFun _ScanMove_PI;
 #endif
 
 #ifndef PAR
-extern StgScanFun _ScanMove_MallocPtr;
+extern StgScanFun _ScanMove_ForeignObj;
 #endif /* !PAR */
 
 extern StgScanFun _ScanMove_ImmuTuple;

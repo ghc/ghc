@@ -25,7 +25,7 @@ StgFloat	&	float				\\
 StgDouble	&	double				\\
 StgChar		&	unsigned char			\\\hline
 StgStablePtr	&	long				\\
-StgMallocPtr	&	(long *)			\\
+StgForeignObj	&	(long *)			\\
 \end{tabular}
 %partain:\end{center}
 
@@ -112,8 +112,8 @@ typedef StgChar	        *StgByteArray;
 typedef StgByteArray	B_;
 
 typedef I_		StgStablePtr;   /* Index into Stable Pointer Table */
-typedef P_		StgMallocPtr;   /* (Probably) Pointer to object in C Heap */
-/* On any architecture, StgMallocPtr should be big enough to hold
+typedef P_		StgForeignObj;  /* (Probably) Pointer to object in C Heap */
+/* On any architecture, StgForeignObj should be big enough to hold
    the largest possible pointer. */
 
 /* These are used to pass the do_full_collection flag to RealPerformGC

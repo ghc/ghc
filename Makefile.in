@@ -31,6 +31,6 @@ Makefile: Makefile.in config.status
 config.status: configure
 	$(SHELL) config.status --recheck
 configure: configure.in
-	cd $(srcdir); autoconf < configure.in > configure.new
+	cd $(srcdir) && autoconf < configure.in > configure.new
 	grep -v '# Generated automatically from' < configure.new > configure
     

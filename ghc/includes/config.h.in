@@ -150,7 +150,7 @@
 /* Define if you have the <termios.h> header file.  */
 #undef HAVE_TERMIOS_H
 
-/* Define if you have the <types.h> header file.  */
+/* Define if you have the <time.h> header file.  */
 #undef HAVE_TIME_H
 
 /* Define if you have the <types.h> header file.  */

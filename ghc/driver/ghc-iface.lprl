@@ -1,0 +1,271 @@
+%************************************************************************
+%*									*
+\section[Driver-iface-thing]{Interface-file handling}
+%*									*
+%************************************************************************
+
+\begin{code}
+sub postprocessHiFile {
+    local($hsc_hi,		# The iface info produced by hsc.
+	  $hifile_target,	# The name both of the .hi file we
+				# already have and which we *might*
+				# replace.
+	  $going_interactive) = @_;
+
+    local($new_hi) = "$Tmp_prefix.hi-new";
+
+#   print STDERR `$Cat $hsc_hi`;
+
+    &constructNewHiFile($hsc_hi, $hifile_target, $new_hi);
+
+    # run diff if they asked for it
+    if ($HiDiff_flag && ! $HiOnStdout && ! $going_interactive && -f $hifile_target) {
+	&run_something("$Cmp -s $hifile_target $new_hi || $Diff $hifile_target $new_hi 1>&2 || exit 0",
+	    "Diff'ing old and new .$HiSuffix files"); # NB: to stderr
+    }
+
+    # if we produced an interface file "no matter what",
+    # print what we got on stderr (ToDo: honor -ohi flag)
+    if ( $HiOnStdout ) {
+	print STDERR `$Cat $new_hi`;
+    } else {
+	&run_something("$Cmp -s $hifile_target $new_hi || ( $Rm $hifile_target && $Cp $new_hi $hifile_target )",
+	   "Replace .$HiSuffix file, if changed");
+    }
+}
+\end{code}
+
+\begin{code}
+sub constructNewHiFile {
+    local($hsc_hi,	    # The iface info produced by hsc.
+	  $hifile_target,   # Pre-existing .hi filename (if it exists)
+	  $new_hi) = @_;    # Filename for new one
+
+    &readHiFile('old',$hifile_target) unless $HiHasBeenRead{'old'} == 1;
+    &readHiFile('new',$hsc_hi)	      unless $HiHasBeenRead{'new'} == 1;
+
+    open(NEWHI, "> $new_hi") || &tidy_up_and_die(1,"Can't open $new_hi (write)\n");
+
+    local($new_module_version) = &calcNewModuleVersion();
+    print NEWHI "interface ", $ModuleName{'new'}, " $new_module_version\n";
+
+    print NEWHI "__usages__\n", $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
+
+    local(@version_keys) = sort (keys %Version);
+    local($num_ver_things) = 0;
+    foreach $v (@version_keys) {
+	next unless $v =~ /^new:(.*$)/;
+	last if $num_ver_things >= 1;
+	$num_ver_things++;
+    }
+
+    print NEWHI "__versions__\n" unless $num_ver_things < 1;
+    foreach $v (@version_keys) {
+	next unless $v =~ /^new:(.*$)/;
+	$v = $1;
+
+	&printNewItemVersion($v, $new_module_version), "\n";
+    }
+
+    print NEWHI "__exports__\n";
+    print NEWHI $Stuff{'new:exports'};
+
+    if ( $Stuff{'new:instance_modules'} ) {
+	print NEWHI "__instance_modules__\n";
+	print NEWHI $Stuff{'new:instance_modules'};
+    }
+
+    if ( $Stuff{'new:fixities'} ) {
+	print NEWHI "__fixities__\n";
+	print NEWHI $Stuff{'new:fixities'};
+    }
+
+    if ( $Stuff{'new:declarations'} ) {
+	print NEWHI "__declarations__\n";
+	print NEWHI $Stuff{'new:declarations'};
+    }
+
+    if ( $Stuff{'new:instances'} ) {
+	print NEWHI "__instances__\n";
+	print NEWHI $Stuff{'new:instances'};
+    }
+
+    if ( $Stuff{'new:pragmas'} ) {
+	print NEWHI "__pragmas__\n";
+	print NEWHI $Stuff{'new:pragmas'};
+    }
+
+    close(NEWHI) || &tidy_up_and_die(1,"Failed writing to $new_hi\n");
+}
+\end{code}
+
+\begin{code}
+%Version = ();
+%Decl	 = (); # details about individual definitions
+%Stuff	 = (); # where we glom things together
+%HiExists      = ('old',-1,  'new',-1); # 1 <=> definitely exists; 0 <=> doesn't
+%HiHasBeenRead = ('old', 0,  'new', 0);
+%ModuleVersion = ('old', 0,  'new', 0);
+
+sub readHiFile {
+    local($mod,		    # module to read; can be special tag 'old'
+			    # (old .hi file for module being compiled) or
+			    # 'new' (new proto-.hi file for...)
+	  $hifile) = @_;    # actual file to read
+
+    # info about the old version of this module's interface
+    $HiExists{$mod}      = -1; # 1 <=> definitely exists; 0 <=> doesn't
+    $HiHasBeenRead{$mod} = 0;
+    $ModuleVersion{$mod} = 0;
+    $Stuff{"$mod:usages"}	    = ''; # stuff glommed together
+    $Stuff{"$mod:exports"}	    = '';
+    $Stuff{"$mod:instance_modules"} = '';
+    $Stuff{"$mod:instances"}	    = '';
+    $Stuff{"$mod:fixities"}	    = '';
+    $Stuff{"$mod:declarations"}	    = '';
+    $Stuff{"$mod:pragmas"}	    = '';
+
+    if (! -f $hifile) { # no pre-existing .hi file
+	$HiExists{$mod} = 0;
+	return();
+    }
+
+    open(HIFILE, "< $hifile") || &tidy_up_and_die(1,"Can't open $hifile (read)\n");
+    $HiExists{$mod} = 1;
+    local($now_in) = '';
+    hi_line: while (<HIFILE>) {
+	next if /^ *$/; # blank line
+
+	# avoid pre-1.3 interfaces
+#print STDERR "now_in:$now_in:$_";
+	if ( /\{-# GHC_PRAGMA INTERFACE VERSION . #-\}/ ) {
+	    $HiExists{$mod} = 0;
+	    last hi_line;
+	}
+
+	if ( /^interface ([A-Z]\S*) (\d+)/ ) {
+	    $ModuleName{$mod}	 = $1; # not sure this is used much...
+	    $ModuleVersion{$mod} = $2;
+
+	} elsif ( /^interface ([A-Z]\S*)/ && $mod eq 'new' ) { # special case: no version
+	    $ModuleName{'new'} = $1;
+
+	} elsif ( /^__([a-z]+)__$/ ) {
+	    $now_in = $1;
+
+	} elsif ( $now_in eq 'usages' && /^(\S+)\s+(\d+)\s+:: (.*)/ ) {
+	    $Stuff{"$mod:usages"} .= $_; # save the whole thing
+
+	} elsif ( $now_in eq 'versions' && /^(\S+) (\d+)/ ) {
+	    local($item) = $1;
+	    local($n)    = $2;
+#print STDERR "version read:item=$item, n=$n, line=$_";
+	    $Version{"$mod:$item"} = $n;
+
+	} elsif ( $now_in eq 'versions' && /^(\S+)/ && $mod eq 'new') { # doesn't have versions
+	    local($item) = $1;
+#print STDERR "new version read:item=$item, line=$_";
+	    $Version{"$mod:$item"} = 'y'; # stub value...
+
+	} elsif ( $now_in =~ /^(exports|instance_modules|instances|fixities|pragmas)$/ ) {
+	    $Stuff{"$mod:$1"} .= $_; # just save it up
+
+	} elsif ( $now_in eq 'declarations' ) { # relatively special treatment needed...
+	    $Stuff{"$mod:declarations"} .= $_; # just save it up
+
+	    if ( /^[A-Z][A-Za-z0-9_']*\.(\S+)\s+::\s+/ ) {
+		$Decl{"$mod:$1"} = $_;
+
+	    } elsif ( /^type\s+[A-Z][A-Za-z0-9_']*\.(\S+)/ ) {
+		$Decl{"$mod:$1"} = $_;
+
+	    } elsif ( /^(newtype|data)\s+(.*\s+=>\s+)?[A-Z][A-Za-z0-9_']*\.(\S+)\s+/ ) {
+		$Decl{"$mod:$3"} = $_;
+
+	    } elsif ( /class\s+(.*\s+=>\s+)?[A-Z][A-Za-z0-9_']*\.(\S+)\s+.*where\s+\{.*\};/ ) {
+		$Decl{"$mod:$2"} = $_; # must be wary of => bit matching after "where"...
+	    } elsif ( /class\s+(.*\s+=>\s+)?[A-Z][A-Za-z0-9_']*\.(\S+)\s+/ ) {
+		$Decl{"$mod:$2"} = $_;
+
+	    } else { # oh, well...
+		print STDERR "$Pgm: decl line didn't match?\n$_";
+	    }
+
+	} else {
+	    print STDERR "$Pgm:junk old iface line?:section:$now_in:$_";
+	}
+    }
+
+#   foreach $i ( sort (keys %Decl)) {
+#	print STDERR "$i: ",$Decl{$i}, "\n";
+#   }
+
+    close(HIFILE) || &tidy_up_and_die(1,"Failed reading from $hifile\n");
+    $HiHasBeenRead{$mod} = 1;
+}
+\end{code}
+
+\begin{code}
+sub calcNewModuleVersion {
+
+    return(&mv_change(1,'no old .hi file')) if $HiExists{'old'} == 0;
+	# could use "time()" as initial version; if a module existed, then was deleted,
+	# then comes back, we don't want the resurrected one to have an
+	# lower version number than the original (in case there are any
+	# lingering references to the original in other .hi files).
+
+    local($unchanged_version) = $ModuleVersion{'old'}; # will return one of these two
+    local($changed_version)   = $unchanged_version + 1;
+
+    return(&mv_change($changed_version,'usages changed')) if $Stuff{'old:usages'} ne $Stuff{'new:usages'};
+
+    foreach $t ( 'exports', 'instance_modules', 'instances', 'fixities', 'declarations', 'pragmas' ) {
+	return(&mv_change($changed_version,"$t changed")) if $Stuff{"old:$t"} ne $Stuff{"new:$t"};
+    }
+
+    return($unchanged_version);
+}
+
+sub mv_change {
+    local($mv, $str) = @_;
+
+    print STDERR "$Pgm: module version changed to $mv; reason: $str\n";
+    return($mv);
+}
+
+sub printNewItemVersion {
+    local($item, $mod_version) = @_;
+
+    if (! defined($Decl{"new:$item"}) ) {
+	print STDERR "$item: no decl?! (nothing into __versions__)\n";
+	return;
+    }
+
+    local($idecl) = $Decl{"new:$item"};
+
+    if (! defined($Decl{"old:$item"})) {
+	print STDERR "new: $item\n";
+	print NEWHI  "$item $mod_version\n";
+    } elsif ($idecl ne $Decl{"old:$item"})  {
+	print STDERR "changed: $item\n";
+	print NEWHI  "$item $mod_version\n";
+    } elsif (! defined($Version{"old:$item"}) ) {
+	print STDERR "$item: no old version?!\n" 
+    } else {
+	print NEWHI  "$item ", $Version{"old:$item"}, "\n";
+    }
+    return;
+}
+\end{code}
+
+\begin{code}
+sub findHiChanges {
+    local($hsc_hi,	        # The iface info produced by hsc.
+	  $hifile_target) = @_; # Pre-existing .hi filename (if it exists)
+}
+\end{code}
+
+\begin{code}
+# make "require"r happy...
+1;
+\end{code}

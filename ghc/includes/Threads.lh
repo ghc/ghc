@@ -9,18 +9,23 @@
 \end{code}
 
 \begin{code}
-#ifndef GRAN 
-#define GRAN_ALLOC_HEAP(n,liveness) 			/* nothing */
-#define GRAN_UNALLOC_HEAP(n,liveness) 			/* nothing */
-#define GRAN_FETCH()					/* nothing */
-#define GRAN_FETCH_AND_RESCHEDULE(liveness)		/* nothing */
-#define GRAN_RESCHEDULE(liveness, reenter)		/* nothing */
-#define GRAN_EXEC(arith,branch,loads,stores,floats)	/* nothing */
-#define GRAN_SPARK()					/* nothing */
-#endif
-\end{code}
+#if defined(GRAN)
 
-\begin{code}
+#define sparkq sparkq 
+#define TYPE_OF_SPARK    struct spark
+#define TYPE_OF_SPARK_PTR sparkq
+#define SIZE_OF_SPARK    (sizeof(TYPE_OF_SPARK))
+
+typedef struct spark
+{
+  struct spark *prev, *next;
+  P_ node;
+  I_ name, global;
+  I_ gran_info;
+} *sparkq;
+
+#endif 
+
 #ifndef CONCURRENT
 
 #define OR_CONTEXT_SWITCH
@@ -54,10 +59,15 @@ extern I_ context_switch;	    	    	/* Flag set by signal handler */
 #define ADVISORY_POOL 	1
 #define SPARK_POOLS 	2
 
-#ifndef GRAN
+#if !defined(GRAN) 
 
-extern PP_ PendingSparksBase[SPARK_POOLS], PendingSparksLim[SPARK_POOLS];
-extern PP_ PendingSparksHd[SPARK_POOLS], PendingSparksTl[SPARK_POOLS];
+#define TYPE_OF_SPARK    PP_
+#define SIZE_OF_SPARK    (sizeof(TYPE_OF_SPARK))
+
+extern TYPE_OF_SPARK PendingSparksBase[SPARK_POOLS], 
+                     PendingSparksLim[SPARK_POOLS];
+extern TYPE_OF_SPARK PendingSparksHd[SPARK_POOLS], 
+                     PendingSparksTl[SPARK_POOLS];
 
 extern I_ SparkLimit[SPARK_POOLS];
 
@@ -70,7 +80,10 @@ IF_RTS(extern void AwaitEvent(I_);)
 
 #else /* GRAN */
 
-extern sparkq PendingSparksHd[][SPARK_POOLS], PendingSparksTl[][SPARK_POOLS];
+extern TYPE_OF_SPARK_PTR PendingSparksBase[][SPARK_POOLS], 
+                         PendingSparksLim[][SPARK_POOLS];
+extern TYPE_OF_SPARK_PTR PendingSparksHd[][SPARK_POOLS], 
+                         PendingSparksTl[][SPARK_POOLS];
 extern P_ RunnableThreadsHd[], RunnableThreadsTl[],
           WaitThreadsHd[], WaitThreadsTl[];
 
@@ -85,7 +98,7 @@ extern P_ RunnableThreadsHd[], RunnableThreadsTl[],
 
 IF_RTS(extern void PruneSparks(STG_NO_ARGS);)
 
-#ifdef GRAN
+#if defined(GRAN)
 
 /* Codes that can be used as params for ReSchedule */
 /* I distinguish them from the values 0/1 in the -UGRAN setup for security */
@@ -94,177 +107,23 @@ IF_RTS(extern void PruneSparks(STG_NO_ARGS);)
 #define SAME_THREAD	11
 #define NEW_THREAD	SAME_THREAD
 #define CHANGE_THREAD	13
+#define END_OF_WORLD    14
 
-#define MAX_PROC (BITS_IN(W_))			/* Maximum number of PEs that can be simulated */
-extern W_ max_proc;
-
-extern W_ IdleProcs, Idlers; 
-
-extern unsigned CurrentProc;
-extern W_ CurrentTime[];
 extern W_ SparksAvail, SurplusThreads;
 
-/* Processor numbers to bitmasks and vice-versa */
-#define MainProc	     0
+extern W_ CurrentTime[];
+extern I_ OutstandingFetches[], OutstandingFishes[];
+extern enum proc_status procStatus[];
 
-#define PE_NUMBER(n)          (1l << (long)n)
-#define ThisPE		      PE_NUMBER(CurrentProc)
-#define MainPE		      PE_NUMBER(MainProc)
-
-#define IS_LOCAL_TO(ga,proc)  ((1l << (long) proc) & ga)
-
-/* These constants should eventually be program parameters */
-
-/* Communication Cost Model (EDS-like), max_proc > 2. */
-
-#define LATENCY		           1000	/* Latency for single packet */
-#define ADDITIONAL_LATENCY	    100	/* Latency for additional packets */
-#define BASICBLOCKTIME	    	     10
-#define FETCHTIME	  	(LATENCY*2+MSGUNPACKTIME)
-#define LOCALUNBLOCKTIME  	     10
-#define GLOBALUNBLOCKTIME 	(LATENCY+MSGUNPACKTIME)
-
-extern W_ gran_latency, gran_additional_latency, gran_fetchtime, 
-          gran_lunblocktime, gran_gunblocktime;
-
-#define	MSGPACKTIME		     0  /* Cost of creating a packet */
-#define	MSGUNPACKTIME		     0  /* Cost of receiving a packet */
-
-extern W_ gran_mpacktime, gran_mtidytime, gran_munpacktime;
-
-/* Thread cost model */
-#define THREADCREATETIME	   (25+THREADSCHEDULETIME)
-#define THREADQUEUETIME		    12  /* Cost of adding a thread to the running/runnable queue */
-#define THREADDESCHEDULETIME	    75  /* Cost of descheduling a thread */
-#define THREADSCHEDULETIME	    75  /* Cost of scheduling a thread */
-#define THREADCONTEXTSWITCHTIME	    (THREADDESCHEDULETIME+THREADSCHEDULETIME)
-
-extern W_ gran_threadcreatetime, gran_threadqueuetime, 
-          gran_threadscheduletime, gran_threaddescheduletime, 
-          gran_threadcontextswitchtime;
-
-/* Instruction Cost model (SPARC, including cache misses) */
-#define ARITH_COST	     	   1
-#define BRANCH_COST	     	   2
-#define LOAD_COST	  	   4
-#define STORE_COST	  	   4
-#define FLOAT_COST		   1 /* ? */
-
-extern W_ gran_arith_cost, gran_branch_cost, 
-          gran_load_cost, gran_store_cost, gran_float_cost,
-          gran_heapalloc_cost;
-
-/* Miscellaneous Parameters */
-extern I_ DoFairSchedule;
-extern I_ DoReScheduleOnFetch;
-extern I_ SimplifiedFetch;
-extern I_ DoStealThreadsFirst;
-extern I_ DoAlwaysCreateThreads;
-extern I_ DoThreadMigration;
-extern I_ DoGUMMFetching;
-extern I_ FetchStrategy;
-extern I_ PreferSparksOfLocalNodes;
-/* These come from debug options -bD? */
-extern I_ NoForward;
-extern I_ PrintFetchMisses, fetch_misses;
-#if defined(COUNT)
-extern I_ nUPDs, nUPDs_old, nUPDs_new, nUPDs_BQ, nPAPs, BQ_lens;
-#endif
-
-extern I_ no_gr_profile;
-extern I_ do_sp_profile;
-
-extern I_ NeedToReSchedule;
-
-extern void GranSimAllocate                PROTO((I_, P_, W_));
-extern void GranSimUnAllocate              PROTO((I_, P_, W_));
-extern I_   GranSimFetch                   PROTO((P_));
-extern void GranSimExec                    PROTO((W_,W_,W_,W_,W_));
-extern void GranSimSpark                   PROTO((W_,P_));
-extern void GranSimBlock                   (STG_NO_ARGS);
-extern void PerformReschedule              PROTO((W_, W_));
-
-#if 0   /* 'ngo Dochmey */
-
-#define GRAN_ALLOC_HEAP(n,liveness)	   STGCALL3(void,(),GranSimAllocate,n,0,0)
-#define GRAN_UNALLOC_HEAP(n,liveness)	   STGCALL3(void,(),GranSimUnallocate,n,0,0)
-
-#define GRAN_FETCH()			   STGCALL1(I_,(),GranSimFetch,Node)
-
-#define GRAN_FETCH_AND_RESCHEDULE(liveness_mask)	\
-	do { if(liveness_mask&LIVENESS_R1)  \
-             STGCALL1(I_,(),GranSimFetch,Node); \
-	     GRAN_RESCHEDULE(liveness_mask,1);	\
-	   } while(0)
-
-#define GRAN_RESCHEDULE(liveness_mask,reenter)	\
-        STGCALL2_GC(void,(),     \
-	         PerformReschedule,liveness_mask,reenter)
-
-#define THREAD_CONTEXT_SWITCH(liveness_mask,reenter)	\
-        do { \
-	if (context_switch /* OR_INTERVAL_EXPIRED */) {	\
-          GRAN_RESCHEDULE(liveness_mask,reenter); \
-        } }while(0)
-
-#define GRAN_EXEC(arith,branch,load,store,floats)	\
-					STGCALL5(void,(),GranSimExec,arith,branch,load,store,floats)
-
-
-#else  /* 1 */ /* chu' Dochmey */
-
-#define GRAN_ALLOC_HEAP(n,liveness)	   \
-	SaveAllStgRegs();		   \
-	GranSimAllocate(n,0,0);            \
-	RestoreAllStgRegs();
-
-#define GRAN_UNALLOC_HEAP(n,liveness)	   \
-	SaveAllStgRegs();		   \
-	GranSimUnallocate(n,0,0); 	   \
-	RestoreAllStgRegs();
-
-#define GRAN_FETCH()			   \
-	SaveAllStgRegs();		   \
-	GranSimFetch(Node);		   \
-	RestoreAllStgRegs();
-
-#define GRAN_FETCH_AND_RESCHEDULE(liveness_mask)	\
-	do { if(liveness_mask&LIVENESS_R1)  		\
-	     SaveAllStgRegs();		   	\
-             GranSimFetch(Node); 			\
-	     RestoreAllStgRegs();			\
-	     GRAN_RESCHEDULE(liveness_mask,1);		\
-	   } while(0)
-
-#define GRAN_RESCHEDULE(liveness_mask,reenter)	\
-        PerformReschedule_wrapper(liveness_mask,reenter)
-
-#define THREAD_CONTEXT_SWITCH(liveness_mask,reenter)	\
-        do { \
-	if (context_switch /* OR_INTERVAL_EXPIRED */) {	\
-          GRAN_RESCHEDULE(liveness_mask,reenter); \
-        } }while(0)
-
-#define GRAN_EXEC(arith,branch,load,store,floats)	\
-	SaveAllStgRegs();		   		\
-	GranSimExec(arith,branch,load,store,floats); 	\
-	RestoreAllStgRegs();
-
-#endif
-	
-
-#define ADD_TO_SPARK_QUEUE(spark)			\
-    SPARK_NEXT(spark) = NULL;				\
-    SPARK_PREV(spark) = PendingSparksTl[CurrentProc][ADVISORY_POOL];	\
-    if (PendingSparksHd[CurrentProc][ADVISORY_POOL] == NULL)		\
-	PendingSparksHd[CurrentProc][ADVISORY_POOL] = spark;		\
-    else						\
-	SPARK_NEXT(PendingSparksTl[CurrentProc][ADVISORY_POOL]) = spark;	\
-    PendingSparksTl[CurrentProc][ADVISORY_POOL] = spark;		\
+#  if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
+# define FETCH_MASK_TSO  0x08000000      /* only bits 0, 1, 2 should be used */
+                                        /* normally */
+extern P_ BlockedOnFetch[];
+#  endif
 
 #endif     /* GRAN */
 
-extern P_ CurrentTSO;	    	    	    	/* thread state object now in use */
+extern P_ CurrentTSO;	    	         /* thread state object now in use */
 
 extern P_ AvailableStack;
 extern P_ AvailableTSO;
@@ -272,13 +131,29 @@ extern P_ AvailableTSO;
 extern I_ threadId;
 
 void ScheduleThreads PROTO((P_ topClosure));
+
 #if defined(GRAN)
+#define OLD_SPARKNAME_MASK        0xffff0000
+#define NEW_SPARKNAME_MASK        0x0000ffff
+
 void ReSchedule PROTO((int what_next)) STG_NORETURN;
-#else
+void add_to_spark_queue PROTO((sparkq));
+int set_sparkname PROTO((P_, int));
+int reset_sparkname PROTO((P_)); 
+I_ spark_queue_len PROTO((PROC, I_));
+sparkq delete_from_spark_queue PROTO((sparkq, sparkq));
+I_ thread_queue_len PROTO((PROC));
+void DisposeSparkQ PROTO((sparkq));
+
+#else /* !GRAN */
+
 void ReSchedule PROTO((int again)) STG_NORETURN;
+
 #endif
+
 void EndThread(STG_NO_ARGS) STG_NORETURN;
 
+/* ToDo: Check if these are still needed -- HWL */
 void QP_Event0 PROTO((I_, P_));
 void QP_Event1 PROTO((char *, P_));
 void QP_Event2 PROTO((char *, P_, P_));
@@ -331,7 +206,8 @@ table for those values).
 #endif
 
 #if defined(GRAN) || defined(PAR)
-#define TSO_GRAN_WORDS 15
+           /* do we really need a whole statistics buffer in PAR setup? HWL*/
+#define TSO_GRAN_WORDS 17
 #else
 #define TSO_GRAN_WORDS 0
 #endif
@@ -385,6 +261,8 @@ table for those values).
 #define TSO_GLOBALSPARKS_LOCN  	(TSO_GRAN_START + 12)
 #define TSO_LOCALSPARKS_LOCN   	(TSO_GRAN_START + 13)
 #define TSO_QUEUE_LOCN   	(TSO_GRAN_START + 14)
+#define TSO_PRI_LOCN	    	(TSO_GRAN_START + 15)
+#define TSO_CLOCK_LOCN	    	(TSO_GRAN_START + 16)
 #endif
 
 #define TSO_LINK(closure)     	    (((PP_)closure)[TSO_LINK_LOCN])
@@ -416,6 +294,9 @@ table for those values).
 #define TSO_GLOBALSPARKS(closure)   (((P_)closure)[TSO_GLOBALSPARKS_LOCN])
 #define TSO_LOCALSPARKS(closure)    (((P_)closure)[TSO_LOCALSPARKS_LOCN])
 #define TSO_QUEUE(closure)	    (((P_)closure)[TSO_QUEUE_LOCN])
+#define TSO_PRI(closure)   	    (((P_)closure)[TSO_PRI_LOCN])
+/* TSO_CLOCK is only needed in GrAnSim-Light */
+#define TSO_CLOCK(closure)   	    (((P_)closure)[TSO_CLOCK_LOCN])
 
 #define TSO_INTERNAL_PTR(closure)	    \
   ((STGRegisterTable *)(((W_)(((P_)closure) \
@@ -451,6 +332,7 @@ Here are the various queues for GrAnSim-type events.
 #define Q_RUNNABLE  'A'
 #define Q_BLOCKED   'R'
 #define Q_FETCHING  'Y'
+#define Q_MIGRATING 'B'
 \end{code}
 
 %************************************************************************
@@ -472,23 +354,33 @@ rtsBool Spark PROTO((P_ closure, rtsBool required));
 #ifdef GRAN   /* For GrAnSim sparks are currently mallocated -- HWL */
 
 void DisposeSpark PROTO((sparkq spark));
+sparkq NewSpark PROTO((P_,I_,I_,I_,I_,I_));
 
-# define MAX_SPARKS		2000  /* For GC Roots Purposes */
-# if defined(GRAN_TNG)
-extern sparkq NewSpark		PROTO((P_,I_,I_,I_));
-# else /* !GRAN_TNG */
-extern sparkq NewSpark		PROTO((P_,I_,I_));
-# endif  /* GRAN_TNG */
+/* # define MAX_EVENTS		1000 */  /* For GC Roots Purposes */
+# define MAX_SPARKS		0        /* i.e. infinite */
 
-# define SPARK_PREV(spark)	(spark->prev)
-# define SPARK_NEXT(spark)    	(sparkq)(spark->next)
+#if defined(GRAN_JSM_SPARKS)
+/* spark is a pointer into some sparkq (which is for JSM sparls just an 
+   array of (struct sparks) */
+
+# define SPARK_PREV(spark)	{ fprintf(stderr,"Error: SPARK_PREV not supported for JSM sparks") \
+                                  EXIT(EXIT_FAILURE); }
+/* NB: SPARK_NEXT may only be used as a rhs but NOT as a lhs */
+# define SPARK_NEXT(spark)    	(spark++)
 # define SPARK_NODE(spark)	(P_)(spark->node)
 # define SPARK_NAME(spark)	(spark->name)
-# if defined(GRAN_TNG)
-#  define SPARK_GRAN_INFO(spark) (spark->gran_info)
-# endif  /* GRAN_TNG */
+# define SPARK_GRAN_INFO(spark) (spark->gran_info)
 # define SPARK_GLOBAL(spark)	(spark->global)
 # define SPARK_EXPORTED(spark)	(SPARK_GLOBAL(spark) > 1)
+#else
+# define SPARK_PREV(spark)	(spark->prev)
+# define SPARK_NEXT(spark)    	(sparkq)(spark->next)
+# define SPARK_NODE(spark)	(spark->node)
+# define SPARK_NAME(spark)	(spark->name)
+# define SPARK_GRAN_INFO(spark) (spark->gran_info)
+# define SPARK_GLOBAL(spark)	(spark->global)
+# define SPARK_EXPORTED(spark)	(SPARK_GLOBAL(spark) > 1)
+#endif
 
 #endif      /* GRAN */
 \end{code}

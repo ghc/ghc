@@ -49,7 +49,7 @@ extern F_ _PRStart_MuTuple(STG_NO_ARGS);
 extern F_ _PRStart_PI(STG_NO_ARGS);
 #endif
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 extern F_ _PRStart_RBH_0(STG_NO_ARGS);
 extern F_ _PRStart_RBH_1(STG_NO_ARGS);
 extern F_ _PRStart_RBH_2(STG_NO_ARGS);
@@ -66,9 +66,11 @@ extern F_ _PRStart_RBH_12(STG_NO_ARGS);
 extern F_ _PRStart_RBH_N(STG_NO_ARGS);
 extern F_ _PRStart_FetchMe(STG_NO_ARGS);
 extern F_ _PRStart_BF(STG_NO_ARGS);
-#else
-extern F_ _PRStart_MallocPtr(STG_NO_ARGS);
-#endif /* PAR */
+#endif /* PAR || GRAN */
+
+#if !defined(PAR) || defined(GRAN)
+extern F_ _PRStart_ForeignObj(STG_NO_ARGS);
+#endif
 
 #if defined(CONCURRENT)
 extern F_ _PRStart_StkO(STG_NO_ARGS);
@@ -117,7 +119,7 @@ extern F_ _PRIn_I_Dyn(STG_NO_ARGS);
 extern F_ _PRIn_I_Tuple(STG_NO_ARGS);
 extern F_ _PRIn_I_MuTuple(STG_NO_ARGS);
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 extern F_ _PRIn_BF(STG_NO_ARGS);
 extern F_ _PRIn_RBH_0(STG_NO_ARGS);
 extern F_ _PRIn_RBH_1(STG_NO_ARGS);
@@ -133,9 +135,11 @@ extern F_ _PRIn_RBH_10(STG_NO_ARGS);
 extern F_ _PRIn_RBH_11(STG_NO_ARGS);
 extern F_ _PRIn_RBH_12(STG_NO_ARGS);
 extern F_ _PRIn_RBH_I(STG_NO_ARGS);
-#else
-extern F_ _PRIn_I_MallocPtr(STG_NO_ARGS);
-#endif /* PAR */
+#endif /* PAR || GRAN */
+
+#if !defined(PAR) || defined(GRAN)
+extern F_ _PRIn_I_ForeignObj(STG_NO_ARGS);
+#endif
 
 extern F_ _PRIn_Error(STG_NO_ARGS);
 

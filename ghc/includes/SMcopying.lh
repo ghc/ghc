@@ -84,7 +84,7 @@ extern StgScavFun _Scavenge_Data;
 extern StgEvacFun _Evacuate_MuTuple;
 extern StgScavFun _Scavenge_MuTuple;
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 extern StgEvacFun _Evacuate_RBH_2;
 extern StgEvacFun _Evacuate_RBH_3;
 extern StgEvacFun _Evacuate_RBH_4;
@@ -117,10 +117,13 @@ extern StgScavFun _Scavenge_RBH_12_12;
 extern StgScavFun _Scavenge_RBH_N;
 extern StgScavFun _Scavenge_FetchMe;
 extern StgScavFun _Scavenge_BF;
-#else
-extern StgEvacFun _Evacuate_MallocPtr;
-extern StgScavFun _Scavenge_MallocPtr;
+#endif /* PAR || GRAN */
+
+#if !defined(PAR) || defined(GRAN)
+extern StgEvacFun _Evacuate_ForeignObj;
+extern StgScavFun _Scavenge_ForeignObj;
 #endif /* PAR */
+
 
 extern StgEvacFun _Evacuate_BH_N;
 extern StgScavFun _Scavenge_BH_N;

@@ -506,71 +506,75 @@ they will hear about it soon enough (WDP 95/05).
 
 %************************************************************************
 %*									*
-\subsubsection[MallocPtr-closures]{@MallocPtr@ closure macros}
+\subsubsection[ForeignObj-closures]{@ForeignObj@ closure macros}
 %*									*
 %************************************************************************
 
-Here's what a MallocPtr looks like:
+Here's what a ForeignObj looks like:
 
 \begin{verbatim}
             <Var  Hdr> 
-+----------+----------+------+------+
-| Info Ptr | Forward  | Data | List |
-+----------+----------+------+------+
++----------+----------+------+-------------+------+
+| Info Ptr | Forward  | Data | FreeRoutine | List |
++----------+----------+------+-------------+------+
 \end{verbatim}
 
-The list is a pointer to the next MallocPtr in the list of all
-MallocPtrs.  Note that it is essential that the garbage collector {\em
+@List@ is a pointer to the next ForeignObj in the list of all
+ForeignObjs.  Note that it is essential that the garbage collector {\em
 not\/} follow this link but that the link must get updated with the
 new address.
 
 The optional @Forward@ field is used by copying collectors to insert
 the forwarding pointer into.  (If we overwrite the @Data@ part, we
-don't know which MallocPtr has just died; if we overwrite the @List@ part,
-we can't traverse the list of all MallocPtrs.)
+don't know which ForeignObj has just died; if we overwrite the @List@ part,
+we can't traverse the list of all ForeignObjs.)
+
+The @FreeRoutine@ is a reference to the finalisation routine to call
+when the @ForeignObj@ becomes garbage -- SOF 4/96
 
 \begin{code}
 #if !defined(PAR)
 
 # if defined(_INFO_COPYING)
-#  define MallocPtr_VHS				1
+#  define ForeignObj_VHS			1
 # else
-#  define MallocPtr_VHS				0
+#  define ForeignObj_VHS			0
 # endif
 
-# define MallocPtr_HS			(FIXED_HS + MallocPtr_VHS)
-# define MallocPtr_SIZE			(MallocPtr_VHS + 2)
+# define ForeignObj_HS			(FIXED_HS + ForeignObj_VHS)
+# define ForeignObj_SIZE		(ForeignObj_VHS + 3)
 
-# define MallocPtr_CLOSURE_NoPTRS(closure)  0
-# define MallocPtr_CLOSURE_DATA(closure)    (((StgMallocPtr *)(closure))[MallocPtr_HS + 0])
-# define MallocPtr_CLOSURE_LINK(closure)    (((StgPtrPtr) (closure))[MallocPtr_HS + 1])
+# define ForeignObj_CLOSURE_NoPTRS(closure)     0
+# define ForeignObj_CLOSURE_DATA(closure)       (((StgForeignObj *)(closure))[ForeignObj_HS + 0])
+# define ForeignObj_CLOSURE_FINALISER(closure)  (((StgForeignObj *)(closure))[ForeignObj_HS + 1])
+# define ForeignObj_CLOSURE_LINK(closure)       (((StgPtrPtr) (closure))[ForeignObj_HS + 2])
 
-# define SET_MallocPtr_HDR(closure,infolbl,cc,size,ptrs) \
+# define SET_ForeignObj_HDR(closure,infolbl,cc,size,ptrs) \
 					SET_FIXED_HDR(closure,infolbl,cc)
 \end{code}
 
-And to check that a Malloc ptr closure is valid
+And to check that a Foreign ptr closure is valid
 
 \begin{code}
-EXTDATA_RO(MallocPtr_info);
+EXTDATA_RO(ForeignObj_info);
 
 # if defined(DEBUG)
 
-#  define CHECK_MallocPtr_CLOSURE( closure ) \
+#  define CHECK_ForeignObj_CLOSURE( closure ) \
 do {                                       \
-  CHECK_MallocPtr_InfoTable( closure );    \
+  CHECK_ForeignObj_InfoTable( closure );    \
 } while (0)
 
-#  define CHECK_MallocPtr_InfoTable( closure ) \
-  ASSERT( (*((PP_)(closure))) == MallocPtr_info )
+#  define CHECK_ForeignObj_InfoTable( closure ) \
+  ASSERT( (*((PP_)(closure))) == ForeignObj_info )
 
-extern void Validate_MallocPtrList( P_ MPlist );
-#  define VALIDATE_MallocPtrList( mplist ) Validate_MallocPtrList( mplist )
+extern void Validate_ForeignObjList( P_ MPlist );
+#  define VALIDATE_ForeignObjList( mplist ) Validate_ForeignObjList( mplist )
 
 # else /* !DEBUG */
 
-#  define CHECK_MallocPtr_CLOSURE( closure ) /* nothing */
-#  define VALIDATE_MallocPtrList( mplist ) /* nothing */
+#  define CHECK_ForeignObj_CLOSURE( closure ) /* nothing */
+#  define VALIDATE_ForeignObjList( mplist ) /* nothing */
 
 # endif /* !DEBUG */
 #endif /* !PAR */
@@ -812,8 +816,8 @@ variable header):
 #define DATA_CLOSURE_NoPTRS(closure)    ((I_)0)
 #define DATA_CLOSURE_NoNONPTRS(closure) (DATA_CLOSURE_SIZE(closure) - DATA_VHS)
 
-#define SET_DATA_HDR(closure,infolbl,cc,size,ptrs/*==0*/) 	\
-	{ SET_FIXED_HDR(closure,infolbl,cc);			\
+#define SET_DATA_HDR(closure,infolbl,cc,size,ptrs) 	\
+	{ SET_FIXED_HDR(closure,infolbl,cc);		\
 	  DATA_CLOSURE_SIZE(closure) = (W_)(size); }
 \end{code}
 

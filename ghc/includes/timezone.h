@@ -21,8 +21,8 @@
 #else 
 #if HAVE_TZNAME
 extern time_t timezone, altzone;
-extern char *tmzone[2];
-#define ZONE(x)	    	 (((struct tm *)x)->tm_isdst ? tmzone[1] : tmzone[0])
+extern char *tzname[2];
+#define ZONE(x)	    	 (((struct tm *)x)->tm_isdst ? tzname[1] : tzname[0])
 #define SETZONE(x,z)
 #define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone)
 #endif

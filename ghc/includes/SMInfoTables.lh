@@ -96,8 +96,8 @@ It can have the following values (defined in CostCentre.lh):
   A black hole.
   \item[@ARR_K@]
   An array.
-  \item[@MP_K@]
-  A Malloc Pointer.
+  \item[@ForeignObj_K@]
+  A Foreign object (non-Haskell heap resident).
   \item[@SPT_K@]
   The Stable Pointer table.  (There should only be one of these but it
   represents a form of weak space leak since it can't shrink to meet
@@ -336,7 +336,7 @@ Otherwise, we add the RBH info table pointer to the end of the normal
 info table and vice versa.
 
 \begin{code}
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 # define RBH_INFO_OFFSET	    (GEN_INFO_OFFSET+GEN_INFO_WORDS)
 
 # define INCLUDE_SPEC_PADDING				\
@@ -363,7 +363,12 @@ info table and vice versa.
 
 EXTFUN(RBH_entry);
 P_ convertToRBH PROTO((P_ closure));
+#if defined(GRAN)
+void convertFromRBH PROTO((P_ closure));
+#elif defined(PAR)
 void convertToFetchMe PROTO((P_ closure, globalAddr *ga));
+#endif
+
 #endif
 \end{code}
 
@@ -711,7 +716,7 @@ MAYBE_DECLARE_RTBL(Spec_S,12,12)
 			     CAT2(_ScanMove_,size),CAT2(_PRIn_,ptrs))		\
 	}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 # define SPEC_U_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
     entry_localness(CAT2(RBH_,entry_code));    	\
     localness W_ infolbl[];			\
@@ -873,7 +878,7 @@ Compacting: only the PRStart (marking) routine needs to be special.
 
 \begin{code}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 # define SELECT_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,select_word_i,kind,descr,type) \
     entry_localness(CAT2(RBH_,entry_code));    	\
     localness W_ infolbl[];			\
@@ -1000,7 +1005,7 @@ MAYBE_DECLARE_RTBL(Gen_S,,)
 	INCLUDE_COMPACTING_INFO(_ScanLink_S_N,_PRStart_N,_ScanMove_S,_PRIn_I)	\
 	}
 
-#ifdef PAR
+#if defined(PAR) || defined(GRAN)
 # define GEN_U_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
     entry_localness(CAT2(RBH_,entry_code));    	\
     localness W_ infolbl[];			\
@@ -1274,7 +1279,7 @@ MAYBE_DECLARE_RTBL(Static,,)
 
 %************************************************************************
 %*									*
-\subsection[MallocPtr_ITBL]{@MallocPtr_TBL@: @MallocPtr@ info-table}
+\subsection[ForeignObj_ITBL]{@ForeignObj_TBL@: @ForeignObj@ info-table}
 %*									*
 %************************************************************************
 
@@ -1287,25 +1292,25 @@ I'm assuming @SPEC_N@, so that we don't need to pad out the info table. (JSM)
 \begin{code}
 #if !defined(PAR)
 
-# define MallocPtr_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
+# define ForeignObj_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
     CAT_DECLARE(infolbl,kind,descr,type)	\
     entry_localness(entry_code);		\
     localness W_ infolbl[] = {			\
         (W_) entry_code				\
 	,(W_) tag				\
-	,(W_) MK_REP_REF(MallocPtr,,)		\
+	,(W_) MK_REP_REF(ForeignObj,,)		\
 	INCLUDE_PROFILING_INFO(infolbl)		\
     }
 
-MAYBE_DECLARE_RTBL(MallocPtr,,)
+MAYBE_DECLARE_RTBL(ForeignObj,,)
 
-# define MallocPtr_RTBL() \
-    const W_ MK_REP_LBL(MallocPtr,,)[] = { \
+# define ForeignObj_RTBL() \
+    const W_ MK_REP_LBL(ForeignObj,,)[] = { \
 	INCLUDE_TYPE_INFO(INTERNAL)				\
-	INCLUDE_SIZE_INFO(MallocPtr_SIZE, 0L)   		\
+	INCLUDE_SIZE_INFO(ForeignObj_SIZE, 0L)   		\
 	INCLUDE_PAR_INFO					\
-	INCLUDE_COPYING_INFO(_Evacuate_MallocPtr,_Scavenge_MallocPtr) 	\
-	SPEC_COMPACTING_INFO(_ScanLink_MallocPtr,_PRStart_MallocPtr,_ScanMove_MallocPtr,_PRIn_0) \
+	INCLUDE_COPYING_INFO(_Evacuate_ForeignObj,_Scavenge_ForeignObj) 	\
+	SPEC_COMPACTING_INFO(_ScanLink_ForeignObj,_PRStart_ForeignObj,_ScanMove_ForeignObj,_PRIn_0) \
 	}
 
 #endif /* !PAR */
@@ -1737,7 +1742,7 @@ during a return.
 
 /* Declare the phantom info table vectors (just Bool at the moment) */
 #ifndef COMPILING_GHC
-EXTDATA_RO(Bool_itblvtbl);
+EXTDATA_RO(Prelude_Bool_itblvtbl);
 #endif
 
 \end{code}

@@ -349,8 +349,8 @@ data StateAndFloat#  s     = StateAndFloat#  (State# s) Float#
 data StateAndDouble# s     = StateAndDouble# (State# s) Double#  
 data StateAndAddr#   s     = StateAndAddr#   (State# s) Addr#
 
-data StateAndStablePtr# s a = StateAndStablePtr# (State# s) (StablePtr# a)
-data StateAndMallocPtr# s   = StateAndMallocPtr# (State# s) MallocPtr#
+data StateAndStablePtr# s a = StateAndStablePtr#  (State# s) (StablePtr# a)
+data StateAndForeignObj# s  = StateAndForeignObj# (State# s) ForeignObj#
 data StateAndSynchVar#  s a = StateAndSynchVar#  (State# s) (SynchVar# a)
 
 data StateAndArray#            s elt = StateAndArray#        (State# s) (Array# elt) 
@@ -461,47 +461,68 @@ deRefStablePointer# :: StablePtr# a -> State# _RealWorld -> StateAndPtr _RealWor
 @
 There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
 
-\subsubsection{``Malloc'' pointers}
+%
+% Rewritten and updated for MallocPtr++ -- 4/96 SOF
+%
+\subsubsection{Foreign objects}
 
-A ``malloc'' pointer is an ordinary pointer from outside the Haskell world
-(i.e., from the C world) where the Haskell world has been told ``Let me
+A \tr{ForeignObj} is a reference to an object outside the Haskell
+world (i.e., from the C world, or a reference to an object on another
+machine completely.), where the Haskell world has been told ``Let me
 know when you're finished with this ...''.
 
-The ``malloc'' pointer type is just a special @Addr#@ ({\em not} parameterised).
+The \tr{ForeignObj} type is just a special @Addr#@ ({\em not} parameterised).
 @
-type MallocPtr#
-@
-{\em ToDo: say more about this and how it's used...}
-
-The main point is that when Haskell discards a 
-value of type @MallocPtr#@, it calls the procedure @FreeMallocPtr@, which
-must be provided by the C world.  @FreeMallocPtr@ might in turn call
-the GHC-provided procedure @FreeStablePtr@, to deallocate a stable pointer.
-No other GHC runtime system procedures should be called by @FreeMallocPtr@.
-
-(Implementation: a linked list of all @MallocPtr#@s is maintained to allow the
-garbage collector to detect when a @MallocPtr#@ becomes garbage.)
-
-Like @Array@, @MallocPtr#@s are represented by heap objects.
-
-{\bf ToDo --- Important:} Ian Poole reports a need for functions to return a list of
-CHPs.  Should we add a @CHeapPtrArray@ type too? or just
-hack something up?
-
-The only Haskell operation we might want on @MallocPtr#@s is an
-equality test.  However, this is easily implemented if desired:
-@
->	eqCHP x y = (_runST (_ccall_ equal x y) == 1::Int)
-
-C>	equal (x, y)
-C>	{
-C>	return (x == y ? 1 : 0);
-C>	}
+type ForeignObj#
 @
 
-The C world must provide a function @FreeCHeapPointer@ which
-will be called (with a C Heap pointer as argument) when the garbage
-collector releases a CHP.
+A typical use of \tr{ForeignObj} is in constructing Haskell bindings
+to external libraries. A good example is that of writing a binding to
+an image-processing library (which was actually the main motivation
+for implementing \tr{ForeignObj}'s precursor, \tr{MallocPtr}). The
+images manipulated are not stored in the Haskell heap, either because
+the library insist on allocating them internally or we (sensibly)
+decide to spare the GC from having to heave heavy images around.
+
+@
+data Image = Image ForeignObj#
+
+instance _CCallable Image
+@
+
+The \tr{ForeignObj#} type is then used to refer to the externally
+allocated image, and to acheive some type safety, the Haskell binding
+defines the @Image@ data type. So, a value of type \tr{ForeignObj#} is
+used to ``box'' up an external reference into a Haskell heap object
+that we can then indirectly reference:
+
+@
+createImage :: (Int,Int) -> PrimIO Image
+@
+
+So far, this looks just like an @Addr#@ type, but \tr{ForeignObj#}
+offers a bit more, namely that we can specify a {\em finalisation
+routine} to invoke when the \tr{ForeignObj#} is discarded by the
+GC. The garbage collector invokes the finalisation routine associated
+with the \tr{ForeignObj#}, saying `` Thanks, I'm through with this
+now..'' For the image-processing library, the finalisation routine could for
+the images free up memory allocated for them. The finalisation routine has
+currently to be written in C (the finalisation routine can in turn call on
+@FreeStablePtr@ to deallocate a stable pointer.).
+
+Associating a finalisation routine with an external object is done by 
+\tr{makeForeignObj#}:
+
+@
+makeForeignObj# :: Addr# -- foreign reference
+                -> Addr# -- pointer to finalisation routine
+		-> StateAndForeignObj# _RealWorld ForeignObj#
+@
+
+(Implementation: a linked list of all @ForeignObj#@s is maintained to allow the
+ garbage collector to detect when a @ForeignObj#@ becomes garbage.)
+
+Like @Array@, @ForeignObj#@s are represented by heap objects.
 
 {\bf ToDo:} Decide whether @FreeCHeapPointer@ is allowed to call on a
 stable pointer. (I sincerely hope not since we will still be in the
@@ -803,14 +824,14 @@ writeCharArray  :: Ix ix => _MutableByteArray s ix -> ix -> Char -> _ST s ()
 
 @
 freezeArray :: Ix ix => _MutableArray s ix elt -> _ST s (Array ix elt)
-freezeCharArray :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix Char)
+freezeCharArray :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 ...
 @
 
 We have no need on one-function-per-type for unsafe freezing:
 @
 unsafeFreezeArray :: Ix ix => _MutableArray s ix elt -> _ST s (Array ix elt)  
-unsafeFreezeByteArray :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix elt)
+unsafeFreezeByteArray :: Ix ix => _MutableByteArray s ix -> _ST s (_ByteArray ix)
 @
 
 Sometimes we want to snaffle the bounds of one of these beasts:
@@ -854,11 +875,13 @@ makeStablePointer :: a -> _StablePtr a
 freeStablePointer :: _StablePtr a -> PrimIO ()
 @
 
-\subsection{``Malloc'' pointers}
+\subsection{Foreign objects}
 
 Again, just boxing up.
 @
-data _MallocPtr = _MallocPtr MallocPtr#
+data _ForeignObj = _ForeignObj ForeignObj#
+
+makeForeignObj :: _Addr -> _Addr -> PrimIO _ForeignObj
 @
 
 \subsection{C calls}
@@ -899,22 +922,22 @@ table summarises (including the standard boxed-primitive types):
 Boxed	    	    Type of transferd  	Corresp.     Which is
 Type	    	    Prim. component 	C type       *probably*...
 ------	    	    --------------- 	------       -------------
-Char	    	    Char#		StgChar	     unsigned char
-Int 	    	    Int#		StgInt	     long int
-_Word	    	    Word#		StgWord	     unsigned long int
-_Addr	    	    Addr#		StgAddr	     char *
-Float	    	    Float#		StgFloat     float
-Double		    Double#		StgDouble    double
+Char	    	    Char#		StgChar	      unsigned char
+Int 	    	    Int#		StgInt	      long int
+_Word	    	    Word#		StgWord	      unsigned long int
+_Addr	    	    Addr#		StgAddr	      char *
+Float	    	    Float#		StgFloat      float
+Double		    Double#		StgDouble     double
 
-Array		    Array#		StgArray     StgPtr
-_ByteArray	    ByteArray#		StgByteArray StgPtr
-_MutableArray	    MutableArray#	StgArray     StgPtr
-_MutableByteArray   MutableByteArray#	StgByteArray StgPtr
+Array		    Array#		StgArray      StgPtr
+_ByteArray	    ByteArray#		StgByteArray  StgPtr
+_MutableArray	    MutableArray#	StgArray      StgPtr
+_MutableByteArray   MutableByteArray#	StgByteArray  StgPtr
 
 _State		    State#		nothing!
 
-_StablePtr	    StablePtr#		StgStablePtr StgPtr
-_MallocPtr	    MallocPtr#		StgMallocPtr StgPtr
+_StablePtr	    StablePtr#		StgStablePtr  StgPtr
+_ForeignObj	    ForeignObj#		StgForeignObj StgPtr
 @
 
 All of the above are {\em C-returnable} except:
@@ -959,8 +982,10 @@ are stored on the heap.
 
 ... details omitted ...
 
-More importantly, it must construct a C Heap Pointer heap-object after
-a @_ccall_@ which returns a @MallocPtr#@.
+%
+%More importantly, it must construct a C Heap Pointer heap-object after
+%a @_ccall_@ which returns a @MallocPtr#@.
+%
 
 %--------------------------------------------------------
 \section{Non-primitive stuff that must be wired into GHC}
@@ -977,7 +1002,7 @@ data Integer = J# Int# Int# ByteArray#
 
 -- and the other boxed-primitive types:
     Array, _ByteArray, _MutableArray, _MutableByteArray,
-    _StablePtr, _MallocPtr
+    _StablePtr, _ForeignObj
 
 data Bool     = False | True
 data CMP_TAG# = LT# | EQ# | GT#  -- used in derived comparisons

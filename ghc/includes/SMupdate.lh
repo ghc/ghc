@@ -348,7 +348,7 @@ EXTFUN(UpdatePAP);
     (IS_MUTABLE(INFO_PTR(closure)) && MUT_LINK(closure) != MUT_NOT_LINKED)
 
 # if defined(GRAN)
-extern I_ AwakenBlockingQueue PROTO((P_));
+extern P_ AwakenBlockingQueue PROTO((P_));
 # else
 extern void AwakenBlockingQueue PROTO((P_));
 # endif

@@ -54,10 +54,10 @@ typedef struct {
 #endif
 
 #ifndef PAR
-    P_ MallocPtrList;     /* List of all Malloc Pointers (in new generation) */
+    P_ ForeignObjList;     /* List of all Foreign objects (in new generation) */
 
 #if defined(GCap) || defined(GCgn)
-    P_ OldMallocPtrList;  /* List of all Malloc Pointers in old generation */
+    P_ OldForeignObjList;  /* List of all Foreign objects in old generation */
 #endif
 
     P_ StablePointerTable;
@@ -82,9 +82,8 @@ Answer: They're on the heap in a "Stable Pointer Table". (ADR)
 #else
 # ifndef PAR
 #   ifdef GRAN
-#    define SM_MAXROOTS (10 + (MAX_PROC*4) + 2 + (MAX_PROC*2) + MAX_SPARKS)
-				/* unthreaded + spark/thread queues + Current/Main TSOs
-				   + events + sparks */
+#    define SM_MAXROOTS (10 + (MAX_PROC*2) + 2 )
+		     /* unthreaded + hd/tl thread queues + Current/Main TSOs */
 #   else
 #     define SM_MAXROOTS 5      /* See c-as-asm/HpOverflow.lc */
 #   endif
@@ -150,7 +149,7 @@ roots.  If we are using Appel's collector it also initialises the
 @OldLim@ field.
 
 In the sequential system, it also initialises the stable pointer table
-and the @MallocPtr@ (and @OldMallocPtrList@) fields.
+and the @ForeignObjList@ (and @OldForeignObjList@) fields.
 
 @collectHeap@ invokes the garbage collector that was requested at
 compile time. @reqsize@ is the size of the request (in words) that
@@ -197,9 +196,9 @@ B stack arising from any update frame ``squeezing'' [sequential only].
 \item The elements of @CAFlist@ and the stable pointers will be
 updated to point to the new locations of the closures they reference.
 
-\item Any members of @MallocPtrList@ which became garbage should have
-been reported (by calling @FreeMallocPtr@; and the @(Old)MallocPtrList@
-updated to contain only those Malloc Pointers which are still live.
+\item Any members of @ForeignObjList@ which became garbage should have
+been reported (by calling their finalising routines; and the @(Old)ForeignObjList@
+updated to contain only those Foreign objects which are still live.
 \end{itemize}
 
 \end{description}
@@ -433,7 +432,7 @@ same, but without the saved SuA pointer.
 We store the following information concerning the stacks in a global
 structure. (sequential only).
 \begin{code}
-#ifndef CONCURRENT
+#if 1 /* ndef CONCURRENT * /? HWL */
 
 typedef struct {
     PP_	botA;	/* Points to bottom-most word of A stack */
@@ -470,7 +469,7 @@ in the info-table.
 #define _INFO_MARKING
 
 #else
-/* NO_INFO_SPECIFIED (ToDo: an #error ???) */
+/* NO_INFO_SPECIFIED (ToDo: an #error ?) */
 #endif
 #endif
 #endif

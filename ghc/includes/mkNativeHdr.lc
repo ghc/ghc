@@ -42,8 +42,8 @@
 #define SM_CAFLIST OFFSET(StorageMgrInfo, StorageMgrInfo.CAFlist)
 #define SM_OLDMUTABLES OFFSET(StorageMgrInfo, StorageMgrInfo.OldMutables)
 #define SM_OLDLIM OFFSET(StorageMgrInfo, StorageMgrInfo.OldLim)
-#define SM_MALLOCPTRLIST OFFSET(StorageMgrInfo, StorageMgrInfo.MallocPtrList)
-#define SM_OLDMALLOCPTRLIST OFFSET(StorageMgrInfo, StorageMgrInfo.OldMallocPtrList)
+#define SM_FOREIGNOBJLIST OFFSET(StorageMgrInfo, StorageMgrInfo.ForeignObjList)
+#define SM_OLDFOREIGNOBJLIST OFFSET(StorageMgrInfo, StorageMgrInfo.OldForeignObjList)
 #define SM_STABLEPOINTERTABLE OFFSET(StorageMgrInfo, StorageMgrInfo.StablePointerTable)
 
 STGRegisterTable MainRegTable;
@@ -98,9 +98,9 @@ main()
     printf("#define SM_OLDLIM %d\n", SM_OLDLIM);
 #endif
 #ifndef PAR
-    printf("#define SM_MALLOCPTRLIST %d\n", SM_MALLOCPTRLIST);
+    printf("#define SM_FOREIGNOBJLIST %d\n", SM_FOREIGNOBJLIST);
 #if defined(GCap) || defined(GCgn)
-    printf("#define SM_OLDMALLOCPTRLIST %d\n", SM_OLDMALLOCPTRLIST);
+    printf("#define SM_OLDFOREIGNOBJLIST %d\n", SM_OLDFOREIGNOBJLIST);
 #endif
     printf("#define SM_STABLEPOINTERTABLE %d\n", SM_STABLEPOINTERTABLE);
 #endif

@@ -52,7 +52,7 @@ This is a bug just as surely as a ``panic.'' Please report it.
 \item[``Some confusion about a value specialised to a type...''  Huh???]
 (A deeply obscure and unfriendly error message.)
 
-This message crops up when the typechecker is sees a reference in an
+This message crops up when the typechecker sees a reference in an
 interface pragma to a specialisation of an overloaded value
 (function); for example, \tr{elem} specialised for type \tr{[Char]}
 (\tr{String}).  The problem is: it doesn't {\em know} that such a

@@ -7,44 +7,241 @@
 %*									*
 %************************************************************************
 
+Dummy definitions if we are not compiling for GrAnSim.
+
 \begin{code}
-#ifdef GRAN
+#ifndef GRAN 
+#define GRAN_ALLOC_HEAP(n,liveness) 			/* nothing */
+#define GRAN_UNALLOC_HEAP(n,liveness) 			/* nothing */
+#define GRAN_FETCH()					/* nothing */
+#define GRAN_FETCH_AND_RESCHEDULE(liveness)		/* nothing */
+#define GRAN_RESCHEDULE(liveness, reenter)		/* nothing */
+#define GRAN_EXEC(arith,branch,loads,stores,floats)	/* nothing */
+#define GRAN_SPARK()					/* nothing */
+#endif
+\end{code}
 
-#  define IS_IDLE(proc)	((IdleProcs & PE_NUMBER((long)proc)) != 0l)
-#  define ANY_IDLE	(Idlers > 0)
-#  define MAKE_IDLE(proc) do { if(!IS_IDLE(proc)) { ++Idlers; IdleProcs |= PE_NUMBER(proc);  } } while(0)
-#  define MAKE_BUSY(proc) do { if(IS_IDLE(proc))  { --Idlers; IdleProcs &= ~PE_NUMBER(proc); } } while(0)
+First the basic types specific to GrAnSim.
 
-/* Event Types */
-#  define STARTTHREAD     0	/* Start a newly created thread */
-#  define CONTINUETHREAD  1     /* Continue running the first thread in the queue */
-#  define RESUMETHREAD    2     /* Resume a previously running thread */
-#  define MOVESPARK       3     /* Move a spark from one PE to another */
-#  define MOVETHREAD      4     /* Move a thread from one PE to another */
-#  define FINDWORK        5     /* Search for work */
-#  define FETCHNODE       6     /* Fetch a node */
-#  define FETCHREPLY      7     /* Receive a node */
+\begin{code}
+#if defined(GRAN)
+#define GRANSIMSTATS_BINARY   RTSflags.GranFlags.granSimStats_Binary
+#elif defined(PAR)
+#define GRANSIMSTATS_BINARY   RTSflags.ParFlags.granSimStats_Binary
+#endif
 
-#  define EVENT_PROC(evt)	(evt->proc)
-#  define EVENT_CREATOR(evt)	(evt->creator)
-#  define EVENT_TIME(evt)	(evt->time)
-#  define EVENT_TYPE(evt)	(evt->evttype)
-#  define EVENT_TSO(evt)	(evt->tso)
-#  define EVENT_NODE(evt)	(evt->node)
-#  define EVENT_SPARK(evt)	(evt->spark)
-#  define EVENT_NEXT(evt)	(eventq)(evt->next)
+#ifdef PAR
+ullong msTime(STG_NO_ARGS);
+#  define CURRENT_TIME msTime()
+#  define TIME_ON_PROC(p) msTime()
 
-#endif /* GRAN */
+#  define CURRENT_PROC thisPE
+#endif
+
+#if defined(GRAN)
+
+#if !defined(COMPILING_GHC)
+#include "RtsFlags.h"
+#endif
+
+#  define CURRENT_TIME CurrentTime[CurrentProc]
+#  define TIME_ON_PROC(p) CurrentTime[p]
+#  define CURRENT_PROC CurrentProc
+#endif
 
 #if defined(GRAN) || defined(PAR)
-void DumpGranEvent PROTO((enum gran_event_types name, P_ tso));
-void DumpSparkGranEvent PROTO((enum gran_event_types name, W_ id));
-void DumpGranEventAndNode PROTO((enum gran_event_types name, P_ tso, P_ node, PROC proc));
-void DumpRawGranEvent PROTO((PROC pe, enum gran_event_types name, W_ id));
-void DumpGranInfo PROTO((PROC pe, P_ tso, rtsBool mandatory_thread));
-void grterminate PROTO((TIME v));
 
-# ifdef GRAN
+/* Granularity event types for output (see DumpGranEvent) */
+enum gran_event_types {
+    GR_START = 0, GR_STARTQ, 
+    GR_STEALING, GR_STOLEN, GR_STOLENQ, 
+    GR_FETCH, GR_REPLY, GR_BLOCK, GR_RESUME, GR_RESUMEQ,
+    GR_SCHEDULE, GR_DESCHEDULE,
+    GR_END,
+    SP_SPARK, SP_SPARKAT, SP_USED, SP_PRUNED, SP_EXPORTED, SP_ACQUIRED,
+    GR_ALLOC,
+    GR_TERMINATE,
+    GR_SYSTEM_START, GR_SYSTEM_END,            /* only for debugging */
+    GR_EVENT_MAX
+};
+
+/* Prototypes of functions needed both in GRAN and PAR setup */
+void DumpGranEvent PROTO((enum gran_event_types name, P_ tso));
+void DumpRawGranEvent PROTO((PROC proc, PROC p, enum gran_event_types name, P_ tso, P_ node, I_ len));
+void DumpStartEventAt PROTO((TIME time, PROC proc, PROC p, enum gran_event_types name,
+			     P_ tso, P_ node, I_ len));
+void DumpGranInfo PROTO((PROC proc, P_ tso, rtsBool mandatory_thread));
+void DumpTSO PROTO((P_ tso));
+
+void grterminate PROTO((TIME v));
+void grputw PROTO((TIME v));
+
+extern unsigned CurrentProc;
+    /* I have no idea what this is supposed to be in the PAR case WDP 96/03 */
+
+#endif  /* GRAN || PAR */
+
+/* ----------  The rest of this file is GRAN only  ---------- */
+
+#if defined(GRAN)
+rtsBool any_idle PROTO((STG_NO_ARGS));
+int     idlers   PROTO((STG_NO_ARGS));
+
+enum proc_status {
+  Idle = 0,             /* empty threadq */
+  Sparking,             /* non-empty sparkq; FINDWORK has been issued */
+  Starting,             /* STARTTHREAD has been issue */
+  Fetching,             /* waiting for remote data (only if block-on-fetch) */
+  Fishing,              /* waiting for remote spark/thread */
+  Busy                  /* non-empty threadq, with head of queue active */
+};
+
+typedef struct event {
+  PROC proc;            /* Processor id */
+  PROC creator;         /* Processor id of PE that created the event */
+  EVTTYPE evttype;      /* Event type */
+  TIME time;            /* Time at which event happened */
+  P_ tso;               /* Associated TSO, if relevant, Nil_closure otherwise*/
+  P_ node;              /* Associated node, if relevant, Nil_closure otherwise*/
+  sparkq spark;         /* Associated SPARK, if relevant, NULL otherwise */
+  I_  gc_info;          /* Counter of heap objects to mark (used in GC only)*/
+  struct event *next;
+  } *eventq;
+
+/* Macros for accessing components of the event structure */ 
+#define EVENT_PROC(evt)	(evt->proc)
+#define EVENT_CREATOR(evt)	(evt->creator)
+#define EVENT_TIME(evt)	(evt->time)
+#define EVENT_TYPE(evt)	(evt->evttype)
+#define EVENT_TSO(evt)	(evt->tso)
+#define EVENT_NODE(evt)	(evt->node)
+#define EVENT_SPARK(evt)	(evt->spark)
+#define EVENT_GC_INFO(evt) (evt->gc_info)
+#define EVENT_NEXT(evt)	(eventq)(evt->next)
+
+/* Maximum number of PEs that can be simulated */
+#define MAX_PROC (BITS_IN(W_))
+
+#if 0
+extern W_ IdleProcs, Idlers; 
+#endif
+
+/* Processor numbers to bitmasks and vice-versa */
+#define MainProc	     0           /* Id of main processor */
+#define MAX_PRI              10000       /* max possible priority */
+#define MAIN_PRI             MAX_PRI     /* priority of main thread */ 
+
+/* GrAnSim uses IdleProcs as bitmask to indicate which procs are idle */
+#define PE_NUMBER(n)          (1l << (long)n)
+#define ThisPE		      PE_NUMBER(CurrentProc)
+#define MainPE		      PE_NUMBER(MainProc)
+#define Everywhere	      (~0l)
+#define Nowhere	              (0l)
+
+#define IS_LOCAL_TO(ga,proc)  ((1l << (long) proc) & ga)
+
+#define GRAN_TIME_SLICE       1000        /* max time between 2 ReSchedules */
+
+#if 1
+
+#define IS_IDLE(proc)        (procStatus[proc] == Idle)
+#define IS_SPARKING(proc)    (procStatus[proc] == Sparking)
+#define IS_STARTING(proc)    (procStatus[proc] == Starting)
+#define IS_FETCHING(proc)    (procStatus[proc] == Fetching)
+#define IS_FISHING(proc)     (procStatus[proc] == Fishing)
+#define IS_BUSY(proc)        (procStatus[proc] == Busy)    
+#define ANY_IDLE             (any_idle())
+#define MAKE_IDLE(proc)      do { procStatus[proc] = Idle; } while(0)
+#define MAKE_SPARKING(proc)  do { procStatus[proc] = Sparking; } while(0)
+#define MAKE_STARTING(proc)  do { procStatus[proc] = Starting; } while(0)
+#define MAKE_FETCHING(proc)  do { procStatus[proc] = Fetching; } while(0)
+#define MAKE_FISHING(proc)   do { procStatus[proc] = Fishing; } while(0)
+#define MAKE_BUSY(proc)      do { procStatus[proc] = Busy; } while(0)
+
+#else 
+
+#define IS_IDLE(proc)	((IdleProcs & PE_NUMBER((long)proc)) != 0l)
+#define ANY_IDLE	(Idlers > 0)
+#define MAKE_IDLE(proc) do { \
+                          if (!IS_IDLE(proc)) { \
+                            ++Idlers; \
+			    IdleProcs |= PE_NUMBER(proc); \
+			    procStatus[proc] = Idle; \
+			  } \
+                        } while(0)
+#define MAKE_BUSY(proc) do { \
+			  if (IS_IDLE(proc)) { \
+			    --Idlers; \
+			    IdleProcs &= ~PE_NUMBER(proc); \
+			    procStatus[proc] = Busy; \
+                          } \
+                        } while(0)
+#endif
+
+/* Number of last event type */
+#define MAX_EVENT       9
+ 
+/* Event Types (internal use only) */
+#define STARTTHREAD     0     /* Start a newly created thread */
+#define CONTINUETHREAD  1     /* Continue running the first thread in the queue */
+#define RESUMETHREAD    2     /* Resume a previously running thread */
+#define MOVESPARK       3     /* Move a spark from one PE to another */
+#define MOVETHREAD      4     /* Move a thread from one PE to another */
+#define FINDWORK        5     /* Search for work */
+#define FETCHNODE       6     /* Fetch a node */
+#define FETCHREPLY      7     /* Receive a node */
+#define GLOBALBLOCK     8     /* Block a TSO on a remote node */
+#define UNBLOCKTHREAD   9     /* Make a TSO runnable */
+
+#if defined(GRAN_CHECK)
+/* Prototypes of GrAnSim debugging functions */
+void G_PRINT_NODE(P_);
+void G_TREE(P_); 
+void G_INFO_TABLE(P_);
+void G_CURR_THREADQ(I_);
+void G_THREADQ(P_, I_);
+void G_TSO(P_, I_);
+void G_EVENT(eventq, I_);
+void G_EVENTQ(I_);
+void G_PE_EQ(PROC, I_);
+void G_SPARK(sparkq, I_);
+void G_SPARKQ(sparkq, I_);
+void G_CURR_SPARKQ(I_);
+void G_PROC(I_, I_);
+void GP(I_);
+void GCP();
+void GT(P_);
+void GCT();
+void GEQ();
+void GTQ(PROC);
+void GCTQ();
+void GSQ(PROC);
+void GCSQ();
+void GN(P_);
+void GIT(P_);
+void pC(P_);
+void DN(P_);
+void DIT(P_);
+void DT(P_);
+/* void DS(P_); */
+#endif
+
+/* Interface to event queues */
+extern eventq EventHd;             /* global event queue */
+extern char *event_names[];
+eventq get_next_event PROTO(());
+TIME get_time_of_next_event PROTO(());
+void newevent PROTO((PROC proc, PROC creator, TIME time, EVTTYPE
+			    evttype, P_	tso, P_ node, sparkq spark));
+void prepend_event PROTO((eventq event));
+eventq grab_event PROTO((STG_NO_ARGS));
+void print_event PROTO((eventq event));
+void print_eventq PROTO((eventq hd));
+void print_spark PROTO((sparkq spark));
+void print_sparkq PROTO((sparkq hd));
+
+/* void DumpPruneEvent PROTO((PROC proc, sparkq spark)); */
+
 I_ SaveSparkRoots PROTO((I_));
 I_ SaveEventRoots PROTO((I_));
 
@@ -53,19 +250,179 @@ I_ RestoreEventRoots PROTO((I_));
 
 IF_RTS(int init_gr_simulation PROTO((int, char **, int, char **));)
 IF_RTS(void end_gr_simulation(STG_NO_ARGS);)
-# endif
 
-# ifdef PAR
-ullong msTime(STG_NO_ARGS);
-#  define CURRENT_TIME msTime()
+/* These constants are defaults for the RTS flags of GranSim */
 
-#  define CURRENT_PROC thisPE
+/* Communication Cost Model (EDS-like), max_proc > 2. */
 
-# else	/* GRAN */
+#define LATENCY		           1000	/* Latency for single packet */
+#define ADDITIONAL_LATENCY	    100	/* Latency for additional packets */
+#define BASICBLOCKTIME	    	     10
+#define FETCHTIME	  	(LATENCY*2+MSGUNPACKTIME)
+#define LOCALUNBLOCKTIME  	     10
+#define GLOBALUNBLOCKTIME 	(LATENCY+MSGUNPACKTIME)
 
-#  define CURRENT_TIME CurrentTime[CurrentProc]
-#  define CURRENT_PROC CurrentProc
-# endif
+#define	MSGPACKTIME		     0  /* Cost of creating a packet */
+#define	MSGUNPACKTIME		     0  /* Cost of receiving a packet */
+#define MSGTIDYTIME                  0  /* Cost of cleaning up after send */
+
+#define MAX_FISHES                   1  /* max no. of outstanding spark steals */
+/* How much to increase GrAnSims internal packet size if an overflow 
+   occurs.
+   NB: This is a GrAnSim internal variable and is independent of the
+   simulated packet buffer size.
+*/
+
+#define GRANSIM_DEFAULT_PACK_BUFFER_SIZE     200
+#define REALLOC_SZ                           50
+
+/* extern W_ gran_mpacktime, gran_mtidytime, gran_munpacktime; */
+
+/* Thread cost model */
+#define THREADCREATETIME	   (25+THREADSCHEDULETIME)
+#define THREADQUEUETIME		    12  /* Cost of adding a thread to the running/runnable queue */
+#define THREADDESCHEDULETIME	    75  /* Cost of descheduling a thread */
+#define THREADSCHEDULETIME	    75  /* Cost of scheduling a thread */
+#define THREADCONTEXTSWITCHTIME	    (THREADDESCHEDULETIME+THREADSCHEDULETIME)
+
+/* Instruction Cost model (SPARC, including cache misses) */
+#define ARITH_COST	     	   1
+#define BRANCH_COST	     	   2
+#define LOAD_COST	  	   4
+#define STORE_COST	  	   4
+#define FLOAT_COST		   1 /* ? */
+
+#define HEAPALLOC_COST             11
+
+#define PRI_SPARK_OVERHEAD    5
+#define PRI_SCHED_OVERHEAD    5
+
+/* Miscellaneous Parameters */
+extern rtsBool DoFairSchedule;
+extern rtsBool DoReScheduleOnFetch;
+extern rtsBool SimplifiedFetch;
+extern rtsBool DoStealThreadsFirst;
+extern rtsBool DoAlwaysCreateThreads;
+extern rtsBool DoThreadMigration;
+extern rtsBool DoGUMMFetching;
+extern I_ FetchStrategy;
+extern rtsBool PreferSparksOfLocalNodes;
+extern rtsBool DoPrioritySparking, DoPriorityScheduling;
+extern I_ SparkPriority, SparkPriority2, ThunksToPack;
+/* These come from debug options -bD? */
+extern rtsBool NoForward;
+extern rtsBool PrintFetchMisses;
+
+extern TIME TimeOfNextEvent, EndOfTimeSlice; /* checked from the threaded world! */
+extern I_ avoidedCS; /* Unused!! ToDo: Remake libraries and nuke this var */
+extern rtsBool IgnoreEvents; /* HACK only for testing */
+
+#if defined(GRAN_CHECK)
+/* Variables for gathering misc statistics */
+extern I_ tot_low_pri_sparks;
+extern I_ rs_sp_count, rs_t_count, ntimes_total, fl_total, no_of_steals;
+extern I_ tot_packets, tot_packet_size, tot_cuts, tot_thunks,
+          tot_sq_len, tot_sq_probes,  tot_sparks, withered_sparks,
+          tot_add_threads, tot_tq_len, non_end_add_threads;
+#endif 
+
+extern I_ fetch_misses;
+#if defined(GRAN_COUNT)
+extern I_ nUPDs, nUPDs_old, nUPDs_new, nUPDs_BQ, nPAPs, BQ_lens;
+#endif
+
+extern FILE *gr_file;
+/* extern rtsBool no_gr_profile; */
+/* extern rtsBool do_sp_profile; */ 
+
+extern rtsBool NeedToReSchedule;
+
+void GranSimAllocate                PROTO((I_ n, P_ node, W_ liveness));
+void GranSimUnAllocate              PROTO((I_ n, P_ node, W_ liveness));
+I_   GranSimFetch                   PROTO((P_ node));
+void GranSimExec                    PROTO((W_ ariths, W_ branches, W_ loads, W_ stores, W_ floats));
+void GranSimSpark                   PROTO((W_ local, P_ node));
+void GranSimSparkAt                 PROTO((sparkq spark, P_ where, I_ identifier));
+void GranSimSparkAtAbs              PROTO((sparkq spark, PROC proc, I_ identifier));
+void GranSimBlock                   PROTO((P_ tso, PROC proc, P_ node));
+void PerformReschedule              PROTO((W_, rtsBool));
+
+#define GRAN_ALLOC_HEAP(n,liveness)	   \
+	GranSimAllocate_wrapper(n,0,0);
+
+#define GRAN_UNALLOC_HEAP(n,liveness)	   \
+	GranSimUnallocate_wrapper(n,0,0);
+
+#if 0 
+
+#define GRAN_FETCH()			   \
+	GranSimFetch_wrapper(Node);
+
+#define GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter)	\
+	do { if(liveness_mask&LIVENESS_R1)  		        \
+	     SaveAllStgRegs();		   	                \
+             GranSimFetch(Node); 			        \
+	     PerformReschedule(liveness_mask,reenter);	        \
+	     RestoreAllStgRegs();			        \
+	   } while(0)
+
+#define GRAN_RESCHEDULE(liveness_mask,reenter)	\
+        PerformReschedule_wrapper(liveness_mask,reenter)
+
+#else
+
+#define GRAN_FETCH()			   /*nothing */
+
+#define GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter)	\
+	do { if(liveness_mask&LIVENESS_R1)  		        \
+	     SaveAllStgRegs();		   	                \
+             GranSimFetch(Node); 			        \
+	     PerformReschedule(liveness_mask,reenter);	        \
+	     RestoreAllStgRegs();			        \
+	   } while(0)
+
+#define GRAN_RESCHEDULE(liveness_mask,reenter)	 GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter)
 
 #endif
+
+#define THREAD_CONTEXT_SWITCH(liveness_mask,reenter)	\
+        do { \
+	if (context_switch /* OR_INTERVAL_EXPIRED */) {	\
+          GRAN_RESCHEDULE(liveness_mask,reenter); \
+        } }while(0)
+
+#if 0
+
+#define GRAN_EXEC(arith,branch,load,store,floats)       \
+        GranSimExec_wrapper(arith,branch,load,store,floats);
+
+#else
+
+#define GRAN_EXEC(arith,branch,load,store,floats)       \
+        { \
+          W_ cost = RTSflags.GranFlags.gran_arith_cost*arith +   \
+                    RTSflags.GranFlags.gran_branch_cost*branch + \
+                    RTSflags.GranFlags.gran_load_cost*load +   \
+                    RTSflags.GranFlags.gran_store_cost*store +   \
+                    RTSflags.GranFlags.gran_float_cost*floats;   \
+          TSO_EXECTIME(CurrentTSO) += cost;                      \
+          CurrentTime[CurrentProc] += cost;                      \
+        }
+
+#endif
+               
+#define GRAN_YIELD(liveness)                                   \
+        do {                                                   \
+          if ( (CurrentTime[CurrentProc]>=EndOfTimeSlice) ||   \
+               ((CurrentTime[CurrentProc]>=TimeOfNextEvent) && \
+	        (TimeOfNextEvent!=0) && !IgnoreEvents )) {     \
+	    DO_GRAN_YIELD(liveness);                           \
+	  }                                                    \
+	} while (0);
+
+#define ADD_TO_SPARK_QUEUE(spark)	      \
+   STGCALL1(void,(),add_to_spark_queue,spark) \
+
+#endif  /* GRAN */
+	
 \end{code}

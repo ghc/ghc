@@ -53,6 +53,12 @@ declared in the module. If no group is specified it defaults to the
 module name.
 \end{description}
 
+In addition to the \tr{-prof} option your system might be setup to
+enable you to compile and link with the \tr{-prof-details}
+\index{\tr{-prof-details option}} option instead. This enables
+additional detailed counts to be reported with the \tr{-P} RTS option.
+%-prof-details should also enable age profiling if we get it going again ...
+
 %Alternative profiling semantics have also been implemented. To use
 %these the runtime system and prelude libraries must have been built
 %for the alternative profiling setup. This is done using a particular

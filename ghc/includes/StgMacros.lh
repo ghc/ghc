@@ -54,7 +54,15 @@ Mere abbreviations:
 General things; note: general-but-``machine-dependent'' macros are
 given in \tr{StgMachDeps.lh}.
 \begin{code}
-#define STG_MAX(a,b)	(((a)>=(b)) ? (a) : (b))
+I_ STG_MAX PROTO((I_, I_)); /* GCC -Wall loves prototypes */
+
+extern STG_INLINE
+I_
+STG_MAX(I_ a, I_ b) { return((a >= b) ? a : b); }
+/* NB: the naive #define macro version of STG_MAX
+   can lead to exponential CPP explosion, if you
+   have very-nested STG_MAXes.
+*/
 
 /*
 Macros to combine two short words into a single
@@ -1012,10 +1020,10 @@ which uses these anyway.)
 
 #if ! defined(__GNUC__) || ! defined(__STG_GCC_REGS__)
 
-extern void	    ASSIGN_DBL PROTO((W_ [], StgDouble));
-extern StgDouble    PK_DBL     PROTO((W_ []));
-extern void	    ASSIGN_FLT PROTO((W_ [], StgFloat));
-extern StgFloat	    PK_FLT     PROTO((W_ []));
+void	    ASSIGN_DBL PROTO((W_ [], StgDouble));
+StgDouble   PK_DBL     PROTO((W_ []));
+void	    ASSIGN_FLT PROTO((W_ [], StgFloat));
+StgFloat    PK_FLT     PROTO((W_ []));
 
 #else /* yes, its __GNUC__ && we really want them */
 
@@ -1035,6 +1043,12 @@ extern StgFloat	    PK_FLT     PROTO((W_ []));
     } )
 
 #else /* ! sparc */
+
+/* (not very) forward prototype declarations */
+void	    ASSIGN_DBL PROTO((W_ [], StgDouble));
+StgDouble   PK_DBL     PROTO((W_ []));
+void	    ASSIGN_FLT PROTO((W_ [], StgFloat));
+StgFloat    PK_FLT     PROTO((W_ []));
 
 extern STG_INLINE
 void
@@ -1291,14 +1305,14 @@ void newArrZh_init PROTO((P_ result, I_ n, P_ init));
 %************************************************************************
 
 \begin{code}
-ED_(Nil_closure);
+ED_(Prelude_Z91Z93_closure);
 
 #define newSynchVarZh(r, hp) 				\
 {							\
   ALLOC_PRIM(MUTUPLE_HS,3,0,MUTUPLE_HS+3) /* ticky ticky */; \
   CC_ALLOC(CCC,MUTUPLE_HS+3,ARR_K); /* cc prof */	\
   SET_SVAR_HDR(hp,EmptySVar_info,CCC);			\
-  SVAR_HEAD(hp) = SVAR_TAIL(hp) = SVAR_VALUE(hp) = Nil_closure;	\
+  SVAR_HEAD(hp) = SVAR_TAIL(hp) = SVAR_VALUE(hp) = Prelude_Z91Z93_closure;	\
   r = hp;						\
 }
 \end{code}
@@ -1311,17 +1325,17 @@ extern void Yield PROTO((W_));
 #define takeMVarZh(r, liveness, node)    		\
 {							\
   while (INFO_PTR(node) != (W_) FullSVar_info) {	\
-    if (SVAR_HEAD(node) == Nil_closure) 	    	\
+    if (SVAR_HEAD(node) == Prelude_Z91Z93_closure) 	    	\
       SVAR_HEAD(node) = CurrentTSO; 	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(SVAR_TAIL(node)) = CurrentTSO;	    	\
-    TSO_LINK(CurrentTSO) = (P_) Nil_closure;	    	\
+    TSO_LINK(CurrentTSO) = (P_) Prelude_Z91Z93_closure;	    	\
     SVAR_TAIL(node) = CurrentTSO;   	    	    	\
     DO_YIELD(liveness << 1);				\
   } 	    	    	    	    	    	    	\
   SET_INFO_PTR(node, EmptySVar_info);			\
   r = SVAR_VALUE(node);	    	    	    	    	\
-  SVAR_VALUE(node) = Nil_closure;   	    	    	\
+  SVAR_VALUE(node) = Prelude_Z91Z93_closure;   	    	    	\
 }
 
 #else
@@ -1336,7 +1350,7 @@ extern void Yield PROTO((W_));
   } 	    	    	    	    	    	    	\
   SET_INFO_PTR(node, EmptySVar_info);			\
   r = SVAR_VALUE(node);	    	    	    	    	\
-  SVAR_VALUE(node) = Nil_closure;   	    	    	\
+  SVAR_VALUE(node) = Prelude_Z91Z93_closure;   	    	    	\
 }
 
 #endif
@@ -1364,18 +1378,18 @@ extern void Yield PROTO((W_));
   SET_INFO_PTR(node, FullSVar_info);			\
   SVAR_VALUE(node) = value; 	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Nil_closure) {    	    	    	\
+  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
     if (DO_QP_PROF) 	    	    	    	    	\
       STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
-    if (ThreadQueueHd == Nil_closure)   	    	\
+    if (ThreadQueueHd == Prelude_Z91Z93_closure)   	    	\
       ThreadQueueHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(ThreadQueueTl) = tso;  	    	\
     ThreadQueueTl = tso;	    	    	    	\
     SVAR_HEAD(node) = TSO_LINK(tso);  	    	    	\
-    TSO_LINK(tso) = (P_) Nil_closure; 	    	    	\
-    if(SVAR_HEAD(node) == (P_) Nil_closure)   	    	\
-      SVAR_TAIL(node) = (P_) Nil_closure;	    	\
+    TSO_LINK(tso) = (P_) Prelude_Z91Z93_closure; 	    	    	\
+    if(SVAR_HEAD(node) == (P_) Prelude_Z91Z93_closure)   	    	\
+      SVAR_TAIL(node) = (P_) Prelude_Z91Z93_closure;	    	\
   } 	    	    	    	    	    	    	\
 }
 
@@ -1393,18 +1407,18 @@ extern void Yield PROTO((W_));
   SET_INFO_PTR(node, FullSVar_info);			\
   SVAR_VALUE(node) = value; 	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Nil_closure) {    	    	    	\
+  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
     if (DO_QP_PROF) 	    	    	    	    	\
       STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
-    if (RunnableThreadsHd == Nil_closure)   	    	\
+    if (RunnableThreadsHd == Prelude_Z91Z93_closure)   	    	\
       RunnableThreadsHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(RunnableThreadsTl) = tso;  	    	\
     RunnableThreadsTl = tso;	    	    	    	\
     SVAR_HEAD(node) = TSO_LINK(tso);  	    	    	\
-    TSO_LINK(tso) = (P_) Nil_closure; 	    	    	\
-    if(SVAR_HEAD(node) == (P_) Nil_closure)   	    	\
-      SVAR_TAIL(node) = (P_) Nil_closure;	    	\
+    TSO_LINK(tso) = (P_) Prelude_Z91Z93_closure; 	    	    	\
+    if(SVAR_HEAD(node) == (P_) Prelude_Z91Z93_closure)   	    	\
+      SVAR_TAIL(node) = (P_) Prelude_Z91Z93_closure;	    	\
   } 	    	    	    	    	    	    	\
 }
 
@@ -1434,11 +1448,11 @@ extern void Yield PROTO((W_));
 #define readIVarZh(r, liveness, node)			\
 {							\
   if (INFO_PTR(node) != (W_) ImMutArrayOfPtrs_info) {	\
-    if (SVAR_HEAD(node) == Nil_closure) 	    	\
+    if (SVAR_HEAD(node) == Prelude_Z91Z93_closure) 	    	\
       SVAR_HEAD(node) = CurrentTSO; 	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(SVAR_TAIL(node)) = CurrentTSO;	    	\
-    TSO_LINK(CurrentTSO) = (P_) Nil_closure;	    	\
+    TSO_LINK(CurrentTSO) = (P_) Prelude_Z91Z93_closure;	    	\
     SVAR_TAIL(node) = CurrentTSO;   	    	    	\
     DO_YIELD(liveness << 1);				\
   } 	    	    	    	    	    	    	\
@@ -1481,12 +1495,12 @@ extern void Yield PROTO((W_));
     EXIT(EXIT_FAILURE);	    	    	    	    	\
   } 	    	    	    	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Nil_closure) {    	    	    	\
-    if (ThreadQueueHd == Nil_closure)   	    	\
+  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
+    if (ThreadQueueHd == Prelude_Z91Z93_closure)   	    	\
       ThreadQueueHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(ThreadQueueTl) = tso;  	    	\
-    while(TSO_LINK(tso) != Nil_closure) {   	    	\
+    while(TSO_LINK(tso) != Prelude_Z91Z93_closure) {   	    	\
       if (DO_QP_PROF)	    	    	    	    	\
         STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
       tso = TSO_LINK(tso);  	    	    	    	\
@@ -1513,12 +1527,12 @@ extern void Yield PROTO((W_));
     EXIT(EXIT_FAILURE);	    	    	    	    	\
   } 	    	    	    	    	    	    	\
   tso = SVAR_HEAD(node);    	    	    	    	\
-  if (tso != (P_) Nil_closure) {    	    	    	\
-    if (RunnableThreadsHd == Nil_closure)   	    	\
+  if (tso != (P_) Prelude_Z91Z93_closure) {    	    	    	\
+    if (RunnableThreadsHd == Prelude_Z91Z93_closure)   	    	\
       RunnableThreadsHd = tso;    	    	    	\
     else    	    	    	    	    	    	\
       TSO_LINK(RunnableThreadsTl) = tso;  	    	\
-    while(TSO_LINK(tso) != Nil_closure) {   	    	\
+    while(TSO_LINK(tso) != Prelude_Z91Z93_closure) {   	    	\
       if (DO_QP_PROF)	    	    	    	    	\
         STGCALL3(void,(void *, char *, P_, P_),QP_Event2,do_qp_prof > 1 ? "RA" : "RG",tso,CurrentTSO);	\
       tso = TSO_LINK(tso);  	    	    	    	\
@@ -1568,12 +1582,12 @@ extern void Yield PROTO((W_));
 
 #define delayZh(liveness, us)				\
   {							\
-    if (WaitingThreadsTl == Nil_closure)		\
+    if (WaitingThreadsTl == Prelude_Z91Z93_closure)		\
       WaitingThreadsHd = CurrentTSO;			\
     else						\
       TSO_LINK(WaitingThreadsTl) = CurrentTSO;		\
     WaitingThreadsTl = CurrentTSO;			\
-    TSO_LINK(CurrentTSO) = Nil_closure;			\
+    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;			\
     TSO_EVENT(CurrentTSO) = (W_) ((us) < 1 ? 1 : (us)); \
     DO_YIELD(liveness << 1);				\
   }
@@ -1593,24 +1607,55 @@ extern void Yield PROTO((W_));
 
 /* ToDo: something for GRAN */
 
-#define waitZh(liveness, fd)				\
+#define waitReadZh(liveness, fd)			\
   {							\
-    if (WaitingThreadsTl == Nil_closure)		\
+    if (WaitingThreadsTl == Prelude_Z91Z93_closure)		\
       WaitingThreadsHd = CurrentTSO;			\
     else						\
       TSO_LINK(WaitingThreadsTl) = CurrentTSO;		\
     WaitingThreadsTl = CurrentTSO;			\
-    TSO_LINK(CurrentTSO) = Nil_closure;			\
+    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;			\
     TSO_EVENT(CurrentTSO) = (W_) (-(fd));		\
     DO_YIELD(liveness << 1);				\
   }
 
 #else
 
-#define waitZh(liveness, fd)				\
+#define waitReadZh(liveness, fd)			\
   {							\
     fflush(stdout); 	    	    	    	    	\
-    fprintf(stderr, "wait#: unthreaded build.\n");    	\
+    fprintf(stderr, "waitRead#: unthreaded build.\n"); 	\
+    EXIT(EXIT_FAILURE);	    	    	    	    	\
+  }
+
+#endif
+
+#ifdef CONCURRENT
+
+/* ToDo: something for GRAN */
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif  HAVE_SYS_TYPES_H */
+
+#define waitWriteZh(liveness, fd)			\
+  {							\
+    if (WaitingThreadsTl == Prelude_Z91Z93_closure)		\
+      WaitingThreadsHd = CurrentTSO;			\
+    else						\
+      TSO_LINK(WaitingThreadsTl) = CurrentTSO;		\
+    WaitingThreadsTl = CurrentTSO;			\
+    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;			\
+    TSO_EVENT(CurrentTSO) = (W_) (-(fd+FD_SETSIZE));	\
+    DO_YIELD(liveness << 1);				\
+  }
+
+#else
+
+#define waitWriteZh(liveness, fd)			\
+  {							\
+    fflush(stdout); 	    	    	    	    	\
+    fprintf(stderr, "waitWrite#: unthreaded build.\n"); \
     EXIT(EXIT_FAILURE);	    	    	    	    	\
   }
 
@@ -1806,6 +1851,7 @@ do {								    \
 								    \
   newSP = SPT_POP(StorageMgrInfo.StablePointerTable);		    \
   SPT_SPTR(StorageMgrInfo.StablePointerTable, newSP) = unstablePtr; \
+  CHECK_SPT_CLOSURE( StorageMgrInfo.StablePointerTable );           \
   stablePtr = newSP;						    \
 } while (0)
 
@@ -1864,52 +1910,99 @@ Anything with tag >= 0 is in WHNF, so we discard it.
 \begin{code}
 #ifdef CONCURRENT
 
-ED_(Nil_closure);
+ED_(Prelude_Z91Z93_closure);
 ED_(True_closure);
 
 #if defined(GRAN)
-#define parZh(r,hp,node,rest)				\
-	PARZh(r,hp,node,rest,0,0)
+#define parZh(r,node)				\
+	PARZh(r,node,1,0,0,0,0,0)
 
-#define parAtZh(r,hp,node,where,identifier,rest)	\
-	parATZh(r,hp,node,where,identifier,rest,1)
+#define parAtZh(r,node,where,identifier,gran_info,size_info,par_info,rest) \
+	parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,1)
 
-#define parAtForNowZh(r,hp,node,where,identifier,rest)	\
-	parATZh(r,hp,node,where,identifier,rest,0)
+#define parAtAbsZh(r,node,proc,identifier,gran_info,size_info,par_info,rest) \
+	parATZh(r,node,proc,identifier,gran_info,size_info,par_info,rest,2)
 
-#define parATZh(r,hp,node,where,identifier,rest,local)	\
+#define parAtRelZh(r,node,proc,identifier,gran_info,size_info,par_info,rest) \
+	parATZh(r,node,proc,identifier,gran_info,size_info,par_info,rest,3)
+
+#define parAtForNowZh(r,node,where,identifier,gran_info,size_info,par_info,rest)	\
+	parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,0)
+
+#define parATZh(r,node,where,identifier,gran_info,size_info,par_info,rest,local)	\
 {							\
   sparkq result;						\
   if (SHOULD_SPARK(node)) {				\
-    result = NewSpark((P_)node,identifier,local);	\
-    SAFESTGCALL3(void,(W_),GranSimSparkAt,result,where,identifier);	\
+    SaveAllStgRegs();		   	                \
+    { sparkq result;						\
+      result = NewSpark((P_)node,identifier,gran_info,size_info,par_info,local);	\
+      if (local==2) {         /* special case for parAtAbs */   \
+        GranSimSparkAtAbs(result,(I_)where,identifier);\
+      } else if (local==3) {  /* special case for parAtRel */   \
+        GranSimSparkAtAbs(result,(I_)(CurrentProc+where),identifier);	\
+      } else {       \
+        GranSimSparkAt(result,where,identifier);	\
+      }        \
+      context_switch = 1;                        	\
+    }                                                   \
+    RestoreAllStgRegs();			        \
   } else if (do_qp_prof) {				\
     I_ tid = threadId++;				\
     SAFESTGCALL2(void,(I_, P_),QP_Event0,tid,node);	\
   }							\
-  r = (rest);						\
+  r = 1; /* return code for successful spark -- HWL */	\
 }
 
-#define parLocalZh(r,hp,node,identifier,rest)		\
-	PARZh(r,hp,node,rest,identifier,1)
+#define parLocalZh(r,node,identifier,gran_info,size_info,par_info,rest)	\
+	PARZh(r,node,rest,identifier,gran_info,size_info,par_info,1)
 
-#define parGlobalZh(r,hp,node,identifier,rest)		\
-	PARZh(r,hp,node,rest,identifier,0)
+#define parGlobalZh(r,node,identifier,gran_info,size_info,par_info,rest) \
+	PARZh(r,node,rest,identifier,gran_info,size_info,par_info,0)
 
-#define PARZh(r,hp,node,rest,identifier,local)		\
+#if 1
+
+#define PARZh(r,node,rest,identifier,gran_info,size_info,par_info,local) \
+{							\
+  if (SHOULD_SPARK(node)) {				\
+    SaveAllStgRegs();		   	                \
+    { sparkq result;						\
+      result = NewSpark((P_)node,identifier,gran_info,size_info,par_info,local);\
+      add_to_spark_queue(result); 				\
+      GranSimSpark(local,(P_)node);	                                \
+      context_switch = 1;                        	\
+    }                                                   \
+    RestoreAllStgRegs();			        \
+  } else if (do_qp_prof) {				\
+    I_ tid = threadId++;				\
+    SAFESTGCALL2(void,(I_, P_),QP_Event0,tid,node);	\
+  }							\
+  r = 1; /* return code for successful spark -- HWL */	\
+}
+
+#else
+
+#define PARZh(r,node,rest,identifier,gran_info,size_info,par_info,local) \
 {							\
   sparkq result;						\
   if (SHOULD_SPARK(node)) {				\
-    result = NewSpark((P_)node,identifier,local);	\
+    result = NewSpark((P_)node,identifier,gran_info,size_info,par_info,local);\
     ADD_TO_SPARK_QUEUE(result);				\
     SAFESTGCALL2(void,(W_),GranSimSpark,local,(P_)node);	\
-    /* context_switch = 1;  not needed any more -- HWL */					\
+    /* context_switch = 1;  not needed any more -- HWL */	\
   } else if (do_qp_prof) {				\
     I_ tid = threadId++;				\
     SAFESTGCALL2(void,(I_, P_),QP_Event0,tid,node);	\
   }							\
-  r = (rest);						\
+  r = 1; /* return code for successful spark -- HWL */	\
 }
+
+#endif 
+
+#define copyableZh(r,node)				\
+  /* copyable not yet implemented!! */
+
+#define noFollowZh(r,node)				\
+  /* noFollow not yet implemented!! */
 
 #else  /* !GRAN */
 
@@ -1958,6 +2051,7 @@ extern I_ required_thread_count;
   r = 1; /* Should not be necessary */			\
 }
 
+#endif  /* GRAN */ 
 \end{code}
 
 The following seq# code should only be used in unoptimized code.
@@ -1979,8 +2073,8 @@ ED_RO_(vtbl_seq);
 #define seqZh(r,liveness,node)		    \
   ({					    \
     __label__ cont;			    \
-    STK_CHK(liveness,0,2,0,0,0,0);	    \
-    SpB -= BREL(2);			    \
+    /* STK_CHK(liveness,0,2,0,0,0,0); */    \
+    /* SpB -= BREL(2); */ 		    \
     SpB[BREL(0)] = (W_) RetReg;		    \
     SpB[BREL(1)] = (W_) &&cont;		    \
     RetReg = (StgRetAddr) vtbl_seq;	    \
@@ -1992,23 +2086,27 @@ ED_RO_(vtbl_seq);
     r = 1; /* Should be unnecessary */	    \
   })
 
-#endif  /* GRAN */ 
 #endif	/* CONCURRENT */
 \end{code}
 
 %************************************************************************
 %*									*
-\subsubsection[StgMacros-malloc-ptrs]{Malloc Pointers}
+\subsubsection[StgMacros-foreign-objects]{Foreign Objects}
 %*									*
 %************************************************************************
 
-This macro is used to construct a MallocPtr on the heap after a ccall.
-Since MallocPtr's are like arrays in many ways, this is heavily based
-on the stuff for arrays above.
+[Based on previous MallocPtr comments -- SOF]
+
+This macro is used to construct a ForeignObj on the heap.
 
 What this does is plug the pointer (which will be in a local
-variable), into a fresh heap object and then sets a result (which will
-be a register) to point to the fresh heap object.
+variable) together with its finalising/free routine, into a fresh heap
+object and then sets a result (which will be a register) to point
+to the fresh heap object.
+
+To accommodate per-object finalisation, augment the macro with a
+finalisation routine argument. Nothing spectacular, just plug the
+pointer to the routine into the ForeignObj -- SOF 4/96
 
 Question: what's this "SET_ACTIVITY" stuff - should I be doing this
 too?  (It's if you want to use the SPAT profiling tools to
@@ -2016,42 +2114,45 @@ characterize program behavior by ``activity'' -- tail-calling,
 heap-checking, etc. -- see Ticky.lh.  It is quite specialized.
 WDP 95/1)
 
+(Swapped first two arguments to make it come into line with what appears
+to be `standard' format, return register then liveness mask. -- SOF 4/96)
+
 \begin{code}
 #ifndef PAR
 
-StgInt eqMallocPtr PROTO((StgMallocPtr p1, StgMallocPtr p2));
-void FreeMallocPtr PROTO((StgMallocPtr mp));
+StgInt eqForeignObj PROTO((StgForeignObj p1, StgForeignObj p2));
 
-#define constructMallocPtr(liveness, r, mptr)		\
-do {							\
-  P_ result;						\
-							\
-  HEAP_CHK(liveness, _FHS + MallocPtr_SIZE,0);		\
-  CC_ALLOC(CCC,_FHS + MallocPtr_SIZE,MallocPtr_K); /* cc prof */   \
+#define makeForeignObjZh(r, liveness, mptr, finalise)    \
+do {							 \
+  P_ result;						 \
+							 \
+  HEAP_CHK((W_)liveness, _FHS + ForeignObj_SIZE,0);		 \
+  CC_ALLOC(CCC,_FHS + ForeignObj_SIZE,ForeignObj_K); /* cc prof */   \
 								   \
-  result = Hp + 1 - (_FHS + MallocPtr_SIZE);			   \
-  SET_MallocPtr_HDR(result,MallocPtr_info,CCC,_FHS + MallocPtr_SIZE,0); \
-  MallocPtr_CLOSURE_DATA(result) = mptr;                	   \
-  MallocPtr_CLOSURE_LINK(result) = StorageMgrInfo.MallocPtrList;   \
-  StorageMgrInfo.MallocPtrList = result;			   \
+  result = Hp + 1 - (_FHS + ForeignObj_SIZE);			   \
+  SET_ForeignObj_HDR(result,ForeignObj_info,CCC,_FHS + ForeignObj_SIZE,0); \
+  ForeignObj_CLOSURE_DATA(result)      = (P_)mptr;             	   \
+  ForeignObj_CLOSURE_FINALISER(result) = (P_)finalise;         	   \
+  ForeignObj_CLOSURE_LINK(result) = StorageMgrInfo.ForeignObjList; \
+  StorageMgrInfo.ForeignObjList = result;			   \
 							\
 /*							\
-  printf("DEBUG: MallocPtr(0x%x) = <0x%x, 0x%x, 0x%x, 0x%x>\n",	\
+  printf("DEBUG: ForeignObj(0x%x) = <0x%x, 0x%x, 0x%x, 0x%x>\n",	\
       result,						\
       result[0],result[1],				\
       result[2],result[3]);				\
 */							\
-  CHECK_MallocPtr_CLOSURE( result );			\
-  VALIDATE_MallocPtrList( StorageMgrInfo.MallocPtrList ); \
+  CHECK_ForeignObj_CLOSURE( result );			\
+  VALIDATE_ForeignObjList( StorageMgrInfo.ForeignObjList ); \
 							\
   (r) = (P_) result;					\
 } while (0)
 
 #else
-#define constructMallocPtr(liveness, r, mptr)			    \
+#define makeForeignObjZh(r, liveness, mptr, finalise)	            \
 do {								    \
     fflush(stdout);						    \
-    fprintf(stderr, "constructMallocPtr: no malloc pointer support.\n");\
+    fprintf(stderr, "makeForeignObj#: no foreign object support.\n");\
     EXIT(EXIT_FAILURE);						    \
 } while(0)
 

@@ -40,7 +40,7 @@ JMAKE_CMD = $(NEWTOP)$(JMAKE) -I$(NEWTOP)$(JMAKESRC) $(BOOTSTRAPCFLAGS) -DTopDir
 Makefile:: $(JMAKE)
 
 $(JMAKE):
-	@(cd $(JMAKESRC); if [ -f Makefile ]; then \
+	@(cd $(JMAKESRC) && if [ -f Makefile ]; then \
 	echo "checking $@ in $(JMAKESRC) first..."; $(MAKE) all; else \
 	echo "bootstrapping $@ from Makefile.BOOT in $(JMAKESRC) first..."; \
 	$(MAKE) -f Makefile.BOOT BOOTSTRAPCFLAGS=$(BOOTSTRAPCFLAGS); fi; \

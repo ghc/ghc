@@ -27,7 +27,9 @@ HCFLAGS = -fhaskell-1.3 -cpp -hi-diffs $(EXTRA_HC_OPTS)
 SRCS = Main.lhs Foo.lhs Bar.lhs
 OBJS = Main.o   Foo.o   Bar.o
 
-.SUFFIXES : .o .lhs
+.SUFFIXES : .o .hi .lhs
+.o.hi:
+	@:
 .lhs.o:
         $(RM) $@
         $(HC) -c $< $(HCFLAGS)
@@ -36,6 +38,14 @@ cool_pgm : $(OBJS)
         $(RM) $@
         $(HC) -o $@ $(HCFLAGS) $(OBJS)
 \end{verbatim}
+
+Note the cheesy \tr{.o.hi} rule: It records the dependency of the
+interface (\tr{.hi}) file on the source.  The rule says a \tr{.hi}
+file can be made from a \tr{.o} file by doing... nothing.  Which is
+true.
+
+(Sophisticated \tr{make} variants may achieve some of the above more
+elegantly.  What we've shown should work with any \tr{make}.)
 
 The only thing lacking in the above \tr{Makefile} is interface-file
 dependencies.  If \tr{Foo.lhs} imports module \tr{Bar} and the
@@ -63,6 +73,9 @@ effect.  However, a \tr{make} run that does nothing {\em does} mean
 ``everything's up-to-date.''  (c) This scheme will work with
 mutually-recursive modules but, again, it may take multiple
 iterations to ``settle.''
+
+To see \tr{mkdependHS}'s command-line flags, give it a duff flag,
+e.g., \tr{mkdependHS -help}.
 
 %************************************************************************
 %*                                                                      *

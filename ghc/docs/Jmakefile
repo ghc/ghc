@@ -2,6 +2,7 @@
 
 /* just documents here */
 #define NoAllTargetForSubdirs
+#define NoDependTargetForSubdirs
 #define NoRunTestsTargetForSubdirs
 #define NoInstallTargetForSubdirs
 #define NoTagTargetForSubdirs

@@ -30,15 +30,15 @@ esac
 
 for i in @DoingMkWorld@ @DoingGlaFpUtils@ @DoingLiterate@ ; do
   if [ -d $i ] ; then
-    ( set -e;									\
-      cd $i ;									\
-      echo '' ;									\
-      echo "*** configuring $i ..." ;						\
-      make -f Makefile.BOOT BOOT_DEFINES="-P none -S std -DTopDirPwd=$hardtop";	\
-      echo '' ;									\
-      echo "*** making Makefiles in $i ..." ;					\
-      make Makefile ; 								\
-      make Makefiles 								\
+    ( set -e;								\
+      cd $i ;								\
+      echo '' ;								\
+      echo "*** configuring $i ..." ;					\
+      @MakeCmd@ -f Makefile.BOOT BOOT_DEFINES="-P none -S std -DTopDirPwd=$hardtop";	\
+      echo '' ;								\
+      echo "*** making Makefiles in $i ..." ;				\
+      @MakeCmd@ Makefile ; 						\
+      @MakeCmd@ Makefiles 						\
     )
   else
     echo warning: $i is not a directory -- doing nothing for it
@@ -49,14 +49,14 @@ done
 
 for i in @DoingMkWorld@ @DoingGlaFpUtils@ @DoingLiterate@ ; do
   if [ -d $i ] ; then
-    ( set -e;									\
-      cd $i ;									\
-      echo '' ;									\
-      echo "*** making dependencies in $i ..." ;				\
-      make depend ;								\
-      echo '' ;									\
-      echo "*** making all in $i ..." ;						\
-      make all									\
+    ( set -e;								\
+      cd $i ;								\
+      echo '' ;								\
+      echo "*** making dependencies in $i ..." ;			\
+      @MakeCmd@ depend ;						\
+      echo '' ;								\
+      echo "*** making all in $i ..." ;					\
+      @MakeCmd@ all							\
     )
   else
     echo warning: $i is not a directory -- doing nothing for it
@@ -67,22 +67,22 @@ done
 
 passed_in_setup="-S @MkWorldSetup@"
 
-for i in @DoingGHC@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ EndOfList ; do
+for i in @DoingGHC@ @DoingHsLibs@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ EndOfList ; do
   if [ $i = nofib ] ; then
      setup=$passed_in_setup
   else
      setup=''
   fi
   if [ -d $i ] ; then
-    ( set -e;									\
-      cd $i ;									\
-      echo '' ;									\
-      echo "*** configuring $i ..." ;						\
-      make -f Makefile.BOOT BOOT_DEFINES="-P $i $setup -C mkworld -DTopDirPwd=$hardtop"; \
-      echo '' ;									\
-      echo "*** making Makefiles in $i ..." ;					\
-      make Makefile ; 								\
-      make Makefiles 								\
+    ( set -e;								\
+      cd $i ;								\
+      echo '' ;								\
+      echo "*** configuring $i ..." ;					\
+      @MakeCmd@ -f Makefile.BOOT BOOT_DEFINES="-P $i $setup -C mkworld -DTopDirPwd=$hardtop"; \
+      echo '' ;								\
+      echo "*** making Makefiles in $i ..." ;				\
+      @MakeCmd@ Makefile ; 						\
+      @MakeCmd@ Makefiles 						\
     )
   else
     if [ $i != EndOfList ] ; then
@@ -93,13 +93,13 @@ done
 
 # Finally, the dependencies
 
-for i in @DoingGHC@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ EndOfList ; do
+for i in @DoingGHC@ @DoingHsLibs@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ EndOfList ; do
   if [ -d $i ] ; then
-    ( set -e;									\
-      cd $i ;									\
-      echo '' ;									\
-      echo "*** making dependencies in $i ..." ;				\
-      make depend 								\
+    ( set -e;								\
+      cd $i ;								\
+      echo '' ;								\
+      echo "*** making dependencies in $i ..." ;			\
+      @MakeCmd@ depend 							\
     )
   else
     if [ $i != EndOfList ] ; then
@@ -112,7 +112,7 @@ echo ''
 echo '*******************************************************************'
 echo "* Looking good! All you should need to do now is...               *"
 echo '*                                                                 *'
-for i in @DoingGHC@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ EndOfList ; do
+for i in @DoingGHC@ @DoingHsLibs@ @DoingHappy@ @DoingHaggis@ @DoingNoFib@ EndOfList ; do
     if [ $i != EndOfList ] ; then
 	echo "        cd $i"
 	if [ $i = nofib ] ; then

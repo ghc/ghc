@@ -63,11 +63,13 @@ PLAT_H_FILES = config.h platform.h
 #undef __native_h
 
 /* Literate-pgmming suffix rules used herein */
-LitSuffixRule(.lh,.h)
-LitSuffixRule(.lc,.c)
+UnlitSuffixRule(.lh,.h)
+UnlitSuffixRule(.lc,.c)
 
 all :: /* so it is first */
 	@:
+
+UnlitNeededHere(depend)
 
 #if GhcWithNativeCodeGen == YES
 
@@ -101,9 +103,3 @@ ExtraStuffToClean( $(H_FILES_FROM_LH_FILES) )
 EtagsNeededHere(tags) /* need this to do "make tags" */
 ClearTagsFile()
 CTagsTarget( $(H_FILES) )
-
-LitStuffNeededHere(docs depend)
-InfoStuffNeededHere(docs)
-
-LitDocRootTargetWithNamedOutput(root,lit,root-standalone)
-LitDocRootTargetWithNamedOutput(c-as-asm,lit,c-as-asm-standalone)

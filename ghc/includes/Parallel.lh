@@ -115,8 +115,9 @@ Get this out of the way.  These are all null definitions.
   
 #  define SET_TASK_ACTIVITY(act)	    	/* nothing */
 
-# else
-# ifdef GRAN
+#endif
+
+#if defined(GRAN)
 
 #  define GA_HDR_SIZE			1
 
@@ -130,13 +131,10 @@ Get this out of the way.  These are all null definitions.
 	PROCS(closure) = (W_)(procs)   	/* Set closure's location */
 #  define SET_GRAN_HDR(closure,pe)	SET_PROCS(closure,pe)
 
-#  if defined(GRAN_TNG)
 #   define SET_STATIC_PROCS(closure)	, (W_) (Everywhere)
-#  else
-#   define SET_STATIC_PROCS(closure)	, (W_) (MainPE)
-#  endif   /* GRAN_TNG */
 
 #  define SET_TASK_ACTIVITY(act)    	/* nothing */
+#endif
 \end{code}
 
 %************************************************************************
@@ -154,7 +152,7 @@ for local closures that have no global address), and @setGA@ to store a new
 global address for a local closure which did not previously have one.
 
 \begin{code}
-# else /* it must be PARallel (to end of file) */
+#if defined(PAR) 
 
 #  define GA_HDR_SIZE			0
   
@@ -445,13 +443,8 @@ Special info-table for local blocking queues.
 %************************************************************************
 
 \begin{code}
-#  ifdef GRAN
-#   define HAVE_SPARK ((PendingSparksHd[REQUIRED_POOL] != Nil_closure) || 	\
-		    (PendingSparksHd[ADVISORY_POOL] != Nil_closure))
-#  else
 #   define HAVE_SPARK ((PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL]) \
 		||  (PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL]))
-#  endif
 
 #  define HAVE_WORK  	(RUNNING_THREAD || HAVE_SPARK)
 #  define RUNNING_THREAD  (CurrentTSO != NULL)
@@ -470,33 +463,31 @@ This constant defines how many words of data we can pack into a single
 packet in the parallel (GUM) system.
 
 \begin{code}
-#  ifdef PAR
 void	InitPackBuffer(STG_NO_ARGS);
-P_      PackNearbyGraph PROTO((P_ closure,W_ *size));
 P_      PackTSO PROTO((P_ tso, W_ *size));
 P_      PackStkO PROTO((P_ stko, W_ *size));
 P_	AllocateHeap PROTO((W_ size)); /* Doesn't belong */
-
-P_      get_closure_info PROTO((P_ closure, W_ *size, W_ *ptrs, W_ *nonptrs, W_ *vhs));
-
-rtsBool isOffset PROTO((globalAddr *ga)),
-	isFixed PROTO((globalAddr *ga));
 
 void    InitClosureQueue (STG_NO_ARGS);
 P_      DeQueueClosure(STG_NO_ARGS);
 void    QueueClosure PROTO((P_ closure));
 rtsBool QueueEmpty(STG_NO_ARGS);
 void    PrintPacket PROTO((P_ buffer));
+
+P_      get_closure_info PROTO((P_ closure, W_ *size, W_ *ptrs, W_ *nonptrs, W_ *vhs, char *type));
+
+rtsBool isOffset PROTO((globalAddr *ga)),
+	isFixed PROTO((globalAddr *ga));
+
 void    doGlobalGC(STG_NO_ARGS);
 
-P_ UnpackGraph PROTO((W_ *buffer, globalAddr **gamap, W_ *nGAs));
-#  endif
-
+P_      PackNearbyGraph PROTO((P_ closure,W_ *size));
+P_      UnpackGraph PROTO((W_ *buffer, globalAddr **gamap, W_ *nGAs));
 \end{code}
 
 \begin{code}
-#  define PACK_HEAP_REQUIRED  \
-    ((RTSflags.ParFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (SPEC_HS + 2))
+#    define PACK_HEAP_REQUIRED  \
+      ((RTSflags.ParFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (SPEC_HS + 2))
 
 extern W_      *PackBuffer;      /* size: can be set via option */
 extern long *buffer;             /* HWL_ */
@@ -518,12 +509,55 @@ extern void    AllocClosureQueue(W_ size);
 #  define PACK_HDR_SIZE	1	/* Words of header in a packet */
 
 #  define PACK_PLC_SIZE	2	/* Size of a packed PLC in words */
-  
+
+#endif
 \end{code}
-End multi-slurp protection:
 \begin{code}
-# endif /* yes, it is PARallel */
-#endif /* it was GRAN or PARallel */
+
+#if defined(GRAN)
+/* ToDo: Check which of the PAR routines are needed in GranSim -- HWL */
+void  InitPackBuffer(STG_NO_ARGS);
+P_    AllocateHeap PROTO((W_ size)); /* Doesn't belong */
+P_    PackNearbyGraph PROTO((P_ closure, P_ tso, W_ *packbuffersize));
+P_    PackOneNode PROTO((P_ closure, P_ tso, W_ *packbuffersize));
+P_    UnpackGraph PROTO((P_ buffer));
+
+void    InitClosureQueue (STG_NO_ARGS);
+P_      DeQueueClosure(STG_NO_ARGS);
+void    QueueClosure PROTO((P_ closure));
+rtsBool QueueEmpty(STG_NO_ARGS);
+void    PrintPacket PROTO((P_ buffer));
+
+P_      get_closure_info PROTO((P_ closure, W_ *size, W_ *ptrs, W_ *nonptrs, W_ *vhs, char *type));
+
+/* These are needed in the packing code to get the size of the packet
+   right. The closures itself are never built in GrAnSim. */
+#  define FETCHME_VHS				IND_VHS
+#  define FETCHME_HS				IND_HS
+  
+#  define FETCHME_GA_LOCN                       FETCHME_HS
+  
+#  define FETCHME_CLOSURE_SIZE(closure)		IND_CLOSURE_SIZE(closure)
+#  define FETCHME_CLOSURE_NoPTRS(closure)		0L
+#  define FETCHME_CLOSURE_NoNONPTRS(closure)	(IND_CLOSURE_SIZE(closure)-IND_VHS)
+  
+#  define MAX_GAS 	(RTSflags.GranFlags.packBufferSize / PACK_GA_SIZE)
+#  define PACK_GA_SIZE	3	/* Size of a packed GA in words */
+			        /* Size of a packed fetch-me in words */
+#  define PACK_FETCHME_SIZE (PACK_GA_SIZE + FIXED_HS)
+#  define PACK_HDR_SIZE	4	/* Words of header in a packet */
+
+#    define PACK_HEAP_REQUIRED  \
+      ((RTSflags.GranFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (SPEC_HS + 2))
+
+#    define PACK_FLAG_LOCN           0  
+#    define PACK_TSO_LOCN            1
+#    define PACK_UNPACKED_SIZE_LOCN  2
+#    define PACK_SIZE_LOCN           3
+#    define MAGIC_PACK_FLAG 0xfabc
+#endif  
 
 #endif /* Parallel_H */
 \end{code}
+
+

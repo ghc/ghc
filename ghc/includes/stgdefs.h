@@ -87,6 +87,22 @@ extern int sscanf PROTO((const char *, const char *, ...));
 /* end of hack */
 #endif /* STDC_HEADERS */
 
+/*
+ * threadWaitWrite# uses FD_SETSIZE to distinguish
+ * between read file descriptors and write fd's.
+ * Hence we need to include <sys/types.h>, but
+ * is this the best place to do it?
+ * (the following has been moved from libposix.h)
+ */
+
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif  /* HAVE_SYS_TYPES_H */
+
+#ifndef FD_SETSIZE
+#define FD_SETSIZE 1024
+#endif
+
 #if ! defined(EXIT_SUCCESS) || ! defined(EXIT_FAILURE)
 /* "stdlib.h" should have defined these; but at least
    on SunOS 4.1.3, this is not so.
@@ -188,13 +204,18 @@ extern StgFunPtr returnMain(STG_NO_ARGS);
 extern StgFunPtr impossible_jump_after_switch(STG_NO_ARGS);
 
 /* hooks: user might write some of their own */
-extern void ErrorHdrHook	PROTO((FILE *));
-extern void OutOfHeapHook	PROTO((W_));
-extern void StackOverflowHook	PROTO((I_));
-extern void MallocFailHook	PROTO((I_, char *));
-extern void PatErrorHdrHook	PROTO((FILE *));
-extern void PreTraceHook	PROTO((FILE *));
-extern void PostTraceHook	PROTO((FILE *));
+void ErrorHdrHook	PROTO((FILE *));
+void OutOfHeapHook	PROTO((W_));
+void StackOverflowHook	PROTO((I_));
+#ifdef CONCURRENT
+void NoRunnableThreadsHook (STG_NO_ARGS);
+#endif
+void MallocFailHook	PROTO((I_, char *));
+void PatErrorHdrHook	PROTO((FILE *));
+void PreTraceHook	PROTO((FILE *));
+void PostTraceHook	PROTO((FILE *));
+void defaultsHook	(STG_NO_ARGS);
+void initEachPEHook	(STG_NO_ARGS);
 
 EXTFUN(startStgWorld);
 #ifdef CONCURRENT

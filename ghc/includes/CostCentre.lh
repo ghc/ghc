@@ -44,19 +44,19 @@ The compiler declares a static block for each @_scc_@ annotation in the
 source using the @CC_DECLARE@ macro where @label@, @module@ and
 @group@ are strings and @ident@ the cost centre identifier.
 
-\begin{code}
-# define CC_IS_CAF  'C'
-# define CC_IS_DICT 'D'
+\begin{code} 
+# define CC_IS_CAF      'c'
+# define CC_IS_DICT     'd'
 # define CC_IS_SUBSUMED 'S'
-# define CC_IS_BORING '\0'
+# define CC_IS_BORING   'B'
 
 # define STATIC_CC_REF(cc_ident) &CAT2(cc_ident,_struct)
 # define DYN_CC_REF(cc_ident)    cc_ident /* unused */
 
-# define CC_DECLARE(cc_ident,name,module,group,subsumed,is_local) \
-     is_local struct cc CAT2(cc_ident,_struct)			\
-	= {NOT_REGISTERED, UNHASHED, name, module, group,	\
-	   subsumed, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};	\
+# define CC_DECLARE(cc_ident,name,module,group,subsumed,is_local) 	\
+     is_local struct cc CAT2(cc_ident,_struct)				\
+	= {NOT_REGISTERED, UNHASHED, name, module, group,		\
+	   subsumed, INIT_CC_STATS};					\
      is_local CostCentre cc_ident = STATIC_CC_REF(cc_ident)
 
 #endif /* defined(PROFILING) || defined(CONCURRENT) */
@@ -96,7 +96,9 @@ turn on @PROFILING@.  Get them out of the way....
 # define SET_CC_HDR(closure, cc)	/* Dont set CC header */
 # define SET_STATIC_CC_HDR(cc)		/* No static CC header */
 
-# define SET_CCC(cc_ident,is_dupd)
+# define SET_CCC(cc_ident,do_scc_count)
+# define SET_DICT_CCC(cc_ident,do_scc_count)
+# define SET_CCC_RTS(cc_ident,do_sub_count,do_count)
 
 # define RESTORE_CCC(cc)
 
@@ -104,6 +106,9 @@ turn on @PROFILING@.  Get them out of the way....
 # define ENTER_CC_TCL(closure)
 # define ENTER_CC_F(cc)
 # define ENTER_CC_FCL(closure)
+# define ENTER_CC_FSUB()
+# define ENTER_CC_FCAF(cc)
+# define ENTER_CC_FLOAD(cc)
 # define ENTER_CC_PAP(cc)
 # define ENTER_CC_PAP_CL(closure)
 
@@ -152,7 +157,7 @@ CC_EXTERN(CC_CAFs);		/* prelude cost centre (CAFs  only) */
 CC_EXTERN(CC_DICTs);		/* prelude cost centre (DICTs only) */
 
 # define IS_CAF_OR_DICT_CC(cc) \
-    (((cc)->is_subsumed == CC_IS_CAF) || ((cc)->is_subsumed == CC_IS_DICT))
+    ((cc)->is_subsumed & ' ') 	/* tests for lower case character */
 
 # define IS_SUBSUMED_CC(cc) ((cc)->is_subsumed == CC_IS_SUBSUMED)
 
@@ -200,14 +205,23 @@ not count the entry to avoid large counts arising from simple
 recursion.  (Huh?  WDP 94/07)
 
 \begin{code}
-# define SET_CCC_X(cc,is_dupd)	 						\
-	do {									\
-	if (!(is_dupd)) { CCC->sub_scc_count++; } /* inc subcc count of CCC */	\
-	CCC = (CostCentre)(cc);		/* set CCC to ident cc */		\
-	if (!(is_dupd)) { CCC->scc_count++; }	 /* inc scc count of new CCC*/	\
+# define SET_CCC_X(cc,do_subcc_count,do_subdict_count,do_scc_count)				\
+	do {											\
+	if ((do_subcc_count)) { CCC->sub_scc_count++; }       /* inc subcc count of CCC */	\
+	if ((do_subdict_count)) { CCC->sub_dictcc_count++; }  /* inc sub dict count of CCC */	\
+	CCC = (CostCentre)(cc);				      /* set CCC to ident cc */		\
+	ASSERT_IS_REGISTERED(CCC,1);								\
+	if ((do_scc_count)) { CCC->scc_count++; }	      /* inc scc count of new CCC*/	\
 	} while(0)
 
-# define SET_CCC(cc_ident,is_dupd) SET_CCC_X(STATIC_CC_REF(cc_ident),is_dupd)
+# define SET_CCC(cc_ident,do_scc_count) \
+	 SET_CCC_X(STATIC_CC_REF(cc_ident),do_scc_count,0,do_scc_count)
+
+# define SET_DICT_CCC(cc_ident,do_scc_count) \
+	 SET_CCC_X(STATIC_CC_REF(cc_ident),0,do_scc_count,do_scc_count)
+
+# define SET_CCC_RTS(cc_ident,do_sub_count,do_scc_count) \
+	 SET_CCC_X(STATIC_CC_REF(cc_ident),do_sub_count,0,do_scc_count)
 \end{code}
 
 We have this @RESTORE_CCC@ macro, rather than just an assignment,
@@ -225,9 +239,9 @@ On entry to top level CAFs we count the scc ...
 # define ENTER_CC_CAF_X(cc)						\
 	do {								\
 	CCC->sub_cafcc_count++; /* inc subcaf count of CCC */		\
-	CCC = (CostCentre)(cc);		/* set CCC to ident cc */	\
+	CCC = (CostCentre)(cc);	/* set CCC to ident cc */		\
 	ASSERT_IS_REGISTERED(CCC,1);					\
-	CCC->cafcc_count++; /* inc cafcc count of CCC */		\
+	CCC->scc_count++;       /* inc scc count of CAF cc */		\
 	} while(0)
 
 # define ENTER_CC_CAF(cc_ident)   ENTER_CC_CAF_X(STATIC_CC_REF(cc_ident))
@@ -236,14 +250,14 @@ On entry to top level CAFs we count the scc ...
 
 On entering a closure we only count the enter to thunks ...
 \begin{code}
-# define ENTER_CC_T(cc)						\
-	do {							\
-	CCC = (CostCentre)(cc);		 			\
-	ASSERT_IS_REGISTERED(CCC,1);				\
-	CCC->thunk_count++; /* inc thunk count of new CCC */	\
+# define ENTER_CC_T(cc)					\
+	do {						\
+	CCC = (CostCentre)(cc);		 		\
+	ASSERT_IS_REGISTERED(CCC,1);			\
+	CCC_DETAIL_COUNT(CCC->thunk_count);		\
 	} while(0)	
 
-# define ENTER_CC_TCL(closure)					\
+# define ENTER_CC_TCL(closure)				\
 	ENTER_CC_T(CC_HDR(closure))
 
 /* Here is our special "hybrid" case when we do *not* set the CCC.
@@ -256,12 +270,37 @@ On entering a closure we only count the enter to thunks ...
 	ASSERT_IS_REGISTERED(cc,1);			\
 	if ( ! IS_CAF_OR_DICT_CC(cc) ) {		\
 	    CCC = cc;					\
+	} else {					\
+	    CCC_DETAIL_COUNT(cc->caffun_subsumed); 	\
+	    CCC_DETAIL_COUNT(CCC->subsumed_caf_count);  \
 	}						\
-	CCC->function_count++;				\
+	CCC_DETAIL_COUNT(CCC->function_count);		\
 	} while(0)
 
 # define ENTER_CC_FCL(closure)				\
 	ENTER_CC_F(CC_HDR(closure))
+
+# define ENTER_CC_FSUB()				\
+	do {						\
+	CCC_DETAIL_COUNT(CCC->subsumed_fun_count);	\
+	CCC_DETAIL_COUNT(CCC->function_count);		\
+	} while(0)
+
+# define ENTER_CC_FCAF(centre)				\
+	do {						\
+	CostCentre cc = (CostCentre) (centre);		\
+	ASSERT_IS_REGISTERED(cc,1);			\
+	CCC_DETAIL_COUNT(cc->caffun_subsumed);		\
+	CCC_DETAIL_COUNT(CCC->subsumed_caf_count);	\
+	CCC_DETAIL_COUNT(CCC->function_count);		\
+	} while(0)
+
+# define ENTER_CC_FLOAD(cc)				\
+	do {						\
+	CCC = (CostCentre)(cc);				\
+	ASSERT_IS_REGISTERED(CCC,1);			\
+	CCC_DETAIL_COUNT(CCC->function_count);		\
+	} while(0)
 
 /* These ENTER_CC_PAP things are only used in the RTS */
 
@@ -271,12 +310,21 @@ On entering a closure we only count the enter to thunks ...
 	ASSERT_IS_REGISTERED(cc,1);			\
 	if ( ! IS_CAF_OR_DICT_CC(cc) ) {		\
 	    CCC = cc;					\
+	} else {					\
+	    CCC_DETAIL_COUNT(cc->caffun_subsumed); 	\
+	    CCC_DETAIL_COUNT(CCC->subsumed_caf_count);  \
 	}						\
-	CCC->pap_count++;				\
+	CCC_DETAIL_COUNT(CCC->pap_count);		\
 	} while(0)			
 					
 # define ENTER_CC_PAP_CL(closure)			\
 	ENTER_CC_PAP(CC_HDR(closure))
+
+# if defined(PROFILING_DETAIL_COUNTS)
+# define CCC_DETAIL_COUNT(inc_this) ((inc_this)++)
+# else
+# define CCC_DETAIL_COUNT(inc_this) /*nothing*/
+# endif
 
 #endif /* PROFILING */
 \end{code}
@@ -357,7 +405,7 @@ We don't want to attribute costs to an unregistered cost-centre:
 # define ASSERT_IS_REGISTERED(cc,chk_not_overhead) /*nothing*/
 #else
 # define ASSERT_IS_REGISTERED(cc,chk_not_overhead)				\
-	do {									\
+	do {	/* beware of cc name-capture */					\
 	CostCentre c_c = (CostCentre) (cc);					\
 	if (c_c->registered == NOT_REGISTERED) { 				\
 	    fprintf(stderr,"Entering unregistered CC: %s\n",c_c->label);	\
@@ -398,6 +446,8 @@ reuse @CON_K@ (or something) in runtime/main/StgStartup.lhc.
 Similarily, the SP stuff should probably be the highly uninformative
 @INTERNAL_KIND@.
 
+SOF 4/96: Renamed MallocPtr_K to ForeignObj_K 
+
 \begin{code}
 #if defined(PROFILING)
 
@@ -409,7 +459,7 @@ Similarily, the SP stuff should probably be the highly uninformative
 # define ARR_K		6
 
 # ifndef PAR
-#  define MallocPtr_K	7  /* Malloc Pointer */
+#  define ForeignObj_K	7  /* Malloc Pointer */
 #  define SPT_K		8  /* Stable Pointer Table */
 # endif /* !PAR */
 
@@ -569,19 +619,19 @@ extern hash_t index_type PROTO((ClCategory clcat));
 memory alloc macros.
 
 \begin{code}
-# define CC_TICK(cc)							\
-	do { CostCentre centre = (CostCentre) (cc);			\
-	ASSERT_IS_REGISTERED(centre,1);					\
-	centre->time_ticks += 1;					\
+# define CC_TICK(centre)						\
+	do { CostCentre cc = (CostCentre) (centre);			\
+	ASSERT_IS_REGISTERED(cc,1);					\
+	cc->time_ticks += 1;						\
 	} while(0)
 
 # if defined(PROFILING)
-#  define CC_ALLOC(cc, size, kind) 					\
-	do { CostCentre cc_ = (CostCentre) (cc);			\
-	ASSERT_IS_REGISTERED(cc_,0/*OK if OVERHEAD*/);			\
-	cc_->mem_allocs	+= 1;						\
-	cc_->mem_alloc	+= (size) - (PROF_FIXED_HDR + TICKY_FIXED_HDR);	\
-	} while(0) /* beware name-capture by ASSERT_IS...! */
+# define CC_ALLOC(centre, size, kind) 					\
+	do { CostCentre cc = (CostCentre) (centre);			\
+	ASSERT_IS_REGISTERED(cc,0/*OK if OVERHEAD*/);			\
+	CCC_DETAIL_COUNT(cc->mem_allocs);				\
+	cc->mem_alloc += (size) - (PROF_FIXED_HDR + TICKY_FIXED_HDR);	\
+	} while(0) 
 # endif
 \end{code}
 
@@ -610,13 +660,7 @@ rtsBool cc_to_ignore PROTO((CostCentre));
 \begin{code}
 # if defined(PROFILING)
 
-extern I_ heap_profile_init PROTO((char *select_cc_str,
-				   char *select_mod_str,
-				   char *select_grp_str,
-				   char *select_descr_str,
-				   char *select_typ_str,
-				   char *select_kind_str,
-				   char *argv[]));
+I_ heap_profile_init PROTO((char *argv[]));
 
 extern void heap_profile_finish(STG_NO_ARGS);
 
@@ -628,8 +672,11 @@ extern void (* heap_profile_fn) PROTO((P_ closure,I_ size));
 extern I_ earlier_ticks;	        /* no. of earlier ticks grouped */
 extern hash_t time_intervals;		/* no. of time intervals reported -- 18 */
 
-#  define HEAP_PROFILE_CLOSURE(closure,size) \
-	STGCALL2(void,(void *, P_, I_),(*heap_profile_fn),closure,size)			/*R SM2s.lh */
+# define HEAP_PROFILE_CLOSURE(closure,size) 	\
+	do {					\
+	if (heap_profile_fn) {		    	\
+	    STGCALL2(void,(void *, P_, I_),(*heap_profile_fn),closure,size); \
+	}} while(0)
 
 # endif	/* PROFILING */
 \end{code}

@@ -9,7 +9,7 @@ sub inject_split_markers {
     local($hc_file) = @_;
 
     unlink("$Tmp_prefix.unmkd");
-    local($to_do) = "cp $hc_file $Tmp_prefix.unmkd";
+    local($to_do) = "$Cp $hc_file $Tmp_prefix.unmkd";
     &run_something($to_do, 'Prepare to number split markers');
 
     open(TMPI, "< $Tmp_prefix.unmkd") || &tidy_up_and_die(1,"$Pgm: failed to open `$Tmp_prefix.unmkd' (to read)\n");
@@ -191,8 +191,8 @@ sub process_asm_block_sparc {
     if ( $OptimiseC ) {
 	$str =~ s/_?__stg_split_marker.*:\n//;
     } else {
-	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/\1/;
-	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/\1/;
+	$str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
+	$str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/;
     }
 
     # make sure the *.hc filename gets saved; not just ghc*.c (temp name)
@@ -226,10 +226,10 @@ sub process_asm_block_sparc {
 sub process_asm_block_m68k {
     local($str) = @_;
 
-    # strip the marker (ToDo: something special for unregisterized???)
+    # strip the marker
 
-    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/\1/;
-    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/\1/;
+    $str =~ s/(\.text\n\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\t\.even\n)\t\.globl\s+.*_?__stg_split_marker.*\n/$1/;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.even\n" . $str;
@@ -266,7 +266,7 @@ sub process_asm_block_alpha {
     if ( $OptimiseC ) {
 	$str =~ s/_?__stg_split_marker.*:\n//;
     } else {
-	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/\1/;
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
     }
 
     # remove/record any literal constants defined here
@@ -292,7 +292,7 @@ sub process_asm_block_alpha {
     # Slide the dummy direct return code into the vtbl .ent/.end block,
     # to keep the label fixed if it's the last thing in a module, and
     # to avoid having any anonymous text that the linker will complain about
-    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n\1/g;
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
 
     print STDERR "### STRIPPED BLOCK (alpha):\n$str" if $Dump_asm_splitting_info;
 
@@ -302,10 +302,10 @@ sub process_asm_block_alpha {
 sub process_asm_block_iX86 {
     local($str) = @_;
 
-    # strip the marker (ToDo: something special for unregisterized???)
+    # strip the marker
 
-    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/\1/;
-    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/\1/;
+    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
+    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.align 4\n" . $str;
@@ -396,7 +396,7 @@ sub process_asm_block_mips {
     if ( $OptimiseC ) {
 	$str =~ s/_?__stg_split_marker.*:\n//;
     } else {
-	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/\1/;
+	$str =~ s/(\t\.align .\n)\t\.globl\s+.*_?__stg_split_marker.*\n\t\.ent.*\n/$1/;
     }
 
     # remove/record any literal constants defined here
@@ -422,7 +422,7 @@ sub process_asm_block_mips {
     # Slide the dummy direct return code into the vtbl .ent/.end block,
     # to keep the label fixed if it's the last thing in a module, and
     # to avoid having any anonymous text that the linker will complain about
-    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n\1/g;
+    $str =~ s/(\t\.end [A-Za-z0-9_]+)\n\t# nop/\tnop\n$1/g;
 
     $str .= $UNDEFINED_FUNS; # pin on gratuitiously-large amount of info
 
