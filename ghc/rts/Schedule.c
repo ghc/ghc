@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.98 2001/07/24 06:31:36 ken Exp $
+ * $Id: Schedule.c,v 1.99 2001/07/30 09:47:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2092,7 +2092,8 @@ take_off_run_queue(StgTSO *tso) {
 	KH @ 25/10/99
 */
 
-static void GetRoots(evac_fn evac)
+static void
+GetRoots(evac_fn evac)
 {
   StgMainThread *m;
 
