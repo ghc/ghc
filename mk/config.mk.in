@@ -192,7 +192,7 @@ GhcCompilerWays=
 GhcHcOpts=
 
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
-GhcWithHscBuiltViaC=NO
+GhcWithHscBuiltViaC=@BootingFromHc@
 
 # Build hsc with -O and turn optimising flag on when compiling
 # the intermediate C file
@@ -249,11 +249,10 @@ else
 ifeq "$(strip $(way))" "mr"
 GhcLibHcOpts= -O
 else
-ifeq "$(GhcWithHscBuiltViaC)" "NO"
-GhcLibHcOpts= -O -split-objs -odir $*
+ifeq "$(GhcWithHscBuiltViaC)" "YES"
+GhcLibHcOpts=-O
 else
-#NB: .hc files need to distributed in *unsplit* form.
-GhcLibHcOpts= -O
+GhcLibHcOpts=-O -split-objs -odir $*
 endif
 endif
 endif
