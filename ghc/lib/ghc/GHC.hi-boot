@@ -162,8 +162,6 @@ GHC
   integer2Int#
   int2Integer#
   
-  indexArray#
-  
   Array#
   ByteArray#
   MutableArray#
