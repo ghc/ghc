@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.27 1999/04/08 15:46:15 simonm Exp $
+% $Id: CgClosure.lhs,v 1.28 1999/04/23 09:51:24 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -459,11 +459,6 @@ enterCostCentreCode closure_info ccs is_thunk is_box
 	    ASSERT(is_thunk == IsFunction)
 	    costCentresC SLIT("ENTER_CCS_FSUB") []
  
-	else if isSetCurrentCCS ccs then
-	    ASSERT(not (isToplevClosure closure_info))
-	    ASSERT(is_thunk == IsFunction)
-	    costCentresC SLIT("ENTER_CCS_TCL") [CReg node]
-
 	else if isCurrentCCS ccs then 
 	    if re_entrant && not is_box
 		then costCentresC SLIT("ENTER_CCS_FCL") [CReg node]

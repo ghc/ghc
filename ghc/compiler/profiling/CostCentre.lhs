@@ -9,9 +9,9 @@ module CostCentre (
 		-- All abstract except to friend: ParseIface.y
 
 	CostCentreStack,
-	noCCS, subsumedCCS, currentCCS, setCurrentCCS, overheadCCS, dontCareCCS,
+	noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS,
 	noCostCentre, noCCAttached,
-	noCCSAttached, isCurrentCCS,  isSetCurrentCCS, isSubsumedCCS, currentOrSubsumedCCS,
+	noCCSAttached, isCurrentCCS,  isSubsumedCCS, currentOrSubsumedCCS,
 
 	mkUserCC, mkAutoCC, mkAllCafsCC, 
 	mkSingletonCCS, cafifyCC, dupifyCC,
@@ -52,10 +52,6 @@ data CostCentreStack
 			-- cost centre to be attached to the object, when it 
 			-- is allocated, is whatever is in the 
 			-- current-cost-centre-stack register.
-
-  | SetCurrentCCS       -- Special cost centre for non-top-level functions
-			-- which is always *set* rather than possibly
-			-- appended to the current CCS.
 
   | SubsumedCCS		-- Cost centre stack for top-level subsumed functions
 			-- (CAFs get an AllCafsCC).
@@ -155,7 +151,6 @@ SIMON: Maybe later...
 noCCS 			= NoCCS
 subsumedCCS 		= SubsumedCCS
 currentCCS	 	= CurrentCCS
-setCurrentCCS	 	= SetCurrentCCS
 overheadCCS	 	= OverheadCCS
 dontCareCCS	 	= DontCareCCS
 
@@ -174,9 +169,6 @@ noCCAttached _				= False
 isCurrentCCS CurrentCCS			= True
 isCurrentCCS _	      			= False
 
-isSetCurrentCCS SetCurrentCCS		= True
-isSetCurrentCCS _	     		= False
-
 isSubsumedCCS SubsumedCCS 		= True
 isSubsumedCCS _		     		= False
 
@@ -185,7 +177,6 @@ isCafCCS _				= False
 
 currentOrSubsumedCCS SubsumedCCS	= True
 currentOrSubsumedCCS CurrentCCS		= True
-currentOrSubsumedCCS SetCurrentCCS	= True
 currentOrSubsumedCCS _			= False
 \end{code}
 
@@ -306,7 +297,6 @@ instance Outputable CostCentreStack where
   ppr ccs = case ccs of
 		NoCCS		-> ptext SLIT("NO_CCS")
 		CurrentCCS	-> ptext SLIT("CCCS")
-		SetCurrentCCS	-> ptext SLIT("SetCCCS")
 		OverheadCCS	-> ptext SLIT("CCS_OVERHEAD")
 		DontCareCCS	-> ptext SLIT("CCS_DONTZuCARE")
 		SubsumedCCS	-> ptext SLIT("CCS_SUBSUMED")
@@ -373,13 +363,15 @@ pp_caf other   = empty
 -- Printing as a C label
 ppCostCentreLbl (NoCostCentre)		  	     = text "CC_NONE"
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) 	     = text "CC_CAFs_"  <> pprModule m
-ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m}) = text "CC_" <> pprModule m <> ptext n
+ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
+  = text "CC_" <> text (case is_caf of { CafCC -> "CAF_"; _ -> "" }) 
+    <> pprModule m <> ptext n
 
 -- This is the name to go in the user-displayed string, 
 -- recorded in the cost centre declaration
 costCentreUserName (NoCostCentre)  = "NO_CC"
 costCentreUserName (AllCafsCC {})  = "CAFs_in_..."
-costCentreUserName (NormalCC {cc_name = name, cc_is_caf = is_caf})
+costCentreUserName cc@(NormalCC {cc_name = name, cc_is_caf = is_caf})
   =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (_UNPK_ name)
 \end{code}
 

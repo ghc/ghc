@@ -269,10 +269,7 @@ stgMassageForProfiling mod_name grp_name us stg_binds
     do_rhs (StgRhsClosure cc bi srt fv u args body)
       = set_lambda_cc (do_expr body)		`thenMM` \ body' ->
 	get_prevailing_cc 			`thenMM` \ prev_ccs ->
-	let new_ccs | isCurrentCCS prev_ccs = setCurrentCCS -- are we inside a lambda??
-		    | otherwise             = currentCCS
-	in
-	returnMM (StgRhsClosure new_ccs bi srt fv u args body')
+	returnMM (StgRhsClosure currentCCS bi srt fv u args body')
 
     do_rhs (StgRhsCon cc con args)
       = returnMM (StgRhsCon currentCCS con args)
