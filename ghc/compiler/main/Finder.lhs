@@ -7,6 +7,8 @@
 module Finder (
     initFinder, 	-- :: PackageConfigInfo -> IO (), 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+    mkHomeModuleLocn,	-- :: ModuleName -> String -> FilePath 
+			--	-> IO ModuleLocation
     emptyHomeDirCache	-- :: IO ()
   ) where
 
@@ -16,6 +18,7 @@ import HscTypes		( ModuleLocation(..) )
 import CmStaticInfo
 import DriverPhases
 import DriverState
+import DriverUtil
 import Module
 import FiniteMap
 import Util
@@ -87,40 +90,45 @@ maybeHomeModule mod_name = do
 
         Just home_map -> return home_map
 
-   let basename = moduleNameUserString mod_name
+   let basename = moduleNameUserString mod_name 
        hs  = basename ++ ".hs"
        lhs = basename ++ ".lhs"
 
    case lookupFM home_map hs of {
-	Just path -> mkHomeModuleLocn mod_name (path ++ '/':basename) 
-                                               (path ++ '/':hs);
+	Just path -> mkHomeModuleLocn mod_name 
+			(path ++ '/':basename) (path ++ '/':hs);
 	Nothing ->
 
    case lookupFM home_map lhs of {
-	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename) 
-                                                (path ++ '/':lhs);
+	Just path ->  mkHomeModuleLocn mod_name
+			(path ++ '/':basename) (path ++ '/':lhs);
 	Nothing -> do
 
    -- can't find a source file anywhere, check for a lone .hi file.
    hisuf <- readIORef v_Hi_suf
    let hi = basename ++ '.':hisuf
    case lookupFM home_map hi of {
-	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename)
-                                                (path ++ '/':hs);
+	Just path ->  mkHomeModuleLocn mod_name
+			(path ++ '/':basename) (path ++ '/':hs);
 	Nothing -> do
 
    -- last chance: .hi-boot-<ver> and .hi-boot
    let hi_boot = basename ++ ".hi-boot"
    let hi_boot_ver = basename ++ ".hi-boot-" ++ cHscIfaceFileVersion
    case lookupFM home_map hi_boot_ver of {
-	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename)
-                                                (path ++ '/':hs);
+	Just path ->  mkHomeModuleLocn mod_name
+			(path ++ '/':basename) (path ++ '/':hs);
 	Nothing -> do
    case lookupFM home_map hi_boot of {
-	Just path ->  mkHomeModuleLocn mod_name (path ++ '/':basename)
-                                                (path ++ '/':hs);
+	Just path ->  mkHomeModuleLocn mod_name 
+			(path ++ '/':basename) (path ++ '/':hs);
 	Nothing -> return Nothing
    }}}}}
+
+
+-- The .hi file always follows the module name, whereas the object
+-- file may follow the name of the source file in the case where the
+-- two differ (see summariseFile in compMan/CompManager.lhs).
 
 mkHomeModuleLocn mod_name basename source_fn = do
 
@@ -129,7 +137,9 @@ mkHomeModuleLocn mod_name basename source_fn = do
    ohi    <- readIORef v_Output_hi
    hisuf  <- readIORef v_Hi_suf
    let hifile = case ohi of
-		   Nothing -> basename ++ '.':hisuf
+		   Nothing -> getdir basename 
+				++ '/':moduleNameUserString mod_name 
+				++ '.':hisuf
 		   Just fn -> fn
 
    -- figure out the .o file name.  It also lives in the same dir

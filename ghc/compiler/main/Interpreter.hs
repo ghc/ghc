@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.7 2000/11/20 14:48:54 simonpj Exp $
+-- $Id: Interpreter.hs,v 1.8 2000/11/20 16:28:29 simonmar Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -16,7 +16,7 @@ module Interpreter (
     ClosureEnv, emptyClosureEnv, 
     ItblEnv, emptyItblEnv,
     linkIModules,
-    stgToInterpSyn, stgBindsToInterpSyn,
+    stgExprToInterpSyn, stgBindsToInterpSyn,
     HValue,
     UnlinkedIBind, UnlinkedIExpr,
     loadObjs, resolveObjs,
@@ -56,7 +56,7 @@ instance Outputable UnlinkedIBind where
   ppr x = text "Can't output UnlinkedIBind"
 
 linkIModules	    = error "linkIModules"
-stgToInterpSyn	    = error "stgToInterpSyn"
+stgExprToInterpSyn  = error "stgToInterpSyn"
 stgBindsToInterpSyn = error "stgBindsToInterpSyn"
 loadObjs	    = error "loadObjs"
 resolveObjs	    = error "loadObjs"

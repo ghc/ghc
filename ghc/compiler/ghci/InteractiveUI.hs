@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.4 2000/11/17 16:53:27 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.5 2000/11/20 16:28:29 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -18,6 +18,7 @@ import DriverUtil
 import DriverState
 import Linker
 import Module
+import Outputable
 import Panic
 import Util
 
@@ -49,8 +50,7 @@ commands = [
   ("reload",	reloadModule),
   ("set",	setOptions),
   ("type",	typeOfExpr),
-  ("quit",	quit),
-  ("!",		shellEscape)
+  ("quit",	quit)
   ]
 
 shortHelpText = "use :? for help.\n"
@@ -81,7 +81,8 @@ interactiveUI st = do
 #ifndef NO_READLINE
    Readline.initialize
 #endif
-   _ <- (unGHCi uiLoop) GHCiState{ current_module = mkModuleName "Main", 
+   _ <- (unGHCi uiLoop) GHCiState{ modules = [],
+				   current_module = Nothing, 
 	  	                   target = Nothing,
 			           cmstate = st }
    return ()
@@ -90,7 +91,7 @@ uiLoop :: GHCi ()
 uiLoop = do
   st <- getGHCiState
 #ifndef NO_READLINE
-  l <- io (readline (moduleNameUserString (current_module st)  ++ "> "))
+  l <- io (readline (mkPrompt (current_module st)  ++ "> "))
 #else
   l <- io (hGetLine stdin)
 #endif
@@ -104,7 +105,11 @@ uiLoop = do
   	  runCommand l
 	  uiLoop  
 
--- Top level exception handler, just prints out the exception and carries on.
+mkPrompt Nothing = "> "
+mkPrompt (Just mod_name) = moduleNameUserString mod_name
+
+-- Top level exception handler, just prints out the exception 
+-- and carries on.
 runCommand c = 
   ghciHandle ( \other_exception ->io (putStrLn (show other_exception) )) $
   ghciHandleDyn
@@ -120,12 +125,15 @@ runCommand c =
 doCommand (':' : command) = specialCommand command
 doCommand expr = do
   st <- getGHCiState
-  dflags <- io (readIORef v_DynFlags)
-  (st, maybe_hvalue) <- 
-	io (cmGetExpr (cmstate st) dflags (current_module st) expr)
-  case maybe_hvalue of
-	Nothing -> return ()
-	Just hv -> io (cmRunExpr hv)
+  case current_module st of
+	Nothing -> throwDyn (OtherError "no module context in which to run the expression")
+	Just mod -> do
+             dflags <- io (readIORef v_DynFlags)
+             (st, maybe_hvalue) <- 
+        	io (cmGetExpr (cmstate st) dflags mod expr)
+             case maybe_hvalue of
+        	Nothing -> return ()
+        	Just hv -> io (cmRunExpr hv)
 {-
   let (mod,'.':str) = break (=='.') expr
   case cmLookupSymbol (mkOrig varName (mkModuleName mod) (_PK_ str)) (cmstate st) of
@@ -134,6 +142,7 @@ doCommand expr = do
   return ()
 -}
 
+specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   case [ (s,f) | (s,f) <- commands, prefixMatch cmd s ] of
@@ -159,24 +168,36 @@ changeDirectory = io . setCurrentDirectory
 loadModule :: String -> GHCi ()
 loadModule path = do
   state <- getGHCiState
-  (new_cmstate, mod) <- io (cmLoadModule (cmstate state) 
-				({-ToDo!!-}mkModuleName path))
+  (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) path)
+
   let new_state = GHCiState {
   			cmstate = new_cmstate,
-			current_module = case mod of 
-					   Nothing -> current_module state
-					   Just m  -> m,
+			modules = mods,
+			current_module = case mods of 
+					   [] -> Nothing
+					   xs -> Just (last xs),
 			target = Just path
 		   }
   setGHCiState new_state
+
+  let mod_commas 
+	| null mods = text "none."
+	| otherwise = hsep (
+	    punctuate comma (map (text.moduleNameUserString) mods)) <> text "."
+  case ok of
+    False -> 
+       io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
+    True  -> 
+       io (putStrLn (showSDoc (text "Ok, modules loaded: " <> mod_commas)))
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
   state <- getGHCiState
   case target state of
-	Nothing -> io (putStr "no current target\n")
-	Just path -> do (new_cmstate, mod) <- io (cmLoadModule (cmstate state) (mkModuleName path))
-  			setGHCiState state{cmstate=new_cmstate}  
+   Nothing -> io (putStr "no current target\n")
+   Just path -> do (new_cmstate, ok, mod) 
+			<- io (cmLoadModule (cmstate state) path)
+  		   setGHCiState state{cmstate=new_cmstate}  
 reloadModule _ = noArgs ":reload"
 
 -- set options in the interpreter.  Syntax is exactly the same as the
@@ -213,7 +234,8 @@ shellEscape str = io (system str >> return ())
 
 data GHCiState = GHCiState
      { 
-	current_module :: ModuleName,
+	modules	       :: [ModuleName],
+	current_module :: Maybe ModuleName,
 	target         :: Maybe FilePath,
 	cmstate        :: CmState
      }

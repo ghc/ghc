@@ -29,11 +29,12 @@ import Name		( lookupNameEnv )
 import Module
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
-import Finder		( findModule, emptyHomeDirCache )
+import Finder
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
 			  UniqFM, listToUFM )
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp )
+import DriverPhases
 import DriverUtil	( BarfKind(..), splitFilename3 )
 import Util
 import Outputable
@@ -149,8 +150,10 @@ the system state at the same time.
 
 \begin{code}
 cmLoadModule :: CmState 
-             -> ModuleName
-             -> IO (CmState, Maybe ModuleName)
+             -> FilePath
+             -> IO (CmState,		-- new state
+		    Bool, 		-- was successful
+		    [ModuleName])	-- list of modules loaded
 
 cmLoadModule cmstate1 rootname
    = do -- version 1's are the original, before downsweep
@@ -235,7 +238,7 @@ cmLoadModule cmstate1 rootname
                                                           pci=pcii, gmode=ghci_mode }
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
-                          return (cmstate3, Just rootname)
+                          return (cmstate3, True, map name_of_summary modsDone)
 
          else 
            -- Tricky.  We need to back out the effects of compiling any
@@ -269,10 +272,7 @@ cmLoadModule cmstate1 rootname
                                                           pci=pcii, gmode=ghci_mode }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
-                          return (cmstate4, 
-                                  -- choose rather arbitrarily who to return
-                                  if null mods_to_keep then Nothing 
-                                     else Just (last mods_to_keep_names))
+                          return (cmstate4, False, mods_to_keep_names)
 
 
 -- Return (names of) all those in modsDone who are part of a cycle
@@ -390,6 +390,17 @@ upsweep_mod ghci_mode oldUI threaded1 summary1 reachable_from_here
    = do let mod_name = name_of_summary summary1
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
+
+        -- We *have* to compile it if we're in batch mode and we can't see
+        -- a previous linkable for it on disk.
+        compilation_mandatory 
+           <- if ghci_mode /= Batch then return False 
+              else case ml_obj_file (ms_location summary1) of
+                      Nothing     -> do --putStrLn "cmcm: object?!"
+                                        return True
+                      Just obj_fn -> do --putStrLn ("cmcm: old obj " ++ obj_fn)
+                                        b <- doesFileExist obj_fn
+                                        return (not b)
 
         let maybe_oldUI_linkable = findModuleLinkable_maybe oldUI mod_name
         maybe_oldDisk_linkable
@@ -531,11 +542,21 @@ topological_sort include_source_imports summaries
 -- Chase downwards from the specified root set, returning summaries
 -- for all home modules encountered.  Only follow source-import
 -- links.
-downsweep :: [ModuleName] -> IO [ModSummary]
+downsweep :: [FilePath] -> IO [ModSummary]
 downsweep rootNm
-   = do rootSummaries <- mapM getSummary rootNm
+   = do rootSummaries <- mapM getRootSummary rootNm
         loop (filter (isModuleInThisPackage.ms_mod) rootSummaries)
      where
+	getRootSummary :: FilePath -> IO ModSummary
+	getRootSummary file
+	   | haskellish_file file
+           = do exists <- doesFileExist file
+		if exists then summariseFile file
+			  else getSummary (mkModuleName file)
+		-- ToDo: should check import paths
+  	   | otherwise
+	   = getSummary (mkModuleName file)
+
         getSummary :: ModuleName -> IO ModSummary
         getSummary nm
            | trace ("getSummary: "++ showSDoc (ppr nm)) True
@@ -569,6 +590,40 @@ downsweep rootNm
                  else loop (newHomeSummaries ++ homeSummaries)
 
 
+-----------------------------------------------------------------------------
+-- Summarising modules
+
+-- We have two types of summarisation:
+--
+--    * Summarise a file.  This is used for the root module passed to
+--	cmLoadModule.  The file is read, and used to determine the root
+--	module name.  The module name may differ from the filename.
+--
+--    * Summarise a module.  We are given a module name, and must provide
+--	a summary.  The finder is used to locate the file in which the module
+--	resides.
+
+summariseFile :: FilePath -> IO ModSummary
+summariseFile file
+   = do hspp_fn <- preprocess file
+        modsrc <- readFile hspp_fn
+
+        let (srcimps,imps,mod_name) = getImports modsrc
+	    (path, basename, ext) = splitFilename3 file
+
+	Just (mod, location)
+	   <- mkHomeModuleLocn mod_name (path ++ '/':basename) file
+	   
+        maybe_src_timestamp
+           <- case ml_hs_file location of 
+                 Nothing     -> return Nothing
+                 Just src_fn -> maybe_getModificationTime src_fn
+
+        return (ModSummary mod
+                           location{ml_hspp_file=Just hspp_fn}
+                           srcimps imps
+                           maybe_src_timestamp)
+
 -- Summarise a module, and pick up source and interface timestamps.
 summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
@@ -583,44 +638,24 @@ summarise mod location
                  Nothing     -> return Nothing
                  Just src_fn -> maybe_getModificationTime src_fn
 
-        -- If the module name is Main, allow it to be in a file
-        -- different from Main.hs, and mash the mod and loc 
-        -- to match.  Otherwise just moan.
-        (mashed_mod, mashed_loc)
-           <- case () of
-              () |  mod_name == moduleName mod
-                 -> return (mod, location)
-                 |  mod_name /= moduleName mod && mod_name == mkModuleName "Main"
-                 -> return (mash mod location "Main")
-                 |  otherwise
-                 -> do hPutStrLn stderr (showSDoc (
-                          text "ghc: warning: file name - module name mismatch:" <+> 
-                          ppr (moduleName mod) <+> text "vs" <+> ppr mod_name))
-                       return (mash mod location (moduleNameUserString (moduleName mod)))
-               where
-                 mash old_mod old_loc new_nm
-                    = (mkHomeModule (mkModuleName new_nm), 
-                       old_loc{ml_hi_file = maybe_swizzle_basename new_nm 
-                                                (ml_hi_file old_loc)})
+	if mod_name == moduleName mod
+		then return ()
+		else throwDyn (OtherError 
+			(showSDoc (text "file name does not match module name: "
+			   <+> ppr (moduleName mod) <+> text "vs" 
+			   <+> ppr mod_name)))
 
-                 maybe_swizzle_basename new Nothing = Nothing
-                 maybe_swizzle_basename new (Just old) 
-                    = case splitFilename3 old of 
-                         (dir, name, ext) -> Just (dir ++ new ++ ext)
-
-        return (ModSummary mashed_mod 
-                           mashed_loc{ml_hspp_file=Just hspp_fn} 
-                           srcimps imps
-                           maybe_src_timestamp)
+        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
+                               srcimps imps
+                               maybe_src_timestamp)
 
    | otherwise
    = return (ModSummary mod location [] [] Nothing)
 
-   where
-      maybe_getModificationTime :: FilePath -> IO (Maybe ClockTime)
-      maybe_getModificationTime fn
-         = (do time <- getModificationTime fn
-               return (Just time)) 
-           `catch`
-           (\err -> return Nothing)
+maybe_getModificationTime :: FilePath -> IO (Maybe ClockTime)
+maybe_getModificationTime fn
+   = (do time <- getModificationTime fn
+         return (Just time)) 
+     `catch`
+     (\err -> return Nothing)
 \end{code}

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.26 2000/11/19 19:40:08 simonmar Exp $
+-- $Id: Main.hs,v 1.27 2000/11/20 16:28:29 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -279,7 +279,7 @@ beginMake pkg_details mods
   = do case mods of
 	 []    -> throwDyn (UsageError "no input files")
 	 [mod] -> do state <- cmInit pkg_details Batch
-		     cmLoadModule state (mkModuleName mod)
+		     cmLoadModule state mod
 		     return ()
 	 _     -> throwDyn (UsageError "only one module allowed with --make")
 
@@ -290,7 +290,7 @@ beginInteractive pkg_details mods
   = do state <- cmInit pkg_details Interactive
        case mods of
 	   []    -> return ()
-	   [mod] -> do cmLoadModule state (mkModuleName mod); return ()
+	   [mod] -> do cmLoadModule state mod; return ()
 	   _     -> throwDyn (UsageError 
 				"only one module allowed with --interactive")
        interactiveUI state

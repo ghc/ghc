@@ -1,4 +1,4 @@
-%
+
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[FiniteMap]{An implementation of finite maps}

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.10 2000/11/20 15:40:54 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.11 2000/11/20 16:28:29 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -133,10 +133,7 @@ addNoDups var x = do
   unless (x `elem` xs) $ writeIORef var (x:xs)
 
 splitFilename :: String -> (String,String)
-splitFilename f = (reverse (stripDot rev_basename), reverse rev_ext)
-  where (rev_ext, rev_basename) = span ('.' /=) (reverse f)
-        stripDot ('.':xs) = xs
-        stripDot xs       = xs
+splitFilename f = split_longest_prefix f '.'
 
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,String)
