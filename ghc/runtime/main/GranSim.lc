@@ -2,7 +2,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1995 - 1996
 %     Hans Wolfgang Loidl
 %
-% Time-stamp: <Thu Jul 25 1996 04:01:57 Stardate: [-31]7860.63 hwloidl>
+% Time-stamp: <Sun Oct 19 1997 23:39:59 Stardate: [-30]0119.72 hwloidl>
 %
 %************************************************************************
 %*                                                                      *
@@ -305,7 +305,7 @@ get_next_event()
 
   if(EventHd == NULL)
     {
-      fprintf(stderr,"No next event\n");
+      fprintf(stderr,"No next event. This may be caused by a circular data dependency in the program.\n");
       EXIT(EXIT_FAILURE);
     }
 
@@ -437,7 +437,7 @@ grab_event()             /* undo prepend_event i.e. get the event */
  eventq event = EventHd;
 
  if(EventHd == NULL) {
-   fprintf(stderr,"No next event (in grab_event)\n");
+   fprintf(stderr,"No next event (in grab_event). This may be caused by a circular data dependency in the program.\n");
    EXIT(EXIT_FAILURE);
  }
 
