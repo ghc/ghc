@@ -1003,10 +1003,10 @@ pprInstr g@(GITOD src dst)
                    gpop dst 1, text " ; addl $4,%esp"])
 
 pprInstr g@(GCMP sz src1 src2) 
-   = pprG g (hcat [gtab, text "pushl %eax ; ",
-                   gpush src2 0, gsemi, gpush src1 1]
+   = pprG g (hcat [gtab, text "pushl %eax ; ",gpush src1 0]
              $$
-             hcat [gtab, text "fcompp ; fstsw %ax ; sahf ; popl %eax"])
+             hcat [gtab, text "fcomp ", greg src2 1, 
+                   text "; fstsw %ax ; sahf ; popl %eax"])
 
 pprInstr g@(GABS sz src dst)
    = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
@@ -1028,22 +1028,69 @@ pprInstr g@(GTAN sz src dst)
                    text " fstp %st(0)"] $$
              hcat [gtab, gcoerceto sz, gpop dst 1])
 
+-- In the translations for GADD, GMUL, GSUB and GDIV,
+-- the first two cases are mere optimisations.  The otherwise clause
+-- generates correct code under all circumstances.
+
 pprInstr g@(GADD sz src1 src2 dst)
+   | src1 == dst
+   = pprG g (text "\t#GADD-xxxcase1" $$ 
+             hcat [gtab, gpush src2 0,
+                   text " ; faddp %st(0),", greg src1 1])
+   | src2 == dst
+   = pprG g (text "\t#GADD-xxxcase2" $$ 
+             hcat [gtab, gpush src1 0,
+                   text " ; faddp %st(0),", greg src2 1])
+   | otherwise
    = pprG g (hcat [gtab, gpush src1 0, 
                    text " ; fadd ", greg src2 1, text ",%st(0)",
                    gsemi, gpop dst 1])
-pprInstr g@(GSUB sz src1 src2 dst)
-   = pprG g (hcat [gtab, gpush src1 0, 
-                   text " ; fsub ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
+
+
 pprInstr g@(GMUL sz src1 src2 dst)
+   | src1 == dst
+   = pprG g (text "\t#GMUL-xxxcase1" $$ 
+             hcat [gtab, gpush src2 0,
+                   text " ; fmulp %st(0),", greg src1 1])
+   | src2 == dst
+   = pprG g (text "\t#GMUL-xxxcase2" $$ 
+             hcat [gtab, gpush src1 0,
+                   text " ; fmulp %st(0),", greg src2 1])
+   | otherwise
    = pprG g (hcat [gtab, gpush src1 0, 
                    text " ; fmul ", greg src2 1, text ",%st(0)",
                    gsemi, gpop dst 1])
+
+
+pprInstr g@(GSUB sz src1 src2 dst)
+   | src1 == dst
+   = pprG g (text "\t#GSUB-xxxcase1" $$ 
+             hcat [gtab, gpush src2 0,
+                   text " ; fsubrp %st(0),", greg src1 1])
+   | src2 == dst
+   = pprG g (text "\t#GSUB-xxxcase2" $$ 
+             hcat [gtab, gpush src1 0,
+                   text " ; fsubp %st(0),", greg src2 1])
+   | otherwise
+   = pprG g (hcat [gtab, gpush src1 0, 
+                   text " ; fsub ", greg src2 1, text ",%st(0)",
+                   gsemi, gpop dst 1])
+
+
 pprInstr g@(GDIV sz src1 src2 dst)
+   | src1 == dst
+   = pprG g (text "\t#GDIV-xxxcase1" $$ 
+             hcat [gtab, gpush src2 0,
+                   text " ; fdivrp %st(0),", greg src1 1])
+   | src2 == dst
+   = pprG g (text "\t#GDIV-xxxcase2" $$ 
+             hcat [gtab, gpush src1 0,
+                   text " ; fdivp %st(0),", greg src2 1])
+   | otherwise
    = pprG g (hcat [gtab, gpush src1 0, 
                    text " ; fdiv ", greg src2 1, text ",%st(0)",
                    gsemi, gpop dst 1])
+
 
 pprInstr GFREE 
    = vcat [ ptext SLIT("\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
