@@ -94,7 +94,7 @@ dblImmLit r
 	 IF_ARCH_alpha({-prepend nothing-}
 	,IF_ARCH_i386( '0' : 'd' :
 	,IF_ARCH_sparc('0' : 'r' :,)))
-	show (rational r))
+	showSDoc (rational r))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
