@@ -347,6 +347,9 @@ def compile_fail( name, way, extra_hc_opts ):
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, 0, top_mod, extra_hc_opts )
 
+def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
+    return do_compile( name, way, 1, top_mod, extra_hc_opts )
+
 def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     # print 'Compile only, extra args = ', extra_hc_opts
     pretest_cleanup(name)
