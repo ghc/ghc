@@ -213,16 +213,9 @@ endif
 
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkHaskellSupport)" "YES"
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 boot ::
-	cd gmp && ./configure --enable-shared=no \
+	cd gmp && CC=$(WhatGccIsCalled) ./configure --enable-shared=no \
 		--host=`echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g'`
-else
-# Pass --target to configure of GMP, so that building for mingwin under
-# cygwin works properly (when the host is not the same as the target)
-boot ::
-	cd gmp && CC=$(WhatGccIsCalled) ./configure --enable-shared=no --target=$(HOSTPLATFORM)
-endif
 
 # Slight cheatage here to pass host as target, but x-compilation isn't supported by ghc.
 
