@@ -26,3 +26,4 @@ test "tcrun015" { vtr("-O", "", "") }
 test "tcrun016" { vtr("", "", "") }
 test "tcrun017" { vtr("", "", "") }
 test "tcrun018" { vtr("", "", "") }
+test "tcrun019" { vtr("", "", "") }
