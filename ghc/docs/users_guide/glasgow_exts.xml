@@ -279,7 +279,7 @@ became out of date, and wrong information is worse than none.</para>
 
 <para>The Real Truth about what primitive types there are, and what operations
 work over those types, is held in the file
-<filename>fptools/ghc/compiler/prelude/primops.txt</filename>.
+<filename>fptools/ghc/compiler/prelude/primops.txt.pp</filename>.
 This file is used directly to generate GHC's primitive-operation definitions, so
 it is always correct!  It is also intended for processing into text.</para>
 
@@ -343,11 +343,16 @@ it is accidental that it is represented by a pointer.  If a pointer
 represents a primitive value, then it really does point to that value:
 no unevaluated thunks, no indirections&hellip;nothing can be at the
 other end of the pointer than the primitive value.
+A numerically-intensive program using unboxed types can
+go a <emphasis>lot</emphasis> faster than its &ldquo;standard&rdquo;
+counterpart&mdash;we saw a threefold speedup on one example.
 </para>
 
 <para>
-There are some restrictions on the use of primitive types, the main
-one being that you can't pass a primitive value to a polymorphic
+There are some restrictions on the use of primitive types:
+<itemizedlist>
+<listitem><para>The main restriction
+is that you can't pass a primitive value to a polymorphic
 function or store one in a polymorphic data type.  This rules out
 things like <literal>[Int&num;]</literal> (i.e. lists of primitive
 integers).  The reason for this restriction is that polymorphic
@@ -359,11 +364,33 @@ attempt to dereference the pointer, with disastrous results.  Even
 worse, the unboxed value might be larger than a pointer
 (<literal>Double&num;</literal> for instance).
 </para>
+</listitem>
+<listitem><para> You cannot bind a variable with an unboxed type
+in a <emphasis>top-level</emphasis> binding.
+</para></listitem>
+<listitem><para> You cannot bind a variable with an unboxed type
+in a <emphasis>recursive</emphasis> binding.
+</para></listitem>
+<listitem><para> You may bind unboxed variables in a (non-recursive,
+non-top-level) pattern binding, but any such variable causes the entire
+pattern-match
+to become strict.  For example:
+<programlisting>
+  data Foo = Foo Int Int#
 
-<para>
-Nevertheless, A numerically-intensive program using unboxed types can
-go a <emphasis>lot</emphasis> faster than its &ldquo;standard&rdquo;
-counterpart&mdash;we saw a threefold speedup on one example.
+  f x = let (Foo a b, w) = ..rhs.. in ..body..
+</programlisting>
+Since <literal>b</literal> has type <literal>Int#</literal>, the entire pattern
+match
+is strict, and the program behaves as if you had written
+<programlisting>
+  data Foo = Foo Int Int#
+
+  f x = case ..rhs.. of { (Foo a b, w) -> ..body.. }
+</programlisting>
+</para>
+</listitem>
+</itemizedlist>
 </para>
 
 </sect2>
@@ -398,21 +425,19 @@ values, but they avoid the heap allocation normally associated with
 using fully-fledged tuples.  When an unboxed tuple is returned, the
 components are put directly into registers or on the stack; the
 unboxed tuple itself does not have a composite representation.  Many
-of the primitive operations listed in this section return unboxed
+of the primitive operations listed in <literal>primops.txt.pp</literal> return unboxed
 tuples.
+In particular, the <literal>IO</literal> and <literal>ST</literal> monads use unboxed
+tuples to avoid unnecessary allocation during sequences of operations.
 </para>
 
 <para>
 There are some pretty stringent restrictions on the use of unboxed tuples:
-</para>
-
-<para>
-
 <itemizedlist>
 <listitem>
 
 <para>
- Unboxed tuple types are subject to the same restrictions as
+Values of unboxed tuple types are subject to the same restrictions as
 other unboxed types; i.e. they may not be stored in polymorphic data
 structures or passed to polymorphic functions.
 
@@ -421,56 +446,46 @@ structures or passed to polymorphic functions.
 <listitem>
 
 <para>
- Unboxed tuples may only be constructed as the direct result of
-a function, and may only be deconstructed with a <literal>case</literal> expression.
-eg. the following are valid:
+No variable can have an unboxed tuple type, nor may a constructor or function
+argument have an unboxed tuple type.  The following are all illegal:
 
 
 <programlisting>
-f x y = (# x+1, y-1 #)
-g x = case f x x of { (# a, b #) -&#62; a + b }
+  data Foo = Foo (# Int, Int #)
+
+  f :: (# Int, Int #) -&#62; (# Int, Int #)
+  f x = x
+
+  g :: (# Int, Int #) -&#62; Int
+  g (# a,b #) = a
+
+  h x = let y = (# x,x #) in ...
 </programlisting>
-
-
-but the following are invalid:
-
-
-<programlisting>
-f x y = g (# x, y #)
-g (# x, y #) = x + y
-</programlisting>
-
-
 </para>
 </listitem>
-<listitem>
-
-<para>
- No variable can have an unboxed tuple type.  This is illegal:
-
-
-<programlisting>
-f :: (# Int, Int #) -&#62; (# Int, Int #)
-f x = x
-</programlisting>
-
-
-because <literal>x</literal> has an unboxed tuple type.
-
-</para>
-</listitem>
-
 </itemizedlist>
-
 </para>
-
 <para>
-Note: we may relax some of these restrictions in the future.
-</para>
-
-<para>
-The <literal>IO</literal> and <literal>ST</literal> monads use unboxed
-tuples to avoid unnecessary allocation during sequences of operations.
+The typical use of unboxed tuples is simply to return multiple values,
+binding those multiple results with a <literal>case</literal> expression, thus:
+<programlisting>
+  f x y = (# x+1, y-1 #)
+  g x = case f x x of { (# a, b #) -&#62; a + b }
+</programlisting>
+You can have an unboxed tuple in a pattern binding, thus
+<programlisting>
+  f x = let (# p,q #) = h x in ..body..
+</programlisting>
+If the types of <literal>p</literal> and <literal>q</literal> are not unboxed,
+the resulting binding is lazy like any other Haskell pattern binding.  The 
+above example desugars like this:
+<programlisting>
+  f x = let t = case h x o f{ (# p,q #) -> (p,q)
+            p = fst t
+            q = snd t
+        in ..body..
+</programlisting>
+Indeed, the bindings can even be recursive.
 </para>
 
 </sect2>
