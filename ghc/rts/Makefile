@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.61 2002/02/04 12:09:44 simonmar Exp $
+# $Id: Makefile,v 1.62 2002/02/04 12:23:02 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -75,13 +75,16 @@ WARNING_OPTS += -Wcast-align
 #WARNING_OPTS += -Wredundant-decls 
 #WARNING_OPTS += -Wconversion
 
+# HC_OPTS is included in both .c and .hc compilations, whereas CC_OPTS is
+# only included in .c compilations.  HC_OPTS included the WAY_* opts, which
+# must be included in both types of compilations.
+
 SRC_CC_OPTS += $(WARNING_OPTS)
 
-SRC_CC_OPTS += -I../includes -I. -Iparallel 
-SRC_HC_OPTS += -I../includes -I. -Iparallel 
+SRC_HC_OPTS += -I../includes -I. -Iparallel -DCOMPILING_RTS
 
-SRC_CC_OPTS += $(GhcRtsCcOpts) -DCOMPILING_RTS
-SRC_HC_OPTS += $(GhcRtsHcOpts) -DCOMPILING_RTS
+SRC_CC_OPTS += $(GhcRtsCcOpts)
+SRC_HC_OPTS += $(GhcRtsHcOpts)
 
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
