@@ -1,11 +1,21 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.6 2000/09/04 15:09:49 simonmar Exp $
+ * $Id: Stable.h,v 1.7 2000/11/07 17:05:47 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
- * Stable names and stable pointers
+ * Stable Pointers: A stable pointer is represented as an index into
+ * the stable pointer table in the low BITS_PER_WORD-8 bits with a
+ * weight in the upper 8 bits.
  *
- * ---------------------------------------------------------------------------*/
+ * SUP: StgStablePtr used to be a synonym for StgWord, but stable pointers
+ * are guaranteed to be void* on the C-side, so we have to do some occasional
+ * casting. Size is not a matter, because StgWord is always the same size as
+ * a void*.
+ *
+ * ----------------------------------------------------------------------------*/
+
+#define STABLEPTR_WEIGHT_MASK   ((StgWord)0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
+#define STABLEPTR_WEIGHT_SHIFT  (BITS_IN(StgWord) - 8)
 
 /* -----------------------------------------------------------------------------
    External C Interface

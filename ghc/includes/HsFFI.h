@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.7 2000/11/07 13:30:40 simonmar Exp $
+ * $Id: HsFFI.h,v 1.8 2000/11/07 17:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -65,6 +65,7 @@ typedef StgInt8			HsInt8;
 typedef StgInt16		HsInt16;
 typedef StgInt32		HsInt32;
 typedef StgInt64		HsInt64;
+typedef StgWord                 HsWord;
 typedef StgWord8		HsWord8;
 typedef StgWord16		HsWord16;
 typedef StgWord32		HsWord32;

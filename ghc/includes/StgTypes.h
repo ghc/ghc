@@ -1,23 +1,35 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.14 2000/11/07 13:30:40 simonmar Exp $
+ * $Id: StgTypes.h,v 1.15 2000/11/07 17:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
- * Various C datatypes used in the run-time system.
-
+ * Various C datatypes used in the run-time system.  This is the
+ * lowest-level include file (after config.h).
+ *
+ * This module should define types *only*, all beginning with "Stg".
+ *
  * Specifically:
 
 	StgInt8,  16, 32, 64
 	StgWord8, 16, 32, 64
 	StgChar, StgFloat, StgDouble
 
-	***** All the same size: *****
+	***** All the same size (i.e. sizeof(void *)): *****
 	StgPtr			Basic pointer type
 	StgWord			Unit of heap allocation
 	StgInt			Signed version of StgWord
 	StgAddr			Generic address type
 	
+	StgBool, StgVoid, StgClosurePtr, StgPtr, StgOffset, 
+	StgTSOPtr, StgForeignPtr, StgStackOffset, StgStackPtr,
+	StgCode, StgArray, StgByteArray, StgStablePtr, StgFunPtr,
+	StgUnion.
+
  * WARNING: Keep this file and HsFFI.h in synch!
+ *
+ * NOTE: assumes #include "config.h"
+ * 
+ * Works with or without _POSIX_SOURCE.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -56,15 +68,17 @@ typedef unsigned int             StgWord32;
 
 #ifdef SUPPORT_LONG_LONGS
 /* assume long long is 64 bits */
-typedef unsigned long long int StgWord64;
 typedef signed long long int   StgInt64;
+typedef unsigned long long int StgWord64;
 #elif SIZEOF_LONG == 8
 typedef signed   long          StgInt64;
 typedef unsigned long          StgWord64;
+#elif defined(__MSVC__)
+typedef __int64                StgInt64;
+typedef unsigned __int64       StgWord64;
 #else
 #error GHC untested on this architecture: sizeof(void *) < 8 and no long longs.
 #endif
-
 
 /*
  * Define the standard word size we'll use on this machine: make it
@@ -97,7 +111,8 @@ typedef double		   StgDouble;
                            
 typedef void               StgVoid;
                            
-typedef struct StgClosure_* StgClosurePtr;
+typedef struct StgClosure_ StgClosure;
+typedef StgClosure*        StgClosurePtr;
 typedef StgWord*           StgPtr;           /* pointer into closure       */
 typedef StgWord            StgOffset;        /* byte offset within closure */
                            
@@ -110,26 +125,11 @@ typedef StgInt             StgStackOffset;   /* offset in words! */
 typedef StgWord*           StgStackPtr;
 
 typedef StgWord8 	   StgCode;  	    /* close enough */
-typedef StgCode*	   StgCodePtr;	
 
 typedef StgPtr*            StgArray;        /* the goods of an Array# */
 typedef char*		   StgByteArray;    /* the goods of a ByteArray# */
 
-typedef StgInt64	       LI_;
-typedef StgWord64	       LW_;
-
-/* Stable Pointers:  A stable pointer is represented as an index into
- * the stable pointer table in the low 24 bits with a weight in the
- * upper 8 bits.
- * SUP: StgStablePtr used to be a synonym for StgWord, but stable pointers
- * are guaranteed to be void* on the C-side, so we have to do some occasional
- * casting. Size is not a matter, because StgWord is always the same size as
- * a void*.
- */
 typedef void*		   StgStablePtr;
-
-#define STABLEPTR_WEIGHT_MASK   ((StgWord)0xff << ((sizeof(StgWord)-1) * BITS_PER_BYTE))
-#define STABLEPTR_WEIGHT_SHIFT  (BITS_IN(StgWord) - 8)
 
 /*
   Types for the generated C functions
@@ -161,33 +161,5 @@ typedef union {
     StgByteArray   b;
     StgTSOPtr      t;
 } StgUnion;
-
-/*
- * Shorthand forms
- */
-
-typedef StgChar		C_;
-typedef StgWord		W_;
-typedef StgWord*	P_;
-typedef P_*		PP_;
-typedef StgInt		I_;
-typedef StgAddr	        A_;
-typedef const StgWord*  D_;
-typedef StgFunPtr       F_;
-typedef StgByteArray    B_;
-typedef StgClosurePtr   L_;
-
-/*
- * We often want to know the size of something in units of an
- * StgWord... (rounded up, of course!)
- */
-
-#define sizeofW(t) ((sizeof(t)+sizeof(W_)-1)/sizeof(W_))
-
-/* 
- * It's nice to be able to grep for casts
- */
-
-#define stgCast(ty,e) ((ty)(e))
 
 #endif /* STGTYPES_H */

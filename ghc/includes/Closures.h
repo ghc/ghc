@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.18 2000/08/15 11:48:06 simonmar Exp $
+ * $Id: Closures.h,v 1.19 2000/11/07 17:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -137,10 +137,10 @@ typedef struct {
 
 /* All closures follow the generic format */
 
-typedef struct StgClosure_ {
+struct StgClosure_ {
     StgHeader   header;
     struct StgClosure_ *payload[0];
-} StgClosure;
+};
 
 /* What a stroke of luck - all our mutable closures follow the same
  * basic layout, with the mutable link field as the second field after

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.17 2000/08/29 13:34:21 qrczak Exp $
+ * $Id: RtsAPI.h,v 1.18 2000/11/07 17:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,8 @@
 
 #ifndef RTSAPI_H
 #define RTSAPI_H
+
+#include "HsFFI.h"
 
 /*
  * Running the scheduler
@@ -23,21 +25,6 @@ typedef enum {
 
 typedef StgClosure *HaskellObj;
 
-
-/* Make this compilable with Visual C++.  We can't just use StgInt64 here,
- * because this file should be compilable without reference to the rest
- * of the RTS machinery.  These are absolutely non-standard types, but
- * I don't know what alternatives are safe if we don't #include anything
- * here.
- */
-#if defined(__MSVC__)
-typedef __int64            HsInt64_;
-typedef unsigned __int64   HsWord64_;
-#else
-typedef long long          HsInt64_;
-typedef unsigned long long HsWord64_;
-#endif
-
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
    ------------------------------------------------------------------------- */
@@ -50,39 +37,39 @@ extern void getProgArgv            ( int *argc, char **argv[] );
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
-HaskellObj   rts_mkChar       ( unsigned int c );
-HaskellObj   rts_mkInt        ( int i );
-HaskellObj   rts_mkInt8       ( int i );
-HaskellObj   rts_mkInt16      ( int i );
-HaskellObj   rts_mkInt32      ( int i );
-HaskellObj   rts_mkWord       ( unsigned int w );
-HaskellObj   rts_mkWord8      ( unsigned int w );
-HaskellObj   rts_mkWord16     ( unsigned int w );
-HaskellObj   rts_mkWord32     ( unsigned int w );
-HaskellObj   rts_mkInt64      ( HsInt64_ i );
-HaskellObj   rts_mkWord64     ( HsWord64_ w );
-HaskellObj   rts_mkFloat      ( float f );
-HaskellObj   rts_mkDouble     ( double f );
-HaskellObj   rts_mkStablePtr  ( StgStablePtr s );
-HaskellObj   rts_mkAddr       ( void *a );
-HaskellObj   rts_mkBool       ( int b );
-HaskellObj   rts_mkString     ( char *s );
+HaskellObj   rts_mkChar       ( HsChar   c );
+HaskellObj   rts_mkInt        ( HsInt    i );
+HaskellObj   rts_mkInt8       ( HsInt8   i );
+HaskellObj   rts_mkInt16      ( HsInt16  i );
+HaskellObj   rts_mkInt32      ( HsInt32  i );
+HaskellObj   rts_mkInt64      ( HsInt64  i );
+HaskellObj   rts_mkWord       ( HsWord   w );
+HaskellObj   rts_mkWord8      ( HsWord8  w );
+HaskellObj   rts_mkWord16     ( HsWord16 w );
+HaskellObj   rts_mkWord32     ( HsWord32 w );
+HaskellObj   rts_mkWord64     ( HsWord64 w );
+HaskellObj   rts_mkFloat      ( HsFloat  f );
+HaskellObj   rts_mkDouble     ( HsDouble f );
+HaskellObj   rts_mkStablePtr  ( HsStablePtr s );
+HaskellObj   rts_mkAddr       ( HsAddr   a );
+HaskellObj   rts_mkBool       ( HsBool   b );
+HaskellObj   rts_mkString     ( char    *s );
 
 HaskellObj   rts_apply        ( HaskellObj, HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects
    ------------------------------------------------------------------------- */
-unsigned int rts_getChar      ( HaskellObj );
-int          rts_getInt       ( HaskellObj );
-int          rts_getInt32     ( HaskellObj );
-unsigned int rts_getWord      ( HaskellObj );
-unsigned int rts_getWord32    ( HaskellObj );
-float        rts_getFloat     ( HaskellObj );
-double       rts_getDouble    ( HaskellObj );
-StgStablePtr rts_getStablePtr ( HaskellObj );
-void *       rts_getAddr      ( HaskellObj );
-int          rts_getBool      ( HaskellObj );
+HsChar       rts_getChar      ( HaskellObj );
+HsInt        rts_getInt       ( HaskellObj );
+HsInt32      rts_getInt32     ( HaskellObj );
+HsWord       rts_getWord      ( HaskellObj );
+HsWord32     rts_getWord32    ( HaskellObj );
+HsFloat      rts_getFloat     ( HaskellObj );
+HsDouble     rts_getDouble    ( HaskellObj );
+HsStablePtr  rts_getStablePtr ( HaskellObj );
+HsAddr       rts_getAddr      ( HaskellObj );
+HsBool       rts_getBool      ( HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions

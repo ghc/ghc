@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.20 2000/08/29 13:34:21 qrczak Exp $
+ * $Id: RtsAPI.c,v 1.21 2000/11/07 17:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -19,7 +19,7 @@
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
 HaskellObj
-rts_mkChar (unsigned int c)
+rts_mkChar (HsChar c)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   p->header.info = Czh_con_info;
@@ -28,7 +28,7 @@ rts_mkChar (unsigned int c)
 }
 
 HaskellObj
-rts_mkInt (int i)
+rts_mkInt (HsInt i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   p->header.info = Izh_con_info;
@@ -37,7 +37,7 @@ rts_mkInt (int i)
 }
 
 HaskellObj
-rts_mkInt8 (int i)
+rts_mkInt8 (HsInt8 i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   /* This is a 'cheat', using the static info table for Ints,
@@ -51,7 +51,7 @@ rts_mkInt8 (int i)
 }
 
 HaskellObj
-rts_mkInt16 (int i)
+rts_mkInt16 (HsInt16 i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   /* This is a 'cheat', using the static info table for Ints,
@@ -65,7 +65,7 @@ rts_mkInt16 (int i)
 }
 
 HaskellObj
-rts_mkInt32 (int i)
+rts_mkInt32 (HsInt32 i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   /* see mk_Int8 comment */
@@ -75,7 +75,7 @@ rts_mkInt32 (int i)
 }
 
 HaskellObj
-rts_mkInt64 (HsInt64_ i)
+rts_mkInt64 (HsInt64 i)
 {
   long long *tmp;
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
@@ -87,7 +87,7 @@ rts_mkInt64 (HsInt64_ i)
 }
 
 HaskellObj
-rts_mkWord (unsigned int i)
+rts_mkWord (HsWord i)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   p->header.info = Wzh_con_info;
@@ -96,7 +96,7 @@ rts_mkWord (unsigned int i)
 }
 
 HaskellObj
-rts_mkWord8 (unsigned int w)
+rts_mkWord8 (HsWord8 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
@@ -106,7 +106,7 @@ rts_mkWord8 (unsigned int w)
 }
 
 HaskellObj
-rts_mkWord16 (unsigned int w)
+rts_mkWord16 (HsWord16 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
@@ -116,7 +116,7 @@ rts_mkWord16 (unsigned int w)
 }
 
 HaskellObj
-rts_mkWord32 (unsigned int w)
+rts_mkWord32 (HsWord32 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
@@ -126,7 +126,7 @@ rts_mkWord32 (unsigned int w)
 }
 
 HaskellObj
-rts_mkWord64 (HsWord64_ w)
+rts_mkWord64 (HsWord64 w)
 {
   unsigned long long *tmp;
 
@@ -139,7 +139,7 @@ rts_mkWord64 (HsWord64_ w)
 }
 
 HaskellObj
-rts_mkFloat (float f)
+rts_mkFloat (HsFloat f)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   p->header.info = Fzh_con_info;
@@ -148,7 +148,7 @@ rts_mkFloat (float f)
 }
 
 HaskellObj
-rts_mkDouble (double d)
+rts_mkDouble (HsDouble d)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,sizeofW(StgDouble)));
   p->header.info = Dzh_con_info;
@@ -157,7 +157,7 @@ rts_mkDouble (double d)
 }
 
 HaskellObj
-rts_mkStablePtr (StgStablePtr s)
+rts_mkStablePtr (HsStablePtr s)
 {
   StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
   p->header.info = StablePtr_con_info;
@@ -166,7 +166,7 @@ rts_mkStablePtr (StgStablePtr s)
 }
 
 HaskellObj
-rts_mkAddr (void *a)
+rts_mkAddr (HsAddr a)
 {
   StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
   p->header.info = Azh_con_info;
@@ -176,7 +176,7 @@ rts_mkAddr (void *a)
 
 #ifdef COMPILER /* GHC has em, Hugs doesn't */
 HaskellObj
-rts_mkBool (StgBool b)
+rts_mkBool (HsBool b)
 {
   if (b) {
     return (StgClosure *)True_closure;
@@ -207,7 +207,7 @@ rts_apply (HaskellObj f, HaskellObj arg)
    Deconstructing Haskell objects
    ------------------------------------------------------------------------- */
 
-unsigned int
+HsChar
 rts_getChar (HaskellObj p)
 {
   if ( p->header.info == Czh_con_info || 
@@ -218,7 +218,7 @@ rts_getChar (HaskellObj p)
   }
 }
 
-int
+HsInt
 rts_getInt (HaskellObj p)
 {
   if ( 1 ||
@@ -230,7 +230,7 @@ rts_getInt (HaskellObj p)
   }
 }
 
-int
+HsInt32
 rts_getInt32 (HaskellObj p)
 {
   if ( 1 ||
@@ -242,7 +242,7 @@ rts_getInt32 (HaskellObj p)
   }
 }
 
-unsigned int
+HsWord
 rts_getWord (HaskellObj p)
 {
   if ( 1 || /* see above comment */
@@ -254,7 +254,7 @@ rts_getWord (HaskellObj p)
   }
 }
 
-unsigned int
+HsWord32
 rts_getWord32 (HaskellObj p)
 {
   if ( 1 || /* see above comment */
@@ -266,7 +266,7 @@ rts_getWord32 (HaskellObj p)
   }
 }
 
-float
+HsFloat
 rts_getFloat (HaskellObj p)
 {
   if ( p->header.info == Fzh_con_info || 
@@ -277,7 +277,7 @@ rts_getFloat (HaskellObj p)
   }
 }
 
-double
+HsDouble
 rts_getDouble (HaskellObj p)
 {
   if ( p->header.info == Dzh_con_info || 
@@ -288,7 +288,7 @@ rts_getDouble (HaskellObj p)
   }
 }
 
-StgStablePtr
+HsStablePtr
 rts_getStablePtr (HaskellObj p)
 {
   if ( p->header.info == StablePtr_con_info || 
@@ -299,7 +299,7 @@ rts_getStablePtr (HaskellObj p)
   }
 }
 
-void *
+HsAddr
 rts_getAddr (HaskellObj p)
 {
   if ( p->header.info == Azh_con_info || 
@@ -312,7 +312,7 @@ rts_getAddr (HaskellObj p)
 }
 
 #ifdef COMPILER /* GHC has em, Hugs doesn't */
-int
+HsBool
 rts_getBool (HaskellObj p)
 {
   if (p == True_closure) {

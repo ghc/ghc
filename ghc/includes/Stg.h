@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.32 2000/05/27 14:28:06 panne Exp $
+ * $Id: Stg.h,v 1.33 2000/11/07 17:05:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -102,12 +102,46 @@ void _stgAssert (char *, unsigned int);
 #endif /* DEBUG */
 
 /* -----------------------------------------------------------------------------
-   Include everything STG-ish
+   Global type definitions
    -------------------------------------------------------------------------- */
 
-/* Global type definitions*/
 #include "StgTypes.h"
 #include "RtsTypes.h"
+
+/* -----------------------------------------------------------------------------
+   Shorthand forms
+   -------------------------------------------------------------------------- */
+
+typedef StgChar		C_;
+typedef StgWord		W_;
+typedef StgWord*	P_;
+typedef P_*		PP_;
+typedef StgInt		I_;
+typedef StgAddr	        A_;
+typedef const StgWord*  D_;
+typedef StgFunPtr       F_;
+typedef StgByteArray    B_;
+typedef StgClosurePtr   L_;
+
+typedef StgInt64        LI_;
+typedef StgWord64       LW_;
+
+/*
+ * We often want to know the size of something in units of an
+ * StgWord... (rounded up, of course!)
+ */
+
+#define sizeofW(t) ((sizeof(t)+sizeof(W_)-1)/sizeof(W_))
+
+/* 
+ * It's nice to be able to grep for casts
+ */
+
+#define stgCast(ty,e) ((ty)(e))
+
+/* -----------------------------------------------------------------------------
+   Include everything STG-ish
+   -------------------------------------------------------------------------- */
 
 /* Global constaints */
 #include "Constants.h"
