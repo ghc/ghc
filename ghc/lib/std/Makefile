@@ -217,3 +217,7 @@ endif # ILXized
 
 include $(TOP)/mk/target.mk
 
+# PrelIO.hsc includes PrelHandle_hsc.h
+PrelIO.hsc : PrelHandle_hsc.h
+
+
