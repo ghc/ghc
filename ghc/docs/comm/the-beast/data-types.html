@@ -220,7 +220,23 @@ that type, and that in turn depends on whether module <tt>M</tt> was
 compiled with <tt>-funbox-strict-fields</tt>.  So when writing an
 interface file, GHC therefore records with each data type whether its
 strict fields (if any) should be unboxed.
+
+<h2> Labels and info tables </h2>
+
+<em>Quick rough notes: SLPJ March 2003</em>.
 <p>
+Every data constructor <tt>C</tt>has two info tables:
+<ul>
+<li> The static info table (label <tt>C_static_info</tt>), used for statically-allocated constructors.
+
+<li> The dynamic info table (label <tt>C_con_info</tt>), used for dynamically-allocated constructors.
+</ul>
+Statically-allocated constructors are not moved by the garbage collector, and therefore have a different closure
+type from dynamically-allocated constructors; hence they need
+a distinct info table.  
+Both info tables share the same entry code, but since the entry code is phyiscally juxtaposed with the
+info table, it must be duplicated (<tt>C_static_entry</tt> and <tt>C_con_entry</tt> respectively).
+
   </body>
 </html>
 
