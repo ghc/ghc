@@ -4,8 +4,8 @@
  * Copyright (c) 1994-2002.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.26 $
- * $Date: 2002/12/11 15:36:41 $
+ * $Revision: 1.27 $
+ * $Date: 2003/03/25 17:04:09 $
  * ---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
@@ -34,7 +34,7 @@ disInstr ( StgBCO *bco, int pc )
 {
    int i;
 
-   StgWord16*     instrs      = (StgWord16*)(BCO_INSTRS(bco));
+   StgWord16*     instrs      = (StgWord16*)(bco->instrs->payload);
 
    StgArrWords*   literal_arr = bco->literals;
    StgWord*       literals    = (StgWord*)(&literal_arr->payload[0]);
@@ -249,7 +249,7 @@ disInstr ( StgBCO *bco, int pc )
 void disassemble( StgBCO *bco )
 {
    nat i, j;
-   StgWord16*     instrs    = (StgWord16*)(BCO_INSTRS(bco));
+   StgWord16*     instrs    = (StgWord16*)(bco->instrs->payload);
    StgMutArrPtrs* ptrs      = bco->ptrs;
    nat            nbcs      = (int)instrs[0];
    nat            pc        = 1;
