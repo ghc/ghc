@@ -472,7 +472,7 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
         | errno == eAFNOSUPPORT    = UnsupportedOperation
         | errno == eAGAIN          = ResourceExhausted
         | errno == eALREADY        = AlreadyExists
-        | errno == eBADF           = OtherError
+        | errno == eBADF           = InvalidArgument
         | errno == eBADMSG         = InappropriateType
         | errno == eBADRPC         = OtherError
         | errno == eBUSY           = ResourceBusy
