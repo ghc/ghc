@@ -194,8 +194,24 @@ mkRhsTyLam tyvars body
 	go (fn . Let (mk_silly_bind var rhs')) body	`thenSmpl` \ body' ->
 	returnSmpl (Let (NonRec var' (mkTyLam tyvars_here (fn rhs))) body')
       where
-	tyvars_here = tyVarSetToList (main_tyvar_set `intersectTyVarSets` tyVarsOfType var_ty)
 	var_ty = idType var
+	tyvars_here = tyvars
+		-- tyVarSetToList (main_tyvar_set `intersectTyVarSets` tyVarsOfTypes var_ty)
+		-- tyvars_here was an attempt to reduce the number of tyvars
+		-- wrt which the new binding is abstracted.  But the naive
+		-- approach of abstract wrt the tyvars free in the Id's type
+		-- fails. Consider:
+		--	/\ a b -> let t :: (a,b) = (e1, e2)
+		--		      x :: a     = fst t
+		--		  in ...
+		-- Here, b isn't free in a's type, but we must nevertheless
+		-- abstract wrt b as well, because t's type mentions b.
+		-- Since t is floated too, we'd end up with the bogus:
+		--	poly_t = /\ a b -> (e1, e2)
+		--	poly_x = /\ a   -> fst (poly_t a *b*)
+		-- So for now we adopt the even more naive approach of
+		-- abstracting wrt *all* the tyvars.  We'll see if that
+		-- gives rise to problems.   SLPJ June 98
 
     go fn (Let (Rec prs) body)
        = mapAndUnzipSmpl (mk_poly tyvars_here) var_tys	`thenSmpl` \ (vars', rhss') ->
@@ -206,8 +222,8 @@ mkRhsTyLam tyvars body
 	 returnSmpl (Let (Rec (vars' `zip` [mkTyLam tyvars_here (gn rhs) | rhs <- rhss])) body')
        where
 	 (vars,rhss) = unzip prs
-	 tyvars_here = tyVarSetToList (main_tyvar_set `intersectTyVarSets` tyVarsOfTypes var_tys)
 	 var_tys     = map idType vars
+	 tyvars_here = tyvars	-- See notes on tyvars_here above
 
     go fn body = returnSmpl (mkTyLam tyvars (fn body))
 
