@@ -35,10 +35,12 @@ import Unique		( Unique )
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_PprStyle_Debug )
 import BasicTypes	( FixitySig )
 import Bag		( snocBag, unionBags )
-
+import Panic		( showException )
+ 
 import Maybe		( isJust )
 import IO		( stderr )
 import DATA_IOREF	( newIORef, readIORef )
+import EXCEPTION	( Exception )
 \end{code}
 
 %************************************************************************
@@ -372,7 +374,7 @@ recoverM :: TcRn m r 	-- Recovery action; do this if the main one fails
 	 -> TcRn m r	-- Main action: do this first
 	 -> TcRn m r
 recoverM recover thing 
-  = do { mb_res <- tryM thing ;
+  = do { mb_res <- try_m thing ;
 	 case mb_res of
 	   Left exn  -> recover
 	   Right res -> returnM res }
@@ -388,7 +390,7 @@ tryTc :: TcRn m a -> TcRn m (Messages, Maybe a)
 tryTc m 
  = do {	errs_var <- newMutVar emptyMessages ;
 	
-	mb_r <- tryM (setErrsVar errs_var m) ; 
+	mb_r <- try_m (setErrsVar errs_var m) ; 
 
 	new_errs <- readMutVar errs_var ;
 
@@ -396,10 +398,20 @@ tryTc m
 
 	return (new_errs, 
 		case mb_r of
-		  Left exn  			 	-> Nothing
+		  Left exn -> Nothing
 		  Right r | errorsFound dflags new_errs -> Nothing
 			  | otherwise		        -> Just r) 
    }
+
+try_m :: TcRn m r -> TcRn m (Either Exception r)
+-- Does try_m, with a debug-trace on failure
+try_m thing 
+  = do { mb_r <- tryM thing ;
+	 case mb_r of 
+	     Left exn -> do { traceTc (exn_msg exn); return mb_r }
+	     Right r  -> return mb_r }
+  where
+    exn_msg exn = text "recoverM recovering from" <+> text (showException exn)
 
 tryTcLIE :: TcM a -> TcM (Messages, Maybe a)
 -- Just like tryTc, except that it ensures that the LIE
@@ -411,7 +423,7 @@ tryTcLIE thing_inside
 	 return (errs, mb_r) }
 
 tryTcLIE_ :: TcM r -> TcM r -> TcM r
--- (tryM_ r m) tries m; if it succeeds it returns it,
+-- (tryTcLIE_ r m) tries m; if it succeeds it returns it,
 -- otherwise it returns r.  Any error messages added by m are discarded,
 -- whether or not m succeeds.
 tryTcLIE_ recover main
@@ -473,9 +485,14 @@ forkM doc thing_inside
 	     case mb_res of
 		Just r  -> return (Just r) 
 		Nothing -> do {
-		    -- Bleat about errors in the forked thread
-		    ioToTcRn (do { printErrs (hdr_doc defaultErrStyle) ;
-			       	   printErrorsAndWarnings msgs }) ;
+
+		    -- Bleat about errors in the forked thread, if -ddump-tc-trace is on
+		    -- Otherwise we silently discard errors. Errors can legitimately
+		    -- happen when compiling interface signatures (see tcInterfaceSigs)
+		    ifOptM Opt_D_dump_tc_trace 
+		      (ioToTcRn (do { printErrs (hdr_doc defaultErrStyle) ;
+			       	      printErrorsAndWarnings msgs })) ;
+
 		    return Nothing }
 	}}
   where
