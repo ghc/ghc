@@ -125,7 +125,7 @@ instance Outputable BCInstr where
    ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> int o1 <+> int o2
    ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
    ppr (PUSH_G (Left nm))    = text "PUSH_G  " <+> ppr nm
-   ppr (PUSH_G (Right op))   = text "PUSH_G  " <+> text "PrelPrimopWrappers." 
+   ppr (PUSH_G (Right op))   = text "PUSH_G  " <+> text "GHC.PrimopWrappers." 
                                                <> ppr op
    ppr (PUSH_AS nm pk)       = text "PUSH_AS " <+> ppr nm <+> ppr pk
 
