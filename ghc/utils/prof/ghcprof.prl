@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: ghcprof.prl,v 1.1 2000/04/05 10:06:36 simonmar Exp $
+# $Id: ghcprof.prl,v 1.2 2000/04/05 10:28:02 simonmar Exp $
 #
 # (c) The GHC Team 2000
 #
@@ -55,11 +55,14 @@ $SIG{'INT'}  = 'quit_upon_signal';
 $SIG{'QUIT'} = 'quit_upon_signal';
 
 sub tidy_up_and_die { 
-    if ($tempfile ne "") {
-	print STDERR "Deleting $tempfile .. \n"; 
+    local($msg) = @_;
+    
+    print STDERR "$Pgm: $msg\n";
+    if ($tempfile ne "" && -e $tempfile) {
+	print STDERR "Deleting $tempfile .. \n" if $Verbose; 
 	unlink "$tempfile"; 
     }
-    exit($?);
+    exit(1);
 }
 
 select(STDERR); $| = 1; select(STDOUT); # no STDERR buffering, please.
@@ -147,7 +150,7 @@ print STDERR "$Pgm: ($Version)\n" if $Verbose;
 
 # ToDo: use the real xmlparser
 # system("$xmlparser < $InputFile > $tempfile");
-# if ($? != 0) { tidy_up_and_die(); }
+# if ($? != 0) { tidy_up_and_die("xmlparser failed"); }
 
 # Stehpen's hacky replacement for xmlparser:
 
@@ -155,8 +158,8 @@ $cc_write  = 1;
 $ccs_write = 1;
 $scc_write = 1;
 
-open(INPUT, "<$InputFile") || tidy_up_and_die();
-open(TEMPFILE, ">$tempfile") || tidy_up_and_die();
+open(INPUT, "<$InputFile") || tidy_up_and_die("can't open `$InputFile'");
+open(TEMPFILE, ">$tempfile") || tidy_up_and_die("can't create `$tempfile'");
 
 while (<INPUT>) { 
     if (/^1 (\d+) (.*)$/)
@@ -231,10 +234,7 @@ exit(0);
 sub readProfileHeader {
     local($found);
     
-    if (!open(PROFILE,$tempfile)) {
-	printf STDERR "$Pgm: unable to open profile file \"$tempfile\".\n";
-	$? = 1;	tidy_up_and_die();
-    }
+    open(PROFILE,$tempfile) || tidy_up_and_die("can't open `$tempfile'");
     $found=0;
     
     while(<PROFILE>) {
