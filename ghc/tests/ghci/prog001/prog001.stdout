@@ -1,0 +1,53 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- first, tidy up:
+Prelude> :unset +s
+Prelude> :! rm -f *.hi *.o *~
+Prelude> :! cp D1.hs D.hs
+Prelude> 
+Prelude> -- load the program (all interpreted)
+Prelude> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> 
+Main> -- reloading should do nothing
+Main> :reload
+Ok, modules loaded: Main, B, C, D.
+Main> 
+Main> -- make sure `main' works
+Main> main
+"hello world84"
+Main> 
+Main> -- touch a module + recompile
+Main> :! touch C.hs
+Main> :reload
+Ok, modules loaded: Main, B, C, D.
+Main> 
+Main> -- make sure `main' still works
+Main> main
+"hello world84"
+Main> 
+Main> -- compile D & reload
+Main> :! $HC $HC_OPTS -no-recomp -c D.hs
+Main> :reload
+Ok, modules loaded: Main, B, C, D.
+Main> main
+"hello world84"
+Main> 
+Main> -- change A, recompile & reload
+Main> :! cp D2.hs D.hs
+Main> :! $HC $HC_OPTS -no-recomp -c D.hs
+Main> :reload
+Ok, modules loaded: Main, B, C, D.
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> 
+Main> -- make sure we're picking up the new D, via B
+Main> :module B
+B> g 42
+44
+B> Leaving GHCi.

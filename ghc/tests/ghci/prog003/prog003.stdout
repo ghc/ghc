@@ -1,0 +1,119 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- A small multi-module program, with 4 modules, Main, B, C, D.  B & C
+Prelude> -- depend on D, and A depends on B & C.
+Prelude> -- 
+Prelude> -- This test will try various combinations of compiled and interpreted
+Prelude> -- versions of each module, and make sure each combination behaves
+Prelude> -- sensibly.
+Prelude> 
+Prelude> -- clean up
+Prelude> :! rm *.o *.hi
+Prelude> :unset +s
+Prelude> :! cp D1.hs D.hs
+Prelude> 
+Prelude> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type a
+Int -> Int
+Main> a 42
+168
+Main> 
+Main> -- sigh; sleep 1, because the comp manager only stores times in seconds
+Main> :! sleep 1; cp D2.hs D.hs
+Main> :reload
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- compile D, check that :reload doesn't pick it up
+Main> :! $HC $HC_OPTS -c D.hs
+Main> :reload
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- pick up the compiled D now, with :load
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- D,C compiled
+Main> :! $HC $HC_OPTS -c C.hs
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- D,C,B compiled
+Main> :! $HC $HC_OPTS -c B.hs
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- D,C,B,A compiled
+Main> :! $HC $HC_OPTS -c A.hs
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(PrelFloat.Float -> PrelFloat.Float,
+ PrelFloat.Float -> PrelFloat.Float,
+ PrelFloat.Float -> PrelFloat.Float,
+ PrelFloat.Float -> PrelFloat.Float)
+Main> a 42
+28.0
+Main> 
+Main> -- D,C,A compiled  (better not use A.o)
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(PrelFloat.Float -> PrelFloat.Float,
+ PrelFloat.Float -> PrelFloat.Float,
+ PrelFloat.Float -> PrelFloat.Float,
+ PrelFloat.Float -> PrelFloat.Float)
+Main> a 42
+28.0
+Main> 
+Main> -- D,A compiled  (better not use A.o)
+Main> :! rm C.o
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- A compiled  (better not use A.o)
+Main> :! rm D.o
+Main> :load A
+Ok, modules loaded: Main, B, C, D.
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> 
+Main> -- A,B,C compiled (better not use A.o, B.o, C.o)
+Main> :! $HC $HC_OPTS --make A
+Main> :! rm D.o
+Main> :type (Main.a,B.b,C.c,D.d)
+(Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Main> a 42
+28.0
+Main> Leaving GHCi.

@@ -1,0 +1,64 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 4.11, For Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- first, clean up:
+Prelude> :! rm -f *.hi *.o *~
+Prelude> :unset +s
+Prelude> :! cp A1.hs A.hs
+Prelude> 
+Prelude> :load D
+Ok, modules loaded: Main, C, B, A.
+Main> 
+Main> -- compile A & reload
+Main> :! $HC $HC_OPTS -no-recomp -c A.hs
+Main> :reload
+Ok, modules loaded: Main, C, B, A.
+Main> 
+Main> B.g 42
+85.0
+Main> B.g 42
+85.0
+Main> B.g 42
+85.0
+Main> 
+Main> -- swap A2 for A, compile & reload
+Main> :! cp A2.hs A.hs
+Main> :! $HC $HC_OPTS -no-recomp -c A.hs
+Main> :reload
+Ok, modules loaded: Main, C, B, A.
+Main> -- the system should ignore the compiled version and compile its own.
+Main> 
+Main> B.g 42
+46
+Main> B.g 42
+46
+Main> B.g 42
+46
+Main> 
+Main> -- pick up newly compiled A
+Main> :load D
+Ok, modules loaded: Main, C, B, A.
+Main> 
+Main> B.g 42
+46
+Main> B.g 42
+46
+Main> B.g 42
+46
+Main> 
+Main> -- remove A.o: system should recompile A
+Main> :! rm A.o
+Main> :reload
+Ok, modules loaded: Main, C, B, A.
+Main> 
+Main> B.g 42
+46
+Main> B.g 42
+46
+Main> B.g 42
+46
+Main> Leaving GHCi.
