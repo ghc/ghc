@@ -14,14 +14,14 @@ module PrelInfo (
 			-- it is here, unique and all.  Includes all the 
 
 	derivingOccurrences, 	-- For a given class C, this tells what other 
-				-- things are needed as a result of a 
+	derivableClassKeys,	-- things are needed as a result of a 
 				-- deriving(C) clause
 
 
 	-- Random other things
 	main_NAME, ioTyCon_NAME,
 	deRefStablePtr_NAME, makeStablePtr_NAME,
-	bindIO_NAME, 
+	bindIO_NAME,
 
 	maybeCharLikeCon, maybeIntLikeCon,
 	needsDataDeclCtxtClassKeys, cCallishClassKeys, cCallishTyKeys, 

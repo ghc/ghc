@@ -29,7 +29,7 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			)
 import NameSet
 import OccName		( OccName,
-			  mkDFunOcc, 
+			  mkDFunOcc, occNameUserString,
 			  occNameFlavour
 			)
 import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, listTyCon )
@@ -453,7 +453,7 @@ whether there are any instance decls in this module are ``special''.
 The name cache should have the correct provenance, though.
 
 \begin{code}
-lookupImplicitOccRn :: RdrName -> RnMS Name 
+lookupImplicitOccRn :: RdrName -> RnM d Name 
 lookupImplicitOccRn rdr_name = mkImportedGlobalFromRdrName rdr_name
 \end{code}
 
@@ -725,32 +725,28 @@ warnUnusedBinds warn_when_local names
 
 warnUnusedGroup :: (Bool -> Bool) -> [Name] -> RnM d ()
 warnUnusedGroup emit_warning names
+  | null filtered_names         = returnRn ()
   | not (emit_warning is_local) = returnRn ()
   | otherwise
-  = case filter isReportable names of
-      []       -> returnRn ()
-      repnames -> warn repnames
+  = pushSrcLocRn def_loc	$
+    addWarnRn			$
+    sep [msg <> colon, nest 4 (fsep (punctuate comma (map ppr filtered_names)))]
   where
-  warn repnames = pushSrcLocRn def_loc	$
-                  addWarnRn		$
-                  sep [msg <> colon, nest 4 (fsep (punctuate comma (map ppr repnames)))]
-
-  name1 = head names
-
-  (is_local, def_loc, msg)
-	   = case getNameProvenance name1 of
+    filtered_names = filter reportable names
+    name1 	   = head filtered_names
+    (is_local, def_loc, msg)
+	= case getNameProvenance name1 of
 		LocalDef loc _ 			     -> (True, loc, text "Defined but not used")
 		NonLocalDef (UserImport mod loc _) _ ->
 		 (True, loc, text "Imported from" <+> quotes (ppr mod) <+> 
 			 			      text "but not used")
 		other -> (False, getSrcLoc name1, text "Strangely defined but not used")
 
-  isReportable = not . startsWithUnderscore . occNameUserString  . nameOccName
-    -- Haskell 98 encourages compilers to suppress warnings about
-    -- unused names in a pattern if they start with "_".
-  startsWithUnderscore ('_' : _) = True
-    -- Suppress warnings for names starting with an underscore
-  startsWithUnderscore other     = False
+    reportable name = case occNameUserString (nameOccName name) of
+			('_' : _) -> False
+			_other	  -> True
+	-- Haskell 98 encourages compilers to suppress warnings about
+	-- unused names in a pattern if they start with "_".
 \end{code}
 
 \begin{code}

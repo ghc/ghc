@@ -22,16 +22,17 @@ import RnMonad
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions,
-			  getImportedRules, loadHomeInterface, getSlurped
+			  getImportedRules, loadHomeInterface, getSlurped, removeContext
 			)
 import RnEnv		( availName, availNames, availsToNameSet, 
-			  warnUnusedTopNames, mapFvRn,
+			  warnUnusedTopNames, mapFvRn, lookupImplicitOccRn,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs
 			)
 import Module           ( Module, ModuleName, pprModule, mkSearchPath, mkThisModule )
 import Name		( Name, isLocallyDefined,
 			  NamedThing(..), ImportReason(..), Provenance(..),
-			  pprOccName, getNameProvenance, 
+			  pprOccName, nameOccName,
+			  getNameProvenance, 
 			  maybeWiredInTyConName, maybeWiredInIdName, isWiredInName
 			)
 import Id		( idType )
@@ -41,7 +42,7 @@ import RdrName		( RdrName )
 import NameSet
 import PrelMods		( mAIN_Name, pREL_MAIN_Name )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
-import PrelInfo		( ioTyCon_NAME, thinAirIdNames )
+import PrelInfo		( ioTyCon_NAME, numClass_RDR, thinAirIdNames, derivingOccurrences )
 import Type		( namesOfType, funTyCon )
 import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
@@ -50,6 +51,7 @@ import BasicTypes	( NewOrData(..) )
 import Bag		( isEmptyBag, bagToList )
 import FiniteMap	( fmToList, delListFromFM, addToFM, sizeFM, eltsFM )
 import UniqSupply	( UniqSupply )
+import UniqFM		( lookupUFM )
 import Util		( equivClasses )
 import Maybes		( maybeToBool )
 import Outputable
@@ -118,8 +120,9 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
     )					`thenRn` \ (rn_local_decls, source_fvs) ->
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
+    implicitFVs mod_name rn_local_decls 	`thenRn` \ implicit_fvs -> 
     let
-	real_source_fvs = implicitFVs mod_name `plusFV` source_fvs
+	real_source_fvs = implicit_fvs `plusFV` source_fvs
 		-- It's important to do the "plus" this way round, so that
 		-- when compiling the prelude, locally-defined (), Bool, etc
 		-- override the implicit ones. 
@@ -168,10 +171,13 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
 mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
-implicitFVs mod_name
-  = implicit_main		`plusFV` 
-    mkNameSet default_tys	`plusFV`
-    mkNameSet thinAirIdNames
+implicitFVs mod_name decls
+  = mapRn lookupImplicitOccRn implicit_occs	`thenRn` \ implicit_names ->
+    returnRn (implicit_main		`plusFV` 
+	      mkNameSet default_tys	`plusFV`
+	      mkNameSet thinAirIdNames	`plusFV`
+	      mkNameSet implicit_names)
+    
   where
 	-- Add occurrences for Int, Double, and (), because they
 	-- are the types to which ambigious type variables may be defaulted by
@@ -187,11 +193,30 @@ implicitFVs mod_name
     implicit_main |  mod_name == mAIN_Name
 		  || mod_name == pREL_MAIN_Name = unitFV ioTyCon_NAME
 		  |  otherwise 		        = emptyFVs
+
+	-- Now add extra "occurrences" for things that
+	-- the deriving mechanism, or defaulting, will later need in order to
+	-- generate code
+    implicit_occs = foldr ((++) . get) [] decls
+
+    get (DefD _) = [numClass_RDR]
+    get (TyClD (TyData _ _ _ _ _ (Just deriv_classes) _ _))
+       = concat (map get_deriv deriv_classes)
+    get other = []
+
+    get_deriv cls = case lookupUFM derivingOccurrences cls of
+			Nothing   -> []
+			Just occs -> occs
 \end{code}
 
 \begin{code}
 isOrphanDecl (InstD (InstDecl inst_ty _ _ _ _))
-  = not (foldNameSet ((||) . isLocallyDefined) False (extractHsTyNames inst_ty))
+  = not (foldNameSet ((||) . isLocallyDefined) False (extractHsTyNames (removeContext inst_ty)))
+	-- The 'removeContext' is because of
+	--	instance Foo a => Baz T where ...
+	-- The decl is an orphan if Baz and T are both not locally defined,
+	--	even if Foo *is* locally defined
+
 isOrphanDecl (RuleD (RuleDecl _ _ _ lhs _ _))
   = check lhs
   where
@@ -462,10 +487,6 @@ getInstDeclGates other				    = emptyFVs
 
 \begin{code}
 reportUnusedNames gbl_env avail_env (ExportEnv export_avails _) mentioned_names
-  | not (opt_WarnUnusedBinds || opt_WarnUnusedImports)
-  = returnRn ()
-
-  | otherwise
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 
@@ -487,8 +508,7 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _) mentioned_names
 	-- Filter out the ones only defined implicitly
 	bad_guys = filter reportableUnusedName defined_but_not_used
     in
-    warnUnusedTopNames bad_guys	`thenRn_`
-    returnRn ()
+    warnUnusedTopNames bad_guys
 
 reportableUnusedName :: Name -> Bool
 reportableUnusedName name
@@ -500,7 +520,7 @@ reportableUnusedName name
  	-- Report unused explicit imports
     explicitlyImported other			             = False
 	-- Don't report others
-   
+
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats imp_decls
         | opt_D_dump_rn_trace || 

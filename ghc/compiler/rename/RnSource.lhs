@@ -40,15 +40,15 @@ import NameSet
 import OccName		( mkDefaultMethodOcc )
 import BasicTypes	( TopLevelFlag(..) )
 import FiniteMap	( elemFM )
-import PrelInfo		( derivingOccurrences, numClass_RDR, 
-			  deRefStablePtr_NAME, makeStablePtr_NAME,
-			  bindIO_NAME
+import PrelInfo		( derivableClassKeys,
+			  deRefStablePtr_NAME, makeStablePtr_NAME, bindIO_NAME
 			)
 import Bag		( bagToList )
 import List		( partition, nub )
 import Outputable
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_WarnUnusedMatches )	-- Warn of unused for-all'd tyvars
+import Unique		( Uniquable(..) )
 import UniqFM		( lookupUFM )
 import Maybes		( maybeToBool, catMaybes )
 import Util
@@ -348,8 +348,7 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags dfun_rdr_name src_loc))
 rnDecl (DefD (DefaultDecl tys src_loc))
   = pushSrcLocRn src_loc $
     rnHsTypes doc_str tys		`thenRn` \ (tys', fvs) ->
-    lookupImplicitOccRn numClass_RDR	`thenRn` \ num ->
-    returnRn (DefD (DefaultDecl tys' src_loc), fvs `addOneFV` num)
+    returnRn (DefD (DefaultDecl tys' src_loc), fvs)
   where
     doc_str = text "a `default' declaration"
 \end{code}
@@ -437,22 +436,14 @@ rnDerivs :: Maybe [RdrName] -> RnMS (Maybe [Name], FreeVars)
 rnDerivs Nothing -- derivs not specified
   = returnRn (Nothing, emptyFVs)
 
-rnDerivs (Just ds)
-  = mapFvRn rn_deriv ds		`thenRn` \ (derivs, fvs) ->
-    returnRn (Just derivs, fvs)
+rnDerivs (Just clss)
+  = mapRn do_one clss	`thenRn` \ clss' ->
+    returnRn (Just clss', mkNameSet clss')
   where
-    rn_deriv clas
-      = lookupOccRn clas	    `thenRn` \ clas_name ->
-
-		-- Now add extra "occurrences" for things that
-		-- the deriving mechanism will later need in order to
-		-- generate code for this class.
-	case lookupUFM derivingOccurrences clas_name of
-		Nothing -> addErrRn (derivingNonStdClassErr clas_name)	`thenRn_`
-			   returnRn (clas_name, unitFV clas_name)
-
-		Just occs -> mapRn lookupImplicitOccRn occs	`thenRn` \ names ->
-			     returnRn (clas_name, mkNameSet (clas_name : names))
+    do_one cls = lookupOccRn cls	`thenRn` \ clas_name ->
+		 checkRn (getUnique clas_name `elem` derivableClassKeys)
+			 (derivingNonStdClassErr clas_name)	`thenRn_`
+		 returnRn clas_name
 \end{code}
 
 \begin{code}

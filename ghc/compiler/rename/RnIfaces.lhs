@@ -13,7 +13,8 @@ module RnIfaces (
 
 	checkUpToDate,
 
-	getDeclBinders, getDeclSysBinders
+	getDeclBinders, getDeclSysBinders,
+	removeContext	 	-- removeContext probably belongs somewhere else
     ) where
 
 #include "HsVersions.h"
