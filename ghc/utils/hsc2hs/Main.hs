@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.22 2001/02/22 22:39:56 qrczak Exp $
+-- $Id: Main.hs,v 1.23 2001/03/01 20:32:51 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -22,7 +22,7 @@ import Char          (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
 import List          (intersperse)
 
 version :: String
-version = "hsc2hs-0.64"
+version = "hsc2hs-0.65"
 
 data Flag
     = Help
@@ -145,6 +145,15 @@ special = do
     pos <- getPosition
     char '#'
     skipMany (oneOf " \t")
+    keyArg pos <|> do
+        char '{'
+        skipMany (oneOf " \t")
+        sp <- keyArg pos
+        char '}'
+        return sp
+
+keyArg :: SourcePos -> Parser Token
+keyArg pos = do
     key <- liftM2 (:) (letter <|> char '_') (many (alphaNum <|> char '_'))
         <?> "hsc directive"
     skipMany (oneOf " \t")
