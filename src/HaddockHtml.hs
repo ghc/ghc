@@ -284,9 +284,9 @@ ifaceToHtml mod iface
   | null exports = Html.emptyTable
   | otherwise =
     td << table ! [width "100%", cellpadding 0, cellspacing 15] << 
-	(description </> synopsis </> maybe_hr </> body)
+	(contents </> description </> synopsis </> maybe_hr </> body)
   where 
-	exports = iface_exports iface
+	exports = numberSectionHeadings (iface_exports iface)
 	doc_map = iface_name_docs iface
 
 	has_doc (ExportDecl d)
@@ -294,6 +294,8 @@ ifaceToHtml mod iface
 	has_doc _ = True
 
 	no_doc_at_all = not (any has_doc exports)
+
+	contents = td << ppModuleContents exports
 
 	description
          | Just doc <- iface_doc iface
@@ -312,16 +314,49 @@ ifaceToHtml mod iface
   	        aboves (map (processExport doc_map True)  exports))
 
 	maybe_hr
-	     | not (no_doc_at_all),  ExportGroup 1 _ <- head exports
+	     | not (no_doc_at_all),  ExportGroup 1 _ _ <- head exports
 		 = td << hr
 	     | otherwise  = Html.emptyTable
 
 	body = aboves (map (processExport doc_map False) exports)
 
+ppModuleContents :: [ExportItem] -> HtmlTable
+ppModuleContents exports
+  | null sections = Html.emptyTable
+  | otherwise     = tda [theclass "section4"] << bold << toHtml "Contents"
+  		     </> td << dlist << concatHtml sections
+ where
+  (sections, _leftovers{-should be []-}) = process 0 exports
+
+  process :: Int -> [ExportItem] -> ([Html],[ExportItem])
+  process n [] = ([], [])
+  process n (ExportDecl _ : rest) = process n rest
+  process n items@(ExportGroup lev id doc : rest) 
+    | lev <= n  = ( [], items )
+    | otherwise = ( html:sections, rest2 )
+    where
+	html = (dterm << anchor ! [href ('#':id)] << markup htmlMarkup doc)
+		 +++ mk_subsections subsections
+	(subsections, rest1) = process lev rest
+	(sections,    rest2) = process n   rest1
+
+  mk_subsections [] = noHtml
+  mk_subsections ss = ddef << dlist << concatHtml ss
+
+-- we need to assign a unique id to each section heading so we can hyperlink
+-- them from the contents:
+numberSectionHeadings :: [ExportItem] -> [ExportItem]
+numberSectionHeadings exports = go 1 exports
+  where go n [] = []
+	go n (ExportGroup lev _ doc : es) 
+	  = ExportGroup lev (show n) doc : go (n+1) es
+	go n (other:es)
+	  = other : go n es
+
 processExport :: FiniteMap HsName Doc -> Bool -> ExportItem -> HtmlTable
-processExport doc_map summary (ExportGroup lev doc)
+processExport doc_map summary (ExportGroup lev id doc)
   | summary   = Html.emptyTable
-  | otherwise = ppDocGroup lev (markup htmlMarkup doc)
+  | otherwise = ppDocGroup lev (anchor ! [name id] << markup htmlMarkup doc)
 processExport doc_map summary (ExportDecl decl)
   = doDecl doc_map summary decl
 

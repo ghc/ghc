@@ -191,9 +191,9 @@ lookupIdString str = do
 
 renameExportItems items = mapM rn items
   where
- 	rn (ExportGroup lev doc) 
+ 	rn (ExportGroup lev id doc) 
 	   = do doc <- renameDoc doc
-	        return (ExportGroup lev doc)
+	        return (ExportGroup lev id doc)
 	rn (ExportDecl decl)
 	   = do decl <- renameDecl decl
 		return (ExportDecl decl)

@@ -274,7 +274,7 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 	= [ ExportDecl (restrictTo (map nameOfQName cs) decl) ]
     lookupExport (HsEModuleContents m) = fullContentsOf m
     lookupExport (HsEGroup lev str)
-	= [ ExportGroup lev doc ]
+	= [ ExportGroup lev "" doc ]
 	where (doc, _names) = formatDocHeading (lookupForDoc env) str
 	-- ToDo: report the unresolved names
     lookupExport _ = [] -- didn't find it?
@@ -300,7 +300,7 @@ mkExportItems mod_map mod env decl_map decls (Just specs)
 fullContentsOfThisModule decls env = 
   [ mkExportItem decl | decl <- decls, keepDecl decl ]
   where mkExportItem (HsDocGroup lev str) =
-	   ExportGroup lev doc
+	   ExportGroup lev "" doc
 	  where
 	   (doc, _names) = formatDocHeading (lookupForDoc env) str
 	   -- ToDo: report the unresolved names

@@ -66,8 +66,13 @@ data Interface
 type DocString = String
 
 data ExportItem 
-  = ExportDecl    HsDecl		-- a declaration
-  | ExportGroup   Int Doc		-- a section heading
+  = ExportDecl
+	HsDecl		-- a declaration
+
+  | ExportGroup		-- a section heading
+	Int		-- section level (1, 2, 3, ... )
+	String		-- section "id" (for hyperlinks)
+	Doc		-- section heading text
 
 type ModuleMap = FiniteMap Module Interface
 
