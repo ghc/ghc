@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.4 1999/09/22 11:53:33 sof Exp $
+ * $Id: Signals.h,v 1.5 2000/02/22 12:09:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,7 +22,7 @@ extern void unblockUserSignals(void);
 
 extern void start_signal_handlers(void);
 
-extern void init_shutdown_handler(void);
+extern void init_default_handlers(void);
 
 #else
 

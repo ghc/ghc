@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.12 2000/01/13 12:40:16 simonmar Exp $
+ * $Id: Signals.c,v 1.13 2000/02/22 12:09:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -273,9 +273,13 @@ shutdown_handler(int sig STG_UNUSED)
  * Haskell code may install their own SIGINT handler, which is
  * fine, provided they're so kind as to put back the old one
  * when they de-install.
+ *
+ * We ignore SIGPIPE, because our I/O library handles EPIPE properly,
+ * and a SIGPIPE tends to cause the program to exit silently and
+ * mysteriously.
  */
 void
-init_shutdown_handler()
+init_default_handlers()
 {
     struct sigaction action,oact;
 
@@ -287,13 +291,13 @@ init_shutdown_handler()
     action.sa_flags = 0;
     if (sigaction(SIGINT, &action, &oact) != 0) {
       /* Oh well, at least we tried. */
-#ifdef DEBUG
-      fprintf(stderr, "init_shutdown_handler: failed to reg SIGINT handler");
-#endif
+      prog_belch("failed to install SIGINT handler");
+    }
+
+    action.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &action, &oact) != 0) {
+      prog_belch("failed to install SIGINT handler");
     }
 }
-
-
-
 
 #endif /*! mingw32_TARGET_OS */
