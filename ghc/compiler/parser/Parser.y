@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.58 2001/05/01 09:16:55 qrczak Exp $
+$Id: Parser.y,v 1.59 2001/05/03 08:08:44 simonpj Exp $
 
 Haskell grammar.
 
@@ -428,7 +428,7 @@ rules	:: { RdrBinding }
 	|  {- empty -}				{ RdrNullBind }
 
 rule  	:: { RdrBinding }
-	: STRING rule_forall fexp '=' srcloc exp
+	: STRING rule_forall infixexp '=' srcloc exp
 	     { RdrHsDecl (RuleD (HsRule $1 [] $2 $3 $6 $5)) }
 
 rule_forall :: { [RdrNameRuleBndr] }
