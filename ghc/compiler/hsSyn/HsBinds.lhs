@@ -222,10 +222,21 @@ data Sig name
   | InlineSig	name		  -- INLINE f
 		SrcLoc
 
-  | MagicUnfoldingSig
-		name		-- Associate the "name"d function with
-		FAST_STRING	-- the compiler-builtin unfolding (known
-		SrcLoc		-- by the String name)
+  | SpecInstSig (HsType name)    -- (Class tys); should be a specialisation of the 
+				  -- current instance decl
+		SrcLoc
+\end{code}
+
+\begin{code}
+sigsForMe :: (name -> Bool) -> [Sig name] -> [Sig name]
+sigsForMe f sigs
+  = filter sig_for_me sigs
+  where
+    sig_for_me (Sig        n _ _)    = f n
+    sig_for_me (ClassOpSig n _ _ _)  = f n
+    sig_for_me (SpecSig    n _ _ _)  = f n
+    sig_for_me (InlineSig  n     _)  = f n  
+    sig_for_me (SpecInstSig _ _)     = False
 \end{code}
 
 \begin{code}
@@ -252,7 +263,7 @@ ppr_sig (SpecSig var ty using _)
 ppr_sig (InlineSig var _)
         = hsep [text "{-# INLINE", ppr var, text "#-}"]
 
-ppr_sig (MagicUnfoldingSig var str _)
-      = hsep [text "{-# MAGIC_UNFOLDING", ppr var, ptext str, text "#-}"]
+ppr_sig (SpecInstSig ty _)
+      = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
 \end{code}
 

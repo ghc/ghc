@@ -138,6 +138,23 @@ instance ... Eq (Foo ...) where
   produced don't get through the typechecker.
 \end{itemize}
 
+
+deriveEq :: RdrName				-- Class
+	 -> RdrName				-- Type constructor
+	 -> [ (RdrName, [RdrType]) ]	-- Constructors
+	 -> (RdrContext,		-- Context for the inst decl
+	     [RdrBind],			-- Binds in the inst decl
+	     [RdrBind])			-- Extra value bindings outside
+
+deriveEq clas tycon constrs 
+  = (context, [eq_bind, ne_bind], [])
+  where
+    context = [(clas, [ty]) | (_, tys) <- constrs, ty <- tys]
+
+    ne_bind = mkBind 
+    (nullary_cons, non_nullary_cons) = partition is_nullary constrs
+    is_nullary (_, args) = null args
+
 \begin{code}
 gen_Eq_binds :: TyCon -> RdrNameMonoBinds
 

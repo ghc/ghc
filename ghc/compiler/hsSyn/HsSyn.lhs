@@ -35,7 +35,7 @@ import HsDecls		( HsDecl(..), TyDecl(..), InstDecl(..), ClassDecl(..),
 			  DefaultDecl(..), 
 			  FixityDecl(..), 
 			  ConDecl(..), ConDetails(..), BangType(..),
-			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), SpecInstSig(..),
+			  IfaceSig(..), HsIdInfo,  SpecDataSig(..), 
 			  hsDeclName
 			)
 import HsExpr

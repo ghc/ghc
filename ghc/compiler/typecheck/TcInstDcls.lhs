@@ -13,16 +13,17 @@ module TcInstDcls (
 
 import HsSyn		( HsDecl(..), InstDecl(..),
 			  HsBinds(..), MonoBinds(..), GRHSsAndBinds(..), GRHS(..),
-			  HsExpr(..), InPat(..), HsLit(..),
+			  HsExpr(..), InPat(..), HsLit(..), Sig(..),
 			  unguardedRHS,
 			  collectMonoBinders, andMonoBinds
 			)
+import HsBinds		( sigsForMe )
 import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds,
 			  RenamedInstDecl, RenamedHsExpr,
 			  RenamedSig, RenamedHsDecl
 			)
 import TcHsSyn		( TcMonoBinds, TcIdOcc(..), TcIdBndr, 
-			  maybeBoxedPrimType
+			  maybeBoxedPrimType, tcIdType
 			)
 
 import TcBinds		( tcPragmaSigs )
@@ -46,13 +47,13 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			)
 import CmdLineOpts	( opt_GlasgowExts, opt_WarnMissingMethods )
 import Class		( classBigSig, Class )
-import Id		( isNullaryDataCon, dataConArgTys, Id )
+import Id		( isNullaryDataCon, dataConArgTys, replaceIdInfo, idName, Id )
 import Maybes 		( maybeToBool, seqMaybe, catMaybes )
 import Name		( nameOccName, mkLocalName,
 			  isLocallyDefined, Module,
 			  NamedThing(..)
 			)
-import PrelVals		( nO_METHOD_BINDING_ERROR_ID )
+import PrelVals		( nO_METHOD_BINDING_ERROR_ID, eRROR_ID )
 import PprType		( pprParendType,  pprConstraint )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
@@ -329,7 +330,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     tcInstTheta tenv inst_decl_theta	`thenNF_Tc` \ inst_decl_theta' ->
 
          -- Instantiate the super-class context with inst_tys
-    
     tcInstTheta (zipTyVarEnv class_tyvars inst_tys') sc_theta		`thenNF_Tc` \ sc_theta' ->
 
 	 -- Create dictionary Ids from the specified instance contexts.
@@ -337,10 +337,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     newDicts origin dfun_theta'		`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
     newDicts origin inst_decl_theta'	`thenNF_Tc` \ (inst_decl_dicts, _) ->
     newDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
-
-	-- Now process any INLINE or SPECIALIZE pragmas for the methods
-	-- ...[NB May 97; all ignored except INLINE]
-    tcPragmaSigs uprags		      `thenTc` \ (prag_fn, spec_binds, spec_lie) ->
 
 	 -- Check that all the method bindings come from this class
     let
@@ -356,9 +352,17 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     tcExtendGlobalValEnv (catMaybes defm_ids) (
 
 		-- Default-method Ids may be mentioned in synthesised RHSs 
-	mapAndUnzip3Tc (tcInstMethodBind clas inst_tys' inst_tyvars' monobinds) 
+	mapAndUnzip3Tc (tcInstMethodBind clas inst_tys' inst_tyvars' monobinds uprags) 
 		       (op_sel_ids `zip` defm_ids)
     )		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
+
+	-- Deal with SPECIALISE instance pragmas
+    let
+	dfun_prags = [Sig (idName dfun_id) ty loc | SpecInstSig ty loc <- uprags]
+    in
+    tcExtendGlobalValEnv [dfun_id] (
+	tcPragmaSigs dfun_prags
+    )					`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
 
 	-- Check the overloading constraints of the methods and superclasses
     mapNF_Tc zonkSigTyVar inst_tyvars' 	`thenNF_Tc` \ zonked_inst_tyvars ->
@@ -409,33 +413,49 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		 inst_tyvars_set
 		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
 					-- get bound by just selecting from this_dict!!
-		 (sc_dicts `plusLIE` methods_lie)
+		 (sc_dicts `plusLIE` methods_lie `plusLIE` prag_lie)
     )						 `thenTc` \ (const_lie, lie_binds) ->
 	
 
 	-- Create the result bindings
     let
-        dict_constr = classDataCon clas
+        dict_constr   = classDataCon clas
+	scs_and_meths = sc_dict_ids ++ meth_ids
 
-	con_app = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
-			      (map HsVar (sc_dict_ids ++ meth_ids))
+	dict_rhs
+	  | null scs_and_meths
+	  = 	-- Blatant special case for CCallable, CReturnable
+		-- If the dictionary is empty then we should never
+		-- select anything from it, so we make its RHS just
+		-- emit an error message.  This in turn means that we don't
+		-- mention the constructor, which doesn't exist for CCallable, CReturnable
+		-- Hardly beautiful, but only three extra lines.
+	   HsApp (TyApp (HsVar (RealId eRROR_ID)) [tcIdType this_dict_id])
+		 (HsLit (HsString (_PK_ ("Compiler error: bad dictionary " ++ showSDoc (ppr clas)))))
+
+	  | otherwise	-- The common case
+	  = foldl HsApp (TyApp (HsVar (RealId dict_constr)) inst_tys')
+			       (map HsVar (sc_dict_ids ++ meth_ids))
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application
 
-	dict_bind    = VarMonoBind this_dict_id con_app
+	dict_bind    = VarMonoBind this_dict_id dict_rhs
 	method_binds = andMonoBinds method_binds_s
 
+	final_dfun_id = replaceIdInfo dfun_id (prag_info_fn (idName dfun_id))
+				-- Pretty truesome
 	main_bind
 	  = AbsBinds
 		 zonked_inst_tyvars
 		 dfun_arg_dicts_ids
-		 [(inst_tyvars', RealId dfun_id, this_dict_id)] 
+		 [(inst_tyvars', RealId final_dfun_id, this_dict_id)] 
 		 (lie_binds	`AndMonoBinds` 
 		  method_binds	`AndMonoBinds`
+		  prag_binds	`AndMonoBinds`
 		  dict_bind)
     in
-    returnTc (const_lie `plusLIE` spec_lie,
-	      main_bind `AndMonoBinds` spec_binds)
+    returnTc (const_lie,
+	      main_bind `AndMonoBinds` prag_binds)
 \end{code}
 
 
@@ -451,19 +471,22 @@ tcInstMethodBind
 	-> [TcType s]					-- Instance types
 	-> [TcTyVar s]					-- and their free (sig) tyvars
 	-> RenamedMonoBinds				-- Method binding
+	-> [RenamedSig]					-- Pragmas
 	-> (Id, Maybe Id)				-- Selector id and default-method id
 	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-tcInstMethodBind clas inst_tys inst_tyvars meth_binds (sel_id, maybe_dm_id)
+tcInstMethodBind clas inst_tys inst_tyvars meth_binds prags (sel_id, maybe_dm_id)
   = tcGetSrcLoc			`thenNF_Tc` \ loc ->
     tcGetUnique			`thenNF_Tc` \ uniq ->
     let
-	meth_occ	  = getOccName sel_id
+	sel_name	  = idName sel_id
+	meth_occ	  = getOccName sel_name
 	default_meth_name = mkLocalName uniq meth_occ loc
 	maybe_meth_bind   = find meth_occ meth_binds 
         the_meth_bind     = case maybe_meth_bind of
 				  Just stuff -> stuff
 				  Nothing    -> mk_default_bind default_meth_name loc
+	meth_prags	  = sigsForMe (== sel_name) prags
     in
 
 	-- Warn if no method binding, only if -fwarn-missing-methods
@@ -474,7 +497,7 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds (sel_id, maybe_dm_id)
 	(omittedMethodWarn sel_id clas)		`thenNF_Tc_`
 
 	-- Typecheck the method binding
-    tcMethodBind clas origin inst_tys inst_tyvars sel_id the_meth_bind
+    tcMethodBind clas origin inst_tys inst_tyvars sel_id the_meth_bind meth_prags
   where
     origin = InstanceDeclOrigin 	-- Poor
 
@@ -503,7 +526,6 @@ tcInstMethodBind clas inst_tys inst_tyvars meth_binds (sel_id, maybe_dm_id)
 	             (HsLit (HsString (_PK_ (error_msg loc))))
 
     error_msg loc = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
-
 \end{code}
 
 

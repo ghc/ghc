@@ -37,19 +37,18 @@ import Util		( mapAndUnzip, panic, assertPanic )
 
 We make a point not to throw any user-pragma ``sigs'' at
 these conversion functions:
+
 \begin{code}
 cvValSig, cvClassOpSig, cvInstDeclSig :: SigConverter
 
-cvValSig (RdrTySig vars poly_ty src_loc)
-  = [ Sig v poly_ty src_loc | v <- vars ]
+cvValSig      sig = sig
 
-cvClassOpSig (RdrTySig vars poly_ty src_loc)
-  = [ ClassOpSig v Nothing poly_ty src_loc | v <- vars ]
+cvInstDeclSig sig = sig
 
-cvInstDeclSig (RdrSpecValSig        sigs) = sigs
-cvInstDeclSig (RdrInlineValSig      sig)  = [ sig ]
-cvInstDeclSig (RdrMagicUnfoldingSig sig)  = [ sig ]
+cvClassOpSig (Sig var poly_ty src_loc) = ClassOpSig var Nothing poly_ty src_loc
+cvClassOpSig sig 		       = sig
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -89,12 +88,8 @@ cvMonoBindsAndSigs sf sig_cvtr fb
     mangle_bind acc (RdrAndBindings fb1 fb2)
       = mangle_bind (mangle_bind acc fb1) fb2
 
-    mangle_bind (b_acc, s_acc) sig@(RdrTySig _ _ _)
-      = (b_acc, s_acc ++ sig_cvtr sig)
-
-    mangle_bind (b_acc, s_acc) (RdrSpecValSig	     sig) = (b_acc, sig ++ s_acc)
-    mangle_bind (b_acc, s_acc) (RdrInlineValSig      sig) = (b_acc, sig : s_acc)
-    mangle_bind (b_acc, s_acc) (RdrMagicUnfoldingSig sig) = (b_acc, sig : s_acc)
+    mangle_bind (b_acc, s_acc) (RdrSig sig)
+      = (b_acc, sig_cvtr sig : s_acc)
 
     mangle_bind (b_acc, s_acc)
 		(RdrPatternBinding lousy_srcline [patbinding])

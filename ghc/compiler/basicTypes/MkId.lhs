@@ -16,6 +16,7 @@ module MkId (
 	mkImportedId,
 	mkUserId,
 	mkUserLocal, mkSysLocal, 
+	mkSpecPragmaId,
 
 	mkDataCon, mkTupleCon,
 
@@ -89,6 +90,9 @@ mkSysLocal str uniq ty loc
 
 mkUserLocal occ uniq ty loc
   = mkVanillaId (mkLocalName uniq occ loc) ty noIdInfo
+
+mkSpecPragmaId occ uniq ty loc
+  = mkId (mkLocalName uniq occ loc) ty SpecPragmaId noIdInfo
 
 mkUserId :: Name -> GenType flexi -> GenId (GenType flexi)
 mkUserId name ty

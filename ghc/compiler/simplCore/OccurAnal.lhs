@@ -22,7 +22,7 @@ import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
-			  omitIfaceSigForId,
+			  omitIfaceSigForId, isSpecPragmaId,
 			  idType, idUnique, Id,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  elementOfIdSet,
@@ -790,7 +790,7 @@ tagBinder usage binder =
 
 
 usage_of usage binder
-  | isExported binder
+  | isExported binder || isSpecPragmaId binder
   = noBinderInfo	-- Visible-elsewhere things count as many
   | otherwise
   = case (lookupIdEnv usage binder) of

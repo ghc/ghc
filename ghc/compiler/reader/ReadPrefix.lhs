@@ -620,15 +620,15 @@ wlk_sig_thing (U_sbind sbindids sbindid srcline)
   = mkSrcLocUgn		srcline  	$ \ src_loc ->
     wlkList rdVarId	sbindids `thenUgn` \ vars    ->
     wlkHsType		sbindid  `thenUgn` \ poly_ty ->
-    returnUgn (RdrTySig vars poly_ty src_loc)
+    returnUgn (foldr1 RdrAndBindings [RdrSig (Sig var poly_ty src_loc) | var <- vars])
 
 	-- value specialisation user-pragma
 wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline)
   = mkSrcLocUgn	srcline		    	    $ \ src_loc ->
     wlkVarId  uvar		    `thenUgn` \ var ->
     wlkList rd_ty_and_id vspec_tys  `thenUgn` \ tys_and_ids ->
-    returnUgn (RdrSpecValSig [SpecSig var ty using_id src_loc
-			     | (ty, using_id) <- tys_and_ids ])
+    returnUgn (foldr1 RdrAndBindings [ RdrSig (SpecSig var ty using_id src_loc)
+				     | (ty, using_id) <- tys_and_ids ])
   where
     rd_ty_and_id :: ParseTree -> UgnM (RdrNameHsType, Maybe RdrName)
     rd_ty_and_id pt
@@ -639,29 +639,15 @@ wlk_sig_thing (U_vspec_uprag uvar vspec_tys srcline)
 
 	-- instance specialisation user-pragma
 wlk_sig_thing (U_ispec_uprag iclas ispec_ty srcline)
-  = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkTCId	iclas		`thenUgn` \ clas    ->
-    wlkMonoType ispec_ty	`thenUgn` \ ty	    ->
-    returnUgn (RdrSpecInstSig (SpecInstSig clas ty src_loc))
-
-	-- data specialisation user-pragma
-wlk_sig_thing (U_dspec_uprag itycon dspec_tys srcline)
-  = mkSrcLocUgn srcline		 	 $ \ src_loc ->
-    wlkTCId	itycon		 `thenUgn` \ tycon   ->
-    wlkList rdMonoType dspec_tys `thenUgn` \ tys     ->
-    returnUgn (RdrSpecDataSig (SpecDataSig tycon (foldl MonoTyApp (MonoTyVar tycon) tys) src_loc))
+  = mkSrcLocUgn srcline		$ \ src_loc ->
+    wlkHsType ispec_ty		`thenUgn` \ ty	    ->
+    returnUgn (RdrSig (SpecInstSig ty src_loc))
 
 	-- value inlining user-pragma
 wlk_sig_thing (U_inline_uprag ivar srcline)
   = mkSrcLocUgn	srcline      		$ \ src_loc ->
     wlkVarId	ivar		`thenUgn` \ var     ->
-    returnUgn (RdrInlineValSig (InlineSig var src_loc))
-
-	-- "magic" unfolding user-pragma
-wlk_sig_thing (U_magicuf_uprag ivar str srcline)
-  = mkSrcLocUgn srcline			$ \ src_loc ->
-    wlkVarId	ivar		`thenUgn` \ var     ->
-    returnUgn (RdrMagicUnfoldingSig (MagicUnfoldingSig var str src_loc))
+    returnUgn (RdrSig (InlineSig var src_loc))
 \end{code}
 
 %************************************************************************

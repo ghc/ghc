@@ -31,7 +31,6 @@ module RdrHsSyn (
 	RdrNamePat,
 	RdrNameHsType,
 	RdrNameSig,
-	RdrNameSpecInstSig,
 	RdrNameStmt,
 	RdrNameTyDecl,
 
@@ -91,7 +90,6 @@ type RdrNameMonoBinds		= MonoBinds		Unused RdrName RdrNamePat
 type RdrNamePat			= InPat			RdrName
 type RdrNameHsType		= HsType		RdrName
 type RdrNameSig			= Sig			RdrName
-type RdrNameSpecInstSig		= SpecInstSig 		RdrName
 type RdrNameStmt		= Stmt			Unused RdrName RdrNamePat
 type RdrNameTyDecl		= TyDecl		RdrName
 

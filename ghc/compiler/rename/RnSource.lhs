@@ -18,7 +18,7 @@ import RnHsSyn
 import HsCore
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 
-import RnBinds		( rnTopBinds, rnMethodBinds )
+import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
 import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bindLocalsRn,
 			  newDfunName, checkDupOrQualNames, checkDupNames,
 			  newLocallyDefinedGlobalName, newImportedGlobalName, ifaceFlavour,
@@ -26,9 +26,10 @@ import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bi
 import RnMonad
 
 import Name		( Name, OccName(..), occNameString, prefixOccName,
-			  ExportFlag(..), Provenance(..), NameSet,
+			  ExportFlag(..), Provenance(..), NameSet, mkNameSet,
 			  elemNameSet, nameOccName, NamedThing(..)
 			)
+import BasicTypes	( TopLevelFlag(..) )
 import FiniteMap	( lookupFM )
 import Id		( GenId{-instance NamedThing-} )
 import IdInfo		( FBTypeInfo, ArgUsageInfo )
@@ -173,7 +174,7 @@ rnDecl (ClD (ClassDecl context cname tyvars sigs mbinds pragmas tname dname src_
   where
     cls_doc  = text "the declaration for class" 	<+> ppr cname
     sig_doc  = text "the signatures for class"  	<+> ppr cname
-    meth_doc = text "the default-methods for class" <+> ppr cname
+    meth_doc = text "the default-methods for class"	<+> ppr cname
 
     sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
@@ -239,7 +240,10 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
 	-- NB meth_names can be qualified!
     checkDupNames meth_doc meth_names 		`thenRn_`
     rnMethodBinds mbinds			`thenRn` \ mbinds' ->
-    mapRn rn_uprag uprags			`thenRn` \ new_uprags ->
+    let 
+	binders = mkNameSet (map fst (bagToList (collectMonoBinders mbinds')))
+    in
+    renameSigs NotTopLevel True binders uprags	`thenRn` \ new_uprags ->
    
     let
      -- We use the class name and the name of the first
@@ -278,27 +282,6 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun src_loc))
   where
     meth_doc = text "the bindings in an instance declaration"
     meth_names   = bagToList (collectMonoBinders mbinds)
-
-    rn_uprag (SpecSig op ty using locn)
-      = pushSrcLocRn src_loc $
-	lookupBndrRn op				`thenRn` \ op_name ->
-	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ new_ty ->
-	rn_using using				`thenRn` \ new_using ->
-	returnRn (SpecSig op_name new_ty new_using locn)
-
-    rn_uprag (InlineSig op locn)
-      = pushSrcLocRn locn $
-	lookupBndrRn op			`thenRn` \ op_name ->
-	returnRn (InlineSig op_name locn)
-
-    rn_uprag (MagicUnfoldingSig op str locn)
-      = pushSrcLocRn locn $
-	lookupBndrRn op			`thenRn` \ op_name ->
-	returnRn (MagicUnfoldingSig op_name str locn)
-
-    rn_using Nothing  = returnRn Nothing
-    rn_using (Just v) = lookupOccRn v	`thenRn` \ new_v ->
-			returnRn (Just new_v)
 \end{code}
 
 %*********************************************************

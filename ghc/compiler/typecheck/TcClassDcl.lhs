@@ -15,15 +15,16 @@ import HsPragmas	( ClassPragmas(..) )
 import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RenamedClassOpSig(..), RenamedMonoBinds,
-			  RenamedContext(..), RenamedHsDecl
+			  RenamedContext(..), RenamedHsDecl, RenamedSig
 			)
 import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, newDicts, newMethod )
 import TcEnv		( TcIdOcc(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTyVar, 
-			  tcExtendGlobalTyVars )
-import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, TcSigInfo(..) )
+			  tcExtendGlobalTyVars, tcExtendLocalValEnv
+			)
+import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, tcPragmaSigs, TcSigInfo(..) )
 import TcKind		( unifyKinds, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
@@ -410,7 +411,7 @@ tcDefaultMethodBinds clas default_binds
 
 	  | otherwise
 	  =	-- Normal case
-	    tcMethodBind clas origin inst_tys clas_tyvars sel_id meth_bind
+	    tcMethodBind clas origin inst_tys clas_tyvars sel_id meth_bind [{- No prags -}]
 						`thenTc` \ (bind, insts, (_, local_dm_id)) ->
 	    returnTc (bind, insts, (clas_tyvars, RealId dm_id, local_dm_id))
 	  where
@@ -475,9 +476,10 @@ tcMethodBind
 							--  want to check that they don't bound
 	-> Id						-- The method selector
 	-> RenamedMonoBinds				-- Method binding (just one)
+	-> [RenamedSig]					-- Pramgas (just for this one)
 	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
 
-tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind
+tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind prags
  = tcAddSrcLoc src_loc	 		        $
    newMethod origin (RealId sel_id) inst_tys	`thenNF_Tc` \ meth@(_, TcId local_meth_id) ->
    tcInstSigTcType (idType local_meth_id)	`thenNF_Tc` \ (tyvars', rho_ty') ->
@@ -485,10 +487,14 @@ tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind
 	(theta', tau')  = splitRhoTy rho_ty'
 	sig_info        = TySigInfo bndr_name local_meth_id tyvars' theta' tau' src_loc
    in
+   tcExtendLocalValEnv [bndr_name] [local_meth_id] (
+	tcPragmaSigs prags
+   )						`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
+
    tcExtendGlobalTyVars inst_tyvars (
      tcAddErrCtxt (methodCtxt sel_id)		$
      tcBindWithSigs NotTopLevel [bndr_name] meth_bind [sig_info]
-		    NonRecursive (\_ -> noIdInfo)	
+		    NonRecursive prag_info_fn 	
    )							`thenTc` \ (binds, insts, _) ->
 
 	-- Now check that the instance type variables
@@ -499,7 +505,9 @@ tcMethodBind clas origin inst_tys inst_tyvars sel_id meth_bind
      checkSigTyVars inst_tyvars (idType local_meth_id)
    )							`thenTc_` 
 
-   returnTc (binds, insts, meth)
+   returnTc (binds `AndMonoBinds` prag_binds, 
+	     insts `plusLIE` prag_lie, 
+	     meth)
  where
    (bndr_name, src_loc) = case meth_bind of
 				FunMonoBind name _ _ loc	  -> (name, loc)

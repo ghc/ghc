@@ -11,9 +11,10 @@ module TcBinds ( tcBindsAndThen, tcTopBindsAndThen,
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
+import {-# SOURCE #-} TcExpr  ( tcExpr )
 
-import HsSyn		( HsBinds(..), MonoBinds(..), Sig(..), InPat(..),
-			  collectMonoBinders
+import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), InPat(..),
+			  collectMonoBinders, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig(..), 
 			  RenamedMonoBinds
@@ -28,7 +29,8 @@ import Inst		( Inst, LIE, emptyLIE, plusLIE, plusLIEs, InstOrigin(..),
 			  newDicts, tyVarsOfInst, instToId, newMethodWithGivenTy,
 			  zonkInst, pprInsts
 			)
-import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newLocalId,
+import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK,
+			  newLocalId, newSpecPragmaId,
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import TcMatches	( tcMatchesFun )
@@ -155,7 +157,7 @@ tcBinds top_lvl (MonoBind bind sigs is_rec)
 	-- should be no black-hole problems here.
 
   	-- TYPECHECK THE SIGNATURES
-      mapTc (tcTySig prag_info_fn) ty_sigs		`thenTc` \ tc_ty_sigs ->
+      mapTc tcTySig ty_sigs		`thenTc` \ tc_ty_sigs ->
   
       tcBindWithSigs top_lvl binder_names bind 
 		     tc_ty_sigs is_rec prag_info_fn	`thenTc` \ (poly_binds, poly_lie, poly_ids) ->
@@ -336,13 +338,14 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	dict_tys = map tcIdType dicts_bound
 
 	mk_export binder_name mono_id zonked_mono_id_ty
-	  | maybeToBool maybe_sig = (sig_tyvars,              TcId sig_poly_id, TcId mono_id)
-	  | otherwise		  = (real_tyvars_to_gen_list, TcId poly_id,     TcId mono_id)
+	  = (tyvars, TcId (replaceIdInfo poly_id (prag_info_fn binder_name)), TcId mono_id)
 	  where
-	    maybe_sig = maybeSig tc_ty_sigs binder_name
-	    Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) = maybe_sig
-	    poly_id = replaceIdInfo (mkUserId binder_name poly_ty) (prag_info_fn binder_name)
-	    poly_ty = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
+	    (tyvars, poly_id) = case maybeSig tc_ty_sigs binder_name of
+				  Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) -> (sig_tyvars, sig_poly_id)
+				  Nothing ->			        (real_tyvars_to_gen_list, new_poly_id)
+
+	    new_poly_id = mkUserId binder_name poly_ty
+	    poly_ty     = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
 				-- It's important to build a fully-zonked poly_ty, because
 				-- we'll slurp out its free type variables when extending the
 				-- local environment (tcExtendLocalValEnv); if it's not zonked
@@ -621,18 +624,17 @@ maybeSig (sig@(TySigInfo sig_name _ _ _ _ _) : sigs) name
 
 
 \begin{code}
-tcTySig :: (Name -> IdInfo)
-	-> RenamedSig
+tcTySig :: RenamedSig
 	-> TcM s (TcSigInfo s)
 
-tcTySig prag_info_fn (Sig v ty src_loc)
+tcTySig (Sig v ty src_loc)
  = tcAddSrcLoc src_loc $
    tcHsType ty			`thenTc` \ sigma_ty ->
 
 	-- Convert from Type to TcType	
    tcInstSigType sigma_ty	`thenNF_Tc` \ sigma_tc_ty ->
    let
-     poly_id = replaceIdInfo (mkUserId v sigma_tc_ty) (prag_info_fn v)
+     poly_id = mkUserId v sigma_tc_ty
    in
 	-- Instantiate this type
 	-- It's important to do this even though in the error-free case
@@ -796,16 +798,12 @@ tcPragmaSigs :: [RenamedSig]		-- The pragma signatures
 		       TcMonoBinds s,
 		       LIE s)
 
--- For now we just deal with INLINE pragmas
-tcPragmaSigs sigs = returnTc (prag_fn, EmptyMonoBinds, emptyLIE )
-  where
-    prag_fn name = info
-	      where
-		 info | any has_inline sigs = IWantToBeINLINEd `setInlinePragInfo` noIdInfo
-		      | otherwise	    = noIdInfo
-
-		 has_inline (InlineSig n _) = (n == name)
-		 has_inline other	    = False
+tcPragmaSigs sigs
+  = mapAndUnzip3Tc tcPragmaSig sigs	`thenTc` \ (maybe_info_modifiers, binds, lies) ->
+    let
+	prag_fn name = foldr ($) noIdInfo [f | Just (n,f) <- maybe_info_modifiers, n==name]
+    in
+    returnTc (prag_fn, andMonoBinds binds, plusLIEs lies)
 \end{code}
 
 The interesting case is for SPECIALISE pragmas.  There are two forms.
@@ -857,51 +855,61 @@ and the simplifer won't discard SpecIds for exporte things anyway, so maybe this
 a bit of overkill.
 
 \begin{code}
-{-
-tcPragmaSig :: RenamedSig -> TcM s ((Name, IdInfo -> IdInfo), TcMonoBinds s, LIE s)
+tcPragmaSig :: RenamedSig -> TcM s (Maybe (Name, IdInfo -> IdInfo), TcMonoBinds s, LIE s)
+tcPragmaSig (Sig _ _ _)       = returnTc (Nothing, EmptyMonoBinds, emptyLIE)
+tcPragmaSig (SpecInstSig _ _) = returnTc (Nothing, EmptyMonoBinds, emptyLIE)
+
 tcPragmaSig (InlineSig name loc)
-  = returnTc ((name, setInlinePragInfo IdWantsToBeINLINEd), EmptyBinds, emptyLIE)
+  = returnTc (Just (name, setInlinePragInfo IWantToBeINLINEd), EmptyMonoBinds, emptyLIE)
 
 tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
-  = tcAddSrcLoc src_loc		 		$
-    tcAddErrCtxt (valSpecSigCtxt name spec_ty)	$
+  = 	-- SPECIALISE f :: forall b. theta => tau  =  g
+    tcAddSrcLoc src_loc		 		$
+    tcAddErrCtxt (valSpecSigCtxt name poly_ty)	$
 
 	-- Get and instantiate its alleged specialised type
     tcHsType poly_ty				`thenTc` \ sig_sigma ->
     tcInstSigType  sig_sigma			`thenNF_Tc` \ sig_ty ->
 
-	-- Typecheck the RHS 
-	--	f :: sig_ty
-    tcPolyExpr str (Var name) sig_ty	`thenTc` \ (rhs, lie) ->
+	-- Check that f has a more general type, and build a RHS for
+	-- the spec-pragma-id at the same time
+    tcExpr (HsVar name) sig_ty			`thenTc` \ (spec_expr, spec_lie) ->
 
-	-- If this succeeds, then the signature is indeed less general
-	-- than the main function
-    let
-	(tyvars, tys, template)
-	  = case rhs of
-		TyLam tyvars (DictLam dicts (HsLet (MonoBind dict_binds
-we can take apart the RHS, 
-	-- which will be of very specific form
-    
+    case maybe_spec_name of
+	Nothing -> 	-- Just specialise "f" by building a pecPragmaId binding
+			-- It is the thing that makes sure we don't prematurely 
+			-- dead-code-eliminate the binding we are really interested in.
+		   newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_id ->
+		   returnTc (Nothing, VarMonoBind (TcId spec_id) spec_expr, spec_lie)
 
-    tcLookupLocalValueOK "tcPragmaSig" name	`thenNF_Tc` \ main_id ->
+	Just g_name ->	-- Don't create a SpecPragmaId.  Instead add some suitable IdIfo
+		
+		panic "Can't handle SPECIALISE with a '= g' part"
 
-	-- Check that the specialised signature is an instance
-	-- of the 
-    let
-	rhs_name = case maybe_spec_name of
-			Just name -> name
-			other     -> name
-    in
-   
-	-- Build the SpecPragmaId; it is the thing that makes sure we
-	-- don't prematurely dead-code-eliminate the binding we are really interested in.
-    newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_id ->
+	{-  Not yet.  Because we're still in the TcType world we
+	    can't really add to the SpecEnv of the Id.  Instead we have to
+	    record the information in a different sort of Sig, and add it to
+	    the IdInfo after zonking.
 
-    returnTc ((name, ...),
-	      VarMonoBind spec_id rhs,
-	      lie)
--}
+	    For now we just leave out this case
+
+			-- Get the type of f, and find out what types
+			--  f has to be instantiated at to give the signature type
+		    tcLookupLocalValueOK "tcPragmaSig" name	`thenNF_Tc` \ f_id ->
+		    tcInstSigTcType (idType f_id)		`thenNF_Tc` \ (f_tyvars, f_rho) ->
+
+		    let
+			(sig_tyvars, sig_theta, sig_tau) = splitSigmaTy sig_ty
+			(f_theta, f_tau)                 = splitRhoTy f_rho
+			sig_tyvar_set			 = mkTyVarSet sig_tyvars
+		    in
+		    unifyTauTy sig_tau f_tau		`thenTc_`
+
+		    tcPolyExpr str (HsVar g_name) (mkSigmaTy sig_tyvars f_theta sig_tau)	`thenTc` \ (_, _, 
+	-}
+
+tcPragmaSig other = pprTrace "tcPragmaSig: ignoring" (ppr other) $
+		    returnTc (Nothing, EmptyMonoBinds, emptyLIE)
 \end{code}
 
 

@@ -284,7 +284,7 @@ instance (NamedThing name, Outputable name, Outputable pat)
 
 %************************************************************************
 %*									*
-\subsection[InstDecl]{An instance declaration (also, @SpecInstSig@)}
+\subsection[InstDecl]{An instance declaration
 %*									*
 %************************************************************************
 
@@ -317,21 +317,6 @@ instance (NamedThing name, Outputable name, Outputable pat)
 	         nest 4 (ppr binds) ]
 \end{code}
 
-A type for recording what instances the user wants to specialise;
-called a ``Sig'' because it's sort of like a ``type signature'' for an
-instance.
-\begin{code}
-data SpecInstSig name
-  = SpecInstSig  name		    -- class
-		 (HsType name)    -- type to specialise to
-		 SrcLoc
-
-instance (NamedThing name, Outputable name)
-	      => Outputable (SpecInstSig name) where
-
-    ppr (SpecInstSig clas ty _)
-      = hsep [text "{-# SPECIALIZE instance", ppr clas, ppr ty, text "#-}"]
-\end{code}
 
 %************************************************************************
 %*									*

@@ -14,7 +14,7 @@ module Specialise (
 import MkId		( mkUserLocal )
 import Id		( Id, DictVar, idType, 
 
-			  getIdSpecialisation, setIdSpecialisation,
+			  getIdSpecialisation, setIdSpecialisation, isSpecPragmaId,
 
 			  IdSet, mkIdSet, addOneToIdSet, intersectIdSets, isEmptyIdSet, 
 			         emptyIdSet, unionIdSets, minusIdSet, unitIdSet, elementOfIdSet,
@@ -58,10 +58,9 @@ infixr 9 `thenSM`
 %************************************************************************
 
 These notes describe how we implement specialisation to eliminate
-overloading, and optionally to eliminate unboxed polymorphism, and
-full polymorphism.
+overloading.
 
-The specialisation pass is a partial evaluator which works on Core
+The specialisation pass works on Core
 syntax, complete with all the explicit dictionary application,
 abstraction and construction as added by the type checker.  The
 existing type checker remains largely as it is.
@@ -125,12 +124,12 @@ and create a local instance of f, defined thus:
 
 	f@t1/t2 = <f_rhs> t1 t2 d1 d2
 
-(f_rhs presumably has some big lambdas and dictionary lambdas, so lots
-of simplification will now result.)  Then we should recursively do
-everything again.
-
-The new id has its own unique, but its print-name (if exported) has
-an explicit representation of the instance types t1/t2.
+f_rhs presumably has some big lambdas and dictionary lambdas, so lots
+of simplification will now result.  However we don't actually *do* that
+simplification.  Rather, we leave it for the simplifier to do.  If we
+*did* do it, though, we'd get more call instances from the specialised
+RHS.  We can work out what they are by instantiating the call-instance
+set from f's RHS with the types t1, t2.
 
 Add this new id to f's IdInfo, to record that f has a specialised version.
 
@@ -157,8 +156,8 @@ becomes
 			 in
 			 fl
 
-We still have recusion for non-overloadd functions which we
-speciailise, but the recursive call should get speciailised to the
+We still have recusion for non-overloaded functions which we
+speciailise, but the recursive call should get specialised to the
 same recursive version.
 
 
@@ -240,22 +239,23 @@ polymorphic versions.  Thus:
 
 	f@t1/ = /\b -> <f_rhs> t1 b d1 d2
 
-This seems pretty simple, and a Good Thing.
-
-Polymorphism 3 -- Unboxed
-~~~~~~~~~~~~~~
-
-If we are speciailising at unboxed types we must speciailise
-regardless of the overloading constraint.  In the exaple above it is
-worth speciailising at types Int/Int#, Int/Bool# and a/Int#, Int#/Int#
-etc.
-
-Note that specialising an overloaded type at an uboxed type requires
-an unboxed instance -- we cannot default to an unspecialised version!
+We do this.
 
 
 Dictionary floating
 ~~~~~~~~~~~~~~~~~~~
+Consider this
+
+	f a (d::Num a) = let g = ...
+			 in
+			 ...(let d1::Ord a = Num.Ord.sel a d in g a d1)...
+
+Here, g is only called at one type, but the dictionary isn't in scope at the
+definition point for g.  Usually the type checker would build a
+definition for d1 which enclosed g, but the transformation system
+might have moved d1's defn inward.  Solution: float dictionary bindings
+outwards along with call instances.
+
 Consider
 
 	f x = let g p q = p==q
@@ -283,11 +283,6 @@ But we can't naively make an instance for g from this, because deq is not in sco
 at the defn of g.  Instead, we have to float out the (new) defn of deq
 to widen its scope.  Notice that this floating can't be done in advance -- it only
 shows up when specialisation is done.
-
-DELICATE MATTER: the way we tell a dictionary binding is by looking to
-see if it has a Dict type.  If the type has been "undictify'd", so that
-it looks like a tuple, then the dictionary binding won't be floated, and
-an opportunity to specialise might be lost.
 
 User SPECIALIZE pragmas
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -360,13 +355,6 @@ ordinary function definitions:
 The information about what instance of the dfun exist gets added to
 the dfun's IdInfo in the same way as a user-defined function too.
 
-In fact, matters are a little bit more complicated than this.
-When we make one of these specialised instances, we are defining
-a constant dictionary, and so we want immediate access to its constant
-methods and superclasses.  Indeed, these constant methods and superclasses
-must be in the IdInfo for the class selectors!  We need help from the
-typechecker to sort this out, perhaps by generating a separate IdInfo
-for each.
 
 Automatic instance decl specialisation?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -377,6 +365,9 @@ for ordinary functions; and when we specialised their bodies, we might get
 new call-instances of the dfuns, and so on.  This all arises because of
 the unrestricted mutual recursion between instance decls and value decls.
 
+Still, there's no actual problem; it just means that we may not do all
+the specialisation we could theoretically do.
+
 Furthermore, instance decls are usually exported and used non-locally,
 so we'll want to compile enough to get those specialisations done.
 
@@ -384,33 +375,6 @@ Lastly, there's no such thing as a local instance decl, so we can
 survive solely by spitting out *usage* information, and then reading that
 back in as a pragma when next compiling the file.  So for now,
 we only specialise instance decls in response to pragmas.
-
-That means that even if an instance decl ain't otherwise exported it
-needs to be spat out as with a SPECIALIZE pragma.  Furthermore, it needs
-something to say which module defined the instance, so the usage info
-can be fed into the right reqts info file.  Blegh.
-
-
-SPECIAILISING DATA DECLARATIONS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-With unboxed specialisation (or full specialisation) we also require
-data types (and their constructors) to be speciailised on unboxed
-type arguments.
-
-In addition to normal call instances we gather TyCon call instances at
-unboxed types, determine equivalence classes for the locally defined
-TyCons and build speciailised data constructor Ids for each TyCon and
-substitute these in the Con calls.
-
-We need the list of local TyCons to partition the TyCon instance info.
-We pass out a FiniteMap from local TyCons to Specialised Instances to
-give to the interface and code genertors.
-
-N.B. The specialised data constructors reference the original data
-constructor and type constructor which do not have the updated
-specialisation info attached.  Any specialisation info must be
-extracted from the TyCon map returned.
 
 
 SPITTING OUT USAGE INFORMATION
@@ -422,6 +386,8 @@ and data types. Then we equivalence-class it and spit it out.
 
 This is done at the top-level when all the call instances which escape
 must be for imported functions and data types.
+
+*** Not currently done ***
 
 
 Partial specialisation by pragmas
@@ -485,25 +451,27 @@ response to a SPECIALIZE pragma on the Eq [a] instance decl.
 In short, dfun Ids need IdInfo with a specialisation for each
 constant instance of their instance declaration.
 
+All this uses a single mechanism: the SpecEnv inside an Id
+
 
 What does the specialisation IdInfo look like?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-	SpecInfo
-		[Maybe Type] -- Instance types
-		Int		-- No of dicts to eat
-		Id		-- Specialised version
+The SpecEnv of an Id maps a list of types (the template) to an expression
+
+	[Type]  |->  Expr
 
 For example, if f has this SpecInfo:
 
-	SpecInfo [Just t1, Nothing, Just t3] 2 f'
+	[Int, a]  ->  \d:Ord Int. f' a
 
-then
+it means that we can replace the call
 
-	f t1 t2 t3 d1 d2  ===>  f t2
+	f Int t  ===>  (\d. f' t)
 
-The "Nothings" identify type arguments in which the specialised
-version is polymorphic.
+This chucks one dictionary away and proceeds with the
+specialised version of f, namely f'.
+
 
 What can't be done this way?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -527,98 +495,6 @@ of this is permanently ruled out.
 Still, this is no great hardship, because we intend to eliminate
 overloading altogether anyway!
 
-
-Mutter mutter
-~~~~~~~~~~~~~
-What about types/classes mentioned in SPECIALIZE pragmas spat out,
-but not otherwise exported.  Even if they are exported, what about
-their original names.
-
-Suggestion: use qualified names in pragmas, omitting module for
-prelude and "this module".
-
-
-Mutter mutter 2
-~~~~~~~~~~~~~~~
-Consider this
-
-	f a (d::Num a) = let g = ...
-			 in
-			 ...(let d1::Ord a = Num.Ord.sel a d in g a d1)...
-
-Here, g is only called at one type, but the dictionary isn't in scope at the
-definition point for g.  Usually the type checker would build a
-definition for d1 which enclosed g, but the transformation system
-might have moved d1's defn inward.
-
-
-Unboxed bindings
-~~~~~~~~~~~~~~~~
-
-What should we do when a value is specialised to a *strict* unboxed value?
-
-	map_*_* f (x:xs) = let h = f x
-			       t = map f xs
-			   in h:t
-
-Could convert let to case:
-
-	map_*_Int# f (x:xs) = case f x of h# ->
-			      let t = map f xs
-			      in h#:t
-
-This may be undesirable since it forces evaluation here, but the value
-may not be used in all branches of the body. In the general case this
-transformation is impossible since the mutual recursion in a letrec
-cannot be expressed as a case.
-
-There is also a problem with top-level unboxed values, since our
-implementation cannot handle unboxed values at the top level.
-
-Solution: Lift the binding of the unboxed value and extract it when it
-is used:
-
-	map_*_Int# f (x:xs) = let h = case (f x) of h# -> _Lift h#
-				  t = map f xs
-			      in case h of
-				 _Lift h# -> h#:t
-
-Now give it to the simplifier and the _Lifting will be optimised away.
-
-The benfit is that we have given the specialised "unboxed" values a
-very simplep lifted semantics and then leave it up to the simplifier to
-optimise it --- knowing that the overheads will be removed in nearly
-all cases.
-
-In particular, the value will only be evaluted in the branches of the
-program which use it, rather than being forced at the point where the
-value is bound. For example:
-
-	filtermap_*_* p f (x:xs)
-	  = let h = f x
-		t = ...
-	    in case p x of
-		True  -> h:t
-		False -> t
-   ==>
-	filtermap_*_Int# p f (x:xs)
-	  = let h = case (f x) of h# -> _Lift h#
-		t = ...
-	    in case p x of
-		True  -> case h of _Lift h#
-			   -> h#:t
-		False -> t
-
-The binding for h can still be inlined in the one branch and the
-_Lifting eliminated.
-
-
-Question: When won't the _Lifting be eliminated?
-
-Answer: When they at the top-level (where it is necessary) or when
-inlining would duplicate work (or possibly code depending on
-options). However, the _Lifting will still be eliminated if the
-strictness analyser deems the lifted binding strict.
 
 
 A note about non-tyvar dictionaries
@@ -832,6 +708,10 @@ specBind (NonRec bndr rhs) body_uds
     in
     returnSM ([], all_uds)
 
+  | isSpecPragmaId bndr
+  = specExpr rhs				`thenSM` \ (rhs', rhs_uds) ->
+    returnSM ([], rhs_uds)
+
   | otherwise
   =   -- Deal with the RHS, specialising it according
       -- to the calls found in the body
@@ -949,8 +829,13 @@ specDefn calls (fn, rhs)
 
 		-- Construct the stuff for f's spec env
 		--	[b,d] [t1,b,t3,d]  |->  \d1 d2 -> f1 b d
+		-- The only awkward bit is that d1,d2 might well be global
+		-- dictionaries, so it's tidier to make new local variables
+		-- for the lambdas in the RHS, rather than lambda-bind the
+		-- dictionaries themselves.
+	mapSM (\d -> newIdSM d (idType d)) call_ds	`thenSM` \ arg_ds ->
 	let
-	   spec_env_rhs  = mkValLam call_ds $
+	   spec_env_rhs  = mkValLam arg_ds $
 			   mkTyApp (Var spec_f) $
 			   map mkTyVarTy spec_tyvars
            spec_env_info = (spec_tyvars, spec_tys, spec_env_rhs)
@@ -1255,4 +1140,72 @@ newIdSM old_id new_ty
     )
 \end{code}
 
+
+		Old (but interesting) stuff about unboxed bindings
+		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+What should we do when a value is specialised to a *strict* unboxed value?
+
+	map_*_* f (x:xs) = let h = f x
+			       t = map f xs
+			   in h:t
+
+Could convert let to case:
+
+	map_*_Int# f (x:xs) = case f x of h# ->
+			      let t = map f xs
+			      in h#:t
+
+This may be undesirable since it forces evaluation here, but the value
+may not be used in all branches of the body. In the general case this
+transformation is impossible since the mutual recursion in a letrec
+cannot be expressed as a case.
+
+There is also a problem with top-level unboxed values, since our
+implementation cannot handle unboxed values at the top level.
+
+Solution: Lift the binding of the unboxed value and extract it when it
+is used:
+
+	map_*_Int# f (x:xs) = let h = case (f x) of h# -> _Lift h#
+				  t = map f xs
+			      in case h of
+				 _Lift h# -> h#:t
+
+Now give it to the simplifier and the _Lifting will be optimised away.
+
+The benfit is that we have given the specialised "unboxed" values a
+very simplep lifted semantics and then leave it up to the simplifier to
+optimise it --- knowing that the overheads will be removed in nearly
+all cases.
+
+In particular, the value will only be evaluted in the branches of the
+program which use it, rather than being forced at the point where the
+value is bound. For example:
+
+	filtermap_*_* p f (x:xs)
+	  = let h = f x
+		t = ...
+	    in case p x of
+		True  -> h:t
+		False -> t
+   ==>
+	filtermap_*_Int# p f (x:xs)
+	  = let h = case (f x) of h# -> _Lift h#
+		t = ...
+	    in case p x of
+		True  -> case h of _Lift h#
+			   -> h#:t
+		False -> t
+
+The binding for h can still be inlined in the one branch and the
+_Lifting eliminated.
+
+
+Question: When won't the _Lifting be eliminated?
+
+Answer: When they at the top-level (where it is necessary) or when
+inlining would duplicate work (or possibly code depending on
+options). However, the _Lifting will still be eliminated if the
+strictness analyser deems the lifted binding strict.
 

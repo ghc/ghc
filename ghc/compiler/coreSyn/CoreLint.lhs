@@ -19,7 +19,7 @@ import CoreSyn
 import Bag
 import Kind		( hasMoreBoxityInfo, Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
-import Id		( idType, isBottomingId, dataConRepType, isDataCon, isNewCon, isAlgCon,
+import Id		( idType, isBottomingId, dataConRepType, isDataCon, isAlgCon,
 			  dataConArgTys, GenId{-instances-},
 			  emptyIdSet, mkIdSet,
 			  unionIdSets, elementOfIdSet, IdSet,
@@ -27,7 +27,8 @@ import Id		( idType, isBottomingId, dataConRepType, isDataCon, isNewCon, isAlgCo
 			)
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-},
-			  NamedThing(..) )
+			  NamedThing(..)
+			)
 import PprCore
 import ErrUtils		( doIfSet, ghcExit )
 import PrimOp		( primOpType )

@@ -18,13 +18,13 @@ module TcEnv(
 	tcAddImportedIdInfo, tcExplicitLookupGlobal,
 	tcLookupGlobalValueByKeyMaybe, 
 
-	newMonoIds, newLocalIds, newLocalId,
+	newMonoIds, newLocalIds, newLocalId, newSpecPragmaId,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars
   ) where
 
 #include "HsVersions.h"
 
-import MkId	( mkUserLocal, mkUserId )
+import MkId	( mkUserLocal, mkUserId, mkSpecPragmaId )
 import Id	( Id, GenId, idType, replaceIdInfo, idInfo )
 import TcKind	( TcKind, kindToTcKind, Kind )
 import TcType	( TcType, TcMaybe, TcTyVar, TcTyVarSet, TcThetaType,
@@ -38,7 +38,7 @@ import Class	( Class )
 import TcMonad
 
 import IdInfo		( noIdInfo )
-import Name		( Name, OccName(..), 
+import Name		( Name, OccName(..), nameOccName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
 			  NamedThing(..)
 			)
@@ -407,6 +407,12 @@ newLocalIds names tys
 	mk_id name uniq ty = mkUserLocal name uniq ty loc
     in
     returnNF_Tc new_ids
+
+newSpecPragmaId :: Name -> TcType s -> NF_TcM s (TcIdBndr s)
+newSpecPragmaId name ty 
+  = tcGetSrcLoc		`thenNF_Tc` \ loc ->
+    tcGetUnique		`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty loc)
 \end{code}
 
 

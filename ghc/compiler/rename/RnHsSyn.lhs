@@ -44,7 +44,6 @@ type RenamedPat			= InPat			Name
 type RenamedHsType		= HsType		Name
 type RenamedRecordBinds		= HsRecordBinds		Unused Name RenamedPat
 type RenamedSig			= Sig			Name
-type RenamedSpecInstSig		= SpecInstSig 		Name
 type RenamedStmt		= Stmt			Unused Name RenamedPat
 type RenamedTyDecl		= TyDecl		Name
 

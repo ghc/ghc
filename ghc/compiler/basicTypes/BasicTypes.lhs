@@ -173,7 +173,17 @@ data TopLevelFlag
 %************************************************************************
 
 \begin{code} 
-data RecFlag
-  = Recursive 
-  | NonRecursive
+data RecFlag = Recursive 
+	     | NonRecursive
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Strictness indication}
+%*									*
+%************************************************************************
+
+\begin{code}
+data StrictnessMark = MarkedStrict
+		    | NotMarkedStrict
 \end{code}

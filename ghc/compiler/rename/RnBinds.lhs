@@ -11,7 +11,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 \begin{code}
 module RnBinds (
 	rnTopBinds, rnTopMonoBinds,
-	rnMethodBinds,
+	rnMethodBinds, renameSigs,
 	rnBinds, rnMonoBinds
    ) where
 
@@ -20,6 +20,7 @@ module RnBinds (
 import {-# SOURCE #-} RnSource ( rnHsSigType )
 
 import HsSyn
+import HsBinds		( sigsForMe )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
@@ -262,7 +263,7 @@ rn_mono_binds top_lev binders mbinds sigs
 	 -- Rename the bindings, returning a MonoBindsInfo
 	 -- which is a list of indivisible vertices so far as
 	 -- the strongly-connected-components (SCC) analysis is concerned
-    rnBindSigs top_lev binders sigs	`thenRn` \ siglist ->
+    renameSigs top_lev False binders sigs	`thenRn` \ siglist ->
     flattenMonoBinds siglist mbinds	`thenRn` \ mbinds_info ->
 
 	 -- Do the SCC analysis
@@ -299,7 +300,7 @@ flattenMonoBinds sigs (PatMonoBind pat grhss_and_binds locn)
 	 -- Find which things are bound in this group
     let
 	names_bound_here = mkNameSet (collectPatBinders pat')
-	sigs_for_me      = filter ((`elemNameSet` names_bound_here) . sig_name) sigs
+	sigs_for_me      = sigsForMe (`elemNameSet` names_bound_here) sigs
 	sigs_fvs         = foldr sig_fv emptyNameSet sigs_for_me
     in
     returnRn 
@@ -316,7 +317,7 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
     mapAndUnzipRn rnMatch matches		`thenRn` \ (new_matches, fv_lists) ->
     let
 	fvs	    = unionManyNameSets fv_lists
-	sigs_for_me = filter ((name' ==) . sig_name) sigs
+	sigs_for_me = sigsForMe (name' ==) sigs
 	sigs_fvs    = foldr sig_fv emptyNameSet sigs_for_me
     in
     returnRn
@@ -437,17 +438,19 @@ mkEdges flat_info
 %*									*
 %************************************************************************
 
-@rnBindSigs@ checks for: (a)~more than one sig for one thing;
+@renameSigs@ checks for: (a)~more than one sig for one thing;
 (b)~signatures given for things not bound here; (c)~with suitably
 flaggery, that all top-level things have type signatures.
 
 \begin{code}
-rnBindSigs :: TopLevelFlag
-	   -> NameSet			-- Set of names bound in this group
-	   -> [RdrNameSig]
-	   -> RnMS s [RenamedSig]		 -- List of Sig constructors
+renameSigs :: TopLevelFlag
+	    -> Bool			-- True <-> sigs for an instance decl
+					-- hence SPECIALISE instance prags ok
+	    -> NameSet			-- Set of names bound in this group
+	    -> [RdrNameSig]
+	    -> RnMS s [RenamedSig]		 -- List of Sig constructors
 
-rnBindSigs top_lev binders sigs
+renameSigs top_lev inst_decl binders sigs
   =	 -- Rename the signatures
     mapRn renameSig sigs   	`thenRn` \ sigs' ->
 
@@ -455,8 +458,9 @@ rnBindSigs top_lev binders sigs
 	--	     (b) signatures for things not in this group
 	--	     (c) optionally, bindings with no signature
     let
-	(goodies, dups) = removeDups cmp_sig (filter (not.isUnboundName.sig_name) sigs')
-	not_this_group  = filter (\sig -> not (sig_name sig `elemNameSet` binders)) goodies
+	(goodies, dups) = removeDups cmp_sig (sigsForMe (not . isUnboundName) sigs')
+	not_this_group  = sigsForMe (not . (`elemNameSet` binders)) goodies
+	spec_inst_sigs  = [s | s@(SpecInstSig _ _) <- goodies]
 	type_sig_vars	= [n | Sig n _ _ <- goodies]
 	sigs_required   = case top_lev of {TopLevel -> opt_SigsRequired; NotTopLevel -> False}
 	un_sigd_binders | sigs_required = nameSetToList binders `minusList` type_sig_vars
@@ -464,6 +468,11 @@ rnBindSigs top_lev binders sigs
     in
     mapRn dupSigDeclErr dups 				`thenRn_`
     mapRn unknownSigErr not_this_group			`thenRn_`
+    (if not inst_decl then
+	mapRn unknownSigErr spec_inst_sigs
+     else
+	returnRn []
+    )							`thenRn_`
     mapRn (addErrRn.missingSigErr) un_sigd_binders	`thenRn_`
 
     returnRn sigs' -- bad ones and all:
@@ -475,6 +484,11 @@ renameSig (Sig v ty src_loc)
     lookupBndrRn v				`thenRn` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty		`thenRn` \ new_ty ->
     returnRn (Sig new_v new_ty src_loc)
+
+renameSig (SpecInstSig ty src_loc)
+  = pushSrcLocRn src_loc $
+    rnHsSigType (text "A SPECIALISE instance pragma") ty		`thenRn` \ new_ty ->
+    returnRn (SpecInstSig new_ty src_loc)
 
 renameSig (SpecSig v ty using src_loc)
   = pushSrcLocRn src_loc $
@@ -491,21 +505,16 @@ renameSig (InlineSig v src_loc)
   = pushSrcLocRn src_loc $
     lookupBndrRn v		`thenRn` \ new_v ->
     returnRn (InlineSig new_v src_loc)
-
-renameSig (MagicUnfoldingSig v str src_loc)
-  = pushSrcLocRn src_loc $
-    lookupBndrRn v		`thenRn` \ new_v ->
-    returnRn (MagicUnfoldingSig new_v str src_loc)
 \end{code}
 
 Checking for distinct signatures; oh, so boring
 
 \begin{code}
 cmp_sig :: RenamedSig -> RenamedSig -> Ordering
-cmp_sig (Sig n1 _ _)	           (Sig n2 _ _)    	  = n1 `compare` n2
-cmp_sig (InlineSig n1 _)  	   (InlineSig n2 _) 	  = n1 `compare` n2
-cmp_sig (MagicUnfoldingSig n1 _ _) (MagicUnfoldingSig n2 _ _) = n1 `compare` n2
-cmp_sig (SpecSig n1 ty1 _ _)       (SpecSig n2 ty2 _ _)
+cmp_sig (Sig n1 _ _)	     (Sig n2 _ _)    	  = n1 `compare` n2
+cmp_sig (InlineSig n1 _)     (InlineSig n2 _) 	  = n1 `compare` n2
+cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
+cmp_sig (SpecSig n1 ty1 _ _) (SpecSig n2 ty2 _ _) 
   = -- may have many specialisations for one value;
 	-- but not ones that are exactly the same...
 	thenCmp (n1 `compare` n2) (cmpHsType compare ty1 ty2)
@@ -517,14 +526,8 @@ cmp_sig other_1 other_2					-- Tags *must* be different
 sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
 sig_tag (SpecSig n1 _ _ _)    	   = ILIT(2)
 sig_tag (InlineSig n1 _)  	   = ILIT(3)
-sig_tag (MagicUnfoldingSig n1 _ _) = ILIT(4)
+sig_tag (SpecInstSig _ _)	   = ILIT(5)
 sig_tag _			   = panic# "tag(RnBinds)"
-
-sig_name (Sig        n _ _) 	   = n
-sig_name (ClassOpSig n _ _ _) 	   = n
-sig_name (SpecSig    n _ _ _) 	   = n
-sig_name (InlineSig  n     _) 	   = n  
-sig_name (MagicUnfoldingSig n _ _) = n
 \end{code}
 
 %************************************************************************
@@ -536,24 +539,25 @@ sig_name (MagicUnfoldingSig n _ _) = n
 \begin{code}
 dupSigDeclErr (sig:sigs)
   = pushSrcLocRn loc $
-    addErrRn (sep [ptext SLIT("more than one"), 
-		   ptext what_it_is, ptext SLIT("given for"), 
-		   quotes (ppr (sig_name sig))])
+    addErrRn (sep [ptext SLIT("Duplicate"),
+		   ptext what_it_is <> colon,
+		   ppr sig])
   where
     (what_it_is, loc) = sig_doc sig
 
 unknownSigErr sig
   = pushSrcLocRn loc $
-    addErrRn (sep [ptext flavour, ptext SLIT("but no definition for"),
-		   quotes (ppr (sig_name sig))])
+    addErrRn (sep [ptext SLIT("Misplaced"),
+		   ptext what_it_is <> colon,
+		   ppr sig])
   where
-    (flavour, loc) = sig_doc sig
+    (what_it_is, loc) = sig_doc sig
 
 sig_doc (Sig        _ _ loc) 	    = (SLIT("type signature"),loc)
 sig_doc (ClassOpSig _ _ _ loc) 	    = (SLIT("class-method type signature"), loc)
-sig_doc (SpecSig    _ _ _ loc) 	    = (SLIT("SPECIALIZE pragma"),loc)
+sig_doc (SpecSig    _ _ _ loc) 	    = (SLIT("SPECIALISE pragma"),loc)
 sig_doc (InlineSig  _     loc) 	    = (SLIT("INLINE pragma"),loc)
-sig_doc (MagicUnfoldingSig _ _ loc) = (SLIT("MAGIC_UNFOLDING pragma"),loc)
+sig_doc (SpecInstSig _ loc)	    = (SLIT("SPECIALISE instance pragma"),loc)
 
 missingSigErr var
   = sep [ptext SLIT("Definition but no type signature for"), quotes (ppr var)]

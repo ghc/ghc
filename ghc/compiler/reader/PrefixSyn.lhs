@@ -50,18 +50,9 @@ data RdrBinding
 			-- signatures are mysterious; we can't
 			-- tell if its a Sig or a ClassOpSig,
 			-- so we just save the pieces:
-  | RdrTySig		[RdrName]	    -- vars getting sigs
-			RdrNameHsType     -- the type
-			SrcLoc
+  | RdrSig		RdrNameSig
 
-  -- user pragmas come in in a Sig-ish way/form...
-  | RdrSpecValSig   	[RdrNameSig]
-  | RdrInlineValSig 	RdrNameSig
-  | RdrMagicUnfoldingSig RdrNameSig
-  | RdrSpecInstSig  	RdrNameSpecInstSig
-  | RdrSpecDataSig   	RdrNameSpecDataSig
-
-type SigConverter = RdrBinding {- a Sig -} -> [RdrNameSig]
+type SigConverter = RdrNameSig -> RdrNameSig
 \end{code}
 
 \begin{code}
