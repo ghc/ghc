@@ -247,7 +247,6 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 
 	-- GENERATE THE VERSION/USAGE INFO
     mkImportInfo mod_name imports 			`thenRn` \ my_usages ->
-    traceHiDiffsRn (vcat (map pprUsage my_usages)) `thenRn_`
 
 	-- BUILD THE MODULE INTERFACE
     let
