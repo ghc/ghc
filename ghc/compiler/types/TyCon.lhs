@@ -475,7 +475,8 @@ tyConPrimRep tc			              = ASSERT( not (isUnboxedTupleTyCon tc) )
 \begin{code}
 tyConTheta :: TyCon -> [PredType]
 tyConTheta (AlgTyCon {algTyConTheta = theta}) = theta
--- should ask about anything else
+tyConTheta (TupleTyCon {}) = []
+-- shouldn't ask about anything else
 \end{code}
 
 @tyConArgVrcs_maybe@ gives a list of (occPos,occNeg) flags, one for
