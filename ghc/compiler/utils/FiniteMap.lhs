@@ -15,23 +15,13 @@ This code is derived from that in the paper:
 \end{display}
 
 The code is SPECIALIZEd to various highly-desirable types (e.g., Id)
-near the end (only \tr{#ifdef COMPILING_GHC}).
+near the end.
 
 \begin{code}
-#ifdef COMPILING_GHC
 #include "HsVersions.h"
 #define IF_NOT_GHC(a) {--}
-#else
-#define ASSERT(e) {--}
-#define IF_NOT_GHC(a) a
-#define COMMA ,
-#define _tagCmp compare
-#define _LT LT
-#define _GT GT
-#define _EQ EQ
-#endif
 
-#if defined(COMPILING_GHC) && defined(DEBUG_FINITEMAPS)/* NB NB NB */
+#if defined(DEBUG_FINITEMAPS)/* NB NB NB */
 #define OUTPUTABLE_key , Outputable key
 #else
 #define OUTPUTABLE_key {--}
@@ -62,11 +52,10 @@ module FiniteMap (
 
 	fmToList, keysFM, eltsFM
 
-#ifdef COMPILING_GHC
 	, bagToFM
 	, SYN_IE(FiniteSet), emptySet, mkSet, isEmptySet
 	, elementOf, setToList, union, minusSet
-#endif
+
     ) where
 
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
@@ -86,14 +75,12 @@ import Bag	  ( Bag, foldrBag )
 import Outputable ( PprStyle, Outputable(..) )
 import Pretty	( Doc )
 
-#ifdef COMPILING_GHC
-
-# if ! OMIT_NATIVE_CODEGEN
+#if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a
-# else
+#else
 #  define IF_NCG(a) {--}
-# endif
 #endif
+
 
 -- SIGH: but we use unboxed "sizes"...
 #if __GLASGOW_HASKELL__
@@ -116,10 +103,8 @@ emptyFM		:: FiniteMap key elt
 unitFM		:: key -> elt -> FiniteMap key elt
 listToFM	:: (Ord key OUTPUTABLE_key) => [(key,elt)] -> FiniteMap key elt
 			-- In the case of duplicates, the last is taken
-#ifdef COMPILING_GHC
 bagToFM		:: (Ord key OUTPUTABLE_key) => Bag (key,elt) -> FiniteMap key elt
 			-- In the case of duplicates, who knows which is taken
-#endif
 
 --	ADDING AND DELETING
 		   -- Throws away any previous binding
@@ -224,9 +209,7 @@ unitFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
 
 listToFM = addListToFM emptyFM
 
-#ifdef COMPILING_GHC
 bagToFM = foldrBag (\(k,v) fm -> addToFM fm k v) emptyFM
-#endif
 \end{code}
 
 %************************************************************************
@@ -442,7 +425,7 @@ mkBranch :: (Ord key OUTPUTABLE_key) 		-- Used for the assertion checking only
 
 mkBranch which key elt fm_l fm_r
   = --ASSERT( left_ok && right_ok && balance_ok )
-#if defined(COMPILING_GHC) && defined(DEBUG_FINITEMAPS)
+#if defined(DEBUG_FINITEMAPS)
     if not ( left_ok && right_ok && balance_ok ) then
 	pprPanic ("mkBranch:"++show which) (vcat [ppr PprDebug [left_ok, right_ok, balance_ok],
 				       ppr PprDebug key,
@@ -704,7 +687,7 @@ deleteMax (Branch key elt _ fm_l    fm_r) = mkBalBranch key elt fm_l (deleteMax 
 %************************************************************************
 
 \begin{code}
-#if defined(COMPILING_GHC) && defined(DEBUG_FINITEMAPS)
+#if defined(DEBUG_FINITEMAPS)
 
 instance (Outputable key) => Outputable (FiniteMap key elt) where
     ppr sty fm = pprX sty fm
@@ -716,7 +699,7 @@ pprX sty (Branch key elt sz fm_l fm_r)
 		      pprX sty fm_r])
 #endif
 
-#ifndef COMPILING_GHC
+#if 0
 instance (Eq key, Eq elt) => Eq (FiniteMap key elt) where
   fm_1 == fm_2 = (sizeFM   fm_1 == sizeFM   fm_2) &&   -- quick test
 		 (fmToList fm_1 == fmToList fm_2)
@@ -736,8 +719,6 @@ instance (Ord key, Ord elt) => Ord (FiniteMap key elt) where
 %************************************************************************
 
 \begin{code}
-#ifdef COMPILING_GHC
-
 type FiniteSet key = FiniteMap key ()
 emptySet	:: FiniteSet key
 mkSet		:: (Ord key OUTPUTABLE_key) => [key] -> FiniteSet key
@@ -755,7 +736,6 @@ minusSet  = minusFM
 setToList = keysFM
 union = plusFM
 
-#endif
 \end{code}
 
 %************************************************************************
@@ -768,7 +748,7 @@ When the FiniteMap module is used in GHC, we specialise it for
 \tr{Uniques}, for dastardly efficiency reasons.
 
 \begin{code}
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ && !defined(REALLY_HASKELL_1_3)
+#if __GLASGOW_HASKELL__ && !defined(REALLY_HASKELL_1_3)
 
 {-# SPECIALIZE addListToFM
 		:: FiniteMap (FAST_STRING, FAST_STRING) elt -> [((FAST_STRING, FAST_STRING),elt)] -> FiniteMap (FAST_STRING, FAST_STRING) elt
@@ -829,5 +809,5 @@ When the FiniteMap module is used in GHC, we specialise it for
     IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
     #-}
 
-#endif {- compiling for GHC -}
+#endif {- compiling with ghc and have specialiser -}
 \end{code}
