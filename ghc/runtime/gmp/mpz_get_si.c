@@ -34,7 +34,7 @@ mpz_get_si (integer)
   if (size > 0)
     return integer->d[0] % ((mp_limb) 1 << (BITS_PER_MP_LIMB - 1));
   else if (size < 0)
-    return -(integer->d[0] % ((mp_limb) 1 << (BITS_PER_MP_LIMB - 1)));
+    return ~((integer->d[0] - 1) % ((mp_limb) 1 << (BITS_PER_MP_LIMB - 1)));
   else
     return 0;
 }
