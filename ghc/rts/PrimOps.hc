@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.31 1999/10/13 16:39:23 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.32 1999/10/15 09:50:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,7 +55,7 @@ W_ GHC_ZCCReturnable_static_info[0];
  */
 
 /*------ All Regs available */
-#ifdef REG_R8
+#if defined(REG_R8)
 # define RET_P(a)     R1.w = (W_)(a); JMP_(ENTRY_CODE(Sp[0]));
 # define RET_N(a)     RET_P(a)
 
@@ -80,15 +80,60 @@ W_ GHC_ZCCReturnable_static_info[0];
         R4.w = (W_)(d); R5.w = (W_)(e); R6.w = (W_)(f); \
 	JMP_(ENTRY_CODE(Sp[0]));
 
-#else
-
-#if defined(REG_R7) || defined(REG_R6) || defined(REG_R5) || \
-    defined(REG_R4) || defined(REG_R3) || defined(REG_R2)
+#elif defined(REG_R7) || defined(REG_R6) || defined(REG_R5) || \
+      defined(REG_R4) || defined(REG_R3)
 # error RET_n macros not defined for this setup.
-#else
+
+/*------ 2 Registers available */
+#elif defined(REG_R2)
+
+# define RET_P(a)     R1.w = (W_)(a); JMP_(ENTRY_CODE(Sp[0]));
+# define RET_N(a)     RET_P(a)
+
+# define RET_PP(a,b)   R1.w = (W_)(a); R2.w = (W_)(b); \
+		       JMP_(ENTRY_CODE(Sp[0]));
+# define RET_NN(a,b)   RET_PP(a,b)
+# define RET_NP(a,b)   RET_PP(a,b)
+
+# define RET_PPP(a,b,c) \
+	R1.w = (W_)(a); R2.w = (W_)(b); Sp[-1] = (W_)(c); Sp -= 1; \
+	JMP_(ENTRY_CODE(Sp[1]));
+# define RET_NNP(a,b,c) \
+	R1.w = (W_)(a); R2.w = (W_)(b); Sp[-1] = (W_)(c); Sp -= 1; \
+	JMP_(ENTRY_CODE(Sp[1]));
+
+# define RET_NNNP(a,b,c,d)			\
+	R1.w = (W_)(a); 			\
+        R2.w = (W_)(b); 			\
+    /*  Sp[-3] = ARGTAG(1); */			\
+        Sp[-2] = (W_)(c); 			\
+        Sp[-1] = (W_)(d); 			\
+        Sp -= 3;				\
+        JMP_(ENTRY_CODE(Sp[3]));
+
+# define RET_NPNP(a,b,c,d)			\
+	R1.w = (W_)(a); 			\
+        R2.w = (W_)(b); 			\
+    /*  Sp[-3] = ARGTAG(1); */			\
+        Sp[-2] = (W_)(c); 			\
+        Sp[-1] = (W_)(d); 			\
+        Sp -= 3;				\
+        JMP_(ENTRY_CODE(Sp[3]));
+
+# define RET_NNPNNP(a,b,c,d,e,f)		\
+        R1.w = (W_)(a);				\
+	R2.w = (W_)(b);				\
+	Sp[-6] = (W_)(c);			\
+	/* Sp[-5] = ARGTAG(1); */		\
+	Sp[-4] = (W_)(d);			\
+	/* Sp[-3] = ARGTAG(1); */		\
+	Sp[-2] = (W_)(e);			\
+	Sp[-1] = (W_)(f);			\
+	Sp -= 6;				\
+	JMP_(ENTRY_CODE(Sp[6]));
 
 /*------ 1 Register available */
-#ifdef REG_R1
+#elif defined(REG_R1)
 # define RET_P(a)     R1.w = (W_)(a); JMP_(ENTRY_CODE(Sp[0]));
 # define RET_N(a)     RET_P(a)
 
@@ -174,9 +219,6 @@ W_ GHC_ZCCReturnable_static_info[0];
 # define RET_NPNP(a,b,c,d) PUSH_N(6,a); PUSH_P(4,b); PUSH_N(3,c); PUSH_P(1,d); PUSHED(6)	
 # define RET_NNPNNP(a,b,c,d,e,f) PUSH_N(10,a); PUSH_N(8,b); PUSH_P(6,c); PUSH_N(5,d); PUSH_N(3,e); PUSH_P(1,f); PUSHED(10)
 
-#endif
-
-#endif
 #endif
 
 /*-----------------------------------------------------------------------------
