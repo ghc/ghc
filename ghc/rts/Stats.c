@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.25 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: Stats.c,v 1.26 2001/07/02 13:02:29 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -107,7 +107,7 @@ static nat   pageFaults(void);
 
 /* elapsedtime() -- The current elapsed time in seconds */
 
-#ifdef _WIN32
+#if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 #define NS_PER_SEC 10000000LL
 /* Convert FILETIMEs into secs since the Epoch (Jan1-1970) */
 #define FT2longlong(ll,ft)    \
@@ -117,7 +117,7 @@ static nat   pageFaults(void);
     (ll) /= (unsigned long long) (NS_PER_SEC / CLOCKS_PER_SEC)
 #endif
 
-#ifdef _WIN32
+#ifdef defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
 /* cygwin32 or mingw32 version */
 static void
 getTimes(void)
@@ -140,7 +140,7 @@ getTimes(void)
     CurrentUserTime = uT;
 }
 
-#else /* !_WIN32 */
+#else /* !win32 */
 
 static void
 getTimes(void)
