@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.63 1999/10/21 08:23:56 simonmar Exp $
+ * $Id: GC.c,v 1.64 1999/11/01 18:17:45 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1143,7 +1143,18 @@ loop:
   switch (info -> type) {
 
   case BCO:
-    return copy(q,bco_sizeW(stgCast(StgBCO*,q)),step);
+    {
+      nat size = bco_sizeW((StgBCO*)q);
+
+      if (size >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+	evacuate_large((P_)q, rtsFalse);
+	to = q;
+      } else {
+	/* just copy the block */
+	to = copy(q,size,step);
+      }
+      return to;
+    }
 
   case MUT_VAR:
     ASSERT(q->header.info != &MUT_CONS_info);
