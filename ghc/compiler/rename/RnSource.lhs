@@ -109,8 +109,6 @@ rnSourceDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
 rnSourceDecl (TyClD tycl_decl)
   = rnTyClDecl tycl_decl		`thenRn` \ new_decl ->
     rnClassBinds tycl_decl new_decl	`thenRn` \ (new_decl', fvs) ->
-    traceRn (text "rnClassDecl:" <+> (ppr (nameSetToList (tyClDeclFVs new_decl')) $$
-				      ppr (nameSetToList fvs))) 	`thenRn_`
     returnRn (TyClD new_decl', fvs `plusFV` tyClDeclFVs new_decl')
 
 rnSourceDecl (InstD inst)
