@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.134 2001/02/11 17:01:46 simonmar Exp $
+# $Id: Makefile,v 1.135 2001/02/11 17:12:35 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -166,49 +166,29 @@ SRC_HC_OPTS += \
   -I. -IcodeGen -InativeGen -Iparser \
   -i$(subst $(space),:,$(DIRS)) 
 
-ghc_407_at_least = $(shell expr "$(GhcMinVersion)" \>= 7)
-ifeq "$(ghc_407_at_least)" "1"
 ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util
 else
 SRC_HC_OPTS += -package concurrent -package text -package util
 endif
-else
-SRC_HC_OPTS += -syslib concurrent -syslib posix -syslib misc -syslib util
-endif
 
 SRC_CC_OPTS += -Iparser -I. -I$(TOP)/includes -O
-
 SRC_HC_OPTS += -recomp $(GhcHcOpts)
+SRC_HC_OPTS += -H16m
 
 # 	Special flags for particular modules
 #	The standard suffix rule for compiling a Haskell file
 #	adds these flags to the command line
 
-# Was 6m with 2.10
-absCSyn/PprAbsC_HC_OPTS 	= -H10m
-
-codeGen/CgCase_HC_OPTS		= -fno-prune-tydecls
+# not sure if this is required --SDM
 main/Main_HC_OPTS 		= -fvia-C
 
-ifneq "$(GhcWithHscBuiltViaC)" "YES"
-ifeq "$(GhcReportCompiles)" "YES"
-main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
-endif
-endif
-
-nativeGen/MachCode_HC_OPTS 	= -H10m
-
-# Avoids Bug in 3.02, it seems
-usageSP/UsageSPInf_HC_OPTS	= -Onot
-
-prelude/PrimOp_HC_OPTS 		= -H12m -no-recomp
+prelude/PrimOp_HC_OPTS 		= -no-recomp
 
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
-
 parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
@@ -222,42 +202,8 @@ ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
 rename/RnMonad_HC_OPTS 		=  -O2 -O2-for-C
 endif
 
-rename/RnSource_HC_OPTS		= -H12m
-rename/RnIfaces_HC_OPTS		= -H8m 
-rename/RnExpr_HC_OPTS		= -H10m
-rename/RnNames_HC_OPTS		= -H12m
-specialise/Specialise_HC_OPTS 	= -Onot -H12m
-simplCore/Simplify_HC_OPTS	= -H15m	
-simplCore/OccurAnal_HC_OPTS	= -H10m
-typecheck/TcGenDeriv_HC_OPTS	= -H10m
-
-# tmp, -- SDM
-specialise/Specialise_HC_OPTS 	+= -fno-prune-tydecls
-hsSyn/HsBasic_HC_OPTS		+= -fno-prune-tydecls
-simplCore/SimplMonad_HC_OPTS	+= -fno-prune-tydecls
-absCSyn/AbsCSyn_HC_OPTS		+= -fno-prune-tydecls
-absCSyn/AbsCUtils_HC_OPTS	+= -fno-prune-tydecls
-codeGen/CgBindery_HC_OPTS	+= -fno-prune-tydecls
-codeGen/CgLetNoEscape_HC_OPTS	+= -fno-prune-tydecls
-codeGen/CgExpr_HC_OPTS		+= -fno-prune-tydecls
-nativeGen/AbsCStixGen_HC_OPTS	+= -fno-prune-tydecls
-
-# Was 10m for 2.10
-typecheck/TcHsSyn_HC_OPTS	= -H15m	
-
-
-# Was 10m for 2.10
-typecheck/TcExpr_HC_OPTS	= -H15m
-typecheck/TcBinds_HC_OPTS       = -H10m
-
-typecheck/TcEnv_HC_OPTS		= -H10m
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
-
-# temporary, due to bug in NCG (x86 spiller fails because a basic block
-# contains both multiply and divide insns, probably soaking up all spill
-# regs) (SDM, 1/6/2000), augmented by JRS 27 Oct 00.
-utils/FastString_HC_OPTS	= -fvia-C
 
 # flags for PrimPacked:
 #
@@ -272,13 +218,6 @@ utils/FastString_HC_OPTS	= -fvia-C
 #	the -funfolding flags.
 
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs -funfolding-interface-threshold7
-
-# Strictness analyser misbehaving in 2.10, fails to terminate on
-# UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
-# separate bugfix to the fixpoint finder.
-simplStg/UpdAnal_HC_OPTS	= -fno-strictness
-
-ghci/StgInterp_HC_OPTS		= -fvia-C
 
 # ----------------------------------------------------------------------------
 #		C compilations
