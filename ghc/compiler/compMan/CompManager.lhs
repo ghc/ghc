@@ -81,7 +81,7 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import Monad
 import List		( nub )
-import Maybe		( catMaybes, fromMaybe, isJust, fromJust )
+import Maybe
 \end{code}
 
 
@@ -388,8 +388,7 @@ cmLoadModule cmstate1 rootname
         -- 2.  A valid linkable exists for each module in ms
 
         stable_mods
-           <- preUpsweep valid_linkables ui1 mg2unsorted_names
-		 [] mg2_with_srcimps
+           <- preUpsweep valid_linkables mg2unsorted_names [] mg2_with_srcimps
 
         let stable_summaries
                = concatMap (findInSummaries mg2unsorted) stable_mods
@@ -529,12 +528,14 @@ ppFilesFromSummaries summaries
 
 -- For each module (or SCC of modules), we take:
 --
---	- the old in-core linkable, if available
---	- an on-disk linkable, if available
+--	- an on-disk linkable, if this is the first time around and one
+--	  is available.
 --
--- and we take the youngest of these, provided it is younger than the
--- source file.  We ignore the on-disk linkables unless all of the
--- dependents of this SCC also have on-disk linkables.
+--	- the old linkable, otherwise (and if one is available).
+--
+-- and we throw away the linkable if it is older than the source
+-- file.  We ignore the on-disk linkables unless all of the dependents
+-- of this SCC also have on-disk linkables.
 --
 -- If a module has a valid linkable, then it may be STABLE (see below),
 -- and it is classified as SOURCE UNCHANGED for the purposes of calling
@@ -582,47 +583,49 @@ getValidLinkablesSCC old_linkables all_home_mods new_linkables scc0
 getValidLinkable :: [Linkable] -> Bool -> [Linkable] -> ModSummary 
 	-> IO [Linkable]
 getValidLinkable old_linkables objects_allowed new_linkables summary 
-   = do 
-	let mod_name = name_of_summary summary
+  = do let mod_name = name_of_summary summary
 
-	maybe_disk_linkable
-           <- if (not objects_allowed)
+       -- we only look for objects on disk the first time around;
+       -- if the user compiles a module on the side during a GHCi session,
+       -- it won't be picked up until the next ":load".  This is what the
+       -- "null old_linkables" test below is.
+       maybe_disk_linkable
+          <- if (not objects_allowed)
 		then return Nothing
 		else case ml_obj_file (ms_location summary) of
                  	Just obj_fn -> maybe_getFileLinkable mod_name obj_fn
                  	Nothing -> return Nothing
 
-	 -- find an old in-core linkable if we have one. (forget about
-	 -- on-disk linkables for now, we'll check again whether there's
-	 -- one here below, just in case a new one has popped up recently).
-        let old_linkable = findModuleLinkable_maybe old_linkables mod_name
-            maybe_old_linkable =
-	 	case old_linkable of
-	    	    Just (LM _ _ ls) | all isInterpretable ls -> old_linkable
-	    	    _ -> Nothing
+       let old_linkable = findModuleLinkable_maybe old_linkables mod_name
+	   maybe_old_linkable =
+	  	case old_linkable of
+		    Just l | not (isObjectLinkable l) || stillThere l 
+				-> old_linkable
+				-- ToDo: emit a warning if not (stillThere l)
+			   | otherwise
+				-> Nothing
 
-        -- The most recent of the old UI linkable or whatever we could
-        -- find on disk is returned as the linkable if compile
-        -- doesn't think we need to recompile.        
-        let linkable_list
-               = case (maybe_old_linkable, maybe_disk_linkable) of
-                    (Nothing, Nothing) -> []
-                    (Nothing, Just di) -> [di]
-                    (Just ui, Nothing) -> [ui]
-                    (Just ui, Just di)
-                       | linkableTime ui >= linkableTime di -> [ui]
-                       | otherwise                          -> [di]
+	   -- make sure that if we had an old disk linkable around, that it's
+	   -- still there on the disk (in case we need to re-link it).
+	   stillThere l = 
+		case maybe_disk_linkable of
+		   Nothing    -> False
+		   Just l_disk -> linkableTime l == linkableTime l_disk
 
-        -- only linkables newer than the source code are valid
-        let maybe_src_date = ms_hs_date summary
+           linkable | null old_linkables = maybeToList maybe_disk_linkable
+		    | otherwise          = maybeToList maybe_old_linkable
 
-	    valid_linkable_list
+           -- only linkables newer than the source code are valid
+           maybe_src_date = ms_hs_date summary
+
+	   valid_linkable
 	      = case maybe_src_date of
 		  Nothing -> panic "valid_linkable_list"
 		  Just src_date	
-		     -> filter (\li -> linkableTime li > src_date) linkable_list
+		     -> filter (\l -> linkableTime l > src_date) linkable
 
-        return (valid_linkable_list ++ new_linkables)
+       return (valid_linkable ++ new_linkables)
+
 
 
 maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
@@ -645,15 +648,13 @@ maybe_getFileLinkable mod_name obj_fn
 -- (downward-closed) set of stable modules for which we won't call compile.
 
 preUpsweep :: [Linkable]	-- new valid linkables
-	   -> [Linkable]	-- old linkables
            -> [ModuleName]      -- names of all mods encountered in downsweep
            -> [ModuleName]      -- accumulating stable modules
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
            -> IO [ModuleName]	-- stable modules
 
-preUpsweep valid_lis old_lis all_home_mods stable [] 
-   = return stable
-preUpsweep valid_lis old_lis all_home_mods stable (scc0:sccs)
+preUpsweep valid_lis all_home_mods stable []  = return stable
+preUpsweep valid_lis all_home_mods stable (scc0:sccs)
    = do let scc = flattenSCC scc0
             scc_allhomeimps :: [ModuleName]
             scc_allhomeimps 
@@ -666,25 +667,17 @@ preUpsweep valid_lis old_lis all_home_mods stable (scc0:sccs)
                = m `elem` scc_names || m `elem` stable
 
 	    -- now we check for valid linkables: each module in the SCC must 
-	    -- have a valid linkable (see getValidLinkables above), and the
-	    -- newest linkable must be the same as the previous linkable for
-	    -- this module (if one exists).
+	    -- have a valid linkable (see getValidLinkables above).
 	    has_valid_linkable new_summary
-   	      = case findModuleLinkable_maybe valid_lis modname of
-		   Nothing -> False
-		   Just l  -> case findModuleLinkable_maybe old_lis modname of
-				Nothing -> True
-				Just m  -> linkableTime l == linkableTime m
+   	      = isJust (findModuleLinkable_maybe valid_lis modname)
 	       where modname = name_of_summary new_summary
 
 	    scc_is_stable = all_imports_in_scc_or_stable
 			  && all has_valid_linkable scc
 
         if scc_is_stable
-         then preUpsweep valid_lis old_lis all_home_mods 
-		(scc_names++stable) sccs
-         else preUpsweep valid_lis old_lis all_home_mods 
-		stable sccs
+         then preUpsweep valid_lis all_home_mods (scc_names++stable) sccs
+         else preUpsweep valid_lis all_home_mods stable sccs
 
    where 
 
