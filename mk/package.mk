@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.18 2002/09/25 10:32:23 simonmar Exp $
+# $Id: package.mk,v 1.19 2002/09/26 09:07:50 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -160,6 +160,14 @@ HTML_DIR = html
 HTML_DOC = $(HTML_DIR)/index.html
 
 ifneq "$(HS_PPS)" ""
+
+ifeq "$(HADDOCK)" ""
+html ::
+	@echo Haddock must be installed in order to build HTML library documentation.
+	@echo Please install Haddock and re-configure.
+	@exit 1
+endif
+
 html :: $(HTML_DOC)
 
 $(HTML_DOC) : $(HS_PPS)
