@@ -207,19 +207,25 @@ tcMatchPats
 
 tcMatchPats pats expected_ty thing_inside
   = 	-- STEP 1: Bring pattern-signature type variables into scope
-    tcAddScopedTyVars (collectSigTysFromPats pats)			$
+    tcAddScopedTyVars (collectSigTysFromPats pats)	(
 
 	-- STEP 2: Typecheck the patterns themselves, gathering all the stuff
-    tc_match_pats pats expected_ty	`thenTc` \ (rhs_ty, pats', lie_req1, ex_tvs, pat_bndrs, lie_avail) ->
+        tc_match_pats pats expected_ty	`thenTc` \ (rhs_ty, pats', lie_req1, ex_tvs, pat_bndrs, lie_avail) ->
     
 	-- STEP 3: Extend the environment, and do the thing inside
-    let
+	let
 	  xve     = bagToList pat_bndrs
 	  pat_ids = map snd xve
-    in
-    tcExtendLocalValEnv xve (thing_inside pats' rhs_ty)		`thenTc` \ (result, lie_req2) ->
+	in
+	tcExtendLocalValEnv xve (thing_inside pats' rhs_ty)		`thenTc` \ (result, lie_req2) ->
+
+	returnTc (rhs_ty, lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2)
+    ) `thenTc` \ (rhs_ty, lie_req1, ex_tvs, pat_ids, lie_avail, result, lie_req2) -> 
 
 	-- STEP 4: Check for existentially bound type variables
+	-- Do this *outside* the scope of the tcAddScopedTyVars, else checkSigTyVars
+	-- complains that 'a' is captured by the inscope 'a'!  (Test (d) in checkSigTyVars.)
+	--
 	-- I'm a bit concerned that lie_req1 from an 'inner' pattern in the list
 	-- might need (via lie_req2) something made available from an 'outer' 
 	-- pattern.  But it's inconvenient to deal with, and I can't find an example
@@ -274,8 +280,7 @@ tcCheckExistentialPat ids ex_tvs lie_avail lie_req result_ty
     bindInstsOfLocalFuns lie_req ids	 			`thenTc` \ (lie1, inst_binds) ->
 
 	-- Deal with overloaded functions bound by the pattern
-    tcSimplifyCheck doc tv_list
-		    (lieToList lie_avail) lie1		`thenTc` \ (lie2, dict_binds) ->
+    tcSimplifyCheck doc tv_list (lieToList lie_avail) lie1	`thenTc` \ (lie2, dict_binds) ->
     checkSigTyVars tv_list emptyVarSet				`thenTc_` 
 
     returnTc (lie2, dict_binds `AndMonoBinds` inst_binds)
