@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.6 2001/03/25 19:30:23 qrczak Exp $
+-- $Id: Main.hs,v 1.7 2001/03/27 13:38:03 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -17,13 +17,6 @@ import Monad
 import Directory
 import System
 import IO
-
--- HACK: 'tail' below deletes a leading space introduced by a confusing
--- cpp trick. Note that cpp's stringify operator # doesn't work
--- because of the -traditional flag.  TEXT SUBSTITUTION IS EVIL.
--- TEXT SUBSTITUTION IS EVIL. TEXT SUBSTITUTION...
-default_pkgconf = tail $ "\ 
-   \ clibdir" ++ "/package.conf"
 
 main = do
   args <- getArgs
@@ -53,7 +46,7 @@ flags = [
 runit clis = do
   conf_file <- 
      case [ f | Config f <- clis ] of
-        []  -> return default_pkgconf
+        []  -> die "missing -f option, location of package.conf unknown"
         [f] -> return f
         _   -> die (usageInfo usageHeader flags)
 
