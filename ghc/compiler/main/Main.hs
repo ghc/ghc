@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.81 2001/07/11 19:48:07 sof Exp $
+-- $Id: Main.hs,v 1.82 2001/08/03 20:40:43 sof Exp $
 --
 -- GHC Driver program
 --
@@ -114,14 +114,18 @@ main =
   handle (\exception -> do
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
-		IOException _ ->  hPutStr stderr (show exception)
-		_other 	      ->  hPutStr stderr (show (Panic (show exception)))
+		IOException _   ->  hPutStr stderr (show exception)
+		  -- let exit exceptions bubble all the way out.
+		ExitException e ->  exitWith e
+		_other 	        ->  hPutStr stderr (show (Panic (show exception)))
 	   exitWith (ExitFailure 1)
          ) $ do
 
   -- all error messages are propagated as exceptions
   handleDyn (\dyn -> case dyn of
-			  PhaseFailed _phase code -> exitWith code
+			  PhaseFailed _phase code -> do
+			  		hPutStr stderr "\nCompilation had errors\n"
+					exitWith code
 			  Interrupted -> exitWith (ExitFailure 1)
 			  _ -> do hPutStrLn stderr (show (dyn :: GhcException))
 			          exitWith (ExitFailure 1)
