@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.123 2003/06/26 20:48:59 panne Exp $
+ * $Id: Linker.c,v 1.124 2003/06/26 20:58:33 panne Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -411,6 +411,7 @@ typedef struct _RtsSymbolVal {
       SymX(quotIntegerzh_fast)			\
       SymX(quotRemIntegerzh_fast)		\
       SymX(raisezh_fast)			\
+      SymX(raiseIOzh_fast)			\
       SymX(remIntegerzh_fast)			\
       SymX(resetNonBlockingFd)			\
       SymX(resumeThread)			\
