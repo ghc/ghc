@@ -1,7 +1,7 @@
 /* 
  * (c) The GHC Team 2001
  *
- * $Id: ilxstubs.c,v 1.1 2001/07/13 13:40:48 rrt Exp $
+ * $Id: ilxstubs.c,v 1.2 2001/07/16 09:23:24 rrt Exp $
  *
  * ILX stubs for external function calls
  */
@@ -17,6 +17,7 @@
 */
 
 
+#include "Stg.h"
 #include "HsStd.h"
 #include <stdlib.h>
 #include <stddef.h>
@@ -25,7 +26,7 @@
 
 /* From the RTS */
 
-    /* StgPrimFloat Add to mini-RTS */
+    /* StgPrimFloat Add to mini-RTS, which is put in a DLL */
 
     /* Need to be implemented in ILX RTS */
      /*foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
@@ -35,6 +36,39 @@ foreign label "ErrorHdrHook" errorHdrHook :: Ptr ()
 ../PrelTopHandler.lhs:49:foreign import ccall "shutdownHaskellAndExit" 
 ../PrelTopHandler.lhs:77:foreign import ccall "stackOverflow" unsafe
 ../PrelTopHandler.lhs:80:foreign import ccall "stg_exit" unsafe */
+
+void
+stg_exit(I_ n)
+{
+  fprintf(stderr, "doing stg_exit(%d)\n", n);
+  exit(n);
+}
+
+/* The code is in includes/Stable.h [sic] */
+void
+freeStablePtr(StgStablePtr sp)
+{
+  fprintf(stderr, "Freeing stable ptr %p (NOT!)\n", sp);
+}
+
+void
+shutdownHaskellAndExit(int n)
+{
+  stg_exit(n);
+}
+
+void 
+stackOverflow(void)
+{
+}
+
+void
+ErrorHdrHook (long fd)
+{
+    const char msg[] = "\nFail: ";
+    write(fd, msg, sizeof(msg)-1);
+}
+
 
 
 /* Import directly from correct DLL */

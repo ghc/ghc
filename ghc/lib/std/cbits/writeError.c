@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: writeError.c,v 1.7 2001/07/12 10:34:54 rrt Exp $
+ * $Id: writeError.c,v 1.8 2001/07/16 09:23:24 rrt Exp $
  *
  * hPutStr Runtime Support
  */
@@ -27,7 +27,9 @@ writeErrString__ (HsAddr msg_hdr, HsAddr msg, HsInt len)
   char* p  = (char*)msg;
   char  nl = '\n';
 
+#ifndef DLLized
   resetNonBlockingFd(2);
+#endif
 
   /* Print error msg header */
   if (msg_hdr) {
