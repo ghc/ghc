@@ -63,7 +63,7 @@ doIt (core_cmds, stg_cmds)
   = doIfSet opt_Verbose 
 	(hPutStr stderr "Glasgow Haskell Compiler, version " 	>>
  	 hPutStr stderr compiler_version                    	>>
-	 hPutStr stderr ", for Haskell 1.4\n")			>>
+	 hPutStr stderr ", for Haskell 98\n")			>>
 
     -- ******* READER
     show_pass "Reader"	>>
