@@ -257,6 +257,10 @@ updateBinders :: IdSet	 		-- Locally defined ids with their Rules attached
 --	  (the occurrence analyser knows about rules attached to Ids)
 --	- It makes sure that, when we apply a rule, the free vars
 --	  of the RHS are more likely to be in scope
+--	- The imported rules are carried in the in-scope set
+--	  which is extended on each iteration by the new wave of
+--	  local binders; any rules which aren't on the binding will
+--	  thereby get dropped
 
 updateBinders rule_ids binds
   = map update_bndrs binds
