@@ -167,26 +167,27 @@ Here we handle top-level things, like @CCodeBlock@s and
     -> UniqSM StixTreeList
  -}
  genCodeStaticClosure (CStaticClosure _ cl_info cost_centre amodes)
-  = returnUs (\xs -> table : xs)
+  = returnUs (\xs -> table ++ xs)
   where
-    table = StData PtrRep (StCLbl info_lbl : body)
-    info_lbl = infoTableLabelFromCI cl_info
+    table = StData PtrRep [StCLbl (infoTableLabelFromCI cl_info)] : 
+	    map (\amode -> StData (getAmodeRep amode) [a2stix amode]) amodes ++
+	    [StData PtrRep padding_wds]
 
     -- always at least one padding word: this is the static link field
     -- for the garbage collector.
-    body = if closureUpdReqd cl_info then
-    	    	take (1 + max mIN_UPD_SIZE (length amodes')) (amodes' ++ zeros)
-    	   else
-    	    	amodes' ++ [StInt 0]
+    padding_wds = if closureUpdReqd cl_info then
+    	    		take (1 + max 0 (mIN_UPD_SIZE - length amodes)) zeros
+    	   	  else
+    	    		[StInt 0]
 
     zeros = StInt 0 : zeros
 
-    amodes' = map amodeZeroVoid amodes
-
+    {- needed??? --SDM
     	-- Watch out for VoidKinds...cf. PprAbsC
     amodeZeroVoid item
       | getAmodeRep item == VoidRep = StInt 0
       | otherwise = a2stix item
+    -}
 
 \end{code}
 
