@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.23 2002/12/19 14:25:05 simonmar Exp $
+ * $Id: Stable.c,v 1.24 2003/01/28 17:05:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -90,10 +90,10 @@
   make sure we can still find the object.
 */
 
-snEntry *stable_ptr_table;
-static snEntry *stable_ptr_free;
+snEntry *stable_ptr_table = NULL;
+static snEntry *stable_ptr_free = NULL;
 
-static unsigned int SPT_size;
+static unsigned int SPT_size = 0;
 
 /* This hash table maps Haskell objects to stable names, so that every
  * call to lookupStableName on a given object will return the same
@@ -128,7 +128,7 @@ static unsigned int SPT_size;
  * to the weight stored in the table entry.
  * */
 
-static HashTable *addrToStableHash;
+static HashTable *addrToStableHash = NULL;
 
 #define INIT_SPT_SIZE 64
 
@@ -150,12 +150,9 @@ initFreeList(snEntry *table, nat n, snEntry *free)
 void
 initStablePtrTable(void)
 {
-  /* the table will be allocated the first time makeStablePtr is
-   * called */
-  stable_ptr_table = NULL;
-  stable_ptr_free  = NULL;
-  addrToStableHash = NULL;
-  SPT_size = 0;
+    // Nothing to do:
+    // the table will be allocated the first time makeStablePtr is
+    // called, and we want the table to persist through multiple inits.
 }
 
 /*
