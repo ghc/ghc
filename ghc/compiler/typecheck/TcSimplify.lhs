@@ -1754,7 +1754,7 @@ addAvailAndSCs avails inst avail
     avails1 	 = addToFM avails inst avail
     is_loop inst = any (`tcEqType` idType (instToId inst)) dep_tys
 			-- Note: this compares by *type*, not by Unique
-    deps         = findAllDeps emptyVarSet avail
+    deps         = findAllDeps (unitVarSet (instToId inst)) avail
     dep_tys	 = map idType (varSetElems deps)
 
     findAllDeps :: IdSet -> Avail -> IdSet
@@ -1762,12 +1762,17 @@ addAvailAndSCs avails inst avail
     -- See Note [SUPERCLASS-LOOP]
     -- Watch out, though.  Since the avails may contain loops 
     -- (see Note [RECURSIVE DICTIONARIES]), so we need to track the ones we've seen so far
-    findAllDeps so_far (Rhs _ kids) 
-      = foldl findAllDeps
-    	      (extendVarSetList so_far (map instToId kids))	-- Add the kids to so_far
-              [a | Just a <- map (lookupFM avails) kids]	-- Find the kids' Avail
-    findAllDeps so_far other = so_far
+    findAllDeps so_far (Rhs _ kids) = foldl find_all so_far kids
+    findAllDeps so_far other	    = so_far
 
+    find_all :: IdSet -> Inst -> IdSet
+    find_all so_far kid
+      | kid_id `elemVarSet` so_far	  = so_far
+      | Just avail <- lookupFM avails kid = findAllDeps so_far' avail
+      | otherwise			  = so_far'
+      where
+	so_far' = extendVarSet so_far kid_id	-- Add the new kid to so_far
+	kid_id = instToId kid
 
 addSCs :: (Inst -> Bool) -> Avails -> Inst -> TcM Avails
 	-- Add all the superclasses of the Inst to Avails
