@@ -228,7 +228,7 @@ sub setupOptFlags {
    $Oopt_FinalStgProfilingMassage = '';
    $Oopt_StgStats		  = '';
    $Oopt_SpecialiseUnboxed	  = '';
-   $Oopt_DoSpecialise		  = ''; # ToDo:LATER: '-fspecialise';
+   $Oopt_DoSpecialise		  = '-fspecialise'; # ToDo:LATER: '-fspecialise';
    $Oopt_FoldrBuild		  = 0; # *Off* by default!
    $Oopt_FB_Support		  = ''; # was '-fdo-arity-expand';
 #  $Oopt_FoldrBuildWW		  = 0; # Off by default
