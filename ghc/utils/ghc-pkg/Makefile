@@ -1,16 +1,11 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.15 2002/02/12 16:55:22 simonmar Exp $
+# $Id: Makefile,v 1.16 2002/04/30 14:40:56 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 # hack for ghci-inplace script, see below
 INSTALLING=1
-
-# ghc-pkg is needed to boot in ghc/rts and library dirs
-ifneq "$(BootingFromHc)" "YES"
-boot :: depend all
-endif
 
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
@@ -70,8 +65,18 @@ endif
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
-all clean distclean maintainer-clean ::
+all :: $(HS_PROG)
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+clean distclean maintainer-clean ::
+	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+endif
+
+# ghc-pkg is needed to boot in ghc/rts and library dirs
+# Do a recursive 'make all' after generating dependencies, because this
+# will work with 'make -j'.
+ifneq "$(BootingFromHc)" "YES"
+boot :: depend
+	$(MAKE) all
 endif
 
 include $(TOP)/mk/target.mk
