@@ -23,7 +23,8 @@ import RdrHsSyn		( RdrName(..), SYN_IE(RdrNameHsModule), SYN_IE(RdrNameImportDec
 import RnHsSyn		( SYN_IE(RenamedHsModule), SYN_IE(RenamedHsDecl), extractHsTyNames )
 
 import CmdLineOpts	( opt_HiMap, opt_WarnNameShadowing, opt_D_show_rn_trace,
-			  opt_D_dump_rn, opt_D_show_passes
+			  opt_D_dump_rn, opt_D_show_rn_stats,
+			  opt_D_show_unused_imports, opt_PprUserLength
 		        )
 import RnMonad
 import RnNames		( getGlobalNames )
@@ -38,7 +39,7 @@ import Id		( GenId {- instance NamedThing -} )
 import Name		( Name, Provenance, ExportFlag(..), isLocallyDefined,
 			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, 
 			  nameSetToList, minusNameSet, NamedThing(..),
-			  modAndOcc, pprModule, pprOccName, nameOccName
+			  nameModule, pprModule, pprOccName, nameOccName
 			)
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon )
 import PrelInfo		( ioTyCon_NAME, primIoTyCon_NAME )
@@ -47,7 +48,7 @@ import PrelMods		( mAIN, gHC_MAIN )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import Outputable	( Outputable(..), PprStyle(..) )
 import Util		( cmpPString, equivClasses, panic, assertPanic, pprTrace )
 #if __GLASGOW_HASKELL__ >= 202
 import UniqSupply
@@ -94,7 +95,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
     )							`thenRn` \ rn_local_decls ->
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
-    closeDecls rn_local_decls				`thenRn` \ rn_all_decls ->
+    slurpDecls rn_local_decls				`thenRn` \ rn_all_decls ->
 
 
 	-- GENERATE THE VERSION/USAGE INFO
@@ -160,71 +161,92 @@ addImplicits mod_name
 
 
 \begin{code}
-closeDecls :: [RenamedHsDecl]			-- Declarations got so far
+slurpDecls decls
+  = 	-- First of all, get all the compulsory decls
+    slurp_compulsories decls	`thenRn` \ decls1 ->
+
+	-- Next get the optional ones
+    closeDecls Optional decls1	`thenRn` \ decls2 ->
+
+	-- Finally get those deferred data type declarations
+    getDeferredDataDecls			`thenRn` \ data_decls ->
+    mapRn rn_data_decl data_decls		`thenRn` \ rn_data_decls ->
+
+	-- Done
+    returnRn (rn_data_decls ++ decls2)
+
+  where
+	-- The "slurp_compulsories" function is a loop that alternates
+	-- between slurping compulsory decls and slurping the instance
+	-- decls thus made relavant.
+        -- We *must* loop again here.  Why?  Two reasons:
+	-- (a) an instance decl will give rise to an unresolved dfun, whose
+	--	decl we must slurp to get its version number; that's the version
+	-- 	number for the whole instance decl.  (And its unfolding might mention new
+	--  unresolved names.)
+	-- (b) an instance decl might give rise to a new unresolved class,
+	-- 	whose decl we must slurp, which might let in some new instance decls,
+	--	and so on.  Example:  instance Foo a => Baz [a] where ...
+    slurp_compulsories decls
+      = closeDecls Compulsory decls	`thenRn` \ decls1 ->
+	
+		-- Instance decls still pending?
+        getImportedInstDecls			`thenRn` \ inst_decls ->
+	if null inst_decls then 
+		-- No, none
+	    returnRn decls1
+	else
+		-- Yes, there are some, so rename them and loop
+	     traceRn (sep [ptext SLIT("Slurped"), int (length inst_decls), ptext SLIT("instance decls")])
+						`thenRn_`
+	     mapRn rn_inst_decl inst_decls	`thenRn` \ new_inst_decls ->
+    	     slurp_compulsories (new_inst_decls ++ decls1)
+\end{code}
+
+\begin{code}
+closeDecls :: Necessity
+	   -> [RenamedHsDecl]			-- Declarations got so far
 	   -> RnMG [RenamedHsDecl]		-- input + extra decls slurped
 	-- The monad includes a list of possibly-unresolved Names
 	-- This list is empty when closeDecls returns
 
-closeDecls decls 
-  = popOccurrenceName		`thenRn` \ maybe_unresolved ->
+closeDecls necessity decls 
+  = popOccurrenceName necessity		`thenRn` \ maybe_unresolved ->
     case maybe_unresolved of
 
 	-- No more unresolved names
-	Nothing ->	-- Instance decls still pending?
-		   getImportedInstDecls			`thenRn` \ inst_decls ->
-		   traceRn (sep [ptext SLIT("Slurped"), int (length inst_decls), ptext SLIT("instance decls")])
-							`thenRn_`
-		   if not (null inst_decls) then
-		       mapRn rn_inst_decl inst_decls	`thenRn` \ new_inst_decls ->
-    
-			    -- We *must* loop again here.  Why?  Two reasons:
-			    -- (a) an instance decl will give rise to an unresolved dfun, whose
-			    --	decl we must slurp to get its version number; that's the version
-			    -- 	number for the whole instance decl.  (And its unfolding might mention new
-			    --  unresolved names.)
-			    -- (b) an instance decl might give rise to a new unresolved class,
-			    -- 	whose decl we must slurp, which might let in some new instance decls,
-			    --	and so on.  Example:  instance Foo a => Baz [a] where ...
-	    
-		       closeDecls (new_inst_decls ++ decls)
-		   else
-
-			-- No more instance decls, so all we have left is
-			-- to deal with the deferred data type decls.
-		  getDeferredDataDecls			`thenRn` \ data_decls ->
-		  mapRn rn_data_decl data_decls		`thenRn` \ rn_data_decls ->
-		  returnRn (rn_data_decls ++ decls)
+	Nothing -> returnRn decls
 			
 	-- An unresolved name
-	Just (name,necessity)
+	Just name
 	  -> 	-- Slurp its declaration, if any
---	     traceRn (sep [ptext SLIT("Considering"), ppr PprDebug name])	`thenRn_`
+	     traceRn (sep [ptext SLIT("Considering"), ppr PprDebug name])	`thenRn_`
 	     importDecl name necessity		`thenRn` \ maybe_decl ->
 	     case maybe_decl of
 
 		-- No declaration... (wired in thing or optional)
-		Nothing   -> closeDecls decls
+		Nothing   -> closeDecls necessity decls
 
 		-- Found a declaration... rename it
-		Just decl -> rn_iface_decl mod_name decl	`thenRn` \ new_decl ->
-			     closeDecls (new_decl : decls)
+		Just decl -> rn_iface_decl mod_name necessity decl	`thenRn` \ new_decl ->
+			     closeDecls necessity (new_decl : decls)
 			 where
-		           (mod_name,_) = modAndOcc name
+		           mod_name = nameModule name
 
 
-rn_iface_decl mod_name decl       = initRnMS emptyRnEnv mod_name InterfaceMode (rnDecl decl)
-					-- Notice that the rnEnv starts empty
+rn_iface_decl mod_name necessity decl	-- Notice that the rnEnv starts empty
+  = initRnMS emptyRnEnv mod_name (InterfaceMode necessity) (rnDecl decl)
+					
+rn_inst_decl (mod_name,decl)      = rn_iface_decl mod_name Compulsory (InstD decl)
 
-rn_inst_decl (mod_name,decl)      = rn_iface_decl mod_name (InstD decl)
-
-rn_data_decl (tycon_name,ty_decl) = rn_iface_decl mod_name (TyD ty_decl)
+rn_data_decl (tycon_name,ty_decl) = rn_iface_decl mod_name Compulsory (TyD ty_decl)
 				  where
-				    (mod_name, _) = modAndOcc tycon_name
+				    mod_name = nameModule tycon_name
 \end{code}
 
 \begin{code}
 reportUnusedNames explicit_avail_names
-  | not opt_WarnNameShadowing
+  | not opt_D_show_unused_imports
   = returnRn ()
 
   | otherwise
@@ -236,12 +258,12 @@ reportUnusedNames explicit_avail_names
 	name1 `cmp` name2 = nameModule name1 `_CMP_STRING_` nameModule name2 
 
 	pp_imp sty = sep [text "For information: the following unqualified imports are unused:",
-			    nest 4 (vcat (map (pp_group sty) imports_by_module))]
-	pp_group sty (n:ns) = sep [hcat [text "Module ", pprModule PprForUser (nameModule n), char ':'],
-				     nest 4 (sep (map (pprOccName sty . nameOccName) (n:ns)))]
+			  nest 4 (vcat (map (pp_group sty) imports_by_module))]
+	pp_group sty (n:ns) = sep [hcat [text "Module ", pprModule (PprForUser opt_PprUserLength) (nameModule n), char ':'],
+				   nest 4 (sep (map (pprOccName sty . nameOccName) (n:ns)))]
 
 	pp_local sty = sep [text "For information: the following local top-level definitions are unused:",
-			      nest 4 (sep (map (pprOccName sty . nameOccName) local_unused))]
+			    nest 4 (sep (map (pprOccName sty . nameOccName) local_unused))]
     in
     (if null imported_unused 
      then returnRn ()
@@ -251,13 +273,11 @@ reportUnusedNames explicit_avail_names
      then returnRn ()
      else addWarnRn pp_local)
 
-nameModule n = fst (modAndOcc n)
-
 rnStats :: [RenamedHsDecl] -> RnMG ()
 rnStats all_decls
-        | opt_D_show_rn_trace ||
-	  opt_D_dump_rn ||
-	  opt_D_show_passes
+        | opt_D_show_rn_trace || 
+	  opt_D_show_rn_stats ||
+	  opt_D_dump_rn 
  	= getRnStats all_decls		        `thenRn` \ msg ->
 	  ioToRnMG (hPutStr stderr (show msg) >> 
 		    hPutStr stderr "\n")	`thenRn_`
