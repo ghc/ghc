@@ -1555,10 +1555,12 @@ implicitly parameterized by a comparison function named <literal>cmp</literal>.
 The dynamic binding constraints are just a new form of predicate in the type class system.
 </para>
 <para>
-An implicit parameter is introduced by the special form <literal>?x</literal>, 
+An implicit parameter occurs in an exprssion using the special form <literal>?x</literal>, 
 where <literal>x</literal> is
-any valid identifier. Use if this construct also introduces new
-dynamic binding constraints. For example, the following definition
+any valid identifier (e.g. <literal>ord ?x</literal> is a valid expression). 
+Use of this construct also introduces a new
+dynamic-binding constraint in the type of the expression. 
+For example, the following definition
 shows how we can define an implicitly parameterized sort function in
 terms of an explicitly parameterized <literal>sortBy</literal> function:
 <programlisting>
@@ -1567,6 +1569,11 @@ terms of an explicitly parameterized <literal>sortBy</literal> function:
   sort   :: (?cmp :: a -> a -> Bool) => [a] -> [a]
   sort    = sortBy ?cmp
 </programlisting>
+</para>
+
+<sect3>
+<title>Implicit-parameter type constraints</title>
+<para>
 Dynamic binding constraints behave just like other type class
 constraints in that they are automatically propagated. Thus, when a
 function is used, its implicit parameters are inherited by the
@@ -1583,54 +1590,14 @@ propagated. With implicit parameters, the default is to always
 propagate them.
 </para>
 <para>
-An implicit parameter differs from other type class constraints in the
+An implicit-parameter type constraint differs from other type class constraints in the
 following way: All uses of a particular implicit parameter must have
 the same type. This means that the type of <literal>(?x, ?x)</literal> 
 is <literal>(?x::a) => (a,a)</literal>, and not 
 <literal>(?x::a, ?x::b) => (a, b)</literal>, as would be the case for type
 class constraints.
 </para>
-<para>
-An implicit parameter is bound using the standard
-<literal>let</literal> binding form, where the bindings must be a
-collection of simple bindings to implicit-style variables (no
-function-style bindings, and no type signatures); these bindings are
-neither polymorphic or recursive. This form binds the implicit
-parameters arising in the body, not the free variables as a
-<literal>let</literal> or <literal>where</literal> would do. For
-example, we define the <literal>min</literal> function by binding
-<literal>cmp</literal>.</para>
-<programlisting>
-  min :: [a] -> a
-  min  = let ?cmp = (<=) in least
-</programlisting>
-<para>
-Note the following points:
-<itemizedlist>
-<listitem><para>
-You may not mix implicit-parameter bindings with ordinary bindings in a 
-single <literal>let</literal>
-expression; use two nested <literal>let</literal>s instead.
-</para></listitem>
 
-<listitem><para>
-You may put multiple implicit-parameter bindings in a
-single <literal>let</literal> expression; they are <emphasis>not</emphasis> treated
-as a mutually recursive group (as ordinary <literal>let</literal> bindings are).
-Instead they are treated as a non-recursive group, each scoping over the bindings that
-follow.  For example, consider:
-<programlisting>
-  f y = let { ?x = y; ?x = ?x+1 } in ?x
-</programlisting>
-This function adds one to its argument.
-</para></listitem>
-
-<listitem><para>
-You may not have an implicit-parameter binding in a <literal>where</literal> clause,
-only in a <literal>let</literal> binding.
-</para></listitem>
-
-<listitem>
 <para> You can't have an implicit parameter in the context of a class or instance
 declaration.  For example, both these declarations are illegal:
 <programlisting>
@@ -1641,10 +1608,62 @@ Reason: exactly which implicit parameter you pick up depends on exactly where
 you invoke a function. But the ``invocation'' of instance declarations is done
 behind the scenes by the compiler, so it's hard to figure out exactly where it is done.
 Easiest thing is to outlaw the offending types.</para>
-</listitem>
+</sect3>
+
+<sect3>
+<title>Implicit-parameter bindings</title>
+
+<para>
+An implicit parameter is <emphasis>bound</emphasis> using the standard
+<literal>let</literal> or <literal>where</literal> binding forms.
+For example, we define the <literal>min</literal> function by binding
+<literal>cmp</literal>.
+<programlisting>
+  min :: [a] -> a
+  min  = let ?cmp = (<=) in least
+</programlisting>
+</para>
+<para>
+A group of implicit-parameter bindings may occur anywhere a normal group of Haskell
+bindings can occur, except at top level.  That is, they can occur in a <literal>let</literal> 
+(including in a list comprehension, or do-notation, or pattern guards), 
+or a <literal>where</literal> clause.
+Note the following points:
+<itemizedlist>
+<listitem><para>
+An implicit-parameter binding group must be a
+collection of simple bindings to implicit-style variables (no
+function-style bindings, and no type signatures); these bindings are
+neither polymorphic or recursive.  
+</para></listitem>
+<listitem><para>
+You may not mix implicit-parameter bindings with ordinary bindings in a 
+single <literal>let</literal>
+expression; use two nested <literal>let</literal>s instead.
+(In the case of <literal>where</literal> you are stuck, since you can't nest <literal>where</literal> clauses.)
+</para></listitem>
+
+<listitem><para>
+You may put multiple implicit-parameter bindings in a
+single binding group; but they are <emphasis>not</emphasis> treated
+as a mutually recursive group (as ordinary <literal>let</literal> bindings are).
+Instead they are treated as a non-recursive group, simultaneously binding all the implicit
+parameter.  The bindings are not nested, and may be re-ordered without changing
+the meaning of the program.
+For example, consider:
+<programlisting>
+  f t = let { ?x = t; ?y = ?x+(1::Int) } in ?x + ?y
+</programlisting>
+The use of <literal>?x</literal> in the binding for <literal>?y</literal> does not "see"
+the binding for <literal>?x</literal>, so the type of <literal>f</literal> is
+<programlisting>
+  f :: (?x::Int) => Int -> Int
+</programlisting>
+</para></listitem>
 </itemizedlist>
 </para>
 
+</sect3>
 </sect2>
 
 <sect2 id="linear-implicit-parameters">
