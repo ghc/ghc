@@ -456,6 +456,11 @@ stat_exit(I_ alloc)
 	StgDouble time = usertime();
 	StgDouble etime = elapsedtime();
 
+	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
+	if (time  == 0.0)  time = 0.0001;
+	if (etime == 0.0) etime = 0.0001;
+	
+
 	if (RTSflags.GcFlags.giveStats) {
 	    fprintf(sf, "%8ld\n\n", alloc*sizeof(W_));
 	}
