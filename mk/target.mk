@@ -169,7 +169,7 @@ endif
 # `TAGS'
 #      Update a tags table for this program.
 # 
-# `dvi' `ps' `pdf' `html' `pdf'
+# `dvi' `ps' `pdf' `html' `rtf' 
 #      Generate DVI/PS/PDF files for LaTeX/DocBook docs. Not everything is
 #      supported everywhere, but the intention is to standardise on DocBook
 #      producing all formats.
