@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.35 2002/12/19 18:02:13 panne Exp $
+ * $Id: Profiling.c,v 1.36 2003/02/22 04:51:52 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -16,7 +16,7 @@
 #include "Profiling.h"
 #include "Storage.h"
 #include "Proftimer.h"
-#include "Itimer.h"
+#include "Timer.h"
 #include "ProfHeap.h"
 #include "Arena.h"
 #include "RetainerProfile.h"

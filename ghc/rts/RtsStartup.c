@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.71 2003/02/21 05:34:15 sof Exp $
+ * $Id: RtsStartup.c,v 1.72 2003/02/22 04:51:53 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -17,7 +17,7 @@
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "Signals.h"
-#include "Itimer.h"
+#include "Timer.h"      /* startTimer, stopTimer */
 #include "Weak.h"
 #include "Ticky.h"
 #include "StgRun.h"
@@ -145,7 +145,7 @@ hs_init(int *argc, char **argv[])
 #endif
 
     /* start the virtual timer 'subsystem'. */
-    startVirtTimer(TICK_MILLISECS);
+    startTimer(TICK_MILLISECS);
 
     /* Initialise the stats department */
     initStats();
@@ -304,7 +304,7 @@ hs_exit(void)
 #endif
     
     /* stop the ticker */
-    stopVirtTimer();
+    stopTimer();
     
     /* reset the standard file descriptors to blocking mode */
     resetNonBlockingFd(0);

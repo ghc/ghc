@@ -30,7 +30,6 @@ Package {
 #endif
 #endif
 #ifdef mingw32_TARGET_OS
-			      ,"winmm"		/* for the threadDelay timer */
 			      ,"wsock32"	/* for the linker */
 #endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)

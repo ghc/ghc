@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.6 2002/12/11 15:36:47 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.7 2003/02/22 04:51:52 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -27,8 +27,6 @@
 #include "Profiling.h"
 #include "Stats.h"
 #include "BlockAlloc.h"
-#include "Itimer.h"
-#include "Proftimer.h"
 #include "ProfHeap.h"
 #include "Apply.h"
 

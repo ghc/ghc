@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.c,v 1.11 2002/12/11 15:36:47 simonmar Exp $
+ * $Id: Proftimer.c,v 1.12 2003/02/22 04:51:52 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -15,7 +15,7 @@
 
 #include "Rts.h"
 #include "Profiling.h"
-#include "Itimer.h"
+#include "Timer.h"
 #include "Proftimer.h"
 #include "RtsFlags.h"
 

@@ -132,7 +132,6 @@ NewIOWorkerThread(IOManagerState* iom)
 			       (LPVOID)iom,
 			       0,
 			       NULL) );
-  //CreateThread( NULL, 0, IOWorkerProc, (LPVOID)iom, 0, NULL));
 }
 
 BOOL

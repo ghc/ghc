@@ -43,6 +43,8 @@ typedef struct CompletedReq {
 
 static CRITICAL_SECTION queue_lock;
 static HANDLE           completed_req_event;
+static HANDLE           abandon_req_wait;
+static HANDLE           wait_handles[2];
 static CompletedReq     completedTable[MAX_REQUESTS];
 static int              completed_hw;
 static int              issued_reqs;
@@ -97,6 +99,18 @@ addIORequest(int   fd,
   return AddIORequest(fd,forWriting,isSock,len,buf,0,onIOComplete);
 }
 
+unsigned int
+addDelayRequest(int   msecs)
+{
+  EnterCriticalSection(&queue_lock);
+  issued_reqs++;
+  LeaveCriticalSection(&queue_lock);
+#if 0
+  fprintf(stderr, "addDelayReq: %d %d %d\n", msecs); fflush(stderr);
+#endif
+  return AddDelayRequest(msecs,0,onIOComplete);
+}
+
 int
 startupAsyncIO()
 {
@@ -104,9 +118,20 @@ startupAsyncIO()
     return 0;
   }
   InitializeCriticalSection(&queue_lock);
-  completed_req_event = CreateEvent (NULL, TRUE, FALSE, NULL);
+  /* Create a pair of events:
+   *
+   *    - completed_req_event  -- signals the deposit of request result; manual reset.
+   *    - abandon_req_wait     -- external OS thread tells current RTS/Scheduler
+   *                              thread to abandon wait for IO request completion.
+   *                              Auto reset.
+   */
+  completed_req_event = CreateEvent (NULL, TRUE,  FALSE, NULL);
+  abandon_req_wait    = CreateEvent (NULL, FALSE, FALSE, NULL);
+  wait_handles[0] = completed_req_event;
+  wait_handles[1] = abandon_req_wait;
   completed_hw = 0;
-  return 1;
+  return ( completed_req_event != INVALID_HANDLE_VALUE &&
+	   abandon_req_wait    != INVALID_HANDLE_VALUE );
 }
 
 void
@@ -134,7 +159,17 @@ start:
     /* empty table, drop lock and wait */
     LeaveCriticalSection(&queue_lock);
     if (wait) {
-      WaitForSingleObject( completed_req_event, INFINITE );
+      DWORD dwRes = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
+      switch (dwRes) {
+      case WAIT_OBJECT_0:
+	break;
+      case WAIT_OBJECT_0 + 1:
+      case WAIT_TIMEOUT:
+	return 0;
+      default:
+	fprintf(stderr, "awaitRequests: unexpected wait return code %lu\n", dwRes); fflush(stderr);
+	return 0;
+      }
     } else {
       return 0; /* cannot happen */
     }
@@ -148,14 +183,17 @@ start:
       prev = NULL;
       for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; tso = tso->link) {
 	switch(tso->why_blocked) {
+	case BlockedOnDelay:
 	case BlockedOnRead:
 	case BlockedOnWrite:
 	  if (tso->block_info.async_result->reqID == rID) {
 	    /* Found the thread blocked waiting on request; stodgily fill 
 	     * in its result block. 
 	     */
-	    tso->block_info.async_result->len = completedTable[i].len;
-	    tso->block_info.async_result->errCode = completedTable[i].errCode;
+	    if (tso->why_blocked != BlockedOnDelay) {
+	      tso->block_info.async_result->len = completedTable[i].len;
+	      tso->block_info.async_result->errCode = completedTable[i].errCode;
+	    }
 
 	    /* Drop the matched TSO from blocked_queue */
 	    if (prev) {
@@ -184,4 +222,14 @@ start:
     LeaveCriticalSection(&queue_lock);
     return 1;
   }
+}
+
+void
+abandonRequestWait()
+{
+  /* the event is auto-reset, but in case there's no thread
+   * already waiting on the event, we want to return it to
+   * a non-signalled state.
+   */
+  PulseEvent(abandon_req_wait);
 }

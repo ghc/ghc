@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.161 2003/01/25 15:54:49 wolfgang Exp $
+ * $Id: Schedule.c,v 1.162 2003/02/22 04:51:53 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -95,7 +95,7 @@
 #include "Signals.h"
 #include "Sanity.h"
 #include "Stats.h"
-#include "Itimer.h"
+#include "Timer.h"
 #include "Prelude.h"
 #include "ThreadLabels.h"
 #ifdef PROFILING

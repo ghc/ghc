@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.104 2003/02/21 05:34:15 sof Exp $
+ * $Id: PrimOps.hc,v 1.105 2003/02/22 04:51:51 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -19,8 +19,11 @@
 #include "BlockAlloc.h" /* tmp */
 #include "StablePriv.h"
 #include "StgRun.h"
-#include "Itimer.h"
+#include "Timer.h"      /* TICK_MILLISECS */
 #include "Prelude.h"
+#ifndef mingw32_TARGET_OS
+#include "Itimer.h"    /* getourtimeofday() */
+#endif
 
 #ifdef HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -1602,15 +1605,29 @@ FN_(waitWritezh_fast)
 
 FN_(delayzh_fast)
 {
+#ifdef mingw32_TARGET_OS
+  StgAsyncIOResult* ares;
+  unsigned int reqID;
+#else
   StgTSO *t, *prev;
   nat target;
+#endif
   FB_
     /* args: R1.i */
     ASSERT(CurrentTSO->why_blocked == NotBlocked);
     CurrentTSO->why_blocked = BlockedOnDelay;
 
     ACQUIRE_LOCK(&sched_mutex);
-
+#ifdef mingw32_TARGET_OS
+    /* could probably allocate this on the heap instead */
+    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncWritezh_fast");
+    reqID = RET_STGCALL1(W_,addDelayRequest,R1.i);
+    ares->reqID   = reqID;
+    ares->len     = 0;
+    ares->errCode = 0;
+    CurrentTSO->block_info.async_result = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+#else
     target = (R1.i / (TICK_MILLISECS*1000)) + getourtimeofday();
     CurrentTSO->block_info.target = target;
 
@@ -1628,7 +1645,7 @@ FN_(delayzh_fast)
     } else {
 	prev->link = CurrentTSO;
     }
-
+#endif
     RELEASE_LOCK(&sched_mutex);
     JMP_(stg_block_noregs);
   FE_

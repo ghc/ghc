@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LdvProfile.c,v 1.4 2003/01/30 10:06:35 simonmar Exp $
+ * $Id: LdvProfile.c,v 1.5 2003/02/22 04:51:51 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -14,8 +14,6 @@
 #include "Rts.h"
 #include "LdvProfile.h"
 #include "RtsFlags.h"
-#include "Itimer.h"
-#include "Proftimer.h"
 #include "Profiling.h"
 #include "Stats.h"
 #include "Storage.h"

@@ -12,10 +12,12 @@ addIORequest(int   fd,
 	     int   isSock,
 	     int   len,
 	     char* buf);
-
+extern unsigned int addDelayRequest(int   msecs);
 extern int  startupAsyncIO(void);
 extern void shutdownAsyncIO(void);
 
 extern int awaitRequests(rtsBool wait);
+
+extern void abandonRequestWait(void);
 
 #endif /* __ASYNCHIO_H__ */
