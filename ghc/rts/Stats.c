@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.9 1999/02/23 15:45:08 simonm Exp $
+ * $Id: Stats.c,v 1.10 1999/03/02 20:00:50 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -55,16 +55,20 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_SYS_TIMES_H
-#include <sys/times.h>
+#ifndef _WIN32
+# ifdef HAVE_SYS_TIMES_H
+#  include <sys/times.h>
+# endif
 #endif
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
-#if defined(HAVE_SYS_RESOURCE_H) && ! irix_TARGET_OS
-#include <sys/resource.h>
+#if ! irix_TARGET_OS && ! defined(_WIN32)
+# if defined(HAVE_SYS_RESOURCE_H)
+#  include <sys/resource.h>
+# endif
 #endif
 
 #ifdef HAVE_SYS_TIMEB_H
@@ -73,6 +77,10 @@
 
 #if HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
+
+#if HAVE_WINDOWS_H
+#include <windows.h>
 #endif
 
 /* huh? */
@@ -101,42 +109,81 @@ static double *GC_coll_times;
 
 /* elapsedtime() -- The current elapsed time in seconds */
 
+#ifdef _WIN32
+#define NS_PER_SEC 10000000LL
+/* Convert FILETIMEs into secs since the Epoch (Jan1-1970) */
+#define FT2longlong(ll,ft)    \
+    (ll)=(ft).dwHighDateTime; \
+    (ll) <<= 32;              \
+    (ll) |= (ft).dwLowDateTime; \
+    (ll) /= (unsigned long long) (NS_PER_SEC / CLOCKS_PER_SEC)
+#endif
+
+#ifdef _WIN32
+/* cygwin32 or mingw32 version */
 double
 elapsedtime(void)
 {
-#if ! (defined(HAVE_TIMES) || defined(HAVE_FTIME))
+    FILETIME creationTime, exitTime, kernelTime, userTime;
+    long long int kT, uT;
+ 
+ 
+    /* ToDo: pin down elapsed times to just the OS thread(s) that
+       are evaluating/managing Haskell code.
+    */
+    if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
+		          &exitTime, &kernelTime, &userTime)) {
+	/* Probably on a Win95 box..*/
+	return 0;
+    }
+
+    FT2longlong(kT,kernelTime);
+    FT2longlong(uT,userTime);
+    return (((StgDouble)(uT + kT))/TicksPerSecond - ElapsedTimeStart);
+}
+
+#else 
+
+double
+elapsedtime(void)
+{
+# if ! (defined(HAVE_TIMES) || defined(HAVE_FTIME))
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
     fprintf(stderr, "NOTE: `elapsedtime' does nothing!\n");
     return 0.0;
 
-#else /* not stumped */
+# else /* not stumped */
 
 /* "ftime" may be nicer, but "times" is more standard;
    but, on a Sun, if you do not get the SysV one, you are *hosed*...
  */
 
-# if defined(HAVE_TIMES) && ! sunos4_TARGET_OS
+#  if defined(HAVE_TIMES) && ! sunos4_TARGET_OS
     struct tms t;
     clock_t r = times(&t);
 
     return (((double)r)/TicksPerSecond - ElapsedTimeStart);
 
-# else /* HAVE_FTIME */
+#  else /* HAVE_FTIME */
     struct timeb t;
 
     ftime(&t);
     return (fabs(t.time + 1e-3*t.millitm - ElapsedTimeStart));
 
-# endif /* HAVE_FTIME */
-#endif /* not stumped */
+#  endif /* HAVE_FTIME */
+# endif /* not stumped */
 }
+#endif /* !_WIN32 */
+
 
 static nat
 pagefaults(void)
 {
-# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS
+  /* ToDo (on NT): better, get this via the performance data
+     that's stored in the registry. */
+# if !defined(HAVE_GETRUSAGE) || irix_TARGET_OS || defined(_WIN32)
     return 0;
 # else
     struct rusage t;
@@ -151,9 +198,10 @@ pagefaults(void)
 void
 start_time(void)
 {
+#ifdef HAVE_SYSCONF
     long ticks;
     /* Determine TicksPerSecond ... */
-#ifdef HAVE_SYSCONF
+
     ticks = sysconf(_SC_CLK_TCK);
     if ( ticks == -1 ) {
 	fprintf(stderr, "stat_init: bad call to 'sysconf'!\n");
@@ -161,17 +209,18 @@ start_time(void)
     }
     TicksPerSecond = (double) ticks;
 
-#else /* no "sysconf"; had better guess */
-# ifdef HZ
-    TicksPerSecond = (double) (HZ);
+/* no "sysconf"; had better guess */
+#elif defined(HZ)
+    TicksPerSecond = (StgDouble) (HZ);
 
-# else /* had better guess wildly */
+#elif defined(CLOCKS_PER_SEC)
+    TicksPerSecond = (StgDouble) (CLOCKS_PER_SEC);
+#else /* had better guess wildly */
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
     fprintf(stderr, "NOTE: Guessing `TicksPerSecond = 60'!\n");
     TicksPerSecond = 60.0;
-# endif
 #endif
 
     ElapsedTimeStart = elapsedtime();
@@ -188,7 +237,6 @@ initStats(void)
     fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
     fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
   }
-
   GC_coll_times = 
     (double *)stgMallocBytes(sizeof(double) * RtsFlags.GcFlags.generations,
 			   "initStats");
@@ -197,34 +245,54 @@ initStats(void)
   }
 }    
 
+#ifdef _WIN32
+double
+usertime(void)
+{
+    FILETIME creationTime, exitTime, kernelTime, userTime;
+    long long int uT;
+
+    /* Convert FILETIMEs into long longs */
+
+    if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
+		          &exitTime, &kernelTime, &userTime)) {
+	/* Probably exec'ing this on a Win95 box..*/
+	return 0;
+    }
+
+    FT2longlong(uT,userTime);
+    return (((StgDouble)uT)/TicksPerSecond);
+}
+#else
 
 double
 usertime(void)
 {
-#if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
+# if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
     fprintf(stderr, "NOTE: `usertime' does nothing!\n");
     return 0.0;
 
-#else /* not stumped */
+# else /* not stumped */
 
-# if defined(HAVE_TIMES) 
+#  if defined(HAVE_TIMES) 
     struct tms t;
 
     times(&t);
     return(((double)(t.tms_utime))/TicksPerSecond);
 
-#else /* HAVE_GETRUSAGE */
+#  else /* HAVE_GETRUSAGE */
     struct rusage t;
 
     getrusage(RUSAGE_SELF, &t);
     return(t.ru_utime.tv_sec + 1e-6*t.ru_utime.tv_usec);
 
-# endif /* HAVE_GETRUSAGE */
-#endif /* not stumped */
+#  endif /* HAVE_GETRUSAGE */
+# endif /* not stumped */
 }
+#endif /* ! _WIN32 */
 
 void 
 end_init(void)
