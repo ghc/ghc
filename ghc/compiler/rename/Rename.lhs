@@ -129,7 +129,7 @@ renameStmt dflags hit hst pcs this_module ic stmt
 	--	  Mod> let y = x + 3
 	--     We need to pass 'x' among the fvs to slurpImpDecls, so that
 	--     the latter can see that T is a gate, and hence import the Num T 
-	--     instance decl.  (See the InTypEnv case in RnIfaces.slurpSourceRefs
+	--     instance decl.  (See the InTypEnv case in RnIfaces.slurpSourceRefs.)
 
     doDump dflags binders stmt decls   	`thenRn_`
     returnRn (print_unqual, Just (binders, (stmt, decls)))
