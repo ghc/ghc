@@ -360,7 +360,7 @@ gmtoff x = do
 # else /* ! HAVE_DECL_ALTZONE */
 
 #if !defined(mingw32_TARGET_OS)
-foreign import ccall unsafe "timezone" timezone :: Ptr CLong
+foreign import ccall "&timezone" timezone :: Ptr CLong
 #endif
 
 -- Assume that DST offset is 1 hour ...
