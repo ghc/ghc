@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.42 2000/02/25 15:07:09 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.43 2000/02/28 13:59:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -183,7 +183,13 @@ W_ GHC_ZCCReturnable_static_info[0];
 #else /* 0 Regs available */
 
 #define PUSH_P(o,x) Sp[-o] = (W_)(x)
+
+#ifdef DEBUG
 #define PUSH_N(o,x) Sp[1-o] = (W_)(x);  Sp[-o] = ARG_TAG(1);
+#else
+#define PUSH_N(o,x) Sp[1-o] = (W_)(x);
+#endif
+
 #define PUSHED(m)   Sp -= (m); JMP_(ENTRY_CODE(Sp[m]));
 
 /* Here's how to construct these macros:
