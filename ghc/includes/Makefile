@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.12 2000/08/02 14:13:27 rrt Exp $
+# $Id: Makefile,v 1.13 2000/08/07 16:07:53 rrt Exp $
 #
 
 TOP = ..
@@ -14,6 +14,8 @@ H_FILES = $(filter-out gmp.h,$(wildcard *.h)) gmp.h
 # Header file built from the configure script's findings
 #
 H_CONFIG = config.h
+
+boot :: gmp.h
 
 all :: $(H_CONFIG) NativeDefs.h
 
