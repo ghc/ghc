@@ -3447,7 +3447,7 @@ can be written infix (indeed, you can now use
 any operator starting in a colon as an infix type constructor).  Also note that
 the type constructors are not exactly as in the paper (Unit instead of 1, etc).
 Finally, note that the syntax of the type patterns in the class declaration
-uses "<literal>{|</literal>" and "<literal>{|</literal>" brackets; curly braces
+uses "<literal>{|</literal>" and "<literal>|}</literal>" brackets; curly braces
 alone would ambiguous when they appear on right hand sides (an extension we 
 anticipate wanting).
 </para>
