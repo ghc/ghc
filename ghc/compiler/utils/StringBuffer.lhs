@@ -293,13 +293,12 @@ reAllocMem ptr sz = do
 
 allocMem :: Int -> IO Addr
 allocMem sz = do
-#if __GLASGOW_HASKELL__ < 303
    chunk <- _ccall_ malloc sz
+#if __GLASGOW_HASKELL__ < 303
    if chunk == nullAddr 
       then fail (userError "allocMem")
       else return chunk
 #else
-   chunk <- _ccall_ allocMemory__ sz
    if chunk == nullAddr 
       then constructErrorAndFail "allocMem"
       else return chunk
