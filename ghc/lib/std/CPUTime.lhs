@@ -15,6 +15,7 @@ module CPUTime
 
 
 #ifndef __HUGS__
+
 \begin{code}
 import PrelBase
 import PrelArr  	( ByteArray(..), newIntArray, unsafeFreezeByteArray )
@@ -37,30 +38,6 @@ in CPU time that the implementation can record, and is given as an
 integral number of picoseconds.
 
 \begin{code}
-#ifdef __HUGS__
-
-sizeof_int :: Int
-sizeof_int = 4
-
-getCPUTime :: IO Integer
-getCPUTime = do
-    marr <- primNewByteArray (sizeof_int * 4)
-    rc   <- primGetCPUTime marr
-    if rc /= 0 then do
-        x0 <- primReadIntArray marr 0
-        x1 <- primReadIntArray marr 1
-        x2 <- primReadIntArray marr 2
-        x3 <- primReadIntArray marr 3
-        return ((fromIntegral x0 * 1000000000 + fromIntegral  x1 + 
-		 fromIntegral x2 * 1000000000 + fromIntegral  x3)
-	       * 1000)
-      else
-	ioError (IOError Nothing UnsupportedOperation 
-			 "getCPUTime"
-			 "can't get CPU time")
-
-#else
-
 getCPUTime :: IO Integer
 getCPUTime = do
     marr <- stToIO (newIntArray ((0::Int),3))
@@ -77,14 +54,11 @@ getCPUTime = do
 	ioError (IOError Nothing UnsupportedOperation 
 			 "getCPUTime"
 		         "can't get CPU time")
-#endif
 
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % 
                           fromInt (unsafePerformIO clockTicks))
-\end{code}
 
-\begin{code}
 foreign import "libHS_cbits" "getCPUTime" unsafe primGetCPUTime :: ByteArray Int -> IO Int
 foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 
@@ -93,12 +67,16 @@ foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 #else
 
 \begin{code}
--- TODO: Hugs/getCPUTime
 getCPUTime :: IO Integer
-getCPUTime = return 0
+getCPUTime 
+   = do seconds <- nh_getCPUtime
+        return (round (seconds * 1.0e+12))
 
--- TODO: Hugs/cpuTimePrecision
 cpuTimePrecision :: Integer
-cpuTimePrecision = 1
+cpuTimePrecision
+   = primRunST (
+        do resolution <- nh_getCPUprec
+           return (round (resolution * 1.0e+12))
+     )
 \end{code} 
 #endif

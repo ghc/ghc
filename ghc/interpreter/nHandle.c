@@ -9,8 +9,27 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <sys/times.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
+
+double nh_getCPUtime ( void )
+{
+   double usertime;
+   struct rusage usage;
+   getrusage ( RUSAGE_SELF, &usage );
+   usertime = (double)usage.ru_utime.tv_sec +
+              (double)usage.ru_utime.tv_usec / 1000000.0;
+   return usertime;
+}
+
+double nh_getCPUprec ( void )
+{
+   /* or perhaps CLOCKS_PER_SEC ? */
+   return 1.0 / (double)(CLK_TCK);
+}
 
 int nh_getPID ( void )
 {

@@ -119,6 +119,7 @@ module Prelude (
     ,unsafeInterleaveIO,nh_write,primCharToInt,
     nullAddr, incAddr, isNullAddr, 
     nh_filesize, nh_iseof, nh_system, nh_exitwith, nh_getPID,
+    nh_getCPUtime, nh_getCPUprec,
 
     Word,
     primGtWord, primGeWord, primEqWord, primNeWord,
@@ -1738,6 +1739,9 @@ foreign import "nHandle" "nh_iseof"    nh_iseof    :: FILE_STAR -> IO Int
 foreign import "nHandle" "nh_system"   nh_system   :: Addr -> IO Int
 foreign import "nHandle" "nh_exitwith" nh_exitwith :: Int -> IO ()
 foreign import "nHandle" "nh_getPID"   nh_getPID   :: IO Int
+
+foreign import "nHandle" "nh_getCPUtime" nh_getCPUtime :: IO Double
+foreign import "nHandle" "nh_getCPUprec" nh_getCPUprec :: IO Double
 
 copy_String_to_cstring :: String -> IO Addr
 copy_String_to_cstring s
