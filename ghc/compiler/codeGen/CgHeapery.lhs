@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.37 2003/07/02 13:12:36 simonpj Exp $
+% $Id: CgHeapery.lhs,v 1.38 2003/07/18 14:39:06 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -372,8 +372,6 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
 Occasionally we can update a closure in place instead of allocating
 new space for it.  This is the function that does the business, assuming:
 
-	- node points to the closure to be overwritten
-
 	- the new closure doesn't contain any pointers if we're
 	  using a generational collector.
 
@@ -396,6 +394,12 @@ inPlaceAllocDynClosure closure_info head use_cc amodes_with_offsets
     in
 	-- GENERATE THE CODE
     absC ( mkAbstractCs (
-	   [ CInitHdr closure_info head use_cc 0{-no alloc-} ]
+	   [ 
+		-- don't forget to AWAKEN_BQ_CLOSURE: even though we're
+		-- doing update-in-place, the thunk might still have been
+		-- blackholed and another thread might be waiting on it.
+		CMacroStmt AWAKEN_BQ_CLOSURE [head],
+	        CInitHdr closure_info head use_cc 0{-no alloc-}
+ 	   ]
 	   ++ (map do_move amodes_with_offsets)))
 \end{code}

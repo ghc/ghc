@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.53 2003/07/02 13:12:33 simonpj Exp $
+% $Id: AbsCSyn.lhs,v 1.54 2003/07/18 14:39:06 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -251,6 +251,8 @@ data CStmtMacro
       -- dataToTag# primop -- *only* used in unregisterised builds.
       -- (see AbsCUtils.dsCOpStmt)
   | DATA_TO_TAGZH
+  | AWAKEN_BQ_CLOSURE			-- possibly awaken a blocking quuee
+					-- (used for in-place updates)
 
   | REGISTER_FOREIGN_EXPORT		-- register a foreign exported fun
   | REGISTER_IMPORT			-- register an imported module
