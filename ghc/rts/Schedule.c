@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.24 1999/08/25 16:11:51 simonmar Exp $
+ * $Id: Schedule.c,v 1.25 1999/09/10 11:11:51 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -654,6 +654,7 @@ StgTSO *unblockOne(StgTSO *tso)
   ASSERT(tso->why_blocked != NotBlocked);
   tso->why_blocked = NotBlocked;
   next = tso->link;
+  tso->link = END_TSO_QUEUE;
   PUSH_ON_RUN_QUEUE(tso);
   IF_DEBUG(scheduler,belch("Waking up thread %ld", tso->id));
   return next;

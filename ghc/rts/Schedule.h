@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.6 1999/08/25 16:11:51 simonmar Exp $
+ * $Id: Schedule.h,v 1.7 1999/09/10 11:11:52 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -43,6 +43,9 @@ extern StgTSO *MainTSO; /* temporary hack */
 #endif
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&END_TSO_QUEUE_closure)
 
+/* Add a thread to the end of the run queue.
+ * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
+ */
 #define PUSH_ON_RUN_QUEUE(tso)			\
     if (run_queue_hd == END_TSO_QUEUE) {        \
       run_queue_hd = tso;			\
