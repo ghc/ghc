@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Array.lhs,v 1.13 2000/06/30 13:39:35 simonmar Exp $
+% $Id: Array.lhs,v 1.14 2000/08/29 16:36:23 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -42,7 +42,6 @@ module  Array
 #ifndef __HUGS__
 import Ix
 import PrelList
-import PrelShow
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
 #else

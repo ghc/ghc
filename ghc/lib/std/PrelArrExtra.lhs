@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArrExtra.lhs,v 1.10 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelArrExtra.lhs,v 1.11 2000/08/29 16:36:23 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -21,7 +21,6 @@ import PrelByteArr
 import PrelST
 import PrelIOBase
 import PrelBase
-import PrelGHC
 \end{code}
 
 %*********************************************************
