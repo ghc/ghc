@@ -65,8 +65,6 @@ data GenCmmTop d i
 		       -- to a label.  To jump to the first block in a Proc,
 		       -- use the appropriate CLabel.
 
-     [GenCmmCont i]    -- Continuations declared in this proc
-
   -- some static data.
   | CmmData Section [d]	-- constant values only
 
@@ -95,15 +93,6 @@ blockStmts :: GenBasicBlock i -> [i]
 blockStmts (BasicBlock _ stmts) = stmts
 
 
-data GenCmmCont i 
-  = CmmCont 
-	[LocalReg] 		-- The formal params of the ccntinuation
-	(GenBasicBlock i)	
-
-type ContId = BlockId	-- Continuation is named (in eg 
-			-- also-unwinds-to annotations) via the 
-			-- block-id of its GenBasicBlock
-
 -----------------------------------------------------------------------------
 --		CmmStmt
 -- A "statement".  Note that all branches are explicit: there are no
@@ -124,7 +113,10 @@ data CmmStmt
      CmmCallTarget
      [(CmmReg,MachHint)]	 -- zero or more results
      [(CmmExpr,MachHint)]	 -- zero or more arguments
-     Flow
+     (Maybe [GlobalReg])	 -- Global regs that may need to be saved
+				 -- if they will be clobbered by the call.
+				 -- Nothing <=> save *all* globals that
+				 -- might be clobbered.
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 
@@ -139,14 +131,6 @@ data CmmStmt
   | CmmJump CmmExpr [LocalReg]    -- Jump to another function, with these 
 				  -- parameters.
 
-  | CmmSpan CmmSpan [CmmStmt]
-
------------------------------------------------------------------------------
---		CmmSpan
------------------------------------------------------------------------------
-
-data CmmSpan = UpdateFrame | CatchFrame 	-- Etc.
-
 -----------------------------------------------------------------------------
 --		CmmCallTarget
 --
@@ -154,9 +138,7 @@ data CmmSpan = UpdateFrame | CatchFrame 	-- Etc.
 -----------------------------------------------------------------------------
 
 data CmmCallTarget
-  = CmmVanillaCall CmmExpr	-- Ordinarly call to a Cmm procedure
- 
-  | CmmForeignCall		-- Call to a foreign function
+  = CmmForeignCall		-- Call to a foreign function
 	CmmExpr 		-- literal label <=> static call
 				-- other expression <=> dynamic call
 	CCallConv		-- The calling convention
@@ -164,24 +146,6 @@ data CmmCallTarget
   | CmmPrim			-- Call to a "primitive" (eg. sin, cos)
 	CallishMachOp		-- These might be implemented as inline
 				-- code by the backend.
-
------------------------------------------------------------------------------
---		Flow
--- 
------------------------------------------------------------------------------
-
-data Flow
-   = Flow { normal_live :: FlowEdge ()
-	  , also_unwinds :: [FlowEdge ContId]
-     }
-
-data FlowEdge a
-  = FlowEdge { edge_target :: a
-	     , live_locals :: [LocalReg]		-- Live across the call
-	     , save_globals :: Maybe [GlobalReg]	-- Global regs that may need to be saved
-    }							-- if they will be clobbered by the call.
-							-- Nothing <=> save *all* globals that
-							-- might be clobbered
 
 -----------------------------------------------------------------------------
 --		CmmExpr
