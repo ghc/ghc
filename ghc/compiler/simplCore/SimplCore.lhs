@@ -34,6 +34,7 @@ import CoreLint		( lintCoreBindings )
 import CoreSyn
 import CoreUnfold
 import CoreUtils	( substCoreBindings, manifestlyWHNF )
+import ErrUtils		( ghcExit )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )
@@ -46,9 +47,6 @@ import Id		( idType, toplevelishId, idWantsToBeINLINEd,
 import IdInfo		( mkUnfolding )
 import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
-import MainMonad	( writeMn, exitMn, thenMn, thenMn_, returnMn,
-			  MainIO(..)
-			)
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore		( pprCoreBinding, GenCoreExpr{-instance Outputable-} )
@@ -85,7 +83,7 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	  -> [TyCon]			-- local data tycons and tycon specialisations
 	  -> FiniteMap TyCon [(Bool, [Maybe Type])]
 	  -> [CoreBinding]		-- input...
-	  -> MainIO
+	  -> IO
 	      ([CoreBinding],	-- results: program, plus...
 	       IdEnv UnfoldingDetails,	--  unfoldings to be exported from here
 	      SpecialiseData)		--  specialisation data
@@ -94,32 +92,32 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
   = BSCC("Core2Core")
     if null core_todos then -- very rare, I suspect...
 	-- well, we still must do some renumbering
-	returnMn (
+	return (
 	(substCoreBindings nullIdEnv nullTyVarEnv binds us,
 	 nullIdEnv,
 	 init_specdata)
 	)
     else
 	(if do_verbose_core2core then
-	    writeMn stderr "VERBOSE CORE-TO-CORE:\n"
-	 else returnMn ()) `thenMn_`
+	    hPutStr stderr "VERBOSE CORE-TO-CORE:\n"
+	 else return ()) >>
 
 	-- better do the main business
 	foldl_mn do_core_pass
 		(binds, us, nullIdEnv, init_specdata, zeroSimplCount)
 		core_todos
-		`thenMn` \ (processed_binds, _, inline_env, spec_data, simpl_stats) ->
+		>>= \ (processed_binds, _, inline_env, spec_data, simpl_stats) ->
 
 	(if  opt_D_simplifier_stats
-	 then writeMn stderr ("\nSimplifier Stats:\n")
-		`thenMn_`
-	      writeMn stderr (showSimplCount simpl_stats)
-		`thenMn_`
-	      writeMn stderr "\n"
-	 else returnMn ()
-	) `thenMn_`
+	 then hPutStr stderr ("\nSimplifier Stats:\n")
+		>>
+	      hPutStr stderr (showSimplCount simpl_stats)
+		>>
+	      hPutStr stderr "\n"
+	 else return ()
+	) >>
 
-	returnMn (processed_binds, inline_env, spec_data)
+	return (processed_binds, inline_env, spec_data)
     ESCC
   where
     init_specdata = initSpecData local_tycons tycon_specs
@@ -146,7 +144,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	  CoreDoSimplify simpl_sw_chkr
 	    -> BSCC("CoreSimplify")
 	       begin_pass ("Simplify" ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
-					 then " (foldr/build)" else "") `thenMn_`
+					 then " (foldr/build)" else "") >>
 	       case (simplifyPgm binds simpl_sw_chkr simpl_stats us1) of
 		 (p, it_cnt, simpl_stats2)
 		   -> end_pass False us2 p inline_env spec_data simpl_stats2
@@ -157,56 +155,56 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 
 	  CoreDoFoldrBuildWorkerWrapper
 	    -> BSCC("CoreDoFoldrBuildWorkerWrapper")
-	       begin_pass "FBWW" `thenMn_`
+	       begin_pass "FBWW" >>
 	       case (mkFoldrBuildWW us1 binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FBWW"
 	       } ESCC
 
 	  CoreDoFoldrBuildWWAnal
 	    -> BSCC("CoreDoFoldrBuildWWAnal")
-	       begin_pass "AnalFBWW" `thenMn_`
+	       begin_pass "AnalFBWW" >>
 	       case (analFBWW binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AnalFBWW"
 	       } ESCC
 
 	  CoreLiberateCase
 	    -> BSCC("LiberateCase")
-	       begin_pass "LiberateCase" `thenMn_`
+	       begin_pass "LiberateCase" >>
 	       case (liberateCase lib_case_threshold binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "LiberateCase"
 	       } ESCC
 
 	  CoreDoCalcInlinings1	-- avoid inlinings w/ cost-centres
 	    -> BSCC("CoreInlinings1")
-	       begin_pass "CalcInlinings" `thenMn_`
+	       begin_pass "CalcInlinings" >>
 	       case (calcInlinings False inline_env binds) of { inline_env2 ->
 	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings"
 	       } ESCC
 
 	  CoreDoCalcInlinings2  -- allow inlinings w/ cost-centres
 	    -> BSCC("CoreInlinings2")
-	       begin_pass "CalcInlinings" `thenMn_`
+	       begin_pass "CalcInlinings" >>
 	       case (calcInlinings True inline_env binds) of { inline_env2 ->
 	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings"
 	       } ESCC
 
 	  CoreDoFloatInwards
 	    -> BSCC("FloatInwards")
-	       begin_pass "FloatIn" `thenMn_`
+	       begin_pass "FloatIn" >>
 	       case (floatInwards binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatIn"
 	       } ESCC
 
 	  CoreDoFullLaziness
 	    -> BSCC("CoreFloating")
-	       begin_pass "FloatOut" `thenMn_`
+	       begin_pass "FloatOut" >>
 	       case (floatOutwards us1 binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatOut"
 	       } ESCC
 
 	  CoreDoStaticArgs
 	    -> BSCC("CoreStaticArgs")
-	       begin_pass "StaticArgs" `thenMn_`
+	       begin_pass "StaticArgs" >>
 	       case (doStaticArgs binds us1) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StaticArgs"
 		-- Binds really should be dependency-analysed for static-
@@ -216,14 +214,14 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 
 	  CoreDoStrictness
 	    -> BSCC("CoreStranal")
-	       begin_pass "StrAnal" `thenMn_`
+	       begin_pass "StrAnal" >>
 	       case (saWwTopBinds us1 binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StrAnal"
 	       } ESCC
 
 	  CoreDoSpecialising
 	    -> BSCC("Specialise")
-	       begin_pass "Specialise" `thenMn_`
+	       begin_pass "Specialise" >>
 	       case (specProgram us1 binds spec_data) of {
 		 (p, spec_data2@(SpecData _ spec_noerrs _ _ _
 					  spec_errs spec_warn spec_tyerrs)) ->
@@ -231,16 +229,16 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 		   -- if we got errors, we die straight away
 		   (if not spec_noerrs ||
 		       (opt_ShowImportSpecs && not (isEmptyBag spec_warn)) then
-			writeMn stderr (ppShow 1000 {-pprCols-}
+			hPutStr stderr (ppShow 1000 {-pprCols-}
 			    (pprSpecErrs module_name spec_errs spec_warn spec_tyerrs))
-			`thenMn_` writeMn stderr "\n"
+			>> hPutStr stderr "\n"
 		    else
-			returnMn ()) `thenMn_`
+			return ()) >>
 
 		   (if not spec_noerrs then -- Stop here if specialisation errors occured
-			exitMn 1
+			ghcExit 1
 		   else
-			returnMn ()) `thenMn_`
+			return ()) >>
 
 		   end_pass False us2 p inline_env spec_data2 simpl_stats "Specialise"
 	       }
@@ -251,7 +249,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	    -> error "ERROR: CoreDoDeforest: not built into compiler\n"
 #else
 	    -> BSCC("Deforestation")
-	       begin_pass "Deforestation" `thenMn_`
+	       begin_pass "Deforestation" >>
 	       case (deforestProgram binds us1) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation"
 	       }
@@ -260,7 +258,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 
 	  CoreDoAutoCostCentres
 	    -> BSCC("AutoSCCs")
-	       begin_pass "AutoSCCs" `thenMn_`
+	       begin_pass "AutoSCCs" >>
 	       case (addAutoCostCentres module_name binds) of { binds2 ->
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AutoSCCs"
 	       }
@@ -274,8 +272,8 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 
     begin_pass
       = if opt_D_show_passes
-	then \ what -> writeMn stderr ("*** Core2Core: "++what++"\n")
-	else \ what -> returnMn ()
+	then \ what -> hPutStr stderr ("*** Core2Core: "++what++"\n")
+	else \ what -> return ()
 
     end_pass print us2 binds2 inline_env2
 	     spec_data2@(SpecData spec_done _ _ _ _ _ _ _)
@@ -284,18 +282,18 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	(if (do_verbose_core2core && not print) ||
 	    (print && not do_verbose_core2core)
 	 then
-	    writeMn stderr ("\n*** "++what++":\n")
-		`thenMn_`
-	    writeMn stderr (ppShow 1000
+	    hPutStr stderr ("\n*** "++what++":\n")
+		>>
+	    hPutStr stderr (ppShow 1000
 		(ppAboves (map (pprCoreBinding ppr_style) binds2)))
-		`thenMn_`
-	    writeMn stderr "\n"
+		>>
+	    hPutStr stderr "\n"
 	 else
-	    returnMn ()) `thenMn_`
+	    return ()) >>
 	let
 	    linted_binds = core_linter what spec_done binds2
 	in
-	returnMn
+	return
 	(linted_binds,	-- processed binds, possibly run thru CoreLint
 	 us2,		-- UniqueSupply for the next guy
 	 inline_env2,	-- possibly-updated inline env
@@ -304,8 +302,8 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	)
 
 -- here so it can be inlined...
-foldl_mn f z []     = returnMn z
-foldl_mn f z (x:xs) = f z x	`thenMn` \ zz ->
+foldl_mn f z []     = return z
+foldl_mn f z (x:xs) = f z x	>>= \ zz ->
 		     foldl_mn f zz xs
 \end{code}
 

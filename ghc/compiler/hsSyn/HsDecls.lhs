@@ -16,7 +16,8 @@ import Ubiq
 -- friends:
 import HsLoop		( nullMonoBinds, MonoBinds, Sig )
 import HsPragmas	( DataPragmas, ClassPragmas,
-			  InstancePragmas, ClassOpPragmas )
+			  InstancePragmas, ClassOpPragmas
+			)
 import HsTypes
 
 -- others:
@@ -167,8 +168,8 @@ data ConDecl name
 		SrcLoc
 
 data BangType name
-  = Banged   (MonoType name)
-  | Unbanged (MonoType name)
+  = Banged   (PolyType name)	-- PolyType: to allow Haskell extensions
+  | Unbanged (PolyType name)	-- (MonoType only needed for straight Haskell)
 \end{code}
 
 \begin{code}
@@ -186,8 +187,8 @@ instance (NamedThing name, Outputable name) => Outputable (ConDecl name) where
       where
 	pp_field (n, ty) = ppCat [ppr sty n, ppPStr SLIT("::"), ppr_bang sty ty]
 
-ppr_bang sty (Banged   ty) = ppBeside (ppChar '!') (pprParendMonoType sty ty)
-ppr_bang sty (Unbanged ty) = pprParendMonoType sty ty
+ppr_bang sty (Banged   ty) = ppBeside (ppChar '!') (pprParendPolyType sty ty)
+ppr_bang sty (Unbanged ty) = pprParendPolyType sty ty
 \end{code}
 
 %************************************************************************

@@ -28,10 +28,12 @@ module Name (
 	mkTupNameStr,
 
 	NamedThing(..), -- class
-	ExportFlag(..), isExported,
+	ExportFlag(..),
+	isExported{-overloaded-}, exportFlagOn{-not-},
 
 	nameUnique,
 	nameOccName,
+	nameOrigName,
 	nameExportFlag,
 	nameSrcLoc,
 	nameImportFlag,
@@ -340,10 +342,10 @@ data ExportFlag
   | ExportAbs		-- export abstractly (tycons/classes only)
   | NotExported
 
-isExported a
-  = case (getExportFlag a) of
-      NotExported -> False
-      _		  -> True
+exportFlagOn NotExported = False
+exportFlagOn _		 = True
+
+isExported a = exportFlagOn (getExportFlag a)
 
 #ifdef USE_ATTACK_PRAGMAS
 {-# SPECIALIZE isExported :: Class -> Bool #-}
@@ -400,17 +402,7 @@ as to canonicalize interfaces.  [Regular @(<)@ should be used for fast
 comparison.]
 
 \begin{code}
-a `ltLexical` b
-  = case (moduleNamePair a)	of { (a_mod, a_name) ->
-    case (moduleNamePair b)	of { (b_mod, b_name) ->
-    if isLocallyDefined a || isLocallyDefined b then
-       a_name < b_name	-- can't compare module names
-    else
-       case _CMP_STRING_ a_mod b_mod of
-	 LT_  -> True
-	 EQ_  -> a_name < b_name
-	 GT__ -> False
-    }}
+a `ltLexical` b = origName a < origName b
 
 #ifdef USE_ATTACK_PRAGMAS
 {-# SPECIALIZE ltLexical :: Class -> Class -> Bool #-}

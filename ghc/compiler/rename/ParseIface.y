@@ -137,13 +137,13 @@ fixities_part	:  FIXITIES_PART fixes	{ $2 }
 		|			{ emptyFM }
 
 fixes		:: { FixitiesMap }
-fixes		:  fix		  { case $1 of (k,v) -> unitFM k v }
-		|  fixes SEMI fix { case $3 of (k,v) -> addToFM $1 k v }
+fixes		:  fix  	{ case $1 of (k,v) -> unitFM k v }
+		|  fixes fix	{ case $2 of (k,v) -> addToFM $1 k v }
 
 fix		:: { (FAST_STRING, RdrNameFixityDecl) }
-fix		:  INFIXL INTEGER qop { (de_qual $3, InfixL $3 (fromInteger $2)) }
-		|  INFIXR INTEGER qop { (de_qual $3, InfixR $3 (fromInteger $2)) }
-		|  INFIX  INTEGER qop { (de_qual $3, InfixN $3 (fromInteger $2))
+fix		:  INFIXL INTEGER qop SEMI { (de_qual $3, InfixL $3 (fromInteger $2)) }
+		|  INFIXR INTEGER qop SEMI { (de_qual $3, InfixR $3 (fromInteger $2)) }
+		|  INFIX  INTEGER qop SEMI { (de_qual $3, InfixN $3 (fromInteger $2))
 --------------------------------------------------------------------------
 				      }
 
@@ -151,17 +151,17 @@ decls_part	:: { (LocalTyDefsMap, LocalValDefsMap) }
 decls_part	: DECLARATIONS_PART topdecls { $2 }
 
 topdecls	:: { (LocalTyDefsMap, LocalValDefsMap) }
-topdecls	:  topdecl		 { $1 }
-		|  topdecls SEMI topdecl { case $1 of { (ts1, vs1) ->
-					   case $3 of { (ts2, vs2) ->
-					   (plusFM ts1 ts2, plusFM vs1 vs2)}}
-					 }
+topdecls	:  topdecl	    { $1 }
+		|  topdecls topdecl { case $1 of { (ts1, vs1) ->
+				      case $2 of { (ts2, vs2) ->
+				      (plusFM ts1 ts2, plusFM vs1 vs2)}}
+				     }
 
 topdecl		:: { (LocalTyDefsMap, LocalValDefsMap) }
-topdecl		:  typed	{ ($1, emptyFM) }
-		|  datad	{ $1 }
-		|  newtd	{ $1 }
-		|  classd	{ $1 }
+topdecl		:  typed  SEMI	{ ($1, emptyFM) }
+		|  datad  SEMI	{ $1 }
+		|  newtd  SEMI	{ $1 }
+		|  classd SEMI	{ $1 }
 		|  decl		{ case $1 of { (n, Sig qn ty _ loc) ->
 				  (emptyFM, unitFM n (ValSig qn loc ty)) }
 				}
@@ -186,11 +186,11 @@ cbody		:  WHERE OCURLY decls CCURLY { $3 }
 		|			     { [] }
 
 decls		:: { [(FAST_STRING, RdrNameSig)] }
-decls		: decl		    { [$1] }
-		| decls SEMI decl   { $1 ++ [$3] }
+decls		: decl		{ [$1] }
+		| decls decl	{ $1 ++ [$2] }
 
 decl		:: { (FAST_STRING, RdrNameSig) }
-decl		:  var DCOLON ctype { (de_qual $1, Sig $1 $3 noGenPragmas mkIfaceSrcLoc) }
+decl		:  var DCOLON ctype SEMI { (de_qual $1, Sig $1 $3 noGenPragmas mkIfaceSrcLoc) }
 
 context		:: { RdrNameContext }
 context		:  OPAREN context_list CPAREN	{ reverse $2 }
@@ -293,12 +293,12 @@ btyconapp	:  gtycon			{ ($1, []) }
 		|  btyconapp batype		{ case $1 of (tc,tys) -> (tc, tys ++ [$2]) }
 
 bbtype		:: { RdrNameBangType }
-bbtype		:  btype			{ Unbanged $1 }
-		|  BANG atype			{ Banged   $2 }
+bbtype		:  btype			{ Unbanged (HsPreForAllTy [] $1) }
+		|  BANG atype			{ Banged   (HsPreForAllTy [] $2) }
 
 batype		:: { RdrNameBangType }
-batype		:  atype			{ Unbanged $1 }
-		|  BANG atype			{ Banged   $2 }
+batype		:  atype			{ Unbanged (HsPreForAllTy [] $1) }
+		|  BANG atype			{ Banged   (HsPreForAllTy [] $2) }
 
 batypes		:: { [RdrNameBangType] }
 batypes		:  batype			{ [$1] }
@@ -309,8 +309,8 @@ fields		: field				{ [$1] }
 		| fields COMMA field		{ $1 ++ [$3] }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  var DCOLON type	    { ([$1], Unbanged $3) }
-		|  var DCOLON BANG atype    { ([$1], Banged   $4) }
+field		:  var DCOLON type	    { ([$1], Unbanged (HsPreForAllTy [] $3)) }
+		|  var DCOLON BANG atype    { ([$1], Banged   (HsPreForAllTy [] $4)) }
 
 constr1		:: { (RdrName, RdrNameMonoType) }
 constr1		:  gtycon atype	{ ($1, $2) }
@@ -353,11 +353,11 @@ instances_part	:  INSTANCES_PART instdecls { $2 }
 
 instdecls	:: { Bag RdrIfaceInst }
 instdecls	:  instd		    { unitBag $1 }
-		|  instdecls SEMI instd	    { $1 `snocBag` $3 }
+		|  instdecls instd	    { $1 `snocBag` $2 }
 
 instd		:: { RdrIfaceInst }
-instd		:  INSTANCE context DARROW gtycon restrict_inst	{ mk_inst $2 $4 $5 }
-		|  INSTANCE		   gtycon general_inst	{ mk_inst [] $2 $3 }
+instd		:  INSTANCE context DARROW gtycon restrict_inst	SEMI { mk_inst $2 $4 $5 }
+		|  INSTANCE		   gtycon general_inst	SEMI { mk_inst [] $2 $3 }
 
 restrict_inst	:: { RdrNameMonoType }
 restrict_inst	:  gtycon				{ MonoTyApp $1 [] }

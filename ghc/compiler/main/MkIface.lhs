@@ -6,24 +6,217 @@
 \begin{code}
 #include "HsVersions.h"
 
-module MkIface ( mkInterface ) where
+module MkIface {-( mkInterface )-} where
 
-import PrelInfo		( mkLiftTy, pRELUDE_BUILTIN )
-import HsSyn		( FixityDecl(..), RenamedFixityDecl(..), MonoBinds,
-			  RenamedMonoBinds(..), Name, RenamedPat(..), Sig
+import Ubiq{-uitous-}
+
+import Bag		( emptyBag, snocBag, bagToList )
+import Class		( GenClass{-instance NamedThing-} )
+import CmdLineOpts	( opt_ProduceHi )
+import HsSyn
+import Id		( GenId{-instance NamedThing/Outputable-} )
+import Name		( nameOrigName, exportFlagOn, nameExportFlag, ExportFlag(..),
+			  ltLexical, isExported,
+			  RdrName{-instance Outputable-}
 			)
-import Type
-import Bag
-import FiniteMap
-import Id
-import IdInfo		-- plenty from here
-import Maybes		( catMaybes, Maybe(..) )
-import Outputable
-import Pretty
-import StgSyn
-import TcInstDcls	( InstInfo(..) )
-import Util
+import PprStyle		( PprStyle(..) )
+import PprType		( TyCon{-instance Outputable-}, GenClass{-ditto-} )
+import Pretty		-- quite a bit
+import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
+import RnIfaces		( VersionInfo(..) )
+import TcModule		( TcIfaceInfo(..) )
+import TcInstUtil	( InstInfo )
+import TyCon		( TyCon{-instance NamedThing-} )
+import Util		( sortLt, assertPanic )
+
+ppSemid x = ppBeside (ppr PprInterface x) ppSemi -- micro util
 \end{code}
+
+We have a function @startIface@ to open the output file and put
+(something like) ``interface Foo N'' in it.  It gives back a handle
+for subsequent additions to the interface file.
+
+We then have one-function-per-block-of-interface-stuff, e.g.,
+@ifaceExportList@ produces the @__exports__@ section; it appends
+to the handle provided by @startIface@.
+
+\begin{code}
+startIface  :: Module
+	    -> IO (Maybe Handle) -- Nothing <=> don't do an interface
+endIface    :: Maybe Handle -> IO ()
+ifaceVersions
+	    :: Maybe Handle
+	    -> VersionInfo
+	    -> IO ()
+ifaceExportList
+	    :: Maybe Handle
+	    -> RenamedHsModule
+	    -> IO ()
+ifaceFixities
+	    :: Maybe Handle
+	    -> RenamedHsModule
+	    -> IO ()
+ifaceInstanceModules
+	    :: Maybe Handle
+	    -> [Module]
+	    -> IO ()
+ifaceDecls  :: Maybe Handle
+	    -> TcIfaceInfo  -- info produced by typechecker, for interfaces
+	    -> IO ()
+ifaceInstances
+	    :: Maybe Handle
+	    -> TcIfaceInfo  -- as above
+	    -> IO ()
+--ifacePragmas
+\end{code}
+
+\begin{code}
+startIface mod
+  = case opt_ProduceHi of
+      Nothing -> return Nothing -- not producing any .hi file
+      Just fn ->
+	openFile fn WriteMode	>>= \ if_hdl ->
+	hPutStr if_hdl ("interface "++ _UNPK_ mod ++" 1\n") >>
+	return (Just if_hdl)
+
+endIface Nothing	= return ()
+endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
+\end{code}
+
+\begin{code}
+ifaceVersions Nothing{-no iface handle-} _ = return ()
+
+ifaceVersions (Just if_hdl) version_info
+  = hPutStr if_hdl "__versions__\nFoo(1)" -- a stub, obviously
+\end{code}
+
+\begin{code}
+ifaceInstanceModules Nothing{-no iface handle-} _ = return ()
+ifaceInstanceModules (Just _)		       [] = return ()
+
+ifaceInstanceModules (Just if_hdl) imods
+  = hPutStr if_hdl "\n__instance_modules__\n" >>
+    hPutStr if_hdl (ppShow 100 (ppCat (map ppPStr imods)))
+\end{code}
+
+Export list: grab the Names of things that are marked Exported, sort
+(so the interface file doesn't ``wobble'' from one compilation to the
+next...), and print.  Note that the ``module'' now contains all the
+imported things that we are dealing with, thus including any entities
+that we are re-exporting from somewhere else.
+\begin{code}
+ifaceExportList Nothing{-no iface handle-} _ = return ()
+
+ifaceExportList (Just if_hdl)
+		(HsModule _ _ _ _ _ typedecls _ classdecls _ _ _ binds sigs _)
+  = let
+	name_flag_pairs :: Bag (Name, ExportFlag)
+	name_flag_pairs
+	  = foldr from_ty
+	   (foldr from_cls
+	   (foldr from_sig
+	   (from_binds binds emptyBag{-init accum-})
+	     sigs)
+	     classdecls)
+	     typedecls
+
+	sorted_pairs = sortLt lexical_lt (bagToList name_flag_pairs)
+
+    in
+    hPutStr if_hdl "\n__exports__\n" >>
+    hPutStr if_hdl (ppShow 100 (ppAboves (map pp_pair sorted_pairs)))
+  where
+    from_ty (TyData _ n _ _ _ _ _) acc = maybe_add acc n
+    from_ty (TyNew  _ n _ _ _ _ _) acc = maybe_add acc n
+    from_ty (TySynonym n _ _ _)	   acc = maybe_add acc n
+
+    from_cls (ClassDecl _ n _ _ _ _ _) acc = maybe_add acc n
+
+    from_sig (Sig n _ _ _) acc = maybe_add acc n
+
+    from_binds bs acc = maybe_add_list acc (collectTopLevelBinders bs)
+
+    --------------
+    maybe_add :: Bag (Name, ExportFlag) -> RnName -> Bag (Name, ExportFlag)
+
+    maybe_add acc rn
+      | exportFlagOn ef = acc `snocBag` (n, ef)
+      | otherwise       = acc
+      where
+	n  = getName rn
+	ef = nameExportFlag n
+
+    --------------
+    maybe_add_list acc []     = acc
+    maybe_add_list acc (n:ns) = maybe_add (maybe_add_list acc ns) n
+
+    --------------
+    lexical_lt (n1,_) (n2,_) = nameOrigName n1 < nameOrigName n2
+
+    --------------
+    pp_pair (n, ef)
+      = ppBeside (ppr PprInterface (nameOrigName n)) (pp_export ef)
+      where
+	pp_export ExportAll = ppPStr SLIT("(..)")
+	pp_export ExportAbs = ppNil
+\end{code}
+
+\begin{code}
+ifaceFixities Nothing{-no iface handle-} _ = return ()
+
+ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
+  = if null fixities then
+	return ()
+    else 
+	hPutStr if_hdl "\n__fixities__\n" >>
+	hPutStr if_hdl (ppShow 100 (ppAboves (map ppSemid fixities)))
+\end{code}
+
+\begin{code}
+ifaceDecls Nothing{-no iface handle-} _ = return ()
+
+ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
+  = ASSERT(not (null vals && null tycons && null classes))
+    let
+	exported_classes = filter isExported classes
+	exported_tycons  = filter isExported tycons
+	exported_vals	 = filter isExported vals
+
+	sorted_classes   = sortLt ltLexical exported_classes
+	sorted_tycons	 = sortLt ltLexical exported_tycons
+	sorted_vals	 = sortLt ltLexical exported_vals
+    in
+    hPutStr if_hdl "\n__declarations__\n" >>
+    hPutStr if_hdl (ppShow 100 (ppAboves [
+	ppAboves (map ppSemid sorted_classes),
+	ppAboves (map ppSemid sorted_tycons),
+	ppAboves (map ppSemid sorted_vals)]))
+\end{code}
+
+\begin{code}
+ifaceInstances Nothing{-no iface handle-} _ = return ()
+
+ifaceInstances (Just if_hdl) (_, _, _, insts)
+  = return ()
+{-
+    let
+	exported_classes = filter isExported classes
+	exported_tycons  = filter isExported tycons
+	exported_vals	 = filter isExported vals
+
+	sorted_classes   = sortLt ltLexical exported_classes
+	sorted_tycons	 = sortLt ltLexical exported_tycons
+	sorted_vals	 = sortLt ltLexical exported_vals
+    in
+    hPutStr if_hdl "\n__declarations__\n" >>
+    hPutStr if_hdl (ppShow 100 (ppAboves [
+	ppAboves (map ppSemid sorted_classes),
+	ppAboves (map ppSemid sorted_tycons),
+	ppAboves (map ppSemid sorted_vals)]))
+-}
+\end{code}
+
+=== ALL OLD BELOW HERE ==============
 
 %************************************************************************
 %*									*
@@ -67,6 +260,7 @@ to \tr{make}.
 \end{enumerate}
 
 \begin{code}
+{- OLD: to the end
 mkInterface :: FAST_STRING
 	    -> (FAST_STRING -> Bool,  -- is something in export list, explicitly?
 		FAST_STRING -> Bool)  -- is a module among the "dotdot" exported modules?
@@ -449,7 +643,7 @@ do_instance better_id_fn inline_env
 	better_dfun_info = getIdInfo better_dfun
 	better_constms	 = map better_id_fn constm_ids
 
-	class_op_strs = map getClassOpString (getClassOps clas)
+	class_op_strs = map classOpString (classOps clas)
 
 	pragma_begin
 	  = ppCat [ppPStr SLIT("\t{-# GHC_PRAGMA"), pp_modname, ppPStr SLIT("{-dfun-}"),
@@ -564,4 +758,5 @@ getMentionedTyConsAndClassesFromInstInfo (InstInfo clas _ ty _ dfun_theta _ _ _ 
     case [ c | (c, _) <- dfun_theta ]  	    	      of { theta_classes ->
     (ts, (cs `unionBags` listToBag theta_classes) `snocBag` clas)
     }}
+OLD from the beginning -}
 \end{code}

@@ -145,6 +145,7 @@ isBoxedTyCon = not . isPrimTyCon
 -- isDataTyCon returns False for @newtype@.
 -- Not sure about this decision yet.
 isDataTyCon (DataTyCon _ _ _ _ _ _ _ DataType) = True
+isDataTyCon (TupleTyCon _ _ _)		       = True
 isDataTyCon other 			       = False
 
 isSynTyCon (SynTyCon _ _ _ _ _ _) = True
@@ -229,7 +230,7 @@ tyConFamilySize (TupleTyCon _ _ _)		    = 1
 \begin{code}
 tyConDerivings :: TyCon -> [Class]
 tyConDerivings (DataTyCon _ _ _ _ _ _ derivs _) = derivs
-tyConDerivings other				   = []
+tyConDerivings other				= []
 \end{code}
 
 \begin{code}
@@ -317,11 +318,12 @@ instance Ord TyCon where
     _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 
 instance Uniquable TyCon where
-    uniqueOf (DataTyCon u _ _ _ _ _ _ _) = u
-    uniqueOf (PrimTyCon u _ _)		 = u
-    uniqueOf (SynTyCon  u _ _ _ _ _)	 = u
-    uniqueOf tc@(SpecTyCon _ _)		 = panic "uniqueOf:SpecTyCon"
-    uniqueOf tc				 = uniqueOf (getName tc)
+    uniqueOf (DataTyCon  u _ _ _ _ _ _ _) = u
+    uniqueOf (TupleTyCon u _ _)		  = u
+    uniqueOf (PrimTyCon  u _ _)		  = u
+    uniqueOf (SynTyCon   u _ _ _ _ _)	  = u
+    uniqueOf tc@(SpecTyCon _ _)		  = panic "uniqueOf:SpecTyCon"
+    uniqueOf tc				  = uniqueOf (getName tc)
 \end{code}
 
 \begin{code}

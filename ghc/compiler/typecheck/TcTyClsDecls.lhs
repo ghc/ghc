@@ -30,7 +30,7 @@ import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 
 import Bag	
-import Class		( Class(..), getClassSelIds )
+import Class		( Class(..), classSelIds )
 import Digraph		( findSCCs, SCC(..) )
 import Name		( getSrcLoc )
 import PprStyle
@@ -130,7 +130,7 @@ tcGroup inst_mapper decls
 
     tcSetEnv final_env						$
     tcExtendGlobalValEnv (concat data_ids_s)			$
-    tcExtendGlobalValEnv (concat (map getClassSelIds classes))  $
+    tcExtendGlobalValEnv (concat (map classSelIds classes))  $
     tcGetEnv			`thenNF_Tc` \ really_final_env ->
 
     returnTc (really_final_env, foldr ThenBinds EmptyBinds binds)
@@ -232,8 +232,8 @@ get_cons cons
     get_con (RecConDecl _ nbtys _)
       = unionManyUniqSets (map (get_bty.snd) nbtys)
 
-    get_bty (Banged ty)   = get_ty ty
-    get_bty (Unbanged ty) = get_ty ty
+    get_bty (Banged ty)   = get_pty ty
+    get_bty (Unbanged ty) = get_pty ty
 
 get_ty (MonoTyVar tv)
   = emptyUniqSet

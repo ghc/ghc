@@ -154,7 +154,6 @@ typecheck/TcPat.lhs \
 typecheck/TcSimplify.lhs \
 typecheck/TcTyClsDecls.lhs \
 typecheck/TcTyDecls.lhs \
-typecheck/Typecheck.lhs \
 typecheck/Unify.lhs
 
 /*
@@ -319,14 +318,10 @@ utils/Unpretty.lhs \
 utils/Util.lhs
 
 #define MAIN_SRCS_LHS \
-main/MainMonad.lhs \
 main/CmdLineOpts.lhs \
 main/ErrUtils.lhs \
-main/Main.lhs
-
-/* 
 main/MkIface.lhs \
-*/
+main/Main.lhs
 
 #define VBASICSRCS_LHS \
 prelude/PrelMods.lhs \
@@ -587,7 +582,6 @@ compile(deSugar/MatchLit,lhs,)
 compile(main/CmdLineOpts,lhs,if_ghc(-fvia-C))
 compile(main/ErrUtils,lhs,)
 compile(main/Main,lhs,if_ghc(-fvia-C))
-compile(main/MainMonad,lhs,)
 compile(main/MkIface,lhs,)
 
 #if GhcWithNativeCodeGen == YES
@@ -718,7 +712,6 @@ compile(typecheck/TcPragmas,lhs,)
 compile(typecheck/TcSimplify,lhs,)
 compile(typecheck/TcTyClsDecls,lhs,)
 compile(typecheck/TcTyDecls,lhs,)
-compile(typecheck/Typecheck,lhs,)
 compile(typecheck/Unify,lhs,)
 
 compile(types/Class,lhs,)

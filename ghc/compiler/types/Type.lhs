@@ -45,7 +45,7 @@ import PrelLoop  -- for paranoia checking
 --import Util	( pprPanic )
 
 -- friends:
-import Class	( getClassSig, getClassOpLocalType, GenClass{-instances-} )
+import Class	( classSig, classOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind )
 import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, isSynTyCon, tyConArity,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
@@ -147,12 +147,12 @@ expandTy (DictTy clas ty u)
 		--       CCallable, CReturnable (and anything else
 		--       *really weird* that the user writes).
   where
-    (tyvar, super_classes, ops) = getClassSig clas
+    (tyvar, super_classes, ops) = classSig clas
     super_dict_tys = map mk_super_ty super_classes
     class_op_tys   = map mk_op_ty ops
     all_arg_tys    = super_dict_tys ++ class_op_tys
     mk_super_ty sc = DictTy sc ty usageOmega
-    mk_op_ty	op = instantiateTy [(tyvar,ty)] (getClassOpLocalType op)
+    mk_op_ty	op = instantiateTy [(tyvar,ty)] (classOpLocalType op)
 
 expandTy ty = ty
 \end{code}

@@ -27,7 +27,7 @@ import Ubiq{-uitous-}
 
 import CoreSyn
 import CostCentre	( showCostCentre )
-import Id		( idType, getIdInfo, getIdStrictness,
+import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
 			  nullIdEnv, DataCon(..), GenId{-instances-}
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
@@ -303,9 +303,14 @@ ppr_alts pe (AlgAlts alts deflt)
   = ppAboves [ ppAboves (map ppr_alt alts), ppr_default pe deflt ]
   where
     ppr_alt (con, params, expr)
-      = ppHang (ppCat [ppr_con con (pCon pe con),
-		       ppInterleave ppSP (map (pMinBndr pe) params),
-		       ppStr "->"])
+      = ppHang (if isTupleCon con then
+		    ppCat [ppParens (ppInterleave ppComma (map (pMinBndr pe) params)),
+			   ppStr "->"]
+		else
+		    ppCat [ppr_con con (pCon pe con),
+			   ppInterleave ppSP (map (pMinBndr pe) params),
+			   ppStr "->"]
+	       )
 	     4 (ppr_expr pe expr)
       where
     	ppr_con con pp_con

@@ -32,7 +32,7 @@ import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
 import TyVar	( mkTyVar, tyVarKind, unionTyVarSets, emptyTyVarSet )
 import Type	( tyVarsOfTypes )
 import TyCon	( TyCon, Arity(..), tyConKind, synTyConArity )
-import Class	( Class(..), GenClass, getClassSig )
+import Class	( Class(..), GenClass, classSig )
 
 import TcMonad
 

@@ -27,7 +27,7 @@ import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType, zonkId,
 			  TcHsBinds(..), TcIdOcc(..)
 			)
 import Inst		( newDicts, InstOrigin(..), Inst )
-import TcMonoType	( tcMonoTypeKind, tcMonoType, tcContext )
+import TcMonoType	( tcMonoTypeKind, tcMonoType, tcPolyType, tcContext )
 import TcType		( tcInstTyVars, tcInstType, tcInstId )
 import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 			  newLocalId, newLocalIds
@@ -382,16 +382,16 @@ tcConDecl tycon tyvars ctxt (RecConDecl name fields src_loc)
     returnTc data_con
 
 tcField (field_label_names, bty)
-  = tcMonoType (get_ty bty)	`thenTc` \ field_ty ->
+  = tcPolyType (get_pty bty)	`thenTc` \ field_ty ->
     returnTc [(name, field_ty, get_strictness bty) | name <- field_label_names]
 
 tcDataCon tycon tyvars ctxt name btys src_loc
   = tcAddSrcLoc src_loc	$
     let
 	stricts = map get_strictness btys
-	tys	= map get_ty btys
+	tys	= map get_pty btys
     in
-    mapTc tcMonoType tys `thenTc` \ arg_tys ->
+    mapTc tcPolyType tys `thenTc` \ arg_tys ->
     let
       data_con = mkDataCon (getName name)
 			   stricts
@@ -412,11 +412,11 @@ thinContext arg_tys ctxt
       arg_tyvars = tyVarsOfTypes arg_tys
       in_arg_tys (clas,ty) = getTyVar "tcDataCon" ty `elementOfTyVarSet` arg_tyvars
   
-get_strictness (Banged ty)   = MarkedStrict
-get_strictness (Unbanged ty) = NotMarkedStrict
+get_strictness (Banged   _) = MarkedStrict
+get_strictness (Unbanged _) = NotMarkedStrict
 
-get_ty (Banged ty)   = ty
-get_ty (Unbanged ty) = ty
+get_pty (Banged ty)   = ty
+get_pty (Unbanged ty) = ty
 \end{code}
 
 

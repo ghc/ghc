@@ -1285,7 +1285,7 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 primOpInfo (CCallOp _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
-    (result_tycon, tys_applied, _) = getAppDataTyCon result_ty
+    (result_tycon, tys_applied, _) = _trace "getAppDataTyCon.PrimOp" $ getAppDataTyCon result_ty
 \end{code}
 
 %************************************************************************

@@ -35,14 +35,15 @@ import TcType		( TcType(..), TcTyVar(..), tcInstType, tcInstSigTyVars )
 import TcKind		( TcKind )
 
 import Bag		( foldBag )
-import Class		( GenClass, mkClass, mkClassOp, getClassBigSig, 
-			  getClassOps, getClassOpString, getClassOpLocalType )
-import CoreUtils	( escErrorMsg )
+import Class		( GenClass, mkClass, mkClassOp, classBigSig, 
+			  classOps, classOpString, classOpLocalType,
+			  classOpTagByString
+			)
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )
 import IdInfo		( noIdInfo )
 import Name		( isLocallyDefined, moduleNamePair, getLocalName )
-import PrelVals		( pAT_ERROR_ID )
+import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import PprStyle
 import Pretty
 import PprType		( GenType, GenTyVar, GenClassOp )
@@ -87,10 +88,11 @@ tcClassDecl1 rec_inst_mapper
 				`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS OBJECT ITSELF
-    tcGetUnique			`thenNF_Tc` \ uniq ->
+-- BOGUS:
+--  tcGetUnique			`thenNF_Tc` \ uniq ->
     let
 	(ops, op_sel_ids, defm_ids) = unzip3 sig_stuff
-	clas = mkClass uniq (getName class_name) rec_tyvar
+	clas = mkClass (uniqueOf class_name) (getName class_name) rec_tyvar
 		       scs sc_sel_ids ops op_sel_ids defm_ids
 		       rec_class_inst_env
     in
@@ -176,8 +178,9 @@ tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
 	full_theta  = (rec_clas, mkTyVarTy rec_clas_tyvar) : theta
 	global_ty   = mkSigmaTy full_tyvars full_theta tau
 	local_ty    = mkSigmaTy tyvars theta tau
-	class_op    = mkClassOp (getLocalName op_name)
-				(panic "(getTagFromClassOpName op_name)TcClassDecl"{-(getTagFromClassOpName op_name)-})
+	class_op_nm = getLocalName op_name
+	class_op    = mkClassOp class_op_nm
+				(classOpTagByString rec_clas{-yeeps!-} class_op_nm)
 				local_ty
     in
 
@@ -259,7 +262,7 @@ tcClassDecl2 (ClassDecl context class_name
     tcLookupClass class_name		`thenNF_Tc` \ (_, clas) ->
     let
 	(tyvar, scs, sc_sel_ids, ops, op_sel_ids, defm_ids)
-	  = getClassBigSig clas
+	  = classBigSig clas
     in
     tcInstSigTyVars [tyvar]		`thenNF_Tc` \ ([clas_tyvar], _, _) ->
 
@@ -292,10 +295,10 @@ buildSelectors clas clas_tyvar clas_tc_tyvar scs sc_sel_ids ops op_sel_ids
 	-- Make new Ids for the components of the dictionary
     let
 	clas_tyvar_ty = mkTyVarTy clas_tc_tyvar
-	mk_op_ty = tcInstType [(clas_tyvar, clas_tyvar_ty)] . getClassOpLocalType 
+	mk_op_ty = tcInstType [(clas_tyvar, clas_tyvar_ty)] . classOpLocalType 
     in
     mapNF_Tc mk_op_ty ops  				`thenNF_Tc` \ op_tys ->
-    newLocalIds (map getClassOpString ops) op_tys	`thenNF_Tc` \ method_ids ->
+    newLocalIds (map classOpString ops) op_tys	`thenNF_Tc` \ method_ids ->
 
     newDicts ClassDeclOrigin 
 	     [ (super_clas, clas_tyvar_ty)
@@ -473,6 +476,7 @@ buildDefaultMethodBinds clas clas_tyvar
   =	-- Deal with the method declarations themselves
     mapNF_Tc unZonkId default_method_ids	`thenNF_Tc` \ tc_defm_ids ->
     processInstBinds
+	 clas
 	 (makeClassDeclDefaultMethodRhs clas default_method_ids)
 	 []		-- No tyvars in scope for "this inst decl"
 	 emptyLIE 	-- No insts available
@@ -501,21 +505,17 @@ makeClassDeclDefaultMethodRhs clas method_ids tag
 
     returnNF_Tc (mkHsTyLam tyvars (
 		 mkHsDictLam dict_ids (
-		 HsApp (mkHsTyApp (HsVar (RealId pAT_ERROR_ID)) [tau])
+		 HsApp (mkHsTyApp (HsVar (RealId nO_DEFAULT_METHOD_ERROR_ID)) [tau])
 		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
   where
     (clas_mod, clas_name) = moduleNamePair clas
 
     method_id = method_ids  !! (tag-1)
-    class_op = (getClassOps clas) !! (tag-1)
+    class_op = (classOps clas) !! (tag-1)
 
-    error_msg = "%D" -- => No default method for \"
-	     ++ unencoded_part_of_msg
-
-    unencoded_part_of_msg = escErrorMsg (
-	_UNPK_ clas_mod ++ "." ++ _UNPK_ clas_name ++ "."
-	     ++ (ppShow 80 (ppr PprForUser class_op))
-	     ++ "\"" )
+    error_msg = _UNPK_ clas_mod ++ "." ++ _UNPK_ clas_name ++ "."
+		 ++ (ppShow 80 (ppr PprForUser class_op))
+		 ++ "\""
 \end{code}
 
 

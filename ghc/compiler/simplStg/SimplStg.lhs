@@ -31,7 +31,6 @@ import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
 			  growIdEnvList, isNullIdEnv, IdEnv(..),
 			  GenId{-instance Eq/Outputable -}
 			)
-import MainMonad	( writeMn, thenMn_, thenMn, returnMn, MainIO(..) )
 import Maybes		( maybeToBool )
 import Name		( isExported )
 import PprType		( GenType{-instance Outputable-} )
@@ -48,7 +47,7 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	-> PprStyle		-- printing style (for debugging only)
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
-	-> MainIO
+	-> IO
 	    ([StgBinding],	-- output program...
 	     ([CostCentre],	-- local cost-centres that need to be decl'd
 	      [CostCentre]))	-- "extern" cost-centres
@@ -58,16 +57,16 @@ stg2stg stg_todos module_name ppr_style us binds
     case (splitUniqSupply us)	of { (us4now, us4later) ->
 
     (if do_verbose_stg2stg then
-	writeMn stderr "VERBOSE STG-TO-STG:\n" `thenMn_`
-	writeMn stderr (ppShow 1000
+	hPutStr stderr "VERBOSE STG-TO-STG:\n" >>
+	hPutStr stderr (ppShow 1000
 	(ppAbove (ppStr ("*** Core2Stg:"))
 		 (ppAboves (map (ppr ppr_style) (setStgVarInfo False binds)))
 	))
-     else returnMn ()) `thenMn_`
+     else return ()) >>
 
 	-- Do the main business!
     foldl_mn do_stg_pass (binds, us4now, ([],[])) stg_todos
-		`thenMn` \ (processed_binds, _, cost_centres) ->
+		>>= \ (processed_binds, _, cost_centres) ->
 	-- Do essential wind-up: part (a) is SatStgRhs
 
 	-- Not optional, because correct arity information is used by
@@ -102,7 +101,7 @@ stg2stg stg_todos module_name ppr_style us binds
 	    then no_ind_binds
 	    else snd (unlocaliseStgBinds unlocal_tag nullIdEnv no_ind_binds)
     in
-    returnMn (setStgVarInfo do_let_no_escapes binds_to_mangle, cost_centres)
+    return (setStgVarInfo do_let_no_escapes binds_to_mangle, cost_centres)
     }}
     ESCC
   where
@@ -172,23 +171,23 @@ stg2stg stg_todos module_name ppr_style us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if do_verbose_stg2stg then
-	    writeMn stderr (ppShow 1000
+	    hPutStr stderr (ppShow 1000
 	    (ppAbove (ppStr ("*** "++what++":"))
 		     (ppAboves (map (ppr ppr_style) binds2))
 	    ))
-	 else returnMn ()) `thenMn_`
+	 else return ()) >>
 	let
 	    linted_binds = stg_linter what binds2
 	in
-	returnMn (linted_binds, us2, ccs)
+	return (linted_binds, us2, ccs)
 	    -- return: processed binds
 	    -- 	       UniqueSupply for the next guy to use
 	    --	       cost-centres to be declared/registered (specialised)
 	    --	       add to description of what's happened (reverse order)
 
 -- here so it can be inlined...
-foldl_mn f z []     = returnMn z
-foldl_mn f z (x:xs) = f z x	`thenMn` \ zz ->
+foldl_mn f z []     = return z
+foldl_mn f z (x:xs) = f z x	>>= \ zz ->
 		     foldl_mn f zz xs
 \end{code}
 

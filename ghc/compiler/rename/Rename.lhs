@@ -32,7 +32,6 @@ import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
 import RnIfaces		( findHiFiles, rnIfaces, finalIfaceInfo, VersionInfo(..) )
 import RnUtils		( RnEnv(..), extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
-import MainMonad
 
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
 import CmdLineOpts	( opt_HiDirList, opt_SysHiDirList )
@@ -72,11 +71,11 @@ ToDo: Deal with instances (instance version, this module on instance list ???)
 renameModule b_names b_keys us
    	     input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
-  = pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
-			    ppAboves [ ppCat (map ppPStr (keysFM builtin_ids))
-				     , ppCat (map ppPStr (keysFM builtin_tcs))
-				     , ppCat (map ppPStr (keysFM b_keys))
-				     ]}) $
+  = --pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
+    --			    ppAboves [ ppCat (map ppPStr (keysFM builtin_ids))
+    --				     , ppCat (map ppPStr (keysFM builtin_tcs))
+    --				     , ppCat (map ppPStr (keysFM b_keys))
+    --				     ]}) $
 
     findHiFiles opt_HiDirList opt_SysHiDirList	    >>=	         \ hi_files ->
     newVar (emptyFM, hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->

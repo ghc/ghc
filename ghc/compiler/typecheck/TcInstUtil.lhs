@@ -25,7 +25,7 @@ import Inst		( InstanceMapper(..) )
 
 import Bag		( bagToList )
 import Class		( GenClass, GenClassOp, ClassInstEnv(..),
-			  getClassBigSig, getClassOps, getClassOpLocalType )
+			  classBigSig, classOps, classOpLocalType )
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
 import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
 import MatchEnv		( nullMEnv, insertMEnv )
@@ -128,7 +128,7 @@ mkInstanceRelatedIds from_here inst_mod inst_pragmas
 
     returnTc (dfun_id, dfun_theta, const_meth_ids)
   where
-    (class_tyvar, super_classes, _, class_ops, _, _) = getClassBigSig clas
+    (class_tyvar, super_classes, _, class_ops, _, _) = classBigSig clas
     tenv = [(class_tyvar, inst_ty)]
   
     super_class_theta = super_classes `zip` (repeat inst_ty)
@@ -150,7 +150,7 @@ mkInstanceRelatedIds from_here inst_mod inst_pragmas
 				       from_here inst_mod id_info)
 	  )
 	where
-	  op_ty       = getClassOpLocalType op
+	  op_ty       = classOpLocalType op
 	  meth_ty     = mkForAllTys inst_tyvars (instantiateTy tenv op_ty)
 {- LATER
 	  inline_me   = isIn "mkInstanceRelatedIds" op ops_to_inline
@@ -199,7 +199,7 @@ buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
 
 buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _ _ _ _ _) : _)
   = foldlTc addClassInstance
-	    (nullMEnv, [(op, nullSpecEnv) | op <- getClassOps clas])
+	    (nullMEnv, [(op, nullSpecEnv) | op <- classOps clas])
 	    inst_infos
 					`thenTc` \ (class_inst_env, op_inst_envs) ->
     returnTc (clas, (class_inst_env,
@@ -272,7 +272,7 @@ addClassInstance
 		 Failed (tys', rhs') -> panic "TcInstDecls:add_const_meth"
 	         Succeeded spec_env' -> spec_env' )
         where
-	  (local_tyvars, _) = splitForAllTy (getClassOpLocalType op)
+	  (local_tyvars, _) = splitForAllTy (classOpLocalType op)
 	  local_tyvar_tys   = mkTyVarTys local_tyvars
 	  rhs = mkValLam [dict] (mkTyApp (mkTyApp (Var meth_id) 
 						  (mkTyVarTys inst_tyvars)) 

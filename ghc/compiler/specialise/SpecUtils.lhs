@@ -24,7 +24,7 @@ module SpecUtils (
 import Ubiq{-uitous-}
 
 import Bag		( isEmptyBag, bagToList )
-import Class		( getClassOpString, GenClass{-instance NamedThing-} )
+import Class		( classOpString, GenClass{-instance NamedThing-} )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
 			  lookupWithDefaultFM
 			)
@@ -314,7 +314,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   = let
 	Just (cls, clsty, clsop) = const_method_maybe
     	(_, cls_str) = moduleNamePair cls
-	clsop_str    = getClassOpString clsop
+	clsop_str    = classOpString clsop
     in
     ppCat [pp_mod,
 	   ppStr "{-# SPECIALIZE",
@@ -328,7 +328,7 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
   = let
 	Just (cls, clsop, _) = default_method_maybe
     	(_, cls_str) = moduleNamePair cls
-	clsop_str    = getClassOpString clsop
+	clsop_str    = classOpString clsop
     in
     ppCat [pp_mod,
 	   ppStr "{- instance",

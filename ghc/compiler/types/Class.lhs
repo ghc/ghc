@@ -10,22 +10,21 @@ module Class (
 	GenClass(..), Class(..),
 
 	mkClass,
-	getClassKey, getClassOps, getClassSelIds,
-	getSuperDictSelId, getClassOpId, getDefaultMethodId,
-	getClassSig, getClassBigSig, getClassInstEnv,
+	classKey, classOps, classSelIds,
+	classSuperDictSelId, classOpId, classDefaultMethodId,
+	classSig, classBigSig, classInstEnv,
 	isSuperClassOf,
+	classOpTagByString,
 
 	derivableClassKeys, cCallishClassKeys,
 	isNumericClass, isStandardClass, isCcallishClass,
 
 	GenClassOp(..), ClassOp(..),
 	mkClassOp,
-	getClassOpTag, getClassOpString,
-	getClassOpLocalType,
+	classOpTag, classOpString,
+	classOpLocalType,
 
 	ClassInstEnv(..)
-
-	-- and to make the interface self-sufficient...
     ) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -37,10 +36,8 @@ import TyVar		( TyVar(..), GenTyVar )
 import Usage		( GenUsage, Usage(..), UVar(..) )
 
 import Maybes		( assocMaybe, Maybe )
---import Name		( Name )
 import Unique		-- Keys for built-in classes
---import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
-import Pretty		( Pretty(..), PrettyRep )
+import Pretty		( Pretty(..), ppCat{-ToDo:rm-}, ppPStr{-ditto-} )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
 import Util
@@ -142,25 +139,25 @@ mkClass uniq full_name tyvar super_classes superdict_sels
 The rest of these functions are just simple selectors.
 
 \begin{code}
-getClassKey (Class key _ _ _ _ _ _ _ _ _) = key
-getClassOps (Class _ _ _ _ _ ops _ _ _ _) = ops
-getClassSelIds (Class _ _ _ _ _ _ sels _ _ _) = sels
+classKey (Class key _ _ _ _ _ _ _ _ _) = key
+classOps (Class _ _ _ _ _ ops _ _ _ _) = ops
+classSelIds (Class _ _ _ _ _ _ sels _ _ _) = sels
 
-getClassOpId (Class _ _ _ _ _ ops op_ids _ _ _) op
-  = op_ids !! (getClassOpTag op - 1)
-getDefaultMethodId (Class _ _ _ _ _ ops _ defm_ids _ _) op
-  = defm_ids !! (getClassOpTag op - 1)
-getSuperDictSelId (Class _ _ _ scs scsel_ids _ _ _ _ _) super_clas
-  = assoc "getSuperDictSelId" (scs `zip` scsel_ids) super_clas
+classOpId (Class _ _ _ _ _ ops op_ids _ _ _) op
+  = op_ids !! (classOpTag op - 1)
+classDefaultMethodId (Class _ _ _ _ _ ops _ defm_ids _ _) op
+  = defm_ids !! (classOpTag op - 1)
+classSuperDictSelId (Class _ _ _ scs scsel_ids _ _ _ _ _) super_clas
+  = assoc "classSuperDictSelId" (scs `zip` scsel_ids) super_clas
 
-getClassSig :: GenClass t u -> (t, [GenClass t u], [GenClassOp (GenType t u)])
-getClassSig (Class _ _ tyvar super_classes _ ops _ _ _ _)
+classSig :: GenClass t u -> (t, [GenClass t u], [GenClassOp (GenType t u)])
+classSig (Class _ _ tyvar super_classes _ ops _ _ _ _)
   = (tyvar, super_classes, ops)
 
-getClassBigSig (Class _ _ tyvar super_classes sdsels ops sels defms _ _)
+classBigSig (Class _ _ tyvar super_classes sdsels ops sels defms _ _)
   = (tyvar, super_classes, sdsels, ops, sels, defms)
 
-getClassInstEnv (Class _ _ _ _ _ _ _ _ inst_env _) = inst_env
+classInstEnv (Class _ _ _ _ _ _ _ _ inst_env _) = inst_env
 \end{code}
 
 @a `isSuperClassOf` b@ returns @Nothing@ if @a@ is not a superclass of
@@ -189,7 +186,8 @@ because the list of ambiguous dictionaries hasn't been simplified.
 \begin{code}
 isNumericClass, isStandardClass :: Class -> Bool
 
-isNumericClass   (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` numericClassKeys
+isNumericClass   (Class key _ _ _ _ _ _ _ _ _) = --pprTrace "isNum:" (ppCat (map pprUnique (key : numericClassKeys ))) $
+						 key `is_elem` numericClassKeys
 isStandardClass  (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` standardClassKeys
 isCcallishClass	 (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` cCallishClassKeys
 is_elem = isIn "is_X_Class"
@@ -301,14 +299,29 @@ object).  Of course, the type of @op@ recorded in the GVE will be its
 mkClassOp :: FAST_STRING -> Int -> ty -> GenClassOp ty
 mkClassOp name tag ty = ClassOp name tag ty
 
-getClassOpTag :: GenClassOp ty -> Int
-getClassOpTag    (ClassOp _ tag _) = tag
+classOpTag :: GenClassOp ty -> Int
+classOpTag    (ClassOp _ tag _) = tag
 
-getClassOpString :: GenClassOp ty -> FAST_STRING
-getClassOpString (ClassOp str _ _) = str
+classOpString :: GenClassOp ty -> FAST_STRING
+classOpString (ClassOp str _ _) = str
 
-getClassOpLocalType :: GenClassOp ty -> ty {-SigmaType-}
-getClassOpLocalType (ClassOp _ _ ty) = ty
+classOpLocalType :: GenClassOp ty -> ty {-SigmaType-}
+classOpLocalType (ClassOp _ _ ty) = ty
+\end{code}
+
+Rather unsavoury ways of getting ClassOp tags:
+\begin{code}
+classOpTagByString :: Class -> FAST_STRING -> Int
+
+classOpTagByString clas op
+  = go (map classOpString (classOps clas)) 1
+  where
+    go (n:ns) tag = if n == op
+		    then tag
+		    else go ns (tag+1)
+#ifdef DEBUG
+    go []     tag = pprPanic "classOpTagByString:" (ppCat (ppPStr op : map (ppPStr . classOpString) (classOps clas)))
+#endif
 \end{code}
 
 %************************************************************************

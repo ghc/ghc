@@ -12,7 +12,6 @@ module CoreUtils (
 	substCoreExpr, substCoreBindings
 
 	, mkCoreIfThenElse
-	, escErrorMsg -- ToDo: kill
 	, argToExpr
 	, unTagBinders, unTagBindersAlts
 	, manifestlyWHNF, manifestlyBottom
@@ -130,7 +129,8 @@ default_ty (BindDefault _ rhs) = coreExprType rhs
 \end{code}
 
 \begin{code}
-applyTypeToArgs = panic "applyTypeToArgs"
+applyTypeToArgs op_ty args
+  = foldl applyTy op_ty [ ty | TyArg ty <- args ]
 \end{code}
 
 %************************************************************************
@@ -149,23 +149,6 @@ mkCoreIfThenElse guard then_expr else_expr
       (AlgAlts [ (trueDataCon,  [], then_expr),
 		 (falseDataCon, [], else_expr) ]
        NoDefault )
-\end{code}
-
-\begin{code}
-{- OLD:
-mkErrorApp :: Id -> Type -> Id -> String -> CoreExpr
-
-mkErrorApp err_fun ty str_var error_msg
-  = Let (NonRec str_var (Lit (NoRepStr (_PK_ error_msg)))) (
-    mkApp (Var err_fun) [] [ty] [VarArg str_var])
--}
-
-escErrorMsg = panic "CoreUtils.escErrorMsg: To Die"
-{- OLD:
-escErrorMsg [] = []
-escErrorMsg ('%':xs) = '%' : '%' : escErrorMsg xs
-escErrorMsg (x:xs)   = x : escErrorMsg xs
--}
 \end{code}
 
 For making @Apps@ and @Lets@, we must take appropriate evasive

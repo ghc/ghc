@@ -31,11 +31,13 @@ import Unify		( unifyTauTy )
 import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
 			  snocBag, consBag, unionBags, isEmptyBag )
 import Class		( isNumericClass, isStandardClass, isCcallishClass,
-			  isSuperClassOf, getSuperDictSelId )
+			  isSuperClassOf, classSuperDictSelId
+			)
 import Id		( GenId )
 import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool, Maybe(..) )
 import Outputable	( Outputable(..){-instance * []-} )
-import PprType		( GenType, GenTyVar )
+import PprStyle--ToDo:rm
+import PprType		( GenType, GenTyVar, GenClass{-instance Outputable;ToDo:rm-} )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )
 import Util
@@ -271,7 +273,8 @@ tcSimplifyCheckThetas :: InstOrigin s		-- context; for error msg
 		      -> [(Class, TauType)]	-- Simplify this
 		      -> TcM s ()
 
-tcSimplifyCheckThetas = panic "tcSimplifyCheckThetas"
+tcSimplifyCheckThetas x y = _trace "tcSimplifyCheckThetas: does nothing" $
+		        returnTc ()
 
 {- 	LATER
 tcSimplifyCheckThetas origin theta
@@ -489,7 +492,7 @@ trySC givens wanted@(Dict _ wanted_class wanted_ty wanted_orig loc)
     let
 	mk_bind (dict,clas) dict_sub@(Dict _ dict_sub_class ty _ _)
 	  = ((dict_sub, dict_sub_class),
-	     (instToId dict, DictApp (TyApp (HsVar (RealId (getSuperDictSelId dict_sub_class 
+	     (instToId dict, DictApp (TyApp (HsVar (RealId (classSuperDictSelId dict_sub_class 
 									      clas)))
 					    [ty])
 				     [instToId dict_sub]))
@@ -698,15 +701,9 @@ all are standard; or all are CcallIsh.
 isStandardNumericDefaultable :: [Class] -> Bool
 
 isStandardNumericDefaultable classes
-  | any isNumericClass classes && all isStandardClass classes
-  = True
-
-isStandardNumericDefaultable classes
-  | all isCcallishClass classes
-  = True
-
-isStandardNumericDefaultable classes
-  = False
+  = --pprTrace "isStdNumeric:\n" (ppAboves [ppCat (map (ppr PprDebug) classes), ppCat (map (ppr PprDebug . isNumericClass) classes), ppCat (map (ppr PprDebug . isStandardClass) classes), ppCat (map (ppr PprDebug . isCcallishClass) classes)]) $
+     (any isNumericClass classes && all isStandardClass classes)
+  || (all isCcallishClass classes)
 \end{code}
 
 

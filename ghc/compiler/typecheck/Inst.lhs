@@ -42,7 +42,7 @@ import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
 		  tcInstType, tcInstTcType, zonkTcType )
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
-import Class	( Class(..), GenClass, ClassInstEnv(..), getClassInstEnv )
+import Class	( Class(..), GenClass, ClassInstEnv(..), classInstEnv )
 import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
 import Name	( mkLocalName, getLocalName, Name )
@@ -154,73 +154,72 @@ newDicts :: InstOrigin s
 	 -> [(Class, TcType s)]
 	 -> NF_TcM s (LIE s, [TcIdOcc s])
 newDicts orig theta
- = tcGetSrcLoc				`thenNF_Tc` \ loc ->
-   tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
-   let
+  = tcGetSrcLoc				`thenNF_Tc` \ loc ->
+    tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
+    let
 	mk_dict u (clas, ty) = Dict u clas ty orig loc
 	dicts = zipWithEqual mk_dict new_uniqs theta
-   in
-   returnNF_Tc (listToBag dicts, map instToId dicts)
+    in
+    returnNF_Tc (listToBag dicts, map instToId dicts)
 
 newDictsAtLoc orig loc theta	-- Local function, similar to newDicts, 
 				-- but with slightly different interface
- = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
-   let
+  = tcGetUniques (length theta)		`thenNF_Tc` \ new_uniqs ->
+    let
 	mk_dict u (clas, ty) = Dict u clas ty orig loc
 	dicts = zipWithEqual mk_dict new_uniqs theta
-   in
-   returnNF_Tc (dicts, map instToId dicts)
+    in
+    returnNF_Tc (dicts, map instToId dicts)
 
 newMethod :: InstOrigin s
 	  -> TcIdOcc s
 	  -> [TcType s]
 	  -> NF_TcM s (LIE s, TcIdOcc s)
 newMethod orig id tys
- =   	-- Get the Id type and instantiate it at the specified types
-   (case id of
-	RealId id -> let (tyvars, rho) = splitForAllTy (idType id)
-		     in tcInstType (tyvars `zipEqual` tys) rho
-	TcId   id -> let (tyvars, rho) = splitForAllTy (idType id)
-		     in tcInstTcType (tyvars `zipEqual` tys) rho
-   )						`thenNF_Tc` \ rho_ty ->
-
-	-- Our friend does the rest
-   newMethodWithGivenTy orig id tys rho_ty
+  =   	-- Get the Id type and instantiate it at the specified types
+    (case id of
+       RealId id -> let (tyvars, rho) = splitForAllTy (idType id)
+		    in tcInstType (tyvars `zipEqual` tys) rho
+       TcId   id -> let (tyvars, rho) = splitForAllTy (idType id)
+		    in tcInstTcType (tyvars `zipEqual` tys) rho
+    )						`thenNF_Tc` \ rho_ty ->
+	 -- Our friend does the rest
+    newMethodWithGivenTy orig id tys rho_ty
 
 
 newMethodWithGivenTy orig id tys rho_ty
- = tcGetSrcLoc			`thenNF_Tc` \ loc ->
-   tcGetUnique 			`thenNF_Tc` \ new_uniq ->
-   let
+  = tcGetSrcLoc		`thenNF_Tc` \ loc ->
+    tcGetUnique		`thenNF_Tc` \ new_uniq ->
+    let
 	meth_inst = Method new_uniq id tys rho_ty orig loc
-   in
-   returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
+    in
+    returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
 
 newMethodAtLoc :: InstOrigin s -> SrcLoc -> Id -> [TcType s] -> NF_TcM s (Inst s, TcIdOcc s)
 newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but with 
 					-- slightly different interface
- =   	-- Get the Id type and instantiate it at the specified types
-   let
-	(tyvars,rho) = splitForAllTy (idType real_id)
-   in
-   tcInstType (tyvars `zipEqual` tys) rho	`thenNF_Tc` \ rho_ty ->
-   tcGetUnique 					`thenNF_Tc` \ new_uniq ->
-   let
+  =   	-- Get the Id type and instantiate it at the specified types
+    let
+	 (tyvars,rho) = splitForAllTy (idType real_id)
+    in
+    tcInstType (tyvars `zipEqual` tys) rho	`thenNF_Tc` \ rho_ty ->
+    tcGetUnique					`thenNF_Tc` \ new_uniq ->
+    let
 	meth_inst = Method new_uniq (RealId real_id) tys rho_ty orig loc
-   in
-   returnNF_Tc (meth_inst, instToId meth_inst)
+    in
+    returnNF_Tc (meth_inst, instToId meth_inst)
 
 newOverloadedLit :: InstOrigin s
 		 -> OverloadedLit
 		 -> TcType s
 		 -> NF_TcM s (LIE s, TcIdOcc s)
 newOverloadedLit orig lit ty
- = tcGetSrcLoc			`thenNF_Tc` \ loc ->
-   tcGetUnique 			`thenNF_Tc` \ new_uniq ->
-   let
+  = tcGetSrcLoc			`thenNF_Tc` \ loc ->
+    tcGetUnique			`thenNF_Tc` \ new_uniq ->
+    let
 	lit_inst = LitInst new_uniq lit ty orig loc
-   in
-   returnNF_Tc (unitLIE lit_inst, instToId lit_inst)
+    in
+    returnNF_Tc (unitLIE lit_inst, instToId lit_inst)
 \end{code}
 
 
@@ -473,7 +472,7 @@ ambiguous dictionaries.
 lookupClassInstAtSimpleType :: Class -> Type -> Maybe Id
 
 lookupClassInstAtSimpleType clas ty
-  = case (lookupMEnv matchTy (getClassInstEnv clas) ty) of
+  = case (lookupMEnv matchTy (classInstEnv clas) ty) of
       Nothing	    -> Nothing
       Just (dfun,_) -> ASSERT( null tyvars && null theta )
 		       Just dfun
@@ -499,7 +498,7 @@ mkInstSpecEnv :: Class			-- class
 mkInstSpecEnv clas inst_ty inst_tvs inst_theta
   = mkSpecEnv (catMaybes (map maybe_spec_info matches))
   where
-    matches = matchMEnv matchTy (getClassInstEnv clas) inst_ty
+    matches = matchMEnv matchTy (classInstEnv clas) inst_ty
 
     maybe_spec_info (_, match_info, MkInstTemplate dfun _ [])
       = Just (SpecInfo (map (assocMaybe match_info) inst_tvs) (length inst_theta) dfun)
@@ -601,7 +600,7 @@ get_inst_env clas (DerivingOrigin inst_mapper _ _)
   = fst (inst_mapper clas)
 get_inst_env clas (InstanceSpecOrigin inst_mapper _ _)
   = fst (inst_mapper clas)
-get_inst_env clas other_orig = getClassInstEnv clas
+get_inst_env clas other_orig = classInstEnv clas
 
 
 pprOrigin :: PprStyle -> InstOrigin s -> Pretty

@@ -20,9 +20,8 @@ import RdrHsSyn
 import PrefixToHs
 
 import CmdLineOpts	( opt_CompilingPrelude )
-import ErrUtils		( addErrLoc )
+import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
-import MainMonad	( writeMn, exitMn, MainIO(..) )
 import Name		( RdrName(..), isRdrLexCon )
 import PprStyle		( PprStyle(..) )
 import PrelMods		( fromPrelude )
@@ -84,8 +83,8 @@ cvFlag 1 = True
 %************************************************************************
 
 \begin{code}
-rdModule :: MainIO (Module,	   	-- this module's name
-	            RdrNameHsModule)	-- the main goods
+rdModule :: IO (Module,		    -- this module's name
+	        RdrNameHsModule)    -- the main goods
 
 rdModule
   = _ccall_ hspmain `thenPrimIO` \ pt -> -- call the Yacc parser!
@@ -398,8 +397,8 @@ wlkPat pat
 			             (\sty -> ppInterleave ppSP (map (ppr sty) (lpat:lpats)))
 		     msg = ppShow 100 (err PprForUser)
 		 in
-	         ioToUgnM  (writeMn stderr msg) `thenUgn` \ _ ->
-		 ioToUgnM  (exitMn 1)		`thenUgn` \ _ ->
+	         ioToUgnM  (hPutStr stderr msg) `thenUgn` \ _ ->
+		 ioToUgnM  (ghcExit 1)		`thenUgn` \ _ ->
 		 returnUgn (error "ReadPrefix")
 
 	)			`thenUgn` \ (n, arg_pats) ->
@@ -790,9 +789,10 @@ rdBangType pt = rdU_ttype pt `thenUgn` \ ty -> wlkBangType ty
 
 wlkBangType :: U_ttype -> UgnM (BangType RdrName)
 
-wlkBangType (U_tbang bty) = wlkMonoType bty `thenUgn` \ ty -> returnUgn (Banged   ty)
-wlkBangType uty		  = wlkMonoType uty `thenUgn` \ ty -> returnUgn (Unbanged ty)
-
+wlkBangType (U_tbang bty) = wlkMonoType bty `thenUgn` \ ty ->
+			    returnUgn (Banged   (HsPreForAllTy [] ty))
+wlkBangType uty		  = wlkMonoType uty `thenUgn` \ ty ->
+			    returnUgn (Unbanged (HsPreForAllTy [] ty))
 \end{code}
 
 %************************************************************************

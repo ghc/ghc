@@ -413,7 +413,7 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
     let rbinds' = panic "dsExpr:RecordUpdOut:rbinds'" in
     let
 	record_ty		= coreExprType record_expr'
-	(tycon, inst_tys, cons) = getAppDataTyCon record_ty
+	(tycon, inst_tys, cons) = _trace "getAppDataTyCon.DsExpr" $ getAppDataTyCon record_ty
 	cons_to_upd  	 	= filter has_all_fields cons
 
 	-- initial_args are passed to every constructor

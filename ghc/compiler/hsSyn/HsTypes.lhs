@@ -15,6 +15,7 @@ module HsTypes (
 	Context(..), ClassAssertion(..)
 
 #ifdef COMPILING_GHC
+	, pprParendPolyType
 	, pprParendMonoType, pprContext
 	, extractMonoTyNames, extractCtxtTyNames
 	, cmpPolyType, cmpMonoType, cmpContext
@@ -102,6 +103,8 @@ pprContext sty context
 instance (Outputable name) => Outputable (PolyType name) where
     ppr sty (HsPreForAllTy ctxt ty)
       = print_it sty ppNil ctxt ty
+    ppr sty (HsForAllTy [] ctxt ty)
+      = print_it sty ppNil ctxt ty
     ppr sty (HsForAllTy tvs ctxt ty)
       = print_it sty
 	    (ppBesides [ppStr "_forall_ ", interppSP sty tvs, ppStr " => "])
@@ -110,6 +113,9 @@ instance (Outputable name) => Outputable (PolyType name) where
 print_it sty pp_forall ctxt ty
   = ppCat [ifnotPprForUser sty pp_forall, -- print foralls unless PprForUser
 	   pprContext sty ctxt, ppr sty ty]
+
+pprParendPolyType :: Outputable name => PprStyle -> PolyType name -> Pretty
+pprParendPolyType sty ty = ppr sty ty -- ToDo: more later
 
 instance (Outputable name) => Outputable (MonoType name) where
     ppr = pprMonoType

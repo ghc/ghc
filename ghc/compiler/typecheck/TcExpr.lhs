@@ -41,7 +41,7 @@ import TcType		( TcType(..), TcMaybe(..),
 			  newTyVarTy, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
-import Class		( Class(..), getClassSig )
+import Class		( Class(..), classSig )
 import FieldLabel	( fieldLabelName )
 import Id		( Id(..), GenId, idType, dataConFieldLabels, dataConSig )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
@@ -394,7 +394,7 @@ tcExpr (RecordUpd record_expr rbinds)
 	-- Check that the field names are plausible
     zonkTcType record_ty		`thenNF_Tc` \ record_ty' ->
     let
-	(tycon, inst_tys, data_cons) = getAppDataTyCon record_ty'
+	(tycon, inst_tys, data_cons) = _trace "getAppDataTyCon.TcExpr" $ getAppDataTyCon record_ty'
 	-- The record binds are non-empty (syntax); so at least one field
 	-- label will have been unified with record_ty by tcRecordBinds;
 	-- field labels must be of data type; hencd the getAppDataTyCon must succeed.

@@ -61,11 +61,11 @@ completeVar env var args
 	-> ASSERT( null args )
 	   returnSmpl (Lit lit)
 
-      ConForm con args
+      ConForm con con_args
 		-- Always inline constructors.
 		-- See comments before completeLetBinding
 	-> ASSERT( null args )
-	   returnSmpl (Con con args)
+	   returnSmpl (Con con con_args)
 
       GenForm txt_occ form_summary template guidance
 	-> considerUnfolding env var args

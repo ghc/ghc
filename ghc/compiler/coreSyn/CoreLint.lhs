@@ -277,10 +277,15 @@ lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
       Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
 
       Just (tyvar,body) ->
-	if (tyVarKind tyvar `isSubKindOf` typeKind arg_ty) then
+	let
+	    tyvar_kind = tyVarKind tyvar
+	    argty_kind = typeKind arg_ty
+	in
+	if (tyvar_kind `isSubKindOf` argty_kind
+	 || argty_kind `isSubKindOf` tyvar_kind) then
 	    returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
 	else
-	    pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug (tyVarKind tyvar), ppr PprDebug (typeKind arg_ty)]) $
+	    pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug tyvar_kind, ppr PprDebug argty_kind]) $
 	    addErrL (mkTyAppMsg SLIT("Kinds not right in") ty arg_ty e) `seqL` returnL Nothing
 	
 lintCoreArg _ e ty (UsageArg u)

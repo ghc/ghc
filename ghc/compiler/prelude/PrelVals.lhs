@@ -83,6 +83,10 @@ iRREFUT_PAT_ERROR_ID
   = generic_ERROR_ID irrefutPatErrorIdKey SLIT("irrefutPatError#")
 nON_EXHAUSTIVE_GUARDS_ERROR_ID
   = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey SLIT("nonExhaustiveGuardsError#")
+nO_DEFAULT_METHOD_ERROR_ID
+  = generic_ERROR_ID noDefaultMethodErrorIdKey SLIT("noDefaultMethodError#")
+nO_EXPLICIT_METHOD_ERROR_ID
+  = generic_ERROR_ID nonExplicitMethodErrorIdKey SLIT("noExplicitMethodError#")
 
 aBSENT_ERROR_ID
   = pc_bottoming_Id absentErrorIdKey pRELUDE_BUILTIN SLIT("absent#")

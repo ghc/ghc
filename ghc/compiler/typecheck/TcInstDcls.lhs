@@ -57,14 +57,15 @@ import CmdLineOpts	( opt_GlasgowExts, opt_CompilingPrelude,
 			  opt_OmitDefaultInstanceMethods,
 			  opt_SpecialiseOverloaded )
 import Class		( GenClass, GenClassOp, 
-			  isCcallishClass, getClassBigSig,
-			  getClassOps, getClassOpLocalType )
-import CoreUtils	( escErrorMsg )
+			  isCcallishClass, classBigSig,
+			  classOps, classOpLocalType,
+			  classOpTagByString
+			  )
 import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust )
 import Name		( getLocalName, origName, nameOf )
-import PrelInfo		( pAT_ERROR_ID )
+import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID )
 import PrelMods		( pRELUDE )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			  pprParendGenType
@@ -358,7 +359,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     let 
         (class_tyvar,
 	 super_classes, sc_sel_ids,
-	 class_ops, op_sel_ids, defm_ids) = getClassBigSig clas
+	 class_ops, op_sel_ids, defm_ids) = classBigSig clas
     in
     tcInstType tenv inst_ty		`thenNF_Tc` \ inst_ty' ->
     tcInstTheta tenv dfun_theta		`thenNF_Tc` \ dfun_theta' ->
@@ -388,7 +389,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	    else
 		makeInstanceDeclDefaultMethodExpr origin meth_ids defm_ids inst_ty' this_dict_id 
     in
-    processInstBinds mk_method_expr inst_tyvars' avail_insts meth_ids monobinds
+    processInstBinds clas mk_method_expr inst_tyvars' avail_insts meth_ids monobinds
 					 	`thenTc` \ (insts_needed, method_mbinds) ->
     let
 	-- Create the dict and method binds
@@ -546,23 +547,20 @@ makeInstanceDeclNoDefaultExpr origin meth_ids defm_ids inst_ty clas inst_mod tag
 					`thenNF_Tc_`
     returnNF_Tc (mkHsTyLam op_tyvars (
 		 mkHsDictLam op_dicts (
-		 HsApp (mkHsTyApp (HsVar (RealId pAT_ERROR_ID)) [op_tau])
+		 HsApp (mkHsTyApp (HsVar (RealId nO_EXPLICIT_METHOD_ERROR_ID)) [op_tau])
 		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
   where
     idx	    = tag - 1
     meth_id = meth_ids  !! idx
-    clas_op = (getClassOps clas) !! idx
+    clas_op = (classOps clas) !! idx
     defm_id = defm_ids  !! idx
     (op_tyvars,op_theta,op_tau) = splitSigmaTy (tcIdType meth_id)
 
     Just (_, _, err_defm_ok) = isDefaultMethodId_maybe defm_id
 
-    error_msg = "%E" 	-- => No explicit method for \"
-	     	++ escErrorMsg error_str
-
     mod_str = case inst_mod of { Nothing -> pRELUDE; Just m -> m }
 
-    error_str = _UNPK_ mod_str ++ "." ++ _UNPK_ clas_name ++ "."
+    error_msg = _UNPK_ mod_str ++ "." ++ _UNPK_ clas_name ++ "."
 	     	++ (ppShow 80 (ppr PprForUser inst_ty)) ++ "."
 	     	++ (ppShow 80 (ppr PprForUser clas_op))	++ "\""
 
@@ -588,7 +586,8 @@ do differs between instance and class decls.
 
 \begin{code}
 processInstBinds
-	:: (Int -> NF_TcM s (TcExpr s))    -- Function to make default method
+	:: Class
+	-> (Int -> NF_TcM s (TcExpr s))    -- Function to make default method
 	-> [TcTyVar s]			   -- Tyvars for this instance decl
 	-> LIE s			   -- available Insts
 	-> [TcIdOcc s]			   -- Local method ids in tag order
@@ -597,10 +596,10 @@ processInstBinds
 	-> TcM s (LIE s,		   -- These are required
 		  TcMonoBinds s)
 
-processInstBinds mk_default_method_rhs inst_tyvars avail_insts method_ids monobinds
+processInstBinds clas mk_default_method_rhs inst_tyvars avail_insts method_ids monobinds
   =
 	 -- Process the explicitly-given method bindings
-    processInstBinds1 inst_tyvars avail_insts method_ids monobinds
+    processInstBinds1 clas inst_tyvars avail_insts method_ids monobinds
 	 		`thenTc` \ (tags, insts_needed_in_methods, method_binds) ->
 
 	 -- Find the methods not handled, and make default method bindings for them.
@@ -621,7 +620,8 @@ processInstBinds mk_default_method_rhs inst_tyvars avail_insts method_ids monobi
 
 \begin{code}
 processInstBinds1
-	:: [TcTyVar s]		-- Tyvars for this instance decl
+	:: Class
+	-> [TcTyVar s]		-- Tyvars for this instance decl
 	-> LIE s		-- available Insts
 	-> [TcIdOcc s]		-- Local method ids in tag order (instance tyvars are free),
 	-> RenamedMonoBinds
@@ -629,13 +629,13 @@ processInstBinds1
 		  LIE s,	-- These are required
 		  TcMonoBinds s)
 
-processInstBinds1 inst_tyvars avail_insts method_ids EmptyMonoBinds
+processInstBinds1 clas inst_tyvars avail_insts method_ids EmptyMonoBinds
   = returnTc ([], emptyLIE, EmptyMonoBinds)
 
-processInstBinds1 inst_tyvars avail_insts method_ids (AndMonoBinds mb1 mb2)
-  = processInstBinds1 inst_tyvars avail_insts method_ids mb1
+processInstBinds1 clas inst_tyvars avail_insts method_ids (AndMonoBinds mb1 mb2)
+  = processInstBinds1 clas inst_tyvars avail_insts method_ids mb1
 				 `thenTc`	\ (op_tags1,dicts1,method_binds1) ->
-    processInstBinds1 inst_tyvars avail_insts method_ids mb2
+    processInstBinds1 clas inst_tyvars avail_insts method_ids mb2
 				 `thenTc`	\ (op_tags2,dicts2,method_binds2) ->
     returnTc (op_tags1 ++ op_tags2,
 	      dicts1 `unionBags` dicts2,
@@ -643,7 +643,7 @@ processInstBinds1 inst_tyvars avail_insts method_ids (AndMonoBinds mb1 mb2)
 \end{code}
 
 \begin{code}
-processInstBinds1 inst_tyvars avail_insts method_ids mbind
+processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
   =
     -- Find what class op is being defined here.  The complication is
     -- that we could have a PatMonoBind or a FunMonoBind.  If the
@@ -662,7 +662,8 @@ processInstBinds1 inst_tyvars avail_insts method_ids mbind
     tcAddSrcLoc locn			 $
 
     -- Make a method id for the method
-    let tag       = panic "processInstBinds1:getTagFromClassOpName"{-getTagFromClassOpName op-}
+    let
+	tag       = classOpTagByString clas occ
 	method_id = method_ids !! (tag-1)
 
 	method_ty = tcIdType method_id

@@ -40,10 +40,10 @@ import DsMonad
 
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PprStyle		( PprStyle(..) )
-import PprType		( pprType{-ToDo:rm-} )
 import PrelInfo		( stringTy, iRREFUT_PAT_ERROR_ID )
 import Pretty		( ppShow )
 import Id		( idType, dataConArgTys, mkTupleCon,
+			  pprId{-ToDo:rm-},
 			  DataCon(..), DictVar(..), Id(..), GenId )
 import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon )
@@ -52,6 +52,12 @@ import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
 			)
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
+import PprCore{-ToDo:rm-}
+import PprType--ToDo:rm
+import Pretty--ToDo:rm
+import TyVar--ToDo:rm
+import Unique--ToDo:rm
+import Usage--ToDo:rm
 
 splitDictType = panic "DsUtils.splitDictType"
 \end{code}
@@ -397,7 +403,9 @@ The general case:
 
 \begin{code}
 mkTupleBind tyvars dicts local_global_prs tuple_expr
-  = newSysLocalDs tuple_var_ty	`thenDs` \ tuple_var ->
+  = pprTrace "mkTupleBind:\n" (ppAboves [ppCat (map (pprId PprShowAll) locals), ppCat (map (pprId PprShowAll) globals), {-ppr PprDebug local_tuple, pprType PprDebug res_ty,-} ppr PprDebug tuple_expr]) $
+
+    newSysLocalDs tuple_var_ty	`thenDs` \ tuple_var ->
 
     zipWithDs (mk_selector (Var tuple_var))
 	      local_global_prs

@@ -11,7 +11,8 @@ module ErrUtils (
 	addErrLoc,
 	addShortErrLocLine,
 	dontAddErrLoc,
-	pprBagOfErrors
+	pprBagOfErrors,
+	ghcExit
     ) where
 
 import Ubiq{-uitous-}
@@ -48,4 +49,13 @@ pprBagOfErrors :: PprStyle -> Bag Error -> Pretty
 pprBagOfErrors sty bag_of_errors
   = let  pretties = map ( \ e -> e sty ) (bagToList bag_of_errors)  in
     ppAboves (map (\ p -> ppAbove ppSP p) pretties)
+\end{code}
+
+\begin{code}
+ghcExit :: Int -> IO ()
+
+ghcExit val
+  = if val /= 0
+    then error "Compilation had errors\n"
+    else return ()
 \end{code}

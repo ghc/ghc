@@ -354,12 +354,13 @@ rnConDecls tv_env con_decls
 	returnRn (new_names, new_ty) 
 
     rn_mono_ty = rnMonoType tv_env
+    rn_poly_ty = rnPolyType tv_env
 
     rn_bang_ty (Banged ty)
-      = rn_mono_ty ty `thenRn` \ new_ty ->
+      = rn_poly_ty ty `thenRn` \ new_ty ->
 	returnRn (Banged new_ty)
     rn_bang_ty (Unbanged ty)
-      = rn_mono_ty ty `thenRn` \ new_ty ->
+      = rn_poly_ty ty `thenRn` \ new_ty ->
 	returnRn (Unbanged new_ty)
 \end{code}
 

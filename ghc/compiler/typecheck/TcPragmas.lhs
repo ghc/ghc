@@ -557,21 +557,21 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 	    clas       = lookupCE rec_ce c
 	    super_clas = lookupCE rec_ce sc
 	in
-	returnB_Tc (getSuperDictSelId clas super_clas)
+	returnB_Tc (classSuperDictSelId clas super_clas)
 
     tc_uf_Id lve (ClassOpUfId c op_name)
       = let
 	    clas = lookupCE rec_ce c
 	    op	 = lookup_class_op clas op_name
 	in
-	returnB_Tc (getClassOpId clas op)
+	returnB_Tc (classOpId clas op)
 
     tc_uf_Id lve (DefaultMethodUfId c op_name)
       = let
 	    clas = lookupCE rec_ce c
 	    op	 = lookup_class_op clas op_name
 	in
-	returnB_Tc (getDefaultMethodId clas op)
+	returnB_Tc (classDefaultMethodId clas op)
 
     tc_uf_Id lve uf_id@(DictFunUfId c ty)
       = tc_uf_type nullTVE ty	`thenB_Tc` \ new_ty ->
@@ -624,7 +624,7 @@ tc_unfolding e (ImpUnfolding guidance uf_core)
 
     ---------------
     lookup_class_op clas (ClassOpName _ _ _ tag)
-      = getClassOps clas !! (tag - 1)
+      = classOps clas !! (tag - 1)
 
     ---------------------------------------------------------------------
     tc_uf_type :: TVE -> UnfoldingType Name -> Baby_TcM Type

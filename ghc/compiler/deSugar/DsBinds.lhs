@@ -37,7 +37,11 @@ import Type		( mkTyVarTys, mkForAllTys, splitSigmaTy,
 			  tyVarsOfType, tyVarsOfTypes
 			)
 import TyVar		( tyVarSetToList, GenTyVar{-instance Eq-} )
-import Util		( isIn, panic )
+import Util		( isIn, panic, pprTrace{-ToDo:rm-} )
+import PprCore--ToDo:rm
+import PprType--ToDo:rm
+import Usage--ToDo:rm
+import Unique--ToDo:rm
 
 isDictTy = panic "DsBinds.isDictTy"
 \end{code}
@@ -540,6 +544,8 @@ dsMonoBinds is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
 	-- we can just use the rhs directly
     else
 -}
+    pprTrace "dsMonoBinds:PatMonoBind:" (ppr PprDebug body_expr) $
+
     mkSelectorBinds tyvars pat
 	[(binder, binder_subst binder) | binder <- pat_binders]
 	body_expr

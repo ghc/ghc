@@ -7,10 +7,16 @@
 #include "HsVersions.h"
 
 module TcModule (
-	tcModule
+	typecheckModule,
+	TcResults(..),
+	TcResultBinds(..),
+	TcIfaceInfo(..),
+	TcLocalTyConsAndClasses(..),
+	TcSpecialiseRequests(..),
+	TcDDumpDeriv(..)
     ) where
 
-import Ubiq
+import Ubiq{-uitous-}
 
 import HsSyn		( HsModule(..), HsBinds(..), Bind, HsExpr,
 			  TyDecl, SpecDataSig, ClassDecl, InstDecl,
@@ -37,6 +43,7 @@ import TcTyClsDecls	( tcTyAndClassDecls1 )
 
 import Bag		( listToBag )
 import Class		( GenClass )
+import ErrUtils		( Warning(..), Error(..) )
 import Id		( GenId, isDataCon, isMethodSelId, idType )
 import Maybes		( catMaybes )
 import Name		( isExported, isLocallyDefined )
@@ -51,35 +58,64 @@ import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 import Unique		( iOTyConKey, mainIdKey, mainPrimIOIdKey )
 import Util
 
-
 import FiniteMap	( emptyFM )
 tycon_specs = emptyFM
-
-
 \end{code}
 
+Outside-world interface:
 \begin{code}
-tcModule :: RnEnv			-- for renaming derivings
-	 -> RenamedHsModule		-- input
-	 -> TcM s ((TypecheckedHsBinds,	-- record selector binds
-		    TypecheckedHsBinds,	-- binds from class decls; does NOT
-					-- include default-methods bindings
-		    TypecheckedHsBinds,	-- binds from instance decls; INCLUDES
-					-- class default-methods binds
-		    TypecheckedHsBinds,	-- binds from value decls
+-- Convenient type synonyms first:
+type TcResults
+  = (TcResultBinds,
+     TcIfaceInfo,
+     TcLocalTyConsAndClasses,
+     TcSpecialiseRequests,
+     TcDDumpDeriv)
 
-		    [(Id, TypecheckedHsExpr)]), -- constant instance binds
+type TcResultBinds
+  = (TypecheckedHsBinds,	-- record selector binds
+     TypecheckedHsBinds,	-- binds from class decls; does NOT
+				-- include default-methods bindings
+     TypecheckedHsBinds,	-- binds from instance decls; INCLUDES
+				-- class default-methods binds
+     TypecheckedHsBinds,	-- binds from value decls
 
-		   ([RenamedFixityDecl], [Id], [TyCon], [Class], Bag InstInfo),
-					-- things for the interface generator
+     [(Id, TypecheckedHsExpr)]) -- constant instance binds
 
-		   ([TyCon], [Class]),
-					-- environments of info from this module only
+type TcIfaceInfo -- things for the interface generator
+  = ([Id], [TyCon], [Class], Bag InstInfo)
 
-		   FiniteMap TyCon [(Bool, [Maybe Type])],
-					-- source tycon specialisation requests
+type TcLocalTyConsAndClasses -- things defined in this module
+  = ([TyCon], [Class])
+    -- not sure the classes are used at all (ToDo)
 
-		   PprStyle -> Pretty)	-- -ddump-deriving info
+type TcSpecialiseRequests
+  = FiniteMap TyCon [(Bool, [Maybe Type])]
+    -- source tycon specialisation requests
+
+type TcDDumpDeriv
+  = PprStyle -> Pretty
+
+---------------
+typecheckModule
+	:: UniqSupply
+	-> RnEnv		-- for renaming derivings
+	-> RenamedHsModule
+	-> MaybeErr
+	    (TcResults,		-- if all goes well...
+	     Bag Warning)	-- (we can still get warnings)
+	    (Bag Error,		-- if we had errors...
+	     Bag Warning)
+
+typecheckModule us rn_env mod
+  = initTc us (tcModule rn_env mod)
+\end{code}
+
+The internal monster:
+\begin{code}
+tcModule :: RnEnv		-- for renaming derivings
+	 -> RenamedHsModule	-- input
+	 -> TcM s TcResults	-- output
 
 tcModule rn_env
 	(HsModule mod_name verion exports imports fixities
@@ -194,7 +230,7 @@ tcModule rn_env
 	(record_binds', cls_binds', inst_binds', val_binds', const_insts'),
 
 	     -- the next collection is just for mkInterface
-	(fixities, exported_ids', tycons, classes, inst_info),
+	(exported_ids', tycons, classes, inst_info),
 
 	(local_tycons, local_classes),
 

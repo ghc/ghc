@@ -223,6 +223,8 @@ opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="
 opt_ProduceHi 			= lookup_str "-hifile="
 opt_ProduceHu 			= lookup_str "-hufile="
+opt_MyHi 			= lookup_str "-myhifile=" -- the ones produced last time
+opt_MyHu 			= lookup_str "-myhufile=" -- for this module
 opt_EnsureSplittableC		= lookup_str "-fglobalise-toplev-names="
 opt_UnfoldingUseThreshold	= lookup_int "-funfolding-use-threshold"
 opt_UnfoldingCreationThreshold	= lookup_int "-funfolding-creation-threshold"
@@ -232,6 +234,7 @@ opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 opt_NoImplicitPrelude		= lookup  SLIT("-fno-implicit-prelude")
 opt_IgnoreIfacePragmas		= lookup  SLIT("-fignore-interface-pragmas")
 
+opt_HuSuffix	 = case (lookup_str "-husuffix=")    of { Nothing -> ".hu" ; Just x -> x }
 opt_HiSuffix	 = case (lookup_str "-hisuffix=")    of { Nothing -> ".hi" ; Just x -> x }
 opt_SysHiSuffix	 = case (lookup_str "-syshisuffix=") of { Nothing -> ".hi" ; Just x -> x }
 

@@ -16,7 +16,6 @@ import PreludeGlaST
 
 import Ubiq
 
-import MainMonad	( MainIO(..) )		
 import Name		( RdrName(..) )
 import SrcLoc		( mkSrcLoc2, mkUnknownSrcLoc )
 \end{code}
@@ -35,7 +34,7 @@ thenUgn x y stuff
   = x stuff	`thenPrimIO` \ z ->
     y z stuff
 
-initUgn :: UgnM a -> MainIO a
+initUgn :: UgnM a -> IO a
 initUgn action
   = action (SLIT(""),SLIT(""),mkUnknownSrcLoc) `thenPrimIO` \ result ->
     return result

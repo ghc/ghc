@@ -63,7 +63,7 @@ data UniqSupply
 \end{code}
 
 \begin{code}
-mkSplitUniqSupply :: Char -> PrimIO UniqSupply
+mkSplitUniqSupply :: Char -> IO UniqSupply
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 getUnique :: UniqSupply -> Unique
@@ -97,7 +97,8 @@ mkSplitUniqSupply (MkChar c#)
 	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (W# u#) ->
 		    returnPrimIO (MkInt (w2i (mask# `or#` u#)))
     in
-    mk_supply#
+    mk_supply#	`thenPrimIO` \ s ->
+    return s
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}

@@ -97,7 +97,7 @@ import IdLoop   -- for paranoia checking
 import TyLoop   -- for paranoia checking
 
 import Bag
-import Class		( getClassOpString, Class(..), GenClass, ClassOp(..), GenClassOp )
+import Class		( classOpString, Class(..), GenClass, ClassOp(..), GenClassOp )
 import CStrings		( identToC, cSEP )
 import IdInfo
 import Maybes		( maybeToBool )
@@ -1039,7 +1039,7 @@ getIdNamePieces show_uniqs id
 
       MethodSelId clas op ->
 	case (moduleNamePair clas)	of { (c_mod, c_name) ->
-	case (getClassOpString op)	of { op_name ->
+	case (classOpString op)	of { op_name ->
 	if isPreludeDefined clas
 	then [op_name]
         else [c_mod, c_name, op_name]
@@ -1047,7 +1047,7 @@ getIdNamePieces show_uniqs id
 
       DefaultMethodId clas op _ ->
 	case (moduleNamePair clas)		of { (c_mod, c_name) ->
-	case (getClassOpString op)	of { op_name ->
+	case (classOpString op)	of { op_name ->
 	if isPreludeDefined clas
 	then [SLIT("defm"), op_name]
 	else [SLIT("defm"), c_mod, c_name, op_name] }}
@@ -1066,7 +1066,7 @@ getIdNamePieces show_uniqs id
       ConstMethodId c ty o _ _ ->
 	case (moduleNamePair c)	    of { (c_mod, c_name) ->
 	case (getTypeString ty)	    of { ty_bits ->
-	case (getClassOpString o)   of { o_name ->
+	case (classOpString o)   of { o_name ->
 	case (if isPreludeDefined c
 	      then [c_name]
 	      else [c_mod, c_name]) of { c_bits ->
@@ -1142,7 +1142,7 @@ getInstIdModule other = panic "Id:getInstIdModule"
 
 \begin{code}
 mkSuperDictSelId  u c sc     ty info = Id u ty (SuperDictSelId c sc) NoPragmaInfo info
-mkMethodSelId       u c op     ty info = Id u ty (MethodSelId c op) NoPragmaInfo info
+mkMethodSelId     u c op     ty info = Id u ty (MethodSelId c op) NoPragmaInfo info
 mkDefaultMethodId u c op gen ty info = Id u ty (DefaultMethodId c op gen) NoPragmaInfo info
 
 mkDictFunId u c ity full_ty from_here mod info
@@ -1817,7 +1817,7 @@ instance NamedThing (GenId ty) where
 
 {- LATER:
 	get (MethodSelId c op)	= case (moduleOf (origName c)) of -- ToDo; better ???
-				    mod -> (mod, getClassOpString op)
+				    mod -> (mod, classOpString op)
 
 	get (SpecId unspec ty_maybes _)
 	  = BIND moduleNamePair unspec	      _TO_ (mod, unspec_nm) ->

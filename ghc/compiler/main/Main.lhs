@@ -10,14 +10,14 @@ module Main ( main ) where
 
 import Ubiq{-uitous-}
 
-import PreludeGlaST	( thenPrimIO, _FILE{-instances-} ) -- ToDo: STOP using this...
+import PreludeGlaST	( thenPrimIO, fopen, fclose, _FILE{-instance CCallable-} )
 
-import MainMonad
 import HsSyn
 
 import ReadPrefix	( rdModule )
 import Rename		( renameModule )
-import Typecheck	( typecheckModule, InstInfo )
+import MkIface		-- several functions
+import TcModule		( typecheckModule )
 import Desugar		( deSugar, DsMatchContext, pprDsWarnings )
 import SimplCore	( core2core )
 import CoreToStg	( topCoreBindsToStg )
@@ -31,12 +31,14 @@ import AbsCSyn		( absCNop, AbstractC )
 import AbsCUtils	( flattenAbsC )
 import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
-import ErrUtils		( pprBagOfErrors )
+import ErrUtils		( pprBagOfErrors, ghcExit )
 import Maybes		( maybeToBool, MaybeErr(..) )
 import PrelInfo		( builtinNameInfo )
 import RdrHsSyn		( getRawExportees )
 import Specialise	( SpecialiseData(..) )
 import StgSyn		( pprPlainStgBinding, GenStgBinding )
+import TcInstUtil	( InstInfo )
+import UniqSupply	( mkSplitUniqSupply )
 
 import PprAbsC		( dumpRealC, writeRealC )
 import PprCore		( pprCoreBinding )
@@ -49,16 +51,11 @@ import PprType		( GenType, GenTyVar )	-- instances
 import RnHsSyn		( RnName )		-- instances
 import TyVar		( GenTyVar )		-- instances
 import Unique		( Unique )		-- instances
-
-{-
---import MkIface	( mkInterface )
--}
-
 \end{code}
 
 \begin{code}
 main
-  = readMn stdin	`thenMn` \ input_pgm     ->
+  = hGetContents stdin	>>= \ input_pgm ->
     let
 	cmd_line_info = classifyOpts
     in
@@ -66,77 +63,73 @@ main
 \end{code}
 
 \begin{code}
-doIt :: ([CoreToDo], [StgToDo]) -> String -> MainIO ()
+doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose "Glasgow Haskell Compiler, version 1.3-xx" ""
-						`thenMn_`
+  = doDump opt_Verbose "Glasgow Haskell Compiler, version 1.01, for Haskell 1.3" "" >>
 
     -- ******* READER
-    show_pass "Reader"				`thenMn_`
-    rdModule 					`thenMn`
+    show_pass "Reader"	>>
+    rdModule		>>= \ (mod_name, rdr_module) ->
 
-	\ (mod_name, rdr_module) ->
-
-    let
-	-- reader things used much later
-	ds_mod_name = mod_name
-	if_mod_name = mod_name
-	co_mod_name = mod_name
-	st_mod_name = mod_name
-	cc_mod_name = mod_name
-    in
     doDump opt_D_dump_rdr "Reader:"
-	(pp_show (ppr pprStyle rdr_module))	`thenMn_`
+	(pp_show (ppr pprStyle rdr_module))	>>
 
     doDump opt_D_source_stats "\nSource Statistics:"
-	(pp_show (ppSourceStats rdr_module)) 	`thenMn_`
+	(pp_show (ppSourceStats rdr_module)) 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
-    getSplitUniqSupplyMn 'r'	`thenMn` \ rn_uniqs ->	-- renamer
-    getSplitUniqSupplyMn 't'	`thenMn` \ tc_uniqs ->	-- typechecker
-    getSplitUniqSupplyMn 'd'	`thenMn` \ ds_uniqs ->	-- desugarer
-    getSplitUniqSupplyMn 's'	`thenMn` \ sm_uniqs ->	-- core-to-core simplifier
-    getSplitUniqSupplyMn 'c'	`thenMn` \ c2s_uniqs ->	-- core-to-stg
-    getSplitUniqSupplyMn 'g'	`thenMn` \ st_uniqs ->	-- stg-to-stg passes
-    getSplitUniqSupplyMn 'f'	`thenMn` \ fl_uniqs ->	-- absC flattener
-    getSplitUniqSupplyMn 'n'	`thenMn` \ ncg_uniqs -> -- native-code generator
+    mkSplitUniqSupply 'r'	>>= \ rn_uniqs ->	-- renamer
+    mkSplitUniqSupply 't'	>>= \ tc_uniqs ->	-- typechecker
+    mkSplitUniqSupply 'd'	>>= \ ds_uniqs ->	-- desugarer
+    mkSplitUniqSupply 's'	>>= \ sm_uniqs ->	-- core-to-core simplifier
+    mkSplitUniqSupply 'c'	>>= \ c2s_uniqs ->	-- core-to-stg
+    mkSplitUniqSupply 'g'	>>= \ st_uniqs ->	-- stg-to-stg passes
+    mkSplitUniqSupply 'f'	>>= \ fl_uniqs ->	-- absC flattener
+    mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
     -- ******* RENAMER
-    show_pass "Renamer" 			`thenMn_`
+    show_pass "Renamer" 			>>
 
     case builtinNameInfo
     of { (wiredin_fm, key_fm, idinfo_fm) ->
 
-    renameModule wiredin_fm key_fm rn_uniqs rdr_module `thenMn`
+    renameModule wiredin_fm key_fm rn_uniqs rdr_module >>=
 	\ (rn_mod, rn_env, import_names,
 	   version_info, instance_modules,
 	   rn_errs_bag, rn_warns_bag) ->
 
     if (not (isEmptyBag rn_errs_bag)) then
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_errs_bag))
-	`thenMn_` writeMn stderr "\n" `thenMn_`
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
-	`thenMn_` writeMn stderr "\n" `thenMn_`
-	exitMn 1
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_errs_bag))
+	>> hPutStr stderr "\n" >>
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
+	>> hPutStr stderr "\n" >>
+	ghcExit 1
 
     else -- No renaming errors ...
 
     (if (isEmptyBag rn_warns_bag) then
-	returnMn ()
+	return ()
      else
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
-	`thenMn_` writeMn stderr "\n"
-    )   					`thenMn_`
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle rn_warns_bag))
+	>> hPutStr stderr "\n"
+    )   					>>
 
     doDump opt_D_dump_rn "Renamer:"
-	(pp_show (ppr pprStyle rn_mod))		`thenMn_`
+	(pp_show (ppr pprStyle rn_mod))		>>
 
---    exitMn 0
-{- LATER ... -}
+    -- Safely past renaming: we can start the interface file:
+    -- (the iface file is produced incrementally, as we have
+    -- the information that we need...; we use "iface<blah>")
+    -- "endIface" finishes the job.
+    startIface mod_name				    >>= \ if_handle ->
+    ifaceVersions	 if_handle version_info	    >>
+    ifaceExportList	 if_handle rn_mod	    >>
+    ifaceFixities	 if_handle rn_mod	    >>
+    ifaceInstanceModules if_handle instance_modules >>
 
     -- ******* TYPECHECKER
-    show_pass "TypeCheck" 			`thenMn_`
+    show_pass "TypeCheck" 			>>
     case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_env rn_mod) of
 	    Succeeded (stuff, warns)
 		-> (emptyBag, warns, stuff)
@@ -146,24 +139,24 @@ doIt (core_cmds, stg_cmds) input_pgm
     of { (tc_errs_bag, tc_warns_bag, tc_results) ->
 
     if (not (isEmptyBag tc_errs_bag)) then
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_errs_bag))
-	`thenMn_` writeMn stderr "\n" `thenMn_`
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
-	`thenMn_` writeMn stderr "\n" `thenMn_`
-	exitMn 1
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_errs_bag))
+	>> hPutStr stderr "\n" >>
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
+	>> hPutStr stderr "\n" >>
+	ghcExit 1
 
     else ( -- No typechecking errors ...
 
     (if (isEmptyBag tc_warns_bag) then
-	returnMn ()
+	return ()
      else
-	writeMn stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
-	`thenMn_` writeMn stderr "\n"
-    )   					`thenMn_`
+	hPutStr stderr (ppShow pprCols (pprBagOfErrors pprErrorsStyle tc_warns_bag))
+	>> hPutStr stderr "\n"
+    )   					>>
 
     case tc_results
     of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
-	   interface_stuff@(_,_,_,_,_),  -- @-pat just for strictness...
+	   interface_stuff,
 	   (local_tycons,local_classes), pragma_tycon_specs, ddump_deriv) ->
 
     doDump opt_D_dump_tc "Typechecked:"
@@ -172,87 +165,68 @@ doIt (core_cmds, stg_cmds) input_pgm
 	    ppr pprStyle class_binds,
 	    ppr pprStyle inst_binds,
 	    ppAboves (map (\ (i,e) -> ppr pprStyle (VarMonoBind i e)) const_binds),
-	    ppr pprStyle val_binds]))   	`thenMn_`
+	    ppr pprStyle val_binds]))   	>>
 
     doDump opt_D_dump_deriv "Derived instances:"
-	(pp_show (ddump_deriv pprStyle))	`thenMn_`
+	(pp_show (ddump_deriv pprStyle))	>>
+
+    -- OK, now do the interface stuff that relies on typechecker output:
+    ifaceDecls     if_handle interface_stuff	>>
+    ifaceInstances if_handle interface_stuff	>>
 
     -- ******* DESUGARER
-    show_pass "DeSugar" 			`thenMn_`
+    show_pass "DeSugar" 			>>
     let
 	(desugared,ds_warnings)
-	  = deSugar ds_uniqs ds_mod_name typechecked_quint
+	  = deSugar ds_uniqs mod_name typechecked_quint
     in
     (if isEmptyBag ds_warnings then
-	returnMn ()
+	return ()
      else
-	writeMn stderr (ppShow pprCols (pprDsWarnings pprErrorsStyle ds_warnings))
-	`thenMn_` writeMn stderr "\n"
-    ) 						`thenMn_`
+	hPutStr stderr (ppShow pprCols (pprDsWarnings pprErrorsStyle ds_warnings))
+	>> hPutStr stderr "\n"
+    ) 						>>
 
     doDump opt_D_dump_ds "Desugared:" (pp_show (ppAboves
 	(map (pprCoreBinding pprStyle) desugared)))
-						`thenMn_`
+						>>
 
     -- ******* CORE-TO-CORE SIMPLIFICATION (NB: I/O op)
-    core2core core_cmds co_mod_name pprStyle
+    core2core core_cmds mod_name pprStyle
 	      sm_uniqs local_tycons pragma_tycon_specs desugared
-						`thenMn`
+						>>=
 
 	 \ (simplified, inlinings_env,
 	    SpecData _ _ _ gen_tycons all_tycon_specs _ _ _) ->
 
     doDump opt_D_dump_simpl "Simplified:" (pp_show (ppAboves
 	(map (pprCoreBinding pprStyle) simplified)))
-						`thenMn_`
+						>>
 
     -- ******* STG-TO-STG SIMPLIFICATION
-    show_pass "Core2Stg" 			`thenMn_`
+    show_pass "Core2Stg" 			>>
     let
 	stg_binds   = topCoreBindsToStg c2s_uniqs simplified
     in
 
-    show_pass "Stg2Stg" 			`thenMn_`
-    stg2stg stg_cmds st_mod_name pprStyle st_uniqs stg_binds
-						`thenMn`
+    show_pass "Stg2Stg" 			>>
+    stg2stg stg_cmds mod_name pprStyle st_uniqs stg_binds
+						>>=
 
 	\ (stg_binds2, cost_centre_info) ->
 
     doDump opt_D_dump_stg "STG syntax:"
 	(pp_show (ppAboves (map (pprPlainStgBinding pprStyle) stg_binds2)))
-						`thenMn_`
+						>>
 
-{- LATER ...
-    -- ******* INTERFACE GENERATION (needs STG output)
-{-  let
-	mod_name = "_TestName_"
-    	export_list_fns = (\ x -> False, \ x -> False)
-	inlinings_env = nullIdEnv
-	fixities = []
-	if_global_ids = []
-	if_ce = nullCE
-	if_tce = nullTCE
-	if_inst_info = emptyBag
-    in
--}
-
-    show_pass "Interface" 			`thenMn_`
-    let
-	mod_interface
-    	  = mkInterface if_mod_name export_list_fns
-			inlinings_env all_tycon_specs
-			interface_stuff
-			stg_binds2
-    in
-    doOutput opt_ProduceHi ( \ file ->
-			 ppAppendFile file 1000{-pprCols-} mod_interface )
-       						`thenMn_`
--}
+    -- We are definitely done w/ interface-file stuff at this point:
+    -- (See comments near call to "startIface".)
+    endIface if_handle				>>
 
     -- ******* "ABSTRACT", THEN "FLAT", THEN *REAL* C!
-    show_pass "CodeGen" 			`thenMn_`
+    show_pass "CodeGen" 			>>
     let
-	abstractC      = codeGen cc_mod_name     -- module name for CC labelling
+	abstractC      = codeGen mod_name     -- module name for CC labelling
 				 cost_centre_info
 				 import_names -- import names for CC registering
 				 gen_tycons	 -- type constructors generated locally
@@ -262,10 +236,10 @@ doIt (core_cmds, stg_cmds) input_pgm
     	flat_abstractC = flattenAbsC fl_uniqs abstractC
     in
     doDump opt_D_dump_absC  "Abstract C:"
-	(dumpRealC abstractC)		  	`thenMn_`
+	(dumpRealC abstractC)		  	>>
 
     doDump opt_D_dump_flatC "Flat Abstract C:"
-	(dumpRealC flat_abstractC)		`thenMn_`
+	(dumpRealC flat_abstractC)		>>
 
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
@@ -291,18 +265,14 @@ doIt (core_cmds, stg_cmds) input_pgm
 #endif
     in
 
-    doDump opt_D_dump_asm "" ncg_output_d 	`thenMn_`
-    doOutput opt_ProduceS ncg_output_w 		`thenMn_`
+    doDump opt_D_dump_asm "" ncg_output_d 	>>
+    doOutput opt_ProduceS ncg_output_w 		>>
 
-    doDump opt_D_dump_realC "" c_output_d 	`thenMn_`
-    doOutput opt_ProduceC c_output_w 		`thenMn_`
+    doDump opt_D_dump_realC "" c_output_d 	>>
+    doOutput opt_ProduceC c_output_w 		>>
 
-    exitMn 0
-    } ) }
-
-{- LATER -}
-
-    }
+    ghcExit 0
+    } ) } }
   where
     -------------------------------------------------------------
     -- ****** printing styles and column width:
@@ -326,29 +296,29 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     show_pass
       = if opt_D_show_passes
-	then \ what -> writeMn stderr ("*** "++what++":\n")
-	else \ what -> returnMn ()
+	then \ what -> hPutStr stderr ("*** "++what++":\n")
+	else \ what -> return ()
 
     doOutput switch io_action
       = case switch of
-	  Nothing -> returnMn ()
+	  Nothing -> return ()
 	  Just fname ->
 	    fopen fname "a+"	`thenPrimIO` \ file ->
 	    if (file == ``NULL'') then
 		error ("doOutput: failed to open:"++fname)
 	    else
-		io_action file		`thenMn`     \ () ->
+		io_action file		>>=     \ () ->
 		fclose file		`thenPrimIO` \ status ->
 		if status == 0
-		then returnMn ()
+		then return ()
 		else error ("doOutput: closed failed: "{-++show status++" "-}++fname)
 
     doDump switch hdr string
       = if switch
-	then writeMn stderr hdr		    `thenMn_`
-	     writeMn stderr ('\n': string)  `thenMn_`
-	     writeMn stderr "\n"
-	else returnMn ()
+	then hPutStr stderr hdr		    >>
+	     hPutStr stderr ('\n': string)  >>
+	     hPutStr stderr "\n"
+	else return ()
 
 
 ppSourceStats (HsModule name version exports imports fixities typedecls typesigs

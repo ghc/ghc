@@ -34,7 +34,7 @@ import RnUtils		( RnEnv(..) )
 import RnBinds		( rnMethodBinds, rnTopBinds )
 
 import Bag		( emptyBag{-ToDo:rm-}, Bag, isEmptyBag, unionBags, listToBag )
-import Class		( GenClass, getClassKey )
+import Class		( GenClass, classKey )
 import CmdLineOpts	( opt_CompilingPrelude )
 import ErrUtils		( pprBagOfErrors, addErrLoc, Error(..) )
 import Id		( dataConSig, dataConArity )
@@ -281,7 +281,7 @@ makeDerivEqns
     chk_out :: [(Class, TyCon)] -> (Class, TyCon) -> TcM s ()
     chk_out whole_deriving_list this_one@(clas, tycon)
       =	let
-	    clas_key = getClassKey clas
+	    clas_key = classKey clas
     	in
 
 	    -- Are things OK for deriving Enum (if appropriate)?
@@ -563,7 +563,7 @@ gen_inst_info modname fixities deriver_rn_env
 		       (if from_here then mbinds else EmptyMonoBinds)
 		       from_here modname locn [])
   where
-    clas_key = getClassKey clas
+    clas_key = classKey clas
     clas_Name
       = let  (mod, nm) = moduleNamePair clas  in
     	ClassName clas_key (mkPreludeCoreName mod nm) []
@@ -672,7 +672,7 @@ gen_taggery_Names eqns
       where
 	is_in_eqns clas_key tycon [] = False
 	is_in_eqns clas_key tycon ((c,t,_,_):eqns)
-	  =  (clas_key == getClassKey c && tycon == t)
+	  =  (clas_key == classKey c && tycon == t)
 	  || is_in_eqns clas_key tycon eqns
 
 \end{code}

@@ -120,6 +120,8 @@ module Unique (
 	recUpdErrorIdKey,
 	irrefutPatErrorIdKey,
 	nonExhaustiveGuardsErrorIdKey,
+	noDefaultMethodErrorIdKey,
+	nonExplicitMethodErrorIdKey,
 	primIoTyConKey,
 	ratioDataConKey,
 	ratioTyConKey,
@@ -568,12 +570,14 @@ recConErrorIdKey	      = mkPreludeMiscIdUnique 29
 recUpdErrorIdKey	      = mkPreludeMiscIdUnique 30
 irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 31
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 32
+noDefaultMethodErrorIdKey     = mkPreludeMiscIdUnique 33
+nonExplicitMethodErrorIdKey   = mkPreludeMiscIdUnique 34
 
 #ifdef GRAN
-parLocalIdKey		= mkPreludeMiscIdUnique 33
-parGlobalIdKey		= mkPreludeMiscIdUnique 34
-noFollowIdKey		= mkPreludeMiscIdUnique 35
-copyableIdKey		= mkPreludeMiscIdUnique 36
+parLocalIdKey		= mkPreludeMiscIdUnique 35
+parGlobalIdKey		= mkPreludeMiscIdUnique 36
+noFollowIdKey		= mkPreludeMiscIdUnique 37
+copyableIdKey		= mkPreludeMiscIdUnique 38
 #endif
 \end{code}
 
