@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.17 1999/09/13 08:14:00 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.18 1999/09/13 08:14:51 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -13,7 +13,6 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "ProfRts.h"
-#include "Itimer.h"
 
 #if defined(PROFILING) 
 #include "Itimer.h"
