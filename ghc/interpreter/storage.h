@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.21 $
- * $Date: 1999/12/16 16:34:45 $
+ * $Revision: 1.22 $
+ * $Date: 1999/12/17 16:34:08 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -477,25 +477,6 @@ Tycon addWiredInEnumTycon ( String modNm, String typeNm,
 #define offsetOf(c)  ((c)-OFFMIN)
 #define mkOffset(o)  (OFFMIN+(o))
 
-/* --------------------------------------------------------------------------
- * Object symbols:
- * ------------------------------------------------------------------------*/
-
-/* An entry in a very crude object symbol table */
-typedef struct { char* nm; void* ad; } 
-   OSym;
-
-/* Indication of section kinds for loaded objects.  Needed by
-   the GC for deciding whether or not a pointer on the stack
-   is a code pointer.
-*/
-typedef enum { HUGS_DL_SECTION_CODE_OR_RODATA,
-               HUGS_DL_SECTION_RWDATA,
-               HUGS_DL_SECTION_OTHER } 
-   DLSect;
-
-typedef struct { void* start; void* end; DLSect sect; } 
-   DLTabEnt;
 
 /* --------------------------------------------------------------------------
  * Modules:
@@ -506,6 +487,9 @@ typedef struct { void* start; void* end; DLSect sect; }
 #define isModule(c)   (MODMIN<=(c) && (c)<TYCMIN)
 #define mkModule(n)   (MODMIN+(n))
 #define module(n)     tabModule[(n)-MODMIN]
+
+/* Import defns for the ObjectCode struct in Module. */
+#include "object.h"
 
 /* Under Haskell 1.3, the list of qualified imports is always a subset
  * of the list of unqualified imports.  For simplicity and flexibility,
@@ -532,20 +516,10 @@ struct Module {
     /* TRUE if module exists only via GHC primop defn; usually FALSE */
     Bool  fake; 
 
-    /* ptr to malloc'd lump of memory holding the obj file */
-    void* oImage;
-
-    /* ptr to object symbol table; lives in mallocville.  
-       Dynamically expands. */
-    OSym* oTab;
-    Int   sizeoTab;
-    Int   usedoTab;
-
-    /* The section-kind entries for this object module.  Dynamically expands. */    
-    DLTabEnt* dlTab;
-    Int       sizedlTab;
-    Int       useddlTab;        
+    /* One or more object file descriptors. */
+    ObjectCode* object;
 };
+
 
 extern Module currentModule;           /* Module currently being processed */
 extern struct Module DECTABLE(tabModule);
@@ -560,8 +534,8 @@ extern void      addOTabName     Args((Module,char*,void*));
 extern void*     lookupOTabName  Args((Module,char*));
 extern char*     nameFromOPtr    Args((void*));
 
-extern void      addDLSect    Args((Module,void*,void*,DLSect));
-extern DLSect    lookupDLSect Args((void*));
+extern void          addSection    Args((Module,void*,void*,OSectionKind));
+extern OSectionKind  lookupSection Args((void*));
 
 
 #define isPrelude(m) (m==modulePrelude)

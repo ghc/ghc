@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.26 $
- * $Date: 1999/12/16 16:34:43 $
+ * $Revision: 1.27 $
+ * $Date: 1999/12/17 16:34:08 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -18,6 +18,7 @@
 #include "backend.h"
 #include "connect.h"
 #include "errors.h"
+#include "object.h"
 #include <setjmp.h>
 
 /*#define DEBUG_SHOWUSE*/
@@ -1335,13 +1336,7 @@ Text t; {
     module(moduleHw).tycons        = NIL;
     module(moduleHw).names         = NIL;
     module(moduleHw).classes       = NIL;
-    module(moduleHw).oImage        = NULL;
-    module(moduleHw).oTab          = NULL;
-    module(moduleHw).sizeoTab      = 0;
-    module(moduleHw).usedoTab      = 0;
-    module(moduleHw).dlTab         = NULL;
-    module(moduleHw).sizedlTab     = 0;
-    module(moduleHw).useddlTab     = 0;
+    module(moduleHw).object        = NULL;
     return moduleHw++;
 }
 
@@ -1427,96 +1422,35 @@ Name jrsFindQualName ( Text mn, Text sn )
 }
 
 
-/* A bit tricky.  Assumes that if tab==NULL, then 
-   currUsed and *currSize must be zero.
-*/
-static
-void* genericExpand ( void* tab, 
-                      int*  currSize, int  currUsed,
-                      int   initSize, int  elemSize )
-{
-   int   size2;
-   void* tab2;
-   if (currUsed < *currSize)
-      return tab;
-   size2 = (*currSize == 0) ? initSize : (2 * *currSize);
-   tab2 = malloc ( size2 * elemSize );
-   if (!tab2) {
-      ERRMSG(0) "Can't allocate enough memory to resize a table"
-      EEND;
-   }
-   if (*currSize > 0)
-      memcpy ( tab2, tab, elemSize * *currSize );
-   *currSize = size2;
-   if (tab) free ( tab );
-   return tab2;
-}
-
-void addOTabName ( Module m, char* nm, void* ad )
-{
-   module(m).oTab
-      = genericExpand ( module(m).oTab, 
-                        &module(m).sizeoTab,
-                        module(m).usedoTab,
-                        8, sizeof(OSym) );
-
-   module(m).oTab[ module(m).usedoTab ].nm = nm;
-   module(m).oTab[ module(m).usedoTab ].ad = ad;
-   module(m).usedoTab++;
-}
-
-
-void addDLSect ( Module m, void* start, void* end, DLSect sect )
-{
-   module(m).dlTab
-      = genericExpand ( module(m).dlTab,
-                        &module(m).sizedlTab,
-                        module(m).useddlTab,
-                        4, sizeof(DLTabEnt) );
-   module(m).dlTab[ module(m).useddlTab ].start = start;
-   module(m).dlTab[ module(m).useddlTab ].end   = end;
-   module(m).dlTab[ module(m).useddlTab ].sect  = sect;
-   module(m).useddlTab++;
-}
-
-
-void* lookupOTabName ( Module m, char* nm )
-{
-   int i;
-   for (i = 0; i < module(m).usedoTab; i++) {
-      if (0)
-         fprintf ( stderr, 
-                   "lookupOTabName: request %s, table has %s\n",
-                   nm, module(m).oTab[i].nm );
-      if (0==strcmp(nm,module(m).oTab[i].nm))
-         return module(m).oTab[i].ad;
-   }
-   return NULL;
-}
-
-
 char* nameFromOPtr ( void* p )
 {
    int i;
    Module m;
-   for (m=MODMIN; m<moduleHw; m++)
-      for (i = 0; i < module(m).usedoTab; i++)
-         if (p == module(m).oTab[i].ad)
-            return module(m).oTab[i].nm;
+   for (m=MODMIN; m<moduleHw; m++) {
+      char* nm = ocLookupAddr ( module(m).object, p );
+      if (nm) return nm;
+   }
    return NULL;
 }
 
 
-DLSect lookupDLSect ( void* ad )
+void* lookupOTabName ( Module m, char* sym )
+{
+   return ocLookupSym ( module(m).object, sym );
+}
+
+
+OSectionKind lookupSection ( void* ad )
 {
    int i;
    Module m;
-   for (m=MODMIN; m<moduleHw; m++)
-      for (i = 0; i < module(m).useddlTab; i++)
-         if (module(m).dlTab[i].start <= ad &&
-             ad <= module(m).dlTab[i].end)
-            return module(m).dlTab[i].sect;
-   return HUGS_DL_SECTION_OTHER;
+   for (m=MODMIN; m<moduleHw; m++) {
+      OSectionKind sect
+         = ocLookupSection ( module(m).object, ad );
+      if (sect != HUGS_SECTIONKIND_NOINFOAVAIL)
+         return sect;
+   }
+   return HUGS_SECTIONKIND_OTHER;
 }
 
 

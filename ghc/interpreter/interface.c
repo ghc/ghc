@@ -7,23 +7,9 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/12/16 16:42:56 $
+ * $Revision: 1.13 $
+ * $Date: 1999/12/17 16:34:08 $
  * ------------------------------------------------------------------------*/
-
-/* ToDo:
- * o use Z encoding
- * o use vectored CONSTR_entry when appropriate
- * o generate export list
- *
- * Needs GHC changes to generate member selectors,
- * superclass selectors, etc
- * o instance decls
- * o dictionary constructors ?
- *
- * o Get Hugs/GHC to agree on what interface files look like.
- * o figure out how to replace the Hugs Prelude with the GHC Prelude
- */
 
 #include "prelude.h"
 #include "storage.h"
@@ -32,7 +18,8 @@
 #include "errors.h"
 #include "link.h"
 #include "Assembler.h"  /* for wrapping GHC objects */
-#include "dynamic.h"
+#include "object.h"
+
 
 #define DEBUG_IFACE
 #define VERBOSE FALSE
@@ -178,10 +165,6 @@ static List       ifTyvarsIn       Args((Type));
 
 static Type       tvsToOffsets       Args((Int,Type,List));
 static Type       conidcellsToTycons Args((Int,Type));
-
-static Void       resolveReferencesInObjectModule Args((Module,Bool));
-static Bool       validateOImage Args((void*, Int, Bool));
-static Void       readSyms Args((Module,Bool));
 
 static void*      lookupObjName ( char* );
 
@@ -967,12 +950,20 @@ printf("\n");
  * Modules
  * ------------------------------------------------------------------------*/
 
+void startGHCModule_errMsg ( char* msg )
+{
+   fprintf ( stderr, "object error: %s\n", msg );
+}
+
+void* startGHCModule_clientLookup ( char* sym )
+{
+   return lookupObjName ( sym );
+}
+
 Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
 {
-    FILE* f;
-    void* img;
-
     Module m = findModule(mname);
+
     if (isNull(m)) {
        m = newModule(mname);
        fprintf ( stderr, "startGHCIface: name %16s   objsize %d\n", 
@@ -986,37 +977,29 @@ Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
        }
     }
 
-    img = malloc ( sizeObj );
-    if (!img) {
-       ERRMSG(0) "Can't allocate memory to load object file for module \"%s\"",
+    module(m).object
+       = ocNew ( startGHCModule_errMsg,
+                 startGHCModule_clientLookup,
+                 textToStr(nameObj),
+                 sizeObj );
+    
+    if (!module(m).object) {
+       ERRMSG(0) "Object loading failed for module \"%s\"",
                  textToStr(mname)
        EEND;
     }
-    f = fopen( textToStr(nameObj), "rb" );
-    if (!f) {
-       /* Really, this shouldn't happen, since makeStackEntry ensures the
-          object is available.  Nevertheless ...
-       */
-       ERRMSG(0) "Object file \"%s\" can't be opened to read -- oops!",
-	         &(textToStr(nameObj)[0])
-       EEND;
-    }
-    if (sizeObj != fread ( img, 1, sizeObj, f)) {
-       ERRMSG(0) "Read of object file \"%s\" failed", textToStr(nameObj)
-       EEND;
-    }
-    if (!validateOImage(img,sizeObj,VERBOSE)) {
+
+    if (!ocVerifyImage(module(m).object,VERBOSE)) {
        ERRMSG(0) "Validation of object file \"%s\" failed", 
                  textToStr(nameObj)
        EEND;
     }
-    
-    assert(!module(m).oImage);
-    module(m).oImage = img;
 
-    readSyms(m,VERBOSE);
-
-    /* setCurrModule(m); */
+    if (!ocGetNames(module(m).object,VERBOSE)) {
+       ERRMSG(0) "Reading of symbol names in object file \"%s\" failed", 
+                 textToStr(nameObj)
+       EEND;
+    }
 }
 
 
@@ -1188,7 +1171,8 @@ Void finishGHCModule ( Cell root )
    }
 
    /* Last, but by no means least ... */
-   resolveReferencesInObjectModule ( mod, VERBOSE );
+   if (!ocResolve(module(mod).object,VERBOSE))
+      internal("finishGHCModule: object resolution failed");
 }
 
 
@@ -2147,383 +2131,6 @@ Type type; {
 }
 
 
-/* --------------------------------------------------------------------------
- * ELF specifics
- * ------------------------------------------------------------------------*/
-
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
-
-#include <elf.h>
-
-static char* findElfSection ( void* objImage, Elf32_Word sh_type )
-{
-   Int i;
-   char* ehdrC = (char*)objImage;
-   Elf32_Ehdr* ehdr = ( Elf32_Ehdr*)ehdrC;
-   Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-   char* ptr = NULL;
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == sh_type &&
-          i !=  ehdr->e_shstrndx) {
-         ptr = ehdrC + shdr[i].sh_offset;
-         break;
-      }
-   }
-   return ptr;
-}
-
-
-static Void resolveReferencesInObjectModule_elf ( Module m, 
-                                                        Bool   verb )
-{
-   char symbol[1000]; // ToDo
-   int i, j;
-   Elf32_Sym*  stab = NULL;
-   char* strtab;
-   char* ehdrC = (char*)(module(m).oImage);
-   Elf32_Ehdr* ehdr = (Elf32_Ehdr*) ehdrC;
-   Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-   Elf32_Word* targ;
-   // first find "the" symbol table
-   // why is this commented out???
-   stab = (Elf32_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
-
-   // also go find the string table
-   strtab = findElfSection ( ehdrC, SHT_STRTAB );
-
-   if (!stab || !strtab) 
-      internal("resolveReferencesInObjectModule_elf");
-
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == SHT_REL ) {
-         Elf32_Rel*  rtab = (Elf32_Rel*) (ehdrC + shdr[i].sh_offset);
-         Int         nent = shdr[i].sh_size / sizeof(Elf32_Rel);
-         Int target_shndx = shdr[i].sh_info;
-         Int symtab_shndx = shdr[i].sh_link;
-         stab  = (Elf32_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
-         targ  = (Elf32_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-         if (verb)
-         fprintf ( stderr,
-                  "relocations for section %d using symtab %d\n",
-                  target_shndx, symtab_shndx );
-         for (j = 0; j < nent; j++) {
-            Elf32_Addr offset = rtab[j].r_offset;
-            Elf32_Word info   = rtab[j].r_info;
-
-            Elf32_Addr  P = ((Elf32_Addr)targ) + offset;
-            Elf32_Word* pP = (Elf32_Word*)P;
-            Elf32_Addr  A = *pP;
-            Elf32_Addr  S;
-
-            if (verb) fprintf ( stderr, "Rel entry %3d is raw(%6p %6p)   ", 
-                                j, (void*)offset, (void*)info );
-            if (!info) {
-               if (verb) fprintf ( stderr, " ZERO\n" );
-               S = 0;
-            } else {
-               if (stab[ ELF32_R_SYM(info)].st_name == 0) {
-                  if (verb) fprintf ( stderr, "(noname)  ");
-                  /* nameless (local) symbol */
-                  S = (Elf32_Addr)(ehdrC
-                                   + shdr[stab[ELF32_R_SYM(info)].st_shndx ].sh_offset
-                                   + stab[ELF32_R_SYM(info)].st_value
-                                  );
-                  strcpy ( symbol, "(noname)");
-               } else {
-                  strcpy ( symbol, strtab+stab[ ELF32_R_SYM(info)].st_name );
-                  if (verb) fprintf ( stderr, "`%s'  ", symbol );
-                  S = (Elf32_Addr)lookupObjName ( symbol );
-               }
-               if (verb) fprintf ( stderr, "resolves to %p\n", (void*)S );
-               if (!S) {
-                  fprintf ( stderr, "link failure for `%s'\n",
-                                    strtab+stab[ ELF32_R_SYM(info)].st_name );
-                  assert(0);
-               }
-	    }
-            //fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n\n",
-            //      (void*)P, (void*)S, (void*)A );
-            switch (ELF32_R_TYPE(info)) {
-               case R_386_32:   *pP = S + A;     break;
-               case R_386_PC32: *pP = S + A - P; break;
-               default: fprintf(stderr, 
-                                "unhandled ELF relocation type %d\n",
-                                ELF32_R_TYPE(info));
-                        assert(0);
-	    }
-
-         }
-      }
-      else
-      if (shdr[i].sh_type == SHT_RELA) {
-         fprintf ( stderr, "RelA style reloc table -- not yet done" );
-         assert(0);
-      }
-   }
-}
-
-
-static Bool validateOImage_elf ( void*  imgV, 
-                                       Int    size, 
-                                       Bool   verb )
-{
-   Elf32_Shdr* shdr;
-   Elf32_Sym*  stab;
-   int i, j, nent, nstrtab, nsymtabs;
-   char* sh_strtab;
-   char* strtab;
-
-   char* ehdrC = (char*)imgV;
-   Elf32_Ehdr* ehdr = ( Elf32_Ehdr*)ehdrC;
-
-   if (ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
-       ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
-       ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
-       ehdr->e_ident[EI_MAG3] != ELFMAG3) {
-      if (verb) fprintf ( stderr, "Not an ELF header\n" ); 
-      return FALSE;
-   }
-   if (verb) fprintf ( stderr, "Is an ELF header\n" );
-
-   if (ehdr->e_ident[EI_CLASS] != ELFCLASS32) {
-      if (verb) fprintf ( stderr, "Not 32 bit ELF\n" );
-      return FALSE;
-   }
-   if (verb) fprintf ( stderr, "Is 32 bit ELF\n" );
-
-   if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB) {
-      if (verb) fprintf ( stderr, "Is little-endian\n" );
-   } else
-   if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
-      if (verb) fprintf ( stderr, "Is big-endian\n" );
-   } else {
-      if (verb) fprintf ( stderr, "Unknown endiannness\n" );
-      return FALSE;
-   }
-
-   if (ehdr->e_type != ET_REL) {
-      if (verb) fprintf ( stderr, "Not a relocatable object (.o) file\n" );
-      return FALSE;
-   }
-   if (verb) fprintf ( stderr, "Is a relocatable object (.o) file\n" );
-
-   if (verb) fprintf ( stderr, "Architecture is " );
-   switch (ehdr->e_machine) {
-      case EM_386:   if (verb) fprintf ( stderr, "x86\n" ); break;
-      case EM_SPARC: if (verb) fprintf ( stderr, "sparc\n" ); break;
-      default:       if (verb) fprintf ( stderr, "unknown\n" ); return FALSE;
-   }
-
-   if (verb) 
-   fprintf ( stderr,
-             "\nSection header table: start %d, n_entries %d, ent_size %d\n", 
-             ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  );
-
-   assert (ehdr->e_shentsize == sizeof(Elf32_Shdr));
-
-   shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-
-   if (ehdr->e_shstrndx == SHN_UNDEF) {
-      if (verb) fprintf ( stderr, "No section header string table\n" );
-      sh_strtab = NULL;
-      return FALSE;
-   } else {
-      if (verb) fprintf (  stderr,"Section header string table is section %d\n", 
-                          ehdr->e_shstrndx);
-      sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
-   }
-
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (verb) fprintf ( stderr, "%2d:  ", i );
-      if (verb) fprintf ( stderr, "type=%2d  ", shdr[i].sh_type );
-      if (verb) fprintf ( stderr, "size=%4d  ", shdr[i].sh_size );
-      if (verb) fprintf ( stderr, "offs=%4d  ", shdr[i].sh_offset );
-      if (verb) fprintf ( stderr, "  (%p .. %p)  ",
-               ehdrC + shdr[i].sh_offset, 
-               ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1);
-
-      if (shdr[i].sh_type == SHT_REL  && verb) fprintf ( stderr, "Rel  " ); else
-      if (shdr[i].sh_type == SHT_RELA && verb) fprintf ( stderr, "RelA " ); else
-      if (verb)                                fprintf ( stderr, "     " );
-      if (sh_strtab && verb) 
-         fprintf ( stderr, "sname=%s", sh_strtab + shdr[i].sh_name );
-      if (verb) fprintf ( stderr, "\n" );
-   }
-
-   if (verb) fprintf ( stderr, "\n\nString tables\n" );
-   strtab = NULL;
-   nstrtab = 0;
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == SHT_STRTAB &&
-          i !=  ehdr->e_shstrndx) {
-         if (verb) 
-            fprintf ( stderr, "   section %d is a normal string table\n", i );
-         strtab = ehdrC + shdr[i].sh_offset;
-         nstrtab++;
-      }
-   }  
-   if (nstrtab != 1) {
-      if (verb) fprintf ( stderr, "WARNING: no string tables, or too many\n" );
-      return FALSE;
-   }
-
-   nsymtabs = 0;
-   if (verb) fprintf ( stderr, "\n\nSymbol tables\n" ); 
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type != SHT_SYMTAB) continue;
-      if (verb) fprintf ( stderr, "section %d is a symbol table\n", i );
-      nsymtabs++;
-      stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
-      nent = shdr[i].sh_size / sizeof(Elf32_Sym);
-      if (verb) fprintf ( stderr, "   number of entries is apparently %d (%d rem)\n",
-               nent,
-               shdr[i].sh_size % sizeof(Elf32_Sym)
-             );
-      if (0 != shdr[i].sh_size % sizeof(Elf32_Sym)) {
-         if (verb) fprintf ( stderr, "non-integral number of symbol table entries\n");
-         return FALSE;
-      }
-      for (j = 0; j < nent; j++) {
-         if (verb) fprintf ( stderr, "   %2d  ", j );
-         if (verb) fprintf ( stderr, "  sec=%-5d  size=%-3d  val=%-5p  ", 
-                             (int)stab[j].st_shndx,
-                             (int)stab[j].st_size,
-                             (char*)stab[j].st_value );
-
-         if (verb) fprintf ( stderr, "type=" );
-         switch (ELF32_ST_TYPE(stab[j].st_info)) {
-            case STT_NOTYPE:  if (verb) fprintf ( stderr, "notype " ); break;
-            case STT_OBJECT:  if (verb) fprintf ( stderr, "object " ); break;
-            case STT_FUNC  :  if (verb) fprintf ( stderr, "func   " ); break;
-            case STT_SECTION: if (verb) fprintf ( stderr, "section" ); break;
-            case STT_FILE:    if (verb) fprintf ( stderr, "file   " ); break;
-            default:          if (verb) fprintf ( stderr, "?      " ); break;
-         }
-         if (verb) fprintf ( stderr, "  " );
-
-         if (verb) fprintf ( stderr, "bind=" );
-         switch (ELF32_ST_BIND(stab[j].st_info)) {
-            case STB_LOCAL :  if (verb) fprintf ( stderr, "local " ); break;
-            case STB_GLOBAL:  if (verb) fprintf ( stderr, "global" ); break;
-            case STB_WEAK  :  if (verb) fprintf ( stderr, "weak  " ); break;
-            default:          if (verb) fprintf ( stderr, "?     " ); break;
-         }
-         if (verb) fprintf ( stderr, "  " );
-
-         if (verb) fprintf ( stderr, "name=%s\n", strtab + stab[j].st_name );
-      }
-   }
-
-   if (nsymtabs == 0) {
-      if (verb) fprintf ( stderr, "Didn't find any symbol tables\n" );
-      return FALSE;
-   }
-
-   return TRUE;
-}
-
-
-static void readSyms_elf ( Module m, Bool verb )
-{
-   int i, j, k, nent;
-   Elf32_Sym* stab;
-
-   char*       ehdrC      = (char*)(module(m).oImage);
-   Elf32_Ehdr* ehdr       = (Elf32_Ehdr*)ehdrC;
-   char*       strtab     = findElfSection ( ehdrC, SHT_STRTAB );
-   Elf32_Shdr* shdr       = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
-   char*       sh_strtab  = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
-
-   if (!strtab) internal("readSyms_elf");
-
-   k = 0;
-   for (i = 0; i < ehdr->e_shnum; i++) {
-
-      /* make a HugsDLSection entry for relevant sections */
-      DLSect kind = HUGS_DL_SECTION_OTHER;
-      if (0==strcmp(".data",sh_strtab+shdr[i].sh_name) ||
-          0==strcmp(".data1",sh_strtab+shdr[i].sh_name))
-         kind = HUGS_DL_SECTION_RWDATA;
-      if (0==strcmp(".text",sh_strtab+shdr[i].sh_name) ||
-          0==strcmp(".rodata",sh_strtab+shdr[i].sh_name) ||
-          0==strcmp(".rodata1",sh_strtab+shdr[i].sh_name))
-         kind = HUGS_DL_SECTION_CODE_OR_RODATA;
-      if (kind != HUGS_DL_SECTION_OTHER)
-         addDLSect (
-            m,
-            ehdrC + shdr[i].sh_offset, 
-            ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1,
-            kind
-         );
-
-      if (shdr[i].sh_type != SHT_SYMTAB) continue;
-
-      /* copy stuff into this module's object symbol table */
-      stab = (Elf32_Sym*) (ehdrC + shdr[i].sh_offset);
-      nent = shdr[i].sh_size / sizeof(Elf32_Sym);
-      for (j = 0; j < nent; j++) {
-         if ( ( ELF32_ST_BIND(stab[j].st_info)==STB_GLOBAL ||
-                ELF32_ST_BIND(stab[j].st_info)==STB_LOCAL
-              )
-              &&
-              ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
-                ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT ||
-                ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE)
-	      ) {
-            char* nm = strtab + stab[j].st_name;
-            char* ad = ehdrC 
-                       + shdr[ stab[j].st_shndx ].sh_offset
-                       + stab[j].st_value;
-            assert(nm);
-            assert(ad);
-            if (verb)
-               fprintf(stderr, "addOTabName: %10p  %s %s\n",
-                       ad, textToStr(module(m).text), nm );
-            addOTabName ( m, nm, ad );
-         }
-	 //else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
-      }
-
-   }
-}
-
-#endif /* defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) */
-
-
-/* --------------------------------------------------------------------------
- * Arch-independent interface to the runtime linker
- * ------------------------------------------------------------------------*/
-
-static Bool validateOImage ( void* img, Int size, Bool verb )
-{
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
-   return
-      validateOImage_elf ( img, size, verb );
-#else
-   internal("validateOImage: not implemented on this platform");
-#endif
-}
-
-
-static Void resolveReferencesInObjectModule ( Module m, Bool verb )
-{
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
-   resolveReferencesInObjectModule_elf ( m, verb );
-#else
-   internal("resolveReferencesInObjectModule: not implemented on this platform");
-#endif
-}
-
-
-static Void readSyms ( Module m, Bool verb )
-{
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
-   readSyms_elf ( m, verb );
-#else
-   internal("readSyms: not implemented on this platform");
-#endif
-}
-
 
 /* --------------------------------------------------------------------------
  * General object symbol query stuff
@@ -2583,7 +2190,7 @@ void* lookupObjName ( char* nm )
    m = findModule(t);
    if (isNull(m)) goto not_found;
 fprintf(stderr, "   %%%% %s\n", nm );
-   a = lookupOTabName ( m, nm );
+   a = lookupOTabName ( m, nm );  /* RATIONALISE */
    if (a) return a;
 
   not_found:
@@ -2596,22 +2203,25 @@ fprintf(stderr, "   %%%% %s\n", nm );
 
 int is_dynamically_loaded_code_or_rodata_ptr ( char* p )
 {
-   return 
-      lookupDLSect(p) == HUGS_DL_SECTION_CODE_OR_RODATA;
+   OSectionKind sk = lookupSection(p);
+   assert (sk != HUGS_SECTIONKIND_NOINFOAVAIL);
+   return (sk == HUGS_SECTIONKIND_CODE_OR_RODATA);
 }
 
 
 int is_dynamically_loaded_rwdata_ptr ( char* p )
 {
-   return
-      lookupDLSect(p) == HUGS_DL_SECTION_RWDATA;
+   OSectionKind sk = lookupSection(p);
+   assert (sk != HUGS_SECTIONKIND_NOINFOAVAIL);
+   return (sk == HUGS_SECTIONKIND_RWDATA);
 }
 
 
 int is_not_dynamically_loaded_ptr ( char* p )
 {
-   return
-      lookupDLSect(p) == HUGS_DL_SECTION_OTHER;
+   OSectionKind sk = lookupSection(p);
+   assert (sk != HUGS_SECTIONKIND_NOINFOAVAIL);
+   return (sk == HUGS_SECTIONKIND_OTHER);
 }
 
 

@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.22 1999/11/24 10:12:47 andy Exp $                      #
+# $Id: Makefile,v 1.23 1999/12/17 16:34:08 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -36,7 +36,7 @@ HS_SRCS =
 Y_SRCS = parser.y
 C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c output.c   \
-     hugs.c dynamic.c stg.c sainteger.c interface.c
+     hugs.c dynamic.c stg.c sainteger.c object.c interface.c
 
 SRC_CC_OPTS = -g -O -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline
 
