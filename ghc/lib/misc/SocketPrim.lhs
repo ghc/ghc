@@ -42,8 +42,6 @@ module SocketPrim (
 --    sendmsg		-- :: Socket -> Message -> MsgFlags -> IO Int
 --    recvmsg		-- :: Socket -> MsgFlags -> IO Message
 
-    shutdown,		-- :: Socket -> ShutdownCmd -> IO ()
-    sClose,		-- :: Socket -> IO ()
 
     inet_addr,		-- :: String -> IO HostAddress
     inet_ntoa,		-- :: HostAddress -> IO String
@@ -53,6 +51,8 @@ module SocketPrim (
     sIsListening,	-- :: Socket -> IO Bool 
     sIsReadable,	-- :: Socket -> IO Bool
     sIsWritable,	-- :: Socket -> IO Bool
+    shutdown,		-- :: Socket -> ShutdownCmd -> IO ()
+    sClose,		-- :: Socket -> IO ()
 
     -- socket opts
     SocketOption(..),
@@ -71,7 +71,7 @@ module SocketPrim (
 
 
 -- The following are exported ONLY for use in the BSD module and
--- should not be used else where.
+-- should not be used anywhere else.
 
     packFamily, unpackFamily,
     packSocketType,
@@ -162,6 +162,13 @@ type HostAddress = Word
 --
 newtype PortNumber = PNum Int  -- 16-bit value stored in network byte order.
 		     deriving ( Eq )
+
+instance Show PortNumber where
+  showsPrec p (PNum pn) = showsPrec p pn_host
+   where
+     pn_host :: Int
+     pn_host = unsafePerformIO  (_casm_ ``%r=(int)ntohs((int)%0); '' pn)
+
 
 mkPortNumber :: Int -> PortNumber
 mkPortNumber v = unsafePerformIO $ do
@@ -423,7 +430,7 @@ readSocket (MkSocket s family stype protocol status) nbytes = do
     fail (userError ("readSocket: can't perform read on socket in status " ++
 	  show currentStatus))
    else do
-    ptr <- stToIO (newCharArray (0, nbytes))
+    ptr <- stToIO (newCharArray (1, nbytes))
     nbytes <- _ccall_ readDescriptor s ptr nbytes
     case nbytes of
       -1 -> constructErrorAndFail "readSocket"
@@ -524,45 +531,49 @@ getSocketName (MkSocket s family stype protocol status) = do
 
 \begin{code}
 data SocketOption
-    = Broadcast     {- SO_BROADCAST -}
-    | Debug         {- SO_DEBUG     -}
-    | DontRoute     {- SO_DONTROUTE -}
+    = Debug         {- SO_DEBUG     -}
+    | ReuseAddr     {- SO_REUSEADDR -}
+    | Type          {- SO_TYPE      -}
     | SoError       {- SO_ERROR     -}
-    | KeepAlive     {- SO_KEEPALIVE -}
---    | Linger        {- SO_LINGER    -}
-    | OOBInline     {- SO_OOBINLINE -}
-    | RecvBuffer    {- SO_RCVBUF    -}
+    | DontRoute     {- SO_DONTROUTE -}
+    | Broadcast     {- SO_BROADCAST -}
     | SendBuffer    {- SO_SNDBUF    -}
+    | RecvBuffer    {- SO_RCVBUF    -}
+    | KeepAlive     {- SO_KEEPALIVE -}
+    | OOBInline     {- SO_OOBINLINE -}
+    | MaxSegment    {- TCP_MAXSEG   -}
+    | NoDelay       {- TCP_NODELAY  -}
+--    | Linger        {- SO_LINGER    -}
+#if 0
     | RecvLowWater  {- SO_RCVLOWAT  -}
     | SendLowWater  {- SO_SNDLOWAT  -}
     | RecvTimeOut   {- SO_RCVTIMEO  -}
     | SendTimeOut   {- SO_SNDTIMEO  -}
-    | ReuseAddr     {- SO_REUSEADDR -}
-    | Type          {- SO_TYPE      -}
     | UseLoopBack   {- SO_USELOOPBACK -}  -- not used, I believe.
-    | MaxSegment    {- TCP_MAXSEG   -}
-    | NoDelay       {- TCP_NODELAY  -}
+#endif
 
 packSocketOption :: SocketOption -> Int
 packSocketOption so =
   case so of
-    Broadcast     -> ``SO_BROADCAST''
     Debug         -> ``SO_DEBUG''
-    DontRoute     -> ``SO_DONTROUTE''
+    ReuseAddr     -> ``SO_REUSEADDR''
+    Type          -> ``SO_TYPE''
     SoError       -> ``SO_ERROR''
+    DontRoute     -> ``SO_DONTROUTE''
+    Broadcast     -> ``SO_BROADCAST''
+    SendBuffer    -> ``SO_SNDBUF''
+    RecvBuffer    -> ``SO_RCVBUF''
     KeepAlive     -> ``SO_KEEPALIVE''
     OOBInline     -> ``SO_OOBINLINE''
-    RecvBuffer    -> ``SO_RCVBUF''
-    SendBuffer    -> ``SO_SNDBUF''
+    MaxSegment    -> ``TCP_MAXSEG''
+    NoDelay       -> ``TCP_NODELAY''
+#if 0
     RecvLowWater  -> ``SO_RCVLOWAT''
     SendLowWater  -> ``SO_SNDLOWAT''
     RecvTimeOut   -> ``SO_RCVTIMEO''
     SendTimeOut   -> ``SO_SNDTIMEO''
-    ReuseAddr     -> ``SO_REUSEADDR''
-    Type          -> ``SO_TYPE''
     UseLoopBack   -> ``SO_USELOOPBACK''
-    MaxSegment    -> ``TCP_MAXSEG''
-    NoDelay       -> ``TCP_NODELAY''
+#endif
 
 setSocketOption :: Socket 
 		-> SocketOption -- Option Name
@@ -982,7 +993,9 @@ packSocketType stype = 1 + (index (Stream, Packet) stype)
 %************************************************************************
 
 \begin{code}
-aNY_PORT = 0::Int
+aNY_PORT :: PortNumber 
+aNY_PORT = mkPortNumber 0
+
 iNADDR_ANY :: HostAddress
 iNADDR_ANY = unsafePerformIO (_casm_ `` %r = htonl(INADDR_ANY); '')
 
@@ -1172,19 +1185,21 @@ it subsequently.
 #ifndef __PARALLEL_HASKELL__
 socketToHandle :: Socket -> IOMode -> IO Handle
 
-socketToHandle (MkSocket s family stype protocol status) m = do
-    ptr <- _casm_ ``%r = fdopen (%0, (char *)%1);'' s m'
-    fp <- makeForeignObj ptr (``&freeFile'' :: Addr)
-    hndl <- newHandle (htype fp Nothing False)
-    hSetBuffering hndl NoBuffering
+socketToHandle (MkSocket fd family stype protocol status) m = do
+    fo <- _ccall_ openFd fd file_mode flush_on_close
+    fo <- makeForeignObj fo (``&freeFileObject'' :: Addr)
+    mkBuffer__ fo 0  -- not buffered
+    hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)
     return hndl
  where
-  m' = 
+  socket_str = "<socket: "++show fd
+  (flush_on_close, file_mode) =
    case m of 
-     ReadMode      -> "r"
-     WriteMode     -> "w"
-     AppendMode    -> "a"
-     ReadWriteMode -> "r+"
+           AppendMode    -> (1, 0)
+           WriteMode     -> (1, 1)
+           ReadMode      -> (0, 2)
+           ReadWriteMode -> (1, 3)
+
   htype = 
    case m of 
      ReadMode      -> ReadHandle
