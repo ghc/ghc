@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.56 2004/06/11 11:14:58 malcolm Exp $
+-- $Id: Main.hs,v 1.57 2004/06/27 20:41:07 panne Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -478,14 +478,15 @@ output :: [Flag] -> String -> [Token] -> IO ()
 output flags name toks = do
     
     (outName, outDir, outBase) <- case [f | Output f <- flags] of
-        []
-            | not (null ext) &&
-              last ext == 'c'   -> return (dir++base++init ext,  dir, base)
-            | ext == ".hs"      -> return (dir++base++"_out.hs", dir, base)
-            | otherwise         -> return (dir++base++".hs",     dir, base)
-            where
-            (dir,  file) = splitName name
-            (base, ext)  = splitExt  file
+        [] -> if not (null ext) && last ext == 'c'
+                 then return (dir++base++init ext,  dir, base)
+                 else
+                    if ext == ".hs"
+                       then return (dir++base++"_out.hs", dir, base)
+                       else return (dir++base++".hs",     dir, base)
+              where
+               (dir,  file) = splitName name
+               (base, ext)  = splitExt  file
         [f] -> let
             (dir,  file) = splitName f
             (base, _)    = splitExt file
@@ -504,7 +505,7 @@ output flags name toks = do
         outHName     = outDir++outHFile
         outCName     = outDir++outBase++"_hsc.c"
 	
-	beVerbose    = any (\ x -> case x of { Verbose{} -> True; _ -> False}) flags
+	beVerbose    = any (\ x -> case x of { Verbose -> True; _ -> False}) flags
 
     let execProgName
             | null outDir = dosifyPath ("./" ++ progName)
@@ -648,7 +649,7 @@ outHeaderCProg (pos, key, arg) = case key of
                 "#define hsc_"++name++"("++dropWhile isSpace args++") \ 
                 \printf ("++joinLines body++");\n"
     _ -> ""
-    where
+   where
     joinLines = concat . intersperse " \\\n" . lines
 
 outHeaderHs :: [Flag] -> Maybe String -> [(SourcePos, String, String)] -> String
@@ -747,7 +748,7 @@ outTokenH (pos, key, arg) =
                 \#endif\n"++
                 arg++"\n"
             _ -> "extern "++header++";\n"
-            where header = takeWhile (\c -> c /= '{' && c /= '=') arg
+          where header = takeWhile (\c -> c /= '{' && c /= '=') arg
         _ | conditional key -> outCLine pos++"#"++key++" "++arg++"\n"
         _ -> ""
 
