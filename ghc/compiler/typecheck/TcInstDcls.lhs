@@ -66,6 +66,7 @@ import TysWiredIn	( genericTyCons )
 import Name             ( Name )
 import SrcLoc           ( SrcLoc )
 import Unique		( Uniquable(..) )
+import Util             ( lengthExceeds )
 import BasicTypes	( NewOrData(..), Fixity )
 import ErrUtils		( dumpIfSet_dyn )
 import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
@@ -348,7 +349,7 @@ get_generics decl@(ClassDecl {tcdName = class_name, tcdMeths = Just def_methods,
 	tc_inst_infos = [(simpleInstInfoTyCon i, i) | i <- inst_infos]
 
 	bad_groups = [group | group <- equivClassesByUniq get_uniq tc_inst_infos,
-			      length group > 1]
+			      group `lengthExceeds` 1]
 	get_uniq (tc,_) = getUnique tc
     in
     mapTc (addErrTc . dupGenericInsts) bad_groups	`thenTc_`

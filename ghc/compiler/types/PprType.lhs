@@ -37,6 +37,7 @@ import Maybes		( maybeToBool )
 import Name		( getOccString, getOccName )
 import Outputable
 import Unique		( Uniquable(..) )
+import Util             ( lengthIs )
 import BasicTypes	( tupleParens )
 import PrelNames		-- quite a few *Keys
 \end{code}
@@ -136,7 +137,7 @@ ppr_ty ctxt_prec ty@(TyConApp tycon tys)
 	
 	-- TUPLE CASE (boxed and unboxed)
   |  isTupleTyCon tycon,
-     length tys == tyConArity tycon	-- No magic if partially applied
+      tys `lengthIs` tyConArity tycon 	-- No magic if partially applied
   = tupleParens (tupleTyConBoxity tycon)
 		(sep (punctuate comma (map (ppr_ty tOP_PREC) tys)))
 

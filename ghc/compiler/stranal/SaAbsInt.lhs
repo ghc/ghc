@@ -35,7 +35,7 @@ import Type		( splitTyConApp_maybe,
 		          isUnLiftedType, Type )
 import TyCon		( tyConUnique )
 import PrelInfo		( numericTyKeys )
-import Util		( isIn, nOfThem, zipWithEqual )
+import Util		( isIn, nOfThem, zipWithEqual, equalLength )
 import Outputable	
 \end{code}
 
@@ -294,7 +294,7 @@ evalStrictness (WwUnpack _ demand_info) val
       AbsTop	   -> False
       AbsBot	   -> True
       AbsProd vals
-	   | length vals /= length demand_info -> pprTrace "TELL SIMON: evalStrictness" (ppr demand_info $$ ppr val)
+	   | not (equalLength vals demand_info) -> pprTrace "TELL SIMON: evalStrictness" (ppr demand_info $$ ppr val)
 						  False
 	   | otherwise -> or (zipWithEqual "evalStrictness" evalStrictness demand_info vals)
 
@@ -323,7 +323,7 @@ evalAbsence (WwUnpack _ demand_info) val
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
 	AbsProd vals 
-	   | length vals /= length demand_info -> pprTrace "TELL SIMON: evalAbsence" (ppr demand_info $$ ppr val)
+	   | not (equalLength vals demand_info) -> pprTrace "TELL SIMON: evalAbsence" (ppr demand_info $$ ppr val)
 						  True
 	   | otherwise -> or (zipWithEqual "evalAbsence" evalAbsence demand_info vals)
 	_	       -> pprTrace "TELL SIMON: evalAbsence" 
@@ -464,7 +464,7 @@ absEval anal expr@(Case scrut case_bndr alts) env
 		-- type; so the constructor in this alternative must be the right one
 		-- so we can go ahead and bind the constructor args to the components
 		-- of the product value.
-	    ASSERT(length arg_vals == length val_bndrs)
+	    ASSERT(equalLength arg_vals val_bndrs)
 	    absEval anal rhs rhs_env
 	  where
 	    val_bndrs = filter isId bndrs

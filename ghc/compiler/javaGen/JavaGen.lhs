@@ -66,6 +66,7 @@ import Outputable
 
 import Maybe
 import PrimOp
+import Util     ( lengthIs )
 
 #include "HsVersions.h"
 
@@ -266,7 +267,7 @@ javaCase :: (Expr -> Statement) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 -- If we've got the wrong one, this is _|_, and the
 -- casting will catch this with an exception.
 
-javaCase r e x [(DataAlt d,bs,rhs)] | length bs > 0
+javaCase r e x [(DataAlt d,bs,rhs)] | not (null bs)
   = java_expr PushExpr e ++
     [ var [Final] (javaName x)
 	          (whnf primRep (vmPOP (primRepToType primRep))) ] ++
@@ -420,7 +421,7 @@ javaApp r (CoreSyn.App f a) as
 	| otherwise  = javaApp r f as
 javaApp r (CoreSyn.Var f) as 
   = case isDataConId_maybe f of {
-	Just dc | length as == dataConRepArity dc
+	Just dc | as `lengthIs` dataConRepArity dc
 	 -- NOTE: Saturated constructors never returning a primitive at this point
 	 --
 	 -- We push the arguments backwards, because we are using

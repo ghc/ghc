@@ -109,7 +109,7 @@ import Maybes		( maybeToBool )
 import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..) )
 import Unique		( Uniquable(..) )
-import Util		( mapAccumL, seqList )
+import Util		( mapAccumL, seqList, lengthIs )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 \end{code}
@@ -326,7 +326,7 @@ mkTyConApp tycon tys
 
   | isNewTyCon tycon,			-- A saturated newtype application;
     not (isRecursiveTyCon tycon),	-- Not recursive (we don't use SourceTypes for them)
-    length tys == tyConArity tycon	-- use the SourceType form
+    tys `lengthIs` tyConArity tycon     -- use the SourceType form
   = SourceTy (NType tycon tys)
 
   | otherwise
@@ -372,7 +372,7 @@ mkSynTy tycon tys
   | n_args == arity	-- Exactly saturated
   = mk_syn tys
   | n_args >  arity	-- Over-saturated
-  = foldl AppTy (mk_syn (take arity tys)) (drop arity tys)
+  = case splitAt arity tys of { (as,bs) -> foldl AppTy (mk_syn as) bs }
   | otherwise		-- Un-saturated
   = TyConApp tycon tys
 	-- For the un-saturated case we build TyConApp directly
@@ -426,7 +426,7 @@ repType (ForAllTy _ ty)   = repType ty
 repType (NoteTy   _ ty)   = repType ty
 repType (SourceTy  p)     = repType (sourceTypeRep p)
 repType (UsageTy  _ ty)   = repType ty
-repType (TyConApp tc tys) | isNewTyCon tc && length tys == tyConArity tc
+repType (TyConApp tc tys) | isNewTyCon tc && tys `lengthIs` tyConArity tc
 			  = repType (newTypeRep tc tys)
 repType ty	 	  = ty
 
@@ -650,7 +650,7 @@ splitNewType_maybe :: Type -> Maybe Type
 
 splitNewType_maybe ty
   = case splitTyConApp_maybe ty of
-	Just (tc,tys) | isNewTyCon tc -> ASSERT( length tys == tyConArity tc )
+	Just (tc,tys) | isNewTyCon tc -> ASSERT( tys `lengthIs` tyConArity tc )
 						-- The assert should hold because repType should
 						-- only be applied to *types* (of kind *)
 					 Just (newTypeRep tc tys)
@@ -880,7 +880,7 @@ isUnboxedTupleType ty = case splitTyConApp_maybe ty of
 -- Should only be applied to *types*; hence the assert
 isAlgType :: Type -> Bool
 isAlgType ty = case splitTyConApp_maybe ty of
-			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+			Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
 					      isAlgTyCon tc
 			other		   -> False
 \end{code}
@@ -911,7 +911,7 @@ isPrimitiveType :: Type -> Bool
 -- Most of these are unlifted, but now that we interact with .NET, we
 -- may have primtive (foreign-imported) types that are lifted
 isPrimitiveType ty = case splitTyConApp_maybe ty of
-			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+			Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
 					      isPrimTyCon tc
 			other		   -> False
 \end{code}

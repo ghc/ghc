@@ -40,7 +40,8 @@ import ErrUtils		( dumpIfSet_dyn )
 import BasicTypes	( Activation( AlwaysActive ) )
 import Bag
 import List		( partition )
-import Util		( zipEqual, zipWithEqual, cmpList )
+import Util		( zipEqual, zipWithEqual, cmpList, lengthIs,
+			  equalLength, lengthAtLeast )
 import Outputable
 
 
@@ -785,8 +786,8 @@ specDefn :: Subst			-- Subst to use for RHS
 
 specDefn subst calls (fn, rhs)
 	-- The first case is the interesting one
-  |  n_tyvars == length rhs_tyvars	-- Rhs of fn's defn has right number of big lambdas
-  && n_dicts  <= length rhs_bndrs	-- and enough dict args
+  |  rhs_tyvars `lengthIs` n_tyvars 	-- Rhs of fn's defn has right number of big lambdas
+  && rhs_bndrs  `lengthAtLeast` n_dicts	-- and enough dict args
   && not (null calls_for_me)		-- And there are some calls to specialise
   && not (isDataConWrapId fn)		-- And it's not a data con wrapper, which have
 					-- stupid overloading that simply discard the dictionary
@@ -848,7 +849,7 @@ specDefn subst calls (fn, rhs)
 	                UsageDetails, 			-- Usage details from specialised body
                 	CoreRule)			-- Info for the Id's SpecEnv
     spec_call (CallKey call_ts, (call_ds, call_fvs))
-      = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
+      = ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
 		-- Calls are only recorded for properly-saturated applications
 	
 	-- Suppose f's defn is 	f = /\ a b c d -> \ d1 d2 -> rhs	
@@ -910,8 +911,8 @@ specDefn subst calls (fn, rhs)
 
       where
 	my_zipEqual doc xs ys 
-	 | length xs /= length ys = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
-	 | otherwise		  = zipEqual doc xs ys
+	 | not (equalLength xs ys) = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
+	 | otherwise		   = zipEqual doc xs ys
 
 dropInline :: CoreExpr -> (Bool, CoreExpr) 
 dropInline (Note InlineMe rhs) = (True, rhs)
@@ -1004,8 +1005,8 @@ callDetailsToList calls = [ (id,tys,dicts)
 
 mkCallUDs subst f args 
   | null theta
-  || length spec_tys /= n_tyvars
-  || length dicts    /= n_dicts
+  || not (spec_tys `lengthIs` n_tyvars)
+  || not ( dicts   `lengthIs` n_dicts)
   || maybeToBool (lookupRule (\act -> True) (substInScope subst) f args)
 	-- There's already a rule covering this call.  A typical case
 	-- is where there's an explicit user-provided rule.  Then

@@ -18,6 +18,7 @@ import BasicTypes	( TopLevelFlag(..), isTopLevel )
 import Util		( mapAccumL )
 
 #ifdef DEBUG
+import Util		( lengthIs )
 import Outputable
 #endif
 \end{code}
@@ -202,7 +203,7 @@ constructSRT caf_refs sub_srt initial_offset current_offset
        srt_info | srt_length == 0 = NoSRT
 		| otherwise       = SRT initial_offset srt_length
 
-   in ASSERT( srt_length == length this_srt )
+   in ASSERT( this_srt `lengthIs` srt_length )
       (srt_info, this_srt, new_offset)
 \end{code}
 

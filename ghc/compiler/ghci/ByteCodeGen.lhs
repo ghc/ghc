@@ -538,10 +538,10 @@ schemeT d s p app
    | let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
          isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
      in  is_con_call && isUnboxedTupleCon con 
-         && ( (length args_r_to_l == 2 && isVoidRepAtom (last (args_r_to_l)))
-              || (length args_r_to_l == 1)
+         && ( (args_r_to_l `lengthIs` 2 && isVoidRepAtom (last (args_r_to_l)))
+              || (isSingleton args_r_to_l) )
             )
-   = --trace (if length args_r_to_l == 1
+   = --trace (if isSingleton args_r_to_l
      --       then "schemeT: unboxed singleton"
      --       else "schemeT: unboxed pair with Void first component") (
      schemeT d s p (head args_r_to_l)
@@ -863,12 +863,12 @@ maybe_getCCallReturnRep :: Type -> Maybe PrimRep
 maybe_getCCallReturnRep fn_ty
    = let (a_tys, r_ty) = splitRepFunTys fn_ty
          maybe_r_rep_to_go  
-            = if length r_reps == 1 then Nothing else Just (r_reps !! 1)
+            = if isSingleton r_reps then Nothing else Just (r_reps !! 1)
          (r_tycon, r_reps) 
             = case splitTyConApp_maybe (repType r_ty) of
                       (Just (tyc, tys)) -> (tyc, map typePrimRep tys)
                       Nothing -> blargh
-         ok = ( (length r_reps == 2 && VoidRep == head r_reps)
+         ok = ( ( r_reps `lengthIs` 2 && VoidRep == head r_reps)
                 || r_reps == [VoidRep] )
               && isUnboxedTupleTyCon r_tycon
               && case maybe_r_rep_to_go of

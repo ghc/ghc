@@ -87,6 +87,7 @@ import Unique		( mkBuiltinUnique )
 import Maybes
 import PrelNames
 import Maybe            ( isJust )
+import Util             ( dropList, isSingleton )
 import Outputable
 import ListSetOps	( assoc, assocMaybe )
 import UnicodeUtil      ( stringToUtf8 )
@@ -256,7 +257,7 @@ mkDataConWrapId data_con
 	-- we want to see that w is strict in its two arguments
 
     wrap_rhs | isNewTyCon tycon
-	     = ASSERT( null ex_tyvars && null ex_dict_args && length orig_arg_tys == 1 )
+	     = ASSERT( null ex_tyvars && null ex_dict_args && isSingleton orig_arg_tys )
 		-- No existentials on a newtype, but it can have a context
 		-- e.g. 	newtype Eq a => T a = MkT (...)
 		mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $ 
@@ -537,7 +538,7 @@ rebuildConArgs (arg:args) (str:stricts) us
 	 	 = splitProductType "rebuildConArgs" arg_ty
 
 	unpacked_args  = zipWith (mkSysLocal SLIT("rb")) us con_arg_tys
-	(binds, args') = rebuildConArgs args stricts (drop (length con_arg_tys) us)
+	(binds, args') = rebuildConArgs args stricts (dropList con_arg_tys us)
 	con_app	       = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
     in
     (NonRec arg con_app : binds, unpacked_args ++ args')

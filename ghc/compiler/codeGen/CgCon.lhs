@@ -69,8 +69,8 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> [StgArg]		-- Args
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
-  = ASSERT(not (isDllConApp con args))	-- checks for litlit args too
-    ASSERT(length args == dataConRepArity con)
+  = ASSERT( not (isDllConApp con args) )	-- checks for litlit args too
+    ASSERT( args `lengthIs` dataConRepArity con )
 
 	-- LAY IT OUT
     getArgAmodes args		`thenFC` \ amodes ->
@@ -234,7 +234,7 @@ bindUnboxedTupleComponents
 bindUnboxedTupleComponents args
  =  -- Assign as many components as possible to registers
     let (arg_regs, _leftovers) = assignRegs [] (map idPrimRep args)
-	(reg_args, stk_args)   = splitAt (length arg_regs) args
+	(reg_args, stk_args)   = splitAtList arg_regs args
     in
 
     -- Allocate the rest on the stack (ToDo: separate out pointers)
@@ -268,7 +268,7 @@ sure the @amodes@ passed don't conflict with each other.
 cgReturnDataCon :: DataCon -> [CAddrMode] -> Code
 
 cgReturnDataCon con amodes
-  = ASSERT(length amodes == dataConRepArity con)
+  = ASSERT( amodes `lengthIs` dataConRepArity con )
     getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_sp sequel) ->
 
     case sequel of

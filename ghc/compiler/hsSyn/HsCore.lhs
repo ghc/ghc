@@ -48,7 +48,7 @@ import Type		( Kind, eqKind )
 import BasicTypes	( Arity )
 import FiniteMap	( lookupFM )
 import CostCentre
-import Util		( eqListBy )
+import Util		( eqListBy, lengthIs )
 import Outputable
 \end{code}
 
@@ -159,7 +159,7 @@ toUfApp (Var v) as
 		-> UfTuple (mk_hs_tup_con tc dc) tup_args
 	  where
 	    val_args  = dropWhile isTypeArg as
-	    saturated = length val_args == idArity v
+	    saturated = val_args `lengthIs` idArity v
 	    tup_args  = map toUfExpr val_args
 	    tc	      = dataConTyCon dc
 	;

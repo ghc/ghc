@@ -28,6 +28,7 @@ import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( noSrcLoc )
 import UniqSet
+import Util             ( takeList, splitAtList )
 import Outputable
 
 #include "HsVersions.h"
@@ -187,7 +188,7 @@ check' :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
 check' []                                              = ([([],[])],emptyUniqSet)
 
 check' [EqnInfo n ctx ps (MatchResult CanFail _)] 
-   | all_vars ps  = ([(take (length ps) (repeat new_wild_pat),[])],  unitUniqSet n)
+   | all_vars ps  = ([(takeList ps (repeat new_wild_pat),[])],  unitUniqSet n)
 
 check' qs@((EqnInfo n ctx ps (MatchResult CanFail _)):rs)
    | all_vars ps  = (pats,  addOneToUniqSet indexs n)
@@ -244,8 +245,8 @@ must be one Variable to be complete.
 
 process_literals :: [HsLit] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
 process_literals used_lits qs 
-  | length default_eqns == 0 = ([make_row_vars used_lits (head qs)]++pats,indexs)
-  | otherwise                = (pats_default,indexs_default)
+  | null default_eqns  = ([make_row_vars used_lits (head qs)]++pats,indexs)
+  | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = process_explicit_literals used_lits qs
        default_eqns    = (map remove_var (filter is_var qs))
@@ -283,8 +284,9 @@ same constructor.
 
 split_by_constructor :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
 
-split_by_constructor qs | length unused_cons /= 0 = need_default_case used_cons unused_cons qs 
-                        | otherwise               = no_need_default_case used_cons qs 
+split_by_constructor qs 
+  | not (null unused_cons) = need_default_case used_cons unused_cons qs 
+  | otherwise              = no_need_default_case used_cons qs 
                        where 
                           used_cons   = get_used_cons qs 
                           unused_cons = get_unused_cons used_cons 
@@ -319,8 +321,8 @@ no_need_default_case cons qs = (concat pats, unionManyUniqSets indexs)
 
 need_default_case :: [TypecheckedPat] -> [DataCon] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
 need_default_case used_cons unused_cons qs 
-  | length default_eqns == 0 = (pats_default_no_eqns,indexs)
-  | otherwise                = (pats_default,indexs_default)
+  | null default_eqns  = (pats_default_no_eqns,indexs)
+  | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = no_need_default_case used_cons qs
        default_eqns    = (map remove_var (filter is_var qs))
@@ -368,7 +370,7 @@ remove_first_column (ConPat con _ _ _ con_pats) qs =
 
 make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
 make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
-   (VarPatIn new_var:take (length (tail pats)) (repeat new_wild_pat),[(new_var,used_lits)])
+   (VarPatIn new_var:takeList (tail pats) (repeat new_wild_pat),[(new_var,used_lits)])
   where new_var = hash_x
 
 hash_x = mkLocalName unboundKey {- doesn't matter much -}
@@ -376,7 +378,7 @@ hash_x = mkLocalName unboundKey {- doesn't matter much -}
 		     noSrcLoc
 
 make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
-make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = take (length (tail pats)) (repeat new_wild_pat)
+make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = takeList (tail pats) (repeat new_wild_pat)
 
 compare_cons :: TypecheckedPat -> TypecheckedPat -> Bool
 compare_cons (ConPat id1 _ _ _ _) (ConPat id2 _ _ _ _) = id1 == id2  
@@ -524,10 +526,8 @@ make_con (ConPat id _ _ _ _) (p:q:ps, constraints)
 make_con (ConPat id _ _ _ pats) (ps,constraints) 
       | isTupleTyCon tc = (TuplePatIn pats_con (tupleTyConBoxity tc) : rest_pats, constraints) 
       | otherwise       = (ConPatIn name pats_con		     : rest_pats, constraints)
-    where num_args  = length pats
-          name      = getName id
-          pats_con  = take num_args ps
-          rest_pats = drop num_args ps
+    where name      = getName id
+	  (pats_con, rest_pats) = splitAtList pats ps
 	  tc	    = dataConTyCon id
 	  
 
@@ -538,7 +538,7 @@ make_whole_con con | isInfixCon con = ConOpPatIn new_wild_pat name fixity new_wi
                   fixity = panic "Check.make_whole_con: Guessing fixity"
                   name   = getName con
                   arity  = dataConSourceArity con 
-                  pats   = take arity (repeat new_wild_pat)
+                  pats   = replicate arity new_wild_pat
 
 
 new_wild_pat :: WarningPat

@@ -68,6 +68,7 @@ import BasicTypes	( Arity )
 import Unique		( Unique )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
+import Util             ( equalLength, lengthAtLeast )
 \end{code}
 
 
@@ -623,7 +624,7 @@ exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
 	new_val_args	 = zipWith mk_coerce to_arg_tys val_args
     in
     ASSERT( all isTypeArg (take arity args) )
-    ASSERT( length val_args == length to_arg_tys )
+    ASSERT( equalLength val_args to_arg_tys )
     Just (dc, map Type tc_arg_tys ++ new_val_args)
     }}
 
@@ -644,7 +645,7 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
   where
     analyse (Var fun, args)
 	| Just con <- isDataConId_maybe fun,
-	  length args >= dataConRepArity con
+	  args `lengthAtLeast` dataConRepArity con
 		-- Might be > because the arity excludes type args
 	= Just (con,args)
 
@@ -961,7 +962,7 @@ eqExpr e1 e2
     eq env (Let (NonRec v1 r1) e1)
 	   (Let (NonRec v2 r2) e2)   = eq env r1 r2 && eq (extendVarEnv env v1 v2) e1 e2
     eq env (Let (Rec ps1) e1)
-	   (Let (Rec ps2) e2)        = length ps1 == length ps2 &&
+	   (Let (Rec ps2) e2)        = equalLength ps1 ps2 &&
 				       and (zipWith eq_rhs ps1 ps2) &&
 				       eq env' e1 e2
 				     where
@@ -969,7 +970,7 @@ eqExpr e1 e2
 				       eq_rhs (_,r1) (_,r2) = eq env' r1 r2
     eq env (Case e1 v1 a1)
 	   (Case e2 v2 a2)	     = eq env e1 e2 &&
-				       length a1 == length a2 &&
+				       equalLength a1 a2 &&
 				       and (zipWith (eq_alt env') a1 a2)
 				     where
 				       env' = extendVarEnv env v1 v2

@@ -11,6 +11,7 @@ module HscStats ( ppSourceStats ) where
 import HsSyn
 import Outputable
 import Char		( isSpace )
+import Util             ( count )
 \end{code}
 
 %************************************************************************
@@ -62,7 +63,7 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     
     trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
-    fixity_ds   = length [() | FixD d <- decls]
+    fixity_ds   = count (\ x -> case x of { FixD{} -> True; _ -> False}) decls
 		-- NB: this omits fixity decls on local bindings and
 		-- in class decls.  ToDo
 
@@ -71,12 +72,13 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
 
     inst_decls  = [d | InstD d <- decls]
     inst_ds     = length inst_decls
-    default_ds  = length [() | DefD _ <- decls]
+    default_ds  = count (\ x -> case x of { DefD{} -> True; _ -> False}) decls
     val_decls   = [d | ValD d <- decls]
 
     real_exports = case exports of { Nothing -> []; Just es -> es }
     n_exports  	 = length real_exports
-    export_ms  	 = length [() | IEModuleContents _ <- real_exports]
+    export_ms  	 = count (\ e -> case e of { IEModuleContents{} -> True;_ -> False})
+                         real_exports
     export_ds  	 = n_exports - export_ms
     export_all 	 = case exports of { Nothing -> 1; other -> 0 }
 

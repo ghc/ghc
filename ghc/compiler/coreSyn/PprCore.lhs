@@ -38,6 +38,7 @@ import TyCon		( tupleTyConBoxity, isTupleTyCon )
 import PprType		( pprParendType, pprTyVarBndr )
 import BasicTypes	( tupleParens )
 import PprEnv
+import Util             ( lengthIs )
 import Outputable
 \end{code}
 
@@ -184,7 +185,7 @@ ppr_expr add_par pe expr@(App fun arg)
 			   -> tupleParens (tupleTyConBoxity tc) pp_tup_args
 			   where
 			     tc	       = dataConTyCon dc
-			     saturated = length val_args == idArity f
+			     saturated = val_args `lengthIs` idArity f
 
 		   other -> add_par (hang (pOcc pe f) 2 pp_args)
 

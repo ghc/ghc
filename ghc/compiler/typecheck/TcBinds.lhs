@@ -50,7 +50,7 @@ import NameSet
 import Var		( tyVarKind )
 import VarSet
 import Bag
-import Util		( isIn )
+import Util		( isIn, equalLength )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isNotTopLevel,
 			  isAlwaysActive )
 import FiniteMap	( listToFM, lookupFM )
@@ -471,12 +471,11 @@ checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
     returnTc (sig_avails, map instToId sig_dicts)
   where
     sig1_dict_tys = map mkPredTy theta1
-    n_sig1_theta  = length theta1
     sig_meths 	  = concat [insts | TySigInfo _ _ _ _ _ _ insts _ <- sigs]
 
     check_one sig@(TySigInfo _ id _ theta _ _ _ src_loc)
        = tcAddErrCtxt (sigContextsCtxt id1 id)			$
-	 checkTc (length theta == n_sig1_theta) sigContextsErr	`thenTc_`
+	 checkTc (equalLength theta theta1) sigContextsErr	`thenTc_`
 	 unifyTauTyLists sig1_dict_tys (map mkPredTy theta)
 
 checkSigsTyVars sigs = mapTc_ check_one sigs

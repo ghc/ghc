@@ -46,7 +46,7 @@ import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey
 			  usOnceTyConName, usManyTyConName
 			)
 import FiniteMap
-import Util		( eqListBy )
+import Util		( eqListBy, lengthIs )
 import Outputable
 \end{code}
 
@@ -341,7 +341,7 @@ toHsType ty@(TyConApp tc tys)	-- Must be saturated because toHsType's arg is of 
   where
      generic_case = foldl HsAppTy (HsTyVar (getName tc)) tys'
      tys'         = map toHsType tys
-     saturated    = length tys == tyConArity tc
+     saturated    = tys `lengthIs` tyConArity tc
 
 toHsType ty@(ForAllTy _ _) = case tcSplitSigmaTy ty of
 			        (tvs, preds, tau) -> HsForAllTy (Just (map toHsTyVar tvs))

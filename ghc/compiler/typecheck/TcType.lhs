@@ -134,7 +134,7 @@ import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
-import Util		( cmpList, thenCmp )
+import Util		( cmpList, thenCmp, equalLength )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 \end{code}
@@ -857,7 +857,7 @@ uTysX (FunTy fun1 arg1) (FunTy fun2 arg2) k subst
 
 	-- Type constructors must match
 uTysX (TyConApp con1 tys1) (TyConApp con2 tys2) k subst
-  | (con1 == con2 && length tys1 == length tys2)
+  | (con1 == con2 && equalLength tys1 tys2)
   = uTyListsX tys1 tys2 k subst
 
 	-- Applications need a bit of care!

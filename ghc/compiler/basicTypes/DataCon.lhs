@@ -42,7 +42,7 @@ import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
 import Maybe
 import ListSetOps	( assoc )
-import Util		( zipEqual, zipWithEqual )
+import Util		( zipEqual, zipWithEqual, equalLength )
 \end{code}
 
 
@@ -216,7 +216,7 @@ mkDataCon :: Name
 mkDataCon name arg_stricts fields
 	  tyvars theta ex_tyvars ex_theta orig_arg_tys tycon
 	  work_id wrap_id
-  = ASSERT(length arg_stricts == length orig_arg_tys)
+  = ASSERT(equalLength arg_stricts orig_arg_tys)
 	-- The 'stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.

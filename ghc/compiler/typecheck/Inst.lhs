@@ -71,7 +71,7 @@ import VarEnv	( TidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames( fromIntegerName, fromRationalName )
-import Util	( thenCmp )
+import Util	( thenCmp, equalLength )
 import Bag
 import Outputable
 \end{code}
@@ -415,7 +415,7 @@ newMethodAtLoc inst_loc real_id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
 	(tyvars,rho)  = tcSplitForAllTys (idType real_id)
-	rho_ty	      = ASSERT( length tyvars == length tys )
+	rho_ty	      = ASSERT( equalLength tyvars tys )
 			substTy (mkTopTyVarSubst tyvars tys) rho
 	(theta, tau)  = tcSplitRhoTy rho_ty
     in

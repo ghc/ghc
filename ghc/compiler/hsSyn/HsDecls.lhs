@@ -42,7 +42,7 @@ import FunDeps		( pprFundeps )
 import Class		( FunDep, DefMeth(..) )
 import CStrings		( CLabelString )
 import Outputable	
-import Util		( eqListBy )
+import Util		( eqListBy, count )
 import SrcLoc		( SrcLoc )
 import FastString
 
@@ -445,11 +445,17 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl {} <- decls],
-    length [() | TySynonym {} <- decls],
-    length [() | IfaceSig  {} <- decls],
-    length [() | TyData {tcdND = DataType} <- decls],
-    length [() | TyData {tcdND = NewType} <- decls])
+ = (count isClassDecl     decls,
+    count isSynDecl       decls,
+    count isIfaceSigDecl  decls,
+    count isDataTy        decls,
+    count isNewTy         decls) 
+ where
+   isDataTy TyData{tcdND=DataType} = True
+   isDataTy _                      = False
+   
+   isNewTy TyData{tcdND=NewType} = True
+   isNewTy _                     = False
 \end{code}
 
 \begin{code}

@@ -32,7 +32,7 @@ import BasicTypes	( Activation(..) )
 import Outputable
 
 import Maybes		( orElse )
-import Util		( mapAccumL )
+import Util		( mapAccumL, lengthAtLeast )
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
@@ -432,7 +432,7 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
 	good_calls :: [[CoreArg]]
 	good_calls = [ pats
 		     | (con_env, call_args) <- all_calls,
-		       length call_args >= n_bndrs,	    -- App is saturated
+		       call_args `lengthAtLeast` n_bndrs,	    -- App is saturated
 		       let call = (bndrs `zip` call_args),
 		       any (good_arg con_env occs) call,    -- At least one arg is a constr app
 		       let (_, pats) = argsToPats con_env us call_args
@@ -565,7 +565,7 @@ is_con_app_maybe env (Lit lit)
 is_con_app_maybe env expr
   = case collectArgs expr of
 	(Var fun, args) | Just con <- isDataConId_maybe fun,
-			  length args >= dataConRepArity con
+			  args `lengthAtLeast` dataConRepArity con
 		-- Might be > because the arity excludes type args
 		        -> Just (DataAlt con,args)
 

@@ -88,7 +88,7 @@ import BasicTypes	( Boxity, Arity, isBoxed )
 import CmdLineOpts	( dopt, DynFlag(..) )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
-import Util		( nOfThem )
+import Util		( nOfThem, isSingleton, equalLength )
 import ListSetOps	( removeDups )
 import Outputable
 \end{code}
@@ -937,11 +937,11 @@ check_inst_head dflags clas tys
   = check_tyvars dflags clas tys
 
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
-  | length tys == 1,
+  | isSingleton tys,
     Just (tycon, arg_tys) <- tcSplitTyConApp_maybe first_ty,
     not (isSynTyCon tycon), 		-- ...but not a synonym
     all tcIsTyVarTy arg_tys,  		-- Applied to type variables
-    length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
+    equalLength (varSetElems (tyVarsOfTypes arg_tys)) arg_tys
           -- This last condition checks that all the type variables are distinct
   = returnTc ()
 
@@ -1114,7 +1114,7 @@ uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
 
 	-- Type constructors must match
 uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
-  | con1 == con2 && length tys1 == length tys2
+  | con1 == con2 && equalLength tys1 tys2
   = unifyTauTyLists tys1 tys2
 
   | con1 == openKindCon

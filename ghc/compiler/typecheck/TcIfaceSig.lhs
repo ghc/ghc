@@ -37,7 +37,7 @@ import Var		( mkTyVar, tyVarKind )
 import Name		( Name, nameIsLocalOrFrom )
 import ErrUtils		( pprBagOfErrors )
 import Outputable	
-import Util		( zipWithEqual )
+import Util		( zipWithEqual, dropList, equalLength )
 import HscTypes		( TyThing(..) )
 \end{code}
 
@@ -337,10 +337,10 @@ tcCoreAlt scrut_ty alt@(con, names, rhs)
 	ex_tyvars'	    = [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
 	ex_tys'		    = mkTyVarTys ex_tyvars'
 	arg_tys		    = dataConArgTys con (inst_tys ++ ex_tys')
-	id_names	    = drop (length ex_tyvars) names
+	id_names	    = dropList ex_tyvars names
 	arg_ids
 #ifdef DEBUG
-		| length id_names /= length arg_tys
+		| not (equalLength id_names arg_tys)
 		= pprPanic "tcCoreAlts" (ppr (con, names, rhs) $$
 					 (ppr main_tyvars <+> ppr ex_tyvars) $$
 					 ppr arg_tys)
@@ -348,7 +348,7 @@ tcCoreAlt scrut_ty alt@(con, names, rhs)
 #endif
 		= zipWithEqual "tcCoreAlts" mkLocalId id_names arg_tys
     in
-    ASSERT( con `elem` tyConDataCons tycon && length inst_tys == length main_tyvars )
+    ASSERT( con `elem` tyConDataCons tycon && equalLength inst_tys main_tyvars )
     tcExtendTyVarEnv ex_tyvars'			$
     tcExtendGlobalValEnv arg_ids		$
     tcCoreExpr rhs					`thenTc` \ rhs' ->

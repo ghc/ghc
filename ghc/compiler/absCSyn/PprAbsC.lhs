@@ -57,7 +57,7 @@ import StgSyn		( StgOp(..) )
 import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
-import Util		( nOfThem )
+import Util		( nOfThem, lengthExceeds, listLengthCmp )
 
 import ST
 
@@ -349,7 +349,7 @@ pprAbsC stmt@(CCallTypedef is_tdef (CCallSpec op_str cconv _) uniq results args)
       -- should ignore and a (possibly void) result.
      non_void_results =
 	let nvrs = grab_non_void_amodes results
-	in ASSERT (length nvrs <= 1) nvrs
+	in ASSERT (listLengthCmp nvrs 1 /= GT) nvrs
 
 pprAbsC (CCodeBlock lbl abs_C) _
   = if not (maybeToBool(nonemptyAbsC abs_C)) then
@@ -800,7 +800,7 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
 
     non_void_results =
 	let nvrs = grab_non_void_amodes results
-	in ASSERT (length nvrs <= 1) nvrs
+	in ASSERT (listLengthCmp nvrs 1 /= GT) nvrs
     -- there will usually be two results: a (void) state which we
     -- should ignore and a (possibly void) result.
 
@@ -947,7 +947,7 @@ process_casm results args string = process results args string
 	  in
 	  case (read_int other) of
 	    [(num,css)] ->
-		  if 0 <= num && num < length args
+		  if num >= 0 && args `lengthExceeds` num
 		  then parens (args !! num) <> process ress args css
 		  else error ("process_casm: no such arg #:"++(show num)++" while processing \"" ++ string ++ "\".\n")
 	    _ -> error ("process_casm: not %<num> while processing _casm_ \"" ++ string ++ "\".\n")

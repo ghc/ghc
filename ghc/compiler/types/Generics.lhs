@@ -34,8 +34,9 @@ import TysWiredIn       ( genericTyCons,
 import IdInfo           ( noCafNoTyGenIdInfo, setUnfoldingInfo )
 import CoreUnfold       ( mkTopUnfolding ) 
 
-import Unique		( mkBuiltinUnique )
 import SrcLoc		( builtinSrcLoc )
+import Unique		( mkBuiltinUnique )
+import Util             ( takeList )
 import Outputable 
 
 #include "HsVersions.h"
@@ -517,7 +518,7 @@ bimapTuple eps
   = EP { fromEP = mk_hs_lam [tuple_pat] from_body,
 	 toEP   = mk_hs_lam [tuple_pat] to_body }
   where
-    names	= take (length eps) genericNames
+    names	= takeList eps genericNames
     tuple_pat	= TuplePatIn (map VarPatIn names) Boxed
     eps_w_names = eps `zip` names
     to_body     = ExplicitTuple [toEP   ep `HsApp` HsVar g | (ep,g) <- eps_w_names] Boxed

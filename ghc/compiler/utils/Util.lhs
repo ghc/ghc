@@ -17,7 +17,9 @@ module Util (
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
 	mapAndUnzip, mapAndUnzip3,
-	nOfThem, lengthExceeds, isSingleton, only,
+	nOfThem, 
+	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
+	isSingleton, only,
 	snocView,
 	isIn, isn'tIn,
 
@@ -39,9 +41,12 @@ module Util (
 	-- accumulating
 	mapAccumL, mapAccumR, mapAccumB, 
 	foldl2, count,
+	
+	takeList, dropList, splitAtList,
 
 	-- comparisons
-	eqListBy, thenCmp, cmpList, prefixMatch, suffixMatch,
+	eqListBy, equalLength, compareLength,
+	thenCmp, cmpList, prefixMatch, suffixMatch,
 
 	-- strictness
 	foldl', seqList,
@@ -228,10 +233,47 @@ mapAndUnzip3 f (x:xs)
 nOfThem :: Int -> a -> [a]
 nOfThem n thing = replicate n thing
 
+-- 'atLength atLen atEnd ls n' unravels list 'ls' to position 'n';
+-- specification:
+--
+--  atLength atLenPred atEndPred ls n
+--   | n < 0         = atLenPred n
+--   | length ls < n = atEndPred (n - length ls)
+--   | otherwise     = atLenPred (drop n ls)
+--
+atLength :: ([a] -> b)
+         -> (Int -> b)
+         -> [a]
+         -> Int
+         -> b
+atLength atLenPred atEndPred ls n 
+  | n < 0     = atEndPred n 
+  | otherwise = go n ls
+  where
+    go n [] = atEndPred n
+    go 0 ls = atLenPred ls
+    go n (_:xs) = go (n-1) xs
+
+-- special cases.
 lengthExceeds :: [a] -> Int -> Bool
--- (lengthExceeds xs n) is True if   length xs > n
-(x:xs)	`lengthExceeds` n = n < 1 || xs `lengthExceeds` (n - 1)
-[]	`lengthExceeds` n = n < 0
+lengthExceeds = atLength (not.null) (const False)
+
+lengthAtLeast :: [a] -> Int -> Bool
+lengthAtLeast = atLength (not.null) (== 0)
+
+lengthIs :: [a] -> Int -> Bool
+lengthIs = atLength null (==0)
+
+listLengthCmp :: [a] -> Int -> Ordering 
+listLengthCmp = atLength atLen atEnd 
+ where
+  atEnd 0      = EQ
+  atEnd x
+   | x > 0     = LT -- not yet seen 'n' elts, so list length is < n.
+   | otherwise = GT
+
+  atLen []     = EQ
+  atLen _      = GT
 
 isSingleton :: [a] -> Bool
 isSingleton [x] = True
@@ -631,6 +673,32 @@ count p (x:xs) | p x       = 1 + count p xs
 	       | otherwise = count p xs
 \end{code}
 
+@splitAt@, @take@, and @drop@ but with length of another
+list giving the break-off point:
+
+\begin{code}
+takeList :: [b] -> [a] -> [a]
+takeList [] _ = []
+takeList (_:xs) ls = 
+   case ls of
+     [] -> []
+     (y:ys) -> y : takeList xs ys
+
+dropList :: [b] -> [a] -> [a]
+dropList [] xs    = xs
+dropList _  xs@[] = xs
+dropList (_:xs) (_:ys) = dropList xs ys
+
+
+splitAtList :: [b] -> [a] -> ([a], [a])
+splitAtList [] xs     = ([], xs)
+splitAtList _ xs@[]   = (xs, xs)
+splitAtList (_:xs) (y:ys) = (y:ys', ys'')
+    where
+      (ys', ys'') = splitAtList xs ys
+
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -643,6 +711,17 @@ eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
 eqListBy eq []     []     = True
 eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
 eqListBy eq xs     ys     = False
+
+equalLength :: [a] -> [b] -> Bool
+equalLength [] []         = True
+equalLength (_:xs) (_:ys) = equalLength xs ys
+equalLength xs    ys      = False
+
+compareLength :: [a] -> [b] -> Ordering
+compareLength [] []         = EQ
+compareLength (_:xs) (_:ys) = compareLength xs ys
+compareLength [] _ys        = LT
+compareLength _xs []        = GT
 
 thenCmp :: Ordering -> Ordering -> Ordering
 {-# INLINE thenCmp #-}

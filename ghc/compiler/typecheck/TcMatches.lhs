@@ -40,7 +40,9 @@ import NameSet
 import VarSet
 import Var		( Id )
 import Bag
+import Util		( isSingleton )
 import Outputable
+
 import List		( nub )
 \end{code}
 
@@ -457,7 +459,7 @@ number of args are used in each equation.
 
 \begin{code}
 sameNoOfArgs :: [RenamedMatch] -> Bool
-sameNoOfArgs matches = length (nub (map args_in_match matches)) == 1
+sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
   where
     args_in_match :: RenamedMatch -> Int
     args_in_match (Match _ pats _ _) = length pats

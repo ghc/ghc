@@ -61,7 +61,7 @@ import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
-import Util		( isSingleton )
+import Util		( isSingleton, lengthIs )
 import Outputable
 
 \end{code}
@@ -381,7 +381,7 @@ tc_type (HsListTy ty)
     returnTc (mkListTy tau_ty)
 
 tc_type (HsTupleTy (HsTupCon _ boxity arity) tys)
-  = ASSERT( arity == length tys )
+  = ASSERT( tys `lengthIs` arity )
     tc_types tys	`thenTc` \ tau_tys ->
     returnTc (mkTupleTy boxity arity tau_tys)
 

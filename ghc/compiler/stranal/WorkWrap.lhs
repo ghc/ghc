@@ -28,6 +28,7 @@ import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
 import Maybes		( orElse )
 import CmdLineOpts
 import WwLib
+import Util		( lengthIs )
 import Outputable
 \end{code}
 
@@ -226,7 +227,7 @@ tryWW is_rec fn_id rhs
 
 ---------------------
 splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
-  = WARN( arity /= length wrap_dmds, ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) )
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) )
 	-- The arity should match the signature
     mkWwBodies fun_ty wrap_dmds res_info one_shots 	`thenUs` \ (work_demands, wrap_fn, work_fn) ->
     getUniqueUs						`thenUs` \ work_uniq ->

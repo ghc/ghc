@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.15 2001/09/26 15:11:50 simonpj Exp $
+% $Id: CgLetNoEscape.lhs,v 1.16 2001/10/25 02:13:11 sof Exp $
 %
 %********************************************************
 %*							*
@@ -35,8 +35,9 @@ import CostCentre       ( CostCentreStack )
 import Id		( idPrimRep, Id )
 import Var		( idUnique )
 import PrimRep		( PrimRep(..), retPrimRepSize )
-import Unique		( Unique )
 import BasicTypes	( RecFlag(..) )
+import Unique		( Unique )
+import Util		( splitAtList )
 \end{code}
 
 %************************************************************************
@@ -198,7 +199,7 @@ cgLetNoEscapeBody binder cc all_args body uniq
      let
 	arg_kinds	     = map idPrimRep all_args
 	(arg_regs, _)	     = assignRegs [{-nothing live-}] arg_kinds
-	(reg_args, stk_args) = splitAt (length arg_regs) all_args
+	(reg_args, stk_args) = splitAtList arg_regs all_args
 
     	(sp_stk_args, stk_offsets, stk_tags)
 	  = mkTaggedVirtStkOffsets sp idPrimRep stk_args

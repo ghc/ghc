@@ -32,6 +32,7 @@ import VarEnv
 import VarSet
 import UniqSupply       ( UniqSupply, UniqSM,
                           initUs, splitUniqSupply )
+import Util             ( lengthExceeds )
 import Outputable
 import Maybes           ( expectJust )
 import List             ( unzip4 )
@@ -477,7 +478,7 @@ pessimise ty
     pessN co ve     (NoteTy (FTVNote _)    ty) = pessN co ve ty
     pessN co ve     (TyVarTy _)                = emptyUConSet
     pessN co ve     (AppTy _ _)                = emptyUConSet
-    pessN co ve     (TyConApp tc tys)          = ASSERT( not((isFunTyCon tc)&&(length tys > 1)) )
+    pessN co ve     (TyConApp tc tys)          = ASSERT( not((isFunTyCon tc)&&( tys `lengthExceeds` 1)) )
                                                  emptyUConSet
     pessN co ve     (FunTy ty1 ty2)            = pess (not co) ve ty1 `unionUCS` pess co ve ty2
     pessN co ve     (ForAllTy _ ty)            = pessN co ve ty

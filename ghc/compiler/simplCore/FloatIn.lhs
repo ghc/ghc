@@ -25,7 +25,7 @@ import Id		( isOneShotLambda )
 import Var		( Id, idType, isTyVar )
 import Type		( isUnLiftedType )
 import VarSet
-import Util		( zipEqual, zipWithEqual )
+import Util		( zipEqual, zipWithEqual, count )
 import Outputable
 \end{code}
 
@@ -424,7 +424,7 @@ sepBindsByDropPoint is_case drop_pts floaters
 		--	  E -> ...not mentioning x...
 
 	  n_alts      = length used_in_flags
-	  n_used_alts = length [() | True <- used_in_flags]
+	  n_used_alts = count id used_in_flags -- returns number of Trues in list.
 
 	  can_push = n_used_alts == 1		-- Used in just one branch
 		   || (is_case && 		-- We are looking at case alternatives

@@ -23,7 +23,7 @@ import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
 			  isUnLiftedType, isTyVarTy, splitForAllTys, Type
 			)
 import TyCon		( TyCon, isDataTyCon, tyConDataCons )
-import Util		( zipEqual )
+import Util		( zipEqual, equalLength )
 import Outputable
 
 infixr 9 `thenL`, `thenL_`, `thenMaybeL`, `thenMaybeL_`
@@ -261,7 +261,7 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
 		-- This almost certainly does not work for existential constructors
 	 in
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
-	 checkL (length arg_tys == length args) (mkAlgAltMsg3 con args)
+	 checkL (equalLength arg_tys args) (mkAlgAltMsg3 con args)
 								 `thenL_`
 	 mapL check (zipEqual "lintAlgAlt:stg" arg_tys args)	 `thenL_`
 	 returnL ()

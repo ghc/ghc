@@ -77,11 +77,12 @@ import IOExts
 import Interpreter	( HValue )
 import HscMain		( hscStmt )
 import PrelGHC		( unsafeCoerce# )
-#endif
 
 -- lang
 import Foreign
 import CForeign
+#endif
+
 import Exception	( Exception, try, throwDyn )
 
 -- std
@@ -828,9 +829,7 @@ findInSummaries old_summaries mod_name
 
 findModInSummaries :: [ModSummary] -> Module -> Maybe ModSummary
 findModInSummaries old_summaries mod
-   = case [s | s <- old_summaries, ms_mod s == mod] of
-	 [] -> Nothing
-	 (s:_) -> Just s
+   = listToMaybe [s | s <- old_summaries, ms_mod s == mod]
 
 -- Return (names of) all those in modsDone who are part of a cycle
 -- as defined by theGraph.
@@ -848,7 +847,7 @@ findPartiallyCompletedCycles modsDone theGraph
                  chewed_rest = chew rest
              in 
              if   not (null mods_in_this_cycle) 
-                  && length mods_in_this_cycle < length names_in_this_cycle
+                  && compareLength mods_in_this_cycle names_in_this_cycle == LT
              then mods_in_this_cycle ++ chewed_rest
              else chewed_rest
 
@@ -1018,7 +1017,7 @@ simple_transitive_closure graph set
    = let set2      = nub (concatMap dsts set ++ set)
          dsts node = fromMaybe [] (lookup node graph)
      in
-         if   length set == length set2
+         if   equalLength set set2
          then set
          else simple_transitive_closure graph set2
 
@@ -1071,21 +1070,28 @@ downsweep rootNm old_summaries
 	getRootSummary file
 	   | haskellish_src_file file
 	   = do exists <- doesFileExist file
-		if exists then summariseFile file else do
-		throwDyn (CmdLineError ("can't find file `" ++ file ++ "'"))	
+		when (not exists)
+		     (throwDyn (CmdLineError ("can't find file `" ++ file ++ "'")))
+		summariseFile file
 	   | otherwise
- 	   = do exists <- doesFileExist hs_file
-		if exists then summariseFile hs_file else do
-		exists <- doesFileExist lhs_file
-		if exists then summariseFile lhs_file else do
-		let mod_name = mkModuleName file
-		maybe_summary <- getSummary mod_name
-		case maybe_summary of
-		   Nothing -> packageModErr mod_name
-		   Just s  -> return s
+ 	   = do mb_file <- findFile [hs_file, lhs_file]
+	        case mb_file of
+		  Just x  -> summariseFile x
+		  Nothing -> do
+		     let mod_name = mkModuleName file
+	 	     maybe_summary <- getSummary mod_name
+		     case maybe_summary of
+		       Nothing -> packageModErr mod_name
+		       Just s  -> return s
            where 
 		 hs_file = file ++ ".hs"
 		 lhs_file = file ++ ".lhs"
+
+        findFile :: [FilePath] -> IO (Maybe FilePath)
+	findFile [] = return Nothing
+	findFile (x:xs) = do
+	    flg <- doesFileExist x
+	    if flg then return (Just x) else findFile xs
 
         getSummary :: ModuleName -> IO (Maybe ModSummary)
         getSummary nm

@@ -101,7 +101,7 @@ import NewDemand	( Demand(..), Keepity(..), DmdResult(..),
 			  StrictSig, mkStrictSig, mkTopDmdType
 			)
 import Outputable	
-import Util		( seqList )
+import Util		( seqList, listLengthCmp )
 import List		( replicate )
 
 infixl 	1 `setDemandInfo`,
@@ -133,7 +133,7 @@ To be removed later
 \begin{code}
 mkNewStrictnessInfo :: Id -> Arity -> Demand.StrictnessInfo -> CprInfo -> StrictSig
 mkNewStrictnessInfo id arity (Demand.StrictnessInfo ds res) cpr
-  | length ds <= arity
+  | listLengthCmp ds arity /= GT -- length ds <= arity
 	-- Sometimes the old strictness analyser has more
 	-- demands than the arity justifies
   = mk_strict_sig id arity $

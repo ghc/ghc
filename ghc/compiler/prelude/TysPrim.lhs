@@ -153,7 +153,7 @@ pcPrimTyCon name arg_vrcs rep
   = mkPrimTyCon name kind arity arg_vrcs rep
   where
     arity       = length arg_vrcs
-    kind        = mkArrowKinds (take arity (repeat liftedTypeKind)) result_kind
+    kind        = mkArrowKinds (replicate arity liftedTypeKind) result_kind
     result_kind = unliftedTypeKind -- all primitive types are unlifted
 
 pcPrimTyCon0 :: Name -> PrimRep -> TyCon

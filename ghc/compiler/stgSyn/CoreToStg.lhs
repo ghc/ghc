@@ -35,6 +35,7 @@ import OccName		( occNameUserString )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, Arity )
 import CmdLineOpts	( DynFlags, opt_RuntimeTypes )
 import FastTypes	hiding ( fastOr )
+import Util             ( listLengthCmp )
 import Outputable
 
 infixr 9 `thenLne`
@@ -305,7 +306,7 @@ to do it before the SRT pass to save the SRT entries associated with
 any top-level PAPs.
 
 \begin{code}
-isPAP (StgApp f args) = idArity f > length args
+isPAP (StgApp f args) = listLengthCmp args (idArity f) == LT -- idArity f > length args
 isPAP _ 	      = False
 \end{code}
 

@@ -27,6 +27,7 @@ import Util		( sortLt )
 import Outputable
 import CmdLineOpts	( DynFlags(..), DynFlag(..), dopt )
 
+import List             ( replicate )
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, hPutStrLn, stderr )
 \end{code}
@@ -161,5 +162,5 @@ dump hdr doc
 	   doc,
 	   text ""]
      where 
-        line = text (take 20 (repeat '='))
+        line = text (replicate 20 '=')
 \end{code}

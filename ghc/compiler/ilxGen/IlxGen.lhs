@@ -855,7 +855,7 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
        = ([],[],env,args,funty)
     get_term_args n max args env funty
       | (case known_clo of
-           Just (_,_,needed,_) -> (length needed == n)
+           Just (_,_,needed,_) -> needed `lengthIs` n
            Nothing -> False)
        -- Stop if we have the optimal number for a direct call
        = ([],[],env,args,funty)
@@ -897,7 +897,7 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
     -- the "callfunc" case.
     basic_call_instr =
       case known_clo of
-        Just (known_env,fun,needed,fvs) | (length needed == length now_args) && 
+        Just (known_env,fun,needed,fvs) | (equalLength needed now_args) && 
                                           all (\x -> elemIlxTyEnv x env) free_ilx_tvs -> 
            vcat [text "callclo class",
                  nameReference env (idName fun) <+> singleQuotes (ilxEnvQualifyByModule env (ppr fun)),

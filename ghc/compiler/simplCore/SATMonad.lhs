@@ -179,7 +179,7 @@ saTransform binder rhs
     case r of
       -- [Andre] test: do it only if we have more than one static argument.
       --Just (tyargs,args) | any isStatic args
-      Just (tyargs,args) | length (filter isStatic args) > 1
+      Just (tyargs,args) | (filter isStatic args) `lengthExceeds` 1
 	-> newSATName binder (new_ty tyargs args)  `thenSAT` \ binder' ->
 	   mkNewRhs binder binder' tyargs args rhs `thenSAT` \ new_rhs ->
 	   trace ("SAT "++ show (length (filter isStatic args))) (
@@ -240,10 +240,12 @@ saTransform binder rhs
 
 	-- now, we drop the ones that are
 	-- static, that is, the ones we will not pass to the local function
-	l   	     = length dict_tys
 	tv_tmpl'     = dropStatics tyargs tv_tmpl
-	dict_tys'    = dropStatics (take l args) dict_tys
-	reg_arg_tys' = dropStatics (drop l args) reg_arg_tys
+
+	(args1, args2) = splitAtList dict_tys args
+	dict_tys'    = dropStatics args1 dict_tys
+	reg_arg_tys' = dropStatics args2 reg_arg_tys
+
 	tau_ty'	     = glueTyArgs reg_arg_tys' res_type
 
 	mk_inst_tyenv []		    _ = emptyVarEnv

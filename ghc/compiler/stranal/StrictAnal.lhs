@@ -22,7 +22,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import SaAbsInt
 import SaLib
 import Demand		( Demand, wwStrict, isStrict, isLazy )
-import Util		( zipWith3Equal, stretchZipWith )
+import Util		( zipWith3Equal, stretchZipWith, compareLength )
 import BasicTypes	( Activation( NeverActive ) )
 import Outputable
 import FastTypes
@@ -233,7 +233,9 @@ saApp str_env abs_env (fun, args)
   where
     arg_dmds = case fun of
 		 Var var -> case lookupAbsValEnv str_env var of
-				Just (AbsApproxFun ds _) | length ds >= length args 
+				Just (AbsApproxFun ds _) 
+				   | compareLength ds args /= LT 
+				              -- 'ds' is at least as long as 'args'.
 					-> ds ++ minDemands
 				other   -> minDemands
 		 other -> minDemands

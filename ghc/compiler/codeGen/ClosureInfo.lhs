@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.49 2001/10/18 16:29:13 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.50 2001/10/25 02:13:11 sof Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -89,7 +89,7 @@ import PrimRep		( getPrimRepSize, separateByPtrFollowness, PrimRep )
 import SMRep		-- all of it
 import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel )
-import Util		( mapAccumL )
+import Util		( mapAccumL, listLengthCmp, lengthIs )
 import Outputable
 \end{code}
 
@@ -635,7 +635,7 @@ getEntryConvention name lf_info arg_kinds
     case lf_info of
 
 	LFReEntrant _ _ arity _ ->
-	    if arity == 0 || (length arg_kinds) < arity then
+	    if arity == 0 || (listLengthCmp arg_kinds arity == LT) then
 		StdEntry (mkStdEntryLabel name)
 	    else
 		DirectEntry (mkFastEntryLabel name arity) arity arg_regs
@@ -678,7 +678,7 @@ getEntryConvention name lf_info arg_kinds
 	  -> StdEntry (mkReturnPtLabel (nameUnique name))
 
 	LFLetNoEscape arity
-	  -> if (arity /= length arg_kinds) then pprPanic "let-no-escape: " (ppr name <+> ppr arity) else
+	  -> if (not (arg_kinds `lengthIs` arity)) then pprPanic "let-no-escape: " (ppr name <+> ppr arity) else
 	     DirectEntry (mkReturnPtLabel (nameUnique name)) arity arg_regs
 	 where
 	    (arg_regs, _) = assignRegs [] arg_kinds

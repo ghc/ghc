@@ -23,6 +23,7 @@ module Demand(
 #include "HsVersions.h"
 
 import Outputable
+import Util ( listLengthCmp )
 \end{code}
 
 
@@ -191,7 +192,7 @@ isBottomingStrictness (StrictnessInfo _ bot) = bot
 isBottomingStrictness NoStrictnessInfo       = False
 
 -- appIsBottom returns true if an application to n args would diverge
-appIsBottom (StrictnessInfo ds bot)   n = bot && (n >= length ds)
+appIsBottom (StrictnessInfo ds bot)   n = bot && (listLengthCmp ds n /=GT) -- not more than 'n' elts in 'ds'.
 appIsBottom  NoStrictnessInfo	      n	= False
 
 ppStrictnessInfo NoStrictnessInfo		   = empty

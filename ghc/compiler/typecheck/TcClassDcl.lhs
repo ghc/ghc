@@ -53,7 +53,7 @@ import Var		( TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet )
-import Util		( count )
+import Util		( count, isSingleton, lengthIs, equalLength )
 import Maybes		( seqMaybe, maybeToBool )
 \end{code}
 
@@ -122,7 +122,7 @@ tcClassDecl1 rec_env
 	-- The renamer has already checked that the context mentions
 	-- only the type variable of the class decl.
 	-- Context is already kind-checked
-    ASSERT( length context == length sc_sel_names )
+    ASSERT( equalLength context sc_sel_names )
     tcHsTheta context						`thenTc` \ sc_theta ->
 
 	-- CHECK THE CLASS SIGNATURES,
@@ -193,7 +193,7 @@ checkDefaultBinds clas ops (Just mbs)
       where
 	n_generic    = count (maybeToBool . maybeGenericMatch) matches
 	none_generic = n_generic == 0
-	all_generic  = n_generic == length matches
+	all_generic  = matches `lengthIs` n_generic
 \end{code}
 
 
@@ -262,7 +262,7 @@ checkValidClass cls
     doptsTc Opt_GlasgowExts				`thenTc` \ gla_exts ->
 
     	-- Check that the class is unary, unless GlaExs
-    checkTc (arity > 0)		(nullaryClassErr cls)	`thenTc_`
+    checkTc (not (null tyvars))		(nullaryClassErr cls)	`thenTc_`
     checkTc (gla_exts || unary) (classArityErr cls)	`thenTc_`
 
    	-- Check the super-classes
@@ -278,8 +278,7 @@ checkValidClass cls
 
   where
     (tyvars, theta, _, op_stuff) = classBigSig cls
-    arity	= length tyvars
-    unary 	= arity == 1
+    unary 	= isSingleton tyvars
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
 
     check_op (sel_id, dm) 

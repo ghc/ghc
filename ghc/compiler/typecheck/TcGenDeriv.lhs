@@ -57,7 +57,7 @@ import TcType		( isUnLiftedType, tcEqType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
-import Util		( mapAccumL, zipEqual, zipWithEqual,
+import Util		( mapAccumL, zipEqual, zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool, orElse )
@@ -351,7 +351,7 @@ gen_Ord_binds tycon
     cmp_eq =
        mk_FunMonoBind tycon_loc 
                       cmp_eq_RDR 
-                      (if null nonnullary_cons && (length nullary_cons == 1) then
+                      (if null nonnullary_cons && isSingleton nullary_cons then
 			   -- catch this specially to avoid warnings
 			   -- about overlapping patterns from the desugarer.
 		          let 
@@ -363,7 +363,7 @@ gen_Ord_binds tycon
 		       else
 		          map pats_etc nonnullary_cons ++
 			  -- leave out wildcards to silence desugarer.
-		          (if length tycon_data_cons == 1 then
+		          (if isSingleton tycon_data_cons then
 			      []
 			   else
                               [([WildPatIn, WildPatIn], default_rhs)]))
@@ -527,7 +527,7 @@ gen_Bounded_binds tycon
   = if isEnumerationTyCon tycon then
 	min_bound_enum `AndMonoBinds` max_bound_enum
     else
-	ASSERT(length data_cons == 1)
+	ASSERT(isSingleton data_cons)
 	min_bound_1con `AndMonoBinds` max_bound_1con
   where
     data_cons = tyConDataCons tycon

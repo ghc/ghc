@@ -642,12 +642,7 @@ type TcError   = Message
 type TcWarning = Message
 
 ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
-		 | otherwise	      = takeAtMost 3 ctxt
-		 where
-		   takeAtMost :: Int -> [a] -> [a]
-     		   takeAtMost 0 ls = []
-     		   takeAtMost n [] = []
-     		   takeAtMost n (x:xs) = x:takeAtMost (n-1) xs
+		 | otherwise	      = take 3 ctxt
 
 arityErr kind name n m
   = hsep [ text kind, quotes (ppr name), ptext SLIT("should have"),

@@ -23,6 +23,7 @@ module NewDemand(
 import BasicTypes	( Arity )
 import VarEnv		( VarEnv, emptyVarEnv, isEmptyVarEnv )
 import UniqFM		( ufmToList )
+import Util             ( listLengthCmp )
 import Outputable
 \end{code}
 
@@ -169,7 +170,7 @@ topSig = StrictSig topDmdType
 botSig = StrictSig botDmdType
 
 -- appIsBottom returns true if an application to n args would diverge
-appIsBottom (StrictSig (DmdType _ ds BotRes)) n = n >= length ds
+appIsBottom (StrictSig (DmdType _ ds BotRes)) n = listLengthCmp ds n /= GT
 appIsBottom _				      _ = False
 
 isBottomingSig (StrictSig (DmdType _ _ BotRes)) = True

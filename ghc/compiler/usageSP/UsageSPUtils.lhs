@@ -37,6 +37,7 @@ import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import VarEnv
 import PrimOp           ( PrimOp, primOpUsg )
 import UniqSupply       ( UniqSupply, UniqSM, initUs, getUniqueUs, thenUs, returnUs )
+import Util             ( lengthExceeds )
 import Outputable
 
 
@@ -431,7 +432,7 @@ pessimiseN co     (NoteTy      (SynNote sty) ty) = NoteTy (SynNote (pessimiseN c
 pessimiseN co     (NoteTy note@(FTVNote _  ) ty) = NoteTy note (pessimiseN co ty)
 pessimiseN co ty0@(TyVarTy _)                    = ty0
 pessimiseN co ty0@(AppTy _ _)                    = ty0
-pessimiseN co ty0@(TyConApp tc tys)              = ASSERT( not ((isFunTyCon tc) && (length tys > 1)) )
+pessimiseN co ty0@(TyConApp tc tys)              = ASSERT( not ((isFunTyCon tc) && (tys `lengthExceeds` 1)) )
                                                    ty0
 pessimiseN co     (FunTy ty1 ty2)                = FunTy (pessimise (not co) ty1)
                                                          (pessimise      co  ty2)

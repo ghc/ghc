@@ -191,7 +191,7 @@ hscNoRecomp ghci_mode dflags have_object
       }}}
 
 compMsg use_object mod location =
-    mod_str ++ take (max 0 (16 - length mod_str)) (repeat ' ')
+    mod_str ++ replicate (max 0 (16 - length mod_str)) ' '
     ++" ( " ++ unJust "hscRecomp" (ml_hs_file location) ++ ", "
     ++ (if use_object
 	  then unJust "hscRecomp" (ml_obj_file location)

@@ -211,7 +211,7 @@ drawTree         = unlines . draw
 draw (Node x ts) = grp this (space (length this)) (stLoop ts)
  where this          = s1 ++ x ++ " "
 
-       space n       = take n (repeat ' ')
+       space n       = replicate n ' '
 
        stLoop []     = [""]
        stLoop [t]    = grp s2 "  " (draw t)

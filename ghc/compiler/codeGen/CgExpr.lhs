@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.45 2001/10/17 14:24:52 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.46 2001/10/25 02:13:11 sof Exp $
 %
 %********************************************************
 %*							*
@@ -48,6 +48,7 @@ import Maybes		( maybeToBool )
 import ListSetOps	( assocMaybe )
 import Unique		( mkBuiltinUnique )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
+import Util             ( lengthIs )
 import Outputable
 \end{code}
 
@@ -362,7 +363,7 @@ mkRhsClosure 	bndr cc bi srt
 		[]			-- No args; a thunk
 		body@(StgApp fun_id args)
 
-  | length args + 1 == arity
+  | args `lengthIs` (arity-1)
  	&& all isFollowableRep (map idPrimRep fvs) 
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE 

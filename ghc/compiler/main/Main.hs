@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.88 2001/10/22 13:45:15 simonmar Exp $
+-- $Id: Main.hs,v 1.89 2001/10/25 02:13:13 sof Exp $
 --
 -- GHC Driver program
 --
@@ -257,7 +257,7 @@ main =
 	-- -ohi sanity checking
    ohi    <- readIORef v_Output_hi
    if (isJust ohi && 
-	(mode == DoMake || mode == DoInteractive || length srcs > 1))
+	(mode == DoMake || mode == DoInteractive || srcs `lengthExceeds` 1))
 	then throwDyn (UsageError "-ohi can only be used when compiling a single source file")
 	else do
 
@@ -267,7 +267,7 @@ main =
 
 	-- -o sanity checking
    o_file <- readIORef v_Output_file
-   if (length srcs > 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
+   if (srcs `lengthExceeds` 1 && isJust o_file && mode /= DoLink && mode /= DoMkDLL)
 	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 

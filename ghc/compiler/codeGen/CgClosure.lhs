@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.50 2001/10/03 13:59:22 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.51 2001/10/25 02:13:11 sof Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -51,7 +51,7 @@ import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
 import PprType          ( showTypeCategory )
-import Util		( isIn )
+import Util		( isIn, splitAtList )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Outputable
 
@@ -328,9 +328,7 @@ closureCodeBody binder_info closure_info cc all_args body
 		DirectEntry lbl arity regs -> regs
 		other 		           -> []  -- "(HWL ignored; no args passed in regs)"
 
-	num_arg_regs = length arg_regs
-	
-    	(reg_args, stk_args) = splitAt num_arg_regs all_args
+    	(reg_args, stk_args) = splitAtList arg_regs all_args
 
     	(sp_stk_args, stk_offsets, stk_tags)
 	  = mkTaggedVirtStkOffsets vSp idPrimRep stk_args

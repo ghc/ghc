@@ -283,9 +283,8 @@ tcMonoExpr e0@(HsCCall lbl args may_gc is_casm ignored_fake_result_ty) res_ty
     in
 
 	-- Arguments
-    let n_args = length args
-	tv_idxs | n_args == 0 = []
-		| otherwise   = [1..n_args]
+    let tv_idxs | null args  = []
+		| otherwise  = [1..length args]
     in
     newTyVarTys (length tv_idxs) openTypeKind		`thenNF_Tc` \ arg_tys ->
     tcMonoExprs args arg_tys		   		`thenTc`    \ (args', args_lie) ->
@@ -704,9 +703,12 @@ checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
       (exp_args, _)    = tcSplitFunTys exp_ty''
       (act_args, _)    = tcSplitFunTys act_ty''
 
-      message | length exp_args < length act_args = wrongArgsCtxt "too few" fun args
-              | length exp_args > length act_args = wrongArgsCtxt "too many" fun args
-	      | otherwise			  = appCtxt fun args
+      len_act_args     = length act_args
+      len_exp_args     = length exp_args
+
+      message | len_exp_args < len_act_args = wrongArgsCtxt "too few" fun args
+              | len_exp_args > len_act_args = wrongArgsCtxt "too many" fun args
+	      | otherwise		    = appCtxt fun args
     in
     returnNF_Tc (env2, message)
 
@@ -896,7 +898,7 @@ missingFields rbinds data_con
 
     field_info = zipEqual "missingFields"
 			  field_labels
-	  		  (drop (length ex_theta) (dataConStrictMarks data_con))
+	  		  (dropList ex_theta (dataConStrictMarks data_con))
 	-- The 'drop' is because dataConStrictMarks
 	-- includes the existential dictionaries
     (_, _, _, ex_theta, _, _) = dataConSig data_con

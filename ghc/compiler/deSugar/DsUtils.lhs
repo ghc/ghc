@@ -63,6 +63,7 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  plusIntegerName, timesIntegerName )
 import Outputable
 import UnicodeUtil      ( stringToUtf8 )
+import Util             ( isSingleton )
 \end{code}
 
 
@@ -430,7 +431,7 @@ mkSelectorBinds (VarPat v) val_expr
   = returnDs [(v, val_expr)]
 
 mkSelectorBinds pat val_expr
-  | length binders == 1 || is_simple_pat pat
+  | isSingleton binders || is_simple_pat pat
   = newSysLocalDs (exprType val_expr)	`thenDs` \ val_var ->
 
 	-- For the error message we don't use mkErrorAppDs to avoid

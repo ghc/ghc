@@ -64,6 +64,7 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..),
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )
 import PrimRep		( PrimRep(..), isFollowableRep )
+import Util             ( lengthIs )
 import Outputable
 import FastString
 \end{code}
@@ -439,7 +440,7 @@ isForeignTyCon other				      = False
 
 \begin{code}
 tyConDataCons :: TyCon -> [DataCon]
-tyConDataCons tycon = ASSERT2( length cons == tyConFamilySize tycon, ppr tycon )
+tyConDataCons tycon = ASSERT2( cons `lengthIs` (tyConFamilySize tycon), ppr tycon )
 		      cons
 		    where
 		      cons = tyConDataConsIfAvailable tycon

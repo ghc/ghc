@@ -27,6 +27,7 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy, tupleCon )
 import BasicTypes	( Boxity(..) )
 import UniqSet
 import ErrUtils		( addWarnLocHdrLine, dontAddErrLoc )
+import Util             ( lengthExceeds )
 import Outputable
 \end{code}
 
@@ -62,7 +63,7 @@ matchExport_really dflags vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
       match vars qs
   where (pats,indexs) = check qs
         incomplete    = dopt Opt_WarnIncompletePatterns dflags
-			&& (length pats /= 0)
+			&& (not (null pats))
         shadow        = dopt Opt_WarnOverlappingPatterns dflags
 			&& sizeUniqSet indexs < no_eqns
         no_eqns       = length qs
@@ -85,7 +86,7 @@ The next two functions create the warning message.
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
 dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn 
 	where
-	  warn | length qs > maximum_output
+	  warn | qs `lengthExceeds` maximum_output
                = pp_context ctx (ptext SLIT("are overlapped"))
 		            (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
 			    ptext SLIT("..."))
@@ -103,8 +104,8 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn
 						  (take maximum_output pats))
 		                      $$ dots))
 
-	  dots | length pats > maximum_output = ptext SLIT("...")
-	       | otherwise                    = empty
+	  dots | pats `lengthExceeds` maximum_output = ptext SLIT("...")
+	       | otherwise                           = empty
 
 pp_context NoMatchContext msg rest_of_msg_fun
   = dontAddErrLoc (ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))

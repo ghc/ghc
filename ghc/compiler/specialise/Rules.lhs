@@ -505,7 +505,7 @@ ruleCheckProgram phase rule_pat binds
 	 ]
   where
     results = unionManyBags (map (ruleCheckBind (phase, rule_pat)) binds)
-    line = text (take 20 (repeat '-'))
+    line = text (replicate 20 '-')
 	  
 type RuleCheckEnv = (CompilerPhase, String) 	-- Phase and Pattern
 

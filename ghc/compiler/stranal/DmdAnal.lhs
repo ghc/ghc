@@ -31,7 +31,7 @@ import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
 import Type		( isUnLiftedType )
 import CoreLint		( showPass, endPass )
-import Util		( mapAndUnzip, mapAccumL, mapAccumR )
+import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs, equalLength )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive )
 import Maybes		( orElse, expectJust )
 import Outputable
@@ -667,7 +667,7 @@ dmdTransform sigs var dmd
 		-- ds can be empty, when we are just seq'ing the thing
 		-- If so we must make up a suitable bunch of demands
 	   dmd_ds | null ds   = replicate arity Abs
-		  | otherwise = ASSERT( length ds == arity ) ds
+		  | otherwise = ASSERT( ds `lengthIs` arity ) ds
 
 	   arg_ds = case k of
 			Keep  -> bothLazy_s dmd_ds
@@ -831,13 +831,13 @@ bothRes r1 r2     = r1
 -- A Seq can have an empty list of demands, in the polymorphic case.
 lubs [] ds2 = ds2
 lubs ds1 [] = ds1
-lubs ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith lub ds1 ds2
+lubs ds1 ds2 = ASSERT( equalLength ds1 ds2 ) zipWith lub ds1 ds2
 
 -----------------------------------
 -- A Seq can have an empty list of demands, in the polymorphic case.
 boths [] ds2  = ds2
 boths ds1 []  = ds1
-boths ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith both ds1 ds2
+boths ds1 ds2 = ASSERT( equalLength ds1 ds2 ) zipWith both ds1 ds2
 \end{code}
 
 \begin{code}

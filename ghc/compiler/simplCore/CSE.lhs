@@ -21,7 +21,7 @@ import CoreSyn
 import VarEnv	
 import CoreLint		( showPass, endPass )
 import Outputable
-import Util		( mapAccumL )
+import Util		( mapAccumL, lengthExceeds )
 import UniqFM
 \end{code}
 
@@ -227,7 +227,7 @@ extendCSEnv (CS cs in_scope sub) id expr
   = CS (addToUFM_C combine cs hash [(id, expr)]) in_scope sub
   where
     hash   = hashExpr expr
-    combine old new = WARN( length result > 4, text "extendCSEnv: long list:" <+> ppr result )
+    combine old new = WARN( result `lengthExceeds` 4, text "extendCSEnv: long list:" <+> ppr result )
 		      result
 		    where
 		      result = new ++ old

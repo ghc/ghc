@@ -37,6 +37,7 @@ import Maybes
 import OrdList
 import ErrUtils
 import CmdLineOpts
+import Util       ( listLengthCmp )
 import Outputable
 \end{code}
 
@@ -415,8 +416,9 @@ corePrepExprFloat env expr@(App _ _)
 	where
 	  stricts = case idNewStrictness v of
 			StrictSig (DmdType _ demands _)
-			    | depth >= length demands -> demands
-			    | otherwise               -> []
+			    | listLengthCmp demands depth /= GT -> demands
+			            -- length demands <= depth
+			    | otherwise                         -> []
 		-- If depth < length demands, then we have too few args to 
 		-- satisfy strictness  info so we have to  ignore all the 
 		-- strictness info, e.g. + (error "urk")
