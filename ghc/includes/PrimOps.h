@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.27 1999/05/04 08:58:18 sof Exp $
+ * $Id: PrimOps.h,v 1.28 1999/05/07 15:42:49 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -303,16 +303,23 @@ typedef union {
 
 /* We can do integer2Int and cmpInteger inline, since they don't need
  * to allocate any memory.
+ *
+ * integer2Int# is now modular.
  */
 
 #define integer2Intzh(r, sa,da)					\
 { MP_INT arg;							\
-								\
+  								\
   arg._mp_size	= (sa);						\
   arg._mp_alloc	= ((StgArrWords *)da)->words;			\
   arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
 								\
-  (r) = RET_PRIM_STGCALL1(I_,mpz_get_ui,&arg);			\
+  (r) =                                                         \
+    ( arg._mp_size == 0 ) ?                                     \
+       0 :                                                      \
+       ( arg._mp_size < 0 && arg._mp_d[0] > 0x80000000 ) ?      \
+         -(I_)arg._mp_d[0] :                                    \
+	  (I_)arg._mp_d[0];                                     \
 }
 
 #define integer2Wordzh(r, sa,da)				\
