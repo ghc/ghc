@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.10 1999/02/26 12:32:51 simonm Exp $
+ * $Id: Schedule.c,v 1.11 1999/02/26 16:44:13 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -313,6 +313,14 @@ void initScheduler(void)
   interrupted    = 0;
 
   enteredCAFs = END_CAF_LIST;
+}
+
+void 
+run_all_threads ( void )
+{
+  while (run_queue_hd != END_TSO_QUEUE) {
+    schedule(run_queue_hd, NULL);
+  }
 }
 
 /* -----------------------------------------------------------------------------

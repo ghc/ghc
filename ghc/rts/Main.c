@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.3 1999/01/21 10:31:47 simonm Exp $
+ * $Id: Main.c,v 1.4 1999/02/26 16:44:13 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -68,6 +68,8 @@ int main(int argc, char *argv[])
     case Interrupted:
       /* carry on */
     }
+    /* run all threads */
+    run_all_threads();
     shutdownHaskell();
     stg_exit(EXIT_SUCCESS);
 }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.14 1999/02/23 17:18:01 simonm Exp $
+ * $Id: Storage.c,v 1.15 1999/02/26 16:44:14 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -387,7 +387,7 @@ calcLive(void)
   step *step;
 
   if (RtsFlags.GcFlags.generations == 1) {
-    live = g0s0->to_blocks * BLOCK_SIZE_W + 
+    live = (g0s0->to_blocks - 1) * BLOCK_SIZE_W + 
       ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
     return live;
   }
@@ -402,7 +402,7 @@ calcLive(void)
       }
       step = &generations[g].steps[s];
       live += (step->n_blocks - 1) * BLOCK_SIZE_W +
-	((lnat)step->hp_bd->free -(lnat)step->hp_bd->start) / sizeof(W_);
+	((lnat)step->hp_bd->free - (lnat)step->hp_bd->start) / sizeof(W_);
     }
   }
   return live;
