@@ -84,6 +84,8 @@ module Data.FiniteMap (
 #endif
     ) where
 
+import Prelude -- necessary to get dependencies right
+
 import Data.Maybe ( isJust )
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base

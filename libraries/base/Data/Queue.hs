@@ -23,9 +23,7 @@ module Data.Queue(
 	listToQueue, queueToList
     ) where
 
-#ifdef __HADDOCK__
-import Prelude
-#endif
+import Prelude -- necessary to get dependencies right
 
 -- | The type of FIFO queues.
 data Queue a = Q [a] [a] [a]
