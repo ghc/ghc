@@ -239,7 +239,9 @@ else
 fi
 egrep -v '^ld\.so:.*has older revision than expected' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
 mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
-egrep '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $HeimdallStats
+if [ "$Heimdall" = "1" ]; then
+  egrep '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $HeimdallStats
+fi
 egrep -v '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
 mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
 
