@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.27 2000/11/20 16:28:29 simonmar Exp $
+-- $Id: Main.hs,v 1.28 2000/11/20 16:37:42 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -213,6 +213,12 @@ main =
     	-- complain about any unknown flags
    mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
 
+	-- save the flag state, because this could be modified by OPTIONS 
+	-- pragmas during the compilation, and we'll need to restore it
+	-- before starting the next compilation.
+   saved_driver_state <- readIORef v_Driver_state
+   writeIORef v_InitDriverState saved_driver_state
+
 	-- get the -v flag
    verb <- readIORef v_Verbose
 
@@ -246,12 +252,6 @@ main =
 	else do
 
    if null srcs then throwDyn (UsageError "no input files") else do
-
-	-- save the flag state, because this could be modified by OPTIONS 
-	-- pragmas during the compilation, and we'll need to restore it
-	-- before starting the next compilation.
-   saved_driver_state <- readIORef v_Driver_state
-   writeIORef v_InitDriverState saved_driver_state
 
    let compileFile (src, phases) = do
 	  writeIORef v_Driver_state saved_driver_state
