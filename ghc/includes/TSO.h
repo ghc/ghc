@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.24 2002/02/13 07:46:42 sof Exp $
+ * $Id: TSO.h,v 1.25 2002/02/13 07:47:41 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -145,7 +145,7 @@ typedef enum {
   , BlockedOnGA_NoSend // same as above but without sending a Fetch message
 #endif
 #if defined(RTS_SUPPORTS_THREADS)
-  , BlockedOnCCall
+  , BlockedOnCCall 
 #endif
 } StgTSOBlockReason;
 
