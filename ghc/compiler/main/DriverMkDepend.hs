@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.37 2005/01/27 10:44:27 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.38 2005/01/27 14:38:29 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -273,13 +273,14 @@ insertSuffixes file_name extras
 
 endMkDependHS :: DynFlags -> MkDepFiles -> IO ()
 
-endMkDependHS dflags (MkDep { mkd_make_file = make_file, mkd_make_hdl =  makefile_hdl,
-			      mkd_tmp_file  = tmp_file,  mkd_tmp_hdl  =  tmp_hdl }) 
+endMkDependHS dflags 
+   (MkDep { mkd_make_file = make_file, mkd_make_hdl =  makefile_hdl,
+            mkd_tmp_file  = tmp_file,  mkd_tmp_hdl  =  tmp_hdl }) 
   = do	{ 	-- write the magic marker into the tmp file
 	  hPutStrLn tmp_hdl depEndMarker
 
-	; case makefile_hdl of
-	     Nothing  -> return ()
+	; case makefile_hdl of {
+	     Nothing  -> return ();
 	     Just hdl -> do
 	{
 	  -- slurp the rest of the original makefile and copy it into the output
@@ -302,7 +303,7 @@ endMkDependHS dflags (MkDep { mkd_make_file = make_file, mkd_make_hdl =  makefil
 
 	  	-- Copy the new makefile in place
 	; SysTools.copy dflags "Installing new makefile" tmp_file make_file
-	}}
+	}}}
 
 
 -----------------------------------------------------------------
