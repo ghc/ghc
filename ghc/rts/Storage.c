@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.8 1999/01/28 15:04:02 simonm Exp $
+ * $Id: Storage.c,v 1.9 1999/02/02 14:21:33 simonm Exp $
  *
  * Storage manager front end
  *
@@ -68,6 +68,7 @@ initStorage (void)
     gen = &generations[g];
     gen->no = g;
     gen->mut_list = END_MUT_LIST;
+    gen->mut_once_list = END_MUT_LIST;
     gen->collections = 0;
     gen->failed_promotions = 0;
     gen->max_blocks = RtsFlags.GcFlags.minOldGenSize;
@@ -225,26 +226,6 @@ exitStorage (void)
 }
 
 void
-recordMutable(StgMutClosure *p)
-{
-  bdescr *bd;
-
-  ASSERT(closure_MUTABLE(p));
-
-  bd = Bdescr((P_)p);
-
-  /* no need to bother in generation 0 */
-  if (bd->gen == g0) { 
-    return; 
-  } 
-
-  if (p->mut_link == NULL) {
-    p->mut_link = bd->gen->mut_list;
-    bd->gen->mut_list = p;
-  }
-}
-
-void
 newCAF(StgClosure* caf)
 {
   /* Put this CAF on the mutable list for the old generation.
@@ -254,8 +235,8 @@ newCAF(StgClosure* caf)
    * come to do a major GC we won't need the mut_link field
    * any more and can use it as a STATIC_LINK.
    */
-  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_list;
-  oldest_gen->mut_list = (StgMutClosure *)caf;
+  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
+  oldest_gen->mut_once_list = (StgMutClosure *)caf;
 
 #ifdef DEBUG
   { 

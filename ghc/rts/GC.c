@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.22 1999/01/28 15:04:00 simonm Exp $
+ * $Id: GC.c,v 1.23 1999/02/02 14:21:29 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -104,6 +104,7 @@ static void           scavenge_large(step *step);
 static void           scavenge(step *step);
 static void           scavenge_static(void);
 static StgMutClosure *scavenge_mutable_list(StgMutClosure *p, nat gen);
+static StgMutClosure *scavenge_mut_once_list(StgMutClosure *p, nat gen);
 
 #ifdef DEBUG
 static void gcCAFs(void);
@@ -191,7 +192,7 @@ void GarbageCollect(void (*get_roots)(void))
    * zeroMutableList below).
    */
   if (major_gc) { 
-    zeroMutableList(generations[RtsFlags.GcFlags.generations-1].mut_list);
+    zeroMutableList(generations[RtsFlags.GcFlags.generations-1].mut_once_list);
   }
 
   /* Save the old to-space if we're doing a two-space collection
@@ -205,6 +206,7 @@ void GarbageCollect(void (*get_roots)(void))
    * collecting.
    */
   for (g = 0; g <= N; g++) {
+    generations[g].mut_once_list = END_MUT_LIST;
     generations[g].mut_list = END_MUT_LIST;
 
     for (s = 0; s < generations[g].n_steps; s++) {
@@ -287,6 +289,12 @@ void GarbageCollect(void (*get_roots)(void))
     for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
       generations[g].saved_mut_list = generations[g].mut_list;
       generations[g].mut_list = END_MUT_LIST;
+    }
+
+    /* Do the mut-once lists first */
+    for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
+      generations[g].mut_once_list = 
+	scavenge_mut_once_list(generations[g].mut_once_list, g);
     }
 
     for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
@@ -815,6 +823,7 @@ copy(StgClosure *src, nat size, step *step)
 {
   P_ to, from, dest;
 
+  TICK_GC_WORDS_COPIED(size);
   /* Find out where we're going, using the handy "to" pointer in 
    * the step of the source object.  If it turns out we need to
    * evacuate to an older generation, adjust it here (see comment
@@ -850,6 +859,7 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
 {
   P_ dest, to, from;
 
+  TICK_GC_WORDS_COPIED(size_to_copy);
   if (step->gen->no < evac_gen) {
     step = &generations[evac_gen].steps[0];
   }
@@ -874,25 +884,6 @@ upd_evacuee(StgClosure *p, StgClosure *dest)
 
   SET_INFO(q,&EVACUATED_info);
   q->evacuee = dest;
-}
-
-/* -----------------------------------------------------------------------------
-   Evacuate a mutable object
-   
-   If we evacuate a mutable object to an old generation, cons the
-   object onto the older generation's mutable list.
-   -------------------------------------------------------------------------- */
-   
-static inline void
-evacuate_mutable(StgMutClosure *c)
-{
-  bdescr *bd;
-  
-  bd = Bdescr((P_)c);
-  if (bd->gen->no > 0) {
-    c->mut_link = bd->gen->mut_list;
-    bd->gen->mut_list = c;
-  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -952,7 +943,7 @@ evacuate_large(StgPtr p, rtsBool mutable)
   bd->evacuated = 1;
 
   if (mutable) {
-    evacuate_mutable((StgMutClosure *)p);
+    recordMutable((StgMutClosure *)p);
   }
 }
 
@@ -984,7 +975,7 @@ mkMutCons(StgClosure *ptr, generation *gen)
 
   SET_HDR(q,&MUT_CONS_info,CCS_GC);
   q->var = ptr;
-  evacuate_mutable((StgMutClosure *)q);
+  recordOldToNewPtrs((StgMutClosure *)q);
 
   return (StgClosure *)q;
 }
@@ -1054,10 +1045,11 @@ loop:
     return to;
 
   case MUT_VAR:
+    ASSERT(q->header.info != &MUT_CONS_info);
   case MVAR:
     to = copy(q,sizeW_fromITBL(info),step);
     upd_evacuee(q,to);
-    evacuate_mutable((StgMutClosure *)to);
+    recordMutable((StgMutClosure *)to);
     return to;
 
   case STABLE_NAME:
@@ -1111,7 +1103,7 @@ loop:
   case BLACKHOLE_BQ:
     to = copy(q,BLACKHOLE_sizeW(),step); 
     upd_evacuee(q,to);
-    evacuate_mutable((StgMutClosure *)to);
+    recordMutable((StgMutClosure *)to);
     return to;
 
   case THUNK_SELECTOR:
@@ -1275,7 +1267,7 @@ loop:
 	/*	fprintf(stderr,"evac failed!\n");*/
 	failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
-      } 
+      }
     }
     return ((StgEvacuated*)q)->evacuee;
 
@@ -1308,7 +1300,7 @@ loop:
 	to = copy(q,size,step);
 	upd_evacuee(q,to);
 	if (info->type == MUT_ARR_PTRS) {
-	  evacuate_mutable((StgMutClosure *)to);
+	  recordMutable((StgMutClosure *)to);
 	}
       }
       return to;
@@ -1342,7 +1334,7 @@ loop:
 	relocate_TSO(tso, new_tso);
 	upd_evacuee(q,(StgClosure *)new_tso);
 
-	evacuate_mutable((StgMutClosure *)new_tso);
+	recordMutable((StgMutClosure *)new_tso);
 	return (StgClosure *)new_tso;
       }
     }
@@ -1595,7 +1587,7 @@ scavenge(step *step)
 	  evacuate((StgClosure *)bh->blocking_queue);
 	if (failed_to_evac) {
 	  failed_to_evac = rtsFalse;
-	  evacuate_mutable((StgMutClosure *)bh);
+	  recordMutable((StgMutClosure *)bh);
 	}
 	p += BLACKHOLE_sizeW();
 	break;
@@ -1681,7 +1673,7 @@ scavenge(step *step)
 	}
 	if (failed_to_evac) {
 	  /* we can do this easier... */
-	  evacuate_mutable((StgMutClosure *)start);
+	  recordMutable((StgMutClosure *)start);
 	  failed_to_evac = rtsFalse;
 	}
 	break;
@@ -1733,15 +1725,15 @@ scavenge(step *step)
    objects can have this property.
    -------------------------------------------------------------------------- */
 static rtsBool
-scavenge_one(StgPtr p)
+scavenge_one(StgClosure *p)
 {
   StgInfoTable *info;
   rtsBool no_luck;
 
-  ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO((StgClosure *)p))
-	       || IS_HUGS_CONSTR_INFO(GET_INFO((StgClosure *)p))));
+  ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
+	       || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
 
-  info = get_itbl((StgClosure *)p);
+  info = get_itbl(p);
 
   switch (info -> type) {
 
@@ -1770,11 +1762,11 @@ scavenge_one(StgPtr p)
   case CAF_UNENTERED:
   case CAF_ENTERED:
     {
-      StgPtr end;
+      StgPtr q, end;
       
-      end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
-      for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-	(StgClosure *)*p = evacuate((StgClosure *)*p);
+      end = (P_)p->payload + info->layout.payload.ptrs;
+      for (q = (P_)p->payload; q < end; q++) {
+	(StgClosure *)*q = evacuate((StgClosure *)*q);
       }
       break;
     }
@@ -1787,7 +1779,7 @@ scavenge_one(StgPtr p)
     { 
       StgSelector *s = (StgSelector *)p;
       s->selectee = evacuate(s->selectee);
-       break;
+      break;
     }
     
   case AP_UPD: /* same as PAPs */
@@ -1796,7 +1788,7 @@ scavenge_one(StgPtr p)
      * evacuate the function pointer too...
      */
     { 
-      StgPAP* pap = stgCast(StgPAP*,p);
+      StgPAP* pap = (StgPAP *)p;
       
       pap->fun = evacuate(pap->fun);
       scavenge_stack((P_)pap->payload, (P_)pap->payload + pap->n_args);
@@ -1828,6 +1820,83 @@ scavenge_one(StgPtr p)
    generations older than the one being collected) as roots.  We also
    remove non-mutable objects from the mutable list at this point.
    -------------------------------------------------------------------------- */
+
+static StgMutClosure *
+scavenge_mut_once_list(StgMutClosure *p, nat gen)
+{
+  StgInfoTable *info;
+  StgMutClosure *start;
+  StgMutClosure **prev;
+
+  prev = &start;
+  start = p;
+
+  evac_gen = gen;
+  failed_to_evac = rtsFalse;
+
+  for (; p != END_MUT_LIST; p = *prev) {
+
+    /* make sure the info pointer is into text space */
+    ASSERT(p && (LOOKS_LIKE_GHC_INFO(GET_INFO(p))
+		 || IS_HUGS_CONSTR_INFO(GET_INFO(p))));
+    
+    info = get_itbl(p);
+    switch(info->type) {
+      
+    case IND_OLDGEN:
+    case IND_OLDGEN_PERM:
+    case IND_STATIC:
+      /* Try to pull the indirectee into this generation, so we can
+       * remove the indirection from the mutable list.  
+       */
+      ((StgIndOldGen *)p)->indirectee = 
+        evacuate(((StgIndOldGen *)p)->indirectee);
+      
+      /* failed_to_evac might happen if we've got more than two
+       * generations, we're collecting only generation 0, the
+       * indirection resides in generation 2 and the indirectee is
+       * in generation 1.
+       */
+      if (failed_to_evac) {
+	failed_to_evac = rtsFalse;
+	prev = &p->mut_link;
+      } else {
+	*prev = p->mut_link;
+	/* the mut_link field of an IND_STATIC is overloaded as the
+	 * static link field too (it just so happens that we don't need
+	 * both at the same time), so we need to NULL it out when
+	 * removing this object from the mutable list because the static
+	 * link fields are all assumed to be NULL before doing a major
+	 * collection. 
+	 */
+	p->mut_link = NULL;
+      }
+      continue;
+      
+    case MUT_VAR:
+      /* MUT_CONS is a kind of MUT_VAR, except it that we try to remove
+       * it from the mutable list if possible by promoting whatever it
+       * points to.
+       */
+      ASSERT(p->header.info == &MUT_CONS_info);
+      if (scavenge_one(((StgMutVar *)p)->var) == rtsTrue) {
+	/* didn't manage to promote everything, so leave the
+	 * MUT_CONS on the list.
+	 */
+	prev = &p->mut_link;
+      } else {
+	*prev = p->mut_link;
+      }
+      continue;
+      
+    default:
+      /* shouldn't have anything else on the mutables list */
+      barf("scavenge_mut_once_list: strange object?");
+    }
+  }
+  return start;
+}
+
 
 static StgMutClosure *
 scavenge_mutable_list(StgMutClosure *p, nat gen)
@@ -1893,21 +1962,9 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
        * it from the mutable list if possible by promoting whatever it
        * points to.
        */
-      if (p->header.info == &MUT_CONS_info) {
-	evac_gen = gen;
-	if (scavenge_one((P_)((StgMutVar *)p)->var) == rtsTrue) {
-	  /* didn't manage to promote everything, so leave the
-	   * MUT_CONS on the list.
-	   */
-	  prev = &p->mut_link;
-	} else {
-	  *prev = p->mut_link;
-	}
-	evac_gen = 0;
-      } else {
-	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	prev = &p->mut_link;
-      }
+      ASSERT(p->header.info != &MUT_CONS_info);
+      ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
+      prev = &p->mut_link;
       continue;
       
     case MVAR:
@@ -1943,33 +2000,6 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 	continue;
       }
       
-    case IND_OLDGEN:
-    case IND_OLDGEN_PERM:
-    case IND_STATIC:
-      /* Try to pull the indirectee into this generation, so we can
-       * remove the indirection from the mutable list.  
-       */
-      evac_gen = gen;
-      ((StgIndOldGen *)p)->indirectee = 
-        evacuate(((StgIndOldGen *)p)->indirectee);
-      evac_gen = 0;
-
-      if (failed_to_evac) {
-	failed_to_evac = rtsFalse;
-	prev = &p->mut_link;
-      } else {
-	*prev = p->mut_link;
-	/* the mut_link field of an IND_STATIC is overloaded as the
-	 * static link field too (it just so happens that we don't need
-	 * both at the same time), so we need to NULL it out when
-	 * removing this object from the mutable list because the static
-	 * link fields are all assumed to be NULL before doing a major
-	 * collection. 
-	 */
-	p->mut_link = NULL;
-      }
-      continue;
-      
     case BLACKHOLE_BQ:
       { 
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
@@ -1981,7 +2011,7 @@ scavenge_mutable_list(StgMutClosure *p, nat gen)
 
     default:
       /* shouldn't have anything else on the mutables list */
-      barf("scavenge_mutable_object: non-mutable object?");
+      barf("scavenge_mut_list: strange object?");
     }
   }
   return start;
@@ -2029,8 +2059,8 @@ scavenge_static(void)
 	if (failed_to_evac) {
 	  failed_to_evac = rtsFalse;
 	  scavenged_static_objects = STATIC_LINK(info,p);
-	  ((StgMutClosure *)ind)->mut_link = oldest_gen->mut_list;
-	  oldest_gen->mut_list = (StgMutClosure *)ind;
+	  ((StgMutClosure *)ind)->mut_link = oldest_gen->mut_once_list;
+	  oldest_gen->mut_once_list = (StgMutClosure *)ind;
 	}
 	break;
       }
@@ -2168,7 +2198,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	    to = copy(frame->updatee, BLACKHOLE_sizeW(), step);
 	    upd_evacuee(frame->updatee,to);
 	    frame->updatee = to;
-	    evacuate_mutable((StgMutClosure *)to);
+	    recordMutable((StgMutClosure *)to);
 	    continue;
 	  default:
 	    barf("scavenge_stack: UPDATE_FRAME updatee");
@@ -2303,7 +2333,7 @@ scavenge_large(step *step)
 	}
 	evac_gen = 0;
 	if (failed_to_evac) {
-	  evacuate_mutable((StgMutClosure *)start);
+	  recordMutable((StgMutClosure *)start);
 	}
 	continue;
       }

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.1 1999/01/21 10:31:44 simonm Exp $
+ * $Id: StgTicky.h,v 1.2 1999/02/02 14:21:28 simonm Exp $
  *
  * Ticky-ticky profiling macros.
  *
@@ -249,6 +249,12 @@
  */
 #define TICK_GC_FAILED_PROMOTION()	GC_FAILED_PROMOTION_ctr++
 
+/* Bytes copied: this is a fairly good measure of GC cost and depends
+ * on all sorts of things like number of generations, aging, eager
+ * promotion, generation sizing policy etc.
+ */
+#define TICK_GC_WORDS_COPIED(n)         GC_WORDS_COPIED_ctr+=(n)
+
 /* -----------------------------------------------------------------------------
    The accumulators (extern decls)
    -------------------------------------------------------------------------- */
@@ -457,6 +463,8 @@ EXTERN unsigned long GC_SEL_MAJOR_ctr INIT(0);
 
 EXTERN unsigned long GC_FAILED_PROMOTION_ctr INIT(0);
 
+EXTERN unsigned long GC_WORDS_COPIED_ctr INIT(0);
+
 #undef INIT
 #undef EXTERN
 
@@ -522,6 +530,7 @@ EXTERN unsigned long GC_FAILED_PROMOTION_ctr INIT(0);
 #define TICK_GC_SEL_MAJOR()
 
 #define TICK_GC_FAILED_PROMOTION()
+#define TICK_GC_WORDS_COPIED(n)
 
 #endif /* !TICKY_TICKY */
 

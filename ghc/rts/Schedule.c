@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.6 1999/01/26 11:12:48 simonm Exp $
+ * $Id: Schedule.c,v 1.7 1999/02/02 14:21:31 simonm Exp $
  *
  * Scheduler
  *
@@ -399,7 +399,9 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
     /* Be friendly to the storage manager: we're about to *run* this
      * thread, so we better make sure the TSO is mutable.
      */
-    recordMutable((StgMutClosure *)t);
+    if (t->mut_link == NULL) {
+      recordMutable((StgMutClosure *)t);
+    }
 
     /* Run the current thread */
     switch (t->whatNext) {

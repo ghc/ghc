@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.6 1999/01/28 15:04:02 simonm Exp $
+ * $Id: StoragePriv.h,v 1.7 1999/02/02 14:21:34 simonm Exp $
  *
  * Internal Storage Manger Interface
  *
@@ -71,6 +71,7 @@ typedef struct _generation {
   nat n_steps;			/* number of steps */
   nat max_blocks;		/* max blocks in step 0 */
   StgMutClosure *mut_list;      /* mutable objects in this generation (not G0)*/
+  StgMutClosure *mut_once_list; /* objects that point to younger generations */
 
   /* temporary use during GC: */
   StgMutClosure *saved_mut_list;

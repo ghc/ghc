@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.5 1999/01/21 10:31:52 simonm Exp $
+ * $Id: Storage.h,v 1.6 1999/02/02 14:21:34 simonm Exp $
  *
  * External Storage Manger Interface
  *
@@ -91,7 +91,31 @@ extern StgClosure *MarkRoot(StgClosure *p);
 
    -------------------------------------------------------------------------- */
 
-extern void recordMutable(StgMutClosure *p);
+static inline void
+recordMutable(StgMutClosure *p)
+{
+  bdescr *bd;
+
+  ASSERT(closure_MUTABLE(p));
+
+  bd = Bdescr((P_)p);
+  if (bd->gen->no > 0) {
+    p->mut_link = bd->gen->mut_list;
+    bd->gen->mut_list = p;
+  }
+}
+
+static inline void
+recordOldToNewPtrs(StgMutClosure *p)
+{
+  bdescr *bd;
+  
+  bd = Bdescr((P_)p);
+  if (bd->gen->no > 0) {
+    p->mut_link = bd->gen->mut_once_list;
+    bd->gen->mut_once_list = p;
+  }
+}
 
 static inline void
 updateWithIndirection(StgClosure *p1, StgClosure *p2) 
@@ -106,8 +130,8 @@ updateWithIndirection(StgClosure *p1, StgClosure *p2)
   } else {
     SET_INFO(p1,&IND_OLDGEN_info);
     ((StgIndOldGen *)p1)->indirectee = p2;
-    ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_list;
-    bd->gen->mut_list = (StgMutClosure *)p1;
+    ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
+    bd->gen->mut_once_list = (StgMutClosure *)p1;
     TICK_UPD_OLD_IND();
   }
 }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.1 1999/01/21 10:31:52 simonm Exp $
+ * $Id: Ticky.c,v 1.2 1999/02/02 14:21:34 simonm Exp $
  *
  * (c) The GHC Team, Glasgow University, 1992-1998
  *
@@ -261,6 +261,9 @@ PrintTickyInfo(void)
 	      PC(INTAVG(tot_old_updates,tot_gengc_updates)));
   }
 
+  fprintf(tf,"\nTotal bytes copied during GC: %ld\n",
+	  GC_WORDS_COPIED_ctr * sizeof(W_));
+
 #if 0
   printRegisteredCounterInfo(tf);
 #endif
@@ -478,6 +481,7 @@ PrintTickyInfo(void)
   PR_CTR(GC_SEL_MINOR_ctr);
   PR_CTR(GC_SEL_MAJOR_ctr);
   PR_CTR(GC_FAILED_PROMOTION_ctr);
+  PR_CTR(GC_WORDS_COPIED_ctr);
 }
 
 #if 0

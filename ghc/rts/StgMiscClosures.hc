@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.10 1999/02/01 18:05:34 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.11 1999/02/02 14:21:32 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -143,7 +143,6 @@ STGFUN(BLACKHOLE_entry)
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
-    ((StgBlockingQueue *)R1.p)->mut_link = NULL;
     recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */
@@ -178,7 +177,6 @@ STGFUN(CAF_BLACKHOLE_entry)
     /* Put ourselves on the blocking queue for this black hole */
     CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
-    ((StgBlockingQueue *)R1.p)->mut_link = NULL;
     recordMutable((StgMutClosure *)R1.cl);
 
     /* stg_gen_block is too heavyweight, use a specialised one */
