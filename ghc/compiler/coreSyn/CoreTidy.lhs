@@ -21,11 +21,9 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
-			  idSpecialisation, idUnique, isDataConWrapId,
-			  mkVanillaGlobal, mkGlobalId, isLocalId, 
-			  isDataConId, mkUserLocal, isGlobalId, globalIdDetails,
-			  idNewDemandInfo, setIdNewDemandInfo, setIdCgInfo,
-			  idNewStrictness, setIdNewStrictness
+			  idSpecialisation, idUnique, 
+			  mkVanillaGlobal, isLocalId, 
+			  isImplicitId, mkUserLocal, setIdInfo
 			) 
 import IdInfo		{- loads of stuff -}
 import NewDemand	( isBottomingSig, topSig )
@@ -40,7 +38,7 @@ import Module		( Module, moduleName )
 import HscTypes		( PersistentCompilerState( pcs_PRS ), 
 			  PersistentRenamerState( prsOrig ),
 			  NameSupply( nsNames, nsUniqs ),
-			  TypeEnv, extendTypeEnvList, 
+			  TypeEnv, extendTypeEnvList, typeEnvIds,
 			  ModDetails(..), TyThing(..)
 			)
 import FiniteMap	( lookupFM, addToFM )
@@ -151,11 +149,18 @@ tidyCorePgm dflags mod pcs cg_info_env
 		orig_ns       = prsOrig prs
 
 		init_tidy_env = (orig_ns, initTidyOccEnv avoids, emptyVarEnv)
-		avoids	      = [getOccName bndr | bndr <- bindersOfBinds binds_in,
-				 	           isGlobalName (idName bndr)]
+		avoids	      = [getOccName name | bndr <- typeEnvIds env_tc,
+						   let name = idName bndr,
+						   isGlobalName name]
+		-- In computing our "avoids" list, we must include
+		--	all implicit Ids
+		--	all things with global names (assigned once and for
+		--					all by the renamer)
+		-- since their names are "taken".
+		-- The type environment is a convenient source of such things.
 
 	; let ((orig_ns', occ_env, subst_env), tidy_binds) 
-	       		= mapAccumL (tidyTopBind mod ext_ids) 
+	       		= mapAccumL (tidyTopBind mod ext_ids cg_info_env) 
 				    init_tidy_env binds_in
 
 	; let tidy_rules = tidyIdRules (occ_env,subst_env) ext_rules
@@ -163,7 +168,7 @@ tidyCorePgm dflags mod pcs cg_info_env
 	; let prs' = prs { prsOrig = orig_ns' }
 	      pcs' = pcs { pcs_PRS = prs' }
 
-	; let final_ids  = [ addCgInfo cg_info_env id 
+	; let final_ids  = [ id 
 			   | bind <- tidy_binds
 			   , id <- bindersOf bind
 			   , isGlobalName (idName id)]
@@ -189,16 +194,6 @@ tidyCorePgm dflags mod pcs cg_info_env
 
 	; return (pcs', tidy_details)
 	}
-
-addCgInfo :: CgInfoEnv -> Id -> Id
--- Pin on the info that comes from the code generator
--- This doesn't make its way into the *bindings* that 
--- go on to the code generator (that might give black holes etc)
--- Rather, it's pinned onto the Id in the type environment 
--- that (a) generates the interface file
---	(b) in GHCi goes into subsequent compilations
-addCgInfo cg_info_env id 
-  = id `setIdCgInfo` lookupCgInfo cg_info_env (idName id)
 
 tidyCoreExpr :: CoreExpr -> IO CoreExpr
 tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
@@ -235,9 +230,9 @@ mkFinalTypeEnv type_env final_ids
 	-- in interface files, because they are needed by importing modules when
 	-- using the compilation manager
 
-	-- We keep constructor workers, 
-	-- because they won't appear in the bindings from which final_ids are derived!
-    keep_it (AnId id) = isDataConId id	-- Remove all Ids except constructor workers
+	-- We keep implicit Ids, because they won't appear 
+	-- in the bindings from which final_ids are derived!
+    keep_it (AnId id) = isImplicitId id	-- Remove all Ids except implicit ones
     keep_it other     = True		-- Keep all TyCons and Classes
 \end{code}
 
@@ -386,18 +381,20 @@ type TopTidyEnv = (NameSupply, TidyOccEnv, VarEnv Var)
 tidyTopBind :: Module
 	    -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
+	    -> CgInfoEnv
 	    -> TopTidyEnv -> CoreBind
 	    -> (TopTidyEnv, CoreBind)
 
-tidyTopBind mod ext_ids top_tidy_env (NonRec bndr rhs)
+tidyTopBind mod ext_ids cg_info_env top_tidy_env (NonRec bndr rhs)
   = ((orig,occ,subst) , NonRec bndr' rhs')
   where
     ((orig,occ,subst), bndr')
-	 = tidyTopBinder mod ext_ids rec_tidy_env rhs' top_tidy_env bndr
+	 = tidyTopBinder mod ext_ids cg_info_env 
+			 rec_tidy_env rhs' top_tidy_env bndr
     rec_tidy_env = (occ,subst)
     rhs' = tidyExpr rec_tidy_env rhs
 
-tidyTopBind mod ext_ids top_tidy_env (Rec prs)
+tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
   = (final_env, Rec prs')
   where
     (final_env@(_,occ,subst), prs') = mapAccumL do_one top_tidy_env prs
@@ -407,12 +404,12 @@ tidyTopBind mod ext_ids top_tidy_env (Rec prs)
 	= ((orig,occ,subst), (bndr',rhs'))
 	where
 	((orig,occ,subst), bndr')
-	   = tidyTopBinder mod ext_ids
+	   = tidyTopBinder mod ext_ids cg_info_env
 		rec_tidy_env rhs' top_tidy_env bndr
 
         rhs' = tidyExpr rec_tidy_env rhs
 
-tidyTopBinder :: Module -> IdEnv Bool
+tidyTopBinder :: Module -> IdEnv Bool -> CgInfoEnv
 	      -> TidyEnv -> CoreExpr
 			-- The TidyEnv is used to tidy the IdInfo
 			-- The expr is the already-tided RHS
@@ -420,34 +417,10 @@ tidyTopBinder :: Module -> IdEnv Bool
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
   -- NB: tidyTopBinder doesn't affect the unique supply
 
-tidyTopBinder mod ext_ids tidy_env rhs
+tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
 	      env@(ns2, occ_env2, subst_env2) id
-
-  | isDataConWrapId id	-- Don't tidy constructor wrappers
-  = (env, id)		-- The Id is stored in the TyCon, so it would be bad
-			-- if anything changed
-
--- HACK ALERT: we *do* tidy record selectors.  Reason: they mention error
--- messages, which may be floated out:
---	x_field pt = case pt of
---			Rect x y -> y
---			Pol _ _  -> error "buggle wuggle"
--- The error message will be floated out so we'll get
---	lvl5 = error "buggle wuggle"
---	x_field pt = case pt of
---			Rect x y -> y
---			Pol _ _  -> lvl5
---
--- When this happens, it's vital that the Id exposed to importing modules
--- (by ghci) mentions lvl5 in its unfolding, not the un-tidied version.
--- 
--- What about the Id in the TyCon?  It probably shouldn't be in the TyCon at
--- all, but in any case it will have the error message inline so it won't matter.
-
-
-  | otherwise
 	-- This function is the heart of Step 2
-	-- The second env is the one to use for the IdInfo
+	-- The rec_tidy_env is the one to use for the IdInfo
 	-- It's necessary because when we are dealing with a recursive
 	-- group, a variable late in the group might be mentioned
 	-- in the IdInfo of one early in the group
@@ -459,13 +432,12 @@ tidyTopBinder mod ext_ids tidy_env rhs
     (orig_env', occ_env', name') = tidyTopName mod ns2 occ_env2
 					       is_external
 					       (idName id)
-    ty'	    = tidyTopType (idType id)
-    idinfo' = tidyIdInfo tidy_env is_external unfold_info id
+    ty'	   = tidyTopType (idType id)
+    idinfo = tidyTopIdInfo rec_tidy_env is_external 
+			   (idInfo id) unfold_info
+			   (lookupCgInfo cg_info_env name')
 
-    id' | isGlobalId id = mkGlobalId (globalIdDetails id) name' ty' idinfo'
-	| otherwise     = mkVanillaGlobal		  name' ty' idinfo'
-	-- The test ensures that record selectors (which must be tidied; see above)
-	-- retain their details.  If it's forgotten, importing modules get confused.
+    id' = mkVanillaGlobal name' ty' idinfo
 
     subst_env' = extendVarEnv subst_env2 id id'
 
@@ -478,26 +450,46 @@ tidyTopBinder mod ext_ids tidy_env rhs
 		| otherwise   = noUnfolding
 
 
-tidyIdInfo tidy_env is_external unfold_info id
+-- tidyTopIdInfo creates the final IdInfo for top-level
+-- binders.  There are two delicate pieces:
+--
+--  * Arity.  We assume that the simplifier has just run, so
+-- 	that there is a reasonable arity on each binder.
+--	After CoreTidy, this arity must not change any more.
+--	Indeed, CorePrep must eta expand where necessary to make
+--	the manifest arity equal to the claimed arity.
+--
+-- * CAF info, which comes from the CoreToStg pass via a knot.
+-- 	The CAF info will not be looked at by the downstream stuff:
+-- 	it *generates* it, and knot-ties it back.  It will only be
+-- 	looked at by (a) MkIface when generating an interface file
+-- 		     (b) In GHCi, importing modules
+-- 	Nevertheless, we add the info here so that it propagates to all
+-- 	occurrences of the binders in RHSs, and hence to occurrences in
+-- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
+--     
+-- 	An alterative would be to do a second pass over the unfoldings 
+-- 	of Ids, and rules, right at the top, but that would be a pain.
+
+tidyTopIdInfo tidy_env is_external idinfo unfold_info cg_info
   | opt_OmitInterfacePragmas || not is_external
-	-- No IdInfo if the Id isn't external, or if we don't have -O
-  = vanillaIdInfo 
-	`setArityInfo`	       arityInfo core_idinfo
-	`setNewStrictnessInfo` newStrictnessInfo core_idinfo
-	-- Keep strictness and arity; both are used by CorePrep
+	-- Only basic info if the Id isn't external, or if we don't have -O
+  = basic_info
 
-  | otherwise
-  =  vanillaIdInfo 
-	`setArityInfo`	       arityInfo core_idinfo
-	`setNewStrictnessInfo` newStrictnessInfo core_idinfo
-	`setInlinePragInfo`    inlinePragInfo core_idinfo
+  | otherwise	-- Add extra optimisation info
+  = basic_info
+	`setInlinePragInfo`    inlinePragInfo idinfo
 	`setUnfoldingInfo`     unfold_info
-	`setWorkerInfo`	       tidyWorker tidy_env (workerInfo core_idinfo)
-	-- NB: we throw away the Rules
-	-- They have already been extracted by findExternalRules
+	`setWorkerInfo`	       tidyWorker tidy_env (workerInfo idinfo)
+		-- NB: we throw away the Rules
+		-- They have already been extracted by findExternalRules
+  
   where
-    core_idinfo = idInfo id
-
+	-- baasic_info is attached to every top-level binder
+    basic_info = vanillaIdInfo 
+			`setCgInfo` 	       cg_info
+			`setArityInfo`	       arityInfo idinfo
+			`setNewStrictnessInfo` newStrictnessInfo idinfo
 
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
@@ -523,7 +515,9 @@ tidyTopName mod ns occ_env external name
 			   Nothing   -> (ns { nsUniqs = us2, nsNames = ns_names' }, occ_env', global_name)
 	-- If we want to globalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
-	-- If so, use it; if not, extend the table
+	-- If so, use it; if not, extend the table.
+	-- This is needed when *re*-compiling a module in GHCi; we want to
+	-- use the same name for externally-visible things as we did before.
 
   where
     global	     = isGlobalName name
@@ -647,8 +641,14 @@ tidyLetBndr env (id,rhs)
 	--
 	-- Similarly for the demand info - on a let binder, this tells 
 	-- CorePrep to turn the let into a case.
-    final_id = new_id `setIdNewDemandInfo` idNewDemandInfo id
-		      `setIdNewStrictness` idNewStrictness id
+	--
+	-- Similarly arity info for eta expansion in CorePrep
+    final_id = new_id `setIdInfo` new_info
+    idinfo   = idInfo id
+    new_info = vanillaIdInfo 
+		`setArityInfo`		arityInfo idinfo
+		`setNewStrictnessInfo`	newStrictnessInfo idinfo
+		`setNewDemandInfo`	newDemandInfo idinfo
 
     -- Override the env we get back from tidyId with the new IdInfo
     -- so it gets propagated to the usage sites.
@@ -662,8 +662,8 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- The SrcLoc isn't important now, 
 	-- though we could extract it from the Id
 	-- 
-	-- All local Ids now have the same IdInfo, which should save some
-	-- space.
+	-- All nested Ids now have the same IdInfo, namely none,
+	-- which should save some space.
 	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
         ty'          	  = tidyType env (idType id)
 	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc

@@ -62,7 +62,6 @@ module Id (
 	idSpecialisation,
 	idCgInfo,
 	idCafInfo,
-	idCgArity,
 	idCprInfo,
 	idLBVarInfo,
 	idOccInfo,
@@ -266,11 +265,12 @@ isDataConWrapId id = case globalIdDetails id of
 			DataConWrapId con -> True
 			other	          -> False
 
-	-- hasNoBinding returns True of an Id which may not have a
-	-- binding, even though it is defined in this module.  Notably,
-	-- the constructors of a dictionary are in this situation.
+-- hasNoBinding returns True of an Id which may not have a
+-- binding, even though it is defined in this module.  
+-- Data constructor workers used to be things of this kind, but
+-- they aren't any more.  Instead, we inject a binding for 
+-- them at the CorePrep stage.
 hasNoBinding id = case globalIdDetails id of
-			DataConId _ -> True
 			PrimOpId _  -> True
 			FCallId _   -> True
 			other	    -> False
@@ -426,17 +426,6 @@ idCafInfo id = case cgInfo (idInfo id) of
 		  info     -> cgCafInfo info
 #else
 idCafInfo id = cgCafInfo (idCgInfo id)
-#endif
-
-	---------------------------------
-	-- CG ARITY
-idCgArity :: Id -> Arity
-#ifdef DEBUG
-idCgArity id = case cgInfo (idInfo id) of
-		  NoCgInfo -> pprPanic "idCgArity" (ppr id)
-		  info     -> cgArity info
-#else
-idCgArity id = cgArity (idCgInfo id)
 #endif
 
 	---------------------------------

@@ -24,9 +24,11 @@ import VarSet
 import VarEnv
 import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  setIdType, isPrimOpId_maybe, isFCallId, isGlobalId, 
-		  hasNoBinding, idNewStrictness, setIdArity
+		  hasNoBinding, idNewStrictness, 
+		  isDataConId_maybe, idUnfolding
 		)
-import HscTypes ( ModDetails(..) )
+import HscTypes ( ModDetails(..), implicitTyThingIds, typeEnvElts )
+import Unique	( mkBuiltinUnique )
 import BasicTypes ( Arity, TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -72,12 +74,18 @@ The goal of this pass is to prepare for code generation.
 7.  Give each dynamic CCall occurrence a fresh unique; this is
     rather like the cloning step above.
 
+8.  Inject bindings for the "implicit" Ids:
+	* Constructor wrappers
+	* Constructor workers
+	* Record selectors
+    We want curried definitions for all of these in case they
+    aren't inlined by some caller.
+	
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
 
   
-
 
 -- -----------------------------------------------------------------------------
 -- Top level stuff
@@ -89,13 +97,18 @@ corePrepPgm dflags mod_details
   = do	showPass dflags "CorePrep"
 	us <- mkSplitUniqSupply 's'
 
-	let floats    = initUs_ us (corePrepTopBinds emptyVarEnv (md_binds mod_details))
-	    new_binds = foldrOL get [] floats
-	    get (FloatLet b) bs = b:bs
-	    get b	     bs = pprPanic "corePrepPgm" (ppr b)
+	let implicit_binds = mkImplicitBinds (md_types mod_details)
+		-- NB: we must feed mkImplicitBinds through corePrep too
+		-- so that they are suitably cloned and eta-expanded
 
-        endPass dflags "CorePrep" Opt_D_dump_prep new_binds
-	return (mod_details { md_binds = new_binds })
+	    binds_out = initUs_ us (
+			  corePrepTopBinds (md_binds mod_details)	`thenUs` \ floats1 ->
+			  corePrepTopBinds implicit_binds		`thenUs` \ floats2 ->
+			  returnUs (deFloatTop (floats1 `appOL` floats2))
+			)
+	    
+        endPass dflags "CorePrep" Opt_D_dump_prep binds_out
+	return (mod_details { md_binds = binds_out })
 
 corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags expr
@@ -105,7 +118,52 @@ corePrepExpr dflags expr
        dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" 
 		     (ppr new_expr)
        return new_expr
+\end{code}
 
+-- -----------------------------------------------------------------------------
+-- Implicit bindings
+-- -----------------------------------------------------------------------------
+
+Create any necessary "implicit" bindings (data constructors etc).
+Namely:
+	* Constructor workers
+	* Constructor wrappers
+	* Data type record selectors
+	* Class op selectors
+
+In the latter three cases, the Id contains the unfolding to use for
+the binding.  In the case of data con workers we create the rather 
+strange (non-recursive!) binding
+
+	$wC = \x y -> $wC x y
+
+i.e. a curried constructor that allocates.  This means that we can
+treat the worker for a constructor like any other function in the rest
+of the compiler.  The point here is that CoreToStg will generate a
+StgConApp for the RHS, rather than a call to the worker (which would
+give a loop).  As Lennart says: the ice is thin here, but it works.
+
+Hmm.  Should we create bindings for dictionary constructors?  They are
+always fully applied, and the bindings are just there to support
+partial applications. But it's easier to let them through.
+
+\begin{code}
+mkImplicitBinds type_env
+  = [ NonRec id (get_unfolding id)
+    | id <- implicitTyThingIds (typeEnvElts type_env) ]
+	-- The etaExpand is so that the manifest arity of the
+	-- binding matches its claimed arity, which is an 
+	-- invariant of top level bindings going into the code gen
+  where
+    tmpl_uniqs = map mkBuiltinUnique [1..]
+
+get_unfolding id 	-- See notes above
+  | Just data_con <- isDataConId_maybe id = Var id	-- The ice is thin here, but it works
+  | otherwise			  	  = unfoldingTemplate (idUnfolding id)
+\end{code}
+	
+
+\begin{code}
 -- ---------------------------------------------------------------------------
 -- Dealing with bindings
 -- ---------------------------------------------------------------------------
@@ -119,6 +177,14 @@ instance Outputable FloatingBind where
   ppr (FloatCase b rhs spec) = text "FloatCase" <+> ppr b <+> ppr spec <+> equals <+> ppr rhs
 
 type CloneEnv = IdEnv Id	-- Clone local Ids
+
+deFloatTop :: OrdList FloatingBind -> [CoreBind]
+-- For top level only; we don't expect any FloatCases
+deFloatTop floats
+  = foldrOL get [] floats
+  where
+    get (FloatLet b) bs = b:bs
+    get b	     bs = pprPanic "corePrepPgm" (ppr b)
 
 allLazy :: TopLevelFlag -> RecFlag -> OrdList FloatingBind -> Bool
 allLazy top_lvl is_rec floats 
@@ -137,13 +203,14 @@ allLazy top_lvl is_rec floats
 -- 			Bindings
 -- ---------------------------------------------------------------------------
 
-corePrepTopBinds :: CloneEnv -> [CoreBind] -> UniqSM (OrdList FloatingBind)
-corePrepTopBinds env [] = returnUs nilOL
-
-corePrepTopBinds env (bind : binds)
-  = corePrepTopBind env bind		`thenUs` \ (env', bind') ->
-    corePrepTopBinds env' binds		`thenUs` \ binds' ->
-    returnUs (bind' `appOL` binds')
+corePrepTopBinds :: [CoreBind] -> UniqSM (OrdList FloatingBind)
+corePrepTopBinds binds 
+  = go emptyVarEnv binds
+  where
+    go env []		  = returnUs nilOL
+    go env (bind : binds) = corePrepTopBind env bind	`thenUs` \ (env', bind') ->
+			    go env' binds		`thenUs` \ binds' ->
+			    returnUs (bind' `appOL` binds')
 
 -- NB: we do need to float out of top-level bindings
 -- Consider	x = length [True,False]
@@ -159,6 +226,7 @@ corePrepTopBinds env (bind : binds)
 --	x* = f a
 -- And then x will actually end up case-bound
 
+--------------------------------
 corePrepTopBind :: CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
 corePrepTopBind env (NonRec bndr rhs) 
   = cloneBndr env bndr					`thenUs` \ (env', bndr') ->
@@ -167,6 +235,7 @@ corePrepTopBind env (NonRec bndr rhs)
 
 corePrepTopBind env (Rec pairs) = corePrepRecPairs TopLevel env pairs
 
+--------------------------------
 corePrepBind ::  CloneEnv -> CoreBind -> UniqSM (CloneEnv, OrdList FloatingBind)
 	-- This one is used for *local* bindings
 corePrepBind env (NonRec bndr rhs)
@@ -217,14 +286,12 @@ corePrepArg env arg dem
   = corePrepExprFloat env arg		`thenUs` \ (floats, arg') ->
     if exprIsTrivial arg'
     then returnUs (floats, arg')
-    else newVar (exprType arg') (exprArity arg')	`thenUs` \ v ->
-	 mkLocalNonRec v dem floats arg'		`thenUs` \ floats' -> 
+    else newVar (exprType arg')			`thenUs` \ v ->
+	 mkLocalNonRec v dem floats arg'	`thenUs` \ floats' -> 
 	 returnUs (floats', Var v)
 
 -- version that doesn't consider an scc annotation to be trivial.
-exprIsTrivial (Var v)
-  | hasNoBinding v		       = idArity v == 0
-  | otherwise                          = True
+exprIsTrivial (Var v)		       = True
 exprIsTrivial (Type _)	      	       = True
 exprIsTrivial (Lit lit)       	       = True
 exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
@@ -369,7 +436,7 @@ corePrepExprFloat env expr@(App _ _)
 	-- non-variable fun, better let-bind it
     collect_args fun depth
 	= corePrepExprFloat env fun			`thenUs` \ (fun_floats, fun') ->
-	  newVar ty (exprArity fun')	 		`thenUs` \ fn_id ->
+	  newVar ty			 		`thenUs` \ fn_id ->
           mkLocalNonRec fn_id onceDem fun_floats fun'	`thenUs` \ floats ->
 	  returnUs (Var fn_id, (Var fn_id, depth), ty, floats, [])
         where
@@ -444,6 +511,10 @@ mkLocalNonRec bndr dem floats rhs
   = floatRhs NotTopLevel NonRecursive bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
     returnUs (floats' `snocOL` FloatLet (NonRec bndr rhs'))
 
+  where
+    bndr_ty	 = idType bndr
+    bndr_rep_ty  = repType bndr_ty
+
 mkBinds :: OrdList FloatingBind -> CoreExpr -> UniqSM CoreExpr
 mkBinds binds body 
   | isNilOL binds = returnUs body
@@ -484,7 +555,13 @@ etaExpandRhs bndr rhs
 	--		f = /\a -> \y -> let s = h 3 in g s y
 	--
     getUniquesUs		`thenUs` \ us ->
-    returnUs (etaExpand (idArity bndr) us rhs (idType bndr))
+    returnUs (etaExpand arity us rhs (idType bndr))
+  where
+	-- For a GlobalId, take the Arity from the Id.
+	-- It was set in CoreTidy and must not change
+	-- For all others, just expand at will
+    arity | isGlobalId bndr = idArity bndr
+	  | otherwise	    = exprArity rhs
 
 -- ---------------------------------------------------------------------------
 -- Eliminate Lam as a non-rhs (STG doesn't have such a thing)
@@ -505,7 +582,7 @@ deLam expr
   | otherwise 
   = case tryEta bndrs body of
       Just no_lam_result -> returnUs no_lam_result
-      Nothing	         -> newVar (exprType expr) (exprArity expr) `thenUs` \ fn ->
+      Nothing	         -> newVar (exprType expr)	`thenUs` \ fn ->
 			    returnUs (Let (NonRec fn expr) (Var fn))
   where
     (bndrs,body) = collectBinders expr
@@ -677,12 +754,9 @@ fiddleCCall id
 -- Generating new binders
 -- ---------------------------------------------------------------------------
 
-newVar :: Type -> Arity -> UniqSM Id
--- We're creating a new let binder, and we must give
--- it the right arity for the benefit of the code generator.
-newVar ty arity
+newVar :: Type -> UniqSM Id
+newVar ty
  = seqType ty			`seq`
    getUniqueUs	 		`thenUs` \ uniq ->
-   returnUs (mkSysLocal SLIT("sat") uniq ty
-	     `setIdArity` arity)
+   returnUs (mkSysLocal SLIT("sat") uniq ty)
 \end{code}

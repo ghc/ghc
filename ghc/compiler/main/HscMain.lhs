@@ -435,19 +435,14 @@ myCoreToStg dflags this_mod tidy_binds
 	   <- _scc_ "Core2Stg" stg2stg dflags this_mod stg_binds
 
       let env_rhs :: CgInfoEnv
-	  env_rhs = mkNameEnv [ (idName bndr, CgInfo (stgRhsArity rhs) caf_info)
+	  env_rhs = mkNameEnv [ (idName bndr, CgInfo caf_info)
 			      | (bind,_) <- stg_binds2, 
 			        let caf_info 
 				     | stgBindHasCafRefs bind = MayHaveCafRefs
-				     | otherwise = NoCafRefs,
-			        (bndr,rhs) <- stgBindPairs bind ]
+				     | otherwise	      = NoCafRefs,
+			        bndr <- stgBinders bind ]
 
       return (stg_binds2, cost_centre_info, env_rhs)
-   where
-      stgBindPairs (StgNonRec _ b r) = [(b,r)]
-      stgBindPairs (StgRec    _ prs) = prs
-
-
 \end{code}
 
 

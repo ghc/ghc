@@ -19,10 +19,11 @@ module CoreUtils (
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsAtom,
 	idAppIsBottom, idAppIsCheap,
-	exprArity, 
 
-	-- Expr transformation
-	etaExpand, exprArity, exprEtaExpandArity, 
+
+	-- Arity and eta expansion
+	manifestArity, exprArity, 
+	exprEtaExpandArity, etaExpand, 
 
 	-- Size
 	coreBindsSize,
@@ -49,7 +50,7 @@ import DataCon		( DataCon, dataConRepArity, dataConArgTys, isExistentialDataCon,
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
-			  isDataConId_maybe, mkSysLocal, hasNoBinding, isDataConId, isBottomingId
+			  isDataConId_maybe, mkSysLocal, isDataConId, isBottomingId
 			)
 import IdInfo		( LBVarInfo(..),  
 			  GlobalIdDetails(..),
@@ -298,26 +299,25 @@ findAlt con alts
 @exprIsBottom@	is true of expressions that are guaranteed to diverge
 
 
+There used to be a gruesome test for (hasNoBinding v) in the
+Var case:
+	exprIsTrivial (Var v) | hasNoBinding v = idArity v == 0
+The idea here is that a constructor worker, like $wJust, is
+really short for (\x -> $wJust x), becuase $wJust has no binding.
+So it should be treated like a lambda.  Ditto unsaturated primops.
+But now constructor workers are not "have-no-binding" Ids.  And
+completely un-applied primops and foreign-call Ids are sufficiently
+rare that I plan to allow them to be duplicated and put up with
+saturating them.
+
 \begin{code}
-exprIsTrivial (Var v)
-  | hasNoBinding v		       = idArity v == 0
-	-- WAS: | Just op <- isPrimOpId_maybe v      = primOpIsDupable op
-	-- The idea here is that a constructor worker, like $wJust, is
-	-- really short for (\x -> $wJust x), becuase $wJust has no binding.
-	-- So it should be treated like a lambda.
-	-- Ditto unsaturated primops.
-	-- This came up when dealing with eta expansion/reduction for
-	-- 	x = $wJust
-	-- Here we want to eta-expand.  This looks like an optimisation,
-	-- but it's important (albeit tiresome) that CoreSat doesn't increase 
-	-- anything's arity
-  | otherwise                          = True
-exprIsTrivial (Type _)	      	       = True
-exprIsTrivial (Lit lit)       	       = True
-exprIsTrivial (App e arg)     	       = not (isRuntimeArg arg) && exprIsTrivial e
-exprIsTrivial (Note _ e)      	       = exprIsTrivial e
-exprIsTrivial (Lam b body)             = not (isRuntimeVar b) && exprIsTrivial body
-exprIsTrivial other	      	       = False
+exprIsTrivial (Var v)	   = True	-- See notes above
+exprIsTrivial (Type _)	   = True
+exprIsTrivial (Lit lit)    = True
+exprIsTrivial (App e arg)  = not (isRuntimeArg arg) && exprIsTrivial e
+exprIsTrivial (Note _ e)   = exprIsTrivial e
+exprIsTrivial (Lam b body) = not (isRuntimeVar b) && exprIsTrivial body
+exprIsTrivial other	   = False
 
 exprIsAtom :: CoreExpr -> Bool
 -- Used to decide whether to let-binding an STG argument

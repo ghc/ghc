@@ -88,8 +88,7 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
 
     tcPrag info (HsArity arity) = 
-	returnTc (info `setArityInfo` arity
-	 	       `setCgArity`   arity)
+	returnTc (info `setArityInfo` arity)
 
     tcPrag info (HsUnfold inline_prag expr)
 	= tcPragExpr unf_env name in_scope_vars expr 	`thenNF_Tc` \ maybe_expr' ->

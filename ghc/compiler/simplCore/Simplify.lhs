@@ -14,7 +14,7 @@ import CmdLineOpts	( dopt, DynFlag(Opt_D_dump_inlinings),
 import SimplMonad
 import SimplUtils	( mkCase, mkLam, newId,
 			  simplBinder, simplBinders, simplLamBndrs, simplRecBndrs, simplLetBndr,
-			  simplTopBndrs, SimplCont(..), DupFlag(..), LetRhsFlag(..), 
+			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkStop, mkBoringStop,  pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
@@ -24,8 +24,7 @@ import VarEnv
 import Id		( Id, idType, idInfo, idArity, isDataConId, 
 			  idUnfolding, setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo,
-			  setIdOccInfo, isLocalId,
-			  zapLamIdInfo, setOneShotLambda, 
+			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
 			)
 import IdInfo		( OccInfo(..), isLoopBreaker,
 			  setArityInfo, 
@@ -38,9 +37,9 @@ import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
-			  exprIsConApp_maybe, mkPiType, findAlt, findDefault,
+			  exprIsConApp_maybe, mkPiType, findAlt, 
 			  exprType, coreAltsType, exprIsValue, 
-			  exprOkForSpeculation, exprArity, 
+			  exprOkForSpeculation, exprArity, findDefault,
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
 			)
 import Rules		( lookupRule )
@@ -54,7 +53,7 @@ import Subst		( mkSubst, substTy, substExpr,
 			)
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
-import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel,
+import BasicTypes	( TopLevelFlag(..), isTopLevel, 
 			  RecFlag(..), isNonRec
 			)
 import OrdList
@@ -230,7 +229,7 @@ simplTopBinds env binds
 	-- so that if a transformation rule has unexpectedly brought
 	-- anything into scope, then we don't get a complaint about that.
 	-- It's rather as if the top-level binders were imported.
-    simplTopBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
+    simplRecBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
     simpl_binds env binds bndrs'		`thenSmpl` \ (floats, _) ->
     freeTick SimplifierDone			`thenSmpl_`
     returnSmpl (floatBinds floats)
@@ -442,11 +441,12 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 	--
 	-- NB: does no harm for non-recursive bindings
     let
+ 	is_top_level	  = isTopLevel top_lvl
 	bndr_ty'     	  = idType bndr'
 	bndr''       	  = simplIdInfo (getSubst rhs_se) (idInfo bndr) bndr'
 	env1	     	  = modifyInScope env bndr'' bndr''
 	rhs_env      	  = setInScope rhs_se env1
-	ok_float_unlifted = isNotTopLevel top_lvl && isNonRec is_rec
+	ok_float_unlifted = not is_top_level && isNonRec is_rec
 	rhs_cont	  = mkStop bndr_ty' AnRhs
     in
   	-- Simplify the RHS; note the mkStop, which tells 
@@ -481,7 +481,8 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
  	-- Either we must be careful not to float demanded non-values, or
 	-- we must use exprIsValue for the test, which ensures that the
 	-- thing is non-strict.  I think.  The WARN below tests for this.
-    else if exprIsTrivial rhs2 || exprIsValue rhs2 then
+    else if is_top_level || exprIsTrivial rhs2 || exprIsValue rhs2 then
+
 		-- There's a subtlety here.  There may be a binding (x* = e) in the
 		-- floats, where the '*' means 'will be demanded'.  So is it safe
 		-- to float it out?  Answer no, but it won't matter because

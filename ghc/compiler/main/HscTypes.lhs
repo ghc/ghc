@@ -26,7 +26,7 @@ module HscTypes (
 
 	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnvList, extendTypeEnvWithIds,
-	typeEnvClasses, typeEnvTyCons, typeEnvIds,
+	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
 	ImportedModuleInfo, WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, DeclsMap,
@@ -64,7 +64,7 @@ import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
 import Class		( Class, classSelIds )
-import TyCon		( TyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
+import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
 import DataCon		( dataConId, dataConWrapId )
 
 import BasicTypes	( Version, initialVersion, Fixity )
@@ -189,7 +189,7 @@ data ModDetails
 -- The ModDetails takes on several slightly different forms:
 --
 -- After typecheck + desugar
---	md_types	Contains TyCons, Classes, and hasNoBinding Ids
+--	md_types	Contains TyCons, Classes, and implicit Ids
 --	md_insts	All instances from this module (incl derived ones)
 --	md_rules	All rules from this module
 --	md_binds	Desugared bindings
@@ -317,9 +317,16 @@ instance Outputable TyThing where
   ppr (ATyCon tc) = ptext SLIT("ATyCon") <+> ppr tc
   ppr (AClass cl) = ptext SLIT("AClass") <+> ppr cl
 
-typeEnvClasses env = [cl | AClass cl <- nameEnvElts env]
-typeEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts env] 
-typeEnvIds     env = [id | AnId id   <- nameEnvElts env] 
+
+typeEnvElts    :: TypeEnv -> [TyThing]
+typeEnvClasses :: TypeEnv -> [Class]
+typeEnvTyCons  :: TypeEnv -> [TyCon]
+typeEnvIds     :: TypeEnv -> [Id]
+
+typeEnvElts    env = nameEnvElts env
+typeEnvClasses env = [cl | AClass cl <- typeEnvElts env]
+typeEnvTyCons  env = [tc | ATyCon tc <- typeEnvElts env] 
+typeEnvIds     env = [id | AnId id   <- typeEnvElts env] 
 
 implicitTyThingIds :: [TyThing] -> [Id]
 -- Add the implicit data cons and selectors etc 
@@ -331,8 +338,13 @@ implicitTyThingIds things
     go (ATyCon tc) = tyConGenIds tc ++
 		     tyConSelIds tc ++
 		     [ n | dc <- tyConDataConsIfAvailable tc, 
-			   n  <- [dataConId dc, dataConWrapId dc] ] 
+			   n  <- implicitConIds tc dc]
 		-- Synonyms return empty list of constructors and selectors
+
+    implicitConIds tc dc	-- Newtypes have a constructor wrapper,
+				-- but no worker
+	| isNewTyCon tc = [dataConWrapId dc]
+	| otherwise     = [dataConId dc, dataConWrapId dc]
 \end{code}
 
 

@@ -5,8 +5,8 @@
 
 \begin{code}
 module SimplUtils (
-	simplBinder, simplBinders, simplRecBndrs, simplLetBndr, 
-	simplLamBndrs, simplTopBndrs,
+	simplBinder, simplBinders, simplRecBndrs, 
+	simplLetBndr, simplLamBndrs, 
 	newId, mkLam, mkCase,
 
 	-- The continuation type
@@ -30,8 +30,8 @@ import CoreUtils	( cheapEqExpr, exprType,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
 import qualified Subst	( simplBndrs, simplBndr, simplLetId, simplLamBndr )
-import Id		( Id, idType, idInfo, isLocalId,
-			  mkSysLocal, hasNoBinding, isDeadBinder, idNewDemandInfo,
+import Id		( Id, idType, idInfo, 
+			  mkSysLocal, isDeadBinder, idNewDemandInfo,
 			  idUnfolding, idNewStrictness
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
@@ -447,25 +447,10 @@ simplLetBndr env id
     seqBndr id'		`seq`
     returnSmpl (setSubst env subst', id')
 
-simplTopBndrs, simplLamBndrs, simplRecBndrs 
+simplLamBndrs, simplRecBndrs 
 	:: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
-simplTopBndrs = simplBndrs simplTopBinder
 simplRecBndrs = simplBndrs Subst.simplLetId
 simplLamBndrs = simplBndrs Subst.simplLamBndr
-
--- For top-level binders, don't use simplLetId for GlobalIds. 
--- There are some of these, notably consructor wrappers, and we don't
--- want to clone them or fiddle with them at all.  
--- Rather tiresomely, the specialiser may float a use of a constructor
--- wrapper to before its definition (which shouldn't really matter)
--- because it doesn't see the constructor wrapper as free in the binding
--- it is floating (because it's a GlobalId).
--- Then the simplifier brings all top level Ids into scope at the
--- beginning, and we don't want to lose the IdInfo on the constructor
--- wrappers.  It would also be Bad to clone it!
-simplTopBinder subst bndr
-  | isLocalId bndr = Subst.simplLetId subst bndr
-  | otherwise	   = (subst, bndr)
 
 simplBndrs simpl_bndr env bndrs
   = let
@@ -561,9 +546,7 @@ tryEtaReduce bndrs body
     go []       (Var fun)     | ok_fun fun   = Just (Var fun)	-- Success!
     go _        _			     = Nothing		-- Failure!
 
-    ok_fun fun   = not (fun `elem` bndrs) && not (hasNoBinding fun)
-			-- Note the awkward "hasNoBinding" test
-			-- Details with exprIsTrivial
+    ok_fun fun   = not (fun `elem` bndrs)
     ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
 \end{code}
 

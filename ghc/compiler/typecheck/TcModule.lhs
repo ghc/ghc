@@ -61,7 +61,7 @@ import ErrUtils		( printErrorsAndWarnings, errorsFound,
 import Id		( Id, idType, idUnfolding )
 import Module           ( Module, moduleName )
 import Name		( Name )
-import NameEnv		( nameEnvElts, lookupNameEnv )
+import NameEnv		( lookupNameEnv )
 import TyCon		( tyConGenInfo )
 import BasicTypes       ( EP(..), Fixity, RecFlag(..) )
 import SrcLoc		( noSrcLoc )
@@ -70,8 +70,8 @@ import IO		( stdout )
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
 			  PackageTypeEnv, ModIface(..),
 			  ModDetails(..), DFunId,
-			  TypeEnv, extendTypeEnvList, 
-		          TyThing(..), implicitTyThingIds, 
+			  TypeEnv, extendTypeEnvList, typeEnvTyCons, typeEnvElts,
+		          TyThing(..), 
 			  mkTypeEnv
 			)
 \end{code}
@@ -447,17 +447,7 @@ tcModule pcs hst get_fixity this_mod decls
 	zonkRules more_local_rules	`thenNF_Tc` \ more_local_rules' ->
 	
 	
-	let	local_things = filter (isLocalThing this_mod) (nameEnvElts (getTcGEnv final_env))
-	
-		-- Create any necessary "implicit" bindings (data constructors etc)
-		-- Should we create bindings for dictionary constructors?
-		-- They are always fully applied, and the bindings are just there
-		-- to support partial applications. But it's easier to let them through.
-		implicit_binds = andMonoBindList [ CoreMonoBind id (unfoldingTemplate unf)
-						 | id <- implicitTyThingIds local_things
-						 , let unf = idUnfolding id
-						 , hasUnfolding unf
-						 ]
+	let	local_things = filter (isLocalThing this_mod) (typeEnvElts (getTcGEnv final_env))
 	
 		local_type_env :: TypeEnv
 		local_type_env = mkTypeEnv local_things
@@ -469,7 +459,7 @@ tcModule pcs hst get_fixity this_mod decls
 		  new_pcs,
 		  TcResults { tc_env     = local_type_env,
 			      tc_insts   = map iDFunId local_insts,
-			      tc_binds   = implicit_binds `AndMonoBinds` all_binds', 
+			      tc_binds   = all_binds', 
 			      tc_fords   = foi_decls ++ foe_decls',
 			      tc_rules   = all_local_rules
 			    }
@@ -519,7 +509,7 @@ typecheckIface dflags pcs hst mod_iface decls
 			    deriv_binds, local_rules) ->
 	  ASSERT(nullBinds deriv_binds)
 	  let 
-	      local_things = filter (isLocalThing this_mod) (nameEnvElts (getTcGEnv env))
+	      local_things = filter (isLocalThing this_mod) (typeEnvElts (getTcGEnv env))
 
 	      mod_details = ModDetails { md_types = mkTypeEnv local_things,
 					 md_insts = map iDFunId local_inst_info,
@@ -587,7 +577,7 @@ tcImports unf_env pcs hst get_fixity this_mod decls
     
     tcGetEnv						`thenTc` \ unf_env ->
     let
-        all_things = nameEnvElts (getTcGEnv unf_env)
+        all_things = typeEnvElts (getTcGEnv unf_env)
     
          -- sometimes we're compiling in the context of a package module
          -- (on the GHCi command line, for example).  In this case, we
@@ -722,7 +712,7 @@ dump_tc_iface dflags results
 	  ppr_rules (tc_rules results),
 
 	  if dopt Opt_Generics dflags then
-		ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
+		ppr_gen_tycons (typeEnvTyCons (tc_env results))
 	  else 
 		empty
     ]

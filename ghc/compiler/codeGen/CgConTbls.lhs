@@ -9,22 +9,17 @@ module CgConTbls ( genStaticConBits ) where
 #include "HsVersions.h"
 
 import AbsCSyn
-import StgSyn
 import CgMonad
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import CostCentre	( subsumedCCS )
-import CgCon		( cgTopRhsCon )
-import CgClosure	( cgTopRhsClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
-import ClosureInfo	( layOutStaticConstr, layOutDynConstr, mkClosureLFInfo, ClosureInfo )
-import DataCon		( DataCon, dataConName, dataConRepArgTys, dataConId, isNullaryDataCon )
-import Id		( mkTemplateLocals )
+import ClosureInfo	( layOutStaticConstr, layOutDynConstr, ClosureInfo )
+import DataCon		( DataCon, dataConName, dataConRepArgTys, isNullaryDataCon )
 import Name		( getOccName )
 import OccName		( occNameUserString )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep )
-import BasicTypes	( TopLevelFlag(..) )
 import Outputable
 \end{code}
 
@@ -114,8 +109,7 @@ genConInfo comp_info data_con
   = 	-- Order of things is to reduce forward references
     mkAbstractCs [CSplitMarker,
 		  closure_code,
-    	    	  static_code,
-		  wrkr_code]
+    	    	  static_code]
   where
     (closure_info, body_code) = mkConCodeAndInfo data_con
 
@@ -128,7 +122,6 @@ genConInfo comp_info data_con
 	    	      profCtrC SLIT("TICK_ENT_CON") [CReg node] `thenC`
 		      body_code)
 
-    wrkr_code  = initC comp_info (cgWorker data_con `thenFC` \ _ -> returnFC ())
     con_descr  = occNameUserString (getOccName data_con)
 
     -- Don't need any dynamic closure code for zero-arity constructors
@@ -168,28 +161,4 @@ mkConCodeAndInfo con
 				(mkStaticAlgReturnCode con)
 	in
 	(closure_info, body_code)
-\end{code}
-
-For a constructor C, make a binding
-
-	$wC = \x y -> $wC x y
-
-i.e. a curried constructor that allocates.  This means that we can treat
-the worker for a constructor like any other function in the rest of the compiler.
-
-\begin{code}
-cgWorker data_con
-  | isNullaryDataCon data_con
-  = cgTopRhsCon work_id data_con []
-
-  | otherwise
-  = cgTopRhsClosure work_id
-	    subsumedCCS noBinderInfo NoSRT
-	    arg_ids rhs
-	    lf_info
-  where
-    work_id = dataConId data_con
-    arg_ids = mkTemplateLocals (dataConRepArgTys data_con)
-    rhs     = StgConApp data_con [StgVarArg id | id <- arg_ids]
-    lf_info = mkClosureLFInfo work_id TopLevel [{-no fvs-}] ReEntrant arg_ids
 \end{code}

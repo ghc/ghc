@@ -31,7 +31,7 @@ import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( idName, setIdLocalExported, isImplicitId )
+import Id		( idName, setIdLocalExported )
 import VarSet
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
@@ -282,12 +282,6 @@ updateBinders rule_ids rule_rhs_fvs is_exported binds
     update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
     update_bndr bndr 
-	| isImplicitId bndr = bndr_with_rules
-		-- Constructors, selectors; doesn't 
-		-- make sense to call setIdLocalExported
-		-- They can have rules, though; e.g. 
-		-- 	class Foo a where { op :: a->a }
-		--	{-# RULES  op x = y #-}
 	| dont_discard bndr = setIdLocalExported bndr_with_rules
 	| otherwise	    = bndr_with_rules
 	where

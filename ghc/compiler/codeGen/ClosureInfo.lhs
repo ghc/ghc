@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.48 2001/09/26 15:11:50 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.49 2001/10/18 16:29:13 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -77,7 +77,7 @@ import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
-import Id		( Id, idType, idCgArity )
+import Id		( Id, idType, idArity )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon,
 			  isNullaryDataCon, dataConName
 			)
@@ -249,7 +249,7 @@ mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
-  = case idCgArity id of
+  = case idArity id of
       n | n > 0 -> LFReEntrant (idType id) TopLevel n True  -- n > 0
       other -> LFImported	-- Not sure of exact arity
 \end{code}

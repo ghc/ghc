@@ -176,7 +176,7 @@ coreTopBindToStg env body_fvs (NonRec id rhs)
   = let 
 	caf_info  = hasCafRefs env rhs
 	env' 	  = extendVarEnv env id how_bound
-	how_bound = LetBound (TopLet caf_info) (predictArity rhs)
+	how_bound = LetBound (TopLet caf_info) (manifestArity rhs)
 
         (stg_rhs, fvs', lv_info) = 
 	    initLne env (
@@ -187,7 +187,8 @@ coreTopBindToStg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec (mkSRT lv_info) id stg_rhs
     in
-    ASSERT2(predictArity rhs == stgRhsArity stg_rhs, ppr id)
+    ASSERT2(isLocalId id || idArity id == manifestArity rhs, ppr id)
+    ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id)
     ASSERT2(consistent caf_info bind, ppr id)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
@@ -205,7 +206,7 @@ coreTopBindToStg env body_fvs (Rec pairs)
 	caf_info = hasCafRefss env1{-NB: not env'-} rhss
 
 	env' = extendVarEnvList env 
-		[ (b, LetBound (TopLet caf_info) (predictArity rhs)) 
+		[ (b, LetBound (TopLet caf_info) (manifestArity rhs)) 
 	        | (b,rhs) <- pairs ]
 
         (stg_rhss, fvs', lv_info)
@@ -219,7 +220,8 @@ coreTopBindToStg env body_fvs (Rec pairs)
 
 	bind = StgRec (mkSRT lv_info) (zip binders stg_rhss)
     in
-    ASSERT2(and [predictArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
+    ASSERT2(and [isLocalId bndr || manifestArity rhs == idArity bndr | (bndr,rhs) <- pairs], ppr binders)
+    ASSERT2(and [manifestArity rhs == stgRhsArity stg_rhs | (rhs,stg_rhs) <- rhss `zip` stg_rhss], ppr binders)
     ASSERT2(consistent caf_info bind, ppr binders)
 --    WARN(not (consistent caf_info bind), ppr binders <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
@@ -678,7 +680,7 @@ coreToStgLet let_no_escape bind body
     binders	   = bindersOf bind
 
     mk_binding bind_lv_info binder rhs
-	= (binder, LetBound (NestedLet live_vars) (predictArity rhs))
+	= (binder, LetBound (NestedLet live_vars) (manifestArity rhs))
 	where
 	   live_vars | let_no_escape = addLiveVar bind_lv_info binder
 		     | otherwise     = unitLiveVar binder
@@ -732,28 +734,6 @@ is_join_var :: Id -> Bool
 -- A hack (used only for compiler debuggging) to tell if
 -- a variable started life as a join point ($j)
 is_join_var j = occNameUserString (getOccName j) == "$j"
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Arity prediction}
-%*									*
-%************************************************************************
-
-To avoid yet another knot, we predict the arity of each function from
-its Core form, based on the number of visible top-level lambdas.  
-It should be the same as the arity of the STG RHS!
-
-\begin{code}
-predictArity :: CoreExpr -> Int
-predictArity (Lam x e)
-  | isTyVar x = predictArity e
-  | otherwise = 1 + predictArity e
-predictArity (Note _ e)
-  -- Ignore coercions.   Top level sccs are removed by the final 
-  -- profiling pass, so we ignore those too.
-  = predictArity e
-predictArity _ = 0
 \end{code}
 
 

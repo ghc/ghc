@@ -29,7 +29,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  TyThing(..), DFunId, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
-			  lookupVersion,
+			  lookupVersion, typeEnvIds
 			)
 
 import CmdLineOpts
@@ -256,7 +256,7 @@ ifaceTyThing (AnId id) = iface_sig
     id_type = idType id
     id_info = idInfo id
     cg_info = idCgInfo id
-    arity_info = cgArity cg_info
+    arity_info = arityInfo id_info
     caf_info   = cgCafInfo cg_info
 
     hs_idinfo | opt_OmitInterfacePragmas = []
@@ -452,7 +452,7 @@ pprModDetails (ModDetails { md_types = type_env, md_insts = dfun_ids, md_rules =
 dump_types dfun_ids type_env
   = text "TYPE SIGNATURES" $$ nest 4 (dump_sigs ids)
   where
-    ids = [id | AnId id <- nameEnvElts type_env, want_sig id]
+    ids = [id | id <- typeEnvIds type_env, want_sig id]
     want_sig id | opt_PprStyle_Debug = True
 	        | otherwise	     = isLocalId id && 
 				       isGlobalName (idName id) && 

@@ -62,9 +62,8 @@ module IdInfo (
 
 	-- CG info
 	CgInfo(..), cgInfo, setCgInfo,  pprCgInfo,
- 	cgArity, cgCafInfo, vanillaCgInfo,
+ 	cgCafInfo, vanillaCgInfo,
 	CgInfoEnv, lookupCgInfo,
-	setCgArity,
 
 	-- CAF info
 	CafInfo(..), ppCafInfo, setCafInfo, mayHaveCafRefs,
@@ -118,7 +117,6 @@ infixl 	1 `setDemandInfo`,
 	  `setOccInfo`,
 	  `setCgInfo`,
 	  `setCafInfo`,
-	  `setCgArity`,
 	  `setNewStrictnessInfo`,
 	  `setNewDemandInfo`
 	-- infixl so you can say (id `set` a `set` b)
@@ -341,7 +339,7 @@ vanillaIdInfo
 	   }
 
 noCafNoTyGenIdInfo = vanillaIdInfo `setTyGenInfo` TyGenNever
-			      	   `setCgInfo`    (CgInfo 0 NoCafRefs)
+			      	   `setCgInfo`    CgInfo NoCafRefs
 	-- Used for built-in type Ids in MkId.
 	-- Many built-in things have fixed types, so we shouldn't
 	-- run around generalising them
@@ -539,33 +537,24 @@ but only as a thunk --- the information is only actually produced further
 downstream, by the code generator.
 
 \begin{code}
-data CgInfo = CgInfo 
-		!Arity 		-- Exact arity for calling purposes
-		!CafInfo
-#ifdef DEBUG
+#ifndef DEBUG
+newtype CgInfo = CgInfo CafInfo	-- We are back to only having CafRefs in CgInfo
+noCgInfo = panic "NoCgInfo!"
+#else
+data CgInfo = CgInfo CafInfo
 	    | NoCgInfo		-- In debug mode we don't want a black hole here
 				-- See Id.idCgInfo
-
 	-- noCgInfo is used for local Ids, which shouldn't need any CgInfo
 noCgInfo = NoCgInfo
-#else
-noCgInfo = panic "NoCgInfo!"
 #endif
 
-cgArity   (CgInfo arity _)    = arity
-cgCafInfo (CgInfo _ caf_info) = caf_info
+cgCafInfo (CgInfo caf_info) = caf_info
 
-setCafInfo info caf_info = 
-  case cgInfo info of { CgInfo arity _  -> 
-	info `setCgInfo` CgInfo arity caf_info }
-
-setCgArity info arity = 
-  case cgInfo info of { CgInfo _ caf_info  -> 
-	info `setCgInfo` CgInfo arity caf_info }
+setCafInfo info caf_info = info `setCgInfo` CgInfo caf_info 
 
 seqCg c = c `seq` ()  -- fields are strict anyhow
 
-vanillaCgInfo = CgInfo 0 MayHaveCafRefs		-- Definitely safe
+vanillaCgInfo = CgInfo MayHaveCafRefs		-- Definitely safe
 
 -- CafInfo is used to build Static Reference Tables (see simplStg/SRT.lhs).
 
@@ -583,7 +572,7 @@ mayHaveCafRefs _	       = False
 
 seqCaf c = c `seq` ()
 
-pprCgInfo (CgInfo arity caf_info) = ppArity arity <+> ppCafInfo caf_info
+pprCgInfo (CgInfo caf_info) = ppCafInfo caf_info
 
 ppArity 0 = empty
 ppArity n = hsep [ptext SLIT("__A"), int n]

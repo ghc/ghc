@@ -71,10 +71,10 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			)
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  setUnfoldingInfo, 
-			  setArityInfo, setSpecInfo,  setCgInfo,
+			  setArityInfo, setSpecInfo,  setCgInfo, setCafInfo,
 			  mkNewStrictnessInfo, setNewStrictnessInfo,
 			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
-			  CgInfo(..), setCgArity
+			  CgInfo 
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
 			  mkTopDmdType, topDmd, evalDmd, Demand(..), Keepity(..) )
@@ -145,7 +145,6 @@ mkDataConId work_name data_con
   = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
   where
     info = noCafNoTyGenIdInfo
-	   `setCgArity`			arity
 	   `setArityInfo`		arity
 	   `setNewStrictnessInfo`	Just strict_sig
 
@@ -234,7 +233,6 @@ mkDataConWrapId data_con
 
     info = noCafNoTyGenIdInfo
 	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
-	   `setCgArity` 	arity
 		-- The NoCaf-ness is set by noCafNoTyGenIdInfo
 	   `setArityInfo`	arity
 		-- It's important to specify the arity, so that partial
@@ -433,7 +431,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	-- With all this unpackery it's not easy!
 
     info = noCafNoTyGenIdInfo
-	   `setCgInfo`		  CgInfo arity caf_info
+	   `setCafInfo`		  caf_info
 	   `setArityInfo`	  arity
 	   `setUnfoldingInfo`     mkTopUnfolding rhs_w_str
 	   `setNewStrictnessInfo` Just strict_sig
@@ -570,7 +568,6 @@ mkDictSelId name clas
     tag       = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
 
     info      = noCafNoTyGenIdInfo
-		`setCgArity` 	    	1
 		`setArityInfo`	    	1
 		`setUnfoldingInfo`  	mkTopUnfolding rhs
 		`setNewStrictnessInfo`	Just strict_sig
@@ -630,7 +627,6 @@ mkPrimOpId prim_op
 		
     info = noCafNoTyGenIdInfo
 	   `setSpecInfo`	rules
-	   `setCgArity` 	arity
 	   `setArityInfo` 	arity
 	   `setNewStrictnessInfo`	Just (mkNewStrictnessInfo id arity strict_info NoCPRInfo)
 	-- Until we modify the primop generation code
@@ -661,7 +657,6 @@ mkFCallId uniq fcall ty
     name = mkFCallName uniq occ_str
 
     info = noCafNoTyGenIdInfo
-	   `setCgArity` 		arity
 	   `setArityInfo` 		arity
 	   `setNewStrictnessInfo`	Just strict_sig
 

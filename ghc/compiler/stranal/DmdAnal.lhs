@@ -20,8 +20,8 @@ import PprCore
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idDemandInfo, idArity,
-			  isDataConId, isImplicitId, isGlobalId,
+import Id		( Id, idType, idDemandInfo, 
+			  isDataConId, isGlobalId, idArity,
 			  idNewStrictness, idNewStrictness_maybe, getNewStrictness, setIdNewStrictness,
 			  idNewDemandInfo, setIdNewDemandInfo, newStrictnessFromOld )
 import IdInfo		( newDemand )
@@ -78,9 +78,6 @@ dmdAnalTopBind :: SigEnv
 	       -> CoreBind 
 	       -> (SigEnv, CoreBind)
 dmdAnalTopBind sigs (NonRec id rhs)
-  | isImplicitId id		-- Don't touch the info on constructors, selectors etc
-  = (sigs, NonRec id rhs)	-- It's pre-computed in MkId.lhs
-  | otherwise
   = let
 	(sigs', _, (id', rhs')) = dmdAnalRhs TopLevel sigs (id, rhs)
     in
@@ -161,7 +158,7 @@ dmdAnal sigs dmd (App fun (Type ty))
 
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
-dmdAnal sigs dmd (App fun arg)	-- Non-type arguments
+dmdAnal sigs dmd e@(App fun arg)	-- Non-type arguments
   = let				-- [Type arg handled above]
 	(fun_ty, fun') 	  = dmdAnal sigs (Call dmd) fun
 	(arg_ty, arg') 	  = dmdAnal sigs arg_dmd arg
@@ -475,7 +472,7 @@ splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
 splitDmdTy ty@(DmdType fv [] TopRes)      = (Lazy, ty)
 splitDmdTy ty@(DmdType fv [] BotRes)      = (Bot,  ty)
 	-- NB: Bot not Abs
-splitDmdTy (DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
+splitDmdTy ty@(DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
 	-- We should not be applying a product as a function!
 \end{code}
 
@@ -909,8 +906,7 @@ get_changes_bind (Rec pairs) = vcat (map get_changes_pr pairs)
 get_changes_bind (NonRec id rhs) = get_changes_pr (id,rhs)
 
 get_changes_pr (id,rhs) 
-  | isImplicitId id = empty  -- We don't look inside these
-  | otherwise	    = get_changes_var id $$ get_changes_expr rhs
+  = get_changes_var id $$ get_changes_expr rhs
 
 get_changes_var var
   | isId var  = get_changes_str var $$ get_changes_dmd var
