@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.139 2002/09/05 16:26:33 simonmar Exp $
+ * $Id: GC.c,v 1.140 2002/09/06 09:56:12 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -143,6 +143,8 @@ static void         zero_mutable_list       ( StgMutClosure *first );
 
 static rtsBool      traverse_weak_ptr_list  ( void );
 static void         mark_weak_ptr_list      ( StgWeak **list );
+
+static StgClosure * eval_thunk_selector     ( nat field, StgSelector * p );
 
 static void         scavenge                ( step * );
 static void         scavenge_mark_stack     ( void );
@@ -1724,153 +1726,26 @@ loop:
 
   case THUNK_SELECTOR:
     {
-      const StgInfoTable* selectee_info;
-      StgClosure* selectee = ((StgSelector*)q)->selectee;
+	StgClosure *p;
 
-      // We only recurse a certain depth through selector thunks.
-      // NOTE: the depth is maintained manually, and we must be very
-      // careful to always decrement it before returning.
-      //
-      thunk_selector_depth++;
-      if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
-	  goto selector_abandon;
-      }
-
-    selector_loop:
-      selectee_info = get_itbl(selectee);
-      switch (selectee_info->type) {
-      case CONSTR:
-      case CONSTR_1_0:
-      case CONSTR_0_1:
-      case CONSTR_2_0:
-      case CONSTR_1_1:
-      case CONSTR_0_2:
-      case CONSTR_STATIC:
-      case CONSTR_NOCAF_STATIC:
-	{ 
-	  StgWord offset = info->layout.selector_offset;
-
-	  // check that the size is in range 
-	  ASSERT(offset < 
-		 (StgWord32)(selectee_info->layout.payload.ptrs + 
-		            selectee_info->layout.payload.nptrs));
-
-	  // The thunk is now under evaluation, so we overwrite it
-	  // with a BLACKHOLE.  This has a beneficial effect if the
-	  // selector thunk eventually refers to itself: we won't
-	  // recurse indefinitely, and the object which eventually
-	  // gets evacuated will be a BLACKHOLE (as it should be: a
-	  // selector thunk which refers to itself can only have value
-	  // _|_).
-	  SET_INFO(q,&stg_BLACKHOLE_info);
-
-	  // perform the selection! 
-	  selectee = selectee->payload[offset];
-          if (major_gc==rtsTrue) {TICK_GC_SEL_MAJOR();} else {TICK_GC_SEL_MINOR();}
-	  // Carry on and evacuate this constructor field,
-	  // (but not the constructor itself)
-	  //
-	  // It is tempting to just 'goto loop;' at this point, but
-	  // that doesn't give us a way to decrement
-	  // thunk_selector_depth later.  So we recurse (boundedly)
-	  // into evacuate().
-	  // 
-	  selectee = evacuate(selectee);
-	  upd_evacuee(q,selectee);
-	  thunk_selector_depth--;
-	  return selectee;
+	if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
+	    return copy(q,THUNK_SELECTOR_sizeW(),stp);
 	}
 
-      case IND:
-      case IND_STATIC:
-      case IND_PERM:
-      case IND_OLDGEN:
-      case IND_OLDGEN_PERM:
-	selectee = ((StgInd *)selectee)->indirectee;
-	goto selector_loop;
+	p = eval_thunk_selector(info->layout.selector_offset,
+				(StgSelector *)q);
 
-      case EVACUATED:
-	  // We could follow forwarding pointers here too, but we don't
-	  // for two reasons:
-	  //    * If the constructor has already been evacuated, then
-	  //      we're only doing the evaluation early, not fixing a
-	  //      space leak.
-	  //    * When we finally reach the destination, we have to
-	  //      figure out whether we are in to-space or not, and this
-	  //      is somewhat awkward.
-	  //
-	  //   selectee = ((StgEvacuated *)selectee)->evacuee;
-	  //   goto selector_loop;
-	  break;
-
-      case THUNK_SELECTOR:
-	  /* we can't recurse indefinitely in evacuate(), so set a
-	   * limit on the number of times we can go around this
-	   * loop.
-	   */
-	  q = evacuate(selectee);
-	  thunk_selector_depth--;
-	  return q;
-	  
-      case AP_UPD:
-      case THUNK:
-      case THUNK_1_0:
-      case THUNK_0_1:
-      case THUNK_2_0:
-      case THUNK_1_1:
-      case THUNK_0_2:
-      case THUNK_STATIC:
-      case CAF_BLACKHOLE:
-      case SE_CAF_BLACKHOLE:
-      case SE_BLACKHOLE:
-      case BLACKHOLE:
-      case BLACKHOLE_BQ:
-	  // not evaluated yet 
-	  break;
-
-#if defined(PAR)
-	// a copy of the top-level cases below 
-      case RBH: // cf. BLACKHOLE_BQ
-  	{
-  	  //StgInfoTable *rip = get_closure_info(q, &size, &ptrs, &nonptrs, &vhs, str);
-  	  to = copy(q,BLACKHOLE_sizeW(),stp); 
-  	  //ToDo: derive size etc from reverted IP
-  	  //to = copy(q,size,stp);
-  	  // recordMutable((StgMutClosure *)to);
-	  thunk_selector_depth--;
-  	  return to;
-  	}
-    
-      case BLOCKED_FETCH:
-  	ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
-  	to = copy(q,sizeofW(StgBlockedFetch),stp);
-	thunk_selector_depth--;
-  	return to;
-
-# ifdef DIST    
-      case REMOTE_REF:
-# endif
-      case FETCH_ME:
-  	ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
-  	to = copy(q,sizeofW(StgFetchMe),stp);
-	thunk_selector_depth--;
-  	return to;
-    
-      case FETCH_ME_BQ:
-  	ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
-  	to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
-	thunk_selector_depth--;
-  	return to;
-#endif
-
-      default:
-	barf("evacuate: THUNK_SELECTOR: strange selectee %d",
-	     (int)(selectee_info->type));
-      }
+	if (p == NULL) {
+	    return copy(q,THUNK_SELECTOR_sizeW(),stp);
+	} else {
+	    // q is still BLACKHOLE'd.
+	    thunk_selector_depth++;
+	    p = evacuate(p);
+	    thunk_selector_depth--;
+	    upd_evacuee(q,p);
+	    return p;
+	}
     }
-  selector_abandon:
-    thunk_selector_depth--;
-    return copy(q,THUNK_SELECTOR_sizeW(),stp);
 
   case IND:
   case IND_OLDGEN:
@@ -2035,6 +1910,128 @@ loop:
   }
 
   barf("evacuate");
+}
+
+/* -----------------------------------------------------------------------------
+   Evaluate a THUNK_SELECTOR if possible.
+
+   returns: NULL if we couldn't evaluate this THUNK_SELECTOR, or
+   a closure pointer if we evaluated it and this is the result
+
+   If the return value is non-NULL, the original selector thunk has
+   been BLACKHOLE'd, and should be updated with an indirection or a
+   forwarding pointer.  If the return value is NULL, then the selector
+   thunk is unchanged.
+   -------------------------------------------------------------------------- */
+
+static StgClosure *
+eval_thunk_selector( nat field, StgSelector * p )
+{
+    StgInfoTable *info;
+    const StgInfoTable *info_ptr;
+    StgClosure *selectee;
+
+    selectee = p->selectee;
+
+    // Save the real info pointer (NOTE: not the same as get_itbl()).
+    info_ptr = p->header.info;
+
+    // BLACKHOLE the selector thunk, since it is now under evaluation.
+    // This is important to stop us going into an infinite loop if
+    // this selector thunk eventually refers to itself.
+    SET_INFO(p,&stg_BLACKHOLE_info);
+
+selector_loop:
+    info = get_itbl(selectee);
+    switch (info->type) {
+      case CONSTR:
+      case CONSTR_1_0:
+      case CONSTR_0_1:
+      case CONSTR_2_0:
+      case CONSTR_1_1:
+      case CONSTR_0_2:
+      case CONSTR_STATIC:
+      case CONSTR_NOCAF_STATIC:
+	  // check that the size is in range 
+	  ASSERT(field <  (StgWord32)(info->layout.payload.ptrs + 
+				      info->layout.payload.nptrs));
+	  
+	  return selectee->payload[field];
+
+      case IND:
+      case IND_STATIC:
+      case IND_PERM:
+      case IND_OLDGEN:
+      case IND_OLDGEN_PERM:
+	  selectee = ((StgInd *)selectee)->indirectee;
+	  goto selector_loop;
+
+      case EVACUATED:
+	  // We don't follow pointers into to-space; the constructor
+	  // has already been evacuated, so we won't save any space
+	  // leaks by evaluating this selector thunk anyhow.
+	  break;
+
+      case THUNK_SELECTOR:
+      {
+	  StgClosure *val;
+
+	  // check that we don't recurse too much, re-using the
+	  // depth bound also used in evacuate().
+	  thunk_selector_depth++;
+	  if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
+	      break;
+	  }
+
+	  val = eval_thunk_selector(info->layout.selector_offset, 
+				    (StgSelector *)selectee);
+
+	  thunk_selector_depth--;
+
+	  if (val == NULL) { 
+	      break;
+	  } else {
+	      // we evaluated this selector thunk, so update it with
+	      // an indirection.
+	      UPD_IND_NOLOCK(selectee, val);
+	      selectee = val;
+	      goto selector_loop;
+	  }
+      }
+
+      case AP_UPD:
+      case THUNK:
+      case THUNK_1_0:
+      case THUNK_0_1:
+      case THUNK_2_0:
+      case THUNK_1_1:
+      case THUNK_0_2:
+      case THUNK_STATIC:
+      case CAF_BLACKHOLE:
+      case SE_CAF_BLACKHOLE:
+      case SE_BLACKHOLE:
+      case BLACKHOLE:
+      case BLACKHOLE_BQ:
+#if defined(PAR)
+      case RBH:
+      case BLOCKED_FETCH:
+# ifdef DIST    
+      case REMOTE_REF:
+# endif
+      case FETCH_ME:
+      case FETCH_ME_BQ:
+#endif
+	  // not evaluated yet 
+	  break;
+    
+      default:
+	barf("eval_thunk_selector: strange selectee %d",
+	     (int)(info->type));
+    }
+
+    // We didn't manage to evaluate this thunk; restore the old info pointer
+    SET_INFO(p, info_ptr);
+    return NULL;
 }
 
 /* -----------------------------------------------------------------------------
