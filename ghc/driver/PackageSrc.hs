@@ -316,7 +316,11 @@ package_details installing
                              else [ "$libdir/hslibs/util"
                                   , "$libdir/hslibs/util/cbits" ],
          hs_libraries      = [ "HSutil" ],
-	 extra_libraries   = [ "HSutil_cbits" ] ++ words cLibsReadline,
+	 extra_libraries   = [ "HSutil_cbits" ] 
+#ifndef mingw32_TARGET_OS
+                             ++ words cLibsReadline
+#endif
+                             ,
          include_dirs   = if installing
                              then []
                              else [ "$libdir/hslibs/util/cbits" ],
