@@ -43,7 +43,7 @@ import Outputable
 import Char		( ord )
 import List		( partition, elem, insertBy,any  )
 import UniqSet
-import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
+import PprType		( pprType )	-- Only called in debug messages
 
 import TysPrim  ( foreignObjPrimTyCon, weakPrimTyCon, byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 

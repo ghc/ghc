@@ -38,12 +38,10 @@ import RdrHsSyn		( RdrBinding(..),
 			)
 import RdrName
 import PrelNames	( unitTyCon_RDR )
-import ForeignCall	( CCallConv(..) )
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
 import CStrings		( CLabelString )
 import FastString	( unpackFS )
-import UniqFM		( UniqFM, listToUFM )
 import Outputable
 
 -----------------------------------------------------------------------------
