@@ -432,7 +432,7 @@ cmLoadModule cmstate1 rootnames
 
 	-- unload any modules which aren't going to be re-linked this
 	-- time around.
-	pls2 <- unload ghci_mode dflags stable_linkables pls1
+	pls2 <- CmLink.unload ghci_mode dflags stable_linkables pls1
 
         -- We could at this point detect cycles which aren't broken by
         -- a source-import, and complain immediately, but it seems better
