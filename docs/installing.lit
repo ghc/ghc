@@ -702,6 +702,10 @@ Unlikely.}
 This is a quite-a-bit-better-than-Lex lexer.  Used in the
 literate-programming stuff.  You won't need it unless you're hacking
 on some of our more obscure stuff.
+On our machines, the version in @/bin@ doesn't work; you need the
+GNU version.  Find out by saying @flex --version@ (our current version
+is 2.5.3, but maybe earlier ones will work).  If it doesn't know about
+the @--version@ flag, it ain't the right @flex@.
 
 \item[Yacc:]
 \index{pre-supposed: non-worthless Yacc}
@@ -1644,7 +1648,7 @@ shell of your choice).
 
 The best way around it is to say
 \begin{verbatim}
-  TMPDIR=<dir>
+export TMPDIR=<dir>
 \end{verbatim}
 in your @build.mk@ file.
 Then GHC and the other @fptools@ programs will use the appropriate directory
