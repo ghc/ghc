@@ -135,6 +135,7 @@ isInlinableOcc whnf small (ManyOcc _)
 isInlinableOcc whnf small (OneOcc _ dup_danger _ n_alts _)
   =  (whnf || (case dup_danger of {NoDupDanger -> True; other -> False}))
   && (small || n_alts <= 1)
+isInlinableOcc _ _ DeadCode = False
 
 isDeadOcc :: BinderInfo -> Bool
 isDeadOcc DeadCode = True
