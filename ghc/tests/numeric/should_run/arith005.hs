@@ -20,14 +20,18 @@ main =
     , show ((map truncate float_list) :: [Integer])
     , show ((map truncate double_list) :: [Int])
     , show ((map truncate double_list) :: [Integer])
+{-
     , show ((map round float_list) :: [Int])
+-}
     , show ((map round float_list) :: [Integer])
     , show ((map round double_list) :: [Int])
     , show ((map round double_list) :: [Integer])
     , show ((map properFraction float_list) :: [(Int,Float)])
     , show ((map properFraction float_list) :: [(Integer,Float)])
-    , show ((map properFraction double_list) :: [(Int,Double)])
+    , show $ head ((map properFraction double_list) :: [(Int,Double)])
+{-
     , show ((map properFraction double_list) :: [(Integer,Double)])
+-}
     ]
   where
     float_list :: [Float]

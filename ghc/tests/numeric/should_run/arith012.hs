@@ -53,7 +53,7 @@ showList' [] = "[]"
 showList' (x:xs) = showChar '[' . x $ showl xs ""
       where 
        showl []     = showChar ']'
-       showl (x:xs) = showString ", " . x . showl xs
+       showl (x:xs) = showChar ',' . x . showl xs
 
 
 test_showOct :: IO ()
