@@ -658,7 +658,7 @@ For (1) it is slightly harmful to record @B.f@ in @A@'s usages,
 because a change in @B.f@'s version will provoke full recompilation of @A@,
 producing an identical @A.o@,
 and @A.hi@ differing only in its usage-version of @B.f@
-(which isn't used by any importer).
+(and this usage-version info isn't used by any importer).
 
 For (2), because of the tricky @B.h@ question above,
 we ensure that @A.hi@ is touched
@@ -691,19 +691,30 @@ getImportVersions this_mod exports
 		-- mv_map2 adds the version numbers of things exported individually
 	mv_map2 = foldr add_mv mv_map1 imp_names
 
-	-- Build the result list by adding info for each module, 
-	-- *omitting*	(a) library modules
-	--		(b) source-imported modules
+	-- Build the result list by adding info for each module.
+	-- For (a) library modules
+	--     (b) source-imported modules
+	-- we do something special.  We don't want to record detailed usage information.
+	-- Indeed we don't want to record them at all unless they contain orphans,
+	-- which we must never lose track of.
 	mk_version_info mod_name (version, has_orphans, cts) so_far
-	   | omit cts  = so_far	-- Don't record usage info for this module
-	   | otherwise = (mod_name, version, has_orphans, whats_imported) : so_far
+	   | lib_or_source_imported && not has_orphans
+	   = so_far	-- Don't record any usage info for this module
+	   
+	   | lib_or_source_imported	-- Has orphans; record the module but not
+					-- detailed version information for the imports
+	   = (mod_name, version, has_orphans, Specifically []) : so_far
+
+	   | otherwise 
+	   = (mod_name, version, has_orphans, whats_imported) : so_far
 	   where
 	     whats_imported = case lookupFM mv_map2 mod_name of
 				Just wi -> wi
 				Nothing -> Specifically []
 
- 	omit (Just (mod, boot_import, _)) = isLibModule mod || boot_import
-	omit Nothing			  = False
+	     lib_or_source_imported = case cts of
+					Just (mod, boot_import, _) -> isLibModule mod || boot_import
+					Nothing			   -> False
     in
     returnRn (foldFM mk_version_info [] mod_map)
   where

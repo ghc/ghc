@@ -294,7 +294,9 @@ type RdrNamePragma = ()				-- Fudge for now
 data Ifaces = Ifaces {
 		iImpModInfo :: ImportedModuleInfo,
 				-- Modules this one depends on: that is, the union 
-				-- of the modules its direct imports depend on.
+				-- of the modules its *direct* imports depend on.
+				-- NB: The direct imports have .hi files that enumerate *all* the
+				-- dependencies (direct or not) of the imported module.
 
 		iDecls :: DeclsMap,	-- A single, global map of Names to decls
 
