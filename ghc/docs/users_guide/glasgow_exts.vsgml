@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.6 1999/03/16 17:07:21 simonm Exp $
+% $Id: glasgow_exts.vsgml,v 1.7 1999/03/26 19:50:31 sof Exp $
 %
 % GHC Language Extensions.
 %
@@ -273,6 +273,35 @@ inlining of C code (GHC - A Better C Compiler :-), the option
 
 %************************************************************************
 %*                                                                      *
+<sect2>Literal-literals
+<label id="glasgow-literal-literals">
+<p>
+<nidx>Literal-literals</nidx>
+%*                                                                      *
+%************************************************************************
+
+The literal-literal argument to @_casm_@ can be made use of separately
+from the @_casm_@ construct itself. Indeed, we've already used it:
+
+<tscreen><verb>
+fooH :: Char -> Int -> Double -> Word -> IO Double
+fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
+</verb></tscreen>
+
+The first argument that's passed to @fooC@ is given as a literal-literal, 
+that is, a literal chunk of C code that will be inserted into the generated
+@.hc@ code at the right place.
+
+A literal-literal is restricted to having a type that's an instance of
+the @CCallable@ class, see <ref name="CCallable" id="ccall-gotchas">
+for more information.
+
+Notice that literal-literals are by their very nature unfriendly to
+native code generators, so exercise judgement about whether or not to
+make use of them in your code.
+
+%************************************************************************
+%*                                                                      *
 <sect2>Using function headers
 <label id="glasgow-foreign-headers">
 <p>
@@ -521,6 +550,8 @@ useful in debugging code.)
 <label id="ccall-gotchas">
 <p>
 <nidx>C call dangers</nidx>
+<nidx>CCallable</nidx>
+<nidx>CReturnable</nidx>
 %*                                                                      *
 %************************************************************************
 
@@ -1457,6 +1488,51 @@ use.  So the simple restriction (no existential stuff on <tt>newtype</tt>)
 stands, unless there are convincing reasons to change it.
 </itemize>
 
+
+<sect1> <idx/Assertions/ 
+<label id="sec:assertions">
+<p>
+
+If you want to use assertions in your standard Haskell code, you
+could define something like the following:
+
+<tscreen><verb>
+assert :: Bool -> a -> a
+assert False x = error "assertion failed!"
+assert _     x = x
+</verb></tscreen>
+
+which works, but gives you back a less than useful error message --
+an assertion failed, but which?
+
+One way out is to define an extended <tt/assert/ function which also
+takes a descriptive string to include in the error message and
+perhaps combine this with the use of a pre-processor which inserts
+the source location where <tt/assert/ was used.
+
+Ghc offers a helping hand here, doing all of this for you. For every
+use of <tt/assert/ in the user's source:
+
+<tscreen><verb>
+kelvinToC :: Double -> Double
+kelvinToC k = assert (k &gt;= 0.0) (k+273.15)
+</verb></tscreen>
+
+Ghc will rewrite this to also include the source location where the
+assertion was made, 
+
+<tscreen><verb>
+assert pred val ==> assertError "Main.hs,15" pred val
+</verb></tscreen>
+
+The rewrite is only performed by the compiler when applications of
+<tt>Exception.assert</tt> are spotted, so you can still define and use
+your own versions of <tt/assert/, should you so wish. If not, import
+<tt/Exception/ to use <tt/assert/ in your code.
+
+Assertion failures can be caught, see the documentation for the
+Hugs/GHC Exception library for information of how.
+
 % -----------------------------------------------------------------------------
 <sect1>Scoped Type Variables
 <label id="scoped-type-variables">
@@ -1882,3 +1958,4 @@ if you'd generated the current file from something called @Foo.vhs@
 and this line corresponds to line 42 in the original.  GHC will adjust
 its error messages to refer to the line/file named in the @LINE@
 pragma.
+
