@@ -421,6 +421,30 @@ square x = x * x
       then Haddock can't tell what its type is and it won't be
       included in the documentation.</para>
       
+      <para>Documentation annotations may span several lines; the
+      annotation continues until the first non-comment line in the
+      source file.  For example:</para>
+
+<programlisting>
+-- |The 'square' function squares an integer.
+-- It takes one argument, of type 'Int'.
+square :: Int -> Int
+square x = x * x
+</programlisting>
+
+      <para>You can also use Haskell's nested-comment style for
+      documentation annotations, which is sometimes more convenient
+      when using multi-line comments:</para>
+
+<programlisting>
+{-|
+  The 'square' function squares an integer.
+  It takes one argument, of type 'Int'.
+-}
+square :: Int -> Int
+square x = x * x
+</programlisting>
+      
     </section>
     <section>
       <title>Documenting parts of a declaration</title>
@@ -591,18 +615,45 @@ module Foo (
 	list:</para>
 
 <programlisting>
-module Foo (
-  module Bar,
-  module Baz
+module A (
+  module B,
+  module C
  ) where	  
 </programlisting>
 
 	<para>What will the Haddock-generated documentation for this
-	module look like?  Well, Haddock simply behaves as if the
-	export list for modules <literal>Bar</literal> and
-	<literal>Baz</literal> had been expanded in-place in the
-	export list for <literal>Foo</literal>, including all of their
-	structure (section headings etc.).</para>
+	module look like?  Well, it depends on how the modules
+	<literal>B</literal> and <literal>C</literal> are imported.
+	If they are imported wholly and without any
+	<literal>hiding</literal> qualifiers, then the documentation
+	will just contain a cross-reference to the documentation for
+	<literal>B</literal> and <literal>C</literal>.  However, if
+	the modules are not <emphasis>completely</emphasis>
+	re-exported, for example:</para>
+
+<programlisting>
+module A (
+  module B,
+  module C
+ ) where	  
+
+import B hiding (f)
+import C (a, b)
+</programlisting>
+
+	<para>then Haddock behaves as if the set of entities
+	re-exported from <literal>B</literal> and <literal>C</literal>
+	had been listed explicitly in the export
+	list<footnote><para>NOTE: this is not fully implemented at the
+	time of writing (version 0.2).  At the moment, Haddock always
+	inserts a cross-reference.</para>
+	  </footnote>.</para>
+
+	<para>The exception to this rule is when the re-exported
+	module is declared with the <literal>hide</literal> attribute
+	(<xref linkend="module-attributes">), in which case the module
+	is never cross-referenced; the contents are always expanded in
+	place in the re-exporting module.</para>
       </section>
       
       <section>
@@ -639,6 +690,7 @@ module Foo (
 <programlisting>
 module Foo (
    -- * A section heading
+
    -- | Some documentation not attached to a particular Haskell entity
    ...
  ) where
@@ -656,6 +708,7 @@ module Foo (
 <programlisting>
 module Foo (
    -- * A section heading
+
    -- $doc
    ...
  ) where
@@ -742,6 +795,61 @@ import B
       </itemizedlist>
     </section>
 
+    <section id="module-attributes">
+      <title>Module Attributes</title>
+      
+      <para>Certain attributes may be specified for each module which
+      affects the way that Haddock generates documentation for that
+      module.  Attributes are specified in a comma-separated list in a
+      <literal>-- #</literal> (or
+      <literal>{-&nbsp;#&nbsp;...&nbsp;-}</literal>) comment at the
+      top of the module, either before or after the module
+      description.  For example:</para>
+
+<programlisting>
+-- #hide, prune, ignore-exports
+-- |Module description
+module A where
+...
+</programlisting>
+
+      <para>The following attributes are currently understood by
+      Haddock:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>hide</literal></term>
+	  <indexterm><primary><literal>hide</literal></primary></indexterm>
+	  <listitem>
+	    <para>Omit this module from the generated documentation,
+	    but nevertheless propagate definitions and documentation
+	    from within this module to modules that re-export those
+	    definitions.</para>
+	  </listitem>
+	</varlistentry>
+	
+	<varlistentry>
+	  <term><literal>prune</literal></term>
+	  <indexterm><primary><literal>hide</literal></primary></indexterm>
+	  <listitem>
+	    <para>Omit definitions that have no documentation
+	    annotations from the generated documentation.</para>
+	  </listitem>
+	</varlistentry>
+	
+	<varlistentry>
+	  <term><literal>ignore-exports</literal></term>
+	  <indexterm><primary><literal>hide</literal></primary></indexterm>
+	  <listitem>
+	    <para>Ignore the export list.  Generate documentation as
+	    if the module had no export list - i.e. all the top-level
+	    declarations are exported, and section headings may be
+	    given in the body of the module.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </section>
+
     <section>
       <title>Markup</title>
 
@@ -764,42 +872,34 @@ import B
 
 	<para>The following characters have special meanings in
 	documentation comments: <literal>/</literal>,
-	<literal>'</literal>, <literal>[</literal>,
-	<literal>]</literal>, <literal>&lt;</literal>.  To insert a
-	literal occurrence of one of these special characters, precede
-	it with a backslash (<literal>\</literal>).</para>
+	<literal>'</literal>, <literal>`</literal>,
+	<literal>"</literal>, <literal>@</literal>,
+	<literal>&lt;</literal>.  To insert a literal occurrence of
+	one of these special characters, precede it with a backslash
+	(<literal>\</literal>).</para>
 
-	<para>Additionally, the following characters have special
-	meanings at the beginning of a paragraph:
+	<para>Additionally, the character <literal>&gt;</literal> has
+	a special meaning at the beginning of a line, and the
+	following characters have special meanings at the beginning of
+	a paragraph:
 	<literal>*</literal>, <literal>-</literal>.  These characters
 	can also be escaped using <literal>\</literal>.</para>
-
-      </section>
-
-      <section>
-	<title>Emphasis and Monospaced text</title>
-
-	<para>Emphasis may be added by surrounding text with
-	<literal>/.../</literal>.</para>
-
-	<para>Monospaced (or typewriter) text is indicated by
-	surrounding it with <literal>[...]</literal>.</para>
       </section>
 
       <section>
 	<title>Code Blocks</title>
 
 	<para>Displayed blocks of code are indicated by surrounding a
-	paragraph with <literal>[...]</literal> or by preceding each
+	paragraph with <literal>@...@</literal> or by preceding each
 	line of a paragraph with <literal>&gt;</literal>.  For
 	example:</para>
 
 <programlisting>
 -- | This documentation includes two blocks of code:
 --
--- [
+-- @
 --     f x = x + x
--- ]
+-- @
 --
 -- >  g x = x * 42
 </programlisting>
@@ -822,6 +922,26 @@ import B
 	<literal>T</literal> (if the output format supports
 	hyperlinking, of course; in a printed format it might instead
 	insert a page reference to the definition).</para>
+
+	<para>For compatibility with other systems, the following
+	alternative form of markup is accepted<footnote><para>
+	We chose not to use this as the primary markup for
+	identifiers because strictly speaking the <literal>`</literal>
+	character should not be used as a left quote, it is a grave accent.</para>
+	  </footnote>: <literal>`T'</literal>.</para>
+      </section>
+
+      <section>
+	<title>Emphasis and Monospaced text</title>
+
+	<para>Emphasis may be added by surrounding text with
+	<literal>/.../</literal>.</para>
+
+	<para>Monospaced (or typewriter) text is indicated by
+	surrounding it with <literal>@...@</literal>.  Other markup is
+	valid inside a monospaced span: for example
+	<literal>@'f'&nbsp;a&nbsp;b@</literal> will hyperlink the
+	identifier <literal>f</literal> inside the code fragment.</para>
       </section>
 
       <section>
