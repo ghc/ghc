@@ -27,6 +27,7 @@
 #include "Task.h"
 #include "Stats.h"
 #include "RtsFlags.h"
+#include "Schedule.h"
 
 /* There's not all that much code that is shared between the
  * SMP and threads version of the 'task manager.' A sign
@@ -44,7 +45,6 @@ static TaskInfo* taskTable;
 static nat maxTasks;  
 /* number of tasks currently created */
 static nat taskCount; 
-static nat tasksAvailable;
 
 
 #if defined(SMP)
@@ -144,7 +144,6 @@ startTaskManager( nat maxCount, void (*taskStart)(void) )
   */
   maxTasks = maxCount;
   taskCount = 0;
-  tasksAvailable = 0;
 }
 
 void
@@ -155,10 +154,16 @@ startTask ( void (*taskStart)(void) )
   
   /* Locks assumed: rts_mutex */
   
-  /* If there are threads known to be waiting to do
-     useful work, no need to create a new task. */
-  if (tasksAvailable > 0) {
-    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: %d tasks available, not creating new one.\n",tasksAvailable););
+  /* If more than one worker thread is known to be blocked waiting
+     on thread_ready_cond, signal it rather than creating a new one.
+  */
+  if ( rts_n_waiting_tasks > 0) {
+    IF_DEBUG(scheduler,fprintf(stderr,
+			       "scheduler: startTask: %d tasks waiting, not creating new one.\n", 
+			       rts_n_waiting_tasks););
+    signalCondition(&thread_ready_cond);
+    /* Not needed, but gives more 'interesting' thread schedules when testing */
+    yieldThread();
     return;
   }
 
@@ -174,55 +179,10 @@ startTask ( void (*taskStart)(void) )
     barf("startTask: Can't create new task");
   }
   taskCount++;
-  tasksAvailable++;
 
-  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Started task (%d): %ld\n", taskCount, tid););
+  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: new task %ld (total_count: %d; waiting: %d)\n", tid, taskCount, rts_n_waiting_tasks););
   return;
 }
-
-/*
- *   When the RTS thread ends up performing a call-out, 
- *   we need to know whether there'll be other tasks/threads
- *   to take over RTS responsibilities. The 'tasksAvailable'
- *   variable holds the number of threads that are _blocked
- *   waiting to enter the RTS_ (or soon will be). Equipped
- *   with that count, startTask() is able to make an informed
- *   decision on whether or not to create a new thread.
- * 
- *   Two functions control increments / decrements of
- *   'tasksAvailable':
- *   
- *      - taskNotAvailable() : called whenever a task/thread
- *        has acquired the RTS lock, i.e., always called by
- *        a thread that holds the rts_mutex lock.
- *
- *      - taskAvailable():     called whenever a task/thread
- *        is about to try to grab the RTS lock. The task manager
- *        and scheduler will only call this whenever it is 
- *        in possession of the rts_mutex lock, i.e.,
- *             - when a new task is created in startTask().
- *             - when the scheduler gives up the RTS token to
- *               let threads waiting to return from an external
- *               call continue.
- * 
- */
-void
-taskNotAvailable()
-{
-  if (tasksAvailable > 0) {
-    tasksAvailable--;
-  }
-  return;
-}
-
-void
-taskAvailable()
-{
-  tasksAvailable++;
-  return;
-}
-
-
 
 void
 stopTaskManager ()
@@ -230,13 +190,6 @@ stopTaskManager ()
 
 }
 #endif
-
-
-nat
-getTaskCount ()
-{
-  return taskCount;
-}
 
 
 #endif /* RTS_SUPPORTS_THREADS */

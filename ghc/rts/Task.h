@@ -29,13 +29,7 @@ extern TaskInfo *taskIds;
 extern void startTaskManager ( nat maxTasks, void (*taskStart)(void) );
 extern void stopTaskManager ( void );
 
-#if defined(THREADED_RTS)
-extern void taskNotAvailable ( void );
-extern void taskAvailable    ( void );
-#endif
-
 extern void startTask ( void (*taskStart)(void) );
-extern nat  getTaskCount( void );
 
 #endif /* RTS_SUPPORTS_THREADS */
 #endif /* __TASK_H__ */
