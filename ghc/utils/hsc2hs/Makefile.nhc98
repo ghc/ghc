@@ -33,7 +33,7 @@ realclean: clean cleanC
 	-rm -f $(OBJDIR)/Main$(EXE)
 
 $(TARGET): $(OBJDIR) $(SRCS)
-	$(HMAKE) -hc=$(HC) Main -d$(OBJDIR) \
+	$(HMAKE) -hc=$(HC) Main -d$(OBJDIR) -DBUILD_NHC \
 		$(shell echo "${BUILDOPTS}") $(HFLAGS)
 	mv $(OBJDIR)/Main$(EXE) $(TARGET)
 	$(STRIP) $(TARGET)
