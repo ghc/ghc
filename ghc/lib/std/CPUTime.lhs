@@ -28,7 +28,7 @@ import IO		( ioError )
 import Ratio
 
 #ifdef __HUGS__
-#define cat2(x,y)  x##y
+#define cat2(x,y)  x/**/y
 #define CCALL(fun) cat2(prim_,fun)
 #define stToIO id
 #define sizeof_int64 8

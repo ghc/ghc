@@ -15,7 +15,7 @@ main = do
   testEnumWord64
 
 
-#define printTest(x) (do{ putStr ( "    " ++ #x ++ " = " ) ; print (x) })
+#define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 
 testEnumWord8 :: IO ()
 testEnumWord8 = do

@@ -1,16 +1,16 @@
 #include "options.h"
 
 #if BIGNUM_IS_INT64
-#define primToBignum(t)   prim##t##ToInt64
-#define primFromBignum(t) primInt64To##t
+#define primToBignum(t)   prim/**/t/**/ToInt64
+#define primFromBignum(t) primInt64To/**/t
 #define primInt64ToInt64 id
 #define	primEncodeFloat primEncodeFloatz
 #define	primDecodeFloat	primDecodeFloatz
 #define	primEncodeDouble primEncodeDoublez
 #define	primDecodeDouble primDecodeDoublez
 #elif BIGNUM_IS_INTEGER
-#define primToBignum(t)   prim##t##ToInteger
-#define primFromBignum(t) primIntegerTo##t
+#define primToBignum(t)   prim/**/t/**/ToInteger
+#define primFromBignum(t) primIntegerTo/**/t
 #define primIntegerToInteger id
 #define	primEncodeFloat primEncodeFloatZ
 #define	primDecodeFloat	primDecodeFloatZ

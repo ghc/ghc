@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.11 1999/06/12 16:17:26 keithw Exp $
+% $Id: PrelIOBase.lhs,v 1.12 1999/08/23 12:53:25 keithw Exp $
 % 
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
@@ -33,7 +33,7 @@ import PrelArr	  ( MutableVar, readVar )
 #endif
 
 #ifdef __HUGS__
-#define cat2(x,y)  x##y
+#define cat2(x,y)  x/**/y
 #define CCALL(fun) cat2(prim_,fun)
 #define __CONCURRENT_HASKELL__
 #define stToIO id

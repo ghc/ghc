@@ -14,7 +14,7 @@ main = do
   putStrLn "Testing Enum Int64:"
   testEnumInt64
 
-#define printTest(x) (do{ putStr ( "    " ++ #x ++ " = " ) ; print (x) })
+#define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 
 testEnumInt8 :: IO ()
 testEnumInt8 = do
