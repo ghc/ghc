@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.168 2003/04/08 15:53:51 sof Exp $
+ * $Id: Schedule.c,v 1.169 2003/05/14 09:11:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -217,14 +217,15 @@ static StgThreadID next_thread_id = 1;
 /* The smallest stack size that makes any sense is:
  *    RESERVED_STACK_WORDS    (so we can get back from the stack overflow)
  *  + sizeofW(StgStopFrame)   (the stg_stop_thread_info frame)
- *  + 1                       (the realworld token for an IO thread)
  *  + 1                       (the closure to enter)
+ *  + 1			      (stg_ap_v_ret)
+ *  + 1			      (spare slot req'd by stg_ap_v_ret)
  *
  * A thread with this stack will bomb immediately with a stack
  * overflow, which will increase its stack size.  
  */
 
-#define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 2)
+#define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 3)
 
 
 #if defined(GRAN)
