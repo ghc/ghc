@@ -305,10 +305,13 @@ char **av;
     char *prog_name = av[0];
     char *fn, *tn;
     struct stat fs, ts;
+    int force=0;
 
     while (++av, --ac) {
 	if (strcmp(*av, "-silent") == 0)
 	    silent = 1;
+	if (strcmp(*av, "-f") == 0)
+	    force = 1;
 	else if (strcmp(*av, "-ignorelinks") == 0)
 	    ignore_links = 1;
 	else if (strcmp(*av, "--") == 0) {
@@ -320,7 +323,7 @@ char **av;
     }
 
     if (ac < 1 || ac > 2)
-	quit (1, "usage: %s [-silent] [-ignorelinks] fromdir [todir]",
+	quit (1, "usage: %s [-f] [-silent] [-ignorelinks] fromdir [todir]",
 	      prog_name);
 
     fn = av[0];
@@ -330,14 +333,20 @@ char **av;
 	tn = ".";
 
     /* to directory */
-    if (stat (tn, &ts) < 0)
+    if (stat (tn, &ts) < 0) {
+      if (force && (tn[0] != '.' || tn[1] != '\0') ) {
+         mkdir(tn, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
+      } 
+      else {
 	quiterr (1, tn);
 #ifdef S_ISDIR
-    if (!(S_ISDIR(ts.st_mode)))
+        if (!(S_ISDIR(ts.st_mode)))
 #else
-    if (!(ts.st_mode & S_IFDIR))
+        if (!(ts.st_mode & S_IFDIR))
 #endif
-	quit (2, "%s: Not a directory", tn);
+	   quit (2, "%s: Not a directory", tn);
+      }
+    }
     if (chdir (tn) < 0)
 	quiterr (1, tn);
 
