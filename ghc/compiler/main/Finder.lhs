@@ -176,7 +176,7 @@ findOnPackagePath pkgs file = loop pkgs
     found <- findOnPath (import_dirs p) file
     case found of
 	Nothing   -> loop ps
-	Just path -> return (Just (mkFastString (name p), path ++ '/':file))
+	Just path -> return (Just (mkFastString (name p), path))
 
 findOnPath :: [String] -> String -> IO (Maybe FilePath)
 findOnPath path s = loop path
