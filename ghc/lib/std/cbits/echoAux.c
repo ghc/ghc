@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: echoAux.c,v 1.4 2001/01/16 14:06:14 simonmar Exp $
+ * $Id: echoAux.c,v 1.5 2001/02/19 16:07:48 rrt Exp $
  *
  * Support functions for changing echoing
  */
@@ -28,13 +28,13 @@
 StgInt
 setTerminalEcho(StgForeignPtr ptr, StgInt on)
 {
+#ifndef mingw32_TARGET_OS
    IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
    int fd, rc;
 
    fd = fo->fd;
 
-#ifndef mingw32_TARGET_OS
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -61,16 +61,15 @@ setTerminalEcho(StgForeignPtr ptr, StgInt on)
 }
 
 StgInt
-getTerminalEcho(ptr)
-StgForeignPtr ptr;
+getTerminalEcho(StgForeignPtr ptr)
 {
+#ifndef mingw32_TARGET_OS
    IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
    int fd, rc;
 
    fd = fo->fd;
 
-#ifndef mingw32_TARGET_OS
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
@@ -85,16 +84,15 @@ StgForeignPtr ptr;
 }
 
 StgInt
-isTerminalDevice(ptr)
-StgForeignPtr ptr;
+isTerminalDevice(StgForeignPtr ptr)
 {
+#ifndef mingw32_TARGET_OS
    IOFileObject* fo = (IOFileObject*)ptr;
    struct termios tios;
    int fd, rc;
 
    fd = fo -> fd;
 
-#ifndef mingw32_TARGET_OS
    while ( (rc = tcgetattr(fd,&tios)) == -1) {
         if (errno == ENOTTY) return 0;
 	if (errno != EINTR) {
