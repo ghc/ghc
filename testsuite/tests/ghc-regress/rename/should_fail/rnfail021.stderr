@@ -1,4 +1,1 @@
-
-rnfail021.hs:5:
-    Invalid use of qualified name `Baz.f'
-    In its declaration
+rnfail021.hs:5: Qualified variable in pattern: Baz.f

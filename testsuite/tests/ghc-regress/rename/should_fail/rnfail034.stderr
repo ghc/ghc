@@ -1,4 +1,1 @@
-
-rnfail034.hs:4:
-    Invalid use of qualified name `M.y'
-    In the binding group for: M.y
+rnfail034.hs:4: Qualified name in function definition: M.y
