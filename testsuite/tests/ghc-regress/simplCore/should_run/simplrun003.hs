@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -O2 #-}
+{-# OPTIONS -fglasgow-exts -O #-}
 
 -- O2 to get CSE
 
@@ -19,6 +19,5 @@ g x = case f x of
 --	  (# a,b #) -> if a>0 then
 --			  t	-- WRONG
 --			else (# b,a #)
-
 
 main = case g 2 of (# a,b #) -> print a
