@@ -542,18 +542,17 @@ reportUnusedNames gbl_env avail_env (ExportEnv export_avails _ _) mentioned_name
 	bad_locals = [n | n <- defined_but_not_used, isLocallyDefined		  n]
 	bad_imps   = [n | n <- defined_but_not_used, isUserImportedExplicitlyName n]
 
-	non_locally_used = [ n | n <- nameSetToList really_used_names, not (isLocallyDefined n) ]
-	deprec_used deprec_env = [ (n,txt) | n <- non_locally_used, Just txt <- [lookupNameEnv deprec_env n] ]
+	deprec_used deprec_env = [ (n,txt)
+                                 | n <- nameSetToList mentioned_names,
+                                   not (isLocallyDefined n),
+                                   Just txt <- [lookupNameEnv deprec_env n] ]
     in
-    traceRn (text "really used and non-locally defined" <> colon <+>
-             nest 4 (fsep (punctuate comma [ text (occNameFlavour (nameOccName n)) <+> ppr n
-                                           | n <- non_locally_used]))) `thenRn_`
-    getIfacesRn								`thenRn` \ ifaces ->
+    warnUnusedLocalBinds bad_locals				`thenRn_`
+    warnUnusedImports bad_imps					`thenRn_`
+    getIfacesRn							`thenRn` \ ifaces ->
     (if opt_WarnDeprecations
 	then mapRn_ warnDeprec (deprec_used (iDeprecs ifaces))
-	else returnRn ())						`thenRn_`
-    warnUnusedLocalBinds bad_locals					`thenRn_`
-    warnUnusedImports bad_imps
+	else returnRn ())
 
 warnDeprec :: (Name, DeprecTxt) -> RnM d ()
 warnDeprec (name, txt)
