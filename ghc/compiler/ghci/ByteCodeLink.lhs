@@ -67,8 +67,8 @@ linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
 	     -> IO ([HValue], ItblEnv, ClosureEnv)
 linkIModules gie gce mods 
    = do let (bcoss, ies) = unzip mods
-            bcos = concat bcoss
-            final_gie = foldr plusFM gie ies
+            bcos         = concat bcoss
+            final_gie    = foldr plusFM gie ies
         (final_gce, linked_bcos) <- linkSomeBCOs True final_gie gce bcos
         return (linked_bcos, final_gie, final_gce)
 
@@ -226,8 +226,13 @@ mkBits findLabel st proto_insns
                PUSH_AS   nm pk    -> do (p, st2)  <- ptr st (Left nm)
                                         (np, st3) <- ctoi_itbl st2 pk
                                         instr3 st3 i_PUSH_AS p np
-               PUSH_UBX  lit nws  -> do (np, st2) <- literal st lit
+               PUSH_UBX  (Left lit) nws  
+                                  -> do (np, st2) <- literal st lit
                                         instr3 st2 i_PUSH_UBX np nws
+               PUSH_UBX  (Right aa) nws  
+                                  -> do (np, st2) <- addr st aa
+                                        instr3 st2 i_PUSH_UBX np nws
+
                PUSH_TAG  tag      -> instr2 st i_PUSH_TAG tag
                SLIDE     n by     -> instr3 st i_SLIDE n by
                ALLOC     n        -> instr2 st i_ALLOC n
@@ -252,10 +257,12 @@ mkBits findLabel st proto_insns
                TESTLT_P  i l      -> instr3 st i_TESTLT_P i (findLabel l)
                TESTEQ_P  i l      -> instr3 st i_TESTEQ_P i (findLabel l)
                CASEFAIL           -> instr1 st i_CASEFAIL
-               JMP l              -> instr2 st i_JMP (findLabel l)
+               JMP       l        -> instr2 st i_JMP (findLabel l)
                ENTER              -> instr1 st i_ENTER
-               RETURN rep         -> do (itbl_no,st2) <- itoc_itbl st rep
+               RETURN    rep      -> do (itbl_no,st2) <- itoc_itbl st rep
                                         instr2 st2 i_RETURN itbl_no
+               CCALL     m_addr   -> do (np, st2) <- addr st m_addr
+                                        instr2 st2 i_CCALL np
 
        i2s :: Int -> Word16
        i2s = fromIntegral
@@ -315,6 +322,7 @@ mkBits findLabel st proto_insns
        literal st (MachFloat r)  = float st (fromRational r)
        literal st (MachDouble r) = double st (fromRational r)
        literal st (MachChar c)   = int st c
+       literal st other          = pprPanic "ByteCodeLink.mkBits" (ppr other)
 
        ctoi_itbl st pk
           = addr st ret_itbl_addr
@@ -513,7 +521,7 @@ lookupCE ce (Right primop)
         case m of
            Just (Ptr addr) -> case addrToHValue# addr of
                                  (# hval #) -> return hval
-           Nothing -> pprPanic "ByteCodeGen.lookupCE(primop)" (ppr primop)
+           Nothing -> pprPanic "ByteCodeLink.lookupCE(primop)" (ppr primop)
 lookupCE ce (Left nm)
    = case lookupFM ce nm of
         Just aa -> return aa
@@ -522,7 +530,7 @@ lookupCE ce (Left nm)
                  case m of
                     Just (Ptr addr) -> case addrToHValue# addr of
                                           (# hval #) -> return hval
-                    Nothing        -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
+                    Nothing        -> pprPanic "ByteCodeLink.lookupCE" (ppr nm)
 
 lookupIE :: ItblEnv -> Name -> IO (Ptr a)
 lookupIE ie con_nm 
@@ -538,7 +546,7 @@ lookupIE ie con_nm
                              n <- lookupSymbol (nameToCLabel con_nm "static_info")
                              case n of
                                 Just addr -> return addr
-                                Nothing -> pprPanic "ByteCodeGen.lookupIE" (ppr con_nm)
+                                Nothing -> pprPanic "ByteCodeLink.lookupIE" (ppr con_nm)
 
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
@@ -592,6 +600,7 @@ i_ENTER    = (bci_ENTER :: Int)
 i_RETURN   = (bci_RETURN :: Int)
 i_STKCHECK = (bci_STKCHECK :: Int)
 i_JMP      = (bci_JMP :: Int)
+i_CCALL    = (bci_CCALL :: Int)
 
 iNTERP_STACK_CHECK_THRESH = (INTERP_STACK_CHECK_THRESH :: Int)
 

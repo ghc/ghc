@@ -14,7 +14,8 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 import Outputable
 import Name		( Name, getName )
 import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe, isFCallId,
-			  idPrimRep, mkSysLocal, idName )
+			  idPrimRep, mkSysLocal, idName, isFCallId_maybe )
+import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM,
@@ -29,8 +30,9 @@ import Type		( typePrimRep, splitTyConApp_maybe, isTyVarTy, splitForAllTys )
 import DataCon		( dataConTag, fIRST_TAG, dataConTyCon, 
                           dataConWrapId, isUnboxedTupleCon )
 import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
-			  isFunTyCon )
+			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
+import Type		( Type, repType, splitRepFunTys )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
@@ -46,10 +48,12 @@ import ByteCodeItbls	( ItblEnv, mkITbls )
 import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
 			  ClosureEnv, HValue, filterNameMap,
 			  iNTERP_STACK_CHECK_THRESH )
+import ByteCodeFFI	( taggedSizeW, untaggedSizeW, mkMarshalCode )
+import Linker		( lookupSymbol )
 
 import List		( intersperse, sortBy, zip4 )
 import Foreign		( Ptr(..), mallocBytes )
-import Addr		( Addr(..), addrToInt, writeCharOffAddr )
+import Addr		( Addr(..), nullAddr, addrToInt, writeCharOffAddr )
 import CTypes		( CInt )
 import Exception	( throwDyn )
 
@@ -263,9 +267,11 @@ schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(fvs, AnnApp f a) 
    = schemeT d s p (fvs, AnnApp f a)
+
 schemeE d s p e@(fvs, AnnVar v)
    | isFollowableRep v_rep
-   = schemeT d s p (fvs, AnnVar v)
+   =  -- Ptr-ish thing; push it in the normal way
+     schemeT d s p (fvs, AnnVar v)
 
    | otherwise
    = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
@@ -328,11 +334,10 @@ schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr
                                  [(DEFAULT, [], (fvs_rhs, rhs))])
 
    | let isFunType var_type 
-            = case splitForAllTys var_type of
-                 (_, ty) -> case splitTyConApp_maybe ty of
-                               Just (tycon,_) | isFunTyCon tycon -> True
-                               _ -> False
-         ty_bndr = idType bndr
+            = case splitTyConApp_maybe var_type of
+                 Just (tycon,_) | isFunTyCon tycon -> True
+                 _ -> False
+         ty_bndr = repType (idType bndr)
      in isFunType ty_bndr || isTyVarTy ty_bndr
 
    -- Nasty hack; treat
@@ -355,8 +360,16 @@ schemeE d s p (fvs_case, AnnCase (fvs_scrut, scrut) bndr
          (schemeE d s p new_expr)
 
 
-schemeE d s p (fvs, AnnCase scrut bndr alts)
+schemeE d s p (fvs, AnnCase scrut bndr alts0)
    = let
+        alts = case alts0 of
+                  [(DataAlt dc, [bind1, bind2], rhs)] 
+                     | isUnboxedTupleCon dc
+                       && VoidRep == typePrimRep (idType bind1)
+                     ->  [(DEFAULT, [bind2], rhs)]
+                  other
+                     -> alts0
+
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.
         -- When an alt is entered, it assumes the returned value is
@@ -445,11 +458,15 @@ schemeE d s p other
 -- 1.  A nullary constructor.  Push its closure on the stack 
 --     and SLIDE and RETURN.
 --
--- 2.  Application of a non-nullary constructor, by defn saturated.
+-- 2.  (Another nasty hack).  Spot (# a::VoidRep, b #) and treat
+--     it simply as  b  -- since the representations are identical
+--     (the VoidRep takes up zero stack space).
+--
+-- 3.  Application of a non-nullary constructor, by defn saturated.
 --     Split the args into ptrs and non-ptrs, and push the nonptrs, 
 --     then the ptrs, and then do PACK and RETURN.
 --
--- 3.  Otherwise, it must be a function call.  Push the args
+-- 4.  Otherwise, it must be a function call.  Push the args
 --     right to left, SLIDE and ENTER.
 
 schemeT :: Int 		-- Stack depth
@@ -461,6 +478,9 @@ schemeT :: Int 		-- Stack depth
 schemeT d s p app
 --   | trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) False
 --   = panic "schemeT ?!?!"
+
+--   | trace ("\nschemeT\n" ++ showSDoc (pprCoreExpr (deAnnotate app)) ++ "\n") False
+--   = error "?!?!" 
 
    -- Handle case 0
    | Just (arg, constr_names) <- maybe_is_tagToEnum_call
@@ -477,17 +497,27 @@ schemeT d s p app
         `snocOL` ENTER
      )
 
-   -- Cases 2 and 3
+   -- Handle case 2
+   | let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
+         isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
+     in  is_con_call && isUnboxedTupleCon con 
+         && length args_r_to_l == 2 
+         && isVoidRepAtom (last (args_r_to_l))
+   = trace ("schemeT: unboxed pair with Void first component") (
+     schemeT d s p (head args_r_to_l)
+     )
+
+   -- Cases 3 and 4
    | otherwise
    = if   is_con_call && isUnboxedTupleCon con
      then returnBc unboxedTupleException
-     else returnBc code
+     else code `seq` returnBc code
 
    where
       -- Detect and extract relevant info for the tagToEnum kludge.
       maybe_is_tagToEnum_call
          = let extract_constr_Names ty
-                  = case splitTyConApp_maybe ty of
+                  = case splitTyConApp_maybe (repType ty) of
                        (Just (tyc, [])) |  isDataTyCon tyc
                                         -> map getName (tyConDataCons tyc)
                        other            -> panic "maybe_is_tagToEnum_call.extract_constr_Ids"
@@ -504,12 +534,12 @@ schemeT d s p app
       chomp expr
          = case snd expr of
               AnnVar v    -> ([], v)
-              AnnApp f a  -> case chomp f of (az, f) -> (snd a:az, f)
+              AnnApp f a  -> case chomp f of (az, f) -> (a:az, f)
               AnnNote n e -> chomp e
               other       -> pprPanic "schemeT" 
                                 (ppr (deAnnotate (panic "schemeT.chomp", other)))
          
-      args_r_to_l = filter (not.isTypeAtom) args_r_to_l_raw
+      args_r_to_l = filter (not.isTypeAtom.snd) args_r_to_l_raw
       isTypeAtom (AnnType _) = True
       isTypeAtom _           = False
 
@@ -523,20 +553,108 @@ schemeT d s p app
          | not is_con_call
          = args_r_to_l
          | otherwise
-         = filter (not.isPtr) args_r_to_l ++ filter isPtr args_r_to_l
+         = filter (not.isPtr.snd) args_r_to_l ++ filter (isPtr.snd) args_r_to_l
            where isPtr = isFollowableRep . atomRep
 
       -- make code to push the args and then do the SLIDE-ENTER thing
-      code = do_pushery d args_final_r_to_l
-
+      code          = do_pushery d (map snd args_final_r_to_l)
       tag_when_push = not is_con_call
-      narg_words    = sum (map (get_arg_szw . atomRep) args_r_to_l)
+      narg_words    = sum (map (get_arg_szw . atomRep . snd) args_r_to_l)
       get_arg_szw   = if tag_when_push then taggedSizeW else untaggedSizeW
 
       do_pushery d (arg:args)
          = let (push, arg_words) = pushAtom tag_when_push d p arg
            in  push `appOL` do_pushery (d+arg_words) args
       do_pushery d []
+
+         -- CCALL !
+         | Just (CCall (CCallSpec (StaticTarget target) 
+                                  cconv safety)) <- isFCallId_maybe fn
+         = let -- Get the arg and result reps.
+               (a_reps, r_rep) = getCCallPrimReps (idType fn)               
+               tys_str = showSDoc (ppr (a_reps, r_rep))
+               {-
+               Because the Haskell stack grows down, the a_reps refer to 
+               lowest to highest addresses in that order.  The args for the call
+               are on the stack.  Now push an unboxed, tagged Addr# indicating
+               the C function to call.  Then push a dummy placeholder for the 
+               result.  Finally, emit a CCALL insn with an offset pointing to the 
+               Addr# just pushed, and a literal field holding the mallocville
+               address of the piece of marshalling code we generate.
+               So, just prior to the CCALL insn, the stack looks like this 
+               (growing down, as usual):
+                 
+                  <arg_n>
+                  ...
+                  <arg_1>
+                  Addr# address_of_C_fn
+                  <placeholder-for-result#> (must be an unboxed type)
+
+               The interpreter then calls the marshall code mentioned
+               in the CCALL insn, passing it (& <placeholder-for-result#>), 
+               that is, the addr of the topmost word in the stack.
+               When this returns, the placeholder will have been
+               filled in.  The placeholder is slid down to the sequel
+               depth, and we RETURN.
+
+               This arrangement makes it simple to do f-i-dynamic since the Addr#
+               value is the first arg anyway.  It also has the virtue that the
+               stack is GC-understandable at all times.
+
+               The marshalling code is generated specifically for this
+               call site, and so knows exactly the (Haskell) stack
+               offsets of the args, fn address and placeholder.  It
+               copies the args to the C stack, calls the stacked addr,
+               and parks the result back in the placeholder.  The interpreter
+               calls it as a normal C call, assuming it has a signature
+                  void marshall_code ( StgWord* ptr_to_top_of_stack )
+               -}
+
+               -- resolve static address
+               target_addr 
+                  = let unpacked = _UNPK_ target
+                    in  case unsafePerformIO (lookupSymbol unpacked) of
+                           Just aa -> case aa of Ptr a# -> A# a#
+                           Nothing -> panic ("interpreted ccall: can't resolve: " 
+                                             ++ unpacked)
+
+               -- push the Addr#
+               addr_usizeW  = untaggedSizeW AddrRep
+               addr_tsizeW  = taggedSizeW AddrRep
+               push_Addr    = toOL [PUSH_UBX (Right target_addr) addr_usizeW,
+                                    PUSH_TAG addr_usizeW]
+               d_after_Addr = d + addr_tsizeW
+               -- push the return placeholder
+               r_lit        = mkDummyLiteral r_rep
+               r_usizeW     = untaggedSizeW r_rep
+               r_tsizeW     = 1{-tag-} + r_usizeW
+               push_r       = toOL [PUSH_UBX (Left r_lit) r_usizeW,
+                                    PUSH_TAG r_usizeW]
+               d_after_r    = d_after_Addr + r_tsizeW
+               -- do the call
+               do_call      = unitOL (CCALL addr_of_marshaller)
+               -- slide and return
+               wrapup       = mkSLIDE r_tsizeW
+                                      (d_after_r - r_tsizeW - s)
+                              `snocOL` RETURN r_rep
+
+               -- generate the marshalling code we're going to call
+               r_offW       = 0 
+               addr_offW    = r_tsizeW
+               arg1_offW    = r_tsizeW + addr_tsizeW
+               args_offW    = map (arg1_offW +) 
+                                  (init (scanl (+) 0 (map taggedSizeW a_reps)))
+               addr_of_marshaller
+                            = mkMarshalCode (r_offW, r_rep) addr_offW
+                                            (zip args_offW a_reps)               
+           in
+               trace (show (arg1_offW, args_offW  ,  (map taggedSizeW a_reps) )) (
+               target_addr 
+               `seq`
+               (push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup)
+               )
+
+         | otherwise
          = case maybe_dcon of
               Just con -> PACK con narg_words `consOL` (
                           mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
@@ -552,6 +670,44 @@ mkSLIDE n d
 bind x f 
    = f x
 
+
+mkDummyLiteral :: PrimRep -> Literal
+mkDummyLiteral pr
+   = case pr of
+        IntRep -> MachInt 0
+        _      -> pprPanic "mkDummyLiteral" (ppr pr)
+
+
+-- Convert (eg) 
+--       PrelGHC.Int# -> PrelGHC.State# PrelGHC.RealWorld
+--                    -> (# PrelGHC.State# PrelGHC.RealWorld, PrelGHC.Int# #)
+--
+-- to [IntRep] -> IntRep
+-- and check that the last arg is VoidRep'd and that an unboxed pair is
+-- returned wherein the first arg is VoidRep'd.
+
+getCCallPrimReps :: Type -> ([PrimRep], PrimRep)
+getCCallPrimReps fn_ty
+   = let (a_tys, r_ty) = splitRepFunTys fn_ty
+         a_reps        = map typePrimRep a_tys
+         (r_tycon, r_reps) 
+            = case splitTyConApp_maybe (repType r_ty) of
+                      (Just (tyc, tys)) -> (tyc, map typePrimRep tys)
+                      Nothing -> blargh
+         ok = length a_reps >= 1 && VoidRep == last a_reps
+               && length r_reps == 2 && VoidRep == head r_reps
+               && isUnboxedTupleTyCon r_tycon
+               && PtrRep /= r_rep_to_go	-- if it was, it would be impossible 
+                                        -- to create a valid return value 
+                                        -- placeholder on the stack
+         a_reps_to_go = init a_reps
+         r_rep_to_go  = r_reps !! 1
+         blargh       = pprPanic "getCCallPrimReps: can't handle:" 
+                                 (pprType fn_ty)
+     in 
+     --trace (showSDoc (ppr (a_reps, r_reps))) (
+     if ok then (a_reps_to_go, r_rep_to_go) else blargh
+     --)
 
 atomRep (AnnVar v)    = typePrimRep (idType v)
 atomRep (AnnLit l)    = literalPrimRep l
@@ -689,7 +845,7 @@ pushAtom tagged d p (AnnVar v)
      (unitOL (PUSH_TAG 0), 1)
 
    | isFCallId v
-   = pprPanic "pushAtom: byte code generator can't handle CCalls" (ppr v)
+   = pprPanic "pushAtom: shouldn't get an FCallId here" (ppr v)
 
    | Just primop <- isPrimOpId_maybe v
    = (unitOL (PUSH_G (Right primop)), 1)
@@ -736,7 +892,7 @@ pushAtom False d p (AnnLit lit)
      where
         code rep
            = let size_host_words = untaggedSizeW rep
-             in (unitOL (PUSH_UBX lit size_host_words), size_host_words)
+             in (unitOL (PUSH_UBX (Left lit) size_host_words), size_host_words)
 
         pushStr s 
            = let mallocvilleAddr
@@ -758,12 +914,9 @@ pushAtom False d p (AnnLit lit)
                                       return (A# a#)
                                    )
                          _ -> panic "StgInterp.lit2expr: unhandled string constant type"
-
-                 addrLit 
-                    = MachInt (toInteger (addrToInt mallocvilleAddr))
              in
                 -- Get the addr on the stack, untaggedly
-                (unitOL (PUSH_UBX addrLit 1), 1)
+                (unitOL (PUSH_UBX (Right mallocvilleAddr) 1), 1)
 
 
 
@@ -929,20 +1082,6 @@ instance Outputable Discr where
 
 lookupBCEnv_maybe :: BCEnv -> Id -> Maybe Int
 lookupBCEnv_maybe = lookupFM
-
-
--- When I push one of these on the stack, how much does Sp move by?
-taggedSizeW :: PrimRep -> Int
-taggedSizeW pr
-   | isFollowableRep pr = 1
-   | otherwise          = 1{-the tag-} + getPrimRepSize pr
-
-
--- The plain size of something, without tag.
-untaggedSizeW :: PrimRep -> Int
-untaggedSizeW pr
-   | isFollowableRep pr = 1
-   | otherwise          = getPrimRepSize pr
 
 
 taggedIdSizeW, untaggedIdSizeW :: Id -> Int
