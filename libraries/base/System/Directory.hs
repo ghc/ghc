@@ -28,6 +28,7 @@ module System.Directory
     -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
     , renameFile                -- :: FilePath -> FilePath -> IO ()
+    , copyFile                  -- :: FilePath -> FilePath -> IO ()
 
     -- * Existence tests
     , doesFileExist		-- :: FilePath -> IO Bool
