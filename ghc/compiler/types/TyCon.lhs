@@ -10,7 +10,7 @@ module TyCon(
 	AlgTyConFlavour(..), 
 	DataConDetails(..), visibleDataCons,
 
-	isFunTyCon, isUnLiftedTyCon, isBoxedTyCon, isProductTyCon,
+	isFunTyCon, isUnLiftedTyCon, isProductTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
 	isEnumerationTyCon, 
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
@@ -28,8 +28,6 @@ module TyCon(
 	mkKindCon,
 	mkSuperKindCon,
 
-	setTyConName,
-
 	tyConName,
 	tyConKind,
 	tyConUnique,
@@ -45,8 +43,6 @@ module TyCon(
 	tyConExtName,		-- External name for foreign types
 
         maybeTyConSingleCon,
-
-	matchesTyCon,
 
 	-- Generics
         tyConHasGenerics
@@ -338,9 +334,6 @@ mkSynTyCon name kind tyvars rhs argvrcs
 	synTyConDefn = rhs,
 	argVrcs      = argvrcs
     }
-
-setTyConName tc name = tc {tyConName = name, tyConUnique = nameUnique name}
-
 \end{code}
 
 \begin{code}
@@ -357,12 +350,14 @@ isUnLiftedTyCon (PrimTyCon  {isUnLifted = is_unlifted}) = is_unlifted
 isUnLiftedTyCon (TupleTyCon {tyConBoxed = boxity})      = not (isBoxed boxity)
 isUnLiftedTyCon _    				        = False
 
+#ifdef UNUSED
 -- isBoxedTyCon should not be applied to SynTyCon, nor KindCon
 isBoxedTyCon :: TyCon -> Bool
 isBoxedTyCon (AlgTyCon {}) = True
 isBoxedTyCon (FunTyCon {}) = True
 isBoxedTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isBoxedTyCon (PrimTyCon {primTyConRep = rep}) = isFollowableRep rep
+#endif
 
 -- isAlgTyCon returns True for both @data@ and @newtype@
 isAlgTyCon :: TyCon -> Bool
@@ -570,28 +565,3 @@ instance Outputable TyCon where
 instance NamedThing TyCon where
     getName = tyConName
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Kind constructors}
-%*									*
-%************************************************************************
-
-@matchesTyCon tc1 tc2@ checks whether an appliation
-(tc1 t1..tn) matches (tc2 t1..tn).  By "matches" we basically mean "equals",
-except that at the kind level tc2 might have more boxity info than tc1.
-
-\begin{code}
-matchesTyCon :: TyCon	-- Expected (e.g. arg type of function)
-	     -> TyCon	-- Inferred (e.g. type of actual arg to function)
-	     -> Bool
-
-matchesTyCon tc1 tc2 =  uniq1 == uniq2 || uniq1 == anyBoxConKey
-		     where
-			uniq1 = tyConUnique tc1
-			uniq2 = tyConUnique tc2
-\end{code}
-
-
-
