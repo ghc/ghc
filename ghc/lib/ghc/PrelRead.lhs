@@ -292,10 +292,12 @@ readRational :: ReadS Rational -- NB: doesn't handle leading "-"
 
 readRational r
   = [ ( (n%1)*10^^(k-d), t ) | (n,d,s) <- readFix r,
-			       (k,t)   <- readExp s]
+			       (k,t)   <- readExp s] ++
+    [(0/0, t) | ("NaN", t) <- lex r] ++
+    [(1/0, t) | ("Infinity", t) <- lex r]
               where readFix r = [(read (ds++ds'), length ds', t)
-					| (ds,'.':s) <- lexDigits r,
-					  (ds',t)    <- lexDigits s ]
+					| (ds,s)  <- lexDigits r,
+					  (ds',t) <- lexDotDigits s ]
 
 		    readExp (e:s) | e `elem` "eE" = readExp' s
                     readExp s			  = [(0,s)]
@@ -303,6 +305,11 @@ readRational r
                     readExp' ('-':s) = [(-k,t) | (k,t) <- readDec s]
                     readExp' ('+':s) = readDec s
                     readExp' s	     = readDec s
+
+		    lexDotDigits ('.':s) = lex0Digits s
+		    lexDotDigits s       = [("",s)]
+
+{- ToDo: remove completely
 
 readRational__ :: String -> Rational -- we export this one (non-std)
 				    -- NB: *does* handle a leading "-"
@@ -316,7 +323,7 @@ readRational__ top_s
 	  [x] -> x
 	  []  -> error ("readRational__: no parse:"        ++ top_s)
 	  _   -> error ("readRational__: ambiguous parse:" ++ top_s)
-
+-}
 -- The number of decimal digits m below is chosen to guarantee 
 -- read (show x) == x.  See
 --	Matula, D. W.  A formalization of floating-point numeric base
@@ -367,8 +374,7 @@ lex (c:s) | isSingle c = [([c],s)]
               isSym c    =  c `elem` "!@#$%&*+./<=>?\\^|:-~"
               isIdChar c =  isAlphanum c || c `elem` "_'"
 
-              lexFracExp ('.':c:cs) | isDigit c
-				    = [('.':ds++e,u) | (ds,t) <- lexDigits (c:cs),
+              lexFracExp ('.':cs)   = [('.':ds++e,u) | (ds,t) <- lex0Digits cs,
                                                        (e,u)  <- lexExp t]
               lexFracExp s          = [("",s)]
 
@@ -380,6 +386,10 @@ lex (c:s) | isSingle c = [([c],s)]
 
 lexDigits               :: ReadS String 
 lexDigits               =  nonnull isDigit
+
+-- 0 or more digits
+lex0Digits               :: ReadS String 
+lex0Digits  s            =  [span isDigit s]
 
 nonnull                 :: (Char -> Bool) -> ReadS String
 nonnull p s             =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
