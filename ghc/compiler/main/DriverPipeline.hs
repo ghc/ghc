@@ -994,7 +994,11 @@ staticLink o_files dep_packages = do
     -- dependencies, and eliminating duplicates.
 
     o_file <- readIORef v_Output_file
+#if defined(mingw32_HOST_OS)
+    let output_fn = case o_file of { Just s -> s; Nothing -> "main.exe"; }
+#else
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+#endif
 
     pkg_lib_paths <- getPackageLibraryPath dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
