@@ -28,7 +28,7 @@ fi
 #
 case "$configopts" in
 *--enable-hc-boot-unregisterised*)
-cat >mk/build.mk <<END
+cat >>mk/build.mk <<END
 GhcWithInterpreter=NO
 GhcWithNativeCodeGen=NO
 SplitObjs=NO
@@ -37,7 +37,7 @@ END
 ;;
 
 *)
-cat >mk/build.mk <<END
+cat >>mk/build.mk <<END
 # empty
 END
 ;;
@@ -77,7 +77,7 @@ PRIMOP_BITS="primop-data-decl.hs-incl \
 # Remove the old libraries.  Don't use make clean, because we don't
 # want to delete the .hs files generated from the .hsc files, because
 # we don't have hsc2hs built yet.
-find libraries hslibs | grep '\.\(o\|a\)$' | xargs rm -f
+find libraries hslibs | grep '\.[oa]$' | xargs rm -f
 
 # Do includes and RTS now
 $MAKE -C ghc/includes boot && $MAKE -C ghc/includes all
