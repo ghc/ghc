@@ -570,11 +570,11 @@ exprEtaExpandArity :: CoreExpr -> Int 	-- The number of args the thing can be ap
 -- Hence "generous" arity
 
 exprEtaExpandArity e
-  = go e
+  = go e `max` 0	-- Never go -ve!
   where
     go (Var v)         			= idArity v
     go (App f (Type _))			= go f
-    go (App f a)  | exprIsCheap a	= (go f - 1) `max` 0	-- Never go -ve!
+    go (App f a)  | exprIsCheap a	= go f - 1
     go (Lam x e)  | isId x    		= go e + 1
 		  | otherwise 		= go e
     go (Note n e) | ok_note n		= go e
