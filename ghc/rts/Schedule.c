@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.60 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: Schedule.c,v 1.61 2000/04/03 15:24:21 rrt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -2893,7 +2893,7 @@ printThreadBlockage(StgTSO *tso)
     fprintf(stderr,"blocked on write to fd %d", tso->block_info.fd);
     break;
   case BlockedOnDelay:
-#if defined(HAVE_SETITIMER)
+#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
     fprintf(stderr,"blocked on delay of %d ms", tso->block_info.delay);
 #else
     fprintf(stderr,"blocked on delay of %d ms", 

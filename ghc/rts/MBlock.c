@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.14 2000/01/22 12:06:43 simonmar Exp $
+ * $Id: MBlock.c,v 1.15 2000/04/03 15:24:21 rrt Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -152,11 +152,12 @@ char* base_non_committed = (char*)0;
 #define SIZE_RESERVED_POOL  ( 128 * 1024 * 1024 )
 
 /* This predicate should be inlined, really. */
+/* TODO: this only works for a single chunk */
 int
 is_heap_alloced(const void* x)
 {
   return (((char*)(x) >= base_non_committed) && 
-          ((char*)(x) <= (base_non_committed + 128 * 1024 * 1024)));
+          ((char*)(x) <= (base_non_committed + SIZE_RESERVED_POOL)));
 }
 
 void *

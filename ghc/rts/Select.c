@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.11 2000/03/23 12:02:38 simonmar Exp $
+ * $Id: Select.c,v 1.12 2000/04/03 15:24:21 rrt Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -107,7 +107,7 @@ awaitEvent(rtsBool wait)
 	case BlockedOnDelay:
 	  {
 	    int candidate; /* signed int is intentional */
-#if defined(HAVE_SETITIMER)
+#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
 	    candidate = tso->block_info.delay;
 #else
 	    candidate = tso->block_info.target - getourtimeofday();
@@ -222,7 +222,7 @@ awaitEvent(rtsBool wait)
 	
 	case BlockedOnDelay:
 	  {
-#if defined(HAVE_SETITIMER)
+#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
 	    if (tso->block_info.delay > delta) {
 	      tso->block_info.delay -= delta;
 	      ready = 0;

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.45 $
- * $Date: 2000/03/20 15:49:56 $
+ * $Revision: 1.46 $
+ * $Date: 2000/04/03 15:24:21 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -530,7 +530,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 	   cap->rCurrentTSO->why_blocked = BlockedOnDelay;
 	   ACQUIRE_LOCK(&sched_mutex);
 	   
-#if defined(HAVE_SETITIMER)
+#if defined(HAVE_SETITIMER) || defined(mingw32_TARGET_OS)
 	   cap->rCurrentTSO->block_info.delay 
 	     = hugsBlock.delay + ticks_since_select;
 #else
