@@ -692,7 +692,15 @@ AC_SUBST(CompressCmd)
 AC_SUBST(CompressSuffix)
 
 dnl ** check for ghc-pkg command
-AC_PATH_PROG(GhcPkgCmd,ghc-pkg)
+changequote(, )dnl
+ghc_pkg_guess=`echo $WithGhc | sed 's@ghc\([^/\\]*\)$@ghc-pkg\1@'`
+changequote([, ])dnl
+if $ghc_pkg_guess -l >/dev/null 2>/dev/null; then
+   GhcPkgCmd=$ghc_pkg_guess
+   AC_MSG_NOTICE([using $ghc_pkg_guess for ghc-pkg])
+else
+   AC_PATH_PROG(GhcPkgCmd,ghc-pkg)
+fi
 
 AC_ARG_WITH(greencard,
 [  --with-greencard=<greencard compiler>
