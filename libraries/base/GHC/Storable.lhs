@@ -48,25 +48,15 @@ module GHC.Storable
 	, writeWord32OffPtr   
 	, writeWord64OffPtr   
         ) where
-\end{code}
 
-\begin{code}
-import Control.Monad		( liftM )
-import Foreign.C.Types
-import Foreign.C.TypesISO
-
-#ifdef __GLASGOW_HASKELL__
 import GHC.Stable	( StablePtr )
-import GHC.Num
 import GHC.Int
 import GHC.Word
 import GHC.Stable
 import GHC.Ptr
 import GHC.Float
-import GHC.Err
 import GHC.IOBase
 import GHC.Base
-#endif
 \end{code}
 
 Helper functions for Foreign.Storable
