@@ -1043,7 +1043,7 @@ dnl (Mac OS X only) ... but don't check if we already have the
 dnl HaskellSupport.framework
 
 if test $HaveFrameworkHaskellSupport = YES; then
-    HaveLibDL = NO
+    HaveLibDL=NO
     HaveRtldNext=NO
     HaveRtldLocal=YES
     AC_DEFINE(HAVE_RTLDLOCAL)
