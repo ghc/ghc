@@ -141,8 +141,8 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
    in  return (HscNoRecomp pcs_ch bomb bomb)
  | otherwise
  = do {
-      hPutStrLn stderr "compilation not required";
-      ;
+      hPutStrLn stderr "compilation IS NOT required";
+
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
          <- closeIfaceDecls dflags hit hst pcs_ch old_iface ;
@@ -170,7 +170,8 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
 
 hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  = do	{
-      	; hPutStrLn stderr "compilation IS required";
+      	; when (verbosity dflags >= 1) $
+		hPutStrLn stderr "compilation IS required";
 
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -202,8 +203,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
 	; maybe_tc_result <- typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls
 	; case maybe_tc_result of {
-      	     Nothing -> do { hPutStrLn stderr "Typecheck failed" 
- 			   ; return (HscFail pcs_rn) } ;
+      	     Nothing -> return (HscFail pcs_rn);
       	     Just (pcs_tc, tc_result) -> do {
     
 	; let env_tc        = tc_env tc_result
