@@ -17,7 +17,7 @@ module SaAbsInt (
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UfExpr, RdrName, SimpleUnfolding(..), FormSummary )
+import CoreUnfold	( Unfolding(..), SimpleUnfolding(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
 			  dataConTyCon, dataConArgTys, Id
