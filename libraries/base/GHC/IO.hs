@@ -21,7 +21,9 @@ module GHC.IO (
    commitBuffer',	-- hack, see below
    hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
    hGetBuf, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking, slurpFile,
+{- NOTE: As far as I can tell, not defined.
    createPipe, createPipeEx,
+-}
    memcpy_ba_baoff,
    memcpy_ptr_baoff,
    memcpy_baoff_ba,
