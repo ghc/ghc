@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.63 2000/12/12 12:19:57 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.64 2000/12/19 12:34:01 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1021,20 +1021,21 @@ FN_(newBCOzh_fast)
   /* R1.p = instrs
      R2.p = literals
      R3.p = ptrs
+     R4.p = itbls
   */
   StgBCO *bco;
   FB_
 
-  HP_CHK_GEN_TICKY(sizeofW(StgBCO),R1_PTR|R2_PTR|R3_PTR, newBCOzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgBCO),R1_PTR|R2_PTR|R3_PTR|R4_PTR, newBCOzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader), sizeofW(StgBCO)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgBCO)); /* ccs prof */
-
-  bco = (StgBCO *) (Hp + 1 - sizeof(StgBCO));
+  bco = (StgBCO *) (Hp + 1 - sizeofW(StgBCO));
   SET_HDR(bco, &stg_BCO_info, CCCS);
 
   bco->instrs     = R1.cl;
   bco->literals   = R2.cl;
   bco->ptrs       = R3.cl;
+  bco->itbls      = R4.cl;
 
   TICK_RET_UNBOXED_TUP(1);
   RET_P(bco);
