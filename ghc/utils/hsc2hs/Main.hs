@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.71 2005/01/29 12:15:33 ross Exp $
+-- $Id: Main.hs,v 1.72 2005/03/10 17:58:42 malcolm Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -512,7 +512,7 @@ output flags name toks = do
     let cProgName    = outDir++outBase++"_hsc_make.c"
         oProgName    = outDir++outBase++"_hsc_make.o"
         progName     = outDir++outBase++"_hsc_make"
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(__CYGWIN32__)
 -- This is a real hack, but the quoting mechanism used for calling the C preprocesseor
 -- via GHC has changed a few times, so this seems to be the only way...  :-P * * *
                           ++ ".exe"
@@ -873,7 +873,7 @@ showCString = concatMap showCChar
 -- Convert paths foo/baz to foo\baz on Windows
 
 dosifyPath, unDosifyPath :: String -> String
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(__CYGWIN32__)
 dosifyPath xs = subst '/' '\\' xs
 unDosifyPath xs = subst '\\' '/' xs
 
