@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.6 2000/12/18 20:42:14 qrczak Exp $
+-- $Id: PackageMaintenance.hs,v 1.7 2001/03/06 11:23:46 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -37,6 +37,7 @@ listPackages = do
 
 newPackage :: IO ()
 newPackage = do
+  error "wibble" {-
   checkConfigAccess
   details <- readIORef v_Package_details
   hPutStr stdout "Reading package info from stdin... "
@@ -54,6 +55,7 @@ newPackage = do
   maybeRestoreOldConfig conf_file $ do
   writeNewConfig conf_file ( ++ [new_pkg])
   exitWith ExitSuccess
+-}
 
 deletePackage :: String -> IO ()
 deletePackage pkg = do  

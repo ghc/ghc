@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.58 2001/03/05 12:18:21 simonpj Exp $
+-- $Id: Main.hs,v 1.59 2001/03/06 11:23:46 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -27,6 +27,7 @@ import Posix
 #endif
 
 import CompManager
+import ParsePkgConf
 import DriverPipeline
 import DriverState
 import DriverFlags
@@ -39,8 +40,8 @@ import TmpFiles
 import Finder		( initFinder )
 import CmStaticInfo
 import Config
+import Outputable
 import Util
-
 
 import Concurrent
 import Directory
@@ -155,8 +156,11 @@ main =
 
 	-- read the package configuration
    conf_file <- readIORef v_Path_package_config
-   contents <- readFile conf_file
-   let pkg_details = read contents	-- ToDo: faster
+   r <- parsePkgConf conf_file
+   case r of {
+	Left err -> throwDyn (OtherError (showSDoc err));
+	Right pkg_details -> do
+
    writeIORef v_Package_details pkg_details
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
@@ -297,7 +301,7 @@ main =
    when (mode == DoMkDependHS) endMkDependHS
    when (mode == DoLink) (doLink o_files)
    when (mode == DoMkDLL) (doMkDLL o_files)
-
+  }
 	-- grab the last -B option on the command line, and
 	-- set topDir to its value.
 setTopDir :: [String] -> IO [String]
