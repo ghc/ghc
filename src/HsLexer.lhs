@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.16 2004/05/09 14:39:53 panne Exp $
+-- $Id: HsLexer.lhs,v 1.17 2005/01/04 16:15:51 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -181,6 +181,19 @@ reserved_ids = [
  ( "hiding", 	KW_Hiding ),
  ( "stdcall",   KW_StdCall )
  ]
+
+specialIds = [
+  KW_As,
+  KW_Unsafe,
+  KW_Safe,
+  KW_ThreadSafe,
+  KW_Qualified,
+  KW_Hiding,
+  KW_Export,
+  KW_StdCall,
+  KW_CCall,
+  KW_DotNet
+  ]
 
 isIdent, isSymbol, isWhite :: Char -> Bool
 isIdent  c = isAlpha c || isDigit c || c == '\'' || c == '_'
@@ -463,8 +476,8 @@ lexCon qual cont s0 loc y x =
 	in
 	case lookup id0 reserved_ids of
 	   -- cannot qualify a reserved word
-	   Just _  -> just_a_conid
-	   Nothing -> forward (l_con+1+l_id) (QVarId (qual', id0)) rest1
+	   Just id | id `notElem` specialIds  -> just_a_conid
+	   _ -> forward (l_con+1+l_id) (QVarId (qual', id0)) rest1
 
      | isUpper c1 ->	-- qualified conid?
 	lexCon qual' cont (c1:s1) loc y (x+l_con+1)
