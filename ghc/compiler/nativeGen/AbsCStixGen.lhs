@@ -416,7 +416,7 @@ be tuned.)
 \begin{code}
 
  intTag :: Literal -> Integer
- intTag (MachChar c)  = fromInt (ord c)
+ intTag (MachChar c)  = toInteger (ord c)
  intTag (MachInt i _) = i
  intTag _ = panic "intTag"
 

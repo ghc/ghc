@@ -25,6 +25,10 @@ import BitSet		( intBS )
 
 import Bits
 import Word
+
+#if __GLASGOW_HASKELL__ >= 404
+import GlaExts		( fromInt )
+#endif
 \end{code}
 
 Generating code for info tables (arrays of data).
