@@ -50,11 +50,6 @@ ifdef USE_REPORT_PRELUDE
 SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
 endif
 
-# Object and interface files have suffixes tagged with their ways
-ifneq "$(way)" ""
-SRC_HC_OPTS += -hisuf $(way_)hi
-endif
-
 # Special options
 PrelStorable_HC_OPTS = -monly-3-regs
 PrelCError_HC_OPTS = +RTS -K4m -RTS
