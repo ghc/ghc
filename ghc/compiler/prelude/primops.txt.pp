@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.15 2001/12/18 15:23:16 sewardj Exp $
+-- $Id: primops.txt.pp,v 1.16 2002/02/17 13:02:44 panne Exp $
 --
 -- Primitive Operations
 --
@@ -1621,7 +1621,7 @@ primop  NewBCOOp "newBCO#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Coercion" 
-	{{\tt unsafeCoerce# :: a -> b} is not a primop, but is defined in MkId.lhs.}
+	{{\tt unsafeCoerce\# :: a -> b} is not a primop, but is defined in MkId.lhs.}
 
 ------------------------------------------------------------------------
 
