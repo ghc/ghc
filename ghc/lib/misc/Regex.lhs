@@ -233,7 +233,8 @@ re_search pbuf str start range reg
       _casm_ ``%r = (struct re_registers *)malloc(sizeof(struct re_registers *));''
     else
       _casm_ ``%r = (struct re_registers *)NULL;'')	>>= \ regs ->
-   _casm_ ``%r=(int)re_search((struct re_pattern_buffer *)%0,
+   _casm_ ``((struct re_pattern_buffer *)%0)->regs_allocated = REGS_UNALLOCATED;
+	    %r=(int)re_search((struct re_pattern_buffer *)%0,
  			       (char *)%1,
 			       (int)%2,
 			       (int)%3,
@@ -255,7 +256,9 @@ re_search pbuf str start range reg
 		   (range,start)
      in
       build_re_match st en regs					     >>= \ arr ->
-      _casm_ ``free((struct re_registers *)%0); '' regs >>
+     _casm_ ``free(((struct re_registers *)%0)->start);
+              free(((struct re_registers *)%0)->end);
+              free((struct re_registers *)%0); '' regs  >>
       return (Just arr)
 \end{code}
 
