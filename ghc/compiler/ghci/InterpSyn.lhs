@@ -251,6 +251,9 @@ instance Outputable HValue where
    ppr x = text (show (A# (unsafeCoerce# x :: Addr#)))
         -- ptext SLIT("<O>")  -- unidentified lurking object
 
+instance (Outputable var, Outputable con) => Outputable (IBind con var) where
+  ppr ibind = pprIBind ibind
+
 pprIBind :: (Outputable var, Outputable con) => IBind con var -> SDoc
 pprIBind (IBind v e) = ppr v <+> char '=' <+> pprIExpr e
 

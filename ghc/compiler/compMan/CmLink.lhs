@@ -15,8 +15,6 @@ where
 import Interpreter
 import CmStaticInfo	( PackageConfigInfo )
 import Module		( ModuleName, PackageName )
-import InterpSyn	( UnlinkedIBind, HValue, binder )
-import Module		( Module )
 import Outputable	( SDoc )
 import FiniteMap	( emptyFM )
 import Digraph		( SCC(..), flattenSCC )
@@ -58,7 +56,7 @@ instance Outputable Unlinked where
    ppr (DotO path)   = text "DotO" <+> text path
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
-   ppr (Trees binds _) = text "Trees" <+> ppr (map binder binds)
+   ppr (Trees binds _) = text "Trees" <+> ppr binds
 
 
 isObject (DotO _) = True
