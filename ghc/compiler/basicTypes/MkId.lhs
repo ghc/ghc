@@ -36,14 +36,13 @@ module MkId (
 import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
 			  intPrimTy, realWorldStatePrimTy
 			)
-import TysWiredIn	( boolTy, charTy, mkListTy )
+import TysWiredIn	( charTy, mkListTy )
 import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
 import Type		( Type, ThetaType, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
-			  mkFunTys, mkFunTy, mkSigmaTy, classesToPreds,
-			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType, tyVarsOfTypes,
-			  splitSigmaTy, splitFunTy_maybe, 
+			  mkFunTys, mkFunTy, mkSigmaTy,
+			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  splitFunTys, splitForAllTys, unUsgTy,
 			  mkUsgTy, UsageAnn(..)
 			)
@@ -51,13 +50,13 @@ import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
 import Literal		( Literal(..) )
-import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons, isDataTyCon, 
+import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
                           tyConTheta, isProductTyCon, isUnboxedTupleTyCon )
-import Class		( Class, classBigSig, classTyCon, classTyVars, classSelIds )
+import Class		( Class, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
-import Name		( mkDerivedName, mkWiredInIdName, mkLocalName, 
-			  mkWorkerOcc, mkSuperDictSelOcc, mkCCallName,
+import Name		( mkDerivedName, mkWiredInName, mkLocalName, 
+			  mkWorkerOcc, mkCCallName,
 			  Name, NamedThing(..),
 			)
 import OccName		( mkVarOcc )
@@ -76,15 +75,15 @@ import DataCon		( DataCon, StrictnessMark(..),
 			)
 import Id		( idType, mkId,
 			  mkVanillaId, mkTemplateLocals,
-			  mkTemplateLocal, setInlinePragma, idCprInfo
+			  mkTemplateLocal, idCprInfo
 			)
 import IdInfo		( IdInfo, vanillaIdInfo, mkIdInfo,
 			  exactArity, setUnfoldingInfo, setCafInfo, setCprInfo,
-			  setArityInfo, setInlinePragInfo, setSpecInfo,
+			  setArityInfo, setSpecInfo,
 			  mkStrictnessInfo, setStrictnessInfo,
-			  IdFlavour(..), InlinePragInfo(..), CafInfo(..), StrictnessInfo(..), CprInfo(..)
+			  IdFlavour(..), CafInfo(..), CprInfo(..)
 			)
-import FieldLabel	( FieldLabel, FieldLabelTag, mkFieldLabel, fieldLabelName, 
+import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
 			)
 import CoreSyn
@@ -563,7 +562,7 @@ mkPrimOpId prim_op
   where
     (tyvars,arg_tys,res_ty, arity, strict_info) = primOpSig prim_op
     ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
-    name = mkPrimOpIdName prim_op id
+    name = mkPrimOpIdName prim_op
     id   = mkId name ty info
 		
     info = mkIdInfo (PrimOpId prim_op)
@@ -783,7 +782,7 @@ pAR_ERROR_ID
 pcMiscPrelId :: Unique{-IdKey-} -> Module -> FAST_STRING -> Type -> IdInfo -> Id
 pcMiscPrelId key mod str ty info
   = let
-	name = mkWiredInIdName key mod (mkVarOcc str) imp
+	name = mkWiredInName mod (mkVarOcc str) key
 	imp  = mkId name ty info -- the usual case...
     in
     imp
