@@ -173,16 +173,16 @@ unboxArg arg
     Just (arg2_tycon,_) = maybe_arg2_tycon
 
 can't_see_datacons_error thing ty
-  = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ (try compiling with -fno-prune-tydecls ..)"
-	     (hcat [text thing, text "; type: ", ppr (PprForUser opt_PprUserLength) ty])
+  = pprError "ERROR: Can't see the data constructor(s) for _ccall_/_casm_ "
+	     (hcat [text thing, text "; type: ", ppr (PprForUser opt_PprUserLength) ty, text "(try compiling with -fno-prune-tydecls ..)\n"])
 \end{code}
 
 
 \begin{code}
-boxResult :: Type				-- Type of desired result
+boxResult :: Type			-- Type of desired result
 	  -> DsM (Type,			-- Type of the result of the ccall itself
 		  CoreExpr -> CoreExpr)	-- Wrapper for the ccall
-							-- to box the result
+					-- to box the result
 boxResult result_ty
   | null data_cons
   -- oops! can't see the data constructors
