@@ -2759,9 +2759,9 @@ arg: while($_ = $Args[0]) {
 
     /^-concurrent$/ && do { $CONCURing = 'c'; &add_syslib('concurrent'); next arg; }; 
 			  # concurrent Haskell; implies -syslib conc
-    /^-gransim$/    && do { $GRANing   = 'g'; next arg; }; # GranSim
+    /^-gransim$/    && do { $GRANing   = 'g'; &add_syslib('concurrent'); next arg; }; # GranSim
     /^-ticky$/	    && do { $TICKYing  = 't'; next arg; }; # ticky-ticky
-    /^-parallel$/   && do { $PARing    = 'p'; next arg; }; # parallel Haskell
+    /^-parallel$/   && do { $PARing    = 'p'; &add_syslib('concurrent'); next arg; }; # parallel Haskell
 
     #-------------- "user ways" --------------------------------------------
 
