@@ -94,14 +94,14 @@ pprReg IF_ARCH_i386(s,) r
 	_ -> SLIT("very naughty I386 byte register")
       })
 
-    {- UNUSED:
+{- UNUSED:
     ppr_reg_no HB i = ptext
       (case i of {
 	ILIT( 0) -> SLIT("%ah");  ILIT( 1) -> SLIT("%bh");
 	ILIT( 2) -> SLIT("%ch");  ILIT( 3) -> SLIT("%dh");
 	_ -> SLIT("very naughty I386 high byte register")
       })
-    -}
+-}
 
 {- UNUSED:
     ppr_reg_no S i = ptext
@@ -125,21 +125,17 @@ pprReg IF_ARCH_i386(s,) r
 
     ppr_reg_no F i = ptext
       (case i of {
-	--ToDo: rm these (???)
-	ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
-	ILIT(10) -> SLIT("%st(2)");  ILIT(11) -> SLIT("%st(3)");
-	ILIT(12) -> SLIT("%st(4)");  ILIT(13) -> SLIT("%st(5)");
-	ILIT(14) -> SLIT("%st(6)");  ILIT(15) -> SLIT("%st(7)");
+	ILIT( 8) -> SLIT("%fake0");  ILIT( 9) -> SLIT("%fake1");
+	ILIT(10) -> SLIT("%fake2");  ILIT(11) -> SLIT("%fake3");
+	ILIT(12) -> SLIT("%fake4");  ILIT(13) -> SLIT("%fake5");
 	_ -> SLIT("very naughty I386 float register")
       })
 
     ppr_reg_no DF i = ptext
       (case i of {
-	--ToDo: rm these (???)
-	ILIT( 8) -> SLIT("%st(0)");  ILIT( 9) -> SLIT("%st(1)");
-	ILIT(10) -> SLIT("%st(2)");  ILIT(11) -> SLIT("%st(3)");
-	ILIT(12) -> SLIT("%st(4)");  ILIT(13) -> SLIT("%st(5)");
-	ILIT(14) -> SLIT("%st(6)");  ILIT(15) -> SLIT("%st(7)");
+	ILIT( 8) -> SLIT("%fake0");  ILIT( 9) -> SLIT("%fake1");
+	ILIT(10) -> SLIT("%fake2");  ILIT(11) -> SLIT("%fake3");
+	ILIT(12) -> SLIT("%fake4");  ILIT(13) -> SLIT("%fake5");
 	_ -> SLIT("very naughty I386 float register")
       })
 #endif
@@ -405,7 +401,7 @@ pprInstr (SEGMENT TextSegment)
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
 	,IF_ARCH_sparc(SLIT("\t.text\n\t.align 4") {-word boundary-}
-	,IF_ARCH_i386(SLIT(".text\n\t.align 4") {-needs per-OS variation!-}
+	,IF_ARCH_i386(SLIT(".text\n\t.align 4,0x90") {-needs per-OS variation!-}
 	,)))
 
 pprInstr (SEGMENT DataSegment)
@@ -998,70 +994,111 @@ pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP op) = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
 
 pprInstr (CALL imm)
-  = hcat [ ptext SLIT("\tcall "), pprImm imm ]
+   = hcat [ ptext SLIT("\tffree %st(0) ; call "), pprImm imm ]
 
-pprInstr SAHF = ptext SLIT("\tsahf")
-pprInstr FABS = ptext SLIT("\tfabs")
 
-pprInstr (FADD sz src@(OpAddr _))
-  = hcat [ptext SLIT("\tfadd"), pprSize sz, space, pprOperand sz src]
-pprInstr (FADD sz src)
-  = ptext SLIT("\tfadd")
-pprInstr FADDP
-  = ptext SLIT("\tfaddp")
-pprInstr (FMUL sz src)
-  = hcat [ptext SLIT("\tfmul"), pprSize sz, space, pprOperand sz src]
-pprInstr FMULP
-  = ptext SLIT("\tfmulp")
-pprInstr (FIADD size op) = pprSizeAddr SLIT("fiadd") size op
-pprInstr FCHS = ptext SLIT("\tfchs")
-pprInstr (FCOM size op) = pprSizeOp SLIT("fcom") size op
-pprInstr FCOS = ptext SLIT("\tfcos")
-pprInstr (FIDIV size op) = pprSizeAddr SLIT("fidiv") size op
-pprInstr (FDIV sz src)
-  = hcat [ptext SLIT("\tfdiv"), pprSize sz, space, pprOperand sz src]
-pprInstr FDIVP
-  = ptext SLIT("\tfdivp")
-pprInstr (FDIVR sz src)
-  = hcat [ptext SLIT("\tfdivr"), pprSize sz, space, pprOperand sz src]
-pprInstr FDIVRP
-  = ptext SLIT("\tfdivpr")
-pprInstr (FIDIVR size op) = pprSizeAddr SLIT("fidivr") size op
-pprInstr (FICOM size op) = pprSizeAddr SLIT("ficom") size op
-pprInstr (FILD sz op reg) = pprSizeAddrReg SLIT("fild") sz op reg
-pprInstr (FIST size op) = pprSizeAddr SLIT("fist") size op
-pprInstr (FLD sz (OpImm (ImmCLbl src)))
-  = hcat [ptext SLIT("\tfld"),pprSize sz,space,pprCLabel_asm src]
-pprInstr (FLD sz src)
-  = hcat [ptext SLIT("\tfld"),pprSize sz,space,pprOperand sz src]
-pprInstr FLD1 = ptext SLIT("\tfld1")
-pprInstr FLDZ = ptext SLIT("\tfldz")
-pprInstr (FIMUL size op) = pprSizeAddr SLIT("fimul") size op
-pprInstr FRNDINT = ptext SLIT("\tfrndint")
-pprInstr FSIN = ptext SLIT("\tfsin")
-pprInstr FSQRT = ptext SLIT("\tfsqrt")
-pprInstr (FST sz dst)
-  = hcat [ptext SLIT("\tfst"), pprSize sz, space, pprOperand sz dst]
-pprInstr (FSTP sz dst)
-  = hcat [ptext SLIT("\tfstp"), pprSize sz, space, pprOperand sz dst]
-pprInstr (FISUB size op) = pprSizeAddr SLIT("fisub") size op
-pprInstr (FSUB sz src)
-  = hcat [ptext SLIT("\tfsub"), pprSize sz, space, pprOperand sz src]
-pprInstr FSUBP
-  = ptext SLIT("\tfsubp")
-pprInstr (FSUBR size src)
-  = pprSizeOp SLIT("fsubr") size src
-pprInstr FSUBRP
-  = ptext SLIT("\tfsubpr")
-pprInstr (FISUBR size op)
-  = pprSizeAddr SLIT("fisubr") size op
-pprInstr FTST = ptext SLIT("\tftst")
-pprInstr (FCOMP sz op)
-  = hcat [ptext SLIT("\tfcomp"), pprSize sz, space, pprOperand sz op]
-pprInstr FUCOMPP = ptext SLIT("\tfucompp")
-pprInstr FXCH = ptext SLIT("\tfxch")
-pprInstr FNSTSW = ptext SLIT("\tfnstsw %ax")
-pprInstr FNOP = ptext SLIT("")
+-- Simulating a flat register set on the x86 FP stack is tricky.
+-- you have to free %st(7) before pushing anything on the FP reg stack
+-- so as to preclude the possibility of a FP stack overflow exception.
+-- ToDo: make gpop into a single instruction, FST
+pprInstr g@(GMOV src dst) 
+   = pprG g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
+
+-- GLD sz addr dst ==> FFREE %st(7) ; FLDsz addr ; FXCH (dst+1) ; FINCSTP
+pprInstr g@(GLD sz addr dst)
+ = pprG g (hcat [gtab, text "ffree %st(7) ; fld", pprSize sz, gsp, 
+                 pprAddr addr, gsemi, gpop dst 1])
+
+-- GST sz src addr ==> FFREE %st(7) ; FLD dst ; FSTPsz addr
+pprInstr g@(GST sz src addr)
+ = pprG g (hcat [gtab, gpush src 0, gsemi, 
+                 text "fstp", pprSize sz, gsp, pprAddr addr])
+
+pprInstr g@(GFTOD src dst) 
+   = pprG g bogus
+pprInstr g@(GFTOI src dst) 
+   = pprG g bogus
+
+pprInstr g@(GDTOF src dst) 
+   = pprG g bogus
+pprInstr g@(GDTOI src dst) 
+   = pprG g bogus
+
+pprInstr g@(GITOF src dst) 
+   = pprG g bogus
+pprInstr g@(GITOD src dst) 
+   = pprG g bogus
+
+pprInstr g@(GCMP sz src1 src2) 
+   = pprG g (hcat [gtab, text "pushl %eax ; ",
+                   gpush src2 0, gsemi, gpush src1 1]
+             $$
+             hcat [gtab, text "fcompp ; fstsw %ax ; sahf ; popl %eax"])
+
+pprInstr g@(GABS sz src dst)
+   = pprG g bogus
+pprInstr g@(GNEG sz src dst)
+   = pprG g bogus
+pprInstr g@(GSQRT sz src dst)
+   = pprG g bogus
+
+pprInstr g@(GADD sz src1 src2 dst)
+   = pprG g (hcat [gtab, gpush src1 0, 
+                   text " ; fadd ", greg src2 1, text ",%st(0)",
+                   gsemi, gpop dst 1])
+pprInstr g@(GSUB sz src1 src2 dst)
+   = pprG g (hcat [gtab, gpush src1 0, 
+                   text " ; fsub ", greg src2 1, text ",%st(0)",
+                   gsemi, gpop dst 1])
+pprInstr g@(GMUL sz src1 src2 dst)
+   = pprG g (hcat [gtab, gpush src1 0, 
+                   text " ; fmul ", greg src2 1, text ",%st(0)",
+                   gsemi, gpop dst 1])
+pprInstr g@(GDIV sz src1 src2 dst)
+   = pprG g (hcat [gtab, gpush src1 0, 
+                   text " ; fdiv ", greg src2 1, text ",%st(0)",
+                   gsemi, gpop dst 1])
+
+--------------------------
+gpush reg offset
+   = hcat [text "ffree %st(7) ; fld ", greg reg offset]
+gpop reg offset
+   = hcat [text "fxch ", greg reg offset, gsemi, text "fincstp"]
+
+bogus = text "\tbogus"
+greg reg offset = text "%st(" <> int (gregno reg - 8+offset) <> char ')'
+gsemi = text " ; "
+gtab  = char '\t'
+gsp   = char ' '
+gregno (FixedReg i) = I# i
+gregno (MappedReg i) = I# i
+
+pprG :: Instr -> SDoc -> SDoc
+pprG fake actual
+   = (char '#' <> pprGInstr fake) $$ actual
+
+pprGInstr (GMOV src dst)   = pprSizeRegReg SLIT("gmov") DF src dst
+pprGInstr (GLD sz src dst) = pprSizeAddrReg SLIT("gld") sz src dst
+pprGInstr (GST sz src dst) = pprSizeRegAddr SLIT("gst") sz src dst
+
+pprGInstr (GFTOD src dst) = pprSizeSizeRegReg SLIT("gftod") F DF src dst
+pprGInstr (GFTOI src dst) = pprSizeSizeRegReg SLIT("gftoi") F L  src dst
+
+pprGInstr (GDTOF src dst) = pprSizeSizeRegReg SLIT("gdtof") DF F src dst
+pprGInstr (GDTOI src dst) = pprSizeSizeRegReg SLIT("gdtoi") DF L src dst
+
+pprGInstr (GITOF src dst) = pprSizeSizeRegReg SLIT("gitof") L F  src dst
+pprGInstr (GITOD src dst) = pprSizeSizeRegReg SLIT("gitod") L DF src dst
+
+pprGInstr (GCMP sz src dst) = pprSizeRegReg SLIT("gcmp") sz src dst
+pprGInstr (GABS sz src dst) = pprSizeRegReg SLIT("gabs") sz src dst
+pprGInstr (GNEG sz src dst) = pprSizeRegReg SLIT("gneg") sz src dst
+pprGInstr (GSQRT sz src dst) = pprSizeRegReg SLIT("gsqrt") sz src dst
+
+pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg SLIT("gadd") sz src1 src2 dst
+pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg SLIT("gsub") sz src1 src2 dst
+pprGInstr (GMUL sz src1 src2 dst) = pprSizeRegRegReg SLIT("gmul") sz src1 src2 dst
+pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg SLIT("gdiv") sz src1 src2 dst
 \end{code}
 
 Continue with I386-only printing bits and bobs:
@@ -1121,6 +1158,45 @@ pprSizeOpReg name size op1 reg
 	pprReg size reg
     ]
 
+pprSizeRegReg :: FAST_STRING -> Size -> Reg -> Reg -> SDoc
+pprSizeRegReg name size reg1 reg2
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprSize size,
+	space,
+	pprReg size reg1,
+        comma,
+        pprReg size reg2
+    ]
+
+pprSizeSizeRegReg :: FAST_STRING -> Size -> Size -> Reg -> Reg -> SDoc
+pprSizeSizeRegReg name size1 size2 reg1 reg2
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprSize size1,
+        pprSize size2,
+	space,
+	pprReg size1 reg1,
+        comma,
+        pprReg size2 reg2
+    ]
+
+pprSizeRegRegReg :: FAST_STRING -> Size -> Reg -> Reg -> Reg -> SDoc
+pprSizeRegRegReg name size reg1 reg2 reg3
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprSize size,
+	space,
+	pprReg size reg1,
+        comma,
+        pprReg size reg2,
+        comma,
+        pprReg size reg3
+    ]
+
 pprSizeAddr :: FAST_STRING -> Size -> MachRegsAddr -> SDoc
 pprSizeAddr name size op
   = hcat [
@@ -1141,6 +1217,18 @@ pprSizeAddrReg name size op dst
 	pprAddr op,
 	comma,
 	pprReg size dst
+    ]
+
+pprSizeRegAddr :: FAST_STRING -> Size -> Reg -> MachRegsAddr -> SDoc
+pprSizeRegAddr name size src op
+  = hcat [
+    	char '\t',
+	ptext name,
+    	pprSize size,
+	space,
+	pprReg size src,
+	comma,
+	pprAddr op
     ]
 
 pprOpOp :: FAST_STRING -> Size -> Operand -> Operand -> SDoc

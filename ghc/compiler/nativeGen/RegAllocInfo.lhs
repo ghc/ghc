@@ -64,6 +64,7 @@ import OrdList		( mkUnitList )
 import PrimRep		( PrimRep(..) )
 import UniqSet		-- quite a bit of it
 import Outputable
+import PprMach		( pprInstr )
 \end{code}
 
 %************************************************************************
@@ -379,48 +380,36 @@ regUsage instr = case instr of
     CALL imm		-> usage [] callClobberedRegs
     CLTD		-> usage [eax] [edx]
     NOP			-> usage [] []
-    SAHF 		-> usage [eax] []
-    FABS 		-> usage [st0] [st0]
-    FADD sz src		-> usage (st0:opToReg src) [st0] -- allFPRegs
-    FADDP 		-> usage [st0,st1] [st0] -- allFPRegs
-    FIADD sz asrc	-> usage (addrToRegs asrc) [st0]
-    FCHS 		-> usage [st0] [st0]
-    FCOM sz src		-> usage (st0:opToReg src) []
-    FCOS 		-> usage [st0] [st0]
-    FDIV sz src 	-> usage (st0:opToReg src) [st0]
-    FDIVP  		-> usage [st0,st1] [st0]
-    FDIVRP 		-> usage [st0,st1] [st0]
-    FIDIV sz asrc	-> usage (addrToRegs asrc) [st0]
-    FDIVR sz src 	-> usage (st0:opToReg src) [st0]
-    FIDIVR sz asrc	-> usage (addrToRegs asrc) [st0]
-    FICOM sz asrc	-> usage (addrToRegs asrc) []
-    FILD sz asrc dst	-> usage (addrToRegs asrc) [dst] -- allFPRegs
-    FIST sz adst	-> usage (st0:addrToRegs adst) []
-    FLD	 sz src 	-> usage (opToReg src) [st0] -- allFPRegs
-    FLD1 		-> usage [] [st0] -- allFPRegs
-    FLDZ 		-> usage [] [st0] -- allFPRegs
-    FMUL sz src 	-> usage (st0:opToReg src) [st0]
-    FMULP 	 	-> usage [st0,st1] [st0]
-    FIMUL sz asrc	-> usage (addrToRegs asrc) [st0]
-    FRNDINT 		-> usage [st0] [st0]
-    FSIN 		-> usage [st0] [st0]
-    FSQRT 		-> usage [st0] [st0]
-    FST sz (OpReg r)	-> usage [st0] [r]
-    FST sz dst		-> usage (st0:opToReg dst) []
-    FSTP sz (OpReg r)	-> usage [st0] [r] -- allFPRegs
-    FSTP sz dst		-> usage (st0:opToReg dst) [] -- allFPRegs
-    FSUB sz src		-> usage (st0:opToReg src) [st0] -- allFPRegs
-    FSUBR sz src	-> usage (st0:opToReg src) [st0] -- allFPRegs
-    FISUB sz asrc	-> usage (addrToRegs asrc) [st0]
-    FSUBP 		-> usage [st0,st1] [st0] -- allFPRegs
-    FSUBRP 		-> usage [st0,st1] [st0] -- allFPRegs
-    FISUBR sz asrc	-> usage (addrToRegs asrc) [st0]
-    FTST 		-> usage [st0] []
-    FCOMP sz op		-> usage (st0:opToReg op) [st0] -- allFPRegs
-    FUCOMPP 		-> usage [st0, st1] [st0, st1] --  allFPRegs
-    FXCH		-> usage [st0, st1] [st0, st1]
-    FNSTSW		-> usage [] [eax]
-    _			-> noUsage
+
+    GMOV src dst	-> usage [src] [dst]
+    GLD sz src dst	-> usage (addrToRegs src) [dst]
+    GST sz src dst	-> usage [src] (addrToRegs dst)
+
+    GFTOD src dst	-> usage [src] [dst]
+    GFTOI src dst	-> usage [src] [dst]
+
+    GDTOF src dst	-> usage [src] [dst]
+    GDTOI src dst	-> usage [src] [dst]
+
+    GITOF src dst	-> usage [src] [dst]
+    GITOD src dst	-> usage [src] [dst]
+
+    GADD sz s1 s2 dst	-> usage [s1,s2] [dst]
+    GSUB sz s1 s2 dst	-> usage [s1,s2] [dst]
+    GMUL sz s1 s2 dst	-> usage [s1,s2] [dst]
+    GDIV sz s1 s2 dst	-> usage [s1,s2] [dst]
+
+    GCMP sz src1 src2	-> usage [src1,src2] []
+    GABS sz src dst	-> usage [src] [dst]
+    GNEG sz src dst	-> usage [src] [dst]
+    GSQRT sz src dst	-> usage [src] [dst]
+
+    COMMENT _		-> noUsage
+    SEGMENT _ 		-> noUsage
+    LABEL _		-> noUsage
+    ASCII _ _		-> noUsage
+    DATA _ _		-> noUsage
+    _			-> error ("regUsage: " ++ showSDoc (pprInstr instr)) --noUsage
  where
     usage2 :: Operand -> Operand -> RegUsage
     usage2 op (OpReg reg) = usage (opToReg op) [reg]
@@ -429,10 +418,10 @@ regUsage instr = case instr of
     usage1 :: Operand -> RegUsage
     usage1 (OpReg reg)    = usage [reg] [reg]
     usage1 (OpAddr ea)    = usage (addrToRegs ea) []
-    allFPRegs = [st0,st1,st2,st3,st4,st5,st6,st7]
+    allFPRegs = [fake0,fake1,fake2,fake3,fake4,fake5]
 
     --callClobberedRegs = [ eax, ecx, edx ] -- according to gcc, anyway.
-    callClobberedRegs = [eax]
+    callClobberedRegs = [eax,fake0,fake1,fake2,fake3,fake4,fake5]
 
 -- General purpose register collecting functions.
 
@@ -672,32 +661,39 @@ patchRegs instr env = case instr of
     POP  sz op		-> patch1 (POP  sz) op
     SETCC cond op	-> patch1 (SETCC cond) op
     JMP op		-> patch1 JMP op
-    FADD sz src		-> FADD sz (patchOp src)
-    FIADD sz asrc	-> FIADD sz (lookupAddr asrc)
-    FCOM sz src		-> patch1 (FCOM sz) src
-    FDIV sz src 	-> FDIV sz (patchOp src)
-    --FDIVP sz src 	-> FDIVP sz (patchOp src)
-    FIDIV sz asrc	-> FIDIV sz (lookupAddr asrc)
-    FDIVR sz src 	-> FDIVR sz (patchOp src)
-    --FDIVRP sz src 	-> FDIVRP sz (patchOp src)
-    FIDIVR sz asrc	-> FIDIVR sz (lookupAddr asrc)
-    FICOM sz asrc	-> FICOM sz (lookupAddr asrc)
-    FILD sz asrc dst	-> FILD sz (lookupAddr asrc) (env dst)
-    FIST sz adst	-> FIST sz (lookupAddr adst)
-    FLD	sz src 		-> patch1 (FLD sz) (patchOp src)
-    FMUL sz src 	-> FMUL sz (patchOp src)
-    --FMULP sz src 	-> FMULP sz (patchOp src)
-    FIMUL sz asrc	-> FIMUL sz (lookupAddr asrc)
-    FST sz dst		-> FST sz (patchOp dst)
-    FSTP sz dst		-> FSTP sz (patchOp dst)
-    FSUB sz src		-> FSUB sz (patchOp src)
-    --FSUBP sz src	-> FSUBP sz (patchOp src)
-    FISUB sz asrc	-> FISUB sz (lookupAddr asrc)
-    FSUBR sz src 	-> FSUBR sz (patchOp src)
-    --FSUBRP sz src 	-> FSUBRP sz (patchOp src)
-    FISUBR sz asrc	-> FISUBR sz (lookupAddr asrc)
-    FCOMP sz src	-> FCOMP sz (patchOp src)
-    _			-> instr
+
+    GMOV src dst	-> GMOV (env src) (env dst)
+    GLD sz src dst	-> GLD sz (lookupAddr src) (env dst)
+    GST sz src dst	-> GST sz (env src) (lookupAddr dst)
+
+    GFTOD src dst	-> GFTOD (env src) (env dst)
+    GFTOI src dst	-> GFTOI (env src) (env dst)
+
+    GDTOF src dst	-> GDTOF (env src) (env dst)
+    GDTOI src dst	-> GDTOI (env src) (env dst)
+
+    GITOF src dst	-> GITOF (env src) (env dst)
+    GITOD src dst	-> GITOD (env src) (env dst)
+
+    GADD sz s1 s2 dst	-> GADD sz (env s1) (env s2) (env dst)
+    GSUB sz s1 s2 dst	-> GSUB sz (env s1) (env s2) (env dst)
+    GMUL sz s1 s2 dst	-> GMUL sz (env s1) (env s2) (env dst)
+    GDIV sz s1 s2 dst	-> GDIV sz (env s1) (env s2) (env dst)
+
+    GCMP sz src1 src2	-> GCMP sz (env src1) (env src2)
+    GABS sz src dst	-> GABS sz (env src) (env dst)
+    GNEG sz src dst	-> GNEG sz (env src) (env dst)
+    GSQRT sz src dst	-> GSQRT sz (env src) (env dst)
+
+    COMMENT _		-> instr
+    SEGMENT _ 		-> instr
+    LABEL _		-> instr
+    ASCII _ _		-> instr
+    DATA _ _		-> instr
+    JXX _ _		-> instr
+    CALL _		-> instr
+    CLTD		-> instr
+    _			-> error ("patchInstr: " ++ showSDoc (pprInstr instr)) --instr
   where
     patch1 insn op      = insn (patchOp op)
     patch2 insn src dst = insn (patchOp src) (patchOp dst)
@@ -765,10 +761,15 @@ patchRegs instr env = case instr of
 
 Spill to memory, and load it back...
 
+JRS, 000122: on x86, don't spill directly below the stack pointer, since 
+some insn sequences (int <-> conversions) use this as a temp location.
+Leave 16 bytes of slop.
+
 \begin{code}
 spillReg, loadReg :: Reg -> Reg -> InstrList
 
 spillReg dyn (MemoryReg i pk)
+  | i >= 0  -- JRS paranoia
   = let
 	sz = primRepToSize pk
     in
@@ -777,7 +778,9 @@ spillReg dyn (MemoryReg i pk)
 	 IF_ARCH_alpha( ST sz dyn (spRel i)
 
 	{-I386: spill below stack pointer leaving 2 words/spill-}
-	,IF_ARCH_i386 ( MOV sz (OpReg dyn) (OpAddr (spRel (-2 * i)))
+	,IF_ARCH_i386 ( if pk == FloatRep || pk == DoubleRep
+                        then GST sz dyn (spRel (-16 + (-2 * i)))
+                        else MOV sz (OpReg dyn) (OpAddr (spRel (-16 + (-2 * i))))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( ST sz dyn (fpRel (-2 * i))
@@ -786,12 +789,15 @@ spillReg dyn (MemoryReg i pk)
 
 ----------------------------
 loadReg (MemoryReg i pk) dyn
+  | i >= 0  -- JRS paranoia
   = let
 	sz = primRepToSize pk
     in
     mkUnitList (
 	 IF_ARCH_alpha( LD  sz dyn (spRel i)
-	,IF_ARCH_i386 ( MOV sz (OpAddr (spRel (-2 * i))) (OpReg dyn)
+	,IF_ARCH_i386 ( if   pk == FloatRep || pk == DoubleRep
+                        then GLD sz (spRel (-16 + (-2 * i))) dyn
+                        else MOV sz (OpAddr (spRel (-16 + (-2 * i)))) (OpReg dyn)
 	,IF_ARCH_sparc( LD  sz (fpRel (-2 * i)) dyn
 	,)))
     )

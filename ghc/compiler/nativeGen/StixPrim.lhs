@@ -159,7 +159,7 @@ primCode [] WriteArrayOp [obj, ix, v]
 	obj' = amodeToStix obj
     	ix' = amodeToStix ix
     	v' = amodeToStix v
-    	base = StIndex IntRep obj' arrHS
+    	base = StIndex IntRep obj' arrHS --(StInt (toInteger 3))
     	assign = StAssign PtrRep (StInd PtrRep (StIndex PtrRep base ix')) v'
     in
     returnUs (\xs -> assign : xs)

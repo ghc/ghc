@@ -84,18 +84,10 @@ nativeCodeGen :: AbstractC -> UniqSupply -> (SDoc, SDoc)
 nativeCodeGen absC us
    = let (stixRaw, us1) = initUs us (genCodeAbstractC absC)
          stixOpt        = map (map genericOpt) stixRaw
-         stixFinal      = map x86floatFix stixOpt
-         insns          = initUs_ us1 (codeGen stixFinal)
-         debug_stix     = vcat (map pprStixTrees stixFinal)
+         insns          = initUs_ us1 (codeGen stixOpt)
+         debug_stix     = vcat (map pprStixTrees stixOpt)
      in 
          (debug_stix, insns)
-
-#if i386_TARGET_ARCH
-x86floatFix = floatFix
-#else
-x86floatFix = id
-#endif
-
 \end{code}
 
 @codeGen@ is the top-level code-generation function:
@@ -108,7 +100,10 @@ codeGen stixFinal
 	static_instrss = scheduleMachCode dynamic_codes
         docs           = map (vcat . map pprInstr) static_instrss       
     in
-    returnUs (vcat (intersperse (char ' ' $$ char ' ') docs))
+    returnUs (vcat (intersperse (char ' ' 
+                                 $$ text "# ___stg_split_marker" 
+                                 $$ char ' ') 
+                    docs))
 \end{code}
 
 Top level code generator for a chunk of stix code:
@@ -291,65 +286,4 @@ Anything else is just too hard.
 
 \begin{code}
 primOpt op args = StPrim op args
-\end{code}
-
------------------------------------------------------------------------------
-Fix up floating point operations for x86.
-
-The problem is that the code generator can't handle the weird register
-naming scheme for floating point registers on the x86, so we have to
-deal with memory-resident floating point values wherever possible.
-
-We therefore can't stand references to floating-point kinded temporary
-variables, and try to translate them into memory addresses wherever
-possible.
-
-\begin{code}
-floatFix :: [StixTree] -> [StixTree]
-floatFix trees = fltFix emptyUFM trees
-
-fltFix 	:: UniqFM StixTree	-- mapping tmp vars to memory locations
-      	-> [StixTree]
-	-> [StixTree]
-fltFix locs [] = []
-
--- The case we're interested in: loading a temporary from a memory
--- address.  Eliminate the instruction and replace all future references
--- to the temporary with the memory address.
-fltFix locs ((StAssign rep (StReg (StixTemp uq _)) loc) : trees)
-  | isFloatingRep rep  = fltFix (addToUFM locs uq loc) trees
-
-fltFix locs ((StAssign rep src dst) : trees)
-  = StAssign rep (fltFix1 locs src) (fltFix1 locs dst) : fltFix locs trees
-  
-fltFix locs (tree : trees)
-  = fltFix1 locs tree : fltFix locs trees
-
-
-fltFix1 :: UniqFM StixTree -> StixTree -> StixTree
-fltFix1 locs r@(StReg (StixTemp uq rep))
-  | isFloatingRep rep = case lookupUFM locs uq of
-			 	Nothing   -> panic "fltFix1"
-				Just tree -> tree
-
-fltFix1 locs (StIndex rep l r) =
-  StIndex rep (fltFix1 locs l) (fltFix1 locs r)
-
-fltFix1 locs (StInd rep tree) =
-  StInd rep (fltFix1 locs tree)
-
-fltFix1 locs (StAssign rep dst src) = panic "fltFix1: StAssign"
-
-fltFix1 locs (StJump tree) = StJump (fltFix1 locs tree)
-
-fltFix1 locs (StCondJump lbl tree) =
-  StCondJump lbl (fltFix1 locs tree)
-
-fltFix1 locs (StPrim op trees) = 
-  StPrim op (map (fltFix1 locs) trees)
-
-fltFix1 locs (StCall f conv rep trees) =
-  StCall f conv rep (map (fltFix1 locs) trees)
- 
-fltFix1 locs tree = tree
 \end{code}

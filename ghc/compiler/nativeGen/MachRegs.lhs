@@ -46,7 +46,7 @@ module MachRegs (
 #endif
 #if i386_TARGET_ARCH
 	, eax, ebx, ecx, edx, esi, esp
-	, st0, st1, st2, st3, st4, st5, st6, st7
+	, fake0, fake1, fake2, fake3, fake4, fake5
 #endif
 #if sparc_TARGET_ARCH
 	, allArgRegs
@@ -370,7 +370,10 @@ Intel x86 architecture:
 - Only ebx, esi, edi and esp are available across a C call (they are callee-saves).
 - Registers 0-7 have 16-bit counterparts (ax, bx etc.)
 - Registers 0-3 have 8 bit counterparts (ah, bh etc.)
-- Registers 8-15 hold extended floating point values.
+- Registers 8-13 are fakes; we pretend x86 has 6 conventionally-addressable
+  fp registers, and 3-operand insns for them, and we translate this into
+  real stack-based x86 fp code after register allocation.
+
 \begin{code}
 #if i386_TARGET_ARCH
 
@@ -378,7 +381,7 @@ gReg,fReg :: Int -> Int
 gReg x = x
 fReg x = (8 + x)
 
-st0, st1, st2, st3, st4, st5, st6, st7, eax, ebx, ecx, edx, esp :: Reg
+fake0, fake1, fake2, fake3, fake4, fake5, eax, ebx, ecx, edx, esp :: Reg
 eax = realReg (gReg 0)
 ebx = realReg (gReg 1)
 ecx = realReg (gReg 2)
@@ -387,15 +390,12 @@ esi = realReg (gReg 4)
 edi = realReg (gReg 5)
 ebp = realReg (gReg 6)
 esp = realReg (gReg 7)
-st0 = realReg (fReg 0)
-st1 = realReg (fReg 1)
-st2 = realReg (fReg 2)
-st3 = realReg (fReg 3)
-st4 = realReg (fReg 4)
-st5 = realReg (fReg 5)
-st6 = realReg (fReg 6)
-st7 = realReg (fReg 7)
-
+fake0 = realReg (fReg 0)
+fake1 = realReg (fReg 1)
+fake2 = realReg (fReg 2)
+fake3 = realReg (fReg 3)
+fake4 = realReg (fReg 4)
+fake5 = realReg (fReg 5)
 #endif
 \end{code}
 
@@ -474,14 +474,12 @@ names in the header files.  Gag me with a spoon, eh?
 #define edi 5
 #define ebp 6
 #define esp 7
-#define st0 8
-#define st1 9
-#define st2 10
-#define st3 11
-#define st4 12
-#define st5 13
-#define st6 14
-#define st7 15
+#define fake0 8
+#define fake1 9
+#define fake2 10
+#define fake3 11
+#define fake4 12
+#define fake5 13
 #endif
 #if sparc_TARGET_ARCH
 #define g0 0
@@ -765,7 +763,7 @@ reservedRegs
 freeRegs :: [Reg]
 freeRegs
   = freeMappedRegs IF_ARCH_alpha( [0..63],
-		   IF_ARCH_i386(  [0..15],
+		   IF_ARCH_i386(  [0..13],
 		   IF_ARCH_sparc( [0..63],)))
 
 -------------------------------

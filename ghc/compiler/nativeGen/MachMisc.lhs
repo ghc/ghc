@@ -475,49 +475,34 @@ data RI
 
 -- Float Arithmetic. -- ToDo for 386
 
--- Note that we cheat by treating F{ABS,MOV,NEG} of doubles as single instructions
+-- Note that we cheat by treating G{ABS,MOV,NEG} of doubles as single instructions
 -- right up until we spit them out.
 
-	      | SAHF	      -- stores ah into flags
-    	      | FABS
-	      | FADD	      Size Operand -- src
-	      | FADDP
-	      | FIADD	      Size MachRegsAddr -- src
-    	      | FCHS
-    	      | FCOM	      Size Operand -- src
-    	      | FCOS
-	      | FDIV	      Size Operand -- src
-	      | FDIVP
-	      | FIDIV	      Size MachRegsAddr -- src
-	      | FDIVR	      Size Operand -- src
-	      | FDIVRP
-	      | FIDIVR	      Size MachRegsAddr -- src
-    	      | FICOM	      Size MachRegsAddr -- src
-    	      | FILD	      Size MachRegsAddr Reg -- src, dst
-    	      | FIST	      Size MachRegsAddr -- dst
-    	      | FLD	      Size Operand -- src
-    	      | FLD1
-    	      | FLDZ
-    	      | FMUL	      Size Operand -- src
-    	      | FMULP
-    	      | FIMUL	      Size MachRegsAddr -- src
-    	      | FRNDINT
-    	      | FSIN
-    	      | FSQRT
-    	      | FST	      Size Operand -- dst
-    	      | FSTP	      Size Operand -- dst
-	      | FSUB	      Size Operand -- src
-	      | FSUBP
-	      | FISUB	      Size MachRegsAddr -- src
-	      | FSUBR	      Size Operand -- src
-	      | FSUBRP
-	      | FISUBR	      Size MachRegsAddr -- src
-	      | FTST
-    	      | FCOMP	      Size Operand -- src
-    	      | FUCOMPP
-	      | FXCH
-	      | FNSTSW
-	      | FNOP
+              -- all the 3-operand fake fp insns are src1 src2 dst
+              -- and furthermore are constrained to be fp regs only.
+    	      | GMOV	      Reg Reg -- src(fpreg), dst(fpreg)
+              | GLD           Size MachRegsAddr Reg -- src, dst(fpreg)
+              | GST           Size Reg MachRegsAddr -- src(fpreg), dst
+
+    	      | GFTOD	      Reg Reg -- src(fpreg), dst(fpreg)
+              | GFTOI         Reg Reg -- src(fpreg), dst(intreg)
+
+    	      | GDTOF	      Reg Reg -- src(fpreg), dst(fpreg)
+              | GDTOI         Reg Reg -- src(fpreg), dst(intreg)
+
+              | GITOF         Reg Reg -- src(intreg), dst(fpreg)
+              | GITOD         Reg Reg -- src(intreg), dst(fpreg)
+
+	      | GADD	      Size Reg Reg Reg -- src1, src2, dst
+	      | GDIV	      Size Reg Reg Reg -- src1, src2, dst
+	      | GSUB	      Size Reg Reg Reg -- src1, src2, dst
+	      | GMUL	      Size Reg Reg Reg -- src1, src2, dst
+
+    	      | GCMP	      Size Reg Reg -- src1, src2
+
+     	      | GABS	      Size Reg Reg -- src, dst
+    	      | GNEG	      Size Reg Reg -- src, dst
+    	      | GSQRT	      Size Reg Reg -- src, dst
 
 -- Comparison
 
