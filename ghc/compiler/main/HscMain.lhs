@@ -18,7 +18,7 @@ import Rename		( renameExpr )
 import CoreToStg	( coreExprToStg )
 import StringBuffer	( stringToStringBuffer, freeStringBuffer )
 import Unique		( Uniquable(..) )
-import Type		( splitTyConApp_maybe )
+import Type		( Type, splitTyConApp_maybe )
 import PrelNames	( ioTyConKey )
 import ByteCodeGen	( byteCodeGen )
 #endif
