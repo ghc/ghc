@@ -65,7 +65,7 @@ import Name		( Name, OccName, NamedThing(..),
 			  extendNameEnvList, emptyNameEnv
 			)
 import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
-import HscTypes		( DFunId )
+import HscTypes		( DFunId, TypeEnv )
 import Module		( Module )
 import InstEnv		( InstEnv, emptyInstEnv )
 import HscTypes		( lookupTypeEnv, TyThing(..), GlobalSymbolTable )
@@ -92,8 +92,8 @@ data TcEnv
 
 	tcInsts	 :: InstEnv,		-- All instances (both imported and in this module)
 
-	tcGEnv	 :: NameEnv TyThing,	-- The global type environment we've accumulated while
-		    {- TypeEnv -}	-- compiling this module:
+	tcGEnv	 :: TypeEnv,		-- The global type environment we've accumulated while
+		    {- NameEnv TyThing-}-- compiling this module:
 					--	types and classes (both imported and local)
 					-- 	imported Ids
 					-- (Ids defined in this module are in the local envt)

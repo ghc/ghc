@@ -11,14 +11,15 @@ module SimplCore ( core2core ) where
 import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), 
 			  SwitchResult(..), intSwitchSet,
                           opt_UsageSPOn,
-			  DynFlags, DynFlag(..), dopt
+			  DynFlags, DynFlag(..), dopt, dopt_CoreToDo
 			)
 import CoreLint		( beginPass, endPass )
 import CoreSyn
 import CoreFVs		( ruleSomeFreeVars )
 import HscTypes		( PackageRuleBase, HomeSymbolTable, ModDetails(..) )
 import CSE		( cseProgram )
-import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, extendRuleBaseList, addRuleBaseFVs )
+import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds, 
+			  extendRuleBaseList, addRuleBaseFVs )
 import Module		( moduleEnvElts )
 import CoreUnfold
 import PprCore		( pprCoreBindings, pprIdCoreRule )
@@ -54,16 +55,16 @@ import List             ( partition )
 %************************************************************************
 
 \begin{code}
-core2core :: DynFlags 
+core2core :: DynFlags		-- includes spec of what core-to-core passes to do
 	  -> PackageRuleBase	-- Rule-base accumulated from imported packages
 	  -> HomeSymbolTable
-	  -> [CoreToDo]		-- Spec of what core-to-core passes to do
 	  -> [CoreBind]		-- Binds in
 	  -> [IdCoreRule]	-- Rules in
 	  -> IO ([CoreBind], [IdCoreRule])  -- binds, local orphan rules out
 
-core2core dflags pkg_rule_base hst core_todos binds rules
+core2core dflags pkg_rule_base hst binds rules
   = do
+        let core_todos = dopt_CoreToDo dflags
 	us <-  mkSplitUniqSupply 's'
 	let (cp_us, ru_us) = splitUniqSupply us
 

@@ -20,7 +20,7 @@ import SRT		( computeSRTs )
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt, 
 			  opt_StgDoLetNoEscapes,
-			  StgToDo(..)
+			  StgToDo(..), dopt_StgToDo
 			)
 import Id		( Id )
 import Module		( Module, moduleString )
@@ -31,8 +31,7 @@ import Outputable
 \end{code}
 
 \begin{code}
-stg2stg :: DynFlags
-	-> [StgToDo]		-- spec of what stg-to-stg passes to do
+stg2stg :: DynFlags		-- includes spec of what stg-to-stg passes to do
 	-> Module		-- module name (profiling only)
 	-> UniqSupply		-- a name supply
 	-> [StgBinding]		-- input...
@@ -42,7 +41,7 @@ stg2stg :: DynFlags
 	      [CostCentre],	   -- "extern" cost-centres
 	      [CostCentreStack]))  -- pre-defined "singleton" cost centre stacks
 
-stg2stg dflags stg_todos module_name us binds
+stg2stg dflags module_name us binds
   = case (splitUniqSupply us)	of { (us4now, us4later) ->
 
     doIfSet_dyn dflags Opt_D_verbose_stg2stg (printErrs (text "VERBOSE STG-TO-STG:")) >>
@@ -51,7 +50,7 @@ stg2stg dflags stg_todos module_name us binds
 		>>= \ (binds', us, ccs) ->
 
 	-- Do the main business!
-    foldl_mn do_stg_pass (binds', us, ccs) stg_todos
+    foldl_mn do_stg_pass (binds', us, ccs) (dopt_StgToDo dflags)
 		>>= \ (processed_binds, _, cost_centres) ->
 
 	-- 	Do essential wind-up

@@ -4,7 +4,7 @@
 \section[CmSummarise]{Module summariser for GHCI}
 
 \begin{code}
-module CmSummarise ( ModImport(..), mi_name,
+module CmSummarise ( ModImport(..), mimp_name,
                      ModSummary(..), summarise, ms_get_imports,
 		     name_of_summary, deps_of_summary,
 		     getImports )
@@ -62,14 +62,14 @@ instance Outputable ModImport where
    ppr (MISource nm) = text "{-# SOURCE #-}" <+> ppr nm
 
 
-mi_name (MINormal nm) = nm
-mi_name (MISource nm) = nm
+mimp_name (MINormal nm) = nm
+mimp_name (MISource nm) = nm
 
 name_of_summary :: ModSummary -> ModuleName
 name_of_summary = moduleName . ms_mod
 
 deps_of_summary :: ModSummary -> [ModuleName]
-deps_of_summary = map mi_name . ms_get_imports
+deps_of_summary = map mimp_name . ms_get_imports
 
 ms_get_imports :: ModSummary -> [ModImport]
 ms_get_imports summ

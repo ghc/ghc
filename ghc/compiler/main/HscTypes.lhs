@@ -19,6 +19,7 @@ module HscTypes (
 	TyThing(..), groupTyThings, isTyClThing,
 
 	TypeEnv, extendTypeEnv, lookupTypeEnv, 
+	typeEnvClasses, typeEnvTyCons,
 
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
@@ -46,11 +47,11 @@ import RdrName		( RdrNameEnv, emptyRdrEnv )
 import Name		( Name, NameEnv, NamedThing,
 			  emptyNameEnv, unitNameEnv, extendNameEnv, plusNameEnv, 
 			  lookupNameEnv, emptyNameEnv, getName, nameModule,
-			  nameSrcLoc )
+			  nameSrcLoc, nameEnvElts )
 import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,
-			  lookupModuleEnv, lookupModuleEnvByName
+			  extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName
 			)
 import Rules		( RuleBase )
 import VarSet		( TyVarSet )
@@ -224,6 +225,10 @@ instance NamedThing TyThing where
   getName (AnId id)   = getName id
   getName (ATyCon tc) = getName tc
   getName (AClass cl) = getName cl
+
+typeEnvClasses env = [cl | AClass cl <- nameEnvElts env]
+typeEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts env] 
+
 \end{code}
 
 
@@ -254,7 +259,7 @@ extendTypeEnv tbl things
   = foldFM add tbl things
   where
     add mod type_env tbl
-	= panic "extendTypeEnv" --extendModuleEnv mod new_details
+	= extendModuleEnv tbl mod new_details
 	where
 	  new_details 
              = case lookupModuleEnv tbl mod of

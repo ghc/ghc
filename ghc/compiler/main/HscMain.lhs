@@ -44,7 +44,8 @@ import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
 import Module		( ModuleName, moduleNameUserString, 
-			  moduleUserString, moduleName, emptyModuleEnv )
+			  moduleUserString, moduleName, emptyModuleEnv,
+			  extendModuleEnv )
 import CmdLineOpts
 import ErrUtils		( ghcExit, doIfSet, dumpIfSet_dyn )
 import UniqSupply	( mkSplitUniqSupply )
@@ -54,22 +55,26 @@ import Outputable
 import Char		( isSpace )
 import StgInterp	( stgToInterpSyn )
 import HscStats		( ppSourceStats )
-import HscTypes		( ModDetails, ModIface, PersistentCompilerState(..),
+import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  PersistentRenamerState(..), WhatsImported(..),
 			  HomeSymbolTable, PackageSymbolTable, ImportVersion, 
 			  GenAvailInfo(..), RdrAvailInfo, OrigNameEnv(..),
 			  PackageRuleBase, HomeIfaceTable, PackageIfaceTable,
-			  extendTypeEnv )
+			  extendTypeEnv, groupTyThings, TypeEnv, TyThing,
+			  typeEnvClasses, typeEnvTyCons )
 import RnMonad		( ExportItem, ParsedIface(..) )
-import CmSummarise	( ModSummary(..), name_of_summary, ms_get_imports )
+import CmSummarise	( ModSummary(..), name_of_summary, ms_get_imports,
+			  mimp_name )
 import Finder		( Finder )
 import InterpSyn	( UnlinkedIBind )
 import StgInterp	( ItblEnv )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName, pprOccName )
 import Name		( Name, nameModule, emptyNameEnv, nameOccName, 
-			  getName, extendNameEnv_C )
+			  getName, extendNameEnv_C, nameEnvElts )
 import VarEnv		( emptyVarEnv )
+import Module		( Module, mkModuleName,	lookupModuleEnvByName )
+
 \end{code}
 
 
@@ -97,17 +102,13 @@ hscMain
   -> Finder
   -> ModSummary       -- summary, including source filename
   -> Maybe ModIface   -- old interface, if available
-  -> String	      -- file in which to put the output (.s, .hc, .java etc.)
-  -> [CoreToDo]
-  -> [StgToDo]
   -> HomeSymbolTable		-- for home module ModDetails
   -> HomeIfaceTable
   -> PackageIfaceTable
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain dflags finder summary maybe_old_iface output_filename
-        core_cmds stg_cmds hst hit pit pcs
+hscMain dflags finder summary maybe_old_iface hst hit pit pcs
  = do {
       -- ????? source_unchanged :: Bool -- extracted from summary?
       let source_unchanged = trace "WARNING: source_unchanged?!" False
@@ -123,13 +124,12 @@ hscMain dflags finder summary maybe_old_iface output_filename
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
-      what_next dflags finder summary maybe_checked_iface output_filename
-                core_cmds stg_cmds hst hit pit pcs_ch
+      what_next dflags finder summary maybe_checked_iface
+                hst hit pit pcs_ch
       }}
 
 
-hscNoRecomp dflags finder summary maybe_checked_iface output_filename
-            core_cmds stg_cmds hst hit pit pcs_ch
+hscNoRecomp dflags finder summary maybe_checked_iface hst hit pit pcs_ch
  = do {
       -- we definitely expect to have the old interface available
       let old_iface = case maybe_checked_iface of 
@@ -167,8 +167,7 @@ hscNoRecomp dflags finder summary maybe_checked_iface output_filename
       }}}}
 
 
-hscRecomp dflags finder summary maybe_checked_iface output_filename
-          core_cmds stg_cmds hst hit pit pcs_ch
+hscRecomp dflags finder summary maybe_checked_iface hst hit pit pcs_ch
  = do {
       -- what target are we shooting for?
       let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -204,29 +203,32 @@ hscRecomp dflags finder summary maybe_checked_iface output_filename
       -- DESUGAR, SIMPLIFY, TIDY-CORE
       -- We grab the the unfoldings at this point.
       (tidy_binds, orphan_rules, foreign_stuff)
-         <- dsThenSimplThenTidy dflags this_mod tc_result core_cmds
+         <- dsThenSimplThenTidy dflags (pcs_rules pcs_tc) this_mod tc_result hst
       ;
       -- CONVERT TO STG
       (stg_binds, oa_tidy_binds, cost_centre_info, top_level_ids) 
-         <- myCoreToStg dflags this_mod tidy_binds stg_cmds
+         <- myCoreToStg dflags this_mod tidy_binds
       ;
       -- cook up a new ModDetails now we (finally) have all the bits
       let new_details = mkModDetails env_tc local_insts tidy_binds 
 			             top_level_ids orphan_rules
       ;
       -- and possibly create a new ModIface
-      let maybe_final_iface 
+      let maybe_final_iface_and_sdoc 
              = completeIface maybe_checked_iface new_iface new_details 
+          maybe_final_iface
+             = case maybe_final_iface_and_sdoc of 
+                  Just (fif, sdoc) -> Just fif; Nothing -> Nothing
       ;
-
-      -- Write the interface file
-      writeIface finder maybe_final_iface
-      ;
-
+      -- SimonM does this, higher up
+      -- -- Write the interface file
+      -- writeIface finder maybe_final_iface
+      -- ;
       -- do the rest of code generation/emission
-      (maybe_ibinds, maybe_stub_h_filename, maybe_stub_c_filename) 
+      (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
          <- restOfCodeGeneration dflags toInterp summary
-               cost_centre_info foreign_stuff tc_env stg_binds oa_tidy_binds
+               cost_centre_info foreign_stuff env_tc stg_binds oa_tidy_binds
+               hit (pcs_PIT pcs_tc)       
       ;
       -- and the answer is ...
       return (HscOK new_details maybe_final_iface 
@@ -270,15 +272,17 @@ myParseModule dflags summary
 
 
 restOfCodeGeneration dflags toInterp summary cost_centre_info 
-                     foreign_stuff tc_env stg_binds oa_tidy_binds
+                     foreign_stuff env_tc stg_binds oa_tidy_binds
+                     hit pit -- these last two for mapping ModNames to Modules
  | toInterp
- = return (Nothing, Nothing, 
-	   Just (stgToInterpSyn stg_binds local_tycons local_classes))
+ = do (ibinds,itbl_env) 
+         <- stgToInterpSyn (map fst stg_binds) local_tycons local_classes
+      return (Nothing, Nothing, Just (ibinds,itbl_env))
  | otherwise
  = do --------------------------  Code generation -------------------------------
       show_pass dflags "CodeGen"
       -- _scc_     "CodeGen"
-      abstractC <- codeGen this_mod imported_modules
+      abstractC <- codeGen dflags this_mod imported_modules
                            cost_centre_info fe_binders
                            local_tycons local_classes stg_binds
 
@@ -287,39 +291,54 @@ restOfCodeGeneration dflags toInterp summary cost_centre_info
       -- _scc_     "CodeOutput"
       ncg_uniqs <- mkSplitUniqSupply 'n'
       (maybe_stub_h_name, maybe_stub_c_name)
-         <- codeOutput this_mod local_tycons local_classes
+         <- codeOutput dflags this_mod local_tycons local_classes
                        oa_tidy_binds stg_binds
                        c_code h_code abstractC ncg_uniqs
 
       return (maybe_stub_h_name, maybe_stub_c_name, Nothing)
  where
-    local_tycons     = tcEnvTyCons tc_env
-    local_classes    = tcEnvClasses tc_env
+    local_tycons     = typeEnvTyCons env_tc
+    local_classes    = typeEnvClasses env_tc
     this_mod         = ms_mod summary
-    imported_modules = ms_get_imports summary
+    imported_modules = map (mod_name_to_Module.mimp_name) 
+	                   (ms_get_imports summary)
     (fe_binders,h_code,c_code) = foreign_stuff
 
+    mod_name_to_Module :: ModuleName -> Module
+    mod_name_to_Module nm
+       = let str_mi = case lookupModuleEnvByName hit nm of
+                          Just mi -> mi
+                          Nothing -> case lookupModuleEnvByName pit nm of
+                                        Just mi -> mi
+                                        Nothing -> barf nm
+         in  mi_module str_mi
+    barf nm = pprPanic "mod_name_to_Module: no hst or pst mapping for" 
+                       (ppr nm)
 
-dsThenSimplThenTidy dflags this_mod tc_result core_cmds
--- make up ds_uniqs here
+
+dsThenSimplThenTidy dflags rule_base this_mod tc_result hst
  = do --------------------------  Desugaring ----------------
       -- _scc_     "DeSugar"
+      show_pass dflags "DeSugar"
       ds_uniqs <- mkSplitUniqSupply 'd'
       (desugared, rules, h_code, c_code, fe_binders) 
-         <- deSugar this_mod ds_uniqs tc_result
+         <- deSugar dflags this_mod ds_uniqs hst tc_result
 
       --------------------------  Main Core-language transformations ----------------
       -- _scc_     "Core2Core"
-      (simplified, orphan_rules)  <- core2core core_cmds desugared rules
+      show_pass dflags "Core2Core"
+      (simplified, orphan_rules) 
+         <- core2core dflags rule_base hst desugared rules
 
       -- Do the final tidy-up
+      show_pass dflags "CoreTidy"
       (tidy_binds, tidy_orphan_rules) 
-         <- tidyCorePgm this_mod simplified orphan_rules
+         <- tidyCorePgm dflags this_mod simplified orphan_rules
       
       return (tidy_binds, tidy_orphan_rules, (fe_binders,h_code,c_code))
 
 
-myCoreToStg dflags this_mod tidy_binds stg_cmds
+myCoreToStg dflags this_mod tidy_binds
  = do 
       c2s_uniqs <- mkSplitUniqSupply 'c'
       st_uniqs  <- mkSplitUniqSupply 'g'
@@ -336,7 +355,7 @@ myCoreToStg dflags this_mod tidy_binds stg_cmds
 
       show_pass dflags "Stg2Stg"
       -- _scc_     "Stg2Stg"
-      (stg_binds2, cost_centre_info) <- stg2stg stg_cmds this_mod st_uniqs stg_binds
+      (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod st_uniqs stg_binds
       let final_ids = collectFinalStgBinders (map fst stg_binds2)
 
       return (stg_binds2, occ_anal_tidy_binds, cost_centre_info, final_ids)
@@ -368,7 +387,9 @@ initPersistentCompilerState
         )
 
 initPackageDetails :: PackageSymbolTable
-initPackageDetails = extendTypeEnv emptyModuleEnv wiredInThings
+initPackageDetails = extendTypeEnv emptyModuleEnv (groupTyThings wiredInThings)
+
+--initPackageDetails = panic "initPackageDetails"
 
 initPersistentRenamerState :: IO PersistentRenamerState
   = do ns <- mkSplitUniqSupply 'r'
@@ -383,16 +404,20 @@ initPersistentRenamerState :: IO PersistentRenamerState
         )
 
 initOrigNames :: FiniteMap (ModuleName,OccName) Name
-initOrigNames = grab knownKeyNames `plusFM` grab (map getName wiredInThings)
-	      where
-		grab names   = foldl add emptyFM names
-		add env name = addToFM env (moduleName (nameModule name), nameOccName name) name
+initOrigNames 
+   = grab knownKeyNames `plusFM` grab (map getName wiredInThings)
+     where
+        grab names = foldl add emptyFM names
+        add env name 
+           = addToFM env (moduleName (nameModule name), nameOccName name) name
 
 
 initRules :: PackageRuleBase
-initRules = foldl add emptyVarEnv builtinRules
+initRules = emptyRuleBase
+{- SHOULD BE (ish)
+            foldl add emptyVarEnv builtinRules
 	  where
 	    add env (name,rule) 
-               = extendNameEnv_C (\rules _ -> rule:rules) 
-                                 env name [rule]
+              = extendRuleBase env name rule
+-}
 \end{code}

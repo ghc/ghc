@@ -277,8 +277,8 @@ data DynFlag
    deriving (Eq)
 
 data DynFlags = DynFlags {
-  coreToDo   :: CoreToDo,
-  stgToDo    :: StgToDo,
+  coreToDo   :: [CoreToDo],
+  stgToDo    :: [StgToDo],
   hscLang    :: HscLang,
   hscOutName :: String,  -- name of the file in which to place output
   flags      :: [DynFlag]
@@ -287,10 +287,10 @@ data DynFlags = DynFlags {
 dopt :: DynFlag -> DynFlags -> Bool
 dopt f dflags  = f `elem` (flags dflags)
 
-dopt_CoreToDo :: DynFlags -> CoreToDo
+dopt_CoreToDo :: DynFlags -> [CoreToDo]
 dopt_CoreToDo = coreToDo
 
-dopt_StgToDo :: DynFlags -> StgToDo
+dopt_StgToDo :: DynFlags -> [StgToDo]
 dopt_StgToDo = stgToDo
 
 dopt_OutName :: DynFlags -> String

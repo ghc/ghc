@@ -137,6 +137,8 @@ cmLoadModule cmstate1 modname
         -- then generate version 2's by removing from HIT,HST,UI any
         -- modules in the old MG which are not in the new one.
 
+        -- TODO: call newFinder to reestablish home module cache?!
+
         putStr "cmLoadModule: downsweep begins\n"
         mg2unsorted <- downsweep modname finderr
         putStrLn (showSDoc (vcat (map ppr mg2unsorted)))
