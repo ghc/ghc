@@ -1121,7 +1121,7 @@ match (TyVarTy v) ty tmpls k senv
   | v `elemVarSet` tmpls
   =     -- v is a template variable
     case lookupSubstEnv senv v of
-	Nothing | typeKind ty == tyVarKind v	
+	Nothing | typeKind ty `isSubKind` tyVarKind v	
 			-- We do a kind check, just as in the uVarX above
 			-- The kind check is needed to avoid bogus matches
 			-- of (a b) with (c d), where the kinds don't match
@@ -1156,12 +1156,14 @@ match (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2)) tmpls k senv
 match (FunTy arg1 res1) (FunTy arg2 res2) tmpls k senv
   = match arg1 arg2 tmpls (match res1 res2 tmpls k) senv
 
+	-- If the template is an application, try to make the 
+	-- thing we are matching look like an application
 match (AppTy fun1 arg1) ty2 tmpls k senv 
   = case tcSplitAppTy_maybe ty2 of
 	Just (fun2,arg2) -> match fun1 fun2 tmpls (match arg1 arg2 tmpls k) senv
 	Nothing 	 -> Nothing	-- Fail
 
--- Newtypes are opaque; predicate types should not happen
+	-- Newtypes are opaque; predicate types should not happen
 match (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) tmpls k senv
   | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
 match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
