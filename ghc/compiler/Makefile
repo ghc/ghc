@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.172 2001/07/09 13:21:09 sewardj Exp $
+# $Id: Makefile,v 1.173 2001/07/09 19:09:39 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -109,8 +109,10 @@ CANON_HC_VERSION=$(shell echo "$(GhcVersion)" | sed -e 's/\.//g;s/^\(...\)......
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 bootstrapped = YES
+compiling_with_4xx=NO
 else
 bootstrapped = $(shell if (test $(CANON_HC_VERSION) -ge $(ProjectVersionInt)0); then echo YES; else echo NO; fi)
+compiling_with_4xx = $(shell if (test $(CANON_HC_VERSION) -lt 5000); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
@@ -247,7 +249,7 @@ main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
-ifeq "$(bootstrapped)" "NO"
+ifeq "$(compiling_with_4xx)" "YES"
 rename/ParseIface_HC_OPTS 	+= -K2m
 parser/Parser_HC_OPTS 		+= -K2m
 endif
