@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.162 2001/06/23 10:54:07 panne Exp $
+# $Id: Makefile,v 1.163 2001/06/25 17:28:30 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -95,16 +95,24 @@ DIRS += ilxGen
 SRC_HC_OPTS += -DILX
 endif
 
+#
+# Canonicalize the GHC version number - assume it is has the form x.yy.[z].
+#
+# [First sed substitution gets rid of the '.' - second appends a '0' if the
+#  'z' portion is missing]
+#
+CANON_HC_VERSION=$(shell echo "$(GhcVersion)" | sed -e 's/\.//g;s/^\(...\)$$/\10/g')
+
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
-ghc_411_at_least = 1
+ghc_411_at_least = YES
 else
-ghc_411_at_least = $(shell expr "$(GhcVersion)" \>= 4.11)
+ghc_411_at_least=$(shell if (test $(CANON_HC_VERSION) -ge 4110); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
-ifeq "$(ghc_411_at_least)" "1"
+ifeq "$(ghc_411_at_least)" "YES"
 SRC_HC_OPTS += -DGHCI
 DIRS += ghci
 endif
@@ -114,8 +122,9 @@ endif
 # for explanatory comment as to what this does.
 ifeq "$(MinimalUnixDeps)" "YES"
 SRC_HC_OPTS += -DMINIMAL_UNIX_DEPS
-ghc_501_at_least = $(shell expr "$(GhcVersion)" \> 5.00)
-ifneq "$(ghc_501_at_least)" "1"
+ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -gt 5000); then echo YES; else echo NO; fi)
+
+ifneq "$(ghc_501_at_least)" "YES"
 boot ::
 	$(CP) ../lib/std/cbits/system.c main
 C_SRCS += main/system.c
@@ -222,7 +231,7 @@ main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
-ifeq "$(ghc_411_at_least)" "0"
+ifeq "$(ghc_411_at_least)" "NO"
 rename/ParseIface_HC_OPTS 	+= -K2m
 parser/Parser_HC_OPTS 		+= -K2m
 endif
