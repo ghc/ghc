@@ -116,6 +116,12 @@ wiredInIds
 	-- error-reporting functions that they have an 'open' 
 	-- result type. -- sof 1/99]
 
+    eRROR_ID,	-- This one isn't used anywhere else in the compiler
+		-- But we still need it in wiredInIds so that when GHC
+		-- compiles a program that mentions 'error' we don't
+		-- import its type from the interface file; we just get
+		-- the Id defined here.  Which has an 'open-tyvar' type.
+
     rUNTIME_ERROR_ID,
     iRREFUT_PAT_ERROR_ID,
     nON_EXHAUSTIVE_GUARDS_ERROR_ID,
@@ -924,6 +930,16 @@ mkRuntimeErrorId key name = pc_bottoming_Id key pREL_ERR name runtimeErrorTy
 runtimeErrorTy 		  = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
 \end{code}
 
+\begin{code}
+eRROR_ID = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
+
+errorTy  :: Type
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] openAlphaTy)
+    -- Notice the openAlphaTyVar.  It says that "error" can be applied
+    -- to unboxed as well as boxed types.  This is OK because it never
+    -- returns, so the return type is irrelevant.
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -952,17 +968,8 @@ pc_bottoming_Id key mod name ty
     bottoming_info = noCafNoTyGenIdInfo `setAllStrictnessInfo` Just strict_sig
 	-- these "bottom" out, no matter what their arguments
 
-generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy
-
 (openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars
 openAlphaTy  = mkTyVarTy openAlphaTyVar
 openBetaTy   = mkTyVarTy openBetaTyVar
-
-errorTy  :: Type
-errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] 
-                                                   openAlphaTy)
-    -- Notice the openAlphaTyVar.  It says that "error" can be applied
-    -- to unboxed as well as boxed types.  This is OK because it never
-    -- returns, so the return type is irrelevant.
 \end{code}
 
