@@ -51,11 +51,12 @@ type binding;
 
 	nullbind : < >;
 
-	import	: < gibindimod	: stringId;
-		    gibindqual	: long;
-		    gibindas	: maybe;
-		    gibindspec	: maybe;
-		    gibindline	: long; >;
+	import	: < gibindimod	 : stringId;
+		    gibindqual	 : long;
+		    gibindas	 : maybe;
+		    gibindspec	 : maybe;
+		    gibindsource : long;
+		    gibindline	 : long; >;
 
 	/* user-specified pragmas:XXXX */
 
