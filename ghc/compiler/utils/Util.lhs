@@ -73,6 +73,9 @@ import FastTypes
 #if __GLASGOW_HASKELL__ <= 408
 import Exception	( catchIO, justIoErrors, raiseInThread )
 #endif
+#ifndef mingw32_TARGET_OS
+import Posix
+#endif
 infixr 9 `thenCmp`
 \end{code}
 
@@ -727,7 +730,6 @@ throwTo   = raiseInThread
 foreign import "_getpid" myGetProcessID :: IO Int 
 #else
 myGetProcessID :: IO Int
-myGetProcessID = do hPutStrLn stderr "Warning:faking process ID in myGetProcessID"
-                    return 12345
+myGetProcessID = Posix.getProcessID
 #endif
 \end{code}
