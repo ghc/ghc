@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.19 1999/03/20 17:33:07 sof Exp $
+ * $Id: Schedule.c,v 1.20 1999/04/27 10:59:31 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -520,8 +520,13 @@ threadStackOverflow(StgTSO *tso)
     printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
 				     tso->sp+64));
 #endif
+#ifdef INTERPRETER
+    fprintf(stderr, "fatal: stack overflow in Hugs; aborting\n" );
+    exit(1);
+#else
     /* Send this thread the StackOverflow exception */
     raiseAsync(tso, (StgClosure *)&stackOverflow_closure);
+#endif
     return tso;
   }
 

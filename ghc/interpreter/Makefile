@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.7 1999/04/27 10:06:47 sewardj Exp $                         #
+# $Id: Makefile,v 1.8 1999/04/27 10:59:29 sewardj Exp $                         #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -42,7 +42,7 @@ nHandle.so:
 	gcc -O -fPIC -shared -o nHandle.so nHandle.c
 
 $(TOP)/ghc/rts/libHSrts.a:
-	(cd $(TOP)/ghc/rts ; make clean ; make)
+	(cd $(TOP)/ghc/rts ; make clean ; make EXTRA_CC_OPTS=-I$(GHC_DIR)/interpreter)
 
 cleanish:
 	/bin/rm *.o
@@ -53,7 +53,7 @@ snapshot:
              ../rts/Assembler.c ../rts/Evaluator.c ../rts/Disassembler.c \
              ../rts/ForeignCall.c ../rts/Printer.c ../rts/QueueTemplate.h \
              ../includes/options.h ../includes/Assembler.h nHandle.c \
-             ../includes/Assembler.h ../rts/Bytecodes.h \
+             ../includes/Assembler.h ../rts/Bytecodes.h ../includes/ClosureMacros.h \
              lib/*.hs runnofib runallnofib
 
 

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.11 1999/04/23 13:54:12 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.12 1999/04/27 10:59:30 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -367,5 +367,7 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
 #define bcoConstFloat( bco, i )  (PK_FLT(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
 #define bcoConstDouble( bco, i ) (PK_DBL(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
 #define bcoInstr( bco, i )       (stgCast(StgWord8*,      ((bco)->payload+(bco)->n_ptrs+(bco)->n_words))[i])
+static __inline__ StgInt bcoInstr16 ( StgBCO* bco, unsigned int i )
+{ StgInt x = (bcoInstr(bco,i) << 8) + bcoInstr(bco,i+1); return x; }
 
 #endif /* CLOSUREMACROS_H */
