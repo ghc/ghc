@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.95 2001/08/03 07:44:47 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.96 2001/08/10 23:08:25 sof Exp $
 --
 -- GHC Driver
 --
@@ -327,7 +327,12 @@ run_phase Unlit _basename _suff input_fn output_fn
        -- The -h option passes the file name for unlit to put in a #line directive;
        -- we undosify it so that it doesn't contain backslashes in Windows, which
        -- would disappear in error messages
-       SysTools.runUnlit (unlit_flags ++ ["-h", unDosifyPath input_fn, input_fn, output_fn])
+       SysTools.runUnlit (map SysTools.Option unlit_flags ++
+       			  [ SysTools.Option     "-h"
+ 			  , SysTools.Option     input_fn
+			  , SysTools.FileOption input_fn
+			  , SysTools.FileOption output_fn
+			  ])
        return (Just output_fn)
 
 -------------------------------------------------------------------------------
@@ -355,12 +360,16 @@ run_phase Cpp basename suff input_fn output_fn
 	    verb <- getVerbFlag
 	    (md_c_flags, _) <- machdepCCOpts
 
-	    SysTools.runCpp ([verb]
-			    ++ include_paths
-			    ++ hs_src_cpp_opts
-			    ++ hscpp_opts
-			    ++ md_c_flags
-			    ++ [ "-x", "c", input_fn, "-o", output_fn ])
+	    SysTools.runCpp ([SysTools.Option verb]
+			    ++ map SysTools.Option include_paths
+			    ++ map SysTools.Option hs_src_cpp_opts
+			    ++ map SysTools.Option hscpp_opts
+			    ++ map SysTools.Option md_c_flags
+			    ++ [ SysTools.Option     "-x c"
+			       , SysTools.FileOption input_fn
+			       , SysTools.Option     "-o"
+			       , SysTools.FileOption output_fn
+			       ])
 	    return (Just output_fn)
 
 -----------------------------------------------------------------------------
@@ -569,8 +578,13 @@ run_phase cc_phase basename suff input_fn output_fn
 		      | otherwise         = [ ]
 
 	excessPrecision <- readIORef v_Excess_precision
-	SysTools.runCc ([ "-x", "c", input_fn, "-o", output_fn ]
-		       ++ md_c_flags
+	SysTools.runCc ([ SysTools.Option "-x c"
+	                , SysTools.FileOption input_fn
+			, SysTools.Option "-o"
+			, SysTools.FileOption output_fn
+			]
+		       ++ map SysTools.Option (
+		          md_c_flags
 		       ++ (if cc_phase == HCc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])
@@ -581,7 +595,7 @@ run_phase cc_phase basename suff input_fn output_fn
 		       ++ (if excessPrecision then [] else [ "-ffloat-store" ])
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
-		       )
+		       ))
 	return (Just output_fn)
 
 	-- ToDo: postprocess the output from gcc
@@ -596,9 +610,11 @@ run_phase Mangle _basename _suff input_fn output_fn
 			       return [ show n_regs ]
 		       else return []
 
-       SysTools.runMangle (mangler_opts
-		          ++ [ input_fn, output_fn ]
-		          ++ machdep_opts)
+       SysTools.runMangle (map SysTools.Option mangler_opts
+		          ++ [ SysTools.FileOption input_fn
+			     , SysTools.FileOption output_fn
+			     ]
+			  ++ map SysTools.Option machdep_opts)
        return (Just output_fn)
 
 -----------------------------------------------------------------------------
@@ -610,7 +626,10 @@ run_phase SplitMangle _basename _suff input_fn output_fn
 	split_s_prefix <- SysTools.newTempName "split"
 	let n_files_fn = split_s_prefix
 
-	SysTools.runSplit [input_fn, split_s_prefix, n_files_fn]
+	SysTools.runSplit [ SysTools.FileOption input_fn
+			  , SysTools.FileOption split_s_prefix
+			  , SysTools.FileOption n_files_fn
+			  ]
 
 	-- Save the number of split files for future references
 	s <- readFile n_files_fn
@@ -630,9 +649,13 @@ run_phase As _basename _suff input_fn output_fn
   = do	as_opts		      <- getOpts opt_a
         cmdline_include_paths <- readIORef v_Include_paths
 
-	SysTools.runAs (as_opts
-		       ++ [ "-I" ++ p | p <- cmdline_include_paths ]
-		       ++ [ "-c", input_fn, "-o",  output_fn ])
+	SysTools.runAs (map SysTools.Option as_opts
+		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
+		       ++ [ SysTools.Option "-c"
+		          , SysTools.FileOption input_fn
+			  , SysTools.Option "-o"
+			  , SysTools.FileOption output_fn
+			  ])
 	return (Just output_fn)
 
 run_phase SplitAs basename _suff _input_fn output_fn
@@ -650,7 +673,12 @@ run_phase SplitAs basename _suff _input_fn output_fn
 		    let output_o = newdir real_odir 
 					(basename ++ "__" ++ show n ++ ".o")
 		    real_o <- osuf_ify output_o
-		    SysTools.runAs (as_opts ++ ["-c", "-o", real_o, input_s])
+		    SysTools.runAs (map SysTools.Option as_opts ++
+		    		    [ SysTools.Option "-c"
+				    , SysTools.Option "-o"
+				    , SysTools.FileOption real_o
+				    , SysTools.FileOption input_s
+				    ])
 	
 	mapM_ assemble_file [1..n]
 	return (Just output_fn)
@@ -790,8 +818,12 @@ doLink o_files = do
                           head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
 
     (md_c_flags, _) <- machdepCCOpts
-    SysTools.runLink ( [verb, "-o", output_fn]
-		      ++ md_c_flags
+    SysTools.runLink ( [ SysTools.Option verb
+    		       , SysTools.Option "-o"
+		       , SysTools.FileOption output_fn
+		       ]
+		      ++ map SysTools.Option (
+		         md_c_flags
 	 	      ++ o_files
 		      ++ extra_os
 		      ++ extra_ld_inputs
@@ -809,7 +841,7 @@ doLink o_files = do
 			    [ "-u", prefixUnderscore "PrelMain_mainIO_closure" ,
 			      "-u", prefixUnderscore "__init_PrelMain"] 
 #endif
-			 else [])
+			 else []))
 
     -- parallel only: move binary to another dir -- HWL
     ways_ <- readIORef v_Ways
@@ -862,8 +894,12 @@ doMkDLL o_files = do
 
     (md_c_flags, _) <- machdepCCOpts
     SysTools.runMkDLL
-	 ([ verb, "-o", output_fn ]
-	 ++ md_c_flags
+	 ([ SysTools.Option verb
+	  , SysTools.Option "-o"
+	  , SysTools.FileOption output_fn
+	  ]
+	 ++ map SysTools.Option (
+	    md_c_flags
 	 ++ o_files
 	 ++ extra_os
 	 ++ [ "--target=i386-mingw32" ]
@@ -877,7 +913,7 @@ doMkDLL o_files = do
                Nothing -> [ "--export-all" ]
 	       Just _  -> [ "" ])
 	 ++ extra_ld_opts
-	)
+	))
 
 -----------------------------------------------------------------------------
 -- Just preprocess a file, put the result in a temp. file (used by the

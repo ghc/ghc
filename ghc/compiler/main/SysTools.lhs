@@ -17,9 +17,9 @@ module SysTools (
 				-- Where package.conf is
 
 	-- Interface to system tools
-	runUnlit, runCpp, runCc,-- [String] -> IO ()
-	runMangle, runSplit,	-- [String] -> IO ()
-	runAs, runLink,		-- [String] -> IO ()
+	runUnlit, runCpp, runCc, -- [Option] -> IO ()
+	runMangle, runSplit,	 -- [Option] -> IO ()
+	runAs, runLink,		 -- [Option] -> IO ()
 	runMkDLL,
 
 	touch,			-- String -> String -> IO ()
@@ -38,7 +38,9 @@ module SysTools (
 
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
-	getSysMan		-- IO String	Parallel system only
+	getSysMan,		-- IO String	Parallel system only
+	
+	Option(..)
 
  ) where
 
@@ -388,47 +390,82 @@ getTopDir minusbs
 
 %************************************************************************
 %*									*
+\subsection{Command-line options}
+n%*									*
+%************************************************************************
+
+When invoking external tools as part of the compilation pipeline, we
+pass these a sequence of options on the command-line. Rather than
+just using a list of Strings, we use a type that allows us to distinguish
+between filepaths and 'other stuff'. [The reason being, of course, that
+this type gives us a handle on transforming filenames, and filenames only,
+to whatever format they're expected to be on a particular platform.]
+
+
+\begin{code}
+data Option
+ = FileOption String
+ | Option     String
+ 
+showOptions :: [Option] -> String
+showOptions ls = unwords (map (quote.showOpt) ls)
+ where
+   showOpt (FileOption f) = dosifyPath f
+   showOpt (Option s)     = s
+
+#if defined(mingw32_TARGET_OS)
+   quote "" = ""
+   quote s  = "\"" ++ s ++ "\""
+#else
+   quote = id
+#endif
+
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{Running an external program}
 n%*									*
 %************************************************************************
 
 
 \begin{code}
-runUnlit :: [String] -> IO ()
+runUnlit :: [Option] -> IO ()
 runUnlit args = do p <- readIORef v_Pgm_L
 		   runSomething "Literate pre-processor" p args
 
-runCpp :: [String] -> IO ()
+runCpp :: [Option] -> IO ()
 runCpp args =   do p <- readIORef v_Pgm_P
 		   runSomething "C pre-processor" p args
 
-runCc :: [String] -> IO ()
+runCc :: [Option] -> IO ()
 runCc args =   do p <- readIORef v_Pgm_c
 	          runSomething "C Compiler" p args
 
-runMangle :: [String] -> IO ()
+runMangle :: [Option] -> IO ()
 runMangle args = do p <- readIORef v_Pgm_m
 		    runSomething "Mangler" p args
 
-runSplit :: [String] -> IO ()
+runSplit :: [Option] -> IO ()
 runSplit args = do p <- readIORef v_Pgm_s
 		   runSomething "Splitter" p args
 
-runAs :: [String] -> IO ()
+runAs :: [Option] -> IO ()
 runAs args = do p <- readIORef v_Pgm_a
 		runSomething "Assembler" p args
 
-runLink :: [String] -> IO ()
+runLink :: [Option] -> IO ()
 runLink args = do p <- readIORef v_Pgm_l
 	          runSomething "Linker" p args
 
-runMkDLL :: [String] -> IO ()
+runMkDLL :: [Option] -> IO ()
 runMkDLL args = do p <- readIORef v_Pgm_MkDLL
 	           runSomething "Make DLL" p args
 
 touch :: String -> String -> IO ()
 touch purpose arg =  do p <- readIORef v_Pgm_T
-			runSomething purpose p [arg]
+			runSomething purpose p [FileOption arg]
 
 copy :: String -> String -> String -> IO ()
 copy purpose from to = do
@@ -548,7 +585,7 @@ setDryRun = writeIORef v_Dry_run True
 runSomething :: String		-- For -v message
 	     -> String		-- Command name (possibly a full path)
 				-- 	assumed already dos-ified
-	     -> [String]	-- Arguments
+	     -> [Option]	-- Arguments
 				--	runSomething will dos-ify them
 	     -> IO ()
 
@@ -565,7 +602,7 @@ runSomething phase_name pgm args
   	  else return ()
 	}
   where
-    cmd_line = unwords (pgm : dosifyPaths (map quote args))
+    cmd_line = pgm ++ ' ':showOptions args -- unwords (pgm : dosifyPaths (map quote args))
 	-- The pgm is already in native format (appropriate dir separators)
 #if defined(mingw32_TARGET_OS)
     quote "" = ""
@@ -654,9 +691,10 @@ dosifyPath stuff
 #else
 
 --------------------- Unix version ---------------------
-dosifyPaths  ps = ps
-unDosifyPath xs = xs
-pgmPath dir pgm = dir ++ '/' : pgm
+dosifyPaths  ps  = ps
+unDosifyPath xs  = xs
+pgmPath dir pgm  = dir ++ '/' : pgm
+dosifyPath stuff = stuff
 --------------------------------------------------------
 #endif
 
