@@ -32,7 +32,7 @@ mkdependHS-specific options (not between --'s):
 
     -v		Be verbose.
     -v -v	Be very verbose.
-    -W          No warnings
+    -w          No warnings
     -f blah	Use "blah" as the makefile, rather than "makefile"
 		or "Makefile".
     -o <osuf>	Use <osuf> as the "object file" suffix ( default: o)
@@ -48,6 +48,11 @@ mkdependHS-specific options (not between --'s):
                 Regard : separated list of directories as containing stable,
                 don't generate any dependencies on modules therein.
     -Xdirs      same as --exclude-directory
+    --include-prelude
+		Regard prelude library as unstable, i.e., generate dependencies
+		on prelude modules. This option is normally only used by the
+                various system libraries. If a -syslib option is used, dependencies
+                will also be generated on the library's interfaces.
     --include-module=<file> 
                 Regard <file> as not "stable"; i.e., generate dependencies
                 on it (if any). This option is normally used in conjunction 
@@ -105,29 +110,16 @@ $ghc_version_info = int ( ${PROJECTVERSION} * 100 );
 $Import_dirs = '.';
 %Syslibs = ();
 %LibIfaces  = ();  # known prelude/syslib ifaces; read from a file
-
 %IgnoreMe = ();
 # directories to considered stable.
-@Ignore_dirs = ($INSTALLING) ? 
-                   ("$InstLibDirGhc/imports")
-		 : ("$TopPwd/ghc/lib/ghc",
-		    "$TopPwd/ghc/lib/required",
-		    "$TopPwd/ghc/lib/glaExts",
-		    "$TopPwd/ghc/lib/concurrent");
+@Ignore_dirs = ();
 
 $Include_dirs = '-I.';
 $Makefile = '';
 @Src_files = ();
+$Include_prelude = 0;
 
 &mangle_command_line_args();
-
-# set up array of ignored modules
-foreach $lib ( @Syslibs ) {
-    local($dir) = 
-      ($INSTALLING) ? "${InstHsLibDirGhc}/${lib}/imports" 
-	            : "${TopPwd}/hslibs/${lib}/src";
-    push(@Ignore_dirs,$dir);
-}
 
 if ( $Status ) {
     print stderr $Usage;
@@ -140,6 +132,32 @@ push(@Defines,
 
 @Import_dirs  = split(/:/,$Import_dirs);
 @Include_dirs = split(/\s+/,$Include_dirs); # still has -I's in it
+
+# set up array of ignored modules
+local(@dirs) = ($INSTALLING) ? 
+    	       ("$InstLibDirGhc/imports")
+	     : ("$TopPwd/ghc/lib/ghc",
+	        "$TopPwd/ghc/lib/required",
+	        "$TopPwd/ghc/lib/glaExts",
+	        "$TopPwd/ghc/lib/concurrent");
+if (!$Include_prelude) {
+    push(@Ignore_dirs, @dirs);
+} else {
+    push(@Import_dirs, @dirs);
+}
+
+foreach $lib ( @Syslibs ) {
+    local($dir) = 
+      ($INSTALLING) ? "${InstHsLibDirGhc}/${lib}/imports" 
+	            : "${TopPwd}/hslibs/${lib}/src";
+    if (!$Include_prelude) {
+       push(@Ignore_dirs,$dir);
+    } else {
+       push(@Import_dirs, @dirs);
+    }
+}
+
+
 # NB: We keep the scalar-variable equivalents to use in error messages
 
 if ( ! $Makefile && -f 'makefile' ) {
@@ -250,7 +268,7 @@ sub mangle_command_line_args {
 	} elsif ($Dashdashes_seen != 1) { # not between -- ... --
 	    if ( /^-v$/ ) {
 		$Verbose++;
-	    } elsif ( /^-W$/ ) {
+	    } elsif ( /^-w$/ ) {
 		$Warnings     = 0;
 	    } elsif ( /^-f(.*)/ ) {
 		$Makefile	= &grab_arg_arg('-f',$1);
@@ -273,6 +291,8 @@ sub mangle_command_line_args {
 	    } elsif ( /^--include-module=(.*)/ ) { 
 		local($thing) = &grab_arg_arg($1,$2);
 		$IgnoreMe{$thing} = 'n';
+	    } elsif ( /^--include-prelude$/ ) { 
+		$Include_prelude = 1;
 	    } elsif ( /^-s(.*)/ ) {
 		local($suff)	=  &grab_arg_arg('-s',$1);
 		push(@File_suffix, $suff);
@@ -356,6 +376,8 @@ sub slurp_file_for_imports {
     $last_seen_dir =~ s/\/[^\/]+$//; # strip to dir name
     $last_seen_dir = '.' if ($last_seen_dir eq $orig_src_file);
 
+    process_dependency('import',0,'Prelude') if ($Include_prelude);
+
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
     
@@ -376,74 +398,81 @@ sub slurp_file_for_imports {
 	$modname = $4;
 
         next if $modname eq '';
-	if ($todo eq 'import') {
-	    if ( $ModuleIn{$modname} ) {
-   		   $follow_file = "$ModuleIn{$modname}/$modname.hi";
-	    } else { # hard way
-		$follow_file
-		  = &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir, $source );
-	    }
-	} else {
-		$follow_file
-		  = &find_in_Include_dirs($orig_src_file, $modname, $last_seen_dir);
-	}
-
-	if (! $follow_file) { # it didnae find anything
-	    die "$orig_src_file: Couldn't handle: $_\n";
-
-	} else { # it found something
-	    if ($follow_file ne '__ignore__') {
-		local($int_file);
-		$int_file = $follow_file;
-
-		if ( $int_file !~ /\.(l?hs|hi|l?y)$/ ) {
-		    local($str) = "";
-		    foreach $obj  (@Obj_suffix) {
-			$str .= "$bf.$obj ";
-			foreach $suff (@File_suffix) {
-			   $str .= "$bf.${suff}_$obj ";
-		        }
-    		    }
-   	            push(@Depend_lines, "$str: $int_file\n");
-		} else {
-		    $int_file =~ s/\.l?hs$//;
-		    $int_file =~ s/\.l?y$//;
-		    $int_file =~ s/\.hi$//;
-                    local($source_dep);
-
-                    if ( $source ) {
-                        $source_dep = "$int_file.hi-boot";
-                    } else {
-		        local($str)="";
-			foreach $obj (@Obj_suffix) {
-		           $str .= "$bf.$obj ";
-	                }
-		        push(@Depend_lines, "$str: $int_file.hi\n");
-	            }
-
-                    if ( ! $source ) {
-	               foreach $suff  (@File_suffix) {
-		  	   local($str) = "";
-			   foreach $obj (@Obj_suffix) {
-			     $str .= "$bf.${suff}_$obj ";
-		           }
-		           push(@Depend_lines, "$str: $int_file.${suff}_hi\n");
-    		       }
-                    } else {
-		       local($str) = "";
-		       foreach $obj  (@Obj_suffix) {
-			   $str .= "$bf.$obj ";
-			   foreach $suff (@File_suffix) {
-			     $str .= "$bf.${suff}_$obj ";
-		           }
-    		       }
-		       push(@Depend_lines, "$str: $source_dep\n");
-                   }
-		}
-	    }
-	}
+	process_dependency($todo,$source,$modname);
     }
     close(SRCFILE) || exit(1);
+}
+
+#
+# Handle
+sub process_dependency {
+  local($todo,$source,$modname) = @_;
+
+  if ($todo eq 'import') {
+    if ( $ModuleIn{$modname} ) {
+        $follow_file = "$ModuleIn{$modname}/$modname.hi";
+    } else { # hard way
+	$follow_file =
+	  &find_in_Import_dirs($orig_src_file, $modname, $last_seen_dir, $source );
+    }
+  } else {
+	$follow_file
+	  = &find_in_Include_dirs($orig_src_file, $modname, $last_seen_dir);
+  }
+
+  if (! $follow_file) { # it didnae find anything
+      die "$orig_src_file: Couldn't handle: $_\n";
+
+  } else { # it found something
+    if ($follow_file ne '__ignore__') {
+	local($int_file) = $follow_file;
+
+	if ( $int_file !~ /\.(l?hs|hi|l?y)$/ ) {
+	    local($str) = "";
+	    foreach $obj  (@Obj_suffix) {
+		$str .= "$bf.$obj ";
+		foreach $suff (@File_suffix) {
+		   $str .= "$bf.${suff}_$obj ";
+	        }
+	    }
+            push(@Depend_lines, "$str: $int_file\n");
+	} else {
+	    $int_file =~ s/\.l?hs$//;
+	    $int_file =~ s/\.l?y$//;
+	    $int_file =~ s/\.hi$//;
+            local($source_dep);
+
+            if ( $source ) {
+                $source_dep = "$int_file.hi-boot";
+            } else {
+	        local($str)="";
+		foreach $obj (@Obj_suffix) {
+	           $str .= "$bf.$obj ";
+                }
+	        push(@Depend_lines, "$str: $int_file.hi\n");
+            }
+
+            if ( ! $source ) {
+	       foreach $suff  (@File_suffix) {
+	          local($str) = "";
+		  foreach $obj (@Obj_suffix) {
+		    $str .= "$bf.${suff}_$obj ";
+		  }
+		  push(@Depend_lines, "$str: $int_file.${suff}_hi\n");
+	       }
+            } else {
+	       local($str) = "";
+	       foreach $obj  (@Obj_suffix) {
+		   $str .= "$bf.$obj ";
+		   foreach $suff (@File_suffix) {
+		     $str .= "$bf.${suff}_$obj ";
+	           }
+	       }
+	       push(@Depend_lines, "$str: $source_dep\n");
+            }
+	}
+     }
+   }
 }
 
 # when we see something, we cache that fact ('y').
