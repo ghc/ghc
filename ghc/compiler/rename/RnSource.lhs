@@ -566,21 +566,16 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 
 rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	-- Explicit quantification.
-	-- Check that the forall'd tyvars are a subset of the
-	-- free tyvars in the tau-type part
-	-- That's only a warning... unless the tyvar is constrained by a 
-	-- context in which case it's an error
+	-- Check that the forall'd tyvars are actually 
+	-- mentioned in the type, and produce a warning if not
   = let
 	mentioned_in_tau		= extractHsTyRdrTyVars tau
 	mentioned_in_ctxt		= extractHsCtxtRdrTyVars ctxt
 	mentioned			= nub (mentioned_in_tau ++ mentioned_in_ctxt)
-  	tys_of_pred (HsPClass clas tys) = tys
-	tys_of_pred (HsPIParam n ty)	= [ty]
 	forall_tyvar_names		= map getTyVarName forall_tyvars
 
-	-- explicitly quantified but not mentioned in ctxt or tau
+	-- Explicitly quantified but not mentioned in ctxt or tau
 	warn_guys			= filter (`notElem` mentioned) forall_tyvar_names
-
     in
     mapRn_ (forAllWarn doc tau) warn_guys			`thenRn_`
     rnForAll doc forall_tyvars ctxt tau

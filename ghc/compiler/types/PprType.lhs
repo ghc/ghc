@@ -72,7 +72,7 @@ pprPred (Class clas tys) = pprConstraint clas tys
 pprPred (IParam n ty)    = hsep [ppr n, ptext SLIT("::"), ppr ty]
 
 pprConstraint :: Class -> [Type] -> SDoc
-pprConstraint clas tys = ppr clas <+> hsep (map (pprParendType) tys)
+pprConstraint clas tys = ppr clas <+> hsep (map pprParendType tys)
 
 pprTheta :: ThetaType -> SDoc
 pprTheta theta = parens (hsep (punctuate comma (map pprPred theta)))
@@ -226,11 +226,6 @@ ppr_pred env (Class clas tys) = ppr clas <+>
 				hsep (map (ppr_ty env tYCON_PREC) tys)
 ppr_pred env (IParam n ty)    = hsep [char '?' <> ppr n, text "::",
 				      ppr_ty env tYCON_PREC ty]
-
-{-
-ppr_dict env ctxt (clas, tys) = ppr clas <+> 
-				hsep (map (ppr_ty env tYCON_PREC) tys)
--}
 \end{code}
 
 \begin{code}

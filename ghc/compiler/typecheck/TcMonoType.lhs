@@ -37,12 +37,12 @@ import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
                           mkUsForAllTy, zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkDictTy, mkPredTy, mkTyConApp,
 			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
-			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
+			  boxedTypeKind, unboxedTypeKind, 
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
-			  tyVarsOfType, tyVarsOfTypes, mkForAllTys
+			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, mkForAllTys
 			)
-import PprType		( pprConstraint, pprType )
+import PprType		( pprConstraint, pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
 import Var		( TyVar, mkTyVar, mkNamedUVar, varName )
@@ -214,19 +214,41 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 		-- give overloaded functions like
 		--	f :: forall a. Num a => (# a->a, a->a #)
 		-- And we want these to get through the type checker
-        check ct@(Class c tys) | ambiguous = failWithTc (ambigErr (c,tys) tau)
-	  where ct_vars		    = tyVarsOfTypes tys
-		forall_tyvars	    = map varName in_scope_vars
-		tau_vars	    = tyVarsOfType tau
-		fds		    = instFunDepsOfTheta theta
-		tvFundep	    = tyVarFunDep fds
-		extended_tau_vars   = oclose tvFundep tau_vars
-		ambig ct_var	    = (varName ct_var `elem` forall_tyvars) &&
-				      not (ct_var `elemUFM` extended_tau_vars)
-		ambiguous	    = foldUFM ((||) . ambig) False ct_vars
-	check _ = returnTc ()
+
+	-- Check for ambiguity
+	--   forall V. P => tau
+	-- is ambiguous if P contains generic variables
+	-- (i.e. one of the Vs) that are not mentioned in tau
+	--
+	-- However, we need to take account of functional dependencies
+	-- when we speak of 'mentioned in tau'.  Example:
+	--	class C a b | a -> b where ...
+	-- Then the type
+	--	forall x y. (C x y) => x
+	-- is not ambiguous because x is mentioned and x determines y
+	--
+	-- In addition, GHC insists that at least one type variable
+	-- in each constraint is in V.  So we disallow a type like
+	--	forall a. Eq b => b -> b
+	-- even in a scope where b is in scope.
+
+	forall_tyvars	    = map varName tyvars	-- was: in_scope_vars.  Why???
+	tau_vars	    = tyVarsOfType tau
+	fds		    = instFunDepsOfTheta theta
+	tvFundep	    = tyVarFunDep fds
+	extended_tau_vars   = oclose tvFundep tau_vars
+	is_ambig ct_var	    = (varName ct_var `elem` forall_tyvars) &&
+			      not (ct_var `elemUFM` extended_tau_vars)
+	is_free ct_var	    = not (varName ct_var `elem` forall_tyvars)
+
+	check_pred pred = checkTc (not any_ambig) (ambigErr pred ty) `thenTc_`
+			  checkTc (not all_free)  (freeErr  pred ty)
+	      where 
+		ct_vars	  = varSetElems (tyVarsOfPred pred)
+		any_ambig = any is_ambig ct_vars
+		all_free  = all is_free  ct_vars
     in
-    mapTc check theta			`thenTc_`
+    mapTc check_pred theta			`thenTc_`
     returnTc (body_kind, mkSigmaTy tyvars theta tau)
 \end{code}
 
@@ -410,7 +432,8 @@ maybeSig (sig@(TySigInfo sig_name _ _ _ _ _ _ _) : sigs) name
 tcTySig :: RenamedSig -> TcM s TcSigInfo
 
 tcTySig (Sig v ty src_loc)
- = tcAddSrcLoc src_loc $
+ = tcAddSrcLoc src_loc				$ 
+   tcAddErrCtxt (tcsigCtxt v) 			$
    tcHsSigType ty				`thenTc` \ sigma_tc_ty ->
    mkTcSig (mkVanillaId v sigma_tc_ty) src_loc	`thenNF_Tc` \ sig -> 
    returnTc sig
@@ -699,6 +722,8 @@ sigPatCtxt bound_tvs bound_ids tidy_env
 %************************************************************************
 
 \begin{code}
+tcsigCtxt v   = ptext SLIT("In a type signature for") <+> quotes (ppr v)
+
 typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)
 
 typeKindCtxt :: RenamedHsType -> Message
@@ -718,8 +743,14 @@ tyConAsClassErr name
 tyVarAsClassErr name
   = ptext SLIT("Type variable used as a class:") <+> ppr name
 
-ambigErr (c, ts) ty
-  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprConstraint c ts),
+ambigErr pred ty
+  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext SLIT("for the type:") <+> ppr ty),
 	 nest 4 (ptext SLIT("Each forall'd type variable mentioned by the constraint must appear after the =>"))]
+
+freeErr pred ty
+  = sep [ptext SLIT("The constraint") <+> quotes (pprPred pred) <+>
+		   ptext SLIT("does not mention any of the universally quantified type variables"),
+	 nest 4 (ptext SLIT("in the type") <+> quotes (ppr ty))
+    ]
 \end{code}

@@ -44,8 +44,8 @@ patterns in each equation.
 \begin{code}
 data Match id pat
   = Match
-	[HsTyVarBndr id] 			-- Tyvars wrt which this match is universally quantified
-					-- 	emtpy after typechecking
+	[HsTyVarBndr id] 		-- Tyvars wrt which this match is universally quantified
+					-- 	empty after typechecking
 	[pat]				-- The patterns
 	(Maybe (HsType id))		-- A type signature for the result of the match
 					--	Nothing after typechecking
