@@ -171,8 +171,9 @@ Foreign labels
 dsFLabel :: Id -> ExtName -> DsM CoreBind
 dsFLabel nm ext_name = returnDs (NonRec nm fo_rhs)
   where
-   fo_rhs = mkConApp addrDataCon [mkLit (MachLitLit enm addrPrimTy)]
+   fo_rhs = mkConApp addrDataCon [mkLit (MachLitLit addr addrPrimTy)]
    enm    = extNameStatic ext_name
+   addr   = SLIT("(&") _APPEND_ enm _APPEND_ SLIT(")")
 \end{code}
 
 The function that does most of the work for `@foreign export@' declarations.
