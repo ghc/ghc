@@ -61,7 +61,6 @@ import Subst	( emptyInScopeSet, mkSubst,
 		  substTy, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
 import TyCon	( TyCon )
-import Subst	( mkTyVarSubst )
 import VarEnv	( lookupVarEnv, TidyEnv,
 		  lookupSubstEnv, SubstResult(..)
 		)

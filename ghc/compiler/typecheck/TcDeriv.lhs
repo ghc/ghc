@@ -32,9 +32,9 @@ import Class		( classKey, Class )
 import ErrUtils		( dumpIfSet, Message, pprBagOfErrors )
 import MkId		( mkDictFunId )
 import Id		( mkVanillaId )
-import DataCon		( dataConArgTys, isNullaryDataCon )
+import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, catMaybes )
 import Module		( ModuleName )
 import Name		( isLocallyDefined, getSrcLoc,
 			  Name, NamedThing(..),
@@ -297,8 +297,8 @@ makeDerivEqns
     if null local_data_tycons then
 	returnTc []	-- Bale out now
     else
-    mapTc chk_out think_about_deriving `thenTc_`
-    returnTc eqns
+    mapTc mk_eqn derive_these `thenTc`	\ maybe_eqns ->
+    returnTc (catMaybes maybe_eqns)
   where
     ------------------------------------------------------------------
     need_deriving :: [TyCon] -> [(Class, TyCon)]
@@ -310,45 +310,20 @@ makeDerivEqns
 	      tycons_to_consider
 
     ------------------------------------------------------------------
-    chk_out :: (Class, TyCon) -> TcM s ()
-    chk_out this_one@(clas, tycon)
-      =	let
-	    clas_key = classKey clas
-
-	    is_enumeration = isEnumerationTyCon tycon
-	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
-
-	    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
-	    nullary_why        = SLIT("data type with all nullary constructors expected")
-
-	    chk_clas clas_uniq clas_str clas_why cond
-	      = if (clas_uniq == clas_key)
-		then checkTc cond (derivingThingErr clas_str clas_why tycon)
-		else returnTc ()
-    	in
-	    -- Are things OK for deriving Enum (if appropriate)?
-	chk_clas enumClassKey (SLIT("Enum")) nullary_why is_enumeration `thenTc_`
-
-	    -- Are things OK for deriving Bounded (if appropriate)?
-	chk_clas boundedClassKey (SLIT("Bounded")) single_nullary_why
-		 (is_enumeration || is_single_con) `thenTc_`
-
-	    -- Are things OK for deriving Ix (if appropriate)?
-	chk_clas ixClassKey (SLIT("Ix.Ix")) single_nullary_why 
-		 (is_enumeration || is_single_con)
-
-    ------------------------------------------------------------------
     cmp_deriv :: (Class, TyCon) -> (Class, TyCon) -> Ordering
     cmp_deriv (c1, t1) (c2, t2)
       = (c1 `compare` c2) `thenCmp` (t1 `compare` t2)
 
     ------------------------------------------------------------------
-    mk_eqn :: (Class, TyCon) -> DerivEqn
+    mk_eqn :: (Class, TyCon) -> NF_TcM s (Maybe DerivEqn)
 	-- we swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 
     mk_eqn (clas, tycon)
-      = (clas, tycon, tyvars, constraints)
+      = case chk_out clas tycon of
+	   Just err ->  addErrTc err	`thenNF_Tc_` 
+			returnNF_Tc Nothing
+	   Nothing  ->  returnNF_Tc (Just (clas, tycon, tyvars, constraints))
       where
 	clas_key  = classKey clas
 	tyvars    = tyConTyVars tycon	-- ToDo: Do we need new tyvars ???
@@ -371,6 +346,26 @@ makeDerivEqns
 	     ]
 	   where
 	     instd_arg_tys  = dataConArgTys data_con tyvar_tys
+
+    ------------------------------------------------------------------
+    chk_out :: Class -> TyCon -> Maybe Message
+    chk_out clas tycon
+	| clas_key == enumClassKey    && not is_enumeration 	      = bog_out nullary_why
+	| clas_key == boundedClassKey && not is_enumeration_or_single = bog_out single_nullary_why
+	| clas_key == ixClassKey      && not is_enumeration_or_single = bog_out single_nullary_why
+	| any isExistentialDataCon (tyConDataCons tycon)	      = Just (existentialErr clas tycon)
+	| otherwise						      = Nothing
+	where
+	    clas_key = classKey clas
+
+	    is_enumeration = isEnumerationTyCon tycon
+	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
+	    is_enumeration_or_single = is_enumeration || is_single_con
+
+	    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
+	    nullary_why        = SLIT("data type with all nullary constructors expected")
+
+	    bog_out why = Just (derivingThingErr clas tycon why)
 \end{code}
 
 %************************************************************************
@@ -690,12 +685,16 @@ gen_taggery_Names inst_infos
 \end{code}
 
 \begin{code}
-derivingThingErr :: FAST_STRING -> FAST_STRING -> TyCon -> Message
+derivingThingErr :: Class -> TyCon -> FAST_STRING -> Message
 
-derivingThingErr thing why tycon
-  = hang (hsep [ptext SLIT("Can't make a derived instance of"), ptext thing])
-	 0 (hang (hsep [ptext SLIT("for the type"), quotes (ppr tycon)])
-	         0 (parens (ptext why)))
+derivingThingErr clas tycon why
+  = sep [hsep [ptext SLIT("Can't make a derived instance of"), quotes (ppr clas)],
+	 hsep [ptext SLIT("for the type"), quotes (ppr tycon)],
+	 parens (ptext why)]
+
+existentialErr clas tycon
+  = sep [ptext SLIT("Can't derive any instances for type") <+> quotes (ppr tycon),
+	 ptext SLIT("because it has existentially-quantified constructor(s)")]
 
 derivCtxt tycon
   = ptext SLIT("When deriving classes for") <+> quotes (ppr tycon)
