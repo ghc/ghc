@@ -11,7 +11,7 @@ module Usage (
 	usageOmega, pprUVar, duffUsage,
 	nullUVarEnv, mkUVarEnv, addOneToUVarEnv,
 	growUVarEnvList, isNullUVarEnv, lookupUVarEnv,
-	eqUVar, eqUsage
+	eqUVar, eqUsage, cloneUVar
 ) where
 
 IMP_Ubiq(){-uitous-}
@@ -35,6 +35,9 @@ type UVar  = Unique
 type Usage = GenUsage UVar
 
 usageOmega = UsageOmega
+
+cloneUVar :: UVar -> Unique -> UVar
+cloneUVar uvar uniq = uniq
 
 duffUsage :: GenUsage uvar
 duffUsage = panic "Usage of non-Type kind doesn't make sense"
