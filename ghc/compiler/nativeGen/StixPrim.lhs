@@ -212,6 +212,30 @@ primCode [lhs] UnsafeFreezeByteArrayOp [rhs]
   = simpleCoercion PtrRep lhs rhs
 \end{code}
 
+Returning the size of (mutable) byte arrays is just
+an indexing operation.
+
+\begin{code}
+primCode [lhs] SizeofByteArrayOp [rhs]
+  = let
+	lhs' = amodeToStix lhs
+    	rhs' = amodeToStix rhs
+    	sz   = StIndex IntRep rhs' fixedHS
+    	assign = StAssign IntRep lhs' (StInd IntRep sz)
+    in
+    returnUs (\xs -> assign : xs)
+
+primCode [lhs] SizeofMutableByteArrayOp [rhs]
+  = let
+	lhs' = amodeToStix lhs
+    	rhs' = amodeToStix rhs
+    	sz   = StIndex IntRep rhs' fixedHS
+    	assign = StAssign IntRep lhs' (StInd IntRep sz)
+    in
+    returnUs (\xs -> assign : xs)
+
+\end{code}
+
 Most other array primitives translate to simple indexing.
 
 \begin{code}
