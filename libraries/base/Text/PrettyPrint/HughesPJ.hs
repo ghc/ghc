@@ -881,6 +881,15 @@ indent n | n >= 8 = '\t' : indent (n - 8)
 multi_ch 0 ch = ""
 multi_ch n       ch = ch : multi_ch (n - 1) ch
 
-spaces 0 = ""
-spaces n       = ' ' : spaces (n - 1)
+-- (spaces n) generates a list of n spaces
+--
+-- It should never be called with 'n' < 0, but that can happen for reasons I don't understand
+-- Here's a test case:
+--	ncat x y = nest 4 $ cat [ x, y ]
+--	d1 = foldl1 ncat $ take 50 $ repeat $ char 'a'
+--	d2 = parens $  sep [ d1, text "+" , d1 ]
+--	main = print d2
+-- I don't feel motivated enough to find the Real Bug, so meanwhile we just test for n<=0
+spaces n | n <= 0    = ""
+	 | otherwise = ' ' : spaces (n - 1)
 
