@@ -41,7 +41,7 @@ module System.Posix.Signals (
   backgroundWrite, sigTTOU,
   userDefinedSignal1, sigUSR1,
   userDefinedSignal2, sigUSR2,
-#if HAVE_SIGPOLL
+#ifdef SIGPOLL
   pollableEvent, sigPOLL,
 #endif
   profilingTimerExpired, sigPROF,
@@ -51,12 +51,6 @@ module System.Posix.Signals (
   virtualTimerExpired, sigVTALRM,
   cpuTimeLimitExceeded, sigXCPU,
   fileSizeLimitExceeded, sigXFSZ,
-#if HAVE_SIGINFO
-  infoEvent, sigINFO,
-#endif
-#if HAVE_SIGWINCH
-  windowChange, sigWINCH,
-#endif
 
   -- * Sending signals
   raiseSignal,
@@ -144,7 +138,7 @@ sigTTIN   = (#const SIGTTIN)   :: CInt
 sigTTOU   = (#const SIGTTOU)   :: CInt
 sigUSR1   = (#const SIGUSR1)   :: CInt
 sigUSR2   = (#const SIGUSR2)   :: CInt
-#if HAVE_SIGPOLL
+#ifdef SIGPOLL
 sigPOLL   = (#const SIGPOLL)   :: CInt
 #endif
 sigPROF   = (#const SIGPROF)   :: CInt
@@ -154,12 +148,6 @@ sigURG    = (#const SIGURG)    :: CInt
 sigVTALRM = (#const SIGVTALRM) :: CInt
 sigXCPU   = (#const SIGXCPU)   :: CInt
 sigXFSZ   = (#const SIGXFSZ)   :: CInt
-#if HAVE_SIGINFO
-sigINFO   = (#const SIGINFO)   :: CInt
-#endif
-#if HAVE_SIGWINCH
-sigWINCH  = (#const SIGWINCH)  :: CInt
-#endif
 #else
 foreign import ccall unsafe "__hsposix_SIGABRT"   sigABRT   :: CInt
 foreign import ccall unsafe "__hsposix_SIGALRM"   sigALRM   :: CInt
@@ -181,7 +169,7 @@ foreign import ccall unsafe "__hsposix_SIGTTIN"   sigTTIN   :: CInt
 foreign import ccall unsafe "__hsposix_SIGTTOU"   sigTTOU   :: CInt
 foreign import ccall unsafe "__hsposix_SIGUSR1"   sigUSR1   :: CInt
 foreign import ccall unsafe "__hsposix_SIGUSR2"   sigUSR2   :: CInt
-#if HAVE_SIGPOLL
+#ifdef SIGPOLL
 foreign import ccall unsafe "__hsposix_SIGPOLL"   sigPOLL   :: CInt
 #endif
 foreign import ccall unsafe "__hsposix_SIGPROF"   sigPROF   :: CInt
@@ -191,12 +179,6 @@ foreign import ccall unsafe "__hsposix_SIGURG"    sigURG    :: CInt
 foreign import ccall unsafe "__hsposix_SIGVTALRM" sigVTALRM :: CInt
 foreign import ccall unsafe "__hsposix_SIGXCPU"   sigXCPU   :: CInt
 foreign import ccall unsafe "__hsposix_SIGXFSZ"   sigXFSZ   :: CInt
-#if HAVE_SIGINFO
-foreign import ccall unsafe "__hsposix_SIGINFO"   sigINFO   :: CInt
-#endif
-#if HAVE_SIGWINCH
-foreign import ccall unsafe "__hsposix_SIGWINCH"   sigWINCH   :: CInt
-#endif
 #endif /* __HUGS__ */
 
 internalAbort ::Signal
@@ -259,7 +241,7 @@ userDefinedSignal1 = sigUSR1
 userDefinedSignal2 :: Signal
 userDefinedSignal2 = sigUSR2
 
-#if HAVE_SIGPOLL
+#ifdef SIGPOLL
 pollableEvent :: Signal
 pollableEvent = sigPOLL
 #endif
@@ -284,16 +266,6 @@ cpuTimeLimitExceeded = sigXCPU
 
 fileSizeLimitExceeded :: Signal
 fileSizeLimitExceeded = sigXFSZ
-
-#if HAVE_SIGINFO
-infoEvent :: Signal
-infoEvent = sigINFO
-#endif
-
-#if HAVE_SIGWINCH
-windowChange :: Signal
-windowChange = sigWINCH
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Signal-related functions

@@ -669,7 +669,7 @@ INLINE int __hsposix_SIGTTIN()   { return SIGTTIN; }
 INLINE int __hsposix_SIGTTOU()   { return SIGTTOU; }
 INLINE int __hsposix_SIGUSR1()   { return SIGUSR1; }
 INLINE int __hsposix_SIGUSR2()   { return SIGUSR2; }
-#if HAVE_SIGPOLL
+#ifdef SIGPOLL
 INLINE int __hsposix_SIGPOLL()   { return SIGPOLL; }
 #endif
 INLINE int __hsposix_SIGPROF()   { return SIGPROF; }
@@ -684,12 +684,6 @@ INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
 INLINE int __hsposix_SIG_UNBLOCK() { return SIG_UNBLOCK; }
 INLINE int __hsposix_SIG_SETMASK() { return SIG_SETMASK; }
 
-#if HAVE_SIGINFO
-INLINE int __hsposix_SIGINFO()	{ return SIGINFO; }
-#endif
-#if HAVE_SIGWINCH
-INLINE int __hsposix_SIGWINCH()	{ return SIGWINCH; }
-#endif
 #endif /* mingw32_TARGET_OS */
 
 // These are wrapped because on some OSs (eg. Linux) they are
