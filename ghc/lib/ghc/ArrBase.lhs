@@ -562,7 +562,7 @@ freezeFloatArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
 	    = case (readFloatArray#  from# cur#     s#)  of { StateAndFloat# s1# ele ->
 	      case (writeFloatArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) from# to# s1#
-	      }
+	      }}
 
 freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
     case rangeSize ixs     of { I# n# ->
@@ -592,7 +592,7 @@ freezeDoubleArray (MutableByteArray ixs arr#) = ST $ \ (S# s#) ->
 	    = case (readDoubleArray#  from# cur#     s#)  of { StateAndDouble# s1# ele ->
 	      case (writeDoubleArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s1#
-	      }
+	      }}
 
 unsafeFreezeArray     :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
 unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
