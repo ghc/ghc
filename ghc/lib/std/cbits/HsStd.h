@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsStd.h,v 1.2 2001/05/18 16:54:06 simonmar Exp $
+ * $Id: HsStd.h,v 1.3 2001/06/06 11:03:48 simonmar Exp $
  *
  * Definitions for package `std' which are visible in Haskell land.
  *
@@ -83,6 +83,9 @@ int *ghcErrno(void);
 
 /* in system.c */
 HsInt systemCmd(HsAddr cmd);
+
+/* in inputReady.c */
+int inputReady(int fd, int msecs);
 
 /* in progargs.c */
 HsAddr get_prog_argv(void);
