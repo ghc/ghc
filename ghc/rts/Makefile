@@ -38,6 +38,7 @@ ALL_DIRS = hooks parallel
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 ALL_DIRS += win32
+EXCLUDED_SRCS += Itimer.c Select.c Signals.c
 endif
 
 ifneq "$(DLLized)" "YES"

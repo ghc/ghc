@@ -20,7 +20,7 @@
 #include "Schedule.h"
 #include "Timer.h"
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS)
 #include "Itimer.h"
 #else
 #include "win32/Ticker.h"

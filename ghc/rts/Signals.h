@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.h,v 1.9 2003/01/25 15:54:50 wolfgang Exp $
+ * $Id: Signals.h,v 1.10 2003/03/29 00:00:43 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,7 +27,11 @@ extern void startSignalHandlers(void);
 extern void markSignalHandlers (evac_fn evac);
 extern void initDefaultHandlers(void);
 
+#if !defined(mingw32_TARGET_OS)
 extern void handleSignalsInThisThread(void);
+#else
+#define handleSignalsInThisThread() /* nothing */
+#endif
 
 #else
 

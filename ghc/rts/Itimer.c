@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.33 2003/03/28 23:46:39 sof Exp $
+ * $Id: Itimer.c,v 1.34 2003/03/29 00:00:41 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -18,7 +18,6 @@
  * to support.  So much for standards.
  */
 #include "Rts.h"
-#if !defined(mingw32_TARGET_OS) /* to the end */
 #include "RtsFlags.h"
 #include "Timer.h"
 #include "Itimer.h"
@@ -173,4 +172,3 @@ getourtimeofday(void)
 	  tv.tv_usec * TICK_FREQUENCY / 1000000);
 }
 
-#endif /* !mingw32_TARGET_OS */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.26 2003/02/22 06:13:41 sof Exp $
+ * $Id: Select.c,v 1.27 2003/03/29 00:00:41 sof Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -12,9 +12,6 @@
 /* #include "PosixSource.h" */
 
 #include "Rts.h"
-#ifndef mingw32_TARGET_OS
-/* to the end */
-
 #include "Schedule.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
@@ -349,5 +346,3 @@ wakeBlockedWorkerThread()
     }
 }
 #endif
-
-#endif /* !mingw_TARGET_OS */

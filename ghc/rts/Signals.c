@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.35 2003/03/25 17:15:07 sof Exp $
+ * $Id: Signals.c,v 1.36 2003/03/29 00:00:41 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -31,8 +31,6 @@
 #endif
 
 #include <stdlib.h>
-
-#ifndef mingw32_TARGET_OS
 
 #ifndef PAR
 
@@ -469,18 +467,3 @@ initDefaultHandlers()
     ieee_set_fp_control(0);
 #endif
 }
-#else /* mingw32_TARGET_OS */
-
-// Handle all signals in the current thread.
-// Called from Capability.c whenever the main capability is granted to a thread
-// and in installDefaultHandlers
-void
-handleSignalsInThisThread()
-{
-#ifdef RTS_SUPPORTS_THREADS
-#error "handleSignalsInThread needs to be sorted out for MinGW32"
-  /*    signalHandlingThread = pthread_self();*/
-#endif
-}
-
-#endif /* mingw32_TARGET_OS */
