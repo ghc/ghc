@@ -304,7 +304,7 @@ SRC_HC_OPTS += -split-objs
 ifeq "$(ArSupportsInput)" ""
 define BUILD_LIB
 $(RM) $@ $@.tmp
-(echo $(STUBOBJS) $(C_OBJS); $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o') -print | xargs $(AR) $@
+(echo $(STUBOBJS) $(C_OBJS); $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print) | xargs $(AR) $@
 $(RANLIB) $@
 endef
 else
