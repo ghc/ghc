@@ -27,7 +27,7 @@ import Name		( OccName(..), isTCOcc, Provenance, SYN_IE(Module) )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( panic{-, pprPanic ToDo:rm-} )
 import Pretty           ( Doc )
-import PprStyle         -- PprDebug for panic
+import Outputable	( PprStyle(..) )
 import Maybes           ( MaybeErr(..) )
 
 ------------------------------------------------------------------
@@ -84,7 +84,7 @@ parseUnfolding ls =
 
 	ARITY_PART	{ ITarity }
 	STRICT_PART	{ ITstrict }
-	UNFOLD_PART	{ ITunfold }
+	UNFOLD_PART	{ ITunfold $$ }
 	DEMAND		{ ITdemand $$ }
 	BOTTOM		{ ITbottom }
 	LAM		{ ITlam }
@@ -124,13 +124,14 @@ id_info_item	:: { HsIdInfo RdrName }
 id_info_item	: ARITY_PART arity_info			{ HsArity $2 }
 		| STRICT_PART strict_info		{ HsStrictness $2 }
 		| BOTTOM 				{ HsStrictness mkBottomStrictnessInfo }
-		| UNFOLD_PART core_expr			{ HsUnfold $2 }
+		| UNFOLD_PART core_expr			{ HsUnfold $1 $2 }
 
 arity_info	:: { ArityInfo }
 arity_info	: INTEGER					{ exactArity (fromInteger $1) }
 
 strict_info	:: { StrictnessInfo RdrName }
-strict_info	: DEMAND any_var_name				{ mkStrictnessInfo $1 (Just $2) }
+strict_info	: DEMAND any_var_name OCURLY data_names CCURLY 	{ mkStrictnessInfo $1 (Just ($2,$4)) }
+		| DEMAND any_var_name 			 	{ mkStrictnessInfo $1 (Just ($2,[])) }
 		| DEMAND 					{ mkStrictnessInfo $1 Nothing }
 
 core_expr	:: { UfExpr RdrName }
@@ -272,7 +273,11 @@ any_var_name	:  var_name		{ $1 }
 
 var_names	:: { [RdrName] }
 var_names	:			{ [] }
-		| var_name var_names	{ $1 : $2
+		| var_name var_names	{ $1 : $2 }
+
+data_names	:: { [RdrName] }
+data_names	:			{ [] }
+		| data_name data_names	{ $1 : $2
 
 --productions-for-types--------------------------------
 					     }
