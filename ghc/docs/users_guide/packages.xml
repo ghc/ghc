@@ -580,7 +580,7 @@ exposed-modules: Network.BSD,
 
     <para>A package specification is a Haskell record; in particular, it is the
       record <ulink
-	url="../libraries/Cabal/Distribution.InstalledPackageInfo#%tInstalledPackageInfo">InstalledPackageInfo</ulink> in the module Distribution.InstalledPackageInfo, which is part of the Cabal package distributed with GHC.</para>
+	url="../libraries/Cabal/Distribution.InstalledPackageInfo.html#%tInstalledPackageInfo">InstalledPackageInfo</ulink> in the module Distribution.InstalledPackageInfo, which is part of the Cabal package distributed with GHC.</para>
 
     <para>An <literal>InstalledPackageInfo</literal> has a human
       readable/writable syntax.  The functions
