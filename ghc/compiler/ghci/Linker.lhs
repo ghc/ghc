@@ -732,11 +732,13 @@ loadFramework extraPaths rootname
    = do	{ mb_fwk <- findFile mk_fwk (extraPaths ++ defaultFrameworkPaths)
 	; case mb_fwk of
 	    Just fwk_path -> loadDLL fwk_path
-	    Nothing	  -> return (Just "not found")
+	    Nothing	  -> return (Just "not found") }
  		-- Tried all our known library paths, but dlopen()
 		-- has no built-in paths for frameworks: give up
    where
      mk_fwk dir = dir ++ '/' : rootname ++ ".framework/" ++ rootname
+	-- sorry for the hardcoded paths, I hope they won't change anytime soon:
+     defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 #endif
 \end{code}
 
