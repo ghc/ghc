@@ -1,4 +1,4 @@
-{-# OPTIONS -H12m -syslib lang #-}
+{-# OPTIONS -H12m -package lang #-}
 
 module Basic where
 import TypesettingTricks
