@@ -142,17 +142,6 @@ exec /local/grasp_tmp3/simonpj/ghc-BUILDS/working-alpha/ghc/driver/ghc \
 <VariableList>
 
 <VarListEntry>
-<Term><Option>-noC</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-noC option</Primary></IndexTerm>
-Don't bother generating C output <Emphasis>or</Emphasis> an interface file.  Usually
-used in conjunction with one or more of the <Option>-ddump-*</Option> options; for
-example: <Command>ghc -noC -ddump-simpl Foo.hs</Command>
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
 <Term><Option>-hi</Option>:</Term>
 <ListItem>
 <Para>
