@@ -3792,12 +3792,10 @@ $ make boot stage=2 &amp;&amp; make stage=2</screen>
 	    <listitem>
 <screen>$ cd <replaceable>H</replaceable>/ghc/lib
 $ make clean
-$ make -k UseStage1=YES \
-                EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
+$ make -k UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
 $ cd <replaceable>H</replaceable>/ghc/utils
 $ make clean
-$ make -k UseStage1=YES \
-		EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'</screen>
+$ make -k UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'</screen>
 	    </listitem>
 	    
 	    <listitem>
