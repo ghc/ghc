@@ -1037,6 +1037,8 @@ printDoc mode hdl doc
 hPutBuf = hPutBufFull
 #endif
 
+  -- some versions of hPutBuf will barf if the length is zero
+hPutLitString handle a# 0# = return ()
 hPutLitString handle a# l#
 #if __GLASGOW_HASKELL__ < 411
   = hPutBuf handle (A# a#) (I# l#)
