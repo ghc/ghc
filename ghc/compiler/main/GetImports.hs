@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.6 2001/05/01 16:01:06 simonmar Exp $
+-- $Id: GetImports.hs,v 1.7 2001/05/29 01:07:00 sof Exp $
 --
 -- GHC Driver program
 --
@@ -82,7 +82,7 @@ clean s
         keep acc ('\'':cs)            = cons acc (squote cs)
         keep acc ('-':'-':cs)         = cons acc (linecomment cs)
         keep acc ('{':'-':'#':' ':cs) = cons acc (cons "#-{" (keep "" cs))
-        keep acc ('{':'-':cs)         = cons acc (runcomment cs)	-- -}
+        keep acc ('{':'-':cs)         = cons acc (runcomment (0::Int) cs)	-- -}
         keep acc (c:cs)               = keep (c:acc) cs
 
         cons [] xs = xs
@@ -108,6 +108,9 @@ clean s
         linecomment (c:cs)    = linecomment cs
 
         -- in a running comment
-        runcomment []           = []
-        runcomment ('-':'}':cs) = keep "" cs
-        runcomment (c:cs)       = runcomment cs
+        runcomment _ []           = []
+	runcomment n ('{':'-':cs) = runcomment (n+1) cs -- catches both nested comments and pragmas.
+        runcomment n ('-':'}':cs) 
+	  | n == 0    = keep "" cs
+	  | otherwise = runcomment (n-1) cs
+        runcomment n (c:cs)       = runcomment n cs
