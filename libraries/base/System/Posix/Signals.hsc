@@ -370,10 +370,8 @@ foreign import ccall "&nocldstop" nocldstop :: Ptr Int
 setStoppedChildFlag :: Bool -> IO Bool
 setStoppedChildFlag b = do
     rc <- peek nocldstop
-    poke nocldstop x
+    poke nocldstop $ fromEnum (not b) 
     return (rc == (0::Int))
-  where
-    x = case b of {True -> 0; False -> 1}
 
 -- | Queries the current state of the stopped child flag.
 queryStoppedChildFlag :: IO Bool
