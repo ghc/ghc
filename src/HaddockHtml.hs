@@ -371,7 +371,7 @@ ppHtmlModule odir doctitle source_url
 	header (thetitle (toHtml mdl) +++
 		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"] +++
-		(script ! [src jsFile] $ noHtml)) +++
+		(script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
 	    pageHeader mdl iface doctitle source_url 
 		maybe_contents_url maybe_index_url </> s15 </>
