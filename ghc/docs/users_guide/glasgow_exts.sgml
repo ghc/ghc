@@ -4188,35 +4188,34 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
       <para>A <literal>SPECIALIZE</literal> pragma for a function can
       be put anywhere its type signature could be put.</para>
 
-      <para>To get very fancy, you can also specify a named function
-      to use for the specialised value, as in:</para>
-
+<para>A <literal>SPECIALIZE</literal> has the effect of generating (a) a specialised
+version of the function and (b) a rewrite rule (see <xref linkend="rules">) that 
+rewrites a call to the un-specialised function into a call to the specialised
+one. You can, instead, provide your own specialised function and your own rewrite rule.
+For example, suppose that:
 <programlisting>
-{-# RULES "hammeredLookup" hammeredLookup = blah #-}
+  genericLookup :: Ord a => Table a b   -> a   -> b
+  intLookup     ::          Table Int b -> Int -> b
 </programlisting>
-
-      <para>where <literal>blah</literal> is an implementation of
-      <literal>hammerdLookup</literal> written specialy for
-      <literal>Widget</literal> lookups.  It's <emphasis>Your
+where <literal>intLookup</literal> is an implementation of <literal>genericLookup</literal>
+that works very fast for keys of type <literal>Int</literal>.  Then you can write the rule
+<programlisting>
+  {-# RULES "intLookup" genericLookup = intLookup #-}
+</programlisting>
+(see <xref linkend="rule-spec">). It is <emphasis>Your
       Responsibility</emphasis> to make sure that
-      <function>blah</function> really behaves as a specialised
-      version of <function>hammeredLookup</function>!!!</para>
-
-      <para>Note we use the <literal>RULE</literal> pragma here to
-      indicate that <literal>hammeredLookup</literal> applied at a
-      certain type should be replaced by <literal>blah</literal>.  See
-      <xref linkend="rules"> for more information on
-      <literal>RULES</literal>.</para>
+      <function>intLookup</function> really behaves as a specialised
+      version of <function>genericLookup</function>!!!</para>
 
       <para>An example in which using <literal>RULES</literal> for
       specialisation will Win Big:
 
 <programlisting>
-toDouble :: Real a => a -> Double
-toDouble = fromRational . toRational
+  toDouble :: Real a => a -> Double
+  toDouble = fromRational . toRational
 
-{-# RULES "toDouble/Int" toDouble = i2d #-}
-i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
+  {-# RULES "toDouble/Int" toDouble = i2d #-}
+  i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
 </programlisting>
 
       The <function>i2d</function> function is virtually one machine
@@ -4266,7 +4265,10 @@ of the pragma.
 
 <para>
 The programmer can specify rewrite rules as part of the source program
-(in a pragma).  GHC applies these rewrite rules wherever it can.
+(in a pragma).  GHC applies these rewrite rules wherever it can, provided (a) 
+the <option>-O</option> flag (<xref LinkEnd="options-optimise">) is on, 
+and (b) the <option>-frules-off</option> flag
+(<xref LinkEnd="options-f">) is not specified.
 </para>
 
 <para>
@@ -4714,7 +4716,7 @@ will fuse with one but not the other)
 
 </para>
 
-<para>
+ <para>
 So, for example, the following should generate no intermediate lists:
 
 <programlisting>
