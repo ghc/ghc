@@ -709,10 +709,9 @@ LIT2TEXT 		= $(LITERATE_PREFIX)lit2text
 #
 # Stuff from fptools/ghc/utils
 #
-UNLIT	 		= $(UNLIT_PREFIX)unlit
-UGEN			= $(UGEN_PREFIX)ugen
+UNLIT	 		= $(UNLIT_PREFIX)unlit$(EXE_SUFFIX)
 STAT2RESID		= $(STAT2RESID_PREFIX)stat2resid
-HP2PS			= $(HP2PS_PREFIX)hp2ps
+HP2PS			= $(HP2PS_PREFIX)hp2ps$(EXE_SUFFIX)
 HSCPP			= $(HSCPP_PREFIX)hscpp
 HSTAGS			= $(HSTAGS_PREFIX)hstags
 
