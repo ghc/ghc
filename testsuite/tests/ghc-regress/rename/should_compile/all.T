@@ -25,9 +25,9 @@ test('rn033', normal, compile, [''])
 test('rn034', normal, compile, [''])
 test('rn035', normal, compile, [''])
 test('rn036', normal, compile, [''])
+test('rn037', normal, compile, [''])
 	
 # Missing:
-# test('rn037', normal, compile, [''])
 # test('rn038', normal, compile, [''])
 
 test('rn039', normal, compile, [''])
