@@ -290,6 +290,26 @@ to be inlined across modules, use the command-line and package-configuration
 <option>-&num;include</option> mechanism.
 </para>
 
+      <sect3 id="finding-header-files">
+	<title>Finding Header files</title>
+
+	<para>Header files named by the <option>-&num;include</option>
+	option or in a <literal>foreign import</literal> declaration
+	are searched for using the C compiler's usual search path.
+	You can add directories to this search path using the
+	<option>-I</option> option (see <xref
+	linkend="c-pre-processor">).</para>
+
+	<para>Note: header files are ignored unless compiling via C.
+	If you had been compiling your code using the native code
+	generator (the default) and suddenly switch to compiling via
+	C, then you can get unexpected errors about missing include
+	files.  Compiling via C is enabled automatically when certain
+	options are given (eg. <option>-O</option> and
+	<option>-prof</option> both enable
+	<option>-fvia-C</option>).</para>
+      </sect3>
+
     </sect2>
 
     <sect2>
