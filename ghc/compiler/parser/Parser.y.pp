@@ -898,8 +898,15 @@ strict_mark :: { Located HsBang }
 	: '!'				{ L1 HsStrict }
 	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
 
+-- We allow the odd-looking 'inst_type' in a deriving clause, so that
+-- we can do deriving( forall a. C [a] ) in a newtype (GHC extension).
+-- The 'C [a]' part is converted to an HsPredTy by checkInstType
+-- We don't allow a context, but that's sorted out by the type checker.
 deriving :: { Located (Maybe [LHsType RdrName]) }
 	: {- empty -}				{ noLoc Nothing }
+	| 'deriving' qtycon	{% do { let { L loc tv = $2 }
+				      ; p <- checkInstType (L loc (HsTyVar tv))
+				      ; return (LL (Just [p])) } }
 	| 'deriving' '(' ')'	 		{ LL (Just []) }
 	| 'deriving' '(' inst_types1 ')' 	{ LL (Just $3) }
              -- Glasgow extension: allow partial 
