@@ -1,5 +1,6 @@
 
-tests/ghc-regress/deSugar/should_compile/ds041.hs:15:
-    Warning: Field `x' is not initialised
+ds041.hs:15:
+    Warning: Fields of `Foo' not initialised: x
 	     In the record construction: Foo {}
-	     In the definition of `foo': Foo {}
+	     In a right-hand side of function `foo': Foo {}
+	     In the definition of `foo': foo = Foo {}
