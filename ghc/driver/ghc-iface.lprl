@@ -108,7 +108,6 @@ sub constructNewHiFile {
     print NEWHI $Stuff{'new:usages'} unless $Stuff{'new:usages'} eq '';
     print NEWHI $Stuff{'new:instance_modules'} unless $Stuff{'new:instance_modules'} eq '';
     print NEWHI $Stuff{'new:exports'};
-    print NEWHI $Stuff{'new:fixities'} unless $Stuff{'new:fixities'} eq '';
     print NEWHI $Stuff{'new:instances'} unless $Stuff{'new:instances'} eq '';
 
     foreach $v (@decl_names) {
@@ -148,7 +147,6 @@ sub readHiFile {
     $Stuff{"$mod:instance_modules"} = '';
     $Stuff{"$mod:usages"}	    = ''; # stuff glommed together
     $Stuff{"$mod:exports"}	    = '';
-    $Stuff{"$mod:fixities"}	    = '';
     $Stuff{"$mod:instances"}	    = '';
     $Stuff{"$mod:declarations"}	    = '';
 
@@ -176,9 +174,6 @@ sub readHiFile {
 
 	} elsif ( /^__export/ ) {
 	    $Stuff{"$mod:exports"} .= $_;
-
-	} elsif ( /^infix(r|l)? / ) {
-	    $Stuff{"$mod:fixities"} .= $_;
 
 	} elsif ( /^instance / ) {
 	    $Stuff{"$mod:instances"} .= $_;
@@ -217,6 +212,12 @@ sub readHiFile {
 		# ..hence the [^{}] part
 		# NB: a class decl may not have a where part at all
 		$current_name = "class $2";
+		$Decl{"$mod:$current_name"} = $_;
+	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
+
+	   } elsif ( /^infix(r|l)?\s+[0-9]\s+(\S+)/ ) {
+		    # fixity declaration
+		$current_name = "fixity $2";
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
