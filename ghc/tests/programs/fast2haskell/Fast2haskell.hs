@@ -10,6 +10,7 @@
             import Word;
 	    import Complex; -- 1.3
 	    import Array; -- 1.3
+	    import Int ( Num(fromInt) );
             type Complex_type   = Complex Double;
             type Array_type b   = Array Int b;
             type Assoc_type a   = (Int, a);

@@ -1,6 +1,7 @@
 -- Check that "->" is an instance of Eval
 
 module ShouldSucceed where
+import Int( Num(fromInt) )
 
 instance Show (a->b)
 

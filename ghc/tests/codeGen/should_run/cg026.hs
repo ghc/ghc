@@ -8,7 +8,8 @@ import IOExts
 import MutableArray
 import ByteArray
 import Addr
-
+import Int( Num(fromInt) )
+	
 import Ratio
 import Array
 

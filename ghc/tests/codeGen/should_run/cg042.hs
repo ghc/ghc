@@ -7,6 +7,7 @@ import IOExts
 import ByteArray
 import MutableArray
 import ST
+import Int( Num(fromInt) )
 
 import Ratio   -- 1.3
 import Array   -- 1.3

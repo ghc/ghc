@@ -6,6 +6,7 @@
 > import Trace
 > import Maybe   -- an hbc library module defining the ``Maybe'' type
 >#endif
+> import Int( Num(fromInt) )
 
 > import Native  -- an hbc library module for native-mode binary IO
 

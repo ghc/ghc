@@ -1,7 +1,8 @@
-{-# OPTIONS -H12m #-}
+{-# OPTIONS -H12m -syslib exts #-}
 
 module Basic where
 import TypesettingTricks
+import Int( Num(fromInt) )
 import Physical
 --import GHC( (->) )
 infixr 7 |>

@@ -4,6 +4,7 @@
 >#ifndef __GLASGOW_HASKELL__
 > import Trace
 >#endif
+> import Int( Num(fromInt) )
 
 \end{comment}
 

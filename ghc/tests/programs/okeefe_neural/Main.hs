@@ -1,4 +1,8 @@
+{-# OPTIONS -syslib exts #-}
+
 module Main(main) where
+
+import Int( Num(fromInt) )
 
 newtype RNG_State = RNG_State (Int, Int, Int)
 

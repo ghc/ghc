@@ -3,6 +3,7 @@ module Main(main) where
 
 import Exception
 import Word
+import Int( Num(fromInt) )
 
 main = do
   putStrLn "Testing Enum Word8:"
