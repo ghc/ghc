@@ -5,15 +5,15 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.1 $
- * $Date: 1999/10/19 11:03:39 $
+ * $Revision: 1.2 $
+ * $Date: 1999/10/19 12:11:05 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
 #include "options.h"	
 	
 #ifdef INTERPRETER
-	.file "callfun.S"
+	.file "universal_call_c.S"
 
 #if 0
    Implement this.  See comment in rts/ForeignCall.c for details.
