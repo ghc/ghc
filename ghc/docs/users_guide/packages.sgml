@@ -189,13 +189,26 @@
 	<varlistentry>
 	  <term><option>--add-package</option></term>
 	  <term><option>-a</option></term>
-	  <indexterm><primary><option>--add-package</option></primary>
-	      </indexterm>
+	  <indexterm><primary><option>--add-package</option></primary></indexterm>
 	  <listitem>
-	    <para>Reads a package specification (see below) on stdin,
+	    <para>Reads package specification from the input (see below),
 	    and adds it to the database of installed packages.  The
 	    package specification must be a package that isn't already
 	    installed.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--input-file=<replaceable>file</replaceable></option></term>
+	  <term><option>-i <replaceable>file</replaceable></option></term>
+	  <indexterm><primary><option>--input-file</option></primary></indexterm>
+	  <listitem>
+	    <para>Read new package specifications from file
+	    <replaceable>file</replaceable>. If a value of
+	    <filename>"-"</filename> is given, standard input is used.
+	    If no <option>-i</option> is present on the command-line,
+	    an input file of <filename>"-"</filename> is assumed.
+	    </para>
 	  </listitem>
 	</varlistentry>
 
