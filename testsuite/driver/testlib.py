@@ -344,6 +344,18 @@ def framework_fail( name ):
     t.framework_failures.append(name)
 
 # -----------------------------------------------------------------------------
+# Generic command tests
+
+# A generic command test is expected to run and exit successfully.
+
+def generic_command( name, way, cmd, args ):
+    result = runCmd( cmd + ' ' + join(args,' ') );
+    if result == 0:
+        return 'pass'
+    else:
+        return 'fail'
+
+# -----------------------------------------------------------------------------
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
