@@ -44,7 +44,7 @@ import TcSimplify	( bindInstsOfLocalFuns )
 import TcType		( TcIdOcc(..), SYN_IE(TcIdBndr), 
 			  SYN_IE(TcType), SYN_IE(TcThetaType), SYN_IE(TcTauType), 
 			  SYN_IE(TcTyVarSet), SYN_IE(TcTyVar),
-			  newTyVarTy, zonkTcType, zonkTcTyVar, zonkTcTyVars,
+			  newTyVarTy, zonkTcType, zonkSigTyVar,
 			  newTcTyVar, tcInstSigType, newTyVarTys
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )
@@ -618,28 +618,35 @@ checkSigTyVars :: [TcTyVar s]		-- The original signature type variables
 	       -> TcM s ()
 
 checkSigTyVars sig_tyvars sig_tau
-  = tcGetGlobalTyVars			`thenNF_Tc` \ globals ->
-    let
-	mono_tyvars = filter (`elementOfTyVarSet` globals) sig_tyvars
-    in
-	-- TEMPORARY FIX
-	-- Until the final Bind-handling stuff is in, several type signatures in the same
-	-- bindings group can cause the signature type variable from the different
-	-- signatures to be unified.  So we still need to zonk and check point (b).
-	-- Remove when activating the new binding code
-    mapNF_Tc zonkTcTyVar sig_tyvars	`thenNF_Tc` \ sig_tys ->
-    checkTcM (hasNoDups (map (getTyVar "checkSigTyVars") sig_tys))
+  =	-- Several type signatures in the same bindings group can 
+	-- cause the signature type variable from the different
+	-- signatures to be unified.  So we need to zonk them.
+    mapNF_Tc zonkSigTyVar sig_tyvars	`thenNF_Tc` \ sig_tyvars' ->
+
+	-- Point (a) is forced by the fact that they are signature type
+	-- variables, so the unifer won't bind them to a type.
+
+	-- Check point (b)
+    checkTcM (hasNoDups sig_tyvars')
 	     (zonkTcType sig_tau 	`thenNF_Tc` \ sig_tau' ->
 	      failTc (badMatchErr sig_tau sig_tau')
 	     )				`thenTc_`
 
-
 	-- Check point (c)
 	-- We want to report errors in terms of the original signature tyvars,
-	-- ie sig_tyvars, NOT sig_tyvars'.  sig_tys and sig_tyvars' correspond
+	-- ie sig_tyvars, NOT sig_tyvars'.  sig_tyvars' correspond
 	-- 1-1 with sig_tyvars, so we can just map back.
-    checkTc (null mono_tyvars)
-	    (notAsPolyAsSigErr sig_tau mono_tyvars)
+    tcGetGlobalTyVars			`thenNF_Tc` \ globals ->
+    let
+--	mono_tyvars = [sig_tv | (sig_tv, sig_tv') <- sig_tyvars `zip` sig_tyvars',
+--				 sig_tv' `elementOfTyVarSet` globals
+--		      ]
+	mono_tyvars' = [sig_tv' | sig_tv' <- sig_tyvars', 
+				  sig_tv' `elementOfTyVarSet` globals]
+    in
+    checkTcM (null mono_tyvars')
+	     (zonkTcType sig_tau 	`thenNF_Tc` \ sig_tau' ->
+	      failTc (notAsPolyAsSigErr sig_tau' mono_tyvars'))
 \end{code}
 
 
@@ -850,10 +857,9 @@ valSpecSigCtxt v ty sty
 -----------------------------------------------
 notAsPolyAsSigErr sig_tau mono_tyvars sty
   = hang (ptext SLIT("A type signature is more polymorphic than the inferred type"))
-	4  (vcat [text "Some type variables in the inferred type can't be forall'd, namely:",
-		      interpp'SP sty mono_tyvars,
-		      ptext SLIT("Possible cause: the RHS mentions something subject to the monomorphism restriction")
-		     ])
+	4  (vcat [text "Can't for-all the type variable(s)" <+> interpp'SP sty mono_tyvars,
+		  text "in the inferred type" <+> ppr sty sig_tau
+	   ])
 
 -----------------------------------------------
 badMatchErr sig_ty inferred_ty sty
