@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.106 2003/03/24 14:46:54 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.107 2003/04/15 14:37:12 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -368,7 +368,6 @@ FN_(atomicModifyMutVarzh_fast)
    r->payload[0] = z;
 
    RET_P(r);
-   JMP_(ENTRY_CODE(Sp[0]));
    FE_
 }
 
@@ -1064,8 +1063,7 @@ FN_(forkProcesszh_fast)
 
   R1.i = RET_STGCALL1(StgInt, forkProcess, CurrentTSO);
 
-  JMP_(ENTRY_CODE(Sp[0]));
-
+  RET_N(R1.i);
   FE_
 }
 
