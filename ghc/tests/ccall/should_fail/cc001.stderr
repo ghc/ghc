@@ -1,8 +1,8 @@
- 
+
 cc001.hs:5:
-    Ambiguous type variable(s) `$0'
-	in the constraint `PrelGHC.CCallable $0'
+    Ambiguous type variable(s) `t'
+	in the constraint `PrelGHC.CCallable t'
 	arising from an argument in the _ccall_ to `foo', namely `(undefined ())' at cc001.hs:5
 
-
 Compilation had errors
+

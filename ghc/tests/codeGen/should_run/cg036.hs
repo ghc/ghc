@@ -4,13 +4,13 @@
 --
 module Main ( main, g ) where
 
-main = putStr (shows (g 42) "\n")
+main = putStr (shows (g 42 45 45) "\n")
 
-g :: Int -> Int -> Int -> (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+g :: Int -> Int -> Int -> [Int]
 
 g x y z
   = let
 	f a b = a + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b
 	g c = f c c
     in
-    (g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y)
+    [g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y]

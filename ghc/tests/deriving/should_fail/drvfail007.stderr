@@ -1,7 +1,7 @@
- 
+
 drvfail007.hs:2:
     No instance for `Eq (Int -> Int)'
     When deriving classes for `Foo'
 
-
 Compilation had errors
+
