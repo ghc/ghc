@@ -8,7 +8,7 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import Module		( Module, pprModule, moduleIfaceFlavour, bootFlavour )
+import Module		( ModuleName, WhereFrom, pprModuleName )
 import Outputable
 import SrcLoc		( SrcLoc )
 \end{code}
@@ -22,28 +22,26 @@ import SrcLoc		( SrcLoc )
 One per \tr{import} declaration in a module.
 \begin{code}
 data ImportDecl name
-  = ImportDecl	  Module			-- module name
+  = ImportDecl	  ModuleName			-- module name
+		  WhereFrom
 		  Bool				-- True => qualified
-		  (Maybe Module)		-- as Module
+		  (Maybe ModuleName)		-- as Module
 		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
 		  SrcLoc
 \end{code}
 
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
-    ppr (ImportDecl mod qual as spec _)
-      = hang (hsep [ptext SLIT("import"), pp_src, 
-                    pp_qual qual, pprModule mod, pp_as as])
+    ppr (ImportDecl mod from qual as spec _)
+      = hang (hsep [ptext SLIT("import"), ppr from, 
+                    pp_qual qual, pprModuleName mod, pp_as as])
 	     4 (pp_spec spec)
       where
-	pp_src | bootFlavour (moduleIfaceFlavour mod) = ptext SLIT("{-# SOURCE #-}")
-	       | otherwise			      = empty
-
 	pp_qual False   = empty
 	pp_qual True	= ptext SLIT("qualified")
 
 	pp_as Nothing   = empty
-	pp_as (Just a)  = ptext SLIT("as ") <+> pprModule a
+	pp_as (Just a)  = ptext SLIT("as ") <+> pprModuleName a
 
 	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
@@ -64,7 +62,7 @@ data IE name
   | IEThingAbs          name		-- Class/Type (can't tell)
   | IEThingAll          name		-- Class/Type plus all methods/constructors
   | IEThingWith		name [name]	-- Class/Type plus some methods/constructors
-  | IEModuleContents    Module		-- (Export Only)
+  | IEModuleContents    ModuleName	-- (Export Only)
 \end{code}
 
 \begin{code}
@@ -83,6 +81,6 @@ instance (Outputable name) => Outputable (IE name) where
     ppr (IEThingWith thing withs)
 	= ppr thing <> parens (fsep (punctuate comma (map ppr withs)))
     ppr (IEModuleContents mod)
-	= ptext SLIT("module") <+> pprModule mod
+	= ptext SLIT("module") <+> pprModuleName mod
 \end{code}
 

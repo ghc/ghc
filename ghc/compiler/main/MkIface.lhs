@@ -5,9 +5,7 @@
 
 \begin{code}
 module MkIface (
-	startIface, endIface,
-	ifaceMain,
-	ifaceDecls
+	startIface, endIface, ifaceDecls
     ) where
 
 #include "HsVersions.h"
@@ -16,36 +14,32 @@ import IO		( Handle, hPutStr, openFile,
 			  hClose, hPutStrLn, IOMode(..) )
 
 import HsSyn
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..),
-  			  StrictnessMark(..) 
-			)
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
 import RnMonad
 import RnEnv		( availName )
 
 import TcInstUtil	( InstInfo(..) )
-import WorkWrap		( getWorkerIdAndCons )
+import WorkWrap		( getWorkerId )
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, omitIfaceSigForId,
+import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId,
 			  getIdSpecialisation
 			)
 import Var		( isId )
 import VarSet
-import DataCon		( dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePragInfo,
 			  arityInfo, ppArityInfo, 
 			  strictnessInfo, ppStrictnessInfo, 
-			  cafInfo, ppCafInfo,
+			  cafInfo, ppCafInfo, specInfo,
 			  cprInfo, ppCprInfo,
 			  workerExists, workerInfo, isBottomingStrictness
 			)
-import CoreSyn		( CoreExpr, CoreBind, Bind(..) )
-import CoreUtils	( exprSomeFreeVars )
-import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), 
-			  Unfolding, okToUnfoldInHiFile )
-import Module		( moduleString, pprModule, pprModuleBoot )
+import CoreSyn		( CoreExpr, CoreBind, Bind(..), rulesRules, rulesRhsFreeVars )
+import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
+import CoreUnfold	( calcUnfoldingGuidance, okToUnfoldInHiFile, couldBeSmallEnoughToInline )
+import Module		( moduleString, pprModule, pprModuleName )
 import Name		( isLocallyDefined, isWiredInName, nameRdrName, nameModule,
-			  isExported,
 			  Name, NamedThing(..)
 			)
 import OccName		( OccName, pprOccName )
@@ -53,14 +47,14 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons
 			)
 import Class		( Class, classBigSig )
-import SpecEnv		( specEnvToList )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType, deNoteType,
 			  Type, ThetaType
 		        )
 
 import PprType
-import PprCore		( pprIfaceUnfolding )
+import PprCore		( pprIfaceUnfolding, pprCoreRule )
+import Rules		( pprProtoCoreRule, ProtoCoreRule(..) )
 
 import Bag		( bagToList, isEmptyBag )
 import Maybes		( catMaybes, maybeToBool )
@@ -68,6 +62,7 @@ import FiniteMap	( emptyFM, addToFM, addToFM_C, fmToList, FiniteMap )
 import UniqFM		( lookupUFM, listToUFM )
 import UniqSet		( uniqSetToList )
 import Util		( sortLt, mapAccumL )
+import Bag
 import Outputable
 \end{code}
 
@@ -80,33 +75,37 @@ We then have one-function-per-block-of-interface-stuff, e.g.,
 to the handle provided by @startIface@.
 
 \begin{code}
-startIface  :: Module
+startIface  :: Module -> InterfaceDetails
 	    -> IO (Maybe Handle) -- Nothing <=> don't do an interface
-
-ifaceMain   :: Maybe Handle
-	    -> InterfaceDetails
-	    -> IO ()
-
 
 ifaceDecls :: Maybe Handle
 	   -> [TyCon] -> [Class]
 	   -> Bag InstInfo 
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBind]	-- In dependency order, later depend on earlier
+	   -> [ProtoCoreRule]	-- Rules
 	   -> IO ()
 
 endIface    :: Maybe Handle -> IO ()
 \end{code}
 
 \begin{code}
-startIface mod
+startIface mod (has_orphans, import_usages, ExportEnv avails fixities)
   = case opt_ProduceHi of
-      Nothing -> return Nothing -- not producing any .hi file
-      Just fn -> do
+      Nothing -> return Nothing ; -- not producing any .hi file
+
+      Just fn -> do 
 	if_hdl <- openFile fn WriteMode
-	hPutStr if_hdl ("__interface " ++ moduleString mod ++ ' ':show (opt_HiVersion :: Int))
-	hPutStrLn if_hdl " where"
+	hPutStr		if_hdl ("__interface " ++ moduleString mod)
+	hPutStr		if_hdl (' ' : show (opt_HiVersion :: Int) ++ orphan_indicator)
+	hPutStrLn	if_hdl " where"
+	ifaceExports	if_hdl avails
+	ifaceImports	if_hdl import_usages
+	ifaceFixities	if_hdl fixities
 	return (Just if_hdl)
+  where
+    orphan_indicator | has_orphans = " !"
+		     | otherwise   = ""
 
 endIface Nothing	= return ()
 endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
@@ -114,60 +113,62 @@ endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
 
 
 \begin{code}
-ifaceMain Nothing iface_stuff = return ()
-ifaceMain (Just if_hdl)
-	  (import_usages, ExportEnv avails fixities, instance_modules)
-  = do
-    ifaceImports		if_hdl import_usages
-    ifaceInstanceModules	if_hdl instance_modules
-    ifaceExports		if_hdl avails
-    ifaceFixities		if_hdl fixities
-    return ()
-
-ifaceDecls Nothing tycons classes inst_info final_ids simplified = return ()
+ifaceDecls Nothing tycons classes inst_info final_ids simplified rules = return ()
 ifaceDecls (Just hdl)
 	   tycons classes
 	   inst_infos
 	   final_ids binds
+	   orphan_rules		-- Rules defined locally for an Id that is *not* defined locally
   | null_decls = return ()		 
 	--  You could have a module with just (re-)exports/instances in it
   | otherwise
   = ifaceClasses hdl classes			>>
-    ifaceInstances hdl inst_infos		>>= \ needed_ids ->
+    ifaceInstances hdl inst_infos		>>= \ inst_ids ->
     ifaceTyCons hdl tycons			>>
-    ifaceBinds hdl needed_ids final_ids binds	>>
+    ifaceBinds hdl (inst_ids `unionVarSet` orphan_rule_ids)
+	       final_ids binds			>>= \ emitted_ids ->
+    ifaceRules hdl orphan_rules emitted_ids	>>
     return ()
   where
+     orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
+				    | ProtoCoreRule _ _ rule <- orphan_rules]
+
      null_decls = null binds      && 
 		  null tycons     &&
 	          null classes    && 
-	          isEmptyBag inst_infos
+	          isEmptyBag inst_infos &&
+		  null orphan_rules
 \end{code}
 
 \begin{code}
 ifaceImports if_hdl import_usages
   = hPutCol if_hdl upp_uses (sortLt lt_imp_vers import_usages)
   where
-    upp_uses (m, mv, whats_imported)
-      = ptext SLIT("import ") <>
-	hsep [pprModule m, pprModuleBoot m, int mv, dcolon,
+    upp_uses (m, mv, has_orphans, whats_imported)
+      = hsep [ptext SLIT("import"), pprModuleName m, 
+	      int mv, pp_orphan,
 	      upp_import_versions whats_imported
 	] <> semi
+      where
+	pp_orphan | has_orphans = ptext SLIT("!")
+		  | otherwise   = empty
 
 	-- Importing the whole module is indicated by an empty list
     upp_import_versions Everything = empty
 
 	-- For imported versions we do print the version number
     upp_import_versions (Specifically nvs)
-      = hsep [ hsep [ppr_unqual_name n, int v] | (n,v) <- sort_versions nvs ]
+      = dcolon <+> hsep [ hsep [ppr_unqual_name n, int v] | (n,v) <- sort_versions nvs ]
 
-ifaceInstanceModules if_hdl [] = return ()
-ifaceInstanceModules if_hdl imods
-  = let sorted = sortLt (<) imods
-	lines = map (\m -> ptext SLIT("__instimport ") <> pprModule m <>
-			   ptext SLIT(" ;")) sorted
+ifaceModuleDeps if_hdl [] = return ()
+ifaceModuleDeps if_hdl mod_deps
+  = let 
+	lines = map ppr_mod_dep mod_deps
+	ppr_mod_dep (mod, contains_orphans) 
+	   | contains_orphans = pprModuleName mod <+> ptext SLIT("!")
+	   | otherwise	      = pprModuleName mod
     in 
-    printForIface if_hdl (vcat lines) >>
+    printForIface if_hdl (ptext SLIT("__depends") <+> vcat lines <> ptext SLIT(" ;")) >>
     hPutStr if_hdl "\n"
 
 ifaceExports if_hdl [] = return ()
@@ -186,15 +187,40 @@ ifaceExports if_hdl avails
     do_one_module :: (Module, [AvailInfo]) -> SDoc
     do_one_module (mod_name, avails@(avail1:_))
 	= ptext SLIT("__export ") <>
-	  hsep [pprModuleBoot (nameModule (availName avail1)), 
-		pprModule mod_name,
+	  hsep [pprModule mod_name,
 		hsep (map upp_avail (sortLt lt_avail avails))
 	  ] <> semi
 
 ifaceFixities if_hdl [] = return ()
 ifaceFixities if_hdl fixities 
   = hPutCol if_hdl upp_fixity fixities
-\end{code}			 
+
+ifaceRules if_hdl rules emitted
+  | null orphan_rule_pretties && null local_id_pretties
+  = return ()
+  | otherwise
+  = do	printForIface if_hdl (vcat [
+		ptext SLIT("{-## __R"),
+
+		vcat orphan_rule_pretties,
+
+		vcat local_id_pretties,
+
+		ptext SLIT("##-}")
+          ])
+	
+	return ()
+  where
+    orphan_rule_pretties =  [ pprCoreRule (Just fn) rule <+> semi
+			    | ProtoCoreRule _ fn rule <- rules
+			    ]
+    local_id_pretties = [ pprCoreRule (Just fn) rule <+> semi
+ 		        | fn <- varSetElems emitted, 
+			  rule <- rulesRules (getIdSpecialisation fn),
+			  all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))
+				-- Spit out a rule only if all its lhs free vars are eemitted
+		        ]
+\end{code}
 
 %************************************************************************
 %*				 					*
@@ -257,18 +283,17 @@ ifaceId :: (Id -> IdInfo)		-- This function "knows" the extra info added
 	    -> Bool			-- True <=> recursive, so don't print unfolding
 	    -> Id
 	    -> CoreExpr			-- The Id's right hand side
-	    -> Maybe (SDoc, IdSet)	-- The emitted stuff, plus a possibly-augmented set of needed Ids
+	    -> Maybe (SDoc, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
 
 ifaceId get_idinfo needed_ids is_rec id rhs
   | not (id `elemVarSet` needed_ids ||		-- Needed [no id in needed_ids has omitIfaceSigForId]
-	 (isExported id && not (omitIfaceSigForId id)))	-- or exported and not to be omitted
+	 (isUserExportedId id && not (omitIfaceSigForId id)))	-- or exported and not to be omitted
   = Nothing 		-- Well, that was easy!
 
 ifaceId get_idinfo needed_ids is_rec id rhs
   = Just (hsep [sig_pretty, prag_pretty, char ';'], new_needed_ids)
   where
     idinfo         = get_idinfo id
-    inline_pragma  = inlinePragInfo idinfo
 
     ty_pretty  = pprType (idType id)
     sig_pretty = hsep [ppr (getOccName id), dcolon, ty_pretty]
@@ -281,7 +306,6 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 					cpr_pretty,
 					strict_pretty, 
 					unfold_pretty, 
-					spec_pretty,
 					ptext SLIT("##-}")]
 
     ------------  Arity  --------------
@@ -301,81 +325,55 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     strict_pretty = ppStrictnessInfo strict_info <+> wrkr_pretty
 
     wrkr_pretty | not has_worker = empty
-		| null con_list  = ppr work_id
-		| otherwise      = ppr work_id <+> 
-				   braces (hsep (map ppr con_list))
+		| otherwise      = ppr work_id
 
 --    (Just work_id) = work_info
 -- Temporary fix.  We can't use the worker id saved by the w/w
 -- pass because later optimisations may have changed it.  So try
 -- to snaffle from the wrapper code again ...
-    (work_id, wrapper_cons)   = getWorkerIdAndCons id rhs
-    con_list       = uniqSetToList wrapper_cons
+    work_id    = getWorkerId id rhs
 
     ------------  Unfolding  --------------
-    unfold_pretty | show_unfold = unfold_herald <+> pprIfaceUnfolding rhs
+    inline_pragma  = inlinePragInfo idinfo
+    dont_inline	   = case inline_pragma of
+			IMustNotBeINLINEd -> True
+			IAmALoopBreaker	  -> True
+			other		  -> False
+
+    unfold_pretty | show_unfold = ptext SLIT("__u") <+> pprIfaceUnfolding rhs
 		  | otherwise   = empty
 
-    show_unfold = not has_worker	&&	-- Not unnecessary
-		  not bottoming_fn	&&	-- Not necessary
-		  unfolding_needed		-- Not dangerous
+    show_unfold = not has_worker	 &&	-- Not unnecessary
+		  not bottoming_fn	 &&	-- Not necessary
+		  not dont_inline	 &&
+		  rhs_is_small		 &&	-- Small enough
+		  okToUnfoldInHiFile rhs 	-- No casms etc
 
-    unfolding_needed =  case inline_pragma of
-			      IMustBeINLINEd    -> definitely_ok_to_unfold
-			      IWantToBeINLINEd  -> definitely_ok_to_unfold
-			      NoInlinePragInfo  -> rhs_is_small
-			      other	        -> False
-
-
-    unfold_herald = case inline_pragma of
-			NoInlinePragInfo -> ptext SLIT("__u")
-			other		 -> ppr inline_pragma
-
-    rhs_is_small = case calcUnfoldingGuidance opt_InterfaceUnfoldThreshold rhs of
-			UnfoldNever -> False	-- Too big
-			other	    ->  definitely_ok_to_unfold -- Small enough
-
-    definitely_ok_to_unfold =  okToUnfoldInHiFile rhs
+    rhs_is_small = couldBeSmallEnoughToInline (calcUnfoldingGuidance opt_UF_HiFileThreshold rhs)
 
     ------------  Specialisations --------------
-    spec_list = specEnvToList (getIdSpecialisation id)
-    spec_pretty = hsep (map pp_spec spec_list)
-    pp_spec (tyvars, tys, rhs) = hsep [ptext SLIT("__P"),
-				       if null tyvars then ptext SLIT("[ ]")
-						      else brackets (interppSP tyvars),
-					-- The lexer interprets "[]" as a CONID.  Sigh.
-				       hsep (map pprParendType tys),
-				       ptext SLIT("="),
-				       pprIfaceUnfolding rhs
-				 ]
+    spec_info   = specInfo idinfo
     
     ------------  Extra free Ids  --------------
-    new_needed_ids = (needed_ids `minusVarSet` unitVarSet id)	`unionVarSet` 
-		     extra_ids
+    new_needed_ids | opt_OmitInterfacePragmas = emptyVarSet
+	           | otherwise		      = worker_ids	`unionVarSet`
+						unfold_ids	`unionVarSet`
+						spec_ids
 
-    extra_ids | opt_OmitInterfacePragmas = emptyVarSet
-	      | otherwise		 = worker_ids	`unionVarSet`
-					   unfold_ids	`unionVarSet`
-					   spec_ids
-
-    worker_ids | has_worker && interesting work_id = unitVarSet work_id
+    worker_ids | has_worker && interestingId work_id = unitVarSet work_id
 			-- Conceivably, the worker might come from
 			-- another module
 	       | otherwise			   = emptyVarSet
 
-    spec_ids = foldr add emptyVarSet spec_list
-	     where
-	       add (_, _, rhs) = unionVarSet (find_fvs rhs)
+    spec_ids = filterVarSet interestingId (rulesRhsFreeVars spec_info)
 
     unfold_ids | show_unfold = find_fvs rhs
 	       | otherwise   = emptyVarSet
 
-    find_fvs expr = free_vars
-		  where
-		    free_vars = exprSomeFreeVars interesting expr
+    find_fvs expr = exprSomeFreeVars interestingId expr
 
-    interesting id = isId id && isLocallyDefined id &&
-		     not (omitIfaceSigForId id)
+interestingId id = isId id && isLocallyDefined id &&
+		   not (omitIfaceSigForId id)
 \end{code}
 
 \begin{code}
@@ -383,11 +381,12 @@ ifaceBinds :: Handle
 	   -> IdSet		-- These Ids are needed already
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBind]	-- In dependency order, later depend on earlier
-	   -> IO ()
+	   -> IO IdSet		-- Set of Ids actually spat out
 
 ifaceBinds hdl needed_ids final_ids binds
-  = mapIO (printForIface hdl) pretties >>
-    hPutStr hdl "\n"
+  = mapIO (printForIface hdl) (bagToList pretties)	>>
+    hPutStr hdl "\n"					>>
+    return emitted
   where
     final_id_map  = listToUFM [(id,id) | id <- final_ids]
     get_idinfo id = case lookupUFM final_id_map id of
@@ -395,43 +394,51 @@ ifaceBinds hdl needed_ids final_ids binds
 			Nothing  -> pprTrace "ifaceBinds not found:" (ppr id) $
 				    idInfo id
 
-    pretties = go needed_ids (reverse binds)	-- Reverse so that later things will 
-						-- provoke earlier ones to be emitted
-    go needed [] = if not (isEmptyVarSet needed) then
-			pprTrace "ifaceBinds: free vars:" 
-				  (sep (map ppr (varSetElems needed))) $
-			[]
-		   else
-			[]
+    (pretties, emitted) = go needed_ids (reverse binds) emptyBag emptyVarSet 
+			-- Reverse so that later things will 
+			-- provoke earlier ones to be emitted
+    go needed [] pretties emitted
+	| not (isEmptyVarSet needed) = pprTrace "ifaceBinds: free vars:" 
+					  (sep (map ppr (varSetElems needed)))
+				       (pretties, emitted)
+	| otherwise 		     = (pretties, emitted)
 
-    go needed (NonRec id rhs : binds)
+    go needed (NonRec id rhs : binds) pretties emitted
 	= case ifaceId get_idinfo needed False id rhs of
-		Nothing		       -> go needed binds
-		Just (pretty, needed') -> pretty : go needed' binds
+		Nothing		      -> go needed binds pretties emitted
+		Just (pretty, extras) -> let
+					    needed' = (needed `unionVarSet` extras) `delVarSet` id
+						-- 'extras' can include the Id itself via a rule
+					    emitted' = emitted `extendVarSet` id
+					 in
+					 go needed' binds (pretty `consBag` pretties) emitted'
 
 	-- Recursive groups are a bit more of a pain.  We may only need one to
 	-- start with, but it may call out the next one, and so on.  So we
 	-- have to look for a fixed point.
-    go needed (Rec pairs : binds)
-	= pretties ++ go needed'' binds
+    go needed (Rec pairs : binds) pretties emitted
+	= go needed' binds pretties' emitted' 
 	where
-	  (needed', pretties) = go_rec needed pairs
-	  needed'' = needed' `minusVarSet` mkVarSet (map fst pairs)
-		-- Later ones may spuriously cause earlier ones to be "needed" again
+	  (new_pretties, new_emitted, extras) = go_rec needed pairs
+	  pretties' = new_pretties `unionBags` pretties
+	  needed'   = (needed `unionVarSet` extras) `minusVarSet` mkVarSet (map fst pairs) 
+	  emitted'  = emitted `unionVarSet` new_emitted
 
-    go_rec :: IdSet -> [(Id,CoreExpr)] -> (IdSet, [SDoc])
+    go_rec :: IdSet -> [(Id,CoreExpr)] -> (Bag SDoc, IdSet, IdSet)
     go_rec needed pairs
-	| null pretties = (needed, [])
-	| otherwise	= (final_needed, more_pretties ++ pretties)
+	| null pretties = (emptyBag, emptyVarSet, emptyVarSet)
+	| otherwise	= (more_pretties `unionBags`   listToBag pretties, 
+			   more_emitted  `unionVarSet` mkVarSet emitted,
+			   more_extras   `unionVarSet` extras)
 	where
-	  reduced_pairs		 	= [pair | (pair,Nothing) <- pairs `zip` maybes]
-	  pretties		 	= catMaybes maybes
-	  (needed', maybes)	 	= mapAccumL do_one needed pairs
-	  (final_needed, more_pretties) = go_rec needed' reduced_pairs
+	  maybes	       = map do_one pairs
+	  emitted	       = [id   | ((id,_), Just _)  <- pairs `zip` maybes]
+	  reduced_pairs	       = [pair | (pair,   Nothing) <- pairs `zip` maybes]
+	  (pretties, extras_s) = unzip (catMaybes maybes)
+	  extras	       = unionVarSets extras_s
+	  (more_pretties, more_emitted, more_extras) = go_rec extras reduced_pairs
 
-	  do_one needed (id,rhs) = case ifaceId get_idinfo needed True id rhs of
-					Nothing		       -> (needed,  Nothing)
-					Just (pretty, needed') -> (needed', Just pretty)
+	  do_one (id,rhs) = ifaceId get_idinfo needed True id rhs
 \end{code}
 
 
@@ -613,7 +620,7 @@ lt_lexical :: NamedThing a => a -> a -> Bool
 lt_lexical a1 a2 = getName a1 `lt_name` getName a2
 
 lt_imp_vers :: ImportVersion a -> ImportVersion a -> Bool
-lt_imp_vers (m1,_,_) (m2,_,_) = m1 < m2
+lt_imp_vers (m1,_,_,_) (m2,_,_,_) = m1 < m2
 
 sort_versions vs = sortLt lt_vers vs
 

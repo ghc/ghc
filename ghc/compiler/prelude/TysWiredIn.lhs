@@ -82,13 +82,12 @@ import TysPrim
 
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
-import Module		( Module )
+import Module		( Module, mkPrelModule )
 import Name		( mkWiredInTyConName, mkWiredInIdName, mkSrcOccFS, dataName )
-import DataCon		( DataCon, mkDataCon )
+import DataCon		( DataCon, StrictnessMark(..),  mkDataCon )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, ArgVrcs, mkAlgTyCon, mkSynTyCon, mkTupleTyCon )
-import BasicTypes	( Arity, NewOrData(..), 
-			  RecFlag(..), StrictnessMark(..) )
+import BasicTypes	( Arity, NewOrData(..), RecFlag(..) )
 import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys, 
 			  mkArrowKinds, boxedTypeKind, unboxedTypeKind,
 			  mkFunTy, mkFunTys, isUnLiftedType,
@@ -179,15 +178,16 @@ mk_tuple :: Int -> (TyCon,DataCon)
 mk_tuple arity = (tycon, tuple_con)
   where
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con True
-	tc_name = mkWiredInTyConName tc_uniq mod_name name_str tycon
+	tc_name = mkWiredInTyConName tc_uniq mod name_str tycon
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) boxedTypeKind
 
-	tuple_con = pcDataCon dc_uniq mod_name name_str tyvars [] tyvar_tys tycon
+	tuple_con = pcDataCon dc_uniq mod name_str tyvars [] tyvar_tys tycon
 	tyvars    = take arity alphaTyVars
 	tyvar_tys = mkTyVarTys tyvars
 	(mod_name, name_str) = mkTupNameStr arity
  	tc_uniq   = mkTupleTyConUnique   arity
 	dc_uniq   = mkTupleDataConUnique arity
+	mod	  = mkPrelModule mod_name
 
 unitTyCon = tupleTyCon 0
 pairTyCon = tupleTyCon 2
@@ -224,15 +224,16 @@ mk_unboxed_tuple :: Int -> (TyCon,DataCon)
 mk_unboxed_tuple arity = (tycon, tuple_con)
   where
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con False
-	tc_name = mkWiredInTyConName tc_uniq mod_name name_str tycon
+	tc_name = mkWiredInTyConName tc_uniq mod name_str tycon
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) unboxedTypeKind
 
-	tuple_con = pcDataCon dc_uniq mod_name name_str tyvars [] tyvar_tys tycon
+	tuple_con = pcDataCon dc_uniq mod name_str tyvars [] tyvar_tys tycon
 	tyvars    = take arity openAlphaTyVars
 	tyvar_tys = mkTyVarTys tyvars
 	(mod_name, name_str) = mkUbxTupNameStr arity
  	tc_uniq   = mkUbxTupleTyConUnique   arity
 	dc_uniq   = mkUbxTupleDataConUnique arity
+	mod	  = mkPrelModule mod_name
 
 unboxedPairTyCon   = unboxedTupleTyCon 2
 unboxedPairDataCon = unboxedTupleCon 2

@@ -27,9 +27,10 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
 import CoreSyn
 import Const            ( Con(..), Literal(..) )
 import Var              ( IdOrTyVar, varName, varType, setVarType, mkUVar )
-import Id               ( idMustBeINLINEd )
-import Name             ( isLocallyDefined, isExported )
-import Type             ( Type(..), TyNote(..), UsageAnn(..), isUsgTy, substTy, splitFunTys )
+import Id               ( idMustBeINLINEd, isExportedId )
+import Name             ( isLocallyDefined )
+import Type             ( Type(..), TyNote(..), UsageAnn(..), isUsgTy, splitFunTys )
+import Subst		( substTy, mkTyVarSubst )
 import TyCon            ( isAlgTyCon, isPrimTyCon, isSynTyCon, isFunTyCon )
 import VarEnv
 import PrimOp           ( PrimOp, primOpUsg )
@@ -156,7 +157,7 @@ data MungeFlags = MungeFlags { isSigma :: Bool,  -- want annotated on top (sigma
 tauTyMF loc  = MungeFlags { isSigma = False, isLocal = True,
                             hasUsg = False,  isExp = False,  mfLoc = loc }
 sigVarTyMF v = MungeFlags { isSigma = True,  isLocal = hasLocalDef v, 
-                            hasUsg = hasUsgInfo v, isExp = isExported v,
+                            hasUsg = hasUsgInfo v, isExp = isExportedId v,
                             mfLoc = ptext SLIT("type of binder") <+> ppr v }
 \end{code}
 
@@ -621,7 +622,7 @@ primOpUsgTys :: PrimOp         -- this primop
                                --  and returns this (sigma) type
 
 primOpUsgTys p tys = let (tyvs,ty0us,rtyu) = primOpUsg p
-                         s                 = zipVarEnv tyvs tys
+                         s                 = mkTyVarSubst tyvs tys
                          (ty1us,rty1u)     = splitFunTys (substTy s rtyu)
                                              -- substitution may reveal more args
                      in  ((map (substTy s) ty0us) ++ ty1us,

@@ -4,26 +4,28 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
 \begin{code}
-module WorkWrap ( wwTopBinds, getWorkerIdAndCons ) where
+module WorkWrap ( wwTopBinds, getWorkerId ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlySmallEnoughToInline, calcUnfoldingGuidance )
-import CmdLineOpts	( opt_UnfoldingCreationThreshold, opt_D_verbose_core2core, 
-                          opt_D_dump_worker_wrapper )
+import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core, 
+                          opt_D_dump_worker_wrapper
+			)
 import CoreLint		( beginPass, endPass )
 import CoreUtils	( coreExprType )
 import Const		( Con(..) )
 import DataCon		( DataCon )
 import MkId		( mkWorkerId )
-import Id		( Id, getIdStrictness,
-			  setIdStrictness, setInlinePragma, idWantsToBeINLINEd,
+import Id		( Id, getIdStrictness, setIdArity, 
+			  setIdStrictness, 
 			  setIdWorkerInfo, getIdCprInfo )
 import VarSet
 import Type		( splitAlgTyConApp_maybe )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
-			  InlinePragInfo(..), CprInfo(..) )
+			  CprInfo(..), exactArity
+			)
 import Demand           ( wwLazy )
 import SaLib
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
@@ -203,9 +205,8 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW non_rec fn_id rhs
-  |  idWantsToBeINLINEd fn_id 
-  || (non_rec &&	-- Don't split if its non-recursive and small
-      certainlySmallEnoughToInline fn_id unfold_guidance
+  | (non_rec &&	-- Don't split if its non-recursive and small
+      certainlySmallEnoughToInline unfold_guidance
      )
 	    -- No point in worker/wrappering something that is going to be
 	    -- INLINEd wholesale anyway.  If the strictness analyser is run
@@ -228,15 +229,15 @@ tryWW non_rec fn_id rhs
     let
 	work_rhs  = work_fn body
 	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) `setIdStrictness`
-		    (if do_strict_ww then mkStrictnessInfo (work_demands, result_bot)
-                                     else noStrictnessInfo) 
+		    (if has_strictness_info then mkStrictnessInfo (work_demands, result_bot)
+	                                    else noStrictnessInfo) 
 
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdStrictness` 
-                         (if do_strict_ww then mkStrictnessInfo (revised_wrap_args_info, result_bot)
-                                          else noStrictnessInfo) 
-                         `setIdWorkerInfo` (Just work_id)
-			 `setInlinePragma` IWantToBeINLINEd
+                         (if has_strictness_info then mkStrictnessInfo (revised_wrap_args_info, result_bot)
+	                                         else noStrictnessInfo) 
+                         `setIdWorkerInfo`	Just work_id
+			 `setIdArity`		exactArity (length wrap_args)
 		-- Add info to the wrapper:
 		--	(a) we want to inline it everywhere
 		-- 	(b) we want to pin on its revised strictness info
@@ -256,43 +257,40 @@ tryWW non_rec fn_id rhs
                                then setUnpackStrategy wrap_args_info
                                else repeat wwLazy
 
-
-    -- If we are going to split for CPR purposes anyway,  then 
-    -- we may as well do the strictness transformation
-    do_strict_ww = has_strictness_info && (do_cpr_ww || 
-					   worthSplitting revised_wrap_args_info)
+    do_strict_ww = has_strictness_info && worthSplitting revised_wrap_args_info result_bot
 
     cpr_info     = getIdCprInfo fn_id
     has_cpr_info = case cpr_info of
-				CPRInfo _ -> True
-				other	  -> False
+			CPRInfo _ -> True
+			other	  -> False
 
     do_cpr_ww = has_cpr_info
-
-    unfold_guidance = calcUnfoldingGuidance opt_UnfoldingCreationThreshold rhs
+    unfold_guidance = calcUnfoldingGuidance opt_UF_CreationThreshold rhs
 
 -- This rather (nay! extremely!) crude function looks at a wrapper function, and
--- snaffles out (a) the worker Id and (b) constructors needed to 
--- make the wrapper.
--- These are needed when we write an interface file.
+-- snaffles out the worker Id from the wrapper.
+-- This is needed when we write an interface file.
+-- [May 1999: we used to get the constructors too, but that's no longer
+--  	      necessary, because the renamer hauls in all type decls in 
+--	      their fullness.]
 
 -- <Mar 1999 (keving)> - Well,  since the addition of the CPR transformation this function
 -- got too crude!  
 -- Now the worker id is stored directly in the id's Info field.  We still use this function to
 -- snaffle the wrapper's constructors but I don't trust the code to find the worker id.
-getWorkerIdAndCons :: Id -> CoreExpr -> (Id, UniqSet DataCon)
-getWorkerIdAndCons wrap_id wrapper_fn
-  = (work_id wrapper_fn, get_cons wrapper_fn)
+getWorkerId :: Id -> CoreExpr -> Id
+getWorkerId wrap_id wrapper_fn
+  = work_id wrapper_fn
   where
 
     work_id wrapper_fn
             = case get_work_id wrapper_fn of
                 []   -> case work_id_try2 wrapper_fn of
-                        [] -> pprPanic "getWorkerIdAndCons: can't find worker id" (ppr wrap_id)
+                        [] -> pprPanic "getWorkerId: can't find worker id" (ppr wrap_id)
                         [id] -> id
-			_    -> pprPanic "getWorkerIdAndCons: found too many worker ids" (ppr wrap_id)
+			_    -> pprPanic "getWorkerId: found too many worker ids" (ppr wrap_id)
                 [id] -> id
-                _    -> pprPanic "getWorkerIdAndCons: found too many worker ids" (ppr wrap_id)
+                _    -> pprPanic "getWorkerId: found too many worker ids" (ppr wrap_id)
 
     get_work_id (Lam _ body)			 = get_work_id body
     get_work_id (Case _ _ [(_,_,rhs@(Case _ _ _))])	= get_work_id rhs
@@ -310,22 +308,4 @@ getWorkerIdAndCons wrap_id wrapper_fn
     work_id_try2 (App fn _)   			 = work_id_try2 fn
     work_id_try2 (Var work_id)			 = [work_id]
     work_id_try2 other	   			 = [] 
-
-    get_cons (Lam _ body)			= get_cons body
-    get_cons (Let (NonRec _ rhs) body)		= get_cons rhs `unionUniqSets` get_cons body
-
-    get_cons (Case e _ [(DataCon dc,_,rhs)]) 	= (get_cons e `unionUniqSets` get_cons rhs)
-						  `addOneToUniqSet` dc
-
-	-- Coercions don't mention the construtor now,
-	-- but we must still put the constructor in the interface
-	-- file so that the RHS of the newtype decl is imported
-    get_cons (Note (Coerce to_ty from_ty) body)
-	= get_cons body `addOneToUniqSet` con
-	where
-	  con = case splitAlgTyConApp_maybe from_ty of
-			Just (_, _, [con]) -> con
-			other		   -> pprPanic "getWorkerIdAndCons" (ppr to_ty)
-
-    get_cons other = emptyUniqSet
 \end{code}

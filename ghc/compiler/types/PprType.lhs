@@ -118,7 +118,7 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
     case ty1 of
 	TyConApp bx [] -> ppr bx
 	other	       -> maybeParen ctxt_prec tYCON_PREC 
-				     (ppr tycon <+> tys_w_spaces)
+				     (sep [ppr tycon, nest 4 tys_w_spaces])
 		       
 	
 	-- TUPLE CASE (boxed and unboxed)
@@ -146,7 +146,7 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 
 	-- GENERAL CASE
   | otherwise
-  = maybeParen ctxt_prec tYCON_PREC (hsep [ppr tycon, tys_w_spaces])
+  = maybeParen ctxt_prec tYCON_PREC (sep [ppr tycon, nest 4 tys_w_spaces])
 
   where
     tycon_uniq = tyConUnique tycon
@@ -155,7 +155,7 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
     Just ctys  = maybe_dict
     maybe_dict = splitDictTy_maybe ty	-- Checks class and arity
     tys_w_commas = sep (punctuate comma (map (ppr_ty env tOP_PREC) tys))
-    tys_w_spaces = hsep (map (ppr_ty env tYCON_PREC) tys)
+    tys_w_spaces = sep (map (ppr_ty env tYCON_PREC) tys)
   
 
 

@@ -27,8 +27,10 @@ module CmdLineOpts (
 	opt_D_dump_rdr,
 	opt_D_dump_realC,
 	opt_D_dump_rn,
+	opt_D_dump_rules,
 	opt_D_dump_simpl,
 	opt_D_dump_simpl_iterations,
+	opt_D_dump_simpl_stats,
 	opt_D_dump_spec,
 	opt_D_dump_stg,
 	opt_D_dump_stranal,
@@ -36,10 +38,8 @@ module CmdLineOpts (
         opt_D_dump_usagesp,
 	opt_D_dump_worker_wrapper,
 	opt_D_show_passes,
-	opt_D_show_rn_imports,
-	opt_D_show_rn_stats,
-	opt_D_show_rn_trace,
-	opt_D_simplifier_stats,
+	opt_D_dump_rn_trace,
+	opt_D_dump_rn_stats,
 	opt_D_source_stats,
 	opt_D_verbose_core2core,
 	opt_D_verbose_stg2stg,
@@ -88,17 +88,32 @@ module CmdLineOpts (
 	opt_DoEtaReduction,
 	opt_DoSemiTagging,
 	opt_FoldrBuildOn,
-	opt_InterfaceUnfoldThreshold,
 	opt_LiberateCaseThreshold,
 	opt_NoPreInlining,
 	opt_StgDoLetNoEscapes,
 	opt_UnfoldCasms,
-	opt_UnfoldingConDiscount,
-	opt_UnfoldingCreationThreshold,
-	opt_UnfoldingKeenessFactor,
-	opt_UnfoldingUseThreshold,
         opt_UsageSPOn,
 	opt_UnboxStrictFields,
+	opt_SimplNoPreInlining,
+	opt_SimplDoEtaReduction,
+	opt_SimplDoCaseElim,
+	opt_SimplDoLambdaEtaExpansion,
+	opt_SimplCaseOfCase,
+	opt_SimplCaseMerge,
+	opt_SimplLetToCase,
+	opt_SimplPedanticBottoms,
+
+	-- Unfolding control
+	opt_UF_HiFileThreshold,
+	opt_UF_CreationThreshold,
+	opt_UF_UseThreshold,
+	opt_UF_ScrutConDiscount,
+	opt_UF_FunAppDiscount,
+	opt_UF_PrimArgDiscount,
+	opt_UF_KeenessFactor,
+	opt_UF_CheapOp,
+	opt_UF_DearOp,
+	opt_UF_NoRepLit,
 
 	-- misc opts
 	opt_CompilingPrelude,
@@ -107,6 +122,7 @@ module CmdLineOpts (
 	opt_GranMacros,
 	opt_HiMap,
 	opt_HiVersion,
+	opt_HistorySize,
 	opt_IgnoreAsserts,
 	opt_IgnoreIfacePragmas,
         opt_NoHiCheck,
@@ -118,14 +134,14 @@ module CmdLineOpts (
 	opt_ProduceExportHStubs,
 	opt_ProduceHi,
 	opt_ProduceS,
-	opt_PruneInstDecls,
-	opt_PruneTyDecls,
+	opt_NoPruneDecls,
 	opt_ReportCompile,
 	opt_SourceUnchanged,
 	opt_Static,
 	opt_Unregisterised,
 	opt_Verbose,
 
+	-- Code generation
 	opt_UseVanillaRegs,
 	opt_UseFloatRegs,
 	opt_UseDoubleRegs,
@@ -163,6 +179,7 @@ main loop (\tr{main/Main.lhs}), in the Core-to-Core processing loop
 (\tr{simplCore/SimplCore.lhs), and in the STG-to-STG processing loop
 (\tr{simplStg/SimplStg.lhs}).
 
+
 %************************************************************************
 %*									*
 \subsection{Datatypes associated with command-line options}
@@ -185,8 +202,6 @@ data CoreToDo		-- These are diff core-to-core passes,
 	(SimplifierSwitch -> SwitchResult)
 			-- Each run of the simplifier can take a different
 			-- set of simplifier-specific flags.
-  | CoreDoCalcInlinings1
-  | CoreDoCalcInlinings2
   | CoreDoFloatInwards
   | CoreDoFullLaziness
   | CoreLiberateCase
@@ -195,8 +210,6 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoStrictness
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
-  | CoreDoFoldrBuildWorkerWrapper
-  | CoreDoFoldrBuildWWAnal
   | CoreDoUSPInf
   | CoreDoCPResult 
 \end{code}
@@ -214,37 +227,8 @@ data StgToDo
 
 \begin{code}
 data SimplifierSwitch
-  = SimplOkToDupCode
-  | SimplFloatLetsExposingWHNF
-  | SimplOkToFloatPrimOps
-  | SimplAlwaysFloatLetsFromLets
-  | SimplDoCaseElim
-  | SimplCaseOfCase
-  | SimplLetToCase
-  | SimplMayDeleteConjurableIds
-  | SimplPedanticBottoms -- see Simplifier for an explanation
-  | SimplDoArityExpand	 -- expand arity of bindings
-  | SimplDoFoldrBuild	 -- This is the per-simplification flag;
-			 -- see also FoldrBuildOn, used elsewhere
-			 -- in the compiler.
-  | SimplDoInlineFoldrBuild
-			 -- inline foldr/build (*after* f/b rule is used)
-
-  | IgnoreINLINEPragma
-  | SimplDoLambdaEtaExpansion
-
-  | EssentialUnfoldingsOnly -- never mind the thresholds, only
-			    -- do unfoldings that *must* be done
-			    -- (to saturate constructors and primitives)
-
-  | MaxSimplifierIterations Int
-
-  | SimplNoLetFromCase	    -- used when turning off floating entirely
-  | SimplNoLetFromApp	    -- (for experimentation only) WDP 95/10
-  | SimplNoLetFromStrictLet
-
-  | SimplCaseMerge
-  | SimplPleaseClone
+  = MaxSimplifierIterations Int
+  | SimplInlinePhase Int
 \end{code}
 
 %************************************************************************
@@ -318,13 +302,13 @@ opt_D_dump_spec			= lookUp  SLIT("-ddump-spec")
 opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
 opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
 opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
+opt_D_dump_rules		= lookUp  SLIT("-ddump-rules")
 opt_D_dump_usagesp              = lookUp  SLIT("-ddump-usagesp")
 opt_D_dump_worker_wrapper	= lookUp  SLIT("-ddump-workwrap")
 opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
-opt_D_show_rn_imports		= lookUp  SLIT("-dshow-rn-imports")
-opt_D_show_rn_trace		= lookUp  SLIT("-dshow-rn-trace")
-opt_D_show_rn_stats		= lookUp SLIT("-dshow-rn-stats")
-opt_D_simplifier_stats		= lookUp  SLIT("-dsimplifier-stats")
+opt_D_dump_rn_trace		= lookUp  SLIT("-ddump-rn-trace")
+opt_D_dump_rn_stats		= lookUp  SLIT("-ddump-rn-stats")
+opt_D_dump_simpl_stats		= lookUp  SLIT("-ddump-simpl-stats")
 opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
@@ -373,15 +357,10 @@ opt_Parallel			= lookUp  SLIT("-fparallel")
 opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
-opt_InterfaceUnfoldThreshold	= lookup_def_int "-funfolding-interface-threshold" iNTERFACE_UNFOLD_THRESHOLD
-opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
+opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_NoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
 opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
-opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDING_CON_DISCOUNT_WEIGHT
-opt_UnfoldingCreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  uNFOLDING_CREATION_THRESHOLD
-opt_UnfoldingKeenessFactor	= lookup_def_float "-funfolding-keeness-factor"	   uNFOLDING_KEENESS_FACTOR
-opt_UnfoldingUseThreshold	= lookup_def_int "-funfolding-use-threshold"	   uNFOLDING_USE_THRESHOLD
 opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
 opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
 
@@ -398,6 +377,7 @@ opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
 opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
+opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
@@ -408,14 +388,39 @@ opt_ProduceC  			= lookup_str "-C="
 opt_ProduceExportCStubs		= lookup_str "-F="
 opt_ProduceExportHStubs		= lookup_str "-FH="
 opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
+
+-- Simplifier switches
+opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
+	-- NoPreInlining is there just to see how bad things
+	-- get if you don't do it!
+opt_SimplDoEtaReduction		= lookUp SLIT("-fdo-eta-reduction")
+opt_SimplDoCaseElim		= lookUp SLIT("-fdo-case-elim")
+opt_SimplDoLambdaEtaExpansion	= lookUp SLIT("-fdo-lambda-eta-expansion")
+opt_SimplCaseOfCase		= lookUp SLIT("-fcase-of-case")
+opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")
+opt_SimplLetToCase		= lookUp SLIT("-flet-to-case")
+opt_SimplPedanticBottoms	= lookUp SLIT("-fpedantic-bottoms")
+
+-- Unfolding control
+opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (30::Int)
+opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (30::Int)
+opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
+opt_UF_ScrutConDiscount		= lookup_def_int "-funfolding-con-discount"	   (3::Int)
+opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
+opt_UF_PrimArgDiscount		= lookup_def_int "-funfolding-prim-discount"	   (1::Int)
+opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (2.0::Float)
+
+opt_UF_CheapOp  = ( 1 :: Int)
+opt_UF_DearOp   = ( 8 :: Int)
+opt_UF_NoRepLit = ( 20 :: Int)	-- Strings can be pretty big
+			
 opt_ProduceS  			= lookup_str "-S="
-opt_ReportCompile                = lookUp SLIT("-freport-compile")
-opt_PruneTyDecls		= not (lookUp SLIT("-fno-prune-tydecls"))
-opt_PruneInstDecls		= not (lookUp SLIT("-fno-prune-instdecls"))
-opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
-opt_Static			= lookUp  SLIT("-static")
-opt_Unregisterised		= lookUp  SLIT("-funregisterised")
-opt_Verbose			= lookUp  SLIT("-v")
+opt_ReportCompile               = lookUp SLIT("-freport-compile")
+opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
+opt_SourceUnchanged		= lookUp SLIT("-fsource-unchanged")
+opt_Static			= lookUp SLIT("-static")
+opt_Unregisterised		= lookUp SLIT("-funregisterised")
+opt_Verbose			= lookUp SLIT("-v")
 
 opt_UseVanillaRegs | opt_Unregisterised = 0
 		   | otherwise          = mAX_Real_Vanilla_REG
@@ -425,8 +430,6 @@ opt_UseDoubleRegs  | opt_Unregisterised = 0
 		   | otherwise          = mAX_Real_Double_REG
 opt_UseLongRegs    | opt_Unregisterised = 0
 		   | otherwise          = mAX_Real_Long_REG
-
--- opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 \end{code}
 
 \begin{code}
@@ -452,8 +455,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fsimplify"  -> -- gather up SimplifierSwitches specially...
 			   simpl_sep opts defaultSimplSwitches core_td stg_td
 
-	  "-fcalc-inlinings1"-> CORE_TD(CoreDoCalcInlinings1)
-	  "-fcalc-inlinings2"-> CORE_TD(CoreDoCalcInlinings2)
 	  "-ffloat-inwards"  -> CORE_TD(CoreDoFloatInwards)
 	  "-ffull-laziness"  -> CORE_TD(CoreDoFullLaziness)
 	  "-fliberate-case"  -> CORE_TD(CoreLiberateCase)
@@ -462,8 +463,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)
 	  "-fworker-wrapper" -> CORE_TD(CoreDoWorkerWrapper)
 	  "-fspecialise"     -> CORE_TD(CoreDoSpecialising)
-	  "-ffoldr-build-worker-wrapper"  -> CORE_TD(CoreDoFoldrBuildWorkerWrapper)
-	  "-ffoldr-build-ww-anal"  -> CORE_TD(CoreDoFoldrBuildWWAnal)
 	  "-fusagesp"        -> CORE_TD(CoreDoUSPInf)
 	  "-fcpr-analyse"    -> CORE_TD(CoreDoCPResult)
 
@@ -501,38 +500,23 @@ classifyOpts = sep argv [] [] -- accumulators...
 		 in
 		 sep opts (this_simpl : core_td) stg_td
 
-#	  define SIMPL_SW(sw) simpl_sep opts (sw:simpl_sw) core_td stg_td
+	  opt -> case matchSimplSw opt of
+			Just sw -> simpl_sep opts (sw:simpl_sw) core_td stg_td
+			Nothing -> simpl_sep opts simpl_sw      core_td stg_td
 
-	  -- the non-"just match a string" options are at the end...
-	  "-fcode-duplication-ok"	    -> SIMPL_SW(SimplOkToDupCode)
-	  "-ffloat-lets-exposing-whnf"	    -> SIMPL_SW(SimplFloatLetsExposingWHNF)
-	  "-ffloat-primops-ok"		    -> SIMPL_SW(SimplOkToFloatPrimOps)
-	  "-falways-float-lets-from-lets"   -> SIMPL_SW(SimplAlwaysFloatLetsFromLets)
-	  "-fdo-case-elim"		    -> SIMPL_SW(SimplDoCaseElim)
-	  "-fdo-lambda-eta-expansion"	    -> SIMPL_SW(SimplDoLambdaEtaExpansion)
-	  "-fdo-foldr-build"		    -> SIMPL_SW(SimplDoFoldrBuild)
-	  "-fdo-arity-expand"		    -> SIMPL_SW(SimplDoArityExpand)
-	  "-fdo-inline-foldr-build"	    -> SIMPL_SW(SimplDoInlineFoldrBuild)
-	  "-fcase-of-case"		    -> SIMPL_SW(SimplCaseOfCase)
-	  "-fcase-merge"		    -> SIMPL_SW(SimplCaseMerge)
-	  "-flet-to-case"		    -> SIMPL_SW(SimplLetToCase)
-	  "-fpedantic-bottoms"		    -> SIMPL_SW(SimplPedanticBottoms)
-	  "-fmay-delete-conjurable-ids"     -> SIMPL_SW(SimplMayDeleteConjurableIds)
-	  "-fessential-unfoldings-only"     -> SIMPL_SW(EssentialUnfoldingsOnly)
-	  "-fignore-inline-pragma"  	    -> SIMPL_SW(IgnoreINLINEPragma)
-	  "-fno-let-from-case"		    -> SIMPL_SW(SimplNoLetFromCase)
-	  "-fno-let-from-app"		    -> SIMPL_SW(SimplNoLetFromApp)
-	  "-fno-let-from-strict-let"	    -> SIMPL_SW(SimplNoLetFromStrictLet)
-	  "-fclone-binds"		    -> SIMPL_SW(SimplPleaseClone)
+matchSimplSw opt
+  = firstJust	[ matchSwInt  opt "-fmax-simplifier-iterations"		MaxSimplifierIterations
+		, matchSwInt  opt "-finline-phase"			SimplInlinePhase
+		]
 
-	  o | starts_with_msi  -> SIMPL_SW(MaxSimplifierIterations (read after_msi))
-	   where
-	    maybe_msi		= startsWith "-fmax-simplifier-iterations"   o
-	    starts_with_msi	= maybeToBool maybe_msi
-	    (Just after_msi)	= maybe_msi
+matchSwBool :: String -> String -> a -> Maybe a
+matchSwBool opt str sw | opt == str = Just sw
+		       | otherwise  = Nothing
 
-	  _ -> -- NB: the driver is really supposed to handle bad options
-	       simpl_sep opts simpl_sw core_td stg_td
+matchSwInt :: String -> String -> (Int -> a) -> Maybe a
+matchSwInt opt str sw = case startsWith str opt of
+			    Just opt_left -> Just (sw (read opt_left))
+			    Nothing	  -> Nothing
 \end{code}
 
 %************************************************************************
@@ -552,33 +536,13 @@ instance Ord SimplifierSwitch where
     a <  b  = tagOf_SimplSwitch a _LT_ tagOf_SimplSwitch b
     a <= b  = tagOf_SimplSwitch a _LE_ tagOf_SimplSwitch b
 
-tagOf_SimplSwitch SimplOkToDupCode		=(ILIT(0) :: FAST_INT)
-tagOf_SimplSwitch SimplFloatLetsExposingWHNF	= ILIT(1)
-tagOf_SimplSwitch SimplOkToFloatPrimOps		= ILIT(2)
-tagOf_SimplSwitch SimplAlwaysFloatLetsFromLets	= ILIT(3)
-tagOf_SimplSwitch SimplDoCaseElim		= ILIT(4)
-tagOf_SimplSwitch SimplCaseOfCase		= ILIT(6)
-tagOf_SimplSwitch SimplLetToCase		= ILIT(7)
-tagOf_SimplSwitch SimplMayDeleteConjurableIds	= ILIT(9)
-tagOf_SimplSwitch SimplPedanticBottoms		= ILIT(10)
-tagOf_SimplSwitch SimplDoArityExpand		= ILIT(11)
-tagOf_SimplSwitch SimplDoFoldrBuild		= ILIT(12)
-tagOf_SimplSwitch SimplDoInlineFoldrBuild	= ILIT(14)
-tagOf_SimplSwitch IgnoreINLINEPragma 		= ILIT(15)
-tagOf_SimplSwitch SimplDoLambdaEtaExpansion	= ILIT(16)
-tagOf_SimplSwitch EssentialUnfoldingsOnly	= ILIT(19)
-tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(21)
-tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(27)
-tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(28)
-tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)
-tagOf_SimplSwitch SimplCaseMerge		= ILIT(31)
-tagOf_SimplSwitch SimplPleaseClone		= ILIT(32)
+
+tagOf_SimplSwitch (SimplInlinePhase _)		= ILIT(1)
+tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(2)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
-tagOf_SimplSwitch _ = panic# "tagOf_SimplSwitch"
-
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplPleaseClone)
+lAST_SIMPL_SWITCH_TAG = 2
 \end{code}
 
 %************************************************************************
@@ -598,7 +562,6 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 		-- ie the ones that occur earliest in the list.
 
 	sw_tbl :: Array Int SwitchResult
-
 	sw_tbl = (array	(0, lAST_SIMPL_SWITCH_TAG) -- bounds...
 			all_undefined)
 		 // defined_elems
@@ -613,16 +576,14 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
 #if __GLASGOW_HASKELL__ < 400
 	  Lift v -> v
-#elif __GLASGOW_HASKELL__ < 403
-	  (# _, v #) -> v
 #else
-	  (# v #) -> v
+	  (# _, v #) -> v
 #endif
     }
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl)       = (IBOX(tagOf_SimplSwitch k), SwInt lvl)
-
-    mk_assoc_elem k = (IBOX(tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
+    mk_assoc_elem k@(MaxSimplifierIterations lvl) = (IBOX(tagOf_SimplSwitch k), SwInt lvl)
+    mk_assoc_elem k@(SimplInlinePhase n)          = (IBOX(tagOf_SimplSwitch k), SwInt n)
+    mk_assoc_elem k 				  = (IBOX(tagOf_SimplSwitch k), SwBool True) -- I'm here, Mom!
 
     -- cannot have duplicates if we are going to use the array thing
     rm_dups switches_so_far switch
@@ -638,8 +599,7 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 Default settings for simplifier switches
 
 \begin{code}
-defaultSimplSwitches = [MaxSimplifierIterations		1
-		       ]
+defaultSimplSwitches = [MaxSimplifierIterations	1]
 \end{code}
 
 %************************************************************************
@@ -668,13 +628,15 @@ intSwitchSet lookup_fn switch
 \end{code}
 
 \begin{code}
-startsWith, endsWith :: String -> String -> Maybe String
+startsWith :: String -> String -> Maybe String
+-- startsWith pfx (pfx++rest) = Just rest
 
 startsWith []     str = Just str
 startsWith (c:cs) (s:ss)
   = if c /= s then Nothing else startsWith cs ss
 startsWith  _	  []  = Nothing
 
+endsWith  :: String -> String -> Maybe String
 endsWith cs ss
   = case (startsWith (reverse cs) (reverse ss)) of
       Nothing -> Nothing

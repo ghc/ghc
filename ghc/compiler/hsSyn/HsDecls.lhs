@@ -8,11 +8,11 @@ Definitions for: @TyDecl@ and @ConDecl@, @ClassDecl@,
 
 \begin{code}
 module HsDecls (
-	HsDecl(..), TyClDecl(..), InstDecl(..),
+	HsDecl(..), TyClDecl(..), InstDecl(..), RuleDecl(..), RuleBndr(..),
 	DefaultDecl(..), ForeignDecl(..), ForKind(..),
 	ExtName(..), isDynamic,
 	ConDecl(..), ConDetails(..), BangType(..),
-	IfaceSig(..),  SpecDataSig(..), HsIdInfo(..), HsStrictnessInfo(..),
+	IfaceSig(..),  SpecDataSig(..), 
 	hsDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls
     ) where
 
@@ -20,15 +20,16 @@ module HsDecls (
 
 -- friends:
 import HsBinds		( HsBinds, MonoBinds, Sig, FixitySig(..), nullMonoBinds )
+import HsExpr		( HsExpr )
 import HsPragmas	( DataPragmas, ClassPragmas )
 import HsTypes
-import HsCore		( UfExpr )
+import HsCore		( UfExpr, UfBinder, IfaceSig(..), UfRuleBody )
 import BasicTypes	( Fixity, NewOrData(..) )
-import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo, CprInfo )
-import Demand		( Demand )
 import CallConv		( CallConv, pprCallConv )
+import Var		( TyVar )
 
 -- others:
+import PprType
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
@@ -50,6 +51,7 @@ data HsDecl name pat
   | ForD        (ForeignDecl name)
   | SigD	(IfaceSig name)
   | FixD	(FixitySig name)
+  | RuleD	(RuleDecl name pat)
 
 -- NB: all top-level fixity decls are contained EITHER
 -- EITHER FixDs
@@ -63,10 +65,6 @@ data HsDecl name pat
 --	d) top level decls
 --
 -- The latter is for class methods only
-
--- It's a bit wierd that the fixity decls in the ValD
--- cover all the classops and imported decls too, but it's convenient
--- For a start, it means we don't need a FixD
 \end{code}
 
 \begin{code}
@@ -74,20 +72,20 @@ data HsDecl name pat
 hsDeclName :: (Outputable name, Outputable pat)
 	   => HsDecl name pat -> name
 #endif
-hsDeclName (TyClD decl)				    = tyClDeclName decl
-hsDeclName (SigD  (IfaceSig name _ _ _))	    = name
-hsDeclName (InstD (InstDecl _ _ _ (Just name) _))   = name
-hsDeclName (ForD  (ForeignDecl name _ _ _ _ _))     = name
-hsDeclName (FixD  (FixitySig name _ _))		    = name
+hsDeclName (TyClD decl)				 = tyClDeclName decl
+hsDeclName (SigD  (IfaceSig name _ _ _))	 = name
+hsDeclName (InstD (InstDecl _ _ _ name _))       = name
+hsDeclName (ForD  (ForeignDecl name _ _ _ _ _))  = name
+hsDeclName (FixD  (FixitySig name _ _))		 = name
 -- Others don't make sense
 #ifdef DEBUG
 hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 #endif
 
 tyClDeclName :: TyClDecl name pat -> name
-tyClDeclName (TyData _ _ name _ _ _ _ _)      = name
-tyClDeclName (TySynonym name _ _ _)           = name
-tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _) = name
+tyClDeclName (TyData _ _ name _ _ _ _ _)        = name
+tyClDeclName (TySynonym name _ _ _)             = name
+tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _) = name
 \end{code}
 
 \begin{code}
@@ -101,26 +99,7 @@ instance (Outputable name, Outputable pat)
     ppr (InstD inst) = ppr inst
     ppr (ForD fd)    = ppr fd
     ppr (FixD fd)    = ppr fd
-
-{-	Why do we need ordering on decls?
-
-#ifdef DEBUG
--- hsDeclName needs more context when DEBUG is on
-instance (Outputable name, Outputable pat, Eq name)
-      => Eq (HsDecl name pat) where
-   d1 == d2 = hsDeclName d1 == hsDeclName d2
-	
-instance (Outputable name, Outputable pat, Ord name)
-      => Ord (HsDecl name pat) where
-	d1 `compare` d2 = hsDeclName d1 `compare` hsDeclName d2
-#else
-instance (Eq name) => Eq (HsDecl name pat) where
-	d1 == d2 = hsDeclName d1 == hsDeclName d2
-	
-instance (Ord name) => Ord (HsDecl name pat) where
-	d1 `compare` d2 = hsDeclName d1 `compare` hsDeclName d2
-#endif
--}
+    ppr (RuleD rd)   = ppr rd
 \end{code}
 
 
@@ -149,14 +128,14 @@ data TyClDecl name pat
 		(HsType name)	-- synonym expansion
 		SrcLoc
 
-  | ClassDecl	(Context name)	    		-- context...
-		name		    		-- name of the class
-		[HsTyVar name]	    		-- the class type variables
-		[Sig name]			-- methods' signatures
+  | ClassDecl	(Context name)	    	-- context...
+		name		    	-- name of the class
+		[HsTyVar name]	    	-- the class type variables
+		[Sig name]		-- methods' signatures
 		(MonoBinds name pat)	-- default methods
 		(ClassPragmas name)
-		name name			-- The names of the tycon and datacon for this class
-						-- These are filled in by the renamer
+		name name [name]	-- The names of the tycon, datacon, and superclass selectors
+					-- for this class.  These are filled in as the ClassDecl is made.
 		SrcLoc
 \end{code}
 
@@ -164,7 +143,7 @@ data TyClDecl name pat
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl _ _ _ _ _ _ _ _   _ <- decls],
+ = (length [() | ClassDecl _ _ _ _ _ _ _ _ _ _ <- decls],
     length [() | TyData DataType _ _ _ _ _ _ _ <- decls],
     length [() | TyData NewType  _ _ _ _ _ _ _ <- decls],
     length [() | TySynonym _ _ _ _	       <- decls])
@@ -177,8 +156,8 @@ isSynDecl other		      = False
 isDataDecl (TyData _ _ _ _ _ _ _ _) = True
 isDataDecl other		    = False
 
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _) = True
-isClassDecl other			  = False
+isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ _) = True
+isClassDecl other		 	    = False
 \end{code}
 
 \begin{code}
@@ -199,7 +178,7 @@ instance (Outputable name, Outputable pat)
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-    ppr (ClassDecl context clas tyvars sigs methods pragmas _ _ src_loc)
+    ppr (ClassDecl context clas tyvars sigs methods pragmas _ _ _ src_loc)
       | null sigs	-- No "where" part
       = top_matter
 
@@ -333,7 +312,7 @@ data InstDecl name pat
 
 		[Sig name]		-- User-supplied pragmatic info
 
-		(Maybe name)		-- Name for the dictionary function
+		name			-- Name for the dictionary function
 
 		SrcLoc
 \end{code}
@@ -430,34 +409,43 @@ instance Outputable ExtName where
 
 %************************************************************************
 %*									*
-\subsection{Signatures in interface files}
+\subsection{Transformation rules}
 %*									*
 %************************************************************************
 
 \begin{code}
-data IfaceSig name
-  = IfaceSig	name
-		(HsType name)
-		[HsIdInfo name]
-		SrcLoc
+data RuleDecl name pat
+  = RuleDecl
+	FAST_STRING		-- Rule name
+	[name]			-- Forall'd tyvars, filled in by the renamer with
+				-- tyvars mentioned in sigs; then filled out by typechecker
+	[RuleBndr name]		-- Forall'd term vars
+	(HsExpr name pat)	-- LHS
+	(HsExpr name pat)	-- RHS
+	SrcLoc		
 
-instance (Outputable name) => Outputable (IfaceSig name) where
-    ppr (IfaceSig var ty _ _)
-      = hang (hsep [ppr var, dcolon])
-	     4 (ppr ty)
+  | IfaceRuleDecl 		-- One that's come in from an interface file
+	name
+	(UfRuleBody name)
+	SrcLoc		
 
-data HsIdInfo name
-  = HsArity		ArityInfo
-  | HsStrictness	HsStrictnessInfo
-  | HsUnfold		InlinePragInfo (Maybe (UfExpr name))
-  | HsUpdate		UpdateInfo
-  | HsSpecialise	[HsTyVar name] [HsType name] (UfExpr name)
-  | HsNoCafRefs
-  | HsCprInfo           CprInfo
-  | HsWorker		name [name]		-- Worker, if any
-						-- and needed constructors
+data RuleBndr name
+  = RuleBndr name
+  | RuleBndrSig name (HsType name)
 
-data HsStrictnessInfo
-  = HsStrictnessInfo ([Demand], Bool)
-  | HsBottom
+instance (Outputable name, Outputable pat)
+	      => Outputable (RuleDecl name pat) where
+  ppr (RuleDecl name tvs ns lhs rhs loc)
+	= text "RULE" <+> doubleQuotes (ptext name) <> colon <+> 
+	  sep [pp_forall, ppr lhs, equals <+> ppr rhs]
+	where
+	  pp_forall | null tvs && null ns = empty
+		    | otherwise		  = text "forall" <+> 
+					    fsep (map ppr tvs ++ map ppr ns)
+					    <> dot
+  ppr (IfaceRuleDecl var body loc) = text "An imported rule..."
+
+instance Outputable name => Outputable (RuleBndr name) where
+   ppr (RuleBndr name) = ppr name
+   ppr (RuleBndrSig name ty) = ppr name <> dcolon <> ppr ty
 \end{code}

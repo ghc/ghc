@@ -7,17 +7,20 @@ This module contains a unifier and a matcher, both of which
 use an explicit substitution
 
 \begin{code}
-module Unify ( Subst,
-	       unifyTysX, unifyTyListsX,
-	       matchTy, matchTys
+module Unify ( unifyTysX, unifyTyListsX,
+	       match, matchTy, matchTys
   ) where 
 
-import Var	( TyVar, tyVarKind )
-import VarEnv
-import VarSet	( varSetElems )
 import Type	( Type(..), funTyCon, typeKind, tyVarsOfType,
 		  splitAppTy_maybe
 		)
+
+import Var	( TyVar, tyVarKind )
+import VarSet
+import VarEnv	( TyVarSubstEnv, emptySubstEnv, lookupSubstEnv, extendSubstEnv, 
+		  SubstResult(..)
+		)
+
 import Unique	( Uniquable(..) )
 import Outputable( panic )
 import Util	( snocView )
@@ -32,27 +35,27 @@ import Util	( snocView )
 Unify types with an explicit substitution and no monad.
 
 \begin{code}
-type Subst
-   = ([TyVar],		-- Set of template tyvars
-      TyVarEnv Type)	-- Not necessarily idempotent
+type MySubst
+   = (TyVarSet,		-- Set of template tyvars
+      TyVarSubstEnv)	-- Not necessarily idempotent
 
-unifyTysX :: [TyVar]		-- Template tyvars
+unifyTysX :: TyVarSet		-- Template tyvars
 	  -> Type
           -> Type
-          -> Maybe (TyVarEnv Type)
+          -> Maybe TyVarSubstEnv
 unifyTysX tmpl_tyvars ty1 ty2
-  = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, emptyVarEnv)
+  = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, emptySubstEnv)
 
-unifyTyListsX :: [TyVar] -> [Type] -> [Type]
-              -> Maybe (TyVarEnv Type)
+unifyTyListsX :: TyVarSet -> [Type] -> [Type]
+              -> Maybe TyVarSubstEnv
 unifyTyListsX tmpl_tyvars tys1 tys2
-  = uTyListsX tys1 tys2 (\(_,s) -> Just s) (tmpl_tyvars, emptyVarEnv)
+  = uTyListsX tys1 tys2 (\(_,s) -> Just s) (tmpl_tyvars, emptySubstEnv)
 
 
 uTysX :: Type
       -> Type
-      -> (Subst -> Maybe result)
-      -> Subst
+      -> (MySubst -> Maybe result)
+      -> MySubst
       -> Maybe result
 
 uTysX (NoteTy _ ty1) ty2 k subst = uTysX ty1 ty2 k subst
@@ -63,10 +66,10 @@ uTysX (TyVarTy tyvar1) (TyVarTy tyvar2) k subst
   | tyvar1 == tyvar2
   = k subst
 uTysX (TyVarTy tyvar1) ty2 k subst@(tmpls,_)
-  | tyvar1 `elem` tmpls
+  | tyvar1 `elemVarSet` tmpls
   = uVarX tyvar1 ty2 k subst
 uTysX ty1 (TyVarTy tyvar2) k subst@(tmpls,_)
-  | tyvar2 `elem` tmpls
+  | tyvar2 `elemVarSet` tmpls
   = uVarX tyvar2 ty1 k subst
 
 	-- Functions; just check the two parts
@@ -110,23 +113,23 @@ uTyListsX tys1	     tys2       k subst = Nothing   -- Fail if the lists are diff
 \begin{code}
 -- Invariant: tv1 is a unifiable variable
 uVarX tv1 ty2 k subst@(tmpls, env)
-  = case lookupVarEnv env tv1 of
-      Just ty1 ->    -- Already bound
+  = case lookupSubstEnv env tv1 of
+      Just (DoneTy ty1) ->    -- Already bound
 		     uTysX ty1 ty2 k subst
 
       Nothing	     -- Not already bound
 	       |  typeKind ty2 == tyVarKind tv1
 	       && occur_check_ok ty2
 	       ->     -- No kind mismatch nor occur check
-	          k (tmpls, extendVarEnv env tv1 ty2)
+	          k (tmpls, extendSubstEnv env tv1 (DoneTy ty2))
 
 	       | otherwise -> Nothing	-- Fail if kind mis-match or occur check
   where
     occur_check_ok ty = all occur_check_ok_tv (varSetElems (tyVarsOfType ty))
     occur_check_ok_tv tv | tv1 == tv = False
-			 | otherwise = case lookupVarEnv env tv of
-				         Nothing -> True
-					 Just ty -> occur_check_ok ty
+			 | otherwise = case lookupSubstEnv env tv of
+				         Nothing	   -> True
+					 Just (DoneTy ty)  -> occur_check_ok ty
 \end{code}
 
 
@@ -147,76 +150,80 @@ types.  It also fails on nested foralls.
 types.
 
 \begin{code}
-matchTy :: [TyVar]			-- Template tyvars
+matchTy :: TyVarSet			-- Template tyvars
 	-> Type  			-- Template
 	-> Type				-- Proposed instance of template
-	-> Maybe (TyVarEnv Type)	-- Matching substitution
+	-> Maybe TyVarSubstEnv		-- Matching substitution
 					
 
-matchTys :: [TyVar]			-- Template tyvars
+matchTys :: TyVarSet			-- Template tyvars
 	 -> [Type]			-- Templates
 	 -> [Type]			-- Proposed instance of template
-	 -> Maybe (TyVarEnv Type,	-- Matching substitution
+	 -> Maybe (TyVarSubstEnv,		-- Matching substitution
 		   [Type])		-- Left over instance types
 
-matchTy  tmpls ty1  ty2  = match      ty1  ty2  (\(_,env)       -> Just env)
-						(tmpls, emptyVarEnv)
+matchTy tmpls ty1 ty2 = match ty1 ty2 tmpls (\ senv -> Just senv) emptySubstEnv
 
-matchTys tmpls tys1 tys2 = match_list tys1 tys2 (\((_,env),tys) -> Just (env,tys))
-						(tmpls, emptyVarEnv)
+matchTys tmpls tys1 tys2 = match_list tys1 tys2 tmpls 
+				      (\ (senv,tys) -> Just (senv,tys))
+				      emptySubstEnv
 \end{code}
 
 @match@ is the main function.
 
 \begin{code}
-match :: Type -> Type    	    -- Current match pair
-      -> (Subst -> Maybe result)    -- Continuation
-      -> Subst 		 	    -- Current substitution
+match :: Type -> Type    	    		-- Current match pair
+      -> TyVarSet				-- Template vars
+      -> (TyVarSubstEnv -> Maybe result)	-- Continuation
+      -> TyVarSubstEnv				-- Current subst
       -> Maybe result
 
 -- When matching against a type variable, see if the variable
 -- has already been bound.  If so, check that what it's bound to
 -- is the same as ty; if not, bind it and carry on.
 
-match (TyVarTy v) ty k = \  s@(tmpls,env) ->
-			 if v `elem` tmpls then
-                               -- v is a template variable
-                               case lookupVarEnv env v of
-				  Nothing  -> k (tmpls, extendVarEnv env v ty)
-				  Just ty' | ty' == ty -> k s      -- Succeeds
-				           | otherwise -> Nothing  -- Fails
-                         else
-                                     -- v is not a template variable; ty had better match
-                                     -- Can't use (==) because types differ
-                               case ty of
-                                  TyVarTy v' | getUnique v == getUnique v'
-                                             -> k s       -- Success
-                                  other      -> Nothing   -- Failure
+match (TyVarTy v) ty tmpls k senv
+  | v `elemVarSet` tmpls
+  =     -- v is a template variable
+    case lookupSubstEnv senv v of
+	Nothing -> k (extendSubstEnv senv v (DoneTy ty))
+	Just (DoneTy ty')  | ty' == ty	       -> k senv   -- Succeeds
+			   | otherwise	       -> Nothing  -- Fails
 
-match (FunTy arg1 res1)   (FunTy arg2 res2)   k = match arg1 arg2 (match res1 res2 k)
-match (AppTy fun1 arg1)   ty2		      k = case splitAppTy_maybe ty2 of
-							Just (fun2,arg2) -> match fun1 fun2 (match arg1 arg2 k)
-							Nothing 	 -> \ _ -> Nothing	-- Fail
-match (TyConApp tc1 tys1) (TyConApp tc2 tys2) k | tc1 == tc2
-					        = match_list tys1 tys2 ( \(s,tys2') ->
-						  if null tys2' then 
-							k s	-- Succeed
-						  else
-							Nothing	-- Fail	
-						  )
+  | otherwise
+  =     -- v is not a template variable; ty had better match
+        -- Can't use (==) because types differ
+    case ty of
+        TyVarTy v' | v == v' -> k senv    -- Success
+        other    	     -> Nothing   -- Failure
+
+match (FunTy arg1 res1) (FunTy arg2 res2) tmpls k senv
+  = match arg1 arg2 tmpls (match res1 res2 tmpls k) senv
+
+match (AppTy fun1 arg1) ty2 tmpls k senv 
+  = case splitAppTy_maybe ty2 of
+	Just (fun2,arg2) -> match fun1 fun2 tmpls (match arg1 arg2 tmpls k) senv
+	Nothing 	 -> Nothing	-- Fail
+
+match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
+  | tc1 == tc2
+  = match_list tys1 tys2 tmpls k' senv
+  where
+    k' (senv', tys2') | null tys2' = k senv'	-- Succeed
+		      | otherwise  = Nothing	-- Fail	
 
 	-- With type synonyms, we have to be careful for the exact
 	-- same reasons as in the unifier.  Please see the
 	-- considerable commentary there before changing anything
 	-- here! (WDP 95/05)
-match (NoteTy _ ty1) ty2           k = match ty1 ty2 k
-match ty1	    (NoteTy _ ty2) k = match ty1 ty2 k
+match (NoteTy _ ty1) ty2            tmpls k senv = match ty1 ty2 tmpls k senv
+match ty1	     (NoteTy _ ty2) tmpls k senv = match ty1 ty2 tmpls k senv
 
 -- Catch-all fails
-match _ _ _ = \s -> Nothing
+match _ _ _ _ _ = Nothing
 
-match_list []         tys2       k = \s -> k (s, tys2)
-match_list (ty1:tys1) []         k = \s -> Nothing	-- Not enough arg tys => failure
-match_list (ty1:tys1) (ty2:tys2) k = match ty1 ty2 (match_list tys1 tys2 k)
+match_list []         tys2       tmpls k senv = k (senv, tys2)
+match_list (ty1:tys1) []         tmpls k senv = Nothing	-- Not enough arg tys => failure
+match_list (ty1:tys1) (ty2:tys2) tmpls k senv = match ty1 ty2 tmpls (match_list tys1 tys2 tmpls k) senv
 \end{code}
 

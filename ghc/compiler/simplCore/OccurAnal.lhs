@@ -13,7 +13,8 @@ core expression with (hopefully) improved usage information.
 \begin{code}
 module OccurAnal (
 	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr,
-	markBinderInsideLambda
+	markBinderInsideLambda, tagBinders,
+	UsageDetails
     ) where
 
 #include "HsVersions.h"
@@ -21,28 +22,28 @@ module OccurAnal (
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUtils	( exprIsTrivial, idSpecVars )
+import CoreFVs		( idRuleVars )
+import CoreUtils	( exprIsTrivial )
 import Const		( Con(..), Literal(..) )
-import Id		( idWantsToBeINLINEd, isSpecPragmaId,
+import Id		( isSpecPragmaId,
 			  getInlinePragma, setInlinePragma,
-			  omitIfaceSigForId,
+			  isExportedId, modifyIdInfo, idInfo,
 			  getIdSpecialisation, 
 			  idType, idUnique, Id
 			)
-import IdInfo		( InlinePragInfo(..), OccInfo(..) )
-import SpecEnv		( isEmptySpecEnv )
+import IdInfo		( InlinePragInfo(..), OccInfo(..), copyIdInfo )
 
 import VarSet
 import VarEnv
 
-import PrelInfo		( noRepStrIds, noRepIntegerIds )
-import Name		( isExported, isLocallyDefined )
+import ThinAir		( noRepStrIds, noRepIntegerIds )
+import Name		( isLocallyDefined )
 import Type		( splitFunTy_maybe, splitForAllTys )
 import Maybes		( maybeToBool )
 import Digraph		( stronglyConnCompR, SCC(..) )
-import Unique		( u2i )
+import Unique		( u2i, buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import UniqFM		( keysUFM )  
-import Util		( zipWithEqual, mapAndUnzip )
+import Util		( zipWithEqual, mapAndUnzip, count )
 import Outputable
 \end{code}
 
@@ -56,23 +57,6 @@ import Outputable
 Here's the externally-callable interface:
 
 \begin{code}
-occurAnalyseBinds
-	:: (SimplifierSwitch -> Bool)
-	-> [CoreBind]
-	-> [CoreBind]
-
-occurAnalyseBinds simplifier_sw_chkr binds
-  = binds'
-  where
-    (_, _, binds') = occAnalTop initial_env binds
-
-    initial_env = OccEnv (simplifier_sw_chkr IgnoreINLINEPragma)
-			 (\id -> isLocallyDefined id)	-- Anything local is interesting
-			 emptyVarSet
-\end{code}
-
-
-\begin{code}
 occurAnalyseExpr :: (Id -> Bool)	-- Tells if a variable is interesting
 		 -> CoreExpr
 		 -> (IdEnv BinderInfo,	-- Occ info for interesting free vars
@@ -81,9 +65,7 @@ occurAnalyseExpr :: (Id -> Bool)	-- Tells if a variable is interesting
 occurAnalyseExpr interesting expr
   = occAnal initial_env expr
   where
-    initial_env = OccEnv False {- Do not ignore INLINE Pragma -}
-			 interesting
-			 emptyVarSet
+    initial_env = OccEnv interesting emptyVarSet []
 
 occurAnalyseGlobalExpr :: CoreExpr -> CoreExpr
 occurAnalyseGlobalExpr expr
@@ -115,7 +97,7 @@ Without this we never get rid of the exp = loc thing.
 This save a gratuitous jump
 (from \tr{x_exported} to \tr{x_local}), and makes strictness
 information propagate better.
-This used to happen in the final phase, but its tidier to do it here.
+This used to happen in the final phase, but it's tidier to do it here.
 
 
 If more than one exported thing is equal to a local thing (i.e., the
@@ -147,80 +129,78 @@ and it's dangerous to do this fiddling in STG land
 because we might elminate a binding that's mentioned in the
 unfolding for something.
 
-
 \begin{code}
-occAnalTop :: OccEnv 			-- What's in scope
-	   -> [CoreBind]
-	   -> (IdEnv BinderInfo, 	-- Occurrence info
-	       IdEnv Id,		-- Indirection elimination info
-	       [CoreBind]
-	      )
+occurAnalyseBinds :: [CoreBind] -> [CoreBind]
 
-occAnalTop env [] = (emptyDetails, emptyVarEnv, [])
+occurAnalyseBinds binds
+  = binds'
+  where
+    (_, _, binds') = go initialTopEnv binds
 
--- Special case for eliminating indirections
---   Note: it's a shortcoming that this only works for
---	   non-recursive bindings.  Elminating indirections
---	   makes perfect sense for recursive bindings too, but
---	   it's more complicated to implement, so I haven't done so
+    go :: OccEnv -> [CoreBind]
+       -> (UsageDetails, 	-- Occurrence info
+	   IdEnv Id,		-- Indirection elimination info
+	   [CoreBind])
 
-occAnalTop env (bind : binds)
-  = case bind of
-	NonRec exported_id (Var local_id) | shortMeOut ind_env exported_id local_id
-		->  	-- Aha!  An indirection; let's eliminate it!
-		   (scope_usage, ind_env', binds')
+    go env [] = (emptyDetails, emptyVarEnv, [])
+
+    go env (bind : binds)
+      = let
+	    new_env			   = env `addNewCands` (bindersOf bind)
+	    (scope_usage, ind_env, binds') = go new_env binds
+	    (final_usage, new_binds)       = occAnalBind env (zapBind ind_env bind) scope_usage
+						-- NB: I zap before occur-analysing, so
+						-- I don't need to worry about getting the
+						-- occ info on the new bindings right.
+	in
+        case bind of
+	    NonRec exported_id (Var local_id) 
+		| shortMeOut ind_env exported_id local_id
+		-- Special case for eliminating indirections
+		--   Note: it's a shortcoming that this only works for
+		--	   non-recursive bindings.  Elminating indirections
+		--	   makes perfect sense for recursive bindings too, but
+		--	   it's more complicated to implement, so I haven't done so
+		-> (scope_usage, ind_env', binds')
 		where
 		   ind_env' = extendVarEnv ind_env local_id exported_id
 
-	other	-> 	-- Ho ho! The normal case
+	    other -> 	-- Ho ho! The normal case
 		   (final_usage, ind_env, new_binds ++ binds')
-		where
-		   (final_usage, new_binds) = occAnalBind env (zap_bind bind) scope_usage
-  where
-    new_env			   = env `addNewCands` (bindersOf bind)
-    (scope_usage, ind_env, binds') = occAnalTop new_env binds
+		   
+initialTopEnv = OccEnv isLocallyDefined	-- Anything local is interesting
+		       emptyVarSet
+		       []
 
-	-- Deal with any indirections
-    zap_bind (NonRec bndr rhs) 
-	| bndr `elemVarEnv` ind_env 			= Rec (zap (bndr,rhs))
+
+-- Deal with any indirections
+zapBind ind_env (NonRec bndr rhs) 
+  | bndr `elemVarEnv` ind_env 			   = Rec (zap ind_env (bndr,rhs))
 		-- The Rec isn't strictly necessary, but it's convenient
-    zap_bind (Rec pairs)
-	| or [id `elemVarEnv` ind_env | (id,_) <- pairs] = Rec (concat (map zap pairs))
+zapBind ind_env (Rec pairs)
+  | or [id `elemVarEnv` ind_env | (id,_) <- pairs] = Rec (concat (map (zap ind_env) pairs))
 
-    zap_bind bind = bind
+zapBind ind_env bind = bind
 
-    zap pair@(bndr,rhs) = case lookupVarEnv ind_env bndr of
-			    Nothing          -> [pair]
-			    Just exported_id -> [(bndr, Var exported_id),
-					         (exported_id, rhs)]
-
+zap ind_env pair@(bndr,rhs)
+  = case lookupVarEnv ind_env bndr of
+	Nothing          -> [pair]
+	Just exported_id -> [(bndr, Var exported_id),
+			     (exported_id_w_info, rhs)]
+		         where
+			   exported_id_w_info = modifyIdInfo (copyIdInfo (idInfo bndr)) exported_id
+				-- See notes with copyIdInfo about propagating IdInfo from
+				-- one to t'other
+			
 shortMeOut ind_env exported_id local_id
-  = isExported exported_id &&		-- Only if this is exported
+  = isExportedId exported_id &&		-- Only if this is exported
 
     isLocallyDefined local_id &&	-- Only if this one is defined in this
 					-- 	module, so that we *can* change its
 				  	-- 	binding to be the exported thing!
 
-    not (isExported local_id) &&	-- Only if this one is not itself exported,
+    not (isExportedId local_id) &&	-- Only if this one is not itself exported,
 					--	since the transformation will nuke it
-
-    not (omitIfaceSigForId local_id) &&	-- Don't do the transformation if rhs_id is
-					-- 	something like a constructor, whose 
-					--	definition is implicitly exported and 
-					-- 	which must not vanish.
-		-- To illustrate the preceding check consider
-		--	data T = MkT Int
-		--	mkT = MkT
-		--	f x = MkT (x+1)
-		-- Here, we'll make a local, non-exported, defn for MkT, and without the
-		-- above condition we'll transform it to:
-		--	mkT = \x. MkT [x]
-		--	f = \y. mkT (y+1)
-		-- This is bad because mkT will get the IdDetails of MkT, and won't
-		-- be exported.  Also the code generator won't make a definition for
-		-- the MkT constructor.
-		-- Slightly gruesome, this.
-
 
     not (local_id `elemVarEnv` ind_env)		-- Only if not already substituted for
 \end{code}
@@ -468,21 +448,20 @@ reOrderRec env (CyclicSCC (bind : binds))
     score :: Node Details2 -> Int	-- Higher score => less likely to be picked as loop breaker
     score ((bndr, rhs), _, _)
 	| exprIsTrivial rhs && 
-	  not (isExported bndr)    = 3		-- Practically certain to be inlined
-	| inlineCandidate bndr	   = 3		-- Likely to be inlined
+	  not (isExportedId bndr)  = 3		-- Practically certain to be inlined
+	| inlineCandidate bndr rhs = 3		-- Likely to be inlined
 	| not_fun_ty (idType bndr) = 2		-- Data types help with cases
-	| not (isEmptySpecEnv (getIdSpecialisation bndr)) = 1
-		-- Avoid things with a SpecEnv; we'd like
-		-- to take advantage of the SpecEnv in the subsequent bindings
+	| not (isEmptyCoreRules (getIdSpecialisation bndr)) = 1
+		-- Avoid things with specialisations; we'd like
+		-- to take advantage of them in the subsequent bindings
 	| otherwise = 0
 
-    inlineCandidate :: Id -> Bool
-    inlineCandidate id
-      = case getInlinePragma id of
-	    IWantToBeINLINEd        -> True
-	    IMustBeINLINEd          -> True
-	    ICanSafelyBeINLINEd _ _ -> True
-	    other		    -> False
+    inlineCandidate :: Id -> CoreExpr -> Bool
+    inlineCandidate id (Note InlineMe _) = True
+    inlineCandidate id rhs	         = case getInlinePragma id of
+						IMustBeINLINEd          -> True
+						ICanSafelyBeINLINEd _ _ -> True
+						other		    -> False
 
 	-- Real example (the Enum Ordering instance from PrelBase):
 	--	rec	f = \ x -> case d of (p,q,r) -> p x
@@ -509,43 +488,27 @@ ToDo: try using the occurrence info for the inline'd binder.
 [March 97] We do the same for atomic RHSs.  Reason: see notes with reOrderRec.
 [June 98, SLPJ]  I've undone this change; I don't understand it.  See notes with reOrderRec.
 
-[March 98] A new wrinkle is that if the binder has specialisations inside
-it then we count the specialised Ids as "extra rhs's".  That way
-the "parent" keeps the specialised "children" alive.  If the parent
-dies (because it isn't referenced any more), then the children will
-die too unless they are already referenced directly.
 
 \begin{code}
 occAnalRhs :: OccEnv
 	   -> Id -> CoreExpr	-- Binder and rhs
 	   -> (UsageDetails, CoreExpr)
 
-{-	DELETED SLPJ June 98: seems quite bogus to me
-occAnalRhs env id (Var v)
-  | isCandidate env v
-  = (unitVarEnv v (markMany (funOccurrence 0)), Var v)
-
-  | otherwise
-  = (emptyDetails, Var v)
--}
-
 occAnalRhs env id rhs
-  | idWantsToBeINLINEd id
-  = (mapVarEnv markMany total_usage, rhs')
-
-  | otherwise
-  = (total_usage, rhs')
-
+  = (final_usage, rhs')
   where
     (rhs_usage, rhs') = occAnal env rhs
-    lazy_rhs_usage    = mapVarEnv markLazy rhs_usage
-    total_usage	      = foldVarSet add lazy_rhs_usage spec_ids
-    add v u	      = addOneOcc u v noBinderInfo	-- Give a non-committal binder info
-							-- (i.e manyOcc) because many copies
-							-- of the specialised thing can appear
-    spec_ids = idSpecVars id
-\end{code}
 
+	-- [March 98] A new wrinkle is that if the binder has specialisations inside
+	-- it then we count the specialised Ids as "extra rhs's".  That way
+	-- the "parent" keeps the specialised "children" alive.  If the parent
+	-- dies (because it isn't referenced any more), then the children will
+	-- die too unless they are already referenced directly.
+
+    final_usage = foldVarSet add rhs_usage (idRuleVars id)
+    add v u = addOneOcc u v noBinderInfo	-- Give a non-committal binder info
+						-- (i.e manyOcc) because many copies
+						-- of the specialised thing can appear
 \end{code}
 
 Expressions
@@ -558,9 +521,19 @@ occAnal :: OccEnv
 
 occAnal env (Type t)  = (emptyDetails, Type t)
 
-occAnal env (Var v)
-  | isCandidate env v = (unitVarEnv v funOccZero, Var v)
-  | otherwise	      = (emptyDetails, Var v)
+occAnal env (Var v) 
+  = (var_uds, Var v)
+  where
+    var_uds | isCandidate env v = unitVarEnv v funOccZero
+	    | otherwise	        = emptyDetails
+
+    -- At one stage, I gathered the idRuleVars for v here too,
+    -- which in a way is the right thing to do.
+    -- But that went wrong right after specialisation, when
+    -- the *occurrences* of the overloaded function didn't have any
+    -- rules in them, so the *specialised* versions looked as if they
+    -- weren't used at all.
+
 \end{code}
 
 We regard variables that occur as constructor arguments as "dangerousToDup":
@@ -596,17 +569,14 @@ occAnal env expr@(Con (Literal lit) args)
 	      | otherwise	  = uds
 
 occAnal env (Con con args)
-  = case mapAndUnzip (occAnal env) args of { (arg_uds_s, args') ->
+  = case occAnalArgs env args of { (arg_uds, args') ->
     let	
-    	arg_uds 	 = foldr combineUsageDetails emptyDetails arg_uds_s
-
 	-- We mark the free vars of the argument of a constructor as "many"
 	-- This means that nothing gets inlined into a constructor argument
 	-- position, which is what we want.  Typically those constructor
 	-- arguments are just variables, or trivial expressions.
 	final_arg_uds    = case con of
 				DataCon _ -> mapVarEnv markMany arg_uds
-				PrimOp _  -> mapVarEnv markLazy arg_uds
 				other	  -> arg_uds
     in
     (final_arg_uds, Con con args')
@@ -614,6 +584,11 @@ occAnal env (Con con args)
 \end{code}
 
 \begin{code}
+occAnal env (Note InlineMe body)
+  = case occAnal env body of { (usage, body') -> 
+    (mapVarEnv markMany usage, Note InlineMe body')
+    }
+
 occAnal env (Note note@(SCC cc) body)
   = case occAnal env body of { (usage, body') ->
     (mapVarEnv markInsideSCC usage, Note note body')
@@ -626,12 +601,9 @@ occAnal env (Note note body)
 \end{code}
 
 \begin{code}
-occAnal env (App fun arg)
-  = case occAnal env fun of { (fun_usage, fun') ->
-    case occAnal env arg of { (arg_usage, arg') ->
-    (fun_usage `combineUsageDetails` mapVarEnv markLazy arg_usage, App fun' arg')
-    }}    
-    
+occAnal env app@(App fun arg)
+  = occAnalApp env (collectArgs app)
+
 -- Ignore type variables altogether
 --   (a) occurrences inside type lambdas only not marked as InsideLam
 --   (b) type variables not in environment
@@ -651,15 +623,19 @@ occAnal env expr@(Lam x body) | isTyVar x
 -- Then, the simplifier is careful when partially applying lambdas.
 
 occAnal env expr@(Lam _ _)
-  = case occAnal (env `addNewCands` binders) body of { (body_usage, body') ->
+  = case occAnal (env_body `addNewCands` binders) body of { (body_usage, body') ->
     let
         (final_usage, tagged_binders) = tagBinders body_usage binders
+	really_final_usage = if linear then
+				final_usage
+			     else
+				mapVarEnv markInsideLam final_usage
     in
-    (mapVarEnv markInsideLam final_usage,
+    (really_final_usage,
      mkLams tagged_binders body') }
   where
-    (binders, body) = collectBinders expr
-    
+    (binders, body)    = collectBinders expr
+    (linear, env_body) = getCtxt env (count isId binders)
 
 occAnal env (Case scrut bndr alts)
   = case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   -> 
@@ -679,8 +655,61 @@ occAnal env (Let bind body)
        (final_usage, mkLets new_binds body') }}
   where
     new_env = env `addNewCands` (bindersOf bind)
+
+occAnalArgs env args
+  = case mapAndUnzip (occAnal env) args of	{ (arg_uds_s, args') ->
+    (foldr combineUsageDetails emptyDetails arg_uds_s, args')}
 \end{code}
 
+Applications are dealt with specially because we want
+the "build hack" to work.
+
+\begin{code}
+-- Hack for build, fold, runST
+occAnalApp env (Var fun, args)
+  = case args_stuff of { (args_uds, args') ->
+    let
+	final_uds = fun_uds `combineUsageDetails` args_uds
+    in
+    (final_uds, mkApps (Var fun) args') }
+  where
+    fun_uniq = idUnique fun
+
+    fun_uds | isCandidate env fun = unitVarEnv fun funOccZero
+	    | otherwise	  	  = emptyDetails
+
+    args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
+		| fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
+		| fun_uniq == foldrIdKey    = appSpecial env 3 [False,True] args
+		| fun_uniq == runSTRepIdKey = appSpecial env 2 [True]	 args
+		| otherwise		    = occAnalArgs env args
+
+occAnalApp env (fun, args)
+  = case occAnal env fun of		{ (fun_uds, fun') ->
+    case occAnalArgs env args of	{ (args_uds, args') ->
+    let
+	final_uds = fun_uds `combineUsageDetails` args_uds
+    in
+    (final_uds, mkApps fun' args') }}
+    
+appSpecial :: OccEnv -> Int -> CtxtTy -> [CoreExpr] -> (UsageDetails, [CoreExpr])
+appSpecial env n ctxt args
+  = go n args
+  where
+    go n [] = (emptyDetails, [])	-- Too few args
+
+    go 1 (arg:args)			-- The magic arg
+      = case occAnal (setCtxt env ctxt) arg of	{ (arg_uds, arg') ->
+	case occAnalArgs env args of		{ (args_uds, args') ->
+	(combineUsageDetails arg_uds args_uds, arg':args') }}
+    
+    go n (arg:args)
+      = case occAnal env arg of		{ (arg_uds, arg') ->
+	case go (n-1) args of		{ (args_uds, args') ->
+	(combineUsageDetails arg_uds args_uds, arg':args') }}
+\end{code}
+
+    
 Case alternatives
 ~~~~~~~~~~~~~~~~~
 \begin{code}
@@ -700,29 +729,44 @@ occAnalAlt env (con, bndrs, rhs)
 %************************************************************************
 
 \begin{code}
+-- We gather inforamtion for variables that are either
+--	(a) in scope or
+--	(b) interesting
+
 data OccEnv =
-  OccEnv
-    Bool	-- IgnoreINLINEPragma flag
-		-- False <=> OK to use INLINEPragma information
-		-- True  <=> ignore INLINEPragma information
+  OccEnv (Id -> Bool)	-- Tells whether an Id occurrence is interesting,
+  	 IdSet		-- In-scope Ids
+	 CtxtTy		-- Tells about linearity
 
-    (Id -> Bool)	-- Tells whether an Id occurrence is interesting,
-			-- given the set of in-scope variables
-
-    IdSet	-- In-scope Ids
-
-
-addNewCands :: OccEnv -> [Id] -> OccEnv
-addNewCands (OccEnv ip ifun cands) ids
-  = OccEnv ip ifun (cands `unionVarSet` mkVarSet ids)
-
-addNewCand :: OccEnv -> Id -> OccEnv
-addNewCand (OccEnv ip ifun cands) id
-  = OccEnv ip ifun (extendVarSet cands id)
+type CtxtTy = [Bool]
+	-- []	 	No info
+	--
+	-- True:ctxt  	Analysing a function-valued expression that will be
+	--			applied just once
+	--
+	-- False:ctxt	Analysing a function-valued expression that may
+	--			be applied many times; but when it is, 
+	--			the CtxtTy inside applies
 
 isCandidate :: OccEnv -> Id -> Bool
-isCandidate (OccEnv _ ifun cands) id = id `elemVarSet` cands || ifun id
+isCandidate (OccEnv ifun cands _) id = id `elemVarSet` cands || ifun id
 
+addNewCands :: OccEnv -> [Id] -> OccEnv
+addNewCands (OccEnv ifun cands ctxt) ids
+  = OccEnv ifun (cands `unionVarSet` mkVarSet ids) ctxt
+
+addNewCand :: OccEnv -> Id -> OccEnv
+addNewCand (OccEnv ifun cands ctxt) id
+  = OccEnv ifun (extendVarSet cands id) ctxt
+
+setCtxt :: OccEnv -> CtxtTy -> OccEnv
+setCtxt (OccEnv ifun cands _) ctxt = OccEnv ifun cands ctxt
+
+getCtxt :: OccEnv -> Int -> (Bool, OccEnv)	-- True <=> this is a linear lambda
+						-- The Int is the number of lambdas
+getCtxt env@(OccEnv ifun cands []) n = (False, env)
+getCtxt (OccEnv ifun cands ctxt)   n = (and (take n ctxt), OccEnv ifun cands (drop n ctxt))
+		-- Only return True if *all* the lambdas are linear
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 
@@ -745,9 +789,7 @@ emptyDetails = (emptyVarEnv :: UsageDetails)
 unitDetails id info = (unitVarEnv id info :: UsageDetails)
 
 usedIn :: Id -> UsageDetails -> Bool
-v `usedIn` details =  isExported v
-		   || v `elemVarEnv` details
-		   || isSpecPragmaId v
+v `usedIn` details =  isExportedId v || v `elemVarEnv` details
 
 tagBinders :: UsageDetails	    -- Of scope
 	   -> [Id]		    -- Binders
@@ -786,8 +828,6 @@ setBinderPrag usage bndr
 	ICanSafelyBeINLINEd _ _ -> new_bndr	-- from the previous iteration of
 	IAmALoopBreaker	        -> new_bndr	-- the occurrence analyser
 
-	IAmASpecPragmaId	-> bndr		-- Don't ever overwrite or drop these as dead
-
 	other | its_now_dead	-> new_bndr	-- Overwrite the others iff it's now dead
 	      | otherwise	-> bndr
 
@@ -802,7 +842,7 @@ setBinderPrag usage bndr
     new_prag = occInfoToInlinePrag occ_info
 
     occ_info
-	| isExported bndr = noBinderInfo
+	| isExportedId bndr = noBinderInfo
 	-- Don't use local usage info for visible-elsewhere things
 	-- But NB that we do set NoInlinePragma for exported things
 	-- thereby nuking any IAmALoopBreaker from a previous pass.

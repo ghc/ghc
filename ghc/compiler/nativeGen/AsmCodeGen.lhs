@@ -3,7 +3,7 @@
 %
 
 \begin{code}
-module AsmCodeGen ( writeRealAsm, dumpRealAsm ) where
+module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
 
@@ -77,13 +77,8 @@ The machine-dependent bits break down as follows:
 
 So, here we go:
 \begin{code}
-writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
-writeRealAsm handle absC us
-  = -- _scc_ "writeRealAsm" 
-    printForAsm handle (initUs_ us (runNCG absC))
-
-dumpRealAsm :: AbstractC -> UniqSupply -> SDoc
-dumpRealAsm absC us = initUs_ us (runNCG absC)
+nativeCodeGen :: AbstractC -> UniqSupply -> SDoc
+nativeCodeGen absC us = initUs_ us (runNCG absC)
 
 runNCG absC
   = genCodeAbstractC absC	`thenUs` \ treelists ->

@@ -36,18 +36,21 @@ type SrcFun  = RdrName
 
 \begin{code}
 data RdrBinding
-  = RdrNullBind
+  = 	-- On input we use the Empty/And form rather than a list
+    RdrNullBind
   | RdrAndBindings	RdrBinding RdrBinding
-  | RdrTyClDecl		RdrNameTyClDecl
-  | RdrValBinding	RdrNameMonoBinds	-- Pattern or function binding
-  | RdrInstDecl 	RdrNameInstDecl
-  | RdrDefaultDecl	RdrNameDefaultDecl
-  | RdrForeignDecl      RdrNameForeignDecl
 
-			-- signatures are mysterious; we can't
-			-- tell if its a Sig or a ClassOpSig,
-			-- so we just save the pieces:
+	-- Value bindings havn't been united with their
+	-- signatures yet
+  | RdrValBinding	RdrNameMonoBinds
+
+	-- Signatures are mysterious; we can't
+	-- tell if its a Sig or a ClassOpSig,
+	-- so we just save the pieces:
   | RdrSig		RdrNameSig
+
+	-- The remainder all fit into the main HsDecl form
+  | RdrHsDecl		RdrNameHsDecl
 
 type SigConverter = RdrNameSig -> RdrNameSig
 \end{code}

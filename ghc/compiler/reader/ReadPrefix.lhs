@@ -15,14 +15,12 @@ import HsTypes		( HsTyVar(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import RdrHsSyn         
 import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
-import PrelMods		( pRELUDE )
+import PrelMods		( pRELUDE_Name )
 import PrefixToHs
 import CallConv
 
-import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts )
-import Module		( Module, mkSrcModuleFS, mkImportModuleFS,
-			  hiFile, hiBootFile
-			)
+import CmdLineOpts      ( opt_NoImplicitPrelude, opt_GlasgowExts, opt_D_dump_rdr )
+import Module		( ModuleName, mkSrcModuleFS, WhereFrom(..) )
 import OccName		( NameSpace, tcName, clsName, tcClsName, varName, dataName, tvName,
 			  isLexCon
 			)
@@ -30,83 +28,10 @@ import RdrName		( RdrName, isRdrDataCon, mkSrcQual, mkSrcUnqual, mkPreludeQual,
 			  dummyRdrVarName
 			)
 import Outputable
+import ErrUtils		( dumpIfSet )
 import SrcLoc		( SrcLoc )
 import FastString	( mkFastCharString )
 import PrelRead		( readRational__ )
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[ReadPrefix-help]{Help Functions}
-%*									*
-%************************************************************************
-
-\begin{code}
-wlkList :: (U_VOID_STAR -> UgnM a) -> U_list -> UgnM [a]
-
-wlkList wlk_it U_lnil = returnUgn []
-
-wlkList wlk_it (U_lcons hd tl)
-  = wlk_it  hd		`thenUgn` \ hd_it ->
-    wlkList wlk_it tl	`thenUgn` \ tl_it ->
-    returnUgn (hd_it : tl_it)
-\end{code}
-
-\begin{code}
-wlkMaybe :: (U_VOID_STAR -> UgnM a) -> U_maybe -> UgnM (Maybe a)
-
-wlkMaybe wlk_it U_nothing  = returnUgn Nothing
-wlkMaybe wlk_it (U_just x)
-  = wlk_it  x		`thenUgn` \ it ->
-    returnUgn (Just it)
-\end{code}
-
-\begin{code}
-wlkTcClsId = wlkQid (\_ -> tcClsName)
-wlkTcId    = wlkQid (\_ -> tcName)
-wlkClsId   = wlkQid (\_ -> clsName)
-wlkVarId   = wlkQid (\occ -> if isLexCon occ
-			     then dataName
-			     else varName)
-wlkDataId  = wlkQid (\_ -> dataName)
-wlkEntId   = wlkQid (\occ -> if isLexCon occ
-			     then tcClsName
-			     else varName)
-
-wlkQid	:: (FAST_STRING -> NameSpace) -> U_qid -> UgnM RdrName
-
--- There are three kinds of qid:
---	qualified name (aqual)		A.x
---	unqualified name (noqual)	x
---	special name (gid)		[], (), ->, (,,,)
--- The special names always mean "Prelude.whatever"; that's why
--- they are distinct.  So if you write "()", it's just as if  you
--- had written "Prelude.()".  
--- NB: The (qualified) prelude is always in scope, so the renamer will find it.
-
--- EXCEPT: when we're compiling with -fno-implicit-prelude, in which
--- case we need to unqualify these things. -- SDM.
-
-wlkQid mk_name_space (U_noqual name)
-  = returnUgn (mkSrcUnqual (mk_name_space name) name)
-wlkQid mk_name_space (U_aqual  mod name)
-  = returnUgn (mkSrcQual (mk_name_space name) mod name)
-wlkQid mk_name_space (U_gid n name)	-- Built in Prelude things
-  | opt_NoImplicitPrelude 
-  = returnUgn (mkSrcUnqual (mk_name_space name) name)
-  | otherwise
-  = returnUgn (mkPreludeQual (mk_name_space name) pRELUDE name)
-
-
-rdTCId  pt = rdU_qid pt `thenUgn` wlkTcId
-rdVarId pt = rdU_qid pt `thenUgn` wlkVarId
-
-rdTvId  pt = rdU_stringId pt `thenUgn` \ string -> wlkTvId string
-wlkTvId string = returnUgn (mkSrcUnqual tvName string)
-
-cvFlag :: U_long -> Bool
-cvFlag 0 = False
-cvFlag 1 = True
 \end{code}
 
 %************************************************************************
@@ -116,23 +41,33 @@ cvFlag 1 = True
 %************************************************************************
 
 \begin{code}
-rdModule :: IO (Module,		    -- this module's name
+rdModule :: IO (ModuleName,	    -- this module's name
 	        RdrNameHsModule)    -- the main goods
 
 rdModule
-  = _ccall_ hspmain 	>>= \ pt -> -- call the Yacc parser!
-    let
-	srcfile  = mkFastCharString ``input_filename'' -- What A Great Hack! (TM)
-    in
-    initUgn 		  $
-    rdU_tree pt `thenUgn` \ (U_hmodule mod_fs himplist hexplist
+  = 	-- call the Yacc parser!
+    _ccall_ hspmain				>>= \ pt -> 
+
+	-- Read from the Yacc tree
+    initUgn (read_module pt)			>>= \ (mod_name, rdr_module) ->
+
+	-- Dump if reqd
+    dumpIfSet opt_D_dump_rdr "Reader"
+	      (ppr rdr_module)			>>
+
+	-- And return
+    return (mod_name, rdr_module)
+
+read_module :: ParseTree -> UgnM (ModuleName, RdrNameHsModule)
+read_module pt
+  = rdU_tree pt `thenUgn` \ (U_hmodule mod_fs himplist hexplist
 				       hmodlist srciface_version srcline) ->
     let
+	srcfile  = mkFastCharString ``input_filename'' -- What A Great Hack! (TM)
 	mod_name = mkSrcModuleFS mod_fs
     in
 
     setSrcFileUgn srcfile 		$
-    setSrcModUgn  mod_name		$
     mkSrcLocUgn srcline			$ \ src_loc	->
 
     wlkMaybe rdEntities	hexplist `thenUgn` \ exports	->
@@ -140,16 +75,15 @@ rdModule
     wlkBinding		hmodlist `thenUgn` \ binding	->
 
     let
-	top_decls = cvTopDecls srcfile binding
+	top_decls  = cvTopDecls srcfile binding
+       	rdr_module = HsModule mod_name
+	      		      (case srciface_version of { 0 -> Nothing; n -> Just n })
+	      		      exports
+	      		      imports
+			      top_decls
+	      		      src_loc
     in
-    returnUgn (mod_name,
-       	       HsModule mod_name
-	      		  (case srciface_version of { 0 -> Nothing; n -> Just n })
-	      		  exports
-	      		  imports
-			  top_decls
-	      		  src_loc
-       		)
+    returnUgn (mod_name, rdr_module)
 \end{code}
 
 %************************************************************************
@@ -552,7 +486,8 @@ wlkBinding binding
 	wlkConAndTyVars    ttype    `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  tcons    `thenUgn` \ cons	    ->
 	wlkDerivings	   tderivs  `thenUgn` \ derivings   ->
-	returnUgn (RdrTyClDecl (TyData DataType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
+	returnUgn (RdrHsDecl (TyClD (TyData DataType ctxt tycon tyvars cons 
+					    derivings noDataPragmas src_loc)))
 
 	-- "newtype" declaration
       U_ntbind ntctxt nttype ntcon ntderivs srcline ->
@@ -561,14 +496,15 @@ wlkBinding binding
 	wlkConAndTyVars    nttype   `thenUgn` \ (tycon, tyvars) ->
 	wlkList rdConDecl  ntcon    `thenUgn` \ cons	    ->
 	wlkDerivings	   ntderivs `thenUgn` \ derivings   ->
-	returnUgn (RdrTyClDecl (TyData NewType ctxt tycon tyvars cons derivings noDataPragmas src_loc))
+	returnUgn (RdrHsDecl (TyClD (TyData NewType ctxt tycon tyvars cons 
+					    derivings noDataPragmas src_loc)))
 
 	-- "type" declaration
       U_nbind nbindid nbindas srcline -> 		
 	mkSrcLocUgn	  srcline 	  $ \ src_loc	    ->
 	wlkConAndTyVars   nbindid `thenUgn` \ (tycon, tyvars) ->
 	wlkHsType	  nbindas `thenUgn` \ expansion	    ->
-	returnUgn (RdrTyClDecl (TySynonym tycon tyvars expansion src_loc))
+	returnUgn (RdrHsDecl (TyClD (TySynonym tycon tyvars expansion src_loc)))
 
 	-- function binding
       U_fbind fbindm srcline ->
@@ -593,8 +529,8 @@ wlkBinding binding
 	let
 	    (final_methods, final_sigs) = cvMonoBindsAndSigs sf cvClassOpSig binding
 	in
-	returnUgn (RdrTyClDecl
-	  (mkClassDecl ctxt clas tyvars final_sigs final_methods noClassPragmas src_loc))
+	returnUgn (RdrHsDecl (TyClD (mkClassDecl ctxt clas tyvars final_sigs 
+						 final_methods noClassPragmas src_loc)))
 
 	-- "instance" declaration
       U_ibind ty ibindw srcline ->
@@ -604,19 +540,19 @@ wlkBinding binding
 	mkSrcLocUgn	srcline		$ \ src_loc ->
 	wlkInstType       ty		`thenUgn` \ inst_ty    ->
 	wlkBinding	ibindw		`thenUgn` \ binding ->
-	getSrcModUgn			`thenUgn` \ modname ->
 	getSrcFileUgn			`thenUgn` \ sf	    ->
 	let
 	    (binds,uprags) = cvMonoBindsAndSigs sf cvInstDeclSig binding
 	in
-	returnUgn (RdrInstDecl
-          (InstDecl inst_ty binds uprags Nothing {- No dfun id -} src_loc))
+	returnUgn (RdrHsDecl (InstD (InstDecl inst_ty binds uprags 
+					      dummyRdrVarName {- No dfun id yet -} 
+					      src_loc)))
 
 	-- "default" declaration
       U_dbind dbindts srcline ->
 	mkSrcLocUgn        srcline  	$ \ src_loc ->
 	wlkList rdMonoType dbindts  `thenUgn` \ tys ->
-	returnUgn (RdrDefaultDecl (DefaultDecl tys src_loc))
+	returnUgn (RdrHsDecl (DefD (DefaultDecl tys src_loc)))
 
         -- "foreign" declaration
       U_fobind id ty ext_name unsafe_flag cconv imp_exp srcline ->
@@ -626,7 +562,7 @@ wlkBinding binding
 	wlkExtName ext_name			   `thenUgn` \ h_ext_name ->
 	rdCallConv cconv		           `thenUgn` \ h_cconv ->
 	rdForKind imp_exp (cvFlag unsafe_flag)    `thenUgn` \ h_imp_exp ->
- 	returnUgn (RdrForeignDecl (ForeignDecl h_id h_imp_exp h_ty h_ext_name h_cconv src_loc))
+ 	returnUgn (RdrHsDecl (ForD (ForeignDecl h_id h_imp_exp h_ty h_ext_name h_cconv src_loc)))
 
       U_sbind sbindids sbindid srcline ->
 	-- Type signature
@@ -639,21 +575,14 @@ wlkBinding binding
 	-- value specialisation user-pragma
 	mkSrcLocUgn srcline		$ \ src_loc ->
 	wlkVarId uvar		    	`thenUgn` \ var ->
-	wlkList rd_ty_and_id vspec_tys  `thenUgn` \ tys_and_ids ->
-	returnUgn (foldr1 RdrAndBindings [ RdrSig (SpecSig var ty using_id src_loc)
-				         | (ty, using_id) <- tys_and_ids ])
-	where
-	  rd_ty_and_id :: ParseTree -> UgnM (RdrNameHsType, Maybe RdrName)
-          rd_ty_and_id pt
-	      = rdU_binding pt			`thenUgn` \ (U_vspec_ty_and_id vspec_ty vspec_id) ->
-		wlkHsSigType vspec_ty		`thenUgn` \ ty	     ->
-		wlkMaybe rdVarId vspec_id	`thenUgn` \ id_maybe ->
-		returnUgn(ty, id_maybe)
+	wlkList rdHsSigType vspec_tys	`thenUgn` \ tys ->
+	returnUgn (foldr1 RdrAndBindings [ RdrSig (SpecSig var ty src_loc)
+				         | ty <- tys ])
 
-      U_ispec_uprag iclas ispec_ty srcline ->
+      U_ispec_uprag ispec_ty srcline ->
 	-- instance specialisation user-pragma
 	mkSrcLocUgn srcline		$ \ src_loc ->
-	wlkHsSigType ispec_ty		`thenUgn` \ ty	    ->
+	wlkInstType  ispec_ty		`thenUgn` \ ty    ->
 	returnUgn (RdrSig (SpecInstSig ty src_loc))
 
       U_inline_uprag ivar srcline ->
@@ -668,6 +597,13 @@ wlkBinding binding
 	wlkVarId	ivar		`thenUgn` \ var     ->
 	returnUgn (RdrSig (NoInlineSig var src_loc))
 
+      U_rule_prag name ivars ilhs irhs srcline -> 
+	-- Transforamation rule
+	mkSrcLocUgn srcline		$ \ src_loc ->
+	wlkList rdRuleBndr ivars	`thenUgn` \ vars ->
+	rdExpr ilhs			`thenUgn` \ lhs ->
+	rdExpr irhs			`thenUgn` \ rhs ->
+	returnUgn (RdrHsDecl (RuleD (RuleDecl name [] vars lhs rhs src_loc)))
 
 mkRdrFunctionBinding :: [RdrNameMatch] -> SrcLoc -> RdrNameMonoBinds
 mkRdrFunctionBinding fun_matches src_loc
@@ -677,6 +613,18 @@ mkRdrFunctionBinding fun_matches src_loc
 
     de_fun_match (Match _ [ConPatIn fn pats]      sig grhss) = (fn, False, Match [] pats    sig grhss)
     de_fun_match (Match _ [ConOpPatIn p1 fn _ p2] sig grhss) = (fn, True,  Match [] [p1,p2] sig grhss)
+
+
+rdRuleBndr :: ParseTree -> UgnM RdrNameRuleBndr
+rdRuleBndr pt = rdU_rulevar pt	`thenUgn` wlkRuleBndr
+
+wlkRuleBndr :: U_rulevar -> UgnM RdrNameRuleBndr
+wlkRuleBndr (U_prulevar v)
+  = returnUgn (RuleBndr (mkSrcUnqual varName v))
+wlkRuleBndr (U_prulevarsig v ty)
+  = wlkHsType ty	`thenUgn` \ ty'	 ->
+    returnUgn (RuleBndrSig (mkSrcUnqual varName v) ty')
+
 
 
 rdGRHSs :: ParseTree -> UgnM RdrNameGRHSs
@@ -719,11 +667,13 @@ wlkDerivings (U_just pt)
 %************************************************************************
 
 \begin{code}
-rdHsType :: ParseTree -> UgnM RdrNameHsType
-rdMonoType :: ParseTree -> UgnM RdrNameHsType
+rdHsSigType :: ParseTree -> UgnM RdrNameHsType
+rdHsType    :: ParseTree -> UgnM RdrNameHsType
+rdMonoType  :: ParseTree -> UgnM RdrNameHsType
 
-rdHsType   pt = rdU_ttype pt `thenUgn` wlkHsType
-rdMonoType pt = rdU_ttype pt `thenUgn` wlkHsType
+rdHsSigType pt = rdU_ttype pt `thenUgn` wlkHsSigType
+rdHsType    pt = rdU_ttype pt `thenUgn` wlkHsType
+rdMonoType  pt = rdU_ttype pt `thenUgn` wlkHsType
 
 wlkHsConstrArgType ttype
 	-- Used for the argument types of contructors
@@ -922,7 +872,8 @@ rdImport pt
     mkSrcLocUgn srcline				$ \ src_loc      ->
     wlkMaybe rdU_stringId ias		`thenUgn` \ maybe_as	->
     wlkMaybe rd_spec ispec		`thenUgn` \ maybe_spec	->
-    returnUgn (ImportDecl (mkImportModuleFS imod (cvIfaceFlavour isrc)) 
+    returnUgn (ImportDecl (mkSrcModuleFS imod)
+			  (cvImportSource isrc)
 			  (cvFlag iqual) 
 			  (case maybe_as of { Just m -> Just (mkSrcModuleFS m); Nothing -> Nothing })
 			  maybe_spec src_loc)
@@ -934,8 +885,8 @@ rdImport pt
 	U_right pt -> rdEntities pt 	`thenUgn` \ ents ->
 		      returnUgn (True, ents)
 
-cvIfaceFlavour 0 = hiFile	-- No pragam
-cvIfaceFlavour 1 = hiBootFile	-- {-# SOURCE #-}
+cvImportSource 0 = ImportByUser			-- No pragam
+cvImportSource 1 = ImportByUserSource		-- {-# SOURCE #-}
 \end{code}
 
 \begin{code}
@@ -1002,3 +953,82 @@ rdForKind 2 _ = -- foreign label
   returnUgn FoLabel
 
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection[ReadPrefix-help]{Help Functions}
+%*									*
+%************************************************************************
+
+\begin{code}
+wlkList :: (U_VOID_STAR -> UgnM a) -> U_list -> UgnM [a]
+
+wlkList wlk_it U_lnil = returnUgn []
+
+wlkList wlk_it (U_lcons hd tl)
+  = wlk_it  hd		`thenUgn` \ hd_it ->
+    wlkList wlk_it tl	`thenUgn` \ tl_it ->
+    returnUgn (hd_it : tl_it)
+\end{code}
+
+\begin{code}
+wlkMaybe :: (U_VOID_STAR -> UgnM a) -> U_maybe -> UgnM (Maybe a)
+
+wlkMaybe wlk_it U_nothing  = returnUgn Nothing
+wlkMaybe wlk_it (U_just x)
+  = wlk_it  x		`thenUgn` \ it ->
+    returnUgn (Just it)
+\end{code}
+
+\begin{code}
+wlkTcClsId = wlkQid (\_ -> tcClsName)
+wlkTcId    = wlkQid (\_ -> tcName)
+wlkClsId   = wlkQid (\_ -> clsName)
+wlkVarId   = wlkQid (\occ -> if isLexCon occ
+			     then dataName
+			     else varName)
+wlkDataId  = wlkQid (\_ -> dataName)
+wlkEntId   = wlkQid (\occ -> if isLexCon occ
+			     then tcClsName
+			     else varName)
+
+wlkQid	:: (FAST_STRING -> NameSpace) -> U_qid -> UgnM RdrName
+
+-- There are three kinds of qid:
+--	qualified name (aqual)		A.x
+--	unqualified name (noqual)	x
+--	special name (gid)		[], (), ->, (,,,)
+-- The special names always mean "Prelude.whatever"; that's why
+-- they are distinct.  So if you write "()", it's just as if  you
+-- had written "Prelude.()".  
+-- NB: The (qualified) prelude is always in scope, so the renamer will find it.
+
+-- EXCEPT: when we're compiling with -fno-implicit-prelude, in which
+-- case we need to unqualify these things. -- SDM.
+
+wlkQid mk_name_space (U_noqual name)
+  = returnUgn (mkSrcUnqual (mk_name_space name) name)
+wlkQid mk_name_space (U_aqual  mod name)
+  = returnUgn (mkSrcQual (mk_name_space name) mod name)
+wlkQid mk_name_space (U_gid n name)	-- Built in Prelude things
+  | opt_NoImplicitPrelude 
+  = returnUgn (mkSrcUnqual (mk_name_space name) name)
+  | otherwise
+  = returnUgn (mkPreludeQual (mk_name_space name) pRELUDE_Name name)
+
+
+rdTCId  pt = rdU_qid pt `thenUgn` wlkTcId
+rdVarId pt = rdU_qid pt `thenUgn` wlkVarId
+
+rdTvId  pt = rdU_stringId pt `thenUgn` \ string -> wlkTvId string
+wlkTvId string = returnUgn (mkSrcUnqual tvName string)
+
+-- Unqualified variables, used in the 'forall' of a RULE
+rdUVarId  pt = rdU_stringId pt `thenUgn` \ string -> wlkUVarId string
+wlkUVarId string = returnUgn (mkSrcUnqual varName string)
+
+cvFlag :: U_long -> Bool
+cvFlag 0 = False
+cvFlag 1 = True
+\end{code}
+

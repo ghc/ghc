@@ -4,7 +4,7 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcExpr, tcPolyExpr, tcId ) where
+module TcExpr ( tcApp, tcExpr, tcPolyExpr, tcId ) where
 
 #include "HsVersions.h"
 
@@ -13,7 +13,7 @@ import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds,
-			  mkHsTyApp, maybeBoxedPrimType
+			  mkHsTyApp, mkHsLet, maybeBoxedPrimType
 			)
 
 import TcMonad
@@ -21,7 +21,7 @@ import BasicTypes	( RecFlag(..) )
 
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  LIE, emptyLIE, unitLIE, plusLIE, plusLIEs, newOverloadedLit,
-			  newMethod, newMethodWithGivenTy, newDicts, instToId )
+			  newMethod, instOverloadedFun, newDicts, instToId )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcInstId,
 			  tcLookupValue, tcLookupClassByKey,
@@ -53,10 +53,10 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
 			  isForAllTy, splitAlgTyConApp, splitAlgTyConApp_maybe,
 			  boxedTypeKind, mkArrowKind,
-			  substTopTheta, tidyOpenType
+			  tidyOpenType
 			)
+import Subst		( mkTopTyVarSubst, substTheta )
 import UsageSPUtils     ( unannotTy )
-import VarEnv		( zipVarEnv )
 import VarSet		( elemVarSet, mkVarSet )
 import TyCon		( tyConDataCons )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
@@ -153,7 +153,7 @@ tcPolyExpr arg expected_arg_ty
 	    -- a couple of new names which seems worse.
 	generalised_arg = TyLam zonked_sig_tyvars $
 			  DictLam dict_ids $
-			  HsLet (MonoBind inst_binds [] Recursive) 
+			  mkHsLet inst_binds $ 
 			  arg' 
     in
     returnTc ( generalised_arg, free_insts,
@@ -596,8 +596,8 @@ tcMonoExpr (RecordUpd record_expr rbinds) res_ty
 	-- union the ones that could participate in the update.
     let
 	(tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
-	inst_env = zipVarEnv tyvars result_inst_tys
-	theta'   = substTopTheta inst_env theta
+	inst_env = mkTopTyVarSubst tyvars result_inst_tys
+	theta'   = substTheta inst_env theta
     in
     newDicts RecordUpdOrigin theta'		`thenNF_Tc` \ (con_lie, dicts) ->
 
@@ -715,9 +715,9 @@ tcExpr_id id_expr
 
 \begin{code}
 
-tcApp :: RenamedHsExpr -> [RenamedHsExpr]   -- Function and args
-      -> TcType			    -- Expected result type of application
-      -> TcM s (TcExpr, [TcExpr],	    -- Translated fun and args
+tcApp :: RenamedHsExpr -> [RenamedHsExpr]   	-- Function and args
+      -> TcType			    		-- Expected result type of application
+      -> TcM s (TcExpr, [TcExpr],	    	-- Translated fun and args
 		LIE)
 
 tcApp fun args res_ty
@@ -811,11 +811,11 @@ tcId name
     tcLookupValueMaybe name	`thenNF_Tc` \ maybe_local ->
 
     case maybe_local of
-      Just tc_id -> instantiate_it tc_id (unannotTy (idType tc_id))
+      Just tc_id -> instantiate_it (OccurrenceOf tc_id) (HsVar tc_id) (unannotTy (idType tc_id))
 
       Nothing ->    tcLookupValue name		`thenNF_Tc` \ id ->
 		    tcInstId id			`thenNF_Tc` \ (tyvars, theta, tau) ->
-		    instantiate_it2 id tyvars theta tau
+		    instantiate_it2 (OccurrenceOf id) (HsVar id) tyvars theta tau
 
   where
 	-- The instantiate_it loop runs round instantiating the Id.
@@ -824,23 +824,22 @@ tcId name
 	--		f:: forall a. Eq a => forall b. Baz b => tau
 	-- We want to instantiate this to
 	--		f2::tau		{f2 = f1 b (Baz b), f1 = f a (Eq a)}
-    instantiate_it tc_id_occ ty
+    instantiate_it orig fun ty
       = tcInstTcType ty		`thenNF_Tc` \ (tyvars, rho) ->
 	tcSplitRhoTy rho	`thenNF_Tc` \ (theta, tau) ->
-	instantiate_it2 tc_id_occ tyvars theta tau
+	instantiate_it2 orig fun tyvars theta tau
 
-    instantiate_it2 tc_id_occ tyvars theta tau
+    instantiate_it2 orig fun tyvars theta tau
       = if null theta then 	-- Is it overloaded?
-		returnNF_Tc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
+		returnNF_Tc (mkHsTyApp fun arg_tys, emptyLIE, tau)
 	else
 		-- Yes, it's overloaded
-	newMethodWithGivenTy (OccurrenceOf tc_id_occ)
-			     tc_id_occ arg_tys theta tau `thenNF_Tc` \ inst ->
-	instantiate_it (instToId inst) tau		 `thenNF_Tc` \ (expr, lie2, final_tau) ->
-	returnNF_Tc (expr, unitLIE inst `plusLIE` lie2, final_tau)
+	instOverloadedFun orig fun arg_tys theta tau	`thenNF_Tc` \ (fun', lie1) ->
+	instantiate_it orig fun' tau			`thenNF_Tc` \ (expr, lie2, final_tau) ->
+	returnNF_Tc (expr, lie1 `plusLIE` lie2, final_tau)
 
       where
-	arg_tys	      = mkTyVarTys tyvars
+	arg_tys	= mkTyVarTys tyvars
 \end{code}
 
 %************************************************************************
@@ -859,6 +858,7 @@ tcDoStmts do_or_lc stmts src_loc res_ty
     newTyVarTy (mkArrowKind boxedTypeKind boxedTypeKind)	`thenNF_Tc` \ m ->
     newTyVarTy boxedTypeKind 					`thenNF_Tc` \ elt_ty ->
     unifyTauTy res_ty (mkAppTy m elt_ty)			`thenTc_`
+
 	-- If it's a comprehension we're dealing with, 
 	-- force it to be a list comprehension.
 	-- (as of Haskell 98, monad comprehensions are no more.)

@@ -11,7 +11,7 @@ module LambdaLift ( liftProgram ) where
 import StgSyn
 
 import Bag		( Bag, emptyBag, unionBags, unitBag, snocBag, bagToList )
-import Id		( mkUserId, idType, setIdArity, Id )
+import Id		( mkVanillaId, idType, setIdArity, Id )
 import VarSet
 import VarEnv
 import IdInfo		( exactArity )
@@ -441,7 +441,7 @@ newSupercombinator :: Type
 		   -> LiftM Id
 
 newSupercombinator ty arity mod ci us idenv
-  = mkUserId (mkTopName uniq mod SLIT("_ll")) ty
+  = mkVanillaId (mkTopName uniq mod SLIT("_ll")) ty
     `setIdArity` exactArity arity
 	-- ToDo: rm the setIdArity?  Just let subsequent stg-saturation pass do it?
   where

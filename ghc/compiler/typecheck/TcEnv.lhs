@@ -42,10 +42,11 @@ import TcType	( TcType, TcTyVar, TcTyVarSet, TcThetaType,
 import VarEnv
 import VarSet
 import Type	( Kind, superKind,
-		  tyVarsOfType, tyVarsOfTypes, mkTyVarTy, substTy,
-		  splitForAllTys, splitRhoTy, splitFunTys, substTopTy,
+		  tyVarsOfType, tyVarsOfTypes, mkTyVarTy,
+		  splitForAllTys, splitRhoTy, splitFunTys,
 		  splitAlgTyConApp_maybe, getTyVar
 		)
+import Subst	( substTy )
 import UsageSPUtils ( unannotTy )
 import DataCon	( DataCon )
 import TyCon	( TyCon, tyConKind, tyConArity, isSynTyCon )
@@ -54,7 +55,7 @@ import Class	( Class, classTyCon )
 import TcMonad
 
 import BasicTypes	( Arity )
-import IdInfo		( noIdInfo )
+import IdInfo		( vanillaIdInfo )
 import Name		( Name, OccName, nameOccName, getSrcLoc,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
 			  NamedThing(..)
@@ -111,7 +112,7 @@ tcInstId id
     in
     tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
     let
-	rho'	       = substTopTy tenv rho
+	rho'	       = substTy tenv rho
 	(theta', tau') = splitRhoTy rho' 
     in
     returnNF_Tc (tyvars', theta', tau')
@@ -400,7 +401,7 @@ tcAddImportedIdInfo unf_env id
   where
     new_info = -- pprTrace "tcAdd" (ppr id) $
 	       case explicitLookupValue unf_env (getName id) of
-		     Nothing	      -> noIdInfo
+		     Nothing	      -> vanillaIdInfo
 		     Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same
 \end{code}

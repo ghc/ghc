@@ -331,6 +331,10 @@ NL  	    	    	[\n\r]
 			      PUSH_STATE(UserPragma);
 			      RETURN(INLINE_UPRAGMA);
 			    }
+<Code,GlaExt>"{-#"{WS}*"RULES" {
+			      PUSH_STATE(Code);	/* I'm not sure about this */
+			      RETURN(RULES_UPRAGMA);
+			    }
 <Code,GlaExt>"{-#"{WS}*"inline" {
 			      PUSH_STATE(UserPragma);
 			      RETURN(INLINE_UPRAGMA);
@@ -373,7 +377,7 @@ NL  	    	    	[\n\r]
 			      nested_comments = 1; comment_start = hsplineno;
 			      PUSH_STATE(Comment);
 			    }
-<UserPragma>"#-}"	    { POP_STATE; RETURN(END_UPRAGMA); }
+<Code,GlaExt,UserPragma>"#-}"	    { POP_STATE; RETURN(END_UPRAGMA); }
 
 %{
     /*

@@ -14,7 +14,7 @@ module TcHsSyn (
 	TcHsModule, TcCoreExpr, TcDictBinds,
 	TcForeignExportDecl,
 	
-	TypecheckedHsBinds, 
+	TypecheckedHsBinds, TypecheckedRuleDecl,
 	TypecheckedMonoBinds, TypecheckedPat,
 	TypecheckedHsExpr, TypecheckedArithSeqInfo,
 	TypecheckedStmt, TypecheckedForeignDecl,
@@ -23,7 +23,7 @@ module TcHsSyn (
 	TypecheckedRecordBinds, TypecheckedDictBinds,
 
 	mkHsTyApp, mkHsDictApp,
-	mkHsTyLam, mkHsDictLam,
+	mkHsTyLam, mkHsDictLam, mkHsLet,
 
 	-- re-exported from TcEnv
 	TcId, tcInstId,
@@ -31,7 +31,7 @@ module TcHsSyn (
 	maybeBoxedPrimType,
 
 	zonkTopBinds, zonkId, zonkIdOcc,
-	zonkForeignExports
+	zonkForeignExports, zonkRules
   ) where
 
 #include "HsVersions.h"
@@ -57,6 +57,7 @@ import Var	( TyVar )
 import VarEnv	( TyVarEnv, emptyVarEnv, extendVarEnvList )
 import VarSet	( isEmptyVarSet )
 import CoreSyn  ( Expr )
+import BasicTypes ( RecFlag(..) )
 import Bag
 import UniqFM
 import Outputable
@@ -89,6 +90,7 @@ type TcHsModule	= HsModule TcId TcPat
 
 type TcCoreExpr	= Expr TcId
 type TcForeignExportDecl = ForeignDecl TcId
+type TcRuleDecl 	 = RuleDecl    TcId TcPat
 
 type TypecheckedPat		= OutPat	Id
 type TypecheckedMonoBinds 	= MonoBinds	Id TypecheckedPat
@@ -103,6 +105,7 @@ type TypecheckedGRHS		= GRHS		Id TypecheckedPat
 type TypecheckedRecordBinds	= HsRecordBinds Id TypecheckedPat
 type TypecheckedHsModule	= HsModule	Id TypecheckedPat
 type TypecheckedForeignDecl     = ForeignDecl Id
+type TypecheckedRuleDecl	= RuleDecl      Id TypecheckedPat
 \end{code}
 
 \begin{code}
@@ -117,6 +120,9 @@ mkHsTyLam tyvars expr = TyLam tyvars expr
 
 mkHsDictLam []    expr = expr
 mkHsDictLam dicts expr = DictLam dicts expr
+
+mkHsLet EmptyMonoBinds expr = expr
+mkHsLet mbinds	       expr = HsLet (MonoBind mbinds [] Recursive) expr
 \end{code}
 
 %************************************************************************
@@ -270,7 +276,7 @@ zonkMonoBinds (FunMonoBind var inf ms locn)
     returnNF_Tc (FunMonoBind new_var inf new_ms locn, unitBag new_var)
 
 
-zonkMonoBinds (AbsBinds tyvars dicts exports val_bind)
+zonkMonoBinds (AbsBinds tyvars dicts exports inlines val_bind)
   = mapNF_Tc zonkTcTyVarToTyVar tyvars	`thenNF_Tc` \ new_tyvars ->
 	-- No need to extend tyvar env: the effects are
 	-- propagated through binding the tyvars themselves
@@ -287,7 +293,7 @@ zonkMonoBinds (AbsBinds tyvars dicts exports val_bind)
     let
 	    new_globals = listToBag [global | (_, global, local) <- new_exports]
     in
-    returnNF_Tc (AbsBinds new_tyvars new_dicts new_exports new_val_bind,
+    returnNF_Tc (AbsBinds new_tyvars new_dicts new_exports inlines new_val_bind,
 		 new_globals)
   where
     zonkExport (tyvars, global, local)
@@ -650,4 +656,21 @@ zonkForeignExport :: TcForeignExportDecl -> NF_TcM s (TypecheckedForeignDecl)
 zonkForeignExport (ForeignDecl i imp_exp hs_ty ext_nm cconv src_loc) =
    zonkIdOcc i	`thenNF_Tc` \ i' ->
    returnNF_Tc (ForeignDecl i' imp_exp undefined ext_nm cconv src_loc)
+\end{code}
+
+\begin{code}
+zonkRules :: [TcRuleDecl] -> NF_TcM s [TypecheckedRuleDecl]
+zonkRules rs = mapNF_Tc zonkRule rs
+
+zonkRule (RuleDecl name tyvars vars lhs rhs loc)
+  = mapNF_Tc zonkTcTyVarToTyVar tyvars			`thenNF_Tc` \ new_tyvars ->
+    mapNF_Tc zonkIdBndr [v | RuleBndr v <- vars]	`thenNF_Tc` \ new_bndrs ->
+    tcExtendGlobalValEnv new_bndrs			$
+    zonkExpr lhs					`thenNF_Tc` \ new_lhs ->
+    zonkExpr rhs					`thenNF_Tc` \ new_rhs ->
+    returnNF_Tc (RuleDecl name new_tyvars (map RuleBndr new_bndrs) new_lhs new_rhs loc)
+	-- I hate this map RuleBndr stuff
+
+zonkRule (IfaceRuleDecl fun rule loc)
+  = returnNF_Tc (IfaceRuleDecl fun rule loc)
 \end{code}

@@ -20,11 +20,11 @@ import IdInfo		( CprInfo(..), noCprInfo )
 import Const		( Con(..), DataCon )
 import DataCon		( dataConArgTys )
 import Demand		( Demand(..) )
-import PrelVals		( aBSENT_ERROR_ID )
-import TysWiredIn	( unitTy, unitDataCon, 
-                          unboxedTupleCon, unboxedTupleTyCon )
+import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
+import TysPrim		( realWorldStatePrimTy )
+import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
 import Type		( isUnLiftedType, mkTyVarTys, mkTyVarTy, mkFunTys,
-			  splitForAllTys, splitFunTys,
+			  splitForAllTys, splitFunTysN,
 			  splitAlgTyConApp_maybe, mkTyConApp,
 			  Type
 			)
@@ -204,8 +204,13 @@ nonAbsentArgs []		 = 0
 nonAbsentArgs (WwLazy True : ds) = nonAbsentArgs ds
 nonAbsentArgs (d	   : ds) = 1 + nonAbsentArgs ds
 
-worthSplitting :: [Demand] -> Bool	-- True <=> the wrapper would not be an identity function
-worthSplitting ds = any worth_it ds
+worthSplitting :: [Demand]
+	       -> Bool	-- Result is bottom
+	       -> Bool	-- True <=> the wrapper would not be an identity function
+worthSplitting ds result_bot = not result_bot && any worth_it ds
+	-- Don't split if the result is bottom; there's no efficiency to
+	-- be gained, and (worse) the wrapper body may not look like a wrapper
+	-- body to getWorkerIdAndCons
   where
     worth_it (WwLazy True)	 = True		-- Absent arg
     worth_it (WwUnpack _ True _) = True		-- Arg to unpack
@@ -232,31 +237,25 @@ the function and the name of its worker, and we want to make its body (the wrapp
 
 \begin{code}
 mkWrapper :: Type		-- Wrapper type
+	  -> Int		-- Arity
 	  -> [Demand]		-- Wrapper strictness info
 	  -> CprInfo            -- Wrapper cpr info
 	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
 
-mkWrapper fun_ty demands cpr_info
-  = let
-	n_wrap_args = length demands
-    in
-    getUniquesUs n_wrap_args	`thenUs` \ wrap_uniqs ->
+mkWrapper fun_ty arity demands cpr_info
+  = getUniquesUs arity		`thenUs` \ wrap_uniqs ->
     let
 	(tyvars, tau_ty)   = splitForAllTys fun_ty
-	(arg_tys, body_ty) = splitFunTys tau_ty
+	(arg_tys, body_ty) = splitFunTysN "mkWrapper" arity tau_ty
 		-- The "expanding dicts" part here is important, even for the splitForAll
 		-- The imported thing might be a dictionary, such as Functor Foo
 		-- But Functor Foo = forall a b. (a->b) -> Foo a -> Foo b
 		-- and as such might have some strictness info attached.
 		-- Then we need to have enough args to zip to the strictness info
 	
-	wrap_args	   = ASSERT( n_wrap_args <= length arg_tys )
-			     zipWith mk_ww_local wrap_uniqs arg_tys
-
-	leftover_arg_tys   = drop n_wrap_args arg_tys
-	final_body_ty	   = mkFunTys leftover_arg_tys body_ty
+	wrap_args	   = zipWith mk_ww_local wrap_uniqs arg_tys
     in
-    mkWwBodies tyvars wrap_args final_body_ty demands cpr_info	`thenUs` \ (wrap_fn, _, _) ->
+    mkWwBodies tyvars wrap_args body_ty demands cpr_info	`thenUs` \ (wrap_fn, _, _) ->
     returnUs wrap_fn
 \end{code}
 
@@ -280,13 +279,15 @@ mkWwBodies tyvars args body_ty demands cpr_info
 	--	f = /\abc. \xyz. fw abc void
 	-- 	fw = /\abc. \v. body
 	--
+	-- We use the state-token type which generates no code
     getUniqueUs 		`thenUs` \ void_arg_uniq ->
     let
-	void_arg = mk_ww_local void_arg_uniq unitTy
+	void_arg = mk_ww_local void_arg_uniq realWorldStatePrimTy
     in
-    returnUs (\ work_id -> mkLams tyvars $ mkLams args $
+    returnUs (\ work_id -> Note InlineMe $		-- Inline the wrapper
+			   mkLams tyvars $ mkLams args $
 			   mkApps (Var work_id) 
-				  (map (Type . mkTyVarTy) tyvars ++ [mkConApp unitDataCon []]),
+				  (map (Type . mkTyVarTy) tyvars ++ [Var realWorldPrimId]),
 	      \ body    -> mkLams (tyvars ++ [void_arg]) body,
 	      [WwLazy True])
 
@@ -298,9 +299,11 @@ mkWwBodies tyvars wrap_args body_ty demands cpr_info
 	wrap_args_w_demands = zipWith setIdDemandInfo wrap_args demands
     in
     mkWW wrap_args_w_demands 		`thenUs` \ (wrap_fn, work_args_w_demands, work_fn) ->
-    mkWWcpr body_ty cpr_info
-                                        `thenUs` \ (wrap_fn_w_cpr, work_fn_w_cpr) ->
-    returnUs (\ work_id -> mkLams tyvars $ mkLams wrap_args_w_demands $
+
+    mkWWcpr body_ty cpr_info            `thenUs` \ (wrap_fn_w_cpr, work_fn_w_cpr) ->
+
+    returnUs (\ work_id -> Note InlineMe $
+			   mkLams tyvars $ mkLams wrap_args_w_demands $
 			   (wrap_fn_w_cpr . wrap_fn) (mkTyApps (Var work_id) (mkTyVarTys tyvars)),
 
 	      \ body    -> mkLams tyvars $ mkLams work_args_w_demands $
@@ -385,11 +388,10 @@ left-to-right traversal of the result structure.
 
 
 \begin{code}
-
-mkWWcpr ::    Type                              -- function body type
-           -> CprInfo                           -- CPR analysis results
-           -> UniqSM (CoreExpr -> CoreExpr,             -- New wrapper 
-                      CoreExpr -> CoreExpr)	        -- New worker
+mkWWcpr :: Type                              -- function body type
+        -> CprInfo                           -- CPR analysis results
+        -> UniqSM (CoreExpr -> CoreExpr,             -- New wrapper 
+                   CoreExpr -> CoreExpr)	     -- New worker
 
 mkWWcpr body_ty NoCPRInfo 
     = returnUs (id, id)      -- Must be just the strictness transf.
@@ -401,11 +403,12 @@ mkWWcpr body_ty (CPRInfo cpr_args)
       cpr_reconstruct body_ty cpr_info'                   `thenUs` \reconst_fn ->
       cpr_flatten body_ty cpr_info'                       `thenUs` \flatten_fn ->
       returnUs (reconst_fn, flatten_fn)
-    -- We only make use of the outer level of CprInfo,  otherwise we
-    -- may lose laziness.  :-(  Hopefully,  we will find a use for the
-    -- extra info some day (e.g. creating versions specialized to 
-    -- the use made of the components of the result by the callee)
-    where cpr_info' = CPRInfo (map (const NoCPRInfo) cpr_args) 
+    where
+	    -- We only make use of the outer level of CprInfo,  otherwise we
+	    -- may lose laziness.  :-(  Hopefully,  we will find a use for the
+	    -- extra info some day (e.g. creating versions specialized to 
+	    -- the use made of the components of the result by the callee)
+      cpr_info' = CPRInfo (map (const NoCPRInfo) cpr_args) 
 \end{code}
 
 
@@ -414,7 +417,6 @@ from the CPR analysis and flattens the constructed product components.
 These are returned in an unboxed tuple.
 
 \begin{code}
-
 cpr_flatten :: Type -> CprInfo -> UniqSM (CoreExpr -> CoreExpr)
 cpr_flatten ty cpr_info
     = mk_cpr_case (ty, cpr_info)       `thenUs` \(res_id, tup_ids, flatten_exp) ->
@@ -488,8 +490,11 @@ mk_cpr_let :: (Type, CprInfo) ->
 mk_cpr_let (ty, NoCPRInfo)
       -- this component will appear explicitly in the unboxed tuple.
     = getUniqueUs            `thenUs`     \id_uniq   ->
-      let id_id = mk_ww_local id_uniq ty in
-        returnUs (id_id, [id_id], id)
+      let
+	id_id = mk_ww_local id_uniq ty
+      in
+      returnUs (id_id, [id_id], id)
+
 mk_cpr_let (ty, cpr_info@(CPRInfo ci_args))
     | isNewTyCon tycon   -- a new type: must coerce the argument to this type
     = ASSERT ( null $ tail inst_con_arg_tys )
@@ -533,9 +538,8 @@ splitType fname ty = (data_con, tycon, tycon_arg_tys, dataConArgTys data_con tyc
 	      Nothing		->
 		   pprPanic (fname ++ ":") 
                             (text "not a datatype" $$ ppr ty)
-
-
 \end{code}
+
 
 %************************************************************************
 %*									*

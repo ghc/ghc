@@ -31,7 +31,9 @@ import Var		( Id )
 import Name		( UserFS, EncodedFS, encodeFS, decode,
 			  getOccName, occNameFS
 			)
-import Module		( Module, pprModule, moduleUserString )
+import Module		( Module, ModuleName, moduleName,
+			  pprModuleName, moduleNameUserString
+			)
 import Outputable	
 import Util	        ( thenCmp )
 \end{code}
@@ -104,14 +106,14 @@ data CostCentre
 
   | NormalCC {  
 		cc_name :: CcName,		-- Name of the cost centre itself
-		cc_mod  :: Module,		-- Name of module defining this CC.
+		cc_mod  :: ModuleName,		-- Name of module defining this CC.
 		cc_grp  :: Group,	  	-- "Group" that this CC is in.
 		cc_is_dupd :: IsDupdCC,		-- see below
 		cc_is_caf  :: IsCafCC		-- see below
     }
 
   | AllCafsCC {	
-		cc_mod  :: Module,		-- Name of module defining this CC.
+		cc_mod  :: ModuleName,		-- Name of module defining this CC.
 		cc_grp  :: Group	  	-- "Group" that this CC is in
 			-- Again, one "big" CAF cc per module, where all
 			-- CAF costs are attributed unless the user asked for
@@ -185,21 +187,21 @@ Building cost centres
 \begin{code}
 mkUserCC :: UserFS -> Module -> Group -> CostCentre
 
-mkUserCC cc_name module_name group_name
+mkUserCC cc_name mod group_name
   = NormalCC { cc_name = encodeFS cc_name,
-	       cc_mod =  module_name, cc_grp = group_name,
+	       cc_mod =  moduleName mod, cc_grp = group_name,
 	       cc_is_dupd = OriginalCC, cc_is_caf = NotCafCC {-might be changed-}
     }
 
 mkAutoCC :: Id -> Module -> Group -> IsCafCC -> CostCentre
 
-mkAutoCC id module_name group_name is_caf
+mkAutoCC id mod group_name is_caf
   = NormalCC { cc_name = occNameFS (getOccName id), 
-	       cc_mod =  module_name, cc_grp = group_name,
+	       cc_mod =  moduleName mod, cc_grp = group_name,
 	       cc_is_dupd = OriginalCC, cc_is_caf = is_caf
     }
 
-mkAllCafsCC  m g	  = AllCafsCC  { cc_mod = m, cc_grp = g }
+mkAllCafsCC m g = AllCafsCC  { cc_mod = moduleName m, cc_grp = g }
 
 mkSingletonCCS :: CostCentre -> CostCentreStack
 mkSingletonCCS cc = SingletonCCS cc
@@ -248,7 +250,7 @@ sccAbleCostCentre cc | isCafCC cc = False
 		     | otherwise  = True
 
 ccFromThisModule :: CostCentre -> Module -> Bool
-ccFromThisModule cc m = cc_mod cc == m
+ccFromThisModule cc m = cc_mod cc == moduleName m
 \end{code}
 
 \begin{code}
@@ -342,12 +344,12 @@ instance Outputable CostCentre where
 
 -- Printing in an interface file or in Core generally
 pprCostCentreCore (AllCafsCC {cc_mod = m, cc_grp = g})
-  = text "__sccC" <+> braces (pprModule m <+> doubleQuotes (ptext g))
+  = text "__sccC" <+> braces (pprModuleName m <+> doubleQuotes (ptext g))
 pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m, cc_grp = g,
 			     cc_is_caf = caf, cc_is_dupd = dup})
   = text "__scc" <+> braces (hsep [
 	ptext n,
-	pprModule m,	
+	pprModuleName m,	
 	doubleQuotes (ptext g),
 	pp_dup dup,
 	pp_caf caf
@@ -362,10 +364,10 @@ pp_caf other   = empty
 
 -- Printing as a C label
 ppCostCentreLbl (NoCostCentre)		  	     = text "CC_NONE"
-ppCostCentreLbl (AllCafsCC  {cc_mod = m}) 	     = text "CC_CAFs_"  <> pprModule m
+ppCostCentreLbl (AllCafsCC  {cc_mod = m}) 	     = text "CC_CAFs_"  <> pprModuleName m
 ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
   = text "CC_" <> text (case is_caf of { CafCC -> "CAF_"; _ -> "" }) 
-    <> pprModule m <> ptext n
+    <> pprModuleName m <> ptext n
 
 -- This is the name to go in the user-displayed string, 
 -- recorded in the cost centre declaration
@@ -386,11 +388,11 @@ pprCostCentreDecl is_local cc
   = if is_local then
 	hcat [
 	    ptext SLIT("CC_DECLARE"),char '(',
-	    cc_ident, 		  				comma,
-	    doubleQuotes (text (costCentreUserName cc)),	comma,
-	    doubleQuotes (text (moduleUserString mod_name)),	comma,
-	    doubleQuotes (ptext grp_name),			comma,
-	    ptext is_subsumed,					comma,
+	    cc_ident, 		  					comma,
+	    doubleQuotes (text (costCentreUserName cc)),		comma,
+	    doubleQuotes (text (moduleNameUserString mod_name)),	comma,
+	    doubleQuotes (ptext grp_name),				comma,
+	    ptext is_subsumed,						comma,
 	    empty,	-- Now always externally visible
 	    text ");"]
     else

@@ -15,7 +15,7 @@ module BinderInfo (
 
 	deadOccurrence, funOccurrence, noBinderInfo,
 
-	markLazy, markMany, markInsideLam, markInsideSCC,
+	markMany, markInsideLam, markInsideSCC,
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
 
@@ -94,9 +94,9 @@ deadOccurrence :: BinderInfo
 deadOccurrence = DeadCode
 
 funOccurrence :: Int -> BinderInfo
-funOccurrence = OneOcc StrictOcc NotInsideSCC 1
+funOccurrence = OneOcc NotInsideLam NotInsideSCC 1
 
-markLazy, markMany, markInsideLam, markInsideSCC :: BinderInfo -> BinderInfo
+markMany, markInsideLam, markInsideSCC :: BinderInfo -> BinderInfo
 
 markMany (OneOcc _ _ _ ar) = ManyOcc ar
 markMany (ManyOcc ar) 	   = ManyOcc ar
@@ -107,9 +107,6 @@ markInsideLam other		 	  = other
 
 markInsideSCC (OneOcc dup_danger _ n_alts ar) = OneOcc dup_danger InsideSCC n_alts ar
 markInsideSCC other			      = other
-
-markLazy (OneOcc StrictOcc scc n_alts ar) = OneOcc LazyOcc scc n_alts ar
-markLazy other			          = other
 
 addBinderInfo, orBinderInfo :: BinderInfo -> BinderInfo -> BinderInfo
 
@@ -138,8 +135,7 @@ orBinderInfo info1 info2
 
 or_dups InsideLam _         = InsideLam
 or_dups _         InsideLam = InsideLam
-or_dups StrictOcc StrictOcc = StrictOcc
-or_dups _         _         = LazyOcc
+or_dups _         _         = NotInsideLam
 
 or_sccs InsideSCC _ = InsideSCC
 or_sccs _ InsideSCC = InsideSCC

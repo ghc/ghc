@@ -526,7 +526,6 @@ prbind(b)
 	case ispec_uprag:
 			  PUTTAGSTR("SS");
 			  plineno(gispec_line(b));
-			  pqid(gispec_clas(b));
 			  pttype(gispec_ty(b));
 			  break;
 	case inline_uprag:

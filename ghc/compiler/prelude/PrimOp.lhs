@@ -6,14 +6,13 @@
 \begin{code}
 module PrimOp (
 	PrimOp(..), allThePrimOps,
-	tagOf_PrimOp, -- ToDo: rm
 	primOpType, primOpSig, primOpUsg,
-	primOpUniq, primOpOcc,
+	mkPrimOpIdName, primOpRdrName,
 
 	commutableOp,
 
 	primOpOutOfLine, primOpNeedsWrapper, primOpStrictness,
-	primOpOkForSpeculation, primOpIsCheap,
+	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 	primOpHasSideEffects,
 
 	getPrimOpResultInfo,  PrimOpResultInfo(..),
@@ -28,9 +27,11 @@ import TysPrim
 import TysWiredIn
 
 import Demand		( Demand, wwLazy, wwPrim, wwStrict )
-import Var		( TyVar )
+import Var		( TyVar, Id )
 import CallConv		( CallConv, pprCallConv )
 import PprType		( pprParendType )
+import Name		( Name, mkWiredInIdName )
+import RdrName		( RdrName, mkRdrQual )
 import OccName		( OccName, pprOccName, mkSrcVarOcc )
 import TyCon		( TyCon, tyConArity )
 import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
@@ -39,6 +40,7 @@ import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
                           UsageAnn(..), mkUsgTy
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
+import PrelMods		( pREL_GHC, pREL_GHC_Name )
 import Outputable
 import Util		( assoc, zipWithEqual )
 import GlaExts		( Int(..), Int#, (==#) )
@@ -1983,6 +1985,15 @@ than once.  Evaluation order is unaffected.
 primOpIsCheap op = not (primOpHasSideEffects op || primOpOutOfLine op)
 \end{code}
 
+primOpIsDupable means that the use of the primop is small enough to
+duplicate into different case branches.  See CoreUtils.exprIsDupable.
+
+\begin{code}
+primOpIsDupable (CCallOp _ _ _ _) = False
+primOpIsDupable op		  = not (primOpOutOfLine op)
+\end{code}
+
+
 \begin{code}
 primOpCanFail :: PrimOp -> Bool
 -- Int.
@@ -2102,18 +2113,6 @@ primOpNeedsWrapper other_op 	    	= False
 \end{code}
 
 \begin{code}
-primOpOcc op
-  = case (primOpInfo op) of
-      Dyadic     occ _	       -> occ
-      Monadic    occ _	       -> occ
-      Compare    occ _	       -> occ
-      GenPrimOp  occ _ _ _     -> occ
-\end{code}
-
-\begin{code}
-primOpUniq :: PrimOp -> Unique
-primOpUniq op = mkPrimOpIdUnique (IBOX(tagOf_PrimOp op))
-
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case (primOpInfo op) of
@@ -2123,6 +2122,27 @@ primOpType op
 
       GenPrimOp occ tyvars arg_tys res_ty -> 
 	mkForAllTys tyvars (mkFunTys arg_tys res_ty)
+
+mkPrimOpIdName :: PrimOp -> Id -> Name
+	-- Make the name for the PrimOp's Id
+	-- We have to pass in the Id itself because it's a WiredInId
+	-- and hence recursive
+mkPrimOpIdName op id
+  = mkWiredInIdName key pREL_GHC occ_name id
+  where
+    occ_name = primOpOcc op
+    key	     = mkPrimOpIdUnique (IBOX(tagOf_PrimOp op))
+
+
+primOpRdrName :: PrimOp -> RdrName 
+primOpRdrName op = mkRdrQual pREL_GHC_Name (primOpOcc op)
+
+primOpOcc :: PrimOp -> OccName
+primOpOcc op = case (primOpInfo op) of
+			      Dyadic    occ _	  -> occ
+			      Monadic   occ _	  -> occ
+			      Compare   occ _	  -> occ
+			      GenPrimOp occ _ _ _ -> occ
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)

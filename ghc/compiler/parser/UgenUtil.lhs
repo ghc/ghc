@@ -18,7 +18,7 @@ import FastString	( FastString, mkFastCharString, mkFastCharString2 )
 
 \begin{code}
 type UgnM a
-  = (FastString,Module,SrcLoc)	   -- file, module and src_loc carried down
+  = (FastString,SrcLoc)	   -- file, and src_loc carried down
   -> IO a
 
 {-# INLINE returnUgn #-}
@@ -31,7 +31,7 @@ thenUgn x y stuff
     y z stuff
 
 initUgn :: UgnM a -> IO a
-initUgn action = action (SLIT(""),mkSrcModule "",noSrcLoc)
+initUgn action = action (SLIT(""),noSrcLoc)
 
 ioToUgnM :: IO a -> UgnM a
 ioToUgnM x stuff = x
@@ -67,23 +67,17 @@ rdU_hstring x
 
 \begin{code}
 setSrcFileUgn :: FastString -> UgnM a -> UgnM a
-setSrcFileUgn file action stuff@(_,mod,loc) = action (file,mod,loc)
+setSrcFileUgn file action stuff@(_,loc) = action (file,loc)
 
 getSrcFileUgn :: UgnM FastString
-getSrcFileUgn stuff@(file,mod,loc) = returnUgn file stuff
-
-setSrcModUgn :: Module -> UgnM a -> UgnM a
-setSrcModUgn mod action stuff@(file,_,loc) = action (file,mod,loc)
-
-getSrcModUgn :: UgnM Module
-getSrcModUgn stuff@(file,mod,loc) = returnUgn mod stuff
+getSrcFileUgn stuff@(file,loc) = returnUgn file stuff
 
 mkSrcLocUgn :: U_long -> (SrcLoc -> UgnM a) -> UgnM a
-mkSrcLocUgn ln action (file,mod,_)
-  = action loc (file,mod,loc)
+mkSrcLocUgn ln action (file,_)
+  = action loc (file,loc)
   where
     loc = mkSrcLoc file ln
 
 getSrcLocUgn :: UgnM SrcLoc
-getSrcLocUgn stuff@(file,mod,loc) = returnUgn loc stuff
+getSrcLocUgn stuff@(file,loc) = returnUgn loc stuff
 \end{code}

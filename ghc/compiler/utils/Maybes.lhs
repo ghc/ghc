@@ -8,6 +8,7 @@ module Maybes (
 --	Maybe(..), -- no, it's in 1.3
 	MaybeErr(..),
 
+	orElse, 
 	mapMaybe,
 	allMaybes,
 	firstJust,
@@ -29,6 +30,9 @@ module Maybes (
 #include "HsVersions.h"
 
 import Maybe( catMaybes, mapMaybe )
+
+
+infixr 4 `orElse`
 \end{code}
 
 
@@ -96,6 +100,10 @@ returnMaybe = Just
 
 failMaybe :: Maybe a
 failMaybe = Nothing
+
+orElse :: Maybe a -> a -> a
+(Just x) `orElse` y = x
+Nothing  `orElse` y = y
 \end{code}
 
 Lookup functions

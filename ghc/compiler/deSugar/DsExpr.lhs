@@ -26,7 +26,7 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp )
-import DsUtils		( mkErrorAppDs )
+import DsUtils		( mkErrorAppDs, mkDsLets, mkConsExpr, mkNilExpr )
 import Match		( matchWrapper, matchSimply )
 
 import CoreUtils	( coreExprType )
@@ -36,7 +36,7 @@ import Id		( Id, idType, recordSelectorFieldLabel )
 import Const		( Con(..) )
 import DataCon		( DataCon, dataConId, dataConTyCon, dataConArgTys, dataConFieldLabels )
 import Const		( mkMachInt, Literal(..), mkStrLit )
-import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
+import PrelInfo		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import TyCon		( isNewTyCon )
 import DataCon		( isExistentialDataCon )
 import Type		( splitFunTys, mkTyConApp,
@@ -44,7 +44,7 @@ import Type		( splitFunTys, mkTyConApp,
 			  splitAppTy, isUnLiftedType, Type
 			)
 import TysWiredIn	( tupleCon, unboxedTupleCon,
-			  consDataCon, listTyCon, mkListTy,
+			  listTyCon, mkListTy,
 			  charDataCon, charTy, stringTy
 			)
 import BasicTypes	( RecFlag(..) )
@@ -82,7 +82,8 @@ dsLet (ThenBinds b1 b2) body
     dsLet b1 body'
   
 -- Special case for bindings which bind unlifted variables
-dsLet (MonoBind (AbsBinds [] [] binder_triples (PatMonoBind pat grhss loc)) sigs is_rec) body
+-- Silently ignore INLINE pragmas...
+dsLet (MonoBind (AbsBinds [] [] binder_triples inlines (PatMonoBind pat grhss loc)) sigs is_rec) body
   | or [isUnLiftedType (idType g) | (_, g, l) <- binder_triples]
   = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
     putSrcLocDs loc			$
@@ -102,9 +103,7 @@ dsLet (MonoBind binds sigs is_rec) body
   = dsMonoBinds NoSccs binds []  `thenDs` \ prs ->
     case is_rec of
       Recursive    -> returnDs (Let (Rec prs) body)
-      NonRecursive -> returnDs (foldr mk_let body prs)
-  where
-    mk_let (bndr,rhs) body = Let (NonRec bndr rhs) body
+      NonRecursive -> returnDs (mkDsLets [NonRec b r | (b,r) <- prs] body)
 \end{code}
 
 %************************************************************************
@@ -149,7 +148,7 @@ dsExpr (HsLitOut (HsString s) _)
   = let
 	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_ s))]
 	the_nil  = mkNilExpr charTy
-	the_cons = mkConApp consDataCon [Type charTy, the_char, the_nil]
+	the_cons = mkConsExpr charTy the_char the_nil
     in
     returnDs the_cons
 
@@ -277,9 +276,6 @@ will sort it out.
 dsExpr (OpApp e1 op _ e2)
   = dsExpr op						`thenDs` \ core_op ->
     -- for the type of y, we need the type of op's 2nd argument
-    let
-	(x_ty:y_ty:_, _) = splitFunTys (coreExprType core_op)
-    in
     dsExpr e1				`thenDs` \ x_core ->
     dsExpr e2				`thenDs` \ y_core ->
     returnDs (mkApps core_op [x_core, y_core])
@@ -399,7 +395,7 @@ dsExpr (ExplicitListOut ty xs)
     go (x:xs) = dsExpr x				`thenDs` \ core_x ->
 		go xs					`thenDs` \ core_xs ->
                 ASSERT( isNotUsgTy ty )
-		returnDs (mkConApp consDataCon [Type ty, core_x, core_xs])
+		returnDs (mkConsExpr ty core_x core_xs)
 
 dsExpr (ExplicitTuple expr_list boxed)
   = mapDs dsExpr expr_list	  `thenDs` \ core_exprs  ->

@@ -6,7 +6,7 @@
 \begin{code}
 module TcModule (
 	typecheckModule,
-	TcResults
+	TcResults(..)
     ) where
 
 #include "HsVersions.h"
@@ -14,8 +14,9 @@ module TcModule (
 import CmdLineOpts	( opt_D_dump_tc )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
 import RnHsSyn		( RenamedHsModule )
-import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, zonkTopBinds,
-			  TypecheckedForeignDecl, zonkForeignExports
+import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, 
+			  TypecheckedForeignDecl, TypecheckedRuleDecl,
+			  zonkTopBinds, zonkForeignExports, zonkRules
 			)
 
 import TcMonad
@@ -30,6 +31,7 @@ import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
 			  ValueEnv, TcTyThing(..)
 			)
 import TcExpr		( tcId )
+import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
@@ -48,7 +50,7 @@ import ErrUtils		( Message,
 			  pprBagOfErrors, dumpIfSet
 			)
 import Id		( Id, idType )
-import Module           ( pprModule )
+import Module           ( pprModuleName )
 import Name		( Name, nameUnique, isLocallyDefined, NamedThing(..) )
 import TyCon		( TyCon, tyConKind )
 import DataCon		( dataConId )
@@ -56,7 +58,7 @@ import Class		( Class, classSelIds, classTyCon )
 import Type		( mkTyConApp, mkForAllTy,
 			  boxedTypeKind, getTyVar, Type )
 import TysWiredIn	( unitTy )
-import PrelMods		( mAIN )
+import PrelMods		( mAIN_Name )
 import PrelInfo		( main_NAME, thinAirIdNames, setThinAirIds )
 import TcUnify		( unifyTauTy )
 import Unique		( Unique  )
@@ -73,14 +75,17 @@ Outside-world interface:
 \begin{code}
 
 -- Convenient type synonyms first:
-type TcResults
-  = (TypecheckedMonoBinds,
-     [TyCon], [Class],
-     Bag InstInfo,		-- Instance declaration information
-     [TypecheckedForeignDecl], -- foreign import & exports.
-     ValueEnv,
-     [Id]			-- The thin-air Ids
-     )
+data TcResults
+  = TcResults {
+	tc_binds   :: TypecheckedMonoBinds,
+	tc_tycons  :: [TyCon],
+	tc_classes :: [Class],
+	tc_insts   :: Bag InstInfo,		-- Instance declaration information
+	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
+	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
+	tc_env	   :: ValueEnv,
+	tc_thinair :: [Id]			-- The thin-air Ids
+    }
 
 ---------------
 typecheckModule
@@ -99,19 +104,26 @@ typecheckModule us rn_name_supply iface_det mod
 
     -- write the thin-air Id map
     (case maybe_result of
-	Just (_, _, _, _, _, _, thin_air_ids) -> setThinAirIds thin_air_ids
-	Nothing 		              -> return ()
+	Just results -> setThinAirIds (tc_thinair results)
+	Nothing      -> return ()
     ) 									>>
 
     dumpIfSet opt_D_dump_tc "Typechecked"
 	(case maybe_result of
-	    Just (binds, _, _, _, _, _, _) -> ppr binds
-	    Nothing 		          -> text "Typecheck failed") 	>>
+	    Just results -> ppr (tc_binds results) 
+			    $$ 
+			    pp_rules (tc_rules results)
+	    Nothing 	 -> text "Typecheck failed") 	>>
 
     return (if isEmptyBag errs then 
 		maybe_result 
 	    else 
 		Nothing)
+
+pp_rules [] = empty
+pp_rules rs = vcat [ptext SLIT("{-# RULES"),
+		    nest 4 (vcat (map ppr rs)),
+		    ptext SLIT("#-}")]
 
 print_errs errs
   | isEmptyBag errs = return ()
@@ -226,6 +238,7 @@ tcModule rn_name_supply fixities
 		-- to compile the bindings themselves.
 	tcInstDecls2  inst_info		`thenNF_Tc` \ (lie_instdecls, inst_binds) ->
 	tcClassDecls2 decls		`thenNF_Tc` \ (lie_clasdecls, cls_binds) ->
+	tcRules decls			`thenNF_Tc` \ (lie_rules,     rules) ->
 
 
 	     -- Deal with constant or ambiguous InstIds.  How could
@@ -238,12 +251,13 @@ tcModule rn_name_supply fixities
 	    lie_alldecls = lie_valdecls  `plusLIE`
 			   lie_instdecls `plusLIE`
 			   lie_clasdecls `plusLIE`
-			   lie_fodecls
+			   lie_fodecls	 `plusLIE`
+			   lie_rules
 	in
 	tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
 
 		-- Check that Main defines main
-	(if mod_name == mAIN then
+	(if mod_name == mAIN_Name then
 		tcLookupValueMaybe main_NAME	`thenNF_Tc` \ maybe_main ->
 		checkTc (maybeToBool maybe_main) noMainErr
 	 else
@@ -263,6 +277,7 @@ tcModule rn_name_supply fixities
 	zonkTopBinds all_binds		`thenNF_Tc` \ (all_binds', really_final_env)  ->
 	tcSetValueEnv really_final_env	$
 	zonkForeignExports foe_decls    `thenNF_Tc` \ foe_decls' ->
+	zonkRules rules			`thenNF_Tc` \ rules' ->
 
 	let
 	   thin_air_ids = map (explicitLookupValueByKey really_final_env . nameUnique) thinAirIdNames
@@ -271,10 +286,15 @@ tcModule rn_name_supply fixities
 		-- Hence using really_final_env
 	in
 	returnTc (really_final_env, 
-		  (all_binds', local_tycons, local_classes, inst_info,
-		   (foi_decls ++ foe_decls'),
-		   really_final_env,
-		   thin_air_ids))
+		  (TcResults {	tc_binds   = all_binds', 
+				tc_tycons  = local_tycons,
+				tc_classes = local_classes,
+				tc_insts   = inst_info,
+				tc_fords   = foi_decls ++ foe_decls',
+				tc_rules   = rules',
+				tc_env     = really_final_env,
+				tc_thinair = thin_air_ids
+		 }))
 	)
 
     -- End of outer fix loop
@@ -287,7 +307,7 @@ get_val_decls decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 
 \begin{code}
 noMainErr
-  = hsep [ptext SLIT("Module"), quotes (pprModule mAIN), 
+  = hsep [ptext SLIT("Module"), quotes (pprModuleName mAIN_Name), 
 	  ptext SLIT("must include a definition for"), quotes (ppr main_NAME)]
 \end{code}
 

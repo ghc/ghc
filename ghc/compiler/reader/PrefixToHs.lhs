@@ -108,10 +108,7 @@ cvTopDecls srcfile bind
   where
     go acc		  RdrNullBind		 = acc
     go acc                (RdrAndBindings b1 b2) = go (go acc b1) b2
-    go (topds, mbs, sigs) (RdrTyClDecl d)	 = (TyClD d : topds, mbs, sigs)
-    go (topds, mbs, sigs) (RdrInstDecl d)	 = (InstD d : topds, mbs, sigs) 
-    go (topds, mbs, sigs) (RdrDefaultDecl d)     = (DefD d  : topds, mbs, sigs)
-    go (topds, mbs, sigs) (RdrForeignDecl d)     = (ForD d  : topds, mbs, sigs)
+    go (topds, mbs, sigs) (RdrHsDecl d)	 	 = (d : topds, mbs, sigs)
     go (topds, mbs, sigs) (RdrSig (FixSig d))    = (FixD d  : topds, mbs, sigs)
     go (topds, mbs, sigs) (RdrSig sig)		 = (topds, mbs, sig:sigs)
     go (topds, mbs, sigs) (RdrValBinding bind)   = (topds, mbs `AndMonoBinds` bind, sigs)

@@ -10,16 +10,14 @@ module Class (
 	mkClass,
 	classKey, classSelIds, classTyCon,
 	classSuperClassTheta,
-	classBigSig, classInstEnv,
-
-	ClassInstEnv
+	classBigSig, classInstEnv
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} Type	( Type )
-import {-# SOURCE #-} SpecEnv	( SpecEnv )
+import {-# SOURCE #-} InstEnv	( InstEnv )
 
 import Var		( Id, TyVar )
 import Name		( NamedThing(..), Name )
@@ -54,12 +52,10 @@ data Class
 				-- They are all ordered by tag.  The
 				-- selector ids contain unfoldings.
 
-	ClassInstEnv		-- All the instances of this class
+	InstEnv			-- All the instances of this class
 
 	TyCon			-- The data type constructor for dictionaries
 				-- of this class
-
-type ClassInstEnv = SpecEnv Id		-- The Ids are dfuns
 \end{code}
 
 The @mkClass@ function fills in the indirect superclasses.
@@ -69,7 +65,7 @@ mkClass :: Name -> [TyVar]
 	-> [(Class,[Type])] -> [Id]
 	-> [Id] -> [Maybe Id]
 	-> TyCon
-	-> ClassInstEnv
+	-> InstEnv
 	-> Class
 
 mkClass name tyvars super_classes superdict_sels

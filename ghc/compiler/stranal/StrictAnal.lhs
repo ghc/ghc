@@ -11,7 +11,7 @@ module StrictAnal ( saBinds ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_stranal, opt_D_simplifier_stats,  opt_D_verbose_core2core )
+import CmdLineOpts	( opt_D_dump_stranal, opt_D_dump_simpl_stats,  opt_D_verbose_core2core )
 import CoreSyn
 import Id		( idType, setIdStrictness,
 			  getIdDemandInfo, setIdDemandInfo,
@@ -89,7 +89,7 @@ saBinds binds
 	-- Mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
 	let { (binds_w_strictness, sa_stats) = saTopBinds binds nullSaStats };
-	dumpIfSet opt_D_simplifier_stats "Strictness analysis statistics"
+	dumpIfSet opt_D_dump_simpl_stats "Strictness analysis statistics"
 		  (pp_stats sa_stats);
 #else
 	let { binds_w_strictness = saTopBindsBinds binds };
@@ -324,11 +324,14 @@ addStrictnessInfoToId
 	-> Id			-- Augmented with strictness
 
 addStrictnessInfoToId str_val abs_val binder body
-  = case (collectTyAndValBinders body) of
-	(_, lambda_bounds, rhs) -> binder `setIdStrictness` 
-				   mkStrictnessInfo strictness
+  = case collectBinders body of
+	-- We could use 'collectBindersIgnoringNotes', but then the 
+	-- strictness info may have more items than the visible binders
+	-- used by WorkWrap.tryWW
+	(binders, rhs) -> binder `setIdStrictness` 
+			  mkStrictnessInfo strictness
 		where
-		    tys        = map idType lambda_bounds
+		    tys        = [idType id | id <- binders, isId id]
 		    strictness = findStrictness tys str_val abs_val
 \end{code}
 

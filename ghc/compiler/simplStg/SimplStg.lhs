@@ -21,13 +21,13 @@ import SRT		( computeSRTs )
 
 import CmdLineOpts	( opt_SccGroup,
 			  opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
-			  opt_DoStgLinting,
+			  opt_DoStgLinting, opt_D_dump_stg,
 			  StgToDo(..)
 			)
 import Id		( Id )
 import Module		( Module, moduleString )
 import VarEnv
-import ErrUtils		( doIfSet )
+import ErrUtils		( doIfSet, dumpIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
@@ -73,6 +73,9 @@ stg2stg stg_todos module_name us binds
 	annotated_binds = setStgVarInfo do_let_no_escapes processed_binds
 	srt_binds       = computeSRTs annotated_binds
     in
+
+    dumpIfSet opt_D_dump_stg "STG syntax:" 
+	      (pprStgBindingsWithSRTs srt_binds)	>>
 
     return (srt_binds, cost_centres)
    }

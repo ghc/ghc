@@ -14,7 +14,7 @@ module Inst (
         InstanceMapper,
 
 	newDictFromOld, newDicts, newDictsAtLoc, 
-	newMethod, newMethodWithGivenTy, newOverloadedLit,
+	newMethod, newMethodWithGivenTy, newOverloadedLit, instOverloadedFun,
 
 	tyVarsOfInst, instLoc, getDictClassTys,
 
@@ -43,24 +43,28 @@ import TcType	( TcThetaType,
 		  zonkTcThetaType
 		)
 import Bag
-import Class	( classInstEnv,
-		  Class, ClassInstEnv 
-		)
+import Class	( classInstEnv, Class )
 import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
 import VarSet	( elemVarSet )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( OccName, Name, mkDictOcc, mkMethodOcc, getOccName )
 import PprType	( pprConstraint )	
-import SpecEnv	( SpecEnv, lookupSpecEnv )
+import InstEnv	( InstEnv, lookupInstEnv )
 import SrcLoc	( SrcLoc )
-import Type	( Type, ThetaType, substTy,
-		  isTyVarTy, mkDictTy, splitForAllTys, splitSigmaTy,
+import Type	( Type, ThetaType,
+		  mkTyVarTy, isTyVarTy, mkDictTy, splitForAllTys, splitSigmaTy,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes,
-		  mkSynTy, substTopTy, substTopTheta,
-		  tidyOpenType, tidyOpenTypes
+		  mkSynTy, tidyOpenType, tidyOpenTypes
+		)
+import InstEnv	( InstEnv )
+import Subst	( emptyInScopeSet, mkSubst,
+		  substTy, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
 import TyCon	( TyCon )
-import VarEnv	( zipVarEnv, lookupVarEnv, TidyEnv )
+import Subst	( mkTyVarSubst )
+import VarEnv	( lookupVarEnv, TidyEnv,
+		  lookupSubstEnv, SubstResult(..)
+		)
 import VarSet	( unionVarSet )
 import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn ( intDataCon, isIntTy, inIntRange,
@@ -97,7 +101,7 @@ zonkLIE :: LIE -> NF_TcM s LIE
 zonkLIE lie = mapBagNF_Tc zonkInst lie
 
 pprInsts :: [Inst] -> SDoc
-pprInsts insts = parens (hsep (punctuate comma (map pprInst insts)))
+pprInsts insts = parens (sep (punctuate comma (map pprInst insts)))
 
 
 pprInstsInFull insts
@@ -304,12 +308,15 @@ newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
 	(tyvars, rho) = splitForAllTys (idType id)
-	rho_ty	      = substTy (zipVarEnv tyvars tys) rho
-	(theta, tau) = splitRhoTy rho_ty
+	rho_ty	      = substTy (mkTyVarSubst tyvars tys) rho
+	(theta, tau)  = splitRhoTy rho_ty
     in
     newMethodWithGivenTy orig id tys theta tau	`thenNF_Tc` \ meth_inst ->
     returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
 
+instOverloadedFun orig (HsVar v) arg_tys theta tau
+  = newMethodWithGivenTy orig v arg_tys theta tau	`thenNF_Tc` \ inst ->
+    returnNF_Tc (HsVar (instToId inst), unitLIE inst)
 
 newMethodWithGivenTy orig id tys theta tau
   = tcGetSrcLoc		`thenNF_Tc` \ loc ->
@@ -329,7 +336,7 @@ newMethodAtLoc orig loc real_id tys	-- Local function, similar to newMethod but 
     let
 	(tyvars,rho) = splitForAllTys (idType real_id)
 	rho_ty	      = ASSERT( length tyvars == length tys )
-			substTopTy (zipVarEnv tyvars tys) rho
+			substTy (mkTopTyVarSubst tyvars tys) rho
 	(theta, tau)  = splitRhoTy rho_ty
 	meth_inst     = Method new_uniq real_id tys theta tau orig loc
     in
@@ -467,7 +474,7 @@ show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
 %************************************************************************
 
 \begin{code}
-type InstanceMapper = Class -> ClassInstEnv
+type InstanceMapper = Class -> InstEnv
 \end{code}
 
 A @ClassInstEnv@ lives inside a class, and identifies all the instances
@@ -497,16 +504,19 @@ lookupInst :: Inst
 -- Dictionaries
 
 lookupInst dict@(Dict _ clas tys orig loc)
-  = case lookupSpecEnv (ppr clas) (classInstEnv clas) tys of
+  = case lookupInstEnv (ppr clas) (classInstEnv clas) tys of
 
       Just (tenv, dfun_id)
 	-> let
+		subst	      = mkSubst (tyVarsOfTypes tys) tenv
 		(tyvars, rho) = splitForAllTys (idType dfun_id)
-		ty_args	      = map (expectJust "Inst" . lookupVarEnv tenv) tyvars
-				-- tenv should bind all the tyvars
-		dfun_rho      = substTopTy tenv rho
+		ty_args	      = map subst_tv tyvars
+		dfun_rho      = substTy subst rho
 		(theta, tau)  = splitRhoTy dfun_rho
 		ty_app        = mkHsTyApp (HsVar dfun_id) ty_args
+		subst_tv tv   = case lookupSubstEnv tenv tv of
+				   Just (DoneTy ty)  -> ty
+					-- tenv should bind all the tyvars
 	   in
 	   if null theta then
 		returnNF_Tc (SimpleInst ty_app)
@@ -584,17 +594,17 @@ appropriate dictionary if it exists.  It is used only when resolving
 ambiguous dictionaries.
 
 \begin{code}
-lookupSimpleInst :: ClassInstEnv
+lookupSimpleInst :: InstEnv
 		 -> Class
 		 -> [Type]			-- Look up (c,t)
 	         -> NF_TcM s (Maybe ThetaType)		-- Here are the needed (c,t)s
 
 lookupSimpleInst class_inst_env clas tys
-  = case lookupSpecEnv (ppr clas) class_inst_env tys of
+  = case lookupInstEnv (ppr clas) class_inst_env tys of
       Nothing	 -> returnNF_Tc Nothing
 
       Just (tenv, dfun)
-	-> returnNF_Tc (Just (substTopTheta tenv theta))
+	-> returnNF_Tc (Just (substTheta (mkSubst emptyInScopeSet tenv) theta))
         where
 	   (_, theta, _) = splitSigmaTy (idType dfun)
 \end{code}

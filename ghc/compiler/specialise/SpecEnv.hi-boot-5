@@ -1,3 +1,7 @@
 __interface SpecEnv 1 0 where
-__export SpecEnv SpecEnv ;
+__export SpecEnv SpecEnv emptySpecEnv specEnvFreeVars isEmptySpecEnv ;
 1 data SpecEnv a;
+1 emptySpecEnv :: __forall [a] => SpecEnv a ;
+1 isEmptySpecEnv :: __forall [a] => SpecEnv a -> PrelBase.Bool ;
+1 specEnvFreeVars :: __forall [a] => (a -> VarSet.IdOrTyVarSet) -> SpecEnv a -> VarSet.IdOrTyVarSet ;
+

@@ -291,8 +291,8 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
     let
 	-- determine whether the default binder is dead or not
 	bndr'= if (bndr `elementOfFVInfo` alts_fvs) 
-		  then bndr `modifyIdInfo` (setInlinePragInfo NoInlinePragInfo)
-		  else bndr `modifyIdInfo` (setInlinePragInfo IAmDead)
+		  then modifyIdInfo (`setInlinePragInfo` NoInlinePragInfo) bndr
+		  else modifyIdInfo (`setInlinePragInfo` IAmDead)	   bndr
 
 	-- don't consider the default binder as being 'live in alts',
 	-- since this is from the point of view of the case expr, where
@@ -313,10 +313,11 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
       StgCase scrut2 live_in_whole_case live_in_alts bndr' srt alts2,
       (scrut_fvs `unionFVInfo` alts_fvs) 
 	  `minusFVBinders` [bndr],
-      (alts_escs `unionVarSet` (getFVSet scrut_fvs))
-	  `minusVarSet` unitVarSet bndr
-	
-    ))
+      (alts_escs `minusVarSet` unitVarSet bndr) `unionVarSet` getFVSet scrut_fvs
+		-- You might think we should have scrut_escs, not (getFVSet scrut_fvs),
+		-- but actually we can't call, and then return from, a let-no-escape thing.
+      )
+    )
   where
     vars_alts (StgAlgAlts ty alts deflt)
       = mapAndUnzip3Lne vars_alg_alt alts

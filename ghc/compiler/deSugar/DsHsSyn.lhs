@@ -59,7 +59,7 @@ collectTypedMonoBinders (VarMonoBind v _)       = [v]
 collectTypedMonoBinders (CoreMonoBind v _)      = [v]
 collectTypedMonoBinders (AndMonoBinds bs1 bs2)
  = collectTypedMonoBinders bs1 ++ collectTypedMonoBinders bs2
-collectTypedMonoBinders (AbsBinds _ _ exports _)
+collectTypedMonoBinders (AbsBinds _ _ exports _ _)
   = [global | (_, global, local) <- exports]
 
 collectTypedPatBinders :: TypecheckedPat -> [Id]

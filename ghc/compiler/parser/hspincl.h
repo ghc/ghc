@@ -56,6 +56,7 @@
 #include "tree.h"
 #include "entidt.h"
 #include "gdexp.h"
+#include "rulevar.h"
 
 extern char *input_filename;
 extern tree hspmain();

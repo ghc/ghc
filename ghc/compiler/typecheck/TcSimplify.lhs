@@ -116,7 +116,7 @@ and hence the default mechanism would resolve the "a".
 
 \begin{code}
 module TcSimplify (
-	tcSimplify, tcSimplifyAndCheck,
+	tcSimplify, tcSimplifyAndCheck, tcSimplifyRuleLhs, 
 	tcSimplifyTop, tcSimplifyThetas, tcSimplifyCheckThetas,
 	bindInstsOfLocalFuns
     ) where
@@ -144,19 +144,18 @@ import TcEnv		( tcGetGlobalTyVars )
 import TcType		( TcType, TcTyVarSet, typeToTcType )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
-import VarSet		( mkVarSet )
-
 import Bag		( bagToList )
-import Class		( Class, ClassInstEnv, classBigSig, classInstEnv )
+import Class		( Class, classBigSig, classInstEnv )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
 import Type		( Type, ThetaType, TauType, mkTyVarTy, getTyVar,
-			  isTyVarTy, substTopTheta, splitSigmaTy, tyVarsOfTypes
+			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
+import InstEnv		( InstEnv )
+import Subst		( mkTopTyVarSubst, substTheta )
 import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
 import VarSet
-import VarEnv		( zipVarEnv )
 import FiniteMap
 import BasicTypes	( TopLevelFlag(..) )
 import CmdLineOpts	( opt_GlasgowExts )
@@ -185,7 +184,7 @@ tcSimplify
 	-> TopLevelFlag
 	-> TcTyVarSet			-- ``Local''  type variables
 					-- ASSERT: this tyvar set is already zonked
-	-> LIE			-- Wanted
+	-> LIE				-- Wanted
 	-> TcM s (LIE,			-- Free
 		  TcDictBinds,		-- Bindings
 		  LIE)			-- Remaining wanteds; no dups
@@ -288,6 +287,24 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
 
     complain dict = mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens ->
 		    addNoInstanceErr str given_dicts dict
+\end{code}
+
+On the LHS of transformation rules we only simplify methods and constants,
+getting dictionaries.  We want to keep all of them unsimplified, to serve
+as the available stuff for the RHS of the rule.
+
+\begin{code}
+tcSimplifyRuleLhs :: LIE -> TcM s (LIE, TcDictBinds)
+tcSimplifyRuleLhs wanted_lie
+  = reduceContext (text "tcSimplRuleLhs") try_me [] wanteds	`thenTc` \ (binds, frees, irreds) ->
+    ASSERT( null frees )
+    returnTc (mkLIE irreds, binds)
+  where
+    wanteds	= bagToList wanted_lie
+
+	-- Reduce methods and lits only; stop as soon as we get a dictionary
+    try_me inst	| isDict inst = DontReduce
+		| otherwise   = ReduceMe AddToIrreds
 \end{code}
 
 
@@ -677,7 +694,7 @@ addSuperClasses avails dict
     (clas, tys) = getDictClassTys dict
     
     (tyvars, sc_theta, sc_sels, _, _) = classBigSig clas
-    sc_theta' = substTopTheta (zipVarEnv tyvars tys) sc_theta
+    sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
 
     add_sc avails ((super_clas, super_tys), sc_sel)
       = newDictFromOld dict super_clas super_tys	`thenNF_Tc` \ super_dict ->
@@ -727,9 +744,9 @@ a,b,c are type variables.  This is required for the context of
 instance declarations.
 
 \begin{code}
-tcSimplifyThetas :: (Class -> ClassInstEnv)		-- How to find the ClassInstEnv
-	       	 -> ThetaType				-- Wanted
-	       	 -> TcM s ThetaType			-- Needed
+tcSimplifyThetas :: (Class -> InstEnv)		-- How to find the InstEnv
+	       	 -> ThetaType			-- Wanted
+	       	 -> TcM s ThetaType		-- Needed
 
 tcSimplifyThetas inst_mapper wanteds
   = reduceSimple inst_mapper [] wanteds		`thenNF_Tc` \ irreds ->
@@ -775,7 +792,7 @@ type AvailsSimple = FiniteMap (Class, [TauType]) Bool
 		    -- True  => irreducible 
 		    -- False => given, or can be derived from a given or from an irreducible
 
-reduceSimple :: (Class -> ClassInstEnv) 
+reduceSimple :: (Class -> InstEnv) 
 	     -> ThetaType		-- Given
 	     -> ThetaType		-- Wanted
 	     -> NF_TcM s ThetaType	-- Irreducible
@@ -787,7 +804,7 @@ reduceSimple inst_mapper givens wanteds
     givens_fm     = foldl addNonIrred emptyFM givens
 
 reduce_simple :: (Int,ThetaType)		-- Stack
-	      -> (Class -> ClassInstEnv) 
+	      -> (Class -> InstEnv) 
 	      -> AvailsSimple
 	      -> ThetaType
 	      -> NF_TcM s AvailsSimple
@@ -822,7 +839,7 @@ addSCs givens ct@(clas,tys)
  = foldl add givens sc_theta
  where
    (tyvars, sc_theta_tmpl, _, _, _) = classBigSig clas
-   sc_theta = substTopTheta (zipVarEnv tyvars tys) sc_theta_tmpl
+   sc_theta = substTheta (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
 
    add givens ct = case lookupFM givens ct of
 			   Nothing    -> -- Add it and its superclasses
@@ -1129,6 +1146,15 @@ warnDefault dicts default_ty
 	  ptext SLIT("to type") <+> quotes (ppr default_ty)
 
     (_, tidy_dicts) = mapAccumL tidyInst emptyTidyEnv dicts
+
+addRuleLhsErr dict
+  = tcAddSrcLoc (instLoc dict)			$
+    addErrTcM (tidy_env,
+	       vcat [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
+		     nest 4 (pprOrigin dict),
+		     ptext SLIT("LHS of a rule must have no overloading")])
+  where
+    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 -- Used for top-level irreducibles
 addTopInstanceErr dict

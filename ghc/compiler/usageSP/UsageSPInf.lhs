@@ -495,7 +495,7 @@ appUSubstBinds s binds = fst $ initAnnotM () $
         mungeTerm   (Note (TermUsg (UsVar uv)) (Lam v e))
           -- perform substitution *and* munge annot on lambda into IdInfo.lbvarInfo
           = let lb = case (s uv) of { UsOnce -> IsOneShotLambda; UsMany -> NoLBVarInfo }
-                v' = modifyIdInfo v (setLBVarInfo lb)  -- HACK ALERT!
+                v' = modifyIdInfo (`setLBVarInfo` lb) v  -- HACK ALERT!
                      -- see comment in IdInfo.lhs; this is because the info is easier to
                      -- access here, by agreement SLPJ/KSW 1999-04 (as a "short-term hack").
             in  return (Lam v' e)

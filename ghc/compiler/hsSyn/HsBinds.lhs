@@ -20,6 +20,7 @@ import PprCore		()	   -- Instances for Outputable
 
 --others:
 import Id		( Id )
+import NameSet		( NameSet, nameSetToList )
 import BasicTypes	( RecFlag(..), Fixity )
 import Outputable	
 import Bag
@@ -100,7 +101,7 @@ data MonoBinds id pat
 		    SrcLoc
 
   | FunMonoBind     id
-		    Bool			-- True => infix declaration
+		    Bool		-- True => infix declaration
 		    [Match id pat]
 		    SrcLoc
 
@@ -110,10 +111,11 @@ data MonoBinds id pat
   | CoreMonoBind    id			-- TRANSLATION
 		    CoreExpr		-- No zonking; this is a final CoreExpr with Ids and Types!
 
-  | AbsBinds			-- Binds abstraction; TRANSLATION
-		[TyVar]	  -- Type variables
-		[id]			  -- Dicts
-		[([TyVar], id, id)]  -- (type variables, polymorphic, momonmorphic) triples
+  | AbsBinds				-- Binds abstraction; TRANSLATION
+		[TyVar]	  		-- Type variables
+		[id]			-- Dicts
+		[([TyVar], id, id)]	-- (type variables, polymorphic, momonmorphic) triples
+		NameSet			-- Set of *polymorphic* variables that have an INLINE pragma
 		(MonoBinds id pat)      -- The "business end"
 
 	-- Creates bindings for *new* (polymorphic, overloaded) locals
@@ -188,11 +190,12 @@ ppr_monobind (VarMonoBind name expr)
 ppr_monobind (CoreMonoBind name expr)
       = sep [ppr name <+> equals, nest 4 (ppr expr)]
 
-ppr_monobind (AbsBinds tyvars dictvars exports val_binds)
+ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
      = sep [ptext SLIT("AbsBinds"),
 	    brackets (interpp'SP tyvars),
 	    brackets (interpp'SP dictvars),
-	    brackets (interpp'SP exports)]
+	    brackets (interpp'SP exports),
+	    brackets (interpp'SP (nameSetToList inlines))]
        $$
        nest 4 (ppr val_binds)
 \end{code}
@@ -221,7 +224,6 @@ data Sig name
 
   | SpecSig 	name		-- specialise a function or datatype ...
 		(HsType name)	-- ... to these types
-		(Maybe name)	-- ... maybe using this as the code for it
 		SrcLoc
 
   | InlineSig	name		-- INLINE f
@@ -247,7 +249,7 @@ sigsForMe f sigs
   where
     sig_for_me (Sig         n _ _)    	  = f n
     sig_for_me (ClassOpSig  n _ _ _)  	  = f n
-    sig_for_me (SpecSig     n _ _ _)  	  = f n
+    sig_for_me (SpecSig     n _ _)  	  = f n
     sig_for_me (InlineSig   n     _)  	  = f n  
     sig_for_me (NoInlineSig n     _)  	  = f n  
     sig_for_me (SpecInstSig _ _)      	  = False
@@ -276,13 +278,10 @@ ppr_sig (Sig var ty _)
 ppr_sig (ClassOpSig var _ ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
-ppr_sig (SpecSig var ty using _)
+ppr_sig (SpecSig var ty _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],
-	      nest 4 (hsep [ppr ty, pp_using using, text "#-}"])
+	      nest 4 (ppr ty <+> text "#-}")
 	]
-      where
-	pp_using Nothing   = empty
-	pp_using (Just me) = hsep [char '=', ppr me]
 
 ppr_sig (InlineSig var _)
         = hsep [text "{-# INLINE", ppr var, text "#-}"]

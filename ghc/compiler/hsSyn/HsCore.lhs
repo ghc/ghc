@@ -13,7 +13,9 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 \begin{code}
 module HsCore (
 	UfExpr(..), UfAlt, UfBinder(..), UfNote(..),
-	UfBinding(..), UfCon(..)
+	UfBinding(..), UfCon(..),
+	HsIdInfo(..), HsStrictnessInfo(..),
+	IfaceSig(..), UfRuleBody(..)
     ) where
 
 #include "HsVersions.h"
@@ -22,9 +24,13 @@ module HsCore (
 import HsTypes		( HsType, pprParendHsType )
 
 -- others:
+import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo, CprInfo )
+import CoreSyn		( CoreBndr, CoreExpr )
+import Demand		( Demand )
 import Const		( Literal )
 import Type		( Kind )
 import CostCentre
+import SrcLoc		( SrcLoc )
 import Outputable
 \end{code}
 
@@ -49,6 +55,7 @@ data UfExpr name
 data UfNote name = UfSCC CostCentre
 	         | UfCoerce (HsType name)
 	         | UfInlineCall
+	         | UfInlineMe
 
 type UfAlt name = (UfCon name, [name], UfExpr name)
 
@@ -128,3 +135,48 @@ instance Outputable name => Outputable (UfBinder name) where
     ppr (UfTyBinder name kind) = hsep [ppr name, dcolon, ppr kind]
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Signatures in interface files}
+%*									*
+%************************************************************************
+
+\begin{code}
+data IfaceSig name
+  = IfaceSig	name
+		(HsType name)
+		[HsIdInfo name]
+		SrcLoc
+
+instance (Outputable name) => Outputable (IfaceSig name) where
+    ppr (IfaceSig var ty _ _)
+      = hang (hsep [ppr var, dcolon])
+	     4 (ppr ty)
+
+data HsIdInfo name
+  = HsArity		ArityInfo
+  | HsStrictness	HsStrictnessInfo
+  | HsUnfold		InlinePragInfo (Maybe (UfExpr name))
+  | HsUpdate		UpdateInfo
+  | HsSpecialise	(UfRuleBody name)
+  | HsNoCafRefs
+  | HsCprInfo           CprInfo
+  | HsWorker		name		-- Worker, if any
+
+data HsStrictnessInfo
+  = HsStrictnessInfo ([Demand], Bool)
+  | HsBottom
+\end{code}
+
+ 
+%************************************************************************
+%*									*
+\subsection{Rules in interface files}
+%*									*
+%************************************************************************
+
+\begin{code}
+data UfRuleBody name = UfRuleBody   FAST_STRING [UfBinder name] [UfExpr name] (UfExpr name)	-- Pre typecheck
+		     | CoreRuleBody FAST_STRING [CoreBndr]      [CoreExpr]    CoreExpr		-- Post typecheck
+\end{code}

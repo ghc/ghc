@@ -12,7 +12,7 @@ module FloatOut ( floatOutwards ) where
 
 import CoreSyn
 
-import CmdLineOpts	( opt_D_verbose_core2core, opt_D_simplifier_stats )
+import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_stats )
 import ErrUtils		( dumpIfSet )
 import CostCentre	( dupifyCC, CostCentre )
 import Id		( Id )
@@ -91,7 +91,7 @@ floatOutwards us pgm
 
 	let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
-	dumpIfSet opt_D_simplifier_stats "FloatOut stats:"
+	dumpIfSet opt_D_dump_simpl_stats "FloatOut stats:"
 		(hcat [	int tlets,  ptext SLIT(" Lets floated to top level; "),
 			int ntlets, ptext SLIT(" Lets floated elsewhere; from "),
 			int lams,   ptext SLIT(" Lambda groups")]);

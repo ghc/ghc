@@ -19,8 +19,10 @@ module FloatIn ( floatInwards ) where
 import CmdLineOpts	( opt_D_verbose_core2core )
 import CoreSyn
 import CoreLint		( beginPass, endPass )
-import FreeVars		( CoreExprWithFVs, freeVars, freeVarsOf )
-import Var		( Id )
+import Const		( isDataCon )
+import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
+import Var		( Id, idType )
+import Type		( isUnLiftedType )
 import VarSet
 import Util		( zipEqual )
 import Outputable
@@ -196,6 +198,10 @@ fiExpr to_drop (_, AnnNote InlineCall expr)
 	-- the the call it annotates
     mkCoLets' to_drop (Note InlineCall (fiExpr [] expr))
 
+fiExpr to_drop (_, AnnNote InlineMe expr)
+  = 	-- Ditto... don't float anything into an INLINE expression
+    mkCoLets' to_drop (Note InlineMe (fiExpr [] expr))
+
 fiExpr to_drop (_, AnnNote note@(Coerce _ _) expr)
   = 	-- Just float in past coercion
     Note note (fiExpr to_drop expr)
@@ -216,12 +222,12 @@ let
     w = ...
 in {
     let v = ... w ...
-    in ... w ...
+    in ... v .. w ...
 }
 \end{verbatim}
 Look at the inner \tr{let}.  As \tr{w} is used in both the bind and
 body of the inner let, we could panic and leave \tr{w}'s binding where
-it is.  But \tr{v} is floatable into the body of the inner let, and
+it is.  But \tr{v} is floatable further into the body of the inner let, and
 {\em then} \tr{w} will also be only in the body of that inner let.
 
 So: rather than drop \tr{w}'s binding here, we add it onto the list of
@@ -229,13 +235,19 @@ things to drop in the outer let's body, and let nature take its
 course.
 
 \begin{code}
-fiExpr to_drop (_,AnnLet (AnnNonRec id rhs) body)
+fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
   = fiExpr new_to_drop body
   where
-    rhs_fvs  = freeVarsOf rhs
     body_fvs = freeVarsOf body
 
-    [shared_binds, rhs_binds, body_binds] = sepBindsByDropPoint [rhs_fvs, body_fvs] to_drop
+    final_body_fvs | noFloatIntoRhs ann_rhs
+		   || isUnLiftedType (idType id) = body_fvs `unionVarSet` rhs_fvs
+		   | otherwise		         = body_fvs
+	-- See commments with letrec below
+	-- No point in floating in only to float straight out again
+	-- Ditto ok-for-speculation unlifted RHSs
+
+    [shared_binds, rhs_binds, body_binds] = sepBindsByDropPoint [rhs_fvs, final_body_fvs] to_drop
 
     new_to_drop = body_binds ++				-- the bindings used only in the body
 		  [(NonRec id rhs', rhs_fvs')] ++ 	-- the new binding itself
@@ -253,7 +265,25 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
     rhss_fvs = map freeVarsOf rhss
     body_fvs = freeVarsOf body
 
-    (shared_binds:body_binds:rhss_binds) = sepBindsByDropPoint (body_fvs:rhss_fvs) to_drop
+	-- Add to body_fvs the free vars of any RHS that has
+	-- a lambda at the top.  This has the effect of making it seem
+	-- that such things are used in the body as well, and hence prevents
+	-- them getting floated in.  The big idea is to avoid turning:
+	--	let x# = y# +# 1#
+	--	in
+	--	letrec f = \z. ...x#...f...
+	--	in ...
+	-- into
+	--	letrec f = let x# = y# +# 1# in \z. ...x#...f... in ...
+	-- 
+	-- Because now we can't float the let out again, because a letrec
+	-- can't have unboxed bindings.
+
+    final_body_fvs = foldr (unionVarSet . get_extras) body_fvs rhss
+    get_extras (rhs_fvs, rhs) | noFloatIntoRhs rhs = rhs_fvs
+			      | otherwise	   = emptyVarSet
+
+    (shared_binds:body_binds:rhss_binds) = sepBindsByDropPoint (final_body_fvs:rhss_fvs) to_drop
 
     new_to_drop = -- the bindings used only in the body
 		  body_binds ++
@@ -292,6 +322,11 @@ fiExpr to_drop (_, AnnCase scrut case_bndr alts)
 				-- to get free vars of alt
 
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
+
+noFloatIntoRhs (AnnNote InlineMe _) = True
+noFloatIntoRhs (AnnLam _ _)   	    = True
+noFloatIntoRhs (AnnCon con _)       = isDataCon con
+noFloatIntoRhs other	            = False
 \end{code}
 
 

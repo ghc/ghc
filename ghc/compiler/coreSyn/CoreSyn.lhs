@@ -9,20 +9,26 @@ module CoreSyn (
 	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
 	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg,
 
-	mkLets, mkLetBinds, mkLams,
+	mkLets, mkLams,
 	mkApps, mkTyApps, mkValApps,
-	mkLit, mkStringLit, mkConApp, mkPrimApp, mkNote, mkNilExpr,
+	mkLit, mkStringLit, mkConApp, mkPrimApp, mkNote,
 	bindNonRec, mkIfThenElse, varToCoreExpr,
 
-	bindersOf, rhssOfBind, rhssOfAlts, isDeadBinder, isTyVar, isId,
+	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isDeadBinder, isTyVar, isId,
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
-	collectArgs,
+	collectArgs, collectBindersIgnoringNotes,
 	coreExprCc,
+	flattenBinds, 
 
-	isValArg, isTypeArg, valArgCount,
+	isValArg, isTypeArg, valArgCount, valBndrCount,
 
 	-- Annotated expressions
-	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate
+	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, deAnnotate,
+
+	-- Core rules
+	CoreRules(..), 	-- Representation needed by friends
+	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
+	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules
     ) where
 
 #include "HsVersions.h"
@@ -30,11 +36,13 @@ module CoreSyn (
 import TysWiredIn	( boolTy, stringTy, nilDataCon )
 import CostCentre	( CostCentre, isDupdCC, noCostCentre )
 import Var		( Var, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
+import VarEnv
 import Id		( mkWildId, getInlinePragma )
 import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType )
 import IdInfo		( InlinePragInfo(..) )
 import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
 import TysWiredIn	( trueDataCon, falseDataCon )
+import VarSet
 import Outputable
 \end{code}
 
@@ -47,6 +55,8 @@ import Outputable
 These data types are the heart of the compiler
 
 \begin{code}
+infixl 8 `App`	-- App brackets to the left
+
 data Expr b	-- "b" for the type of binders, 
   = Var	  Id
   | Con   Con [Arg b]		-- Guaranteed saturated
@@ -80,8 +90,45 @@ data Note
   | InlineCall		-- Instructs simplifier to inline
 			-- the enclosed call
 
+  | InlineMe		-- Instructs simplifer to treat the enclosed expression
+			-- as very small, and inline it at its call sites
+
   | TermUsg             -- A term-level usage annotation
         UsageAnn        -- (should not be a variable except during UsageSP inference)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Transformation rules}
+%*									*
+%************************************************************************
+
+The CoreRule type and its friends are dealt with mainly in CoreRules,
+but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
+
+\begin{code}
+data CoreRules 
+  = Rules [CoreRule]
+	  IdOrTyVarSet		-- Locally-defined free vars of RHSs
+
+data CoreRule
+  = Rule FAST_STRING	-- Rule name
+	 [CoreBndr]	-- Forall'd variables
+	 [CoreExpr]	-- LHS args
+	 CoreExpr	-- RHS
+
+emptyCoreRules :: CoreRules
+emptyCoreRules = Rules [] emptyVarSet
+
+isEmptyCoreRules :: CoreRules -> Bool
+isEmptyCoreRules (Rules rs _) = null rs
+
+rulesRhsFreeVars :: CoreRules -> IdOrTyVarSet
+rulesRhsFreeVars (Rules _ fvs) = fvs
+
+rulesRules :: CoreRules -> [CoreRule]
+rulesRules (Rules rules _) = rules
 \end{code}
 
 
@@ -139,9 +186,6 @@ mkStringLit str	  = Con (Literal (NoRepStr (_PK_ str) stringTy)) []
 mkConApp con args = Con (DataCon con) args
 mkPrimApp op args = Con (PrimOp op)   args
 
-mkNilExpr :: Type -> CoreExpr
-mkNilExpr ty = Con (DataCon nilDataCon) [Type ty]
-
 varToCoreExpr :: CoreBndr -> CoreExpr
 varToCoreExpr v | isId v    = Var v
                 | otherwise = Type (mkTyVarTy v)
@@ -156,13 +200,6 @@ mkLams binders body = foldr Lam body binders
 mkLets :: [Bind b] -> Expr b -> Expr b
 mkLets binds body = foldr Let body binds
 
-mkLetBinds :: [CoreBind] -> CoreExpr -> CoreExpr
--- mkLetBinds is like mkLets, but it uses bindNonRec to 
--- make a case binding for unlifted things
-mkLetBinds []                   body = body
-mkLetBinds (NonRec b r : binds) body = bindNonRec b r (mkLetBinds binds body)
-mkLetBinds (bind       : binds) body = Let bind (mkLetBinds binds body)
-
 bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- (bindNonRec x r b) produces either
 --	let x = r in b
@@ -170,7 +207,10 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 --	case r of x { _DEFAULT_ -> b }
 --
 -- depending on whether x is unlifted or not
-bindNonRec bndr rhs body
+-- It's used by the desugarer to avoid building bindings
+-- that give Core Lint a heart attack.  Actually the simplifier
+-- deals with them perfectly well.
+bindNonRec bndr rhs body 
   | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
   | otherwise			 = Let (NonRec bndr rhs) body
 
@@ -196,10 +236,15 @@ mkNote (SCC cc1) expr@(Note (SCC cc2) _)
 mkNote note@(SCC cc1) expr@(Lam x e)	-- Move _scc_ inside lambda
   = Lam x (mkNote note e)
 
+-- Drop trivial InlineMe's
+mkNote InlineMe expr@(Con _ _) = expr
+mkNote InlineMe expr@(Var v)   = expr
+
 -- Slide InlineCall in around the function
-mkNote InlineCall (App f a) = App (mkNote InlineCall f) a
-mkNote InlineCall (Var v)   = Note InlineCall (Var v)
-mkNote InlineCall expr      = expr
+--	No longer necessary I think (SLPJ Apr 99)
+-- mkNote InlineCall (App f a) = App (mkNote InlineCall f) a
+-- mkNote InlineCall (Var v)   = Note InlineCall (Var v)
+-- mkNote InlineCall expr      = expr
 
 mkNote note expr = Note note expr
 \end{code}
@@ -215,6 +260,9 @@ bindersOf  :: Bind b -> [b]
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
+bindersOfBinds :: [Bind b] -> [b]
+bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
+
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
@@ -227,6 +275,11 @@ isDeadBinder bndr | isId bndr = case getInlinePragma bndr of
 					IAmDead -> True
 					other	-> False
 		  | otherwise = False	-- TyVars count as not dead
+
+flattenBinds :: [Bind b] -> [(b, Expr b)]	-- Get all the lhs/rhs pairs
+flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
+flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
+flattenBinds []			  = []
 \end{code}
 
 We often want to strip off leading lambdas before getting down to
@@ -236,22 +289,33 @@ We expect (by convention) type-, and value- lambdas in that
 order.
 
 \begin{code}
-collectBinders	       :: Expr b -> ([b],         Expr b)
-collectTyBinders       :: CoreExpr -> ([TyVar],     CoreExpr)
-collectValBinders      :: CoreExpr -> ([Id],        CoreExpr)
-collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
+collectBinders	             :: Expr b -> ([b],         Expr b)
+collectBindersIgnoringNotes  :: Expr b -> ([b],         Expr b)
+collectTyBinders       	     :: CoreExpr -> ([TyVar],     CoreExpr)
+collectValBinders      	     :: CoreExpr -> ([Id],        CoreExpr)
+collectTyAndValBinders 	     :: CoreExpr -> ([TyVar], [Id], CoreExpr)
+
+collectBinders expr
+  = go [] expr
+  where
+    go bs (Lam b e) = go (b:bs) e
+    go bs e	     = (reverse bs, e)
+
+-- This one ignores notes.  It's used in CoreUnfold and StrAnal
+-- when we aren't going to put the expression back together from
+-- the pieces, so we don't mind losing the Notes
+collectBindersIgnoringNotes expr
+  = go [] expr
+  where
+    go bs (Lam b e)  = go (b:bs) e
+    go bs (Note _ e) = go    bs  e
+    go bs e	     = (reverse bs, e)
 
 collectTyAndValBinders expr
   = (tvs, ids, body)
   where
     (tvs, body1) = collectTyBinders expr
     (ids, body)  = collectValBinders body1
-
-collectBinders expr
-  = go [] expr
-  where
-    go tvs (Lam b e) = go (b:tvs) e
-    go tvs e	     = (reverse tvs, e)
 
 collectTyBinders expr
   = go [] expr
@@ -303,6 +367,11 @@ isValArg other    = True
 
 isTypeArg (Type _) = True
 isTypeArg other    = False
+
+valBndrCount :: [CoreBndr] -> Int
+valBndrCount []		    	  = 0
+valBndrCount (b : bs) | isId b    = 1 + valBndrCount bs
+		      | otherwise = valBndrCount bs
 
 valArgCount :: [Arg b] -> Int
 valArgCount []		    = 0

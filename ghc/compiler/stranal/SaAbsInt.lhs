@@ -381,7 +381,7 @@ absId anal var env
 
 
 	(Nothing, strictness_info, _) ->
-			-- Includes MagicUnfolding, NoUnfolding
+			-- Includes NoUnfolding
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
 \end{code}

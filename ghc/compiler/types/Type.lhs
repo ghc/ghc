@@ -25,11 +25,11 @@ module Type (
 
 	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
 
-	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, funResultTy,
+	mkFunTy, mkFunTys, splitFunTy_maybe, splitFunTys, splitFunTysN, funResultTy,
 	zipFunTys,
 
 	mkTyConApp, mkTyConTy, splitTyConApp_maybe,
-	splitAlgTyConApp_maybe, splitAlgTyConApp,
+	splitAlgTyConApp_maybe, splitAlgTyConApp, splitRepTyConApp_maybe,
 	mkDictTy, splitDictTy_maybe, isDictTy,
 
 	mkSynTy, isSynTy, deNoteType,
@@ -37,8 +37,7 @@ module Type (
         mkUsgTy, isUsgTy{- dont use -}, isNotUsgTy, splitUsgTy, unUsgTy, tyUsg,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-	applyTy, applyTys, isForAllTy,
-	mkPiType,
+	isForAllTy, applyTy, applyTys, mkPiType,
 
 	TauType, RhoType, SigmaType, ThetaType,
 	isTauTy,
@@ -53,10 +52,6 @@ module Type (
 	tyVarsOfType, tyVarsOfTypes, namesOfType, typeKind,
 	addFreeTyVars,
 
-	-- Substitution
-	substTy, substTheta, fullSubstTy, substTyVar,
-	substTopTy, substTopTheta,
-
 	-- Tidying up for printing
 	tidyType,     tidyTypes,
 	tidyOpenType, tidyOpenTypes,
@@ -66,8 +61,9 @@ module Type (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	DataCon( DataCon )
+import {-# SOURCE #-}	DataCon( DataCon, dataConType )
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
+import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
 
 -- friends:
 import Var	( Id, TyVar, IdOrTyVar, UVar,
@@ -85,7 +81,7 @@ import Class	( classTyCon, Class )
 import TyCon	( TyCon, KindCon, 
 		  mkFunTyCon, mkKindCon, mkSuperKindCon,
 		  matchesTyCon, isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isDataTyCon,
+		  isFunTyCon, isDataTyCon, isNewTyCon,
 		  isAlgTyCon, isSynTyCon, tyConArity,
 		  tyConKind, tyConDataCons, getSynTyConDefn, 
 		  tyConPrimRep, tyConClass_maybe
@@ -162,7 +158,7 @@ ByteArray#	Yes		Yes		No		No
 type SuperKind = Type
 type Kind      = Type
 
-type TyVarSubst 	 = TyVarEnv Type
+type TyVarSubst = TyVarEnv Type
 
 data Type
   = TyVarTy TyVar
@@ -427,13 +423,20 @@ splitFunTy_maybe (FunTy arg res) = Just (arg, res)
 splitFunTy_maybe (NoteTy _ ty)   = splitFunTy_maybe ty
 splitFunTy_maybe other	         = Nothing
 
-
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty (FunTy arg res) = split (arg:args) res res
     split args orig_ty (NoteTy _ ty)   = split args orig_ty ty
     split args orig_ty ty              = (reverse args, orig_ty)
+
+splitFunTysN :: String -> Int -> Type -> ([Type], Type)
+splitFunTysN msg orig_n orig_ty = split orig_n [] orig_ty orig_ty
+  where
+    split 0 args syn_ty ty		= (reverse args, syn_ty) 
+    split n args syn_ty (FunTy arg res) = split (n-1) (arg:args) res    res
+    split n args syn_ty (NoteTy _ ty)   = split n     args       syn_ty ty
+    split n args syn_ty ty              = pprPanic ("splitFunTysN: " ++ msg) (int orig_n <+> pprType orig_ty)
 
 zipFunTys :: Outputable a => [a] -> Type -> ([(a,Type)], Type)
 zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
@@ -526,6 +529,26 @@ isDictTy (NoteTy _ ty)	= isDictTy ty
 isDictTy other		= False
 \end{code}
 
+splitRepTyConApp_maybe is like splitTyConApp_maybe except
+that it looks through 
+	(a) for-alls, and
+	(b) newtypes
+in addition to synonyms.  It's useful in the back end where we're not
+interested in newtypes anymore.
+
+\begin{code}
+splitRepTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+splitRepTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+splitRepTyConApp_maybe (NoteTy _ ty)     = splitRepTyConApp_maybe ty
+splitRepTyConApp_maybe (ForAllTy _ ty)   = splitRepTyConApp_maybe ty
+splitRepTyConApp_maybe (TyConApp tc tys) 
+	| isNewTyCon tc	
+	= case splitFunTy_maybe (applyTys (dataConType (head (tyConDataCons tc))) tys) of
+		Just (rep_ty, _) -> splitRepTyConApp_maybe rep_ty
+	| otherwise
+	= Just (tc,tys)
+splitRepTyConApp_maybe other	         = Nothing
+\end{code}
 
 ---------------------------------------------------------------------
 				SynTy
@@ -536,7 +559,7 @@ mkSynTy syn_tycon tys
   = ASSERT( isSynTyCon syn_tycon )
     ASSERT( isNotUsgTy body )
     NoteTy (SynNote (TyConApp syn_tycon tys))
-	   (substTopTy (zipVarEnv tyvars tys) body)
+	   (substTy (mkTyVarSubst tyvars tys) body)
   where
     (tyvars, body) = getSynTyConDefn syn_tycon
 
@@ -695,25 +718,41 @@ mkPiType v ty | isId v    = mkFunTy (idType v) ty
 	      | otherwise = mkForAllTy v ty
 \end{code}
 
+Applying a for-all to its arguments
+
 \begin{code}
 applyTy :: Type -> Type -> Type
 applyTy (NoteTy note@(UsgNote _) fun) arg = NoteTy note (applyTy fun arg)
 applyTy (NoteTy _ fun)                arg = applyTy fun arg
 applyTy (ForAllTy tv ty)              arg = ASSERT( isNotUsgTy arg )
-                                            substTy (mkVarEnv [(tv,arg)]) ty
+                                            substTy (mkTyVarSubst [tv] [arg]) ty
 applyTy other		              arg = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 applyTys fun_ty arg_tys
- = go [] fun_ty arg_tys
+ = substTy (mkTyVarSubst tvs arg_tys) ty
  where
+   (tvs, ty) = split fun_ty arg_tys
+   
+   split fun_ty               []         = ([], fun_ty)
+   split (NoteTy _ fun_ty)    args       = split fun_ty args
+   split (ForAllTy tv fun_ty) (arg:args) = ASSERT2( isNotUsgTy arg, vcat (map pprType arg_tys) $$
+								    text "in application of" <+> pprType fun_ty)
+					   case split fun_ty args of
+						  (tvs, ty) -> (tv:tvs, ty)
+   split other_ty             args       = panic "applyTys"
+
+{- 		OLD version with bogus usage stuff
+
+	************* CHECK WITH KEITH **************
+
    go env ty               []         = substTy (mkVarEnv env) ty
    go env (NoteTy note@(UsgNote _) fun)
                            args       = NoteTy note (go env fun args)
    go env (NoteTy _ fun)   args       = go env fun args
-   go env (ForAllTy tv ty) (arg:args) = ASSERT2( isNotUsgTy arg, vcat ((map pprType arg_tys) ++ [text "in application of" <+> pprType fun_ty]) )
-                                        go ((tv,arg):env) ty args
+   go env (ForAllTy tv ty) (arg:args) = go ((tv,arg):env) ty args
    go env other            args       = panic "applyTys"
+-}
 \end{code}
 
 Note that we allow applications to be of usage-annotated- types, as an
@@ -789,25 +828,12 @@ typeKind (TyVarTy tyvar)	= tyVarKind tyvar
 typeKind (TyConApp tycon tys)	= foldr (\_ k -> funResultTy k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)		= typeKind ty
 typeKind (AppTy fun arg)	= funResultTy (typeKind fun)
-typeKind (FunTy fun arg)	= typeKindF arg
-typeKind (ForAllTy _ ty)	= typeKindF ty	-- We could make this a new kind polyTypeKind
-						-- to prevent a forall type unifying with a 
-						-- boxed type variable, but I didn't think it
-						-- was worth it yet.
 
--- The complication is that a *function* is boxed even if
--- its *result* type is unboxed.  Seems wierd.
+typeKind (FunTy arg res)	= boxedTypeKind	-- A function is boxed regardless of its result type
+						-- No functions at the type level, hence we don't need
+						-- to say (typeKind res).
 
-typeKindF :: Type -> Kind
-typeKindF (NoteTy _ ty)   = typeKindF ty
-typeKindF (FunTy _ ty)    = typeKindF ty
-typeKindF (ForAllTy _ ty) = typeKindF ty
-typeKindF other		  = fix_up (typeKind other)
-  where
-    fix_up (TyConApp kc _) | kc == typeCon = boxedTypeKind
-		-- Functions at the type level are always boxed
-    fix_up (NoteTy _ kind) = fix_up kind
-    fix_up kind            = kind
+typeKind (ForAllTy tv ty)	= typeKind ty
 \end{code}
 
 
@@ -848,92 +874,6 @@ namesOfType (AppTy fun arg)		= namesOfType fun `unionNameSets` namesOfType arg
 namesOfType (ForAllTy tyvar ty)		= namesOfType ty `minusNameSet` unitNameSet (getName tyvar)
 
 namesOfTypes tys = foldr (unionNameSets . namesOfType) emptyNameSet tys
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Instantiating a type}
-%*									*
-%************************************************************************
-
-@substTy@ applies a substitution to a type.  It deals correctly with name capture.
-
-\begin{code}
-substTy :: TyVarSubst -> Type -> Type
-substTy tenv ty 
-  | isEmptyVarEnv tenv = ty
-  | otherwise	       = subst_ty tenv tset ty
-  where
-    tset = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet tenv
-		-- If ty doesn't have any for-alls, then this thunk
-		-- will never be evaluated
-
-substTheta :: TyVarSubst -> ThetaType -> ThetaType
-substTheta tenv theta
-  | isEmptyVarEnv tenv = theta
-  | otherwise	       = [(clas, map (subst_ty tenv tset) tys) | (clas, tys) <- theta]
-  where
-    tset = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet tenv
-		-- If ty doesn't have any for-alls, then this thunk
-		-- will never be evaluated
-
-substTopTy :: TyVarSubst -> Type -> Type
-substTopTy = substTy	-- Called when doing top-level substitutions.
-			-- Here we expect that the free vars of the range of the
-			-- substitution will be empty; but during typechecking I'm
-			-- a bit dubious about that (mutable tyvars bouund to Int, say)
-			-- So I've left it as substTy for the moment.  SLPJ Nov 98
-substTopTheta = substTheta
-\end{code}
-
-@fullSubstTy@ is like @substTy@ except that it needs to be given a set
-of in-scope type variables.  In exchange it's a bit more efficient, at least
-if you happen to have that set lying around.
-
-\begin{code}
-fullSubstTy :: TyVarSubst 	  	-- Substitution to apply
-            -> TyVarSet 		-- Superset of the free tyvars of
-					-- the range of the tyvar env
-            -> Type  -> Type
--- ASSUMPTION: The substitution is idempotent.
--- Equivalently: No tyvar is both in scope, and in the domain of the substitution.
-fullSubstTy tenv tset ty | isEmptyVarEnv tenv = ty
-		         | otherwise	      = subst_ty tenv tset ty
-
--- subst_ty does the business
-subst_ty tenv tset ty
-   = go ty
-  where
-    go (TyConApp tc tys)	   = let args = map go tys
-				     in  args `seqList` TyConApp tc args
-    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
-    go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
-    go (NoteTy (UsgNote usg) ty2)  = (NoteTy $! (UsgNote usg)) $! (go ty2)  -- Keep usage annot
-    go (FunTy arg res)   	   = FunTy (go arg) (go res)
-    go (AppTy fun arg)   	   = mkAppTy (go fun) (go arg)
-    go ty@(TyVarTy tv)   	   = case (lookupVarEnv tenv tv) of
-	       			      Nothing  -> ty
-       				      Just ty' -> ty'
-    go (ForAllTy tv ty)		   = case substTyVar tenv tset tv of
-					(tenv', tset', tv') -> ForAllTy tv' $! (subst_ty tenv' tset' ty)
-
-substTyVar ::  TyVarSubst -> TyVarSet -> TyVar
-	   -> (TyVarSubst,   TyVarSet,   TyVar)
-
-substTyVar tenv tset tv
-  | not (tv `elemVarSet` tset)	-- No need to clone
-				-- But must delete from substitution
-  = (tenv `delVarEnv` tv, tset `extendVarSet` tv, tv)
-
-  | otherwise	-- The forall's variable is in scope so
-		-- we'd better rename it away from the in-scope variables
-		-- Extending the substitution to do this renaming also
-		-- has the (correct) effect of discarding any existing
-		-- substitution for that variable
-  = (extendVarEnv tenv tv (TyVarTy tv'), tset `extendVarSet` tv', tv')
-  where
-     tv' = uniqAway tset tv
 \end{code}
 
 

@@ -45,14 +45,14 @@ import BasicTypes	( Fixity, Version, NewOrData )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Bag
-import Module		( Module, pprModule )
+import Module		( ModuleName, pprModuleName )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
 data HsModule name pat
   = HsModule
-	Module			-- module name
+	ModuleName		-- module name
 	(Maybe Version)		-- source interface version number
 	(Maybe [IE name])	-- export list; Nothing => export everything
 				-- Just [] => export *nothing* (???)
@@ -73,9 +73,9 @@ instance (Outputable name, Outputable pat)
 		      decls src_loc)
       = vcat [
 	    case exports of
-	      Nothing -> hsep [ptext SLIT("module"), pprModule name, ptext SLIT("where")]
+	      Nothing -> hsep [ptext SLIT("module"), pprModuleName name, ptext SLIT("where")]
 	      Just es -> vcat [
-			    hsep [ptext SLIT("module"), pprModule name, lparen],
+			    hsep [ptext SLIT("module"), pprModuleName name, lparen],
 			    nest 8 (fsep (punctuate comma (map ppr es))),
 			    nest 4 (ptext SLIT(") where"))
 			  ],

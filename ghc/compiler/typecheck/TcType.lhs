@@ -56,9 +56,9 @@ import Type		( Type(..), Kind, ThetaType, TyNote(..),
 			  mkAppTy, mkTyConApp,
 			  splitDictTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
-			  fullSubstTy, substTopTy, 
 			  typeCon, openTypeKind, boxedTypeKind, boxedKind, superKind, superBoxity
 			)
+import Subst		( Subst, mkTopTyVarSubst, substTy )
 import TyCon		( tyConKind, mkPrimTyCon )
 import PrimRep		( PrimRep(VoidRep) )
 import VarEnv
@@ -170,14 +170,17 @@ Instantiating a bunch of type variables
 
 \begin{code}
 tcInstTyVars :: [TyVar] 
-	     -> NF_TcM s ([TcTyVar], [TcType], TyVarEnv TcType)
+	     -> NF_TcM s ([TcTyVar], [TcType], Subst)
 
 tcInstTyVars tyvars
   = mapNF_Tc tcInstTyVar tyvars	`thenNF_Tc` \ tc_tyvars ->
     let
 	tys = mkTyVarTys tc_tyvars
     in
-    returnNF_Tc (tc_tyvars, tys, zipVarEnv tyvars tys)
+    returnNF_Tc (tc_tyvars, tys, mkTopTyVarSubst tyvars tys)
+		-- Since the tyvars are freshly made,
+		-- they cannot possibly be captured by
+		-- any existing for-alls.  Hence mkTopTyVarSubst
 
 tcInstTyVar tyvar
   = tcGetUnique 		`thenNF_Tc` \ uniq ->
@@ -229,10 +232,7 @@ tcInstTcType ty
   = case splitForAllTys ty of
 	([], _)       -> returnNF_Tc ([], ty)	-- Nothing to do
 	(tyvars, rho) -> tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
-			 returnNF_Tc (tyvars', fullSubstTy tenv emptyVarSet rho)
-					-- Since the tyvars are freshly made,
-					-- they cannot possibly be captured by
-					-- any existing for-alls.  Hence emptyVarSet
+			 returnNF_Tc (tyvars', substTy tenv rho)
 \end{code}
 
 

@@ -4,7 +4,7 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcVarPat, badFieldCon, polyPatSig ) where
+module TcPat ( tcPat, tcPatBndr_NoSigs, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
@@ -17,7 +17,7 @@ import TcHsSyn		( TcPat, TcId )
 import TcMonad
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			  emptyLIE, plusLIE, LIE,
-			  newMethod, newMethodWithGivenTy, newOverloadedLit, 
+			  newMethod, newOverloadedLit, 
 			  newDicts, instToIdBndr
 			)
 import Name		( Name, getOccName, getSrcLoc )
@@ -34,8 +34,9 @@ import TcUnify 		( unifyTauTy, unifyListTy,
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( DataCon, dataConSig, dataConFieldLabels, dataConSourceArity )
-import Id		( Id, mkUserId, idType, isDataConId_maybe )
-import Type		( Type, isTauTy, substTopTy, substTopTheta, mkTyConApp )
+import Id		( Id, idType, isDataConId_maybe )
+import Type		( Type, isTauTy, mkTyConApp )
+import Subst		( substTy, substTheta )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
@@ -55,28 +56,12 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-tcVarPat :: (Name -> Maybe TcId) -- Info about signatures; gives the *monomorphic*
-				 -- Id for variables with a type signature
-         -> Name
-
-         -> TcType		-- Expected type, derived from the context
-				--	In the case of a function with a rank-2 signature,
-				--	this type might be a forall type.
-				--	INVARIANT: if it is, the foralls will always be visible,
-				--	not hidden inside a mutable type variable
-
-         -> TcM s TcId	-- The monomorphic Id; this is put in the pattern itself
-
-tcVarPat sig_fn binder_name pat_ty
- = case sig_fn binder_name of
-	Nothing -> 	-- Need to make a new, monomorphic, Id
-			-- The binder_name is already being used for the polymorphic Id
-		   newLocalId (getOccName binder_name) pat_ty loc	`thenNF_Tc` \ bndr_id ->
-		   returnTc bndr_id
-
-	Just bndr_id -> tcAddSrcLoc loc				$
-			unifyTauTy (idType bndr_id) pat_ty 	`thenTc_`
-			returnTc bndr_id
+-- This is the right function to pass to tcPat when there are no signatures
+tcPatBndr_NoSigs binder_name pat_ty
+  =  	-- Need to make a new, monomorphic, Id
+	-- The binder_name is already being used for the polymorphic Id
+     newLocalId (getOccName binder_name) pat_ty loc	`thenNF_Tc` \ bndr_id ->
+     returnTc bndr_id
  where
    loc = getSrcLoc binder_name
 \end{code}
@@ -89,10 +74,17 @@ tcVarPat sig_fn binder_name pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat :: (Name -> Maybe TcId)	-- Info about signatures; gives the *monomorphic*
-					-- Id for variables with a type signature
+tcPat :: (Name -> TcType -> TcM s TcId)	-- How to construct a suitable (monomorphic)
+					-- Id for variables found in the pattern
+			         	-- The TcType is the expected type, see note below
       -> RenamedPat
-      -> TcType			-- Expected type; see invariant in tcVarPat
+
+      -> TcType		-- Expected type derived from the context
+			--	In the case of a function with a rank-2 signature,
+			--	this type might be a forall type.
+			--	INVARIANT: if it is, the foralls will always be visible,
+			--	not hidden inside a mutable type variable
+
       -> TcM s (TcPat, 
 		LIE,			-- Required by n+k and literal pats
 		Bag TcTyVar,	-- TyVars bound by the pattern
@@ -115,35 +107,35 @@ tcPat :: (Name -> Maybe TcId)	-- Info about signatures; gives the *monomorphic*
 %************************************************************************
 
 \begin{code}
-tcPat sig_fn (VarPatIn name) pat_ty
-  = tcVarPat sig_fn name pat_ty		`thenTc` \ bndr_id ->
+tcPat tc_bndr (VarPatIn name) pat_ty
+  = tc_bndr name pat_ty		`thenTc` \ bndr_id ->
     returnTc (VarPat bndr_id, emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
 
-tcPat sig_fn (LazyPatIn pat) pat_ty
-  = tcPat sig_fn pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
+tcPat tc_bndr (LazyPatIn pat) pat_ty
+  = tcPat tc_bndr pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
     returnTc (LazyPat pat', lie_req, tvs, ids, lie_avail)
 
-tcPat sig_fn pat_in@(AsPatIn name pat) pat_ty
-  = tcVarPat sig_fn name pat_ty		`thenTc` \ bndr_id ->
-    tcPat sig_fn pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
+tcPat tc_bndr pat_in@(AsPatIn name pat) pat_ty
+  = tc_bndr name pat_ty			`thenTc` \ bndr_id ->
+    tcPat tc_bndr pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
     tcAddErrCtxt (patCtxt pat_in) 	$
     returnTc (AsPat bndr_id pat', lie_req, 
 	      tvs, (name, bndr_id) `consBag` ids, lie_avail)
 
-tcPat sig_fn WildPatIn pat_ty
+tcPat tc_bndr WildPatIn pat_ty
   = returnTc (WildPat pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-tcPat sig_fn (NegPatIn pat) pat_ty
-  = tcPat sig_fn (negate_lit pat) pat_ty
+tcPat tc_bndr (NegPatIn pat) pat_ty
+  = tcPat tc_bndr (negate_lit pat) pat_ty
   where
     negate_lit (LitPatIn (HsInt  i)) = LitPatIn (HsInt  (-i))
     negate_lit (LitPatIn (HsFrac f)) = LitPatIn (HsFrac (-f))
     negate_lit _                     = panic "TcPat:negate_pat"
 
-tcPat sig_fn (ParPatIn parend_pat) pat_ty
-  = tcPat sig_fn parend_pat pat_ty
+tcPat tc_bndr (ParPatIn parend_pat) pat_ty
+  = tcPat tc_bndr parend_pat pat_ty
 
-tcPat sig_fn (SigPatIn pat sig) pat_ty
+tcPat tc_bndr (SigPatIn pat sig) pat_ty
   = tcHsType sig					`thenTc` \ sig_ty ->
 
 	-- Check that the signature isn't a polymorphic one, which
@@ -151,7 +143,7 @@ tcPat sig_fn (SigPatIn pat sig) pat_ty
     checkTc (isTauTy sig_ty) (polyPatSig sig_ty)	`thenTc_`
 
     unifyTauTy pat_ty sig_ty	`thenTc_`
-    tcPat sig_fn pat sig_ty
+    tcPat tc_bndr pat sig_ty
 \end{code}
 
 %************************************************************************
@@ -161,20 +153,20 @@ tcPat sig_fn (SigPatIn pat sig) pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat sig_fn pat_in@(ListPatIn pats) pat_ty
+tcPat tc_bndr pat_in@(ListPatIn pats) pat_ty
   = tcAddErrCtxt (patCtxt pat_in)		$
     unifyListTy pat_ty				`thenTc` \ elem_ty ->
-    tcPats sig_fn pats (repeat elem_ty)		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
+    tcPats tc_bndr pats (repeat elem_ty)	`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
     returnTc (ListPat elem_ty pats', lie_req, tvs, ids, lie_avail)
 
-tcPat sig_fn pat_in@(TuplePatIn pats boxed) pat_ty
+tcPat tc_bndr pat_in@(TuplePatIn pats boxed) pat_ty
   = tcAddErrCtxt (patCtxt pat_in)	$
 
     (if boxed
      then unifyTupleTy        arity pat_ty
      else unifyUnboxedTupleTy arity pat_ty)	`thenTc` \ arg_tys ->
 
-    tcPats sig_fn pats arg_tys 	 		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
+    tcPats tc_bndr pats arg_tys 	 		`thenTc` \ (pats', lie_req, tvs, ids, lie_avail) ->
 
 	-- possibly do the "make all tuple-pats irrefutable" test:
     let
@@ -202,11 +194,11 @@ tcPat sig_fn pat_in@(TuplePatIn pats boxed) pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat sig_fn pat@(ConPatIn name arg_pats) pat_ty
-  = tcConPat sig_fn pat name arg_pats pat_ty
+tcPat tc_bndr pat@(ConPatIn name arg_pats) pat_ty
+  = tcConPat tc_bndr pat name arg_pats pat_ty
 
-tcPat sig_fn pat@(ConOpPatIn pat1 op _ pat2) pat_ty
-  = tcConPat sig_fn pat op [pat1, pat2] pat_ty
+tcPat tc_bndr pat@(ConOpPatIn pat1 op _ pat2) pat_ty
+  = tcConPat tc_bndr pat op [pat1, pat2] pat_ty
 \end{code}
 
 
@@ -217,7 +209,7 @@ tcPat sig_fn pat@(ConOpPatIn pat1 op _ pat2) pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat sig_fn pat@(RecPatIn name rpats) pat_ty
+tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
   = tcAddErrCtxt (patCtxt pat)	$
 
  	-- Check the constructor itself
@@ -251,7 +243,7 @@ tcPat sig_fn pat@(RecPatIn name rpats) pat_ty
 	tc_fields field_tys rpats	`thenTc` \ (rpats', lie_req1, tvs1, ids1, lie_avail1) ->
 
 	tcLookupValue field_label	`thenNF_Tc` \ sel_id ->
-	tcPat sig_fn rhs_pat rhs_ty	`thenTc` \ (rhs_pat', lie_req2, tvs2, ids2, lie_avail2) ->
+	tcPat tc_bndr rhs_pat rhs_ty	`thenTc` \ (rhs_pat', lie_req2, tvs2, ids2, lie_avail2) ->
 
 	returnTc ((sel_id, rhs_pat', pun_flag) : rpats',
 		  lie_req1 `plusLIE` lie_req2,
@@ -270,14 +262,14 @@ tcPat sig_fn pat@(RecPatIn name rpats) pat_ty
 %************************************************************************
 
 \begin{code}
-tcPat sig_fn (LitPatIn lit@(HsChar _))       pat_ty = tcSimpleLitPat lit charTy       pat_ty
-tcPat sig_fn (LitPatIn lit@(HsIntPrim _))    pat_ty = tcSimpleLitPat lit intPrimTy    pat_ty
-tcPat sig_fn (LitPatIn lit@(HsCharPrim _))   pat_ty = tcSimpleLitPat lit charPrimTy   pat_ty
-tcPat sig_fn (LitPatIn lit@(HsStringPrim _)) pat_ty = tcSimpleLitPat lit addrPrimTy   pat_ty
-tcPat sig_fn (LitPatIn lit@(HsFloatPrim _))  pat_ty = tcSimpleLitPat lit floatPrimTy  pat_ty
-tcPat sig_fn (LitPatIn lit@(HsDoublePrim _)) pat_ty = tcSimpleLitPat lit doublePrimTy pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsChar _))       pat_ty = tcSimpleLitPat lit charTy       pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsIntPrim _))    pat_ty = tcSimpleLitPat lit intPrimTy    pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsCharPrim _))   pat_ty = tcSimpleLitPat lit charPrimTy   pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsStringPrim _)) pat_ty = tcSimpleLitPat lit addrPrimTy   pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsFloatPrim _))  pat_ty = tcSimpleLitPat lit floatPrimTy  pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsDoublePrim _)) pat_ty = tcSimpleLitPat lit doublePrimTy pat_ty
 
-tcPat sig_fn (LitPatIn lit@(HsLitLit s))     pat_ty = tcSimpleLitPat lit intTy pat_ty
+tcPat tc_bndr (LitPatIn lit@(HsLitLit s))     pat_ty = tcSimpleLitPat lit intTy pat_ty
 	-- This one looks weird!
 \end{code}
 
@@ -288,7 +280,7 @@ tcPat sig_fn (LitPatIn lit@(HsLitLit s))     pat_ty = tcSimpleLitPat lit intTy p
 %************************************************************************
 
 \begin{code}
-tcPat sig_fn pat@(LitPatIn lit@(HsString str)) pat_ty
+tcPat tc_bndr pat@(LitPatIn lit@(HsString str)) pat_ty
   = unifyTauTy pat_ty stringTy			`thenTc_` 
     tcLookupValueByKey eqClassOpKey		`thenNF_Tc` \ sel_id ->
     newMethod (PatOrigin pat) sel_id [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
@@ -298,15 +290,15 @@ tcPat sig_fn pat@(LitPatIn lit@(HsString str)) pat_ty
     returnTc (NPat lit stringTy comp_op, lie, emptyBag, emptyBag, emptyLIE)
 
 
-tcPat sig_fn pat@(LitPatIn lit@(HsInt i)) pat_ty
+tcPat tc_bndr pat@(LitPatIn lit@(HsInt i)) pat_ty
   = tcOverloadedLitPat pat lit (OverloadedIntegral i) pat_ty
 
-tcPat sig_fn pat@(LitPatIn lit@(HsFrac f)) pat_ty
+tcPat tc_bndr pat@(LitPatIn lit@(HsFrac f)) pat_ty
   = tcOverloadedLitPat pat lit (OverloadedFractional f) pat_ty
 
 
-tcPat sig_fn pat@(NPlusKPatIn name lit@(HsInt i)) pat_ty
-  = tcVarPat sig_fn name pat_ty				`thenTc` \ bndr_id ->
+tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsInt i)) pat_ty
+  = tc_bndr name pat_ty				`thenTc` \ bndr_id ->
     tcLookupValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
     tcLookupValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
 
@@ -324,7 +316,7 @@ tcPat sig_fn pat@(NPlusKPatIn name lit@(HsInt i)) pat_ty
   where
     origin = PatOrigin pat
 
-tcPat sig_fn (NPlusKPatIn pat other) pat_ty
+tcPat tc_bndr (NPlusKPatIn pat other) pat_ty
   = panic "TcPat:NPlusKPat: not an HsInt literal"
 \end{code}
 
@@ -337,19 +329,19 @@ tcPat sig_fn (NPlusKPatIn pat other) pat_ty
 Helper functions
 
 \begin{code}
-tcPats :: (Name -> Maybe TcId)	-- Info about signatures
-       -> [RenamedPat] -> [TcType]	-- Excess 'expected types' discarded
+tcPats :: (Name -> TcType -> TcM s TcId)	-- How to deal with variables
+       -> [RenamedPat] -> [TcType]		-- Excess 'expected types' discarded
        -> TcM s ([TcPat], 
 		 LIE,				-- Required by n+k and literal pats
 		 Bag TcTyVar,
 		 Bag (Name, TcId),	-- Ids bound by the pattern
 		 LIE)				-- Dicts bound by the pattern
 
-tcPats sig_fn [] tys = returnTc ([], emptyLIE, emptyBag, emptyBag, emptyLIE)
+tcPats tc_bndr [] tys = returnTc ([], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
-tcPats sig_fn (ty:tys) (pat:pats)
-  = tcPat sig_fn ty pat		`thenTc` \ (pat',  lie_req1, tvs1, ids1, lie_avail1) ->
-    tcPats sig_fn tys pats	`thenTc` \ (pats', lie_req2, tvs2, ids2, lie_avail2) ->
+tcPats tc_bndr (ty:tys) (pat:pats)
+  = tcPat tc_bndr ty pat		`thenTc` \ (pat',  lie_req1, tvs1, ids1, lie_avail1) ->
+    tcPats tc_bndr tys pats	`thenTc` \ (pats', lie_req2, tvs2, ids2, lie_avail2) ->
 
     returnTc (pat':pats', lie_req1 `plusLIE` lie_req2,
 	      tvs1 `unionBags` tvs2, ids1 `unionBags` ids2, 
@@ -394,8 +386,8 @@ tcConstructor pat con_name pat_ty
     in
     tcInstTyVars (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
     let
-	ex_theta' = substTopTheta tenv ex_theta
-	arg_tys'  = map (substTopTy tenv) arg_tys
+	ex_theta' = substTheta tenv ex_theta
+	arg_tys'  = map (substTy tenv) arg_tys
 
 	n_ex_tvs  = length ex_tvs
 	ex_tvs'   = take n_ex_tvs all_tvs'
@@ -412,7 +404,7 @@ tcConstructor pat con_name pat_ty
 
 ------------------------------------------------------
 \begin{code}
-tcConPat sig_fn pat con_name arg_pats pat_ty
+tcConPat tc_bndr pat con_name arg_pats pat_ty
   = tcAddErrCtxt (patCtxt pat)	$
 
 	-- Check the constructor itself
@@ -427,7 +419,7 @@ tcConPat sig_fn pat con_name arg_pats pat_ty
 	    (arityErr "Constructor" data_con con_arity no_of_args)	`thenTc_`
 
 	-- Check arguments
-    tcPats sig_fn arg_pats arg_tys'	`thenTc` \ (arg_pats', lie_req, tvs, ids, lie_avail2) ->
+    tcPats tc_bndr arg_pats arg_tys'	`thenTc` \ (arg_pats', lie_req, tvs, ids, lie_avail2) ->
 
     returnTc (ConPat data_con pat_ty ex_tvs' dicts arg_pats',
 	      lie_req,

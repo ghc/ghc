@@ -22,15 +22,14 @@ import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( coreExprType )
 import Const		( Con(..), mkMachInt )
 import DataCon		( DataCon, dataConId )
-import Id		( Id, idType, idName, mkWildId, mkUserId )
+import Id		( Id, idType, idName, mkWildId, mkVanillaId )
 import Const		( Literal(..) )
 import Module		( Module )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..), Provenance(..), ExportFlag(..)
 			)
-import PrelVals		( realWorldPrimId )
-import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME )
+import PrelInfo		( deRefStablePtr_NAME, bindIO_NAME, makeStablePtr_NAME, realWorldPrimId )
 import Type		( splitAlgTyConApp_maybe, 
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
@@ -165,7 +164,7 @@ dsFImport nm ty may_not_gc ext_name cconv =
       		      [Type io_res_ty, Var ds]
 
       fo_rhs = mkLams (tvs ++ args)
-		      (Let (NonRec ds (the_body::CoreExpr)) io_app)
+		      (mkDsLet (NonRec ds (the_body::CoreExpr)) io_app)
     in
     returnDs (NonRec nm fo_rhs)
 \end{code}
@@ -229,7 +228,7 @@ dsFExport i ty mod_name ext_name cconv isDyn =
      getUniqueDs					`thenDs` \ uniq ->
      getSrcLocDs					`thenDs` \ src_loc ->
      let
-	f_helper_glob = mkUserId helper_name helper_ty
+	f_helper_glob = mkVanillaId helper_name helper_ty
 		      where
 			name	            = idName i
 			mod	

@@ -397,7 +397,7 @@ pprPanic# heading pretty_msg = panic# (show (doc PprDebug))
 pprAndThen :: (String -> a) -> String -> SDoc -> a
 pprAndThen cont heading pretty_msg = cont (show (doc PprDebug))
     where
-     doc = text heading <+> pretty_msg
+     doc = sep [text heading, nest 4 pretty_msg]
 
 assertPprPanic :: String -> Int -> SDoc -> a
 assertPprPanic file line msg

@@ -5,16 +5,6 @@
 
 \begin{code}
 module Constants (
-	uNFOLDING_USE_THRESHOLD,
-	uNFOLDING_CREATION_THRESHOLD,
-	iNTERFACE_UNFOLD_THRESHOLD,
-	lIBERATE_CASE_THRESHOLD,
-	uNFOLDING_CHEAP_OP_COST,
-	uNFOLDING_DEAR_OP_COST,
-	uNFOLDING_NOREP_LIT_COST,
-	uNFOLDING_CON_DISCOUNT_WEIGHT,
-	uNFOLDING_KEENESS_FACTOR,
-
 	mAX_CONTEXT_REDUCTION_DEPTH,
 	mAX_TUPLE_SIZE,
 
@@ -96,21 +86,8 @@ mAX_TUPLE_SIZE = (37 :: Int)
 mAX_CONTEXT_REDUCTION_DEPTH = (20 :: Int)
 \end{code}
 
-\begin{code}
-uNFOLDING_USE_THRESHOLD	      = ( 8 :: Int)
-uNFOLDING_CREATION_THRESHOLD  = (30 :: Int)	-- Discounts can be big
-iNTERFACE_UNFOLD_THRESHOLD    = (30 :: Int)
-lIBERATE_CASE_THRESHOLD	      = (10 :: Int)
-
-uNFOLDING_CHEAP_OP_COST       = ( 1 :: Int)
-uNFOLDING_DEAR_OP_COST        = ( 4 :: Int)
-uNFOLDING_NOREP_LIT_COST      = ( 20 :: Int)	-- Strings can be pretty big
-uNFOLDING_CON_DISCOUNT_WEIGHT = ( 3 :: Int)
-uNFOLDING_KEENESS_FACTOR      = ( 2.0 :: Float)
-\end{code}
 
 \begin{code}
-
 -- specialised fun/thunk/constr closure types
 mAX_SPEC_THUNK_SIZE   = (MAX_SPEC_THUNK_SIZE :: Int)
 mAX_SPEC_FUN_SIZE     = (MAX_SPEC_FUN_SIZE :: Int)

@@ -14,45 +14,53 @@ find, unsurprisingly, a Core expression.
 
 \begin{code}
 module CoreUnfold (
-	Unfolding(..), UnfoldingGuidance(..), -- types
+	Unfolding(..), UnfoldingGuidance, -- types
 
-	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
+	noUnfolding, mkUnfolding, getUnfoldingTemplate,
 	isEvaldUnfolding, hasUnfolding,
 
-	smallEnoughToInline, unfoldAlways, couldBeSmallEnoughToInline, 
+	couldBeSmallEnoughToInline, 
 	certainlySmallEnoughToInline, 
 	okToUnfoldInHiFile,
 
-	calcUnfoldingGuidance
+	calcUnfoldingGuidance,
+
+	callSiteInline, blackListed
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MagicUFs	( MagicUnfoldingFun, mkMagicUnfoldingFun )
-
-import CmdLineOpts	( opt_UnfoldingCreationThreshold,
-			  opt_UnfoldingUseThreshold,
-			  opt_UnfoldingConDiscount,
-			  opt_UnfoldingKeenessFactor,
-			  opt_UnfoldCasms, opt_PprStyle_Debug 
-			)
-import Constants	( uNFOLDING_CHEAP_OP_COST,
-			  uNFOLDING_DEAR_OP_COST,
-			  uNFOLDING_NOREP_LIT_COST
+import CmdLineOpts	( opt_UF_CreationThreshold,
+			  opt_UF_UseThreshold,
+			  opt_UF_ScrutConDiscount,
+			  opt_UF_FunAppDiscount,
+			  opt_UF_PrimArgDiscount,
+			  opt_UF_KeenessFactor,
+			  opt_UF_CheapOp, opt_UF_DearOp, opt_UF_NoRepLit,
+			  opt_UnfoldCasms, opt_PprStyle_Debug,
+			  opt_D_dump_inlinings
 			)
 import CoreSyn
+import PprCore		( pprCoreExpr )
+import CoreUtils	( whnfOrBottom )
 import OccurAnal	( occurAnalyseGlobalExpr )
+import BinderInfo	( )
 import CoreUtils	( coreExprType, exprIsTrivial, mkFormSummary, 
 			  FormSummary(..) )
-import Id		( Id, idType, isId )
-import Const		( Con(..), isLitLitLit )
-import PrimOp		( PrimOp(..), primOpOutOfLine )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..) )
+import Id		( Id, idType, idUnique, isId, 
+			  getIdSpecialisation, getInlinePragma, getIdUnfolding
+			)
+import VarSet
+import Const		( Con(..), isLitLitLit, isWHNFCon )
+import PrimOp		( PrimOp(..), primOpIsDupable )
+import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..) )
 import TyCon		( tyConFamilySize )
-import Type		( splitAlgTyConApp_maybe )
+import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe )
 import Const		( isNoRepLit )
-import Unique           ( Unique )
-import Util		( isIn )
+import Unique		( Unique, buildIdKey, augmentIdKey, runSTRepIdKey )
+import Maybes		( maybeToBool )
+import Bag
+import Util		( isIn, lengthExceeds )
 import Outputable
 \end{code}
 
@@ -79,10 +87,6 @@ data Unfolding
 		FormSummary		-- Tells whether the template is a WHNF or bottom
 		UnfoldingGuidance	-- Tells about the *size* of the template.
 		CoreExpr		-- Template; binder-info is correct
-
-  | MagicUnfolding
-	Unique				-- Unique of the Id whose magic unfolding this is
-	MagicUnfoldingFun
 \end{code}
 
 \begin{code}
@@ -91,13 +95,10 @@ noUnfolding = NoUnfolding
 mkUnfolding expr
   = let
      -- strictness mangling (depends on there being no CSE)
-     ufg = calcUnfoldingGuidance opt_UnfoldingCreationThreshold expr
+     ufg = calcUnfoldingGuidance opt_UF_CreationThreshold expr
      occ = occurAnalyseGlobalExpr expr
     in
     CoreUnfolding (mkFormSummary expr) ufg occ
-
-mkMagicUnfolding :: Unique -> Unfolding
-mkMagicUnfolding tag  = MagicUnfolding tag (mkMagicUnfoldingFun tag)
 
 getUnfoldingTemplate :: Unfolding -> CoreExpr
 getUnfoldingTemplate (CoreUnfolding _ _ expr) = expr
@@ -119,8 +120,7 @@ data UnfoldingGuidance
 				-- so cheap to unfold (e.g., 1#) that
 				-- you should do it absolutely always.
 
-  | UnfoldIfGoodArgs	Int	-- if "m" type args 
-			Int	-- and "n" value args
+  | UnfoldIfGoodArgs	Int	-- and "n" value args
 
 			[Int]	-- Discount if the argument is evaluated.
 				-- (i.e., a simplification will definitely
@@ -132,17 +132,14 @@ data UnfoldingGuidance
 			Int	-- Scrutinee discount: the discount to substract if the thing is in
 				-- a context (case (thing args) of ...),
 				-- (where there are the right number of arguments.)
-
-unfoldAlways :: UnfoldingGuidance -> Bool
-unfoldAlways UnfoldAlways = True
-unfoldAlways other	  = False
 \end{code}
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr UnfoldAlways    	= ptext SLIT("_ALWAYS_")
-    ppr (UnfoldIfGoodArgs t v cs size discount)
-      = hsep [ptext SLIT("_IF_ARGS_"), int t, int v,
+    ppr UnfoldAlways    = ptext SLIT("ALWAYS")
+    ppr UnfoldNever	= ptext SLIT("NEVER")
+    ppr (UnfoldIfGoodArgs v cs size discount)
+      = hsep [ptext SLIT("IF_ARGS"), int v,
 	       if null cs	-- always print *something*
 	       	then char 'X'
 		else hcat (map (text . show) cs),
@@ -171,14 +168,16 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
   = UnfoldAlways
  
   | otherwise
-  = case collectTyAndValBinders expr of { (ty_binders, val_binders, body) ->
+  = case collectBinders expr of { (binders, body) ->
+    let
+	val_binders = filter isId binders
+    in
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
       TooBig -> UnfoldNever
 
       SizeIs size cased_args scrut_discount
 	-> UnfoldIfGoodArgs
-			(length ty_binders)
 			(length val_binders)
 			(map discount_for val_binders)
 			(I# size)
@@ -186,17 +185,17 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	where        
 	    discount_for b 
 		| num_cases == 0 = 0
-		| otherwise
-		= if is_data 
-			then tyConFamilySize tycon * num_cases
-			else num_cases -- prim cases are pretty cheap
-	  
-		 where
-		   (is_data, tycon)
-		     = case (splitAlgTyConApp_maybe (idType b)) of
-			  Nothing       -> (False, panic "discount")
-			  Just (tc,_,_) -> (True,  tc)
-		   num_cases = length (filter (==b) cased_args)
+		| is_fun_ty  	 = num_cases * opt_UF_FunAppDiscount
+		| is_data_ty 	 = num_cases * tyConFamilySize tycon * opt_UF_ScrutConDiscount
+		| otherwise  	 = num_cases * opt_UF_PrimArgDiscount
+		where
+		  num_cases	      = foldlBag (\n b' -> if b==b' then n+1 else n) 0 cased_args
+					-- Count occurrences of b in cased_args
+		  arg_ty	      = idType b
+		  is_fun_ty	      = maybeToBool (splitFunTy_maybe arg_ty)
+		  (is_data_ty, tycon) = case (splitAlgTyConApp_maybe (idType b)) of
+					  Nothing       -> (False, panic "discount")
+					  Just (tc,_,_) -> (True,  tc)
 	}
 \end{code}
 
@@ -210,13 +209,22 @@ sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
 sizeExpr (I# bOMB_OUT_SIZE) args expr
   = size_up expr
   where
-    size_up (Type t)	   = sizeZero		-- Types cost nothing
-    size_up (Note _ body)  = size_up body	-- Notes cost nothing
-    size_up (Var v)        = sizeOne
-    size_up (App fun arg)  = size_up fun `addSize` size_up arg
+    size_up (Type t)	      = sizeZero	-- Types cost nothing
+    size_up (Var v)           = sizeOne
+
+    size_up (Note InlineMe _) = sizeTwo		-- The idea is that this is one more
+						-- than the size of the "call" (i.e. 1)
+						-- We want to reply "no" to noSizeIncrease
+						-- for a bare reference (i.e. applied to no args) 
+						-- to an INLINE thing
+
+    size_up (Note _ body)     = size_up body	-- Notes cost nothing
+
+    size_up (App fun (Type t)) = size_up fun
+    size_up (App fun arg)      = size_up_app fun `addSize` size_up arg
 
     size_up (Con con args) = foldr (addSize . size_up) 
-				   (size_up_con con (valArgCount args))
+				   (size_up_con con args)
 				   args
 
     size_up (Lam b e) | isId b    = size_up e `addSizeN` 1
@@ -243,25 +251,30 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 	      	Just (tc,_,_) -> tyConFamilySize tc
 
     ------------ 
+	-- A function application with at least one value argument
+	-- so if the function is an argument give it an arg-discount
+    size_up_app (App fun arg) = size_up_app fun  `addSize` size_up arg
+    size_up_app fun	      = arg_discount fun `addSize` size_up fun
+
+    ------------ 
     size_up_alt (con, bndrs, rhs) = size_up rhs
 	    -- Don't charge for args, so that wrappers look cheap
 
     ------------
-    size_up_con (Literal lit) nv | isNoRepLit lit = sizeN uNFOLDING_NOREP_LIT_COST
-			         | otherwise      = sizeOne
+    size_up_con (Literal lit) args | isNoRepLit lit = sizeN opt_UF_NoRepLit
+			           | otherwise      = sizeOne
 
-    size_up_con (DataCon dc) n_val_args = conSizeN n_val_args
+    size_up_con (DataCon dc) args = conSizeN (valArgCount args)
 			     
-    size_up_con (PrimOp op) nv = sizeN op_cost
+    size_up_con (PrimOp op) args = foldr addSize (sizeN op_cost) (map arg_discount args)
+		-- Give an arg-discount if a primop is applies to
+		-- one of the function's arguments
       where
-	op_cost = if primOpOutOfLine op
-		  then uNFOLDING_DEAR_OP_COST
-			-- these *tend* to be more expensive;
-			-- number chosen to avoid unfolding (HACK)
-		  else uNFOLDING_CHEAP_OP_COST
+	op_cost | primOpIsDupable op = opt_UF_CheapOp
+		| otherwise 	     = opt_UF_DearOp
 
     ------------
-	-- We want to record if we're case'ing an argument
+	-- We want to record if we're case'ing, or applying, an argument
     arg_discount (Var v) | v `is_elem` args = scrutArg v
     arg_discount other			    = sizeZero
 
@@ -287,9 +300,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
       where
 	n_tot = n1 +# n2
 	d_tot = d1 +# d2
-	xys   = xs ++ ys
-
-
+	xys   = xs `unionBags` ys
 \end{code}
 
 Code for manipulating sizes
@@ -298,20 +309,26 @@ Code for manipulating sizes
 
 data ExprSize = TooBig
 	      | SizeIs Int#	-- Size found
-		       [Id]	-- Arguments cased herein
+		       (Bag Id)	-- Arguments cased herein
 		       Int#	-- Size to subtract if result is scrutinised 
 				-- by a case expression
 
-sizeZero     	= SizeIs 0# [] 0#
-sizeOne      	= SizeIs 1# [] 0#
-sizeN (I# n) 	= SizeIs n  [] 0#
-conSizeN (I# n) = SizeIs 0# [] n   -- We don't count 1 for the constructor because we're
-				   -- quite keen to get constructors into the open
-scrutArg v	= SizeIs 0# [v] 0#
+sizeZero     	= SizeIs 0# emptyBag 0#
+sizeOne      	= SizeIs 1# emptyBag 0#
+sizeTwo      	= SizeIs 2# emptyBag 0#
+sizeN (I# n) 	= SizeIs n  emptyBag 0#
+conSizeN (I# n) = SizeIs 1# emptyBag (n +# 1#)
+	-- Treat constructors as size 1, that unfoldAlways responsds 'False'
+	-- when asked about 'x' when x is bound to (C 3#).
+	-- This avoids gratuitous 'ticks' when x itself appears as an
+	-- atomic constructor argument.
+						
+scrutArg v	= SizeIs 0# (unitBag v) 0#
 
 nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
 nukeScrutDiscount TooBig	  = TooBig
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -343,80 +360,19 @@ the expression is going to be taken apart, discounting its size
 is more accurate (see @sizeExpr@ above for how this discount size
 is computed).
 
-\begin{code}
-smallEnoughToInline :: Id			-- The function (trace msg only)
-		    -> [Bool]			-- Evaluated-ness of value arguments
-						-- ** May be infinite in don't care cases **
-						--    see couldBeSmallEnoughToInline etc
-		    -> Bool			-- Result is scrutinised
-		    -> UnfoldingGuidance
-		    -> Bool			-- True => unfold it
-
-smallEnoughToInline _ _ _ UnfoldAlways = True
-smallEnoughToInline _ _ _ UnfoldNever  = False
-smallEnoughToInline id arg_evals result_is_scruted
-		    (UnfoldIfGoodArgs m_tys_wanted n_vals_wanted discount_vec size scrut_discount)
-  | fun_with_no_args
-  = False
-  
-  | (size - discount) > opt_UnfoldingUseThreshold
-  = if opt_PprStyle_Debug then 
-	pprTrace " too big:" stuff False
-    else
-	False
-
-  | otherwise		-- All right!
-  = if opt_PprStyle_Debug then 
-	pprTrace " small enough:" stuff True
-    else
-	True
-
-  where
-    stuff = braces (ppr id <+> ppr (take 10 arg_evals) <+> ppr result_is_scruted <+> 
-		    ppr size <+> ppr discount)
-
-    fun_with_no_args = n_vals_wanted > 0 && null arg_evals
-		-- A *function* with *no* value args => don't unfold
-		-- Otherwise it's ok to try
-
-	-- We multiple the raw discounts (args_discount and result_discount)
-	-- ty opt_UnfoldingKeenessFactor because the former have to do with
-	-- *size* whereas the discounts imply that there's some extra 
-	-- *efficiency* to be gained (e.g. beta reductions, case reductions) 
-	-- by inlining.
-
-	-- we also discount 1 for each argument passed, because these will
-	-- reduce with the lambdas in the function (we count 1 for a lambda
- 	-- in size_up).
-
-	-- NB: we never take the length of arg_evals because it might be infinite
-    discount :: Int
-    discount = length (take n_vals_wanted arg_evals) +
-	       round (opt_UnfoldingKeenessFactor * 
-		      fromInt (arg_discount + result_discount))
-
-    arg_discount    = sum (zipWith mk_arg_discount discount_vec arg_evals)
-    result_discount = mk_result_discount (drop n_vals_wanted arg_evals)
-
-    mk_arg_discount no_of_constrs is_evald
-      | is_evald  = no_of_constrs * opt_UnfoldingConDiscount
-      | otherwise = 0
-
-    mk_result_discount extra_args
-	| not (null extra_args) || result_is_scruted = scrut_discount	-- Over-applied, or case scrut
-        | otherwise	      			     = 0
-\end{code}
-
 We use this one to avoid exporting inlinings that we ``couldn't possibly
 use'' on the other side.  Can be overridden w/ flaggery.
 Just the same as smallEnoughToInline, except that it has no actual arguments.
 
 \begin{code}
-couldBeSmallEnoughToInline :: Id -> UnfoldingGuidance -> Bool
-couldBeSmallEnoughToInline id guidance = smallEnoughToInline id (repeat True) True guidance
+couldBeSmallEnoughToInline :: UnfoldingGuidance -> Bool
+couldBeSmallEnoughToInline UnfoldNever = False
+couldBeSmallEnoughToInline other       = True
 
-certainlySmallEnoughToInline :: Id -> UnfoldingGuidance -> Bool
-certainlySmallEnoughToInline id guidance = smallEnoughToInline id (repeat False) False guidance
+certainlySmallEnoughToInline :: UnfoldingGuidance -> Bool
+certainlySmallEnoughToInline UnfoldNever		   = False
+certainlySmallEnoughToInline UnfoldAlways		   = True
+certainlySmallEnoughToInline (UnfoldIfGoodArgs _ _ size _) = size <= opt_UF_UseThreshold
 \end{code}
 
 @okToUnfoldInHifile@ is used when emitting unfolding info into an interface
@@ -450,3 +406,243 @@ okToUnfoldInHiFile e = opt_UnfoldCasms || go e
     okToUnfoldPrimOp (CCallOp _ is_casm _ _) = not is_casm
     okToUnfoldPrimOp _                       = True
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{callSiteInline}
+%*									*
+%************************************************************************
+
+This is the key function.  It decides whether to inline a variable at a call site
+
+callSiteInline is used at call sites, so it is a bit more generous.
+It's a very important function that embodies lots of heuristics.
+A non-WHNF can be inlined if it doesn't occur inside a lambda,
+and occurs exactly once or 
+    occurs once in each branch of a case and is small
+
+If the thing is in WHNF, there's no danger of duplicating work, 
+so we can inline if it occurs once, or is small
+
+\begin{code}
+callSiteInline :: Bool			-- True <=> the Id is black listed
+	       -> Bool			-- 'inline' note at call site
+	       -> Id			-- The Id
+	       -> [CoreExpr]		-- Arguments
+	       -> Bool			-- True <=> continuation is interesting
+	       -> Maybe CoreExpr	-- Unfolding, if any
+
+
+callSiteInline black_listed inline_call id args interesting_cont
+  = case getIdUnfolding id of {
+	NoUnfolding -> Nothing ;
+	OtherCon _  -> Nothing ;
+	CoreUnfolding form guidance unf_template ->
+
+    let
+	result | yes_or_no = Just unf_template
+	       | otherwise = Nothing
+
+	inline_prag = getInlinePragma id
+	arg_infos   = map interestingArg val_args
+	val_args    = filter isValArg args
+	whnf	    = whnfOrBottom form
+
+	yes_or_no =
+	    case inline_prag of
+		IAmDead		  -> pprTrace "callSiteInline: dead" (ppr id) False
+		IMustNotBeINLINEd -> False
+		IAmALoopBreaker   -> False
+		IMustBeINLINEd    -> True	-- Overrides absolutely everything, including the black list
+		ICanSafelyBeINLINEd in_lam one_br -> consider in_lam    one_br
+		NoInlinePragInfo		  -> consider InsideLam False
+
+	consider in_lam one_branch 
+	  | black_listed = False
+	  | inline_call  = True
+	  | one_branch	-- Be very keen to inline something if this is its unique occurrence; that
+			-- gives a good chance of eliminating the original binding for the thing.
+			-- The only time we hold back is when substituting inside a lambda;
+			-- then if the context is totally uninteresting (not applied, not scrutinised)
+			-- there is no point in substituting because it might just increase allocation.
+	  = case in_lam of
+		NotInsideLam -> True
+		InsideLam    -> whnf && (not (null args) || interesting_cont)
+
+	  | otherwise	-- Occurs (textually) more than once, so look at its size
+	  = case guidance of
+	      UnfoldAlways -> True
+	      UnfoldNever  -> False
+	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
+		| enough_args && size <= (n_vals_wanted + 1)
+			-- No size increase
+			-- Size of call is n_vals_wanted (+1 for the function)
+		-> case in_lam of
+			NotInsideLam -> True
+			InsideLam    -> whnf
+
+		| not (or arg_infos || really_interesting_cont)
+			-- If it occurs more than once, there must be something interesting 
+			-- about some argument, or the result, to make it worth inlining
+		-> False
+  
+		| otherwise
+		-> case in_lam of
+			NotInsideLam -> small_enough
+			InsideLam    -> whnf && small_enough
+
+		where
+		  n_args		  = length arg_infos
+		  enough_args		  = n_args >= n_vals_wanted
+		  really_interesting_cont | n_args <  n_vals_wanted = False	-- Too few args
+					  | n_args == n_vals_wanted = interesting_cont
+					  | otherwise		    = True	-- Extra args
+			-- This rather elaborate defn for really_interesting_cont is important
+			-- Consider an I# = INLINE (\x -> I# {x})
+			-- The unfolding guidance deems it to have size 2, and no arguments.
+			-- So in an application (I# y) we must take the extra arg 'y' as
+			-- evidene of an interesting context!
+			
+		  small_enough = (size - discount) <= opt_UF_UseThreshold
+		  discount     = computeDiscount n_vals_wanted arg_discounts res_discount 
+						 arg_infos really_interesting_cont
+
+				
+    in    
+#ifdef DEBUG
+    if opt_D_dump_inlinings then
+	pprTrace "Considering inlining"
+		 (ppr id <+> vcat [text "black listed" <+> ppr black_listed,
+				   text "inline prag:" <+> ppr inline_prag,
+			  	   text "arg infos" <+> ppr arg_infos,
+				   text "interesting continuation" <+> ppr interesting_cont,
+				   text "whnf" <+> ppr whnf,
+				   text "guidance" <+> ppr guidance,
+				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO",
+				   if yes_or_no then
+					text "Unfolding =" <+> pprCoreExpr unf_template
+				   else empty])
+		  result
+    else
+#endif
+    result
+    }
+
+-- An argument is interesting if it has *some* structure
+-- We are here trying to avoid unfolding a function that
+-- is applied only to variables that have no unfolding
+-- (i.e. they are probably lambda bound): f x y z
+-- There is little point in inlining f here.
+interestingArg (Type _)	         = False
+interestingArg (App fn (Type _)) = interestingArg fn
+interestingArg (Var v)	         = hasUnfolding (getIdUnfolding v)
+interestingArg other	         = True
+
+
+computeDiscount :: Int -> [Int] -> Int -> [Bool] -> Bool -> Int
+computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
+ 	-- We multiple the raw discounts (args_discount and result_discount)
+	-- ty opt_UnfoldingKeenessFactor because the former have to do with
+	-- *size* whereas the discounts imply that there's some extra 
+	-- *efficiency* to be gained (e.g. beta reductions, case reductions) 
+	-- by inlining.
+
+	-- we also discount 1 for each argument passed, because these will
+	-- reduce with the lambdas in the function (we count 1 for a lambda
+ 	-- in size_up).
+  = length (take n_vals_wanted arg_infos) +
+			-- Discount of 1 for each arg supplied, because the 
+			-- result replaces the call
+    round (opt_UF_KeenessFactor * 
+	   fromInt (arg_discount + result_discount))
+  where
+    arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)
+
+    mk_arg_discount discount is_evald | is_evald  = discount
+				      | otherwise = 0
+
+	-- Don't give a result discount unless there are enough args
+    result_discount | result_used = res_discount	-- Over-applied, or case scrut
+	            | otherwise	  = 0
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Black-listing}
+%*									*
+%************************************************************************
+
+Inlining is controlled by the "Inline phase" number, which is set
+by the per-simplification-pass '-finline-phase' flag.
+
+For optimisation we use phase 1,2 and nothing (i.e. no -finline-phase flag)
+in that order.  The meanings of these are determined by the @blackListed@ function
+here.
+
+\begin{code}
+blackListed :: IdSet 		-- Used in transformation rules
+	    -> Maybe Int	-- Inline phase
+	    -> Id -> Bool	-- True <=> blacklisted
+	
+-- The blackListed function sees whether a variable should *not* be 
+-- inlined because of the inline phase we are in.  This is the sole
+-- place that the inline phase number is looked at.
+
+-- Phase 0: used for 'no inlinings please'
+blackListed rule_vars (Just 0)
+  = \v -> True
+
+-- Phase 1: don't inline any rule-y things or things with specialisations
+blackListed rule_vars (Just 1)
+  = \v -> let v_uniq = idUnique v
+	  in v `elemVarSet` rule_vars
+	  || not (isEmptyCoreRules (getIdSpecialisation v))
+	  || v_uniq == runSTRepIdKey
+
+-- Phase 2: allow build/augment to inline, and specialisations
+blackListed rule_vars (Just 2)
+  = \v -> let v_uniq = idUnique v
+	  in (v `elemVarSet` rule_vars && not (v_uniq == buildIdKey || 
+					       v_uniq == augmentIdKey))
+	  || v_uniq == runSTRepIdKey
+
+-- Otherwise just go for it
+blackListed rule_vars phase
+  = \v -> False
+\end{code}
+
+
+SLPJ 95/04: Why @runST@ must be inlined very late:
+\begin{verbatim}
+f x =
+  runST ( \ s -> let
+		    (a, s')  = newArray# 100 [] s
+		    (_, s'') = fill_in_array_or_something a x s'
+		  in
+		  freezeArray# a s'' )
+\end{verbatim}
+If we inline @runST@, we'll get:
+\begin{verbatim}
+f x = let
+	(a, s')  = newArray# 100 [] realWorld#{-NB-}
+	(_, s'') = fill_in_array_or_something a x s'
+      in
+      freezeArray# a s''
+\end{verbatim}
+And now the @newArray#@ binding can be floated to become a CAF, which
+is totally and utterly wrong:
+\begin{verbatim}
+f = let
+    (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
+    in
+    \ x ->
+	let (_, s'') = fill_in_array_or_something a x s' in
+	freezeArray# a s''
+\end{verbatim}
+All calls to @f@ will share a {\em single} array!  
+
+Yet we do want to inline runST sometime, so we can avoid
+needless code.  Solution: black list it until the last moment.
+

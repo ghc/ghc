@@ -17,6 +17,7 @@ module UgenAll (
 	module U_gdexp,
 	module U_match,
 	module U_qid,
+	module U_rulevar,
 	module U_tree,
 	module U_ttype
     ) where
@@ -39,6 +40,7 @@ import U_match
 import U_qid
 import U_tree
 import U_ttype
+import U_rulevar
 
 import UgenUtil
 \end{code}

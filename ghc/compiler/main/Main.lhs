@@ -8,28 +8,27 @@ module Main ( main ) where
 
 #include "HsVersions.h"
 
-import IO	( IOMode(..), hPutStr, hClose, openFile, stderr	)
+import IO		( hPutStr, stderr )
 import HsSyn
 import BasicTypes	( NewOrData(..) )
 
 import ReadPrefix	( rdModule )
 import Rename		( renameModule )
 
-import MkIface		-- several functions
-import TcModule		( typecheckModule )
+import MkIface		( startIface, ifaceDecls, endIface )
+import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
 import SimplCore	( core2core )
+import CoreLint		( endPass )
+import CoreTidy		( tidyCorePgm )
 import CoreToStg	( topCoreBindsToStg )
-import StgSyn		( collectFinalStgBinders, pprStgBindingsWithSRTs )
+import StgSyn		( collectFinalStgBinders, pprStgBindings )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
-#if ! OMIT_NATIVE_CODEGEN
-import AsmCodeGen	( dumpRealAsm, writeRealAsm )
-#endif
+import CodeOutput	( codeOutput )
 
-import Module		( Module, moduleString )
+import Module		( ModuleName, moduleNameUserString )
 import AbsCSyn		( absCNop )
-import AbsCUtils	( flattenAbsC )
 import CmdLineOpts
 import ErrUtils		( ghcExit, doIfSet, dumpIfSet )
 import Maybes		( maybeToBool, MaybeErr(..) )
@@ -37,7 +36,6 @@ import TyCon		( isDataTyCon )
 import Class		( classTyCon )
 import UniqSupply	( mkSplitUniqSupply )
 
-import PprAbsC		( dumpRealC, writeRealC )
 import FiniteMap	( emptyFM )
 import Outputable
 import Char		( isSpace )
@@ -65,184 +63,116 @@ doIt (core_cmds, stg_cmds)
  	 hPutStr stderr compiler_version                    	>>
 	 hPutStr stderr ", for Haskell 98\n")			>>
 
-    -- ******* READER
+	--------------------------  Reader  ----------------
     show_pass "Reader"	>>
     _scc_     "Reader"
     rdModule		>>= \ (mod_name, rdr_module) ->
-
-    dumpIfSet opt_D_dump_rdr "Reader" (ppr rdr_module)		>>
 
     dumpIfSet opt_D_source_stats "Source Statistics"
 	(ppSourceStats False rdr_module)	 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
---    _scc_     "spl-rn"
     mkSplitUniqSupply 'r'	>>= \ rn_uniqs 	-> -- renamer
---    _scc_     "spl-tc"
     mkSplitUniqSupply 'a'	>>= \ tc_uniqs 	-> -- typechecker
---    _scc_     "spl-ds"
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
---    _scc_     "spl-sm"
-    mkSplitUniqSupply 's'	>>= \ sm_uniqs 	-> -- core-to-core simplifier
---    _scc_     "spl-c2s"
+    mkSplitUniqSupply 'r'	>>= \ ru_uniqs 	-> -- rules
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
---    _scc_     "spl-st"
+    mkSplitUniqSupply 'u'	>>= \ tidy_uniqs -> -- tidy up
     mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
---    _scc_     "spl-absc"
-    mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
---    _scc_     "spl-ncg"
     mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
-    -- ******* RENAMER
+	--------------------------  Rename  ----------------
     show_pass "Renamer" 			>>
     _scc_     "Renamer"
 
-    renameModule rn_uniqs rdr_module		>>=
-	\ maybe_rn_stuff ->
+    renameModule rn_uniqs rdr_module		>>= \ maybe_rn_stuff ->
     case maybe_rn_stuff of {
 	Nothing -> 	-- Hurrah!  Renamer reckons that there's no need to
 			-- go any further
 			reportCompile mod_name "Compilation NOT required!" >>
 			return ();
 	
-	Just (rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
+	Just (this_mod, rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
 			-- Oh well, we've got to recompile for real
 
 
+	--------------------------  Start interface file  ----------------
     -- Safely past renaming: we can start the interface file:
     -- (the iface file is produced incrementally, as we have
     -- the information that we need...; we use "iface<blah>")
     -- "endIface" finishes the job.
-    startIface mod_name					>>= \ if_handle ->
-    ifaceMain if_handle iface_file_stuff		>>
+    startIface this_mod iface_file_stuff	>>= \ if_handle ->
 
 
-    -- ******* TYPECHECKER
+	--------------------------  Typechecking ----------------
     show_pass "TypeCheck" 				>>
     _scc_     "TypeCheck"
-    typecheckModule tc_uniqs rn_name_supply iface_file_stuff rn_mod
-						        >>= \ maybe_tc_stuff ->
+    typecheckModule tc_uniqs rn_name_supply
+		    iface_file_stuff rn_mod	        >>= \ maybe_tc_stuff ->
     case maybe_tc_stuff of {
 	Nothing -> ghcExit 1;	-- Type checker failed
 
-	Just (all_binds,
-	      local_tycons, local_classes, inst_info, 
-	      fo_decls,
-	      global_env,
-	      global_ids) ->
+	Just (tc_results@(TcResults {tc_tycons  = local_tycons, 
+		   	 	     tc_classes = local_classes, 
+		   	 	     tc_insts   = inst_info })) ->
 
-    -- ******* DESUGARER
-    show_pass "DeSugar"					    >>
+
+	--------------------------  Desugaring ----------------
     _scc_     "DeSugar"
-    deSugar ds_uniqs global_env mod_name all_binds fo_decls >>= \ (desugared, h_code, c_code) ->
+    deSugar this_mod ds_uniqs tc_results	>>= \ (desugared, rules, h_code, c_code) ->
 
 
-    -- ******* CORE-TO-CORE SIMPLIFICATION
-    show_pass "Core2Core" 			>>
+	--------------------------  Main Core-language transformations ----------------
     _scc_     "Core2Core"
-    let
-	local_data_tycons = filter isDataTyCon local_tycons
-    in
-    core2core core_cmds mod_name local_classes
-	      sm_uniqs desugared
-						>>=
-	 \ simplified ->
+    core2core core_cmds desugared rules			>>= \ (simplified, imp_rule_ids) ->
+
+	-- Do the final tidy-up
+    tidyCorePgm tidy_uniqs this_mod
+		simplified imp_rule_ids			>>= \ (tidy_binds, tidy_imp_rule_ids) -> 
 
 
-    -- ******* STG-TO-STG SIMPLIFICATION
+	--------------------------  Convert to STG code -------------------------------
     show_pass "Core2Stg" 			>>
     _scc_     "Core2Stg"
     let
-	stg_binds   = topCoreBindsToStg c2s_uniqs simplified
+	stg_binds   = topCoreBindsToStg c2s_uniqs tidy_binds
     in
 
+	--------------------------  Simplify STG code -------------------------------
     show_pass "Stg2Stg" 			>>
     _scc_     "Stg2Stg"
-    stg2stg stg_cmds mod_name st_uniqs stg_binds
-						>>=
-	\ (stg_binds2, cost_centre_info) ->
+    stg2stg stg_cmds this_mod st_uniqs stg_binds >>= \ (stg_binds2, cost_centre_info) ->
 
-    dumpIfSet opt_D_dump_stg "STG syntax:" 
-	(pprStgBindingsWithSRTs stg_binds2)	>>
 
+	--------------------------  Interface file -------------------------------
 	-- Dump instance decls and type signatures into the interface file
+    _scc_     "Interface"
     let
 	final_ids = collectFinalStgBinders (map fst stg_binds2)
     in
-    _scc_     "Interface"
-    ifaceDecls if_handle local_tycons local_classes inst_info final_ids simplified	>>
+    ifaceDecls if_handle local_tycons local_classes 
+	       inst_info final_ids tidy_binds imp_rule_ids	>>
     endIface if_handle						>>
-    -- We are definitely done w/ interface-file stuff at this point:
-    -- (See comments near call to "startIface".)
+	    -- We are definitely done w/ interface-file stuff at this point:
+	    -- (See comments near call to "startIface".)
 
-    -- ******* "ABSTRACT", THEN "FLAT", THEN *REAL* C!
+
+	--------------------------  Code generation -------------------------------
     show_pass "CodeGen" 			>>
     _scc_     "CodeGen"
-    let
-	all_local_data_tycons = filter isDataTyCon (map classTyCon local_classes)
-				++ local_data_tycons
-					-- Generate info tables  for the data constrs arising
-					-- from class decls as well
+    codeGen this_mod imported_modules
+	    cost_centre_info
+	    local_tycons local_classes 
+	    stg_binds2				>>= \ abstractC ->
 
-	all_tycon_specs       = emptyFM	-- Not specialising tycons any more
 
-	abstractC      = codeGen mod_name		-- module name for CC labelling
-				 cost_centre_info
-				 imported_modules	-- import names for CC registering
-				 all_local_data_tycons	-- type constructors generated locally
-				 all_tycon_specs	-- tycon specialisations
-				 stg_binds2
-
-    	flat_abstractC = flattenAbsC fl_uniqs abstractC
-    in
-    dumpIfSet opt_D_dump_absC "Abstract C" (dumpRealC abstractC) >>
-
-    show_pass "CodeOutput" 			>>
+	--------------------------  Code output -------------------------------
+    show_pass "CodeOutput" 				>>
     _scc_     "CodeOutput"
-    -- You can have C (c_output) or assembly-language (ncg_output),
-    -- but not both.  [Allowing for both gives a space leak on
-    -- flat_abstractC.  WDP 94/10]
-    let
-	(flat_absC_c, flat_absC_ncg) =
-	   case (maybeToBool opt_ProduceC || opt_D_dump_realC,
-		 maybeToBool opt_ProduceS || opt_D_dump_asm) of
-	     (True,  False) -> (flat_abstractC, absCNop)
-	     (False, True)  -> (absCNop, flat_abstractC)
-	     (False, False) -> (absCNop, absCNop)
-	     (True,  True)  -> error "ERROR: Can't do both .hc and .s at the same time"
+    codeOutput this_mod c_code h_code abstractC ncg_uniqs	>>
 
-        -- C stubs for "foreign export"ed functions.
-	stub_c_output_d = pprCode CStyle c_code
-        stub_c_output_w = showSDoc stub_c_output_d
 
-        -- Header file protos for "foreign export"ed functions.
-	stub_h_output_d = pprCode CStyle h_code
-        stub_h_output_w = showSDoc stub_h_output_d
-
-	c_output_d = dumpRealC flat_absC_c
-	c_output_w = (\ f -> writeRealC f flat_absC_c)
-
-#if OMIT_NATIVE_CODEGEN
-	ncg_output_d = error "*** GHC not built with a native-code generator ***"
-	ncg_output_w = ncg_output_d
-#else
-	ncg_output_d = dumpRealAsm flat_absC_ncg ncg_uniqs
-	ncg_output_w = (\ f -> writeRealAsm f flat_absC_ncg ncg_uniqs)
-#endif
-    in
-
-    dumpIfSet opt_D_dump_asm "Asm code" ncg_output_d 	>>
-    doOutput opt_ProduceS ncg_output_w 			>>
-
-    dumpIfSet opt_D_dump_foreign "Foreign export header file" stub_h_output_d >>
-    outputHStub opt_ProduceExportHStubs stub_h_output_w	>>
-
-    dumpIfSet opt_D_dump_foreign "Foreign export stubs" stub_c_output_d >>
-    outputCStub mod_name opt_ProduceExportCStubs stub_c_output_w	>>
-
-    dumpIfSet opt_D_dump_realC "Real C" c_output_d 	>>
-    doOutput opt_ProduceC c_output_w 			>>
-
+	--------------------------  Final report -------------------------------
     reportCompile mod_name (showSDoc (ppSourceStats True rdr_module)) >>
 
     ghcExit 0
@@ -255,31 +185,6 @@ doIt (core_cmds, stg_cmds)
       = if opt_D_show_passes
 	then \ what -> hPutStr stderr ("*** "++what++":\n")
 	else \ what -> return ()
-
-    doOutput switch io_action
-      = case switch of
-	  Nothing    -> return ()
-	  Just fname ->
-	    openFile fname WriteMode	>>= \ handle ->
-	    io_action handle		>>
-	    hClose handle
-
-    -- don't use doOutput for dumping the f. export stubs
-    -- since it is more than likely that the stubs file will
-    -- turn out to be empty, in which case no file should be created.
-    outputCStub mod_name switch "" = return ()
-    outputCStub mod_name switch doc_str
-      = case switch of
-	  Nothing    -> return ()
-	  Just fname -> writeFile fname ("#include \"Rts.h\"\n#include \"RtsAPI.h\"\n"++rest)
-	    where
-	     rest = "#include "++show (moduleString mod_name ++ "_stub.h") ++ '\n':doc_str
-	      
-    outputHStub switch "" = return ()
-    outputHStub switch doc_str
-      = case switch of
-	  Nothing    -> return ()
-	  Just fname -> writeFile fname ("#include \"Rts.h\"\n"++doc_str)
 
 ppSourceStats short (HsModule name version exports imports decls src_loc)
  = (if short then hcat else vcat)
@@ -369,11 +274,11 @@ ppSourceStats short (HsModule name version exports imports decls src_loc)
 
     sig_info (Sig _ _ _)          = (1,0,0,0)
     sig_info (ClassOpSig _ _ _ _) = (0,1,0,0)
-    sig_info (SpecSig _ _ _ _)    = (0,0,1,0)
+    sig_info (SpecSig _ _ _)      = (0,0,1,0)
     sig_info (InlineSig _ _)      = (0,0,0,1)
     sig_info _                    = (0,0,0,0)
 
-    import_info (ImportDecl _ qual as spec _)
+    import_info (ImportDecl _ _ qual as spec _)
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
     qual_info False  = 0
     qual_info True   = 1
@@ -387,7 +292,7 @@ ppSourceStats short (HsModule name version exports imports decls src_loc)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
-    class_info (ClassDecl _ _ _ meth_sigs def_meths _ _ _ _)
+    class_info (ClassDecl _ _ _ meth_sigs def_meths _ _ _ _ _)
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))
@@ -430,14 +335,15 @@ compiler_version =
 \end{code}
 
 \begin{code}
-reportCompile :: Module -> String -> IO ()
+reportCompile :: ModuleName -> String -> IO ()
 #if REPORT_TO_MOTHERLODE && __GLASGOW_HASKELL__ >= 303
 reportCompile mod_name info
   | not opt_ReportCompile = return ()
   | otherwise = (do 
       sock <- udpSocket 0
       addr <- motherShip
-      sendTo sock (moduleString mod_name ++ ';': compiler_version ++ ';': os ++ ';':arch ++ '\n':' ':info ++ "\n") addr
+      sendTo sock (moduleNameUserString mod_name ++ ';': compiler_version ++ 
+		   ';': os ++ ';':arch ++ '\n':' ':info ++ "\n") addr
       return ()) `catch` (\ _ -> return ())
 
 motherShip :: IO SockAddr

@@ -35,7 +35,7 @@ module Util (
 	transitiveClosure,
 
 	-- accumulating
-	mapAccumL, mapAccumR, mapAccumB,
+	mapAccumL, mapAccumR, mapAccumB, foldl2, count,
 
 	-- comparisons
 	thenCmp, cmpList,
@@ -115,21 +115,21 @@ zipWith4Equal _ = zipWith4
 #else
 zipEqual msg []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
-zipEqual msg as     bs     = panic ("zipEqual: unequal lists: "++msg)
+zipEqual msg as     bs     = panic ("zipEqual: unequal lists:"++msg)
 
 zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
 zipWithEqual msg _ [] []	=  []
-zipWithEqual msg _ _ _		=  panic ("zipWithEqual: unequal lists: "++msg)
+zipWithEqual msg _ _ _		=  panic ("zipWithEqual: unequal lists:"++msg)
 
 zipWith3Equal msg z (a:as) (b:bs) (c:cs)
 				=  z a b c : zipWith3Equal msg z as bs cs
 zipWith3Equal msg _ [] []  []	=  []
-zipWith3Equal msg _ _  _   _	=  panic ("zipWith3Equal: unequal lists: "++msg)
+zipWith3Equal msg _ _  _   _	=  panic ("zipWith3Equal: unequal lists:"++msg)
 
 zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
 				=  z a b c d : zipWith4Equal msg z as bs cs ds
 zipWith4Equal msg _ [] [] [] []	=  []
-zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists: "++msg)
+zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists:"++msg)
 #endif
 \end{code}
 
@@ -180,12 +180,11 @@ nOfThem :: Int -> a -> [a]
 nOfThem n thing = replicate n thing
 
 lengthExceeds :: [a] -> Int -> Bool
-
-[]	`lengthExceeds` n =  0 > n
-(x:xs)	`lengthExceeds` n = (1 > n) || (xs `lengthExceeds` (n - 1))
+-- (lengthExceeds xs n) is True if   length xs > n
+(x:xs)	`lengthExceeds` n = n < 1 || xs `lengthExceeds` (n - 1)
+[]	`lengthExceeds` n = n < 0
 
 isSingleton :: [a] -> Bool
-
 isSingleton [x] = True
 isSingleton  _  = False
 
@@ -660,6 +659,24 @@ mapAccumB f a b (x:xs) = (a'',b'',y:ys)
 	(a'',b',ys) = mapAccumB f a' b xs
 \end{code}
 
+A combination of foldl with zip.  It works with equal length lists.
+
+\begin{code}
+foldl2 :: (acc -> a -> b -> acc) -> acc -> [a] -> [b] -> acc
+foldl2 k z [] [] = z
+foldl2 k z (a:as) (b:bs) = foldl2 k (k z a b) as bs
+\end{code}
+
+Count the number of times a predicate is true
+
+\begin{code}
+count :: (a -> Bool) -> [a] -> Int
+count p [] = 0
+count p (x:xs) | p x       = 1 + count p xs
+	       | otherwise = count p xs
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection[Utils-comparison]{Comparisons}
@@ -694,7 +711,6 @@ cmpString xs     []	= GT
 \end{code}
 
 
-y
 %************************************************************************
 %*									*
 \subsection[Utils-pairs]{Pairs}

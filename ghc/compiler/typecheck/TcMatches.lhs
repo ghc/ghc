@@ -18,10 +18,10 @@ import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
 
 import TcMonad
-import TcMonoType	( checkSigTyVars, tcHsTyVar, tcHsType, noSigs, sigPatCtxt )
+import TcMonoType	( checkSigTyVars, tcHsTyVar, tcHsType, sigPatCtxt )
 import Inst		( Inst, LIE, plusLIE, emptyLIE, plusLIEs )
 import TcEnv		( tcExtendLocalValEnv, tcExtendGlobalTyVars, tcExtendTyVarEnv )
-import TcPat		( tcPat, polyPatSig )
+import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
 import TcType		( TcType, newTyVarTy, newTyVarTy_OpenKind )
 import TcBinds		( tcBindsAndThen )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
@@ -243,9 +243,9 @@ tcMatchPats [] expected_ty
   = returnTc (expected_ty, [], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
 tcMatchPats (pat:pats) expected_ty
-  = unifyFunTy expected_ty	`thenTc` \ (arg_ty, rest_ty) ->
-    tcPat noSigs pat arg_ty	`thenTc` \ (pat', lie_req, pat_tvs, pat_ids, lie_avail) ->
-    tcMatchPats pats rest_ty	`thenTc` \ (rhs_ty, pats', lie_reqs, pats_tvs, pats_ids, lie_avails) ->
+  = unifyFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
+    tcPat tcPatBndr_NoSigs pat arg_ty	`thenTc` \ (pat', lie_req, pat_tvs, pat_ids, lie_avail) ->
+    tcMatchPats pats rest_ty		`thenTc` \ (rhs_ty, pats', lie_reqs, pats_tvs, pats_ids, lie_avails) ->
     returnTc (	rhs_ty, 
 		pat':pats',
 		lie_req `plusLIE` lie_reqs,
@@ -309,7 +309,7 @@ tcStmts do_or_lc m (stmt@(BindStmt pat exp src_loc) : stmts) elt_ty
   = tcAddSrcLoc src_loc		(
 	tcSetErrCtxt (stmtCtxt do_or_lc stmt)	$
     	newTyVarTy boxedTypeKind		`thenNF_Tc` \ pat_ty ->
-  	tcPat noSigs pat pat_ty			`thenTc` \ (pat', pat_lie, pat_tvs, pat_ids, avail) ->  
+  	tcPat tcPatBndr_NoSigs pat pat_ty	`thenTc` \ (pat', pat_lie, pat_tvs, pat_ids, avail) ->  
       	tcExpr exp (m pat_ty)			`thenTc` \ (exp', exp_lie) ->
   	returnTc (pat', exp',
 		  pat_lie `plusLIE` exp_lie,

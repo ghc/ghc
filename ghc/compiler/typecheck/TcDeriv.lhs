@@ -35,7 +35,7 @@ import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool )
-import Module		( Module )
+import Module		( ModuleName )
 import Name		( isLocallyDefined, getSrcLoc,
 			  Name, NamedThing(..),
 			  OccName, nameOccName
@@ -186,7 +186,7 @@ context to the instance decl.  The "offending classes" are
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: Module			-- name of module under scrutiny
+tcDeriving  :: ModuleName		-- name of module under scrutiny
 	    -> Fixities			-- for the deriving code (Show/Read.)
 	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
@@ -234,13 +234,14 @@ tcDeriving modname fixs rn_name_supply inst_decl_infos_in
 			returnRn (dfun_names_w_method_binds, rn_extra_binds)
 		  )
 	rn_one (cl_nm, tycon_nm, meth_binds) 
-	        = newDFunName cl_nm tycon_nm
-		              Nothing mkGeneratedSrcLoc	        `thenRn` \ dfun_name ->
-		  rnMethodBinds meth_binds			`thenRn` \ (rn_meth_binds, _) ->
+	        = newDFunName (cl_nm, tycon_nm)
+		              mkGeneratedSrcLoc	        `thenRn` \ dfun_name ->
+		  rnMethodBinds meth_binds		`thenRn` \ (rn_meth_binds, _) ->
 		  returnRn (dfun_name, rn_meth_binds)
 
-	really_new_inst_infos = map (gen_inst_info modname)
-			  	    (new_inst_infos `zip` dfun_names_w_method_binds)
+	really_new_inst_infos = zipWith gen_inst_info
+			  	        new_inst_infos
+					dfun_names_w_method_binds
 
 	ddump_deriv = ddump_deriving really_new_inst_infos rn_extra_binds
     in
@@ -583,12 +584,12 @@ gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
       ckey	  = classKey clas
 	    
 
-gen_inst_info :: Module					-- Module name
-	      -> (InstInfo, (Name, RenamedMonoBinds))		-- the main stuff to work on
+gen_inst_info :: InstInfo
+	      -> (Name, RenamedMonoBinds)
 	      -> InstInfo				-- the gen'd (filled-in) "instance decl"
 
-gen_inst_info modname
-    (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _, (dfun_name, meth_binds))
+gen_inst_info (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _) 
+	      (dfun_name, meth_binds)
   =
 	-- Generate the various instance-related Ids
     InstInfo clas tyvars tys inst_decl_theta

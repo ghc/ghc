@@ -4,70 +4,115 @@
 \section[Simplify]{The main module of the simplifier}
 
 \begin{code}
-module Simplify ( simplBind ) where
+module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( switchIsOn, opt_SccProfilingOn, opt_PprStyle_Debug,
-			  opt_NoPreInlining, opt_DictsStrict, opt_D_dump_inlinings,
+import CmdLineOpts	( intSwitchSet,
+			  opt_SccProfilingOn, opt_PprStyle_Debug, opt_SimplDoEtaReduction,
+			  opt_SimplNoPreInlining, opt_DictsStrict, opt_SimplPedanticBottoms,
+			  opt_SimplDoCaseElim,
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, etaCoreExpr, etaExpandCount, findAlt, mkRhsTyLam,
-			  simplBinder, simplBinders, simplIds, findDefault
+import SimplUtils	( mkCase, transformRhs, findAlt,
+			  simplBinder, simplBinders, simplIds, findDefault, mkCoerce
 			)
-import Var		( TyVar, mkSysTyVar, tyVarKind )
+import Var		( TyVar, mkSysTyVar, tyVarKind, maybeModifyIdInfo )
 import VarEnv
 import VarSet
-import Id		( Id, idType, 
-			  getIdUnfolding, setIdUnfolding, 
+import Id		( Id, idType, idInfo, idUnique,
+			  getIdUnfolding, setIdUnfolding, isExportedId, 
 			  getIdSpecialisation, setIdSpecialisation,
 			  getIdDemandInfo, setIdDemandInfo,
 			  getIdArity, setIdArity, 
-			  getIdStrictness,
-			  setInlinePragma, getInlinePragma, idMustBeINLINEd,
-			  idWantsToBeINLINEd
+			  getIdStrictness, 
+			  setInlinePragma, getInlinePragma, idMustBeINLINEd
 			)
 import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
-		 	  ArityInfo, atLeastArity, arityLowerBound, unknownArity
+		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity,
+			  specInfo, inlinePragInfo, zapLamIdInfo
 			)
 import Demand		( Demand, isStrict, wwLazy )
 import Const		( isWHNFCon, conOkForAlt )
 import ConFold		( tryPrimOp )
-import PrimOp		( PrimOp, primOpStrictness )
-import DataCon		( DataCon, dataConNumInstArgs, dataConStrictMarks, dataConSig, dataConArgTys )
+import PrimOp		( PrimOp, primOpStrictness, primOpType )
+import DataCon		( DataCon, dataConNumInstArgs, dataConRepStrictness, dataConSig, dataConArgTys )
 import Const		( Con(..) )
-import MagicUFs		( applyMagicUnfoldingFun )
-import Name		( isExported, isLocallyDefined )
+import Name		( isLocallyDefined )
 import CoreSyn
-import CoreUnfold	( Unfolding(..), UnfoldingGuidance(..),
-			  mkUnfolding, smallEnoughToInline, 
-			  isEvaldUnfolding, unfoldAlways
-			)
-import CoreUtils	( IdSubst, SubstCoreExpr(..),
-			  cheapEqExpr, exprIsDupable, exprIsWHNF, exprIsTrivial,
-			  coreExprType, coreAltsType, exprIsCheap, substExpr,
+import CoreFVs		( exprFreeVars )
+import CoreUnfold	( Unfolding(..), mkUnfolding, callSiteInline, 
+			  isEvaldUnfolding, blackListed )
+import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsWHNF, exprIsTrivial,
+			  coreExprType, coreAltsType, exprIsCheap, exprArity,
+			  exprOkForSpeculation,
 			  FormSummary(..), mkFormSummary, whnfOrBottom
 			)
-import SpecEnv		( lookupSpecEnv, isEmptySpecEnv, substSpecEnv )
+import Rules		( lookupRule )
 import CostCentre	( isSubsumedCCS, currentCCS, isEmptyCC )
-import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, fullSubstTy, 
+import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, 
 			  mkFunTy, splitFunTys, splitTyConApp_maybe, splitFunTy_maybe,
-			  applyTy, applyTys, funResultTy, isDictTy, isDataType
+			  funResultTy, isDictTy, isDataType, applyTy, applyTys, mkFunTys
+			)
+import Subst		( Subst, mkSubst, emptySubst, substExpr, substTy, 
+			  substEnv, lookupInScope, lookupSubst, substRules
 			)
 import TyCon		( isDataTyCon, tyConDataCons, tyConClass_maybe, tyConArity, isDataTyCon )
 import TysPrim		( realWorldStatePrimTy )
-import PrelVals		( realWorldPrimId )
-import BasicTypes	( StrictnessMark(..) )
+import PrelInfo		( realWorldPrimId )
+import BasicTypes	( TopLevelFlag(..), isTopLevel )
 import Maybes		( maybeToBool )
-import Util		( zipWithEqual, stretchZipEqual )
+import Util		( zipWithEqual, stretchZipEqual, lengthExceeds )
 import PprCore
 import Outputable
 \end{code}
 
 
 The guts of the simplifier is in this module, but the driver
-loop for the simplifier is in SimplPgm.lhs.
+loop for the simplifier is in SimplCore.lhs.
+
+
+%************************************************************************
+%*									*
+\subsection{Bindings}
+%*									*
+%************************************************************************
+
+\begin{code}
+simplTopBinds :: [InBind] -> SimplM [OutBind]
+
+simplTopBinds binds
+  = 	-- Put all the top-level binders into scope at the start
+	-- so that if a transformation rule has unexpectedly brought
+	-- anything into scope, then we don't get a complaint about that.
+	-- It's rather as if the top-level binders were imported.
+    extendInScopes top_binders	$
+    simpl_binds binds		`thenSmpl` \ (binds', _) ->
+    freeTick SimplifierDone	`thenSmpl_`
+    returnSmpl binds'
+  where
+    top_binders	= bindersOfBinds binds
+
+    simpl_binds []			  = returnSmpl ([], panic "simplTopBinds corner")
+    simpl_binds (NonRec bndr rhs : binds) = simplLazyBind TopLevel bndr  bndr rhs	 (simpl_binds binds)
+    simpl_binds (Rec pairs       : binds) = simplRecBind  TopLevel pairs (map fst pairs) (simpl_binds binds)
+
+
+simplRecBind :: TopLevelFlag -> [(InId, InExpr)] -> [OutId]
+	     -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+simplRecBind top_lvl pairs bndrs' thing_inside
+  = go pairs bndrs'		`thenSmpl` \ (binds', stuff) ->
+    returnSmpl (addBind (Rec (flattenBinds binds')) stuff)
+  where
+    go [] _ = thing_inside 	`thenSmpl` \ stuff ->
+	      returnSmpl ([], stuff)
+	
+    go ((bndr, rhs) : pairs) (bndr' : bndrs')
+	= simplLazyBind top_lvl bndr bndr' rhs (go pairs bndrs')
+		-- Don't float unboxed bindings out,
+		-- because we can't "rec" them
+\end{code}
 
 
 %************************************************************************
@@ -124,130 +169,219 @@ might do the same again.
 
 
 \begin{code}
-simplExpr :: CoreExpr -> SimplCont -> SimplM CoreExpr
-simplExpr expr cont = simplExprB expr cont	`thenSmpl` \ (binds, (_, body)) ->
-  		      returnSmpl (mkLetBinds binds body)
+simplExpr :: CoreExpr -> SimplM CoreExpr
+simplExpr expr = getSubst	`thenSmpl` \ subst ->
+		 simplExprC expr (Stop (substTy subst (coreExprType expr)))
+	-- The type in the Stop continuation is usually not used
+	-- It's only needed when discarding continuations after finding
+	-- a function that returns bottom
 
-simplExprB :: InExpr -> SimplCont -> SimplM OutExprStuff
+simplExprC :: CoreExpr -> SimplCont -> SimplM CoreExpr
+	-- Simplify an expression, given a continuation
 
-simplExprB (Note InlineCall (Var v)) cont
-  = simplVar True v cont
+simplExprC expr cont = simplExprF expr cont	`thenSmpl` \ (floats, (_, body)) ->
+  		       returnSmpl (mkLets floats body)
 
-simplExprB (Var v) cont
-  = simplVar False v cont
+simplExprF :: InExpr -> SimplCont -> SimplM OutExprStuff
+	-- Simplify an expression, returning floated binds
 
-simplExprB expr@(Con (PrimOp op) args) cont
-  = simplType (coreExprType expr)	`thenSmpl` \ expr_ty ->
-    getInScope				`thenSmpl` \ in_scope ->
-    getSubstEnv				`thenSmpl` \ se ->
+simplExprF (Var v) cont
+  = simplVar v cont
+
+simplExprF expr@(Con (PrimOp op) args) cont
+  = getSubstEnv				`thenSmpl` \ se ->
+    prepareArgs (ppr op)
+		(primOpType op)
+		(primOpStrictness op)
+		(pushArgs se args cont)	$ \ args1 cont1 ->
+
     let
-	(val_arg_demands, _) = primOpStrictness op
-
-	-- Main game plan: loop through the arguments, simplifying
-	-- each of them with an ArgOf continuation.  Getting the right
-	-- cont_ty in the ArgOf continuation is a bit of a nuisance.
-        go []         ds     args' = rebuild_primop (reverse args')
-        go (arg:args) ds     args' 
-	   | isTypeArg arg  	   = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
-				     go args ds (arg':args')
-        go (arg:args) (d:ds) args' 
-	   | not (isStrict d)      = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
-				     go args ds (arg':args')
-	   | otherwise		   = setSubstEnv se (simplExprB arg (mk_cont args ds args'))
-
-	cont_ty = contResultType in_scope expr_ty cont
-	mk_cont args ds args' = ArgOf NoDup (\ arg' -> go args ds (arg':args')) cont_ty
-    in
-    go args val_arg_demands []
-  where
-
-    rebuild_primop args'
-      =	-- 	Try the prim op simplification
+	-- Boring... we may have too many arguments now, so we push them back
+	n_args = length args
+	args2 = ASSERT( length args1 >= n_args )
+		 take n_args args1
+	cont2 = pushArgs emptySubstEnv (drop n_args args1) cont1
+    in				
+     	-- 	Try the prim op simplification
 	-- It's really worth trying simplExpr again if it succeeds,
 	-- because you can find
 	--	case (eqChar# x 'a') of ...
 	-- ==>  
 	-- 	case (case x of 'a' -> True; other -> False) of ...
-	case tryPrimOp op args' of
-	  Just e' -> zapSubstEnv (simplExprB e' cont)
-	  Nothing -> rebuild (Con (PrimOp op) args') cont
+     case tryPrimOp op args2 of
+	  Just e' -> zapSubstEnv (simplExprF e' cont2)
+	  Nothing -> rebuild (Con (PrimOp op) args2) cont2
 
-simplExprB (Con con@(DataCon _) args) cont
-  = simplConArgs args		$ \ args' ->
-    rebuild (Con con args') cont
+simplExprF (Con con@(DataCon _) args) cont
+  = freeTick LeafVisit			`thenSmpl_`
+    simplConArgs args		( \ args' ->
+    rebuild (Con con args') cont)
 
-simplExprB expr@(Con con@(Literal _) args) cont
+simplExprF expr@(Con con@(Literal _) args) cont
   = ASSERT( null args )
+    freeTick LeafVisit			`thenSmpl_`
     rebuild expr cont
 
-simplExprB (App fun arg) cont
+simplExprF (App fun arg) cont
   = getSubstEnv		`thenSmpl` \ se ->
-    simplExprB fun (ApplyTo NoDup arg se cont)
+    simplExprF fun (ApplyTo NoDup arg se cont)
 
-simplExprB (Case scrut bndr alts) cont
+simplExprF (Case scrut bndr alts) cont
   = getSubstEnv		`thenSmpl` \ se ->
-    simplExprB scrut (Select NoDup bndr alts se cont)
+    simplExprF scrut (Select NoDup bndr alts se cont)
 
-simplExprB (Note (Coerce to from) e) cont
-  | to == from = simplExprB e cont
-  | otherwise  = getSubstEnv		`thenSmpl` \ se ->
-    		 simplExprB e (CoerceIt NoDup to se cont)
+
+simplExprF (Let (Rec pairs) body) cont
+  = simplIds (map fst pairs) 		$ \ bndrs' -> 
+	-- NB: bndrs' don't have unfoldings or spec-envs
+	-- We add them as we go down, using simplPrags
+
+    simplRecBind NotTopLevel pairs bndrs' (simplExprF body cont)
+
+simplExprF expr@(Lam _ _) cont = simplLam expr cont
+simplExprF (Type ty) cont
+  = ASSERT( case cont of { Stop _ -> True; ArgOf _ _ _ -> True; other -> False } )
+    simplType ty	`thenSmpl` \ ty' ->
+    rebuild (Type ty') cont
+
+simplExprF (Note (Coerce to from) e) cont
+  | to == from = simplExprF e cont
+  | otherwise  = getSubst		`thenSmpl` \ subst ->
+    		 simplExprF e (CoerceIt (substTy subst to) cont)
 
 -- hack: we only distinguish subsumed cost centre stacks for the purposes of
 -- inlining.  All other CCCSs are mapped to currentCCS.
-simplExprB (Note (SCC cc) e) cont
+simplExprF (Note (SCC cc) e) cont
   = setEnclosingCC currentCCS $
-    simplExpr e Stop	`thenSmpl` \ e ->
+    simplExpr e 	`thenSmpl` \ e ->
     rebuild (mkNote (SCC cc) e) cont
 
-simplExprB (Note note e) cont
-  = simplExpr e Stop	`thenSmpl` \ e' ->
-    rebuild (mkNote note e') cont
+simplExprF (Note InlineCall e) cont
+  = simplExprF e (InlinePlease cont)
+
+-- Comments about the InlineMe case 
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Don't inline in the RHS of something that has an
+-- inline pragma.  But be careful that the InScopeEnv that
+-- we return does still have inlinings on!
+-- 
+-- It really is important to switch off inlinings.  This function
+-- may be inlinined in other modules, so we don't want to remove
+-- (by inlining) calls to functions that have specialisations, or
+-- that may have transformation rules in an importing scope.
+-- E.g. 	{-# INLINE f #-}
+-- 		f x = ...g...
+-- and suppose that g is strict *and* has specialisations.
+-- If we inline g's wrapper, we deny f the chance of getting
+-- the specialised version of g when f is inlined at some call site
+-- (perhaps in some other module).
+
+simplExprF (Note InlineMe e) cont
+  = case cont of
+	Stop _ -> 	-- Totally boring continuation
+			-- Don't inline inside an INLINE expression
+		  switchOffInlining (simplExpr e)	`thenSmpl` \ e' ->
+		  rebuild (mkNote InlineMe e') cont
+
+	other  -> 	-- Dissolve the InlineMe note if there's
+			-- an interesting context of any kind to combine with
+			-- (even a type application -- anything except Stop)
+		  simplExprF e cont	
 
 -- A non-recursive let is dealt with by simplBeta
-simplExprB (Let (NonRec bndr rhs) body) cont
-  = getSubstEnv		`thenSmpl` \ se ->
-    simplBeta bndr rhs se body cont
-
-simplExprB (Let (Rec pairs) body) cont
-  = simplRecBind pairs (simplExprB body cont)
-
--- Type-beta reduction
-simplExprB expr@(Lam bndr body) cont@(ApplyTo _ (Type ty_arg) arg_se body_cont)
-  = ASSERT( isTyVar bndr )
-    tick BetaReduction				`thenSmpl_`
-    setSubstEnv arg_se (simplType ty_arg)	`thenSmpl` \ ty' ->
-    extendTySubst bndr ty'			$
-    simplExprB body body_cont
-
--- Ordinary beta reduction
-simplExprB expr@(Lam bndr body) cont@(ApplyTo _ arg arg_se body_cont)
-  = tick BetaReduction		`thenSmpl_`
-    simplBeta bndr' arg arg_se body body_cont
-  where
-    bndr' = zapLambdaBndr bndr body body_cont
-
-simplExprB (Lam bndr body) cont  
-  = simplBinder bndr			$ \ bndr' ->
-    simplExpr body Stop			`thenSmpl` \ body' ->
-    rebuild (Lam bndr' body') cont
-
-simplExprB (Type ty) cont
-  = ASSERT( case cont of { Stop -> True; ArgOf _ _ _ -> True; other -> False } )
-    simplType ty	`thenSmpl` \ ty' ->
-    rebuild (Type ty') cont
+simplExprF (Let (NonRec bndr rhs) body) cont
+  = getSubstEnv			`thenSmpl` \ se ->
+    simplBeta bndr rhs se (contResultType cont)	$
+    simplExprF body cont
 \end{code}
 
 
 ---------------------------------
+
 \begin{code}
-simplArg :: InArg -> SimplM OutArg
-simplArg arg = simplExpr arg Stop
+simplLam fun cont
+  = go fun cont
+  where
+    zap_it = mkLamBndrZapper fun (countArgs cont)
+    cont_ty = contResultType cont
+
+      	-- Type-beta reduction
+    go (Lam bndr body) (ApplyTo _ (Type ty_arg) arg_se body_cont)
+      =	ASSERT( isTyVar bndr )
+	tick (BetaReduction bndr)		`thenSmpl_`
+	getInScope				`thenSmpl` \ in_scope ->
+	let
+		ty' = substTy (mkSubst in_scope arg_se) ty_arg
+	in
+	extendSubst bndr (DoneTy ty')
+	(go body body_cont)
+
+	-- Ordinary beta reduction
+    go (Lam bndr body) cont@(ApplyTo _ arg arg_se body_cont)
+      = tick (BetaReduction bndr)			`thenSmpl_`
+	simplBeta zapped_bndr arg arg_se cont_ty
+	(go body body_cont)
+      where
+	zapped_bndr = zap_it bndr
+
+	-- Not enough args
+    go lam@(Lam _ _) cont = completeLam [] lam cont
+
+	-- Exactly enough args
+    go expr cont = simplExprF expr cont
+
+
+-- completeLam deals with the case where a lambda doesn't have an ApplyTo
+-- continuation.  Try for eta reduction, but *only* if we get all
+-- the way to an exprIsTrivial expression.  
+-- 'acc' holds the simplified binders, in reverse order
+
+completeLam acc (Lam bndr body) cont
+  = simplBinder bndr			$ \ bndr' ->
+    completeLam (bndr':acc) body cont
+
+completeLam acc body cont
+  = simplExpr body 			`thenSmpl` \ body' ->
+
+    case (opt_SimplDoEtaReduction, check_eta acc body') of
+	(True, Just body'') 	-- Eta reduce!
+		-> tick (EtaReduction (head acc))	`thenSmpl_`
+		   rebuild body'' cont
+
+	other	-> 	-- No eta reduction
+		   rebuild (foldl (flip Lam) body' acc) cont
+			-- Remember, acc is the reversed binders
+  where
+	-- NB: the binders are reversed
+    check_eta (b : bs) (App fun arg)
+	|  (varToCoreExpr b `cheapEqExpr` arg)
+	= check_eta bs fun
+
+    check_eta [] body
+	| exprIsTrivial body && 		-- ONLY if the body is trivial
+	  not (any (`elemVarSet` body_fvs) acc)
+	= Just body		-- Success!
+	where
+	  body_fvs = exprFreeVars body
+
+    check_eta _ _ = Nothing	-- Bale out
+
+mkLamBndrZapper :: CoreExpr 	-- Function
+		-> Int		-- Number of args
+		-> Id -> Id	-- Use this to zap the binders
+mkLamBndrZapper fun n_args
+  | saturated fun n_args = \b -> b
+  | otherwise		 = \b -> maybeModifyIdInfo zapLamIdInfo b
+  where
+    saturated (Lam b e) 0 = False
+    saturated (Lam b e) n = saturated e (n-1)
+    saturated e		n = True
 \end{code}
+
 
 ---------------------------------
 simplConArgs makes sure that the arguments all end up being atomic.
-That means it may generate some Lets, hence the 
+That means it may generate some Lets, hence the strange type
 
 \begin{code}
 simplConArgs :: [InArg] -> ([OutArg] -> SimplM OutExprStuff) -> SimplM OutExprStuff
@@ -255,7 +389,7 @@ simplConArgs [] thing_inside
   = thing_inside []
 
 simplConArgs (arg:args) thing_inside
-  = switchOffInlining (simplArg arg)	`thenSmpl` \ arg' ->
+  = switchOffInlining (simplExpr arg)	`thenSmpl` \ arg' ->
 	-- Simplify the RHS with inlining switched off, so that
 	-- only absolutely essential things will happen.
 
@@ -275,403 +409,8 @@ simplConArgs (arg:args) thing_inside
 \begin{code}
 simplType :: InType -> SimplM OutType
 simplType ty
-  = getTyEnv		`thenSmpl` \ (ty_subst, in_scope) ->
-    returnSmpl (fullSubstTy ty_subst in_scope ty)
-\end{code}
-
-
-\begin{code}
--- Find out whether the lambda is saturated, 
--- if not zap the over-optimistic info in the binder
-
-zapLambdaBndr bndr body body_cont
-  | isTyVar bndr || safe_info || definitely_saturated 20 body body_cont
-	-- The "20" is to catch pathalogical cases with bazillions of arguments
-	-- because we are using an n**2 algorithm here
-  = bndr		-- No need to zap
-  | otherwise
-  = setInlinePragma (setIdDemandInfo bndr wwLazy)
-		    safe_inline_prag
-
-  where
-    inline_prag      	= getInlinePragma bndr
-    demand		= getIdDemandInfo bndr
-
-    safe_info        	= is_safe_inline_prag && not (isStrict demand)
-
-    is_safe_inline_prag = case inline_prag of
-			 	ICanSafelyBeINLINEd StrictOcc nalts -> False
-			 	ICanSafelyBeINLINEd LazyOcc   nalts -> False
-				other				    -> True
-
-    safe_inline_prag    = case inline_prag of
-			 	ICanSafelyBeINLINEd _ nalts
-				      -> ICanSafelyBeINLINEd InsideLam nalts
-				other -> inline_prag
-
-    definitely_saturated :: Int -> CoreExpr -> SimplCont -> Bool
-    definitely_saturated 0 _	        _		     = False	-- Too expensive to find out
-    definitely_saturated n (Lam _ body) (ApplyTo _ _ _ cont) = definitely_saturated (n-1) body cont
-    definitely_saturated n (Lam _ _)    other_cont	     = False
-    definitely_saturated n _            _		     = True
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Variables}
-%*									*
-%************************************************************************
-
-Coercions
-~~~~~~~~~
-\begin{code}
-simplVar inline_call var cont
-  = getValEnv		`thenSmpl` \ (id_subst, in_scope) ->
-    case lookupVarEnv id_subst var of
-	Just (Done e)
-		-> zapSubstEnv (simplExprB e cont)
-
-	Just (SubstMe e ty_subst id_subst)
-		-> setSubstEnv (ty_subst, id_subst) (simplExprB e cont)
-
-	Nothing -> let
-			var' = case lookupVarSet in_scope var of
-				 Just v' -> v'
-				 Nothing -> 
-#ifdef DEBUG
-					    if isLocallyDefined var && not (idMustBeINLINEd var) then
-						-- Not in scope
-						pprTrace "simplVar:" (ppr var) var
-					    else
-#endif
-					    var
-		   in
-		   getSwitchChecker	`thenSmpl` \ sw_chkr ->
-		   completeVar sw_chkr in_scope inline_call var' cont
-
-completeVar sw_chkr in_scope inline_call var cont
-
-{-	MAGIC UNFOLDINGS NOT USED NOW
-  | maybeToBool maybe_magic_result
-  = tick MagicUnfold	`thenSmpl_`
-    magic_result
--}
-	-- Look for existing specialisations before trying inlining
-  | maybeToBool maybe_specialisation
-  = tick SpecialisationDone			`thenSmpl_`
-    setSubstEnv (spec_bindings, emptyVarEnv)	(
-	-- See note below about zapping the substitution here
-
-    simplExprB spec_template remaining_cont
-    )
-
-	-- Don't actually inline the scrutinee when we see
-	--	case x of y { .... }
-	-- and x has unfolding (C a b).  Why not?  Because
-	-- we get a silly binding y = C a b.  If we don't
-	-- inline knownCon can directly substitute x for y instead.
-  | has_unfolding && var_is_case_scrutinee && unfolding_is_constr
-  = knownCon (Var var) con con_args cont
-
-	-- Look for an unfolding. There's a binding for the
-	-- thing, but perhaps we want to inline it anyway
-  | has_unfolding && (inline_call || ok_to_inline)
-  = getEnclosingCC	`thenSmpl` \ encl_cc ->
-    if must_be_unfolded || costCentreOk encl_cc var
-    then	-- OK to unfold
-
-	tickUnfold var		`thenSmpl_` (
-
-	zapSubstEnv 		$
-		-- The template is already simplified, so don't re-substitute.
-		-- This is VITAL.  Consider
-		--	let x = e in
-		--	let y = \z -> ...x... in
-		--	\ x -> ...y...
-		-- We'll clone the inner \x, adding x->x' in the id_subst
-		-- Then when we inline y, we must *not* replace x by x' in
-		-- the inlined copy!!
-#ifdef DEBUG
-	if opt_D_dump_inlinings then
-		pprTrace "Inlining:" (ppr var <+> ppr unf_template) $
-		simplExprB unf_template cont
-	else
-#endif
-	simplExprB unf_template cont
-	)
-    else
-#ifdef DEBUG
-	pprTrace "Inlining disallowed due to CC:\n" (ppr encl_cc <+> ppr unf_template <+> ppr (coreExprCc unf_template)) $
-#endif
-	-- Can't unfold because of bad cost centre
-	rebuild (Var var) cont
-
-  | inline_call		-- There was an InlineCall note, but we didn't inline!
-  = rebuild (Note InlineCall (Var var)) cont
-
-  | otherwise
-  = rebuild (Var var) cont
-
-  where
-    unfolding = getIdUnfolding var
-
-{-	MAGIC UNFOLDINGS NOT USED CURRENTLY
-	---------- Magic unfolding stuff
-    maybe_magic_result	= case unfolding of
-				MagicUnfolding _ magic_fn -> applyMagicUnfoldingFun magic_fn 
-										    cont
-			        other 			  -> Nothing
-    Just magic_result = maybe_magic_result
--}
-
-	---------- Unfolding stuff
-    has_unfolding = case unfolding of
-			CoreUnfolding _ _ _ -> True
-			other		    -> False
-    CoreUnfolding form guidance unf_template = unfolding
-
-	-- overrides cost-centre business
-    must_be_unfolded = case getInlinePragma var of
-			  IMustBeINLINEd -> True
-			  _		 -> False
-
-    ok_to_inline	= okToInline sw_chkr in_scope var form guidance cont
-    unfolding_is_constr = case unf_template of
-				  Con con _ -> conOkForAlt con
-				  other	    -> False
-    Con con con_args    = unf_template
-
-    	---------- Specialisation stuff
-    ty_args		      = initial_ty_args cont
-    remaining_cont	      = drop_ty_args cont
-    maybe_specialisation      = lookupSpecEnv (ppr var) (getIdSpecialisation var) ty_args
-    Just (spec_bindings, spec_template) = maybe_specialisation
-
-    initial_ty_args (ApplyTo _ (Type ty) (ty_subst,_) cont) 
-	= fullSubstTy ty_subst in_scope ty : initial_ty_args cont
-	-- Having to do the substitution here is a bit of a bore
-    initial_ty_args other_cont = []
-
-    drop_ty_args (ApplyTo _ (Type _) _ cont) = drop_ty_args cont
-    drop_ty_args other_cont		     = other_cont
-
-	---------- Switches
-
-    var_is_case_scrutinee = case cont of
-				  Select _ _ _ _ _ -> True
-				  other		   -> False
-
------------ costCentreOk
--- costCentreOk checks that it's ok to inline this thing
--- The time it *isn't* is this:
---
---	f x = let y = E in
---	      scc "foo" (...y...)
---
--- Here y has a "current cost centre", and we can't inline it inside "foo",
--- regardless of whether E is a WHNF or not.
---
--- We can inline a top-level binding anywhere.
-    
-costCentreOk ccs_encl x
-  =  not opt_SccProfilingOn
-  || isSubsumedCCS ccs_encl	  -- can unfold anything into a subsumed scope
-  || not (isLocallyDefined x)
-\end{code}		   
-
-
-%************************************************************************
-%*									*
-\subsection{Bindings}
-%*									*
-%************************************************************************
-
-\begin{code}
-simplBind :: InBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
-
-simplBind (NonRec bndr rhs) thing_inside
-  = simplTopRhs bndr rhs	`thenSmpl` \ (binds, in_scope,  rhs', arity) ->
-    setInScope in_scope							$
-    completeBindNonRec (bndr `setIdArity` arity) rhs' thing_inside	`thenSmpl` \ stuff ->
-    returnSmpl (addBinds binds stuff)
-
-simplBind (Rec pairs) thing_inside
-  = simplRecBind pairs thing_inside
-	-- The assymetry between the two cases is a bit unclean
-
-simplRecBind :: [(InId, InExpr)] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
-simplRecBind pairs thing_inside
-  = simplIds (map fst pairs) 		$ \ bndrs' -> 
-	-- NB: bndrs' don't have unfoldings or spec-envs
-	-- We add them as we go down, using simplPrags
-
-    go (pairs `zip` bndrs')		`thenSmpl` \ (pairs', stuff) ->
-    returnSmpl (addBind (Rec pairs') stuff)
-  where
-    go [] = thing_inside 	`thenSmpl` \ stuff ->
-	    returnSmpl ([], stuff)
-
-    go (((bndr, rhs), bndr') : pairs) 
-	= simplTopRhs bndr rhs 				`thenSmpl` \ (rhs_binds, in_scope, rhs', arity) ->
-	  setInScope in_scope				$
-	  completeBindRec bndr (bndr' `setIdArity` arity) 
-			  rhs' (go pairs)		`thenSmpl` \ (pairs', stuff) ->
-	  returnSmpl (flatten rhs_binds pairs', stuff)
-
-    flatten (NonRec b r : binds) prs  = (b,r) : flatten binds prs
-    flatten (Rec prs1   : binds) prs2 = prs1 ++ flatten binds prs2
-    flatten []			 prs  = prs
-
-
-completeBindRec bndr bndr' rhs' thing_inside
-  |  postInlineUnconditionally bndr etad_rhs
-	-- NB: a loop breaker never has postInlineUnconditionally True
-	-- and non-loop-breakers only have *forward* references
-	-- Hence, it's safe to discard the binding
-  =  tick PostInlineUnconditionally		`thenSmpl_`
-     extendIdSubst bndr (Done etad_rhs) thing_inside
-
-  |  otherwise
-  =  	-- Here's the only difference from completeBindNonRec: we 
-	-- don't do simplBinder first, because we've already
-	-- done simplBinder on the recursive binders
-     simplPrags bndr bndr' etad_rhs		`thenSmpl` \ bndr'' ->
-     modifyInScope bndr''			$
-     thing_inside				`thenSmpl` \ (pairs, res) ->
-     returnSmpl ((bndr'', etad_rhs) : pairs, res)
-  where
-     etad_rhs = etaCoreExpr rhs'
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Right hand sides}
-%*									*
-%************************************************************************
-
-simplRhs basically just simplifies the RHS of a let(rec).
-It does two important optimisations though:
-
-	* It floats let(rec)s out of the RHS, even if they
-	  are hidden by big lambdas
-
-	* It does eta expansion
-
-\begin{code}
-simplTopRhs :: InId -> InExpr
-  -> SimplM ([OutBind], InScopeEnv, OutExpr, ArityInfo)
-simplTopRhs bndr rhs 
-  = getSubstEnv  		`thenSmpl` \ bndr_se ->
-    simplRhs bndr bndr_se rhs
-
-simplRhs bndr bndr_se rhs
-  | idWantsToBeINLINEd bndr	-- Don't inline in the RHS of something that has an
-				-- inline pragma.  But be careful that the InScopeEnv that
-				-- we return does still have inlinings on!
-  = switchOffInlining (simplExpr rhs Stop)	`thenSmpl` \ rhs' ->
-    getInScope					`thenSmpl` \ in_scope ->
-    returnSmpl ([], in_scope, rhs', unknownArity)
-
-  | otherwise
-  = 	-- Swizzle the inner lets past the big lambda (if any)
-    mkRhsTyLam rhs			`thenSmpl` \ swizzled_rhs ->
-
-	-- Simplify the swizzled RHS
-    simplRhs2 bndr bndr_se swizzled_rhs	`thenSmpl` \ (floats, (in_scope, rhs', arity)) ->
-
-    if not (null floats) && exprIsWHNF rhs' then	-- Do the float
-	tick LetFloatFromLet	`thenSmpl_`
-	returnSmpl (floats, in_scope, rhs', arity)
-    else			-- Don't do it
-	getInScope		`thenSmpl` \ in_scope ->
-	returnSmpl ([], in_scope, mkLetBinds floats rhs', arity)
-\end{code}
-
----------------------------------------------------------
-	Try eta expansion for RHSs
-
-We need to pass in the substitution environment for the RHS, because
-it might be different to the current one (see simplBeta, as called
-from simplExpr for an applied lambda).  The binder needs to 
-
-\begin{code}
-simplRhs2 bndr bndr_se (Let bind body)
-  = simplBind bind (simplRhs2 bndr bndr_se body)
-
-simplRhs2 bndr bndr_se rhs 
-  | null ids	-- Prevent eta expansion for both thunks 
-		-- (would lose sharing) and variables (nothing gained).
-		-- To see why we ignore it for thunks, consider
-		--	let f = lookup env key in (f 1, f 2)
-		-- We'd better not eta expand f just because it is 
-		-- always applied!
-		--
-		-- Also if there isn't a lambda at the top we use
-		-- simplExprB so that we can do (more) let-floating
-  = simplExprB rhs Stop		`thenSmpl` \ (binds, (in_scope, rhs')) ->
-    returnSmpl (binds, (in_scope, rhs', unknownArity))
-
-  | otherwise	-- Consider eta expansion
-  = getSwitchChecker		`thenSmpl` \ sw_chkr ->
-    getInScope			`thenSmpl` \ in_scope ->
-    simplBinders tyvars		$ \ tyvars' ->
-    simplBinders ids		$ \ ids' ->
-
-    if switchIsOn sw_chkr SimplDoLambdaEtaExpansion
-    && not (null extra_arg_tys)
-    then
-	tick EtaExpansion			`thenSmpl_`
-	setSubstEnv bndr_se (mapSmpl simplType extra_arg_tys)
-						`thenSmpl` \ extra_arg_tys' ->
-	newIds extra_arg_tys'			$ \ extra_bndrs' ->
-	simplExpr body (mk_cont extra_bndrs') 	`thenSmpl` \ body' ->
-	let
-	    expanded_rhs = mkLams tyvars'
-			 $ mkLams ids' 
- 			 $ mkLams extra_bndrs' body'
-	    expanded_arity = atLeastArity (no_of_ids + no_of_extras)	
-	in
-	returnSmpl ([], (in_scope, expanded_rhs, expanded_arity))
-
-    else
-	simplExpr body Stop 			`thenSmpl` \ body' ->
-	let
-	    unexpanded_rhs = mkLams tyvars'
-			   $ mkLams ids' body'
-	    unexpanded_arity = atLeastArity no_of_ids
-	in
-	returnSmpl ([], (in_scope, unexpanded_rhs, unexpanded_arity))
-
-  where
-    (tyvars, ids, body) = collectTyAndValBinders rhs
-    no_of_ids		= length ids
-
-    potential_extra_arg_tys :: [InType]	-- NB: InType
-    potential_extra_arg_tys  = case splitFunTys (applyTys (idType bndr) (mkTyVarTys tyvars)) of
-				  (arg_tys, _) -> drop no_of_ids arg_tys
-
-    extra_arg_tys :: [InType]
-    extra_arg_tys  = take no_extras_wanted potential_extra_arg_tys
-    no_of_extras   = length extra_arg_tys
-
-    no_extras_wanted =  -- Use information about how many args the fn is applied to
-			(arity - no_of_ids) 	`max`
-
-			-- See if the body could obviously do with more args
-			etaExpandCount body	`max`
-
-			-- Finally, see if it's a state transformer, in which
-			-- case we eta-expand on principle! This can waste work,
-			-- but usually doesn't
-			case potential_extra_arg_tys of
-				[ty] | ty == realWorldStatePrimTy -> 1
-				other				  -> 0
-
-    arity = arityLowerBound (getIdArity bndr)
-
-    mk_cont []     = Stop
-    mk_cont (b:bs) = ApplyTo OkToDup (Var b) emptySubstEnv (mk_cont bs)
+  = getSubst	`thenSmpl` \ subst ->
+    returnSmpl (substTy subst ty)
 \end{code}
 
 
@@ -681,53 +420,78 @@ simplRhs2 bndr bndr_se rhs
 %*									*
 %************************************************************************
 
+@simplBeta@ is used for non-recursive lets in expressions, 
+as well as true beta reduction.
+
+Very similar to @simplLazyBind@, but not quite the same.
+
 \begin{code}
 simplBeta :: InId 			-- Binder
 	  -> InExpr -> SubstEnv		-- Arg, with its subst-env
-	  -> InExpr -> SimplCont 	-- Lambda body
+	  -> OutType			-- Type of thing computed by the context
+	  -> SimplM OutExprStuff	-- The body
 	  -> SimplM OutExprStuff
 #ifdef DEBUG
-simplBeta bndr rhs rhs_se body cont
+simplBeta bndr rhs rhs_se cont_ty thing_inside
   | isTyVar bndr
-  = pprPanic "simplBeta" ((ppr bndr <+> ppr rhs) $$ ppr cont)
+  = pprPanic "simplBeta" (ppr bndr <+> ppr rhs)
 #endif
 
-simplBeta bndr rhs rhs_se body cont
-  |  isUnLiftedType bndr_ty
-  || (isStrict (getIdDemandInfo bndr) || is_dict bndr) && not (exprIsWHNF rhs)
-  = tick Let2Case	`thenSmpl_`
-    getSubstEnv 	`thenSmpl` \ body_se ->
-    setSubstEnv rhs_se	$
-    simplExprB rhs (Select NoDup bndr [(DEFAULT, [], body)] body_se cont)
-
-  | preInlineUnconditionally bndr && not opt_NoPreInlining
-  = tick PreInlineUnconditionally			`thenSmpl_`
-    case rhs_se of 					{ (ty_subst, id_subst) ->
-    extendIdSubst bndr (SubstMe rhs ty_subst id_subst)	$
-    simplExprB body cont }
+simplBeta bndr rhs rhs_se cont_ty thing_inside
+  | preInlineUnconditionally bndr && not opt_SimplNoPreInlining
+  = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
+    extendSubst bndr (ContEx rhs_se rhs) thing_inside
 
   | otherwise
-  = getSubstEnv 		`thenSmpl` \ bndr_se ->
-    setSubstEnv rhs_se (simplRhs bndr bndr_se rhs)
-				`thenSmpl` \ (floats, in_scope, rhs', arity) ->
-    setInScope in_scope				$
-    completeBindNonRec (bndr `setIdArity` arity) rhs' (
-	    simplExprB body cont		
-    )						`thenSmpl` \ stuff ->
-    returnSmpl (addBinds floats stuff)
-  where
-	-- Return true only for dictionary types where the dictionary
-	-- has more than one component (else we risk poking on the component
-	-- of a newtype dictionary)
-    is_dict bndr = opt_DictsStrict && isDictTy bndr_ty && isDataType bndr_ty
-    bndr_ty      = idType bndr
+  = 	-- Simplify the RHS
+    simplBinder bndr					$ \ bndr' ->
+    simplArg (idType bndr') (getIdDemandInfo bndr)
+	     rhs rhs_se cont_ty				$ \ rhs' ->
+
+	-- Now complete the binding and simplify the body
+    completeBeta bndr bndr' rhs' thing_inside
+
+completeBeta bndr bndr' rhs' thing_inside
+  | isUnLiftedType (idType bndr') && not (exprOkForSpeculation rhs')
+	-- Make a case expression instead of a let
+	-- These can arise either from the desugarer,
+	-- or from beta reductions: (\x.e) (x +# y)
+  = getInScope 			`thenSmpl` \ in_scope ->
+    thing_inside		`thenSmpl` \ (floats, (_, body)) ->
+    returnSmpl ([], (in_scope, Case rhs' bndr' [(DEFAULT, [], mkLets floats body)]))
+
+  | otherwise
+  = completeBinding bndr bndr' rhs' thing_inside
 \end{code}
 
 
-completeBindNonRec
+\begin{code}
+simplArg :: OutType -> Demand
+	 -> InExpr -> SubstEnv
+	 -> OutType		-- Type of thing computed by the context
+	 -> (OutExpr -> SimplM OutExprStuff)
+	 -> SimplM OutExprStuff
+simplArg arg_ty demand arg arg_se cont_ty thing_inside
+  | isStrict demand || 
+    isUnLiftedType arg_ty || 
+    (opt_DictsStrict && isDictTy arg_ty && isDataType arg_ty)
+	-- Return true only for dictionary types where the dictionary
+	-- has more than one component (else we risk poking on the component
+	-- of a newtype dictionary)
+  = getSubstEnv					`thenSmpl` \ body_se ->
+    transformRhs arg				`thenSmpl` \ t_arg ->
+    setSubstEnv arg_se (simplExprF t_arg (ArgOf NoDup cont_ty $ \ arg' ->
+    setSubstEnv body_se (thing_inside arg')
+    ))	-- NB: we must restore body_se before carrying on with thing_inside!!
+
+  | otherwise
+  = simplRhs NotTopLevel True arg_ty arg arg_se thing_inside
+\end{code}
+
+
+completeBinding
 	- deals only with Ids, not TyVars
 	- take an already-simplified RHS
-	- always produce let bindings
 
 It does *not* attempt to do let-to-case.  Why?  Because they are used for
 
@@ -738,58 +502,393 @@ It does *not* attempt to do let-to-case.  Why?  Because they are used for
 		(so let-to-case is inappropriate).
 
 \begin{code}
-completeBindNonRec :: InId 		-- Binder
+completeBinding :: InId 		-- Binder
+		-> OutId		-- New binder
 	        -> OutExpr		-- Simplified RHS
-	   	-> SimplM (OutStuff a)	-- Thing inside
+		-> SimplM (OutStuff a)	-- Thing inside
 	   	-> SimplM (OutStuff a)
-completeBindNonRec bndr rhs thing_inside
-  |  isDeadBinder bndr		-- This happens; for example, the case_bndr during case of
+
+completeBinding old_bndr new_bndr new_rhs thing_inside
+  |  isDeadBinder old_bndr	-- This happens; for example, the case_bndr during case of
 				-- known constructor:  case (a,b) of x { (p,q) -> ... }
 				-- Here x isn't mentioned in the RHS, so we don't want to
 				-- create the (dead) let-binding  let x = (a,b) in ...
   =  thing_inside
 
-  |  postInlineUnconditionally bndr etad_rhs
-  =  tick PostInlineUnconditionally	`thenSmpl_`
-     extendIdSubst bndr (Done etad_rhs)	
+  |  postInlineUnconditionally old_bndr new_rhs
+	-- Maybe we don't need a let-binding!  Maybe we can just
+	-- inline it right away.  Unlike the preInlineUnconditionally case
+	-- we are allowed to look at the RHS.
+	--
+	-- NB: a loop breaker never has postInlineUnconditionally True
+	-- and non-loop-breakers only have *forward* references
+	-- Hence, it's safe to discard the binding
+  =  tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
+     extendSubst old_bndr (DoneEx new_rhs)	
      thing_inside
 
-  |  otherwise			-- Note that we use etad_rhs here
-				-- This gives maximum chance for a remaining binding
-				-- to be zapped by the indirection zapper in OccurAnal
-  =  simplBinder bndr				$ \ bndr' ->
-     simplPrags bndr bndr' etad_rhs		`thenSmpl` \ bndr'' ->
-     modifyInScope bndr''			$ 
-     thing_inside				`thenSmpl` \ stuff ->
-     returnSmpl (addBind (NonRec bndr'' etad_rhs) stuff)
-  where
-     etad_rhs = etaCoreExpr rhs
+  |  otherwise
+  =  getSubst			`thenSmpl` \ subst ->
+     let
+	bndr_info = idInfo old_bndr
+	old_rules = specInfo bndr_info
+	new_rules = substRules subst old_rules
 
--- (simplPrags old_bndr new_bndr new_rhs) does two things
---	(a) it attaches the new unfolding to new_bndr
---	(b) it grabs the SpecEnv from old_bndr, applies the current
---	    substitution to it, and attaches it to new_bndr
---  The assumption is that new_bndr, which is produced by simplBinder
---  has no unfolding or specenv.
+	-- The new binding site Id needs its specialisations re-attached
+	bndr_w_arity = new_bndr `setIdArity` ArityAtLeast (exprArity new_rhs)
 
-simplPrags old_bndr new_bndr new_rhs
-  | isEmptySpecEnv spec_env
-  = returnSmpl (bndr_w_unfolding)
+	binding_site_id
+	  | isEmptyCoreRules old_rules = bndr_w_arity 
+	  | otherwise		       = bndr_w_arity `setIdSpecialisation` new_rules
+
+	-- At the occurrence sites we want to know the unfolding,
+	-- and the occurrence info of the original
+	-- (simplBinder cleaned up the inline prag of the original
+	--  to eliminate un-stable info, in case this expression is
+	--  simplified a second time; hence the need to reattach it)
+	occ_site_id = binding_site_id
+		      `setIdUnfolding` mkUnfolding new_rhs
+		      `setInlinePragma` inlinePragInfo bndr_info
+     in
+     modifyInScope occ_site_id thing_inside	`thenSmpl` \ stuff ->
+     returnSmpl (addBind (NonRec binding_site_id new_rhs) stuff)
+\end{code}    
+
+
+%************************************************************************
+%*									*
+\subsection{simplLazyBind}
+%*									*
+%************************************************************************
+
+simplLazyBind basically just simplifies the RHS of a let(rec).
+It does two important optimisations though:
+
+	* It floats let(rec)s out of the RHS, even if they
+	  are hidden by big lambdas
+
+	* It does eta expansion
+
+\begin{code}
+simplLazyBind :: TopLevelFlag
+	      -> InId -> OutId
+	      -> InExpr 		-- The RHS
+	      -> SimplM (OutStuff a)	-- The body of the binding
+	      -> SimplM (OutStuff a)
+-- When called, the subst env is correct for the entire let-binding
+-- and hence right for the RHS.
+-- Also the binder has already been simplified, and hence is in scope
+
+simplLazyBind top_lvl bndr bndr' rhs thing_inside
+  | preInlineUnconditionally bndr && not opt_SimplNoPreInlining
+  = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
+    getSubstEnv 					`thenSmpl` \ rhs_se ->
+    (extendSubst bndr (ContEx rhs_se rhs) thing_inside)
 
   | otherwise
-  = getSimplBinderStuff		`thenSmpl` \ (ty_subst, id_subst, in_scope, us) ->
-    let
-	spec_env'  = substSpecEnv ty_subst in_scope (subst_val id_subst) spec_env
-	final_bndr = bndr_w_unfolding `setIdSpecialisation` spec_env'
-    in
-    returnSmpl final_bndr
-  where
-    bndr_w_unfolding = new_bndr `setIdUnfolding` mkUnfolding new_rhs
+  = 	-- Simplify the RHS
+    getSubstEnv 					`thenSmpl` \ rhs_se ->
 
-    spec_env = getIdSpecialisation old_bndr
-    subst_val id_subst ty_subst in_scope expr
-	= substExpr ty_subst id_subst in_scope expr
-\end{code}    
+    simplRhs top_lvl False {- Not ok to float unboxed -}
+	     (idType bndr')
+	     rhs rhs_se  				$ \ rhs' ->
+
+	-- Now compete the binding and simplify the body
+    completeBinding bndr bndr' rhs' thing_inside
+\end{code}
+
+
+
+\begin{code}
+simplRhs :: TopLevelFlag
+	 -> Bool		-- True <=> OK to float unboxed (speculative) bindings
+	 -> OutType -> InExpr -> SubstEnv
+	 -> (OutExpr -> SimplM (OutStuff a))
+	 -> SimplM (OutStuff a)
+simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
+  =    	-- Swizzle the inner lets past the big lambda (if any)
+	-- and try eta expansion
+    transformRhs rhs					`thenSmpl` \ t_rhs ->
+
+	-- Simplify it
+    setSubstEnv rhs_se (simplExprF t_rhs (Stop rhs_ty))	`thenSmpl` \ (floats, (in_scope', rhs')) ->
+
+	-- Float lets out of RHS
+    let
+	(floats_out, rhs'') | float_ubx = (floats, rhs')
+			    | otherwise	= splitFloats floats rhs' 
+    in
+    if (isTopLevel top_lvl || exprIsWHNF rhs') && 	-- Float lets if (a) we're at the top level
+        not (null floats_out)				-- or 		 (b) it exposes a HNF
+    then
+	tickLetFloat floats_out				`thenSmpl_`
+		-- Do the float
+		-- 
+		-- There's a subtlety here.  There may be a binding (x* = e) in the
+		-- floats, where the '*' means 'will be demanded'.  So is it safe
+		-- to float it out?  Answer no, but it won't matter because
+		-- we only float if arg' is a WHNF,
+		-- and so there can't be any 'will be demanded' bindings in the floats.
+		-- Hence the assert
+	WARN( any demanded_float floats_out, ppr floats_out )
+	setInScope in_scope' (thing_inside rhs'') 	`thenSmpl` \ stuff ->
+		-- in_scope' may be excessive, but that's OK;
+		-- it's a superset of what's in scope
+	returnSmpl (addBinds floats_out stuff)
+    else	
+		-- Don't do the float
+	thing_inside (mkLets floats rhs')
+
+-- In a let-from-let float, we just tick once, arbitrarily
+-- choosing the first floated binder to identify it
+tickLetFloat (NonRec b r      : fs) = tick (LetFloatFromLet b)
+tickLetFloat (Rec ((b,r):prs) : fs) = tick (LetFloatFromLet b)
+	
+demanded_float (NonRec b r) = isStrict (getIdDemandInfo b) && not (isUnLiftedType (idType b))
+		-- Unlifted-type (cheap-eagerness) lets may well have a demanded flag on them
+demanded_float (Rec _)	    = False
+
+-- Don't float any unlifted bindings out, because the context
+-- is either a Rec group, or the top level, neither of which
+-- can tolerate them.
+splitFloats floats rhs
+  = go floats
+  where
+    go []		    = ([], rhs)
+    go (f:fs) | must_stay f = ([], mkLets (f:fs) rhs)
+	      | otherwise   = case go fs of
+				   (out, rhs') -> (f:out, rhs')
+
+    must_stay (Rec prs)    = False	-- No unlifted bindings in here
+    must_stay (NonRec b r) = isUnLiftedType (idType b)
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{Variables}
+%*									*
+%************************************************************************
+
+\begin{code}
+simplVar var cont
+  = freeTick LeafVisit	`thenSmpl_`
+    getSubst		`thenSmpl` \ subst ->
+    case lookupSubst subst var of
+	Just (DoneEx (Var v)) -> zapSubstEnv (simplVar v cont)
+	Just (DoneEx e)	      -> zapSubstEnv (simplExprF e cont)
+	Just (ContEx env' e)  -> setSubstEnv env' (simplExprF e cont)
+
+	Nothing -> let
+			var' = case lookupInScope subst var of
+				 Just v' -> v'
+				 Nothing -> 
+#ifdef DEBUG
+					    if isLocallyDefined var && not (idMustBeINLINEd var)
+						-- The idMustBeINLINEd test accouunts for the fact
+						-- that class method selectors don't have top level
+						-- bindings and hence aren't in scope.
+					    then
+						-- Not in scope
+						pprTrace "simplVar:" (ppr var) var
+					    else
+#endif
+					    var
+		   in
+		   getBlackList		`thenSmpl` \ black_list ->
+		   getInScope		`thenSmpl` \ in_scope ->
+
+		   prepareArgs (ppr var') (idType var') (get_str var') cont	$ \ args' cont' ->
+		   completeCall black_list in_scope var' args' cont'
+  where
+    get_str var = case getIdStrictness var of
+			NoStrictnessInfo		  -> (repeat wwLazy, False)
+			StrictnessInfo demands result_bot -> (demands, result_bot)
+
+
+---------------------------------------------------------
+--	Preparing arguments for a call
+
+prepareArgs :: SDoc 	-- Error message info
+	    -> OutType -> ([Demand],Bool) -> SimplCont
+	    -> ([OutExpr] -> SimplCont -> SimplM OutExprStuff)
+	    -> SimplM OutExprStuff
+
+prepareArgs pp_fun orig_fun_ty (fun_demands, result_bot) orig_cont thing_inside
+  = go [] demands orig_fun_ty orig_cont
+  where
+    not_enough_args = fun_demands `lengthExceeds` countValArgs orig_cont
+	-- "No strictness info" is signalled by an infinite list of wwLazy
+ 
+    demands | not_enough_args = repeat wwLazy			-- Not enough args, or no strictness
+	    | result_bot      = fun_demands			-- Enough args, and function returns bottom
+	    | otherwise	      = fun_demands ++ repeat wwLazy	-- Enough args and function does not return bottom
+	-- NB: demands is finite iff enough args and result_bot is True
+
+	-- Main game plan: loop through the arguments, simplifying
+	-- each of them in turn.  We carry with us a list of demands,
+	-- and the type of the function-applied-to-earlier-args
+
+	-- Type argument
+    go acc ds fun_ty (ApplyTo _ arg@(Type ty_arg) se cont)
+	= getInScope		`thenSmpl` \ in_scope ->
+	  let
+		ty_arg' = substTy (mkSubst in_scope se) ty_arg
+		res_ty  = applyTy fun_ty ty_arg'
+	  in
+	  go (Type ty_arg' : acc) ds res_ty cont
+
+	-- Value argument
+    go acc (d:ds) fun_ty (ApplyTo _ val_arg se cont)
+	= case splitFunTy_maybe fun_ty of {
+		Nothing -> pprTrace "prepareArgs" (pp_fun $$ ppr orig_fun_ty $$ ppr orig_cont) 
+			   (thing_inside (reverse acc) cont) ;
+		Just (arg_ty, res_ty) ->
+	  simplArg arg_ty d val_arg se (contResultType cont) 	$ \ arg' ->
+	  go (arg':acc) ds res_ty cont }
+
+	-- We've run out of demands, which only happens for functions
+	-- we *know* now return bottom
+	-- This deals with
+	--	* case (error "hello") of { ... }
+	--	* (error "Hello") arg
+	--	* f (error "Hello") where f is strict
+	--	etc
+    go acc [] fun_ty cont = tick_case_of_error cont		`thenSmpl_`
+    			    thing_inside (reverse acc) (discardCont cont)
+
+	-- We're run out of arguments
+    go acc ds fun_ty cont = thing_inside (reverse acc) cont
+
+-- Boring: we must only record a tick if there was an interesting
+--	   continuation to discard.  If not, we tick forever.
+tick_case_of_error (Stop _)		 = returnSmpl ()
+tick_case_of_error (CoerceIt _ (Stop _)) = returnSmpl ()
+tick_case_of_error other		 = tick BottomFound
+
+---------------------------------------------------------
+--	Dealing with a call
+
+completeCall black_list_fn in_scope var args cont
+	-- Look for rules or specialisations that match
+	-- Do this *before* trying inlining because some functions
+	-- have specialisations *and* are strict; we don't want to
+	-- inline the wrapper of the non-specialised thing... better
+	-- to call the specialised thing instead.
+  | maybeToBool maybe_rule_match
+  = tick (RuleFired rule_name)			`thenSmpl_`
+    zapSubstEnv (completeApp rule_rhs rule_args cont)
+	-- See note below about zapping the substitution here
+
+	-- Look for an unfolding. There's a binding for the
+	-- thing, but perhaps we want to inline it anyway
+  | maybeToBool maybe_inline
+  = tick (UnfoldingDone var)		`thenSmpl_`
+    zapSubstEnv (completeInlining var unf_template args (discardInlineCont cont))
+		-- The template is already simplified, so don't re-substitute.
+		-- This is VITAL.  Consider
+		--	let x = e in
+		--	let y = \z -> ...x... in
+		--	\ x -> ...y...
+		-- We'll clone the inner \x, adding x->x' in the id_subst
+		-- Then when we inline y, we must *not* replace x by x' in
+		-- the inlined copy!!
+    
+  | otherwise		-- Neither rule nor inlining
+  = rebuild (mkApps (Var var) args) cont
+  
+  where
+	---------- Unfolding stuff
+    maybe_inline  = callSiteInline black_listed inline_call 
+				   var args interesting_cont
+    Just unf_template = maybe_inline
+    interesting_cont  = contIsInteresting cont
+    inline_call	      = contIsInline cont
+    black_listed      = black_list_fn var
+
+    	---------- Specialisation stuff
+    maybe_rule_match           = lookupRule in_scope var args
+    Just (rule_name, rule_rhs, rule_args) = maybe_rule_match
+
+
+-- First a special case
+-- Don't actually inline the scrutinee when we see
+--	case x of y { .... }
+-- and x has unfolding (C a b).  Why not?  Because
+-- we get a silly binding y = C a b.  If we don't
+-- inline knownCon can directly substitute x for y instead.
+completeInlining var (Con con con_args) args (Select _ bndr alts se cont)
+  | conOkForAlt con 
+  = ASSERT( null args )
+    knownCon (Var var) con con_args bndr alts se cont
+
+-- Now the normal case
+completeInlining var unfolding args cont
+  = completeApp unfolding args cont
+
+-- completeApp applies a new InExpr (from an unfolding or rule)
+-- to an *already simplified* set of arguments
+completeApp :: InExpr			-- (\xs. body)
+	    -> [OutExpr]		-- Args; already simplified
+	    -> SimplCont		-- What to do with result of applicatoin
+	    -> SimplM OutExprStuff
+completeApp fun args cont
+  = go fun args
+  where
+    zap_it = mkLamBndrZapper fun (length args)
+    cont_ty = contResultType cont
+
+    -- These equations are very similar to simplLam and simplBeta combined,
+    -- except that they deal with already-simplified arguments
+
+	-- Type argument
+    go (Lam bndr fun) (Type ty:args) = tick (BetaReduction bndr) 	`thenSmpl_`
+				       extendSubst bndr (DoneTy ty)
+				       (go fun args)
+
+	-- Value argument
+    go (Lam bndr fun) (arg:args)
+	  | preInlineUnconditionally bndr && not opt_SimplNoPreInlining
+	  = tick (BetaReduction bndr) 			`thenSmpl_`
+	    tick (PreInlineUnconditionally bndr)	`thenSmpl_`
+	    extendSubst bndr (DoneEx arg)
+	    (go fun args)
+	  | otherwise
+	  = tick (BetaReduction bndr) 			`thenSmpl_`
+	    simplBinder zapped_bndr			( \ bndr' ->
+	    completeBeta zapped_bndr bndr' arg		$
+	    go fun args
+	    )
+         where
+	   zapped_bndr = zap_it bndr
+
+	-- Consumed all the lambda binders or args
+    go fun args = simplExprF fun (pushArgs emptySubstEnv args cont)
+
+
+----------- costCentreOk
+-- costCentreOk checks that it's ok to inline this thing
+-- The time it *isn't* is this:
+--
+--	f x = let y = E in
+--	      scc "foo" (...y...)
+--
+-- Here y has a "current cost centre", and we can't inline it inside "foo",
+-- regardless of whether E is a WHNF or not.
+    
+costCentreOk ccs_encl cc_rhs
+  =  not opt_SccProfilingOn
+  || isSubsumedCCS ccs_encl	  -- can unfold anything into a subsumed scope
+  || not (isEmptyCC cc_rhs)	  -- otherwise need a cc on the unfolding
+\end{code}		   
+
+
+%************************************************************************
+%*									*
+\subsection{Decisions about inlining}
+%*									*
+%************************************************************************
 
 \begin{code}
 preInlineUnconditionally :: InId -> Bool
@@ -810,8 +909,14 @@ preInlineUnconditionally :: InId -> Bool
 	-- we'd do the same for y -- aargh!  So we must base this
 	-- pre-rhs-simplification decision solely on x's occurrences, not
 	-- on its rhs.
+	-- 
+	-- Evne RHSs labelled InlineMe aren't caught here, because
+	-- there might be no benefit from inlining at the call site.
+	-- But things labelled 'IMustBeINLINEd' *are* caught.  We use this
+	-- for the trivial bindings introduced by SimplUtils.mkRhsTyLam
 preInlineUnconditionally bndr
   = case getInlinePragma bndr of
+	IMustBeINLINEd			    -> True
 	ICanSafelyBeINLINEd InsideLam  _    -> False
 	ICanSafelyBeINLINEd not_in_lam True -> True	-- Not inside a lambda,
 							-- one occurrence ==> safe!
@@ -828,46 +933,38 @@ postInlineUnconditionally :: InId -> OutExpr -> Bool
 	-- we'll get another opportunity when we get to the ocurrence(s)
 
 postInlineUnconditionally bndr rhs
-  | isExported bndr 
+  | isExportedId bndr 
   = False
   | otherwise
   = case getInlinePragma bndr of
 	IAmALoopBreaker			    	  -> False   
-	IMustNotBeINLINEd 		    	  -> False
-	IAmASpecPragmaId		    	  -> False	-- Don't discard SpecPrag Ids
 
 	ICanSafelyBeINLINEd InsideLam one_branch  -> exprIsTrivial rhs
-			-- Don't inline even WHNFs inside lambdas; this
-			-- isn't the last chance; see NOTE above.
+		-- Don't inline even WHNFs inside lambdas; doing so may
+		-- simply increase allocation when the function is called
+		-- This isn't the last chance; see NOTE above.
 
-	ICanSafelyBeINLINEd not_in_lam one_branch -> one_branch || exprIsDupable rhs
+	ICanSafelyBeINLINEd not_in_lam one_branch -> one_branch || exprIsTrivial rhs
+		-- Was 'exprIsDupable' instead of 'exprIsTrivial' but the
+		-- decision about duplicating code is best left to callSiteInline
 
 	other				    	  -> exprIsTrivial rhs	-- Duplicating is *free*
-		-- NB: Even IWantToBeINLINEd and IMustBeINLINEd are ignored here
+		-- NB: Even InlineMe and IMustBeINLINEd are ignored here
 		-- Why?  Because we don't even want to inline them into the
 		-- RHS of constructor arguments. See NOTE above
+		-- NB: Even IMustBeINLINEd is ignored here: if the rhs is trivial
+		-- it's best to inline it anyway.  We often get a=E; b=a
+		-- from desugaring, with both a and b marked NOINLINE.
+\end{code}
 
+\begin{code}
 inlineCase bndr scrut
-  = case getInlinePragma bndr of
-	-- Not expecting IAmALoopBreaker etc; this is a case binder!
-
-	ICanSafelyBeINLINEd StrictOcc one_branch
-		-> one_branch || exprIsDupable scrut
-		-- This case is the entire reason we distinguish StrictOcc from LazyOcc
-		-- We want eliminate the "case" only if we aren't going to
-		-- build a thunk instead, and that's what StrictOcc finds
-		-- For example:
-		-- 	case (f x) of y { DEFAULT -> g y }
-		-- Here we DO NOT WANT:
-		--	g (f x)
-		-- *even* if g is strict.  We want to avoid constructing the
-		-- thunk for (f x)!  So y gets a LazyOcc.
-
-	other	-> exprIsTrivial scrut			-- Duplication is free
-		&& (  isUnLiftedType (idType bndr) 
-		   || scrut_is_evald_var		-- So dropping the case won't change termination
-		   || isStrict (getIdDemandInfo bndr))	-- It's going to get evaluated later, so again
-							-- termination doesn't change
+    =  exprIsTrivial scrut			-- Duplication is free
+   && (  isUnLiftedType (idType bndr) 
+      || scrut_is_evald_var			-- So dropping the case won't change termination
+      || isStrict (getIdDemandInfo bndr)	-- It's going to get evaluated later, so again
+	   					-- termination doesn't change
+      || not opt_SimplPedanticBottoms)		-- Or we don't care!
   where
 	-- Check whether or not scrut is known to be evaluted
 	-- It's not going to be a visible value (else the previous
@@ -877,150 +974,6 @@ inlineCase bndr scrut
 				other -> False
 \end{code}
 
-okToInline is used at call sites, so it is a bit more generous.
-It's a very important function that embodies lots of heuristics.
-
-\begin{code}
-okToInline :: SwitchChecker
-	   -> InScopeEnv
-	   -> Id		-- The Id
-	   -> FormSummary	-- The thing is WHNF or bottom; 
-	   -> UnfoldingGuidance
-	   -> SimplCont
-	   -> Bool		-- True <=> inline it
-
--- A non-WHNF can be inlined if it doesn't occur inside a lambda,
--- and occurs exactly once or 
---     occurs once in each branch of a case and is small
---
--- If the thing is in WHNF, there's no danger of duplicating work, 
--- so we can inline if it occurs once, or is small
-
-okToInline sw_chkr in_scope id form guidance cont
-  =
-#ifdef DEBUG
-    if opt_D_dump_inlinings then
-	pprTrace "Considering inlining"
-		 (ppr id <+> vcat [text "inline prag:" <+> ppr inline_prag,
-				   text "whnf" <+> ppr whnf,
-				   text "small enough" <+> ppr small_enough,
-				   text "some benefit" <+> ppr some_benefit,
-			  	   text "arg evals" <+> ppr arg_evals,
-				   text "result scrut" <+> ppr result_scrut,
-				   text "ANSWER =" <+> if result then text "YES" else text "NO"])
-		  result
-    else
-#endif
-    result
-  where
-    result =
-      case inline_prag of
-	IAmDead		  -> pprTrace "okToInline: dead" (ppr id) False
-	IAmASpecPragmaId  -> False
-	IMustNotBeINLINEd -> False
-	IAmALoopBreaker   -> False
-	IMustBeINLINEd    -> True	-- If "essential_unfoldings_only" is true we do no inlinings at all,
-					-- EXCEPT for things that absolutely have to be done
-					-- (see comments with idMustBeINLINEd)
-	IWantToBeINLINEd  -> inlinings_enabled
-	ICanSafelyBeINLINEd inside_lam one_branch
-			  -> inlinings_enabled && (unfold_always || consider_single inside_lam one_branch) 
-	NoInlinePragInfo  -> inlinings_enabled && (unfold_always || consider_multi)
-
-    inlinings_enabled = not (switchIsOn sw_chkr EssentialUnfoldingsOnly)
-    unfold_always     = unfoldAlways guidance
-
-	-- Consider benefit for ICanSafelyBeINLINEd
-    consider_single inside_lam one_branch
-	= (small_enough || one_branch) && some_benefit && (whnf || not_inside_lam)
-	where
-	  not_inside_lam = case inside_lam of {InsideLam -> False; other -> True}
-
-	-- Consider benefit for NoInlinePragInfo
-    consider_multi = whnf && small_enough && some_benefit
-			-- We could consider using exprIsCheap here,
-			-- as in postInlineUnconditionally, but unlike the latter we wouldn't
-			-- necessarily eliminate a thunk; and the "form" doesn't tell
-			-- us that.
-
-    inline_prag  = getInlinePragma id
-    whnf         = whnfOrBottom form
-    small_enough = smallEnoughToInline id arg_evals result_scrut guidance
-    (arg_evals, result_scrut) = get_evals cont
-
-	-- some_benefit checks that *something* interesting happens to
-	-- the variable after it's inlined.
-    some_benefit = contIsInteresting cont
-
-	-- Finding out whether the args are evaluated.  This isn't completely easy
-	-- because the args are not yet simplified, so we have to peek into them.
-    get_evals (ApplyTo _ arg (te,ve) cont) 
-      | isValArg arg = case get_evals cont of 
-			  (args, res) -> (get_arg_eval arg ve : args, res)
-      | otherwise    = get_evals cont
-
-    get_evals (Select _ _ _ _ _) = ([], True)
-    get_evals other		 = ([], False)
-
-    get_arg_eval (Con con _) ve = isWHNFCon con
-    get_arg_eval (Var v)     ve = case lookupVarEnv ve v of
-				    Just (SubstMe e' _ ve') -> get_arg_eval e' ve'
-				    Just (Done (Con con _)) -> isWHNFCon con
-				    Just (Done (Var v'))    -> get_var_eval v'
-				    Just (Done other)	    -> False
-				    Nothing		    -> get_var_eval v
-    get_arg_eval other	     ve = False
-
-    get_var_eval v = case lookupVarSet in_scope v of
-			Just v' -> isEvaldUnfolding (getIdUnfolding v')
-			Nothing -> isEvaldUnfolding (getIdUnfolding v)
-
-
-contIsInteresting :: SimplCont -> Bool
-contIsInteresting Stop			      = False
-contIsInteresting (ArgOf _ _ _)		      = False
-contIsInteresting (ApplyTo _ (Type _) _ cont) = contIsInteresting cont
-contIsInteresting (CoerceIt _ _ _ cont)	      = contIsInteresting cont
-
--- See notes below on why a case with only a DEFAULT case is not intersting
--- contIsInteresting (Select _ _ [(DEFAULT,_,_)] _ _) = False
-
-contIsInteresting _ 			      = True
-\end{code}
-
-Comment about some_benefit above
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We want to avoid inlining an expression where there can't possibly be
-any gain, such as in an argument position.  Hence, if the continuation
-is interesting (eg. a case scrutinee, application etc.) then we
-inline, otherwise we don't.  
-
-Previously some_benefit used to return True only if the variable was
-applied to some value arguments.  This didn't work:
-
-	let x = _coerce_ (T Int) Int (I# 3) in
-	case _coerce_ Int (T Int) x of
-		I# y -> ....
-
-we want to inline x, but can't see that it's a constructor in a case
-scrutinee position, and some_benefit is False.
-
-Another example:
-
-dMonadST = _/\_ t -> :Monad (g1 _@_ t, g2 _@_ t, g3 _@_ t)
-
-....  case dMonadST _@_ x0 of (a,b,c) -> ....
-
-we'd really like to inline dMonadST here, but we *don't* want to
-inline if the case expression is just
-
-	case x of y { DEFAULT -> ... }
-
-since we can just eliminate this case instead (x is in WHNF).  Similar
-applies when x is bound to a lambda expression.  Hence
-contIsInteresting looks for case expressions with just a single
-default case.
 
 
 %************************************************************************
@@ -1031,95 +984,68 @@ default case.
 
 \begin{code}
 -------------------------------------------------------------------
-rebuild :: OutExpr -> SimplCont -> SimplM OutExprStuff
-
-rebuild expr cont
-  = tick LeavesExamined					`thenSmpl_`
-    case expr of
-	Var v -> case getIdStrictness v of
-		    NoStrictnessInfo		        -> do_rebuild expr cont
-		    StrictnessInfo demands result_bot   -> ASSERT( not (null demands) || result_bot )
-								-- If this happened we'd get an infinite loop
-							   rebuild_strict demands result_bot expr (idType v) cont
-	other  -> do_rebuild expr cont
-
+-- Finish rebuilding
 rebuild_done expr
-  = getInScope			`thenSmpl` \ in_scope ->		
+  = getInScope			`thenSmpl` \ in_scope ->
     returnSmpl ([], (in_scope, expr))
 
 ---------------------------------------------------------
+rebuild :: OutExpr -> SimplCont -> SimplM OutExprStuff
+
 --	Stop continuation
+rebuild expr (Stop _) = rebuild_done expr
 
-do_rebuild expr Stop = rebuild_done expr
-
-
----------------------------------------------------------
 --	ArgOf continuation
+rebuild expr (ArgOf _ _ cont_fn) = cont_fn expr
 
-do_rebuild expr (ArgOf _ cont_fn _) = cont_fn expr
-
----------------------------------------------------------
 --	ApplyTo continuation
+rebuild expr cont@(ApplyTo _ arg se cont')
+  = setSubstEnv se (simplExpr arg)	`thenSmpl` \ arg' ->
+    rebuild (App expr arg') cont'
 
-do_rebuild expr cont@(ApplyTo _ arg se cont')
-  = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
-    do_rebuild (App expr arg') cont'
-
-
----------------------------------------------------------
 --	Coerce continuation
+rebuild expr (CoerceIt to_ty cont)
+  = rebuild (mkCoerce to_ty expr) cont
 
-do_rebuild expr (CoerceIt _ to_ty se cont)
-  = setSubstEnv se	$
-    simplType to_ty	`thenSmpl` \ to_ty' ->
-    do_rebuild (mk_coerce to_ty' expr) cont
+--	Inline continuation
+rebuild expr (InlinePlease cont)
+  = rebuild (Note InlineCall expr) cont
 
-
----------------------------------------------------------
 -- 	Case of known constructor or literal
-
-do_rebuild expr@(Con con args) cont@(Select _ _ _ _ _)
+rebuild expr@(Con con args) (Select _ bndr alts se cont)
   | conOkForAlt con	-- Knocks out PrimOps and NoRepLits
-  = knownCon expr con args cont
-
-
----------------------------------------------------------
+  = knownCon expr con args bndr alts se cont
 
 --	Case of other value (e.g. a partial application or lambda)
 --	Turn it back into a let
-
-do_rebuild expr (Select _ bndr ((DEFAULT, bs, rhs):alts) se cont)
-  | case mkFormSummary expr of { ValueForm -> True; other -> False }
+rebuild scrut (Select _ bndr ((DEFAULT, bs, rhs):alts) se cont)
+  |  isUnLiftedType (idType bndr) && exprOkForSpeculation scrut
+  || exprIsWHNF scrut
   = ASSERT( null bs && null alts )
-    tick Case2Let		`thenSmpl_`
-    setSubstEnv se 		(
-    completeBindNonRec bndr expr 	$
-    simplExprB rhs cont
-    )
+    setSubstEnv se			$			
+    simplBinder bndr			$ \ bndr' ->
+    completeBinding bndr bndr' scrut 	$
+    simplExprF rhs cont
 
 
 ---------------------------------------------------------
 -- 	The other Select cases
 
-do_rebuild scrut (Select _ bndr alts se cont)
-  = getSwitchChecker					`thenSmpl` \ chkr ->
-
-    if all (cheapEqExpr rhs1) other_rhss
-       && inlineCase bndr scrut
-       && all binders_unused alts
-       && switchIsOn chkr SimplDoCaseElim
-    then
-  	-- Get rid of the case altogether
+rebuild scrut (Select _ bndr alts se cont)
+  | all (cheapEqExpr rhs1) other_rhss
+    && inlineCase bndr scrut
+    && all binders_unused alts
+    && opt_SimplDoCaseElim
+  =   	-- Get rid of the case altogether
 	-- See the extensive notes on case-elimination below
 	-- Remember to bind the binder though!
-	    tick  CaseElim		`thenSmpl_`
+	    tick (CaseElim bndr)		`thenSmpl_`
 	    setSubstEnv se			(
-	    extendIdSubst bndr (Done scrut)	$
-	    simplExprB rhs1 cont
+	    extendSubst bndr (DoneEx scrut)	$
+	    simplExprF rhs1 cont
 	    )
-
-    else
-	rebuild_case chkr scrut bndr alts se cont
+  | otherwise
+  = rebuild_case scrut bndr alts se cont
   where
     (rhs1:other_rhss)		 = [rhs | (_,_,rhs) <- alts]
     binders_unused (_, bndrs, _) = all isDeadBinder bndrs
@@ -1204,90 +1130,15 @@ So the case-elimination algorithm is:
 If so, then we can replace the case with one of the rhss.
 
 
-\begin{code}
----------------------------------------------------------
---	Rebuiling a function with strictness info
---	This just a version of do_rebuild, enhanced with info about
---	the strictness of the thing being rebuilt.
-
-rebuild_strict :: [Demand] -> Bool 	-- Stricness info
-	       -> OutExpr -> OutType	-- Function and type
-	       -> SimplCont		-- Continuation
-	       -> SimplM OutExprStuff
-
-rebuild_strict [] True  fun fun_ty cont = rebuild_bot fun fun_ty cont
-rebuild_strict [] False fun fun_ty cont = do_rebuild fun cont
-
-rebuild_strict ds result_bot fun fun_ty (CoerceIt _ to_ty se cont)
-	= setSubstEnv se	$
-	  simplType to_ty	`thenSmpl` \ to_ty' ->
-	  rebuild_strict ds result_bot (mk_coerce to_ty' fun) to_ty' cont
-
-rebuild_strict ds result_bot fun fun_ty (ApplyTo _ (Type ty_arg) se cont)
-				-- Type arg; don't consume a demand
-	= setSubstEnv se (simplType ty_arg)	`thenSmpl` \ ty_arg' ->
-	  rebuild_strict ds result_bot (App fun (Type ty_arg')) 
-			 (applyTy fun_ty ty_arg') cont
-
-rebuild_strict (d:ds) result_bot fun fun_ty (ApplyTo _ val_arg se cont)
-	| isStrict d || isUnLiftedType arg_ty
-				-- Strict value argument
-	= getInScope 				`thenSmpl` \ in_scope ->
-	  let
-		cont_ty = contResultType in_scope res_ty cont
-	  in
- 	  setSubstEnv se (simplExprB val_arg (ArgOf NoDup cont_fn cont_ty))
-
-	| otherwise  				-- Lazy value argument
-	= setSubstEnv se (simplArg val_arg)	`thenSmpl` \ val_arg' ->
-	  cont_fn val_arg'
-
-	where
-	  Just (arg_ty, res_ty) = splitFunTy_maybe fun_ty
-	  cont_fn arg'          = rebuild_strict ds result_bot 
-						 (App fun arg') res_ty
-						 cont
-
-rebuild_strict ds result_bot fun fun_ty cont = do_rebuild fun cont
-
----------------------------------------------------------
--- 	Dealing with
---	* case (error "hello") of { ... }
---	* (error "Hello") arg
---	* f (error "Hello") where f is strict
---	etc
-
-rebuild_bot expr expr_ty Stop				-- No coerce needed
-  = rebuild_done expr
-
-rebuild_bot expr expr_ty (CoerceIt _ to_ty se Stop)	-- Don't "tick" on this,
-							-- else simplifier never stops
-  = setSubstEnv se	$
-    simplType to_ty	`thenSmpl` \ to_ty' ->
-    rebuild_done (mkNote (Coerce to_ty' expr_ty) expr)
-
-rebuild_bot expr expr_ty cont				-- Abandon the (strict) continuation,
-							-- and just return expr
-  = tick CaseOfError		`thenSmpl_`
-    getInScope			`thenSmpl` \ in_scope ->
-    let
-	result_ty = contResultType in_scope expr_ty cont
-    in
-    rebuild_done (mkNote (Coerce result_ty expr_ty) expr)
-
-mk_coerce to_ty (Note (Coerce _ from_ty) expr) = Note (Coerce to_ty from_ty) expr
-mk_coerce to_ty expr			       = Note (Coerce to_ty (coreExprType expr)) expr
-\end{code}
-
 Blob of helper functions for the "case-of-something-else" situation.
 
 \begin{code}
 ---------------------------------------------------------
 -- 	Case of something else
 
-rebuild_case sw_chkr scrut case_bndr alts se cont
+rebuild_case scrut case_bndr alts se cont
   = 	-- Prepare case alternatives
-    prepareCaseAlts (splitTyConApp_maybe (idType case_bndr))
+    prepareCaseAlts case_bndr (splitTyConApp_maybe (idType case_bndr))
 		    scrut_cons alts		`thenSmpl` \ better_alts ->
     
 	-- Set the new subst-env in place (before dealing with the case binder)
@@ -1309,7 +1160,7 @@ rebuild_case sw_chkr scrut case_bndr alts se cont
     simplAlts zap_occ_info scrut_cons 
 	      case_bndr'' better_alts cont'	`thenSmpl` \ alts' ->
 
-    mkCase sw_chkr scrut case_bndr'' alts'	`thenSmpl` \ case_expr ->
+    mkCase scrut case_bndr'' alts'		`thenSmpl` \ case_expr ->
     rebuild_done case_expr	
   where
 	-- scrut_cons tells what constructors the scrutinee can't possibly match
@@ -1320,32 +1171,38 @@ rebuild_case sw_chkr scrut case_bndr alts se cont
 		   other -> []
 
 
-knownCon expr con args (Select _ bndr alts se cont)
-  = tick KnownBranch		`thenSmpl_`
-    setSubstEnv se 		(
+knownCon expr con args bndr alts se cont
+  = tick (KnownBranch bndr)	`thenSmpl_`
+    setSubstEnv se		(
+    simplBinder bndr		$ \ bndr' ->
     case findAlt con alts of
 	(DEFAULT, bs, rhs)     -> ASSERT( null bs )
-				  completeBindNonRec bndr expr $
-			          simplExprB rhs cont
+				  completeBinding bndr bndr' expr $
+					-- Don't use completeBeta here.  The expr might be
+					-- an unboxed literal, like 3, or a variable
+					-- whose unfolding is an unboxed literal... and
+					-- completeBeta will just construct another case
+					-- expression!
+			          simplExprF rhs cont
 
 	(Literal lit, bs, rhs) -> ASSERT( null bs )
-				  extendIdSubst bndr (Done expr)	$
+				  extendSubst bndr (DoneEx expr)	$
 					-- Unconditionally substitute, because expr must
 					-- be a variable or a literal.  It can't be a
 					-- NoRep literal because they don't occur in
 					-- case patterns.
-				  simplExprB rhs cont
+				  simplExprF rhs cont
 
-	(DataCon dc, bs, rhs)  -> completeBindNonRec bndr expr 		$
-				  extend bs real_args			$
-			          simplExprB rhs cont
+	(DataCon dc, bs, rhs)  -> ASSERT( length bs == length real_args )
+				  completeBinding bndr bndr' expr	$
+					-- See note above
+				  extendSubstList bs (map mk real_args) $
+			          simplExprF rhs cont
 			       where
-				  real_args = drop (dataConNumInstArgs dc) args
+				  real_args    = drop (dataConNumInstArgs dc) args
+				  mk (Type ty) = DoneTy ty
+				  mk other     = DoneEx other
     )
-  where
-    extend []     []	     thing_inside = thing_inside
-    extend (b:bs) (arg:args) thing_inside = extendIdSubst b (Done arg)	$
-					    extend bs args thing_inside
 \end{code}
 
 \begin{code}
@@ -1372,7 +1229,7 @@ variables!  Example:
 Here, b and p are dead.  But when we move the argment inside the first
 case RHS, and eliminate the second case, we get
 
-	case x or { (a,b) -> a b
+	case x or { (a,b) -> a b }
 
 Urk! b is alive!  Reason: the scrutinee was a variable, and case elimination
 happened.  Hence the zap_occ_info function returned by substForVarScrut
@@ -1405,12 +1262,12 @@ prepareCaseAlts does two things:
     when rhs also scrutinises x or e.
 
 \begin{code}
-prepareCaseAlts (Just (tycon, inst_tys)) scrut_cons alts
+prepareCaseAlts bndr (Just (tycon, inst_tys)) scrut_cons alts
   | isDataTyCon tycon
   = case (findDefault filtered_alts, missing_cons) of
 
 	((alts_no_deflt, Just rhs), [data_con]) 	-- Just one missing constructor!
-		-> tick FillInCaseDefault	`thenSmpl_`
+		-> tick (FillInCaseDefault bndr)	`thenSmpl_`
 		   let
 			(_,_,ex_tyvars,_,_,_) = dataConSig data_con
 		   in
@@ -1437,7 +1294,7 @@ prepareCaseAlts (Just (tycon, inst_tys)) scrut_cons alts
 			[data_con | (DataCon data_con, _, _) <- filtered_alts]
 
 -- The default case
-prepareCaseAlts _ scrut_cons alts
+prepareCaseAlts _ _ scrut_cons alts
   = returnSmpl alts			-- Functions
 
 
@@ -1456,8 +1313,8 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 	=	-- In the default case we record the constructors that the
 		-- case-binder *can't* be.
 		-- We take advantage of any OtherCon info in the case scrutinee
-	  modifyInScope (case_bndr'' `setIdUnfolding` OtherCon handled_cons)	$
-	  simplExpr rhs cont'							`thenSmpl` \ rhs' ->
+	  modifyInScope (case_bndr'' `setIdUnfolding` OtherCon handled_cons)	$ 
+	  simplExprC rhs cont'							`thenSmpl` \ rhs' ->
 	  returnSmpl (DEFAULT, [], rhs')
 
     simpl_alt (con, vs, rhs)
@@ -1471,7 +1328,7 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 		con_app = Con con (map Type inst_tys' ++ map varToCoreExpr vs')
 	  in
 	  modifyInScope (case_bndr'' `setIdUnfolding` mkUnfolding con_app)	$
-	  simplExpr rhs cont'		`thenSmpl` \ rhs' ->
+	  simplExprC rhs cont'		`thenSmpl` \ rhs' ->
 	  returnSmpl (con, vs', rhs')
 
 
@@ -1484,22 +1341,17 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 	-- We really must record that b is already evaluated so that we don't
 	-- go and re-evaluate it when constructing the result.
 
-    add_evals (DataCon dc) vs = cat_evals vs (dataConStrictMarks dc)
+    add_evals (DataCon dc) vs = cat_evals vs (dataConRepStrictness dc)
     add_evals other_con    vs = vs
 
     cat_evals [] [] = []
     cat_evals (v:vs) (str:strs)
-	| isTyVar v = v : cat_evals vs (str:strs)
-	| otherwise = 
-	   case str of
-		MarkedStrict    -> 
-		  (zap_occ_info v `setIdUnfolding` OtherCon [])	
-			: cat_evals vs strs
-		MarkedUnboxed con _ -> 
-		  cat_evals (v:vs) (dataConStrictMarks con ++ strs)
-		NotMarkedStrict -> zap_occ_info v : cat_evals vs strs
+	| isTyVar v    = v				   : cat_evals vs (str:strs)
+	| isStrict str = (v' `setIdUnfolding` OtherCon []) : cat_evals vs strs
+	| otherwise    = v'				   : cat_evals vs strs
+	where
+	  v' = zap_occ_info v
 \end{code}
-
 
 
 %************************************************************************
@@ -1517,25 +1369,28 @@ mkDupableCont ty cont thing_inside
   | contIsDupable cont
   = thing_inside cont
 
-mkDupableCont _ (CoerceIt _ ty se cont) thing_inside
+mkDupableCont _ (CoerceIt ty cont) thing_inside
   = mkDupableCont ty cont		$ \ cont' ->
-    thing_inside (CoerceIt OkToDup ty se cont')
+    thing_inside (CoerceIt ty cont')
 
-mkDupableCont join_arg_ty (ArgOf _ cont_fn res_ty) thing_inside
+mkDupableCont ty (InlinePlease cont) thing_inside
+  = mkDupableCont ty cont		$ \ cont' ->
+    thing_inside (InlinePlease cont')
+
+mkDupableCont join_arg_ty (ArgOf _ cont_ty cont_fn) thing_inside
   = 	-- Build the RHS of the join point
     simplType join_arg_ty				`thenSmpl` \ join_arg_ty' ->
     newId join_arg_ty'					( \ arg_id ->
     	getSwitchChecker				`thenSmpl` \ chkr ->
 	cont_fn (Var arg_id)				`thenSmpl` \ (binds, (_, rhs)) ->
-	returnSmpl (Lam arg_id (mkLetBinds binds rhs))
+	returnSmpl (Lam arg_id (mkLets binds rhs))
     )							`thenSmpl` \ join_rhs ->
    
 	-- Build the join Id and continuation
     newId (coreExprType join_rhs)		$ \ join_id ->
     let
-	new_cont = ArgOf OkToDup
+	new_cont = ArgOf OkToDup cont_ty
 			 (\arg' -> rebuild_done (App (Var join_id) arg'))
-			 res_ty
     in
 	
 	-- Do the thing inside
@@ -1544,7 +1399,7 @@ mkDupableCont join_arg_ty (ArgOf _ cont_fn res_ty) thing_inside
 
 mkDupableCont ty (ApplyTo _ arg se cont) thing_inside
   = mkDupableCont (funResultTy ty) cont 		$ \ cont' ->
-    setSubstEnv se (simplArg arg)			`thenSmpl` \ arg' ->
+    setSubstEnv se (simplExpr arg)			`thenSmpl` \ arg' ->
     if exprIsDupable arg' then
 	thing_inside (ApplyTo OkToDup arg' emptySubstEnv cont')
     else
@@ -1553,40 +1408,44 @@ mkDupableCont ty (ApplyTo _ arg se cont) thing_inside
     returnSmpl (addBind (NonRec bndr arg') res)
 
 mkDupableCont ty (Select _ case_bndr alts se cont) thing_inside
-  = tick CaseOfCase						`thenSmpl_` (
-    setSubstEnv se	(
-	simplBinder case_bndr					$ \ case_bndr' ->
-	prepareCaseCont alts cont				$ \ cont' ->
-	mapAndUnzipSmpl (mkDupableAlt case_bndr' cont') alts	`thenSmpl` \ (alt_binds_s, alts') ->
-	returnSmpl (concat alt_binds_s, (case_bndr', alts'))
-    )					`thenSmpl` \ (alt_binds, (case_bndr', alts')) ->
+  = tick (CaseOfCase case_bndr)						`thenSmpl_`
+    setSubstEnv se (
+	simplBinder case_bndr						$ \ case_bndr' ->
+	prepareCaseCont alts cont					$ \ cont' ->
+	mapAndUnzipSmpl (mkDupableAlt case_bndr case_bndr' cont') alts	`thenSmpl` \ (alt_binds_s, alts') ->
+	returnSmpl (concat alt_binds_s, alts')
+    )					`thenSmpl` \ (alt_binds, alts') ->
 
-    extendInScopes [b | NonRec b _ <- alt_binds]			$
-    thing_inside (Select OkToDup case_bndr' alts' emptySubstEnv Stop)	`thenSmpl` \ res ->
+    extendInScopes [b | NonRec b _ <- alt_binds]		$
+
+	-- NB that the new alternatives, alts', are still InAlts, using the original
+	-- binders.  That means we can keep the case_bndr intact. This is important
+	-- because another case-of-case might strike, and so we want to keep the
+	-- info that the case_bndr is dead (if it is, which is often the case).
+	-- This is VITAL when the type of case_bndr is an unboxed pair (often the
+	-- case in I/O rich code.  We aren't allowed a lambda bound
+	-- arg of unboxed tuple type, and indeed such a case_bndr is always dead
+    thing_inside (Select OkToDup case_bndr alts' se (Stop (contResultType cont)))	`thenSmpl` \ res ->
+
     returnSmpl (addBinds alt_binds res)
-    )
 
-mkDupableAlt :: OutId -> SimplCont -> InAlt -> SimplM (OutStuff CoreAlt)
-mkDupableAlt case_bndr' cont alt@(con, bndrs, rhs)
-  = simplBinders bndrs					$ \ bndrs' ->
-    simplExpr rhs cont					`thenSmpl` \ rhs' ->
-    if exprIsDupable rhs' then
-	-- It's small, so don't bother to let-bind it
-	returnSmpl ([], (con, bndrs', rhs'))
-    else
-	-- It's big, so let-bind it
+
+mkDupableAlt :: InId -> OutId -> SimplCont -> InAlt -> SimplM (OutStuff InAlt)
+mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
+  =	-- Not worth checking whether the rhs is small; the
+	-- inliner will inline it if so.
+    simplBinders bndrs					$ \ bndrs' ->
+    simplExprC rhs cont					`thenSmpl` \ rhs' ->
     let
 	rhs_ty' = coreExprType rhs'
-        used_bndrs' = filter (not . isDeadBinder) (case_bndr' : bndrs')
+        (used_bndrs, used_bndrs')
+	   = unzip [pr | pr@(bndr,bndr') <- zip (case_bndr  : bndrs)
+						(case_bndr' : bndrs'),
+			 not (isDeadBinder bndr)]
+		-- The new binders have lost their occurrence info,
+		-- so we have to extract it from the old ones
     in
-    ( if null used_bndrs' && isUnLiftedType rhs_ty'
-	then newId realWorldStatePrimTy  $ \ rw_id ->
-	     returnSmpl ([rw_id], [varToCoreExpr realWorldPrimId])
-	else 
-	     returnSmpl (used_bndrs', map varToCoreExpr used_bndrs')
-    )
-	`thenSmpl` \ (final_bndrs', final_args) ->
-
+    ( if null used_bndrs' 
 	-- If we try to lift a primitive-typed something out
 	-- for let-binding-purposes, we will *caseify* it (!),
 	-- with potentially-disastrous strictness results.  So
@@ -1598,7 +1457,23 @@ mkDupableAlt case_bndr' cont alt@(con, bndrs, rhs)
 	-- case_bndr to all the join points if it's used in *any* RHS,
 	-- because we don't know its usage in each RHS separately
 
+	-- We used to say "&& isUnLiftedType rhs_ty'" here, but now
+	-- we make the join point into a function whenever used_bndrs'
+	-- is empty.  This makes the join-point more CPR friendly. 
+	-- Consider:	let j = if .. then I# 3 else I# 4
+	--		in case .. of { A -> j; B -> j; C -> ... }
+	--
+	-- Now CPR should not w/w j because it's a thunk, so
+	-- that means that the enclosing function can't w/w either,
+	-- which is a BIG LOSE.  This actually happens in practice
+	then newId realWorldStatePrimTy  $ \ rw_id ->
+	     returnSmpl ([rw_id], [Var realWorldPrimId])
+	else 
+	     returnSmpl (used_bndrs', map varToCoreExpr used_bndrs)
+    )
+	`thenSmpl` \ (final_bndrs', final_args) ->
+
     newId (foldr (mkFunTy . idType) rhs_ty' final_bndrs')	$ \ join_bndr ->
     returnSmpl ([NonRec join_bndr (mkLams final_bndrs' rhs')],
-		(con, bndrs', mkApps (Var join_bndr) final_args))
+		(con, bndrs, mkApps (Var join_bndr) final_args))
 \end{code}

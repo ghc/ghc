@@ -5,30 +5,18 @@
 
 \begin{code}
 module PrelInfo (
+	module ThinAir,
+	module MkId,
+
 	builtinNames, 	-- Names of things whose *unique* must be known, but 
 			-- that is all. If something is in here, you know that
 			-- if it's used at all then it's Name will be just as
 			-- it is here, unique and all.  Includes all the 
-			-- wired-in names.
-
-	thinAirIdNames,	-- Names of non-wired-in Ids that may be used out of
-	setThinAirIds,	-- thin air in any compilation. If they are not wired in
-	thinAirModules,	-- we must be sure to import them from some Prelude 
-			-- interface file even if they are not overtly 
-			-- mentioned.  Subset of builtinNames.
-	noRepIntegerIds,
-	noRepStrIds,
 
 	derivingOccurrences, 	-- For a given class C, this tells what other 
 				-- things are needed as a result of a 
 				-- deriving(C) clause
 
-
-	-- Here are the thin-air Ids themselves
-	addr2IntegerId,
-	packStringForCId, unpackCStringId, unpackCString2Id,
-	unpackCStringAppendId, unpackCStringFoldrId,
-	foldrId,
 
 	-- Random other things
 	main_NAME, ioTyCon_NAME,
@@ -69,11 +57,13 @@ module PrelInfo (
 #include "HsVersions.h"
 
 
+
 -- friends:
+import ThinAir		-- Re-export all these
+import MkId		-- Ditto
+
 import PrelMods		-- Prelude module names
-import PrelVals		-- VALUES
-import MkId		( mkPrimitiveId )
-import PrimOp		( PrimOp(..), allThePrimOps )
+import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName )
 import DataCon		( DataCon )
 import PrimRep		( PrimRep(..) )
 import TysPrim		-- TYPES
@@ -84,6 +74,7 @@ import RdrName		( RdrName, mkPreludeQual )
 import Var		( varUnique, Id )
 import Name		( Name, OccName, Provenance(..), 
 			  NameSpace, tcName, clsName, varName, dataName,
+			  mkKnownKeyGlobal,
 			  getName, mkGlobalName, nameRdrName, systemProvenance
 			)
 import RdrName		( rdrNameModule, rdrNameOcc, mkSrcQual )
@@ -92,11 +83,9 @@ import TyCon		( tyConDataCons, TyCon )
 import Type		( funTyCon )
 import Bag
 import Unique		-- *Key stuff
-import UniqFM		( UniqFM, listToUFM, lookupWithDefaultUFM ) 
+import UniqFM		( UniqFM, listToUFM )
 import Util		( isIn )
 import Panic		( panic )
-
-import IOExts
 \end{code}
 
 %************************************************************************
@@ -116,7 +105,7 @@ builtinNames
 	  unionManyBags (map getTyConNames wired_in_tycons)
 
 		-- Wired in Ids
-	, listToBag (map getName wired_in_ids)
+	, listToBag (map getName wiredInIds)
 
 		-- PrimOps
 	, listToBag (map (getName . mkPrimitiveId) allThePrimOps)
@@ -199,115 +188,6 @@ data_tycons
 
 %************************************************************************
 %*									*
-\subsection{Wired in Ids}
-%*									*
-%************************************************************************
-
-\begin{code}
-wired_in_ids
-  = [ 	-- These error-y things are wired in because we don't yet have
-	-- a way to express in an interface file that the result type variable
-	-- is 'open'; that is can be unified with an unboxed type
-	-- 
-	-- [The interface file format now carry such information, but there's
-	--  no way yet of expressing at the definition site for these error-reporting
-	--  functions that they have an 'open' result type. -- sof 1/99]
-	-- 
-      aBSENT_ERROR_ID
-    , eRROR_ID
-    , iRREFUT_PAT_ERROR_ID
-    , nON_EXHAUSTIVE_GUARDS_ERROR_ID
-    , nO_METHOD_BINDING_ERROR_ID
-    , pAR_ERROR_ID
-    , pAT_ERROR_ID
-    , rEC_CON_ERROR_ID
-    , rEC_UPD_ERROR_ID
-
-	-- These three can't be defined in Haskell
-    , realWorldPrimId
-    , unsafeCoerceId
-    , getTagId
-    ]
-
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Thin air entities}
-%*									*
-%************************************************************************
-
-These are Ids that we need to reference in various parts of the
-system, and we'd like to pull them out of thin air rather than pass
-them around.  We'd also like to have all the IdInfo available for each
-one: i.e. everything that gets pulled out of the interface file.
-
-The solution is to generate this map of global Ids after the
-typechecker, and assign it to a global variable.  Any subsequent
-pass may refer to the map to pull Ids out.  Any invalid
-(i.e. pre-typechecker) access to the map will result in a panic.
-
-\begin{code}
-thinAirIdNames 
-  = map mkKnownKeyGlobal
-    [
-	-- Needed for converting literals to Integers (used in tidyCoreExpr)
-      (varQual pREL_BASE SLIT("addr2Integer"), addr2IntegerIdKey)
-
-	-- String literals
-    , (varQual pREL_PACK SLIT("packCString#"),   packCStringIdKey)
-    , (varQual pREL_PACK SLIT("unpackCString#"), unpackCStringIdKey)
-    , (varQual pREL_PACK SLIT("unpackNBytes#"),  unpackCString2IdKey)
-    , (varQual pREL_PACK SLIT("unpackAppendCString#"), unpackCStringAppendIdKey)
-    , (varQual pREL_PACK SLIT("unpackFoldrCString#"),  unpackCStringFoldrIdKey)
-
-	-- Folds; introduced by desugaring list comprehensions
-    , (varQual pREL_BASE SLIT("foldr"), foldrIdKey)
-    ]
-
-thinAirModules = [pREL_PACK]	-- See notes with RnIfaces.findAndReadIface
-
-noRepIntegerIds = [addr2IntegerId]
-
-noRepStrIds = [unpackCString2Id, unpackCStringId]
-
-addr2IntegerId = lookupThinAirId addr2IntegerIdKey
-
-packStringForCId = lookupThinAirId packCStringIdKey
-unpackCStringId  = lookupThinAirId unpackCStringIdKey
-unpackCString2Id = lookupThinAirId unpackCString2IdKey 
-unpackCStringAppendId = lookupThinAirId unpackCStringAppendIdKey 
-unpackCStringFoldrId  = lookupThinAirId unpackCStringFoldrIdKey 
-
-foldrId = lookupThinAirId foldrIdKey
-\end{code}
-
-
-\begin{code}
-\end{code}
-
-\begin{code}
-thinAirIdMapRef :: IORef (UniqFM Id)
-thinAirIdMapRef = unsafePerformIO (newIORef (panic "thinAirIdMap: still empty"))
-
-setThinAirIds :: [Id] -> IO ()
-setThinAirIds thin_air_ids
-  = writeIORef thinAirIdMapRef the_map
-  where
-    the_map = listToUFM [(varUnique id, id) | id <- thin_air_ids]
-
-thinAirIdMap :: UniqFM Id
-thinAirIdMap = unsafePerformIO (readIORef thinAirIdMapRef)
-  -- Read it just once, the first time someone tugs on thinAirIdMap
-
-lookupThinAirId :: Unique -> Id
-lookupThinAirId uniq = lookupWithDefaultUFM thinAirIdMap
-			(panic "lookupThinAirId: no mapping") uniq 
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Built-in keys}
 %*									*
 %************************************************************************
@@ -315,11 +195,6 @@ lookupThinAirId uniq = lookupWithDefaultUFM thinAirIdMap
 Ids, Synonyms, Classes and ClassOps with builtin keys. 
 
 \begin{code}
-mkKnownKeyGlobal :: (RdrName, Unique) -> Name
-mkKnownKeyGlobal (rdr_name, uniq)
-  = mkGlobalName uniq (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
-		 systemProvenance
-
 ioTyCon_NAME	  = mkKnownKeyGlobal (ioTyCon_RDR,       ioTyConKey)
 main_NAME	  = mkKnownKeyGlobal (main_RDR,	         mainKey)
 
@@ -396,6 +271,8 @@ knownKeyNames
     , (concat_RDR,		concatIdKey)
     , (filter_RDR,		filterIdKey)
     , (zip_RDR,			zipIdKey)
+    , (build_RDR,		buildIdKey)
+    , (augment_RDR,		augmentIdKey)
 
 	-- FFI primitive types that are not wired-in.
     , (int8TyCon_RDR,           int8TyConKey)
@@ -410,6 +287,7 @@ knownKeyNames
 	-- Others
     , (otherwiseId_RDR,		otherwiseIdKey)
     , (assert_RDR,		assertIdKey)
+    , (runSTRep_RDR,		runSTRepIdKey)
     ]
 \end{code}
 
@@ -432,146 +310,170 @@ These RdrNames are not really "built in", but some parts of the compiler
 to write them all down in one place.
 
 \begin{code}
-prelude_primop op = nameRdrName (getName (mkPrimitiveId op))
-
-main_RDR		= varQual mAIN      SLIT("main")
-otherwiseId_RDR 	= varQual pREL_BASE SLIT("otherwise")
+main_RDR		= varQual mAIN_Name      SLIT("main")
+otherwiseId_RDR 	= varQual pREL_BASE_Name SLIT("otherwise")
 
 intTyCon_RDR		= nameRdrName (getName intTyCon)
-ioTyCon_RDR		= tcQual   pREL_IO_BASE SLIT("IO")
-ioDataCon_RDR  	   	= dataQual pREL_IO_BASE SLIT("IO")
-bindIO_RDR	        = varQual  pREL_IO_BASE SLIT("bindIO")
+ioTyCon_RDR		= tcQual   pREL_IO_BASE_Name SLIT("IO")
+ioDataCon_RDR  	   	= dataQual pREL_IO_BASE_Name SLIT("IO")
+bindIO_RDR	        = varQual  pREL_IO_BASE_Name SLIT("bindIO")
 
-orderingTyCon_RDR	= tcQual   pREL_BASE SLIT("Ordering")
-rationalTyCon_RDR	= tcQual   pREL_NUM  SLIT("Rational")
-ratioTyCon_RDR		= tcQual   pREL_NUM  SLIT("Ratio")
-ratioDataCon_RDR	= dataQual pREL_NUM  SLIT(":%")
+orderingTyCon_RDR	= tcQual   pREL_BASE_Name SLIT("Ordering")
+rationalTyCon_RDR	= tcQual   pREL_NUM_Name  SLIT("Rational")
+ratioTyCon_RDR		= tcQual   pREL_NUM_Name  SLIT("Ratio")
+ratioDataCon_RDR	= dataQual pREL_NUM_Name  SLIT(":%")
 
-byteArrayTyCon_RDR		= tcQual pREL_ARR  SLIT("ByteArray")
-mutableByteArrayTyCon_RDR	= tcQual pREL_ARR  SLIT("MutableByteArray")
+byteArrayTyCon_RDR		= tcQual pREL_ARR_Name  SLIT("ByteArray")
+mutableByteArrayTyCon_RDR	= tcQual pREL_ARR_Name  SLIT("MutableByteArray")
 
-foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE SLIT("ForeignObj")
-stablePtrTyCon_RDR	= tcQual   pREL_STABLE SLIT("StablePtr")
-stablePtrDataCon_RDR	= dataQual pREL_STABLE SLIT("StablePtr")
-deRefStablePtr_RDR      = varQual  pREL_STABLE SLIT("deRefStablePtr")
-makeStablePtr_RDR       = varQual  pREL_STABLE SLIT("makeStablePtr")
+foreignObjTyCon_RDR	= tcQual   pREL_IO_BASE_Name SLIT("ForeignObj")
+stablePtrTyCon_RDR	= tcQual   pREL_STABLE_Name SLIT("StablePtr")
+stablePtrDataCon_RDR	= dataQual pREL_STABLE_Name SLIT("StablePtr")
+deRefStablePtr_RDR      = varQual  pREL_STABLE_Name SLIT("deRefStablePtr")
+makeStablePtr_RDR       = varQual  pREL_STABLE_Name SLIT("makeStablePtr")
 
-eqClass_RDR		= clsQual pREL_BASE SLIT("Eq")
-ordClass_RDR		= clsQual pREL_BASE SLIT("Ord")
-boundedClass_RDR	= clsQual pREL_BASE SLIT("Bounded")
-numClass_RDR		= clsQual pREL_BASE SLIT("Num")
-enumClass_RDR 		= clsQual pREL_BASE SLIT("Enum")
-monadClass_RDR		= clsQual pREL_BASE SLIT("Monad")
-monadPlusClass_RDR	= clsQual pREL_BASE SLIT("MonadPlus")
-functorClass_RDR	= clsQual pREL_BASE SLIT("Functor")
-showClass_RDR		= clsQual pREL_BASE SLIT("Show")
-realClass_RDR		= clsQual pREL_NUM  SLIT("Real")
-integralClass_RDR	= clsQual pREL_NUM  SLIT("Integral")
-fractionalClass_RDR	= clsQual pREL_NUM  SLIT("Fractional")
-floatingClass_RDR	= clsQual pREL_NUM  SLIT("Floating")
-realFracClass_RDR	= clsQual pREL_NUM  SLIT("RealFrac")
-realFloatClass_RDR	= clsQual pREL_NUM  SLIT("RealFloat")
-readClass_RDR		= clsQual pREL_READ SLIT("Read")
-ixClass_RDR		= clsQual iX	    SLIT("Ix")
-ccallableClass_RDR	= clsQual pREL_GHC  SLIT("CCallable")
-creturnableClass_RDR	= clsQual pREL_GHC  SLIT("CReturnable")
+-- Random PrelBase data constructors
+mkInt_RDR	   = dataQual pREL_BASE_Name SLIT("I#")
+false_RDR	   = dataQual pREL_BASE_Name SLIT("False")
+true_RDR	   = dataQual pREL_BASE_Name SLIT("True")
 
-fromInt_RDR	   = varQual pREL_BASE SLIT("fromInt")
-fromInteger_RDR	   = varQual pREL_BASE SLIT("fromInteger")
-minus_RDR	   = varQual pREL_BASE SLIT("-")
-succ_RDR	   = varQual pREL_BASE SLIT("succ")
-pred_RDR	   = varQual pREL_BASE SLIT("pred")
-toEnum_RDR	   = varQual pREL_BASE SLIT("toEnum")
-fromEnum_RDR	   = varQual pREL_BASE SLIT("fromEnum")
-enumFrom_RDR	   = varQual pREL_BASE SLIT("enumFrom")
-enumFromTo_RDR	   = varQual pREL_BASE SLIT("enumFromTo")
-enumFromThen_RDR   = varQual pREL_BASE SLIT("enumFromThen")
-enumFromThenTo_RDR = varQual pREL_BASE SLIT("enumFromThenTo")
+-- Random PrelBase functions
+and_RDR		   = varQual pREL_BASE_Name SLIT("&&")
+not_RDR		   = varQual pREL_BASE_Name SLIT("not")
+compose_RDR	   = varQual pREL_BASE_Name SLIT(".")
+append_RDR	   = varQual pREL_BASE_Name SLIT("++")
+map_RDR		   = varQual pREL_BASE_Name SLIT("map")
+build_RDR	   = varQual pREL_BASE_Name SLIT("build")
+augment_RDR	   = varQual pREL_BASE_Name SLIT("augment")
 
-thenM_RDR	   = varQual pREL_BASE SLIT(">>=")
-returnM_RDR	   = varQual pREL_BASE SLIT("return")
-failM_RDR	   = varQual pREL_BASE SLIT("fail")
+-- Classes Eq and Ord
+eqClass_RDR		= clsQual pREL_BASE_Name SLIT("Eq")
+ordClass_RDR		= clsQual pREL_BASE_Name SLIT("Ord")
+eq_RDR		   = varQual pREL_BASE_Name SLIT("==")
+ne_RDR		   = varQual pREL_BASE_Name SLIT("/=")
+le_RDR		   = varQual pREL_BASE_Name SLIT("<=")
+lt_RDR		   = varQual pREL_BASE_Name SLIT("<")
+ge_RDR		   = varQual pREL_BASE_Name SLIT(">=")
+gt_RDR		   = varQual pREL_BASE_Name SLIT(">")
+ltTag_RDR	   = dataQual pREL_BASE_Name SLIT("LT")
+eqTag_RDR	   = dataQual pREL_BASE_Name SLIT("EQ")
+gtTag_RDR	   = dataQual pREL_BASE_Name SLIT("GT")
+max_RDR		   = varQual pREL_BASE_Name SLIT("max")
+min_RDR		   = varQual pREL_BASE_Name SLIT("min")
+compare_RDR	   = varQual pREL_BASE_Name SLIT("compare")
 
-fromRational_RDR   = varQual pREL_NUM  SLIT("fromRational")
-negate_RDR	   = varQual pREL_BASE SLIT("negate")
-eq_RDR		   = varQual pREL_BASE SLIT("==")
-ne_RDR		   = varQual pREL_BASE SLIT("/=")
-le_RDR		   = varQual pREL_BASE SLIT("<=")
-lt_RDR		   = varQual pREL_BASE SLIT("<")
-ge_RDR		   = varQual pREL_BASE SLIT(">=")
-gt_RDR		   = varQual pREL_BASE SLIT(">")
-ltTag_RDR	   = dataQual pREL_BASE SLIT("LT")
-eqTag_RDR	   = dataQual pREL_BASE SLIT("EQ")
-gtTag_RDR	   = dataQual pREL_BASE SLIT("GT")
-max_RDR		   = varQual pREL_BASE SLIT("max")
-min_RDR		   = varQual pREL_BASE SLIT("min")
-compare_RDR	   = varQual pREL_BASE SLIT("compare")
-minBound_RDR	   = varQual pREL_BASE SLIT("minBound")
-maxBound_RDR	   = varQual pREL_BASE SLIT("maxBound")
-false_RDR	   = dataQual pREL_BASE SLIT("False")
-true_RDR	   = dataQual pREL_BASE SLIT("True")
-and_RDR		   = varQual pREL_BASE SLIT("&&")
-not_RDR		   = varQual pREL_BASE SLIT("not")
-compose_RDR	   = varQual pREL_BASE SLIT(".")
-append_RDR	   = varQual pREL_BASE SLIT("++")
-map_RDR		   = varQual pREL_BASE SLIT("map")
-concat_RDR	   = varQual mONAD     SLIT("concat")
-filter_RDR	   = varQual mONAD     SLIT("filter")
-zip_RDR		   = varQual pREL_LIST SLIT("zip")
+-- Class Monad
+monadClass_RDR	   = clsQual pREL_BASE_Name SLIT("Monad")
+monadPlusClass_RDR = clsQual pREL_BASE_Name SLIT("MonadPlus")
+thenM_RDR	   = varQual pREL_BASE_Name SLIT(">>=")
+returnM_RDR	   = varQual pREL_BASE_Name SLIT("return")
+failM_RDR	   = varQual pREL_BASE_Name SLIT("fail")
 
-showList___RDR     = varQual pREL_BASE  SLIT("showList__")
-showsPrec_RDR	   = varQual pREL_BASE SLIT("showsPrec")
-showList_RDR	   = varQual pREL_BASE SLIT("showList")
-showSpace_RDR	   = varQual pREL_BASE SLIT("showSpace")
-showString_RDR	   = varQual pREL_BASE SLIT("showString")
-showParen_RDR	   = varQual pREL_BASE SLIT("showParen")
+-- Class Functor
+functorClass_RDR	= clsQual pREL_BASE_Name SLIT("Functor")
 
-range_RDR	   = varQual iX   SLIT("range")
-index_RDR	   = varQual iX   SLIT("index")
-inRange_RDR	   = varQual iX   SLIT("inRange")
+-- Class Show
+showClass_RDR	   = clsQual pREL_SHOW_Name SLIT("Show")
+showList___RDR     = varQual pREL_SHOW_Name SLIT("showList__")
+showsPrec_RDR	   = varQual pREL_SHOW_Name SLIT("showsPrec")
+showList_RDR	   = varQual pREL_SHOW_Name SLIT("showList")
+showSpace_RDR	   = varQual pREL_SHOW_Name SLIT("showSpace")
+showString_RDR	   = varQual pREL_SHOW_Name SLIT("showString")
+showParen_RDR	   = varQual pREL_SHOW_Name SLIT("showParen")
 
-readsPrec_RDR	   = varQual pREL_READ SLIT("readsPrec")
-readList_RDR	   = varQual pREL_READ SLIT("readList")
-readParen_RDR	   = varQual pREL_READ SLIT("readParen")
-lex_RDR		   = varQual pREL_READ SLIT("lex")
-readList___RDR     = varQual pREL_READ SLIT("readList__")
 
-plus_RDR	   = varQual pREL_BASE SLIT("+")
-times_RDR	   = varQual pREL_BASE SLIT("*")
-mkInt_RDR	   = dataQual pREL_BASE SLIT("I#")
+-- Class Read
+readClass_RDR	   = clsQual pREL_READ_Name SLIT("Read")
+readsPrec_RDR	   = varQual pREL_READ_Name SLIT("readsPrec")
+readList_RDR	   = varQual pREL_READ_Name SLIT("readList")
+readParen_RDR	   = varQual pREL_READ_Name SLIT("readParen")
+lex_RDR		   = varQual pREL_READ_Name SLIT("lex")
+readList___RDR     = varQual pREL_READ_Name SLIT("readList__")
 
-int8TyCon_RDR    = tcQual iNT       SLIT("Int8")
-int16TyCon_RDR   = tcQual iNT       SLIT("Int16")
-int32TyCon_RDR   = tcQual iNT       SLIT("Int32")
-int64TyCon_RDR   = tcQual pREL_ADDR SLIT("Int64")
 
-word8TyCon_RDR    = tcQual wORD      SLIT("Word8")
-word16TyCon_RDR   = tcQual wORD      SLIT("Word16")
-word32TyCon_RDR   = tcQual wORD      SLIT("Word32")
-word64TyCon_RDR   = tcQual pREL_ADDR SLIT("Word64")
+-- Class Num
+numClass_RDR	   = clsQual pREL_NUM_Name SLIT("Num")
+fromInt_RDR	   = varQual pREL_NUM_Name SLIT("fromInt")
+fromInteger_RDR	   = varQual pREL_NUM_Name SLIT("fromInteger")
+minus_RDR	   = varQual pREL_NUM_Name SLIT("-")
+negate_RDR	   = varQual pREL_NUM_Name SLIT("negate")
+plus_RDR	   = varQual pREL_NUM_Name SLIT("+")
+times_RDR	   = varQual pREL_NUM_Name SLIT("*")
 
-error_RDR	   = varQual pREL_ERR SLIT("error")
-assert_RDR         = varQual pREL_GHC SLIT("assert")
-assertErr_RDR      = varQual pREL_ERR SLIT("assertError")
+-- Other numberic classes
+realClass_RDR		= clsQual pREL_NUM_Name  SLIT("Real")
+integralClass_RDR	= clsQual pREL_NUM_Name  SLIT("Integral")
+fractionalClass_RDR	= clsQual pREL_NUM_Name  SLIT("Fractional")
+floatingClass_RDR	= clsQual pREL_NUM_Name  SLIT("Floating")
+realFracClass_RDR	= clsQual pREL_NUM_Name  SLIT("RealFrac")
+realFloatClass_RDR	= clsQual pREL_NUM_Name  SLIT("RealFloat")
+fromRational_RDR   	= varQual pREL_NUM_Name  SLIT("fromRational")
 
-eqH_Char_RDR	= prelude_primop CharEqOp
-ltH_Char_RDR	= prelude_primop CharLtOp
-eqH_Word_RDR	= prelude_primop WordEqOp
-ltH_Word_RDR	= prelude_primop WordLtOp
-eqH_Addr_RDR	= prelude_primop AddrEqOp
-ltH_Addr_RDR	= prelude_primop AddrLtOp
-eqH_Float_RDR	= prelude_primop FloatEqOp
-ltH_Float_RDR	= prelude_primop FloatLtOp
-eqH_Double_RDR	= prelude_primop DoubleEqOp
-ltH_Double_RDR	= prelude_primop DoubleLtOp
-eqH_Int_RDR	= prelude_primop IntEqOp
-ltH_Int_RDR	= prelude_primop IntLtOp
-geH_RDR		= prelude_primop IntGeOp
-leH_RDR		= prelude_primop IntLeOp
-minusH_RDR	= prelude_primop IntSubOp
-tagToEnumH_RDR	= prelude_primop TagToEnumOp
+-- Class Ix
+ixClass_RDR	   = clsQual iX_Name	  SLIT("Ix")
+range_RDR	   = varQual iX_Name   SLIT("range")
+index_RDR	   = varQual iX_Name   SLIT("index")
+inRange_RDR	   = varQual iX_Name   SLIT("inRange")
 
-getTag_RDR	= varQual pREL_GHC SLIT("getTag#")
+-- Class CCallable and CReturnable
+ccallableClass_RDR	= clsQual pREL_GHC_Name  SLIT("CCallable")
+creturnableClass_RDR	= clsQual pREL_GHC_Name  SLIT("CReturnable")
+
+-- Class Enum
+enumClass_RDR 	   = clsQual pREL_ENUM_Name SLIT("Enum")
+succ_RDR	   = varQual pREL_ENUM_Name SLIT("succ")
+pred_RDR	   = varQual pREL_ENUM_Name SLIT("pred")
+toEnum_RDR	   = varQual pREL_ENUM_Name SLIT("toEnum")
+fromEnum_RDR	   = varQual pREL_ENUM_Name SLIT("fromEnum")
+enumFrom_RDR	   = varQual pREL_ENUM_Name SLIT("enumFrom")
+enumFromTo_RDR	   = varQual pREL_ENUM_Name SLIT("enumFromTo")
+enumFromThen_RDR   = varQual pREL_ENUM_Name SLIT("enumFromThen")
+enumFromThenTo_RDR = varQual pREL_ENUM_Name SLIT("enumFromThenTo")
+
+-- Class Bounded
+boundedClass_RDR   = clsQual pREL_ENUM_Name SLIT("Bounded")
+minBound_RDR	   = varQual pREL_ENUM_Name SLIT("minBound")
+maxBound_RDR	   = varQual pREL_ENUM_Name SLIT("maxBound")
+
+
+-- List functions
+concat_RDR	   = varQual pREL_LIST_Name SLIT("concat")
+filter_RDR	   = varQual pREL_LIST_Name SLIT("filter")
+zip_RDR		   = varQual pREL_LIST_Name SLIT("zip")
+
+int8TyCon_RDR    = tcQual iNT_Name       SLIT("Int8")
+int16TyCon_RDR   = tcQual iNT_Name       SLIT("Int16")
+int32TyCon_RDR   = tcQual iNT_Name       SLIT("Int32")
+int64TyCon_RDR   = tcQual pREL_ADDR_Name SLIT("Int64")
+
+word8TyCon_RDR    = tcQual wORD_Name      SLIT("Word8")
+word16TyCon_RDR   = tcQual wORD_Name      SLIT("Word16")
+word32TyCon_RDR   = tcQual wORD_Name      SLIT("Word32")
+word64TyCon_RDR   = tcQual pREL_ADDR_Name SLIT("Word64")
+
+error_RDR	   = varQual pREL_ERR_Name SLIT("error")
+assert_RDR         = varQual pREL_GHC_Name SLIT("assert")
+assertErr_RDR      = varQual pREL_ERR_Name SLIT("assertError")
+runSTRep_RDR	   = varQual pREL_ST_Name  SLIT("runSTRep")
+
+eqH_Char_RDR	= primOpRdrName CharEqOp
+ltH_Char_RDR	= primOpRdrName CharLtOp
+eqH_Word_RDR	= primOpRdrName WordEqOp
+ltH_Word_RDR	= primOpRdrName WordLtOp
+eqH_Addr_RDR	= primOpRdrName AddrEqOp
+ltH_Addr_RDR	= primOpRdrName AddrLtOp
+eqH_Float_RDR	= primOpRdrName FloatEqOp
+ltH_Float_RDR	= primOpRdrName FloatLtOp
+eqH_Double_RDR	= primOpRdrName DoubleEqOp
+ltH_Double_RDR	= primOpRdrName DoubleLtOp
+eqH_Int_RDR	= primOpRdrName IntEqOp
+ltH_Int_RDR	= primOpRdrName IntLtOp
+geH_RDR		= primOpRdrName IntGeOp
+leH_RDR		= primOpRdrName IntLeOp
+minusH_RDR	= primOpRdrName IntSubOp
+
+tagToEnumH_RDR	= primOpRdrName TagToEnumOp
+getTag_RDR	= varQual pREL_GHC_Name SLIT("getTag#")
 \end{code}
 
 \begin{code}

@@ -1,5 +1,10 @@
 __interface CoreSyn 1 0 where
-__export CoreSyn CoreExpr ;
+__export CoreSyn CoreExpr CoreRules CoreRule emptyCoreRules ;
+
 -- Needed by IdInfo
 1 type CoreExpr = Expr Var.IdOrTyVar;
 1 data Expr b ;
+
+1 data CoreRule ;
+1 type CoreRules = [CoreRule] ;
+1 emptyCoreRules :: CoreRules ;

@@ -14,16 +14,17 @@ module CoreLint (
 
 import IO	( hPutStr, stderr )
 
-import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting )
+import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
 import CoreSyn
-import CoreUtils	( idFreeVars )
+import CoreFVs		( idFreeVars )
+import CoreUtils	( exprOkForSpeculation )
 
 import Bag
 import Const		( Con(..), DataCon, conType, conOkForApp, conOkForAlt )
 import Id		( isConstantId, idMustBeINLINEd )
 import Var		( IdOrTyVar, Id, TyVar, idType, tyVarKind, isTyVar, isId )
 import VarSet
-import VarEnv		( mkVarEnv )
+import Subst		( mkTyVarSubst, substTy )
 import Name		( isLocallyDefined, getSrcLoc )
 import PprCore
 import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, 
@@ -33,12 +34,13 @@ import SrcLoc		( SrcLoc, noSrcLoc, isNoSrcLoc )
 import Type		( Type, Kind, tyVarsOfType,
 			  splitFunTy_maybe, mkPiType, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
-			  isUnLiftedType, typeKind, substTy,
+			  isUnLiftedType, typeKind, 
 			  splitAlgTyConApp_maybe,
 			  isUnboxedTupleType,
 			  hasMoreBoxityInfo
 			)
 import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
+import BasicTypes	( RecFlag(..), isNonRec )
 import Outputable
 
 infixr 9 `thenL`, `seqL`
@@ -122,10 +124,15 @@ lintCoreBindings whoDunnit binds
       Just bad_news -> printDump (display bad_news)	>>
 		       ghcExit 1
   where
-    lint_binds [] = returnL ()
-    lint_binds (bind:binds)
-      = lintCoreBinding bind `thenL` \binders ->
-	addInScopeVars binders (lint_binds binds)
+	-- Put all the top-level binders in scope at the start
+	-- This is because transformation rules can bring something
+	-- into use 'unexpectedly'
+    lint_binds binds = addInScopeVars (bindersOfBinds binds) $
+		       mapL lint_bind binds
+
+    lint_bind (Rec prs)		= mapL (lintSingleBinding Recursive) prs	`seqL`
+				  returnL ()
+    lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
     display bad_news
       = vcat [
@@ -150,26 +157,16 @@ We use this to check all unfoldings that come in from interfaces
 lintUnfolding :: SrcLoc
 	      -> [IdOrTyVar]		-- Treat these as in scope
 	      -> CoreExpr
-	      -> Maybe CoreExpr
+	      -> Maybe Message		-- Nothing => OK
 
 lintUnfolding locn vars expr
   | not opt_DoCoreLinting
-  = Just expr
+  = Nothing
 
   | otherwise
-  = case
-      initL (addLoc (ImportedUnfolding locn) $
+  = initL (addLoc (ImportedUnfolding locn) $
 	     addInScopeVars vars	     $
 	     lintCoreExpr expr)
-    of
-      Nothing  -> Just expr
-      Just msg ->
-        pprTrace "WARNING: Discarded bad unfolding from interface:\n"
-	(vcat [msg,
-		   ptext SLIT("*** Bad unfolding ***"),
-		   ppr expr,
-		   ptext SLIT("*** End unfolding ***")])
-	Nothing
 \end{code}
 
 %************************************************************************
@@ -181,19 +178,7 @@ lintUnfolding locn vars expr
 Check a core binding, returning the list of variables bound.
 
 \begin{code}
-lintCoreBinding :: CoreBind -> LintM [Id]
-
-lintCoreBinding (NonRec binder rhs)
-  = lintSingleBinding (binder,rhs) `seqL` returnL [binder]
-
-lintCoreBinding (Rec pairs)
-  = addInScopeVars binders (
-      mapL lintSingleBinding pairs `seqL` returnL binders
-    )
-  where
-    binders = map fst pairs
-
-lintSingleBinding (binder,rhs)
+lintSingleBinding rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
 
 	-- Check the rhs
@@ -204,7 +189,7 @@ lintSingleBinding (binder,rhs)
     checkTys binder_ty ty (mkRhsMsg binder ty)	`seqL`
 
 	-- Check (not isUnLiftedType) (also checks for bogus unboxed tuples)
-    checkL (not (isUnLiftedType binder_ty))
+    checkL (not (isUnLiftedType binder_ty) || (isNonRec rec_flag && exprOkForSpeculation rhs))
  	   (mkRhsPrimMsg binder rhs)		`seqL`
 
         -- Check whether binder's specialisations contain any out-of-scope variables
@@ -252,13 +237,17 @@ lintCoreExpr (Note (Coerce to_ty from_ty) expr)
 lintCoreExpr (Note other_note expr)
   = lintCoreExpr expr
 
-lintCoreExpr (Let binds body)
-  = lintCoreBinding binds `thenL` \binders ->
-    if (null binders) then
-	lintCoreExpr body  -- Can't add a new source location
-    else
-      addLoc (BodyOfLetRec binders)
-	(addInScopeVars binders (lintCoreExpr body))
+lintCoreExpr (Let (NonRec bndr rhs) body)
+  = lintSingleBinding NonRecursive (bndr,rhs)	`seqL`
+    addLoc (BodyOfLetRec [bndr])
+	   (addInScopeVars [bndr] (lintCoreExpr body))
+
+lintCoreExpr (Let (Rec pairs) body)
+  = addInScopeVars bndrs	$
+    mapL (lintSingleBinding Recursive) pairs	`seqL`
+    addLoc (BodyOfLetRec bndrs) (lintCoreExpr body)
+  where
+    bndrs = map fst pairs
 
 lintCoreExpr e@(Con con args)
   = addLoc (AnExpr e)	$
@@ -357,7 +346,7 @@ lintTyApp ty arg_ty
 		-- 	error :: forall a:*. String -> a
 		-- and then apply it to both boxed and unboxed types.
 	 then
-	    returnL (substTy (mkVarEnv [(tyvar,arg_ty)]) body)
+	    returnL (substTy (mkTyVarSubst [tyvar] [arg_ty]) body)
 	else
 	    addErrL (mkKindErrMsg tyvar arg_ty)
 
@@ -541,11 +530,14 @@ addErr errs_so_far msg locs
   = ASSERT (not (null locs))
     errs_so_far `snocBag` mk_msg msg
   where
-   (loc, pref) = dumpLoc (head locs)
-
+   (loc, cxt1) = dumpLoc (head locs)
+   cxts        = [snd (dumpLoc loc) | loc <- locs]   
+   context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1
+	       | otherwise	    = cxt1
+ 
    mk_msg msg
-     | isNoSrcLoc loc = (loc, hang pref 4 msg)
-     | otherwise      = addErrLocHdrLine loc pref msg
+     | isNoSrcLoc loc = (loc, hang context 4 msg)
+     | otherwise      = addErrLocHdrLine loc context msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m loc scope errs

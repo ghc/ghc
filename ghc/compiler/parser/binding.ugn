@@ -99,14 +99,13 @@ type binding;
 	/* user-specified pragmas:XXXX */
 
 	vspec_uprag : <	gvspec_id   : qid;
-			gvspec_tys  : list;
+			gvspec_tys  : list;	/* Of type */
 			gvspec_line : long; >;
 
 	vspec_ty_and_id : < gvspec_ty : ttype;
 			gvspec_tyid : maybe; /* nil or singleton */ >;
 
-	ispec_uprag : <	gispec_clas : qid;
-			gispec_ty   : ttype;
+	ispec_uprag : <	gispec_ty   : ttype;
 			gispec_line : long; >;
 
 	inline_uprag: <	ginline_id   : qid;
@@ -123,4 +122,10 @@ type binding;
 			gdspec_tys  : list;
 			gdspec_line : long; >;
 
+	/* Transformation rule */
+	rule_prag	: < grule_name   : hstring;
+			    grule_forall : list;
+			    grule_lhs    : VOID_STAR;	/* Really tree, but mutual recursion problem in C */
+			    grule_rhs    : VOID_STAR;	/* Really tree, but mutual recursion problem in C */
+			    grule_line   : long;  >;
 end;

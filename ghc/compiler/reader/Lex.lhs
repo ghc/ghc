@@ -37,7 +37,6 @@ import List             ( isSuffixOf )
 
 import IdInfo		( InlinePragInfo(..), CprInfo(..) )
 import Name		( isLowerISO, isUpperISO )
-import Module		( IfaceFlavour, hiFile, hiBootFile )
 import PrelMods		( mkTupNameStr, mkUbxTupNameStr )
 import CmdLineOpts	( opt_IgnoreIfacePragmas, opt_HiVersion, opt_NoHiCheck )
 import Demand		( Demand(..) {- instance Read -} )
@@ -120,11 +119,12 @@ data IfaceToken
 
   | ITinterface			-- GHC-extension keywords
   | ITexport
-  | ITinstimport
+  | ITdepends
   | ITforall
   | ITletrec 
   | ITcoerce
-  | ITinline
+  | ITinlineCall 
+  | ITinlineMe
   | ITccall (Bool,Bool,Bool)	-- (is_dyn, is_casm, may_gc)
   | ITdefaultbranch
   | ITbottom
@@ -138,6 +138,7 @@ data IfaceToken
   | ITonce			-- usage annotations
   | ITmany
   | ITarity 
+  | ITrules
   | ITspecialise
   | ITnocaf
   | ITunfold InlinePragInfo
@@ -176,10 +177,10 @@ data IfaceToken
   | ITconid   FAST_STRING
   | ITvarsym  FAST_STRING
   | ITconsym  FAST_STRING
-  | ITqvarid  (FAST_STRING,FAST_STRING,IfaceFlavour)
-  | ITqconid  (FAST_STRING,FAST_STRING,IfaceFlavour)
-  | ITqvarsym (FAST_STRING,FAST_STRING,IfaceFlavour)
-  | ITqconsym (FAST_STRING,FAST_STRING,IfaceFlavour)
+  | ITqvarid  (FAST_STRING,FAST_STRING)
+  | ITqconid  (FAST_STRING,FAST_STRING)
+  | ITqvarsym (FAST_STRING,FAST_STRING)
+  | ITqconsym (FAST_STRING,FAST_STRING)
 
   | ITpragma StringBuffer
 
@@ -483,8 +484,7 @@ lex_con cont buf =
  case expandWhile# is_ident buf of 	  { buf1 ->
  case expandWhile# (eqChar# '#'#) buf1 of { buf' ->
  case currentChar# buf' of
-     '.'# -> munch hiFile
-     '!'# -> munch hiBootFile
+     '.'# -> lex_qid cont lexeme (stepOn new_buf) just_a_conid
      _    -> just_a_conid
  
    where
@@ -492,33 +492,32 @@ lex_con cont buf =
 		   cont (ITconid lexeme) new_buf
     lexeme = lexemeToFastString buf'
     new_buf = stepOverLexeme buf'
-    munch hif = lex_qid cont lexeme hif (stepOn new_buf) just_a_conid
  }}
 
-lex_qid cont mod hif buf just_a_conid =
+lex_qid cont mod buf just_a_conid =
  case currentChar# buf of
   '['# -> 	-- Special case for []
     case lookAhead# buf 1# of
-     ']'# -> cont (ITqconid  (mod,SLIT("[]"),hif)) (stepOnBy# buf 2#)
+     ']'# -> cont (ITqconid (mod,SLIT("[]"))) (stepOnBy# buf 2#)
      _    -> just_a_conid
 
   '('# ->  -- Special case for (,,,)
 	   -- This *is* necessary to deal with e.g. "instance C PrelBase.(,,)"
     case lookAhead# buf 1# of
      '#'# -> case lookAhead# buf 2# of
-		','# -> lex_ubx_tuple cont mod hif (stepOnBy# buf 3#) 
+		','# -> lex_ubx_tuple cont mod (stepOnBy# buf 3#) 
 				just_a_conid
 		_    -> just_a_conid
-     ')'# -> cont (ITqconid (mod,SLIT("()"),hif)) (stepOnBy# buf 2#)
-     ','# -> lex_tuple cont mod hif (stepOnBy# buf 2#) just_a_conid
+     ')'# -> cont (ITqconid (mod,SLIT("()"))) (stepOnBy# buf 2#)
+     ','# -> lex_tuple cont mod (stepOnBy# buf 2#) just_a_conid
      _    -> just_a_conid
 
   '-'# -> case lookAhead# buf 1# of
-            '>'# -> cont (ITqconid (mod,SLIT("->"),hif)) (stepOnBy# buf 2#)
-            _    -> lex_id3 cont mod hif buf just_a_conid
-  _    -> lex_id3 cont mod hif buf just_a_conid
+            '>'# -> cont (ITqconid (mod,SLIT("->"))) (stepOnBy# buf 2#)
+            _    -> lex_id3 cont mod buf just_a_conid
+  _    -> lex_id3 cont mod buf just_a_conid
 
-lex_id3 cont mod hif buf just_a_conid
+lex_id3 cont mod buf just_a_conid
   | is_symbol c =
      case expandWhile# is_symbol buf of { buf' ->
      let
@@ -527,7 +526,7 @@ lex_id3 cont mod hif buf just_a_conid
      in
      case lookupUFM haskellKeySymsFM lexeme of {
 	Just kwd_token -> just_a_conid;	-- avoid M.:: etc.
-	Nothing        -> cont (mk_qvar_token mod hif lexeme) new_buf
+	Nothing        -> cont (mk_qvar_token mod lexeme) new_buf
      }}
 
   | otherwise   =
@@ -545,7 +544,7 @@ lex_id3 cont mod hif buf just_a_conid
     	    Nothing        -> 
      case lookupUFM ifaceKeywordsFM lexeme of {	-- only for iface files
     	    Just kwd_token -> just_a_conid;
-    	    Nothing        -> cont (mk_qvar_token mod hif lexeme) new_buf
+    	    Nothing        -> cont (mk_qvar_token mod lexeme) new_buf
      }}}}
   where c = currentChar# buf
 
@@ -561,12 +560,12 @@ mk_var_token pk_str
       (C# f) = _HEAD_ pk_str
       tl     = _TAIL_ pk_str
 
-mk_qvar_token m hif token =
+mk_qvar_token m token =
  case mk_var_token token of
-   ITconid n  -> ITqconid  (m,n,hif)
-   ITvarid n  -> ITqvarid  (m,n,hif)
-   ITconsym n -> ITqconsym (m,n,hif)
-   ITvarsym n -> ITqvarsym (m,n,hif)
+   ITconid n  -> ITqconid  (m,n)
+   ITvarid n  -> ITqvarid  (m,n)
+   ITconsym n -> ITqconsym (m,n)
+   ITvarsym n -> ITqvarsym (m,n)
    _	      -> ITunknown (show token)
 \end{code}
 
@@ -574,23 +573,23 @@ mk_qvar_token m hif token =
 Horrible stuff for dealing with M.(,,,)
 
 \begin{code}
-lex_tuple cont mod hif buf back_off =
+lex_tuple cont mod buf back_off =
   go 2 buf
   where
    go n buf =
     case currentChar# buf of
       ','# -> go (n+1) (stepOn buf)
-      ')'# -> cont (ITqconid (mod, snd (mkTupNameStr n),hif)) (stepOn buf)
+      ')'# -> cont (ITqconid (mod, snd (mkTupNameStr n))) (stepOn buf)
       _    -> back_off
 
-lex_ubx_tuple cont mod hif buf back_off =
+lex_ubx_tuple cont mod buf back_off =
   go 2 buf
   where
    go n buf =
     case currentChar# buf of
       ','# -> go (n+1) (stepOn buf)
       '#'# -> case lookAhead# buf 1# of
-		')'# -> cont (ITqconid (mod, snd (mkUbxTupNameStr n), hif))
+		')'# -> cont (ITqconid (mod, snd (mkUbxTupNameStr n)))
 				 (stepOnBy# buf 2#)
 	        _    -> back_off
       _    -> back_off
@@ -605,11 +604,12 @@ ifaceKeywordsFM = listToUFM $
       map (\ (x,y) -> (_PK_ x,y))
      [  ("__interface",		ITinterface),
 	("__export",		ITexport),
-	("__instimport",	ITinstimport),
+	("__depends",		ITdepends),
 	("__forall",		ITforall),
 	("__letrec",		ITletrec),
 	("__coerce",		ITcoerce),
-	("__inline",		ITinline),
+	("__inline_me",		ITinlineMe),
+	("__inline_call",	ITinlineCall),
 	("__DEFAULT",		ITdefaultbranch),
 	("__bot",		ITbottom),
 	("__integer",		ITinteger_lit),
@@ -618,6 +618,7 @@ ifaceKeywordsFM = listToUFM $
 	("__addr",		ITaddr_lit),
 	("__litlit",		ITlit_lit),
 	("__string",		ITstring_lit),
+	("__R",			ITrules),
 	("__a",			ITtypeapp),
 	("__o",			ITonce),
 	("__m",			ITmany),
@@ -625,10 +626,6 @@ ifaceKeywordsFM = listToUFM $
 	("__P",			ITspecialise),
 	("__C",			ITnocaf),
         ("__u",			ITunfold NoInlinePragInfo),
-        ("__U",			ITunfold IWantToBeINLINEd),
-        ("__UU",		ITunfold IMustBeINLINEd),
-        ("__Unot",		ITunfold IMustNotBeINLINEd),
-        ("__Ux",		ITunfold IAmALoopBreaker),
 	
         ("__ccall",		ITccall (False, False, False)),
         ("__ccall_GC",		ITccall (False, False, True)),

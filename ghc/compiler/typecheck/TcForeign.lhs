@@ -36,7 +36,7 @@ import Inst		( emptyLIE, LIE, plusLIE )
 import CoreSyn
 
 import ErrUtils		( Message )
-import Id		( Id, idName, mkUserId )
+import Id		( Id, idName, mkVanillaId )
 import Name		( nameOccName )
 import Type		( splitFunTys
 			, splitTyConApp_maybe
@@ -101,7 +101,7 @@ tcFImport fo@(ForeignDecl nm FoExport hs_ty Dynamic cconv src_loc) =
    case splitFunTys t_ty of
      (arg_tys, res_ty) -> 
 	checkForeignExport True t_ty arg_tys res_ty `thenTc_`
-	let i = (mkUserId nm sig_ty) in
+	let i = (mkVanillaId nm sig_ty) in
 	returnTc (i, (ForeignDecl i FoExport undefined Dynamic cconv src_loc))
 
 tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
@@ -114,7 +114,7 @@ tcFImport fo@(ForeignDecl nm FoLabel hs_ty ext_nm cconv src_loc) =
     (_, t_ty) = splitForAllTys sig_ty
    in
    check (isAddrTy t_ty) (illegalForeignTyErr False{-result-} sig_ty) `thenTc_`
-   let i = (mkUserId nm sig_ty) in
+   let i = (mkVanillaId nm sig_ty) in
    returnTc (i, (ForeignDecl i FoLabel undefined ext_nm cconv src_loc))
 
 tcFImport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
@@ -132,7 +132,7 @@ tcFImport fo@(ForeignDecl nm imp_exp hs_ty ext_nm cconv src_loc) =
    case splitFunTys t_ty of
      (arg_tys, res_ty) ->
         checkForeignImport (isDynamic ext_nm) ty arg_tys res_ty `thenTc_`
-	let i = (mkUserId nm ty) in
+	let i = (mkVanillaId nm ty) in
 	returnTc (i, (ForeignDecl i imp_exp undefined ext_nm cconv src_loc))
 
 tcFExport :: RenamedForeignDecl -> TcM s (LIE, TcMonoBinds, TcForeignExportDecl)

@@ -14,56 +14,60 @@ module PrelMods
         (
         mkTupNameStr, mkUbxTupNameStr,
 
-	pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR,
-	pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ,
-	pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR, pREL_FOREIGN,
-	pREL_STABLE,
+	pREL_GHC, pREL_BASE, pREL_ADDR, pREL_STABLE,
+	pREL_IO_BASE, pREL_PACK, pREL_ERR,
 
-	iNT, wORD
+	pREL_GHC_Name, pRELUDE_Name, mONAD_Name, rATIO_Name, 
+	iX_Name, mAIN_Name, pREL_MAIN_Name, pREL_ERR_Name,
+	pREL_BASE_Name, pREL_NUM_Name, pREL_LIST_Name, 
+	pREL_TUP_Name, pREL_ADDR_Name, pREL_READ_Name,
+	pREL_PACK_Name, pREL_CONC_Name, pREL_IO_BASE_Name, 
+	pREL_ST_Name, pREL_ARR_Name, pREL_FOREIGN_Name,
+	pREL_STABLE_Name, pREL_SHOW_Name, pREL_ENUM_Name, iNT_Name, wORD_Name
 	) where
 
 #include "HsVersions.h"
 
-import Module	( Module, mkPrelModule, mkSrcModule )
+import Module	( Module, ModuleName, mkPrelModule, mkSrcModule )
 import Util	( nOfThem )
 import Panic	( panic )
 \end{code}
 
 \begin{code}
-pREL_GHC, pRELUDE, mONAD, rATIO, iX, mAIN, pREL_MAIN, pREL_ERR      :: Module
-pREL_BASE, pREL_NUM, pREL_LIST, pREL_TUP, pREL_ADDR, pREL_READ      :: Module	
-pREL_PACK, pREL_CONC, pREL_IO_BASE, pREL_ST, pREL_ARR	  	    :: Module	
-pREL_FOREIGN, pREL_STABLE					    :: Module
+pRELUDE_Name      = mkSrcModule  "Prelude"
+pREL_GHC_Name     = mkSrcModule "PrelGHC"	   -- Primitive types and values
+pREL_BASE_Name    = mkSrcModule "PrelBase"
+pREL_ENUM_Name    = mkSrcModule "PrelEnum"
+pREL_SHOW_Name    = mkSrcModule "PrelShow"
+pREL_READ_Name    = mkSrcModule "PrelRead"
+pREL_NUM_Name     = mkSrcModule "PrelNum"
+pREL_LIST_Name    = mkSrcModule "PrelList"
+pREL_TUP_Name     = mkSrcModule "PrelTup"
+pREL_PACK_Name    = mkSrcModule "PrelPack"
+pREL_CONC_Name    = mkSrcModule "PrelConc"
+pREL_IO_BASE_Name = mkSrcModule "PrelIOBase"
+pREL_ST_Name	  = mkSrcModule "PrelST"
+pREL_ARR_Name     = mkSrcModule "PrelArr"
+pREL_FOREIGN_Name = mkSrcModule "PrelForeign"
+pREL_STABLE_Name  = mkSrcModule "PrelStable"
+pREL_ADDR_Name    = mkSrcModule "PrelAddr"
+pREL_ERR_Name     = mkSrcModule "PrelErr"
 
-pRELUDE	     = mkPrelModule "Prelude"
-pREL_GHC     = mkPrelModule "PrelGHC"	   -- Primitive types and values
-pREL_BASE    = mkPrelModule "PrelBase"
-pREL_READ    = mkPrelModule "PrelRead"
-pREL_NUM     = mkPrelModule "PrelNum"
-pREL_LIST    = mkPrelModule "PrelList"
-pREL_TUP     = mkPrelModule "PrelTup"
-pREL_PACK    = mkPrelModule "PrelPack"
-pREL_CONC    = mkPrelModule "PrelConc"
-pREL_IO_BASE = mkPrelModule "PrelIOBase"
-pREL_ST	     = mkPrelModule "PrelST"
-pREL_ARR     = mkPrelModule "PrelArr"
-pREL_FOREIGN = mkPrelModule "PrelForeign"
-pREL_STABLE  = mkPrelModule "PrelStable"
-pREL_ADDR    = mkPrelModule "PrelAddr"
-pREL_ERR     = mkPrelModule "PrelErr"
+mONAD_Name	 = mkSrcModule "Monad"
+rATIO_Name	 = mkSrcModule "Ratio"
+iX_Name	    	 = mkSrcModule "Ix"
+pREL_MAIN_Name   = mkSrcModule "PrelMain"
+mAIN_Name	 = mkSrcModule "Main"
+iNT_Name	 = mkSrcModule "Int"
+wORD_Name	 = mkSrcModule "Word"
 
-mONAD	     = mkPrelModule "Monad"
-rATIO	     = mkPrelModule "Ratio"
-iX	     = mkPrelModule "Ix"
-
-pREL_MAIN    = mkPrelModule "PrelMain"
-mAIN	     = mkSrcModule "Main"
-
-iNT, wORD   :: Module
-
-iNT	     = mkSrcModule "Int"
-wORD	     = mkSrcModule "Word"
-
+pREL_GHC     = mkPrelModule pREL_GHC_Name
+pREL_BASE    = mkPrelModule pREL_BASE_Name
+pREL_ADDR    = mkPrelModule pREL_ADDR_Name
+pREL_STABLE  = mkPrelModule pREL_STABLE_Name
+pREL_IO_BASE = mkPrelModule pREL_IO_BASE_Name
+pREL_PACK    = mkPrelModule pREL_PACK_Name
+pREL_ERR     = mkPrelModule pREL_ERR_Name
 \end{code}
 
 %************************************************************************
@@ -73,21 +77,21 @@ wORD	     = mkSrcModule "Word"
 %************************************************************************
 
 \begin{code}
-mkTupNameStr, mkUbxTupNameStr :: Int -> (Module, FAST_STRING)
+mkTupNameStr, mkUbxTupNameStr :: Int -> (ModuleName, FAST_STRING)
 
-mkTupNameStr 0 = (pREL_BASE, SLIT("()"))
+mkTupNameStr 0 = (pREL_BASE_Name, SLIT("()"))
 mkTupNameStr 1 = panic "Name.mkTupNameStr: 1 ???"
-mkTupNameStr 2 = (pREL_TUP, _PK_ "(,)")   -- not strictly necessary
-mkTupNameStr 3 = (pREL_TUP, _PK_ "(,,)")  -- ditto
-mkTupNameStr 4 = (pREL_TUP, _PK_ "(,,,)") -- ditto
-mkTupNameStr n = (pREL_TUP, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
+mkTupNameStr 2 = (pREL_TUP_Name, _PK_ "(,)")   -- not strictly necessary
+mkTupNameStr 3 = (pREL_TUP_Name, _PK_ "(,,)")  -- ditto
+mkTupNameStr 4 = (pREL_TUP_Name, _PK_ "(,,,)") -- ditto
+mkTupNameStr n = (pREL_TUP_Name, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
 
 mkUbxTupNameStr 0 = panic "Name.mkUbxTupNameStr: 0 ???"
-mkUbxTupNameStr 1 = (pREL_GHC, _PK_ "(# #)") -- 1 and 0 both make sense!!!
-mkUbxTupNameStr 2 = (pREL_GHC, _PK_ "(#,#)")
-mkUbxTupNameStr 3 = (pREL_GHC, _PK_ "(#,,#)")
-mkUbxTupNameStr 4 = (pREL_GHC, _PK_ "(#,,,#)")
-mkUbxTupNameStr n = (pREL_GHC, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
+mkUbxTupNameStr 1 = (pREL_GHC_Name, _PK_ "(# #)") -- 1 and 0 both make sense!!!
+mkUbxTupNameStr 2 = (pREL_GHC_Name, _PK_ "(#,#)")
+mkUbxTupNameStr 3 = (pREL_GHC_Name, _PK_ "(#,,#)")
+mkUbxTupNameStr 4 = (pREL_GHC_Name, _PK_ "(#,,,#)")
+mkUbxTupNameStr n = (pREL_GHC_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
 \end{code}
 
 

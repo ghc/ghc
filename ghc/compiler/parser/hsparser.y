@@ -95,6 +95,7 @@ BOOLEAN pat_check=TRUE;
 	entidt uentid;
 	id uid;
 	qid uqid;
+	rulevar urulevar;
 	literal uliteral;
         maybe umaybe;
         either ueither;
@@ -194,7 +195,7 @@ BOOLEAN pat_check=TRUE;
 **********************************************************************/
 
 %token  INTERFACE_UPRAGMA SPECIALISE_UPRAGMA
-%token  INLINE_UPRAGMA NOINLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
+%token  INLINE_UPRAGMA NOINLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA RULES_UPRAGMA
 %token  END_UPRAGMA 
 %token  SOURCE_UPRAGMA
 
@@ -238,16 +239,16 @@ BOOLEAN pat_check=TRUE;
 		rbinds rbinds1 rpats rpats1 list_exps list_rest
 		qvarsk qvars_list
 		constrs fields conargatypes
-		tautypes atypes
-		types_and_maybe_ids
+		tautypes polytypes atypes
   		pats simple_context simple_context_list
 		export_list enames
   		import_list inames
  		impdecls maybeimpdecls impdecl
 		dtyclses dtycls_list
   		gdrhs gdpat 
-  		lampats	cexps gd texps
-		tyvars1 constr_context forall
+  		lampats	aexps gd texps
+		var_list constr_context forall
+		rule_forall rule_var_list
 
 %type <umatch>  alt
 
@@ -264,6 +265,8 @@ BOOLEAN pat_check=TRUE;
  		pat dpat cpat bpat apat apatc conpat rpat
           	patk bpatk apatck conpatk
 
+
+%type <urulevar> rule_var
 
 %type <uid>	MINUS PLUS DARROW AS LAZY
 		VARID CONID VARSYM CONSYM 
@@ -282,7 +285,8 @@ BOOLEAN pat_check=TRUE;
 %type <ubinding>  topdecl topdecls letdecls
 		  typed datad newtd classd instd defaultd foreignd
 		  decl decls non_empty_decls fixdecl fix_op fix_ops valdef
- 		  maybe_where where_body type_and_maybe_id
+ 		  maybe_where where_body 
+		  ruled rules rule
 
 %type <uttype>    polytype
 		  conargatype conapptype
@@ -302,6 +306,7 @@ BOOLEAN pat_check=TRUE;
 
 %type <ulong>     commas importkey get_line_no
 		  unsafe_flag callconv
+
 
 /**********************************************************************
 *                                                                     *
@@ -468,8 +473,39 @@ topdecl	:  typed				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  instd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  defaultd 				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  foreignd				{ $$ = $1; FN = NULL; SAMEFN = 0; }
+	|  ruled				{ $$ = $1; FN = NULL; SAMEFN = 0; }
 	|  decl 				{ $$ = $1; }
 	;
+
+/* ***********************************************************  */
+/*		Transformation rules				*/
+
+ruled	: RULES_UPRAGMA rules END_UPRAGMA	{ $$ = $2; }
+	;
+
+rules	:  /* empty */				{ $$ = mknullbind(); }
+        |  rule                		        { $$ = $1; }
+	|  rule SEMI rules			{ $$ = mkabind($1,$3); }
+        |  SEMI rules                           { $$ = $2; }
+	;
+
+rule	: STRING rule_forall fexp
+		 EQUAL get_line_no exp		{ $$ = mkrule_prag($1,$2,$3,$6,$5); }
+
+rule_forall : FORALL rule_var_list DOT		{ $$ = $2; }
+	    | /* Empty */			{ $$ = Lnil; }
+	    ;
+
+rule_var_list : /* Empty */			{ $$ = Lnil; }
+	      | rule_var			{ $$ = lsing($1); }
+	      | rule_var COMMA rule_var_list	{ $$ = mklcons($1,$3); }
+	      ;
+
+rule_var : varid				{ $$ = mkprulevar( $1 ); }
+	 | varid DCOLON polytype		{ $$ = mkprulevarsig( $1, $3 ); }
+	 ;
+
+/* *********************************************************** */
 
 typed	:  typekey simple_con_app EQUAL tautype		{ $$ = mknbind($2,$4,startlineno); }
 	;
@@ -596,15 +632,15 @@ decl	: fixdecl
 	   Have left out the case specialising to an overloaded type.
 	   Let's get real, OK?  (WDP)
 	*/
-	|  SPECIALISE_UPRAGMA qvark DCOLON types_and_maybe_ids END_UPRAGMA
+	|  SPECIALISE_UPRAGMA qvark DCOLON polytypes END_UPRAGMA
 		{
 		  $$ = mkvspec_uprag($2, $4, startlineno);
 		  FN = NULL; SAMEFN = 0;
 		}
 
-	|  SPECIALISE_UPRAGMA INSTANCE gtycon atype END_UPRAGMA
+	|  SPECIALISE_UPRAGMA INSTANCE inst_type END_UPRAGMA
 		{
-		  $$ = mkispec_uprag($3, $4, startlineno);
+		  $$ = mkispec_uprag($3, startlineno);
 		  FN = NULL; SAMEFN = 0;
 		}
 
@@ -667,15 +703,6 @@ qvars_list: qvar				{ $$ = lsing($1); }
 	|   qvars_list COMMA qvar		{ $$ = lapp($1,$3); }
 	;
 
-types_and_maybe_ids :
-	   type_and_maybe_id				{ $$ = lsing($1); }
-	|  types_and_maybe_ids COMMA type_and_maybe_id	{ $$ = lapp($1,$3); }
-	;
-
-type_and_maybe_id :
-	   tautype				{ $$ = mkvspec_ty_and_id($1,mknothing()); }
-	|  tautype EQUAL qvark			{ $$ = mkvspec_ty_and_id($1,mkjust($3)); }
-
 
 /**********************************************************************
 *                                                                     *
@@ -702,12 +729,16 @@ type_and_maybe_id :
 polyatype : atype
           ;
 
-polytype : FORALL tyvars1 DOT
+polytype : FORALL var_list DOT
                   apptype DARROW tautype	{ $$ = mkforall($2,   type2context($4), $6); }
-         | FORALL tyvars1 DOT tautype           { $$ = mkforall($2,   Lnil,             $4); }
+         | FORALL var_list DOT tautype           { $$ = mkforall($2,   Lnil,             $4); }
          |        apptype DARROW tautype	{ $$ = mkimp_forall(  type2context($1), $3); }
          | tautype
 	 ;
+
+polytypes :  polytype				{ $$ = lsing($1); }
+	  |  polytypes COMMA polytype		{ $$ = lapp($1,$3); }
+	  ;
 
 /* --------------------------- */
 /* tautype is just a monomorphic type.
@@ -796,10 +827,6 @@ constrs	:  constr				{ $$ = lsing($1); }
 constr	:  forall constr_context DARROW constr_after_context	{ $$ = mkconstrex ( $1, $2, $4 ); }
         |  forall constr_after_context	                        { $$ = mkconstrex ( $1, Lnil, $2 ); }
 	;
-
-forall :                                                { $$ = Lnil }
-       | FORALL tyvars1 DOT                             { $$ = $2; }
-       ;
 
 constr_context
 	: conapptype conargatype 	{ $$ = type2context( mktapp($1,$2) ); }
@@ -1026,14 +1053,10 @@ kexpLno	:  LAMBDA
 	   dorest				{ $$ = mkdoe($3,$<ulong>2); }
 
 	/* CCALL/CASM Expression */
-	|  CCALL ccallid cexps			{ $$ = mkccall($2,install_literal("n"),$3); }
-	|  CCALL ccallid			{ $$ = mkccall($2,install_literal("n"),Lnil); }
-	|  CCALL_GC ccallid cexps		{ $$ = mkccall($2,install_literal("p"),$3); }
-	|  CCALL_GC ccallid 			{ $$ = mkccall($2,install_literal("p"),Lnil); }
-	|  CASM CLITLIT cexps			{ $$ = mkccall($2,install_literal("N"),$3); }
-	|  CASM CLITLIT				{ $$ = mkccall($2,install_literal("N"),Lnil); }
-	|  CASM_GC CLITLIT cexps		{ $$ = mkccall($2,install_literal("P"),$3); }
-	|  CASM_GC CLITLIT 			{ $$ = mkccall($2,install_literal("P"),Lnil); }
+	|  CCALL ccallid aexps			{ $$ = mkccall($2,install_literal("n"),$3); }
+	|  CCALL_GC ccallid aexps		{ $$ = mkccall($2,install_literal("p"),$3); }
+	|  CASM CLITLIT aexps			{ $$ = mkccall($2,install_literal("N"),$3); }
+	|  CASM_GC CLITLIT aexps		{ $$ = mkccall($2,install_literal("P"),$3); }
 
 	/* SCC Expression */
 	|  SCC STRING exp
@@ -1088,8 +1111,8 @@ aexp	:  qvar					{ $$ = mkident($1); }
 	;
 
 	/* ccall arguments */
-cexps	:  cexps aexp				{ $$ = lapp($1,$2); }
-	|  aexp					{ $$ = lsing($1); }
+aexps	:  aexps aexp				{ $$ = lapp($1,$2); }
+	|  /* empty */				{ $$ = Lnil; }
 	;
 
 caserest:  ocurly alts ccurly			{ $$ = $2; }
@@ -1581,13 +1604,18 @@ modid	:  CONID
 	;
 
 /* ---------------------------------------------- */
-tyvar	:  varid_noforall		{ $$ = $1; }
+tyvar	:  varid_noforall			{ $$ = $1; }
 	;
 
-/* tyvars1: At least one tyvar */
-tyvars1 : tyvar				{ $$ = lsing($1); }
-	| tyvar tyvars1  		{ $$ = mklcons($1,$2); }
-	;
+/* var_list: At least one var; used mainly for tyvars */
+var_list : varid_noforall			{ $$ = lsing($1); }
+	 | varid_noforall var_list  		{ $$ = mklcons($1,$2); }
+	 ;
+
+forall : /* Empty */                            { $$ = Lnil }
+       | FORALL var_list DOT                    { $$ = $2; }
+       ;
+
 
 /**********************************************************************
 *                                                                     *

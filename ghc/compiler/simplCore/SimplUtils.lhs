@@ -6,33 +6,35 @@
 \begin{code}
 module SimplUtils (
 	simplBinder, simplBinders, simplIds,
-	mkRhsTyLam,		
+	transformRhs,
 	etaCoreExpr, 
-	etaExpandCount, 
-	mkCase, findAlt, findDefault
+	mkCase, findAlt, findDefault,
+	mkCoerce
     ) where
 
 #include "HsVersions.h"
 
 import BinderInfo
-import CmdLineOpts	( opt_DoEtaReduction, switchIsOn, SimplifierSwitch(..) )
+import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
-import CoreUtils	( exprIsCheap, exprIsTrivial, exprFreeVars, cheapEqExpr,
-			  FormSummary(..),
-			  substId, substIds
+import CoreFVs		( exprFreeVars )
+import CoreUtils	( exprIsCheap, exprIsTrivial, cheapEqExpr, coreExprType,
+			  exprIsWHNF, FormSummary(..)
 			)
+import Subst		( substBndrs, substBndr, substIds )
 import Id		( Id, idType, getIdArity, isId, idName,
 			  getInlinePragma, setInlinePragma,
-			  getIdDemandInfo
+			  getIdDemandInfo, mkId
 			)
-import IdInfo		( arityLowerBound, InlinePragInfo(..) )
-import Maybes		( maybeToBool )
+import IdInfo		( arityLowerBound, InlinePragInfo(..), setInlinePragInfo, vanillaIdInfo )
+import Maybes		( maybeToBool, catMaybes )
 import Const		( Con(..) )
-import Name		( isLocalName )
+import Name		( isLocalName, setNameUnique )
 import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys,
-			  splitTyConApp_maybe, substTyVar, mkTyVarTys
+			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
 			)
+import TysPrim		( statePrimTyCon )
 import Var		( setVarUnique )
 import VarSet
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
@@ -47,67 +49,56 @@ import Outputable
 %*									*
 %************************************************************************
 
-When we hit a binder we may need to
-  (a) apply the the type envt (if non-empty) to its type
-  (b) apply the type envt and id envt to its SpecEnv (if it has one)
-  (c) give it a new unique to avoid name clashes
-
 \begin{code}
 simplBinders :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
 simplBinders bndrs thing_inside
-  = getSwitchChecker	`thenSmpl` \ sw_chkr ->
-    getSimplBinderStuff `thenSmpl` \ stuff ->
+  = getSubst		`thenSmpl` \ subst ->
     let
-	must_clone       = switchIsOn sw_chkr SimplPleaseClone
-	(stuff', bndrs') = mapAccumL (subst_binder must_clone) stuff bndrs
+	(subst', bndrs') = substBndrs subst bndrs
     in
-    setSimplBinderStuff stuff' 	$
+    setSubst subst' 	$
     thing_inside bndrs'
 
 simplBinder :: InBinder -> (OutBinder -> SimplM a) -> SimplM a
 simplBinder bndr thing_inside
-  = getSwitchChecker	`thenSmpl` \ sw_chkr ->
-    getSimplBinderStuff `thenSmpl` \ stuff ->
+  = getSubst		`thenSmpl` \ subst ->
     let
-	must_clone      = switchIsOn sw_chkr SimplPleaseClone
-	(stuff', bndr') = subst_binder must_clone stuff bndr
+	(subst', bndr') = substBndr subst bndr
     in
-    setSimplBinderStuff stuff' 	$
+    setSubst subst' 	$
     thing_inside bndr'
+
 
 -- Same semantics as simplBinders, but a little less 
 -- plumbing and hence a little more efficient.
 -- Maybe not worth the candle?
 simplIds :: [InBinder] -> ([OutBinder] -> SimplM a) -> SimplM a
 simplIds ids thing_inside
-  = getSwitchChecker	`thenSmpl` \ sw_chkr ->
-    getSimplBinderStuff `thenSmpl` \ (ty_subst, id_subst, in_scope, us) ->
+  = getSubst		`thenSmpl` \ subst ->
     let
-	must_clone			  = switchIsOn sw_chkr SimplPleaseClone
-	(id_subst', in_scope', us', ids') = substIds (simpl_clone_fn must_clone)
-						     ty_subst id_subst in_scope us ids
+	(subst', bndrs') = substIds subst ids
     in
-    setSimplBinderStuff (ty_subst, id_subst', in_scope', us') 	$
-    thing_inside ids'
+    setSubst subst' 	$
+    thing_inside bndrs'
+\end{code}
 
-subst_binder must_clone (ty_subst, id_subst, in_scope, us) bndr
-  | isTyVar bndr
-  = case substTyVar ty_subst in_scope bndr of
-	(ty_subst', in_scope', bndr') -> ((ty_subst', id_subst, in_scope', us), bndr')
 
-  | otherwise
-  = case substId (simpl_clone_fn must_clone) ty_subst id_subst in_scope us bndr of
-	(id_subst', in_scope', us', bndr')
-		-> ((ty_subst, id_subst', in_scope', us'), bndr')
+%************************************************************************
+%*									*
+\subsection{Transform a RHS}
+%*									*
+%************************************************************************
 
-simpl_clone_fn must_clone in_scope us id 
-  |  (must_clone && isLocalName (idName id))
-  || id `elemVarSet` in_scope
-  = case splitUniqSupply us of
-	(us1, us2) -> Just (us1, setVarUnique id (uniqFromSupply us2))
+Try (a) eta expansion
+    (b) type-lambda swizzling
 
-  |  otherwise
-  =  Nothing
+\begin{code}
+transformRhs :: InExpr -> SimplM InExpr
+transformRhs rhs 
+  = tryEtaExpansion body		`thenSmpl` \ body' ->
+    mkRhsTyLam tyvars body'
+  where
+    (tyvars, body) = collectTyBinders rhs
 \end{code}
 
 
@@ -159,18 +150,40 @@ So far as the implemtation is concerned:
 		where
 		  G = F . Let {xi = xi' tvs}
 
+[May 1999]  If we do this transformation *regardless* then we can
+end up with some pretty silly stuff.  For example, 
+
+	let 
+	    st = /\ s -> let { x1=r1 ; x2=r2 } in ...
+	in ..
+becomes
+	let y1 = /\s -> r1
+	    y2 = /\s -> r2
+	    st = /\s -> ...[y1 s/x1, y2 s/x2]
+	in ..
+
+Unless the "..." is a WHNF there is really no point in doing this.
+Indeed it can make things worse.  Suppose x1 is used strictly,
+and is of the form
+
+	x1* = case f y of { (a,b) -> e }
+
+If we abstract this wrt the tyvar we then can't do the case inline
+as we would normally do.
+
+
 \begin{code}
-mkRhsTyLam (Lam b e)
- | isTyVar b = case collectTyBinders e of
-		  (bs,body) -> mkRhsTyLam_help (b:bs) body
-
-mkRhsTyLam other_expr		-- No-op if not a type lambda
-  = returnSmpl other_expr
-
-
-mkRhsTyLam_help tyvars body
+mkRhsTyLam tyvars body			-- Only does something if there's a let
+  | null tyvars || not (worth_it body)	-- inside a type lambda, and a WHNF inside that
+  = returnSmpl (mkLams tyvars body)
+  | otherwise
   = go (\x -> x) body
   where
+    worth_it (Let _ e)	     = whnf_in_middle e
+    worth_it other     	     = False
+    whnf_in_middle (Let _ e) = whnf_in_middle e
+    whnf_in_middle e	     = exprIsWHNF e
+
     main_tyvar_set = mkVarSet tyvars
 
     go fn (Let bind@(NonRec var rhs) body) | exprIsTrivial rhs
@@ -190,7 +203,7 @@ mkRhsTyLam_help tyvars body
 		--	/\ a b -> let t :: (a,b) = (e1, e2)
 		--		      x :: a     = fst t
 		--		  in ...
-		-- Here, b isn't free in a's type, but we must nevertheless
+		-- Here, b isn't free in x's type, but we must nevertheless
 		-- abstract wrt b as well, because t's type mentions b.
 		-- Since t is floated too, we'd end up with the bogus:
 		--	poly_t = /\ a b -> (e1, e2)
@@ -219,29 +232,29 @@ mkRhsTyLam_help tyvars body
     go fn body = returnSmpl (mkLams tyvars (fn body))
 
     mk_poly tyvars_here var
-      = newId (mkForAllTys tyvars_here (idType var))	$ \ poly_id ->
+      = getUniqueSmpl		`thenSmpl` \ uniq ->
 	let
+	    poly_name = setNameUnique (idName var) uniq		-- Keep same name
+	    poly_ty   = mkForAllTys tyvars_here (idType var)	-- But new type of course
+
 		-- It's crucial to copy the inline-prag of the original var, because
 		-- we're looking at occurrence-analysed but as yet unsimplified code!
 		-- In particular, we mustn't lose the loop breakers.
 		-- 
-		-- *However* we don't want to retain a single-occurrence or dead-var info
-		-- because we're adding a load of "silly bindings" of the form
-		--	var _U_ = poly_var t1 t2
-		-- with a must-inline pragma on the silly binding to prevent the
-		-- poly-var from being inlined right back in.  Since poly_var now
-		-- occurs inside an INLINE binding, it should be given a ManyOcc,
-		-- else it may get inlined unconditionally
-	    poly_inline_prag = case getInlinePragma var of
-				  ICanSafelyBeINLINEd _ _ -> NoInlinePragInfo
-				  IAmDead		  -> NoInlinePragInfo
-				  var_inline_prag	  -> var_inline_prag
+		-- It's even right to retain single-occurrence or dead-var info:
+		-- Suppose we started with  /\a -> let x = E in B
+		-- where x occurs once in E. Then we transform to:
+		--	let x' = /\a -> E in /\a -> let x* = x' a in B
+		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
+		-- the occurrences of x' will be just the occurrences originaly
+		-- pinned on x.
+	    poly_info = vanillaIdInfo `setInlinePragInfo` getInlinePragma var
 
-	    poly_id' = setInlinePragma poly_id poly_inline_prag
+	    poly_id   = mkId poly_name poly_ty poly_info
 	in
-	returnSmpl (poly_id', mkTyApps (Var poly_id') (mkTyVarTys tyvars_here))
+	returnSmpl (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tyvars_here))
 
-    mk_silly_bind var rhs = NonRec (setInlinePragma var IWantToBeINLINEd) rhs
+    mk_silly_bind var rhs = NonRec (setInlinePragma var IMustBeINLINEd) rhs
 		-- The addInlinePragma is really important!  If we don't say 
 		-- INLINE on these silly little bindings then look what happens!
 		-- Suppose we start with:
@@ -254,12 +267,104 @@ mkRhsTyLam_help tyvars body
 		-- 		* but then it gets inlined into the rhs of g*
 		--		* then the binding for g* is floated out of the /\b
 		--		* so we're back to square one
-		-- The silly binding for g* must be INLINE, so that no inlining
-		-- will happen in its RHS.
-		-- PS: Jun 98: actually this isn't important any more; 
-		--	       inlineUnconditionally will catch the type applicn
-		--	       and inline it unconditionally, without ever trying
-		-- 	       to simplify the RHS
+		-- The silly binding for g* must be IMustBeINLINEs, so that
+		-- we simply substitute for g* throughout.
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Eta expansion}
+%*									*
+%************************************************************************
+
+	Try eta expansion for RHSs
+
+We go for:
+		\x1..xn -> N	==>   \x1..xn y1..ym -> N y1..ym
+	AND		
+		N E1..En	==>   let z1=E1 .. zn=En in \y1..ym -> N z1..zn y1..ym
+
+where (in both cases) N is a NORMAL FORM (i.e. no redexes anywhere)
+wanting a suitable number of extra args.
+
+NB: the Ei may have unlifted type, but the simplifier (which is applied
+to the result) deals OK with this).
+
+There is no point in looking for a combination of the two, 
+because that would leave use with some lets sandwiched between lambdas;
+but it's awkward to detect that case, so we don't bother.
+
+\begin{code}
+tryEtaExpansion :: InExpr -> SimplM InExpr
+tryEtaExpansion rhs
+  |  not opt_SimplDoLambdaEtaExpansion
+  || exprIsTrivial rhs			-- Don't eta-expand a trival RHS
+  || null y_tys				-- No useful expansion
+  = returnSmpl rhs
+
+  | otherwise	-- Consider eta expansion
+  = newIds y_tys			( \ y_bndrs ->
+    tick (EtaExpansion (head y_bndrs))	`thenSmpl_`
+    mapAndUnzipSmpl bind_z_arg args	`thenSmpl` (\ (z_binds, z_args) ->
+    returnSmpl (mkLams x_bndrs			$ 
+		mkLets (catMaybes z_binds)	$
+ 		mkLams y_bndrs			$
+		mkApps (mkApps fun z_args) (map Var y_bndrs))))
+  where
+    (x_bndrs, body) = collectValBinders rhs
+    (fun, args)	    = collectArgs body
+    no_of_xs	    = length x_bndrs
+    fun_arity	    = case fun of
+			Var v -> arityLowerBound (getIdArity v)
+			other -> 0
+
+    bind_z_arg arg | exprIsTrivial arg = returnSmpl (Nothing, arg)
+		   | otherwise	       = newId (coreExprType arg)	$ \ z ->
+					 returnSmpl (Just (NonRec z arg), Var z)
+
+	-- Note: I used to try to avoid the coreExprType call by using
+	-- the type of the binder.  But this type doesn't necessarily
+	-- belong to the same substitution environment as this rhs;
+	-- and we are going to make extra term binders (y_bndrs) from the type
+	-- which will be processed with the rhs substitution environment.
+	-- This only went wrong in a mind bendingly complicated case.
+    (potential_extra_arg_tys, inner_ty) = splitFunTys (coreExprType body)
+	
+    y_tys :: [InType]
+    y_tys  = take no_extras_wanted potential_extra_arg_tys
+	
+    no_extras_wanted :: Int
+    no_extras_wanted = 
+
+	-- We used to expand the arity to the previous arity fo the
+	-- function; but this is pretty dangerous.  Consdier
+	--	f = \xy -> e
+	-- so that f has arity 2.  Now float something into f's RHS:
+	--	f = let z = BIG in \xy -> e
+	-- The last thing we want to do now is to put some lambdas
+	-- outside, to get
+	--	f = \xy -> let z = BIG in e
+	--
+	-- (bndr_arity - no_of_xs)		`max`
+
+	-- See if the body could obviously do with more args
+	(fun_arity - valArgCount args)	`max`
+
+	-- Finally, see if it's a state transformer, and xs is non-null
+	-- (so it's also a function not a thunk) in which
+	-- case we eta-expand on principle! This can waste work,
+	-- but usually doesn't.
+	-- I originally checked for a singleton type [ty] in this case
+	-- but then I found a situation in which I had
+	--	\ x -> let {..} in \ s -> f (...) s
+	-- AND f RETURNED A FUNCTION.  That is, 's' wasn't the only
+	-- potential extra arg.
+	case (x_bndrs, potential_extra_arg_tys) of
+	    (_:_, ty:_)  -> case splitTyConApp_maybe ty of
+				  Just (tycon,_) | tycon == statePrimTyCon -> 1
+				  other					   -> 0
+	    other -> 0
 \end{code}
 
 
@@ -274,8 +379,9 @@ mkRhsTyLam_help tyvars body
 e.g.	\ x y -> f x y	===>  f
 
 It is used
-	a) Before constructing an Unfolding, to 
-	   try to make the unfolding smaller;
+-- OLD
+--	a) Before constructing an Unfolding, to 
+--	   try to make the unfolding smaller;
 	b) In tidyCoreExpr, which is done just before converting to STG.
 
 But we only do this if 
@@ -283,8 +389,9 @@ But we only do this if
 	   The idea is that lambdas are often quite helpful: they indicate
 	   head normal forms, so we don't want to chuck them away lightly.
 
-	ii) It exposes a simple variable or a type application; in short
-	    it exposes a "trivial" expression. (exprIsTrivial)
+-- OLD: in core2stg we want to do this even if the result isn't trivial
+--	ii) It exposes a simple variable or a type application; in short
+--	    it exposes a "trivial" expression. (exprIsTrivial)
 
 \begin{code}
 etaCoreExpr :: CoreExpr -> CoreExpr
@@ -292,13 +399,12 @@ etaCoreExpr :: CoreExpr -> CoreExpr
 		-- lambda into a bottom variable.  Sigh
 
 etaCoreExpr expr@(Lam bndr body)
-  | opt_DoEtaReduction
   = check (reverse binders) body
   where
     (binders, body) = collectBinders expr
 
     check [] body
-	| exprIsTrivial body && not (any (`elemVarSet` body_fvs) binders)
+	| not (any (`elemVarSet` body_fvs) binders)
 	= body			-- Success!
 	where
 	  body_fvs = exprFreeVars body
@@ -315,76 +421,12 @@ etaCoreExpr expr = expr		-- The common case
 
 %************************************************************************
 %*									*
-\subsection{Eta expansion}
-%*									*
-%************************************************************************
-
-@etaExpandCount@ takes an expression, E, and returns an integer n,
-such that
-
-	E  ===>   (\x1::t1 x1::t2 ... xn::tn -> E x1 x2 ... xn)
-
-is a safe transformation.  In particular, the transformation should
-not cause work to be duplicated, unless it is ``cheap'' (see
-@manifestlyCheap@ below).
-
-@etaExpandCount@ errs on the conservative side.  It is always safe to
-return 0.
-
-An application of @error@ is special, because it can absorb as many
-arguments as you care to give it.  For this special case we return
-100, to represent "infinity", which is a bit of a hack.
-
-\begin{code}
-etaExpandCount :: CoreExpr
-	       -> Int	-- Number of extra args you can safely abstract
-
-etaExpandCount (Lam b body)
-  | isId b
-  = 1 + etaExpandCount body
-
-etaExpandCount (Let bind body)
-  | all exprIsCheap (rhssOfBind bind)
-  = etaExpandCount body
-
-etaExpandCount (Case scrut _ alts)
-  | exprIsCheap scrut
-  = minimum [etaExpandCount rhs | (_,_,rhs) <- alts]
-
-etaExpandCount fun@(Var _)     = eta_fun fun
-
-etaExpandCount (App fun (Type ty))
-  = eta_fun fun
-etaExpandCount (App fun arg)
-  | exprIsCheap arg = case etaExpandCount fun of
-				0 -> 0
-				n -> n-1	-- Knock off one
-
-etaExpandCount other = 0    -- Give up
-	-- Lit, Con, Prim,
-	-- non-val Lam,
-	-- Scc (pessimistic; ToDo),
-	-- Let with non-whnf rhs(s),
-	-- Case with non-whnf scrutinee
-
------------------------------
-eta_fun :: CoreExpr	 -- The function
-	-> Int		 -- How many args it can safely be applied to
-
-eta_fun (App fun (Type ty)) = eta_fun fun
-eta_fun (Var v) 	    = arityLowerBound (getIdArity v)
-eta_fun other 		    = 0		-- Give up
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Case absorption and identity-case elimination}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkCase :: SwitchChecker -> OutExpr -> OutId -> [OutAlt] -> SimplM OutExpr
+mkCase :: OutExpr -> OutId -> [OutAlt] -> SimplM OutExpr
 \end{code}
 
 @mkCase@ tries the following transformation (if possible):
@@ -407,11 +449,11 @@ transformation is called Case Merging.  It avoids that the same
 variable is scrutinised multiple times.
 
 \begin{code}
-mkCase sw_chkr scrut outer_bndr outer_alts
-  |  switchIsOn sw_chkr SimplCaseMerge
+mkCase scrut outer_bndr outer_alts
+  |  opt_SimplCaseMerge
   && maybeToBool maybe_case_in_default
      
-  = tick CaseMerge			`thenSmpl_`
+  = tick (CaseMerge outer_bndr)		`thenSmpl_`
     returnSmpl (Case scrut outer_bndr new_alts)
 	-- Warning: don't call mkCase recursively!
 	-- Firstly, there's no point, because inner alts have already had
@@ -449,9 +491,9 @@ Now the identity-case transformation:
 and similar friends.
 
 \begin{code}
-mkCase sw_chkr scrut case_bndr alts
+mkCase scrut case_bndr alts
   | all identity_alt alts
-  = tick CaseIdentity		`thenSmpl_`
+  = tick (CaseIdentity case_bndr)		`thenSmpl_`
     returnSmpl scrut
   where
     identity_alt (DEFAULT, [], Var v)	     = v == case_bndr
@@ -469,7 +511,7 @@ mkCase sw_chkr scrut case_bndr alts
 The catch-all case
 
 \begin{code}
-mkCase sw_chkr other_scrut case_bndr other_alts
+mkCase other_scrut case_bndr other_alts
   = returnSmpl (Case other_scrut case_bndr other_alts)
 \end{code}
 
@@ -492,4 +534,11 @@ findAlt con alts
 
     matches (DEFAULT, _, _) = True
     matches (con1, _, _)    = con == con1
+
+
+mkCoerce to_ty (Note (Coerce _ from_ty) expr) 
+  | to_ty == from_ty = expr
+  | otherwise	     = Note (Coerce to_ty from_ty) expr
+mkCoerce to_ty expr
+  = Note (Coerce to_ty (coreExprType expr)) expr
 \end{code}

@@ -9,30 +9,32 @@ module SimplCore ( core2core ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..), 
-			  SwitchResult, switchIsOn,
-			  opt_D_dump_occur_anal,
+			  SwitchResult(..), switchIsOn, intSwitchSet,
+			  opt_D_dump_occur_anal, opt_D_dump_rules,
 			  opt_D_dump_simpl_iterations,
-			  opt_D_simplifier_stats,
-			  opt_D_dump_simpl,
+			  opt_D_dump_simpl_stats,
+			  opt_D_dump_simpl, opt_D_dump_rules,
 			  opt_D_verbose_core2core,
 			  opt_D_dump_occur_anal,
                           opt_UsageSPOn,
 			)
 import CoreLint		( beginPass, endPass )
+import CoreTidy		( tidyCorePgm )
 import CoreSyn
+import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareRuleBase, orphanRule )
+import CoreUnfold
 import PprCore		( pprCoreBindings )
 import OccurAnal	( occurAnalyseBinds )
 import CoreUtils	( exprIsTrivial, coreExprType )
-import Simplify		( simplBind )
-import SimplUtils	( etaCoreExpr, findDefault )
+import Simplify		( simplTopBinds, simplExpr )
+import SimplUtils	( etaCoreExpr, findDefault, simplBinders )
 import SimplMonad
-import CoreUnfold
 import Const		( Con(..), Literal(..), literalType, mkMachInt )
 import ErrUtils		( dumpIfSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( Id, mkSysLocal, mkUserId, isBottomingId,
-			  idType, setIdType, idName, idInfo, idDetails
+import Id		( Id, mkSysLocal, mkVanillaId, isBottomingId,
+			  idType, setIdType, idName, idInfo, setIdNoDiscard
 			)
 import IdInfo		( InlinePragInfo(..), specInfo, setSpecInfo,
 			  inlinePragInfo, setInlinePragInfo,
@@ -42,7 +44,7 @@ import Demand		( wwLazy )
 import VarEnv
 import VarSet
 import Module		( Module )
-import Name		( mkLocalName, tidyOccName, tidyTopName, initTidyOccEnv, isExported,
+import Name		( mkLocalName, tidyOccName, tidyTopName, 
 			  NamedThing(..), OccName
 			)
 import TyCon		( TyCon, isDataTyCon )
@@ -58,17 +60,15 @@ import TysWiredIn	( smallIntegerDataCon, isIntegerTy )
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
-import SpecEnv		( specEnvToList, specEnvFromList )
 import UsageSPInf       ( doUsageSPInf )
 import StrictAnal	( saBinds )
 import WorkWrap	        ( wwTopBinds )
 import CprAnalyse       ( cprAnalyse )
 
-import Var		( TyVar, mkId )
 import Unique		( Unique, Uniquable(..),
-			  ratioTyConKey, mkUnique, incrUnique, initTidyUniques
+			  ratioTyConKey
 		        )
-import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply )
+import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply, uniqFromSupply )
 import Constants	( tARGET_MIN_INT, tARGET_MAX_INT )
 import Util		( mapAccumL )
 import SrcLoc		( noSrcLoc )
@@ -80,63 +80,119 @@ import Outputable
 import Ratio 		( numerator, denominator )
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{The driver for the simplifier}
+%*									*
+%************************************************************************
+
 \begin{code}
 core2core :: [CoreToDo]		-- Spec of what core-to-core passes to do
-	  -> Module		-- Module name (profiling only)
-	  -> [Class]		-- Local classes
-	  -> UniqSupply		-- A name supply
-	  -> [CoreBind]		-- Input
-	  -> IO [CoreBind]	-- Result
+	  -> [CoreBind]		-- Binds in
+	  -> [ProtoCoreRule]	-- Rules
+	  -> IO ([CoreBind], [ProtoCoreRule])
 
-core2core core_todos module_name classes us binds
+core2core core_todos binds rules
   = do
-	let (us1, us23) = splitUniqSupply us
-            (us2, us3 ) = splitUniqSupply us23
+	us <-  mkSplitUniqSupply 's'
+	let (cp_us, us1)   = splitUniqSupply us
+	    (ru_us, ps_us) = splitUniqSupply us1
+
+        better_rules <- simplRules ru_us rules binds
+
+	let (binds1, rule_base) = prepareRuleBase binds better_rules
 
 	-- Do the main business
-	processed_binds <- doCorePasses us1 binds core_todos
+	(stats, processed_binds) <- doCorePasses zeroSimplCount cp_us binds1 
+						 rule_base core_todos
+
+	dumpIfSet opt_D_dump_simpl_stats
+		  "Grand total simplifier statistics"
+		  (pprSimplCount stats)
 
 	-- Do the post-simplification business
-	post_simpl_binds <- doPostSimplification us2 processed_binds
-
-	-- Do the final tidy-up
-	final_binds <- tidyCorePgm us3 module_name classes post_simpl_binds
+	post_simpl_binds <- doPostSimplification ps_us processed_binds
 
 	-- Return results
-	return final_binds
+	return (post_simpl_binds, filter orphanRule better_rules)
+   
 
-doCorePasses us binds []
-  = return binds
+doCorePasses stats us binds irs []
+  = return (stats, binds)
 
-doCorePasses us binds (to_do : to_dos) 
+doCorePasses stats us binds irs (to_do : to_dos) 
   = do
 	let (us1, us2) =  splitUniqSupply us
-	binds1 	       <- doCorePass us1 binds to_do
-	doCorePasses us2 binds1 to_dos
+	(stats1, binds1) <- doCorePass us1 binds irs to_do
+	doCorePasses (stats `plusSimplCount` stats1) us2 binds1 irs to_dos
 
-doCorePass us binds (CoreDoSimplify sw_chkr) = _scc_ "Simplify"       simplifyPgm sw_chkr us binds
-doCorePass us binds CoreLiberateCase	     = _scc_ "LiberateCase"   liberateCase binds
-doCorePass us binds CoreDoFloatInwards	     = _scc_ "FloatInwards"   floatInwards binds
-doCorePass us binds CoreDoFullLaziness       = _scc_ "CoreFloating"   floatOutwards us binds
-doCorePass us binds CoreDoStaticArgs	     = _scc_ "CoreStaticArgs" doStaticArgs us binds
-doCorePass us binds CoreDoStrictness	     = _scc_ "CoreStranal"    saBinds binds
-doCorePass us binds CoreDoWorkerWrapper	     = _scc_ "CoreWorkWrap"   wwTopBinds us binds
-doCorePass us binds CoreDoSpecialising	     = _scc_ "Specialise"     specProgram us binds
-doCorePass us binds CoreDoUSPInf
+doCorePass us binds rb (CoreDoSimplify sw_chkr) = _scc_ "Simplify"      simplifyPgm rb sw_chkr us binds
+doCorePass us binds rb CoreLiberateCase	        = _scc_ "LiberateCase"  noStats (liberateCase binds)
+doCorePass us binds rb CoreDoFloatInwards       = _scc_ "FloatInwards"  noStats (floatInwards binds)
+doCorePass us binds rb CoreDoFullLaziness       = _scc_ "FloatOutwards" noStats (floatOutwards us binds)
+doCorePass us binds rb CoreDoStaticArgs	        = _scc_ "StaticArgs"    noStats (doStaticArgs us binds)
+doCorePass us binds rb CoreDoStrictness	        = _scc_ "Stranal"       noStats (saBinds binds)
+doCorePass us binds rb CoreDoWorkerWrapper      = _scc_ "WorkWrap"      noStats (wwTopBinds us binds)
+doCorePass us binds rb CoreDoSpecialising       = _scc_ "Specialise"    noStats (specProgram us binds)
+doCorePass us binds rb CoreDoCPResult	        = _scc_ "CPResult"      noStats (cprAnalyse binds)
+doCorePass us binds rb CoreDoPrintCore	        = _scc_ "PrintCore"     noStats (printCore binds)
+doCorePass us binds rb CoreDoUSPInf
   = _scc_ "CoreUsageSPInf" 
     if opt_UsageSPOn then
-      doUsageSPInf us binds
+      noStats (doUsageSPInf us binds)
     else
       trace "WARNING: ignoring requested -fusagesp pass; requires -fusagesp-on" $
-        return binds
-doCorePass us binds CoreDoCPResult	     = _scc_ "CPResult"       cprAnalyse binds
-doCorePass us binds CoreDoPrintCore
-  = _scc_ "PrintCore"
-    do
-      putStr (showSDoc $ pprCoreBindings binds)
-      return binds
+      noStats (return binds)
+
+printCore binds = do dumpIfSet True "Print Core"
+			       (pprCoreBindings binds)
+		     return binds
+
+noStats thing = do { result <- thing; return (zeroSimplCount, result) }
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Dealing with rules}
+%*									*
+%************************************************************************
+
+We must do some gentle simplifiation on the template (but not the RHS)
+of each rule.  The case that forced me to add this was the fold/build rule,
+which without simplification looked like:
+	fold k z (build (/\a. g a))  ==>  ...
+This doesn't match unless you do eta reduction on the build argument.
+
+\begin{code}
+simplRules :: UniqSupply -> [ProtoCoreRule] -> [CoreBind] -> IO [ProtoCoreRule]
+simplRules us rules binds
+  = do  let (better_rules,_) = initSmpl sw_chkr us bind_vars black_list_all (mapSmpl simplRule rules)
+	
+	dumpIfSet opt_D_dump_rules
+		  "Transformation rules"
+		  (vcat (map pprProtoCoreRule better_rules))
+
+	return better_rules
+  where
+    black_list_all v = True 		-- This stops all inlining
+    sw_chkr any = SwBool False		-- A bit bogus
+
+	-- Boringly, we need to gather the in-scope set.
+	-- Typically this thunk won't even be force, but the test in
+	-- simpVar fails if it isn't right, and it might conceivably matter
+    bind_vars = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet binds
+
+
+simplRule rule@(ProtoCoreRule is_local id (Rule name bndrs args rhs))
+  | not is_local
+  = returnSmpl rule	-- No need to fiddle with imported rules
+  | otherwise
+  = simplBinders bndrs			$ \ bndrs' -> 
+    mapSmpl simplExpr args		`thenSmpl` \ args' ->
+    simplExpr rhs			`thenSmpl` \ rhs' ->
+    returnSmpl (ProtoCoreRule is_local id (Rule name bndrs' args' rhs'))
+\end{code}
 
 %************************************************************************
 %*									*
@@ -145,29 +201,38 @@ doCorePass us binds CoreDoPrintCore
 %************************************************************************
 
 \begin{code}
-simplifyPgm :: (SimplifierSwitch -> SwitchResult)
+simplifyPgm :: RuleBase
+	    -> (SimplifierSwitch -> SwitchResult)
 	    -> UniqSupply
-	    -> [CoreBind]		-- Input
-	    -> IO [CoreBind]		-- New bindings
+	    -> [CoreBind]				-- Input
+	    -> IO (SimplCount, [CoreBind])		-- New bindings
 
-simplifyPgm sw_chkr us binds
+simplifyPgm (imported_rule_ids, rule_lhs_fvs) 
+	    sw_chkr us binds
   = do {
 	beginPass "Simplify";
 
-	(termination_msg, it_count, counts, binds') <- iteration us 1 zeroSimplCount binds;
+	-- Glom all binds together in one Rec, in case any
+	-- transformations have introduced any new dependencies
+	let { recd_binds = [Rec (flattenBinds binds)] };
 
-	dumpIfSet opt_D_simplifier_stats "Simplifier statistics"
+	(termination_msg, it_count, counts_out, binds') <- iteration us 1 zeroSimplCount recd_binds;
+
+	dumpIfSet (opt_D_verbose_core2core && opt_D_dump_simpl_stats)
+		  "Simplifier statistics"
 		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
 			 text "",
-			 pprSimplCount counts]);
+			 pprSimplCount counts_out]);
 
 	endPass "Simplify" 
 		(opt_D_verbose_core2core && not opt_D_dump_simpl_iterations)
-		binds'
+		binds' ;
+
+	return (counts_out, binds')
     }
   where
-    max_iterations      = getSimplIntSwitch sw_chkr MaxSimplifierIterations
-    simpl_switch_is_on  = switchIsOn sw_chkr
+    max_iterations = getSimplIntSwitch sw_chkr MaxSimplifierIterations
+    black_list_fn  = blackListed rule_lhs_fvs (intSwitchSet sw_chkr SimplInlinePhase)
 
     core_iter_dump binds | opt_D_verbose_core2core = pprCoreBindings binds
 		         | otherwise		   = empty
@@ -175,12 +240,15 @@ simplifyPgm sw_chkr us binds
     iteration us iteration_no counts binds
       = do {
 		-- Occurrence analysis
-	   let { tagged_binds = _scc_ "OccAnal" occurAnalyseBinds simpl_switch_is_on binds };
+	   let { tagged_binds = _scc_ "OccAnal" occurAnalyseBinds binds } ;
+
 	   dumpIfSet opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
 		-- Simplify
-	   let { (binds', counts') = initSmpl sw_chkr us1 (simplTopBinds tagged_binds);
+	   let { (binds', counts') = initSmpl sw_chkr us1 imported_rule_ids 
+					      black_list_fn 
+					      (simplTopBinds tagged_binds);
 	         all_counts        = counts `plusSimplCount` counts'
 	       } ;
 
@@ -193,14 +261,19 @@ simplifyPgm sw_chkr us binds
 	   dumpIfSet opt_D_dump_simpl_iterations
 		     ("Simplifier iteration " ++ show iteration_no 
 		      ++ " out of " ++ show max_iterations)
-		     (vcat[pprSimplCount counts',
-			   text "",
-			   core_iter_dump binds']) ;
+		     (pprSimplCount counts') ;
+
+	   if opt_D_dump_simpl_iterations then
+		endPass ("Simplifier iteration " ++ show iteration_no ++ " result")
+			opt_D_verbose_core2core
+			binds'
+	   else
+		return [] ;
 
 		-- Stop if we've run out of iterations
 	   if iteration_no == max_iterations then
 		do {
-		    if  max_iterations > 1 then
+		    if  max_iterations > 2 then
 			    hPutStr stderr ("NOTE: Simplifier still going after " ++ 
 				    show max_iterations ++ 
 				    " iterations; bailing out.\n")
@@ -214,188 +287,7 @@ simplifyPgm sw_chkr us binds
 	}  }
       where
   	  (us1, us2) = splitUniqSupply us
-
-
-simplTopBinds binds = go binds		`thenSmpl` \ (binds', _) ->
-		      returnSmpl binds'
-		    where
-		      go []              = returnSmpl ([], ())
-		      go (bind1 : binds) = simplBind bind1 (go binds)
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Tidying core}
-%*									*
-%************************************************************************
-
-Several tasks are done by @tidyCorePgm@
-
-1.  Make certain top-level bindings into Globals. The point is that 
-    Global things get externally-visible labels at code generation
-    time
-
-
-2. Give all binders a nice print-name.  Their uniques aren't changed;
-   rather we give them lexically unique occ-names, so that we can
-   safely print the OccNae only in the interface file.  [Bad idea to
-   change the uniques, because the code generator makes global labels
-   from the uniques for local thunks etc.]
-
-3. If @opt_UsageSPOn@ then compute usage information (which is
-   needed by Core2Stg).  ** NOTE _scc_ HERE **
-
-\begin{code}
-tidyCorePgm :: UniqSupply -> Module -> [Class] -> [CoreBind] -> IO [CoreBind]
-tidyCorePgm us mod local_classes binds_in
-  = do
-	beginPass "Tidy Core"
-	let (_, binds_tidy) = mapAccumL (tidyBind (Just mod)) init_tidy_env binds_in
-        binds_out <- if opt_UsageSPOn
-                     then _scc_ "CoreUsageSPInf" doUsageSPInf us binds_tidy
-                     else return binds_tidy
-	endPass "Tidy Core" (opt_D_dump_simpl || opt_D_verbose_core2core) binds_out
-  where
-	-- Make sure to avoid the names of class operations
-	-- They don't have top-level bindings, so we won't see them
-	-- in binds_in; so we must initialise the tidy_env appropriately
-	--
-	-- We also make sure to avoid any exported binders.  Consider
-	--	f{-u1-} = 1	-- Local decl
-	--	...
-	--	f{-u2-} = 2	-- Exported decl
-	--
-	-- The second exported decl must 'get' the name 'f', so we
-	-- have to put 'f' in the avoids list before we get to the first
-	-- decl.  Name.tidyName then does a no-op on exported binders.
-    init_tidy_env = (initTidyOccEnv avoids, emptyVarEnv)
-    avoids	  = [getOccName sel_id | cls <- local_classes,
-					 sel_id <- classSelIds cls]
-		    ++
-		    [getOccName bndr | bind <- binds_in,
-				       bndr <- bindersOf bind,
-				       isExported bndr]
-
-tidyBind :: Maybe Module		-- (Just m) for top level, Nothing for nested
-	 -> TidyEnv
-	 -> CoreBind
-	 -> (TidyEnv, CoreBind)
-tidyBind maybe_mod env (NonRec bndr rhs)
-  = let
-	(env', bndr') = tidyBndr maybe_mod env bndr
-	rhs'	      = tidyExpr env rhs
-    in
-    (env', NonRec bndr' rhs')
-
-tidyBind maybe_mod env (Rec pairs)
-  = let
-	-- We use env' when tidying the rhss
-	-- When tidying the binder itself we may tidy it's
-	-- specialisations; if any of these mention other binders
-	-- in the group we should really feed env' to them too;
-	-- but that seems (a) unlikely and (b) a bit tiresome.
-	-- So I left it out for now
-
-	(bndrs, rhss)  = unzip pairs
-	(env', bndrs') = mapAccumL (tidyBndr maybe_mod) env bndrs
-	rhss'	       = map (tidyExpr env') rhss
-  in
-  (env', Rec (zip bndrs' rhss'))
-
-tidyExpr env (Type ty)	     = Type (tidyType env ty)
-tidyExpr env (Con con args)  = Con con (map (tidyExpr env) args)
-tidyExpr env (App f a)       = App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (Note n e)      = Note (tidyNote env n) (tidyExpr env e)
-
-tidyExpr env (Let b e)       = Let b' (tidyExpr env' e)
-			     where
-			       (env', b') = tidyBind Nothing env b
-
-tidyExpr env (Case e b alts) = Case (tidyExpr env e) b' (map (tidyAlt env') alts)
-			     where
-			       (env', b') = tidyNestedBndr env b
-
-tidyExpr env (Var v)         = case lookupVarEnv var_env v of
-				  Just v' -> Var v'
-				  Nothing -> Var v
-			     where
-			       (_, var_env) = env
-
-tidyExpr env (Lam b e)	     = Lam b' (tidyExpr env' e)
-			     where
-			       (env', b') = tidyNestedBndr env b
-
-tidyAlt env (con, vs, rhs)   = (con, vs', tidyExpr env' rhs)
-			     where
-			       (env', vs') = mapAccumL tidyNestedBndr env vs
-
-tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
-
-tidyNote env note            = note
-\end{code}
-
-\begin{code}
-tidyBndr (Just mod) env id  = tidyTopBndr mod env id
-tidyBndr Nothing    env var = tidyNestedBndr  env var
-
-tidyNestedBndr env tyvar
-  | isTyVar tyvar
-  = tidyTyVar env tyvar
-
-tidyNestedBndr env@(tidy_env, var_env) id
-  = 	-- Non-top-level variables
-    let 
-	-- Give the Id a fresh print-name, *and* rename its type
-	-- The SrcLoc isn't important now, though we could extract it from the Id
-	name'        	  = mkLocalName (getUnique id) occ' noSrcLoc
-	(tidy_env', occ') = tidyOccName tidy_env (getOccName id)
-        ty'          	  = tidyType env (idType id)
-	id'          	  = mkUserId name' ty'
-			-- NB: This throws away the IdInfo of the Id, which we
-			-- no longer need.  That means we don't need to
-			-- run over it with env, nor renumber it.
-	var_env'	  = extendVarEnv var_env id id'
-    in
-    ((tidy_env', var_env'), id')
-
-tidyTopBndr mod env@(tidy_env, var_env) id
-  =	-- Top level variables
-    let
-	(tidy_env', name') = tidyTopName mod tidy_env (idName id)
-	ty'	           = tidyTopType (idType id)
-	idinfo'		   = tidyIdInfo env (idInfo id)
-	id'		   = mkId name' ty' (idDetails id) idinfo'
-	var_env'	   = extendVarEnv var_env id id'
-    in
-    ((tidy_env', var_env'), id')
-
--- tidyIdInfo does these things:
---	a) tidy the specialisation info (if any)
---	b) zap a complicated ICanSafelyBeINLINEd pragma,
---	c) zap the unfolding
--- The latter two are to avoid space leaks
-
-tidyIdInfo env info
-  = info3
-  where
-    spec_items = specEnvToList (specInfo info)
-    spec_env'  = specEnvFromList (map tidy_item spec_items)
-    info1 | null spec_items = info 
-	  | otherwise	    = spec_env' `setSpecInfo` info
-		
-    info2 = case inlinePragInfo info of
-		ICanSafelyBeINLINEd _ _ -> NoInlinePragInfo `setInlinePragInfo` info1
-		other			-> info1
-
-    info3 = noUnfolding `setUnfoldingInfo` (wwLazy `setDemandInfo`  info2)
-
-    tidy_item (tyvars, tys, rhs)
-	= (tyvars', tidyTypes env' tys, tidyExpr env' rhs)
-	where
-	  (env', tyvars') = tidyTyVars env tyvars
-\end{code}
-
 
 
 %************************************************************************

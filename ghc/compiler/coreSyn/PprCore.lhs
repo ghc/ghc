@@ -9,8 +9,9 @@
 
 \begin{code}
 module PprCore (
-	pprCoreExpr, pprIfaceUnfolding, 
-	pprCoreBinding, pprCoreBindings, pprIdBndr
+	pprCoreExpr, pprParendExpr, pprIfaceUnfolding, 
+	pprCoreBinding, pprCoreBindings, pprIdBndr,
+	pprCoreRules, pprCoreRule
     ) where
 
 #include "HsVersions.h"
@@ -20,7 +21,7 @@ import CostCentre	( pprCostCentreCore )
 import Id		( idType, idInfo, getInlinePragma, getIdDemandInfo, Id )
 import Var		( isTyVar )
 import IdInfo		( IdInfo,
-			  arityInfo, ppArityInfo,
+			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
 			  cprInfo, ppCprInfo
@@ -28,7 +29,6 @@ import IdInfo		( IdInfo,
 import Const		( Con(..), DataCon )
 import DataCon		( isTupleCon, isUnboxedTupleCon )
 import PprType		( pprParendType, pprTyVarBndr )
-import SpecEnv		( specEnvToList )
 import PprEnv
 import Outputable
 \end{code}
@@ -58,10 +58,12 @@ Un-annotated core dumps
 pprCoreBindings :: [CoreBind] -> SDoc
 pprCoreBinding  :: CoreBind   -> SDoc
 pprCoreExpr     :: CoreExpr   -> SDoc
+pprParendExpr   :: CoreExpr   -> SDoc
 
 pprCoreBindings = pprTopBinds pprCoreEnv
 pprCoreBinding  = pprTopBind pprCoreEnv
 pprCoreExpr     = ppr_expr pprCoreEnv
+pprParendExpr   = ppr_parend_expr pprCoreEnv
 
 pprCoreEnv = initCoreEnv pprCoreBinder
 \end{code}
@@ -70,7 +72,10 @@ Printer for unfoldings in interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 pprIfaceUnfolding :: CoreExpr -> SDoc
-pprIfaceUnfolding = ppr_expr pprIfaceEnv
+pprIfaceUnfolding = ppr_parend_expr pprIfaceEnv
+	-- Notice that it's parenthesised
+
+pprIfaceArg = ppr_arg pprIfaceEnv
 
 pprIfaceEnv = initCoreEnv pprIfaceBinder
 \end{code}
@@ -245,21 +250,24 @@ ppr_expr pe (Note (SCC cc) expr)
 
 #ifdef DEBUG
 ppr_expr pe (Note (Coerce to_ty from_ty) expr)
- = \ sty ->
+ = getPprStyle $ \ sty ->
    if debugStyle sty && not (ifaceStyle sty) then
-      sep [hsep [ptext SLIT("__coerce"), pTy pe to_ty, pTy pe from_ty],
-		  ppr_parend_expr pe expr] sty
+      sep [ptext SLIT("__coerce") <+> sep [pTy pe to_ty, pTy pe from_ty],
+	   ppr_parend_expr pe expr]
    else
       sep [hsep [ptext SLIT("__coerce"), pTy pe to_ty],
-	          ppr_parend_expr pe expr] sty
+	          ppr_parend_expr pe expr]
 #else
 ppr_expr pe (Note (Coerce to_ty from_ty) expr)
-  = sep [hsep [ptext SLIT("__coerce"), pTy pe to_ty],
+  = sep [sep [ptext SLIT("__coerce"), nest 4 pTy pe to_ty],
 	 ppr_parend_expr pe expr]
 #endif
 
 ppr_expr pe (Note InlineCall expr)
-  = ptext SLIT("__inline") <+> ppr_parend_expr pe expr
+  = ptext SLIT("__inline_call") <+> ppr_parend_expr pe expr
+
+ppr_expr pe (Note InlineMe expr)
+  = ptext SLIT("__inline_me") <+> ppr_parend_expr pe expr
 
 ppr_expr pe (Note (TermUsg u) expr)
   = \ sty ->
@@ -333,13 +341,14 @@ pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdDem
 ppIdInfo :: IdInfo -> SDoc
 ppIdInfo info
   = hsep [
+	    ppFlavourInfo (flavourInfo info),
 	    ppArityInfo a,
 	    ppUpdateInfo u,
 	    ppStrictnessInfo s,
 	    ppr d,
 	    ppCafInfo c,
             ppCprInfo m,
-	    ppSpecInfo p
+	    pprIfaceCoreRules p
 	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
 	]
   where
@@ -352,16 +361,24 @@ ppIdInfo info
     p = specInfo info
 \end{code}
 
-\begin{code}
-ppSpecInfo spec_env
-  = vcat (map pp_item (specEnvToList spec_env))
-  where
-    pp_item (tyvars, tys, rhs) = hsep [ptext SLIT("__P"),
-				       hsep (map pprParendType tys),
-				       ptext SLIT("->"),
-				       ppr head]
-	where
-	   (_, body) = collectBinders rhs
-	   (head, _) = collectArgs body
-\end{code}
 
+\begin{code}
+pprCoreRules :: Id -> CoreRules -> SDoc
+pprCoreRules var (Rules rules _) = vcat (map (pprCoreRule (Just var)) rules)
+
+pprIfaceCoreRules :: CoreRules -> SDoc
+pprIfaceCoreRules (Rules rules _) = vcat (map (pprCoreRule Nothing) rules)
+
+pprCoreRule :: Maybe Id -> CoreRule -> SDoc
+pprCoreRule maybe_fn (Rule name tpl_vars tpl_args rhs)
+  = doubleQuotes (ptext name) <+> 
+    sep [
+	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
+	  nest 4 (pp_fn <+> sep (map pprIfaceArg tpl_args)),
+	  nest 4 (ptext SLIT("=") <+> pprIfaceUnfolding rhs)
+    ]
+  where
+    pp_fn = case maybe_fn of
+	    	Just id -> ppr id
+		Nothing -> empty		-- Interface file
+\end{code}

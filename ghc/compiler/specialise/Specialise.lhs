@@ -8,28 +8,31 @@ module Specialise ( specProgram ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_spec )
+import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_spec, opt_D_dump_rules )
 import Id		( Id, idName, idType, mkTemplateLocals, mkUserLocal,
-			  getIdSpecialisation, setIdSpecialisation, 
-			  isSpecPragmaId,
+			  getIdSpecialisation, setIdNoDiscard, isExportedId,
+			  modifyIdInfo
 			)
+import IdInfo		( zapSpecPragInfo )
 import VarSet
 import VarEnv
 
-import Type		( Type, TyVarSubst, mkTyVarTy, splitSigmaTy, substTy, 
-			  fullSubstTy, tyVarsOfType, tyVarsOfTypes,
+import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
+			  tyVarsOfType, tyVarsOfTypes, applyTys,
 			  mkForAllTys, boxedTypeKind
 			)
+import Subst		( Subst, mkSubst, substTy, emptySubst, substBndrs, extendSubstList,
+			  substExpr, substId, substIds, substAndCloneId, substAndCloneIds, lookupSubst
+			) 
 import Var		( TyVar, mkSysTyVar, setVarUnique )
 import VarSet
 import VarEnv
 import CoreSyn
-import CoreUtils	( IdSubst, SubstCoreExpr(..), exprFreeVars,
-			  substExpr, substId, substIds, coreExprType
-			)
+import CoreUtils	( coreExprType, applyTypeToArgs )
+import CoreFVs		( exprFreeVars, exprsFreeVars )
 import CoreLint		( beginPass, endPass )
-import PprCore		()	-- Instances 
-import SpecEnv		( addToSpecEnv )
+import PprCore		( pprCoreRules )
+import Rules		( addIdSpecialisations )
 
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, thenUs_, returnUs, getUniqueUs, 
@@ -38,9 +41,10 @@ import UniqSupply	( UniqSupply,
 import Name		( nameOccName, mkSpecOcc, getSrcLoc )
 import FiniteMap
 import Maybes		( MaybeErr(..), catMaybes )
+import ErrUtils		( dumpIfSet )
 import Bag
 import List		( partition )
-import Util		( zipEqual, mapAccumL )
+import Util		( zipEqual, zipWithEqual, mapAccumL )
 import Outputable
 
 
@@ -584,11 +588,17 @@ specProgram us binds
 
 	endPass "Specialise" (opt_D_dump_spec || opt_D_verbose_core2core) binds'
 
+	dumpIfSet opt_D_dump_rules "Top-level specialisations"
+		  (vcat (map dump_specs (concat (map bindersOf binds'))))
+
+	return binds'
   where
     go []	    = returnSM ([], emptyUDs)
-    go (bind:binds) = go binds 		`thenSM` \ (binds', uds) ->
-		      specBind bind uds	`thenSM` \ (bind', uds') ->
+    go (bind:binds) = go binds 				`thenSM` \ (binds', uds) ->
+		      specBind emptySubst bind uds	`thenSM` \ (bind', uds') ->
 		      returnSM (bind' ++ binds', uds')
+
+dump_specs var = pprCoreRules var (getIdSpecialisation var)
 \end{code}
 
 %************************************************************************
@@ -598,70 +608,90 @@ specProgram us binds
 %************************************************************************
 
 \begin{code}
-specExpr :: CoreExpr -> SpecM (CoreExpr, UsageDetails)
+specVar :: Subst -> Id -> CoreExpr
+specVar subst v = case lookupSubst subst v of
+			Nothing	        -> Var v
+			Just (DoneEx e) -> e
+
+specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
+-- We carry a substitution down:
+--	a) we must clone any binding that might flaot outwards,
+--	   to avoid name clashes
+--	b) we carry a type substitution to use when analysing
+--	   the RHS of specialised bindings (no type-let!)
 
 ---------------- First the easy cases --------------------
-specExpr e@(Type _)   = returnSM (e, emptyUDs)
-specExpr e@(Var _)    = returnSM (e, emptyUDs)
+specExpr subst (Type ty) = returnSM (Type (substTy subst ty), emptyUDs)
+specExpr subst (Var v)   = returnSM (specVar subst v,         emptyUDs)
 
-specExpr e@(Con con args)
-  = mapAndCombineSM specExpr args	`thenSM` \ (args', uds) ->
+specExpr subst e@(Con con args)
+  = mapAndCombineSM (specExpr subst) args	`thenSM` \ (args', uds) ->
     returnSM (Con con args', uds)
 
-specExpr (Note note body)
-  = specExpr body 	`thenSM` \ (body', uds) ->
-    returnSM (Note note body', uds)
+specExpr subst (Note note body)
+  = specExpr subst body 	`thenSM` \ (body', uds) ->
+    returnSM (Note (specNote subst note) body', uds)
 
 
 ---------------- Applications might generate a call instance --------------------
-specExpr expr@(App fun arg)
+specExpr subst expr@(App fun arg)
   = go expr []
   where
-    go (App fun arg) args = specExpr arg	`thenSM` \ (arg', uds_arg) ->
+    go (App fun arg) args = specExpr subst arg	`thenSM` \ (arg', uds_arg) ->
 			    go fun (arg':args)	`thenSM` \ (fun', uds_app) ->
 			    returnSM (App fun' arg', uds_arg `plusUDs` uds_app)
 
-    go (Var f)       args = returnSM (Var f, mkCallUDs f args)
-    go other	     args = specExpr other
+    go (Var f)       args = case specVar subst f of
+				Var f' -> returnSM (Var f', mkCallUDs f' args)
+				e'     -> returnSM (e', emptyUDs)	-- I don't expect this!
+    go other	     args = specExpr subst other
 
 ---------------- Lambda/case require dumping of usage details --------------------
-specExpr e@(Lam _ _)
-  = specExpr body 	`thenSM` \ (body', uds) ->
+specExpr subst e@(Lam _ _)
+  = specExpr subst' body 	`thenSM` \ (body', uds) ->
     let
-	(filtered_uds, body'') = dumpUDs bndrs uds body'
+	(filtered_uds, body'') = dumpUDs bndrs' uds body'
     in
-    returnSM (mkLams bndrs body'', filtered_uds)
+    returnSM (mkLams bndrs' body'', filtered_uds)
   where
-    (bndrs, body) = go [] e
-
+    (bndrs, body) = collectBinders e
+    (subst', bndrs') = substBndrs subst bndrs
 	-- More efficient to collect a group of binders together all at once
 	-- and we don't want to split a lambda group with dumped bindings
-    go bndrs (Lam bndr e) = go (bndr:bndrs) e
-    go bndrs e            = (reverse bndrs, e)
 
-
-specExpr (Case scrut case_bndr alts)
-  = specExpr scrut			`thenSM` \ (scrut', uds_scrut) ->
+specExpr subst (Case scrut case_bndr alts)
+  = specExpr subst scrut			`thenSM` \ (scrut', uds_scrut) ->
     mapAndCombineSM spec_alt alts	`thenSM` \ (alts', uds_alts) ->
-    returnSM (Case scrut' case_bndr alts', uds_scrut `plusUDs` uds_alts)
+    returnSM (Case scrut' case_bndr' alts', uds_scrut `plusUDs` uds_alts)
   where
+    (subst_alt, case_bndr') = substId subst case_bndr
+
     spec_alt (con, args, rhs)
-	= specExpr rhs		`thenSM` \ (rhs', uds) ->
+	= specExpr subst_rhs rhs		`thenSM` \ (rhs', uds) ->
 	  let
 	     (uds', rhs'') = dumpUDs args uds rhs'
 	  in
-	  returnSM ((con, args, rhs''), uds')
+	  returnSM ((con, args', rhs''), uds')
+	where
+	  (subst_rhs, args') = substBndrs subst_alt args
 
 ---------------- Finally, let is the interesting case --------------------
-specExpr (Let bind body)
-  =	-- Deal with the body
-    specExpr body				`thenSM` \ (body', body_uds) ->
+specExpr subst (Let bind body)
+  =	-- Clone binders
+    cloneBindSM subst bind			`thenSM` \ (rhs_subst, body_subst, bind') ->
+	
+	-- Deal with the body
+    specExpr body_subst body			`thenSM` \ (body', body_uds) ->
 
 	-- Deal with the bindings
-    specBind bind body_uds			`thenSM` \ (binds', uds) ->
+    specBind rhs_subst bind' body_uds		`thenSM` \ (binds', uds) ->
 
 	-- All done
     returnSM (foldr Let body' binds', uds)
+
+-- Must apply the type substitution to coerceions
+specNote subst (Coerce t1 t2) = Coerce (substTy subst t1) (substTy subst t2)
+specNote subst note	      = note
 \end{code}
 
 %************************************************************************
@@ -671,20 +701,14 @@ specExpr (Let bind body)
 %************************************************************************
 
 \begin{code}
-specBind :: CoreBind
+specBind :: Subst			-- Use this for RHSs
+	 -> CoreBind
 	 -> UsageDetails		-- Info on how the scope of the binding
 	 -> SpecM ([CoreBind],		-- New bindings
 		   UsageDetails)	-- And info to pass upstream
 
-specBind bind@(NonRec bndr rhs) body_uds
-  | isSpecPragmaId bndr		-- Aha!  A spec-pragma Id.  Collect UDs from
-				-- its RHS and discard it!
-  = specExpr rhs				`thenSM` \ (rhs', rhs_uds) ->
-    returnSM ([], rhs_uds `plusUDs` body_uds)
-
-
-specBind bind body_uds
-  = specBindItself bind (calls body_uds)	`thenSM` \ (bind', bind_uds) ->
+specBind rhs_subst bind body_uds
+  = specBindItself rhs_subst bind (calls body_uds)	`thenSM` \ (bind', bind_uds) ->
     let
 	bndrs   = bindersOf bind
 	all_uds = zapCalls bndrs (body_uds `plusUDs` bind_uds)
@@ -728,8 +752,8 @@ mkBigUD bind dbs calls
 
 -- specBindItself deals with the RHS, specialising it according
 -- to the calls found in the body (if any)
-specBindItself (NonRec bndr rhs) call_info
-  = specDefn call_info (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
+specBindItself rhs_subst (NonRec bndr rhs) call_info
+  = specDefn rhs_subst call_info (bndr,rhs)	`thenSM` \ ((bndr',rhs'), spec_defns, spec_uds) ->
     let
         new_bind | null spec_defns = NonRec bndr' rhs'
                  | otherwise       = Rec ((bndr',rhs'):spec_defns)
@@ -738,8 +762,8 @@ specBindItself (NonRec bndr rhs) call_info
     in
     returnSM (new_bind, spec_uds)
 
-specBindItself (Rec pairs) call_info
-  = mapSM (specDefn call_info) pairs	`thenSM` \ stuff ->
+specBindItself rhs_subst (Rec pairs) call_info
+  = mapSM (specDefn rhs_subst call_info) pairs	`thenSM` \ stuff ->
     let
 	(pairs', spec_defns_s, spec_uds_s) = unzip3 stuff
 	spec_defns = concat spec_defns_s
@@ -749,7 +773,8 @@ specBindItself (Rec pairs) call_info
     returnSM (new_bind, spec_uds)
     
 
-specDefn :: CallDetails			-- Info on how it is used in its scope
+specDefn :: Subst			-- Subst to use for RHS
+	 -> CallDetails			-- Info on how it is used in its scope
 	 -> (Id, CoreExpr)		-- The thing being bound and its un-processed RHS
 	 -> SpecM ((Id, CoreExpr),	-- The thing and its processed RHS
 					-- 	the Id may now have specialisations attached
@@ -757,34 +782,35 @@ specDefn :: CallDetails			-- Info on how it is used in its scope
 		   UsageDetails		-- Stuff to fling upwards from the RHS and its
 	    )				-- 	specialised versions
 
-specDefn calls (fn, rhs)
+specDefn subst calls (fn, rhs)
 	-- The first case is the interesting one
   |  n_tyvars == length rhs_tyvars	-- Rhs of fn's defn has right number of big lambdas
   && n_dicts  <= length rhs_bndrs	-- and enough dict args
   && not (null calls_for_me)		-- And there are some calls to specialise
   =   -- Specialise the body of the function
-    specExpr body					`thenSM` \ (body', body_uds) ->
-    let
-	(float_uds, bound_uds@(dict_binds,_)) = splitUDs rhs_bndrs body_uds
-    in
+    specExpr subst rhs					`thenSM` \ (rhs', rhs_uds) ->
 
       -- Make a specialised version for each call in calls_for_me
-    mapSM (spec_call bound_uds) calls_for_me		`thenSM` \ stuff ->
+    mapSM spec_call calls_for_me		`thenSM` \ stuff ->
     let
 	(spec_defns, spec_uds, spec_env_stuff) = unzip3 stuff
 
-	fn'  = addIdSpecialisations fn spec_env_stuff
-	rhs' = mkLams rhs_bndrs (mkDictLets dict_binds body')
+	fn' = addIdSpecialisations zapped_fn spec_env_stuff
     in
     returnSM ((fn',rhs'), 
 	      spec_defns, 
-	      float_uds `plusUDs` plusUDList spec_uds)
+	      rhs_uds `plusUDs` plusUDList spec_uds)
 
   | otherwise	-- No calls or RHS doesn't fit our preconceptions
-  = specExpr rhs			`thenSM` \ (rhs', rhs_uds) ->
-    returnSM ((fn, rhs'), [], rhs_uds)
+  = specExpr subst rhs			`thenSM` \ (rhs', rhs_uds) ->
+    returnSM ((zapped_fn, rhs'), [], rhs_uds)
   
   where
+    zapped_fn		 = modifyIdInfo zapSpecPragInfo fn
+	-- If the fn is a SpecPragmaId, make it discardable
+	-- It's role as a holder for a call instance is o'er
+	-- But it might be alive for some other reason by now.
+
     fn_type		 = idType fn
     (tyvars, theta, tau) = splitSigmaTy fn_type
     n_tyvars		 = length tyvars
@@ -802,87 +828,61 @@ specDefn calls (fn, rhs)
 
     ----------------------------------------------------------
 	-- Specialise to one particular call pattern
-    spec_call :: ProtoUsageDetails          -- From the original body, captured by
-					    -- the dictionary lambdas
-              -> ([Maybe Type], ([DictExpr], IdOrTyVarSet))  -- Call instance
-              -> SpecM ((Id,CoreExpr),    	  -- Specialised definition
-	                UsageDetails,             -- Usage details from specialised body
-                	([TyVar], [Type], CoreExpr))       -- Info for the Id's SpecEnv
-    spec_call bound_uds (call_ts, (call_ds, _))
+    spec_call :: ([Maybe Type], ([DictExpr], IdOrTyVarSet))	-- Call instance
+              -> SpecM ((Id,CoreExpr),				-- Specialised definition
+	                UsageDetails, 				-- Usage details from specialised body
+                	([CoreBndr], [CoreExpr], CoreExpr))	-- Info for the Id's SpecEnv
+    spec_call (call_ts, (call_ds, call_fvs))
       = ASSERT( length call_ts == n_tyvars && length call_ds == n_dicts )
 		-- Calls are only recorded for properly-saturated applications
 	
-        -- Supppose the call is for f [Just t1, Nothing, Just t3, Nothing] [d1, d2]
+	-- Suppose f's defn is 	f = /\ a b c d -> \ d1 d2 -> rhs	
+        -- Supppose the call is for f [Just t1, Nothing, Just t3, Nothing] [dx1, dx2]
 
-		-- Construct the new binding
-		-- 	f1 = /\ b d -> (..rhs of f..) t1 b t3 d d1 d2
-		-- and the type of this binder
+	-- Construct the new binding
+	-- 	f1 = SUBST[a->t1,c->t3, d1->d1', d2->d2'] (/\ b d -> rhs)
+	-- PLUS the usage-details
+	--	{ d1' = dx1; d2' = dx2 }
+	-- where d1', d2' are cloned versions of d1,d2, with the type substitution applied.
+	--
+	-- Note that the substitution is applied to the whole thing.
+	-- This is convenient, but just slightly fragile.  Notably:
+	--	* There had better be no name clashes in a/b/c/d
+	--
         let
-	  mk_spec_ty Nothing   = newTyVarSM   `thenSM` \ tyvar ->
-			         returnSM (Just tyvar, mkTyVarTy tyvar)
-	  mk_spec_ty (Just ty) = returnSM (Nothing,    ty)
-        in
-        mapSM mk_spec_ty call_ts   `thenSM` \ stuff ->
-        let
-	   (maybe_spec_tyvars, spec_tys) = unzip stuff
-           spec_tyvars = catMaybes maybe_spec_tyvars
-  	   spec_id_ty  = mkForAllTys spec_tyvars 
-				     (substTy (zipVarEnv tyvars spec_tys) tau)
-		-- NB When substituting in tau we need a ty_env mentioning tyvars
-		-- but when substituting in UDs we need a ty_evn mentioning rhs_tyvars
-	   ud_ty_env   = zipVarEnv rhs_tyvars spec_tys
-	   ud_dict_env = zipVarEnv rhs_dicts (map Done call_ds)
-
-		-- Only the overloaded tyvars should be free in the uds
-	   ty_env   = mkVarEnv [ (rhs_tyvar, ty) 
-			       | (rhs_tyvar, Just ty) <- zipEqual "specUDs1" rhs_tyvars call_ts
-			       ]
-
+		-- poly_tyvars = [b,d] in the example above
+		-- spec_tyvars = [a,c] 
+		-- ty_args     = [t1,b,t3,d]
+	   poly_tyvars = [tv | (tv, Nothing) <- rhs_tyvars `zip` call_ts]
+           spec_tyvars = [tv | (tv, Just _)  <- rhs_tyvars `zip` call_ts]
+	   ty_args     = zipWithEqual "spec_call" mk_ty_arg rhs_tyvars call_ts
+		       where
+		 	 mk_ty_arg rhs_tyvar Nothing   = Type (mkTyVarTy rhs_tyvar)
+			 mk_ty_arg rhs_tyvar (Just ty) = Type ty
+	   rhs_subst  = extendSubstList subst spec_tyvars [DoneTy ty | Just ty <- call_ts]
 	in
-
-		-- Specialise the UDs from f's RHS
-        specUDs ud_ty_env ud_dict_env bound_uds			`thenSM` \ spec_uds ->
-
-
-		-- Construct the stuff for f's spec env
-		--	[b,d] [t1,b,t3,d]  |->  \d1 d2 -> f1 b d
-		-- The only awkward bit is that d1,d2 might well be global
-		-- dictionaries, so it's tidier to make new local variables
-		-- for the lambdas in the RHS, rather than lambda-bind the
-		-- dictionaries themselves.
-		--
-		-- In fact we use the standard template locals, so that the
-		-- they don't need to be "tidied" before putting in interface files
-	newIdSM fn spec_id_ty		`thenSM` \ spec_f ->
+	cloneBinders rhs_subst rhs_dicts 		`thenSM` \ (rhs_subst', rhs_dicts') ->
 	let
-	   arg_ds	 = mkTemplateLocals (map coreExprType call_ds)
-	   spec_env_rhs  = mkLams arg_ds $
-			   mkTyApps (Var spec_f) $
-			   map mkTyVarTy spec_tyvars
-           spec_env_info = (spec_tyvars, spec_tys, spec_env_rhs)
-        in
+	   inst_args = ty_args ++ map Var rhs_dicts'
 
-		-- Finally construct f's RHS
-		-- Annoyingly, the specialised UDs may mention some of the *un* specialised
-		-- type variables.  Here's a case that came up in nofib/spectral/typech98:
-		--	f = /\m a -> \d:Monad m -> let d':Monad (T m a) = ...a... in ...
-		-- When we try to make a specialised verison of f, from a call pattern
-		--	(f Maybe ?)
-		-- where ? is the Nothing for an unspecialised position, we must get
-		--	spec_f = /\ a -> let d':Monad (T Maybe a) = ...a... in ....
-		-- If we don't do the splitUDs below, the d' binding floats out too far.
-		-- Sigh. What a mess.
+		-- Figure out the type of the specialised function
+	   spec_id_ty = mkForAllTys poly_tyvars (applyTypeToArgs rhs fn_type inst_args)
+	in
+	newIdSM fn spec_id_ty				`thenSM` \ spec_f ->
+	specExpr rhs_subst' (mkLams poly_tyvars body)	`thenSM` \ (spec_rhs, rhs_uds) ->	
 	let
-	   (float_uds, (dict_binds,_)) = splitUDs spec_tyvars spec_uds
+		-- The rule to put in the function's specialisation is:
+		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
+           spec_env_rule = (poly_tyvars ++ rhs_dicts',
+			    inst_args, 
+			    mkTyApps (Var spec_f) (map mkTyVarTy poly_tyvars))
 
-	   spec_rhs    = mkLams spec_tyvars $
-			 mkDictLets dict_binds $
-                         mkApps rhs (map Type spec_tys ++ call_ds)
+		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
+	   final_uds = foldr addDictBind rhs_uds (zipEqual "spec_call" rhs_dicts' call_ds)
 	in
         returnSM ((spec_f, spec_rhs),
-	          float_uds,
-		  spec_env_info
-	)
+	          final_uds,
+		  spec_env_rule)
 \end{code}
 
 %************************************************************************
@@ -892,8 +892,6 @@ specDefn calls (fn, rhs)
 %************************************************************************
 
 \begin{code}
-type FreeDicts = IdSet
-
 data UsageDetails 
   = MkUD {
 	dict_binds :: !(Bag DictBind),
@@ -901,7 +899,6 @@ data UsageDetails
 			-- The order is important; 
 			-- in ds1 `union` ds2, bindings in ds2 can depend on those in ds1
 			-- (Remember, Bags preserve order in GHC.)
-			-- The FreeDicts is the free vars of the RHS
 
 	calls     :: !CallDetails
     }
@@ -920,9 +917,10 @@ type ProtoUsageDetails = ([DictBind],
 
 ------------------------------------------------------------			
 type CallDetails  = FiniteMap Id CallInfo
-type CallInfo     = FiniteMap [Maybe Type]		-- Nothing => unconstrained type argument
-		              ([DictExpr], IdSet)	-- Dict args and the free dicts
-							-- free dicts does *not* include the main id itself
+type CallInfo     = FiniteMap [Maybe Type]			-- Nothing => unconstrained type argument
+		              ([DictExpr], IdOrTyVarSet)	-- Dict args and the vars of the whole
+								-- call (including tyvars)
+								-- [*not* include the main id itself, of course]
 	-- The finite maps eliminate duplicates
 	-- The list of types and dictionaries is guaranteed to
 	-- match the type of f
@@ -930,16 +928,19 @@ type CallInfo     = FiniteMap [Maybe Type]		-- Nothing => unconstrained type arg
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusFM_C plusFM c1 c2
 
+singleCall :: (Id, [Maybe Type], [DictExpr]) -> CallDetails
 singleCall (id, tys, dicts) 
-  = unitFM id (unitFM tys (dicts, dict_fvs))
+  = unitFM id (unitFM tys (dicts, call_fvs))
   where
-    dict_fvs = foldr (unionVarSet . exprFreeVars) emptyVarSet dicts
+    call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
+    tys_fvs  = tyVarsOfTypes (catMaybes tys)
 	-- The type args (tys) are guaranteed to be part of the dictionary
 	-- types, because they are just the constrained types,
 	-- and the dictionary is therefore sure to be bound
 	-- inside the binding for any type variables free in the type;
 	-- hence it's safe to neglect tyvars free in tys when making
 	-- the free-var set for this call
+	-- BUT I don't trust this reasoning; play safe and include tys_fvs
 	--
 	-- We don't include the 'id' itself.
 
@@ -995,32 +996,26 @@ zapCalls ids uds = uds {calls = delListFromFM (calls uds) ids}
 mkDB bind = (bind, bind_fvs bind)
 
 bind_fvs (NonRec bndr rhs) = exprFreeVars rhs
-bind_fvs (Rec prs)	   = foldl delVarSet rhs_fvs (map fst prs)
+bind_fvs (Rec prs)	   = foldl delVarSet rhs_fvs bndrs
 			   where
-			     rhs_fvs = foldr (unionVarSet . exprFreeVars . snd) emptyVarSet prs
+			     bndrs = map fst prs
+			     rhs_fvs = unionVarSets [exprFreeVars rhs | (bndr,rhs) <- prs]
 
-addDictBind uds bind = uds { dict_binds = mkDB bind `consBag` dict_binds uds }
+addDictBind (dict,rhs) uds = uds { dict_binds = mkDB (NonRec dict rhs) `consBag` dict_binds uds }
 
 dumpAllDictBinds (MkUD {dict_binds = dbs}) binds
   = foldrBag add binds dbs
   where
     add (bind,_) binds = bind : binds
 
-mkDictBinds :: [DictBind] -> [CoreBind]
-mkDictBinds = map fst
-
-mkDictLets :: [DictBind] -> CoreExpr -> CoreExpr
-mkDictLets dbs body = foldr mk body dbs
-		    where
-		      mk (bind,_) e = Let bind e 
-
 dumpUDs :: [CoreBndr]
 	-> UsageDetails -> CoreExpr
 	-> (UsageDetails, CoreExpr)
 dumpUDs bndrs uds body
-  = (free_uds, mkDictLets dict_binds body)
+  = (free_uds, foldr add_let body dict_binds)
   where
     (free_uds, (dict_binds, _)) = splitUDs bndrs uds
+    add_let (bind,_) body 	= Let bind body
 
 splitUDs :: [CoreBndr]
 	 -> UsageDetails
@@ -1064,44 +1059,6 @@ splitUDs bndrs uds@(MkUD {dict_binds = orig_dbs,
 	= (free_dbs `snocBag` db, dump_dbs, dump_idset)
 \end{code}
 
-Given a type and value substitution, specUDs creates a specialised copy of
-the given UDs
-
-\begin{code}
-specUDs :: TyVarSubst -> IdSubst -> ProtoUsageDetails -> SpecM UsageDetails
-specUDs tv_env dict_env (dbs, calls)
-  = getUniqSupplySM			`thenSM` \ us ->
-    let
-	((us', dict_env'), dbs') = mapAccumL specDB (us, dict_env) dbs
-    in
-    setUniqSupplySM us'			`thenSM_`
-    returnSM (MkUD { dict_binds = listToBag dbs',
-	  	     calls      = foldr (unionCalls . singleCall . inst_call dict_env') 
-					emptyFM calls
-    })
-  where
-    inst_call dict_env (id, tys, (dicts,fvs)) = (id, map (inst_maybe_ty fvs) tys, 
-				                     map (substExpr tv_env dict_env fvs) dicts)
-
-    inst_maybe_ty fvs Nothing   = Nothing
-    inst_maybe_ty fvs (Just ty) = Just (fullSubstTy tv_env fvs ty)
-
-    specDB (us, dict_env) (NonRec bndr rhs, fvs)
-	= ((us', dict_env'), mkDB (NonRec bndr' (substExpr tv_env dict_env fvs rhs)))
-	where
-	  (dict_env', _, us', bndr') = substId clone_fn tv_env dict_env fvs us bndr
-		-- Fudge the in_scope set a bit by using the free vars of
-		-- the binding, and ignoring the one that comes back
-
-    specDB (us, dict_env) (Rec prs, fvs)
-	= ((us', dict_env'), mkDB (Rec (bndrs' `zip` rhss')))
-	where
-	  (dict_env', _, us', bndrs') = substIds clone_fn tv_env dict_env fvs us (map fst prs)
-	  rhss' = [substExpr tv_env dict_env' fvs rhs | (_, rhs) <- prs]
-
-    clone_fn _ us id = case splitUniqSupply us of
-			  (us1, us2) -> Just (us1, setVarUnique id (uniqFromSupply us2))
-\end{code}
 
 %************************************************************************
 %*									*
@@ -1114,20 +1071,6 @@ lookupId:: IdEnv Id -> Id -> Id
 lookupId env id = case lookupVarEnv env id of
 			Nothing  -> id
 			Just id' -> id'
-
-addIdSpecialisations id spec_stuff
-  = (if not (null errs) then
-	pprTrace "Duplicate specialisations" (vcat (map ppr errs))
-     else \x -> x
-    )
-    setIdSpecialisation id new_spec_env
-  where
-    (new_spec_env, errs) = foldr add (getIdSpecialisation id, []) spec_stuff
-
-    add (tyvars, tys, template) (spec_env, errs)
-	= case addToSpecEnv True spec_env tyvars tys template of
-		Succeeded spec_env' -> (spec_env', errs)
-		Failed err 	    -> (spec_env, err:errs)
 
 ----------------------------------------
 type SpecM a = UniqSM a
@@ -1146,14 +1089,47 @@ mapAndCombineSM f (x:xs) = f x	`thenSM` \ (y, uds1) ->
 			   mapAndCombineSM f xs	`thenSM` \ (ys, uds2) ->
 			   returnSM (y:ys, uds1 `plusUDs` uds2)
 
+cloneBindSM :: Subst -> CoreBind -> SpecM (Subst, Subst, CoreBind)
+-- Clone the binders of the bind; return new bind with the cloned binders
+-- Return the substitution to use for RHSs, and the one to use for the body
+cloneBindSM subst (NonRec bndr rhs)
+  = getUs	`thenUs` \ us ->
+    let
+	(subst', us', bndr') = substAndCloneId subst us bndr
+    in
+    setUs us'	`thenUs_`
+    returnUs (subst, subst', NonRec bndr' rhs)
+
+cloneBindSM subst (Rec pairs)
+  = getUs	`thenUs` \ us ->
+    let
+	(subst', us', bndrs') = substAndCloneIds subst us (map fst pairs)
+    in
+    setUs us'	`thenUs_`
+    returnUs (subst', subst', Rec (bndrs' `zip` map snd pairs))
+
+cloneBinders subst bndrs
+  = getUs	`thenUs` \ us ->
+    let
+	(subst', us', bndrs') = substAndCloneIds subst us bndrs
+    in
+    setUs us'	`thenUs_`
+    returnUs (subst', bndrs')
+
+
 newIdSM old_id new_ty
   = getUniqSM		`thenSM` \ uniq ->
     let 
 	-- Give the new Id a similar occurrence name to the old one
-	new_id = mkUserLocal (mkSpecOcc (nameOccName name)) uniq new_ty (getSrcLoc name)
 	name   = idName old_id
+	new_id = mkUserLocal (mkSpecOcc (nameOccName name)) uniq new_ty (getSrcLoc name)
+
+	-- If the old Id was exported, make the new one non-discardable,
+	-- else we will discard it since it doesn't seem to be called.
+	new_id' | isExportedId old_id = setIdNoDiscard new_id
+		| otherwise	      = new_id
     in
-    returnSM new_id
+    returnSM new_id'
 
 newTyVarSM
   = getUniqSM		`thenSM` \ uniq ->

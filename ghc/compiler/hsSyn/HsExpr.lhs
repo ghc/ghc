@@ -11,7 +11,7 @@ module HsExpr where
 -- friends:
 import {-# SOURCE #-} HsMatches ( pprMatches, pprMatch, Match )
 
-import HsBinds		( HsBinds )
+import HsBinds		( HsBinds(..) )
 import HsBasic		( HsLit )
 import BasicTypes	( Fixity(..), FixityDirection(..) )
 import HsTypes		( HsType )

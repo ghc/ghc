@@ -18,11 +18,11 @@ import HsSyn		( MonoBinds(..),
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl )
 import TcHsSyn		( TcMonoBinds )
-import BasicTypes	( RecFlag(..), NewOrData(..), StrictnessMark(..) )
+import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonoType	( tcExtendTopTyVarScope, tcExtendTyVarScope, 
 			  tcHsTypeKind, tcHsType, tcHsTopType, tcHsTopBoxedType,
-			  tcContext
+			  tcContext, tcHsTopTypeKind
 			)
 import TcType		( zonkTcTyVarToTyVar, zonkTcThetaType )
 import TcEnv		( tcLookupTy, TcTyThing(..) )
@@ -31,7 +31,8 @@ import TcUnify		( unifyKind )
 
 import Class		( Class )
 import DataCon		( DataCon, dataConSig, mkDataCon, isNullaryDataCon,
-			  dataConFieldLabels, dataConId
+			  dataConFieldLabels, dataConId,
+			  markedStrict, notMarkedStrict, markedUnboxed
 			)
 import MkId		( mkDataConId, mkRecordSelId, mkNewTySelId )
 import Id		( getIdUnfolding )
@@ -110,7 +111,7 @@ tcTyDecl :: RecFlag -> FiniteMap Name ArgVrcs -> RenamedTyClDecl -> TcM s TyCon
 tcTyDecl is_rec rec_vrcs (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTy tycon_name				`thenNF_Tc` \ (tycon_kind, Just arity, _) ->
     tcExtendTopTyVarScope tycon_kind tyvar_names	$ \ tyvars _ ->
-    tcHsTopType rhs					`thenTc` \ rhs_ty ->
+    tcHsTopTypeKind rhs					`thenTc` \ (_, rhs_ty) ->
     let
 	-- Construct the tycon
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcTyDecl: argvrcs:" $ ppr tycon_name)
@@ -196,7 +197,7 @@ tc_con_decl_help tycon tyvars ctxt name ex_tyvars ex_theta details
 	      Nothing -> []
 	      Just f  -> [mkFieldLabel (getName f) arg_ty (head allFieldLabelTags)]
         in	      
-	mk_data_con [NotMarkedStrict] [arg_ty] field_label
+	mk_data_con [notMarkedStrict] [arg_ty] field_label
 
     tc_rec_con fields
       = checkTc (null ex_tyvars) (exRecConErr name)	    `thenTc_`
@@ -242,10 +243,9 @@ thinContext arg_tys ctxt
       in_arg_tys (clas,tys) = not $ isEmptyVarSet $ 
 			      tyVarsOfTypes tys `intersectVarSet` arg_tyvars
   
-get_strictness (Banged   _) = MarkedStrict
-get_strictness (Unbanged _) = NotMarkedStrict
-get_strictness (Unpacked _) = MarkedUnboxed bot bot
-	where bot = error "get_strictness"
+get_strictness (Banged   _) = markedStrict
+get_strictness (Unbanged _) = notMarkedStrict
+get_strictness (Unpacked _) = markedUnboxed
 
 get_pty (Banged ty)   = ty
 get_pty (Unbanged ty) = ty
@@ -276,9 +276,12 @@ mkDataBinds_one tycon
 
 	-- For the locally-defined things
 	-- we need to turn the unfoldings inside the Ids into bindings,
-	binds = [ CoreMonoBind data_id (getUnfoldingTemplate (getIdUnfolding data_id))
+	binds | isLocallyDefined tycon
+	      = [ CoreMonoBind data_id (getUnfoldingTemplate (getIdUnfolding data_id))
 		| data_id <- data_ids, isLocallyDefined data_id
 		]
+	      | otherwise
+	      = []
     in	
     returnTc (data_ids, andMonoBindList binds)
   where

@@ -21,9 +21,9 @@ import TcMonad
 import Inst		( InstanceMapper )
 
 import Bag		( bagToList, Bag )
-import Class		( ClassInstEnv, Class )
+import Class		( Class )
 import Var		( TyVar, Id )
-import SpecEnv		( emptySpecEnv, addToSpecEnv )
+import InstEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc )
 import SrcLoc		( SrcLoc )
@@ -89,18 +89,18 @@ buildInstanceEnvs info
     in
     mapNF_Tc buildInstanceEnv info_by_class    `thenNF_Tc` \ inst_env_entries ->
     let
-	class_lookup_fn = mkLookupFunDef (==) inst_env_entries emptySpecEnv
+	class_lookup_fn = mkLookupFunDef (==) inst_env_entries emptyInstEnv
     in
     returnNF_Tc class_lookup_fn
 \end{code}
 
 \begin{code}
 buildInstanceEnv :: [InstInfo]		-- Non-empty, and all for same class
-		 -> NF_TcM s (Class, ClassInstEnv)
+		 -> NF_TcM s (Class, InstEnv)
 
 buildInstanceEnv inst_infos@((InstInfo clas _ _ _ _ _ _ _) : _)
   = foldrNF_Tc addClassInstance
-	    emptySpecEnv
+	    emptyInstEnv
 	    inst_infos				`thenNF_Tc` \ class_inst_env ->
     returnNF_Tc (clas, class_inst_env)
 \end{code}
@@ -112,15 +112,15 @@ about any overlap with an existing instance.
 \begin{code}
 addClassInstance
     :: InstInfo
-    -> ClassInstEnv
-    -> NF_TcM s ClassInstEnv
+    -> InstEnv
+    -> NF_TcM s InstEnv
 
 addClassInstance 
     (InstInfo clas inst_tyvars inst_tys _
 	      dfun_id _ src_loc _)
     class_inst_env
   = 	-- Add the instance to the class's instance environment
-    case addToSpecEnv opt_AllowOverlappingInstances 
+    case addToInstEnv opt_AllowOverlappingInstances 
 		      class_inst_env inst_tyvars inst_tys dfun_id of
 	Failed (ty', dfun_id')    -> addErrTc (dupInstErr clas (inst_tys, src_loc) 
 							       (ty', getSrcLoc dfun_id'))

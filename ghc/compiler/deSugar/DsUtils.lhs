@@ -10,13 +10,15 @@ module DsUtils (
 	CanItFail(..), EquationInfo(..), MatchResult(..),
         EqnNo, EqnSet,
 
+	mkDsLet, mkDsLets,
+
 	cantFailMatchResult, extractMatchResult,
 	combineMatchResults, 
 	adjustMatchResult, adjustMatchResultDs,
 	mkCoLetsMatchResult, mkGuardedMatchResult, 
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 
-	mkErrorAppDs,
+	mkErrorAppDs, mkNilExpr, mkConsExpr,
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector,
 
@@ -35,18 +37,42 @@ import CoreSyn
 import DsMonad
 
 import CoreUtils	( coreExprType )
-import PrelVals		( iRREFUT_PAT_ERROR_ID )
+import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
 import Const		( Literal(..), Con(..) )
 import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, dataConStrictMarks, dataConArgTys )
-import BasicTypes	( StrictnessMark(..) )
+import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, dataConStrictMarks, 
+			  dataConArgTys, dataConId
+			)
 import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp, unUsgTy,
 			  Type
 			)
-import TysWiredIn	( unitDataCon, tupleCon, stringTy, unitTy, unitDataCon )
+import TysWiredIn	( unitDataCon, tupleCon, stringTy, unitTy, unitDataCon,
+			  nilDataCon, consDataCon
+			)
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
 import Outputable
+\end{code}
+
+
+%************************************************************************
+%*									*
+%* Building lets
+%*									*
+%************************************************************************
+
+Use case, not let for unlifted types.  The simplifier will turn some
+back again.
+
+\begin{code}
+mkDsLet :: CoreBind -> CoreExpr -> CoreExpr
+mkDsLet (NonRec bndr rhs) body
+  | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
+mkDsLet bind body
+  = Let bind body
+
+mkDsLets :: [CoreBind] -> CoreExpr -> CoreExpr
+mkDsLets binds body = foldr mkDsLet body binds
 \end{code}
 
 
@@ -127,7 +153,7 @@ extractMatchResult (MatchResult CantFail match_fn) fail_expr
 extractMatchResult (MatchResult CanFail match_fn) fail_expr
   = mkFailurePair fail_expr	 	`thenDs` \ (fail_bind, if_it_fails) ->
     match_fn if_it_fails		`thenDs` \ body ->
-    returnDs (Let fail_bind body)
+    returnDs (mkDsLet fail_bind body)
 
 
 combineMatchResults :: MatchResult -> MatchResult -> MatchResult
@@ -157,7 +183,7 @@ adjustMatchResultDs encl_fn (MatchResult can_it_fail body_fn)
 
 mkCoLetsMatchResult :: [CoreBind] -> MatchResult -> MatchResult
 mkCoLetsMatchResult binds match_result
-  = adjustMatchResult (mkLets binds) match_result
+  = adjustMatchResult (mkDsLets binds) match_result
 
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
@@ -244,14 +270,14 @@ rebuildConArgs con (arg:args) stricts body | isTyVar arg
     returnDs (body',arg:args')
 rebuildConArgs con (arg:args) (str:stricts) body
   = rebuildConArgs con args stricts body `thenDs` \ (body', real_args) ->
-    case str of
-	MarkedUnboxed pack_con tys -> 
+    case maybeMarkedUnboxed str of
+	Just (pack_con, tys) -> 
 	    let id_tys  = dataConArgTys pack_con ty_args in
 	    newSysLocalsDs id_tys `thenDs` \ unpacked_args ->
 	    returnDs (
-		 Let (NonRec arg (Con (DataCon pack_con) 
-				      (map Type ty_args ++
-				       map Var  unpacked_args))) body', 
+		 mkDsLet (NonRec arg (Con (DataCon pack_con) 
+				          (map Type ty_args ++
+				           map Var  unpacked_args))) body', 
 		 unpacked_args ++ real_args
 	    )
 	_ -> returnDs (body', arg:real_args)
@@ -400,6 +426,24 @@ mkTupleSelector [var] should_be_the_same_var scrut_var scrut
 mkTupleSelector vars the_var scrut_var scrut
   = ASSERT( not (null vars) )
     Case scrut scrut_var [(DataCon (tupleCon (length vars)), vars, Var the_var)]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[mkFailurePair]{Code for pattern-matching and other failures}
+%*									*
+%************************************************************************
+
+Call the constructor Ids when building explicit lists, so that they
+interact well with rules.
+
+\begin{code}
+mkNilExpr :: Type -> CoreExpr
+mkNilExpr ty = App (Var (dataConId nilDataCon)) (Type ty)
+
+mkConsExpr :: Type -> CoreExpr -> CoreExpr -> CoreExpr
+mkConsExpr ty hd tl = mkApps (Var (dataConId consDataCon)) [Type ty, hd, tl]
 \end{code}
 
 

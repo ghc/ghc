@@ -29,10 +29,12 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs,
 			  opt_AutoSccsOnExportedToplevs, opt_AutoSccsOnDicts
 		        )
 import CostCentre	( CostCentre, mkAutoCC, IsCafCC(..) )
-import Id		( idType, Id )
+import Id		( idType, idName, isUserExportedId, Id )
+import NameSet
 import VarEnv
-import Name		( isExported )
-import Type		( mkTyVarTy, isDictTy, substTy )
+import VarSet
+import Type		( mkTyVarTy, isDictTy )
+import Subst		( mkTyVarSubst, substTy )
 import TysWiredIn	( voidTy )
 import Outputable
 
@@ -87,33 +89,36 @@ dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
 
 	-- Common case: one exported variable
 	-- All non-recursive bindings come through this way
-dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] binds) rest
+dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] inlines binds) rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
     dsMonoBinds (addSccs auto_scc exps) binds []	`thenDs` \ core_prs ->
     let 
 	-- Always treat the binds as recursive, because the typechecker
 	-- makes rather mixed-up dictionary bindings
 	core_binds = [Rec core_prs]
-	global' = (global, mkLams tyvars $ mkLams dicts $ 
-	                   mkLets core_binds (Var local))
+	global'    = (global, mkInline (idName global `elemNameSet` inlines) $
+			      mkLams tyvars $ mkLams dicts $ 
+	                      mkDsLets core_binds (Var local))
     in
-    
     returnDs (global' : rest)
 
-	-- Another Common special case: no type or dictionary abstraction
-dsMonoBinds auto_scc (AbsBinds [] [] exports binds) rest
-  = let exports' = [(global, Var local) | (_, global, local) <- exports] in
-    dsMonoBinds (addSccs auto_scc exports) binds (exports' ++ rest)
-
-dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
+	-- Another common special case: no type or dictionary abstraction
+dsMonoBinds auto_scc (AbsBinds [] [] exports inlines binds) rest
   = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
     let 
-	core_binds = [Rec core_prs]
+	exports' = [(global, Var local) | (_, global, local) <- exports]
+    in
+    returnDs (addLocalInlines exports inlines core_prs ++ exports' ++ rest)
+
+dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
+  = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
+    let 
+	core_binds = [Rec (addLocalInlines exports inlines core_prs)]
 
 	tup_expr      = mkTupleExpr locals
 	tup_ty	      = coreExprType tup_expr
 	poly_tup_expr = mkLams all_tyvars $ mkLams dicts $
-		        mkLets core_binds tup_expr
+		        mkDsLets core_binds tup_expr
 	locals        = [local | (_, _, local) <- exports]
 	local_tys     = map idType locals
     in
@@ -133,11 +138,30 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
 	    mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 				| otherwise		  = voidTy
 	    ty_args = map mk_ty_arg all_tyvars
-	    env     = all_tyvars `zipVarEnv` ty_args
+	    env     = mkTyVarSubst all_tyvars ty_args
     in
     zipWithDs mk_bind exports [0..]		`thenDs` \ export_binds ->
      -- don't scc (auto-)annotate the tuple itself.
     returnDs ((poly_tup_id, poly_tup_expr) : (export_binds ++ rest))
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Adding inline pragmas}
+%*									*
+%************************************************************************
+
+\begin{code}
+mkInline :: Bool -> CoreExpr -> CoreExpr
+mkInline True  body = Note InlineMe body
+mkInline False body = body
+
+addLocalInlines :: [(a, Id, Id)] -> NameSet -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
+addLocalInlines exports inlines pairs
+  = [(bndr, mkInline (bndr `elemVarSet` local_inlines) rhs) | (bndr,rhs) <- pairs]
+  where
+    local_inlines = mkVarSet [l | (_,g,l) <- exports, idName g `elemNameSet` inlines]
 \end{code}
 
 
@@ -159,7 +183,7 @@ addSccs NoSccs   exports = NoSccs
 addSccs TopLevel exports 
   = TopLevelAddSccs (\id -> case [ exp | (_,exp,loc) <- exports, loc == id ] of
 				(exp:_)  | opt_AutoSccsOnAllToplevs || 
-					    (isExported exp && 
+					    (isUserExportedId exp && 
 					     opt_AutoSccsOnExportedToplevs)
 					-> Just exp
 				_ -> Nothing)

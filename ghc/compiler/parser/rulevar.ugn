@@ -1,0 +1,21 @@
+%{
+#include "hspincl.h"
+%}
+%{{
+module U_rulevar where
+
+#include "HsVersions.h"
+
+import UgenUtil
+
+import U_ttype
+import U_list
+import U_tree
+%}}
+
+type rulevar;
+	prulevar  : < gpvar : stringId ; >;	/* Variable without signature */
+
+	prulevarsig : < gpsigvar : stringId ;	/* With signature */
+			gpsigsig : ttype ; >;
+end;

@@ -163,7 +163,7 @@ system, to parameterise State#.
 \begin{code}
 realWorldTy	     = mkTyConTy realWorldTyCon
 realWorldTyCon	     = pcPrimTyCon realWorldTyConKey SLIT("RealWorld") 0 [] PtrRep
-realWorldStatePrimTy = mkStatePrimTy realWorldTy
+realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
 
 Note: the ``state-pairing'' types are not truly primitive, so they are

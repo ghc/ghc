@@ -18,7 +18,7 @@ import Type		( Type )
 
 import DsMonad
 import DsUtils
-import PrelVals		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
+import PrelInfo		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
 import Unique		( otherwiseIdKey, trueDataConKey, Uniquable(..) )
 import Outputable
 \end{code}
