@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.53 2000/07/11 10:47:06 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.54 2000/07/11 21:25:37 michaelw Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -350,14 +350,14 @@ fi
 rm -fr conftest*
 ])
 
-dnl Test for version of installed ghc.  Uses $GHC.  Largely pinched from c2hs.
-dnl
 dnl
 dnl FPTOOLS_GHC_VERSION
 dnl FPTOOLS_GHC_VERSION(version)
 dnl FPTOOLS_GHC_VERSION(major, minor [, patchlevel])
+dnl FPTOOLS_GHC_VERSION(version, major, minor, patchlevel)
 dnl
 dnl Test for version of installed ghc.  Uses $GHC.
+dnl [original version pinched from c2hs]
 dnl
 AC_DEFUN(FPTOOLS_GHC_VERSION,
 [define([FPTOOLS_CV_GHC_VERSION], [fptools_cv_ghc_version])dnl
