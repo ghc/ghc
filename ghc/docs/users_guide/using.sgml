@@ -252,10 +252,10 @@ module X where
 
     <variablelist>
       <varlistentry>
-	<term><literal>-help</literal></term>
+	<term><literal>--help</literal></term>
 	<term><literal>-?</literal></term>
 	<indexterm><primary><literal>-?</literal></primary></indexterm>
-	<indexterm><primary><literal>-help</literal></primary></indexterm>
+	<indexterm><primary><literal>--help</literal></primary></indexterm>
 	<listitem>
 	  <para>Cause GHC to spew a long usage message to standard
           output and then exit.</para>
