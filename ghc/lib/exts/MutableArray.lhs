@@ -25,8 +25,8 @@ module MutableArray
     newDoubleArray,
     newStablePtrArray,  -- :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
 
-    boundsOfArray,      -- :: Ix ix => MutableArray s ix elt -> (ix, ix)  
-    boundsOfByteArray,  -- :: Ix ix => MutableByteArray s ix -> (ix, ix)
+    boundsOfArray,            -- :: Ix ix => MutableArray s ix elt -> (ix, ix)  
+    boundsOfMutableByteArray, -- :: Ix ix => MutableByteArray s ix -> (ix, ix)
 
     readArray,   	-- :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
 
@@ -58,7 +58,6 @@ module MutableArray
     thawArray,             -- :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
 
      -- the sizes are reported back are *in bytes*.
-    sizeofByteArray,	    -- :: Ix ix => ByteArray ix -> Int
     sizeofMutableByteArray, -- :: Ix ix => MutableByteArray s ix -> Int
 
     readWord8Array,	    -- :: Ix ix => MutableByteArray s ix -> Int -> IO Word8
@@ -103,11 +102,6 @@ array is not accidental; storing foreign objs in a mutable array is
 not supported.
 
 \begin{code}
-sizeofByteArray :: Ix ix => ByteArray ix -> Int
-sizeofByteArray (ByteArray _ arr#) = 
-  case (sizeofByteArray# arr#) of
-    i# -> (I# i#)
-
 sizeofMutableByteArray :: Ix ix => MutableByteArray s ix -> Int
 sizeofMutableByteArray (MutableByteArray _ arr#) = 
   case (sizeofMutableByteArray# arr#) of
@@ -375,5 +369,12 @@ writeInt64Array mb n w = do
     h       = int64ToInt32 h'
     l       = int64ToInt32 l'
     (h',l') = w `divMod` (int32ToInt64 (maxBound::Int32) * 2 - 1)
+
+\end{code}
+
+\begin{code}
+{-# SPECIALIZE boundsOfMutableByteArray :: MutableByteArray s Int -> IPr #-}
+boundsOfMutableByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
+boundsOfMutableByteArray (MutableByteArray ixs _) = ixs
 
 \end{code}
