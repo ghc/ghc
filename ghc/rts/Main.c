@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.10 1999/07/14 13:38:27 simonmar Exp $
+ * $Id: Main.c,v 1.11 1999/09/16 08:29:01 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -34,8 +34,6 @@
 #include <windows.h>
 #endif
 
-
-#ifndef ENABLE_WIN32_DLL_SUPPORT
 
 /* Hack: we assume that we're building a batch-mode system unless 
  * INTERPRETER is set
@@ -80,31 +78,3 @@ int main(int argc, char *argv[])
     shutdownHaskellAndExit(EXIT_SUCCESS);
 }
 # endif /* BATCH_MODE */
-
-#else   /* !ENABLE_WIN32_DLL_SUPPORT */
-
-static char* args[] = { "ghcRts" };
-
-BOOL
-WINAPI
-DllMain ( HINSTANCE hInstance
-        , DWORD reason
-	, LPVOID reserved
-	)
-{
-  /*
-    ToDo: let the user configure RTS options to use
-          via the registry.
-   */
-  switch (reason) {
-  case DLL_PROCESS_ATTACH:
-    startupHaskell(1,args);
-    /* ToDo: gracefully handle startupHaskell() failures.. */
-    return TRUE;
-  case DLL_PROCESS_DETACH:
-    shutdownHaskell();
-  }
-  return TRUE;
-}
-
-#endif /* !ENABLE_WIN32_DLL_SUPPORT */
