@@ -20,7 +20,9 @@ to support.  So much for standards.
 
 #if defined(PROFILING) || defined(CONCURRENT)
 
-# include "platform.h"
+/* OLD: # include "platform.h" */
+
+# include "config.h"
 
 # define NON_POSIX_SOURCE
 
