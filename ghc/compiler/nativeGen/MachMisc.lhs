@@ -677,7 +677,7 @@ is_G_instr instr
     	      | BF  	      Cond Bool Imm -- cond, annul?, target
 
 	      | JMP	      DestInfo MachRegsAddr      -- target
-	      | CALL	      Imm Int Bool -- target, args, terminal
+	      | CALL	      (Either Imm Reg) Int Bool -- target, args, terminal
 
 data RI = RIReg Reg
 	| RIImm Imm

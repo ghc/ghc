@@ -369,8 +369,10 @@ regUsage instr = case instr of
     -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
     JMP   dst addr 	-> usage (regAddr addr, [])
 
-    CALL  _ n True   	-> noUsage
-    CALL  _ n False  	-> usage (argRegs n, callClobberedRegs)
+    CALL  (Left imm)  n True  -> noUsage
+    CALL  (Left imm)  n False -> usage (argRegs n, callClobberedRegs)
+    CALL  (Right reg) n True  -> usage ([reg], [])
+    CALL  (Right reg) n False -> usage (reg : (argRegs n), callClobberedRegs)
 
     _ 	    	    	-> noUsage
   where
@@ -744,6 +746,8 @@ patchRegs instr env = case instr of
     FSUB  s r1 r2 r3    -> FSUB s (env r1) (env r2) (env r3)
     FxTOy s1 s2 r1 r2   -> FxTOy s1 s2 (env r1) (env r2)
     JMP   dsts addr     -> JMP dsts (fixAddr addr)
+    CALL  (Left i) n t  -> CALL (Left i) n t
+    CALL  (Right r) n t -> CALL (Right (env r)) n t
     _ -> instr
   where
     fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)

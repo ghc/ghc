@@ -1275,7 +1275,7 @@ getRegister (StMachOp mop [x]) -- unary PrimOps
                       then StMachOp MO_Flt_to_Dbl [x]
                       else x
 	in
-	getRegister (StCall fn CCallConv DoubleRep [fixed_x])
+	getRegister (StCall (Left fn) CCallConv DoubleRep [fixed_x])
     where
         integerExtend signed nBits x
            = getRegister (
@@ -1391,15 +1391,15 @@ getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
       MO_Nat_Shr   -> trivialCode SRL x y
       MO_Nat_Sar   -> trivialCode SRA x y
 
-      MO_Flt_Pwr  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
-                                           [promote x, promote y])
+      MO_Flt_Pwr  -> getRegister (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+                                         [promote x, promote y])
 		       where promote x = StMachOp MO_Flt_to_Dbl [x]
-      MO_Dbl_Pwr -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
-                                           [x, y])
+      MO_Dbl_Pwr -> getRegister (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+                                        [x, y])
 
       other -> pprPanic "getRegister(sparc) - binary StMachOp (1)" (pprMachOp mop)
   where
-    idiv fn x y = getRegister (StCall fn CCallConv IntRep [x, y])
+    idiv fn x y = getRegister (StCall (Left fn) CCallConv IntRep [x, y])
 
     --------------------
     imulMayOflo :: StixExpr -> StixExpr -> NatM Register
@@ -2375,7 +2375,7 @@ genJump dsts tree
 genJump dsts (StCLbl lbl)
   | hasDestInfo dsts = panic "genJump(sparc): CLbl and dsts"
   | isAsmTemp lbl    = returnNat (toOL [BI ALWAYS False target, NOP])
-  | otherwise        = returnNat (toOL [CALL target 0 True, NOP])
+  | otherwise        = returnNat (toOL [CALL (Left target) 0 True, NOP])
   where
     target = ImmCLbl lbl
 
@@ -2858,11 +2858,23 @@ genCCall fn cconv ret_rep args
 
 genCCall fn cconv kind args
   = mapNat arg_to_int_vregs args `thenNat` \ argcode_and_vregs ->
-    let (argcodes, vregss) = unzip argcode_and_vregs
-        argcode            = concatOL argcodes
-        vregs              = concat vregss
+    let 
+        (argcodes, vregss) = unzip argcode_and_vregs
         n_argRegs          = length allArgRegs
         n_argRegs_used     = min (length vregs) n_argRegs
+        vregs              = concat vregss
+    in
+    -- deal with static vs dynamic call targets
+    (case fn of
+        Left t_static
+           -> returnNat (unitOL (CALL (Left fn__2) n_argRegs_used False))
+        Right dyn
+           -> arg_to_int_vregs dyn `thenNat` \ (dyn_c, [dyn_r]) ->
+              returnNat (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
+    )
+				`thenNat` \ callinsns ->
+    let
+        argcode = concatOL argcodes
         (move_sp_down, move_sp_up)
            = let nn = length vregs - n_argRegs 
                                    + 1 -- (for the road)
@@ -2871,13 +2883,11 @@ genCCall fn cconv kind args
                  else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
         transfer_code
            = toOL (move_final vregs allArgRegs eXTRA_STK_ARGS_HERE)
-        call
-           = unitOL (CALL fn__2 n_argRegs_used False)
     in
         returnNat (argcode       `appOL`
                    move_sp_down  `appOL`
                    transfer_code `appOL`
-                   call          `appOL`
+                   callinsns     `appOL`
                    unitOL NOP    `appOL`
                    move_sp_up)
   where
@@ -2885,9 +2895,10 @@ genCCall fn cconv kind args
      -- internally generated names like '.mul,' which don't get an
      -- underscore prefix
      -- ToDo:needed (WDP 96/03) ???
-     fn__2 = case (_HEAD_ fn) of
-	        '.' -> ImmLit (ptext fn)
-	        _   -> ImmLab False (ptext fn)
+     fn_static = unLeft fn
+     fn__2 = case (_HEAD_ fn_static) of
+	        '.' -> ImmLit (ptext fn_static)
+	        _   -> ImmLab False (ptext fn_static)
 
      -- move args from the integer vregs into which they have been 
      -- marshalled, into %o0 .. %o5, and the rest onto the stack.

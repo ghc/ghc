@@ -1687,8 +1687,10 @@ pprInstr (BF cond b lab)
 
 pprInstr (JMP dsts addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
 
-pprInstr (CALL imm n _)
+pprInstr (CALL (Left imm) n _)
   = hcat [ ptext SLIT("\tcall\t"), pprImm imm, comma, int n ]
+pprInstr (CALL (Right reg) n _)
+  = hcat [ ptext SLIT("\tcall *\t"), pprReg reg, comma, int n ]
 \end{code}
 
 Continue with SPARC-only printing bits and bobs:
