@@ -309,7 +309,7 @@ heap_profile_init(argv)
 	fprintf(heap_file, "}");
     }
     if (type_select_no) {
-	fprintf(heap_file, " -t{%s", type_select_strs[0]);
+	fprintf(heap_file, " -y{%s", type_select_strs[0]);
 	for (count = 1; count < type_select_no; count++)
 	    fprintf(heap_file, ",%s", type_select_strs[count]);
 	fprintf(heap_file, "}");
