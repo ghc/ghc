@@ -33,7 +33,7 @@ import DriverUtil
 import DriverMkDepend
 import DriverPhases
 import DriverFlags
-import SysTools		( newTempName, addFilesToClean, getSysMan )
+import SysTools		( newTempName, addFilesToClean, getSysMan, copy )
 import qualified SysTools	
 import HscMain
 import Finder
@@ -285,7 +285,21 @@ pipeLoop (all_phases@((phase, keep, o_suffix):phases))
 	      ofile <- outputFileName True keep final_suffix
 	      return (ofile, final_suffix)
           -- carry on ...
-       Just fn -> 
+       Just fn -> do
+		{-
+		  Check to see whether we've reached the end of the
+		  pipeline, but did so with an ineffective last stage.
+		  (i.e., it returned the input_fn as the output filename).
+		  
+		  If we did and the output is persistent, copy the contents
+		  of input_fn into the file where the pipeline's output is
+		  expected to end up.
+		-}
+	      atEnd <- finalStage (null phases)
+	      when (atEnd && fn == input_fn)
+	      	   (copy "Saving away compilation pipeline's output"
+		   	 input_fn
+			 output_fn)
               {-
 	       Notice that in order to keep the invariant that we can
 	       determine a compilation pipeline's 'start phase' just
@@ -306,9 +320,14 @@ pipeLoop (all_phases@((phase, keep, o_suffix):phases))
               pipeLoop phases (fn, o_suffix) do_linking use_ofile
        			orig_basename orig_suffix
   where
+     finalStage lastPhase = do
+       o_file <- readIORef v_Output_file
+       return (lastPhase && not do_linking && use_ofile && isJust o_file)
+
      outputFileName last_phase keep suffix
   	= do o_file <- readIORef v_Output_file
-   	     if last_phase && not do_linking && use_ofile && isJust o_file
+	     atEnd  <- finalStage last_phase
+   	     if atEnd
    	       then case o_file of 
    		       Just s  -> return s
    		       Nothing -> error "outputFileName"
