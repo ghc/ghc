@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.95 2002/02/13 19:42:38 sof Exp $
+dnl $Id: aclocal.m4,v 1.96 2002/02/17 13:56:35 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1180,7 +1180,7 @@ dnl    AC_HELP_STRING([--with-Mesa],
 dnl                   [Prefer the Mesa library over a vendors native OpenGL library (default=yes)],
 dnl                   with_Mesa_help_string)
 dnl    AC_ARG_ENABLE(Mesa, $with_Mesa_help_string, use_Mesa=$enableval, use_Mesa=yes)
-  AC_ARG_ENABLE(Mesa, [  --with-Mesa             Prefer the Mesa library over a vendors native OpenGL library (default=yes)], use_Mesa=$enableval, use_Mesa=yes)
+  AC_ARG_ENABLE(Mesa, [  --with-Mesa             Prefer the Mesa library over a vendors native OpenGL library (default=no)], use_Mesa=$enableval, use_Mesa=no)
 
   if test x"$use_Mesa" = xyes; then
      GL_search_list="MesaGL  GL  opengl32"
