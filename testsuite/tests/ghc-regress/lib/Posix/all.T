@@ -3,8 +3,6 @@ if config.platform == 'i386-unknown-mingw32':
 else:
    conf = normal
 
-test('signals001',  conf, compile_and_run, ['-package unix'])
-test('signals002',  conf, compile_and_run, ['-package unix'])
 test('signals001',  conf, compile_and_run, ['-package unix -cpp'])
 test('signals002',  conf, compile_and_run, ['-package unix'])
 test('fileexist01', conf, compile_and_run, ['-package unix'])
