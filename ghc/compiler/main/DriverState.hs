@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.8 2000/10/26 16:51:44 sewardj Exp $
+-- $Id: DriverState.hs,v 1.9 2000/10/27 14:56:00 sewardj Exp $
 --
 -- Settings for the driver
 --
@@ -109,9 +109,6 @@ v_Hs_source_cpp_opts = global
 -- Verbose
 GLOBAL_VAR(v_Verbose, False, Bool)
 is_verbose = do v <- readIORef v_Verbose; if v then return "-v" else return ""
-
--- where to keep temporary files
-GLOBAL_VAR(v_TmpDir,       cDEFAULT_TMPDIR,  String   )
 
 -- Keep output from intermediate phases
 GLOBAL_VAR(v_Keep_hi_diffs, 		False, 		Bool)

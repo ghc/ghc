@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.5 2000/10/27 13:50:25 sewardj Exp $
+-- $Id: TmpFiles.hs,v 1.6 2000/10/27 14:56:00 sewardj Exp $
 --
 -- Temporary file management
 --
@@ -16,7 +16,6 @@ module TmpFiles (
  ) where
 
 -- main
-import DriverState
 import Config
 import Util
 
@@ -33,6 +32,8 @@ import Monad
 #include "HsVersions.h"
 
 GLOBAL_VAR(v_FilesToClean, [],               [String] )
+GLOBAL_VAR(v_TmpDir,       cDEFAULT_TMPDIR,  String   )
+
 
 initTempFileStorage = do
 	-- check whether TMPDIR is set in the environment
