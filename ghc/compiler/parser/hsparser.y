@@ -511,7 +511,7 @@ classd	:  classkey btype DARROW simple_con_app1 cbody
 	|  classkey btype cbody
 		/* We have to say btype rather than simple_con_app1, else
 		   we get reduce/reduce errs */
-		{ check_class_decl_head($3);
+		{ check_class_decl_head($2);
 		  $$ = mkcbind(Lnil,$2,$3,startlineno); }
 	;
 
