@@ -9,12 +9,12 @@
 -- Portability :  portable
 --
 -- A finite map implementation, derived from the paper:
--- 	   S Adams, "Efficient sets: a balancing act"
+-- 	   /Efficient sets: a balancing act/, S. Adams,
 -- 	   Journal of functional programming 3(4) Oct 1993, pp553-562
 --
--- ToDo: clean up, remove the COMPILING_GHC stuff.
---
 -----------------------------------------------------------------------------
+
+-- ToDo: clean up, remove the COMPILING_GHC stuff.
 
 -- The code is SPECIALIZEd to various highly-desirable types (e.g., Id)
 -- near the end (only \tr{#ifdef COMPILING_GHC}).
@@ -39,29 +39,40 @@
 #endif
 
 module Data.FiniteMap (
+	-- * The @FiniteMap@ type
 	FiniteMap,		-- abstract type
 
+	-- * Construction
 	emptyFM, unitFM, listToFM,
 
+	-- * Lookup operations
+	lookupFM, lookupWithDefaultFM,
+	elemFM,
+
+	-- * Adding elements
 	addToFM,
 	addToFM_C,
 	addListToFM,
 	addListToFM_C,
+
+	-- * Deleting elements
 	IF_NOT_GHC(delFromFM COMMA)
 	delListFromFM,
 
+	-- * Combination
 	plusFM,
 	plusFM_C,
+
+	-- * Extracting information
+	fmToList, keysFM, eltsFM,
+	sizeFM, isEmptyFM,
+
+	-- * Other operations
 	minusFM,
 	foldFM,
-
 	IF_NOT_GHC(intersectFM COMMA)
 	IF_NOT_GHC(intersectFM_C COMMA)
 	IF_NOT_GHC(mapFM COMMA filterFM COMMA)
-
-	sizeFM, isEmptyFM, elemFM, lookupFM, lookupWithDefaultFM,
-
-	fmToList, keysFM, eltsFM
 
 #ifdef COMPILING_GHC
 	, bagToFM
@@ -100,51 +111,76 @@ import Bag	( foldBag )
 -- ---------------------------------------------------------------------------
 -- The signature of the module
 
---	BUILDING
+-- | An empty 'FiniteMap'.
 emptyFM		:: FiniteMap key elt
+
+-- | A 'FiniteMap' containing a single mapping
 unitFM		:: key -> elt -> FiniteMap key elt
+
+-- | Makes a 'FiniteMap' from a list of @(key,value)@ pairs. In the
+-- case of duplicates, the last is taken
 listToFM	:: (Ord key OUTPUTABLE_key) => [(key,elt)] -> FiniteMap key elt
-			-- In the case of duplicates, the last is taken
+
 #ifdef COMPILING_GHC
 bagToFM		:: (Ord key OUTPUTABLE_key) => Bag (key,elt) -> FiniteMap key elt
 			-- In the case of duplicates, who knows which is taken
 #endif
 
 --	ADDING AND DELETING
-		   -- Throws away any previous binding
-		   -- In the list case, the items are added starting with the
-		   -- first one in the list
+
+-- | Adds an element to a 'FiniteMap'.  Any previous mapping with the same
+-- key is overwritten.
 addToFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key -> elt  -> FiniteMap key elt
+
+-- | Adds a list of elements to a 'FiniteMap', in the order given in
+-- the list.  Overwrites previous mappings.
 addListToFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> [(key,elt)] -> FiniteMap key elt
 
 		   -- Combines with previous binding
 		   -- In the combining function, the first argument is the "old" element,
 		   -- while the second is the "new" one.
+
+-- | Adds an element to a 'FiniteMap'.  If there is already an element
+-- with the same key, then the specified combination function is used
+-- to calculate the new value.
 addToFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> key -> elt
 			   -> FiniteMap key elt
+
+-- | A list version of 'addToFM_C'.  The elements are added in the
+-- order given in the list.
 addListToFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> [(key,elt)]
 			   -> FiniteMap key elt
 
-		   -- Deletion doesn't complain if you try to delete something
-		   -- which isn't there
+-- | Deletes an element from a 'FiniteMap'.  If there is no element with
+-- the specified key, then the original 'FiniteMap' is returned.
 delFromFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key   -> FiniteMap key elt
+
+-- | List version of 'delFromFM'.
 delListFromFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> [key] -> FiniteMap key elt
 
---	COMBINING
-		   -- Bindings in right argument shadow those in the left
+-- | Combine two 'FiniteMaps'.  Mappings in the second argument shadow
+-- those in the first.
 plusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt
 			   -> FiniteMap key elt
 
-		   -- Combines bindings for the same thing with the given function
+-- | Combine two 'FiniteMaps'.  The specified combination function is
+-- used to calculate the new value when there are two elements with
+-- the same key.
 plusFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)
 			   -> FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
+-- | @(minusFM a1 a2)@ deletes from @a1@ any mappings which are bound in @a2@
 minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
-		   -- (minusFM a1 a2) deletes from a1 any bindings which are bound in a2
 
+-- | @(intersectFM a1 a2)@ returns a new 'FiniteMap' containing
+-- mappings from @a1@ for which @a2@ also has a mapping with the same
+-- key.
 intersectFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
+
+-- | Returns the interesction of two mappings, using the specified
+-- combination function to combine values.
 intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt1 -> elt2 -> elt3)
 			   -> FiniteMap key elt1 -> FiniteMap key elt2 -> FiniteMap key elt3
 
@@ -158,8 +194,16 @@ filterFM	:: (Ord key OUTPUTABLE_key) => (key -> elt -> Bool)
 sizeFM		:: FiniteMap key elt -> Int
 isEmptyFM	:: FiniteMap key elt -> Bool
 
+-- | Returns 'True' if the specified @key@ has a mapping in this
+-- 'FiniteMap', or 'False' otherwise.
 elemFM		:: (Ord key OUTPUTABLE_key) => key -> FiniteMap key elt -> Bool
+
+-- | Looks up a key in a 'FiniteMap', returning @'Just' v@ if the key
+-- was found with value @v@, or 'Nothing' otherwise.
 lookupFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key -> Maybe elt
+
+-- | Looks up a key in a 'FiniteMap', returning @elt@ if the specified
+-- @key@ was not found.
 lookupWithDefaultFM
 		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> elt -> key -> elt
 		-- lookupWithDefaultFM supplies a "default" elt
@@ -185,6 +229,7 @@ eltsFM		:: FiniteMap key elt -> [elt]
 -- * size of left subtree is differs from size of right subtree by a
 --   factor of at most \tr{sIZE_RATIO}
 
+-- | A mapping from @key@s to @elt@s.
 data FiniteMap key elt
   = EmptyFM
   | Branch key elt	    	-- Key and elt stored here
