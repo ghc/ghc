@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.76 2001/12/10 17:59:54 sof Exp $
+ * $Id: Linker.c,v 1.77 2001/12/29 09:24:42 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -203,30 +203,42 @@ typedef struct _RtsSymbolVal {
       SymX(catchzh_fast)			\
       SymX(cmp_thread)				\
       SymX(complementIntegerzh_fast)		\
+      SymX(cmpIntegerzh_fast)	        	\
+      SymX(cmpIntegerIntzh_fast)	      	\
       SymX(createAdjustor)			\
       SymX(decodeDoublezh_fast)			\
       SymX(decodeFloatzh_fast)			\
       SymX(defaultsHook)			\
       SymX(delayzh_fast)			\
+      SymX(deRefWeakzh_fast)			\
+      SymX(deRefStablePtrzh_fast)		\
       SymX(divExactIntegerzh_fast)		\
       SymX(divModIntegerzh_fast)		\
       SymX(forkzh_fast)				\
       SymX(freeHaskellFunctionPtr)		\
+      SymX(freeStablePtr)		        \
       SymX(gcdIntegerzh_fast)			\
+      SymX(gcdIntegerIntzh_fast)		\
+      SymX(gcdIntzh_fast)			\
       SymX(getProgArgv)				\
       SymX(getStablePtr)			\
       SymX(int2Integerzh_fast)			\
+      SymX(integer2Intzh_fast)			\
+      SymX(integer2Wordzh_fast)			\
       SymX(isDoubleDenormalized)		\
       SymX(isDoubleInfinite)			\
       SymX(isDoubleNaN)				\
       SymX(isDoubleNegativeZero)		\
+      SymX(isEmptyMVarzh_fast)			\
       SymX(isFloatDenormalized)			\
       SymX(isFloatInfinite)			\
       SymX(isFloatNaN)				\
       SymX(isFloatNegativeZero)			\
       SymX(killThreadzh_fast)			\
+      SymX(makeStablePtrzh_fast)		\
       SymX(minusIntegerzh_fast)			\
       SymX(mkApUpd0zh_fast)			\
+      SymX(myThreadIdzh_fast)			\
       SymX(newArrayzh_fast)			\
       SymX(newBCOzh_fast)			\
       SymX(newByteArrayzh_fast)			\
