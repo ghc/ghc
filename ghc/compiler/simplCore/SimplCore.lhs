@@ -25,7 +25,7 @@ import Module		( moduleEnvElts )
 import CoreUnfold
 import PprCore		( pprCoreBindings, pprIdCoreRule, pprCoreExpr )
 import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
-import CoreUtils	( etaReduce, coreBindsSize )
+import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( simplBinders )
 import SimplMonad
