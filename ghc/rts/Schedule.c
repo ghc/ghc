@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.144 2002/05/18 05:28:15 ken Exp $
+ * $Id: Schedule.c,v 1.145 2002/06/19 20:45:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1908,6 +1908,13 @@ activateSpark (rtsSpark spark)
 }
 #endif
 
+static SchedulerStatus waitThread_(/*out*/StgMainThread* m
+#if defined(THREADED_RTS)
+				   , rtsBool blockWaiting
+#endif
+				   );
+
+
 /* ---------------------------------------------------------------------------
  * scheduleThread()
  *
@@ -1954,12 +1961,48 @@ scheduleThread_(StgTSO *tso
 
 void scheduleThread(StgTSO* tso)
 {
-  return scheduleThread_(tso, rtsFalse);
+  scheduleThread_(tso, rtsFalse);
 }
 
-void scheduleExtThread(StgTSO* tso)
+SchedulerStatus
+scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret)
 {
-  return scheduleThread_(tso, rtsTrue);
+  StgMainThread *m;
+
+  m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
+  m->tso = tso;
+  m->ret = ret;
+  m->stat = NoStatus;
+#if defined(RTS_SUPPORTS_THREADS)
+  initCondition(&m->wakeup);
+#endif
+
+  /* Put the thread on the main-threads list prior to scheduling the TSO.
+     Failure to do so introduces a race condition in the MT case (as
+     identified by Wolfgang Thaller), whereby the new task/OS thread 
+     created by scheduleThread_() would complete prior to the thread
+     that spawned it managed to put 'itself' on the main-threads list.
+     The upshot of it all being that the worker thread wouldn't get to
+     signal the completion of the its work item for the main thread to
+     see (==> it got stuck waiting.)    -- sof 6/02.
+  */
+  ACQUIRE_LOCK(&sched_mutex);
+  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
+  
+  m->link = main_threads;
+  main_threads = m;
+
+  /* Inefficient (scheduleThread_() acquires it again right away),
+   * but obviously correct.
+   */
+  RELEASE_LOCK(&sched_mutex);
+
+  scheduleThread_(tso, rtsTrue);
+#if defined(THREADED_RTS)
+  return waitThread_(m, rtsTrue);
+#else
+  return waitThread_(m);
+#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -2143,30 +2186,9 @@ finishAllThreads ( void )
 SchedulerStatus
 waitThread(StgTSO *tso, /*out*/StgClosure **ret)
 { 
-  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
-#if defined(THREADED_RTS)
-  return waitThread_(tso,ret, rtsFalse);
-#else
-  return waitThread_(tso,ret);
-#endif
-}
-
-SchedulerStatus
-waitThread_(StgTSO *tso,
-	    /*out*/StgClosure **ret
-#if defined(THREADED_RTS)
-	    , rtsBool blockWaiting
-#endif
-	   )
-{
   StgMainThread *m;
-  SchedulerStatus stat;
 
-  ACQUIRE_LOCK(&sched_mutex);
-  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
-  
   m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
-
   m->tso = tso;
   m->ret = ret;
   m->stat = NoStatus;
@@ -2174,8 +2196,30 @@ waitThread_(StgTSO *tso,
   initCondition(&m->wakeup);
 #endif
 
+  /* see scheduleWaitThread() comment */
+  ACQUIRE_LOCK(&sched_mutex);
+  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
   m->link = main_threads;
   main_threads = m;
+  RELEASE_LOCK(&sched_mutex);
+
+  IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
+#if defined(THREADED_RTS)
+  return waitThread_(m, rtsFalse);
+#else
+  return waitThread_(m);
+#endif
+}
+
+static
+SchedulerStatus
+waitThread_(StgMainThread* m
+#if defined(THREADED_RTS)
+	    , rtsBool blockWaiting
+#endif
+	   )
+{
+  SchedulerStatus stat;
 
   IF_DEBUG(scheduler, sched_belch("== scheduler: new main thread (%d)\n", m->tso->id));
 
@@ -2187,12 +2231,12 @@ waitThread_(StgTSO *tso,
      * gets to enter the RTS directly without going via another
      * task/thread.
      */
-    RELEASE_LOCK(&sched_mutex);
     schedule();
     ASSERT(m->stat != NoStatus);
   } else 
 # endif
   {
+    ACQUIRE_LOCK(&sched_mutex);
     do {
       waitCondition(&m->wakeup, &sched_mutex);
     } while (m->stat == NoStatus);

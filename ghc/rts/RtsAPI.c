@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.34 2002/04/13 05:28:04 sof Exp $
+ * $Id: RtsAPI.c,v 1.35 2002/06/19 20:45:14 sof Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -17,14 +17,6 @@
 #include "Prelude.h"
 #include "OSThreads.h"
 #include "Schedule.h"
-
-#if defined(THREADED_RTS)
-#define WAIT_MAIN_THREAD(tso,ret) waitThread_(tso,ret,rtsFalse)
-#define WAIT_EXT_THREAD(tso,ret) waitThread_(tso,ret,rtsTrue)
-#else
-#define WAIT_MAIN_THREAD(tso,ret) waitThread(tso,ret)
-#define WAIT_EXT_THREAD(tso,ret) waitThread(tso,ret)
-#endif
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* Cheesy locking scheme while waiting for the 
@@ -455,8 +447,7 @@ rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
 
     tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    scheduleExtThread(tso);
-    return WAIT_EXT_THREAD(tso, ret);
+    return scheduleWaitThread(tso,ret);
 }
 
 SchedulerStatus
@@ -466,8 +457,7 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
     
     tso = createGenThread(stack_size, p);
     releaseAllocLock();
-    scheduleExtThread(tso);
-    return WAIT_EXT_THREAD(tso, ret);
+    return scheduleWaitThread(tso,ret);
 }
 
 /*
@@ -481,8 +471,7 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
     
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    scheduleExtThread(tso);
-    return WAIT_EXT_THREAD(tso, ret);
+    return scheduleWaitThread(tso,ret);
 }
 
 /*
@@ -497,7 +486,7 @@ rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret)
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
     scheduleThread(tso);
-    return WAIT_MAIN_THREAD(tso, ret);
+    return waitThread(tso, ret);
 }
 
 /*
@@ -516,8 +505,7 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
     releaseAllocLock();
-    scheduleExtThread(tso);
-    stat = WAIT_EXT_THREAD(tso, &r);
+    stat = scheduleWaitThread(tso,&r);
 
     if (stat == Success) {
 	ASSERT(r != NULL);
@@ -537,8 +525,7 @@ rts_evalLazyIO (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
 
     tso = createIOThread(stack_size, p);
     releaseAllocLock();
-    scheduleExtThread(tso);
-    return WAIT_EXT_THREAD(tso, ret);
+    return scheduleWaitThread(tso,ret);
 }
 
 /* Convenience function for decoding the returned status. */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.14 2002/02/15 07:37:55 sof Exp $
+ * $Id: SchedAPI.h,v 1.15 2002/06/19 20:45:17 sof Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -30,7 +30,7 @@ extern StgTSO *createThread(nat stack_size);
 extern void taskStart(void);
 #endif
 extern void scheduleThread(StgTSO *tso);
-extern void scheduleExtThread(StgTSO *tso);
+extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret);
 
 static inline void pushClosure   (StgTSO *tso, StgClosure *c) {
   tso->sp--;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.33 2002/04/13 05:33:03 sof Exp $
+ * $Id: Schedule.h,v 1.34 2002/06/19 20:45:15 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -138,14 +138,6 @@ extern nat         rts_n_waiting_tasks;
 
 StgInt forkProcess(StgTSO *tso);
 
-/* Sigh, RTS-internal versions of waitThread(), scheduleThread(), and
-   rts_evalIO() for the use by main() only. ToDo: better. */
-extern SchedulerStatus waitThread_(StgTSO *tso,
-				   /*out*/StgClosure **ret
-#if defined(THREADED_RTS)
-				   , rtsBool blockWaiting
-#endif
-				   );
 extern SchedulerStatus rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret);
 
 
