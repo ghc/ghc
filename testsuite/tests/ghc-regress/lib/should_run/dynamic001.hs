@@ -1,7 +1,7 @@
 -- !!! Dynamic library regression tests
 module Main(main) where
 
-import Dynamic
+import Data.Dynamic
 
 main :: IO ()
 main = do

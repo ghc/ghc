@@ -1,9 +1,9 @@
 -- !!! Testing the Word Enum instances.
 module Main(main) where
 
-import Exception
-import Word
-import Int
+import Control.Exception
+import Data.Word
+import Data.Int
 
 main = do
   putStrLn "Testing Enum Word8:"

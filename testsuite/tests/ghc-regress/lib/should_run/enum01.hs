@@ -1,7 +1,7 @@
 -- !!! Testing the Prelude's Enum instances.
 module Main(main) where
 
-import Exception
+import Control.Exception
 import Char
 import Ratio
 

@@ -1,10 +1,10 @@
 -- !!! Testing that Show for Addr is OK..
 module Main(main) where
 
-import Addr
+import Foreign.Ptr
 
 main :: IO ()
 main = do
-  print (intToAddr maxBound)
-  print (intToAddr minBound)
+  print (nullPtr `plusPtr` maxBound)
+  print (nullPtr `plusPtr` minBound)
 

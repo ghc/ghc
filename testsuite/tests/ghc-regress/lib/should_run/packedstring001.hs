@@ -3,7 +3,7 @@
 module Main (main) where
 
 import Char (isSpace)
-import PackedString
+import Data.PackedString
 
 -- Bug in PackedString.lhs (fixed in rev 1.5)
 

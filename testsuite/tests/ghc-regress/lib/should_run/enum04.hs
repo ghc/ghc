@@ -1,4 +1,4 @@
-import Exception
+import Control.Exception
 import Prelude hiding (catch)
 
 main = do 

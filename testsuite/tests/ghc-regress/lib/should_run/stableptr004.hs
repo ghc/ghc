@@ -1,4 +1,4 @@
-import StablePtr
+import Foreign.StablePtr
 
 -- compile without optimisation.
 -- run with +RTS -D256 to see the stable pointer being garbage collected.

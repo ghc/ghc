@@ -1,7 +1,7 @@
 module Main where
 
-import List
-import Exception
+import Data.List
+import Control.Exception
 import Prelude hiding (catch)
 
 -- This module briefly tests all the functions in PrelList and a few

@@ -8,11 +8,6 @@ test('read001',		normal, compile_and_run, [''])
 test('show001',		normal, compile_and_run, [''])
 test('text001',		normal, compile_and_run, [''])
 
-# The rest of these tests need -package lang...
-def set_opts( opts ):
-  opts.extra_hc_opts = '-package lang'
-setTestOpts( set_opts )
-
 test('addr001',		normal, compile_and_run, [''])
 test('dynamic001', 	normal, compile_and_run, [''])
 test('dynamic002', 	normal, compile_and_run, [''])

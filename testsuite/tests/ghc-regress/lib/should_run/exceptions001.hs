@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude hiding (catch)
-import Exception 
-import IO hiding (try, catch)
+import Control.Exception 
+import System.IO hiding (try, catch)
 
 main = do
   ioTest

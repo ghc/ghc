@@ -1,6 +1,6 @@
 module Main where
 
-import Stable
+import System.Mem.StableName
 
 main = do
   stable_list1 <- mapM makeStableName list

@@ -1,7 +1,7 @@
 -- !!! Testing the Int Enum instances.
 module Main(main) where
 
-import Exception
+import Control.Exception
 import Int
 
 main = do

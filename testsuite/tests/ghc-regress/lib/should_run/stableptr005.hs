@@ -1,7 +1,7 @@
 -- !!! triggered a temporary bug in freeStablePtr around 20020424
 
 module Main where
-import StablePtr (newStablePtr, freeStablePtr)
+import Foreign.StablePtr (newStablePtr, freeStablePtr)
 
 data Foo = A | B | C | D
 
