@@ -161,13 +161,21 @@ class  Eq a  where
     x /= y		 = not (x == y)
     x == y		 = not (x /= y)
 
+-- | The 'Ord' class is used for totally ordered datatypes.
+--
+-- Instances of 'Ord' can be derived for any user-defined
+-- datatype whose constituent types are in 'Ord'.  The declared order
+-- of the constructors in the data declaration determines the ordering
+-- in derived 'Ord' instances.  The 'Ordering' datatype allows a single
+-- comparison to determine the precise ordering of two objects.
+--
+-- Minimal complete definition: either 'compare' or '<='.
+-- Using 'compare' can be more efficient for complex types.
+--
 class  (Eq a) => Ord a  where
     compare		 :: a -> a -> Ordering
     (<), (<=), (>), (>=) :: a -> a -> Bool
     max, min		 :: a -> a -> a
-
-    -- An instance of Ord should define either 'compare' or '<='.
-    -- Using 'compare' can be more efficient for complex types.
 
     compare x y
 	| x == y    = EQ
@@ -583,10 +591,9 @@ eqString cs1      cs2	   = False
 
 \begin{code}
 data Int = I# Int#
--- ^A fixed-precision integer type with at least the range @[-2^29
--- .. 2^29-1]@.  The exact range for a given implementation can be
--- determined by using 'minBound' and 'maxBound' from the 'Bounded'
--- class.
+-- ^A fixed-precision integer type with at least the range @[-2^29 .. 2^29-1]@.
+-- The exact range for a given implementation can be determined by using
+-- 'Prelude.minBound' and 'Prelude.maxBound' from the 'Prelude.Bounded' class.
 
 zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#

@@ -36,17 +36,66 @@ default ()		-- Double isn't available yet
 %*********************************************************
 
 \begin{code}
+-- | The 'Bounded' class is used to name the upper and lower limits of a
+-- type.  'Ord' is not a superclass of 'Bounded' since types that are not
+-- totally ordered may also have upper and lower bounds.
+--
+-- The 'Bounded' class may be derived for any enumeration type;
+-- 'minBound' is the first constructor listed in the @data@ declaration
+-- and 'maxBound' is the last.
+-- 'Bounded' may also be derived for single-constructor datatypes whose
+-- constituent types are in 'Bounded'.
+
 class  Bounded a  where
     minBound, maxBound :: a
 
+-- | Class 'Enum' defines operations on sequentially ordered types.
+--
+-- The @enumFrom@... methods are used in Haskell's translation of
+-- arithmetic sequences.
+--
+-- Instances of 'Enum' may be derived for any enumeration type (types
+-- whose constructors have no fields); see Chapter 10 of the /Haskell Report/.
+--  
+-- For any type that is an instance of class 'Bounded' as well as 'Enum',
+-- the following should hold:
+--
+-- * The calls @'succ' 'maxBound'@ and @'pred' 'minBound'@ should result in
+--   a runtime error.
+-- 
+-- * 'fromEnum' and 'toEnum' should give a runtime error if the 
+--   result value is not representable in the result type.
+--   For example, @'toEnum' 7 :: 'Bool'@ is an error.
+--
+-- * 'enumFrom' and 'enumFromThen' should be defined with an implicit bound,
+--   thus:
+--
+-- >	enumFrom     x   = enumFromTo     x maxBound
+-- >	enumFromThen x y = enumFromThenTo x y bound
+-- >	  where
+-- >	    bound | fromEnum y >= fromEnum x = maxBound
+-- >	          | otherwise                = minBound
+--
 class  Enum a	where
-    succ, pred		:: a -> a
+    -- | the successor of a value.  For numeric types, 'succ' adds 1.
+    succ		:: a -> a
+    -- | the predecessor of a value.  For numeric types, 'pred' subtracts 1.
+    pred		:: a -> a
+    -- | Convert from an 'Int'.
     toEnum              :: Int -> a
+    -- | Convert to an 'Int'.
+    -- It is implementation-dependent what 'fromEnum' returns when
+    -- applied to a value that is too large to fit in an 'Int'.
     fromEnum            :: a -> Int
-    enumFrom		:: a -> [a]		-- [n..]
-    enumFromThen	:: a -> a -> [a]	-- [n,n'..]
-    enumFromTo		:: a -> a -> [a]	-- [n..m]
-    enumFromThenTo	:: a -> a -> a -> [a]	-- [n,n'..m]
+
+    -- | Used in Haskell's translation of @[n..]@.
+    enumFrom		:: a -> [a]
+    -- | Used in Haskell's translation of @[n,n'..]@.
+    enumFromThen	:: a -> a -> [a]
+    -- | Used in Haskell's translation of @[n..m]@.
+    enumFromTo		:: a -> a -> [a]
+    -- | Used in Haskell's translation of @[n,n'..m]@.
+    enumFromThenTo	:: a -> a -> a -> [a]
 
     succ		   = toEnum . (`plusInt` oneInt)  . fromEnum
     pred		   = toEnum . (`minusInt` oneInt) . fromEnum
