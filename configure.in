@@ -916,6 +916,14 @@ AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
 
+dnl ** check for mingwex library
+AC_CHECK_LIB(mingwex, closedir, HaveLibMingwEx=YES, HaveLibMingwEx=NO)
+AC_SUBST(HaveLibMingwEx)
+
+if test $HaveLibMingwEx = YES ; then
+  AC_DEFINE(HAVE_MINGWEX)
+fi
+
 if test "$HaveLibGmp" = "NO"; then
 if test "$HostArch_CPP" = "ia64"; then
 AC_MSG_ERROR([You need to install libgmp (the in-tree version does not work on IA64).])

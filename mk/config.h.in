@@ -649,6 +649,9 @@
 /* Define if you have the `vsnprintf' function. */
 #undef HAVE_VSNPRINTF
 
+/* Define if you have the mingwex library. */
+#undef HAVE_MINGWEX
+
 /* Define if you have the <windows.h> header file. */
 #undef HAVE_WINDOWS_H
 

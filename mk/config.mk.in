@@ -676,6 +676,11 @@ HaveLibGmp	= @HaveLibGmp@
 LibGmp		= @LibGmp@
 
 #-----------------------------------------------------------------------------
+# Mingwex Library
+#
+HaveLibMingwEx	= @HaveLibMingwEx@
+
+#-----------------------------------------------------------------------------
 # Regex libraries
 # (if present in libc use that one, otherwise use the one in the tree)
 #

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.70 2002/04/13 05:18:07 sof Exp $
+# $Id: Makefile,v 1.71 2002/06/25 15:49:58 mthomas Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -41,6 +41,10 @@ ALL_DIRS = hooks parallel
 
 ifeq "$(HaveLibGmp)" "YES"
 PACKAGE_CPP_OPTS += -DHAVE_LIBGMP
+endif
+
+ifeq "$(HaveLibMingwEx)" "YES"
+PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
 ifneq "$(DLLized)" "YES"
