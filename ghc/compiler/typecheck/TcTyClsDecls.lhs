@@ -702,7 +702,7 @@ genericMultiParamErr clas
 badGenericMethodType op op_ty
   = hang (ptext SLIT("Generic method type is too complex"))
        4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
-		ptext SLIT("You can only use type variables, arrows, and tuples")])
+		ptext SLIT("You can only use type variables, arrows, lists, and tuples")])
 
 recSynErr syn_decls
   = setSrcSpan (getLoc (head sorted_decls)) $

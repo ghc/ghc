@@ -10,7 +10,8 @@ import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			  isTyVarTy, getTyVar_maybe, funTyCon
 			)
 import TcHsSyn		( mkSimpleHsAlt )
-import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy, isTauTy )
+import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitPhiTy, applyTy, 
+			  isTauTy, mkTyVarTy )
 import DataCon          ( DataCon, dataConOrigArgTys, isVanillaDataCon,
 			  dataConSourceArity )
 
@@ -24,10 +25,11 @@ import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( varSetElems )
 import Id               ( Id, idType )
+import TysWiredIn	( listTyCon )
 import PrelNames
 	
 import SrcLoc		( srcLocSpan, noLoc, Located(..) )
-import Util             ( takeList )
+import Util             ( takeList, isSingleton )
 import Bag
 import Outputable 
 import FastString
@@ -190,6 +192,7 @@ validGenericMethodType :: Type -> Bool
   -- 	* type variables
   --	* function arrow
   --	* boxed tuples
+  --    * lists
   --	* an arbitrary type not involving the class type variables
   --		e.g. this is ok: 	forall b. Ord b => [b] -> a
   --	             where a is the class variable
@@ -207,7 +210,7 @@ validGenericMethodType ty
       where
 	no_tyvars_in_ty = all (`elem` local_tvs) (varSetElems (tyVarsOfType ty))
 
-    valid_tycon tc = tc == funTyCon || isBoxedTupleTyCon tc 
+    valid_tycon tc = tc == funTyCon || tc == listTyCon || isBoxedTupleTyCon tc 
 	-- Compare bimapApp, below
 \end{code}
 
@@ -429,7 +432,9 @@ will be fed to the type checker.  So the 'op' on the RHS will be
 at the representation type for T, Trep.
 
 
-A note about polymorphism.  Suppose the class op is polymorphic:
+Note [Polymorphic methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the class op is polymorphic:
 
 	class Baz a where
 	  op :: forall b. Ord b => a -> b -> b
@@ -451,18 +456,19 @@ By the time the type checker has done its stuff we'll get
 \begin{code}
 mkGenericRhs :: Id -> TyVar -> TyCon -> LHsExpr RdrName
 mkGenericRhs sel_id tyvar tycon
-  = mkHsApp (toEP bimap) (nlHsVar (getRdrName sel_id))
+  = ASSERT( isSingleton ctxt ) 	-- Checks shape of selector-id context
+    pprTrace "mkGenericRhs" (vcat [ppr sel_id, ppr (idType sel_id), ppr tyvar, ppr tycon, ppr local_tvs, ppr final_ty]) $
+    mkHsApp (toEP bimap) (nlHsVar (getRdrName sel_id))
   where 
 	-- Initialising the "Environment" with the from/to functions
 	-- on the datatype (actually tycon) in question
 	(from_RDR, to_RDR) = mkGenericNames tycon 
 
-        -- Takes out the ForAll and the Class restrictions 
-        -- in front of the type of the method.
-	(_,_,op_ty) = tcSplitSigmaTy (idType sel_id)
+        -- Instantiate the selector type, and strip off its class context
+	(ctxt, op_ty) = tcSplitPhiTy (applyTy (idType sel_id) (mkTyVarTy tyvar))
 
         -- Do it again!  This deals with the case where the method type 
-	-- is polymorphic -- see notes above
+	-- is polymorphic -- see Note [Polymorphic methods] above
 	(local_tvs,_,final_ty) = tcSplitSigmaTy op_ty
 
 	-- Now we probably have a tycon in front
@@ -492,6 +498,7 @@ bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP (LHsExpr RdrName)
 bimapApp env Nothing		    = panic "TcClassDecl: Type Application!"
 bimapApp env (Just (tycon, ty_args)) 
   | tycon == funTyCon       = bimapArrow arg_eps
+  | tycon == listTyCon      = bimapList arg_eps
   | isBoxedTupleTyCon tycon = bimapTuple arg_eps
   | otherwise		    =	-- Otherwise validGenericMethodType will 
 				-- have checked that the type is a constant type
@@ -511,6 +518,7 @@ bimapArrow [ep1, ep2]
     to_body   = toEP   ep2 `mkHsApp` (mkHsPar $ nlHsVar a_RDR `mkHsApp` (mkHsPar $ fromEP ep1 `mkHsApp` nlHsVar b_RDR))
 
 -------------------
+-- bimapTuple :: [EP a1 b1, ... EP an bn] -> EP (a1,...an) (b1,..bn)
 bimapTuple eps 
   = EP { fromEP = mkHsLam [noLoc tuple_pat] (noLoc from_body),
 	 toEP   = mkHsLam [noLoc tuple_pat] (noLoc to_body) }
@@ -520,6 +528,12 @@ bimapTuple eps
     eps_w_names = eps `zip` names
     to_body     = ExplicitTuple [toEP   ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names] Boxed
     from_body   = ExplicitTuple [fromEP ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names] Boxed
+
+-------------------
+-- bimapList :: EP a b -> EP [a] [b]
+bimapList [ep]
+  = EP { fromEP = nlHsApp (nlHsVar map_RDR) (fromEP ep),
+	 toEP   = nlHsApp (nlHsVar map_RDR) (toEP ep) }
 
 -------------------
 a_RDR	= mkVarUnqual FSLIT("a")
