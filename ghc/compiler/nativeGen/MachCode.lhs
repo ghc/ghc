@@ -2437,119 +2437,125 @@ genCCall fn cconv kind args
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
+{- 
+   The SPARC calling convention is an absolute
+   nightmare.  The first 6x32 bits of arguments are mapped into
+   %o0 through %o5, and the remaining arguments are dumped to the
+   stack, beginning at [%sp+92].  (Note that %o6 == %sp.)
+
+   If we have to put args on the stack, move %o6==%sp down by
+   the number of words to go on the stack, to ensure there's enough space.
+
+   According to Fraser and Hanson's lcc book, page 478, fig 17.2,
+   16 words above the stack pointer is a word for the address of
+   a structure return value.  I use this as a temporary location
+   for moving values from float to int regs.  Certainly it isn't
+   safe to put anything in the 16 words starting at %sp, since
+   this area can get trashed at any time due to window overflows
+   caused by signal handlers.
+
+   A final complication (if the above isn't enough) is that 
+   we can't blithely calculate the arguments one by one into
+   %o0 .. %o5.  Consider the following nested calls:
+
+       fff a (fff b c)
+
+   Naive code moves a into %o0, and (fff b c) into %o1.  Unfortunately
+   the inner call will itself use %o0, which trashes the value put there
+   in preparation for the outer call.  Upshot: we need to calculate the
+   args into temporary regs, and move those to arg regs or onto the
+   stack only immediately prior to the call proper.  Sigh.
+-}
+
 genCCall fn cconv kind args
-  = mapAccumLNat get_arg (allArgRegs, eXTRA_STK_ARGS_HERE) args
-    	    	    	  `thenNat` \ ((unused,_), argCode) ->
-    let
-
-    	nRegs = length allArgRegs - length unused
-    	call = unitOL (CALL fn__2 nRegs False)
-    	code = concatOL argCode
-
-        -- 3 because in the worst case, %o0 .. %o5 will only use up 3 args
+  = mapNat arg_to_int_vregs args `thenNat` \ argcode_and_vregs ->
+    let (argcodes, vregss) = unzip argcode_and_vregs
+        argcode            = concatOL argcodes
+        vregs              = concat vregss
+        n_argRegs          = length allArgRegs
+        n_argRegs_used     = min (length vregs) n_argRegs
         (move_sp_down, move_sp_up)
-           = let nn = length args - 3 
+           = let nn = length vregs - n_argRegs 
+                                   + 1 -- (for the road)
              in  if   nn <= 0
                  then (nilOL, nilOL)
-                 else (unitOL (moveSp (-(2*nn))), unitOL (moveSp (2*nn)))
+                 else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
+        transfer_code
+           = toOL (move_final vregs allArgRegs eXTRA_STK_ARGS_HERE)
+        call
+           = unitOL (CALL fn__2 n_argRegs_used False)
     in
-    	returnNat (move_sp_down `appOL` 
-                   code         `appOL` 
-                   call         `appOL` 
-                   unitOL NOP   `appOL`
+        returnNat (argcode       `appOL`
+                   move_sp_down  `appOL`
+                   transfer_code `appOL`
+                   call          `appOL`
+                   unitOL NOP    `appOL`
                    move_sp_up)
   where
-    -- function names that begin with '.' are assumed to be special
-    -- internally generated names like '.mul,' which don't get an
-    -- underscore prefix
-    -- ToDo:needed (WDP 96/03) ???
-    fn__2 = case (_HEAD_ fn) of
-	      '.' -> ImmLit (ptext fn)
-	      _   -> ImmLab False (ptext fn)
+     -- function names that begin with '.' are assumed to be special
+     -- internally generated names like '.mul,' which don't get an
+     -- underscore prefix
+     -- ToDo:needed (WDP 96/03) ???
+     fn__2 = case (_HEAD_ fn) of
+	        '.' -> ImmLit (ptext fn)
+	        _   -> ImmLab False (ptext fn)
 
-    ------------------------------------
-    {-  Try to get a value into a specific register (or registers) for
-	a call.  The SPARC calling convention is an absolute
-	nightmare.  The first 6x32 bits of arguments are mapped into
-	%o0 through %o5, and the remaining arguments are dumped to the
-	stack, beginning at [%sp+92].  (Note that %o6 == %sp.)  Our
-	first argument is a pair of the list of remaining argument
-	registers to be assigned for this call and the next stack
-	offset to use for overflowing arguments.  This way,
-	@get_arg@ can be applied to all of a call's arguments using
-	@mapAccumL@.
+     -- move args from the integer vregs into which they have been 
+     -- marshalled, into %o0 .. %o5, and the rest onto the stack.
+     move_final :: [Reg] -> [Reg] -> Int -> [Instr]
 
-        If we have to put args on the stack, move %o6==%sp down by
-        8 x the number of args, to ensure there's enough space.
-    -}
-    get_arg
-	:: ([Reg],Int)	-- Argument registers and stack offset (accumulator)
-	-> StixTree	-- Current argument
-	-> NatM (([Reg],Int), InstrBlock) -- Updated accumulator and code
+     move_final [] _ offset          -- all args done
+        = []
 
-    -- We have to use up all of our argument registers first...
+     move_final (v:vs) [] offset     -- out of aregs; move to stack
+        = ST W v (spRel offset)
+          : move_final vs [] (offset+1)
 
-    get_arg (dst:dsts, offset) arg
-      = getRegister arg			`thenNat` \ register ->
-	getNewRegNCG (registerRep register)
-					`thenNat` \ tmp ->
-	let
-	    reg  = if isFloatingRep pk then tmp else dst
-	    code = registerCode register reg
-	    src  = registerName register reg
-	    pk   = registerRep register
-	in
-	returnNat (
-         case pk of
-	    DoubleRep ->
-		case dsts of
-		   [] -> ( ([], offset + 1), 
-                            code `snocOL`
-			    -- put the second part in the right stack
-			    -- and load the first part into %o5
-                            FMOV DF src f0             `snocOL`
-			    ST   F  f0 (spRel offset)  `snocOL`
-                            LD   W  (spRel offset) dst `snocOL`
-                            ST   F  (fPair f0) (spRel offset)
-                         )
-		   (dst__2:dsts__2) 
-                       -> ( (dsts__2, offset), 
-                            code                          `snocOL`
-                            FMOV DF src f0                `snocOL`
-                            ST   F  f0 (spRel 16)         `snocOL`
-                            LD   W  (spRel 16) dst        `snocOL`
-                            ST   F  (fPair f0) (spRel 16) `snocOL`
-                            LD   W  (spRel 16) dst__2
-                          )
-	    FloatRep 
-               -> ( (dsts, offset), 
-                    code `snocOL`
-	            ST F src (spRel 16) `snocOL`
-	            LD W (spRel 16) dst
-                  )
-	    _  -> ( (dsts, offset), 
-                    if   isFixed register 
-                    then code `snocOL` OR False g0 (RIReg src) dst
-		    else code
-                  )
-        )
-    -- Once we have run out of argument registers, we move to the
-    -- stack...
+     move_final (v:vs) (a:az) offset -- move into an arg (%o[0..5]) reg
+        = OR False g0 (RIReg v) a
+          : move_final vs az offset
 
-    get_arg ([], offset) arg
-      = getRegister arg			`thenNat` \ register ->
-	getNewRegNCG (registerRep register)
-					`thenNat` \ tmp ->
-	let
-	    code  = registerCode register tmp
-	    src   = registerName register tmp
-	    pk    = registerRep register
-	    sz    = primRepToSize pk
-	    words = if pk == DoubleRep then 2 else 1
-	in
-	returnNat ( ([], offset + words), 
-                    code `snocOL` ST sz src (spRel offset) )
-
+     -- generate code to calculate an argument, and move it into one
+     -- or two integer vregs.
+     arg_to_int_vregs :: StixTree -> NatM (OrdList Instr, [Reg])
+     arg_to_int_vregs arg
+        = getRegister arg                     `thenNat` \ register ->
+          getNewRegNCG (registerRep register) `thenNat` \ tmp ->
+          let code = registerCode register tmp
+              src  = registerName register tmp
+              pk   = registerRep register
+          in
+          -- the value is in src.  Get it into 1 or 2 int vregs.
+          case pk of
+             DoubleRep -> 
+                getNewRegNCG WordRep  `thenNat` \ v1 ->
+                getNewRegNCG WordRep  `thenNat` \ v2 ->
+                returnNat (
+                   code                          `snocOL`
+                   FMOV DF src f0                `snocOL`
+                   ST   F  f0 (spRel 16)         `snocOL`
+                   LD   W  (spRel 16) v1         `snocOL`
+                   ST   F  (fPair f0) (spRel 16) `snocOL`
+                   LD   W  (spRel 16) v2
+                   ,
+                   [v1,v2]
+                )
+             FloatRep -> 
+                getNewRegNCG WordRep  `thenNat` \ v1 ->
+                returnNat (
+                   code                    `snocOL`
+                   ST   F  src (spRel 16)  `snocOL`
+                   LD   W  (spRel 16) v1
+                   ,
+                   [v1]
+                )
+             other ->
+                getNewRegNCG WordRep  `thenNat` \ v1 ->
+                returnNat (
+                   code `snocOL` OR False g0 (RIReg src) v1
+                   , 
+                   [v1]
+                )
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
 
