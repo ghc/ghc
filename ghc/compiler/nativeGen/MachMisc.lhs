@@ -463,6 +463,12 @@ FP stack, the operation done, and the result copied back into the
 relevant register.  There are only six %fake registers because 2 are
 needed for the translation, and x86 has 8 in total.
 
+The translation is inefficient but is simple and it works.  A cleverer
+translation would handle a sequence of insns, simulating the FP stack
+contents, would not impose a fixed mapping from %fake to %st regs, and
+hopefully could avoid most of the redundant reg-reg moves of the
+current translation.
+
 \begin{code}
 #if i386_TARGET_ARCH
 
