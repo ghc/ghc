@@ -1,10 +1,13 @@
 --
 -- Haddock - A Haskell Documentation Tool
 --
--- (c) Simon Marlow 2002
+-- (c) Simon Marlow 2002-2003
 --
 
-module HaddockHtml ( ppHtml, copyHtmlBits, ppHtmlIndex ) where
+module HaddockHtml ( 
+	ppHtml, copyHtmlBits, 
+	ppHtmlIndex, ppHtmlContents
+  ) where
 
 import Prelude hiding (div)
 import HaddockVersion
@@ -47,23 +50,30 @@ ppHtml	:: String
 	-> FilePath			-- destination directory
 	-> Maybe Doc			-- prologue text, maybe
 	-> Bool				-- do MS Help stuff
+	-> Maybe String			-- the contents URL (--use-contents)
 	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
 
-ppHtml doctitle source_url ifaces odir prologue do_ms_help maybe_index_url =  do
+ppHtml doctitle source_url ifaces odir prologue do_ms_help 
+	maybe_contents_url maybe_index_url =  do
   let
 	visible_ifaces = filter visible ifaces
 	visible (_, i) = OptHide `notElem` iface_options i
 
-  ppHtmlContents odir doctitle maybe_index_url (map fst visible_ifaces) prologue
-  ppHtmlIndex odir doctitle visible_ifaces
+  when (not (isJust maybe_contents_url)) $ 
+    ppHtmlContents odir doctitle maybe_index_url 
+	(map fst visible_ifaces) prologue
+
+  when (not (isJust maybe_index_url)) $ 
+    ppHtmlIndex odir doctitle maybe_contents_url visible_ifaces
 
   -- Generate index and contents page for MS help if requested
   when do_ms_help $ do
     ppHHContents odir (map fst visible_ifaces)
     ppHHIndex odir visible_ifaces
 
-  mapM_ (ppHtmlModule odir doctitle source_url maybe_index_url) visible_ifaces
+  mapM_ (ppHtmlModule odir doctitle source_url 
+	   maybe_contents_url maybe_index_url) visible_ifaces
 
 
 copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
@@ -119,30 +129,34 @@ parent_button mdl =
    _ -> 
 	Html.emptyTable
 
-contentsButton :: HtmlTable
-contentsButton = topButBox (anchor ! [href contentsHtmlFile] << 
-				toHtml "Contents")
+contentsButton :: Maybe String -> HtmlTable
+contentsButton maybe_contents_url 
+  = topButBox (anchor ! [href url] << toHtml "Contents")
+  where url = case maybe_contents_url of
+			Nothing -> contentsHtmlFile
+			Just url -> url
 
 indexButton :: Maybe String -> HtmlTable
 indexButton maybe_index_url 
- = topButBox (anchor ! [href url] << toHtml "Index")
+  = topButBox (anchor ! [href url] << toHtml "Index")
   where url = case maybe_index_url of
 			Nothing -> indexHtmlFile
 			Just url -> url
 
-simpleHeader :: String -> Maybe String -> HtmlTable
-simpleHeader doctitle maybe_index_url = 
+simpleHeader :: String -> Maybe String -> Maybe String -> HtmlTable
+simpleHeader doctitle maybe_contents_url maybe_index_url = 
   (tda [theclass "topbar"] << 
      vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " " ]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	contentsButton <-> indexButton maybe_index_url
+	contentsButton maybe_contents_url <-> indexButton maybe_index_url
    ))
 
-pageHeader :: String -> Interface -> String -> Maybe String -> Maybe String -> HtmlTable
-pageHeader mdl iface doctitle source_url maybe_index_url =
+pageHeader :: String -> Interface -> String
+    -> Maybe String -> Maybe String -> Maybe String -> HtmlTable
+pageHeader mdl iface doctitle source_url maybe_contents_url maybe_index_url =
   (tda [theclass "topbar"] << 
     vanillaTable << (
        (td << 
@@ -151,7 +165,7 @@ pageHeader mdl iface doctitle source_url maybe_index_url =
        (tda [theclass "title"] << toHtml doctitle) <->
 	src_button source_url mdl (iface_filename iface) <->
 	parent_button mdl <->
-	contentsButton <->
+	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
    ) </>
@@ -179,16 +193,20 @@ moduleInfo iface =
 -- ---------------------------------------------------------------------------
 -- Generate the module contents
 
-ppHtmlContents :: FilePath -> String -> Maybe String -> [Module] -> Maybe Doc
+ppHtmlContents
+   :: FilePath -> String
+   -> Maybe String
+   -> [Module] -> Maybe Doc
    -> IO ()
-ppHtmlContents odir doctitle maybe_index_url mdls prologue = do
+ppHtmlContents odir doctitle maybe_index_url
+  mdls prologue = do
   let tree = mkModuleTree mdls  
       html = 
 	header (thetitle (toHtml doctitle) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-   	    simpleHeader doctitle maybe_index_url </>
+   	    simpleHeader doctitle Nothing maybe_index_url </>
 	    ppPrologue prologue </>
 	    ppModuleTree doctitle tree </>
 	    s15 </>
@@ -218,7 +236,7 @@ mkNode ss (Node s leaf ts) =
 
 mkLeaf :: String -> [String] -> Bool -> Html
 mkLeaf s _ False = toHtml s
-mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mdl)] << toHtml s
+mkLeaf s ss True  = ppHsModule mdl
   where mdl = foldr (++) "" (s' : map ('.':) ss')
 	(s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
@@ -226,14 +244,15 @@ mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mdl)] << toHtml s
 -- ---------------------------------------------------------------------------
 -- Generate the index
 
-ppHtmlIndex :: FilePath -> String -> [(Module,Interface)] -> IO ()
-ppHtmlIndex odir doctitle ifaces = do
+ppHtmlIndex :: FilePath -> String -> Maybe String
+   -> [(Module,Interface)] -> IO ()
+ppHtmlIndex odir doctitle maybe_contents_url ifaces = do
   let html = 
 	header (thetitle (toHtml (doctitle ++ " (Index)")) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-	    simpleHeader doctitle Nothing </>
+	    simpleHeader doctitle maybe_contents_url Nothing </>
 	    index_html
 	   )
 
@@ -270,7 +289,7 @@ ppHtmlIndex odir doctitle ifaces = do
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
              body << vanillaTable << (
-	        simpleHeader doctitle Nothing </>
+	        simpleHeader doctitle maybe_contents_url Nothing </>
 		indexInitialLetterLinks </>
 	        tda [theclass "section1"] << 
 	      	toHtml ("Index (" ++ c:")") </>
@@ -337,15 +356,18 @@ ppHtmlIndex odir doctitle ifaces = do
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
 
-ppHtmlModule :: FilePath -> String -> Maybe String -> Maybe String ->
-	(Module,Interface) -> IO ()
-ppHtmlModule odir doctitle source_url maybe_index_url (Module mdl,iface) = do
+ppHtmlModule
+	:: FilePath -> String -> Maybe String -> Maybe String -> Maybe String
+	-> (Module,Interface) -> IO ()
+ppHtmlModule odir doctitle source_url 
+  maybe_contents_url maybe_index_url (Module mdl,iface) = do
   let html = 
 	header (thetitle (toHtml mdl) +++
 		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-	    pageHeader mdl iface doctitle source_url maybe_index_url </> s15 </>
+	    pageHeader mdl iface doctitle source_url 
+		maybe_contents_url maybe_index_url </> s15 </>
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
@@ -917,10 +939,13 @@ htmlMarkup = Markup {
   markupMonospaced    = tt . toHtml,
   markupUnorderedList = ulist . concatHtml . map (li <<),
   markupOrderedList   = olist . concatHtml . map (li <<),
+  markupDefList       = dlist . concatHtml . map markupDef,
   markupCodeBlock     = pre,
   markupURL	      = \url -> anchor ! [href url] << toHtml url,
   markupAName	      = \aname -> namedAnchor aname << toHtml ""
   }
+
+markupDef (a,b) = dterm << a +++ ddef << b
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).

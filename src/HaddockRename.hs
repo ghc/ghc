@@ -213,10 +213,13 @@ markupRename = Markup {
   markupMonospaced    = liftM DocMonospaced,
   markupUnorderedList = liftM DocUnorderedList . sequence,
   markupOrderedList   = liftM DocOrderedList . sequence,
+  markupDefList       = liftM DocDefList . mapM markupDef,
   markupCodeBlock     = liftM DocCodeBlock,
   markupURL	      = return . DocURL,
   markupAName	      = return . DocAName
   }
+
+markupDef (ma,mb) = do a <- ma; b <- mb; return (a,b)
 
 renameDoc :: Doc -> RnM Doc
 renameDoc = markup markupRename

@@ -9,10 +9,12 @@ import HsSyn
 
 %token	'/'	{ TokSpecial '/' }
 	'@'	{ TokSpecial '@' }
+	'['     { TokDefStart }
+	']'     { TokDefEnd }
 	DQUO 	{ TokSpecial '\"' }
 	URL	{ TokURL $$ }
 	ANAME	{ TokAName $$ }
-	'*'	{ TokBullet }
+	'-'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	'>..'	{ TokBirdTrack $$ }
 	IDENT   { TokIdent $$ }
@@ -35,13 +37,17 @@ doc	:: { Doc }
 apara	:: { Doc }
 	: ulpara		{ DocUnorderedList [$1] }
 	| olpara		{ DocOrderedList [$1] }
+        | defpara               { DocDefList [$1] }
 	| para			{ $1 }
 
 ulpara  :: { Doc }
-	: '*' para		{ $2 }
+	: '-' para		{ $2 }
 
 olpara  :: { Doc } 
 	: '(n)' para		{ $2 }
+
+defpara :: { (Doc,Doc) }
+	: '[' seq ']' seq	{ ($2, $4) }
 
 para    :: { Doc }
 	: seq			{ docParagraph $1 }

@@ -14,7 +14,7 @@ import Char
 import HsSyn
 import HsLexer hiding (Token)
 import HsParseMonad
-import Debug.Trace
+--import Debug.Trace
 }
 
 $ws    = $white # \n
@@ -29,8 +29,9 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 <0,para> {
  $ws* \n		;
  $ws* \>		{ begin birdtrack }
- $ws* [\*\-]		{ token TokBullet }
- $ws* \( $digit+ \) 	{ token TokNumber }
+ $ws* [\*\-]		{ token TokBullet `andBegin` string }
+ $ws* \[		{ token TokDefStart `andBegin` def }
+ $ws* \( $digit+ \) 	{ token TokNumber `andBegin` string }
  $ws*			{ begin string }		
 }
 
@@ -43,7 +44,7 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 
 <birdtrack> .*	\n?	{ strtoken TokBirdTrack `andBegin` line }
 
-<string> {
+<string,def> {
   $special			{ strtoken $ \s -> TokSpecial (head s) }
   \<.*\>			{ strtoken $ \s -> TokURL (init (tail s)) }
   \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
@@ -52,8 +53,18 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
   -- allow special characters through if they don't fit one of the previous
   -- patterns.
   [\'\`\<\#\\]			{ strtoken TokString }
-  [^ $special \< \# \n \'\` \\]* \n { strtoken TokString `andBegin` line }
-  [^ $special \< \# \n \'\` \\]+    { strtoken TokString }
+  [^ $special \< \# \n \'\` \\ \]]* \n { strtoken TokString `andBegin` line }
+  [^ $special \< \# \n \'\` \\ \]]+    { strtoken TokString }
+}
+
+<def> {
+  \]				{ token TokDefEnd `andBegin` string }
+}
+
+-- ']' doesn't have any special meaning outside of the [...] at the beginning
+-- of a definition paragraph.
+<string> {
+  \]				{ strtoken TokString }
 }
 
 {
@@ -61,6 +72,8 @@ data Token
   = TokPara
   | TokNumber
   | TokBullet
+  | TokDefStart
+  | TokDefEnd
   | TokSpecial Char
   | TokIdent [HsQName]
   | TokString String

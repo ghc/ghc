@@ -80,6 +80,8 @@ data Flag
   | Flag_Help
   | Flag_Verbose
   | Flag_Version
+  | Flag_UseContents String
+  | Flag_GenContents
   | Flag_UseIndex String
   | Flag_GenIndex
   deriving (Eq)
@@ -119,6 +121,10 @@ options =
 	"output version information and exit",
     Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
         "increase verbosity",
+    Option [] ["use-contents"] (ReqArg Flag_UseContents "URL")
+	"use a separately-generated HTML contents page",
+    Option [] ["gen-contents"] (NoArg Flag_GenContents)
+	"generate an HTML contents from specified interfaces",
     Option [] ["use-index"] (ReqArg Flag_UseIndex "URL")
 	"use a separately-generated HTML index",
     Option [] ["gen-index"] (NoArg Flag_GenIndex)
@@ -167,6 +173,11 @@ run flags files = do
       no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
       verbose = Flag_Verbose `elem` flags
 
+      maybe_contents_url = 
+	case [url | Flag_UseContents url <- flags] of
+		[] -> Nothing
+		us -> Just (last us)
+
       maybe_index_url = 
 	case [url | Flag_UseIndex url <- flags] of
 		[] -> Nothing
@@ -178,15 +189,17 @@ run flags files = do
 
   updateHTMLXRefs (map fst ifaces_to_read) read_ifaces_s
 
-  if Flag_GenIndex `elem` flags
-     then do 
-	when (not (null files)) $
-	   die ("--gen-index: expected no additional file arguments")	
-	ppHtmlIndex odir title (concat read_ifaces_s)
-        copyHtmlBits odir libdir css_file
-     else do
-
   writeIORef saved_flags flags
+
+  when (Flag_GenContents `elem` flags) $ do
+	ppHtmlContents odir title maybe_index_url 
+		(map fst (concat read_ifaces_s)) prologue
+        copyHtmlBits odir libdir css_file
+
+  when (Flag_GenIndex `elem` flags) $ do
+	ppHtmlIndex odir title maybe_contents_url (concat read_ifaces_s)
+        copyHtmlBits odir libdir css_file
+
   parsed_mods <- mapM parse_file files
 
   let read_ifaces = concat read_ifaces_s
@@ -225,7 +238,8 @@ run flags files = do
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title source_url these_mod_ifaces odir
-	prologue (Flag_MSHtmlHelp `elem` flags) maybe_index_url
+	prologue (Flag_MSHtmlHelp `elem` flags) 
+		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
   -- dump an interface if requested

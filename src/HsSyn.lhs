@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.18 2003/10/20 17:19:23 sof Exp $
+% $Id: HsSyn.lhs,v 1.19 2003/11/06 12:39:47 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -400,6 +400,7 @@ data GenDoc id
   | DocMonospaced (GenDoc id)
   | DocUnorderedList [GenDoc id]
   | DocOrderedList [GenDoc id]
+  | DocDefList [(GenDoc id, GenDoc id)]
   | DocCodeBlock (GenDoc id)
   | DocURL String
   | DocAName String
@@ -422,6 +423,7 @@ data DocMarkup id a = Markup {
   markupMonospaced    :: a -> a,
   markupUnorderedList :: [a] -> a,
   markupOrderedList   :: [a] -> a,
+  markupDefList       :: [(a,a)] -> a,
   markupCodeBlock     :: a -> a,
   markupURL	      :: String -> a,
   markupAName	      :: String -> a
@@ -438,9 +440,12 @@ markup m (DocEmphasis d)	= markupEmphasis m (markup m d)
 markup m (DocMonospaced d)	= markupMonospaced m (markup m d)
 markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
 markup m (DocOrderedList ds)	= markupOrderedList m (map (markup m) ds)
+markup m (DocDefList ds)        = markupDefList m (map (markupPair m) ds)
 markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
 markup m (DocURL url)		= markupURL m url
 markup m (DocAName ref)		= markupAName m ref
+
+markupPair m (a,b) = (markup m a, markup m b)
 
 -- | The identity markup
 idMarkup :: DocMarkup a (GenDoc a)
@@ -455,6 +460,7 @@ idMarkup = Markup {
   markupMonospaced    = DocMonospaced,
   markupUnorderedList = DocUnorderedList,
   markupOrderedList   = DocOrderedList,
+  markupDefList       = DocDefList,
   markupCodeBlock     = DocCodeBlock,
   markupURL	      = DocURL,
   markupAName	      = DocAName
@@ -479,6 +485,10 @@ docAppend (DocOrderedList ds1) (DocOrderedList ds2)
   = DocOrderedList (ds1++ds2)
 docAppend (DocOrderedList ds1) (DocAppend (DocOrderedList ds2) d)
   = DocAppend (DocOrderedList (ds1++ds2)) d
+docAppend (DocDefList ds1) (DocDefList ds2)
+  = DocDefList (ds1++ds2)
+docAppend (DocDefList ds1) (DocAppend (DocDefList ds2) d)
+  = DocAppend (DocDefList (ds1++ds2)) d
 docAppend DocEmpty d = d
 docAppend d DocEmpty = d
 docAppend d1 d2 
