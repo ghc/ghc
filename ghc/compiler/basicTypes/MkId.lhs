@@ -345,6 +345,33 @@ We're going to build a record selector unfolding that looks like this:
 				    T2 ... x ... -> x
 				    other	 -> error "..."
 
+Similarly for newtypes
+
+	newtype N a = MkN { unN :: a->a }
+
+	unN :: N a -> a -> a
+	unN n = coerce (a->a) n
+	
+We need to take a little care if the field has a polymorphic type:
+
+	data R = R { f :: forall a. a->a }
+
+Then we want
+
+	f :: forall a. R -> a -> a
+	f = /\ a \ r = case r of
+			  R f -> f a
+
+(not f :: R -> forall a. a->a, which gives the type inference mechanism 
+problems at call sites)
+
+Similarly for newtypes
+
+	newtype N = MkN { unN :: forall a. a->a }
+
+	unN :: forall a. N -> a -> a
+	unN = /\a -> \n:N -> coerce (a->a) n
+
 \begin{code}
 mkRecordSelId tycon field_label
 	-- Assumes that all fields with the same field label
@@ -360,8 +387,9 @@ mkRecordSelId tycon field_label
 					-- the FieldLabels of constructors of this type
     tycon_theta	= tyConTheta tycon	-- The context on the data decl
 					--   eg data (Eq a, Ord b) => T a b = ...
+    (field_tyvars,field_tau) = splitForAllTys field_ty
 
-    data_ty   = mkTyConApp tycon (mkTyVarTys tyvars)
+    data_ty   = mkTyConApp tycon tyvar_tys
     tyvar_tys = mkTyVarTys tyvars
 
 	-- Very tiresomely, the selectors are (unnecessarily!) overloaded over
@@ -374,8 +402,8 @@ mkRecordSelId tycon field_label
 			  | (DataAlt dc, _, _) <- the_alts]
 
     selector_ty :: Type
-    selector_ty  = mkForAllTys tyvars $ mkFunTys dict_tys $ 
-		   mkFunTy data_ty field_ty
+    selector_ty  = mkForAllTys tyvars $ mkForAllTys field_tyvars $
+		   mkFunTys dict_tys $  mkFunTy data_ty field_tau
       
     info = mkIdInfo (RecordSelId field_label)
 	   `setArityInfo`	exactArity 1
@@ -395,23 +423,25 @@ mkRecordSelId tycon field_label
     sel_rhs | isNewTyCon tycon = new_sel_rhs
 	    | otherwise	       = data_sel_rhs
 
-    data_sel_rhs = mkLams tyvars $ mkLams dict_ids $ Lam data_id $
+    data_sel_rhs = mkLams tyvars $ mkLams field_tyvars $ 
+		   mkLams dict_ids $ Lam data_id $
 	 	   Case (Var data_id) data_id (the_alts ++ default_alt)
 
-    new_sel_rhs  = mkLams tyvars $ Lam data_id $
-		    Note (Coerce (unUsgTy field_ty) (unUsgTy data_ty)) (Var data_id)
+    new_sel_rhs  = mkLams tyvars $ mkLams field_tyvars $ Lam data_id $
+		    Note (Coerce (unUsgTy field_tau) (unUsgTy data_ty)) (Var data_id)
 
     mk_maybe_alt data_con 
 	  = case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (DataAlt data_con, arg_ids, Var the_arg_id)
+		Just the_arg_id -> Just (DataAlt data_con, arg_ids, 
+					 mkVarApps (Var the_arg_id) field_tyvars)
 	  where
 	    arg_ids 	     = mkTemplateLocals (dataConArgTys data_con tyvar_tys)
 				    -- The first one will shadow data_id, but who cares
 	    field_lbls	     = dataConFieldLabels data_con
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_label
 
-    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_ty), mkStringLit full_msg]
+    error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_tau), mkStringLit full_msg]
        -- preserves invariant that type args are *not* usage-annotated on top.  KSW 1999-04.
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 \end{code}
