@@ -18,14 +18,16 @@
 module Prelude (
 
     -- * Basic data types
-    Bool(..),
-    Maybe(..),
-    Either(..),
-    Ordering(..), 
+    Bool(False, True),
+    Maybe(Nothing, Just),
+    Either(Left, Right),
+    Ordering(LT, EQ, GT),
     Char, String, Int, Integer, Float, Double, IO,
     Rational,
+#ifdef __GLASGOW_HASKELL__
 	-- Restore export of (:) until we get to 5.05
     []((:), []),	-- Not legal Haskell 98; available through built-in syntax
+#endif
     
     module Data.Tuple,
         -- Includes tuple types + fst, snd, curry, uncurry
@@ -33,17 +35,23 @@ module Prelude (
     -- (->),		-- ... available through built-in syntax
     
     -- * Basic type classes
-    Eq(..),
-    Ord(..), 
-    Enum(..),
-    Bounded(..), 
-    Num(..),
-    Real(..),
-    Integral(..),
-    Fractional(..),
-    Floating(..),
-    RealFrac(..),
-    RealFloat(..),
+    Eq((==), (/=)),
+    Ord(compare, (<), (<=), (>=), (>), max, min),
+    Enum(succ, pred, toEnum, fromEnum, enumFrom, enumFromThen,
+         enumFromTo, enumFromThenTo),
+    Bounded(minBound, maxBound),
+
+    -- * Numeric type classes
+    Num((+), (-), (*), negate, abs, signum, fromInteger),
+    Real(toRational),
+    Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
+    Fractional((/), recip, fromRational),
+    Floating(pi, exp, log, sqrt, (**), logBase, sin, cos, tan,
+             asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh),
+    RealFrac(properFraction, truncate, round, ceiling, floor),
+    RealFloat(floatRadix, floatDigits, floatRange, decodeFloat,
+              encodeFloat, exponent, significand, scaleFloat, isNaN,
+              isInfinite, isDenormalized, isIEEE, isNegativeZero, atan2),
 
     -- * List operations
     map, (++), filter, concat,
@@ -76,8 +84,8 @@ module Prelude (
     readFile, writeFile, appendFile, readIO, readLn,
 
     -- * Monads
-    Monad(..),
-    Functor(..), 
+    Monad((>>=), (>>), return, fail),
+    Functor(fmap),
     mapM, mapM_, sequence, sequence_, (=<<),
 
     -- * Miscellaneous functions
