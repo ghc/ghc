@@ -88,7 +88,6 @@ import HsPragmas
 import List		( nub )
 import BasicTypes	( Boxity(..), RecFlag(..) )
 import Class            ( DefMeth (..) )
-import Outputable
 \end{code}
 
  

@@ -13,12 +13,11 @@ module HsMatches where
 -- Friends
 import HsExpr		( HsExpr, Stmt(..) )
 import HsBinds		( HsBinds(..), nullBinds )
-import HsTypes		( HsTyVarBndr, HsType )
+import HsTypes		( HsType )
 -- Others
 import Type		( Type )
 import SrcLoc		( SrcLoc )
 import Outputable
-import HsPat            ( InPat (..) )
 import List
 \end{code}
 

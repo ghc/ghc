@@ -8,10 +8,8 @@ module PrelInfo (
 	module PrelNames,
 	module MkId,
 
-	wiredInNames, 	-- Names of wired in things
-	wiredInThings,
-	maybeWiredInTyConName,
-	maybeWiredInIdName,
+	wiredInThings, 	-- Names of wired in things
+	wiredInThingEnv,
 	
 	-- Primop RdrNames
 	eqH_Char_RDR,   ltH_Char_RDR,   eqH_Word_RDR,  ltH_Word_RDR, 
@@ -40,16 +38,12 @@ import MkId		-- All of it, for re-export
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
 import HscTypes 	( TyThing(..) )
-import Id		( Id, idName )
 
 -- others:
-import RdrName		( RdrName )
-import Name		( Name, getName )
-import TyCon		( tyConDataConsIfAvailable, TyCon, tyConName )
+import Name		( getName, NameEnv, mkNameEnv )
+import TyCon		( tyConDataConsIfAvailable, TyCon )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
-import Bag
-import BasicTypes	( Boxity(..) )
 import Util		( isIn )
 import Outputable	( ppr, pprPanic )
 \end{code}
@@ -68,7 +62,7 @@ wiredInThings :: [TyThing]
 wiredInThings
   = concat
     [		-- Wired in TyCons
-	  map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
+	  concat (map wiredInTyConThings ([funTyCon] ++ primTyCons ++ wiredInTyCons))
 
 		-- Wired in Ids
 	, map AnId wiredInIds
@@ -77,28 +71,14 @@ wiredInThings
 	, map (AnId . mkPrimOpId) allThePrimOps
     ]
 
-wiredInNames :: [Name]
-wiredInNames = [n | thing <- wiredInThings, n <- tyThingNames thing]
+wiredInTyConThings :: TyCon -> [TyThing]
+wiredInTyConThings tc
+   = ATyCon tc : [ AnId n | dc <- tyConDataConsIfAvailable tc, 
+                            n  <- [dataConId dc, dataConWrapId dc] ]
+			-- Synonyms return empty list of constructors
 
-tyThingNames :: TyThing -> [Name]
-tyThingNames (AClass cl) = pprPanic "tyThingNames" (ppr cl)	-- Not used
-tyThingNames (AnId   id) = [getName id]
-tyThingNames (ATyCon tc) 
-   = getName tc : [ getName n | dc <- tyConDataConsIfAvailable tc, 
-                                n  <- [dataConId dc, dataConWrapId dc] ]
-						-- Synonyms return empty list of constructors
-
-maybeWiredInIdName :: Name -> Maybe Id
-maybeWiredInIdName nm
-   = case filter ((== nm).idName) wiredInIds of
-        []     -> Nothing
-        (i:is) -> Just i
-
-maybeWiredInTyConName :: Name -> Maybe TyCon
-maybeWiredInTyConName nm
-   = case filter ((== nm).tyConName) wiredInTyCons of
-        []       -> Nothing
-        (tc:tcs) -> Just tc
+wiredInThingEnv :: NameEnv TyThing
+wiredInThingEnv = mkNameEnv [ (getName thing, thing) | thing <- wiredInThings ]
 \end{code}
 
 We let a lot of "non-standard" values be visible, so that we can make

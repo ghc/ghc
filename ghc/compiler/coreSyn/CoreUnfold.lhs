@@ -355,8 +355,6 @@ data ExprSize = TooBig
 		       FastInt		-- Size to subtract if result is scrutinised 
 					-- by a case expression
 
-isTooBig TooBig = True
-isTooBig _      = False
 
 maxSize TooBig         _ 				  = TooBig
 maxSize _              TooBig				  = TooBig

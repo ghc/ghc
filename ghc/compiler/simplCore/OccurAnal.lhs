@@ -830,8 +830,6 @@ addOneOcc usage id info
 
 emptyDetails = (emptyVarEnv :: UsageDetails)
 
-unitDetails id info = (unitVarEnv id info :: UsageDetails)
-
 usedIn :: Id -> UsageDetails -> Bool
 v `usedIn` details =  isExportedId v || v `elemVarEnv` details
 

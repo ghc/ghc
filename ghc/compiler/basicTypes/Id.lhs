@@ -70,8 +70,7 @@ module Id (
 #include "HsVersions.h"
 
 
-import CoreSyn		( Unfolding, CoreRules, CoreExpr, Expr(..),
-			  AltCon (..), Alt, mkApps, Arg )
+import CoreSyn		( Unfolding, CoreRules )
 import BasicTypes	( Arity )
 import Var		( Id, DictId,
 			  isId, mkIdVar,
@@ -83,30 +82,23 @@ import Var		( Id, DictId,
 			)
 import VarSet
 import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, 
-			  seqType, splitAlgTyConApp_maybe, mkTyVarTy,
-			  mkTyConApp, splitTyConApp_maybe)
+			  seqType, splitTyConApp_maybe )
 
 import IdInfo 
 
-import Demand		( Demand, isStrict, wwLazy )
+import Demand		( Demand )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
 			  isUserExportedName, getOccName, isIPOcc
 			) 
 import OccName		( UserFS )
 import PrimRep		( PrimRep )
-import PrimOp		( PrimOp, primOpIsCheap )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques, 
 			  getNumBuiltinUniques )
-import Outputable
-import TyCon            ( TyCon, AlgTyConFlavour(..), ArgVrcs, mkSynTyCon, 
-			  mkAlgTyConRep, tyConName, 
-			  tyConTyVars, tyConDataCons )
-import DataCon 		( DataCon, dataConWrapId, dataConOrigArgTys )
-import Var 		( Var )
+
 infixl 	1 `setIdUnfolding`,
 	  `setIdArityInfo`,
 	  `setIdDemandInfo`,

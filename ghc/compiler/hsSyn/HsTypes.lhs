@@ -25,10 +25,9 @@ module HsTypes (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} HsExpr ( HsExpr ) 
 import Class		( FunDep )
-import Type		( Type, Kind, PredType(..), UsageAnn(..), ClassContext,
-			  getTyVar_maybe, splitSigmaTy, unUsgTy, boxedTypeKind
+import Type		( Type, Kind, PredType(..), ClassContext,
+			  splitSigmaTy, unUsgTy, boxedTypeKind
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity )
@@ -37,9 +36,8 @@ import Name		( toRdrName )
 import OccName		( NameSpace )
 import Var		( TyVar, tyVarKind )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
-import BasicTypes	( Arity, Boxity(..), tupleParens )
-import PrelNames	( mkTupConRdrName, listTyConKey, hasKey, Uniquable(..) )
-import Maybes		( maybeToBool )
+import BasicTypes	( Boxity(..), tupleParens )
+import PrelNames	( mkTupConRdrName, listTyConKey, hasKey )
 import FiniteMap
 import Outputable
 
@@ -282,8 +280,6 @@ toHsTyVars tvs = map toHsTyVar tvs
 toHsType :: Type -> HsType RdrName
 toHsType ty = toHsType' (unUsgTy ty)
 	-- For now we just discard the usage
---  = case splitUsgTy ty of
---	(usg, tau) -> HsUsgTy (toHsUsg usg) (toHsType' tau)
 	
 toHsType' :: Type -> HsType RdrName
 -- Called after the usage is stripped off
@@ -318,10 +314,6 @@ toHsPred (IParam n ty)	 = HsPIParam (toRdrName n)  (toHsType ty)
 
 toHsContext :: ClassContext -> HsContext RdrName
 toHsContext cxt = [HsPClass (toRdrName cls) (map toHsType tys) | (cls,tys) <- cxt]
-
-toHsUsg UsOnce    = HsUsOnce
-toHsUsg UsMany    = HsUsMany
-toHsUsg (UsVar v) = HsUsVar (toRdrName v)
 
 toHsFDs :: [FunDep TyVar] -> [FunDep RdrName]
 toHsFDs fds = [(map toRdrName ns, map toRdrName ms) | (ns,ms) <- fds]

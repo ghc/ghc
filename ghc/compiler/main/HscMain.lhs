@@ -20,6 +20,7 @@ import SrcLoc		( mkSrcLoc )
 
 import Rename		( renameModule )
 
+import PrelInfo		( wiredInThings )
 import MkIface		( writeIface )
 import TcModule		( TcResults(..), typecheckModule )
 import Desugar		( deSugar )
@@ -57,6 +58,19 @@ import StgInterp	( runStgI )
 %************************************************************************
 
 \begin{code}
+data HscResult
+   = HscOK   ModDetails  	     -- new details (HomeSymbolTable additions)
+	     (Maybe ModIface)	     -- new iface (if any compilation was done)
+	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
+	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
+	     (Maybe [UnlinkedIBind]) -- interpreted code, if any
+             PersistentCompilerState -- updated PCS
+             (Bag WarnMsg) 		-- warnings
+
+   | HscErrs PersistentCompilerState -- updated PCS
+             (Bag ErrMsg)		-- errors
+             (Bag WarnMsg)             -- warnings
+
 hscMain
   :: DynFlags	
   -> ModSummary       -- summary, including source filename
@@ -258,7 +272,7 @@ initPersistentRenamerState :: PersistentRenamerState
     }
 
 initOrigNames :: FiniteMap (ModuleName,OccName) Name
-initOrigNames = grab knownKeyNames `plusFM` grab wiredInNames
+initOrigNames = grab knownKeyNames `plusFM` grab (map getName wiredInThings)
 	      where
 		grab names   = foldl add emptyFM names
 		add env name = addToFM env (moduleName (nameModule name), nameOccName name) name

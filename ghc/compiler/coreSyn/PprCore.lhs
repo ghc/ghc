@@ -23,11 +23,10 @@ import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
 			  idInfo, idInlinePragma, idDemandInfo, idOccInfo
 			)
 import Var		( isTyVar )
-import IdInfo		( IdInfo, megaSeqIdInfo, occInfo,
+import IdInfo		( IdInfo, megaSeqIdInfo, 
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
-			  demandInfo, specInfo, 
+			  specInfo, cprInfo, ppCprInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
-			  cprInfo, ppCprInfo, lbvarInfo,
 			  workerInfo, ppWorkerInfo
 			)
 import DataCon		( dataConTyCon )

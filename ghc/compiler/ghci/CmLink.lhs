@@ -13,17 +13,14 @@ module CmLink ( Linkable(..),  Unlinked(..),
 where
 
 import StgInterp	( linkIModules, ClosureEnv, ItblEnv )
-import Linker
 
 import CmStaticInfo	( PackageConfigInfo )
 import Module		( ModuleName, PackageName )
 import InterpSyn	( UnlinkedIBind, HValue, binder )
 import Module		( Module )
 import Outputable	( SDoc )
-import FiniteMap	( FiniteMap, emptyFM )
-import RdrName		( RdrName )
+import FiniteMap	( emptyFM )
 import Digraph		( SCC(..) )
-import Addr		( Addr )
 import Outputable
 import Panic		( panic )
 

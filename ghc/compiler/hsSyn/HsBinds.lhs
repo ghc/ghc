@@ -16,7 +16,7 @@ import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSs, GRHSs )
 -- friends:
 import HsTypes		( HsType )
 import CoreSyn		( CoreExpr )
-import PprCore		( {- Instances -} )
+import PprCore		( {- instance Outputable (Expr a) -} )
 
 --others:
 import Name		( Name )

@@ -27,7 +27,7 @@ import BasicTypes	( Fixity, Boxity, tupleParens )
 -- others:
 import Var		( Id, TyVar )
 import DataCon		( DataCon, dataConTyCon )
-import Name		( Name, isDataSymOcc, getOccName, NamedThing )
+import Name		( isDataSymOcc, getOccName, NamedThing )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )

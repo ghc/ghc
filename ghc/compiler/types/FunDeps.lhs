@@ -23,7 +23,6 @@ import UniqSet
 import VarSet
 import VarEnv
 import Unique		( Uniquable )
-import List		( elemIndex )
 import Util		( zipEqual )
 \end{code}
 

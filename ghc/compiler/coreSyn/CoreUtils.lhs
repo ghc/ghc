@@ -41,8 +41,8 @@ import PprCore		( pprCoreExpr )
 import Var		( Var, isId, isTyVar )
 import VarSet
 import VarEnv
-import Name		( isLocallyDefined, hashName )
-import Literal		( Literal, hashLiteral, literalType, litIsDupable )
+import Name		( hashName )
+import Literal		( hashLiteral, literalType, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
 			  primOpIsDupable )
@@ -50,17 +50,16 @@ import Id		( Id, idType, idFlavour, idStrictness, idLBVarInfo,
 			  mkWildId, idArity, idName, idUnfolding, idInfo, 
 			  isDataConId_maybe, isPrimOpId_maybe
 			)
-import IdInfo		( arityLowerBound, InlinePragInfo(..),
-			  LBVarInfo(..),  
+import IdInfo		( LBVarInfo(..),  
 			  IdFlavour(..),
 			  megaSeqIdInfo )
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy,
-			  splitFunTy_maybe, tyVarsOfType, tyVarsOfTypes,
+			  splitFunTy_maybe, 
                           isNotUsgTy, mkUsgTy, unUsgTy, UsageAnn(..),
 			  applyTys, isUnLiftedType, seqType
 			)
-import TysWiredIn	( boolTy, stringTy, trueDataCon, falseDataCon )
+import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
 import Maybes		( maybeToBool )
 import Outputable
@@ -701,8 +700,6 @@ noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
 noteSize InlineCall     = 1
 noteSize InlineMe       = 1
 noteSize (TermUsg usg)  = usg `seq` 1
-
-exprsSize = foldr ((+) . exprSize) 0 
 
 varSize :: Var -> Int
 varSize b  | isTyVar b = 1

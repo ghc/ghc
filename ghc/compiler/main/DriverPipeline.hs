@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.4 2000/10/17 11:50:20 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.5 2000/10/23 09:03:27 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -44,7 +44,7 @@ import Panic
 import Directory
 import System
 import IOExts
-import Posix
+-- import Posix		commented out temp by SLPJ to get going on windows
 import Exception
 
 import IO
@@ -712,12 +712,31 @@ preprocess filename =
 -- reading the OPTIONS pragma from the source file, and passing the
 -- output of hsc through the C compiler.
 
+-- The driver sits between 'compile' and 'hscMain', translating calls
+-- to the former into calls to the latter, and results from the latter
+-- into results from the former.  It does things like preprocessing
+-- the .hs file if necessary, and compiling up the .stub_c files to
+-- generate Linkables.
+
 compile :: Finder                  -- to find modules
         -> ModSummary              -- summary, including source
         -> Maybe ModIFace          -- old interface, if available
         -> HomeSymbolTable         -- for home module ModDetails          
         -> PersistentCompilerState -- persistent compiler state
         -> IO CompResult
+
+data CompResult
+   = CompOK   ModDetails  -- new details (HST additions)
+              (Maybe (ModIface, Linkable))
+                       -- summary and code; Nothing => compilation not reqd
+                       -- (old summary and code are still valid)
+              PersistentCompilerState	-- updated PCS
+              (Bag WarnMsg) 		-- warnings
+
+   | CompErrs PersistentCompilerState	-- updated PCS
+              (Bag ErrMsg)		-- errors
+              (Bag WarnMsg)             -- warnings
+
 
 compile finder summary old_iface hst pcs = do 
    verb <- readIORef verbose

@@ -56,7 +56,7 @@ module Module
     , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
     , delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv
     , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
-    , rngModuleEnv, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv
+    , rngModuleEnv, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv, lookupModuleEnvByName
 
     ) where
 
@@ -276,7 +276,8 @@ mapModuleEnv         :: (a -> b) -> ModuleEnv a -> ModuleEnv b
 rngModuleEnv         :: ModuleEnv a -> [a]
                   
 isEmptyModuleEnv     :: ModuleEnv a -> Bool
-lookupModuleEnv      :: ModuleEnv a -> Module -> Maybe a
+lookupModuleEnv      :: ModuleEnv a -> Module     -> Maybe a
+lookupModuleEnvByName:: ModuleEnv a -> ModuleName -> Maybe a
 lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
 elemModuleEnv        :: Module -> ModuleEnv a -> Bool
 foldModuleEnv        :: (a -> b -> b) -> b -> ModuleEnv a -> b
@@ -289,6 +290,7 @@ delModuleEnvList    = delListFromUFM
 delModuleEnv        = delFromUFM
 plusModuleEnv       = plusUFM
 lookupModuleEnv     = lookupUFM
+lookupModuleEnvByName = lookupUFM
 lookupWithDefaultModuleEnv = lookupWithDefaultUFM
 mapModuleEnv        = mapUFM
 mkModuleEnv         = listToUFM

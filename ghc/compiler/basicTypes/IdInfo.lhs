@@ -80,7 +80,6 @@ import DataCon		( DataCon )
 import FieldLabel	( FieldLabel )
 import Demand		-- Lots of stuff
 import Outputable	
-import Maybe            ( isJust )
 
 infixl 	1 `setDemandInfo`,
 	  `setStrictnessInfo`,

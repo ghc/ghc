@@ -22,7 +22,7 @@ import Id		( Id, idFreeTyVars, hasNoBinding, idSpecialisation )
 import VarSet
 import Var		( Var, isId )
 import Name		( isLocallyDefined )
-import Type		( tyVarsOfType, Type )
+import Type		( tyVarsOfType )
 import Util		( mapAndUnzip )
 import Outputable
 \end{code}

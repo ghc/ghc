@@ -17,7 +17,6 @@ import RnHsSyn		( RenamedHsModule, RenamedHsDecl,
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
-import Finder		( Finder )
 import RnNames		( getGlobalNames )
 import RnSource		( rnSourceDecls, rnDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, 
@@ -68,7 +67,7 @@ import SrcLoc		( noSrcLoc )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 import IO		( openFile, IOMode(..) )
-import HscTypes		( PersistentCompilerState, HomeSymbolTable, GlobalRdrEnv,
+import HscTypes		( Finder, PersistentCompilerState, HomeSymbolTable, GlobalRdrEnv,
 			  AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..) )
 
@@ -84,13 +83,16 @@ type FixityEnv = LocalFixityEnv
 
 \begin{code}
 type RenameResult = ( PersistentCompilerState
-		    , ModIface		-- The mi_decls in here include
-					-- ones imported from packages too
+		    , ModIface	
 		    )	
 		   
 renameModule :: DynFlags -> Finder 
 	     -> PersistentCompilerState -> HomeSymbolTable
-	     -> RdrNameHsModule -> IO (Maybe RenameResult)
+	     -> RdrNameHsModule 
+	     -> IO (PersistentCompilerState, Maybe ModIface)
+			-- The mi_decls in the ModIface include
+			-- ones imported from packages too
+
 renameModule dflags finder old_pcs hst 
              this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
@@ -113,7 +115,7 @@ renameModule dflags finder old_pcs hst
 \end{code}
 
 \begin{code}
-rename :: RdrNameHsModule -> RnMG (Maybe RenameResult, IO ())
+rename :: RdrNameHsModule -> RnMG (Maybe ModIface, IO ())
 rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec loc)
   =  	-- FIND THE GLOBAL NAME ENVIRONMENT
     getGlobalNames this_mod			`thenRn` \ maybe_stuff ->
@@ -165,7 +167,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
-    mkImportExportInfo mod_name export_avails exports 	`thenRn` \ (my_exports, my_usages) ->
+    mkImportExportInfo mod_name export_avails imports 	`thenRn` \ (my_exports, my_usages) ->
 
 	-- RETURN THE RENAMED MODULE
     getNameSupplyRn			`thenRn` \ name_supply ->
@@ -187,33 +189,20 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 	--	(a) defined in this module
 	--	(b) exported
 	exported_fixities
-	  = [ FixitySig (toRdrName name) fixity loc
-	    | FixitySig name fixity loc <- nameEnvElts local_fixity_env,
-	      isUserExportedName name
-	    ]
- ------ HERE
-	new_iface = ParsedIface { pi_mod     = this_module
-				, pi_vers    = initialVersion
-				, pi_orphan  = any isOrphanDecl rn_local_decls
-				, pi_exports = my_exports
-				, pi_usages  = my_usages
-				, pi_fixity  = (initialVersion, exported_fixities)
-				, pi_deprecs = my_deprecs
-				  	-- These ones get filled in later
-				, pi_insts = [], pi_decls = []
-				, pi_rules = (initialVersion, [])
-			}
-	
-	renamed_module = HsModule mod_name vers 
-				  trashed_exports trashed_imports
-				  (rn_local_decls ++ rn_imp_decls)
-			          mod_deprec
-			          loc
+	  = mkNameEnv [ (name, fixity)
+		      | FixitySig name fixity loc <- nameEnvElts local_fixity_env,
+			isUserExportedName name
+		      ]
 
-	result = (this_module,   renamed_module, 
-		  old_iface,   new_iface,
-		  name_supply, local_fixity_env,
-		  direct_import_mods)
+	mod_iface = ModIface {	mi_module  = this_module
+				mi_version = panic "mi_version: not filled in yet",
+				mi_orphan  = any isOrphanDecl rn_local_decls,
+				mi_exports = my_exports,
+				mi_usages  = my_usages,
+				mi_fixity  = exported_fixities)
+				mi_deprecs = my_deprecs
+				mi_decls   = rn_local_decls ++ rn_imp_decls
+		    }
     in
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
@@ -222,7 +211,7 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 		      export_avails source_fvs
 		      rn_imp_decls			`thenRn_`
 
-    returnRn (Just result, dump_action) }
+    returnRn (Just mod_iface, dump_action) }
   where
     trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []

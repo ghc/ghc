@@ -169,35 +169,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 \end{code}
 	
 \begin{code}
-checkEarlyExit mod_name
-  = traceRn (text "Considering whether compilation is required...")	`thenRn_`
-
-	-- Read the old interface file, if any, for the module being compiled
-    findAndReadIface doc_str mod_name False {- Not hi-boot -}	`thenRn` \ maybe_iface ->
-
-	-- CHECK WHETHER WE HAVE IT ALREADY
-    case maybe_iface of
-	Left err -> 	-- Old interface file not found, so we'd better bail out
-		    traceRn (vcat [ptext SLIT("No old interface file for") <+> ppr mod_name,
-				   err])			`thenRn_`
-		    returnRn (outOfDate, Nothing)
-
-	Right iface
-	  | panic "checkEarlyExit: ???: not opt_SourceUnchanged"
-	  -> 	-- Source code changed
-	     traceRn (nest 4 (text "source file changed or recompilation check turned off"))	`thenRn_` 
-	     returnRn (False, Just iface)
-
-	  | otherwise
-	  -> 	-- Source code unchanged and no errors yet... carry on 
-	     checkModUsage (pi_usages iface)	`thenRn` \ up_to_date ->
-	     returnRn (up_to_date, Just iface)
-  where
-	-- Only look in current directory, with suffix .hi
-    doc_str = sep [ptext SLIT("need usage info from"), ppr mod_name]
-\end{code}
-	
-\begin{code}
 importsFromImportDecl :: (Name -> Bool)		-- OK to omit qualifier
 		      -> RdrNameImportDecl
 		      -> RnMG (GlobalRdrEnv, 

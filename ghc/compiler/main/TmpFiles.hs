@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: TmpFiles.hs,v 1.2 2000/10/11 11:54:58 simonmar Exp $
+-- $Id: TmpFiles.hs,v 1.3 2000/10/23 09:03:27 simonpj Exp $
 --
 -- Temporary file management
 --
@@ -21,7 +21,7 @@ import Config
 import Util
 
 -- hslibs
-import Posix
+-- import Posix		commented out SLPJ
 import Exception
 import IOExts
 

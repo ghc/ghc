@@ -1,45 +1,4 @@
-Notes July 00
-~~~~~~~~~~~~~~
-Time.lhs: fails with too many arguments to C function
-works with native code gen
+21 Oct 00
 
-CTypes.lhs: fails with
-    /tmp/ghc2840.hc:42413: fixed or forbidden register 3 (bx) was spilled for class GENERAL_REGS.
-    This may be due to a compiler bug or to impossible asm statements or clauses.
-works without -O
-
-posix/* fails with
-      ghc1653.c:4: `#include' expects "FILENAME" or <FILENAME>
-      ghc1653.c:6: `#include' expects "FILENAME" or <FILENAME>
-works when one fixes the makefile
-
-make depend needs the -osuf o removed.
-
-CTypes also has a Subst-worker WARNING.
-
-
-Notes June 99
-~~~~~~~~~~~~~
-* In nofib/spectral/mandel2/Main.check_radius, there's a call to (fromIntegral m), where
-  m is defined at top level. The full-laziness pass doesn't catch this because by
-  the time it runs, enough inlining has happened that it looks like
-	case ccall ... of (# a,b #) -> ...
-  and the full laziness pass doesn't float unboxed things.
-
-* The same function is an excellent example of where liberate-case would be a win.
-
-* Don't forget to try CSE
-
-Interface files
-~~~~~~~~~~~~~~~
-* Don't need to pin a kind on the type variable in a interface class decl,
-  because it'll be correctly re-inferred when we read it in.
-
-* The double semicolon at the end of an interface-file signature is so that
-  the lexer can run through the pragmas very fast when -O isn't being used.
-
-* In export lists, T|(A,B) says that constructors A and B are exported, 
-  but not the type T.  Similarly for classes.  
-  We can't say T(T,A,B) and T(A,B) to export or not-export T respectively,
-  because the type T might have a constructor T.
-
+- Do we want to continue to record the package name in an interface file?
+  Does pi_mod have a Module or a ModuleName?

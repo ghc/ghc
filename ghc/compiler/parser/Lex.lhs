@@ -52,7 +52,7 @@ import FastString
 import StringBuffer
 import GlaExts
 import Ctype
-import Char		( chr, ord )
+import Char		( ord )
 import PrelRead 	( readRational__ ) -- Glasgow non-std
 \end{code}
 

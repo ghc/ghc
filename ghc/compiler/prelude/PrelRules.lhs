@@ -310,7 +310,6 @@ trueVal       = Var trueDataConId
 falseVal      = Var falseDataConId
 mkIntVal    i = Lit (mkMachInt  i)
 mkWordVal   w = Lit (mkMachWord w)
-mkCharVal   c = Lit (MachChar   c)
 mkFloatVal  f = Lit (convFloating (MachFloat  f))
 mkDoubleVal d = Lit (convFloating (MachDouble d))
 \end{code}

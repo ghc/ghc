@@ -65,16 +65,14 @@ import GlaExts		( Int(..) )
 import Module		( moduleNameFS )
 #endif
 
-import TyCon		( TyCon, isDataTyCon, tyConFamilySize, tyConDataCons )
-import Class		( Class, classTyCon )
+import TyCon		( TyCon )
+import Class		( Class )
 import InterpSyn
 import StgSyn
 import Addr
-import RdrName		( RdrName, rdrNameModule, rdrNameOcc )
-import OccName		( occNameString )
+import RdrName		( RdrName )
 import FiniteMap
 import Panic		( panic )
-import PrelAddr
 
 -- ---------------------------------------------------------------------------
 -- Environments needed by the linker

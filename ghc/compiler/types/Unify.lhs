@@ -12,16 +12,14 @@ module Unify ( unifyTysX, unifyTyListsX,
   ) where 
 
 import TypeRep	( Type(..) )	 -- friend
-import Type	( Kind, funTyCon, 
-		  typeKind, tyVarsOfType, splitAppTy_maybe
-		)
+import Type	( typeKind, tyVarsOfType, splitAppTy_maybe )
 
 import PprType	()	-- Instances
 			-- This import isn't strictly necessary, but it makes sure that
 			-- PprType is below Unify in the hierarchy, which in turn makes
 			-- fewer modules boot-import PprType
 
-import Var	( TyVar, tyVarKind )
+import Var	( tyVarKind )
 import VarSet
 import VarEnv	( TyVarSubstEnv, emptySubstEnv, lookupSubstEnv, extendSubstEnv, 
 		  SubstResult(..)

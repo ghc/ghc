@@ -13,6 +13,7 @@ module Finder (
 
 #include "HsVersions.h"
 
+import HscTyes		( Finder, ModuleLocation(..) )
 import CmStaticInfo
 import DriverPhases
 import DriverState
@@ -34,22 +35,6 @@ lives in, so it can make a Module from a ModuleName, and (b) where the
 source, interface, and object files for a module live.
 
 \begin{code}
-type Finder = ModuleName -> IO (Maybe (Module, ModuleLocation))
-
--- For a module in another package, the hs_file and obj_file
--- components of ModuleLocation are undefined.  
-
--- The locations specified by a ModuleLocation may or may not
--- correspond to actual files yet: for example, even if the object
--- file doesn't exist, the ModuleLocation still contains the path to
--- where the object file will reside if/when it is created.
-
-data ModuleLocation
-   = ModuleLocation {
-	hs_file  :: FilePath,
-	hi_file  :: FilePath,
-	obj_file :: FilePath
-      }
 
 -- caches contents of package directories, never expunged
 GLOBAL_VAR(pkgDirCache,    Nothing,  Maybe (FiniteMap String (PackageName, FilePath)))

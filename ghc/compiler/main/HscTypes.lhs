@@ -5,9 +5,13 @@
 
 \begin{code}
 module HscTypes ( 
+	Finder, ModuleLocation(..),
+
 	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
 	HomeIfaceTable, PackageIfaceTable,
+
+	VersionInfo(..),
 
 	TyThing(..), groupTyThings,
 
@@ -15,9 +19,9 @@ module HscTypes (
 
 	lookupFixityEnv,
 
-	WhetherHasOrphans, ImportVersion, ExportItem, WhatsImported(..),
+	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-	IfaceInsts, IfaceRules, DeprecationEnv, 
+	IfaceInsts, IfaceRules, DeprecationEnv, GatedDecl,
 	OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 	AvailEnv, AvailInfo, GenAvailInfo(..),
 	PersistentCompilerState(..),
@@ -25,8 +29,6 @@ module HscTypes (
 	InstEnv, ClsInstEnv, DFunId,
 
 	GlobalRdrEnv, RdrAvailInfo,
-
-	CompResult(..), HscResult(..),
 
 	-- Provenance
 	Provenance(..), ImportReason(..), PrintUnqualified,
@@ -36,41 +38,63 @@ module HscTypes (
 
 #include "HsVersions.h"
 
+import RdrName		( RdrNameEnv, emptyRdrEnv )
 import Name		( Name, NameEnv, NamedThing,
-			  unitNameEnv, extendNameEnv, plusNameEnv, 
+			  emptyNameEnv, unitNameEnv, extendNameEnv, plusNameEnv, 
 			  lookupNameEnv, emptyNameEnv, getName, nameModule,
 			  nameSrcLoc )
-import Module		( Module, ModuleName, ModuleEnv,
-			  extendModuleEnv, lookupModuleEnv )
-import Class		( Class )
+import NameSet		( NameSet )
 import OccName		( OccName )
-import RdrName		( RdrNameEnv, emptyRdrEnv )
-import Outputable	( SDoc )
-import UniqFM 		( UniqFM )
+import Module		( Module, ModuleName, ModuleEnv,
+			  lookupModuleEnv )
+import VarSet		( TyVarSet )
+import VarEnv		( IdEnv, emptyVarEnv )
+import Id		( Id )
+import Class		( Class )
+import TyCon		( TyCon )
+
+import BasicTypes	( Version, Fixity )
+
+import HsSyn		( DeprecTxt )
+import RdrHsSyn		( RdrNameHsDecl )
+import RnHsSyn		( RenamedHsDecl )
+
+import CoreSyn		( CoreRule )
+import Type		( Type )
+
 import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
 import Bag		( Bag )
-import Id		( Id )
-import VarEnv		( IdEnv, emptyVarEnv )
-import BasicTypes	( Version, Fixity, defaultFixity )
-import TyCon		( TyCon )
-import ErrUtils		( ErrMsg, WarnMsg )
-import CmLink		( Linkable )
-import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameHsDecl,
-			  RdrNameDeprecation, RdrNameFixitySig )
-import InterpSyn	( UnlinkedIBind )
-import UniqSupply	( UniqSupply )
-import HsDecls		( DeprecTxt )
-import CoreSyn		( CoreRule )
-import NameSet		( NameSet )
-import Type		( Type )
-import Name		( emptyNameEnv )
-import VarSet		( TyVarSet )
-import Panic		( panic )
+import UniqFM 		( UniqFM )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp )
-import RnHsSyn		( RenamedHsDecl )
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{The Finder type}
+%*									*
+%************************************************************************
+
+\begin{code}
+type Finder = ModuleName -> IO (Maybe (Module, ModuleLocation))
+
+data ModuleLocation
+   = ModuleLocation {
+	hs_file  :: FilePath,
+	hi_file  :: FilePath,
+	obj_file :: FilePath
+      }
+\end{code}
+
+For a module in another package, the hs_file and obj_file
+components of ModuleLocation are undefined.  
+
+The locations specified by a ModuleLocation may or may not
+correspond to actual files yet: for example, even if the object
+file doesn't exist, the ModuleLocation still contains the path to
+where the object file will reside if/when it is created.
+
 
 %************************************************************************
 %*									*
@@ -147,7 +171,6 @@ Simple lookups in the symbol table.
 
 \begin{code}
 lookupFixityEnv :: IfaceTable -> Name -> Maybe Fixity
-	-- Returns defaultFixity if there isn't an explicit fixity
 lookupFixityEnv tbl name
   = case lookupModuleEnv tbl (nameModule name) of
 	Nothing	     -> Nothing
@@ -225,10 +248,14 @@ but they are mostly elaborated elsewhere
 \begin{code}
 data VersionInfo 
   = VersionInfo {
-	modVers  :: Version,
-	fixVers  :: Version,
-	ruleVers :: Version,
-	declVers :: NameEnv Version
+	vers_module  :: Version,	-- Changes when anything changes
+	vers_exports :: Version,	-- Changes when export list changes
+	vers_rules   :: Version,	-- Changes when any rule changes
+	vers_decls   :: NameEnv Version
+		-- Versions for "big" names only (not data constructors, class ops)
+		-- The version of an Id changes if its fixity changes
+		-- Ditto data constructors, class operations, except that the version of
+		-- the parent class/tycon changes
     }
 
 type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
@@ -268,14 +295,6 @@ type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contain
 %************************************************************************
 
 \begin{code}
-type ExportItem		 = (ModuleName, [RdrAvailInfo])
-
-type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
-
-type ModVersionInfo	= (Version,		-- Version of the whole module
-			   Version,		-- Version number for all fixity decls together
-			   Version)		-- ...ditto all rules together
-
 type WhetherHasOrphans   = Bool
 	-- An "orphan" is 
 	-- 	* an instance decl in a module other than the defn module for 
@@ -285,25 +304,31 @@ type WhetherHasOrphans   = Bool
 
 type IsBootInterface     = Bool
 
+type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
+
 data WhatsImported name  = NothingAtAll				-- The module is below us in the
 								-- hierarchy, but we import nothing
 
-			 | Everything Version			-- The module version
+			 | Everything Version		-- Used for modules from other packages;
+							-- we record only the module's version number
 
-			 | Specifically Version			-- Module version
-					Version			-- Fixity version
-					Version			-- Rules version
-					[(name,Version)]	-- List guaranteed non-empty
+			 | Specifically 
+				Version			-- Module version
+				(Maybe Version)		-- Export-list version, if we depend on it
+				[(name,Version)]	-- List guaranteed non-empty
+				Version			-- Rules version
+
 			 deriving( Eq )
-	-- 'Specifically' doesn't let you say "I imported f but none of the fixities in
-	-- the module". If you use anything in the module you get its fixity and rule version
-	-- So if the fixities or rules change, you'll recompile, even if you don't use either.
+	-- 'Specifically' doesn't let you say "I imported f but none of the rules in
+	-- the module". If you use anything in the module you get its rule version
+	-- So if the rules change, you'll recompile, even if you don't use them.
 	-- This is easy to implement, and it's safer: you might not have used the rules last
 	-- time round, but if someone has added a new rule you might need it this time
 
-	-- 'Everything' means there was a "module M" in 
-	-- this module's export list, so we just have to go by M's version,
-	-- not the list of (name,version) pairs
+	-- The export list field is (Just v) if we depend on the export list:
+	--	we imported the module without saying exactly what we imported
+	-- We need to recompile if the module exports changes, because we might
+	-- now have a name clash in the importing module.
 \end{code}
 
 
@@ -316,6 +341,8 @@ data WhatsImported name  = NothingAtAll				-- The module is below us in the
 \begin{code}
 data PersistentCompilerState 
    = PCS {
+        pcs_PIT :: PackageIfaceTable,	-- Domain = non-home-package modules
+					--   the mi_decls component is empty
         pcs_PST :: PackageSymbolTable,	-- Domain = non-home-package modules
 					--   except that the InstEnv components is empty
 	pcs_insts :: InstEnv,		-- The total InstEnv accumulated from all
@@ -390,47 +417,6 @@ type IfaceInsts = Bag GatedDecl
 type IfaceRules = Bag GatedDecl
 
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{The result of compiling one module}
-%*									*
-%************************************************************************
-
-\begin{code}
-data CompResult
-   = CompOK   ModDetails  -- new details (HST additions)
-              (Maybe (ModIface, Linkable))
-                       -- summary and code; Nothing => compilation not reqd
-                       -- (old summary and code are still valid)
-              PersistentCompilerState	-- updated PCS
-              (Bag WarnMsg) 		-- warnings
-
-   | CompErrs PersistentCompilerState	-- updated PCS
-              (Bag ErrMsg)		-- errors
-              (Bag WarnMsg)             -- warnings
-
-
--- The driver sits between 'compile' and 'hscMain', translating calls
--- to the former into calls to the latter, and results from the latter
--- into results from the former.  It does things like preprocessing
--- the .hs file if necessary, and compiling up the .stub_c files to
--- generate Linkables.
-
-data HscResult
-   = HscOK   ModDetails  	     -- new details (HomeSymbolTable additions)
-	     (Maybe ModIface)	     -- new iface (if any compilation was done)
-	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
-	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
-	     (Maybe [UnlinkedIBind]) -- interpreted code, if any
-             PersistentCompilerState -- updated PCS
-             (Bag WarnMsg) 		-- warnings
-
-   | HscErrs PersistentCompilerState -- updated PCS
-             (Bag ErrMsg)		-- errors
-             (Bag WarnMsg)             -- warnings
 \end{code}
 
 

@@ -35,6 +35,15 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
+import HscTypes		( Finder,
+			  AvailEnv, lookupTypeEnv,
+			  OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
+			  WhetherHasOrphans, ImportVersion, 
+			  PersistentRenamerState(..), IsBootInterface, Avails,
+			  DeclsMap, IfaceInsts, IfaceRules, 
+			  HomeSymbolTable, PackageSymbolTable,
+			  PersistentCompilerState(..), GlobalRdrEnv,
+			  HomeIfaceTable, PackageIfaceTable )
 import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
@@ -49,25 +58,17 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  extendNameEnvList
 			)
-import Module		( Module, ModuleName, WhereFrom, moduleName )
+import Module		( Module, ModuleName )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc )
 import Unique		( Unique )
-import FiniteMap	( FiniteMap, emptyFM, listToFM, plusFM )
-import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
+import FiniteMap	( FiniteMap, emptyFM )
+import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
-import Finder		( Finder )
 import PrelNames	( mkUnboundName )
-import HscTypes		( GlobalSymbolTable, AvailEnv, 
-			  OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
-			  WhetherHasOrphans, ImportVersion, ExportItem,
-			  PersistentRenamerState(..), IsBootInterface, Avails,
-			  DeclsMap, IfaceInsts, IfaceRules, DeprecationEnv,
-			  HomeSymbolTable, PackageSymbolTable,
-			  PersistentCompilerState(..), GlobalRdrEnv,
-			  HomeIfaceTable, PackageIfaceTable )
+import Maybes		( maybeToBool, seqMaybe )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -119,8 +120,13 @@ data RnDown
 
 	rn_finder  :: Finder,
 	rn_dflags  :: DynFlags,
+
 	rn_hit     :: HomeIfaceTable,
-	rn_done    :: Name -> Bool,   -- available before compiling this module?
+	rn_done    :: Name -> Bool,	-- Tells what things (both in the
+					-- home package and other packages)
+					-- were already available (i.e. in
+					-- the relevant SymbolTable) before 
+					-- compiling this module
 
 	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
 
@@ -186,6 +192,7 @@ type ExportAvails = (FiniteMap ModuleName Avails,
 %===================================================
 
 \begin{code}
+type ExportItem = (ModuleName, [RdrAvailInfo])
 
 data ParsedIface
   = ParsedIface {
@@ -251,11 +258,14 @@ data Ifaces = Ifaces {
 		-- All the names (whether "big" or "small", whether wired-in or not,
 		-- whether locally defined or not) that have been slurped in so far.
 
-	iVSlurp :: [(Name,Version)]
+	iVSlurp :: [Name]
 		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
 		-- names that have been slurped in so far, with their versions.
 		-- This is used to generate the "usage" information for this module.
 		-- Subset of the previous field.
+		-- It's worth keeping separately, because there's no very easy 
+		-- way to distinguish the "big" names from the "non-big" ones.
+		-- But this is a decision we might want to revisit.
     }
 
 type ImportedModuleInfo = FiniteMap ModuleName 
@@ -274,15 +284,18 @@ type IsLoaded = Bool
 initRn :: DynFlags 
        -> Finder 
        -> HomeIfaceTable
+       -> HomeSymbolTable
        -> PersistentCompilerState
        -> Module 
        -> SrcLoc
        -> RnMG t
        -> IO (t, PersistentCompilerState, (Bag WarnMsg, Bag ErrMsg))
 
-initRn dflags finder hit pcs mod loc do_rn
+initRn dflags finder hit hst pcs mod loc do_rn
   = do 
 	let prs = pcs_PRS pcs
+	let pst = pcs_PST pcs
+
 	uniqs     <- mkSplitUniqSupply 'r'
 	names_var <- newIORef (uniqs, origNames (prsOrig prs), 
 				      origIParam (prsOrig prs))
@@ -294,6 +307,7 @@ initRn dflags finder hit pcs mod loc do_rn
 			       rn_finder = finder,
 			       rn_dflags = dflags,
 			       rn_hit    = hit,
+			       rn_done   = is_done hst pst,
 					     
 			       rn_ns     = names_var, 
 			       rn_errs   = errs_var, 
@@ -312,15 +326,23 @@ initRn dflags finder hit pcs mod loc do_rn
 			    prsDecls = iDecls new_ifaces,
 			    prsInsts = iInsts new_ifaces,
 			    prsRules = iRules new_ifaces }
-	let new_pcs = pcs { pcs_PST = iPST new_ifaces, 
+	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	
 	return (res, new_pcs, (warns, errs))
 
+is_done :: HomeSymbolTable -> PackageSymbolTable -> Name -> Bool
+-- Returns True iff the name is in either symbol table
+is_done hst pst n = maybeToBool (lookupTypeEnv pst n `seqMaybe` lookupTypeEnv hst n)
+
+lookupIface :: HomeInterfaceTable -> PackageInterfaceTable -> ModuleName -> ModIface
+lookupIface hit pit mod = lookupModuleEnvByName hit mod `orElse` 
+			  lookupModuleEnvByName pit mod `orElse`
+			  pprPanic "lookupIface" (ppr mod)
 
 initIfaces :: PersistentCompilerState -> Ifaces
-initIfaces (PCS { pcs_PST = pst, pcs_PRS = prs })
-  = Ifaces { iPST   = pst,
+initIfaces (PCS { pcs_PIT = pit, pcs_PRS = prs })
+  = Ifaces { iPIT   = pit,
 	     iDecls = prsDecls prs,
 	     iInsts = prsInsts prs,
 	     iRules = prsRules prs,
@@ -379,7 +401,8 @@ renameSourceCode dflags mod prs m
 			       rn_loc = generatedSrcLoc, rn_ns = names_var,
 			       rn_errs = errs_var, 
 			       rn_mod = mod, 
-			       rn_ifaces = panic "rnameSourceCode: rn_ifaces"  -- Not required
+			       rn_ifaces = panic "rnameSourceCode: rn_ifaces",  -- Not required
+			       rn_finder = panic "rnameSourceCode: rn_finder"  -- Not required
 			     }
 	    s_down = SDown { rn_mode = InterfaceMode,
 			       -- So that we can refer to PrelBase.True etc
@@ -559,6 +582,9 @@ getFinderRn down l_down = return (rn_finder down)
 
 getHomeIfaceTableRn :: RnM d HomeIfaceTable
 getHomeIfaceTableRn down l_down = return (rn_hit down)
+
+checkAlreadyAvailable :: Name -> RnM d Bool
+checkAlreadyAvailable name down l_down = return (rn_done down name)
 \end{code}
 
 %================

@@ -13,16 +13,15 @@ import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
 			  mkRdrUnqual, qualifyRdrName
 			)
-import HsTypes		( hsTyVarName, hsTyVarNames, replaceTyVarName )
+import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
-			  ImportReason(..), GlobalRdrEnv, Avails, AvailEnv,
+			  ImportReason(..), GlobalRdrEnv, AvailEnv,
 			  AvailInfo, GenAvailInfo(..), RdrAvailInfo )
 import RnMonad
 import Name		( Name, NamedThing(..),
 			  getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName,
-			  mkIPName, isLocallyDefined, 
-			  nameOccName, nameModule,
+			  mkIPName, nameOccName, nameModule,
 			  extendNameEnv_C, plusNameEnv_C, nameEnvElts,
 			  setNameModuleAndLoc
 			)
@@ -35,7 +34,7 @@ import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
 import ListSetOps	( removeDups, equivClasses )
-import Util		( thenCmp, sortLt )
+import Util		( sortLt )
 import List		( nub )
 import PrelNames	( mkUnboundName )
 import CmdLineOpts
