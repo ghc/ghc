@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.25 $
- * $Date: 1999/11/08 15:30:33 $
+ * $Revision: 1.26 $
+ * $Date: 1999/11/12 17:50:04 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1259,6 +1259,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             Case(i_VAR_CHAR_big):
             Case(i_CONST_ADDR_big):
             Case(i_VAR_ADDR_big):
+            Case(i_VAR_STABLE_big):
             Case(i_CONST_INTEGER_big):
             Case(i_CONST_INT_big):
             Case(i_VAR_INT_big):

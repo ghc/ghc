@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.19 $
- * $Date: 1999/11/12 17:32:39 $
+ * $Revision: 1.20 $
+ * $Date: 1999/11/12 17:50:01 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -316,7 +316,7 @@ String argv[]; {
         }
     }
 
-#ifdef DEBUG
+#if DEBUG
     DEBUG_LoadSymbols(argv_0_orig);
 #endif
 
