@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.31 $
- * $Date: 1999/12/07 11:49:11 $
+ * $Revision: 1.32 $
+ * $Date: 2000/02/14 11:04:58 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -70,7 +70,7 @@
    for a given function by name.  Useful but a hack.  Sigh.
  */
 extern void* getHugs_AsmObject_for ( char* s );
-
+extern int /*Bool*/ combined;
 
 /* --------------------------------------------------------------------------
  * Crude profiling stuff (mainly to assess effect of optimiser)
@@ -2254,6 +2254,9 @@ void myStackCheck ( Capability* cap )
 */
 static void* enterBCO_primop1 ( int primop1code )
 {
+    if (combined)
+       barf("enterBCO_primop1 in combined mode");
+
     switch (primop1code) {
         case i_pushseqframe:
             {
@@ -2650,6 +2653,9 @@ static void* enterBCO_primop2 ( int primop2code,
                                 StgBCO** bco,
                                 Capability* cap )
 {
+        if (combined)
+           barf("enterBCO_primop1 in combined mode");
+
         switch (primop2code) {
         case i_raise:  /* raise#{err} */
             {
