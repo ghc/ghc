@@ -18,6 +18,8 @@ test "arith010" { vtr("-package lang", "", "") }
 test "arith011" { vtr("-package lang", "", "") }
 test "arith012" { vtr("-package lang", "", "") }
 test "arith013" { vtr("", "", "") }
+test "arith014" { vtr("", "", "") }
+test "arith015" { vtr("", "", "") }
 test "num001" { vtr("", "", "") }
 test "num002" { vtr("", "", "") }
 test "num003" { vtr("", "", "") }
