@@ -71,33 +71,71 @@ The @Handle@ and @Handle__@ types are defined in @IOBase@.
 \begin{code}
 {-# INLINE newHandle   #-}
 {-# INLINE withHandle #-}
-{-# INLINE writeHandle #-}
 newHandle     :: Handle__ -> IO Handle
-withHandle    :: Handle   -> (Handle__ -> IO a) -> IO a
-writeHandle   :: Handle -> Handle__ -> IO ()
 
 #if defined(__CONCURRENT_HASKELL__)
 
 -- Use MVars for concurrent Haskell
 newHandle hc  = newMVar	hc 	>>= \ h ->
 	        return (Handle h)
-
-  -- withHandle grabs the handle lock, performs
-  -- some operation over it, making sure that we
-  -- unlock & reset the handle state should an
-  -- exception occur while performing said op.
-withHandle (Handle h) act = do
-   h_ <- takeMVar h
-   v  <- catchNonIO (act h_) (\ ex -> putMVar h h_ >> throw ex)
-   return v
-   
-writeHandle (Handle h) hc = putMVar h hc
 #else 
 
 -- Use ordinary MutableVars for non-concurrent Haskell
 newHandle hc  = stToIO (newVar	hc 	>>= \ h ->
 		        return (Handle h))
+#endif
+\end{code}
 
+%*********************************************************
+%*							*
+\subsection{@withHandle@ operations}
+%*							*
+%*********************************************************
+
+In the concurrent world, handles are locked during use.  This is done
+by wrapping an MVar around the handle which acts as a mutex over
+operations on the handle.
+
+To avoid races, we use the following bracketing operations.  The idea
+is to obtain the lock, do some operation and replace the lock again,
+whether the operation succeeded or failed.  We also want to handle the
+case where the thread receives an exception while processing the IO
+operation: in these cases we also want to relinquish the lock.
+
+There are three versions of @withHandle@: corresponding to the three
+possible combinations of:
+
+	- the operation may side-effect the handle
+	- the operation may return a result
+
+If the operation generates an error or an exception is raised, the
+orignal handle is always replaced [ this is the case at the moment,
+but we might want to revisit this in the future --SDM ].
+
+\begin{code}
+#ifdef __CONCURRENT_HASKELL__
+withHandle :: Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
+withHandle (Handle h) act = do
+   h_ <- takeMVar h
+   (h',v)  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
+   putMVar h h'
+   return v
+
+withHandle_ :: Handle -> (Handle__ -> IO a) -> IO a
+withHandle_ (Handle h) act = do
+   h_ <- takeMVar h
+   v  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
+   putMVar h h_
+   return v
+   
+withHandle__ :: Handle -> (Handle__ -> IO Handle__) -> IO ()
+withHandle__ (Handle h) act = do
+   h_ <- takeMVar h
+   h'  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
+   putMVar h h'
+   return ()
+
+#else
    -- of questionable value to install this exception
    -- handler, but let's do it in the non-concurrent
    -- case too, for now.
@@ -106,7 +144,6 @@ withHandle (Handle h) act = do
    v  <- catchException (act h_) (\ ex -> stToIO (writeVar h h_) >> throw ex)
    return v
 
-writeHandle (Handle h) hc = stToIO (writeVar h hc)
 #endif
 \end{code}
 
@@ -363,14 +400,10 @@ implementation is free to impose stricter conditions.
 hClose :: Handle -> IO ()
 
 hClose handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle__ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-	  ioError theError
-      ClosedHandle -> do
-          writeHandle handle handle_
-	  return ()
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> return handle_
       _ -> do
           rc      <- CCALL(closeFile) (haFO__ handle_) (1::Int){-flush if you can-}  -- ConcHask: SAFE, won't block
           {- We explicitly close a file object so that we can be told
@@ -382,12 +415,9 @@ hClose handle =
 	     FileObject with a NULL as part of closeFile())
 	  -}
           if rc == (0::Int)
-	   then
-	      writeHandle handle (handle_{ haType__   = ClosedHandle,
-					   haFO__     = nullFile__ })
-           else do
-	     writeHandle handle handle_
-	     constructErrorAndFail "hClose"
+	   then return (handle_{ haType__   = ClosedHandle,
+			         haFO__     = nullFile__ })
+           else constructErrorAndFail "hClose"
 
 \end{code}
 
@@ -409,22 +439,15 @@ which can be read from {\em hdl}.
 \begin{code}
 hFileSize :: Handle -> IO Integer
 hFileSize handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-	  ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle "hFileSize" handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle "hFileSize" handle
+      ErrorHandle theError 	-> ioError theError
+      ClosedHandle 		-> ioe_closedHandle "hFileSize" handle
+      SemiClosedHandle 		-> ioe_closedHandle "hFileSize" handle
 #ifdef __HUGS__
       _ -> do
           mem <- primNewByteArray sizeof_int64
           rc <- CCALL(fileSize_int64) (haFO__ handle_) mem  -- ConcHask: SAFE, won't block
-          writeHandle handle handle_
           if rc == 0 then do
 	     result <- primReadInt64Array mem 0
              return (primInt64ToInteger result)
@@ -442,7 +465,6 @@ hFileSize handle =
           case int2Integer# hack# of
               (# s, d #) -> do
                 rc <- CCALL(fileSize) (haFO__ handle_) d  -- ConcHask: SAFE, won't block
-                writeHandle handle handle_
                 if rc == (0::Int) then
 		   return (J# s d)
                  else
@@ -461,7 +483,6 @@ hIsEOF handle =
     wantReadableHandle "hIsEOF" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(fileEOF) fo)  -- ConcHask: UNSAFE, may block
-    writeHandle handle handle_
     case rc of
       0 -> return False
       1 -> return True
@@ -515,14 +536,10 @@ hSetBuffering handle mode =
 			          "hSetBuffering"
 				  ("illegal buffer size " ++ showsPrec 9 n []))  -- 9 => should be parens'ified.
       _ ->
-          withHandle handle $ \ handle_ -> do
+          withHandle__ handle $ \ handle_ -> do
           case haType__ handle_ of
-	     ErrorHandle theError -> do
-	        writeHandle handle handle_
-	        ioError theError
-             ClosedHandle -> do
-		writeHandle handle handle_
-	        ioe_closedHandle "hSetBuffering" handle
+	     ErrorHandle theError -> ioError theError
+             ClosedHandle 	  -> ioe_closedHandle "hSetBuffering" handle
              _ -> do
 	        {- Note:
 		    - we flush the old buffer regardless of whether
@@ -538,10 +555,9 @@ hSetBuffering handle mode =
                 rc <- mayBlock fo (CCALL(setBuffering) fo bsize) -- ConcHask: UNSAFE, may block
                 if rc == 0 
 		 then do
-		   writeHandle handle (handle_{ haBufferMode__ = mode })
+		   return (handle_{ haBufferMode__ = mode })
                  else do
 		   -- Note: failure to change the buffer size will cause old buffer to be flushed.
-		   writeHandle handle handle_
 		   constructErrorAndFail "hSetBuffering"
   where
     bsize :: Int
@@ -562,7 +578,6 @@ hFlush handle =
     wantWriteableHandle "hFlush" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     rc	    <- mayBlock fo (CCALL(flushFile) fo)   -- ConcHask: UNSAFE, may block
-    writeHandle handle handle_
     if rc == 0 then 
        return ()
      else
@@ -597,8 +612,7 @@ hGetPosn :: Handle -> IO HandlePosn
 hGetPosn handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
     posn    <- CCALL(getFilePosn) (haFO__ handle_)   -- ConcHask: SAFE, won't block
-    writeHandle handle handle_
-    if posn /= -1 then
+    if posn /= -1 then do
       return (HandlePosn handle posn)
      else
       constructErrorAndFail "hGetPosn"
@@ -608,8 +622,7 @@ hSetPosn (HandlePosn handle posn) =
     wantSeekableHandle "hSetPosn" handle $ \ handle_ -> do -- not as silly as it looks: the handle may have been closed in the meantime.
     let fo = haFO__ handle_
     rc     <- mayBlock fo (CCALL(setFilePosn) fo posn)    -- ConcHask: UNSAFE, may block
-    writeHandle handle handle_
-    if rc == 0 then 
+    if rc == 0 then do
        return ()
      else
 	constructErrorAndFail "hSetPosn"
@@ -652,8 +665,7 @@ hSeek handle mode (J# s# d#) =
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(seekFile) fo whence (I# s#) d#)  -- ConcHask: UNSAFE, may block
 #endif
-    writeHandle handle handle_
-    if rc == 0 then 
+    if rc == 0 then do
        return ()
      else
 	constructErrorAndFail "hSeek"
@@ -684,34 +696,20 @@ $( Just n )$ for block-buffering of {\em n} bytes.
 \begin{code}
 hIsOpen :: Handle -> IO Bool
 hIsOpen handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  return False
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-	  return False
-      _ -> do
-	  writeHandle handle handle_
-	  return True
+      ErrorHandle theError -> ioError theError
+      ClosedHandle         -> return False
+      SemiClosedHandle     -> return False
+      _ 		   -> return True
 
 hIsClosed :: Handle -> IO Bool
 hIsClosed handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  return True
-      _ -> do
-	  writeHandle handle handle_
-	  return False
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> return True
+      _ 		   -> return False
 
 {- not defined, nor exported, but mentioned
    here for documentation purposes:
@@ -725,20 +723,12 @@ hIsClosed handle =
 
 hIsReadable :: Handle -> IO Bool
 hIsReadable handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hIsReadable" handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hIsReadable" handle
-      htype -> do
-	  writeHandle handle handle_
-	  return (isReadable htype)
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle "hIsReadable" handle
+      SemiClosedHandle 	   -> ioe_closedHandle "hIsReadable" handle
+      htype 		   -> return (isReadable htype)
   where
     isReadable ReadHandle      = True
     isReadable ReadWriteHandle = True
@@ -746,20 +736,12 @@ hIsReadable handle =
 
 hIsWritable :: Handle -> IO Bool
 hIsWritable handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hIsWritable" handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hIsWritable" handle
-      htype -> do
-	  writeHandle handle handle_
-	  return (isWritable htype)
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle "hIsWritable" handle
+      SemiClosedHandle 	   -> ioe_closedHandle "hIsWritable" handle
+      htype 		   -> return (isWritable htype)
   where
     isWritable AppendHandle    = True
     isWritable WriteHandle     = True
@@ -790,45 +772,29 @@ Querying how a handle buffers its data:
 \begin{code}
 hGetBuffering :: Handle -> IO BufferMode
 hGetBuffering handle = 
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hGetBuffering" handle
-      _ -> do
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle "hGetBuffering" handle
+      _ -> 
 	  {-
 	   We're being non-standard here, and allow the buffering
 	   of a semi-closed handle to be queried.   -- sof 6/98
           -}
-	  let v = haBufferMode__ handle_
-	  writeHandle handle handle_
-	  return v  -- could be stricter..
-
+	  return (haBufferMode__ handle_)  -- could be stricter..
 \end{code}
 
 \begin{code}
 hIsSeekable :: Handle -> IO Bool
 hIsSeekable handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hIsSeekable" handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-          ioe_closedHandle "hIsSeekable" handle
-      AppendHandle -> do
-	  writeHandle handle handle_
-	  return False
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
+      SemiClosedHandle 	   -> ioe_closedHandle "hIsSeekable" handle
+      AppendHandle 	   -> return False
       _ -> do
 	  rc <- CCALL(seekFileP) (haFO__ handle_)   -- ConcHask: SAFE, won't block
-	  writeHandle handle handle_
 	  case (rc::Int) of
             0 -> return False
             1 -> return True
@@ -852,17 +818,12 @@ hSetEcho handle on = do
     if not isT
      then return ()
      else
-      withHandle handle $ \ handle_ -> do
+      withHandle_ handle $ \ handle_ -> do
       case haType__ handle_ of 
-         ErrorHandle theError ->  do 
-            writeHandle handle handle_
-	    ioError theError
-         ClosedHandle	   ->  do
-            writeHandle handle handle_
-	    ioe_closedHandle "hSetEcho" handle
+         ErrorHandle theError -> ioError theError
+         ClosedHandle	      -> ioe_closedHandle "hSetEcho" handle
          _ -> do
             rc <- CCALL(setTerminalEcho) (haFO__ handle_) ((if on then 1 else 0)::Int)  -- ConcHask: SAFE, won't block
-	    writeHandle handle handle_
 	    if rc /= ((-1)::Int)
 	     then return ()
 	     else constructErrorAndFail "hSetEcho"
@@ -873,17 +834,12 @@ hGetEcho handle = do
     if not isT
      then return False
      else
-       withHandle handle $ \ handle_ -> do
+       withHandle_ handle $ \ handle_ -> do
        case haType__ handle_ of 
-         ErrorHandle theError ->  do 
-            writeHandle handle handle_
-	    ioError theError
-         ClosedHandle	   ->  do
-            writeHandle handle handle_
-	    ioe_closedHandle "hGetEcho" handle
+         ErrorHandle theError -> ioError theError
+         ClosedHandle	      -> ioe_closedHandle "hGetEcho" handle
          _ -> do
             rc <- CCALL(getTerminalEcho) (haFO__ handle_)  -- ConcHask: SAFE, won't block
-	    writeHandle handle handle_
 	    case (rc::Int) of
 	      1 -> return True
 	      0 -> return False
@@ -891,17 +847,12 @@ hGetEcho handle = do
 
 hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
      case haType__ handle_ of 
-       ErrorHandle theError ->  do 
-            writeHandle handle handle_
-	    ioError theError
-       ClosedHandle	   ->  do
-            writeHandle handle handle_
-	    ioe_closedHandle "hIsTerminalDevice" handle
+       ErrorHandle theError -> ioError theError
+       ClosedHandle	    -> ioe_closedHandle "hIsTerminalDevice" handle
        _ -> do
           rc <- CCALL(isTerminalDevice) (haFO__ handle_)   -- ConcHask: SAFE, won't block
-	  writeHandle handle handle_
 	  case (rc::Int) of
 	    1 -> return True
 	    0 -> return False
@@ -920,8 +871,6 @@ hConnectHdl_ hW hR is_tty =
   wantRWHandle "hConnectTo" hW $ \ hW_ ->
   wantRWHandle "hConnectTo" hR $ \ hR_ -> do
   CCALL(setConnectedTo) (haFO__ hR_) (haFO__ hW_) is_tty  -- ConcHask: SAFE, won't block
-  writeHandle hR hR_
-  writeHandle hW hW_
 
 #ifndef __PARALLEL_HASKELL__
 #define FILE_OBJECT     ForeignObj
@@ -943,7 +892,6 @@ hUngetChar :: Handle -> Char -> IO ()
 hUngetChar handle c = 
     wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
     rc      <- CCALL(ungetChar) (haFO__ handle_) c  -- ConcHask: SAFE, won't block
-    writeHandle handle handle_
     if rc == ((-1)::Int)
      then constructErrorAndFail "hUngetChar"
      else return ()
@@ -969,11 +917,11 @@ slurpFile fname = do
       then do
         hClose handle
         constructErrorAndFail "slurpFile"
-      else
-        withHandle handle $ \ handle_ -> do
-        let fo = haFO__ handle_
-	rc      <- mayBlock fo (CCALL(readChunk) fo chunk sz_i)    -- ConcHask: UNSAFE, may block.
-        writeHandle handle handle_
+      else do
+        rc <- withHandle_ handle ( \ handle_ -> do
+          let fo = haFO__ handle_
+	  mayBlock fo (CCALL(readChunk) fo chunk sz_i)    -- ConcHask: UNSAFE, may block.
+	 )
 	hClose handle
         if rc < (0::Int)
 	 then constructErrorAndFail "slurpFile"
@@ -994,7 +942,6 @@ hFillBufBA handle buf sz
 #else
     rc      <- mayBlock fo (CCALL(readChunk) fo buf sz)    -- ConcHask: UNSAFE, may block.
 #endif
-    writeHandle handle handle_
     if rc >= (0::Int)
      then return rc
      else constructErrorAndFail "hFillBufBA"
@@ -1010,7 +957,6 @@ hFillBuf handle buf sz
     wantReadableHandle "hFillBuf" handle $ \ handle_ -> do
     let fo  = haFO__ handle_
     rc      <- mayBlock fo (CCALL(readChunk) fo buf sz)    -- ConcHask: UNSAFE, may block.
-    writeHandle handle handle_
     if rc >= 0
      then return rc
      else constructErrorAndFail "hFillBuf"
@@ -1026,7 +972,6 @@ hPutBuf handle buf len =
     wantWriteableHandle "hPutBuf" handle $ \ handle_ -> do
     let fo  = haFO__ handle_
     rc      <- mayBlock fo (CCALL(writeBuf) fo buf len)  -- ConcHask: UNSAFE, may block.
-    writeHandle handle handle_
     if rc == (0::Int)
      then return ()
      else constructErrorAndFail "hPutBuf"
@@ -1037,7 +982,6 @@ hPutBufBA handle buf len =
     wantWriteableHandle "hPutBufBA" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     rc      <- mayBlock fo (CCALL(writeBufBA) fo buf len)  -- ConcHask: UNSAFE, may block.
-    writeHandle handle handle_
     if rc == (0::Int)
      then return ()
      else constructErrorAndFail "hPutBuf"
@@ -1050,17 +994,12 @@ the Handle contains..
 \begin{code}
 getHandleFd :: Handle -> IO Int
 getHandleFd handle =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case (haType__ handle_) of
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle "getHandleFd" handle
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle "getHandleFd" handle
       _ -> do
           fd <- CCALL(getFileFd) (haFO__ handle_)
-	  writeHandle handle handle_
 	  return fd
 \end{code}
 
@@ -1150,24 +1089,14 @@ if it isn't:
 \begin{code}
 wantReadableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle fun handle act = 
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      AppendHandle -> do
-	  writeHandle handle handle_
-	  ioError not_readable_error
-      WriteHandle -> do
-	  writeHandle handle handle_
-	  ioError not_readable_error
-      _ -> act handle_
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle fun handle
+      SemiClosedHandle 	   -> ioe_closedHandle fun handle
+      AppendHandle 	   -> ioError not_readable_error
+      WriteHandle 	   -> ioError not_readable_error
+      _ 		   -> act handle_
   where
    not_readable_error = 
 	   IOError (Just handle) IllegalOperation fun	
@@ -1175,21 +1104,13 @@ wantReadableHandle fun handle act =
 
 wantWriteableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWriteableHandle fun handle act = 
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      ReadHandle -> do
-	  writeHandle handle handle_
-	  ioError not_writeable_error
-      _ -> act handle_
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle fun handle
+      SemiClosedHandle 	   -> ioe_closedHandle fun handle
+      ReadHandle 	   -> ioError not_writeable_error
+      _ 		   -> act handle_
   where
    not_writeable_error = 
 	   IOError (Just handle) IllegalOperation fun
@@ -1197,18 +1118,12 @@ wantWriteableHandle fun handle act =
 
 wantRWHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantRWHandle fun handle act = 
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      _ -> act handle_
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle fun handle
+      SemiClosedHandle 	   -> ioe_closedHandle fun handle
+      _ 		   -> act handle_
   where
    not_rw_error = 
 	   IOError (Just handle) IllegalOperation fun
@@ -1216,21 +1131,13 @@ wantRWHandle fun handle act =
 
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun handle act =
-    withHandle handle $ \ handle_ -> do
+    withHandle_ handle $ \ handle_ -> do
     case haType__ handle_ of 
-      ErrorHandle theError -> do
-	  writeHandle handle handle_
-          ioError theError
-      ClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      SemiClosedHandle -> do
-	  writeHandle handle handle_
-	  ioe_closedHandle fun handle
-      AppendHandle -> do
-	  writeHandle handle handle_
-	  ioError not_seekable_error
-      _ -> act handle_
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle fun handle
+      SemiClosedHandle	   -> ioe_closedHandle fun handle
+      AppendHandle  	   -> ioError not_seekable_error
+      _ 		   -> act handle_
   where
    not_seekable_error = 
 	   IOError (Just handle) 

@@ -109,7 +109,7 @@ import PrelRead         ( readParen, Read(..), reads, lex,
 			  readIO 
 			)
 import PrelShow
-import PrelMaybe	( Either(..) )
+import PrelMaybe	( Either(..), Maybe(..) )
 import PrelAddr		( Addr(..), nullAddr )
 import PrelArr		( ByteArray )
 import PrelPack		( unpackNBytesAccST )
@@ -194,7 +194,6 @@ hWaitForInput :: Handle -> Int -> IO Bool
 hWaitForInput handle msecs =
     wantReadableHandle "hWaitForInput" handle $ \ handle_ -> do
     rc       <- CCALL(inputReady) (haFO__ handle_) (msecs::Int)     -- ConcHask: SAFE, won't block
-    writeHandle handle handle_
     case (rc::Int) of
       0 -> return False
       1 -> return True
@@ -210,7 +209,6 @@ hGetChar handle =
     wantReadableHandle "hGetChar" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     intc     <- mayBlock fo (CCALL(fileGetc) fo)  -- ConcHask: UNSAFE, may block
-    writeHandle handle handle_
     if intc /= ((-1)::Int)
      then return (chr intc)
      else constructErrorAndFail "hGetChar"
@@ -256,7 +254,6 @@ hLookAhead handle =
     wantReadableHandle "hLookAhead" handle $ \ handle_ -> do
     let fo = haFO__ handle_
     intc    <- mayBlock fo (CCALL(fileLookAhead) fo)  -- ConcHask: UNSAFE, may block
-    writeHandle handle handle_
     if intc /= (-1)
      then return (chr intc)
      else constructErrorAndFail "hLookAhead"
@@ -277,18 +274,36 @@ which is made semi-closed.
 \begin{code}
 hGetContents :: Handle -> IO String
 hGetContents handle = 
-    wantReadableHandle "hGetContents" handle $ \ handle_ -> do
-      {- 
-        To avoid introducing an extra layer of buffering here,
-        we provide three lazy read methods, based on character,
-        line, and block buffering.
-      -}
-    writeHandle handle (handle_{ haType__ = SemiClosedHandle })
-    case (haBufferMode__ handle_) of
-     LineBuffering    -> unsafeInterleaveIO (lazyReadLine handle (haFO__ handle_))
-     BlockBuffering _ -> unsafeInterleaveIO (lazyReadBlock handle (haFO__ handle_))
-     NoBuffering      -> unsafeInterleaveIO (lazyReadChar handle (haFO__ handle_))
-
+	-- can't use wantReadableHandle here, because we want to side effect
+	-- the handle.
+    withHandle handle $ \ handle_ -> do
+    case haType__ handle_ of 
+      ErrorHandle theError -> ioError theError
+      ClosedHandle 	   -> ioe_closedHandle "hGetContents" handle
+      SemiClosedHandle 	   -> ioe_closedHandle "hGetContents" handle
+      AppendHandle 	   -> ioError not_readable_error
+      WriteHandle 	   -> ioError not_readable_error
+      _ -> do
+    	  {- 
+    	    To avoid introducing an extra layer of buffering here,
+    	    we provide three lazy read methods, based on character,
+    	    line, and block buffering.
+    	  -}
+   	let handle_' = handle_{ haType__ = SemiClosedHandle }
+    	case (haBufferMode__ handle_) of
+    	 LineBuffering    -> do
+    	    str <- unsafeInterleaveIO (lazyReadLine handle (haFO__ handle_))
+    	    return (handle_', str)
+    	 BlockBuffering _ -> do
+    	    str <- unsafeInterleaveIO (lazyReadBlock handle (haFO__ handle_))
+    	    return (handle_', str)
+    	 NoBuffering      -> do
+    	    str <- unsafeInterleaveIO (lazyReadChar handle (haFO__ handle_))
+    	    return (handle_', str)
+  where
+   not_readable_error = 
+	   IOError (Just handle) IllegalOperation "hGetContents"
+		   ("handle is not open for reading")
 \end{code}
 
 Note that someone may close the semi-closed handle (or change its buffering), 
@@ -316,9 +331,9 @@ lazyReadBlock handle fo = do
      -1 -> -- an error occurred, close the handle
 	  withHandle handle $ \ handle_ -> do
           CCALL(closeFile) (haFO__ handle_) (0::Int){-don't bother flushing-}  -- ConcHask: SAFE, won't block.
-	  writeHandle handle (handle_ { haType__    = ClosedHandle,
-					haFO__      = nullFile__ })
-	  return ""
+	  return (handle_ { haType__    = ClosedHandle,
+			    haFO__      = nullFile__ }, 
+		  "")
      _ -> do
       more <- unsafeInterleaveIO (lazyReadBlock handle fo)
       stToIO (unpackNBytesAccST buf bytes more)
@@ -332,9 +347,9 @@ lazyReadLine handle fo = do
        -1 -> -- an error occurred, close the handle
   	     withHandle handle $ \ handle_ -> do
              CCALL(closeFile) (haFO__ handle_) (0::Int){- don't bother flushing-}  -- ConcHask: SAFE, won't block
-	     writeHandle handle (handle_ { haType__    = ClosedHandle,
-					   haFO__      = nullFile__ })
-	     return ""
+	     return (handle_ { haType__    = ClosedHandle,
+			       haFO__      = nullFile__ },
+		     "")
        _ -> do
           more <- unsafeInterleaveIO (lazyReadLine handle fo)
           buf  <- CCALL(getBufStart) fo bytes  -- ConcHask: won't block
@@ -352,9 +367,9 @@ lazyReadChar handle fo = do
       -1 -> -- error, silently close handle.
  	 withHandle handle $ \ handle_ -> do
          CCALL(closeFile) (haFO__ handle_) (0::Int){-don't bother flusing-}  -- ConcHask: SAFE, won't block
-	 writeHandle handle (handle_{ haType__  = ClosedHandle,
-				      haFO__    = nullFile__ })
-	 return ""
+	 return (handle_{ haType__  = ClosedHandle,
+			  haFO__    = nullFile__ },
+		 "")
       _ -> do
 	 more <- unsafeInterleaveIO (lazyReadChar handle fo)
          return (chr char : more)
@@ -379,7 +394,6 @@ hPutChar handle c =
     let fo = haFO__ handle_
     flushConnectedBuf fo
     rc       <- mayBlock fo (CCALL(filePutc) fo c)   -- ConcHask: UNSAFE, may block.
-    writeHandle handle handle_
     if rc == 0
      then return ()
      else constructErrorAndFail "hPutChar"
@@ -408,8 +422,6 @@ hPutStr handle str =
             writeBlocks fo buf bsz pos str
        NoBuffering -> do
 	    writeChars fo str
-    writeHandle handle handle_
-
 \end{code}
 
 Going across the border between Haskell and C is relatively costly,
