@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.129 2002/07/17 13:49:15 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.130 2002/07/26 03:06:58 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -243,8 +243,14 @@ runGHCi paths dflags = do
 	loadModule (unwords paths)
 
   -- enter the interactive loop
+#if defined(mingw32_TARGET_OS)
+   -- always show prompt, since hIsTerminalDevice returns True for Consoles
+   -- only, which we may or may not be running under (cf. Emacs sub-shells.)
+  interactiveLoop True
+#else
   is_tty <- io (hIsTerminalDevice stdin)
   interactiveLoop is_tty
+#endif
 
   -- and finally, exit
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
