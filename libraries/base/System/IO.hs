@@ -104,6 +104,10 @@ module System.IO (
 
     hIsTerminalDevice,	 	-- :: Handle -> IO Bool
 #endif
+
+#ifdef __GLASGOW_HASKELL__
+    hShow,			-- :: Handle -> IO String
+#endif
   ) where
 
 #ifdef __GLASGOW_HASKELL__
