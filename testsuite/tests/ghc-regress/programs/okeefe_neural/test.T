@@ -9,4 +9,4 @@ def set_opts( opts ):
 	opts.skip = 1;
 
 test('okeefe_neural', set_opts, multimod_compile_and_run, \
-	['Main', '', '-package lang +RTS -M64m -RTS'])
+	['Main', '-package lang +RTS -M64m -RTS'])
