@@ -3,12 +3,15 @@ module Main where
 
 import CmdSyntax
 import CmdSemantics	( parseOneTFile, processParsedTFile )
+
+import GetOpt
 import Directory
 import System
 import List
+import Maybe		( isJust, fromJust )
 import Monad		( when )
 import Time		( ClockTime, getClockTime )
-import IO		( catch )
+import IO		( try )
 
 
 --import IOExts(trace)
@@ -63,20 +66,47 @@ scrub ('/':'.':'/':cs) = scrub ('/':cs)
 scrub (c:cs)           = c : scrub cs
 
 
-usage
-   = "\nusage:\n" ++
-     "runtests --tool=<compiler-to-test>\n" ++   		   -- "
-     "         --config=<path_to_config_file>\n" ++ 		   -- "
-     "         --rootdir=<path_to_root_of_tests_directory>\n" ++   -- "
-     "         --save-summary=<path_of_summary_file_to_create>\n" ++   -- "
-     "         --compare-summary=<path_of_summary_file_to_compare_against>\n" ++   -- "
-     "         [--$var=literal-value]\n" ++			   -- "
-     "         [names of tests to run, if you don't want all]\n" ++
-     "\n" ++
-     "         You may not set any of the following vars from the\n" ++
+data Opt
+ = OptTool           String
+ | OptConfig         String
+ | OptRootDir        String
+ | OptSaveSummary    String
+ | OptCompareSummary String
+
+option_descrs = [
+  Option "" ["tool"]        (ReqArg OptTool "PATH")
+	"compiler to test",
+  Option "" ["config"]      (ReqArg OptConfig "FILE")
+	"config file",
+  Option "" ["rootdir"]     (ReqArg OptRootDir "DIR")
+	"root of tree containing tests (default: .)",
+  Option "" ["save-summary"] (ReqArg OptSaveSummary "PATH")
+	"file in which to save the summary",
+  Option "" ["compare-summary"] (ReqArg OptCompareSummary "PATH")
+	"old summary to compare against"
+  ]
+
+usage      = GetOpt.usageInfo header option_descrs ++ '\n':extra_info
+header     = "runtests [OPTION | VAR=VALUE | TEST]..."
+
+extra_info
+   = "         You may not set any of the following vars from the\n" ++
      "         command line:\n" ++
      concatMap (\w -> "            $" ++ w ++ "\n") special_var_names
 
+getToolOpt      os = exactlyOne "-tool"         [ t | OptTool    t <- os ]
+getConfigOpt    os = exactlyOne "-config"       [ t | OptConfig  t <- os ]
+getRootOpt      os = upToOne    "-rootdir"      [ t | OptRootDir t <- os ]
+getSaveSuOpt    os = upToOne "-save-summary"    [ t | OptSaveSummary t <- os ]
+getCompareSuOpt os = upToOne "-compare-summary" [ t | OptCompareSummary t <- os]
+
+exactlyOne s []  = die ("missing " ++ '-':s ++ " option")
+exactlyOne _ [a] = return a
+exactlyOne s as  = die ("multiple " ++ '-':s ++ " options")
+
+upToOne s []  = return Nothing 
+upToOne s [a] = return (Just a)
+upToOne s as  = die ("multiple " ++ '-':s ++ " options")
 
 main
    = getArgs >>= main_really
@@ -87,85 +117,84 @@ test
             ++ "--rootdir=../tests/codeGen")
 
 main_really arg_ws0
-   = do { start_time <- getClockTime
-        ; let (arg_ws1, maybe_tool)    = fish arg_ws0 "--tool="
-        ; let (arg_ws2, maybe_conf)    = fish arg_ws1 "--config="
-        ; let (arg_ws3, maybe_root)    = fish arg_ws2 "--rootdir="
-        ; let (arg_ws4, maybe_save_su) = fish arg_ws3 "--save-summary="
-        ; let (arg_ws5, maybe_cmp_su)  = fish arg_ws4 "--compare-summary="
-        ; let (arg_ws6, cmd_binds)  = getBinds arg_ws5
-        ; let invalid_binds
+   = do start_time <- getClockTime
+    	case getOpt Permute option_descrs arg_ws0 of 
+	    (opts, args, []) -> got_args opts args start_time
+	    (_, _, errs)     -> die (concat errs ++ usage)
+
+got_args opts args start_time
+  = do   tool <- getToolOpt opts
+	 conf <- getConfigOpt opts
+ 	 maybe_root <- getRootOpt opts
+ 	 maybe_save_su <- getSaveSuOpt opts
+ 	 maybe_cmp_su <- getCompareSuOpt opts
+	 
+         let (not_binds, cmd_binds)  = getBinds args
+         let invalid_binds
                  = filter (`elem` special_var_names) 
                           (map fst cmd_binds)
-        ; if (isNothing maybe_tool 
-              || isNothing maybe_conf
-              || isNothing maybe_root
-              || not (null invalid_binds)) 
-           then do officialMsg usage
-                   exitWith (ExitFailure 1)
-           else 
 
-     do { let tool = unJust maybe_tool
-              conf = unJust maybe_conf
-              root = unJust maybe_root
+	 when (not (null invalid_binds)) $ do
+	   die ("cannot set special variable $" ++ head invalid_binds ++
+		" on the command line")
+
+         let -- default root is '.'
+	      root | isJust maybe_root = fromJust maybe_root
+		   | otherwise         = "." 
+
               (confdir, conffile) = splitPathname conf
+
               base_genv = [("tool", tool), 
                            ("confdir", confdir), 
                            ("conffilename", conffile)]
 
               tests_to_run
-                 = if null arg_ws6 then Nothing{-all of them-}
-                                   else Just arg_ws4{-just these-}
+                 = if null not_binds then Nothing{-all of them-}
+                                     else Just not_binds{-just these-}
 
-        ; conf_ok <- doesFileExist conf
-        ; if    not conf_ok
-           then do officialMsg ("Config file `" ++ conf ++ "' doesn't exist.")
-                   exitWith (ExitFailure 1)
-           else 
+         conf_ok <- doesFileExist conf
+         when (not conf_ok) (die ("config file `" ++ conf ++ "' doesn't exist"))
 
-     do { -- Find all the .T files
-        ; all_tfiles <- findTFiles root
-        ; putStr "\n"
-        ; officialMsg ("Found " ++ show (length all_tfiles) 
+        -- Find all the .T files
+         all_tfiles <- findTFiles root
+         officialMsg ("Found " ++ show (length all_tfiles) 
                        ++ " test description files:")
-        ; putStr "\n"
-        ; putStrLn (unlines (map ("   "++) all_tfiles))
+         putStrLn (unlines (map ("   "++) all_tfiles))
         -- Parse them all
-        ; all_parsed 
+         all_parsed 
              <- mapM (\tfpath -> parseOneTFile
                                     (addTVars base_genv tfpath) tfpath)
                      all_tfiles
-        ; let parse_fails = filter isLeft all_parsed
-        ; when (not (null parse_fails)) (
+         let parse_fails = filter isLeft all_parsed
+         when (not (null parse_fails)) (
              do officialMsg ("Parse errors for the following .T files:\n")
                 putStr (unlines (map (("   "++).unLeft) parse_fails))
           )
-        ; let parsed_ok = map unRight (filter isRight all_parsed)
+         let parsed_ok = map unRight (filter isRight all_parsed)
         -- Run all the tests in each successfully-parsed .T file.
-        ; resultss 
+         resultss 
              <- mapM ( \ (path,topdefs) -> processParsedTFile 
                                               tests_to_run
                                               path
                                               (addTVars base_genv path)
                                               topdefs) 
                      parsed_ok
-        ; let results = concat resultss
-        ; putStr "\n"
-        ; officialMsg ("=== All done. ===")
+         let results = concat resultss
+         putStr "\n"
+         officialMsg ("=== All done. ===")
         -- ; putStr ("\n" ++ ((unlines . map show) results))
-        ; let summary = makeSummary start_time results
-        ; putStr ("\n" ++ snd (ppSummary summary))
-        ; putStr "\n"
-        ; case maybe_cmp_su of
+         let summary = makeSummary start_time results
+         putStrLn ("\n" ++ snd (ppSummary summary))
+         case maybe_cmp_su of
              Nothing -> return ()
              Just fn 
                 -> do { officialMsg ("=== Comparing against: " ++ fn ++ " ===")
-                      ; maybe_txt <- maybe_readFile fn
+                      ; maybe_txt <- try (readFile fn)
                       ; case maybe_txt of {
-                           Nothing -> do 
+                           Left err -> do 
                               officialMsg ("=== Can't read abovementioned file ===")
-                              return ()
-                         ; Just txt -> 
+			      print err
+                         ; Right txt -> 
                    do { case ((reads txt) :: [(Summary, String)]) of
                            ((old_summ, ""):_)
                               -> do putStrLn ""
@@ -175,15 +204,16 @@ main_really arg_ws0
                                        ("=== Parse error in: " ++ fn ++ " ===")
                                     return ()
                       }}}
-        ; case maybe_save_su of
+         case maybe_save_su of
              Nothing -> return ()
              Just fn -> do officialMsg ("=== Saving summary in: " ++ fn ++ " ===")
-                           wr_ok <- maybe_writeFile fn (show summary)
-                           when (not wr_ok)
-                              (officialMsg ("=== Can't write abovementioned file ==="))
-        ; putStrLn ""
+                           wr_ok <- try (writeFile fn (show summary))
+			   case wr_ok of
+			     Right _  -> return ()
+			     Left err -> do officialMsg ("=== Can't write abovementioned file ===")
+					    print err
+         putStrLn ""
         -- ; exitWith ExitSuccess
-     }}}
      where
         addTVars some_genv tfpath
            = case splitPathname tfpath of
@@ -326,18 +356,6 @@ ppSummaryDiffs old new
                             now_unexp
 
 
--- Helper for cmd line args
-fish :: [String] -> String -> ([String], Maybe String)
-fish strs prefix
-   = let n_prefix  = length prefix
-         pfx_eq    = (== prefix).(take n_prefix)
-         matched   = filter pfx_eq strs
-         unmatched = filter (not.pfx_eq) strs
-     in  case matched of
-            [m] -> (unmatched, Just (drop n_prefix m))
-            _   -> (strs,      Nothing)
-
-
 -- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy.ext")
 splitPathname :: String -> (String, String)
 splitPathname full
@@ -349,40 +367,24 @@ splitPathname full
      in  if null p_r then (".", reverse f_r)
                      else (reverse p_r, reverse f_r)
 
--- Extract all the   --$var=value  binds from a bunch of cmd line opts.
+-- Extract all the var=value binds from a bunch of cmd line opts.
 getBinds :: [String] -> ([String], [(Var,String)])
-getBinds cmd_line_opts
-   = f [] [] cmd_line_opts 
-     where
-        f acc_n acc_y []
-           = (reverse acc_n, reverse acc_y)
-        f acc_n acc_y (str:strs)
-           | take 3 str /= "--$" || '=' `notElem` drop 3 str
-           = f (str:acc_n) acc_y strs
-           | otherwise
-           = let varname = takeWhile (/= '=') (drop 3 str)
-                 value   = drop (4 + length varname) str
-             in 
-                 f acc_n ((varname,value):acc_y) strs
+getBinds args = f args [] []
+  where
+   f [] binds rest = (reverse rest, reverse binds)
+   f (arg:args) binds rest
+	| isJust maybe_bind  = f args (fromJust maybe_bind:binds) rest
+	| otherwise          = f args binds (arg:rest)
+      where
+	maybe_bind = is_bind (break (== '=') arg)
+   	is_bind (var, '=':value) = Just (var,value)
+   	is_bind str = Nothing
 
 -- These vars have special meanings and may not be set from the
 -- command line.
 special_var_names
    = ["testfilename", "testdir", "conffilename", "confdir", 
       "tool", "testname"]
-
-
--- File reader/writer with exception catching.
-maybe_readFile :: FilePath -> IO (Maybe String)
-maybe_readFile fname
-   = catch (readFile fname >>= (return . Just))
-           (const (return Nothing))
-
-maybe_writeFile :: FilePath -> String -> IO Bool
-maybe_writeFile fname cts
-   = catch (writeFile fname cts >> (return True))
-           (const (return False))
-
 
 -- (eg) "foo/bar/xyzzy.ext" --> ("foo/bar", "xyzzy", "ext")
 --splitPathname3 full

@@ -6,6 +6,7 @@ import CmdSyntax
 import CmdLexer		( isVarChar )
 import CmdParser	( parseScript )
 import TopSort		( topSort )
+import Maybe		( isJust, fromJust )
 import Monad		( when )
 import Directory	( doesFileExist, removeFile )
 import System		( ExitCode(..) )
@@ -158,7 +159,7 @@ setResult is_actual res
      (if is_actual then (r_exp, Just res)
                    else (Just res, r_act))	`bind` \ (new_exp, new_act) ->
      if   isJust new_exp && isJust new_act
-     then resultsEV (unJust new_exp, unJust new_act)
+     then resultsEV (fromJust new_exp, fromJust new_act)
      else 
      setEvalEnv (p{results = (new_exp, new_act)})
 						`thenE_`
@@ -278,7 +279,7 @@ evalTopBinds globals binds
            -> return (Left ("circular dependencies for top-level vars: " 
                            ++ unwords (map ('$':) circular_vars)))
         Right eval_order
-           -> let in_order = [ (v, unJust (lookup v binds)) | v <- eval_order ]
+           -> let in_order = [ (v, fromJust (lookup v binds)) | v <- eval_order ]
               in
               loop globals in_order
      where

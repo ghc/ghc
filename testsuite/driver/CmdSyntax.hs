@@ -5,15 +5,15 @@ module CmdSyntax ( Var, MacroName, TestName, MacroDef(..),
                    TestID(..), ppTestID,
                    TestResult(..), ppTestResult,
                    testid_of_TestResult, results_of_TestResult,
-                   panic, officialMsg, my_system,
-                   isJust, isNothing, unJust,
                    isTInclude, isTTest, isTMacroDef, isTAssign,
-                   isLeft, isRight, unLeft, unRight
+                   isLeft, isRight, unLeft, unRight,
+
+                   panic, officialMsg, my_system, die,
                  )
 where
 
-import IO		( stdout, hPutStrLn )
-import System		( system )
+import IO
+import System
 
 ---------------------------------------------------------------------
 -- misc
@@ -21,19 +21,17 @@ panic str
    = error ("\nruntests: the `impossible' happened:\n\t" ++ str ++ "\n")
 
 officialMsg str
-   = hPutStrLn stdout ("runtests: " ++ str)
+   = do prog <- getProgName
+        hPutStrLn stderr (prog ++ ": " ++ str)
+
+die :: String -> IO a
+die s = do officialMsg s; exitWith (ExitFailure 1)
 
 my_system s
    = do putStrLn s
         exit_code <- system s
         --putStrLn (show exit_code)
         return exit_code
-
-isJust (Just _) = True
-isJust Nothing  = False
-isNothing = not . isJust
-
-unJust (Just x) = x
 
 isLeft (Left _)  = True
 isLeft (Right _) = False
