@@ -339,6 +339,13 @@
 	      </listitem>
 	    </varlistentry>
 	    <varlistentry>
+	      <term><filename>haddock.js</filename></term>
+	      <listitem>
+		<para>A small piece of JavaScript for collapsing sections
+		of the generated HTML.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
 	      <term><filename><replaceable>module</replaceable>.html</filename></term>
 	      <listitem>
 		<para>An HTML page for each
