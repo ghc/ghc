@@ -1,4 +1,4 @@
---!!! basic Rational operations
+-- !!! basic Rational operations
 --
 import Ratio
 

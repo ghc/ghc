@@ -1,4 +1,4 @@
---!!! test arithmetic operations from "Prelude" (gcd, ldm, etc.)
+-- !!! test arithmetic operations from "Prelude" (gcd, ldm, etc.)
 --
 main
   = let

@@ -1,4 +1,4 @@
---!!! test RealFrac ops (ceiling/floor/etc.) on Floats/Doubles
+-- !!! test RealFrac ops (ceiling/floor/etc.) on Floats/Doubles
 --
 main = 
  putStr $

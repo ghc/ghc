@@ -1,4 +1,4 @@
---!!! test simple Integer things
+-- !!! test simple Integer things
 --
 
 f x y z = x y z

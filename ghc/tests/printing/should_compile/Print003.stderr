@@ -1,19 +1,8 @@
 
 ==================== Typechecked ====================
-Word.bitLsh{-r3A-} =
-    _/\_ a_tr3y -> \ x1_B1 ->
-	case x1_B1 of { Word.:Bits{-r3C-} x2_B2 x3_B3  -> x2_B2;}
-Word.bitRsh{-r3z-} =
-    _/\_ a_tr3y -> \ x1_B1 ->
-	case x1_B1 of { Word.:Bits{-r3C-} x2_B2 x3_B3  -> x3_B3;}
-AbsBinds [a_taqz] [d.Bits_aqy] []
+AbsBinds [a{-aSM-}] [_dBits{-aSL-}] []
 
 
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-Word Bits(:Bits :Bits bitLsh bitRsh);
-_fixities_
-infixl 8 bitLsh;
-infixl 8 bitRsh;
-_declarations_
+__export Word Bits{bitLsh bitRsh};
 1 class Bits a where {bitLsh :: a -> PrelBase.Int -> a; bitRsh :: a -> PrelBase.Int -> a} ;

@@ -1,4 +1,4 @@
---!!! a random test from Nick North
+-- !!! a random test from Nick North
 -- (got this in mid-1993; don't remember why.  WDP 95/02)
 --
 

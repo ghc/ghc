@@ -1,4 +1,4 @@
---!!! conversions: Double <=> Rational/Integer things
+-- !!! conversions: Double <=> Rational/Integer things
 --
 import Ratio
 

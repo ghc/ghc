@@ -1,330 +1,372 @@
 
 ==================== Typechecked ====================
-Print002.MkFoo1{-ro-} =
-    _/\_ a_tr4H
-	 b_tr4I
-	 c_tr4J -> \ x1_B1
-		     x2_B2 ->
-	Print002.MkFoo1{-ro-} {_@_ a_tr4H
-			       _@_ b_tr4I
-			       _@_ c_tr4J
-			       x1_B1
-			       x2_B2}
-Print002.:##{-rn-} =
-    _/\_ a_tr4H
-	 b_tr4I
-	 c_tr4J -> \ x1_B1
-		     x2_B2 ->
-	Print002.:##{-rn-} {_@_ a_tr4H _@_ b_tr4I _@_ c_tr4J x1_B1 x2_B2}
-Print002.MkFoo3{-rq-} =
-    _/\_ a_tr4H
-	 b_tr4I
-	 c_tr4J -> \ x1_B1
-		     x2_B2 ->
-	Print002.MkFoo3{-rq-} {_@_ a_tr4H
-			       _@_ b_tr4I
-			       _@_ c_tr4J
-			       x1_B1
-			       x2_B2}
-Print002.:***{-rs-} =
-    _/\_ a_tr4H
-	 b_tr4I
-	 c_tr4J -> \ x1_B1
-		     x2_B2 ->
-	Print002.:***{-rs-} {_@_ a_tr4H _@_ b_tr4I _@_ c_tr4J x1_B1 x2_B2}
-AbsBinds [aQU] [d.Bar_aQY] [([aQU], Print002.f3d{-r4L-}, f3d_a13B)]
-    /////_a13C = Print002./////{-r4t-} aQU d.Bar_aQY
-    f3d_a13B x_r4v y_r4w = x_r4v /////_a13C y_r4w
-AbsBinds [aRf] [d.Bar_aRj] [([aRf], Print002.f3c{-r4M-}, f3c_a13H)]
-    /////_a13I = Print002./////{-r4t-} aRf d.Bar_aRj
-    f3c_a13H x_r4r y_r4s = /////_a13I x_r4r y_r4s
-AbsBinds [aRA] [d.Bar_aRE] [([aRA], Print002.f3b{-r4N-}, f3b_a13J)]
-    meth1_a13K = Print002.meth1{-r4m-} aRA d.Bar_aRE
-    f3b_a13J x_r4o y_r4p = x_r4o meth1_a13K y_r4p
-AbsBinds [aRV] [d.Bar_aRZ] [([aRV], Print002.f3a{-r4O-}, f3a_a13L)]
-    meth1_a13M = Print002.meth1{-r4m-} aRV d.Bar_aRZ
-    f3a_a13L x_r4k y_r4l = meth1_a13M x_r4k y_r4l
+Print002.MkFoo1{-rz,x-} =
+    \ a{-rsQ-} b{-rsR-} c{-rsS-} tpl_B1 tpl_B2 ->
+	Print002.MkFoo1{-rz,x-} {__a a{-rsQ-}
+				 __a b{-rsR-}
+				 __a c{-rsS-}
+				 tpl_B1
+				 tpl_B2}
+Print002.:##{-rB,x-} =
+    \ a{-rsQ-} b{-rsR-} c{-rsS-} tpl_B1 tpl_B2 ->
+	Print002.:##{-rB,x-} {__a a{-rsQ-}
+			      __a b{-rsR-}
+			      __a c{-rsS-}
+			      tpl_B1
+			      tpl_B2}
+Print002.MkFoo3{-rD,x-} =
+    \ a{-rsQ-} b{-rsR-} c{-rsS-} tpl_B1 tpl_B2 ->
+	Print002.MkFoo3{-rD,x-} {__a a{-rsQ-}
+				 __a b{-rsR-}
+				 __a c{-rsS-}
+				 tpl_B1
+				 tpl_B2}
+Print002.:***{-rF,x-} =
+    \ a{-rsQ-} b{-rsR-} c{-rsS-} tpl_B1 tpl_B2 ->
+	Print002.:***{-rF,x-} {__a a{-rsQ-}
+			       __a b{-rsR-}
+			       __a c{-rsS-}
+			       tpl_B1
+			       tpl_B2}
 AbsBinds
-[aSq, aSs, aSu]
+[a{-a11K-}]
+[_dBar{-a11R-}]
+[([a{-a11K-}], Print002.f3d{-rl,x-}, f3d{-a11O-})]
+    /////{-a1gB-} = Print002./////{-rt,x-} a{-a11K-} _dBar{-a11R-}
+    f3d{-a11O-} x{-a11H-} y{-a11M-} = x{-a11H-} /////{-a1gB-} y{-a11M-}
+AbsBinds
+[a{-a12d-}]
+[_dBar{-a12k-}]
+[([a{-a12d-}], Print002.f3c{-rj,x-}, f3c{-a12h-})]
+    /////{-a1gC-} = Print002./////{-rt,x-} a{-a12d-} _dBar{-a12k-}
+    f3c{-a12h-} x{-a12a-} y{-a12f-} = /////{-a1gC-} x{-a12a-} y{-a12f-}
+AbsBinds
+[a{-a12G-}]
+[_dBar{-a12N-}]
+[([a{-a12G-}], Print002.f3b{-rh,x-}, f3b{-a12K-})]
+    meth1{-a1gD-} = Print002.meth1{-rv,x-} a{-a12G-} _dBar{-a12N-}
+    f3b{-a12K-} x{-a12D-} y{-a12I-}
+		  = x{-a12D-} `meth1{-a1gD-}` y{-a12I-}
+AbsBinds
+[a{-a139-}]
+[_dBar{-a13g-}]
+[([a{-a139-}], Print002.f3a{-rf,x-}, f3a{-a13d-})]
+    meth1{-a1gE-} = Print002.meth1{-rv,x-} a{-a139-} _dBar{-a13g-}
+    f3a{-a13d-} x{-a136-} y{-a13b-} = meth1{-a1gE-} x{-a136-} y{-a13b-}
+AbsBinds
+[a{-a13N-}, b{-a13P-}, c{-a13R-}]
 []
-[([aSq, aSs, aSu], Print002.<<<<{-r4P-}, <<<<_a13N)]
-    <<<<_a13N x_r4e y_r4f
-	      = Print002.:***{-rs-} [aSq, aSs, aSu] x_r4e y_r4f
-    <<<<_a13N x_r4h y_r4i
-	      = Print002.:***{-rs-} [aSq, aSs, aSu] x_r4h y_r4i
+[([a{-a13N-}, b{-a13P-}, c{-a13R-}],
+  Print002.<<<<{-rd,x-},
+  <<<<{-a13U-})]
+    <<<<{-a13U-} x{-a13G-} y{-a13I-}
+		   = Print002.:***{-rF,x-} [a{-a13N-}, b{-a13P-}, c{-a13R-}]
+			 x{-a13G-} y{-a13I-}
+    <<<<{-a13U-} x{-a13S-} y{-a13T-}
+		   = Print002.:***{-rF,x-} [a{-a13N-}, b{-a13P-}, c{-a13R-}] x{-a13S-}
+									     y{-a13T-}
 AbsBinds
-[aSL, aSN, aSP]
+[a{-a14f-}, b{-a14h-}, c{-a14j-}]
 []
-[([aSL, aSN, aSP], Print002......{-r4Q-}, ....._a13O)]
-    ....._a13O x_r4b y_r4c
-	       = Print002.MkFoo3{-rq-} [aSL, aSN, aSP] x_r4b y_r4c
+[([a{-a14f-}, b{-a14h-}, c{-a14j-}],
+  Print002......{-rb,x-},
+  .....{-a14o-})]
+    .....{-a14o-} x{-a14k-} y{-a14m-}
+		    = Print002.MkFoo3{-rD,x-} [a{-a14f-}, b{-a14h-}, c{-a14j-}]
+			  x{-a14k-} y{-a14m-}
 AbsBinds
-[aT6, aT8, aTa]
+[a{-a14J-}, b{-a14L-}, c{-a14N-}]
 []
-[([aT6, aT8, aTa], Print002.....{-r4R-}, ...._a13P)]
-    ...._a13P x_r48 y_r49
-	      = Print002.MkFoo3{-rq-} [aT6, aT8, aTa] x_r48 y_r49
+[([a{-a14J-}, b{-a14L-}, c{-a14N-}],
+  Print002.....{-r9,x-},
+  ....{-a14S-})]
+    ....{-a14S-} x{-a14O-} y{-a14Q-}
+		   = Print002.MkFoo3{-rD,x-}
+			 [a{-a14J-}, b{-a14L-}, c{-a14N-}] x{-a14O-} y{-a14Q-}
 AbsBinds
-[aTr, aTt, aTv]
+[a{-a15d-}, b{-a15f-}, c{-a15h-}]
 []
-[([aTr, aTt, aTv], Print002.f2a{-r4S-}, f2a_a13Q)]
-    f2a_a13Q x_r45 y_r46
-	     = Print002.:##{-rn-} [aTr, aTt, aTv] x_r45 y_r46
+[([a{-a15d-}, b{-a15f-}, c{-a15h-}],
+  Print002.f2a{-r7,x-},
+  f2a{-a15m-})]
+    f2a{-a15m-} x{-a15i-} y{-a15k-}
+		  = Print002.:##{-rB,x-} [a{-a15d-}, b{-a15f-}, c{-a15h-}]
+			x{-a15i-} y{-a15k-}
 AbsBinds
-[aTM, aTO, aTQ]
+[a{-a15H-}, b{-a15J-}, c{-a15L-}]
 []
-[([aTM, aTO, aTQ], Print002.f2{-r4T-}, f2_a13R)]
-    f2_a13R x_r42 y_r43
-	    = Print002.:##{-rn-} [aTM, aTO, aTQ] x_r42 y_r43
+[([a{-a15H-}, b{-a15J-}, c{-a15L-}],
+  Print002.f2{-r5,x-},
+  f2{-a15Q-})]
+    f2{-a15Q-} x{-a15M-} y{-a15O-}
+		 = Print002.:##{-rB,x-} [a{-a15H-}, b{-a15J-}, c{-a15L-}] x{-a15M-}
+									  y{-a15O-}
 AbsBinds
-[aU7, aU9, aUb]
+[a{-a16b-}, b{-a16d-}, c{-a16f-}]
 []
-[([aU7, aU9, aUb], Print002.f1a{-r4U-}, f1a_a13S)]
-    f1a_a13S x_r3Z y_r40
-	     = Print002.MkFoo1{-ro-} [aU7, aU9, aUb] x_r3Z y_r40
+[([a{-a16b-}, b{-a16d-}, c{-a16f-}],
+  Print002.f1a{-r3,x-},
+  f1a{-a16k-})]
+    f1a{-a16k-} x{-a16g-} y{-a16i-}
+		  = Print002.MkFoo1{-rz,x-}
+			[a{-a16b-}, b{-a16d-}, c{-a16f-}] x{-a16g-} y{-a16i-}
 AbsBinds
-[aUs, aUu, aUw]
+[a{-a16F-}, b{-a16H-}, c{-a16J-}]
 []
-[([aUs, aUu, aUw], Print002.f1{-r4V-}, f1_a13T)]
-    f1_a13T x_r3W y_r3X
-	    = Print002.MkFoo1{-ro-} [aUs, aUu, aUw] x_r3W y_r3X
+[([a{-a16F-}, b{-a16H-}, c{-a16J-}],
+  Print002.f1{-r1,x-},
+  f1{-a16O-})]
+    f1{-a16O-} x{-a16K-} y{-a16M-}
+		 = Print002.MkFoo1{-rz,x-} [a{-a16F-}, b{-a16H-}, c{-a16J-}]
+		       x{-a16K-} y{-a16M-}
 AbsBinds
-[aVd, aVg, aVh]
+[a{-a17m-}, b{-a17o-}, c{-a17q-}]
 []
-[([aVd, aVg, aVh], con2tag_Foo#_rOp, con2tag_Foo#_a13U)]
-    con2tag_Foo#_a13U (Print002.MkFoo1{-ro-} _ _) = 0#
-    con2tag_Foo#_a13U (Print002.:##{-rn-} _ _) = 1#
-    con2tag_Foo#_a13U (Print002.MkFoo3{-rq-} _ _) = 2#
-    con2tag_Foo#_a13U (Print002.:***{-rs-} _ _) = 3#
+[([a{-a17m-}, b{-a17o-}, c{-a17q-}],
+  con2tag_Foo#{-rXU-},
+  con2tag_Foo#{-a17r-})]
+    con2tag_Foo#{-a17r-} (Print002.MkFoo1{-rz,x-} _ _) = 0#
+    con2tag_Foo#{-a17r-} (Print002.:##{-rB,x-} _ _) = 1#
+    con2tag_Foo#{-a17r-} (Print002.MkFoo3{-rD,x-} _ _) = 2#
+    con2tag_Foo#{-a17r-} (Print002.:***{-rF,x-} _ _) = 3#
 AbsBinds
-[a_taVs, b_taVt, c_taVu]
-[d.Eq_aXB, d.Eq_aXC, d.Eq_aXD]
-[([a_taVs, b_taVt, c_taVu], Print002.$dEqFoo0{-r13G-}, d.Eq_aVp)]
-    ==_a13h = ==_aVH
-    ==_a13f = PrelBase.=={-8X-} c_taVu d.Eq_aXO
-    ==_a13g = ==_a13f
-    ==_a13e = ==_a13f
-    ==_a13c = PrelBase.=={-8X-} b_taVt d.Eq_aXQ
-    ==_a13d = ==_a13c
-    ==_a13b = ==_a13c
-    ==_a13a = PrelBase.=={-8X-} a_taVs d.Eq_aXS
-    ==_a139 = ==_a13a
-    d.Eq_aXO = d.Eq_aXD
-    d.Eq_aXQ = d.Eq_aXC
-    d.Eq_aXS = d.Eq_aXB
-    AbsBinds [] [] [([], /=_aVr, /=_a13V)]
-	/=_a13V a_rOT b_rOU = PrelBase.not{-rhG-} ==_a13h a_rOT b_rOU
-    AbsBinds [] [] [([], ==_aVH, ==_a13W)]
-	==_a13W (Print002.MkFoo1{-ro-} a1_rOw a2_rOx)
-		(Print002.MkFoo1{-ro-} b1_rOy b2_rOz)
-		= (a1_rOw ==_a13a b1_rOy)
-		  PrelBase.&&{-rgy-} (a2_rOx ==_a139 b2_rOz)
-	==_a13W (Print002.:##{-rn-} a1_rOB a2_rOC)
-		(Print002.:##{-rn-} b1_rOD b2_rOE)
-		= (a1_rOB ==_a13b b1_rOD)
-		  PrelBase.&&{-rgy-} (a2_rOC ==_a13e b2_rOE)
-	==_a13W (Print002.MkFoo3{-rq-} a1_rOG a2_rOH)
-		(Print002.MkFoo3{-rq-} b1_rOI b2_rOJ)
-		= (a1_rOG ==_a13c b1_rOI)
-		  PrelBase.&&{-rgy-} (a2_rOH ==_a13d b2_rOJ)
-	==_a13W (Print002.:***{-rs-} a1_rOL a2_rOM)
-		(Print002.:***{-rs-} b1_rON b2_rOO)
-		= (a1_rOL ==_a13f b1_rON)
-		  PrelBase.&&{-rgy-} (a2_rOM ==_a13g b2_rOO)
-	==_a13W a_rOQ b_rOR = PrelBase.False{-58-}
-    d.Eq_aVp =
-	PrelBase.:Eq{-r17-} (Print002.Foo{-r52-} a_taVs b_taVt c_taVu)
-			    /=_aVr
-			    ==_aVH
+[a{-a19v-}, b{-a19x-}, c{-a19z-}]
+[_dEq{-a19R-}, _dEq{-a19S-}, _dEq{-a19T-}]
+[([a{-a19v-}, b{-a19x-}, c{-a19z-}],
+  Print002._fEqFoo{-r17s,x-},
+  _dEq{-a17C-})]
+    =={-a1gN-} = =={-a17U-}
+    =={-a1gL-} = PrelBase.=={-01L,i-} c{-a19z-} _dEq{-a19Z-}
+    =={-a1gM-} = =={-a1gL-}
+    =={-a1gK-} = =={-a1gL-}
+    =={-a1gI-} = PrelBase.=={-01L,i-} b{-a19x-} _dEq{-a19X-}
+    =={-a1gJ-} = =={-a1gI-}
+    =={-a1gH-} = =={-a1gI-}
+    =={-a1gG-} = PrelBase.=={-01L,i-} a{-a19v-} _dEq{-a19V-}
+    =={-a1gF-} = =={-a1gG-}
+    _dEq{-a19Z-} = _dEq{-a19T-}
+    _dEq{-a19X-} = _dEq{-a19S-}
+    _dEq{-a19V-} = _dEq{-a19R-}
+    AbsBinds [] [] [([], /={-a17E-}, /={-a17G-})]
+	/={-a17G-} a{-a17N-} b{-a17R-}
+		     = PrelBase.not{-rIN,i-} =={-a1gN-} a{-a17N-} b{-a17R-}
+    AbsBinds [] [] [([], =={-a17U-}, =={-a17W-})]
+	=={-a17W-} (Print002.MkFoo1{-rz,x-} a1{-a18e-} a2{-a18l-})
+		   (Print002.MkFoo1{-rz,x-} b1{-a18k-} b2{-a18p-})
+		     = (a1{-a18e-} =={-a1gG-} b1{-a18k-})
+		       PrelBase.&&{-rrR,i-} (a2{-a18l-} =={-a1gF-} b2{-a18p-})
+	=={-a17W-} (Print002.:##{-rB,x-} a1{-a18G-} a2{-a18N-})
+		   (Print002.:##{-rB,x-} b1{-a18M-} b2{-a18R-})
+		     = (a1{-a18G-} =={-a1gI-} b1{-a18M-})
+		       PrelBase.&&{-rrR,i-} (a2{-a18N-} =={-a1gL-} b2{-a18R-})
+	=={-a17W-} (Print002.MkFoo3{-rD,x-} a1{-a198-} a2{-a19f-})
+		   (Print002.MkFoo3{-rD,x-} b1{-a19e-} b2{-a19j-})
+		     = (a1{-a198-} =={-a1gJ-} b1{-a19e-})
+		       PrelBase.&&{-rrR,i-} (a2{-a19f-} =={-a1gH-} b2{-a19j-})
+	=={-a17W-} (Print002.:***{-rF,x-} a1{-a19A-} a2{-a19H-})
+		   (Print002.:***{-rF,x-} b1{-a19G-} b2{-a19L-})
+		     = (a1{-a19A-} =={-a1gM-} b1{-a19G-})
+		       PrelBase.&&{-rrR,i-} (a2{-a19H-} =={-a1gK-} b2{-a19L-})
+	=={-a17W-} a{-a19O-} b{-a19Q-} = PrelBase.False{-65,w-}
+    _dEq{-a17C-} =
+	PrelBase._DEq{-rJI,i-}
+	    (Print002.Foo{-rx,x-} a{-a19v-} b{-a19x-} c{-a19z-}) /={-a17E-}
+								 =={-a17U-}
 AbsBinds
-[a_ta13i, b_ta13k, c_ta13j]
-[]
-[([a_ta13i, b_ta13k, c_ta13j],
-  Print002.$dEvalFoo0{-r13F-},
-  d.Eval_aY3)]
-    d.Eval_aY3 =
-	PrelErr.error{-87-}
-	    {PrelBase.Eval{-24-} (Print002.Foo{-r52-} a_ta13i b_ta13k c_ta13j)} "Compiler error: bad dictionary Eval"
-AbsBinds
-[a_taYe, b_taYf, c_taYg]
-[d.Ord_a12F, d.Ord_a12H, d.Ord_a12I, d.Eq_a12J]
-[([a_taYe, b_taYf, c_taYg], Print002.$dOrdFoo0{-r13E-}, d.Ord_aYb)]
-    compare_a13q = compare_aZC
-    compare_a13p = compare_aZC
-    compare_a13o = compare_aZC
-    compare_a13n = compare_aZC
-    compare_a13m = compare_aZC
-    compare_a13l = compare_aZC
-    d.Ord_a12D = d.Ord_a12I
-    d.Ord_a12C = d.Ord_a12H
-    d.Ord_a12E = d.Ord_a12F
-    d.Eq_a12G = d.Eq_a12J
-    AbsBinds [] [] [([], min_aYd, min_a13X)]
-	min_a13X a_rPs b_rPt
-		 = case compare_a13q a_rPs b_rPt of
-		     PrelBase.LT{-rbj-} -> a_rPs
-		     PrelBase.EQ{-r4K-} -> b_rPt
-		     PrelBase.GT{-rbk-} -> b_rPt
-    AbsBinds [] [] [([], max_aYu, max_a13Y)]
-	max_a13Y a_rPm b_rPn
-		 = case compare_a13p a_rPm b_rPn of
-		     PrelBase.LT{-rbj-} -> b_rPn
-		     PrelBase.EQ{-r4K-} -> a_rPm
-		     PrelBase.GT{-rbk-} -> a_rPm
-    AbsBinds [] [] [([], >_aYI, >_a13Z)]
-	>_a13Z a_rPg b_rPh
-	       = case compare_a13o a_rPg b_rPh of
-		   PrelBase.LT{-rbj-} -> PrelBase.False{-58-}
-		   PrelBase.EQ{-r4K-} -> PrelBase.False{-58-}
-		   PrelBase.GT{-rbk-} -> PrelBase.True{-5D-}
-    AbsBinds [] [] [([], >=_aYW, >=_a140)]
-	>=_a140 a_rPa b_rPb
-		= case compare_a13n a_rPa b_rPb of
-		    PrelBase.LT{-rbj-} -> PrelBase.False{-58-}
-		    PrelBase.EQ{-r4K-} -> PrelBase.True{-5D-}
-		    PrelBase.GT{-rbk-} -> PrelBase.True{-5D-}
-    AbsBinds [] [] [([], <=_aZa, <=_a141)]
-	<=_a141 a_rP4 b_rP5
-		= case compare_a13m a_rP4 b_rP5 of
-		    PrelBase.LT{-rbj-} -> PrelBase.True{-5D-}
-		    PrelBase.EQ{-r4K-} -> PrelBase.True{-5D-}
-		    PrelBase.GT{-rbk-} -> PrelBase.False{-58-}
-    AbsBinds [] [] [([], <_aZo, <_a142)]
-	<_a142 a_rOY b_rOZ
-	       = case compare_a13l a_rOY b_rOZ of
-		   PrelBase.LT{-rbj-} -> PrelBase.True{-5D-}
-		   PrelBase.EQ{-r4K-} -> PrelBase.False{-58-}
-		   PrelBase.GT{-rbk-} -> PrelBase.False{-58-}
-    AbsBinds [] [] [([], compare_aZC, compare_a143)]
-	compare_a143 a_rPy b_rPz
-		     = case con2tag_Foo#_rOp [c_taYg, a_taYe, b_taYf] a_rPy of
-			 a#_rQm
-			 -> case con2tag_Foo#_rOp [c_taYg, a_taYe, b_taYf] b_rPz of
-			      b#_rQo
-			      -> if a#_rQm PrelGHC.==#{-79-} b#_rQo then
-				     case cmp_eq_a144 a_rPy b_rPz of
-				       PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-				       PrelBase.EQ{-r4K-} -> PrelBase.EQ{-r4K-}
-				       PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-				 else
-				     if a#_rQm PrelGHC.<#{-7b-} b#_rQo then
-					 PrelBase.LT{-rbj-}
-				     else
-					 PrelBase.GT{-rbk-}
-		     where
-			 {- rec -}
-			 AbsBinds
-			 [a11D, a11G, a11H]
-			 [d.Ord_a125, d.Ord_a122, d.Ord_a11Z]
-			 [([a11D, a11G, a11H], cmp_eq_rPB, cmp_eq_a145)]
-			     compare_a13x = PrelBase.compare{-rh8-} a11H d.Ord_a125
-			     compare_a13y = compare_a13x
-			     compare_a13w = compare_a13x
-			     compare_a13v = PrelBase.compare{-rh8-} a11G d.Ord_a11Z
-			     compare_a13u = compare_a13v
-			     compare_a13s = PrelBase.compare{-rh8-} a11D d.Ord_a122
-			     compare_a13t = compare_a13s
-			     compare_a13r = compare_a13s
-			     cmp_eq_a145 (Print002.MkFoo1{-ro-} a1_rPD a2_rPE)
-					 (Print002.MkFoo1{-ro-} b1_rPF b2_rPG)
-					 = case compare_a13u a1_rPD b1_rPF of
-					     PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-					     PrelBase.EQ{-r4K-}
-					     -> case compare_a13v a2_rPE b2_rPG of
-						  PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-						  PrelBase.EQ{-r4K-} -> PrelBase.EQ{-r4K-}
-						  PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-					     PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-			     cmp_eq_a145 (Print002.:##{-rn-} a1_rPO a2_rPP)
-					 (Print002.:##{-rn-} b1_rPQ b2_rPR)
-					 = case compare_a13x a1_rPO b1_rPQ of
-					     PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-					     PrelBase.EQ{-r4K-}
-					     -> case compare_a13s a2_rPP b2_rPR of
-						  PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-						  PrelBase.EQ{-r4K-} -> PrelBase.EQ{-r4K-}
-						  PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-					     PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-			     cmp_eq_a145 (Print002.MkFoo3{-rq-} a1_rPZ a2_rQ0)
-					 (Print002.MkFoo3{-rq-} b1_rQ1 b2_rQ2)
-					 = case compare_a13w a1_rPZ b1_rQ1 of
-					     PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-					     PrelBase.EQ{-r4K-}
-					     -> case compare_a13y a2_rQ0 b2_rQ2 of
-						  PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-						  PrelBase.EQ{-r4K-} -> PrelBase.EQ{-r4K-}
-						  PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-					     PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-			     cmp_eq_a145 (Print002.:***{-rs-} a1_rQa a2_rQb)
-					 (Print002.:***{-rs-} b1_rQc b2_rQd)
-					 = case compare_a13r a1_rQa b1_rQc of
-					     PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-					     PrelBase.EQ{-r4K-}
-					     -> case compare_a13t a2_rQb b2_rQd of
-						  PrelBase.LT{-rbj-} -> PrelBase.LT{-rbj-}
-						  PrelBase.EQ{-r4K-} -> PrelBase.EQ{-r4K-}
-						  PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-					     PrelBase.GT{-rbk-} -> PrelBase.GT{-rbk-}
-			     cmp_eq_a145 _ _
-					 = PrelErr.error{-87-}
-					       PrelBase.Ordering{-3p-} "Urk! in TcGenDeriv"
-			 cmp_eq_a144 =
-			     cmp_eq_rPB [c_taYg, a_taYe, b_taYf]
-				 [d.Ord_a12C, d.Ord_a12D, d.Ord_a12E]
-    d.Ord_aYb =
-	PrelBase.:Ord{-r1o-} (Print002.Foo{-r52-} a_taYe b_taYf c_taYg)
-			     d.Eq_a12G
-			     min_aYd
-			     max_aYu
-			     >_aYI
-			     >=_aYW
-			     <=_aZa
-			     <_aZo
-			     compare_aZC
-Print002.Bar2_sc1{-a13D-} =
-    _/\_ a_tr4y -> \ x1_B1 ->
-	_coerce_ {Print002.Bar{-r4z-} a_tr4y} {Print002.Bar2{-r4Y-} a_tr4y}
-	x1_B1
-AbsBinds [a_ta13z] [d.Bar2_a134] []
-Print002.meth2{-r4Z-} =
-    _/\_ a_tr4B -> \ x1_B1 ->
-	case x1_B1 of { Print002.:Bar{-r51-} x2_B2 x3_B3 x4_B4  -> x2_B2;}
-Print002./////{-r4t-} =
-    _/\_ a_tr4B -> \ x1_B1 ->
-	case x1_B1 of { Print002.:Bar{-r51-} x2_B2 x3_B3 x4_B4  -> x3_B3;}
-Print002.meth1{-r4m-} =
-    _/\_ a_tr4B -> \ x1_B1 ->
-	case x1_B1 of { Print002.:Bar{-r51-} x2_B2 x3_B3 x4_B4  -> x4_B4;}
-AbsBinds [a_ta13A] [d.Bar_a138] []
+[a{-a1ai-}, b{-a1aj-}, c{-a1ak-}]
+[_dOrd{-a1g7-}, _dOrd{-a1g9-}, _dOrd{-a1ga-}, _dEq{-a1gb-}]
+[([a{-a1ai-}, b{-a1aj-}, c{-a1ak-}],
+  Print002._fOrdFoo{-r1a3,x-},
+  _dOrd{-a1ab-})]
+    compare{-a1gT-} = compare{-a1cc-}
+    compare{-a1gS-} = compare{-a1cc-}
+    compare{-a1gR-} = compare{-a1cc-}
+    compare{-a1gQ-} = compare{-a1cc-}
+    compare{-a1gP-} = compare{-a1cc-}
+    compare{-a1gO-} = compare{-a1cc-}
+    _dOrd{-a1g4-} = _dOrd{-a1ga-}
+    _dOrd{-a1g5-} = _dOrd{-a1g9-}
+    _dOrd{-a1g6-} = _dOrd{-a1g7-}
+    _dEq{-a1g8-} = _dEq{-a1gb-}
+    AbsBinds [] [] [([], min{-a1ad-}, min{-a1af-})]
+	min{-a1af-} a{-a1ar-} b{-a1as-}
+		      = case compare{-a1gT-} a{-a1ar-} b{-a1as-} of
+			  PrelBase.LT{-rJk,i-} -> a{-a1ar-}
+			  PrelBase.EQ{-rsT,i-} -> b{-a1as-}
+			  PrelBase.GT{-rJl,i-} -> b{-a1as-}
+    AbsBinds [] [] [([], max{-a1aA-}, max{-a1aC-})]
+	max{-a1aC-} a{-a1aM-} b{-a1aL-}
+		      = case compare{-a1gS-} a{-a1aM-} b{-a1aL-} of
+			  PrelBase.LT{-rJk,i-} -> b{-a1aL-}
+			  PrelBase.EQ{-rsT,i-} -> a{-a1aM-}
+			  PrelBase.GT{-rJl,i-} -> a{-a1aM-}
+    AbsBinds [] [] [([], >{-a1aU-}, >{-a1aW-})]
+	>{-a1aW-} a{-a1b5-} b{-a1bb-}
+		    = case compare{-a1gR-} a{-a1b5-} b{-a1bb-} of
+			PrelBase.LT{-rJk,i-} -> PrelBase.False{-65,w-}
+			PrelBase.EQ{-rsT,i-} -> PrelBase.False{-65,w-}
+			PrelBase.GT{-rJl,i-} -> PrelBase.True{-6y,w-}
+    AbsBinds [] [] [([], >={-a1be-}, >={-a1bg-})]
+	>={-a1bg-} a{-a1bp-} b{-a1bv-}
+		     = case compare{-a1gQ-} a{-a1bp-} b{-a1bv-} of
+			 PrelBase.LT{-rJk,i-} -> PrelBase.False{-65,w-}
+			 PrelBase.EQ{-rsT,i-} -> PrelBase.True{-6y,w-}
+			 PrelBase.GT{-rJl,i-} -> PrelBase.True{-6y,w-}
+    AbsBinds [] [] [([], <={-a1by-}, <={-a1bA-})]
+	<={-a1bA-} a{-a1bJ-} b{-a1bP-}
+		     = case compare{-a1gP-} a{-a1bJ-} b{-a1bP-} of
+			 PrelBase.LT{-rJk,i-} -> PrelBase.True{-6y,w-}
+			 PrelBase.EQ{-rsT,i-} -> PrelBase.True{-6y,w-}
+			 PrelBase.GT{-rJl,i-} -> PrelBase.False{-65,w-}
+    AbsBinds [] [] [([], <{-a1bS-}, <{-a1bU-})]
+	<{-a1bU-} a{-a1c3-} b{-a1c9-}
+		    = case compare{-a1gO-} a{-a1c3-} b{-a1c9-} of
+			PrelBase.LT{-rJk,i-} -> PrelBase.True{-6y,w-}
+			PrelBase.EQ{-rsT,i-} -> PrelBase.False{-65,w-}
+			PrelBase.GT{-rJl,i-} -> PrelBase.False{-65,w-}
+    AbsBinds [] [] [([], compare{-a1cc-}, compare{-a1ce-})]
+	compare{-a1ce-} a{-a1fm-} b{-a1fn-}
+			  = case
+				con2tag_Foo#{-rXU-} [a{-a1ai-}, b{-a1aj-}, c{-a1ak-}] a{-a1fm-}
+			    of
+			      a#{-a1fB-}
+				-> case
+				       con2tag_Foo#{-rXU-}
+					   [a{-a1ai-}, b{-a1aj-}, c{-a1ak-}] b{-a1fn-}
+				   of
+				     b#{-a1fH-}
+				       -> if a#{-a1fB-} PrelGHC.==#{-99,w-} b#{-a1fH-} then
+					      cmp_eq{-a1h2-} a{-a1fm-} b{-a1fn-}
+					  else
+					      if a#{-a1fB-} PrelGHC.<#{-9b,w-} b#{-a1fH-} then
+						  PrelBase.LT{-rJk,i-}
+					      else
+						  PrelBase.GT{-rJl,i-}
+			  where
+			      {- nonrec -}
+			      AbsBinds
+			      [a{-a1eO-}, b{-a1eQ-}, c{-a1eS-}]
+			      [_dOrd{-a1fw-}, _dOrd{-a1ft-}, _dOrd{-a1fq-}]
+			      [([a{-a1eO-}, b{-a1eQ-}, c{-a1eS-}],
+				cmp_eq{-rZE-},
+				cmp_eq{-a1fo-})]
+				  compare{-a1h0-} =
+				      PrelBase.compare{-rJt,i-} c{-a1eS-} _dOrd{-a1fw-}
+				  compare{-a1h1-} = compare{-a1h0-}
+				  compare{-a1gZ-} = compare{-a1h0-}
+				  compare{-a1gX-} =
+				      PrelBase.compare{-rJt,i-} b{-a1eQ-} _dOrd{-a1ft-}
+				  compare{-a1gY-} = compare{-a1gX-}
+				  compare{-a1gW-} = compare{-a1gX-}
+				  compare{-a1gV-} =
+				      PrelBase.compare{-rJt,i-} a{-a1eO-} _dOrd{-a1fq-}
+				  compare{-a1gU-} = compare{-a1gV-}
+				  cmp_eq{-a1fo-} (Print002.MkFoo1{-rz,x-} a1{-a1db-} a2{-a1d4-})
+						 (Print002.MkFoo1{-rz,x-} b1{-a1dg-} b2{-a1da-})
+						   = case compare{-a1gV-} a1{-a1db-} b1{-a1dg-} of
+						       PrelBase.LT{-rJk,i-} -> PrelBase.LT{-rJk,i-}
+						       PrelBase.EQ{-rsT,i-}
+							 -> case
+								compare{-a1gU-} a2{-a1d4-}
+										b2{-a1da-}
+							    of
+							      PrelBase.LT{-rJk,i-}
+								-> PrelBase.LT{-rJk,i-}
+							      PrelBase.EQ{-rsT,i-}
+								-> PrelBase.EQ{-rsT,i-}
+							      PrelBase.GT{-rJl,i-}
+								-> PrelBase.GT{-rJl,i-}
+						       PrelBase.GT{-rJl,i-} -> PrelBase.GT{-rJl,i-}
+				  cmp_eq{-a1fo-} (Print002.:##{-rB,x-} a1{-a1dR-} a2{-a1dK-})
+						 (Print002.:##{-rB,x-} b1{-a1dW-} b2{-a1dQ-})
+						   = case compare{-a1gX-} a1{-a1dR-} b1{-a1dW-} of
+						       PrelBase.LT{-rJk,i-} -> PrelBase.LT{-rJk,i-}
+						       PrelBase.EQ{-rsT,i-}
+							 -> case
+								compare{-a1h0-} a2{-a1dK-}
+										b2{-a1dQ-}
+							    of
+							      PrelBase.LT{-rJk,i-}
+								-> PrelBase.LT{-rJk,i-}
+							      PrelBase.EQ{-rsT,i-}
+								-> PrelBase.EQ{-rsT,i-}
+							      PrelBase.GT{-rJl,i-}
+								-> PrelBase.GT{-rJl,i-}
+						       PrelBase.GT{-rJl,i-} -> PrelBase.GT{-rJl,i-}
+				  cmp_eq{-a1fo-} (Print002.MkFoo3{-rD,x-} a1{-a1ex-} a2{-a1eq-})
+						 (Print002.MkFoo3{-rD,x-} b1{-a1eC-} b2{-a1ew-})
+						   = case compare{-a1gY-} a1{-a1ex-} b1{-a1eC-} of
+						       PrelBase.LT{-rJk,i-} -> PrelBase.LT{-rJk,i-}
+						       PrelBase.EQ{-rsT,i-}
+							 -> case
+								compare{-a1gW-} a2{-a1eq-}
+										b2{-a1ew-}
+							    of
+							      PrelBase.LT{-rJk,i-}
+								-> PrelBase.LT{-rJk,i-}
+							      PrelBase.EQ{-rsT,i-}
+								-> PrelBase.EQ{-rsT,i-}
+							      PrelBase.GT{-rJl,i-}
+								-> PrelBase.GT{-rJl,i-}
+						       PrelBase.GT{-rJl,i-} -> PrelBase.GT{-rJl,i-}
+				  cmp_eq{-a1fo-} (Print002.:***{-rF,x-} a1{-a1fd-} a2{-a1f6-})
+						 (Print002.:***{-rF,x-} b1{-a1fi-} b2{-a1fc-})
+						   = case compare{-a1h1-} a1{-a1fd-} b1{-a1fi-} of
+						       PrelBase.LT{-rJk,i-} -> PrelBase.LT{-rJk,i-}
+						       PrelBase.EQ{-rsT,i-}
+							 -> case
+								compare{-a1gZ-} a2{-a1f6-}
+										b2{-a1fc-}
+							    of
+							      PrelBase.LT{-rJk,i-}
+								-> PrelBase.LT{-rJk,i-}
+							      PrelBase.EQ{-rsT,i-}
+								-> PrelBase.EQ{-rsT,i-}
+							      PrelBase.GT{-rJl,i-}
+								-> PrelBase.GT{-rJl,i-}
+						       PrelBase.GT{-rJl,i-} -> PrelBase.GT{-rJl,i-}
+				  cmp_eq{-a1fo-} _ _
+						   = PrelErr.error{-05,w-}
+							 PrelBase.Ordering{-3s,i-} "Urk! in TcGenDeriv"
+			      {- rec -}
+			      cmp_eq{-a1h2-} =
+				  cmp_eq{-rZE-} [a{-a1ai-}, b{-a1aj-}, c{-a1ak-}]
+				      [_dOrd{-a1g4-}, _dOrd{-a1g5-}, _dOrd{-a1g6-}]
+    _dOrd{-a1ab-} =
+	PrelBase._DOrd{-rJw,i-}
+	    (Print002.Foo{-rx,x-} a{-a1ai-} b{-a1aj-} c{-a1ak-}) _dEq{-a1g8-}
+								 min{-a1ad-}
+								 max{-a1aA-}
+								 >{-a1aU-}
+								 >={-a1be-}
+								 <={-a1by-}
+								 <{-a1bS-}
+								 compare{-a1cc-}
+AbsBinds [a{-a1gw-}] [_dBar{-a1gv-}] []
+AbsBinds [a{-a1gA-}] [_dBar2{-a1gz-}] []
 
 
-Print002.hs:34: 
-    Pattern match(es) are overlapped
-	in the definition of function `<<<<'
-	    x y = ...
+ 
+Print002.hs:34: Pattern match(es) are overlapped
+    in the definition of function `<<<<' x y = ...
 
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-Print002 .... ..... <<<< f1 f1a f2 f2a f3a f3b f3c f3d Bar(:Bar :Bar meth2 ///// meth1) Bar2(:Bar2 :Bar2) Foo(MkFoo1 :## MkFoo3 :***);
-_instances_
-instance _forall_ [a b c] {PrelBase.Eq a, PrelBase.Eq b, PrelBase.Eq c} => {PrelBase.Eq (Foo a b c)} = $dEqFoo0;
-instance _forall_ [a b c] => {PrelBase.Eval (Foo a b c)} = $dEvalFoo0;
-instance _forall_ [a b c] {PrelBase.Ord a, PrelBase.Ord b, PrelBase.Ord c} => {PrelBase.Ord (Foo a b c)} = $dOrdFoo0;
-_declarations_
-1 $dEqFoo0 _:_ _forall_ [a b c] {PrelBase.Eq a, PrelBase.Eq b, PrelBase.Eq c} => {PrelBase.Eq (Foo a b c)} ;;
-1 $dEvalFoo0 _:_ _forall_ [a b c] => {PrelBase.Eval (Foo a b c)} ;;
-1 $dOrdFoo0 _:_ _forall_ [a b c] {PrelBase.Ord a, PrelBase.Ord b, PrelBase.Ord c, PrelBase.Eq (Foo a b c)} => {PrelBase.Ord (Foo a b c)} ;;
-1 .... _:_ _forall_ [a b c] => b -> b -> Foo a b c ;;
-1 ..... _:_ _forall_ [a b c] => b -> b -> Foo a b c ;;
-1 <<<< _:_ _forall_ [a b c] => c -> c -> Foo a b c ;;
-1 class Bar a where {meth2 :: _forall_ [b] => a -> b -> PrelBase.Bool; ///// :: a -> a -> PrelBase.Bool; meth1 :: a -> a -> PrelBase.Bool} ;
-1 class {Bar a} => Bar2 a ;
+__export Print002 .... ..... <<<< f1 f1a f2 f2a f3a f3b f3c f3d Bar{meth2 ///// meth1} Bar2 Foo{MkFoo1 :## MkFoo3 :***};
+instance __forall [a b c] {PrelBase.Eq a, PrelBase.Eq b, PrelBase.Eq c} => {PrelBase.Eq (Foo a b c)} = _fEqFoo;
+instance __forall [a b c] {PrelBase.Ord a, PrelBase.Ord b, PrelBase.Ord c} => {PrelBase.Ord (Foo a b c)} = _fOrdFoo;
+1 .... :: __forall [a b c] => b -> b -> Foo a b c ;
+1 ..... :: __forall [a b c] => b -> b -> Foo a b c ;
+1 <<<< :: __forall [a b c] => c -> c -> Foo a b c ;
+1 _fEqFoo :: __forall [a b c] {PrelBase.Eq a, PrelBase.Eq b, PrelBase.Eq c} => {PrelBase.Eq (Foo a b c)} ;
+1 _fOrdFoo :: __forall [a b c] {PrelBase.Ord a, PrelBase.Ord b, PrelBase.Ord c, PrelBase.Eq (Foo a b c)} => {PrelBase.Ord (Foo a b c)} ;
+1 class Bar a where {meth2 :: __forall [b] => a -> b -> PrelBase.Bool; ///// :: a -> a -> PrelBase.Bool; meth1 :: a -> a -> PrelBase.Bool} ;
+1 class {Bar a}  => Bar2 a ;
 1 data Foo a b c = MkFoo1 a a |  :## b c |  MkFoo3 b b |  :*** c c ;
-1 f1 _:_ _forall_ [a b c] => a -> a -> Foo a b c ;;
-1 f1a _:_ _forall_ [a b c] => a -> a -> Foo a b c ;;
-1 f2 _:_ _forall_ [a b c] => b -> c -> Foo a b c ;;
-1 f2a _:_ _forall_ [a b c] => b -> c -> Foo a b c ;;
-1 f3a _:_ _forall_ [a] {Bar a} => a -> a -> PrelBase.Bool ;;
-1 f3b _:_ _forall_ [a] {Bar a} => a -> a -> PrelBase.Bool ;;
-1 f3c _:_ _forall_ [a] {Bar a} => a -> a -> PrelBase.Bool ;;
-1 f3d _:_ _forall_ [a] {Bar a} => a -> a -> PrelBase.Bool ;;
+1 f1 :: __forall [a b c] => a -> a -> Foo a b c ;
+1 f1a :: __forall [a b c] => a -> a -> Foo a b c ;
+1 f2 :: __forall [a b c] => b -> c -> Foo a b c ;
+1 f2a :: __forall [a b c] => b -> c -> Foo a b c ;
+1 f3a :: __forall [a] {Bar a} => a -> a -> PrelBase.Bool ;
+1 f3b :: __forall [a] {Bar a} => a -> a -> PrelBase.Bool ;
+1 f3c :: __forall [a] {Bar a} => a -> a -> PrelBase.Bool ;
+1 f3d :: __forall [a] {Bar a} => a -> a -> PrelBase.Bool ;

@@ -1,4 +1,4 @@
---!!! Testing NumExts
+-- !!! Testing NumExts
 module Main(main) where
 
 import NumExts
@@ -12,6 +12,7 @@ tst = do
   test_floatToDouble
   test_showHex
   test_showOct
+  test_showBin
 
 ----
 -- Test data:
@@ -47,6 +48,14 @@ test_showHex = do
   putStrLn (showList' (map showHex ints))
   putStrLn (show integers)
   putStrLn (showList' (map showHex integers))
+
+test_showBin :: IO ()
+test_showBin = do
+  test_banner "showBin"
+  putStrLn (show ints)
+  putStrLn (showList' (map showBin ints))
+  putStrLn (show integers)
+  putStrLn (showList' (map showBin integers))
 
 showList' :: [ShowS] -> String
 showList' [] = "[]"

@@ -1,4 +1,4 @@
---!!! test quot/rem/div/mod functions on Ints and Integers
+-- !!! test quot/rem/div/mod functions on Ints and Integers
 --
 main
   = putStr

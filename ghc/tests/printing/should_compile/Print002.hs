@@ -1,5 +1,5 @@
---!!! Print002.hs: printing various entities in prefix/infix forms
---!!!	(both in various syntaxes & in interfaces)
+-- !!! Print002.hs: printing various entities in prefix/infix forms
+-- !!!	(both in various syntaxes & in interfaces)
 
 module Print002 where
 

@@ -1,4 +1,4 @@
---!!! Print001.hs: printing of types (esp for interfaces)
+-- !!! Print001.hs: printing of types (esp for interfaces)
 
 module Print001 where
 

@@ -1,4 +1,4 @@
---!!! export a derived thingy which mentions an internal type
+-- !!! export a derived thingy which mentions an internal type
 --
 {- from simonpj; who adds:
 
