@@ -8,15 +8,18 @@
 
 module Simplify ( simplTopBinds, simplExpr, simplBind ) where
 
-IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 IMPORT_1_3(List(partition))
+
+IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
+#endif
 
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import ConFold		( completePrim )
 import CoreUnfold	( Unfolding, SimpleUnfolding, mkFormSummary, exprIsTrivial, whnfOrBottom, FormSummary(..) )
-import CostCentre 	( isSccCountCostCentre, cmpCostCentre )
+import CostCentre 	( isSccCountCostCentre, cmpCostCentre, costsAreSubsumed, useCurrentCostCentre )
 import CoreSyn
 import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			  unTagBinders, squashableDictishCcExpr
@@ -538,10 +541,20 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
     returnSmpl (rhs', arity)
   where
     rhs_env | idWantsToBeINLINEd id  	-- Don't ever inline in a INLINE thing's rhs
-	    = switchOffInlining env	-- See comments with switchOffInlining
+	    = switchOffInlining env1	-- See comments with switchOffInlining
 	    | otherwise	
-            = env
+            = env1
 
+	-- The top level "enclosing CC" is "SUBSUMED".  But the enclosing CC
+	-- for the rhs of top level defs is "OST_CENTRE".  Consider
+	--	f = \x -> e
+	--	g = \y -> let v = f y in scc "x" (v ...)
+	-- Here we want to inline "f", since its CC is SUBSUMED, but we don't
+	-- want to inline "v" since its CC is dynamically determined.
+
+    current_cc = getEnclosingCC env
+    env1 | costsAreSubsumed current_cc = setEnclosingCC env useCurrentCostCentre
+	 | otherwise		       = env
 
     (uvars, tyvars, body) = collectUsageAndTyBinders rhs
 \end{code}
@@ -745,24 +758,20 @@ simplBind env (NonRec binder@(id,occ_info) rhs) body_c body_ty
   | otherwise
   = simpl_bind env rhs
   where
-    -- Try for strict let of error
-    simpl_bind env rhs | will_be_demanded && maybeToBool maybe_error_app
-       = returnSmpl retyped_error_app
-      where
-	maybe_error_app        = maybeErrorApp rhs (Just body_ty)
-	Just retyped_error_app = maybe_error_app
-       
     -- Try let-to-case; see notes below about let-to-case
-    simpl_bind env rhs | will_be_demanded &&
-		         try_let_to_case &&
-		         singleConstructorType rhs_ty &&
+    simpl_bind env rhs | try_let_to_case &&
+			 will_be_demanded &&
+		         (rhs_is_bot ||
+			  not rhs_is_whnf &&
+		          singleConstructorType rhs_ty
 				-- Only do let-to-case for single constructor types. 
 				-- For other types we defer doing it until the tidy-up phase at
 				-- the end of simplification.
-			 not rhs_is_whnf	-- note: WHNF, but not bottom,  (comment below)
+			 )
       = tick Let2Case				`thenSmpl_`
-        mkIdentityAlts rhs_ty demand_info	`thenSmpl` \ id_alts ->
-        simplCase env rhs id_alts (\env rhs -> complete_bind env rhs) body_ty
+        simplCase env rhs (AlgAlts [] (BindDefault binder (Var id)))
+			  (\env rhs -> complete_bind env rhs) body_ty
+		-- OLD COMMENT:  [now the new RHS is only "x" so there's less worry]
 		-- NB: it's tidier to call complete_bind not simpl_bind, else
 		-- we nearly end up in a loop.  Consider:
 		-- 	let x = rhs in b
@@ -1100,6 +1109,17 @@ x.  That's just what completeLetBinding does.
 
 
 \begin{code}
+{- FAILED CODE
+   The trouble is that we keep transforming
+		let x = coerce e
+		    y = coerce x
+		in ...
+   to
+		let x' = coerce e
+		    y' = coerce x'
+		in ...
+   and counting a couple of ticks for this non-transformation
+
 	-- We want to ensure that all let-bound Coerces have 
 	-- atomic bodies, so they can freely be inlined.
 completeNonRec env binder new_id (Coerce coercion ty rhs)
@@ -1118,7 +1138,9 @@ completeNonRec env binder new_id (Coerce coercion ty rhs)
 		   (Coerce coercion ty atomic_rhs)	`thenSmpl` \ (env2, binds2) ->
 
     returnSmpl (env2, binds1 ++ binds2)
-	
+-}
+
+
 	-- Right hand sides that are constructors
 	--	let v = C args
 	--	in
