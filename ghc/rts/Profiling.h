@@ -1,6 +1,5 @@
 /* -----------------------------------------------------------------------------
-
- * $Id: Profiling.h,v 1.4 2001/12/12 14:31:43 simonmar Exp $
+ * $Id: Profiling.h,v 1.5 2002/07/18 09:12:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -27,6 +26,5 @@ void PrintNewStackDecls ( void );
 extern lnat total_prof_ticks;
 
 extern void fprintCCS( FILE *f, CostCentreStack *ccs );
-
 
 #endif
