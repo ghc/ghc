@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.6 2002/03/26 23:50:56 sof Exp $
+ * $Id: HsBase.h,v 1.7 2002/04/02 15:33:34 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -179,9 +179,11 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 #define INLINE extern inline
 #endif
 
+#if !defined(mingw32_TARGET_OS)
 INLINE int
 __hscore_sigaddset( sigset_t * set, int s )
 { return sigaddset(set,s); }
+#endif
 
 INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
 INLINE int __hscore_s_isdir(m)  { return S_ISDIR(m);  }
