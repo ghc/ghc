@@ -29,7 +29,7 @@ import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			)
 import NameSet
 import OccName		( OccName,
-			  mkDFunOcc, occNameUserString,
+			  mkDFunOcc, occNameUserString, occNameString,
 			  occNameFlavour
 			)
 import TysWiredIn	( tupleTyCon, unboxedTupleTyCon, listTyCon )
@@ -168,8 +168,11 @@ Make a name for the dict fun for an instance decl
 \begin{code}
 newDFunName :: (OccName, OccName) -> SrcLoc -> RnMS Name
 newDFunName key@(cl_occ, tycon_occ) loc
-  = newInstUniq key	`thenRn` \ inst_uniq ->
-    newImplicitBinder (mkDFunOcc cl_occ tycon_occ inst_uniq) loc
+  = newInstUniq string	`thenRn` \ inst_uniq ->
+    newImplicitBinder (mkDFunOcc string inst_uniq) loc
+  where
+	-- Any string that is somewhat unique will do
+    string = occNameString cl_occ ++ occNameString tycon_occ
 \end{code}
 
 \begin{code}

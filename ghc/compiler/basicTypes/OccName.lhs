@@ -304,18 +304,16 @@ mkSuperDictSelOcc index cls_occ
 
 
 \begin{code}
-mkDFunOcc :: OccName 	-- class, eg "Ord"
-	  -> OccName 	-- tycon (or something convenient from the instance type)
-			--	eg "Maybe"
-	  -> Int	-- Unique to distinguish dfuns which share the previous two
-			--	eg 3
-	  -> OccName	-- "dOrdMaybe3"
+mkDFunOcc :: EncodedString	-- Typically the class and type glommed together e.g. "OrdMaybe"
+	  -> Int		-- Unique to distinguish dfuns which share the previous two
+				--	eg 3
+	  -- The requirement is that the (string,index) pair be unique in this module
 
-mkDFunOcc cls_occ tycon_occ index
-  = mk_deriv VarName "$f" (show_index ++ cls_str ++ tycon_str)
+	  -> OccName	-- "$fOrdMaybe3"
+
+mkDFunOcc string index
+  = mk_deriv VarName "$f" (show_index ++ string)
   where
-    cls_str   = occNameString cls_occ
-    tycon_str = occNameString tycon_occ
     show_index | index == 0 = ""
    	       | otherwise  = show index
 \end{code}

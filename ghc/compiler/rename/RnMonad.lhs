@@ -197,12 +197,14 @@ type FixityEnv = NameEnv RenamedFixitySig
 type RnNameSupply
  = ( UniqSupply
 
-   , FiniteMap (OccName, OccName) Int
+   , FiniteMap String Int
 	-- This is used as a name supply for dictionary functions
-	-- From the inst decl we derive a (class, tycon) pair;
+	-- From the inst decl we derive a string, usually by glomming together
+	-- the class and tycon name -- but it doesn't matter exactly how;
 	-- this map then gives a unique int for each inst decl with that
-	-- (class, tycon) pair.  (In Haskell 98 there can only be one,
-	-- but not so in more extended versions.)
+	-- string.  (In Haskell 98 there can only be one,
+	-- but not so in more extended versions; also class CC type T
+	-- and class C type TT might both give the string CCT
 	--	
 	-- We could just use one Int for all the instance decls, but this
 	-- way the uniques change less when you add an instance decl,	
@@ -615,7 +617,7 @@ setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
 -- See comments with RnNameSupply above.
-newInstUniq :: (OccName, OccName) -> RnM d Int
+newInstUniq :: String -> RnM d Int
 newInstUniq key (RnDown {rn_ns = names_var}) l_down
   = readIORef names_var				>>= \ (us, mapInst, cache) ->
     let
