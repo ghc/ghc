@@ -163,11 +163,9 @@ hidden-modules:
 
 import-dirs:	IMPORT_DIR
 
-#ifdef INSTALLING
-library-dirs:	"$libdir"
-#else
-library-dirs:	"$libdir/libraries/base",
-		"$libdir/libraries/base/cbits"
+library-dirs:	LIB_DIR
+#ifndef INSTALLING
+		, LIB_DIR"/cbits"
 #endif
 
 #if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
@@ -187,12 +185,7 @@ extra-libs:  "HSbase_cbits"
 	     , "wsock32", "msvcrt", "kernel32", "user32", "shell32"
 #endif
 
-#ifdef INSTALLING
-include-dirs:
-#else
-include-dirs: "$libdir/libraries/base/include"
-#endif
-
+include-dirs:		INCLUDE_DIR
 includes:		HsBase.h
 depends:	 	rts
 extra-hugs-opts:
@@ -200,5 +193,5 @@ extra-cc-opts:
 extra-ld-opts:
 framework-dirs:
 extra-frameworks:
-haddock-interfaces:
-haddock-html:
+haddock-interfaces:	HADDOCK_IFACE
+haddock-html:		HTML_DIR
