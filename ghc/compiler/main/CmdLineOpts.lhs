@@ -297,7 +297,11 @@ src_filename = case argv of
 -- debugging opts
 opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
 opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
-opt_D_dump_cpranal	        = lookUp  SLIT("-ddump-cpranalyse")
+-- Make the option agree with the doc! dump-cpranal is preferred over
+-- dump-cpranalyse because of consistency with dump-stranal (and
+-- we don't have to worry about british vs american english).
+opt_D_dump_cpranal	        = lookUp  SLIT("-ddump-cpranal") ||
+				  lookUp  SLIT("-ddump-cpranalyse")
 opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
 opt_D_dump_ds			= lookUp  SLIT("-ddump-ds")
 opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
