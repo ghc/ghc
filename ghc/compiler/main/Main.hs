@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.92 2001/12/05 00:08:27 sof Exp $
+-- $Id: Main.hs,v 1.93 2002/01/04 11:35:13 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -23,7 +23,7 @@ import InteractiveUI(ghciWelcomeMsg, interactiveUI)
 
 
 import Finder		( initFinder )
-import CompManager	( cmInit, cmLoadModule )
+import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
@@ -39,8 +39,8 @@ import DriverState	( buildCoreToDo, buildStgToDo, defaultHscLang,
 			  v_Package_details, v_Ways, getPackageExtraGhcOpts,
 			  readPackageConf
 			)
-import DriverFlags	( dynFlag, buildStaticHscOpts, dynamic_flags,
-			  processArgs, static_flags)
+import DriverFlags	( dynFlag, getDynFlags, buildStaticHscOpts,
+			  dynamic_flags, processArgs, static_flags)
 
 import DriverMkDepend	( beginMkDependHS, endMkDependHS )
 import DriverPhases	( Phase(HsPp, Hsc, HCc), haskellish_src_file, objish_file )
@@ -320,8 +320,10 @@ beginMake fileish_args
 
        case mods of
 	 []    -> throwDyn (UsageError "no input files")
-	 mod   -> do state <- cmInit Batch
-		     (_, ok, _) <- cmLoadModule state mods
+	 _     -> do dflags <- getDynFlags 
+		     state <- cmInit Batch
+		     graph <- cmDepAnal state dflags mods
+		     (_, ok, _) <- cmLoadModules state dflags graph
 		     when (not ok) (exitWith (ExitFailure 1))
 		     return ()
 
