@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.16 2001/09/25 13:00:41 simonmar Exp $
+# $Id: bootstrap.mk,v 1.17 2001/09/25 18:08:48 ken Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -50,7 +50,7 @@ endif
 
 ifeq "$(alpha_TARGET_ARCH)" "1"
 PLATFORM_CC_OPTS += -static -w
-PLATFORM_HC_BOOT_CC_OPTS +=
+PLATFORM_HC_BOOT_CC_OPTS += -mieee
 endif
 
 ifeq "$(sparc_TARGET_ARCH)" "1"
