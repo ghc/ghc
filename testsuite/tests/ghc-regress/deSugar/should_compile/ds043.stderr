@@ -1,3 +1,4 @@
 
-ds043.hs:8: Warning: Pattern match(es) are overlapped in a group of case alternatives beginning (B _ _ _ _ True False):
-	    B {e = True, f = False} -> ...
+tests/ghc-regress/deSugar/should_compile/ds043.hs:8: Warning: Pattern match(es) are overlapped
+    In a case alternative (B _ _ _ _ True False):
+	B {e = True, f = False} -> ...

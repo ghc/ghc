@@ -9,7 +9,7 @@ import Maybe
 
 main = do
     prog <- getProgName
-    let Just (name:_) = matchRegex (mkRegex ".*(cg025.bin)") prog
+    let Just (name:_) = matchRegex (mkRegex ".*(cg025)") prog
     hPutStr stderr (shows name "\n")
     args <- getArgs
     hPutStr stderr (shows args "\n")
