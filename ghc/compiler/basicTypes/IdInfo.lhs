@@ -753,7 +753,7 @@ This got shorted out to:
      #-}
 
 And now we get an infinite loop in the rule system 
-	iterate f x -> build (\cn -> iterateFB c f x
+	iterate f x -> build (\cn -> iterateFB c f x)
 		    -> iterateFB (:) f x
 		    -> iterate f x
 
