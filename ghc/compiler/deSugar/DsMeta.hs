@@ -213,20 +213,24 @@ repTyClD (L loc d) = do { dsWarn (loc, hang msg 4 (ppr d)) ;
   where
     msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
 
-repInstD' (L loc (InstDecl ty binds _))
-	-- Ignore user pragmas for now
- = do	{ cxt1 <- repContext cxt
-	; inst_ty1 <- repPred (HsClassP cls tys)
-	; ss <- mkGenSyms (collectHsBindBinders binds)
-	; binds1 <- addBinds ss (rep_binds binds)
-	; decls1 <- coreList decQTyConName binds1
-	; decls2 <- wrapNongenSyms ss decls1
-		-- wrapNonGenSyms: do not clone the class op names!
-		-- They must be called 'op' etc, not 'op34'
-	; i <- repInst cxt1 inst_ty1 decls2
+repInstD' (L loc (InstDecl ty binds _))		-- Ignore user pragmas for now
+ = do	{ i <- addTyVarBinds tvs $ \tv_bndrs ->
+		-- We must bring the type variables into scope, so their occurrences
+		-- don't fail,  even though the binders don't appear in the resulting 
+		-- data structure
+		do {  cxt1 <- repContext cxt
+		   ; inst_ty1 <- repPred (HsClassP cls tys)
+		   ; ss <- mkGenSyms (collectHsBindBinders binds)
+		   ; binds1 <- addBinds ss (rep_binds binds)
+		   ; decls1 <- coreList decQTyConName binds1
+		   ; decls2 <- wrapNongenSyms ss decls1
+		   -- wrapNonGenSyms: do not clone the class op names!
+		   -- They must be called 'op' etc, not 'op34'
+		   ; repInst cxt1 inst_ty1 decls2 }
+
 	; return (loc, i)}
  where
-   (_, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
+   (tvs, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
 
 -------------------------------------------------------
 -- 			Constructors
