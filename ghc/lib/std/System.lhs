@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: System.lhs,v 1.27 2001/01/11 07:04:16 qrczak Exp $
+% $Id: System.lhs,v 1.28 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -20,24 +20,17 @@ module System
   ) where
 \end{code}
 
-
-#ifndef __HUGS__
 \begin{code}
+import Monad
 import Prelude
-import PrelAddr
+import PrelCString
+import PrelCTypes
+import PrelMarshalArray
+import PrelPtr
+import PrelStorable
 import PrelIOBase	( IOException(..), ioException, 
-			  IOErrorType(..), constructErrorAndFailWithInfo, stToIO )
-import PrelPack    	( unpackCString, unpackCStringST, packString )
+			  IOErrorType(..), constructErrorAndFailWithInfo )
 import PrelByteArr	( ByteArray )
-
-type PrimByteArray  = ByteArray Int
-
-primUnpackCString :: Addr -> IO String
-primUnpackCString s = stToIO ( unpackCStringST s )
-
-primPackString :: String -> PrimByteArray
-primPackString s    = packString s
-
 \end{code}
 
 %*********************************************************
@@ -63,19 +56,19 @@ Computation $getArgs$ returns a list of the program's command
 line arguments (not including the program name).
 
 \begin{code}
-getArgs 		:: IO [String]
-getArgs = return (unpackArgv primArgv primArgc)
+getArgs :: IO [String]
+getArgs = unpackArgv primArgv primArgc
 
-foreign import ccall "libHS_cbits.so" "get_prog_argv" unsafe primArgv :: Addr
-foreign import ccall "libHS_cbits.so" "get_prog_argc" unsafe primArgc :: Int
+foreign import ccall "get_prog_argv" unsafe   primArgv :: Ptr (Ptr CChar)
+foreign import ccall "get_prog_argc" unsafe   primArgc :: Int
 \end{code}
 
 Computation $getProgName$ returns the name of the program
 as it was invoked.
 
 \begin{code}
-getProgName 		:: IO String
-getProgName = return (unpackProgName primArgv)
+getProgName :: IO String
+getProgName = unpackProgName primArgv
 \end{code}
 
 Computation $getEnv var$ returns the value
@@ -88,15 +81,16 @@ The environment variable does not exist.
 \end{itemize}
 
 \begin{code}
-getEnv        		:: String -> IO String
-getEnv name = do
-    litstring <- primGetEnv (primPackString name)
-    if litstring /= nullAddr
-	then primUnpackCString litstring
+getEnv :: String -> IO String
+getEnv name =
+    withUnsafeCString name $ \s -> do
+      litstring <- _getenv s
+      if litstring /= nullPtr
+	then peekCString litstring
         else ioException (IOError Nothing NoSuchThing "getEnv"
 			  "no environment variable" (Just name))
 
-foreign import ccall "libHS_cbits.so" "getenv" unsafe primGetEnv :: PrimByteArray -> IO Addr
+foreign import ccall "getenv" unsafe _getenv :: UnsafeCString -> IO (Ptr CChar)
 \end{code}
 
 Computation $system cmd$ returns the exit code
@@ -115,14 +109,15 @@ The implementation does not support system calls.
 \begin{code}
 system        		:: String -> IO ExitCode
 system "" = ioException (IOError Nothing InvalidArgument "system" "null command" Nothing)
-system cmd = do
-    status <- primSystem (primPackString cmd)
+system cmd =
+  withUnsafeCString cmd $ \s -> do
+    status <- primSystem s
     case status of
         0  -> return ExitSuccess
         -1 -> constructErrorAndFailWithInfo "system" cmd
         n  -> return (ExitFailure n)
 
-foreign import ccall "libHS_cbits.so" "systemCmd" unsafe primSystem :: PrimByteArray -> IO Int
+foreign import ccall "systemCmd" unsafe primSystem :: UnsafeCString -> IO Int
 \end{code}
 
 @exitWith code@ terminates the program, returning {\em code} to the program's caller.
@@ -156,23 +151,13 @@ exitFailure = exitWith (ExitFailure 1)
 %*********************************************************
 
 \begin{code}
-type CHAR_STAR_STAR	= Addr	-- this is all a  HACK
-type CHAR_STAR		= Addr
+unpackArgv :: Ptr (Ptr CChar) -> Int -> IO [String] -- argv[1 .. argc-1]
+unpackArgv argv argc = peekArray argc argv >>= mapM peekCString
 
-unpackArgv :: CHAR_STAR_STAR -> Int -> [String] -- argv[1 .. argc-1]
-unpackArgv argv argc = unpack 1
-  where
-   unpack :: Int -> [String]
-   unpack n
-     | n >= argc = []
-     | otherwise =
-	 case (indexAddrOffAddr argv n) of 
-	   item -> unpackCString item : unpack (n + 1)
-
-unpackProgName	:: CHAR_STAR_STAR	 -> String   -- argv[0]
-unpackProgName argv
-  = case (indexAddrOffAddr argv 0) of { prog ->
-    de_slash [] (unpackCString prog) }
+unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
+unpackProgName argv = do 
+  s <- peekElemOff argv 0 >>= peekCString
+  return (de_slash "" s)
   where
     -- re-start accumulating at every '/'
     de_slash :: String -> String -> String
@@ -180,90 +165,3 @@ unpackProgName argv
     de_slash _acc ('/':xs) = de_slash []      xs
     de_slash  acc (x:xs)   = de_slash (x:acc) xs
 \end{code}
-
-#else
-
-\begin{code}
------------------------------------------------------------------------------
--- Standard Library: System operations
---
--- Warning: the implementation of these functions in Hugs 98 is very weak.
--- The functions themselves are best suited to uses in compiled programs,
--- and not to use in an interpreter-based environment like Hugs.
---
--- Suitable for use with Hugs 98
------------------------------------------------------------------------------
-import PrelPrim ( primGetRawArgs
-		, primGetEnv
-		, prelCleanupAfterRunAction
-		, copy_String_to_cstring
-		, readIORef
-		, nh_stderr
-		, nh_stdout
-		, nh_stdin 
-		, nh_exitwith 
-		, nh_flush
-		, nh_close
-		, nh_system
-		, nh_free
-		, nh_getPID
-		)
-
-
-data ExitCode = ExitSuccess | ExitFailure Int
-                deriving (Eq, Ord, Read, Show)
-
-getArgs                     :: IO [String]
-getArgs                      = primGetRawArgs >>= \rawargs ->
-                               return (tail rawargs)
-
-getProgName                 :: IO String
-getProgName                  = primGetRawArgs >>= \rawargs ->
-                               return (head rawargs)
-
-getEnv                      :: String -> IO String
-getEnv                       = primGetEnv
-
-exitFailure		    :: IO a
-exitFailure		     = exitWith (ExitFailure 1)
-
-toExitCode                  :: Int -> ExitCode
-toExitCode 0                 = ExitSuccess
-toExitCode n                 = ExitFailure n
-
-fromExitCode                :: ExitCode -> Int
-fromExitCode ExitSuccess     = 0
-fromExitCode (ExitFailure n) = n
-
--- see comment in Prelude.hs near primRunIO_hugs_toplevel
-exitWith :: ExitCode -> IO a
-exitWith c
-   = do cleanup_action <- readIORef prelCleanupAfterRunAction
-        case cleanup_action of
-           Just xx -> xx
-           Nothing -> return ()
-        nh_stderr >>= nh_flush
-        nh_stdout >>= nh_flush
-        nh_stdin  >>= nh_close
-        nh_exitwith (fromExitCode c)
-        (ioException . IOError) "System.exitWith: should not return"
-
-system :: String -> IO ExitCode
-system cmd
-   | null cmd
-   = (ioException.IOError) "System.system: null command"
-   | otherwise
-   = do str    <- copy_String_to_cstring cmd
-        status <- nh_system str
-        nh_free str
-        case status of
-           0  -> return ExitSuccess
-           n  -> return (ExitFailure n)
-
-getPID :: IO Int
-getPID
-   = nh_getPID
-
------------------------------------------------------------------------------
-\end{code}
-#endif

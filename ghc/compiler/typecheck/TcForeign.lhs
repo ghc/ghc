@@ -40,7 +40,8 @@ import Type		( splitFunTys
 			, splitTyConApp_maybe
 			, splitForAllTys
 			)
-import TysWiredIn	( isFFIArgumentTy, isFFIResultTy, 
+import TysWiredIn	( isFFIArgumentTy, isFFIImportResultTy, 
+			  isFFIExportResultTy,
 			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy,
 			  isFFILabelTy
 			)
@@ -170,11 +171,11 @@ checkForeignImport is_dynamic is_safe ty args res
 	getDOptsTc						`thenTc` \ dflags ->
         check (isFFIDynArgumentTy x) (illegalForeignTyErr True{-Arg-} ty) `thenTc_`
         mapTc (checkForeignArg (isFFIArgumentTy dflags is_safe)) xs	`thenTc_`
-	checkForeignRes True {-NonIO ok-} isFFIResultTy res
+	checkForeignRes True {-NonIO ok-} (isFFIImportResultTy dflags) res
  | otherwise =
      getDOptsTc							   `thenTc` \ dflags ->
      mapTc (checkForeignArg (isFFIArgumentTy dflags is_safe)) args `thenTc_`
-     checkForeignRes True {-NonIO ok-} isFFIResultTy res
+     checkForeignRes True {-NonIO ok-} (isFFIImportResultTy dflags) res
 
 checkForeignExport :: Bool -> Type -> [Type] -> Type -> TcM ()
 checkForeignExport is_dynamic ty args res
@@ -187,12 +188,13 @@ checkForeignExport is_dynamic ty args res
 	case splitFunTys arg of
 	   (arg_tys, res_ty) -> 
 		mapTc (checkForeignArg isFFIExternalTy) arg_tys	`thenTc_`
-		checkForeignRes True {-NonIO ok-} isFFIResultTy res_ty `thenTc_`
+		checkForeignRes True {-NonIO ok-} isFFIExportResultTy res_ty
+								 `thenTc_`
 		checkForeignRes False {-Must be IO-} isFFIDynResultTy res
      _      -> check False (illegalForeignTyErr True{-Arg-} ty)
  | otherwise =
      mapTc (checkForeignArg isFFIExternalTy) args  	        `thenTc_`
-     checkForeignRes True {-NonIO ok-} isFFIResultTy res
+     checkForeignRes True {-NonIO ok-} isFFIExportResultTy res
  
 checkForeignArg :: (Type -> Bool) -> Type -> TcM ()
 checkForeignArg pred ty = check (pred ty) (illegalForeignTyErr True{-Arg-} ty)

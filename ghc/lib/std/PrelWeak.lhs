@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelWeak.lhs,v 1.14 2001/01/03 14:47:18 simonmar Exp $
+% $Id: PrelWeak.lhs,v 1.15 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -14,8 +14,7 @@ module PrelWeak where
 import PrelGHC
 import PrelBase
 import PrelMaybe
--- NOTE: To break a cycle, ForeignObj is not in PrelForeign, but PrelIOBase!
-import PrelIOBase	( IO(..), unIO, ForeignObj(..) )
+import PrelIOBase	( IO(..), unIO )
 
 #ifndef __PARALLEL_HASKELL__
 
@@ -38,10 +37,6 @@ addFinalizer :: key -> IO () -> IO ()
 addFinalizer key finalizer = do
    mkWeakPtr key (Just finalizer)	-- throw it away
    return ()
-
-addForeignFinalizer :: ForeignObj -> IO () -> IO ()
-addForeignFinalizer (ForeignObj fo) finalizer
-  = IO $ \s -> case mkWeak# fo () finalizer s of { (# s1, w #) -> (# s1, () #) }
 
 {-
 Instance Eq (Weak v) where

@@ -1,7 +1,7 @@
 %
 % (c) The University of Glasgow, 2000
 %
-\section[Int]{Module @PrelInt@}
+\section[PrelInt]{Module @PrelInt@}
 
 \begin{code}
 {-# OPTIONS -monly-3-regs #-}
@@ -44,34 +44,16 @@ module PrelInt
         , int64ToInt16   -- :: Int64   -> Int16
         , int64ToInt32   -- :: Int64   -> Int32
 
-	-- The "official" place to get these from is Addr, importing
-	-- them from Int is a non-standard thing to do.
-        -- SUP: deprecated in the new FFI, subsumed by the Storable class
-	, indexInt8OffAddr
-	, indexInt16OffAddr
-	, indexInt32OffAddr
-	, indexInt64OffAddr
-	
-	, readInt8OffAddr
-	, readInt16OffAddr
-	, readInt32OffAddr
-	, readInt64OffAddr
-	
-	, writeInt8OffAddr
-	, writeInt16OffAddr
-	, writeInt32OffAddr
-	, writeInt64OffAddr
-	
 	-- internal stuff
 	, intToInt8#, i8ToInt#, intToInt16#, i16ToInt#, intToInt32#, i32ToInt#,
 	, intToInt64#, plusInt64#, minusInt64#, negateInt64#
+
  ) where
 
 import PrelWord
+import PrelBits
 import PrelArr
 import PrelRead
-import PrelIOBase
-import PrelAddr
 import PrelReal
 import PrelNum
 import PrelBase
@@ -297,6 +279,40 @@ instance Read Int8 where
 instance Show Int8 where
     showsPrec p i8 = showsPrec p (int8ToInt i8)
 
+binop8 :: (Int32 -> Int32 -> a) -> (Int8 -> Int8 -> a)
+binop8 op x y = int8ToInt32 x `op` int8ToInt32 y
+
+instance Bits Int8 where
+  (I8# x) .&. (I8# y) = I8# (word2Int# ((int2Word# x) `and#` (int2Word# y)))
+  (I8# x) .|. (I8# y) = I8# (word2Int# ((int2Word# x) `or#`  (int2Word# y)))
+  (I8# x) `xor` (I8# y) = I8# (word2Int# ((int2Word# x) `xor#` (int2Word# y)))
+  complement (I8# x)    = I8# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xff#)))
+  shift (I8# x) i@(I# i#)
+	| i > 0     = I8# (intToInt8# (iShiftL# (i8ToInt# x)  i#))
+	| otherwise = I8# (intToInt8# (iShiftRA# (i8ToInt# x) (negateInt# i#)))
+  i8@(I8# x)  `rotate` (I# i)
+        | i ==# 0#    = i8
+	| i ># 0#     = 
+	     I8# (intToInt8# ( word2Int#  (
+	             (int2Word# (iShiftL# (i8ToInt# x) i'))
+		             `or#`
+                     (int2Word# (iShiftRA# (word2Int# (
+		                                (int2Word# x) `and#` 
+			                        (int2Word# (0x100# -# pow2# i2))))
+			                  i2)))))
+	| otherwise = rotate i8 (I# (8# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 7#)
+           i2 = 8# -# i'
+  bitSize  _    = 8
+  isSigned _    = True
+
+pow2# :: Int# -> Int#
+pow2# x# = iShiftL# 1# x#
+
+pow2_64# :: Int# -> Int64#
+pow2_64# x# = word64ToInt64# (shiftL64# (wordToWord64# (int2Word# 1#)) x#)
+
 -- -----------------------------------------------------------------------------
 -- Int16
 -- -----------------------------------------------------------------------------
@@ -406,6 +422,34 @@ instance Read Int16 where
 
 instance Show Int16 where
     showsPrec p i16 = showsPrec p (int16ToInt i16)
+
+
+binop16 :: (Int32 -> Int32 -> a) -> (Int16 -> Int16 -> a)
+binop16 op x y = int16ToInt32 x `op` int16ToInt32 y
+
+instance Bits Int16 where
+  (I16# x) .&. (I16# y) = I16# (word2Int# ((int2Word# x) `and#` (int2Word# y)))
+  (I16# x) .|. (I16# y) = I16# (word2Int# ((int2Word# x) `or#`  (int2Word# y)))
+  (I16# x) `xor` (I16# y) = I16# (word2Int# ((int2Word# x) `xor#`  (int2Word# y)))
+  complement (I16# x)    = I16# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xffff#)))
+  shift (I16# x) i@(I# i#)
+	| i > 0     = I16# (intToInt16# (iShiftL# (i16ToInt# x)  i#))
+	| otherwise = I16# (intToInt16# (iShiftRA# (i16ToInt# x) (negateInt# i#)))
+  i16@(I16# x)  `rotate` (I# i)
+        | i ==# 0#    = i16
+	| i ># 0#     = 
+	     I16# (intToInt16# (word2Int# (
+	            (int2Word# (iShiftL# (i16ToInt# x) i')) 
+		             `or#`
+                    (int2Word# (iShiftRA# ( word2Int# (
+		                    (int2Word# x) `and#` (int2Word# (0x100# -# pow2# i2))))
+			                  i2)))))
+	| otherwise = rotate i16 (I# (16# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 15#)
+           i2 = 16# -# i'
+  bitSize  _        = 16
+  isSigned _        = True
 
 -- -----------------------------------------------------------------------------
 -- Int32
@@ -532,13 +576,44 @@ instance Read Int32 where
 instance Show Int32 where
     showsPrec p i32 = showsPrec p (int32ToInt i32)
 
+instance Bits Int32 where
+  (I32# x) .&. (I32# y)   = I32# (word2Int# ((int2Word# x) `and#` (int2Word# y)))
+  (I32# x) .|. (I32# y)   = I32# (word2Int# ((int2Word# x) `or#`  (int2Word# y)))
+  (I32# x) `xor` (I32# y) = I32# (word2Int# ((int2Word# x) `xor#` (int2Word# y)))
+#if WORD_SIZE_IN_BYTES > 4
+  complement (I32# x)     = I32# (word2Int# ((int2Word# x) `xor#` (int2Word# 0xffffffff#)))
+#else
+  complement (I32# x)     = I32# (word2Int# ((int2Word# x) `xor#` (int2Word# (negateInt# 1#))))
+#endif
+  shift (I32# x) i@(I# i#)
+	| i > 0     = I32# (intToInt32# (iShiftL# (i32ToInt# x)  i#))
+	| otherwise = I32# (intToInt32# (iShiftRA# (i32ToInt# x) (negateInt# i#)))
+  i32@(I32# x)  `rotate` (I# i)
+        | i ==# 0#    = i32
+	| i ># 0#     = 
+             -- ( (x<<i') | ((x&(0x100000000-2^i2))>>i2)
+	     I32# (intToInt32# ( word2Int# (
+	            (int2Word# (iShiftL# (i32ToInt# x) i')) 
+		          `or#`
+                    (int2Word# (iShiftRA# (word2Int# (
+		                              (int2Word# x) 
+					          `and#` 
+			                       (int2Word# (maxBound# -# pow2# i2 +# 1#))))
+			                  i2)))))
+	| otherwise = rotate i32 (I# (32# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 31#)
+           i2 = 32# -# i'
+           (I32# maxBound#) = maxBound
+  bitSize  _    = 32
+  isSigned _    = True
+
 -- -----------------------------------------------------------------------------
 -- Int64
 -- -----------------------------------------------------------------------------
 
 #if WORD_SIZE_IN_BYTES == 8
-
---data Int64 = I64# Int#
+data Int64  = I64# Int#
 
 int32ToInt64 (I32# i#) = I64# i#
 
@@ -603,7 +678,7 @@ int64ToInt (I64# i#) = I# i#
 
 #else
 --assume: support for long-longs
---data Int64 = I64 Int64# deriving (Eq, Ord, Bounded)
+data Int64 = I64# Int64#
 
 int32ToInt64 (I32# i#) = I64# (intToInt64# i#)
 int64ToInt32 (I64# i#) = I32# (int64ToInt# i#)
@@ -680,70 +755,49 @@ quotInt64 (I64# x) (I64# y) = I64# (x `quotInt64#` y)
 intToInt64 (I# i#) = I64# (intToInt64# i#)
 int64ToInt (I64# i#) = I# (int64ToInt# i#)
 
--- Word64# primop wrappers:
+-- Int64# primop wrappers:
 
 ltInt64# :: Int64# -> Int64# -> Bool
-ltInt64# x# y# = stg_ltInt64 x# y# /= 0
+ltInt64# x# y# = stg_ltInt64 x# y# /=# 0#
       
 leInt64# :: Int64# -> Int64# -> Bool
-leInt64# x# y# = stg_leInt64 x# y# /= 0
+leInt64# x# y# = stg_leInt64 x# y# /=# 0#
 
 eqInt64# :: Int64# -> Int64# -> Bool
-eqInt64# x# y# = stg_eqInt64 x# y# /= 0
+eqInt64# x# y# = stg_eqInt64 x# y# /=# 0#
 
 neInt64# :: Int64# -> Int64# -> Bool
-neInt64# x# y# = stg_neInt64 x# y# /= 0
+neInt64# x# y# = stg_neInt64 x# y# /=# 0#
 
 geInt64# :: Int64# -> Int64# -> Bool
-geInt64# x# y# = stg_geInt64 x# y# /= 0
+geInt64# x# y# = stg_geInt64 x# y# /=# 0#
 
 gtInt64# :: Int64# -> Int64# -> Bool
-gtInt64# x# y# = stg_gtInt64 x# y# /= 0
+gtInt64# x# y# = stg_gtInt64 x# y# /=# 0#
 
-plusInt64# :: Int64# -> Int64# -> Int64#
-plusInt64# a# b# = case stg_plusInt64 a# b# of { I64# i# -> i# }
-
-minusInt64# :: Int64# -> Int64# -> Int64#
-minusInt64# a# b# = case stg_minusInt64 a# b# of { I64# i# -> i# }
-
-timesInt64# :: Int64# -> Int64# -> Int64#
-timesInt64# a# b# = case stg_timesInt64 a# b# of { I64# i# -> i# }
-
-quotInt64# :: Int64# -> Int64# -> Int64#
-quotInt64# a# b# = case stg_quotInt64 a# b# of { I64# i# -> i# }
-
-remInt64# :: Int64# -> Int64# -> Int64#
-remInt64# a# b# = case stg_remInt64 a# b# of { I64# i# -> i# }
-
-negateInt64# :: Int64# -> Int64#
-negateInt64# a# = case stg_negateInt64 a# of { I64# i# -> i# }
-
-int64ToInt# :: Int64# -> Int#
-int64ToInt# i64# = case stg_int64ToInt i64# of { I# i# -> i# }
-
-intToInt64# :: Int# -> Int64#
-intToInt64# i# = case stg_intToInt64 i# of { I64# i64# -> i64# }
-
-foreign import "stg_intToInt64" unsafe stg_intToInt64 :: Int# -> Int64
-foreign import "stg_int64ToInt" unsafe stg_int64ToInt :: Int64# -> Int
-foreign import "stg_negateInt64" unsafe stg_negateInt64 :: Int64# -> Int64
-foreign import "stg_remInt64" unsafe stg_remInt64 :: Int64# -> Int64# -> Int64
-foreign import "stg_quotInt64" unsafe stg_quotInt64 :: Int64# -> Int64# -> Int64
-foreign import "stg_timesInt64" unsafe stg_timesInt64 :: Int64# -> Int64# -> Int64
-foreign import "stg_minusInt64" unsafe stg_minusInt64 :: Int64# -> Int64# -> Int64
-foreign import "stg_plusInt64" unsafe stg_plusInt64 :: Int64# -> Int64# -> Int64
-foreign import "stg_gtInt64" unsafe stg_gtInt64 :: Int64# -> Int64# -> Int
-foreign import "stg_geInt64" unsafe stg_geInt64 :: Int64# -> Int64# -> Int
-foreign import "stg_neInt64" unsafe stg_neInt64 :: Int64# -> Int64# -> Int
-foreign import "stg_eqInt64" unsafe stg_eqInt64 :: Int64# -> Int64# -> Int
-foreign import "stg_leInt64" unsafe stg_leInt64 :: Int64# -> Int64# -> Int
-foreign import "stg_ltInt64" unsafe stg_ltInt64 :: Int64# -> Int64# -> Int
+foreign import "stg_intToInt64" unsafe intToInt64# :: Int# -> Int64#
+foreign import "stg_int64ToInt" unsafe int64ToInt# :: Int64# -> Int#
+foreign import "stg_negateInt64" unsafe negateInt64# :: Int64# -> Int64#
+foreign import "stg_remInt64" unsafe remInt64# :: Int64# -> Int64# -> Int64#
+foreign import "stg_quotInt64" unsafe quotInt64# :: Int64# -> Int64# -> Int64#
+foreign import "stg_timesInt64" unsafe timesInt64# :: Int64# -> Int64# -> Int64#
+foreign import "stg_minusInt64" unsafe minusInt64# :: Int64# -> Int64# -> Int64#
+foreign import "stg_plusInt64" unsafe plusInt64# :: Int64# -> Int64# -> Int64#
+foreign import "stg_gtInt64" unsafe stg_gtInt64 :: Int64# -> Int64# -> Int#
+foreign import "stg_geInt64" unsafe stg_geInt64 :: Int64# -> Int64# -> Int#
+foreign import "stg_neInt64" unsafe stg_neInt64 :: Int64# -> Int64# -> Int#
+foreign import "stg_eqInt64" unsafe stg_eqInt64 :: Int64# -> Int64# -> Int#
+foreign import "stg_leInt64" unsafe stg_leInt64 :: Int64# -> Int64# -> Int#
+foreign import "stg_ltInt64" unsafe stg_ltInt64 :: Int64# -> Int64# -> Int#
 
 #endif
 
 --
 -- Code that's independent of Int64 rep.
 -- 
+instance CCallable   Int64
+instance CReturnable Int64
+
 instance Enum Int64 where
     succ i
       | i == maxBound = succError "Int64"
@@ -787,74 +841,78 @@ instance Ix Int64 where
 instance Real Int64 where
   toRational x = toInteger x % 1
 
--- ---------------------------------------------------------------------------
--- Reading/writing Ints from memory
--- ---------------------------------------------------------------------------
-
-indexInt8OffAddr  :: Addr -> Int -> Int8
-indexInt8OffAddr (A# a#) (I# i#) = I8# (indexInt8OffAddr# a# i#)
-
-indexInt16OffAddr  :: Addr -> Int -> Int16
-indexInt16OffAddr (A# a#) (I# i#) = I16# (indexInt16OffAddr# a# i#)
-
-indexInt32OffAddr  :: Addr -> Int -> Int32
-indexInt32OffAddr (A# a#) (I# i#) = I32# (indexInt32OffAddr# a# i#)
-
-indexInt64OffAddr  :: Addr -> Int -> Int64
-#if WORD_SIZE_IN_BYTES==8
-indexInt64OffAddr (A# a#) (I# i#) = I64# (indexIntOffAddr# a# i#)
-#else
-indexInt64OffAddr (A# a#) (I# i#) = I64# (indexInt64OffAddr# a# i#)
-#endif
-
-
-readInt8OffAddr :: Addr -> Int -> IO Int8
-readInt8OffAddr (A# a) (I# i)
-  = IO $ \s -> case readInt8OffAddr# a i s of (# s, w #) -> (# s, I8# w #)
-
-readInt16OffAddr :: Addr -> Int -> IO Int16
-readInt16OffAddr (A# a) (I# i)
-  = IO $ \s -> case readInt16OffAddr# a i s of (# s, w #) -> (# s, I16# w #)
-
-readInt32OffAddr :: Addr -> Int -> IO Int32
-readInt32OffAddr (A# a) (I# i)
-  = IO $ \s -> case readInt32OffAddr# a i s of (# s, w #) -> (# s, I32# w #)
-
-readInt64OffAddr  :: Addr -> Int -> IO Int64
 #if WORD_SIZE_IN_BYTES == 8
-readInt64OffAddr (A# a) (I# i)
-  = IO $ \s -> case readIntOffAddr# a i s of (# s, w #) -> (# s, I64# w #)
-#else
-readInt64OffAddr (A# a) (I# i)
-  = IO $ \s -> case readInt64OffAddr# a i s of (# s, w #) -> (# s, I64# w #)
+instance Bits Int64 where
+  (I64# x) .&. (I64# y)   = I64# (word2Int# ((int2Word# x) `and#` (int2Word# y)))
+  (I64# x) .|. (I64# y)   = I64# (word2Int# ((int2Word# x) `or#`  (int2Word# y)))
+  (I64# x) `xor` (I64# y) = I64# (word2Int# ((int2Word# x) `xor#` (int2Word# y)))
+  complement (I64# x)     = I64# (negateInt# x)
+  shift (I64# x) i@(I# i#)
+	| i > 0     = I64# (iShiftL# x  i#)
+	| otherwise = I64# (iShiftRA# x (negateInt# i#))
+  i64@(I64# x)  `rotate` (I# i)
+        | i ==# 0#    = i64
+	| i ># 0#     = 
+             -- ( (x<<i') | ((x&(0x10000000000000000-2^i2))>>i2) )
+	     I64# (word2Int# (
+	            (int2Word# (iShiftL# x i')) 
+		          `or#`
+                    (int2Word# (iShiftRA# (word2Int# (
+		                              (int2Word# x) 
+					          `and#` 
+			                       (int2Word# (maxBound# -# pow2# i2 +# 1#))))
+			                  i2))))
+	| otherwise = rotate i64 (I# (64# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 63#)
+           i2 = 64# -# i'
+           (I64# maxBound#) = maxBound
+  bitSize  _    = 64
+  isSigned _    = True
+
+#else /* WORD_SIZE_IN_BYTES != 8 */
+
+instance Bits Int64 where
+  (I64# x) .&. (I64# y)   = I64# (word64ToInt64# ((int64ToWord64# x) `and64#` (int64ToWord64# y)))
+  (I64# x) .|. (I64# y)   = I64# (word64ToInt64# ((int64ToWord64# x) `or64#`  (int64ToWord64# y)))
+  (I64# x) `xor` (I64# y) = I64# (word64ToInt64# ((int64ToWord64# x) `xor64#` (int64ToWord64# y)))
+  complement (I64# x)     = I64# (negateInt64# x)
+  shift (I64# x) i@(I# i#)
+	| i > 0     = I64# (iShiftL64# x  i#)
+	| otherwise = I64# (iShiftRA64# x (negateInt# i#))
+  i64@(I64# x)  `rotate` (I# i)
+        | i ==# 0#    = i64
+	| i ># 0#     = 
+             -- ( (x<<i') | ((x&(0x10000000000000000-2^i2))>>i2) )
+	     I64# (word64ToInt64# (
+	            (int64ToWord64# (iShiftL64# x i'))		          `or64#`
+                    (int64ToWord64# (iShiftRA64# (word64ToInt64# ((int64ToWord64# x)     `and64#` 
+			                         (int64ToWord64# (maxBound# `minusInt64#` (pow2_64# i2 `plusInt64#` (intToInt64# 1#))))))
+			                        i2))))
+	| otherwise = rotate i64 (I# (64# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 63#)
+           i2 = 64# -# i'
+           (I64# maxBound#) = maxBound
+  bitSize  _    = 64
+  isSigned _    = True
+
+foreign import "stg_not64" unsafe not64# :: Word64# -> Word64#
+foreign import "stg_xor64" unsafe xor64# :: Word64# -> Word64# -> Word64#
+foreign import "stg_or64" unsafe or64# :: Word64# -> Word64# -> Word64#
+foreign import "stg_and64" unsafe and64# :: Word64# -> Word64# -> Word64#
+foreign import "stg_shiftRL64" unsafe shiftRL64# :: Word64# -> Int# -> Word64#
+foreign import "stg_iShiftRA64" unsafe iShiftRA64# :: Int64# -> Int# -> Int64#
+foreign import "stg_iShiftRL64" unsafe iShiftRL64# :: Int64# -> Int# -> Int64#
+foreign import "stg_iShiftL64" unsafe iShiftL64# :: Int64# -> Int# -> Int64#
+foreign import "stg_shiftL64" unsafe shiftL64# :: Word64# -> Int# -> Word64#
+
 #endif
 
+-- ---------------------------------------------------------------------------
+-- Miscellaneous Utilities
+-- ---------------------------------------------------------------------------
 
-writeInt8OffAddr  :: Addr -> Int -> Int8  -> IO ()
-writeInt8OffAddr (A# a#) (I# i#) (I8# w#) = IO $ \ s# ->
-      case (writeInt8OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-writeInt16OffAddr  :: Addr -> Int -> Int16  -> IO ()
-writeInt16OffAddr (A# a#) (I# i#) (I16# w#) = IO $ \ s# ->
-      case (writeInt16OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-writeInt32OffAddr  :: Addr -> Int -> Int32  -> IO ()
-writeInt32OffAddr (A# a#) (I# i#) (I32# w#) = IO $ \ s# ->
-      case (writeInt32OffAddr# a# i# w# s#) of s2# -> (# s2#, () #)
-
-writeInt64OffAddr :: Addr -> Int -> Int64 -> IO ()
-#if WORD_SIZE_IN_BYTES == 8
-writeInt64OffAddr (A# a#) (I# i#) (I64# w#) = IO $ \ s# ->
-      case (writeIntOffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
-#else
-writeInt64OffAddr (A# a#) (I# i#) (I64# w#) = IO $ \ s# ->
-      case (writeInt64OffAddr#  a# i# w# s#) of s2# -> (# s2#, () #)
-#endif
-\end{code}
-
-Miscellaneous Utilities
-
-\begin{code}
 absReal :: (Ord a, Num a) => a -> a
 absReal x    | x >= 0    = x
 	     | otherwise = -x

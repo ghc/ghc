@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: progargs.c,v 1.3 2000/03/14 01:52:25 sof Exp $
+ * $Id: progargs.c,v 1.4 2001/01/11 17:25:58 simonmar Exp $
  *
  * System.getArgs Runtime Support
  */
@@ -9,13 +9,13 @@
 #include "Rts.h"
 #include "stgio.h"
 
-StgAddr
+HsAddr
 get_prog_argv(void)
 { 
   return prog_argv;
 }
 
-StgInt
+HsInt
 get_prog_argc()
 {
   return prog_argc;

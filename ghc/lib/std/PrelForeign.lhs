@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelForeign.lhs,v 1.16 2000/12/11 16:56:47 simonmar Exp $
+% $Id: PrelForeign.lhs,v 1.17 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -9,23 +9,11 @@
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-module PrelForeign (
-	module PrelForeign,
-#ifndef __PARALLEL_HASKELL__
-	ForeignPtr(..),
-
-	-- the rest are deprecated
-	ForeignObj(..),
-	makeForeignObj,
-	mkForeignObj,
-	writeForeignObj
-#endif
-   ) where
+module PrelForeign where
 
 import PrelIOBase
 import PrelBase
-import PrelAddr
-import PrelWeak	( addForeignFinalizer )
+import PrelPtr
 \end{code}
 
 %*********************************************************
@@ -35,79 +23,37 @@ import PrelWeak	( addForeignFinalizer )
 %*********************************************************
 
 \begin{code}
-data ForeignPtr a = ForeignPtr ForeignObj#
-instance CCallable (ForeignPtr a)
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Type @ForeignObj@ and its operations}
-%*							*
-%*********************************************************
-
-mkForeignObj and writeForeignObj are the building blocks
-for makeForeignObj, they can probably be nuked in the future.
-
-\begin{code}
 #ifndef __PARALLEL_HASKELL__
---instance CCallable ForeignObj
---instance CCallable ForeignObj#
+newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
+newForeignPtr p finalizer
+  = do fObj <- mkForeignPtr p
+       addForeignPtrFinalizer fObj finalizer
+       return fObj
 
-makeForeignObj :: Addr -> IO () -> IO ForeignObj
-makeForeignObj addr finalizer = do
-   fObj <- mkForeignObj addr
-   addForeignFinalizer fObj finalizer
-   return fObj
+addForeignPtrFinalizer :: ForeignPtr a -> IO () -> IO ()
+addForeignPtrFinalizer (ForeignPtr fo) finalizer = 
+  IO $ \s -> case mkWeak# fo () finalizer s of { (# s1, w #) -> (# s1, () #) }
 
-mkForeignObj  :: Addr -> IO ForeignObj
-mkForeignObj (A# obj) = IO ( \ s# ->
+mkForeignPtr :: Ptr a -> IO (ForeignPtr a) {- not exported -}
+mkForeignPtr (Ptr obj) =  IO ( \ s# ->
     case mkForeignObj# obj s# of
-      (# s1#, fo# #) -> (# s1#,  ForeignObj fo# #) )
+      (# s1#, fo# #) -> (# s1#,  ForeignPtr fo# #) )
 
-writeForeignObj :: ForeignObj -> Addr -> IO ()
-writeForeignObj (ForeignObj fo#) (A# datum#) = IO ( \ s# ->
-    case writeForeignObj# fo# datum# s# of { s1# -> (# s1#, () #) } )
-#endif /* !__PARALLEL_HASKELL__ */
-\end{code}
+touchForeignPtr :: ForeignPtr a -> IO ()
+touchForeignPtr (ForeignPtr fo) 
+   = IO $ \s -> case touch# fo s of s -> (# s, () #)
 
-%*********************************************************
-%*							*
-\subsection{Unpacking Foreigns}
-%*							*
-%*********************************************************
+withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+withForeignPtr fo io
+  = do r <- io (foreignPtrToPtr fo)
+       touchForeignPtr fo
+       return r
 
-Primitives for converting Foreigns pointing to external
-sequence of bytes into a list of @Char@s (a renamed version
-of the code above).
+foreignPtrToPtr :: ForeignPtr a -> Ptr a
+foreignPtrToPtr (ForeignPtr fo) = Ptr (foreignObjToAddr# fo)
 
-\begin{code}
-#ifndef __PARALLEL_HASKELL__
-unpackCStringFO :: ForeignObj -> [Char]
-unpackCStringFO (ForeignObj fo#) = unpackCStringFO# fo#
-
-unpackCStringFO# :: ForeignObj# -> [Char]
-unpackCStringFO# fo {- ptr. to NUL terminated string-}
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = []
-      | otherwise	   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffForeignObj# fo nh
-
-unpackNBytesFO :: ForeignObj -> Int -> [Char]
-unpackNBytesFO (ForeignObj fo) (I# l) = unpackNBytesFO# fo l
-
-unpackNBytesFO#    :: ForeignObj# -> Int#   -> [Char]
-  -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
-unpackNBytesFO# fo len
-  = unpack 0#
-    where
-     unpack i
-      | i >=# len  = []
-      | otherwise  = C# ch : unpack (i +# 1#)
-      where
-	ch = indexCharOffForeignObj# fo i
+castForeignPtr (ForeignPtr a) = ForeignPtr a
 #endif
 \end{code}
+
 

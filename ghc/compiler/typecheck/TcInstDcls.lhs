@@ -62,7 +62,7 @@ import Type		( splitDFunTy, isTyVarTy,
 			)
 import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
-import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIResultTy )
+import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIImportResultTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import Name             ( Name )
 import SrcLoc           ( SrcLoc )
@@ -719,7 +719,7 @@ scrutiniseInstanceHead dflags clas inst_taus
     Just (tycon, arg_tys) = maybe_tycon_app
 
     ccallable_type   dflags ty = isFFIArgumentTy dflags False {- Not safe call -} ty
-    creturnable_type        ty = isFFIResultTy ty
+    creturnable_type        ty = isFFIImportResultTy dflags ty
 \end{code}
 
 

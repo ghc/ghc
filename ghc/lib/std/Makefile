@@ -22,7 +22,8 @@ endif
 # 	Setting the standard variables
 #
 
-HC 	   = $(GHC_INPLACE)
+HC 	 = $(GHC_INPLACE)
+CC	 = $(GHC_INPLACE)
 
 ifneq "$(DLLized)" "YES"
 PACKAGE = -package-name std
@@ -35,6 +36,8 @@ HSLIB = std
 
 # we don't want PrelMain in the GHCi library.
 GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
+
+HS_SRCS += $(patsubst %.hsc,%.hs,$(wildcard *.hsc))
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options

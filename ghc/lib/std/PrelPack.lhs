@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelPack.lhs,v 1.15 2000/12/12 12:19:58 simonmar Exp $
+% $Id: PrelPack.lhs,v 1.16 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -25,11 +25,12 @@ module PrelPack
 	packStringST,      -- :: [Char] -> ST s (ByteArray Int)
 	packNBytesST,      -- :: Int -> [Char] -> ST s (ByteArray Int)
 
-	unpackCString,     -- :: Addr -> [Char]
-	unpackCStringST,   -- :: Addr -> ST s [Char]
-	unpackNBytes,      -- :: Addr -> Int -> [Char]
-	unpackNBytesST,    -- :: Addr -> Int -> ST s [Char]
-	unpackNBytesAccST, -- :: Addr -> Int -> [Char] -> ST s [Char]
+	unpackCString,     -- :: Ptr a -> [Char]
+	unpackCStringST,   -- :: Ptr a -> ST s [Char]
+	unpackNBytes,      -- :: Ptr a -> Int -> [Char]
+	unpackNBytesST,    -- :: Ptr a -> Int -> ST s [Char]
+	unpackNBytesAccST, -- :: Ptr a -> Int -> [Char] -> ST s [Char]
+	unpackNBytesAccST#,-- :: Ptr a -> Int -> [Char] -> ST s [Char]
 	unpackCString#,    -- :: Addr# -> [Char]	 **
 	unpackNBytes#,     -- :: Addr# -> Int# -> [Char] **
 	unpackNBytesST#,   -- :: Addr# -> Int# -> ST s [Char]
@@ -56,13 +57,13 @@ import PrelList ( length )
 import PrelST
 import PrelNum
 import PrelByteArr
-import PrelAddr
+import PrelPtr
 
 \end{code}
 
 %*********************************************************
 %*							*
-\subsection{Unpacking Addrs}
+\subsection{Unpacking Ptrs}
 %*							*
 %*********************************************************
 
@@ -70,17 +71,17 @@ Primitives for converting Addrs pointing to external
 sequence of bytes into a list of @Char@s:
 
 \begin{code}
-unpackCString :: Addr -> [Char]
-unpackCString a@(A# addr)
-  | a == nullAddr  = []
+unpackCString :: Ptr a -> [Char]
+unpackCString a@(Ptr addr)
+  | a == nullPtr  = []
   | otherwise	   = unpackCString# addr
      
-unpackNBytes :: Addr -> Int -> [Char]
-unpackNBytes (A# addr) (I# l) = unpackNBytes# addr l
+unpackNBytes :: Ptr a -> Int -> [Char]
+unpackNBytes (Ptr addr) (I# l) = unpackNBytes# addr l
 
-unpackCStringST  :: Addr{- ptr. to NUL terminated string-} -> ST s [Char]
-unpackCStringST a@(A# addr)
-  | a == nullAddr  = return []
+unpackCStringST  :: Ptr a{- ptr. to NUL terminated string-} -> ST s [Char]
+unpackCStringST a@(Ptr addr)
+  | a == nullPtr  = return []
   | otherwise	   = unpack 0#
   where
     unpack nh
@@ -91,11 +92,11 @@ unpackCStringST a@(A# addr)
       where
 	ch = indexCharOffAddr# addr nh
 
-unpackNBytesST :: Addr -> Int -> ST s [Char]
-unpackNBytesST (A# addr) (I# l) = unpackNBytesAccST# addr l []
+unpackNBytesST :: Ptr a -> Int -> ST s [Char]
+unpackNBytesST (Ptr addr) (I# l) = unpackNBytesAccST# addr l []
 
-unpackNBytesAccST :: Addr -> Int -> [Char] -> ST s [Char]
-unpackNBytesAccST (A# addr) (I# l) rest = unpackNBytesAccST# addr l rest
+unpackNBytesAccST :: Ptr a -> Int -> [Char] -> ST s [Char]
+unpackNBytesAccST (Ptr addr) (I# l) rest = unpackNBytesAccST# addr l rest
 
 unpackNBytesST# :: Addr# -> Int# -> ST s [Char]
 unpackNBytesST# addr# l#   = unpackNBytesAccST# addr# l# []

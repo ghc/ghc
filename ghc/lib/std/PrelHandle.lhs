@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.65 2001/01/11 07:04:16 qrczak Exp $
+% $Id: PrelHandle.lhs,v 1.66 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -18,7 +18,7 @@ module PrelHandle where
 
 import PrelArr
 import PrelBase
-import PrelAddr		( Addr, nullAddr )
+import PrelPtr
 import PrelByteArr	( ByteArray(..) )
 import PrelRead		( Read )
 import PrelList 	( break )
@@ -28,17 +28,13 @@ import PrelException
 import PrelEnum
 import PrelNum		( toBig, Integer(..), Num(..) )
 import PrelShow
-import PrelAddr		( Addr, nullAddr )
 import PrelReal		( toInteger )
 import PrelPack         ( packString )
-#ifndef __PARALLEL_HASKELL__
-import PrelWeak		( addForeignFinalizer )
-#endif
 
 import PrelConc
 
 #ifndef __PARALLEL_HASKELL__
-import PrelForeign  ( makeForeignObj, mkForeignObj )
+import PrelForeign  ( newForeignPtr, mkForeignPtr, addForeignPtrFinalizer )
 #endif
 
 #endif /* ndef(__HUGS__) */
@@ -49,9 +45,9 @@ import PrelForeign  ( makeForeignObj, mkForeignObj )
 #endif
 
 #ifndef __PARALLEL_HASKELL__
-#define FILE_OBJECT	    ForeignObj
+#define FILE_OBJECT	    (ForeignPtr ())
 #else
-#define FILE_OBJECT	    Addr
+#define FILE_OBJECT	    (Ptr ())
 #endif
 \end{code}
 
@@ -60,10 +56,10 @@ mkBuffer__ :: FILE_OBJECT -> Int -> IO ()
 mkBuffer__ fo sz_in_bytes = do
  chunk <- 
   case sz_in_bytes of
-    0 -> return nullAddr  -- this has the effect of overwriting the pointer to the old buffer.
+    0 -> return nullPtr  -- this has the effect of overwriting the pointer to the old buffer.
     _ -> do
      chunk <- malloc sz_in_bytes
-     if chunk == nullAddr
+     if chunk == nullPtr
       then ioException (IOError Nothing ResourceExhausted
 	  "mkBuffer__" "not enough virtual memory" Nothing)
       else return chunk
@@ -149,9 +145,9 @@ file object reference.
 nullFile__ :: FILE_OBJECT
 nullFile__ = 
 #ifndef __PARALLEL_HASKELL__
-    unsafePerformIO (makeForeignObj nullAddr (return ()))
+    unsafePerformIO (newForeignPtr nullPtr (return ()))
 #else
-    nullAddr
+    nullPtr
 #endif
 
 
@@ -194,7 +190,7 @@ foreign import "libHS_cbits" "freeStdFileObject" unsafe
 foreign import "libHS_cbits" "freeFileObject" unsafe
         freeFileObject :: FILE_OBJECT -> IO ()
 foreign import "free" unsafe 
-	free :: Addr -> IO ()
+	free :: Ptr a -> IO ()
 \end{code}
 
 %*********************************************************
@@ -221,10 +217,10 @@ stdout = unsafePerformIO (do
 			      (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-	    fo <- mkForeignObj fo
+	    fo <- mkForeignPtr fo
 	  	-- I know this is deprecated, but I couldn't bring myself
-		-- to move fixIO into the prelude just so I could use makeForeignObj.
-		--      --SDM
+		-- to move fixIO into the prelude just so I could use 	
+		-- newForeignPtr.  --SDM
 #endif
 
 #ifdef __HUGS__
@@ -239,7 +235,7 @@ stdout = unsafePerformIO (do
 	    hdl <- newHandle (Handle__ fo WriteHandle bm "stdout" [])
 
 #ifndef __PARALLEL_HASKELL__
-	    addForeignFinalizer fo (stdHandleFinalizer hdl)
+	    addForeignPtrFinalizer fo (stdHandleFinalizer hdl)
 #endif
 	    return hdl
 
@@ -255,7 +251,7 @@ stdin = unsafePerformIO (do
 			      (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- mkForeignObj fo
+            fo <- mkForeignPtr fo
 #endif
 	    (bm, bf_size) <- getBMode__ fo
 	    mkBuffer__ fo bf_size
@@ -264,7 +260,7 @@ stdin = unsafePerformIO (do
 	     -- that anything buffered on stdout is flushed prior to reading from 
 	     -- stdin.
 #ifndef __PARALLEL_HASKELL__
-	    addForeignFinalizer fo (stdHandleFinalizer hdl)
+	    addForeignPtrFinalizer fo (stdHandleFinalizer hdl)
 #endif
 	    hConnectTerms stdout hdl
 	    return hdl
@@ -281,14 +277,14 @@ stderr = unsafePerformIO (do
 			      (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 
 #ifndef __PARALLEL_HASKELL__
-            fo <- mkForeignObj fo
+            fo <- mkForeignPtr fo
 #endif
             hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr" [])
 	    -- when stderr and stdout are both connected to a terminal, ensure
 	    -- that anything buffered on stdout is flushed prior to writing to
 	    -- stderr.
 #ifndef __PARALLEL_HASKELL__
-	    addForeignFinalizer fo (stdHandleFinalizer hdl)
+	    addForeignPtrFinalizer fo (stdHandleFinalizer hdl)
 #endif
 	    hConnectTo stdout hdl
 	    return hdl
@@ -321,15 +317,15 @@ openFileEx f m = do
     fo <- primOpenFile (packString f)
                        (file_mode::Int) 
 		       (binary::Int)     -- ConcHask: SAFE, won't block
-    if fo /= nullAddr then do
+    if fo /= nullPtr then do
 #ifndef __PARALLEL_HASKELL__
-	fo  <- mkForeignObj fo
+	fo  <- mkForeignPtr fo
 #endif
 	(bm, bf_size)  <- getBMode__ fo
         mkBuffer__ fo bf_size
 	hdl <- newHandle (Handle__ fo htype bm f [])
 #ifndef __PARALLEL_HASKELL__
-	addForeignFinalizer fo (handleFinalizer hdl)
+	addForeignPtrFinalizer fo (handleFinalizer hdl)
 #endif
 	return hdl
       else do
@@ -390,9 +386,9 @@ hClose handle =
 	  		       (1::Int){-flush if you can-}  -- ConcHask: SAFE, won't block
           {- We explicitly close a file object so that we can be told
              if there were any errors. Note that after @hClose@
-             has been performed, the ForeignObj embedded in the Handle
+             has been performed, the ForeignPtr embedded in the Handle
              is still lying around in the heap, so care is taken
-             to avoid closing the file object when the ForeignObj
+             to avoid closing the file object when the ForeignPtr
              is finalized. (we overwrite the file ptr in the underlying
 	     FileObject with a NULL as part of closeFile())
 	  -}
@@ -884,7 +880,7 @@ this as an extension:
 
 \begin{code}
 -- in one go, read file into an externally allocated buffer.
-slurpFile :: FilePath -> IO (Addr, Int)
+slurpFile :: FilePath -> IO (Ptr (), Int)
 slurpFile fname = do
   handle <- openFile fname ReadMode
   sz     <- hFileSize handle
@@ -893,7 +889,7 @@ slurpFile fname = do
    else do
      let sz_i = fromInteger sz
      chunk <- malloc sz_i
-     if chunk == nullAddr 
+     if chunk == nullPtr 
       then do
         hClose handle
         constructErrorAndFail "slurpFile"
@@ -993,10 +989,10 @@ reportError bombOut str = do
      return ()
 
 foreign import ccall "addrOf_ErrorHdrHook" unsafe
-        addrOf_ErrorHdrHook :: Addr
+        addrOf_ErrorHdrHook :: Ptr ()
 
 foreign import ccall "writeErrString__" unsafe
-	writeErrString :: Addr -> ByteArray Int -> Int -> IO ()
+	writeErrString :: Ptr () -> ByteArray Int -> Int -> IO ()
 
 -- SUP: Are the hooks allowed to re-enter Haskell land? If yes, remove the unsafe below.
 foreign import ccall "stackOverflow" unsafe
@@ -1216,13 +1212,13 @@ foreign import "libHS_cbits" "writeFileObject" unsafe
 foreign import "libHS_cbits" "filePutc" unsafe
            filePutc         :: FILE_OBJECT -> Char -> IO Int{-ret code-}
 foreign import "libHS_cbits" "write_" unsafe
-           write_           :: FILE_OBJECT -> Addr -> Int -> IO Int{-ret code-}
+           write_           :: FILE_OBJECT -> Ptr () -> Int -> IO Int{-ret code-}
 foreign import "libHS_cbits" "getBufStart" unsafe
-           getBufStart      :: FILE_OBJECT -> Int -> IO Addr
+           getBufStart      :: FILE_OBJECT -> Int -> IO (Ptr ())
 foreign import "libHS_cbits" "getWriteableBuf" unsafe
-           getWriteableBuf  :: FILE_OBJECT -> IO Addr
+           getWriteableBuf  :: FILE_OBJECT -> IO (Ptr ())
 foreign import "libHS_cbits" "getBuf" unsafe
-           getBuf           :: FILE_OBJECT -> IO Addr
+           getBuf           :: FILE_OBJECT -> IO (Ptr ())
 foreign import "libHS_cbits" "getBufWPtr" unsafe
            getBufWPtr       :: FILE_OBJECT -> IO Int
 foreign import "libHS_cbits" "setBufWPtr" unsafe
@@ -1260,7 +1256,7 @@ foreign import "libHS_cbits" "setConnectedTo" unsafe
 foreign import "libHS_cbits" "ungetChar" unsafe
            ungetChar        :: FILE_OBJECT -> Char -> IO Int{-ret code-}
 foreign import "libHS_cbits" "readChunk" unsafe
-           readChunk        :: FILE_OBJECT -> Addr -> Int -> Int -> IO Int{-ret code-}
+           readChunk        :: FILE_OBJECT -> Ptr a -> Int -> Int -> IO Int{-ret code-}
 foreign import "libHS_cbits" "getFileFd" unsafe
            getFileFd        :: FILE_OBJECT -> IO Int{-fd-}
 #ifdef __HUGS__
@@ -1280,17 +1276,17 @@ foreign import "libHS_cbits" "getConnFileFd" unsafe
 foreign import "libHS_cbits" "getLock" unsafe
            getLock  :: Int{-Fd-} -> Int{-exclusive-} -> IO Int{-return code-}
 foreign import "libHS_cbits" "openStdFile" unsafe
-           openStdFile      :: Int{-fd-} -> Int{-Readable?-} -> IO Addr{-file obj-}
+           openStdFile      	:: Int{-fd-}
+				-> Int{-Readable?-}
+				-> IO (Ptr ()){-file object-}
 foreign import "libHS_cbits" "openFile" unsafe
            primOpenFile         :: ByteArray Int{-CString-}
 	                        -> Int{-How-}
 				-> Int{-Binary-}
-				-> IO Addr {-file obj-}
+				-> IO (Ptr ()){-file object-}
 foreign import "libHS_cbits" "const_BUFSIZ" unsafe
            const_BUFSIZ          :: Int
 
 foreign import "libHS_cbits" "setBinaryMode__" unsafe
 	   setBinaryMode :: FILE_OBJECT -> Int -> IO Int
 \end{code}
-
-

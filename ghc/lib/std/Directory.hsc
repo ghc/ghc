@@ -1,11 +1,12 @@
-% -----------------------------------------------------------------------------
-% $Id: Directory.lhs,v 1.21 2001/01/11 07:04:16 qrczak Exp $
-%
-% (c) The University of Glasgow, 1994-2000
-%
+-- -----------------------------------------------------------------------------
+-- $Id: Directory.hsc,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+--
+-- (c) The University of Glasgow, 1994-2000
+--
 
-\section[Directory]{Directory interface}
+-- The Directory Interface
 
+{-
 A directory contains a series of entries, each of which is a named
 reference to a file system object (file, directory etc.).  Some
 entries may be hidden, inaccessible, or have some administrative
@@ -18,9 +19,8 @@ Each file system object is referenced by a {\em path}.  There is
 normally at least one absolute path to each file system object.  In
 some operating systems, it may also be possible to have paths which
 are relative to the current directory.
+-}
 
-\begin{code}
-{-# OPTIONS -#include <sys/stat.h> -#include <dirent.h> -#include "cbits/stgio.h" #-}
 module Directory 
    ( 
       Permissions               -- abstract
@@ -47,62 +47,52 @@ module Directory
     , getPermissions            -- :: FilePath -> IO Permissions
     , setPermissions	        -- :: FilePath -> Permissions -> IO ()
 
-
-#ifndef __HUGS__
     , getModificationTime       -- :: FilePath -> IO ClockTime
-#endif
    ) where
-
-#ifdef __HUGS__
---import PreludeBuiltin
-#else
 
 import Prelude		-- Just to get it in the dependencies
 
-import PrelGHC		( RealWorld, or#, and# )
-import PrelByteArr	( ByteArray, MutableByteArray,
-			  newWordArray, readWordArray, newCharArray )
-import PrelArrExtra	( unsafeFreezeByteArray )
-import PrelPack		( packString, unpackCStringST )
-import PrelIOBase	( stToIO,
-			  constructErrorAndFail, constructErrorAndFailWithInfo,
-			  IOException(..), ioException, IOErrorType(SystemError) )
 import Time             ( ClockTime(..) )
-import PrelAddr		( Addr, nullAddr, Word(..), wordToInt, intToWord )
-#endif
 
-\end{code}
+import PrelStorable
+import PrelCString
+import PrelMarshalAlloc
+import PrelCTypes
+import PrelPosixTypes
+import PrelCError
+import PrelPtr
+import PrelIOBase
+import PrelBase
 
-%*********************************************************
-%*							*
-\subsection{Permissions}
-%*							*
-%*********************************************************
+#include <sys/stat.h>
+#include <dirent.h>
+#include <limits.h>
+#include <errno.h>
+#include <unistd.h>
 
-The @Permissions@ type is used to record whether certain
-operations are permissible on a file/directory:
-[to whom? - owner/group/world - the Report don't say much]
+-----------------------------------------------------------------------------
+-- Permissions
 
-\begin{code}
+-- The @Permissions@ type is used to record whether certain
+-- operations are permissible on a file/directory:
+-- [to whom? - presumably the "current user"]
+
 data Permissions
  = Permissions {
     readable,   writable, 
     executable, searchable :: Bool 
    } deriving (Eq, Ord, Read, Show)
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Implementation}
-%*							*
-%*********************************************************
+-----------------------------------------------------------------------------
+-- Implementation
 
-@createDirectory dir@ creates a new directory {\em dir} which is
-initially empty, or as near to empty as the operating system
-allows.
+-- @createDirectory dir@ creates a new directory {\em dir} which is
+-- initially empty, or as near to empty as the operating system
+-- allows.
 
-The operation may fail with:
+-- The operation may fail with:
 
+{-
 \begin{itemize}
 \item @isPermissionError@ / @PermissionDenied@
 The process has insufficient privileges to perform the operation.
@@ -127,15 +117,19 @@ physical disk space, etc.) are available to perform the operation.
 The path refers to an existing non-directory object.
 @[EEXIST]@
 \end{itemize}
+-}
 
-\begin{code}
 createDirectory :: FilePath -> IO ()
 createDirectory path = do
-    rc <- primCreateDirectory (primPackString path)
-    if rc == 0 then return () else
-        constructErrorAndFailWithInfo "createDirectory" path
-\end{code}
+    withUnsafeCString path $ \s -> do
+      throwErrnoIfMinus1Retry_ "createDirectory" $
+#if defined(mingw32_TARGET_OS)
+        mkdir s
+#else
+        mkdir s 0o777
+#endif
 
+{-
 @removeDirectory dir@ removes an existing directory {\em dir}.  The
 implementation may specify additional constraints which must be
 satisfied before a directory can be removed (e.g. the directory has to
@@ -169,18 +163,15 @@ The implementation does not support removal in this situation.
 The operand refers to an existing non-directory object.
 @[ENOTDIR]@
 \end{itemize}
+-}
 
-\begin{code}
 removeDirectory :: FilePath -> IO ()
 removeDirectory path = do
-    rc <- primRemoveDirectory (primPackString path)
-    if rc == 0 then 
-	return ()
-     else 
-        constructErrorAndFailWithInfo "removeDirectory" path
-\end{code}
+    withUnsafeCString path $ \s ->
+       throwErrnoIfMinus1Retry_ "removeDirectory" (rmdir s)
 
-@removeFile file@ removes the directory entry for an existing file
+{-
+@Removefile file@ removes the directory entry for an existing file
 {\em file}, where {\em file} is not itself a directory. The
 implementation may specify additional constraints which must be
 satisfied before a file can be removed (e.g. the file may not be in
@@ -207,17 +198,14 @@ Implementation-dependent constraints are not satisfied.
 The operand refers to an existing directory.
 @[EPERM, EINVAL]@
 \end{itemize}
+-}
 
-\begin{code}
 removeFile :: FilePath -> IO ()
 removeFile path = do
-    rc <- primRemoveFile (primPackString path)
-    if rc == 0 then
-        return ()
-     else
-        constructErrorAndFailWithInfo "removeFile" path
-\end{code}
+    withUnsafeCString path $ \s ->
+      throwErrnoIfMinus1Retry_ "removeFile" (unlink s)
 
+{-
 @renameDirectory old@ {\em new} changes the name of an existing
 directory from {\em old} to {\em new}.  If the {\em new} directory
 already exists, it is atomically replaced by the {\em old} directory.
@@ -255,17 +243,22 @@ The implementation does not support renaming in this situation.
 Either path refers to an existing non-directory object.
 @[ENOTDIR, EISDIR]@
 \end{itemize}
+-}
 
-\begin{code}
 renameDirectory :: FilePath -> FilePath -> IO ()
-renameDirectory opath npath = do
-    rc <- primRenameDirectory (primPackString opath) (primPackString npath)
-    if rc == 0 then
-        return ()
-     else
-        constructErrorAndFailWithInfo "renameDirectory" ("old: " ++ opath ++ ",new: " ++ npath)
-\end{code}
+renameDirectory opath npath =
+   withFileStatus opath $ \st -> do
+   is_dir <- isDirectory st
+   if (not is_dir)
+	then ioException (IOError Nothing InappropriateType "renameDirectory"
+			    ("not a directory") (Just opath))
+	else do
 
+   withUnsafeCString opath $ \s1 ->
+     withUnsafeCString npath $ \s2 ->
+        throwErrnoIfMinus1Retry_ "renameDirectory" (rename s1 s2)
+
+{-
 @renameFile@ {\em old} {\em new} changes the name of an existing file system
 object from {\em old} to {\em new}.  If the {\em new} object already
 exists, it is atomically replaced by the {\em old} object.  Neither
@@ -301,17 +294,22 @@ The implementation does not support renaming in this situation.
 Either path refers to an existing directory.
 @[ENOTDIR, EISDIR, EINVAL, EEXIST, ENOTEMPTY]@
 \end{itemize}
+-}
 
-\begin{code}
 renameFile :: FilePath -> FilePath -> IO ()
-renameFile opath npath = do
-    rc <- primRenameFile (primPackString opath) (primPackString npath)
-    if rc == 0 then
-        return ()
-     else
-        constructErrorAndFailWithInfo	"renameFile" opath
-\end{code}
+renameFile opath npath =
+   withFileStatus opath $ \st -> do
+   is_dir <- isDirectory st
+   if is_dir
+	then ioException (IOError Nothing InappropriateType "renameFile"
+			   "is a directory" (Just opath))
+	else do
 
+    withUnsafeCString opath $ \s1 ->
+      withUnsafeCString npath $ \s2 ->
+         throwErrnoIfMinus1Retry_ "renameFile" (rename s1 s2)
+
+{-
 @getDirectoryContents dir@ returns a list of {\em all} entries
 in {\em dir}. 
 
@@ -336,30 +334,29 @@ Insufficient resources are available to perform the operation.
 The path refers to an existing non-directory object.
 @[ENOTDIR]@
 \end{itemize}
+-}
 
-\begin{code}
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-    dir <- primOpenDir (primPackString path)
-    if dir == nullAddr
-	then constructErrorAndFailWithInfo "getDirectoryContents" path
-     	else loop dir
+   p <- withUnsafeCString path $ \s ->
+	  throwErrnoIfNullRetry "getDirectoryContents" (opendir s)
+   loop p
   where
-    loop :: Addr -> IO [String]
-    loop dir  = do
-      dirent_ptr <- primReadDir dir
-      if dirent_ptr == nullAddr
-       then do
-	  -- readDir__ implicitly performs closedir() when the
-	  -- end is reached.
-	  return [] 
-       else do
-          str     <- primGetDirentDName dirent_ptr
-	  entry   <- primUnpackCString str
-	  entries <- loop dir
-          return (entry:entries)
-\end{code}
+    loop :: Ptr CDir -> IO [String]
+    loop dir = do
+      p <- readdir dir
+      if (p /= nullPtr)
+	 then do entry   <- peekCString ((#ptr struct dirent,d_name) p)
+		 entries <- loop dir
+		 return (entry:entries)
+	 else do errno <- getErrno
+		 if (errno == eINTR) then loop dir else do
+		 throwErrnoIfMinus1_ "getDirectoryContents" $ closedir dir
+		 if (isValidErrno errno) -- EOF
+		    then throwErrno "getDirectoryContents"
+		    else return []
 
+{-
 If the operating system has a notion of current directories,
 @getCurrentDirectory@ returns an absolute path to the
 current directory of the calling process.
@@ -380,20 +377,26 @@ Insufficient resources are available to perform the operation.
 \item @UnsupportedOperation@
 The operating system has no notion of current directory.
 \end{itemize}
+-}
 
-\begin{code}
 getCurrentDirectory :: IO FilePath
 getCurrentDirectory = do
-    str <- primGetCurrentDirectory
-    if str /= nullAddr
-	then do
-            pwd <- primUnpackCString str
-            primFree str
-            return pwd
-    	else
-            constructErrorAndFail "getCurrentDirectory"
-\end{code}
+  p <- mallocBytes (#const PATH_MAX)
+  go p (#const PATH_MAX)
+  where go p bytes = do
+    	  p' <- getcwd p (fromIntegral bytes)
+	  if p' /= nullPtr 
+	     then do s <- peekCString p'
+		     free p'
+		     return s
+	     else do errno <- getErrno
+		     if errno == eRANGE
+		        then do let bytes' = bytes * 2
+			        p' <- reallocBytes p bytes'
+			        go p' bytes'
+		        else throwErrno "getCurrentDirectory"
 
+{-
 If the operating system has a notion of current directories,
 @setCurrentDirectory dir@ changes the current
 directory of the calling process to {\em dir}.
@@ -419,186 +422,123 @@ current directory cannot be dynamically changed.
 The path refers to an existing non-directory object.
 @[ENOTDIR]@
 \end{itemize}
+-}
 
-\begin{code}
 setCurrentDirectory :: FilePath -> IO ()
 setCurrentDirectory path = do
-    rc <- primSetCurrentDirectory (primPackString path)
-    if rc == 0 
-	then return ()
-	else constructErrorAndFailWithInfo "setCurrentDirectory" path
-\end{code}
+    withUnsafeCString path $ \s -> 
+       throwErrnoIfMinus1Retry_ "setCurrentDirectory" (chdir s)
+	-- ToDo: add path to error
 
+{-
 To clarify, @doesDirectoryExist@ returns True if a file system object
 exist, and it's a directory. @doesFileExist@ returns True if the file
 system object exist, but it's not a directory (i.e., for every other 
 file system object that is not a directory.) 
+-}
 
-\begin{code}
 doesDirectoryExist :: FilePath -> IO Bool
 doesDirectoryExist name = 
  catch
-   (getFileStatus name >>= \ st -> return (isDirectory st))
+   (withFileStatus name $ \st -> isDirectory st)
    (\ _ -> return False)
 
 doesFileExist :: FilePath -> IO Bool
 doesFileExist name = do 
  catch
-   (getFileStatus name >>= \ st -> return (not (isDirectory st)))
+   (withFileStatus name $ \st -> do b <- isDirectory st; return (not b))
    (\ _ -> return False)
 
-#ifndef __HUGS__
 getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =
- getFileStatus name >>= \ st ->
+ withFileStatus name $ \ st ->
  modificationTime st
-#endif
 
 getPermissions :: FilePath -> IO Permissions
 getPermissions name = do
-  st <- getFileStatus name
-  read  <- primAccess (primPackString name) readOK
-  write <- primAccess (primPackString name) writeOK
-  exec  <- primAccess (primPackString name) executeOK
-
+  withUnsafeCString name $ \s -> do
+  read  <- access s (#const R_OK)
+  write <- access s (#const W_OK)
+  exec  <- access s (#const X_OK)
+  withFileStatus name $ \st -> do
+  is_dir <- isDirectory st
+  is_reg <- isRegularFile st
   return (
     Permissions {
       readable   = read  == 0,
       writable   = write == 0,
-      executable = not (isDirectory st)   && exec == 0,
-      searchable = not (isRegularFile st) && exec == 0
+      executable = not is_dir && exec == 0,
+      searchable = not is_reg && exec == 0
     }
    )
 
 setPermissions :: FilePath -> Permissions -> IO ()
 setPermissions name (Permissions r w e s) = do
     let
-     read  = if r      then ownerReadMode    else emptyFileMode
-     write = if w      then ownerWriteMode   else emptyFileMode
-     exec  = if e || s then ownerExecuteMode else emptyFileMode
+     read  = if r      then (#const S_IRUSR) else emptyCMode
+     write = if w      then (#const S_IWUSR) else emptyCMode
+     exec  = if e || s then (#const S_IXUSR) else emptyCMode
 
-     mode  = read `unionFileMode` (write `unionFileMode` exec)
+     mode  = read `unionCMode` (write `unionCMode` exec)
 
-    rc <- primChmod (primPackString name) mode
-    if rc == 0
-	then return ()
-	else ioException (IOError Nothing SystemError
-	    "setPermissions" "insufficient permissions" (Just name))
-\end{code}
+    withUnsafeCString name $ \s ->
+      throwErrnoIfMinus1_ "setPermissions" $ chmod s mode
 
-(Sigh)..copied from Posix.Files to avoid dep. on posix library
+withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
+withFileStatus name f = do
+    allocaBytes (#const sizeof(struct stat)) $ \p ->
+      withUnsafeCString name $ \s -> do
+        throwErrnoIfMinus1Retry_ "withFileStatus" (stat s p)
+	f p
 
-\begin{code}
-type FileStatus = PrimByteArray
-
-getFileStatus :: FilePath -> IO FileStatus
-getFileStatus name = do
-    bytes <- primNewByteArray sizeof_stat
-    rc <- primStat (primPackString name) bytes
-    if rc == 0 
-#ifdef __HUGS__
-	then primUnsafeFreezeByteArray bytes
-#else
-	then stToIO (unsafeFreezeByteArray bytes)
-#endif
-     	else ioException (IOError Nothing SystemError
-	    "getFileStatus" "" (Just name))
-
-#ifndef __HUGS__
-modificationTime :: FileStatus -> IO ClockTime
+modificationTime :: Ptr CStat -> IO ClockTime
 modificationTime stat = do
-    i1 <- stToIO (newWordArray (0,1))
-    setFileMode i1 stat
-    secs <- stToIO (readWordArray i1 0)
-    return (TOD (toInteger (wordToInt secs)) 0)
+    mtime <- (#peek struct stat, st_mtime) stat
+    return (TOD (toInteger (mtime :: CTime)) 0)
 
-foreign import ccall "libHS_cbits" "set_stat_st_mtime" unsafe
-   setFileMode :: PrimMutableByteArray RealWorld -> FileStatus -> IO ()
-#endif
+isDirectory :: Ptr CStat -> IO Bool
+isDirectory stat = do
+  mode <- (#peek struct stat, st_mode) stat
+  return (s_ISDIR mode /= 0)
 
-isDirectory :: FileStatus -> Bool
-isDirectory stat = prim_S_ISDIR (fileMode stat) /= 0
+isRegularFile :: Ptr CStat -> IO Bool
+isRegularFile stat = do
+  mode <- (#peek struct stat, st_mode) stat
+  return (s_ISREG mode /= 0)
 
-isRegularFile :: FileStatus -> Bool
-isRegularFile stat = prim_S_ISREG (fileMode stat) /= 0
+foreign import ccall unsafe s_ISDIR :: CMode -> Int
+#def inline HsInt s_ISDIR(m) {return S_ISDIR(m);}
 
-foreign import ccall "libHS_cbits" "sizeof_stat" unsafe sizeof_stat :: Int
-foreign import ccall "libHS_cbits" "prim_stat"   unsafe
-  primStat :: PrimByteArray -> PrimMutableByteArray RealWorld -> IO Int
+foreign import ccall unsafe s_ISREG :: CMode -> Int
+#def inline HsInt s_ISREG(m) {return S_ISREG(m);}
 
-foreign import ccall "libHS_cbits" "get_stat_st_mode" unsafe fileMode     :: FileStatus -> FileMode
-foreign import ccall "libHS_cbits" "prim_S_ISDIR"     unsafe prim_S_ISDIR :: FileMode -> Int
-foreign import ccall "libHS_cbits" "prim_S_ISREG"     unsafe prim_S_ISREG :: FileMode -> Int
-\end{code}
+emptyCMode     :: CMode
+emptyCMode     = 0
 
-\begin{code}
-type FileMode = Word
+unionCMode     :: CMode -> CMode -> CMode
+unionCMode     = (+)
 
-emptyFileMode     :: FileMode
-unionFileMode     :: FileMode -> FileMode -> FileMode
-intersectFileMode :: FileMode -> FileMode -> FileMode
+type UCString = UnsafeCString
 
-foreign import ccall "libHS_cbits" "const_S_IRUSR" unsafe ownerReadMode    :: FileMode
-foreign import ccall "libHS_cbits" "const_S_IWUSR" unsafe ownerWriteMode   :: FileMode
-foreign import ccall "libHS_cbits" "const_S_IXUSR" unsafe ownerExecuteMode :: FileMode
-
-#ifdef __HUGS__
-emptyFileMode     = primIntToWord 0
-unionFileMode     = primOrWord
-intersectFileMode = primAndWord
+#if defined(mingw32_TARGET_OS)
+foreign import ccall unsafe mkdir    :: UCString -> IO CInt
 #else
-emptyFileMode     = intToWord 0
-unionFileMode     = orWord
-intersectFileMode = andWord
-#endif
-\end{code}
-
-\begin{code}
-type AccessMode = Word
-
-foreign import ccall "libHS_cbits" "const_R_OK" unsafe readOK       :: AccessMode
-foreign import ccall "libHS_cbits" "const_W_OK" unsafe writeOK      :: AccessMode
-foreign import ccall "libHS_cbits" "const_X_OK" unsafe executeOK    :: AccessMode
-\end{code}
-
-Some defns. to allow us to share code.
-
-\begin{code}
-#ifndef __HUGS__
-
-primPackString :: [Char] -> ByteArray Int
-primPackString    = packString
---ToDo: fix.
-primUnpackCString :: Addr -> IO String
-primUnpackCString a = stToIO (unpackCStringST a)
-
-type PrimByteArray = ByteArray Int
-type PrimMutableByteArray s = MutableByteArray RealWorld Int
-type CString = PrimByteArray
-
-orWord, andWord :: Word -> Word -> Word
-orWord (W# x#) (W# y#) = W# (x# `or#` y#)
-andWord (W# x#) (W# y#) = W# (x# `and#` y#)
-
-primNewByteArray :: Int -> IO (PrimMutableByteArray s)
-primNewByteArray sz_in_bytes = stToIO (newCharArray (0,sz_in_bytes))
+foreign import ccall unsafe mkdir    :: UCString -> CInt -> IO CInt
 #endif
 
-foreign import ccall "libHS_cbits" "createDirectory"  	unsafe primCreateDirectory     :: CString -> IO Int
-foreign import ccall "libHS_cbits" "removeDirectory"  	unsafe primRemoveDirectory     :: CString -> IO Int
-foreign import ccall "libHS_cbits" "removeFile"       	unsafe primRemoveFile          :: CString -> IO Int
-foreign import ccall "libHS_cbits" "renameDirectory"  	unsafe primRenameDirectory     :: CString -> CString -> IO Int
-foreign import ccall "libHS_cbits" "renameFile"       	unsafe primRenameFile          :: CString -> CString -> IO Int
-foreign import ccall "libHS_cbits" "openDir__"        	unsafe primOpenDir     	:: CString -> IO Addr
-foreign import ccall "libHS_cbits" "readDir__"        	unsafe primReadDir     	:: Addr -> IO Addr
-foreign import ccall "libHS_cbits" "get_dirent_d_name"   unsafe primGetDirentDName      :: Addr -> IO Addr
-foreign import ccall "libHS_cbits" "setCurrentDirectory" unsafe primSetCurrentDirectory :: CString -> IO Int
-foreign import ccall "libHS_cbits" "getCurrentDirectory" unsafe primGetCurrentDirectory :: IO Addr
-foreign import ccall "libc"        "free"                unsafe primFree                :: Addr -> IO ()
-foreign import ccall "libc"        "malloc"              unsafe primMalloc              :: Word -> IO Addr
-foreign import ccall "libc"        "chmod"               unsafe primChmod               :: CString -> Word -> IO Int
+foreign import ccall unsafe chmod    :: UCString -> CMode -> IO CInt
+foreign import ccall unsafe access   :: UCString -> CMode -> IO CInt
+foreign import ccall unsafe rmdir    :: UCString -> IO CInt
+foreign import ccall unsafe chdir    :: UCString -> IO CInt
+foreign import ccall unsafe getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
+foreign import ccall unsafe unlink   :: UCString -> IO CInt
+foreign import ccall unsafe rename   :: UCString -> UCString -> IO CInt
+		     
+foreign import ccall unsafe opendir  :: UCString  -> IO (Ptr CDir)
+foreign import ccall unsafe readdir  :: Ptr CDir -> IO (Ptr CDirent)
+foreign import ccall unsafe closedir :: Ptr CDir -> IO CInt
 
-foreign import ccall "libc" "access" unsafe 
-	primAccess :: CString -> Word -> IO Int
-\end{code}
+foreign import ccall unsafe stat     :: UCString -> Ptr CStat -> IO CInt
 
+type CDirent = ()
+type CStat   = ()

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.31 2001/01/11 07:04:16 qrczak Exp $
+% $Id: PrelIOBase.lhs,v 1.32 2001/01/11 17:25:57 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -23,10 +23,10 @@ import PrelST
 import PrelBase
 import PrelNum	  ( fromInteger )	-- Integer literals
 import PrelMaybe  ( Maybe(..) )
-import PrelAddr	  ( Addr(..), nullAddr )
 import PrelShow
 import PrelList
 import PrelDynamic
+import PrelPtr
 import PrelPack ( unpackCString )
 
 #if !defined(__CONCURRENT_HASKELL__)
@@ -41,9 +41,10 @@ import PrelArr	  ( MutableVar, readVar )
 #endif
 
 #ifndef __PARALLEL_HASKELL__
-#define FILE_OBJECT	    ForeignObj
+#define FILE_OBJECT	    (ForeignPtr ())
 #else
-#define FILE_OBJECT	    Addr
+#define FILE_OBJECT	    (Ptr ())
+
 #endif
 \end{code}
 
@@ -170,20 +171,21 @@ instance Eq (MVar a) where
 	(MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
 
 {-
-  Double sigh - ForeignObj is needed here too to break a cycle.
+  Double sigh - ForeignPtr is needed here too to break a cycle.
 -}
-data ForeignObj = ForeignObj ForeignObj#   -- another one
-instance CCallable ForeignObj
+data ForeignPtr a = ForeignPtr ForeignObj#
+instance CCallable (ForeignPtr a)
 
-eqForeignObj :: ForeignObj  -> ForeignObj -> Bool
-eqForeignObj mp1 mp2
-  = unsafePerformIO (primEqForeignObj mp1 mp2) /= (0::Int)
+eqForeignPtr :: ForeignPtr a -> ForeignPtr a -> Bool
+eqForeignPtr mp1 mp2
+  = unsafePerformIO (primEqForeignPtr mp1 mp2) /= (0::Int)
 
-foreign import "eqForeignObj" unsafe primEqForeignObj :: ForeignObj -> ForeignObj -> IO Int
+foreign import "eqForeignObj" unsafe 
+  primEqForeignPtr :: ForeignPtr a -> ForeignPtr a -> IO Int
 
-instance Eq ForeignObj where 
-    p == q = eqForeignObj p q
-    p /= q = not (eqForeignObj p q)
+instance Eq (ForeignPtr a) where 
+    p == q = eqForeignPtr p q
+    p /= q = not (eqForeignPtr p q)
 #endif /* ndef __HUGS__ */
 
 #if defined(__CONCURRENT_HASKELL__)
@@ -215,7 +217,7 @@ data Handle__
       haType__        :: Handle__Type,
       haBufferMode__  :: BufferMode,
       haFilePath__    :: FilePath,
-      haBuffers__     :: [Addr]
+      haBuffers__     :: [Ptr ()]
     }
 
 {-
@@ -354,24 +356,25 @@ data BufferMode
 Foreign import declarations to helper routines:
 
 \begin{code}
-foreign import "libHS_cbits" "getErrStr__"  unsafe getErrStr__  :: IO Addr 
+foreign import "libHS_cbits" "getErrStr__"  unsafe getErrStr__  :: IO (Ptr ())
 foreign import "libHS_cbits" "getErrNo__"   unsafe getErrNo__   :: IO Int  
 foreign import "libHS_cbits" "getErrType__" unsafe getErrType__ :: IO Int  
   
-malloc :: Int -> IO Addr
+-- ToDo: use mallocBytes from PrelMarshal?
+malloc :: Int -> IO (Ptr ())
 malloc sz = do
   a <- _malloc sz
-  if (a == nullAddr)
+  if (a == nullPtr)
 	then ioException (IOError Nothing ResourceExhausted
 	    "malloc" "out of memory" Nothing)
 	else return a
 
-foreign import "malloc" unsafe _malloc :: Int -> IO Addr
+foreign import "malloc" unsafe _malloc :: Int -> IO (Ptr ())
 
 foreign import "libHS_cbits" "getBufSize"  unsafe
            getBufSize       :: FILE_OBJECT -> IO Int
 foreign import "libHS_cbits" "setBuf" unsafe
-           setBuf       :: FILE_OBJECT -> Addr -> Int -> IO ()
+           setBuf       :: FILE_OBJECT -> Ptr () -> Int -> IO ()
 
 \end{code}
 

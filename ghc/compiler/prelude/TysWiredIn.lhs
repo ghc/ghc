@@ -16,6 +16,9 @@ module TysWiredIn (
 	addrDataCon,
 	addrTy,
 	addrTyCon,
+	ptrDataCon,
+	ptrTy,
+	ptrTyCon,
 	boolTy,
 	boolTyCon,
 	charDataCon,
@@ -69,14 +72,15 @@ module TysWiredIn (
 	wordTy,
 	wordTyCon,
 
-	isFFIArgumentTy,    -- :: Bool -> Type -> Bool
-	isFFIResultTy,      -- :: Type -> Bool
-	isFFIExternalTy,    -- :: Type -> Bool
-        isFFIDynArgumentTy, -- :: Type -> Bool
- 	isFFIDynResultTy,   -- :: Type -> Bool
- 	isFFILabelTy,       -- :: Type -> Bool
-	isAddrTy,	    -- :: Type -> Bool
-	isForeignPtrTy      -- :: Type -> Bool
+	isFFIArgumentTy,     -- :: DynFlags -> Bool -> Type -> Bool
+	isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
+	isFFIExportResultTy, -- :: Type -> Bool
+	isFFIExternalTy,     -- :: Type -> Bool
+        isFFIDynArgumentTy,  -- :: Type -> Bool
+ 	isFFIDynResultTy,    -- :: Type -> Bool
+ 	isFFILabelTy,        -- :: Type -> Bool
+	isAddrTy,	     -- :: Type -> Bool
+	isForeignPtrTy       -- :: Type -> Bool
 
     ) where
 
@@ -131,6 +135,7 @@ wiredInTyCons = data_tycons ++ tuple_tycons ++ unboxed_tuple_tycons
 
 data_tycons = genericTyCons ++
 	      [ addrTyCon
+	      , ptrTyCon
     	      , boolTyCon
     	      , charTyCon
     	      , doubleTyCon
@@ -332,6 +337,13 @@ isAddrTy = isTyCon addrTyConKey
 \end{code}
 
 \begin{code}
+ptrTy = mkTyConTy ptrTyCon
+
+ptrTyCon = pcNonRecDataTyCon ptrTyConName alpha_tyvar [(True,False)] [ptrDataCon]
+ptrDataCon = pcDataCon ptrDataConName alpha_tyvar [] [addrPrimTy] ptrTyCon
+\end{code}
+
+\begin{code}
 floatTy	= mkTyConTy floatTyCon
 
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
@@ -430,14 +442,14 @@ isFFIArgumentTy dflags is_safe ty
 
 isFFIExternalTy :: Type -> Bool
 -- Types that are allowed as arguments of a 'foreign export'
-isFFIExternalTy ty = checkRepTyCon legalIncomingTyCon ty
+isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty
 
-isFFIResultTy :: Type -> Bool
--- Types that are allowed as a result of a 'foreign import' or of a 'foreign export'
--- Maybe we should distinguish between import and export, but 
--- here we just choose the more restrictive 'incoming' predicate
--- But we allow () as well
-isFFIResultTy ty = checkRepTyCon (\tc -> tc == unitTyCon || legalIncomingTyCon tc) ty
+isFFIImportResultTy :: DynFlags -> Type -> Bool
+isFFIImportResultTy dflags ty 
+  = checkRepTyCon (legalFIResultTyCon dflags) ty
+
+isFFIExportResultTy :: Type -> Bool
+isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
 isFFIDynArgumentTy :: Type -> Bool
 -- The argument type of a foreign import dynamic must be either Addr, or
@@ -452,7 +464,7 @@ isFFIDynResultTy = checkRepTyCon (== addrTyCon)
 isFFILabelTy :: Type -> Bool
 -- The type of a foreign label must be either Addr, or
 -- a newtype of Addr.
-isFFILabelTy = checkRepTyCon (== addrTyCon)
+isFFILabelTy = checkRepTyCon (\tc -> tc == addrTyCon || tc == ptrTyCon)
 
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- look through newtypes
@@ -472,11 +484,11 @@ These chaps do the work; they are not exported
 ----------------------------------------------
 
 \begin{code}
-legalIncomingTyCon :: TyCon -> Bool
+legalFEArgTyCon :: TyCon -> Bool
 -- It's illegal to return foreign objects and (mutable)
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
-legalIncomingTyCon tc
+legalFEArgTyCon tc
   | getUnique tc `elem` [ foreignObjTyConKey, foreignPtrTyConKey,
 			  byteArrayTyConKey, mutableByteArrayTyConKey ] 
   = False
@@ -484,6 +496,22 @@ legalIncomingTyCon tc
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
   | otherwise
   = boxedMarshalableTyCon tc
+
+legalFIResultTyCon :: DynFlags -> TyCon -> Bool
+legalFIResultTyCon dflags tc
+  | getUnique tc `elem`
+	[ foreignObjTyConKey, foreignPtrTyConKey,
+	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
+  | tc == unitTyCon = True
+  | otherwise	    = marshalableTyCon dflags tc
+
+legalFEResultTyCon :: TyCon -> Bool
+legalFEResultTyCon tc
+  | getUnique tc `elem` 
+	[ foreignObjTyConKey, foreignPtrTyConKey,
+	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
+  | tc == unitTyCon = True
+  | otherwise       = boxedMarshalableTyCon tc
 
 legalOutgoingTyCon :: DynFlags -> Bool -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
@@ -500,10 +528,13 @@ marshalableTyCon dflags tc
   || boxedMarshalableTyCon tc
 
 boxedMarshalableTyCon tc
-   = getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
-			 , wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
+   = getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
+			 , int32TyConKey, int64TyConKey
+			 , wordTyConKey, word8TyConKey, word16TyConKey
+			 , word32TyConKey, word64TyConKey
 			 , floatTyConKey, doubleTyConKey
-			 , addrTyConKey, charTyConKey, foreignObjTyConKey
+			 , addrTyConKey, ptrTyConKey
+			 , charTyConKey, foreignObjTyConKey
 			 , foreignPtrTyConKey
 			 , stablePtrTyConKey
 			 , byteArrayTyConKey, mutableByteArrayTyConKey
@@ -690,8 +721,3 @@ genUnitTyCon = pcNonRecDataTyCon genUnitTyConName [] [] [genUnitDataCon]
 genUnitDataCon :: DataCon
 genUnitDataCon = pcDataCon genUnitDataConName [] [] [] genUnitTyCon
 \end{code}
-
-
-
-
-

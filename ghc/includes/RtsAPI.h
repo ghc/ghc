@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.18 2000/11/07 17:05:47 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.19 2001/01/11 17:25:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,14 +48,17 @@ HaskellObj   rts_mkWord8      ( HsWord8  w );
 HaskellObj   rts_mkWord16     ( HsWord16 w );
 HaskellObj   rts_mkWord32     ( HsWord32 w );
 HaskellObj   rts_mkWord64     ( HsWord64 w );
+HaskellObj   rts_mkPtr        ( HsPtr    a );
 HaskellObj   rts_mkFloat      ( HsFloat  f );
 HaskellObj   rts_mkDouble     ( HsDouble f );
 HaskellObj   rts_mkStablePtr  ( HsStablePtr s );
-HaskellObj   rts_mkAddr       ( HsAddr   a );
 HaskellObj   rts_mkBool       ( HsBool   b );
 HaskellObj   rts_mkString     ( char    *s );
 
 HaskellObj   rts_apply        ( HaskellObj, HaskellObj );
+
+/* DEPRECATED (use rts_mkPtr): */
+HaskellObj   rts_mkAddr       ( HsAddr   a );
 
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects
@@ -65,11 +68,14 @@ HsInt        rts_getInt       ( HaskellObj );
 HsInt32      rts_getInt32     ( HaskellObj );
 HsWord       rts_getWord      ( HaskellObj );
 HsWord32     rts_getWord32    ( HaskellObj );
+HsPtr        rts_getPtr       ( HaskellObj );
 HsFloat      rts_getFloat     ( HaskellObj );
 HsDouble     rts_getDouble    ( HaskellObj );
 HsStablePtr  rts_getStablePtr ( HaskellObj );
-HsAddr       rts_getAddr      ( HaskellObj );
 HsBool       rts_getBool      ( HaskellObj );
+
+/* DEPRECATED (use rts_getPtr): */
+HsAddr       rts_getAddr      ( HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions

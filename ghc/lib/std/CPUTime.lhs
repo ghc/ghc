@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: CPUTime.lhs,v 1.26 2001/01/11 07:04:16 qrczak Exp $
+% $Id: CPUTime.lhs,v 1.27 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -25,7 +25,7 @@ import PrelBase		( Int(..) )
 import PrelByteArr  	( ByteArray(..), newIntArray )
 import PrelArrExtra     ( unsafeFreezeByteArray )
 import PrelNum		( fromInt )
-import PrelIOBase	( IOError, IOException(..), 
+import PrelIOBase	( IOException(..), 
 			  IOErrorType( UnsupportedOperation ), 
 			  unsafePerformIO, stToIO, ioException )
 import Ratio

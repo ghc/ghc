@@ -190,6 +190,7 @@ pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
 pREL_FOREIGN_Name = mkModuleName "PrelForeign"
 pREL_STABLE_Name  = mkModuleName "PrelStable"
 pREL_ADDR_Name    = mkModuleName "PrelAddr"
+pREL_PTR_Name     = mkModuleName "PrelPtr"
 pREL_ERR_Name     = mkModuleName "PrelErr"
 pREL_REAL_Name    = mkModuleName "PrelReal"
 pREL_FLOAT_Name   = mkModuleName "PrelFloat"
@@ -199,9 +200,13 @@ mAIN_Name	  = mkModuleName "Main"
 pREL_INT_Name	  = mkModuleName "PrelInt"
 pREL_WORD_Name	  = mkModuleName "PrelWord"
 
+fOREIGNOBJ_Name	  = mkModuleName "ForeignObj"
+aDDR_Name	  = mkModuleName "Addr"
+
 pREL_GHC     	= mkPrelModule pREL_GHC_Name
 pREL_BASE    	= mkPrelModule pREL_BASE_Name
 pREL_ADDR    	= mkPrelModule pREL_ADDR_Name
+pREL_PTR    	= mkPrelModule pREL_PTR_Name
 pREL_STABLE  	= mkPrelModule pREL_STABLE_Name
 pREL_IO_BASE 	= mkPrelModule pREL_IO_BASE_Name
 pREL_PACK    	= mkPrelModule pREL_PACK_Name
@@ -423,28 +428,31 @@ returnIOName	  = varQual  pREL_IO_BASE_Name SLIT("returnIO") returnIOIdKey
 int8TyConName     = tcQual pREL_INT_Name  SLIT("Int8") int8TyConKey
 int16TyConName    = tcQual pREL_INT_Name  SLIT("Int16") int16TyConKey
 int32TyConName    = tcQual pREL_INT_Name  SLIT("Int32") int32TyConKey
-int64TyConName    = tcQual pREL_ADDR_Name SLIT("Int64") int64TyConKey
+int64TyConName    = tcQual pREL_INT_Name  SLIT("Int64") int64TyConKey
 
-wordTyConName     = tcQual   pREL_ADDR_Name SLIT("Word")   wordTyConKey
-wordDataConName   = dataQual pREL_ADDR_Name SLIT("W#")     wordDataConKey
-word8TyConName    = tcQual   pREL_WORD_Name SLIT("Word8")  word8TyConKey
-word16TyConName   = tcQual   pREL_WORD_Name SLIT("Word16") word16TyConKey
-word32TyConName   = tcQual   pREL_WORD_Name SLIT("Word32") word32TyConKey
-word64TyConName   = tcQual   pREL_ADDR_Name SLIT("Word64") word64TyConKey
+word8TyConName    = tcQual pREL_WORD_Name SLIT("Word8")  word8TyConKey
+word16TyConName   = tcQual pREL_WORD_Name SLIT("Word16") word16TyConKey
+word32TyConName   = tcQual pREL_WORD_Name SLIT("Word32") word32TyConKey
+word64TyConName   = tcQual pREL_WORD_Name SLIT("Word64") word64TyConKey
 
-addrTyConName	  = tcQual   pREL_ADDR_Name SLIT("Addr") addrTyConKey
-addrDataConName   = dataQual pREL_ADDR_Name SLIT("A#") addrDataConKey
+wordTyConName     = tcQual   pREL_WORD_Name SLIT("Word")   wordTyConKey
+wordDataConName   = dataQual pREL_WORD_Name SLIT("W#")     wordDataConKey
 
+addrTyConName	  = tcQual   aDDR_Name SLIT("Addr") addrTyConKey
+addrDataConName   = dataQual aDDR_Name SLIT("A#") addrDataConKey
+
+ptrTyConName	  = tcQual   pREL_PTR_Name SLIT("Ptr") ptrTyConKey
+ptrDataConName    = dataQual pREL_PTR_Name SLIT("Ptr") ptrDataConKey
 
 -- Byte array types
 byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  SLIT("ByteArray") byteArrayTyConKey
 mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") mutableByteArrayTyConKey
 
 -- Forign objects and weak pointers
-foreignObjTyConName   = tcQual   pREL_IO_BASE_Name SLIT("ForeignObj") foreignObjTyConKey
-foreignObjDataConName = dataQual pREL_IO_BASE_Name SLIT("ForeignObj") foreignObjDataConKey
-foreignPtrTyConName   = tcQual   pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrTyConKey
-foreignPtrDataConName = dataQual pREL_FOREIGN_Name SLIT("ForeignPtr") foreignPtrDataConKey
+foreignObjTyConName   = tcQual   fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjTyConKey
+foreignObjDataConName = dataQual fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjDataConKey
+foreignPtrTyConName   = tcQual   pREL_IO_BASE_Name SLIT("ForeignPtr") foreignPtrTyConKey
+foreignPtrDataConName = dataQual pREL_IO_BASE_Name SLIT("ForeignPtr") foreignPtrDataConKey
 stablePtrTyConName    = tcQual   pREL_STABLE_Name SLIT("StablePtr") stablePtrTyConKey
 stablePtrDataConName  = dataQual pREL_STABLE_Name SLIT("StablePtr") stablePtrDataConKey
 deRefStablePtrName    = varQual  pREL_STABLE_Name SLIT("deRefStablePtr") deRefStablePtrIdKey
@@ -689,16 +697,17 @@ boxityConKey				= mkPreludeTyConUnique 68
 typeConKey				= mkPreludeTyConUnique 69
 threadIdPrimTyConKey			= mkPreludeTyConUnique 70
 bcoPrimTyConKey				= mkPreludeTyConUnique 71
+ptrTyConKey				= mkPreludeTyConUnique 72
 
 -- Usage type constructors
-usageConKey				= mkPreludeTyConUnique 72
-usOnceTyConKey				= mkPreludeTyConUnique 73
-usManyTyConKey				= mkPreludeTyConUnique 74
+usageConKey				= mkPreludeTyConUnique 73
+usOnceTyConKey				= mkPreludeTyConUnique 74
+usManyTyConKey				= mkPreludeTyConUnique 75
 
 -- Generic Type Constructors
-crossTyConKey		      		= mkPreludeTyConUnique 75
-plusTyConKey		      		= mkPreludeTyConUnique 76
-genUnitTyConKey				= mkPreludeTyConUnique 77
+crossTyConKey		      		= mkPreludeTyConUnique 76
+plusTyConKey		      		= mkPreludeTyConUnique 77
+genUnitTyConKey				= mkPreludeTyConUnique 78
 \end{code}
 
 %************************************************************************
@@ -726,12 +735,13 @@ stableNameDataConKey			= mkPreludeDataConUnique 14
 trueDataConKey				= mkPreludeDataConUnique 15
 wordDataConKey				= mkPreludeDataConUnique 16
 ioDataConKey				= mkPreludeDataConUnique 17
+ptrDataConKey				= mkPreludeDataConUnique 18
 
 -- Generic data constructors
-crossDataConKey		      		= mkPreludeDataConUnique 17
-inlDataConKey		      		= mkPreludeDataConUnique 18
-inrDataConKey		      		= mkPreludeDataConUnique 19
-genUnitDataConKey			= mkPreludeDataConUnique 20
+crossDataConKey		      		= mkPreludeDataConUnique 19
+inlDataConKey		      		= mkPreludeDataConUnique 20
+inrDataConKey		      		= mkPreludeDataConUnique 21
+genUnitDataConKey			= mkPreludeDataConUnique 22
 \end{code}
 
 %************************************************************************

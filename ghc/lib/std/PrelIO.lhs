@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIO.lhs,v 1.17 2001/01/11 07:04:16 qrczak Exp $
+% $Id: PrelIO.lhs,v 1.18 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -26,13 +26,18 @@ import PrelNum
 import PrelRead         ( Read(..), readIO )
 import PrelShow
 import PrelMaybe	( Maybe(..) )
-import PrelAddr		( Addr(..), nullAddr, plusAddr )
+import PrelPtr
 import PrelList		( concat, reverse, null )
 import PrelPack		( unpackNBytesST, unpackNBytesAccST )
 import PrelException    ( ioError, catch, catchException, throw )
 import PrelConc
-\end{code}
 
+#ifndef __PARALLEL_HASKELL__
+#define FILE_OBJECT	    (ForeignPtr ())
+#else
+#define FILE_OBJECT	    (Ptr ())
+#endif
+\end{code}
 
 %*********************************************************
 %*							 *
@@ -155,7 +160,7 @@ hGetLine h = do
 	        (\fo -> readLine fo)
 	        (\fo bytes -> do
 	    	  buf <- getBufStart fo bytes
-	    	  eol <- readCharOffAddr buf (bytes-1)
+	    	  eol <- readCharOffPtr buf (bytes-1)
 		  xs <- if (eol == '\n') 
 			  then stToIO (unpackNBytesST buf (bytes-1))
  	        	  else stToIO (unpackNBytesST buf bytes)
@@ -196,7 +201,7 @@ hGetLineUnBuffered h = do
        return (c:s)
 
 
-readCharOffAddr (A# a) (I# i)
+readCharOffPtr (Ptr a) (I# i)
   = IO $ \s -> case readCharOffAddr# a i s of { (# s,x #) -> (# s, C# x #) }
 \end{code}
 
@@ -261,15 +266,9 @@ so each these lazy read functions are pulled on, they have to check whether
 the handle has indeed been closed.
 
 \begin{code}
-#ifndef __PARALLEL_HASKELL__
-lazyReadBlock :: Handle -> ForeignObj -> IO String
-lazyReadLine  :: Handle -> ForeignObj -> IO String
-lazyReadChar  :: Handle -> ForeignObj -> IO String
-#else
-lazyReadBlock :: Handle -> Addr -> IO String
-lazyReadLine  :: Handle -> Addr -> IO String
-lazyReadChar  :: Handle -> Addr -> IO String
-#endif
+lazyReadBlock :: Handle -> FILE_OBJECT -> IO String
+lazyReadLine  :: Handle -> FILE_OBJECT -> IO String
+lazyReadChar  :: Handle -> FILE_OBJECT -> IO String
 
 lazyReadBlock handle fo = do
    buf   <- getBufStart fo 0
@@ -369,27 +368,27 @@ hPutStr handle str = do
 	-- malloced buffers is one way around this, but we really ought to
 	-- be able to handle it with exception handlers/block/unblock etc.
 
-getBuffer :: Handle__ -> IO (Handle__, (BufferMode, Addr, Int))
+getBuffer :: Handle__ -> IO (Handle__, (BufferMode, Ptr (), Int))
 getBuffer handle_ = do
    let bufs = haBuffers__ handle_
        fo   = haFO__ handle_
        mode = haBufferMode__ handle_	
    sz <- getBufSize fo
    case mode of
-	NoBuffering -> return (handle_, (mode, nullAddr, 0))
+	NoBuffering -> return (handle_, (mode, nullPtr, 0))
 	_ -> case bufs of
 		[] -> do  buf <- malloc sz
 			  return (handle_, (mode, buf, sz))
 		(b:bs) -> return (handle_{ haBuffers__ = bs }, (mode, b, sz))
 
-freeBuffer :: Handle__ -> Addr -> Int -> IO Handle__
+freeBuffer :: Handle__ -> Ptr () -> Int -> IO Handle__
 freeBuffer handle_ buf sz = do
    fo_sz <- getBufSize (haFO__ handle_)
    if (sz /= fo_sz) 
 	then do { free buf; return handle_ }
 	else do { return handle_{ haBuffers__ = buf : haBuffers__ handle_ } }
 
-swapBuffers :: Handle__ -> Addr -> Int -> IO Handle__
+swapBuffers :: Handle__ -> Ptr () -> Int -> IO Handle__
 swapBuffers handle_ buf sz = do
    let fo = haFO__ handle_
    fo_buf <- getBuf fo
@@ -419,7 +418,7 @@ swapBuffers handle_ buf sz = do
 
 commitAndReleaseBuffer
 	:: Handle			-- handle to commit to
-	-> Addr -> Int			-- address and size (in bytes) of buffer
+	-> Ptr () -> Int		-- address and size (in bytes) of buffer
 	-> Int				-- number of bytes of data in buffer
 	-> Bool				-- flush the handle afterward?
 	-> IO ()
@@ -480,7 +479,7 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 
 		-- not flushing, and there's enough room in the buffer:
 		-- just copy the data in and update bufWPtr.
-	    else do memcpy (plusAddr fo_buf fo_wptr) buf count
+	    else do memcpy (plusPtr fo_buf fo_wptr) buf count
 		    setBufWPtr fo (fo_wptr + count)
 		    handle_ <- freeBuffer handle_ buf sz
 		    ok handle_
@@ -507,7 +506,7 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
 
 commitBuffer
 	:: Handle			-- handle to commit to
-	-> Addr -> Int			-- address and size (in bytes) of buffer
+	-> Ptr () -> Int		-- address and size (in bytes) of buffer
 	-> Int				-- number of bytes of data in buffer
 	-> Bool				-- flush the handle afterward?
 	-> IO ()
@@ -534,7 +533,7 @@ commitBuffer handle buf sz count flush = do
 		    if (rc < 0) then constructErrorAndFail "commitBuffer"
 			        else return ()
 
-	    else do memcpy (plusAddr fo_buf new_wptr) buf count
+	    else do memcpy (plusPtr fo_buf new_wptr) buf count
 		    setBufWPtr fo (new_wptr + count)
 		    return ()
 
@@ -552,7 +551,7 @@ checkedCommitBuffer handle buf sz count flush
 		   (\e -> do withHandle__ handle (\h_ -> freeBuffer h_ buf sz)
 			     throw e)
 
-foreign import "memcpy" unsafe memcpy :: Addr -> Addr -> Int -> IO ()
+foreign import "memcpy" unsafe memcpy :: Ptr () -> Ptr () -> Int -> IO ()
 \end{code}
 
 Going across the border between Haskell and C is relatively costly,
@@ -567,7 +566,7 @@ before passing the external write routine a pointer to the buffer.
 #warning delayed update of buffer disnae work with killThread
 #endif
 
-writeLines :: Handle -> Addr -> Int -> String -> IO ()
+writeLines :: Handle -> Ptr () -> Int -> String -> IO ()
 writeLines handle buf bufLen s =
   let
    shoveString :: Int -> [Char] -> IO ()
@@ -590,7 +589,7 @@ writeLines handle buf bufLen s =
 
 #else /* ndef __HUGS__ */
 
-writeLines :: Handle -> Addr -> Int -> String -> IO ()
+writeLines :: Handle -> Ptr () -> Int -> String -> IO ()
 writeLines hdl buf len@(I# bufLen) s =
   let
    shoveString :: Int# -> [Char] -> IO ()
@@ -614,7 +613,7 @@ writeLines hdl buf len@(I# bufLen) s =
 #endif /* ndef __HUGS__ */
 
 #ifdef __HUGS__
-writeBlocks :: Handle -> Addr -> Int -> String -> IO ()
+writeBlocks :: Handle -> Ptr () -> Int -> String -> IO ()
 writeBlocks hdl buf bufLen s =
   let
    shoveString :: Int -> [Char] -> IO ()
@@ -636,7 +635,7 @@ writeBlocks hdl buf bufLen s =
 
 #else /* ndef __HUGS__ */
 
-writeBlocks :: Handle -> Addr -> Int -> String -> IO ()
+writeBlocks :: Handle -> Ptr () -> Int -> String -> IO ()
 writeBlocks hdl buf len@(I# bufLen) s =
   let
    shoveString :: Int# -> [Char] -> IO ()
@@ -656,8 +655,8 @@ writeBlocks hdl buf len@(I# bufLen) s =
   in
   shoveString 0# s
 
-write_char :: Addr -> Int# -> Char# -> IO ()
-write_char (A# buf#) n# c# =
+write_char :: Ptr () -> Int# -> Char# -> IO ()
+write_char (Ptr buf#) n# c# =
    IO $ \ s# ->
    case (writeCharOffAddr# buf# n# c# s#) of s2# -> (# s2#, () #)
 #endif /* ndef __HUGS__ */

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Time.lhs,v 1.24 2000/12/12 12:19:58 simonmar Exp $
+% $Id: Time.lhs,v 1.25 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -110,7 +110,7 @@ import PrelPack 	( unpackCString, unpackCStringBA,
 			)
 import PrelByteArr	( MutableByteArray(..), wORD_SCALE )
 import PrelHandle	( Bytes )
-import PrelAddr		( Addr )
+import PrelPtr
 
 #endif
 
@@ -719,14 +719,14 @@ foreign import "libHS_cbits" "prim_SETZONE" unsafe prim_SETZONE :: MBytes -> MBy
 #ifdef __HUGS__
 foreign import "libHS_cbits" "prim_toLocalTime"  unsafe prim_toLocalTime :: Int64 -> MBytes -> IO Int
 foreign import "libHS_cbits" "prim_toUTCTime"    unsafe prim_toUTCTime   :: Int64 -> MBytes -> IO Int
-foreign import "libHS_cbits" "prim_ZONE"    unsafe prim_ZONE    :: Bytes -> IO Addr
+foreign import "libHS_cbits" "prim_ZONE"    unsafe prim_ZONE    :: Bytes -> IO (Ptr ())
 foreign import "libHS_cbits" "prim_GMTOFF"  unsafe prim_GMTOFF  :: Bytes -> IO Int
 #else
 foreign import "libHS_cbits" "toLocalTime"  unsafe prim_toLocalTime :: Int -> Bytes -> MBytes -> IO Int
 foreign import "libHS_cbits" "toUTCTime"    unsafe prim_toUTCTime   :: Int -> Bytes -> MBytes -> IO Int
 #endif
 
-foreign import "libHS_cbits" "get_ZONE"  unsafe get_ZONE   :: MBytes -> IO Addr
+foreign import "libHS_cbits" "get_ZONE"  unsafe get_ZONE   :: MBytes -> IO (Ptr ())
 foreign import "libHS_cbits" "GMTOFF"    unsafe get_GMTOFF :: MBytes -> IO Int
 
 

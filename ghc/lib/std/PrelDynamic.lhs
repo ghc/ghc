@@ -1,12 +1,12 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelDynamic.lhs,v 1.5 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelDynamic.lhs,v 1.6 2001/01/11 17:25:57 simonmar Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
 
 The Dynamic type is used in the Exception type, so we have to have
 Dynamic visible here.  The rest of the operations on Dynamics are
-available in exts/Dynamic.lhs.
+available in lang/Dynamic.lhs.
 
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
