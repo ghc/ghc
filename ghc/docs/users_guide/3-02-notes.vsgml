@@ -35,4 +35,9 @@ fixed.
 <item> Bump some of the constants that affect unfolding agression:
 performance is now better than 2.10, and binary sizes are smaller.
 
+<item> Add NOINLINE pragma, and use it for unsafePerformIO and
+friends.  Remove PrelUnsafe and PrelUnsafeST, move the contents into
+PrelIOBase and PrelST respectively.  Add NOINLINE pragma to
+LazyST.runST.
+
 </itemize>
