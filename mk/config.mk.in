@@ -529,13 +529,6 @@ HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 HC		= $(FPTOOLS_TOP)/ghc/driver/ghc
 MKDEPENDHS	= $(HC)
 
-#
-# The compiler proper is built with the 1.2 compiler,
-# so when building the dependencies, we need mkdependHS
-# for the 1.2 compiler.
-#
-MKDEPENDHS_1_2  = mkdependHS-1.2
-
 #-----------------------------------------------------------------------------
 # C compiler
 #
