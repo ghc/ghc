@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelArr.lhs,v 1.27 2001/04/14 22:27:00 qrczak Exp $
+% $Id: PrelArr.lhs,v 1.28 2001/05/01 09:16:56 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -480,11 +480,9 @@ instance Ix i => Functor (Array i) where
     fmap = amap
 
 instance (Ix i, Eq e) => Eq (Array i e) where
-    {-# INLINE instance #-}
     (==) = eqArray
 
 instance (Ix i, Ord e) => Ord (Array i e) where
-    {-# INLINE instance #-}
     compare = cmpArray
 
 instance (Ix a, Show a, Show b) => Show (Array a b) where

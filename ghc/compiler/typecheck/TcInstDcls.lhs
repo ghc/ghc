@@ -52,7 +52,7 @@ import FunDeps		( checkInstFDs )
 import Generics		( validGenericInstanceType )
 import Module		( Module, foldModuleEnv )
 import Name		( getSrcLoc )
-import NameSet		( emptyNameSet, mkNameSet, nameSetToList )
+import NameSet		( emptyNameSet, unitNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprClassPred, pprPred )
 import TyCon		( TyCon, isSynTyCon )
@@ -601,7 +601,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id,
         dict_constr   = classDataCon clas
 	scs_and_meths = map instToId (sc_dicts ++ meth_insts)
 	this_dict_id  = instToId this_dict
-	inlines       = mkNameSet [idName dfun_id | InlineInstSig _ _ <- uprags]
+	inlines       = unitNameSet (idName dfun_id)
 
 	dict_rhs
 	  | null scs_and_meths

@@ -524,9 +524,6 @@ renameSig (SpecInstSig ty src_loc)
     rnHsType (text "A SPECIALISE instance pragma") ty `thenRn` \ new_ty ->
     returnRn (SpecInstSig new_ty src_loc)
 
-renameSig (InlineInstSig p src_loc)
-  = returnRn (InlineInstSig p src_loc)
-
 renameSig (SpecSig v ty src_loc)
   = pushSrcLocRn src_loc $
     lookupSigOccRn v			`thenRn` \ new_v ->

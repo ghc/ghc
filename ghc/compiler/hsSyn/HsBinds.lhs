@@ -261,9 +261,6 @@ data Sig name
 				-- current instance decl
 		SrcLoc
 
-  | InlineInstSig (Maybe Int)	-- phase
-		SrcLoc
-
   | FixSig	(FixitySig name)	-- Fixity declaration
 
 
@@ -286,7 +283,6 @@ okInstDclSig :: NameSet -> Sig Name -> Bool
 okInstDclSig ns (Sig _ _ _)					   = False
 okInstDclSig ns (FixSig _)					   = False
 okInstDclSig ns (SpecInstSig _ _)				   = True
-okInstDclSig ns (InlineInstSig _ _)				   = True
 okInstDclSig ns sig = sigForThisGroup ns sig
 
 sigForThisGroup ns sig 
@@ -318,7 +314,6 @@ isPragSig (SpecSig _ _ _)     = True
 isPragSig (InlineSig   _ _ _) = True
 isPragSig (NoInlineSig _ _ _) = True
 isPragSig (SpecInstSig _ _)   = True
-isPragSig (InlineInstSig _ _) = True
 isPragSig other		      = False
 \end{code}
 
@@ -329,7 +324,6 @@ hsSigDoc (SpecSig    _ _ loc) 	      = (SLIT("SPECIALISE pragma"),loc)
 hsSigDoc (InlineSig  _ _    loc)      = (SLIT("INLINE pragma"),loc)
 hsSigDoc (NoInlineSig  _ _  loc)      = (SLIT("NOINLINE pragma"),loc)
 hsSigDoc (SpecInstSig _ loc)	      = (SLIT("SPECIALISE instance pragma"),loc)
-hsSigDoc (InlineInstSig _ loc)	      = (SLIT("INLINE instance pragma"),loc)
 hsSigDoc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
 \end{code}
 
@@ -363,9 +357,6 @@ ppr_sig (NoInlineSig var phase _)
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
 
-ppr_sig (InlineInstSig phase _)
-      = hsep [text "{-# INLINE instance", ppr_phase phase, text "#-}"]
-
 ppr_sig (FixSig fix_sig) = ppr fix_sig
 
 
@@ -391,7 +382,6 @@ eqHsSig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _)   =
     -- may have many specialisations for one value;
     -- but not ones that are exactly the same...
     (n1 == n2) && (ty1 == ty2)
-eqHsSig (InlineInstSig _ _)  (InlineInstSig _ _)  = True
 
-eqHsSig other_1 other_2 = False
+eqHsSig _other1 _other2 = False
 \end{code}
