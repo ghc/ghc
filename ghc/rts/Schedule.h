@@ -127,7 +127,7 @@ void    initThread(StgTSO *tso, nat stack_size);
 /* Context switch flag.
  * Locks required  : sched_mutex
  */
-extern nat RTS_VAR(context_switch);
+extern int RTS_VAR(context_switch);
 extern rtsBool RTS_VAR(interrupted);
 
 /* In Select.c */

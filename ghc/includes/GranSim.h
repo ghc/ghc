@@ -1,6 +1,6 @@
 /*
   Time-stamp: <Fri Mar 24 2000 23:55:42 Stardate: [-30]4554.98 hwloidl>
-  $Id: GranSim.h,v 1.3 2000/03/31 03:09:35 hwloidl Exp $
+  $Id: GranSim.h,v 1.4 2004/11/10 04:17:50 wolfgang Exp $
   
   Headers for GranSim specific objects.
   
@@ -301,7 +301,7 @@ void GranSimBlock(StgTSO *tso, PEs proc, StgClosure *node);
 
 #define GRAN_YIELD(ptrs)                                   \
         {                                                   \
-          extern  nat context_switch;                          \
+          extern int context_switch;                          \
           if ( (CurrentTime[CurrentProc]>=EndOfTimeSlice) ||   \
                ((CurrentTime[CurrentProc]>=TimeOfNextEvent) && \
 	        (TimeOfNextEvent!=0) && !IgnoreEvents )) {     \

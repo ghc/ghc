@@ -162,7 +162,7 @@ static StgTSO *threadStackOverflow(StgTSO *tso);
 */
 
 /* flag set by signal handler to precipitate a context switch */
-nat context_switch = 0;
+int context_switch = 0;
 
 /* if this flag is set as well, give up execution */
 rtsBool interrupted = rtsFalse;
