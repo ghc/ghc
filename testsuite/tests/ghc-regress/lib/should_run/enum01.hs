@@ -119,6 +119,14 @@ testEnumInt = do
   let x = (maxBound::Int) - 5
   printTest ((take 7 [x, (x+1) ..]))
 
+	-- Test overflow conditions
+  printTest (([minBound::Int,1..]))
+  printTest (([minBound::Int,0..]))
+  printTest (([minBound::Int,-1..]))
+  printTest (([maxBound::Int,1..]))
+  printTest (([maxBound::Int,0..]))
+  printTest (([maxBound::Int,-1..]))
+
      -- [x..y] aka enumFromTo
   printTest ((take 7 ([(1::Int) .. 5])))
   printTest ((take 4 ([(1::Int) .. 1])))
@@ -135,6 +143,19 @@ testEnumInt = do
   printTest ((take 7 [(2::Int),1..2]))
   printTest ((take 7 [(2::Int),1..1]))
   printTest ((take 7 [(2::Int),3..1]))
+
+	-- Test overflow conditions
+  printTest (([minBound, 1..maxBound::Int]))
+  printTest (([minBound, 0..maxBound::Int]))
+  printTest (([minBound,-1..maxBound::Int]))
+  printTest (([minBound,-1..maxBound-1::Int]))
+  printTest (([minBound,-1..maxBound-2::Int]))
+
+  printTest (([maxBound, 1..minBound::Int]))
+  printTest (([maxBound, 0..minBound::Int]))
+  printTest (([maxBound, 0..minBound+1::Int]))
+  printTest (([maxBound, 0..minBound+2::Int]))
+  printTest (([maxBound,-1..minBound::Int]))
 
   let x = (maxBound::Int) - 4
   printTest ((take 7 [x,(x+1)..maxBound]))
