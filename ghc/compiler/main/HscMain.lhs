@@ -59,7 +59,7 @@ data HscResult
 	     (Maybe ModIface)	     -- new iface (if any compilation was done)
 	     (Maybe String)  	     -- generated stub_h filename (in /tmp)
 	     (Maybe String)  	     -- generated stub_c filename (in /tmp)
-	     (Maybe [UnlinkedIBind]) -- interpreted code, if any
+	     (Maybe ([UnlinkedIBind],ItblEnv)) -- interpreted code, if any
              PersistentCompilerState -- updated PCS
 
    | HscFail PersistentCompilerState -- updated PCS
@@ -151,6 +151,7 @@ hscRecomp dflags core_cmds stg_cmds summary hit hst pcs maybe_old_iface
                     maybe_ibinds pcs_tc)
       }}}}}}}
 
+
 myParseModule dflags summary
  = do --------------------------  Reader  ----------------
       show_pass "Parser"
@@ -185,7 +186,7 @@ myParseModule dflags summary
 restOfCodeGeneration toInterp this_mod imported_modules cost_centre_info 
                      fe_binders local_tycons local_classes stg_binds
  | toInterp
- = return (Nothing, Nothing, stgToIBinds stg_binds local_tycons local_classes)
+ = return (Nothing, Nothing, stgToInterpSyn stg_binds local_tycons local_classes)
 
  | otherwise
  = do --------------------------  Code generation -------------------------------

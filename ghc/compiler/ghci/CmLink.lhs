@@ -30,8 +30,16 @@ import Panic		( panic )
 \begin{code}
 data PersistentLinkerState 
    = PersistentLinkerState {
+	-- Current global mapping from RdrNames to closure addresses
         closure_env :: ClosureEnv,
+
+	-- the current global mapping from RdrNames of DataCons to 
+	-- info table addresses.
+	-- When a new Unlinked is linked into the running image, or an existing
+	-- module in the image is replaced, the itbl_env must be updated
+	-- appropriately.
         itbl_env    :: ItblEnv
+
 	-- notionally here, but really lives in the C part of the linker:
 	--            object_symtab :: FiniteMap String Addr
      }
@@ -44,7 +52,8 @@ data Unlinked
    = DotO FilePath
    | DotA FilePath
    | DotDLL FilePath
-   | Trees [UnlinkedIBind]	-- bunch of interpretable bindings
+   | Trees [UnlinkedIBind] ItblEnv  -- bunch of interpretable bindings, +
+				    -- a mapping from DataCons to their itbls
 
 instance Outputable Unlinked where
    ppr (DotO path)   = text "DotO" <+> text path

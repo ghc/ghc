@@ -7,12 +7,8 @@
 
 module StgInterp ( 
     ClosureEnv, ItblEnv,
-
-    linkIModules,	-- :: ItblEnv -> ClosureEnv -> [[UnlinkedIBind]] -> 
-		 	--	([LinkedIBind], ItblEnv, ClosureEnv)
-
-    stgToIBinds,	-- :: [StgBinding] -> [UnlinkedIBind]
-
+    linkIModules,
+    stgToInterpSyn,
     runStgI  -- tmp, for testing
  ) where
 
@@ -138,8 +134,15 @@ runStgI tycons classes stgbinds
 -- ---------------------------------------------------------------------------
 
 -- visible from outside
-stgToIBinds :: [StgBinding] -> [UnlinkedIBind]
-stgToIBinds = concatMap (translateBind emptyUniqSet)
+stgToInterpSyn :: [StgBinding] 
+	       -> [TyCon] -> [Class] 
+	       -> IO ([UnlinkedIBind], ItblEnv)
+stgToInterpSyn binds local_tycons local_classes
+ = do let ibinds = concatMap (translateBind emptyUniqSet) binds
+      let tycs   = local_tycons ++ map classTyCon local_classes
+      itblenv <- makeItbls tycs
+      return (ibinds, itblenv)
+
 
 translateBind :: UniqSet Id -> StgBinding -> [UnlinkedIBind]
 translateBind ie (StgNonRec v e)  = [IBind v (rhs2expr ie e)]
@@ -409,25 +412,29 @@ repOfArg (StgTypeArg ty) = pprPanic "repOfArg" (ppr ty)
 
 id2VaaRep var = (var, repOfId var)
 
+
 -- ---------------------------------------------------------------------------
--- Link an interpretable into something we can run
+-- Link interpretables into something we can run
 -- ---------------------------------------------------------------------------
 
-linkIModules :: ItblEnv -> ClosureEnv -> [([TyCon],[UnlinkedIBind])] -> 
-	IO ([LinkedIBind], ItblEnv, ClosureEnv)
-linkIModules ie ce mods = do
-  let (tyconss, bindss) = unzip mods
-      tycons = concat tyconss
+linkIModules :: ClosureEnv -- incoming global closure env; returned updated
+	     -> ItblEnv    -- incoming global itbl env; returned updated
+	     -> [([UnlinkedIBind], ItblEnv)]
+	     -> IO ([LinkedIBind], ItblEnv, ClosureEnv)
+linkIModules gie gce mods = do
+  let (bindss, ies) = unzip mods
       binds  = concat bindss
       top_level_binders = map (toRdrName.binder) binds
-
-  new_ie <- mkITbls (concat tyconss)
-  let new_ce = addListToFM ce (zip top_level_binders new_rhss)
+      final_gie = foldr plusFM gie ies
+  
+  let {-rec-}
+      new_gce = addListToFM gce (zip top_level_binders new_rhss)
       new_rhss = map (\b -> evalP (bindee b) emptyUFM) new_binds
     ---vvvvvvvvv---------------------------------------^^^^^^^^^-- circular
-      (new_binds, final_ie, final_ce) = linkIBinds new_ie new_ce binds
+      (new_binds, final_gce) = linkIBinds final_gie new_gce binds
 
-  return (new_binds, final_ie, final_ce)
+  return (new_binds, final_gie, final_gce)
+
 
 -- We're supposed to augment the environments with the values of any
 -- external functions/info tables we need as we go along, but that's a
@@ -435,35 +442,11 @@ linkIModules ie ce mods = do
 -- up and not cache them in the source symbol tables.  The interpreted
 -- code will still be referenced in the source symbol tables.
 
+-- JRS 001025: above comment is probably out of date ... interpret
+-- with care.
 
--- Make info tables for the data decls in this module
-mkITbls :: [TyCon] -> IO ItblEnv
-mkITbls [] = return emptyFM
-mkITbls (tc:tcs) = do itbls  <- mkITbl tc
-                      itbls2 <- mkITbls tcs
-                      return (itbls `plusFM` itbls2)
-
-mkITbl :: TyCon -> IO ItblEnv
-mkITbl tc
---   | trace ("TYCON: " ++ showSDoc (ppr tc)) False
---   = error "?!?!"
-   | not (isDataTyCon tc) 
-   = return emptyFM
-   | n == length dcs  -- paranoia; this is an assertion.
-   = make_constr_itbls dcs
-     where
-        dcs = tyConDataCons tc
-        n   = tyConFamilySize tc
-
-
-linkIBinds :: ItblEnv -> ClosureEnv -> [UnlinkedIBind] -> 
-   ([LinkedIBind], ItblEnv, ClosureEnv)
-linkIBinds ie ce binds
-  = (new_binds, ie, ce) 
-  where new_binds = map (linkIBind ie ce) binds
-
-linkIBinds' ie ce binds 
-  = new_binds where (new_binds, ie, ce) = linkIBinds ie ce binds
+linkIBinds :: ItblEnv -> ClosureEnv -> [UnlinkedIBind] -> [LinkedIBind]
+linkIBinds ie ce binds = map (linkIBind ie ce) binds
 
 linkIBind ie ce (IBind bndr expr) = IBind bndr (linkIExpr ie ce expr)
 
@@ -505,10 +488,10 @@ linkIExpr ie ce expr = case expr of
    PrimOpP op args -> PrimOpP op (map (linkIExpr ie ce) args)
    
    NonRecP bind expr  -> NonRecP (linkIBind ie ce bind) (linkIExpr ie ce expr)
-   RecP    binds expr -> RecP (linkIBinds' ie ce binds) (linkIExpr ie ce expr)
+   RecP    binds expr -> RecP (linkIBinds ie ce binds) (linkIExpr ie ce expr)
    
    NonRecI bind expr  -> NonRecI (linkIBind ie ce bind) (linkIExpr ie ce expr)
-   RecI    binds expr -> RecI (linkIBinds' ie ce binds) (linkIExpr ie ce expr)
+   RecI    binds expr -> RecI (linkIBinds ie ce binds) (linkIExpr ie ce expr)
    
    LitI i -> LitI i
    LitF i -> LitF i
@@ -1063,6 +1046,25 @@ indexIntOffClosure con (I# offset)
 ------------------------------------------------------------------------
 --- Manufacturing of info tables for DataCons defined in this module ---
 ------------------------------------------------------------------------
+
+-- Make info tables for the data decls in this module
+mkITbls :: [TyCon] -> IO ItblEnv
+mkITbls [] = return emptyFM
+mkITbls (tc:tcs) = do itbls  <- mkITbl tc
+                      itbls2 <- mkITbls tcs
+                      return (itbls `plusFM` itbls2)
+
+mkITbl :: TyCon -> IO ItblEnv
+mkITbl tc
+--   | trace ("TYCON: " ++ showSDoc (ppr tc)) False
+--   = error "?!?!"
+   | not (isDataTyCon tc) 
+   = return emptyFM
+   | n == length dcs  -- paranoia; this is an assertion.
+   = make_constr_itbls dcs
+     where
+        dcs = tyConDataCons tc
+        n   = tyConFamilySize tc
 
 cONSTR :: Int
 cONSTR = 1  -- as defined in ghc/includes/ClosureTypes.h
