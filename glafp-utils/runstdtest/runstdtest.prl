@@ -311,7 +311,7 @@ if ( $SysSpecificTiming eq '' ) {
 # print out what we found
 if ( $SpixTiming ne 'yes' ) {
     print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
 	" :$SysSpecificTiming>>\n";
 } else {
     print STDERR "<<$SysSpecificTiming: ",
@@ -381,6 +381,7 @@ sub process_stats_file {
 	    }
 
 	    $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
+	    $GCWork = $1     if /^\s*([0-9,]+) bytes copied during GC/;
 
 #	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
 #		$MaxResidency = $1; $ResidencySamples = $2;
@@ -441,6 +442,7 @@ sub process_stats_file {
     print STDERR "Warning: GcTime inot found in stats file\n" unless defined($GcTime);
     print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
     print STDERR "Warning: total memory not found in stats file\n" unless defined($TotMem);
+    print STDERR "Warning: GC work not found in stats file\n" unless defined($GCWork);
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
@@ -449,6 +451,7 @@ sub process_stats_file {
 
     # a bit of tidying
     $BytesAlloc =~ s/,//g;
+    $GCWork =~ s/,//g;
     $MaxResidency =~ s/,//g;
     $GCs =~ s/,//g;
     $InitTime =~ s/,//g;
