@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.33 $
- * $Date: 2000/02/15 13:16:20 $
+ * $Revision: 1.34 $
+ * $Date: 2000/02/15 15:14:09 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -915,6 +915,12 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                     xPushTaggedInt(bcoConstInt(bco,BCO_INSTR_8));
                     Continue;
                 }
+            Case(i_CONST_INT_big):
+                {
+                    int n = BCO_INSTR_16;
+                    xPushTaggedInt(bcoConstInt(bco,n));
+                    Continue;
+                }
             Case(i_PACK_INT):
                 {
                     StgClosure* o;
@@ -1003,6 +1009,12 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             Case(i_CONST_ADDR):
                 {
                     xPushTaggedAddr(bcoConstAddr(bco,BCO_INSTR_8));
+                    Continue;
+                }
+            Case(i_CONST_ADDR_big):
+                {
+                    int n = BCO_INSTR_16;
+                    xPushTaggedAddr(bcoConstAddr(bco,n));
                     Continue;
                 }
             Case(i_PACK_ADDR):
@@ -1268,11 +1280,9 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             Case(i_VAR_FLOAT_big):
             Case(i_CONST_CHAR_big):
             Case(i_VAR_CHAR_big):
-            Case(i_CONST_ADDR_big):
             Case(i_VAR_ADDR_big):
             Case(i_VAR_STABLE_big):
             Case(i_CONST_INTEGER_big):
-            Case(i_CONST_INT_big):
             Case(i_VAR_INT_big):
             Case(i_VAR_WORD_big):
             Case(i_RETADDR_big):
