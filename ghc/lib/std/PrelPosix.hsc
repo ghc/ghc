@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.13 2001/08/23 10:36:50 sewardj Exp $
+-- $Id: PrelPosix.hsc,v 1.14 2001/09/26 10:35:41 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -212,9 +212,11 @@ getEcho fd = return False
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
 		 (fcntl_read (fromIntegral fd) (#const F_GETFL))
-  throwErrnoIfMinus1Retry "setNonBlockingFD"
-	(fcntl_write (fromIntegral fd) 
-	   (#const F_SETFL) (flags .|. #const O_NONBLOCK))
+  -- An error when setting O_NONBLOCK isn't fatal: on some systems 
+  -- there are certain file handles on which this will fail (eg. /dev/null
+  -- on FreeBSD) so we throw away the return code from fcntl_write.
+  fcntl_write (fromIntegral fd) 
+	(#const F_SETFL) (flags .|. #const O_NONBLOCK)
 #else
 
 -- bogus defns for win32
