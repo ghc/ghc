@@ -349,7 +349,7 @@ completeNonRecX env is_strict old_bndr new_bndr new_rhs thing_inside
 
 	-- Make the arguments atomic if necessary, 
 	-- adding suitable bindings
-    addAtomicBindsE env aux_binds		$ \ env ->
+    addAtomicBindsE env (fromOL aux_binds)	$ \ env ->
     completeLazyBind env NotTopLevel
 		     old_bndr new_bndr rhs2	`thenSmpl` \ (floats, env) ->
     addFloats env floats thing_inside
@@ -466,7 +466,7 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 
 	-- If the result is a PAP, float the floats out, else wrap them
 	-- By this time it's already been ANF-ised (if necessary)
-    if isEmptyFloats floats && null aux_binds then	-- Shortcut a common case
+    if isEmptyFloats floats && isNilOL aux_binds then	-- Shortcut a common case
 	completeLazyBind env1 top_lvl bndr bndr'' rhs2
 
 	-- We use exprIsTrivial here because we want to reveal lone variables.  
@@ -494,7 +494,7 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 
 	tick LetFloatFromLet			`thenSmpl_` (
 	addFloats env1 floats			$ \ env2 ->
-	addAtomicBinds env2 aux_binds		$ \ env3 ->
+	addAtomicBinds env2 (fromOL aux_binds)	$ \ env3 ->
 	completeLazyBind env3 top_lvl bndr bndr'' rhs2)
 
     else
@@ -1097,56 +1097,42 @@ context information.
 mkAtomicArgs :: Bool	-- A strict binding
 	     -> Bool	-- OK to float unlifted args
 	     -> OutExpr
-	     -> SimplM ([(OutId,OutExpr)],	-- The floats (unusually) may include
-			OutExpr)		-- things that need case-binding,
-						-- if the strict-binding flag is on
+	     -> SimplM (OrdList (OutId,OutExpr),  -- The floats (unusually) may include
+			OutExpr)		  -- things that need case-binding,
+						  -- if the strict-binding flag is on
 
 mkAtomicArgs is_strict ok_float_unlifted rhs
-  = mk_atomic_args rhs		`thenSmpl` \ maybe_stuff ->
-    case maybe_stuff of
-	Nothing		      -> returnSmpl ([], 	      rhs) 
-	Just (ol_binds, rhs') -> returnSmpl (fromOL ol_binds, rhs')
+  | (Var fun, args) <- collectArgs rhs,			-- It's an application
+    isDataConId fun || valArgCount args < idArity fun	-- And it's a constructor or PAP
+  = go fun nilOL [] args	-- Have a go
+
+  | otherwise = bale_out	-- Give up
 
   where
-    mk_atomic_args :: OutExpr -> SimplM (Maybe (OrdList (Id,OutExpr), OutExpr))
-	-- Nothing => no change
-    mk_atomic_args rhs
-      | (Var fun, args) <- collectArgs rhs,			-- It's an application
-        isDataConId fun || valArgCount args < idArity fun	-- And it's a constructor or PAP
-      = 	-- Worth a try
-        go nilOL [] args	`thenSmpl` \ maybe_stuff ->
-	case maybe_stuff of
-	  Nothing		  -> returnSmpl Nothing
-	  Just (aux_binds, args') -> returnSmpl (Just (aux_binds, mkApps (Var fun) args'))
-    
-     | otherwise
-     = returnSmpl Nothing
+    bale_out = returnSmpl (nilOL, rhs)
 
-    go binds rev_args [] 
-	= returnSmpl (Just (binds, reverse rev_args))
-    go binds rev_args (arg : args) 
-	|  exprIsTrivial arg 	-- Easy case
-	= go binds (arg:rev_args) args
+    go fun binds rev_args [] 
+	= returnSmpl (binds, mkApps (Var fun) (reverse rev_args))
+
+    go fun binds rev_args (arg : args) 
+	| exprIsTrivial arg 	-- Easy case
+	= go fun binds (arg:rev_args) args
 
 	| not can_float_arg	-- Can't make this arg atomic
-  	= returnSmpl Nothing	-- ... so give up
+  	= bale_out		-- ... so give up
 
 	| otherwise	-- Don't forget to do it recursively
 			-- E.g.  x = a:b:c:[]
-	=  mk_atomic_args arg					`thenSmpl` \ maybe_anf ->
-	   case maybe_anf of {
-	     Nothing -> returnSmpl Nothing ;
-	     Just (arg_binds,arg') ->
-
-	   newId SLIT("a") arg_ty				`thenSmpl` \ arg_id ->
-	   go ((arg_binds `snocOL` (arg_id,arg')) `appOL` binds) 
+	=  mkAtomicArgs is_strict ok_float_unlifted arg	`thenSmpl` \ (arg_binds, arg') ->
+	   newId SLIT("a") arg_ty			`thenSmpl` \ arg_id ->
+	   go fun ((arg_binds `snocOL` (arg_id,arg')) `appOL` binds) 
 	      (Var arg_id : rev_args) args
-	   }
 	where
 	  arg_ty        = exprType arg
 	  can_float_arg =  is_strict 
 			|| not (isUnLiftedType arg_ty)
 			|| (ok_float_unlifted && exprOkForSpeculation arg)
+
 
 addAtomicBinds :: SimplEnv -> [(OutId,OutExpr)]
 	       -> (SimplEnv -> SimplM (FloatsWith a))
