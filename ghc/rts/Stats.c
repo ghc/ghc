@@ -746,7 +746,7 @@ stat_exit(int alloc)
 
 	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
 	  /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
-	  statsPrintf("<<ghc: %llu bytes, ", GC_tot_alloc*sizeof(W_));
+	  statsPrintf("<<ghc: %llu bytes, ", GC_tot_alloc*(ullong)sizeof(W_));
 	  statsPrintf("%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
 		    total_collections,
 		    ResidencySamples == 0 ? 0 : 

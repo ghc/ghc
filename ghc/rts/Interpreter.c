@@ -1005,7 +1005,7 @@ run_BCO:
 	}
 
 	case bci_TESTLT_P: {
-	    int discr  = BCO_NEXT;
+	    unsigned int discr  = BCO_NEXT;
 	    int failto = BCO_NEXT;
 	    StgClosure* con = (StgClosure*)Sp[0];
 	    if (GET_TAG(con) >= discr) {
@@ -1015,7 +1015,7 @@ run_BCO:
 	}
 
 	case bci_TESTEQ_P: {
-	    int discr  = BCO_NEXT;
+	    unsigned int discr  = BCO_NEXT;
 	    int failto = BCO_NEXT;
 	    StgClosure* con = (StgClosure*)Sp[0];
 	    if (GET_TAG(con) != discr) {
