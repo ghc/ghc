@@ -64,10 +64,12 @@ $(H_CONFIG) :
 	@echo "#define $(HostArch_CPP)_HOST_ARCH	1" >> $@
 	@echo "#define $(HostArch_CPP)_TARGET_ARCH	1" >> $@
 	@echo "#define $(HostArch_CPP)_BUILD_ARCH  	1" >> $@
+	@echo "#define HOST_ARCH			\"$(HostArch_CPP)\"" >> $@
 	@echo >> $@
 	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
 	@echo "#define $(HostOS_CPP)_TARGET_OS		1" >> $@  
 	@echo "#define $(HostOS_CPP)_BUILD_OS 		1" >> $@
+	@echo "#define HOST_OS 				\"$(HostOS_CPP)\"" >> $@
 ifeq "$(HostOS_CPP)" "irix"
 	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS		 " >> $@  
 	@echo "#define $(IRIX_MAJOR)_TARGET_OS		1" >> $@  
