@@ -210,10 +210,10 @@ collect xs not_lambda
 
 schemeR_wrk is_top original_body nm (args, body)
    | Just dcon <- maybe_toplevel_null_con_rhs
-   = trace ("nullary constructor! " ++ showSDocDebug (ppr nm)) (
+   = --trace ("nullary constructor! " ++ showSDocDebug (ppr nm)) (
      emitBc (mkProtoBCO (getName nm) (toOL [PACK dcon 0, ENTER])
                                      (Right original_body))
-     )
+     --)
 
    | otherwise
    = let fvs       = filter (not.isTyVar) (varSetElems (fst original_body))
@@ -354,6 +354,8 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
            = case l of MachInt i     -> DiscrI (fromInteger i)
                        MachFloat r   -> DiscrF (fromRational r)
                        MachDouble r  -> DiscrD (fromRational r)
+                       MachChar i    -> DiscrI i
+                       _ -> pprPanic "schemeE(AnnCase).my_discr" (ppr l)
 
         maybe_ncons 
            | not isAlgCase = Nothing
@@ -538,6 +540,7 @@ mkUnpackCode vars d p
            = case npr of
                 IntRep -> approved ; FloatRep -> approved
                 DoubleRep -> approved ; AddrRep -> approved
+                CharRep -> approved
                 _ -> pprPanic "ByteCodeGen.mkUnpackCode" (ppr npr)
              where
                 approved = UPK_TAG usizeW (off_h-usizeW) off_s   `consOL` theRest

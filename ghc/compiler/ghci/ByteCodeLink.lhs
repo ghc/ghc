@@ -282,6 +282,7 @@ mkBits findLabel st proto_insns
                ret_itbl_addr = case pk of
                                   PtrRep    -> stg_ctoi_ret_R1p_info
                                   IntRep    -> stg_ctoi_ret_R1n_info
+                                  AddrRep   -> stg_ctoi_ret_R1n_info
                                   CharRep   -> stg_ctoi_ret_R1n_info
                                   FloatRep  -> stg_ctoi_ret_F1_info
                                   DoubleRep -> stg_ctoi_ret_D1_info
@@ -291,6 +292,7 @@ mkBits findLabel st proto_insns
           = addr st ret_itbl_addr
             where
                ret_itbl_addr = case pk of
+                                  CharRep   -> stg_gc_unbx_r1_info
                                   IntRep    -> stg_gc_unbx_r1_info
                                   FloatRep  -> stg_gc_f1_info
                                   DoubleRep -> stg_gc_d1_info
@@ -511,7 +513,7 @@ nameToCLabel n suffix
 primopToCLabel :: PrimOp -> String{-suffix-} -> String
 primopToCLabel primop suffix
    = let str = "PrelPrimopWrappers_" ++ occNameString (primOpOcc primop) ++ '_':suffix
-     in trace ("primopToCLabel: " ++ str)
+     in --trace ("primopToCLabel: " ++ str)
         str
 
 \end{code}
