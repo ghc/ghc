@@ -1860,7 +1860,8 @@ sub runLinker
     local($lnkr) = ( $Lnkr ) ? $Lnkr : $CcRegd;
 
     if ( ($Specific_output_file eq '') && 
-         ($TargetPlatform eq 'i386-unknown-cygwin32') ) {
+         ( ($TargetPlatform eq 'i386-unknown-cygwin32') ||
+	   ($TargetPlatform eq 'i386-unknown-mingw32')) ) {
          $Specific_output_file = 'main.exe';
          print STDERR "Output file not specified, defaulting to \"main.exe\"\n";
     }
