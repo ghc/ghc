@@ -1059,8 +1059,11 @@ readIface wanted_mod file_path
 \begin{code}
 noIfaceErr mod_name boot_file search_path
   = vcat [ptext SLIT("Could not find interface file for") <+> quotes (pprModuleName mod_name),
-	  ptext SLIT("in the directories") <+> vcat [ text dir <> text "/*" <> pp_suffix suffix 
-						    | (dir,suffix) <- search_path]
+	  ptext SLIT("in the directories") <+> 
+			-- \& to avoid cpp interpreting this string as a
+			-- comment starter with a pre-4.06 mkdependHS --SDM
+		vcat [ text dir <> text "/\&*" <> pp_suffix suffix 
+		     | (dir,suffix) <- search_path]
 	]
   where
     pp_suffix suffix | boot_file = ptext SLIT(".hi-boot")
