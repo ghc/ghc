@@ -23,7 +23,12 @@ module SimplMonad (
 IMP_Ubiq(){-uitous-}
 IMPORT_1_3(Ix)
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
+#else
+import {-# SOURCE #-} Simplify
+import {-# SOURCE #-} MagicUFs
+#endif
 
 import Id		( GenId, mkSysLocal, mkIdWithNewUniq, SYN_IE(Id) )
 import CoreUnfold	( SimpleUnfolding )
