@@ -257,6 +257,7 @@ atLength atLenPred atEndPred ls n
 
 -- special cases.
 lengthExceeds :: [a] -> Int -> Bool
+-- (lengthExceeds xs n) = (length xs > n)
 lengthExceeds = atLength (not.null) (const False)
 
 lengthAtLeast :: [a] -> Int -> Bool
