@@ -26,12 +26,12 @@ import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
 import Const		( Con(..), Literal(..) )
 import Id		( isSpecPragmaId, isOneShotLambda, setOneShotLambda, 
-			  getInlinePragma, setInlinePragma,
+			  getIdOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo,
 			  getIdSpecialisation, 
 			  idType, idUnique, Id
 			)
-import IdInfo		( InlinePragInfo(..), OccInfo(..), copyIdInfo )
+import IdInfo		( OccInfo(..), insideLam, copyIdInfo )
 
 import VarSet
 import VarEnv
@@ -416,7 +416,7 @@ reOrderRec env (AcyclicSCC (bind, _, _)) = [bind]
 
 	-- Common case of simple self-recursion
 reOrderRec env (CyclicSCC [bind])
-  = [(setInlinePragma tagged_bndr IAmALoopBreaker, rhs)]
+  = [(setIdOccInfo tagged_bndr IAmALoopBreaker, rhs)]
   where
     ((tagged_bndr, rhs), _, _) = bind
 
@@ -425,7 +425,7 @@ reOrderRec env (CyclicSCC (bind : binds))
 	-- do SCC analysis on the rest, and recursively sort them out
     concat (map (reOrderRec env) (stronglyConnCompR unchosen))
     ++ 
-    [(setInlinePragma tagged_bndr IAmALoopBreaker, rhs)]
+    [(setIdOccInfo tagged_bndr IAmALoopBreaker, rhs)]
 
   where
     (chosen_pair, unchosen) = choose_loop_breaker bind (score bind) [] binds
@@ -458,10 +458,9 @@ reOrderRec env (CyclicSCC (bind : binds))
 
     inlineCandidate :: Id -> CoreExpr -> Bool
     inlineCandidate id (Note InlineMe _) = True
-    inlineCandidate id rhs	         = case getInlinePragma id of
-						IMustBeINLINEd          -> True
-						ICanSafelyBeINLINEd _ _ -> True
-						other		    -> False
+    inlineCandidate id rhs	         = case getIdOccInfo id of
+						OneOcc _ _ -> True
+						other	   -> False
 
 	-- Real example (the Enum Ordering instance from PrelBase):
 	--	rec	f = \ x -> case d of (p,q,r) -> p x
@@ -646,12 +645,24 @@ occAnal env (Case scrut bndr alts)
     case occAnal (zapCtxt env) scrut	       of { (scrut_usage, scrut') ->
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
-	(alts_usage1, tagged_bndr) = tagBinder alts_usage bndr
+	alts_usage' = addCaseBndrUsage alts_usage
+	(alts_usage1, tagged_bndr) = tagBinder alts_usage' bndr
         total_usage = scrut_usage `combineUsageDetails` alts_usage1
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr alts') }}
   where
     alt_env = env `addNewCand` bndr
+
+	-- The case binder gets a usage of either "many" or "dead", never "one".
+	-- Reason: we like to inline single occurrences, to eliminate a binding,
+	-- but inlining a case binder *doesn't* eliminate a binding.
+	-- We *don't* want to transform
+	--	case x of w { (p,q) -> f w }
+	-- into
+	--	case x of w { (p,q) -> f (p,q) }
+    addCaseBndrUsage usage = case lookupVarEnv usage bndr of
+				Nothing  -> usage
+				Just occ -> extendVarEnv usage bndr (markMany occ)
 
 occAnal env (Let bind body)
   = case occAnal new_env body            of { (body_usage, body') ->
@@ -828,7 +839,7 @@ tagBinders :: UsageDetails	    -- Of scope
 tagBinders usage binders
  = let
      usage' = usage `delVarEnvList` binders
-     uss    = map (setBinderPrag usage) binders
+     uss    = map (setBinderOcc usage) binders
    in
    usage' `seq` (usage', uss)
 
@@ -840,45 +851,27 @@ tagBinder :: UsageDetails	    -- Of scope
 tagBinder usage binder
  = let
      usage'  = usage `delVarEnv` binder
-     binder' = setBinderPrag usage binder
+     binder' = setBinderOcc usage binder
    in
    usage' `seq` (usage', binder')
 
 
-setBinderPrag :: UsageDetails -> CoreBndr -> CoreBndr
-setBinderPrag usage bndr
-  | isTyVar bndr
-  = bndr
-
-  | otherwise
-  = case old_prag of
-	NoInlinePragInfo	-> new_bndr
-	IAmDead	     		-> new_bndr	-- The next three are annotations
-	ICanSafelyBeINLINEd _ _ -> new_bndr	-- from the previous iteration of
-	IAmALoopBreaker	        -> new_bndr	-- the occurrence analyser
-
-	other | its_now_dead	-> new_bndr	-- Overwrite the others iff it's now dead
-	      | otherwise	-> bndr
-
+setBinderOcc :: UsageDetails -> CoreBndr -> CoreBndr
+setBinderOcc usage bndr
+  | isTyVar bndr      = bndr
+  | isExportedId bndr 
+  = -- Don't use local usage info for visible-elsewhere things
+    -- BUT *do* erase any IAmALoopBreaker annotation, because we're
+    -- about to re-generate it and it shouldn't be "sticky"
+    case getIdOccInfo bndr of
+	NoOccInfo -> bndr
+	other     -> setIdOccInfo bndr NoOccInfo
+			  
+  | otherwise         = setIdOccInfo bndr occ_info
   where
-    old_prag = getInlinePragma bndr 
-    new_bndr = setInlinePragma bndr new_prag
-
-    its_now_dead = case new_prag of
-			IAmDead -> True
-			other   -> False
-
-    new_prag = occInfoToInlinePrag occ_info
-
-    occ_info
-	| isExportedId bndr = noBinderInfo
-	-- Don't use local usage info for visible-elsewhere things
-	-- But NB that we do set NoInlinePragma for exported things
-	-- thereby nuking any IAmALoopBreaker from a previous pass.
-
-	| otherwise       = case lookupVarEnv usage bndr of
-				    Nothing   -> deadOccurrence
-				    Just info -> info
+    occ_info = case lookupVarEnv usage bndr of
+		 Nothing   -> IAmDead
+		 Just info -> binderInfoToOccInfo info
 
 markBinderInsideLambda :: CoreBndr -> CoreBndr
 markBinderInsideLambda bndr
@@ -886,10 +879,9 @@ markBinderInsideLambda bndr
   = bndr
 
   | otherwise
-  = case getInlinePragma bndr of
-	ICanSafelyBeINLINEd not_in_lam nalts
-		-> bndr `setInlinePragma` ICanSafelyBeINLINEd InsideLam nalts
-	other   -> bndr
+  = case getIdOccInfo bndr of
+	OneOcc _ once -> bndr `setIdOccInfo` OneOcc insideLam once
+	other         -> bndr
 
 funOccZero = funOccurrence 0
 \end{code}

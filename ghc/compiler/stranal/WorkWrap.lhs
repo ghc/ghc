@@ -14,17 +14,17 @@ import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core,
                           opt_D_dump_worker_wrapper
 			)
 import CoreLint		( beginPass, endPass )
-import CoreUtils	( coreExprType, exprArity )
+import CoreUtils	( coreExprType, exprEtaExpandArity )
 import Const		( Con(..) )
 import DataCon		( DataCon )
 import MkId		( mkWorkerId )
-import Id		( Id, idType, getIdStrictness, setIdArity, 
-			  setIdStrictness, getIdDemandInfo,
+import Id		( Id, idType, getIdStrictness, setIdArity, isOneShotLambda,
+			  setIdStrictness, getIdDemandInfo, getInlinePragma,
 			  setIdWorkerInfo, getIdCprInfo )
 import VarSet
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
-			  CprInfo(..), exactArity
+			  CprInfo(..), exactArity, InlinePragInfo(..)
 			)
 import Demand           ( Demand, wwLazy )
 import SaLib
@@ -203,13 +203,14 @@ tryWW non_rec fn_id rhs
     )
 
   || arity == 0		-- Don't split if it's not a function
+  || never_inline fn_id
 
   || not (do_strict_ww || do_cpr_ww || do_coerce_ww)
   = returnUs [ (fn_id, rhs) ]
 
   | otherwise		-- Do w/w split
-  = mkWwBodies fun_ty arity wrap_dmds cpr_info	`thenUs` \ (work_args, wrap_fn, work_fn) ->
-    getUniqueUs					`thenUs` \ work_uniq ->
+  = mkWwBodies fun_ty arity wrap_dmds one_shots cpr_info	`thenUs` \ (work_args, wrap_fn, work_fn) ->
+    getUniqueUs							`thenUs` \ work_uniq ->
     let
 	work_rhs     = work_fn rhs
 	work_demands = [getIdDemandInfo v | v <- work_args, isId v]
@@ -230,7 +231,12 @@ tryWW non_rec fn_id rhs
 	-- Worker first, because wrapper mentions it
   where
     fun_ty = idType fn_id
-    arity  = exprArity rhs
+    arity  = exprEtaExpandArity rhs
+
+	-- Don't split something which is marked unconditionally NOINLINE
+    never_inline fn_id = case getInlinePragma fn_id of
+				IMustNotBeINLINEd False Nothing -> True
+				other			        -> False
 
     strictness_info     		  = getIdStrictness fn_id
     StrictnessInfo arg_demands result_bot = strictness_info
@@ -253,15 +259,16 @@ tryWW non_rec fn_id rhs
 	               | otherwise      = noStrictnessInfo
 
 	-------------------------------------------------------------
-    cpr_info     = getIdCprInfo fn_id
-    has_cpr_info = case cpr_info of
+    cpr_info  = getIdCprInfo fn_id
+    do_cpr_ww = case cpr_info of
 			CPRInfo _ -> True
 			other	  -> False
 
-    do_cpr_ww = has_cpr_info
-
 	-------------------------------------------------------------
     do_coerce_ww = check_for_coerce arity fun_ty
+
+	-------------------------------------------------------------
+    one_shots = get_one_shots rhs
 
 -- See if there's a Coerce before we run out of arity;
 -- if so, it's worth trying a w/w split.  Reason: we find
@@ -278,6 +285,16 @@ check_for_coerce arity ty
   where
     (_, tau) 	      = splitForAllTys ty
     (arg_tys, res_ty) = splitFunTys tau
+
+-- If the original function has one-shot arguments, it is important to
+-- make the wrapper and worker have corresponding one-shot arguments too.
+-- Otherwise we spuriously float stuff out of case-expression join points,
+-- which is very annoying.
+get_one_shots (Lam b e)
+  | isId b    = isOneShotLambda b : get_one_shots e
+  | otherwise = get_one_shots e
+get_one_shots (Note _ e) = get_one_shots e
+get_one_shots other	 = noOneShotInfo
 \end{code}
 
 
@@ -299,8 +316,10 @@ mkWrapper :: Type		-- Wrapper type
 	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
 
 mkWrapper fun_ty arity demands cpr_info
-  = mkWwBodies fun_ty arity demands cpr_info	`thenUs` \ (_, wrap_fn, _) ->
+  = mkWwBodies fun_ty arity demands noOneShotInfo cpr_info	`thenUs` \ (_, wrap_fn, _) ->
     returnUs wrap_fn
+
+noOneShotInfo = repeat False
 \end{code}
 
 

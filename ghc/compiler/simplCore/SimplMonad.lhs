@@ -51,13 +51,14 @@ module SimplMonad (
 #include "HsVersions.h"
 
 import Const		( Con(DEFAULT) )
-import Id		( Id, mkSysLocal, idMustBeINLINEd )
+import Id		( Id, mkSysLocal, isConstantId )
 import IdInfo		( InlinePragInfo(..) )
 import Demand		( Demand )
 import CoreSyn
 import PprCore		()	-- Instances
 import Rules		( RuleBase )
 import CostCentre	( CostCentreStack, subsumedCCS )
+import Name		( isLocallyDefined )
 import Var		( TyVar )
 import VarEnv
 import VarSet
@@ -743,7 +744,23 @@ environment seems like wild overkill.
 \begin{code}
 switchOffInlining :: SimplM a -> SimplM a
 switchOffInlining m env us sc
-  = m (env { seBlackList = \v -> True  }) us sc
+  = m (env { seBlackList = \v -> (v `isInScope` subst) || not (isLocallyDefined v) 
+	   }) us sc
+	-- Black list anything that is in scope or imported.
+	-- The in-scope thing arranges *not* to black list inlinings that are
+	-- completely inside the switch-off-inlining block.
+	-- This allows simplification to proceed un-hindered inside the block.
+	--
+	-- At one time I had an exception for constant Ids (constructors, primops)
+	--		      && (old_black_list v || not (isConstantId v ))
+	-- because (a) some don't have bindings, so we never want not to inline them
+	--	   (b) their defns are very seldom big, so there's no size penalty
+	--	       to inline them
+	-- But that failed because if we inline (say) [] in build's rhs, then
+	-- the exported thing doesn't match rules
+  where
+    subst	   = seSubst env
+    old_black_list = seBlackList env
 \end{code}
 
 
@@ -813,15 +830,9 @@ setInScope :: InScopeSet -> SimplM a -> SimplM a
 setInScope in_scope m env@(SimplEnv {seSubst = subst}) us sc
   = m (env {seSubst = Subst.setInScope subst in_scope}) us sc
 
-modifyInScope :: CoreBndr -> SimplM a -> SimplM a
-modifyInScope v m env us sc 
-#ifdef DEBUG
-  | not (v `isInScope` seSubst env)
-  = pprTrace "modifyInScope: not in scope:" (ppr v)
-    m env us sc
-#endif
-  | otherwise
-  = extendInScope v m env us sc
+modifyInScope :: CoreBndr -> CoreBndr -> SimplM a -> SimplM a
+modifyInScope v v' m env@(SimplEnv {seSubst = subst}) us sc 
+  = m (env {seSubst = Subst.modifyInScope subst v v'}) us sc
 
 extendSubst :: CoreBndr -> SubstResult -> SimplM a -> SimplM a
 extendSubst var res m env@(SimplEnv {seSubst = subst}) us sc

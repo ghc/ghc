@@ -105,7 +105,6 @@ applyTypeToArgs e op_ty (other_arg : args)
 	Nothing -> pprPanic "applyTypeToArgs" (pprCoreExpr e)
 \end{code}
 
-
 %************************************************************************
 %*									*
 \subsection{Figuring out things about expressions}
@@ -344,8 +343,9 @@ exprEtaExpandArity (Case scrut _ alts)
 exprEtaExpandArity (Note note e)	
   | ok_note note			= exprEtaExpandArity e
   where
-    ok_note InlineCall = True
-    ok_note other      = False
+    ok_note (Coerce _ _) = True
+    ok_note InlineCall   = True
+    ok_note other        = False
 	-- Notice that we do not look through __inline_me__
 	-- This one is a bit more surprising, but consider
 	--	f = _inline_me (\x -> e)
@@ -355,11 +355,6 @@ exprEtaExpandArity (Note note e)
 	-- giving just
 	--	f = \x -> e
 	-- A Bad Idea
-	--
-	-- Notice also that we don't look through Coerce
-	-- This is simply because the etaExpand code in SimplUtils
-	-- isn't capable of making the alternating lambdas and coerces
-	-- that would be necessary to exploit it
 
 exprEtaExpandArity other 		= 0	-- Could do better for applications
 

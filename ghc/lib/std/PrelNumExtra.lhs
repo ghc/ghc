@@ -5,6 +5,7 @@
 \section[PrelNumExtra]{Module @PrelNumExtra@}
 
 \begin{code}
+{-# OPTIONS -fno-cpr-analyse #-}
 {-# OPTIONS -fno-implicit-prelude #-}
 {-# OPTIONS -H20m #-}
 

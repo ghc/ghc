@@ -24,11 +24,11 @@ import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
 			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
 			  unBindSubst, bindSubstList, unBindSubstList, substInScope
 			)
-import Id		( Id, getIdUnfolding, 
+import Id		( Id, getIdUnfolding, zapLamIdInfo, 
 			  getIdSpecialisation, setIdSpecialisation,
 			  setIdNoDiscard, maybeModifyIdInfo, modifyIdInfo
 			) 
-import IdInfo		( zapLamIdInfo, setSpecInfo, specInfo )
+import IdInfo		( setSpecInfo, specInfo )
 import Name		( Name, isLocallyDefined )
 import Var		( isTyVar, isId )
 import VarSet
@@ -205,13 +205,13 @@ matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
 	where	
 	  senv = substEnv subst
 	  go v = case lookupSubstEnv senv v of
-			Just (DoneEx ex) -> ex
-			Just (DoneTy ty) -> Type ty
+			Just (DoneEx ex)  -> ex
+			Just (DoneTy ty)  -> Type ty
 			-- Substitution should bind them all!
 
 
 zapOccInfo bndr | isTyVar bndr = bndr
-		| otherwise    = maybeModifyIdInfo zapLamIdInfo bndr
+		| otherwise    = zapLamIdInfo bndr
 \end{code}
 
 \begin{code}

@@ -227,9 +227,11 @@ data Sig name
 		SrcLoc
 
   | InlineSig	name		-- INLINE f
+	 	(Maybe Int)	-- phase
 		SrcLoc
 
   | NoInlineSig	name		-- NOINLINE f
+	 	(Maybe Int)	-- phase
 		SrcLoc
 
   | SpecInstSig (HsType name)	-- (Class tys); should be a specialisation of the 
@@ -250,8 +252,8 @@ sigsForMe f sigs
     sig_for_me (Sig         n _ _)    	  = f n
     sig_for_me (ClassOpSig  n _ _ _)  	  = f n
     sig_for_me (SpecSig     n _ _)  	  = f n
-    sig_for_me (InlineSig   n     _)  	  = f n  
-    sig_for_me (NoInlineSig n     _)  	  = f n  
+    sig_for_me (InlineSig   n _   _)  	  = f n  
+    sig_for_me (NoInlineSig n _   _)  	  = f n  
     sig_for_me (SpecInstSig _ _)      	  = False
     sig_for_me (FixSig (FixitySig n _ _)) = f n
 
@@ -265,11 +267,11 @@ isClassOpSig _			  = False
 
 isPragSig :: Sig name -> Bool
 	-- Identifies pragmas 
-isPragSig (SpecSig _ _ _)   = True
-isPragSig (InlineSig   _ _) = True
-isPragSig (NoInlineSig _ _) = True
-isPragSig (SpecInstSig _ _) = True
-isPragSig other		    = False
+isPragSig (SpecSig _ _ _)     = True
+isPragSig (InlineSig   _ _ _) = True
+isPragSig (NoInlineSig _ _ _) = True
+isPragSig (SpecInstSig _ _)   = True
+isPragSig other		      = False
 \end{code}
 
 \begin{code}
@@ -291,15 +293,18 @@ ppr_sig (SpecSig var ty _)
 	      nest 4 (ppr ty <+> text "#-}")
 	]
 
-ppr_sig (InlineSig var _)
-        = hsep [text "{-# INLINE", ppr var, text "#-}"]
+ppr_sig (InlineSig var phase _)
+        = hsep [text "{-# INLINE", ppr_phase phase, ppr var, text "#-}"]
 
-ppr_sig (NoInlineSig var _)
-        = hsep [text "{-# NOINLINE", ppr var, text "#-}"]
+ppr_sig (NoInlineSig var phase _)
+        = hsep [text "{-# NOINLINE", ppr_phase phase, ppr var, text "#-}"]
 
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
 
 ppr_sig (FixSig fix_sig) = ppr fix_sig
+
+ppr_phase Nothing = empty
+ppr_phase (Just n) = int n
 \end{code}
 

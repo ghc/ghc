@@ -19,6 +19,7 @@ module Id (
 	-- Modifying an Id
 	setIdName, setIdUnique, setIdType, setIdNoDiscard, 
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
+	zapFragileIdInfo, zapLamIdInfo,
 
 	-- Predicates
 	omitIfaceSigForId,
@@ -28,12 +29,12 @@ module Id (
 
 	-- Inline pragma stuff
 	getInlinePragma, setInlinePragma, modifyInlinePragma, 
-	idMustBeINLINEd, idMustNotBeINLINEd,
 
 	isSpecPragmaId,	isRecordSelector,
 	isPrimitiveId_maybe, isDataConId_maybe,
 	isConstantId, isBottomingId, idAppIsBottom,
 	isExportedId, isUserExportedId,
+	mayHaveNoBinding,
 
 	-- One shot lambda stuff
 	isOneShotLambda, setOneShotLambda, clearOneShotLambda,
@@ -48,6 +49,7 @@ module Id (
 	setIdUpdateInfo,
 	setIdCafInfo,
 	setIdCprInfo,
+	setIdOccInfo,
 
 	getIdArity,
 	getIdDemandInfo,
@@ -57,7 +59,8 @@ module Id (
 	getIdSpecialisation,
 	getIdUpdateInfo,
 	getIdCafInfo,
-	getIdCprInfo
+	getIdCprInfo,
+	getIdOccInfo
 
     ) where
 
@@ -74,17 +77,20 @@ import Var		( Id, DictId,
 			  externallyVisibleId
 			)
 import VarSet
-import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, seqType )
-import IdInfo
+import Type		( Type, tyVarsOfType, typePrimRep, addFreeTyVars, seqType, splitTyConApp_maybe )
+
+import IdInfo 
+
 import Demand		( Demand, isStrict, wwLazy )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
 			  isWiredInName, isUserExportedName
 			) 
+import OccName		( UserFS )
 import Const		( Con(..) )
 import PrimRep		( PrimRep )
 import PrimOp		( PrimOp )
-import TysPrim		( realWorldStatePrimTy )
+import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel(..) )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, mkBuiltinUnique, getBuiltinUniques )
@@ -131,8 +137,8 @@ mkVanillaId name ty = mkId name ty vanillaIdInfo
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
-mkUserLocal :: OccName     -> Unique -> Type -> SrcLoc -> Id
-mkSysLocal  :: FAST_STRING -> Unique -> Type -> Id
+mkUserLocal :: OccName -> Unique -> Type -> SrcLoc -> Id
+mkSysLocal  :: UserFS  -> Unique -> Type -> Id
 
 mkSysLocal  fs uniq ty      = mkVanillaId (mkSysLocalName uniq fs)      ty
 mkUserLocal occ uniq ty loc = mkVanillaId (mkLocalName    uniq occ loc) ty
@@ -214,6 +220,14 @@ isConstantId id = case idFlavour id of
 isSpecPragmaId id = case idFlavour id of
 			SpecPragmaId -> True
 			other	     -> False
+
+mayHaveNoBinding id = isConstantId id
+	-- mayHaveNoBinding returns True of an Id which may not have a
+	-- binding, even though it is defined in this module.  Notably,
+	-- the constructors of a dictionary are in this situation.
+	--	
+	-- mayHaveNoBinding returns True of some things that *do* have a local binding,
+	-- so it's only an approximation.  That's ok... it's only use for assertions.
 
 -- Don't drop a binding for an exported Id,
 -- if it otherwise looks dead.  
@@ -344,6 +358,14 @@ getIdCprInfo id = cprInfo (idInfo id)
 
 setIdCprInfo :: Id -> CprInfo -> Id
 setIdCprInfo id cpr_info = modifyIdInfo (`setCprInfo` cpr_info) id
+
+	---------------------------------
+	-- Occcurrence INFO
+getIdOccInfo :: Id -> OccInfo
+getIdOccInfo id = occInfo (idInfo id)
+
+setIdOccInfo :: Id -> OccInfo -> Id
+setIdOccInfo id occ_info = modifyIdInfo (`setOccInfo` occ_info) id
 \end{code}
 
 
@@ -361,15 +383,6 @@ setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
 
 modifyInlinePragma :: Id -> (InlinePragInfo -> InlinePragInfo) -> Id
 modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (inlinePragInfo info))) id
-
-idMustNotBeINLINEd id = case getInlinePragma id of
-			  IMustNotBeINLINEd -> True
-			  IAmALoopBreaker   -> True
-			  other		    -> False
-
-idMustBeINLINEd id =  case getInlinePragma id of
-			IMustBeINLINEd -> True
-			other	       -> False
 \end{code}
 
 
@@ -379,7 +392,9 @@ idMustBeINLINEd id =  case getInlinePragma id of
 isOneShotLambda :: Id -> Bool
 isOneShotLambda id = case lbvarInfo (idInfo id) of
 			IsOneShotLambda -> True
-			NoLBVarInfo	-> idType id == realWorldStatePrimTy
+			NoLBVarInfo	-> case splitTyConApp_maybe (idType id) of
+						Just (tycon,_) -> tycon == statePrimTyCon
+						other	       -> False
 	-- The last clause is a gross hack.  It claims that 
 	-- every function over realWorldStatePrimTy is a one-shot
 	-- function.  This is pretty true in practice, and makes a big
@@ -391,9 +406,12 @@ isOneShotLambda id = case lbvarInfo (idInfo id) of
 	-- When `thenST` gets inlined, we end up with
 	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
 	-- and we don't re-inline E.
-	--	
+	--
 	-- It would be better to spot that r was one-shot to start with, but
 	-- I don't want to rely on that.
+	--
+	-- Another good example is in fill_in in PrelPack.lhs.  We should be able to
+	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 setOneShotLambda :: Id -> Id
 setOneShotLambda id = modifyIdInfo (`setLBVarInfo` IsOneShotLambda) id
@@ -407,3 +425,12 @@ clearOneShotLambda id
 --	f = \x -> e
 -- If we change the one-shot-ness of x, f's type changes
 \end{code}
+
+\begin{code}
+zapFragileIdInfo :: Id -> Id
+zapFragileIdInfo id = maybeModifyIdInfo zapFragileInfo id
+
+zapLamIdInfo :: Id -> Id
+zapLamIdInfo id = maybeModifyIdInfo zapLamInfo id
+\end{code}
+

@@ -27,7 +27,7 @@ module UsageSPUtils ( AnnotM(AnnotM), initAnnotM,
 import CoreSyn
 import Const            ( Con(..), Literal(..) )
 import Var              ( IdOrTyVar, varName, varType, setVarType, mkUVar )
-import Id               ( idMustBeINLINEd, isExportedId )
+import Id               ( mayHaveNoBinding, isExportedId )
 import Name             ( isLocallyDefined )
 import TypeRep          ( Type(..), TyNote(..) )  -- friend
 import Type             ( UsageAnn(..), isUsgTy, splitFunTys )
@@ -167,7 +167,7 @@ for us.  @sigVarTyMF@ checks the variable to see how to set the flags.
 
 @hasLocalDef@ tells us if the given variable has an actual local
 definition that we can play with.  This is not quite the same as
-@isLocallyDefined@, since @IMustBeINLINEd@ things (usually) don't have
+@isLocallyDefined@, since @mayHaveNoBindingId@ things (usually) don't have
 a local definition - the simplifier will inline whatever their
 unfolding is anyway.  We treat these as if they were externally
 defined, since we don't have access to their definition (at least not
@@ -182,7 +182,7 @@ assumed true (exactly) of all imported ids.
 \begin{code}
 hasLocalDef :: IdOrTyVar -> Bool
 hasLocalDef var = isLocallyDefined var
-                  && not (idMustBeINLINEd var)
+                  && not (mayHaveNoBinding var)
 
 hasUsgInfo :: IdOrTyVar -> Bool
 hasUsgInfo var = (not . isLocallyDefined) var

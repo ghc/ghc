@@ -21,10 +21,10 @@ import CoreFVs		( exprFreeVars )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap, exprEtaExpandArity )
 import Subst		( substBndrs, substBndr, substIds )
 import Id		( Id, idType, getIdArity, isId, idName,
-			  getInlinePragma, setInlinePragma,
+			  getIdOccInfo,
 			  getIdDemandInfo, mkId, idInfo
 			)
-import IdInfo		( arityLowerBound, InlinePragInfo(..), setInlinePragInfo, vanillaIdInfo )
+import IdInfo		( arityLowerBound, setOccInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
 import Const		( Con(..) )
 import Name		( isLocalName, setNameUnique )
@@ -243,7 +243,7 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 	    poly_name = setNameUnique (idName var) uniq		-- Keep same name
 	    poly_ty   = mkForAllTys tyvars_here (idType var)	-- But new type of course
 
-		-- It's crucial to copy the inline-prag of the original var, because
+		-- It's crucial to copy the occInfo of the original var, because
 		-- we're looking at occurrence-analysed but as yet unsimplified code!
 		-- In particular, we mustn't lose the loop breakers.
 		-- 
@@ -254,14 +254,14 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
 		-- the occurrences of x' will be just the occurrences originaly
 		-- pinned on x.
-	    poly_info = vanillaIdInfo `setInlinePragInfo` getInlinePragma var
+	    poly_info = vanillaIdInfo `setOccInfo` getIdOccInfo var
 
 	    poly_id   = mkId poly_name poly_ty poly_info
 	in
 	returnSmpl (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tyvars_here))
 
-    mk_silly_bind var rhs = NonRec (setInlinePragma var IMustBeINLINEd) rhs
-		-- The addInlinePragma is really important!  If we don't say 
+    mk_silly_bind var rhs = NonRec var rhs
+		-- The Inline note is really important!  If we don't say 
 		-- INLINE on these silly little bindings then look what happens!
 		-- Suppose we start with:
 		--
@@ -273,7 +273,7 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- 		* but then it gets inlined into the rhs of g*
 		--		* then the binding for g* is floated out of the /\b
 		--		* so we're back to square one
-		-- The silly binding for g* must be IMustBeINLINEs, so that
+		-- The silly binding for g* must be INLINEd, so that
 		-- we simply substitute for g* throughout.
 \end{code}
 
@@ -541,11 +541,14 @@ findAlt con alts
 
     matches (DEFAULT, _, _) = True
     matches (con1, _, _)    = con == con1
+\end{code}
 
 
-mkCoerce to_ty (Note (Coerce _ from_ty) expr) 
+\begin{code}
+mkCoerce :: Type -> CoreExpr -> CoreExpr
+mkCoerce to_ty expr
   | to_ty == from_ty = expr
   | otherwise	     = Note (Coerce to_ty from_ty) expr
-mkCoerce to_ty expr
-  = Note (Coerce to_ty (coreExprType expr)) expr
+  where
+    from_ty = coreExprType expr
 \end{code}

@@ -149,29 +149,32 @@ foldr k z xs = go xs
 	       go (x:xs) = x `k` go xs
 
 build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
-{-# INLINE build #-}
+{-# INLINE 2 build #-}
 	-- The INLINE is important, even though build is tiny,
  	-- because it prevents [] getting inlined in the version that
 	-- appears in the interface file.  If [] *is* inlined, it
 	-- won't match with [] appearing in rules in an importing module.
+	--
+	-- The "2" says to inline in phase 2
+
 build g = g (:) []
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
-{-# INLINE augment #-}
+{-# INLINE 2 augment #-}
 augment g xs = g (:) xs
 
 {-# RULES
-"fold/build" 	forall k,z,g::forall b. (a->b->b) -> b -> b . 
+"fold/build" 	forall k z (g::forall b. (a->b->b) -> b -> b) . 
 		foldr k z (build g) = g k z
 
-"foldr/augment" forall k,z,xs,g::forall b. (a->b->b) -> b -> b . 
+"foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) . 
 		foldr k z (augment g xs) = g k (foldr k z xs)
 
 "foldr/id"    	foldr (:) [] = \x->x
-"foldr/app"    	forall xs, ys. foldr (:) ys xs = append xs ys
+"foldr/app"    	forall xs ys. foldr (:) ys xs = append xs ys
 
-"foldr/cons"	forall k,z,x,xs. foldr k z (x:xs) = k x (foldr k z xs)
-"foldr/nil"	forall k,z.	 foldr k z []     = z 
+"foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
+"foldr/nil"	forall k z.	 foldr k z []     = z 
  #-}
 \end{code}
 
@@ -193,7 +196,7 @@ mapList _ []     = []
 mapList f (x:xs) = f x : mapList f xs
 
 {-# RULES
-"mapFB"	    forall c,f,g.	mapFB (mapFB c f) g	= mapFB c (f.g) 
+"mapFB"	    forall c f g.	mapFB (mapFB c f) g	= mapFB c (f.g) 
 "mapList"   forall f.		foldr (mapFB (:) f) []	= mapList f
  #-}
 \end{code}

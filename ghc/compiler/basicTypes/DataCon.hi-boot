@@ -1,6 +1,7 @@
 _interface_ DataCon 1
 _exports_
-DataCon DataCon dataConType ;
+DataCon DataCon dataConType isExistentialDataCon ;
 _declarations_
 1 data DataCon ;
 1 dataConType _:_ DataCon -> TypeRep.Type ;;
+1 isExistentialDataCon _:_ DataCon -> PrelBase.Bool ;;

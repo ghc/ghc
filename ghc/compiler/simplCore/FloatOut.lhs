@@ -15,7 +15,7 @@ import CoreSyn
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_simpl_stats )
 import ErrUtils		( dumpIfSet )
 import CostCentre	( dupifyCC, CostCentre )
-import Id		( Id )
+import Id		( Id, idType )
 import Const		( isWHNFCon )
 import VarEnv
 import CoreLint		( beginPass, endPass )
@@ -24,6 +24,7 @@ import SetLevels	( setLevels,
 		 	  Level(..), tOP_LEVEL, ltMajLvl, ltLvl, isTopLvl
 			)
 import BasicTypes	( Unused )
+import Type		( isUnLiftedType )
 import Var		( TyVar )
 import UniqSupply       ( UniqSupply )
 import List		( partition )
@@ -261,6 +262,16 @@ floatExpr env lvl (Note note@(SCC cc) expr)
 	-- Note: Nested SCC's are preserved for the benefit of
 	--       cost centre stack profiling (Durham)
 
+-- At one time I tried the effect of not float anything out of an InlineMe,
+-- but it sometimes works badly.  For example, consider PrelArr.done.  It
+-- has the form 	__inline (\d. e)
+-- where e doesn't mention d.  If we float this to 
+--	__inline (let x = e in \d. x)
+-- things are bad.  The inliner doesn't even inline it because it doesn't look
+-- like a head-normal form.  So it seems a lesser evil to let things float.
+-- In SetLevels we do set the context to (Level 0 0) when we get to an InlineMe
+-- which discourages floating out.
+
 floatExpr env lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Note note expr') }
@@ -359,10 +370,16 @@ partitionByMajorLevel, partitionByLevel
 partitionByMajorLevel ctxt_lvl defns
   = partition float_further defns
   where
-    float_further (my_lvl, _) = my_lvl `lt_major` ctxt_lvl
-
-my_lvl `lt_major`  ctxt_lvl = my_lvl `ltMajLvl` ctxt_lvl ||
-			      isTopLvl my_lvl
+	-- Float it if we escape a value lambda, 
+	-- or if we get to the top level
+    float_further (my_lvl, bind) = my_lvl `ltMajLvl` ctxt_lvl || isTopLvl my_lvl
+	-- The isTopLvl part says that if we can get to the top level, say "yes" anyway
+	-- This means that 
+	--	x = f e
+	-- transforms to 
+	--    lvl = e
+	--    x = f lvl
+	-- which is as it should be
 
 partitionByLevel ctxt_lvl defns
   = partition float_further defns

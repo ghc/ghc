@@ -16,7 +16,7 @@ find, unsurprisingly, a Core expression.
 module CoreUnfold (
 	Unfolding, UnfoldingGuidance, -- types
 
-	noUnfolding, mkUnfolding, seqUnfolding,
+	noUnfolding, mkTopUnfolding, mkUnfolding, mkCompulsoryUnfolding, seqUnfolding,
 	mkOtherCon, otherCons,
 	unfoldingTemplate, maybeUnfoldingTemplate,
 	isEvaldUnfolding, isCheapUnfolding,
@@ -55,11 +55,11 @@ import VarSet
 import Name		( isLocallyDefined )
 import Const		( Con(..), isLitLitLit, isWHNFCon )
 import PrimOp		( PrimOp(..), primOpIsDupable )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), workerExists )
+import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), insideLam, workerExists )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe, isUnLiftedType )
 import Const		( isNoRepLit )
-import Unique		( Unique, buildIdKey, augmentIdKey, runSTRepIdKey )
+import Unique		( Unique, buildIdKey, augmentIdKey )
 import Maybes		( maybeToBool )
 import Bag
 import Util		( isIn, lengthExceeds )
@@ -89,8 +89,12 @@ data Unfolding
 				-- 	case x of { C f -> ... }
 				-- Here, f gets an OtherCon [] unfolding.
 
+  | CompulsoryUnfolding CoreExpr	-- There is no "original" definition,
+					-- so you'd better unfold.
+
   | CoreUnfolding			-- An unfolding with redundant cached information
 		CoreExpr		-- Template; binder-info is correct
+		Bool			-- This is a top-level binding
 		Bool			-- exprIsCheap template (cached); it won't duplicate (much) work 
 					--	if you inline this in more than one place
 		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
@@ -98,8 +102,8 @@ data Unfolding
 		UnfoldingGuidance	-- Tells about the *size* of the template.
 
 seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding e b1 b2 g)
-  = seqExpr e `seq` b1 `seq` b2 `seq` seqGuidance g
+seqUnfolding (CoreUnfolding e top b1 b2 g)
+  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` seqGuidance g
 seqUnfolding other = ()
 \end{code}
 
@@ -107,35 +111,44 @@ seqUnfolding other = ()
 noUnfolding = NoUnfolding
 mkOtherCon  = OtherCon
 
-mkUnfolding expr
+mkTopUnfolding expr = mkUnfolding True expr
+
+mkUnfolding top_lvl expr
   = CoreUnfolding (occurAnalyseGlobalExpr expr)
+		  top_lvl
 		  (exprIsCheap expr)
 		  (exprIsValue expr)
 		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 
+mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
+  = CompulsoryUnfolding (occurAnalyseGlobalExpr expr)
+
 unfoldingTemplate :: Unfolding -> CoreExpr
-unfoldingTemplate (CoreUnfolding expr _ _ _) = expr
+unfoldingTemplate (CoreUnfolding expr _ _ _ _) = expr
+unfoldingTemplate (CompulsoryUnfolding expr)   = expr
 unfoldingTemplate other = panic "getUnfoldingTemplate"
 
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
-maybeUnfoldingTemplate (CoreUnfolding expr _ _ _) = Just expr
-maybeUnfoldingTemplate other 			  = Nothing
+maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _) = Just expr
+maybeUnfoldingTemplate (CompulsoryUnfolding expr)   = Just expr
+maybeUnfoldingTemplate other 			    = Nothing
 
 otherCons (OtherCon cons) = cons
 otherCons other		  = []
 
 isEvaldUnfolding :: Unfolding -> Bool
-isEvaldUnfolding (OtherCon _)		        = True
-isEvaldUnfolding (CoreUnfolding _ _ is_evald _) = is_evald
-isEvaldUnfolding other			        = False
+isEvaldUnfolding (OtherCon _)		          = True
+isEvaldUnfolding (CoreUnfolding _ _ _ is_evald _) = is_evald
+isEvaldUnfolding other			          = False
 
 isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding _ is_cheap _ _) = is_cheap
-isCheapUnfolding other				= False
+isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _) = is_cheap
+isCheapUnfolding other				  = False
 
 hasUnfolding :: Unfolding -> Bool
-hasUnfolding (CoreUnfolding _ _ _ _) = True
-hasUnfolding other 	 	     = False
+hasUnfolding (CoreUnfolding _ _ _ _ _) = True
+hasUnfolding (CompulsoryUnfolding _)   = True
+hasUnfolding other 	 	       = False
 
 hasSomeUnfolding :: Unfolding -> Bool
 hasSomeUnfolding NoUnfolding = False
@@ -143,11 +156,6 @@ hasSomeUnfolding other	     = True
 
 data UnfoldingGuidance
   = UnfoldNever
-  | UnfoldAlways		-- There is no "original" definition,
-				-- so you'd better unfold.  Or: something
-				-- so cheap to unfold (e.g., 1#) that
-				-- you should do it absolutely always.
-
   | UnfoldIfGoodArgs	Int	-- and "n" value args
 
 			[Int]	-- Discount if the argument is evaluated.
@@ -167,7 +175,6 @@ seqGuidance other			= ()
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr UnfoldAlways    = ptext SLIT("ALWAYS")
     ppr UnfoldNever	= ptext SLIT("NEVER")
     ppr (UnfoldIfGoodArgs v cs size discount)
       = hsep [ ptext SLIT("IF_ARGS"), int v,
@@ -189,18 +196,20 @@ calcUnfoldingGuidance
 	-> CoreExpr    		-- expression to look at
 	-> UnfoldingGuidance
 calcUnfoldingGuidance bOMB_OUT_SIZE expr
-  | exprIsTrivial expr		-- Often trivial expressions are never bound
-				-- to an expression, but it can happen.  For
-				-- example, the Id for a nullary constructor has
-				-- a trivial expression as its unfolding, and
-				-- we want to make sure that we always unfold it.
-  = UnfoldAlways
- 
-  | otherwise
   = case collect_val_bndrs expr of { (inline, val_binders, body) ->
+    let
+	n_val_binders = length val_binders
+    in
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
-      TooBig -> UnfoldNever
+      TooBig 
+	| not inline -> UnfoldNever
+		-- A big function with an INLINE pragma must
+		-- have an UnfoldIfGoodArgs guidance
+	| inline     -> UnfoldIfGoodArgs n_val_binders
+					 (map (const 0) val_binders)
+					 (n_val_binders + 2) 0
+				-- See comments with final_size below
 
       SizeIs size cased_args scrut_discount
 	-> UnfoldIfGoodArgs
@@ -211,14 +220,22 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	where        
 	    boxed_size    = I# size
 
-	    n_val_binders = length val_binders
-
-	    final_size | inline     = boxed_size `min` (n_val_binders + 2)
+	    final_size | inline     = 0	-- Trying very agresssive inlining of INLINE things.
+					-- Reason: we don't want to call the un-inlined version,
+					--	   because its body is awful
+					-- boxed_size `min` (n_val_binders + 2)	-- Trying "+2" again...
 		       | otherwise  = boxed_size
 		-- The idea is that if there is an INLINE pragma (inline is True)
-		-- and there's a big body, we give a size of n_val_binders+2.  This
-		-- This is enough to defeat the no-size-increase test in callSiteInline;
-		--   we don't want to inline an INLINE thing into a totally boring context
+		-- and there's a big body, we give a size of n_val_binders+1.  This
+		-- This is enough to pass the no-size-increase test in callSiteInline,
+		--   but no more.
+		-- I tried n_val_binders+2, to just defeat the test, on the grounds that
+		--   we don't want to inline an INLINE thing into a totally boring context,
+		--   but I found that some wrappers (notably one for a join point) weren't
+		--   getting inlined, and that was terrible.  In that particular case, the
+		--   call site applied the wrapper to realWorld#, so if we made that an 
+		--   "interesting" value the inlining would have happened... but it was
+		--   simpler to inline wrappers a little more eagerly instead.
 		--
 		-- Sometimes, though, an INLINE thing is smaller than n_val_binders+2.
 		-- A particular case in point is a constructor, which has size 1.
@@ -306,15 +323,17 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 
     ------------ 
     size_up_app (App fun arg) args   = size_up_app fun (arg:args)
-    size_up_app fun 	      args   = foldr (addSize . nukeScrutDiscount . size_up) (fun_discount fun) args
+    size_up_app fun 	      args   = foldr (addSize . nukeScrutDiscount . size_up) 
+					     (size_up_fun fun)
+					     args
 
 	-- A function application with at least one value argument
 	-- so if the function is an argument give it an arg-discount
 	-- Also behave specially if the function is a build
-    fun_discount (Var fun) | idUnique fun == buildIdKey   = buildSize
-    			   | idUnique fun == augmentIdKey = augmentSize
-    			   | fun `is_elem` args 	= scrutArg fun
-    fun_discount other					= sizeZero
+    size_up_fun (Var fun) | idUnique fun == buildIdKey   = buildSize
+    			  | idUnique fun == augmentIdKey = augmentSize
+    			  | fun `is_elem` args	 	 = scrutArg fun `addSize` sizeOne
+    size_up_fun other					 = size_up other
 
     ------------ 
     size_up_alt (con, bndrs, rhs) = size_up rhs
@@ -443,7 +462,6 @@ couldBeSmallEnoughToInline other       = True
 
 certainlySmallEnoughToInline :: UnfoldingGuidance -> Bool
 certainlySmallEnoughToInline UnfoldNever		   = False
-certainlySmallEnoughToInline UnfoldAlways		   = True
 certainlySmallEnoughToInline (UnfoldIfGoodArgs _ _ size _) = size <= opt_UF_UseThreshold
 \end{code}
 
@@ -500,95 +518,93 @@ so we can inline if it occurs once, or is small
 \begin{code}
 callSiteInline :: Bool			-- True <=> the Id is black listed
 	       -> Bool			-- 'inline' note at call site
+	       -> OccInfo
 	       -> Id			-- The Id
 	       -> [Bool]		-- One for each value arg; True if it is interesting
 	       -> Bool			-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline black_listed inline_call id arg_infos interesting_cont
+callSiteInline black_listed inline_call occ id arg_infos interesting_cont
   = case getIdUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon _  -> Nothing ;
-	CoreUnfolding unf_template is_cheap _ guidance ->
+	CompulsoryUnfolding unf_template -> Just unf_template ;
+	CoreUnfolding unf_template is_top is_cheap _ guidance ->
 
     let
 	result | yes_or_no = Just unf_template
 	       | otherwise = Nothing
 
-	inline_prag = getInlinePragma id
 	n_val_args  = length arg_infos
 
-	yes_or_no =
-	    case inline_prag of
-		IAmDead		  -> pprTrace "callSiteInline: dead" (ppr id) False
-		IMustNotBeINLINEd -> False
-		IAmALoopBreaker   -> False
-		IMustBeINLINEd    -> True	-- Overrides absolutely everything, including the black list
-		ICanSafelyBeINLINEd in_lam one_br -> consider in_lam    True  one_br
-		NoInlinePragInfo		  -> consider InsideLam False False
-
-	consider in_lam once once_in_one_branch
+ 	yes_or_no 
 	  | black_listed = False
+	  | otherwise    = case occ of
+				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
+				IAmALoopBreaker      -> False
+				OneOcc in_lam one_br -> (not in_lam || is_cheap) && consider_safe in_lam True  one_br
+				NoOccInfo	     -> is_cheap 		 && consider_safe True   False False
+
+	consider_safe in_lam once once_in_one_branch
+		-- consider_safe decides whether it's a good idea to inline something,
+		-- given that there's no work-duplication issue (the caller checks that).
+		-- once_in_one_branch = True means there's a unique textual occurrence
 	  | inline_call  = True
+
 	  | once_in_one_branch	-- Be very keen to inline something if this is its unique occurrence; that
 				-- gives a good chance of eliminating the original binding for the thing.
 				-- The only time we hold back is when substituting inside a lambda;
 				-- then if the context is totally uninteresting (not applied, not scrutinised)
 				-- there is no point in substituting because it might just increase allocation.
-	  = WARN( case in_lam of { NotInsideLam -> True; other -> False },
-		  text "callSiteInline:oneOcc" <+> ppr id )
-		-- If it has one occurrence, not inside a lambda, PreInlineUnconditionally
-		-- should have zapped it already
-	    is_cheap && (not (null arg_infos) || interesting_cont)
+	  = not in_lam || not (null arg_infos) || interesting_cont
 
-	  | otherwise	-- Occurs (textually) more than once, so look at its size
+	  | otherwise
 	  = case guidance of
-	      UnfoldAlways -> True
-	      UnfoldNever  -> False
+	      UnfoldNever  -> False ;
 	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
-		| enough_args && size <= (n_vals_wanted + 1)
+
+		  | enough_args && size <= (n_vals_wanted + 1)
 			-- No size increase
 			-- Size of call is n_vals_wanted (+1 for the function)
-		-> case in_lam of
-			NotInsideLam -> True
-			InsideLam    -> is_cheap
+		  -> True
 
-		| not (or arg_infos || really_interesting_cont || once)
-			-- If it occurs more than once, there must be something interesting 
-			-- about some argument, or the result, to make it worth inlining
-			-- We also drop this case if the thing occurs once, although perhaps in 
-			-- several branches.  In this case we are keener about inlining in the hope
-			-- that we'll be able to drop the allocation for the function altogether.
-		-> False
-  
-		| otherwise
-		-> case in_lam of
-			NotInsideLam -> small_enough
-			InsideLam    -> is_cheap && small_enough
+	  	  | otherwise
+		  -> some_benefit && small_enough
 
-		where
-		  enough_args		  = n_val_args >= n_vals_wanted
-		  really_interesting_cont | n_val_args <  n_vals_wanted = False	-- Too few args
-					  | n_val_args == n_vals_wanted = interesting_cont
-					  | otherwise		        = True	-- Extra args
-			-- This rather elaborate defn for really_interesting_cont is important
-			-- Consider an I# = INLINE (\x -> I# {x})
-			-- The unfolding guidance deems it to have size 2, and no arguments.
-			-- So in an application (I# y) we must take the extra arg 'y' as
-			-- evidence of an interesting context!
-			
-		  small_enough = (size - discount) <= opt_UF_UseThreshold
-		  discount     = computeDiscount n_vals_wanted arg_discounts res_discount 
+		  where
+		    some_benefit = or arg_infos || really_interesting_cont || 
+		    		 (not is_top && (once || (n_vals_wanted > 0 && enough_args)))
+		    	-- If it occurs more than once, there must be something interesting 
+		    	-- about some argument, or the result context, to make it worth inlining
+		    	--
+		    	-- If a function has a nested defn we also record some-benefit,
+		    	-- on the grounds that we are often able to eliminate the binding,
+		    	-- and hence the allocation, for the function altogether; this is good
+		    	-- for join points.  But this only makes sense for *functions*;
+		    	-- inlining a constructor doesn't help allocation unless the result is
+		    	-- scrutinised.  UNLESS the constructor occurs just once, albeit possibly
+		    	-- in multiple case branches.  Then inlining it doesn't increase allocation,
+		    	-- but it does increase the chance that the constructor won't be allocated at all
+		    	-- in the branches that don't use it.
+	    
+		    enough_args		  = n_val_args >= n_vals_wanted
+		    really_interesting_cont | n_val_args <  n_vals_wanted = False	-- Too few args
+		    			    | n_val_args == n_vals_wanted = interesting_cont
+		    			    | otherwise		          = True	-- Extra args
+	    	-- really_interesting_cont tells if the result of the
+	    	-- call is in an interesting context.
+	    	
+		    small_enough = (size - discount) <= opt_UF_UseThreshold
+		    discount     = computeDiscount n_vals_wanted arg_discounts res_discount 
 						 arg_infos really_interesting_cont
-
-				
+		
     in    
 #ifdef DEBUG
     if opt_D_dump_inlinings then
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "black listed" <+> ppr black_listed,
-				   text "inline prag:" <+> ppr inline_prag,
+				   text "occ info:" <+> ppr occ,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
 				   text "is cheap" <+> ppr is_cheap,
@@ -646,6 +662,19 @@ For optimisation we use phase 1,2 and nothing (i.e. no -finline-phase flag)
 in that order.  The meanings of these are determined by the @blackListed@ function
 here.
 
+The final simplification doesn't have a phase number
+
+Pragmas
+~~~~~~~
+	Pragma		Black list if
+
+(least black listing, most inlining)
+	INLINE n foo	phase is Just p *and* p<n *and* foo appears on LHS of rule
+	INLINE foo	phase is Just p *and*           foo appears on LHS of rule
+	NOINLINE n foo	phase is Just p *and* (p<n *or* foo appears on LHS of rule)
+	NOINLINE foo	always
+(most black listing, least inlining)
+
 \begin{code}
 blackListed :: IdSet 		-- Used in transformation rules
 	    -> Maybe Int	-- Inline phase
@@ -655,39 +684,42 @@ blackListed :: IdSet 		-- Used in transformation rules
 -- inlined because of the inline phase we are in.  This is the sole
 -- place that the inline phase number is looked at.
 
--- 	ToDo: improve horrible coding style (too much duplication)
+blackListed rule_vars Nothing		-- Last phase
+  = \v -> case getInlinePragma v of
+		IMustNotBeINLINEd False Nothing -> True		-- An unconditional NOINLINE pragma
+		other				-> False
 
+blackListed rule_vars (Just 0)
 -- Phase 0: used for 'no imported inlinings please'
 -- This prevents wrappers getting inlined which in turn is bad for full laziness
 -- NEW: try using 'not a wrapper' rather than 'not imported' in this phase.
 -- This allows a little more inlining, which seems to be important, sometimes.
 -- For example PrelArr.newIntArr gets better.
-blackListed rule_vars (Just 0)
-  = \v -> let v_uniq = idUnique v
-	  in 
-		-- not (isLocallyDefined v)
-	     workerExists (getIdWorkerInfo v)
-	  || v `elemVarSet` rule_vars
-	  || not (isEmptyCoreRules (getIdSpecialisation v))
-	  || v_uniq == runSTRepIdKey
+  = \v -> -- workerExists (getIdWorkerInfo v) || normal_case rule_vars 0 v
+	  -- True	-- Try going back to no inlinings at all
+			-- BUT: I found that there is some advantage in doing 
+			-- local inlinings first.  For example in fish/Main.hs
+			-- it's advantageous to inline scale_vec2 before inlining
+			-- wrappers from PrelNum that make it look big.
+	  not (isLocallyDefined v)	-- This seems best at the moment
 
--- Phase 1: don't inline any rule-y things or things with specialisations
-blackListed rule_vars (Just 1)
-  = \v -> let v_uniq = idUnique v
-	  in v `elemVarSet` rule_vars
-	  || not (isEmptyCoreRules (getIdSpecialisation v))
-	  || v_uniq == runSTRepIdKey
+blackListed rule_vars (Just phase)
+  = \v -> normal_case rule_vars phase v
 
--- Phase 2: allow build/augment to inline, and specialisations
-blackListed rule_vars (Just 2)
-  = \v -> let v_uniq = idUnique v
-	  in (v `elemVarSet` rule_vars && not (v_uniq == buildIdKey || 
-					       v_uniq == augmentIdKey))
-	  || v_uniq == runSTRepIdKey
+normal_case rule_vars phase v 
+  = case getInlinePragma v of
+	NoInlinePragInfo -> has_rules
 
--- Otherwise just go for it
-blackListed rule_vars phase
-  = \v -> False
+	IMustNotBeINLINEd from_INLINE Nothing
+	  | from_INLINE -> has_rules	-- Black list until final phase
+	  | otherwise   -> True		-- Always blacklisted
+
+	IMustNotBeINLINEd from_inline (Just threshold)
+	  | from_inline -> phase < threshold && has_rules
+	  | otherwise   -> phase < threshold || has_rules
+  where
+    has_rules =  v `elemVarSet` rule_vars
+	      || not (isEmptyCoreRules (getIdSpecialisation v))
 \end{code}
 
 

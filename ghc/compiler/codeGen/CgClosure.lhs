@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.35 1999/10/13 16:39:15 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.36 1999/11/01 17:10:07 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -46,7 +46,7 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
 import CostCentre	
 import Id		( Id, idName, idType, idPrimRep )
-import Name		( Name )
+import Name		( Name, isLocalName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
@@ -372,9 +372,10 @@ closureCodeBody binder_info closure_info cc all_args body
 	-- fast_entry_code = forceHeapCheck [] True fast_entry_code'
 
 	fast_entry_code
-	  = profCtrC SLIT("TICK_CTR") [ 
+	  = moduleName		`thenFC` \ mod_name ->
+	    profCtrC SLIT("TICK_CTR") [ 
 		CLbl ticky_ctr_label DataPtrRep,
-		mkCString (_PK_ (showSDocDebug (ppr name))),
+		mkCString (_PK_ (ppr_for_ticky_name mod_name name)),
 		mkIntCLit stg_arity,	-- total # of args
 		mkIntCLit sp_stk_args,	-- # passed on stk
 		mkCString (_PK_ (map (showTypeCategory . idType) all_args))
@@ -437,6 +438,14 @@ closureCodeBody binder_info closure_info cc all_args body
     name       = closureName closure_info
     fast_label = mkFastEntryLabel name stg_arity
     info_label = mkInfoTableLabel name
+
+
+-- When printing the name of a thing in a ticky file, we want to
+-- give the module name even for *local* things.   We print
+-- just "x (M)" rather that "M.x" to distinguish them from the global kind.
+ppr_for_ticky_name mod_name name
+  | isLocalName name = showSDocDebug (ppr name <+> (parens (ppr mod_name)))
+  | otherwise	     = showSDocDebug (ppr name)
 \end{code}
 
 For lexically scoped profiling we have to load the cost centre from

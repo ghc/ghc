@@ -219,9 +219,8 @@ tidyTopId mod env@(tidy_env, var_env) env_idinfo id
 
 \begin{code}
 -- tidyIdInfo does these things:
---	a) tidy the specialisation info (if any)
---	b) zap a complicated ICanSafelyBeINLINEd pragma,
---	c) zap the unfolding
+--	a) tidy the specialisation info and worker info (if any)
+--	b) zap the unfolding and demand info
 -- The latter two are to avoid space leaks
 
 tidyIdInfo env info
@@ -229,13 +228,9 @@ tidyIdInfo env info
   where
     rules = specInfo info
 
-    info1 | isEmptyCoreRules rules = info 
+    info2 | isEmptyCoreRules rules = info 
 	  | otherwise	           = info `setSpecInfo` tidyRules env rules
 		
-    info2 = case inlinePragInfo info of
-		ICanSafelyBeINLINEd _ _ -> info1 `setInlinePragInfo` NoInlinePragInfo 
-		other			-> info1
-
     info3 = info2 `setUnfoldingInfo` noUnfolding 
     info4 = info3 `setDemandInfo`    wwLazy		-- I don't understand why...
 

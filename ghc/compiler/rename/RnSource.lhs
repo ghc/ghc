@@ -617,7 +617,7 @@ rnForAll doc forall_tyvars ctxt ty
 
 ---------------------------------------
 rnHsType doc ty@(HsForAllTy _ _ inner_ty)
-  = addErrRn (unexpectedForAllTy ty)	`thenRn_`
+  = addWarnRn (unexpectedForAllTy ty)	`thenRn_`
     rnHsPolyType doc ty
 
 rnHsType doc (MonoTyVar tyvar)
@@ -715,9 +715,8 @@ rnIdInfo (HsWorker worker)
   = lookupOccRn worker			`thenRn` \ worker' ->
     returnRn (HsWorker worker', unitFV worker')
 
-rnIdInfo (HsUnfold inline (Just expr))	= rnCoreExpr expr `thenRn` \ (expr', fvs) ->
-				  	  returnRn (HsUnfold inline (Just expr'), fvs)
-rnIdInfo (HsUnfold inline Nothing)	= returnRn (HsUnfold inline Nothing, emptyFVs)
+rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ (expr', fvs) ->
+				  returnRn (HsUnfold inline expr', fvs)
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity, emptyFVs)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update, emptyFVs)
 rnIdInfo (HsNoCafRefs)		= returnRn (HsNoCafRefs, emptyFVs)

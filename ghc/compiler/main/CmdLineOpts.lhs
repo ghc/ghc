@@ -93,7 +93,6 @@ module CmdLineOpts (
 	opt_DoSemiTagging,
 	opt_FoldrBuildOn,
 	opt_LiberateCaseThreshold,
-	opt_NoPreInlining,
 	opt_StgDoLetNoEscapes,
 	opt_UnfoldCasms,
         opt_UsageSPOn,
@@ -103,7 +102,6 @@ module CmdLineOpts (
 	opt_SimplDoLambdaEtaExpansion,
 	opt_SimplCaseOfCase,
 	opt_SimplCaseMerge,
-	opt_SimplLetToCase,
 	opt_SimplPedanticBottoms,
 
 	-- Unfolding control
@@ -235,6 +233,8 @@ data StgToDo
 data SimplifierSwitch
   = MaxSimplifierIterations Int
   | SimplInlinePhase Int
+  | DontApplyRules
+  | SimplLetToCase
 \end{code}
 
 %************************************************************************
@@ -381,7 +381,6 @@ opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
-opt_NoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
 opt_UnfoldCasms		        = lookUp SLIT("-funfold-casms-in-hi-file")
 opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
@@ -421,7 +420,6 @@ opt_SimplDoEtaReduction		= lookUp SLIT("-fdo-eta-reduction")
 opt_SimplDoLambdaEtaExpansion	= lookUp SLIT("-fdo-lambda-eta-expansion")
 opt_SimplCaseOfCase		= lookUp SLIT("-fcase-of-case")
 opt_SimplCaseMerge		= lookUp SLIT("-fcase-merge")
-opt_SimplLetToCase		= lookUp SLIT("-flet-to-case")
 opt_SimplPedanticBottoms	= lookUp SLIT("-fpedantic-bottoms")
 
 -- Unfolding control
@@ -531,6 +529,8 @@ classifyOpts = sep argv [] [] -- accumulators...
 matchSimplSw opt
   = firstJust	[ matchSwInt  opt "-fmax-simplifier-iterations"		MaxSimplifierIterations
 		, matchSwInt  opt "-finline-phase"			SimplInlinePhase
+		, matchSwBool opt "-fno-rules"				DontApplyRules
+		, matchSwBool opt "-flet-to-case"			SimplLetToCase
 		]
 
 matchSwBool :: String -> String -> a -> Maybe a
@@ -563,10 +563,12 @@ instance Ord SimplifierSwitch where
 
 tagOf_SimplSwitch (SimplInlinePhase _)		= ILIT(1)
 tagOf_SimplSwitch (MaxSimplifierIterations _)	= ILIT(2)
+tagOf_SimplSwitch DontApplyRules		= ILIT(3)
+tagOf_SimplSwitch SimplLetToCase		= ILIT(4)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
-lAST_SIMPL_SWITCH_TAG = 2
+lAST_SIMPL_SWITCH_TAG = 4
 \end{code}
 
 %************************************************************************

@@ -536,30 +536,30 @@ renameSig lookup_occ_nm (SpecSig v ty src_loc)
     rnHsSigType (quotes (ppr v)) ty	`thenRn` \ (new_ty,fvs) ->
     returnRn (SpecSig new_v new_ty src_loc, fvs `addOneFV` new_v)
 
-renameSig lookup_occ_nm (InlineSig v src_loc)
-  = pushSrcLocRn src_loc $
-    lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (InlineSig new_v src_loc, unitFV new_v)
-
 renameSig lookup_occ_nm (FixSig (FixitySig v fix src_loc))
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
     returnRn (FixSig (FixitySig new_v fix src_loc), unitFV new_v)
 
-renameSig lookup_occ_nm (NoInlineSig v src_loc)
+renameSig lookup_occ_nm (InlineSig v p src_loc)
   = pushSrcLocRn src_loc $
     lookup_occ_nm v		`thenRn` \ new_v ->
-    returnRn (NoInlineSig new_v src_loc, unitFV new_v)
+    returnRn (InlineSig new_v p src_loc, unitFV new_v)
+
+renameSig lookup_occ_nm (NoInlineSig v p src_loc)
+  = pushSrcLocRn src_loc $
+    lookup_occ_nm v		`thenRn` \ new_v ->
+    returnRn (NoInlineSig new_v p src_loc, unitFV new_v)
 \end{code}
 
 Checking for distinct signatures; oh, so boring
 
 \begin{code}
 cmp_sig :: RenamedSig -> RenamedSig -> Ordering
-cmp_sig (Sig n1 _ _)	     (Sig n2 _ _)    	  = n1 `compare` n2
-cmp_sig (InlineSig n1 _)     (InlineSig n2 _) 	  = n1 `compare` n2
-cmp_sig (NoInlineSig n1 _)   (NoInlineSig n2 _)	  = n1 `compare` n2
-cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)  = cmpHsType compare ty1 ty2
+cmp_sig (Sig n1 _ _)	     (Sig n2 _ _)    	     = n1 `compare` n2
+cmp_sig (InlineSig n1 _ _)     (InlineSig n2 _ _)    = n1 `compare` n2
+cmp_sig (NoInlineSig n1 _ _)   (NoInlineSig n2 _ _)  = n1 `compare` n2
+cmp_sig (SpecInstSig ty1 _)  (SpecInstSig ty2 _)     = cmpHsType compare ty1 ty2
 cmp_sig (SpecSig n1 ty1 _)   (SpecSig n2 ty2 _) 
   = -- may have many specialisations for one value;
     -- but not ones that are exactly the same...
@@ -571,8 +571,8 @@ cmp_sig other_1 other_2					-- Tags *must* be different
 
 sig_tag (Sig n1 _ _)    	   = (ILIT(1) :: FAST_INT)
 sig_tag (SpecSig n1 _ _)    	   = ILIT(2)
-sig_tag (InlineSig n1 _)  	   = ILIT(3)
-sig_tag (NoInlineSig n1 _)  	   = ILIT(4)
+sig_tag (InlineSig n1 _ _)  	   = ILIT(3)
+sig_tag (NoInlineSig n1 _ _)  	   = ILIT(4)
 sig_tag (SpecInstSig _ _)	   = ILIT(5)
 sig_tag (FixSig _)		   = ILIT(6)
 sig_tag _			   = panic# "tag(RnBinds)"
@@ -603,8 +603,8 @@ unknownSigErr sig
 sig_doc (Sig        _ _ loc) 	     = (SLIT("type signature"),loc)
 sig_doc (ClassOpSig _ _ _ loc) 	     = (SLIT("class-method type signature"), loc)
 sig_doc (SpecSig    _ _ loc) 	     = (SLIT("SPECIALISE pragma"),loc)
-sig_doc (InlineSig  _     loc) 	     = (SLIT("INLINE pragma"),loc)
-sig_doc (NoInlineSig  _   loc) 	     = (SLIT("NOINLINE pragma"),loc)
+sig_doc (InlineSig  _ _    loc)	     = (SLIT("INLINE pragma"),loc)
+sig_doc (NoInlineSig  _ _  loc)	     = (SLIT("NOINLINE pragma"),loc)
 sig_doc (SpecInstSig _ loc)	     = (SLIT("SPECIALISE instance pragma"),loc)
 sig_doc (FixSig (FixitySig _ _ loc)) = (SLIT("fixity declaration"), loc)
 

@@ -31,7 +31,8 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo, InlinePragInfo(..), inli
 			  arityInfo, ppArityInfo, arityLowerBound,
 			  strictnessInfo, ppStrictnessInfo, isBottomingStrictness,
 			  cafInfo, ppCafInfo, specInfo,
-			  cprInfo, ppCprInfo,
+			  cprInfo, ppCprInfo, pprInlinePragInfo,
+			  occInfo, OccInfo(..),
 			  workerExists, workerInfo, ppWorkerInfo
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), rulesRules, rulesRhsFreeVars )
@@ -332,19 +333,25 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     Just work_id  = work_info
 
 
+    ------------  Occ info  --------------
+    loop_breaker  = case occInfo core_idinfo of
+			IAmALoopBreaker -> True
+			other		-> False
+
     ------------  Unfolding  --------------
     inline_pragma  = inlinePragInfo core_idinfo
     dont_inline	   = case inline_pragma of
-			IMustNotBeINLINEd -> True
-			IAmALoopBreaker	  -> True
-			other		  -> False
+			IMustNotBeINLINEd False Nothing -> True	-- Unconditional NOINLINE
+			other		  	        -> False
 
-    unfold_pretty | show_unfold = ptext SLIT("__U") <+> pprIfaceUnfolding rhs
+
+    unfold_pretty | show_unfold = ptext SLIT("__U") <> pprInlinePragInfo inline_pragma <+> pprIfaceUnfolding rhs
 		  | otherwise   = empty
 
     show_unfold = not has_worker	 &&	-- Not unnecessary
 		  not bottoming_fn	 &&	-- Not necessary
 		  not dont_inline	 &&
+		  not loop_breaker	 &&
 		  rhs_is_small		 &&	-- Small enough
 		  okToUnfoldInHiFile rhs 	-- No casms etc
 
@@ -374,10 +381,11 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     ------------ Sanity checking --------------
 	-- The arity of a wrapper function should match its strictness,
 	-- or else an importing module will get very confused indeed.
+	-- [later: actually all that is necessary is for strictness to exceed arity]
     arity_matches_strictness
 	= not has_worker ||
 	  case strict_info of
-	    StrictnessInfo ds _ -> length ds == arityLowerBound arity_info
+	    StrictnessInfo ds _ -> length ds >= arityLowerBound arity_info
 	    other		-> True
     
 interestingId id = isId id && isLocallyDefined id &&

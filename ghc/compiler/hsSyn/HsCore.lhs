@@ -157,7 +157,7 @@ instance (Outputable name) => Outputable (IfaceSig name) where
 data HsIdInfo name
   = HsArity		ArityInfo
   | HsStrictness	HsStrictnessInfo
-  | HsUnfold		InlinePragInfo (Maybe (UfExpr name))
+  | HsUnfold		InlinePragInfo (UfExpr name)
   | HsUpdate		UpdateInfo
   | HsSpecialise	(UfRuleBody name)
   | HsNoCafRefs

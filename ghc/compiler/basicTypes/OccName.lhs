@@ -58,7 +58,7 @@ code the encoding operation is not performed on each occurrence.
 These type synonyms help documentation.
 
 \begin{code}
-type UserFS     = FAST_STRING	-- As the user typed it
+type UserFS    = FAST_STRING	-- As the user typed it
 type EncodedFS = FAST_STRING	-- Encoded form
 
 type UserString = String	-- As the user typed it

@@ -20,7 +20,8 @@ module VarEnv (
 	TidyEnv, emptyTidyEnv,
 
 	-- SubstEnvs
-	SubstEnv, TyVarSubstEnv, SubstResult(..), emptySubstEnv, 
+	SubstEnv, TyVarSubstEnv, SubstResult(..),
+	emptySubstEnv, 
 	mkSubstEnv, lookupSubstEnv, extendSubstEnv, extendSubstEnvList,
 	delSubstEnv, noTypeSubst, isEmptySubstEnv
     ) where
@@ -30,6 +31,7 @@ module VarEnv (
 import {-# SOURCE #-}	CoreSyn( CoreExpr )
 import {-# SOURCE #-}	TypeRep( Type )
 
+import IdInfo	( OccInfo )
 import OccName	( TidyOccEnv, emptyTidyOccEnv )
 import Var	( Var, Id, IdOrTyVar )
 import UniqFM
@@ -74,6 +76,8 @@ type TyVarSubstEnv = SubstEnv	-- of the form (DoneTy ty) *only*
 
 data SubstResult
   = DoneEx CoreExpr		-- Completed term
+  | DoneId Id OccInfo		-- Completed term variable, with occurrence info; only 
+				-- used by the simplifier
   | DoneTy Type			-- Completed type
   | ContEx SubstEnv CoreExpr  	-- A suspended substitution
 

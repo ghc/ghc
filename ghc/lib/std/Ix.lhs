@@ -101,8 +101,8 @@ instance  Ix Int  where
     index b i | inRange b i =  unsafeIndex b i
 	      | otherwise   =  indexError b i "Int"
 
+    {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
-
 
 ----------------------------------------------------------------------
 instance  Ix Integer  where

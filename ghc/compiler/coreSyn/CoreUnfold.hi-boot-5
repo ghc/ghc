@@ -1,8 +1,7 @@
 __interface CoreUnfold 1 0 where
-__export CoreUnfold Unfolding UnfoldingGuidance mkUnfolding noUnfolding hasUnfolding isEvaldUnfolding seqUnfolding ;
+__export CoreUnfold Unfolding UnfoldingGuidance noUnfolding hasUnfolding isEvaldUnfolding seqUnfolding ;
 1 data Unfolding;
 1 data UnfoldingGuidance;
-1 mkUnfolding :: CoreSyn.CoreExpr -> Unfolding ;
 1 noUnfolding :: Unfolding ;
 1 hasUnfolding :: Unfolding -> PrelBase.Bool ;
 1 seqUnfolding :: Unfolding -> PrelBase.Z0T ;

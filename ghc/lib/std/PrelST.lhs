@@ -114,8 +114,10 @@ All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 runST :: (forall s. ST s a) -> a
 runST st = runSTRep (case st of { ST st_rep -> st_rep })
 
--- I'm letting runSTRep be inlined *after* full laziness
+-- I'm only letting runSTRep be inlined right at the end, in particular *after* full laziness
+-- That's what the "INLINE 100" says.
 -- 		SLPJ Apr 99
+{-# INLINE 100 runSTRep #-}
 runSTRep :: (forall s. STRep s a) -> a
 runSTRep st_rep = case st_rep realWorld# of
 	      		(# _, r #) -> r

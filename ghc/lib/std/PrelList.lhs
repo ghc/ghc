@@ -64,9 +64,9 @@ badHead = errorEmptyList "head"
 -- This rule is useful in cases like 
 --	head [y | (x,y) <- ps, x==t]
 {-# RULES
-"head/build"	forall g::forall b.(Bool->b->b)->b->b . 
+"head/build"	forall (g::forall b.(Bool->b->b)->b->b) . 
 		head (build g) = g (\x _ -> x) badHead
-"head/augment"	forall xs, g::forall b. (a->b->b) -> b -> b . 
+"head/augment"	forall xs (g::forall b. (a->b->b) -> b -> b) . 
 		head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
@@ -125,7 +125,7 @@ filterFB c p x r | p x       = x `c` r
 		 | otherwise = r
 
 {-# RULES
-"filterFB"	forall c,p,q.	filterFB (filterFB c p) q = filterFB c (\x -> p x && q x)
+"filterFB"	forall c p q.	filterFB (filterFB c p) q = filterFB c (\x -> p x && q x)
 "filterList" 	forall p.	foldr (filterFB (:) p) [] = filterList p
  #-}
 
@@ -361,9 +361,9 @@ or []		=  False
 or (x:xs)	=  x || or xs
 
 {-# RULES
-"and/build"	forall g::forall b.(Bool->b->b)->b->b . 
+"and/build"	forall (g::forall b.(Bool->b->b)->b->b) . 
 		and (build g) = g (&&) True
-"or/build"	forall g::forall b.(Bool->b->b)->b->b . 
+"or/build"	forall (g::forall b.(Bool->b->b)->b->b) . 
 		or (build g) = g (||) False
  #-}
 #endif
@@ -381,9 +381,9 @@ any p (x:xs)	= p x || any p xs
 all _ []	=  True
 all p (x:xs)	=  p x && all p xs
 {-# RULES
-"any/build"	forall p, g::forall b.(a->b->b)->b->b . 
+"any/build"	forall p (g::forall b.(a->b->b)->b->b) . 
 		any p (build g) = g ((||) . p) False
-"all/build"	forall p, g::forall b.(a->b->b)->b->b . 
+"all/build"	forall p (g::forall b.(a->b->b)->b->b) . 
 		all p (build g) = g ((&&) . p) True
  #-}
 #endif
@@ -475,10 +475,10 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 -- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
 -- foldr2 k z xs ys = foldr (foldr2_right k z) (\_ -> z) ys xs
 {-# RULES
-"foldr2/left"	forall k,z,ys,g::forall b.(a->b->b)->b->b . 
+"foldr2/left"	forall k z ys (g::forall b.(a->b->b)->b->b) . 
 		  foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
 
-"foldr2/right"	forall k,z,xs,g::forall b.(a->b->b)->b->b . 
+"foldr2/right"	forall k z xs (g::forall b.(a->b->b)->b->b) . 
 		  foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
  #-}
 \end{code}

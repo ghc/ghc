@@ -21,6 +21,7 @@ module CgUsages (
 #include "HsVersions.h"
 
 import AbsCSyn
+import PrimRep		( PrimRep(..) )
 import AbsCUtils	( mkAbstractCs )
 import CgMonad
 \end{code}
@@ -143,9 +144,10 @@ That's done by functions which allocate stack space.
 \begin{code}
 adjustSpAndHp :: VirtualSpOffset 	-- New offset for Arg stack ptr
 	      -> Code
-adjustSpAndHp newRealSp info_down (MkCgState absC binds
-					((vSp,fSp,realSp,hwSp),	
-					 (vHp, rHp)))
+adjustSpAndHp newRealSp (MkCgInfoDown _ _ _ ticky_ctr _)
+			(MkCgState absC binds
+				   ((vSp,fSp,realSp,hwSp),	
+				   (vHp, rHp)))
   = MkCgState (mkAbstractCs [absC,move_sp,move_hp]) binds new_usage
     where
 
@@ -153,9 +155,14 @@ adjustSpAndHp newRealSp info_down (MkCgState absC binds
 	      else (CAssign (CReg Sp)
 			    (CAddr (spRel realSp newRealSp)))
 
+	-- Adjust the heap pointer backwards in case we over-allocated
+	-- Analogously, we also remove bytes from the ticky counter
     move_hp = if (rHp == vHp) then AbsCNop
-	      else (CAssign (CReg Hp)
-			    (CAddr (hpRel rHp vHp)))
+	      else mkAbstractCs [
+			CAssign (CReg Hp) (CAddr (hpRel rHp vHp)),
+			profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+			    [ mkIntCLit (vHp - rHp), CLbl ticky_ctr DataPtrRep ]
+	      ]
 
     new_usage = ((vSp, fSp, newRealSp, hwSp), (vHp,vHp))
 \end{code}

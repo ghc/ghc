@@ -459,8 +459,9 @@ tcMonoExpr (ExplicitTuple exprs boxed) res_ty
                					`thenTc` \ (exprs', lies) ->
     returnTc (ExplicitTuple exprs' boxed, plusLIEs lies)
 
-tcMonoExpr (RecordCon con_name rbinds) res_ty
-  = tcId con_name			`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
+tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
+  = tcAddErrCtxt (recordConCtxt expr)		$
+    tcId con_name			`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
 	(_, record_ty) = splitFunTys con_tau
     in
@@ -522,8 +523,8 @@ tcMonoExpr (RecordCon con_name rbinds) res_ty
 --
 -- All this is done in STEP 4 below.
 
-tcMonoExpr (RecordUpd record_expr rbinds) res_ty
-  = tcAddErrCtxt recordUpdCtxt			$
+tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
+  = tcAddErrCtxt (recordUpdCtxt	expr)		$
 
 	-- STEP 0
 	-- Check that the field names are really field names
@@ -1091,7 +1092,8 @@ badFieldsUpd rbinds
   where
     fields = [field | (field, _, _) <- rbinds]
 
-recordUpdCtxt = ptext SLIT("In a record update construct")
+recordUpdCtxt expr = ptext SLIT("In the record update:") <+> ppr expr
+recordConCtxt expr = ptext SLIT("In the record construction:") <+> ppr expr
 
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
@@ -1112,7 +1114,6 @@ missingStrictFieldCon con field
 
 missingFieldCon :: Name -> Name -> SDoc
 missingFieldCon con field
-  = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
-	  ptext SLIT("does not have the field"), quotes (ppr field)]
-
+  = hsep [ptext SLIT("Field") <+> quotes (ppr field),
+	  ptext SLIT("is not initialised")]
 \end{code}

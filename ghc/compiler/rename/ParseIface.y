@@ -14,7 +14,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind, UsageAnn(..) )
-import IdInfo           ( ArityInfo, exactArity, CprInfo(..) )
+import IdInfo           ( ArityInfo, exactArity, CprInfo(..), InlinePragInfo(..) )
 import Lex		
 
 import RnMonad		( ImportVersion, LocalVersion, ParsedIface(..), WhatsImported(..),
@@ -602,12 +602,16 @@ id_info		:: { [HsIdInfo RdrName] }
 
 id_info_item	:: { HsIdInfo RdrName }
 		: '__A' INTEGER			{ HsArity (exactArity (fromInteger $2)) }
-		| '__U' core_expr		{ HsUnfold $1 (Just $2) }
-                | '__U' 		 	{ HsUnfold $1 Nothing }
+		| '__U' inline_prag core_expr	{ HsUnfold $2 $3 }
 		| '__M'				{ HsCprInfo $1 }
 		| '__S'				{ HsStrictness (HsStrictnessInfo $1) }
 		| '__C'                         { HsNoCafRefs }
 		| '__P' qvar_name 		{ HsWorker $2 }
+
+inline_prag     :: { InlinePragInfo }
+                :  {- empty -}                  { NoInlinePragInfo }
+                | '[' INTEGER ']'               { IMustNotBeINLINEd True  (Just (fromInteger $2)) } -- INLINE n
+                | '[' '!' INTEGER ']'           { IMustNotBeINLINEd False (Just (fromInteger $3)) } -- NOINLINE n
 
 -------------------------------------------------------
 core_expr	:: { UfExpr RdrName }

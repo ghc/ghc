@@ -1,6 +1,7 @@
 _interface_ IdInfo 1
 _exports_
-IdInfo IdInfo seqIdInfo ;
+IdInfo IdInfo seqIdInfo vanillaIdInfo;
 _declarations_
 1 data IdInfo ;
 1 seqIdInfo _:_ IdInfo -> PrelBase.() ;;
+1 vanillaIdInfo  _:_ IdInfo ;;

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.35 1999/10/13 16:39:14 simonmar Exp $
+% $Id: CgCase.lhs,v 1.36 1999/11/01 17:10:06 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -174,6 +174,7 @@ cgCase (StgCon (PrimOp op) args res_ty)
     } 						`thenC`
 
  	-- bind the default binder if necessary
+	-- The deadness info is set by StgVarInfo
     (if (isDeadBinder bndr)
 	then nopC
 	else bindNewToTemp bndr 		`thenFC` \ bndr_amode ->

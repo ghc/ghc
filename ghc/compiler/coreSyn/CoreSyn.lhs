@@ -43,9 +43,9 @@ import TysWiredIn	( boolTy, stringTy, nilDataCon )
 import CostCentre	( CostCentre, isDupdCC, noCostCentre )
 import Var		( Var, Id, TyVar, IdOrTyVar, isTyVar, isId, idType )
 import VarEnv
-import Id		( mkWildId, getInlinePragma, idInfo )
+import Id		( mkWildId, getIdOccInfo, idInfo )
 import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
-import IdInfo		( InlinePragInfo(..), megaSeqIdInfo )
+import IdInfo		( OccInfo(..), megaSeqIdInfo )
 import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
 import TysWiredIn	( trueDataCon, falseDataCon )
 import VarSet
@@ -279,7 +279,7 @@ rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | (_,_,e) <- alts]
 
 isDeadBinder :: CoreBndr -> Bool
-isDeadBinder bndr | isId bndr = case getInlinePragma bndr of
+isDeadBinder bndr | isId bndr = case getIdOccInfo bndr of
 					IAmDead -> True
 					other	-> False
 		  | otherwise = False	-- TyVars count as not dead

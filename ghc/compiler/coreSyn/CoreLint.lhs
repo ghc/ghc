@@ -21,7 +21,7 @@ import CoreUtils	( exprOkForSpeculation )
 
 import Bag
 import Const		( Con(..), DataCon, conType, conOkForApp, conOkForAlt )
-import Id		( isConstantId, idMustBeINLINEd )
+import Id		( mayHaveNoBinding )
 import Var		( IdOrTyVar, Id, TyVar, idType, tyVarKind, isTyVar, isId )
 import VarSet
 import Subst		( mkTyVarSubst, substTy )
@@ -219,20 +219,7 @@ lintSingleBinding rec_flag (binder,rhs)
 \begin{code}
 lintCoreExpr :: CoreExpr -> LintM Type
 
-lintCoreExpr (Var var) 
-  | isConstantId var = returnL (idType var)
-	-- Micro-hack here... Class decls generate applications of their
-	-- dictionary constructor, but don't generate a binding for the
-	-- constructor (since it would never be used).  After a single round
-	-- of simplification, these dictionary constructors have been
-	-- inlined (from their UnfoldInfo) to CoCons.  Just between
-	-- desugaring and simplfication, though, they appear as naked, unbound
-	-- variables as the function in an application.
-	-- The hack here simply doesn't check for out-of-scope-ness for
-	-- data constructors (at least, in a function position).
-	-- Ditto primitive Ids
-
-  | otherwise    = checkIdInScope var `seqL` returnL (idType var)
+lintCoreExpr (Var var) = checkIdInScope var `seqL` returnL (idType var)
 
 lintCoreExpr (Note (Coerce to_ty from_ty) expr)
   = lintCoreExpr expr 	`thenL` \ expr_ty ->
@@ -573,9 +560,17 @@ checkInScope :: SDoc -> IdOrTyVar -> LintM ()
 checkInScope loc_msg var loc scope errs
   |  isLocallyDefined var 
   && not (var `elemVarSet` scope)
-  && not (isId var && idMustBeINLINEd var)	-- Constructors and dict selectors 
-						-- don't have bindings, 
-						-- just MustInline prags
+  && not (isId var && mayHaveNoBinding var)
+	-- Micro-hack here... Class decls generate applications of their
+	-- dictionary constructor, but don't generate a binding for the
+	-- constructor (since it would never be used).  After a single round
+	-- of simplification, these dictionary constructors have been
+	-- inlined (from their UnfoldInfo) to CoCons.  Just between
+	-- desugaring and simplfication, though, they appear as naked, unbound
+	-- variables as the function in an application.
+	-- The hack here simply doesn't check for out-of-scope-ness for
+	-- data constructors (at least, in a function position).
+	-- Ditto primitive Ids
   = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc)
   | otherwise
   = (Nothing,errs)

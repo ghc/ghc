@@ -47,7 +47,7 @@ import Type		( Type, ThetaType,
 			  mkUsgTy, UsageAnn(..)
 			)
 import Module		( Module )
-import CoreUnfold 	( mkUnfolding )
+import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Subst		( mkTopTyVarSubst, substTheta )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
 import Class		( Class, classBigSig, classTyCon )
@@ -199,7 +199,9 @@ dataConInfo data_con
     `setArityInfo` exactArity (n_dicts + n_ex_dicts + n_id_args)
     `setUnfoldingInfo` unfolding
   where
-        unfolding = mkUnfolding (Note InlineMe con_rhs)
+        unfolding = mkTopUnfolding (Note InlineMe con_rhs)
+	-- The dictionary constructors of a class don't get a binding,
+	-- but they are always saturated, so they should always be inlined.
 
 	(tyvars, theta, ex_tyvars, ex_theta, orig_arg_tys, tycon) 
 	   = dataConSig data_con
@@ -290,7 +292,7 @@ mkRecordSelId field_label selector_ty
 	   
 	-- ToDo: consider adding further IdInfo
 
-    unfolding = mkUnfolding sel_rhs
+    unfolding = mkTopUnfolding sel_rhs
 
     (tyvars, theta, tau)  = splitSigmaTy selector_ty
     (data_ty,rhs_ty)      = expectJust "StdIdInfoRec" (splitFunTy_maybe tau)
@@ -343,7 +345,7 @@ mkNewTySelId field_label selector_ty = sel_id
 	   
 	-- ToDo: consider adding further IdInfo
 
-    unfolding = mkUnfolding sel_rhs
+    unfolding = mkTopUnfolding sel_rhs
 
     (tyvars, theta, tau)  = splitSigmaTy selector_ty
     (data_ty,rhs_ty)      = expectJust "StdIdInfoRec" (splitFunTy_maybe tau)
@@ -380,7 +382,7 @@ mkDictSelId name clas ty
 	-- We no longer use 'must-inline' on record selectors.  They'll
 	-- inline like crazy if they scrutinise a constructor
 
-    unfolding = mkUnfolding rhs
+    unfolding = mkTopUnfolding rhs
 
     (tyvars, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
 
@@ -419,13 +421,11 @@ mkPrimitiveId prim_op
 		
     info = mkIdInfo (ConstantId (PrimOp prim_op))
 	   `setUnfoldingInfo`	unfolding
-	   `setInlinePragInfo`	IMustBeINLINEd
-		-- The pragma @IMustBeINLINEd@ says that this Id absolutely 
+
+    unfolding = mkCompulsoryUnfolding rhs
+		-- The mkCompulsoryUnfolding says that this Id absolutely 
 		-- must be inlined.  It's only used for primitives, 
 		-- because we don't want to make a closure for each of them.
-	   
-
-    unfolding = mkUnfolding rhs
 
     args = mkTemplateLocals arg_tys
     rhs =  mkLams tyvars $ mkLams args $
@@ -500,8 +500,7 @@ unsafeCoerceId
   = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
   where
     info = vanillaIdInfo
-	   `setUnfoldingInfo`	mkUnfolding rhs
-	   `setInlinePragInfo`	IMustBeINLINEd 
+	   `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
     ty  = mkForAllTys [openAlphaTyVar,openBetaTyVar]
@@ -520,8 +519,7 @@ getTagId
   = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty info
   where
     info = vanillaIdInfo
-	   `setUnfoldingInfo`	mkUnfolding rhs
-	   `setInlinePragInfo`	IMustBeINLINEd 
+	   `setUnfoldingInfo`	mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
 
     ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)

@@ -13,12 +13,12 @@ module StgVarInfo ( setStgVarInfo ) where
 
 import StgSyn
 
-import Id		( setIdArity, getIdArity, Id )
+import Id		( setIdArity, getIdArity, setIdOccInfo, Id )
 import VarSet
 import VarEnv
 import Var
 import Const		( Con(..) )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..), 
+import IdInfo		( ArityInfo(..), OccInfo(..), 
 			  setInlinePragInfo )
 import PrimOp		( PrimOp(..) )
 import TysWiredIn       ( isForeignObjTy )
@@ -294,8 +294,8 @@ varsExpr (StgCase scrut _ _ bndr srt alts)
     let
 	-- determine whether the default binder is dead or not
 	bndr'= if (bndr `elementOfFVInfo` alts_fvs) 
-		  then modifyIdInfo (`setInlinePragInfo` NoInlinePragInfo) bndr
-		  else modifyIdInfo (`setInlinePragInfo` IAmDead)	   bndr
+		  then bndr `setIdOccInfo` NoOccInfo
+		  else bndr `setIdOccInfo` IAmDead
 
 	 -- for a _ccall_GC_, some of the *arguments* need to live across the
 	 -- call (see findLiveArgs comments.), so we annotate them as being live

@@ -26,14 +26,14 @@ module Var (
 	-- Ids
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
-	setIdName, setIdUnique, setIdInfo, lazySetIdInfo,
+	setIdName, setIdUnique, setIdInfo, lazySetIdInfo, zapIdInfo,
 	mkIdVar, isId, externallyVisibleId
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TypeRep( Type, Kind )
-import {-# SOURCE #-}	IdInfo( IdInfo, seqIdInfo )
+import {-# SOURCE #-}	IdInfo( IdInfo, seqIdInfo, vanillaIdInfo )
 
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey )
 import Name		( Name, OccName, NamedThing(..),
@@ -283,6 +283,9 @@ lazySetIdInfo var info = var {varInfo = info}
 setIdInfo :: Id -> IdInfo -> Id
 setIdInfo var info = seqIdInfo info `seq` var {varInfo = info}
 	-- Try to avoid spack leaks by seq'ing
+
+zapIdInfo :: Id -> Id
+zapIdInfo var = var {varInfo = vanillaIdInfo}
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
 modifyIdInfo fn var@(Var {varInfo = info})

@@ -12,9 +12,12 @@ module IdInfo (
 
 	vanillaIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
 
+	-- Zapping
+	zapFragileInfo,	zapLamInfo, zapSpecPragInfo, copyIdInfo,
+
 	-- Flavour
 	IdFlavour(..), flavourInfo, 
-	setNoDiscardInfo, zapSpecPragInfo, copyIdInfo,
+	setNoDiscardInfo,
 	ppFlavourInfo,
 
 	-- Arity
@@ -40,8 +43,12 @@ module IdInfo (
 	demandInfo, setDemandInfo, 
 
 	-- Inline prags
-	InlinePragInfo(..), OccInfo(..),
-	inlinePragInfo, setInlinePragInfo, notInsideLambda,
+	InlinePragInfo(..), 
+	inlinePragInfo, setInlinePragInfo, pprInlinePragInfo,
+
+	-- Occurrence info
+	OccInfo(..), InsideLam, OneBranch, insideLam, notInsideLam, oneBranch, notOneBranch,
+	occInfo, setOccInfo, isFragileOccInfo,
 
 	-- Specialisation
 	specInfo, setSpecInfo,
@@ -56,9 +63,6 @@ module IdInfo (
         -- Constructed Product Result Info
         CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
 
-	-- Zapping
- 	zapLamIdInfo, zapFragileIdInfo, zapIdInfoForStg,
-
         -- Lambda-bound variable info
         LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo
     ) where
@@ -71,9 +75,9 @@ import {-# SOURCE #-} CoreSyn	 ( CoreExpr, CoreRules, emptyCoreRules, isEmptyCor
 import {-# SOURCE #-} Const	 ( Con )
 
 import Var              ( Id )
+import VarSet		( IdOrTyVarSet )
 import FieldLabel	( FieldLabel )
 import Demand		( Demand, isStrict, isLazy, wwLazy, pprDemands, seqDemand, seqDemands )
-import Type             ( UsageAnn )
 import Outputable	
 import Maybe            ( isJust )
 
@@ -86,7 +90,8 @@ infixl 	1 `setUpdateInfo`,
 	  `setUnfoldingInfo`,
 	  `setCprInfo`,
 	  `setWorkerInfo`,
-	  `setCafInfo`
+	  `setCafInfo`,
+	  `setOccInfo`
 	-- infixl so you can say (id `set` a `set` b)
 \end{code}
 
@@ -121,7 +126,8 @@ data IdInfo
 	cafInfo		:: CafInfo,
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
-	inlinePragInfo	:: InlinePragInfo	-- Inline pragmas
+	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
+	occInfo		:: OccInfo		-- How it occurs
     }
 
 seqIdInfo :: IdInfo -> ()
@@ -143,7 +149,7 @@ megaSeqIdInfo info
     seqCaf (cafInfo info)		`seq`
     seqCpr (cprInfo info)		`seq`
     seqLBVar (lbvarInfo info)		`seq`
-    seqInlinePrag (inlinePragInfo info) 
+    seqOccInfo (occInfo info) 
 \end{code}
 
 Setters
@@ -152,6 +158,7 @@ Setters
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
 setSpecInfo 	  info sp = PSEQ sp (info { specInfo = sp })
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+setOccInfo	  info oc = oc `seq` info { occInfo = oc }
 setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
 	-- Try to avoid spack leaks by seq'ing
 
@@ -173,33 +180,6 @@ zapSpecPragInfo   info = case flavourInfo info of
 				SpecPragmaId -> info { flavourInfo = VanillaId }
 				other	     -> info
 
-copyIdInfo :: IdInfo	-- From
-  	   -> IdInfo	-- To
-	   -> IdInfo	-- To, updated with stuff from From; except flavour unchanged
--- copyIdInfo is used when shorting out a top-level binding
---	f_local = BIG
---	f = f_local
--- where f is exported.  We are going to swizzle it around to
---	f = BIG
---	f_local = f
--- but we must be careful to combine their IdInfos right.
--- The fact that things can go wrong here is a bad sign, but I can't see
--- how to make it 'patently right', so copyIdInfo is derived (pretty much) by trial and error
---
--- Here 'from' is f_local, 'to' is f, and the result is attached to f
-
-copyIdInfo from to = from { flavourInfo = flavourInfo to,
-			    specInfo = specInfo to,
-			    inlinePragInfo = inlinePragInfo to
-			  }
-	-- It's important to preserve the inline pragma on 'f'; e.g. consider
-	--	{-# NOINLINE f #-}
-	--	f = local
-	--
-	-- similarly, transformation rules may be attached to f
-	-- and we want to preserve them.  
-	--
-	-- On the other hand, we want the strictness info from f_local.
 \end{code}
 
 
@@ -220,7 +200,8 @@ mkIdInfo flv = IdInfo {
 		    cafInfo		= MayHaveCafRefs,
 		    cprInfo		= NoCPRInfo,
 		    lbvarInfo		= NoLBVarInfo,
-		    inlinePragInfo 	= NoInlinePragInfo
+		    inlinePragInfo 	= NoInlinePragInfo,
+		    occInfo		= NoOccInfo
 	   }
 \end{code}
 
@@ -314,66 +295,78 @@ ppArityInfo (ArityAtLeast arity) = hsep [ptext SLIT("__AL"), int arity]
 \begin{code}
 data InlinePragInfo
   = NoInlinePragInfo
-
-  | IMustNotBeINLINEd	-- User NOINLINE pragma
-
-  | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
-			-- in a group of recursive definitions
-
-  | ICanSafelyBeINLINEd	-- Used by the occurrence analyser to mark things
-			-- that manifesly occur once, not inside SCCs, 
-			-- not in constructor arguments
-
-	OccInfo		-- Says whether the occurrence is inside a lambda
-			--	If so, must only substitute WHNFs
-
-	Bool		-- False <=> occurs in more than one case branch
-			--	If so, there's a code-duplication issue
-
-  | IAmDead		-- Marks unused variables.  Sometimes useful for
-			-- lambda and case-bound variables.
-
-  | IMustBeINLINEd	-- Absolutely must inline; used for PrimOps and
-			-- constructors only.
-
-seqInlinePrag :: InlinePragInfo -> ()
-seqInlinePrag (ICanSafelyBeINLINEd occ alts) 
-  = occ `seq` alts `seq` ()
-seqInlinePrag other
-  = ()
+  | IMustNotBeINLINEd Bool		-- True <=> came from an INLINE prag, False <=> came from a NOINLINE prag
+		      (Maybe Int)	-- Phase number from pragma, if any
+	-- The True, Nothing case doesn't need to be recorded
 
 instance Outputable InlinePragInfo where
-  -- only used for debugging; never parsed.  KSW 1999-07
-  ppr NoInlinePragInfo  	= empty
-  ppr IMustBeINLINEd    	= ptext SLIT("__UU")
-  ppr IMustNotBeINLINEd 	= ptext SLIT("__Unot")
-  ppr IAmALoopBreaker   	= ptext SLIT("__Ux")
-  ppr IAmDead			= ptext SLIT("__Ud")
-  ppr (ICanSafelyBeINLINEd InsideLam _) = ptext SLIT("__Ul")
-  ppr (ICanSafelyBeINLINEd NotInsideLam True)  = ptext SLIT("__Us")
-  ppr (ICanSafelyBeINLINEd NotInsideLam False) = ptext SLIT("__Us*")
+  -- This is now parsed in interface files
+  ppr NoInlinePragInfo = empty
+  ppr other_prag       = ptext SLIT("__U") <> pprInlinePragInfo other_prag
 
+pprInlinePragInfo NoInlinePragInfo  		     = empty
+pprInlinePragInfo (IMustNotBeINLINEd True Nothing)   = empty
+pprInlinePragInfo (IMustNotBeINLINEd True (Just n))  = brackets (int n)
+pprInlinePragInfo (IMustNotBeINLINEd False Nothing)  = brackets (char '!')
+pprInlinePragInfo (IMustNotBeINLINEd False (Just n)) = brackets (char '!' <> int n)
+							
 instance Show InlinePragInfo where
   showsPrec p prag = showsPrecSDoc p (ppr prag)
 \end{code}
 
-\begin{code}
-data OccInfo
-  = NotInsideLam
 
-  | InsideLam		-- Inside a non-linear lambda (that is, a lambda which
-			-- is sure to be instantiated only once).
+%************************************************************************
+%*									*
+\subsection{Occurrence information}
+%*									*
+%************************************************************************
+
+\begin{code}
+data OccInfo 
+  = NoOccInfo
+
+  | IAmDead		-- Marks unused variables.  Sometimes useful for
+			-- lambda and case-bound variables.
+
+  | OneOcc InsideLam
+
+ 	   OneBranch
+
+  | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
+			-- in a group of recursive definitions
+
+seqOccInfo :: OccInfo -> ()
+seqOccInfo (OneOcc in_lam once) = in_lam `seq` once `seq` ()
+seqOccInfo occ			= ()
+
+type InsideLam = Bool	-- True <=> Occurs inside a non-linear lambda
 			-- Substituting a redex for this occurrence is
 			-- dangerous because it might duplicate work.
+insideLam    = True
+notInsideLam = False
 
+type OneBranch = Bool	-- True <=> Occurs in only one case branch
+			--	so no code-duplication issue to worry about
+oneBranch    = True
+notOneBranch = False
+
+isFragileOccInfo :: OccInfo -> Bool
+isFragileOccInfo (OneOcc _ _) = True
+isFragileOccInfo other	      = False
+\end{code}
+
+\begin{code}
 instance Outputable OccInfo where
-  ppr NotInsideLam = empty
-  ppr InsideLam    = text "l"
+  -- only used for debugging; never parsed.  KSW 1999-07
+  ppr NoOccInfo  			  	  = empty
+  ppr IAmALoopBreaker 				  = ptext SLIT("_Kx")
+  ppr IAmDead					  = ptext SLIT("_Kd")
+  ppr (OneOcc inside_lam one_branch) | inside_lam = ptext SLIT("_Kl")
+				     | one_branch = ptext SLIT("_Ks")
+				     | otherwise  = ptext SLIT("_Ks*")
 
-
-notInsideLambda :: OccInfo -> Bool
-notInsideLambda NotInsideLam = True
-notInsideLambda InsideLam    = False
+instance Show OccInfo where
+  showsPrec p occ = showsPrecSDoc p (ppr occ)
 \end{code}
 
 %************************************************************************
@@ -535,98 +528,6 @@ ppCafInfo MayHaveCafRefs = empty
 
 %************************************************************************
 %*									*
-\subsection[CAF-IdInfo]{CAF-related information}
-%*									*
-%************************************************************************
-
-zapFragileIdInfo is used when cloning binders, mainly in the
-simplifier.  We must forget about used-once information because that
-isn't necessarily correct in the transformed program.
-Also forget specialisations and unfoldings because they would need
-substitution to be correct.  (They get pinned back on separately.)
-
-\begin{code}
-zapFragileIdInfo :: IdInfo -> Maybe IdInfo
-zapFragileIdInfo info@(IdInfo {inlinePragInfo	= inline_prag, 
-			       workerInfo	= wrkr,
-			       specInfo		= rules, 
-			       unfoldingInfo	= unfolding})
-  |  not is_fragile_inline_prag 
-        -- We must forget about whether it was marked safe-to-inline,
-	-- because that isn't necessarily true in the simplified expression.
-	-- This is important because expressions may  be re-simplified
-
-  && isEmptyCoreRules rules
-	-- Specialisations would need substituting.  They get pinned
-	-- back on separately.
-
-  && not (workerExists wrkr)
-
-  && not (hasUnfolding unfolding)
-	-- This is very important; occasionally a let-bound binder is used
-	-- as a binder in some lambda, in which case its unfolding is utterly
-	-- bogus.  Also the unfolding uses old binders so if we left it we'd
-	-- have to substitute it. Much better simply to give the Id a new
-	-- unfolding each time, which is what the simplifier does.
-  = Nothing
-
-  | otherwise
-  = Just (info {inlinePragInfo	= safe_inline_prag, 
-		workerInfo	= noWorkerInfo,
-		specInfo	= emptyCoreRules,
-		unfoldingInfo	= noUnfolding})
-
-  where
-    is_fragile_inline_prag = case inline_prag of
-				ICanSafelyBeINLINEd _ _ -> True
-
--- We used to say the dead-ness was fragile, but I don't
--- see why it is.  Furthermore, deadness is a pain to lose;
--- see Simplify.mkDupableCont (Select ...)
---				IAmDead			-> True
-
-				other			-> False
-
-	-- Be careful not to destroy real 'pragma' info
-    safe_inline_prag | is_fragile_inline_prag = NoInlinePragInfo
-		     | otherwise	      = inline_prag
-\end{code}
-
-
-@zapLamIdInfo@ is used for lambda binders that turn out to to be
-part of an unsaturated lambda
-
-\begin{code}
-zapLamIdInfo :: IdInfo -> Maybe IdInfo
-zapLamIdInfo info@(IdInfo {inlinePragInfo = inline_prag, demandInfo = demand})
-  | is_safe_inline_prag && not (isStrict demand)
-  = Nothing
-  | otherwise
-  = Just (info {inlinePragInfo = safe_inline_prag,
-		demandInfo = wwLazy})
-  where
-	-- The "unsafe" prags are the ones that say I'm not in a lambda
-	-- because that might not be true for an unsaturated lambda
-    is_safe_inline_prag = case inline_prag of
-			 	ICanSafelyBeINLINEd NotInsideLam nalts -> False
-				other				       -> True
-
-    safe_inline_prag    = case inline_prag of
-			 	ICanSafelyBeINLINEd _ nalts
-				      -> ICanSafelyBeINLINEd InsideLam nalts
-				other -> inline_prag
-\end{code}
-
-\begin{code}
-zapIdInfoForStg :: IdInfo -> IdInfo
-	-- Return only the info needed for STG stuff
-	-- Namely, nothing, I think
-zapIdInfoForStg info = vanillaIdInfo	
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection[cpr-IdInfo]{Constructed Product Result info about an @Id@}
 %*									*
 %************************************************************************
@@ -739,4 +640,113 @@ instance Outputable LBVarInfo where
 
 instance Show LBVarInfo where
     showsPrec p c = showsPrecSDoc p (ppr c)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Bulk operations on IdInfo}
+%*									*
+%************************************************************************
+
+zapFragileInfo is used when cloning binders, mainly in the
+simplifier.  We must forget about used-once information because that
+isn't necessarily correct in the transformed program.
+Also forget specialisations and unfoldings because they would need
+substitution to be correct.  (They get pinned back on separately.)
+
+\begin{code}
+zapFragileInfo :: IdInfo -> Maybe IdInfo
+zapFragileInfo info@(IdInfo {occInfo		= occ, 
+			     workerInfo		= wrkr,
+			     specInfo		= rules, 
+			     unfoldingInfo	= unfolding})
+  |  not (isFragileOccInfo occ)
+        -- We must forget about whether it was marked safe-to-inline,
+	-- because that isn't necessarily true in the simplified expression.
+	-- This is important because expressions may  be re-simplified
+	-- We don't zap deadness or loop-breaker-ness.
+	-- The latter is important because it tells MkIface not to 
+	-- spit out an inlining for the thing.  The former doesn't
+	-- seem so important, but there's no harm.
+
+  && isEmptyCoreRules rules
+	-- Specialisations would need substituting.  They get pinned
+	-- back on separately.
+
+  && not (workerExists wrkr)
+
+  && not (hasUnfolding unfolding)
+	-- This is very important; occasionally a let-bound binder is used
+	-- as a binder in some lambda, in which case its unfolding is utterly
+	-- bogus.  Also the unfolding uses old binders so if we left it we'd
+	-- have to substitute it. Much better simply to give the Id a new
+	-- unfolding each time, which is what the simplifier does.
+  = Nothing
+
+  | otherwise
+  = Just (info {occInfo		= robust_occ_info,
+		workerInfo	= noWorkerInfo,
+		specInfo	= emptyCoreRules,
+		unfoldingInfo	= noUnfolding})
+  where
+	-- It's important to keep the loop-breaker info,
+	-- because the substitution doesn't remember it.
+    robust_occ_info = case occ of
+			OneOcc _ _ -> NoOccInfo
+			other	   -> occ
+\end{code}
+
+@zapLamInfo@ is used for lambda binders that turn out to to be
+part of an unsaturated lambda
+
+\begin{code}
+zapLamInfo :: IdInfo -> Maybe IdInfo
+zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
+  | is_safe_occ && not (isStrict demand)
+  = Nothing
+  | otherwise
+  = Just (info {occInfo = safe_occ,
+		demandInfo = wwLazy})
+  where
+	-- The "unsafe" occ info is the ones that say I'm not in a lambda
+	-- because that might not be true for an unsaturated lambda
+    is_safe_occ = case occ of
+		 	OneOcc in_lam once -> in_lam
+			other	  	   -> True
+
+    safe_occ = case occ of
+		 OneOcc _ once -> OneOcc insideLam once
+		 other	       -> occ
+\end{code}
+
+
+copyIdInfo is used when shorting out a top-level binding
+	f_local = BIG
+	f = f_local
+where f is exported.  We are going to swizzle it around to
+	f = BIG
+	f_local = f
+but we must be careful to combine their IdInfos right.
+The fact that things can go wrong here is a bad sign, but I can't see
+how to make it 'patently right', so copyIdInfo is derived (pretty much) by trial and error
+
+Here 'from' is f_local, 'to' is f, and the result is attached to f
+
+\begin{code}
+copyIdInfo :: IdInfo	-- From
+  	   -> IdInfo	-- To
+	   -> IdInfo	-- To, updated with stuff from From; except flavour unchanged
+copyIdInfo from to = from { flavourInfo = flavourInfo to,
+			    specInfo = specInfo to,
+			    inlinePragInfo = inlinePragInfo to
+			  }
+	-- It's important to preserve the inline pragma on 'f'; e.g. consider
+	--	{-# NOINLINE f #-}
+	--	f = local
+	--
+	-- similarly, transformation rules may be attached to f
+	-- and we want to preserve them.  
+	--
+	-- On the other hand, we want the strictness info from f_local.
 \end{code}

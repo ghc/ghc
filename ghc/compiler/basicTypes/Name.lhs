@@ -114,7 +114,7 @@ mkKnownKeyGlobal (rdr_name, uniq)
 		      (rdrNameOcc rdr_name)
 		      systemProvenance
 
-mkSysLocalName :: Unique -> FAST_STRING -> Name
+mkSysLocalName :: Unique -> UserFS -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = Local, 
 				n_occ = mkSrcVarOcc fs, n_prov = systemProvenance }
 

@@ -24,7 +24,7 @@ import Id		( Id, mkSysLocal, idType, getIdStrictness, idUnique, isExportedId, mk
 			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo, setIdType
 			)
 import Var		( Var, varType, modifyIdInfo )
-import IdInfo		( setDemandInfo, StrictnessInfo(..), zapIdInfoForStg )
+import IdInfo		( setDemandInfo, StrictnessInfo(..) )
 import UsageSPUtils     ( primOpUsgTys )
 import DataCon		( DataCon, dataConName, dataConId )
 import Demand		( Demand, isStrict, wwStrict, wwLazy )

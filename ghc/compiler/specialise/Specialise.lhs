@@ -22,7 +22,7 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
 			  mkForAllTys, boxedTypeKind
 			)
 import Subst		( Subst, mkSubst, substTy, emptySubst, substBndrs, extendSubstList,
-			  substExpr, substId, substIds, substAndCloneId, substAndCloneIds, lookupSubst
+			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst
 			) 
 import Var		( TyVar, mkSysTyVar, setVarUnique )
 import VarSet
@@ -609,9 +609,9 @@ dump_specs var = pprCoreRules var (getIdSpecialisation var)
 
 \begin{code}
 specVar :: Subst -> Id -> CoreExpr
-specVar subst v = case lookupSubst subst v of
-			Nothing	        -> Var v
-			Just (DoneEx e) -> e
+specVar subst v = case lookupIdSubst subst v of
+			DoneEx e   -> e
+			DoneId v _ -> Var v
 
 specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 -- We carry a substitution down:

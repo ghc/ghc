@@ -58,6 +58,7 @@ import Bag
 import Util		( isIn )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
+import FiniteMap	( listToFM, lookupFM )
 import SrcLoc           ( SrcLoc )
 import Outputable
 \end{code}
@@ -354,8 +355,14 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	exports  = zipWith mk_export binder_names zonked_mono_ids
 	dict_tys = map idType dicts_bound
 
-	inlines    = mkNameSet [name | InlineSig   name loc <- inline_sigs]
-        no_inlines = mkNameSet [name | NoInlineSig name loc <- inline_sigs]
+	inlines    = mkNameSet [name | InlineSig name _ loc <- inline_sigs]
+        no_inlines = listToFM ([(name, IMustNotBeINLINEd False phase) | NoInlineSig name phase loc <- inline_sigs] ++
+			       [(name, IMustNotBeINLINEd True  phase) | InlineSig   name phase loc <- inline_sigs, maybeToBool phase])
+		-- "INLINE n foo" means inline foo, but not until at least phase n
+		-- "NOINLINE n foo" means don't inline foo until at least phase n, and even 
+		--		    then only if it is small enough etc.
+		-- "NOINLINE foo" means don't inline foo ever, which we signal with a (IMustNotBeINLINEd Nothing)
+		-- See comments in CoreUnfold.blackListed for the Authorised Version
 
 	mk_export binder_name zonked_mono_id
 	  = (tyvars, 
@@ -408,8 +415,9 @@ justPatBindings (AndMonoBinds b1 b2) binds =
 justPatBindings other_bind binds = binds
 
 attachNoInlinePrag no_inlines bndr
-  | idName bndr `elemNameSet` no_inlines = bndr `setInlinePragma` IMustNotBeINLINEd
-  | otherwise				 = bndr
+  = case lookupFM no_inlines (idName bndr) of
+	Just prag -> bndr `setInlinePragma` prag
+	Nothing   -> bndr
 \end{code}
 
 Polymorphic recursion

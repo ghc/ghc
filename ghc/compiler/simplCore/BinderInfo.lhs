@@ -9,7 +9,7 @@
 
 \begin{code}
 module BinderInfo (
-	BinderInfo(..),
+	BinderInfo,
 
 	addBinderInfo, orBinderInfo,
 
@@ -19,12 +19,12 @@ module BinderInfo (
 	getBinderInfoArity,
 	setBinderInfoArityToZero,
 
-	occInfoToInlinePrag
+	binderInfoToOccInfo
     ) where
 
 #include "HsVersions.h"
 
-import IdInfo		( InlinePragInfo(..), OccInfo(..) )
+import IdInfo		( OccInfo(..), InsideLam, OneBranch, insideLam, notInsideLam, oneBranch )
 import GlaExts		( Int(..), (+#) )
 import Outputable
 \end{code}
@@ -46,10 +46,10 @@ data BinderInfo
 	!Int	-- number of arguments on stack when called; this is a minimum guarantee
 
 
-  | OneOcc	-- Just one occurrence (or one each in
+  | SingleOcc	-- Just one occurrence (or one each in
 		-- mutually-exclusive case alts).
 
-      !OccInfo
+      !InsideLam
 
       !InsideSCC
 
@@ -57,7 +57,7 @@ data BinderInfo
 		-- in which it occurs
 
 		-- Note that we only worry about the case-alt counts
-		-- if the OneOcc is substitutable -- that's the only
+		-- if the SingleOcc is substitutable -- that's the only
 		-- time we *use* the info; we could be more clever for
 		-- other cases if we really had to. (WDP/PS)
 
@@ -79,10 +79,10 @@ noBinderInfo = ManyOcc 0	-- A non-committal value
 \end{code} 
 
 \begin{code}
-occInfoToInlinePrag :: BinderInfo -> InlinePragInfo
-occInfoToInlinePrag DeadCode				    = IAmDead
-occInfoToInlinePrag (OneOcc occ_info NotInsideSCC n_alts _) = ICanSafelyBeINLINEd occ_info (n_alts==1)
-occInfoToInlinePrag other 				    = NoInlinePragInfo
+binderInfoToOccInfo :: BinderInfo -> OccInfo
+binderInfoToOccInfo DeadCode				     = IAmDead
+binderInfoToOccInfo (SingleOcc in_lam NotInsideSCC n_alts _) = OneOcc in_lam (n_alts==1)
+binderInfoToOccInfo other 				     = NoOccInfo
 \end{code}
 
 
@@ -94,18 +94,18 @@ deadOccurrence :: BinderInfo
 deadOccurrence = DeadCode
 
 funOccurrence :: Int -> BinderInfo
-funOccurrence = OneOcc NotInsideLam NotInsideSCC 1
+funOccurrence = SingleOcc notInsideLam NotInsideSCC 1
 
 markMany, markInsideLam, markInsideSCC :: BinderInfo -> BinderInfo
 
-markMany (OneOcc _ _ _ ar) = ManyOcc ar
+markMany (SingleOcc _ _ _ ar) = ManyOcc ar
 markMany (ManyOcc ar) 	   = ManyOcc ar
 markMany DeadCode	   = panic "markMany"
 
-markInsideLam (OneOcc _ in_scc n_alts ar) = OneOcc InsideLam in_scc n_alts ar
+markInsideLam (SingleOcc _ in_scc n_alts ar) = SingleOcc insideLam in_scc n_alts ar
 markInsideLam other		 	  = other
 
-markInsideSCC (OneOcc dup_danger _ n_alts ar) = OneOcc dup_danger InsideSCC n_alts ar
+markInsideSCC (SingleOcc dup_danger _ n_alts ar) = SingleOcc dup_danger InsideSCC n_alts ar
 markInsideSCC other			      = other
 
 addBinderInfo, orBinderInfo :: BinderInfo -> BinderInfo -> BinderInfo
@@ -120,22 +120,20 @@ addBinderInfo info1 info2
 
 orBinderInfo DeadCode info2 = info2
 orBinderInfo info1 DeadCode = info1
-orBinderInfo (OneOcc dup1 scc1 n_alts1 ar_1)
-	     (OneOcc dup2 scc2 n_alts2 ar_2)
+orBinderInfo (SingleOcc dup1 scc1 n_alts1 ar_1)
+	     (SingleOcc dup2 scc2 n_alts2 ar_2)
   = let
      scc  = or_sccs  scc1  scc2
      dup  = or_dups  dup1  dup2
      alts = n_alts1 + n_alts2
      ar   = min ar_1 ar_2
    in
-   OneOcc dup scc alts ar
+   SingleOcc dup scc alts ar
 
 orBinderInfo info1 info2
  = ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
-or_dups InsideLam _         = InsideLam
-or_dups _         InsideLam = InsideLam
-or_dups _         _         = NotInsideLam
+or_dups in_lam1 in_lam2 = in_lam1 || in_lam2
 
 or_sccs InsideSCC _ = InsideSCC
 or_sccs _ InsideSCC = InsideSCC
@@ -144,20 +142,20 @@ or_sccs _ _	    = NotInsideSCC
 setBinderInfoArityToZero :: BinderInfo -> BinderInfo
 setBinderInfoArityToZero DeadCode    = DeadCode
 setBinderInfoArityToZero (ManyOcc _) = ManyOcc 0
-setBinderInfoArityToZero (OneOcc dd sc i _) = OneOcc dd sc i 0
+setBinderInfoArityToZero (SingleOcc dd sc i _) = SingleOcc dd sc i 0
 \end{code}
 
 \begin{code}
 getBinderInfoArity (DeadCode) = 0
 getBinderInfoArity (ManyOcc i) = i
-getBinderInfoArity (OneOcc _ _ _ i) = i
+getBinderInfoArity (SingleOcc _ _ _ i) = i
 \end{code}
 
 \begin{code}
 instance Outputable BinderInfo where
   ppr DeadCode     = ptext SLIT("Dead")
   ppr (ManyOcc ar) = hcat [ ptext SLIT("Many-"), int ar ]
-  ppr (OneOcc dup_danger in_scc n_alts ar)
+  ppr (SingleOcc dup_danger in_scc n_alts ar)
     = hcat [ ptext SLIT("One-"), ppr dup_danger,
 		  char '-', pp_scc in_scc,  char '-', int n_alts,
 		  char '-', int ar ]
@@ -165,4 +163,3 @@ instance Outputable BinderInfo where
       pp_scc InsideSCC	  = ptext SLIT("*SCC*")
       pp_scc NotInsideSCC = ptext SLIT("noscc")
 \end{code}
-

@@ -14,6 +14,7 @@ module WwLib (
 import CoreSyn
 import CoreUtils	( coreExprType )
 import Id		( Id, idType, mkSysLocal, getIdDemandInfo, setIdDemandInfo,
+			  isOneShotLambda, setOneShotLambda,
                           mkWildId, setIdInfo
 			)
 import IdInfo		( CprInfo(..), noCprInfo, vanillaIdInfo )
@@ -34,8 +35,9 @@ import BasicTypes	( NewOrData(..), Arity )
 import Var              ( TyVar, IdOrTyVar )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, 
                           mapUs, UniqSM )
-import Util		( zipWithEqual, zipEqual )
+import Util		( zipWithEqual, zipEqual, lengthExceeds )
 import Outputable
+import List		( zipWith4 )
 \end{code}
 
 
@@ -223,17 +225,20 @@ allAbsent ds = all absent ds
 mkWwBodies :: Type				-- Type of original function
 	   -> Arity				-- Arity of original function
 	   -> [Demand]				-- Strictness of original function
+	   -> [Bool]				-- One-shot-ness of the function
 	   -> CprInfo                           -- Result of CPR analysis 
 	   -> UniqSM ([IdOrTyVar],		-- Worker args
 		      Id -> CoreExpr,		-- Wrapper body, lacking only the worker Id
 		      CoreExpr -> CoreExpr)	-- Worker body, lacking the original function rhs
 
-mkWwBodies fun_ty arity demands cpr_info
-  = WARN( arity /= length demands, text "mkWrapper" <+> ppr fun_ty <+> ppr arity <+> ppr demands )
-    mkWWargs fun_ty arity demands	`thenUs` \ (wrap_args, wrap_fn_args,   work_fn_args, res_ty) ->
-    mkWWstr wrap_args			`thenUs` \ (work_args, wrap_fn_str,    work_fn_str) ->
-    mkWWcpr res_ty cpr_info      	`thenUs` \ (wrap_fn_cpr,    work_fn_cpr,  cpr_res_ty) ->
-    mkWWfixup cpr_res_ty work_args	`thenUs` \ (wrap_fn_fixup,  work_fn_fixup) ->
+mkWwBodies fun_ty arity demands one_shots cpr_info
+  = WARN(    not (lengthExceeds demands (arity-1)) 
+	  || not (lengthExceeds one_shots (arity-1)),
+          text "mkWrapper" <+> ppr fun_ty <+> ppr arity <+> ppr (take arity demands) <+> ppr (take arity one_shots) )
+    mkWWargs fun_ty arity demands one_shots	`thenUs` \ (wrap_args, wrap_fn_args,   work_fn_args, res_ty) ->
+    mkWWstr wrap_args				`thenUs` \ (work_args, wrap_fn_str,    work_fn_str) ->
+    mkWWcpr res_ty cpr_info      		`thenUs` \ (wrap_fn_cpr,    work_fn_cpr,  cpr_res_ty) ->
+    mkWWfixup cpr_res_ty work_args		`thenUs` \ (wrap_fn_fixup,  work_fn_fixup) ->
 
     returnUs (work_args,
 	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . wrap_fn_fixup . Var,
@@ -278,25 +283,28 @@ the \x to get what we want.
 -- It chomps bites off foralls, arrows, newtypes
 -- and keeps repeating that until it's satisfied the supplied arity
 
-mkWWargs :: Type -> Int -> [Demand]
-	 -> UniqSM  ([IdOrTyVar],			-- Wrapper args
-		     CoreExpr -> CoreExpr,		-- Wrapper fn
-		     CoreExpr -> CoreExpr,		-- Worker fn
-		     Type)				-- Type of wrapper body
+mkWWargs :: Type -> Arity
+	 -> [Demand] -> [Bool]			-- Both these will in due course be derived
+						-- from the type.  The [Bool] is True for a one-shot arg.
+	 -> UniqSM  ([IdOrTyVar],		-- Wrapper args
+		     CoreExpr -> CoreExpr,	-- Wrapper fn
+		     CoreExpr -> CoreExpr,	-- Worker fn
+		     Type)			-- Type of wrapper body
 
-mkWWargs fun_ty arity demands
+mkWWargs fun_ty arity demands one_shots
   | arity == 0
   = returnUs ([], id, id, fun_ty)
 
   | otherwise
   = getUniquesUs n_args		`thenUs` \ wrap_uniqs ->
     let
-      val_args	= zipWith3 mk_wrap_arg wrap_uniqs arg_tys demands
+      val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
     in
     mkWWargs body_rep_ty 
 	     (arity - n_args) 
-	     (drop n_args demands)	`thenUs` \ (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
+	     (drop n_args demands)
+	     (drop n_args one_shots)	`thenUs` \ (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
 
     returnUs (wrap_args ++ more_wrap_args,
 	      mkLams wrap_args . wrap_coerce_fn . wrap_fn_args,
@@ -319,7 +327,11 @@ mkWWargs fun_ty arity demands
 applyToVars :: [IdOrTyVar] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg uniq ty dmd = setIdDemandInfo (mkSysLocal SLIT("w") uniq ty) dmd
+mk_wrap_arg uniq ty dmd one_shot 
+  = set_one_shot one_shot (setIdDemandInfo (mkSysLocal SLIT("w") uniq ty) dmd)
+  where
+    set_one_shot True  id = setOneShotLambda id
+    set_one_shot False id = id
 \end{code}
 
 
@@ -401,7 +413,7 @@ mk_ww_str (arg : ds)
 	getUniquesUs (length inst_con_arg_tys)		`thenUs` \ uniqs ->
 	let
 	  unpk_args	 = zipWith mk_ww_local uniqs inst_con_arg_tys
-	  unpk_args_w_ds = zipWithEqual "mk_ww_str" setIdDemandInfo unpk_args cs
+	  unpk_args_w_ds = zipWithEqual "mk_ww_str" set_worker_arg_info unpk_args cs
 	in
 	mk_ww_str (unpk_args_w_ds ++ ds)		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
 	returnUs (worker_args,
@@ -414,6 +426,14 @@ mk_ww_str (arg : ds)
       other_demand ->
 	mk_ww_str ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
 	returnUs (arg : worker_args, wrap_fn, work_fn)
+  where
+	-- If the wrapper argument is a one-shot lambda, then
+	-- so should (all) the corresponding worker arguments be
+	-- This bites when we do w/w on a case join point
+    set_worker_arg_info worker_arg demand = set_one_shot (setIdDemandInfo worker_arg demand)
+
+    set_one_shot | isOneShotLambda arg = setOneShotLambda
+		 | otherwise	       = \x -> x
 \end{code}
 
 
@@ -451,8 +471,8 @@ mkWWcpr body_ty (CPRInfo cpr_args)
 	work_wild = mk_ww_local work_uniq body_ty
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
       in
-      returnUs (\ wkr_call -> mkConApp data_con (map Type tycon_arg_tys ++ [wkr_call]),
-		\ body     -> Case body work_wild [(DataCon data_con, [arg], Var arg)],
+      returnUs (\ wkr_call -> Case wkr_call arg       [(DEFAULT, [], mkConApp data_con (map Type tycon_arg_tys ++ [Var arg]))],
+		\ body     -> Case body     work_wild [(DataCon data_con, [arg], Var arg)],
 		con_arg_ty1)
 
     | otherwise		-- The general case
@@ -502,7 +522,7 @@ splitProductType fname ty
 		   text "splitProductType hack: I happened!" <+> ppr ty )
 	     (tycon, tycon_args, con, dataConArgTys con tycon_args)
 	     
-	Nothing -> pprPanic (fname ++ ": not a product") (ppr ty)
+	other -> pprPanic (fname ++ ": not a product") (ppr ty)
 \end{code}
 
 

@@ -45,7 +45,7 @@ import {-# SOURCE #-} TypeRep ( Type, Kind, SuperKind )
  -- Should just be Type(Type), but this fails due to bug present up to
  -- and including 4.02 involving slurping of hi-boot files.  Bug is now fixed.
 
-import {-# SOURCE #-} DataCon ( DataCon )
+import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 import Class 		( Class )
 import Var   		( TyVar )
@@ -276,10 +276,16 @@ isDataTyCon other = False
 isNewTyCon (AlgTyCon {algTyConFlavour = NewType}) = True 
 isNewTyCon other			          = False
 
--- A "product" tycon is non-recursive and has one constructor, and is *not* an unboxed tuple
+-- A "product" tycon is 
+--	non-recursive 
+--	has one constructor, 
+--	is *not* existential
+--	is *not* an unboxed tuple
 -- whether DataType or NewType
-isProductTyCon (AlgTyCon {dataCons = [c], algTyConRec = NonRecursive}) = True
-isProductTyCon (TupleTyCon { tyConBoxed = boxed }) = boxed
+isProductTyCon (AlgTyCon {dataCons = [data_con], algTyConRec = NonRecursive}) 
+  = not (isExistentialDataCon data_con)
+isProductTyCon (TupleTyCon { tyConBoxed = boxed }) 
+  = boxed
 isProductTyCon other = False
 
 isSynTyCon (SynTyCon {}) = True

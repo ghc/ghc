@@ -378,8 +378,7 @@ splitProductType_maybe
 splitProductType_maybe ty
   = case splitAlgTyConApp_maybe ty of
 	Just (tycon,ty_args,[data_con]) 
-	   | isProductTyCon tycon && 		-- Checks for non-recursive
-	     not (isExistentialDataCon data_con)
+	   | isProductTyCon tycon  		-- Checks for non-recursive, non-existential
 	   -> Just (tycon, ty_args, data_con, data_con_arg_tys)
 	   where
 	      data_con_arg_tys = map (substTy (mkTyVarSubst (dcTyVars data_con) ty_args)) 

@@ -19,6 +19,7 @@ import Id		( idType, setIdStrictness,
 			)
 import IdInfo		( mkStrictnessInfo )
 import CoreLint		( beginPass, endPass )
+import Type		( repType, splitFunTys )
 import ErrUtils		( dumpIfSet )
 import SaAbsInt
 import SaLib
@@ -324,19 +325,24 @@ addStrictnessInfoToId
 	-> Id			-- Augmented with strictness
 
 addStrictnessInfoToId str_val abs_val binder body
-  = case collectBindersIgnoringNotes body of
-	-- It's imporant to use collectBindersIgnoringNotes, so that INLINE prags
-	-- don't inhibit strictness info.  In particular, foldr is marked INLINE,
-	-- but we still want it to be strict in its third arg, so that
-	--	foldr k z (case e of p -> build g) 
-	-- gets transformed to
-	--	case e of p -> foldr k z (build g)
-	-- [foldr is only inlined late in compilation, after strictness analysis]
-	(binders, rhs) -> binder `setIdStrictness` 
-			  mkStrictnessInfo strictness
-		where
-		    tys        = [idType id | id <- binders, isId id]
-		    strictness = findStrictness tys str_val abs_val
+  = binder `setIdStrictness` mkStrictnessInfo strictness
+  where
+    arg_tys = collect_arg_tys (idType binder)
+    strictness = findStrictness arg_tys str_val abs_val
+
+    collect_arg_tys ty
+	| null arg_tys = []
+	| otherwise    = arg_tys ++ collect_arg_tys res_ty
+	where
+	  (arg_tys, res_ty) = splitFunTys (repType ty)
+    -- repType looks through for-alls and new-types.  And since we look on the
+    -- type info, we aren't confused by INLINE prags.
+    -- In particular, foldr is marked INLINE,
+    -- but we still want it to be strict in its third arg, so that
+    --	foldr k z (case e of p -> build g) 
+    -- gets transformed to
+    --	case e of p -> foldr k z (build g)
+    -- [foldr is only inlined late in compilation, after strictness analysis]
 \end{code}
 
 \begin{code}

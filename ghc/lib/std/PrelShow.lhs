@@ -57,7 +57,7 @@ class  Show a  where
 
     showsPrec _ x s = show x ++ s
     show x          = shows x ""
-    showList ls     = showList__ shows ls 
+    showList ls   s = showList__ shows ls s
 
 showList__ :: (a -> ShowS) ->  [a] -> ShowS
 showList__ _     []     s = "[]" ++ s
@@ -95,26 +95,31 @@ instance  Show Char  where
     showsPrec _ c    = showChar '\'' . showLitChar c . showChar '\''
 
     showList cs = showChar '"' . showl cs
-		 where showl ""       = showChar '"'
-		       showl ('"':xs) = showString "\\\"" . showl xs
-		       showl (x:xs)   = showLitChar x . showl xs
+		 where showl ""       s = showChar '"' s
+		       showl ('"':xs) s = showString "\\\"" (showl xs s)
+		       showl (x:xs)   s = showLitChar x (showl xs s)
+		-- Making 's' an explicit parameter makes it clear to GHC
+		-- that showl has arity 2, which avoids it allocating an extra lambda
+		-- The sticking point is the recursive call to (showl xs), which
+		-- it can't figure out would be ok with arity 2.
 
 instance  Show Int  where
     showsPrec p n = showSignedInt p n
 
 instance Show a => Show (Maybe a) where
-    showsPrec _p Nothing  = showString "Nothing"
-    showsPrec p@(I# p#) (Just x)
-                          = showParen (p# >=# 10#) $ 
-    			    showString "Just " . 
-			    showsPrec (I# 10#) x
+    showsPrec _p Nothing s = showString "Nothing" s
+    showsPrec p@(I# p#) (Just x) s
+                          = (showParen (p# >=# 10#) $ 
+    			     showString "Just " . 
+			     showsPrec (I# 10#) x) s
 
 instance (Show a, Show b) => Show (Either a b) where
-    showsPrec p@(I# p#) e =
-       showParen (p# >=# 10#) $
-       case e of
+    showsPrec p@(I# p#) e s =
+       (showParen (p# >=# 10#) $
+        case e of
          Left  a -> showString "Left "  . showsPrec (I# 10#) a
-	 Right b -> showString "Right " . showsPrec (I# 10#) b
+	 Right b -> showString "Right " . showsPrec (I# 10#) b)
+       s
 
 \end{code}
 
@@ -126,27 +131,37 @@ instance (Show a, Show b) => Show (Either a b) where
 %*********************************************************
 
 \begin{code}
+-- The explicit 's' parameters are important
+-- Otherwise GHC thinks that "shows x" might take a lot of work to compute
+-- and generates defns like
+--	showsPrec _ (x,y) = let sx = shows x; sy = shows y in
+--			    \s -> showChar '(' (sx (showChar ',' (sy (showChar ')' s))))
+
 instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec _ (x,y) = showChar '(' . shows x . showChar ',' .
-                                       shows y . showChar ')'
+    showsPrec _ (x,y) s = (showChar '(' . shows x . showChar ',' .
+                                          shows y . showChar ')') 
+			  s
 
 instance (Show a, Show b, Show c) => Show (a, b, c) where
-    showsPrec _ (x,y,z) = showChar '(' . shows x . showChar ',' .
-					 shows y . showChar ',' .
-					 shows z . showChar ')'
+    showsPrec _ (x,y,z) s = (showChar '(' . shows x . showChar ',' .
+					    shows y . showChar ',' .
+					    shows z . showChar ')')
+			    s
 
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
-    showsPrec _ (w,x,y,z) = showChar '(' . shows w . showChar ',' .
-					   shows x . showChar ',' .
-					   shows y . showChar ',' .
-					   shows z . showChar ')'
+    showsPrec _ (w,x,y,z) s = (showChar '(' . shows w . showChar ',' .
+					      shows x . showChar ',' .
+					      shows y . showChar ',' .
+					      shows z . showChar ')')
+			      s
 
 instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
-    showsPrec _ (v,w,x,y,z) = showChar '(' . shows v . showChar ',' .
-					     shows w . showChar ',' .
-					     shows x . showChar ',' .
-					     shows y . showChar ',' .
-					     shows z . showChar ')'
+    showsPrec _ (v,w,x,y,z) s = (showChar '(' . shows v . showChar ',' .
+					     	shows w . showChar ',' .
+					     	shows x . showChar ',' .
+					     	shows y . showChar ',' .
+					     	shows z . showChar ')') 
+				s
 \end{code}
 
 
@@ -177,7 +192,7 @@ Code specific for characters
 
 \begin{code}
 showLitChar 		   :: Char -> ShowS
-showLitChar c | c > '\DEL' =  showChar '\\' . protectEsc isDigit (shows (ord c))
+showLitChar c | c > '\DEL' =  \s -> showChar '\\' (protectEsc isDigit (shows (ord c)) s)
 showLitChar '\DEL'	   =  showString "\\DEL"
 showLitChar '\\'	   =  showString "\\\\"
 showLitChar c | c >= ' '   =  showChar c
@@ -188,8 +203,11 @@ showLitChar '\n'	   =  showString "\\n"
 showLitChar '\r'	   =  showString "\\r"
 showLitChar '\t'	   =  showString "\\t"
 showLitChar '\v'	   =  showString "\\v"
-showLitChar '\SO'	   =  protectEsc (== 'H') (showString "\\SO")
-showLitChar c		   =  showString ('\\' : asciiTab!!ord c)
+showLitChar '\SO'	   =  \s -> protectEsc (== 'H') (showString "\\SO") s
+showLitChar c		   =  \s -> showString ('\\' : asciiTab!!ord c) s
+	-- The "\s ->" here means that GHC knows it's ok to put the
+	-- asciiTab!!ord c inside the lambda.  Otherwise we get an extra
+	-- lambda allocated, and that can be pretty bad
 
 protectEsc :: (Char -> Bool) -> ShowS -> ShowS
 protectEsc p f		   = f . cont

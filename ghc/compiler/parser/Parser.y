@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.14 1999/09/01 14:08:19 sof Exp $
+$Id: Parser.y,v 1.15 1999/11/01 17:10:23 simonpj Exp $
 
 Haskell grammar.
 
@@ -367,14 +367,18 @@ decl 	:: { RdrBinding }
 	: signdecl			{ $1 }
  	| fixdecl			{ $1 }
 	| valdef			{ RdrValBinding $1 }
-	| '{-# INLINE'   srcloc qvar '#-}'	{ RdrSig (InlineSig $3 $2) }
-	| '{-# NOINLINE' srcloc qvar '#-}'	{ RdrSig (NoInlineSig $3 $2) }
+	| '{-# INLINE'   srcloc opt_phase qvar '#-}'	{ RdrSig (InlineSig $4 $3 $2) }
+	| '{-# NOINLINE' srcloc opt_phase qvar '#-}'	{ RdrSig (NoInlineSig $4 $3 $2) }
 	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
 	 	{ foldr1 RdrAndBindings 
 		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
 	| '{-# SPECIALISE' srcloc 'instance' inst_type '#-}'
 		{ RdrSig (SpecInstSig $4 $2) }
 	| '{-# RULES' rules '#-}' 	{ $2 }
+
+opt_phase :: { Maybe Int }
+          : INTEGER                     { Just (fromInteger $1) }
+          | {- empty -}                 { Nothing }
 
 sigtypes :: { [RdrNameHsType] }
 	: sigtype			{ [ $1 ] }
@@ -443,11 +447,11 @@ rule_forall :: { [RdrNameRuleBndr] }
 
 rule_var_list :: { [RdrNameRuleBndr] }
         : rule_var				{ [$1] }
-        | rule_var ',' rule_var_list		{ $1 : $3 }
+        | rule_var rule_var_list		{ $1 : $2 }
 
 rule_var :: { RdrNameRuleBndr }
 	: varid                              	{ RuleBndr $1 }
-       	| varid '::' ctype                	{ RuleBndrSig $1 $3 }
+       	| '(' varid '::' ctype ')'             	{ RuleBndrSig $2 $4 }
 
 -----------------------------------------------------------------------------
 -- Foreign import/export

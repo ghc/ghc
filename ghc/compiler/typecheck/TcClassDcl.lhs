@@ -179,10 +179,7 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 			   dict_component_tys
 		      	   tycon dict_con_id
 
-	-- In general, constructors don't have to be inlined, but this one
-	-- does, because we don't make a top level binding for it.	
 	dict_con_id = mkDataConId dict_con
-		      `setInlinePragma` IMustBeINLINEd
 
         argvrcs = lookupWithDefaultFM rec_vrcs (pprPanic "tcClassDecl1: argvrcs:" $
                                                          ppr tycon_name)
@@ -614,10 +611,10 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
    find_prags meth_name [] = []
    find_prags meth_name (SpecSig name ty loc : prags)
 	| name == sel_name = SpecSig meth_name ty loc : find_prags meth_name prags
-   find_prags meth_name (InlineSig name loc : prags)
-	| name == sel_name = InlineSig meth_name loc : find_prags meth_name prags
-   find_prags meth_name (NoInlineSig name loc : prags)
-	| name == sel_name = NoInlineSig meth_name loc : find_prags meth_name prags
+   find_prags meth_name (InlineSig name phase loc : prags)
+	| name == sel_name = InlineSig meth_name phase loc : find_prags meth_name prags
+   find_prags meth_name (NoInlineSig name phase loc : prags)
+	| name == sel_name = NoInlineSig meth_name phase loc : find_prags meth_name prags
    find_prags meth_name (prag:prags) = find_prags meth_name prags
 
    mk_default_bind local_meth_name loc

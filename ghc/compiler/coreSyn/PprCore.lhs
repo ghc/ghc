@@ -18,7 +18,7 @@ module PprCore (
 
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
-import Id		( idType, idInfo, getInlinePragma, getIdDemandInfo, Id )
+import Id		( idType, idInfo, getInlinePragma, getIdDemandInfo, getIdOccInfo, Id )
 import Var		( isTyVar )
 import IdInfo		( IdInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
@@ -334,7 +334,8 @@ pprTypedBinder binder
 	-- printing interfaces, because we get \ x::(a->b) y::(c->d) -> ...
 
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
-pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdDemandInfo id)) <+> ppr (lbvarInfo (idInfo id))
+pprIdBndr id = ppr id <+> ifPprDebug (ppr (getInlinePragma id) <+> ppr (getIdOccInfo id) <+> 
+				      ppr (getIdDemandInfo id)) <+> ppr (lbvarInfo (idInfo id))
 \end{code}
 
 

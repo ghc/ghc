@@ -30,7 +30,7 @@ import DataCon          ( dataConType )
 import Const            ( Con(..), Literal(..), literalType )
 import Var              ( Var, UVar, varType, setVarType, mkUVar, modifyIdInfo )
 import IdInfo           ( setLBVarInfo, LBVarInfo(..) )
-import Id               ( idMustBeINLINEd, isExportedId )
+import Id               ( mayHaveNoBinding, isExportedId )
 import Name             ( isLocallyDefined )
 import VarEnv
 import VarSet
@@ -394,7 +394,7 @@ lookupVar :: VarEnv Var -> Var -> Var
 --lookupVar ve v = error "lookupVar unimplemented"
 lookupVar ve v = case lookupVarEnv ve v of
                    Just v' -> v'
-                   Nothing -> ASSERT( not (isLocallyDefined v) || (idMustBeINLINEd v) )
+                   Nothing -> ASSERT( not (isLocallyDefined v) || (mayHaveNoBinding v) )
                               ASSERT( isUsgTy (varType v) )
                               v
 
