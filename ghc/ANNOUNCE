@@ -1,8 +1,8 @@
-	     The Glasgow Haskell Compiler -- version 4.06
+	     The Glasgow Haskell Compiler -- version 4.07
 	    ==============================================
 
 We are pleased to announce a new release of the Glasgow Haskell
-Compiler (GHC), version 4.06.  The source distribution is freely
+Compiler (GHC), version 4.07.  The source distribution is freely
 available via the World-Wide Web and through anon. FTP; details below.
 
 Haskell is "the" standard lazy functional programming language; the
@@ -18,40 +18,37 @@ GHC's Web page lives at
 + What's new
 =============
 
-This should be a stable release. We have not made major changes
-since 4.04 to the core compiler, but we have fixed lots of bugs.
-We believe that 4.06 is in a nice stable well-tested state.  (Ha!)
+This should be a stable release.  There have been many enhancements
+since 4.06, and shed-loads of bug-fixes (one shed (imperial) ~ one ton
+(US)).
 
-Apart from that, there are the following changes
+There are the following changes
 
-   - Major library reorganisation.  All libraries, except the ones that
-     are part of the Haskell 98 *language* specification, have moved to
-     fptools/hslibs/.  The hslibs tree is independent of GHC, shared between
-     GHC, Hugs, and (we hope) other Haskell implementations.  
-     The idea is to make it easier for people to contribute and maintain 
-     libraries.
+   - New profiling subsystem, based on cost-centre stacks.
 
-     The hslibs/ tree is organised in a Java-like fashion.  Details in 
-     the new Library guide:
-     http://www.haskell.org/ghc/docs/4.06/hslibs/book1.html
+   - Working x86 native code generator: now it works properly, runs
+     about twice as fast as compiling via C, and is on a par for
+     run-time speed (except in FP-intensive programs).
 
-     Existing programs that use the -syslib flag may need to change which
-     syslibs they include.
+   - Implicit parameters (i.e. dynamic scoping without the pain).
 
-   - Support for "foreign export dynamic".
+   - DEPRECATED pragma for marking obsolescent interfaces.
 
-   - Clean up of concurrent I/O system; in particular, I/O is now non-blocking,
-     except (alas) on stdout/stderr for tiresome reasons.
+   - In the wake of hslibs, a new package system for
+     libraries. -package should now be used instead of -syslib.
 
-   - Some refinements to the exceptions mechanism:
-     http://www.haskell.org/ghc/docs/4.06/users_guide/release-4-06.html#exc-changes-406
+   - Result type signatures work.
 
-   - More performance tuning: compiled programs now allocate 10% less memory
-     than 4.04
+   - Many tiresome long-standing bugs and problems (e.g. the trace
+     problem) have been fixed.
+
+   - Many error messages have been made more helpful and/or
+     accurate.
 
 For full details see the release notes:
 
-	http://www.haskell.org/ghc/docs/4.06/users_guide/release-4-06.html
+	http://www.haskell.org/ghc/docs/4.07/users_guide/release-4-07.html
+
 
 + Mailing lists
 ================
@@ -59,10 +56,15 @@ For full details see the release notes:
 We run mailing lists for GHC users and bug reports; to subscribe, send
 mail to majordomo@haskell.org; the msg body should be:
 
-    subscribe glasgow-haskell-<which> Your Name <your-email@where.you.are>
+    subscribe glasgow-haskell-{users,bugs} Your Name <you@where.soever>
 
-Please send bug reports about GHC to glasgow-haskell-bugs@haskell.org ; GHC
-users hang out on glasgow-haskell-users@haskell.org
+or
+
+    subscribe cvs-ghc Your Name <you@where.soever>
+
+Please send bug reports about GHC to glasgow-haskell-bugs@haskell.org;
+GHC users hang out on glasgow-haskell-users@haskell.org.  Bleeding
+edge CVS users party on cvs-ghc@haskell.org.
 
 
 + On-line GHC-related resources
@@ -72,7 +74,7 @@ Relevant URLs on the World-Wide Web:
 
 GHC home page    	  http://www.haskell.org/ghc/
 Haskell home page	  http://www.haskell.org/
-comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
+comp.lang.functional FAQ  http://www.cs.nott.ac.uk/~gmh/faq.html
 
 
 + How to get it
@@ -92,22 +94,23 @@ for tar, please)!
 + System requirements
 ======================
 
-To compile up this source-only release, you need a machine with 32+MB
-memory, GNU C (`gcc'), `perl' plus a version of GHC installed (3.02 at
-least).  This release is known to work on the following platforms:
+To compile the sources, you need a machine with 32+MB memory, GNU C
+(`gcc'), `perl' plus a version of GHC installed (3.02 at least).  This
+release is known to work on the following platforms:
 
-  * i386-unknown-{linux,solaris2,freebsd,netbsd,cygwin32}
+  * i386-unknown-{linux,freebsd,netbsd,cygwin32,mingw32}
   * sparc-sun-{sunos4,solaris2}
   * hppa1.1-hp-hpux{9,10}
 
-Ports to the following platforms should be relatively easy, but
-haven't been tested due to lack of time/hardware:
+Ports to the following platforms should be relatively easy (for a
+wunderhacker), but haven't been tested due to lack of time/hardware:
 
+  * i386-unknown-solaris2
   * alpha-dec-osf{2,3}
   * mips-sgi-irix{5,6}
   * {rs6000,powerpc}-ibm-aix
 
 The builder's guide included in distribution gives a complete
-run-down of what-ports-work; an on-line version can be found at
+run-down of what ports work; an on-line version can be found at
 
-   http://www.haskell.org/ghc/docs/4.06/building_guide/installing.html
+   http://www.haskell.org/ghc/docs/4.07/building/building-guide.html
