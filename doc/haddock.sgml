@@ -371,7 +371,7 @@ square x = x * x
     <para>Then we can document it like this:</para>
 
 <programlisting>
--- |The 'sqaure' function squares an integer.
+-- |The 'square' function squares an integer.
 square :: Int -> Int
 square x = x * x
 </programlisting>
@@ -412,7 +412,7 @@ square x = x * x
      
 <programlisting>
 square :: Int -> Int
--- ^The 'sqaure' function squares an integer.
+-- ^The 'square' function squares an integer.
 square x = x * x
 </programlisting>
 
@@ -503,13 +503,13 @@ data R a b =
 	like this:</para>
 
 <programlisting>
-f  :: Int      -- | The 'Int' argument
-   -> Float    -- | The 'Float' argument
-   -> IO ()    -- | The return value
+f  :: Int      -- ^ The 'Int' argument
+   -> Float    -- ^ The 'Float' argument
+   -> IO ()    -- ^ The return value
 </programlisting>
 
 	<para>NOTE: this feature isn't implemented in Haddock
-	1.0.</para>
+	0.1.</para>
       </section>
     </section>
 
