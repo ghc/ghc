@@ -26,3 +26,10 @@ import GHC.IOBase
 #ifdef __HUGS__
 import Hugs.IOExts
 #endif
+
+#ifdef __NHC__
+import NHC.Internal (unsafePerformIO)
+
+unsafeInterleaveIO :: IO a -> IO a
+unsafeInterleaveIO f = let x = unsafePerformIO f in return x
+#endif

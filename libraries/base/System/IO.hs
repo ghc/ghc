@@ -35,7 +35,9 @@ module System.IO (
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: HandlePosn -> IO ()
     hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
+#if !defined(__NHC__)
     hTell,		       -- :: Handle -> IO Integer
+#endif
     hWaitForInput,	       -- :: Handle -> Int -> IO Bool
     hReady,		       -- :: Handle -> IO Bool
     hGetChar,		       -- :: Handle -> IO Char
@@ -87,14 +89,14 @@ module System.IO (
     readIO,		       -- :: Read a => String -> IO a
     readLn,		       -- :: Read a => IO a
 
-#ifndef __HUGS__
+#if !defined(__HUGS__) && !defined(__NHC__)
     hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
  
     fixIO,		       -- :: (a -> IO a) -> IO a
 
-#ifndef __HUGS__
+#if !defined(__HUGS__) && !defined(__NHC__)
     hSetEcho,			-- :: Handle -> Bool -> IO ()
     hGetEcho,			-- :: Handle -> IO Bool
 
@@ -117,6 +119,56 @@ import GHC.Show
 #ifdef __HUGS__
 import Hugs.IO
 import Hugs.IOExts
+#endif
+
+#ifdef __NHC__
+import IO
+  ( Handle ()
+  , HandlePosn ()
+  , IOMode (ReadMode,WriteMode,AppendMode,ReadWriteMode)
+  , BufferMode (NoBuffering,LineBuffering,BlockBuffering)
+  , SeekMode (AbsoluteSeek,RelativeSeek,SeekFromEnd)
+  , stdin, stdout, stderr
+  , openFile                  -- :: FilePath -> IOMode -> IO Handle
+  , hClose                    -- :: Handle -> IO ()
+  , hFileSize                 -- :: Handle -> IO Integer
+  , hIsEOF                    -- :: Handle -> IO Bool
+  , isEOF                     -- :: IO Bool
+  , hSetBuffering             -- :: Handle -> BufferMode -> IO ()
+  , hGetBuffering             -- :: Handle -> IO BufferMode
+  , hFlush                    -- :: Handle -> IO ()
+  , hGetPosn                  -- :: Handle -> IO HandlePosn
+  , hSetPosn                  -- :: HandlePosn -> IO ()
+  , hSeek                     -- :: Handle -> SeekMode -> Integer -> IO ()
+  , hWaitForInput             -- :: Handle -> Int -> IO Bool
+  , hGetChar                  -- :: Handle -> IO Char
+  , hGetLine                  -- :: Handle -> IO [Char]
+  , hLookAhead                -- :: Handle -> IO Char
+  , hGetContents              -- :: Handle -> IO [Char]
+  , hPutChar                  -- :: Handle -> Char -> IO ()
+  , hPutStr                   -- :: Handle -> [Char] -> IO ()
+  , hIsOpen, hIsClosed        -- :: Handle -> IO Bool
+  , hIsReadable, hIsWritable  -- :: Handle -> IO Bool
+  , hIsSeekable               -- :: Handle -> IO Bool
+  , isAlreadyExistsError, isDoesNotExistError  -- :: IOError -> Bool
+  , isAlreadyInUseError, isFullError
+  , isEOFError, isIllegalOperation
+  , isPermissionError, isUserError
+  , ioeGetErrorString         -- :: IOError -> String
+  , ioeGetHandle              -- :: IOError -> Maybe Handle
+  , ioeGetFileName            -- :: IOError -> Maybe FilePath
+  , try                       -- :: IO a -> IO (Either IOError a)
+  , bracket                   -- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
+  , bracket_                  -- :: IO a -> (a -> IO b) -> IO c -> IO c
+
+  , IO ()
+  , FilePath                  -- :: String
+  , IOError
+  , ioError                   -- :: IOError -> IO a
+  , userError                 -- :: String  -> IOError
+  , catch                     -- :: IO a    -> (IOError -> IO a) -> IO a
+  )
+import NHC.Internal (unsafePerformIO)
 #endif
 
 import System.IO.Error
@@ -198,4 +250,8 @@ hPrint hdl 	=  hPutStrLn hdl . show
 #ifdef __GLASGOW_HASKELL__
 fixIO 		:: (a -> IO a) -> IO a
 fixIO m         = stToIO (fixST (ioToST . m))
+#endif
+#ifdef __NHC__
+fixIO           :: (a -> IO a) -> IO a
+fixIO f         = let x = unsafePerformIO (f x) in return x
 #endif

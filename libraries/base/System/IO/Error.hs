@@ -16,14 +16,14 @@
 
 module System.IO.Error (
     IOError,			-- abstract
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
     IOErrorType,		-- abstract
 #endif
 
     ioError,		       	-- :: IOError -> IO a
     userError,		       	-- :: String  -> IOError
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
     mkIOError,			-- :: IOErrorType -> String -> Maybe Handle
 				--    -> Maybe FilePath -> IOError
 
@@ -44,7 +44,7 @@ module System.IO.Error (
     isIllegalOperationErrorType, 
     isPermissionErrorType,
     isUserErrorType, 
-#endif  /* __HUGS__ */
+#endif  /* __GLASGOW_HASKELL__ */
 
     isAlreadyExistsError,	-- :: IOError -> Bool
     isDoesNotExistError,
@@ -55,7 +55,7 @@ module System.IO.Error (
     isPermissionError,
     isUserError,
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
     ioeGetErrorType,		-- :: IOError -> IOErrorType
 #endif
     ioeGetErrorString,		-- :: IOError -> String
@@ -76,7 +76,28 @@ import Text.Show
 import Hugs.IO
 #endif
 
-#ifndef __HUGS__
+#ifdef __NHC__
+import IO
+  ( IOError ()
+  , ioError
+  , userError
+  , isAlreadyExistsError	-- :: IOError -> Bool
+  , isDoesNotExistError
+  , isAlreadyInUseError
+  , isFullError
+  , isEOFError
+  , isIllegalOperation
+  , isPermissionError
+  , isUserError
+  , ioeGetErrorString           -- :: IOError -> String
+  , ioeGetHandle                -- :: IOError -> Maybe Handle
+  , ioeGetFileName              -- :: IOError -> Maybe FilePath
+  )
+--import Data.Maybe (fromJust)
+--import Control.Monad (MonadPlus(mplus))
+#endif
+
+#ifdef __GLASGOW_HASKELL__
 -- -----------------------------------------------------------------------------
 -- Constructing an IOError
 
@@ -88,6 +109,21 @@ mkIOError t location maybe_hdl maybe_filename =
 			ioe_handle = maybe_hdl, 
 			ioe_filename = maybe_filename
  			}
+#ifdef __NHC__
+mkIOError EOF       location maybe_hdl maybe_filename =
+    EOFError location (fromJust maybe_hdl)
+mkIOError UserError location maybe_hdl maybe_filename =
+    UserError location ""
+mkIOError t         location maybe_hdl maybe_filename =
+    NHC.FFI.mkIOError location maybe_filename maybe_handle (ioeTypeToInt t)
+  where
+    ioeTypeToInt AlreadyExists     = fromEnum EEXIST
+    ioeTypeToInt NoSuchThing       = fromEnum ENOENT
+    ioeTypeToInt ResourceBusy      = fromEnum EBUSY
+    ioeTypeToInt ResourceExhausted = fromEnum ENOSPC
+    ioeTypeToInt IllegalOperation  = fromEnum EPERM
+    ioeTypeToInt PermissionDenied  = fromEnum EACCES
+#endif
 
 -- -----------------------------------------------------------------------------
 -- IOErrorType
@@ -109,6 +145,12 @@ isUserError          = isUserErrorType             . ioeGetErrorType
 -- -----------------------------------------------------------------------------
 -- IOErrorTypes
 
+#ifdef __NHC__
+data IOErrorType = AlreadyExists | NoSuchThing | ResourceBusy
+		 | ResourceExhausted | EOF | IllegalOperation
+		 | PermissionDenied | UserError
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 alreadyExistsErrorType, doesNotExistErrorType, alreadyInUseErrorType,
  fullErrorType, eofErrorType, illegalOperationErrorType,
@@ -127,7 +169,7 @@ userErrorType		  = UserError
 -- -----------------------------------------------------------------------------
 -- IOErrorType predicates
 
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 isAlreadyExistsErrorType, isDoesNotExistErrorType, isAlreadyInUseErrorType,
   isFullErrorType, isEOFErrorType, isIllegalOperationErrorType, 
   isPermissionErrorType, isUserErrorType :: IOErrorType -> Bool
@@ -199,4 +241,15 @@ annotateIOError (IOException (IOError hdl errTy _ str path)) loc opath ohdl =
     xs      `mplus` _  = xs
 annotateIOError exc _ _ _ = 
   exc
+#endif
+
+#ifdef 0 /*__NHC__*/
+annotateIOError (IOError msg file hdl code) msg' file' hdl' =
+    IOError (msg++'\n':msg') (file`mplus`file') (hdl`mplus`hdl') code
+annotateIOError (EOFError msg hdl) msg' file' hdl' =
+    EOFError (msg++'\n':msg') (hdl`mplus`hdl')
+annotateIOError (UserError loc msg) msg' file' hdl' =
+    UserError loc (msg++'\n':msg')
+annotateIOError (PatternError loc) msg' file' hdl' =
+    PatternError (loc++'\n':msg')
 #endif
