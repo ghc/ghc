@@ -449,9 +449,7 @@ mk_sig_ty never_inline strictly_demanded rhs (DmdType fv dmds res)
 	-- DmdType, because that makes fixpointing very slow --- the 
 	-- DmdType gets full of lazy demands that are slow to converge.
 
-    lazified_dmds = map funArgDemand dmds
-	-- Get rid of defers in the arguments
-    final_dmds = setUnpackStrategy lazified_dmds
+    final_dmds = setUnpackStrategy dmds
 	-- Set the unpacking strategy
 	
     res' = case res of
@@ -594,11 +592,10 @@ annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- No effect on the argument demands
 annotateBndr dmd_ty@(DmdType fv ds res) var
   | isTyVar var = (dmd_ty, var)
-  | otherwise   = (DmdType fv' ds res, setIdNewDemandInfo var hacked_dmd)
+  | otherwise   = (DmdType fv' ds res, 
+		   setIdNewDemandInfo var (argDemand var dmd))
   where
     (fv', dmd) = removeFV fv var res
-    hacked_dmd | isUnLiftedType (idType var) = unliftedDemand dmd
-	       | otherwise		     = dmd
 
 annotateBndrs = mapAccumR annotateBndr
 
@@ -609,9 +606,8 @@ annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
     (DmdType fv' (hacked_dmd:ds) res, setIdNewDemandInfo id hacked_dmd)
   where
     (fv', dmd) = removeFV fv id res
-    hacked_dmd | isUnLiftedType (idType id) = unliftedDemand dmd
-	       | otherwise		    = funArgDemand dmd
-	-- This call to funArgDemand is vital, because otherwise we label
+    hacked_dmd = argDemand id dmd
+	-- This call to argDemand is vital, because otherwise we label
 	-- a lambda binder with demand 'B'.  But in terms of calling
 	-- conventions that's Abs, because we don't pass it.  But
 	-- when we do a w/w split we get
@@ -752,21 +748,28 @@ bothLazy   = both Lazy
 bothLazy_s :: [Demand] -> [Demand]
 bothLazy_s = map bothLazy
 
-funArgDemand :: Demand -> Demand
+
+----------------
+argDemand :: Id -> Demand -> Demand
+argDemand id dmd | isUnLiftedType (idType id) = unliftedArgDemand dmd
+		 | otherwise	    	      = liftedArgDemand   dmd
+
+liftedArgDemand :: Demand -> Demand
 -- The 'Defer' demands are just Lazy at function boundaries
 -- Ugly!  Ask John how to improve it.
-funArgDemand (Seq Defer ds) = Lazy
-funArgDemand (Seq k     ds) = Seq k (map funArgDemand ds)
-funArgDemand Err	    = Eval	-- Args passed to a bottoming function
-funArgDemand Bot	    = Abs	-- Don't pass args that are consumed by bottom/err
-funArgDemand d	            = d
+liftedArgDemand (Seq Defer ds) = Lazy
+liftedArgDemand (Seq k     ds) = Seq k (map liftedArgDemand ds)
+					-- Urk! Don't have type info here
+liftedArgDemand Err	       = Eval	-- Args passed to a bottoming function
+liftedArgDemand Bot	       = Abs	-- Don't pass args that are consumed by bottom/err
+liftedArgDemand d	       = d
 
-unliftedDemand :: Demand -> Demand
+unliftedArgDemand :: Demand -> Demand
 -- Same idea, but for unlifted types the domain is much simpler:
 -- Either we use it (Lazy) or we don't (Abs)
-unliftedDemand Bot   = Abs
-unliftedDemand Abs   = Abs
-unliftedDemand other = Lazy
+unliftedArgDemand Bot   = Abs
+unliftedArgDemand Abs   = Abs
+unliftedArgDemand other = Lazy
 \end{code}
 
 \begin{code}
@@ -1025,7 +1028,7 @@ get_changes_dmd id
   where
     message word = text word <+> text "demand for" <+> ppr id <+> info
     info = (text "Old" <+> ppr old) $$ (text "New" <+> ppr new)
-    new = funArgDemand (idNewDemandInfo id)	-- FunArgDemand to avoid spurious improvements
+    new = liftedArgDemand (idNewDemandInfo id)	-- To avoid spurious improvements
     old = newDemand (idDemandInfo id)
     new_better = new `betterDemand` old 
     old_better = old `betterDemand` new
