@@ -1,9 +1,7 @@
 /* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ * (c) The GRASP/AQUA Project, Glasgow University, 1994-2002
  *
- * $Id: inputReady.c,v 1.5 2002/02/07 11:13:30 simonmar Exp $
- *
- * hReady Runtime Support
+ * hWaitForInput Runtime Support
  */
 
 /* select and supporting types is not Posix */
@@ -18,51 +16,52 @@
 int
 inputReady(int fd, int msecs, int isSock)
 {
-  if 
+    if 
 #ifndef mingw32_TARGET_OS
     ( 1 ) {
 #else
     ( isSock ) {
 #endif
-    int maxfd, ready;
-    fd_set rfd;
-    struct timeval tv;
-
-    FD_ZERO(&rfd);
-    FD_SET(fd, &rfd);
-
-    /* select() will consider the descriptor set in the range of 0 to
-     * (maxfd-1) 
-     */
-    maxfd = fd + 1;
-    tv.tv_sec  = msecs / 1000;
-    tv.tv_usec = msecs % 1000;
-
-    while ((ready = select(maxfd, &rfd, NULL, NULL, &tv)) < 0 ) {
-      if (errno != EINTR ) {
-          return -1;
-      }
-   }
-
-    /* 1 => Input ready, 0 => not ready, -1 => error */
-    return (ready);
+	int maxfd, ready;
+	fd_set rfd;
+	struct timeval tv;
+	
+	FD_ZERO(&rfd);
+	FD_SET(fd, &rfd);
+	
+	/* select() will consider the descriptor set in the range of 0 to
+	 * (maxfd-1) 
+	 */
+	maxfd = fd + 1;
+	tv.tv_sec  = msecs / 1000;
+	tv.tv_usec = msecs % 1000;
+	
+	while ((ready = select(maxfd, &rfd, NULL, NULL, &tv)) < 0 ) {
+	    if (errno != EINTR ) {
+		return -1;
+	    }
+	}
+	
+	/* 1 => Input ready, 0 => not ready, -1 => error */
+	return (ready);
+    }
 #ifdef mingw32_TARGET_OS
-    } else {
-      DWORD rc;
-      HANDLE hFile = (HANDLE)_get_osfhandle(fd);
-    
-      rc = MsgWaitForMultipleObjects( 1,
-				      &hFile,
-				      FALSE, /* wait all */
-			              msecs, /*millisecs*/
-				      QS_ALLEVENTS);
-    
-      /* 1 => Input ready, 0 => not ready, -1 => error */
-      switch (rc) {
-       case WAIT_TIMEOUT: return 0;
-       case WAIT_OBJECT_0: return 1;
-       default: return -1;
-      }
+    else {
+	DWORD rc;
+	HANDLE hFile = (HANDLE)_get_osfhandle(fd);
+	
+	rc = MsgWaitForMultipleObjects( 1,
+					&hFile,
+					FALSE, /* wait all */
+					msecs, /*millisecs*/
+					QS_ALLEVENTS);
+	
+	/* 1 => Input ready, 0 => not ready, -1 => error */
+	switch (rc) {
+	case WAIT_TIMEOUT: return 0;
+	case WAIT_OBJECT_0: return 1;
+	default: return -1;
+	}
     }
 #endif
-  }}
+}    
