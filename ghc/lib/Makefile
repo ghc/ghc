@@ -70,7 +70,12 @@ ghc/Unsafe_HC_OPTS           += -Onot
 
 ghc/PrelBase_HC_OPTS         += -H12m
 ghc/PrelRead_HC_OPTS         += -H8m
+ghc/PrelTup_HC_OPTS          += -H8m
+ghc/ArrBase_HC_OPTS          += -H8m
 ghc/IOHandle_HC_OPTS         += -H8m
+required/Time_HC_OPTS        += -H8m
+glaExts/Int_HC_OPTS          += -H8m
+glaExts/Word_HC_OPTS         += -H8m
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
