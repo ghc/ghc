@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.67 2001/01/15 09:55:41 sewardj Exp $
+ * $Id: PrimOps.hc,v 1.68 2001/01/16 11:57:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -27,13 +27,13 @@
    classes CCallable and CReturnable don't really exist, but the
    compiler insists on generating dictionaries containing references
    to GHC_ZcCCallable_static_info etc., so we provide dummy symbols
-   for these.
+   for these.  Some C compilers can't cope with zero-length static arrays,
+   so we have to make these one element long.
 */
 
-W_ GHC_ZCCCallable_static_info[0];
-W_ GHC_ZCCReturnable_static_info[0];
-
-
+StgWord GHC_ZCCCallable_static_info[1];
+StgWord GHC_ZCCReturnable_static_info[1];
+  
 /* -----------------------------------------------------------------------------
    Macros for Hand-written primitives.
    -------------------------------------------------------------------------- */
