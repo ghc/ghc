@@ -8,20 +8,27 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- This module presents an identical interface to Control.Monad.ST,
--- but the underlying implementation of the state thread is lazy.
+-- This module presents an identical interface to "Control.Monad.ST",
+-- but the underlying implementation of the state thread is /lazy/ (in
+-- the sense that (@_|_ >> a@ is not necessarily equal to @_|_@).
 --
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST.Lazy (
+	-- * The 'ST' monad
 	ST,
-
 	runST,
-	unsafeInterleaveST,
 	fixST,
 
-	ST.unsafeIOToST, ST.stToIO,
+	-- * Unsafe operations
+	unsafeInterleaveST,
+	ST.unsafeIOToST,
 
+	-- * Converting 'ST' To 'IO'
+	RealWorld,
+	ST.stToIO,
+
+	-- * Converting between strict and lazy 'ST'
 	strictToLazyST, lazyToStrictST
     ) where
 
@@ -80,6 +87,11 @@ fixST m = ST (\ s ->
 -- Strict <--> Lazy
 
 #ifdef __GLASGOW_HASKELL__
+{-|
+Convert a strict 'ST' computation into a lazy one.  The strict state
+thread passed to 'strictToLazyST' is not performed until the result of
+the lazy state thread it returns is demanded.
+-}
 strictToLazyST :: ST.ST s a -> ST s a
 strictToLazyST m = ST $ \s ->
         let 
@@ -89,6 +101,9 @@ strictToLazyST m = ST $ \s ->
 	in
 	(r, s')
 
+{-| 
+Convert a lazy 'ST' computation into a strict one.
+-}
 lazyToStrictST :: ST s a -> ST.ST s a
 lazyToStrictST (ST m) = GHC.ST.ST $ \s ->
         case (m (S# s)) of (a, S# s') -> (# s', a #)

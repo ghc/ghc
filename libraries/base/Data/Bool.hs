@@ -9,12 +9,14 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- The Bool type and related functions.
+-- The 'Bool' type and related functions.
 --
 -----------------------------------------------------------------------------
 
 module Data.Bool (
+   -- * Booleans
    Bool(..),
+   -- ** Operations 
    (&&),	-- :: Bool -> Bool -> Bool
    (||),	-- :: Bool -> Bool -> Bool
    not,		-- :: Bool -> Bool

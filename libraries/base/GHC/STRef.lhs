@@ -20,20 +20,26 @@ import GHC.ST
 import GHC.Base
 
 data STRef s a = STRef (MutVar# s a)
+-- ^ a value of type @STRef s a@ is a mutable variable in state thread @s@,
+-- containing a value of type @a@
 
+-- |Build a new 'STRef' in the current state thread
 newSTRef :: a -> ST s (STRef s a)
 newSTRef init = ST $ \s1# ->
     case newMutVar# init s1#            of { (# s2#, var# #) ->
     (# s2#, STRef var# #) }
 
+-- |Read the value of an 'STRef'
 readSTRef :: STRef s a -> ST s a
 readSTRef (STRef var#) = ST $ \s1# -> readMutVar# var# s1#
 
+-- |Write a new value into an 'STRef'
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef (STRef var#) val = ST $ \s1# ->
     case writeMutVar# var# val s1#      of { s2# ->
     (# s2#, () #) }
 
+-- |Mutate the contents of an 'STRef'
 modifySTRef :: STRef s a -> (a -> a) -> ST s ()
 modifySTRef ref f = readSTRef ref >>= writeSTRef ref . f
 

@@ -13,14 +13,16 @@
 -----------------------------------------------------------------------------
 
 module Data.IORef
-	( IORef		      -- abstract, instance of: Eq, Typeable
-        , newIORef	      -- :: a -> IO (IORef a)
-        , readIORef	      -- :: IORef a -> IO a
-        , writeIORef	      -- :: IORef a -> a -> IO ()
-	, modifyIORef	      -- :: IORef a -> (a -> a) -> IO ()
+  ( 
+	-- * IORefs
+	IORef,		      -- abstract, instance of: Eq, Typeable
+	newIORef,	      -- :: a -> IO (IORef a)
+        readIORef,	      -- :: IORef a -> IO a
+        writeIORef,	      -- :: IORef a -> a -> IO ()
+	modifyIORef,	      -- :: IORef a -> (a -> a) -> IO ()
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
-	, mkWeakIORef           -- :: IORef a -> IO () -> IO (Weak (IORef a))
+	mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
 #endif
 	) where
 
@@ -38,6 +40,7 @@ import GHC.Weak
 import Data.Dynamic
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
+-- |Make a 'Weak' pointer to an 'IORef'
 mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
 mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
   case mkWeak# r# r f s of (# s1, w #) -> (# s1, Weak w #)
@@ -55,6 +58,7 @@ instance Eq (IORef a) where
     (==) = eqIORef
 #endif /* __HUGS__ */
 
+-- |Mutate the contents of an 'IORef'
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 

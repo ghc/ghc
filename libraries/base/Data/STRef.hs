@@ -13,6 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Data.STRef (
+	-- * STRefs
 	STRef,		-- abstract, instance Eq
 	newSTRef,	-- :: a -> ST s (STRef s a)
 	readSTRef,	-- :: STRef s a -> ST s a

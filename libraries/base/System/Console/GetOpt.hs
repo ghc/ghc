@@ -8,7 +8,9 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- A Haskell port of the GNU getopt library 
+-- This library provides facilities for parsing the command-line options
+-- in a standalone program.  It is essentially a Haskell port of the GNU 
+-- @getopt@ library.
 --
 -----------------------------------------------------------------------------
 
@@ -32,32 +34,52 @@ including a 46 line example! :-)
 -}
 
 module System.Console.GetOpt (
+	-- * GetOpt
+	getOpt,
+	usageInfo,
 	ArgOrder(..),
 	OptDescr(..),
 	ArgDescr(..),
-	usageInfo,	-- :: String -> [OptDescr a] -> String
-	getOpt		-- :: ArgOrder a -> [OptDescr a] -> [String]
-			--        -> ([a],[String],[String])
+
+	-- * Example
+		
+	-- $example
   ) where
 
 import Prelude
 import Data.List 	( isPrefixOf )
 
-data ArgOrder a                -- what to do with options following non-options:
-   = RequireOrder                --  no option processing after first non-option
-   | Permute                     --  freely intersperse options and non-options
-   | ReturnInOrder (String -> a) --  wrap non-options into options
+-- |What to do with options following non-options
+data ArgOrder a
+  = RequireOrder                -- ^ no option processing after first non-option
+  | Permute                     -- ^ freely intersperse options and non-options
+  | ReturnInOrder (String -> a) -- ^ wrap non-options into options
 
+{-|
+Each 'OptDescr' describes a single option.
+
+The arguments to 'Option' are:
+
+* list of short option characters
+
+* list of long option strings (without "--")
+
+* argument descriptor
+
+* explanation of option for user
+-}
 data OptDescr a =              -- description of a single options:
    Option [Char]                --    list of short option characters
           [String]              --    list of long option strings (without "--")
           (ArgDescr a)          --    argument descriptor
           String                --    explanation of option for user
 
-data ArgDescr a                        -- description of an argument option:
-   = NoArg                   a         --    no argument expected
-   | ReqArg (String       -> a) String --    option requires argument
-   | OptArg (Maybe String -> a) String --    optional argument
+-- |Describes whether an option takes an argument or not, and if so
+-- how the argument is injected into a value of type @a@.
+data ArgDescr a
+   = NoArg                   a         -- ^   no argument expected
+   | ReqArg (String       -> a) String -- ^   option requires argument
+   | OptArg (Maybe String -> a) String -- ^   optional argument
 
 data OptKind a                -- kind of cmd line arg (internal use only):
    = Opt       a                --    an option
@@ -65,6 +87,9 @@ data OptKind a                -- kind of cmd line arg (internal use only):
    | EndOfOpts                  --    end-of-options marker (i.e. "--")
    | OptErr    String           --    something went wrong...
 
+-- | Return a string describing the usage of a command, derived from
+-- the header (first argument) and the options described by the 
+-- second argument.
 usageInfo :: String                    -- header
           -> [OptDescr a]              -- option descriptors
           -> String                    -- nicely formatted decription of options
@@ -93,6 +118,20 @@ fmtLong (NoArg  _   ) lo = "--" ++ lo
 fmtLong (ReqArg _ ad) lo = "--" ++ lo ++ "=" ++ ad
 fmtLong (OptArg _ ad) lo = "--" ++ lo ++ "[=" ++ ad ++ "]"
 
+{-|
+Process the command-line, and return the list of values that matched
+(and those that didn\'t). The arguments are:
+
+* The order requirements (see 'ArgOrder')
+
+* The option descriptions (see 'OptDescr')
+
+* The actual command line arguments (presumably got from 
+  'System.Console.Environment.getArgs').
+
+'getOpt' returns a triple, consisting of the argument values, a list
+of options that didn\'t match, and a list of error messages.
+-}
 getOpt :: ArgOrder a                   -- non-option handling
        -> [OptDescr a]                 -- option descriptors
        -> [String]                     -- the commandline arguments
@@ -213,4 +252,42 @@ test order cmdline = case getOpt order options cmdline of
 --          -o[FILE]  --output[=FILE]       use FILE for dump     
 --          -n USER   --name=USER           only dump USER's files
 -----------------------------------------------------------------------------------------
+-}
+
+{- $example
+
+To hopefully illuminate the role of the different "GetOpt" data
+structures, here\'s the command-line options for a (very simple)
+compiler:
+
+>    module Opts where
+>    
+>    import GetOpt
+>    import Maybe ( fromMaybe )
+>    
+>    data Flag 
+>     = Verbose  | Version 
+>     | Input String | Output String | LibDir String
+>    	deriving Show
+>    
+>    options :: [OptDescr Flag]
+>    options =
+>     [ Option [\'v\']     [\"verbose\"] (NoArg Verbose)       \"chatty output on stderr\"
+>     , Option [\'V\',\'?\'] [\"version\"] (NoArg Version)       \"show version number\"
+>     , Option [\'o\']     [\"output\"]  (OptArg outp \"FILE\")  \"output FILE\"
+>     , Option [\'c\']     []          (OptArg inp  \"FILE\")  \"input FILE\"
+>     , Option [\'L\']     [\"libdir\"]  (ReqArg LibDir \"DIR\") \"library directory\"
+>     ]
+>    
+>    inp,outp :: Maybe String -> Flag
+>    outp = Output . fromMaybe \"stdout\"
+>    inp  = Input  . fromMaybe \"stdout\"
+>    
+>    compilerOpts :: [String] -> IO ([Flag], [String])
+>    compilerOpts argv = 
+>    	case (getOpt Permute options argv) of
+>    	   (o,n,[]  ) -> return (o,n)
+>    	   (_,_,errs) -> failIO (concat errs ++ usageInfo header options)
+>      where header = \"Usage: ic [OPTION...] files...\"
+
 -}

@@ -368,21 +368,34 @@ mapFB c f x ys = c (f x) ys
 %*********************************************************
 
 \begin{code}
+-- |The 'Bool' type is an enumeration.  It is defined with 'False'
+-- first so that the corresponding 'Enum' instance will give @'fromEnum'
+-- False@ the value zero, and @'fromEnum' True@ the value 1.
 data  Bool  =  False | True  deriving (Eq, Ord)
 	-- Read in GHC.Read, Show in GHC.Show
 
 -- Boolean functions
 
-(&&), (||)		:: Bool -> Bool -> Bool
+-- | Boolean \"and\"
+(&&)			:: Bool -> Bool -> Bool
 True  && x		=  x
 False && _		=  False
+
+-- | Boolean \"or\"
+(||)			:: Bool -> Bool -> Bool
 True  || _		=  True
 False || x		=  x
 
+-- | Boolean \"not\"
 not			:: Bool -> Bool
 not True		=  False
 not False		=  True
 
+-- |'otherwise' is defined as the value 'True'; it helps to make
+-- guards more readable.  eg.
+--
+-- >  f x | x \< 0     = ...
+-- >      | otherwise = ...
 otherwise		:: Bool
 otherwise 		=  True
 \end{code}

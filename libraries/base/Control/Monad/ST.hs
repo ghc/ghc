@@ -8,21 +8,26 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- The State Transformer Monad, ST
+-- This library provides support for /strict/ state threads, as
+-- described in the PLDI \'94 paper by John Launchbury and Simon Peyton
+-- Jones /Lazy State Threads/.
 --
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST
-      (
-	ST                  -- abstract, instance of Functor, Monad, Typeable.
-      , runST		    -- :: (forall s. ST s a) -> a
-      , fixST		    -- :: (a -> ST s a) -> ST s a
-      , unsafeInterleaveST  -- :: ST s a -> ST s a
+  (
+	-- * The 'ST' Monad
+	ST,		-- abstract, instance of Functor, Monad, Typeable.
+	runST,		-- :: (forall s. ST s a) -> a
+	fixST,		-- :: (a -> ST s a) -> ST s a
 
-      , unsafeIOToST	    -- :: IO a -> ST s a
+	-- * Unsafe operations
+	unsafeInterleaveST,  	-- :: ST s a -> ST s a
+	unsafeIOToST,		-- :: IO a -> ST s a
 
-      , RealWorld	    -- abstract
-      , stToIO		    -- :: ST RealWorld a -> IO a
+	-- * Converting 'ST' to 'IO'
+	RealWorld,		-- abstract
+	stToIO			-- :: ST RealWorld a -> IO a
       ) where
 
 import Prelude

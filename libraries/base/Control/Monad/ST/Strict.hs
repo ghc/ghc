@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  non-portable (requires universal quantification for runST)
 --
--- The strict ST monad (identical to Control.Monad.ST)
+-- The strict ST monad (re-export of "Control.Monad.ST")
 --
 -----------------------------------------------------------------------------
 

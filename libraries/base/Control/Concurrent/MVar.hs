@@ -36,7 +36,6 @@ import ConcBase	( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 		  tryTakeMVar, tryPutMVar, isEmptyMVar,
                   readMVar, swapMVar,
 		)
-import Prelude hiding( catch )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -45,6 +44,7 @@ import GHC.Conc	( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 		)
 #endif
 
+import Prelude
 import Control.Exception as Exception
 
 #ifdef __HUGS__
