@@ -220,6 +220,8 @@ lookup_list ((x,e):es) expr | cheapEqExpr e expr = Just x
 
 addCSEnvItem env id expr | exprIsBig expr = env
 			 | otherwise      = extendCSEnv env id expr
+   -- We don't try to CSE big expressions, because they are expensive to compare
+   -- (and are unlikely to be the same anyway)
 
 extendCSEnv (CS cs in_scope sub) id expr
   = CS (addToUFM_C combine cs hash [(id, expr)]) in_scope sub
