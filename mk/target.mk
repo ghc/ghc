@@ -445,6 +445,7 @@ endif
 
 $(DLL_NAME) :: $(LIBRARY)
 	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS)
+	$(MV) $(DLL_NAME) $(DLL_PEN)
 endif
 
 #
