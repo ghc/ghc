@@ -114,6 +114,7 @@ static BOOLEAN noGap = TRUE;	/* For checking string gaps */
 static BOOLEAN forgetindent = FALSE;	/* Don't bother applying indentation rules */
 
 static int nested_comments; 	/* For counting comment nesting depth */
+static int comment_start;
 
 /* OLD: Hacky definition of yywrap: see flex doc.
 
@@ -336,19 +337,19 @@ NL  	    	    	[\n\r]
 			    }
 <Code,GlaExt>"{-#"{WS}*"GENERATE_SPECS" {
 			      /* these are handled by hscpp */
-			      nested_comments =1;
+			      nested_comments =1; comment_start = hsplineno;
                               PUSH_STATE(Comment);
 			    }
 <Code,GlaExt>"{-#"{WS}*"OPTIONS" {
 			      /* these are for the driver! */
-			      nested_comments =1;
+			      nested_comments =1; comment_start = hsplineno;
                               PUSH_STATE(Comment);
 			    }
 <Code,GlaExt>"{-#"{WS}*"SOURCE"{WS}*"#"?"-}" {
 			      /* these are used by `make depend' and the
 			         compiler to indicate that a module should
 				 be imported from source */
-			      nested_comments =1;
+			      nested_comments =1; comment_start = hsplineno; 
                               RETURN(SOURCE_UPRAGMA); 
 			    }
 
@@ -357,7 +358,7 @@ NL  	    	    	[\n\r]
     	    	    	        input_filename, hsplineno);
     	    	    	      format_string(stderr, (unsigned char *) yytext, yyleng);
     	    	    	      fputs("'\n", stderr);
-			      nested_comments = 1;
+			      nested_comments = 1; comment_start = hsplineno;
 			      PUSH_STATE(Comment);
 			    }
 <UserPragma>"#-}"	    { POP_STATE; RETURN(END_UPRAGMA); }
@@ -848,7 +849,7 @@ NL  	    	    	[\n\r]
 %}
 
 <Code,GlaExt,UserPragma,StringEsc>"{-"	{ 
-    	    	    	  noGap = FALSE; nested_comments = 1; PUSH_STATE(Comment); 
+    	    	    	  noGap = FALSE; nested_comments = 1; comment_start = hsplineno; PUSH_STATE(Comment); 
     	    	    	}
 
 <Comment>[^-{]*     	|
@@ -932,8 +933,10 @@ NL  	    	    	[\n\r]
     	    	    	  hsperror("unterminated character literal");
     	    	    	}
 <Comment><<EOF>>    	{ 
+			  char errbuf[ERR_BUF_SIZE];
     	    	    	  hsplineno = hslineno; hspcolno = hscolno;
-    	    	    	  hsperror("unterminated comment"); 
+ 		          sprintf(errbuf, "unterminated comment (which started on line %d)", comment_start);
+    	    	    	  hsperror(errbuf); 
     	    	    	}
 <String,StringEsc><<EOF>>   { 
     	    	    	  hsplineno = hslineno; hspcolno = hscolno;
