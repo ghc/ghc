@@ -243,9 +243,6 @@ else
 $(HS_PROG) :: $(HS_OBJS)
 	$(CC) -o $@ $(HC_BOOT_CC_OPTS) $(HC_BOOT_LD_OPTS) $(HS_OBJS) $(HC_BOOT_LIBS)
 endif
-
-# for building a Haskell program, we add FptoolsHcOpts
-SRC_HC_OPTS += $(FptoolsHcOpts)
 endif
 
 #----------------------------------------

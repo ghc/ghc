@@ -23,9 +23,9 @@ ifeq "$(BuildFlavour)" "devel"
 
 GhcCompilerWays =
 
-FptoolsHcOpts = -H32m $(MyWarningOpts)
+SRC_HC_OPTS   = -H32m -O0 $(MyWarningOpts)
 GhcHcOpts     = -Rghc-timing -DDEBUG
-GhcLibHcOpts  = -dcore-lint -O -H32m  $(MyWarningOpts) -keep-hc-files 
+GhcLibHcOpts  = -dcore-lint $(MyWarningOpts) -keep-hc-files 
 GhcLibWays    =
 
 # Debugging RTS
@@ -54,9 +54,9 @@ endif
 
 ifeq "$(BuildFlavour)" "perf"
 
-FptoolsHcOpts = -H32m -O $(MyWarningOpts)
+SRC_HC_OPTS   = -H32m -O $(MyWarningOpts)
 GhcHcOpts     = -Rghc-timing
-GhcLibHcOpts  = -H32m -O $(MyWarningOpts)
+GhcLibHcOpts  =
 
 GhcLibWays    = p
 

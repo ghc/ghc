@@ -164,16 +164,6 @@ GhcCompilerWays=
 #			used to compile GHC.  Useful when bootstrapping.
 GhcHcOpts=-Rghc-timing
 
-# Extra Haskell compiler options to use when compiling all Haskell
-# *programs* (not libraries), including GHC itself.
-# Typical options to use here:
-#
-#	-H25m		use a bigger heap (to speed up compilation)
-#
-#	-O		compile an optimised compiler
-#
-FptoolsHcOpts=-O
-
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
@@ -214,9 +204,6 @@ HaveRtldLocal = @HaveRtldLocal@
 
 ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd netbsd openbsd)" ""
 GhcWithInterpreter=YES
-ifeq "$(HaveLibDL)" "YES"
-SRC_HC_OPTS += -ldl
-endif
 else 
 GhcWithInterpreter=NO
 endif
@@ -550,6 +537,8 @@ endif
 # compilations, 
 #
 #	SRC_HC_OPTS += -O
+
+SRC_HC_OPTS += -H16m -O
 
 # These flags make flex 8-bit
 SRC_FLEX_OPTS	+= -8
