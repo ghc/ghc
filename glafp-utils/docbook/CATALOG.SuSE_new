@@ -1,0 +1,16 @@
+DTDDECL "-//OASIS//DTD DocBook V3.1//EN" "/usr/share/sgml/docbk31/docbook.dcl"
+
+PUBLIC "-//OASIS//DTD DocBook V3.1//EN" /usr/share/sgml/OASIS/dtd/DocBook_V3.1
+PUBLIC "-//USA-DOD//DTD Table Model 951010//EN" /usr/share/sgml/USA-DOD/dtd/Table_Model_951010
+PUBLIC "-//OASIS//ELEMENTS DocBook Information Pool V3.1//EN" /usr/share/sgml/OASIS/elements/DocBook_Information_Pool_V3.1
+PUBLIC "-//OASIS//ELEMENTS DocBook Document Hierarchy V3.1//EN" /usr/share/sgml/OASIS/elements/DocBook_Document_Hierarchy_V3.1
+PUBLIC "-//OASIS//ENTITIES DocBook Additional General Entities V3.1//EN" /usr/share/sgml/OASIS/entities/DocBook_Additional_General_Entities_V3.1
+PUBLIC "-//OASIS//ENTITIES DocBook Notations V3.1//EN" /usr/share/sgml/OASIS/entities/DocBook_Notations_V3.1
+PUBLIC "-//OASIS//ENTITIES DocBook Character Entities V3.1//EN" /usr/share/sgml/OASIS/entities/DocBook_Character_Entities_V3.1
+
+CATALOG  "/var/lib/sgml/CATALOG.iso_ent"
+
+PUBLIC "-//James Clark//DTD DSSSL Style Sheet//EN" /usr/share/sgml/James_Clark/dtd/DSSSL_Style_Sheet
+PUBLIC "-//Norman Walsh//DOCUMENT DocBook Print Stylesheet//EN" /usr/share/sgml/docbook/dsssl-stylesheets-1.77/print/docbook.dsl
+PUBLIC "-//Norman Walsh//DOCUMENT DocBook HTML Stylesheet//EN" /usr/share/sgml/docbook/dsssl-stylesheets-1.77/html/docbook.dsl
+PUBLIC "ISO/IEC 10179:1996//DTD DSSSL Architecture//EN" /usr/share/sgml/jade_dsl/dsssl.dtd
