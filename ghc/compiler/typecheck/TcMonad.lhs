@@ -244,7 +244,7 @@ which is a Royal Pain.  By the time this fork stuff is used they'll
 have been unified down so there won't be any kind variables, but we
 can't express that in the current typechecker framework.
 
-So we compromise and use unsafeInterleaveSST.
+So we compromise and use unsafeInterleaveIO.
 
 We throw away any error messages!
 

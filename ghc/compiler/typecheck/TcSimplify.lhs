@@ -78,7 +78,7 @@ We have in our hand
 
 	G	the environment
 	T	the type of the RHS
-	C	the constraints fromm that RHS
+	C	the constraints from that RHS
 
 The game is to figure out
 
@@ -242,11 +242,11 @@ in the environment, or by the variables in the type.
 
 Notice that we union before calling oclose.  Here's an example:
 
-	class J a b c | a,b -> c
+	class J a b c | a b -> c
 	fv(G) = {a}
 
 Is this ambiguous?
-	forall b,c. (J a b c) => b -> b
+	forall b c. (J a b c) => b -> b
 
 Only if we union {a} from G with {b} from T before using oclose,
 do we see that c is fixed.  
