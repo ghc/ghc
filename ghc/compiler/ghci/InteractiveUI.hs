@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.106 2002/01/09 12:41:47 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.107 2002/01/22 13:04:13 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -15,11 +15,10 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 import Packages
 import CompManager
 import HscTypes		( TyThing(..) )
-import MkIface
-import ByteCodeLink
+import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
-import DriverUtil
+import DriverUtil	( handle, remove_spaces )
 import Linker
 import Finder		( flushPackageCache )
 import Util
@@ -34,7 +33,8 @@ import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 import OccName		( isSymOcc )
 import BasicTypes	( defaultFixity )
 import Outputable
-import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, dopt_unset )
+import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, 
+			  dopt_unset )
 import Panic		( GhcException(..), showGhcException )
 import Config
 
