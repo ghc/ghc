@@ -192,6 +192,10 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     place %i4 and %i5 at [%sp+92] and [%sp+96] respectively.  This
     machinery should then work in all cases.  (Or would it?  Perhaps
     it would trash parts of the caller's frame.  Dunno).  
+
+    SUP, 25 Apr 02: Alas, the "fully correct" solution above is only
+    half correct: "%sp has to be 16-byte aligned at all time", the
+    almighty ABI spec says...
   */
     if ((adjustor = stgMallocBytes(4*(8+1), "createAdjustor")) != NULL) {
 	unsigned long *const adj_code = (unsigned long *)adjustor;
@@ -222,6 +226,18 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 	adj_code[7] |= ((unsigned long)hptr) & 0x000003ff;
 
 	adj_code[8] = (StgStablePtr)hptr;
+
+	/* flush cache */
+	asm("flush %0" : : "r" (adj_code    ));
+	asm("flush %0" : : "r" (adj_code + 2));
+	asm("flush %0" : : "r" (adj_code + 4));
+	asm("flush %0" : : "r" (adj_code + 6));
+
+	/* max. 5 instructions latency, and we need at >= 1 for returning */
+	asm("nop");
+	asm("nop");
+	asm("nop");
+	asm("nop");
     }
 #elif defined(alpha_TARGET_ARCH)
   /* Magic constant computed by inspecting the code length of
@@ -377,13 +393,13 @@ freeHaskellFunctionPtr(void* ptr)
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }    
 #elif defined(sparc_TARGET_ARCH)
- if ( *(unsigned char*)ptr != 0x13 ) {
+ if ( *(unsigned long*)ptr != 0x9A10000B ) {
    fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
  /* Free the stable pointer first..*/
- freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
+ freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 8)));
 #elif defined(alpha_TARGET_ARCH)
  if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
    fprintf(stderr, "freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
