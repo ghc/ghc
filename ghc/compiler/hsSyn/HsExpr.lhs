@@ -123,9 +123,14 @@ data HsExpr id
 					-- 	type of input record)
 		 (HsRecordBinds id)
 
-  | ExprWithTySig			-- signature binding
+  | ExprWithTySig			-- e :: type
 		(LHsExpr id)
 		(LHsType id)
+
+  | ExprWithTySigOut			-- TRANSLATION
+		(LHsExpr id)
+		(LHsType Name)		-- Retain the signature for round-tripping purposes
+
   | ArithSeqIn				-- arithmetic sequence
 		(ArithSeqInfo id)
   | ArithSeqOut
@@ -353,6 +358,9 @@ ppr_expr (RecordUpdOut aexp _ _ rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)
+  = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
+	 4 (ppr sig)
+ppr_expr (ExprWithTySigOut expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
 	 4 (ppr sig)
 

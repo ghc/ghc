@@ -482,6 +482,10 @@ zonkExpr env (RecordUpdOut expr in_ty out_ty rbinds)
     zonkRbinds env rbinds	`thenM` \ new_rbinds ->
     returnM (RecordUpdOut new_expr new_in_ty new_out_ty new_rbinds)
 
+zonkExpr env (ExprWithTySigOut e ty) 
+  = do { e' <- zonkLExpr env e
+       ; return (ExprWithTySigOut e' ty) }
+
 zonkExpr env (ExprWithTySig _ _) = panic "zonkExpr env:ExprWithTySig"
 zonkExpr env (ArithSeqIn _)      = panic "zonkExpr env:ArithSeqIn"
 zonkExpr env (PArrSeqIn _)       = panic "zonkExpr env:PArrSeqIn"

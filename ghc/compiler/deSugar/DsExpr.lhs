@@ -156,7 +156,8 @@ dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
 
 dsExpr :: HsExpr Id -> DsM CoreExpr
 
-dsExpr (HsPar x) = dsLExpr x
+dsExpr (HsPar e) 	      = dsLExpr e
+dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)  = returnDs (Var var)
 dsExpr (HsIPVar ip) = returnDs (Var (ipNameName ip))
 dsExpr (HsLit lit)  = dsLit lit

@@ -166,8 +166,7 @@ tc_expr in_expr@(ExprWithTySig expr poly_ty) res_ty
  = addErrCtxt (exprCtxt in_expr)			$
    tcHsSigType ExprSigCtxt poly_ty			`thenM` \ sig_tc_ty ->
    tcThingWithSig sig_tc_ty (tcCheckRho expr) res_ty	`thenM` \ (co_fn, expr') ->
-   returnM (co_fn <$> unLoc expr')
-	-- ToDo: nasty unLoc
+   returnM (co_fn <$> ExprWithTySigOut expr' poly_ty)
 
 tc_expr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
