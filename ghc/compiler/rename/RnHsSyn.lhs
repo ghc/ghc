@@ -81,6 +81,7 @@ extractHsTyNames ty
     get (MonoTupleTy tys boxed)  = unitNameSet (tupleTyCon_name boxed (length tys)) 
 				   `unionNameSets` extractHsTyNames_s tys
     get (MonoFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
+    get (MonoIParamTy n ty)	 = get ty
     get (MonoDictTy cls tys)     = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
     get (MonoUsgForAllTy uv ty)  = get ty
     get (MonoUsgTy u ty)         = get ty

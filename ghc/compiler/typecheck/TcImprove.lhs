@@ -25,7 +25,7 @@ import List		( elemIndex, nub )
 
 \begin{code}
 tcImprove lie =
-    if null cfdss then
+    if null nfdss then
 	returnTc ()
     else
 	-- zonkCfdss cfdss `thenTc` \ cfdss' ->

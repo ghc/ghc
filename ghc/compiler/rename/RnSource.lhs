@@ -646,6 +646,11 @@ rnHsType doc (MonoTyApp ty1 ty2)
     rnHsType doc ty2		`thenRn` \ (ty2', fvs2) ->
     returnRn (MonoTyApp ty1' ty2', fvs1 `plusFV` fvs2)
 
+rnHsType doc (MonoIParamTy n ty)
+  = getIPName n			`thenRn` \ name ->
+    rnHsType doc ty		`thenRn` \ (ty', fvs) ->
+    returnRn (MonoIParamTy name ty', fvs)
+
 rnHsType doc (MonoDictTy clas tys)
   = lookupOccRn clas		`thenRn` \ clas' ->
     rnHsTypes doc tys		`thenRn` \ (tys', fvs) ->

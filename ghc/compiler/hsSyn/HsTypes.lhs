@@ -186,6 +186,9 @@ ppr_mono_ty ctxt_prec (MonoTyApp fun_ty arg_ty)
   = maybeParen (ctxt_prec >= pREC_CON)
 	       (hsep [ppr_mono_ty pREC_FUN fun_ty, ppr_mono_ty pREC_CON arg_ty])
 
+ppr_mono_ty ctxt_prec (MonoIParamTy n ty)
+  = hsep [{- char '?' <> -} ppr n, text "::", ppr_mono_ty pREC_TOP ty]
+
 ppr_mono_ty ctxt_prec (MonoDictTy clas tys)
   = ppr clas <+> hsep (map (ppr_mono_ty pREC_CON) tys)
 

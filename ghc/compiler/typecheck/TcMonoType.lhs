@@ -33,7 +33,8 @@ import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
 import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
                           mkUsForAllTy, zipFunTys,
-			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
+			  mkSigmaTy, mkDictTy, mkPredTy, mkTyConApp,
+			  mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar,
@@ -140,7 +141,7 @@ tc_type ty
 tc_type_kind :: RenamedHsType -> TcM s (TcKind, Type)
 tc_type_kind ty@(MonoTyVar name)
   = tc_app ty []
-    
+
 tc_type_kind (MonoListTy ty)
   = tc_boxed_type ty		`thenTc` \ tau_ty ->
     returnTc (boxedTypeKind, mkListTy tau_ty)
@@ -160,6 +161,10 @@ tc_type_kind (MonoFunTy ty1 ty2)
 
 tc_type_kind (MonoTyApp ty1 ty2)
   = tc_app ty1 [ty2]
+
+tc_type_kind (MonoIParamTy n ty)
+  = tc_type ty `thenTc` \ tau ->
+    returnTc (boxedTypeKind, mkPredTy (IParam n tau))
 
 tc_type_kind (MonoDictTy class_name tys)
   = tcClassAssertion (HsPClass class_name tys)	`thenTc` \ (Class clas arg_tys) ->
