@@ -24,7 +24,8 @@
     <ul>
       <li>The code executed when a closure is entered is moved adjacent to
 	that closure's infotable.  Moreover, the order of the info table
-	entries is reversed.
+	entries is reversed.  Also, SRT pointers are removed from closures that
+        don't need them (non-FUN, RET and THUNK ones).
       <li>Function prologue and epilogue code is removed.  (GHC generated code
 	manages its own stack and uses the system stack only for return
 	addresses and during calls to C code.)
