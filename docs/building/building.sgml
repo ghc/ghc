@@ -2940,6 +2940,35 @@ when you install it.
       </para>
 
       <sect3>
+	<title>Extra features of the InstallShield</title>
+
+	<para>
+	  The InstallShield has some IS-specific twiddles:
+
+	  <itemizedlist>
+	    <listitem>
+	      <para>
+		Two registry entries are set under
+		<literal>HKEY_LOCAL_MACHINE\SOFTWARE\GHC</literal>:
+		<literal>Path</literal> and
+		<literal>Version</literal>, which record respectively
+		the directory in which GHC was installed, and the
+		version number.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+		The InstallShield adds some entries to the Program
+		menu, for GHCi and for the documentation. See under
+		Setup Design and the individual components (each
+		component can add entries to the menu).
+	      </para>
+	    </listitem>
+	  </itemizedlist>
+	</para>
+      </sect3>
+      
+      <sect3>
 	<title>External add-ins</title>
 
 	<para>
@@ -2960,6 +2989,7 @@ include/
   Mingwin includes
 </screen>
 	  </para>
+	</sect3>
       
     </sect2>
 
