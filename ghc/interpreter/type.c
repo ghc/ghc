@@ -9,11 +9,11 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.30 $
- * $Date: 2000/03/13 11:37:17 $
+ * $Revision: 1.31 $
+ * $Date: 2000/03/23 14:54:21 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
+#include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"

@@ -7,11 +7,11 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.41 $
- * $Date: 2000/03/23 12:19:22 $
+ * $Revision: 1.42 $
+ * $Date: 2000/03/23 14:54:21 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
+#include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"
@@ -2618,9 +2618,9 @@ Type type; {
       Sym(setmode)                   \
       SymX(system)                   \
       SymX(sleep)                    \
-      Sym(__imp__tzname)             \
-      Sym(__imp__timezone)           \
-      Sym(tzset)                     \
+      SymX(__imp__tzname)            \
+      SymX(__imp__timezone)          \
+      SymX(tzset)                    \
       Sym(log)                       \
       Sym(exp)                       \
       Sym(sqrt)                      \

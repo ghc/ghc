@@ -9,11 +9,11 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.14 $
- * $Date: 2000/03/10 20:03:36 $
+ * $Revision: 1.15 $
+ * $Date: 2000/03/23 14:54:21 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
+#include "hugsbasictypes.h"
 #include "storage.h"
 #include "errors.h"
 #include "connect.h"

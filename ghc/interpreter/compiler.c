@@ -11,11 +11,11 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/03/15 23:27:16 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/23 14:54:20 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
+#include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"

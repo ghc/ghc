@@ -9,9 +9,9 @@
  * free software under the license in the file "License", which is
  * included in the distribution.
  *
- * $RCSfile: prelude.h,v $
- * $Revision: 1.11 $
- * $Date: 2000/03/22 18:14:23 $
+ * $RCSfile: hugsbasictypes.h,v $
+ * $Revision: 1.1 $
+ * $Date: 2000/03/23 14:54:21 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE

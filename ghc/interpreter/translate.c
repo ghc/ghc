@@ -10,11 +10,11 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/03/13 14:11:14 $
+ * $Revision: 1.30 $
+ * $Date: 2000/03/23 14:54:21 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
+#include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"

@@ -9,11 +9,11 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.13 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.14 $
+ * $Date: 2000/03/23 14:54:20 $
  * ------------------------------------------------------------------------*/
 
-#include "prelude.h"
+#include "hugsbasictypes.h"
 #include "storage.h"
 #include "connect.h"
 #include "errors.h"

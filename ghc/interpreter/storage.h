@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.35 $
- * $Date: 2000/03/22 18:14:23 $
+ * $Revision: 1.36 $
+ * $Date: 2000/03/23 14:54:21 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE
@@ -63,7 +63,7 @@ typedef Cell         ConVarId;
  * TAG_PTR_MIN(200)    .. TAG_PTR_MAX(298)            pointer tags
  * TAG_SPEC_MIN(400)   .. TAG_SPEC_MAX(425)           special tags
  * OFF_MIN(1,000)      .. OFF_MAX(1,999)              offsets
- * CHAR_MIN(3,000)     .. CHAR_MAX(3,255)             chars
+ * CHARR_MIN(3,000)    .. CHARR_MAX(3,255)            chars
  *
  * SMALL_INT_MIN(100,000) .. SMALL_INT_MAX(499,999)   smallish ints
  *              (300,000 denotes 0)
@@ -889,11 +889,11 @@ extern Class findQualClassWithoutConsultingExportList ( QualId q );
  * ------------------------------------------------------------------------*/
 
 /* I think this assumes that NUM_CHARS==256. */
-#define CHAR_MIN     3000
-#define CHAR_MAX     3255
-#define isChar(c)    (CHAR_MIN<=(c) && (c)<=CHAR_MAX)
-#define charOf(c)    ((Char)((c)-CHAR_MIN))
-#define mkChar(c)    (CHAR_MIN+(((Cell)(c)) & 0xFF))
+#define CHARR_MIN    3000
+#define CHARR_MAX    3255
+#define isChar(c)    (CHARR_MIN<=(c) && (c)<=CHARR_MAX)
+#define charOf(c)    ((Char)((c)-CHARR_MIN))
+#define mkChar(c)    (CHARR_MIN+(((Cell)(c)) & 0xFF))
 #define MAXCHARVAL   (NUM_CHARS-1)
 
 /* --------------------------------------------------------------------------
