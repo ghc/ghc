@@ -389,7 +389,7 @@ searchPathSeparator = ':'
 -- (typically @\"\"@ on Unix and @\".exe\"@ on Windows or OS\/2)
 exeExtension :: String
 #ifdef mingw32_TARGET_OS
-exeExtension = ".exe"
+exeExtension = "exe"
 #else
 exeExtension = ""
 #endif
@@ -399,16 +399,16 @@ exeExtension = ""
 -- (typically @\".o\"@ on Unix and @\".obj\"@ on Windows)
 objExtension :: String
 #ifdef mingw32_TARGET_OS
-objExtension = ".obj"
+objExtension = "obj"
 #else
-objExtension = ".o"
+objExtension = "o"
 #endif
 
 -- | Extension for dynamically linked (or shared) libraries
 -- (typically @\".so\"@ on Unix and @\".dll\"@ on Windows)
 dllExtension :: String
 #ifdef mingw32_TARGET_OS
-dllExtension = ".dll"
+dllExtension = "dll"
 #else
-dllExtension = ".so"
+dllExtension = "so"
 #endif
