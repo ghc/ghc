@@ -11,4 +11,4 @@ clean:
 
 test: runtests
 	driver/runtests --tool=../ghc/compiler/ghc-inplace \
-		 --config=config/msrc/cam-02-unx.T tests
+		 --config=config/msrc/cam-02-unx.T --rootdir=tests
