@@ -275,7 +275,7 @@ dist ::
 # Automatic generation of a MANIFEST file for a source distribution
 # tree that is ready to go.
 dist-manifest ::
-	cd $(SRC_DIST_DIR); $(FIND) . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
+	cd $(SRC_DIST_DIR); $(FIND) . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > MANIFEST.tmp ; mv MANIFEST.tmp MANIFEST
 
 dist-package :: dist-package-tar-gz
 
