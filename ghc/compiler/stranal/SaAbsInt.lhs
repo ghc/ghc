@@ -37,8 +37,7 @@ import Type		( splitAlgTyConApp_maybe,
 import TysWiredIn	( intTyCon, integerTyCon, doubleTyCon,
 			  floatTyCon, wordTyCon, addrTyCon
 			)
-import Util		( isIn, isn'tIn, nOfThem, zipWithEqual )
-import GlaExts		( trace )
+import Util		( isIn, isn'tIn, nOfThem, zipWithEqual, trace )
 import Outputable	
 
 returnsRealWorld x = False -- ToDo: panic "SaAbsInt.returnsRealWorld (ToDo)"
