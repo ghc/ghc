@@ -202,7 +202,7 @@ split_marker = ':'   -- not configurable (ToDo)
 
 v_Import_paths, v_Include_paths, v_Library_paths :: IORef [String]
 GLOBAL_VAR(v_Import_paths,  ["."], [String])
-GLOBAL_VAR(v_Include_paths, ["."], [String])
+GLOBAL_VAR(v_Include_paths, [], [String])
 GLOBAL_VAR(v_Library_paths, [],	 [String])
 
 #ifdef darwin_TARGET_OS

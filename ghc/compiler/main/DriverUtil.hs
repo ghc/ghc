@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.44 2004/09/30 10:37:11 simonpj Exp $
+-- $Id: DriverUtil.hs,v 1.45 2004/10/03 16:28:06 panne Exp $
 --
 -- Utils for the driver
 --
@@ -15,8 +15,8 @@ module DriverUtil (
 	split, add, addNoDups, 
 	Suffix, splitFilename, getFileSuffix,
 	splitFilename3, remove_suffix, split_longest_prefix,
-	replaceFilenameSuffix, directoryOf, replaceFilenameDirectory,
-	remove_spaces, escapeSpaces,
+	replaceFilenameSuffix, directoryOf, filenameOf,
+	replaceFilenameDirectory, remove_spaces, escapeSpaces,
   ) where
 
 #include "../includes/ghcconfig.h"
@@ -211,6 +211,11 @@ replaceFilenameSuffix s suf = remove_suffix '.' s ++ suf
 -- the directory.
 directoryOf :: FilePath -> String
 directoryOf = fst . splitFilenameDir
+
+-- filenameOf strips the directory off the input string, returning
+-- the filename.
+filenameOf :: FilePath -> String
+filenameOf = snd . splitFilenameDir
 
 replaceFilenameDirectory :: FilePath -> String -> FilePath
 replaceFilenameDirectory s dir

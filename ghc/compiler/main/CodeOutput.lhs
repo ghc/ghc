@@ -28,6 +28,7 @@ import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
 import DriverState	( getExplicitPackagesAnd, getPackageCIncludes )
+import DriverUtil	( filenameOf )
 import FastString	( unpackFS )
 import Cmm		( Cmm )
 import HscTypes
@@ -151,7 +152,7 @@ outputC dflags filenm flat_absC
 	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
 	  hPutStr h cc_injects
 	  when stub_h_exists $ 
-	     hPutStrLn h ("#include \"" ++ (hscStubHOutName dflags) ++ "\"")
+	     hPutStrLn h ("#include \"" ++ (filenameOf (hscStubHOutName dflags)) ++ "\"")
 	  writeCs h flat_absC
 \end{code}
 
