@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/02/04 13:41:00 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/06 08:38:04 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -3027,7 +3027,6 @@ Inst in; {                              /* of the context for a derived    */
         ps     = tl(ps);
 	if (its++ >= factor*cutoff) {
 	    Cell bpi = inst(in).head;
-	    Cell pi  = copyPred(fun(p),intOf(snd(p)));
 	    ERRMSG(inst(in).line) "\n*** Cannot derive " ETHEN ERRPRED(bpi);
 	    ERRTEXT " after %d iterations.", its-1   ETHEN
 	    ERRTEXT
@@ -5037,15 +5036,23 @@ Void checkDefns() {                     /* Top level static analysis       */
     }
     mapProc(checkImportList, unqualImports);
 
+    /* Note: there's a lot of side-effecting going on here, so
+       don't monkey about with the order of operations here unless
+       you know what you are doing */
     if (!combined) linkPreludeTC();     /* Get prelude tycons and classes  */
 
     mapProc(checkTyconDefn,tyconDefns); /* validate tycon definitions      */
     checkSynonyms(tyconDefns);          /* check synonym definitions       */
     mapProc(checkClassDefn,classDefns); /* process class definitions       */
     mapProc(kindTCGroup,tcscc(tyconDefns,classDefns)); /* attach kinds     */
+    mapProc(visitClass,classDefns);	/* check class hierarchy	   */
     mapProc(extendFundeps,classDefns);  /* finish class definitions	   */
+					/* (convenient if we do this after */
+					/* calling `visitClass' so that we */
+					/* know the class hierarchy is     */
+					/* acyclic)                        */
+
     mapProc(addMembers,classDefns);     /* add definitions for member funs */
-    mapProc(visitClass,classDefns);     /* check class hierarchy           */
 
     if (!combined) linkPreludeCM();     /* Get prelude cfuns and mfuns     */
     

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: preds.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/11/17 16:57:43 $
+ * $Revision: 1.10 $
+ * $Date: 2000/03/06 08:38:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -448,24 +448,25 @@ Int  d; {
     if (nonNull(in)) {
         Int  beta = typeOff;
         Cell e    = inst(in).builder;
-        Cell es   = inst(in).specifics;
+	List es   = inst(in).specifics;
+	List fs   = NIL;
+	for (; nonNull(es); es=tl(es))
+ 	    fs = cons(triple(hd(es),mkInt(beta),NIL),fs);
+	fs = rev(fs);
+	improve(0,ps,fs);
 #if EXPLAIN_INSTANCE_RESOLUTION
 	if (showInstRes) {
 	    for (i = 0; i < d; i++)
 	      fputc(' ', stdout);
 	    fputs("try ", stdout);
-	    printContext(stdout, es);
+	    printContext(stdout, copyPreds(fs));
 	    fputs(" => ", stdout);
-	    printPred(stdout, inst(in).head);
+	    printPred(stdout, copyPred(inst(in).head,beta));
 	    fputc('\n', stdout);
 	}
 #endif
-	/* would need to lift es to triples, so be lazy, and just
-	   use improve1 in the loop */
-	/* improve(0,ps,es); */
-	for (; nonNull(es); es=tl(es)) {
+	for (es=inst(in).specifics; nonNull(es); es=tl(es)) {
 	    Cell ev;
-	    improve1(0,ps,hd(es),beta);
 	    ev = entail(ps,hd(es),beta,d);
             if (nonNull(ev))
                 e = ap(e,ev);
@@ -827,7 +828,10 @@ List sps; {                             /* context ps.  sps = savePreds.   */
 
 	if (nonNull(ev)) {		/* Discharge if ps ||- (pi,o)	   */
             overEvid(thd3(hd(p)),ev);
-	} else if (!isAp(pi) || isIP(fun(pi)) || !anyGenerics(pi,o)) {
+	} else if (isIP(fun(pi))) {
+	    tl(p) = rems;
+	    rems  = p;
+	} else if (!isAp(pi) || !anyGenerics(pi,o)) {
 	    tl(p) = sps;		/* Defer if no generics		   */
             sps   = p;
         }
