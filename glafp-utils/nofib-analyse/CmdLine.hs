@@ -32,6 +32,7 @@ reportTitle = case [ t | OptTitle t <- flags ] of
 
 data CLIFlags
   = OptASCIIOutput
+  | OptLaTeXOutput
   | OptHTMLOutput
   | OptIgnoreSmallTimes Float
   | OptDeviations
@@ -52,6 +53,8 @@ argInfo =
 	"Ignore runtimes smaller than <secs>"
   , Option ['d'] ["deviations"] (NoArg OptDeviations)
 	"Display deviations (default)"
+  , Option ['l'] ["latex"]    (NoArg OptLaTeXOutput)  
+	"Produce LaTeX output"
   , Option ['n'] ["nodeviations"] (NoArg OptNoDeviations)
 	"Hide deviations"
   , Option ['t'] ["title"] (ReqArg OptTitle "title")
