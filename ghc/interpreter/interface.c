@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.44 $
- * $Date: 2000/04/04 15:41:56 $
+ * $Revision: 1.45 $
+ * $Date: 2000/04/05 09:22:28 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -390,10 +390,12 @@ static Cell deleteUnexportedIFaceEntities ( Cell root )
       hd(t) = zsnd(unap(I_EXPORT,hd(t)));
    /* exlist_list :: [[ ConVarId | ((ConId, [ConVarId])) ]] */
 
+#if 0
    if (isNull(exlist_list)) {
       ERRMSG(0) "Can't find any export lists in interface file"
       EEND;
    }
+#endif
 
    return filterInterface ( root, isExportedIFaceEntity, 
                             exlist_list, NULL );
@@ -1020,7 +1022,7 @@ void processInterfaces ( List /* of CONID */ iface_modnames )
              case I_DATA: {
                 Cell ddecl   = unap(I_DATA,decl);
                 List constrs = finishGHCDataDecl ( zsel35(ddecl) );
-                constructor_list = appendOnto ( constrs, constructor_list );
+                constructor_list = dupOnto ( constrs, constructor_list );
                 break;
              }
              case I_NEWTYPE: {
@@ -1668,7 +1670,10 @@ List  constrs0;  /* [((ConId,[((Type,VarId,Int))]))]  */
               conArgStrictness = intOf(zthd3(conArg));
               tyvarsMentioned = dupListOnto(ifTyvarsIn(conArgTy),
                                             tyvarsMentioned);
-              if (conArgStrictness > 0) conArgTy = bang(conArgTy);
+              /* Not sure what the deal is with strictness.  Do we need
+                 to notify the symbol table, or not?  The Hugs desugarer?
+                 Currently disabled. */
+              /* if (conArgStrictness > 0) conArgTy = bang(conArgTy); */
               ty = fn(conArgTy,ty);
               if (nonNull(conArgNm)) {
                  /* a field name is mentioned too */
