@@ -28,7 +28,8 @@ import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, getIPName,
 			  checkDupOrQualNames, checkDupNames,
 			  mkImportedGlobalName, mkImportedGlobalFromRdrName,
 			  newDFunName, getDFunKey, newImplicitBinder,
-			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV, mapFvRn
+			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, 
+			  addOneFV, mapFvRn
 			)
 import RnMonad
 
@@ -353,18 +354,21 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
     lookupOccRn name		        `thenRn` \ name' ->
     let 
 	extra_fvs FoExport 
-	  | isDyn     	= lookupImplicitOccsRn [makeStablePtr_RDR, deRefStablePtr_RDR]
-	  | otherwise 	= returnRn (unitFV name')
+	  | isDyn = 
+		lookupImplicitOccsRn [makeStablePtr_RDR, deRefStablePtr_RDR,
+				      bindIO_RDR, returnIO_RDR]
+	  | otherwise = 
+		lookupImplicitOccsRn [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
+		returnRn (addOneFV fvs name')
 	extra_fvs other = returnRn emptyFVs
     in
     checkRn (ok_ext_nm ext_nm) (badExtName ext_nm)	`thenRn_`
 
-    lookupImplicitOccsRn [bindIO_RDR, returnIO_RDR]	`thenRn` \ fvs1 ->
-    extra_fvs imp_exp					`thenRn` \ fvs2 -> 
+    extra_fvs imp_exp					`thenRn` \ fvs1 -> 
 
-    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs3) ->
+    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs2) ->
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
-	      fvs1 `plusFV` fvs2 `plusFV` fvs3)
+	      fvs1 `plusFV` fvs2)
  where
   fo_decl_msg = ptext SLIT("a foreign declaration")
   isDyn	      = isDynamicExtName ext_nm
