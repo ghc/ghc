@@ -22,15 +22,13 @@ import FastString	( FastString(..) )
 import Util             ( lengthIs, listLengthCmp )
 
 import Foreign		( Storable(..), Word8, Word16, Word32, Word64, Ptr(..), 
-			  malloc, castPtr, plusPtr, Addr )
-import Addr		( addrToInt )
+			  malloc, castPtr, plusPtr )
 import Bits		( Bits(..), shiftR )
-
-import PrelBase		( Int(..) )
-import PrelIOBase	( IO(..) )
 
 import Monad		( liftM )
 
+import GlaExts		( Int(I#), addr2Int# )
+import Ptr		( Ptr(Ptr) )
 \end{code}
 
 %************************************************************************
@@ -80,7 +78,7 @@ make_constr_itbls cons
         mk_dirret_itbl (dcon, conNo)
            = mk_itbl dcon conNo stg_interp_constr_entry
 
-        mk_itbl :: DataCon -> Int -> Addr -> IO (Name,ItblPtr)
+        mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr
            = let (tot_wds, ptr_wds, _) 
                     = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
@@ -118,7 +116,9 @@ make_constr_itbls cons
 itblCodeLength :: Int
 itblCodeLength = length (mkJumpToAddr undefined)
 
-mkJumpToAddr :: Addr -> [ItblCode]
+mkJumpToAddr :: Ptr () -> [ItblCode]
+
+ptrToInt (Ptr a#) = I# (addr2Int# a#)
 
 #if sparc_TARGET_ARCH
 -- After some consideration, we'll try this, where
@@ -133,7 +133,7 @@ mkJumpToAddr :: Addr -> [ItblCode]
 
 type ItblCode = Word32
 mkJumpToAddr a
-   = let w32 = fromIntegral (addrToInt a)
+   = let w32 = fromIntegral ()
 
          hi22, lo10 :: Word32 -> Word32
          lo10 x = x .&. 0x3FF
@@ -153,7 +153,7 @@ mkJumpToAddr a
 
 type ItblCode = Word8
 mkJumpToAddr a
-   = let w32 = fromIntegral (addrToInt a)
+   = let w32 = fromIntegral (ptrToInt a)
          insnBytes :: [Word8]
          insnBytes
             = [0xB8, byte 0 w32, byte 1 w32, 
@@ -172,7 +172,7 @@ mkJumpToAddr a
       , 0x47ff041f      -- nop
       , fromIntegral (w64 .&. 0x0000FFFF)
       , fromIntegral ((w64 `shiftR` 32) .&. 0x0000FFFF) ]
-    where w64 = fromIntegral (addrToInt a) :: Word64
+    where w64 = fromIntegral (ptrToInt a) :: Word64
 #endif
 
 
@@ -193,16 +193,16 @@ vecret_entry 6 = stg_interp_constr7_entry
 vecret_entry 7 = stg_interp_constr8_entry
 
 -- entry point for direct returns for created constr itbls
-foreign label "stg_interp_constr_entry" stg_interp_constr_entry :: Addr
+foreign label "stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
 -- and the 8 vectored ones
-foreign label "stg_interp_constr1_entry" stg_interp_constr1_entry :: Addr
-foreign label "stg_interp_constr2_entry" stg_interp_constr2_entry :: Addr
-foreign label "stg_interp_constr3_entry" stg_interp_constr3_entry :: Addr
-foreign label "stg_interp_constr4_entry" stg_interp_constr4_entry :: Addr
-foreign label "stg_interp_constr5_entry" stg_interp_constr5_entry :: Addr
-foreign label "stg_interp_constr6_entry" stg_interp_constr6_entry :: Addr
-foreign label "stg_interp_constr7_entry" stg_interp_constr7_entry :: Addr
-foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Addr
+foreign label "stg_interp_constr1_entry" stg_interp_constr1_entry :: Ptr ()
+foreign label "stg_interp_constr2_entry" stg_interp_constr2_entry :: Ptr ()
+foreign label "stg_interp_constr3_entry" stg_interp_constr3_entry :: Ptr ()
+foreign label "stg_interp_constr4_entry" stg_interp_constr4_entry :: Ptr ()
+foreign label "stg_interp_constr5_entry" stg_interp_constr5_entry :: Ptr ()
+foreign label "stg_interp_constr6_entry" stg_interp_constr6_entry :: Ptr ()
+foreign label "stg_interp_constr7_entry" stg_interp_constr7_entry :: Ptr ()
+foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Ptr ()
 
 
 
