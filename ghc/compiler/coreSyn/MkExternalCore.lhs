@@ -176,13 +176,30 @@ make_lit l =
     t = make_ty (literalType l)
 
 make_ty :: Type -> C.Ty
-make_ty (TyVarTy tv) = C.Tvar (make_var_id (tyVarName tv))
-make_ty (AppTy t1 t2) = C.Tapp (make_ty t1) (make_ty t2)
-make_ty (TyConApp tc ts) = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) (map make_ty ts)
-make_ty (FunTy t1 t2) = make_ty (TyConApp funTyCon [t1,t2])
-make_ty (ForAllTy tv t) = C.Tforall (make_tbind tv) (make_ty t)
-make_ty (SourceTy p) = make_ty (sourceTypeRep p)
-make_ty (NoteTy _ t) = make_ty t
+make_ty (TyVarTy tv)    	 = C.Tvar (make_var_id (tyVarName tv))
+make_ty (AppTy t1 t2) 		 = C.Tapp (make_ty t1) (make_ty t2)
+make_ty (FunTy t1 t2) 		 = make_ty (TyConApp funTyCon [t1,t2])
+make_ty (ForAllTy tv t) 	 = C.Tforall (make_tbind tv) (make_ty t)
+make_ty (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) 
+					 (map make_ty ts)
+-- The special case for newtypes says "do not expand newtypes".
+-- Reason: sourceTypeRep does substitution and, while substitution deals
+-- 	   correctly with name capture, it's only correct if you see the uniques!
+--	   If you just see occurrence names, name capture may occur.
+-- Example: newtype A a = A (forall b. b -> a)
+--	    test :: forall q b. q -> A b
+--	    test _ = undefined
+-- 	Here the 'a' gets substituted by 'b', which is captured.
+-- Another solution would be to expand newtypes before tidying; but that would
+-- expose the representation in interface files, which definitely isn't right.
+-- Maybe CoreTidy should know whether to expand newtypes or not?
+
+make_ty (SourceTy (NType tc ts)) = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) 
+					 (map make_ty ts)
+
+make_ty (SourceTy p)		 = make_ty (sourceTypeRep p)
+make_ty (NoteTy _ t) 		 = make_ty t
+
 
 
 make_kind :: Kind -> C.Kind
