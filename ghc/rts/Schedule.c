@@ -3013,7 +3013,10 @@ unblockThread(StgTSO *tso)
 void 
 deleteThread(StgTSO *tso)
 {
-  raiseAsync(tso,NULL);
+  if (tso->why_blocked != BlockedOnCCall &&
+      tso->why_blocked != BlockedOnCCall_NoUnblockExc) {
+      raiseAsync(tso,NULL);
+  }
 }
 
 #ifdef FORKPROCESS_PRIMOP_SUPPORTED
