@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.7 1999/06/25 09:13:37 simonmar Exp $
+ * $Id: InfoMacros.h,v 1.8 1999/11/30 11:44:32 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -18,6 +18,11 @@
 #define SRT_INFO(type_,srt_,srt_off_,srt_len_)			\
 		srt : (StgSRT *)((StgClosure **)srt_+srt_off_),	\
 		srt_len : srt_len_,				\
+		type : type_
+
+#define CONSTR_INFO(type_,tag_)			\
+		srt : 0,			\
+		srt_len : tag_,			\
 		type : type_
 
 #ifdef USE_MINIINTERPRETER
@@ -93,8 +98,7 @@ INFO_TABLE_CONSTR(info, entry, ptrs, nptrs, tag_,type_,info_class,	\
         entry_class(entry);						\
 	info_class INFO_TBL_CONST StgInfoTable info = {			\
 		layout : { payload : {ptrs,nptrs} },			\
-		srt_len : tag_,						\
-		type : type_,						\
+                CONSTR_INFO(type_,tag_),				\
                 INIT_ENTRY(entry),					\
                 INIT_VECTOR						\
 	}
