@@ -346,6 +346,22 @@ $(LIBRARY) :: $(LIBOBJS)
 endif
 
 #----------------------------------------
+#	Building Win32 DLLs
+#
+ifeq "$(way)" "dll"
+
+ifeq "$(DLL_NAME)" ""
+DLL_NAME = $(patsubst %.a, %.dll, $(subst lib,,$(LIBRARY)))
+endif
+
+all :: $(DLL_NAME)
+
+$(DLL_NAME) :: $(LIBRARY)
+	$(BLD_DLL) --output-lib $(patsubst %.a, %_imp.a, $(LIBRARY)) --output-def $(patsubst %.dll,%.def,$(DLL_NAME)) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS) 
+	touch dLL_ifs.hi
+endif
+
+#----------------------------------------
 #	Script programs
 
 ifneq "$(SCRIPT_PROG)" ""
