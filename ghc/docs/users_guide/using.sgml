@@ -1622,7 +1622,7 @@ construction of interface files, is (allegedly) in the works.
       version of GHC that was used to compile any Haskell code in this
       package (GHC will refuse to add the package if its version
       number differs from this one).  The rest of the components of
-      the package speecification may be specified in any order, and
+      the package specification may be specified in any order, and
       are:</para>
 
       <variablelist>
