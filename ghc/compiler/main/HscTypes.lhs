@@ -65,7 +65,7 @@ import HsSyn		( DeprecTxt )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
-import CoreSyn		( CoreRule, IdCoreRule )
+import CoreSyn		( IdCoreRule )
 import Type		( Type )
 
 import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )

@@ -25,10 +25,8 @@ import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
 			  substEnv, setSubstEnv, emptySubst, isInScope,
 			  bindSubstList, unBindSubstList, substInScope, uniqAway
 			)
-import Id		( Id, idUnfolding, zapLamIdInfo, 
-			  idSpecialisation, setIdSpecialisation
-			) 
-import Var		( isTyVar, isId )
+import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
+import Var		( isId )
 import VarSet
 import VarEnv
 import Type		( mkTyVarTy )

@@ -24,7 +24,8 @@ module Module
       Module, moduleName
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
-    , isModuleInThisPackage, mkModuleInThisPackage
+    , isModuleInThisPackage, mkModuleInThisPackage,
+    , printModulePrefix
 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
@@ -98,6 +99,12 @@ data PackageInfo
 					-- as the one being compiled
   | AnotherPackage PackageName		-- A module from a different package
 
+  | DunnoYet	-- This is used when we don't yet know
+		-- Main case: we've come across Foo.x in an interface file
+		-- but we havn't yet opened Foo.hi.  We need a Name for Foo.x
+		-- Later on (in RnEnv.newTopBinder) we'll update the cache
+		-- to have the right PackageInfo
+
 type PackageName = FastString		-- No encoding at all
 
 preludePackage :: PackageName
@@ -106,6 +113,7 @@ preludePackage = SLIT("std")
 instance Outputable PackageInfo where
 	-- Just used in debug prints of lex tokens and in debug modde
    ppr ThisPackage        = ptext SLIT("<THIS>")
+   ppr DunnoYet		  = ptext SLIT("<?>")
    ppr (AnotherPackage p) = ptext p
 \end{code}
 
@@ -235,7 +243,7 @@ mkHomeModule mod_nm = Module mod_nm ThisPackage
 -- file, but before we've opened Foo.hi.
 -- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
 mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = mkModule name (panic "mkVanillaModule:unknown mod_kind field")
+mkVanillaModule name = Module name DunnoYet
 
 mkPrelModule :: ModuleName -> Module
 mkPrelModule name = mkModule name preludePackage
@@ -252,7 +260,13 @@ moduleUserString (Module mod _) = moduleNameUserString mod
 isModuleInThisPackage :: Module -> Bool
 isModuleInThisPackage (Module nm ThisPackage) = True
 isModuleInThisPackage _                       = False
+
+printModulePrefix :: Module -> Bool
+  -- When printing, say M.x
+printModulePrefix (Module nm ThisPackage) = False
+printModulePrefix _                       = True
 \end{code}
+
 
 %************************************************************************
 %*                                                                      *

@@ -57,7 +57,7 @@ import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
 
 import Class 		( Class, ClassContext )
 import Var   		( TyVar, Id )
-import BasicTypes	( Arity, NewOrData(..), RecFlag(..), Boxity(..), 
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), 
 			  isBoxed, EP(..) )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..), anyBoxConKey )

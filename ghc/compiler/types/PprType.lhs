@@ -27,18 +27,16 @@ import Type		( PredType(..), ThetaType,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
                           splitUsForAllTys, predRepTy
 			)
-import Var		( TyVar, tyVarKind,
-			  tyVarName, setTyVarName
-			)
+import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, isUnboxedTupleTyCon, 
 			  maybeTyConSingleCon, isEnumerationTyCon, 
-			  tyConArity, tyConUnique
+			  tyConArity
 			)
-import Class		( Class, className )
+import Class		( Class )
 
 -- others:
 import Maybes		( maybeToBool )
-import Name		( getOccString, NamedThing(..) )
+import Name		( getOccString )
 import Outputable
 import PprEnv
 import Unique		( Uniquable(..) )
@@ -216,9 +214,6 @@ ppr_ty env ctxt_prec (NoteTy (UsgNote u) ty)
     ptext SLIT("__u") <+> ppr u <+> ppr_ty env tYCON_PREC ty
 
 ppr_ty env ctxt_prec (PredTy p) = braces (ppr_pred env p)
-
-ppr_theta env []    = empty
-ppr_theta env theta = braces (hsep (punctuate comma (map (ppr_pred env) theta)))
 
 ppr_pred env (Class clas tys) = ppr clas <+>
 				hsep (map (ppr_ty env tYCON_PREC) tys)

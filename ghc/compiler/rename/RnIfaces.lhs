@@ -40,7 +40,7 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 			  NamedThing(..),
 			  elemNameEnv
 			 )
-import Module		( Module, ModuleEnv,
+import Module		( Module, ModuleEnv, mkVanillaModule,
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
 			  emptyModuleEnv, lookupModuleEnvByName,
@@ -79,7 +79,8 @@ getInterfaceExports mod_name from
 	Just mi -> returnRn (mi_module mi, mi_exports mi) ;
 		-- loadInterface always puts something in the map
 		-- even if it's a fake
-	Nothing -> pprPanic "getInterfaceExports" (ppr mod_name)
+	Nothing -> returnRn (mkVanillaModule mod_name, [])
+		-- pprPanic "getInterfaceExports" (ppr mod_name)
     }
     where
       doc_str = sep [ppr mod_name, ptext SLIT("is directly imported")]

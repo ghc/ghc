@@ -28,7 +28,7 @@ import VarEnv
 import VarSet
 
 import Name	( Name, mkGlobalName, mkKindOccFS, tcName )
-import OccName	( mkOccFS, tcName )
+import OccName	( tcName )
 import TyCon	( TyCon, KindCon,
 		  mkFunTyCon, mkKindCon, mkSuperKindCon,
 		)

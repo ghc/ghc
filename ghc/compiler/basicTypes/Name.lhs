@@ -42,7 +42,7 @@ module Name (
 
 import OccName		-- All of it
 import Module		( Module, moduleName, mkVanillaModule, 
-			  isModuleInThisPackage )
+			  printModulePrefix, isModuleInThisPackage )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, 
 			  rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_PprStyle_NoPrags, 
@@ -446,7 +446,7 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
 
         global m | codeStyle sty
                  = ppr (moduleName m) <> char '_' <> pprOccName occ
-                 | debugStyle sty || not (isModuleInThisPackage m)
+                 | debugStyle sty || printModulePrefix m
                  = ppr (moduleName m) <> dot <> pprOccName occ
                  | otherwise
                  = pprOccName occ

@@ -257,7 +257,7 @@ is_boot		    : 						{ False }
 whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           	{ NothingAtAll }
 		    | '::' version					{ Everything $2 }
-                    | '::' version version name_version_pairs version  { Specifically $2 (Just $3) $4 $5 }
+                    | '::' version version version name_version_pairs   { Specifically $2 (Just $3) $5 $4 }
 
 name_version_pairs  ::	{ [(OccName, Version)] }
 name_version_pairs  :  						{ [] }

@@ -23,7 +23,6 @@ import Name		( NamedThing(..), Name )
 import BasicTypes	( Arity )
 import Unique		( Unique, Uniquable(..) )
 import Outputable
-import Util
 \end{code}
 
 %************************************************************************

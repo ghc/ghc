@@ -28,10 +28,10 @@ module DataCon (
 import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
 
 import CmdLineOpts	( opt_DictsStrict )
-import Type		( Type, ThetaType, TauType, ClassContext,
+import Type		( Type, TauType, ClassContext,
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  mkTyVarTys, mkDictTys,
-			  splitTyConApp_maybe, classesToPreds
+			  splitTyConApp_maybe
 			)
 import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isDataTyCon, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
