@@ -91,7 +91,7 @@ INSTALL_DIR  = ./mkdirhier
 # to be created, i.e., create a symlink, ghc-$(version), pointing to ghc to
 # avoid version vertigo.
 #
-VERSION_SYMLINKS_FOR=$(package)
+VERSION_SYMLINKS_FOR=$(PACKAGE_LINKS)
 
 # Binaries to install
 PACKAGE_BIN_INSTALL=$(PACKAGE_PRL_SCRIPTS) $(PACKAGE_SH_SCRIPTS)
@@ -195,7 +195,7 @@ install-bin:
 	for i in $(PACKAGE_BINS) ""; do \
 	   if test -n "$$i" ; then $(INSTALL_BIN) bin/$(platform)/$$i$(exeext) $(bindir); fi; \
 	done;
-	for i in $(VERSION_SYMLINKS_FOR) ""; do \
+	@for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
 	   	( cd $(bindir); 		\
 		  if ( $(PERL) -e '$$fn="'$$i'"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
