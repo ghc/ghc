@@ -181,7 +181,7 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     [ StLabel tmp_lbl
 	     , StAssign PtrRep stgSp
                         (StIndex PtrRep stgSp (StInt (-1)))
-	     , StJump (StInd WordRep stgSp)
+	     , StJump NoDestInfo (StInd WordRep stgSp)
 	     ])
 
  gentopcode absC
@@ -348,22 +348,22 @@ which varies depending on whether we're profiling etc.
 \begin{code}
 
  gencode (CJump dest)
-  = returnUs (\xs -> StJump (a2stix dest) : xs)
+  = returnUs (\xs -> StJump NoDestInfo (a2stix dest) : xs)
 
  gencode (CFallThrough (CLbl lbl _))
   = returnUs (\xs -> StFallThrough lbl : xs)
 
  gencode (CReturn dest DirectReturn)
-  = returnUs (\xs -> StJump (a2stix dest) : xs)
+  = returnUs (\xs -> StJump NoDestInfo (a2stix dest) : xs)
 
  gencode (CReturn table (StaticVectoredReturn n))
-  = returnUs (\xs -> StJump dest : xs)
+  = returnUs (\xs -> StJump NoDestInfo dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table)
     	    	      	    	  (StInt (toInteger (-n-fixedItblSize-1))))
 
  gencode (CReturn table (DynamicVectoredReturn am))
-  = returnUs (\xs -> StJump dest : xs)
+  = returnUs (\xs -> StJump NoDestInfo dest : xs)
   where
     dest = StInd PtrRep (StIndex PtrRep (a2stix table) dyn_off)
     dyn_off = StPrim IntSubOp [StPrim IntNegOp [a2stix am], 
@@ -506,14 +506,14 @@ be tuned.)
     	highest = if floating then targetMaxDouble else targetMaxInt
     in
     	(
-    	if False && -- jump tables disabled for now until the register allocator is
-		    -- fixed to cope with them --SDM 18/8/2000
-	   not floating && choices > 4 && highTag - lowTag < toInteger (2 * choices) then
+    	if  not floating && choices > 4 
+            && highTag - lowTag < toInteger (2 * choices)
+        then
     	    mkJumpTable am' sortedAlts lowTag highTag udlbl
     	else
     	    mkBinaryTree am' floating sortedAlts choices lowest highest udlbl
     	)
-    	    	    	    	    	    	    	`thenUs` \ alt_code ->
+    	    	    	    	    	    	`thenUs` \ alt_code ->
 	gencode absC				`thenUs` \ dflt_code ->
 
     	returnUs (\xs -> alt_code (StLabel udlbl : dflt_code (StLabel ujlbl : xs)))
@@ -557,8 +557,9 @@ already finish with a jump to the join point.
     	cjmpHi = StCondJump dflt (StPrim IntGtOp [am, StInt (toInteger highTag)])
 
     	offset = StPrim IntSubOp [am, StInt lowTag]
+        dsts   = DestInfo (dflt : map fst branches)
 
-    	jump = StJump (StInd PtrRep (StIndex PtrRep (StCLbl utlbl) offset))
+    	jump = StJump dsts (StInd PtrRep (StIndex PtrRep (StCLbl utlbl) offset))
     	tlbl = StLabel utlbl
     	table = StData PtrRep (mkTable branches [lowTag..highTag] [])
     in

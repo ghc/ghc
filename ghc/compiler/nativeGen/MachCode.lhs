@@ -26,7 +26,7 @@ import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
 import CallConv		( cCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
-			  StixReg(..), CodeSegment(..), 
+			  StixReg(..), CodeSegment(..), DestInfo,
                           pprStixTree, ppStixReg,
                           NatM, thenNat, returnNat, mapNat, 
                           mapAndUnzipNat, mapAccumLNat,
@@ -68,7 +68,7 @@ stmt2Instrs stmt = case stmt of
 
     StLabel lab	   -> returnNat (unitOL (LABEL lab))
 
-    StJump arg		   -> genJump (derefDLL arg)
+    StJump dsts arg	   -> genJump dsts (derefDLL arg)
     StCondJump lab arg	   -> genCondJump lab (derefDLL arg)
 
     -- A call returning void, ie one done for its side-effects
@@ -1982,7 +1982,7 @@ branch instruction.  Other CLabels are assumed to be far away.
 register allocator.
 
 \begin{code}
-genJump :: StixTree{-the branch target-} -> NatM InstrBlock
+genJump :: DestInfo -> StixTree{-the branch target-} -> NatM InstrBlock
 
 #if alpha_TARGET_ARCH
 
@@ -1993,7 +1993,7 @@ genJump (StCLbl lbl)
     target = ImmCLbl lbl
 
 genJump tree
-  = getRegister tree	    	    	    `thenNat` \ register ->
+  = getRegister tree	     	    `thenNat` \ register ->
     getNewRegNCG PtrRep    	    `thenNat` \ tmp ->
     let
     	dst    = registerName register pv
@@ -2009,17 +2009,17 @@ genJump tree
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if i386_TARGET_ARCH
 
-genJump (StInd pk mem)
+genJump dsts (StInd pk mem)
   = getAmode mem    	    	    `thenNat` \ amode ->
     let
     	code   = amodeCode amode
     	target = amodeAddr amode
     in
-    returnNat (code `snocOL` JMP (OpAddr target))
+    returnNat (code `snocOL` JMP dsts (OpAddr target))
 
-genJump tree
+genJump dsts tree
   | maybeToBool imm
-  = returnNat (unitOL (JMP (OpImm target)))
+  = returnNat (unitOL (JMP dsts (OpImm target)))
 
   | otherwise
   = getRegister tree	    	    `thenNat` \ register ->
@@ -2028,7 +2028,7 @@ genJump tree
     	code   = registerCode register tmp
     	target = registerName register tmp
     in
-    returnNat (code `snocOL` JMP (OpReg target))
+    returnNat (code `snocOL` JMP dsts (OpReg target))
   where
     imm    = maybeImm tree
     target = case imm of Just x -> x

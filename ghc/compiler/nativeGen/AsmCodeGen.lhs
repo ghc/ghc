@@ -224,7 +224,7 @@ stixConFold (StInd pk addr) = StInd pk (stixConFold addr)
 stixConFold (StAssign pk dst src)
   = StAssign pk (stixConFold dst) (stixConFold src)
 
-stixConFold (StJump addr) = StJump (stixConFold addr)
+stixConFold (StJump dsts addr) = StJump dsts (stixConFold addr)
 
 stixConFold (StCondJump addr test)
   = StCondJump addr (stixConFold test)

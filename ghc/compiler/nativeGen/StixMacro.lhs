@@ -212,7 +212,7 @@ stg_update_PAP  = StCLbl mkStgUpdatePAPLabel
 
 updatePAP, stackOverflow :: StixTree
 
-updatePAP     = StJump stg_update_PAP
+updatePAP     = StJump NoDestInfo stg_update_PAP
 stackOverflow = StCall SLIT("StackOverflow") cCallConv VoidRep []
 \end{code}
 
@@ -338,7 +338,7 @@ checkCode macro args assts
 mkStJump_to_GCentry :: String -> StixTree
 mkStJump_to_GCentry gcname
 --   | opt_Static
-   = StJump (StCLbl (mkRtsGCEntryLabel gcname))
+   = StJump NoDestInfo (StCLbl (mkRtsGCEntryLabel gcname))
 --   | otherwise -- it's in a different DLL
 --   = StJump (StInd PtrRep (StLitLbl True sdoc))
 

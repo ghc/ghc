@@ -771,8 +771,8 @@ find_flow_edges insns
                  Branch lab -- jmps to lab; add fe i_num -> i_target
                     -> let i_target = find_label lab
                        in 
-                       mk_succ_map i_num_1 ((i_num, [i_target]): rsucc_map)
-                                           is
+                       mk_succ_map i_num_1 ((i_num, [i_target]): rsucc_map) is
+
                  NextOrBranch lab
                     |  null is   -- jmps to label, or falls through, and this is
                                  -- the last insn (a meaningless scenario); 
@@ -785,6 +785,13 @@ find_flow_edges insns
                        in
                        mk_succ_map i_num_1 ((i_num, [i_num_1, i_target]):rsucc_map)
                                            is
+                 MultiFuture labels
+                    -> -- A jump, whose targets are listed explicitly.  
+                       -- (Generated from table-based switch translations).
+                       -- Add fes  i_num -> x  for each x in labels
+                       let is_target = nub (map find_label labels)
+                       in
+                       mk_succ_map i_num_1 ((i_num, is_target):rsucc_map) is
 
          -- Third phase: invert the successor map to get the predecessor
          -- map, using an algorithm which is quadratic in the worst case,

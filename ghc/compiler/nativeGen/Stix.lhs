@@ -7,6 +7,7 @@ module Stix (
 	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList,
 	pprStixTrees, pprStixTree, ppStixReg,
         stixCountTempUses, stixSubst,
+	DestInfo(..),
 
 	stgBaseReg, stgNode, stgSp, stgSu, stgSpLim, 
         stgHp, stgHpLim, stgTagReg, stgR9, stgR10, 
@@ -81,10 +82,15 @@ data StixTree
   | StFunBegin CLabel
   | StFunEnd CLabel
 
-    -- An unconditional jump. This instruction is terminal.
-    -- Dynamic targets are allowed
+    -- An unconditional jump. This instruction may or may not jump
+    -- out of the register allocation domain (basic block, more or
+    -- less).  For correct register allocation when this insn is used
+    -- to jump through a jump table, we optionally allow a list of
+    -- the exact targets to be attached, so that the allocator can
+    -- easily construct the exact flow edges leaving this insn.
+    -- Dynamic targets are allowed.
 
-  | StJump StixTree
+  | StJump DestInfo StixTree
 
     -- A fall-through, from slow to fast
 
@@ -120,6 +126,16 @@ data StixTree
   | StComment FAST_STRING
 
 
+-- used by insnFuture in RegAllocInfo.lhs
+data DestInfo
+   = NoDestInfo             -- no supplied dests; infer from context
+   | DestInfo [CLabel]      -- precisely these dests and no others
+
+pprDests :: DestInfo -> SDoc
+pprDests NoDestInfo      = text "NoDestInfo"
+pprDests (DestInfo dsts) = brack (hsep (map pprCLabel dsts))
+
+
 pprStixTrees :: [StixTree] -> SDoc
 pprStixTrees ts 
   = vcat [
@@ -129,6 +145,7 @@ pprStixTrees ts
     ]
 
 paren t = char '(' <> t <> char ')'
+brack t = char '[' <> t <> char ']'
 
 pprStixTree :: StixTree -> SDoc
 pprStixTree t 
@@ -149,7 +166,7 @@ pprStixTree t
        StLabel ll       -> pprCLabel ll <+> char ':'
        StFunBegin ll    -> char ' ' $$ paren (text "FunBegin" <+> pprCLabel ll)
        StFunEnd ll      -> paren (text "FunEnd" <+> pprCLabel ll)
-       StJump t         -> paren (text "Jump" <+> pprStixTree t)
+       StJump dsts t    -> paren (text "Jump" <+> pprDests dsts <+> pprStixTree t)
        StFallThrough ll -> paren (text "FallThru" <+> pprCLabel ll)
        StCondJump l t   -> paren (text "JumpC" <+> pprCLabel l 
                                                <+> pprStixTree t)
@@ -260,7 +277,7 @@ stixCountTempUses u t
         StIndex    pk t1 t2       -> qq t1 + qq t2
         StInd      pk t1          -> qq t1
         StAssign   pk t1 t2       -> qq t1 + qq t2
-        StJump     t1             -> qq t1
+        StJump     dsts t1        -> qq t1
         StCondJump lbl t1         -> qq t1
         StData     pk ts          -> sum (map qq ts)
         StPrim     op ts          -> sum (map qq ts)
@@ -304,7 +321,7 @@ stixMapUniques f t
         StIndex    pk t1 t2       -> StIndex    pk (qq t1) (qq t2)
         StInd      pk t1          -> StInd      pk (qq t1)
         StAssign   pk t1 t2       -> StAssign   pk (qq t1) (qq t2)
-        StJump     t1             -> StJump     (qq t1)
+        StJump     dsts t1        -> StJump     dsts (qq t1)
         StCondJump lbl t1         -> StCondJump lbl (qq t1)
         StData     pk ts          -> StData     pk (map qq ts)
         StPrim     op ts          -> StPrim     op (map qq ts)

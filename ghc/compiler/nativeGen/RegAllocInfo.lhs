@@ -39,7 +39,7 @@ module RegAllocInfo (
 import List		( partition, sort )
 import MachMisc
 import MachRegs
-
+import Stix		( DestInfo(..) )
 import CLabel		( pprCLabel_asm, isAsmTemp, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM, FiniteMap )
 import Outputable
@@ -251,7 +251,7 @@ regUsage instr = case instr of
     CMP    sz src dst	-> mkRU (use_R src ++ use_R dst) []
     SETCC  cond op	-> mkRU [] (def_W op)
     JXX    cond lbl	-> mkRU [] []
-    JMP    op		-> mkRU (use_R op) []
+    JMP    dsts op	-> mkRU (use_R op) []
     CALL   imm		-> mkRU [] callClobberedRegs
     CLTD		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
@@ -481,6 +481,7 @@ data InsnFuture
    | Next                  -- falls through to next insn
    | Branch CLabel         -- unconditional branch to the label
    | NextOrBranch CLabel   -- conditional branch to the label
+   | MultiFuture [CLabel]  -- multiple specific futures
 
 --instance Outputable InsnFuture where
 --   ppr NoFuture            = text "NoFuture"
@@ -513,11 +514,17 @@ insnFuture insn
     JXX _ clbl | isAsmTemp clbl -> NextOrBranch clbl
     JXX _ _ -> panic "insnFuture: conditional jump to non-local label"
 
+    -- If the insn says what its dests are, use em!
+    JMP (DestInfo dsts) _ -> MultiFuture dsts
+
     -- unconditional jump to local label
-    JMP (OpImm (ImmCLbl clbl)) | isAsmTemp clbl -> Branch clbl
+    JMP NoDestInfo (OpImm (ImmCLbl clbl)) | isAsmTemp clbl -> Branch clbl
     
     -- unconditional jump to non-local label
-    JMP lbl	-> NoFuture
+    JMP NoDestInfo lbl	-> NoFuture
+
+    -- be extra-paranoid
+    JMP _ _ -> panic "insnFuture(x86): JMP wierdness"
 
     boring	-> Next
 
@@ -638,7 +645,7 @@ patchRegs instr env = case instr of
     PUSH sz op		-> patch1 (PUSH sz) op
     POP  sz op		-> patch1 (POP  sz) op
     SETCC cond op	-> patch1 (SETCC cond) op
-    JMP op		-> patch1 JMP op
+    JMP dsts op		-> patch1 (JMP dsts) op
 
     GMOV src dst	-> GMOV (env src) (env dst)
     GLD sz src dst	-> GLD sz (lookupAddr src) (env dst)

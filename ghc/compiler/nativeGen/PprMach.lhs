@@ -959,10 +959,9 @@ pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand B op)
 
 pprInstr (JXX cond lab) = pprCondInstr SLIT("j") cond (pprCLabel_asm lab)
 
-pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
-pprInstr (JMP op) = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
-pprInstr (CALL imm)
-   = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
+pprInstr (JMP dsts (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
+pprInstr (JMP dsts op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
+pprInstr (CALL imm)             = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
 
 
 -- Simulating a flat register set on the x86 FP stack is tricky.

@@ -50,7 +50,7 @@ import MachRegs		( stgReg, callerSaves, RegLoc(..),
 #                         endif
 			)
 import PrimRep		( PrimRep(..) )
-import Stix		( StixTree(..), StixReg(..), CodeSegment )
+import Stix		( StixTree(..), StixReg(..), CodeSegment, DestInfo(..) )
 import Panic		( panic )
 import GlaExts		( word2Int#, int2Word#, shiftRL#, and#, (/=#) )
 import Outputable	( pprPanic, ppr )
@@ -529,7 +529,7 @@ Hence GLDZ and GLD1.  Bwahahahahahahaha!
 
 -- Jumping around.
 
-	      | JMP	      Operand -- target
+	      | JMP	      DestInfo Operand -- possible dests, target
 	      | JXX	      Cond CLabel -- target
 	      | CALL	      Imm
 
@@ -552,10 +552,14 @@ i386_insert_ffrees insns
 
 ffree_before_nonlocal_transfers insn
    = case insn of
-        CALL _                                      -> [GFREE, insn]
-        JMP (OpImm (ImmCLbl clbl)) | isAsmTemp clbl -> [insn]
-        JMP _                                       -> [GFREE, insn]
-        other                                       -> [insn]
+        CALL _                                        -> [GFREE, insn]
+        -- Jumps to immediate labels are local
+        JMP _ (OpImm (ImmCLbl clbl)) | isAsmTemp clbl -> [insn]
+        -- If a jump mentions dests, it is a local jump thru
+        -- a case table.
+        JMP (DestInfo _) _                            -> [insn]
+        JMP _ _                                       -> [GFREE, insn]
+        other                                         -> [insn]
 
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
