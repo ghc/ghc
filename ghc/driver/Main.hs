@@ -51,7 +51,7 @@ name = global (value) :: IORef (ty); \
 -----------------------------------------------------------------------------
 -- non-configured things
 
-_Haskell1Version = "5" -- i.e., Haskell 98
+cHaskell1Version = "5" -- i.e., Haskell 98
 
 -----------------------------------------------------------------------------
 -- Usage Message
@@ -201,7 +201,7 @@ getStopAfter flags
 	-- Cpp-related flags
 GLOBAL_VAR(cpp_flag, False, Bool)
 hs_source_cpp_opts = global
-	[ "-D__HASKELL1__="++_Haskell1Version
+	[ "-D__HASKELL1__="++cHaskell1Version
 	, "-D__GLASGOW_HASKELL__="++cProjectVersionInt				
 	, "-D__HASKELL98__"
 	, "-D__CONCURRENT_HASKELL__"
