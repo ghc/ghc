@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.64 2001/05/08 10:58:48 simonmar Exp $
+-- $Id: Main.hs,v 1.65 2001/05/23 09:59:18 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -87,8 +87,13 @@ import Maybe
 
 main =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
-  handle (\exception -> do hPutStr stderr (show (Panic (show exception)))
-			   exitWith (ExitFailure 1)
+  handle (\exception -> 
+	  case exception of
+#if __GLASGOW_HASKELL__ >= 501
+	     ExitException _ -> throw exception
+#endif
+	     _other -> do hPutStr stderr (show (Panic (show exception)))
+			  exitWith (ExitFailure 1)
          ) $ do
 
   -- all error messages are propagated as exceptions
