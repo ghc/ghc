@@ -261,8 +261,8 @@ checkValidClass cls
     doptsTc Opt_GlasgowExts				`thenTc` \ gla_exts ->
 
     	-- Check that the class is unary, unless GlaExs
-    checkTc (gla_exts || unary)
-	    (classArityErr cls)				`thenTc_`
+    checkTc (arity > 0)		(nullaryClassErr cls)	`thenTc_`
+    checkTc (gla_exts || unary) (classArityErr cls)	`thenTc_`
 
    	-- Check the super-classes
     checkValidTheta (ClassSCCtxt (className cls)) theta	`thenTc_`
@@ -277,7 +277,8 @@ checkValidClass cls
 
   where
     (tyvars, theta, sel_ids, op_stuff) = classBigSig cls
-    unary 	= length tyvars == 1
+    arity	= length tyvars
+    unary 	= arity == 1
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
 
     check_op (sel_id, dm) 
@@ -614,8 +615,12 @@ find_prags sel_name meth_name (prag:prags) = find_prags sel_name meth_name prags
 Contexts and errors
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
+nullaryClassErr cls
+  = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
+
 classArityErr cls
-  = ptext SLIT("Too many parameters for class") <+> quotes (ppr cls)
+  = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
+	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
 
 defltMethCtxt clas
   = ptext SLIT("When checking the default methods for class") <+> quotes (ppr clas)
