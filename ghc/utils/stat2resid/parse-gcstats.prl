@@ -1,4 +1,3 @@
-#!/local/sun4/bin/perl
 #
 # Subroutines to parses a ghc Garbage Collection stats file
 #

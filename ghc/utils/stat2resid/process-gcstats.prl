@@ -1,4 +1,3 @@
-#!/local/sun4/bin/perl
 #
 # Subroutines which derive information from
 #   ghc garbage collection stats -- %gcstat
