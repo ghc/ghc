@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.4 2002/08/20 10:03:05 simonmar Exp $
+ * $Id: CTypes.h,v 1.5 2002/09/04 16:05:29 simonmar Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -21,6 +21,7 @@ INSTANCE_NUM(T) ; \
 INSTANCE_READ(T) ; \
 INSTANCE_SHOW(T) ; \
 INSTANCE_ENUM(T) ; \
+INSTANCE_STORABLE(T) : \
 INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INTEGRAL_TYPE(T,C,S,B) \
@@ -158,13 +159,20 @@ instance RealFloat T where { \
    isIEEE         (T x) = isIEEE x ; \
    (T x) `atan2`  (T y) = T (x `atan2` y) }
 
+#define INSTANCE_STORABLE(T) \
+instance Storable T where { \
+   sizeOf    (T x)       = sizeOf x ; \
+   alignment (T x)       = alignment x ; \
+   peekElemOff a i       = liftM T (peekElemOff (castPtr a) i) ; \
+   pokeElemOff a i (T x) = pokeElemOff (castPtr a) i x }
+
 #else /* __GLASGOW_HASKELL__ */
 
 /* GHC can derive any class for a newtype, so we make use of that
  * here...
  */
 
-#define NUMERIC_CLASSES  Eq,Ord,Num,Enum
+#define NUMERIC_CLASSES  Eq,Ord,Num,Enum,Storable
 #define INTEGRAL_CLASSES Bounded,Real,Integral,Bits
 #define FLOATING_CLASSES Real,Fractional,Floating,RealFrac,RealFloat
 

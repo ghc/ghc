@@ -30,11 +30,9 @@ module Foreign.Storable
 
 
 import Control.Monad		( liftM )
-import Foreign.Ptr
-import Foreign.C.Types
-import Foreign.C.TypesISO
 
 #include "MachDeps.h"
+#include "config.h"
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Storable
@@ -165,10 +163,10 @@ sizeOfPtr px x = sizeOf x
 -- System-dependent, but rather obvious instances
 
 instance Storable Bool where
-   sizeOf _          = sizeOf (undefined::CInt)
-   alignment _       = alignment (undefined::CInt)
-   peekElemOff p i   = liftM (/= (0::CInt)) $ peekElemOff (castPtr p) i
-   pokeElemOff p i x = pokeElemOff (castPtr p) i (if x then 1 else 0::CInt)
+   sizeOf _          = sizeOf (undefined::HTYPE_INT)
+   alignment _       = alignment (undefined::HTYPE_INT)
+   peekElemOff p i   = liftM (/= (0::HTYPE_INT)) $ peekElemOff (castPtr p) i
+   pokeElemOff p i x = pokeElemOff (castPtr p) i (if x then 1 else 0::HTYPE_INT)
 
 #define STORABLE(T,size,align,read,write)	\
 instance Storable (T) where {			\
@@ -231,33 +229,3 @@ STORABLE(Int32,SIZEOF_INT32,ALIGNMENT_INT32,
 
 STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
 	 readInt64OffPtr,writeInt64OffPtr)
-
-#define NSTORABLE(T) \
-instance Storable T where { \
-   sizeOf    (T x)       = sizeOf x ; \
-   alignment (T x)       = alignment x ; \
-   peekElemOff a i       = liftM T (peekElemOff (castPtr a) i) ; \
-   pokeElemOff a i (T x) = pokeElemOff (castPtr a) i x }
-
-NSTORABLE(CChar)
-NSTORABLE(CSChar)
-NSTORABLE(CUChar)
-NSTORABLE(CShort)
-NSTORABLE(CUShort)
-NSTORABLE(CInt)
-NSTORABLE(CUInt)
-NSTORABLE(CLong)
-NSTORABLE(CULong)
-#ifndef __HUGS__
-NSTORABLE(CLLong)
-NSTORABLE(CULLong)
-#endif
-NSTORABLE(CFloat)
-NSTORABLE(CDouble)
-NSTORABLE(CLDouble)
-NSTORABLE(CPtrdiff)
-NSTORABLE(CSize)
-NSTORABLE(CWchar)
-NSTORABLE(CSigAtomic)
-NSTORABLE(CClock)
-NSTORABLE(CTime)
