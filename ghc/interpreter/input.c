@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/06/07 17:22:32 $
+ * $Revision: 1.7 $
+ * $Date: 1999/10/15 11:02:12 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -124,7 +124,8 @@ static Text textWildcard;
 
 static Text textModule,  textImport,    textInterface,  textInstImport;
 static Text textHiding,  textQualified, textAsMod;
-static Text textExport,  textUnsafe,    text__All;
+static Text textExport,  textDynamic,   textUUExport;
+static Text textUnsafe,  textUUAll;
 
 Text   textNum;                         /* Num                             */
 Text   textPrelude;                     /* Prelude                         */
@@ -1470,12 +1471,14 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textInstImport)        return INSTIMPORT;
         if (it==textImport)            return IMPORT;
         if (it==textExport)            return EXPORT;
+        if (it==textDynamic)           return DYNAMIC;
+        if (it==textUUExport)          return UUEXPORT;
         if (it==textHiding)            return HIDING;
         if (it==textQualified)         return QUALIFIED;
         if (it==textAsMod)             return ASMOD;
         if (it==textWildcard)          return '_';
         if (it==textAll && !haskell98) return ALL;
-        if (it==text__All)             return ALL;
+        if (it==textUUAll)             return ALL;
         if (it==textRepeat && reading==KEYBOARD)
             return repeatLast();
 
@@ -1671,14 +1674,16 @@ Int what; {
                        textModule     = findText("module");
                        textInterface  = findText("__interface");
                        textInstImport = findText("__instimport");
-                       textExport     = findText("__export");
+                       textExport     = findText("export");
+                       textDynamic    = findText("dynamic");
+                       textUUExport   = findText("__export");
                        textImport     = findText("import");
                        textHiding     = findText("hiding");
                        textQualified  = findText("qualified");
                        textAsMod      = findText("as");
                        textWildcard   = findText("_");
                        textAll        = findText("forall");
-                       text__All      = findText("__forall");
+                       textUUAll      = findText("__forall");
                        varMinus       = mkVar(textMinus);
                        varPlus        = mkVar(textPlus);
                        varBang        = mkVar(textBang);

@@ -16,9 +16,7 @@ extern Name nameMkW;
 extern Name nameMkA;
 extern Name nameMkF;
 extern Name nameMkD;
-#ifdef PROVIDE_STABLE
 extern Name nameMkStable;    
-#endif
 
 /* The following data constructors are used to make boxed but 
  * unpointed values pointed and require no special treatment
@@ -58,9 +56,7 @@ extern Type typePrimMutableArray;
 extern Type typePrimMutableByteArray; 
 extern Type typeFloat;
 extern Type typeDouble;
-#ifdef PROVIDE_STABLE
 extern Type typeStable;
-#endif
 #ifdef PROVIDE_WEAK
 extern Type typeWeak;
 #endif
@@ -106,6 +102,7 @@ extern Name namePmLe;
 extern Name namePmSubtract;
 extern Name namePmFromInteger;
 extern Name nameMkIO;
+extern Name nameRunST;
 extern Name nameUnpackString;
 extern Name namePrimSeq;
 extern Name nameMap;

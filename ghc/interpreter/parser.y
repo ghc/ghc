@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.7 $
- * $Date: 1999/07/06 15:24:40 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/15 11:02:20 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -89,7 +89,8 @@ static Void   local noTREX       Args((String));
 %token '!'        IMPLIES    '('        ','        ')'
 %token '['        ';'        ']'        '`'        '.'
 %token TMODULE    IMPORT     HIDING     QUALIFIED  ASMOD
-%token EXPORT     INTERFACE  REQUIRES   UNSAFE     INSTIMPORT
+%token EXPORT     UUEXPORT   INTERFACE  REQUIRES   UNSAFE     
+%token INSTIMPORT DYNAMIC
 
 %%
 /*- Top level script/module structure -------------------------------------*/
@@ -139,7 +140,7 @@ ifDecl
 
           | INSTIMPORT CONID            {$$=gc2(NIL);}
 
-          | EXPORT CONID ifEntities     { addGHCExports($2,$3);
+          | UUEXPORT CONID ifEntities   { addGHCExports($2,$3);
                                           $$=gc3(NIL);}
 
           | NUMLIT INFIXL optDigit varid_or_conid   
@@ -623,7 +624,7 @@ derivs    : derivs ',' qconid           {$$ = gc3(cons($3,$1));}
 
 topDecl   : FOREIGN IMPORT callconv ext_loc ext_name unsafe_flag var COCO type 
                                         {foreignImport($1,pair($4,$5),$7,$9); sp-=9;}
-          | FOREIGN EXPORT callconv ext_name qvarid COCO type 
+          | FOREIGN EXPORT callconv DYNAMIC qvarid COCO type 
                                         {foreignExport($1,$4,$5,$7); sp-=7;}
 	  ;
 

@@ -7,8 +7,8 @@
  * in the distribution for details.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:45 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/15 11:02:09 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -74,6 +74,7 @@ extern Name  nameReturn,  nameBind;     /* for translating monad comps     */
 extern Name  nameMFail;
 extern Name  nameListMonad;             /* builder function for List Monad */
 extern Name  namePrint;                 /* printing primitive              */
+extern Name  nameCreateAdjThunk;        /* f-x-dyn: create adjustor thunk  */
 extern Text  textPrelude;
 extern Text  textNum;                   /* used to process default decls   */
 #if    NPLUSK

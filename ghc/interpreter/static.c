@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/07/06 15:24:41 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/15 11:02:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2789,7 +2789,6 @@ static Void local checkDefaultDefns() { /* check that default types are    */
 }
 
 
-/*-- from STG --*/
 /* --------------------------------------------------------------------------
  * Foreign import declarations are Hugs' equivalent of GHC's ccall mechanism.
  * They are used to "import" C functions into a module.
@@ -2866,61 +2865,6 @@ Name p; {
                                 name(p).type);
     implementForeignExport(p);
 }
-
-
-
-
-#if 0
-/*-- from 98 --*/
-/* --------------------------------------------------------------------------
- * Primitive definitions are usually only included in the first script
- * file read - the prelude.  A primitive definition associates a variable
- * name with a string (which identifies a built-in primitive) and a type.
- * ------------------------------------------------------------------------*/
-
-Void primDefn(line,prims,type)          /* Handle primitive definitions    */
-Cell line;
-List prims;
-Cell type; {
-    primDefns = cons(triple(line,prims,type),primDefns);
-}
-
-static List local checkPrimDefn(pd)     /* Check primitive definition      */
-Triple pd; {
-    Int  line  = intOf(fst3(pd));
-    List prims = snd3(pd);
-    Type type  = thd3(pd);
-    emptySubstitution();
-    type = checkSigType(line,"primitive definition",fst(hd(prims)),type);
-    for (; nonNull(prims); prims=tl(prims)) {
-        Cell   p    = hd(prims);
-        Bool   same = isVar(p);
-        Text   pt   = textOf(same ? p : fst(p));
-        String pr   = textToStr(textOf(same ? p : snd(p)));
-        hd(prims)   = addNewPrim(line,pt,pr,type);
-    }
-    return snd3(pd);
-}
-
-static Name local addNewPrim(l,vn,s,t)  /* make binding of variable vn to  */
-Int    l;                               /* primitive function referred     */
-Text   vn;                              /* to by s, with given type t      */
-String s;
-Cell   t;{
-    Name n = findName(vn);
-
-    if (isNull(n)) {
-        n = newName(vn,NIL);
-    } else if (name(n).defn!=PREDEFINED) {
-        duplicateError(l,name(n).mod,vn,"primitive");
-    }
-
-    addPrim(l,n,s,t);
-    return n;
-}
-#endif
-
-
 
 
 

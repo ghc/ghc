@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/07/06 15:24:43 $
+ * $Revision: 1.9 $
+ * $Date: 1999/10/15 11:02:26 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -503,6 +503,16 @@ Name nameFromStgVar ( StgVar v )
    return NIL;
 }
 
+void* getHugs_AsmObject_for ( char* s )
+{
+   StgVar v;
+   Name   n = findName(findText(s));
+   if (isNull(n)) internal("getHugs_AsmObject_for(1)");
+   v = name(n).stgVar;
+   if (!isStgVar(v) || !isPtr(stgVarInfo(v)))
+      internal("getHugs_AsmObject_for(2)");
+   return ptrOf(stgVarInfo(v));
+}
 
 /* --------------------------------------------------------------------------
  * Primitive functions:

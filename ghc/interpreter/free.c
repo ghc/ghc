@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: free.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/04/27 10:06:52 $
+ * $Revision: 1.5 $
+ * $Date: 1999/10/15 11:02:09 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -116,7 +116,7 @@ static List freeVarsExpr( List acc, StgExpr e )
     case NAME:
             return acc;  /* Names are never free vars */
     default:
-printf("\n\n");
+printf("\n");
 ppStgExpr(e);
 printf("\n");
             internal("freeVarsExpr");

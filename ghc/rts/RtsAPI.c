@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.8 1999/07/06 09:42:38 sof Exp $
+ * $Id: RtsAPI.c,v 1.9 1999/10/15 11:03:10 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -189,6 +189,7 @@ rts_mkString (char *s)
 {
   return rts_apply((StgClosure *)&unpackCString_closure, rts_mkAddr(s));
 }
+#endif /* COMPILER */
 
 HaskellObj
 rts_apply (HaskellObj f, HaskellObj arg)
@@ -200,7 +201,6 @@ rts_apply (HaskellObj f, HaskellObj arg)
   ap->payload[0] = (P_)arg;
   return (StgClosure *)ap;
 }
-#endif /* COMPILER */
 
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects

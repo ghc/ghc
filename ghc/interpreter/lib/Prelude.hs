@@ -60,7 +60,8 @@ module Prelude (
 --  module Ratio,
     Ratio, Rational, (%), numerator, denominator, approxRational,
 --  Non-standard exports
-    IO(..), IOResult(..), Addr,
+    IO(..), IOResult(..), Addr, StablePtr,
+    makeStablePtr, freeStablePtr, deRefStablePtr,
 
     Bool(False, True),
     Maybe(Nothing, Just),
@@ -111,8 +112,8 @@ module Prelude (
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
     ,unsafeInterleaveIO,nh_write,primCharToInt
 
-    -- ToDo: rm -- these are only for debugging
-    ,primPlusInt,primEqChar,primRunIO
+    -- debugging hacks
+    ,ST(..)
   ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
@@ -1383,7 +1384,7 @@ nonnull p s             =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
 lexLitChar              :: ReadS String
 lexLitChar ('\\':s)     =  [('\\':esc, t) | (esc,t) <- lexEsc s] 
 	where
-	lexEsc (c:s)     | c `elem` "abfnrtv\\\"'" = [([c],s)]
+	lexEsc (c:s)     | c `elem` "abfnrtv\\\"'" = [([c],s)]    -- "
         lexEsc ('^':c:s) | c >= '@' && c <= '_'    = [(['^',c],s)]
 	lexEsc s@(d:_)   | isDigit d               = lexDigits s
         lexEsc s@(c:_)   | isUpper c
@@ -1548,6 +1549,13 @@ primPmFail        = error "Pattern Match Failure"
 primMkIO :: (RealWorld -> (a,RealWorld)) -> IO a
 primMkIO = ST
 
+primCreateAdjThunk :: (a -> b) -> String -> IO Addr
+primCreateAdjThunk fun typestr 
+   = do sp <- makeStablePtr fun
+        p  <- copy_String_to_cstring typestr  -- is never freed
+        a  <- primCreateAdjThunkARCH sp p
+        return a
+
 -- The following primitives are only needed if (n+k) patterns are enabled:
 primPmNpk        :: Integral a => Int -> a -> Maybe a
 primPmNpk n x     = if n'<=x then Just (x-n') else Nothing
@@ -1655,7 +1663,6 @@ writeFile fname contents
      then (ioError.IOError) ("writeFile: can't create file " ++ fname)
      else writetohandle fname h contents
 
-
 appendFile :: FilePath -> String -> IO ()
 appendFile fname contents
    = copy_String_to_cstring fname  >>= \ptr ->
@@ -1694,46 +1701,43 @@ instance Show Exception where
 data IOResult  = IOResult  deriving (Show)
 
 type FILE_STAR = Int   -- FILE *
-type Ptr       = Int   -- char *
 
 foreign import stdcall "nHandle.so" "nh_stdin"  nh_stdin  :: IO FILE_STAR
 foreign import stdcall "nHandle.so" "nh_stdout" nh_stdout :: IO FILE_STAR
 foreign import stdcall "nHandle.so" "nh_stderr" nh_stderr :: IO FILE_STAR
 foreign import stdcall "nHandle.so" "nh_write"  nh_write  :: FILE_STAR -> Int -> IO ()
 foreign import stdcall "nHandle.so" "nh_read"   nh_read   :: FILE_STAR -> IO Int
-foreign import stdcall "nHandle.so" "nh_open"   nh_open   :: Int -> Int -> IO FILE_STAR
+foreign import stdcall "nHandle.so" "nh_open"   nh_open   :: Addr -> Int -> IO FILE_STAR
 foreign import stdcall "nHandle.so" "nh_flush"  nh_flush  :: FILE_STAR -> IO ()
 foreign import stdcall "nHandle.so" "nh_close"  nh_close  :: FILE_STAR -> IO ()
 foreign import stdcall "nHandle.so" "nh_errno"  nh_errno  :: IO Int
 
-foreign import stdcall "nHandle.so" "nh_malloc" nh_malloc :: Int -> IO Ptr
-foreign import stdcall "nHandle.so" "nh_free"   nh_free   :: Ptr -> IO ()
-foreign import stdcall "nHandle.so" "nh_store"  nh_store  :: Ptr -> Int -> IO ()
-foreign import stdcall "nHandle.so" "nh_load"   nh_load   :: Ptr -> IO Int
+foreign import stdcall "nHandle.so" "nh_malloc" nh_malloc :: Int -> IO Addr
+foreign import stdcall "nHandle.so" "nh_free"   nh_free   :: Addr -> IO ()
+foreign import stdcall "nHandle.so" "nh_store"  nh_store  :: Addr -> Int -> IO ()
+foreign import stdcall "nHandle.so" "nh_load"   nh_load   :: Addr -> IO Int
 
 foreign import stdcall "nHandle.so" "nh_argc"   nh_argc   :: IO Int
 foreign import stdcall "nHandle.so" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
-foreign import stdcall "nHandle.so" "nh_getenv" nh_getenv :: Ptr -> IO Ptr
+foreign import stdcall "nHandle.so" "nh_getenv" nh_getenv :: Addr -> IO Addr
 
-copy_String_to_cstring :: String -> IO Ptr
+copy_String_to_cstring :: String -> IO Addr
 copy_String_to_cstring s
    = nh_malloc (1 + length s) >>= \ptr0 -> 
      let loop ptr []     = nh_store ptr 0 >> return ptr0
-         loop ptr (c:cs) = --trace ("Out `" ++ [c] ++ "'") (
-                           nh_store ptr (primCharToInt c) >> loop (ptr+1) cs
-                           --)
+         loop ptr (c:cs) = nh_store ptr (primCharToInt c) >> loop (incAddr ptr) cs
      in
-         loop ptr0 s
+         if   isNullAddr ptr0
+         then error "copy_String_to_cstring: malloc failed"
+         else loop ptr0 s
 
-copy_cstring_to_String :: Ptr -> IO String
+copy_cstring_to_String :: Addr -> IO String
 copy_cstring_to_String ptr
    = nh_load ptr >>= \ci ->
      if   ci == 0 
      then return []
-     else copy_cstring_to_String (ptr+1) >>= \cs -> 
-          --trace ("In " ++ show ci) (
+     else copy_cstring_to_String (incAddr ptr) >>= \cs -> 
           return ((primIntToChar ci) : cs)
-          --)
 
 readfromhandle :: FILE_STAR -> IO String
 readfromhandle h
@@ -1772,7 +1776,7 @@ primGetEnv v
    = copy_String_to_cstring v     >>= \ptr ->
      nh_getenv ptr                >>= \ptr2 ->
      nh_free ptr                  >>
-     if   ptr2 == 0
+     if   isNullAddr ptr2
      then return []
      else
      copy_cstring_to_String ptr2  >>= \result ->
@@ -1799,12 +1803,12 @@ primRunST m = fst (unST m theWorld)
 unST (ST a) = a
 
 instance Functor (ST s) where
-   fmap f x = x >>= (return . f)
+   fmap f x  = x >>= (return . f)
 
 instance Monad (ST s) where
-    m >> k      =  m >>= \ _ -> k
-    return x    =  ST $ \ s -> (x,s)
-    m >>= k = ST $ \s -> case unST m s of { (a,s') -> unST (k a) s' }
+   m >> k    = ST (\s -> case unST m s of { (a,s') -> unST k s' })
+   return x  = ST (\s -> (x,s))
+   m >>= k   = ST (\s -> case unST m s of { (a,s') -> unST (k a) s' })
 
 
 -- used when Hugs invokes top level function
@@ -1812,7 +1816,7 @@ primRunIO :: IO () -> ()
 primRunIO m
    = protect (fst (unST m realWorld))
      where
-        realWorld = error "panic: Hugs entered the real world"
+        realWorld = error "primRunIO: entered the RealWorld"
         protect :: () -> ()
         protect comp 
            = primCatch comp (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
@@ -1829,12 +1833,14 @@ unsafeInterleaveIO = unsafeInterleaveST
 
 
 ------------------------------------------------------------------------------
--- Word, Addr, ForeignObj, Prim*Array ----------------------------------------
+-- Word, Addr, StablePtr, Prim*Array -----------------------------------------
 ------------------------------------------------------------------------------
 
 data Addr
 
-nullAddr = primIntToAddr 0
+nullAddr     =  primIntToAddr 0
+incAddr a    =  primIntToAddr (1 + primAddrToInt a)
+isNullAddr a =  0 == primAddrToInt a
 
 instance Eq Addr where 
   (==)            = primEqAddr
@@ -1860,9 +1866,14 @@ instance Ord Word where
   (>)             = primGtWord
 
 
---data ForeignObj
---makeForeignObj :: Addr -> IO ForeignObj
---makeForeignObj = primMakeForeignObj
+data StablePtr a
+
+makeStablePtr   :: a -> IO (StablePtr a)
+makeStablePtr    = primMakeStablePtr
+deRefStablePtr  :: StablePtr a -> IO a
+deRefStablePtr   = primDeRefStablePtr
+freeStablePtr   :: StablePtr a -> IO ()
+freeStablePtr    = primFreeStablePtr
 
 
 data PrimArray              a -- immutable arrays with Int indices
@@ -1873,172 +1884,6 @@ data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
 
 
-
-------------------------------------------------------------------------------
--- hooks to call libHS_cbits -------------------------------------------------
-------------------------------------------------------------------------------
-{-
-type FILE_OBJ     = ForeignObj -- as passed into functions
-type CString      = PrimByteArray
-type How          = Int
-type Binary       = Int
-type OpenFlags    = Int
-type IOFileAddr   = Addr  -- as returned from functions
-type FD           = Int
-type OpenStdFlags = Int
-type Readable     = Int  -- really Bool
-type Exclusive    = Int  -- really Bool
-type RC           = Int  -- standard return code
-type Bytes        = PrimMutableByteArray RealWorld
-type Flush        = Int  -- really Bool
-
-foreign import stdcall "libHS_cbits.so" "freeStdFileObject"     
-   freeStdFileObject     :: ForeignObj -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "freeFileObject"        
-   freeFileObject        :: ForeignObj -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "setBuf"                
-   prim_setBuf           :: FILE_OBJ -> Addr -> Int -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "getBufSize"            
-   prim_getBufSize       :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "inputReady"            
-   prim_inputReady       :: FILE_OBJ -> Int -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "fileGetc"              
-   prim_fileGetc         :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "fileLookAhead"         
-   prim_fileLookAhead    :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "readBlock"             
-   prim_readBlock        :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "readLine"              
-   prim_readLine         :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "readChar"              
-   prim_readChar         :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "writeFileObject"       
-   prim_writeFileObject  :: FILE_OBJ -> Int -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "filePutc"              
-   prim_filePutc         :: FILE_OBJ -> Char -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "getBufStart"           
-   prim_getBufStart      :: FILE_OBJ -> Int -> IO Addr
-
-foreign import stdcall "libHS_cbits.so" "getWriteableBuf"       
-   prim_getWriteableBuf  :: FILE_OBJ -> IO Addr
-
-foreign import stdcall "libHS_cbits.so" "getBufWPtr"            
-   prim_getBufWPtr       :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "setBufWPtr"            
-   prim_setBufWPtr       :: FILE_OBJ -> Int -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "closeFile"             
-   prim_closeFile        :: FILE_OBJ -> Flush -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "fileEOF"               
-   prim_fileEOF          :: FILE_OBJ -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "setBuffering"     	
-   prim_setBuffering     :: FILE_OBJ -> Int -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "flushFile"        	
-   prim_flushFile        :: FILE_OBJ -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "getBufferMode"    	
-   prim_getBufferMode    :: FILE_OBJ -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "seekFileP"        	
-   prim_seekFileP        :: FILE_OBJ -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "setTerminalEcho"  	
-   prim_setTerminalEcho  :: FILE_OBJ -> Int -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "getTerminalEcho"  	
-   prim_getTerminalEcho  :: FILE_OBJ -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "isTerminalDevice"  
-   prim_isTerminalDevice :: FILE_OBJ -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "setConnectedTo"    
-   prim_setConnectedTo   :: FILE_OBJ -> FILE_OBJ -> Int -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "ungetChar"     
-   prim_ungetChar    :: FILE_OBJ -> Char -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "readChunk"     
-   prim_readChunk    :: FILE_OBJ -> Addr      -> Int -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "writeBuf"      
-   prim_writeBuf     :: FILE_OBJ -> Addr -> Int -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "getFileFd"     
-   prim_getFileFd    :: FILE_OBJ -> IO FD
-
-foreign import stdcall "libHS_cbits.so" "fileSize_int64"    
-   prim_fileSize_int64   :: FILE_OBJ -> Bytes -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "getFilePosn"   
-   prim_getFilePosn      :: FILE_OBJ -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "setFilePosn"   
-   prim_setFilePosn      :: FILE_OBJ -> Int -> IO Int
-
-foreign import stdcall "libHS_cbits.so" "getConnFileFd"     
-   prim_getConnFileFd    :: FILE_OBJ -> IO FD
-
-foreign import stdcall "libHS_cbits.so" "allocMemory__"     
-   prim_allocMemory__    :: Int -> IO Addr
-
-foreign import stdcall "libHS_cbits.so" "getLock"       
-   prim_getLock      :: FD -> Exclusive -> IO RC
-
-foreign import stdcall "libHS_cbits.so" "openStdFile"   
-   prim_openStdFile      :: FD -> OpenStdFlags -> Readable -> IO IOFileAddr
-
-foreign import stdcall "libHS_cbits.so" "openFile"      
-   prim_openFile     :: CString -> How -> Binary -> OpenFlags -> IO IOFileAddr
-
-foreign import stdcall "libHS_cbits.so" "freeFileObject"    
-   prim_freeFileObject    :: FILE_OBJ -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "freeStdFileObject" 
-   prim_freeStdFileObject :: FILE_OBJ -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "const_BUFSIZ"      
-   const_BUFSIZ      :: Int
-
-foreign import stdcall "libHS_cbits.so" "setConnNonBlockingIOFlag__"   
-   prim_setConnNonBlockingIOFlag__   :: FILE_OBJ -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "clearConnNonBlockingIOFlag__" 
-   prim_clearConnNonBlockingIOFlag__ :: FILE_OBJ -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "setNonBlockingIOFlag__"   
-   prim_setNonBlockingIOFlag__   :: FILE_OBJ -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "clearNonBlockingIOFlag__"     
-   prim_clearNonBlockingIOFlag__     :: FILE_OBJ -> IO ()
-
-foreign import stdcall "libHS_cbits.so" "getErrStr__"  
-   prim_getErrStr__  :: IO Addr 
-
-foreign import stdcall "libHS_cbits.so" "getErrNo__"   
-   prim_getErrNo__   :: IO Int  
-
-foreign import stdcall "libHS_cbits.so" "getErrType__" 
-   prim_getErrType__ :: IO Int  
-
---foreign import stdcall "libHS_cbits.so" "seekFile_int64"   	  
---   prim_seekFile_int64   :: FILE_OBJ -> Int -> Int64 -> IO RC
--}
 
 -- showFloat ------------------------------------------------------------------
 
@@ -2193,12 +2038,6 @@ floatToDigits base x =
                 let bk = expt base (-k)
                 in  gen [] (r * bk) s (mUp * bk) (mDn * bk)
     in  (map toInt (reverse rds), k)
-
-{-
--- Exponentiation with(out) a cache for the most common numbers.
-expt :: Integer -> Int -> Integer
-expt base n = base^n
--}
 
 
 -- Exponentiation with a cache for the most common numbers.

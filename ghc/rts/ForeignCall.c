@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.4 1999/03/01 14:47:06 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.5 1999/10/15 11:03:06 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -120,12 +120,24 @@ void ccall( CFunDescriptor* d, void (*fun)(void) )
 #if 1
 /* HACK alert (red alert) */
 extern StgInt          PopTaggedInt       ( void ) ;
-extern void PushTaggedInt ( StgInt );
-extern StgPtr PopPtr ( void );
+extern StgDouble       PopTaggedDouble    ( void ) ;
+extern StgFloat        PopTaggedFloat     ( void ) ;
+extern StgChar         PopTaggedChar      ( void ) ;
+extern StgAddr         PopTaggedAddr      ( void ) ;
+
+extern void   PushTaggedInt  ( StgInt );
+extern void   PushTaggedAddr ( StgAddr );
+extern void   PushPtr        ( StgPtr );
+extern StgPtr PopPtr         ( void );
+
 
 int seqNr = 0;
 #define IF(sss) if (strcmp(sss,cdesc)==0)
-void ccall( CFunDescriptor* d, void (*fun)(void) )
+#define STS      PushPtr((StgPtr)(*bco));SaveThreadState()
+#define LTS      LoadThreadState();*bco=(StgBCO*)PopPtr();
+#define LTS_RET  LoadThreadState();*bco=(StgBCO*)PopPtr(); return
+#define RET      return
+void ccall( CFunDescriptor* d, void (*fun)(void), StgBCO** bco )
 {
    int i;
    char cdesc[100];
@@ -141,20 +153,56 @@ void ccall( CFunDescriptor* d, void (*fun)(void) )
 
    //fprintf(stderr, "ccall: %d cdesc = `%s'\n", seqNr++, cdesc);
 
-   IF(":") { ((void(*)(void))(fun))(); return; };
-   IF(":I") { int a1=PopTaggedInt(); ((void(*)(int))(fun))(a1); return;};
-   IF("I:") { int r= ((int(*)(void))(fun))(); PushTaggedInt(r); return;};
-   IF(":II") { int a1=PopTaggedInt(); int a2=PopTaggedInt();
-               ((void(*)(int,int))(fun))(a1,a2); return; };
-   IF("I:I") { int a1=PopTaggedInt();
-              int r=((int(*)(int))(fun))(a1); PushTaggedInt(r); return; };
-   IF("I:II") { int a1=PopTaggedInt(); int a2=PopTaggedInt();
-              int r=((int(*)(int,int))(fun))(a1,a2); PushTaggedInt(r); return; };
-   IF("I:III") { int a1=PopTaggedInt(); int a2=PopTaggedInt(); int a3=PopTaggedInt();
-              int r=((int(*)(int,int,int))(fun))(a1,a2,a3); PushTaggedInt(r); return; };
+   IF(":") { STS; ((void(*)(void))(fun))(); LTS_RET; };
 
-   //IF("I:AI") { void* a1=(void*)PopPtr(); int a2=PopTaggedInt();
-   //           int r=((int(*)(void*,int))(fun))(a1,a2); PushTaggedInt(r); return; };
+   IF(":I") { int a1=PopTaggedInt(); 
+              STS; ((void(*)(int))(fun))(a1); LTS_RET; };
+   IF(":A") { void* a1=PopTaggedAddr(); 
+              STS; ((void(*)(void*))(fun))(a1); LTS_RET; };
+
+   IF("I:") { int r; 
+              STS; r= ((int(*)(void))(fun))(); LTS;
+              PushTaggedInt(r); RET ;};
+
+   IF(":II") { int a1=PopTaggedInt(); int a2=PopTaggedInt();
+               STS; ((void(*)(int,int))(fun))(a1,a2); LTS_RET; };
+   IF(":AI") { void* a1=PopTaggedAddr(); int a2=PopTaggedInt();
+               STS; ((void(*)(void*,int))(fun))(a1,a2); LTS_RET; };
+
+   IF("I:I") { int a1=PopTaggedInt(); int r;
+               STS; r=((int(*)(int))(fun))(a1); LTS;
+               PushTaggedInt(r); RET; };
+   IF("A:I") { int a1=PopTaggedInt(); void* r;
+               STS; r=((void*(*)(int))(fun))(a1); LTS;
+               PushTaggedAddr(r); RET; };
+   IF("A:A") { void* a1=PopTaggedAddr(); void* r;
+               STS; r=((void*(*)(void*))(fun))(a1); LTS;
+               PushTaggedAddr(r); RET; };
+
+   IF("I:II") { int a1=PopTaggedInt(); int a2=PopTaggedInt(); int r;
+                STS; r=((int(*)(int,int))(fun))(a1,a2); LTS;
+                PushTaggedInt(r); RET; };
+   IF("I:AI") { void* a1=PopTaggedAddr(); int a2=PopTaggedInt(); int r;
+                STS; r=((int(*)(void*,int))(fun))(a1,a2); LTS;
+                PushTaggedInt(r); RET; };
+   IF("A:AI") { void* a1=PopTaggedAddr(); int a2=PopTaggedInt(); void* r;
+                STS; r=((void*(*)(void*,int))(fun))(a1,a2); LTS;
+                PushTaggedAddr(r); RET; };
+
+   IF("I:III") { int a1=PopTaggedInt(); int a2=PopTaggedInt(); 
+                 int a3=PopTaggedInt(); int r;
+                 STS; r=((int(*)(int,int,int))(fun))(a1,a2,a3); LTS;
+                 PushTaggedInt(r); RET; };
+
+   IF(":AIDCF") { void*  a1 = PopTaggedAddr(); 
+                  int    a2 = PopTaggedInt();
+                  double a3 = PopTaggedDouble();
+                  char   a4 = PopTaggedChar();
+                  float  a5 = PopTaggedFloat();
+                  STS;
+                  ((void(*)(void*,int,double,char,float))(fun))(a1,a2,a3,a4,a5); 
+                  LTS_RET; };
+
 
 fprintf(stderr,"panic: ccall cdesc `%s' not implemented\n", cdesc );
    exit(1);
@@ -164,7 +212,13 @@ fprintf(stderr,
         "ccall: arg_tys %s arg_size %d result_tys %s result_size %d\n",
         d->arg_tys, d->arg_size, d->result_tys, d->result_size );
 }
+
 #undef IF
+#undef STS
+#undef LTS
+#undef LTS_RET
+#undef RET
+
 #endif
 
 

@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/06/07 17:22:31 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/15 11:02:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2469,10 +2469,7 @@ Char k; {
     case REF_REP:     return ap2(typeRef,mkStateVar(),mkAlphaVar());                  
     case MUTARR_REP:  return ap2(typePrimMutableArray,mkStateVar(),mkAlphaVar());     
     case MUTBARR_REP: return ap(typePrimMutableByteArray,mkStateVar()); 
-#ifdef PROVIDE_STABLE
-    case STABLE_REP:
-            return ap(typeStable,mkAlphaVar());
-#endif
+    case STABLE_REP:  return ap(typeStable,mkAlphaVar());
 #ifdef PROVIDE_WEAK
     case WEAK_REP:
             return ap(typeWeak,mkAlphaVar());

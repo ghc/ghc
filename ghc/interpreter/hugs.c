@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/11 12:22:58 $
+ * $Revision: 1.11 $
+ * $Date: 1999/10/15 11:02:10 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -811,7 +811,8 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
         );
    if (!ok) {
       ERRMSG(0) 
-         "Can't file source or object+interface for module \"%s\"",
+	/* "Can't file source or object+interface for module \"%s\"", */
+         "Can't file source for module \"%s\"",
          iname
       EEND;
    }
@@ -825,7 +826,6 @@ static Void local makeStackEntry ( ScriptInfo* ent, String iname )
                 ? (oAvail && iAvail && timeEarlier(sTime,oTime))
                 : TRUE;
    */
-
    fromObj = FALSE;
 
    /* ToDo: namesUpto overflow */

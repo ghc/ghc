@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.10 1999/07/06 15:24:35 sewardj Exp $                         #
+# $Id: Makefile,v 1.11 1999/10/15 11:02:09 sewardj Exp $                         #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -27,7 +27,7 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c interface.c
 
-SRC_CC_OPTS = -g -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -DDEBUG -DDEBUG_EXTRA
+SRC_CC_OPTS = -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a
 
@@ -39,7 +39,7 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/StgCRun.o nHandle.so
 	$(CC) -o $@ -rdynamic $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -ldl -lm
 
-nHandle.so:
+nHandle.so: nHandle.c
 	gcc -O -fPIC -shared -o nHandle.so nHandle.c
 
 $(TOP)/ghc/rts/libHSrts.a:

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/07/06 16:40:24 $
+ * $Revision: 1.18 $
+ * $Date: 1999/10/15 11:03:01 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -19,18 +19,15 @@
 #include "Storage.h"
 #include "SchedAPI.h" /* for createGenThread */
 #include "Schedule.h" /* for context_switch  */
-
 #include "Bytecodes.h"
 #include "Assembler.h" /* for CFun stuff */
 #include "ForeignCall.h"
-#include "StablePriv.h"
 #include "PrimOps.h"   /* for __{encode,decode}{Float,Double} */
 #include "Evaluator.h"
 
 #ifdef DEBUG
 #include "Printer.h"
 #include "Disassembler.h"
-
 #include "Sanity.h"
 #include "StgRun.h"
 #endif
@@ -47,7 +44,6 @@
 #else
 #error Non-standalone integer not yet supported
 #endif
-
 
 /* An incredibly useful abbreviation.
  * Interestingly, there are some uses of END_TSO_QUEUE_closure that
@@ -69,6 +65,12 @@
 #else
 #define USE_GCC_LABELS 0
 #endif
+
+/* Make it possible for the evaluator to get hold of bytecode
+   for a given function by name.  Useful but a hack.  Sigh.
+ */
+extern void* getHugs_AsmObject_for ( char* s );
+
 
 /* --------------------------------------------------------------------------
  * Crude profiling stuff (mainly to assess effect of optimiser)
@@ -233,13 +235,24 @@ void cp_show ( void )
  * Hugs Hooks - a bit of a hack
  * ------------------------------------------------------------------------*/
 
-/* A total hack -- this code has an endian dependancy and only works
-   on little-endian archs.
-*/
 void setRtsFlags( int x );
 void setRtsFlags( int x )
 {
-    *(int*)(&(RtsFlags.DebugFlags)) = x;
+    unsigned int w    = 0x12345678;
+    unsigned char* pw = (unsigned char *)&w;
+    if (*pw == 0x78) {
+       /* little endian */
+       *(int*)(&(RtsFlags.DebugFlags)) = x;
+    } else {
+       /* big endian */
+       unsigned int w1 = x;
+       unsigned int w2 = 0;
+       w2 |= (w1 && 0xFF); w2 <<= 8; w1 >>= 8;
+       w2 |= (w1 && 0xFF); w2 <<= 8; w1 >>= 8;
+       w2 |= (w1 && 0xFF); w2 <<= 8; w1 >>= 8;
+       w2 |= (w1 && 0xFF); w2 <<= 8; w1 >>= 8;
+       *(int*)(&(RtsFlags.DebugFlags)) = (int)w2;
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -247,7 +260,7 @@ void setRtsFlags( int x )
  *
  * ToDo: figure out why these are being used and crush them!
  * ------------------------------------------------------------------------*/
-
+#if 0
 void OnExitHook (void)
 {
 }
@@ -270,7 +283,7 @@ void defaultsHook (void)
 {
     /* do nothing */
 }
-
+#endif
 
 /* --------------------------------------------------------------------------
  * Entering-objects and bytecode interpreter part of evaluator
@@ -300,7 +313,7 @@ void defaultsHook (void)
 
 /* Forward decls ... */
 static        void* enterBCO_primop1 ( int );
-static        void* enterBCO_primop2 ( int , int* /*StgThreadReturnCode* */ );
+static        void* enterBCO_primop2 ( int , int* /*StgThreadReturnCode* */, StgBCO** );
 static inline void PopUpdateFrame ( StgClosure* obj );
 static inline void PopCatchFrame  ( void );
 static inline void PopSeqFrame    ( void );
@@ -310,6 +323,8 @@ static inline void PushTaggedInteger  ( mpz_ptr );
 static inline StgPtr grabHpUpd( nat size );
 static inline StgPtr grabHpNonUpd( nat size );
 static        StgClosure* raiseAnError   ( StgClosure* errObj );
+static StgAddr createAdjThunkARCH ( StgStablePtr stableptr,
+                                    StgAddr      typestr );
 
 static int  enterCountI = 0;
 
@@ -337,7 +352,11 @@ void      SloppifyIntegerEnd ( StgPtr );
 #define LLL { xSp = Sp; xSu = Su; xSpLim = SpLim; }
 #endif
 
-#define RETURN(vvv) { StgThreadReturnCode retVal=(vvv); SSS; return retVal; }
+#define RETURN(vvv) {                                         \
+           StgThreadReturnCode retVal=(vvv); SSS;             \
+           /* SaveThreadState() is done by the scheduler. */  \
+           return retVal;                                     \
+        }
 
 
 /* Macros to operate directly on the pulled-out machine state.
@@ -384,6 +403,12 @@ void      SloppifyIntegerEnd ( StgPtr );
 #define xTaggedStackAddr(iii)   ((StgAddr)(*(xSp+1+(iii))))
 #define xPopTaggedAddr()        ((xSp++,xSp+=sizeofW(StgAddr), \
                                  (StgAddr)(*(xSp-sizeofW(StgAddr)))))
+
+#define xPushTaggedStable(xxx)  { xSp -= sizeofW(StgStablePtr); \
+                                  *xSp = (StgWord)(xxx); xPushTag(STABLE_TAG); }
+#define xTaggedStackStable(iii) ((StgStablePtr)(*(xSp+1+(iii))))
+#define xPopTaggedStable()      ((xSp++,xSp+=sizeofW(StgStablePtr), \
+                                 (StgStablePtr)(*(xSp-sizeofW(StgStablePtr)))))
 
 #define xPushTaggedChar(xxx)    { xSp -= sizeofW(StgChar); \
                                   *xSp = (StgWord)(xxx); xPushTag(CHAR_TAG); }
@@ -437,10 +462,15 @@ StgThreadReturnCode enter( StgClosure* obj0 )
     register StgPtr           xSpLim; /* local state -- stack lim pointer */
     register StgClosure*      obj;    /* object currently under evaluation */
              char             eCount; /* enter counter, for context switching */
+             StgBCO**         bco_SAVED;
 
 #ifdef DEBUG
     /* use the t values to check that Su/Sp/SpLim do not change unexpectedly */
-    StgPtr tSp = Sp; StgUpdateFrame* tSu = Su; StgPtr tSpLim = SpLim;
+    StgPtr tSp; StgUpdateFrame* tSu; StgPtr tSpLim;
+#endif
+    /* LoadThreadState() is done by the scheduler. */
+#ifdef DEBUG
+    tSp = Sp; tSu = Su; tSpLim = SpLim;
 #endif
 
     obj    = obj0;
@@ -514,6 +544,8 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             register StgWord8* bciPtr; /* instruction pointer */
             register StgBCO*   bco = (StgBCO*)obj;
             StgWord wantToGC;
+
+            bco_SAVED = bco;
 
             /* Don't need to SSS ... LLL around doYouWantToGC */
             wantToGC = doYouWantToGC();
@@ -975,7 +1007,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                 }
             Case(i_UNPACK_ADDR):
                 {
-                    StgClosure* con = stgCast(StgClosure*,xStackPtr(0));
+                    StgClosure* con = (StgClosure*)xStackPtr(0);
                     /* ASSERT(isAddrLike(con)); */
                     xPushTaggedAddr(payloadPtr(con,0));
                     Continue;
@@ -1085,38 +1117,30 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                 }
             Case(i_VAR_STABLE):
                 {   
-                    fprintf(stderr, "unimp: i_VAR_STABLE\n" ); exit(0);
-                    /*fix side effects here ...*/
-                    /*
-                    xPushTaggedStablePtr(xTaggedStackStable(BCO_INSTR_8));
-                    */
+                    StgStablePtr s = xTaggedStackStable(BCO_INSTR_8);
+                    xPushTaggedStable(s);
                     Continue;
                 }
             Case(i_PACK_STABLE):
                 {
-        	    //StgClosure* o;
-                    fprintf(stderr, "unimp: i_PACK_STABLE\n" ); exit(0);
-                    /*
+                    StgClosure* o;
                     SSS; o = (StgClosure*)grabHpNonUpd(Stablezh_sizeW); LLL;
                     SET_HDR(o,&StablePtr_con_info,??);
-                    payloadWord(o,0) = xPopTaggedStablePtr();
+                    payloadWord(o,0) = xPopTaggedStable();
                     IF_DEBUG(evaluator,
                              fprintf(stderr,"\tBuilt "); 
+                             SSS;
                              printObj(stgCast(StgClosure*,o));
+                             LLL;
                              );
                     xPushPtr(stgCast(StgPtr,o));
-                    */
                     Continue;
                 }
             Case(i_UNPACK_STABLE):
                 {
-        	    //StgClosure* con;
-                    fprintf(stderr, "unimp: i_UNPACK_STABLE\n" ); exit(0);
-                    /*
-                    con = stgCast(StgClosure*,xStackPtr(0));
-                    ASSERT(isStableLike(con));
-                    xPushTaggedStablePtr(payloadWord(con,0));
-                    */
+                    StgClosure* con = (StgClosure*)xStackPtr(0);
+                    /* ASSERT(isStableLike(con)); */
+                    xPushTaggedStable(payloadWord(con,0));
                     Continue;
                 }
             Case(i_PRIMOP1):
@@ -1130,11 +1154,19 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                 }
             Case(i_PRIMOP2):
                 {
-                    int   i, trc;
-                    void* p;
-                    trc = 12345678;  /* Hope that no StgThreadReturnCode has this value */
-                    i   = BCO_INSTR_8;
-                    SSS; p = enterBCO_primop2 ( i, &trc ); LLL;
+		  /* Remember to save  */
+                    int      i, trc, pc_saved;
+                    void*    p;
+                    StgBCO*  bco_tmp;
+                    trc      = 12345678; /* Assume != any StgThreadReturnCode */
+                    i        = BCO_INSTR_8;
+                    pc_saved = PC; 
+                    bco_tmp  = bco;
+                    SSS;
+                    p        = enterBCO_primop2 ( i, &trc, &bco_tmp ); 
+                    LLL;
+                    bco      = bco_tmp;
+                    bciPtr   = &(bcoInstr(bco,pc_saved));
                     if (p) {
                        if (trc == 12345678) {
                           /* we want to enter p */
@@ -1315,13 +1347,16 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             }
             obj = ap->fun;
 #ifdef EAGER_BLACKHOLING
+#warn  LAZY_BLACKHOLING is default for StgHugs
+#error Dont know if EAGER_BLACKHOLING works in StgHugs
             {
-                /* superfluous - but makes debugging easier */
-                StgBlackHole* bh = stgCast(StgBlackHole*,ap);
-                SET_INFO(bh,&BLACKHOLE_info);
-                bh->blocking_queue = EndTSOQueue;
-                IF_DEBUG(gccafs,fprintf(stderr,"Eagerly blackholed AP_UPD %p in evaluator\n",bh));
-                /*printObj(bh); */
+            /* superfluous - but makes debugging easier */
+            StgBlackHole* bh = stgCast(StgBlackHole*,ap);
+            SET_INFO(bh,&BLACKHOLE_info);
+            bh->blocking_queue = EndTSOQueue;
+            IF_DEBUG(gccafs,
+                     fprintf(stderr,"Eagerly blackholed AP_UPD %p in evaluator\n",bh));
+            /* printObj(bh); */
             }
 #endif /* EAGER_BLACKHOLING */
             goto enterLoop;
@@ -1376,9 +1411,10 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                         ASSERT(xSp==(P_)xSu);
                         IF_DEBUG(evaluator,
                                  SSS;
+                                 fprintf(stderr, "hit a STOP_FRAME\n");
                                  printObj(obj);
-                                 /*fprintf(stderr,"xSp = %p\txSu = %p\n", xSp, xSu);*/
-                                 /*printStack(xSp,CurrentTSO->stack+CurrentTSO->stack_size,xSu);*/
+                                 fprintf(stderr,"xSp = %p\txSu = %p\n", xSp, xSu);
+                                 printStack(xSp,CurrentTSO->stack+CurrentTSO->stack_size,xSu);
                                  LLL;
                                  );
                         SSS; PopStopFrame(obj); LLL;
@@ -1400,7 +1436,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                 case RET_VEC_SMALL:
                 case RET_BIG:
                 case RET_VEC_BIG:
-                        barf("todo: RET_[VEC_]{BIG,SMALL}");
+		  //       barf("todo: RET_[VEC_]{BIG,SMALL}");
                 default:
                         belch("entered CONSTR with invalid continuation on stack");
                         IF_DEBUG(evaluator,
@@ -1453,6 +1489,9 @@ StgThreadReturnCode enter( StgClosure* obj0 )
 #undef xPushTaggedAddr
 #undef xTaggedStackAddr
 #undef xPopTaggedAddr
+#undef xPushTaggedStable
+#undef xTaggedStackStable
+#undef xPopTaggedStable
 #undef xPushTaggedChar
 #undef xTaggedStackChar
 #undef xPopTaggedChar
@@ -1471,7 +1510,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
 
 static inline void            PushTag            ( StackTag    t ) 
    { *(--Sp) = t; }
-static inline void            PushPtr            ( StgPtr      x ) 
+       inline void            PushPtr            ( StgPtr      x ) 
    { *(--stgCast(StgPtr*,Sp))  = x; }
 static inline void            PushCPtr           ( StgClosure* x ) 
    { *(--stgCast(StgClosure**,Sp)) = x; }
@@ -1485,7 +1524,7 @@ static inline void            checkTag           ( StackTag t1, StackTag t2 )
    { ASSERT(t1 == t2);}
 static inline void            PopTag             ( StackTag t ) 
    { checkTag(t,*(Sp++));    }
-static inline StgPtr          PopPtr             ( void )       
+       inline StgPtr          PopPtr             ( void )       
    { return *stgCast(StgPtr*,Sp)++; }
 static inline StgClosure*     PopCPtr            ( void )       
    { return *stgCast(StgClosure**,Sp)++; }
@@ -1510,7 +1549,7 @@ static inline void            PushTaggedRealWorld( void            )
    { Sp -= sizeofW(StgInt);        *Sp = x;          PushTag(INT_TAG);    }
 static inline void            PushTaggedWord     ( StgWord       x ) 
    { Sp -= sizeofW(StgWord);       *Sp = x;          PushTag(WORD_TAG);   }
-static inline void            PushTaggedAddr     ( StgAddr       x ) 
+       inline void            PushTaggedAddr     ( StgAddr       x ) 
    { Sp -= sizeofW(StgAddr);       *Sp = (W_)x;      PushTag(ADDR_TAG);   }
 static inline void            PushTaggedChar     ( StgChar       x ) 
    { Sp -= sizeofW(StgChar);         *Sp = stgCast(StgWord,x); PushTag(CHAR_TAG); }
@@ -1533,16 +1572,16 @@ static inline void            PopTaggedRealWorld ( void )
 static inline StgWord         PopTaggedWord      ( void ) 
    { StgWord   r; PopTag(WORD_TAG);    r = *stgCast(StgWord*, Sp);      
      Sp += sizeofW(StgWord);       return r;}
-static inline StgAddr         PopTaggedAddr      ( void ) 
+       inline StgAddr         PopTaggedAddr      ( void ) 
    { StgAddr   r; PopTag(ADDR_TAG);    r = *stgCast(StgAddr*, Sp);      
      Sp += sizeofW(StgAddr);       return r;}
-static inline StgChar         PopTaggedChar      ( void ) 
+       inline StgChar         PopTaggedChar      ( void ) 
    { StgChar   r; PopTag(CHAR_TAG);    r = stgCast(StgChar, *Sp);       
      Sp += sizeofW(StgChar);       return r;}
-static inline StgFloat        PopTaggedFloat     ( void ) 
+       inline StgFloat        PopTaggedFloat     ( void ) 
    { StgFloat  r; PopTag(FLOAT_TAG);   r = PK_FLT(Sp);                  
      Sp += sizeofW(StgFloat);      return r;}
-static inline StgDouble       PopTaggedDouble    ( void ) 
+       inline StgDouble       PopTaggedDouble    ( void ) 
    { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(Sp);                  
      Sp += sizeofW(StgDouble);     return r;}
 static inline StgStablePtr    PopTaggedStablePtr    ( void ) 
@@ -1616,6 +1655,8 @@ static inline void PopUpdateFrame( StgClosure* obj )
              fprintf(stderr,"Sp = %p\tSu = %p\n\n", Sp, Su);
              );
 #ifdef EAGER_BLACKHOLING
+#warn  LAZY_BLACKHOLING is default for StgHugs
+#error Dont know if EAGER_BLACKHOLING works in StgHugs
     ASSERT(get_itbl(Su->updatee)->type == BLACKHOLE
            || get_itbl(Su->updatee)->type == SE_BLACKHOLE
            || get_itbl(Su->updatee)->type == CAF_BLACKHOLE
@@ -1713,32 +1754,29 @@ static inline StgClosure* raiseAnError( StgClosure* errObj )
     }
 }
 
-static StgClosure* raisePrim(char* msg)
+
+static StgClosure* makeErrorCall ( const char* msg )
 {
-    /* ToDo: figure out some way to turn the msg into a Haskell Exception
-     * Hack: we don't know how to build an Exception but we do know how
-     * to build a (recursive!) error object.
-     * The result isn't pretty but it's (slightly) better than nothing.
-     */
-    nat size = sizeof(StgClosure) + 1;
-    StgClosure* errObj = stgCast(StgClosure*,grabHpNonUpd(size));
-    SET_INFO(errObj,&raise_info);
-    errObj->payload[0] = errObj;
-fprintf(stderr, "\n\n\nRAISE PRIM %s\n", msg);
-#if 0
-    belch(msg);
-#else
-    /* At the moment, I prefer to put it on stdout to make things as
-     * close to Hugs' old behaviour as possible.
-     */
-    fprintf(stdout, "Program error: %s", msg);
-    fflush(stdout);
-#endif
-    return raiseAnError(stgCast(StgClosure*,errObj));
+   /* Note!  the msg string should be allocated in a 
+      place which will not get freed -- preferably 
+      read-only data of the program.  That's because
+      the thunk we build here may linger indefinitely.
+      (thinks: probably not so, but anyway ...)
+   */
+   HaskellObj error 
+      = asmClosureOfObject(getHugs_AsmObject_for("error"));
+   HaskellObj unpack
+      = asmClosureOfObject(getHugs_AsmObject_for("primUnpackString"));
+   HaskellObj thunk
+      = rts_apply ( unpack, rts_mkAddr ( (void*)msg ) );
+   thunk
+      = rts_apply ( error, thunk );
+   return 
+      (StgClosure*) thunk;
 }
 
-#define raiseIndex(where) raisePrim("Array index out of range in " where)
-#define raiseDiv0(where)  raisePrim("Division by 0 in " where)
+#define raiseIndex(where) makeErrorCall("Array index out of range in " where)
+#define raiseDiv0(where)  makeErrorCall("Division by zero in " where)
 
 /* --------------------------------------------------------------------------
  * Evaluator
@@ -1822,6 +1860,12 @@ fprintf(stderr, "\n\n\nRAISE PRIM %s\n", msg);
     PushTaggedWord(e);       \
 }
 
+#define OP_I_s(e)            \
+{                            \
+    StgInt x = PopTaggedInt();  \
+    PushTaggedStablePtr(e);  \
+}
+
 #define OP__F(e)             \
 {                            \
     PushTaggedFloat(e);      \
@@ -1861,6 +1905,12 @@ fprintf(stderr, "\n\n\nRAISE PRIM %s\n", msg);
 #define OP_W_I(e)             \
 {                             \
     StgWord x = PopTaggedWord(); \
+    PushTaggedInt(e);         \
+}
+
+#define OP_s_I(e)             \
+{                             \
+    StgStablePtr x = PopTaggedStablePtr(); \
     PushTaggedInt(e);         \
 }
 
@@ -1927,7 +1977,7 @@ fprintf(stderr, "\n\n\nRAISE PRIM %s\n", msg);
     int  y = PopTaggedInt();  \
     StgStablePtr r;           \
     s;                        \
-    PushTaggedStablePtr(r);      \
+    PushTaggedStablePtr(r);   \
 }
 #define OP_AIC_(s)            \
 {                             \
@@ -2236,8 +2286,7 @@ static void* enterBCO_primop1 ( int primop1code )
                     return (raiseDiv0("quotInt"));
                 }
                 /* ToDo: protect against minInt / -1 errors
-                 * (repeat for all other division primops)
-				 */
+                 * (repeat for all other division primops) */
                 PushTaggedInt(x/y);
             }
             break;
@@ -2334,6 +2383,9 @@ static void* enterBCO_primop1 ( int primop1code )
         case i_intToAddr:       OP_I_A((StgAddr)x);  break;  /*  ToDo */
         case i_addrToInt:       OP_A_I((StgInt)x);   break;  /* ToDo */
 
+        case i_intToStable:     OP_I_s(x);           break;
+        case i_stableToInt:     OP_s_I(x);           break;
+
         case i_indexCharOffAddr:   OP_AI_C(indexCharOffAddrzh(r,x,y));      break;
         case i_readCharOffAddr:    OP_AI_C(indexCharOffAddrzh(r,x,y));      break;
         case i_writeCharOffAddr:   OP_AIC_(writeCharOffAddrzh(x,y,z));      break;
@@ -2354,11 +2406,9 @@ static void* enterBCO_primop1 ( int primop1code )
         case i_readDoubleOffAddr:  OP_AI_D(indexDoubleOffAddrzh(r,x,y));    break;
         case i_writeDoubleOffAddr: OP_AID_(writeDoubleOffAddrzh(x,y,z));    break;
 
-#ifdef PROVIDE_STABLE
         case i_indexStableOffAddr: OP_AI_s(indexStablePtrOffAddrzh(r,x,y)); break;
         case i_readStableOffAddr:  OP_AI_s(indexStablePtrOffAddrzh(r,x,y)); break;
         case i_writeStableOffAddr: OP_AIs_(writeStablePtrOffAddrzh(x,y,z)); break;
-#endif
 
 #ifdef STANDALONE_INTEGER
         case i_compareInteger:     
@@ -2448,11 +2498,6 @@ static void* enterBCO_primop1 ( int primop1code )
             {
                 StgFloat x = PopTaggedFloat();
                 StgFloat y = PopTaggedFloat();
-#if 0
-                if (y == 0) {
-                    return (raiseDiv0("divideFloat"));
-                }
-#endif
                 PushTaggedFloat(x/y);
             }
             break;
@@ -2519,11 +2564,6 @@ static void* enterBCO_primop1 ( int primop1code )
             {
                 StgDouble x = PopTaggedDouble();
                 StgDouble y = PopTaggedDouble();
-#if 0
-                if (y == 0) {
-                    return (raiseDiv0("divideDouble"));
-                }
-#endif
                 PushTaggedDouble(x/y);
             }
             break;
@@ -2593,7 +2633,8 @@ static void* enterBCO_primop1 ( int primop1code )
       set *return2 to it and return a non-NULL value.
 */
 static void* enterBCO_primop2 ( int primop2code, 
-                                int* /*StgThreadReturnCode* */ return2 )
+                                int* /*StgThreadReturnCode* */ return2,
+                                StgBCO** bco )
 {
         switch (primop2code) {
         case i_raise:  /* raise#{err} */
@@ -2713,8 +2754,8 @@ static void* enterBCO_primop2 ( int primop2code,
             }
 
         /* Most of these generate alignment warnings on Sparcs and similar architectures.
-	                 * These are harmless and are caused by the cast to C* in BYTE_ARR_CTS.
-	                 */
+         * These are harmless and are caused by the cast to C* in BYTE_ARR_CTS.
+         */
         case i_indexCharArray:   
             OP_mI_ty(Char,"indexCharArray",    indexCharArrayzh(r,x,i)); break;
         case i_readCharArray:    
@@ -2750,6 +2791,7 @@ static void* enterBCO_primop2 ( int primop2code,
         case i_writeDoubleArray: 
             OP_mIty_(Double,"writeDoubleArray", writeDoubleArrayzh(x,i,z)); break;
 
+#if 0
 #ifdef PROVIDE_STABLE
         case i_indexStableArray: 
             OP_mI_ty(StablePtr,"indexStableArray", indexStablePtrArrayzh(r,x,i)); break;
@@ -2758,7 +2800,7 @@ static void* enterBCO_primop2 ( int primop2code,
         case i_writeStableArray: 
             OP_mIty_(StablePtr,"writeStableArray", writeStablePtrArrayzh(x,i,z)); break;
 #endif
-
+#endif
 
 
 
@@ -2812,54 +2854,45 @@ static void* enterBCO_primop2 ( int primop2code,
                     PushCPtr(w->value); /* last result  */
                     PushTaggedInt(1);   /* first result */
                 } else {
-                    PushPtr(stgCast(StgPtr,w)); /* ToDo: error thunk would be better */
+                    PushPtr(stgCast(StgPtr,w)); 
+                           /* ToDo: error thunk would be better */
                     PushTaggedInt(0);
                 }
                 break;
             }
 #endif /* PROVIDE_WEAK */
-#ifdef PROVIDE_STABLE
-                /* StablePtr# operations */
-        case i_makeStablePtr: 
-        case i_deRefStablePtr: 
-        case i_freeStablePtr: 
-           { fprintf(stderr,"Evaluator.c:stablePtrOp unimp\n" );
-			   exit(1); };
 
-#if 0
-			ToDo: reinstate
         case i_makeStablePtr:
             {
-                StgStablePtr stable_ptr;
-                if (stable_ptr_free == NULL) {
-                    enlargeStablePtrTable();
-                }
-        
-                stable_ptr = stable_ptr_free - stable_ptr_table;
-                stable_ptr_free  = (P_*)*stable_ptr_free;
-                stable_ptr_table[stable_ptr] = PopPtr();
-
-                PushTaggedStablePtr(stable_ptr);
+                StgPtr       p  = PopPtr();                
+                StgStablePtr sp = getStablePtr ( p );
+                PushTaggedStablePtr(sp);
                 break;
             }
         case i_deRefStablePtr:
             {
-                StgStablePtr stable_ptr = PopTaggedStablePtr();
-                PushPtr(stable_ptr_table[stable_ptr]);
+                StgPtr p;
+                StgStablePtr sp = PopTaggedStablePtr();
+                p = deRefStablePtr(sp);
+                PushPtr(p);
                 break;
             }     
-
         case i_freeStablePtr:
             {
-                StgStablePtr stable_ptr = PopTaggedStablePtr();
-                stable_ptr_table[stable_ptr] = (P_)stable_ptr_free;
-                stable_ptr_free = stable_ptr_table + stable_ptr;
+                StgStablePtr sp = PopTaggedStablePtr();
+                freeStablePtr(sp);
                 break;
             }     
-#endif /* 0 */
 
+        case i_createAdjThunkARCH:
+            {
+                StgStablePtr stableptr = PopTaggedStablePtr();
+                StgAddr      typestr   = PopTaggedAddr();
+                StgAddr      adj_thunk = createAdjThunkARCH(stableptr,typestr);
+                PushTaggedAddr(adj_thunk);
+                break;
+            }     
 
-#endif /* PROVIDE_STABLE */
 #ifdef PROVIDE_CONCURRENT
         case i_fork:
             {
@@ -3012,8 +3045,8 @@ off the stack.
         case i_ccall_IO:
             {
                 CFunDescriptor* descriptor = PopTaggedAddr();
-                StgAddr funPtr = PopTaggedAddr();
-                ccall(descriptor,funPtr);
+                void (*funPtr)(void)       = PopTaggedAddr();
+                ccall(descriptor,funPtr,bco);
                 break;
             }
         default:
@@ -3060,11 +3093,9 @@ nat marshall(char arg_ty, void* arg)
     case ADDR_REP:
             PushTaggedAddr(*((void**)arg));
             return ARG_SIZE(ADDR_TAG);
-#ifdef PROVIDE_STABLE
     case STABLE_REP:
             PushTaggedStablePtr(*((StgStablePtr*)arg));
             return ARG_SIZE(STABLE_TAG);
-#endif
 #ifdef PROVIDE_FOREIGN
     case FOREIGN_REP:
             /* Not allowed in this direction - you have to
@@ -3114,11 +3145,9 @@ nat unmarshall(char res_ty, void* res)
     case ADDR_REP:
             *((void**)res) = PopTaggedAddr();
             return ARG_SIZE(ADDR_TAG);
-#ifdef PROVIDE_STABLE
     case STABLE_REP:
             *((StgStablePtr*)res) = PopTaggedStablePtr();
             return ARG_SIZE(STABLE_TAG);
-#endif
 #ifdef PROVIDE_FOREIGN
     case FOREIGN_REP:
         {
@@ -3167,11 +3196,9 @@ nat argSize( const char* ks )
         case ADDR_REP:
                 sz += sizeof(StgWord) * ARG_SIZE(ADDR_TAG);
                 break;
-#ifdef PROVIDE_STABLE
         case STABLE_REP:
                 sz += sizeof(StgWord) * ARG_SIZE(STABLE_TAG);
                 break;
-#endif
 #ifdef PROVIDE_FOREIGN
         case FOREIGN_REP:
 #endif
@@ -3370,5 +3397,157 @@ void B__decodeFloat (B* man, I_* exp, StgFloat flt)
 #endif /* STANDALONE_INTEGER */
 
 
+
+/* -----------------------------------------------------------------------------
+ * Support for foreign export dynamic.
+ * ---------------------------------------------------------------------------*/
+
+static 
+int unpackArgsAndCallHaskell_x86 ( StgStablePtr stableptr, 
+                                   char* tydesc, char* args)
+{
+   HaskellObj      node;
+   HaskellObj      nodeOut;
+   SchedulerStatus sstat;
+
+   char* resp = tydesc;
+   char* argp = tydesc;
+
+   /*
+   fprintf ( stderr,
+      "unpackArgsAndCallHaskell_x86: args=0x%x tydesc=%s stableptr=0x%x\n",
+      (unsigned int)args, tydesc, stableptr );
+   */
+
+   node = deRefStablePtr(stableptr);
+
+   if (*argp != ':') argp++;
+   ASSERT( *argp == ':' );
+   argp++;
+   while (*argp) {
+      switch (*argp) {
+         case CHAR_REP:
+            node = rts_apply ( node, rts_mkChar ( *(char*)args ) );
+            /* fprintf(stderr, "char `%c' ", *(char*)args ); */
+            args += 4;
+            break;
+         case INT_REP:
+            node = rts_apply ( node, rts_mkInt ( *(int*)args ) );
+            /* fprintf(stderr, "int  %d ", *(int*)args ); */
+            args += 4;
+            break;
+         case FLOAT_REP:
+            node = rts_apply ( node, rts_mkFloat ( *(float*)args ) );
+            /* fprintf(stderr, "float %f ", *(float*)args ); */
+            args += 4;
+            break;
+         case DOUBLE_REP:
+            node = rts_apply ( node, rts_mkDouble ( *(double*)args ) );
+            /* fprintf(stderr, "double %f ", *(double*)args ); */
+            args += 8;
+            break;
+         case WORD_REP:
+         case ADDR_REP:
+         default:
+            internal(
+               "unpackArgsAndCallHaskell_x86: unexpected arg type rep");
+      }
+      argp++;
+   }
+   fprintf ( stderr, "\n" );
+   node = rts_apply ( 
+             asmClosureOfObject(getHugs_AsmObject_for("primRunST")), 
+             node );
+
+   sstat = rts_eval ( node, &nodeOut );
+   if (sstat != Success)
+      internal ("unpackArgsAndCallHaskell_x86: evalIO failed");
+
+   switch (*resp) {
+      case ':':        return 0;
+      case CHAR_REP:   return rts_getChar(nodeOut);
+      case INT_REP:    return rts_getInt(nodeOut);
+      //case FLOAT_REP:  return rts_getFloat(nodeOut);
+      //case DOUBLE_REP: return rts_getDouble(nodeOut);
+      case WORD_REP:
+      case ADDR_REP:
+      default:
+         internal(
+            "unpackArgsAndCallHaskell_x86: unexpected res type rep");
+   }
+}
+
+static
+StgAddr createAdjThunk_x86 ( StgStablePtr stableptr,
+                             StgAddr      typestr )
+{
+   unsigned char* codeblock;
+   unsigned char* cp;
+   unsigned int ts = (unsigned int)typestr;
+   unsigned int sp = (unsigned int)stableptr;
+   unsigned int ch = (unsigned int)&unpackArgsAndCallHaskell_x86;
+
+   /* fprintf ( stderr, "createAdjThunk_x86: %s 0x%x\n", (char*)typestr, sp ); */
+   codeblock = malloc ( 1 + 0x22 );
+   if (!codeblock) {
+      fprintf ( stderr, 
+                "createAdjThunk_x86 (foreign export dynamic):\n"
+                "\tfatal: can't alloc mem\n" );
+      exit(1);
+   }
+   cp = codeblock;
+   /* Generate the following:
+   9 0000 53           pushl %ebx
+  10 0001 51           pushl %ecx
+  11 0002 56           pushl %esi
+  12 0003 57           pushl %edi
+  13 0004 55           pushl %ebp
+  14 0005 89E0         movl %esp,%eax    # sp -> eax
+  15 0007 83C018       addl $24,%eax     # move eax back over 5 saved regs + retaddr
+  16 000a 50           pushl %eax        # push arg-block addr
+  17 000b 6844332211   pushl $0x11223344 # push addr of type descr string
+  18 0010 6877665544   pushl $0x44556677 # push stableptr to closure
+  19 0015 E8BBAA9988   call 0x8899aabb   # SEE COMMENT BELOW
+  20 001a 83C40C       addl $12,%esp     # pop 3 args
+  21 001d 5D           popl %ebp
+  22 001e 5F           popl %edi
+  23 001f 5E           popl %esi
+  24 0020 59           popl %ecx
+  25 0021 5B           popl %ebx
+  26 0022 C3           ret
+    */
+   *cp++ = 0x53;
+   *cp++ = 0x51;
+   *cp++ = 0x56;
+   *cp++ = 0x57;
+   *cp++ = 0x55;
+   *cp++ = 0x89; *cp++ = 0xE0;
+   *cp++ = 0x83; *cp++ = 0xC0; *cp++ = 0x18;
+   *cp++ = 0x50;
+   *cp++ = 0x68; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;ts>>=8; *cp++=ts;
+   *cp++ = 0x68; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;sp>>=8; *cp++=sp;
+
+   /* call address needs to be: displacement relative to next insn */
+   ch = ch - ( ((unsigned int)cp) + 5);
+   *cp++ = 0xE8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;ch>>=8; *cp++=ch;
+
+   *cp++ = 0x83; *cp++ = 0xC4; *cp++ = 0x0C;
+   *cp++ = 0x5D;
+   *cp++ = 0x5F;
+   *cp++ = 0x5E;
+   *cp++ = 0x59;
+   *cp++ = 0x5B;
+   *cp++ = 0xC3;
+
+   return codeblock;
+}
+
+
+static
+StgAddr createAdjThunkARCH ( StgStablePtr stableptr,
+                             StgAddr      typestr )
+{
+   return createAdjThunk_x86 ( stableptr, typestr );
+}
 
 #endif /* INTERPRETER */

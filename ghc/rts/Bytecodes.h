@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.6 1999/04/27 10:07:20 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.7 1999/10/15 11:02:59 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -87,6 +87,7 @@
     Ins(i_PACK_DOUBLE),       \
     Ins(i_UNPACK_DOUBLE),     \
     Ins(i_VAR_STABLE),        \
+    Ins(i_VAR_STABLE_big),    \
     Ins(i_PACK_STABLE),       \
     Ins(i_UNPACK_STABLE),     \
     Ins(i_PRIMOP1),           \
@@ -180,6 +181,10 @@ typedef enum
     , i_intToAddr
     , i_addrToInt
 
+    /* Stable# operations */
+    , i_intToStable
+    , i_stableToInt
+
     /* Stateless Addr operations */
     , i_indexCharOffAddr
     , i_indexIntOffAddr
@@ -187,9 +192,7 @@ typedef enum
     , i_indexAddrOffAddr
     , i_indexFloatOffAddr
     , i_indexDoubleOffAddr
-#ifdef PROVIDE_STABLE
     , i_indexStableOffAddr
-#endif
 
     , i_readCharOffAddr
     , i_readIntOffAddr
@@ -197,9 +200,7 @@ typedef enum
     , i_readAddrOffAddr
     , i_readFloatOffAddr
     , i_readDoubleOffAddr
-#ifdef PROVIDE_STABLE
     , i_readStableOffAddr
-#endif
 
     , i_writeCharOffAddr
     , i_writeIntOffAddr
@@ -207,9 +208,7 @@ typedef enum
     , i_writeAddrOffAddr
     , i_writeFloatOffAddr
     , i_writeDoubleOffAddr
-#ifdef PROVIDE_STABLE
     , i_writeStableOffAddr
-#endif
 
     /* Integer operations */
     , i_compareInteger
@@ -370,10 +369,12 @@ typedef enum
     , i_readDoubleArray
     , i_indexDoubleArray
 
+#if 0
 #ifdef PROVIDE_STABLE
     , i_writeStableArray
     , i_readStableArray
     , i_indexStableArray
+#endif
 #endif
 
     /* {write,read,index}ForeignObjArray not provided */
@@ -403,12 +404,13 @@ typedef enum
     , i_makeWeak
     , i_deRefWeak
 #endif 
-#ifdef PROVIDE_STABLE
     /* StablePtr# operations */
     , i_makeStablePtr
     , i_deRefStablePtr
     , i_freeStablePtr
-#endif
+
+    /* foreign export dynamic support */
+    , i_createAdjThunkARCH
 
 #ifdef PROVIDE_CONCURRENT
     /* Concurrency operations */

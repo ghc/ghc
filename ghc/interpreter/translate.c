@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/04/27 10:07:08 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/15 11:02:35 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -534,11 +534,15 @@ List scs; {                             /* in incr order of strict comps.  */
  * Foreign function calls and primops
  * ------------------------------------------------------------------------*/
 
-static String  charListToString( List cs );
-static Cell    foreignResultTy( Type t );
-static Cell    foreignArgTy( Type t );
-static Name    repToBox        Args(( char c ));
-static StgRhs  makeStgPrim     Args(( Name,Bool,List,String,String ));
+/* Outbound denotes data moving from Haskell world to elsewhere.
+   Inbound denotes data moving from elsewhere to Haskell world.
+*/
+static String  charListToString   ( List cs );
+static Cell    foreignTy          ( Bool outBound, Type t );
+static Cell    foreignOutboundTy  ( Type t );
+static Cell    foreignInboundTy   ( Type t );
+static Name    repToBox           ( char c );
+static StgRhs  makeStgPrim        ( Name,Bool,List,String,String );
 
 static String charListToString( List cs )
 {
@@ -553,11 +557,13 @@ static String charListToString( List cs )
     return textToStr(findText(s));
 }
 
-static Cell foreignResultTy( Type t )
+static Cell foreignTy ( Bool outBound, Type t )
 {
     if      (t == typeChar)   return mkChar(CHAR_REP);
     else if (t == typeInt)    return mkChar(INT_REP);
+#if 0
     else if (t == typeInteger)return mkChar(INTEGER_REP);
+#endif
     else if (t == typeWord)   return mkChar(WORD_REP);
     else if (t == typeAddr)   return mkChar(ADDR_REP);
     else if (t == typeFloat)  return mkChar(FLOAT_REP);
@@ -566,6 +572,7 @@ static Cell foreignResultTy( Type t )
     else if (t == typeForeign)return mkChar(FOREIGN_REP); 
          /* ToDo: argty only! */
 #endif
+#if 0
     else if (t == typePrimByteArray) return mkChar(BARR_REP); 
          /* ToDo: argty only! */
     else if (whatIs(t) == AP) {
@@ -573,16 +580,29 @@ static Cell foreignResultTy( Type t )
         if (h == typePrimMutableByteArray) return mkChar(MUTBARR_REP); 
          /* ToDo: argty only! */
     }
+#endif
    /* ToDo: decent line numbers! */
-   ERRMSG(0) "Illegal foreign type" ETHEN
-   ERRTEXT " \"" ETHEN ERRTYPE(t);
-   ERRTEXT "\""
-   EEND;
+   if (outBound) {
+      ERRMSG(0) "Illegal outbound (away from Haskell) type" ETHEN
+      ERRTEXT " \"" ETHEN ERRTYPE(t);
+      ERRTEXT "\""
+      EEND;
+   } else {
+      ERRMSG(0) "Illegal inbound (towards Haskell) type" ETHEN
+      ERRTEXT " \"" ETHEN ERRTYPE(t);
+      ERRTEXT "\""
+      EEND;
+   }
 }
 
-static Cell foreignArgTy( Type t )
+static Cell foreignOutboundTy ( Type t )
 {
-    return foreignResultTy( t );
+    return foreignTy ( TRUE, t );
+}
+
+static Cell foreignInboundTy ( Type t )
+{
+    return foreignTy ( FALSE, t );
 }
 
 static Name repToBox( char c )
@@ -600,9 +620,7 @@ static Name repToBox( char c )
     case REF_REP:     return nameMkRef;                  
     case MUTARR_REP:  return nameMkPrimMutableArray;     
     case MUTBARR_REP: return nameMkPrimMutableByteArray; 
-#ifdef PROVIDE_STABLE
     case STABLE_REP:  return nameMkStable;
-#endif
 #ifdef PROVIDE_WEAK
     case WEAK_REP:  return nameMkWeak;
 #endif
@@ -765,7 +783,7 @@ String r_reps; {
     }
 }    
 
-Void implementPrim( n )
+Void implementPrim ( n )
 Name n; {
     const AsmPrim* p = name(n).primop;
     StgRhs   rhs = makeStgPrim(n,p->monad!=MONAD_Id,NIL,p->args,p->results);
@@ -797,9 +815,9 @@ Name n; {
  *	 ::
  *	 Addr -> (Int -> Float -> IO (Char,Addr))
  */
-Void implementForeignImport( Name n )
+Void implementForeignImport ( Name n )
 {
-    Type t       = name(n).type;
+    Type t         = name(n).type;
     List argTys    = NIL;
     List resultTys = NIL;
     CFunDescriptor* descriptor = 0;
@@ -828,8 +846,8 @@ Void implementForeignImport( Name n )
     } else {
         resultTys = singleton(resultTys);
     }
-    mapOver(foreignArgTy,argTys);  /* allows foreignObj, byteArrays, etc */
-    mapOver(foreignResultTy,resultTys); /* doesn't */
+    mapOver(foreignOutboundTy,argTys);  /* allows foreignObj, byteArrays, etc */
+    mapOver(foreignInboundTy,resultTys); /* doesn't */
     descriptor = mkDescriptor(charListToString(argTys),
                               charListToString(resultTys));
     name(n).primop = addState ? &ccall_IO : &ccall_Id;
@@ -847,7 +865,7 @@ Void implementForeignImport( Name n )
                 textToStr(textOf(fst(extName)))
             EEND;
         }
-        //ppStg(v);
+        /* ppStg(v); */
         name(n).defn     = NIL;
         name(n).stgVar   = v;
         name(n).stgSize  = stgSize(stgVarBody(v));
@@ -856,9 +874,94 @@ Void implementForeignImport( Name n )
     }
 }
 
-Void implementForeignExport( Name n )
+
+/* Generate code:
+ *
+ * \ fun s0 ->
+     let e1 = A# "...."
+     in  primMkAdjThunk fun s0 e1
+
+   we require, and check that,
+     fun :: prim_arg* -> IO prim_result
+ */
+Void implementForeignExport ( Name n )
 {
-    internal("implementForeignExport: not implemented");
+    Type t         = name(n).type;
+    List argTys    = NIL;
+    List resultTys = NIL;
+
+    if (getHead(t)==typeArrow && argCount==2) {
+       t = arg(fun(t));
+    } else {
+        ERRMSG(0) "foreign export has illegal type" ETHEN
+        ERRTEXT " \"" ETHEN ERRTYPE(t);
+        ERRTEXT "\""
+        EEND;        
+    }
+
+    while (getHead(t)==typeArrow && argCount==2) {
+        Type ta = fullExpand(arg(fun(t)));
+        Type tr = arg(t);
+        argTys = cons(ta,argTys);
+        t = tr;
+    }
+    argTys = rev(argTys);
+    if (getHead(t) == typeIO) {
+        resultTys = getArgs(t);
+        assert(length(resultTys) == 1);
+        resultTys = hd(resultTys);
+    } else {
+        ERRMSG(0) "foreign export doesn't return an IO type" ETHEN
+        ERRTEXT " \"" ETHEN ERRTYPE(t);
+        ERRTEXT "\""
+        EEND;        
+    }
+    resultTys = fullExpand(resultTys);
+
+    mapOver(foreignInboundTy,argTys);
+
+    {
+    List     tdList;
+    Text     tdText;
+    List     args;
+    StgVar   e1, e2, v;
+    StgExpr  fun;
+
+    tdList = cons(mkChar(':'),argTys);
+    if (resultTys != typeUnit)
+       tdList = cons(foreignOutboundTy(resultTys),tdList);
+
+    tdText = findText(charListToString ( tdList ));
+    args   = makeArgs(2);
+    e1     = mkStgVar(
+                mkStgCon(nameMkA,singleton(ap(STRCELL,tdText))),
+                NIL
+             );
+     e2    = mkStgVar(
+                mkStgApp(nameUnpackString,singleton(e1)),
+                NIL
+             );
+
+    fun    = mkStgLambda(
+                args,
+                mkStgLet(
+                   doubleton(e1,e2),
+                   mkStgApp(
+                      nameCreateAdjThunk,
+                      tripleton(hd(args),e2,hd(tl(args)))
+                   )
+                )
+             );
+
+    v = mkStgVar(fun,NIL);
+    /* ppStg(v); */
+
+    name(n).defn     = NIL;    
+    name(n).stgVar   = v;
+    name(n).stgSize  = stgSize(stgVarBody(v));
+    name(n).inlineMe = FALSE;
+    stgGlobals       = cons(pair(n,v),stgGlobals);
+    }
 }
 
 // ToDo: figure out how to set inlineMe for these (non-Name) things

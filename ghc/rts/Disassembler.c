@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/07/06 16:40:24 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/15 11:03:01 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -336,14 +336,12 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
     case i_UNPACK_DOUBLE:
             return disNone(bco,pc,"UNPACK_DOUBLE");
 
-#ifdef PROVIDE_STABLE
     case i_VAR_STABLE:
             return disInt(bco,pc,"VAR_STABLE");
     case i_PACK_STABLE:
             return disNone(bco,pc,"PACK_STABLE");
     case i_UNPACK_STABLE:
             return disNone(bco,pc,"UNPACK_STABLE");
-#endif
 
     case i_PRIMOP1:
         {

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.9 $
- * $Date: 1999/07/06 16:40:22 $
+ * $Revision: 1.10 $
+ * $Date: 1999/10/15 11:02:58 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -464,9 +464,7 @@ static StgWord repSizeW( AsmRep rep )
     case ADDR_REP:    return sizeofW(StgWord) + sizeofW(StgAddr);
     case FLOAT_REP:   return sizeofW(StgWord) + sizeofW(StgFloat);
     case DOUBLE_REP:  return sizeofW(StgWord) + sizeofW(StgDouble);
-#ifdef PROVIDE_STABLE
     case STABLE_REP:  return sizeofW(StgWord) + sizeofW(StgWord);
-#endif
 
     case INTEGER_REP: 
 #ifdef PROVIDE_WEAK
@@ -635,6 +633,14 @@ static void emit_i_VAR_DOUBLE ( AsmBCO bco, int arg1 )
       emiti_16(bco,i_VAR_DOUBLE_big,arg1);
 }
 
+static void emit_i_VAR_STABLE ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256)
+      emiti_8 (bco,i_VAR_STABLE,    arg1); else
+      emiti_16(bco,i_VAR_STABLE_big,arg1);
+}
+
 static void emit_i_VAR ( AsmBCO bco, int arg1 )
 {
    ASSERT(arg1 >= 0);
@@ -796,11 +802,9 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case DOUBLE_REP:
             emit_i_VAR_DOUBLE(bco,offset);
             break;
-#ifdef PROVIDE_STABLE
     case STABLE_REP:
             emit_i_VAR_STABLE(bco,offset);
             break;
-#endif
 
     case INTEGER_REP:
 #ifdef PROVIDE_WEAK
@@ -884,12 +888,10 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
             emiti_(bco,i_PACK_DOUBLE);
             grabHpNonUpd(bco,Dzh_sizeW);
             break;
-#ifdef PROVIDE_STABLE
     case STABLE_REP:
             emiti_(bco,i_PACK_STABLE);
             grabHpNonUpd(bco,Stablezh_sizeW);
             break;
-#endif
 
     default:
             barf("asmBox %d",rep);
@@ -925,11 +927,9 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
     case DOUBLE_REP:
             emiti_(bco,i_UNPACK_DOUBLE);
             break;
-#ifdef PROVIDE_STABLE
     case STABLE_REP:
             emiti_(bco,i_UNPACK_STABLE);
             break;
-#endif
     default:
             barf("asmUnbox %d",rep);
     }
@@ -1171,9 +1171,11 @@ const AsmPrim asmPrimOps[] = {
     , { "primIndexAddrOffAddr",      "AI", "A",  MONAD_Id, i_PRIMOP1, i_indexAddrOffAddr }
     , { "primIndexFloatOffAddr",     "AI", "F",  MONAD_Id, i_PRIMOP1, i_indexFloatOffAddr }
     , { "primIndexDoubleOffAddr",    "AI", "D",  MONAD_Id, i_PRIMOP1, i_indexDoubleOffAddr }
-#ifdef PROVIDE_STABLE
     , { "primIndexStableOffAddr",    "AI", "s",  MONAD_Id, i_PRIMOP1, i_indexStableOffAddr }
-#endif
+
+    /* Stable# operations */
+    , { "primIntToStablePtr",        "I",  "s",  MONAD_Id, i_PRIMOP1, i_intToStable }
+    , { "primStablePtrToInt",        "s",  "I",  MONAD_Id, i_PRIMOP1, i_stableToInt }
 
     /* These ops really ought to be in the IO monad */
     , { "primReadCharOffAddr",       "AI", "C",  MONAD_ST, i_PRIMOP1, i_readCharOffAddr }
@@ -1182,9 +1184,7 @@ const AsmPrim asmPrimOps[] = {
     , { "primReadAddrOffAddr",       "AI", "A",  MONAD_ST, i_PRIMOP1, i_readAddrOffAddr }
     , { "primReadFloatOffAddr",      "AI", "F",  MONAD_ST, i_PRIMOP1, i_readFloatOffAddr }
     , { "primReadDoubleOffAddr",     "AI", "D",  MONAD_ST, i_PRIMOP1, i_readDoubleOffAddr }
-#ifdef PROVIDE_STABLE                
     , { "primReadStableOffAddr",     "AI", "s",  MONAD_ST, i_PRIMOP1, i_readStableOffAddr }
-#endif
 
     /* These ops really ought to be in the IO monad */
     , { "primWriteCharOffAddr",      "AIC", "",  MONAD_ST, i_PRIMOP1, i_writeCharOffAddr }
@@ -1193,9 +1193,7 @@ const AsmPrim asmPrimOps[] = {
     , { "primWriteAddrOffAddr",      "AIA", "",  MONAD_ST, i_PRIMOP1, i_writeAddrOffAddr }
     , { "primWriteFloatOffAddr",     "AIF", "",  MONAD_ST, i_PRIMOP1, i_writeFloatOffAddr }
     , { "primWriteDoubleOffAddr",    "AID", "",  MONAD_ST, i_PRIMOP1, i_writeDoubleOffAddr }
-#ifdef PROVIDE_STABLE
     , { "primWriteStableOffAddr",    "AIs", "",  MONAD_ST, i_PRIMOP1, i_writeStableOffAddr }
-#endif
 
     /* Integer operations */
     , { "primCompareInteger",        "ZZ", "I",  MONAD_Id, i_PRIMOP1, i_compareInteger }
@@ -1343,12 +1341,13 @@ const AsmPrim asmPrimOps[] = {
     , { "primReadDoubleArray",       "mI",  "D", MONAD_ST, i_PRIMOP2, i_readDoubleArray }
     , { "primIndexDoubleArray",      "xI",  "D", MONAD_Id, i_PRIMOP2, i_indexDoubleArray }
 
-#ifdef PROVIDE_STABLE                
+#if 0
+#ifdef PROVIDE_STABLE
     , { "primWriteStableArray",      "mIs", "",  MONAD_ST, i_PRIMOP2, i_writeStableArray }
     , { "primReadStableArray",       "mI",  "s", MONAD_ST, i_PRIMOP2, i_readStableArray }
     , { "primIndexStableArray",      "xI",  "s", MONAD_Id, i_PRIMOP2, i_indexStableArray }
 #endif
-
+#endif
     /* {new,write,read,index}ForeignObjArray not provided */
 
 
@@ -1361,12 +1360,14 @@ const AsmPrim asmPrimOps[] = {
     , { "primMakeWeak",              "bac", "w",  MONAD_IO, i_PRIMOP2, i_makeWeak }
     , { "primDeRefWeak",             "w",   "Ia", MONAD_IO, i_PRIMOP2, i_deRefWeak }
 #endif
-#ifdef PROVIDE_STABLE
     /* StablePtr# operations */
     , { "primMakeStablePtr",         "a", "s",   MONAD_IO, i_PRIMOP2, i_makeStablePtr }
     , { "primDeRefStablePtr",        "s", "a",   MONAD_IO, i_PRIMOP2, i_deRefStablePtr }
     , { "primFreeStablePtr",         "s", "",    MONAD_IO, i_PRIMOP2, i_freeStablePtr }
-#endif
+
+    /* foreign export dynamic support */
+    , { "primCreateAdjThunkARCH",    "sA", "A",  MONAD_IO, i_PRIMOP2, i_createAdjThunkARCH }
+
 #ifdef PROVIDE_PTREQUALITY
     , { "primReallyUnsafePtrEquality", "aa", "B",MONAD_Id, i_PRIMOP2, i_reallyUnsafePtrEquality }
 #endif

@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.7 1999/07/06 16:17:39 sewardj Exp $
+ * $Id: Assembler.h,v 1.8 1999/10/15 11:02:06 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -89,9 +89,7 @@ typedef enum {
   ADDR_REP    = 'A',     
   FLOAT_REP   = 'F',    
   DOUBLE_REP  = 'D',   
-#ifdef PROVIDE_STABLE
   STABLE_REP  = 's',   /* StablePtr a */
-#endif
 #ifdef PROVIDE_FOREIGN
   FOREIGN_REP = 'f',   /* ForeignObj  */
 #endif

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/04/27 10:06:54 $
+ * $Revision: 1.8 $
+ * $Date: 1999/10/15 11:02:15 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -35,9 +35,7 @@ Type typePrimMutableArray;
 Type typePrimMutableByteArray; 
 Type typeFloat;
 Type typeDouble;
-#ifdef PROVIDE_STABLE
 Type typeStable;
-#endif
 #ifdef PROVIDE_WEAK
 Type typeWeak;
 #endif
@@ -113,9 +111,11 @@ Name namePmLe;
 Name namePmSubtract;
 Name namePmFromInteger;
 Name nameMkIO;
+Name nameRunST;
 Name nameUnpackString;
 Name nameError;
 Name nameInd;
+Name nameCreateAdjThunk;
 
 Name nameAnd;
 Name nameConCmp;
@@ -165,9 +165,7 @@ Name nameMkPrimByteArray;
 Name nameMkRef;                  
 Name nameMkPrimMutableArray;     
 Name nameMkPrimMutableByteArray; 
-#ifdef PROVIDE_STABLE
 Name nameMkStable;                      /* StablePtr# a -> StablePtr a     */
-#endif
 #ifdef PROVIDE_WEAK
 Name nameMkWeak;                        /* Weak# a      -> Weak a          */
 #endif
@@ -290,9 +288,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         typePrimMutableByteArray = linkTycon("PrimMutableByteArray");
         typeFloat        = linkTycon("Float");
         typeDouble       = linkTycon("Double");
-#ifdef PROVIDE_STABLE
         typeStable       = linkTycon("StablePtr");
-#endif
 #ifdef PROVIDE_WEAK
         typeWeak         = linkTycon("Weak");
 #endif
@@ -342,9 +338,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         nameMkA          = addPrimCfunREP(findText("A#"),1,0,ADDR_REP);
         nameMkF          = addPrimCfunREP(findText("F#"),1,0,FLOAT_REP);
         nameMkD          = addPrimCfunREP(findText("D#"),1,0,DOUBLE_REP);
-#ifdef PROVIDE_STABLE
         nameMkStable     = addPrimCfunREP(findText("Stable#"),1,0,STABLE_REP);
-#endif
         nameMkInteger    = addPrimCfunREP(findText("Integer#"),1,0,0);
 #ifdef PROVIDE_FOREIGN
         nameMkForeign    = addPrimCfunREP(findText("Foreign#"),1,0,0);
@@ -477,6 +471,8 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
             implementPrim(n);
         }
 
+        nameRunST         = linkName("primRunST");
+
         /* static(tidyInfix)                        */
         nameNegate        = linkName("negate");
         /* user interface                           */
@@ -492,6 +488,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         /* translator                               */
         nameEqChar        = linkName("primEqChar");
         nameEqInt         = linkName("primEqInt");
+nameCreateAdjThunk = linkName("primCreateAdjThunk");
 #if !OVERLOADED_CONSTANTS
         nameEqInteger     = linkName("primEqInteger");
 #endif /* !OVERLOADED_CONSTANTS */
@@ -564,6 +561,9 @@ Int what; {
                        pFun(namePMFail,         "primPmFail");
 		       pFun(nameError,          "error");
 		       pFun(nameUnpackString,   "primUnpackString");
+
+		       //                       /* foreign export dynamic */
+		       //pFun(nameCreateAdjThunk, "primCreateAdjThunk");
 
                        /* hooks for handwritten bytecode */
                        pFun(namePrimSeq,        "primSeq");
