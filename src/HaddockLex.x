@@ -39,7 +39,7 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 <line> {
   $ws* \>		{ begin birdtrack }
   $ws* \n		{ token TokPara `andBegin` para }
-  $ws* 			{ begin string }
+  () 			{ begin string }
 }
 
 <birdtrack> .*	\n?	{ strtoken TokBirdTrack `andBegin` line }
