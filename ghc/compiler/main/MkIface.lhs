@@ -104,7 +104,7 @@ startIface mod
       Nothing -> return Nothing -- not producing any .hi file
       Just fn -> do
 	if_hdl <- openFile fn WriteMode
-	hPutStrLn if_hdl ("_interface_ "++ _UNPK_ mod ++ ' ':show (PROJECTVERSION :: Int))
+	hPutStrLn if_hdl ("_interface_ "++ _UNPK_ mod ++ ' ':show (opt_HiVersion :: Int))
 	return (Just if_hdl)
 
 endIface Nothing	= return ()
@@ -182,6 +182,7 @@ ifaceExports if_hdl avails
 		       mod = nameModule (availName avail)
 
 	-- Print one module's worth of stuff
+    do_one_module :: (Module, [AvailInfo]) -> SDoc
     do_one_module (mod_name, avails@(avail1:_))
 	= hsep [pp_hif (ifaceFlavour (availName avail1)), 
 		pprModule mod_name,
