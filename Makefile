@@ -259,13 +259,10 @@ SRC_DIST_FILES += \
 	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
 	mk/paths.mk mk/package.mk mk/suffix.mk mk/target.mk
 
-# Just provide a subset.
-GHC_SRC_DIST_DIRS= glafp-utils ghc libraries hslibs
-
 dist dist-manifest dist-package :: project-check
 
 # clean the tree first, leaving certain extra files in place (eg. configure)
-#dist :: distclean
+dist :: distclean
 
 dist ::
 	-rm -rf $(SRC_DIST_DIR)
