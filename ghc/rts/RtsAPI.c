@@ -430,11 +430,12 @@ rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
     StgTSO* tso;
     StgClosure *p, *r;
     SchedulerStatus stat;
+    Capability *cap = rtsApiCapability;
+    rtsApiCapability = NULL;
     
     p = (StgClosure *)deRefStablePtr(s);
     tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    stat = scheduleWaitThread(tso,&r,rtsApiCapability);
-    rtsApiCapability = NULL;
+    stat = scheduleWaitThread(tso,&r,cap);
 
     if (stat == Success && ret != NULL) {
 	ASSERT(r != NULL);
