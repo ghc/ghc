@@ -694,7 +694,7 @@ splitDictTy (NoteTy _ ty) = splitDictTy ty
 splitDictTy (PredTy (Class clas tys)) = (clas, tys)
 
 splitDictTy_maybe :: Type -> Maybe (Class, [Type])
-splitDictTy_maybe (NoteTy _ ty) = splitDictTy ty
+splitDictTy_maybe (NoteTy _ ty) = Just (splitDictTy ty)
 splitDictTy_maybe (PredTy (Class clas tys)) = Just (clas, tys)
 splitDictTy_maybe other			    = Nothing
 

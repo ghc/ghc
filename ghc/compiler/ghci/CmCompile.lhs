@@ -99,24 +99,10 @@ type HomeInterfaceTable = ModuleEnv ModIFace
 
 A @ModDetails@ summarises everything we know about a compiled module
 
-\begin{code}
-data ModDetails
-   = ModDetails {
-        moduleExports :: Avails,		-- What it exports
-        moduleEnv     :: GlobalRdrEnv,		-- Its top level environment
-
-        fixityEnv     :: NameEnv Fixity,
-	deprecEnv     :: NameEnv DeprecTxt,
-        typeEnv       :: NameEnv TcEnv.TyThing,
-
-        instEnv       :: InstEnv,
-        ruleEnv       :: IdEnv [CoreRule]	-- Domain includes Ids from other modules
-     }
-\end{code}
-
 Auxiliary definitions
 
 \begin{code}
+{- I DONT think this should be here -- should be in HscTypes 
 type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
 
 type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
@@ -136,6 +122,7 @@ type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contain
 type AvailInfo    = GenAvailInfo Name
 type RdrAvailInfo = GenAvailInfo OccName
 type Avails	  = [AvailInfo]
+-}
 \end{code}
 
 

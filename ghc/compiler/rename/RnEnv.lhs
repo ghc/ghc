@@ -20,14 +20,14 @@ import HscTypes		( pprNameProvenance )
 import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
-			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
+			  mkLocalName, mkImportedLocalName, mkGlobalName,
 			  mkIPName, hasBetterProv, isLocallyDefined, 
 			  nameOccName, setNameModule, nameModule,
 			  extendNameEnv_C, plusNameEnv_C, nameEnvElts
 			)
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
-import Module		( ModuleName, moduleName, mkVanillaModule, pprModuleName )
+import Module		( ModuleName, moduleName, mkVanillaModule )
 import FiniteMap
 import Unique		( Unique )
 import UniqSupply
@@ -36,6 +36,7 @@ import Outputable
 import ListSetOps	( removeDups, equivClasses )
 import Util		( thenCmp, sortLt )
 import List		( nub )
+import PrelNames	( mkUnboundName )
 \end{code}
 
 
@@ -682,7 +683,7 @@ warnUnusedModules mods
   | not opt_WarnUnusedImports = returnRn ()
   | otherwise 		      = mapRn_ (addWarnRn . unused_mod . moduleName) mods
   where
-    unused_mod m = vcat [ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
+    unused_mod m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			   text "is imported, but nothing from it is used",
 			 parens (ptext SLIT("except perhaps to re-export instances visible in") <+>
 				   quotes (pprModuleName m))]

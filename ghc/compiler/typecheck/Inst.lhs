@@ -43,9 +43,8 @@ import TcHsSyn	( TcExpr, TcId,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcGetInstEnv, lookupInstEnv, InstLookupResult(..),
-		  tcLookupGlobalId
-		)
+import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupGlobalId )
+import TcInstUtil ( InstLookupResult(..), lookupInstEnv )
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
 		  zonkTcTyVars, zonkTcType, zonkTcTypes, 
@@ -75,7 +74,7 @@ import TysWiredIn ( isIntTy,
 		    doubleDataCon, isDoubleTy,
 		    isIntegerTy, voidTy
 		  ) 
-import PrelNames( Unique, hasKey, fromIntClassOpKey, fromIntegerClassOpKey )
+import PrelNames( Unique, hasKey, fromIntName, fromIntegerClassOpKey )
 import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable
@@ -663,7 +662,7 @@ lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
 							-- (i.e. no funny business with user-defined
 							--  packages of numeric classes)
   =	-- So we can use the Prelude fromInt 
-    tcLookupGlobalId fromIntClassOpName	`thenNF_Tc` \ from_int ->
+    tcLookupGlobalId fromIntName		`thenNF_Tc` \ from_int ->
     newMethodAtLoc loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) int_lit))
 

@@ -110,8 +110,8 @@ type RnMG r  = RnM ()    r		-- Getting global names etc
 	-- Common part
 data RnDown
   = RnDown {
-	rn_mod     :: Module,			-- This module
-	rn_loc     :: SrcLoc,			-- Current locn
+	rn_mod     :: Module,		-- This module
+	rn_loc     :: SrcLoc,		-- Current locn
 
 	rn_finder  :: Finder,
 	rn_dflags  :: DynFlags,

@@ -25,10 +25,10 @@ import TcHsSyn		( TcId )
 
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, 
-			  tcLookup, tcLookupGlobal,
-			  tcGetEnv, tcEnvTyVars, tcEnvTcIds,
+			  --tcLookup, tcLookupGlobal,
+			  tcEnvTcIds, tcEnvTyVars,
 			  tcGetGlobalTyVars, 
-		 	  TyThing(..)
+		 	  TyThing(..), TcTyThing(..)
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			  newKindVar, tcInstSigVar,
@@ -65,7 +65,7 @@ import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
 import Util		( mapAccumL, isSingleton )
 import Outputable
-
+import HscTypes		( TyThing(..) )
 \end{code}
 
 

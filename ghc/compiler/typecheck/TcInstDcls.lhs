@@ -193,7 +193,7 @@ tcInstDecls1 pcs hst unf_env this_mod decls mod
 	generic_inst_info = concat generic_inst_infos	-- All local
 
 	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . instInfoDFun) imported_inst_info
-	hst_dfuns	 = foldModuleEnv ((++) . mdInsts) [] hst
+	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
     in
     addInstDFuns (pcsInsts pcs) imported_dfuns	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->

@@ -1,11 +1,11 @@
 \begin{code}
 module TcEnv(
 	TcId, TcIdSet, 
-	TyThing(..), TyThingDetails(..),
+	TyThing(..), TyThingDetails(..), TcTyThing(..),
 
 	-- Getting stuff from the environment
 	TcEnv, initTcEnv, 
-	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds,
+	tcEnvTyCons, tcEnvClasses, tcEnvIds, tcEnvTcIds, tcEnvTyVars,
 	
 	-- Instance environment
 	tcGetInstEnv, tcSetInstEnv, 

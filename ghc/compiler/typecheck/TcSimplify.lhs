@@ -123,7 +123,7 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_MaxContextReductionDepth, opt_GlasgowExts, opt_WarnTypeDefaults )
+import CmdLineOpts	( opt_MaxContextReductionDepth, dopt_GlasgowExts, opt_WarnTypeDefaults )
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcId, 
 			  TcMonoBinds, TcDictBinds
@@ -143,9 +143,9 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  mkLIE, emptyLIE, unitLIE, consLIE, plusLIE,
 			  lieToList 
 			)
-import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv,
-			  lookupInstEnv, InstLookupResult(..) 
-			)
+import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
+import TcInstUtil	( lookupInstEnv, InstLookupResult(..) )
+
 import TcType		( TcTyVarSet )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
@@ -161,7 +161,6 @@ import PprType		( pprConstraint )
 import TysWiredIn	( unitTy )
 import VarSet
 import FiniteMap
-import CmdLineOpts	( opt_GlasgowExts )
 import Outputable
 import ListSetOps	( equivClasses )
 import Util		( zipEqual, mapAccumL )
@@ -849,17 +848,18 @@ tcSimplifyThetas :: ClassContext		-- Wanted
 	       	 -> TcM ClassContext		-- Needed
 
 tcSimplifyThetas wanteds
-  = reduceSimple [] wanteds		`thenNF_Tc` \ irreds ->
+  = doptsTc dopt_GlasgowExts 		`thenNF_Tc` \ glaExts ->
+    reduceSimple [] wanteds		`thenNF_Tc` \ irreds ->
     let
 	-- For multi-param Haskell, check that the returned dictionaries
  	-- don't have any of the form (C Int Bool) for which
 	-- we expect an instance here
 	-- For Haskell 98, check that all the constraints are of the form C a,
 	-- where a is a type variable
-    	bad_guys | opt_GlasgowExts = [ct | ct@(clas,tys) <- irreds, 
-					   isEmptyVarSet (tyVarsOfTypes tys)]
-		 | otherwise       = [ct | ct@(clas,tys) <- irreds, 
-					   not (all isTyVarTy tys)]
+    	bad_guys | glaExts   = [ct | ct@(clas,tys) <- irreds, 
+				     isEmptyVarSet (tyVarsOfTypes tys)]
+		 | otherwise = [ct | ct@(clas,tys) <- irreds, 
+				     not (all isTyVarTy tys)]
     in
     if null bad_guys then
 	returnTc irreds

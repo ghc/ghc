@@ -27,6 +27,7 @@ module TcMonad(
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
 	tcGetUnique, tcGetUniques, tcGetDFunUniq,
+	doptsTc,
 
 	tcAddSrcLoc, tcGetSrcLoc, tcGetInstLoc,
 	tcAddErrCtxtM, tcSetErrCtxtM,
@@ -49,7 +50,7 @@ import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr, RenamedHsOverL
 import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
-import CmdLineOpts      ( opt_PprStyle_Debug )
+import CmdLineOpts      ( DynFlags, opt_PprStyle_Debug )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
@@ -123,12 +124,24 @@ type TcRef a = IORef a
 \end{code}
 
 \begin{code}
+<<<<<<< TcMonad.lhs
+-- initEnv is passed in to avoid module recursion between TcEnv & TcMonad.
+
+initTc :: DynFlags
+       -> UniqSupply
+       -> (TcRef (UniqFM a) -> TcEnv)
+=======
 initTc :: TcEnv
        -> SrcLoc
+>>>>>>> 1.44
        -> TcM r
        -> IO (Maybe r, (Bag ErrMsg, Bag WarnMsg))
 
+<<<<<<< TcMonad.lhs
+initTc dflags us initenv do_this
+=======
 initTc tc_env src_loc do_this
+>>>>>>> 1.44
   = do {
       us       <- mkSplitUniqSupply 'a' ;
       us_var   <- newIORef us ;
@@ -137,8 +150,13 @@ initTc tc_env src_loc do_this
       tvs_var  <- newIORef emptyUFM ;
 
       let
+<<<<<<< TcMonad.lhs
+          init_down = TcDown dflags [] us_var dfun_var
+			     noSrcLoc
+=======
           init_down = TcDown [] us_var dfun_var
 			     src_loc
+>>>>>>> 1.44
 			     [] errs_var
       ;
 
@@ -252,7 +270,7 @@ We throw away any error messages!
 
 \begin{code}
 forkNF_Tc :: NF_TcM r -> NF_TcM r
-forkNF_Tc m (TcDown deflts u_var df_var src_loc err_cxt err_var) env
+forkNF_Tc m (TcDown dflags deflts u_var df_var src_loc err_cxt err_var) env
   = do
 	-- Get a fresh unique supply
     	us <- readIORef u_var
@@ -263,7 +281,7 @@ forkNF_Tc m (TcDown deflts u_var df_var src_loc err_cxt err_var) env
 		us_var'  <- newIORef us2 ;
 	      	err_var' <- newIORef (emptyBag,emptyBag) ;
       		tv_var'  <- newIORef emptyUFM ;
-		let { down' = TcDown deflts us_var' df_var src_loc err_cxt err_var' } ;
+		let { down' = TcDown dflags deflts us_var' df_var src_loc err_cxt err_var' } ;
 		m down' env
 			-- ToDo: optionally dump any error messages
 		})
@@ -583,15 +601,18 @@ tcGetDFunUniq key down env
 
 \begin{code}
 data TcDown
-  = TcDown
-	[Type]			-- Types used for defaulting
+   = TcDown {
+        tc_dflags :: DynFlags,
+	tc_def    :: [Type],			-- Types used for defaulting
 
-	(TcRef UniqSupply)	-- Unique supply
-	(TcRef DFunNameSupply)	-- Name supply for dictionary function names
+	tc_us     :: (TcRef UniqSupply),	-- Unique supply
+	tc_ds	  :: (TcRef DFunNameSupply),	-- Name supply for 
+						-- dictionary function names
 
-	SrcLoc			-- Source location
-	ErrCtxt			-- Error context
-	(TcRef (Bag WarnMsg, Bag ErrMsg))
+	tc_loc    :: SrcLoc,			-- Source location
+	tc_ctxt   :: ErrCtxt,			-- Error context
+	tc_errs   :: (TcRef (Bag WarnMsg, Bag ErrMsg))
+   }
 
 type ErrCtxt = [TidyEnv -> NF_TcM (TidyEnv, Message)]	
 			-- Innermost first.  Monadic so that we have a chance
@@ -615,21 +636,25 @@ type DFunNameSupply = FiniteMap String Int
 -- These selectors are *local* to TcMonad.lhs
 
 \begin{code}
-getTcErrs (TcDown def us ds loc ctxt errs)      = errs
-setTcErrs (TcDown def us ds loc ctxt _   ) errs = TcDown def us ds loc ctxt errs
+getTcErrs (TcDown{tc_errs=errs}) = errs
+setTcErrs down errs = down{tc_errs=errs}
 
-getDefaultTys (TcDown def us ds loc ctxt errs)     = def
-setDefaultTys (TcDown _   us ds loc ctxt errs) def = TcDown def us ds loc ctxt errs
+getDefaultTys (TcDown{tc_def=def}) = def
+setDefaultTys down def = down{tc_def=def}
 
-getLoc (TcDown def us ds loc ctxt errs)     = loc
-setLoc (TcDown def us ds _   ctxt errs) loc = TcDown def us ds loc ctxt errs
+getLoc (TcDown{tc_loc=loc}) = loc
+setLoc down loc = down{tc_loc=loc}
 
-getUniqSupplyVar (TcDown def us ds loc ctxt errs) = us
-getDFunSupplyVar (TcDown def us ds loc ctxt errs) = ds
+getUniqSupplyVar (TcDown{tc_us=us}) = us
+getDFunSupplyVar (TcDown{tc_ds=ds}) = ds
 
-setErrCtxt (TcDown def us ds loc ctxt errs) msg = TcDown def us ds loc [msg]      errs
-addErrCtxt (TcDown def us ds loc ctxt errs) msg = TcDown def us ds loc (msg:ctxt) errs
-getErrCtxt (TcDown def us ds loc ctxt errs)     = ctxt
+getErrCtxt (TcDown{tc_ctxt=ctxt}) = ctxt
+setErrCtxt down msg = down{tc_ctxt=[msg]}
+addErrCtxt down msg = down{tc_ctxt = msg : tc_ctxt down}
+
+doptsTc :: (DynFlags -> Bool) -> TcM Bool
+doptsTc dopt (TcDown{tc_dflags=dflags}) env_down
+   = return (dopt dflags)
 \end{code}
 
 

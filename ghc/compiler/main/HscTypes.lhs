@@ -36,7 +36,7 @@ import UniqFM 		( UniqFM )
 import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
 import Bag		( Bag )
 import Id		( Id )
-import VarEnv		( IdEnv )
+import VarEnv		( IdEnv, emptyVarEnv )
 import BasicTypes	( Version, Fixity, defaultFixity )
 import TyCon		( TyCon )
 import ErrUtils		( ErrMsg, WarnMsg )
@@ -49,8 +49,6 @@ import CoreSyn		( CoreRule )
 import NameSet		( NameSet )
 import Type		( Type )
 import VarSet		( TyVarSet )
-import {-# SOURCE #-} 
-       TcInstUtil ( emptyInstEnv )
 import Panic		( panic )
 \end{code}
 
@@ -65,29 +63,29 @@ A @ModDetails@ summarises everything we know about a compiled module.
 \begin{code}
 data ModDetails
    = ModDetails {
-	moduleId      :: Module,
-        moduleExports :: Avails,		-- What it exports
-	mdVersion     :: VersionInfo,
-        moduleEnv     :: GlobalRdrEnv,		-- Its top level environment
+	md_id       :: Module,
+        md_exports  :: Avails,		-- What it exports
+	md_version  :: VersionInfo,
+        md_globals  :: GlobalRdrEnv,	-- Its top level environment
 
-        fixityEnv     :: NameEnv Fixity,
-	deprecEnv     :: NameEnv DeprecTxt,
-        typeEnv       :: TypeEnv,
+        md_fixities :: NameEnv Fixity,
+	md_deprecs  :: NameEnv DeprecTxt,
+        md_types    :: TypeEnv,
 
-        mdInsts       :: [DFunId],	-- Dfun-ids for the instances in this module
-        mdRules       :: RuleEnv	-- Domain may include Id from other modules
+        md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
+        md_rules    :: RuleEnv		-- Domain may include Id from other modules
      }
 
 emptyModDetails :: Module -> ModDetails
 emptyModDetails mod
-  = ModDetails { moduleId      = mod,
-		 moduleExports = [],
-		 moduleEnv     = emptyRdrEnv,
-		 fixityEnv     = emptyNameEnv,
-		 deprecEnv     = emptyNameEnv,
-		 typeEnv       = emptyNameEnv,
-		 mdInsts       = [],
-    		 mdRules       = emptyRuleEnv
+  = ModDetails { md_id       = mod,
+		 md_exports  = [],
+		 md_globals  = emptyRdrEnv,
+		 md_fixities = emptyNameEnv,
+		 md_deprecs  = emptyNameEnv,
+		 md_types    = emptyNameEnv,
+		 md_insts    = [],
+    		 md_rules    = emptyRuleEnv
     }		
 \end{code}
 
@@ -108,7 +106,7 @@ lookupFixityEnv :: SymbolTable -> Name -> Maybe Fixity
 lookupFixityEnv tbl name
   = case lookupModuleEnv tbl (nameModule name) of
 	Nothing	     -> Nothing
-	Just details -> lookupNameEnv (fixityEnv details) name
+	Just details -> lookupNameEnv (md_fixities details) name
 \end{code}
 
 
@@ -136,7 +134,7 @@ instance NamedThing TyThing where
 lookupTypeEnv :: SymbolTable -> Name -> Maybe TyThing
 lookupTypeEnv tbl name
   = case lookupModuleEnv tbl (nameModule name) of
-	Just details -> lookupNameEnv (typeEnv details) name
+	Just details -> lookupNameEnv (md_types details) name
 	Nothing	     -> Nothing
 
 
@@ -163,8 +161,8 @@ extendTypeEnv tbl things
 	where
 	  new_details 
              = case lookupModuleEnv tbl mod of
-                  Nothing      -> (emptyModDetails mod) {typeEnv = type_env}
-                  Just details -> details {typeEnv = typeEnv details 
+                  Nothing      -> (emptyModDetails mod) {md_types = type_env}
+                  Just details -> details {md_types = md_types details 
                                                      `plusNameEnv` type_env}
 \end{code}
 

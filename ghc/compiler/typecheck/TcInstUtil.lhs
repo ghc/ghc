@@ -21,21 +21,27 @@ module TcInstUtil (
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import HsTypes		( toHsType )
 
-import CmdLineOpts	( opt_AllowOverlappingInstances )
+import CmdLineOpts	( dopt_AllowOverlappingInstances )
 import TcMonad
 --import TcEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Bag		( bagToList, Bag )
 import Class		( Class )
 import Var		( TyVar, Id, idName )
-import Maybes		( MaybeErr(..) )
+import VarSet		( unionVarSet, mkVarSet )
+import VarEnv		( TyVarSubstEnv )
+import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc, nameModule, isLocallyDefined, toRdrName )
 import SrcLoc		( SrcLoc )
-import Type		( Type, ThetaType, splitTyConApp_maybe, mkSigmaTy, mkDictTy )
+import Type		( Type, ThetaType, splitTyConApp_maybe, 
+			  mkSigmaTy, mkDictTy, tyVarsOfTypes )
 import PprType		( pprConstraint )
 import Class		( classTyCon )
 import DataCon		( DataCon )
 import TyCon		( TyCon, tyConDataCons )
 import Outputable
+import HscTypes		( InstEnv, ClsInstEnv )
+import Unify		( matchTys, unifyTyListsX )
+import UniqFM		( lookupWithDefaultUFM, addToUFM, emptyUFM )
 \end{code}
 
 
