@@ -700,13 +700,15 @@ sub mangle_asm {
 		    $p =~ s/^\tpushl\s+\%edi\n//;
 		    $p =~ s/^\tpushl\s+\%esi\n//;
 		    $p =~ s/^\tpushl\s+\%ebx\n//;
+		    $p =~ s/^\tmovl\s+\%esi,\s*\d*\(\%esp\)\n//;
+		    $p =~ s/^\tmovl\s+\%edi,\s*\d*\(\%esp\)\n//;
 		    $p =~ s/^\tsubl\s+\$\d+,\s*\%esp\n//;
                     $p =~ s/^\tmovl\s+\$\d+,\s*\%eax\n\tcall\s+__alloca\n// if ($TargetPlatform =~ /^.*-cygwin32/);
 
 		    # GCC 3.1 is in the habit of adding spurious writes to the
 		    # stack in the prologue.  Just to be on the safe side,
 		    # chuck these over the fence into the main code.
-		    while ($p =~ /^\tmovl\s+(\$\d+|\%edi),\s*\d*\(\%esp\)\n/) {
+		    while ($p =~ /^\tmovl\s+\$\d+,\s*\d*\(\%esp\)\n/) {
 			  # print "Spurious instruction: $&";
 			  $p = $` . $';
 			  $r = $& . $r;
