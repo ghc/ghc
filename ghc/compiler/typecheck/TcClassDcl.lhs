@@ -12,7 +12,7 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  InPat(..), HsBinds(..), GRHSs(..),
 			  HsExpr(..), HsLit(..), HsType(..), pprClassAssertion,
 			  unguardedRHS, andMonoBinds, andMonoBindList, getTyVarName,
-			  isClassDecl
+			  isClassDecl, isClassOpSig
 			)
 import HsPragmas	( ClassPragmas(..) )
 import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..), StrictnessMark(..) )
@@ -125,10 +125,12 @@ kcClassDecl (ClassDecl	context class_name
 	-- The net effect is to mutate the class kind
     tcExtendTopTyVarScope kind tyvar_names	$ \ _ _ ->
     tcContext context				`thenTc_`
-    mapTc kc_sig class_sigs			`thenTc_`
+    mapTc kc_sig the_class_sigs			`thenTc_`
 
     returnTc ()
   where
+    the_class_sigs = filter isClassOpSig class_sigs
+  
     kc_sig (ClassOpSig _ _ op_ty loc) = tcAddSrcLoc loc (tcHsType op_ty)
 \end{code}
 
@@ -156,7 +158,8 @@ tcClassDecl1 rec_env rec_inst_mapper
 --  traceTc (text "tcClassCtxt done" <+> ppr class_name)	`thenTc_`
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env rec_class tyvars) class_sigs
+    mapTc (tcClassSig rec_env rec_class tyvars) 
+	  (filter isClassOpSig class_sigs)
 						`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS OBJECT ITSELF

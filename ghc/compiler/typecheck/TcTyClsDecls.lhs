@@ -325,10 +325,11 @@ get_tys tys
 
 ----------------------------------------------------
 get_sigs sigs
-  = unionManyUniqSets (map get_sig sigs)
+  = unionManyUniqSets (mapMaybe get_sig sigs)
   where 
-    get_sig (ClassOpSig _ _ ty _) = get_ty ty
-    get_sig other = panic "TcTyClsDecls:get_sig"
+    get_sig (ClassOpSig _ _ ty _) = Just (get_ty ty)
+    get_sig (FixSig _)		  = Nothing
+    get_sig other		  = panic "TcTyClsDecls:get_sig"
 
 ----------------------------------------------------
 set_name name = unitUniqSet (getUnique name)
