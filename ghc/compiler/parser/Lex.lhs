@@ -703,8 +703,8 @@ readNum cont buf is_digit base conv = read buf 0
 
 is_hexdigit c 
 	=  is_digit c 
-	|| (c `geChar#` 'a'# && c `leChar#` 'h'#)
-	|| (c `geChar#` 'A'# && c `leChar#` 'H'#)
+	|| (c `geChar#` 'a'# && c `leChar#` 'f'#)
+	|| (c `geChar#` 'A'# && c `leChar#` 'F'#)
 
 hex c | is_digit c = ord# c -# ord# '0'#
       | otherwise  = ord# (to_lower c) -# ord# 'a'# +# 10#
