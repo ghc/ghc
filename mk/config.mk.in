@@ -135,9 +135,9 @@ IncludeTestDirsInBuild=NO
 # 
 GhcProjectName       =The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort  =ghc
-GhcProjectVersion    =2.05
+GhcProjectVersion    =2.06
 GhcProjectPatchLevel =0
-GhcBuildeeVersion    =205
+GhcBuildeeVersion    =206
 GhcBuilderVersion    =29
 
 #
@@ -177,9 +177,16 @@ GhcCompilerWays=
 # Extra option flags to pass to the compiler that compiles the compiler
 # (Ones that are essential are wired into ghc/compiler/Makefile)
 # Typical ones:
-#	-O		compiler an optimised compiler
+#	-H25m		allocate a bigger heap (default is 6m)
+#
+#	-O		compile an optimised compiler
+#			NB! If you add -O you'll almost certainly need to increase
+#			the amount of heap space too (to 15m or more)
+#
 #	-DDEBUG		include consistency/assertion checks in the compiled compiler
-#	-fshow-import-specs	show import specialisations
+#
+#	-dcore-lint	check the types after every pass of the compiler;
+#			a pretty strong internal check
 GhcHcOpts=
 
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
@@ -227,7 +234,11 @@ GhcLibWays=p
 # Option flags to pass to GHC when it's compiling prelude modules
 # Typically these are things like -O or -dcore-lint
 # The ones that are *essential* are wired into ghc/lib/Makefile
-GhcLibHcOpts= -split-objs -odir $(basename $*)
+#
+# 	-O is pretty desirable, otherwise no inlining of prelude
+#		things (incl "+") happens when compiling with this compiler
+
+GhcLibHcOpts= -O -split-objs -odir $(basename $*)
 
 
 #################################################################################
@@ -270,6 +281,9 @@ HsLibHcOpts=$(GhcLibHcOpts)
 #
 #################################################################################
 
+# HappyHcOpts gives the flags to pass to the Haskell compiler used
+# 	      to compile the Happy source coed
+HappyHcOpts = 
 
 
 #################################################################################
@@ -417,9 +431,6 @@ endif
 #
 #	SRC_HC_OPTS += -O
 
-ifeq ($(Ghc2_0),NO)
-SRC_HAPPY_OPTS		+= -1.2
-endif
 
 #################################################################################
 #
@@ -606,6 +617,7 @@ ETAGS			= $(ETAGS_PREFIX)etags
 VERBATIM		= $(VERBATIM_PREFIX)verbatim
 RUNTEST			= $(RUNTEST_PREFIX)runstdtest
 HAPPY			= @HappyCmd@
+HAPPY_VERSION		= @HappyVersion@		
 LX			= @LxCmd@
 GREENCARD		= @GreencardCmd@
 
