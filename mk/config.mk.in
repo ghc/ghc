@@ -332,6 +332,8 @@ LIBM=@LIBM@
 # Build the Haskell OpenGL/GLUT binding?
 #
 GhcLibsWithHOpenGL=@GhcLibsWithHOpenGL@
+GL_CFLAGS=@GL_CFLAGS@
+GL_LIBS=@GL_LIBS@
 
 X_CFLAGS=@X_CFLAGS@
 X_LIBS=@X_LIBS@
