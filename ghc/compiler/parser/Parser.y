@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.116 2003/02/20 18:33:53 simonpj Exp $
+$Id: Parser.y,v 1.117 2003/05/06 10:25:32 simonpj Exp $
 
 Haskell grammar.
 
@@ -267,7 +267,16 @@ module 	:: { RdrNameHsModule }
  	: srcloc 'module' modid maybemoddeprec maybeexports 'where' body 
 		{ HsModule (mkHomeModule $3) Nothing $5 (fst $7) (snd $7) $4 $1 }
 	| srcloc body
-		{ HsModule (mkHomeModule mAIN_Name) Nothing Nothing 
+		{ 	-- Behave as if we'd said 
+			--	module Main( main ) where ...
+		  let
+			main_RDR_Unqual = mkUnqual varName FSLIT("main")
+			-- We definitely don't want an Orig RdrName, because
+			-- main might, in principle, be imported into module Main
+		  in
+		  HsModule (mkHomeModule mAIN_Name) 
+			   Nothing 
+			   (Just [IEVar main_RDR_Unqual])
 			   (fst $2) (snd $2) Nothing $1 }
 
 maybemoddeprec :: { Maybe DeprecTxt }

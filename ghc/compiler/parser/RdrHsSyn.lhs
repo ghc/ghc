@@ -43,6 +43,8 @@ module RdrHsSyn (
 	RdrBinding(..),
 	RdrMatch(..),
 
+	main_RDR_Unqual,
+
 	extractHsTyRdrNames,  extractHsTyRdrTyVars, 
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
@@ -154,6 +156,12 @@ type RdrNameFixitySig		= FixitySig		RdrName
 type RdrNameHsRecordBinds	= HsRecordBinds		RdrName
 \end{code}
 
+\begin{code}
+main_RDR_Unqual :: RdrName
+main_RDR_Unqual = mkUnqual varName FSLIT("main")
+	-- We definitely don't want an Orig RdrName, because
+	-- main might, in principle, be imported into module Main
+\end{code}
 
 %************************************************************************
 %*									*

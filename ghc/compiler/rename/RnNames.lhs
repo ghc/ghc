@@ -6,7 +6,7 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, exportsFromAvail,
-	reportUnusedNames, mkModDeps, main_RDR_Unqual
+	reportUnusedNames, mkModDeps
     ) where
 
 #include "HsVersions.h"
@@ -541,27 +541,18 @@ exportsFromAvail exports
 
 exports_from_avail Nothing rdr_env
 		   imports@(ImportAvails { imp_env = entity_avail_env })
- = do { this_mod <- getModule ;
-	if moduleName this_mod == mAIN_Name then
-	   exports_from_avail (Just [IEVar main_RDR_Unqual]) rdr_env imports
-		-- Behave just as if we'd said module Main(main)
-		-- This is particularly important if we compile module Main,
-		-- but then use ghci to call it... we jolly well expect to
-		-- see 'main'!
-	else 
-		-- Export all locally-defined things
-		-- We do this by filtering the global RdrEnv,
-		-- keeping only things that are (a) qualified,
-		-- (b) locally defined, (c) a 'main' name
-		-- Then we look up in the entity-avail-env
-	return [ lookupAvailEnv entity_avail_env name
+ =  	-- Export all locally-defined things
+	-- We do this by filtering the global RdrEnv,
+	-- keeping only things that are (a) qualified,
+	-- (b) locally defined, (c) a 'main' name
+	-- Then we look up in the entity-avail-env
+   return [ lookupAvailEnv entity_avail_env name
 	       | (rdr_name, gres) <- rdrEnvToList rdr_env,
 		 isQual rdr_name,	-- Avoid duplicates
 		 GRE { gre_name   = name, 
 		       gre_parent = Nothing,	-- Main things only
 		       gre_prov   = LocalDef } <- gres
 	       ]
-    }
 
 exports_from_avail (Just export_items) rdr_env
 		   (ImportAvails { imp_qual = mod_avail_env, 
@@ -678,13 +669,6 @@ check_occs ie occs avail
 		     returnM occs }
       where
 	name_occ = nameOccName name
-
-----------------------------
-main_RDR_Unqual :: RdrName
-main_RDR_Unqual = mkUnqual varName FSLIT("main")
-	-- Don't get a RdrName from PrelNames.mainName, because 
-	-- nameRdrNamegets an Orig RdrName, and we want a Qual or Unqual one.  
-	-- An Unqual one will do just fine
 \end{code}
 
 %*********************************************************

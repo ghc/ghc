@@ -28,7 +28,7 @@ import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsExpr(..),
 			  isSrcRule, collectStmtsBinders
 			)
 import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr,
-			  emptyGroup, mkGroup, findSplice, addImpDecls )
+			  emptyGroup, mkGroup, findSplice, addImpDecls, main_RDR_Unqual )
 
 import PrelNames	( iNTERACTIVE, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, thenIOName, runIOName, 
@@ -70,7 +70,7 @@ import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
 
 import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
-			  reportUnusedNames, main_RDR_Unqual )
+			  reportUnusedNames )
 import RnIfaces		( slurpImpDecls, checkVersions, RecompileRequired, outOfDate )
 import RnHiFiles	( readIface, loadOldIface )
 import RnEnv		( lookupSrcName, lookupOccRn, plusGlobalRdrEnv,
