@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.8 $
- * $Date: 1999/10/29 11:41:12 $
+ * $Revision: 1.9 $
+ * $Date: 1999/11/17 13:19:36 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -79,7 +79,7 @@
  */
 
 .globl ADD_UNDERSCORE(universal_call_c_x86_ccall)
-ADD_UNDERSCORE(universal_call_c_x86_ccall):
+ADD_UNDERSCORE(universal_call_c_x86_ccall:)
 	pushl %ebp
 	movl %esp,%ebp
 	pushl %edi
@@ -155,7 +155,7 @@ ADD_UNDERSCORE(universal_call_c_x86_ccall):
 # using ccall.
 	
 .globl ADD_UNDERSCORE(universal_call_c_x86_stdcall)
-ADD_UNDERSCORE(universal_call_c_x86_stdcall):
+ADD_UNDERSCORE(universal_call_c_x86_stdcall:)
 	pushl %ebp
 	movl %esp,%ebp
 	pushl %edi
