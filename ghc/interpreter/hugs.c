@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.54 $
- * $Date: 2000/04/04 01:19:07 $
+ * $Revision: 1.55 $
+ * $Date: 2000/04/04 15:41:56 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -786,6 +786,39 @@ List    moduleGraph   = NIL;
 List    prelModules   = NIL;
 List    targetModules = NIL;
 
+static String modeToString ( Cell mode )
+{
+   switch (mode) {
+      case FM_SOURCE: return "source";
+      case FM_OBJECT: return "object";
+      case FM_EITHER: return "either";
+      default: internal("modeToString");
+   }
+}
+
+static Cell childMode ( Cell modeMeRequest, Cell modeMeActual )
+{
+   assert(modeMeActual == FM_SOURCE || 
+          modeMeActual == FM_OBJECT);
+   assert(modeMeRequest == FM_SOURCE || 
+          modeMeRequest == FM_OBJECT ||
+          modeMeRequest == FM_EITHER);
+   if (modeMeRequest == FM_SOURCE) return modeMeRequest;
+   if (modeMeRequest == FM_OBJECT) return modeMeRequest;
+   if (modeMeActual == FM_OBJECT) return FM_OBJECT;
+   if (modeMeActual == FM_SOURCE) return FM_EITHER;
+   internal("childMode");
+}
+
+static Bool compatibleNewMode ( Cell modeNew, Cell modeExisting )
+{
+   if (modeNew == FM_OBJECT && modeExisting == FM_OBJECT) return TRUE;
+   if (modeNew == FM_SOURCE && modeExisting == FM_SOURCE) return TRUE;
+   if (modeNew == FM_EITHER && modeExisting == FM_OBJECT) return TRUE;
+   if (modeNew == FM_EITHER && modeExisting == FM_SOURCE) return TRUE;
+   return FALSE;
+}
+
 static void setCurrentFile ( Module mod )
 {
    assert(isModule(mod));
@@ -1069,17 +1102,14 @@ static void processModule ( Module m )
 }
 
 
-static Module parseModuleOrInterface ( ConId mc, 
-                                       List renewFromSource, 
-                                       List renewFromObject )
+static Module parseModuleOrInterface ( ConId mc, Cell modeRequest )
 {
    /* Allocate a module-table entry. */
    /* Parse the entity and fill in the .tree and .uses entries. */
    String path;
    String sExt;
-   Bool sAvail; Time sTime; Long sSize;
-   Bool iAvail; Time iTime; Long iSize;
-   Bool oAvail; Time oTime; Long oSize;
+   Bool sAvail;  Time sTime;  Long sSize;
+   Bool oiAvail; Time oiTime; Long oSize; Long iSize;
    Bool ok;
    Bool useSource;
    char name[10000];
@@ -1102,48 +1132,47 @@ static Module parseModuleOrInterface ( ConId mc,
            textToStr(module(mod).text),
            &path,
            &sExt,
-           &sAvail, &sTime, &sSize,
-           &iAvail, &iTime, &iSize,
-           &oAvail, &oTime, &oSize
+           &sAvail,  &sTime,  &sSize,
+           &oiAvail, &oiTime, &oSize, &iSize
         );
 
    if (!ok) goto cant_find;
-   if (!sAvail && !(iAvail && oAvail)) goto cant_find;
+   if (!sAvail && !oiAvail) goto cant_find;
 
    /* Find out whether to use source or object. */
-   if (varIsMember(mt,renewFromSource)) {
-      if (!sAvail) goto cant_find;
-      useSource = TRUE;
-   } else
-   if (varIsMember(mt,renewFromObject)) {
-      if (!(oAvail && iAvail)) goto cant_find;
-      useSource = FALSE;
-   } else
-   if (sAvail && !(iAvail && oAvail)) {
-      useSource = TRUE;
-   } else
-   if (!sAvail && (iAvail && oAvail)) {
-      useSource = FALSE;
-   } else {
-      useSource = firstTimeIsLater(sTime,whicheverIsLater(oTime,iTime));
+   switch (modeRequest) {
+      case FM_SOURCE:
+         if (!sAvail) goto cant_find;
+         useSource = TRUE;
+         break;
+      case FM_OBJECT:
+         if (!oiAvail) goto cant_find;
+         useSource = FALSE;
+         break;
+      case FM_EITHER:
+         if ( sAvail && !oiAvail) { useSource = TRUE; break; }
+         if (!sAvail &&  oiAvail) { useSource = FALSE; break; }
+         useSource = firstTimeIsLater ( sTime, oiTime ) ? TRUE : FALSE;
+         break;
+      default:
+         internal("parseModuleOrInterface");
    }
 
-   if (!combined && !sAvail) goto cant_find;
-   if (!combined) useSource = TRUE;
-
-   module(mod).srcExt = findText(sExt);
-   setCurrentFile(mod);
 
    /* Actually do the parsing. */
    if (useSource) {
+      module(mod).srcExt = findText(sExt);
+      setCurrentFile(mod);
       strcpy(name, path);
       strcat(name, textToStr(mt));
       strcat(name, sExt);
       module(mod).tree      = parseModule(name,sSize);
       module(mod).uses      = getModuleImports(module(mod).tree);
-      module(mod).fromSrc   = TRUE;
+      module(mod).mode      = FM_SOURCE;
       module(mod).lastStamp = sTime;
    } else {
+      module(mod).srcExt = findText(HI_ENDING);
+      setCurrentFile(mod);
       strcpy(name, path);
       strcat(name, textToStr(mt));
       strcat(name, DLL_ENDING);
@@ -1154,8 +1183,8 @@ static Module parseModuleOrInterface ( ConId mc,
       strcat(name, ".u_hi");
       module(mod).tree      = parseInterface(name,iSize);
       module(mod).uses      = getInterfaceImports(module(mod).tree);
-      module(mod).fromSrc   = FALSE;
-      module(mod).lastStamp = whicheverIsLater(oTime,iTime);
+      module(mod).mode      = FM_OBJECT;
+      module(mod).lastStamp = oiTime;
    }
 
    if (path) free(path);
@@ -1164,8 +1193,8 @@ static Module parseModuleOrInterface ( ConId mc,
   cant_find:
    if (path) free(path);
    ERRMSG(0) 
-      "Can't find source or object+interface for module \"%s\"",
-      textToStr(mt)
+      "Can't find %s for module \"%s\"",
+      modeToString(modeRequest), textToStr(mt)
    EEND;
 }
 
@@ -1178,7 +1207,7 @@ static void tryLoadGroup ( Cell grp )
       case GRP_NONREC:
          m = findModule(textOf(snd(grp)));
          assert(nonNull(m));
-         if (module(m).fromSrc) {
+         if (module(m).mode == FM_SOURCE) {
             processModule ( m );
          } else {
             processInterfaces ( singleton(snd(grp)) );
@@ -1188,7 +1217,7 @@ static void tryLoadGroup ( Cell grp )
 	 for (t = snd(grp); nonNull(t); t=tl(t)) {
             m = findModule(textOf(hd(t)));
             assert(nonNull(m));
-            if (module(m).fromSrc) {
+            if (module(m).mode == FM_SOURCE) {
                ERRMSG(0) "Source module \"%s\" imports itself recursively",
                          textToStr(textOf(hd(t)))
                EEND;
@@ -1218,24 +1247,20 @@ static void fallBackToPrelModules ( void )
    to do EENDs (ie, write error messages).  Others should use
    EEND_NO_LONGJMP.
 */
-static void achieveTargetModules ( void )
+static void achieveTargetModules ( Bool loadingThePrelude )
 {
    volatile List   ood;
    volatile List   modgList;
-   volatile List   renewFromSource;
-   volatile List   renewFromObject;
    volatile List   t;
    volatile Module mod;
    volatile Bool   ok;
 
    String path = NULL;
    String sExt = NULL;
-   Bool sAvail; Time sTime; Long sSize;
-   Bool iAvail; Time iTime; Long iSize;
-   Bool oAvail; Time oTime; Long oSize;
+   Bool sAvail;  Time sTime;  Long sSize;
+   Bool oiAvail; Time oiTime; Long oSize; Long iSize;
 
    volatile Time oisTime;
-   volatile Time oiTime;
    volatile Bool sourceIsLatest;
    volatile Bool out_of_date;
    volatile List ood_new;
@@ -1259,8 +1284,6 @@ static void achieveTargetModules ( void )
    ood      = NIL;
    modgList = listFromMG();
 
-   renewFromSource = renewFromObject = NIL;
-
    for (t = modgList; nonNull(t); t=tl(t)) {
 
       if (varIsMember(textOf(hd(t)),prelModules))
@@ -1269,14 +1292,15 @@ static void achieveTargetModules ( void )
       mod = findModule(textOf(hd(t)));
       if (isNull(mod)) internal("achieveTargetSet(1)");
       
+      /* In standalone mode, only succeeds for source modules. */
       ok = findFilesForModule (
               textToStr(module(mod).text),
               &path,
               &sExt,
-              &sAvail, &sTime, &sSize,
-              &iAvail, &iTime, &iSize,
-              &oAvail, &oTime, &oSize
+              &sAvail,  &sTime,  &sSize,
+              &oiAvail, &oiTime, &oSize, &iSize
            );
+
       if (!combined && !sAvail) ok = FALSE;
       if (!ok) {
          fallBackToPrelModules();
@@ -1287,42 +1311,24 @@ static void achieveTargetModules ( void )
          if (path) free(path);
          return;
       }
-      /* findFilesForModule should enforce this */
-      if (!(sAvail || (oAvail && iAvail)))
-         internal("achieveTargetSet(2)");
 
-      if (!combined) {
+      if (sAvail && oiAvail) {
+         oisTime = whicheverIsLater(sTime,oiTime);
+      } 
+      else if (sAvail && !oiAvail) {
          oisTime = sTime;
-         sourceIsLatest = TRUE;
-      } else {
-         if (sAvail && !(oAvail && iAvail)) {
-            oisTime = sTime;
-            sourceIsLatest = TRUE;
-         } else 
-         if (!sAvail && (oAvail && iAvail)) {
-            oisTime = whicheverIsLater(oTime,iTime);
-            sourceIsLatest = FALSE;
-         } else
-         if (sAvail && (oAvail && iAvail)) {
-            oisTime = whicheverIsLater(oTime,iTime);
-            if (firstTimeIsLater(sTime,oisTime)) {
-               oisTime = sTime;
-               sourceIsLatest = TRUE;
-            } else {
-               sourceIsLatest = FALSE;
-            }
-         } else {
-            internal("achieveTargetSet(1a)");
-         }
+      } 
+      else if (!sAvail && oiAvail) {
+         oisTime = oiTime;
       }
-      
+      else {
+         internal("achieveTargetSet(2)");
+      }
+
       out_of_date = firstTimeIsLater(oisTime,module(mod).lastStamp);
       if (out_of_date) {
          assert(!varIsMember(textOf(hd(t)),ood));
          ood = cons(hd(t),ood);
-         if (sourceIsLatest)
-            renewFromSource = cons(hd(t),renewFromSource); else
-            renewFromObject = cons(hd(t),renewFromObject);
       }
 
       if (path) { free(path); path = NULL; };
@@ -1378,23 +1384,48 @@ static void achieveTargetModules ( void )
    /* Parse modules/interfaces, collecting parse trees and chasing
       imports, starting from the target set. 
    */
-   parsedButNotLoaded = NIL;
    toChase = dupList(targetModules);
+   for (t = toChase; nonNull(t); t=tl(t)) {
+      Cell mode = (loadingThePrelude && combined)  
+                  ? FM_OBJECT 
+                  : ( (loadingThePrelude && !combined) 
+                      ? FM_SOURCE 
+                      : FM_EITHER );
+      hd(t) = zpair(hd(t), mode);
+   } 
+
+   /* toChase :: [ ((ConId, {FM_SOURCE|FM_OBJECT|FM_EITHER} )) ] */
+
+   parsedButNotLoaded = NIL;
+
    
    while (nonNull(toChase)) {
-      ConId mc = hd(toChase);
-      toChase  = tl(toChase);
-      if (!varIsMember(textOf(mc),modgList)
-          && !varIsMember(textOf(mc),parsedButNotLoaded)) {
+      ConId mc   = zfst(hd(toChase));
+      Cell  mode = zsnd(hd(toChase));
+      toChase    = tl(toChase);
+      if (varIsMember(textOf(mc),modgList)
+          || varIsMember(textOf(mc),parsedButNotLoaded)) {
+         /* either exists fully, or is at least parsed */
+         mod = findModule(textOf(mc));
+         assert(nonNull(mod));
+         if (!compatibleNewMode(mode,module(mod).mode)) {
+            ERRMSG(0)
+               "module %s: %s required, but %s is more recent",
+               textToStr(textOf(mc)), modeToString(mode),
+               modeToString(module(mod).mode)
+            EEND_NO_LONGJMP;
+            goto parseException;
+         }
+      } else {
 
          setBreakAction ( HugsLongjmpOnBreak );
          if (setjmp(catch_error)==0) {
             /* try this; it may throw an exception */
-            mod = parseModuleOrInterface ( 
-                     mc, renewFromSource, renewFromObject );
+            mod = parseModuleOrInterface ( mc, mode );
          } else {
             /* here's the exception handler, if parsing fails */
             /* A parse error (or similar).  Clean up and abort. */
+           parseException:
             setBreakAction ( HugsIgnoreBreak );
             mod = findModule(textOf(mc));
             if (nonNull(mod)) nukeModule(mod);
@@ -1409,7 +1440,10 @@ static void achieveTargetModules ( void )
          setBreakAction ( HugsIgnoreBreak );
 
          parsedButNotLoaded = cons(mc, parsedButNotLoaded);
-         toChase = dupOnto(module(mod).uses,toChase);
+         for (t = module(mod).uses; nonNull(t); t=tl(t))
+            toChase = cons(
+                        zpair( hd(t), childMode(mode,module(mod).mode) ),
+                        toChase);
       }
    }
 
@@ -1517,13 +1551,12 @@ static Bool loadThePrelude ( void )
       conPrelude    = mkCon(findText("Prelude"));
       conPrelHugs   = mkCon(findText("PrelHugs"));
       targetModules = doubleton(conPrelude,conPrelHugs);
-      achieveTargetModules();
+      achieveTargetModules(TRUE);
       ok = elemMG(conPrelude) && elemMG(conPrelHugs);
    } else {
-      conPrelude    = mkCon(findText("PrimPrel"));
-      conPrelHugs   = mkCon(findText("Prelude"));
-      targetModules = doubleton(conPrelude,conPrelHugs);
-      achieveTargetModules();
+      conPrelude    = mkCon(findText("Prelude"));
+      targetModules = singleton(conPrelude);
+      achieveTargetModules(TRUE);
       ok = elemMG(conPrelude);
    }
 
@@ -1535,7 +1568,7 @@ static Bool loadThePrelude ( void )
 static void refreshActions ( ConId nextCurrMod )
 {
    ConId tryFor = mkCon(module(currentModule).text);
-   achieveTargetModules();
+   achieveTargetModules(FALSE);
    if (nonNull(nextCurrMod))
       tryFor = nextCurrMod;
    if (!elemMG(tryFor))

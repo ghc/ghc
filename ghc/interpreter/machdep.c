@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/04/03 17:27:10 $
+ * $Revision: 1.26 $
+ * $Date: 2000/04/04 15:41:56 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -624,9 +624,8 @@ Bool findFilesForModule (
         String  modName,
         String* path,
         String* sExt,
-        Bool* sAvail, Time* sTime, Long* sSize,
-        Bool* iAvail, Time* iTime, Long* iSize,
-        Bool* oAvail, Time* oTime, Long* oSize
+        Bool* sAvail,  Time* sTime,  Long* sSize,
+        Bool* oiAvail, Time* oiTime, Long* oSize, Long* iSize
      )
 {
    /* Let the module name given be M.
@@ -638,15 +637,21 @@ Bool findFilesForModule (
         use P to fill in the path names.
       Otherwise, move on to the next path entry.
       If all path entries are exhausted, return False.
+
+      If in standalone, only look for (and succeed for) source modules.
+      Caller free()s path.  sExt is statically allocated.
+      srcExt is only set if a valid source file is found.
    */
    Int    nPath;
    Bool   literate;
    String peStart, peEnd;
    String augdPath;       /* .:hugsPath:installDir/GhcPrel:installDir/lib */
+   Time   oTime,  iTime;
+   Bool   oAvail, iAvail;
 
    *path = *sExt = NULL;
-   *sAvail = *iAvail = *oAvail = FALSE;
-   *sSize  = *iSize  = *oSize  = 0;
+   *sAvail = *oiAvail = oAvail = iAvail = FALSE;
+   *sSize  = *oSize  = *iSize  = 0;
 
    augdPath = malloc( 2*(10+3+strlen(installDir)) 
                       +strlen(hugsPath) +10/*paranoia*/);
@@ -701,21 +706,25 @@ Bool findFilesForModule (
       nPath += strlen(modName);
 
       /* searchBuf now holds 'P/M'.  Try out the various endings. */
-      *path = *sExt = NULL;
-      *sAvail = *iAvail = *oAvail = FALSE;
-      *sSize  = *iSize  = *oSize  = 0;
+      *path = *sExt                         = NULL;
+      *sAvail = *oiAvail = oAvail = iAvail  = FALSE;
+      *sSize = *oSize = *iSize              = 0;
 
-      strcpy(searchBuf+nPath, DLL_ENDING);
-      if (readable(searchBuf)) {
-         *oAvail = TRUE;
-         getFileInfo(searchBuf, oTime, oSize);
-      }
-
-      strcpy(searchBuf+nPath, ".u_hi");
-      if (readable(searchBuf)) {
-         *iAvail = TRUE;
-         *sExt = ".u_hi";
-         getFileInfo(searchBuf, iTime, iSize);
+      if (combined) {
+         strcpy(searchBuf+nPath, DLL_ENDING);
+         if (readable(searchBuf)) {
+            oAvail = TRUE;
+            getFileInfo(searchBuf, &oTime, oSize);
+         }
+         strcpy(searchBuf+nPath, HI_ENDING);
+         if (readable(searchBuf)) {
+            iAvail = TRUE;
+            getFileInfo(searchBuf, &iTime, iSize);
+         }
+         if (oAvail && iAvail) {
+            *oiAvail = TRUE;
+            *oiTime = whicheverIsLater ( oTime, iTime );
+         }
       }
 
       strcpy(searchBuf+nPath, ".hs");
@@ -735,7 +744,7 @@ Bool findFilesForModule (
       }
 
       /* Success? */
-      if (*sAvail || (*oAvail && *iAvail)) {
+      if (*sAvail || *oiAvail) {
          nPath -= strlen(modName);
          *path = malloc(nPath+1);
          if (!(*path))

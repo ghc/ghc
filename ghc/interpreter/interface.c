@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.43 $
- * $Date: 2000/04/03 17:27:10 $
+ * $Revision: 1.44 $
+ * $Date: 2000/04/04 15:41:56 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -697,7 +697,7 @@ void processInterfaces ( List /* of CONID */ iface_modnames )
     for (xs = iface_modnames; nonNull(xs); xs=tl(xs)) {
        mod = findModule(textOf(hd(xs)));
        assert(nonNull(mod));
-       assert(!module(mod).fromSrc);
+       assert(module(mod).mode == FM_OBJECT);
        ifaces = cons ( module(mod).tree, ifaces );
     }
     ifaces = reverse(ifaces);

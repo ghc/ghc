@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.37 $
- * $Date: 2000/03/28 10:20:56 $
+ * $Revision: 1.38 $
+ * $Date: 2000/04/04 15:41:56 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE
@@ -61,7 +61,7 @@ typedef Cell         ConVarId;
  *
  * TAG_NONPTR_MIN(100) .. TAG_NONPTR_MAX(115)         non pointer tags
  * TAG_PTR_MIN(200)    .. TAG_PTR_MAX(298)            pointer tags
- * TAG_SPEC_MIN(400)   .. TAG_SPEC_MAX(425)           special tags
+ * TAG_SPEC_MIN(400)   .. TAG_SPEC_MAX(431)           special tags
  * OFF_MIN(1,000)      .. OFF_MAX(1,999)              offsets
  * CHARR_MIN(3,000)    .. CHARR_MAX(3,255)            chars
  *
@@ -455,7 +455,7 @@ extern  Ptr             cptrOf          ( Cell );
  * ------------------------------------------------------------------------*/
 
 #define TAG_SPEC_MIN 400
-#define TAG_SPEC_MAX 428
+#define TAG_SPEC_MAX 431
 
 #define isSpec(c) (TAG_SPEC_MIN<=(c) && (c)<=TAG_SPEC_MAX)
 
@@ -497,6 +497,10 @@ extern  Ptr             cptrOf          ( Cell );
 #define TEXTCELL     426          /* whatIs code for isText                */
 #define INVAR        427          /* whatIs code for isInventedVar         */
 #define INDVAR       428          /* whatIs code for isInventedDictVar     */
+
+#define FM_SOURCE    429          /* denotes source module (FileMode)      */
+#define FM_OBJECT    430          /* denotes object module                 */
+#define FM_EITHER    431          /* no restriction; either is allowed     */
 
 
 /* --------------------------------------------------------------------------
@@ -600,8 +604,8 @@ struct strModule {
    Bool   completed;   /* Fully loaded or just parsed?                     */
    Time   lastStamp;   /* Time of last parse                               */
 
-   Bool   fromSrc;     /* is it from source ?                              */
-   Text   srcExt;      /* if yes, ".lhs", ".hs", etc"                      */
+   Cell   mode;        /* FM_SOURCE or FM_OBJECT                           */
+   Text   srcExt;      /* if mode==FM_SOURCE ".lhs", ".hs", etc            */
    List   uses;        /* :: [CONID] -- names of mods imported by this one */
 
    Text   objName;     /* Name of the primary object code file.            */

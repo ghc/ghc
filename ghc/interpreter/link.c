@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.55 $
- * $Date: 2000/04/04 01:07:49 $
+ * $Revision: 1.56 $
+ * $Date: 2000/04/04 15:41:56 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -608,7 +608,7 @@ assert(nonNull(namePMFail));
            name(nm).mod  = findModule(findText("PrelErr"));
            name(nm).text = findText("error");
            setCurrModule(modulePrelude);
-           module(modulePrimPrel).exports
+           module(modulePrelude).exports
               = cons ( nm, module(modulePrelude).exports );
 
            /* The GHC prelude doesn't seem to export Addr.  Add it to the
@@ -677,7 +677,7 @@ assert(nonNull(namePMFail));
                //   = addWiredInBoxingTycon("PrelConc","ThreadId","ThreadId#"
                //                           ,1,0,THREADID_REP);
 
-               setCurrModule(modulePrimPrel);
+               setCurrModule(modulePrelude);
 
                typeArrow = addPrimTycon(findText("(->)"),
                                         pair(STAR,pair(STAR,STAR)),

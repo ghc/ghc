@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.60 $
- * $Date: 2000/04/04 11:24:48 $
+ * $Revision: 1.61 $
+ * $Date: 2000/04/04 15:41:56 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -1591,7 +1591,7 @@ Module newModule ( Text t )             /* add new module to module table  */
     module(mod).completed        = FALSE;
     module(mod).lastStamp        = 0; /* ???? */
 
-    module(mod).fromSrc          = TRUE;
+    module(mod).mode             = NIL;
     module(mod).srcExt           = findText("");
     module(mod).uses             = NIL;
 
