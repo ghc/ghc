@@ -214,6 +214,9 @@ fromExitCode                :: ExitCode -> Int
 fromExitCode ExitSuccess     = 0
 fromExitCode (ExitFailure n) = n
 
+-- Note. exitWith is supposed to flush and close all open or 
+-- semi-open handles.  The code below doesn't do that -- 
+-- we'd have to keep a list of them somewhere.
 exitWith :: ExitCode -> IO a
 exitWith c
    = do nh_exitwith (fromExitCode c)
