@@ -49,7 +49,6 @@ import IdInfo		( IdInfo, isFragileOccInfo,
 			  specInfo, setSpecInfo, 
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
 			)
-import BasicTypes	( OccInfo(..) )
 import UniqSupply	( UniqSupply, uniqFromSupply, splitUniqSupply )
 import Var		( Var, Id, TyVar, isTyVar )
 import Outputable

@@ -26,7 +26,6 @@ import Id		( idType, idInfo, idName, idSpecialisation,
 			  idDemandInfo, setIdDemandInfo,
 			) 
 import IdInfo		( specInfo, setSpecInfo, 
-			  inlinePragInfo, setInlinePragInfo, InlinePragInfo(..),
 			  setUnfoldingInfo, setDemandInfo,
 			  workerInfo, setWorkerInfo, WorkerInfo(..)
 			)
@@ -39,7 +38,6 @@ import UniqSupply	( UniqSupply )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( mapAccumL )
-import Outputable
 \end{code}
 
 

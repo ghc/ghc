@@ -44,14 +44,12 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
-import BinderInfo	( )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsBottom, exprIsTrivial )
 import Id		( Id, idType, idFlavour, isId, idWorkerInfo,
 			  idSpecialisation, idInlinePragma, idUnfolding,
 			  isPrimOpId_maybe
 			)
 import VarSet
-import Name		( isLocallyDefined )
 import Literal		( isLitLitLit )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), 
@@ -59,10 +57,7 @@ import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), 
 			)
 import Type		( splitFunTy_maybe, isUnLiftedType )
 import Unique		( Unique, buildIdKey, augmentIdKey, hasKey )
-import Maybes		( maybeToBool )
 import Bag
-import List		( maximumBy )
-import Util		( isIn, lengthExceeds )
 import Outputable
 
 #if __GLASGOW_HASKELL__ >= 404
