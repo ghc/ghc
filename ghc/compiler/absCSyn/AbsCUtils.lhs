@@ -595,6 +595,15 @@ rrConflictsWithRR s1b s2b rr1 rr2 = rr rr1 rr2
 ------------------------------------------------------------------------------
 
 -- Assumes no volatiles
+-- Creates
+--     res = arg >> (bits-per-word / 2)   when little-endian
+-- or
+--     res = arg & ((1 << (bits-per-word / 2)) - 1) when big-endian
+--
+-- In other words, if arg had been stored in memory, makes res the 
+-- halfword of arg which would have had the higher address.  This is
+-- why it needs to take into account endianness.
+--
 mkHalfWord_HIADDR res arg
    = mkTemp IntRep			`thenFlt` \ t_hw_shift ->
      mkTemp WordRep			`thenFlt` \ t_hw_mask1 ->
@@ -802,7 +811,7 @@ dscCOpStmt [r] AddrRemOp [a1,a2] vols
      ]
 
 -- not handled by translateOp because they need casts
-dscCOpStmt [r] SllOp [a1,a2] vols
+dscCOpStmt [r] SllOp [a1,a2] vols 
    = translateOp_dyadic_cast1 MO_Nat_Shl r WordRep a1 a2 vols
 dscCOpStmt [r] SrlOp [a1,a2] vols 
    = translateOp_dyadic_cast1 MO_Nat_Shr r WordRep a1 a2 vols
