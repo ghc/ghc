@@ -789,10 +789,9 @@ spillReg vreg_to_slot_map delta dyn vreg
 
 	{-I386: spill above stack pointer leaving 3 words/spill-}
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
-                        in
-                        if   regClass vreg == RcFloating
-                        then GST F80 dyn (spRel off_w)
-                        else MOV L (OpReg dyn) (OpAddr (spRel off_w))
+                        in case regClass vreg of
+                              RcInteger -> MOV L (OpReg dyn) (OpAddr (spRel off_w))
+                              _         -> GST F80 dyn (spRel off_w) -- RcFloat/RcDouble
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( 
@@ -813,10 +812,9 @@ loadReg vreg_to_slot_map delta vreg dyn
 	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))
 
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
-                        in
-                        if   regClass vreg == RcFloating
-                        then GLD F80 (spRel off_w) dyn
-                        else MOV L (OpAddr (spRel off_w)) (OpReg dyn)
+                        in case regClass vreg of
+                              RcInteger -> MOV L (OpAddr (spRel off_w)) (OpReg dyn)
+                              _         -> GLD F80 (spRel off_w) dyn -- RcFloat/RcDouble
 
 	,IF_ARCH_sparc( 
                         let off_w = 1 + (off `div` 4)
