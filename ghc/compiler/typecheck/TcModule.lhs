@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcModule (
-	typecheckModule, typecheckExpr, TcResults(..)
+	typecheckModule, typecheckIface, typecheckExpr, TcResults(..)
     ) where
 
 #include "HsVersions.h"
@@ -82,18 +82,17 @@ typecheckModule
 	:: DynFlags
 	-> PersistentCompilerState
 	-> HomeSymbolTable
-	-> ModIface		-- Iface for this module
+	-> ModIface		-- Iface for this module (just module & fixities)
 	-> PrintUnqualified	-- For error printing
 	-> (SyntaxMap, [RenamedHsDecl])
-	-> Bool			-- True <=> check for Main.main if Module==Main
 	-> IO (Maybe (PersistentCompilerState, TcResults))
 			-- The new PCS is Augmented with imported information,
 						-- (but not stuff from this module)
 
 
-typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls) check_main
+typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls)
   = do	{ maybe_tc_result <- typecheck dflags syn_map pcs hst unqual $
-			     tcModule pcs hst get_fixity this_mod decls check_main
+			     tcModule pcs hst get_fixity this_mod decls
 	; printTcDump dflags maybe_tc_result
 	; return maybe_tc_result }
   where
@@ -102,6 +101,48 @@ typecheckModule dflags pcs hst mod_iface unqual (syn_map, decls) check_main
 
     get_fixity :: Name -> Maybe Fixity
     get_fixity nm = lookupNameEnv fixity_env nm
+
+---------------
+typecheckIface
+	:: DynFlags
+	-> PersistentCompilerState
+	-> HomeSymbolTable
+	-> ModIface		-- Iface for this module (just module & fixities)
+	-> (SyntaxMap, [RenamedHsDecl])
+	-> IO (Maybe (PersistentCompilerState, TypeEnv, [TypecheckedRuleDecl]))
+			-- The new PCS is Augmented with imported information,
+			-- (but not stuff from this module).
+			-- The TcResults returned contains only the environment
+			-- and rules.
+
+
+typecheckIface dflags pcs hst mod_iface (syn_map, decls)
+  = do	{ maybe_tc_stuff <- typecheck dflags syn_map pcs hst alwaysQualify $
+			    tcIfaceImports pcs hst get_fixity this_mod decls
+	; printIfaceDump dflags maybe_tc_stuff
+	; return maybe_tc_stuff }
+  where
+    this_mod   = mi_module   mod_iface
+    fixity_env = mi_fixities mod_iface
+
+    get_fixity :: Name -> Maybe Fixity
+    get_fixity nm = lookupNameEnv fixity_env nm
+
+    tcIfaceImports pcs hst get_fixity this_mod decls
+	= fixTc (\ ~(unf_env, _, _, _, _) ->
+	      tcImports unf_env pcs hst get_fixity this_mod decls
+          )	`thenTc` \ (env, new_pcs, local_inst_info, 
+			    deriv_binds, local_rules) ->
+	  ASSERT(nullBinds deriv_binds)
+	  let 
+	      local_things = filter (isLocalThing this_mod) 
+				 	(nameEnvElts (getTcGEnv env))
+	      local_type_env :: TypeEnv
+	      local_type_env = mkTypeEnv local_things
+	  in
+
+	  -- throw away local_inst_info
+          returnTc (new_pcs, local_type_env, local_rules)
 
 ---------------
 typecheckExpr :: DynFlags
@@ -205,10 +246,9 @@ tcModule :: PersistentCompilerState
 	 -> (Name -> Maybe Fixity)
 	 -> Module
 	 -> [RenamedHsDecl]
-	 -> Bool			-- True <=> check for Main.main if Mod==Main
 	 -> TcM (PersistentCompilerState, TcResults)
 
-tcModule pcs hst get_fixity this_mod decls check_main
+tcModule pcs hst get_fixity this_mod decls
   = fixTc (\ ~(unf_env, _, _) ->
 		-- Loop back the final environment, including the fully zonkec
 		-- versions of bindings from this module.  In the presence of mutual
@@ -261,9 +301,7 @@ tcModule pcs hst get_fixity this_mod decls check_main
 	tcSimplifyTop lie_alldecls			`thenTc` \ const_inst_binds ->
 	
 		-- CHECK THAT main IS DEFINED WITH RIGHT TYPE, IF REQUIRED
-	(if check_main 
-		then tcCheckMain this_mod
-		else returnTc ())		`thenTc_`
+	tcCheckMain this_mod		`thenTc_`
 	
 	    -- Backsubstitution.    This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
@@ -466,9 +504,16 @@ noMainErr = hsep [ptext SLIT("Module") <+> quotes (ppr mAIN_Name),
 printTcDump dflags Nothing = return ()
 printTcDump dflags (Just (_, results))
   = do dumpIfSet_dyn dflags Opt_D_dump_types 
-                     "Type signatures" (dump_sigs results)
+                     "Type signatures" (dump_sigs (tc_env results))
        dumpIfSet_dyn dflags Opt_D_dump_tc    
                      "Typechecked" (dump_tc results) 
+
+printIfaceDump dflags Nothing = return ()
+printIfaceDump dflags (Just (_, env, rules))
+  = do dumpIfSet_dyn dflags Opt_D_dump_types 
+                     "Type signatures" (dump_sigs env)
+       dumpIfSet_dyn dflags Opt_D_dump_tc    
+                     "Typechecked" (dump_iface env rules) 
 
 dump_tc results
   = vcat [ppr (tc_binds results),
@@ -476,12 +521,17 @@ dump_tc results
 	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
     ]
 
-dump_sigs results	-- Print type signatures
+dump_iface env rules
+  = vcat [pp_rules rules,
+	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts env]
+    ]
+
+dump_sigs env	-- Print type signatures
   = 	-- Convert to HsType so that we get source-language style printing
 	-- And sort by RdrName
     vcat $ map ppr_sig $ sortLt lt_sig $
     [ (toRdrName id, toHsType (idType id))
-    | AnId id <- nameEnvElts (tc_env results),
+    | AnId id <- nameEnvElts env,
       want_sig id
     ]
   where

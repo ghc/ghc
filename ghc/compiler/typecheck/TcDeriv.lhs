@@ -247,7 +247,7 @@ tcDeriving prs mod inst_env_in get_fixity tycl_decls
 	-- Make a Real dfun instead of the dummy one we have so far
     gen_inst_info :: DFunId -> RenamedMonoBinds -> InstInfo
     gen_inst_info dfun binds
-      = InstInfo { iLocal = True,  iDFunId = dfun, 
+      = InstInfo { iDFunId = dfun, 
 		   iBinds = binds, iPrags = [] }
 
     rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'

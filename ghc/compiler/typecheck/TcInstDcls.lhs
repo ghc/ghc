@@ -15,8 +15,8 @@ import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), 
 			  andMonoBindList, collectMonoBinders, isClassDecl
 			)
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, RenamedMonoBinds,
-			  RenamedTyClDecl, RenamedHsType, 
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, 
+			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
 			  extractHsTyVars, maybeGenericMatch
 			)
 import TcHsSyn		( TcMonoBinds, mkHsConApp )
@@ -31,8 +31,9 @@ import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
 			  tcExtendTyVarEnvForMeths, 
 			  tcAddImportedIdInfo, tcLookupClass,
- 			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, simpleInstInfoTy, 
-			  newDFunName, tcExtendTyVarEnv
+ 			  InstInfo(..), pprInstInfo, simpleInstInfoTyCon, 
+			  simpleInstInfoTy, newDFunName, tcExtendTyVarEnv,
+			  isLocalThing,
 			)
 import InstEnv		( InstEnv, extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType, checkSigTyVars )
@@ -171,7 +172,7 @@ tcInstDecls1 :: PackageInstEnv
 	     -> [RenamedHsDecl]
 	     -> TcM (PackageInstEnv, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
+tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
   = let
 	inst_decls = [inst_decl | InstD inst_decl <- decls]	
 	tycl_decls = [decl      | TyClD decl <- decls]
@@ -191,7 +192,8 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
 	--	e) generic instances					inst_env4
 	-- The result of (b) replaces the cached InstEnv in the PCS
     let
-	(local_inst_info, imported_inst_info) = partition iLocal (concat inst_infos)
+	(local_inst_info, imported_inst_info) 
+		= partition (isLocalThing this_mod . iDFunId) (concat inst_infos)
 
 	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . iDFunId) 
 			       imported_inst_info
@@ -207,7 +209,8 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving prs mod inst_env4 get_fixity tycl_decls	`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    tcDeriving prs this_mod inst_env4 get_fixity tycl_decls
+					`thenTc` \ (deriv_inst_info, deriv_binds) ->
     addInstInfos inst_env4 deriv_inst_info		`thenNF_Tc` \ final_inst_env ->
 
     returnTc (inst_env1, 
@@ -267,7 +270,7 @@ tcInstDecl1 decl@(InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
     let
 	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys theta
     in
-    returnTc [InstInfo { iLocal = is_local, iDFunId = dfun_id, 
+    returnTc [InstInfo { iDFunId = dfun_id, 
 			 iBinds = binds,    iPrags = uprags }]
 \end{code}
 
@@ -406,7 +409,7 @@ mkGenericInstance clas loc (hs_ty, binds)
 	dfun_id    = mkDictFunId dfun_name clas tyvars inst_tys inst_theta
     in
 
-    returnTc (InstInfo { iLocal = True, iDFunId = dfun_id, 
+    returnTc (InstInfo { iDFunId = dfun_id, 
 		  	 iBinds = binds, iPrags = [] })
 \end{code}
 
@@ -498,15 +501,13 @@ is the @dfun_theta@ below.
 
 First comes the easy case of a non-local instance decl.
 
+
 \begin{code}
 tcInstDecl2 :: InstInfo -> NF_TcM (LIE, TcMonoBinds)
+-- tcInstDecl2 is called *only* on InstInfos 
 
-tcInstDecl2 (InstInfo { iLocal = is_local, iDFunId = dfun_id, 
+tcInstDecl2 (InstInfo { iDFunId = dfun_id, 
 			iBinds = monobinds, iPrags = uprags })
-  | not is_local
-  = returnNF_Tc (emptyLIE, EmptyMonoBinds)
-
-  | otherwise
   =	 -- Prime error recovery
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
     tcAddSrcLoc (getSrcLoc dfun_id)			   $

@@ -57,8 +57,8 @@ import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class, ClassOpItem, ClassContext )
 import Name		( Name, OccName, NamedThing(..), 
-			  nameOccName, getSrcLoc, mkLocalName,
-			  isLocalName, nameModule_maybe
+			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
+			  nameIsLocalOrFrom, nameModule_maybe
 			)
 import Name		( NameEnv, lookupNameEnv, nameEnvElts, extendNameEnvList, emptyNameEnv )
 import OccName		( mkDFunOcc, occNameString )
@@ -261,11 +261,7 @@ newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 
 \begin{code}
 isLocalThing :: NamedThing a => Module -> a -> Bool
-  -- True if the thing has a Local name, 
-  -- or a Global name from the specified module
-isLocalThing mod thing = case nameModule_maybe (getName thing) of
-			   Nothing -> True	-- A local name
-			   Just m  -> m == mod	-- A global thing
+isLocalThing mod thing = nameIsLocalOrFrom mod (getName thing)
 \end{code}
 
 %************************************************************************
@@ -509,7 +505,6 @@ The InstInfo type summarises the information in an instance declaration
 \begin{code}
 data InstInfo
   = InstInfo {
-      iLocal  :: Bool,			-- True <=> it's defined in this module
       iDFunId :: DFunId,		-- The dfun id
       iBinds  :: RenamedMonoBinds,	-- Bindings, b
       iPrags  :: [RenamedSig]		-- User pragmas recorded for generating specialised instances

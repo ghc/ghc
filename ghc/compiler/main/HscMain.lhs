@@ -156,16 +156,13 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
       else do {
 
       -- TYPECHECK
-      maybe_tc_result <- typecheckModule dflags pcs_cl hst 
-					 old_iface alwaysQualify (vanillaSyntaxMap, cl_hs_decls)
-					 False{-don't check for Main.main-};
+      maybe_tc_result 
+	<- typecheckIface dflags pcs_cl hst old_iface (vanillaSyntaxMap, cl_hs_decls);
+
       case maybe_tc_result of {
          Nothing -> return (HscFail pcs_cl);
-         Just (pcs_tc, tc_result) -> do {
+         Just (pcs_tc, env_tc, local_rules) -> do {
 
-      let env_tc      = tc_env tc_result
-          local_rules = tc_rules tc_result
-      ;
       -- create a new details from the closed, typechecked, old iface
       let new_details = mkModDetailsFromIface env_tc local_rules
       ;
@@ -216,7 +213,6 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
 	; maybe_tc_result 
 	    <- _scc_ "TypeCheck" typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls 
-					     True{-check for Main.main if necessary-}
 	; case maybe_tc_result of {
       	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
       	     Just (pcs_tc, tc_result) -> do {
