@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.30 2003/10/01 10:49:09 wolfgang Exp $
+ * $Id: Select.c,v 1.31 2004/07/15 20:42:45 sof Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -33,6 +33,10 @@
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#ifdef INTEGRITY
+#include <sys/socket.h>
 #endif
 
 /* last timestamp */
@@ -166,7 +170,19 @@ awaitEvent(rtsBool wait)
 
 #ifdef RTS_SUPPORTS_THREADS
       if(!workerWakeupInited) {
+#if defined(INTEGRITY)
+	int arg;
+	int rc = socketpair(AF_LOCAL, SOCK_STREAM, 0, workerWakeupPipe);
+	if (rc == -1) {
+	  printf("failed to create socketpair: %d\n", errno);
+	}
+	arg = fcntl(workerWakeupPipe[0], F_GETFL,0);
+	fcntl(workerWakeupPipe[0], F_SETFL, arg | O_NONBLOCK);
+	arg = fcntl(workerWakeupPipe[1], F_GETFL,0);
+	fcntl(workerWakeupPipe[1], F_SETFL, arg | O_NONBLOCK);
+#else
           pipe(workerWakeupPipe);
+#endif
           workerWakeupInited = rtsTrue;
       }
       FD_SET(workerWakeupPipe[0], &rfd);
@@ -345,10 +361,9 @@ wakeBlockedWorkerThread()
 {
     if(isWorkerBlockedInAwaitEvent && !workerWakeupPending) {
     	unsigned char dummy = 42;	// Any value will do here
-    	
-			// write something so that select() wakes up
-    	write(workerWakeupPipe[1],&dummy,1);
+	// write something so that select() wakes up
     	workerWakeupPending = rtsTrue;
+    	write(workerWakeupPipe[1],&dummy,1);
     }
 }
 
