@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.99 2001/10/23 17:18:38 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.100 2001/10/23 22:20:33 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -150,7 +150,7 @@ interactiveUI cmstate paths cmdline_libs = do
    dflags <- getDynFlags
 
    (cmstate, maybe_hval) 
-	<- cmCompileExpr cmstate dflags "IO.hSetBuffering IO.stdout IO.NoBuffering >> IO.hSetBuffering IO.stderr IO.NoBuffering"
+	<- cmCompileExpr cmstate dflags "IO.hSetBuffering IO.stdout IO.NoBuffering Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
    case maybe_hval of
 	Just hval -> unsafeCoerce# hval :: IO ()
 	_ -> panic "interactiveUI:buffering"
