@@ -39,6 +39,12 @@ $ident    = [$alphanum \_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 <line> {
   $ws* \>		{ begin birdtrack }
   $ws* \n		{ token TokPara `andBegin` para }
+  -- Here, we really want to be able to say
+  -- $ws* (\n | <eof>) 	{ token TokPara `andBegin` para}
+  -- because otherwise a trailing line of whitespace will result in 
+  -- a spurious TokString at the end of a docstring.  We don't have <eof>,
+  -- though (NOW I realise what it was for :-).  To get around this, we always
+  -- append \n to the end of a docstring.
   () 			{ begin string }
 }
 
@@ -96,13 +102,17 @@ alexGetChar (_, c:cs) = Just (c, (c,cs))
 alexInputPrevChar (c,_) = c
 
 tokenise :: String -> [Token]
-tokenise str = let toks = go ('\n',str) para in {-trace (show toks)-} toks
+tokenise str = let toks = go ('\n', eofHack str) para in {-trace (show toks)-} toks
   where go inp@(_,str) sc =
 	  case alexScan inp sc of
 		AlexEOF -> []
 		AlexError _ -> error "lexical error"
 		AlexSkip  inp' len     -> go inp' sc
 		AlexToken inp' len act -> act (take len str) sc (\sc -> go inp' sc)
+
+-- NB. we add a final \n to the string, (see comment in the beginning of line
+-- production above).
+eofHack str = str++"\n"
 
 andBegin  :: Action -> StartCode -> Action
 andBegin act new_sc = \str sc cont -> act str new_sc cont
