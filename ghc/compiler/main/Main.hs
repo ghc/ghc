@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.111 2002/09/13 15:02:35 simonpj Exp $
+-- $Id: Main.hs,v 1.112 2002/10/15 13:20:18 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -311,18 +311,22 @@ main =
 
 
 beginMake :: [String] -> IO ()
-beginMake fileish_args
-  = do let (objs, mods) = partition objish_file fileish_args
-       mapM_ (add v_Ld_inputs) objs
-
-       case mods of
-	 []    -> throwDyn (UsageError "no input files")
-	 _     -> do dflags <- getDynFlags 
-		     state <- cmInit Batch
-		     graph <- cmDepAnal state dflags mods
-		     (_, ok_flag, _) <- cmLoadModules state dflags graph
-		     when (failed ok_flag) (exitWith (ExitFailure 1))
-		     return ()
+beginMake fileish_args  = do 
+  -- anything that doesn't look like a Haskell source filename or
+  -- a module name is passed straight through to the linker
+  let (inputs, objects) = partition looks_like_an_input fileish_args
+  mapM_ (add v_Ld_inputs) objects
+  
+  case inputs of
+	[]    -> throwDyn (UsageError "no input files")
+	_     -> do dflags <- getDynFlags 
+		    state <- cmInit Batch
+		    graph <- cmDepAnal state dflags inputs
+		    (_, ok_flag, _) <- cmLoadModules state dflags graph
+		    when (failed ok_flag) (exitWith (ExitFailure 1))
+		    return ()
+  where
+    looks_like_an_input m = haskellish_src_file m || looksLikeModuleName m
 
 
 beginInteractive :: [String] -> IO ()
