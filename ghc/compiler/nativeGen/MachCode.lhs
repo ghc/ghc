@@ -2285,6 +2285,7 @@ genCCall fn cconv kind args
 	      _   -> ImmLab (ptext fn)
 
     arg_size DF = 8
+    arg_size F  = 8
     arg_size _  = 4
 
     ------------
@@ -2313,16 +2314,16 @@ genCCall fn cconv kind args
         in  if   (case sz of DF -> True; F -> True; _ -> False)
             then returnUs (new_sz,
                            code .
-                           mkSeqInstr (GST sz reg
+                           mkSeqInstr (GST DF reg
                                               (AddrBaseIndex (Just esp) 
                                                   Nothing (ImmInt (- new_sz))))
                           )
 	    else returnUs (new_sz,
                            code . 
-                           mkSeqInstr (MOV sz (OpReg reg)
-                                              (OpAddr 
-                                                  (AddrBaseIndex (Just esp) 
-                                                     Nothing (ImmInt (- new_sz)))))
+                           mkSeqInstr (MOV L (OpReg reg)
+                                             (OpAddr 
+                                                 (AddrBaseIndex (Just esp) 
+                                                    Nothing (ImmInt (- new_sz)))))
                           )
     ------------
     get_op
@@ -2732,28 +2733,6 @@ trivialCode instr x y
   where
     imm = maybeImm y
     imm__2 = case imm of Just x -> x
-{-
--- This seems pretty dubious to me.  JRS, 000125.
-trivialCode instr x y
-  | maybeToBool imm
-  = getRegister y		`thenUs` \ register1 ->
-    let
-    	code__2 dst = let code1 = registerCode register1 dst
-			  src1  = registerName register1 dst
-		      in code1 .
-			 if   isFixed register1 && src1 /= dst
-			 then mkSeqInstrs [MOV L (OpImm imm__2) (OpReg dst),
-					   instr (OpReg src1) (OpReg dst)]
-			 else
-                                -- can't possibly be right, if instr is 
-                                -- non-commutative
-				mkSeqInstr (instr (OpImm imm__2) (OpReg src1))
-    in
-    returnUs (Any IntRep code__2)
-  where
-    imm = maybeImm x
-    imm__2 = case imm of Just x -> x
--}
 
 trivialCode instr x y
   = getRegister x		`thenUs` \ register1 ->
