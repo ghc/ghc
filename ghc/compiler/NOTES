@@ -1,3 +1,9 @@
+cvs remove TcGRHSs.hi-boot TcGRHSs.hi-boot-5 TcGRHSs.lhs
+cvs remove pbinding.ugn
+cvs add grhsb.ugn gdexp.ugn
+-----------------------
+
+
 * CHECK that the things seek_liftable found are done in Core
 
 * CHECK that there aren't too many indirections in STG

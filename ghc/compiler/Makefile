@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.46 1998/12/02 13:17:15 simonm Exp $
+# $Id: Makefile,v 1.47 1998/12/10 08:54:18 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -158,17 +158,20 @@ nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
 nativeGen/MachCode_HC_OPTS 	= -H10m
 parser/UgenAll_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/UgenUtil_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
-parser/U_constr_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_binding_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
-parser/U_pbinding_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
+parser/U_constr_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
+parser/U_either_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_entidt_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
+parser/U_gdexp_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
+parser/U_grhsb_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_list_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_literal_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
+parser/U_match_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_maybe_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
-parser/U_either_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
 parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -H12m -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
+
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 
