@@ -188,12 +188,25 @@ tryWW non_rec fn_id rhs
   = 	-- Don't split things that will never be inlined
     returnUs [ (fn_id, rhs) ]
 
-  | non_rec && not do_coerce_ww && certainlyWillInline fn_id
+  | non_rec && certainlyWillInline fn_id
 	-- No point in worker/wrappering a function that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)
 	-- from being re-done.
+	--	
+	-- It's very important to refrain from w/w-ing an INLINE function
+	-- If we do so by mistake we transform
+	--	f = __inline (\x -> E)
+	-- into
+	--	f = __inline (\x -> case x of (a,b) -> fw E)
+	--	fw = \ab -> (__inline (\x -> E)) (a,b)
+	-- and the original __inline now vanishes, so E is no longer
+	-- inside its __inline wrapper.  Death!  Disaster!
 	--
+	-- OUT OF DATE NOTE:
+	--  	[There used to be "&& not do_coerce_ww" in the above test.
+	--	 No longer necessary because SimplUtils.tryEtaExpansion
+	--	 now deals with coerces.]
 	-- The do_coerce_ww test is so that
 	-- a function with a coerce should w/w to get rid
 	-- of the coerces, which can significantly improve its arity.
@@ -204,10 +217,9 @@ tryWW non_rec fn_id rhs
 	--		     x:xs -> __coerce (IO [Int]) (\ s -> (# s, x:xs #)
 	--		     []   -> lvl_sJ8
 	--
-	--
-	-- OUT OF DATE NOTE, kept for info:
-	-- It's out of date because now wrappers look very cheap 
-	-- even when they are inlined.
+	-- OUT OF DATE NOTE:
+	-- 	[Out of date because the size calculation in CoreUnfold now
+	--	 makes wrappers look very cheap even when they are inlined.]
 	--   In this case we add an INLINE pragma to the RHS.  Why?
 	--   Because consider
 	--	  f = \x -> g x x
