@@ -21,7 +21,7 @@ ghcpkg01 :
 	$(GHC_PKG) describe testpkg-2.0
 
 	@: # cannot use testpkg as a package name, it is ambiguous now
-	if $(GHC_PKG) describe testpkg; then false; else true; fi 
+	if $(GHC_PKG) describe testpkg; then false; else true; fi
 
 	@: # test hiding/exposing
 	$(GHC_PKG) hide testpkg-1.2.3.4
