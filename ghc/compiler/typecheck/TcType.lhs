@@ -27,7 +27,7 @@ module TcType (
   tcInstType, tcInstSigType, tcInstTcType, tcInstSigTcType,
   tcInstTheta, tcInstId,
 
-  zonkTcTyVars,
+  zonkTcTyVars, zonkSigTyVar,
   zonkTcType,
   zonkTcTypeToType,
   zonkTcTyVar,
@@ -409,6 +409,16 @@ zonkTcTyVar tyvar
 	BoundTo ty@(TyVarTy tyvar') -> returnNF_Tc ty		-- tcReadTyVar never returns a bound tyvar
 	BoundTo other		    -> zonkTcType other
 	other			    -> returnNF_Tc (TyVarTy tyvar)
+
+-- Signature type variables only get bound to each other,
+-- never to a type
+zonkSigTyVar :: TcTyVar s -> NF_TcM s (TcTyVar s)
+zonkSigTyVar tyvar 
+  = tcReadTyVar tyvar		`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	BoundTo ty@(TyVarTy tyvar') -> returnNF_Tc tyvar'	-- tcReadTyVar never returns a bound tyvar
+	BoundTo other		    -> panic "zonkSigTyVar"	-- Should only be bound to another tyvar
+	other			    -> returnNF_Tc tyvar
 
 zonkTcType :: TcType s -> NF_TcM s (TcType s)
 
