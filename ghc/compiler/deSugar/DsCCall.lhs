@@ -156,7 +156,8 @@ unboxArg arg
     )
 
   | otherwise
-  = pprPanic "unboxArg: " (ppr arg_ty)
+  = getSrcLocDs `thenDs` \ l ->
+    pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
     arg_ty = coreExprType arg
 
