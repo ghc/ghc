@@ -27,9 +27,7 @@ module HsTypes (
 
 import Class		( FunDep )
 import Type		( Type, Kind, PredType(..), UsageAnn(..), ClassContext,
-			  getTyVar_maybe, splitFunTy_maybe, splitAppTy_maybe,
-			  splitTyConApp_maybe, splitPredTy_maybe,
-			  splitUsgTy, splitSigmaTy, unUsgTy, boxedTypeKind
+			  getTyVar_maybe, splitSigmaTy, unUsgTy, boxedTypeKind
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
 import TyCon		( isTupleTyCon, tupleTyConBoxity, tyConArity, tyConClass_maybe )
