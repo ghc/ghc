@@ -128,6 +128,7 @@ foreign import ccall unsafe "getenv"
 @withArgs args act@ - while executing action @act@, have 'System.getArgs'
 return @args@ (GHC only).
 -}
+withArgs :: [String] -> IO a -> IO a
 withArgs xs act = do
    p <- System.Environment.getProgName
    withArgv (p:xs) act
@@ -136,6 +137,7 @@ withArgs xs act = do
 @withProgName name act@ - while executing action @act@,
 have 'System.getProgName' return @name@ (GHC only).
 -}
+withProgName :: String -> IO a -> IO a
 withProgName nm act = do
    xs <- System.Environment.getArgs
    withArgv (nm:xs) act
@@ -143,6 +145,7 @@ withProgName nm act = do
 -- Worker routine which marshals and replaces an argv vector for
 -- the duration of an action.
 
+withArgv :: [String] -> IO a -> IO a
 withArgv new_args act = do
   pName <- System.Environment.getProgName
   existing_args <- System.Environment.getArgs

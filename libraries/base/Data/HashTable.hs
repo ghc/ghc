@@ -157,7 +157,8 @@ hashString = fromIntegral . foldr f 0
   where f c m = ord c + (m * 128) `rem` fromIntegral prime
 
 -- | A prime larger than the maximum hash table size
-prime = 1500007 :: Int32
+prime :: Int32
+prime = 1500007
 
 -- -----------------------------------------------------------------------------
 -- Parameters
