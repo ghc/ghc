@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.81 2002/12/11 15:36:51 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.82 2002/12/13 19:14:58 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -656,7 +656,7 @@ NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 INFO_TABLE_CONSTR(stg_NO_FINALIZER_info,stg_NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"NO_FINALIZER","NO_FINALIZER");
 NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
-SET_STATIC_HDR(stg_NO_FINALIZER_closure,stg_NO_FINALIZER_info,0/*CC*/,,extern StgInfoTable)
+SET_STATIC_HDR(stg_NO_FINALIZER_closure,stg_NO_FINALIZER_info,0/*CC*/,,extern const StgInfoTable)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
@@ -696,7 +696,7 @@ NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
 INFO_TABLE_CONSTR(stg_END_TSO_QUEUE_info,stg_END_TSO_QUEUE_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"END_TSO_QUEUE","END_TSO_QUEUE");
 NON_ENTERABLE_ENTRY_CODE(END_TSO_QUEUE);
 
-SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,extern StgInfoTable)
+SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,extern const StgInfoTable)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
@@ -710,7 +710,7 @@ SET_STATIC_HDR(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE_info,0/*CC*/,,extern 
 INFO_TABLE_CONSTR(stg_END_MUT_LIST_info,stg_END_MUT_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"END_MUT_LIST","END_MUT_LIST");
 NON_ENTERABLE_ENTRY_CODE(END_MUT_LIST);
 
-SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,extern StgInfoTable)
+SET_STATIC_HDR(stg_END_MUT_LIST_closure,stg_END_MUT_LIST_info,0/*CC*/,,extern const StgInfoTable)
 , /*payload*/{} };
 
 INFO_TABLE(stg_MUT_CONS_info, stg_MUT_CONS_entry, 1, 1, MUT_CONS, , IF_, "MUT_CONS", "MUT_CONS");
@@ -723,7 +723,7 @@ NON_ENTERABLE_ENTRY_CODE(MUT_CONS);
 INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST_info,stg_END_EXCEPTION_LIST_entry,0,0,0,CONSTR_NOCAF_STATIC,,IF_,"END_EXCEPTION_LIST","END_EXCEPTION_LIST");
 NON_ENTERABLE_ENTRY_CODE(END_EXCEPTION_LIST);
 
-SET_STATIC_HDR(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST_info,0/*CC*/,,extern StgInfoTable)
+SET_STATIC_HDR(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST_info,0/*CC*/,,extern const StgInfoTable)
 , /*payload*/{} };
 
 INFO_TABLE(stg_EXCEPTION_CONS_info, stg_EXCEPTION_CONS_entry, 1, 1, CONSTR, , IF_, "EXCEPTION_CONS", "EXCEPTION_CONS");
@@ -780,7 +780,7 @@ STGFUN(stg_dummy_ret_entry)
   JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
-SET_STATIC_HDR(stg_dummy_ret_closure,stg_dummy_ret_info,CCS_DONT_CARE,,extern StgInfoTable)
+SET_STATIC_HDR(stg_dummy_ret_closure,stg_dummy_ret_info,CCS_DONT_CARE,,extern const StgInfoTable)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
