@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.165 2001/06/26 11:07:55 simonpj Exp $
+# $Id: Makefile,v 1.166 2001/06/26 16:31:07 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -130,6 +130,8 @@ ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -gt 5000); then echo YES
 ifneq "$(ghc_501_at_least)" "YES"
 boot ::
 	$(CP) ../lib/std/cbits/system.c main
+# Build GHC 5.xx's version of systemCmd, so that even when bootstrapping with 4.08, we
+# can assume that system works properly on Win32
 C_SRCS += main/system.c
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
@@ -151,16 +153,16 @@ ifeq "$(BootingFromHc)" "YES"
 HCS	+= rename/ParseIface.hc parser/Parser.hc main/ParsePkgConf.hc
 endif
 
-HS_OBJS = \
-  $(patsubst %.hc, %.o, $(HCS)) \
-  parser/hschooks.o
-
-DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
-
 #
 # Add misc .c helper code (used by the frontend.)
 #
 C_SRCS += parser/hschooks.c
+
+HS_OBJS = \
+  $(patsubst %.hc, %.o, $(HCS)) \
+  $(patsubst %.c, %.o, $(C_SRCS))
+
+DESTDIR       = $(INSTALL_LIBRARY_DIR_GHC)
 
 #
 # Big Fudge to get around inherent problem that Makefile setup
