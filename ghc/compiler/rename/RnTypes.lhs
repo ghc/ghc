@@ -557,7 +557,8 @@ sectionPrecErr op arg_op section
 	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
 
 infixTyConWarn op
-  = ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op)
+  = vcat [ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op),
+	  ftext FSLIT("Use -fglasgow-exts to avoid this warning"))
 
 patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
