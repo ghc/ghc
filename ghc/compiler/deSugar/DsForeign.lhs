@@ -18,6 +18,11 @@ import DsMonad
 
 import HsSyn		( ForeignDecl(..), ForeignExport(..), LForeignDecl,
 			  ForeignImport(..), CImportSpec(..) )
+import DataCon		( splitProductType_maybe )
+#ifdef DEBUG
+import DataCon		( dataConSourceArity )
+import Type		( isUnLiftedType )
+#endif
 import MachOp		( machRepByteWidth )
 import SMRep		( argMachRep, primRepToCgRep )
 import CoreUtils	( exprType, mkInlineMe )
@@ -287,7 +292,7 @@ dsFExport :: Id			-- Either the exported Id,
 				-- 	   the first argument's stable pointer
 	  -> DsM ( SDoc		-- contents of Module_stub.h
 		 , SDoc		-- contents of Module_stub.c
-		 , [Type]       -- arguments expected by stub function.
+		 , [Type]       -- primitive arguments expected by stub function.
 		 )
 
 dsFExport fn_id ty ext_name cconv isDyn
@@ -389,10 +394,21 @@ dsFExportDynamic id cconv
 	-- (probably in the RTS.) 
       adjustor	 = FSLIT("createAdjustor")
       
-      sz_args	 = sum (map (machRepByteWidth.argMachRep.primRepToCgRep.typePrimRep) stub_args)
+	-- Determine the number of bytes of arguments to the stub function,
+	-- so that we can attach the '@N' suffix to its label if it is a
+	-- stdcall on Windows.
       mb_sz_args = case cconv of
-		      StdCallConv -> Just sz_args
+		      StdCallConv -> Just (sum (map ty_size stub_args))
 		      _ 	  -> Nothing
+
+	-- NB. the calculation here isn't strictly speaking correct.
+	-- We have a primitive Haskell type (eg. Int#, Double#), and
+	-- we want to know the size, when passed on the C stack, of
+	-- the associated C type (eg. HsInt, HsDouble).  We don't have
+	-- this information to hand, but we know what GHC's conventions
+	-- are for passing around the primitive Haskell types, so we
+	-- use that instead.  I hope the two coincide --SDM
+      ty_size = machRepByteWidth.argMachRep.primRepToCgRep.typePrimRep
      in
      dsCCall adjustor adj_args PlayRisky io_res_ty	`thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -437,9 +453,12 @@ mkFExportCBits :: FastString
 	       -> Type 
                -> Bool		-- True <=> returns an IO type
 	       -> CCallConv 
-	       -> (SDoc, SDoc, [Type])
+	       -> (SDoc, 
+		   SDoc,
+		   [Type] 	-- the *primitive* argument types
+		  )
 mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
- = (header_bits, c_bits, all_arg_tys)
+ = (header_bits, c_bits, all_prim_arg_tys)
  where
   -- Create up types and names for the real args
   arg_cnames, arg_ctys :: [SDoc]
@@ -461,8 +480,8 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   all_cnames_and_ctys 
      = map fst extra_cnames_and_tys ++ zip arg_cnames arg_ctys
 
-  all_arg_tys
-     = map snd extra_cnames_and_tys ++ arg_htys
+  all_prim_arg_tys
+     = map snd extra_cnames_and_tys ++ map getPrimTyOf arg_htys
 
   -- stuff to do with the return type of the C function
   res_hty_is_unit = res_hty `coreEqType` unitTy	-- Look through any newtypes
@@ -561,4 +580,18 @@ showFFIType t = getOccString (getName tc)
   tc = case tcSplitTyConApp_maybe (repType t) of
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
+
+-- This function returns the primitive type associated with the boxed
+-- type argument to a foreign export (eg. Int ==> Int#).  It assumes
+-- that all the types we are interested in have a single constructor
+-- with a single primitive-typed argument, which is true for all of the legal
+-- foreign export argument types (see TcType.legalFEArgTyCon).
+getPrimTyOf :: Type -> Type
+getPrimTyOf ty =
+  case splitProductType_maybe (repType ty) of
+     Just (_, _, data_con, [prim_ty]) ->
+	ASSERT(dataConSourceArity data_con == 1)
+	ASSERT2(isUnLiftedType prim_ty, ppr prim_ty)
+	prim_ty
+     _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
 \end{code}
