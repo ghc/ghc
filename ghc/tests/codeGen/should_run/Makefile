@@ -1,11 +1,14 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 2000/08/15 11:41:19 rrt Exp $
+# $Id: Makefile,v 1.14 2000/08/22 14:05:05 sewardj Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 OMITTED_RUNTESTS = cg030.run cg035.run
+endif
+ifeq "$(TARGETPLATFORM)" "sparc-sun-solaris2"
+OMITTED_RUNTESTS = cg026.run
 endif
 
 include $(TOP)/mk/should_run.mk
