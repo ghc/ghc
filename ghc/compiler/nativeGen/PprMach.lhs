@@ -477,11 +477,24 @@ pprInstr (DATA s xs)
   = vcat (concatMap (ppr_item s) xs)
     where
 #if alpha_TARGET_ARCH
+            ppr_item = error "ppr_item on Alpha"
+#if 0
             This needs to be fixed.
 	    B  -> SLIT("\t.byte\t")
 	    BU -> SLIT("\t.byte\t")
 	    Q  -> SLIT("\t.quad\t")
 	    TF -> SLIT("\t.t_floating\t")
+#endif
+#endif
+#if sparc_TARGET_ARCH
+            ppr_item = error "ppr_item on Sparc"
+#if 0
+            This needs to be fixed.
+	    B  -> SLIT("\t.byte\t")
+	    BU -> SLIT("\t.byte\t")
+	    W  -> SLIT("\t.word\t")
+    	    DF -> SLIT("\t.double\t")
+#endif
 #endif
 #if i386_TARGET_ARCH
 	ppr_item B  x = [text "\t.byte\t" <> pprImm x]
@@ -521,13 +534,6 @@ pprInstr (DATA s xs)
                 return (map ord [i0,i1,i2,i3,i4,i5,i6,i7])
              )
 
-#endif
-#if sparc_TARGET_ARCH
-            This needs to be fixed.
-	    B  -> SLIT("\t.byte\t")
-	    BU -> SLIT("\t.byte\t")
-	    W  -> SLIT("\t.word\t")
-    	    DF -> SLIT("\t.double\t")
 #endif
 
 -- fall through to rest of (machine-specific) pprInstr...
