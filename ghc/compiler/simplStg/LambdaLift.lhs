@@ -15,7 +15,8 @@ import Id		( mkUserId, idType, setIdArity, Id )
 import VarSet
 import VarEnv
 import IdInfo		( exactArity )
-import Name             ( Module, mkTopName )
+import Module		( Module )
+import Name             ( mkTopName )
 import Type		( splitForAllTys, mkForAllTys, mkFunTys, Type )
 import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
 import Util		( zipEqual )

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.17 1999/01/06 11:35:27 simonm Exp $
+% $Id: CgMonad.lhs,v 1.18 1999/03/02 14:34:38 sof Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -50,7 +50,7 @@ import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
 import CLabel           ( CLabel, mkUpdEntryLabel )
-import OccName		( Module )
+import Module		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
 import VarEnv

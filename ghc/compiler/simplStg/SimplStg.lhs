@@ -25,7 +25,7 @@ import CmdLineOpts	( opt_SccGroup,
 			  StgToDo(..)
 			)
 import Id		( Id )
-import OccName		( Module, moduleString )
+import Module		( Module, moduleString )
 import VarEnv
 import ErrUtils		( doIfSet )
 import UniqSupply	( splitUniqSupply, UniqSupply )

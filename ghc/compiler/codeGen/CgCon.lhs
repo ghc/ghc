@@ -45,12 +45,14 @@ import DataCon		( DataCon, dataConName, dataConTag, dataConTyCon,
 			  isUnboxedTupleCon )
 import MkId		( mkDataConId )
 import Id		( Id, idName, idType, idPrimRep )
-import Const		( Con(..), Literal(..) )
+import Name		( nameModule, isLocallyDefinedName )
+import Module		( isDynamicModule )
+import Const		( Con(..), Literal(..), isLitLitLit )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..) )
 import BasicTypes	( TopLevelFlag(..) )
 import Util
-import Panic		( assertPanic )
+import Panic		( assertPanic, trace )
 \end{code}
 
 %************************************************************************
@@ -65,69 +67,9 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> [StgArg]		-- Args
 	    -> Bool		-- All zero-size args (see buildDynCon)
 	    -> FCode (Id, CgIdInfo)
-\end{code}
-
-Special Case: Constructors some of whose arguments are of \tr{Double#}
-type, {\em or} which are ``lit lits'' (which are given \tr{Addr#}
-type).
-
-These ones have to be compiled as re-entrant thunks rather than
-closures, because we can't figure out a way to persuade C to allow us
-to initialise a static closure with Doubles!  Thus, for \tr{x = 2.0}
-(defaults to Double), we get:
-
-\begin{verbatim}
--- The STG syntax:
-    Main.x = MkDouble [2.0##]
-
--- C Code:
-
--- closure:
-    SET_STATIC_HDR(Main_x_closure,Main_x_static,CC_DATA,,EXTDATA_RO)
-    };
--- its *own* info table:
-    STATIC_INFO_TABLE(Main_x,Main_x_entry,,,,EXTFUN,???,":MkDouble","Double");
--- with its *own* entry code:
-    STGFUN(Main_x_entry) {
-	P_ u1701;
-	RetDouble1=2.0;
-	u1701=(P_)*SpB;
-	SpB=SpB-1;
-	JMP_(u1701[0]);
-    }
-\end{verbatim}
-
-The above has the down side that each floating-point constant will end
-up with its own info table (rather than sharing the MkFloat/MkDouble
-ones).  On the plus side, however, it does return a value (\tr{2.0})
-{\em straight away}.
-
-Here, then is the implementation: just pretend it's a non-updatable
-thunk.  That is, instead of
-
-	x = D# 3.455#
-
-pretend we've seen
-
-	x = [] \n [] -> D# 3.455#
-
-\begin{code}
-top_ccc = mkCCostCentreStack dontCareCCS -- because it's static data
-
-cgTopRhsCon bndr con args all_zero_size_args
-  | any isLitLitArg args
-  = cgTopRhsClosure bndr dontCareCCS NoStgBinderInfo NoSRT [] body lf_info
-  where
-    body    = StgCon (DataCon con) args rhs_ty
-    lf_info = mkClosureLFInfo bndr TopLevel [] ReEntrant []
-    rhs_ty  = idType bndr
-\end{code}
-
-OK, so now we have the general case.
-
-\begin{code}
 cgTopRhsCon id con args all_zero_size_args
-  = (
+  = ASSERT(not (any_litlit_args || dynamic_con_or_args))
+    (
 	-- LAY IT OUT
     getArgAmodes args		`thenFC` \ amodes ->
 
@@ -152,6 +94,30 @@ cgTopRhsCon id con args all_zero_size_args
     lf_info	    = mkConLFInfo    con
     closure_label   = mkClosureLabel name
     name            = idName id
+
+    top_ccc = mkCCostCentreStack dontCareCCS -- because it's static data
+
+    -- stuff needed by the assert pred only.
+    any_litlit_args     = any isLitLitArg args
+    dynamic_con_or_args = dynamic_con || any (isDynamic) args
+
+    dynamic_con = isDynName (dataConName con)
+
+    isDynName nm = 
+      not (isLocallyDefinedName nm) && 
+      isDynamicModule (nameModule nm)
+
+     {-
+      Do any of the arguments refer to something in a DLL?
+     -}
+    isDynamic (StgVarArg v) = isDynName (idName v)
+    isDynamic (StgConArg c) =
+      case c of
+        DataCon dc -> isDynName (dataConName dc)
+	Literal	l  -> isLitLitLit l  -- all bets are off if it is.
+	_	   -> False
+
+
 \end{code}
 
 %************************************************************************

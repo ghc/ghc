@@ -21,8 +21,12 @@ import CoreUtils	( coreExprType )
 import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
 import Id		( Id, mkSysLocal, idType,
-			  externallyVisibleId, setIdUnique
+			  externallyVisibleId, setIdUnique, idName
 			)
+import DataCon		( DataCon, dataConName, dataConId )
+import Name	        ( Name, nameModule, isLocallyDefinedName )
+import Module		( isDynamicModule )
+import Const	        ( Con(..), Literal, isLitLitLit )
 import VarEnv
 import Const		( Con(..), isWHNFCon, Literal(..) )
 import PrimOp		( PrimOp(..) )
@@ -146,16 +150,74 @@ exprToRhs (StgLet (StgNonRec var1 rhs) (StgApp var2 []))
 	-- incoming rhs.  Why?  Because trivial bindings might conceal
 	-- what the rhs is actually like.
 
-exprToRhs (StgCon (DataCon con) args _) = StgRhsCon noCCS con args
+{-
+  We reject the following candidates for 'static constructor'dom:
+  
+    - any dcon that takes a lit-lit as an arg.
+    - [Win32 DLLs only]: any dcon that is (or takes as arg)
+      that's living in a DLL.
+
+  These constraints are necessary to ensure that the code
+  generated in the end for the static constructors, which
+  live in the data segment, remain valid - i.e., it has to
+  be constant. For obvious reasons, that's hard to guarantee
+  with lit-lits. The second case of a constructor referring
+  to static closures hiding out in some DLL is an artifact
+  of the way Win32 DLLs handle global DLL variables. A (data)
+  symbol exported from a DLL  has to be accessed through a
+  level of indirection at the site of use, so whereas
+
+     extern StgClosure y_closure;
+     extern StgClosure z_closure;
+     x = { ..., &y_closure, &z_closure };
+
+  is legal when the symbols are in scope at link-time, it is
+  not when y_closure is in a DLL. So, any potential static
+  closures that refers to stuff that's residing in a DLL
+  will be put in an (updateable) thunk instead.
+
+  An alternative strategy is to support the generation of
+  constructors (ala C++ static class constructors) which will
+  then be run at load time to fix up static closures.
+-}
+exprToRhs (StgCon (DataCon con) args _)
+  | not is_dynamic  &&
+    all  (not.is_lit_lit) args  = StgRhsCon noCCS con args
+ where
+  is_dynamic = isDynCon con || any (isDynArg) args
+
+  is_lit_lit (StgVarArg _) = False
+  is_lit_lit (StgConArg x) =
+     case x of
+       Literal l -> isLitLitLit l
+       _         -> False
 
 exprToRhs expr 
 	= StgRhsClosure noCCS		-- No cost centre (ToDo?)
 		        stgArgOcc	-- safe
 			noSRT		-- figure out later
 			bOGUS_FVs
+
 			Updatable	-- Be pessimistic
 			[]
 			expr
+
+isDynCon :: DataCon -> Bool
+isDynCon con = isDynName (dataConName con)
+
+isDynArg :: StgArg -> Bool
+isDynArg (StgVarArg v)   = isDynName (idName v)
+isDynArg (StgConArg con) =
+  case con of
+    DataCon dc -> isDynCon dc
+    Literal l  -> isLitLitLit l
+    _          -> False
+
+isDynName :: Name -> Bool
+isDynName nm = 
+      not (isLocallyDefinedName nm) && 
+      isDynamicModule (nameModule nm)
+
 
 \end{code}
 

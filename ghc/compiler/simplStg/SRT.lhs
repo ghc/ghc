@@ -10,7 +10,8 @@ bindings have no CAF references, and record the fact in their IdInfo.
 module SRT where
 
 import Id       ( Id, setIdCafInfo, getIdCafInfo, externallyVisibleId,
-		  idAppIsBottom )
+		  idAppIsBottom
+		)
 import IdInfo 	( CafInfo(..) )
 import StgSyn
 
@@ -126,7 +127,7 @@ srtTopBind rho (StgNonRec binder rhs) =
 
 	-- don't output an SRT for the constructor, but just remember
 	-- whether it had any caf references or not.
-	StgRhsCon _ _ _ -> (StgNonRec binder' rhs, [], rho')
+	StgRhsCon _ _ _    -> (StgNonRec binder' rhs, [], rho')
 
 
 srtTopBind rho (StgRec bs) =
@@ -391,9 +392,10 @@ mk_caf_info (StgRhsClosure _ _ _ free_vars upd args body) srt
 	| null srt  = NoCafRefs		 -- function w/ no static references
 	| otherwise = MayHaveCafRefs	 -- function w/ some static references
 
-mk_caf_info (StgRhsCon cc con args) srt 
-	| null srt  = NoCafRefs 	 -- constructor w/ no static references
-	| otherwise = MayHaveCafRefs	 -- otherwise, treat as a CAF
+mk_caf_info rcon@(StgRhsCon cc con args) srt 
+	| null srt   = NoCafRefs 	 -- constructor w/ no static references
+	| otherwise  = MayHaveCafRefs	 -- otherwise, treat as a CAF
+
 
 isBottomingExpr (StgLet bind expr) = isBottomingExpr expr
 isBottomingExpr (StgApp f args)    = idAppIsBottom f (length args)

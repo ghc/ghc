@@ -36,7 +36,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_EnsureSplittableC,
 import CostCentre       ( CostCentre, CostCentreStack )
 import FiniteMap	( FiniteMap )
 import Id               ( Id, idName )
-import Name             ( Module, moduleString )
+import Module           ( Module, moduleString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Type             ( Type )
 import TyCon            ( TyCon )

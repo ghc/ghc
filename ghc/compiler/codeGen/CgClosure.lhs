@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.23 1999/01/21 10:31:55 simonm Exp $
+% $Id: CgClosure.lhs,v 1.24 1999/03/02 14:34:36 sof Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -47,7 +47,8 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn )
 import CostCentre	
 import Id		( Id, idName, idType, idPrimRep )
-import Name		( Name, Module, pprModule )
+import Name		( Name )
+import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import PrimRep		( PrimRep(..) )
 import PprType          ( showTypeCategory )
