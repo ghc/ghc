@@ -1003,9 +1003,11 @@ pprInstr g@(GDTOI src dst)
    = pprG g bogus
 
 pprInstr g@(GITOF src dst) 
-   = pprG g bogus
+   = pprInstr (GITOD src dst)
 pprInstr g@(GITOD src dst) 
-   = pprG g bogus
+   = pprG g (hcat [gtab, text "pushl ", pprReg L src, 
+                   text " ; ffree %st(7); fildl (%esp) ; ",
+                   gpop dst 1, text " ; addl $4,%esp"])
 
 pprInstr g@(GCMP sz src1 src2) 
    = pprG g (hcat [gtab, text "pushl %eax ; ",

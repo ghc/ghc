@@ -581,8 +581,13 @@ findReservedRegs instrs
     -- dire straits (but still correct): see if we can bag %eax and %edx
     ++ if   any hasFixedEAXorEDX instrs
        then []  -- bummer
-       else [ [ecx,edx,fake4,fake5],
-              [ecx,edx,eax,fake4,fake5] ]
+       else --[ [ecx,edx,fake4,fake5],
+            --  [ecx,edx,eax,fake4,fake5] ]
+            -- pro tem, don't use %eax until we institute a check that
+            -- instrs doesn't do a CALL insn, since that effectively
+            -- uses %eax in a fixed way
+            [ [ecx,edx,fake4,fake5] ]
+
     )
 #endif
 \end{code}

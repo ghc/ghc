@@ -2743,7 +2743,7 @@ The Rules of the Game are:
 * You cannot assume anything about the destination register dst;
   it may be anything, includind a fixed reg.
 
-* You may compute a value into a fixed reg, but you may not 
+* You may compute an operand into a fixed reg, but you may not 
   subsequently change the contents of that fixed reg.  If you
   want to do so, first copy the value either to a temporary
   or into dst.  You are free to modify dst even if it happens
@@ -2752,8 +2752,9 @@ The Rules of the Game are:
 * You cannot assume that a fixed reg will stay live over an
   arbitrary computation.  The same applies to the dst reg.
 
-* Temporary regs obtained from getNewRegNCG are distinct from
-  all other regs, and stay live over arbitrary computations.
+* Temporary regs obtained from getNewRegNCG are distinct from 
+  each other and from all other regs, and stay live over 
+  arbitrary computations.
 
 \begin{code}
 

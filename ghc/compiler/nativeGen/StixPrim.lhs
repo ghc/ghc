@@ -256,6 +256,27 @@ primCode [lhs] DataToTagOp [arg]
     returnUs (\xs -> assign : xs)
 \end{code}
 
+MutVars are pretty simple.
+#define writeMutVarzh(a,v)       (P_)(((StgMutVar *)(a))->var)=(v)
+
+\begin{code}
+primCode [] WriteMutVarOp [aa,vv]
+   = let aa_s      = amodeToStix aa
+         vv_s      = amodeToStix vv
+         var_field = StIndex PtrRep aa_s fixedHS
+         assign    = StAssign PtrRep (StInd PtrRep var_field) vv_s
+     in
+     returnUs (\xs -> assign : xs)
+
+primCode [rr] ReadMutVarOp [aa]
+   = let aa_s      = amodeToStix aa
+         rr_s      = amodeToStix rr
+         var_field = StIndex PtrRep aa_s fixedHS
+         assign    = StAssign PtrRep rr_s (StInd PtrRep var_field)
+     in
+     returnUs (\xs -> assign : xs)
+\end{code}
+
 Now the more mundane operations.
 
 \begin{code}

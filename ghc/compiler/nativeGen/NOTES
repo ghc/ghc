@@ -26,6 +26,10 @@ All these bugs are for x86; I don't know about sparc/alpha.
    by the OS), and (2) if a signal should be handled on that stack
    during argument construction, the args will get silently trashed.
 
+   Currently, implementation of GITOF et al use the stack, so are
+   incompatible with current ccall implementation.  When the latter
+   is fixed, GITOF et al should present no problem.
+
 -- nofib/real/hidden gets slightly different FP answers from the
    via-C route; possibly due to exp/log not being done in-line.
 

@@ -89,6 +89,7 @@ nativeCodeGen absC us
          insns          = initUs_ us1 (codeGen stixOpt)
          debug_stix     = vcat (map pprStixTrees stixOpt)
      in 
+         trace "--------- native code generator ---------"
          (debug_stix, insns)
 \end{code}
 
