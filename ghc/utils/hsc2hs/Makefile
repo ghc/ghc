@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.30 2002/01/29 18:28:49 sof Exp $
+# $Id: Makefile,v 1.31 2002/04/30 14:19:56 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -74,11 +74,11 @@ INSTALL_DATAS += template-hsc.h
 # -----------------------------------------------------------------------------
 # Create driver configuration
 
-CONFIG_HS = Config.hs
+CONFIG_HS   = Config.hs
+CLEAN_FILES += $(CONFIG_HS)
+EXTRA_SRCS  += $(CONFIG_HS)
 
 boot :: $(CONFIG_HS)
-
-all :: $(CONFIG_HS)
 
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@$(RM) -f $(CONFIG_HS)
@@ -94,16 +94,15 @@ else
 endif
 	@echo done.
 
-CLEAN_FILES += $(CONFIG_HS)
-
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
-all clean distclean maintainer-clean ::
+all :: $(HS_PROG)
+	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+
+clean distclean maintainer-clean :: 
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
-
-MKDEPENDHS_SRCS += $(CONFIG_HS)
 
 include $(TOP)/mk/target.mk
 
