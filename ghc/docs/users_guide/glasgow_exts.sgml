@@ -1555,7 +1555,7 @@ implicitly parameterized by a comparison function named <literal>cmp</literal>.
 The dynamic binding constraints are just a new form of predicate in the type class system.
 </para>
 <para>
-An implicit parameter occurs in an exprssion using the special form <literal>?x</literal>, 
+An implicit parameter occurs in an expression using the special form <literal>?x</literal>, 
 where <literal>x</literal> is
 any valid identifier (e.g. <literal>ord ?x</literal> is a valid expression). 
 Use of this construct also introduces a new
@@ -1608,6 +1608,19 @@ Reason: exactly which implicit parameter you pick up depends on exactly where
 you invoke a function. But the ``invocation'' of instance declarations is done
 behind the scenes by the compiler, so it's hard to figure out exactly where it is done.
 Easiest thing is to outlaw the offending types.</para>
+<para>
+Implicit-parameter constraints do not cause ambiguity.  For example, consider:
+<programlisting>
+   f :: (?x :: [a]) => Int -> Int
+   f n = n + length ?x
+
+   g :: (Read a, Show a) => String -> String
+   g s = show (read s)
+</programlisting>
+Here, <literal>g</literal> has an ambiguous type, and is rejected, but <literal>f</literal>
+is fine.  The binding for <literal>?x</literal> at <literal>f</literal>'s call site is 
+quite unambiguous, and fixes the type <literal>a</literal>.
+</para>
 </sect3>
 
 <sect3>
@@ -3272,12 +3285,6 @@ Tim Sheard is going to expand it.)
     </para></listitem>
 
     <listitem><para>
-	    If the module contains any top-level splices that must be run, you must use GHC with
-	    <literal>--make</literal> or <literal>--interactive</literal> flags.  (Reason: that 
-	    means it walks the dependency tree and knows what modules must be linked etc.)
-   </para></listitem>
-
-    <listitem><para>
     You can only run a function at compile time if it is imported from another module.  That is,
 	    you can't define a function in a module, and call it from within a splice in the same module.
 	    (It would make sense to do so, but it's hard to implement.)
@@ -3287,6 +3294,10 @@ Tim Sheard is going to expand it.)
 	    The flag <literal>-ddump-splices</literal> shows the expansion of all top-level splices as they happen.
    </para></listitem>
 </itemizedlist>
+</para>
+<para> Template Haskell works in any mode (<literal>--make</literal>, <literal>--interactive</literal>,
+	or file-at-a-time).  There used to be a restriction to the former two, but that restriction 
+	has been lifted.
 </para>
 </sect2>
  
