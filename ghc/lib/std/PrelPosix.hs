@@ -12,7 +12,7 @@ module PrelPosix where
 -- See above comment for non-Posixness reasons.
 -- #include "PosixSource.h"
 
-#include "HsStd.h"
+#include "config.h"
 
 import PrelBase
 import PrelNum
@@ -39,22 +39,22 @@ import Monad
 data CDir    = CDir
 type CSigset = ()
 
-type CDev    = #type dev_t
-type CIno    = #type ino_t
-type CMode   = #type mode_t
-type COff    = #type off_t
-type CPid    = #type pid_t
+type CDev    = HTYPE_DEV_T
+type CIno    = HTYPE_INO_T
+type CMode   = HTYPE_MODE_T
+type COff    = HTYPE_OFF_T
+type CPid    = HTYPE_PID_T
 
 #ifdef mingw32_TARGET_OS
-type CSsize  = #type size_t
+type CSsize  = HTYPE_SIZE_T
 #else
-type CGid    = #type gid_t
-type CNlink  = #type nlink_t
-type CSsize  = #type ssize_t
-type CUid    = #type uid_t
-type CCc     = #type cc_t
-type CSpeed  = #type speed_t
-type CTcflag = #type tcflag_t
+type CGid    = HTYPE_GID_T
+type CNlink  = HTYPE_NLINK_T
+type CSsize  = HTYPE_SSIZE_T
+type CUid    = HTYPE_UID_T
+type CCc     = HTYPE_CC_T
+type CSpeed  = HTYPE_SPEED_T
+type CTcflag = HTYPE_TCFLAG_T
 #endif
 
 -- ---------------------------------------------------------------------------
