@@ -119,25 +119,10 @@ cd $BUILD_DIR
 tar -cz -f $BUILD_DIR/SOURCES/ghc-$VERSION-src.tar.gz fptools || exit 1
 rm -rf $BUILD_DIR/fptools
 
-# set up the configuration for rpm
-#
-# * !!! this is not really elegant - any better idea?
-#
-our_rcfile=$BUILD_DIR/rpmrc
-our_macrofile=$BUILD_DIR/rpmmacros
-cat >$our_rcfile <<END
-macrofiles: /usr/lib/rpm/macros:/usr/lib/rpm/%{_target}/macros:/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.rpmmacros:$our_macrofile
-END
-
-cat >$our_macrofile <<END
-%_topdir $BUILD_DIR
-END
-
 # Build packages with rpm
 #
 echo "*** Building packages..."
-rcfiles=/usr/lib/rpm/rpmrc:$our_rcfile
-rpm --rcfile "$rcfiles" -ba SPEC/ghc-${VERSION}.spec || exit 1
+rpm --define "_topdir $BUILD_DIR" -ba SPEC/ghc-${VERSION}.spec || exit 1
 echo "*** ...made the packages"
 
 # Cleaning up
