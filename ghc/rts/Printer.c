@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.55 2002/12/19 18:00:42 panne Exp $
+ * $Id: Printer.c,v 1.56 2003/03/25 17:23:05 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -37,9 +37,11 @@ int fixed_hs = FIXED_HS, itbl_sz = sizeofW(StgInfoTable),
 
 static void    printStdObject( StgClosure *obj, char* tag );
 static void    printStdObjPayload( StgClosure *obj );
+#ifdef USING_LIBBFD
 static void    reset_table   ( int size );
 static void    prepare_table ( void );
 static void    insert        ( unsigned value, const char *name );
+#endif
 #if 0 /* unused but might be useful sometime */
 static rtsBool lookup_name   ( char *name, unsigned *result );
 static void    enZcode       ( char *in, char *out );
@@ -672,15 +674,17 @@ struct entry {
     const char *name;
 };
 
-static nat max_table_size;
 static nat table_size;
 static struct entry* table;
+
+#ifdef USING_LIBBFD
+static nat max_table_size;
 
 static void reset_table( int size )
 {
     max_table_size = size;
     table_size = 0;
-    table = (struct entry *) malloc(size * sizeof(struct entry));
+    table = (struct entry *)stgMallocBytes(size * sizeof(struct entry), "Printer.c:reset_table()");
 }
 
 static void prepare_table( void )
@@ -697,7 +701,7 @@ static void insert( unsigned value, const char *name )
     table[table_size].name = name;
     table_size = table_size + 1;
 }
-
+#endif
 
 #if 0
 static rtsBool lookup_name( char *name, unsigned *result )
