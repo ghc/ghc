@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.50 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.51 2000/11/14 12:49:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -581,18 +581,18 @@ STGFUN(stg_RBH_entry)
   FE_
 }
 
-INFO_TABLE(RBH_Save_0_info, RBH_Save_0_entry,0,2,CONSTR,,EF_,0,0);
+INFO_TABLE(stg_RBH_Save_0_info, stg_RBH_Save_0_entry,0,2,CONSTR,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_0);
 
-INFO_TABLE(RBH_Save_1_info, RBH_Save_1_entry,1,1,CONSTR,,EF_,0,0);
+INFO_TABLE(stg_RBH_Save_1_info, stg_RBH_Save_1_entry,1,1,CONSTR,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_1);
 
-INFO_TABLE(RBH_Save_2_info, RBH_Save_2_entry,2,0,CONSTR,,EF_,0,0);
+INFO_TABLE(stg_RBH_Save_2_info, stg_RBH_Save_2_entry,2,0,CONSTR,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(RBH_Save_2);
 #endif /* defined(PAR) || defined(GRAN) */
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
+INFO_TABLE(stg_CAF_BLACKHOLE_info, stg_CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
 STGFUN(stg_CAF_BLACKHOLE_entry)
 {
   FB_
@@ -724,7 +724,7 @@ NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 INFO_TABLE_CONSTR(stg_NO_FINALIZER_info,stg_NO_FINALIZER_entry,0,0,0,CONSTR_NOCAF_STATIC,,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(NO_FINALIZER);
 
-SET_STATIC_HDR(stg_NO_FINALIZER_closure,NO_FINALIZER_info,0/*CC*/,,EI_)
+SET_STATIC_HDR(stg_NO_FINALIZER_closure,stg_NO_FINALIZER_info,0/*CC*/,,EI_)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
