@@ -4,7 +4,7 @@
 #
 
 #
-PROJECTVERSION=$(GhcBuildeeVersion)
+PROJECTVERSION=$(GhcProjectVersion)
 PROJECTNAME=$(GhcProjectName)
 PROJECTPATCHLEVEL=$(GhcProjectPatchLevel)
 
