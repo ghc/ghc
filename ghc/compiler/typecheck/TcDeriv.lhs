@@ -584,7 +584,7 @@ sideConditions
 	(enumClassKey,	   cond_std `andCond` cond_isEnumeration),
 	(ixClassKey,	   cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
 	(boundedClassKey,  cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
- 	(typeableClassKey, cond_glaExts `andCond` cond_allTypeKind),
+ 	(typeableClassKey, cond_glaExts `andCond` cond_typeableOK),
 	(dataClassKey,	   cond_glaExts `andCond` cond_std)
     ]
 
@@ -627,12 +627,17 @@ cond_isProduct (gla_exts, tycon)
   where
     why = quotes (ppr tycon) <+> ptext SLIT("has more than one constructor")
 
-cond_allTypeKind :: Condition
-cond_allTypeKind (gla_exts, tycon)
-  | all (isArgTypeKind . tyVarKind) (tyConTyVars tycon) = Nothing
-  | otherwise	  				     = Just why
+cond_typeableOK :: Condition
+-- OK for Typeable class
+-- Currently: (a) args all of kind *
+--	      (b) 7 or fewer args
+cond_typeableOK (gla_exts, tycon)
+  | tyConArity tycon > 7				      = Just too_many
+  | not (all (isArgTypeKind . tyVarKind) (tyConTyVars tycon)) = Just bad_kind
+  | otherwise	  				              = Nothing
   where
-    why  = quotes (ppr tycon) <+> ptext SLIT("is parameterised over arguments of kind other than `*'")
+    too_many = quotes (ppr tycon) <+> ptext SLIT("has too many arguments")
+    bad_kind = quotes (ppr tycon) <+> ptext SLIT("has arguments of kind other than `*'")
 
 cond_glaExts :: Condition
 cond_glaExts (gla_exts, tycon) | gla_exts  = Nothing
