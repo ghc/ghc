@@ -17,8 +17,8 @@ import CoreSyn
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idInfo, idArity, idCprInfo, idDemandInfo,
-			  modifyIdInfo, isDataConId, isImplicitId, isGlobalId,
+import Id		( Id, idType, idDemandInfo,
+			  isDataConId, isImplicitId, isGlobalId,
 			  idNewStrictness, idNewStrictness_maybe, getNewStrictness, setIdNewStrictness,
 			  idNewDemandInfo, setIdNewDemandInfo, newStrictnessFromOld )
 import IdInfo		( newDemand )
@@ -28,12 +28,10 @@ import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
 import Type		( isUnLiftedType )
 import CoreLint		( showPass, endPass )
-import ErrUtils		( dumpIfSet_dyn )
-import Util		( mapAndUnzip, mapAccumL, mapAccumR, zipWithEqual )
+import Util		( mapAndUnzip, mapAccumL, mapAccumR )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel )
 import Maybes		( orElse, expectJust )
 import Outputable
-import FastTypes
 \end{code}
 
 To think about
@@ -181,18 +179,29 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
 	(alt_ty1, case_bndr')    = annotateBndr alt_ty case_bndr
 	(_, bndrs', _)		 = alt'
 
-	-- Figure out whether the case binder is used, and use
-	-- that to set the keepity of the demand.  This is utterly essential.
+	-- Figure out whether the demand on the case binder is used, and use
+	-- that to set the scrut_dmd.  This is utterly essential.
 	-- Consider	f x = case x of y { (a,b) -> k y a }
 	-- If we just take scrut_demand = U(L,A), then we won't pass x to the
 	-- worker, so the worker will rebuild 
 	--	x = (a, absent-error)
 	-- and that'll crash.
-	dead_case_bndr		 = isAbsentDmd (idNewDemandInfo case_bndr')
-	keepity | dead_case_bndr = Drop
-		| otherwise	 = Keep		
+	-- So at one stage I had:
+	--	dead_case_bndr		 = isAbsentDmd (idNewDemandInfo case_bndr')
+	--	keepity | dead_case_bndr = Drop
+	--		| otherwise	 = Keep		
+	--
+	-- But then consider
+	--	case x of y { (a,b) -> h y + a }
+	-- where h : U(LL) -> T
+	-- The above code would compute a Keep for x, since y is not Abs, which is silly
+	-- The insight is, of course, that a demand on y is a demand on the
+	-- scrutinee, so we need to `both` it with the scrut demand
 
-        scrut_dmd 		 = Seq keepity Now [idNewDemandInfo b | b <- bndrs', isId b]
+        scrut_dmd 		 = Seq Drop Now [idNewDemandInfo b | b <- bndrs', isId b]
+				   `both`
+				   idNewDemandInfo case_bndr'
+
 	(scrut_ty, scrut')       = dmdAnal sigs scrut_dmd scrut
     in
     (alt_ty1 `bothType` scrut_ty, Case scrut' case_bndr' [alt'])
@@ -590,16 +599,14 @@ deferType (DmdType fv _ _) = DmdType (mapVarEnv defer fv) [] TopRes
 	-- We don't want to get a stricness type V->T for f.
 
 defer :: Demand -> Demand
--- c.f. `lub` Abs
-defer Abs	   = Abs
-defer (Seq k _ ds) = Seq k Defer ds
-defer other	   = Lazy
+defer = lub Abs
 
 lazify :: Demand -> Demand
 -- The 'Defer' demands are just Lazy at function boundaries
 lazify (Seq k Defer ds) = Lazy
 lazify (Seq k Now   ds) = Seq k Now (map lazify ds)
-lazify Bot		= Abs	-- Don't pass args that are consumed by bottom
+lazify Bot		= Abs	-- Don't pass args that are consumed by bottom/err
+lazify Err		= Abs
 lazify d		= d
 \end{code}
 
@@ -633,7 +640,9 @@ lub Lazy d = Lazy
 lub Err Bot = Err 
 lub Err d   = d 
 
-lub Abs Bot 	     = Abs
+lub Abs Bot 	     = Abs	-- E.g f x y = if ... then x else error x
+				-- Then for y we get Abs `lub` Bot, and we really
+				-- want Abs overall
 lub Abs Err 	     = Abs
 lub Abs Abs 	     = Abs    
 lub Abs (Seq k _ ds) = Seq k Defer ds	-- Very important ('radicals' example)
@@ -641,7 +650,25 @@ lub Abs d 	     = Lazy
 
 lub Eval Abs	          = Lazy
 lub Eval Lazy	          = Lazy
-lub Eval (Seq k Now   ds) = Eval	-- Was (incorrectly): Seq Keep Now ds
+
+lub Eval (Seq k Now  ds) = Eval		-- Urk!  Is this monotonic?
+	-- Was (incorrectly): 
+	--	lub Eval (Seq k Now ds) = Seq Keep Now ds
+	-- Incorrect because 
+	--	Eval `lub` U(VV) is not S(VV)
+	-- (because the components aren't necessarily evaluated)
+	--
+	-- Was (correctly, but pessimistically): 
+	--	lub Eval (Seq k Now ds) = Eval
+	-- Pessimistic because
+	--	f n []     = n
+	--	f n (x:xs) = f (n+x) xs
+	-- Here we want to do better than just V for n.  It's
+	-- unboxed in the (x:xs) case, and we might be prepared to
+	-- rebox it in the [] case.
+	-- To achieve this we could perhaps consider Eval to be equivalent to
+	--	U(L), or S(A)
+
 lub Eval (Seq k Defer ds) = Lazy
 lub Eval d    	          = Eval
 
