@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.38 1998/04/16 10:04:12 sof Exp $
+# $Id: Makefile,v 1.39 1998/04/30 19:47:45 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -194,6 +194,8 @@ utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 utils/Outputable_HC_OPTS	= -monly-3-regs
+utils/DirUtils_HC_OPTS 		= -fvia-C
+
 
 # Strictness analyser misbehaving in 2.10, fails to terminate on
 # UpdAnal.lhs due to weird recursive datatype.  Bug was exposed by a
