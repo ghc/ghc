@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.13 1999/04/27 12:25:23 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.14 1999/05/04 08:50:43 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -131,11 +131,10 @@ extern int is_heap_alloced(const void* x);
 #define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
 
 /* Tiresome predicates needed to check for pointers into the closure tables */
-#define IS_BOOL_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,PrelBase_Bool_closure_tbl) && stgCast(char*,p) <= (stgCast(char*,PrelBase_Bool_closure_tbl) + 2 * sizeof(StgClosure)))
 #define IS_CHARLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,CHARLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,CHARLIKE_closure) + 255 * sizeof(StgIntCharlikeClosure)))
 #define IS_INTLIKE_CLOSURE(p)  ( stgCast(StgPtr,p) >= stgCast(StgPtr,INTLIKE_closure) && stgCast(char*,p) <= (stgCast(char*,INTLIKE_closure) + 32 * sizeof(StgIntCharlikeClosure)))
 
-#define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r) || IS_BOOL_CLOSURE(r))
+#define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r))
 #else
 #define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
 #define LOOKS_LIKE_STATIC_CLOSURE(r) IS_DATA_PTR(r)
