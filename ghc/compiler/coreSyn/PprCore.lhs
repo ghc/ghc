@@ -309,7 +309,7 @@ pprCoreBinder LambdaBind bndr = pprTypedBinder bndr
 pprCoreBinder CaseBind bndr = pprUntypedBinder bndr
 
 pprUntypedBinder binder
-  | isTyVar binder = ptext SLIT("@") <+> pprTyVarBndr binder
+  | isTyVar binder = ptext SLIT("@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedBinder binder
@@ -321,6 +321,7 @@ pprTypedBinder binder
 	-- It's important that the type is parenthesised too, at least when
 	-- printing interfaces, because we get \ x::(a->b) y::(c->d) -> ...
 
+-- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
 pprIdBndr id = ppr id <+> 
 	       (megaSeqIdInfo (idInfo id) `seq`
