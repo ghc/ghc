@@ -56,6 +56,7 @@ import Channel
 import Semaphore
 import SampleVar
 import PrelConc
+import PrelHandle       ( topHandler )
 import PrelException
 import PrelIOBase	( IO(..) )
 import IO
