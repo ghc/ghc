@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.25 2000/02/17 14:15:10 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.26 2000/02/17 17:19:42 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -200,7 +200,6 @@ void initRtsFlagsDefaults(void)
 
 #if defined(PROFILING) || defined(PAR)
     RtsFlags.CcFlags.doCostCentres	= 0;
-    RtsFlags.CcFlags.sortBy		= SORTCC_TIME;
 #endif /* PROFILING or PAR */
 
 #ifdef PROFILING
@@ -697,20 +696,16 @@ error = rtsTrue;
 
 	      case 'P': /* detailed cost centre profiling (time/alloc) */
 		COST_CENTRE_USING_BUILD_ONLY(
-		RtsFlags.CcFlags.doCostCentres++;
+		RtsFlags.CcFlags.doCostCentres = COST_CENTRES_VERBOSE;
 		)
 	      case 'p': /* cost centre profiling (time/alloc) */
 		COST_CENTRE_USING_BUILD_ONLY(
-		RtsFlags.CcFlags.doCostCentres++;
-
 		switch (rts_argv[arg][2]) {
-		  case SORTCC_LABEL:
-		  case SORTCC_TIME:
-		  case SORTCC_ALLOC:
-			RtsFlags.CcFlags.sortBy = rts_argv[arg][2];
+		  case 'x':
+		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_XML;
 		    break;
 		  default:
-		    	RtsFlags.CcFlags.sortBy = SORTCC_TIME;
+		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_SUMMARY;
 		    break;
 		}
 		) break;

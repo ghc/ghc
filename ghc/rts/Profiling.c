@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.11 1999/11/04 10:15:50 simonmar Exp $
+ * $Id: Profiling.c,v 1.12 2000/02/17 17:19:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -62,7 +62,6 @@ CostCentreStack *CCCS;
  */
 CostCentre *CC_LIST;
 CostCentreStack *CCS_LIST;
-CCSDecList *New_CCS_LIST;
 
 /*
  * Built-in cost centres and cost-centre stacks:
@@ -105,6 +104,16 @@ CCS_DECLARE(CCS_SUBSUMED,   CC_SUBSUMED,   CC_IS_SUBSUMED, );
 CCS_DECLARE(CCS_DONTZuCARE, CC_DONTZuCARE, CC_IS_BORING,   );
 
 /* 
+ * Uniques for the XML log-file format
+ */
+#define CC_UQ         1
+#define CCS_UQ        2
+#define TC_UQ         3
+#define HEAP_OBJ_UQ   4
+#define TIME_UPD_UQ   5
+#define HEAP_UPD_UQ   6
+
+/* 
  * Static Functions
  */
 
@@ -121,6 +130,9 @@ static    CostCentreStack *pruneCCSTree ( CostCentreStack *ccs );
 static    void printCCS            ( CostCentreStack *ccs );
 #endif
 static    void initTimeProfiling   ( void );
+static    void initProfilingLogFile( void );
+
+static    void reportCCS_XML       ( CostCentreStack *ccs );
 
 /* -----------------------------------------------------------------------------
    Initialise the profiling environment
@@ -135,9 +147,9 @@ initProfiling (void)
   CCCS = CCS_SYSTEM;
 
   /* Initialize counters for IDs */
-  CC_ID  = 0;
-  CCS_ID = 0;
-  HP_ID  = 0;
+  CC_ID  = 1;
+  CCS_ID = 1;
+  HP_ID  = 1;
   
   /* Initialize Declaration lists to NULL */
   CC_LIST  = NULL;
@@ -163,11 +175,17 @@ initProfiling (void)
   registerCostCentres();
   CCCS = CCS_SYSTEM;
 
+  /* Set up the log file, and dump the header and cost centre
+   * information into it.
+   */
+  initProfilingLogFile();
+
   /* find all the "special" cost centre stacks, and make them children
    * of CCS_MAIN.
    */
   ASSERT(CCS_MAIN->prevStack == 0);
   CCS_MAIN->root = CC_MAIN;
+  DecCCS(CCS_MAIN);
   for (ccs = CCS_LIST; ccs != CCS_MAIN; ) {
     next = ccs->prevStack;
     ccs->prevStack = 0;
@@ -185,14 +203,40 @@ initProfiling (void)
   }
 }
   
+static void
+initProfilingLogFile(void)
+{
+  /* Initialise the log file name */
+  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+  sprintf(prof_filename, "%s.prof", prog_argv[0]);
+
+  /* open the log file */
+  if ((prof_file = fopen(prof_filename, "w")) == NULL) {
+    fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
+    RtsFlags.CcFlags.doCostCentres = 0;
+    return;
+  }
+  
+  if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
+    /* dump the time, and the profiling interval */
+    fprintf(prof_file, "\"%s\"\n", time_str());
+    fprintf(prof_file, "\"%d ms\"\n", TICK_MILLISECS);
+    
+    /* declare all the cost centres */
+    {
+      CostCentre *cc;
+      for (cc = CC_LIST; cc != NULL; cc = cc->link) {
+	fprintf(prof_file, "%d %d \"%s\" \"%s\" \"%s\"\n",
+		CC_UQ, cc->ccID, cc->label, cc->module, cc->group);
+      }
+    }
+  }
+}
+
 void
 initTimeProfiling(void)
 {
   time_profiling = rtsTrue;
-
-  /* Initialise the log file name */
-  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
-  sprintf(prof_filename, "%s.prof", prog_argv[0]);
 
   /* Start ticking */
   startProfTimer();
@@ -340,7 +384,7 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 CostCentreStack *
 AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 {
-  CostCentreStack *ccs;
+  CostCentreStack *ccs = NULL;
 
   /* Optimisation: if we attempt to append a CCS to itself, we're
    * going to end up with the same ccs after a great deal of pushing
@@ -491,22 +535,19 @@ print_ccs (FILE *fp, CostCentreStack *ccs)
 static void
 DecCCS(CostCentreStack *ccs)
 {
-   CCSDecList *temp_list;
-	
-   temp_list = 
-     (CCSDecList *) stgMallocBytes(sizeof(CCSDecList), 
-				   "Error allocating space for CCSDecList");
-   temp_list->ccs = ccs;
-   temp_list->nextList = New_CCS_LIST;
-   
-   New_CCS_LIST = temp_list;
+  if (prof_file && RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
+    if (ccs->prevStack == EMPTY_STACK)
+      fprintf(prof_file, "%d %d 1 %d\n", CCS_UQ, 
+	      ccs->ccsID, ccs->cc->ccID);
+    else
+      fprintf(prof_file, "%d %d 2 %d %d\n", CCS_UQ, 
+	      ccs->ccsID, ccs->cc->ccID, ccs->prevStack->ccsID);
+  }
 }
 
 /* -----------------------------------------------------------------------------
    Generating a time & allocation profiling report.
    -------------------------------------------------------------------------- */
-
-static FILE *prof_file;
 
 /* -----------------------------------------------------------------------------
    Generating the aggregated per-cost-centre time/alloc report.
@@ -622,20 +663,21 @@ report_ccs_profiling( void )
     rtsBool do_groups = rtsFalse;
 #endif
 
-    if (!RtsFlags.CcFlags.doCostCentres)
-	return;
-
     stopProfTimer();
 
     total_prof_ticks = 0;
     total_alloc = 0;
     count_ticks(CCS_MAIN);
     
-    /* open profiling output file */
-    if ((prof_file = fopen(prof_filename, "w")) == NULL) {
-	fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
-	return;
+    switch (RtsFlags.CcFlags.doCostCentres) {
+    case 0:
+      return;
+    case COST_CENTRES_XML:
+      gen_XML_logfile();
+      return;
+    default:
     }
+
     fprintf(prof_file, "\t%s Time and Allocation Profiling Report  (%s)\n", 
 	    time_str(), "Final");
 
@@ -781,6 +823,38 @@ pruneCCSTree( CostCentreStack *ccs )
     return ccs;
   } else {
     return NULL;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Generate the XML time/allocation profile
+   -------------------------------------------------------------------------- */
+
+void
+gen_XML_logfile( void )
+{
+  fprintf(prof_file, "%d %lu", TIME_UPD_UQ, total_prof_ticks);
+
+  reportCCS_XML(pruneCCSTree(CCS_MAIN));
+
+  fprintf(prof_file, " 0\n");
+
+  fclose(prof_file);
+}
+
+static void 
+reportCCS_XML(CostCentreStack *ccs)
+{
+  CostCentre *cc;
+  IndexTable *i;
+
+  cc = ccs->cc;
+  
+  fprintf(prof_file, " 1 %d %lu %lu %lu", 
+	  ccs->ccsID, ccs->scc_count, ccs->time_ticks, ccs->mem_alloc);
+
+  for (i = ccs->indexTable; i != 0; i = i->next) {
+    reportCCS_XML(i->ccs);
   }
 }
 

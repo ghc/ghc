@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfRts.h,v 1.7 1999/12/03 15:55:29 chak Exp $
+ * $Id: ProfRts.h,v 1.8 2000/02/17 17:19:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,6 +14,7 @@ void endProfiling  ( void );
 
 #ifdef PROFILING
 
+void gen_XML_logfile     ( void );
 void report_ccs_profiling ( void );
 void heap_profile_finish (void);
 

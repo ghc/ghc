@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.20 2000/01/13 14:34:04 hwloidl Exp $
+ * $Id: RtsFlags.h,v 1.21 2000/02/17 17:19:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -72,11 +72,7 @@ struct COST_CENTRE_FLAGS {
 # define COST_CENTRES_SUMMARY	1
 # define COST_CENTRES_VERBOSE	2 /* incl. serial time profile */
 # define COST_CENTRES_ALL	3
-
-    char    sortBy;
-# define SORTCC_LABEL	'C'
-# define SORTCC_TIME 	'T'
-# define SORTCC_ALLOC	'A'
+# define COST_CENTRES_XML       4
 
     int	    ctxtSwitchTicks; /* derived */
     int	    profilerTicks;   /* derived */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.2 1999/09/16 12:29:55 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.3 2000/02/17 17:19:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -50,15 +50,6 @@ initHeapProfiling(void)
 {
     if (! RtsFlags.ProfFlags.doHeapProfile) {
         return 0;
-    }
-
-    sprintf(prof_filename, "%.124s.hp", prog_argv[0]);
-
-    prof_file = fopen(prof_filename, "w");
-    if (prof_file == NULL) {
-	fprintf(stderr, "Can't open heap profiling log file %s\n",
-		prof_filename);
-	return 1;
     }
 
     fprintf(prof_file, "JOB \"%s\"\n", prog_argv[0]);

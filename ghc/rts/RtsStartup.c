@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.28 2000/02/07 20:57:58 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.29 2000/02/17 17:19:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -224,7 +224,7 @@ shutdownHaskell(void)
 #endif
 
 #if defined(PROFILING) 
-  report_ccs_profiling( );
+  report_ccs_profiling();
 #endif
 
 #if defined(TICKY_TICKY)
