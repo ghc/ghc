@@ -113,19 +113,19 @@ obj_sizeW( StgClosure *p, StgInfoTable *info )
     case CONSTR_0_1:
     case FUN_1_0:
     case CONSTR_1_0:
-	return sizeofW(StgHeader) + 1;
     case THUNK_0_1:
+    case THUNK_1_0:
+	return sizeofW(StgHeader) + 1;
     case THUNK_0_2:
     case FUN_0_2:
     case CONSTR_0_2:
-    case THUNK_1_0:
     case THUNK_1_1:
     case FUN_1_1:
     case CONSTR_1_1:
     case THUNK_2_0:
     case FUN_2_0:
     case CONSTR_2_0:
-	return sizeofW(StgHeader) + 2; // MIN_UPD_SIZE
+	return sizeofW(StgHeader) + 2;
     case THUNK_SELECTOR:
 	return THUNK_SELECTOR_sizeW();
     case AP_STACK:
@@ -137,6 +137,7 @@ obj_sizeW( StgClosure *p, StgInfoTable *info )
 	return arr_words_sizeW((StgArrWords *)p);
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
     case TSO:
 	return tso_sizeW((StgTSO *)p);
@@ -461,6 +462,7 @@ update_fwd_large( bdescr *bd )
 
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
       // follow everything 
       {
 	StgPtr next;
@@ -496,6 +498,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     switch (info->type) {
     case FUN_0_1:
     case CONSTR_0_1:
+    case THUNK_0_1:
 	return p + sizeofW(StgHeader) + 1;
 	
     case FUN_1_0:
@@ -505,9 +508,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	
     case THUNK_1_0:
 	thread((StgPtr)&((StgClosure *)p)->payload[0]);
-	return p + sizeofW(StgHeader) + 2; // MIN_UPD_SIZE
+	return p + sizeofW(StgHeader) + 1;
 	
-    case THUNK_0_1: // MIN_UPD_SIZE
     case THUNK_0_2:
     case FUN_0_2:
     case CONSTR_0_2:
@@ -603,6 +605,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 	// follow everything 
     {
 	StgPtr next;
