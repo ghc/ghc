@@ -1,18 +1,13 @@
-* IDoc compatibility, as far as possible
-	- bird-tracks for code blocks
+* Put SrcLocs in DocComments
 
 * facilities for saving interfaces so that you can run Haddock against
   something that isn't the Prelude.
-
------------------------------------------------------------------------------
 
 * Do the unlitting/CPPing from Haddock itself so we get the source file
   links right.
 
 * Allow documentation annotations to explicitly name the entity they
   refer to.
-
-* Allow {- -} style documentation comments in addition to --.
 
 * Add back-references from the definition to the uses of types/classes
   (perhaps in the index?)
@@ -35,8 +30,6 @@
 
 * include file revision info in module headers
 
-* Allow fully hiding modules from the output
-
 * Add a link to the defining location of a re-exported entity
 
 * fixities
@@ -50,10 +43,6 @@
 * check handling of special types ([], (), (,) etc.)
 
 * Horizontal lines?
-
-* enhance the doc string parser:
-	* @...@ for monospaced text
-	* an apostrophe inside a string shouldn't be considered to be a quote
 
 * Do proper dependency analysis rather than relying on laziness to
   sort it out.
