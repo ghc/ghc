@@ -46,7 +46,11 @@ package_details installing =
                             then [ clibdir ]
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
         hs_libraries      = [ "HSrts" ],
+#ifndef mingw32_TARGET_OS
 	extra_libraries   = [],
+#else
+        extra_libraries   = [ "-lwinmm" ], -- for the threadDelay timer
+#endif
         include_dirs   = if installing
                             then [ clibdir ++ "/includes" ]
                             else [ ghc_src_dir cGHC_INCLUDE_DIR ],
