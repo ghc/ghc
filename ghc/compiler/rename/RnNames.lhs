@@ -29,7 +29,7 @@ import Module		( Module, ModuleName, moduleName,
 			  moduleNameUserString, 
 			  unitModuleEnvByName, lookupModuleEnvByName,
 			  moduleEnvElts )
-import Name		( Name, nameSrcLoc, nameOccName, nameModule )
+import Name		( Name, nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
 import OccName		( OccName, dataName, isTcOcc )
@@ -615,9 +615,15 @@ reportUnusedNames gbl_env used_names
     (defined_and_used, defined_but_not_used) = partition used defined_names
     used gre = gre_name gre `elemNameSet` really_used_names
     
-    -- Filter out the ones only defined implicitly
+    -- Filter out the ones that are 
+    --  (a) defined in this module, and
+    --	(b) not defined by a 'deriving' clause 
+    -- The latter have an Internal Name, so we can filter them out easily
     bad_locals :: [GlobalRdrElt]
-    bad_locals = filter isLocalGRE defined_but_not_used
+    bad_locals = filter is_bad defined_but_not_used
+
+    is_bad :: GlobalRdrElt -> Bool
+    is_bad gre = isLocalGRE gre && isExternalName (gre_name gre)
     
     bad_imports :: [GlobalRdrElt]
     bad_imports = filter bad_imp defined_but_not_used
