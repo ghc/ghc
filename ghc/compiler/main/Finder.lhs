@@ -99,7 +99,7 @@ maybeHomeModule mod_name is_source = do
 	]
 
    searchPathExts home_path basename
-	(if is_source then (boot_exts++std_exts) else std_exts ++ boot_exts)
+	(if is_source then boot_exts else (std_exts ++ boot_exts))
 			-- for SOURCE imports, check the hi-boot extensions
 			-- before the source/iface ones, to avoid
 			-- creating circ Makefile deps.
