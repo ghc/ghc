@@ -38,10 +38,6 @@ GHCI_LIBOBJS = $(filter-out PrelMain.$(way_)o,$(HS_OBJS))
 
 BOOT_SRCS += PrelPrimopWrappers.hs
 
-HSC_SRCS = $(wildcard *.hsc)
-HSC_HS   = $(patsubst %.hsc,%.hs, $(HSC_SRCS))
-HS_SRCS := $(HSC_HS) $(filter-out $(HSC_HS),$(HS_SRCS))
-
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
@@ -90,11 +86,6 @@ all :: PrelMain.dll_o
 endif
 
 CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
-
-CLEAN_FILES +=  \
-	$(patsubst %.hsc, %.hs,    $(HSC_SRCS)) \
-	$(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
-	$(patsubst %.hsc, %_hsc.h, $(HSC_SRCS))
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries

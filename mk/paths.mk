@@ -97,7 +97,9 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-SRCS=$(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb)
+HSC_SRCS = $(wildcard *.hsc)
+SRCS     = $(wildcard *.lhs *.hs *.c *.prl *.lprl *.lit *.verb) \
+           $(patsubst %.hsc,%.hs,$(HSC_SRCS))
 
 HS_SRCS=$(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS=$(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
@@ -163,10 +165,12 @@ TAGS_C_SRCS=$(C_SRCS)
 #                        that may require extra tools to create.
 #
 #
-MOSTLY_CLEAN_FILES     += $(HS_OBJS) $(C_OBJS)
-CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
-			  $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_SS) \
-			  a.out
+MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS)
+CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
+		      $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_SS) a.out \
+		      $(patsubst %.hsc,%.hs,$(HSC_SRCS)) \
+		      $(patsubst %.hsc,%_hsc.c,$(HSC_SRCS)) \
+		      $(patsubst %.hsc,%_hsc.h,$(HSC_SRCS))
 
 # Don't clean the .hc files if we're bootstrapping
 ifneq "$(BootingFromHc)" "YES"
