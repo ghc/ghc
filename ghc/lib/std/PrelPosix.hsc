@@ -142,8 +142,8 @@ setEcho fd on = do
     throwErrnoIfMinus1Retry "setEcho"
 	(c_tcgetattr (fromIntegral fd) p_tios)
     c_lflag <- c_lflag p_tios :: IO CTcflag
-    let new_c_lflag | on        = c_lflag .|. prel_echo
-	            | otherwise = c_lflag .&. complement prel_echo
+    let new_c_lflag | on        = c_lflag .|. fromIntegral prel_echo
+	            | otherwise = c_lflag .&. complement (fromIntegral prel_echo)
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
     tcSetAttr fd prel_tcsanow p_tios
 
@@ -153,7 +153,7 @@ getEcho fd = do
     throwErrnoIfMinus1Retry "setEcho"
 	(c_tcgetattr (fromIntegral fd) p_tios)
     c_lflag <- c_lflag p_tios :: IO CTcflag
-    return ((c_lflag .&. prel_echo) /= 0)
+    return ((c_lflag .&. fromIntegral prel_echo) /= 0)
 
 setCooked :: Int -> Bool -> IO ()
 setCooked fd cooked = 
@@ -163,15 +163,15 @@ setCooked fd cooked =
 
     -- turn on/off ICANON
     c_lflag <- c_lflag p_tios :: IO CTcflag
-    let new_c_lflag | cooked    = c_lflag .|. prel_icanon
-	            | otherwise = c_lflag .&. complement prel_icanon
+    let new_c_lflag | cooked    = c_lflag .|. (fromIntegral prel_icanon)
+	            | otherwise = c_lflag .&. complement (fromIntegral prel_icanon)
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
     when cooked $ do
-            c_cc <- prel_ptr_c_cc p_tios
-	    let vmin  = c_cc `plusPtr` prel_vmin  :: Ptr Word8
-		vtime = c_cc `plusPtr` prel_vtime :: Ptr Word8
+            c_cc <- ptr_c_cc p_tios
+	    let vmin  = (c_cc `plusPtr` (fromIntegral prel_vmin))  :: Ptr Word8
+		vtime = (c_cc `plusPtr` (fromIntegral prel_vtime)) :: Ptr Word8
 	    poke vmin  1
 	    poke vtime 0
 
@@ -196,7 +196,7 @@ tcSetAttr fd options p_tios = do
 
 foreign import ccall "prel_lflag" c_lflag :: Ptr Termios -> IO CTcflag
 foreign import ccall "prel_poke_lflag" poke_c_lflag :: Ptr Termios -> CTcflag -> IO ()
-foreign import ccall "prel_ptr_c_cc" ptr_c_cc  :: Ptr Termios -> IO Word8
+foreign import ccall "prel_ptr_c_cc" ptr_c_cc  :: Ptr Termios -> IO (Ptr Word8)
 
 foreign import ccall "prel_echo"      unsafe prel_echo :: CInt
 foreign import ccall "prel_tcsanow"   unsafe prel_tcsanow :: CInt
