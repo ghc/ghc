@@ -61,7 +61,7 @@ import OccName          ( mkSysOccFS,
 			)
 import Module           ( ModuleName, PackageName, mkSysModuleNameFS, mkModule )
 import SrcLoc		( SrcLoc )
-import CmdLineOpts	( opt_InPackage )
+import CmdLineOpts	( opt_InPackage, opt_IgnoreIfacePragmas )
 import Outputable
 import List		( insert )
 import Class            ( DefMeth (..) )
@@ -355,31 +355,47 @@ inst_decl	:  src_loc 'instance' type '=' var_name ';'
 
 --------------------------------------------------------------------------
 
-decls_part :: { [(Version, RdrNameHsDecl)] }
+decls_part :: { [(Version, RdrNameTyClDecl)] }
 decls_part 
 	:  {- empty -}				{ [] }
 	|  opt_version decl ';' decls_part 		{ ($1,$2):$4 }
 
-decl	:: { RdrNameHsDecl }
+decl	:: { RdrNameTyClDecl }
 decl    : src_loc var_name '::' type maybe_idinfo
-  		 	 { SigD (IfaceSig $2 $4 ($5 $2) $1) }
+  		 	{ IfaceSig $2 $4 ($5 $2) $1 }
 	| src_loc 'type' tc_name tv_bndrs '=' type 		       
-			{ TyClD (TySynonym $3 $4 $6 $1) }
+			{ TySynonym $3 $4 $6 $1 }
 	| src_loc 'data' opt_decl_context tc_name tv_bndrs constrs 	       
-	       		{ TyClD (mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1) }
+	       		{ mkTyData DataType $3 $4 $5 $6 (length $6) Nothing $1 }
 	| src_loc 'newtype' opt_decl_context tc_name tv_bndrs newtype_constr
-			{ TyClD (mkTyData NewType $3 $4 $5 $6 1 Nothing $1) }
+			{ mkTyData NewType $3 $4 $5 $6 1 Nothing $1 }
 	| src_loc 'class' opt_decl_context tc_name tv_bndrs fds csigs
-			{ TyClD (mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds $1) }
+			{ mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds $1 }
 
 maybe_idinfo  :: { RdrName -> [HsIdInfo RdrName] }
 maybe_idinfo  : {- empty -} 	{ \_ -> [] }
-	      | pragma		{ \x -> case $1 of
-				     POk _ (PIdInfo id_info) -> id_info
-				     PFailed err -> 
-				        pprPanic "IdInfo parse failed" 
-				            (vcat [ppr x, err])
+	      | pragma		{ \x -> if opt_IgnoreIfacePragmas then [] 
+					else case $1 of
+						POk _ (PIdInfo id_info) -> id_info
+						PFailed err -> pprPanic "IdInfo parse failed" 
+								        (vcat [ppr x, err])
 				}
+    {-
+      If a signature decl is being loaded, and opt_IgnoreIfacePragmas is on,
+      we toss away unfolding information.
+
+      Also, if the signature is loaded from a module we're importing from source,
+      we do the same. This is to avoid situations when compiling a pair of mutually
+      recursive modules, peering at unfolding info in the interface file of the other, 
+      e.g., you compile A, it looks at B's interface file and may as a result change
+      its interface file. Hence, B is recompiled, maybe changing its interface file,
+      which will the unfolding info used in A to become invalid. Simple way out is to
+      just ignore unfolding info.
+
+      [Jan 99: I junked the second test above.  If we're importing from an hi-boot
+       file there isn't going to *be* any pragma info.  The above comment
+       dates from a time where we picked up a .hi file first if it existed.]
+    -}
 
 pragma	:: { ParseResult IfaceStuff }
 pragma	: src_loc PRAGMA	{ parseIface $2 PState{ bol = 0#, atbol = 1#,

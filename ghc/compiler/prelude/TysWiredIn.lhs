@@ -256,7 +256,6 @@ mk_tc_gen_info mod tc_uniq tc_name tycon
 	name1	    = mkWiredInName  mod occ_name1 fn1_key
 	name2	    = mkWiredInName  mod occ_name2 fn2_key
 	gen_info    = mkTyConGenInfo tycon name1 name2
-	Just (EP id1 id2) = gen_info
 
 unitTyCon     = tupleTyCon Boxed 0
 unitDataConId = dataConId (head (tyConDataCons unitTyCon))
@@ -575,8 +574,6 @@ data (,) a b = (,,) a b
 \begin{code}
 mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
-
-alphaListTy = mkSigmaTy alpha_tyvar [] (mkTyConApp listTyCon alpha_ty)
 
 listTyCon = pcRecDataTyCon listTyConName
 			alpha_tyvar [(True,False)] [nilDataCon, consDataCon]

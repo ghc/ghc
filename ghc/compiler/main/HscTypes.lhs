@@ -60,8 +60,8 @@ import TyCon		( TyCon )
 import BasicTypes	( Version, initialVersion, Fixity )
 
 import HsSyn		( DeprecTxt )
-import RdrHsSyn		( RdrNameHsDecl )
-import RnHsSyn		( RenamedTyClDecl, RenamedIfaceSig, RenamedRuleDecl, RenamedInstDecl )
+import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl )
+import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( CoreRule )
 import Type		( Type )
@@ -138,7 +138,6 @@ data ModIface
      }
 
 data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
-			       dcl_sigs  :: [RenamedIfaceSig],	-- Sorted
 			       dcl_rules :: [RenamedRuleDecl],	-- Sorted
 			       dcl_insts :: [RenamedInstDecl] }	-- Unsorted
 
@@ -451,7 +450,7 @@ including the constructors of a type decl etc.  The Bool is True just
 for the 'main' Name.
 
 \begin{code}
-type DeclsMap = NameEnv (AvailInfo, Bool, (Module, RdrNameHsDecl))
+type DeclsMap = NameEnv (AvailInfo, Bool, (Module, RdrNameTyClDecl))
 
 type IfaceInsts = Bag GatedDecl
 type IfaceRules = Bag GatedDecl

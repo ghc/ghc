@@ -85,23 +85,29 @@ typecheckModule
 	-> HomeSymbolTable
 	-> HomeIfaceTable
 	-> PackageIfaceTable
-	-> RenamedHsModule
-	-> IO (Maybe (TcEnv, TcResults))
+	-> [RenamedHsDecl]
+	-> IO (Maybe TcResults)
 
-typecheckModule dflags this_mod pcs hst hit pit (HsModule mod_name _ _ _ decls _ src_loc)
-  = do env <- initTcEnv global_symbol_table
-       (maybe_result, (errs,warns)) <- initTc dflags env src_loc tc_module
+typecheckModule dflags this_mod pcs hst hit pit decls
+  = do	env <- initTcEnv global_symbol_table
+
+        (maybe_result, (errs,warns)) <- initTc dflags env tc_module
+
+	let maybe_tc_result :: Maybe TcResults
+	    maybe_tc_result = mapMaybe snd maybe_result
+
        printErrorsAndWarnings (errs,warns)
-       printTcDump dflags maybe_result
+       printTcDump dflags maybe_tc_result
+
        if isEmptyBag errs then 
           return Nothing 
          else 
-          return maybe_result
+          return maybe_tc_result
   where
     global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
-    tc_module = fixTc (\ ~(unf_env ,_) 
-		         -> tcModule pcs hst get_fixity this_mod decls unf_env)
+    tc_module :: TcM (TcEnv, TcResults)
+    tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst get_fixity this_mod decls unf_env)
 
     get_fixity :: Name -> Maybe Fixity
     get_fixity nm = lookupTable hit pit nm 	`thenMaybe` \ iface ->
@@ -283,7 +289,7 @@ noMainErr
 
 \begin{code}
 printTcDump dflags Nothing = return ()
-printTcDump dflags (Just (_,results))
+printTcDump dflags (Just results)
   = do dumpIfSet_dyn dflags Opt_D_dump_types 
                      "Type signatures" (dump_sigs results)
        dumpIfSet_dyn dflags Opt_D_dump_tc    

@@ -124,11 +124,10 @@ type TcRef a = IORef a
 
 initTc :: DynFlags 
        -> TcEnv
-       -> SrcLoc
        -> TcM r
        -> IO (Maybe r, (Bag ErrMsg, Bag WarnMsg))
 
-initTc dflags tc_env src_loc do_this
+initTc dflags tc_env do_this
   = do {
       us       <- mkSplitUniqSupply 'a' ;
       us_var   <- newIORef us ;
@@ -138,7 +137,7 @@ initTc dflags tc_env src_loc do_this
 
       let
           init_down = TcDown dflags [] us_var dfun_var
-			     src_loc
+			     noSrcLoc
 			     [] errs_var
       ;
 

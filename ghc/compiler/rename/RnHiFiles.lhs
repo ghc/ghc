@@ -7,8 +7,9 @@
 module RnHiFiles (
 	findAndReadIface, loadInterface, loadHomeInterface, 
 	tryLoadInterface, loadOrphanModules,
+	loadExports, loadFixDecls, loadDeprecs,
 
-	getDeclBinders, getDeclSysBinders,
+	getTyClDeclBinders, 
 	removeContext	 	-- removeContext probably belongs somewhere else
    ) where
 
@@ -16,16 +17,15 @@ module RnHiFiles (
 
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes
-import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..), 
+import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..),
 			  HsType(..), ConDecl(..), 
-			  ForeignDecl(..), ForKind(..), isDynamicExtName,
 			  FixitySig(..), RuleDecl(..),
 			  tyClDeclNames
 			)
-import BasicTypes	( Version )
-import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameRuleDecl,
+import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl,
 			  extractHsTyRdrNames 
 			)
+import BasicTypes	( Version )
 import RnEnv
 import RnMonad
 import ParseIface	( parseIface, IfaceStuff(..) )
@@ -33,7 +33,7 @@ import ParseIface	( parseIface, IfaceStuff(..) )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule,
 			  NamedThing(..),
-			  mkNameEnv, elemNameEnv, extendNameEnv
+			  mkNameEnv, extendNameEnv
 			 )
 import Module		( Module,
 			  moduleName, isModuleInThisPackage,
@@ -162,10 +162,10 @@ tryLoadInterface doc_str mod_name from
 
     loadDecls mod		(iDecls ifaces)	  (pi_decls iface)	`thenRn` \ (decls_vers, new_decls) ->
     loadRules mod		(iRules ifaces)   (pi_rules iface)	`thenRn` \ (rule_vers, new_rules) ->
-    loadFixDecls mod_name	 		  (pi_fixity iface)	`thenRn` \ fix_env ->
-    loadDeprecs mod				  (pi_deprecs iface)	`thenRn` \ deprec_env ->
     foldlRn (loadInstDecl mod)	(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
     loadExports 			 	  (pi_exports iface)	`thenRn` \ (export_vers, avails) ->
+    loadFixDecls mod		 		  (pi_fixity iface)	`thenRn` \ fix_env ->
+    loadDeprecs mod				  (pi_deprecs iface)	`thenRn` \ deprec_env ->
     let
 	version	= VersionInfo { vers_module  = pi_vers iface, 
 				vers_exports = export_vers,
@@ -284,40 +284,26 @@ loadExport this_mod (mod, entities)
 
 loadDecls :: Module 
 	  -> DeclsMap
-	  -> [(Version, RdrNameHsDecl)]
+	  -> [(Version, RdrNameTyClDecl)]
 	  -> RnM d (NameEnv Version, DeclsMap)
 loadDecls mod decls_map decls
   = foldlRn (loadDecl mod) (emptyNameEnv, decls_map) decls
 
 loadDecl :: Module 
 	 -> (NameEnv Version, DeclsMap)
-	 -> (Version, RdrNameHsDecl)
+	 -> (Version, RdrNameTyClDecl)
 	 -> RnM d (NameEnv Version, DeclsMap)
 loadDecl mod (version_map, decls_map) (version, decl)
-  = getDeclBinders new_name decl	`thenRn` \ maybe_avail ->
-    case maybe_avail of {
-	Nothing    -> returnRn (version_map, decls_map);	-- No bindings
-	Just avail -> 
-
-    getDeclSysBinders new_name decl	`thenRn` \ sys_bndrs ->
+  = getIfaceDeclBinders new_name decl	`thenRn` \ full_avail ->
     let
-	full_avail    = addSysAvails avail sys_bndrs
-		-- Add the sys-binders to avail.  When we import the decl,
-		-- it's full_avail that will get added to the 'already-slurped' set (iSlurp)
-		-- If we miss out sys-binders, we'll read the decl multiple times!
-
-	main_name     = availName avail
-	new_decls_map = foldl add_decl decls_map
-				       [ (name, (full_avail, name==main_name, (mod, decl'))) 
-				       | name <- availNames full_avail]
-	add_decl decls_map (name, stuff)
-	  = WARN( name `elemNameEnv` decls_map, ppr name )
-	    extendNameEnv decls_map name stuff
+	main_name     = availName full_avail
+	new_decls_map = extendNameEnvList decls_map stuff
+	stuff  	      = [ (name, (full_avail, name==main_name, (mod, decl))) 
+			| name <- availNames full_avail]
 
 	new_version_map = extendNameEnv version_map main_name version
     in
     returnRn (new_version_map, new_decls_map)
-    }
   where
 	-- newTopBinder puts into the cache the binder with the
 	-- module information set correctly.  When the decl is later renamed,
@@ -327,34 +313,16 @@ loadDecl mod (version_map, decls_map) (version, decl)
 	-- the occurrences, so that doesn't matter
     new_name rdr_name loc = newTopBinder mod rdr_name loc
 
-    {-
-      If a signature decl is being loaded, and optIgnoreIfacePragmas is on,
-      we toss away unfolding information.
-
-      Also, if the signature is loaded from a module we're importing from source,
-      we do the same. This is to avoid situations when compiling a pair of mutually
-      recursive modules, peering at unfolding info in the interface file of the other, 
-      e.g., you compile A, it looks at B's interface file and may as a result change
-      its interface file. Hence, B is recompiled, maybe changing its interface file,
-      which will the unfolding info used in A to become invalid. Simple way out is to
-      just ignore unfolding info.
-
-      [Jan 99: I junked the second test above.  If we're importing from an hi-boot
-       file there isn't going to *be* any pragma info.  Maybe the above comment
-       dates from a time where we picked up a .hi file first if it existed?]
-    -}
-    decl' = case decl of
-	       SigD (IfaceSig name tp ls loc) | opt_IgnoreIfacePragmas
-			 ->  SigD (IfaceSig name tp [] loc)
-	       other	 -> decl
 
 -----------------------------------------------------
 --	Loading fixity decls
 -----------------------------------------------------
 
-loadFixDecls mod_name decls
+loadFixDecls mod decls
   = mapRn (loadFixDecl mod_name) decls	`thenRn` \ to_add ->
     returnRn (mkNameEnv to_add)
+  where
+    mod_name = moduleName mod
 
 loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
   = newGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
@@ -429,7 +397,7 @@ loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
 
 loadDeprecs :: Module -> IfaceDeprecs -> RnM d Deprecations
 loadDeprecs m Nothing				       = returnRn NoDeprecs
-loadDeprecs m (Just (Left txt)) = returnRn (DeprecAll txt)
+loadDeprecs m (Just (Left txt))  = returnRn (DeprecAll txt)
 loadDeprecs m (Just (Right prs)) = setModuleRn m 				$
     				   foldlRn loadDeprec emptyNameEnv prs	`thenRn` \ env ->
 				   returnRn (DeprecSome env)
@@ -454,39 +422,28 @@ It doesn't deal with source-code specific things: @ValD@, @DefD@.  They
 are handled by the sourc-code specific stuff in @RnNames@.
 
 \begin{code}
-getDeclBinders :: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
-		-> RdrNameHsDecl
-		-> RnM d (Maybe AvailInfo)
+getIfaceDeclBinders, getTyClDeclBinders
+	:: (RdrName -> SrcLoc -> RnM d Name)	-- New-name function
+	-> RdrNameTyClDecl
+	-> RnM d AvailInfo
 
-getDeclBinders new_name (TyClD tycl_decl)
+getIfaceDeclBinders new_name tycl_decl
+  = getTyClDeclBinders    new_name tycl_decl	`thenRn` \ avail ->
+    getSysTyClDeclBinders new_name tycl_decl	`thenRn` \ extras ->
+    returnRn (addSysAvails avail extras)
+		-- Add the sys-binders to avail.  When we import the decl,
+		-- it's full_avail that will get added to the 'already-slurped' set (iSlurp)
+		-- If we miss out sys-binders, we'll read the decl multiple times!
+
+getTyClDeclBinders new_name (IfaceSig var ty prags src_loc)
+  = new_name var src_loc			`thenRn` \ var_name ->
+    returnRn (Avail var_name)
+
+getTyClDeclBinders new_name tycl_decl
   = mapRn do_one (tyClDeclNames tycl_decl)	`thenRn` \ (main_name:sub_names) ->
-    returnRn (Just (AvailTC main_name (main_name : sub_names)))
+    returnRn (AvailTC main_name (main_name : sub_names))
   where
     do_one (name,loc) = new_name name loc
-
-getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
-  = new_name var src_loc			`thenRn` \ var_name ->
-    returnRn (Just (Avail var_name))
-
-    -- foreign declarations
-getDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
-  | binds_haskell_name kind dyn
-  = new_name nm loc		    `thenRn` \ name ->
-    returnRn (Just (Avail name))
-
-  | otherwise 		-- a foreign export
-  = lookupOrigName nm `thenRn_` 
-    returnRn Nothing
-
-getDeclBinders new_name (FixD _)    = returnRn Nothing
-getDeclBinders new_name (DeprecD _) = returnRn Nothing
-getDeclBinders new_name (DefD _)    = returnRn Nothing
-getDeclBinders new_name (InstD _)   = returnRn Nothing
-getDeclBinders new_name (RuleD _)   = returnRn Nothing
-
-binds_haskell_name (FoImport _) _   = True
-binds_haskell_name FoLabel      _   = True
-binds_haskell_name FoExport  ext_nm = isDynamicExtName ext_nm
 \end{code}
 
 @getDeclSysBinders@ gets the implicit binders introduced by a decl.
@@ -499,15 +456,16 @@ and the dict fun of an instance decl, because both of these have
 bindings of their own elsewhere.
 
 \begin{code}
-getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ names src_loc))
+getSysTyClDeclBinders new_name (ClassDecl _ cname _ _ sigs _ names src_loc)
   = sequenceRn [new_name n src_loc | n <- names]
 
-getDeclSysBinders new_name (TyClD (TyData _ _ _ _ cons _ _ _ _ _))
+getSysTyClDeclBinders new_name (TyData _ _ _ _ cons _ _ _ _ _)
   = sequenceRn [new_name wkr_name src_loc | ConDecl _ wkr_name _ _ _ src_loc <- cons]
 
-getDeclSysBinders new_name other_decl
+getSysTyClDeclBinders new_name other_decl
   = returnRn []
 \end{code}
+
 
 
 %*********************************************************
@@ -526,9 +484,6 @@ findAndReadIface :: SDoc -> ModuleName
 
 findAndReadIface doc_str mod_name hi_boot_file
   = traceRn trace_msg			`thenRn_`
-      -- we keep two maps for interface files,
-      -- one for 'normal' ones, the other for .hi-boot files,
-      -- hence the need to signal which kind we're interested.
 
     getFinderRn				`thenRn` \ finder ->
     ioToRnM (finder mod_name)		`thenRn` \ maybe_found ->

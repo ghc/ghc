@@ -67,14 +67,15 @@ import List		( partition )
 %************************************************************************
 
 \begin{code}
+completeModDetails :: ModDetails
+	  	   -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
+					-- code generator; they have authoritative arity info
+		   -> [ProtoCoreRule]	-- Tidy orphan rules
+		   -> ModDetails
+
 completeIface :: Maybe ModIface		-- The old interface, if we have it
 	      -> ModIface		-- The new one, minus the decls and versions
-
 	      -> ModDetails		-- The ModDetails for this module
-	      -> [CoreBind] -> [Id]	-- Final bindings, plus the top-level Ids from the
-					-- code generator; they have authoritative arity info
-	      -> [ProtoCoreRule]	-- Tidy orphan rules
-
 	      -> Maybe (ModIface, SDoc)	-- The new one, complete with decls and versions
 					-- The SDoc is a debug document giving differences
 					-- Nothing => no change
@@ -94,9 +95,8 @@ completeIface maybe_old_iface new_iface mod_details
 
 declsFromDetails :: ModDetails -> [CoreBind] -> [Id] -> [ProtoCoreRule] -> IfaceDecls
 declsFromDetails details tidy_binds final_ids tidy_orphan_rules
-   = IfaceDecls { dcl_tycl  = ty_cls_dcls,
+   = IfaceDecls { dcl_tycl  = ty_cls_dcls ++ bagToList val_dcls,
 		  dcl_insts = inst_dcls,
-		  dcl_sigs  = bagToList val_dcls,
 		  dcl_rules = rule_dcls }
    where
      dfun_ids	 = md_insts details
@@ -326,7 +326,7 @@ ifaceId :: (Id -> IdInfo)	-- This function "knows" the extra info added
 	-> Bool			-- True <=> recursive, so don't print unfolding
 	-> Id
 	-> CoreExpr		-- The Id's right hand side
-	-> (RenamedIfaceSig, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
+	-> (RenamedTyClDecl, IdSet)	-- The emitted stuff, plus any *extra* needed Ids
 
 ifaceId get_idinfo is_rec id rhs
   = (IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc,  new_needed_ids)
@@ -484,7 +484,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 				vers_rules   = bumpVersion no_rule_change   (vers_rules   old_version),
 				vers_decls   = sig_vers `plusNameEnv` tc_vers }
 
-    no_output_change = no_sig_change && no_tc_change && no_rule_change && no_export_change
+    no_output_change = no_tc_change && no_rule_change && no_export_change
     no_usage_change  = mi_usages old_iface == mi_usages new_iface
 
     no_export_change = mi_exports old_iface == mi_exports new_iface		-- Kept sorted
@@ -494,30 +494,24 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 	-- Set the flag if anything changes. 
 	-- Assumes that the decls are sorted by hsDeclName.
     old_vers_decls = vers_decls old_version
-    (no_sig_change, pp_sig_diffs, sig_vers) = diffDecls ifaceSigName eq_sig old_vers_decls
-							(dcl_sigs old_decls) (dcl_sigs new_decls)
-    (no_tc_change,  pp_tc_diffs,  tc_vers)  = diffDecls tyClDeclName eq_tc old_vers_decls
-							(dcl_tycl old_decls) (dcl_tycl new_decls)
-
-	-- When seeing if two decls are the same, 
-	-- remember to check whether any relevant fixity has changed
-    eq_sig i1 i2 = i1 == i2 && same_fixity (ifaceSigName i1)
-    eq_tc  d1 d2 = d1 == d2 && all (same_fixity . fst) (tyClDeclNames d1)
-    same_fixity n = lookupNameEnv old_fixities n == lookupNameEnv new_fixities n
+    (no_tc_change,  pp_tc_diffs,  tc_vers) = diffDecls old_vers_decls (dcl_tycl old_decls) (dcl_tycl new_decls)
 
 
-diffDecls :: (Outputable decl)
-	  => (decl->Name)
-	  -> (decl->decl->Bool)	-- True if no change
-	  -> NameEnv Version	-- Old version map
-	  -> [decl] -> [decl]	-- Old and new decls
+
+diffDecls :: NameEnv Version				-- Old version map
+	  -> [RenamedTyClDecl] -> [RenamedTyClDecl]	-- Old and new decls
 	  -> (Bool,		-- True <=> no change
 	      SDoc,		-- Record of differences
 	      NameEnv Version)	-- New version
 
-diffDecls get_name eq old_vers old new
+diffDecls old_vers old new
   = diff True empty emptyNameEnv old new
   where
+	-- When seeing if two decls are the same, 
+	-- remember to check whether any relevant fixity has changed
+    eq_tc  d1 d2 = d1 == d2 && all (same_fixity . fst) (tyClDeclNames d1)
+    same_fixity n = lookupNameEnv old_fixities n == lookupNameEnv new_fixities n
+
     diff ok_so_far pp new_vers []  []      = (ok_so_far, pp, new_vers)
     diff ok_so_far pp new_vers old []      = (False,     pp, new_vers)
     diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers [] nds

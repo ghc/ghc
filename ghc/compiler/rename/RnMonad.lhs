@@ -207,7 +207,7 @@ data ParsedIface
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
       pi_exports   :: (Version, [ExportItem]),		-- Exports
-      pi_decls	   :: [(Version, RdrNameHsDecl)],	-- Local definitions
+      pi_decls	   :: [(Version, RdrNameTyClDecl)],	-- Local definitions
       pi_fixity	   :: [RdrNameFixitySig],		-- Local fixity declarations,
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version

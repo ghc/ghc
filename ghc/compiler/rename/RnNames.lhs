@@ -13,13 +13,14 @@ module RnNames (
 import CmdLineOpts	( DynFlag(..), opt_NoImplicitPrelude )
 
 import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
+			  ForeignDecl(..), ForKind(..), isDynamicExtName,
 			  collectTopBinders
 			)
 import RdrHsSyn		( RdrNameIE, RdrNameImportDecl,
 			  RdrNameHsModule, RdrNameHsDecl
 			)
 import RnIfaces		( getInterfaceExports, recordLocalSlurps )
-import RnHiFiles	( getDeclBinders )
+import RnHiFiles	( getTyClDeclBinders )
 import RnEnv
 import RnMonad
 
@@ -36,6 +37,7 @@ import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual, isUnqual )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
+import SrcLoc		( SrcLoc )
 import Outputable
 import Maybes		( maybeToBool, catMaybes, mapMaybe )
 import UniqFM		( emptyUFM, listToUFM )
@@ -192,7 +194,7 @@ importsFromImportDecl is_unqual (ImportDecl imp_mod_name from qual_only as_mod i
 
 \begin{code}
 importsFromLocalDecls mod_name rec_exp_fn decls
-  = mapRn (getLocalDeclBinders mod rec_exp_fn) decls	`thenRn` \ avails_s ->
+  = mapRn (getLocalDeclBinders (newLocalName mod rec_exp_fn)) decls	`thenRn` \ avails_s ->
 
     let
 	avails = concat avails_s
@@ -219,21 +221,40 @@ importsFromLocalDecls mod_name rec_exp_fn decls
   where
     mod = mkModuleInThisPackage mod_name
 
-getLocalDeclBinders :: Module 
-		    -> (Name -> Bool)	-- Is-exported predicate
+---------------------------
+getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)
 		    -> RdrNameHsDecl -> RnMG Avails
-getLocalDeclBinders mod rec_exp_fn (ValD binds)
+getLocalDeclBinders new_name (ValD binds)
   = mapRn do_one (bagToList (collectTopBinders binds))
   where
-    do_one (rdr_name, loc) = newLocalName mod rec_exp_fn rdr_name loc	`thenRn` \ name ->
+    do_one (rdr_name, loc) = new_name rdr_name loc	`thenRn` \ name ->
 			     returnRn (Avail name)
 
-getLocalDeclBinders mod rec_exp_fn decl
-  = getDeclBinders (newLocalName mod rec_exp_fn) decl	`thenRn` \ maybe_avail ->
-    case maybe_avail of
-	Nothing    -> returnRn []		-- Instance decls and suchlike
-	Just avail -> returnRn [avail]
+getLocalDeclBinders new_name (TyClD tycl_decl)
+  = getTyClDeclBinders new_name tycl_decl	`thenRn` \ avail ->
+    returnRn [avail]
 
+getLocalDeclBinders new_name (ForD (ForeignDecl nm kind _ ext_nm _ loc))
+  | binds_haskell_name kind
+  = new_name nm loc		    `thenRn` \ name ->
+    returnRn [Avail name]
+
+  | otherwise 		-- a foreign export
+  = lookupOrigName nm `thenRn_` 
+    returnRn []
+  where
+    binds_haskell_name (FoImport _) = True
+    binds_haskell_name FoLabel      = True
+    binds_haskell_name FoExport     = isDynamicExtName ext_nm
+
+getLocalDeclBinders new_name (FixD _)    = returnRn []
+getLocalDeclBinders new_name (DeprecD _) = returnRn []
+getLocalDeclBinders new_name (DefD _)    = returnRn []
+getLocalDeclBinders new_name (InstD _)   = returnRn []
+getLocalDeclBinders new_name (RuleD _)   = returnRn []
+
+
+---------------------------
 newLocalName mod rec_exp_fn rdr_name loc 
   = check_unqual rdr_name loc		`thenRn_`
     newTopBinder mod rdr_name loc 	`thenRn` \ name ->

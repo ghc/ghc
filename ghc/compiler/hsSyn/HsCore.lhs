@@ -14,8 +14,7 @@ We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
 module HsCore (
 	UfExpr(..), UfAlt, UfBinder(..), UfNote(..),
 	UfBinding(..), UfConAlt(..),
-	HsIdInfo(..), 
-	IfaceSig(..), ifaceSigName,
+	HsIdInfo(..), pprHsIdInfo,
 
 	eq_ufExpr, eq_ufBinders, pprUfExpr,
 
@@ -312,26 +311,6 @@ eq_ufConAlt env (UfTupleAlt c1)	    (UfTupleAlt c2)	= c1==c2
 eq_ufConAlt env (UfLitAlt l1)	    (UfLitAlt l2)	= l1==l2
 eq_ufConAlt env (UfLitLitAlt s1 t1) (UfLitLitAlt s2 t2) = s1==s2 && eq_hsType env t1 t2
 eq_ufConAlt env _ _ = False
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Signatures in interface files}
-%*									*
-%************************************************************************
-
-\begin{code}
-data IfaceSig name = IfaceSig name (HsType name) [HsIdInfo name] SrcLoc
-
-instance Ord name => Eq (IfaceSig name) where
-  (==) (IfaceSig n1 t1 i1 _) (IfaceSig n2 t2 i2 _) = n1==n2 && t1==t2 && i1==i2
-
-instance (Outputable name) => Outputable (IfaceSig name) where
-    ppr (IfaceSig var ty info _) = hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
-
-ifaceSigName :: IfaceSig name -> name
-ifaceSigName (IfaceSig name _ _ _) = name
 \end{code}
 
 

@@ -9,25 +9,28 @@ module Rename ( renameModule ) where
 #include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation )
-import RnHsSyn		( RenamedHsDecl, 
+import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameDeprecation, 
+			  RdrNameTyClDecl, RdrNameRuleDecl, RdrNameInstDecl
+			)
+import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl,
 			  extractHsTyNames, extractHsCtxtTyNames
 			)
 
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import RnMonad
 import RnNames		( getGlobalNames )
-import RnSource		( rnSourceDecls, rnDecl )
+import RnSource		( rnSourceDecls, rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl )
 import RnIfaces		( getImportedInstDecls, importDecl, mkImportInfo, 
 			  getInterfaceExports,
 			  getImportedRules, getSlurped,
-			  ImportDeclResult(..)
+			  ImportDeclResult(..),
+			  RecompileRequired, recompileRequired
 			)
-import RnHiFiles	( removeContext )
+import RnHiFiles	( findAndReadIface, removeContext, loadExports, loadFixDecls, loadDeprecs )
 import RnEnv		( availName, availsToNameSet, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, sortAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupOrigNames, lookupGlobalRn, 
+			  lookupOrigNames, lookupGlobalRn, newGlobalName,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
@@ -60,7 +63,8 @@ import Maybes		( maybeToBool, catMaybes )
 import Outputable
 import IO		( openFile, IOMode(..) )
 import HscTypes		( Finder, PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
-			  ModIface(..), TyThing(..),
+			  ModIface(..), TyThing(..), WhatsImported(..), 
+			  VersionInfo(..), ImportVersion, IfaceDecls(..),
 			  GlobalRdrEnv, AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
 			  Provenance(..), ImportReason(..), initialVersionInfo,
 			  Deprecations(..), lookupDeprec
@@ -70,12 +74,19 @@ import List		( partition, nub )
 
 
 
+%*********************************************************
+%*						 	 *
+\subsection{The main function: rename}
+%*							 *
+%*********************************************************
+
 \begin{code}
 renameModule :: DynFlags -> Finder 
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
 	     -> IO (PersistentCompilerState, Maybe (ModIface, [RenamedHsDecl]))
+	-- Nothing => some error occurred in the renamer
 
 renameModule dflags finder hit hst old_pcs this_module rdr_module
   = 	-- Initialise the renamer monad
@@ -86,9 +97,9 @@ renameModule dflags finder hit hst old_pcs this_module rdr_module
 	-- Dump any debugging output
 	dump_action ;
 
-	-- Return results
+	-- Return results.  No harm in updating the PCS
 	if errors_found then
-	    return (old_pcs, Nothing)
+	    return (new_pcs, Nothing)
         else
 	    return (new_pcs, maybe_rn_stuff)
     }
@@ -332,8 +343,8 @@ slurpSourceRefs source_binders source_fvs
 	    WiredIn        -> returnRn (decls, fvs, gates `plusFV` getWiredInGates wanted_name)
 	    Deferred       -> returnRn (decls, fvs, gates `addOneFV` wanted_name)	-- It's a type constructor
 			
-	    HereItIs decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			     returnRn (new_decl : decls, 
+	    HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
+			     returnRn (TyClD new_decl : decls, 
 				       fvs1 `plusFV` fvs,
 			   	       gates `plusFV` getGates source_fvs new_decl)
 
@@ -379,8 +390,8 @@ slurpDecl decls fvs wanted_name
   = importDecl wanted_name 		`thenRn` \ import_result ->
     case import_result of
 	-- Found a declaration... rename it
-	HereItIs decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 returnRn (new_decl:decls, fvs1 `plusFV` fvs)
+	HereItIs decl -> rnIfaceTyClDecl decl		`thenRn` \ (new_decl, fvs1) ->
+			 returnRn (TyClD new_decl:decls, fvs1 `plusFV` fvs)
 
 	-- No declaration... (wired in thing, or deferred, or already slurped)
 	other -> returnRn (decls, fvs)
@@ -394,7 +405,8 @@ rnIfaceDecls decls fvs []     = returnRn (decls, fvs)
 rnIfaceDecls decls fvs (d:ds) = rnIfaceDecl d		`thenRn` \ (new_decl, fvs1) ->
 				rnIfaceDecls (new_decl:decls) (fvs1 `plusFV` fvs) ds
 
-rnIfaceDecl (mod, decl) = initIfaceRnMS mod (rnDecl decl)	
+rnIfaceDecl	(mod, decl) = initIfaceRnMS mod (rnDecl decl)	
+rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	
 \end{code}
 
 
@@ -466,10 +478,10 @@ decls for (say) @Eq Wibble@, when they can't possibly be useful.
 vars of the source program, and extracts from the decl the gate names.
 
 \begin{code}
-getGates source_fvs (SigD (IfaceSig _ ty _ _))
+getGates source_fvs (IfaceSig _ ty _ _)
   = extractHsTyNames ty
 
-getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ ))
+getGates source_fvs (ClassDecl ctxt cls tvs _ sigs _ _ _ )
   = (delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		        (hsTyVarNames tvs)
      `addOneToNameSet` cls)
@@ -489,12 +501,12 @@ getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ ))
 		 | otherwise
 		 = emptyFVs
 
-getGates source_fvs (TyClD (TySynonym tycon tvs ty _))
+getGates source_fvs (TySynonym tycon tvs ty _)
   = delListFromNameSet (extractHsTyNames ty)
 		       (hsTyVarNames tvs)
 	-- A type synonym type constructor isn't a "gate" for instance decls
 
-getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _ _))
+getGates source_fvs (TyData _ ctxt tycon tvs cons _ _ _ _ _)
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) cons)
 		       (hsTyVarNames tvs)
     `addOneToNameSet` tycon
@@ -522,8 +534,6 @@ getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _ _))
 		     | otherwise			 = emptyFVs
 
     get_bang bty = extractHsTyNames (getBangType bty)
-
-getGates source_fvs other_decl = emptyFVs
 \end{code}
 
 @getWiredInGates@ is just like @getGates@, but it sees a wired-in @Name@
@@ -627,6 +637,129 @@ rnDeprecs gbl_env Nothing decls
        case maybe_name of
 	 Just n  -> returnRn (Just (n,txt))
 	 Nothing -> returnRn Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Grabbing the old interface file and checking versions}
+%*									*
+%************************************************************************
+
+\begin{code}
+checkOldIface :: DynFlags -> Finder
+	      -> HomeIfaceTable -> HomeSymbolTable
+	      -> PersistentCompilerState
+	      -> Module 
+	      -> Bool 			-- Source unchanged
+	      -> Maybe ModIface 	-- Old interface from compilation manager, if any
+	      -> IO (PersistentCompilerState, Bool, (RecompileRequired, Maybe ModIface))
+				-- True <=> errors happened
+
+checkOldIface dflags finder hit hst pcs mod source_unchanged maybe_iface
+  = initRn dflags finder hit hst pcs mod $
+	
+	-- Load the old interface file, if we havn't already got it
+    loadOldIface mod maybe_iface			`thenRn` \ maybe_iface ->
+
+	-- Check versions
+    recompileRequired mod source_unchanged maybe_iface	`thenRn` \ recompile ->
+
+    returnRn (recompile, maybe_iface)
+\end{code}
+
+
+\begin{code}
+loadOldIface :: Module -> Maybe ModIface -> RnMG (Maybe ModIface)
+loadOldIface mod (Just iface) 
+  = returnRn (Just iface)
+
+loadOldIface mod Nothing
+  = 	-- LOAD THE OLD INTERFACE FILE
+    findAndReadIface doc_str (moduleName mod) False {- Not hi-boot -}	`thenRn` \ read_result ->
+    case read_result of {
+	Left err -> 	-- Old interface file not found, or garbled, so we'd better bail out
+		    traceRn (vcat [ptext SLIT("No old interface file:"), err])	`thenRn_`
+		    returnRn Nothing ;
+
+	Right (_, iface) ->
+
+	-- RENAME IT
+    initIfaceRnMS mod (
+	loadHomeDecls (pi_decls iface)	`thenRn` \ decls ->
+	loadHomeRules (pi_rules iface)	`thenRn` \ rules -> 
+	loadHomeInsts (pi_insts iface)	`thenRn` \ insts ->
+	returnRn (decls, rules, insts)
+    )				`thenRn` \ ((decls_vers, new_decls), (rule_vers, new_rules), new_insts) ->
+
+    mapRn loadHomeUsage	(pi_usages iface)	`thenRn` \ usages ->
+    loadExports 	(pi_exports iface)	`thenRn` \ (export_vers, avails) ->
+    loadFixDecls mod	(pi_fixity iface)	`thenRn` \ fix_env ->
+    loadDeprecs mod	(pi_deprecs iface)	`thenRn` \ deprec_env ->
+    let
+	version	= VersionInfo { vers_module  = pi_vers iface, 
+				vers_exports = export_vers,
+				vers_rules   = rule_vers,
+				vers_decls   = decls_vers }
+
+	decls = IfaceDecls { dcl_tycl = new_decls,
+			     dcl_rules = new_rules,
+			     dcl_insts = new_insts }
+
+ 	mod_iface = ModIface { mi_module = mod, mi_version = version,
+			       mi_exports = avails, mi_orphan = pi_orphan iface,
+			       mi_fixities = fix_env, mi_deprecs = deprec_env,
+			       mi_usages  = usages,
+			       mi_decls   = decls,
+			       mi_globals = panic "No mi_globals in old interface"
+		    }
+    in
+    returnRn (Just mod_iface)
+    }
+
+    
+  where
+    doc_str = ptext SLIT("need usage info from") <+> ppr mod
+\end{code}
+
+\begin{code}
+loadHomeDecls :: [(Version, RdrNameTyClDecl)]
+	      -> RnMS (NameEnv Version, [RenamedTyClDecl])
+loadHomeDecls decls = foldlRn loadHomeDecl (emptyNameEnv, []) decls
+
+loadHomeDecl :: (NameEnv Version, [RenamedTyClDecl])
+	     -> (Version, RdrNameTyClDecl)
+	     -> RnMS (NameEnv Version, [RenamedTyClDecl])
+loadHomeDecl (version_map, decls) (version, decl)
+  = rnTyClDecl decl	`thenRn` \ (decl', _) ->
+    returnRn (extendNameEnv version_map (tyClDeclName decl') version, decl':decls)
+
+------------------
+loadHomeRules :: (Version, [RdrNameRuleDecl])
+	      -> RnMS (Version, [RenamedRuleDecl])
+loadHomeRules (version, rules)
+  = mapAndUnzipRn rnRuleDecl rules	`thenRn` \ (rules', _) ->
+    returnRn (version, rules')
+
+------------------
+loadHomeInsts :: [RdrNameInstDecl]
+	      -> RnMS [RenamedInstDecl]
+loadHomeInsts insts = mapAndUnzipRn rnInstDecl insts	`thenRn` \ (insts', _) ->
+		      returnRn insts'
+
+------------------
+loadHomeUsage :: ImportVersion OccName
+	      -> RnMG (ImportVersion Name)
+loadHomeUsage (mod_name, orphans, is_boot, whats_imported)
+  = rn_imps whats_imported	`thenRn` \ whats_imported' ->
+    returnRn (mod_name, orphans, is_boot, whats_imported')
+  where
+    rn_imps NothingAtAll	   	  = returnRn NothingAtAll
+    rn_imps (Everything v)		  = returnRn (Everything v)
+    rn_imps (Specifically mv ev items rv) = mapRn rn_imp items 	`thenRn` \ items' ->
+					    returnRn (Specifically mv ev items' rv)
+    rn_imp (occ,vers) = newGlobalName mod_name occ	`thenRn` \ name ->
+			returnRn (name,vers)
 \end{code}
 
 
@@ -839,7 +972,7 @@ getRnStats imported_decls
 				 not (isLocallyDefined (availName avail))
 			     ]
 
-	(cd_rd, dd_rd, nd_rd, sd_rd, vd_rd,     _) = count_decls decls_read
+	(cd_rd, dd_rd, nd_rd, sd_rd, vd_rd)        = countTyClDecls decls_read
 	(cd_sp, dd_sp, nd_sp, sd_sp, vd_sp, id_sp) = count_decls imported_decls
 
 	unslurped_insts       = iInsts ifaces
@@ -863,7 +996,7 @@ getRnStats imported_decls
 		 text "cls dcls slurp" <+> fsep (map (ppr . tyClDeclName) 
 					   [d | TyClD d <- imported_decls, isClassDecl d]),
 		 text "cls dcls read"  <+> fsep (map (ppr . tyClDeclName) 
-					   [d | TyClD d <- decls_read, isClassDecl d])]
+					   [d | d <- decls_read, isClassDecl d])]
     in
     returnRn (hcat [text "Renamer stats: ", stats])
 
@@ -876,9 +1009,8 @@ count_decls decls
      inst_decls)
   where
     tycl_decls = [d | TyClD d <- decls]
-    (class_decls, data_decls, newtype_decls, syn_decls) = countTyClDecls tycl_decls
+    (class_decls, data_decls, newtype_decls, syn_decls, val_decls) = countTyClDecls tycl_decls
 
-    val_decls     = length [() | SigD _	  <- decls]
     inst_decls    = length [() | InstD _  <- decls]
 \end{code}    
 

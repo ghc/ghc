@@ -12,7 +12,7 @@ module RnIfaces
 	importDecl, ImportDeclResult(..), recordLocalSlurps, 
 	mkImportInfo, getSlurped,
 
-	recompileRequired
+	RecompileRequired, outOfDate, upToDate, recompileRequired
        )
 where
 
@@ -23,8 +23,10 @@ import HscTypes
 import HsSyn		( HsDecl(..), InstDecl(..),  HsType(..) )
 import HsImpExp		( ImportDecl(..) )
 import BasicTypes	( Version, defaultFixity )
-import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl )
-import RnHiFiles	( tryLoadInterface, loadHomeInterface, loadInterface, loadOrphanModules )
+import RdrHsSyn		( RdrNameHsDecl, RdrNameTyClDecl, RdrNameInstDecl )
+import RnHiFiles	( tryLoadInterface, loadHomeInterface, loadInterface, 
+			  loadOrphanModules
+			)
 import RnEnv
 import RnMonad
 import Name		( Name {-instance NamedThing-}, nameOccName,
@@ -74,6 +76,39 @@ getInterfaceExports mod_name from
     }
     where
       doc_str = sep [ppr mod_name, ptext SLIT("is directly imported")]
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Instance declarations are handled specially}
+%*							*
+%*********************************************************
+
+This has to be in RnIfaces (or RnHiFiles) because it calls loadHomeInterface
+
+\begin{code}
+lookupFixityRn :: Name -> RnMS Fixity
+lookupFixityRn name
+  | isLocallyDefined name
+  = getFixityEnv			`thenRn` \ local_fix_env ->
+    returnRn (lookupLocalFixity local_fix_env name)
+
+  | otherwise	-- Imported
+      -- For imported names, we have to get their fixities by doing a loadHomeInterface,
+      -- and consulting the Ifaces that comes back from that, because the interface
+      -- file for the Name might not have been loaded yet.  Why not?  Suppose you import module A,
+      -- which exports a function 'f', which is defined in module B.  Then B isn't loaded
+      -- right away (after all, it's possible that nothing from B will be used).
+      -- When we come across a use of 'f', we need to know its fixity, and it's then,
+      -- and only then, that we load B.hi.  That is what's happening here.
+  = getHomeIfaceTableRn 		`thenRn` \ hit ->
+    loadHomeInterface doc name		`thenRn` \ ifaces ->
+    case lookupTable hit (iPIT ifaces) name of
+	Just iface -> returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
+	Nothing	   -> returnRn defaultFixity
+  where
+    doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
 
 
@@ -148,28 +183,6 @@ selectGated gates decl_bag
     select (reqd, decl) (yes, no)
 	| isEmptyNameSet (reqd `minusNameSet` gates) = (decl:yes, no)
 	| otherwise				     = (yes,      (reqd,decl) `consBag` no)
-
-lookupFixityRn :: Name -> RnMS Fixity
-lookupFixityRn name
-  | isLocallyDefined name
-  = getFixityEnv			`thenRn` \ local_fix_env ->
-    returnRn (lookupLocalFixity local_fix_env name)
-
-  | otherwise	-- Imported
-      -- For imported names, we have to get their fixities by doing a loadHomeInterface,
-      -- and consulting the Ifaces that comes back from that, because the interface
-      -- file for the Name might not have been loaded yet.  Why not?  Suppose you import module A,
-      -- which exports a function 'f', which is defined in module B.  Then B isn't loaded
-      -- right away (after all, it's possible that nothing from B will be used).
-      -- When we come across a use of 'f', we need to know its fixity, and it's then,
-      -- and only then, that we load B.hi.  That is what's happening here.
-  = getHomeIfaceTableRn 		`thenRn` \ hit ->
-    loadHomeInterface doc name		`thenRn` \ ifaces ->
-    case lookupTable hit (iPIT ifaces) name of
-	Just iface -> returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
-	Nothing	   -> returnRn defaultFixity
-  where
-    doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}
 
 
@@ -369,7 +382,7 @@ data ImportDeclResult
   = AlreadySlurped
   | WiredIn	
   | Deferred
-  | HereItIs (Module, RdrNameHsDecl)
+  | HereItIs (Module, RdrNameTyClDecl)
 
 importDecl name
   = 	-- Check if it was loaded before beginning this module
@@ -507,17 +520,12 @@ type RecompileRequired = Bool
 upToDate  = False	-- Recompile not required
 outOfDate = True	-- Recompile required
 
-recompileRequired :: DynFlags -> Finder
-		  -> HomeIfaceTable -> HomeSymbolTable
-		  -> PersistentCompilerState
-		  -> Module 
+recompileRequired :: Module 
 		  -> Bool 		-- Source unchanged
 		  -> Maybe ModIface 	-- Old interface, if any
-		  -> IO (PersistentCompilerState, Bool, RecompileRequired)
-				-- True <=> errors happened
-recompileRequired dflags finder hit hst pcs mod source_unchanged maybe_iface
-  = initRn dflags finder hit hst pcs mod $
-    traceRn (text "Considering whether compilation is required for" <+> ppr mod <> colon)	`thenRn_`
+		  -> RnMG RecompileRequired
+recompileRequired mod source_unchanged maybe_iface
+  = traceRn (text "Considering whether compilation is required for" <+> ppr mod <> colon)	`thenRn_`
 
 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     if not source_unchanged then

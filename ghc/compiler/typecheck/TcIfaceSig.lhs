@@ -8,7 +8,7 @@ module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), IfaceSig(..), HsTupCon(..) )
+import HsSyn		( HsDecl(..), TyClDecl(..), HsTupCon(..) )
 import TcMonad
 import TcMonoType	( tcHsType )
 				-- NB: all the tyars in interface files are kinded,
@@ -58,7 +58,7 @@ tcInterfaceSigs :: TcEnv		-- Envt to use when checking unfoldings
 
 tcInterfaceSigs unf_env decls
   = listTc [ do_one name ty id_infos src_loc
-	   | SigD (IfaceSig name ty id_infos src_loc) <- decls]
+	   | TyClD (IfaceSig name ty id_infos src_loc) <- decls]
   where
     in_scope_vars = filter isLocallyDefined (tcEnvIds unf_env)
 

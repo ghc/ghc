@@ -67,7 +67,7 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
 		-- in class decls.  ToDo
 
     tycl_decls  = [d | TyClD d <- decls]
-    (class_ds, data_ds, newt_ds, type_ds) = countTyClDecls tycl_decls
+    (class_ds, data_ds, newt_ds, type_ds, _) = countTyClDecls tycl_decls
 
     inst_decls  = [d | InstD d <- decls]
     inst_ds     = length inst_decls

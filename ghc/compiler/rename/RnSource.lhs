@@ -4,7 +4,9 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType ) where
+module RnSource ( rnDecl, rnTyClDecl, rnRuleDecl, rnInstDecl,
+		  rnSourceDecls, rnHsType, rnHsSigType
+	) where
 
 #include "HsVersions.h"
 
@@ -102,20 +104,164 @@ rnDecl :: RdrNameHsDecl -> RnMS (RenamedHsDecl, FreeVars)
 rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
 		      returnRn (ValD new_binds, fvs)
 
+rnDecl (TyClD tycl_decl) = rnTyClDecl tycl_decl	`thenRn` \ (new_decl, fvs) ->
+			   returnRn (TyClD new_decl, fvs)
 
-rnDecl (SigD (IfaceSig name ty id_infos loc))
-  = pushSrcLocRn loc $
-    lookupTopBndrRn name		`thenRn` \ name' ->
-    rnHsType doc_str ty			`thenRn` \ (ty',fvs1) ->
-    mapFvRn rnIdInfo id_infos		`thenRn` \ (id_infos', fvs2) -> 
-    returnRn (SigD (IfaceSig name' ty' id_infos' loc), fvs1 `plusFV` fvs2)
+rnDecl (RuleD rule)
+  = rnRuleDecl rule	`thenRn` \ (new_rule, fvs) ->
+    returnRn (RuleD new_rule, fvs)
+
+rnDecl (InstD inst)
+  = rnInstDecl inst	`thenRn` \ (new_inst, fvs) ->
+    returnRn (InstD new_inst, fvs)
+
+rnDecl (DefD (DefaultDecl tys src_loc))
+  = pushSrcLocRn src_loc $
+    rnHsTypes doc_str tys		`thenRn` \ (tys', fvs) ->
+    returnRn (DefD (DefaultDecl tys' src_loc), fvs)
   where
-    doc_str = text "the interface signature for" <+> quotes (ppr name)
+    doc_str = text "a `default' declaration"
+
+rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
+  = pushSrcLocRn src_loc $
+    lookupOccRn name		        `thenRn` \ name' ->
+    let 
+	extra_fvs FoExport 
+	  | isDyn = lookupOrigNames [makeStablePtr_RDR, deRefStablePtr_RDR,
+				     bindIO_RDR, returnIO_RDR]
+	  | otherwise =
+		lookupOrigNames [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
+		returnRn (addOneFV fvs name')
+	extra_fvs other = returnRn emptyFVs
+    in
+    checkRn (ok_ext_nm ext_nm) (badExtName ext_nm)	`thenRn_`
+
+    extra_fvs imp_exp					`thenRn` \ fvs1 -> 
+
+    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs2) ->
+    returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
+	      fvs1 `plusFV` fvs2)
+ where
+  fo_decl_msg = ptext SLIT("a foreign declaration")
+  isDyn	      = isDynamicExtName ext_nm
+
+  ok_ext_nm Dynamic 		   = True
+  ok_ext_nm (ExtName nm (Just mb)) = isCLabelString nm && isCLabelString mb
+  ok_ext_nm (ExtName nm Nothing)   = isCLabelString nm
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Instance declarations}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnInstDecl (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc)
+  = pushSrcLocRn src_loc $
+    rnHsSigType (text "an instance decl") inst_ty `thenRn` \ (inst_ty', inst_fvs) ->
+    let
+	inst_tyvars = case inst_ty' of
+			HsForAllTy (Just inst_tyvars) _ _ -> inst_tyvars
+			other			          -> []
+	-- (Slightly strangely) the forall-d tyvars scope over
+	-- the method bindings too
+    in
+
+	-- Rename the bindings
+	-- NB meth_names can be qualified!
+    checkDupNames meth_doc meth_names 		`thenRn_`
+    extendTyVarEnvFVRn (map hsTyVarName inst_tyvars) (		
+	rnMethodBinds [] mbinds
+    )						`thenRn` \ (mbinds', meth_fvs) ->
+    let 
+	binders    = collectMonoBinders mbinds'
+	binder_set = mkNameSet binders
+    in
+	-- Rename the prags and signatures.
+	-- Note that the type variables are not in scope here,
+	-- so that	instance Eq a => Eq (T a) where
+	--			{-# SPECIALISE instance Eq a => Eq (T [a]) #-}
+	-- works OK. 
+	--
+	-- But the (unqualified) method names are in scope
+    bindLocalNames binders (
+       renameSigs (okInstDclSig binder_set) uprags
+    )							`thenRn` \ (new_uprags, prag_fvs) ->
+
+    (case maybe_dfun_rdr_name of
+	Nothing		   -> returnRn (Nothing, emptyFVs)
+
+	Just dfun_rdr_name -> lookupSysBinder dfun_rdr_name	`thenRn` \ dfun_name ->
+			      returnRn (Just dfun_name, unitFV dfun_name)
+    )							`thenRn` \ (maybe_dfun_name, dfun_fv) ->
+
+    -- The typechecker checks that all the bindings are for the right class.
+    returnRn (InstDecl inst_ty' mbinds' new_uprags maybe_dfun_name src_loc,
+	      inst_fvs `plusFV` meth_fvs `plusFV` prag_fvs `plusFV` dfun_fv)
+  where
+    meth_doc   = text "the bindings in an instance declaration"
+    meth_names = collectLocatedMonoBinders mbinds
 \end{code}
 
 %*********************************************************
 %*							*
-\subsection{Type declarations}
+\subsection{Rules}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnRuleDecl (IfaceRule rule_name vars fn args rhs src_loc)
+  = pushSrcLocRn src_loc	$
+    lookupOccRn fn		`thenRn` \ fn' ->
+    rnCoreBndrs vars		$ \ vars' ->
+    mapFvRn rnCoreExpr args	`thenRn` \ (args', fvs1) ->
+    rnCoreExpr rhs		`thenRn` \ (rhs',  fvs2) ->
+    returnRn (IfaceRule rule_name vars' fn' args' rhs' src_loc, 
+	      (fvs1 `plusFV` fvs2) `addOneFV` fn')
+
+rnRuleDecl (IfaceRuleOut fn rule)
+	-- This one is used for BuiltInRules
+	-- The rule itself is already done, but the thing
+	-- to attach it to is not.
+  = lookupOccRn fn		`thenRn` \ fn' ->
+    returnRn (IfaceRuleOut fn' rule, unitFV fn')
+
+rnRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
+  = ASSERT( null tvs )
+    pushSrcLocRn src_loc			$
+
+    bindTyVarsFV2Rn doc (map UserTyVar sig_tvs)	$ \ sig_tvs' _ ->
+    bindLocalsFVRn doc (map get_var vars)	$ \ ids ->
+    mapFvRn rn_var (vars `zip` ids)		`thenRn` \ (vars', fv_vars) ->
+
+    rnExpr lhs					`thenRn` \ (lhs', fv_lhs) ->
+    rnExpr rhs					`thenRn` \ (rhs', fv_rhs) ->
+    checkRn (validRuleLhs ids lhs')
+	    (badRuleLhsErr rule_name lhs')	`thenRn_`
+    let
+	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
+    in
+    mapRn (addErrRn . badRuleVar rule_name) bad_vars	`thenRn_`
+    returnRn (HsRule rule_name sig_tvs' vars' lhs' rhs' src_loc,
+	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
+  where
+    doc = text "the transformation rule" <+> ptext rule_name
+    sig_tvs = extractRuleBndrsTyVars vars
+  
+    get_var (RuleBndr v)      = v
+    get_var (RuleBndrSig v _) = v
+
+    rn_var (RuleBndr v, id)	 = returnRn (RuleBndr id, emptyFVs)
+    rn_var (RuleBndrSig v t, id) = rnHsType doc t	`thenRn` \ (t', fvs) ->
+				   returnRn (RuleBndrSig id t', fvs)
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Type, class and iface sig declarations}
 %*							*
 %*********************************************************
 
@@ -133,7 +279,16 @@ and then go over it again to rename the tyvars!
 However, we can also do some scoping checks at the same time.
 
 \begin{code}
-rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivings src_loc gen_name1 gen_name2))
+rnTyClDecl (IfaceSig name ty id_infos loc)
+  = pushSrcLocRn loc $
+    lookupTopBndrRn name		`thenRn` \ name' ->
+    rnHsType doc_str ty			`thenRn` \ (ty',fvs1) ->
+    mapFvRn rnIdInfo id_infos		`thenRn` \ (id_infos', fvs2) -> 
+    returnRn (IfaceSig name' ty' id_infos' loc, fvs1 `plusFV` fvs2)
+  where
+    doc_str = text "the interface signature for" <+> quotes (ppr name)
+
+rnTyClDecl (TyData new_or_data context tycon tyvars condecls nconstrs derivings src_loc gen_name1 gen_name2)
   = pushSrcLocRn src_loc $
     lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsFVRn data_doc tyvars		$ \ tyvars' ->
@@ -143,20 +298,20 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivin
     lookupSysBinder gen_name1	                `thenRn` \ name1' ->
     lookupSysBinder gen_name2		        `thenRn` \ name2' ->
     rnDerivs derivings				`thenRn` \ (derivings', deriv_fvs) ->
-    returnRn (TyClD (TyData new_or_data context' tycon' tyvars' condecls' nconstrs
-                     derivings' src_loc name1' name2'),
+    returnRn (TyData new_or_data context' tycon' tyvars' condecls' nconstrs
+                     derivings' src_loc name1' name2',
 	      cxt_fvs `plusFV` con_fvs `plusFV` deriv_fvs)
   where
     data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
 
-rnDecl (TyClD (TySynonym name tyvars ty src_loc))
+rnTyClDecl (TySynonym name tyvars ty src_loc)
   = pushSrcLocRn src_loc $
     doptRn Opt_GlasgowExts			`thenRn` \ glaExts ->
     lookupTopBndrRn name			`thenRn` \ name' ->
     bindTyVarsFVRn syn_doc tyvars 		$ \ tyvars' ->
     rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ (ty', ty_fvs) ->
-    returnRn (TyClD (TySynonym name' tyvars' ty' src_loc), ty_fvs)
+    returnRn (TySynonym name' tyvars' ty' src_loc, ty_fvs)
   where
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 
@@ -165,7 +320,7 @@ rnDecl (TyClD (TySynonym name tyvars ty src_loc))
     unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
     unquantify glaExys ty			     	      = ty
 
-rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds names src_loc))
+rnTyClDecl (ClassDecl context cname tyvars fds sigs mbinds names src_loc)
   = pushSrcLocRn src_loc $
 
     lookupTopBndrRn cname			`thenRn` \ cname' ->
@@ -227,8 +382,8 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds names src_loc))
 	-- The renamer *could* check this for class decls, but can't
 	-- for instance decls.
 
-    returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds'
-			       names' src_loc),
+    returnRn (ClassDecl context' cname' tyvars' fds' (non_ops' ++ sigs') mbinds'
+			       names' src_loc,
 	      sig_fvs	`plusFV`
 
 	      fix_fvs	`plusFV`
@@ -274,164 +429,6 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds names src_loc))
 	)						`thenRn` \ (maybe_dm_stuff', dm_fvs) ->
 
 	returnRn (ClassOpSig op_name maybe_dm_stuff' new_ty locn, op_ty_fvs `plusFV` dm_fvs)
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Instance declarations}
-%*							*
-%*********************************************************
-
-\begin{code}
-rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc))
-  = pushSrcLocRn src_loc $
-    rnHsSigType (text "an instance decl") inst_ty `thenRn` \ (inst_ty', inst_fvs) ->
-    let
-	inst_tyvars = case inst_ty' of
-			HsForAllTy (Just inst_tyvars) _ _ -> inst_tyvars
-			other			          -> []
-	-- (Slightly strangely) the forall-d tyvars scope over
-	-- the method bindings too
-    in
-
-	-- Rename the bindings
-	-- NB meth_names can be qualified!
-    checkDupNames meth_doc meth_names 		`thenRn_`
-    extendTyVarEnvFVRn (map hsTyVarName inst_tyvars) (		
-	rnMethodBinds [] mbinds
-    )						`thenRn` \ (mbinds', meth_fvs) ->
-    let 
-	binders    = collectMonoBinders mbinds'
-	binder_set = mkNameSet binders
-    in
-	-- Rename the prags and signatures.
-	-- Note that the type variables are not in scope here,
-	-- so that	instance Eq a => Eq (T a) where
-	--			{-# SPECIALISE instance Eq a => Eq (T [a]) #-}
-	-- works OK. 
-	--
-	-- But the (unqualified) method names are in scope
-    bindLocalNames binders (
-       renameSigs (okInstDclSig binder_set) uprags
-    )							`thenRn` \ (new_uprags, prag_fvs) ->
-
-    (case maybe_dfun_rdr_name of
-	Nothing		   -> returnRn (Nothing, emptyFVs)
-
-	Just dfun_rdr_name -> lookupSysBinder dfun_rdr_name	`thenRn` \ dfun_name ->
-			      returnRn (Just dfun_name, unitFV dfun_name)
-    )							`thenRn` \ (maybe_dfun_name, dfun_fv) ->
-
-    -- The typechecker checks that all the bindings are for the right class.
-    returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags maybe_dfun_name src_loc),
-	      inst_fvs `plusFV` meth_fvs `plusFV` prag_fvs `plusFV` dfun_fv)
-  where
-    meth_doc   = text "the bindings in an instance declaration"
-    meth_names = collectLocatedMonoBinders mbinds
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Default declarations}
-%*							*
-%*********************************************************
-
-\begin{code}
-rnDecl (DefD (DefaultDecl tys src_loc))
-  = pushSrcLocRn src_loc $
-    rnHsTypes doc_str tys		`thenRn` \ (tys', fvs) ->
-    returnRn (DefD (DefaultDecl tys' src_loc), fvs)
-  where
-    doc_str = text "a `default' declaration"
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Foreign declarations}
-%*							*
-%*********************************************************
-
-\begin{code}
-rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
-  = pushSrcLocRn src_loc $
-    lookupOccRn name		        `thenRn` \ name' ->
-    let 
-	extra_fvs FoExport 
-	  | isDyn = lookupOrigNames [makeStablePtr_RDR, deRefStablePtr_RDR,
-				     bindIO_RDR, returnIO_RDR]
-	  | otherwise =
-		lookupOrigNames [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
-		returnRn (addOneFV fvs name')
-	extra_fvs other = returnRn emptyFVs
-    in
-    checkRn (ok_ext_nm ext_nm) (badExtName ext_nm)	`thenRn_`
-
-    extra_fvs imp_exp					`thenRn` \ fvs1 -> 
-
-    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs2) ->
-    returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
-	      fvs1 `plusFV` fvs2)
- where
-  fo_decl_msg = ptext SLIT("a foreign declaration")
-  isDyn	      = isDynamicExtName ext_nm
-
-  ok_ext_nm Dynamic 		   = True
-  ok_ext_nm (ExtName nm (Just mb)) = isCLabelString nm && isCLabelString mb
-  ok_ext_nm (ExtName nm Nothing)   = isCLabelString nm
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Rules}
-%*							*
-%*********************************************************
-
-\begin{code}
-rnDecl (RuleD (IfaceRule rule_name vars fn args rhs src_loc))
-  = pushSrcLocRn src_loc	$
-    lookupOccRn fn		`thenRn` \ fn' ->
-    rnCoreBndrs vars		$ \ vars' ->
-    mapFvRn rnCoreExpr args	`thenRn` \ (args', fvs1) ->
-    rnCoreExpr rhs		`thenRn` \ (rhs',  fvs2) ->
-    returnRn (RuleD (IfaceRule rule_name vars' fn' args' rhs' src_loc), 
-	      (fvs1 `plusFV` fvs2) `addOneFV` fn')
-
-rnDecl (RuleD (IfaceRuleOut fn rule))
-	-- This one is used for BuiltInRules
-	-- The rule itself is already done, but the thing
-	-- to attach it to is not.
-  = lookupOccRn fn		`thenRn` \ fn' ->
-    returnRn (RuleD (IfaceRuleOut fn' rule), unitFV fn')
-
-rnDecl (RuleD (HsRule rule_name tvs vars lhs rhs src_loc))
-  = ASSERT( null tvs )
-    pushSrcLocRn src_loc			$
-
-    bindTyVarsFV2Rn doc (map UserTyVar sig_tvs)	$ \ sig_tvs' _ ->
-    bindLocalsFVRn doc (map get_var vars)	$ \ ids ->
-    mapFvRn rn_var (vars `zip` ids)		`thenRn` \ (vars', fv_vars) ->
-
-    rnExpr lhs					`thenRn` \ (lhs', fv_lhs) ->
-    rnExpr rhs					`thenRn` \ (rhs', fv_rhs) ->
-    checkRn (validRuleLhs ids lhs')
-	    (badRuleLhsErr rule_name lhs')	`thenRn_`
-    let
-	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
-    in
-    mapRn (addErrRn . badRuleVar rule_name) bad_vars	`thenRn_`
-    returnRn (RuleD (HsRule rule_name sig_tvs' vars' lhs' rhs' src_loc),
-	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
-  where
-    doc = text "the transformation rule" <+> ptext rule_name
-    sig_tvs = extractRuleBndrsTyVars vars
-  
-    get_var (RuleBndr v)      = v
-    get_var (RuleBndrSig v _) = v
-
-    rn_var (RuleBndr v, id)	 = returnRn (RuleBndr id, emptyFVs)
-    rn_var (RuleBndrSig v t, id) = rnHsType doc t	`thenRn` \ (t', fvs) ->
-				   returnRn (RuleBndrSig id t', fvs)
 \end{code}
 
 

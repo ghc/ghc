@@ -44,7 +44,6 @@ type RenamedStmt		= Stmt			Name RenamedPat
 type RenamedFixitySig		= FixitySig		Name
 type RenamedDeprecation		= DeprecDecl		Name
 type RenamedHsOverLit		= HsOverLit		Name
-type RenamedIfaceSig		= IfaceSig		Name
 \end{code}
 
 %************************************************************************

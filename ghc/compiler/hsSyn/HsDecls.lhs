@@ -13,7 +13,6 @@ module HsDecls (
 	ExtName(..), isDynamicExtName, extNameStatic,
 	ConDecl(..), ConDetails(..), 
 	BangType(..), getBangType,
-	IfaceSig(..),  
 	DeprecDecl(..), DeprecTxt,
 	hsDeclName, instDeclName, tyClDeclName, tyClDeclNames,
 	isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule,
@@ -28,7 +27,7 @@ import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig(..) )
 import HsExpr		( HsExpr )
 import HsTypes
 import PprCore		( pprCoreRule )
-import HsCore		( UfExpr(UfVar), UfBinder, IfaceSig(..), ifaceSigName,
+import HsCore		( UfExpr(UfVar), UfBinder, HsIdInfo, pprHsIdInfo,
 			  eq_ufBinders, eq_ufExpr, pprUfExpr, toUfExpr, toUfBndr
 			)
 import CoreSyn		( CoreRule(..) )
@@ -58,7 +57,6 @@ data HsDecl name pat
   | DefD	(DefaultDecl name)
   | ValD	(HsBinds name pat)
   | ForD        (ForeignDecl name)
-  | SigD	(IfaceSig name)
   | FixD	(FixitySig name)
   | DeprecD	(DeprecDecl name)
   | RuleD	(RuleDecl name pat)
@@ -84,7 +82,6 @@ hsDeclName :: (Outputable name, Outputable pat)
 #endif
 hsDeclName (TyClD decl)				    = tyClDeclName decl
 hsDeclName (InstD   decl)			    = instDeclName decl
-hsDeclName (SigD    decl)			    = ifaceSigName decl
 hsDeclName (ForD    (ForeignDecl name _ _ _ _ _))   = name
 hsDeclName (FixD    (FixitySig name _ _))	    = name
 -- Others don't make sense
@@ -103,7 +100,6 @@ instance (Outputable name, Outputable pat)
 	=> Outputable (HsDecl name pat) where
 
     ppr (TyClD dcl)  = ppr dcl
-    ppr (SigD sig)   = ppr sig
     ppr (ValD binds) = ppr binds
     ppr (DefD def)   = ppr def
     ppr (InstD inst) = ppr inst
@@ -117,7 +113,6 @@ instance (Outputable name, Outputable pat)
 instance Ord name => Eq (HsDecl name pat) where
 	-- Used only when comparing interfaces, 
 	-- at which time only signature and type/class decls
-   (SigD s1)  == (SigD s2)  = s1 == s2
    (TyClD d1) == (TyClD d2) = d1 == d2
    _          == _          = False
 \end{code}
@@ -173,7 +168,12 @@ Plan of attack:
 
 \begin{code}
 data TyClDecl name pat
-  = TyData	NewOrData
+  = IfaceSig	name			-- It may seem odd to classify an interface-file signature
+		(HsType name)		-- as a 'TyClDecl', but it's very convenient.  These three
+		[HsIdInfo name]		-- are the kind that appear in interface files.
+		SrcLoc
+
+  | TyData	NewOrData
 		(HsContext name) -- context
 		name		 -- type constructor
 		[HsTyVarBndr name]	 -- type variables
@@ -202,6 +202,7 @@ data TyClDecl name pat
 		SrcLoc
 
 tyClDeclName :: TyClDecl name pat -> name
+tyClDeclName (IfaceSig name _ _ _)	     = name
 tyClDeclName (TyData _ _ name _ _ _ _ _ _ _) = name
 tyClDeclName (TySynonym name _ _ _)          = name
 tyClDeclName (ClassDecl _ name _ _ _ _ _ _)  = name
@@ -222,6 +223,7 @@ tyClDeclNames (ClassDecl _ name _ _ sigs _ _ loc)
 tyClDeclNames (TyData _ _ name _ cons _ _ loc _ _)
   = (name,loc) : conDeclsNames cons
 
+tyClDeclNames (IfaceSig _ _ _ _) = []
 
 type ClassDeclSysNames name = [name]
 	-- 	[tycon, datacon wrapper, datacon worker, 
@@ -252,6 +254,9 @@ isClassDecl other		 	 = False
 \begin{code}
 instance Ord name => Eq (TyClDecl name pat) where
 	-- Used only when building interface files
+  (==) (IfaceSig n1 t1 i1 _)
+       (IfaceSig n2 t2 i2 _) = n1==n2 && t1==t2 && i1==i2
+
   (==) (TyData nd1 cxt1 n1 tvs1 cons1 _ _ _ _ _)
        (TyData nd2 cxt2 n2 tvs2 cons2 _ _ _ _ _)
     = n1 == n2 &&
@@ -294,18 +299,21 @@ eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
 \end{code}
 
 \begin{code}
-countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int)
+countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
  = (length [() | ClassDecl _ _ _ _ _ _ _ _	   <- decls],
     length [() | TyData DataType _ _ _ _ _ _ _ _ _ <- decls],
     length [() | TyData NewType  _ _ _ _ _ _ _ _ _ <- decls],
-    length [() | TySynonym _ _ _ _	           <- decls])
+    length [() | TySynonym _ _ _ _	           <- decls],
+    length [() | IfaceSig _ _ _ _	           <- decls])
 \end{code}
 
 \begin{code}
 instance (Outputable name, Outputable pat)
 	      => Outputable (TyClDecl name pat) where
+
+    ppr (IfaceSig var ty info _) = hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
 
     ppr (TySynonym tycon tyvars mono_ty src_loc)
       = hang (ptext SLIT("type") <+> pp_decl_head [] tycon tyvars <+> equals)
