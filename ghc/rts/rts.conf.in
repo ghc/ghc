@@ -16,8 +16,8 @@ Package {
 # ifndef HAVE_LIBGMP
 			  , "$libdir/ghc/rts/gmp"
 # endif
-			  ],
 #endif
+			  ],
 
         hs_libraries      = [ "HSrts" ],
 	extra_libraries   = [ "gmp"
