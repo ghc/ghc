@@ -1,0 +1,13 @@
+Module version unchanged at 1
+_interface_ MyList 1
+_instance_modules_
+Addr ArrBase Foreign IO PrelBounded PrelNum
+_usages_
+PrelBase 1 :: $d2 1 $d29 1 $d31 1 $d33 1 $d38 1 Eval 1;
+_exports_
+MyList MyList(Empty :::);
+_instances_
+instance _forall_ [a] => {PrelBase.Eval (MyList a)} = $d1;
+_declarations_
+1 $d1 _:_ _forall_ [a] => {PrelBase.Eval (MyList a)} ;;
+1 data MyList a = Empty |  ::: (MyList a) (MyList a) ;
