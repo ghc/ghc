@@ -20,8 +20,8 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
-			  idSpecialisation, idUnique, 
-			  mkVanillaGlobal, isLocalId, isImplicitId,
+			  idSpecialisation, idUnique, isDataConWrapId,
+			  mkVanillaGlobal, isLocalId, 
 			  hasNoBinding, mkUserLocal
 			) 
 import IdInfo		{- loads of stuff -}
@@ -204,8 +204,8 @@ mkFinalTypeEnv type_env final_ids
 	-- in interface files, because they are needed by importing modules when
 	-- using the compilation manager
 
-	-- We keep constructor workers, because they won't appear
-	-- in the bindings from which final_ids are derived!
+	-- We keep "hasNoBinding" Ids, notably constructor workers, 
+	-- because they won't appear in the bindings from which final_ids are derived!
     keep_it (AnId id) = hasNoBinding id	-- Remove all Ids except constructor workers
     keep_it other     = True		-- Keep all TyCons and Classes
 \end{code}
@@ -393,8 +393,26 @@ tidyTopBinder :: Module -> IdEnv Bool
 tidyTopBinder mod ext_ids cg_info_env tidy_env rhs
 	      env@(orig_env2, occ_env2, subst_env2) id
 
-  | isImplicitId id	-- Don't mess with constructors, 
-  = (env, id)		-- record selectors, and the like
+  | isDataConWrapId id	-- Don't tidy constructor wrappers
+  = (env, id)		-- The Id is stored in the TyCon, so it would be bad
+			-- if anything changed
+
+-- HACK ALERT: we *do* tidy record selectors.  Reason: they mention error
+-- messages, which may be floated out:
+--	x_field pt = case pt of
+--			Rect x y -> y
+--			Pol _ _  -> error "buggle wuggle"
+-- The error message will be floated out so we'll get
+--	lvl5 = error "buggle wuggle"
+--	x_field pt = case pt of
+--			Rect x y -> y
+--			Pol _ _  -> lvl5
+--
+-- When this happens, it's vital that the Id exposed to importing modules
+-- (by ghci) mentions lvl5 in its unfolding, not the un-tidied version.
+-- 
+-- What about the Id in the TyCon?  It probably shouldn't be in the TyCon at
+-- all, but in any case it will have the error message inline so it won't matter.
 
   | otherwise
 	-- This function is the heart of Step 2
