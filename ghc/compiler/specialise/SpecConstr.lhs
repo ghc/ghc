@@ -35,6 +35,7 @@ import Util		( mapAccumL )
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
+import UniqFM		( ufmToList )
 \end{code}
 
 -----------------------------------------------------
@@ -222,6 +223,11 @@ data HowBound = RecFun		-- These are the recursive functions for which
 				-- passed as a parameter and what is in scope at the 
 				-- function definition site
 
+instance Outputable HowBound where
+  ppr RecFun = text "RecFun"
+  ppr RecArg = text "RecArg"
+  ppr Other = text "Other"
+
 lookupScopeEnv env v = lookupVarEnv (scope env) v
 
 extendBndrs env bndrs = env { scope = extendVarEnvList (scope env) [(b,Other) | b <- bndrs] }
@@ -370,18 +376,20 @@ scExpr env e@(App _ _)
 scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec [(fn,rhs)])
   | not (null val_bndrs)
-  = scExpr env' body			`thenUs` \ (usg, body') ->
+  = scExpr env_fn_body body		`thenUs` \ (usg, body') ->
     let
 	SCU { calls = calls, occs = occs } = usg
     in
     specialise env fn bndrs body usg	`thenUs` \ (rules, spec_prs) ->
-    returnUs (extendBndrs env bndrs,
+    returnUs (extendBndr env fn,	-- For the body of the letrec, just
+					-- extend the env with Other to record 
+					-- that it's in scope; no funny RecFun business
 	      SCU { calls = calls `delVarEnv` fn, occs = occs `delVarEnvList` val_bndrs},
 	      Rec ((fn `addIdSpecialisations` rules, mkLams bndrs body') : spec_prs))
   where
     (bndrs,body) = collectBinders rhs
     val_bndrs    = filter isId bndrs
-    env'	 = extendRecBndr env fn bndrs
+    env_fn_body	 = extendRecBndr env fn bndrs
 
 scBind env (Rec prs)
   = mapAndUnzipUs do_one prs	`thenUs` \ (usgs, prs') ->
