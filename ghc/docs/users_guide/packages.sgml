@@ -297,6 +297,17 @@
 	    </para>
 	  </listitem>
 	</varlistentry>
+	<varlistentry>
+	  <term><option>&ndash;&ndash;force</option></term>
+	  <indexterm><primary><option>&ndash;&ndash;force</option></primary></indexterm>
+	  <listitem>
+	    <para>Causes <literal>ghc-pkg</literal> to ignore missing
+	    directories and libraries when adding a package, and just
+	    go ahead and add it anyway.  This might be useful if your
+	    package installation system needs to add the package to
+	    GHC before building and installing the files.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
 
       <para>When modifying the configuration file
