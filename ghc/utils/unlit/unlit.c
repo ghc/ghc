@@ -48,7 +48,7 @@
 #define DEFNCHAR       '>'
 #define MISSINGBLANK   "unlit: Program line next to comment"
 #define EMPTYSCRIPT    "unlit: No definitions in file (perhaps you forgot the '>'s?)"
-#define USAGE          "usage: unlit [-q] [-n] [-c] file1 file2\n"
+#define USAGE          "usage: unlit [-q] [-n] [-c] [-#] [-P] [-h label] file1 file2\n"
 #define CANNOTOPEN     "unlit: cannot open \"%s\"\n"
 #define CANNOTWRITE    "unlit: error writing \"%s\"\n"
 #define CANNOTWRITESTDOUT "unlit: error writing standard output\n"
@@ -77,6 +77,7 @@ static int errors = 0;   /* count the number of errors reported              */
 static int crunchnl = 0; /* don't print \n for removed lines                 */
 static int leavecpp = 1; /* leave preprocessor lines */
 static int ignore_shebang = 1; /* Leave out shebang (#!) lines */
+static int no_line_pragma = 0; /* Leave out initial line pragma */
 
 static char* prefix_str = NULL; /* Prefix output with a string */
 
@@ -308,6 +309,7 @@ FILE *ostream; {
  *  -q  quiet mode - do not complain about bad literate script files
  *  -n  noisy mode - complain about bad literate script files.
  *  -r  remove cpp droppings in output.
+ *  -P  don't output any CPP line pragmas.
  * Expects two additional arguments, a file name for the input and a file
  * name for the output file.  These two names must normally be distinct.
  * An exception is made for the special name "-" which can be used in either
@@ -327,6 +329,8 @@ char **argv; {
             noisy = 0;
         else if (strcmp(*argv,"-c")==0)
 	    crunchnl = 1;
+        else if (strcmp(*argv,"-P")==0)
+	    no_line_pragma = 1;
         else if (strcmp(*argv,"-h")==0) {
 	  if (argc > 1) {
 	    argc--; argv++;
@@ -372,7 +376,7 @@ char **argv; {
         }
 
     /* Prefix the output with line pragmas */
-    if (prefix_str) {
+    if (!no_line_pragma && prefix_str) {
       /* Both GHC and CPP understand the #line pragma.
        * We used to throw in both a #line and a {-# LINE #-} pragma
        * here, but CPP doesn't understand {-# LINE #-} so it thought
@@ -380,7 +384,7 @@ char **argv; {
        * #-} before the #line, but there's no point since GHC
        * understands #line anyhow.  --SDM 8/2003
        */
-      fprintf(ostream, "#line 1 \"%s\"\n", prefix_str, prefix_str);
+      fprintf(ostream, "#line 1 \"%s\"\n", prefix_str);
     }
 
     unlit(file, istream, ostream);
