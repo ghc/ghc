@@ -6,20 +6,13 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-
 {-# OPTIONS -fno-prune-tydecls #-}
--- Don't really understand this!
--- ERROR: Can't see the data constructor(s) for _ccall_/_casm_  argument; 
--- type: ForeignObj(try compiling with -fno-prune-tydecls ..)
-
-
 module StringBuffer
        (
         StringBuffer,
 
 	 -- creation
         hGetStringBuffer,  -- :: FilePath       -> IO StringBuffer
-	freeStringBuffer,  -- :: StringBuffer   -> IO ()
 
          -- Lookup
 	currentChar,      -- :: StringBuffer -> Char
@@ -70,15 +63,18 @@ import GlaExts
 import Addr 		( Addr(..) )
 import Foreign
 import ST
-import IO		( openFile, hFileSize, hClose, IOMode(..) )
-
+import IO		( openFile, hFileSize, hClose, IOMode(..)
+#if __GLASGOW_HASKELL__ >= 303
+		        , slurpFile
+#endif
+		        )
 #if __GLASGOW_HASKELL__ < 301
 import IOBase		( IOError(..), IOErrorType(..) )
 import IOHandle		( readHandle, writeHandle, filePtr )
 import PackBase 	( unpackCStringBA )
 #else
-import PrelIOBase	( IOError(..), IOErrorType(..) )
-import PrelHandle	( readHandle, writeHandle, filePtr )
+import PrelIOBase	( IOError(..), IOErrorType(..), haFO__ )
+import PrelHandle	( readHandle, writeHandle )
 import PrelPack		( unpackCStringBA )
 #endif
 
@@ -91,7 +87,6 @@ import Char 		(isDigit)
 data StringBuffer
  = StringBuffer
      Addr#
---     ForeignObj#  -- the data
      Int#         -- length
      Int#         -- lexeme start
      Int#         -- current pos
@@ -105,6 +100,14 @@ instance Text StringBuffer where
 \begin{code}
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname =
+#if __GLASGOW_HASKELL__ >= 303
+    slurpFile fname  >>= \ (a , read) ->
+    let (A# a#) = a
+        (I# read#) = read
+    in
+    _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' a (I# (read# -# 1#)) >>= \ () ->
+    return (StringBuffer a# read# 0# 0#)
+#else
     openFile fname ReadMode >>= \ hndl ->
     hFileSize hndl          >>= \ len@(J# _ _ d#) ->
     let len_i = fromInteger len in
@@ -115,13 +118,14 @@ hGetStringBuffer fname =
     if addr2Int# a# ==# 0# then
        fail (userError ("hGetStringBuffer: Could not allocate "++show len_i ++ " bytes"))
     else
-
---   _casm_ `` %r=NULL; ''		                     >>= \ free_p ->
---    makeForeignObj arr free_p		                     >>= \ fo@(_ForeignObj fo#) ->
-     readHandle hndl        >>= \ hndl_ ->
-     writeHandle hndl hndl_ >>
+    readHandle hndl        >>= \ hndl_ ->
+    writeHandle hndl hndl_ >>
      let ptr = filePtr hndl_ in
-     _ccall_ fread arr (1::Int) len_i ptr                     >>= \  (I# read#) ->
+#if __GLASGOW_HASKELL__ <= 302
+     _ccall_ fread arr (1::Int) len_i (ptr::ForeignObj)               >>= \  (I# read#) ->
+#else
+     _ccall_ fread arr (1::Int) len_i (ptr::Addr)                     >>= \  (I# read#) ->
+#endif
      hClose hndl		     >>
      if read# ==# 0# then -- EOF or some other error
         fail (userError ("hGetStringBuffer: failed to slurp in interface file "++fname))
@@ -130,9 +134,7 @@ hGetStringBuffer fname =
         _casm_ `` ((char *)%0)[(int)%1]=(char)0; '' arr (I# (read# -# 1#)) >>= \ () ->
         return (StringBuffer a# read# 0# 0#)
 
-freeStringBuffer :: StringBuffer -> IO ()
-freeStringBuffer (StringBuffer a# _ _ _) =
- _casm_ `` free((char *)%0); '' (A# a#)
+#endif
 
 unsafeWriteBuffer :: StringBuffer -> Int# -> Char# -> StringBuffer
 unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
@@ -140,30 +142,28 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
    _casm_ `` ((char *)%0)[(int)%1]=(char)%2; '' (A# a) (I# i#) (C# ch#) >>= \ () ->
    return s
  )
-
 \end{code}
 
 Lookup
 
 \begin{code}
-currentChar# :: StringBuffer -> Char#
-currentChar# (StringBuffer fo# _ _ current#) = indexCharOffAddr# fo# current#
-
 currentChar  :: StringBuffer -> Char
 currentChar sb = case currentChar# sb of c -> C# c
 
-indexSBuffer# :: StringBuffer -> Int# -> Char#
-indexSBuffer# (StringBuffer fo# _ _ _) i# = indexCharOffAddr# fo# i#
+lookAhead :: StringBuffer -> Int  -> Char
+lookAhead sb (I# i#) = case lookAhead# sb i# of c -> C# c
 
 indexSBuffer :: StringBuffer -> Int -> Char
 indexSBuffer sb (I# i#) = case indexSBuffer# sb i# of c -> C# c
 
- -- relative lookup, i.e, currentChar = lookAhead 0
+currentChar# :: StringBuffer -> Char#
+indexSBuffer# :: StringBuffer -> Int# -> Char#
 lookAhead# :: StringBuffer -> Int# -> Char#
-lookAhead# (StringBuffer fo# _ _ c#) i# = indexCharOffAddr# fo# (c# +# i#)
+currentChar# (StringBuffer fo# _ _ current#) = indexCharOffAddr# fo# current#
+indexSBuffer# (StringBuffer fo# _ _ _) i# = indexCharOffAddr# fo# i#
 
-lookAhead :: StringBuffer -> Int  -> Char
-lookAhead sb (I# i#) = case lookAhead# sb i# of c -> C# c
+ -- relative lookup, i.e, currentChar = lookAhead 0
+lookAhead# (StringBuffer fo# _ _ c#) i# = indexCharOffAddr# fo# (c# +# i#)
 
 \end{code}
 
@@ -201,6 +201,7 @@ stepOnTo# :: StringBuffer -> Int# -> StringBuffer
 stepOnTo# (StringBuffer fo l _ _) s# = StringBuffer fo l s# s#
 
 stepOnUntil :: (Char -> Bool) -> StringBuffer -> StringBuffer
+
 stepOnUntil pred (StringBuffer fo l# s# c#) =
  loop c#
   where
@@ -240,11 +241,12 @@ expandUntilMatch (StringBuffer fo l# s# c#) str =
   loop c# str
   where
    loop c# [] = StringBuffer fo l# s# c#
-   loop c# ((C# x#):xs) =
-     if indexCharOffAddr# fo c# `eqChar#` x# then
-	loop (c# +# 1#) xs
-     else
-	loop (c# +# 1#) str
+   loop c# ((C# x#):xs)
+      | indexCharOffAddr# fo c# `eqChar#` x#
+      = loop (c# +# 1#) xs
+      | otherwise 
+      = loop (c# +# 1#) str
+	
 \end{code}
 
 \begin{code}
@@ -261,27 +263,29 @@ prefixMatch (StringBuffer fo l# s# c#) str =
   loop c# str
   where
    loop c# [] = Just (StringBuffer fo l# s# c#)
-   loop c# ((C# x#):xs) =
-     if indexCharOffAddr# fo c# `eqChar#` x# then
-	loop (c# +# 1#) xs
-     else
-        Nothing
+   loop c# ((C# x#):xs)
+     | indexCharOffAddr# fo c# `eqChar#` x#
+     = loop (c# +# 1#) xs
+     | otherwise
+     = Nothing
 
 untilEndOfString# :: StringBuffer -> StringBuffer
 untilEndOfString# (StringBuffer fo l# s# c#) = 
  loop c# 
  where
+  getch# i# = indexCharOffAddr# fo i#
+
   loop c# =
-   case indexCharOffAddr# fo c# of
+   case getch# c# of
     '\"'# ->
-       case indexCharOffAddr# fo (c# -# 1#) of
+      case getch# (c# -# 1#) of
 	'\\'# ->       
                   -- looks like an escaped something or other to me,
 		  -- better count the number of "\\"s that are immediately
 		  -- preceeding to decide if the " is escaped.
 	      let
 	       odd_slashes flg i# =
-	        case indexCharOffAddr# fo i# of
+	        case getch# i# of
 	         '\\'# -> odd_slashes (not flg) (i# -# 1#)
 	         _     -> flg
               in
@@ -303,12 +307,14 @@ untilEndOfChar# :: StringBuffer -> StringBuffer
 untilEndOfChar# (StringBuffer fo l# s# c#) = 
  loop c# 
  where
+  getch# i# = indexCharOffAddr# fo i#
+
   loop c# =
-   case indexCharOffAddr# fo c# of
+   case getch# c# of
     '\''# ->
-       case indexCharOffAddr# fo (c# -# 1#) of
+       case getch# (c# -# 1#) of
 	'\\'# ->
-	   case indexCharOffAddr# fo (c# -# 2#) of 	
+	   case getch# (c# -# 2#) of 	
 	     '\\'# -> -- end of char
 		   StringBuffer fo l# s# c#
              _ -> loop (c# +# 1#) -- false alarm
@@ -324,11 +330,11 @@ untilChar# :: StringBuffer -> Char# -> StringBuffer
 untilChar# (StringBuffer fo l# s# c#) x# = 
  loop c# 
  where
-  loop c# =
-   if indexCharOffAddr# fo c# `eqChar#` x# then
-      StringBuffer fo l# s# c#
-   else
-      loop (c# +# 1#)
+  loop c#
+   | indexCharOffAddr# fo c# `eqChar#` x#
+   = StringBuffer fo l# s# c#
+   | otherwise
+   = loop (c# +# 1#)
 
          -- conversion
 lexemeToString :: StringBuffer -> String
