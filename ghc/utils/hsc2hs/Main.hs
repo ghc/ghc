@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.4 2000/12/30 20:06:00 qrczak Exp $
+-- $Id: Main.hs,v 1.5 2001/01/04 13:18:14 simonmar Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -64,7 +64,7 @@ processFile :: [Flag] -> String -> IO ()
 processFile flags name = do
     parsed <- parseFromFile parser name
     case parsed of
-        Left err -> print err
+        Left err -> print err >> exitFailure
         Right toks -> output flags name toks
 
 data Token
