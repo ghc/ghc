@@ -1,5 +1,8 @@
 module Main where
 
+-- This test used to fail in GHC 5.04.2.  See rev. 1.22 of
+-- libraries/base/GHC/Base.lhs for the fix.
+
 data FourArrow = A | B | C | D | E | ABE | AC | BD | CDE
 		 deriving (Eq)
 
