@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.23 1999/12/17 16:34:08 sewardj Exp $                      #
+# $Id: Makefile,v 1.24 1999/12/20 16:55:26 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -49,7 +49,7 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
       ../rts/StgCRun.o
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
-		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lm
+		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lgmp -lm
 
 nHandle$(DYN_EXT): nHandle.c
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.27 $
- * $Date: 1999/12/17 16:34:08 $
+ * $Revision: 1.28 $
+ * $Date: 1999/12/20 16:55:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1329,14 +1329,16 @@ Text t; {
         ERRMSG(0) "Module storage space exhausted"
         EEND;
     }
-    module(moduleHw).text          = t; /* clear new module record         */
-    module(moduleHw).qualImports   = NIL;
-    module(moduleHw).fake          = FALSE;
-    module(moduleHw).exports       = NIL;
-    module(moduleHw).tycons        = NIL;
-    module(moduleHw).names         = NIL;
-    module(moduleHw).classes       = NIL;
-    module(moduleHw).object        = NULL;
+    module(moduleHw).text             = t; /* clear new module record      */
+    module(moduleHw).qualImports      = NIL;
+    module(moduleHw).fake             = FALSE;
+    module(moduleHw).exports          = NIL;
+    module(moduleHw).tycons           = NIL;
+    module(moduleHw).names            = NIL;
+    module(moduleHw).classes          = NIL;
+    module(moduleHw).object           = NULL;
+    module(moduleHw).objectExtras     = NULL;
+    module(moduleHw).objectExtraNames = NIL;
     return moduleHw++;
 }
 
@@ -1437,6 +1439,20 @@ char* nameFromOPtr ( void* p )
 void* lookupOTabName ( Module m, char* sym )
 {
    return ocLookupSym ( module(m).object, sym );
+}
+
+
+void* lookupOExtraTabName ( char* sym )
+{
+   ObjectCode* oc;
+   Module      m;
+   for (m = MODMIN; m < moduleHw; m++) {
+      for (oc = module(m).objectExtras; oc; oc=oc->next) {
+         void* ad = ocLookupSym ( oc, sym );
+         if (ad) return ad;
+      }
+   }
+   return NULL;
 }
 
 
@@ -2965,6 +2981,7 @@ Int what; {
                            mark(module(i).classes);
                            mark(module(i).exports);
                            mark(module(i).qualImports);
+                           mark(module(i).objectExtraNames);
                        }
                        end("Modules", moduleHw-MODMIN);
 

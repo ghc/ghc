@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.22 $
- * $Date: 1999/12/16 16:34:42 $
+ * $Revision: 1.23 $
+ * $Date: 1999/12/20 16:55:27 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -497,6 +497,10 @@ break;
         case PREPREL : 
 
            if (combined) {
+
+               modulePrelude = findFakeModule(textPrelude);
+               module(modulePrelude).objectExtraNames 
+                  = singleton(findText("libHS_cbits"));
 
                nameMkC = addWiredInBoxingTycon("PrelBase","Char",  "C#",1,0,CHAR_REP  );
                nameMkI = addWiredInBoxingTycon("PrelBase","Int",   "I#",1,0,INT_REP   );

@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.22 $
- * $Date: 1999/12/17 16:34:08 $
+ * $Revision: 1.23 $
+ * $Date: 1999/12/20 16:55:28 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -516,8 +516,12 @@ struct Module {
     /* TRUE if module exists only via GHC primop defn; usually FALSE */
     Bool  fake; 
 
-    /* One or more object file descriptors. */
+    /* The primary object file for this module. */
     ObjectCode* object;
+
+    /* And any extras it might need. */
+    ObjectCode* objectExtras;
+    List        objectExtraNames;   /* :: [Text] -- names of extras */
 };
 
 
@@ -536,7 +540,7 @@ extern char*     nameFromOPtr    Args((void*));
 
 extern void          addSection    Args((Module,void*,void*,OSectionKind));
 extern OSectionKind  lookupSection Args((void*));
-
+extern void* lookupOExtraTabName ( char* sym );
 
 #define isPrelude(m) (m==modulePrelude)
 

@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/12/10 15:59:48 $
+ * $Revision: 1.18 $
+ * $Date: 1999/12/20 16:55:27 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -768,6 +768,43 @@ Bool findFilesForModule (
 
    }
    
+}
+
+
+/* If the primaryObjectName for is (eg)
+     /foo/bar/PrelSwamp.o
+   and the extraFileName is (eg)
+     swampy_cbits
+   and DLL_ENDING is set to .o
+   return
+     /foo/bar/swampy_cbits.o
+     and set *extraFileSize to its size, or -1 if not avail
+*/
+String getExtraObjectInfo ( String primaryObjectName,
+                            String extraFileName,
+                            Int*   extraFileSize )
+{
+   Time   xTime;
+   Long   xSize;
+   String xtra;
+
+   Int i = strlen(primaryObjectName)-1;
+   while (i >= 0 && primaryObjectName[i] != SLASH) i--;
+   if (i == -1) return extraFileName;
+   i++;
+   xtra = malloc ( i+3+strlen(extraFileName)+strlen(DLL_ENDING) );
+   if (!xtra) internal("deriveExtraObjectName: malloc failed");
+   strncpy ( xtra, primaryObjectName, i );
+   xtra[i] = 0;
+   strcat ( xtra, extraFileName );
+   strcat ( xtra, DLL_ENDING );
+
+   *extraFileSize = -1;
+   if (readable(xtra)) {
+      getFileInfo ( xtra, &xTime, &xSize );
+      *extraFileSize = xSize;
+   }
+   return xtra;
 }
 
 

@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "config.h"                             /* for linux_TARGET_OS etc */
 #include "object.h"
 
 
@@ -115,7 +116,7 @@ int ocVerifyImage ( ObjectCode* oc, int verb )
 #  endif
    if (verb) fprintf(stderr, "ocVerifyImage: done, status = %d", ret);
 
-   if (ret) oc->status==OBJECT_VERIFIED;
+   if (ret) oc->status = OBJECT_VERIFIED;
    return ret;
 }
 
@@ -133,7 +134,7 @@ int ocGetNames ( ObjectCode* oc, int verb )
    return 0;
 #  endif
    if (verb) fprintf(stderr, "ocGetNames: done, status = %d\n", ret);
-   if (ret) oc->status==OBJECT_HAVENAMES;
+   if (ret) oc->status = OBJECT_HAVENAMES;
    return ret;
 }
 
@@ -151,7 +152,7 @@ int ocResolve ( ObjectCode* oc, int verb )
    return 0;
 #  endif
    if (verb) fprintf(stderr, "ocResolve: done, status = %d\n", ret);
-   if (ret) oc->status==OBJECT_RESOLVED;
+   if (ret) oc->status = OBJECT_RESOLVED;
    return ret;
 }
 
@@ -318,13 +319,16 @@ static char* hackyAppend ( char* s1, char* s2 )
  * ELF specifics
  * ------------------------------------------------------------------------*/
 
+#define FALSE 0
+#define TRUE  1
+
 #if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
 
 #include <elf.h>
 
 static char* findElfSection ( void* objImage, Elf32_Word sh_type )
 {
-   Int i;
+   int i;
    char* ehdrC = (char*)objImage;
    Elf32_Ehdr* ehdr = ( Elf32_Ehdr*)ehdrC;
    Elf32_Shdr* shdr = (Elf32_Shdr*) (ehdrC + ehdr->e_shoff);
@@ -519,17 +523,17 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
    for (i = 0; i < ehdr->e_shnum; i++) {
 
       /* make a HugsDLSection entry for relevant sections */
-      DLSect kind = HUGS_DL_SECTION_OTHER;
+      OSectionKind kind = HUGS_SECTIONKIND_OTHER;
       if (0==strcmp(".data",sh_strtab+shdr[i].sh_name) ||
           0==strcmp(".data1",sh_strtab+shdr[i].sh_name))
-         kind = HUGS_DL_SECTION_RWDATA;
+         kind = HUGS_SECTIONKIND_RWDATA;
       if (0==strcmp(".text",sh_strtab+shdr[i].sh_name) ||
           0==strcmp(".rodata",sh_strtab+shdr[i].sh_name) ||
           0==strcmp(".rodata1",sh_strtab+shdr[i].sh_name))
-         kind = HUGS_DL_SECTION_CODE_OR_RODATA;
-      if (kind != HUGS_DL_SECTION_OTHER)
-         addDLSect (
-            m,
+         kind = HUGS_SECTIONKIND_CODE_OR_RODATA;
+      if (kind != HUGS_SECTIONKIND_OTHER)
+         addSection (
+            oc,
             ehdrC + shdr[i].sh_offset, 
             ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1,
             kind
@@ -546,8 +550,8 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
               )
               &&
               ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
-                ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT ||
-                ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE)
+                ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT)
+	      /* || ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE */
 	      ) {
             char* nm = strtab + stab[j].st_name;
             char* ad = ehdrC 
@@ -557,13 +561,13 @@ static int ocGetNames_ELF ( ObjectCode* oc, int verb )
             assert(ad);
             if (verb)
                fprintf(stderr, "addOTabName: %10p  %s %s\n",
-                       ad, textToStr(module(m).text), nm );
+                       ad, oc->objFileName, nm );
             addSymbol ( oc, nm, ad );
          }
-	 //else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
+	 else fprintf(stderr, "skipping `%s'\n", strtab + stab[j].st_name );
       }
-
    }
+   return TRUE;
 }
 
 
@@ -592,9 +596,9 @@ static int ocResolve_ELF ( ObjectCode* oc, int verb )
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type == SHT_REL ) {
          Elf32_Rel*  rtab = (Elf32_Rel*) (ehdrC + shdr[i].sh_offset);
-         Int         nent = shdr[i].sh_size / sizeof(Elf32_Rel);
-         Int target_shndx = shdr[i].sh_info;
-         Int symtab_shndx = shdr[i].sh_link;
+         int         nent = shdr[i].sh_size / sizeof(Elf32_Rel);
+         int target_shndx = shdr[i].sh_info;
+         int symtab_shndx = shdr[i].sh_link;
          stab  = (Elf32_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
          targ  = (Elf32_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
          if (verb)
@@ -628,7 +632,7 @@ static int ocResolve_ELF ( ObjectCode* oc, int verb )
                   /* No?  Perhaps it's a named symbol in this file. */
                   strcpy ( symbol, strtab+stab[ ELF32_R_SYM(info)].st_name );
                   if (verb) fprintf ( stderr, "`%s'  ", symbol );
-                  S = (Elf32_Addr)lookupSymbol ( oc, symbol );
+                  S = (Elf32_Addr)ocLookupSym ( oc, symbol );
                   if (!S) {
                      /* No?  Ok, too hard.  Hand the problem to the client. 
                         And if that fails, we're outta options.

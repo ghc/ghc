@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.21 $
- * $Date: 1999/12/10 15:59:43 $
+ * $Revision: 1.22 $
+ * $Date: 1999/12/20 16:55:26 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -565,4 +565,6 @@ extern List /* of ZTriple(I_INTERFACE,
 extern Void hi_o_namesFromSrcName Args((String,String*,String* oName));
 extern Cell parseInterface        Args((String,Long));
 
-
+extern String getExtraObjectInfo ( String primaryObjectName,
+                                   String extraFileName,
+                                   Int*   extraFileSize );

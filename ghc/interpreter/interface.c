@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/12/17 16:34:08 $
+ * $Revision: 1.14 $
+ * $Date: 1999/12/20 16:55:26 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -957,49 +957,74 @@ void startGHCModule_errMsg ( char* msg )
 
 void* startGHCModule_clientLookup ( char* sym )
 {
+   /* fprintf ( stderr, "CLIENTLOOKUP %s\n", sym ); */
    return lookupObjName ( sym );
+}
+
+ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
+{
+   ObjectCode* oc
+      = ocNew ( startGHCModule_errMsg,
+                startGHCModule_clientLookup,
+                objNm, objSz );
+    
+    if (!oc) {
+       ERRMSG(0) "Storage allocation for object file \"%s\" failed", objNm
+       EEND;
+    }
+    if (!ocLoadImage(oc,VERBOSE)) {
+       ERRMSG(0) "Reading of object file \"%s\" failed", objNm
+       EEND;
+    }
+    if (!ocVerifyImage(oc,VERBOSE)) {
+       ERRMSG(0) "Validation of object file \"%s\" failed", objNm
+       EEND;
+    }
+    if (!ocGetNames(oc,0||VERBOSE)) {
+       ERRMSG(0) "Reading of symbol names in object file \"%s\" failed", objNm
+       EEND;
+    }
+    return oc;
 }
 
 Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
 {
-    Module m = findModule(mname);
+   List   xts;
+   Module m = findModule(mname);
 
-    if (isNull(m)) {
-       m = newModule(mname);
-       fprintf ( stderr, "startGHCIface: name %16s   objsize %d\n", 
-                          textToStr(mname), sizeObj );
-    } else {
-       if (module(m).fake) {
-          module(m).fake = FALSE;
-       } else {
-          ERRMSG(0) "Module \"%s\" already loaded", textToStr(mname)
-          EEND;
-       }
-    }
+   if (isNull(m)) {
+      m = newModule(mname);
+      fprintf ( stderr, "startGHCIface: name %16s   objsize %d\n", 
+                         textToStr(mname), sizeObj );
+   } else {
+      if (module(m).fake) {
+         module(m).fake = FALSE;
+      } else {
+         ERRMSG(0) "Module \"%s\" already loaded", textToStr(mname)
+         EEND;
+      }
+   }
 
-    module(m).object
-       = ocNew ( startGHCModule_errMsg,
-                 startGHCModule_clientLookup,
-                 textToStr(nameObj),
-                 sizeObj );
-    
-    if (!module(m).object) {
-       ERRMSG(0) "Object loading failed for module \"%s\"",
-                 textToStr(mname)
-       EEND;
-    }
+   /* Get hold of the primary object for the module. */
+   module(m).object
+      = startGHCModule_partial_load ( textToStr(nameObj), sizeObj );
 
-    if (!ocVerifyImage(module(m).object,VERBOSE)) {
-       ERRMSG(0) "Validation of object file \"%s\" failed", 
-                 textToStr(nameObj)
-       EEND;
-    }
-
-    if (!ocGetNames(module(m).object,VERBOSE)) {
-       ERRMSG(0) "Reading of symbol names in object file \"%s\" failed", 
-                 textToStr(nameObj)
-       EEND;
-    }
+   /* and any extras ... */
+   for (xts = module(m).objectExtraNames; nonNull(xts); xts=tl(xts)) {
+      Int         size;
+      ObjectCode* oc;
+      Text        xtt = hd(xts);
+      String      nm  = getExtraObjectInfo ( textToStr(nameObj),
+                                             textToStr(xtt),
+                                             &size );
+      if (size == -1) {
+         ERRMSG(0) "Can't find extra object file \"%s\"", nm
+         EEND;
+      }
+      oc = startGHCModule_partial_load ( nm, size );
+      oc->next = module(m).objectExtras;
+      module(m).objectExtras = oc;
+   }
 }
 
 
@@ -1031,11 +1056,12 @@ Void startGHCModule ( Text mname, Int sizeObj, Text nameObj )
 Void finishGHCModule ( Cell root ) 
 {
    /* root :: I_INTERFACE */
-   Cell   iface       = unap(I_INTERFACE,root);
-   ConId  iname       = zfst(iface);
-   Module mod         = findModule(textOf(iname));
-   List   exlist_list = NIL;
-   List   t;
+   Cell        iface       = unap(I_INTERFACE,root);
+   ConId       iname       = zfst(iface);
+   Module      mod         = findModule(textOf(iname));
+   List        exlist_list = NIL;
+   List        t;
+   ObjectCode* oc;
 
    fprintf(stderr, "begin finishGHCModule %s\n", textToStr(textOf(iname)));
 
@@ -1171,8 +1197,13 @@ Void finishGHCModule ( Cell root )
    }
 
    /* Last, but by no means least ... */
-   if (!ocResolve(module(mod).object,VERBOSE))
+   if (!ocResolve(module(mod).object,0||VERBOSE))
       internal("finishGHCModule: object resolution failed");
+
+   for (oc=module(mod).objectExtras; oc; oc=oc->next) {
+      if (!ocResolve(oc, 0||VERBOSE))
+         internal("finishGHCModule: extra object resolution failed");
+   }
 }
 
 
@@ -1833,7 +1864,7 @@ static Void finishGHCInstance ( Inst in )
     assert (currentModule==inst(in).mod);
 
     /* inst(in).c is, prior to finishGHCInstance, a ConId or Tuple,
-       since beginGHCInstance couldn't possibly have resolved it to
+       since startGHCInstance couldn't possibly have resolved it to
        a Class at that point.  We convert it to a Class now.
     */
     c = inst(in).c;
@@ -2136,33 +2167,161 @@ Type type; {
  * General object symbol query stuff
  * ------------------------------------------------------------------------*/
 
-/* entirely bogus claims about types of these symbols */
-extern int stg_gc_enter_1;
-extern int stg_chk_0;
-extern int stg_chk_1;
-extern int stg_update_PAP;
-extern int __ap_2_upd_info;
-extern int MainRegTable;
-extern int Upd_frame_info;
-extern int CAF_BLACKHOLE_info;
-extern int IND_STATIC_info;
-extern int newCAF;
+#define EXTERN_SYMS                  \
+      Sym(stg_gc_enter_1)            \
+      Sym(stg_gc_noregs)             \
+      Sym(stg_gc_seq_1)              \
+      Sym(stg_gc_d1)                 \
+      Sym(stg_chk_0)                 \
+      Sym(stg_chk_1)                 \
+      Sym(stg_gen_chk)               \
+      Sym(stg_exit)                  \
+      Sym(stg_update_PAP)            \
+      Sym(stg_error_entry)           \
+      Sym(__ap_2_upd_info)           \
+      Sym(__ap_3_upd_info)           \
+      Sym(__ap_4_upd_info)           \
+      Sym(__ap_5_upd_info)           \
+      Sym(__ap_6_upd_info)           \
+      Sym(__sel_0_upd_info)          \
+      Sym(__sel_1_upd_info)          \
+      Sym(__sel_2_upd_info)          \
+      Sym(__sel_3_upd_info)          \
+      Sym(__sel_4_upd_info)          \
+      Sym(__sel_5_upd_info)          \
+      Sym(__sel_6_upd_info)          \
+      Sym(__sel_7_upd_info)          \
+      Sym(__sel_8_upd_info)          \
+      Sym(__sel_9_upd_info)          \
+      Sym(__sel_10_upd_info)         \
+      Sym(__sel_11_upd_info)         \
+      Sym(__sel_12_upd_info)         \
+      Sym(MainRegTable)              \
+      Sym(Upd_frame_info)            \
+      Sym(seq_frame_info)            \
+      Sym(CAF_BLACKHOLE_info)        \
+      Sym(IND_STATIC_info)           \
+      Sym(EMPTY_MVAR_info)           \
+      Sym(MUT_ARR_PTRS_FROZEN_info)  \
+      Sym(newCAF)                    \
+      Sym(putMVarzh_fast)            \
+      Sym(newMVarzh_fast)            \
+      Sym(takeMVarzh_fast)           \
+      Sym(catchzh_fast)              \
+      Sym(raisezh_fast)              \
+      Sym(delayzh_fast)              \
+      Sym(yieldzh_fast)              \
+      Sym(killThreadzh_fast)         \
+      Sym(waitReadzh_fast)           \
+      Sym(waitWritezh_fast)          \
+      Sym(CHARLIKE_closure)          \
+      Sym(suspendThread)             \
+      Sym(resumeThread)              \
+      Sym(stackOverflow)             \
+      Sym(int2Integerzh_fast)        \
+      Sym(stg_gc_unbx_r1)            \
+      Sym(ErrorHdrHook)              \
+      Sym(makeForeignObjzh_fast)     \
+      Sym(__encodeDouble)            \
+      Sym(decodeDoublezh_fast)       \
+      Sym(isDoubleNaN)               \
+      Sym(isDoubleInfinite)          \
+      Sym(isDoubleDenormalized)      \
+      Sym(isDoubleNegativeZero)      \
+      Sym(__encodeFloat)             \
+      Sym(decodeFloatzh_fast)        \
+      Sym(isFloatNaN)                \
+      Sym(isFloatInfinite)           \
+      Sym(isFloatDenormalized)       \
+      Sym(isFloatNegativeZero)       \
+      Sym(__int_encodeFloat)         \
+      Sym(__int_encodeDouble)        \
+      Sym(mpz_cmp_si)                \
+      Sym(mpz_cmp)                   \
+      Sym(newArrayzh_fast)           \
+      Sym(unsafeThawArrayzh_fast)    \
+      Sym(newDoubleArrayzh_fast)     \
+      Sym(newFloatArrayzh_fast)      \
+      Sym(newAddrArrayzh_fast)       \
+      Sym(newWordArrayzh_fast)       \
+      Sym(newIntArrayzh_fast)        \
+      Sym(newCharArrayzh_fast)       \
+      Sym(newMutVarzh_fast)          \
+      Sym(quotRemIntegerzh_fast)     \
+      Sym(divModIntegerzh_fast)      \
+      Sym(timesIntegerzh_fast)       \
+      Sym(minusIntegerzh_fast)       \
+      Sym(plusIntegerzh_fast)        \
+      Sym(addr2Integerzh_fast)       \
+      Sym(mkWeakzh_fast)             \
+      Sym(prog_argv)                 \
+      Sym(prog_argc)                 \
+      Sym(resetNonBlockingFd)        \
+                                     \
+      /* needed by libHS_cbits */    \
+      SymX(malloc)                   \
+      Sym(__errno_location)          \
+      SymX(close)                    \
+      Sym(__xstat)                   \
+      Sym(__fxstat)                  \
+      Sym(__lxstat)                  \
+      Sym(mkdir)                     \
+      SymX(close)                    \
+      Sym(opendir)                   \
+      Sym(closedir)                  \
+      Sym(readdir)                   \
+      Sym(tcgetattr)                 \
+      Sym(tcsetattr)                 \
+      SymX(isatty)                   \
+      SymX(read)                     \
+      SymX(lseek)                    \
+      SymX(write)                    \
+      Sym(getrusage)                 \
+      Sym(gettimeofday)              \
+      SymX(realloc)                  \
+      SymX(getcwd)                   \
+      SymX(free)                     \
+      SymX(strcpy)                   \
+      SymX(select)                   \
+      Sym(fcntl)                     \
+      SymX(stderr)                   \
+      SymX(fprintf)                  \
+      SymX(exit)                     \
+      Sym(open)                      \
+      SymX(unlink)                   \
+      SymX(memcpy)                   \
+      SymX(memchr)                   \
+      SymX(rmdir)                    \
+      SymX(rename)                   \
+      SymX(chdir)                    \
+      Sym(localtime)                 \
+      Sym(strftime)                  \
+      SymX(vfork)                    \
+      SymX(execl)                    \
+      SymX(_exit)                    \
+      Sym(waitpid)                   \
+      Sym(tzname)                    \
+      Sym(timezone)                  \
+      Sym(mktime)                    \
+      Sym(gmtime)                    \
 
+
+/* entirely bogus claims about types of these symbols */
+#define Sym(vvv)  extern int vvv;
+#define SymX(vvv) /* nothing */
+EXTERN_SYMS
+#undef Sym
+#undef SymX
+
+#define Sym(vvv) { #vvv, &vvv },
+#define SymX(vvv) { #vvv, &vvv },
 OSym rtsTab[] 
    = { 
-       { "stg_gc_enter_1",        &stg_gc_enter_1     },
-       { "stg_chk_0",             &stg_chk_0          },
-       { "stg_chk_1",             &stg_chk_1          },
-       { "stg_update_PAP",        &stg_update_PAP     },
-       { "__ap_2_upd_info",       &__ap_2_upd_info    },
-       { "MainRegTable",          &MainRegTable       },
-       { "Upd_frame_info",        &Upd_frame_info     },
-       { "CAF_BLACKHOLE_info",    &CAF_BLACKHOLE_info },
-       { "IND_STATIC_info",       &IND_STATIC_info    },
-       { "newCAF",                &newCAF             },
+       EXTERN_SYMS
        {0,0} 
      };
-
+#undef Sym
+#undef SymX
 
 void* lookupObjName ( char* nm )
 {
@@ -2176,20 +2335,25 @@ void* lookupObjName ( char* nm )
    nm2[199] = 0;
    strncpy(nm2,nm,200);
 
-   // first see if it's an RTS name
+   /*  first see if it's an RTS name */
    for (k = 0; rtsTab[k].nm; k++)
       if (0==strcmp(nm2,rtsTab[k].nm))
          return rtsTab[k].ad;
 
-   // if not an RTS name, look in the 
-   // relevant module's object symbol table
+   /* perhaps an extra-symbol ? */
+   a = lookupOExtraTabName ( nm );
+   if (a) return a;
+
+   /* if not an RTS name, look in the 
+      relevant module's object symbol table
+   */
    pp = strchr(nm2, '_');
-   if (!pp) goto not_found;
+   if (!pp || !isupper(nm2[0])) goto not_found;
    *pp = 0;
    t = unZcodeThenFindText(nm2);
    m = findModule(t);
    if (isNull(m)) goto not_found;
-fprintf(stderr, "   %%%% %s\n", nm );
+
    a = lookupOTabName ( m, nm );  /* RATIONALISE */
    if (a) return a;
 
@@ -2197,6 +2361,7 @@ fprintf(stderr, "   %%%% %s\n", nm );
    fprintf ( stderr, 
              "lookupObjName: can't resolve name `%s'\n", 
              nm );
+assert(4-4);
    return NULL;
 }
 
