@@ -4318,7 +4318,7 @@ If you add <option>-dppr-debug</option> you get a more detailed listing.
 <listitem>
 
 <para>
- The defintion of (say) <function>build</function> in <FileName>PrelBase.lhs</FileName> looks llike this:
+ The defintion of (say) <function>build</function> in <FileName>GHC/Base.lhs</FileName> looks llike this:
 
 <programlisting>
         build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
@@ -4336,9 +4336,9 @@ in the RHS of the <literal>INLINE</literal> thing.  I regret the delicacy of thi
 <listitem>
 
 <para>
- In <filename>ghc/lib/std/PrelBase.lhs</filename> look at the rules for <function>map</function> to
+ In <filename>libraries/base/GHC/Base.lhs</filename> look at the rules for <function>map</function> to
 see how to write rules that will do fusion and yet give an efficient
-program even if fusion doesn't happen.  More rules in <filename>PrelList.lhs</filename>.
+program even if fusion doesn't happen.  More rules in <filename>GHC/List.lhs</filename>.
 </para>
 </listitem>
 
