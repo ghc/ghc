@@ -58,8 +58,8 @@ import Compat.Directory	( getAppUserDataDirectory )
 
 import Distribution.InstalledPackageInfo
 import Distribution.Package
+import Distribution.Version
 import System.IO	( hPutStrLn, stderr )
-import Data.Version
 import Data.Maybe	( fromJust, isNothing )
 import System.Directory	( doesFileExist )
 import Control.Monad	( when, foldM )
