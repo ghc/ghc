@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.34 2001/11/05 05:12:55 sof Exp $
+ * $Id: Stats.c,v 1.35 2001/11/20 21:39:12 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -124,24 +124,53 @@ static nat   pageFaults(void);
 static void
 getTimes(void)
 {
-    FILETIME creationTime, exitTime, kernelTime, userTime;
+    static int is_win9x = -1;
+
+    FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
     long long int kT, uT;
+    
+    if (is_win9x < 0) {
+      /* figure out whether we're on a Win9x box or not. */
+      OSVERSIONINFO oi;
+      BOOL b;
+
+      /* Need to init the size field first.*/
+      oi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+      b = GetVersionEx(&oi);
+      
+      is_win9x = ( (b && (oi.dwPlatformId & VER_PLATFORM_WIN32_WINDOWS)) ? 1 : 0);
+    }
  
-    /* ToDo: pin down elapsed times to just the OS thread(s) that
-       are evaluating/managing Haskell code.
-    */
-    if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
+    if (is_win9x) {
+      /* On Win9x, just attribute all running time to the user. */
+      SYSTEMTIME st;
+
+      GetSystemTime(&st);
+      SystemTimeToFileTime(&st,&userTime);
+    } else {
+      /* ToDo: pin down elapsed times to just the OS thread(s) that
+	 are evaluating/managing Haskell code.
+      */
+      if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
 		          &exitTime, &kernelTime, &userTime)) {
 	/* Probably on a Win95 box..*/
 	CurrentElapsedTime = 0;
 	CurrentUserTime = 0;
 	return;
+      }
     }
 
     FT2longlong(kT,kernelTime);
     FT2longlong(uT,userTime);
     CurrentElapsedTime = uT + kT;
     CurrentUserTime = uT;
+
+    if (is_win9x) {
+      /* Adjust for the fact that we're using system time & not
+	 process time on Win9x. */
+      CurrentUserTime    -= ElapsedTimeStart;
+      CurrentElapsedTime -= ElapsedTimeStart;
+    }
 }
 
 #else /* !win32 */
