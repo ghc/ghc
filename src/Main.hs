@@ -828,7 +828,7 @@ buildOrigEnv :: Module -> Bool -> ModuleMap -> [HsImportDecl]
    -> ErrMsgM (Map HsQName HsQName)
 buildOrigEnv this_mdl verbose mod_map imp_decls
   = do maps <- mapM build imp_decls
-       return (Map.unions maps)
+       return (Map.unions (reverse maps))
   where
   build imp_decl@(HsImportDecl _ mdl qual maybe_as _)
     = case Map.lookup mdl mod_map of

@@ -47,7 +47,7 @@ unionWith :: Ord k => (a -> a -> a) -> Map k a -> Map k a -> Map k a
 unionWith c l r = plusFM_C c r l
 
 unions :: Ord k => [Map k a] -> Map k a
-unions = foldr plusFM emptyFM
+unions = foldl (flip plusFM) emptyFM
 
 elems :: Map k a -> [a]
 elems = eltsFM
