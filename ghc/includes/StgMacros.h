@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.8 1999/04/27 12:31:40 simonm Exp $
+ * $Id: StgMacros.h,v 1.9 1999/04/28 12:42:45 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -475,12 +475,15 @@ static inline StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
  */
 #if sparc_TARGET_ARCH
 
-#define ASSIGN_DBL(dst,src) \
+#define ASSIGN_DBL(dst0,src) \
+    { StgPtr dst = (StgPtr)(dst0); \
       __asm__("st %2,%0\n\tst %R2,%1" : "=m" (((P_)(dst))[0]), \
-	"=m" (((P_)(dst))[1]) : "f" (src));
+	"=m" (((P_)(dst))[1]) : "f" (src)); \
+    }
 
-#define PK_DBL(src) \
-    ( { register double d; \
+#define PK_DBL(src0) \
+    ( { StgPtr src = (StgPtr)(src0); \
+        register double d; \
       __asm__("ld %1,%0\n\tld %2,%R0" : "=f" (d) : \
 	"m" (((P_)(src))[0]), "m" (((P_)(src))[1])); d; \
     } )
