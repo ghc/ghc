@@ -2171,7 +2171,7 @@ sub runAs {
     # need to add the -I flags in case the file is going through cpp (.S files)
     local($includes) = '-I' . join(' -I', @Include_dir);
 
-    if ( ! $SplitObjFiles ) {
+   if ( ! $SplitObjFiles || $ifile_root =~ /_stub\.s$/ ) {
 	local($to_do)  = "$asmblr -o $as_out -c @As_flags $includes $cc_as";
 	push(@Files_to_tidy, $as_out );
 	&run_something($to_do, 'Unix assembler');
