@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.45 2004/10/03 16:28:06 panne Exp $
+-- $Id: DriverUtil.hs,v 1.46 2004/11/09 16:59:31 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -45,21 +45,23 @@ getOptionsFromSource
 	-> IO [String]		-- options, if any
 getOptionsFromSource file
   = do h <- openFile file ReadMode
-       catchJust ioErrors (look h `finally` hClose h)
-	  (\e -> if isEOFError e then return [] else ioError e)
+       look h `finally` hClose h
   where
-
 	look h = do
-	    l' <- hGetLine h
-	    let l = remove_spaces l'
-	    case () of
-		() | null l -> look h
-		   | prefixMatch "#" l -> look h
-		   | prefixMatch "{-# LINE" l -> look h   -- -}
-		   | Just opts <- matchOptions l
-			-> do rest <- look h
+	    r <- tryJust ioErrors (hGetLine h)
+	    case r of
+	      Left e | isEOFError e -> return []
+	             | otherwise    -> ioError e
+	      Right l' -> do
+	    	let l = remove_spaces l'
+	    	case () of
+		    () | null l -> look h
+		       | prefixMatch "#" l -> look h
+		       | prefixMatch "{-# LINE" l -> look h   -- -}
+		       | Just opts <- matchOptions l
+		       	-> do rest <- look h
                               return (words opts ++ rest)
-		   | otherwise -> return []
+		       | otherwise -> return []
 
 matchOptions s
   | Just s1 <- maybePrefixMatch "{-#" s, -- -}
