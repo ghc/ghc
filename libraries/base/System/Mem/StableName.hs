@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: StableName.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: StableName.hs,v 1.2 2001/09/13 11:37:08 simonmar Exp $
 --
 -- Giving an object a stable (GC-invariant) name.
 --
@@ -21,6 +21,8 @@ module System.Mem.StableName
 	) where
 
 import Prelude
+
+import Data.Dynamic
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base		( Int(..) )
