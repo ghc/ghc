@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.9 $
- * $Date: 1999/10/20 02:15:56 $
+ * $Revision: 1.10 $
+ * $Date: 1999/11/01 12:12:58 $
  * ------------------------------------------------------------------------*/
 
 
@@ -104,7 +104,7 @@
 #define LARGE_HUGS   1
 
 #define NUM_SYNTAX         100
-#define NUM_TUPLES         /*100*/ 20
+#define NUM_TUPLES         20
 #define NUM_OFFSETS        1024
 #define NUM_CHARS          256
 #if TREX
@@ -132,7 +132,7 @@
 #define NUM_NAME           Pick(1000,   2000,       16000)
 #define NUM_CLASSES        Pick(30,     40,         80)
 #define NUM_INSTS          Pick(200,    300,        600)
-#define NUM_TEXT           Pick(12000,  20000,      80000)
+#define NUM_TEXT           Pick(12000,  20000,      100000)
 #define NUM_TEXTH          Pick(1,      10,         10)
 #define NUM_TYVARS         Pick(800,    2000,       4000)
 #define NUM_STACK          Pick(1800,   12000,      16000)
@@ -318,10 +318,6 @@
  * Intended as a stop-gap measure until mutable byte arrays are available.
  */
 #define USE_ADDR_FOR_STRINGS 1
-
-/* turn this off to avoid wrapping int and float literals in "fromInt"
- * or "fromFloat" */
-#define OVERLOADED_CONSTANTS 1
 
 /* Define to include support for (n+k) patterns. 
  * Warning: many people in the Haskell committee want to remove n+k patterns.
