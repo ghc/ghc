@@ -21,6 +21,6 @@ all :: runtests
 runtests: $(RUNTESTS_SRCS)
 	$(GHC) $(HC_OPTS) -W -fno-warn-unused-matches --make Main -o runtests -ibasicRxLib -package lang -package util -cpp
 
-CLEAN_FILES += basicRxLib/*.o basicRxLib/*.hi
+CLEAN_FILES += CmdParser.hs basicRxLib/*.o basicRxLib/*.hi
 
 include $(TOP)/mk/target.mk
