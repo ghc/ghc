@@ -366,7 +366,7 @@ rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
 
 deprecs 	:: { [(Maybe FAST_STRING, FAST_STRING)] }
 deprecs		: {- empty -}		{ [] }
-		| deprecs ';' deprec	{ $3 : $1 }
+		| deprecs deprec ';'	{ $2 : $1 }
 
 deprec		:: { (Maybe FAST_STRING, FAST_STRING) }
 deprec		: STRING		{ (Nothing, $1) }
