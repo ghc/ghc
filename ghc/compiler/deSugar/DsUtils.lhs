@@ -91,11 +91,8 @@ tidyLitPat lit lit_ty default_pat
   | lit_ty == floatTy  	  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
   | lit_ty == doubleTy 	  = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
 
-		-- Convert the literal pattern "" to the constructor pattern [].
-  | null_str_lit lit       = ConPat nilDataCon lit_ty [] [] [] 
-		-- Similar special case for "x"
-  | one_str_lit	lit	   = ConPat consDataCon lit_ty [] [] 
-				[mk_first_char_lit lit, ConPat nilDataCon lit_ty [] [] []]
+		-- Convert literal patterns like "foo" to 'f':'o':'o':[]
+  | str_lit lit           = mk_list lit
 
   | otherwise = default_pat
 
@@ -121,9 +118,14 @@ tidyLitPat lit lit_ty default_pat
     null_str_lit (HsString s) = _NULL_ s
     null_str_lit other_lit    = False
 
-    one_str_lit (HsString s) = _LENGTH_ s == (1::Int)
-    one_str_lit other_lit    = False
-    mk_first_char_lit (HsString s) = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim (_HEAD_ s)) charPrimTy]
+    str_lit (HsString s)     = True
+    str_lit _                = False
+
+    mk_list (HsString s)     = foldr
+	(\c pat -> ConPat consDataCon lit_ty [] [] [mk_char_lit c,pat])
+	(ConPat nilDataCon lit_ty [] [] []) (_UNPK_ s)
+
+    mk_char_lit c            = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim c) charPrimTy]
 \end{code}
 
 
