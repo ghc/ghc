@@ -9,7 +9,7 @@ module CompManager (
 
     cmLoadModule, -- :: CmState -> FilePath -> IO (CmState, [String])
 
-    cmUnload,	  -- :: CmState -> IO CmState
+    cmUnload,	  -- :: CmState -> DynFlags -> IO CmState
 
     cmSetContext, -- :: CmState -> String -> IO CmState
 
@@ -326,15 +326,17 @@ cmInfo cmstate str
 -- Unload the compilation manager's state: everything it knows about the
 -- current collection of modules in the Home package.
 
-cmUnload :: CmState -> IO CmState
-cmUnload state 
+cmUnload :: CmState -> DynFlags -> IO CmState
+cmUnload state@CmState{ gmode=mode, pls=pls, pcs=pcs } dflags
  = do -- Throw away the old home dir cache
       emptyHomeDirCache
-      -- Throw away the HIT and the HST
-      return state{ hst=new_hst, hit=new_hit, ui=emptyUI }
-   where
-     CmState{ hst=hst, hit=hit } = state
-     (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
+
+      -- Unload everything the linker knows about
+      new_pls <- CmLink.unload mode dflags [] pls 
+
+      -- Start with a fresh CmState, but keep the PersistentCompilerState
+      new_state <- cmInit mode
+      return new_state{ pcs=pcs, pls=new_pls }
 
 -----------------------------------------------------------------------------
 -- The real business of the compilation manager: given a system state and

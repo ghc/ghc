@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.64 2001/04/26 11:38:53 qrczak Exp $
+-- $Id: InteractiveUI.hs,v 1.65 2001/05/04 14:56:53 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -20,6 +20,7 @@ import DriverFlags
 import DriverState
 import DriverUtil
 import Linker
+import Finder		( flushPackageCache )
 import Util
 import Name		( Name )
 import Outputable
@@ -27,6 +28,7 @@ import CmdLineOpts	( DynFlag(..), dopt_unset )
 import Panic		( GhcException(..) )
 import Config
 
+import Posix
 import Exception
 import Dynamic
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
@@ -115,7 +117,7 @@ interactiveUI cmstate mod cmdline_libs = do
    -- link in the available packages
    pkgs <- getPackageInfo
    initLinker
-   linkPackages cmdline_libs (reverse pkgs)
+   linkPackages cmdline_libs pkgs
 
    (cmstate, ok, mods) <-
    	case mod of
@@ -148,23 +150,31 @@ interactiveUI cmstate mod cmdline_libs = do
 
 runGHCi :: GHCi ()
 runGHCi = do
-  -- read in ./.ghci
-  dot_ghci <- io (IO.try (openFile "./.ghci" ReadMode))
-  case dot_ghci of
-	Left e -> return ()
-	Right hdl -> fileLoop hdl False
+  -- Read in ./.ghci.
+  let file = "./.ghci"
+  exists <- io (doesFileExist file)
+  when exists $ do
+     dir_ok  <- io (checkPerms ".")
+     file_ok <- io (checkPerms file)
+     when (dir_ok && file_ok) $ do
+   	either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
+   	case either_hdl of
+   	   Left e    -> return ()
+   	   Right hdl -> fileLoop hdl False
   
-  -- read in ~/.ghci
-  home <- io (IO.try (getEnv "HOME"))
-  case home of
-   Left e  -> return ()
-   Right dir -> do
+  -- Read in $HOME/.ghci
+  either_dir <- io (IO.try (getEnv "HOME"))
+  case either_dir of
+     Left e -> return ()
+     Right dir -> do
 	cwd <- io (getCurrentDirectory)
-	when (dir /= cwd) $ do
-  	  dot_ghci <- io (IO.try (openFile (dir ++ "/.ghci") ReadMode))
-  	  case dot_ghci of
-  	     Left e -> return ()
-  	     Right hdl -> fileLoop hdl False
+    	when (dir /= cwd) $ do
+	   let file = dir ++ "/.ghci"
+	   ok <- io (checkPerms file)
+       	   either_hdl <- io (IO.try (openFile file ReadMode))
+	   case either_hdl of
+		Left e    -> return ()
+		Right hdl -> fileLoop hdl False
 
   -- read commands from stdin
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
@@ -176,6 +186,28 @@ runGHCi = do
   -- and finally, exit
   io $ do putStrLn "Leaving GHCi." 
 
+
+-- NOTE: We only read .ghci files if they are owned by the current user,
+--       and aren't world writable.  Otherwise, we could be accidentally 
+--	 running code planted by a malicious third party.
+
+checkPerms :: String -> IO Bool
+checkPerms name =
+  handle (\_ -> return False) $ do
+     st <- getFileStatus name
+     me <- getRealUserID
+     if fileOwner st /= me then do
+   	putStrLn $ "WARNING: " ++ name ++ " is owned by someone else, IGNORING!"
+   	return False
+      else do
+   	let mode =  fileMode st
+   	if (groupWriteMode == (mode `intersectFileModes` groupWriteMode))
+   	   || (otherWriteMode == (mode `intersectFileModes` otherWriteMode)) 
+   	   then do
+   	       putStrLn $ "*** WARNING: " ++ name ++ 
+   			  " is writable by someone else, IGNORING!"
+   	       return False
+   	  else return True
 
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
@@ -380,7 +412,8 @@ loadModule path = timeIt (loadModule' path)
 
 loadModule' path = do
   state <- getGHCiState
-  cmstate1 <- io (cmUnload (cmstate state))
+  dflags <- io (getDynFlags)
+  cmstate1 <- io (cmUnload (cmstate state) dflags)
   io (revertCAFs)			-- always revert CAFs on load.
   (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 path)
   let new_state = state{ cmstate = cmstate2,
@@ -453,32 +486,31 @@ setOptions ""
    	   ))
 setOptions str
   = do -- first, deal with the GHCi opts (+s, +t, etc.)
-       let opts = words str
-	   (minus_opts, rest1) = partition isMinus opts
-	   (plus_opts, rest2)  = partition isPlus rest1
+      let (plus_opts, minus_opts)  = partition isPlus (words str)
+      mapM setOpt plus_opts
 
-       if (not (null rest2)) 
-	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
-	  else do
+      -- now, the GHC flags
+      pkgs_before <- io (readIORef v_Packages)
+      leftovers   <- io (processArgs static_flags minus_opts [])
+      pkgs_after  <- io (readIORef v_Packages)
 
-       mapM setOpt plus_opts
+      -- update things if the users wants more packages
+      when (pkgs_before /= pkgs_after) $
+	 newPackages (pkgs_after \\ pkgs_before)
 
-       -- now, the GHC flags
-       io (do -- first, static flags
-	      leftovers <- processArgs static_flags minus_opts []
+      -- then, dynamic flags
+      io $ do 
+	dyn_flags <- readIORef v_InitDynFlags
+        writeIORef v_DynFlags dyn_flags
+        leftovers <- processArgs dynamic_flags leftovers []
+        dyn_flags <- readIORef v_DynFlags
+        writeIORef v_InitDynFlags dyn_flags
 
-	      -- then, dynamic flags
-	      dyn_flags <- readIORef v_InitDynFlags
-	      writeIORef v_DynFlags dyn_flags
-	      leftovers <- processArgs dynamic_flags leftovers []
-	      dyn_flags <- readIORef v_DynFlags
-	      writeIORef v_InitDynFlags dyn_flags
-
-              if (not (null leftovers))
-		 then throwDyn (CmdLineError ("unrecognised flags: " ++ 
+        if (not (null leftovers))
+		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
-		 else return ()
-         )
+		else return ()
+
 
 unsetOptions :: String -> GHCi ()
 unsetOptions str
@@ -524,6 +556,19 @@ optToStr :: GHCiOption -> String
 optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
+
+newPackages new_pkgs = do
+  state <- getGHCiState
+  dflags <- io (getDynFlags)
+  cmstate1 <- io (cmUnload (cmstate state) dflags)
+  setGHCiState state{ cmstate = cmstate1, target = Nothing }
+
+  io $ do
+    pkgs <- getPackageInfo
+    flushPackageCache pkgs
+   
+    new_pkg_info <- getPackageDetails new_pkgs
+    mapM_ (linkPackage False) (reverse new_pkg_info)
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -602,9 +647,12 @@ showLS (Right nm) = "(dynamic) " ++ nm
 
 linkPackages :: [LibrarySpec] -> [PackageConfig] -> IO ()
 linkPackages cmdline_lib_specs pkgs
-   = do mapM_ linkPackage pkgs
+   = do sequence_ [ linkPackage (name p `elem` loaded) p | p <- reverse pkgs ]
         mapM_ preloadLib cmdline_lib_specs
      where
+	-- packages that are already linked into GHCi
+	loaded = [ "concurrent", "posix", "text", "util" ]
+
         preloadLib lib_spec
            = do putStr ("Loading object " ++ showLS lib_spec ++ " ... ")
                 case lib_spec of
@@ -626,9 +674,9 @@ linkPackages cmdline_lib_specs pkgs
         croak = throwDyn (CmdLineError "user specified .o/.so/.DLL could not be loaded.")
 
 
-linkPackage :: PackageConfig -> IO ()
+linkPackage :: Bool -> PackageConfig -> IO ()
 -- ignore rts and gmp for now (ToDo; better?)
-linkPackage pkg 
+linkPackage loaded_in_ghci pkg
    | name pkg `elem` ["rts", "gmp"] 
    = return ()
    | otherwise
@@ -638,8 +686,13 @@ linkPackage pkg
         let dirs      =  library_dirs pkg
         let objs      =  hs_libraries pkg ++ extra_libraries pkg
         classifieds   <- mapM (locateOneObj dirs) objs
-        let sos_first = filter isRight classifieds 
-                        ++ filter (not.isRight) classifieds
+
+	-- Don't load the .so libs if this is a package GHCi is already
+	-- linked against, because we'll already have the .so linked in.
+	let (so_libs, obj_libs) = partition isRight classifieds
+        let sos_first | loaded_in_ghci = obj_libs
+		      | otherwise      = so_libs ++ obj_libs
+
         mapM loadClassified sos_first
         putStr "linking ... "
         resolveObjs
