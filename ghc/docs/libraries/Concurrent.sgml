@@ -22,7 +22,9 @@ takeMVar         :: MVar a -> IO a
 putMVar          :: MVar a -> a -> IO ()
 swapMVar         :: MVar a -> a -> IO a
 readMVar         :: MVar a -> IO a 
+isEmptyMVar      :: MVar a -> IO Bool
 instance Eq (MVar a)
+
 
 data Chan a      -- channels
 newChan          :: IO (Chan a)
@@ -96,5 +98,17 @@ its children before exiting.
 <item>
 The <tt/Ord/ instance for <tt/ThreadId/s provides an arbitrary total ordering
 which might be used to build an ordered binary tree, say.  
+
+<item>
+The operation <tt/isEmptyMVar/ returns a flag indicating
+whether the <tt/MVar/ is currently empty or filled in, i.e.,
+will a thread block when performing a <tt/takeMVar/ on that
+<tt/MVar/ or not?
+
+Please notice that the Boolean value returned from <tt/isEmptyMVar/
+represent just a snapshot of the state of the <tt/MVar/. By the
+time a thread gets to inspect the result and act upon it, other
+threads may have accessed the <tt/MVar/ and changed its 'filled-in'
+status of the variable. Please be wary of this.
 
 </itemize>
