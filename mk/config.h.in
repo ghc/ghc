@@ -31,6 +31,9 @@
 /* Define if you have <alloca.h> and it should be used (not on Ultrix).  */
 #undef HAVE_ALLOCA_H
 
+/* Define if your struct stat has st_blksize.  */
+#undef HAVE_ST_BLKSIZE
+
 /* Define if your struct tm has tm_zone.  */
 #undef HAVE_TM_ZONE
 
