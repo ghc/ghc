@@ -460,7 +460,7 @@ to compete with it, but link with it.
 </Para>
 
 <Para>
-<XRef LinkEnd="sec-ffi"> describes the foreign calling interface.
+<XRef LinkEnd="ffi"> describes the foreign function interface.
 </Para>
 </ListItem>
 </VarListEntry>
