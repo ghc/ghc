@@ -43,15 +43,14 @@ import List		( intersperse )
 import Monad		( foldM )
 import ST		( runST )
 import MArray		( MArray(..), IOArray, IOUArray, HasBounds(..), freeze, 
-		          mapArray,
-			  castSTUArray, readWord32Array,
+		          mapArray, castSTUArray,
 			  newFloatArray, writeFloatArray,
 			  newDoubleArray,  writeDoubleArray,
 			  newIntArray, writeIntArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
 			  malloc, castPtr, plusPtr )
-import Addr		( Addr, addrToInt, nullAddr )
+import Addr		( Word, Addr, addrToInt, nullAddr )
 import Bits		( Bits(..), shiftR )
 
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, ByteArray#, Array# )
@@ -126,7 +125,7 @@ coreExprToBCOs dflags expr
 data UnlinkedBCO
    = UnlinkedBCO Name
                  Int (IOUArray Int Word16)	-- insns
-                 Int (IOUArray Int Word32)	-- literals
+                 Int (IOUArray Int Word)	-- literals
                  Int (IOArray Int Name)		-- ptrs
                  Int (IOArray Int Name)		-- itbl refs
 
@@ -581,8 +580,7 @@ pushAtom False d p (AnnLit lit)
      where
         code rep
            = let size_host_words = untaggedSizeW rep
-                 size_in_word32s = (size_host_words * wORD_SIZE) `div` 4
-             in (unitOL (PUSH_UBX lit size_in_word32s), size_host_words)
+             in (unitOL (PUSH_UBX lit size_host_words), size_host_words)
 
 pushAtom tagged d p (AnnApp f (_, AnnType _))
    = pushAtom tagged d p (snd f)
@@ -843,7 +841,7 @@ assembleBCO (ProtoBCO nm instrs origin)
          init_n_itbls = 4
      in
      do  insns <- newXIOUArray init_n_insns :: IO (XIOUArray Word16)
-         lits  <- newXIOUArray init_n_lits  :: IO (XIOUArray Word32)
+         lits  <- newXIOUArray init_n_lits  :: IO (XIOUArray Word)
          ptrs  <- newXIOArray  init_n_ptrs  -- :: IO (XIOArray Name)
          itbls <- newXIOArray  init_n_itbls -- :: IO (XIOArray Name)
 
@@ -865,7 +863,7 @@ assembleBCO (ProtoBCO nm instrs origin)
 
 
 -- instrs nonptrs ptrs itbls
-type AsmState = (XIOUArray Word16, XIOUArray Word32, XIOArray Name, XIOArray Name)
+type AsmState = (XIOUArray Word16, XIOUArray Word, XIOArray Name, XIOArray Name)
 
 
 -- This is where all the action is (pass 2 of the assembler)
@@ -1021,78 +1019,59 @@ instrSizeB instr
         RETURN         -> 2
 
 
--- Sizes of Int, Float and Double literals, in units of 32-bitses
-intLitSz32s, floatLitSz32s, doubleLitSz32s, addrLitSz32s :: Int
-intLitSz32s    = wORD_SIZE `div` 4
-floatLitSz32s  = 1	-- Assume IEEE floats
-doubleLitSz32s = 2
-addrLitSz32s   = intLitSz32s
-
--- Make lists of 32-bit words for literals, so that when the
+-- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
 -- bit pattern is correct for the host's word size and endianness.
-mkLitI :: Int    -> [Word32]
-mkLitF :: Float  -> [Word32]
-mkLitD :: Double -> [Word32]
-mkLitA :: Addr   -> [Word32]
+mkLitI :: Int    -> [Word]
+mkLitF :: Float  -> [Word]
+mkLitD :: Double -> [Word]
+mkLitA :: Addr   -> [Word]
 
 mkLitF f
    = runST (do
         arr <- newFloatArray ((0::Int),0)
         writeFloatArray arr 0 f
         f_arr <- castSTUArray arr
-        w0 <- readWord32Array f_arr 0
+        w0 <- readWordArray f_arr 0
         return [w0]
      )
 
 mkLitD d
+   | wORD_SIZE == 4
    = runST (do
         arr <- newDoubleArray ((0::Int),0)
         writeDoubleArray arr 0 d
         d_arr <- castSTUArray arr
-        w0 <- readWord32Array d_arr 0
-        w1 <- readWord32Array d_arr 1
+        w0 <- readWordArray d_arr 0
+        w1 <- readWordArray d_arr 1
         return [w0,w1]
+     )
+   | wORD_SIZE == 8
+   = runST (do
+        arr <- newDoubleArray ((0::Int),0)
+        writeDoubleArray arr 0 d
+        d_arr <- castSTUArray arr
+        w0 <- readWordArray d_arr 0
+        return [w0]
      )
 
 mkLitI i
-   | wORD_SIZE == 4
    = runST (do
         arr <- newIntArray ((0::Int),0)
         writeIntArray arr 0 i
         i_arr <- castSTUArray arr
-        w0 <- readWord32Array i_arr 0
+        w0 <- readWordArray i_arr 0
         return [w0]
      )
-   | wORD_SIZE == 8
-   = runST (do
-        arr <- newIntArray ((0::Int),0)
-        writeIntArray arr 0 i
-        i_arr <- castSTUArray arr
-        w0 <- readWord32Array i_arr 0
-        w1 <- readWord32Array i_arr 1
-        return [w0,w1]
-     )
-   
+
 mkLitA a
-   | wORD_SIZE == 4
    = runST (do
         arr <- newAddrArray ((0::Int),0)
         writeAddrArray arr 0 a
         a_arr <- castSTUArray arr
-        w0 <- readWord32Array a_arr 0
+        w0 <- readWordArray a_arr 0
         return [w0]
      )
-   | wORD_SIZE == 8
-   = runST (do
-        arr <- newAddrArray ((0::Int),0)
-        writeAddrArray arr 0 a
-        a_arr <- castSTUArray arr
-        w0 <- readWord32Array a_arr 0
-        w1 <- readWord32Array a_arr 1
-        return [w0,w1]
-     )
-   
 
 
 -- Zero-based expandable arrays
