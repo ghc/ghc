@@ -38,8 +38,7 @@ import Id		( idType )
 import Type		( namesOfType )
 import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
-			  nameModule, isLocalName, isHomePackageName,
-			  NamedThing(..)
+			  nameModule, isLocalName, NamedThing(..)
 			 )
 import Name 		( elemNameEnv, delFromNameEnv )
 import Module		( Module, ModuleEnv, 
@@ -169,8 +168,7 @@ mkImportInfo this_mod imports
 	    
 		-- The sort is to put them into canonical order
 	    mk_import_items ns = [(n,v) | n <- sortLt lt_occ ns, 
-	    		                  let v = lookupNameEnv version_env n `orElse` 
-	    			                  pprPanic "mk_whats_imported" (ppr n)
+	    		                  let v = lookupVersion version_env n
 		                 ]
 			 where
 			   lt_occ n1 n2 = nameOccName n1 < nameOccName n2
@@ -302,22 +300,26 @@ rnIfaceTyClDecl (mod, decl) = initIfaceRnMS mod (rnTyClDecl decl)	`thenRn` \ dec
 
 
 \begin{code}
-recordSlurp ifaces@(Ifaces { iDecls = (decls_map, n_slurped),
-			     iSlurp = slurped_names, 
-			     iVSlurp = (imp_mods, imp_names) })
+recordDeclSlurp ifaces@(Ifaces { iDecls  = (decls_map, n_slurped),
+				 iSlurp  = slurped_names, 
+				 iVSlurp = vslurp })
 	    avail
   = ASSERT2( not (isLocalName (availName avail)), ppr avail )
-    ifaces { iDecls = (decls_map', n_slurped+1),
+    ifaces { iDecls = (new_decls_map, n_slurped+1),
 	     iSlurp  = new_slurped_names, 
-	     iVSlurp = new_vslurp }
+	     iVSlurp = updateVSlurp vslurp (availName avail) }
   where
-    decls_map' = foldl delFromNameEnv decls_map (availNames avail)
-    main_name  = availName avail
+    new_decls_map     = foldl delFromNameEnv decls_map (availNames avail)
     new_slurped_names = addAvailToNameSet slurped_names avail
-    new_vslurp | isHomePackageName main_name = (imp_mods, addOneToNameSet imp_names main_name)
-    	       | otherwise       	     = (extendModuleSet imp_mods mod, imp_names)
-    mod	       = nameModule main_name
 
+recordVSlurp ifaces name = ifaces { iVSlurp = updateVSlurp (iVSlurp ifaces) name }
+
+updateVSlurp (imp_mods, imp_names) main_name
+  | isHomeModule mod = (imp_mods,		      addOneToNameSet imp_names main_name)
+  | otherwise        = (extendModuleSet imp_mods mod, imp_names)
+  where
+    mod = nameModule main_name
+  
 recordLocalSlurps new_names
   = getIfacesRn 	`thenRn` \ ifaces ->
     setIfacesRn (ifaces { iSlurp  = iSlurp ifaces `unionNameSets` new_names })
@@ -569,17 +571,25 @@ importDecl name
 	returnRn AlreadySlurped	
     else
 
+
 	-- STEP 2: Check if it's already in the type environment
     getTypeEnvRn 			`thenRn` \ lookup ->
     case lookup name of {
-	Just ty_thing | name `elemNameEnv` wiredInThingEnv
-		      -> 	-- When we find a wired-in name we must load its home
-				-- module so that we find any instance decls lurking therein
-			 loadHomeInterface wi_doc name	`thenRn_`
-			 returnRn (InTypeEnv ty_thing)
+	Just ty_thing 
+	   | name `elemNameEnv` wiredInThingEnv
+	   -> 	-- When we find a wired-in name we must load its home
+		-- module so that we find any instance decls lurking therein
+		loadHomeInterface wi_doc name	`thenRn_`
+		returnRn (InTypeEnv ty_thing)
 
-		      | otherwise
-		      -> returnRn (InTypeEnv ty_thing) ;
+	   | otherwise
+ 	   ->	-- Record that we use this thing.  We must do this
+		--  regardless of whether we need to demand-slurp it in
+		--  or we already have it in the type environment.  Why?
+		--  because the slurp information is used to generate usage
+		--  information in the interface.
+		setIfacesRn (recordVSlurp ifaces (getName ty_thing))	`thenRn_`
+		returnRn (InTypeEnv ty_thing) ;
 
 	Nothing -> 
 
@@ -594,13 +604,11 @@ importDecl name
 	(decls_map, _) = iDecls ifaces
     in
     case lookupNameEnv decls_map name of
-      Just (avail,_,decl)
-	-> setIfacesRn (recordSlurp ifaces avail)	`thenRn_`
-	   returnRn (HereItIs decl)
+      Just (avail,_,decl) -> setIfacesRn (recordDeclSlurp ifaces avail)	`thenRn_`
+			     returnRn (HereItIs decl)
 
-      Nothing 
-	-> addErrRn (getDeclErr name)	`thenRn_` 
-	   returnRn AlreadySlurped
+      Nothing -> addErrRn (getDeclErr name)	`thenRn_` 
+		 returnRn AlreadySlurped
     }
   where
     wi_doc = ptext SLIT("need home module for wired in thing") <+> ppr name
@@ -670,6 +678,7 @@ checkModUsage (mod_name, _, is_boot, whats_imported)
     	from    | is_boot   = ImportByUserSource
 	    	| otherwise = ImportByUser
     in
+    traceHiDiffsRn (text "Checking usages for module" <+> ppr mod_name) `thenRn_`
     tryLoadInterface doc_str mod_name from	`thenRn` \ (iface, maybe_err) ->
 
     case maybe_err of {
@@ -739,7 +748,7 @@ checkEntityUsage new_vers (name,old_vers)
 			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
 
 	Just new_vers 	-- It's there, but is it up to date?
-	  | new_vers == old_vers -> returnRn upToDate
+	  | new_vers == old_vers -> traceHiDiffsRn (text "Up to date" <+> ppr name <+> parens (ppr new_vers)) `thenRn_` returnRn upToDate
 	  | otherwise	 	 -> out_of_date (sep [ptext SLIT("Out of date:"), ppr name])
 
 up_to_date  msg = traceHiDiffsRn msg `thenRn_` returnRn upToDate

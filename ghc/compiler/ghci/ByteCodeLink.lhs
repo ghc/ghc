@@ -5,7 +5,8 @@
 
 \begin{code}
 module ByteCodeLink ( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
-		      ClosureEnv, HValue, linkSomeBCOs, filterNameMap,
+		      ClosureEnv, HValue, filterNameMap,
+		      linkIModules, linkIExpr,
 		      iNTERP_STACK_CHECK_THRESH
 		   ) where
 
@@ -38,6 +39,7 @@ import MArray		( castSTUArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Word16, Ptr(..) )
 import Addr 		( Word, Addr, nullAddr )
+import FiniteMap
 
 import PrelBase		( Int(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
@@ -56,6 +58,25 @@ import PrelIOBase	( IO(..) )
 %************************************************************************
 
 \begin{code}
+-- Linking stuff
+linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
+	     -> ClosureEnv -- incoming global closure env; returned updated
+	     -> [([UnlinkedBCO], ItblEnv)]
+	     -> IO ([HValue], ItblEnv, ClosureEnv)
+linkIModules gie gce mods 
+   = do let (bcoss, ies) = unzip mods
+            bcos = concat bcoss
+            final_gie = foldr plusFM gie ies
+        (final_gce, linked_bcos) <- linkSomeBCOs True final_gie gce bcos
+        return (linked_bcos, final_gie, final_gce)
+
+
+linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
+          -> IO HValue 	  -- IO BCO# really
+linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
+   = do (aux_ce, _) <- linkSomeBCOs False ie ce aux_ul_bcos
+        (_, [root_bco]) <- linkSomeBCOs False ie aux_ce [root_ul_bco]
+        return root_bco
 
 -- Link a bunch of BCOs and return them + updated closure env.
 linkSomeBCOs :: Bool 	-- False <=> add _all_ BCOs to returned closure env
@@ -74,7 +95,10 @@ linkSomeBCOs toplevs_only ie ce_in ul_bcos
             ce_top_additions = filter (isGlobalName.fst) ce_all_additions
             ce_additions     = if toplevs_only then ce_top_additions 
                                                else ce_all_additions
-            ce_out = addListToFM ce_in ce_additions
+            ce_out = -- make sure we're not inserting duplicate names into the 
+		     -- closure environment, which leads to trouble.
+		     ASSERT (all (not . (`elemFM` ce_in)) (map fst ce_additions))
+		     addListToFM ce_in ce_additions
         return (ce_out, hvals)
      where
         -- A lazier zip, in which no demand is propagated to the second

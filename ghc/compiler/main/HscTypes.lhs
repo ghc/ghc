@@ -18,7 +18,7 @@ module HscTypes (
 
 	IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 
-	VersionInfo(..), initialVersionInfo,
+	VersionInfo(..), initialVersionInfo, lookupVersion,
 
 	TyThing(..), isTyClThing, implicitTyThingIds,
 
@@ -74,7 +74,7 @@ import CoreSyn		( IdCoreRule )
 
 import FiniteMap	( FiniteMap )
 import Bag		( Bag )
-import Maybes		( seqMaybe )
+import Maybes		( seqMaybe, orElse )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp, sortLt )
@@ -339,13 +339,19 @@ data VersionInfo
 		-- The version of an Id changes if its fixity changes
 		-- Ditto data constructors, class operations, except that the version of
 		-- the parent class/tycon changes
+		--
+		-- If a name isn't in the map, it means 'initialVersion'
     }
 
 initialVersionInfo :: VersionInfo
 initialVersionInfo = VersionInfo { vers_module  = initialVersion,
 				   vers_exports = initialVersion,
 				   vers_rules   = initialVersion,
-				   vers_decls   = emptyNameEnv }
+				   vers_decls   = emptyNameEnv
+			}
+
+lookupVersion :: NameEnv Version -> Name -> Version
+lookupVersion env name = lookupNameEnv env name `orElse` initialVersion
 
 data Deprecations = NoDeprecs
 	 	  | DeprecAll DeprecTxt				-- Whole module deprecated

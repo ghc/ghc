@@ -6,8 +6,7 @@
 \begin{code}
 module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 		     filterNameMap,
-                     byteCodeGen, coreExprToBCOs, 
-		     linkIModules, linkIExpr
+                     byteCodeGen, coreExprToBCOs
 		   ) where
 
 #include "HsVersions.h"
@@ -44,7 +43,7 @@ import PprType		( pprType )
 import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO, bciStackUse )
 import ByteCodeItbls	( ItblEnv, mkITbls )
 import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
-			  ClosureEnv, HValue, linkSomeBCOs, filterNameMap,
+			  ClosureEnv, HValue, filterNameMap,
 			  iNTERP_STACK_CHECK_THRESH )
 
 import List		( intersperse, sortBy )
@@ -122,27 +121,6 @@ coreExprToBCOs dflags expr
       root_bco <- assembleBCO root_proto_bco
 
       return (root_bco, auxiliary_bcos)
-
-
--- Linking stuff
-linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
-	     -> ClosureEnv -- incoming global closure env; returned updated
-	     -> [([UnlinkedBCO], ItblEnv)]
-	     -> IO ([HValue], ItblEnv, ClosureEnv)
-linkIModules gie gce mods 
-   = do let (bcoss, ies) = unzip mods
-            bcos = concat bcoss
-            final_gie = foldr plusFM gie ies
-        (final_gce, linked_bcos) <- linkSomeBCOs True final_gie gce bcos
-        return (linked_bcos, final_gie, final_gce)
-
-
-linkIExpr :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr
-          -> IO HValue 	  -- IO BCO# really
-linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
-   = do (aux_ce, _) <- linkSomeBCOs False ie ce aux_ul_bcos
-        (_, [root_bco]) <- linkSomeBCOs False ie aux_ce [root_ul_bco]
-        return root_bco
 \end{code}
 
 %************************************************************************

@@ -55,7 +55,7 @@ import Type		( funResultTy, splitForAllTys,
 			  liftedTypeKind, mkTyConApp, tidyType )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
 import Id		( Id, idType, idName, isLocalId, idUnfolding )
-import Module           ( Module, isHomeModule, moduleName )
+import Module           ( Module, moduleName )
 import Name		( Name, toRdrName, isGlobalName )
 import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
@@ -482,11 +482,8 @@ tcImports unf_env pcs hst get_fixity this_mod decls
          -- (on the GHCi command line, for example).  In this case, we
          -- want to treat everything we pulled in as an imported thing.
         imported_things
-    	  | isHomeModule this_mod
-    	  = filter (not . isLocalThing this_mod) all_things
-    	  | otherwise
-    	  = all_things
-    
+       	  = filter (not . isLocalThing this_mod) all_things
+        
         new_pte :: PackageTypeEnv
         new_pte = extendTypeEnvList (pcs_PTE pcs) imported_things
         

@@ -50,8 +50,7 @@ import VarEnv		( emptyTidyEnv )
 import HscTypes
 import HscMain		( initPersistentCompilerState )
 import Finder
-import UniqFM		( lookupUFM, addToUFM, delListFromUFM,
-			  UniqFM, listToUFM )
+import UniqFM
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
 import DriverFlags	( getDynFlags )
@@ -233,7 +232,7 @@ cmTypeOfExpr cmstate dflags expr
        case names of
 	 [name] -> do maybe_tystr <- cmTypeOfName new_cmstate name
 		      return (new_cmstate, maybe_tystr)
-	 _other -> pprPanic "cmTypeOfExpr" (ppr names)
+	 _other -> return (new_cmstate, Nothing)
 #endif
 
 -----------------------------------------------------------------------------
@@ -347,9 +346,6 @@ cmLoadModule cmstate1 rootname
         let ghci_mode = gmode cmstate1 -- this never changes
 
         -- Do the downsweep to reestablish the module graph
-        -- then generate version 2's by retaining in HIT,HST,UI a
-        -- stable set S of modules, as defined below.
-
 	dflags <- getDynFlags
         let verb = verbosity dflags
 
@@ -387,8 +383,8 @@ cmLoadModule cmstate1 rootname
         -- 1.  All home imports of ms are either in ms or S
         -- 2.  A valid linkable exists for each module in ms
 
-        stable_mods
-           <- preUpsweep valid_linkables mg2unsorted_names [] mg2_with_srcimps
+        stable_mods <- preUpsweep valid_linkables hit1 
+		 		  mg2unsorted_names [] mg2_with_srcimps
 
         let stable_summaries
                = concatMap (findInSummaries mg2unsorted) stable_mods
@@ -585,10 +581,6 @@ getValidLinkable :: [Linkable] -> Bool -> [Linkable] -> ModSummary
 getValidLinkable old_linkables objects_allowed new_linkables summary 
   = do let mod_name = name_of_summary summary
 
-       -- we only look for objects on disk the first time around;
-       -- if the user compiles a module on the side during a GHCi session,
-       -- it won't be picked up until the next ":load".  This is what the
-       -- "null old_linkables" test below is.
        maybe_disk_linkable
           <- if (not objects_allowed)
 		then return Nothing
@@ -612,6 +604,10 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
 		   Nothing    -> False
 		   Just l_disk -> linkableTime l == linkableTime l_disk
 
+    	   -- we only look for objects on disk the first time around;
+    	   -- if the user compiles a module on the side during a GHCi session,
+    	   -- it won't be picked up until the next ":load".  This is what the
+    	   -- "null old_linkables" test below is.
            linkable | null old_linkables = maybeToList maybe_disk_linkable
 		    | otherwise          = maybeToList maybe_old_linkable
 
@@ -647,14 +643,20 @@ maybe_getFileLinkable mod_name obj_fn
 -- Do a pre-upsweep without use of "compile", to establish a 
 -- (downward-closed) set of stable modules for which we won't call compile.
 
+-- a stable module:
+--	* has a valid linkable (see getValidLinkables above)
+--	* depends only on stable modules
+--	* has an interface in the HIT (interactive mode only)
+
 preUpsweep :: [Linkable]	-- new valid linkables
+	   -> HomeIfaceTable
            -> [ModuleName]      -- names of all mods encountered in downsweep
            -> [ModuleName]      -- accumulating stable modules
            -> [SCC ModSummary]  -- scc-ified mod graph, including src imps
            -> IO [ModuleName]	-- stable modules
 
-preUpsweep valid_lis all_home_mods stable []  = return stable
-preUpsweep valid_lis all_home_mods stable (scc0:sccs)
+preUpsweep valid_lis hit all_home_mods stable []  = return stable
+preUpsweep valid_lis hit all_home_mods stable (scc0:sccs)
    = do let scc = flattenSCC scc0
             scc_allhomeimps :: [ModuleName]
             scc_allhomeimps 
@@ -672,14 +674,15 @@ preUpsweep valid_lis all_home_mods stable (scc0:sccs)
    	      = isJust (findModuleLinkable_maybe valid_lis modname)
 	       where modname = name_of_summary new_summary
 
+	    has_interface summary = ms_mod summary `elemUFM` hit
+
 	    scc_is_stable = all_imports_in_scc_or_stable
 			  && all has_valid_linkable scc
+			  && all has_interface scc
 
         if scc_is_stable
-         then preUpsweep valid_lis all_home_mods (scc_names++stable) sccs
-         else preUpsweep valid_lis all_home_mods stable sccs
-
-   where 
+         then preUpsweep valid_lis hit all_home_mods (scc_names++stable) sccs
+         else preUpsweep valid_lis hit all_home_mods stable sccs
 
 
 -- Helper for preUpsweep.  Assuming that new_summary's imports are all

@@ -6,7 +6,7 @@
 \begin{code}
 module MkIface ( 
 	mkModDetails, mkModDetailsFromIface, completeIface, 
-	writeIface, pprIface
+	writeIface, pprIface, pprUsage
   ) where
 
 #include "HsVersions.h"
@@ -25,7 +25,7 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			  TyThing(..), DFunId, TypeEnv, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
-			  extendTypeEnvList
+			  extendTypeEnvList, lookupVersion,
 			)
 
 import CmdLineOpts
@@ -54,6 +54,7 @@ import Type		( splitSigmaTy, tidyTopType, deNoteType )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
+import Maybes		( orElse )
 
 import IO		( IOMode(..), openFile, hClose )
 \end{code}
@@ -381,7 +382,8 @@ addVersionInfo (Just old_iface@(ModIface { mi_version  = old_version,
 	
   where
     final_iface = new_iface { mi_version = new_version }
-    new_version = VersionInfo { vers_module  = bumpVersion no_output_change (vers_module  old_version),
+    old_mod_vers = vers_module  old_version
+    new_version = VersionInfo { vers_module  = bumpVersion no_output_change old_mod_vers,
 				vers_exports = bumpVersion no_export_change (vers_exports old_version),
 				vers_rules   = bumpVersion no_rule_change   (vers_rules   old_version),
 				vers_decls   = tc_vers }
@@ -396,8 +398,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version  = old_version,
 	-- Fill in the version number on the new declarations by looking at the old declarations.
 	-- Set the flag if anything changes. 
 	-- Assumes that the decls are sorted by hsDeclName.
-    old_vers_decls = vers_decls old_version
-    (no_tc_change,  pp_tc_diffs,  tc_vers) = diffDecls old_vers_decls old_fixities new_fixities
+    (no_tc_change,  pp_tc_diffs,  tc_vers) = diffDecls old_version old_fixities new_fixities
 						       (dcl_tycl old_decls) (dcl_tycl new_decls)
     pp_diffs = vcat [pp_tc_diffs,
 		     pp_change no_export_change "Export list",
@@ -407,14 +408,15 @@ addVersionInfo (Just old_iface@(ModIface { mi_version  = old_version,
     pp_change True  what = empty
     pp_change False what = text what <+> ptext SLIT("changed")
 
-diffDecls :: NameEnv Version				-- Old version map
+diffDecls :: VersionInfo				-- Old version
 	  -> NameEnv Fixity -> NameEnv Fixity		-- Old and new fixities
 	  -> [RenamedTyClDecl] -> [RenamedTyClDecl]	-- Old and new decls
 	  -> (Bool,		-- True <=> no change
 	      SDoc,		-- Record of differences
-	      NameEnv Version)	-- New version
+	      NameEnv Version)	-- New version map
 
-diffDecls old_vers old_fixities new_fixities old new
+diffDecls (VersionInfo { vers_module = old_mod_vers, vers_decls = old_decls_vers })
+	  old_fixities new_fixities old new
   = diff True empty emptyNameEnv old new
   where
 	-- When seeing if two decls are the same, 
@@ -423,19 +425,26 @@ diffDecls old_vers old_fixities new_fixities old new
     same_fixity n = lookupNameEnv old_fixities n == lookupNameEnv new_fixities n
 
     diff ok_so_far pp new_vers []  []      = (ok_so_far, pp, new_vers)
-    diff ok_so_far pp new_vers (od:ods) [] = diff False (pp $$ only_old od) new_vers ods []
-    diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers [] nds
+    diff ok_so_far pp new_vers (od:ods) [] = diff False (pp $$ only_old od) new_vers	      ods []
+    diff ok_so_far pp new_vers [] (nd:nds) = diff False (pp $$ only_new nd) new_vers_with_new []  nds
+	where
+	  new_vers_with_new = extendNameEnv new_vers (tyClDeclName nd) (bumpVersion False old_mod_vers)
+		-- When adding a new item, start from the old module version
+		-- This way, if you have version 4 of f, then delete f, then add f again,
+		-- you'll get version 6 of f, which will (correctly) force recompilation of
+		-- clients
+
     diff ok_so_far pp new_vers (od:ods) (nd:nds)
 	= case od_name `compare` nd_name of
 		LT -> diff False (pp $$ only_old od) new_vers ods      (nd:nds)
 		GT -> diff False (pp $$ only_new nd) new_vers (od:ods) nds
-		EQ | od `eq_tc` nd -> diff ok_so_far pp 		   new_vers  ods nds
-		   | otherwise     -> diff False     (pp $$ changed od nd) new_vers' ods nds
+		EQ | od `eq_tc` nd -> diff ok_so_far pp 		   new_vers	      ods nds
+		   | otherwise     -> diff False     (pp $$ changed od nd) new_vers_with_diff ods nds
 	where
  	  od_name = tyClDeclName od
  	  nd_name = tyClDeclName nd
-	  new_vers' = extendNameEnv new_vers nd_name 
-				    (bumpVersion False (lookupNameEnv_NF old_vers od_name))
+	  new_vers_with_diff = extendNameEnv new_vers nd_name (bumpVersion False old_version)
+	  old_version = lookupVersion old_decls_vers od_name
 
     only_old d    = ptext SLIT("Only in old iface:") <+> ppr d
     only_new d    = ptext SLIT("Only in new iface:") <+> ppr d

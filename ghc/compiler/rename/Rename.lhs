@@ -30,6 +30,7 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			)
+import MkIface		( pprUsage )
 import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
@@ -97,7 +98,8 @@ renameModule dflags hit hst pcs this_module rdr_module
 renameStmt :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
-	   -> Module			-- current context (module)
+	   -> Module			-- current context (scope to compile in)
+	   -> Module			-- current module
 	   -> LocalRdrEnv		-- current context (temp bindings)
 	   -> RdrNameStmt		-- parsed stmt
 	   -> IO ( PersistentCompilerState, 
@@ -105,13 +107,13 @@ renameStmt :: DynFlags
 		   Maybe ([Name], (SyntaxMap, RenamedStmt, [RenamedHsDecl]))
                  )
 
-renameStmt dflags hit hst pcs this_module local_env stmt
+renameStmt dflags hit hst pcs scope_module this_module local_env stmt
   = renameSource dflags hit hst pcs this_module $
 
 	-- Load the interface for the context module, so 
 	-- that we can get its top-level lexical environment
 	-- Bale out if we fail to do this
-    loadInterface doc (moduleName this_module) ImportByUser `thenRn` \ iface ->
+    loadInterface doc (moduleName scope_module) ImportByUser `thenRn` \ iface ->
     let rdr_env       = mi_globals iface
 	print_unqual  = unQualInScope rdr_env
     in 
@@ -245,6 +247,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 
 	-- GENERATE THE VERSION/USAGE INFO
     mkImportInfo mod_name imports 			`thenRn` \ my_usages ->
+    traceHiDiffsRn (vcat (map pprUsage my_usages)) `thenRn_`
 
 	-- BUILD THE MODULE INTERFACE
     let

@@ -20,6 +20,7 @@ module CmLink ( Linkable(..),  Unlinked(..),
 
 import Interpreter
 import DriverPipeline
+import ByteCodeLink	( linkIModules, linkIExpr )
 import CmTypes
 import CmStaticInfo	( GhciMode(..) )
 import Outputable	( SDoc )

@@ -31,7 +31,7 @@ import SrcLoc		( mkSrcLoc )
 import Rename		( checkOldIface, renameModule, closeIfaceDecls )
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
-import PrelNames	( vanillaSyntaxMap, knownKeyNames )
+import PrelNames	( vanillaSyntaxMap, knownKeyNames, iNTERACTIVE )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
 import TcModule
@@ -452,9 +452,9 @@ A naked expression returns a singleton Name [it].
 hscStmt dflags hst hit pcs0 icontext stmt
    = let 
 	InteractiveContext { 
-	     ic_rn_env = rn_env, 
+	     ic_rn_env   = rn_env, 
 	     ic_type_env = type_env,
-	     ic_module   = this_mod } = icontext
+	     ic_module   = scope_mod } = icontext
      in
      do { maybe_stmt <- hscParseStmt dflags stmt
 	; case maybe_stmt of
@@ -463,20 +463,23 @@ hscStmt dflags hst hit pcs0 icontext stmt
 
 		-- Rename it
 	  (pcs1, print_unqual, maybe_renamed_stmt)
-		 <- renameStmt dflags hit hst pcs0 this_mod rn_env parsed_stmt
+		 <- renameStmt dflags hit hst pcs0 scope_mod 
+				iNTERACTIVE rn_env parsed_stmt
+
 	; case maybe_renamed_stmt of
 		Nothing -> return (pcs0, Nothing)
 		Just (bound_names, rn_stmt) -> do {
 
 		-- Typecheck it
-	  maybe_tc_return <- typecheckStmt dflags pcs1 hst type_env
-					   print_unqual this_mod bound_names rn_stmt
+	  maybe_tc_return 
+		<- typecheckStmt dflags pcs1 hst type_env
+				   print_unqual iNTERACTIVE bound_names rn_stmt
 	; case maybe_tc_return of {
 		Nothing -> return (pcs0, Nothing) ;
 		Just (pcs2, tc_expr, bound_ids) -> do {
 
 		-- Desugar it
-	  ds_expr <- deSugarExpr dflags pcs2 hst this_mod print_unqual tc_expr
+	  ds_expr <- deSugarExpr dflags pcs2 hst iNTERACTIVE print_unqual tc_expr
 	
 		-- Simplify it
 	; simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr
