@@ -127,16 +127,20 @@ module Pretty (
 #if defined(__GLASGOW_HASKELL__)
 
 import FastString
-IMP_Ubiq()
 
 #if __GLASGOW_HASKELL__ >= 202
-import GHC
-import PrelBase
+
+import GlaExts
+
+#else
+
+	-- Horrible import to satisfy GHC 0.29
+import Ubiq		( Unique, Uniquable(..), Name )
+
 #endif
 #endif
 
-
-import Util	( assertPanic )
+-- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
 infixl 6 <> 
 infixl 6 <+>
