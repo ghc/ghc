@@ -128,6 +128,11 @@ ProjectsDontInstall = glafp-utils nofib
 #
 IncludeTestDirsInBuild=NO
 
+#
+# Which ways should SGML documents be built?
+#
+SGMLDocWays=
+
 ################################################################################
 #
 #		GHC project
