@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.96 2000/10/27 09:17:20 sewardj Exp $
+# $Id: Makefile,v 1.97 2000/10/27 09:39:35 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -198,7 +198,7 @@ main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
 endif
 endif
 
-main/CmdLineOpts_HC_OPTS 	=  -K6m
+main/CmdLineOpts_HC_OPTS 	= -K6m
 nativeGen/PprMach_HC_OPTS 	= -K2m
 nativeGen/MachMisc_HC_OPTS 	= -K2m 
 nativeGen/MachCode_HC_OPTS 	= -H10m
@@ -207,10 +207,10 @@ nativeGen/MachCode_HC_OPTS 	= -H10m
 usageSP/UsageSPInf_HC_OPTS	= -Onot
 
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
-prelude/PrelRules_HC_OPTS	= -fvia-C
+prelude/PrelRules_HC_OPTS	= 
 
-parser/Lex_HC_OPTS		= -fvia-C -K2m -H16m 
-parser/Ctype_HC_OPTS		= -K2m -fvia-C
+parser/Lex_HC_OPTS		= -K2m -H16m 
+parser/Ctype_HC_OPTS		= -K2m
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 
@@ -251,13 +251,14 @@ typecheck/TcExpr_HC_OPTS	= -H15m
 typecheck/TcBinds_HC_OPTS       = -H10m
 
 typecheck/TcEnv_HC_OPTS		= -H10m
-utils/Argv_HC_OPTS 		= -fvia-C
 utils/SST_HC_OPTS 		= 
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
 utils/DirUtils_HC_OPTS 		= 
 
-# temporary, due to bug in NCG  (SDM, 1/6/2000)
+# temporary, due to bug in NCG (x86 spiller fails because a basic block
+# contains both multiply and divide insns, probably soaking up all spill
+# regs) (SDM, 1/6/2000), augmented by JRS 27 Oct 00.
 utils/FastString_HC_OPTS	= -fvia-C
 
 ifeq "$(alpha_HOST_ARCH)" "1"
