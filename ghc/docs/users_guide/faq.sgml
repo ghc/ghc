@@ -156,6 +156,17 @@
     </varlistentry>
     
     <varlistentry>
+      <term>The build fails in readline.</term>
+      <listitem>
+	<para>It has been reported that if you have multiple versions
+	of the readline library installed on Linux, then this may
+	cause the build to fail.  If you have multiple versions of
+	readline, try uninstalling all except the most recent
+	version.</para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
       <term>When I try to start ghci (probably one I compiled myself)
       it says <literal>ghc-5.02: not built for interactive
       use</literal></term>
