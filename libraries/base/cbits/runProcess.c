@@ -552,4 +552,4 @@ waitForProcess (ProcHandle handle)
     return -1;
 }
 
-#endif // Win32
+#endif /* Win32 */

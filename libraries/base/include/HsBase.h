@@ -723,7 +723,7 @@ INLINE void setTimevalTicks(struct timeval *p, HsInt ticks)
     p->tv_sec  = ticks / TICK_FREQ;
     p->tv_usec = (ticks % TICK_FREQ) * (1000000 / TICK_FREQ);
 }
-#endif // !defined(mingw32_HOST_OS)
+#endif /* !defined(mingw32_HOST_OS) */
 
 // Directory-related
 
