@@ -478,8 +478,8 @@ runInUnboundThread action = do
 
 >   myForkIO :: IO () -> IO (MVar ())
 >   myForkIO io = do
->     mvar \<- newEmptyMVar
->     forkIO (io \`finally\` putMVar mvar ())
+>     mvar <- newEmptyMVar
+>     forkIO (io `finally` putMVar mvar ())
 >     return mvar
 
       Note that we use 'finally' from the
@@ -490,25 +490,26 @@ runInUnboundThread action = do
       A better method is to keep a global list of all child
       threads which we should wait for at the end of the program:
 
->     children :: MVar [MVar ()]
->     children = unsafePerformIO (newMVar [])
->     
->     waitForChildren :: IO ()
->     waitForChildren = do
->     	(mvar:mvars) \<- takeMVar children
->     	putMVar children mvars
->     	takeMVar mvar
->     	waitForChildren
->     
->     forkChild :: IO () -> IO ()
->     forkChild io = do
->     	 mvar \<- newEmptyMVar
->     	 forkIO (p \`finally\` putMVar mvar ())
->     	 childs \<- takeMVar children
->     	 putMVar children (mvar:childs)
->     
->     later = flip finally
->     
+>    children :: MVar [MVar ()]
+>    children = unsafePerformIO (newMVar [])
+>    
+>    waitForChildren :: IO ()
+>    waitForChildren = do
+>      cs <- takeMVar children
+>      case cs of
+>        []   -> return ()
+>        m:ms -> do
+>    	    putMVar children ms
+>    	    takeMVar m
+>    	    waitForChildren
+>    
+>    forkChild :: IO () -> IO ()
+>    forkChild io = do
+>    	 mvar <- newEmptyMVar
+>    	 forkIO (io `finally` putMVar mvar ())
+>    	 childs <- takeMVar children
+>    	 putMVar children (mvar:childs)
+>
 >     main =
 >     	later waitForChildren $
 >     	...
