@@ -303,16 +303,9 @@ rep_proto nm ty = do { nm1 <- lookupBinder nm ;
 -- 			Types
 -------------------------------------------------------
 
--- represent a list of type variables in a usage position that does not need
--- gensym'ing
---
-repTvs :: [HsTyVarBndr Name] -> DsM (Core [String])
-repTvs tvs = do { tvs1 <- mapM (localVar . hsTyVarName) tvs ;
-		  return (coreList' stringTy tvs1) } 
-
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
--- meta environment and gets the *original* names as an argument
+-- meta environment and gets the *new* names on Core-level as an argument
 --
 addTyVarBinds :: [HsTyVarBndr Name]	         -- the binders to be added
 	      -> ([Core String] -> DsM (Core (M.Q a))) -- action in the ext env
