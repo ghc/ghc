@@ -8,7 +8,7 @@ SCRIPT_SUBST_VARS=RAWCPP
 
 # no INTERP: do *not* want #! script stuck on the front
 # what's the deal? I'll add it for now  -- SOF
-INTERP=$(PERL)
+INTERP=perl
 
 #
 # install setup

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1997/03/19 20:44:56 simonpj Exp $
+# $Id: Makefile,v 1.5 1997/03/20 22:21:55 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -18,7 +18,7 @@ INSTALLING=0
 
 SCRIPT_SUBST_VARS=TMPDIR SCRIPT_PATH
 
-INTERP=$(PERL)
+INTERP=perl
 CLEAN_FILES += $(SCRIPT_PROG)
 
 #
@@ -27,9 +27,13 @@ CLEAN_FILES += $(SCRIPT_PROG)
 # is to be installed or not.
 #
 ifeq "$(INSTALLING)" "1"
-SCRIPT_PATH:=$(libdir)
+ifeq "$(BIN_DIST)" "1"
+SCRIPT_PREFIX_FILES += prefix.txt
 else
-SCRIPT_PATH:=$(FPTOOLS_TOP_ABS)/ghc/utils/stat2resid
+INSTLIBDIR_GHC:=$(libdir)
+endif
+else
+INSTLIBDIR_GHC:=$(FPTOOLS_TOP_ABS)/ghc/utils/stat2resid
 endif
 
 #

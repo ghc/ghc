@@ -3,7 +3,7 @@
 #
 # Perl script expect bindings for the following variables to be prepended
 #
-#   TMPDIR SCRIPT_PATH
+#   TMPDIR INSTLIBDIR_GHC
 #
 
 $debug = 0;
@@ -16,7 +16,7 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
 }
 
-@INC = ( ${SCRIPT_PATH} );
+@INC = ( ${INSTLIBDIR_GHC} );
 
 require('parse-gcstats.prl')   || die "Can't load parse-gcstats.prl!\n";
 require('process-gcstats.prl') || die "Can't load process-gcstats.prl!\n";

@@ -46,7 +46,7 @@ endif
 #
 # what's the deal? I'll add it for now (and perhaps pay for it later :-)
 #  -- SOF
-INTERP=$(PERL)
+INTERP=perl
 
 #
 # install setup

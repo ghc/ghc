@@ -16,7 +16,8 @@ SCRIPT_SUBST_VARS= \
  PRELUDE_DIRS \
  PROJECTVERSION SED
 
-INTERP=$(PERL)
+INTERP=perl
+
 #
 # install setup
 #
