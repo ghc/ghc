@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.22 2003/07/02 13:19:29 simonpj Exp $
+% $Id: CgLetNoEscape.lhs,v 1.23 2003/07/18 16:31:27 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -167,8 +167,7 @@ cgLetNoEscapeClosure
 
 	(deAllocStackTop retPrimRepSize		`thenFC` \_ ->
 	 forkAbsC (
-	    restoreCurrentCostCentre cc_slot	`thenC`
-	    cgLetNoEscapeBody bndr cc args body
+	    cgLetNoEscapeBody bndr cc cc_slot args body
 	 )					`thenFC` \ abs_c ->
 	 mkRetDirectTarget bndr abs_c srt
 		-- Ignore the label that comes back from
@@ -181,12 +180,16 @@ cgLetNoEscapeClosure
 \begin{code}
 cgLetNoEscapeBody :: Id		-- Name of the joint point
 		  -> CostCentreStack
+		  -> Maybe VirtualSpOffset
 		  -> [Id]	-- Args
 		  -> StgExpr	-- Body
 		  -> Code
 
-cgLetNoEscapeBody bndr cc all_args body
+cgLetNoEscapeBody bndr cc cc_slot all_args body
    = bindUnboxedTupleComponents all_args	`thenFC` \ (arg_regs, ptrs, nptrs, ret_slot) ->
+
+     -- restore the saved cost centre
+     restoreCurrentCostCentre cc_slot	`thenC`
 
 	-- Enter the closures cc, if required
      --enterCostCentreCode closure_info cc IsFunction  `thenC`
