@@ -1502,7 +1502,7 @@ Now the Haskell compiler, C compiler, and assembler
     }
 
     if (-f $hsc_out_h_stub) {
-	&run_something("mv $hsc_out_h_stub $ofile_h_stub_target", 'Copy foreign export header file');
+	&run_something("cp $hsc_out_h_stub $ofile_h_stub_target", 'Copy foreign export header file');
     }
 
     if (-f $hsc_out_c_stub) {
