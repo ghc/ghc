@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.42 2000/05/25 12:41:15 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.43 2000/07/14 08:14:53 simonpj Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -420,8 +420,6 @@ layOutStaticClosure name kind_fn things lf_info
     -- (a normal static kind and the NOCAF_STATIC kind).
     closure_type = getClosureType is_static tot_wds ptr_wds lf_info
     is_static    = True
-
-    bot = panic "layoutStaticClosure"
 
 layOutStaticNoFVClosure :: Name -> LambdaFormInfo -> ClosureInfo
 layOutStaticNoFVClosure name lf_info
@@ -973,8 +971,6 @@ mkConEntryPtr :: DataCon -> SMRep -> CLabel
 mkConEntryPtr con rep
   | isStaticRep rep = mkStaticConEntryLabel (dataConName con)
   | otherwise       = mkConEntryLabel       (dataConName con)
-  where
-    name = dataConName con
 
 closureLabelFromCI (MkClosureInfo id _ other_rep)   = mkClosureLabel id
 

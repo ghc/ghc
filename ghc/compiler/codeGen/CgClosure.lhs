@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.40 2000/07/06 14:08:31 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.41 2000/07/14 08:14:53 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -158,9 +158,6 @@ cgStdRhsClosure binder cc binder_info fvs args body lf_info payload
 
 	-- RETURN
     returnFC (binder, heapIdInfo binder heap_offset lf_info)
-
-  where
-    is_std_thunk	   = isStandardFormThunk lf_info
 \end{code}
 
 Here's the general case.
@@ -311,7 +308,7 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	-- Arg mapping for standard (slow) entry point; all args on stack,
 	-- with tagging.
-    	(sp_all_args, arg_offsets, arg_tags)
+    	(sp_all_args, arg_offsets, _)
 	   = mkTaggedVirtStkOffsets vSp idPrimRep all_args
 
 	-- Arg mapping for the fast entry point; as many args as poss in

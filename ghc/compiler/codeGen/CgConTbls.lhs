@@ -124,7 +124,6 @@ genConInfo comp_info tycon data_con
 	    	      profCtrC SLIT("TICK_ENT_CON") [CReg node] `thenC`
 		      body_code))
 
-    entry_addr = CLbl entry_label CodePtrRep
     con_descr  = occNameUserString (getOccName data_con)
 
     -- Don't need any dynamic closure code for zero-arity constructors
@@ -134,10 +133,6 @@ genConInfo comp_info tycon data_con
 			CClosureInfoAndCode closure_info body Nothing con_descr
 
     static_code  = CClosureInfoAndCode static_ci body Nothing con_descr
-
-    cost_centre  = mkCCostCentreStack dontCareCCS -- not worried about static data costs
-
-    zero_size arg_ty = getPrimRepSize (typePrimRep arg_ty) == 0
 
     zero_arity_con   = isNullaryDataCon data_con
 	-- We used to check that all the arg-sizes were zero, but we don't

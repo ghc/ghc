@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.25 2000/07/11 16:03:37 simonmar Exp $
+% $Id: CgTailCall.lhs,v 1.26 2000/07/14 08:14:53 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -403,8 +403,6 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
   = getEndOfBlockInfo	`thenFC` \ eob@(EndOfBlockInfo args_sp sequel) ->
 
     let
-	no_of_args = length arg_amodes
-
 	(reg_arg_amodes, stk_arg_amodes) = splitAt (length arg_regs) arg_amodes
 	    -- We get some stk_arg_amodes if (a) no regs, or 
 	    --				     (b) args beyond arity
@@ -428,7 +426,6 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 		splitAt arity stk_arg_amodes
 
 	-- eager blackholing, at the end of the basic block.
-	node_save = CTemp (mkPseudoUnique1 2) DataPtrRep
 	(r1_tmp_asst, bh_asst)
 	 = case sequel of
 #if 0
@@ -441,6 +438,8 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
 		    CAssign (CVal (CIndex node_save (mkIntCLit 0) PtrRep) 
 				  PtrRep)
 			    (CLbl mkBlackHoleInfoTableLabel DataPtrRep))
+		   where
+		     node_save = CTemp (mkPseudoUnique1 2) DataPtrRep
 #endif
 		_ -> (AbsCNop, AbsCNop)
     in

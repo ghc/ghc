@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.43 2000/07/11 16:03:37 simonmar Exp $
+% $Id: CgCase.lhs,v 1.44 2000/07/14 08:14:53 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -899,8 +899,6 @@ mkReturnVector :: Unique
 mkReturnVector uniq tagged_alt_absCs deflt_absC srt liveness ret_conv
   = getSRTLabel `thenFC` \srt_label ->
     let
-     srt_info = (srt_label, srt)
-
      (return_vec_amode, vtbl_body) = case ret_conv of {
 
 	-- might be a polymorphic case...

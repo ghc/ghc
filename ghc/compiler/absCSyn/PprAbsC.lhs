@@ -812,14 +812,6 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
     (local_arg_decls, pp_non_void_args)
       = unzip [ ppr_casm_arg a i | (a,i) <- non_void_args `zip` [1..] ]
 
-    ccall_arg_tys = map (text.showPrimRep.getAmodeRep) non_void_args
-
-    ccall_res_ty = 
-       case non_void_results of
-          []       -> ptext SLIT("void")
-	  [amode]  -> text (showPrimRep (getAmodeRep amode))
-	  _	   -> panic "pprCCall: ccall_res_ty"
-
     (declare_local_vars, local_vars, assign_results)
       = ppr_casm_results non_void_results
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.21 2000/07/11 16:03:37 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.22 2000/07/14 08:14:53 simonpj Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -397,7 +397,6 @@ fetchAndReschedule regs node_reqd  =
 	then fetch_code `thenC` reschedule_code
 	else absC AbsCNop
       where
-	all_regs = if node_reqd then node:regs else regs
         liveness_mask = mkRegLiveness regs
 	reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
                                  mkIntCLit (IBOX(word2Int# liveness_mask)), 
@@ -431,7 +430,6 @@ yield regs node_reqd =
      then yield_code
      else absC AbsCNop
    where
-     -- all_regs = if node_reqd then node:regs else regs
      liveness_mask = mkRegLiveness regs
      yield_code = 
        absC (CMacroStmt GRAN_YIELD 

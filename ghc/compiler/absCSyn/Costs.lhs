@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.24 2000/07/06 14:08:31 simonmar Exp $
+% $Id: Costs.lhs,v 1.25 2000/07/14 08:15:28 simonpj Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -315,10 +315,6 @@ exprMacroCosts side macro mode_list =
 stmtMacroCosts :: CStmtMacro -> [CAddrMode] -> CostRes
 
 stmtMacroCosts macro modes =
-  let
-    arg_costs =	  foldl (+) nullCosts
-			[addrModeCosts mode Rhs | mode <- modes]
-  in
   case macro of
     ARGS_CHK_LOAD_NODE  ->  Cost (2, 1, 0, 0, 0)	 {- StgMacros.lh  -}
 		-- p=probability of PAP (instead of AP): + p*(3,1,0,0,0)

@@ -236,7 +236,6 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 	= alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
 		    (foldr1 maxSize alt_sizes)
 	where
-	  v_in_args = v `elem` top_args
 	  alt_sizes = map size_up_alt alts
 
 	  alts_size (SizeIs tot tot_disc tot_scrut)		-- Size of all alternatives

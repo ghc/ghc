@@ -91,7 +91,6 @@ cgTopRhsCon id con args
 	-- RETURN
     returnFC (id, stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info)
   where
-    con_tycon	    = dataConTyCon   con
     lf_info	    = mkConLFInfo    con
     closure_label   = mkClosureLabel name
     name            = idName id
@@ -173,8 +172,6 @@ buildDynCon binder cc con [arg_amode]
 
     in_range_int_lit (CLit (MachInt val)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
     in_range_int_lit other_amode	  = False
-
-    tycon = dataConTyCon con
 \end{code}
 
 Now the general case.
@@ -364,8 +361,6 @@ cgReturnDataCon con amodes
 		build_it_then (mkStaticAlgReturnCode con)
 
   where
-    con_name = dataConName con
-
     move_to_reg :: CAddrMode -> MagicId -> AbstractC
     move_to_reg src_amode dest_reg = CAssign (CReg dest_reg) src_amode
 
