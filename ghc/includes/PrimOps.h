@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.45 2000/01/18 12:37:33 simonmar Exp $
+ * $Id: PrimOps.h,v 1.46 2000/03/13 12:11:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -595,7 +595,6 @@ extern I_ resetGenSymZh(void);
 	}
 
 #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
-#define unsafeThawByteArrayzh(r,a)	r=(a)
 
 EF_(unsafeThawArrayzh_fast);
 

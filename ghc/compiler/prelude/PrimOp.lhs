@@ -157,7 +157,7 @@ data PrimOp
     | IndexOffForeignObjOp PrimRep
 
     | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp
-    | UnsafeThawArrayOp   | UnsafeThawByteArrayOp
+    | UnsafeThawArrayOp
     | SizeofByteArrayOp   | SizeofMutableByteArrayOp
 
     -- Mutable variables
@@ -512,7 +512,6 @@ tagOf_PrimOp (WriteOffAddrOp Word64Rep)       = ILIT(200)
 tagOf_PrimOp UnsafeFreezeArrayOp	      = ILIT(201)
 tagOf_PrimOp UnsafeFreezeByteArrayOp	      = ILIT(202)
 tagOf_PrimOp UnsafeThawArrayOp		      = ILIT(203)
-tagOf_PrimOp UnsafeThawByteArrayOp	      = ILIT(204)
 tagOf_PrimOp SizeofByteArrayOp		      = ILIT(205)
 tagOf_PrimOp SizeofMutableByteArrayOp	      = ILIT(206)
 tagOf_PrimOp NewMVarOp			      = ILIT(207)
@@ -787,7 +786,6 @@ allThePrimOps
 	UnsafeFreezeArrayOp,
 	UnsafeFreezeByteArrayOp,
 	UnsafeThawArrayOp,
-	UnsafeThawByteArrayOp,
 	SizeofByteArrayOp,
 	SizeofMutableByteArrayOp,
 	NewMutVarOp,
@@ -1380,7 +1378,6 @@ primOpInfo (WriteOffAddrOp kind)
 unsafeFreezeArray#     :: MutArr# s a -> State# s -> (# State# s, Array# a #)
 unsafeFreezeByteArray# :: MutByteArr# s -> State# s -> (# State# s, ByteArray# #)
 unsafeThawArray#       :: Array# a -> State# s -> (# State# s, MutArr# s a #)
-unsafeThawByteArray#   :: ByteArray# -> State# s -> (# State# s, MutByteArr# s #)
 -}
 
 primOpInfo UnsafeFreezeArrayOp
@@ -1409,15 +1406,6 @@ primOpInfo UnsafeThawArrayOp
     mkGenPrimOp SLIT("unsafeThawArray#") [s_tv, elt_tv]
 	[mkArrayPrimTy elt, state]
 	(unboxedPair [state, mkMutableArrayPrimTy s elt])
-
-primOpInfo UnsafeThawByteArrayOp
-  = let { 
-	s = alphaTy; s_tv = alphaTyVar;
-	state = mkStatePrimTy s
-    } in
-    mkGenPrimOp SLIT("unsafeThawByteArray#") [s_tv]
-	[byteArrayPrimTy, state]
-	(unboxedPair [state, mkMutableByteArrayPrimTy s])
 
 ---------------------------------------------------------------------------
 primOpInfo SizeofByteArrayOp
@@ -2130,7 +2118,6 @@ primOpHasSideEffects WriteMutVarOp	   = True
 primOpHasSideEffects UnsafeFreezeArrayOp	= True
 primOpHasSideEffects UnsafeFreezeByteArrayOp	= True
 primOpHasSideEffects UnsafeThawArrayOp		= True
-primOpHasSideEffects UnsafeThawByteArrayOp	= True
 
 primOpHasSideEffects TakeMVarOp        = True
 primOpHasSideEffects PutMVarOp         = True
