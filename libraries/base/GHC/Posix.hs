@@ -189,7 +189,7 @@ setCooked fd cooked =
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
-    when cooked $ do
+    when (not cooked) $ do
             c_cc <- ptr_c_cc p_tios
 	    let vmin  = (c_cc `plusPtr` (fromIntegral const_vmin))  :: Ptr Word8
 		vtime = (c_cc `plusPtr` (fromIntegral const_vtime)) :: Ptr Word8
