@@ -48,9 +48,7 @@ forkST (ST action) = ST $ \ s ->
    let
     (r, new_s) = action s
    in
-    new_s `fork__` (r, s)
- where
-    fork__ x y = case (fork# x) of { 0# -> parError; _ -> y }
+    new_s `fork` (r, s)
 
 forkPrimIO :: PrimIO a -> PrimIO a
 forkPrimIO = forkST
