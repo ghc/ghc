@@ -990,6 +990,23 @@ dataConRepType con
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels (Id _ _ _ (AlgConId _ _ fields _ _ _ _ _ _) _ _) = fields
 dataConFieldLabels (Id _ _ _ (TupleConId _)		    _ _) = []
+#ifdef DEBUG
+dataConFieldLabels x@(Id _ _ _ idt _ _) = 
+  panic ("dataConFieldLabel: " ++
+    (case idt of
+      LocalId _    -> "l"
+      SysLocalId _ -> "sl"
+      PrimitiveId _ -> "p"
+      SpecPragmaId _  _ -> "sp"
+      ImportedId -> "i"
+      RecordSelId _ -> "r"
+      SuperDictSelId _ _ -> "sc"
+      MethodSelId _ -> "m"
+      DefaultMethodId _ -> "d"
+      DictFunId _ _ -> "di"
+      InstId _ -> "in"
+      SpecId _ _ _ -> "spec"))
+#endif
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
 dataConStrictMarks (Id _ _ _ (AlgConId _ stricts _ _ _ _ _ _ _) _ _) = stricts
