@@ -32,6 +32,9 @@ $HostPlatform = ${HOSTPLATFORM};
 if ( $HostPlatform =~ /^i386-/ ) {
     push(@Defines, '-D__i386__');
 }
+if ( $HostPlatform =~ /linux/ ) {
+    push(@Defines, '-D__linux__');
+}
 if ( $HostPlatform =~ /^sparc-/ ) {
     push(@Defines, '-D__sparc__');
 }
