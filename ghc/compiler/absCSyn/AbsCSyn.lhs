@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.23 1999/05/13 17:30:52 simonm Exp $
+% $Id: AbsCSyn.lhs,v 1.24 1999/06/24 13:04:13 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -47,7 +47,7 @@ import CLabel
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, spRelToInt )
 import CostCentre       ( CostCentre, CostCentreStack )
-import Const		( mkMachInt, Literal )
+import Const		( mkMachInt, Literal(..) )
 import PrimRep		( PrimRep(..) )
 import PrimOp           ( PrimOp )
 import Unique           ( Unique )
@@ -114,7 +114,7 @@ stored in a mixed type location.)
 
   | CInitHdr		-- to initialise the header of a closure (both fixed/var parts)
 	ClosureInfo
-	RegRelative	-- address of the info ptr
+	CAddrMode	-- address of the info ptr
 	CAddrMode	-- cost centre to place in closure
 			--   CReg CurCostCentre or CC_HDR(R1.p{-Node-})
 
@@ -232,13 +232,13 @@ data CStmtMacro
   | UPD_BH_SINGLE_ENTRY			-- more eager blackholing
   | PUSH_UPD_FRAME			-- push update frame
   | PUSH_SEQ_FRAME			-- push seq frame
+  | UPDATE_SU_FROM_UPD_FRAME		-- pull Su out of the update frame
   | SET_TAG				-- set TagReg if it exists
   | GRAN_FETCH	    		-- for GrAnSim only  -- HWL
   | GRAN_RESCHEDULE   		-- for GrAnSim only  -- HWL
   | GRAN_FETCH_AND_RESCHEDULE	-- for GrAnSim only  -- HWL
   | THREAD_CONTEXT_SWITCH   	-- for GrAnSim only  -- HWL
   | GRAN_YIELD   		-- for GrAnSim only  -- HWL 
-  deriving Text
 \end{code}
 
 Heap/Stack checks.  There are far too many of these.
@@ -265,7 +265,6 @@ data CCheckMacro
   | HP_CHK_UT_ALT			--   unboxed tuple return.
 
   | HP_CHK_GEN				-- generic heap check
-  deriving Text
 \end{code}
 
 \item[@CCallProfCtrMacro@:]
@@ -300,11 +299,6 @@ data CAddrMode
 
   | CReg MagicId	-- To replace (CAddr MagicId 0)
 
-  | CTableEntry     	    -- CVal should be generalized to allow this
-    	    	CAddrMode   -- Base
-    	        CAddrMode   -- Offset
-    	    	PrimRep    -- For casting
-
   | CTemp !Unique !PrimRep	-- Temporary locations
 	-- ``Temporaries'' correspond to local variables in C, and registers in
 	-- native code.
@@ -320,8 +314,8 @@ data CAddrMode
 			-- specified small integer.  It is guaranteed to be in
 			-- the range mIN_INTLIKE..mAX_INTLIKE
 
-  | CString FAST_STRING	-- The address of the null-terminated string
   | CLit    Literal
+
   | CLitLit FAST_STRING	-- completely literal literal: just spit this String
 			-- into the C output
 	    PrimRep
@@ -348,7 +342,7 @@ data CExprMacro
   = ENTRY_CODE
   | ARG_TAG				-- stack argument tagging
   | GET_TAG				-- get current constructor tag
-  deriving(Text)
+  | UPD_FRAME_UPDATEE
 
 \end{code}
 
@@ -357,6 +351,9 @@ Convenience functions:
 \begin{code}
 mkIntCLit :: Int -> CAddrMode
 mkIntCLit i = CLit (mkMachInt (toInteger i))
+
+mkCString :: FAST_STRING -> CAddrMode
+mkCString s = CLit (MachStr s)
 
 mkCCostCentre :: CostCentre -> CAddrMode
 mkCCostCentre cc = CLbl (mkCC_Label cc) DataPtrRep
@@ -376,6 +373,8 @@ data RegRelative
   = HpRel 	FAST_INT	-- }
   | SpRel 	FAST_INT	-- }- offsets in StgWords
   | NodeRel	FAST_INT	-- }
+  | CIndex	CAddrMode CAddrMode PrimRep	-- pointer arithmetic :-)
+						-- CIndex a b k === (k*)a[b]
 
 data ReturnInfo
   = DirectReturn    	    	    	-- Jump directly, if possible
@@ -400,7 +399,7 @@ nodeRel IBOX(off) = NodeRel off
 
 %************************************************************************
 %*									*
-\subsection[RegRelative]{@RegRelatives@: ???}
+\subsection[Liveness]{Liveness Masks}
 %*									*
 %************************************************************************
 

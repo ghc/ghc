@@ -243,10 +243,10 @@ addresses, etc.)
 
  gencode (CInitHdr cl_info reg_rel _)
   = let
-	lhs = a2stix (CVal reg_rel PtrRep)
+	lhs = a2stix reg_rel
     	lbl = infoTableLabelFromCI cl_info
     in
-	returnUs (\xs -> StAssign PtrRep lhs (StCLbl lbl) : xs)
+	returnUs (\xs -> StAssign PtrRep (StInd PtrRep lhs) (StCLbl lbl) : xs)
 
 \end{code}
 

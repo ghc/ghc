@@ -11,9 +11,8 @@ module CgUpdate ( pushUpdateFrame, reserveSeqFrame, pushSeqFrame ) where
 import CgMonad
 import AbsCSyn
 
-import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE )
 import PrimRep		( PrimRep(..) )
-import CgStackery	( allocStackTop )
+import CgStackery	( allocStackTop, updateFrameSize, seqFrameSize )
 import CgUsages		( getVirtSp, getSpRelOffset )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Panic		( assertPanic )
@@ -38,20 +37,15 @@ to reflect the frame pushed.
 pushUpdateFrame :: CAddrMode -> Code -> Code
 
 pushUpdateFrame updatee code
-  = let
-	-- frame_size *includes* the return address
-	frame_size = if opt_SccProfilingOn
-		     then sCC_UF_SIZE
-		     else uF_SIZE
-    in
+  = 
 #ifdef DEBUG
     getEndOfBlockInfo 	    	    	`thenFC` \ eob_info ->
     ASSERT(case eob_info of { EndOfBlockInfo _ (OnStack _) -> True; 
 			      _ -> False})
 #endif
 
-    allocStackTop frame_size	`thenFC` \ _ ->
-    getVirtSp			`thenFC` \ vsp ->
+    allocStackTop updateFrameSize	`thenFC` \ _ ->
+    getVirtSp				`thenFC` \ vsp ->
 
     setEndOfBlockInfo (EndOfBlockInfo vsp UpdateCode) (
 
@@ -76,16 +70,13 @@ args_sp.  When the scrutinee comes around to pushing a return address,
 it will also push the SEQ frame, using pushSeqFrame.
 
 \begin{code}
-seq_frame_size | opt_SccProfilingOn = sCC_SEQ_FRAME_SIZE
-	       | otherwise          = sEQ_FRAME_SIZE
-
 reserveSeqFrame :: EndOfBlockInfo -> EndOfBlockInfo
 reserveSeqFrame (EndOfBlockInfo args_sp (CaseAlts amode stuff)) 
-  = EndOfBlockInfo (args_sp + seq_frame_size) (SeqFrame amode stuff)
+  = EndOfBlockInfo (args_sp + seqFrameSize) (SeqFrame amode stuff)
 
 pushSeqFrame :: VirtualSpOffset -> FCode VirtualSpOffset
 pushSeqFrame args_sp
   = getSpRelOffset args_sp  `thenFC` \ sp_rel ->
     absC (CMacroStmt PUSH_SEQ_FRAME [CAddr sp_rel]) `thenC`
-    returnFC (args_sp - seq_frame_size)
+    returnFC (args_sp - seqFrameSize)
 \end{code}

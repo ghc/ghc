@@ -147,7 +147,7 @@ pprAbsC (CReturn am return_info)  c
 			      pprAmode am, rparen]
 	DynamicVectoredReturn am' -> mk_vector (pprAmode am')
 	StaticVectoredReturn n -> mk_vector (int n)	-- Always positive
-   mk_vector x = hcat [text "RET_VEC", char '(', pprAmode am, comma,
+   mk_vector x = hcat [ptext SLIT("RET_VEC"), char '(', pprAmode am, comma,
 		       x, rparen ]
 
 pprAbsC (CSplitMarker) _ = ptext SLIT("/* SPLIT */")
@@ -271,12 +271,12 @@ pprAbsC (CSimultaneous abs_c) c
   = hcat [ptext SLIT("{{"), pprAbsC abs_c c, ptext SLIT("}}")]
 
 pprAbsC (CCheck macro as code) c
-  = hcat [text (show macro), lparen,
+  = hcat [ptext (cCheckMacroText macro), lparen,
        hcat (punctuate comma (map ppr_amode as)), comma,
        pprAbsC code c, pp_paren_semi
     ]
 pprAbsC (CMacroStmt macro as) _
-  = hcat [text (show macro), lparen,
+  = hcat [ptext (cStmtMacroText macro), lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi] -- no casting
 pprAbsC (CCallProfCtrMacro op as) _
   = hcat [ptext op, lparen,
@@ -338,9 +338,9 @@ pprAbsC (CCodeBlock label abs_C) _
     }
 
 
-pprAbsC (CInitHdr cl_info reg_rel cost_centre) _
+pprAbsC (CInitHdr cl_info amode cost_centre) _
   = hcat [ ptext SLIT("SET_HDR_"), char '(',
-		ppr_amode (CAddr reg_rel), comma,
+		ppr_amode amode, comma,
 		pprCLabelAddr info_lbl, comma,
 		if_profiling (pprAmode cost_centre),
 		pp_paren_semi ]
@@ -1036,13 +1036,13 @@ pprAssign Word64Rep dest@(CVal reg_rel _) src
 Lastly, the question is: will the C compiler think the types of the
 two sides of the assignment match?
 
-	We assume that the types will match
-	if neither side is a @CVal@ addressing mode for any register
-	which can point into the heap or B stack.
+	We assume that the types will match if neither side is a
+	@CVal@ addressing mode for any register which can point into
+	the heap or stack.
 
-Why?  Because the heap and B stack are used to store miscellaneous things,
-whereas the A stack, temporaries, registers, etc., are only used for things
-of fixed type.
+Why?  Because the heap and stack are used to store miscellaneous
+things, whereas the temporaries, registers, etc., are only used for
+things of fixed type.
 
 \begin{code}
 pprAssign kind (CReg (VanillaReg _ dest)) (CReg (VanillaReg _ src))
@@ -1144,9 +1144,6 @@ ppr_amode (CCharLike ch)
 ppr_amode (CIntLike int)
   = hcat [ptext SLIT("INTLIKE_CLOSURE"), char '(', pprAmode int, rparen ]
 
-ppr_amode (CString str) = hcat [char '"', text (stringToC (_UNPK_ str)), char '"']
-  -- ToDo: are these *used* for anything?
-
 ppr_amode (CLit lit) = pprBasicLit lit
 
 ppr_amode (CLitLit str _) = ptext str
@@ -1154,15 +1151,48 @@ ppr_amode (CLitLit str _) = ptext str
 ppr_amode (CJoinPoint _)
   = panic "ppr_amode: CJoinPoint"
 
-ppr_amode (CTableEntry base index kind)
-  = hcat [text "((", pprPrimKind kind, text " *)(",
-	       ppr_amode base, text "))[(I_)(", ppr_amode index,
-    	       ptext SLIT(")]")]
-
 ppr_amode (CMacroExpr pk macro as)
-  = parens (pprPrimKind pk) <+> 
-    parens (text (show macro) <> 
+  = parens (pprPrimKind pk) <> 
+    parens (ptext (cExprMacroText macro) <> 
 	    parens (hcat (punctuate comma (map pprAmode as))))
+\end{code}
+
+\begin{code}
+cExprMacroText ENTRY_CODE 		= SLIT("ENTRY_CODE")
+cExprMacroText ARG_TAG    		= SLIT("ARG_TAG")
+cExprMacroText GET_TAG    		= SLIT("GET_TAG")
+cExprMacroText UPD_FRAME_UPDATEE 	= SLIT("UPD_FRAME_UPDATEE")
+
+cStmtMacroText ARGS_CHK			= SLIT("ARGS_CHK")
+cStmtMacroText ARGS_CHK_LOAD_NODE	= SLIT("ARGS_CHK_LOAD_NODE")
+cStmtMacroText UPD_CAF			= SLIT("UPD_CAF")
+cStmtMacroText UPD_BH_UPDATABLE		= SLIT("UPD_BH_UPDATABLE")
+cStmtMacroText UPD_BH_SINGLE_ENTRY	= SLIT("UPD_BH_SINGLE_ENTRY")
+cStmtMacroText PUSH_UPD_FRAME		= SLIT("PUSH_UPD_FRAME")
+cStmtMacroText PUSH_SEQ_FRAME		= SLIT("PUSH_SEQ_FRAME")
+cStmtMacroText UPDATE_SU_FROM_UPD_FRAME	= SLIT("UPDATE_SU_FROM_UPD_FRAME")
+cStmtMacroText SET_TAG			= SLIT("SET_TAG")
+cStmtMacroText GRAN_FETCH	    	= SLIT("GRAN_FETCH")
+cStmtMacroText GRAN_RESCHEDULE   	= SLIT("GRAN_RESCHEDULE")
+cStmtMacroText GRAN_FETCH_AND_RESCHEDULE= SLIT("GRAN_FETCH_AND_RESCHEDULE")
+cStmtMacroText THREAD_CONTEXT_SWITCH   	= SLIT("THREAD_CONTEXT_SWITCH")
+cStmtMacroText GRAN_YIELD   		= SLIT("GRAN_YIELD")
+
+cCheckMacroText	HP_CHK_NP		= SLIT("HP_CHK_NP")
+cCheckMacroText	STK_CHK_NP		= SLIT("STK_CHK_NP")
+cCheckMacroText	HP_STK_CHK_NP		= SLIT("HP_STK_CHK_NP")
+cCheckMacroText	HP_CHK_SEQ_NP		= SLIT("HP_CHK_SEQ_NP")
+cCheckMacroText	HP_CHK			= SLIT("HP_CHK")
+cCheckMacroText	STK_CHK			= SLIT("STK_CHK")
+cCheckMacroText	HP_STK_CHK		= SLIT("HP_STK_CHK")
+cCheckMacroText	HP_CHK_NOREGS		= SLIT("HP_CHK_NOREGS")
+cCheckMacroText	HP_CHK_UNPT_R1		= SLIT("HP_CHK_UNPT_R1")
+cCheckMacroText	HP_CHK_UNBX_R1		= SLIT("HP_CHK_UNBX_R1")
+cCheckMacroText	HP_CHK_F1		= SLIT("HP_CHK_F1")
+cCheckMacroText	HP_CHK_D1		= SLIT("HP_CHK_D1")
+cCheckMacroText	HP_CHK_L1		= SLIT("HP_CHK_L1")
+cCheckMacroText	HP_CHK_UT_ALT		= SLIT("HP_CHK_UT_ALT")
+cCheckMacroText	HP_CHK_GEN		= SLIT("HP_CHK_GEN")
 \end{code}
 
 %************************************************************************
@@ -1223,6 +1253,11 @@ pprRegRelative sign_wanted (NodeRel o)
     else
 	(pp_Node, Just (addPlusSign sign_wanted (int off)))
 
+pprRegRelative sign_wanted (CIndex base offset kind)
+  = ( hcat [text "((", pprPrimKind kind, text " *)(", ppr_amode base, text "))"]
+    , Just (hcat [if sign_wanted then char '+' else empty,
+	    text "(I_)(", ppr_amode offset, ptext SLIT(")")])
+    )
 \end{code}
 
 @pprMagicId@ just prints the register name.  @VanillaReg@ registers are
@@ -1491,10 +1526,11 @@ ppr_decls_AbsC (CRetVector _ amodes _ _)     = ppr_decls_Amodes amodes
 
 \begin{code}
 ppr_decls_Amode :: CAddrMode -> TeM (Maybe SDoc, Maybe SDoc)
+ppr_decls_Amode (CVal  (CIndex base offset _) _) = ppr_decls_Amodes [base,offset]
+ppr_decls_Amode (CAddr (CIndex base offset _))   = ppr_decls_Amodes [base,offset]
 ppr_decls_Amode (CVal _ _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CAddr _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CReg _)	= returnTE (Nothing, Nothing)
-ppr_decls_Amode (CString _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CLit _)	= returnTE (Nothing, Nothing)
 ppr_decls_Amode (CLitLit _ _) 	= returnTE (Nothing, Nothing)
 
@@ -1521,11 +1557,6 @@ ppr_decls_Amode (CLbl label kind)
   = labelSeenTE label `thenTE` \ label_seen ->
     returnTE (Nothing,
 	      if label_seen then Nothing else Just (pprExternDecl False{-not in an SRT decl-} label))
-
-ppr_decls_Amode (CTableEntry base index _)
-  = ppr_decls_Amode base    `thenTE` \ p1 ->
-    ppr_decls_Amode index   `thenTE` \ p2 ->
-    returnTE (maybe_vcat [p1, p2])
 
 ppr_decls_Amode (CMacroExpr _ _ amodes)
   = ppr_decls_Amodes amodes

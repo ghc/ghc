@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.32 1999/06/08 15:56:46 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.33 1999/06/24 13:04:17 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -372,21 +372,17 @@ closureCodeBody binder_info closure_info cc all_args body
 
 	fast_entry_code
 	  = profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
-		    mkIntCLit stg_arity		-- total # of args
-
-		{-  CLbl (mkRednCountsLabel name) PtrRep,
-		    CString (_PK_ (showSDoc (ppr name))),
+		    CLbl (mkRednCountsLabel name) PtrRep,
+		    mkCString (_PK_ (showSDoc (ppr name))),
 		    mkIntCLit stg_arity,	-- total # of args
 		    mkIntCLit sp_stk_args,	-- # passed on stk
-		    CString (_PK_ (map (showTypeCategory . idType) all_args)),
-		    CString SLIT(""), CString SLIT("")
-		-}
+		    mkCString (_PK_ (map (showTypeCategory . idType) all_args))
+		]			`thenC`
 
 -- Nuked for now; see comment at end of file
 --		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
 --		    CString (_PK_ (show_wrapper_arg_kinds wrapper_maybe))
 
-		]			`thenC`
 
 		-- Bind args to regs/stack as appropriate, and
 		-- record expected position of sps.
@@ -638,13 +634,13 @@ setupUpdate closure_info code
                            link_caf seCafBlackHoleClosureInfo `thenFC` \ _ -> nopC
                          else
                            nopC)                                                       `thenC`
-                        profCtrC SLIT("TICK_UPD_CAF_BH_SINGLE_ENTRY") [CString cl_name] `thenC`
+                        profCtrC SLIT("TICK_UPD_CAF_BH_SINGLE_ENTRY") [mkCString cl_name] `thenC`
                         profCtrC SLIT("TICK_UPDF_OMITTED") []                           `thenC`
 	                code
        (True ,False) -> pushUpdateFrame (CReg node) code
        (True ,True ) -> -- blackhole the (updatable) CAF:
                         link_caf cafBlackHoleClosureInfo           `thenFC` \ update_closure ->
-                        profCtrC SLIT("TICK_UPD_CAF_BH_UPDATABLE") [CString cl_name]    `thenC`
+                        profCtrC SLIT("TICK_UPD_CAF_BH_UPDATABLE") [mkCString cl_name]    `thenC`
                         pushUpdateFrame update_closure code
  where
    cl_name :: FAST_STRING

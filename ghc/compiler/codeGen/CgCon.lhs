@@ -26,18 +26,21 @@ import CgBindery	( getArgAmodes, bindNewToNode,
 			  idInfoToAmode, stableAmodeIdInfo,
 			  heapIdInfo, CgIdInfo, bindNewToStack
 			)
-import CgStackery	( mkTaggedVirtStkOffsets, freeStackSlots )
-import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp )
+import CgStackery	( mkTaggedVirtStkOffsets, freeStackSlots, 
+			  updateFrameSize
+			)
+import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp,
+			  getSpRelOffset )
 import CgClosure	( cgTopRhsClosure )
 import CgRetConv	( assignRegs )
-import Constants	( mAX_INTLIKE, mIN_INTLIKE )
-import CgHeapery	( allocDynClosure )
+import Constants	( mAX_INTLIKE, mIN_INTLIKE, mIN_UPD_SIZE )
+import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
 			  mkUnboxedTupleReturnCode )
 import CLabel		( mkClosureLabel, mkStaticClosureLabel )
 import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 			  layOutDynCon, layOutDynClosure,
-			  layOutStaticClosure
+			  layOutStaticClosure, closureSize
 			)
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
@@ -49,7 +52,8 @@ import Name		( nameModule, isLocallyDefinedName )
 import Module		( isDynamicModule )
 import Const		( Con(..), Literal(..), isLitLitLit )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
-import PrimRep		( PrimRep(..) )
+import PrimRep		( PrimRep(..), isFollowableRep )
+import Unique		( Uniquable(..) )
 import Util
 import Panic		( assertPanic, trace )
 \end{code}
@@ -286,7 +290,7 @@ cgReturnDataCon con amodes all_zero_size_args
 
     case sequel of
 
-      CaseAlts _ (Just (alts, Just (maybe_deflt_binder, (_,deflt_lbl))))
+      CaseAlts _ (Just (alts, Just (Nothing, (_,deflt_lbl))))
 	| not (dataConTag con `is_elem` map fst alts)
 	->
 		-- Special case!  We're returning a constructor to the default case
@@ -299,26 +303,56 @@ cgReturnDataCon con amodes all_zero_size_args
 		-- In this case,
 		--	if the default is a non-bind-default (ie does not use y),
 		--	then we should simply jump to the default join point;
-		--
-		--	if the default is a bind-default (ie does use y), we
-		--	should return the constructor in the heap,
-		--      pointed to by Node.
 
-		case maybe_deflt_binder of
-		  Just binder ->
-			ASSERT(not (isUnboxedTupleCon con))
-			buildDynCon binder currentCCS con amodes all_zero_size_args
-								`thenFC` \ idinfo ->
-		  	profCtrC SLIT("TICK_RET_NEW") [mkIntCLit (length amodes)] `thenC`
-			idInfoToAmode PtrRep idinfo		`thenFC` \ amode ->
-			performReturn (move_to_reg amode node)  jump_to_join_point
-
-		  Nothing ->
-			performReturn AbsCNop {- No reg assts -} jump_to_join_point
+		performReturn AbsCNop {- No reg assts -} jump_to_join_point
 	where
 	  is_elem = isIn "cgReturnDataCon"
 	  jump_to_join_point sequel = absC (CJump (CLbl deflt_lbl CodePtrRep))
 		-- Ignore the sequel: we've already looked at it above
+
+	-- If the sequel is an update frame, we might be able to
+	-- do update in place...
+      UpdateCode
+	|  not all_zero_size_args      -- no nullary constructors, please
+	&& not (maybeCharLikeCon con)  -- no chars please (these are all static)
+	&& not (any isFollowableRep (map getAmodeRep amodes))
+					-- no ptrs please (generational gc...)
+	&& closureSize closure_info <= mIN_UPD_SIZE
+					-- don't know the real size of the
+					-- thunk, so assume mIN_UPD_SIZE
+
+	-> 	-- get a new temporary and make it point to the updatee
+	   let 
+		uniq = getUnique con
+	       	temp = CTemp uniq PtrRep 
+	   in
+	   getSpRelOffset args_sp			`thenFC` \ sp_rel ->
+	   absC (CAssign temp 
+		    (CMacroExpr PtrRep UPD_FRAME_UPDATEE [CAddr sp_rel])) 
+		`thenC`
+
+	   	-- stomp all over it with the new constructor
+	   inPlaceAllocDynClosure closure_info temp (CReg CurCostCentre) stuff 
+		`thenC`
+
+		-- don't forget to update Su from the update frame
+	   absC (CMacroStmt UPDATE_SU_FROM_UPD_FRAME [CAddr sp_rel])  `thenC`
+
+		-- set Node to point to the closure being returned
+		-- (can't be done earlier: node might conflict with amodes)
+	   absC (CAssign (CReg node) temp) `thenC`
+
+	   	-- pop the update frame off the stack, and do the proper
+	   	-- return.
+	   let new_sp = args_sp - updateFrameSize in
+	   setEndOfBlockInfo (EndOfBlockInfo new_sp (OnStack new_sp)) $
+	   performReturn (AbsCNop) (mkStaticAlgReturnCode con)
+
+	where (closure_info, stuff) 
+		  = layOutDynClosure (dataConName con) 
+			getAmodeRep amodes lf_info
+
+	      lf_info = mkConLFInfo con
 
       other_sequel	-- The usual case
 

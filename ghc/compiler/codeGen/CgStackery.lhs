@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.11 1999/06/08 15:56:47 simonmar Exp $
+% $Id: CgStackery.lhs,v 1.12 1999/06/24 13:04:20 simonmar Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -13,7 +13,8 @@ module CgStackery (
 	allocStack, allocPrimStack, allocStackTop, deAllocStackTop,
 	adjustStackHW, getFinalStackHW,
 	mkTaggedVirtStkOffsets, mkTaggedStkAmodes, mkTagAssts,
-	freeStackSlots, dataStackSlots, addFreeSlots
+	freeStackSlots, dataStackSlots, addFreeSlots,
+	updateFrameSize, seqFrameSize
     ) where
 
 #include "HsVersions.h"
@@ -24,7 +25,10 @@ import AbsCSyn
 import CgUsages		( getRealSp )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
+import CmdLineOpts	( opt_SccProfilingOn )
 import Panic		( panic )
+import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE )
+
 import IOExts		( trace )
 \end{code}
 
@@ -219,6 +223,13 @@ getFinalStackHW fcode info_down (MkCgState absC binds usages) = state1
     (MkCgState _ _ ((_,_,_, hwSp), _)) = state1
 \end{code}
 
+\begin{code}
+updateFrameSize | opt_SccProfilingOn = sCC_UF_SIZE
+		| otherwise          = uF_SIZE
+
+seqFrameSize    | opt_SccProfilingOn  = sCC_SEQ_FRAME_SIZE
+	        | otherwise           = sEQ_FRAME_SIZE
+\end{code}			
 
 %************************************************************************
 %*									*

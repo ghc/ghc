@@ -2,4 +2,4 @@ _interface_ CgUsages 1
 _exports_
 CgUsages getSpRelOffset;
 _declarations_
-1 getSpRelOffset _:_ AbsCSyn.VirtualSpOffset -> CgMonad.FCode AbsCSyn.RegRelative ;;
+1 getSpRelOffset _:_ AbsCSyn.VirtualSpOffset -> CgMonad.FCode AbsCSyn.CAddrMode ;;

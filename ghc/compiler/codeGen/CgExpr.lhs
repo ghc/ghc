@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.27 1999/06/09 14:28:38 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.28 1999/06/24 13:04:18 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -133,9 +133,9 @@ cgExpr (StgCon (PrimOp TagToEnumOp) [arg] res_ty)
     absC (CAssign dyn_tag amode)	`thenC`
     performReturn (
 		CAssign (CReg node) 
-			(CTableEntry 
+			(CVal (CIndex
 		          (CLbl (mkClosureTblLabel tycon) PtrRep)
-		          dyn_tag PtrRep))
+		          dyn_tag PtrRep) PtrRep))
 	    (\ sequel -> mkDynamicAlgReturnCode tycon dyn_tag sequel)
    where
         dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
@@ -177,9 +177,9 @@ cgExpr x@(StgCon (PrimOp op) args res_ty)
 	       -- about to return anyway.
 	       dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
 
-	       closure_lbl = CTableEntry 
+	       closure_lbl = CVal (CIndex
 			       (CLbl (mkClosureTblLabel tycon) PtrRep)
-			       dyn_tag PtrRep
+			       dyn_tag PtrRep) PtrRep
 
 \end{code}
 

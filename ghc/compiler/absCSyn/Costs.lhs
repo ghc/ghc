@@ -117,7 +117,7 @@ costs absC =
 
    CAssign (CReg _) (CTemp _ _) -> Cost (1,0,0,0,0)
 
-   CAssign (CReg _) (CAddr _)	-> Cost (1,0,0,0,0)  -- typ.: add %reg1,<adr>,%reg2
+   CAssign (CReg _) source_m	-> addrModeCosts source_m Rhs
 
    CAssign target_m source_m	-> addrModeCosts target_m Lhs +
 				   addrModeCosts source_m Rhs
@@ -242,16 +242,9 @@ addrModeCosts addr_mode side =
     CVal _ _ -> if lhs then Cost (0, 0, 0, 1, 0)
 		       else Cost (0, 0, 1, 0, 0)
 
-    CAddr _  -> if lhs then Cost (0, 0, 0, 1, 0)  -- ??unchecked
-		       else Cost (0, 0, 1, 0, 0)
-
     CReg _   -> nullCosts	 {- loading from, storing to reg is free ! -}
 				 {- for costing CReg->Creg ops see special -}
 				 {- case in costs fct -}
-    CTableEntry base_mode offset_mode kind ->
-		addrModeCosts base_mode side +
-		addrModeCosts offset_mode side +
-		Cost (1,0,1,0,0)
 
     CTemp _ _  -> nullCosts	{- if lhs then Cost (0, 0, 0, 1, 0)
 					  else Cost (0, 0, 1, 0, 0)  -}
@@ -270,9 +263,6 @@ addrModeCosts addr_mode side =
 			     else Cost (0, 0, 1, 0, 0)
 
     CIntLike mode  -> if lhs then Cost (0, 0, 0, 1, 0)
-			     else Cost (0, 0, 1, 0, 0)
-
-    CString _	   -> if lhs then Cost (0, 0, 0, 1, 0)
 			     else Cost (0, 0, 1, 0, 0)
 
     CLit    _	   -> if lhs then nullCosts	       -- should never occur
@@ -326,7 +316,7 @@ stmtMacroCosts macro modes =
     GRAN_FETCH_AND_RESCHEDULE	->  nullCosts	  {- GrAnSim bookkeeping -}
     GRAN_YIELD		        ->  nullCosts	  {- GrAnSim bookkeeping -- added SOF -}
     THREAD_CONTEXT_SWITCH	->  nullCosts	  {- GrAnSim bookkeeping -}
-    _ -> trace ("Costs.stmtMacroCosts: "++show macro) nullCosts
+    _ -> trace ("Costs.stmtMacroCosts") nullCosts
 
 -- ---------------------------------------------------------------------------
 

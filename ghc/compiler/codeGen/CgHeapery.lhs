@@ -1,14 +1,14 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.17 1999/05/26 14:12:13 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.18 1999/06/24 13:04:19 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
 \begin{code}
 module CgHeapery (
 	fastEntryChecks, altHeapCheck, thunkChecks,
-	allocDynClosure
+	allocDynClosure, inPlaceAllocDynClosure
 
         -- new functions, basically inserting macro calls into Code -- HWL
         ,fetchAndReschedule, yield
@@ -468,11 +468,42 @@ allocDynClosure closure_info use_cc blame_cc amodes_with_offsets
   where
     closure_size = closureSize closure_info
     slop_size    = slopSize closure_info
+\end{code}
+
+Occasionally we can update a closure in place instead of allocating
+new space for it.  This is the function that does the business, assuming:
+
+	- node points to the closure to be overwritten
+
+	- the new closure doesn't contain any pointers if we're
+	  using a generational collector.
+
+\begin{code}
+inPlaceAllocDynClosure
+	:: ClosureInfo
+	-> CAddrMode		-- Pointer to beginning of closure
+	-> CAddrMode		-- Cost Centre to stick in the object
+
+	-> [(CAddrMode, VirtualHeapOffset)]	-- Offsets from start of the object
+						-- ie Info ptr has offset zero.
+	-> Code
+
+inPlaceAllocDynClosure closure_info head use_cc amodes_with_offsets
+  = let	-- do_move IS THE ASSIGNMENT FUNCTION
+	 do_move (amode, offset_from_start)
+	   = CAssign (CVal (CIndex head (mkIntCLit offset_from_start) WordRep)
+		     	(getAmodeRep amode))
+		     amode
+    in
+	-- GENERATE THE CODE
+    absC ( mkAbstractCs (
+	   [ CInitHdr closure_info head use_cc ]
+	   ++ (map do_move amodes_with_offsets)))
 
 -- Avoid hanging on to anything in the CC field when we're not profiling.
 
 cInitHdr closure_info amode cc 
-  | opt_SccProfilingOn = CInitHdr closure_info amode cc
-  | otherwise          = CInitHdr closure_info amode (panic "absent cc")
+  | opt_SccProfilingOn = CInitHdr closure_info (CAddr amode) cc
+  | otherwise          = CInitHdr closure_info (CAddr amode) (panic "absent cc")
 	
 \end{code}

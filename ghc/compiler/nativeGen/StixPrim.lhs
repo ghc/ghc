@@ -314,13 +314,13 @@ amodeToStix (CAddr (HpRel off))
 amodeToStix (CAddr (NodeRel off))
   = StIndex IntRep stgNode (StInt (toInteger IBOX(off)))
 
+amodeToStix (CAddr (CIndex base off pk))
+  = StIndex pk (amodeToStix base) (amodeToStix off)
+
 amodeToStix (CReg magic)    = StReg (StixMagicId magic)
 amodeToStix (CTemp uniq pk) = StReg (StixTemp uniq pk)
 
 amodeToStix (CLbl      lbl _) = StCLbl lbl
-
-amodeToStix (CTableEntry base off pk)
-  = StInd pk (StIndex pk (amodeToStix base) (amodeToStix off))
 
  -- For CharLike and IntLike, we attempt some trivial constant-folding here.
 
@@ -341,9 +341,6 @@ amodeToStix (CIntLike (CLit (MachInt i _)))
 
 amodeToStix (CIntLike x)
   = panic "CIntLike"
-
- -- A CString is just a (CLit . MachStr)
-amodeToStix (CString s) = StString s
 
 amodeToStix (CLit core)
   = case core of

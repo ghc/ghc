@@ -155,14 +155,10 @@ getAmodeRep (CTemp uniq kind)	    	    = kind
 getAmodeRep (CLbl label kind)	    	    = kind
 getAmodeRep (CCharLike _)	    	    = PtrRep
 getAmodeRep (CIntLike _)	    	    = PtrRep
-getAmodeRep (CString _)	    	    	    = PtrRep
 getAmodeRep (CLit lit)		    	    = literalPrimRep lit
 getAmodeRep (CLitLit _ kind)	    	    = kind
-getAmodeRep (CTableEntry _ _ kind)    	    = kind
 getAmodeRep (CMacroExpr kind _ _)    	    = kind
-#ifdef DEBUG
 getAmodeRep (CJoinPoint _)	    	    = panic "getAmodeRep:CJoinPoint"
-#endif
 \end{code}
 
 @mixedTypeLocn@ tells whether an amode identifies an ``StgWord''

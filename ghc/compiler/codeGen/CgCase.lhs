@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.32 1999/06/22 07:59:59 simonpj Exp $
+% $Id: CgCase.lhs,v 1.33 1999/06/24 13:04:16 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -154,7 +154,7 @@ cgCase (StgCon (PrimOp op) args res_ty)
 			TagToEnumOp -> only arg_amodes
 			_ -> CTemp (mkBuiltinUnique 1) IntRep
 
-	closure = CTableEntry (CLbl (mkClosureTblLabel tycon) PtrRep) tag_amode PtrRep
+	closure = CVal (CIndex (CLbl (mkClosureTblLabel tycon) PtrRep) tag_amode PtrRep) PtrRep
     in
 
     case op of {
