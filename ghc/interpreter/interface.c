@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.52 $
- * $Date: 2000/04/11 20:44:18 $
+ * $Revision: 1.53 $
+ * $Date: 2000/04/12 09:43:10 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2656,7 +2656,13 @@ Type type; {
       Sym(pow)                       \
       Sym(__errno)                   \
       Sym(stat)                      \
-      Sym(fstat)
+      Sym(fstat)                     \
+      Sym(gettimeofday)              \
+      SymX(localtime)                \
+      SymX(strftime)                 \
+      SymX(mktime)                   \
+      SymX(gmtime)
+
 
 #define EXTERN_SYMS_linux            \
       Sym(__errno_location)          \

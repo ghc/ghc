@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.29 $
- * $Date: 2000/04/10 15:39:09 $
+ * $Revision: 1.30 $
+ * $Date: 2000/04/12 09:43:10 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -207,12 +207,12 @@ static Void   local searchStr     ( String );
 static Bool   local tryEndings    ( String );
 
 #if (DOS_FILENAMES || __CYGWIN32__) 
-# define SLASH                   '\\'
-# define SLASH_STR               "\\"
+# define SLASH                   '/'
+# define SLASH_STR               "/"
 # define isSLASH(c)              ((c)=='\\' || (c)=='/')
 # define PATHSEP                 ';'
 # define PATHSEP_STR             ";"
-# define DLL_ENDING              ".dll"
+# define DLL_ENDING              ".u_o"
 #elif MAC_FILENAMES
 # define SLASH                   ':'
 # define isSLASH(c)              ((c)==SLASH)
