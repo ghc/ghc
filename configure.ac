@@ -21,7 +21,7 @@ AC_CONFIG_SRCDIR([mk/config.mk.in])
 dnl * We require autoconf version 2.52
 dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
 dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
-AC_PREREQ(2.52)
+AC_PREREQ([2.52])
 
 dnl * Declare subdirectories that have a private configure script
 dnl
@@ -1111,16 +1111,16 @@ dnl ** check return type of signal handlers
 dnl Foo: assumes we can use prototypes.
 dnl On BCC, signal handlers have type "int(void)", elsewhere its "void(int)".
 dnl AC_CACHE_CHECK([type of signal handlers], ac_cv_type_signal_handler,
-dnl [AC_TRY_COMPILE([#include <sys/types.h>
+dnl [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
 dnl #include <signal.h>
 dnl #ifdef signal
 dnl #undef signal
 dnl #endif
 dnl void (*signal (int, void (*)(int)))(int);
-dnl ],
-dnl [int i;], 
-dnl ac_cv_type_signal_handler=void_int,
-dnl ac_cv_type_signal_handler=int_void)])
+dnl ]],
+dnl [[int i;]])],
+dnl [ac_cv_type_signal_handler=void_int],
+dnl [ac_cv_type_signal_handler=int_void])])
 dnl if test "$ac_cv_type_signal_handler" = void_int; then
 dnl AC_DEFINE(VOID_INT_SIGNALS)
 dnl fi

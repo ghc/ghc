@@ -199,7 +199,7 @@ case $HostPlatform in
 alpha-dec-osf*) fptools_cv_leading_underscore=no;;
 *cygwin32) fptools_cv_leading_underscore=yes;;
 *mingw32) fptools_cv_leading_underscore=yes;;
-*) AC_TRY_RUN([#ifdef HAVE_NLIST_H
+*) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
 #include <nlist.h>
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
@@ -216,7 +216,7 @@ char **argv;
         exit(0);
 #endif
     exit(1);
-}], [fptools_cv_leading_underscore=yes], [fptools_cv_leading_underscore=no], [fptools_cv_leading_underscore=no])
+}]])],[fptools_cv_leading_underscore=yes],[fptools_cv_leading_underscore=no],[fptools_cv_leading_underscore=no])
 ;;
 esac]);
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
@@ -711,7 +711,7 @@ AC_CACHE_VAL(AC_CV_NAME,
 [AC_CV_NAME_supported=yes
 fp_check_htype_save_cppflags="$CPPFLAGS"
 CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-AC_TRY_RUN([#include <stdio.h>
+AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <stdio.h>
 #include <stddef.h>
 
 #if HAVE_SYS_TYPES_H
@@ -782,9 +782,9 @@ main() {
   }
   fclose(f);
   exit(0);
-}],AC_CV_NAME=`cat conftestval`,
-ifelse([$2], , [AC_CV_NAME=NotReallyAType; AC_CV_NAME_supported=no], AC_CV_NAME=$2),
-ifelse([$3], , [AC_CV_NAME=NotReallyATypeCross; AC_CV_NAME_supported=no], AC_CV_NAME=$3))]) dnl
+}]])],[AC_CV_NAME=`cat conftestval`],
+[ifelse([$2], , [AC_CV_NAME=NotReallyAType; AC_CV_NAME_supported=no], [AC_CV_NAME=$2])],
+[ifelse([$3], , [AC_CV_NAME=NotReallyATypeCross; AC_CV_NAME_supported=no], [AC_CV_NAME=$3])])]) dnl
 CPPFLAGS="$fp_check_htype_save_cppflags"
 if test "$AC_CV_NAME_supported" = yes; then
   AC_MSG_RESULT($AC_CV_NAME)
@@ -1076,7 +1076,7 @@ AC_DEFUN([FP_CHECK_GL_HELPER],
       fp_try_lib=`echo $fp_try_lib | sed -e 's/^-l//' -e 's/$/.lib/'`
     fi
     LIBS="$fp_try_lib ${$1_LIBS} $fp_save_LIBS"
-    AC_TRY_LINK([$3], [$4], [fp_cv_check_$1_lib="$fp_try_lib ${$1_LIBS}"; break])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([$3], [$4])], [fp_cv_check_$1_lib="$fp_try_lib ${$1_LIBS}"; break])
   done
   LIBS="$fp_save_LIBS"
   CPPFLAGS="$fp_save_CPPFLAGS"])
@@ -1138,7 +1138,7 @@ else
         *-lopengl32*|*opengl32.lib*) ;;
         *) fp_save_LIBS="$LIBS"
            LIBS="$LIBS -lopengl32"
-           AC_TRY_LINK([@%:@include <GL/gl.h>], [glEnd()],
+           AC_LINK_IFELSE([AC_LANG_PROGRAM([[@%:@include <GL/gl.h>]], [[glEnd()]])],
              [GL_LIBS="$GL_LIBS -lopengl32"; GL_LIBS0="$GL_LIBS0 -lopengl32"])
            LIBS="$fp_save_LIBS"
            ;;
@@ -1209,20 +1209,19 @@ AC_SUBST([GLUT_LIBS])
 ])# FP_CHECK_GLUT
 
 
-dnl @synopsis FP_EMPTY_STRUCTS
-dnl 
-dnl Check whether empty structs is accepted by CC.
+# FP_EMPTY_STRUCTS
+# ---------------- 
+# Define output variable SUPPORTS_EMPTY_STRUCTS if empty structs are accepted by
+# CC.
 dnl
 AC_DEFUN(FP_EMPTY_STRUCTS,
-[AC_CACHE_CHECK(empty struct support, fptools_cv_empty_structs,
-[AC_TRY_COMPILE([
-typedef struct { /*empty*/ } StgFoo;
-],
-[int i;], 
-fptools_cv_empty_structs=yes,
-fptools_cv_empty_structs=no)])
-if test "$fptools_cv_empty_structs" = yes; then
-AC_DEFINE([SUPPORTS_EMPTY_STRUCTS], [1], [Define to 1 if C compiler supports declaration of empty structure types.])
+[AC_CACHE_CHECK(empty struct support, fp_cv_empty_structs,
+[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[typedef struct { /* empty */ } StgFoo;]],
+[[int i;]])],
+[fp_cv_empty_structs=yes],
+[fp_cv_empty_structs=no])])
+if test x"$fp_cv_empty_structs" = xyes; then
+  AC_DEFINE([SUPPORTS_EMPTY_STRUCTS], [1], [Define to 1 if C compiler supports declaration of empty structure types.])
 fi
 ])
 
