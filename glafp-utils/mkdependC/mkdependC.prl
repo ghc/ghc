@@ -163,7 +163,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     # ..and the -MM & -MMD.
-    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname");
+    $result = system("${CPP} -MM -MMD $Include_dirs @Defines -x c $fname >/dev/null");
     if ($result != 0) {
 	unlink($tempfile);
 	exit($result);
