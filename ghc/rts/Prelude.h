@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.23 2003/06/23 10:35:23 simonpj Exp $
+ * $Id: Prelude.h,v 1.24 2003/07/10 08:02:29 simonpj Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -18,7 +18,7 @@ extern DLL_IMPORT StgClosure GHCziBase_True_closure;
 extern DLL_IMPORT StgClosure GHCziBase_False_closure;
 extern DLL_IMPORT StgClosure GHCziPack_unpackCString_closure;
 extern DLL_IMPORT StgClosure GHCziWeak_runFinalizzerBatch_closure;
-extern StgClosure zdMain_main_closure;
+extern StgClosure ZCMain_main_closure;
 extern DLL_IMPORT StgClosure GHCziTopHandler_runIO_closure;
 extern DLL_IMPORT StgClosure GHCziTopHandler_runNonIO_closure;
 
@@ -67,7 +67,7 @@ extern DLL_IMPORT const StgInfoTable GHCziStable_StablePtr_con_info;
 #define False_closure             (&GHCziBase_False_closure)
 #define unpackCString_closure     (&GHCziPack_unpackCString_closure)
 #define runFinalizerBatch_closure (&GHCziWeak_runFinalizzerBatch_closure)
-#define mainIO_closure            (&zdMain_main_closure)
+#define mainIO_closure            (&ZCMain_main_closure)
 #define runIO_closure		  (&GHCziTopHandler_runIO_closure)
 #define runNonIO_closure	  (&GHCziTopHandler_runNonIO_closure)
 
