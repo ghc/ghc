@@ -713,6 +713,10 @@ findRecDemand str_fn abs_fn ty
 				-- we don't exploit it yet, so don't bother
 
 	 Just (tycon,_,data_con,cmpnt_tys) 	-- Single constructor case
+	   | isRecursiveTyCon tycon		-- Recursive data type; don't unpack
+	   ->	wwStrict			-- 	(this applies to newtypes too:
+						--	e.g.  data Void = MkVoid Void)
+
 	   | isNewTyCon tycon 			-- A newtype!
 	   ->	ASSERT( null (tail cmpnt_tys) )
 		let
@@ -721,7 +725,6 @@ findRecDemand str_fn abs_fn ty
 		wwUnpackNew demand
 
 	   |  null compt_strict_infos 		-- A nullary data type
-	   || isRecursiveTyCon tycon		-- Recursive data type; don't unpack
 	   ->	wwStrict
 
 	   | otherwise				-- Some other data type
