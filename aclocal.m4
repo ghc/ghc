@@ -24,28 +24,6 @@ AC_CHECK_DECLS([altzone], [], [],[#if TIME_WITH_SYS_TIME
 ])# FP_ALTZONE
 
 
-
-dnl *** Does libc contain GNU regex? ***
-dnl 
-AC_DEFUN(FPTOOLS_REGEX_IN_LIBC,
-[AC_CACHE_CHECK([for GNU regex in libc], fptools_cv_have_regex,
-[AC_TRY_LINK([#if HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#include <regex.h>
-],[ struct re_pattern_buffer patbuf; 
-    re_compile_pattern("",0,&patbuf);
-    re_search_2 (&patbuf, "", 0, "",0, 0,0,0,0); ],
-fptools_cv_have_regex=yes, fptools_cv_have_regex=no)])
-if test "$fptools_cv_have_regex" = yes; then
-	HaveGNURegex=YES
-else
-	HaveGNURegex=NO
-fi
-AC_SUBST(HaveGNURegex)
-])
-
-
 dnl ** check for leading underscores in symbol names
 dnl 
 dnl Test for determining whether symbol names have a leading

@@ -1080,9 +1080,6 @@ AC_MSG_ERROR([You need to install libgmp (the in-tree version does not work on I
 fi;
 fi;
 
-dnl ** check whether this machine has GNU regex in libc.
-FPTOOLS_REGEX_IN_LIBC
-
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
 dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
