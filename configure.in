@@ -593,9 +593,7 @@ dnl ** check for DOS include files
 AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
 
 dnl ** check for Windows include files
-if test $GhcLibsWithHOpenGL = YES ; then
 AC_CHECK_HEADERS(windows.h)
-fi
 
 dnl ** check for OpenGL include files
 AC_CHECK_HEADERS(GL/gl.h)
