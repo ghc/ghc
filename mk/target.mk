@@ -293,8 +293,14 @@ boot :: depend
 ifneq "$(HS_PROG)" ""
 all :: $(HS_PROG)
 
+ifneq "$(BootingFromHc)" "YES"
 $(HS_PROG) :: $(HS_OBJS)
-	$(HC) -o $@ $(HC_OPTS) $(LD_OPTS) $(HS_OBJS) $(LIBS)
+	$(HC) -o $@ $(HC_OPTS) $(LD_OPTS) $(HS_OBJS)
+else
+# see bootstrp.mk
+$(HS_PROG) :: $(HS_OBJS)
+	$(CC) -o $@ $(HC_BOOT_CC_OPTS) $(HC_BOOT_LD_OPTS) $(HS_OBJS) $(HC_BOOT_LIBS)
+endif
 endif
 
 # Object and interface files have suffixes tagged with their ways
