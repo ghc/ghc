@@ -181,22 +181,12 @@ config-pkgs ::
 	  fi; \
 	done
 
-
-mk-version-symlinks ::
-	@for i in $(VERSION_SYMLINKS_FOR) ""; do \
-	  if [ "x$$i" != "x" ]; then \
-	     echo "Symlinking $$i to $$i-$(version)"; \
-	     (cd bin/$(platform)/$(package)-$(version); $(RM) $$i-$(version); $(LN_S) $$i $$i-$(version) ); \
-	  fi;\
-	done
-
 # Convert pwd's UNC reported path into DOS style
 # (cygwin32 only.)
 CURRENT_DIR = $(shell pwd | sed 's|^//\(.\)|\1:|' )
 
 in-place ::
 	$(MAKE) $(MFLAGS) config-pkgs bindir=$(CURRENT_DIR)/bin/$(platform)/$(package)-$(version) libdir=$(CURRENT_DIR)/lib/$(platform) datadir=$(CURRENT_DIR)/share/$(package)-$(version)
-	$(MAKE) $(MFLAGS) mk-version-symlinks
 	@echo "Finished configuring..to use, add $(CURRENT_DIR)/bin/$(platform)/$(package)-$(version) to your PATH."
 
 install-dirs ::
@@ -204,7 +194,7 @@ install-dirs ::
 	(cd lib/$(platform)/$(package)-$(version); find . -type d -exec sh -c '../../../$(INSTALL_DIR) $$0 $(real_libdir)/$$0' {} \; )
 	(cd share/$(package)-$(version); find . -type d -exec sh -c '../../$(INSTALL_DIR) $(real_datadir)/$$0' {} \; )
 
-install :: config-pkgs mk-version-symlinks install-dirs install-bin install-libs install-datas
+install :: config-pkgs install-dirs install-bin install-libs install-datas
 
 .PHONY: install-bin install-libs install-datas
 
@@ -215,8 +205,7 @@ install-bin:
 	for i in $(VERSION_SYMLINKS_FOR) ""; do \
 	   if [ "x$$i" != "x" ]; then 		\
 	   	( cd $(bindir); 		\
-		  $(RM) $$i-$(version);		\
-		  $(MV) $$i $$i-$(version);	\
+		  $(RM) $$i;			\
 		  $(LN_S) $$i-$(version) $$i	\
 		); 				\
 	   fi; 					\
