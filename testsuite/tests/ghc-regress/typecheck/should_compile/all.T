@@ -169,9 +169,11 @@ test('tc168', normal, compile, ['-ddump-types'])
 test('tc169', normal, compile, [''])
 
 # The bug in tc170 is triggered only by batch compilation
-# which we do by steam here, with a pair of tests
-test('Tc170_Aux', normal, compile, ['-O'])
-test('tc170', normal, compile, ['-O'])
+# which we do by steam here, with a pair of tests.  Make sure
+# we run one way only, so we can be sure to have the right kind
+# of interface file for the second part of the test.
+test('Tc170_Aux', only_ways(['opt']), compile, [''])
+test('tc170', only_ways(['opt']), compile, [''])
 
 test('tc171', normal, compile, [''])
 test('tc172', normal, compile, [''])
