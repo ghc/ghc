@@ -1025,7 +1025,7 @@ AC_EGREP_CPP(yes,
   ])    
 AC_SUBST(HaveRtldNext)
 
-dnl ** RTLD_LOCAL isn't available on cygwin
+dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
 AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
 AC_EGREP_CPP(yes,
 [
@@ -1042,6 +1042,42 @@ AC_EGREP_CPP(yes,
   HaveRtldLocal=NO
   ])    
 AC_SUBST(HaveRtldLocal)
+
+dnl ** RTLD_GLOBAL isn't available on openbsd
+AC_MSG_CHECKING(for RTLD_GLOBAL from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_GLOBAL
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_RTLDGLOBAL)
+  HaveRtldGlobal=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldGlobal=NO
+  ])    
+AC_SUBST(HaveRtldGlobal)
+
+dnl ** RTLD_NOW isn't available on openbsd
+AC_MSG_CHECKING(for RTLD_NOW from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_NOW
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_RTLDNOW)
+  HaveRtldNow=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldNow=NO
+  ])    
+AC_SUBST(HaveRtldNow)
 
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
