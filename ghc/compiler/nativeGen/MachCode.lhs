@@ -1241,6 +1241,7 @@ getRegister (StMachOp mop [x]) -- unary PrimOps
   = case mop of
       MO_NatS_Neg      -> trivialUCode (SUB False False g0) x
       MO_Nat_Not       -> trivialUCode (XNOR False g0) x
+      MO_32U_to_8U     -> trivialCode (AND False) x (StInt 255)
 
       MO_Flt_Neg       -> trivialUFCode FloatRep (FNEG F) x
       MO_Dbl_Neg       -> trivialUFCode DoubleRep (FNEG DF) x
