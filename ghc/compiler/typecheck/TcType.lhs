@@ -181,7 +181,6 @@ tcInstTyVars tyvars
 inst_tyvar tyvar	-- Could use the name from the tyvar?
   = tcGetUnique 		`thenNF_Tc` \ uniq ->
     let
-	kind = tyVarKind tyvar
 	name = setNameUnique (tyVarName tyvar) uniq
 	-- Note that we don't change the print-name
 	-- This won't confuse the type checker but there's a chance
@@ -189,8 +188,26 @@ inst_tyvar tyvar	-- Could use the name from the tyvar?
 	-- in an error message.  -dppr-debug will show up the difference
 	-- Better watch out for this.  If worst comes to worst, just
 	-- use mkSysLocalName.
+
+	kind = tyVarKind tyvar
     in
-    tcNewMutTyVar name kind
+
+	-- Hack alert!  Certain system functions (like error) are quantified
+	-- over type variables with an 'open' kind (a :: ?).  When we instantiate
+	-- these tyvars we want to make a type variable whose kind is (Type bv)
+	-- where bv is a boxity variable.  This makes sure it's a type, but 
+	-- is open about its boxity.  We *don't* want to give the thing the
+	-- kind '?' (= Type AnyBox).  
+	--
+	-- This is all a hack to avoid giving error it's "proper" type:
+	--	 error :: forall bv. forall a::Type bv. String -> a
+
+    (if kind == openTypeKind then
+	newOpenTypeKind	
+     else
+	returnNF_Tc kind)	`thenNF_Tc` \ kind' ->
+
+    tcNewMutTyVar name kind'
 \end{code}
 
 @tcInstTcType@ instantiates the outer-level for-alls of a TcType with
