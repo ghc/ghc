@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.30 2000/04/03 17:27:10 sewardj Exp $                      #
+# $Id: Makefile,v 1.31 2000/04/14 15:11:25 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -44,7 +44,7 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c object.c interface.c
 
-SRC_CC_OPTS = -g  -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline
+SRC_CC_OPTS = -I$(GHC_INTERPRETER_DIR) -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -Winline -g -O
 
 GHC_LIBS_NEEDED = $(GHC_RUNTIME_DIR)/libHSrts.a
 
@@ -53,7 +53,8 @@ all :: parser.c $(GHC_LIBS_NEEDED) nHandle$(DYN_EXT) hugs
 ### EXTREMELY hacky
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o   \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
-      ../rts/StgCRun.o ../rts/PrimOps.o ../rts/Prelude.o ../rts/libHSrts.a
+      ../rts/StgCRun.o ../rts/PrimOps.o ../rts/Prelude.o ../rts/Storage.o \
+      ../rts/Schedule.o ../rts/libHSrts.a
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
 		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) \
 		 $(LIB_GMP) -lm
