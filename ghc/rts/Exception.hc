@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.16 2000/11/14 12:52:55 simonmar Exp $
+ * $Id: Exception.hc,v 1.17 2000/11/14 12:53:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -282,7 +282,7 @@ VEC_POLY_INFO_TABLE(stg_catch_frame, CATCH_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off
  * It is used in deleteThread when reverting blackholes.
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_catch_info,catch_entry,2,0,FUN,,EF_,0,0);
+INFO_TABLE(stg_catch_info,stg_catch_entry,2,0,FUN,,EF_,0,0);
 STGFUN(stg_catch_entry)
 {
   FB_
