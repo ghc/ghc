@@ -1036,9 +1036,6 @@ slurp_trailing_hashes buf glaexts
 
 mk_var_token pk_str
   | is_upper f		= ITconid pk_str
- 	-- _[A-Z] is treated as a constructor in interface files.
-  | f `eqChar#` '_'# && not (_NULL_ tl) 
-	&& (case _HEAD_ tl of { C# g -> is_upper g }) = ITconid pk_str
   | is_ident f		= ITvarid pk_str
   | f `eqChar#` ':'#	= ITconsym pk_str
   | otherwise		= ITvarsym pk_str
