@@ -71,15 +71,12 @@ def guess_compiler_flags()
 -- output goes into testname.comp.stderr.  Source is assumed to
 -- be in Main.hs or Main.lhs, and modules reachable from it.
 
-def simple_build_Main_WRK ( $_extra_args ) 
+def simple_build_prog_WRK ( $_main, $_extra_args ) 
 {
    $flags = guess_compiler_flags()
    $errname = qualify("comp.stderr")
    $exename = qualify("")  -- ie, the exe name == the test name
-   $srcname = testdirify("Main.hs")
-   if   not(exists($srcname))
-   then $srcname = testdirify("Main.lhs")
-   fi
+
    rm_or_fail($errname)
    rm_or_fail($exename)
    rm_nofail(testdirify("*.o"))
@@ -88,7 +85,7 @@ def simple_build_Main_WRK ( $_extra_args )
 		  then $extra_hc_flags 
 		  else "")
           ++ " -o " ++ $exename ++ " " 
-          ++ $srcname ++ " &> " ++ $errname
+          ++ $_main ++ " &> " ++ $errname
    $res = run $cmd
    return $res
 }
@@ -139,19 +136,24 @@ def check_stderr_ok()
 
 -- Compile and run (should_run) style test
 
-def multimod-run-test-actions ( $extra_compile_args, 
-                                $extra_run_args, 
-                                $allowable_nonzero_exit_code )
+def multimod-compile( $mod, $extra_compile_args )
 {
    pretest_cleanup()
 
-   $res = simple_build_Main_WRK( $extra_compile_args )
-   -- If the compiler barf'd, fail.
-   if   $res /= "0" 
-   then say_fail_because_compiler_barfd ( $res )
-        return False 
-   fi
+   $main = if $mod == "" then "Main" else $mod
+   $res = simple_build_prog_WRK( $main, $extra_compile_args )
 
+   if   $res /= "0" then
+	say_fail_because_compiler_barfd ( $res )
+        return False 
+   else
+	return True
+   fi
+}
+
+def multimod-run-test ( $extra_run_args, 
+                        $allowable_nonzero_exit_code )
+{
    $exit_code = 
       if $allowable_nonzero_exit_code /= "" then 
 	  $allowable_nonzero_exit_code 
@@ -169,14 +171,28 @@ def multimod-run-test-actions ( $extra_compile_args,
 -- top-level
 -- Compile and run (should_run) style test
 
+def mtc ( $mod, $extra_compile_args )
+{
+   $test_passed = multimod-compile( $mod, $extra_compile_args )
+
+   if ($expect == "pass") then
+      expect pass
+   else
+      expect fail
+   fi
+   pass when $test_passed
+   fail when otherwise
+}
+
 def mtr ( $extra_compile_args, 
           $extra_run_args, 
           $allowable_nonzero_exit_code )
 {
    $test_passed 
-      = multimod-run-test-actions ( $extra_compile_args, 
-                                    $extra_run_args, 
-                                    $allowable_nonzero_exit_code )
+      = multimod-compile( "Main", $extra_compile_args )
+	&& multimod-run-test( $extra_run_args, 
+                              $allowable_nonzero_exit_code )
+
    if ($expect == "pass") then
       expect pass
    else
