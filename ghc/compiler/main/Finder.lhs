@@ -9,7 +9,8 @@ module Finder (
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     mkHomeModuleLocn,	-- :: ModuleName -> String -> FilePath 
 			--	-> IO ModuleLocation
-    emptyHomeDirCache	-- :: IO ()
+    emptyHomeDirCache,	-- :: IO ()
+    flushPackageCache   -- :: [PackageConfig] -> IO ()
   ) where
 
 #include "HsVersions.h"
@@ -26,7 +27,6 @@ import Panic		( panic )
 import Config
 
 import IOExts
-import Directory
 import List
 import IO
 import Monad
@@ -51,15 +51,16 @@ GLOBAL_VAR(v_HomeDirCache, Nothing, Maybe (FiniteMap String FilePath))
 
 initFinder :: [PackageConfig] -> IO ()
 initFinder pkgs 
-  = do	{	-- expunge our home cache
-	; writeIORef v_HomeDirCache Nothing
-		-- lazilly fill in the package cache
-	; writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
-	}
+   = do emptyHomeDirCache
+	flushPackageCache pkgs
+
+-- empty, and lazilly fill in the package cache
+flushPackageCache :: [PackageConfig] -> IO ()
+flushPackageCache pkgs = writeIORef v_PkgDirCache 
+			    (unsafePerformIO (newPkgCache pkgs))
 
 emptyHomeDirCache :: IO ()
-emptyHomeDirCache
-   = writeIORef v_HomeDirCache Nothing
+emptyHomeDirCache = writeIORef v_HomeDirCache Nothing
 
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findModule name
