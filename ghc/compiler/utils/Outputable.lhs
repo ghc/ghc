@@ -113,7 +113,7 @@ defaultErrStyle :: PprStyle
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
 defaultErrStyle 
   | opt_PprStyle_Debug = mkUserStyle alwaysQualify AllTheWay
-  | otherwise	       = mkUserStyle neverQualify  (PartWay opt_PprUserLength)
+  | otherwise	       = mkUserStyle alwaysQualify  (PartWay opt_PprUserLength)
 
 mkUserStyle unqual depth |  opt_PprStyle_Debug = PprDebug
 	          	 |  otherwise          = PprUser unqual depth
