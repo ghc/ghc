@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.28 2000/08/15 11:48:06 simonmar Exp $
+ * $Id: Printer.c,v 1.29 2000/12/11 12:40:24 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -14,6 +14,8 @@
 
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#include "MBlock.h"
+#include "Storage.h"
 #include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
 
