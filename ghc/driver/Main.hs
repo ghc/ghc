@@ -94,8 +94,8 @@ data Phase
 	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
 	| Mangle	-- assembly mangling, now done by a separate script.
 	| SplitMangle	-- after mangler if splitting
-	| As
 	| SplitAs
+	| As
 	| Ln 
   deriving (Eq,Ord,Enum,Ix,Show,Bounded)
 
@@ -1121,11 +1121,11 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 		     | otherwise -> As
 
 		Cc -> As
-		As -> Ln
 
 		Mangle | not split -> As
 		SplitMangle -> SplitAs
-	
+		SplitAs -> Ln
+
 		_  -> succ phase
 
 
