@@ -150,7 +150,8 @@ maybePackageModule mod_name = do
 		then return "hi"
 		else return (tag ++ "_hi")
 
-  let basename = moduleNameUserString mod_name
+  let mod_str  = moduleNameUserString mod_name 
+      basename = map (\c -> if c == '.' then '/' else c) mod_str
       hi = basename ++ '.':package_hisuf
 
   found <- findOnPackagePath pkgs hi
@@ -161,7 +162,7 @@ maybePackageModule mod_name = do
 			  ModuleLocation{ 
                                 ml_hspp_file = Nothing,
 				ml_hs_file   = Nothing,
-				ml_hi_file   = path,
+				ml_hi_file   = path ++ '/':hi,
 				ml_obj_file  = Nothing
 			   }
 		   ))
