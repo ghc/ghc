@@ -64,7 +64,7 @@ import Panic
 import Config
 
 import IOExts
-import Exception	( tryAllIO, Exception(DynException) )
+import Exception
 import Dynamic		( fromDynamic )
 import Directory
 import List		( isSuffixOf )
@@ -581,7 +581,7 @@ readIface file_path
      }}
 
   else
-      ioToRnM_no_fail (tryAllIO (Binary.getBinFileWithDict file_path)) 
+      ioToRnM_no_fail (myTry (Binary.getBinFileWithDict file_path)) 
 	  `thenRn` \ either_iface ->
 
       case either_iface of
@@ -597,6 +597,12 @@ readIface file_path
     loc  = mkSrcLoc (mkFastString file_path) 1
 
     bale_out err = returnRn (Left (badIfaceFile file_path err))
+
+#if __GLASGOW_HASKELL__ < 501
+myTry = Exception.tryAllIO
+#else
+myTry = Exception.try
+#endif
 \end{code}
 
 %*********************************************************
