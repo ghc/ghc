@@ -252,8 +252,13 @@ TAGS_C_SRCS=$(C_SRCS)
 #
 MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
-		      $(PROG) $(LIBRARY) $(HS_IFACES) a.out \
-		      $(DERIVED_HSC_SRCS)
+		      $(PROG) $(LIBRARY) a.out \
+		      $(DERIVED_HSC_SRCS) \
+		      $(patsubst %,%/*.$(way_)hi, . $(ALL_DIRS))
+
+# we delete *all* the .hi files we can find, rather than just
+# $(HS_IFACES), because stale interfaces left around by modules which
+# don't exist any more can screw up the build.
 
 # Don't clean the .hc files if we're bootstrapping
 ifneq "$(BootingFromHc)" "YES"
