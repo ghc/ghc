@@ -16,12 +16,14 @@ import MachMisc
 import AbsCUtils	( getAmodeRep, mixedTypeLocn,
 			  nonemptyAbsC, mkAbsCStmts, mkAbsCStmtList
 			)
+import PprAbsC          ( dumpRealC )
 import SMRep		( fixedItblSize, 
 			  rET_SMALL, rET_BIG, 
 			  rET_VEC_SMALL, rET_VEC_BIG 
 			)
 import Constants   	( mIN_UPD_SIZE )
-import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel )
+import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
+                          mkClosureTblLabel, mkStaticClosureLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
@@ -33,10 +35,13 @@ import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
 import StixMacro	( macroCode, checkCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
+import Outputable       ( pprPanic )
 import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
 import Panic		( panic )
+import TyCon		( tyConDataCons )
 import BitSet 		( intBS )
+import Name             ( NamedThing(..) )
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -137,6 +142,13 @@ Here we handle top-level things, like @CCodeBlock@s and
 	     , StData WordRep (StInt (toInteger (length mask)) : 
 				map  (StInt . toInteger . intBS) mask)
 	     ]
+
+ gentopcode stmt@(CClosureTbl tycon)
+  = returnUs [ StSegment TextSegment
+             , StLabel (mkClosureTblLabel tycon)
+             , StData DataPtrRep (map (StCLbl . mkStaticClosureLabel . getName) 
+                                      (tyConDataCons tycon) )
+             ]
 
  gentopcode absC
   = gencode absC				`thenUs` \ code ->
@@ -406,6 +418,8 @@ Finally, all of the disgusting AbstractC macros.
  gencode (CCallProfCCMacro macro _)
   = returnUs (\xs -> StComment macro : xs)
 
+ gencode other
+  = pprPanic "AbsCStixGen.gencode" (dumpRealC other)
 \end{code}
 
 Here, we generate a jump table if there are more than four (integer)
