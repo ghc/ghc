@@ -16,8 +16,9 @@ import DsMonad
 import DsUtils
 
 import Id		( Id )
-import CoreSyn
-import Type		( mkTyVarTys )
+import Subst		( mkSubst, mkInScopeSet, bindSubst, substExpr )
+import CoreFVs		( exprFreeVars )
+import VarEnv		( emptySubstEnv )
 import ListSetOps	( equivClassesByUniq )
 import Unique		( Uniquable(..) )
 \end{code}
@@ -95,31 +96,44 @@ more-or-less the @matchCon@/@matchClause@ functions on page~94 in
 Wadler's chapter in SLPJ.
 
 \begin{code}
-match_con vars all_eqns@(EqnInfo n ctx (ConPat data_con _ ex_tvs ex_dicts arg_pats : pats1) match_result1 : other_eqns)
+match_con vars (eqn1@(EqnInfo _ _ (ConPat data_con _ ex_tvs ex_dicts arg_pats : _) _)
+		: other_eqns)
   = -- Make new vars for the con arguments; avoid new locals where possible
-    mapDs selectMatchVar arg_pats			   `thenDs` \ arg_vars ->
+    mapDs selectMatchVar arg_pats	`thenDs` \ arg_vars ->
 
     -- Now do the business to make the alt for _this_ ConPat ...
-    match (ex_dicts ++ arg_vars ++ vars)
-	  (map shift_con_pat all_eqns)	`thenDs` \ match_result ->
+    match (arg_vars ++ vars) 
+	  (map shift_con_pat (eqn1:other_eqns))	`thenDs` \ match_result ->
 
-	-- Substitute over the result
+    --		[See "notes on do_subst" below this function]
+    -- Make the ex_tvs and ex_dicts line up with those
+    -- in the first pattern.  Remember, they are all guaranteed to be variables
     let
-	match_result' | null ex_tvs = match_result
-		      | otherwise   = adjustMatchResult subst_it match_result
-    in	
+	match_result' | null ex_tvs     = match_result
+		      | null other_eqns = match_result
+		      | otherwise       = adjustMatchResult do_subst match_result
+    in
+	
     returnDs (data_con, ex_tvs ++ ex_dicts ++ arg_vars, match_result')
   where
     shift_con_pat :: EquationInfo -> EquationInfo
-    shift_con_pat (EqnInfo n ctx (ConPat _ _ ex_tvs' ex_dicts' arg_pats: pats) match_result)
-      = EqnInfo n ctx (new_pats  ++ pats) match_result
-      where
-	new_pats  = map VarPat ex_dicts' ++ arg_pats 
+    shift_con_pat (EqnInfo n ctx (ConPat _ _ _ _ arg_pats : pats) match_result)
+      = EqnInfo n ctx (arg_pats ++ pats) match_result
 
-	-- We 'substitute' by going: (/\ tvs' -> e) tvs
-    subst_it e = foldr subst_one e other_eqns
-    subst_one (EqnInfo _ _ (ConPat _ _ ex_tvs' _ _ : _) _) e = mkTyApps (mkLams ex_tvs' e) ex_tys
-    ex_tys = mkTyVarTys ex_tvs
+    other_pats = [p | EqnInfo _ _ (p:_) _ <- other_eqns]
+
+    var_prs = concat [ (ex_tvs'   `zip` ex_tvs) ++ 
+		       (ex_dicts' `zip` ex_dicts) 
+		     | ConPat _ _ ex_tvs' ex_dicts' _ <- other_pats ]
+
+    do_subst e = substExpr subst e
+	       where
+		 subst    = foldl (\ s (v', v) -> bindSubst s v' v) in_scope var_prs
+		 in_scope = mkSubst (mkInScopeSet (exprFreeVars e)) emptySubstEnv
+			-- We put all the free variables of e into the in-scope 
+			-- set of the substitution, not because it is necessary,
+			-- but to suppress the warning in Subst.lookupInScope
+			-- Tiresome, but doing the substitution at all is rare.
 \end{code}
 
 Note on @shift_con_pats@ just above: does what the list comprehension in
@@ -127,3 +141,37 @@ Note on @shift_con_pats@ just above: does what the list comprehension in
 life.  Works for @ConPats@, and we want it to fail catastrophically
 for anything else (which a list comprehension wouldn't).
 Cf.~@shift_lit_pats@ in @MatchLits@.
+
+
+Notes on do_subst stuff
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	data T = forall a. Ord a => T a (a->Int)
+
+	f (T x f) True  = ...expr1...
+	f (T y g) False = ...expr2..
+
+When we put in the tyvars etc we get
+
+	f (T a (d::Ord a) (x::a) (f::a->Int)) True =  ...expr1...
+	f (T b (e::Ord a) (y::a) (g::a->Int)) True =  ...expr2...
+
+After desugaring etc we'll get a single case:
+
+	f = \t::T b::Bool -> 
+	    case t of
+	       T a (d::Ord a) (x::a) (f::a->Int)) ->
+	    case b of
+		True  -> ...expr1...
+		False -> ...expr2...
+
+*** We have to substitute [a/b, d/e] in expr2! **
+That is what do_subst is doing.
+
+Originally I tried to use 
+	(\b -> let e = d in expr2) a 
+to do this substitution.  While this is "correct" in a way, it fails
+Lint, because e::Ord b but d::Ord a.  
+
+So now I simply do the substitution properly using substExpr.
+
