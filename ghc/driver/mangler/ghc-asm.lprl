@@ -599,7 +599,7 @@ sub mangle_asm {
 	    chop($thing = $_);
 	    print STDERR "Funny global thing?: $_"
 		unless # $KNOWN_FUNNY_THING{$thing}
-		       /^${T_US}stg_.*${T_POST_LBL}$/o          # RTS internals (now dead?)
+		       /^${T_US}stg_.*${T_POST_LBL}$/o          # RTS internals
 		    || /^${T_US}__stg_.*${T_POST_LBL}$/o        # more RTS internals
 		    || /^${T_US}__fexp_.*${T_POST_LBL}$/o       # foreign export
 		    || /^${T_US}__stginit.*${T_POST_LBL}$/o     # __stginit<module>
