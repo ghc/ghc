@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.6 2001/01/04 19:43:07 qrczak Exp $
+-- $Id: Main.hs,v 1.7 2001/01/11 19:50:19 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -107,7 +107,7 @@ argument eol = liftM concat $ many
     <|> (do try (string "//"); skipMany (satisfy (/= '\n')); return " ")
     <|> string "/"
     <|> (do char '['; a <- nested; char ']'; return ("["++a++"]"))
-    <|> (do char '\\'; a <- anyChar; return ['\\',a])
+    <|> (do char '\\'; a <- anyChar; return $ if a == '\n' then [] else ['\\',a])
     <|> (do char '{'; a <- nested; char '}'; return ("{"++a++"}"))
     <?> "C expression")
     where nested = argument (string "\n")
