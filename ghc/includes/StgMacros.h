@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.26 2000/06/08 12:54:29 simonmar Exp $
+ * $Id: StgMacros.h,v 1.27 2000/07/08 19:35:42 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -452,7 +452,7 @@ EDI_(stg_gen_chk_info);
 #  define UPD_BH_SINGLE_ENTRY(thunk) /* nothing */
 #endif /* EAGER_BLACKHOLING */
 
-#define UPD_FRAME_UPDATEE(p)  (((StgUpdateFrame *)(p))->updatee)
+#define UPD_FRAME_UPDATEE(p)  ((P_)(((StgUpdateFrame *)(p))->updatee))
 #define UPDATE_SU_FROM_UPD_FRAME(p) (Su=((StgUpdateFrame *)(p))->link)
 
 /* -----------------------------------------------------------------------------
