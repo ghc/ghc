@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.14 2003/08/29 16:00:26 simonmar Exp $
+ * $Id: MachRegs.h,v 1.15 2003/12/10 11:35:25 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -409,6 +409,8 @@
 #define REG_R7    	r20
 #define REG_R8    	r21
 
+#ifdef darwin_TARGET_OS
+
 #define REG_F1		f14
 #define REG_F2		f15
 #define REG_F3		f16
@@ -416,6 +418,18 @@
 
 #define REG_D1		f18
 #define REG_D2		f19
+
+#else
+
+#define REG_F1		fr14
+#define REG_F2		fr15
+#define REG_F3		fr16
+#define REG_F4		fr17
+
+#define REG_D1		fr18
+#define REG_D2		fr19
+
+#endif
 
 #define REG_Sp    	r22
 #define REG_SpLim    	r24

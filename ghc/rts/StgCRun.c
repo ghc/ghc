@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.40 2003/08/29 16:13:48 simonmar Exp $
+ * $Id: StgCRun.c,v 1.41 2003/12/10 11:35:26 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -530,6 +530,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
 extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
 
+#ifdef darwin_TARGET_OS
 static void StgRunIsImplementedInAssembler(void)
 {
 	__asm__ volatile (
@@ -550,6 +551,81 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tb restFP # f14\n"
 	: : "i"(RESERVED_C_STACK_BYTES+288 /*stack frame size*/));
 }
+#else
+
+// This version is for PowerPC Linux.
+
+// Differences from the Darwin/Mac OS X version:
+// *) Different Assembler Syntax
+// *) Doesn't use Register Saving Helper Functions (although they exist somewhere)
+// *) We may not access positive stack offsets
+//    (no "Red Zone" as in the Darwin ABI)
+// *) The Link Register is saved to a different offset in the caller's stack frame
+//    (Linux: 4(r1), Darwin 8(r1))
+
+static void StgRunIsImplementedInAssembler(void)
+{
+	__asm__ volatile (
+		"\t.globl StgRun\n"
+		"\t.type StgRun,@function\n"
+		"StgRun:\n"
+		"\tmflr 0\n"
+		"\tstw 0,4(1)\n"
+		"\tmr 5,1\n"
+		"\tstwu 1,-%0(1)\n"
+		"\tstmw 13,-220(5)\n"
+		"\tstfd 14,-144(5)\n"
+		"\tstfd 15,-136(5)\n"
+		"\tstfd 16,-128(5)\n"
+		"\tstfd 17,-120(5)\n"
+		"\tstfd 18,-112(5)\n"
+		"\tstfd 19,-104(5)\n"
+		"\tstfd 20,-96(5)\n"
+		"\tstfd 21,-88(5)\n"
+		"\tstfd 22,-80(5)\n"
+		"\tstfd 23,-72(5)\n"
+		"\tstfd 24,-64(5)\n"
+		"\tstfd 25,-56(5)\n"
+		"\tstfd 26,-48(5)\n"
+		"\tstfd 27,-40(5)\n"
+		"\tstfd 28,-32(5)\n"
+		"\tstfd 29,-24(5)\n"
+		"\tstfd 30,-16(5)\n"
+		"\tstfd 31,-8(5)\n"
+		"\tmtctr 3\n"
+		"\tmr 12,3\n"
+		"\tbctr\n"
+		".globl StgReturn\n"
+		"\t.type StgReturn,@function\n"
+		"StgReturn:\n"
+		"\tmr 3,14\n"
+		"\tla 5,%0(1)\n"
+		"\tlmw 13,-220(5)\n"
+		"\tlfd 14,-144(5)\n"
+		"\tlfd 15,-136(5)\n"
+		"\tlfd 16,-128(5)\n"
+		"\tlfd 17,-120(5)\n"
+		"\tlfd 18,-112(5)\n"
+		"\tlfd 19,-104(5)\n"
+		"\tlfd 20,-96(5)\n"
+		"\tlfd 21,-88(5)\n"
+		"\tlfd 22,-80(5)\n"
+		"\tlfd 23,-72(5)\n"
+		"\tlfd 24,-64(5)\n"
+		"\tlfd 25,-56(5)\n"
+		"\tlfd 26,-48(5)\n"
+		"\tlfd 27,-40(5)\n"
+		"\tlfd 28,-32(5)\n"
+		"\tlfd 29,-24(5)\n"
+		"\tlfd 30,-16(5)\n"
+		"\tlfd 31,-8(5)\n"
+		"\tmr 1,5\n"
+		"\tlwz 0,4(1)\n"
+		"\tmtlr 0\n"
+		"\tblr\n"
+	: : "i"(RESERVED_C_STACK_BYTES+288 /*stack frame size*/));
+}
+#endif
 
 #endif
 

@@ -177,6 +177,7 @@ pprReg IF_ARCH_i386(s,) r
       })
 #endif
 #if powerpc_TARGET_ARCH
+#if darwin_TARGET_OS
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
       (case i of {
@@ -214,6 +215,12 @@ pprReg IF_ARCH_i386(s,) r
 	62 -> SLIT("f30"); 63 -> SLIT("f31");
 	_  -> SLIT("very naughty powerpc register")
       })
+#else
+    ppr_reg_no :: Int -> Doc
+    ppr_reg_no i | i <= 31 = int i	-- GPRs
+                 | i <= 63 = int (i-32) -- FPRs
+		 | otherwise = ptext SLIT("very naughty powerpc register")
+#endif
 #endif
 \end{code}
 
@@ -366,6 +373,7 @@ pprImm (HI i)
     pp_hi = text "%hi("
 #endif
 #if powerpc_TARGET_ARCH
+#if darwin_TARGET_OS
 pprImm (LO i)
   = hcat [ pp_lo, pprImm i, rparen ]
   where
@@ -380,6 +388,16 @@ pprImm (HA i)
   = hcat [ pp_ha, pprImm i, rparen ]
   where
     pp_ha = text "ha16("
+#else
+pprImm (LO i)
+  = pprImm i <> text "@l"
+
+pprImm (HI i)
+  = pprImm i <> text "@h"
+
+pprImm (HA i)
+  = pprImm i <> text "@ha"
+#endif
 #endif
 \end{code}
 
@@ -506,7 +524,8 @@ pprInstr (SEGMENT RoDataSegment)
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
-        ,IF_ARCH_powerpc(SLIT(".const_data\n.align 2")
+        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
+                                      SLIT(".section .rodata\n\t.align 2"))
 	,))))
 
 pprInstr (LABEL clab)

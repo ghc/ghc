@@ -94,7 +94,8 @@ where do we start putting the rest of them?
 \begin{code}
 eXTRA_STK_ARGS_HERE :: Int
 eXTRA_STK_ARGS_HERE
-  = IF_ARCH_alpha(0, IF_ARCH_i386(23{-6x4bytes-}, IF_ARCH_sparc(23, IF_ARCH_powerpc(24,???))))
+  = IF_ARCH_alpha(0, IF_ARCH_i386(23{-6x4bytes-}, IF_ARCH_sparc(23,
+    IF_ARCH_powerpc( IF_OS_darwin(24,8{-SVR4 ABI: Linux-}), ???))))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

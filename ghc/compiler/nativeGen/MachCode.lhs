@@ -3484,8 +3484,10 @@ genCCall fn cconv kind args
 #endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
+
+#if darwin_TARGET_OS
 {-
-    The PowerPC calling convention (at least for Darwin/Mac OS X)
+    The PowerPC calling convention for Darwin/Mac OS X
     is described in Apple's document
     "Inside Mac OS X - Mach-O Runtime Architecture".
     Parameters may be passed in general-purpose registers, in
@@ -3592,6 +3594,123 @@ genCCall fn cconv kind args
 		    `snocOL` storeWord vr_hi gprs stackOffset
 		    `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
 		((take 2 gprs) ++ accumUsed)
+#else
+
+{-
+    PowerPC Linux uses the System V Release 4 Calling Convention
+    for PowerPC. It is described in the
+    "System V Application Binary Interface PowerPC Processor Supplement".
+    
+    Like the Darwin/Mac OS X code above, this allocates a new stack frame
+    so that the parameter area doesn't conflict with the spill slots.
+-}
+
+genCCall fn cconv kind args
+  = mapNat prepArg args `thenNat` \ preppedArgs ->
+    let
+	(argReps,argCodes,vregs) = unzip3 preppedArgs
+
+	    -- size of linkage area + size of arguments, in bytes
+	stackDelta = roundTo16 finalStack
+	roundTo16 x | x `mod` 16 == 0 = x
+		    | otherwise = x + 16 - (x `mod` 16)
+
+	move_sp_down = toOL [STU W sp (AddrRegImm sp (ImmInt (-stackDelta))), DELTA (-stackDelta)]
+	move_sp_up = toOL [ADD sp sp (RIImm (ImmInt stackDelta)), DELTA 0]
+
+	(moveFinalCode,usedRegs,finalStack) =
+            move_final (zip vregs argReps)
+	               allArgRegs allFPArgRegs
+	               eXTRA_STK_ARGS_HERE
+	               (toOL []) []
+
+	passArguments = concatOL argCodes
+	    `appOL` move_sp_down
+	    `appOL` moveFinalCode
+    in 
+	case fn of
+	    Left lbl ->
+		addImportNat lbl			`thenNat` \ _ ->
+		returnNat (passArguments
+			    `snocOL`	BL (ImmLit $ ftext  lbl)
+					   usedRegs
+			    `appOL`	move_sp_up)
+	    Right dyn ->
+		getRegister dyn				`thenNat` \ dynReg ->
+		getNewRegNCG (registerRep dynReg)	`thenNat` \ tmp ->
+		returnNat (registerCode dynReg tmp
+			    `appOL`	passArguments
+			    `snocOL`	MTCTR (registerName dynReg tmp)
+			    `snocOL`	BCTRL usedRegs
+			    `appOL`	move_sp_up)
+    where
+    prepArg arg
+        | is64BitRep (repOfStixExpr arg)
+        = iselExpr64 arg		`thenNat` \ (ChildCode64 code vr_lo) ->
+          let r_lo = VirtualRegI vr_lo
+              r_hi = getHiVRegFromLo r_lo
+          in  returnNat (repOfStixExpr arg, code, Right (r_hi,r_lo))
+	| otherwise
+	= getRegister arg			`thenNat` \ register ->
+	  getNewRegNCG (registerRep register)	`thenNat` \ tmp ->
+	  returnNat (registerRep register, registerCode register tmp, Left (registerName register tmp))
+    move_final [] _ _ stackOffset accumCode accumUsed = (accumCode, accumUsed, stackOffset)
+    move_final ((Left vr,rep):vregs) gprs fprs stackOffset accumCode accumUsed
+	| not (is64BitRep rep) =
+	case rep of
+	    FloatRep ->
+                case fprs of
+                    fpr : fprs' -> move_final vregs gprs fprs' stackOffset
+                                              (accumCode `snocOL` MR fpr vr)
+                                              (fpr : accumUsed)
+                    [] -> move_final vregs gprs fprs (stackOffset+4)
+                                     (accumCode `snocOL`
+                                        ST F vr (AddrRegImm sp (ImmInt stackOffset)))
+                                     accumUsed
+	    DoubleRep ->
+                case fprs of
+                    fpr : fprs' -> move_final vregs gprs fprs' stackOffset
+                                              (accumCode `snocOL` MR fpr vr)
+                                              (fpr : accumUsed)
+                    [] -> move_final vregs gprs fprs (stackOffset+8)
+                                     (accumCode `snocOL`
+                                        ST DF vr (AddrRegImm sp (ImmInt stackOffset)))
+                                     accumUsed
+	    VoidRep -> panic "MachCode.genCCall(powerpc): void parameter"
+	    _ ->
+                case gprs of
+                    gpr : gprs' -> move_final vregs gprs' fprs stackOffset
+                                              (accumCode `snocOL` MR gpr vr)
+                                              (gpr : accumUsed)
+                    [] -> move_final vregs gprs fprs (stackOffset+4)
+                                     (accumCode `snocOL`
+                                        ST W vr (AddrRegImm sp (ImmInt stackOffset)))
+                                     accumUsed
+		
+    move_final ((Right (vr_hi,vr_lo),rep):vregs) gprs fprs stackOffset accumCode accumUsed
+	| is64BitRep rep =
+            case gprs of
+                hireg : loreg : regs | even (length gprs) ->
+                    move_final vregs regs fprs stackOffset
+                               (regCode hireg loreg) accumUsed
+                _skipped : hireg : loreg : regs ->
+                    move_final vregs regs fprs stackOffset
+                               (regCode hireg loreg) accumUsed
+                _ -> -- only one or no regs left
+                    move_final vregs [] fprs (stackOffset+8)
+                               stackCode accumUsed
+	where
+            stackCode =
+                accumCode
+                    `snocOL` ST W vr_hi (AddrRegImm sp (ImmInt stackOffset))
+                    `snocOL` ST W vr_lo (AddrRegImm sp (ImmInt (stackOffset+4)))
+            regCode hireg loreg =
+                accumCode
+                    `snocOL` MR hireg vr_hi
+                    `snocOL` MR loreg vr_lo
+
+#endif                
+                
 #endif /* powerpc_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

@@ -312,7 +312,7 @@ sub init_TARGET_STUFF {
 				# Apple PowerPC Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
-    $T_PRE_APP	    = 'WHAT IS THIS'; # regexp that says what comes before APP/NO_APP
+    $T_PRE_APP	    = 'DOESNT APPLY'; # regexp that says what comes before APP/NO_APP
     $T_CONST_LBL    = '^\LC\d+:'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
 
@@ -328,6 +328,33 @@ sub init_TARGET_STUFF {
     $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
     $T_HDR_consist  = "\t\.text\n\t\.align 2\n";
     $T_HDR_closure  = "\t\.const_data\n\t\.align 2\n";
+    $T_HDR_srt      = "\t\.text\n\t\.align 2\n";
+    $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
+    $T_HDR_direct   = "\t\.text\n\t\.align 2\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^powerpc-.*-linux/ ) {
+				# PowerPC Linux
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = ''; # _ if symbols have an underscore on the front
+    $T_PRE_APP	    = '^#'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\.LC\d+:'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*|\.local.*)\n)';
+    $T_COPY_DIRVS   = '^\s*\.(globl|type|size|local)';
+
+    $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
+    $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_toc      = "\.toc\n";
+    $T_HDR_literal  = "\t\.section\t.rodata\n\t\.align 2\n";
+    $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
+    $T_HDR_consist  = "\t\.text\n\t\.align 2\n";
+    $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
     $T_HDR_srt      = "\t\.text\n\t\.align 2\n";
     $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
@@ -792,6 +819,19 @@ sub mangle_asm {
 		    # I have no idea why, and I don't think it is necessary, so let's toss it.
 		    $p =~ s/^\tli r\d+,0\n//g;
 		    $p =~ s/^\tstw r\d+,\d+\(r1\)\n//g;
+		} elsif ($TargetPlatform =~ /^powerpc-.*-linux/) {
+		    $p =~ s/^\tmflr 0\n//;
+		    $p =~ s/^\tstmw \d+,\d+\(1\)\n//;
+   		    $p =~ s/^\tstfd \d+,\d+\(1\)\n//g;
+ 		    $p =~ s/^\tstw r0,8\(1\)\n//;
+  		    $p =~ s/^\tstwu 1,-\d+\(1\)\n//; 
+  		    $p =~ s/^\tstw \d+,\d+\(1\)\n//g; 
+
+		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
+		    # under some circumstances, only when generating position dependent code.
+		    # I have no idea why, and I don't think it is necessary, so let's toss it.
+		    $p =~ s/^\tli \d+,0\n//g;
+		    $p =~ s/^\tstw \d+,\d+\(1\)\n//g;
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
@@ -878,6 +918,7 @@ sub mangle_asm {
 	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
 	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//go if $TargetPlatform =~ /^alpha-/;
 	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
+	$c =~ s/^\tbl\s+__DISCARD__\n//go if $TargetPlatform =~ /^powerpc-.*-linux/;
 
 	# IA64: mangle tailcalls into jumps here
 	if ($TargetPlatform =~ /^ia64-/) {

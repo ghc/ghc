@@ -726,6 +726,8 @@ names in the header files.  Gag me with a spoon, eh?
 #define r29 29
 #define r30 30
 #define r31 31
+
+#ifdef darwin_TARGET_OS
 #define f0  32
 #define f1  33
 #define f2  34
@@ -758,6 +760,40 @@ names in the header files.  Gag me with a spoon, eh?
 #define f29 61
 #define f30 62
 #define f31 63
+#else
+#define fr0  32
+#define fr1  33
+#define fr2  34
+#define fr3  35
+#define fr4  36
+#define fr5  37
+#define fr6  38
+#define fr7  39
+#define fr8  40
+#define fr9  41
+#define fr10 42
+#define fr11 43
+#define fr12 44
+#define fr13 45
+#define fr14 46
+#define fr15 47
+#define fr16 48
+#define fr17 49
+#define fr18 50
+#define fr19 51
+#define fr20 52
+#define fr21 53
+#define fr22 54
+#define fr23 55
+#define fr24 56
+#define fr25 57
+#define fr26 58
+#define fr27 59
+#define fr28 60
+#define fr29 61
+#define fr30 62
+#define fr31 63
+#endif
 #endif
 \end{code}
 
