@@ -1220,20 +1220,6 @@ else
 fi
 
 dnl --------------------------------------------------
-dnl * test for GTK+
-dnl --------------------------------------------------
-
-AC_PATH_PROGS([GTK_CONFIG], [gtk-config gtk12-config])
-if test -n "$GTK_CONFIG"; then
-  AC_CACHE_CHECK([for version of GTK+], [fp_cv_gtk_version],
-    [fp_cv_gtk_version=`$GTK_CONFIG --version`])
-  FP_COMPARE_VERSIONS([$fp_cv_gtk_version], [-lt], [1.2],
-    [AC_MSG_WARN([GTK+ not usable, need at least version 1.2])
-     GTK_CONFIG=])
-fi
-AC_SUBST([GTK_CONFIG])
-
-dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
 dnl --------------------------------------------------
 

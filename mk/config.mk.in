@@ -763,11 +763,6 @@ HaveFrameworkHaskellSupport = @HaveFrameworkHaskellSupport@
 HavePosixRegex  = @HavePosixRegex@
 
 #-----------------------------------------------------------------------------
-# GTK+
-
-GTK_CONFIG		= @GTK_CONFIG@
-
-#-----------------------------------------------------------------------------
 # Flex (currently unused, could be moved to glafp-utils)
 
 # FLEX			= @LEX@

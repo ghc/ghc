@@ -1,3 +1,5 @@
+# -*-makefile-*-
+# @configure_input@
 # -----------------------------------------------------------------------------
 #
 # GHC project configuration
@@ -23,5 +25,8 @@ GhcBinDistLinks = ghc ghci ghc-pkg
 
 # Set to YES if $(GHC) has the readline package installed
 GhcHasReadline	= @GhcHasReadline@
+
+# GTK+
+GTK_CONFIG = @GTK_CONFIG@
 
 include $(GhcMainDir)/mk/version.mk
