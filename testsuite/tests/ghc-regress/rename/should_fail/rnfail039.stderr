@@ -1,0 +1,4 @@
+
+rnfail039.hs:11:
+    Invalid use of qualified name `P.=='
+    In an instance method
