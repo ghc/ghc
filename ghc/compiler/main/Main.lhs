@@ -13,6 +13,7 @@ IMPORT_1_3(IO(hGetContents,stdin,stderr,hPutStr,hClose,openFile,IOMode(..)))
 
 import HsSyn
 import RdrHsSyn		( RdrName )
+import BasicTypes	( NewOrData(..) )
 
 import ReadPrefix	( rdModule )
 import Rename		( renameModule )
@@ -49,7 +50,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import PprAbsC		( dumpRealC, writeRealC )
 import PprCore		( pprCoreBinding )
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import Pretty
 
 import Id		( GenId )		-- instances
@@ -57,9 +58,6 @@ import Name		( Name )		-- instances
 import PprType		( GenType, GenTyVar )	-- instances
 import TyVar		( GenTyVar )		-- instances
 import Unique		( Unique )		-- instances
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 \end{code}
 
 \begin{code}
@@ -195,7 +193,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 						>>=
 
 	 \ (simplified,
-	    SpecData _ _ _ gen_tycons all_tycon_specs _ _ _) ->
+	    SpecData _ _ _ gen_data_tycons all_tycon_specs _ _ _) ->
 
     doDump opt_D_dump_simpl "Simplified:" (pp_show (vcat
 	(map (pprCoreBinding pprStyle) simplified)))
@@ -237,7 +235,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 	abstractC      = codeGen mod_name		-- module name for CC labelling
 				 cost_centre_info
 				 imported_modules	-- import names for CC registering
-				 gen_tycons		-- type constructors generated locally
+				 gen_data_tycons	-- type constructors generated locally
 				 all_tycon_specs	-- tycon specialisations
 				 stg_binds2
 
@@ -305,7 +303,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     doDump switch hdr string
       = if switch
-	then hPutStr stderr ("\n\n" ++ (take 80 $ repeat '=')) >>
+	then hPutStr stderr ("\n\n--" ++ (take 80 $ repeat '=')) >>
 	     hPutStr stderr ('\n': hdr)	    >>
 	     hPutStr stderr ('\n': string)  >>
 	     hPutStr stderr "\n"
