@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.9 1999/02/26 12:43:58 simonm Exp $
+ * $Id: Weak.c,v 1.10 1999/02/26 13:36:14 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,6 +44,13 @@ finalizeWeakPointersNow(void)
  * scheduleFinalizers() is called on the list of weak pointers found
  * to be dead after a garbage collection.  It overwrites each object
  * with DEAD_WEAK, and creates a new thread for the finalizer.
+ *
+ * This function is called just after GC.  The weak pointers on the
+ * argument list are those whose keys were found to be not reachable,
+ * however the value and finalizer fields have by now been marked live.
+ * The weak pointer object itself may not be alive - i.e. we may be
+ * looking at either an object in from-space or one in to-space.  It
+ * doesn't really matter either way.
  */
 
 void
@@ -63,17 +70,3 @@ scheduleFinalizers(StgWeak *list)
     w->header.info = &DEAD_WEAK_info;
   }
 }
-
-void
-markWeakList(void)
-{
-  StgWeak *w, **last_w;
-
-  last_w = &weak_ptr_list;
-  for (w = weak_ptr_list; w; w = w->link) {
-    w = (StgWeak *)MarkRoot((StgClosure *)w);
-    *last_w = w;
-    last_w = &(w->link);
-  }
-}
-

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.43 1999/02/26 12:46:46 simonm Exp $
+ * $Id: GC.c,v 1.44 1999/02/26 13:36:12 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -100,21 +100,23 @@ lnat g0s0_pcnt_kept = 30;	/* percentage of g0s0 live at last minor GC */
    Static function declarations
    -------------------------------------------------------------------------- */
 
-static StgClosure *evacuate(StgClosure *q);
-static void    zeroStaticObjectList(StgClosure* first_static);
-static rtsBool traverse_weak_ptr_list(void);
-static void    zeroMutableList(StgMutClosure *first);
-static void    revertDeadCAFs(void);
+static StgClosure * evacuate                ( StgClosure *q );
+static void         zero_static_object_list ( StgClosure* first_static );
+static void         zero_mutable_list       ( StgMutClosure *first );
+static void         revert_dead_CAFs        ( void );
 
-static void           scavenge_stack(StgPtr p, StgPtr stack_end);
-static void           scavenge_large(step *step);
-static void           scavenge(step *step);
-static void           scavenge_static(void);
-static void           scavenge_mutable_list(generation *g);
-static void           scavenge_mut_once_list(generation *g);
+static rtsBool      traverse_weak_ptr_list  ( void );
+static void         cleanup_weak_ptr_list   ( void );
+
+static void         scavenge_stack          ( StgPtr p, StgPtr stack_end );
+static void         scavenge_large          ( step *step );
+static void         scavenge                ( step *step );
+static void         scavenge_static         ( void );
+static void         scavenge_mutable_list   ( generation *g );
+static void         scavenge_mut_once_list  ( generation *g );
 
 #ifdef DEBUG
-static void gcCAFs(void);
+static void         gcCAFs                  ( void );
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -196,10 +198,10 @@ void GarbageCollect(void (*get_roots)(void))
   scavenged_static_objects = END_OF_STATIC_LIST;
 
   /* zero the mutable list for the oldest generation (see comment by
-   * zeroMutableList below).
+   * zero_mutable_list below).
    */
   if (major_gc) { 
-    zeroMutableList(generations[RtsFlags.GcFlags.generations-1].mut_once_list);
+    zero_mutable_list(generations[RtsFlags.GcFlags.generations-1].mut_once_list);
   }
 
   /* Save the old to-space if we're doing a two-space collection
@@ -337,7 +339,6 @@ void GarbageCollect(void (*get_roots)(void))
   /* Mark the weak pointer list, and prepare to detect dead weak
    * pointers.
    */
-  markWeakList();
   old_weak_ptr_list = weak_ptr_list;
   weak_ptr_list = NULL;
   weak_done = rtsFalse;
@@ -360,7 +361,7 @@ void GarbageCollect(void (*get_roots)(void))
        */
       scavengeEverything();
       /* revert dead CAFs and update enteredCAFs list */
-      revertDeadCAFs();
+      revert_dead_CAFs();
 #endif      
       markHugsObjects();
 #if 0
@@ -427,7 +428,12 @@ void GarbageCollect(void (*get_roots)(void))
     }
   }
 
-  /* Now see which stable names are still alive
+  /* Final traversal of the weak pointer list (see comment by
+   * cleanUpWeakPtrList below).
+   */
+  cleanup_weak_ptr_list();
+
+  /* Now see which stable names are still alive.
    */
   gcStablePtrTable(major_gc);
 
@@ -660,7 +666,7 @@ void GarbageCollect(void (*get_roots)(void))
   }
 
   /* revert dead CAFs and update enteredCAFs list */
-  revertDeadCAFs();
+  revert_dead_CAFs();
   
   /* mark the garbage collected CAFs as dead */
 #ifdef DEBUG
@@ -669,7 +675,7 @@ void GarbageCollect(void (*get_roots)(void))
   
   /* zero the scavenged static object list */
   if (major_gc) {
-    zeroStaticObjectList(scavenged_static_objects);
+    zero_static_object_list(scavenged_static_objects);
   }
 
   /* Reset the nursery
@@ -745,6 +751,17 @@ traverse_weak_ptr_list(void)
   last_w = &old_weak_ptr_list;
   for (w = old_weak_ptr_list; w; w = next_w) {
 
+    /* First, this weak pointer might have been evacuated.  If so,
+     * remove the forwarding pointer from the weak_ptr_list.
+     */
+    if (get_itbl(w)->type == EVACUATED) {
+      w = (StgWeak *)((StgEvacuated *)w)->evacuee;
+      *last_w = w;
+    }
+    ASSERT(get_itbl(w)->type == WEAK);
+
+    /* Now, check whether the key is reachable.
+     */
     if ((new = isAlive(w->key))) {
       w->key = new;
       /* evacuate the value and finalizer */
@@ -780,6 +797,39 @@ traverse_weak_ptr_list(void)
   }
 
   return rtsTrue;
+}
+
+/* -----------------------------------------------------------------------------
+   After GC, the live weak pointer list may have forwarding pointers
+   on it, because a weak pointer object was evacuated after being
+   moved to the live weak pointer list.  We remove those forwarding
+   pointers here.
+
+   Also, we don't consider weak pointer objects to be reachable, but
+   we must nevertheless consider them to be "live" and retain them.
+   Therefore any weak pointer objects which haven't as yet been
+   evacuated need to be evacuated now.
+   -------------------------------------------------------------------------- */
+
+static void
+cleanup_weak_ptr_list ( void )
+{
+  StgWeak *w, **last_w;
+
+  last_w = &weak_ptr_list;
+  for (w = weak_ptr_list; w; w = w->link) {
+
+    if (get_itbl(w)->type == EVACUATED) {
+      w = (StgWeak *)((StgEvacuated *)w)->evacuee;
+      *last_w = w;
+    }
+
+    if (Bdescr((P_)w)->evacuated == 0) {
+      (StgClosure *)w = evacuate((StgClosure *)w);
+      *last_w = w;
+    }
+    last_w = &(w->link);
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -2432,7 +2482,7 @@ scavenge_large(step *step)
 }
 
 static void
-zeroStaticObjectList(StgClosure* first_static)
+zero_static_object_list(StgClosure* first_static)
 {
   StgClosure* p;
   StgClosure* link;
@@ -2454,7 +2504,7 @@ zeroStaticObjectList(StgClosure* first_static)
  * mutable list.
  */
 static void
-zeroMutableList(StgMutClosure *first)
+zero_mutable_list( StgMutClosure *first )
 {
   StgMutClosure *next, *c;
 
@@ -2481,7 +2531,7 @@ void RevertCAFs(void)
   }
 }
 
-void revertDeadCAFs(void)
+void revert_dead_CAFs(void)
 {
     StgCAF* caf = enteredCAFs;
     enteredCAFs = END_CAF_LIST;
@@ -2505,7 +2555,7 @@ void revertDeadCAFs(void)
 		break;
 	    }
 	default:
-		barf("revertDeadCAFs: enteredCAFs list corrupted");
+		barf("revert_dead_CAFs: enteredCAFs list corrupted");
 	} 
 	caf = next;
     }
