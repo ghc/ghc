@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.29 $
- * $Date: 2000/03/14 14:34:47 $
+ * $Revision: 1.30 $
+ * $Date: 2000/03/15 23:27:16 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -129,6 +129,18 @@ extern Name nameUnpackString;
 extern Name namePrimSeq;
 extern Name nameMap;
 extern Name nameMinus;
+
+/* assertion and exceptions */
+extern Name nameAssert;
+extern Name nameAssertError;
+extern Name nameTangleMessage;
+extern Name nameIrrefutPatError;
+extern Name nameNoMethodBindingError;
+extern Name nameNonExhaustiveGuardsError;
+extern Name namePatError;
+extern Name nameRecSelError;
+extern Name nameRecConError;
+extern Name nameRecUpdError;
 
 
 extern Class classMonad;                /* Monads                          */
@@ -302,6 +314,8 @@ extern Long   numCells;                 /* number of cells allocated       */
 extern Int    numGcs;                   /* number of garbage collections   */
 extern Bool   broken;                   /* indicates interrupt received    */
 extern Bool   preludeLoaded;            /* TRUE => prelude has been loaded */
+extern Bool   flagAssert;               /* TRUE => assert False <e> causes
+                                                   an assertion failure    */
 
 extern Bool   gcMessages;               /* TRUE => print GC messages       */
 extern Bool   literateScripts;          /* TRUE => default lit scripts     */

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: errors.h,v $
- * $Revision: 1.6 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.7 $
+ * $Date: 2000/03/15 23:27:16 $
  * ------------------------------------------------------------------------*/
 
 extern Void internal     ( String) HUGS_noreturn;
@@ -41,6 +41,7 @@ extern Void fatal        ( String) HUGS_noreturn;
 extern Void errHead      ( Int );                  /* in main.c            */
 extern Void errFail      ( Void) HUGS_noreturn;
 extern Void errAbort     ( Void );
+extern Cell errAssert    ( Int );
 
 extern sigProto(breakHandler);
 

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.43 $
- * $Date: 2000/03/14 14:34:47 $
+ * $Revision: 1.44 $
+ * $Date: 2000/03/15 23:27:16 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -94,7 +94,6 @@ static Void   local browse	      ( Void );
  * Machine dependent code for Hugs interpreter:
  * ------------------------------------------------------------------------*/
 
-
 #include "machdep.c"
 #ifdef WANT_TIMER
 #include "timer.c"
@@ -112,9 +111,11 @@ static Bool   useDots       = RISCOS;   /* TRUE => use dots in progress    */
 static Bool   quiet         = FALSE;    /* TRUE => don't show progress     */
 static Bool   lastWasObject = FALSE;
 
+       Bool   flagAssert    = FALSE;    /* TRUE => assert False <e> causes
+                                                   an assertion failure    */
        Bool   preludeLoaded = FALSE;
        Bool   debugSC       = FALSE;
-       Bool   combined      = TRUE;
+       Bool   combined      = FALSE;
 
 typedef 
    struct { 
@@ -788,6 +789,7 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'k', 1, "Show kind errors in full",              &kindExpert},
     {'o', 0, "Allow overlapping instances",           &allowOverlap},
     {'S', 1, "Debug: show generated SC code",         &debugSC},
+    {'a', 1, "Raise exception on assert failure",     &flagAssert},
 #if EXPLAIN_INSTANCE_RESOLUTION
     {'x', 1, "Explain instance resolution",           &showInstRes},
 #endif
@@ -2181,6 +2183,19 @@ static Void local failed() {           /* Goal cannot be reached due to    */
 /* --------------------------------------------------------------------------
  * Error handling:
  * ------------------------------------------------------------------------*/
+
+Cell errAssert(l)   /* message to use when raising asserts, etc */
+Int l; {
+  char tmp[100];
+  Cell str;
+  if (scriptFile) {
+    str = mkStr(findText(scriptFile));
+  } else {
+    str = mkStr(findText(""));
+  }
+  return (ap2(nameTangleMessage,str,mkInt(l)));
+}
+
 
 Void errHead(l)                        /* print start of error message     */
 Int l; {

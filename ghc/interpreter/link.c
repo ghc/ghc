@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.51 $
- * $Date: 2000/03/14 14:34:47 $
+ * $Revision: 1.52 $
+ * $Date: 2000/03/15 23:27:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -131,6 +131,17 @@ Name nameFromThen;
 Name nameFrom;
 Name nameFromThenTo;
 Name nameNegate;
+
+Name nameAssert;
+Name nameAssertError;
+Name nameTangleMessage;
+Name nameIrrefutPatError;
+Name nameNoMethodBindingError;
+Name nameNonExhaustiveGuardsError;
+Name namePatError;
+Name nameRecSelError;
+Name nameRecConError;
+Name nameRecUpdError;
 
 /* these names are required before we've had a chance to do the right thing */
 Name nameSel;
@@ -557,6 +568,7 @@ assert(nonNull(namePMFail));
                /* implementTagToCon                     */
                xyzzy(nameError,          "hugsprimError");
 
+
            typeStable = linkTycon("Stable");
            typeRef    = linkTycon("IORef");
            // {Prim,PrimByte,PrimMutable,PrimMutableByte}Array ?
@@ -713,6 +725,21 @@ assert(nonNull(namePMFail));
                pFun(namePMFail,         "hugsprimPmFail");
                pFun(nameError,          "error");
                pFun(nameUnpackString,   "hugsprimUnpackString");
+
+	       /* assertion and exception issues */
+	       pFun(nameAssert,	        "assert");
+	       pFun(nameAssertError,	"assertError");
+	       pFun(nameTangleMessage,	"tangleMessager");
+	       pFun(nameIrrefutPatError,	
+		                        "irrefutPatError");
+	       pFun(nameNoMethodBindingError,
+		                        "noMethodBindingError");
+	       pFun(nameNonExhaustiveGuardsError,
+		                        "nonExhaustiveGuardsError");
+	       pFun(namePatError,	"patError");
+	       pFun(nameRecSelError,	"recSelError");
+	       pFun(nameRecConError,	"recConError");
+	       pFun(nameRecUpdError,	"recUpdError");
 
                /* hooks for handwritten bytecode */
                pFun(namePrimSeq,        "primSeq");

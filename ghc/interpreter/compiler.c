@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.22 $
- * $Date: 2000/03/13 11:37:16 $
+ * $Revision: 1.23 $
+ * $Date: 2000/03/15 23:27:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -77,6 +77,7 @@ static Name local compileSelFunction    ( Pair );
 static List local addStgVar             ( List,Pair );
 
 static Name currentName;               /* Top level name being processed   */
+static Int  lineNumber = 0;            /* previously discarded line number */
 
 /* --------------------------------------------------------------------------
  * Translation:    Convert input expressions into a less complex language
@@ -98,6 +99,9 @@ Cell e; {
 
         case AP         : fst(e) = translate(fst(e));
 
+	  /* T [id <exp>]        ==> T[<exp>]
+	   * T [indirect <exp> ] ==> T[<exp>]
+	   */
                           if (fst(e)==nameId || fst(e)==nameInd)
                               return translate(snd(e));
                           if (isName(fst(e)) &&
@@ -106,10 +110,23 @@ Cell e; {
                               return translate(snd(e));
 
                           snd(e) = translate(snd(e));
+
                           return e;
 
-        case NAME       : if (e==nameOtherwise)
+        case NAME       : 
+
+	  /* T [otherwise] ==> True
+	   */
+
+	                   if (e==nameOtherwise)
                               return nameTrue;
+	  /* T [assert]    ==> T[assertError "<location info>"]
+	   */
+			   if (flagAssert && e==nameAssert) {
+			     Cell str = errAssert(lineNumber);
+			     return (ap(nameAssertError,str));
+			   }
+
                           if (isCfun(e)) {
                               if (isName(name(e).defn))
                                   return name(e).defn;
@@ -247,7 +264,14 @@ Cell rhs; {
                        mapProc(transPair,snd(rhs));
                        return rhs;
 
-        default      : return translate(snd(rhs));  /* discard line number */
+        default      : {
+			 Cell tmp;
+	                 Int prev = lineNumber;
+			 lineNumber = intOf(fst(rhs));
+			 tmp = translate(snd(rhs));  /* discard line number */
+			 lineNumber = prev;
+			 return tmp;
+	               }
     }
 }
 
@@ -1629,6 +1653,7 @@ Int what; {
         case PREPREL :
         case RESET   : freeVars      = NIL;
                        freeFuns      = NIL;
+		       lineNumber    = 0;
                        freeBegin     = mkOffset(0);
                        break;
 
