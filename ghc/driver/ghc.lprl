@@ -304,6 +304,7 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 		   '_p',    "Profiling",
 		   '_t',    "Ticky-ticky Profiling",
 		   '_u',    "Unregisterised",
+		   '_s',    "SMP",
 		   '_mp',   "Parallel",
 		   '_mg',   "Gransim",
 		   # system ways end
@@ -351,8 +352,9 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 	'_p',  "-fscc-profiling -DPROFILING -optc-DPROFILING",
 	'_t',  "-fticky-ticky -DTICKY_TICKY -optc-DTICKY_TICKY",
 	'_u',  "-optc-DNO_REGS -optc-DUSE_MINIINTERPRETER -fno-asm-mangling -funregisterised",
-	'_mp', "-fstack-check -fparallel -D__PARALLEL_HASKELL__ -optc-DPAR",
-	'_mg', "-fstack-check -fconcurrent -fgransim -D__GRANSIM__ -D__CONCURRENT_HASKELL__ -optc-DCONCURRENT -optc-DGRAN");
+	'_s',  "-fparallel -optc-pthread -optl-pthread -optc-DSMP",
+	'_mp', "-fparallel -D__PARALLEL_HASKELL__ -optc-DPAR",
+	'_mg', "-fgransim -D__GRANSIM__ -optc-DGRAN");
 
 # where to look for interface files (system hi's, i.e., prelude and syslibs)
 @SysImport_dir	= ( $INSTALLING )
@@ -900,6 +902,9 @@ sub setupBuildFlags {
 	  print STDERR "$Pgm: both your PVM_ROOT and PVM_ARCH environment variables must be set for linking under -parallel.\n";
 	  exit(1);
       }
+
+  } elsif ( $SMPing eq 's') {
+      $BuildTag = '_s';
 
   } elsif ( $GRANing eq 'g' ) {
       if ($TICKYing eq 't') { print STDERR "$Pgm: Can't mix -gransim with -ticky.\n"; exit 1; }
@@ -2943,6 +2948,7 @@ arg: while($_ = $Args[0]) {
     /^-gransim$/    && do { $GRANing   = 'g'; &add_syslib('concurrent'); next arg; }; # GranSim
     /^-ticky$/	    && do { $TICKYing  = 't'; next arg; }; # ticky-ticky
     /^-parallel$/   && do { $PARing    = 'p'; &add_syslib('concurrent'); next arg; }; # parallel Haskell
+    /^-smp$/        && do { $SMPing    = 's'; &add_syslib('concurrent'); next arg; }; # parallel Haskell
 
     #-------------- "user ways" --------------------------------------------
 

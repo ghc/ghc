@@ -676,7 +676,7 @@ HSTAGS			= $(HSTAGS_PREFIX)hstags
 #
 # The ways currently defined.
 #
-ALL_WAYS=p t u mp mg a b c d e f g h i j k l m n o A B
+ALL_WAYS=p t u s mp mg a b c d e f g h i j k l m n o A B
 
 #
 # The following ways currently have treated specially, p u t mg,
@@ -697,6 +697,10 @@ WAY_t_HC_OPTS= -ticky
 # Way `u':
 WAY_u_NAME=unregisterized (using portable C only)
 WAY_u_HC_OPTS=-unreg
+
+# Way `s':
+WAY_s_NAME=threads (for SMP)
+WAY_s_HC_OPTS=-smp
 
 # Way `mp': 
 WAY_mp_NAME=parallel
