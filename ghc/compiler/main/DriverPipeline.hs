@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.96 2001/08/10 23:08:25 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.97 2001/08/15 00:36:54 sof Exp $
 --
 -- GHC Driver
 --
@@ -365,7 +365,8 @@ run_phase Cpp basename suff input_fn output_fn
 			    ++ map SysTools.Option hs_src_cpp_opts
 			    ++ map SysTools.Option hscpp_opts
 			    ++ map SysTools.Option md_c_flags
-			    ++ [ SysTools.Option     "-x c"
+			    ++ [ SysTools.Option     "-x"
+			       , SysTools.Option     "c"
 			       , SysTools.FileOption input_fn
 			       , SysTools.Option     "-o"
 			       , SysTools.FileOption output_fn
@@ -578,7 +579,7 @@ run_phase cc_phase basename suff input_fn output_fn
 		      | otherwise         = [ ]
 
 	excessPrecision <- readIORef v_Excess_precision
-	SysTools.runCc ([ SysTools.Option "-x c"
+	SysTools.runCc ([ SysTools.Option "-x", SysTools.Option "c"
 	                , SysTools.FileOption input_fn
 			, SysTools.Option "-o"
 			, SysTools.FileOption output_fn
