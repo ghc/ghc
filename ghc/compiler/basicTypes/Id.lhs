@@ -146,9 +146,21 @@ module Id (
 
 IMP_Ubiq()
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)   -- for paranoia checking
 IMPORT_DELOOPER(TyLoop)   -- for paranoia checking
-
+#else
+import {-# SOURCE #-} SpecEnv    ( SpecEnv   )
+import {-# SOURCE #-} CoreUnfold ( Unfolding )
+import {-# SOURCE #-} StdIdInfo  ( addStandardIdInfo )
+-- Let's see how much we can leave out..
+--import {-# SOURCE #-} TyCon
+--import {-# SOURCE #-} Type
+--import {-# SOURCE #-} Class
+--import {-# SOURCE #-} TysWiredIn
+--import {-# SOURCE #-} TysPrim
+--import {-# SOURCE #-} TyVar
+#endif
 
 import Bag
 import Class		( classOpString, SYN_IE(Class), GenClass, SYN_IE(ClassOp), GenClassOp )
@@ -965,7 +977,7 @@ getPragmaInfo (Id _ _ _ _ info _) = info
 replaceIdInfo :: Id -> IdInfo -> Id
 replaceIdInfo (Id u n ty details pinfo _) info = Id u n ty details pinfo info
 
-replacePragmaInfo :: Id -> PragmaInfo -> Id
+replacePragmaInfo :: GenId ty -> PragmaInfo -> GenId ty
 replacePragmaInfo (Id u sn ty details _ info) prag = Id u sn ty details prag info
 \end{code}
 
