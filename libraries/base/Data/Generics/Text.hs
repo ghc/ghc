@@ -23,14 +23,15 @@ module Data.Generics.Text (
 
 ------------------------------------------------------------------------------
 
-
+#ifdef __HADDOCK__
+import Prelude
+#endif
 import Control.Monad
 import Data.Maybe
 import Data.Typeable
 import Data.Generics.Basics
 import Data.Generics.Aliases
 import Text.ParserCombinators.ReadP
-
 
 ------------------------------------------------------------------------------
 

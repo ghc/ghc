@@ -34,10 +34,11 @@ module Data.Generics.Twins (
 
 ------------------------------------------------------------------------------
 
-
+#ifdef __HADDOCK__
+import Prelude
+#endif
 import Data.Generics.Basics
 import Data.Generics.Aliases
-
 
 ------------------------------------------------------------------------------
 

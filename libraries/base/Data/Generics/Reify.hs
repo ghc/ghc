@@ -55,12 +55,12 @@ module Data.Generics.Reify (
 
 ------------------------------------------------------------------------------
 
-
+#ifdef __HADDOCK__
+import Prelude
+#endif
 import Data.Generics.Basics
 import Data.Generics.Aliases
 import Data.Generics.Schemes
-
-
 
 -------------------------------------------------------------
 --
@@ -276,7 +276,7 @@ unGTypeFun' (GTypeFun' f) = f
 
 
 -- | Query all immediate subterm types.
---   There is an extra argument to "constant out" the type at hand.
+--   There is an extra argument to \"constant out\" the type at hand.
 --   This can be used to avoid cycles.
 
 gmapSubtermTypesConst :: (Data a, Typeable r)
@@ -318,7 +318,7 @@ _gmapSubtermTypes o (r::r) f
 
 
 -- | Reachability relation on types, i.e.,
---   test if nodes of type "a" are reachable from nodes of type "b".
+--   test if nodes of type @a@ are reachable from nodes of type @b@.
 --   The relation is defined to be reflexive.
 
 reachableType :: (Data a, Data b) => TypeVal a -> TypeVal b -> Bool
@@ -330,8 +330,8 @@ reachableType (a::TypeVal a) (b::TypeVal b)
 
 
 -- | Depth of a datatype as the constructor with the minimum depth.
---   The outermost "Nothing" denotes a type without constructors.
---   The innermost "Nothing" denotes potentially infinite.
+--   The outermost 'Nothing' denotes a type without constructors.
+--   The innermost 'Nothing' denotes potentially infinite.
 
 depthOfType :: GTypeFun Bool -> GTypeFun (Maybe (Constr, Maybe Int))
 depthOfType p (t::TypeVal a)
@@ -360,7 +360,7 @@ depthOfType p (t::TypeVal a)
 
 -- | Depth of a constructor.
 --   Depth is viewed as the maximum depth of all subterm types + 1.
---   "Nothing" denotes potentially infinite.
+--   'Nothing' denotes potentially infinite.
 
 depthOfConstr :: GTypeFun Bool -> GTypeFun (Constr -> Maybe Int)
 depthOfConstr p (t::TypeVal a) c

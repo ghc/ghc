@@ -45,11 +45,11 @@ module Data.Generics.Aliases (
 
   ) where
 
-
+#ifdef __HADDOCK__
+import Prelude
+#endif
 import Control.Monad
 import Data.Generics.Basics
-
-
 
 ------------------------------------------------------------------------------
 --

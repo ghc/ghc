@@ -18,6 +18,11 @@ module Control.Parallel.Strategies where
 --
 --	Phil Trinder, Hans-Wolfgang Loidl, Kevin Hammond et al. 
 --
+
+#ifdef __HADDOCK__
+import Prelude
+#endif
+
 import Control.Parallel as Parallel
 import Data.Ix
 import Data.Array

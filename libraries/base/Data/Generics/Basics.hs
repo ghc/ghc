@@ -61,11 +61,12 @@ module Data.Generics.Basics (
 
 ------------------------------------------------------------------------------
 
-
+#ifdef __HADDOCK__
+import Prelude
+#endif
 import Data.Typeable
 import Data.Maybe
 import Control.Monad
-
 
 ------------------------------------------------------------------------------
 --
