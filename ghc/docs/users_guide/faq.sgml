@@ -324,9 +324,8 @@ details.</para>
     </varlistentry>
 
     <varlistentry> 
-
       <term>If I explicitely set the buffering on a Handle to
-      "NoBuffering" I'm not able to > enter EOF by typing
+      "NoBuffering" I'm not able to enter EOF by typing
       "Ctrl-D".</term>
 
       <listitem>
@@ -402,6 +401,21 @@ details.</para>
 	is that the record design space is large, and seems to lack
 	local optima.  And all reasonable variants break backward
 	compatibility.  As a result, nothing much happens.</para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>Why do I get errors about missing include files when
+      compiling with <option>-O</option> or
+      <option>-prof</option>?</term>
+
+      <listitem>
+	<para>Certain options, such as <option>-O</option>, turn on
+	via-C compilation, instead of using the native code generator.
+	Include files named by <option>-&num;include</option> options
+	or in <literal>foreign import</literal> declarations are only
+	used in via-C compilation mode.  See <xref
+	linkend="finding-header-files"> for more details.</para>
       </listitem>
     </varlistentry>
 
