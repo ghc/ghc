@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.137 2002/07/17 09:21:49 simonmar Exp $
+ * $Id: GC.c,v 1.138 2002/08/16 13:29:06 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -81,8 +81,8 @@
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
  */
-StgClosure* static_objects;	      // live static objects
-StgClosure* scavenged_static_objects; // static objects scavenged so far
+static StgClosure* static_objects;      // live static objects
+StgClosure* scavenged_static_objects;   // static objects scavenged so far
 
 /* N is the oldest generation being collected, where the generations
  * are numbered starting at 0.  A major GC (indicated by the major_gc
@@ -120,16 +120,16 @@ static rtsBool failed_to_evac;
 
 /* Old to-space (used for two-space collector only)
  */
-bdescr *old_to_blocks;
+static bdescr *old_to_blocks;
 
 /* Data used for allocation area sizing.
  */
-lnat new_blocks;		// blocks allocated during this GC 
-lnat g0s0_pcnt_kept = 30;	// percentage of g0s0 live at last minor GC 
+static lnat new_blocks;		 // blocks allocated during this GC 
+static lnat g0s0_pcnt_kept = 30; // percentage of g0s0 live at last minor GC 
 
 /* Used to avoid long recursion due to selector thunks
  */
-lnat thunk_selector_depth = 0;
+static lnat thunk_selector_depth = 0;
 #define MAX_THUNK_SELECTOR_DEPTH 256
 
 /* -----------------------------------------------------------------------------
@@ -1469,8 +1469,8 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
    Evacuate a large object
 
    This just consists of removing the object from the (doubly-linked)
-   large_alloc_list, and linking it on to the (singly-linked)
-   new_large_objects list, from where it will be scavenged later.
+   step->large_objects list, and linking it on to the (singly-linked)
+   step->new_large_objects list, from where it will be scavenged later.
 
    Convention: bd->flags has BF_EVACUATED set for a large object
    that has been evacuated, or unset otherwise.

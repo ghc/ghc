@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.65 2002/07/17 09:21:50 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.66 2002/08/16 13:29:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -226,7 +226,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
  */
 #define INIT_STACK_BLOCKS  4
 F_ *init_stack = NULL;
-nat init_sp = 0;
 
 static void
 initModules ( void (*init_root)(void) )
@@ -237,6 +236,7 @@ initModules ( void (*init_root)(void) )
 #else
 #define cap MainCapability
 #endif
+    nat init_sp;
 
     init_sp = 0;
     bd = allocGroup(INIT_STACK_BLOCKS);

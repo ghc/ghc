@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.37 2002/07/18 09:12:34 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.38 2002/08/16 13:29:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -95,8 +95,8 @@ typedef struct {
     int       drag_total;
 } Census;
 
-Census *censuses = NULL;
-nat n_censuses = 0;
+static Census *censuses = NULL;
+static nat n_censuses = 0;
 
 #ifdef PROFILING
 static void aggregateCensusInfo( void );

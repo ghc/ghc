@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.30 2002/07/17 09:21:49 simonmar Exp $
+ * $Id: Itimer.c,v 1.31 2002/08/16 13:29:06 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -47,10 +47,10 @@
 # include <signal.h>
 #endif
 
-lnat total_ticks = 0;
+static lnat total_ticks = 0;
 
 /* ticks left before next pre-emptive context switch */
-int ticks_to_ctxt_switch = 0;
+static int ticks_to_ctxt_switch = 0;
 
 /* -----------------------------------------------------------------------------
    Tick handler

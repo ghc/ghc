@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.21 2002/04/24 13:29:01 simonmar Exp $
+ * $Id: Stable.c,v 1.22 2002/08/16 13:29:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -88,9 +88,9 @@
 */
 
 snEntry *stable_ptr_table;
-snEntry *stable_ptr_free;
+static snEntry *stable_ptr_free;
 
-unsigned int SPT_size;
+static unsigned int SPT_size;
 
 /* This hash table maps Haskell objects to stable names, so that every
  * call to lookupStableName on a given object will return the same
@@ -125,7 +125,7 @@ unsigned int SPT_size;
  * to the weight stored in the table entry.
  * */
 
-HashTable *addrToStableHash;
+static HashTable *addrToStableHash;
 
 #define INIT_SPT_SIZE 64
 

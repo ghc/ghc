@@ -4,7 +4,7 @@
 
 #include <stdlib.h>
 
-HashTable * threadLabels = NULL;
+static HashTable * threadLabels = NULL;
 
 void
 initThreadLabelTable(void)

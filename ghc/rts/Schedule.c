@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.151 2002/07/25 18:36:59 sof Exp $
+ * $Id: Schedule.c,v 1.152 2002/08/16 13:29:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -133,7 +133,7 @@
 /* Main thread queue.
  * Locks required: sched_mutex.
  */
-StgMainThread *main_threads;
+StgMainThread *main_threads = NULL;
 
 /* Thread queues.
  * Locks required: sched_mutex.
@@ -160,16 +160,18 @@ StgTSO *ccalling_threadss[MAX_PROC];
 
 #else /* !GRAN */
 
-StgTSO *run_queue_hd, *run_queue_tl;
-StgTSO *blocked_queue_hd, *blocked_queue_tl;
-StgTSO *sleeping_queue;		/* perhaps replace with a hash table? */
+StgTSO *run_queue_hd = NULL;
+StgTSO *run_queue_tl = NULL;
+StgTSO *blocked_queue_hd = NULL;
+StgTSO *blocked_queue_tl = NULL;
+StgTSO *sleeping_queue = NULL;    /* perhaps replace with a hash table? */
 
 #endif
 
 /* Linked list of all threads.
  * Used for detecting garbage collected threads.
  */
-StgTSO *all_threads;
+StgTSO *all_threads = NULL;
 
 /* When a thread performs a safe C call (_ccall_GC, using old
  * terminology), it gets put on the suspended_ccalling_threads
@@ -186,17 +188,17 @@ static StgTSO *threadStackOverflow(StgTSO *tso);
 
 /* flag set by signal handler to precipitate a context switch */
 //@cindex context_switch
-nat context_switch;
+nat context_switch = 0;
 
 /* if this flag is set as well, give up execution */
 //@cindex interrupted
-rtsBool interrupted;
+rtsBool interrupted = rtsFalse;
 
 /* Next thread ID to allocate.
  * Locks required: thread_id_mutex
  */
 //@cindex next_thread_id
-StgThreadID next_thread_id = 1;
+static StgThreadID next_thread_id = 1;
 
 /*
  * Pointers to the state of the current thread.
@@ -227,7 +229,7 @@ StgTSO *CurrentTSO;
  */
 StgTSO dummy_tso;
 
-rtsBool ready_to_gc;
+static rtsBool ready_to_gc;
 
 /*
  * Set to TRUE when entering a shutdown state (via shutdownHaskellAndExit()) --
@@ -275,20 +277,12 @@ rtsBool emitSchedule = rtsTrue;
 #endif
 
 #if DEBUG
-char *whatNext_strs[] = {
+static char *whatNext_strs[] = {
   "ThreadEnterGHC",
   "ThreadRunGHC",
   "ThreadEnterInterp",
   "ThreadKilled",
   "ThreadComplete"
-};
-
-char *threadReturnCode_strs[] = {
-  "HeapOverflow",			/* might also be StackOverflow */
-  "StackOverflow",
-  "ThreadYielding",
-  "ThreadBlocked",
-  "ThreadFinished"
 };
 #endif
 
@@ -2493,7 +2487,7 @@ GetRoots(evac_fn evac)
    This needs to be protected by the GC condition variable above.  KH.
    -------------------------------------------------------------------------- */
 
-void (*extra_roots)(evac_fn);
+static void (*extra_roots)(evac_fn);
 
 void
 performGC(void)
@@ -3279,6 +3273,8 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
     nat i;
     StgAP_UPD * ap;
 
+    ASSERT((P_)su > (P_)sp);
+    
     /* If we find a CATCH_FRAME, and we've got an exception to raise,
      * then build the THUNK raise(exception), and leave it on
      * top of the CATCH_FRAME ready to enter.
@@ -3325,8 +3321,6 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
      * fun field.
      */
     ap = (StgAP_UPD *)allocate(AP_sizeW(words));
-    
-    ASSERT(words >= 0);
     
     ap->n_args = words;
     ap->fun    = (StgClosure *)sp[0];

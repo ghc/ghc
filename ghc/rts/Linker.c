@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.100 2002/07/18 06:05:29 sof Exp $
+ * $Id: Linker.c,v 1.101 2002/08/16 13:29:06 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -71,7 +71,7 @@
 #endif
 
 /* Hash table mapping symbol names to Symbol */
-/*Str*/HashTable *symhash;
+static /*Str*/HashTable *symhash;
 
 #if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );

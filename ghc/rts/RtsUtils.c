@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.26 2002/07/17 09:21:50 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.27 2002/08/16 13:29:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -188,7 +188,7 @@ nat stg_strlen(char *s)
    ToDo: put this somewhere sensible.
    -------------------------------------------------------------------------  */
 
-I_ __GenSymCounter = 0;
+static I_ __GenSymCounter = 0;
 
 I_
 genSymZh(void)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.12 2001/12/20 16:12:09 sewardj Exp $
+ * $Id: Stable.h,v 1.13 2002/08/16 13:29:05 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -38,9 +38,6 @@ typedef struct {
 } snEntry;
 
 extern DLL_IMPORT_RTS snEntry *stable_ptr_table;
-extern DLL_IMPORT_RTS snEntry *stable_ptr_free;
-
-extern DLL_IMPORT_RTS unsigned int SPT_size;
 
 extern void freeStablePtr(StgStablePtr sp);
 

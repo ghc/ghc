@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.44 2002/02/06 01:21:40 sof Exp $
+ * $Id: Stats.c,v 1.45 2002/08/16 13:29:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -111,9 +111,9 @@ static TICK_TYPE HCe_start_time, HCe_tot_time = 0;   // heap census prof elap ti
 #define PROF_VAL(x)   0
 #endif
 
-lnat MaxResidency = 0;     /* in words; for stats only */
-lnat AvgResidency = 0;
-lnat ResidencySamples = 0; /* for stats only */
+static lnat MaxResidency = 0;     // in words; for stats only
+static lnat AvgResidency = 0;
+static lnat ResidencySamples = 0; // for stats only
 
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
