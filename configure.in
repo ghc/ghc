@@ -629,6 +629,13 @@ fi
 AC_SUBST(CompressCmd)
 AC_SUBST(CompressSuffix)
 
+AC_ARG_ENABLE(src-tree-happy,
+[  --enable-src-tree-happy
+        Build and use source tree (fptools/happy) version of happy.
+],
+[UseSrcTreeHappy=YES],
+[UseSrcTreeHappy=NO]
+)
 dnl ** check for installed happy binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if test "$BootingFromHc" = "NO"; then
