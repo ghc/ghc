@@ -17,7 +17,7 @@ module InstEnv (
 #include "HsVersions.h"
 
 import Class		( Class, classTvsFds )
-import Var		( Id )
+import Var		( Id, isTcTyVar )
 import VarSet
 import Type		( TvSubst )
 import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
@@ -332,8 +332,8 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 	        Just _   -> find rest ms (dfun_id:us)
 	        Nothing  -> find rest ms us
 
-    bind_fn tv | isExistentialTyVar tv = Skolem
-	       | otherwise	       = BindMe
+    bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
+	       | otherwise	 		       = BindMe
 	-- The key_tys can contain skolem constants, and we can guarantee that those
 	-- are never going to be instantiated to anything, so we should not involve
 	-- them in the unification test.  Example:
