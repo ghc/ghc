@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.20 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelList.lhs,v 1.21 2000/08/29 16:35:56 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -129,6 +129,15 @@ filterFB c p x r | p x       = x `c` r
 "filterFB"	forall c p q.	filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
 "filterList" 	forall p.	foldr (filterFB (:) p) [] = filterList p
  #-}
+
+-- Note the filterFB rule, which has p and q the "wrong way round" in the RHS.
+--     filterFB (filterFB c p) q a b
+--   = if q a then filterFB c p a b else b
+--   = if q a then (if p a then c a b else b) else b
+--   = if q a && p a then c a b else b
+--   = filterFB c (\x -> q x && p x) a b
+-- I originally wrote (\x -> p x && q x), which is wrong, and actually
+-- gave rise to a live bug report.  SLPJ.
 
 filterList :: (a -> Bool) -> [a] -> [a]
 filterList _pred []    = []
