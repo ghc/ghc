@@ -21,7 +21,8 @@ import Literal		( Literal(..) )
 import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
-import DataCon		( DataCon, dataConTag, fIRST_TAG )
+import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon )
+import TyCon		( tyConFamilySize )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
@@ -68,6 +69,7 @@ data BCInstr
    = ARGCHECK  Int
    | PUSH_L    Int{-offset-}
    | PUSH_G    Name
+   | PUSH_AS   Name
    | PUSHT_I   Int
    | PUSHT_F   Float
    | PUSHT_D   Double
@@ -78,7 +80,10 @@ data BCInstr
    -- To do with the heap
    | ALLOC     Int
    | MKAP      Int{-place ptr to heap this far down stack-} Int{-# words-}
-   | UNPACK    Int
+   | UNPACK    Int	-- unpack N ptr words from t.o.s Constr
+   | UNPACK_I  Int	-- unpack and tag an Int, from t.o.s Constr @ offset
+   | UNPACK_F  Int	-- unpack and tag a Float, from t.o.s Constr @ offset
+   | UNPACK_D  Int	-- unpack and tag a Double, from t.o.s Constr @ offset
    | PACK      DataCon Int
    -- For doing case trees
    | LABEL     LocalLabel
@@ -98,12 +103,26 @@ instance Outputable BCInstr where
    ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
    ppr (PUSH_L offset)       = text "PUSH_L  " <+> int offset
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
+   ppr (PUSH_AS nm)          = text "PUSH_AS " <+> ppr nm
    ppr (PUSHT_I i)           = text "PUSHT_I " <+> int i
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
    ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
+   ppr (UNPACK_I sz)         = text "UNPACK_I" <+> int sz
+   ppr (UNPACK_F sz)         = text "UNPACK_F" <+> int sz
+   ppr (UNPACK_D sz)         = text "UNPACK_D" <+> int sz
    ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
+   ppr (LABEL     lab)       = text "__"       <> int lab <> colon
+   ppr (TESTLT_I  i lab)     = text "TESTLT_I" <+> int i <+> text "__" <> int lab
+   ppr (TESTEQ_I  i lab)     = text "TESTEQ_I" <+> int i <+> text "__" <> int lab
+   ppr (TESTLT_F  f lab)     = text "TESTLT_F" <+> float f <+> text "__" <> int lab
+   ppr (TESTEQ_F  f lab)     = text "TESTEQ_F" <+> float f <+> text "__" <> int lab
+   ppr (TESTLT_D  d lab)     = text "TESTLT_D" <+> double d <+> text "__" <> int lab
+   ppr (TESTEQ_D  d lab)     = text "TESTEQ_D" <+> double d <+> text "__" <> int lab
+   ppr (TESTLT_P  i lab)     = text "TESTLT_P" <+> int i <+> text "__" <> int lab
+   ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> int i <+> text "__" <> int lab
+   ppr CASEFAIL              = text "CASEFAIL"
    ppr ENTER                 = text "ENTER"
 
 pprAltCode discrs_n_codes
@@ -241,29 +260,39 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
                 other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
 
         -- given an alt, return a discr and code for it.
-        codeAlt alt@(discr, binds, rhs)
+        codeAlt alt@(discr, binds_f, rhs)
            | isAlgCase 
-           = let binds_szsw = map untaggedIdSizeW binds
-                 binds_szw  = sum binds_szsw
-                 p'' = addListToFM p' (zip binds (mkStackOffsets d' binds_szsw))
-                 d'' = d' + binds_szw
+           = let binds_r      = reverse binds_f
+                 binds_r_szsw = map untaggedIdSizeW binds_r
+                 binds_szw    = sum binds_r_szsw
+                 p''          = addListToFM 
+                                   p' (zip binds_r (mkStackOffsets d' binds_r_szsw))
+                 d''          = d' + binds_szw
+                 unpack_code  = mkUnpackCode 0 (map (typePrimRep.idType) binds_f)
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
-                returnBc (my_discr alt, UNPACK binds_szw `consOL` rhs_code)
+                returnBc (my_discr alt, unpack_code `appOL` rhs_code)
            | otherwise 
-           = ASSERT(null binds) 
+           = ASSERT(null binds_f) 
              schemeE d' s p' rhs	`thenBc` \ rhs_code ->
              returnBc (my_discr alt, rhs_code)
 
         my_discr (DEFAULT, binds, rhs)  = NoDiscr
-        my_discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc - fIRST_TAG)
+        my_discr (DataAlt dc, binds, rhs) = DiscrP (dataConTag dc)
         my_discr (LitAlt l, binds, rhs)
            = case l of MachInt i     -> DiscrI (fromInteger i)
                        MachFloat r   -> DiscrF (fromRational r)
                        MachDouble r  -> DiscrD (fromRational r)
 
+        maybe_ncons 
+           | not isAlgCase = Nothing
+           | otherwise 
+           = case [dc | (DataAlt dc, _, _) <- alts] of
+                []     -> Nothing
+                (dc:_) -> Just (tyConFamilySize (dataConTyCon dc))
+
      in 
      mapBc codeAlt alts 				`thenBc` \ alt_stuff ->
-     mkMultiBranch alt_stuff				`thenBc` \ alt_final ->
+     mkMultiBranch maybe_ncons alt_stuff		`thenBc` \ alt_final ->
      let 
          alt_bco_name = getName bndr
          alt_bco      = ProtoBCO alt_bco_name alt_final (Left alts)
@@ -272,7 +301,15 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
 
      emitBc alt_bco 					`thenBc_`
-     returnBc (PUSH_G alt_bco_name `consOL` scrut_code)
+     returnBc (PUSH_AS alt_bco_name `consOL` scrut_code)
+
+
+schemeE d s p (fvs, AnnNote note body)
+   = schemeE d s p body
+
+schemeE d s p other
+   = pprPanic "ByteCodeGen.schemeE: unhandled case" 
+               (pprCoreExpr (deAnnotate other))
 
 
 -- Compile code to do a tail call.  Doesn't need to be monadic.
@@ -283,23 +320,27 @@ schemeT :: Bool 	-- do tagging?
         -> BCEnv 	-- stack env
         -> AnnExpr Id VarSet -> BCInstrList
 
-schemeT enTag d s narg_words p (_, AnnApp f a) 
-   = let (push, arg_words) = pushAtom enTag d p (snd a)
-     in arg_words `seq`
-        push 
-        `appOL` schemeT enTag (d+arg_words) s (narg_words+arg_words) p f
+schemeT enTag d s narg_words p (_, AnnApp f a)
+   = case snd a of
+        AnnType _ -> schemeT enTag d s narg_words p f
+        other
+           -> let (push, arg_words) = pushAtom enTag d p (snd a)
+              in push 
+                 `appOL` schemeT enTag (d+arg_words) s (narg_words+arg_words) p f
 
 schemeT enTag d s narg_words p (_, AnnVar f)
    | Just con <- isDataConId_maybe f
    = ASSERT(enTag == False)
-     PACK con narg_words `consOL` SLIDE 1 (d-s-1) `consOL` unitOL ENTER
+     PACK con narg_words `consOL` (mkSLIDE 1 (d-s-1) `snocOL` ENTER)
    | otherwise
    = ASSERT(enTag == True)
      let (push, arg_words) = pushAtom True d p (AnnVar f)
-     in arg_words `seq`
-        push 
-        `snocOL` SLIDE (narg_words+arg_words) (d - s - narg_words)
-        `snocOL` ENTER
+     in  push 
+         `appOL`  mkSLIDE (narg_words+arg_words) (d - s - narg_words)
+         `snocOL` ENTER
+
+mkSLIDE n d 
+   = if d == 0 then nilOL else unitOL (SLIDE n d)
 
 should_args_be_tagged (_, AnnVar v)
    = case isDataConId_maybe v of
@@ -308,6 +349,26 @@ should_args_be_tagged (_, AnnApp f a)
    = should_args_be_tagged f
 should_args_be_tagged (_, other)
    = panic "should_args_be_tagged: tail call to non-con, non-var"
+
+
+-- Make code to unpack a constructor onto the stack, adding
+-- tags for the unboxed bits.  Takes the PrimReps of the constructor's
+-- arguments, and a travelling offset along the *constructor*.
+mkUnpackCode :: Int -> [PrimRep] -> BCInstrList
+mkUnpackCode off [] = nilOL
+mkUnpackCode off (r:rs)
+   | isFollowableRep r
+   = let (rs_ptr, rs_nptr) = span isFollowableRep (r:rs)
+         ptrs_szw = sum (map untaggedSizeW rs_ptr) 
+     in  ASSERT(ptrs_szw == length rs_ptr)
+         UNPACK ptrs_szw `consOL` mkUnpackCode (off+ptrs_szw) rs_nptr
+   | otherwise
+   = case r of
+        IntRep    -> UNPACK_I off `consOL` theRest
+        FloatRep  -> UNPACK_F off `consOL` theRest
+        DoubleRep -> UNPACK_D off `consOL` theRest
+     where
+        theRest = mkUnpackCode (off+untaggedSizeW r) rs
 
 -- Push an atom onto the stack, returning suitable code & number of
 -- stack words used.  Pushes it either tagged or untagged, since 
@@ -330,7 +391,8 @@ should_args_be_tagged (_, other)
 -- numbered stack slot for it.  For example, if the stack has depth 4 
 -- and we tagged-ly push (v :: Int#) on it, the value will be in stack[4],
 -- the tag in stack[5], the stack will have depth 6, and p must map v to
--- 5 and not to 4.
+-- 5 and not to 4.  Stack locations are numbered from zero, so a depth
+-- 6 stack has valid words 0 .. 5.
 
 pushAtom tagged d p (AnnVar v) 
    = let str = "\npushAtom " ++ showSDocDebug (ppr v) ++ ", depth = " ++ show d
@@ -366,12 +428,20 @@ pushAtom False d p (AnnLit lit)
         MachFloat r  -> (unitOL (PUSHU_F (fromRational r)), untaggedSizeW FloatRep)
         MachDouble r -> (unitOL (PUSHU_D (fromRational r)), untaggedSizeW DoubleRep)
 
+pushAtom tagged d p other
+   = pprPanic "ByteCodeGen.pushAtom" 
+              (pprCoreExpr (deAnnotate (undefined, other)))
+
 
 -- Given a bunch of alts code and their discrs, do the donkey work
 -- of making a multiway branch using a switch tree.
 -- What a load of hassle!
-mkMultiBranch :: [(Discr, BCInstrList)] -> BcM BCInstrList
-mkMultiBranch raw_ways
+mkMultiBranch :: Maybe Int	-- # datacons in tycon, if alg alt
+				-- a hint; generates better code
+				-- Nothing is always safe
+              -> [(Discr, BCInstrList)] 
+              -> BcM BCInstrList
+mkMultiBranch maybe_ncons raw_ways
    = let d_way     = filter (isNoDiscr.fst) raw_ways
          notd_ways = naturalMergeSortLe 
                         (\w1 w2 -> leAlt (fst w1) (fst w2))
@@ -428,9 +498,14 @@ mkMultiBranch raw_ways
                             DiscrD maxD );
               DiscrP _ -> ( \(DiscrP i) fail_label -> TESTLT_P i fail_label,
                             \(DiscrP i) fail_label -> TESTEQ_P i fail_label,
-                            DiscrP minBound,
-                            DiscrP maxBound )
+                            DiscrP algMinBound,
+                            DiscrP algMaxBound )
               }
+
+         (algMinBound, algMaxBound)
+            = case maybe_ncons of
+                 Just n  -> (fIRST_TAG, fIRST_TAG + n - 1)
+                 Nothing -> (minBound, maxBound)
 
          (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
          (DiscrF f1) `eqAlt` (DiscrF f2) = f1 == f2
@@ -816,6 +891,7 @@ mkALit a
 i_ARGCHECK = (bci_ARGCHECK :: Int)
 i_PUSH_L   = (bci_PUSH_L   :: Int)
 i_PUSH_G   = (bci_PUSH_G   :: Int)
+i_PUSH_AS  = (bci_PUSH_AS  :: Int)
 i_PUSHT_I  = (bci_PUSHT_I  :: Int)
 i_PUSHT_F  = (bci_PUSHT_F  :: Int)
 i_PUSHT_D  = (bci_PUSHT_D  :: Int)
