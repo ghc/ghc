@@ -856,6 +856,9 @@ primOpStrictness :: PrimOp -> ([Demand], Bool)
 	-- Use only the ones you ned.
 
 primOpStrictness SeqOp            = ([wwLazy], False)
+primOpStrictness ParOp            = ([wwLazy], False)
+primOpStrictness ForkOp		  = ([wwLazy, wwPrim], False)
+
 primOpStrictness NewArrayOp       = ([wwPrim, wwLazy, wwPrim], False)
 primOpStrictness WriteArrayOp     = ([wwPrim, wwPrim, wwLazy, wwPrim], False)
 
