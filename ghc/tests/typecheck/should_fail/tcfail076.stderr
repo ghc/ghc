@@ -4,9 +4,10 @@ tcfail076.hs:18:
 	Quantified type variable `res' escapes
 	It is mentioned in the environment
 	The following variables in the environment mention `res'
-	    cont :: a -> m res
-    In an expression with expected type:
-	forall res1. (a1 -> m1 res1) -> m1 res1
+	  cont :: a -> m res
+    Signature type:     forall res. (a1 -> m1 res) -> m1 res
+    Type to generalise: (b -> m res) -> m res
+    When checking an expression type signature
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
     In the right-hand side of a lambda abstraction:
 	KContT (\ cont' -> cont a)

@@ -1,56 +1,65 @@
 
-tcfail068.hs:13:
+tcfail068.hs:12:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
-	It unifies with `s1', which is mentioned in the environment
-	The following variables in the environment mention `s1'
-    In an expression with expected type: forall s2. ST s2 a
-    In the first argument of `runST', namely `(newArray ((1, 1), n) x)'
-    In the right-hand side of an equation for `itgen':
-	runST (newArray ((1, 1), n) x)
-
-tcfail068.hs:18:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `s' escapes
-	It unifies with `s1', which is mentioned in the environment
-	The following variables in the environment mention `s1'
-	    arr :: IndTree s1 a
-    In an expression with expected type: forall s2. ST s2 a1
+	It is reachable from the type variable(s) `a'
+	  which is free in the signature
+    Signature type:     forall s. ST s a
+    Type to generalise: ST s1 (STArray s1 (Int, Int) a1)
+    When checking an expression type signature
     In the first argument of `runST', namely
-	`((readArray arr i)
-	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
-    In the right-hand side of an equation for `itiap':
-	runST ((readArray arr i)
-	       >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))
+	`(newSTArray ((1, 1), n) x)'
+    In the right-hand side of an equation for `itgen':
+	runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:24:
+tcfail068.hs:17:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
 	The following variables in the environment mention `s1'
-	    arr :: IndTree s1 a
-	    itrapsnd :: Int -> Int -> ST s1 (MutableArray s1 (Int, Int) a)
-	    itrap' :: Int -> Int -> ST s1 (MutableArray s1 (Int, Int) a)
-    In an expression with expected type: forall s2. ST s2 a1
+	  arr :: IndTree s1 a
+    Signature type:     forall s. ST s a1
+    Type to generalise: ST s1 (STArray s1 (Int, Int) a)
+    When checking an expression type signature
+    In the first argument of `runST', namely
+	`((readSTArray arr i)
+	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
+    In the right-hand side of an equation for `itiap':
+	runST ((readSTArray arr i)
+	       >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
+
+tcfail068.hs:23:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	  itrap' :: Int -> Int -> ST s1 (STArray s1 (Int, Int) a)
+	  itrapsnd :: Int -> Int -> ST s1 (STArray s1 (Int, Int) a)
+	  arr :: IndTree s1 a
+    Signature type:     forall s. ST s a1
+    Type to generalise: ST s1 (STArray s1 (Int, Int) a)
+    When checking an expression type signature
     In the first argument of `runST', namely `(itrap' i k)'
     In the right-hand side of an equation for `itrap':
 	runST (itrap' i k)
 
-tcfail068.hs:36:
+tcfail068.hs:35:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
 	It unifies with `s1', which is mentioned in the environment
 	The following variables in the environment mention `s1'
-	    arr :: IndTree s1 b
-	    itrapstatesnd :: Int
-			     -> Int
-			     -> c
-			     -> ST s1 (c, MutableArray s1 (Int, Int) b)
-	    itrapstate' :: Int
+	  itrapstate' :: Int
+			 -> Int
+			 -> c
+			 -> ST s1 (c, STArray s1 (Int, Int) b)
+	  itrapstatesnd :: Int
 			   -> Int
 			   -> c
-			   -> ST s1 (c, MutableArray s1 (Int, Int) b)
-    In an expression with expected type: forall s2. ST s2 a
+			   -> ST s1 (c, STArray s1 (Int, Int) b)
+	  arr :: IndTree s1 b
+    Signature type:     forall s. ST s a
+    Type to generalise: ST s1 (c, IndTree s1 b)
+    When checking an expression type signature
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the right-hand side of an equation for `itrapstate':
 	runST (itrapstate' i k s)

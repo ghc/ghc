@@ -4,9 +4,10 @@ tcfail032.hs:14:
 	Quantified type variable `a' escapes
 	It is mentioned in the environment
 	The following variables in the environment mention `a'
-	    x :: a -> Int
-    In an expression with expected type:
-	forall a1. (Eq a1) => a1 -> Int
+	  x :: a -> Int
+    Signature type:     forall a. (Eq a) => a -> Int
+    Type to generalise: a -> Int
+    When checking an expression type signature
     In an expression with a type signature:
 	  x :: forall a. (Eq a) => a -> Int
 
