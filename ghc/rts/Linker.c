@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.46 2001/06/27 13:56:01 sewardj Exp $
+ * $Id: Linker.c,v 1.47 2001/06/28 14:26:58 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -84,6 +84,38 @@ typedef struct _RtsSymbolVal {
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                  \
+      SymX(inet_ntoa)                           \
+      SymX(inet_addr)                           \
+      SymX(htonl)                               \
+      SymX(recvfrom)                            \
+      SymX(listen)                              \
+      SymX(bind)                                \
+      SymX(shutdown)                            \
+      SymX(connect)                             \
+      SymX(htons)                               \
+      SymX(ntohs)                               \
+      SymX(getservbyname)                       \
+      SymX(getservbyport)                       \
+      SymX(getprotobynumber)                    \
+      SymX(getprotobyname)                      \
+      SymX(gethostbyname)                       \
+      SymX(gethostbyaddr)                       \
+      SymX(gethostname)                         \
+      SymX(strcpy)                              \
+      SymX(strncpy)                             \
+      SymX(abort)                               \
+      Sym(_alloca)                              \
+      Sym(isxdigit)                             \
+      Sym(isupper)                              \
+      Sym(ispunct)                              \
+      Sym(islower)                              \
+      Sym(isspace)                              \
+      Sym(isprint)                              \
+      Sym(isdigit)                              \
+      Sym(iscntrl)                              \
+      Sym(isalpha)                              \
+      Sym(isalnum)                              \
+      SymX(strcmp)                              \
       SymX(memmove)                             \
       SymX(realloc)                             \
       SymX(malloc)                              \
