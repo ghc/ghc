@@ -27,7 +27,7 @@ compilationUnit :: CompilationUnit -> SDoc
 compilationUnit (Package n ds) = package n (decls ds)
 
 package = \n -> \ds ->
-  text "package" <+> name n <> text ";"
+  text "package" <+> packagename n <> text ";"
   $$
   ds
   
@@ -36,13 +36,13 @@ decls (d:ds) = decl d $$ decls ds
     
 decl = \d ->
   case d of
-    { Import n -> importDecl (name n)
-    ; Field mfs t n e -> field (modifiers mfs) (typ t) (name n) e  
-    ; Constructor mfs n as ss -> constructor (modifiers mfs) (name n) (parameters as) (statements ss)
-    ; Method mfs t n as ts ss -> method (modifiers mfs) (typ t) (name n) (parameters as) (throws ts) (statements ss)
+    { Import n -> importDecl (packagename n)
+    ; Field mfs n e -> field (modifiers mfs) (nameTy n) (name n) e  
+    ; Constructor mfs n as ss -> constructor (modifiers mfs) (typename n) (parameters as) (statements ss)
+    ; Method mfs n as ts ss -> method (modifiers mfs) (nameTy n) (name n) (parameters as) (throws ts) (statements ss)
     ; Comment s -> comment s
-    ; Interface mfs n is ms -> interface (modifiers mfs) (name n) (extends is) (decls ms)
-    ; Class mfs n x is ms -> clazz (modifiers mfs) (name n) (extends x) (implements is) (decls ms)
+    ; Interface mfs n is ms -> interface (modifiers mfs) (typename n) (extends is) (decls ms)
+    ; Class mfs n x is ms -> clazz (modifiers mfs) (typename n) (extends x) (implements is) (decls ms)
     }
 
 importDecl n = text "import" <+> n <> text ";"
@@ -91,22 +91,27 @@ modifiers mfs = hsep (map modifier mfs)
 modifier mf = text $ map toLower (show mf)
   
 extends [] = empty
-extends xs = text "extends" <+> hsep (punctuate comma (map name xs))
+extends xs = text "extends" <+> hsep (punctuate comma (map typename xs))
 
 implements [] = empty
-implements xs = text "implements" <+> hsep (punctuate comma (map name xs))
+implements xs = text "implements" <+> hsep (punctuate comma (map typename xs))
 
 throws [] = empty
-throws xs = text "throws" <+> hsep (punctuate comma (map name xs))
+throws xs = text "throws" <+> hsep (punctuate comma (map typename xs))
 
-name n = text n
+name (Name n t)   = text n
+
+nameTy (Name n t) = typ t
+
+typename n        = text n
+packagename n     = text n
 
 parameters as = map parameter as
 
-parameter (Parameter mfs t n) = modifiers mfs <+> typ t <+> name n
+parameter (Parameter mfs n) = modifiers mfs <+> nameTy n <+> name n
 
 typ (PrimType s)  = primtype s
-typ (Type n)      = name n
+typ (Type n)      = typename n
 typ (ArrayType t) = typ t <> text "[]"
 
 primtype PrimInt     = text "int"
@@ -116,8 +121,7 @@ primtype PrimLong    = text "long"
 primtype PrimFloat   = text "float"
 primtype PrimDouble  = text "double"
 primtype PrimByte    = text "byte"
-
-
+primtype PrimVoid    = text "void"
 
 statements ss = vcat (map statement ss)
   
@@ -169,8 +173,8 @@ maybeExpr (Just e) = Just (expr e)
            
 expr = \e ->
  case e of
-   { Var n _ -> name n
-   ; Literal l _ -> literal l
+   { Var n -> name n
+   ; Literal l -> literal l
    ; Cast t e -> cast (typ t) e
    ; Access e n -> expr e <> text "." <> name n
    ; Assign l r -> assign (expr l) r

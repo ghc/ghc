@@ -22,21 +22,21 @@ module Java where
 
 \begin{code}
 data CompilationUnit
-  = Package Name [Decl]
+  = Package PackageName [Decl]
     deriving (Show)
     
 data Decl
  = Import PackageName
- | Field [Modifier] Type Name (Maybe Expr)
- | Constructor [Modifier] Name [Parameter] [Statement]
- | Method [Modifier] Type Name [Parameter] [Exception] [Statement]
+ | Field [Modifier] Name (Maybe Expr)
+ | Constructor [Modifier] TypeName [Parameter] [Statement]
+ | Method [Modifier] Name [Parameter] [Exception] [Statement]
  | Comment [String]
- | Interface [Modifier] Name [TypeName] [Decl]
- | Class [Modifier] Name [TypeName] [TypeName] [Decl]
+ | Interface [Modifier] TypeName [TypeName] [Decl]
+ | Class [Modifier] TypeName [TypeName] [TypeName] [Decl]
    deriving (Show)
 
 data Parameter
- = Parameter [Modifier] Type Name
+ = Parameter [Modifier] Name
    deriving (Show)
    
 data Statement
@@ -55,10 +55,10 @@ data Statement
     deriving (Show)
 
 data Expr 
-  = Var Name Type
-  | Literal Lit Type
+  = Var Name
+  | Literal Lit
   | Cast Type Expr
-  | Access Expr Name		-- perhaps: Access Expr Var?
+  | Access Expr Name
   | Assign Expr Expr
   | InstanceOf Expr Type
   | Call Expr Name [Expr]
@@ -90,6 +90,7 @@ data PrimType
   | PrimFloat
   | PrimDouble
   | PrimByte
+  | PrimVoid
     deriving (Show)
 
 type PackageName = String	-- A package name
@@ -101,9 +102,23 @@ type TypeName    = String	-- a fully qualified type name
 				-- like "java.lang.Object".
 				-- has type "Type <the name>"
 
-type Name        = String	-- A class name or method etc, 
+data Name        = Name String Type
+	deriving Show		-- A class name or method etc, 
 				-- at defintion time,
 				-- this generally not a qualified name.
+
+				-- The type is shape of the box require
+				-- to store an access to this thing.
+				-- So variables might be Int or Object.
+
+				-- ** method calls store the returned
+				-- ** type, not a complete.
+				--
+				-- Thinking:
+				-- ... foo1.foo2(...).foo3 ...
+				-- here you want to know the *result*
+				-- after callling foo1, then foo2,
+				-- then foo3.
 
 
 data Lit
@@ -116,13 +131,16 @@ addModifier :: Modifier -> Decl -> Decl
 addModifier = \m -> \d ->
  case d of
    { Import n -> Import n
-   ; Field ms t n e -> Field (m:ms) t n e  
+   ; Field ms n e -> Field (m:ms) n e  
    ; Constructor ms n as ss -> Constructor (m:ms) n as ss
-   ; Method ms t n as ts ss -> Method (m:ms) t n as ts ss
+   ; Method ms n as ts ss -> Method (m:ms) n as ts ss
    ; Comment ss -> Comment ss
    ; Interface ms n xs ds -> Interface (m:ms) n xs ds
    ; Class ms n xs is ds -> Class (m:ms) n xs is ds
    }
+
+changeNameType :: Type -> Name -> Name
+changeNameType ty (Name n _) = Name n ty
    
 areSimple :: [Expr] -> Bool
 areSimple = \es -> all isSimple es
