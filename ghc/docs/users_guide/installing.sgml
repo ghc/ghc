@@ -408,15 +408,6 @@ Profiling with cost-centres.  You probably want this.
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term><Literal>conc</Literal>:</Term>
-<ListItem>
-<Para>
-Concurrent Haskell features.  You may want this.
-<IndexTerm><Primary>concurrent bundles</Primary></IndexTerm>
-<IndexTerm><Primary>bundles, concurrent</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
 <Term><Literal>par</Literal>:</Term>
 <ListItem>
 <Para>
@@ -447,30 +438,12 @@ for implementors.
 <IndexTerm><Primary>ticky-ticky bundles</Primary></IndexTerm>
 </Para>
 </ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>prof-conc</Literal>:</Term>
-<ListItem>
-<Para>
-Cost-centre profiling for Concurrent Haskell.
-<IndexTerm><Primary>bundles, profiled-concurrent</Primary></IndexTerm>
-<IndexTerm><Primary>profiled-concurrent bundles</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term><Literal>prof-ticky</Literal>:</Term>
-<ListItem>
-<Para>
-Ticky-ticky profiling for Concurrent Haskell.
-<IndexTerm><Primary>bundles, profiled-ticky</Primary></IndexTerm>
-<IndexTerm><Primary>ticky-concurrent bundles</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
 </VariableList>
 </Para>
 
 <Para>
-One likely scenario is that you will grab <Emphasis>three</Emphasis> binary
-bundles&mdash;basic, profiling, and concurrent.  We don't usually make the
+One likely scenario is that you will grab <Emphasis>two</Emphasis>
+binary bundles&mdash;basic, and profiling.  We don't usually make the
 rest, although you can build them yourself from a source distribution.
 </Para>
 
