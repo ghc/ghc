@@ -267,6 +267,21 @@ $Lnkr	 	= ''; # "linker" is normally GCC
 $Nm = ($TargetPlatform =~ /^alpha-/) ? 'nm -B' : 'nm';
 \end{code}
 
+Warning packages that are controlled by -W and -Wall.  The 'standard'
+warnings that you get all the time are
+	
+	-fwarn-overlapping-patterns
+	-fwarn-incomplete-patterns
+
+these are turned off by -Wnot.
+
+\begin{code}
+@StandardWarnings = ('-fwarn-overlapping-patterns', 
+		     '-fwarn-incomplete-patterns');
+@MinusWOpts    = (@StandardWarnings, '-fwarn-name-shadowing');
+@MinusWallOpts = @MinusWOpts;
+\end{code}
+
 What options \tr{-user-setup-a} turn into (user-defined ``packages''
 of options).  Note that a particular user-setup implies a particular
 Prelude ({\em including} its interface file(s)).
@@ -545,37 +560,6 @@ $Cc_consist_options  = '';    # we record, in this order:
 
 Now slurp through the arguments.
 \begin{code}
-
-#---------- user defined prelude ---------------------------------------
-
-if (grep(/^-user-prelude$/, @ARGV)) {
-
-    # If ARGV contains -user-prelude we are compiling a piece of 
-    # prelude for the user, probably with additional specialise pragmas
-
-    # We strip out the -O -f and -user-prelude flags provided on
-    # the command line and add the ones used to compile the prelude
-    # ToDo: get these options from a common definition in mkworld
-
-    # We also enable any options forced through with -user-prelude-force
-
-    # Hey, Check out this grep statement ;-)  (PS)
-
-    @ARGV = grep((!/^-O/ && !/^-f/ && !/^-user-prelude$/) || s/^-user-prelude-force//,
-		 @ARGV);
-
-    unshift(@ARGV,
-	'-fcompiling-ghc-internals=???', # ToDo!!!!
-        '-O',
-        '-fshow-pragma-name-errs',
-        '-fshow-import-specs',
-        '-fglasgow-exts',
-        '-genSPECS',
-        '-DUSE_FOLDR_BUILD',
-	'-dcore-lint');
-
-    print STDERR "ghc: -user-prelude options:\n", "@ARGV", "\n";
-}
 
 &initDriverGlobals();
 &splitCmdLine(@ARGV);
@@ -1176,6 +1160,23 @@ sub setupMachOpts {
 } # end of setupMachOpts
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Set up for warnings}
+%*									*
+%************************************************************************
+
+Several warnings are turned on by default.  These are supposed to be
+the 'I'm pretty sure you've made a mistake here' kind of warnings.
+The rest are turned on by the -W and -Wall options, or individually
+via their -fwarn and -fno-warn flags.
+
+\begin{code}
+sub setupWarningFlags {
+&add_Hsc_flags( @StandardWarnings );
+}
+\end{code}
+
 Same unshifting magic, but for special linker flags.
 
 The configure script determines whether the object file symbol tables
@@ -1576,6 +1577,7 @@ Again, we'll do the post-recompilation-checker parts of this later.
     &setupOptimiseFlags();
     &setupMachOpts();
     &setupIncPaths();
+    &setupWarningFlags();
     &setupHeapStackSize();
 
     #
@@ -2836,9 +2838,6 @@ arg: while($_ = $Args[0]) {
     /^-fticky-ticky$/     && do { push(@HsC_flags,$_); next arg; };
     /^-fgransim$/ 	  && do { push(@HsC_flags,$_); next arg; };
 
-    /^-user-prelude-force/	&& do { # ignore if not -user-prelude
-				        next arg; };
-
     /^-split-objs/	&& do {
 			if ( $TargetPlatform !~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|rs6000|sparc)-/ ) {
 			    $SplitObjFiles = 0;
@@ -2948,13 +2947,18 @@ arg: while($_ = $Args[0]) {
     /^-fshow-import-specs/
 		    && do { push(@HsC_flags, $_); next arg; };
 
-    # for now, just -fwarn-name-shadowing
     /^-fwarn-(.*)$/      && do { push(@HsC_flags, $_);   next arg; };
-
-    /^-fno-warn-(.*)$/   && do { push(@HsC_flags, "-fno-warn-$1"); next arg; };
 
     /^-fno-(.*)$/   && do { push(@HsC_antiflags, "-f$1");
 			    &squashHscFlag("-f$1");
+			    next arg; };
+
+    /^-W$/	    && do { push(@HsC_flags, @MinusWOpts); next arg; };
+    /^-Wall$/	    && do { push(@HsC_flags, @MinusWallOpts); next arg; };
+    /^-Wnot$/       && do { foreach (@Hsc_flags) {
+				/^-fwarn-(.*)$/ && do { $_=''; };
+			    };
+			    push(@HsC_antiflags, @StandardWarnings);
 			    next arg; };
 
     # --------------- platform specific flags (for gcc mostly) ----------------
