@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
 
---!!! Rank 2 polymorphism
+-- !!! Rank 2 polymorphism
 -- Both f and g are rejected by Hugs [April 2001]
 
 module Foo  where
