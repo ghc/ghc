@@ -209,7 +209,7 @@ HaveRtldLocal = @HaveRtldLocal@
 
 # Include GHCi in the compiler.  Default to NO for the time being.
 
-ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd netbsd openbsd)" ""
+ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd netbsd openbsd darwin)" ""
 GhcWithInterpreter=YES
 else 
 GhcWithInterpreter=NO
