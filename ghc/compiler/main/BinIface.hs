@@ -248,7 +248,7 @@ instance Binary ModIface where
 	put_ bh (vers_module (mi_version iface))
 	put_ bh (mi_orphan iface)
 	-- no: mi_boot
-	put_ bh (map importVersionNameToOccName (mi_usages iface))
+	lazyPut bh (map importVersionNameToOccName (mi_usages iface))
 	put_ bh (vers_exports (mi_version iface),
 		 map exportItemToRdrExportItem (mi_exports iface))
 	put_ bh (declsToVersionedDecls (dcl_tycl (mi_decls iface))
@@ -260,7 +260,7 @@ instance Binary ModIface where
 	lazyPut bh (vers_rules (mi_version iface), dcl_rules (mi_decls iface))
 	lazyPut bh (deprecsToIfaceDeprecs (mi_deprecs iface))
 
-  -- Read in an a ParsedIface, not a ModIface.  See above.
+  -- Read in as a ParsedIface, not a ModIface.  See above.
   get bh = error "Binary.get: ModIface"
 
 declsToVersionedDecls :: [RenamedTyClDecl] -> NameEnv Version
@@ -323,7 +323,7 @@ instance Binary ParsedIface where
 	put_ bh pkg_name
 	put_ bh module_ver
 	put_ bh orphan
-	put_ bh usages
+	lazyPut bh usages
 	put_ bh exports
         put_ bh tycl_decls
 	put_ bh fixities
@@ -344,13 +344,13 @@ instance Binary ParsedIface where
 	pkg_name    <- get bh
 	module_ver  <- get bh
 	orphan      <- get bh
-	usages	    <- get bh
-	exports	    <- get bh
-        tycl_decls  <- get bh
-	fixities    <- get bh
-	insts       <- get bh
-	rules	    <- lazyGet bh
-	deprecs     <- lazyGet bh
+	usages	    <- {-# SCC "bin_usages" #-} lazyGet bh
+	exports	    <- {-# SCC "bin_exports" #-} get bh
+        tycl_decls  <- {-# SCC "bin_tycldecls" #-} get bh
+	fixities    <- {-# SCC "bin_fixities" #-} get bh
+	insts       <- {-# SCC "bin_insts" #-} get bh
+	rules	    <- {-# SCC "bin_rules" #-} lazyGet bh
+	deprecs     <- {-# SCC "bin_deprecs" #-} lazyGet bh
 	return (ParsedIface {
 		 pi_mod = module_name,
 		 pi_pkg = pkg_name,
