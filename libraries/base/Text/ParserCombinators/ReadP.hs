@@ -1,20 +1,27 @@
-% -------------------------------------------------------------
-% $Id: ReadP.lhs
-%
-% (c) The University of Glasgow, 1994-2000
-%
+{-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Text.ParserCombinators.ReadP
+-- Copyright   :  (c) The University of Glasgow 2002
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 
-\begin{code}
-{-# OPTIONS -fglasgow-exts -fno-implicit-prelude #-}
 module Text.ParserCombinators.ReadP
-  ( ReadP      -- :: * -> *; instance Functor, Monad, MonadPlus
+  ( 
+  -- * The 'ReadP' type
+    ReadP      -- :: * -> *; instance Functor, Monad, MonadPlus
   
-  -- primitive operations
+  -- * Primitive operations
   , get        -- :: ReadP Char
   , look       -- :: ReadP String
   , (+++)      -- :: ReadP a -> ReadP a -> ReadP a
   
-  -- other operations
+  -- * Other operations
   , pfail      -- :: ReadP a
   , satisfy    -- :: (Char -> Bool) -> ReadP Char
   , char       -- :: Char -> ReadP Char
@@ -24,7 +31,7 @@ module Text.ParserCombinators.ReadP
   , skipSpaces -- :: ReadP ()
   , choice     -- :: [ReadP a] -> ReadP a
   
-  -- converting
+  -- * Conversions
   , readP_to_S -- :: ReadP a -> ReadS a
   , readS_to_P -- :: ReadS a -> ReadP a
   )
@@ -33,16 +40,10 @@ module Text.ParserCombinators.ReadP
 import Control.Monad( MonadPlus(..) )
 import GHC.Show( isSpace  )
 import GHC.Base
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- The ReadP type
 
-%*********************************************************
-%*							*
-\subsection{The @ReadP@ type}
-%*							*
-%*********************************************************
-
-\begin{code}
 newtype ReadP a = R (forall b . (a -> P b) -> P b)
 
 data P a
@@ -69,16 +70,10 @@ instance Monad ReadP where
 instance MonadPlus ReadP where
   mzero = pfail
   mplus = (+++)
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- Operations over ReadP
 
-%*********************************************************
-%*							*
-\subsection{Operations over ReadP}
-%*							*
-%*********************************************************
-
-\begin{code}
 get :: ReadP Char
 get = R (\k -> Get k)
 
@@ -105,16 +100,10 @@ run (Look f)     s     = run (f s) s
 run (Result x p) s     = (x,s) : run p s
 run (ReadS r)    s     = r s
 run Fail         _     = []
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- Derived operations
 
-%*********************************************************
-%*							*
-\subsection{Derived operations}
-%*							*
-%*********************************************************
-
-\begin{code}
 pfail :: ReadP a
 pfail = fail ""
 
@@ -155,16 +144,10 @@ skipSpaces =
  where
   skip (c:s) | isSpace c = do get; skip s
   skip _                 = do return ()
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- Converting between ReadP and Read
 
-%*********************************************************
-%*							*
-\subsection{Converting between ReadP and ReadS
-%*							*
-%*********************************************************
-
-\begin{code}
 readP_to_S :: ReadP a -> ReadS a
 readP_to_S (R f) = run (f (\x -> Result x Fail))
 
@@ -173,4 +156,3 @@ readS_to_P r = R (\k -> ReadS (\s -> [ bs''
                                      | (a,s') <- r s
                                      , bs''   <- run (k a) s'
                                      ]))
-\end{code}

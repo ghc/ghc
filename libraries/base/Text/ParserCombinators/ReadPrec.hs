@@ -1,26 +1,30 @@
-% ----------------------------------------------------------------
-% $Id: ReadPrec.lhs
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Text.ParserCombinators.ReadPrec
+-- Copyright   :  (c) The University of Glasgow 2002
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadPrec
   ( ReadPrec      -- :: * -> *; instance Functor, Monad, MonadPlus
   
-  -- precedences
+  -- * Precedences
   , Prec          -- :: *; = Int
   , minPrec       -- :: Prec; = 0
 
-  -- primitive operations
+  -- * Primitive operations
   , lift          -- :: ReadP a -> ReadPrec a
   , prec          -- :: Prec -> ReadPrec a -> ReadPrec a
   , step          -- :: ReadPrec a -> ReadPrec a
   , reset         -- :: ReadPrec a -> ReadPrec a
 
-  -- other operations
+  -- * Other operations
   , get           -- :: ReadPrec Char
   , look          -- :: ReadPrec String
   , (+++)         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
@@ -53,16 +57,10 @@ import qualified Text.ParserCombinators.ReadP as ReadP
 import Control.Monad( MonadPlus(..) )
 import GHC.Num( Num(..) )
 import GHC.Base
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- The readPrec type
 
-%*********************************************************
-%*							*
-\subsection{The readPrec type}
-%*							*
-%*********************************************************
-
-\begin{code}
 newtype ReadPrec a = P { unP :: Prec -> ReadP a }
 
 -- Functor, Monad, MonadPlus
@@ -85,16 +83,10 @@ type Prec = Int
 
 minPrec :: Prec
 minPrec = 0
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- Operations over ReadPrec
 
-%*********************************************************
-%*							*
-\subsection{Operations over ReadPrec
-%*							*
-%*********************************************************
-
-\begin{code}
 lift :: ReadP a -> ReadPrec a
 lift m = P (\_ -> m)
 
@@ -112,15 +104,10 @@ prec :: Prec -> ReadPrec a -> ReadPrec a
 -- 	if not, fails
 --	if so, parses p in context n
 prec n (P f) = P (\c -> if c <= n then f n else ReadP.pfail)
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Derived operations}
-%*							*
-%*********************************************************
+-- ---------------------------------------------------------------------------
+-- Derived operations
 
-\begin{code}
 get :: ReadPrec Char
 get = lift ReadP.get
 
@@ -135,16 +122,10 @@ pfail = lift ReadP.pfail
 
 choice :: [ReadPrec a] -> ReadPrec a
 choice ps = foldr (+++) pfail ps
-\end{code}
 
+-- ---------------------------------------------------------------------------
+-- Converting between ReadPrec and Read
 
-%*********************************************************
-%*							*
-\subsection{Converting between ReadPrec and ReadS
-%*							*
-%*********************************************************
-
-\begin{code}
 -- We define a local version of ReadS here,
 -- because its "real" definition site is in GHC.Read
 type ReadS a = String -> [(a,String)]
@@ -160,4 +141,3 @@ readPrec_to_S (P f) n = readP_to_S (f n)
 
 readS_to_Prec :: (Int -> ReadS a) -> ReadPrec a
 readS_to_Prec f = P (\n -> readS_to_P (f n))
-\end{code}

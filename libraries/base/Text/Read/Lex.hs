@@ -1,11 +1,17 @@
-% ----------------------------------------------------------------
-% $Id: Lex.lhs
-%
-% (c) The University of Glasgow, 1994-2000
-%
-
-\begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Text.Read.Lex
+-- Copyright   :  (c) The University of Glasgow 2002
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- The cut-down Haskell lexer, used by Text.Read
+--
+-----------------------------------------------------------------------------
 
 module Text.Read.Lex
   -- lexing types
@@ -48,15 +54,10 @@ import GHC.Enum( minBound, maxBound )
 import Data.Maybe
 import Data.Either
 import Control.Monad
-\end{code}
 
-%*********************************************************
-%*							*
-\subsection{Lexing types}
-%*							*
-%*********************************************************
+-- -----------------------------------------------------------------------------
+-- Lexing types
 
-\begin{code}
 type LexP = ReadP Lexeme
 
 data Lexeme
@@ -75,16 +76,10 @@ instance Show Lexeme where
   showsPrec _ (Ident s)  = showString s
   showsPrec _ (Symbol s) = showString s
   showsPrec n (Number x) = showsPrec n x
-\end{code}
 
+-- -----------------------------------------------------------------------------
+-- Lexing
 
-%*********************************************************
-%*							*
-\subsection{Lexing}
-%*							*
-%*********************************************************
-
-\begin{code}
 lex :: LexP
 lex =
   do skipSpaces
@@ -94,10 +89,8 @@ lex =
            +++ lexSymbol
              +++ lexIdf
                +++ lexNumber)
-\end{code}
 
-\begin{code}
-------------------------------------------------------------------------
+-- ----------------------------------------------------------------------
 -- symbols
 
 lexSymbol :: LexP
@@ -107,7 +100,7 @@ lexSymbol =
  where
   isSymbolChar c = c `elem` "!@#$%&*+./<=>?\\^|:-~"
 
-------------------------------------------------------------------------
+-- ----------------------------------------------------------------------
 -- identifiers
 
 lexIdf :: LexP
@@ -117,18 +110,9 @@ lexIdf =
      return (Ident (c:s))
  where
   isIdfChar c = isAlphaNum c || c `elem` "_'"
-\end{code}
 
-
-%*********************************************************
-%*							*
-\subsection{Lexing characters and strings}
-%*							*
-%*********************************************************
-
-\begin{code}
-------------------------------------------------------------------------
--- char literal
+-- ---------------------------------------------------------------------------
+-- Lexing character literals
 
 lexLitChar :: LexP
 lexLitChar =
@@ -255,7 +239,8 @@ lexChar =
          , string "DEL" >> return '\DEL'
          ]
 
-------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
 -- string literal
 
 lexString :: LexP
@@ -281,7 +266,7 @@ lexString =
          _ | isSpace c -> do skipSpaces; char '\\'; return ()
          _             -> do pfail
 
-------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
 -- single character lexemes
 
 lexSingle :: LexP
@@ -290,16 +275,10 @@ lexSingle =
      return (Single c)
  where
   isSingleChar c = c `elem` ",;()[]{=}_`"
-\end{code}
 
+-- ---------------------------------------------------------------------------
+--  Lexing numbers
 
-%*********************************************************
-%*							*
-\subsection{Lexing numbers}
-%*							*
-%*********************************************************
-
-\begin{code}
 data Number
   = MkNumber
     { value    :: Either Integer Rational
@@ -445,7 +424,7 @@ valDig 16 c
   | 'A' <= c && c <= 'F' = Just (ord c - ord 'A' + 10)
   | otherwise            = Nothing
 
-------------------------------------------------------------------------
+-- ----------------------------------------------------------------------
 -- conversion
 
 numberToInt :: Number -> Maybe Int
@@ -481,7 +460,7 @@ numberToDouble x =
     Left n  -> Just (fromInteger n)
     Right r -> Just (fromRational r)
 
-------------------------------------------------------------------------
+-- ----------------------------------------------------------------------
 -- other numeric lexing functions
 
 readIntP :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
@@ -499,4 +478,3 @@ readOctP, readDecP, readHexP :: Num a => ReadP a
 readOctP = readIntP' 8
 readDecP = readIntP' 10
 readHexP = readIntP' 16
-\end{code}
