@@ -63,6 +63,42 @@ operation, but there are several things that can be tweaked for
 maximum performance.
 
 <descrip>
+<tag>@-A<size>@:</tag>
+<nidx>-A&lt;size&gt; RTS option</nidx>
+<nidx>allocation area, size</nidx>
+
+[Default: 256k] Set the allocation area size used by the garbage
+collector.  The allocation area (actually generation 0 step 0) is
+fixed and is never resized (unless you use <tt/-H/, below).
+
+Increasing the allocation area size may or may not give better
+performance (a bigger allocation area means worse cache behaviour but
+fewer garbage collections and less promotion).
+
+With only 1 generation (<tt/-G1/) the <tt/-A/ option specifies the
+minimum allocation area, since the actual size of the allocation area
+will be resized according to the amount of data in the heap (see
+<tt/-F/, below).
+
+<tag>@-F<factor>@:</tag>
+<nidx>-F&lt;factor&gt; RTS option</nidx>
+<nidx>heap size, factor</nidx>
+
+[Default: 2] This option controls the amount of memory reserved for
+the older generations (and in the case of a two space collector the
+size of the allocation area) as a factor of the amount of live data.
+For example, if there was 2M of live data in the oldest generation
+when we last collected it, then by default we'll wait until it grows
+to 4M before collecting it again.
+
+The default seems to work well here.  If you have plenty of memory, it
+is usually better to use <tt/-H&lt;size&gt;/ than to increase
+<tt/-F&lt;factor&gt;/.
+
+The <tt/-F/ setting will be automatically reduced by the garbage
+collector when the maximum heap size (the <tt/-M&lt;size&gt;/ setting)
+is approaching.
+
 <tag>@-G<generations>@:</tag>
 <nidx>-G&lt;generations&gt; RTS option</nidx>
 <nidx>generations, number of</nidx>
@@ -76,22 +112,25 @@ collected.
 
 Specifying 1 generation with @+RTS -G1@ gives you a simple 2-space
 collector, as you would expect.  In a 2-space collector, the @-A@
-option (see below) specifies the <em/minimum/ allocation area size,
+option (see above) specifies the <em/minimum/ allocation area size,
 since the allocation area will grow with the amount of live data in
 the heap.  In a multi-generational collector the allocation area is a
-fixed size.
+fixed size (unless you use the <tt/-H/ option, see below).
 
-<tag>@-A<size>@:</tag>
-<nidx>-A&lt;size&gt; RTS option</nidx>
-<nidx>allocation area, size</nidx>
+<tag>@-H<size>@:</tag>
+<nidx>-H&lt;size&gt; RTS option</nidx>
+<nidx>heap size, suggested</nidx>
 
-[Default: 256k] Set the allocation area size used by the garbage
-collector.  The allocation area (actually generation 0 step 0) is
-fixed and is never resized.
+[Default: 0] This option provides a "suggested heap size" for the
+garbage collector.  The garbage collector will use about this much
+memory until the program residency grows and the heap size needs to be
+expanded to retain reasonable performance.
 
-Increasing the allocation area size may or may not give better
-performance (a bigger allocation area means worse cache behaviour but
-fewer garbage collections and less promotion).
+By default, the heap will start small, and grow and shrink as
+necessary.  This can be bad for performance, so if you have plenty of
+memory it's worthwhile supplying a big <tt/-H&lt;size&gt/.  For
+improving GC performance, using <tt/-H&lt;size&gt/ is usually a better
+bet than <tt/-A&lt;size&gt/.
 
 <tag>@-k<size>@:</tag>
 <nidx>-k&lt;size&gt; RTS option</nidx>

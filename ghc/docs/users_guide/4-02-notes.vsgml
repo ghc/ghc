@@ -41,4 +41,16 @@ occur in the source code.
 <item> Two new functions exported from <tt/ST/ (and <tt/LazyST/):
 <tt/unsafeIOToST/ and <tt/stToIO/.
 
+<item> The <tt/+RTS -H&lt;size&gt;/ option is reinstated.  Now it
+means "use about this much memory" (see Section <ref
+id="rts-options-gc" name="RTS options to control the garbage
+collector">).  This option was added mainly so that 4.02 GC times look
+good compared to 3.02 :-).
+
+<item> <tt/finalise/ and <tt/mkWeakNoFinaliser/ operations added to
+<tt/Weak/ library.
+
+<item> Ticky-ticky profiling works again (cost-centre profiling is
+still broken).
+
 </itemize>
