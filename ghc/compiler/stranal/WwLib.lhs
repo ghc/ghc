@@ -17,12 +17,13 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
 import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
-import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
+import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID, eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
 			)
+import Literal		( Literal(MachStr) )
 import BasicTypes	( Arity, Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, UniqSM )
@@ -219,7 +220,12 @@ mkWWargs fun_ty demands one_shots
       val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
     in
-    ASSERT( not (null tyvars) || not (null arg_tys) )
+{-     ASSERT( not (null tyvars) || not (null arg_tys) ) -}
+    if (null tyvars) && (null arg_tys) then
+	pprTrace "mkWWargs" (ppr fun_ty $$ ppr demands) 
+		returnUs ([], id, id, fun_ty)
+	else
+
     mkWWargs new_fun_ty
 	     new_demands
 	     new_one_shots	`thenUs` \ (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
@@ -446,11 +452,14 @@ workerCase e		     arg alts = Case e arg alts
 \begin{code}
 mk_absent_let arg body
   | not (isUnLiftedType arg_ty)
-  = Let (NonRec arg (mkTyApps (Var aBSENT_ERROR_ID) [arg_ty])) body
+  = Let (NonRec arg abs_rhs) body
   | otherwise
   = panic "WwLib: haven't done mk_absent_let for primitives yet"
   where
     arg_ty = idType arg
+--    abs_rhs = mkTyApps (Var aBSENT_ERROR_ID) [arg_ty]
+    abs_rhs = mkApps (Var eRROR_CSTRING_ID) [Type arg_ty, Lit (MachStr (_PK_ msg))] 
+    msg     = "Oops!  Entered absent arg " ++ showSDocDebug (ppr arg <+> ppr (idType arg))
 
 mk_unpk_case arg unpk_args boxing_con boxing_tycon body
 	-- A data type

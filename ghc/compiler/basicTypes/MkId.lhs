@@ -23,7 +23,7 @@ module MkId (
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds,
 	unsafeCoerceId, realWorldPrimId,
-	eRROR_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID, rEC_CON_ERROR_ID,
+	eRROR_ID, eRROR_CSTRING_ID, rEC_SEL_ERROR_ID, pAT_ERROR_ID, rEC_CON_ERROR_ID,
 	rEC_UPD_ERROR_ID, iRREFUT_PAT_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID,
 	nO_METHOD_BINDING_ERROR_ID, aBSENT_ERROR_ID, pAR_ERROR_ID
     ) where
@@ -33,10 +33,9 @@ module MkId (
 
 import BasicTypes	( Arity, StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
 import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
-			  intPrimTy, realWorldStatePrimTy
+			  intPrimTy, realWorldStatePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, mkListTy )
-import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
@@ -112,6 +111,7 @@ wiredInIds
 
       aBSENT_ERROR_ID
     , eRROR_ID
+    , eRROR_CSTRING_ID
     , iRREFUT_PAT_ERROR_ID
     , nON_EXHAUSTIVE_GUARDS_ERROR_ID
     , nO_METHOD_BINDING_ERROR_ID
@@ -787,6 +787,9 @@ templates, but we don't ever expect to generate code for it.
 \begin{code}
 eRROR_ID
   = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
+eRROR_CSTRING_ID
+  = pc_bottoming_Id errorCStringIdKey pREL_ERR SLIT("errorCString") 
+		    (mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy))
 pAT_ERROR_ID
   = generic_ERROR_ID patErrorIdKey SLIT("patError")
 rEC_SEL_ERROR_ID

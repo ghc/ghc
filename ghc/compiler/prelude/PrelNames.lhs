@@ -809,6 +809,7 @@ irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
 eqStringIdKey		      = mkPreludeMiscIdUnique 16
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 18
+errorCStringIdKey	      = mkPreludeMiscIdUnique 19 
 parErrorIdKey		      = mkPreludeMiscIdUnique 20
 parIdKey		      = mkPreludeMiscIdUnique 21
 patErrorIdKey		      = mkPreludeMiscIdUnique 22
