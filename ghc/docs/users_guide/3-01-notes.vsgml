@@ -16,4 +16,34 @@ Changes made since 3.00:
 
 <item> imported HBC's quick-sort algorithm from @QSort@ into @List@.
 
+<item> added support for assertions. Conceptually, a new function has
+       been added to the Prelude with the following type: 
+
+       <tscreen> <verb>
+          assert :: Bool -> a -> a
+       </verb> </tscreen>
+
+       which has the following behaviour:
+ 
+       <tscreen> <verb>
+          assert pred v 
+             | pred      = v
+	     | otherwise = error "assertion failed"
+       </verb> </tscreen>
+       
+       However in this form, the practical use of assertions is
+       limited as no indication is given as to what assertion failed.
+       So to help out here, ghc will rewrite any uses of <tt/assert/
+       to instead invoke the function <tt/assert__/ :
+ 
+       <tscreen> <verb>
+         assert__ :: String -> Bool -> a -> a
+       </verb> </tscreen>
+	 
+       where the first argument to <tt/assert__/ is a compiler generated string 
+       which encodes the source location of the original <tt/assert/.
+
+       Assertions are a Glasgow extension, so -fglasgow-exts is
+       needed to use them.
+
 </itemize>
