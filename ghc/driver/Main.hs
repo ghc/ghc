@@ -1157,7 +1157,7 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 		_other -> False
 
      output_fn <- 
-	(if phase == last_phase && not do_linking && use_ofile
+	(if next_phase > last_phase && not do_linking && use_ofile
 	    then do o_file <- readIORef output_file
 		    case o_file of 
 		        Just s  -> return s
