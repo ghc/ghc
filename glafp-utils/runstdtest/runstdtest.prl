@@ -36,6 +36,7 @@
 #
 ($Pgm = $0) =~ s|.*/||;
 $Verbose = 0;
+$SaveTmpFile = 0;
 $Status = 0;
 @PgmArgs = ();
 $PgmExitStatus = 0;
@@ -70,7 +71,9 @@ arg: while ($_ = $ARGV[0]) {
 			push(@PgmArgs, @ARGV);
 			last arg; };
 
-    /^-v$/	&& do { $Verbose = 1; next arg; };
+    /^-v$/	       && do { $Verbose = 1; next arg; };
+    /^-accept-output$/ && do { $SaveTmpFile = 1; next arg; };
+
     /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
     /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
 			$Status++,
@@ -107,14 +110,16 @@ arg: while ($_ = $ARGV[0]) {
 }
 
 foreach $out_file ( @PgmStdoutFile ) {
-    $Status++ ,
-    print STDERR "$Pgm: bogus -o1 expected-output file: $out_file\n"
+    #$Status++ ,
+    pop(@PgmStdoutFile),
+    print STDERR "$Pgm: warning: expected-output file missing: $out_file\n"
 	if ! -f $out_file;
 }
 
 foreach $out_file ( @PgmStderrFile ) {
-    $Status++,
-    print STDERR "$Pgm: bogus -o2 expected-stderr file: $out_file\n"
+    #$Status++,
+    pop(@PgmStderrFile),
+    print STDERR "$Pgm: warning: expected-stderr file missing: $out_file\n"
 	if ! -f $out_file;
 }
 
@@ -158,7 +163,7 @@ if ( $SpixTiming eq 'yes' ) {
 
     open(SPIXNM, "nm -n $ToRunOrig |") || die "nm -n $ToRunOrig open failed!\n";
     spix: while (<SPIXNM>) {
-	if ( / T +(_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
+	if ( / T +(_freeForeignObj|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
 	    $LastSpix = $1;
 	    last spix;
 	}
@@ -225,6 +230,12 @@ else
 	myexit=1
 	diffsShown=1
     fi
+    if [ $SaveTmpFile = 1 ] && [ \$progexit = $PgmExitStatus ] ; then
+	rm -f $PgmStdoutFile[0].bak
+	echo Saving away stdout output in $PgmStdoutFile[0] ...
+	cp $PgmStdoutFile[0] $PgmStdoutFile[0].bak
+	cp $TmpPrefix/runtest$$.1 $PgmStdoutFile[0]
+    fi
 fi
 egrep -v '^ld\.so:.*has older revision than expected' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
 mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
@@ -241,6 +252,12 @@ if [ \$hit = 'NO' ] ; then
     ${CONTEXT_DIFF} $PgmStderrFile[0] $TmpPrefix/runtest$$.2
     myexit=1
     diffsShown=1
+fi
+if [ $SaveTmpFile = 1 ] && [ \$progexit = $PgmExitStatus ] ; then
+	rm -f $PgmStderrFile[0].bak
+	echo Saving away stderr output in $PgmStderrFile[0] ...
+	cp $PgmStderrFile[0] $PgmStderrFile[0].bak
+	cp $TmpPrefix/runtest$$.2 $PgmStderrFile[0]
 fi
 $SpixstatsLine1
 
