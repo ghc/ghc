@@ -172,6 +172,7 @@ data PrimOp
 
     | MkWeakOp
     | DeRefWeakOp
+    | FinaliseWeakOp
 
     | MakeStableNameOp
     | EqStableNameOp
@@ -500,35 +501,36 @@ tagOf_PrimOp MakeForeignObjOp		      = ILIT(201)
 tagOf_PrimOp WriteForeignObjOp		      = ILIT(202)
 tagOf_PrimOp MkWeakOp			      = ILIT(203)
 tagOf_PrimOp DeRefWeakOp		      = ILIT(204)
-tagOf_PrimOp MakeStableNameOp		      = ILIT(205)
-tagOf_PrimOp EqStableNameOp		      = ILIT(206)
-tagOf_PrimOp StableNameToIntOp		      = ILIT(207)
-tagOf_PrimOp MakeStablePtrOp		      = ILIT(208)
-tagOf_PrimOp DeRefStablePtrOp		      = ILIT(209)
-tagOf_PrimOp EqStablePtrOp		      = ILIT(210)
-tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(211)
-tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(212)
-tagOf_PrimOp SeqOp			      = ILIT(213)
-tagOf_PrimOp ParOp			      = ILIT(214)
-tagOf_PrimOp ForkOp			      = ILIT(215)
-tagOf_PrimOp KillThreadOp		      = ILIT(216)
-tagOf_PrimOp DelayOp			      = ILIT(217)
-tagOf_PrimOp WaitReadOp			      = ILIT(218)
-tagOf_PrimOp WaitWriteOp		      = ILIT(219)
-tagOf_PrimOp ParGlobalOp		      = ILIT(220)
-tagOf_PrimOp ParLocalOp			      = ILIT(221)
-tagOf_PrimOp ParAtOp			      = ILIT(222)
-tagOf_PrimOp ParAtAbsOp			      = ILIT(223)
-tagOf_PrimOp ParAtRelOp			      = ILIT(224)
-tagOf_PrimOp ParAtForNowOp		      = ILIT(225)
-tagOf_PrimOp CopyableOp			      = ILIT(226)
-tagOf_PrimOp NoFollowOp			      = ILIT(227)
-tagOf_PrimOp NewMutVarOp		      = ILIT(228)
-tagOf_PrimOp ReadMutVarOp		      = ILIT(229)
-tagOf_PrimOp WriteMutVarOp		      = ILIT(230)
-tagOf_PrimOp SameMutVarOp		      = ILIT(231)
-tagOf_PrimOp CatchOp			      = ILIT(232)
-tagOf_PrimOp RaiseOp			      = ILIT(233)
+tagOf_PrimOp FinaliseWeakOp		      = ILIT(205)
+tagOf_PrimOp MakeStableNameOp		      = ILIT(206)
+tagOf_PrimOp EqStableNameOp		      = ILIT(207)
+tagOf_PrimOp StableNameToIntOp		      = ILIT(208)
+tagOf_PrimOp MakeStablePtrOp		      = ILIT(209)
+tagOf_PrimOp DeRefStablePtrOp		      = ILIT(210)
+tagOf_PrimOp EqStablePtrOp		      = ILIT(211)
+tagOf_PrimOp (CCallOp _ _ _ _)		      = ILIT(212)
+tagOf_PrimOp ReallyUnsafePtrEqualityOp	      = ILIT(213)
+tagOf_PrimOp SeqOp			      = ILIT(214)
+tagOf_PrimOp ParOp			      = ILIT(215)
+tagOf_PrimOp ForkOp			      = ILIT(216)
+tagOf_PrimOp KillThreadOp		      = ILIT(217)
+tagOf_PrimOp DelayOp			      = ILIT(218)
+tagOf_PrimOp WaitReadOp			      = ILIT(219)
+tagOf_PrimOp WaitWriteOp		      = ILIT(220)
+tagOf_PrimOp ParGlobalOp		      = ILIT(221)
+tagOf_PrimOp ParLocalOp			      = ILIT(222)
+tagOf_PrimOp ParAtOp			      = ILIT(223)
+tagOf_PrimOp ParAtAbsOp			      = ILIT(224)
+tagOf_PrimOp ParAtRelOp			      = ILIT(225)
+tagOf_PrimOp ParAtForNowOp		      = ILIT(226)
+tagOf_PrimOp CopyableOp			      = ILIT(227)
+tagOf_PrimOp NoFollowOp			      = ILIT(228)
+tagOf_PrimOp NewMutVarOp		      = ILIT(229)
+tagOf_PrimOp ReadMutVarOp		      = ILIT(230)
+tagOf_PrimOp WriteMutVarOp		      = ILIT(231)
+tagOf_PrimOp SameMutVarOp		      = ILIT(232)
+tagOf_PrimOp CatchOp			      = ILIT(233)
+tagOf_PrimOp RaiseOp			      = ILIT(234)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 --panic# "tagOf_PrimOp: pattern-match"
@@ -765,6 +767,7 @@ allThePrimOps
 	WriteForeignObjOp,
 	MkWeakOp,
 	DeRefWeakOp,
+	FinaliseWeakOp,
 	MakeStableNameOp,
 	EqStableNameOp,
 	StableNameToIntOp,
@@ -1558,6 +1561,17 @@ primOpInfo DeRefWeakOp
 	(unboxedTriple [realWorldStatePrimTy, intPrimTy, alphaTy])
 \end{code}
 
+Weak pointers can be finalised early by using the finalise# operation:
+	
+	finalise# :: Weak# v -> State# RealWorld -> State# RealWorld
+
+\begin{code}
+primOpInfo FinaliseWeakOp
+ = mkGenPrimOp SLIT("finaliseWeak#") [alphaTyVar]
+	[mkWeakPrimTy alphaTy, realWorldStatePrimTy]
+	realWorldStatePrimTy
+\end{code}
+
 %************************************************************************
 %*									*
 \subsubsection[PrimOp-stable-pointers]{PrimOpInfo for stable pointers and stable names}
@@ -1791,7 +1805,7 @@ primOpOutOfLine op
 	FloatDecodeOp		-> True
 	DoubleDecodeOp		-> True
 	MkWeakOp		-> True
-	DeRefWeakOp		-> True
+	FinaliseWeakOp		-> True
 	MakeStableNameOp	-> True
 	MakeForeignObjOp	-> True
 	NewMutVarOp		-> True
@@ -1873,6 +1887,7 @@ primOpHasSideEffects MakeForeignObjOp  = True
 primOpHasSideEffects WriteForeignObjOp = True
 primOpHasSideEffects MkWeakOp  	       = True
 primOpHasSideEffects DeRefWeakOp       = True
+primOpHasSideEffects FinaliseWeakOp    = True
 primOpHasSideEffects MakeStablePtrOp   = True
 primOpHasSideEffects MakeStableNameOp  = True
 primOpHasSideEffects EqStablePtrOp     = True  -- SOF
