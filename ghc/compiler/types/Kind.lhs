@@ -92,7 +92,7 @@ Printing
 instance Outputable Kind where
   ppr sty kind = pprQuote sty $ \ _ -> pprKind kind
 
-pprKind TypeKind        = char '*'	-- Can be boxed or unboxed
+pprKind TypeKind        = text "**"	-- Can be boxed or unboxed
 pprKind BoxedTypeKind   = char '*'
 pprKind UnboxedTypeKind = text  "*#"	-- Unboxed
 pprKind (ArrowKind k1 k2) = sep [pprParendKind k1, text "->", pprKind k2]
