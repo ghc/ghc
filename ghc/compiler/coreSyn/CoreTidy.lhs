@@ -14,7 +14,7 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
-import CoreUtils	( exprArity, exprIsBottom )
+import CoreUtils	( exprArity, exprIsValue )
 import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import CoreLint		( showPass, endPass )
 import VarEnv
@@ -654,15 +654,13 @@ cafRefss p (e:es) = cafRefs p e `fastOr` cafRefss p es
 -- in an SRT or not.
 
 isCAF :: CoreExpr -> Bool
-   -- special case for expressions which are always bottom,
-   -- such as 'error "..."'.  We don't need to record it as
-   -- a CAF, since it can only be entered once.
 isCAF e 
-  | not_function && is_bottom = False
-  | not_function && updatable = True
-  | otherwise		      = False
-  where
-    not_function = exprArity e == 0
-    is_bottom    = exprIsBottom e
-    updatable    = True {- ToDo: check type for onceness? -}
+  | exprIsValue e = False
+  | otherwise     = True
+  {- ToDo: check type for onceness, i.e. non-updatable thunks? -}
+
+-- we're assuming here that anything for which exprIsValue is True
+-- will be non-updatable.  This is true for functions and
+-- constructors, but we must make sure that partial applications are
+-- compiled as non-updatable closures (which CoreToStg does).
 \end{code}
