@@ -1,4 +1,4 @@
---!!! Testing layout rule
+-- !!! Testing layout rule
 module Layout where
 
 l1 :: IO ()

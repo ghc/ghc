@@ -1,5 +1,5 @@
---!!! string gaps
---!!!
+-- !!! string gaps
+-- !!!
 module Main(main) where
 
 -----------

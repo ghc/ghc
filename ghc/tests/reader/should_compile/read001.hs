@@ -1,4 +1,4 @@
---!!! import qualified Prelude should leave (), [] etc in scope
+-- !!! import qualified Prelude should leave (), [] etc in scope
 
 module ShouldCompile where
 

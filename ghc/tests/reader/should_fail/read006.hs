@@ -1,4 +1,4 @@
---!!! Using pattern syntax on RHS
+-- !!! Using pattern syntax on RHS
 module ShouldFail where
 
 f :: Int -> Int

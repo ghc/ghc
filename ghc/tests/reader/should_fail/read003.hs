@@ -1,4 +1,4 @@
---!!! Irrefutable patterns + guards
+-- !!! Irrefutable patterns + guards
 module Read003 where
 
 ~(a,b,c) | nullity b	= a

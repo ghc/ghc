@@ -1,4 +1,4 @@
---!!! Testing handling of troublesome constructor name (:::)
+-- !!! Testing handling of troublesome constructor name (:::)
 module MyList (MyList(Empty, (:::))) where
 
 data MyList a =   Empty

@@ -1,2 +1,2 @@
---!!! Empty comments terminating a file..
+-- !!! Empty comments terminating a file..
 main = print "Hello" --

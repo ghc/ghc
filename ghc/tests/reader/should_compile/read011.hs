@@ -1,4 +1,4 @@
---!!! do & where interaction
+-- !!! do & where interaction
 module ShouldSucceed where
 
 f1 :: IO a -> IO [a]

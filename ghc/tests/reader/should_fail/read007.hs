@@ -1,4 +1,4 @@
---!!! Expressions as patterns inside do stmt blocks
+-- !!! Expressions as patterns inside do stmt blocks
 module ShouldFail where
 
 f :: Int -> IO Int

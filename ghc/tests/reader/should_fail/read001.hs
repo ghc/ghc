@@ -1,4 +1,4 @@
---!!! this module supposedly includes one of each Haskell construct
+-- !!! this module supposedly includes one of each Haskell construct
 
 -- HsImpExp stuff
 
@@ -14,10 +14,10 @@ module OneOfEverything (
 	module OneOfEverything
     ) where
 
-import qualified Prelude
+import Prelude
 import IO		( putStr )
 import System hiding	( getArgs )
-import Monad hiding	( filter )
+import Monad
 
 -- HsDecls stuff
 
