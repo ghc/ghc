@@ -1367,7 +1367,8 @@ data Integer = J# Int# Int# ByteArray#
 module GHC  -- all primops and primitive types.
 \end{verbatim}
 
-\subsubsection[sec:mutable-array]{The @MutableArray@ interface}
+\subsubsection{The @MutableArray@ interface}
+\label{sec:mutable-array}
 \index{MutableArray interface (GHC extensions)}
 
 The @MutableArray@ interface defines a general set of operations over
@@ -1417,7 +1418,8 @@ unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 thawArray             :: Ix ix => Array ix elt -> ST s (MutableArray s ix elt)
 \end{verbatim}
 
-\subsubsection[sec:byte-array]{The @ByteArray@ interface}
+\subsubsection{The @ByteArray@ interface}
+\label{sec:byte-array}
 \index{ByteArray interface (GHC extensions)}
 
 @ByteArray@s are chunks of immutable Haskell heap:
