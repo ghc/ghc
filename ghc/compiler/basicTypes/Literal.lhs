@@ -191,7 +191,7 @@ int2CharLit (MachInt  i) = MachChar (fromInteger i)
 float2IntLit (MachFloat f) = MachInt   (truncate    f)
 int2FloatLit (MachInt   i) = MachFloat (fromInteger i)
 
-double2IntLit (MachFloat f) = MachInt    (truncate    f)
+double2IntLit (MachDouble f) = MachInt    (truncate    f)
 int2DoubleLit (MachInt   i) = MachDouble (fromInteger i)
 
 addr2IntLit (MachAddr a) = MachInt  a
