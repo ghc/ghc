@@ -185,7 +185,7 @@ new_ps_array size = ST $ \ s ->
 #if __GLASGOW_HASKELL__ < 400
     case (newCharArray# size s)	  of { StateAndMutableByteArray# s2# barr# ->
     STret s2# (MutableByteArray bot barr#) }
-#elsif __GLASGOW_HASKELL__ < 405
+#elif __GLASGOW_HASKELL__ < 405
     case (newCharArray# size s)	  of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray bot barr# #) }
 #else
