@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.62 1999/09/15 13:45:16 simonmar Exp $
+ * $Id: GC.c,v 1.63 1999/10/21 08:23:56 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2924,7 +2924,8 @@ threadSqueezeStack(StgTSO *tso)
        */
       if (is_update_frame) {
 	StgBlockingQueue *bh = (StgBlockingQueue *)frame->updatee;
-	if (bh->header.info != &BLACKHOLE_BQ_info &&
+	if (bh->header.info != &BLACKHOLE_info &&
+	    bh->header.info != &BLACKHOLE_BQ_info &&
 	    bh->header.info != &CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
           fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
