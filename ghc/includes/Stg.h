@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.27 2000/04/14 13:47:12 simonmar Exp $
+ * $Id: Stg.h,v 1.28 2000/04/14 14:15:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,7 +14,7 @@
 
 #ifndef NON_POSIX_SOURCE
 #define _POSIX_SOURCE   1
-#define _POSIX_C_SOURCE 199506L
+#define _POSIX_C_SOURCE 199309L
 #define _ISOC9X_SOURCE
 #endif
 
