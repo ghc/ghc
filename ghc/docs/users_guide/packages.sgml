@@ -101,31 +101,45 @@
 
 	<listitem>
 	  <para>A package has a name
-  	  (e.g. <filename>std</filename>)</para>
+  	  (e.g. <filename>base</filename>)</para>
 	</listitem>
 
 	<listitem>
 	  <para>The Haskell code in a package may be built into one or
-	  more archive libraries (e.g. <filename>libHSfoo.a</filename>),
-	  or a single DLL on Windows
-	  (e.g. <filename>HSfoo.dll</filename>).  The restriction to a
-	  single DLL on Windows is that the package system is used to
-	  tell the compiler when it should make an inter-DLL call
-	  rather than an intra-DLL call (inter-DLL calls require an
-	  extra indirection). <emphasis>Building packages as DLLs
-	  doesn't work at the moment; see <XRef
-	  LinkEnd="win32-dlls-create"> for the gory details.</emphasis>
+	  more archive libraries
+	  (e.g. <filename>libHSfoo.a</filename>), or a single DLL on
+	  Windows (e.g. <filename>HSfoo.dll</filename>).  The
+	  restriction to a single DLL on Windows is because the
+	  package system is used to tell the compiler when it should
+	  make an inter-DLL call rather than an intra-DLL call
+	  (inter-DLL calls require an extra
+	  indirection). <emphasis>Building packages as DLLs doesn't
+	  work at the moment; see <XRef LinkEnd="win32-dlls-create">
+	  for the gory details.</emphasis>
 	  </para>
+
+	  <para>Building a static library is done by using the
+	  <literal>ar</literal> tool, like so:</para>
+
+<screen>ar cqs libHSfoo.a A.o B.o C.o ...</screen>
+
+	  <para>where <filename>A.o</filename>,
+	  <filename>B.o</filename> and so on are the compiled Haskell
+	  modules, and <filename>libHSfoo.a</filename> is the library
+	  you wish to create.  The syntax may differ slightly on your
+	  system, so check the documentation if you run into
+	  difficulties.</para>
 
 	  <para>Versions of the Haskell libraries for use with GHCi
 	  may also be included: GHCi cannot load <literal>.a</literal>
 	  files directly, instead it will look for an object file
-	  called <filename>HSfoo.o</filename> and load that.  The
-	  <literal>ghc-pkg</literal> tool can automatically build the
-	  GHCi version of each library, see <xref
-	  linkend="package-management">.  To build these libraries by
-	  hand from the <literal>.a</literal> archive, it is possible
-	  to use GNU <command>ld</command> as follows:</para>
+	  called <filename>HSfoo.o</filename> and load that.  On some
+	  systems, the <literal>ghc-pkg</literal> tool can
+	  automatically build the GHCi version of each library, see
+	  <xref linkend="package-management">.  To build these
+	  libraries by hand from the <literal>.a</literal> archive, it
+	  is possible to use GNU <command>ld</command> as
+	  follows:</para>
 
 <screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
 	</listitem>
@@ -408,7 +422,9 @@
 	      <varlistentry>
 		<term><filename>libHSfoo.a</filename></term>
 		<listitem>
-		  <para>The name of the library on Unix
+		  <para>The name of the library on Unix and Windows
+		  (mingw) systems.  Note that we don't support
+		  building dynamic libraries of Haskell code on Unix
 		  systems.</para>
 		</listitem>
 	      </varlistentry>
@@ -416,7 +432,7 @@
 		<term><filename>HSfoo.dll</filename></term>
 		<listitem>
 		  <para>The name of the dynamic library on Windows
-		  systems.</para>
+		  systems (optional).</para>
 		</listitem>
 	      </varlistentry>
 	      <varlistentry>
@@ -451,6 +467,12 @@
 	    <literal>hs_libraries</literal> only, no suffix is added
 	    for libraries in
 	    <literal>extra_libraries</literal>.</para>
+
+	    <para>The libraries listed in
+	    <literal>extra_libraries</literal> may be any libraries
+	    supported by your system's linker, including dynamic
+	    libraries (<literal>.so</literal> on Unix,
+	    <literal>.DLL</literal> on Windows).</para>
 
 	    <para>Also, <literal>extra_libraries</literal> are placed
 	    on the linker command line after the
