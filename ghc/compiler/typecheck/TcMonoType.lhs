@@ -664,7 +664,8 @@ hoistForAllTys ty
     in
     case hoist no_shadow_ty of 
 	(tvs, theta, body) -> mkForAllTys tvs (mkFunTys (nubBy tcEqType theta) body)
-		-- The 'nubBy' eliminates duplicate constraints
+		-- The 'nubBy' eliminates duplicate constraints,
+		-- notably implicit parameters
   where
     hoist ty
 	| (tvs1, body_ty) <- tcSplitForAllTys ty,
