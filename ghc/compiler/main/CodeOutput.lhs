@@ -71,7 +71,7 @@ codeOutput dflags mod_name tycons core_binds stg_binds
              HscInterpreted -> return stub_names
              HscAsm         -> outputAsm dflags filenm flat_abstractC
           		       >> return stub_names
-             HscC           -> outputC dflags filenm flat_abstractC	
+             HscC           -> outputC dflags filenm flat_abstractC stub_names
           		       >> return stub_names
              HscJava        -> outputJava dflags filenm mod_name tycons core_binds
           		       >> return stub_names
@@ -98,11 +98,14 @@ doOutput filenm io_action
 %************************************************************************
 
 \begin{code}
-outputC dflags filenm flat_absC
+outputC dflags filenm flat_absC (maybe_stub_h, _)
   = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
        header <- readIORef v_HCHeader
        doOutput filenm $ \ h -> do
 	  hPutStr h header
+	  case maybe_stub_h of
+		Nothing       -> return ()
+		Just filename -> hPutStrLn h ("#include \"" ++ filename ++ "\"")
 	  writeRealC h flat_absC
 \end{code}
 
