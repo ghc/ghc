@@ -1,7 +1,7 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1995-1996
+% (c) The GRASP/AQUA Project, Glasgow University, 1995-1999
 %
-\section[PosixUtil]{Haskell 1.3 POSIX utilities}
+\section[PosixUtil]{(Glasgow) Haskell POSIX utilities}
 
 \begin{code}
 module PosixUtil where
@@ -10,7 +10,8 @@ import GlaExts
 import PrelIOBase  -- IOError representation
 \end{code}
 
-First, all of the major Posix data types, to avoid any recursive dependencies
+First, all of the major Posix data types, out here
+to avoid any recursive dependencies
 
 \begin{code}
 type ByteCount		= Int
