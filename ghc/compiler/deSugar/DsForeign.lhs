@@ -596,7 +596,7 @@ fexportEntry c_nm helper args res cc =
 
   startTemplate =
     vcat 
-      [ text "extern realWorldZh_closure;"
+      [ text "extern void* realWorldZh_closure;"
       , ptext SLIT("STGFUN") <> parens (h_stub_nm)
       , lbrace
       ,  ptext SLIT("FUNBEGIN;")
