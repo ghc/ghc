@@ -1,8 +1,9 @@
 #
 # (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 #
-# *** MSUB does some substitutions here ***
-# *** grep for $( ***
+# Perl script expect bindings for the following variables to be prepended
+#
+#   TMPDIR SCRIPT_PATH
 #
 
 $debug = 0;
@@ -11,12 +12,11 @@ $outsuffix = ".resid.ps";	# change as appropriate
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $tmpfile = $ENV{'TMPDIR'} . "/$$.resid.data";
 } else {
-    $tmpfile ="$(TMPDIR)/$$.resid.data";
-    $ENV{'TMPDIR'} = '$(TMPDIR)'; # set the env var as well
+    $tmpfile ="${TMPDIR}/$$.resid.data";
+    $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
 }
 
-@INC = ( ( $(INSTALLING) ) ? '$(INSTLIBDIR_GHC)'
-			   : '$(TOP_PWD)/$(CURRENT_DIR)' );
+@INC = ( ${SCRIPT_PATH} );
 
 require('parse-gcstats.prl')   || die "Can't load parse-gcstats.prl!\n";
 require('process-gcstats.prl') || die "Can't load process-gcstats.prl!\n";

@@ -36,9 +36,10 @@ sub parse_stats {
     local($statsfile, $line, $row, $col, $val);
     local(@stats, @hdr1, @hdr2, @line_vals);
     local(%the_stats);
+    local(*STATS);
 
-    open($statsfile, $filename) || die "Cant open $filename \n";
-    @stats = <$statsfile>;
+    open(STATS, $filename) || die "Cant open $filename \n";
+    @stats = <STATS>;
 
     do {$line = shift(@stats);} until ($line !~ /^$/);
     chop($line);
@@ -181,7 +182,7 @@ arg: while($_ = $stats[0]) {
     print STDERR "Unmatched line: $_";
     }
 
-    close($statsfile);
+    close(STATS);
     %the_stats;
 }
 
