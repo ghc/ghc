@@ -222,11 +222,9 @@ stdout = unsafePerformIO (do
 				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 #else
  	    fo <- CCALL(openStdFile) (1::Int)
-				     ((1{-flush on close-} {-+ 128 don't block on I/O-})::Int)
+				     ((1{-flush on close-} + 128 {- don't block on I/O-})::Int)
 				     (0::Int){-writeable-}  -- ConcHask: SAFE, won't block
 #endif
-					    -- NOTE: turn off non-blocking I/O until 
-					    -- we've got proper support for threadWait{Read,Write}
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
@@ -258,7 +256,7 @@ stdin = unsafePerformIO (do
 				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 #else
 	    fo <- CCALL(openStdFile) (0::Int)
-				     ((0{-flush on close-} {-+ 128 don't block on I/O-})::Int)
+				     ((0{-flush on close-} + 128 {- don't block on I/O-})::Int)
 				     (1::Int){-readable-}  -- ConcHask: SAFE, won't block
 #endif
 
@@ -290,7 +288,7 @@ stderr = unsafePerformIO (do
 				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 #else
  	    fo <- CCALL(openStdFile) (2::Int)
-				     ((1{-flush on close-} {- + 128 don't block on I/O-})::Int)
+				     ((1{-flush on close-} + 128 {- don't block on I/O-})::Int)
 				     (0::Int){-writeable-} -- ConcHask: SAFE, won't block
 #endif
 
@@ -355,7 +353,7 @@ openFileEx f m = do
 #else
 	-- See comment next to 'stderr' for why we leave
 	-- non-blocking off for now.
-    file_flags = file_flags' {-+ 128  Don't block on I/O-}
+    file_flags = file_flags' + 128  -- Don't block on I/O
 #endif
 
     (file_flags', file_mode) =
@@ -1160,9 +1158,6 @@ mayBlock :: ForeignObj -> IO Int -> IO Int
 mayBlock :: Addr  -> IO Int -> IO Int
 #endif
 
-#ifndef notyet /*__CONCURRENT_HASKELL__*/
-mayBlock  _ act = act
-#else
 mayBlock fo act = do
    rc <- act
    case rc of
@@ -1186,18 +1181,15 @@ mayBlock fo act = do
 	CCALL(setConnNonBlockingIOFlag__) fo  -- reset (connected) file object.
         return rc
 
-#endif
-
 -- #ifdef __HUGS__
-#if 1
 threadDelay, threadWaitRead, threadWaitWrite :: Int -> IO ()
 
 -- Hugs does actually have the primops needed to implement these
--- but, like GHC, the primops don't actually do anything...
-threadDelay     _ = return ()
-threadWaitRead  _ = return ()
-threadWaitWrite _ = return ()
-#endif
+-- but the primops don't actually do anything...
+threadDelay     (I# ms) = IO $ \s -> case delay# ms s     of s -> (# s, () #)
+threadWaitRead  (I# fd) = IO $ \s -> case waitRead# fd s  of s -> (# s, () #)
+threadWaitWrite (I# fd) = IO $ \s -> case waitWrite# fd s of s -> (# s, () #)
+-- #endif
 
 \end{code}
 
