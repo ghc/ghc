@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.132 2002/03/12 11:50:02 simonmar Exp $
+ * $Id: GC.c,v 1.133 2002/04/13 05:16:25 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -985,17 +985,16 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // Reset the nursery
   resetNurseries();
 
-  // let go of lock (so that it can be re-grabbed below).
   RELEASE_LOCK(&sched_mutex);
   
   // start any pending finalizers 
   scheduleFinalizers(old_weak_ptr_list);
   
-  // send exceptions to any threads which were about to die 
-  resurrectThreads(resurrected_threads);
-
   ACQUIRE_LOCK(&sched_mutex);
 
+  // send exceptions to any threads which were about to die 
+  resurrectThreads(resurrected_threads);
+  
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
 
