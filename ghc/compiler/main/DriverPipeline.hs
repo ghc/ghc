@@ -529,10 +529,13 @@ run_phase Hsc basename suff input_fn output_fn
 	do_recomp   <- readIORef v_Recomp
 	todo        <- readIORef v_GhcMode
 	expl_o_file <- readIORef v_Output_file
-        let o_file = 
-		case expl_o_file of
-		  Nothing -> unJust "source_unchanged" (ml_obj_file location)
-		  Just x  -> x
+
+	let o_file -- if the -o option is given and IT IS THE OBJECT FILE FOR
+		   -- THIS COMPILATION, then use that to determine if the 
+		   -- source is unchanged.
+		| Just x <- expl_o_file, todo == StopBefore Ln  =  x
+		| otherwise = unJust "source_unchanged" (ml_obj_file location)
+
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
 	     then return False
