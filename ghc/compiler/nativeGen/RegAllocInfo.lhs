@@ -65,6 +65,7 @@ import OrdList		( mkUnitList )
 import PrimRep		( PrimRep(..) )
 import UniqSet		-- quite a bit of it
 import Outputable
+import Constants	( rESERVED_C_STACK_BYTES )
 \end{code}
 
 %************************************************************************
@@ -367,9 +368,9 @@ regUsage instr = case instr of
     XOR  sz src dst	-> usage2s src dst
     NOT  sz op		-> usage1 op
     NEGI sz op		-> usage1 op
-    SHL  sz len dst	-> usage2s len dst -- len is either an Imm or ecx.
-    SAR  sz len dst	-> usage2s len dst -- len is either an Imm or ecx.
-    SHR  sz len dst	-> usage2s len dst -- len is either an Imm or ecx.
+    SHL  sz imm dst	-> usage1 dst
+    SAR  sz imm dst	-> usage1 dst
+    SHR  sz imm dst	-> usage1 dst
     BT   sz imm src	-> usage (opToReg src) []
 
     PUSH sz op		-> usage (opToReg op) []
@@ -414,7 +415,7 @@ regUsage instr = case instr of
     LABEL _		-> noUsage
     ASCII _ _		-> noUsage
     DATA _ _		-> noUsage
-    _			-> pprPanic "regUsage(x86) " empty
+    _			-> pprPanic "regUsage(x86)" empty
 
  where
     -- 2 operand form in which the second operand is purely a destination
@@ -558,13 +559,15 @@ a singleton list which we know will satisfy all spill demands.
 findReservedRegs :: [Instr] -> [[RegNo]]
 findReservedRegs instrs
 #if alpha_TARGET_ARCH
-  = [[NCG_Reserved_I1, NCG_Reserved_I2,
-      NCG_Reserved_F1, NCG_Reserved_F2]]
+  = --[[NCG_Reserved_I1, NCG_Reserved_I2,
+    --  NCG_Reserved_F1, NCG_Reserved_F2]]
+    error "findReservedRegs: alpha"
 #endif
 #if sparc_TARGET_ARCH
-  = [[NCG_Reserved_I1, NCG_Reserved_I2,
-      NCG_Reserved_F1, NCG_Reserved_F2,
-      NCG_Reserved_D1, NCG_Reserved_D2]]
+  = --[[NCG_Reserved_I1, NCG_Reserved_I2,
+    --  NCG_Reserved_F1, NCG_Reserved_F2,
+    --  NCG_Reserved_D1, NCG_Reserved_D2]]
+    error "findReservedRegs: sparc"
 #endif
 #if i386_TARGET_ARCH
     -- Sigh.  This is where it gets complicated.
@@ -741,10 +744,10 @@ patchRegs instr env = case instr of
     XOR  sz src dst	-> patch2 (XOR  sz) src dst
     NOT  sz op 		-> patch1 (NOT  sz) op
     NEGI sz op		-> patch1 (NEGI sz) op
-    SHL  sz imm dst 	-> patch2 (SHL  sz) imm dst
-    SAR  sz imm dst 	-> patch2 (SAR  sz) imm dst
-    SHR  sz imm dst 	-> patch2 (SHR  sz) imm dst
-    BT   sz imm src     -> patch1 (BT sz imm) src
+    SHL  sz imm dst 	-> patch1 (SHL sz imm) dst
+    SAR  sz imm dst 	-> patch1 (SAR sz imm) dst
+    SHR  sz imm dst 	-> patch1 (SHR sz imm) dst
+    BT   sz imm src     -> patch1 (BT  sz imm) src
     TEST sz src dst	-> patch2 (TEST sz) src dst
     CMP  sz src dst	-> patch2 (CMP  sz) src dst
     PUSH sz op		-> patch1 (PUSH sz) op
@@ -855,52 +858,60 @@ patchRegs instr env = case instr of
 
 Spill to memory, and load it back...
 
-JRS, 000122: on x86, don't spill directly above the stack pointer, since 
-some insn sequences (int <-> conversions) use this as a temp location.
-Leave 16 bytes of slop.
+JRS, 000122: on x86, don't spill directly above the stack pointer,
+since some insn sequences (int <-> conversions, and eventually
+StixInteger) use this as a temp location.  Leave 8 words (ie, 64 bytes
+for a 64-bit arch) of slop.
 
 \begin{code}
+maxSpillSlots :: Int
+maxSpillSlots = (rESERVED_C_STACK_BYTES - 64) `div` 8
+
+-- convert a spill slot number to a *byte* offset, with no sign:
+-- decide on a per arch basis whether you are spilling above or below
+-- the C stack pointer.
+spillSlotToOffset :: Int -> Int
+spillSlotToOffset slot
+   | slot >= 0 && slot < maxSpillSlots
+   = 64 + 8 * slot
+   | otherwise
+   = pprPanic "spillSlotToOffset:" 
+              (text "invalid spill location: " <> int slot)
+
 spillReg, loadReg :: Reg -> Reg -> InstrList
 
 spillReg dyn (MemoryReg i pk)
-  | i >= 0 -- JRS paranoia
-  = let	sz = primRepToSize pk
+  = let	sz  = primRepToSize pk
+        off = spillSlotToOffset i
     in
     mkUnitList (
 	{-Alpha: spill below the stack pointer (?)-}
-	 IF_ARCH_alpha( ST sz dyn (spRel i)
+	 IF_ARCH_alpha( ST sz dyn (spRel (- (off `div` 8)))
 
 	{-I386: spill above stack pointer leaving 2 words/spill-}
-	,IF_ARCH_i386 ( let loc | i < 60    = 4 + 2 * i
-                                | otherwise = -2000 - 2 * i
+	,IF_ARCH_i386 ( let off_w = off `div` 4
                         in
                         if pk == FloatRep || pk == DoubleRep
-                        then GST DF dyn (spRel loc)
-                        else MOV sz (OpReg dyn) (OpAddr (spRel loc))
+                        then GST DF dyn (spRel off_w)
+                        else MOV sz (OpReg dyn) (OpAddr (spRel off_w))
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
-	,IF_ARCH_sparc( ST sz dyn (fpRel (-2 * i))
+	,IF_ARCH_sparc( ST sz dyn (fpRel (- (off `div` 4)))
         ,)))
     )
-  | otherwise
-  = pprPanic "spillReg:" (text "invalid spill location: " <> int i)
    
-----------------------------
 loadReg (MemoryReg i pk) dyn
-  | i >= 0 -- JRS paranoia
-  = let	sz = primRepToSize pk
+  = let	sz  = primRepToSize pk
+        off = spillSlotToOffset i
     in
     mkUnitList (
-	 IF_ARCH_alpha( LD  sz dyn (spRel i)
-	,IF_ARCH_i386 ( let loc | i < 60    = 4 + 2 * i
-                                | otherwise = -2000 - 2 * i
+	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))
+	,IF_ARCH_i386 ( let off_w = off `div` 4
                         in
                         if   pk == FloatRep || pk == DoubleRep
-                        then GLD DF (spRel loc) dyn
-                        else MOV sz (OpAddr (spRel loc)) (OpReg dyn)
-	,IF_ARCH_sparc( LD  sz (fpRel (-2 * i)) dyn
+                        then GLD DF (spRel off_w) dyn
+                        else MOV sz (OpAddr (spRel off_w)) (OpReg dyn)
+	,IF_ARCH_sparc( LD  sz (fpRel (- (off `div` 4))) dyn
 	,)))
     )
-  | otherwise
-  = pprPanic "loadReg:" (text "invalid spill location: " <> int i)
 \end{code}

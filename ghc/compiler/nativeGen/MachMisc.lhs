@@ -503,11 +503,11 @@ current translation.
 	      | XOR	      Size Operand Operand
 	      | NOT	      Size Operand
 	      | NEGI	      Size Operand -- NEG instruction (name clash with Cond)
-	      | SHL	      Size Operand Operand -- 1st operand must be an Imm or CL
-	      | SAR	      Size Operand Operand -- 1st operand must be an Imm or CL
-	      | SHR	      Size Operand Operand -- 1st operand must be an Imm or CL
-	      | NOP
+	      | SHL	      Size Imm Operand -- Only immediate shifts allowed
+	      | SAR	      Size Imm Operand -- Only immediate shifts allowed
+	      | SHR	      Size Imm Operand -- Only immediate shifts allowed
               | BT            Size Imm Operand
+	      | NOP
 
 -- Float Arithmetic. -- ToDo for 386
 

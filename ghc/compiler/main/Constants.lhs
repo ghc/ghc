@@ -25,6 +25,7 @@ module Constants (
 	tICKY_HDR_SIZE,
 	aRR_WORDS_HDR_SIZE,
 	aRR_PTRS_HDR_SIZE,
+        rESERVED_C_STACK_BYTES,
 
 	sTD_ITBL_SIZE,
 	pROF_ITBL_SIZE,
@@ -228,4 +229,11 @@ using:
 \begin{code}
 interfaceFileFormatVersion :: Int
 interfaceFileFormatVersion = HscIfaceFileVersion
+\end{code}
+
+This tells the native code generator the size of the spill
+area is has available.
+
+\begin{code}
+rESERVED_C_STACK_BYTES = (RESERVED_C_STACK_BYTES :: Int)
 \end{code}

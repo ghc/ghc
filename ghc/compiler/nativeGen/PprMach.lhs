@@ -977,9 +977,10 @@ pprInstr (XOR size src dst) = pprSizeOpOp SLIT("xor")  size src dst
 pprInstr (NOT size op) = pprSizeOp SLIT("not") size op
 pprInstr (NEGI size op) = pprSizeOp SLIT("neg") size op
 
-pprInstr (SHL size imm dst) = {-pprSizeByteOpOp-} pprSizeOpOp SLIT("shl")  size imm dst
-pprInstr (SAR size imm dst) = {-pprSizeByteOpOp-} pprSizeOpOp SLIT("sar")  size imm dst
-pprInstr (SHR size imm dst) = {-pprSizeByteOpOp-} pprSizeOpOp SLIT("shr")  size imm dst
+pprInstr (SHL size imm dst) = pprSizeImmOp SLIT("shl") size imm dst
+pprInstr (SAR size imm dst) = pprSizeImmOp SLIT("sar") size imm dst
+pprInstr (SHR size imm dst) = pprSizeImmOp SLIT("shr") size imm dst
+pprInstr (BT  size imm src) = pprSizeImmOp SLIT("bt")  size imm src
 
 pprInstr (CMP size src dst) = pprSizeOpOp SLIT("cmp")  size src dst
 pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
@@ -989,7 +990,6 @@ pprInstr PUSHA = ptext SLIT("\tpushal")
 pprInstr POPA = ptext SLIT("\tpopal")
 
 pprInstr (NOP) = ptext SLIT("\tnop")
-pprInstr (BT size imm src) = pprSizeImmOp SLIT("bt") size imm src
 pprInstr (CLTD) = ptext SLIT("\tcltd")
 
 pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand B op)

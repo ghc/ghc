@@ -631,9 +631,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    => trivialCode's is not restrictive enough (sigh.)
 	-}
 	   
-      SllOp -> shift_code (SHL L) x y {-False-}
-      SrlOp -> shift_code (SHR L) x y {-False-}
-
+      SllOp  -> shift_code (SHL L) x y {-False-}
+      SrlOp  -> shift_code (SHR L) x y {-False-}
       ISllOp -> shift_code (SHL L) x y {-False-}
       ISraOp -> shift_code (SAR L) x y {-False-}
       ISrlOp -> shift_code (SHR L) x y {-False-}
@@ -649,7 +648,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   where
 
     --------------------
-    shift_code :: (Operand -> Operand -> Instr)
+    shift_code :: (Imm -> Operand -> Instr)
 	       -> StixTree
 	       -> StixTree
 	       -> UniqSM Register
@@ -659,21 +658,16 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
     shift_code instr x y{-amount-}
       | maybeToBool imm
       = getRegister x		`thenUs` \ register ->
-	let
-	    op_imm = OpImm imm__2
+	let op_imm = OpImm imm__2
 	    code__2 dst = 
-		let
-		 code  = registerCode  register dst
-		 src   = registerName  register dst
+		let code  = registerCode  register dst
+                    src   = registerName  register dst
 	        in
-		mkSeqInstr (COMMENT SLIT("shift_code")) . 
 		code .
 		if isFixed register && src /= dst
-		then
-		   mkSeqInstrs [MOV L (OpReg src) (OpReg dst),
-				instr op_imm  (OpReg dst)]
-		else
-		   mkSeqInstr (instr op_imm (OpReg src)) 
+		then mkSeqInstrs [MOV L (OpReg src) (OpReg dst),
+                                  instr imm__2  (OpReg dst)]
+                else mkSeqInstr (instr imm__2 (OpReg src)) 
 	in
         returnUs (Any IntRep code__2)
       where
@@ -681,6 +675,12 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
        imm__2 = case imm of Just x -> x
 
       {- Case2: shift length is complex (non-immediate) -}
+      -- Since ECX is always used as a spill temporary, we can't
+      -- use it here to do non-immediate shifts.  No big deal --
+      -- they are only very rare, and we can use an equivalent
+      -- test-and-jump sequence which doesn't use ECX.
+      -- DO NOT USE REPLACE THIS CODE WITH THE "OBVIOUS" shl/shr/sar CODE, 
+      -- SINCE IT WILL CAUSE SERIOUS PROBLEMS WITH THE SPILLER
     shift_code instr x y{-amount-}
      = getRegister x   `thenUs` \ register1 ->
        getRegister y   `thenUs` \ register2 ->
@@ -707,66 +707,33 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 
                        BT L (ImmInt 4) r_tmp,
                        JXX GEU lbl_test3,
-                       instr (OpImm (ImmInt 16)) r_dst,
+                       instr (ImmInt 16) r_dst,
 
                        LABEL lbl_test3,
                        BT L (ImmInt 3) r_tmp,
                        JXX GEU lbl_test2,
-                       instr (OpImm (ImmInt 8)) r_dst,
+                       instr (ImmInt 8) r_dst,
 
                        LABEL lbl_test2,
                        BT L (ImmInt 2) r_tmp,
                        JXX GEU lbl_test1,
-                       instr (OpImm (ImmInt 4)) r_dst,
+                       instr (ImmInt 4) r_dst,
 
                        LABEL lbl_test1,
                        BT L (ImmInt 1) r_tmp,
                        JXX GEU lbl_test0,
-                       instr (OpImm (ImmInt 2)) r_dst,
+                       instr (ImmInt 2) r_dst,
 
                        LABEL lbl_test0,
                        BT L (ImmInt 0) r_tmp,
                        JXX GEU lbl_after,
-                       instr (OpImm (ImmInt 1)) r_dst,
+                       instr (ImmInt 1) r_dst,
                        LABEL lbl_after,
                                            
                        COMMENT (_PK_ "end shift sequence")
                     ]
        in
        returnUs (Any IntRep code__2)
-
-{-
-     -- since ECX is always used as a spill temporary, we can't
-     -- use it here to do non-immediate shifts.  No big deal --
-     -- they are only very rare, and we can give an equivalent
-     -- insn sequence which doesn't use ECX.
-     -- DO NOT USE THIS CODE, SINCE IT IS INCOMPATIBLE WITH THE SPILLER
-     = getRegister y		`thenUs` \ register1 ->  
-       getRegister x		`thenUs` \ register2 ->
-       let
-	-- Note: we force the shift length to be loaded
-	-- into ECX, so that we can use CL when shifting.
-	-- (only register location we are allowed
-	-- to put shift amounts.)
-	-- 
-	-- The shift instruction is fed ECX as src reg,
-	-- but we coerce this into CL when printing out.
-	src1	= registerName register1 ecx
-    	code1   = if src1 /= ecx then -- if it is not in ecx already, force it!
-    		    registerCode register1 ecx .
-		    mkSeqInstr (MOV L (OpReg src1) (OpReg ecx))
-		  else 
-    		    registerCode register1 ecx
-    	code__2 = 
-		      let
-	               code2 = registerCode register2 eax
-	               src2  = registerName register2 eax
-		      in
-		      code1 . code2 .
-		      mkSeqInstr (instr (OpReg ecx) (OpReg eax))
-       in
-       returnUs (Fixed IntRep eax code__2)
--}
 
     --------------------
     add_code :: Size -> StixTree -> StixTree -> UniqSM Register
