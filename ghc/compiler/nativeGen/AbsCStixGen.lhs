@@ -225,15 +225,14 @@ Here we handle top-level things, like @CCodeBlock@s and
     promote_to_word CharRep = IntRep
     promote_to_word other   = other
 
-    -- always at least one padding word: this is the static link field
-    -- for the garbage collector.
-    padding_wds = if closureUpdReqd cl_info then
-    	    		take (max 0 (mIN_UPD_SIZE - length amodes)) zeros
-    	   	  else
-    	    		[]
+    upd_reqd = closureUpdReqd cl_info
 
-    static_link | staticClosureNeedsLink cl_info = [StInt 0]
-	        | otherwise                      = []
+    padding_wds
+	| upd_reqd  = take (max 0 (mIN_UPD_SIZE - length amodes)) zeros
+	| otherwise = []
+
+    static_link | upd_reqd || staticClosureNeedsLink cl_info = [StInt 0]
+	        | otherwise                                  = []
 
     zeros = StInt 0 : zeros
 
