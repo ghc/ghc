@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hs,v 1.5 2002/02/27 14:32:23 simonmar Exp $
+-- $Id: Handle.hs,v 1.6 2002/03/26 17:06:32 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -118,6 +118,8 @@ withHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
 withHandle fun h@(FileHandle m)     act = withHandle' fun h m act
 withHandle fun h@(DuplexHandle m _) act = withHandle' fun h m act
 
+withHandle' :: String -> Handle -> MVar Handle__
+   -> (Handle__ -> IO (Handle__,a)) -> IO a
 withHandle' fun h m act = 
    block $ do
    h_ <- takeMVar m
@@ -756,6 +758,7 @@ hClose' h m = withHandle__' "hClose" h m $ hClose_help
 -- then closed immediately.  We have to be careful with DuplexHandles
 -- though: we have to leave the closing to the finalizer in that case,
 -- because the write side may still be in use.
+hClose_help :: Handle__ -> IO Handle__
 hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return handle_
@@ -1178,6 +1181,7 @@ hIsTerminalDevice handle = do
 -- -----------------------------------------------------------------------------
 -- hSetBinaryMode
 
+hSetBinaryMode :: Handle -> Bool -> IO ()
 hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
     do throwErrnoIfMinus1_ "hSetBinaryMode"
