@@ -958,6 +958,14 @@ AC_CHECK_FUNCS(pclose    _pclose )
 dnl ** check for specific library functions that we are interested in
 AC_CHECK_FUNCS(access ftime getclock getpagesize getrusage gettimeofday mktime mprotect readlink setitimer stat lstat symlink sysconf timelocal times vadvise vfork localtime_r gmtime_r readdir_r getgrgid_r getgrnam_r getpwuid_r getpwnam_r)
 
+dnl ** Solaris2 needs additionl flag for getpw*_r()
+case "$TargetPlatform" in
+  *-solaris2*)
+    unix_SRC_HSC2HS_OPTS="-D_POSIX_PTHREAD_SEMANTICS"
+    AC_SUBST(unix_SRC_HSC2HS_OPTS)
+  ;;
+esac
+
 dnl ** check whether this machine has gmp3 installed
 AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
   AC_CHECK_LIB(gmp3, __gmpz_fdiv_qr,  HaveLibGmp=YES; LibGmp=gmp3,

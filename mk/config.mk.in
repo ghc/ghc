@@ -662,6 +662,9 @@ ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
 SRC_CC_OPTS += -G0
 endif
 
+# Solaris2 strikes again.
+unix_SRC_HSC2HS_OPTS += @unix_SRC_HSC2HS_OPTS@
+
 #-----------------------------------------------------------------------------
 # GMP Library (version 2.0.x or above)
 #
