@@ -52,7 +52,7 @@ import PrelInfo		( builtinNames )
 import TyCon		( TyCon {- instance NamedThing -} )
 import TysWiredIn	( boolTyCon )
 import Pretty
-import Outputable	( PprStyle(..) )
+import Outputable	( PprStyle(..), printErrs )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
@@ -97,8 +97,7 @@ traceRn msg | opt_D_show_rn_trace = putDocRn msg
 	    | otherwise		  = returnRn ()
 
 putDocRn :: Doc -> RnMG ()
-putDocRn msg = ioToRnMG (hPutStr stderr (show msg) >> 
-	       hPutStr stderr "\n")	`thenRn_`
+putDocRn msg = ioToRnMG (printErrs msg)	`thenRn_`
 	       returnRn ()
 \end{code}
 
