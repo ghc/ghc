@@ -17,26 +17,25 @@ module SaAbsInt (
 
 IMP_Ubiq(){-uitous-}
 
+import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
 import CoreUnfold	( Unfolding(..), UfExpr, RdrName, SimpleUnfolding(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
 			  dataConTyCon, dataConArgTys, SYN_IE(Id)
 			)
-import IdInfo		( StrictnessInfo(..),
-			  wwPrim, wwStrict, wwEnum, wwUnpack
-			)
-import Demand		( Demand(..) )
+import IdInfo		( StrictnessInfo(..) )
+import Demand		( Demand(..), wwPrim, wwStrict, wwEnum, wwUnpackData, wwUnpackNew )
 import MagicUFs		( MagicUnfoldingFun )
 import Maybes		( maybeToBool )
-import Outputable	( Outputable(..){-instance * []-} )
-import PprStyle		( PprStyle(..) )
-import Pretty		( Doc, ptext )
+import Outputable	
+import Pretty		--TEMP:( Doc, ptext )
 import PrimOp		( PrimOp(..) )
 import SaLib
-import TyCon		( maybeTyConSingleCon, isEnumerationTyCon,
+import TyCon		( maybeTyConSingleCon, isEnumerationTyCon, isNewTyCon, 
 			  TyCon{-instance Eq-}
 			)
+import BasicTypes	( NewOrData(..) )
 import Type		( maybeAppDataTyConExpandingDicts, 
 		          isPrimType, SYN_IE(Type) )
 import TysWiredIn	( intTyCon, integerTyCon, doubleTyCon,
@@ -344,7 +343,10 @@ evalStrictness (WwLazy _) _   = False
 evalStrictness WwStrict   val = isBot val
 evalStrictness WwEnum	  val = isBot val
 
-evalStrictness (WwUnpack _ demand_info) val
+evalStrictness (WwUnpack NewType _ (demand:_)) val
+  = evalStrictness demand val
+
+evalStrictness (WwUnpack DataType _ demand_info) val
   = case val of
       AbsTop	   -> False
       AbsBot	   -> True
@@ -369,7 +371,10 @@ possibly} hit poison.
 evalAbsence (WwLazy True) _ = False	-- Can't possibly hit poison
 					-- with Absent demand
 
-evalAbsence (WwUnpack _ demand_info) val
+evalAbsence (WwUnpack NewType _ (demand:_)) val
+  = evalAbsence demand val
+
+evalAbsence (WwUnpack DataType _ demand_info) val
   = case val of
 	AbsTop	     -> False		-- No poison in here
 	AbsBot 	     -> True		-- Pure poison
@@ -503,7 +508,8 @@ absEval AbsAnal (Prim op as) env
 
 absEval anal (Con con as) env
   | has_single_con
-  = AbsProd [absEvalAtom anal a env | a <- as, isValArg a]
+  = --pprTrace "absEval.Con" (cat[ text "con: ", (ppr PprDebug con), text "args: ", interppSP PprDebug as]) $
+    AbsProd [absEvalAtom anal a env | a <- as, isValArg a]
 
   | otherwise	-- Not single-constructor
   = case anal of
@@ -695,7 +701,7 @@ absApply AbsAnal (AbsApproxFun demand val) arg
     else val
 
 #ifdef DEBUG
-absApply anal (AbsProd _)       arg = panic ("absApply: Duff function: AbsProd." ++ show anal)
+absApply anal f@(AbsProd _)       arg = pprPanic ("absApply: Duff function: AbsProd." ++ show anal) ((ppr PprDebug f) <+> (ppr PprDebug arg))
 #endif
 \end{code}
 
@@ -724,21 +730,20 @@ unbound variables in an @AbsValEnv@ are implicitly mapped to that.
 See notes on @addStrictnessInfoToId@.
 
 \begin{code}
-findStrictness :: StrAnalFlags
-	       -> [Type]	-- Types of args in which strictness is wanted
+findStrictness :: [Type]	-- Types of args in which strictness is wanted
 	       -> AbsVal 	-- Abstract strictness value of function
 	       -> AbsVal	-- Abstract absence value of function
 	       -> [Demand]	-- Resulting strictness annotation
 
-findStrictness strflags [] str_val abs_val = []
+findStrictness [] str_val abs_val = []
 
-findStrictness strflags (ty:tys) str_val abs_val
+findStrictness (ty:tys) str_val abs_val
   = let
-	demand 	     = findRecDemand strflags [] str_fn abs_fn ty
+	demand 	     = findRecDemand [] str_fn abs_fn ty
 	str_fn val   = absApply StrAnal str_val val
 	abs_fn val   = absApply AbsAnal abs_val val
 
-	demands = findStrictness strflags tys
+	demands = findStrictness tys
 			(absApply StrAnal str_val AbsTop)
 			(absApply AbsAnal abs_val AbsTop)
     in
@@ -748,29 +753,26 @@ findStrictness strflags (ty:tys) str_val abs_val
 
 \begin{code}
 findDemandStrOnly str_env expr binder 	-- Only strictness environment available
-  = findRecDemand strflags [] str_fn abs_fn (idType binder)
+  = findRecDemand [] str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = AbsBot		-- Always says poison; so it looks as if
 				-- nothing is absent; safe
-    strflags   = getStrAnalFlags str_env
 
 findDemandAbsOnly abs_env expr binder 	-- Only absence environment available
-  = findRecDemand strflags [] str_fn abs_fn (idType binder)
+  = findRecDemand [] str_fn abs_fn (idType binder)
   where
     str_fn val = AbsBot		-- Always says non-termination;
 				-- that'll make findRecDemand peer into the
 				-- structure of the value.
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
-    strflags   = getStrAnalFlags abs_env
 
 
 findDemand str_env abs_env expr binder
-  = findRecDemand strflags [] str_fn abs_fn (idType binder)
+  = findRecDemand [] str_fn abs_fn (idType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
-    strflags   = getStrAnalFlags str_env
 \end{code}
 
 @findRecDemand@ is where we finally convert strictness/absence info
@@ -806,15 +808,14 @@ then we'd let-to-case it:
 Ho hum.
 
 \begin{code}
-findRecDemand :: StrAnalFlags
-	      -> [TyCon]	    -- TyCons already seen; used to avoid
+findRecDemand :: [TyCon]	    -- TyCons already seen; used to avoid
 				    -- zooming into recursive types
 	      -> (AbsVal -> AbsVal) -- The strictness function
 	      -> (AbsVal -> AbsVal) -- The absence function
 	      -> Type 	    -- The type of the argument
 	      -> Demand
 
-findRecDemand strflags seen str_fn abs_fn ty
+findRecDemand seen str_fn abs_fn ty
   = if isPrimType ty then -- It's a primitive type!
        wwPrim
 
@@ -822,9 +823,9 @@ findRecDemand strflags seen str_fn abs_fn ty
        -- We prefer absence over strictness: see NOTE above.
        WwLazy True
 
-    else if not (all_strict ||
-		 (num_strict && is_numeric_type ty) ||
-		 (isBot (str_fn AbsBot))) then
+    else if not (opt_AllStrict ||
+		(opt_NumbersStrict && is_numeric_type ty) ||
+		(isBot (str_fn AbsBot))) then
 	WwLazy False -- It's not strict and we're not pretending
 
     else -- It's strict (or we're pretending it is)!
@@ -835,12 +836,25 @@ findRecDemand strflags seen str_fn abs_fn ty
 
 	 Just (tycon,tycon_arg_tys,[data_con]) | tycon `not_elem` seen ->
 	   -- Single constructor case, tycon not already seen higher up
+
 	   let
 	      cmpnt_tys = dataConArgTys data_con tycon_arg_tys
 	      prod_len = length cmpnt_tys
+	   in
 
+	   if isNewTyCon tycon then	-- A newtype!
+		ASSERT( null (tail cmpnt_tys) )
+		let
+		    demand = findRecDemand (tycon:seen) str_fn abs_fn (head cmpnt_tys)
+		in
+		case demand of		-- No point in unpacking unless there is more to see inside
+		  WwUnpack _ _ _ -> wwUnpackNew demand
+		  other	         -> wwStrict 
+
+	   else				-- A data type!
+	   let
 	      compt_strict_infos
-		= [ findRecDemand strflags (tycon:seen)
+		= [ findRecDemand (tycon:seen)
 			 (\ cmpnt_val ->
 			       str_fn (mkMainlyTopProd prod_len i cmpnt_val)
 			 )
@@ -853,7 +867,7 @@ findRecDemand strflags seen str_fn abs_fn ty
 	   if null compt_strict_infos then
 		 if isEnumerationTyCon tycon then wwEnum else wwStrict
 	   else
-		 wwUnpack compt_strict_infos
+		 wwUnpackData compt_strict_infos
 	  where
 	   not_elem = isn'tIn "findRecDemand"
 
@@ -867,8 +881,6 @@ findRecDemand strflags seen str_fn abs_fn ty
 	    else
 		wwStrict
   where
-    (all_strict, num_strict) = strflags
-
     is_numeric_type ty
       = case (maybeAppDataTyConExpandingDicts ty) of -- NB: duplicates stuff done above
 	  Nothing -> False
