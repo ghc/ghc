@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.42 2001/02/12 11:38:49 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.43 2001/02/12 12:25:50 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -7,6 +7,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS -#include "Linker.h" #-}
 module InteractiveUI (interactiveUI) where
 
 #include "HsVersions.h"
