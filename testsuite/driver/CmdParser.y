@@ -52,6 +52,7 @@ import CmdLexer
 
 %name parser
 
+%nonassoc 'else' 'contents' 'exists' 'run' 'defined' 'framefail'
 %left  '||'
 %left '&&'
 %nonassoc '==' '/=' 'contains' 'lacks'
