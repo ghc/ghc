@@ -1009,9 +1009,11 @@ kexp	:  kexpL
 	|  kexpLno
 	;
 
+/* kexpL = a let expression */
 kexpL	:  letdecls IN exp			{ $$ = mklet($1,$3); }
 	;
 
+/* kexpLno = any other expression more tightly binding than operator application */
 kexpLno	:  LAMBDA
 		{ hsincindent();        /* push new context for FN = NULL;        */
 		  FN = NULL; 	        /* not actually concerned about indenting */
@@ -1199,7 +1201,7 @@ stmts	:  stmt					{ $$ = $1; }
 
 stmt	:  /* empty */				{ $$ = Lnil; }
 	|  letdecls				{ $$ = lsing(mkseqlet($1)); }
-	|  expL					{ $$ = lsing($1); }
+	|  expL					{ $$ = lsing(mkdoexp($1,hsplineno)); }
 	|  {inpat=TRUE;} expLno {inpat=FALSE;} leftexp
 		{ if ($4 == NULL) {
 		      expORpat(LEGIT_EXPR,$2);
