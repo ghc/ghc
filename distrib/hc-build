@@ -43,14 +43,43 @@ $MAKE -C hslibs boot all
 $MAKE -C ghc all
 
 echo "*** Building libraries..."
-GHC="$PWD/ghc/compiler/ghc-inplace" HappyCmd="$PWD/distrib/fake-happy" ./configure
 
-# make ghc/utils while we still have libraries in ghc/lib
-$MAKE -C ghc/utils clean boot
-$MAKE -C ghc/utils all
+# Reconfigure, using the newly-build ghc binary as our $(GHC), and
+# with hc bootstrapping disabled.
+HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/ghc/compiler/ghc-inplace"
 
-# now, clean and build the libraries
-$MAKE -C ghc/lib   clean boot
-$MAKE -C ghc/lib   all
-$MAKE -C hslibs    clean boot
-$MAKE -C hslibs    all
+PRIMOP_BITS=primop-data-decl.hs-incl \
+            primop-tag.hs-incl  \
+            primop-list.hs-incl  \
+            primop-has-side-effects.hs-incl  \
+            primop-out-of-line.hs-incl  \
+            primop-commutable.hs-incl  \
+            primop-needs-wrapper.hs-incl  \
+            primop-can-fail.hs-incl  \
+            primop-strictness.hs-incl  \
+            primop-usage.hs-incl  \
+            primop-primop-info.hs-incl
+
+# The reconfigure step updates a few files, which can lead to
+# unnecessary recompilations.  Touch a bunch of things here to avoid
+# having to recompile stuff that we've already built.
+(cd ghc/compiler; touch $PRIMOP_BITS prelude/PrimOp.o main/Config.{hs,o} ghc-*)
+
+# Remove the old libraries.  Don't use make clean, because we don't
+# want to delete the .hs files generated from the .hsc files, because
+# we don't have hsc2hs built yet.
+/usr/bin/find ghc/lib/std hslibs | grep '\.\(o\|a\)' | /usr/bin/xargs rm -f
+
+# Do includes and RTS now
+$MAKE -C ghc/includes boot && $MAKE -C ghc/includes all
+$MAKE -C ghc/rts      boot && $MAKE -C ghc/rts      all
+
+# Now build a new set of libraries
+$MAKE -C ghc/lib boot all
+$MAKE -C hslibs  boot all
+
+# Finally build ghc/utils, now that we have libraries
+$MAKE -C ghc/utils boot all
+
+# At this point, the tree should be safe to do 'make install' in.
+
