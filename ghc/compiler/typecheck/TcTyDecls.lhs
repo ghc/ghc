@@ -14,11 +14,12 @@ module TcTyDecls (
 
 IMP_Ubiq(){-uitous-}
 
-import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..), 
+import HsSyn		( TyDecl(..), ConDecl(..), ConDetails(..), BangType(..), HsExpr(..), 
 			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
 			  HsBinds(..), HsLit, Stmt, DoOrListComp, ArithSeqInfo,
+			  SYN_IE(RecFlag), nonRecursive,
 			  HsType, Fake, InPat, HsTyVar, Fixity,
-			  Bind(..), MonoBinds(..), Sig 
+			  MonoBinds(..), Sig 
 			)
 import HsTypes		( getTyVarName )
 import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
@@ -39,17 +40,19 @@ import PprType		( GenClass, GenType{-instance Outputable-},
 			  GenTyVar{-instance Outputable-}{-ToDo:possibly rm-}
 			)
 import CoreUnfold	( getUnfoldingTemplate )
-import Class		( GenClass{-instance Eq-}, classInstEnv )
+import Class		( GenClass{-instance Eq-}, classInstEnv, SYN_IE(Class) )
 import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			  dataConFieldLabels, dataConStrictMarks,
 			  StrictnessMark(..), getIdUnfolding,
-			  GenId{-instance NamedThing-}
+			  GenId{-instance NamedThing-},
+			  SYN_IE(Id)
 			)
 import FieldLabel
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
 import SpecEnv		( SpecEnv, nullSpecEnv )
 import Name		( nameSrcLoc, isLocallyDefined, getSrcLoc,
-			  OccName(..), Name{-instance Ord3-}
+			  OccName(..), Name{-instance Ord3-},
+			  NamedThing(..)
 			)
 import Outputable	( Outputable(..), interpp'SP )
 import Pretty
@@ -59,12 +62,14 @@ import TyCon		( TyCon, NewOrData(..), mkSynTyCon, mkDataTyCon, isDataTyCon,
 import Type		( GenType, -- instances
 			  typeKind, getTyVar, tyVarsOfTypes, eqTy, splitSigmaTy,
 			  applyTyCon, mkTyVarTys, mkForAllTys, mkFunTy,
-			  splitFunTy, mkTyVarTy, getTyVar_maybe
+			  splitFunTy, mkTyVarTy, getTyVar_maybe,
+			  SYN_IE(Type)
 			)
-import TyVar		( tyVarKind, elementOfTyVarSet, GenTyVar{-instance Eq-} )
+import TyVar		( tyVarKind, elementOfTyVarSet, 
+			  GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
 import Unique		( Unique {- instance Eq -}, evalClassKey )
 import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, SYN_IE(UniqSet) )
-import Util		( equivClasses, zipEqual, nOfThem, panic, assertPanic )
+import Util		( equivClasses, zipEqual, nOfThem, panic, assertPanic, Ord3(..) )
 \end{code}
 
 \begin{code}
@@ -115,14 +120,7 @@ Algebraic data and newtype decls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-tcTyDecl (TyData context tycon_name tyvar_names con_decls derivings pragmas src_loc)
-  = tcTyDataOrNew DataType context tycon_name tyvar_names con_decls derivings pragmas src_loc
-
-tcTyDecl (TyNew context tycon_name tyvar_names con_decl derivings pragmas src_loc)
-  = tcTyDataOrNew NewType  context tycon_name tyvar_names [con_decl] derivings pragmas src_loc
-
-
-tcTyDataOrNew data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc
+tcTyDecl (TyData data_or_new context tycon_name tyvar_names con_decls derivings pragmas src_loc)
   = tcAddSrcLoc src_loc $
     tcAddErrCtxt (tyDataCtxt tycon_name) $
 
@@ -192,7 +190,7 @@ mkDataBinds_one tycon
 		]
     in	
     returnTc (data_ids,
-	      SingleBind (NonRecBind (foldr AndMonoBinds EmptyMonoBinds binds))
+	      MonoBind (foldr AndMonoBinds EmptyMonoBinds binds) [] nonRecursive
 	     )
   where
     data_cons = tyConDataCons tycon
@@ -244,7 +242,7 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
     field_ty   = fieldLabelType first_field_label
     field_name = fieldLabelName first_field_label
     other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
-    (tyvars, _, _, _) = dataConSig first_con
+    (tyvars, _, _, _, _, _) = dataConSig first_con
     data_ty  = applyTyCon tycon (mkTyVarTys tyvars)
     -- tyvars of first_con may be free in field_ty
     -- Now build the selector
@@ -263,13 +261,13 @@ Constructors
 \begin{code}
 tcConDecl :: TyCon -> [TyVar] -> [(Class,Type)] -> RenamedConDecl -> TcM s Id
 
-tcConDecl tycon tyvars ctxt (ConDecl name btys src_loc)
+tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (VanillaCon btys) src_loc)
   = tcDataCon tycon tyvars ctxt name btys src_loc
 
-tcConDecl tycon tyvars ctxt (ConOpDecl bty1 op bty2 src_loc)
+tcConDecl tycon tyvars ctxt (ConDecl op ex_ctxt (InfixCon bty1 bty2) src_loc)
   = tcDataCon tycon tyvars ctxt op [bty1,bty2] src_loc
 
-tcConDecl tycon tyvars ctxt (NewConDecl name ty src_loc)
+tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (NewCon ty) src_loc)
   = tcAddSrcLoc src_loc	$
     tcHsType ty `thenTc` \ arg_ty ->
     let
@@ -278,13 +276,13 @@ tcConDecl tycon tyvars ctxt (NewConDecl name ty src_loc)
 			   [{- No labelled fields -}]
 		      	   tyvars
 		      	   ctxt
+			   [] []	-- Temporary
 		      	   [arg_ty]
 		      	   tycon
-			-- nullSpecEnv
     in
     returnTc data_con
 
-tcConDecl tycon tyvars ctxt (RecConDecl name fields src_loc)
+tcConDecl tycon tyvars ctxt (ConDecl name ex_ctxt (RecCon fields) src_loc)
   = tcAddSrcLoc src_loc	$
     mapTc tcField fields	`thenTc` \ field_label_infos_s ->
     let
@@ -300,9 +298,9 @@ tcConDecl tycon tyvars ctxt (RecConDecl name fields src_loc)
 			   field_labels
 		      	   tyvars
 		      	   (thinContext arg_tys ctxt)
+			   [] []	-- Temporary
 		      	   arg_tys
 		      	   tycon
-			-- nullSpecEnv
     in
     returnTc data_con
 
@@ -323,9 +321,9 @@ tcDataCon tycon tyvars ctxt name btys src_loc
 			   [{- No field labels -}]
 		      	   tyvars
 		      	   (thinContext arg_tys ctxt)
+			   [] []	-- Temporary
 		      	   arg_tys
 		      	   tycon
-			-- nullSpecEnv
     in
     returnTc data_con
 
@@ -350,19 +348,19 @@ Errors and contexts
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tySynCtxt tycon_name sty
-  = ppCat [ppPStr SLIT("In the type declaration for"), ppr sty tycon_name]
+  = hsep [ptext SLIT("In the type declaration for"), ppr sty tycon_name]
 
 tyDataCtxt tycon_name sty
-  = ppCat [ppPStr SLIT("In the data declaration for"), ppr sty tycon_name]
+  = hsep [ptext SLIT("In the data declaration for"), ppr sty tycon_name]
 
 tyNewCtxt tycon_name sty
-  = ppCat [ppPStr SLIT("In the newtype declaration for"), ppr sty tycon_name]
+  = hsep [ptext SLIT("In the newtype declaration for"), ppr sty tycon_name]
 
 fieldTypeMisMatch field_name sty
-  = ppSep [ppPStr SLIT("Declared types differ for field"), ppr sty field_name]
+  = sep [ptext SLIT("Declared types differ for field"), ppr sty field_name]
 
 missingEvalErr con eval_theta sty
-  = ppCat [ppPStr SLIT("Missing Eval context for constructor"), 
-	   ppQuote (ppr sty con),
-	   ppChar ':', ppr sty eval_theta]
+  = hsep [ptext SLIT("Missing Eval context for constructor"), 
+	   ppr sty con,
+	   char ':', ppr sty eval_theta]
 \end{code}
