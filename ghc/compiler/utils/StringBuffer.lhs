@@ -75,7 +75,11 @@ import Char		( chr )
 #include "../lib/std/cbits/stgerror.h"
 
 #if __GLASGOW_HASKELL__ >= 303
-import IO		( openFile, slurpFile )
+import IO		( openFile
+#if __GLASGOW_HASKELL__ < 407
+                        , slurpFile   -- comes from PrelHandle or IOExts now
+#endif
+                        )
 import PrelIOBase
 import PrelHandle
 import Addr
