@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hsc,v 1.14 2001/07/13 11:48:52 rrt Exp $
+-- $Id: PrelHandle.hsc,v 1.15 2001/07/13 15:01:28 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -1174,7 +1174,7 @@ hIsTerminalDevice handle = do
 -- hSetBinaryMode
 
 #ifdef _WIN32
-hSetBinaryMode handle bin = 
+hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
     do let flg | bin       = (#const O_BINARY)
 	       | otherwise = (#const O_TEXT)
@@ -1184,10 +1184,9 @@ hSetBinaryMode handle bin =
 
 foreign import "setmode" setmode :: CInt -> CInt -> IO CInt
 #else
-hSetBinaryMode handle bin = do
+hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
     return handle_{haIsBin=bin}
-  return ()
 #endif
 
 -- -----------------------------------------------------------------------------
