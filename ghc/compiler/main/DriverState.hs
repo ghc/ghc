@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.77 2002/04/22 16:06:36 simonpj Exp $
+-- $Id: DriverState.hs,v 1.78 2002/05/28 21:52:06 sof Exp $
 --
 -- Settings for the driver
 --
@@ -54,7 +54,7 @@ setMode :: GhcMode -> String -> IO ()
 setMode m flag = do
   old_mode <- readIORef v_GhcMode
   old_flag <- readIORef v_GhcModeFlag
-  when (notNull (old_flag)) $
+  when (notNull old_flag && flag /= old_flag) $
       throwDyn (UsageError 
           ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
   writeIORef v_GhcMode m
