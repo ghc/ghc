@@ -514,8 +514,9 @@ data R a b =
     }
 
 data R a b = 
-  C { a :: a,  -- ^ This is the documentation for the 'a' field
-      b :: b   -- ^ This is the documentation for the 'b' field
+  C { a :: a  -- ^ This is the documentation for the 'a' field
+              -- (NOTE: *before* the following comma)
+    , b :: b  -- ^ This is the documentation for the 'b' field
     }
 </programlisting>
       </section>
