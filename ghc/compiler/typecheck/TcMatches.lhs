@@ -5,10 +5,10 @@
 
 \begin{code}
 module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
-		   matchCtxt,
-		   tcDoStmts, tcStmts, tcMDoStmt, tcGuardStmt, tcThingWithSig,
-		   tcMatchPats,
-		   TcMatchCtxt(..)
+		   tcMatchPats, matchCtxt, TcMatchCtxt(..), 
+		   tcStmts, tcDoStmts, 
+		   tcDoStmt, tcMDoStmt, tcGuardStmt, 
+		   tcThingWithSig
        ) where
 
 #include "HsVersions.h"

@@ -80,7 +80,7 @@ import Outputable
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
 			  LStmt, LHsExpr, LHsType, mkMatchGroup,
-			  collectStmtsBinders, mkSimpleMatch, 
+			  collectLStmtsBinders, mkSimpleMatch, 
 			  mkExprStmt, mkBindStmt, nlVarPat )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..),
@@ -88,11 +88,9 @@ import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
-import TcExpr		( tcCheckRho )
 import TcIface		( loadImportedInsts )
 import TcMType		( zonkTcType, zonkQuantifiedTyVar )
-import TcUnify		( unifyTyConApp )
-import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
+import TcMatches	( tcStmts, tcDoStmt )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
 import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, 
 			  isUnLiftedType, tyClsNamesOfDFunHead )
@@ -122,7 +120,7 @@ import Var		( globaliseId )
 import Name		( nameOccName )
 import OccName		( occNameUserString )
 import NameEnv		( delListFromNameEnv )
-import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
+import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, returnIOName )
 import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
 			  availNames, availName, ModIface(..), icPrintUnqual,
 			  ModDetails(..), Dependencies(..) )
@@ -804,7 +802,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     setInteractiveContext hsc_env ictxt $ do {
 
     -- Rename; use CmdLineMode because tcRnStmt is only used interactively
-    ([rn_stmt], fvs) <- rnStmts DoExpr [rdr_stmt] ;
+    (([rn_stmt], _), fvs) <- rnStmts DoExpr [rdr_stmt] (return ((), emptyFVs)) ;
     traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
     failIfErrsM ;
     
@@ -882,7 +880,7 @@ Here is the grand plan, implemented in tcUserStmt
 \begin{code}
 ---------------------------
 tcUserStmt :: LStmt Name -> TcM ([Id], LHsExpr Id)
-tcUserStmt (L loc (ExprStmt expr _))
+tcUserStmt (L loc (ExprStmt expr _ _))
   = newUnique 		`thenM` \ uniq ->
     let 
 	fresh_it = itName uniq
@@ -902,27 +900,14 @@ tcUserStmt (L loc (ExprStmt expr _))
 tcUserStmt stmt = tc_stmts [stmt]
 
 ---------------------------
-tc_stmts :: [Stmt RdrName] -> 
+tc_stmts :: [LStmt Name] -> TcM ([Id], LHsExpr Id)
 tc_stmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
 	let {
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
 
-	    names = map unLoc (collectStmtsBinders stmts) ;
-
-	    stmt_ctxt = SC { sc_what = DoExpr, 
-			     sc_bind = infer_rhs,
-			     sc_expr = infer_rhs,
-			     sc_body = check_body,
-			     sc_ty   = ret_ty } ;
-
-	    infer_rhs _bind_op rhs
-		= do { (rhs', rhs_ty) <- tcInferRho rhs
-		     ; [pat_ty] <- unifyTyConApp ioTyCon rhs_ty
-		     ; return (noSyntaxExpr, rhs', pat_ty) } ;
-
-	    check_body body = tcCheckRho body io_ret_ty ;
+	    names = map unLoc (collectLStmtsBinders stmts) ;
 
 		-- mk_return builds the expression
 		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
@@ -946,12 +931,12 @@ tc_stmts stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((ids, tc_expr), lie) <- getLIE $ do {
-	    (tc_stmts, ids) <- tcStmtsAndThen combine stmt_ctxt stmts $ 
-			do {
-			    -- Look up the names right in the middle,
-			    -- where they will all be in scope
-			    ids <- mappM tcLookupId names ;
-			    return ids } ;
+		(tc_stmts, ids) <- tcStmts DoExpr (tcDoStmt io_ty io_ret_ty) stmts $ 
+				do {
+				    -- Look up the names right in the middle,
+				    -- where they will all be in scope
+				    ids <- mappM tcLookupId names ;
+				    return ids } ;
 
 	    ret_id <- tcLookupId returnIOName ;		-- return @ IO
 	    return (ids, noLoc (HsDo DoExpr tc_stmts (mk_return ret_id ids) io_ret_ty))
@@ -978,7 +963,6 @@ tc_stmts stmts
 	return (zonked_ids, zonked_expr)
 	}
   where
-    combine stmt (ids, stmts) = (ids, stmt:stmts)
     bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
 				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 \end{code}
