@@ -232,8 +232,8 @@ endif
 # GhcRtsHcOpts is used when compiling .hc files.
 # GhcRtsCcOpts is used when compiling .c  files.
 
-GhcRtsHcOpts=
-GhcRtsCcOpts=
+GhcRtsHcOpts=-O2
+GhcRtsCcOpts=-O2 -optc-fomit-frame-pointer
 
 # Build the Haskell Readline bindings?
 #
