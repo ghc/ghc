@@ -121,10 +121,19 @@ SRC_DIST_FILES += rename/ParseIface.hs \
 #
 HC=$(WithGhcHc)
 
+# magic from GNU make manual to convert a list of values
+# into a colon-separated list
+empty:=
+space:= $(empty) $(empty)
+
 SRC_HC_OPTS += \
-  -cpp -fhaskell-1.3 \
-  -fglasgow-exts -DCOMPILING_GHC -Rghc-timing -I. -IcodeGen \
-  -InativeGen -Iparser $(foreach dir,$(DIRS),-i$(dir))
+  -cpp -fglasgow-exts -Rghc-timing \
+  -I. -IcodeGen -InativeGen -Iparser \
+  -i$(subst $(space),:,$(DIRS))
+
+ifeq "$(Ghc2_0)" "NO"
+SRC_HC_OPTS += -fhaskell-1.3
+endif
 
 # -syslib ghc just needed for use of PackedString.hPutPS
 
@@ -211,7 +220,7 @@ endif
 utils/Argv_HC_OPTS 		= -fvia-C
 utils/SST_HC_OPTS 		= -fvia-C
 utils/PrimPacked_HC_OPTS	= -fvia-C -monly-3-regs
-utils/FastString_HC_OPTS	= -fvia-C
+utils/FastString_HC_OPTS	= -fvia-C -monly-3-regs
 utils/StringBuffer_HC_OPTS	= -fvia-C
 utils/Digraph_HC_OPTS		= -fglasgow-exts -fvia-C
 
