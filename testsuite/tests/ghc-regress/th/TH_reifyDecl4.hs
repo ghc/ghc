@@ -1,6 +1,6 @@
 -- test reification of class declarations
 
-module TH_reifyDecl3
+module TH_reifyDecl4
 where
 
 import Language.Haskell.THSyntax
