@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.2 2001/11/07 19:36:11 sof Exp $
+-- $Id: PrelHandle.hs,v 1.3 2001/11/14 11:39:29 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -292,14 +292,9 @@ ioe_bufsiz n = ioException
 
 -- For a duplex handle, we arrange that the read side points to the write side
 -- (and hence keeps it alive if the read side is alive).  This is done by
--- having the haType field of the read side be ReadSideHandle with a pointer
--- to the write side.  The finalizer is then placed on the write side, and
--- the handle only gets finalized once, when both sides are no longer
--- required.
-
-addFinalizer :: Handle -> IO ()
-addFinalizer (FileHandle m)     = addMVarFinalizer m (handleFinalizer m)
-addFinalizer (DuplexHandle _ w) = addMVarFinalizer w (handleFinalizer w)
+-- having the haOtherSide field of the read side point to the read side.
+-- The finalizer is then placed on the write side, and the handle only gets
+-- finalized once, when both sides are no longer required.
 
 stdHandleFinalizer :: MVar Handle__ -> IO ()
 stdHandleFinalizer m = do
@@ -493,16 +488,7 @@ stdin = unsafePerformIO $ do
    -- ToDo: acquire lock
    setNonBlockingFD fd_stdin
    (buf, bmode) <- getBuffer fd_stdin ReadBuffer
-   spares <- newIORef BufferListNil
-   newFileHandle stdHandleFinalizer
-	    (Handle__ { haFD = fd_stdin,
-			haType = ReadHandle,
-                        haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
-			haBufferMode = bmode,
-			haFilePath = "<stdin>",
-			haBuffer = buf,
-			haBuffers = spares
-		      })
+   mkStdHandle fd_stdin "<stdin>" ReadHandle buf bmode
 
 stdout :: Handle
 stdout = unsafePerformIO $ do
@@ -511,16 +497,7 @@ stdout = unsafePerformIO $ do
    -- some shells don't recover properly.
    -- setNonBlockingFD fd_stdout
    (buf, bmode) <- getBuffer fd_stdout WriteBuffer
-   spares <- newIORef BufferListNil
-   newFileHandle stdHandleFinalizer
-	    (Handle__ { haFD = fd_stdout,
-			haType = WriteHandle,
-                        haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
-			haBufferMode = bmode,
-			haFilePath = "<stdout>",
-			haBuffer = buf,
-			haBuffers = spares
-		      })
+   mkStdHandle fd_stdout "<stdout>" WriteHandle buf bmode
 
 stderr :: Handle
 stderr = unsafePerformIO $ do
@@ -528,17 +505,8 @@ stderr = unsafePerformIO $ do
    -- We don't set non-blocking mode on stdout or sterr, because
    -- some shells don't recover properly.
    -- setNonBlockingFD fd_stderr
-   buffer <- mkUnBuffer
-   spares <- newIORef BufferListNil
-   newFileHandle stdHandleFinalizer
-	    (Handle__ { haFD = fd_stderr,
-			haType = WriteHandle,
-                        haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
-			haBufferMode = NoBuffering,
-			haFilePath = "<stderr>",
-			haBuffer = buffer,
-			haBuffers = spares
-		      })
+   buf <- mkUnBuffer
+   mkStdHandle fd_stderr "<stderr>" WriteHandle buf NoBuffering
 
 -- ---------------------------------------------------------------------------
 -- Opening and Closing Files
@@ -690,6 +658,21 @@ foreign import "lockFile" unsafe
 foreign import "unlockFile" unsafe
   unlockFile :: CInt -> IO CInt
 
+mkStdHandle :: FD -> FilePath -> HandleType -> IORef Buffer -> BufferMode
+	-> IO Handle
+mkStdHandle fd filepath ha_type buf bmode = do
+   spares <- newIORef BufferListNil
+   newFileHandle stdHandleFinalizer
+	    (Handle__ { haFD = fd,
+			haType = ha_type,
+                        haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
+			haBufferMode = bmode,
+			haFilePath = filepath,
+			haBuffer = buf,
+			haBuffers = spares,
+			haOtherSide = Nothing
+		      })
+
 mkFileHandle :: FD -> FilePath -> HandleType -> Bool -> IO Handle
 mkFileHandle fd filepath ha_type binary = do
   (buf, bmode) <- getBuffer fd (initBufferState ha_type)
@@ -701,7 +684,8 @@ mkFileHandle fd filepath ha_type binary = do
 			haBufferMode = bmode,
 			haFilePath = filepath,
 			haBuffer = buf,
-			haBuffers = spares
+			haBuffers = spares,
+		        haOtherSide = Nothing
 		      })
 
 mkDuplexHandle :: FD -> FilePath -> Bool -> IO Handle
@@ -715,7 +699,8 @@ mkDuplexHandle fd filepath binary = do
 			haBufferMode = w_bmode,
 			haFilePath = filepath,
 			haBuffer = w_buf,
-			haBuffers = w_spares
+			haBuffers = w_spares,
+			haOtherSide = Nothing
 		      }
   write_side <- newMVar w_handle_
 
@@ -723,16 +708,17 @@ mkDuplexHandle fd filepath binary = do
   r_spares <- newIORef BufferListNil
   let r_handle_ = 
 	     Handle__ { haFD = fd,
-			haType = ReadSideHandle write_side,
+			haType = ReadHandle,
                         haIsBin = binary,
 			haBufferMode = r_bmode,
 			haFilePath = filepath,
 			haBuffer = r_buf,
-			haBuffers = r_spares
+			haBuffers = r_spares,
+			haOtherSide = Just write_side
 		      }
   read_side <- newMVar r_handle_
 
-  addMVarFinalizer write_side (handleFinalizer write_side)
+  addMVarFinalizer read_side (handleFinalizer read_side)
   return (DuplexHandle read_side write_side)
    
 
@@ -751,22 +737,27 @@ initBufferState _ 	   = WriteBuffer
 
 hClose :: Handle -> IO ()
 hClose h@(FileHandle m)     = hClose' h m
-hClose h@(DuplexHandle r w) = do
-  hClose' h w
-  withHandle__' "hClose" h r $ \ handle_ -> do
-  return handle_{ haFD	 = -1,
-		  haType = ClosedHandle
-		 }
+hClose h@(DuplexHandle r w) = hClose' h w >> hClose' h r
 
 hClose' h m = withHandle__' "hClose" h m $ hClose_help
 
+-- hClose_help is also called by lazyRead (in PrelIO) when EOF is read
+-- or an IO error occurs on a lazy stream.  The semi-closed Handle is
+-- then closed immediately.  We have to be careful with DuplexHandles
+-- though: we have to leave the closing to the finalizer in that case,
+-- because the write side may still be in use.
 hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return handle_
       _ -> do
 	  let fd = fromIntegral (haFD handle_)
 	  flushWriteBufferOnly handle_
-	  throwErrnoIfMinus1Retry_ "hClose" (c_close fd)
+
+	  -- close the file descriptor, but not when this is the read side
+	  -- of a duplex handle.
+	  case haOtherSide handle_ of
+	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" (c_close fd)
+	    Just _  -> return ()
 
 	  -- free the spare buffers
 	  writeIORef (haBuffers handle_) BufferListNil

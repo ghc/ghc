@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.43 2001/10/11 22:27:04 sof Exp $
+% $Id: PrelIOBase.lhs,v 1.44 2001/11/14 11:39:29 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -149,13 +149,15 @@ type FD = Int -- XXX ToDo: should be CInt
 
 data Handle__
   = Handle__ {
-      haFD	    :: !FD,
-      haType        :: HandleType,
-      haIsBin       :: Bool,
-      haBufferMode  :: BufferMode,
-      haFilePath    :: FilePath,
-      haBuffer	    :: !(IORef Buffer),
-      haBuffers     :: !(IORef BufferList)
+      haFD	    :: !FD,		     -- file descriptor
+      haType        :: HandleType,	     -- type (read/write/append etc.)
+      haIsBin       :: Bool,		     -- binary mode?
+      haBufferMode  :: BufferMode,	     -- buffer contains read/write data?
+      haFilePath    :: FilePath,	     -- file name, possibly
+      haBuffer	    :: !(IORef Buffer),	     -- the current buffer
+      haBuffers     :: !(IORef BufferList),  -- spare buffers
+      haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 
+					     -- duplex handle.
     }
 
 -- ---------------------------------------------------------------------------
@@ -233,11 +235,9 @@ data HandleType
  | WriteHandle
  | AppendHandle
  | ReadWriteHandle
- | ReadSideHandle  !(MVar Handle__)	-- read side of a duplex handle
 
 isReadableHandleType ReadHandle         = True
 isReadableHandleType ReadWriteHandle    = True
-isReadableHandleType (ReadSideHandle _) = True
 isReadableHandleType _	       	        = False
 
 isWritableHandleType AppendHandle    = True
@@ -331,13 +331,12 @@ instance Show HandleType where
       WriteHandle       -> showString "writable"
       AppendHandle      -> showString "writable (append)"
       ReadWriteHandle   -> showString "read-writable"
-      ReadSideHandle _  -> showString "read-writable (duplex)"
 
 instance Show Handle where 
-  showsPrec p (FileHandle   h)   = showHandle p h
-  showsPrec p (DuplexHandle h _) = showHandle p h
+  showsPrec p (FileHandle   h)   = showHandle p h False
+  showsPrec p (DuplexHandle _ h) = showHandle p h True
    
-showHandle p h =
+showHandle p h duplex =
     let
      -- (Big) SIGH: unfolded defn of takeMVar to avoid
      -- an (oh-so) unfortunate module loop with PrelConc.
@@ -346,14 +345,18 @@ showHandle p h =
 	     case takeMVar# h# s#   of { (# s2# , r #) -> 
 	     case putMVar# h# r s2# of { s3# ->
 	     (# s3#, r #) }}})
+
+     showType | duplex = showString "duplex (read-write)"
+	      | otherwise = showsPrec p (haType hdl_)
     in
     showChar '{' . 
     showHdl (haType hdl_) 
 	    (showString "loc=" . showString (haFilePath hdl_) . showChar ',' .
-	     showString "type=" . showsPrec p (haType hdl_) . showChar ',' .
+	     showString "type=" . showType . showChar ',' .
 	     showString "binary=" . showsPrec p (haIsBin hdl_) . showChar ',' .
 	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
    where
+
     showHdl :: HandleType -> ShowS -> ShowS
     showHdl ht cont = 
        case ht of
