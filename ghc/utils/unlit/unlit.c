@@ -338,8 +338,8 @@ char **argv; {
 
     unlit(file, istream, ostream);
 
-    fclose(istream);
-    fclose(ostream);
+    if (istream != stdin)  fclose(istream);
+    if (ostream != stdout) fclose(ostream);
 
     exit(errors==0 ? 0 : 1);
 }
