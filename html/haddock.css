@@ -20,6 +20,8 @@ TABLE.vanilla {
 TT  { font-size: 100%; }
 PRE { font-size: 100%; }
 
+LI P { margin: 0pt } 
+
 TD {
   border-width: 0px;
 }
