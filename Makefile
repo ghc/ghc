@@ -55,7 +55,7 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 
 binary-dist::
 	@for i in $(BIN_DIST_TOP); do \
-	  if [ -e $$i ]; then \
+	  if test -f "$$i"; then \
 	     echo cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
 	     cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
 	  fi; \
