@@ -13,7 +13,7 @@ import CmdLineOpts	( DynFlag(..), dopt )
 
 import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), 
-			  andMonoBindList, collectMonoBinders, isClassDecl
+			  andMonoBindList, collectMonoBinders, isClassDecl, toHsType
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, 
 			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
@@ -512,8 +512,9 @@ tcInstDecl2 :: InstInfo -> NF_TcM (LIE, TcMonoBinds)
 tcInstDecl2 (InstInfo { iDFunId = dfun_id, 
 			iBinds = monobinds, iPrags = uprags })
   =	 -- Prime error recovery
-    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
-    tcAddSrcLoc (getSrcLoc dfun_id)			   $
+    recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))	$
+    tcAddSrcLoc (getSrcLoc dfun_id)			   	$
+    tcAddErrCtxt (instDeclCtxt (toHsType (idType dfun_id)))	$
 
 	-- Instantiate the instance decl with tc-style type variables
     tcInstType (idType dfun_id)		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
