@@ -506,7 +506,7 @@ reservedWordsFM = listToUFM $
 	( "where",	ITwhere, 	0 ),
 	( "_scc_",	ITscc, 		0 ),		-- ToDo: remove
 
-      	( "forall",	ITforall,	 bit glaExtsBit),
+      	( "forall",	ITforall,	 bit tvBit),
 	( "mdo",	ITmdo,		 bit glaExtsBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
@@ -542,7 +542,7 @@ reservedSymsFM = listToUFM $
        ,("!",	ITbang, 	0)
 
        ,("*",	ITstar,		bit glaExtsBit)	-- For data T (a::*) = MkT
-       ,(".",	ITdot,		bit glaExtsBit)	-- For 'forall a . t'
+       ,(".",	ITdot,		bit tvBit)	-- For 'forall a . t'
 
        ,("-<",	ITlarrowtail,	bit arrowsBit)
        ,(">-",	ITrarrowtail,	bit arrowsBit)
@@ -1160,6 +1160,7 @@ parrBit	   = 2
 arrowsBit  = 4
 thBit	   = 5
 ipBit      = 6
+tvBit	   = 7	-- Scoped type variables enables 'forall' keyword
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled flags = testBit flags glaExtsBit
@@ -1168,6 +1169,7 @@ parrEnabled    flags = testBit flags parrBit
 arrowsEnabled  flags = testBit flags arrowsBit
 thEnabled      flags = testBit flags thBit
 ipEnabled      flags = testBit flags ipBit
+tvEnabled      flags = testBit flags tvBit
 
 -- create a parse state
 --
@@ -1190,6 +1192,7 @@ mkPState buf loc flags  =
 	       .|. arrowsBit  `setBitIf` dopt Opt_Arrows      flags
 	       .|. thBit      `setBitIf` dopt Opt_TH          flags
 	       .|. ipBit      `setBitIf` dopt Opt_ImplicitParams flags
+	       .|. tvBit      `setBitIf` dopt Opt_ScopedTypeVariables flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

@@ -644,7 +644,9 @@ bindSigTyVarsFV sigs thing_inside
 		bindLocalNamesFV tvs thing_inside }
   where
     tvs = [ hsLTyVarName ltv 
-	  | L _ (Sig _ (L _ (HsForAllTy _ ltvs _ _))) <- sigs, ltv <- ltvs ]
+	  | L _ (Sig _ (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs, ltv <- ltvs ]
+	-- Note the pattern-match on "Explicit"; we only bind
+	-- type variables from signatures with an explicit top-level for-all
 				
 
 extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
