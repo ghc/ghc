@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.56 2001/04/05 11:54:37 simonpj Exp $
+$Id: Parser.y,v 1.57 2001/04/14 22:24:24 qrczak Exp $
 
 Haskell grammar.
 
@@ -386,8 +386,9 @@ decls 	:: { [RdrBinding] }
 decl 	:: { RdrBinding }
 	: fixdecl			{ $1 }
 	| valdef			{ $1 }
-	| '{-# INLINE'   srcloc opt_phase qvar '#-}'	{ RdrSig (InlineSig $4 $3 $2) }
-	| '{-# NOINLINE' srcloc opt_phase qvar '#-}'	{ RdrSig (NoInlineSig $4 $3 $2) }
+	| '{-# INLINE'   srcloc opt_phase qvar '#-}'	 { RdrSig (InlineSig $4 $3 $2) }
+	| '{-# NOINLINE' srcloc opt_phase qvar '#-}'	 { RdrSig (NoInlineSig $4 $3 $2) }
+	| '{-# INLINE' srcloc 'instance' opt_phase '#-}' { RdrSig (InlineInstSig $4 $2) }
 	| '{-# SPECIALISE' srcloc qvar '::' sigtypes '#-}'
 	 	{ foldr1 RdrAndBindings 
 		    (map (\t -> RdrSig (SpecSig $3 t $2)) $5) }
