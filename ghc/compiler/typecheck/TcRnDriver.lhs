@@ -23,7 +23,7 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import DriverState	( v_MainModIs, v_MainFunIs )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl, SpliceDecl(..), HsBind(..),
-			  nlHsApp, nlHsVar )
+			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
 
 import PrelNames	( runIOName, rootMainName, mAIN_Name,
@@ -33,7 +33,7 @@ import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv,
 import TcHsSyn		( zonkTopDecls )
 import TcExpr 		( tcInferRho )
 import TcRnMonad
-import TcType		( tidyTopType )
+import TcType		( tidyTopType, isUnLiftedType )
 import Inst		( showLIE )
 import TcBinds		( tcTopBinds )
 import TcDefaults	( tcDefaults )
@@ -292,10 +292,10 @@ Here is the grand plan, implemented in tcUserStmt
 	pat <- expr		==> 	expr >>= \ pat -> return [coerce HVal x, coerce HVal y, ...]
 					bindings: [x,y,...]
 
-	expr (of IO type)	==>	expr >>= \ v -> return [coerce HVal v]
+	expr (of IO type)	==>	expr >>= \ it -> return [coerce HVal it]
 	  [NB: result not printed]	bindings: [it]
 	  
-	expr (of non-IO type,	==>	let v = expr in print v >> return [coerce HVal v]
+	expr (of non-IO type,	==>	let it = expr in print it >> return [coerce HVal it]
 	  result showable)		bindings: [it]
 
 	expr (of non-IO type, 
@@ -317,8 +317,8 @@ tcUserStmt (L _ (ExprStmt expr _))
 		tc_stmts [
 		    nlLetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
 		    nlExprStmt (nlHsApp (nlHsVar printName) 
-					      (nlHsVar fresh_it)) 
-		] })
+					      (nlHsVar fresh_it)) 	
+	] })
 	  (do { 	-- Try this first 
 		traceTc (text "tcs 1a") ;
 		tc_stmts [nlBindStmt (nlVarPat fresh_it) expr] })
@@ -390,10 +390,16 @@ tc_stmts stmts
 	zonked_expr <- zonkTopLExpr expr ;
 	zonked_ids  <- zonkTopBndrs ids ;
 
+	-- None of the Ids should be of unboxed type, because we
+	-- cast them all to HValues in the end!
+	mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
+
 	return (zonked_ids, zonked_expr)
 	}
   where
     combine stmt (ids, stmts) = (ids, stmt:stmts)
+    bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
+				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 \end{code}
 
 
@@ -1017,7 +1023,7 @@ tcDump env
    }
   where
     short_dump = pprTcGblEnv env
-    full_dump  = ppr (tcg_binds env)
+    full_dump  = pprLHsBinds (tcg_binds env)
 	-- NB: foreign x-d's have undefined's in their types; 
 	--     hence can't show the tc_fords
 
