@@ -643,9 +643,12 @@ schemeT d s p app
 
    -- Case 2
    | [arg1,arg2] <- args_r_to_l,
-     let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
+     let 
+	 isVoidRepAtom (_, AnnVar v)    = typePrimRep (idType v) == VoidRep
          isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
-     in  isVoidRepAtom arg2
+	 isVoidRepAtom _ = False
+     in  
+	 isVoidRepAtom arg2
    = --trace (if isSingleton args_r_to_l
      --       then "schemeT: unboxed singleton"
      --       else "schemeT: unboxed pair with Void first component") (
