@@ -67,7 +67,7 @@ import SrcLoc	  ( noSrcLoc )
 import Maybe	  ( catMaybes )
 import Panic	  ( panic )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique )
-import BasicTypes ( NewOrData(..), StrictnessMark(..) ) 
+import BasicTypes ( NewOrData(..), StrictnessMark(..), isBoxed ) 
 
 import Outputable
 import FastString	( mkFastString )
@@ -299,88 +299,105 @@ repTy (HsPredTy (HsClassP c tys)) = repTy (foldl HsAppTy (HsTyVar c) tys)
 
 repTy other_ty = pprPanic "repTy" (ppr other_ty)	-- HsForAllTy, HsKindSig
 
------------------------------------------------------------------------------      
+-----------------------------------------------------------------------------
 -- 		Expressions
------------------------------------------------------------------------------      
+-----------------------------------------------------------------------------
 
 repEs :: [HsExpr Name] -> DsM (Core [M.Expr])
 repEs es = do { es'  <- mapM repE es ;
 		coreList exprTyConName es' }
 
+-- FIXME: some of these panics should be converted into proper error messages
+--	  unless we can make sure that constructs, which are plainly not
+--	  supported in TH already lead to error messages at an earlier stage
 repE :: HsExpr Name -> DsM (Core M.Expr)
-repE (HsVar x)
-  = do { mb_val <- dsLookupMetaEnv x 
-       ; case mb_val of
-	  Nothing	   -> do { str <- globalVar x
-				 ; repVarOrCon x str }
-	  Just (Bound y)   -> repVarOrCon x (coreVar y)
-	  Just (Splice e)  -> do { e' <- dsExpr e
-				 ; return (MkC e') } }
-
-repE (HsIPVar x)    = panic "Can't represent implicit parameters"
-repE (HsLit l)      = do { a <- repLiteral l;           repLit a }
-repE (HsOverLit l)  = do { a <- repOverloadedLiteral l; repLit a }
-
-repE (HsSplice n e loc) 
-  = do { mb_val <- dsLookupMetaEnv n
-       ; case mb_val of
-	     Just (Splice e) -> do { e' <- dsExpr e
-				   ; return (MkC e') }
-	     other	     -> pprPanic "HsSplice" (ppr n) }
-			
-
-repE (HsLam m)      = repLambda m
-repE (HsApp x y)    = do {a <- repE x; b <- repE y; repApp a b}
-repE (NegApp x nm)  = panic "No negate yet"
-repE (HsPar x)      = repE x
-repE (SectionL x y) = do { a <- repE x; b <- repE y; repSectionL a b } 
-repE (SectionR x y) = do { a <- repE x; b <- repE y; repSectionR a b } 
-
-repE (OpApp e1 (HsVar op) fix e2)
-  =  do { arg1 <- repE e1; 
-	  arg2 <- repE e2; 
-	  the_op <- lookupOcc op ;
-	  repInfixApp arg1 the_op arg2 } 
-
-repE (HsCase e ms loc)
-  = do { arg <- repE e
-       ; ms2 <- mapM repMatchTup ms
-       ; repCaseE arg (nonEmptyCoreList ms2) }
-
--- 	I havn't got the types here right yet
-repE (HsDo DoExpr sts _ ty loc)      = do { (ss,zs) <- repSts sts; 
-					    e       <- repDoE (nonEmptyCoreList zs);
-					    wrapGenSyns expTyConName ss e }
-repE (HsDo ListComp sts _ ty loc) = do { (ss,zs) <- repSts sts; 
-					  e       <- repComp (nonEmptyCoreList zs);
-					  wrapGenSyns expTyConName ss e }
-
-repE (ArithSeqIn (From e)) 		= do { ds1 <- repE e; repFrom ds1 }
-repE (ArithSeqIn (FromThen e1 e2))      = do { ds1 <- repE e1; ds2 <- repE e2; 
-					       repFromThen ds1 ds2 }
-repE (ArithSeqIn (FromTo   e1 e2))      = do { ds1 <- repE e1; ds2 <- repE e2; 
-					       repFromTo   ds1 ds2 }
-repE (ArithSeqIn (FromThenTo e1 e2 e3)) = do { ds1 <- repE e1; ds2 <- repE e2; 
-					       ds3 <- repE e3; repFromThenTo ds1 ds2 ds3 }
-
-repE (HsIf x y z loc) = do { a <- repE x; b <- repE y; c <- repE z; repCond a b c } 
-
-repE (HsLet bs e) = do { (ss,ds) <- repBinds bs
-		       ; e2 <- addBinds ss (repE e)
-		       ; z <- repLetE ds e2
-		       ; wrapGenSyns expTyConName ss z }
-repE (ExplicitList ty es)     = do { xs <- repEs es; repListExp xs } 
-repE (ExplicitTuple es boxed) = do { xs <- repEs es; repTup xs }
-
-repE (ExplicitPArr ty es)   = panic "repE: No parallel arrays yet"
-repE (RecordConOut _ _ _)   = panic "repE: No record construction yet"
-repE (RecordUpdOut _ _ _ _) = panic "repE: No record update yet"
-repE (ExprWithTySig e ty)   = 
-  panic "repE: No expressions with type signatures yet" 
-repE (HsCCall _ _ _ _ _)    = panic "repE: Can't represent __ccall__"
-repE (HsSCC _ _)            = panic "repE: Can't represent SCC"
-repE (HsBracketOut _ _)     = panic "repE: No Oxford brackets yet"
-repE (HsReify _)            = panic "repE: No reification yet"
+repE (HsVar x)            =
+  do { mb_val <- dsLookupMetaEnv x 
+     ; case mb_val of
+	Nothing	   -> do { str <- globalVar x
+			       ; repVarOrCon x str }
+	Just (Bound y)   -> repVarOrCon x (coreVar y)
+	Just (Splice e)  -> do { e' <- dsExpr e
+			       ; return (MkC e') } }
+repE (HsIPVar x)          = 
+  panic "DsMeta.repE: Can't represent implicit parameters"
+repE (HsOverLit l)        = do { a <- repOverloadedLiteral l; repLit a }
+repE (HsLit l)            = do { a <- repLiteral l;           repLit a }
+repE (HsLam m)            = repLambda m
+repE (HsApp x y)          = do {a <- repE x; b <- repE y; repApp a b}
+repE (OpApp e1 op fix e2) =
+  case op of
+    HsVar op -> do { arg1 <- repE e1; 
+		     arg2 <- repE e2; 
+		     the_op <- lookupOcc op ;
+		     repInfixApp arg1 the_op arg2 } 
+    _        -> panic "DsMeta.repE: Operator is not a variable"
+repE (NegApp x nm)        = panic "DsMeta.repE: No negate yet"
+repE (HsPar x)            = repE x
+repE (SectionL x y)       = do { a <- repE x; b <- repE y; repSectionL a b } 
+repE (SectionR x y)       = do { a <- repE x; b <- repE y; repSectionR a b } 
+repE (HsCase e ms loc)    = do { arg <- repE e
+			       ; ms2 <- mapM repMatchTup ms
+			       ; repCaseE arg (nonEmptyCoreList ms2) }
+repE (HsIf x y z loc)     = do
+			      a <- repE x
+			      b <- repE y
+			      c <- repE z
+			      repCond a b c
+repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
+			       ; e2 <- addBinds ss (repE e)
+			       ; z <- repLetE ds e2
+			       ; wrapGenSyns expTyConName ss z }
+-- FIXME: I haven't got the types here right yet
+repE (HsDo ctxt sts _ ty loc) 
+  | isComprCtxt ctxt      = do { (ss,zs) <- repSts sts; 
+				 e       <- repDoE (nonEmptyCoreList zs);
+				 wrapGenSyns expTyConName ss e }
+  | otherwise             = 
+    panic "DsMeta.repE: Can't represent mdo and [: :] yet"
+  where
+    isComprCtxt ListComp = True
+    isComprCtxt DoExpr	 = True
+    isComprCtxt _	 = False
+repE (ExplicitList ty es) = do { xs <- repEs es; repListExp xs } 
+repE (ExplicitPArr ty es) = 
+  panic "DsMeta.repE: No explicit parallel arrays yet"
+repE (ExplicitTuple es boxed) 
+  | isBoxed boxed         = do { xs <- repEs es; repTup xs }
+  | otherwise		  = panic "DsMeta.repE: Can't represent unboxed tuples"
+repE (RecordConOut _ _ _) = panic "DsMeta.repE: No record construction yet"
+repE (RecordUpdOut _ _ _ _) = panic "DsMeta.repE: No record update yet"
+repE (ExprWithTySig e ty) = 
+  panic "DsMeta.repE: No expressions with type signatures yet" 
+repE (ArithSeqOut _ aseq) =
+  case aseq of
+    From e              -> do { ds1 <- repE e; repFrom ds1 }
+    FromThen e1 e2      -> do 
+		             ds1 <- repE e1
+			     ds2 <- repE e2
+			     repFromThen ds1 ds2
+    FromTo   e1 e2      -> do 
+			     ds1 <- repE e1
+			     ds2 <- repE e2
+			     repFromTo ds1 ds2
+    FromThenTo e1 e2 e3 -> do 
+			     ds1 <- repE e1
+			     ds2 <- repE e2
+			     ds3 <- repE e3
+			     repFromThenTo ds1 ds2 ds3
+repE (PArrSeqOut _ aseq)  = panic "DsMeta.repE: parallel array seq.s missing"
+repE (HsCCall _ _ _ _ _)  = panic "DsMeta.repE: Can't represent __ccall__"
+repE (HsSCC _ _)          = panic "DsMeta.repE: Can't represent SCC"
+repE (HsBracketOut _ _)   = 
+  panic "DsMeta.repE: Can't represent Oxford brackets"
+repE (HsSplice n e loc)   = do { mb_val <- dsLookupMetaEnv n
+			       ; case mb_val of
+				 Just (Splice e) -> do { e' <- dsExpr e
+						       ; return (MkC e') }
+				 other	     -> pprPanic "HsSplice" (ppr n) }
+repE (HsReify _)          = panic "DsMeta.repE: Can't represent reification"
+repE e                    = 
+  pprPanic "DsMeta.repE: Illegal expression form" (ppr e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt, 
