@@ -1901,6 +1901,10 @@ statements or clauses.
   files is <emphasis>different</emphasis> (though similar) to the Core output format generated 
   for debugging purposes (<xref linkend="options-debugging">).</para>
 
+  <para>The Core format natively supports notes which you can add to
+  your source code using the <literal>CORE</literal> pragma (see <xref
+  linkend="pragmas">).</para>
+
     <variablelist>
 
   	<varlistentry>
