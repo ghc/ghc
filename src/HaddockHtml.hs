@@ -68,7 +68,7 @@ ppHtml doctitle maybe_package source_url ifaces odir prologue maybe_html_help_fo
     ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_url visible_ifaces
     
   when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
-	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format
+	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
 
   mapM_ (ppHtmlModule odir doctitle source_url 
 	   maybe_contents_url maybe_index_url) visible_ifaces
@@ -79,17 +79,19 @@ ppHtmlHelpFiles
 	-> [(Module, Interface)]
 	-> FilePath                 -- destination directory
 	-> Maybe String             -- the Html Help format (--html-help)
+	-> [FilePath]               -- external packages paths
 	-> IO ()
-ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format =  do
+ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_paths =  do
   let
 	visible_ifaces = filter visible ifaces
 	visible (_, i) = OptHide `notElem` iface_options i
 
   -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
-    Just "mshelp"  -> ppHHProject odir doctitle maybe_package visible_ifaces
+    Nothing        -> return ()
+    Just "mshelp"  -> ppHHProject odir doctitle maybe_package visible_ifaces pkg_paths
     Just "mshelp2" -> do
-		ppHH2Files      odir maybe_package visible_ifaces
+		ppHH2Files      odir maybe_package visible_ifaces pkg_paths
 		ppHH2Collection odir doctitle maybe_package
     Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_ifaces
     Just format    -> fail ("The "++format++" format is not implemented")
@@ -433,7 +435,7 @@ ppHtmlModule odir doctitle source_url
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
-  writeFile (moduleHtmlFile odir mdl) (renderHtml html False)
+  writeFile (odir++moduleHtmlFile mdl) (renderHtml html False)
 
 ifaceToHtml :: String -> Interface -> HtmlTable
 ifaceToHtml _ iface 
@@ -974,17 +976,12 @@ ppHsBindIdent (HsSpecial str) =  toHtml str
 linkId :: Module -> Maybe HsName -> Html -> Html
 linkId (Module mdl) mbName = anchor ! [href hr]
   where hr = case mbName of
-                  Nothing   -> moduleHtmlFile fp mdl
-                  Just name -> nameHtmlRef fp mdl name
-        fp = case lookupFM html_xrefs (Module mdl) of
-		  Nothing  -> ""
-		  Just fp0 -> fp0
+                  Nothing   -> moduleHtmlFile mdl
+                  Just name -> nameHtmlRef mdl name
 
 ppHsModule :: String -> Html
-ppHsModule mdl = anchor ! [href ((moduleHtmlFile fp modname) ++ ref)] << toHtml mdl
-  where fp = case lookupFM html_xrefs (Module modname) of
-		Just fp0 -> fp0 
-		Nothing  -> ""
+ppHsModule mdl = anchor ! [href ((moduleHtmlFile modname) ++ ref)] << toHtml mdl
+  where 
         (modname,ref) = break (== '#') mdl
 
 -- -----------------------------------------------------------------------------

@@ -56,7 +56,7 @@ ppHH2Contents odir maybe_package tree = do
 	    
 	    ppTitle = text "Title=" <> doubleQuotes (text (head ss))
 	    
-	    ppUrl | isleaf    = text " Url=" <> doubleQuotes (text (moduleHtmlFile "" mdl))
+	    ppUrl | isleaf    = text " Url=" <> doubleQuotes (text (moduleHtmlFile mdl))
 	          | otherwise = empty
 
 -----------------------------------------------------------------------------------
@@ -98,17 +98,13 @@ ppHH2Index odir maybe_package ifaces = do
 		text "</Keyword>" $$
 		ppList vs
 
-	ppJump name (Module mdl) = text "<Jump Url=\"" <> text (nameHtmlRef fp mdl name) <> text "\"/>"
-	  where
-	    fp = case lookupFM html_xrefs (Module mdl) of
-	      Nothing  -> ""
-	      Just fp0 -> fp0
+	ppJump name (Module mdl) = text "<Jump Url=\"" <> text (nameHtmlRef mdl name) <> text "\"/>"
 
 
 -----------------------------------------------------------------------------------
 
-ppHH2Files :: FilePath -> Maybe String -> [(Module,Interface)] -> IO ()
-ppHH2Files odir maybe_package ifaces = do
+ppHH2Files :: FilePath -> Maybe String -> [(Module,Interface)] -> [FilePath] -> IO ()
+ppHH2Files odir maybe_package ifaces pkg_paths = do
   let filesHH2File = package++".HxF"
       doc =
         text "<?xml version=\"1.0\"?>" $$
@@ -118,11 +114,7 @@ ppHH2Files odir maybe_package ifaces = do
                 text "<File Url=\""<>text contentsHtmlFile<>text "\"/>" $$
                 text "<File Url=\""<>text indexHtmlFile<>text "\"/>" $$
                 ppIndexFiles chars $$
-                text "<File Url=\""<>text cssFile  <>text "\"/>" $$
-                text "<File Url=\""<>text iconFile <>text "\"/>" $$
-                text "<File Url=\""<>text jsFile   <>text "\"/>" $$
-                text "<File Url=\""<>text plusFile <>text "\"/>" $$
-                text "<File Url=\""<>text minusFile<>text "\"/>") $$
+                ppLibFiles ("":pkg_paths)) $$
         text "</HelpFileList>"
   writeFile (odir ++ pathSeparator:filesHH2File) (render doc)
   where
@@ -130,14 +122,27 @@ ppHH2Files odir maybe_package ifaces = do
 	
     ppMods [] = empty
     ppMods ((Module mdl,_):ifaces) =
-		text "<File Url=\"" <> text (moduleHtmlFile "" mdl) <> text "\"/>" $$
+		text "<File Url=\"" <> text (moduleHtmlFile mdl) <> text "\"/>" $$
 		ppMods ifaces
 		
     ppIndexFiles []     = empty
     ppIndexFiles (c:cs) =
         text "<File Url=\""<>text (subIndexHtmlFile c)<>text "\"/>" $$
         ppIndexFiles cs
-	
+        
+    ppLibFiles []           = empty
+    ppLibFiles (path:paths) =        
+        ppLibFile cssFile   $$
+	ppLibFile iconFile  $$
+	ppLibFile jsFile    $$
+	ppLibFile plusFile  $$
+        ppLibFile minusFile $$
+        ppLibFiles paths
+        where
+            toPath fname | null path = fname
+                         | otherwise = path++pathSeparator:fname
+            ppLibFile fname = text "<File Url=\""<>text (toPath fname)<>text "\"/>"
+
     chars :: [Char]
     chars = keysFM (foldr getIfaceIndex emptyFM ifaces)
 

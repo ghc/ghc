@@ -61,7 +61,7 @@ ppHHContents odir maybe_package tree = do
 		text "<LI>" <> nest 4
 			(text "<OBJECT type=\"text/sitemap\">" $$
 			 text "<PARAM name=\"Name\" value=\"" <> text s <> text "\">" $$
-			 (if isleaf then text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile "" mdl) <> text "\">" else empty) $$
+			 (if isleaf then text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile mdl) <> text "\">" else empty) $$
 			 text "</OBJECT>") $+$
 		text "</LI>"
 		where 
@@ -107,12 +107,12 @@ ppHHIndex odir maybe_package ifaces = do
 
 	ppReference name [] = empty
 	ppReference name (Module mdl:refs) =
-		text "<PARAM name=\"Local\" value=\"" <> text (nameHtmlRef "" mdl name) <> text "\">" $$
+		text "<PARAM name=\"Local\" value=\"" <> text (nameHtmlRef mdl name) <> text "\">" $$
 		ppReference name refs
 
 
-ppHHProject :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> IO ()
-ppHHProject odir doctitle maybe_package ifaces = do
+ppHHProject :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> [FilePath] -> IO ()
+ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
   let projectHHFile = package++".hhp"
       doc =
         text "[OPTIONS]" $$
@@ -129,24 +129,33 @@ ppHHProject odir doctitle maybe_package ifaces = do
         text contentsHtmlFile $$
         text indexHtmlFile $$
         ppIndexFiles chars $$
-        text cssFile $$
-        text iconFile $$
-        text jsFile $$
-        text plusFile $$
-        text minusFile
+        ppLibFiles ("":pkg_paths)
   writeFile (odir ++ pathSeparator:projectHHFile) (render doc)
   where
     package = fromMaybe "pkg" maybe_package
 	
     ppMods [] = empty
     ppMods ((Module mdl,_):ifaces) =
-        text (moduleHtmlFile "" mdl) $$
+        text (moduleHtmlFile mdl) $$
         ppMods ifaces
 		
     ppIndexFiles []     = empty
     ppIndexFiles (c:cs) =
         text (subIndexHtmlFile c) $$
         ppIndexFiles cs
+        
+    ppLibFiles []           = empty
+    ppLibFiles (path:paths) =
+        ppLibFile cssFile   $$
+    	ppLibFile iconFile  $$
+    	ppLibFile jsFile    $$
+    	ppLibFile plusFile  $$
+        ppLibFile minusFile $$
+        ppLibFiles paths
+        where
+            toPath fname | null path = fname
+	                 | otherwise = path++pathSeparator:fname
+            ppLibFile fname = text (toPath fname)
 
     chars :: [Char]
     chars = keysFM (foldr getIfaceIndex emptyFM ifaces)

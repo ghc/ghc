@@ -139,9 +139,6 @@ options =
 	"generate an HTML index from specified interfaces"
   ]
 
-saved_flags :: IORef [Flag]
-saved_flags = unsafePerformIO (newIORef (error "no flags yet"))
-
 run :: [Flag] -> [FilePath] -> IO ()
 run flags files = do
   when (Flag_Help `elem` flags) $ do
@@ -211,10 +208,9 @@ run flags files = do
       visible_read_ifaces = filter ((OptHide `notElem`) . iface_options . snd) 
 				read_ifaces
       external_mods = map fst read_ifaces
+      pkg_paths = map fst ifaces_to_read
 
-  updateHTMLXRefs (map fst ifaces_to_read) read_ifaces_s
-
-  writeIORef saved_flags flags
+  updateHTMLXRefs pkg_paths read_ifaces_s
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
 	&& Flag_Html `elem` flags) $
@@ -229,7 +225,7 @@ run flags files = do
         copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
-    ppHtmlHelpFiles title package visible_read_ifaces odir maybe_html_help_format		
+    ppHtmlHelpFiles title package visible_read_ifaces odir maybe_html_help_format pkg_paths
 
   parsed_mods <- mapM parse_file files
 

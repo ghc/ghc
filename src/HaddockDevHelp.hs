@@ -50,7 +50,7 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
             nest 4 (ppModuleTree (s:ss) ts) $+$
             text "</sub>"
         where
-          ppLink | leaf      = text (moduleHtmlFile "" mdl)
+          ppLink | leaf      = text (moduleHtmlFile mdl)
                  | otherwise = empty
 
           ppAttribs = text "name="<>doubleQuotes (text s)<+>text "link="<>doubleQuotes ppLink
@@ -72,5 +72,5 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
 
     ppReference name [] = empty
     ppReference name (Module mdl:refs) =
-      text "<function name=\""<>text (escapeStr (show name))<>text"\" link=\""<>text (nameHtmlRef "" mdl name)<>text"\"/>" $$
+      text "<function name=\""<>text (escapeStr (show name))<>text"\" link=\""<>text (nameHtmlRef mdl name)<>text"\"/>" $$
       ppReference name refs

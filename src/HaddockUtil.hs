@@ -23,7 +23,7 @@ module HaddockUtil (
   getProgramName, bye, die, dieMsg, mapSnd, mapMaybeM, escapeStr,
 
   -- * HTML cross reference mapping
-  html_xrefs_ref, html_xrefs,
+  html_xrefs_ref,
  ) where
 
 import HsSyn
@@ -272,12 +272,14 @@ isPathSeparator ch =
   ch == '/'
 #endif
 
-moduleHtmlFile :: FilePath -> String -> FilePath
-moduleHtmlFile "" mod0  = mod0 ++ ".html" -- ToDo: Z-encode filename?
-moduleHtmlFile dir mod0 = dir ++ pathSeparator : mod0 ++ ".html"
+moduleHtmlFile :: String -> FilePath
+moduleHtmlFile mdl =
+  case lookupFM html_xrefs (Module mdl) of
+    Nothing  -> mdl ++ ".html"
+    Just fp0 -> fp0 ++ pathSeparator : mdl ++ ".html"
 
-nameHtmlRef :: FilePath -> String -> HsName -> String	
-nameHtmlRef fp mdl str = moduleHtmlFile fp mdl ++ '#':escapeStr (hsAnchorNameStr str)
+nameHtmlRef :: String -> HsName -> String	
+nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (hsAnchorNameStr str)
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
