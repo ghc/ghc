@@ -114,7 +114,6 @@ module Unique (
 	integerPlusOneIdKey,
 	integerPlusTwoIdKey,
 	int2IntegerIdKey,
-	addr2IntegerIdKey,
 	integerTyConKey,
 	integerZeroIdKey,
 	integralClassKey,
@@ -625,7 +624,6 @@ integerPlusOneIdKey	      = mkPreludeMiscIdUnique 10
 integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 11
 integerZeroIdKey	      = mkPreludeMiscIdUnique 12
 int2IntegerIdKey	      = mkPreludeMiscIdUnique 13
-addr2IntegerIdKey	      = mkPreludeMiscIdUnique 14
 irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
 eqStringIdKey		      = mkPreludeMiscIdUnique 16
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17

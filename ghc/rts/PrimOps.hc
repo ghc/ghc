@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.54 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.55 2000/09/26 16:45:35 simonpj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -504,30 +504,6 @@ FN_(word2Integerzh_fast)
    FE_
 }
 
-FN_(addr2Integerzh_fast)
-{
-  MP_INT result;
-  char *str;
-  FB_
-
-  MAYBE_GC(NO_PTRS,addr2Integerzh_fast);
-
-  /* args:   R1 :: Addr# */
-  str = R1.a;
-
-  /* Perform the operation */
-  if (RET_STGCALL3(int, mpz_init_set_str,&result,(str),/*base*/10))
-      abort();
-
-   /* returns (# size  :: Int#, 
-		 data  :: ByteArray# 
-	       #)
-   */
-  TICK_RET_UNBOXED_TUP(2);
-  RET_NP(result._mp_size, 
-	  result._mp_d - sizeofW(StgArrWords));
-  FE_
-}
 
 /*
  * 'long long' primops for converting to/from Integers.

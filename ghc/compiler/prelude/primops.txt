@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.4 2000/09/11 12:20:57 sewardj Exp $
+-- $Id: primops.txt,v 1.5 2000/09/26 16:45:34 simonpj Exp $
 --
 -- Primitive Operations
 --
@@ -64,10 +64,6 @@ primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Bool
 primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Bool
 
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-
-primop   Addr2IntegerOp  "addr2Integer#" GenPrimOp   
-   Addr# -> (# Int#, ByteArr# #)
-   with out_of_line = True
 
 
 ------------------------------------------------------------------------

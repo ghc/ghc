@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.62 2000/09/11 11:17:09 sewardj Exp $
+ * $Id: PrimOps.h,v 1.63 2000/09/26 16:45:34 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -439,7 +439,6 @@ EXTFUN_RTS(divModIntegerzh_fast);
 /* Conversions */
 EXTFUN_RTS(int2Integerzh_fast);
 EXTFUN_RTS(word2Integerzh_fast);
-EXTFUN_RTS(addr2Integerzh_fast);
 
 /* Floating-point decodings */
 EXTFUN_RTS(decodeFloatzh_fast);

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.37 2000/09/07 09:10:07 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.38 2000/09/26 16:45:34 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -79,14 +79,12 @@ module PrelBase
 	(
 	module PrelBase,
 	module PrelGHC,		-- Re-export PrelGHC, PrelErr & PrelNum, to avoid lots
-	module PrelErr,         -- of people having to import it explicitly
-	module PrelNum
+	module PrelErr          -- of people having to import it explicitly
   ) 
 	where
 
 import PrelGHC
 import {-# SOURCE #-} PrelErr
-import {-# SOURCE #-} PrelNum
 
 infixr 9  .
 infixr 5  ++, :
@@ -146,11 +144,8 @@ unpackCStringUtf8# a = error "urk"
 class  Eq a  where
     (==), (/=)		:: a -> a -> Bool
 
---    x /= y		= not (x == y)
---    x == y		= not (x /= y)
---    x /= y		=  True
-    (/=) x y            = not  ((==) x y)
-    x == y		=  True
+    (/=) x y            = not ((==) x y)
+    (==) x y		= not ((/=) x y)
 
 class  (Eq a) => Ord a  where
     compare             :: a -> a -> Ordering
@@ -261,7 +256,7 @@ foldr            :: (a -> b -> b) -> b -> [a] -> b
 foldr k z xs = go xs
 	     where
 	       go []     = z
-	       go (x:xs) = x `k` go xs
+	       go (y:ys) = y `k` go ys
 
 build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 {-# INLINE 2 build #-}
@@ -312,6 +307,7 @@ map :: (a -> b) -> [a] -> [b]
 map = mapList
 
 -- Note eta expanded
+mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
 mapFB c f x ys = c (f x) ys
 
 mapList :: (a -> b) -> [a] -> [b]

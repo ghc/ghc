@@ -123,7 +123,6 @@ __export PrelGHC
   leAddrzh
   int2Addrzh
   addr2Intzh
-  addr2Integerzh
 
   Floatzh
   gtFloatzh

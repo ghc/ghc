@@ -256,7 +256,6 @@ knownKeyNames
     , (makeStablePtr_RDR,	makeStablePtrIdKey)
     , (bindIO_RDR,		bindIOIdKey)
     , (returnIO_RDR,		returnIOIdKey)
-    , (addr2Integer_RDR,	addr2IntegerIdKey)
 
 	-- Strings and lists
     , (map_RDR,			mapIdKey)

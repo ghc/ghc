@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.33 2000/09/25 12:58:39 simonpj Exp $
+% $Id: PrelNum.lhs,v 1.34 2000/09/26 16:45:34 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -128,10 +128,6 @@ int2Integer (I# i) = S# i
 integer2Int :: Integer -> Int
 integer2Int (S# i)   = I# i
 integer2Int (J# s d) = case (integer2Int# s d) of { n# -> I# n# }
-
-addr2Integer :: Addr# -> Integer
-{-# INLINE addr2Integer #-}
-addr2Integer x = case addr2Integer# x of (# s, d #) -> J# s d
 
 toBig (S# i)     = case int2Integer# i of { (# s, d #) -> J# s d }
 toBig i@(J# _ _) = i
