@@ -451,7 +451,7 @@ buildLivenessMask
 	-> VirtualSpOffset	-- offset from which the bitmap should start
 	-> FCode Liveness	-- mask for free/unlifted slots
 
-buildLivenessMask uniq sp = ASSERT (all (>=0) rel_slots) do	
+buildLivenessMask uniq sp = do	
 	-- find all unboxed stack-resident ids
 	binds <- getBinds
 	((vsp, free, _, _), heap_usage) <- getUsage
@@ -477,7 +477,7 @@ buildLivenessMask uniq sp = ASSERT (all (>=0) rel_slots) do
 	let rel_slots = reverse (map (sp-) all_slots)
 
 	-- build the bitmap
-	let liveness_mask = listToLivenessMask rel_slots
+	let liveness_mask = ASSERT(all (>=0) rel_slots) (listToLivenessMask rel_slots)
 
 	livenessToAbsC uniq liveness_mask
 
