@@ -607,12 +607,6 @@ endif
 
 all :: $(SCRIPT_PROG)
 
-#
-# #! support under cygwin32 is not quite there yet, 
-# so we rely on the eval `trick' instead. On all other
-# platforms, we prepend #!$(INTERP)  -- SOF 6/97
-# 
-
 $(SCRIPT_PROG) : $(SCRIPT_OBJS)
 	$(RM) $@
 	@echo Creating $@...
@@ -750,10 +744,7 @@ ifneq "$(LIBRARY)" ""
 INSTALL_LIBS  += $(LIBRARY)
 ifeq "$(DLLized)" "YES"
 INSTALL_PROGS += $(DLL_NAME)
-else
-ifeq "$(DLLized)" "YES"
 INSTALL_LIBS += $(patsubst %.a,%_imp.a, $(LIBRARY))
-endif
 endif
 INSTALL_DATAS += $(HS_IFACES)
 endif
