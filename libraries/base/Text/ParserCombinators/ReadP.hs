@@ -49,6 +49,8 @@ import Control.Monad( MonadPlus(..) )
 import GHC.Show( isSpace  )
 import GHC.Base
 
+infixr 5 +++, <++
+
 -- We define a local version of ReadS here,
 -- because its "real" definition site is in GHC.Read
 type ReadS a = String -> [(a,String)]
