@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.2 2001/07/24 14:29:13 simonmar Exp $
+ * $Id: GCCompact.c,v 1.3 2001/07/24 15:13:01 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -45,9 +45,16 @@ static inline void
 thread( StgPtr p )
 {
     StgPtr q = (StgPtr)*p;
+    bdescr *bd;
+
     ASSERT(!LOOKS_LIKE_GHC_INFO(q));
     if (HEAP_ALLOCED(q)) {
-	if (Bdescr(q)->gen_no > 0) {
+	bd = Bdescr(q); 
+	// a handy way to discover whether the ptr is into the
+	// compacted area of the old gen, is that the EVACUATED flag
+	// is zero (it's non-zero for all the other areas of live
+	// memory).
+	if ((bd->flags & BF_EVACUATED) == 0) {
 	    *p = (StgWord)*q;
 	    *q = (StgWord)p + 1;	// set the low bit
 	}
@@ -269,7 +276,6 @@ update_fwd_large( bdescr *bd )
   for (; bd != NULL; bd = bd->link) {
 
     p = bd->start;
-    unthread(p,p);
     info  = get_itbl((StgClosure *)p);
 
     switch (info->type) {
@@ -333,8 +339,6 @@ update_fwd( bdescr *blocks )
 	// linearly scan the objects in this block
 	while (p < bd->free) {
 
-	    /* unthread the info ptr */
-	    unthread(p,p);
 	    info = get_itbl((StgClosure *)p);
 
 	    ASSERT(p && (LOOKS_LIKE_GHC_INFO(info)
@@ -727,38 +731,6 @@ update_fwd_compact( bdescr *blocks )
     }
 }
 
-static void
-update_bkwd( bdescr *blocks )
-{
-    StgPtr p;
-    bdescr *bd;
-    StgInfoTable *info;
-
-    bd = blocks;
-
-#if defined(PAR)
-    barf("update_bkwd: ToDo");
-#endif
-
-    // cycle through all the blocks in the step
-    for (; bd != NULL; bd = bd->link) {
-	p = bd->start;
-
-	// linearly scan the objects in this block
-	while (p < bd->free) {
-
-	    // must unthread before we look at the info ptr...
-	    unthread(p,p);
-	    
-	    info = get_itbl((StgClosure *)p);
-	    ASSERT(p && (LOOKS_LIKE_GHC_INFO(info)
-			 || IS_HUGS_CONSTR_INFO(info)));
-
-	    p += obj_sizeW((StgClosure *)p,info);
-	}
-    }
-} 
-
 static nat
 update_bkwd_compact( step *stp )
 {
@@ -824,7 +796,9 @@ update_bkwd_compact( step *stp )
 	    }
 
 	    unthread(p,free);
-	    move(free,p,size);
+	    if (free != p) {
+		move(free,p,size);
+	    }
 
 	    // Rebuild the mutable list for the old generation.
 	    // (the mut_once list is updated using threading, with
@@ -857,17 +831,6 @@ update_bkwd_compact( step *stp )
     return free_blocks;
 } 
 
-static void
-update_bkwd_large( bdescr *blocks )
-{
-    bdescr *bd;
-
-    for (bd = blocks; bd != NULL; bd = bd->link ) {
-	unthread(bd->start, bd->start);
-    }
-}
-
-
 void
 compact( void (*get_roots)(evac_fn) )
 {
@@ -886,9 +849,11 @@ compact( void (*get_roots)(evac_fn) )
 	thread((StgPtr)&old_weak_ptr_list); // tmp
     }
 
-    // mutable lists (ToDo: all gens)
-    thread((StgPtr)&oldest_gen->mut_list);
-    thread((StgPtr)&oldest_gen->mut_once_list);
+    // mutable lists
+    for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
+	thread((StgPtr)&generations[g].mut_list);
+	thread((StgPtr)&generations[g].mut_once_list);
+    }
 
     // the global thread list
     thread((StgPtr)&all_threads);
@@ -915,20 +880,12 @@ compact( void (*get_roots)(evac_fn) )
     }
 
     // 3. update backward ptrs
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	for (s = 0; s < generations[g].n_steps; s++) {
-	    stp = &generations[g].steps[s];
-	    IF_DEBUG(gc, fprintf(stderr,"update_bkwd: %d.%d\n", stp->gen->no, stp->no););
-	    update_bkwd(stp->to_blocks);
-	    update_bkwd_large(stp->scavenged_large_objects);
-	    if (g == RtsFlags.GcFlags.generations-1 && stp->blocks != NULL) {
-		IF_DEBUG(gc, fprintf(stderr,"update_bkwd: %d.%d (compact)\n", stp->gen->no, stp->no););
-		blocks = update_bkwd_compact(stp);
-		IF_DEBUG(gc, fprintf(stderr,"update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)\n", 
-				     stp->gen->no, stp->no,
-				     stp->n_blocks, blocks););
-		stp->n_blocks = blocks;
-	    }
-	}
+    stp = &oldest_gen->steps[0];
+    if (stp->blocks != NULL) {
+	blocks = update_bkwd_compact(stp);
+	IF_DEBUG(gc, fprintf(stderr,"update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)\n", 
+			     stp->gen->no, stp->no,
+			     stp->n_blocks, blocks););
+	stp->n_blocks = blocks;
     }
 }
