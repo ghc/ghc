@@ -10,7 +10,7 @@
   go wrong&rdquo; section (<XRef LinkEnd="wrong">) for information
   about crashes, space leaks, and other undesirable phenomena.</para>
 
-  <para>The limitations here are listed in Haskell-Report order
+  <para>The limitations here are listed in Haskell Report order
   (roughly).</para>
 
   <sect2 id="haskell98-divergence">
@@ -119,7 +119,7 @@
             standard namespace.  All of these modules begin with
             <literal>Prel</literal>, so the rule is: don't use any
             modules beginning with <literal>Prel</literal> in your
-            program, or you will be comprehensively screwed.</para>
+            program, or you may be comprehensively screwed.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
