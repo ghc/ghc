@@ -29,7 +29,7 @@ import VarEnv		( TidyEnv, emptyTidyEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
 			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings,
 			  mkLocMessage, mkLongErrMsg )
-import SrcLoc		( mkGeneralSrcSpan, SrcSpan, Located(..) )
+import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( emptyDUs, emptyNameSet )
 import OccName		( emptyOccEnv )
@@ -99,7 +99,7 @@ initTc hsc_env mod do_this
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,
-		tcl_loc	       = mkGeneralSrcSpan FSLIT("Top level of module"),
+		tcl_loc	       = mkGeneralSrcSpan FSLIT("Top level"),
 		tcl_ctxt       = [],
 		tcl_rdr	       = emptyLocalRdrEnv,
 		tcl_th_ctxt    = topStage,
@@ -374,7 +374,9 @@ getSrcSpanM :: TcRn SrcSpan
 getSrcSpanM = do { env <- getLclEnv; return (tcl_loc env) }
 
 addSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-addSrcSpan loc = updLclEnv (\env -> env { tcl_loc = loc })
+addSrcSpan loc thing_inside
+  | isGoodSrcSpan loc = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
+  | otherwise	      = thing_inside	-- Don't overwrite useful info with useless
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = addSrcSpan loc $ fn a
