@@ -39,6 +39,14 @@ import PrelGHC
 
 newtype ST s a = ST (PrelST.State s -> (a,PrelST.State s))
 
+instance Functor (ST s) where
+    map f m = ST $ \ s ->
+      let 
+       ST m_a = m
+       (r,new_s) = m_a s
+      in
+      (f r,new_s)
+
 instance Monad (ST s) where
 
         return a = ST $ \ s -> (a,s)

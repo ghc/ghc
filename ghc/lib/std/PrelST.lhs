@@ -27,6 +27,11 @@ newtype ST s a = ST (State# s -> STret s a)
 
 data STret s a = STret (State# s) a
 
+instance Functor (ST s) where
+    map f (ST m) = ST $ \ s ->
+      case (m s) of { STret new_s r ->
+      STret new_s (f r) }
+
 instance Monad (ST s) where
     {-# INLINE return #-}
     {-# INLINE (>>)   #-}
