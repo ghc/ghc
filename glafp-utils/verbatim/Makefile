@@ -5,6 +5,8 @@ C_SRCS = verbatim.c
 C_PROG = verbatim
 LIBS = $(FLEX_LIB)
 
+override SRC_FLEX_OPTS=-8
+
 #
 # For src distributions, include flex output.
 #
