@@ -462,11 +462,15 @@ $PostprocessCcOutput = 0;
 $Static = 1;
 $Static = 0 if ($EnableWin32DLLs eq 'YES');
 
-# native code-gen or via C?
+# Output language
 $HaveNativeCodeGen = $GhcWithNativeCodeGen;
-$HscOut = '-C='; # '-C=' ==> .hc output; '-S=' ==> .s output; '-N=' ==> neither
-$HscOut = '-S='
+$HscLang = 'C'; 	# 'C'    ==> .hc output; 
+			# 'asm'  ==> .s output; 
+			# 'java' ==> .java output
+			# 'none' ==> no code output
+$HscLang = 'asm'
     if ($HaveNativeCodeGen ne 'YES') && $TargetPlatform =~ /^(alpha)-/;
+
 # TEMP: disable x86 & Sparc if $HaveNativeCodeGen && $TargetPlatform =~ /^(i386|alpha|sparc)-/;
 $ProduceHi    = '-hifile=';
 $HiOnStdout   = 0;
@@ -942,9 +946,9 @@ After the sanity checks, add flags to the necessary parts of the driver pipeline
   if ( $BuildTag ne '' ) { # something other than normal sequential...
 
       local($Tag) = "${BuildTag}";
-      $Tag =~ s/_//;  # move the underscore to the back
+      $Tag =~ s/_//;	# move the underscore to the back
 
-      $HscOut = '-C='; # must go via C
+      $HscLang = 'C'; 	# must go via C
       &processArgs(split(' ', $SetupOpts{$BuildTag}));
 #      eval($EvaldSetupOpts{$BuildTag});
   }
@@ -1401,11 +1405,17 @@ Again, we'll do the post-recompilation-checker parts of this later.
     # 
     local($do_cc)	= ( $Do_cc != -1) # i.e., it was set explicitly
 			  ? $Do_cc
-			  : ( ($HscOut eq '-C=') ? 1 : 0 );
+			  : ( ($HscLang eq 'C') ? 1 : 0 );
     local($do_as)	= $Do_as;
-    local($hsc_out)	   = ( $HscOut eq '-C=' ) ? "$Tmp_prefix.hc" : "$Tmp_prefix.s" ;
-    local($hsc_out_c_stub) = ( $HscOut eq '-C=' ) ? "${Tmp_prefix}_stb.c" : "";
-    local($hsc_out_h_stub) = ( $HscOut eq '-C=' ) ? "${Tmp_prefix}_stb.h" : "";
+
+    local($hsc_out_suffix) = ( $HscLang eq 'C' )    ? "hc" : 
+			     ( $HscLang eq 'asm' )  ? "s" : 
+			     ( $HscLang eq 'java' ) ? "java" : 
+				"" ;
+    
+    local($hsc_out) 	   = $Tmp_prefix.$hsc_out_suffix ;
+    local($hsc_out_c_stub) = ( $HscLang eq 'C' ) ? "${Tmp_prefix}_stb.c" : "";
+    local($hsc_out_h_stub) = ( $HscLang eq 'C' ) ? "${Tmp_prefix}_stb.h" : "";
 
     if ($Only_preprocess_hc) { # stop after having run $Cc -E
        $do_as=0;
@@ -1445,20 +1455,20 @@ not} going to run, set its input (i.e., the output of its preceding
 phase) to @"$ifile_root.<suffix>"@.
 
 \begin{code}
-    local($going_interactive) = $HscOut eq '-N=' || $ifile_root eq '_stdin';
+    local($going_interactive) = $HscLang eq 'none' || $ifile_root eq '_stdin';
 
     #
     # Warning issued if -keep-hc-file-too is used without
     # -fvia-C (or the equivalent)
     #
-    if ( $HscOut ne '-C=' && $Keep_hc_file_too ) {
+    if ( $HscLang ne 'C' && $Keep_hc_file_too ) {
 	print STDERR "$Pgm: warning: Native code generator to be used, -keep-hc-file-too will be ignored\n";
     }
 
     if (! $do_cc && ! $do_as) { # stopping after hsc
 	$hsc_out = ($Specific_output_file ne '')
 		 ? $Specific_output_file
-		 : &odir_ify($ifile_root, ($HscOut eq '-C=') ? 'hc' : 's');
+		 : &odir_ify($ifile_root, $hsc_out_suffix);
 
 	$ofile_target = $hsc_out; # reset
     }
@@ -1673,7 +1683,7 @@ sub runHscAndProcessInterfaces {
 	# recompiling this module has been done
 	#
 	&run_something("touch $ofile_target",
-		       "Touch $ofile_target,  to propagate dependencies") if $HscOut ne '-N=';
+		       "Touch $ofile_target,  to propagate dependencies") if $HscLang ne 'none';
 
     } else {	
 
@@ -1682,18 +1692,20 @@ sub runHscAndProcessInterfaces {
     	# If non-interactive, heave in the consistency info at the end
     	# NB: pretty hackish (depends on how $output is set)
     	if ( ! $going_interactive ) {
-	    if ( $HscOut eq '-C=' ) {
-	    $to_do = "echo 'static char ghc_hsc_ID[] = \"\@(#)hsc $ifile\t$HsC_major_version.$HsC_minor_version,$HsC_consist_options\";' >> $hsc_out";
+	    if ( $HscLang eq 'C' ) {
+	         $to_do = "echo 'static char ghc_hsc_ID[] = \"\@(#)hsc $ifile\t$HsC_major_version.$HsC_minor_version,$HsC_consist_options\";' >> $hsc_out";
     
-	    } elsif ( $HscOut eq '-S=' ) {
+	        &run_something($to_do, 'Pin on Haskell consistency info');	
+	    } elsif ( $HscLang eq 'asm' ) {
 		local($consist) = "hsc.$ifile.$HsC_major_version.$HsC_minor_version.$HsC_consist_options";
 		$consist =~ s/,/./g;
 		$consist =~ s/\//./g;
 		$consist =~ s/-/_/g;
 		$consist =~ s/[^A-Za-z0-9_.]/ZZ/g; # ToDo: properly?
 		$to_do = "echo '\n\t.text\n$consist:' >> $hsc_out";
+		&run_something($to_do, 'Pin on Haskell consistency info');	
 	    }
-	    &run_something($to_do, 'Pin on Haskell consistency info');	
+ 	    # no consistency info for Java output files
     	}   
 
 
@@ -1704,12 +1716,12 @@ sub runHscAndProcessInterfaces {
 	}
 	# if we're going to split up object files,
 	# we inject split markers into the .hc file now
-	if ( $HscOut eq '-C=' && $SplitObjFiles ) {
+	if ( $HscLang eq 'C' && $SplitObjFiles ) {
 	    &inject_split_markers ( $hsc_out );
         }
 
 	# save a copy of the .hc file, even if we are carrying on...
-	if ($HscOut eq '-C=' && $do_cc && $Keep_hc_file_too) {
+	if ($HscLang eq 'C' && $do_cc && $Keep_hc_file_too) {
             &saveIntermediate($ifile_root , "hc" , $hsc_out);
 	}
 
@@ -1738,7 +1750,8 @@ sub runHsc {
 
     # set up for producing output/.hi; note that flag twiddling
     # may mean that nothing will actually be produced:
-    $output = "$ProduceHi$hsc_hi $HscOut$hsc_out -F=$hsc_out_c_stub -FH=$hsc_out_h_stub";
+    $oflags = ( $HscLang eq 'none' ? "" : "-olang=$HscLang -ofile=$hsc_out" ) ;
+    $output = "$ProduceHi$hsc_hi $oflags -F=$hsc_out_c_stub -FH=$hsc_out_h_stub";
     push(@Files_to_tidy, $hsc_hi, $hsc_out, $hsc_out_c_stub, $hsc_out_h_stub );
 
     # if we're compiling foo.hs, we want the GC stats to end up in foo.stat
@@ -2880,11 +2893,15 @@ arg: while($_ = $Args[0]) {
     # change the global default:
     # we won't run cat; we'll run the real thing
 	
-    /^-C$/	    && do { $Do_cc = 0; $Do_as = 0; $Do_lnkr = 0; $HscOut = '-C=';
+    /^-C$/	    && do { $Do_cc = 0; $Do_as = 0; $Do_lnkr = 0; $HscLang = 'C';
 			    next arg; };
     # stop after generating C
 	
-    /^-noC$/	    && do { $HscOut = '-N='; $ProduceHi = '-nohifile=';
+    /^-J$/	    && do { $Do_cc = 0; $Do_as = 0; $Do_lnkr = 0; $HscLang = 'java';
+			    next arg; };
+    # stop after generating Java
+	
+    /^-noC$/	    && do { $HscLang = 'none'; $ProduceHi = '-nohifile=';
 			    $Do_cc = 0; $Do_as = 0; $Do_lnkr = 0;
 			    next arg; };
     # leave out actual C generation (debugging) [also turns off interface gen]
@@ -3162,7 +3179,7 @@ arg: while($_ = $Args[0]) {
 			    print STDERR "WARNING: don't know how to split objects on this platform: $TargetPlatform\n`-split-objs' option ignored\n";
 			} else {
 			    $SplitObjFiles = 1;
-    			    $HscOut = '-C=';
+    			    $HscLang = 'C';
 
 			    push(@HsC_flags, "-fglobalise-toplev-names"); 
 			    push(@CcBoth_flags, '-DUSE_SPLIT_MARKERS');
@@ -3218,8 +3235,8 @@ arg: while($_ = $Args[0]) {
 
     # ---------------
 
-    /^-fasm-(.*)$/  	&& do { $HscOut = '-S='; next arg; }; # force using nativeGen
-    /^-fvia-[cC]$/	&& do { $HscOut = '-C='; next arg; }; # force using C compiler
+    /^-fasm-(.*)$/  	&& do { $HscLang = 'asm'; next arg; }; # force using nativeGen
+    /^-fvia-[cC]$/	&& do { $HscLang = 'C';   next arg; }; # force using C compiler
 
     # ---------------
 
@@ -3391,7 +3408,7 @@ arg: while($_ = $Args[0]) {
 		local($opt_lev) = ( /^-O2$/ ) ? 2 : 1; # max 'em
 		$OptLevel = ( $opt_lev > $OptLevel ) ? $opt_lev : $OptLevel;
 
-		$HscOut = '-C=' if $OptLevel == 2; # force use of C compiler
+		$HscLang = 'C' if $OptLevel == 2; # force use of C compiler
 		next arg; };
 
     /^-Onot$/	&& do { $OptLevel = 0; next arg; }; # # set it to <no opt>
