@@ -223,8 +223,10 @@ satisfy these laws.
 -}
 
 class  Monad m  where
-    (>>=)       :: m a -> (a -> m b) -> m b
-    (>>)        :: m a -> m b -> m b
+    (>>=)       :: forall a b. m a -> (a -> m b) -> m b
+    (>>)        :: forall a b. m a -> m b -> m b
+	-- Explicit for-alls so that we know what order to
+	-- give type arguments when desugaring
     return      :: a -> m a
     fail	:: String -> m a
 
