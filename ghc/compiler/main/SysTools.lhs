@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.53 2001/08/16 14:43:59 rrt Exp $
+-- $Id: SysTools.lhs,v 1.54 2001/08/17 12:43:24 sewardj Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -76,12 +76,20 @@ import List		( isPrefixOf )
 import MarshalArray
 #endif
 
+-- This is a kludge for bootstrapping with 4.08.X.  Given that
+-- all distributed compilers >= 5.0 will be compiled with themselves.
+-- I don't think this kludge is a problem.  And we have to start
+-- building with >= 5.0 on Win32 anyway.
+#if __GLASGOW_HASKELL__ > 408
 -- use the line below when we can be sure of compiling with GHC >=
 -- 5.02, and remove the implementation of rawSystem at the end of this
 -- file
 import PrelIOBase -- this can be removed when SystemExts is used
 import CError     ( throwErrnoIfMinus1 ) -- as can this
 -- import SystemExts       ( rawSystem )
+#else
+import System		( system )
+#endif
 
 #include "HsVersions.h"
 
@@ -798,6 +806,7 @@ getProcessID = Posix.getProcessID
 #endif
 
 rawSystem :: String -> IO ExitCode
+#if __GLASGOW_HASKELL__ > 408
 rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
 rawSystem cmd =
   withCString cmd $ \s -> do
@@ -807,5 +816,9 @@ rawSystem cmd =
         n  -> return (ExitFailure n)
 
 foreign import ccall "rawSystemCmd" unsafe primRawSystem :: CString -> IO Int
+#else
+rawSystem = System.system
+#endif
+
 
 \end{code}
