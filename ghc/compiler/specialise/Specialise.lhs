@@ -34,8 +34,9 @@ import TyVar		( TyVar, mkTyVar,
 			)
 import Kind		( mkBoxedTypeKind )
 import CoreSyn
+import FreeVars		( exprFreeVars )
 import PprCore		()	-- Instances 
-import Name		( NamedThing(..), getSrcLoc, mkSysLocalName )
+import Name		( NamedThing(..), getSrcLoc, mkSysLocalName, isLocallyDefined )
 import SrcLoc		( noSrcLoc )
 import SpecEnv		( addToSpecEnv, lookupSpecEnv, specEnvValues )
 
@@ -1096,29 +1097,7 @@ lookupId env id = case lookupIdEnv env id of
 			Just id' -> id'
 
 dictRhsFVs :: CoreExpr -> IdSet
-	-- Cheapo function for simple RHSs
-dictRhsFVs e
-  = go e
-  where
-    go (App e1 (VarArg a)) = go e1 `addOneToIdSet` a
-    go (App e1 (LitArg l)) = go e1
-    go (App e1 (TyArg t))  = go e1
-    go (Var v)	           = unitIdSet v
-    go (Lit l)	           = emptyIdSet
-    go (Con _ args)        = mkIdSet [id | VarArg id <- args]
-    go (Note _ e)	   = go e
-
-    go (Case e _)	   = go e	-- Claim: no free dictionaries in the alternatives
-					-- These case expressions are of the form
-					--   case d of { D a b c -> b }
-
-    go (Lam _ _)	   = emptyIdSet	-- This can happen for a Functor "dict",
-					-- which is represented by the function
-					-- itself; but it won't have any further
-					-- dicts inside it.  I hope.
-
-    go other		   = pprPanic "dictRhsFVs" (ppr e)
-
+dictRhsFVs e = exprFreeVars isLocallyDefined e
 
 addIdSpecialisations id spec_stuff
   = (if not (null errs) then

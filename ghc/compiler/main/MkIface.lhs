@@ -42,7 +42,7 @@ import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePr
 			)
 import CoreSyn		( CoreExpr, CoreBinding, GenCoreExpr, GenCoreBinding(..) )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), Unfolding )
-import FreeVars		( addExprFVs )
+import FreeVars		( exprFreeVars )
 import Name		( isLocallyDefined, isWiredInName, modAndOcc, nameModule, pprOccName,
 			  OccName, occNameString, nameOccName, nameString, isExported,
 			  Name {-instance NamedThing-}, Provenance, NamedThing(..)
@@ -346,10 +346,9 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     find_fvs expr = free_vars
 		  where
-		    (_,free_vars) = addExprFVs interesting emptyIdSet expr
-		    interesting bound id = isLocallyDefined id &&
-				           not (id `elementOfIdSet` bound) &&
-					   not (omitIfaceSigForId id)
+		    free_vars = exprFreeVars interesting expr
+		    interesting id = isLocallyDefined id &&
+				     not (omitIfaceSigForId id)
 \end{code}
 
 \begin{code}

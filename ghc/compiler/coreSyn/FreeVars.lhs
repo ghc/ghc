@@ -5,16 +5,14 @@ Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
 module FreeVars (
+	-- Cheap and cheerful variant...
+	exprFreeVars,
+
+	-- Complicated and expensive variant for float-out
 	freeVars,
-
-	-- cheap and cheerful variant...
-	addTopBindsFVs, addExprFVs,
-
 	freeVarsOf, freeTyVarsOf,
-	FVCoreExpr, FVCoreBinding,
-
 	CoreExprWithFVs,		-- For the above functions
-	AnnCoreExpr,		-- Dito
+	AnnCoreExpr,			-- Dito
 	FVInfo(..), LeakInfo(..)
     ) where
 
@@ -36,7 +34,7 @@ import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 			  TyVarSet, TyVar
 			)
 import BasicTypes	( Unused )
-import UniqSet		( unionUniqSets )
+import UniqSet		( unionUniqSets, addOneToUniqSet )
 import Util		( panic, assertPanic )
 \end{code}
 
@@ -77,6 +75,7 @@ aFreeTyVar t   = unitTyVarSet t
 is_among       = elementOfIdSet
 munge_id_ty  i = tyVarsOfType (idType i)
 combine	       = unionUniqSets -- used both for {Id,TyVar}Sets
+add	       = addOneToUniqSet
 
 combineFVInfo (FVInfo fvs1 tfvs1 leak1) (FVInfo fvs2 tfvs2 leak2)
   = FVInfo (fvs1  `combine` fvs2)
@@ -344,213 +343,91 @@ leakinessOf (FVInfo _ _ leakiness, _) = leakiness
 
 %************************************************************************
 %*									*
-\section[freevars-binders]{Attaching free variables to binders
+\section{Finding the free variables of an expression}
 %*									*
 %************************************************************************
 
-
-Here's an variant of the free-variable pass, which pins free-variable
-information on {\em binders} rather than every single jolly
-expression!
-\begin{itemize}
-\item
-  The free vars attached to a lambda binder are the free vars of the
-  whole lambda abstraction.  If there are multiple binders, they are
-  each given the same free-var set.
-\item
-  The free vars attached to a let(rec) binder are the free vars of the
-  rhs of the binding.  In the case of letrecs, this set excludes the
-  binders themselves.
-\item
-  The free vars attached to a case alternative binder are the free
-  vars of the alternative, excluding the alternative's binders.
-\end{itemize}
-
-There's a predicate carried in which tells what is a free-var
-candidate. It is passed the Id and a set of in-scope Ids.
-
-(Global) constructors used on the rhs in a Con are also treated as
-potential free-var candidates (though they will not be recorded in the
-in-scope set). The predicate must decide if they are to be recorded as
-free-vars.
-
-As it happens this is only ever used by the Specialiser!
+This function simply finds the free variables of an expression.
 
 \begin{code}
-type FVCoreBinder  = (Id, IdSet)
-type FVCoreExpr    = GenCoreExpr    FVCoreBinder Id Unused
-type FVCoreBinding = GenCoreBinding FVCoreBinder Id Unused
-
 type InterestingIdFun
-  =  IdSet	-- Non-top-level in-scope variables
-  -> Id		-- The Id being looked at
+  =  Id		-- The Id being looked at
   -> Bool	-- True <=> interesting
+
+exprFreeVars :: InterestingIdFun -> CoreExpr -> IdSet
+exprFreeVars fv_cand e = expr_fvs fv_cand emptyIdSet e
 \end{code}
 
+
 \begin{code}
-addExprFVs :: InterestingIdFun	-- "Interesting id" predicate
-	   -> IdSet		-- In scope ids
-	   -> CoreExpr
-	   -> (FVCoreExpr, IdSet)
+expr_fvs :: InterestingIdFun	-- "Interesting id" predicate
+	 -> IdSet		-- In scope ids
+	 -> CoreExpr
+	 -> IdSet
 
-addExprFVs fv_cand in_scope (Var v)
-  = (Var v, if fv_cand in_scope v
-	      then aFreeId v
-	      else noFreeIds)
+expr_fvs fv_cand in_scope (Var v)        = id_fvs fv_cand in_scope v
+expr_fvs fv_cand in_scope (Lit lit)      = noFreeIds
+expr_fvs fv_cand in_scope (Con con args) = args_fvs fv_cand in_scope args
+expr_fvs fv_cand in_scope (Prim op args) = args_fvs fv_cand in_scope args
+expr_fvs fv_cand in_scope (Note _ expr)  = expr_fvs fv_cand in_scope expr
+expr_fvs fv_cand in_scope (App fun arg)  = expr_fvs fv_cand in_scope fun `combine`
+					   arg_fvs fv_cand in_scope arg
 
-addExprFVs fv_cand in_scope (Lit lit) = (Lit lit, noFreeIds)
 
-addExprFVs fv_cand in_scope (Con con args)
-  = (Con con args,
-     if fv_cand in_scope con
-     then aFreeId con
-     else noFreeIds `combine` fvsOfArgs fv_cand in_scope args)
+expr_fvs fv_cand in_scope (Lam (ValBinder b) body)
+  = (expr_fvs fv_cand (in_scope `add` b) body)
+expr_fvs fv_cand in_scope (Lam (TyBinder b) body)
+  = expr_fvs fv_cand in_scope body
 
-addExprFVs fv_cand in_scope (Prim op args)
-  = (Prim op args, fvsOfArgs fv_cand in_scope args)
-
-addExprFVs fv_cand in_scope (Lam binder body)
-  = (Lam new_binder new_body, lam_fvs)
+expr_fvs fv_cand in_scope (Case scrut alts)
+  = expr_fvs fv_cand in_scope scrut `combine` alts_fvs
   where
-    (new_binder, binder_set)
-      = case binder of
-	  TyBinder    t -> (TyBinder t, emptyIdSet)
-          ValBinder   b -> (ValBinder (b, lam_fvs),
-			    unitIdSet b)
-
-    new_in_scope	 = in_scope `combine` binder_set
-    (new_body, body_fvs) = addExprFVs fv_cand new_in_scope body
-    lam_fvs	         = body_fvs `minusIdSet` binder_set
-
-addExprFVs fv_cand in_scope (App fun arg)
-  = (App fun2 arg, fun_fvs `combine` fvsOfArgs fv_cand in_scope [arg])
-  where
-    (fun2, fun_fvs) = addExprFVs fv_cand in_scope fun
-
-addExprFVs fv_cand in_scope (Case scrut alts)
-  = (Case scrut' alts', scrut_fvs `combine` alts_fvs)
-  where
-    (scrut', scrut_fvs) = addExprFVs fv_cand in_scope scrut
-
-    (alts', alts_fvs)
+    alts_fvs
       = case alts of
-	  AlgAlts alg_alts deflt -> (AlgAlts alg_alts' deflt', fvs)
+	  AlgAlts alg_alts deflt -> unionManyIdSets (deflt_fvs : alt_fvs)
 	    where
-	      (alg_alts', alt_fvs) = unzip (map do_alg_alt alg_alts)
-	      (deflt', deflt_fvs) = do_deflt deflt
-	      fvs = unionManyIdSets (deflt_fvs : alt_fvs)
+	      alt_fvs   = map do_alg_alt alg_alts
+	      deflt_fvs = do_deflt deflt
 
-	  PrimAlts prim_alts deflt -> (PrimAlts prim_alts' deflt', fvs)
+	  PrimAlts prim_alts deflt -> unionManyIdSets (deflt_fvs : alt_fvs)
 	    where
-	      (prim_alts', alt_fvs) = unzip (map do_prim_alt prim_alts)
-	      (deflt', deflt_fvs) = do_deflt deflt
-	      fvs = unionManyIdSets (deflt_fvs : alt_fvs)
+	      alt_fvs   = map do_prim_alt prim_alts
+	      deflt_fvs = do_deflt deflt
 
-    do_alg_alt :: (Id, [Id], CoreExpr)
-	       -> ((Id, [FVCoreBinder], FVCoreExpr), IdSet)
-
-    do_alg_alt (con, args, rhs) = ((con, args `zip` (repeat fvs), rhs'), fvs)
+    do_alg_alt :: (Id, [Id], CoreExpr) -> IdSet
+    do_alg_alt (con, args, rhs) = expr_fvs fv_cand new_in_scope rhs
       where
-	new_in_scope = in_scope `combine` arg_set
-	(rhs', rhs_fvs) = addExprFVs fv_cand new_in_scope rhs
-	fvs = rhs_fvs `minusIdSet` arg_set
-	arg_set = mkIdSet args
+	new_in_scope = in_scope `combine` mkIdSet args
 
-    do_prim_alt (lit, rhs) = ((lit, rhs'), rhs_fvs)
-      where
-	(rhs', rhs_fvs) = addExprFVs fv_cand in_scope rhs
+    do_prim_alt (lit, rhs) = expr_fvs fv_cand in_scope rhs
 
-    do_deflt NoDefault = (NoDefault, noFreeIds)
-    do_deflt (BindDefault var rhs)
-      = (BindDefault (var,fvs) rhs', fvs)
-      where
-	new_in_scope = in_scope `combine` var_set
-	(rhs', rhs_fvs) = addExprFVs fv_cand new_in_scope rhs
-	fvs = rhs_fvs `minusIdSet` var_set
-	var_set = aFreeId var
+    do_deflt NoDefault		 = noFreeIds
+    do_deflt (BindDefault b rhs) = expr_fvs fv_cand (in_scope `add` b) rhs
 
-addExprFVs fv_cand in_scope (Let binds body)
-  = (Let binds' body2, fvs_binds `combine` (fvs_body `minusIdSet` binder_set))
+expr_fvs fv_cand in_scope (Let (NonRec b r) body)
+  = expr_fvs fv_cand in_scope r `combine`
+    expr_fvs fv_cand (in_scope `add` b) body
+
+expr_fvs fv_cand in_scope (Let (Rec pairs) body)
+  = foldr (combine . expr_fvs fv_cand in_scope' . snd) noFreeIds pairs `combine`
+    expr_fvs fv_cand in_scope' body
   where
-    (binds', fvs_binds, new_in_scope, binder_set)
-      = addBindingFVs fv_cand in_scope binds
+    in_scope' = in_scope `combine` mkIdSet (map fst pairs)
 
-    (body2, fvs_body)  = addExprFVs fv_cand new_in_scope body
 
-addExprFVs fv_cand in_scope (Note note expr)
-  = (Note note expr2, expr_fvs)
-  where
-    (expr2, expr_fvs) = addExprFVs fv_cand in_scope expr
-\end{code}
 
-\begin{code}
-addBindingFVs
-	    :: InterestingIdFun	-- "Interesting id" predicate
-	    -> IdSet		-- In scope ids
-	    -> CoreBinding
-	    -> (FVCoreBinding,
-		IdSet,		-- Free vars of binding group
-		IdSet,		-- Augmented in-scope Ids
-		IdSet)		-- Set of Ids bound by this binding
 
-addBindingFVs fv_cand in_scope (NonRec binder rhs)
-  = (NonRec binder' rhs', fvs, new_in_scope, binder_set)
-  where
-    ((binder', rhs'), fvs) = do_pair fv_cand in_scope binder_set (binder, rhs)
-    new_in_scope = in_scope `combine` binder_set
-    binder_set = aFreeId binder
+--------------------------------------
+arg_fvs fv_cand in_scope (VarArg v) = id_fvs fv_cand in_scope v
+arg_fvs fv_cand in_scope other_arg  = noFreeIds
 
-addBindingFVs fv_cand in_scope (Rec pairs)
-  = (Rec pairs', unionManyIdSets fvs_s, new_in_scope, binder_set)
-  where
-    binders = [binder | (binder,_) <- pairs]
-    binder_set = mkIdSet binders
-    new_in_scope = in_scope `combine` binder_set
-    (pairs', fvs_s) = unzip (map (do_pair fv_cand new_in_scope binder_set) pairs)
-\end{code}
+--------------------------------------
+args_fvs fv_cand in_scope args = foldr (combine . arg_fvs fv_cand in_scope) noFreeIds args
 
-\begin{code}
-addTopBindsFVs
-	    :: InterestingIdFun	-- "Interesting id" predicate
-	    -> [CoreBinding]
-	    -> ([FVCoreBinding],
-		IdSet)
 
-addTopBindsFVs fv_cand [] = ([], noFreeIds)
-addTopBindsFVs fv_cand (b:bs)
-  = let
-      (b',  fvs_b, _, _) = addBindingFVs fv_cand noFreeIds b
-      (bs', fvs_bs)      = addTopBindsFVs fv_cand bs
-    in
-    (b' : bs', fvs_b `combine` fvs_bs)
-\end{code}
-
-\begin{code}
-fvsOfArgs   :: InterestingIdFun	-- "Interesting id" predicate
-	    -> IdSet		-- In scope ids
-	    -> [CoreArg]
-	    -> IdSet
-
-fvsOfArgs _ _ [] = noFreeIds
-
-fvsOfArgs fv_cand in_scope [VarArg v] -- this is only a short-cut...
-  = if (fv_cand in_scope v) then aFreeId v else noFreeIds
-fvsOfArgs _	  _	   [ _ ] = noFreeIds
-
-fvsOfArgs fv_cand in_scope args
-  = mkIdSet [ v | (VarArg v) <- args, fv_cand in_scope v ]
-    -- all other types of args are uninteresting here...
-
-----------
-do_pair	:: InterestingIdFun -- "Interesting id" predicate
-	-> IdSet   	    -- In scope ids
-	-> IdSet
-	-> (Id, CoreExpr)
-	-> ((FVCoreBinder, FVCoreExpr), IdSet)
-
-do_pair fv_cand in_scope binder_set (binder,rhs)
- = (((binder, fvs), rhs'), fvs)
- where
-   (rhs', rhs_fvs) = addExprFVs fv_cand in_scope rhs
-   fvs = rhs_fvs `minusIdSet` binder_set
+--------------------------------------
+id_fvs fv_cand in_scope v
+  | v `elementOfIdSet` in_scope = noFreeIds
+  | fv_cand v		        = aFreeId v
+  | otherwise			= noFreeIds
 \end{code}
