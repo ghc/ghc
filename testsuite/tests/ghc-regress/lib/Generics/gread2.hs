@@ -3,10 +3,8 @@
 {-
 
 For the discussion in the 2nd boilerplate paper,
-we favour some simplified generic read.
-So the full story is in Data.Generics.Text,
-but the short version from the paper is turned into a test
-case below.
+we favour some simplified generic read, which is checked to compile.
+For the full/real story see Data.Generics.Text.
 
 -}
 
@@ -37,6 +35,7 @@ parseConstr ty = D (\s ->
  where
   match :: String -> [Constr]
         -> Maybe (String, Constr)
+  match _ [] = Nothing
   match input (con:cons)
     | take n input == showConstr con
     = Just (drop n input, con)
@@ -49,13 +48,14 @@ parseConstr ty = D (\s ->
 readM :: Data a => DecM a
 readM = read
     where
-      read = do { let ty = dataTypeOf (foo read)
+      read = do { let val = argOf read
+                ; let ty  = dataTypeOf val
                 ; constr <- parseConstr ty
                 ; let con::a = fromConstr constr
                 ; gmapM (\_ -> readM) con }
 
-foo :: DecM a -> a
-foo = undefined
+argOf :: c a -> a
+argOf = undefined
 
 yareadM :: Data a => DecM a
 yareadM = readM'

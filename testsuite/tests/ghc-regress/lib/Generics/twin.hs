@@ -46,6 +46,38 @@ gfoldlQ k z t = unR (gfoldl k' z' t)
       z' _ = R z
       k' (R r) c = R (k r c)
 
-main = print $ ( geq [True,True] [True,True]
-               , geq [True,True] [True,False]
+-----------------------------------------------------------------------------
+
+-- A dependently polymorphic geq
+geq'' :: Data a => a -> a -> Bool
+geq'' x y =  toConstr x == toConstr y
+          && and (gzipWithQ' geq'' x y)
+
+-- A helper type for existentially quantified queries
+data XQ r = forall a. Data a => XQ (a -> r)
+
+-- A dependently polymorphic gzipWithQ
+gzipWithQ' :: (forall a. Data a => a -> a -> r)
+           -> (forall a. Data a => a -> a -> [r])
+gzipWithQ' f t1 t2
+    = gApplyQ' (gmapQ (\x -> XQ (f x)) t1) t2
+
+-- Apply existentially quantified queries
+-- Insist on equal types!
+--
+gApplyQ' :: Data a => [XQ r] -> a -> [r]
+gApplyQ' qs t = reverse (snd (gfoldlQ k z t))
+    where
+      z = (qs, [])
+      k (XQ q : qs, rs) child = (qs, q' child : rs)
+        where
+          q' = error "Twin mismatch" `extQ` q
+
+
+-----------------------------------------------------------------------------
+
+main = print $ ( geq   [True,True] [True,True]
+               , geq   [True,True] [True,False]
+               , geq'' [True,True] [True,True]
+               , geq'' [True,True] [True,False]
                )

@@ -43,6 +43,7 @@ clean:
 	rm -f gmapQ-assoc
 	rm -f gread
 	rm -f gread2
+	rm -f gshow2
 	rm -f gshow/gshow
 	rm -f gzip/gzip
 	rm -f hopat

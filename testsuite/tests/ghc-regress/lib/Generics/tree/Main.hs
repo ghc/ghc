@@ -16,7 +16,7 @@ import CompanyDatatypes
 
 
 -- Trealise Data to Tree
-data2tree :: forall a. Data a => a -> Tree String
+data2tree :: Data a => a -> Tree String
 data2tree = gdefault `extQ` atString
   where
     atString (x::String) = Node x []
@@ -24,7 +24,7 @@ data2tree = gdefault `extQ` atString
 
 
 -- De-trealise Tree to Data
-tree2data :: forall a. Data a => Tree String -> Maybe a
+tree2data :: Data a => Tree String -> Maybe a
 tree2data = gdefault `extR` atString
   where
     atString (Node x []) = Just x

@@ -13,7 +13,7 @@ import LittleLanguage
 
 
 -- Generate all terms of a given depth
-genUpTo :: forall a. Data a => Int -> [a]
+genUpTo :: Data a => Int -> [a]
 genUpTo 0 = []
 genUpTo d = result
    where
