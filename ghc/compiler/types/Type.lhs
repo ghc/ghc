@@ -106,7 +106,7 @@ import CmdLineOpts	( opt_DictsStrict )
 import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..) )
 import Unique		( Uniquable(..) )
-import Util		( mapAccumL, seqList, lengthIs )
+import Util		( mapAccumL, seqList, lengthIs, snocView )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
@@ -249,14 +249,11 @@ splitAppTy_maybe :: Type -> Maybe (Type, Type)
 splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 splitAppTy_maybe (NoteTy _ ty)     = splitAppTy_maybe ty
-splitAppTy_maybe (SourceTy p)        = splitAppTy_maybe (sourceTypeRep p)
-splitAppTy_maybe (TyConApp tc [])  = Nothing
-splitAppTy_maybe (TyConApp tc tys) = split tys []
-			    where
-			       split [ty2]    acc = Just (TyConApp tc (reverse acc), ty2)
-			       split (ty:tys) acc = split tys (ty:acc)
-
-splitAppTy_maybe other	     	  = Nothing
+splitAppTy_maybe (SourceTy p)      = splitAppTy_maybe (sourceTypeRep p)
+splitAppTy_maybe (TyConApp tc tys) = case snocView tys of
+					Nothing -> Nothing
+					Just (tys',ty') -> Just (TyConApp tc tys', ty')
+splitAppTy_maybe other	     	   = Nothing
 
 splitAppTy :: Type -> (Type, Type)
 splitAppTy ty = case splitAppTy_maybe ty of
@@ -268,7 +265,7 @@ splitAppTys ty = split ty ty []
   where
     split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
     split orig_ty (NoteTy _ ty)         args = split orig_ty ty args
-    split orig_ty (SourceTy p)            args = split orig_ty (sourceTypeRep p) args
+    split orig_ty (SourceTy p)          args = split orig_ty (sourceTypeRep p) args
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)

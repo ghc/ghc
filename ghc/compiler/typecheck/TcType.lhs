@@ -35,7 +35,7 @@ module TcType (
   tcSplitForAllTys, tcSplitPhiTy, 
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
-  tcSplitAppTy_maybe, tcSplitAppTy, tcSplitSigmaTy,
+  tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitSigmaTy,
   tcSplitMethodTy, tcGetTyVar_maybe, tcGetTyVar,
 
   ---------------------------------
@@ -141,7 +141,7 @@ import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
 import BasicTypes	( IPName(..), ipNameName )
 import Unique		( Unique, Uniquable(..) )
 import SrcLoc		( SrcLoc )
-import Util		( cmpList, thenCmp, equalLength )
+import Util		( cmpList, thenCmp, equalLength, snocView )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
 \end{code}
@@ -405,20 +405,25 @@ tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
 tcSplitAppTy_maybe (FunTy ty1 ty2)   	     = Just (TyConApp funTyCon [ty1], ty2)
 tcSplitAppTy_maybe (AppTy ty1 ty2)   	     = Just (ty1, ty2)
 tcSplitAppTy_maybe (NoteTy n ty)     	     = tcSplitAppTy_maybe ty
-tcSplitAppTy_maybe (SourceTy (NType tc tys)) = tc_split_app tc tys
-	--- Don't forget that newtype!
+tcSplitAppTy_maybe (SourceTy (NType tc tys)) = tc_split_app tc tys	--- Don't forget that newtype!
 tcSplitAppTy_maybe (TyConApp tc tys)	     = tc_split_app tc tys
 tcSplitAppTy_maybe other	  	     = Nothing
 
-tc_split_app tc []  = Nothing
-tc_split_app tc tys = split tys []
-		    where
-		      split [ty2]    acc = Just (TyConApp tc (reverse acc), ty2)
-		      split (ty:tys) acc = split tys (ty:acc)
+tc_split_app tc tys = case snocView tys of
+			Just (tys',ty') -> Just (TyConApp tc tys', ty')
+			Nothing		-> Nothing
 
 tcSplitAppTy ty = case tcSplitAppTy_maybe ty of
 		    Just stuff -> stuff
 		    Nothing    -> pprPanic "tcSplitAppTy" (pprType ty)
+
+tcSplitAppTys :: Type -> (Type, [Type])
+tcSplitAppTys ty
+  = go ty []
+  where
+    go ty args = case tcSplitAppTy_maybe ty of
+		   Just (ty', arg) -> go ty' (arg:args)
+		   Nothing	   -> (ty,args)
 
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe (TyVarTy tv) 	= Just tv

@@ -591,7 +591,7 @@ data InstBindings
 pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))]
 
 pprInstInfoDetails (InstInfo { iBinds = VanillaInst b _ }) = ppr b
-pprInstInfoDetails (InstInfo { iBinds = NewTypeDerived _}) = text "Derived from the represenation type"
+pprInstInfoDetails (InstInfo { iBinds = NewTypeDerived _}) = text "Derived from the representation type"
 
 simpleInstInfoTy :: InstInfo -> Type
 simpleInstInfoTy info = case tcSplitDFunTy (idType (iDFunId info)) of

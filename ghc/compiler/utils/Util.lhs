@@ -13,9 +13,8 @@ module Util (
 	nOfThem, 
 	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
 	isSingleton, only,
-	notNull,
+	notNull, snocView,
 
-	snocView,
 	isIn, isn'tIn,
 
 	-- for-loop
@@ -263,20 +262,21 @@ notNull :: [a] -> Bool
 notNull [] = False
 notNull _  = True
 
+snocView :: [a] -> Maybe ([a],a)
+	-- Split off the last element
+snocView [] = Nothing
+snocView xs = go [] xs
+	    where
+		-- Invariant: second arg is non-empty
+	      go acc [x]    = Just (reverse acc, x)
+	      go acc (x:xs) = go (x:acc) xs
+
 only :: [a] -> a
 #ifdef DEBUG
 only [a] = a
 #else
 only (a:_) = a
 #endif
-\end{code}
-
-\begin{code}
-snocView :: [a] -> ([a], a)	-- Split off the last element
-snocView xs = go xs []
-	    where
-	      go [x]    acc = (reverse acc, x)
-	      go (x:xs) acc = go xs (x:acc)
 \end{code}
 
 Debugging/specialising versions of \tr{elem} and \tr{notElem}

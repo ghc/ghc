@@ -36,20 +36,19 @@ import Class		( className, classKey, classTyVars, classSCTheta, Class )
 import Subst		( mkTyVarSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
-import DataCon		( dataConRepArgTys, isNullaryDataCon, isExistentialDataCon )
+import DataCon		( dataConRepArgTys, dataConOrigArgTys, isNullaryDataCon, isExistentialDataCon )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( Name, getSrcLoc, nameUnique )
 import NameSet
 import RdrName		( RdrName )
 
-import TyCon		( tyConTyVars, tyConDataCons, tyConArity, newTyConRep,
+import TyCon		( tyConTyVars, tyConDataCons, tyConArity, 
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, 
-			  tcEqTypes, mkAppTys )
-import Type		( splitAppTys )
+			  tcEqTypes, tcSplitAppTys, mkAppTys )
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
@@ -348,7 +347,7 @@ makeDerivEqns tycl_decls
 	constraints = extra_constraints ++ 
 	  	      [ mkClassPred clas [arg_ty] 
 		      | data_con <- tyConDataCons tycon,
-		        arg_ty   <- dataConRepArgTys data_con,	
+		        arg_ty   <- dataConRepArgTys data_con,		-- dataConOrigArgTys???
 				-- Use the same type variables
 				-- as the type constructor,
 				-- hence no need to instantiate
@@ -362,6 +361,7 @@ makeDerivEqns tycl_decls
       =	doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
         if can_derive_via_isomorphism && (gla_exts || standard_instance) then
 		-- Go ahead and use the isomorphism
+	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
 	   returnM (Nothing, Just (InstInfo { iDFunId = mk_dfun dfun_name,
 					      iBinds = NewTypeDerived rep_tys }))
@@ -394,8 +394,18 @@ makeDerivEqns tycl_decls
 		-- Want to drop 1 arg from (T s a) and (ST s a)
 		-- to get 	instance Monad (ST s) => Monad (T s)
 
-	(tyvars, rep_ty) 	   = newTyConRep tycon
-	(rep_fn, rep_ty_args)	   = splitAppTys rep_ty
+	-- Note [newtype representation]
+	-- We must not use newTyConRep to get the representation 
+	-- type, because that looks through all intermediate newtypes
+	-- To get the RHS of *this* newtype, just look at the data
+	-- constructor.  For example
+	--	newtype B = MkB Int
+	--	newtype A = MkA B deriving( Num )
+	-- We want the Num instance of B, *not* the Num instance of Int,
+	-- when making the Num instance of A!
+	tyvars 		      = tyConTyVars tycon
+        rep_ty 		      = head (dataConOrigArgTys (head (tyConDataCons tycon)))
+	(rep_fn, rep_ty_args) = tcSplitAppTys rep_ty
 
 	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
 	tyvars_to_drop   = drop n_tyvars_to_keep tyvars

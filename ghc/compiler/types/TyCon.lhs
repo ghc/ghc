@@ -181,15 +181,18 @@ data AlgTyConFlavour
   | NewTyCon Type	-- Newtype, with its *ultimate* representation type
 			-- By 'ultimate' I mean that the rep type is not itself
 			-- a newtype or type synonym.
-
+			-- The rep type isn't entirely simple:
+			--  for a recursive newtype we pick () as the rep type
+			--	newtype T = MkT T
+			--
 			-- The rep type has free type variables the tyConTyVars
 			-- Thus:
 			-- 	newtype T a = MkT [(a,Int)]
 			-- The rep type is [(a,Int)]
-			--
-			-- The rep type isn't entirely simple:
-			--  for a recursive newtype we pick () as the rep type
-			--	newtype T = MkT T
+	-- NB: the rep type isn't necessarily the original RHS of the
+	--     newtype decl, because the rep type looks through other
+	--     newtypes.  If you want hte original RHS, look at the 
+	--     argument type of the data constructor.
 
 data DataConDetails datacon
   = DataCons [datacon]	-- Its data constructors, with fully polymorphic types
