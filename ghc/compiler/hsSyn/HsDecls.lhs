@@ -22,17 +22,15 @@ import HsTypes
 import IdInfo
 import SpecEnv		( SpecEnv )
 import HsCore		( UfExpr )
-import HsBasic		( Fixity )
-import TyCon		( NewOrData(..) )	-- Just a boolean flag really
+import BasicTypes	( Fixity, NewOrData(..) )
 
 -- others:
 import Name		--( getOccName, OccName )
 import Outputable	( interppSP, interpp'SP,
-			  Outputable(..){-instance * []-}
+			  PprStyle(..), Outputable(..){-instance * []-}
 			)
 import Pretty
 import SrcLoc		( SrcLoc )
-import PprStyle		( PprStyle(..) )
 import Util
 \end{code}
 
@@ -381,7 +379,7 @@ instance (NamedThing name, Outputable name) => Outputable (IfaceSig name) where
 data HsIdInfo name
   = HsArity		ArityInfo
   | HsStrictness	(StrictnessInfo name)
-  | HsUnfold		(UfExpr name)
+  | HsUnfold		Bool (UfExpr name)	-- True <=> INLINE pragma
   | HsUpdate		UpdateInfo
   | HsDeforest		DeforestInfo
   | HsArgUsage		ArgUsageInfo
