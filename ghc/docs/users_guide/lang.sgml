@@ -1,7 +1,7 @@
 <Chapter id="ghc-language-features">
 <Title>GHC Language Features</Title>
 
-&glaexts
+&glasgowexts
 &parallel
 &vs-hs
 
