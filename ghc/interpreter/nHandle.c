@@ -12,6 +12,21 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+int nh_getPID ( void )
+{
+   return (int) getpid();
+}
+
+void nh_exitwith ( int code )
+{
+   exit(code);
+}
+
+int nh_system ( char* cmd )
+{
+   return system ( cmd );
+}
+
 int nh_iseof ( FILE* f )
 {
    int c;

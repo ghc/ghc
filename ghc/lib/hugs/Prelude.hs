@@ -117,7 +117,8 @@ module Prelude (
     ,nh_stdin,nh_stdout,nh_stderr,copy_String_to_cstring,nh_open
     ,nh_free,nh_close,nh_errno,nh_flush,nh_read,primIntToChar
     ,unsafeInterleaveIO,nh_write,primCharToInt,
-    nullAddr, incAddr, isNullAddr, nh_filesize, nh_iseof,
+    nullAddr, incAddr, isNullAddr, 
+    nh_filesize, nh_iseof, nh_system, nh_exitwith, nh_getPID,
 
     Word,
     primGtWord, primGeWord, primEqWord, primNeWord,
@@ -1734,6 +1735,9 @@ foreign import "nHandle" "nh_load"     nh_load     :: Addr -> IO Char
 foreign import "nHandle" "nh_getenv"   nh_getenv   :: Addr -> IO Addr
 foreign import "nHandle" "nh_filesize" nh_filesize :: FILE_STAR -> IO Int
 foreign import "nHandle" "nh_iseof"    nh_iseof    :: FILE_STAR -> IO Int
+foreign import "nHandle" "nh_system"   nh_system   :: Addr -> IO Int
+foreign import "nHandle" "nh_exitwith" nh_exitwith :: Int -> IO ()
+foreign import "nHandle" "nh_getPID"   nh_getPID   :: IO Int
 
 copy_String_to_cstring :: String -> IO Addr
 copy_String_to_cstring s

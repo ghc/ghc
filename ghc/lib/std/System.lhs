@@ -203,12 +203,6 @@ getProgName                  = primGetRawArgs >>= \rawargs ->
 getEnv                      :: String -> IO String
 getEnv                       = primGetEnv
 
-system                      :: String -> IO ExitCode
-system s                     = error "System.system unimplemented"
-
-exitWith                    :: ExitCode -> IO a
-exitWith c                   = error "System.exitWith unimplemented"
-
 exitFailure		    :: IO a
 exitFailure		     = exitWith (ExitFailure 1)
 
@@ -219,6 +213,27 @@ toExitCode n                 = ExitFailure n
 fromExitCode                :: ExitCode -> Int
 fromExitCode ExitSuccess     = 0
 fromExitCode (ExitFailure n) = n
+
+exitWith :: ExitCode -> IO a
+exitWith c
+   = do nh_exitwith (fromExitCode c)
+        (ioError.IOError) "System.exitWith: should not return"
+
+system :: String -> IO ExitCode
+system cmd
+   | null cmd
+   = (ioError.IOError) "System.system: null command"
+   | otherwise
+   = do str    <- copy_String_to_cstring cmd
+        status <- nh_system str
+        nh_free str
+        case status of
+           0  -> return ExitSuccess
+           n  -> return (ExitFailure n)
+
+getPID :: IO Int
+getPID
+   = nh_getPID
 
 -----------------------------------------------------------------------------
 \end{code}
