@@ -118,17 +118,21 @@
       interface file will be put in <literal>src/A/B/C.hi</literal>
       and the object file in <literal>src/A/B/C.o</literal>.</para>
 
-      <para>Note that it is reasonable to have a module
+      <para>For any module that is imported, GHC requires that the
+      name of the module in the import statement exactly matches the
+      name of the module in the interface file (or source file) found
+      using the strategy specified in <xref linkend="search-path">.
+      This means that for most modules, the source file name should
+      match the module name.</para>
+
+      <para>However, note that it is reasonable to have a module
       <literal>Main</literal> in a file named
       <filename>foo.hs</filename>, but this only works because GHC
       never needs to search for the interface for module
       <literal>Main</literal> (because it is never imported).  It is
       therefore possible to have several <literal>Main</literal>
       modules in separate source files in the same directory, and GHC
-      will not get confused.  For modules other than
-      <literal>Main</literal>, it is strongly recommended that you
-      name the source file after the module name, replacing dots with
-      slashes in hierarchical module names.</para>
+      will not get confused.</para>
 
       <para>In batch compilation mode, the name of the object file can
       also be overriden using the <option>-o</option> option, and the
