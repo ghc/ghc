@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: seekFile.c,v 1.3 1998/12/02 13:27:53 simonm Exp $
+ * $Id: seekFile.c,v 1.4 1999/09/19 19:25:24 sof Exp $
  *
  * hSeek and hIsSeekable Runtime Support
  */
@@ -32,10 +32,10 @@ StgByteArray d;
     int rc = 0;
 
     switch (whence) {
-     case 0: whence=SEEK_SET; break;
-     case 1: whence=SEEK_CUR; break;
-     case 2: whence=SEEK_END; break;
-     default: whence=SEEK_SET; break; /* Should never happen, really */
+     case 0:  whence=SEEK_SET; break;
+     case 1:  whence=SEEK_CUR; break;
+     case 2:  whence=SEEK_END; break;
+     default: whence=SEEK_SET; /* Should never happen, really */
     }
 
     /*
@@ -87,7 +87,7 @@ StgByteArray d;
     rc = flushBuffer(ptr);
     if (rc < 0) return rc;
 
-    /* Try to find out the file type & size for a physical file */
+    /* Try to find out the file type */
     while (fstat(fo->fd, &sb) < 0) {
 	/* highly unlikely */
 	if (errno != EINTR) {
@@ -96,44 +96,10 @@ StgByteArray d;
 	    return -1;
 	}
     }
-    if (S_ISREG(sb.st_mode)) {
-	/* Verify that we are not seeking beyond end-of-file */
-	off_t posn;
-
-	switch (whence) {
-	case SEEK_SET:
-	    posn = offset;
-	    break;
-	case SEEK_CUR:
-	    while ((posn = lseek(fo->fd, 0, SEEK_CUR)) == -1) {
-		/* the possibility seems awfully remote */
-		if (errno != EINTR) {
-		    cvtErrno();
-		    stdErrno();
-		    return -1;
-		}
-	    }
-	    posn -= posn_delta;
-	    posn += offset;
-	    offset -= posn_delta; /* adjust the offset to include the buffer delta */
-	    break;
-	case SEEK_END:
-	    posn = (off_t)sb.st_size + offset;
-	    break;
-	}
-	if (posn > sb.st_size) {
-	    ghc_errtype = ERR_INVALIDARGUMENT;
-	    ghc_errstr = "seek position beyond end of file";
-	    return -1;
-	}
-    } else if (S_ISFIFO(sb.st_mode)) {
+    if (S_ISFIFO(sb.st_mode)) {
 	ghc_errtype = ERR_UNSUPPORTEDOPERATION;
 	ghc_errstr = "can't seek on a pipe";
 	return -1;
-    } else {
-        ghc_errtype = ERR_UNSUPPORTEDOPERATION;
-        ghc_errstr = "can't seek on a device";
-        return -1;
     }
     while ( lseek(fo->fd, offset, whence) == -1) {
 	if (errno != EINTR) {
@@ -203,44 +169,10 @@ StgInt64 d;
 	    return -1;
 	}
     }
-    if (S_ISREG(sb.st_mode)) {
-	/* Verify that we are not seeking beyond end-of-file */
-	off_t posn;
-
-	switch (whence) {
-	case SEEK_SET:
-	    posn = offset;
-	    break;
-	case SEEK_CUR:
-	    while ((posn = lseek(fo->fd, 0, SEEK_CUR)) == -1) {
-		/* the possibility seems awfully remote */
-		if (errno != EINTR) {
-		    cvtErrno();
-		    stdErrno();
-		    return -1;
-		}
-	    }
-	    posn -= posn_delta;
-	    posn += offset;
-	    offset -= posn_delta; /* adjust the offset to include the buffer delta */
-	    break;
-	case SEEK_END:
-	    posn = (off_t)sb.st_size + offset;
-	    break;
-	}
-	if (posn > sb.st_size) {
-	    ghc_errtype = ERR_INVALIDARGUMENT;
-	    ghc_errstr = "seek position beyond end of file";
-	    return -1;
-	}
-    } else if (S_ISFIFO(sb.st_mode)) {
+    if (S_ISFIFO(sb.st_mode)) {
 	ghc_errtype = ERR_UNSUPPORTEDOPERATION;
 	ghc_errstr = "can't seek on a pipe";
 	return -1;
-    } else {
-        ghc_errtype = ERR_UNSUPPORTEDOPERATION;
-        ghc_errstr = "can't seek on a device";
-        return -1;
     }
     while ( lseek(fo->fd, offset, whence) == -1) {
 	if (errno != EINTR) {
@@ -270,12 +202,12 @@ StgForeignPtr ptr;
 	    return -1;
 	}
     }
-    /* Regular files are okay */
-    if (S_ISREG(sb.st_mode)) {
-	return 1;
-    } 
-    /* For now, everything else is not */
-    else {
+    /* Pipes are not okay.. */
+    if (S_ISFIFO(sb.st_mode)) {
 	return 0;
+    } 
+    /* ..for now, everything else is */
+    else {
+	return 1;
     }
 }
