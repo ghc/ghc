@@ -1216,10 +1216,34 @@ getRegister (CmmLoad mem pk)
 
 getRegister (CmmLit (CmmInt 0 rep))
   = let
+	-- x86_64: 32-bit xor is one byte shorter, and zero-extends to 64 bits
+	adj_rep = case rep of I64 -> I32; _ -> rep
+	rep1 = IF_ARCH_i386( rep, adj_rep ) 
     	code dst 
-           = unitOL (XOR rep (OpReg dst) (OpReg dst))
+           = unitOL (XOR rep1 (OpReg dst) (OpReg dst))
     in
     	return (Any rep code)
+
+#if x86_64_TARGET_ARCH
+  -- optimisation for loading small literals on x86_64: take advantage
+  -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
+  -- instruction forms are shorter.
+getRegister (CmmLit lit) 
+  | I64 <- cmmLitRep lit, not (isBigLit lit)
+  = let 
+	imm = litToImm lit
+	code dst = unitOL (MOV I32 (OpImm imm) (OpReg dst))
+    in
+    	return (Any I64 code)
+  where
+   isBigLit (CmmInt i I64) = i < 0 || i > 0xffffffff
+   isBigLit _ = False
+	-- note1: not the same as is64BitLit, because that checks for
+	-- signed literals that fit in 32 bits, but we want unsigned
+	-- literals here.
+	-- note2: all labels are small, because we're assuming the
+	-- small memory model (see gcc docs, -mcmodel=small).
+#endif
 
 getRegister (CmmLit lit)
   = let 
@@ -2026,6 +2050,8 @@ getRegOrMem e = do
 
 #if x86_64_TARGET_ARCH
 is64BitLit (CmmInt i I64) = i > 0x7fffffff || i < -0x80000000
+   -- assume that labels are in the range 0-2^31-1: this assumes the
+   -- small memory model (see gcc docs, -mcmodel=small).
 #endif
 is64BitLit x = False
 #endif
