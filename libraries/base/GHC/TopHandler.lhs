@@ -58,14 +58,15 @@ topHandler err = catchException (real_handler err) topHandler
 --
 real_handler :: Exception -> IO a
 real_handler ex =
+  cleanUp >>
   case ex of
 	AsyncException StackOverflow -> do
 	   reportStackOverflow
 	   safeExit 2
 
 	-- only the main thread gets ExitException exceptions
-	ExitException ExitSuccess     -> cleanUp >> safeExit 0
-	ExitException (ExitFailure n) -> cleanUp >> safeExit n
+	ExitException ExitSuccess     -> safeExit 0
+	ExitException (ExitFailure n) -> safeExit n
 
 	other -> do
 	   reportError other
