@@ -62,17 +62,18 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
    rm_or_fail($testname)
 
    $cmd = "cd " ++ $testdir ++ " && \"" ++ 
-	  $tool ++ "\" " ++ $flags ++ " " ++ $_extra_args ++ " "
-	  ++ (if defined $extra_hc_flags
-		  then $extra_hc_flags 
-		  else "")
+	  $tool ++ "\" "
           ++ (if defined $compile_to_hc && $compile_to_hc
-		  then " -C "
+		  then "-C "
 	     	  else if $compile_only 
-                  	then " -c " 
-                  	else " -o " ++ $testname ++ " ")
-          ++ $srcname ++ " >" ++ $errname ++ " 2>&1"
-   -- print $cmd
+                  	then "-c " 
+                  	else "-o " ++ $testname ++ " ")
+	  ++ $srcname ++ " "
+	  ++ $flags ++ " " ++ $_extra_args ++ " "
+	  ++ (if defined $extra_hc_flags
+		  then $extra_hc_flags ++ " "
+		  else "")
+          ++ ">" ++ $errname ++ " 2>&1"
    $res = runCmd($cmd)
    return $res
 }
@@ -172,7 +173,7 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
         return False
    fi
 
-   if $res /= "0" && $stderr_e == $stderr_a
+   if ($res /= "0") && $stderr_e == $stderr_a
    then
      return True
    else
