@@ -3,6 +3,7 @@
 module Main ( main ) where
 
 import PrelBase
+import PrelAddr(indexAddrOffAddr)
 import ST
 import IOExts
 import ST
@@ -27,13 +28,18 @@ main = putStr
 -- Arr# Char# -------------------------------------------
 -- (main effort is in packString#)
 
+foreign label "stdout" addrOfStdout :: Addr
+
+stdout :: Addr
+stdout = indexAddrOffAddr addrOfStdout 0
+
 test_chars :: String
 test_chars
   = let str = reverse "Now is the time for all good men to come to...\n"
     in
     unsafePerformIO (
-	_ccall_ fprintf (``stdout''::Addr) (packString "%d %s\n") (93::Int) (packString str) >>
-	_ccall_ fflush  (``stdout''::Addr)  >>
+	_ccall_ fprintf stdout (packString "%d %s\n") (93::Int) (packString str) >>
+	_ccall_ fflush  stdout >>
 	return ""
 	)
 
