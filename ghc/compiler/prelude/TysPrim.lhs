@@ -3,9 +3,6 @@
 %
 \section[TysPrim]{Wired-in knowledge about primitive types}
 
-This module tracks the ``state interface'' document, ``GHC prelude:
-types and operations.''
-
 \begin{code}
 module TysPrim(
 	alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
