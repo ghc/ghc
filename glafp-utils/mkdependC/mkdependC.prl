@@ -175,6 +175,9 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 	# depend on the de-litified versions (which have better info)
 	# don't let a file depend on itself
 	next line if /^\/usr\/include/;
+	# Hack - the cygwin32 dir structure is odd!
+	next line if /H-i386-cygwin32\/i386-cygwin32/;
+	next line if /H-i386-cygwin32\/lib\/gcc-lib\/i386-cygwin32/;
 	next line if /\/gcc-lib\/[^\/\n]+\/[\.0-9]+\/include\//;
 	next line if /\/gnu\/[^-\/]+-[^-\/]+-[^-\/]+\/include\//;
 	next line if /\/yaccpar/;
