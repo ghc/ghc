@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2000/04/05 10:27:10 simonmar Exp $
+# $Id: Makefile,v 1.3 2000/04/18 11:31:56 panne Exp $
 #
 # (c) The GHC Team, 2000
 #
@@ -29,7 +29,7 @@ SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
 endif
 
 ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir
+SCRIPT_SUBST_VARS += libdir libexecdir
 endif
 
 # don't recurse on 'make install'

@@ -1,9 +1,9 @@
 # -----------------------------------------------------------------------------
-# $Id: ghcprof.prl,v 1.2 2000/04/05 10:28:02 simonmar Exp $
+# $Id: ghcprof.prl,v 1.3 2000/04/18 11:31:56 panne Exp $
 #
 # (c) The GHC Team 2000
 #
-# needs: INSTALLING, FPTOOLS_TOP_ABS, libdir, TARGETPLATFORM, TMPDIR
+# needs: FPTOOLS_TOP_ABS, INSTALLING, TMPDIR, TARGETPLATFORM, libdir, libexecdir
 #
 
 if ($ENV{'DAVINCIHOME'}) {
