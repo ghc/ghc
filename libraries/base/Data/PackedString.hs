@@ -55,12 +55,13 @@ module Data.PackedString (
 	spanPS,      -- :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
 	breakPS,     -- :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
 	linesPS,     -- :: PackedString -> [PackedString]
-
+	unlinesPS,   -- :: [PackedString] -> PackedString
 	wordsPS,     -- :: PackedString -> [PackedString]
+	unwordsPS,   -- :: [PackedString] -> PackedString
 	splitPS,     -- :: Char -> PackedString -> [PackedString]
 	splitWithPS, -- :: (Char -> Bool) -> PackedString -> [PackedString]
 
---	joinPS,      -- :: PackedString -> [PackedString] -> PackedString
+	joinPS,      -- :: PackedString -> [PackedString] -> PackedString
 
     ) where
 
@@ -189,8 +190,14 @@ breakPS p ps = spanPS (not . p) ps
 linesPS :: PackedString -> [PackedString]
 linesPS ps = splitPS '\n' ps
 
+unlinesPS :: [PackedString] -> PackedString
+unlinesPS = joinPS (packString "\n")
+
 wordsPS :: PackedString -> [PackedString]
-wordsPS ps = splitWithPS isSpace ps
+wordsPS ps = filter (not.nullPS) (splitWithPS isSpace ps)
+
+unwordsPS :: [PackedString] -> PackedString
+unwordsPS = joinPS (packString " ")
 
 reversePS :: PackedString -> PackedString
 reversePS ps = packString (reverse (unpackPS ps))
@@ -199,7 +206,7 @@ concatPS :: [PackedString] -> PackedString
 concatPS pss = packString (concat (map unpackPS pss))
 
 ------------------------------------------------------------
-{-
+
 joinPS :: PackedString -> [PackedString] -> PackedString
 joinPS filler pss = concatPS (splice pss)
  where
@@ -213,17 +220,8 @@ joinPS filler pss = concatPS (splice pss)
 
   * splitPS x ls = ls'   
       where False = any (map (x `elemPS`) ls')
-            False = any (map (nullPS) ls')
 
-    * all x's have been chopped out.
-    * no empty PackedStrings in returned list. A conseq.
-      of this is:
-           splitPS x nilPS = []
-         
-
-  * joinPS (packString [x]) (_splitPS x ls) = ls
-
--}
+  * joinPS (packString [x]) (splitPS x ls) = ls
 -}
 
 splitPS :: Char -> PackedString -> [PackedString]
@@ -241,8 +239,9 @@ splitWithPS pred (PS ps) =
       let
        break_pt = first_pos_that_satisfies pred ps len n
       in
-      if break_pt == n then -- immediate match, no substring to cut out.
-         splitify (break_pt + 1)
+      if break_pt == n then -- immediate match, empty substring
+         nilPS
+	 : splitify (break_pt + 1)
       else 
          substrPS (PS ps) n (break_pt - 1) -- leave out the matching character
          : splitify (break_pt + 1)
