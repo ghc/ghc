@@ -736,7 +736,7 @@ sub mangle_asm {
 	# toss the register-windowing save/restore/ret* instructions
 	# directly:
 	if ( $TargetPlatform =~ /^sparc-/ ) {
-	    $c =~ s/^\t(save .*|restore|ret|retl)\n//g;
+	    $c =~ s/^\t(save.*|restore|ret|retl)\n//g;
 	    # throw away PROLOGUE comments
 	    $c =~ s/^\t!#PROLOGUE# 0\n\t!#PROLOGUE# 1\n//;
 	}
@@ -1017,8 +1017,8 @@ sub mangle_asm {
 		    } elsif ( $TargetPlatform =~ /^powerpc-|^rs6000-/ ) {
 			$c =~ s/^\tb \.${T_US}${symb}_fast\d+\n//;
 		    } elsif ( $TargetPlatform =~ /^sparc-/ ) {
-			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n\tnop\n//;
-			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n(\t[a-z].*\n)/$1/;
+			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n\t\s*nop\n//;
+			$c =~ s/^\tcall\s+${T_US}${symb}_fast\d+,.*\n(\t\s*[a-z].*\n)/$1/;
 		    } else {
 			print STDERR "$Pgm: mystery slow-fast dropthrough: $TargetPlatform\n";
 		    }
