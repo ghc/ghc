@@ -278,12 +278,10 @@ newCAStringLen str  = do
 newCAStringLen str = do
   ptr <- mallocArray0 len
   let
-	go [] n     = n `seq` return ()	-- make it strict in n
+	go []     n = n `seq` return n	-- make it strict in n
     	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
-  go str 0
+  len <- go str 0
   return (ptr, len)
-  where
-    len = length str
 #endif
 
 -- | Marshal a Haskell string into a NUL terminated C string using temporary
@@ -325,13 +323,11 @@ withCAStringLen str act  = withArray (charsToCChars str) $ act . pairLength str
 withCAStringLen str f =
   allocaArray len $ \ptr ->
       let
-	go [] n     = n `seq` return ()	-- make it strict in n
+	go []     n = n `seq` return n	-- make it strict in n
     	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
       in do
-      go str 0
+      len <- go str 0
       f (ptr,len)
-  where
-    len = length str
 #endif
 
 -- auxiliary definitions
