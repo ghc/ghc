@@ -390,7 +390,7 @@ mkFinalId codegen_ids is_rec id rhs
 				    idInfo id
 
     new_idinfo | opt_OmitInterfacePragmas
-	       = vanillaIdInfo
+	       = constantIdInfo
  	       | otherwise		  
 	       = core_idinfo `setArityInfo` 	 arity_info
 			     `setCafInfo`   	 cafInfo stg_idinfo

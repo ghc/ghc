@@ -17,7 +17,7 @@ import TcMonoType	( tcHsType )
 
 import TcEnv		( TcEnv, RecTcEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetEnv,
-			  tcLookupGlobal_maybe, tcLookupRecId, tcEnvIds
+			  tcLookupGlobal_maybe, tcLookupRecId
 			)
 
 import RnHsSyn		( RenamedHsDecl )
@@ -67,12 +67,12 @@ tcInterfaceSigs unf_env decls
 	tcAddErrCtxt (ifaceSigCtxt name)		$
 	tcHsType ty					`thenTc` \ sigma_ty ->
 	tcIdInfo unf_env in_scope_vars name 
-		 sigma_ty vanillaIdInfo id_infos	`thenTc` \ id_info ->
+		 sigma_ty id_infos			`thenTc` \ id_info ->
 	returnTc (mkId name sigma_ty id_info)
 \end{code}
 
 \begin{code}
-tcIdInfo unf_env in_scope_vars name ty info info_ins
+tcIdInfo unf_env in_scope_vars name ty info_ins
   = foldlTc tcPrag constantIdInfo info_ins
   where
     tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)

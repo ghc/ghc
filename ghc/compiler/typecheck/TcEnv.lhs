@@ -45,7 +45,7 @@ import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
 			  tcInstTyVars, zonkTcTyVars,
 			)
 import Id		( idName, mkUserLocal, isDataConWrapId_maybe )
-import IdInfo		( vanillaIdInfo )
+import IdInfo		( constantIdInfo )
 import MkId	 	( mkSpecPragmaId )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
@@ -206,7 +206,7 @@ tcAddImportedIdInfo env id
 	-- The Id must be returned without a data dependency on maybe_id
   where
     new_info = case tcLookupRecId env (idName id) of
-		  Nothing	   -> vanillaIdInfo
+		  Nothing	   -> constantIdInfo
 		  Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same
 

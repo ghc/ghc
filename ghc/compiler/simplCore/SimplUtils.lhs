@@ -29,7 +29,7 @@ import Id		( idType, idName,
 			  idUnfolding, idStrictness,
 			  mkVanillaId, idInfo
 			)
-import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity, vanillaIdInfo )
+import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
 import Demand		( isStrict )
