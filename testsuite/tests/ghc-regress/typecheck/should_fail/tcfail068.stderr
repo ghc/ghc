@@ -4,8 +4,6 @@ tcfail068.hs:12:
 	Quantified type variable `s' escapes
     In the first argument of `runST', namely
 	`(newSTArray ((1, 1), n) x)'
-    In a right-hand side of function `itgen':
-	runST (newSTArray ((1, 1), n) x)
     In the definition of `itgen':
 	itgen n x = runST (newSTArray ((1, 1), n) x)
 
@@ -17,9 +15,6 @@ tcfail068.hs:17:
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
-    In a right-hand side of function `itiap':
-	runST ((readSTArray arr i)
-	       >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
     In the definition of `itiap':
 	itiap i f arr
 		= runST ((readSTArray arr i) >>= (\ val -> (...) >> (...)))
@@ -34,7 +29,6 @@ tcfail068.hs:23:
 	    (bound at tcfail068.hs:25)
 	  arr :: IndTree s a (bound at tcfail068.hs:23)
     In the first argument of `runST', namely `(itrap' i k)'
-    In a right-hand side of function `itrap': runST (itrap' i k)
     In the definition of `itrap':
 	itrap ((i, k), (j, l)) f arr
 		= runST (itrap' i k)
@@ -60,8 +54,6 @@ tcfail068.hs:35:
 	    (bound at tcfail068.hs:37)
 	  arr :: IndTree s b (bound at tcfail068.hs:35)
     In the first argument of `runST', namely `(itrapstate' i k s)'
-    In a right-hand side of function `itrapstate':
-	runST (itrapstate' i k s)
     In the definition of `itrapstate':
 	itrapstate ((i, k), (j, l)) f c d s arr
 		     = runST (itrapstate' i k s)
