@@ -73,11 +73,14 @@ import Ratio ( (%) )
  'qualified' 	{ ITqualified }
  'hiding' 	{ IThiding }
 
+ 'forall'	{ ITforall }			-- GHC extension keywords
+ 'foreign'	{ ITforeign }
  'export'	{ ITexport }
  'label'	{ ITlabel } 
  'dynamic'	{ ITdynamic }
  'unsafe'	{ ITunsafe }
- '__interface'	{ ITinterface }			-- GHC-extension keywords
+
+ '__interface'	{ ITinterface }			-- interface keywords
  '__export'	{ IT__export }
  '__forall'	{ IT__forall }
  '__depends'	{ ITdepends }
@@ -458,6 +461,8 @@ var_fs		:: { EncodedFS }
 		| 'as'			{ SLIT("as") }
 		| 'qualified'		{ SLIT("qualified") }
 		| 'hiding'		{ SLIT("hiding") }
+		| 'forall'		{ SLIT("forall") }
+		| 'foreign'		{ SLIT("foreign") }
 		| 'export'		{ SLIT("export") }
 		| 'label'		{ SLIT("label") }
 		| 'dynamic'		{ SLIT("dynamic") }
