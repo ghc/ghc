@@ -1,9 +1,0 @@
-#!/bin/sh
-
-# $1 is $(platform)
-# $2 is $(libdir)
-
-# This script is run just after installing a binary distribution, to
-# generate a correct package.conf for the new installation.
-
-bin/$1/pkgconf install "$1" "" "NO" "readline" "$2" "" "" "" "" "" > $2/package.conf
