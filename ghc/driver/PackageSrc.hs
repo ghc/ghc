@@ -211,7 +211,7 @@ package_details installing =
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net/cbits" ],
          c_includes     = [ "HsNet.h" ],
-         package_deps   = [ "lang", "text" ],
+         package_deps   = [ "lang", "text", "concurrent" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = if suffixMatch "solaris2" cTARGETPLATFORM
@@ -258,7 +258,7 @@ package_details installing =
                              then []
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/text/cbits" ],
          c_includes     = [ "HsText.h" ],
-         package_deps   = [ "lang", "data" ],
+         package_deps   = [ "lang" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
