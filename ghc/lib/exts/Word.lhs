@@ -8,6 +8,8 @@ interface, types and operations over unsigned, sized
 quantities.
 
 \begin{code}
+#include "MachDeps.h"
+
 module Word
 	( Word8		 -- all abstract.
 	, Word16         -- instances: Eq, Ord
@@ -17,23 +19,60 @@ module Word
 			 --  CCallable, CReturnable
 			 --  (last two 
 
-	, word8ToWord32  -- :: Word8  -> Word32
-	, word32ToWord8  -- :: Word32 -> Word8
-	, word16ToWord32 -- :: Word16 -> Word32
-	, word32ToWord16 -- :: Word32 -> Word16
-	, word8ToInt     -- :: Word8  -> Int
-	, intToWord8     -- :: Int    -> Word8
-	, word16ToInt    -- :: Word16 -> Int
-	, intToWord16    -- :: Int    -> Word16
-	, word32ToInt    -- :: Word32 -> Int
-	, intToWord32    -- :: Int    -> Word32
+	, word8ToWord32   -- :: Word8  -> Word32
+	, word32ToWord8   -- :: Word32 -> Word8
+	, word16ToWord32  -- :: Word16 -> Word32
+	, word32ToWord16  -- :: Word32 -> Word16
+
+	, word8ToInt      -- :: Word8  -> Int
+	, intToWord8      -- :: Int    -> Word8
+	, word16ToInt     -- :: Word16 -> Int
+	, intToWord16     -- :: Int    -> Word16
+	, word32ToInt     -- :: Word32 -> Int
+	, intToWord32     -- :: Int    -> Word32
+
+	, word32ToWord64  -- :: Word32 -> Word64
+	, word64ToWord32  -- :: Word64 -> Word32
+        
+        , word64ToInteger -- :: Word64  -> Integer
+	, integerToWord64 -- :: Integer -> Word64
+
+	-- NB! GHC SPECIFIC:
+ 	, wordToWord8     -- :: Word -> Word8
+	, word8ToWord     -- :: Word8 -> Word
+	, wordToWord16    -- :: Word -> Word16
+	, word16ToWord    -- :: Word16 -> Word
+	, wordToWord32    -- :: Word -> Word32
+	, word32ToWord    -- :: Word32 -> Word
+
+	-- The "official" place to get these from is Addr.
+	, indexWord8OffAddr
+	, indexWord16OffAddr
+	, indexWord32OffAddr
+	, indexWord64OffAddr
+	
+	, readWord8OffAddr
+	, readWord16OffAddr
+	, readWord32OffAddr
+	, readWord64OffAddr
+	
+	, writeWord8OffAddr
+	, writeWord16OffAddr
+	, writeWord32OffAddr
+	, writeWord64OffAddr
+	
+	, sizeofWord8
+	, sizeofWord16
+	, sizeofWord32
+	, sizeofWord64
+
 	) where
 
 import GlaExts
 import Ix
 import Bits
 import CCall
-import Numeric (readDec)
+import Numeric (readDec, showInt)
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -54,8 +93,10 @@ intToWord8  = word32ToWord8  . intToWord32
 word16ToInt = word32ToInt    . word16ToWord32
 intToWord16 = word32ToWord16 . intToWord32
 
-intToWord32 (I# x)   = W32# (int2Word# x)
+intToWord32 (I# x)   = W32# ((int2Word# x) `and#` (case (maxBound::Word32) of W32# x# -> x#))
+--intToWord32 (I# x)   = W32# (int2Word# x)
 word32ToInt (W32# x) = I#   (word2Int# x)
+
 \end{code}
 
 \subsection[Word8]{The @Word8@ interface}
@@ -206,6 +247,9 @@ instance Bits Word8 where
 pow2# :: Int# -> Int#
 pow2# x# = word2Int# (shiftL# (int2Word# 1#) x#)
 
+sizeofWord8 :: Word32
+sizeofWord8 = 1
+
 \end{code}
 
 \subsection[Word16]{The @Word16@ interface}
@@ -339,6 +383,10 @@ instance Bits Word16 where
   bitSize  _    = 16
   isSigned _    = False
 
+
+sizeofWord16 :: Word32
+sizeofWord16 = 2
+
 \end{code}
 
 \subsection[Word32]{The @Word32@ interface}
@@ -352,6 +400,7 @@ the result before building the resulting @Word16@.
 
 \begin{code}
 data Word32 = W32# Word#
+
 instance CCallable Word32
 instance CReturnable Word32
 
@@ -377,7 +426,7 @@ instance Num Word32 where
        W32# (intToWord32# (word2Int# x -# word2Int# y))
   (W32# x) * (W32# y) = 
        W32# (intToWord32# (word2Int# x *# word2Int# y))
-#if WORD_SIZE_IN_BYTES > 4
+#if WORD_SIZE_IN_BYTES == 8
   negate w@(W32# x)  = 
       if x' ==# 0#
        then w
@@ -396,17 +445,19 @@ instance Num Word32 where
 intToWord32#  :: Int#  -> Word#
 wordToWord32# :: Word# -> Word#
 
-#if WORD_SIZE_IN_BYTES > 4
+#if WORD_SIZE_IN_BYTES == 8
 intToWord32#  i# = (int2Word# i#) `and#` (int2Word# 0xffffffff)
 wordToWord32# w# = w# `and#` (int2Word# 0xffffffff)
+wordToWord64# w# = w#
 #else
 intToWord32#  i# = int2Word# i#
 wordToWord32# w# = w#
+
 #endif
 
 instance Bounded Word32 where
     minBound = 0
-#if WORD_SIZE_IN_BYTES > 4
+#if WORD_SIZE_IN_BYTES == 8
     maxBound = 0xffffffff
 #else
     maxBound = minBound - 1
@@ -487,45 +538,277 @@ instance Bits Word32 where
   bitSize  _        = 32
   isSigned _        = False
 
+sizeofWord32 :: Word32
+sizeofWord32 = 4
 \end{code}
 
 \subsection[Word64]{The @Word64@ interface}
 
 \begin{code}
-data Word64 = W64 {lo,hi::Word32} deriving (Eq, Ord, Bounded)
+#if WORD_SIZE_IN_BYTES == 8
+data Word64 = W64# Word#
 
-w64ToInteger W64{lo,hi} = toInteger lo + 0x100000000 * toInteger hi 
-integerToW64 x = case x `quotRem` 0x100000000 of 
-                 (h,l) -> W64{lo=fromInteger l, hi=fromInteger h}
+word32ToWord64 :: Word32 -> Word64
+word32ToWord64 (W32 w#) = W64# w#
 
-instance Show Word64 where
-  showsPrec p x = showsPrec p (w64ToInteger x)
+wordToWord32# :: Word# -> Word#
+wordToWord32# w# = w# `and#` (case (maxBound::Word32) of W# x# -> x#)
+
+word64ToWord32 :: Word64 -> Word32
+word64ToWord32 (W64# w#) = W32# (wordToWord32# w#)
+
+instance Eq  Word64     where 
+  (W64# x) == (W64# y) = x `eqWord#` y
+  (W64# x) /= (W64# y) = x `neWord#` y
+
+instance Ord Word64     where 
+  compare (W64# x#) (W64# y#) = compareWord# x# y#
+  (<)  (W64# x) (W64# y)      = x `ltWord#` y
+  (<=) (W64# x) (W64# y)      = x `leWord#` y
+  (>=) (W64# x) (W64# y)      = x `geWord#` y
+  (>)  (W64# x) (W64# y)      = x `gtWord#` y
+  max x@(W64# x#) y@(W64# y#) = 
+     case (compareWord# x# y#) of { LT -> y ; EQ -> x ; GT -> x }
+  min x@(W64# x#) y@(W64# y#) =
+     case (compareWord# x# y#) of { LT -> x ; EQ -> x ; GT -> y }
+
+instance Num Word64 where
+  (W64# x) + (W64# y) = 
+      W64# (intToWord64# (word2Int# x +# word2Int# y))
+  (W64# x) - (W64# y) = 
+      W64# (intToWord64# (word2Int# x -# word2Int# y))
+  (W64# x) * (W64# y) = 
+      W64# (intToWord64# (word2Int# x *# word2Int# y))
+  negate w@(W64# x)  = 
+     if x' ==# 0# 
+      then w
+      else W64# (int2Word# (0x100# -# x'))
+     where
+      x' = word2Int# x
+  abs x         = x
+  signum        = signumReal
+  fromInteger (J# a# s# d#) = W64# (integer2Word# a# s# d#)
+  fromInt       = intToWord64
+
+instance Bounded Word64 where
+  minBound = 0
+  maxBound = minBound - 1
+
+instance Real Word64 where
+  toRational x = toInteger x % 1
+
+-- Note: no need to mask results here 
+-- as they cannot overflow.
+instance Integral Word64 where
+  div  (W64# x)  (W64# y)   = W64# (x `quotWord#` y)
+  quot (W64# x)  (W64# y)   = W64# (x `quotWord#` y)
+  rem  (W64# x)  (W64# y)   = W64# (x `remWord#` y)
+  mod  (W64# x)  (W64# y)   = W64# (x `remWord#` y)
+  quotRem (W64# x) (W64# y) = (W64# (x `quotWord#` y), W64# (x `remWord#` y))
+  divMod  (W64# x) (W64# y) = (W64# (x `quotWord#` y), W64# (x `remWord#` y))
+  toInteger (W64# x)        = word2Integer# x
+  toInt x                   = word8ToInt x
+
+instance Ix Word64 where
+    range (m,n)          = [m..n]
+    index b@(m,n) i
+	   | inRange b i = word64ToInt (i-m)
+	   | otherwise   = error (showString "Ix{Word64}.index: Index " .
+				  showParen True (showsPrec 0 i) .
+                                  showString " out of range " $
+				  showParen True (showsPrec 0 b) "")
+    inRange (m,n) i      = m <= i && i <= n
+
+instance Enum Word64 where
+    toEnum    (I# i)   = W64# (intToWord# i)
+    fromEnum  (W64# w) = I# (word2Int# w)
+    enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Word64)] -- a long list!
+    enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Word64)]
+		       where last = if d < c then minBound else maxBound
 
 instance Read Word64 where
-  readsPrec p s = [ (integerToW64 x,r) | (x,r) <- readDec s ]
+    readsPrec p = readDec
 
------------------------------------------------------------------------------
--- End of exported definitions
---
--- The remainder of this file consists of definitions which are only
--- used in the implementation.
------------------------------------------------------------------------------
+instance Show Word64 where
+    showsPrec p = showInt
 
------------------------------------------------------------------------------
--- Code copied from the Prelude
------------------------------------------------------------------------------
 
+instance Bits Word64 where
+  (W64# x)  .&.  (W64# y)    = W64# (x `and#` y)
+  (W64# x)  .|.  (W64# y)    = W64# (x `or#` y)
+  (W64# x) `xor` (W64# y)    = W64# (x `xor#` y)
+  complement (W64# x)        = W64# (x `xor#` (case (maxBound::Word64) of W64# x# -> x#))
+  shift (W64# x#) i@(I# i#)
+	| i > 0     = W64# (shiftL# x# i#)
+	| otherwise = W64# (shiftRL# x# (negateInt# i#))
+
+  w@(W64# x)  `rotate` (I# i)
+        | i ==# 0#    = w
+	| i ># 0#     = W64# (shiftL# x i') `or#`
+	                      (shiftRL# (x `and#` 
+			                (int2Word# (word2Int# maxBound# -# pow2# i2 +# 1#)))
+			             i2))
+	| otherwise = rotate w (I# (64# +# i))
+          where
+           i' = word2Int# (int2Word# i `and#` int2Word# 63#)
+           i2 = 64# -# i'
+           (W64# maxBound#) = maxBound
+
+  bit (I# i#)
+	| i# >=# 0# && i# <=# 63# = W64# (shiftL# (int2Word# 1#) i#)
+	| otherwise = 0 -- We'll be overbearing, for now..
+
+  setBit x i    = x .|. bit i
+  clearBit x i  = x .&. complement (bit i)
+  complementBit x i = x `xor` bit i
+
+  testBit (W64# x#) (I# i#)
+    | i# <# 64# && i# >=# 0# = (word2Int# (x# `and#` (shiftL# (int2Word# 1#) i#))) /=# 0#
+    | otherwise              = False -- for now, this is really an error.
+
+  bitSize  _    = 64
+  isSigned _    = False
+
+#else
+data Word64 = W64 {lo,hi::Word32} deriving (Eq, Ord, Bounded)
+
+-- for completeness sake
+word32ToWord64 :: Word32 -> Word64
+word32ToWord64 w = W64 w 0
+
+word64ToWord32 :: Word64 -> Word32
+word64ToWord32 (W64 lo _) = lo
+
+word64ToInteger :: Word64 -> Integer
+word64ToInteger W64{lo,hi} = toInteger lo + 0x100000000 * toInteger hi 
+
+integerToWord64 :: Integer -> Word64
+integerToWord64 x = case x `quotRem` 0x100000000 of 
+                      (h,l) -> W64{lo=fromInteger l, hi=fromInteger h}
+
+instance Show Word64 where
+  showsPrec p x = showsPrec p (word64ToInteger x)
+
+instance Read Word64 where
+  readsPrec p s = [ (integerToWord64 x,r) | (x,r) <- readDec s ]
+
+#endif
+
+sizeofWord64 :: Word32
+sizeofWord64 = 8
+\end{code}
+
+
+
+The Hugs-GHC extension libraries provide functions for going between
+Int and the various (un)signed ints. Here we provide the same for
+the GHC specific Word type:
+
+\begin{code}
+wordToWord8  :: Word -> Word8
+word8ToWord  :: Word8 -> Word
+wordToWord16 :: Word -> Word16
+word16ToWord :: Word16 -> Word
+wordToWord32 :: Word -> Word32
+word32ToWord :: Word32 -> Word
+
+word8ToWord (W8# w#)   = W# w#
+wordToWord8 (W# w#)    = W8# (w# `and#` (case (maxBound::Word8) of W8# x# -> x#))
+word16ToWord (W16# w#) = W# w#
+wordToWord16 (W# w#)   = W16# (w# `and#` (case (maxBound::Word16) of W16# x# -> x#))
+word32ToWord (W32# w#) = W# w#
+wordToWord32 (W# w#)   = W32# (w# `and#` (case (maxBound::Word32) of W32# x# -> x#))
+
+\end{code}
+
+
+--End of exported definitions
+
+The remainder of this file consists of definitions which are only
+used in the implementation.
+
+\begin{code}
 signumReal x | x == 0    =  0
 	     | x > 0     =  1
 	     | otherwise = -1
 
--- showInt is used for positive numbers only
--- stolen from Hugs prelude --SDM
-showInt    :: Integral a => a -> ShowS
-showInt n r | n < 0 = error "Word.showInt: can't show negative numbers"
-            | otherwise =
-              let (n',d) = quotRem n 10
-		  r'     = toEnum (fromEnum '0' + fromIntegral d) : r
-	      in  if n' == 0 then r' else showInt n' r'
+\end{code}
+
+
+NOTE: the index is in units of the size of the type, *not* bytes.
+
+\begin{code}
+indexWord8OffAddr  :: Addr -> Int -> Word8
+indexWord8OffAddr (A# a#) (I# i#) = intToWord8 (I# (ord# (indexCharOffAddr# a# i#)))
+
+indexWord16OffAddr :: Addr -> Int -> Word16
+indexWord16OffAddr a i =
+#ifdef WORDS_BIGENDIAN
+  intToWord16 ( word8ToInt l + (word8ToInt maxBound) * word8ToInt h)
+#else
+  intToWord16 ( word8ToInt h + (word8ToInt maxBound) * word8ToInt l)
+#endif
+ where
+   byte_idx = i * 2
+   l = indexWord8OffAddr a byte_idx
+   h = indexWord8OffAddr a (byte_idx+1)
+
+indexWord32OffAddr :: Addr -> Int -> Word32
+indexWord32OffAddr (A# a#) i = wordToWord32 (W# (indexWordOffAddr# a# i'#))
+ where
+   -- adjust index to be in Word units, not Word32 ones.
+  (I# i'#) 
+#if WORD_SIZE_IN_BYTES==8
+   = i `div` 2
+#else
+   = i
+#endif
+
+indexWord64OffAddr :: Addr -> Int -> Word64
+indexWord64OffAddr (A# i#)
+#if WORD_SIZE_IN_BYTES==8
+ = W64# (indexWordOffAddr# a# i#)
+#else
+ = error "Word.indexWord64OffAddr: not implemented yet"
+#endif
+
+\end{code}
+
+Read words out of mutable memory:
+
+\begin{code}
+readWord8OffAddr :: Addr -> Int -> IO Word8
+readWord8OffAddr a i = _casm_ `` %r=(StgWord8)(((StgWord8*)%0)[(StgInt)%1]); '' a i
+
+readWord16OffAddr  :: Addr -> Int -> IO Word16
+readWord16OffAddr a i = _casm_ `` %r=(StgWord16)(((StgWord16*)%0)[(StgInt)%1]); '' a i
+
+readWord32OffAddr  :: Addr -> Int -> IO Word32
+readWord32OffAddr a i = _casm_ `` %r=(StgWord32)(((StgWord32*)%0)[(StgInt)%1]); '' a i
+
+readWord64OffAddr  :: Addr -> Int -> IO Word64
+#if WORD_SIZE_IN_BYTES==8
+readWord64OffAddr a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a i
+#else
+readWord64OffAddr a i = error "Word.readWord64OffAddr: not implemented yet"
+#endif
+\end{code}
+
+\begin{code}
+writeWord8OffAddr  :: Addr -> Int -> Word8  -> IO ()
+writeWord8OffAddr a i e = _casm_ `` (((StgWord8*)%0)[(StgInt)%1])=(StgWord8)%2; '' a i e
+
+writeWord16OffAddr :: Addr -> Int -> Word16 -> IO ()
+writeWord16OffAddr a i e = _casm_ `` (((StgWord16*)%0)[(StgInt)%1])=(StgWord16)%2; '' a i e
+
+writeWord32OffAddr :: Addr -> Int -> Word32 -> IO ()
+writeWord32OffAddr a i e = _casm_ `` (((StgWord32*)%0)[(StgInt)%1])=(StgWord32)%2; '' a i e
+
+writeWord64OffAddr :: Addr -> Int -> Word64 -> IO ()
+#if WORD_SIZE_IN_BYTES==8
+writeWord64OffAddr a i e = _casm_ `` (((StgWord*)%0)[(StgInt)%1])=(StgWord)%2; '' a i e
+#else
+writeWord64OffAddr = error "Word.writeWord64OffAddr: not implemented yet"
+#endif
 
 \end{code}
