@@ -66,24 +66,34 @@ import SrcLoc		( SrcLoc, isGoodSrcLoc )
 %*									*
 %************************************************************************
 
-A @ModDetails@ summarises everything we know about a compiled module.
+A @ModIface@ plus a @ModDetails@ summarises everything we know 
+about a compiled module.  The @ModIface@ is the stuff *before* linking,
+and can be written out to an interface file.  The @ModDetails@ is after
+linking; it is the "linked" form of the mi_decls field.
 
 \begin{code}
 data ModDetails
    = ModDetails {
-	md_id       :: Module,
-        md_exports  :: Avails,		-- What it exports
-	md_version  :: VersionInfo,
-        md_globals  :: GlobalRdrEnv,	-- Its top level environment
+        md_module   :: Module,			-- Complete with package info
+        md_version  :: VersionInfo,		-- Module version number
+        md_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
+        md_usages   :: [ImportVersion Name],	-- Usages
 
-        md_fixities :: NameEnv Fixity,
-	md_deprecs  :: NameEnv DeprecTxt,
+        md_exports  :: Avails,			-- What it exports
+        md_globals  :: GlobalRdrEnv,		-- Its top level environment
+
+        md_fixities :: NameEnv Fixity,		-- Fixities
+	md_deprecs  :: NameEnv DeprecTxt,	-- Deprecations
+
+	-- The next three fields are created by the typechecker
         md_types    :: TypeEnv,
-
         md_insts    :: [DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: RuleEnv		-- Domain may include Id from other modules
+        md_rules    :: RuleEnv		-- Domain may include Ids from other modules
      }
 
+\end{code}
+
+\begin{code}
 emptyModDetails :: Module -> ModDetails
 emptyModDetails mod
   = ModDetails { md_id       = mod,
@@ -230,23 +240,6 @@ type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contain
 %************************************************************************
 
 \begin{code}
--- ModIFace is nearly the same as RnMonad.ParsedIface.
--- Right now it's identical :)
-data ModIFace 
-   = ModIFace {
-        mi_mod       :: Module,                   -- Complete with package info
-        mi_vers      :: Version,                  -- Module version number
-        mi_orphan    :: WhetherHasOrphans,        -- Whether this module has orphans
-        mi_usages    :: [ImportVersion OccName],  -- Usages
-        mi_exports   :: [ExportItem],             -- Exports
-        mi_insts     :: [RdrNameInstDecl],        -- Local instance declarations
-        mi_decls     :: [(Version, RdrNameHsDecl)],    -- Local definitions
-        mi_fixity    :: (Version, [RdrNameFixitySig]), -- Local fixity declarations, 
-                                                       -- with their version
-        mi_rules     :: (Version, [RdrNameRuleDecl]),  -- Rules, with their version
-        mi_deprecs   :: [RdrNameDeprecation]           -- Deprecations
-     }
-
 type ExportItem		 = (ModuleName, [RdrAvailInfo])
 
 type ImportVersion name  = (ModuleName, WhetherHasOrphans, IsBootInterface, WhatsImported name)
