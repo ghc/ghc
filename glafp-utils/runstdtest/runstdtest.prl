@@ -63,8 +63,9 @@ $PreScript = '';
 $PostScript = '';
 $TimeCmd = '';
 $StatsFile = "$TmpPrefix/stats$$";
+$CacheProfStats = "cacheprof.out.summary";
 $SysSpecificTiming = '';
-$SpixTiming = 'no';
+$CacheProf = 'no';
 
 die "$Pgm: program to run not given as first argument\n" if $#ARGV < 0;
 $ToRun = $ARGV[0]; shift(@ARGV);
@@ -110,9 +111,9 @@ arg: while ($_ = $ARGV[0]) {
 		    next arg; };
     /^-(ghc|hbc)-timing$/ && do { $SysSpecificTiming = $1;
 				  next arg; };
-    /^-spix-timing$/ && do { $SysSpecificTiming = 'ghcspix';
-			     $SpixTiming = 'yes';
-			     next arg; };
+    /^-cacheprof$/ && do { $SysSpecificTiming = 'ghc-instrs';
+			   $CacheProf = 'yes'; 
+			   next arg };
     /^-t(.*)/	&& do { $TimeCmd = &grab_arg_arg('-t', $1); next arg; };
 
     # anything else is taken to be a pgm arg
@@ -161,34 +162,6 @@ if ( $SysSpecificTiming =~ /^ghc/ ) {
     $TimingMagic = "+RTS -S$StatsFile -RTS"
 } elsif ( $SysSpecificTiming eq 'hbc' ) {
     $TimingMagic = "-S$StatsFile";
-}
-
-$ToRunOrig = $ToRun;
-if ( $SpixTiming eq 'yes' ) {
-    $ToRun .= '.spix';
-
-    # gotta find first/last addresses in the mutator code
-    $FirstSpix = '_callWrapper';
-    $LastSpix  = '???'; # usually _mpz_get_si, but can't be sure
-
-    open(SPIXNM, "nm -n $ToRunOrig |") || die "nm -n $ToRunOrig open failed!\n";
-    spix: while (<SPIXNM>) {
-	if ( / T +(_freeForeignObj|_([A-Za-z]+)Hook|_xmalloc|_mpz_get_si)$/ ) {
-	    $LastSpix = $1;
-	    last spix;
-	}
-    }
-    close(SPIXNM); # || die "nm -n $ToRunOrig close failed!\n";
-
-    $SpixifyLine1 = "spix -o $ToRun -t$FirstSpix,$LastSpix $ToRunOrig";
-    $SpixstatsLine1 = "spixstats -b $TmpPrefix/runtest$$.3 $ToRunOrig > $ToRunOrig.spixstats1";
-    $SpixifyLine2 = "spix -o $ToRun +t$FirstSpix,$LastSpix $ToRunOrig";
-    $SpixstatsLine2 = "spixstats -b $TmpPrefix/runtest$$.3 $ToRunOrig > $ToRunOrig.spixstats2";
-} else {
-    $SpixifyLine1 = '';
-    $SpixstatsLine1 = '';
-    $SpixifyLine2 = '';
-    $SpixstatsLine2 = '';
 }
 
 if ($PreScript ne '') {
@@ -284,13 +257,6 @@ if [ $SaveStderr = 1 ] && [ \$progexit = $PgmExitStatus ] &&
 	fi;
 	cp $TmpPrefix/runtest$$.2 $PgmStderrFile[0]
 fi
-$SpixstatsLine1
-
-if [ $SpixTiming = 'yes' -a \$myexit = 0 ] ; then
-    $SpixifyLine2
-    $TimeCmd /bin/sh -c \'$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> /dev/null 2> /dev/null 3> $TmpPrefix/runtest$$.3\'
-    $SpixstatsLine2
-fi
 
 ${RM} core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3
 exit \$myexit
@@ -313,18 +279,16 @@ if ( $SysSpecificTiming eq '' ) {
 }
 
 &process_stats_file();
-&process_spixstats_files() if $SpixTiming eq 'yes';
+&process_cacheprof_files() if $CacheProf eq 'yes';
 
 # print out what we found
-if ( $SpixTiming ne 'yes' ) {
-    print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
-	" :$SysSpecificTiming>>\n";
+print STDERR "<<$SysSpecificTiming: ";
+if ( $CacheProf ne 'yes' ) {
+	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)";
 } else {
-    print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $TotalInsns[1]/$TotalInsns[2] instructions, $LoadInsns[1]/$LoadInsns[2] loads, $StoreInsns[1]/$StoreInsns[2] stores, $BranchInsns[1]/$BranchInsns[2] branches, $OtherInsns[1]/$OtherInsns[2] others",
-	" :$SysSpecificTiming>>\n";
-}
+	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes";
+};
+print STDERR " :$SysSpecificTiming>>\n";
 
 # OK, party over
 unlink $StatsFile;
@@ -478,47 +442,15 @@ sub process_stats_file {
     
 }
 
-sub process_spixstats_files { # 2 of them; one for mutator, one for GC
+sub process_cacheprof_files {
 
-    @TotalInsns = ();
-    @LoadInsns  = ();
-    @StoreInsns = ();
-    @BranchInsns= ();
-    @OtherInsns = ();
-
-    foreach $f (1, 2) {
-
-      open(STATS, "< $ToRunOrig.spixstats$f") || die "Failed when opening $ToRunOrig.spixstats$f\n";
-      while (<STATS>) {
-	  last if /^OPCODES \(STATIC\):/; # party over
-
-	  next if /^OPCODES \(DYNAMIC\):/;
-	  next if /^$/;
-	  next if /^opcode\s+#executed/;
-	  next if /^SUBTOTAL/;
-
-	  if ( /^ld\S*\s+(\d+)/ ) {
-	      $LoadInsns[$f] += $1;
-
-	  } elsif ( /^st\S*\s+(\d+)/ ) {
-	      $StoreInsns[$f] += $1;
-
-	  } elsif ( /^(jmpl|call|b\S*)\s+(\d+)/ ) {
-	      $BranchInsns[$f] += $2;
-
-	  } elsif ( /^TOTAL\s+(\d+)/ ) {
-	      $TotalInsns[$f] = $1;
-	      print STDERR "TotalInsns doesn't match categories total!\n"
-		  if $TotalInsns[$f] !=
-		     ($LoadInsns[$f] + $StoreInsns[$f] + $BranchInsns[$f] + $OtherInsns[$f]);
-
-	  } elsif ( /^\S+\s+(\d+)/ ) {
-	      $OtherInsns[$f] += $1;
-
-	  } else {
-	      die "Funny line?? $_";
-	  }
+    open(STATS, "< $CacheProfStats") || die("Can't open $CacheProfStats\n");
+    while (<STATS>) {
+       /OTHER\(\s*([0-9]+),\s*([0-9]+),\s*([0-9]+)\)/ && do {
+	   $TotInstrs = $1;
+	   $TotReads  = $2;
+	   $TotWrites = $3;
       }
-      close(STATS) || die "Failed when closing $ToRunOrig.spixstats\n";
-    }
+  }
+  close(STATS);
 }
