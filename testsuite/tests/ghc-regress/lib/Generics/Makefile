@@ -38,7 +38,7 @@ clean:
 	rm -f ext1/ext1
 	rm -f datatype
 	rm -f findepth/findepth
-	rm -f findepth/findepth
+	rm -f foldTree
 	rm -f geq/geq
 	rm -f gmapQ-assoc
 	rm -f gread
@@ -49,6 +49,7 @@ clean:
 	rm -f local-quantors
 	rm -f labels
 	rm -f mega-model/mega-model
+	rm -f nested-datatypes
 	rm -f newtype
 	rm -f perm
 	rm -f hlist
@@ -56,8 +57,8 @@ clean:
 	rm -f typecase2
 	rm -f paradise/paradise
 	rm -f reify/reify
-	rm -f shortcut
 	rm -f strings/strings
 	rm -f tree/tree
+	rm -f twin
 	rm -f where
 	rm -f xmlish/xmlish
