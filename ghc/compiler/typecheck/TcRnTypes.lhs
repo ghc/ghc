@@ -361,7 +361,8 @@ topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level spli
 ---------------------------
 
 -- In arrow notation, a variable bound by a proc (or enclosed let/kappa)
--- is not in scope to the left of an arrow tail (-<).  For example
+-- is not in scope to the left of an arrow tail (-<) or the head of (|..|).
+-- For example
 --
 --	proc x -> (e1 -< e2)
 --
@@ -369,7 +370,7 @@ topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level spli
 -- a bit complicated:
 --
 --	let x = 3 in
---	prox y -> (proc z -> e1) -< e2
+--	proc y -> (proc z -> e1) -< e2
 --
 -- Here, x and z are in scope in e1, but y is not.  Here's how we track this:
 --	a) Assign an "proc level" to each proc, being the number of
@@ -378,7 +379,8 @@ topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level spli
 --	   enclosing proc.
 --	c) Keep a list of out-of-scope procs.  When moving to the left of
 --	   an arrow-tail, add the proc-level of the immediately enclosing
---	   proc to the list.
+--	   proc to the list, and increment the proc-level so that variables
+--	   bound inside the expression are in scope.
 --	d) When looking up a variable, complain if its proc-level is in
 --	   the banned list
 

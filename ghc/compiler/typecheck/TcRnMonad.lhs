@@ -794,7 +794,7 @@ popArrowBinders
   where
     pop (ArrCtxt {proc_level = curr_lvl, proc_banned = banned})
 	= ASSERT( not (curr_lvl `elem` banned) )
-	  ArrCtxt {proc_level = curr_lvl, proc_banned = curr_lvl : banned}
+	  ArrCtxt {proc_level = curr_lvl + 1, proc_banned = curr_lvl : banned}
 
 getBannedProcLevels :: TcM [ProcLevel]
   = do { env <- getLclEnv; return (proc_banned (tcl_arrow_ctxt env)) }

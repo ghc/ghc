@@ -231,14 +231,14 @@ tc_cmd env cmd@(HsDo do_or_lc stmts _ ty) (cmd_stk, res_ty)
 
 
 -----------------------------------------------------------------
---	Arrow ``forms''	      (| e |) c1 .. cn
+--	Arrow ``forms''	      (| e c1 .. cn |)
 --
 --	G      |-b  c : [s1 .. sm] s
 --	pop(G) |-   e : forall w. b ((w,s1) .. sm) s
 --			        -> a ((w,t1) .. tn) t
 --	e \not\in (s, s1..sm, t, t1..tn)
 --	----------------------------------------------
---	G |-a  (| e |) c  :  [t1 .. tn] t
+--	G |-a  (| e c |)  :  [t1 .. tn] t
 
 tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)	
   = addErrCtxt (cmdCtxt cmd)	$
@@ -256,7 +256,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 			      e_res_ty
 
 		-- Check expr
-	; (expr', lie) <- getLIE (tcCheckRho expr e_ty)
+	; (expr', lie) <- popArrowBinders (getLIE (tcCheckRho expr e_ty))
 	; inst_binds <- tcSimplifyCheck sig_msg [w_tv] [] lie
 
 		-- Check that the polymorphic variable hasn't been unified with anything
