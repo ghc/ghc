@@ -285,39 +285,6 @@ fi
 AC_SUBST(LdXFlag)
 ])
 
-dnl
-dnl Finding the Right Yacc
-dnl
-AC_DEFUN(FPTOOLS_PROG_YACCY,
-[AC_PROG_YACC
-if test "$YACC" = "yacc"; then
-   AC_CACHE_CHECK([if it is an OK yacc], ac_cv_prog_yacc,
-   [AC_CHECK_PROG(WhatCmd, what, what, :)
-    $WhatCmd $YACC > conftest.out
-    if egrep 'y1\.c 1\..*SMI' conftest.out >/dev/null 2>&1; then
-        echo "I don't trust your $YaccCmd; it looks like an old Sun yacc"
-        if test -f /usr/lang/yacc; then
-           echo "I'm going to use /usr/lang/yacc instead"
-           ac_cv_prog_yacc=/usr/lang/yacc
-        else
-           echo "I'm assuming the worst...no parser generator at all"
-           ac_cv_prog_yacc=:
-        fi
-    elif egrep 'y1\.c.*Revision: 4\.2\.6\.3.*DEC' conftest.out >/dev/null 2>&1; then
-        echo "I don't trust your $YaccCmd; it looks like a lame DEC yacc"
-        echo "I'm assuming the worst...no parser generator at all"
-        ac_cv_prog_yacc=:
-    else
-	ac_cv_prog_yacc=$YACC
-    fi
-    rm -fr conftest*
-])
-else
-    ac_cv_prog_yacc=$YACC
-fi
-YaccCmd=$ac_cv_prog_yacc
-AC_SUBST(YaccCmd)
-])
 
 dnl *** Checking for ar and its arguments + whether we need ranlib.
 dnl

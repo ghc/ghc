@@ -656,11 +656,6 @@ FPTOOLS_PROG_DIFF
 dnl ** Find find command (for Win32's benefit)
 FPTOOLS_FIND_FIND
 
-dnl ** look for a decent parser generator (bison preferred)
-dnl (FPTOOLS_PROG_YACCY is AC_PROG_YACC, but with some extra testing 
-dnl  on the suitability of the 'yacc' returned.)
-FPTOOLS_PROG_YACCY
-
 dnl ** Find lex command (lex or flex) - *doesn't* use autoconf's
 dnl    AC_PROG_LEX, since it doesn't actually check whether 'lex'
 dnl    exists if 'flex' doesn't.

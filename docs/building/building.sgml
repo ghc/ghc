@@ -1589,7 +1589,7 @@ $ make install
             round your computer working out what architecture it has,
             what operating system, whether it has the
             <Function>vfork</Function> system call, where
-            <command>yacc</command> is kept, whether
+            <command>tar</command> is kept, whether
             <command>gcc</command> is available, where various obscure
             <literal>&num;include</literal> files are, whether it's a
             leap year, and what the systems manager had for lunch.  It
@@ -1769,17 +1769,17 @@ GhcHcOpts=-DDEBUG -Rghc-timing
       For example, there's a line that says:</para>
 
 <ProgramListing>
-YACC = @YaccCmd@
+TAR = @TarCmd@
 </ProgramListing>
 
-      <para>This defines the Make variables <constant>YACC</constant>
-      to the pathname for a <command>yacc</command> that
+      <para>This defines the Make variables <constant>TAR</constant>
+      to the pathname for a <command>tar</command> that
       <command>configure</command> finds somewhere.  If you have your
-      own pet <command>yacc</command> you want to use instead, that's
+      own pet <command>tar</command> you want to use instead, that's
       fine. Just add this line to <filename>mk/build.mk</filename>:</para>
 
 <ProgramListing>
-YACC = myyacc
+TAR = mytar
 </ProgramListing>
 
       <para>You do not <emphasis>have</emphasis> to have a

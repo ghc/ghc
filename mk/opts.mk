@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.32 2003/08/13 12:34:46 simonmar Exp $
+# 	$Id: opts.mk,v 1.33 2003/08/18 13:54:06 panne Exp $
 #
 #################################################################################
 
@@ -18,7 +18,7 @@
 #		AR AS CPP CTAGS C FLEX HC HSTAGS LD LINT 
 #		LIT2CHANGELOG LIT2HTML LIT2LATEX LIT2PGM
 #		MKDEPENDC MKDEPENDHS MKDEPENDLIT MSUB
-#		RUNTEST UNLIT YACC          
+#		RUNTEST UNLIT          
 
 
 # For each such utility program P, this file defines
@@ -105,7 +105,6 @@ SGML2PDF_OPTS      = $(SRC_SGML2PDF_OPTS) $(WAY$(_way)_SGML2PDF_OPTS) $(EXTRA_SG
 SGML2RTF_OPTS      = $(SRC_SGML2RTF_OPTS) $(WAY$(_way)_SGML2RTF_OPTS) $(EXTRA_SGML2RTF_OPTS)
 SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)
-YACC_OPTS          = $(SRC_YACC_OPTS) $(WAY$(_way)_YACC_OPTS) $(EXTRA_YACC_OPTS)
 ZIP_OPTS           = $(SRC_ZIP_OPTS) $(EXTRA_ZIP_OPTS)
 
 # Version of CC_OPTS to use when GHC is the C compiler

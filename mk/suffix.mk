@@ -234,18 +234,6 @@ endif
 	$(FLEX) -t $(FLEX_OPTS) $< > $@
 
 #-----------------------------------------------------------------------------
-# Yacc stuff
-
-%.tab.c %.tab.h : %.y
-	@$(RM) $*.tab.h $*.tab.c y.tab.c y.tab.h y.output
-	$(YACC) $(YACC_OPTS) $<
-	$(MV) y.tab.c $*.tab.c
-	@chmod 444 $*.tab.c
-	$(MV) y.tab.h $*.tab.h
-	@chmod 444 $*.tab.h
-
-
-#-----------------------------------------------------------------------------
 # Runtest rules for calling $(HC) on a single-file Haskell program
 
 %.runtest : %.hs

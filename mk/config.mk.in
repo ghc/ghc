@@ -809,7 +809,6 @@ TIB			= tib
 TIME			= @TimeCmd@
 TROFF			= troff
 UNAME			= uname
-YACC			= @YaccCmd@
 
 #-----------------------------------------------------------------------------
 # SGML stuff
