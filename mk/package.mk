@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.47 2005/02/09 10:11:36 simonmar Exp $
+# $Id: package.mk,v 1.48 2005/02/10 13:38:35 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -228,9 +228,6 @@ else
 INSTALL_IFACES += $(HS_IFACES)
 endif
 
-# install library (could be implicitly specified or explicitly, like libHS*_cbits.a)
-INSTALL_LIBS  += $(LIBRARY)
-
 # -----------------------------------------------------------------------------
 # Dependencies
 
@@ -245,6 +242,13 @@ SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 endif
 
 endif # $(PACKAGE) != ""
+
+#--------------------------------------------------------------
+# Installation
+
+ifneq "$(NO_INSTALL_LIBRARY)" "YES"
+INSTALL_LIBS  += $(LIBRARY) $(GHCI_LIBRARY)
+endif
 
 #--------------------------------------------------------------
 # Building dynamically-linkable libraries for GHCi
@@ -264,7 +268,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 
 GHCI_LIBRARY = $(patsubst lib%.a,%.o,$(LIBRARY))
 
-ifneq "$(PACKAGE)" ""
+ifneq "$(NO_INSTALL_LIBRARY)" "YES"
 INSTALL_LIBS += $(GHCI_LIBRARY)
 endif
 
