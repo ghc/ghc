@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.80 2001/07/19 20:27:23 sof Exp $
+dnl $Id: aclocal.m4,v 1.81 2001/07/19 22:08:07 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -672,7 +672,7 @@ AC_DEFUN([FPTOOLS_END_TEXT_SECTION],
 		 if test "$not_done" = 1; then
 		   FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text)
 		   if test "$fptools_end_of_text" = yes; then
-		     fptools_cv_end_of_text="etext asm("etext")"
+		     fptools_cv_end_of_text="etext"
 		   fi
 		 fi])
 		 if test -n "$fptools_cv_end_of_text"; then
@@ -695,7 +695,7 @@ AC_DEFUN([FPTOOLS_END_TEXT_SECTION],
 		 if test "$not_done" = 1; then
 		   FPTOOLS_IN_SCOPE(etext asm("etext"),etext,fptools_end_of_text_decl)
 		   if test "$fptools_end_of_text_decl" = yes; then
-		     fptools_cv_end_of_text_decl=etext
+		     fptools_cv_end_of_text_decl="etext asm(\"etext\")"
 		   fi
 		 fi])
 		 if test -n "$fptools_cv_end_of_text_decl"; then
@@ -723,7 +723,7 @@ AC_DEFUN([FPTOOLS_END_DATA_SECTION],
 		 if test "$not_done" = 1; then
 		   FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data)
 		   if test "$fptools_end_of_data" = yes; then
-		     fptools_cv_end_of_data=end
+		     fptools_cv_end_of_data="end"
 		   fi
 		 fi])
 		 if test -n "$fptools_cv_end_of_data"; then
@@ -746,7 +746,7 @@ AC_DEFUN([FPTOOLS_END_DATA_SECTION],
 		 if test "$not_done" = 1; then
 		   FPTOOLS_IN_SCOPE(end asm("end"),end,fptools_end_of_data_decl)
 		   if test "$fptools_end_of_data_decl" = yes; then
-		     fptools_cv_end_of_data_decl=end
+		     fptools_cv_end_of_data_decl="end asm(\"end\")"
 		   fi
 		 fi])
 		 if test -n "$fptools_cv_end_of_data_decl"; then
