@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.26 2000/08/03 11:28:35 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.27 2000/10/06 15:35:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,9 +59,12 @@ struct DEBUG_FLAGS {
   rtsBool prof        : 1; /* 512 */
   rtsBool gran        : 1; /* 1024 */
   rtsBool par         : 1; /* 2048 */
+
+  /* The object linker */
+  rtsBool linker      : 1; /* 4096 */
 };
 
-#define MAX_DEBUG_OPTION     11
+#define MAX_DEBUG_OPTION     12
 #define DEBUG_MASK(n)        ((nat)(ldexp(1,n)))
 #define MAX_DEBUG_MASK       ((nat)(ldexp(1,(MAX_DEBUG_OPTION+1))-1))
 

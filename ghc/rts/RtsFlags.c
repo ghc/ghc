@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.31 2000/08/03 11:28:35 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.32 2000/10/06 15:35:09 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -67,7 +67,8 @@ char *debug_opts_strs[] = {
   "DEBUG (-D256): stable\n",
   "DEBUG (-D512): prof\n",
   "DEBUG (-D1024): gran\n",
-  "DEBUG (-D2048): par\n"
+  "DEBUG (-D2048): par\n",
+  "DEBUG (-D4096): linker\n"
 };
 
 char *debug_opts_prefix[] = {
@@ -83,6 +84,7 @@ char *debug_opts_prefix[] = {
   "_!", /* prof */
   "_=", /* gran */
   "_=" /* par */
+  "_*" /* linker */
 };
 
 #if defined(GRAN)
@@ -1784,18 +1786,19 @@ set_debug_options(nat n) {
     if ((n>>i)&1) {
       fprintf(stderr, debug_opts_strs[i]);
       switch (i) {
-        case 0: RtsFlags.DebugFlags.scheduler   = rtsTrue; break;
-        case 1: RtsFlags.DebugFlags.evaluator   = rtsTrue; break;
-        case 2: RtsFlags.DebugFlags.codegen     = rtsTrue; break;
-        case 3: RtsFlags.DebugFlags.weak        = rtsTrue; break;
-        case 4: RtsFlags.DebugFlags.gccafs      = rtsTrue; break;
-        case 5: RtsFlags.DebugFlags.gc          = rtsTrue; break;
-        case 6: RtsFlags.DebugFlags.block_alloc = rtsTrue; break;
-        case 7: RtsFlags.DebugFlags.sanity      = rtsTrue; break;
-        case 8: RtsFlags.DebugFlags.stable      = rtsTrue; break;
-        case 9: RtsFlags.DebugFlags.prof        = rtsTrue; break;
-        case 10:  RtsFlags.DebugFlags.gran       = rtsTrue; break;
-        case 11:  RtsFlags.DebugFlags.par        = rtsTrue; break;
+        case 0:  RtsFlags.DebugFlags.scheduler   = rtsTrue; break;
+        case 1:  RtsFlags.DebugFlags.evaluator   = rtsTrue; break;
+        case 2:  RtsFlags.DebugFlags.codegen     = rtsTrue; break;
+        case 3:  RtsFlags.DebugFlags.weak        = rtsTrue; break;
+        case 4:  RtsFlags.DebugFlags.gccafs      = rtsTrue; break;
+        case 5:  RtsFlags.DebugFlags.gc          = rtsTrue; break;
+        case 6:  RtsFlags.DebugFlags.block_alloc = rtsTrue; break;
+        case 7:  RtsFlags.DebugFlags.sanity      = rtsTrue; break;
+        case 8:  RtsFlags.DebugFlags.stable      = rtsTrue; break;
+        case 9:  RtsFlags.DebugFlags.prof        = rtsTrue; break;
+        case 10: RtsFlags.DebugFlags.gran        = rtsTrue; break;
+        case 11: RtsFlags.DebugFlags.par         = rtsTrue; break;
+        case 12: RtsFlags.DebugFlags.linker      = rtsTrue; break;
       } /* switch */
     } /* if */
 }
