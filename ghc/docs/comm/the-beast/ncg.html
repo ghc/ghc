@@ -1,0 +1,299 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - The Native Code Generator</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - The Native Code Generator</h1>
+    <p>
+      On x86 and sparc platforms, GHC can generate assembly code
+      directly, without having to go via C.  This can sometimes almost
+      halve compilation time, and avoids the fragility and
+      horribleness of the mangler.  The NCG is enabled by default for
+      non-optimising compilation on x86 and sparc.  For most programs
+      it generates code which runs only about 1% slower than that
+      created by gcc on x86s, so it is well worth using even with
+      optimised compilation.  FP-intensive x86 programs see a bigger
+      slowdown, and all sparc code runs about 5% slower due to
+      us not filling branch delay slots.
+    <p>
+      In the distant past
+      the NCG could also generate Alpha code, and that machinery
+      is still there, but will need extensive refurbishment to
+      get it going again, due to underlying infrastructural changes.
+      Budding hackers thinking of doing a PowerPC port would do well
+      to use the sparc bits as a starting point.
+    <p>
+      The NCG has always been something of a second-class citizen
+      inside GHC, an unloved child, rather.  This means that its
+      integration into the compiler as a whole is rather clumsy, which
+      brings some problems described below.  That apart, the NCG
+      proper is fairly cleanly designed, as target-independent as it
+      reasonably can be, and so should not be difficult to retarget.
+    <p>
+      The following details are correct as per the CVS head of end-Jan
+      2002.
+
+    <h2>Overview</h2>
+      The top-level code generator fn is
+    <p>
+    <code>absCtoNat :: AbstractC -> UniqSM (SDoc, Pretty.Doc)</code>
+    <p>
+    The returned <code>SDoc</code> is for debugging, so is empty unless
+    you specify <code>-ddump-stix</code>.  The <code>Pretty.Doc</code>
+    bit is the final assembly code.  Translation involves three main
+    phases, the first and third of which are target-independent.
+    <ul>
+    <li><b>Translation into the <code>Stix</code> representation.</b>  Stix
+        is a simple tree-like RTL-style language, in which you can
+        mention:
+        <p>
+        <ul>
+        <li>An infinite number of temporary, virtual registers.
+        <li>The STG "magic" registers (<code>MagicId</code>), such as
+            the heap and stack pointers.
+        <li>Literals and low-level machine ops (<code>MachOp</code>).
+        <li>Simple address computations.
+        <li>Reads and writes of: memory, virtual regs, and various STG
+            regs. 
+        <li>Labels and <code>if ... goto ...</code> style control-flow.
+        </ul>
+        <p>
+        Stix has two main associated types:
+        <p>
+        <ul>
+        <li><code>StixStmt</code> -- trees executed for their side
+        effects: assignments, control transfers, and auxiliary junk
+        such as segment changes and literal data.
+        <li><code>StixExpr</code> -- trees which denote a value.
+        </ul>
+        <p>
+        Translation into Stix is almost completely
+        target-independent.  Needed dependencies are knowledge of
+        word size and endianness, used when generating code to do 
+        deal with half-word fields in info tables.  This could be
+        abstracted out easily enough.  Also, the Stix translation
+        needs to know which <code>MagicId</code>s map to registers
+        on the given target, and which are stored in offsets from
+        <code>BaseReg</code>.
+        <p>
+        After initial Stix generation, the trees are cleaned up with
+        constant-folding and a little copy-propagation ("Stix
+        inlining", as the code misleadingly calls it).  We take
+        the opportunity to translate <code>MagicId</code>s which are
+        stored in memory on the given target, into suitable memory
+        references.  Those which are stored in registers are left
+        alone.  There is also a half-hearted attempt to lift literal
+        strings to the top level in cases where nested strings have
+        been observed to give incorrect code in the past.
+        <p>
+        Primitive machine-level operations will already be phrased in
+        terms of <code>MachOp</code>s in the presented Abstract C, and
+        these are passed through unchanged.  We comment only that the
+        <code>MachOp</code>s have been chosen so as to be easy to
+        implement on all targets, and their meaning is intended to be
+        unambiguous, and the same on all targets, regardless of word
+        size or endianness.
+    <p>
+    <li><b>Instruction selection.</b>  This is the only majorly
+        target-specific phase.  It turns Stix statements and
+        expressions into sequences of <code>Instr</code>, a data
+        type which is different for each architecture.
+        <code>Instr</code>, unsurprisingly, has various supporting
+        types, such as <code>Reg</code>, <code>Operand</code>,
+        <code>Imm</code>, etc.  The generated instructions may refer
+        to specific machine registers, or to arbitrary virtual
+        registers, either those created within the instruction
+        selector, or those mentioned in the Stix passed to it.
+        <p>
+        The instruction selectors live in <code>MachCode.lhs</code>.
+        The core functions, for each target, are:
+        <p>
+        <code>
+        getAmode :: StixExpr -> NatM Amode
+        <br>getRegister :: StixExpr -> NatM Register
+        <br>assignMem_IntCode :: PrimRep -> StixExpr -> StixExpr -> NatM InstrBlock
+        <br>assignReg_IntCode :: PrimRep -> StixReg  -> StixExpr -> NatM InstrBlock
+        </code>
+        <p>
+        The insn selectors use the "maximal munch" property.  The
+        bizarrely-misnamed <code>getRegister</code> translates
+        expressions.  A simplified version of its type is:
+        <p>
+        <code>getRegister :: StixExpr -> NatM (OrdList Instr, Reg)</code>
+        <p>
+        That is: it (monadically) turns a <code>StixExpr</code> into a
+        sequence of instructions, and a register, with the meaning
+        that after executing the (possibly empty) sequence of
+        instructions, the (possibly virtual) register will
+        hold the resulting value.  The real situation is complicated
+        by the presence of fixed registers, and is detailed below.
+        <p>
+        Maximal munch is a greedy algorithm and is known not to give
+        globally optimal code sequences, but it is good enough, and
+        fast and simple.  Early incarnations of the NCG used something
+        more sophisticated, but that is long gone now.
+        <p>
+        Similarly, <code>getAmode</code> translates a value, intended
+        to denote an address, into a sequence of insns leading up to
+        a (processor-specific) addressing mode.  This stuff could be
+        done using the general <code>getRegister</code> selector, but
+        would necessarily generate poorer code, because the calculated
+        address would be forced into a register, which might be
+        unnecessary if it could partially or wholly be calculated
+        using an addressing mode.
+        <p>
+        Finally, <code>assignMem_IntCode</code> and
+        <code>assignReg_IntCode</code> create instruction sequences to
+        calculate a value and store it in the given register, or at
+        the given address.  Because these guys translate a statement,
+        not a value, they just return a sequence of insns and no
+        associated register.  Floating-point and 64-bit integer
+        assignments have analogous selectors.
+        <p>
+        Apart from the complexities of fixed vs floating registers,
+        discussed below, the instruction selector is as simple
+        as it can be.  It looks long and scary but detailed
+        examination reveals it to be fairly straightforward.
+    <p>
+    <li><b>Register allocation.</b> The register allocator,
+        <code>AsmRegAlloc.lhs</code> takes sequences of
+        <code>Instr</code>s which mention a mixture of real and
+        virtual registers, and returns a modified sequence referring
+        only to real ones.  It is gloriously and entirely
+        target-independent.  Well, not exactly true.  Instead it
+        regards <code>Instr</code> (instructions) and <code>Reg</code>
+        (virtual and real registers) as abstract types, to which it has
+        the following interface:
+        <p>
+        <code>
+        insnFuture :: Instr -> InsnFuture
+        <br>regUsage :: Instr -> RegUsage
+        <br>patchRegs :: Instr -> (Reg -> Reg) -> Instr
+        </code>
+        <p>
+        <code>insnFuture</code> is used to (re)construct the graph of
+        all possible control transfers between the insns to be
+        allocated.  <code>regUsage</code> returns the sets of registers
+        read and written by an instruction.  And
+        <code>patchRegs</code> is used to apply the allocator's final
+        decision on virtual-to-real reg mapping to an instruction.
+        <p>
+        Clearly these 3 fns have to be written anew for each
+        architecture.  They are defined in
+        <code>RegAllocInfo.lhs</code>.  Think twice, no, thrice,
+        before modifying them: making false claims about insn
+        behaviour will lead to hard-to-find register allocation
+        errors.
+        <p>
+        <code>AsmRegAlloc.lhs</code> contains detailed comments about
+	how the allocator works.  Here is a summary.  The head honcho
+        <p>
+        <code>allocUsingTheseRegs :: [Instr] -> [Reg] -> (Bool, [Instr])</code>
+        <p>
+        takes a list of instructions and a list of real registers
+        available for allocation, and maps as many of the virtual regs
+        in the input into real ones as it can.  The returned
+        <code>Bool</code> indicates whether or not it was
+        successful.  If so, that's the end of it.  If not, the caller
+        of <code>allocUsingTheseRegs</code> will attempt spilling.
+        More of that later.  What <code>allocUsingTheseRegs</code>
+        does is:
+        <p>
+        <ul>
+        <li>Implicitly number each instruction by its position in the
+            input list.
+        <p>
+        <li>Using <code>insnFuture</code>, create the set of all flow
+            edges -- possible control transfers -- within this set of
+            insns.
+        <p>
+        <li>Using <code>regUsage</code> and iterating around the flow
+            graph from the previous step, calculate, for each virtual
+            register, the set of flow edges on which it is live.
+        <p>
+        <li>Make a real-register committment map, which gives the set
+            of edges for which each real register is committed (in
+            use).  These sets are initially empty.  For each virtual
+            register, attempt to find a real register whose current
+            committment does not intersect that of the virtual
+            register -- ie, is uncommitted on all edges that the
+            virtual reg is live.  If successful, this means the vreg
+            can be assigned to the realreg, so add the vreg's set to
+            the realreg's committment.  
+        <p>
+        <li>If all the vregs were assigned to a realreg, use
+            <code>patchInstr</code> to apply the mapping to the insns themselves.
+        </ul>
+        <p>
+        <b>Spilling</b>
+        <p>
+        If <code>allocUsingTheseRegs</code> fails, a baroque
+        mechanism comes into play.  We now know that much simpler
+        schemes are available to do the same thing.  Anyways:
+        <p>
+        The logic above <code>allocUsingTheseRegs</code>, in
+        <code>doGeneralAlloc</code> and <code>runRegAllocate</code>,
+        observe that allocation has failed with some set R of real
+        registers.  So they apply <code>runRegAllocate</code> a second
+        time to the code, but remove (typically) two registers from R
+        before doing so.  This naturally fails too, but returns a
+        partially-allocated sequence.  <code>doGeneralAlloc</code>
+        then inserts spill code into the sequence, and finally re-runs
+        <code>allocUsingTheseRegs</code>, but supplying the original,
+        unadulterated R.  This is guaranteed to succeed since the two
+        registers previously removed from R are sufficient to allocate
+        all the spill/restore instructions added.
+        <p>
+        Because x86 is very short of registers, and in the worst case
+        needs three removed from R, a softly-softly approach is used.
+        <code>doGeneralAlloc</code> first tries with zero regs removed
+        from R, then if that fails one, then two, etc.  This means
+        <code>allocUsingTheseRegs</code> may get run several times
+        before a successful arrangement is arrived at.
+        <code>findReservedRegs</code> cooks up the sets of spill
+        registers to try with.
+        <p>
+        The resulting machinery is complicated and the generated spill
+        code is appalling.  The saving grace is that spills are very
+        rare so it doesn't matter much.  I did not invent this -- I inherited it.
+        <p>
+        <b>Dealing with common cases fast</b>
+        <p>
+        The entire reg-alloc mechanism described so far is general and
+        correct, but expensive overkill for many simple code blocks.
+        So to begin with we use start off with
+        <code>doSimpleAlloc</code>, which attempts to do something
+        simple.  It exploits the observation that if the total number
+        of virtual registers does not exceed the number of real ones
+        available, we can simply dole out a new realreg each time we
+        see mention of a new vreg, with no regard for control flow.
+        <code>doSimpleAlloc</code> therefore attempts this in a
+        single pass over the code.  It gives up if it runs out of real
+        regs or sees any condition which renders the above observation
+        invalid (fixed reg uses, for example).  
+        <p>
+        This clever hack handles the majority of code blocks quickly.
+        It was copied from the previous reg-allocator (the
+        Mattson/Partain/Marlow/Gill one).
+    </ul>
+
+<p>
+<h2>Complications, observations, and possible improvements</h2>
+
+<h3>How to debug the NCG without losing your sanity</h3>
+   
+<h3>How to debug the NCG without losing your sanity</h3>
+
+
+
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Fri Aug 10 11:47:41 EST 2001
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>
