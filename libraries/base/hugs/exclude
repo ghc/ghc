@@ -2,7 +2,6 @@
 # Only the first word on each line counts; the rest can be explanation.
 #
 Control.Parallel.Strategies	unused by GHC too
-Data.Array.Diff
 Data.Array.Unboxed		GHC-specific implementation
 Data.Generics			GHC-specific
 Data.PackedString		uses Data.Array.Unboxed
