@@ -85,7 +85,7 @@ def simple_build_prog_WRK ( $_main, $_extra_args )
 		  then $extra_hc_flags 
 		  else "")
           ++ " -o " ++ $exename ++ " " 
-          ++ $_main ++ " &> " ++ $errname
+          ++ $_main ++ " >" ++ $errname ++ " 2>&1"
    $res = run $cmd
    return $res
 }
