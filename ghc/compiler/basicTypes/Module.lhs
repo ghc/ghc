@@ -23,6 +23,8 @@ module Module
     (
       Module		    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
+    , ModuleKind(..)
+    , isPackageKind
 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
@@ -31,12 +33,12 @@ module Module
     , moduleUserString      -- :: Module -> UserString
     , moduleName	    -- :: Module -> ModuleName
 
-    , mkVanillaModule	    -- :: ModuleName -> Module
-    , mkThisModule	    -- :: ModuleName -> Module
-    , mkPrelModule          -- :: UserString -> Module
-    , mkModule		    -- :: ModuleName -> PackageName -> Module
+--    , mkVanillaModule	    -- :: ModuleName -> Module
+--    , mkThisModule	    -- :: ModuleName -> Module
+--    , mkPrelModule          -- :: UserString -> Module
+    , mkModule		    -- :: ModuleName -> ModuleKind -> Module
     
-    , isLocalModule       -- :: Module -> Bool
+--    , isLocalModule       -- :: Module -> Bool
 
     , mkSrcModule
 
@@ -56,7 +58,8 @@ module Module
 import OccName
 import Outputable
 import CmdLineOpts	( opt_InPackage )
-import FastString	( FastString )
+import FastString	( FastString, uniqueOfFS )
+import Unique		( Uniquable(..), mkUniqueGrimily )
 \end{code}
 
 
@@ -77,20 +80,31 @@ appropriate code.
 The logic for how an interface file is marked as corresponding to a module that's
 hiding in a DLL is explained elsewhere (ToDo: give renamer href here.)
 
+@SourceOnly@ and @ObjectCode@ indicate a module from the same package
+as the one being compiled, i.e. a home module.  @InPackage@ means one
+from a different package.
+
 \begin{code}
-data PackageInfo = ThisPackage 			-- A module from the same package 
-						-- as the one being compiled
-		 | AnotherPackage PackageName	-- A module from a different package
+data ModuleKind
+   = SourceOnly FilePath            -- .hs
+   | ObjectCode FilePath FilePath   -- .o, .hi
+   | InPackage  PackageName
+
+isPackageKind (InPackage _) = True
+isPackageKind _             = False
 
 type PackageName = FastString		-- No encoding at all
 
 preludePackage :: PackageName
 preludePackage = SLIT("std")
 
-instance Show PackageInfo where	-- Just used in debug prints of lex tokens
-				-- and in debug modde
-  showsPrec n ThisPackage        s = "<THIS>"   ++ s
-  showsPrec n (AnotherPackage p) s = (_UNPK_ p) ++ s
+instance Outputable ModuleKind where
+   ppr (SourceOnly path_hs) 
+      = text "SourceOnly" <+> text (show path_hs)
+   ppr (ObjectCode path_o path_hi)
+      = text "ObjectCode" <+> text (show path_o) <+> text (show path_hi)
+   ppr (InPackage pkgname)
+      = text "InPackage" <+> text (show pkgname)
 \end{code}
 
 
@@ -147,18 +161,29 @@ mkSysModuleFS s = s
 \end{code}
 
 \begin{code}
-data Module = Module ModuleName PackageInfo
+data Module 
+   = Module {
+        mod_name :: ModuleName,
+        mod_kind :: ModuleKind
+     }
 \end{code}
 
 \begin{code}
 instance Outputable Module where
   ppr = pprModule
 
-instance Eq Module where
-  (Module m1 _) == (Module m2 _) = m1 == m2
+instance Uniquable Module where
+  getUnique (Module nm _) = mkUniqueGrimily (uniqueOfFS nm)
 
+-- Same if they have the same name.
+instance Eq Module where
+  m1 == m2 = getUnique m1 == getUnique m2
+
+-- Warning: gives an ordering relation based on the uniques of the
+-- FastStrings which are the (encoded) module names.  This is _not_
+-- a lexicographical ordering.
 instance Ord Module where
-  (Module m1 _) `compare` (Module m2 _) = m1 `compare` m2
+  m1 `compare` m2 = getUnique m1 `compare` getUnique m2
 \end{code}
 
 
@@ -167,34 +192,38 @@ pprModule :: Module -> SDoc
 pprModule (Module mod p) = getPprStyle $ \ sty ->
 			   if debugStyle sty then
 				-- Print the package too
-				text (show p) <> dot <> pprModuleName mod
+				ppr p <> dot <> pprModuleName mod
 			   else
 				pprModuleName mod
 \end{code}
 
 
 \begin{code}
-mkModule :: ModuleName	-- Name of the module
-	 -> PackageName
-	 -> Module
-mkModule mod_nm pack_name
-  = Module mod_nm pack_info
-  where
-    pack_info | pack_name == opt_InPackage = ThisPackage
-	      | otherwise		   = AnotherPackage pack_name
+mkModule :: ModuleName -> ModuleKind -> Module
+mkModule = Module
+-- I don't think anybody except the Finder should ever try to create a
+-- Module now, so this lot commented out pro tem (JRS)
+--mkModule :: ModuleName	-- Name of the module
+--	 -> PackageName
+--	 -> Module
+--mkModule mod_nm pack_name
+--  = Module mod_nm pack_info
+--  where
+--    pack_info | pack_name == opt_InPackage = ThisPackage
+--	      | otherwise		   = AnotherPackage pack_name
 
 
-mkVanillaModule :: ModuleName -> Module
-mkVanillaModule name = Module name ThisPackage
+--mkVanillaModule :: ModuleName -> Module
+--mkVanillaModule name = Module name ThisPackage
 	-- Used temporarily when we first come across Foo.x in an interface
 	-- file, but before we've opened Foo.hi.
 	-- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
 
-mkThisModule :: ModuleName -> Module	-- The module being compiled
-mkThisModule name = Module name ThisPackage
+--mkThisModule :: ModuleName -> Module	-- The module being compiled
+--mkThisModule name = Module name ThisPackage
 
-mkPrelModule :: ModuleName -> Module
-mkPrelModule name = mkModule name preludePackage
+--mkPrelModule :: ModuleName -> Module
+--mkPrelModule name = mkModule name preludePackage
 
 moduleString :: Module -> EncodedString
 moduleString (Module mod _) = _UNPK_ mod
@@ -207,7 +236,7 @@ moduleUserString (Module mod _) = moduleNameUserString mod
 \end{code}
 
 \begin{code}
-isLocalModule :: Module -> Bool
-isLocalModule (Module _ ThisPackage) = True
-isLocalModule _		      	     = False
+--isLocalModule :: Module -> Bool
+--isLocalModule (Module _ ThisPackage) = True
+--isLocalModule _		      	     = False
 \end{code}

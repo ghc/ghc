@@ -4,8 +4,7 @@
 \section[CmFind]{Module finder for GHCI}
 
 \begin{code}
-module CmFind ( ModLocation(..), ml_modname, isPackageLoc,
-		Finder, newFinder )
+module CmFind ( Finder, newFinder )
 where
 
 #include "HsVersions.h"
@@ -17,38 +16,13 @@ import Time		( ClockTime )
 import Directory	( doesFileExist, getModificationTime )
 import Outputable
 
-import Module		( Module, ModuleName, PackageName, 
-			  moduleNameUserString )
+import Module		( Module, ModuleName, ModuleKind(..), PackageName, 
+			  mkModule, moduleNameUserString )
 import CmStaticInfo	( Package(..), PackageConfigInfo(..) )
 \end{code}
 
 \begin{code}
--- make a product type, with Maybe return --> Module,lhs
-data ModLocation 
-   = SourceOnly ModuleName FilePath            -- .hs
-   | ObjectCode ModuleName FilePath FilePath   -- .o, .hi
-   | InPackage  ModuleName PackageName
-   | NotFound
-
-instance Outputable ModLocation where
-   ppr (SourceOnly nm path_hs) 
-      = hsep [text "SourceOnly", text (show nm), text (show path_hs)]
-   ppr (ObjectCode nm path_o path_hi)
-      = hsep [text "ObjectCode", text (show nm), 
-                                 text (show path_o), text (show path_hi)]
-   ppr (InPackage nm pkgname)
-      = hsep [text "InPackage", text (show nm), text (show pkgname)]
-
-
-
-type Finder = ModuleName -> IO ModLocation
-
-ml_modname (SourceOnly nm _)   = nm
-ml_modname (ObjectCode nm _ _) = nm
-ml_modname (InPackage  nm _)   = nm
-
-isPackageLoc (InPackage _ _) = True
-isPackageLoc _               = False
+type Finder = ModuleName -> IO (Maybe Module)
 
 mkFinder :: [(ModuleName,PackageName,FilePath)] -> [FilePath] -> Finder
 mkFinder pkg_ifaces home_dirs modnm
@@ -63,31 +37,32 @@ mkFinderX pkg_ifaces home_dirs modnm
    -- If the module exists both as package and home, emit a warning
    -- and (arbitrarily) choose the user's one.
    = do home_maybe_found <- mapM (homeModuleExists modnm) home_dirs
-                         :: IO [Maybe (ModLocation, ClockTime)]
+                         :: IO [Maybe (Module, ClockTime)]
         case (in_package, catMaybes home_maybe_found) of
            ([], []) 
-              -> return NotFound
+              -> return Nothing
            ([], locs_n_times@(_:_))
-              -> return (homeMod locs_n_times)
+              -> return (Just (homeMod locs_n_times))
            ((pkgname,path):_, [])
-              -> return (InPackage modnm pkgname)
+              -> return (Just (mkModule modnm (InPackage pkgname)))
            (packages, locs_n_times)
-              -> do --hPutStr stderr ( "GHCI: warning: module `" ++ modnm ++
-                    --                 "' appears as both a home and package module\n")
-                    return (homeMod locs_n_times)
+              -> do hPutStr stderr ( "GHCI: warning: module `" 
+                                     ++ moduleNameUserString modnm
+                                     ++ "' appears as both a home and package module\n")
+                    return (Just (homeMod locs_n_times))
      where
         in_package 
            = [(pkgname,path) | (modname,pkgname,path) <- pkg_ifaces, 
                                modname == modnm]
-        homeMod :: [(ModLocation, ClockTime)] -> ModLocation
+        homeMod :: [(Module, ClockTime)] -> Module
         homeMod locs_n_times
            = fst (maximumBy (\lt1 lt2 -> if snd lt1 > snd lt2 then lt1 else lt2)
                             locs_n_times)
         
 
 -- See if a .hs or (.hi, .o) pair exist on the given path,
--- and return a ModLocation for whichever is younger
-homeModuleExists :: ModuleName -> FilePath -> IO (Maybe (ModLocation, ClockTime))
+-- and return a Module for whichever is younger
+homeModuleExists :: ModuleName -> FilePath -> IO (Maybe (Module, ClockTime))
 homeModuleExists modname path
    = do m_ths <- maybeTime nm_hs
         m_thi <- maybeTime nm_hi
@@ -102,8 +77,10 @@ homeModuleExists modname path
               (Nothing, _, _)               -> Nothing
            )
      where
-        object thi to = Just (ObjectCode modname nm_o nm_hi, max thi to)
-        source ths    = Just (SourceOnly modname nm_hs, ths)
+        object thi to = Just (mkModule modname (ObjectCode nm_o nm_hi), 
+                              max thi to)
+        source ths    = Just (mkModule modname (SourceOnly nm_hs), 
+                              ths)
         nm = path ++ "/" ++ moduleNameUserString modname
         nm_hs = nm ++ ".hs"
         nm_hi = nm ++ ".hi"
