@@ -555,8 +555,8 @@ ctxt_to_use ctxt | opt_PprStyle_All = ctxt
      		   takeAtMost n (x:xs) = x:takeAtMost (n-1) xs
 
 arityErr kind name n m
-  = hsep [ ppr name, ptext SLIT("should have"),
-	   n_arguments <> comma, text "but has been given", int m, char '.']
+  = hsep [ text kind, quotes (ppr name), ptext SLIT("should have"),
+	   n_arguments <> comma, text "but has been given", int m]
     where
 	n_arguments | n == 0 = ptext SLIT("no arguments")
 		    | n == 1 = ptext SLIT("1 argument")
