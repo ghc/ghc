@@ -25,6 +25,8 @@ module Addr
 import PreludeBuiltin
 #else
 import PrelAddr
+import PrelForeign
+import PrelStable
 import PrelBase
 import PrelIOBase ( IO(..) )
 import Word	( indexWord8OffAddr,  indexWord16OffAddr
@@ -130,6 +132,9 @@ readWordOffAddr   a i = _casm_ `` %r=(StgWord)(((StgWord*)%0)[(StgInt)%1]); '' a
 readAddrOffAddr   a i = _casm_ `` %r=(StgAddr)(((StgAddr*)%0)[(StgInt)%1]); '' a i
 readFloatOffAddr  a i = _casm_ `` %r=(StgFloat)(((StgFloat*)%0)[(StgInt)%1]); '' a i
 readDoubleOffAddr a i = _casm_ `` %r=(StgDouble)(((StgDouble*)%0)[(StgInt)%1]); '' a i
+
+readStablePtrOffAddr    :: Addr -> Int -> IO (StablePtr a)
+readStablePtrOffAddr a i = _casm_ `` %r=(StgStablePtr)(((StgStablePtr*)%0)[(StgInt)%1]); '' a i
 #endif
 \end{code}
 
@@ -167,5 +172,16 @@ writeFloatOffAddr (A# a#) (I# i#) (F# e#) = IO $ \ s# ->
 
 writeDoubleOffAddr (A# a#) (I# i#) (D# e#) = IO $ \ s# ->
       case (writeDoubleOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+
+#ifndef __PARALLEL_HASKELL__
+writeForeignObjOffAddr   :: Addr -> Int -> ForeignObj -> IO ()
+writeForeignObjOffAddr (A# a#) (I# i#) (ForeignObj e#) = IO $ \ s# ->
+      case (writeForeignObjOffAddr#  a# i# e# s#) of s2# -> (# s2#, () #)
+#endif
+
+writeStablePtrOffAddr    :: Addr -> Int -> StablePtr a -> IO ()
+writeStablePtrOffAddr (A# a#) (I# i#) (StablePtr e#) = IO $ \ s# ->
+      case (writeStablePtrOffAddr#  a# i# e# s#) of s2# -> (# s2# , () #)
+
 #endif
 \end{code}
