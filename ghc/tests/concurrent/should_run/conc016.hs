@@ -8,11 +8,11 @@ main = do
   m <- newEmptyMVar
   sub_thread <- forkIO (do
 	    	 	 takeMVar m
-	    	 	 raiseInThread main_thread (ErrorCall "foo")
+	    	 	 throwTo main_thread (ErrorCall "foo")
 	 		)
-  blockAsyncExceptions (do
+  block (do
     putMVar m ()
     sum [1..10000] `seq` -- to be sure the other thread is now blocked
-       killThread sub_thread
+      killThread sub_thread
    )
   putStrLn "ok"

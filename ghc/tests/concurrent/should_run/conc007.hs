@@ -22,7 +22,7 @@ choose a b = do
 -- exception is raised in any thread.
 
 myForkIO :: IO () -> IO ThreadId
-myForkIO io = forkIO (catchAllIO io (\e -> return ()))
+myForkIO io = forkIO (Exception.catch io (\e -> return ()))
 
 main = do
    let big = sum [1..]

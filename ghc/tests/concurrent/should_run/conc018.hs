@@ -2,7 +2,7 @@ import Concurrent
 import Exception
 
 main = do
-  catchAllIO (do
+  Exception.catch (do
   	m <- newMVar ()
 	putMVar m ()
      )

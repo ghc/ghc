@@ -15,7 +15,7 @@ stackoverflow n = n + stackoverflow n
 main = do
   let x = stackoverflow 1
   result <- newEmptyMVar 
-  forkIO (catchAllIO (x `seq` putMVar result Finished) 
+  forkIO (Exception.catch (x `seq` putMVar result Finished) 
 		     (\e -> putMVar result (Died e)))
   res <- takeMVar result
   case res of

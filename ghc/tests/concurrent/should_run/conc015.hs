@@ -15,18 +15,18 @@ main = do
   m <- newEmptyMVar
   m2 <- newEmptyMVar
   forkIO (do takeMVar m
-	     raiseInThread main_thread (ErrorCall "foo")
-	     raiseInThread main_thread (ErrorCall "bar") 
+	     throwTo main_thread (ErrorCall "foo")
+	     throwTo main_thread (ErrorCall "bar") 
 	     putMVar m2 ()
 	 )
   ( do
-    blockAsyncExceptions (do
+    block (do
 	putMVar m ()
 	sum [1..10000] `seq` -- give 'foo' a chance to be raised
-  	  (unblockAsyncExceptions (threadDelay 500000))
-		`catchAllIO` (\e -> putStrLn ("caught1: " ++ show e))
+  	  (unblock (threadDelay 500000))
+		`Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
      )
     takeMVar m2
    )
-    `catchAllIO`
+    `Exception.catch`
     (\e -> putStrLn ("caught2: " ++ show e))

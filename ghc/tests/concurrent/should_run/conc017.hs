@@ -11,25 +11,25 @@ main = do
   m3 <- newEmptyMVar
   forkIO (do 
 	     takeMVar m1
-	     raiseInThread main_thread (ErrorCall "foo")
+	     throwTo main_thread (ErrorCall "foo")
 	     takeMVar m2
-	     raiseInThread main_thread (ErrorCall "bar")
+	     throwTo main_thread (ErrorCall "bar")
 	     putMVar m3 ()
 	 )
   (do 
-    blockAsyncExceptions (do
+    block (do
 	(do putMVar m1 () 
-	    unblockAsyncExceptions (
+	    unblock (
 		-- unblocked, "foo" delivered to "caught1"
 	       threadDelay 100000
 	     )
-	 ) `catchAllIO` (\e -> putStrLn ("caught1: " ++ show e))
+	 ) `Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
 	putMVar m2 ()
 	-- blocked here, "bar" can't be delivered
 	(sum [1..10000] `seq` return ())
-	  `catchAllIO` (\e -> putStrLn ("caught2: " ++ show e))
+	  `Exception.catch` (\e -> putStrLn ("caught2: " ++ show e))
      )
     -- unblocked here, "bar" delivered to "caught3"
     takeMVar m3
    ) 
-   `catchAllIO` (\e -> putStrLn ("caught3: " ++ show e))
+   `Exception.catch` (\e -> putStrLn ("caught3: " ++ show e))

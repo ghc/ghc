@@ -7,10 +7,10 @@ import Exception
 main = do
   main_thread <- myThreadId
   m <- newEmptyMVar
-  forkIO (do { takeMVar m;  raiseInThread main_thread (ErrorCall "foo") })
+  forkIO (do { takeMVar m;  throwTo main_thread (ErrorCall "foo") })
   (error "wibble")
-	`catchAllIO` (\e -> do putMVar m ()
-			       sum [1..10000] `seq` putStrLn "done.")
+	`Exception.catch` (\e -> do putMVar m ()
+			            sum [1..10000] `seq` putStrLn "done.")
   (threadDelay 500000)
-	`catchAllIO` (\e -> putStrLn ("caught: " ++ show e))
+	`Exception.catch` (\e -> putStrLn ("caught: " ++ show e))
 

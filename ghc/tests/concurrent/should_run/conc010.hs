@@ -22,8 +22,8 @@ main = do
   block  <- newEmptyMVar
   ready  <- newEmptyMVar
   ready2 <- newEmptyMVar
-  id <- forkIO (catchAllIO (putMVar ready () >> takeMVar block) 
+  id <- forkIO (Exception.catch (putMVar ready () >> takeMVar block) 
 		(\e -> putStr (show e) >> putMVar ready2 ()))
   takeMVar ready
-  raiseInThread id (ErrorCall "hello")
+  throwTo id (ErrorCall "hello")
   takeMVar ready2

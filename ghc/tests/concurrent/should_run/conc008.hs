@@ -9,4 +9,4 @@ import Exception
 
 main = do 
   id <- myThreadId
-  catchAllIO (killThread id) (\e -> putStr (show e))
+  Exception.catch (killThread id) (\e -> putStr (show e))

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 2000/11/03 16:23:37 simonmar Exp $
+# $Id: Makefile,v 1.10 2001/02/13 15:12:42 rrt Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -11,8 +11,9 @@ endif
 
 include $(TOP)/mk/should_run.mk
 
+conc007_RUNTEST_OPTS = +RTS -H128M -RTS
 conc009_RUNTEST_OPTS = -x 1
-conc021_RUNTEST_OPTS = -x 250
+conc021_RUNTEST_OPTS = -x 250 -o2 conc021.stderr-mingw
 
 SRC_HC_OPTS += -dcore-lint -package concurrent -fglasgow-exts
 

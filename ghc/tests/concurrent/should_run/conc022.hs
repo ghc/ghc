@@ -25,13 +25,13 @@ timeout secs action on_timeout
     threadid <- myThreadId
     timeout <- forkIOIgnoreExceptions (
 			    do threadDelay (secs * 1000000)
-			       raiseInThread threadid (ErrorCall "__timeout")
+			       throwTo threadid (ErrorCall "__timeout")
 			  )
     ( do result <- action
 	 killThread timeout
 	 return result
       ) 
-      `catchAllIO`
+      `Exception.catch`
       ( \exception -> case exception of
 		       ErrorCall "__timeout" -> on_timeout		       
 		       _other                -> do
@@ -42,5 +42,5 @@ forkIOIgnoreExceptions :: IO () -> IO ThreadId
 forkIOIgnoreExceptions action = IO $ \ s -> 
    case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
  where
-  action_plus = catchAllIO action (\_ -> return ())
+  action_plus = Exception.catch action (\_ -> return ())
 

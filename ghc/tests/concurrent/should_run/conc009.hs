@@ -7,4 +7,4 @@ import Exception
 
 main = do 
   id <- myThreadId
-  raiseInThread id (ErrorCall "hello")
+  throwTo id (ErrorCall "hello")
