@@ -9,9 +9,9 @@ It's hard to put these functions anywhere else without causing
 some unnecessary loops in the module dependency graph.
 
 \begin{code}
-module Panic ( panic, panic#, assertPanic, trace ) where
+module Panic  ( panic, panic#, assertPanic, trace ) where
 
-import GlaExts( trace )
+import IOExts ( trace )
 
 #include "HsVersions.h"
 \end{code}
