@@ -46,6 +46,22 @@ Changes made since 3.00:
        Assertions are a Glasgow extension, so -fglasgow-exts is
        needed to use them.
 
+<item>
+  Split @-fwarn-unused-names@ into
+  
+  <descrip>
+  <tag>@-fwarn-unused-imports@</tag>
+	 Warn about unused explicit imports. (in -W)
+  <tag>@-fwarn-unused-binds@</tag>
+	 Warn about unused bindings	     (in -W)
+  <tag>@-fwarn-unused-matches@</tag>
+	 Warn about unused names in pattern matches
+  		 (not as useful, relegated to -Wall)
+  </descrip>
+
+<item> The driver is now always installed as @ghc-<version>@ with a
+link to it from @ghc@.
+
 <item> Library re-organisation: all libraries now live under ghc/lib,
 which has the following structure:
 
@@ -90,5 +106,17 @@ constructor.
 
 <item> Report the context properly for type errors in newtype
 declarations.
+
+<item> User's Guide replaced with SGML version.
+
+<item> The literate tools have been removed from the standard
+distributions, since they're not needed to format the documentation
+any more.
+
+<item> Lots of bug-fixes to the multi-parameter type classes support.
+
+<item> @alpha-dec-osf1@ and @alpha-dec-osf3@ are now separate
+configurations.  It turns out that an @alpha-dec-osf3@ build doesn't
+work on older versions of the OS.
 
 </itemize>
