@@ -158,20 +158,8 @@ import Data.Word
 
 infixl 9 \\{-This comment teaches CPP correct behaviour -}
 
-#if __HUGS__
-{--------------------------------------------------------------------
-  Hugs:
-  * Older Hugs doesn't define 'Word'.
-  * Newer Hugs defines 'Word' in the Prelude but no operations.
---------------------------------------------------------------------}
-type Nat = Word32   -- illegal on 64-bit platforms!
-#else
-{--------------------------------------------------------------------
-  'Standard' Haskell
-  * A "Nat" is a natural machine word (an unsigned Int)
---------------------------------------------------------------------}
+-- A "Nat" is a natural machine word (an unsigned Int)
 type Nat = Word
-#endif
 
 natFromInt :: Key -> Nat
 natFromInt i = fromIntegral i
