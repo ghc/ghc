@@ -102,6 +102,7 @@ import PackedString (psToByteArrayST)
 import Foreign  -- stable pointers
 import PosixErr
 import PosixUtil
+import Util ( unvectorize )
 
 import System(ExitCode(..))
 import PosixProcEnv (getProcessID)

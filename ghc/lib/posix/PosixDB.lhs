@@ -22,6 +22,7 @@ import PrelIOBase
 import Addr
 import IO
 import PosixUtil
+import Util ( unvectorize )
 
 data GroupEntry =
  GroupEntry {

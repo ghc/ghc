@@ -16,9 +16,11 @@ import PrelBase
 import MutableArray
 import ByteArray
 import Array
-import PackedString	( packCBytesST, psToByteArrayST, unpackPS )
+import PackedString	( unpackCStringIO, packCBytesST, psToByteArrayST )
 import Ix
 import PrelArr          (StateAndMutableByteArray#(..), StateAndByteArray#(..))
+import Util		( unvectorize )
+
 \end{code}
 
 First, all of the major Posix data types, to avoid any recursive dependencies
@@ -96,12 +98,7 @@ freeze (MutableByteArray ixs arr#) = IO $ \ s# ->
 -- Haskellized nonsense inside the heap
 
 strcpy :: Addr -> IO String
-strcpy str
-  | str == ``NULL'' = return ""
-  | otherwise =
-    _ccall_ strlen str		    >>= \ len ->
-    stToIO (packCBytesST len str)   >>= \ ps ->
-    return (unpackPS ps)
+strcpy str = unpackCStringIO str
 
 -- Turn a string list into a NULL-terminated vector of null-terminated
 -- strings No indices...I hate indices.  Death to Ix.
@@ -125,16 +122,7 @@ vectorize xs = do
 	fill arr (n+1) xs
 
 -- Turn a NULL-terminated vector of null-terminated strings into a string list
-
-unvectorize :: Addr -> Int -> IO [String]
-unvectorize ptr n
-  | str == ``NULL'' = return []
-  | otherwise =
-	strcpy str			    >>= \ x ->
-	unvectorize ptr (n+1)		    >>= \ xs ->
-	return (x : xs)
-  where
-    str = indexAddrOffAddr ptr n
+-- unvectorize ... (now in misc/Util.lhs)
 
 -- common templates for system calls
 
