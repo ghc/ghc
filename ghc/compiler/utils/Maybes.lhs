@@ -29,7 +29,7 @@ module Maybes (
     ) where
 
 #if __GLASGOW_HASKELL__ >= 204
-import Maybe( catMaybes, mapMaybe )
+import Maybe ( catMaybes, mapMaybe )
 #endif
 
 \end{code}
