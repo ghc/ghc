@@ -423,7 +423,7 @@ findPackages db_stack pkgid
 	 -- multiple packages.  So eg. "Cabal-*" matches all Cabal packages,
 	 -- but "Cabal" matches just one Cabal package - if there are more,
 	 -- you get an error.
-	ps | versionTags (pkgVersion pkgid) == versionTags globVersion
+	ps | pkgVersion pkgid == globVersion
 	   -> return ps
 	   | otherwise
 	   -> die ("package " ++ showPackageId pkgid ++ 
@@ -460,10 +460,10 @@ toField "extra_libraries" = Just $ strList . extraLibraries
 toField "include_dirs"    = Just $ strList . includeDirs
 toField "c_includes"      = Just $ strList . includes
 toField "package_deps"    = Just $ strList . map showPackageId. depends
-toField "extra_cc_opts"   = Just $ strList . extraCcOpts
-toField "extra_ld_opts"   = Just $ strList . extraLdOpts  
+toField "extra_cc_opts"   = Just $ strList . ccOptions
+toField "extra_ld_opts"   = Just $ strList . ldOptions
 toField "framework_dirs"  = Just $ strList . frameworkDirs  
-toField "extra_frameworks"= Just $ strList . extraFrameworks  
+toField "extra_frameworks"= Just $ strList . frameworks  
 toField s 	 	  = showInstalledPackageInfoField s
 
 strList :: [String] -> String
