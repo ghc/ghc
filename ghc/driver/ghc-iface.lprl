@@ -223,8 +223,10 @@ sub readHiFile {
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
 
-	    } elsif ( /^class\s+(.*\s+=>\s+)?(\S+)\s+.*where\s+\{.*\}/ ) {
+	    } elsif ( /^class\s+(\{[^{}]*\}\s+=>\s+)?(\S+)\s+/ ) {
 		# must be wary of => bit matching after "where"...
+		# ..hence the [^{}] part
+		# NB: a class decl may not have a where part at all
 		$current_name = $2;
 		$Decl{"$mod:$current_name"} = $_;
 	        if ($mod eq "old") { $OldVersion{$current_name} = $version; }
