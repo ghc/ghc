@@ -2301,6 +2301,10 @@ sub process_ghc_timings {
 
         $GCs = $1 if /^\s*([0-9,]+) (collections? in generation 0|garbage collections? performed)/;
 
+	if ( /^\s+([0-9]+)\s+Mb total memory/ ) {
+	    $TotMem = $1;
+        }
+
 	# The presence of -? in the following pattern is only there to
 	# accommodate 0.29 && <= 2.05 RTS'
 	if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*-?(\d+\.\d\d)s elapsed\)/ ) {
@@ -2327,6 +2331,7 @@ sub process_ghc_timings {
     print STDERR "Warning: MutElapsed not found in stats file\n" unless defined($MutElapsed);
     print STDERR "Warning: GcTime inot found in stats file\n" unless defined($GcTime);
     print STDERR "Warning: GcElapsed not found in stats file\n" unless defined($GcElapsed);
+    print STDERR "Warning: total memory not found in stats file\n" unless defined($TotMem);
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
@@ -2346,7 +2351,7 @@ sub process_ghc_timings {
 
     # print out what we found
     print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
 	" :$SysSpecificTiming>>\n";
 
     # OK, party over
