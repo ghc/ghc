@@ -1,5 +1,5 @@
 
-rnfail014.hs:9:
+rnfail014.hs:8:
     None of the type variable(s) in the constraint `Eq a'
 	appears in the type `Eq Bool'
     In the type signature for an instance decl

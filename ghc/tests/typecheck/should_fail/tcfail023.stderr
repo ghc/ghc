@@ -1,7 +1,7 @@
 
 tcfail023.hs:1:
     Duplicate or overlapping instance declarations
-	for `A B' at tcfail023.hs:11 and tcfail023.hs:14
+	for `A B' at tcfail023.hs:13 and tcfail023.hs:10
 
 tcfail023.hs:11:
     Couldn't match `B' against `Bool'

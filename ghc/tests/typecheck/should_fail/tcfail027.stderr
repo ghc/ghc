@@ -1,8 +1,8 @@
 
 tcfail027.hs:2:
     Cycle in class declarations:
-	`B' at tcfail027.hs:8
-	`A' at tcfail027.hs:5
+	`A' at tcfail027.hs:4
+	`B' at tcfail027.hs:7
 
 Compilation had errors
 

@@ -1,8 +1,8 @@
 
 rnfail012.hs:2:
     Multiple declarations of `A'
-	defined at rnfail012.hs:3
-	defined at rnfail012.hs:9
+	defined at rnfail012.hs:2
+	defined at rnfail012.hs:8
 
 Compilation had errors
 

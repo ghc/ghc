@@ -1,14 +1,6 @@
 
 tcfail035.hs:6:
-    Warning: No explicit method nor default method for `fromInteger'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:6:
-    Warning: No explicit method nor default method for `abs'
+    Warning: No explicit method nor default method for `+'
 	     in an instance declaration for `Num'
 
 tcfail035.hs:6:
@@ -16,19 +8,19 @@ tcfail035.hs:6:
 	     in an instance declaration for `Num'
 
 tcfail035.hs:6:
-    Warning: No explicit method nor default method for `+'
+    Warning: No explicit method nor default method for `abs'
 	     in an instance declaration for `Num'
 
-tcfail035.hs:7:
+tcfail035.hs:6:
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:6:
     Warning: No explicit method nor default method for `fromInteger'
 	     in an instance declaration for `Num'
 
 tcfail035.hs:7:
-    Warning: No explicit method nor default method for `signum'
-	     in an instance declaration for `Num'
-
-tcfail035.hs:7:
-    Warning: No explicit method nor default method for `abs'
+    Warning: No explicit method nor default method for `+'
 	     in an instance declaration for `Num'
 
 tcfail035.hs:7:
@@ -36,12 +28,20 @@ tcfail035.hs:7:
 	     in an instance declaration for `Num'
 
 tcfail035.hs:7:
-    Warning: No explicit method nor default method for `+'
+    Warning: No explicit method nor default method for `abs'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `fromInteger'
 	     in an instance declaration for `Num'
 
 tcfail035.hs:3:
     Duplicate or overlapping instance declarations
-	for `Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+	for `Num NUM' at tcfail035.hs:7 and tcfail035.hs:6
 
 Compilation had errors
 

@@ -1,5 +1,5 @@
 
-tcfail028.hs:5:
+tcfail028.hs:4:
     Couldn't match `Type t' against `k -> *'
 	Expected kind: Type t
 	Inferred kind: k -> *

@@ -1,5 +1,5 @@
 
-tcfail001.hs:9:
+tcfail001.hs:8:
     Warning: Duplicate class assertion `A a' in the context:
 		 (A a, A a) => ...
 

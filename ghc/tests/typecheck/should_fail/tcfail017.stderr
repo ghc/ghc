@@ -1,7 +1,7 @@
 
-tcfail017.hs:11:
+tcfail017.hs:10:
     Could not deduce `C [a]'
-	(arising from an instance declaration at tcfail017.hs:11)
+	(arising from an instance declaration at tcfail017.hs:10)
 	from the context: (B a)
     Probable cause: missing `C [a]' in instance declaration context
 		    or missing instance declaration for `C [a]'

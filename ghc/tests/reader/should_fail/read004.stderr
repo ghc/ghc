@@ -1,2 +1,4 @@
-read004.hs:19:1: Illegal character: `.' in a string gap
-read004.hs:19:1:  on input: "."
+read004.hs:14: error in character literal
+
+Compilation had errors
+
