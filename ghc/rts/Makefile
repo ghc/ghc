@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.57 2002/01/24 00:53:18 sof Exp $
+# $Id: Makefile,v 1.58 2002/01/30 12:17:21 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -13,28 +13,43 @@
 #	gmp		-- GNU multi-precision library (for Integer)
 
 #-----------------------------------------------------------------------------
+# Preamble
 
 TOP=..
-DoingRTS=YES
-include $(TOP)/mk/boilerplate.mk
 
-SplitObjs=NO
-
-WAYS=$(GhcLibWays)
-
-SRCS_RTS_C  = $(wildcard *.c) $(wildcard hooks/*.c) $(filter-out parallel/SysMan.c,$(wildcard parallel/*.c))
-SRCS_RTS_S  = $(wildcard *.S)
-SRCS_RTS_HC = $(wildcard *.hc) $(wildcard parallel/*.hc)
-
-ifneq "$(DLLized)" "YES"
-SRCS_RTS_C  := $(filter-out RtsDllMain.c, $(SRCS_RTS_C))
-else
-SRCS_RTS_C  := $(filter-out Main.c, $(SRCS_RTS_C))
+# Set UseGhcForCc: this causes the fptools build system to use a different
+# set of suffix rules for compiling C code, using $(HC) rather than $(CC)
+# and prepending "-optc" to $(CC_OPTS).  NB. must be done before including
+# boilerplate.mk below.
+HC=$(GHC_INPLACE)
+ifneq "$(BootingFromHc)" "YES"
+UseGhcForCc = YES
 endif
 
-LIBOBJS = $(patsubst %.c,%.$(way_)o,$(SRCS_RTS_C)) \
-          $(patsubst %.hc,%.$(way_)o,$(SRCS_RTS_HC)) \
-          $(patsubst %.S,%.$(way_)o,$(SRCS_RTS_S))
+include $(TOP)/mk/boilerplate.mk
+
+PACKAGE = rts
+WAYS=$(GhcLibWays)
+
+# grab sources from these subdirectories
+ALL_DIRS = hooks parallel
+
+ifneq "$(DLLized)" "YES"
+EXCLUDED_SRCS += RtsDllMain.c
+else
+EXCLUDED_SRCS += Main.c
+endif
+
+EXCLUDED_SRCS += parallel/SysMan.c
+
+# The build system doesn't give us these
+HC_SRCS = $(filter %.hc, $(SRCS))
+HC_OBJS = $(patsubst %.hc,%.o, $(HC_SRCS))
+
+# Override the default $(LIBOBJS) (the default provides for building Haskell libs)
+LIBOBJS = $(C_OBJS) $(HC_OBJS)
+
+SplitObjs=NO
 
 #-----------------------------------------------------------------------------
 # Flags for compiling RTS .c and .hc files
@@ -59,9 +74,13 @@ WARNING_OPTS += -Wcast-align
 #WARNING_OPTS += -Wredundant-decls 
 #WARNING_OPTS += -Wconversion
 
-SRC_CC_OPTS +=  $(GhcRtsCcOpts)  $(WARNING_OPTS) -DCOMPILING_RTS
+SRC_CC_OPTS += $(WARNING_OPTS)
 
-SRC_HC_OPTS += -I../includes -I. -Iparallel $(GhcRtsHcOpts) -DCOMPILING_RTS
+SRC_CC_OPTS += -I../includes -I. -Iparallel 
+SRC_HC_OPTS += -I../includes -I. -Iparallel 
+
+SRC_CC_OPTS += $(GhcRtsCcOpts) -DCOMPILING_RTS
+SRC_HC_OPTS += $(GhcRtsHcOpts) -DCOMPILING_RTS
 
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
@@ -72,63 +91,36 @@ ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif
 
-
-ifeq "$(way)" "s"
-SRC_HC_OPTS += -DSMP
-SRC_CC_OPTS += -DSMP
+ifeq "$(BootingFromHc)" "YES"
+# use the normal $(CC) when booting from .hc files
+SRC_CC_OPTS += $(HC_OPTS)
 endif
 
 #-----------------------------------------------------------------------------
 # Include the Front panel code?
 
-SRCS_RTS_C :=  $(filter-out Vis%.c, $(SRCS_RTS_C))
-
 # we need GTK+ for the front panel
 ifneq "$(GTK_CONFIG)" ""
 ifeq "$(GhcRtsWithFrontPanel)" "YES"
 SRC_HC_OPTS 		+= `$(GTK_CONFIG) --cflags` -optc-DRTS_GTK_FRONTPANEL
-SRCS_RTS_C 		:= $(SRCS_RTS_C) $(wildcard Vis*.c)
 VisCallbacks_CC_OPTS 	+= -Wno-unused
-endif # GhcRtsWithFrontPanel
-endif # GTK_CONFIG
-
-#-----------------------------------------------------------------------------
-
-C_SRCS = $(SRCS_RTS_C) $(SRCS_RTS_HC) $(SRCS_RTS_S)
-
-SRC_MKDEPENDC_OPTS += -I. -I../includes
-
-#-----------------------------------------------------------------------------
-#
-# Compiling the individual files
-#
-# Rules for building various types of objects from C files,
-# override the default suffix rule here, as we want to use
-# ../driver/ghc (a better C compiler :-) to compile the
-# different RTS pieces
-#
-
-ifeq "$(BootingFromHc)" "YES"
-# use the normal $(CC) when booting from .hc files
-SRC_CC_OPTS += $(HC_OPTS)
-SRC_CC_OPTS += -I../includes -I. -Iparallel -DCOMPILING_RTS
-else
-# otherwise, use $(GHC_INPLACE) as the C compiler.
-CC=$(GHC_INPLACE)
-CC_OPTS := $(addprefix -optc, $(CC_OPTS)) $(HC_OPTS)
+else # GhcRtsWithFrontPanel
+EXCLUDED_SRCS		+= $(wildcard Vis*.c)
+endif
+else # GTK_CONFIG
+EXCLUDED_SRCS		+= $(wildcard Vis*.c)
 endif
 
-HC=$(GHC_INPLACE)
+#-----------------------------------------------------------------------------
+# make depend setup
 
-# prevent this value from leaking into the GMP makefile
-unexport CC
+MKDEPENDC_SRCS     = $(C_SRCS) $(HC_SRCS)
+SRC_MKDEPENDC_OPTS += -I. -I../includes
 
 # -----------------------------------------------------------------------------
 #
 #  Building DLLs is only supported on mingw32 at the moment.
 #
-PACKAGE             = rts
-
 ifeq "$(DLLized)" "YES"
 SRC_BLD_DLL_OPTS += -lHS_imp_stub -lgmp_imp
 
