@@ -309,7 +309,10 @@ SRC_HC_OPTS += -hisuf $(way_)hi -hcsuf $(way_)hc -osuf $(way_)o
 endif
 
 # add syslib dependencies and current package name
-SRC_HC_OPTS += $(patsubst %, -package %, $(HSLIB_DEPS)) -package-name $(HSLIB)
+SRC_HC_OPTS += $(patsubst %, -package %, $(HSLIB_DEPS))
+ifneq "$(PACKAGE)" ""
+SRC_HC_OPTS += -package-name $(HSLIB)
+endif
 
 #----------------------------------------
 #	C programs
