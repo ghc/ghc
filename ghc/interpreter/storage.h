@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.17 $
- * $Date: 1999/12/06 16:25:27 $
+ * $Revision: 1.18 $
+ * $Date: 1999/12/06 16:47:09 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -312,7 +312,12 @@ extern  Ptr             cptrOf          Args((Cell));
  * ------------------------------------------------------------------------*/
 
 #define SPECMIN      101
-#define isSpec(c)    (SPECMIN<=(c) && (c)<TUPMIN)/* Special cell values    */
+
+#if TREX
+#define isSpec(c)    (SPECMIN<=(c) && (c)<EXTMIN)/* Special cell values    */
+#else
+#define isSpec(c)    (SPECMIN<=(c) && (c)<OFFMIN)
+#endif
 
 #define NONE         101          /* Dummy stub                            */
 #define STAR         102          /* Representing the kind of types        */
@@ -354,25 +359,12 @@ extern  Ptr             cptrOf          Args((Cell));
  * Tuple data/type constructors:
  * ------------------------------------------------------------------------*/
 
-#define TUPMIN       201
-
-#if 0
-#error xyzzy
-#if TREX
-#define isTuple(c)   (TUPMIN<=(c) && (c)<EXTMIN)
-#else
-#define isTuple(c)   (TUPMIN<=(c) && (c)<OFFMIN)
-#endif
-#define mkTuple(n)   (TUPMIN+(n))
-#define tupleOf(n)   ((Int)((n)-TUPMIN))
-#endif
-
 extern Text ghcTupleText Args((Tycon));
 
 
 
 #if TREX
-#define EXTMIN       (TUPMIN+NUM_TUPLES)
+#define EXTMIN       201
 #define isExt(c)     (EXTMIN<=(c) && (c)<OFFMIN)
 #define extText(e)   tabExt[(e)-EXTMIN]
 #define extField(c)  arg(fun(c))
@@ -391,7 +383,7 @@ extern Ext           mkExt Args((Text));
 #if TREX
 #define OFFMIN       (EXTMIN+NUM_EXT)
 #else
-#define OFFMIN       (TUPMIN+NUM_TUPLES)
+#define OFFMIN       201
 #endif
 #define isOffset(c)  (OFFMIN<=(c) && (c)<MODMIN)
 #define offsetOf(c)  ((c)-OFFMIN)

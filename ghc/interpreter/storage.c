@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.22 $
- * $Date: 1999/12/06 16:25:25 $
+ * $Revision: 1.23 $
+ * $Date: 1999/12/06 16:47:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1841,7 +1841,10 @@ register Cell c; {
         register Cell fstc = fst(c);
         return isTag(fstc) ? fstc : AP;
     }
-    if (c<TUPMIN)    return c;
+    if (c<OFFMIN)    return c;
+#if TREX
+    if (isExt(c))    return EXT;
+#endif
     if (c>=INTMIN)   return INTCELL;
 
     if (c>=NAMEMIN){if (c>=CLASSMIN)   {if (c>=CHARMIN) return CHARCELL;
