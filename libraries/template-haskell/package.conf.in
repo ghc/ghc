@@ -1,5 +1,3 @@
-#include "ghcconfig.h"
-
 Package {
 	name		= "template-haskell",
 	auto		= True,
