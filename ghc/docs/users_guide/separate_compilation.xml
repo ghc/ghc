@@ -715,8 +715,16 @@ When a hs-boot file <filename>A.hs-boot</filename>
 
    <listitem><para> If hs-boot files are considered distinct from their parent source
    files, and if a <literal>{-# SOURCE #-}</literal> import is considered to refer to the
-   hs-boot file, then the module import graph must have no cycles.  The <command>ghc -M</command>
-   will report an error if a cycle is found.
+   hs-boot file, then the module import graph must have no cycles.  The command
+   <command>ghc -M</command> will report an error if a cycle is found.
+   </para></listitem>
+
+   <listitem><para> Every module that is 
+   <literal>{-# SOURCE #-}</literal>-imported in a program must also be ordinarily imported (or
+   else be one of the root modules).  To put it another way, if <literal>M.hs-boot</literal> is
+   reachable in the import graph, then <literal>M.hs</literal> must also be reachable.
+   The command <command>ghc --make</command> will report an error if this
+   condition is not satisfied.
    </para></listitem>
 </itemizedlist>
 </para>
@@ -726,7 +734,7 @@ A hs-boot file need only contain the bare
       started.  For example, it doesn't need to contain declarations
       for <emphasis>everything</emphasis> that module
       <literal>A</literal> exports, only the things required by the
-      module that imports <literal>A</literal> recursively.</para>
+      module(s) that import <literal>A</literal> recursively.</para>
 <para>A hs-boot file is written in a subset of Haskell:
 <itemizedlist>
 <listitem><para> The module header (including the export list), and import statements, are exactly as in
