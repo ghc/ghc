@@ -44,7 +44,8 @@ import OccName		( mkDefaultMethodOcc )
 import BasicTypes	( TopLevelFlag(..) )
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys,
-			  deRefStablePtr_RDR, makeStablePtr_RDR, bindIO_RDR
+			  deRefStablePtr_RDR, makeStablePtr_RDR, 
+			  bindIO_RDR, returnIO_RDR
 			)
 import Bag		( bagToList )
 import List		( partition, nub )
@@ -352,15 +353,18 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
     lookupOccRn name		        `thenRn` \ name' ->
     let 
 	extra_fvs FoExport 
-	  | isDyn     	= lookupImplicitOccsRn [makeStablePtr_RDR, deRefStablePtr_RDR, bindIO_RDR]
+	  | isDyn     	= lookupImplicitOccsRn [makeStablePtr_RDR, deRefStablePtr_RDR]
 	  | otherwise 	= returnRn (unitFV name')
 	extra_fvs other = returnRn emptyFVs
     in
     checkRn (ok_ext_nm ext_nm) (badExtName ext_nm)	`thenRn_`
-    extra_fvs imp_exp					`thenRn` \ fvs1 -> 
-    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs2) ->
+
+    lookupImplicitOccsRn [bindIO_RDR, returnIO_RDR]	`thenRn` \ fvs1 ->
+    extra_fvs imp_exp					`thenRn` \ fvs2 -> 
+
+    rnHsSigType fo_decl_msg ty		       		`thenRn` \ (ty', fvs3) ->
     returnRn (ForD (ForeignDecl name' imp_exp ty' ext_nm cconv src_loc), 
-	      fvs1 `plusFV` fvs2)
+	      fvs1 `plusFV` fvs2 `plusFV` fvs3)
  where
   fo_decl_msg = ptext SLIT("a foreign declaration")
   isDyn	      = isDynamicExtName ext_nm
