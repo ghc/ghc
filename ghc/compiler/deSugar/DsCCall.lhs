@@ -311,7 +311,7 @@ resultWrapper result_ty
   | isUnitTy result_ty_rep
   = (Nothing, \e -> Var unitDataConId)
 
-  -- Base case 3: the boolean type ()
+  -- Base case 3: the boolean type
   | isBoolTy result_ty_rep
   = (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
 	                          [(DEFAULT             ,[],Var trueDataConId ),
