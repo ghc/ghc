@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.32 1998/11/21 14:35:00 sof Exp $
+dnl $Id: aclocal.m4,v 1.33 1998/11/24 11:22:47 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -71,10 +71,13 @@ dnl
 dnl Hack!: nlist() under Digital UNIX insist on there being an _,
 dnl but symbol table listings shows none. What is going on here?!?
 dnl
+dnl Another hack: cygwin doesn't come with nlist.h , so we hardwire
+dnl the underscoredness of that "platform"
 changequote(<<, >>)dnl
 <<
 case $HostPlatform in
 alpha-dec-osf*) fptools_cv_lead_uscore='no';;
+*cygwin32)      fptools_cv_lead_uscore='yes';;
 *) >>
 changequote([, ])dnl
 AC_TRY_RUN([#ifdef HAVE_NLIST_H
