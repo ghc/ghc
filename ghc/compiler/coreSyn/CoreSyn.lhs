@@ -48,10 +48,8 @@ module CoreSyn (
 
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId, idType )
-import VarEnv
 import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
 import Literal	        ( Literal(MachStr), mkMachInt )
-import PrimOp		( PrimOp )
 import DataCon		( DataCon, dataConId )
 import VarSet
 import Outputable

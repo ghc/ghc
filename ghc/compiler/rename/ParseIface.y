@@ -53,8 +53,6 @@ import RnMonad		( ImportVersion, ParsedIface(..), WhatsImported(..),
 			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..), 
                           WhetherHasOrphans, IsBootInterface
 			) 
-import Bag		( emptyBag, unitBag, snocBag )
-import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual, mkRdrNameWkr )
 import Name		( OccName, Provenance )
 import OccName          ( mkSysOccFS,
@@ -64,16 +62,11 @@ import OccName          ( mkSysOccFS,
 import Module           ( ModuleName, PackageName, mkSysModuleFS, mkModule )			
 import SrcLoc		( SrcLoc )
 import CmdLineOpts	( opt_InPackage )
-import Maybes
 import Outputable
 import List		( insert )
 
 import GlaExts
 import FastString	( tailFS )
-
-#if __HASKELL1__ > 4
-import Ratio ( (%) )
-#endif
 }
 
 %name	    parseIface
