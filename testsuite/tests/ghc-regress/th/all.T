@@ -26,3 +26,5 @@ test('TH_spliceDecl3', normal, multimod_compile, ['TH_spliceDecl3', '-v0'])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
 
 test('TH_bracket1', normal, compile, [''])
+test('TH_bracket2', normal, compile, [''])
+test('TH_bracket3', normal, compile, [''])

@@ -4,4 +4,4 @@
 module TH_bracket1 where
 
 foo = 1
-bar = [d| foo = 1|]
+bar = [d| foo = 1 |]
