@@ -213,7 +213,7 @@ MAINTAINER_CLEAN_FILES += $(BOOT_SRCS)
 MOSTLY_CLEAN_FILES += \
  *.CKP *.ln *.BAK *.bak .*.bak *.o *core a.out errs ,* *.a .emacs_*  \
  tags TAGS *.ind *.ilg *.idx *.idx-prev *.aux *.aux-prev *.dvi *.log \
- *.toc *.lot *.lof *.blg *.cb *_stub.c *_stub.h *.raw_s
+ *.toc *.lot *.lof *.blg *.cb *_stub.c *_stub.h *.raw_s *.a.list
 
 #------------------------------------------------------------------
 #
