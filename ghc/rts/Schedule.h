@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.37 2003/01/25 15:54:50 wolfgang Exp $
+ * $Id: Schedule.h,v 1.38 2003/03/17 14:47:48 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -151,7 +151,7 @@ extern nat         rts_n_waiting_tasks;
 
 StgInt forkProcess(StgTSO *tso);
 
-extern SchedulerStatus rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret);
+extern SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
 
 
 /* Called by shutdown_handler(). */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.27 2003/01/25 15:54:50 wolfgang Exp $
+ * $Id: Weak.c,v 1.28 2003/03/17 14:47:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,7 @@ finalizeWeakPointersNow(void)
 	    rts_unlock();
 	    rts_lock();
 #else
-	    rts_mainEvalIO(w->finalizer,NULL);
+	    rts_mainLazyIO(w->finalizer,NULL);
 #endif
 	}
     }
