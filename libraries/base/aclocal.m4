@@ -153,16 +153,13 @@ undefine([AC_CV_NAME_supported])dnl
 ])
 
 
-dnl @synopsis FP_READDIR_EOF_ERRNO
-dnl
-dnl Check what readdir() sets 'errno' to upon reaching 
-dnl end of directory; not setting it is the correct thing to do,
-dnl but mingw based versions have set it to ENOENT until recently
-dnl (summer 2004).
-dnl
-dnl
-AC_DEFUN(FP_READDIR_EOF_ERRNO,
-[AC_CACHE_CHECK([what readdir sets errno to upon EOF], fptools_cv_readdir_eof_errno,
+# FP_READDIR_EOF_ERRNO
+# --------------------
+# Defines READDIR_ERRNO_EOF to what readdir() sets 'errno' to upon reaching end
+# of directory (not set => 0); not setting it is the correct thing to do, but
+# MinGW based versions have set it to ENOENT until recently (summer 2004).
+AC_DEFUN([FP_READDIR_EOF_ERRNO],
+[AC_CACHE_CHECK([what readdir sets errno to upon EOF], [fptools_cv_readdir_eof_errno],
 [AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <dirent.h>
 #include <stdio.h>
 #include <errno.h>
@@ -206,7 +203,10 @@ char **argv;
   closedir(dp);
   rmdir("testdir");
   return 0;
-}]])],[fptools_cv_readdir_eof_errno=`cat conftestval`],[fptools_cv_readdir_eof_errno=bogus],[fptools_cv_readdir_eof_errno=0])])
-dnl the cross value is somewhat bogus.
+}]])],
+[fptools_cv_readdir_eof_errno=`cat conftestval`],
+[AC_MSG_WARN([failed to determine the errno value])
+ fptools_cv_readdir_eof_errno=0],
+[fptools_cv_readdir_eof_errno=0])])
 AC_DEFINE_UNQUOTED([READDIR_ERRNO_EOF], [$fptools_cv_readdir_eof_errno], [readdir() sets errno to this upon EOF])
-])
+])# FP_READDIR_EOF_ERRNO
