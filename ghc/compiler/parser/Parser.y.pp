@@ -775,7 +775,7 @@ btype :: { LHsType RdrName }
 
 atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
-	| tyvarid			{ L1 (HsTyVar (unLoc $1)) }
+	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
 	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }
 	| '(' type ',' comma_types1 ')'	{ LL $ HsTupleTy Boxed  ($2:$4) }
 	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy Unboxed $2     }

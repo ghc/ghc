@@ -89,34 +89,35 @@ extractHsRhoRdrTyVars :: LHsContext RdrName -> LHsType RdrName -> [Located RdrNa
 extractHsRhoRdrTyVars ctxt ty 
  = nubBy eqLocated $ extract_lctxt ctxt (extract_lty ty [])
 
-extract_lctxt ctxt acc = foldr (extract_pred.unLoc) acc (unLoc ctxt)
+extract_lctxt ctxt acc = foldr (extract_pred . unLoc) acc (unLoc ctxt)
 
 extract_pred (HsClassP cls tys) acc	= foldr extract_lty acc tys
 extract_pred (HsIParam n ty) acc	= extract_lty ty acc
 
-extract_lty (L loc (HsTyVar tv)) acc
-  | isRdrTyVar tv = L loc tv : acc
-  | otherwise = acc
-extract_lty ty acc = extract_ty (unLoc ty) acc
+extract_lty (L loc ty) acc 
+  = case ty of
+      HsTyVar tv 	        -> extract_tv loc tv acc
+      HsBangTy _ ty            	-> extract_lty ty acc
+      HsAppTy ty1 ty2          	-> extract_lty ty1 (extract_lty ty2 acc)
+      HsListTy ty              	-> extract_lty ty acc
+      HsPArrTy ty              	-> extract_lty ty acc
+      HsTupleTy _ tys          	-> foldr extract_lty acc tys
+      HsFunTy ty1 ty2          	-> extract_lty ty1 (extract_lty ty2 acc)
+      HsPredTy p		-> extract_pred p acc
+      HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
+      HsParTy ty               	-> extract_lty ty acc
+      HsNumTy num              	-> acc
+      HsSpliceTy _             	-> acc	-- Type splices mention no type variables
+      HsKindSig ty k	        -> extract_lty ty acc
+      HsForAllTy exp [] cx ty   -> extract_lctxt cx (extract_lty ty acc)
+      HsForAllTy exp tvs cx ty  -> acc ++ (filter ((`notElem` locals) . unLoc) $
+					   extract_lctxt cx (extract_lty ty []))
+				where
+				   locals = hsLTyVarNames tvs
 
-extract_ty (HsBangTy _ ty)           acc = extract_lty ty acc
-extract_ty (HsAppTy ty1 ty2)         acc = extract_lty ty1 (extract_lty ty2 acc)
-extract_ty (HsListTy ty)             acc = extract_lty ty acc
-extract_ty (HsPArrTy ty)             acc = extract_lty ty acc
-extract_ty (HsTupleTy _ tys)         acc = foldr extract_lty acc tys
-extract_ty (HsFunTy ty1 ty2)         acc = extract_lty ty1 (extract_lty ty2 acc)
-extract_ty (HsPredTy p)		     acc = extract_pred p acc
-extract_ty (HsOpTy ty1 nam ty2)      acc = extract_lty ty1 (extract_lty ty2 acc)
-extract_ty (HsParTy ty)              acc = extract_lty ty acc
-extract_ty (HsNumTy num)             acc = acc
-extract_ty (HsSpliceTy _)            acc = acc	-- Type splices mention no type variables
-extract_ty (HsKindSig ty k)	     acc = extract_lty ty acc
-extract_ty (HsForAllTy exp [] cx ty) acc = extract_lctxt cx (extract_lty ty acc)
-extract_ty (HsForAllTy exp tvs cx ty) 
-                                acc = (filter ((`notElem` locals) . unLoc) $
-				       extract_lctxt cx (extract_lty ty [])) ++ acc
-				    where
-				      locals = hsLTyVarNames tvs
+extract_tv :: SrcSpan -> RdrName -> [Located RdrName] -> [Located RdrName]
+extract_tv loc tv acc | isRdrTyVar tv = L loc tv : acc
+		      | otherwise     = acc
 
 extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
 -- Get the type variables out of the type patterns in a bunch of
