@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.69 2001/10/19 09:45:26 sewardj Exp $
+ * $Id: Linker.c,v 1.70 2001/10/22 16:02:44 sewardj Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -375,6 +375,40 @@ static RtsSymbolVal rtsSyms[] = {
 };
 
 /* -----------------------------------------------------------------------------
+ * Insert symbols into hash tables, checking for duplicates.
+ */
+static void ghciInsertStrHashTable ( char* obj_name,
+                                     HashTable *table,
+                                     char* key, 
+                                     void *data
+				   )
+{
+   if (lookupHashTable(table, (StgWord)key) == NULL)
+   {
+      insertStrHashTable(table, (StgWord)key, data);
+      return;
+   }
+   fprintf(stderr, 
+      "\n\n"
+      "GHCi runtime linker: fatal error: I found a duplicate definition for symbol\n"
+      "   %s\n"
+      "whilst processing object file\n"
+      "   %s\n"
+      "This could be caused by:\n"
+      "   * Loading two different object files which export the same symbol\n"
+      "   * Specifying the same object file twice on the GHCi command line\n"
+      "   * An incorrect `package.conf' entry, causing some object to be\n"
+      "     loaded twice.\n"
+      "GHCi cannot safely continue in this situation.  Exiting now.  Sorry.\n"
+      "\n",
+      (char*)key,
+      obj_name
+   );
+   exit(1);
+}
+
+
+/* -----------------------------------------------------------------------------
  * initialize the object linker
  */
 #if defined(OBJFORMAT_ELF)
@@ -390,7 +424,8 @@ initLinker( void )
 
     /* populate the symbol table with stuff from the RTS */
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
-	insertStrHashTable(symhash, sym->lbl, sym->addr);
+	ghciInsertStrHashTable("(GHCi built-in symbols)",
+                               symhash, sym->lbl, sym->addr);
     }
 #   if defined(OBJFORMAT_ELF)
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
@@ -560,14 +595,27 @@ loadObj( char *path )
    FILE *f;
 
    /* fprintf(stderr, "loadObj %s\n", path ); */
-#  ifdef DEBUG
-   /* assert that we haven't already loaded this object */
+
+   /* Check that we haven't already loaded this object.  Don't give up
+      at this stage; ocGetNames_* will barf later. */
    { 
        ObjectCode *o;
-       for (o = objects; o; o = o->next)
-	   ASSERT(strcmp(o->fileName, path));
+       int is_dup = 0;
+       for (o = objects; o; o = o->next) {
+          if (0 == strcmp(o->fileName, path))
+             is_dup = 1;
+       }
+       if (is_dup) {
+	 fprintf(stderr, 
+            "\n\n"
+            "GHCi runtime linker: warning: looks like you're trying to load the\n"
+            "same object file twice:\n"
+            "   %s\n"
+            "GHCi will continue, but a duplicate-symbol error may shortly follow.\n"
+            "\n"
+            , path);
+       }
    }
-#  endif /* DEBUG */   
 
    oc = stgMallocBytes(sizeof(ObjectCode), "loadObj(oc)");
 
@@ -1321,7 +1369,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
          oc->symbols[i] = sname;
-         insertStrHashTable(symhash, sname, addr);
+         ghciInsertStrHashTable(oc->fileName, symhash, sname, addr);
       } else {
 #        if 0
          fprintf ( stderr, 
@@ -1828,9 +1876,9 @@ ocGetNames_ELF ( ObjectCode* oc )
 	    oc->symbols[j] = nm;
             /* Acquire! */
             if (isLocal) {
-               insertStrHashTable(oc->lochash, nm, ad);
+               ghciInsertStrHashTable(oc->fileName, oc->lochash, nm, ad);
             } else {
-               insertStrHashTable(symhash, nm, ad);
+               ghciInsertStrHashTable(oc->fileName, symhash, nm, ad);
             }
          } else {
             /* Skip. */
