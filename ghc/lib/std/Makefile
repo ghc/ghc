@@ -63,7 +63,6 @@ PrelWord_HC_OPTS     = -monly-3-regs
 # 	Dependency generation
 
 SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
-SRC_MKDEPENDC_OPTS  += -I$(GHC_INCLUDE_DIR)
 
 #-----------------------------------------------------------------------------
 # 	Rules
