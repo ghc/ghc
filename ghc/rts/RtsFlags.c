@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.11 1999/02/18 13:00:27 sewardj Exp $
+ * $Id: RtsFlags.c,v 1.12 1999/03/25 13:14:07 simonm Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -455,6 +455,7 @@ error = rtsTrue;
                    if ((n>>6)&1) RtsFlags.DebugFlags.block_alloc = rtsTrue;
                    if ((n>>7)&1) RtsFlags.DebugFlags.sanity      = rtsTrue;
                    if ((n>>8)&1) RtsFlags.DebugFlags.stable      = rtsTrue;
+                   if ((n>>9)&1) RtsFlags.DebugFlags.prof        = rtsTrue;
                 }
 		break;
 #endif

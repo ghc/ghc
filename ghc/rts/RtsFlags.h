@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.11 1999/03/03 19:20:41 sof Exp $
+ * $Id: RtsFlags.h,v 1.12 1999/03/25 13:14:08 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -57,6 +57,7 @@ struct DEBUG_FLAGS {
   rtsBool sanity      : 1; /* 128 */
 
   rtsBool stable      : 1; /* 256 */
+  rtsBool prof        : 1; /* 512 */
 };
 
 #if defined(PROFILING) || defined(PAR)

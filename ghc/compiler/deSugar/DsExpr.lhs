@@ -22,7 +22,7 @@ import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
 import CoreSyn
 
 import DsMonad
-import DsBinds		( dsMonoBinds )
+import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp )
@@ -99,7 +99,7 @@ dsLet (MonoBind (AbsBinds [] [] binder_triples (PatMonoBind pat grhss loc)) sigs
 
 -- Ordinary case for bindings
 dsLet (MonoBind binds sigs is_rec) body
-  = dsMonoBinds False binds []  `thenDs` \ prs ->
+  = dsMonoBinds NoSccs binds []  `thenDs` \ prs ->
     case is_rec of
       Recursive    -> returnDs (Let (Rec prs) body)
       NonRecursive -> returnDs (foldr mk_let body prs)

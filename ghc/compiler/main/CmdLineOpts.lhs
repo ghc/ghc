@@ -20,6 +20,7 @@ module CmdLineOpts (
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
+	opt_AutoSccsOnDicts,
 	opt_CompilingPrelude,
 	opt_D_dump_absC,
 	opt_D_dump_asm,
@@ -280,6 +281,7 @@ opt_AllowUndecidableInstances 	= lookUp  SLIT("-fallow-undecidable-instances")
 opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
+opt_AutoSccsOnDicts		= lookUp  SLIT("-fauto-sccs-on-dicts")
   {-
    It's a bit unfortunate to have to re-introduce this chap, but on Win32
    platforms we do need a way of distinguishing between the case when we're

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.3 1999/03/18 17:57:19 simonm Exp $
+ * $Id: StgProf.h,v 1.4 1999/03/25 13:14:04 simonm Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -102,7 +102,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 	    scc_count 		: 0,				\
 	    sub_scc_count 	: 0,				\
 	    sub_cafcc_count 	: 0,				\
-	    sub_dictcc_count 	: 0,				\
 	    time_ticks 		: 0,				\
 	    mem_alloc 		: 0,				\
 	    is_subsumed 	: subsumed,			\
@@ -132,12 +131,11 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  * Pushing a new cost centre (i.e. for scc annotations)
  * -------------------------------------------------------------------------- */
 
-# define SET_CCC_X(cc,do_subcc_count,do_subdict_count,do_scc_count)	\
-	do {								\
-	if (do_subcc_count)   { CCCS->sub_scc_count++; }       		\
-	if (do_subdict_count) { CCCS->sub_dictcc_count++; }		\
-	CCCS = PushCostCentre(CCCS,cc);					\
-	if (do_scc_count)     { CCCS->scc_count++; }   			\
+# define SET_CCC_X(cc,do_subcc_count,do_scc_count)		\
+	do {							\
+	if (do_subcc_count)   { CCCS->sub_scc_count++; }	\
+	CCCS = PushCostCentre(CCCS,cc);				\
+	if (do_scc_count)     { CCCS->scc_count++; }		\
 	} while(0)
 
 /* We sometimes don't increment the scc_count field, for example when
@@ -146,13 +144,10 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  */
 
 # define SET_CCC(cc_ident,do_scc_count) \
-	 SET_CCC_X(cc_ident,do_scc_count,0,do_scc_count)
-
-# define SET_DICT_CCC(cc_ident,do_scc_count) \
-	 SET_CCC_X(cc_ident,0,do_scc_count,do_scc_count)
+	 SET_CCC_X(cc_ident,do_scc_count,do_scc_count)
 
 # define SET_CCS_TOP(cc_ident) \
-	 SET_CCC_X(cc_ident,0,0,1)
+	 SET_CCC_X(cc_ident,0,1)
 
 /* -----------------------------------------------------------------------------
  * Allocating new cost centres / cost centre stacks.
@@ -181,7 +176,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
         (stack)->scc_count = 0;           \
         (stack)->time_ticks = 0;          \
         (stack)->sub_cafcc_count = 0;     \
-        (stack)->sub_dictcc_count = 0;    \
         (stack)->mem_alloc = 0;           \
         } while(0)
 
@@ -195,8 +189,8 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 #define CCCS_DETAIL_COUNT(inc_this) /*nothing*/
 #endif
 
-#define IS_CAF_OR_DICT_OR_SUB_CCS(ccs)         \
-        /* tests for lower case character */   \
+#define IS_CAF_OR_SUB_CCS(ccs)			\
+        /* tests for lower case character */	\
         ((ccs)->is_subsumed & ' ')
 	
 
@@ -234,19 +228,20 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  *
  * Here is our special "hybrid" case when we do *not* set the CCCS.
  *  (a) The closure is a function, not a thunk;
- *  (b) The CCS is CAF/DICT-ish.
+ *  (b) The CCS is CAF-ish.
  * -------------------------------------------------------------------------- */
 
-#define ENTER_CCS_F(stack)                                  \
-        do {                                                \
-        CostCentreStack *ccs = (CostCentreStack *) (stack); \
-        if ( ! IS_CAF_OR_DICT_OR_SUB_CCS(ccs) ) {           \
-           CCCS = ccs;                                      \
-        } else {                                            \
-           CCCS_DETAIL_COUNT(ccs->caffun_subsumed);         \
-           CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);     \
-        }                                                   \
-        CCCS_DETAIL_COUNT(CCCS->function_count);            \
+#define ENTER_CCS_F(stack)					\
+        do {							\
+        CostCentreStack *ccs = (CostCentreStack *) (stack);	\
+        if ( ! IS_CAF_OR_SUB_CCS(ccs) ) {			\
+           CCCS = ccs;						\
+        } else {						\
+          CCCS = AppendCCS(CCCS,ccs);				\
+          CCCS_DETAIL_COUNT(ccs->caffun_subsumed);		\
+          CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);		\
+        }							\
+        CCCS_DETAIL_COUNT(CCCS->function_count);		\
         } while(0)
  
 #define ENTER_CCS_FCL(closure)  ENTER_CCS_F(CCS_HDR(closure))
@@ -275,16 +270,17 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  
 /* These ENTER_CC_PAP things are only used in the RTS */
  
-#define ENTER_CCS_PAP(stack)                                \
-        do {                                                \
-        CostCentreStack *ccs = (CostCentreStack *) (stack); \
-        if ( ! IS_CAF_OR_DICT_OR_SUB_CCS(ccs) ) {           \
-            CCCS = ccs;                                     \
-        } else {                                            \
-            CCCS_DETAIL_COUNT(ccs->caffun_subsumed);        \
-            CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);    \
-        }                                                   \
-        CCCS_DETAIL_COUNT(CCCS->pap_count);                 \
+#define ENTER_CCS_PAP(stack)					\
+        do {							\
+        CostCentreStack *ccs = (CostCentreStack *) (stack);	\
+        if ( ! IS_CAF_OR_SUB_CCS(ccs) ) {			\
+            CCCS = ccs;						\
+        } else {						\
+          CCCS = AppendCCS(CCCS,ccs);				\
+          CCCS_DETAIL_COUNT(ccs->caffun_subsumed);		\
+          CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);		\
+        }							\
+        CCCS_DETAIL_COUNT(CCCS->pap_count);			\
         } while(0)                      
 
 #define ENTER_CCS_PAP_CL(closure)  \

@@ -484,6 +484,7 @@ $PROFing = '';		# set to p or e if profiling
 $PROFgroup = '';	# set to group if an explicit -Ggroup specified
 $PROFauto = '';	        # set to relevant hsc flag if -auto or -auto-all
 $PROFcaf  = '';	        # set to relevant hsc flag if -caf-all
+$PROFdict = '';		# set to relevant hsc flag if -auto-dicts
 $PROFignore_scc = '';	# set to relevant parser flag if explicit sccs ignored
 $UNPROFscc_auto = '';	# set to relevant hsc flag if forcing auto sccs without profiling
 $TICKYing = '';    	# set to t if compiling for ticky-ticky profiling
@@ -1000,7 +1001,7 @@ sub setupBuildFlags {
    } else {
       push(@HsC_flags, $PROFauto) if $PROFauto;
       push(@HsC_flags, $PROFcaf)  if $PROFcaf;
-      #push(@HsC_flags, $PROFdict) if $PROFdict;
+      push(@HsC_flags, $PROFdict) if $PROFdict;
 
       $Oopt_FinalStgProfilingMassage = '-fmassage-stg-for-profiling';
 
@@ -2938,13 +2939,14 @@ arg: while($_ = $Args[0]) {
 
     /^-prof$/ && do { $PROFing = 'p'; next arg; }; # profiling -- details later!
 
-    /^-auto/ && do {
-		# generate auto SCCs on top level bindings
-		# -auto-all = all top level bindings
-		# -auto     = only top level exported bindings
-		$PROFauto = ( /-all/ )
-			    ? '-fauto-sccs-on-all-toplevs'
-			    : '-fauto-sccs-on-exported-toplevs';
+    /^-auto-dicts$/ && do {
+		$PROFdicts = '-fauto-sccs-on-dicts';
+		next arg; };
+    /^-auto-all$/ && do {
+		$PROFauto = '-fauto-sccs-on-all-toplevs';
+		next arg; };
+    /^-auto$/ && do {
+		$PROFauto = '-fauto-sccs-on-exported-toplevs';
 		next arg; };
 
     /^-caf-all/ && do { # generate individual CAF SCC annotations

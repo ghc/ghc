@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.11 1999/03/22 11:26:03 simonm Exp $
+ * $Id: Updates.hc,v 1.12 1999/03/25 13:14:08 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -112,9 +112,6 @@ INFO_TABLE(PAP_info,PAP_entry,/*special layout*/0,0,PAP,const,EF_,0,0);
 STGFUN(PAP_entry)
 {
   nat Words;
-#ifdef PROFILING
-  CostCentreStack *CCS_pap;
-#endif
   P_ p;
   nat i;
   StgPAP *pap;
@@ -142,10 +139,8 @@ STGFUN(PAP_entry)
        * CAF/DICT.
        */
       
-      CCS_pap = pap->header.prof.ccs;
-      CCCS = (IS_CAF_OR_DICT_OR_SUB_CCS(CCS_pap)) 
-		? Su->header.prof.ccs 
-		: CCS_pap;
+      CCCS = Su->header.prof.ccs;
+      ENTER_CCS_PAP(pap->header.prof.ccs);
 #endif /* PROFILING */
       
       Su = Su->link;
@@ -215,8 +210,8 @@ EXTFUN(stg_update_PAP)
   FB_
 
     /* Save the pointer to the function closure that just failed the
-       argument satisfaction check
-       */
+     * argument satisfaction check
+     */
     Fun = R1.cl;
 
 #if defined(GRAN_COUNT)
@@ -225,12 +220,8 @@ EXTFUN(stg_update_PAP)
 #endif
 
     /* Just copy the whole block of stack between the stack pointer
-     * and the update frame pointer for now.  This might include some
-     * tagging, which the garbage collector will have to pay attention
-     * to, but it's much easier than sorting the words into pointers
-     * and non-pointers.
+     * and the update frame pointer.
      */
-
     Words    = (P_)Su - (P_)Sp;
     ASSERT((int)Words >= 0);
 
@@ -238,7 +229,7 @@ EXTFUN(stg_update_PAP)
     /* set "CC_pap" to go in the updatee (see Sansom thesis, p 183) */
 
     CCS_pap = (CostCentreStack *) Fun->header.prof.ccs;
-    if (IS_CAF_OR_DICT_OR_SUB_CCS(CCS_pap)) {
+    if (IS_CAF_OR_SUB_CCS(CCS_pap)) {
 	CCS_pap = CCCS;
     }
 #endif
@@ -361,9 +352,8 @@ EXTFUN(stg_update_PAP)
        * Restore the Cost Centre too (if required); again see Sansom
        * thesis p 183.  Take the CC out of the update frame if a CAF/DICT.
        */
-      CCCS = IS_CAF_OR_DICT_OR_SUB_CCS(CCS_pap)
-		? Su->header.prof.ccs 
-		: CCS_pap;
+      CCCS = Su->header.prof.ccs;
+      ENTER_CCS_PAP(CCS_pap);
 #endif /* PROFILING */
       
       /* Restore Su */
@@ -640,7 +630,7 @@ FN_(raisezh_fast)
 	break;
 
       case STOP_FRAME:
-	barf("uncaught exception");
+	barf("raisezh_fast: STOP_FRAME");
 
       default:
 	barf("raisezh_fast: weird activation record");

@@ -14,9 +14,7 @@ module CoreUtils (
 	cheapEqExpr,
 
 	substExpr, substId, substIds,
-	idSpecVars, idFreeVars,
-
-	squashableDictishCcExpr
+	idSpecVars, idFreeVars
     ) where
 
 #include "HsVersions.h"
@@ -38,7 +36,7 @@ import Id		( Id, idType, setIdType, idUnique, idAppIsBottom,
 			)
 import IdInfo		( arityLowerBound, InlinePragInfo(..) )
 import SpecEnv		( emptySpecEnv, specEnvToList, isEmptySpecEnv )
-import CostCentre	( isDictCC, CostCentre )
+import CostCentre	( CostCentre )
 import Const		( Con, conType )
 import Type		( Type, TyVarSubst, mkFunTy, mkForAllTy,
 			  splitFunTy_maybe, applyTys, tyVarsOfType, tyVarsOfTypes,
@@ -314,22 +312,6 @@ exprIsWHNF e@(App _ _)        = case collectArgs e of
 
 				  _	        -> False
 \end{code}
-
-I don't like this function but I'n not confidnt enough to change it.
-
-\begin{code}
-squashableDictishCcExpr :: CostCentre -> Expr b -> Bool
-squashableDictishCcExpr cc expr
-  | isDictCC cc = False		-- that was easy...
-  | otherwise   = squashable expr
-  where
-    squashable (Var _)      = True
-    squashable (Con  _ _)   = True -- I think so... WDP 94/09
-    squashable (App f a)
-      | isTypeArg a	    = squashable f
-    squashable other	    = False
-\end{code}
-
 
 @cheapEqExpr@ is a cheap equality test which bales out fast!
 	True  => definitely equal

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.3 1999/02/05 16:02:26 simonm Exp $
+ * $Id: Profiling.h,v 1.4 1999/03/25 13:14:03 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,9 +29,8 @@
 /* Constants used to set sumbsumed flag on CostCentres */
 
 #define CC_IS_CAF      'c'            /* 'c'  => *is* a CAF cc           */
-#define CC_IS_DICT     'd'            /* 'd'  => *is* a dictionary cc    */
 #define CC_IS_SUBSUMED 's'            /* 's'  => *is* a subsumed cc      */
-#define CC_IS_BORING   'B'            /* 'B'  => *not* a CAF/dict/sub cc */
+#define CC_IS_BORING   'B'            /* 'B'  => *not* a CAF/sub cc      */
 
 /* Constants used for abreviated output of data in binary format.  The order
  * is important and corresponds to the "item" elementType in the XML log 
@@ -81,7 +80,6 @@ typedef struct _CostCentreStack {
   unsigned long scc_count;
   unsigned long sub_scc_count;
   unsigned long sub_cafcc_count;
-  unsigned long sub_dictcc_count;
     
   unsigned long time_ticks;
   unsigned long mem_alloc;
@@ -160,6 +158,7 @@ extern hash_t max_type_no;                      /* Hash on type description */
  * ---------------------------------------------------------------------------*/
 
 CostCentreStack *PushCostCentre ( CostCentreStack *, CostCentre * );
+CostCentreStack *AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
 CostCentreStack *ActualPush ( CostCentreStack *, CostCentre * );
 CostCentreStack *RemoveCC ( CostCentreStack *, CostCentre * );
 

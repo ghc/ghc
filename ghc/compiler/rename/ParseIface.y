@@ -12,7 +12,7 @@ import Const		( Literal(..), mkMachInt_safe )
 import BasicTypes	( Fixity(..), FixityDirection(..), 
 			  NewOrData(..), Version
 			)
-import CostCentre       ( CostCentre(..), IsDictCC(..), IsCafCC(..), IsDupdCC(..) )
+import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import HsPragmas	( noDataPragmas, noClassPragmas )
 import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
 import IdInfo           ( ArityInfo, exactArity )
@@ -92,7 +92,6 @@ import Ratio ( (%) )
  '__ccall'	{ ITccall $$ }
  '__scc' 	{ ITscc }
  '__sccC'       { ITsccAllCafs }
- '__sccD'       { ITsccAllDicts }
 
  '__A'		{ ITarity }
  '__P'		{ ITspecialise }
@@ -683,10 +682,9 @@ ccall_string	:: { FAST_STRING }
 ------------------------------------------------------------------------
 scc     :: { CostCentre }
         :  '__sccC' '{' mod_name STRING '}'                      { AllCafsCC $3 $4 }
-        |  '__sccD' '{' mod_name STRING cc_dup '}'               { AllDictsCC $3 $4 $5 }
-        |  '__scc' '(' cc_name mod_name STRING cc_dict cc_dup cc_caf '}'
+        |  '__scc' '(' cc_name mod_name STRING cc_dup cc_caf '}'
                              { NormalCC { cc_name = $3, cc_mod = $4, cc_grp = $5,
-                                          cc_is_dict = $6, cc_is_dupd = $7, cc_is_caf = $8 } }
+                                          cc_is_dupd = $6, cc_is_caf = $7 } }
 
 cc_name :: { EncodedFS }
         : CONID                 { $1 }
@@ -699,11 +697,6 @@ cc_dup  :                       { OriginalCC }
 cc_caf  :: { IsCafCC }
         :                       { NotCafCC }
         | '__C'                 { CafCC }
-
-cc_dict :: { IsDictCC }
-        :                       { VanillaCC }
-        | '__A'                 { DictCC }
-
 
 -------------------------------------------------------------------
 

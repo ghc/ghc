@@ -142,7 +142,6 @@ data IfaceToken
   | ITstrict ([Demand], Bool)
   | ITscc
   | ITsccAllCafs
-  | ITsccAllDicts
 
   | ITdotdot  			-- reserved symbols
   | ITdcolon
@@ -355,7 +354,6 @@ lex_demand cont buf =
 lex_scc cont buf =
  case currentChar# buf of
   'C'# -> cont ITsccAllCafs  (stepOverLexeme (stepOn buf))
-  'D'# -> cont ITsccAllDicts (stepOverLexeme (stepOn buf))
   other -> cont ITscc buf
 
 -----------

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.21 1999/03/22 16:57:11 simonm Exp $
+% $Id: CgExpr.lhs,v 1.22 1999/03/25 13:13:51 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -36,7 +36,7 @@ import CgTailCall	( cgTailCall, performReturn, performPrimReturn,
 			)
 import ClosureInfo	( mkClosureLFInfo, mkSelectorLFInfo,
 			  mkApLFInfo, layOutDynCon )
-import CostCentre	( sccAbleCostCentre, isDictCC, isSccCountCostCentre )
+import CostCentre	( sccAbleCostCentre, isSccCountCostCentre )
 import Id		( idPrimRep, idType, Id )
 import VarSet
 import DataCon		( DataCon, dataConTyCon )
@@ -234,7 +234,7 @@ centre.
 cgExpr (StgSCC cc expr)
   = ASSERT(sccAbleCostCentre cc)
     costCentresC
-	(if isDictCC cc then SLIT("SET_DICT_CCC") else SLIT("SET_CCC"))
+	SLIT("SET_CCC")
 	[mkCCostCentre cc, mkIntCLit (if isSccCountCostCentre cc then 1 else 0)]
     `thenC`
     cgExpr expr

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.3 1999/02/05 16:02:48 simonm Exp $
+ * $Id: Profiling.c,v 1.4 1999/03/25 13:14:06 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -115,6 +115,10 @@ static rtsBool ccs_to_ignore       ( CostCentreStack *ccs );
 static    void count_ticks         ( CostCentreStack *ccs );
 static    void reportCCS           ( CostCentreStack *ccs, nat indent );
 static    void DecCCS              ( CostCentreStack *ccs );
+static    CostCentreStack *pruneCCSTree ( CostCentreStack *ccs );
+#ifdef DEBUG
+static    void printCCS            ( CostCentreStack *ccs );
+#endif
 
 /* -----------------------------------------------------------------------------
    Initialise the profiling environment
@@ -233,6 +237,20 @@ registerCostCentres ( void )
    Cost-centre stack manipulation
    -------------------------------------------------------------------------- */
 
+#ifdef DEBUG
+CostCentreStack * _PushCostCentre ( CostCentreStack *ccs, CostCentre *cc );
+CostCentreStack *
+PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
+#define PushCostCentre _PushCostCentre
+{
+  IF_DEBUG(prof, 
+	   fprintf(stderr,"Pushing %s on ", cc->label);
+	   printCCS(ccs);
+	   fprintf(stderr,"\n"));
+  return PushCostCentre(ccs,cc);
+}
+#endif
+
 CostCentreStack *
 PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
 {
@@ -263,6 +281,48 @@ PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
   }
 }
 
+/* Append ccs1 to ccs2 (ignoring any CAF cost centre at the root of ccs1 */
+
+#ifdef DEBUG
+CostCentreStack *_AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
+CostCentreStack *
+AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
+#define AppendCCS _AppendCCS
+{
+  CostCentreStack *ccs;
+  IF_DEBUG(prof, 
+	   fprintf(stderr,"Appending ");
+	   printCCS(ccs1);
+	   fprintf(stderr," to ");
+	   printCCS(ccs2);
+	   fprintf(stderr,"\n"));
+  return AppendCCS(ccs1,ccs2);
+}
+#endif
+
+CostCentreStack *
+AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
+{
+  CostCentreStack *ccs;
+
+  /* Optimisation: if we attempt to append a CCS to itself, we're
+   * going to end up with the same ccs after a great deal of pushing
+   * and removing of cost centres.  Furthermore, we'll generate a lot
+   * of intermediate CCSs which would not otherwise be generated.  So:
+   * let's cope with this common case first.
+   */
+  if (ccs1 == ccs2) {
+    return ccs1;
+  }
+
+  if (ccs2->cc->is_subsumed != CC_IS_BORING) {
+    return ccs1;
+  }
+  
+  ASSERT(ccs2->prevStack != NULL);
+  ccs = AppendCCS(ccs1, ccs2->prevStack);
+  return PushCostCentre(ccs,ccs2->cc);
+}
 
 CostCentreStack *
 ActualPush ( CostCentreStack *ccs, CostCentre *cc )
@@ -291,7 +351,6 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   new_ccs->scc_count        = 0;
   new_ccs->sub_scc_count    = 0;
   new_ccs->sub_cafcc_count  = 0;
-  new_ccs->sub_dictcc_count = 0;
   
   /* Initialize all other stats here.  There should be a quick way
    * that's easily used elsewhere too 
@@ -299,14 +358,21 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   new_ccs->time_ticks = 0;
   new_ccs->mem_alloc = 0;
   
-  /* stacks are subsumed only if their top CostCentres are subsumed */
-  new_ccs->is_subsumed = cc->is_subsumed;
+  /* stacks are subsumed if either:
+       - the top cost centre is boring, and the rest of the CCS is subsumed
+       - the top cost centre is subsumed.
+  */
+  if (cc->is_subsumed == CC_IS_BORING) {
+    new_ccs->is_subsumed = ccs->is_subsumed;
+  } else {
+    new_ccs->is_subsumed = cc->is_subsumed;
+  }
   
   /* update the memoization table for the parent stack */
   if (ccs != EMPTY_STACK)
     ccs->indexTable = AddToIndexTable(ccs->indexTable, new_ccs, cc);
   
-  /* make sure this CC is decalred at the next heap/time sample */
+  /* make sure this CC is declared at the next heap/time sample */
   DecCCS(new_ccs);
   
   /* return a pointer to the new stack */
@@ -466,7 +532,7 @@ report_ccs_profiling( void )
     if (do_groups) fprintf(prof_file, " %-11.11s", "GROUP");
 #endif
 
-    fprintf(prof_file, "%8s %5s %5s %8s %5s %5s", "scc", "%time", "%alloc", "inner", "cafs", "dicts");
+    fprintf(prof_file, "%8s %5s %5s %8s %5s", "scc", "%time", "%alloc", "inner", "cafs");
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
 	fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
@@ -477,7 +543,7 @@ report_ccs_profiling( void )
     }
     fprintf(prof_file, "\n\n");
 
-    reportCCS(CCS_MAIN, 0);
+    reportCCS(pruneCCSTree(CCS_MAIN), 0);
 
     fclose(prof_file);
 }
@@ -493,19 +559,11 @@ reportCCS(CostCentreStack *ccs, nat indent)
   
   /* Only print cost centres with non 0 data ! */
   
-  if ( (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
-	/* force printing of *all* cost centres if -P -P */ )
-       
-       || ( ccs->indexTable != 0 )
-       || ( ! ccs_to_ignore(ccs)
-	    && (ccs->scc_count || ccs->sub_scc_count || 
-		ccs->time_ticks || ccs->mem_alloc
-	    || (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
-		&& (ccs->sub_cafcc_count || ccs->sub_dictcc_count
-#if defined(PROFILING_DETAIL_COUNTS)
-		|| cc->thunk_count || cc->function_count || cc->pap_count
-#endif
-		    ))))) {
+  if ( RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL ||
+       ! ccs_to_ignore(ccs))
+	/* force printing of *all* cost centres if -P -P */ 
+    {
+
     fprintf(prof_file, "%-*s%-*s %-10s", 
 	    indent, "", 24-indent, cc->label, cc->module);
 
@@ -513,11 +571,11 @@ reportCCS(CostCentreStack *ccs, nat indent)
     if (do_groups) fprintf(prof_file, " %-11.11s",cc->group);
 #endif
 
-    fprintf(prof_file, "%8ld  %4.1f  %4.1f %8ld %5ld %5ld",
+    fprintf(prof_file, "%8ld  %4.1f  %4.1f %8ld %5ld",
 	    ccs->scc_count, 
 	    total_ticks == 0 ? 0.0 : (ccs->time_ticks / (StgFloat) total_ticks * 100),
 	    total_alloc == 0 ? 0.0 : (ccs->mem_alloc / (StgFloat) total_alloc * 100),
-	    ccs->sub_scc_count, ccs->sub_cafcc_count, ccs->sub_dictcc_count);
+	    ccs->sub_scc_count, ccs->sub_cafcc_count);
     
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
       fprintf(prof_file, "  %5ld %9ld", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
@@ -569,5 +627,54 @@ ccs_to_ignore (CostCentreStack *ccs)
 	return rtsFalse;
     }
 }
+
+static CostCentreStack *
+pruneCCSTree( CostCentreStack *ccs )
+{
+  CostCentreStack *ccs1;
+  IndexTable *i, **prev;
+  
+  prev = &ccs->indexTable;
+  for (i = ccs->indexTable; i != 0; i = i->next) {
+    ccs1 = pruneCCSTree(i->ccs);
+    if (ccs1 == NULL) {
+      *prev = i->next;
+    } else {
+      prev = &(i->next);
+    }
+  }
+
+  if ( (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
+	/* force printing of *all* cost centres if -P -P */ )
+       
+       || ( ccs->indexTable != 0 )
+       || ( (ccs->scc_count || ccs->sub_scc_count || 
+	     ccs->time_ticks || ccs->mem_alloc
+	     || (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
+		 && (ccs->sub_cafcc_count
+#if defined(PROFILING_DETAIL_COUNTS)
+		     || cc->thunk_count || cc->function_count || cc->pap_count
+#endif
+		     ))))) {
+    return ccs;
+  } else {
+    return NULL;
+  }
+}
+
+#ifdef DEBUG
+static void
+printCCS ( CostCentreStack *ccs )
+{
+  fprintf(stderr,"<");
+  for (; ccs; ccs = ccs->prevStack ) {
+    fprintf(stderr,ccs->cc->label);
+    if (ccs->prevStack) {
+      fprintf(stderr,",");
+    }
+  }
+  fprintf(stderr,">");
+}
+#endif
 
 #endif /* PROFILING */

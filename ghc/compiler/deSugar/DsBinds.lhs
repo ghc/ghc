@@ -8,7 +8,7 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-module DsBinds ( dsMonoBinds ) where
+module DsBinds ( dsMonoBinds, AutoScc(..) ) where
 
 #include "HsVersions.h"
 
@@ -26,16 +26,18 @@ import Match		( matchWrapper )
 
 import BasicTypes       ( RecFlag(..) )
 import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
-			  opt_AutoSccsOnExportedToplevs
+			  opt_AutoSccsOnExportedToplevs, opt_AutoSccsOnDicts
 		        )
-import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC )
+import CostCentre	( CostCentre, mkAutoCC, IsCafCC(..) )
 import Id		( idType, Id )
 import VarEnv
 import Name		( isExported )
-import Type		( mkTyVarTy, isDictTy, substTy
-			)
+import Type		( mkTyVarTy, isDictTy, substTy )
 import TysWiredIn	( voidTy )
 import Outputable
+
+import Maybe
+import IOExts (trace)
 \end{code}
 
 %************************************************************************
@@ -45,7 +47,7 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-dsMonoBinds :: Bool		-- False => don't (auto-)annotate scc on toplevs.
+dsMonoBinds :: AutoScc			-- scc annotation policy (see below)
 	    -> TypecheckedMonoBinds
 	    -> [(Id,CoreExpr)]		-- Put this on the end (avoid quadratic append)
 	    -> DsM [(Id,CoreExpr)]	-- Result
@@ -76,33 +78,35 @@ dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   where
     error_string = "function " ++ showSDoc (ppr fun)
 
-dsMonoBinds _ (PatMonoBind pat grhss locn) rest
+dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
   = putSrcLocDs locn $
-    dsGuarded grhss			`thenDs` \ body_expr ->
-    mkSelectorBinds pat body_expr	`thenDs` \ sel_binds ->
+    dsGuarded grhss				`thenDs` \ body_expr ->
+    mkSelectorBinds pat body_expr		`thenDs` \ sel_binds ->
+    mapDs (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
 
-	-- Common special case: no type or dictionary abstraction
-dsMonoBinds auto_scc (AbsBinds [] [] exports binds) rest
-  = mapDs (addAutoScc auto_scc) [(global, Var local) | (_, global, local) <- exports] `thenDs` \ exports' ->
-    dsMonoBinds False binds (exports' ++ rest)
-
-	-- Another common case: one exported variable
+	-- Common case: one exported variable
 	-- All non-recursive bindings come through this way
-dsMonoBinds auto_scc (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds) rest
+dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exps@[(tyvars, global, local)] binds) rest
   = ASSERT( all (`elem` tyvars) all_tyvars )
-    dsMonoBinds False binds []			`thenDs` \ core_prs ->
+    dsMonoBinds (addSccs auto_scc exps) binds []	`thenDs` \ core_prs ->
     let 
 	-- Always treat the binds as recursive, because the typechecker
 	-- makes rather mixed-up dictionary bindings
 	core_binds = [Rec core_prs]
+	global' = (global, mkLams tyvars $ mkLams dicts $ 
+	                   mkLets core_binds (Var local))
     in
-    addAutoScc auto_scc (global, mkLams tyvars $ mkLams dicts $ 
-			         mkLets core_binds (Var local)) `thenDs` \ global' ->
+    
     returnDs (global' : rest)
 
+	-- Another Common special case: no type or dictionary abstraction
+dsMonoBinds auto_scc (AbsBinds [] [] exports binds) rest
+  = let exports' = [(global, Var local) | (_, global, local) <- exports] in
+    dsMonoBinds (addSccs auto_scc exports) binds (exports' ++ rest)
+
 dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
-  = dsMonoBinds False binds []			`thenDs` \ core_prs ->
+  = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
     let 
 	core_binds = [Rec core_prs]
 
@@ -122,10 +126,9 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
 		-- some of the tyvars will be bound to voidTy
 	    newSysLocalsDs (map (substTy env) local_tys) 	`thenDs` \ locals' ->
 	    newSysLocalDs  (substTy env tup_ty)			`thenDs` \ tup_id ->
-	    addAutoScc auto_scc
-		       (global, mkLams tyvars $ mkLams dicts $
-		     	        mkTupleSelector locals' (locals' !! n) tup_id $
-		     	        mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args)
+	    returnDs (global, mkLams tyvars $ mkLams dicts $
+		              mkTupleSelector locals' (locals' !! n) tup_id $
+		              mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args)
 	  where
 	    mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 				| otherwise		  = voidTy
@@ -145,16 +148,34 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports binds) rest
 %************************************************************************
 
 \begin{code}
-addAutoScc :: Bool		-- if needs be, decorate toplevs?
+data AutoScc
+ 	= TopLevel
+	| TopLevelAddSccs (Id -> Maybe Id)
+	| NoSccs
+
+addSccs :: AutoScc -> [(a,Id,Id)] -> AutoScc
+addSccs auto_scc@(TopLevelAddSccs _) exports = auto_scc
+addSccs NoSccs   exports = NoSccs
+addSccs TopLevel exports 
+  = TopLevelAddSccs (\id -> case [ exp | (_,exp,loc) <- exports, loc == id ] of
+				(exp:_)  | opt_AutoSccsOnAllToplevs || 
+					    (isExported exp && 
+					     opt_AutoSccsOnExportedToplevs)
+					-> Just exp
+				_ -> Nothing)
+
+addAutoScc :: AutoScc		-- if needs be, decorate toplevs?
 	   -> (Id, CoreExpr)
 	   -> DsM (Id, CoreExpr)
 
-addAutoScc auto_scc_candidate pair@(bndr, core_expr) 
- | auto_scc_candidate && worthSCC core_expr && 
-   (opt_AutoSccsOnAllToplevs || (isExported bndr && opt_AutoSccsOnExportedToplevs))
+addAutoScc (TopLevelAddSccs auto_scc_fn) pair@(bndr, core_expr) 
+ | do_auto_scc && worthSCC core_expr
      = getModuleAndGroupDs `thenDs` \ (mod,grp) ->
-       returnDs (bndr, Note (SCC (mkAutoCC bndr mod grp NotCafCC)) core_expr)
- | otherwise 
+       returnDs (bndr, Note (SCC (mkAutoCC top_bndr mod grp NotCafCC)) core_expr)
+ where do_auto_scc = isJust maybe_auto_scc
+       maybe_auto_scc = auto_scc_fn bndr
+       (Just top_bndr) = maybe_auto_scc
+addAutoScc _ pair
      = returnDs pair
 
 worthSCC (Note (SCC _) _) = False
@@ -165,15 +186,16 @@ worthSCC core_expr        = True
 If profiling and dealing with a dict binding, wrap the dict in "_scc_ DICT <dict>":
 
 \begin{code}
-addDictScc var rhs
-  | not ( opt_SccProfilingOn || opt_AutoSccsOnAllToplevs)
-	    -- the latter is so that -unprof-auto-scc-all adds dict sccs
+addDictScc var rhs = returnDs rhs
+
+{- DISABLED for now (need to somehow make up a name for the scc) -- SDM
+  | not ( opt_SccProfilingOn && opt_AutoSccsOnDicts)
     || not (isDictTy (idType var))
   = returnDs rhs				-- That's easy: do nothing
 
   | otherwise
   = getModuleAndGroupDs 	`thenDs` \ (mod, grp) ->
-
 	-- ToDo: do -dicts-all flag (mark dict things with individual CCs)
     returnDs (Note (SCC (mkAllDictsCC mod grp False)) rhs)
+-}
 \end{code}

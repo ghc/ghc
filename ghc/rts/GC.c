@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.55 1999/03/18 17:57:21 simonm Exp $
+ * $Id: GC.c,v 1.56 1999/03/25 13:14:05 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2348,8 +2348,8 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	
       /* Dynamic bitmap: the mask is stored on the stack */
     case RET_DYN:
-      bitmap = stgCast(StgRetDyn*,p)->liveness;
-      p      = &payloadWord(stgCast(StgRetDyn*,p),0);
+      bitmap = ((StgRetDyn *)p)->liveness;
+      p      = (P_)((StgRetDyn *)p)->payload[0];
       goto small_bitmap;
 
       /* probably a slow-entry point return address: */

@@ -13,7 +13,7 @@ import HsSyn		( MonoBinds )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedForeignDecl )
 import CoreSyn
 import DsMonad
-import DsBinds		( dsMonoBinds )
+import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsUtils
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
@@ -42,7 +42,9 @@ deSugar us global_val_env mod_name all_binds fo_decls = do
 	beginPass "Desugar"
 	-- Do desugaring
 	let (core_prs, ds_warns1) = initDs us1 global_val_env module_and_group 
-				            (dsMonoBinds opt_SccProfilingOn all_binds [])
+				            (dsMonoBinds auto_scc all_binds [])
+	    auto_scc | opt_SccProfilingOn = TopLevel
+		     | otherwise          = NoSccs
             ds_binds' = [Rec core_prs]
 
     	    ((fi_binds, fe_binds, h_code, c_code), ds_warns2) = 
