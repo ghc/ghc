@@ -163,14 +163,6 @@ for the installation.  Again, there is a sub-directory for each
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term><Literal>info/</Literal></Term>
-<ListItem>
-<Para>
-contains Emacs info documentation files (one
-sub-directory per project).
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
 <Term><Literal>html/</Literal></Term>
 <ListItem>
 <Para>
@@ -323,21 +315,26 @@ documentation.
 </VariableList>
 
 The values for these variables can be set through invocation of the
-<Command>configure</Command><IndexTerm><Primary>configure</Primary></IndexTerm> script that comes with the distribution,
-but doing an optical diff to see if the values match your expectations
-is always a Good Idea.
+<Command>configure</Command><IndexTerm><Primary>configure</Primary></IndexTerm>
+script that comes with the distribution, but doing an optical diff to
+see if the values match your expectations is always a Good Idea.
+</para>
 
-<Emphasis>Instead of running <Command>configure</Command>, it is perfectly OK to copy
-<Filename>Makefile.in</Filename> to <Filename>Makefile</Filename> and set all these variables
-directly yourself.  But do it right!</Emphasis>
-
+<para>
+<Emphasis>Instead of running <Command>configure</Command>, it is
+perfectly OK to copy <Filename>Makefile.in</Filename> to
+<Filename>Makefile</Filename> and set all these variables directly
+yourself.  But do it right!</Emphasis>
 </Para>
+
 </ListItem>
 <ListItem>
 
 <Para>
-Run <Literal>make install</Literal>.  This <Emphasis> should</Emphasis> work with ordinary Unix
-<Literal>make</Literal>&mdash;no need for fancy stuff like GNU <Literal>make</Literal>. 
+Run <Literal>make install</Literal>.  This <Emphasis>
+should</Emphasis> work with ordinary Unix
+<Literal>make</Literal>&mdash;no need for fancy stuff like GNU
+<Literal>make</Literal>.
 
 </Para>
 </ListItem>

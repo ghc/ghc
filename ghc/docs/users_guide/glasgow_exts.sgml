@@ -2212,10 +2212,9 @@ stuff is hairy with a capital H!
 <Para>
 This section documents GHC's implementation of multi-paramter type
 classes.  There's lots of background in the paper <ULink
-URL="http://www.dcs.gla.ac.uk/~simonpj/multi.ps.gz"
->Type classes: exploring the design space</ULink
-> (Simon Peyton
-Jones, Mark Jones, Erik Meijer).
+URL="http://research.microsoft.com/~simonpj/multi.ps.gz" >Type
+classes: exploring the design space</ULink > (Simon Peyton Jones, Mark
+Jones, Erik Meijer).
 </Para>
 
 <Para>

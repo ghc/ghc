@@ -251,15 +251,6 @@ URL="http://www.haskell.org/ghc/"
 
 <Para>
   <ULink
-URL="http://www.dcs.gla.ac.uk/fp/"
->Glasgow FP group page</ULink
->
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
-  <ULink
 URL="http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html"
 >comp.lang.functional FAQ</ULink
 >
@@ -360,8 +351,7 @@ subscribe haskell My Name &#60;m.y.self@fp.rules.ok.org&#62;
 
 <Para>
 Some Haskell-related discussion takes place in the Usenet newsgroup
-<Literal>comp.lang.functional</Literal>.  (But note: news is basically dead at Glasgow.
-That's one reason Glaswegians aren't too active in c.f.l.)
+<Literal>comp.lang.functional</Literal>.
 </Para>
 
 </Sect1>

@@ -28,14 +28,16 @@ a single Unix process on a single processor.
 
 <Para>
 You will find at least one paper about Concurrent Haskell hanging off
-of <ULink URL="http://www.dcs.gla.ac.uk/~simonpj/">Simon Peyton Jones's Web page</ULink>.
+of <ULink URL="http://research.microsoft.com/~simonpj/">Simon Peyton
+Jones's Web page</ULink>.
 </Para>
 
 <Para>
-Parallel Haskell is about <Emphasis>speed</Emphasis>&mdash;spawning threads onto multiple
-processors so that your program will run faster.  The `threads'
-are always <Emphasis>advisory</Emphasis>&mdash;if the runtime system thinks it can
-get the job done more quickly by sequential execution, then fine.
+Parallel Haskell is about <Emphasis>speed</Emphasis>&mdash;spawning
+threads onto multiple processors so that your program will run faster.
+The `threads' are always <Emphasis>advisory</Emphasis>&mdash;if the
+runtime system thinks it can get the job done more quickly by
+sequential execution, then fine.
 </Para>
 
 <Para>
@@ -55,10 +57,7 @@ Again, check Simon's Web page for publications about Parallel Haskell
 
 <Para>
 Some details about Parallel Haskell follow.  For more information
-about concurrent Haskell, see the Concurrent section in the <ULink
-URL="libs.html"
->GHC/Hugs Extension Libraries</ULink
-> documentation.
+about concurrent Haskell, see <xref linkend="sec-Concurrent">.
 </Para>
 
 <Sect2>

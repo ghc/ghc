@@ -935,9 +935,19 @@ Haskell libraries.
 <IndexTerm><Primary><option>-recomp</option> option</Primary></IndexTerm>
 <ListItem>
 <Para>
-Turn on recompilation checking.  This will stop compilation early,
-leaving an existing <filename>.o</filename> file in place, if it can
-be determined that the module does not need to be recompiled.
+(On by default) Turn on recompilation checking.  This will stop
+compilation early, leaving an existing <filename>.o</filename> file in
+place, if it can be determined that the module does not need to be
+recompiled.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Option>-no-recomp</Option></Term>
+<IndexTerm><Primary><option>-recomp</option> option</Primary></IndexTerm>
+<ListItem>
+<Para>
+Turn off recompilation checking.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -1348,9 +1358,9 @@ safely (see <XRef LinkEnd="recomp">).
 
 <VarListEntry>
 <Term>No <Option>-O*</Option>-type option specified:</Term>
+<IndexTerm><Primary>-O* not specified</Primary></IndexTerm>
 <ListItem>
 <Para>
-<IndexTerm><Primary>-O* not specified</Primary></IndexTerm>
 This is taken to mean: &ldquo;Please compile quickly; I'm not over-bothered
 about compiled-code quality.&rdquo;  So, for example: <Command>ghc -c Foo.hs</Command>
 </Para>
@@ -1358,22 +1368,22 @@ about compiled-code quality.&rdquo;  So, for example: <Command>ghc -c Foo.hs</Co
 </VarListEntry>
 <VarListEntry>
 <Term><Option>-O</Option> or <Option>-O1</Option>:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>-O option</Primary></IndexTerm>
 <IndexTerm><Primary>-O1 option</Primary></IndexTerm>
-<IndexTerm><Primary>optimise normally</Primary></IndexTerm>
-Means: &ldquo;Generate good-quality code without taking too long about it.&rdquo;
-Thus, for example: <Command>ghc -c -O Main.lhs</Command>
+<IndexTerm><Primary>optimise</Primary><secondary>normally</secondary></IndexTerm>
+<ListItem>
+<Para>
+Means: &ldquo;Generate good-quality code without taking too long about
+it.&rdquo; Thus, for example: <Command>ghc -c -O Main.lhs</Command>
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
 <Term><Option>-O2</Option>:</Term>
+<IndexTerm><Primary>-O2 option</Primary></IndexTerm>
+<IndexTerm><Primary>optimise</Primary><secondary>aggressively</secondary></IndexTerm>
 <ListItem>
 <Para>
-<IndexTerm><Primary>-O2 option</Primary></IndexTerm>
-<IndexTerm><Primary>optimise aggressively</Primary></IndexTerm>
 Means: &ldquo;Apply every non-dangerous optimisation, even if it means
 significantly longer compile times.&rdquo;
 </Para>
@@ -1392,12 +1402,9 @@ better code than <Option>-O</Option>.
 </VarListEntry>
 <VarListEntry>
 <Term><Option>-O2-for-C</Option>:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>-O2-for-C option</Primary></IndexTerm>
 <IndexTerm><Primary>gcc, invoking with -O2</Primary></IndexTerm>
-</Para>
-
+<ListItem>
 <Para>
 Says to run GCC with <Option>-O2</Option>, which may be worth a few percent in
 execution speed.  Don't forget <Option>-fvia-C</Option>, lest you use the native-code
@@ -1407,35 +1414,33 @@ generator and bypass GCC altogether!
 </VarListEntry>
 <VarListEntry>
 <Term><Option>-Onot</Option>:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>-Onot option</Primary></IndexTerm>
 <IndexTerm><Primary>optimising, reset</Primary></IndexTerm>
-</Para>
-
+<ListItem>
 <Para>
-This option will make GHC &ldquo;forget&rdquo; any <Option>-O</Option>ish options it has seen so
-far.  Sometimes useful; for example: <Command>make all EXTRA&lowbar;HC&lowbar;OPTS=-Onot</Command>.
+This option will make GHC &ldquo;forget&rdquo; any
+<Option>-O</Option>ish options it has seen so far.  Sometimes useful;
+for example: <Command>make all
+EXTRA&lowbar;HC&lowbar;OPTS=-Onot</Command>.
 </Para>
 </ListItem>
 </VarListEntry>
 <VarListEntry>
 <Term><Option>-Ofile &lt;file&gt;</Option>:</Term>
-<ListItem>
-<Para>
 <IndexTerm><Primary>-Ofile &lt;file&gt; option</Primary></IndexTerm>
 <IndexTerm><Primary>optimising, customised</Primary></IndexTerm>
+<ListItem>
+<Para>
+For those who need <Emphasis>absolute</Emphasis> control over
+<Emphasis>exactly</Emphasis> what options are used (e.g., compiler
+writers, sometimes :-), a list of options can be put in a file and
+then slurped in with <Option>-Ofile</Option>.
 </Para>
 
 <Para>
-For those who need <Emphasis>absolute</Emphasis> control over <Emphasis>exactly</Emphasis>
-what options are used (e.g., compiler writers, sometimes :-), a list
-of options can be put in a file and then slurped in with <Option>-Ofile</Option>.
-</Para>
-
-<Para>
-In that file, comments are of the <Literal>&num;</Literal>-to-end-of-line variety; blank
-lines and most whitespace is ignored.
+In that file, comments are of the
+<Literal>&num;</Literal>-to-end-of-line variety; blank lines and most
+whitespace is ignored.
 </Para>
 
 <Para>
@@ -2223,17 +2228,20 @@ options the driver passes through to the linker.
 GHC (as of version 4.00) supports Concurrent Haskell by default,
 without requiring a special option or libraries compiled in a certain
 way.  To get access to the support libraries for Concurrent Haskell
-(i.e. <Literal>Concurrent</Literal> and friends), use the <Option>-syslib concurrent</Option> option.
+(i.e. <Literal>Concurrent</Literal> and friends), use the
+<Option>-syslib concurrent</Option> option.
 </Para>
 
 <Para>
 Three RTS options are provided for modifying the behaviour of the
-threaded runtime system.  See the descriptions of <Option>-C[&lt;us&gt;]</Option>, <Option>-q</Option>,
-and <Option>-t&lt;num&gt;</Option> in <XRef LinkEnd="parallel-rts-opts">.
+threaded runtime system.  See the descriptions of
+<Option>-C[&lt;us&gt;]</Option>, <Option>-q</Option>, and
+<Option>-t&lt;num&gt;</Option> in <XRef LinkEnd="parallel-rts-opts">.
 </Para>
 
 <Para>
-Concurrent Haskell is described in more detail in <XRef LinkEnd="concurrent-and-parallel">.
+Concurrent Haskell is described in more detail in <XRef
+LinkEnd="sec-Concurrent">.
 </Para>
 
 </Sect1>
@@ -2252,16 +2260,19 @@ Concurrent Haskell is described in more detail in <XRef LinkEnd="concurrent-and-
 
 <Para>
 To compile a Haskell program for parallel execution under PVM, use the
-<Option>-parallel</Option> option,<IndexTerm><Primary>-parallel option</Primary></IndexTerm> both when compiling
-<Emphasis>and linking</Emphasis>.  You will probably want to <Literal>import Parallel</Literal>
-into your Haskell modules.
+<Option>-parallel</Option> option,<IndexTerm><Primary>-parallel
+option</Primary></IndexTerm> both when compiling <Emphasis>and
+linking</Emphasis>.  You will probably want to <Literal>import
+Parallel</Literal> into your Haskell modules.
 </Para>
 
 <Para>
-To run your parallel program, once PVM is going, just invoke it &ldquo;as
-normal&rdquo;.  The main extra RTS option is <Option>-N&lt;n&gt;</Option>, to say how many
-PVM &ldquo;processors&rdquo; your program to run on.  (For more details of
-all relevant RTS options, please see <XRef LinkEnd="parallel-rts-opts">.)
+To run your parallel program, once PVM is going, just invoke it
+&ldquo;as normal&rdquo;.  The main extra RTS option is
+<Option>-N&lt;n&gt;</Option>, to say how many PVM
+&ldquo;processors&rdquo; your program to run on.  (For more details of
+all relevant RTS options, please see <XRef
+LinkEnd="parallel-rts-opts">.)
 </Para>
 
 <Para>
