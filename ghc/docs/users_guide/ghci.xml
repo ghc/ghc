@@ -906,6 +906,19 @@ Prelude> :mycd ..
 Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 </screen>
 
+          <para>We can define a command that reads GHCi input from a
+          file.  This might be useful for creating a set of bindings
+          that we want to repeatedly load into the GHCi session:</para>
+
+<screen>
+Prelude> :def . readFile
+Prelude> :. cmds.ghci
+</screen>
+
+          <para>Notice that we named the command
+          <literal>:.</literal>, by analogy with the
+          &lsquo;<literal>.</literal>&rsquo; Unix shell command that
+          does the same thing.</para>
 	</listitem>
       </varlistentry>
 
