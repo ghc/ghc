@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.46 2003/09/21 22:20:56 wolfgang Exp $
+ * $Id: RtsAPI.c,v 1.47 2003/10/01 09:08:10 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -369,13 +369,14 @@ rts_getFunPtr (HaskellObj p)
 HsBool
 rts_getBool (HaskellObj p)
 {
-  if (p == True_closure) {
-    return 1;
-  } else if (p == False_closure) {
-    return 0;
-  } else {
-    barf("rts_getBool: not a Bool");
-  }
+    StgInfoTable *info;
+
+    info = get_itbl((StgClosure *)p);
+    if (info->srt_bitmap == 0) { // srt_bitmap is the constructor tag
+	return 0;
+    } else {
+	return 1;
+    }
 }
 
 /* ----------------------------------------------------------------------------
