@@ -61,6 +61,8 @@ compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
 #ifdef __NHC__
 compilerVersion :: Version
 compilerVersion = Version {versionBranch=[maj,min], versionTags=[]}
-  where (maj,min) = __NHC__ `divMod` 100
+  where version = __NHC__ `divMod` 100
+        maj = fst version
+        min = snd version
 #endif
 
