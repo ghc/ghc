@@ -284,21 +284,25 @@ mkSrcSpan loc1 loc2
 	file = srcLocFile loc1
 
 combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
+-- Assumes the 'file' part is the same in both
 combineSrcSpans	(ImportedSpan str) _  = ImportedSpan str
 combineSrcSpans	(UnhelpfulSpan str) r = r -- this seems more useful
 combineSrcSpans	_ (ImportedSpan str)  = ImportedSpan str
 combineSrcSpans	l (UnhelpfulSpan str) = l
 combineSrcSpans	start end 
- | line1 == line2 = if col1 == col2
-			then SrcSpanPoint file line1 col1
-			else SrcSpanOneLine file line1 col1 col2
- | otherwise      = SrcSpanMultiLine file line1 col1 line2 col2
+ = case line1 `compare` line2 of
+     EQ -> case col1 `compare` col2 of
+		EQ -> SrcSpanPoint file line1 col1
+		LT -> SrcSpanOneLine file line1 col1 col2
+		GT -> SrcSpanOneLine file line1 col2 col1
+     LT -> SrcSpanMultiLine file line1 col1 line2 col2
+     GT -> SrcSpanMultiLine file line2 col2 line1 col1
   where
 	line1 = srcSpanStartLine start
+	col1  = srcSpanStartCol start
 	line2 = srcSpanEndLine end
-	col1 = srcSpanStartCol start
-	col2 = srcSpanEndCol end
-	file = srcSpanFile start
+	col2  = srcSpanEndCol end
+	file  = srcSpanFile start
 
 instance Outputable SrcSpan where
     ppr span
