@@ -383,7 +383,6 @@ standardWarnings
 	Opt_WarnMissingFields,
 	Opt_WarnMissingMethods,
 	Opt_WarnDuplicateExports,
-	Opt_WarnMisc
       ]
 
 minusWOpts
@@ -391,7 +390,8 @@ minusWOpts
       [	Opt_WarnUnusedBinds,
 	Opt_WarnUnusedMatches,
 	Opt_WarnUnusedImports,
-	Opt_WarnIncompletePatterns
+	Opt_WarnIncompletePatterns,
+	Opt_WarnMisc
       ]
 
 minusWallOpts
