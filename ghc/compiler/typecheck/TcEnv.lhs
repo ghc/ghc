@@ -145,27 +145,37 @@ Data type declarations
 ~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-data TcEnv = TcEnv
-                  UsageEnv
-		  TypeEnv
-		  ValueEnv 
-		  InstEnv
-		  (TcTyVarSet,		-- The in-scope TyVars
-		   TcRef TcTyVarSet)	-- Free type variables of the value env
-					-- ...why mutable? see notes with tcGetGlobalTyVars
-					-- Includes the in-scope tyvars
+data TcEnv
+  = TcEnv {
+	tcGST  	 :: GlobalSymbolTable,	-- The symbol table at the moment we began this compilation
 
-type UsageEnv   = NameEnv UVar
-type TypeEnv	= NameEnv TyThing
-type ValueEnv	= NameEnv Id	
+	tcGEnv	 :: NameEnv TyThing	-- The global type environment we've accumulated while
+					-- compiling this module:
+					--	types and classes (both imported and local)
+					-- 	imported Ids
+					-- (Ids defined in this module are in the local envt)
+		-- When type checking is over we'll augment the
+		-- global symbol table with everything in tcGEnv
+		
+	tcInst 	 :: InstEnv,		-- All instances (both imported and in this module)
+
+	tcLEnv 	 :: NameEnv TcTyThing,	-- The local type environment: Ids and TyVars
+					-- defined in this module
+
+	tcTyVars :: FreeTyVars		-- Type variables free in tcLST
+    }
+
+
+type InScopeTyVars = (TcTyVarSet,	-- The in-scope TyVars
+		      TcRef TcTyVarSet)	-- Free type variables of the value env
+					-- ...why mutable? see notes with tcGetGlobalTyVars
 
 valueEnvIds :: ValueEnv -> [Id]
 valueEnvIds ve = nameEnvElts ve
 
-data TyThing = ATyVar TyVar
-	     | ATyCon TyCon
-	     | AClass Class
-	     | AThing TcKind	-- Used temporarily, during kind checking
+data TcTyThing = ATyVar TyVar
+	       | ATcId  TcId
+	       | AThing TcKind	-- Used temporarily, during kind checking
 -- For example, when checking (forall a. T a Int):
 --	1. We first bind (a -> AThink kv), where kv is a kind variable. 
 --	2. Then we kind-check the (T a Int) part.

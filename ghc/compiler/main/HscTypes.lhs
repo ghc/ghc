@@ -13,7 +13,7 @@ where
 
 %************************************************************************
 %*									*
-\subsection{Module details}
+\subsection{Symbol tables and Module details}
 %*									*
 %************************************************************************
 
@@ -34,9 +34,22 @@ data ModDetails
      }
 \end{code}
 
+Symbol tables map modules to ModDetails:
+
+\begin{code}
+type HomeSymbolTable    = ModuleEnv ModDetails	-- Domain = modules in the home package
+type PackageSymbolTable = ModuleEnv ModDetails	-- Domain = modules in the some other package
+type GlobalSymbolTable  = ModuleEnv ModDetails	-- Domain = all modules
+\end{code}
+
+
 Auxiliary definitions
 
 \begin{code}
+data TyThing = AnId   Id
+	     | ATyCon TyCon
+	     | AClass Class
+
 type DeprecationEnv = NameEnv DeprecTxt		-- Give reason for deprecation
 
 type GlobalRdrEnv = RdrNameEnv [Name]	-- The list is because there may be name clashes
@@ -84,6 +97,7 @@ data ModIFace
      }
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection{The persistent compiler state}
@@ -93,19 +107,46 @@ data ModIFace
 \begin{code}
 data PersistentCompilerState 
    = PCS {
-        pcsPST    :: PackageSymbolTable,	-- Domain = non-home-package modules
-        pcsHP     :: HoldingPen, 		-- Pre-slurped interface bits and pieces
-	pcsNS	  :: NameSupply			-- Allocate uniques for names
+        pcsPST :: PackageSymbolTable,		-- Domain = non-home-package modules
+        pcsPRS :: PersistentRenamerState
      }
+\end{code}
 
-type PackageSymbolTable = ModuleEnv ModDetails
+The @PersistentRenamerState@ persists across successive calls to the
+compiler.
+
+It contains:
+  * a name supply, which deals with allocating unique names to
+    (Module,OccName) original names, 
+ 
+  * a "holding pen" for declarations that have been read out of
+    interface files but not yet sucked in, renamed, and typechecked
+
+\begin{code}
+data PersistentRenamerState
+  = PRS { prsNS	   :: NameSupply,
+	  prsDecls :: DeclsMap,
+	  prsInsts :: IfaceInsts,
+	  prsRules :: IfaceRules,
+    }
 
 data NameSupply
  = NS { nsUniqs  :: UniqSupply,
 	nsNames  :: FiniteMap (Module,OccName) Name	-- Ensures that one original name gets one unique
 	nsIParam :: FiniteMap OccName Name		-- Ensures that one implicit parameter name gets one unique
    }
+
+type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))
+		-- A DeclsMap contains a binding for each Name in the declaration
+		-- including the constructors of a type decl etc.
+		-- The Bool is True just for the 'main' Name.
+
+type IfaceInsts = Bag GatedDecl
+type IfaceRules = Bag GatedDecl
+
+type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -119,12 +160,12 @@ data CompResult
               (Maybe (ModIFace, Linkable))
                        -- summary and code; Nothing => compilation not reqd
                        -- (old summary and code are still valid)
-              PersistentCompilerState -- updated PCS
-              [SDoc]                  -- warnings
+              PersistentCompilerState	-- updated PCS
+              (Bag WarnMsg) 		-- warnings
 
-   | CompErrs PersistentCompilerState -- updated PCS
-              [SDoc]                  -- errors
-              [SDoc]                  -- warnings
+   | CompErrs PersistentCompilerState	-- updated PCS
+              (Bag ErrMsg)		-- errors
+              (Bag WarnMsg)             -- warnings
 
 
 -- The driver sits between 'compile' and 'hscMain', translating calls
@@ -146,15 +187,12 @@ data HscResult
              [SDoc]                  	-- warnings
 
 	
-
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.
 type ModuleEnv a = UniqFM a   -- Domain is Module
 
 type HomeModMap         = FiniteMap ModuleName Module -- domain: home mods only
-type HomeSymbolTable    = ModuleEnv ModDetails        -- ditto
 type HomeInterfaceTable = ModuleEnv ModIFace
-
 \end{code}
 
 

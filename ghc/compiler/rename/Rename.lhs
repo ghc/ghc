@@ -80,12 +80,13 @@ type RenameResult = ( Module		-- This module
 		    , FixityEnv		-- The fixity environment; for derivings
 		    , [Module])		-- Imported modules
 		   
-renameModule :: UniqSupply -> RdrNameHsModule -> IO (Maybe RenameResult)
-renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
+renameModule :: PersistentCompilerState -> RdrNameHsModule -> IO (Maybe RenameResult)
+renameModule pcs this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
     do {
 	((maybe_rn_stuff, dump_action), rn_errs_bag, rn_warns_bag) 
-	   <- initRn (mkThisModule mod_name) us 
+	   <- initRn pcs 
+		     (mkThisModule mod_name) 
 		     (mkSearchPath opt_HiMap) loc
 		     (rename this_mod) ;
 

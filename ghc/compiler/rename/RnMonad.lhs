@@ -103,24 +103,27 @@ type RnMS r  = RnM SDown r		-- Renaming source
 type RnMG r  = RnM ()    r		-- Getting global names etc
 
 	-- Common part
-data RnDown = RnDown {
-		  rn_mod     :: Module,
-		  rn_loc     :: SrcLoc,
-		  rn_ns      :: IORef RnNameSupply,
-		  rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
-	  	  rn_ifaces  :: IORef Ifaces,
-		  rn_hi_maps :: (SearchPath,	-- For error messages
-				 ModuleHiMap,	-- for .hi files
-				 ModuleHiMap)	-- for .hi-boot files
-		}
+data RnDown
+  = RnDown {
+	rn_mod     :: Module,			-- This module
+	rn_loc     :: SrcLoc,			-- Current locn
+
+	rn_finder  :: Finder,
+	rn_flags   :: DynFlags,
+	rn_gst     :: GlobalSymbolTable,	-- Both home modules and packages,
+						-- at the moment we started compiling 
+						-- this module
+
+	rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
+	rn_ns      :: IORef NameSupply,
+	rn_ifaces  :: IORef Ifaces,
+    }
 
 	-- For renaming source code
 data SDown = SDown {
 		  rn_mode :: RnMode,
 
-		  rn_genv :: GlobalRdrEnv,
-		    	--   Global envt; the fixity component gets extended
-		    	--   with local fixity decls
+		  rn_genv :: GlobalRdrEnv,    	-- Global envt
 
 		  rn_lenv :: LocalRdrEnv,	-- Local name envt
 			--   Does *not* include global name envt; may shadow it
@@ -162,46 +165,15 @@ lookupFixity env name
   = case lookupNameEnv env name of 
 	Just (FixitySig _ fix _) -> fix
 	Nothing		  	 -> defaultFixity
-
---------------------------------
-type DeprecationEnv = NameEnv DeprecTxt
 \end{code}
 
 \begin{code}
---------------------------------
-type RnNameSupply
- = ( UniqSupply
-
-   , FiniteMap (ModuleName, OccName) Name
-	-- Ensures that one (module,occname) pair gets one unique
-   , FiniteMap OccName Name
-	-- Ensures that one implicit parameter name gets one unique
-   )
-
-
---------------------------------
-type Avails	  = [AvailInfo]
-
 type ExportAvails = (FiniteMap ModuleName Avails,
 	-- Used to figure out "module M" export specifiers
 	-- Includes avails only from *unqualified* imports
 	-- (see 1.4 Report Section 5.1.1)
 
 		     AvailEnv)	-- Used to figure out all other export specifiers.
-			
-
-data GenAvailInfo name	= Avail name	 -- An ordinary identifier
-			| AvailTC name 	 -- The name of the type or class
-				  [name] -- The available pieces of type/class.
-					 -- NB: If the type or class is itself
-					 -- to be in scope, it must be in this list.
-					 -- Thus, typically: AvailTC Eq [Eq, ==, /=]
-			deriving( Eq )
-			-- Equality used when deciding if the interface has changed
-
-type AvailEnv	  = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
-type AvailInfo    = GenAvailInfo Name
-type RdrAvailInfo = GenAvailInfo OccName
 \end{code}
 
 %===================================================
@@ -264,7 +236,16 @@ data ParsedIface
 type RdrNamePragma = ()				-- Fudge for now
 -------------------
 
+%************************************************************************
+%*									*
+\subsection{The renamer state}
+%*									*
+%************************************************************************
+
+\begin{code}
 data Ifaces = Ifaces {
+
+	-- PERSISTENT FIELDS
 		iImpModInfo :: ImportedModuleInfo,
 				-- Modules this one depends on: that is, the union 
 				-- of the modules its *direct* imports depend on.
@@ -272,25 +253,7 @@ data Ifaces = Ifaces {
 				-- dependencies (direct or not) of the imported module.
 
 		iDecls :: DeclsMap,	-- A single, global map of Names to decls
-
-		iDeferred :: NameSet,	-- data (not newtype) TyCons that have been slurped, 
-					-- but none of their constructors have.
-					-- If this is still the case right at the end
 					-- we can get away with importing them abstractly
-
-		iFixes :: FixityEnv,	
-				-- A single, global map of Names to fixities
-				-- See comments with RnIfaces.lookupFixity
-
-		iSlurp :: NameSet,
-		-- All the names (whether "big" or "small", whether wired-in or not,
-		-- whether locally defined or not) that have been slurped in so far.
-
-		iVSlurp :: [(Name,Version)],
-		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
-		-- names that have been slurped in so far, with their versions.
-		-- This is used to generate the "usage" information for this module.
-		-- Subset of the previous field.
 
 		iInsts :: IfaceInsts,
 		-- The as-yet un-slurped instance decls; this bag is depleted when we
@@ -301,13 +264,31 @@ data Ifaces = Ifaces {
 		iRules :: IfaceRules,
 		-- Similar to instance decls, only for rules
 
-		iDeprecs :: DeprecationEnv
+	-- SEMI-EPHEMERAL FIELDS
+		-- iFixes and iDeprecs are accumulated here while one module
+		-- is compiled, but are transferred to the package symbol table
+		-- at the end.  We don't add them to the table as we encounter them
+		-- because doing so would require us to have a mutable symbol table
+		-- which is yukky.
+
+		iFixes :: FixityEnv,		-- A single, global map of Names to fixities
+						-- See comments with RnIfaces.lookupFixity
+		iDeprecs :: DeprecationEnv,
+
+
+	-- EPHEMERAL FIELDS
+	-- These fields persist during the compilation of a single module only
+
+		iSlurp :: NameSet,
+		-- All the names (whether "big" or "small", whether wired-in or not,
+		-- whether locally defined or not) that have been slurped in so far.
+
+		iVSlurp :: [(Name,Version)],
+		-- All the (a) non-wired-in (b) "big" (c) non-locally-defined 
+		-- names that have been slurped in so far, with their versions.
+		-- This is used to generate the "usage" information for this module.
+		-- Subset of the previous field.
 	}
-
-type IfaceInsts = Bag GatedDecl
-type IfaceRules = Bag GatedDecl
-
-type GatedDecl = (NameSet, (Module, RdrNameHsDecl))
 
 type ImportedModuleInfo 
      = FiniteMap ModuleName (WhetherHasOrphans, IsBootInterface, 
@@ -332,11 +313,6 @@ type ImportedModuleInfo
 		-- A.hi or A.hi-boot when importing A.f.
 		-- Basically, we look for A.hi if A is in the map, and A.hi-boot
 		-- otherwise
-
-type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))
-		-- A DeclsMap contains a binding for each Name in the declaration
-		-- including the constructors of a type decl etc.
-		-- The Bool is True just for the 'main' Name.
 \end{code}
 
 
@@ -347,21 +323,29 @@ type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))
 %************************************************************************
 
 \begin{code}
-initRn :: Module -> UniqSupply -> SearchPath -> SrcLoc
+initRn :: DynFlags -> Finder -> GlobalSymbolTable
+       -> PersistentRenamerState
+       -> Module -> SrcLoc
        -> RnMG r
        -> IO (r, Bag ErrMsg, Bag WarnMsg)
 
-initRn mod us dirs loc do_rn = do
+initRn flags finder gst prs mod loc do_rn = do
   himaps    <- mkModuleHiMaps dirs
-  names_var <- newIORef (us, builtins, emptyFM)
+  names_var <- newIORef (prsNS pcs)
   errs_var  <- newIORef (emptyBag,emptyBag)
-  iface_var <- newIORef emptyIfaces 
+  iface_var <- newIORef (initIfaces prs)
   let
-        rn_down = RnDown { rn_loc = loc, rn_ns = names_var, 
-			   rn_errs = errs_var, 
-			   rn_hi_maps = himaps, 
+        rn_down = RnDown { rn_mod = mod,
+			   rn_loc = loc, 
+
+			   rn_finder = finder,
+			   rn_flags  = flags,
+			   rn_gst    = gst,
+				
+			   rn_ns     = names_var, 
+			   rn_errs   = errs_var, 
 		  	   rn_ifaces = iface_var,
-			   rn_mod = mod }
+		  }
 
 	-- do the business
   res <- do_rn rn_down ()
@@ -370,6 +354,25 @@ initRn mod us dirs loc do_rn = do
   (warns, errs) <- readIORef errs_var
 
   return (res, errs, warns)
+
+
+initIfaces :: PersistentRenamerState -> Ifaces
+initIfaces prs
+  = Ifaces { iDecls = prsDecls prs,
+	     iInsts = prsInsts prs,
+	     iRules = prsRules rules,
+
+	     iFixes   = emptyNameEnv,
+	     iDeprecs = emptyNameEnv,
+
+	     iImpModInfo = emptyFM,
+	     iDeferred   = emptyNameSet,
+	     iSlurp      = unitNameSet (mkUnboundName dummyRdrVarName),
+			-- Pretend that the dummy unbound name has already been
+			-- slurped.  This is what's returned for an out-of-scope name,
+			-- and we don't want thereby to try to suck it in!
+	     iVSlurp = []
+      }
 
 
 initRnMS :: GlobalRdrEnv -> FixityEnv -> RnMode -> RnMS r -> RnM d r
@@ -384,21 +387,6 @@ initIfaceRnMS :: Module -> RnMS r -> RnM d r
 initIfaceRnMS mod thing_inside 
   = initRnMS emptyRdrEnv emptyNameEnv InterfaceMode $
     setModuleRn mod thing_inside
-
-emptyIfaces :: Ifaces
-emptyIfaces = Ifaces { iImpModInfo = emptyFM,
-		       iDecls = emptyNameEnv,
-		       iDeferred = emptyNameSet,
-		       iFixes = emptyNameEnv,
-		       iSlurp = unitNameSet (mkUnboundName dummyRdrVarName),
-			-- Pretend that the dummy unbound name has already been
-			-- slurped.  This is what's returned for an out-of-scope name,
-			-- and we don't want thereby to try to suck it in!
-		       iVSlurp = [],
-		       iInsts = emptyBag,
-		       iRules = emptyBag,
-		       iDeprecs = emptyNameEnv
-	      }
 
 builtins :: FiniteMap (ModuleName,OccName) Name
 builtins = listToFM wired_in `plusFM` listToFM known_key
@@ -415,12 +403,12 @@ that is, not as part of the main renamer.
 Sole examples: derived definitions,
 which are only generated in the type checker.
 
-The @RnNameSupply@ includes a @UniqueSupply@, so if you call it more than
+The @NameSupply@ includes a @UniqueSupply@, so if you call it more than
 once you must either split it, or install a fresh unique supply.
 
 \begin{code}
 renameSourceCode :: Module
-		 -> RnNameSupply
+		 -> NameSupply
 	         -> RnMS r
 	         -> r
 
@@ -604,11 +592,11 @@ getSrcLocRn down l_down
 %=====================
 
 \begin{code}
-getNameSupplyRn :: RnM d RnNameSupply
+getNameSupplyRn :: RnM d NameSupply
 getNameSupplyRn rn_down l_down
   = readIORef (rn_ns rn_down)
 
-setNameSupplyRn :: RnNameSupply -> RnM d ()
+setNameSupplyRn :: NameSupply -> RnM d ()
 setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
