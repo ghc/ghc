@@ -308,7 +308,12 @@ int p(int c) \\
 */
 
 unipred(u_iswcntrl,GENCAT_CC)
-unipred(u_iswprint,~(GENCAT_ZL|GENCAT_ZP|GENCAT_CC|GENCAT_CF|GENCAT_CS|GENCAT_CO))
+unipred(u_iswprint, \
+(GENCAT_MC | GENCAT_NO | GENCAT_SK | GENCAT_ME | GENCAT_ND | \
+  GENCAT_PO | GENCAT_LT | GENCAT_PC | GENCAT_SM | GENCAT_ZS | \
+  GENCAT_LU | GENCAT_PD | GENCAT_SO | GENCAT_PE | GENCAT_PF | \
+  GENCAT_PS | GENCAT_SC | GENCAT_LL | GENCAT_LM | GENCAT_PI | \
+  GENCAT_NL | GENCAT_MN | GENCAT_LO))
 unipred_s(u_iswspace,GENCAT_ZS)
 unipred(u_iswupper,(GENCAT_LU|GENCAT_LT))
 unipred(u_iswlower,GENCAT_LL)
