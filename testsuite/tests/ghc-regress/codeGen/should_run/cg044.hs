@@ -15,6 +15,12 @@ reverse_if_bigendian = id
 #ifdef i386_unknown_mingw32
 reverse_if_bigendian = id
 #endif
+#ifdef i386_unknown_mingw32
+reverse_if_bigendian = id
+#endif
+#ifdef alpha_dec_osf3
+reverse_if_bigendian = id
+#endif
 
 
 main :: IO ()
