@@ -104,7 +104,7 @@ unfoldForestM f = mapM (unfoldTreeM f)
 
 -- | Monadic tree builder, in breadth-first order,
 -- using an algorithm adapted from
--- /Breadth­First Numbering: Lessons from a Small Exercise in Algorithm Design/,
+-- /Breadth-First Numbering: Lessons from a Small Exercise in Algorithm Design/,
 -- by Chris Okasaki, /ICFP'00/.
 unfoldTreeM_BF :: Monad m => (b -> m (a, [b])) -> b -> m (Tree a)
 unfoldTreeM_BF f b = liftM (fst . fromJust . deQueue) $
@@ -112,7 +112,7 @@ unfoldTreeM_BF f b = liftM (fst . fromJust . deQueue) $
 
 -- | Monadic forest builder, in breadth-first order,
 -- using an algorithm adapted from
--- /Breadth­First Numbering: Lessons from a Small Exercise in Algorithm Design/,
+-- /Breadth-First Numbering: Lessons from a Small Exercise in Algorithm Design/,
 -- by Chris Okasaki, /ICFP'00/.
 unfoldForestM_BF :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
 unfoldForestM_BF f = liftM (reverseOnto []) . unfoldForestQ f . listToQueue
