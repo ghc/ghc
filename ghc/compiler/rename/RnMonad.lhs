@@ -43,7 +43,8 @@ import HscTypes		( Finder,
 			  DeclsMap, IfaceInsts, IfaceRules, 
 			  HomeSymbolTable, PackageSymbolTable,
 			  PersistentCompilerState(..), GlobalRdrEnv,
-			  HomeIfaceTable, PackageIfaceTable )
+			  HomeIfaceTable, PackageIfaceTable,
+			  RdrAvailInfo, ModIface )
 import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
@@ -58,7 +59,7 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  extendNameEnvList
 			)
-import Module		( Module, ModuleName )
+import Module		( Module, ModuleName, lookupModuleEnvByName )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
 import SrcLoc		( SrcLoc, generatedSrcLoc )
@@ -68,7 +69,7 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 import PrelNames	( mkUnboundName )
-import Maybes		( maybeToBool, seqMaybe )
+import Maybes		( maybeToBool, seqMaybe, orElse )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -335,7 +336,7 @@ is_done :: HomeSymbolTable -> PackageSymbolTable -> Name -> Bool
 -- Returns True iff the name is in either symbol table
 is_done hst pst n = maybeToBool (lookupTypeEnv pst n `seqMaybe` lookupTypeEnv hst n)
 
-lookupIface :: HomeInterfaceTable -> PackageInterfaceTable -> ModuleName -> ModIface
+lookupIface :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> ModIface
 lookupIface hit pit mod = lookupModuleEnvByName hit mod `orElse` 
 			  lookupModuleEnvByName pit mod `orElse`
 			  pprPanic "lookupIface" (ppr mod)

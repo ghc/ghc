@@ -8,7 +8,7 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..), HsTyVarBndr(..) )
+import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..) )
 import CoreSyn		( CoreRule(..) )
 import RnHsSyn		( RenamedHsDecl )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )

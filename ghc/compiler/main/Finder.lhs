@@ -13,7 +13,7 @@ module Finder (
 
 #include "HsVersions.h"
 
-import HscTyes		( Finder, ModuleLocation(..) )
+import HscTypes		( Finder, ModuleLocation(..) )
 import CmStaticInfo
 import DriverPhases
 import DriverState

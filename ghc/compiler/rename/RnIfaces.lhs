@@ -28,7 +28,7 @@ import HsSyn		( HsDecl(..), TyClDecl(..), InstDecl(..), IfaceSig(..),
 			  FixitySig(..), RuleDecl(..),
 			  isClassOpSig, DeprecDecl(..)
 			)
-import HsImpExp		( ieNames )
+import HsImpExp		( ImportDecl(..), ieNames )
 import CoreSyn		( CoreRule )
 import BasicTypes	( Version, defaultFixity )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameRuleDecl,
@@ -44,10 +44,11 @@ import Name		( Name {-instance NamedThing-}, nameOccName,
 			  NamedThing(..),
 			  mkNameEnv, elemNameEnv, extendNameEnv
 			 )
-import Module		( Module, 
+import Module		( Module, ModuleEnv,
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),
-			  extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName
+			  extendModuleEnv, lookupModuleEnv, lookupModuleEnvByName,
+			  plusModuleEnv_C, lookupWithDefaultModuleEnv
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
@@ -64,7 +65,7 @@ import Outputable
 import Bag
 import HscTypes
 
-import List	( nub )
+import List		( nub )
 \end{code}
 
 
@@ -175,10 +176,10 @@ tryLoadInterface doc_str mod_name from
     foldlRn (loadInstDecl mod)	(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
     loadExports 			 	  (pi_exports iface)	`thenRn` \ avails ->
     let
-	version	= VersionInfo { modVers  = pi_vers iface, 
+	version	= VersionInfo { vers_module  = pi_vers iface, 
 				fixVers  = fix_vers,
-				ruleVers = rule_vers,
-				declVers = decls_vers }
+				vers_rules = rule_vers,
+				vers_decls = decls_vers }
 
 	-- For an explicit user import, add to mod_map info about
 	-- the things the imported module depends on, extracted
@@ -833,26 +834,24 @@ mkImportExportInfo this_mod export_avails exports
 	     so_far
  
 	   | not opened 		-- We didn't even open the interface
-	   ->		-- This happens when a module, Foo, that we explicitly imported has 
+	   =		-- This happens when a module, Foo, that we explicitly imported has 
 			-- 'import Baz' in its interface file, recording that Baz is below
 			-- Foo in the module dependency hierarchy.  We want to propagate this
 			-- information.  The Nothing says that we didn't even open the interface
-			-- file but we must still propagate the dependeny info.
+			-- file but we must still propagate the dependency info.
 			-- The module in question must be a local module (in the same package)
 	     go_for_it NothingAtAll
 
 
 	   | is_lib_module && not has_orphans
-	   -> so_far		
+	   = so_far		
 	   
-	   |  is_lib_module 			-- Record the module version only
-	   -> go_for_it (Everything mod_vers)
+	   | is_lib_module 			-- Record the module version only
+	   = go_for_it (Everything vers_module)
 
-	   |  otherwise
-	   -> go_for_it (mk_whats_imported mod mod_vers)
+	   | otherwise
+	   = go_for_it (mk_whats_imported mod vers_module)
 
-		   where
-		     
 	     where
 		go_for_it exports = (mod_name, has_orphans, is_boot, exports) : so_far
 	        mod_iface 	  = lookupIface hit pit mod_name
@@ -868,8 +867,10 @@ mkImportExportInfo this_mod export_avails exports
 				        let v = lookupNameEnv version_env `orElse` 
 					        pprPanic "mk_whats_imported" (ppr n)
 			       ]
-	       export_vers | moduleName mod `elem` import_all_mods = Just (vers_exports version_info)
-		   	   | otherwise			  	   = Nothing
+	        export_vers | moduleName mod `elem` import_all_mods 
+			    = Just (vers_exports version_info)
+			    | otherwise
+			    = Nothing
 	
 	import_info = foldFM mk_imp_info [] mod_map
 

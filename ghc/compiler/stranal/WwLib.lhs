@@ -15,25 +15,22 @@ import CoreSyn
 import CoreUtils	( exprType )
 import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			  isOneShotLambda, setOneShotLambda,
-                          mkWildId, setIdInfo
+                          setIdInfo
 			)
-import IdInfo		( CprInfo(..), noCprInfo, vanillaIdInfo )
-import DataCon		( DataCon, splitProductType )
+import IdInfo		( CprInfo(..), vanillaIdInfo )
+import DataCon		( splitProductType )
 import Demand		( Demand(..), wwLazy, wwPrim )
 import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
-import Type		( isUnLiftedType, 
+import Type		( Type, isUnLiftedType, 
 			  splitForAllTys, splitFunTys,  isAlgType,
-			  splitNewType_maybe,
-			  mkTyConApp, mkFunTys,
-			  Type
+			  splitNewType_maybe, mkFunTys
 			)
 import BasicTypes	( NewOrData(..), Arity, Boxity(..) )
-import Var              ( TyVar, Var, isId )
-import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, 
-                          mapUs, UniqSM )
-import Util		( zipWithEqual, zipEqual, lengthExceeds )
+import Var              ( Var, isId )
+import UniqSupply	( returnUs, thenUs, getUniqueUs, getUniquesUs, UniqSM )
+import Util		( zipWithEqual )
 import Outputable
 import List		( zipWith4 )
 \end{code}

@@ -18,7 +18,7 @@ module TcMonoType ( tcHsType, tcHsSigType, tcHsBoxedSigType,
 
 #include "HsVersions.h"
 
-import HsSyn		( HsType(..), HsTyVarBndr(..), HsUsageAnn(..),
+import HsSyn		( HsType(..), HsTyVarBndr(..),
                           Sig(..), HsPred(..), pprParendHsType, HsTupCon(..), hsTyVarNames )
 import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig )
 import TcHsSyn		( TcId )
@@ -38,16 +38,16 @@ import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr,
 			  instFunDeps, instFunDepsOfTheta )
 import FunDeps		( tyVarFunDep, oclose )
 import TcUnify		( unifyKind, unifyOpenTypeKind )
-import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
-			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
-                          mkUsForAllTy, zipFunTys, hoistForAllTys,
+import Type		( Type, Kind, PredType(..), ThetaType,
+			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
+                          zipFunTys, hoistForAllTys,
 			  mkSigmaTy, mkPredTy, mkTyConApp,
 			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
 			  boxedTypeKind, unboxedTypeKind, mkArrowKind,
 			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
 			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
-			  classesOfPreds, isUnboxedTupleType
+			  classesOfPreds,
 			)
 import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
@@ -56,9 +56,9 @@ import Var		( Var, TyVar, mkTyVar, tyVarKind )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
-import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind, tyConName )
+import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
 import Class		( ClassContext, classArity, classTyCon )
-import Name		( Name, isLocallyDefined )
+import Name		( Name )
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import UniqFM		( elemUFM )
 import BasicTypes	( Boxity(..) )

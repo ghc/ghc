@@ -38,7 +38,7 @@ import Type		( Type, tyVarsOfType,
 			  isUnboxedTupleType,
 			  hasMoreBoxityInfo
 			)
-import TyCon		( TyCon, isPrimTyCon, tyConDataCons )
+import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import Maybe

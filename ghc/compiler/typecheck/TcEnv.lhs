@@ -44,35 +44,30 @@ import TcType		( TcKind,  TcType, TcTyVar, TcTyVarSet, TcThetaType,
 import Id		( mkUserLocal, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import MkId	 	( mkSpecPragmaId )
-import Var		( TyVar, Id, setVarName,
-			  idType, lazySetIdInfo, idInfo, tyVarKind, UVar,
-			)
+import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
-import Type		( Kind, Type, superKind,
-			  tyVarsOfType, tyVarsOfTypes,
-			  splitForAllTys, splitRhoTy, splitFunTys,
-			  splitAlgTyConApp_maybe, getTyVar, getDFunTyKey
+import Type		( Type,
+			  tyVarsOfTypes,
+			  splitForAllTys, splitRhoTy,
+			  getDFunTyKey
 			)
 import DataCon		( DataCon )
-import TyCon		( TyCon, tyConKind, tyConArity, isSynTyCon )
-import Class		( Class, ClassOpItem, ClassContext, classTyCon )
+import TyCon		( TyCon )
+import Class		( Class, ClassOpItem, ClassContext )
 import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
 			  isLocallyDefined,
-			  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
-			  extendNameEnv, extendNameEnvList
+			  NameEnv, lookupNameEnv, nameEnvElts, 
+			  extendNameEnvList, emptyNameEnv
 			)
 import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import Module		( Module )
-import HscTypes		( ModDetails(..), InstEnv, lookupTypeEnv, TyThing(..),
-			  GlobalSymbolTable, Provenance(..) )
-import Unique		( pprUnique10, Unique, Uniquable(..) )
+import HscTypes		( InstEnv, lookupTypeEnv, TyThing(..),
+			  GlobalSymbolTable )
 import UniqFM
-import Unique		( Uniquable(..) )
-import Util		( zipEqual, zipWith3Equal, mapAccumL )
+import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
-import FastString	( FastString )
 import Outputable
 import TcInstUtil	( emptyInstEnv )
 

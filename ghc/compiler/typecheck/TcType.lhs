@@ -43,8 +43,8 @@ module TcType (
 
 -- friends:
 import TypeRep		( Type(..), Kind, TyNote(..) )  -- friend
-import Type		( ThetaType, PredType(..),
-			  getTyVar, mkAppTy, mkTyConApp, mkPredTy,
+import Type		( PredType(..),
+			  getTyVar, mkAppTy,
 			  splitPredTy_maybe, splitForAllTys, isNotUsgTy,
 			  isTyVarTy, mkTyVarTy, mkTyVarTys, 
 			  openTypeKind, boxedTypeKind, 
@@ -52,7 +52,7 @@ import Type		( ThetaType, PredType(..),
 			  defaultKind, boxedBoxity
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
-import TyCon		( tyConKind, mkPrimTyCon )
+import TyCon		( mkPrimTyCon )
 import PrimRep		( PrimRep(VoidRep) )
 import Var		( TyVar, tyVarKind, tyVarName, isTyVar, isMutTyVar, mkTyVar )
 
@@ -63,7 +63,7 @@ import TysWiredIn	( voidTy )
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
 			  mkDerivedName, mkDerivedTyConOcc
 			)
-import Unique		( Unique, Uniquable(..) )
+import Unique		( Uniquable(..) )
 import Util		( nOfThem )
 import Outputable
 \end{code}

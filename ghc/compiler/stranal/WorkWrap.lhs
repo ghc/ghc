@@ -9,19 +9,19 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( Unfolding, certainlyWillInline )
+import CoreUnfold	( certainlyWillInline )
 import CoreLint		( beginPass, endPass )
-import CoreUtils	( exprType, exprEtaExpandArity )
+import CoreUtils	( exprType )
 import MkId		( mkWorkerId )
 import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
 			  setIdStrictness, idInlinePragma, 
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
-			  CprInfo(..), exactArity, InlinePragInfo(..), isNeverInlinePrag,
+			  CprInfo(..), InlinePragInfo(..), isNeverInlinePrag,
 			  WorkerInfo(..)
 			)
-import Demand           ( Demand, wwLazy )
+import Demand           ( Demand )
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import CmdLineOpts
 import WwLib

@@ -16,16 +16,17 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 			  isClassDecl, isClassOpSig, isPragSig,
 			  fromClassDeclNameList, tyClDeclName
 			)
-import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..), EP(..) )
+import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, 
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  RenamedContext, RenamedHsDecl, RenamedSig, 
-			  RenamedHsExpr, maybeGenericMatch
+			  maybeGenericMatch
 			)
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 
-import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
-import TcEnv		( TcId, TcEnv, TyThing(..), TyThingDetails(..), tcAddImportedIdInfo,
+import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
+			  newDicts, newMethod )
+import TcEnv		( TcId, TcEnv, TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
@@ -36,15 +37,15 @@ import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, classSelIds, classTyCon, Class, ClassOpItem,
-			  DefMeth (..) )
-import Bag		( bagToList )
+import Class		( classTyVars, classBigSig, classSelIds, classTyCon, 
+			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
-import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..), mkSysLocalName,
-			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
-import NameSet		( NameSet, mkNameSet, elemNameSet, emptyNameSet )
+import Name		( Name, isLocallyDefined, NamedThing(..),
+			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
+			  plusNameEnv, nameEnvElts )
+import NameSet		( emptyNameSet )
 import Outputable
 import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkSigmaTy, mkClassPred,
 			  splitTyConApp_maybe, isTyVarTy

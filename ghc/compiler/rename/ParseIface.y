@@ -49,9 +49,9 @@ import IdInfo           ( exactArity, InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
-import RnMonad		( ParsedIface(..) ) 
+import RnMonad		( ParsedIface(..), ExportItem ) 
 import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..), 
-                          ImportVersion, ExportItem, WhatsImported(..),
+                          ImportVersion, WhatsImported(..),
                           RdrAvailInfo )
 
 import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
@@ -260,7 +260,7 @@ is_boot		    : 						{ False }
 whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           	{ NothingAtAll }
 		    | '::' version					{ Everything $2 }
-                    | '::' version version version name_version_pairs   { Specifically $2 $3 $4 $5 }
+                    | '::' version version name_version_pairs version  { Specifically $2 (Just $3) $4 $5 }
 
 name_version_pairs  ::	{ [(OccName, Version)] }
 name_version_pairs  :  						{ [] }
