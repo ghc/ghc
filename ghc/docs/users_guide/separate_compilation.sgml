@@ -297,7 +297,7 @@ OBJS = Main.o   Foo.o   Bar.o
 .SUFFIXES : .o .hs .hi .lhs .hc .s
 
 cool_pgm : $(OBJS)
-        rm $@
+        rm -f $@
         $(HC) -o $@ $(HC_OPTS) $(OBJS)
 
 # Standard suffix rules
