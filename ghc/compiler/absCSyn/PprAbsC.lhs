@@ -284,18 +284,51 @@ pprAbsC (CCallProfCtrMacro op as) _
 pprAbsC (CCallProfCCMacro op as) _
   = hcat [ptext op, lparen,
 	hcat (punctuate comma (map ppr_amode as)),pp_paren_semi]
-pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv) results args) _
-  =  hsep [ ptext SLIT("typedef")
+pprAbsC stmt@(CCallTypedef is_tdef op@(CCallOp op_str is_asm may_gc cconv) results args) _
+  =  hsep [ ptext (if is_tdef then SLIT("typedef") else SLIT("extern"))
 	  , ccall_res_ty
 	  , fun_nm
 	  , parens (hsep (punctuate comma ccall_decl_ty_args))
 	  ] <> semi
     where
-     fun_nm       = parens (text (callConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
+    {-
+      In the non-casm case, to ensure that we're entering the given external
+      entry point using the correct calling convention, we have to do the following:
+
+	- When entering via a function pointer (the `dynamic' case) using the specified
+	  calling convention, we emit a typedefn declaration attributed with the
+	  calling convention to use together with the result and parameter types we're
+	  assuming. Coerce the function pointer to this type and go.
+
+        - to enter the function at a given code label, we emit an extern declaration
+	  for the label here, stating the calling convention together with result and
+          argument types we're assuming. 
+
+          The C compiler will hopefully use this extern declaration to good effect,
+          reporting any discrepancies between our extern decl and any other that
+	  may be in scope.
+    
+	  Re: calling convention, notice that gcc (2.8.1 and egcs-1.0.2) will for
+  	  the external function `foo' use the calling convention of the first `foo'
+	  prototype it encounters (nor does it complain about conflicting attribute
+	  declarations). The consequence of this is that you cannot override the
+	  calling convention of `foo' using an extern declaration (you'd have to use
+	  a typedef), but why you would want to do such a thing in the first place
+	  is totally beyond me.
+	  
+	  ToDo: petition the gcc folks to add code to warn about conflicting attribute
+	  declarations.
+
+    -}
+
+     fun_nm
+       | is_tdef   = parens (text (callConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
+       | otherwise = text (callConvAttribute cconv) <+> ccall_fun_ty
 
      ccall_fun_ty = 
         case op_str of
 	  Right u -> ptext SLIT("_ccall_fun_ty") <> ppr u
+	  Left x  -> ptext x
 
      ccall_res_ty = 
        case non_void_results of
@@ -303,7 +336,10 @@ pprAbsC stmt@(CCallTypedef op@(CCallOp op_str is_asm may_gc cconv) results args)
 	  [amode]  -> text (showPrimRep (getAmodeRep amode))
 	  _	   -> panic "pprAbsC{CCallTypedef}: ccall_res_ty"
 
-     ccall_decl_ty_args = tail ccall_arg_tys
+     ccall_decl_ty_args 
+       | is_tdef   = tail ccall_arg_tys
+       | otherwise = ccall_arg_tys
+
      ccall_arg_tys      = map (text.showPrimRep.getAmodeRep) non_void_args
 
       -- the first argument will be the "I/O world" token (a VoidRep)
@@ -743,7 +779,6 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv) args results vol_regs
       declare_local_vars,   -- local var for *result*
       vcat local_arg_decls,
       pp_save_context,
-        declare_fun_extern,   -- declare expected function type.
         process_casm local_vars pp_non_void_args casm_str,
       pp_restore_context,
       assign_results,
@@ -772,58 +807,6 @@ pprCCall op@(CCallOp op_str is_asm may_gc cconv) args results vol_regs
 
     (local_arg_decls, pp_non_void_args)
       = unzip [ ppr_casm_arg a i | (a,i) <- non_void_args `zip` [1..] ]
-
-
-    {-
-      In the non-casm case, to ensure that we're entering the given external
-      entry point using the correct calling convention, we have to do the following:
-
-	- When entering via a function pointer (the `dynamic' case) using the specified
-	  calling convention, we emit a typedefn declaration attributed with the
-	  calling convention to use together with the result and parameter types we're
-	  assuming. Coerce the function pointer to this type and go.
-
-        - to enter the function at a given code label, we emit an extern declaration
-	  for the label here, stating the calling convention together with result and
-          argument types we're assuming. 
-
-          The C compiler will hopefully use this extern declaration to good effect,
-          reporting any discrepancies between our extern decl and any other that
-	  may be in scope.
-    
-	  Re: calling convention, notice that gcc (2.8.1 and egcs-1.0.2) will for
-  	  the external function `foo' use the calling convention of the first `foo'
-	  prototype it encounters (nor does it complain about conflicting attribute
-	  declarations). The consequence of this is that you cannot override the
-	  calling convention of `foo' using an extern declaration (you'd have to use
-	  a typedef), but why you would want to do such a thing in the first place
-	  is totally beyond me.
-	  
-	  ToDo: petition the gcc folks to add code to warn about conflicting attribute
-	  declarations.
-
-    -}
-    declare_fun_extern
-      | is_dynamic || is_asm || not opt_EmitCExternDecls = empty
-      | otherwise			    =
-         hsep [ typedef_or_extern
-	      , ccall_res_ty
-	      , fun_nm
-	      , parens (hsep (punctuate comma ccall_decl_ty_args))
-	      ] <> semi
-       where
-	typedef_or_extern
-	  | is_dynamic     = ptext SLIT("typedef")
-	  | otherwise      = ptext SLIT("extern")
-
-        fun_nm 
-	  | is_dynamic     = parens (text (callConvAttribute cconv) <+> char '*' <> ccall_fun_ty)
-	  | otherwise      = text (callConvAttribute cconv) <+> ptext asm_str
-
-	  -- leave out function pointer
-	ccall_decl_ty_args
-	  | is_dynamic     = tail ccall_arg_tys
-	  | otherwise      = ccall_arg_tys
 
     ccall_arg_tys = map (text.showPrimRep.getAmodeRep) non_void_args
 
