@@ -791,9 +791,6 @@ subst a b ls = map (\ x -> if x == a then b else x) ls
 slash		 :: String -> String -> String
 absPath, relPath :: [String] -> String
 
-isSlash '/'   = True
-isSlash other = False
-
 relPath [] = ""
 relPath xs = foldr1 slash xs
 
