@@ -351,15 +351,6 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 	'_mp', "-fstack-check -fparallel -D__PARALLEL_HASKELL__ -optc-DPAR",
 	'_mg', "-fstack-check -fconcurrent -fgransim -D__GRANSIM__ -D__CONCURRENT_HASKELL__ -optc-DCONCURRENT -optc-DGRAN");
 
-\end{code}
-
-Import/include directories (\tr{-I} options) are sufficiently weird to
-require special handling.
-
-\begin{code}
-@Import_dir	= ('.'); #-i things
-@Include_dir	= ('.'); #-I things; other default(s) stuck on AFTER option processing
-
 # where to look for interface files (system hi's, i.e., prelude and syslibs)
 @SysImport_dir	= ( $INSTALLING )
 		    ? ( "$InstLibDirGhc/imports/std" )
@@ -380,8 +371,6 @@ $Haskell1Version = 5; # i.e., Haskell 1.4
 	, "-D__CONCURRENT_HASKELL__"
 	);
 
-@UserLibrary_dir= ();	#-L things;...
-@UserLibrary   	= ();	#-l things asked for by the user
 
 @SysLibrary_dir = ( ( $INSTALLING )	#-syslib things supplied by the system
 		    ? $InstLibDirGhc
@@ -391,7 +380,6 @@ $Haskell1Version = 5; # i.e., Haskell 1.4
 		      , "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/std/cbits"
 		      )
 		  );
-@SysLibrary = (); # will be built up as we go along
 
 $TopClosureFile # defaults to 1.2 one; will be mangled later
 	= '';
@@ -438,7 +426,10 @@ $StgLint       = '';
 @Import_dir	= ('.'); #-i things
 @Include_dir	= ('.'); #-I things; other default(s) stuck on AFTER option processing
 
+@UserLibrary_dir= ();	#-L things;...
+@UserLibrary   	= ();	#-l things asked for by the user
 
+@SysLibrary = (); # will be built up as we go along
 \end{code}
 
 We are given a list of files with various presumably-known suffixes
