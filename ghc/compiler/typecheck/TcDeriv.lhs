@@ -46,7 +46,8 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
-import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_maybe,
+import TcType		( TcType, ThetaType, mkTyVarTy, mkTyVarTys, mkTyConApp, 
+			  getClassPredTys_maybe,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, tcSplitFunTys, isTypeKind,
 			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
 import Var		( TyVar, tyVarKind, idType, varName )
@@ -340,18 +341,28 @@ makeDerivEqns tycl_decls
       where
 	tyvars    = tyConTyVars tycon
 	data_cons = tyConDataCons tycon
-	constraints = extra_constraints ++ 
-	  	      [ mkClassPred clas [arg_ty] 
-		      | data_con <- tyConDataCons tycon,
-		        arg_ty   <- dataConOrigArgTys data_con,
-				-- Use the same type variables
-				-- as the type constructor,
-				-- hence no need to instantiate
-			not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
-		      ]
-
-	 -- "extra_constraints": see note [Data decl contexts] above
+	constraints = extra_constraints ++ ordinary_constraints
+		 -- "extra_constraints": see note [Data decl contexts] above
 	extra_constraints = tyConTheta tycon
+
+	ordinary_constraints
+	  | clas `hasKey` typeableClassKey	-- For the Typeable class, the constraints
+						-- don't involve the constructor ags, only 
+						-- the tycon tyvars
+						-- e.g.   data T a b = ...
+						-- we want
+						-- 	instance (Typeable a, Typable b)
+						--		 => Typeable (T a b) where
+	  = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
+	  | otherwise
+	  = [ mkClassPred clas [arg_ty] 
+	    | data_con <- tyConDataCons tycon,
+	      arg_ty   <- dataConOrigArgTys data_con,
+			-- Use the same type variables
+			-- as the type constructor,
+			-- hence no need to instantiate
+	      not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
+	    ]
 
     mk_eqn_help gla_exts NewType tycon clas tys
       | can_derive_via_isomorphism && (gla_exts || standard_class gla_exts clas)
