@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Enum.lhs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
+% $Id: Enum.lhs,v 1.4 2001/07/04 11:29:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -21,6 +21,7 @@ module GHC.Enum(
 
 import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
+import Data.Tuple	()		-- for dependencies
 default ()		-- Double isn't available yet
 \end{code}
 
