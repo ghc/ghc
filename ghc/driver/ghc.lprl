@@ -983,6 +983,9 @@ sub setupBuildFlags {
 
       $Oopt_FinalStgProfilingMassage = '-fmassage-stg-for-profiling';
 
+      # Ignore user sccs when auto annotating, but warn when doing so.
+      $PROFignore_scc = '-W' if $PROFauto; 
+
       push(@HsP_flags, (($PROFignore_scc) ? $PROFignore_scc : '-S'));
 
       if ( $SplitObjFiles ) {
@@ -1380,7 +1383,10 @@ if ($Do_lnkr) {
     local($lnkr) = ( $Lnkr ) ? $Lnkr : $CcRegd;
 
     local($output) = ($Specific_output_file ne '') ? "-o $Specific_output_file" : '';
-    @Files_to_tidy = ($Specific_output_file ne '') ? $Specific_output_file : 'a.out';
+    @Files_to_tidy = ($Specific_output_file ne '') ? 
+    		      $Specific_output_file : 
+		      ( ($TargetPlatform eq 'i386-unknown-cygwin32') ? 'main.exe' : 'a.out');
+    print STDERR "Output file not specified, defaulting to \"main.exe\"\n" if ($Specific_output_file eq '' && $TargetPlatform eq 'i386-unknown-cygwin32');
 
     local($to_do) = "$lnkr $Verbose @Ld_flags $output @Link_file $TopClosureFile $libdirs @UserLibrary @SysLibrary";
     &run_something($to_do, 'Linker');
