@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.31 2000/12/19 12:51:58 simonmar Exp $
+ * $Id: Storage.c,v 1.32 2001/01/16 12:02:04 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -61,7 +61,7 @@ void
 initStorage (void)
 {
   nat g, s;
-  step *step;
+  step *stp;
   generation *gen;
 
   /* If we're doing heap profiling, we want a two-space heap with a
@@ -130,19 +130,19 @@ initStorage (void)
   /* Initialise all steps */
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
-      step = &generations[g].steps[s];
-      step->no = s;
-      step->blocks = NULL;
-      step->n_blocks = 0;
-      step->gen = &generations[g];
-      step->hp = NULL;
-      step->hpLim = NULL;
-      step->hp_bd = NULL;
-      step->scan = NULL;
-      step->scan_bd = NULL;
-      step->large_objects = NULL;
-      step->new_large_objects = NULL;
-      step->scavenged_large_objects = NULL;
+      stp = &generations[g].steps[s];
+      stp->no = s;
+      stp->blocks = NULL;
+      stp->n_blocks = 0;
+      stp->gen = &generations[g];
+      stp->hp = NULL;
+      stp->hpLim = NULL;
+      stp->hp_bd = NULL;
+      stp->scan = NULL;
+      stp->scan_bd = NULL;
+      stp->large_objects = NULL;
+      stp->new_large_objects = NULL;
+      stp->scavenged_large_objects = NULL;
     }
   }
   
@@ -591,7 +591,7 @@ calcLive(void)
 {
   nat g, s;
   lnat live = 0;
-  step *step;
+  step *stp;
 
   if (RtsFlags.GcFlags.generations == 1) {
     live = (g0s0->to_blocks - 1) * BLOCK_SIZE_W + 
@@ -607,9 +607,9 @@ calcLive(void)
       if (g == 0 && s == 0) { 
 	  continue; 
       }
-      step = &generations[g].steps[s];
-      live += (step->n_blocks - 1) * BLOCK_SIZE_W +
-	((lnat)step->hp_bd->free - (lnat)step->hp_bd->start) / sizeof(W_);
+      stp = &generations[g].steps[s];
+      live += (stp->n_blocks - 1) * BLOCK_SIZE_W +
+	((lnat)stp->hp_bd->free - (lnat)stp->hp_bd->start) / sizeof(W_);
     }
   }
   return live;
@@ -627,16 +627,16 @@ calcNeeded(void)
 {
   lnat needed = 0;
   nat g, s;
-  step *step;
+  step *stp;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
       if (g == 0 && s == 0) { continue; }
-      step = &generations[g].steps[s];
+      stp = &generations[g].steps[s];
       if (generations[g].steps[0].n_blocks > generations[g].max_blocks) {
-	needed += 2 * step->n_blocks;
+	needed += 2 * stp->n_blocks;
       } else {
-	needed += step->n_blocks;
+	needed += stp->n_blocks;
       }
     }
   }
@@ -657,7 +657,7 @@ extern void
 memInventory(void)
 {
   nat g, s;
-  step *step;
+  step *stp;
   bdescr *bd;
   lnat total_blocks = 0, free_blocks = 0;
 
@@ -665,13 +665,13 @@ memInventory(void)
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
-      step = &generations[g].steps[s];
-      total_blocks += step->n_blocks;
+      stp = &generations[g].steps[s];
+      total_blocks += stp->n_blocks;
       if (RtsFlags.GcFlags.generations == 1) {
 	/* two-space collector has a to-space too :-) */
 	total_blocks += g0s0->to_blocks;
       }
-      for (bd = step->large_objects; bd; bd = bd->link) {
+      for (bd = stp->large_objects; bd; bd = bd->link) {
 	total_blocks += bd->blocks;
 	/* hack for megablock groups: they have an extra block or two in
 	   the second and subsequent megablocks where the block
