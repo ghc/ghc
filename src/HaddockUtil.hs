@@ -447,7 +447,12 @@ mapMaybeM _ Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
 
 escapeStr :: String -> String
+#if __GLASGOW_HASKELL__ < 603
 escapeStr str = escapeString str unreserved
+#else
+escapeStr str = escapeString unreserved str
+#endif
+
 
 -----------------------------------------------------------------------------
 -- HTML cross references
