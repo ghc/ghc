@@ -48,6 +48,14 @@ handle_tick_serial(STG_NO_ARGS)
 	abort();
 #endif
 
+#if 0
+    /* Experimental - don't tick if we're in the middle
+       of reporting a cc_profile. Untested.
+    */
+    if (interval_expired)
+       return;
+#endif
+
     if (++current_ticks >= interval_ticks && CCC != STATIC_CC_REF(CC_GC)) {
 #if defined(PROFILING)
 	interval_expired = 1;	/* stop to process interval */
