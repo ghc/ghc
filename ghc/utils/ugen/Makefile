@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1997/03/24 03:02:09 sof Exp $
+# $Id: Makefile,v 1.5 1997/09/03 23:28:47 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +10,8 @@ C_SRCS = syntax.tab.c lex.c id.c tree.c yyerror.c gen.c main.c
 C_PROG = ugen
 LIBS = $(FLEX_LIB)
 
-CLEAN_FILES += syntax.tab.c syntax.tab.h
+CLEAN_FILES += syntax.tab.c syntax.tab.h lex.c
+SRC_CC_OPTS += -O
 
 #
 # Include flex & bison output in the source distribution.

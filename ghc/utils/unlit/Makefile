@@ -4,6 +4,7 @@ override WAYS=
 
 C_SRCS=unlit.c
 C_PROG=unlit
+SRC_CC_OPTS += -O
 
 # Get it over with!
 boot :: all
