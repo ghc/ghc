@@ -60,7 +60,8 @@ import DriverPipeline	( CompResult(..), preprocess, compile, link )
 import HscMain		( newHscEnv )
 import DriverState	( v_Output_file, v_NoHsMain, v_MainModIs )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, isHaskellSrcFilename )
-import Finder		( findModule, findLinkable, addHomeModuleToFinder, flushFinderCache, 
+import Finder		( findModule, findLinkable, addHomeModuleToFinder,
+			  flushFinderCache, findPackageModule,
 			  mkHomeModLocation, FindResult(..), cantFindError )
 import HscTypes		( ModSummary(..), HomeModInfo(..), ModIface(..), msHsFilePath,
 			  HscEnv(..), GhciMode(..), 
@@ -241,13 +242,26 @@ cmSetContext cmstate toplevs exports = do
       hsc_env = cm_hsc cmstate
       hpt     = hsc_HPT hsc_env
 
-  export_env  <- mkExportEnv hsc_env (map mkModule exports)
+  let export_mods = map mkModule exports
+  mapM_ (checkModuleExists (hsc_dflags hsc_env) hpt) export_mods
+  export_env  <- mkExportEnv hsc_env export_mods
   toplev_envs <- mapM (mkTopLevEnv hpt) toplevs
 
   let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
   return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
  		     		   ic_exports      = exports,
 			       	   ic_rn_gbl_env   = all_env } }
+
+checkModuleExists :: DynFlags -> HomePackageTable -> Module -> IO ()
+checkModuleExists dflags hpt mod = 
+  case lookupModuleEnv hpt mod of
+    Just mod_info -> return ()
+    _not_a_home_module -> do
+	  res <- findPackageModule dflags mod True
+	  case res of
+	    Found _ _ -> return  ()
+	    err -> let msg = cantFindError dflags mod err in
+		   throwDyn (CmdLineError (showSDoc msg))
 
 mkTopLevEnv :: HomePackageTable -> String -> IO GlobalRdrEnv
 mkTopLevEnv hpt mod
