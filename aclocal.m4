@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.77 2001/06/30 00:00:49 sof Exp $
+dnl $Id: aclocal.m4,v 1.78 2001/06/30 00:12:52 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1069,13 +1069,15 @@ dnl
 dnl Check to see whether CC (gcc) supports a particular option.
 dnl 
 AC_DEFUN(FPTOOLS_CC_FLAG,
-[save_CFLAGS="$CFLAGS"
+[
 AC_CACHE_CHECK([whether $CC accepts $1], [ac_cv_cc_$2],
-[CFLAGS="$CFLAGS $1"
+[save_CFLAGS="$CFLAGS"
+ CFLAGS="$CFLAGS $1"
  AC_LANG_C
  AC_TRY_COMPILE(,[int main(){return(0);}],
                  [ac_cv_cc_$2=yes],
 		 [ac_cv_cc_$2=no])
+ CFLAGS="$save_CFLAGS"
 ])
 if test "$ac_cv_cc_$2"x = "yesx"; then
   $2=$extra_flag;
