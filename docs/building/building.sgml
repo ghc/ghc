@@ -1000,8 +1000,17 @@ $ cvs checkout nofib/spectral
 	  <term>sparc-sun-solaris2</term>
 	  <indexterm><primary>sparc-sun-solaris2</primary></indexterm>
 	  <listitem>
-	    <para>Fully supported (at least for Solaris 2.7),
+	    <para>Fully supported (at least for Solaris 2.7 and 2.6),
 	    including native-code generator.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>sparc-unknown-openbsd</term>
+	  <indexterm><primary>sparc-unknown-openbsd</primary></indexterm>
+	  <listitem>
+	    <para>Supported, including native-code generator. The
+	    same should also be true of NetBSD</para>
 	  </listitem>
 	</varlistentry>
 
