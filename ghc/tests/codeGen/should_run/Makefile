@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 1998/07/08 10:36:45 simonm Exp $
+# $Id: Makefile,v 1.8 1999/01/23 18:10:00 sof Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -27,5 +27,10 @@ cg045_RUNTEST_OPTS = -x 1
 
 # mkdependHS doesn't understand OPTIONS pragmas...
 SRC_MKDEPENDHS_OPTS += -fglasgow-exts
+
+.PRECIOUS: %.bin %.o
+
+clean ::
+	rm -f *.bin *.o
 
 include $(TOP)/mk/target.mk

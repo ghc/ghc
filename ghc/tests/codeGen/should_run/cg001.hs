@@ -1,4 +1,4 @@
---!! cg001: main = -42 -- take 1
+-- !! cg001: main = -42 -- take 1
 
 main = print ( f () )
      where

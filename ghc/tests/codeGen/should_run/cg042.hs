@@ -1,4 +1,4 @@
---!!! mutable Double array test (ncg test)
+-- !!! mutable Double array test (ncg test)
 --
 module Main ( main ) where
 

@@ -1,5 +1,5 @@
---!! test GEN reps w/ unboxed values in them
---!! NB: it was the static ones that were hosed...
+-- !! test GEN reps w/ unboxed values in them
+-- !! NB: it was the static ones that were hosed...
 --
 module Main ( main ) where
 

@@ -1,5 +1,5 @@
---!! worker/wrapper turns ( \ <absent> -> Int# ) function
---!! into Int# -- WRONG
+-- !! worker/wrapper turns ( \ <absent> -> Int# ) function
+-- !! into Int# -- WRONG
 
 import PrelBase --ghc1.3
 

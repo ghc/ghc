@@ -2,7 +2,7 @@ module Main where
 
 import IO
 
---!!! CAF space leaks
+-- !!! CAF space leaks
 
 main = lots_of_xs 10000
 

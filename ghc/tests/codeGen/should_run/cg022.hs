@@ -1,5 +1,5 @@
---!!! tests stack stubbing: if "f" doesn't stub "ns",
---!!! the program has a space leak.
+-- !!! tests stack stubbing: if "f" doesn't stub "ns",
+-- !!! the program has a space leak.
 
 module Main where
 

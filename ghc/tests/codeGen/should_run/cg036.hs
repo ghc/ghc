@@ -1,6 +1,6 @@
---!! Won't compile unless the compile succeeds on
---!! the "single occurrence of big thing in a duplicated small thing"
---!! inlining old-chestnut.  WDP 95/03
+-- !! Won't compile unless the compile succeeds on
+-- !! the "single occurrence of big thing in a duplicated small thing"
+-- !! inlining old-chestnut.  WDP 95/03
 --
 module Main ( main, g ) where
 

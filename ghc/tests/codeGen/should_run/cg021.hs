@@ -1,5 +1,5 @@
---!!! Tests garbage collection in the branch of a case
---!!!	alternative where the constructor is returned in the heap.
+-- !!! Tests garbage collection in the branch of a case
+-- !!!	alternative where the constructor is returned in the heap.
 
 {- This is also a rather stressful test for another reason.
    The mutual recursion between munch and f causes lots of

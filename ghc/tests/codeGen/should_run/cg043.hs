@@ -1,6 +1,6 @@
---!!! Tickled a bug in core2stg 
---!!! (CoreSyn.Coerce constructors were not peeled off
---!!! when converting CoreSyn.App)
+-- !!! Tickled a bug in core2stg 
+-- !!! (CoreSyn.Coerce constructors were not peeled off
+-- !!! when converting CoreSyn.App)
 
 module Main where
 

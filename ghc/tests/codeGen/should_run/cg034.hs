@@ -1,3 +1,4 @@
+-- !! fromRational woes
 import Ratio -- 1.3
 
 main = putStr (
@@ -31,8 +32,6 @@ main = putStr (
     x_d = fromRationalX (1.82173691287639817263897126389712638972163e-300 :: Rational)
     y_f = 1.82173691287639817263897126389712638972163e-300
     y_d = 1.82173691287639817263897126389712638972163e-300
-
---!! fromRational woes
 
 fromRationalX :: (RealFloat a) => Rational -> a
 fromRationalX r =

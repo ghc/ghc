@@ -1,6 +1,6 @@
---! From a Rick Morgan bug report:
---! Single-method class with a locally-polymorphic
---! method.
+-- !!! From a Rick Morgan bug report:
+-- !!! Single-method class with a locally-polymorphic
+-- !!! method.
 
 module Main where
 

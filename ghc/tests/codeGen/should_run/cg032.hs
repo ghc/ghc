@@ -1,4 +1,4 @@
---!! pattern-matching failure on functions that return Int#
+-- !! pattern-matching failure on functions that return Int#
 
 import PrelBase --ghc1.3
 

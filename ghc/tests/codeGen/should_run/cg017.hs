@@ -1,4 +1,4 @@
---!!! test of cyclic default methods
+-- !!! test of cyclic default methods
 --
 class Foo a where
     op1 :: Fractional b => a -> b -> Bool

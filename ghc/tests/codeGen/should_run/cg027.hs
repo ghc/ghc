@@ -1,4 +1,4 @@
---!!! simple test of 0-method classes
+-- !!! simple test of 0-method classes
 --
 
 class (Num a, Integral a) => Foo a

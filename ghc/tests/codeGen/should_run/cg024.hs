@@ -1,4 +1,4 @@
---!!! test super-dictionary grabification
+-- !!! test super-dictionary grabification
 --
 
 main = putStr (show (is_one (1.2::Double)))

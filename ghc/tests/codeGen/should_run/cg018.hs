@@ -1,4 +1,4 @@
---!!! test of datatype with many unboxed fields
+-- !!! test of datatype with many unboxed fields
 --
 import PrelBase
 

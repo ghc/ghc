@@ -1,7 +1,7 @@
 "cg025.bin"
 ["cg025.hs"]
 GOT PATH
---!!! test various I/O Requests
+-- !!! test various I/O Requests
 --
 --
 import IO

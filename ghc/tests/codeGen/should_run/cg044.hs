@@ -1,4 +1,4 @@
---!!! Testing IEEE Float and Double extremity predicates.
+-- !!! Testing IEEE Float and Double extremity predicates.
 module Main(main) where
 
 main :: IO ()

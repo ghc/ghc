@@ -1,4 +1,4 @@
---!! answer: 65532
+-- !! answer: 65532
 
 main = print foo
 

@@ -1,4 +1,4 @@
---!!! simple overloading example
+-- !!! simple overloading example
 
 class Foo a where
     foo :: a -> a -> Bool

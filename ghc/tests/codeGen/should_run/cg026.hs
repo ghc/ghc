@@ -1,4 +1,4 @@
---!!! simple tests of primitive arrays
+-- !!! simple tests of primitive arrays
 --
 module Main ( main ) where
 
@@ -29,7 +29,8 @@ test_chars
   = let str = reverse "Now is the time for all good men to come to...\n"
     in
     unsafePerformIO (
-	_ccall_ fprintf (``stdout''::Addr) "%d %s\n" 93 str >>
+	_ccall_ fprintf (``stdout''::Addr) "%d %s\n" (93::Int) str >>
+	_ccall_ fflush  (``stdout''::Addr)  >>
 	return ""
 	)
 
