@@ -277,6 +277,22 @@ haskellKeywordsFM = listToUFM $
 	( "_scc_",	ITscc )
      ]
 
+isSpecial :: Token -> Bool
+-- If we see M.x, where x is a keyword, but
+-- is special, we treat is as just plain M.x, 
+-- not as a keyword.
+isSpecial ITas        	= True
+isSpecial IThiding    	= True
+isSpecial ITqualified 	= True
+isSpecial ITforall    	= True
+isSpecial ITexport    	= True
+isSpecial ITlabel     	= True
+isSpecial ITdynamic   	= True
+isSpecial ITunsafe    	= True
+isSpecial ITwith      	= True
+isSpecial ITccallconv   = True
+isSpecial ITstdcallconv = True
+
 -- IMPORTANT: Keep this in synch with ParseIface.y's var_fs production! (SUP)
 ghcExtensionKeywordsFM = listToUFM $
 	map (\ (x,y) -> (_PK_ x,y))
@@ -995,17 +1011,18 @@ lex_id3 cont glaexts mod buf just_a_conid
      case slurp_trailing_hashes buf1 glaexts of { buf' ->
 
      let
-      lexeme  = lexemeToFastString buf'
-      new_buf = mergeLexemes buf buf'
+      lexeme	  = lexemeToFastString buf'
+      new_buf     = mergeLexemes buf buf'
       is_a_qvarid = cont (mk_qvar_token mod lexeme) new_buf
      in
      case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
-    	    Just kwd_token -> just_a_conid; -- avoid M.where etc.
-    	    Nothing        -> is_a_qvarid
-	-- TODO: special ids (as, qualified, hiding) shouldn't be
-	-- recognised as keywords here.  ie.  M.as is a qualified varid.
-     }}}
+    	    Nothing          -> is_a_qvarid ;
 
+    	    Just kwd_token | isSpecial kwd_token   -- special ids (as, qualified, hiding) shouldn't be
+			   -> is_a_qvarid	   --  recognised as keywords here.
+			   | otherwise
+			   -> just_a_conid	   -- avoid M.where etc.
+     }}}
 
 slurp_trailing_hashes buf glaexts
   | flag glaexts = expandWhile# (`eqChar#` '#'#) buf
