@@ -1,0 +1,14 @@
+module GHC.Unicode where
+
+isAscii		:: GHC.Base.Char -> GHC.Base.Bool
+isLatin1	:: GHC.Base.Char -> GHC.Base.Bool
+isControl	:: GHC.Base.Char -> GHC.Base.Bool
+isPrint		:: GHC.Base.Char -> GHC.Base.Bool
+isSpace		:: GHC.Base.Char -> GHC.Base.Bool
+isUpper		:: GHC.Base.Char -> GHC.Base.Bool
+isLower		:: GHC.Base.Char -> GHC.Base.Bool
+isAlpha		:: GHC.Base.Char -> GHC.Base.Bool
+isDigit		:: GHC.Base.Char -> GHC.Base.Bool
+isOctDigit	:: GHC.Base.Char -> GHC.Base.Bool
+isHexDigit	:: GHC.Base.Char -> GHC.Base.Bool
+isAlphaNum	:: GHC.Base.Char -> GHC.Base.Bool
