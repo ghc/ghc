@@ -26,16 +26,18 @@ fi
 
 # build configuration
 #
-cat >mk/build.mk <<END
-# nothing!
-END
-
-# touch happy generated files; so that in non-bootstrapping mode for
-# installation, no attempt is made to call happy
-#
-touch ghc/compiler/parser/Parser.hs
-touch ghc/compiler/main/ParsePkgConf.hs
-touch hslibs/hssource/HsParser.hs
+case configopts in
+*--enable-hc-boot-unregisterised*)
+    cat >mk/build.mk <<END
+    GhcWithInterpreter=NO
+    GhcWithNativeCodeGen=NO
+    END
+    ;;
+*)
+    cat >mk/build.mk <<END
+    # empty
+    END
+esac
 
 echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
@@ -43,7 +45,6 @@ echo "*** Building compiler..."
 $MAKE -C glafp-utils boot all
 $MAKE -C ghc boot
 $MAKE -C libraries boot all
-$MAKE -C hslibs boot all
 $MAKE -C ghc all
 
 MAKEFLAGS=
@@ -82,10 +83,12 @@ $MAKE -C ghc/rts      boot && $MAKE -C ghc/rts      all
 
 # Now build a new set of libraries
 $MAKE -C libraries boot all
-$MAKE -C hslibs  boot all
 
-# Finally build all of ghc/utils
+# Build all of ghc/utils
 $MAKE -C ghc/utils clean && $MAKE -C ghc/utils boot all
+
+# Now we can build hslibs (hsc2hs is required, so must be after ghc/utils)
+$MAKE -C hslibs  boot all
 
 # Avoid relinking the compiler during 'make install':
 (cd ghc/compiler; touch parser/hschooks.o ghc-*)
