@@ -6,7 +6,7 @@
 
 <Title>Building and Installing the Glasgow Functional Programming Tools Suite</Title>
 <Author><OtherName>The GHC Team</OtherName></Author>
-<Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email></Address>
+<Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@haskell.org</Email></Address>
 <PubDate>January 2000</PubDate>
 
 <Abstract>
@@ -105,7 +105,8 @@ confidence will work well by having tested it (more) thoroughly.
 <Para>
 Source-only distributions are either bugfix releases or snapshots of
 current state of development. The release has undergone some testing.
-Source releases of 4.xx can be compiled up using 2.10 or later.
+Source releases of GHC 4.xx can be compiled up using GHC 2.10 or
+later.
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
@@ -155,10 +156,9 @@ derived files from scratch.
 </Para>
 
 <Para>
-More information about our CVS repository is available at <ULink
-URL="http://www.dcs.gla.ac.uk/fp/software/ghc/cvs-cheat-sheet.html"
->The Fptools CVS Cheat Sheet</ULink
->.
+More information about our CVS repository is available in the <ULink
+URL="http://www.haskell.org/ghc/cvs-cheat-sheet.html" >FPTools CVS
+Cheat Sheet</ULink >.
 </Para>
 </ListItem></VarListEntry>
 </VariableList>
@@ -201,15 +201,12 @@ know the disk requirements for the non-GHC tools).
 <Para>
 Use an appropriate machine, compilers, and things.
 
-SPARC boxes, DEC Alphas running OSF/1, and PCs running Linux, FreeBSD,
-or Solaris are all fully supported.  MIPS, AIX, Win32 and HP boxes are
-in pretty good shape.  <Xref LinkEnd="sec-port-info">
-gives the full run-down on ports or lack thereof.
-
-NOTE: as of version 4.00, we lost a few ports.  All of the x86 ports
-are working, as is the Sparc/Solaris port, but the rest will need a
-little work.  Please contact us if you can provide hardware cycles
-and/or porting expertise.
+SPARC boxes, and PCs running Linux, FreeBSD, NetBSD, or Solaris are
+all fully supported.  Win32 and HP boxes are in pretty good shape.
+DEC Alphas running OSF/1, Linux or some BSD variant, MIPS and AIX
+boxes will need some minimal porting effort before they work (as of
+4.06).  <Xref LinkEnd="sec-port-info"> gives the full run-down on
+ports or lack thereof.
 
 </Para>
 </ListItem>
@@ -225,20 +222,24 @@ and/or porting expertise.
 
 <Para>
  If you have any problem when building or installing the Glasgow
-tools, please check the ``known pitfalls'' (<Xref LinkEnd="sec-build-pitfalls">).  Also check the <ULink
-URL="http://www.dcs.gla.ac.uk/fp/software/ghc/ghc-bugs.html"
->known bugs page</ULink>.
+tools, please check the ``known pitfalls'' (<Xref
+LinkEnd="sec-build-pitfalls">).  Also check the FAQ for the version
+you're building, which should be available from the relevant download
+page on the <ULink URL="http://www.haskell.org/ghc/" >GHC web
+site</ULink>.
+
 <IndexTerm><Primary>known bugs</Primary></IndexTerm>
 <IndexTerm><Primary>bugs, known</Primary></IndexTerm>
 
 If you feel there is still some shortcoming in our procedure or
 instructions, please report it.
 
-For GHC, please see the bug-reporting section of the User's guide
+For GHC, please see the bug-reporting section of the GHC Users' Guide
 (separate document), to maximise the usefulness of your report.
 <IndexTerm><Primary>bugs, reporting</Primary></IndexTerm>
 
-If in doubt, please send a message to <Email>glasgow-haskell-bugs@dcs.gla.ac.uk</Email>.
+If in doubt, please send a message to
+<Email>glasgow-haskell-bugs@haskell.org</Email>.
 <IndexTerm><Primary>bugs, mailing list</Primary></IndexTerm>
 </Para>
 </ListItem>
@@ -297,12 +298,13 @@ port; (c)&nbsp;the bare minimum is an ``unregisterised'' port.
 </Para>
 
 <Para>
-We use Sparcs running Solaris 2.5, x86 boxes running FreeBSD and
-Linux, and DEC&nbsp;Alphas running OSF/1&nbsp;V2.0, so those are the
-``fully-supported'' platforms, unsurprisingly.  All have native-code
-generators, for quicker compilations.  The native-code generator for
-iX86 platforms (e.g., Linux ELF) is <Emphasis>nearly</Emphasis> working; but is not
-turned on by default.
+The native code generator is currently non-functional (as of GHC
+version 4.06), but we're actively working on getting it going again.
+</Para>
+
+<Para>
+We use Sparcs running Solaris 2.7 and x86 boxes running FreeBSD and
+Linux, so those are the best supported platforms, unsurprisingly.
 </Para>
 
 <Para>
@@ -311,228 +313,140 @@ by their ``canonical'' CPU/Manufacturer/OS triple.
 </Para>
 
 <Para>
-Note that some ports are fussy about which GCC version you use; or
-require GAS; or&hellip;
-</Para>
-
-<Para>
 <VariableList>
 
 <VarListEntry>
-<Term>alpha-dec-osf1:</Term>
+<Term>alpha-dec-{osf,linux,freebsd,openbsd,netbsd}:</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>alpha-dec-osf1: fully supported</Primary></IndexTerm>
+<IndexTerm><Primary>alpha-dec-osf</Primary></IndexTerm>
+<IndexTerm><Primary>alpha-dec-linux</Primary></IndexTerm>
+<IndexTerm><Primary>alpha-dec-freebsd</Primary></IndexTerm>
+<IndexTerm><Primary>alpha-dec-openbsd</Primary></IndexTerm>
+<IndexTerm><Primary>alpha-dec-netbsd</Primary></IndexTerm>
 </Para>
 
 <Para>
-(We have OSF/1 V3.0.) Fully supported, including native-code
-generator.  We recommend GCC 2.6.x or later.
+Currently non-working.  The last working version (osf[1-3]) is GHC
+3.02.  A small amount of porting effort will be required to get Alpha
+support into GHC 4.xx, but we don't have easy access to machines right
+now, and there hasn't been a massive demand for support, so Alphas
+remain unsupported for the time being.  Please get in touch if you
+either need Alpha support and/or can provide access to boxes.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>sparc-sun-sunos4:</Term>
 <ListItem>
-<Para>
-<IndexTerm><Primary>sparc-sun-sunos4: fully supported</Primary></IndexTerm>
-</Para>
+<IndexTerm><Primary>sparc-sun-sunos4</Primary></IndexTerm>
 
 <Para>
-Fully supported, including native-code generator.
+Probably works with minor tweaks, hasn't been tested for a while.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>sparc-sun-solaris2:</Term>
 <ListItem>
-<Para>
-<IndexTerm><Primary>sparc-sun-solaris2: fully supported</Primary></IndexTerm>
-</Para>
+<IndexTerm><Primary>sparc-sun-solaris2</Primary></IndexTerm>
 
 <Para>
-Fully supported, including native-code generator.  A couple of quirks,
-though: (a)&nbsp;the profiling libraries are bizarrely huge when compiled
-with object splitting; (b)&nbsp;the default <Command>xargs</Command><IndexTerm><Primary>xargs</Primary></IndexTerm> program is
-atrociously bad for building GHC libraries (see <Xref LinkEnd="sec-pre-supposed"> for
-details).
+Fully supported, including native-code generator.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term>HP-PA box running HP</Term>
+<Term>hppa1.1-hp-hpux (HP-PA boxes running HPUX 9.x)</Term>
 <ListItem>
-<Para>
-UX 9.x:
-<IndexTerm><Primary>hppa1.1-hp-hpux: registerised port</Primary></IndexTerm>
-</Para>
+<IndexTerm><Primary>hppa1.1-hp-hpux</Primary></IndexTerm>
 
 <Para>
-Works registerised.  No native-code generator.  For GCC, you're best
-off with one of the Utah releases of GCC&nbsp;2.6.3 (`u3' or later), from
-<Literal>jaguar.cs.utah.edu</Literal>.  We think a straight GCC 2.7.x works,
-too.
+Works registerised.  No native-code generator.
 </Para>
 
-<Para>
-Concurrent/Parallel Haskell probably don't work (yet).
-<IndexTerm><Primary>hppa1.1-hp-hpux: concurrent&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>hppa1.1-hp-hpux: parallel&mdash;no</Primary></IndexTerm>
-</Para>
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term>i386-*-linux (PCs running Linux&mdash;ELF format):</Term>
+<Term>i386-unknown-linux (PCs running Linux&mdash;ELF format):</Term>
 <ListItem>
-<Para>
-<IndexTerm><Primary>i386-*-linux: registerised port</Primary></IndexTerm>
-</Para>
+<IndexTerm><Primary>i386-*-linux</Primary></IndexTerm>
 
 <Para>
-GHC works registerised.  You <Emphasis>must</Emphasis> have GCC 2.7.x or later.  The
-iX86 native-code generator is <Emphasis>nearly</Emphasis> there, but it isn't turned
-on by default.
+GHC works registerised.  You <Emphasis>must</Emphasis> have GCC 2.7.x
+or later.  NOTE about <literal>glibc</literal> versions: GHC binaries
+built on a system running <literal>glibc 2.0</literal> won't work on a
+system running <literal>glibc 2.1</literal>, and vice version.  In
+general, don't expect compatibility between <literal>glibc</literal>
+versions, even if the shared library version hasn't changed.
 </Para>
 
-<Para>
-Profiling works, and Concurrent Haskell works.
-<IndexTerm><Primary>i386-*-linux: profiling&mdash;yes</Primary></IndexTerm>
-<IndexTerm><Primary>i386-*-linux: concurrent&mdash;yes</Primary></IndexTerm>
-Parallel Haskell probably works.
-<IndexTerm><Primary>i386-*-linux: parallel&mdash;maybe</Primary></IndexTerm>
-</Para>
-
-<Para>
-On old Linux a.out systems: should be the same.
-<IndexTerm><Primary>i386-*-linuxaout: registerised port</Primary></IndexTerm>
-</Para>
 </ListItem></VarListEntry>
 <VarListEntry>
-<Term>i386-*-freebsd (PCs running FreeBSD 2.2 or higher, and
-NetBSD/OpenBSD using FreeBSD emulation):</Term>
+<Term>i386-unknown-{freebsd,netbsd,openbsd) (PCs running FreeBSD 2.2
+or higher, NetBSD, and possibly OpenBSD):</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>i386-*-freebsd:registerised port</Primary></IndexTerm>
+<IndexTerm><Primary>i386-unknown-freebsd</Primary></IndexTerm> 
+<IndexTerm><Primary>i386-unknown-netbsd</Primary></IndexTerm> 
+<IndexTerm><Primary>i386-unknown-openbsd</Primary></IndexTerm> 
 </Para>
 
 <Para>
-GHC works registerised. Supports same set of bundles as the above.
-<IndexTerm><Primary>i386-*-freebsd: profiling&mdash;yes</Primary></IndexTerm>
-<IndexTerm><Primary>i386-*-freebsd: concurrent&mdash;yes</Primary></IndexTerm>
-<IndexTerm><Primary>i386-*-freebsd: parallel&mdash;maybe</Primary></IndexTerm>
+GHC works registerised.  These systems provide ready-built packages of
+GHC, so if you just need binaries you're better off just installing
+the package.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>i386-unknown-cygwin32:</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>i386-unknown-cygwin32: fully supported</Primary></IndexTerm>
-Fully supported under Win95/NT, including a native code
-generator. Requires the <Literal>cygwin32</Literal> compatibility library and a
-healthy collection of GNU tools (i.e., gcc, GNU ld, bash etc.)
-Profiling works, so does Concurrent Haskell.  
-<IndexTerm><Primary>i386-*-cygwin32: profiling&mdash;yes</Primary></IndexTerm> 
-<IndexTerm><Primary>i386-*-cygwin32: concurrent&mdash;yes</Primary></IndexTerm>
+<IndexTerm><Primary>i386-unknown-cygwin32</Primary></IndexTerm>
 </Para>
+
+<Para>
+Fully supported under Win9x/NT, including a native code
+generator. Requires the <Literal>cygwin32</Literal> compatibility
+library and a healthy collection of GNU tools (i.e., gcc, GNU ld, bash
+etc.).
+</Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>mips-sgi-irix5:</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>mips-sgi-irix5: registerised port</Primary></IndexTerm>
-GHC works registerised (no native-code generator).  I suspect any
-GCC&nbsp;2.6.x (or later) is OK.  The GCC that I used was built with
-<Option>--with-gnu-as</Option>; turns out that is important!
+<IndexTerm><Primary>mips-sgi-irix[5-6]</Primary></IndexTerm>
 </Para>
 
 <Para>
-Concurrent/Parallel Haskell probably don't work (yet).
-Profiling might work, but it is untested.
-<IndexTerm><Primary>mips-sgi-irix5: concurrent&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>mips-sgi-irix5: parallel&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>mips-sgi-irix5: profiling&mdash;maybe</Primary></IndexTerm>
+Port currently doesn't work, needs some minimal porting effort.  As
+usual, we don't have access to machines and there hasn't been an
+overwhelming demand for this port, but feel free to get in touch.
 </Para>
 </ListItem></VarListEntry>
-<VarListEntry>
-<Term>mips-sgi-irix6:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>mips-sgi-irix6: registerised port</Primary></IndexTerm>
-Thanks to the fine efforts of Tomasz Cholewo <ULink
-URL="mailto:tjchol01@mecca.spd.louisville.edu"
->tjchol01@mecca.spd.louisville.edu</ULink
->, GHC works registerised (no
-native code generator) under IRIX 6.2 and 6.3. Depends on having a
-<ULink
-URL="http://mecca.spd.louisville.edu/~tjchol01/software/"
->specially tweaked version of gcc-2.7.2 around</ULink>.
-Profiling works, Concurrent/Parallel Haskell might work (AFAIK, untested).
-<IndexTerm><Primary>mips-sgi-irix6: concurrent&mdash;maybe</Primary></IndexTerm>
-<IndexTerm><Primary>mips-sgi-irix6: parallel&mdash;maybe</Primary></IndexTerm>
-<IndexTerm><Primary>mips-sgi-irix6: profiling&mdash;yes</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
+
 <VarListEntry>
 <Term>powerpc-ibm-aix:</Term>
 <ListItem>
 <Para>
-<IndexTerm><Primary>powerpc-ibm-aix: registerised port</Primary></IndexTerm>
-GHC works registerised (no native-code generator&hellip;yet).
-I suspect 2.7.x is what you need together with this.
-</Para>
-
-<Para>
-Concurrent/Parallel Haskell probably don't work (yet).
-Profiling might work, but it is untested.
-<IndexTerm><Primary>mips-sgi-irix5: concurrent&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>mips-sgi-irix5: parallel&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>mips-sgi-irix5: profiling&mdash;maybe</Primary></IndexTerm>
+<IndexTerm><Primary>powerpc-ibm-aix</Primary></IndexTerm>
+Port currently doesn't work, needs some minimal porting effort.  As
+usual, we don't have access to machines and there hasn't been an
+overwhelming demand for this port, but feel free to get in touch.
 </Para>
 </ListItem></VarListEntry>
-<VarListEntry>
-<Term>m68k-apple-macos7 (Mac, using MPW):</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>m68k-apple-macos7: historically ported</Primary></IndexTerm>
-Once upon a time, David Wright in Tasmania actually
-got GHC to run on a Macintosh.  Ditto James Thomson here at Glasgow.
-You may be able to get Thomson's from here.  (Not sure that it will
-excite you to death, but&hellip;)
-</Para>
 
-<Para>
-No particularly recent GHC is known to work on a Mac.
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term>m68k-next-nextstep3:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>m68k-next-nextstep3: historically ported</Primary></IndexTerm>
-Carsten Schultz succeeded with a ``registerised'' port of GHC&nbsp;0.29.
-There's probably a little bit-rot since then, but otherwise it should
-still be fine.
-</Para>
-
-<Para>
-Concurrent/Parallel Haskell probably won't work (yet).
-<IndexTerm><Primary>m68k-next-nextstep3: concurrent&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>m68k-next-nextstep3: parallel&mdash;no</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
-<VarListEntry>
-<Term>m68k-sun-sunos4 (Sun3):</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>m68k-sun-sunos4: registerised
-port</Primary></IndexTerm> GHC 2.0x and 3.0x haven't been tried on a Sun3.  GHC&nbsp;0.26
-worked registerised.  No native-code generator.
-</Para>
-
-<Para>
-Concurrent/Parallel Haskell probably don't work (yet).
-<IndexTerm><Primary>m68k-sun-sunos4: concurrent&mdash;no</Primary></IndexTerm>
-<IndexTerm><Primary>m68k-sun-sunos4: parallel&mdash;no</Primary></IndexTerm>
-</Para>
-</ListItem></VarListEntry>
 </VariableList>
 </Para>
+
+<para>
+Various other systems have had GHC ported to them in the distant past,
+including various Motorola 68k boxes.  The 68k support still remains,
+but porting to one of these systems will certainly be a non-trivial
+task.
+</para>
 
 </Sect2>
 
@@ -541,11 +455,6 @@ Concurrent/Parallel Haskell probably don't work (yet).
 
 <Para>
 Unless you hear otherwise, the other tools work if GHC works.
-</Para>
-
-<Para>
-Haggis requires Concurrent Haskell to work.
-<IndexTerm><Primary>Haggis, Concurrent Haskell</Primary></IndexTerm>
 </Para>
 
 </Sect2>
@@ -581,17 +490,21 @@ It is pretty easy to install.
 </Para>
 
 <Para>
-Perl&nbsp;5 is required.  For Win32 platforms, we strongly suggest you pick
-up a port of Perl&nbsp;5 for <Literal>cygwin32</Literal>, as the common Hip/ActiveWare port
-of Perl is Not Cool Enough for our purposes.
+Perl&nbsp;5 is required.  For Win32 platforms, we strongly suggest you
+pick up a port of Perl&nbsp;5 for <Literal>cygwin32</Literal>, as the
+common Hip/ActiveWare port of Perl is Not Cool Enough for our
+purposes.
 </Para>
 
 <Para>
-Perl should be put somewhere so that it can be invoked by the <Literal>&num;!</Literal>
-script-invoking mechanism. (I believe <Filename>/usr/bin/perl</Filename> is preferred;
-we use <Filename>/usr/local/bin/perl</Filename> at Glasgow.)  The full pathname should
-may need to be less than 32 characters long on some systems.
+Perl should be put somewhere so that it can be invoked by the
+<Literal>&num;!</Literal> script-invoking mechanism. (I believe
+<Filename>/usr/bin/perl</Filename> is preferred; we use
+<Filename>/usr/local/bin/perl</Filename> at Glasgow.)  The full
+pathname should may need to be less than 32 characters long on some
+systems.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term>GNU C (<Command>gcc</Command>):</Term>
@@ -602,8 +515,11 @@ may need to be less than 32 characters long on some systems.
 </Para>
 
 <Para>
-Versions 2.7.2.x, 2.8.1 and egcs 1.1.2 are known to work.  Use other
-versions at your own risk!
+We recommend using GCC version 2.95.2 on all platforms.  Failing that,
+version 2.7.2 is stable on most platforms.  Earlier versions of GCC
+can be assumed not to work, and versions in between 2.7.2 and 2.95.2
+(including <command>egcs</command>) have varying degrees of stability
+depending on the platform.
 </Para>
 
 <Para>
@@ -613,31 +529,7 @@ please let us know, so we can report it and get things improved.
 <Option>-monly-N-regs</Option> option; see the User's Guide)
 </Para>
 </ListItem></VarListEntry>
-<VarListEntry>
-<Term><Command>xargs</Command> on Solaris2:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>xargs, presupposed (Solaris only)</Primary></IndexTerm>
-<IndexTerm><Primary>Solaris: alternative xargs</Primary></IndexTerm>
-The GHC libraries are put together with something like:
 
-<ProgramListing>
-find bunch-of-dirs -name '*.o' -print | xargs ar q ...
-</ProgramListing>
-
-Unfortunately the Solaris <Command>xargs</Command> (the shell-script equivalent
-of <Function>map</Function>) only ``bites off'' the <Filename>.o</Filename> files a few at a
-time&mdash;with near-infinite rebuilding of the symbol table in
-the <Filename>.a</Filename> file.
-</Para>
-
-<Para>
-The best solution is to install a sane <Command>xargs</Command> from the GNU
-findutils distribution.  You can unpack, build, and install the GNU
-version in the time the Solaris <Command>xargs</Command> mangles just one GHC
-library.
-</Para>
-</ListItem></VarListEntry>
 <VarListEntry>
 <Term>Autoconf:</Term>
 <ListItem>
@@ -648,15 +540,17 @@ library.
 
 <Para>
 GNU Autoconf is needed if you intend to build from the CVS sources, it
-is <Emphasis>not</Emphasis> needed if you just intend to build a standard source
-distribution.
+is <Emphasis>not</Emphasis> needed if you just intend to build a
+standard source distribution.
 </Para>
 
 <Para>
-Autoconf builds the <Command>configure</Command> script from <Filename>configure.in</Filename> and
-<Filename>aclocal.m4</Filename>.  If you modify either of these files, you'll need
-Autoconf to rebuild <Filename>configure</Filename>.
+Autoconf builds the <Command>configure</Command> script from
+<Filename>configure.in</Filename> and <Filename>aclocal.m4</Filename>.
+If you modify either of these files, you'll need Autoconf to rebuild
+<Filename>configure</Filename>.
 </Para>
+
 </ListItem></VarListEntry>
 <VarListEntry>
 <Term><Command>sed</Command></Term>
@@ -664,21 +558,23 @@ Autoconf to rebuild <Filename>configure</Filename>.
 <Para>
 <IndexTerm><Primary>pre-supposed: sed</Primary></IndexTerm>
 <IndexTerm><Primary>sed, pre-supposed</Primary></IndexTerm>
-You need a working <Command>sed</Command> if you are going to build from sources.  The
-build-configuration stuff needs it.  GNU sed version 2.0.4 is no good!
-It has a bug in it that is tickled by the build-configuration.  2.0.5
-is OK. Others are probably OK too (assuming we don't create too
-elaborate configure scripts.)
+
+You need a working <Command>sed</Command> if you are going to build
+from sources.  The build-configuration stuff needs it.  GNU sed
+version 2.0.4 is no good!  It has a bug in it that is tickled by the
+build-configuration.  2.0.5 is OK. Others are probably OK too
+(assuming we don't create too elaborate configure scripts.)
 </Para>
 </ListItem></VarListEntry>
 </VariableList>
 </Para>
 
 <Para>
-One <Literal>fptools</Literal> project is worth a quick note at this point, because it
-is useful for all the others: <Literal>glafp-utils</Literal> contains several utilities
-which aren't particularly Glasgow-ish, but Occasionally Indispensable.
-Like <Command>lndir</Command> for creating symbolic link trees.
+One <Literal>fptools</Literal> project is worth a quick note at this
+point, because it is useful for all the others:
+<Literal>glafp-utils</Literal> contains several utilities which aren't
+particularly Glasgow-ish, but Occasionally Indispensable.  Like
+<Command>lndir</Command> for creating symbolic link trees.
 </Para>
 
 <Sect2 id="pre-supposed-gph-tools">
@@ -706,8 +602,8 @@ network of workstations (slow) or a multiprocessor box (faster).
 
 <Para>
 The current version of PVM is 3.3.11; we use 3.3.7.  It is readily
-available on the net; I think I got it from <Literal>research.att.com</Literal>, in
-<Filename>netlib</Filename>.
+available on the net; I think I got it from
+<Literal>research.att.com</Literal>, in <Filename>netlib</Filename>.
 </Para>
 
 <Para>
@@ -747,11 +643,14 @@ documentation that comes with the <Literal>fptools</Literal> projects:
 <ListItem>
 <Para>
 <IndexTerm><Primary>pre-supposed: DocBook</Primary></IndexTerm>
-<IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm>
-All our documentation is written in SGML, using the DocBook DTD and processed using the <ULink URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook tools</ULink>, which is the most shrink-wrapped SGML suite
-that we could find.  Unfortunately, it's only packaged as RPMs. You can use it to generate HTML (and
-hence DVI, PDF and Postscript) and RTF from any
-LinuxDoc source file (including this manual).
+<IndexTerm><Primary>DocBook, pre-supposed</Primary></IndexTerm> All
+our documentation is written in SGML, using the DocBook DTD and
+processed using the <ULink
+URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
+tools</ULink>, which is the most shrink-wrapped SGML suite that we
+could find.  Unfortunately, it's only packaged as RPMs. You can use it
+to generate HTML, DVI (and hence PDF and Postscript) and RTF from any
+DocBook source file (including this manual).
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
@@ -787,9 +686,9 @@ everything you need.
 
 <Para>
 This is a quite-a-bit-better-than-Lex lexer.  Used to build a couple
-of utilities in <Literal>glafp-utils</Literal>.  Depending on your operating system,
-the supplied <Command>lex</Command> may or may not work; you should get the GNU
-version.
+of utilities in <Literal>glafp-utils</Literal>.  Depending on your
+operating system, the supplied <Command>lex</Command> may or may not
+work; you should get the GNU version.
 </Para>
 </ListItem></VarListEntry>
 </VariableList>
