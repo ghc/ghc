@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.31 2002/10/21 12:42:31 simonmar Exp $
+ * $Id: MBlock.c,v 1.32 2002/10/23 12:26:11 mthomas Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -234,6 +234,7 @@ getMBlocks(nat n)
   static char* base_mblocks       = (char*)0;
   static char* next_request       = (char*)0;
   void* ret                       = (void*)0;
+  int i;
 
   lnat size = MBLOCK_SIZE * n;
   
