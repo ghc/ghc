@@ -534,7 +534,6 @@ gets whatever it's after.
     "\ts.d $f0, -8($sp)\n"  	\
     "\tsw  $2, -12($sp)");
 
-
 #define MAGIC_RETURN		\
     __asm__ volatile (		\
     "l.d $f0, -8($sp)\n"	\
