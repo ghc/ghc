@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.19 1999/08/03 15:44:21 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.20 1999/10/27 09:57:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,10 +59,11 @@
 #define INIT_INFO(i)  info : &(i)
 #define SET_INFO(c,i) ((c)->header.info = (i))
 #define GET_INFO(c)   ((c)->header.info)
+#define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
+#define get_itbl(c)   (INFO_PTR_TO_STRUCT((c)->header.info))
 
 #ifdef TABLES_NEXT_TO_CODE
 #define INIT_ENTRY(e)    code : {}
-#define GET_ENTRY(c)     ((StgFunPtr)((c)->header.info))
 #define ENTRY_CODE(info) (info)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)(info) - 1)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
@@ -70,15 +71,12 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 }
 #else
 #define INIT_ENTRY(e)    entry : (F_)(e)
-#define GET_ENTRY(c)     ((c)->header.info->entry)
 #define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return itbl->entry;
 }
 #endif
-
-#define get_itbl(c)      (INFO_PTR_TO_STRUCT((c)->header.info))
 
 /* -----------------------------------------------------------------------------
    Macros for distinguishing data pointers from code pointers
