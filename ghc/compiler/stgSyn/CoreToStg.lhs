@@ -25,6 +25,7 @@ import CoreUtils	( coreExprType )
 import CostCentre	( noCostCentre )
 import Id		( mkSysLocal, idType, isBottomingId,
 			  externallyVisibleId,
+
 			  nullIdEnv, addOneToIdEnv, lookupIdEnv, growIdEnvList,
 			  SYN_IE(IdEnv), GenId{-instance NamedThing-}, SYN_IE(Id)
 			)
@@ -292,6 +293,7 @@ coreExprToStg env expr@(App _ _)
 			    coreExprToStg env non_var_fun
 
       other ->	-- A non-variable applied to things; better let-bind it.
+--		pprTrace "coreExprToStg" (ppr PprDebug expr) $
 		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
 		coreExprToStg env fun		`thenUs` \ (stg_fun) ->
 		let
@@ -309,6 +311,7 @@ coreExprToStg env expr@(App _ _)
     collect_args (App e   (TyArg _))    args = collect_args e   args
     collect_args (App e   (UsageArg _)) args = collect_args e   args
     collect_args (App fun arg)          args = collect_args fun (arg:args)
+    collect_args (Coerce _ _ expr)      args = collect_args expr args
     collect_args fun                    args = (fun, args)
 \end{code}
 
