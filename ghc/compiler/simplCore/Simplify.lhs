@@ -516,7 +516,7 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 	-- We're looking at a binding with a trivial RHS, so
 	-- perhaps we can discard it altogether!
 	--
-	-- NB: a loop breaker never has postInlineUnconditionally True
+	-- NB: a loop breaker has must_keep_binding = True
 	-- and non-loop-breakers only have *forward* references
 	-- Hence, it's safe to discard the binding
 	--	
@@ -764,7 +764,7 @@ simplVar var cont
 ---------------------------------------------------------
 --	Dealing with a call
 
-completeCall var occ cont
+completeCall var occ_info cont
   = getBlackList		`thenSmpl` \ black_list_fn ->
     getInScope			`thenSmpl` \ in_scope ->
     getContArgs var cont	`thenSmpl` \ (args, call_cont, inline_call) ->
@@ -781,7 +781,7 @@ completeCall var occ cont
 	inline_cont | inline_call = discardInline cont
 		    | otherwise   = cont
 
-	maybe_inline = callSiteInline dflags black_listed inline_call occ
+	maybe_inline = callSiteInline dflags black_listed inline_call occ_info
 				      var arg_infos interesting_cont
     in
 	-- First, look for an inlining
@@ -809,10 +809,15 @@ completeCall var occ cont
 	-- But the black-listing mechanism means that inlining of the wrapper
 	-- won't occur for things that have specialisations till a later phase, so
 	-- it's ok to try for inlining first.
+	--
+	-- Don't apply rules for a loop breaker: doing so might give rise
+	-- to an infinite loop, for the same reasons that inlining the ordinary
+	-- RHS of a loop breaker might.
 
     getSwitchChecker 	`thenSmpl` \ chkr ->
     let
-	maybe_rule | switchIsOn chkr DontApplyRules = Nothing
+	maybe_rule |  switchIsOn chkr DontApplyRules 
+		   || isLoopBreaker occ_info	    = Nothing
 		   | otherwise			    = lookupRule in_scope var args' 
     in
     case maybe_rule of {
