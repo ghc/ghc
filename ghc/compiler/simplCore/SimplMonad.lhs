@@ -868,7 +868,7 @@ gentle we are being.
 activeInline :: SimplEnv -> OutId -> OccInfo -> Bool
 activeInline env id occ
   = case getMode env of
-      SimplGently -> isOneOcc occ
+      SimplGently -> isAlwaysActive prag && isOneOcc occ 
 	-- No inlining at all when doing gentle stuff,
 	-- except for things that occur once
 	-- The reason is that too little clean-up happens if you 
@@ -884,7 +884,9 @@ activeInline env id occ
 	-- and they are now constructed as Compulsory unfoldings (in MkId)
 	-- so they'll happen anyway.
 
-      SimplPhase n -> isActive n (idInlinePragma id)
+      SimplPhase n -> isActive n prag
+  where
+    prag = idInlinePragma id
 
 -- Belongs in BasicTypes; this frag occurs in OccurAnal too
 isOneOcc (OneOcc _ _) = True
