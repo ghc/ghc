@@ -649,7 +649,7 @@ rnBracket (DecBr group)
     let 
 	dus = tcg_dus tcg_env 
     in
-    returnM (DecBr group', duUses dus `minusNameSet` duDefs dus)
+    returnM (DecBr group', allUses dus)
 \end{code}
 
 %************************************************************************
