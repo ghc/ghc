@@ -14,8 +14,9 @@ import Bag		( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import Id		( Id, idType, isLocalId )
 import VarSet
 import DataCon		( DataCon, dataConArgTys, dataConRepType )
+import CoreSyn		( AltCon(..) )
 import PrimOp		( primOpType )
-import Literal		( literalType, Literal )
+import Literal		( literalType )
 import Maybes		( catMaybes )
 import Name		( getSrcLoc )
 import ErrUtils		( Message, addErrLocHdrLine )
@@ -200,13 +201,14 @@ lintStgExpr (StgLetNoEscape _ _ binds body)
 
 lintStgExpr (StgSCC _ expr)	= lintStgExpr expr
 
-lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
+lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts)
   = lintStgExpr scrut		`thenMaybeL` \ _ ->
 
-    (case alts of
-	StgPrimAlts tc _ _	 -> check_bndr tc
-	StgAlgAlts (Just tc) _ _ -> check_bndr tc
-	StgAlgAlts Nothing   _ _ -> returnL ()
+    (case alts_type of
+	AlgAlt tc    -> check_bndr tc
+	PrimAlt tc   -> check_bndr tc
+	UbxTupAlt tc -> check_bndr tc
+	PolyAlt      -> returnL ()
     )							`thenL_`
 	
     (trace (showSDoc (ppr e)) $ 
@@ -224,25 +226,15 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts)
     check_bndr tc = case splitTyConApp_maybe scrut_ty of
 			Just (bndr_tc, _) -> checkL (tc == bndr_tc) bad_bndr
 			Nothing		  -> addErrL bad_bndr
-\end{code}
 
-\begin{code}
-lintStgAlts :: StgCaseAlts
-	     -> Type 		-- Type of scrutinee
-	     -> LintM (Maybe Type)	-- Type of alternatives
+
+lintStgAlts :: [StgAlt]
+	    -> Type 		-- Type of scrutinee
+	    -> LintM (Maybe Type)	-- Type of alternatives
 
 lintStgAlts alts scrut_ty
-  = (case alts of
-	 StgAlgAlts _ alg_alts deflt ->
-	   mapL (lintAlgAlt scrut_ty) alg_alts 	`thenL` \ maybe_alt_tys ->
-	   lintDeflt deflt scrut_ty		`thenL` \ maybe_deflt_ty ->
-	   returnL (maybe_deflt_ty : maybe_alt_tys)
+  = mapL (lintAlt scrut_ty) alts 	`thenL` \ maybe_result_tys ->
 
-	 StgPrimAlts _ prim_alts deflt ->
-	   mapL (lintPrimAlt scrut_ty) prim_alts `thenL` \ maybe_alt_tys ->
-	   lintDeflt deflt scrut_ty		 `thenL` \ maybe_deflt_ty ->
-	   returnL (maybe_deflt_ty : maybe_alt_tys)
-    )						 `thenL` \ maybe_result_tys ->
 	 -- Check the result types
     case catMaybes (maybe_result_tys) of
       []	     -> returnL Nothing
@@ -252,7 +244,14 @@ lintStgAlts alts scrut_ty
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
-lintAlgAlt scrut_ty (con, args, _, rhs)
+lintAlt scrut_ty (DEFAULT, _, _, rhs)
+ = lintStgExpr rhs
+
+lintAlt scrut_ty (LitAlt lit, _, _, rhs)
+ = checkTys (literalType lit) scrut_ty (mkAltMsg1 scrut_ty)	`thenL_`
+   lintStgExpr rhs
+
+lintAlt scrut_ty (DataAlt con, args, _, rhs)
   = (case splitTyConApp_maybe scrut_ty of
       Just (tycon, tys_applied) | isAlgTyCon tycon && 
 				  not (isNewTyCon tycon) ->
@@ -267,7 +266,7 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
 	 mapL check (zipEqual "lintAlgAlt:stg" arg_tys args)	 `thenL_`
 	 returnL ()
       other ->
-	 addErrL (mkAlgAltMsg1 scrut_ty)
+	 addErrL (mkAltMsg1 scrut_ty)
     )								 `thenL_`
     addInScopeVars args 	(
 	 lintStgExpr rhs
@@ -280,13 +279,6 @@ lintAlgAlt scrut_ty (con, args, _, rhs)
     -- We give it its own copy, so it isn't overloaded.
     elem _ []	    = False
     elem x (y:ys)   = x==y || elem x ys
-
-lintPrimAlt scrut_ty alt@(lit,rhs)
- = checkTys (literalType lit) scrut_ty (mkPrimAltMsg alt)	`thenL_`
-   lintStgExpr rhs
-
-lintDeflt StgNoDefault scrut_ty = returnL Nothing
-lintDeflt deflt@(StgBindDefault rhs) scrut_ty = lintStgExpr rhs
 \end{code}
 
 
@@ -464,7 +456,7 @@ checkTys ty1 ty2 msg loc scope errs
 \end{code}
 
 \begin{code}
-mkCaseAltMsg :: StgCaseAlts -> Message
+mkCaseAltMsg :: [StgAlt] -> Message
 mkCaseAltMsg alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
 	    (empty) -- LATER: ppr alts
@@ -498,10 +490,10 @@ mkUnappTyMsg var ty
 	      (<>) (ptext SLIT("Var:      ")) (ppr var),
 	      (<>) (ptext SLIT("Its type: ")) (ppr ty)]
 
-mkAlgAltMsg1 :: Type -> Message
-mkAlgAltMsg1 ty
-  = ($$) (text "In some case statement, type of scrutinee is not a data type:")
-	    (ppr ty)
+mkAltMsg1 :: Type -> Message
+mkAltMsg1 ty
+  = ($$) (text "In a case expression, type of scrutinee does not match patterns")
+	 (ppr ty)
 
 mkAlgAltMsg2 :: Type -> DataCon -> Message
 mkAlgAltMsg2 ty con
@@ -526,11 +518,6 @@ mkAlgAltMsg4 ty arg
 	ppr ty,
 	ppr arg
     ]
-
-mkPrimAltMsg :: (Literal, StgExpr) -> Message
-mkPrimAltMsg alt
-  = text "In a primitive case alternative, type of literal doesn't match type of scrutinee:"
-    $$ ppr alt
 
 mkCaseOfCaseMsg :: StgExpr -> Message
 mkCaseOfCaseMsg e

@@ -8,7 +8,7 @@ module CgBindery (
 	CgBindings, CgIdInfo,
 	StableLoc, VolatileLoc,
 
-	stableAmodeIdInfo, heapIdInfo, newTempAmodeAndIdInfo,
+	stableAmodeIdInfo, heapIdInfo, 
 	letNoEscapeIdInfo, idInfoToAmode,
 
 	addBindC, addBindsC,
@@ -18,7 +18,7 @@ module CgBindery (
 
 	bindNewToStack,  rebindToStack,
 	bindNewToNode, bindNewToReg, bindArgsToRegs,
-	bindNewToTemp, bindNewPrimToAmode,
+	bindNewToTemp, 
 	getArgAmode, getArgAmodes,
 	getCAddrModeAndInfo, getCAddrMode,
 	getCAddrModeIfVolatile, getVolatileRegs,
@@ -44,9 +44,9 @@ import VarEnv
 import VarSet		( varSetElems )
 import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool, seqMaybe )
-import Name		( Name, isInternalName, NamedThing(..) )
+import Name		( isInternalName, NamedThing(..) )
 #ifdef DEBUG
-import PprAbsC		( pprAmode )
+import PprAbsC		( pprAmode, pprMagicId )
 #endif
 import PrimRep          ( PrimRep(..) )
 import StgSyn		( StgArg, StgLiveVars, GenStgArg(..), isStgTypeArg )
@@ -109,6 +109,25 @@ maybeStkLoc (VirStkLoc offset) = Just offset
 maybeStkLoc _		       = Nothing
 \end{code}
 
+\begin{code}
+instance Outputable CgIdInfo where
+  ppr (MkCgIdInfo id vol stb lf)
+    = ppr id <+> ptext SLIT("-->") <+> vcat [ppr vol, ppr stb]
+
+instance Outputable VolatileLoc where
+  ppr NoVolatileLoc = empty
+  ppr (TempVarLoc u) = ptext SLIT("tmp") <+> ppr u
+  ppr (RegLoc r)     = ptext SLIT("reg") <+> pprMagicId r
+  ppr (VirHpLoc v)   = ptext SLIT("vh") <+> ppr v
+  ppr (VirNodeLoc v) = ptext SLIT("vn") <+> ppr v
+
+instance Outputable StableLoc where
+  ppr NoStableLoc 	 = empty
+  ppr (VirStkLoc v) 	 = ptext SLIT("vs") <+> ppr v
+  ppr (LitLoc l) 	 = ptext SLIT("lit") <+> ppr l
+  ppr (StableAmodeLoc a) = ptext SLIT("amode") <+> pprAmode a
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection[Bindery-idInfo]{Manipulating IdInfo}
@@ -122,15 +141,6 @@ tempIdInfo i uniq         lf_info = MkCgIdInfo i (TempVarLoc uniq) NoStableLoc l
 
 letNoEscapeIdInfo i sp lf_info
   = MkCgIdInfo i NoVolatileLoc (StableAmodeLoc (CJoinPoint sp)) lf_info
-
-newTempAmodeAndIdInfo :: Id -> LambdaFormInfo -> (CAddrMode, CgIdInfo)
-
-newTempAmodeAndIdInfo name lf_info
-  = (temp_amode, temp_idinfo)
-  where
-    uniq       	= getUnique name
-    temp_amode	= CTemp uniq (idPrimRep name)
-    temp_idinfo = tempIdInfo name uniq lf_info
 
 idInfoToAmode :: PrimRep -> CgIdInfo -> FCode CAddrMode
 idInfoToAmode kind (MkCgIdInfo _ vol stab _) = idInfoPiecesToAmode kind vol stab
@@ -373,14 +383,15 @@ bindNewToNode name offset lf_info
 -- bind the id to it, and return the addressing mode for the
 -- temporary.
 bindNewToTemp :: Id -> FCode CAddrMode
-bindNewToTemp name
-  = let (temp_amode, id_info) = newTempAmodeAndIdInfo name (mkLFArgument name)
-		-- This is used only for things we don't know
-		-- anything about; values returned by a case statement,
-		-- for example.
-    in do
-		addBindC name id_info
-		return temp_amode
+bindNewToTemp id
+  = do	addBindC id id_info
+	return temp_amode
+  where
+    uniq       = getUnique id
+    temp_amode = CTemp uniq (idPrimRep id)
+    id_info    = tempIdInfo id uniq lf_info
+    lf_info    = mkLFArgument id	-- Always used of things we
+					-- know nothing about
 
 bindNewToReg :: Id -> MagicId -> LambdaFormInfo -> Code
 bindNewToReg name magic_id lf_info
@@ -393,24 +404,6 @@ bindArgsToRegs args regs
   = listCs (zipWithEqual "bindArgsToRegs" bind args regs)
   where
     arg `bind` reg = bindNewToReg arg reg (mkLFArgument arg)
-\end{code}
-
-@bindNewPrimToAmode@ works only for certain addressing modes.  Making
-this work for stack offsets is non-trivial (virt vs. real stack offset
-difficulties).
-
-\begin{code}
-bindNewPrimToAmode :: Id -> CAddrMode -> Code
-bindNewPrimToAmode name (CReg reg) 
-  = bindNewToReg name reg (panic "bindNewPrimToAmode")
-
-bindNewPrimToAmode name (CTemp uniq kind)
-  = addBindC name (tempIdInfo name uniq (panic "bindNewPrimToAmode"))
-
-#ifdef DEBUG
-bindNewPrimToAmode name amode
-  = pprPanic "bindNew...:" (pprAmode amode)
-#endif
 \end{code}
 
 \begin{code}
@@ -458,15 +451,16 @@ buildLivenessMask size sp = do {
     	    ];
     };
 
-    ASSERT(all (>=0) rel_slots)
-     return (intsToReverseBitmap size rel_slots)
+    WARN( not (all (>=0) rel_slots), ppr size $$ ppr sp $$ ppr rel_slots $$ ppr binds )
+    return (intsToReverseBitmap size rel_slots)
   }
 
 -- In a continuation, we want a liveness mask that starts from just after
 -- the return address, which is on the stack at realSp.
 
-buildContLivenessMask :: Name -> FCode Liveness
-buildContLivenessMask name = do
+buildContLivenessMask :: Id -> FCode Liveness
+	-- The Id is used just for its unique to make a label
+buildContLivenessMask id = do
 	realSp <- getRealSp
 
 	frame_sp <- getStackFrame
@@ -477,7 +471,7 @@ buildContLivenessMask name = do
 
 	mask <- buildLivenessMask frame_size (realSp-1)
 
-        let liveness = Liveness (mkBitmapLabel name) frame_size mask
+        let liveness = Liveness (mkBitmapLabel (getName id)) frame_size mask
 	absC (maybeLargeBitmap liveness)
 	return liveness
 \end{code}

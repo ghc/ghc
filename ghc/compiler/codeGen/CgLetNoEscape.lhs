@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-% $Id: CgLetNoEscape.lhs,v 1.20 2003/05/14 09:13:56 simonmar Exp $
+% $Id: CgLetNoEscape.lhs,v 1.21 2003/07/02 13:12:37 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -20,27 +20,19 @@ import StgSyn
 import CgMonad
 import AbsCSyn
 
-import CgBindery	( letNoEscapeIdInfo, bindArgsToRegs,
-			  bindNewToStack, buildContLivenessMask, CgIdInfo,
-			  nukeDeadBindings
-			)
+import CgBindery	( CgIdInfo, letNoEscapeIdInfo, nukeDeadBindings	)
+import CgCase		( mkRetDirectTarget, restoreCurrentCostCentre )
+import CgCon		( bindUnboxedTupleComponents )
 import CgHeapery	( unbxTupleHeapCheck )
-import CgRetConv	( assignRegs )
-import CgStackery	( mkVirtStkOffsets, 
-			  allocStackTop, deAllocStackTop, freeStackSlots )
-import CgUsages		( setRealAndVirtualSp, getRealSp, getSpRelOffset )
+import CgStackery	( allocStackTop, deAllocStackTop )
+import CgUsages		( getSpRelOffset )
 import CLabel		( mkReturnInfoLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import CostCentre       ( CostCentreStack )
-import Name		( getName )
-import Id		( Id, idPrimRep, idName )
+import Id		( Id )
 import Var		( idUnique )
-import PrimRep		( PrimRep(..), retPrimRepSize, isFollowableRep )
+import PrimRep		( PrimRep(..), retPrimRepSize )
 import BasicTypes	( RecFlag(..) )
-import Unique		( Unique )
-import Util		( splitAtList )
-
-import List		( partition )
 \end{code}
 
 %************************************************************************
@@ -158,12 +150,11 @@ cgLetNoEscapeClosure
 -- ToDo: deal with the cost-centre issues
 
 cgLetNoEscapeClosure 
-	binder cc binder_info srt full_live_in_rhss 
+	bndr cc binder_info srt full_live_in_rhss 
 	rhs_eob_info cc_slot rec args body
   = let
 	arity   = length args
 	lf_info = mkLFLetNoEscape arity
-	uniq    = idUnique binder
     in
 
     -- saveVolatileVarsAndRegs done earlier in cgExpr.
@@ -175,65 +166,37 @@ cgLetNoEscapeClosure
 	 nukeDeadBindings full_live_in_rhss)
 
 	(deAllocStackTop retPrimRepSize		`thenFC` \_ ->
-	 buildContLivenessMask (getName binder)	`thenFC` \ liveness ->
-     	 forkAbsC (cgLetNoEscapeBody binder cc args body uniq) 
-						`thenFC` \ code ->
-	 getSRTInfo (idName binder) srt		`thenFC` \ srt_info -> 
-	 absC (CRetDirect uniq code srt_info liveness)
-		`thenC` returnFC ())
-	    	    	    	     	`thenFC` \ (vSp, _) ->
+	 forkAbsC (
+-- TEMP omit for line-by-line compatibility
+--	    restoreCurrentCostCentre cc_slot	`thenC`
+	    cgLetNoEscapeBody bndr cc args body
+	 )					`thenFC` \ abs_c ->
+	 mkRetDirectTarget bndr abs_c srt
+		-- Ignore the label that comes back from
+		-- mkRetDirectTarget.  It must be conjured up elswhere
+	)    	    	    	     	`thenFC` \ (vSp, _) ->
 
-    returnFC (binder, letNoEscapeIdInfo binder vSp lf_info)
+    returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info)
 \end{code}
 
 \begin{code}
-cgLetNoEscapeBody :: Id
+cgLetNoEscapeBody :: Id		-- Name of the joint point
 		  -> CostCentreStack
 		  -> [Id]	-- Args
 		  -> StgExpr	-- Body
-		  -> Unique     -- Unique for entry label
 		  -> Code
 
-cgLetNoEscapeBody binder cc all_args body uniq
-   = 
-     -- this is where the stack frame lives:
-     getRealSp   `thenFC` \sp -> 
-
-     -- This is very much like bindUnboxedTupleComponents (ToDo)
-     let
-	arg_kinds	     = map idPrimRep all_args
-	(arg_regs, _)	     = assignRegs [{-nothing live-}] arg_kinds
-	(reg_args, stk_args) = splitAtList arg_regs all_args
-
-	-- separate the rest of the args into pointers and non-pointers
-	( ptr_args, nptr_args ) = 
-	   partition (isFollowableRep . idPrimRep) stk_args
-
-	(ptr_sp,  ptr_offsets)  = mkVirtStkOffsets sp     idPrimRep ptr_args
-	(nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp idPrimRep nptr_args
-
-        ptrs  = ptr_sp - sp
-	nptrs = nptr_sp - ptr_sp
-     in
-
-	-- Bind args to appropriate regs/stk locns
-     bindArgsToRegs reg_args arg_regs		    `thenC`
-     mapCs bindNewToStack ptr_offsets		    `thenC`
-     mapCs bindNewToStack nptr_offsets		    `thenC`
-
-     setRealAndVirtualSp nptr_sp		    `thenC`
-
-	-- free up the stack slots containing the return address
-	-- (frame header itbl).  c.f. CgCase.cgUnboxedTupleAlt.
-     freeStackSlots [sp]			    `thenC`
+cgLetNoEscapeBody bndr cc all_args body
+   = bindUnboxedTupleComponents all_args	`thenFC` \ (arg_regs, ptrs, nptrs, ret_slot) ->
 
 	-- Enter the closures cc, if required
      --enterCostCentreCode closure_info cc IsFunction  `thenC`
 
- 	-- fill in the frame header only if we fail a heap check:
-	-- otherwise it isn't needed.
-     getSpRelOffset sp			`thenFC` \sp_rel ->
-     let lbl = mkReturnInfoLabel uniq
+ 	-- The "return address" slot doesn't have a return address in it;
+	-- but the heap-check needs it filled in if the heap-check fails.
+	-- So we pass code to fill it in to the heap-check macro
+     getSpRelOffset ret_slot			`thenFC` \ sp_rel ->
+     let lbl 		= mkReturnInfoLabel (idUnique bndr)
 	 frame_hdr_asst = CAssign (CVal sp_rel RetRep) (CLbl lbl RetRep)
      in
 

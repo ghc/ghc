@@ -100,8 +100,8 @@ srtBind table (StgRec pairs) = StgRec [ (b, srtRhs table r) | (b,r) <- pairs ]
 srtRhs :: IdEnv Int -> StgRhs -> StgRhs
 
 srtRhs table e@(StgRhsCon cc con args) = e
-srtRhs table (StgRhsClosure cc bi free_vars u (SRTEntries cafs) args body)
-  = StgRhsClosure cc bi free_vars u (constructSRT table cafs) args 
+srtRhs table (StgRhsClosure cc bi free_vars u srt args body)
+  = StgRhsClosure cc bi free_vars u (constructSRT table srt) args 
 	$! (srtExpr table body)
 
 -- ---------------------------------------------------------------------------
@@ -116,13 +116,12 @@ srtExpr table e@(StgOpApp op args ty)   = e
 
 srtExpr table (StgSCC cc expr) = StgSCC cc $! srtExpr table expr
 
-srtExpr table (StgCase scrut live1 live2 uniq (SRTEntries cafs_in_alts) alts)
- = let 
-	expr' = srtExpr table scrut
-	srt_info = constructSRT table cafs_in_alts
-	alts' = srtCaseAlts table alts
-   in
-       StgCase expr' live1 live2 uniq srt_info alts'
+srtExpr table (StgCase scrut live1 live2 uniq srt alt_type alts)
+ = StgCase expr' live1 live2 uniq srt' alt_type alts'
+ where
+   expr' = srtExpr table scrut
+   srt'  = constructSRT table srt
+   alts' = map (srtAlt table) alts
 
 srtExpr table (StgLet bind body)
   = srtBind table bind =: \ bind' ->
@@ -138,32 +137,15 @@ srtExpr table (StgLetNoEscape live1 live2 bind body)
 srtExpr table expr = pprPanic "srtExpr" (ppr expr)
 #endif
 
-
--- Case Alternatives
-
-srtCaseAlts :: IdEnv Int -> StgCaseAlts -> StgCaseAlts
-
-srtCaseAlts table (StgAlgAlts t alts dflt)
-  = (StgAlgAlts t $! map (srtAlgAlt table) alts) $! srtDefault table dflt
-
-srtCaseAlts table (StgPrimAlts t alts dflt)
-  = (StgPrimAlts t $! map (srtPrimAlt table) alts) $! srtDefault table dflt
-
-srtAlgAlt table (con,args,used,rhs)
+srtAlt :: IdEnv Int -> StgAlt -> StgAlt
+srtAlt table (con,args,used,rhs)
   = (,,,) con args used $! srtExpr table rhs
-
-srtPrimAlt table (lit,rhs)
-  = (,) lit $! srtExpr table rhs
-
-srtDefault table StgNoDefault  = StgNoDefault
-srtDefault table (StgBindDefault rhs)
-  = StgBindDefault $! srtExpr table rhs
 
 -----------------------------------------------------------------------------
 -- Construct an SRT bitmap.
 
-constructSRT :: IdEnv Int -> IdSet -> SRT
-constructSRT table entries
+constructSRT :: IdEnv Int -> SRT -> SRT
+constructSRT table (SRTEntries entries)
  | isEmptyVarSet entries = NoSRT
  | otherwise  = SRT offset len bitmap
   where

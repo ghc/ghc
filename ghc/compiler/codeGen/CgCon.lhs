@@ -45,7 +45,7 @@ import DataCon		( DataCon, dataConTag,
 			  isUnboxedTupleCon, isNullaryDataCon, dataConWorkId, 
 			  dataConName, dataConRepArity
 			)
-import Id		( Id, idName, idPrimRep )
+import Id		( Id, idName, idPrimRep, isDeadBinder )
 import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
@@ -229,44 +229,51 @@ returned in registers and on the stack instead of the heap.
 
 \begin{code}
 bindUnboxedTupleComponents
-	:: [Id]				-- args
-	-> FCode ([MagicId], 		-- regs assigned
-		  Int,			-- number of pointer stack slots
-		  Int,			-- number of non-pointer stack slots
-		  Bool)			-- any components on stack?
+	:: [Id]				-- Aargs
+	-> FCode ([MagicId], 		-- Regs assigned
+		  Int,			-- Number of pointer stack slots
+		  Int,			-- Number of non-pointer stack slots
+		  VirtualSpOffset)	-- Offset of return address slot
+					-- (= realSP on entry)
 
 bindUnboxedTupleComponents args
- =  -- Assign as many components as possible to registers
+ =      -- Assign as many components as possible to registers
     let (arg_regs, _leftovers) = assignRegs [] (map idPrimRep args)
 	(reg_args, stk_args)   = splitAtList arg_regs args
 
 	-- separate the rest of the args into pointers and non-pointers
-	( ptr_args, nptr_args ) = 
+	(ptr_args, nptr_args) = 
 	   partition (isFollowableRep . idPrimRep) stk_args
     in
   
     -- Allocate the rest on the stack
+    -- The real SP points to the return address, above which any 
+    -- leftover unboxed-tuple components will be allocated
     getVirtSp `thenFC` \ vsp ->
     getRealSp `thenFC` \ rsp ->
     let 
 	(ptr_sp,  ptr_offsets)  = mkVirtStkOffsets rsp    idPrimRep ptr_args
 	(nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp idPrimRep nptr_args
+        ptrs  = ptr_sp - rsp
+	nptrs = nptr_sp - ptr_sp
     in
 
     -- The stack pointer points to the last stack-allocated component
     setRealAndVirtualSp nptr_sp  		`thenC`
 
-    -- need to explicitly free any empty slots we just jumped over
-    (if vsp < rsp then freeStackSlots [vsp+1 .. rsp] else nopC) `thenC`
+    -- We have just allocated slots starting at real SP + 1, and set the new
+    -- virtual SP to the topmost allocated slot.  
+    -- If the virtual SP started *below* the real SP, we've just jumped over
+    -- some slots that won't be in the free-list, so put them there
+    -- This commonly happens because we've freed the return-address slot
+    -- (trimming back the virtual SP), but the real SP still points to that slot
+    freeStackSlots [vsp+1,vsp+2 .. rsp]		`thenC`
 
     bindArgsToRegs reg_args arg_regs 		`thenC`
     mapCs bindNewToStack ptr_offsets 		`thenC`
     mapCs bindNewToStack nptr_offsets 		`thenC`
 
-    returnFC (arg_regs, 
-	      ptr_sp - rsp, nptr_sp - ptr_sp, 
-	      notNull ptr_offsets || notNull ptr_offsets
-	     )
+    returnFC (arg_regs, ptrs, nptrs, rsp)
 \end{code}
 
 %************************************************************************
@@ -287,7 +294,7 @@ cgReturnDataCon con amodes
 
     case sequel of
 
-      CaseAlts _ (Just (alts, Just (maybe_deflt, (_,deflt_lbl)))) False
+      CaseAlts _ (Just (alts, Just (deflt_bndr, (_,deflt_lbl)))) False
 	| not (dataConTag con `is_elem` map fst alts)
 	->
 		-- Special case!  We're returning a constructor to the default case
@@ -301,9 +308,9 @@ cgReturnDataCon con amodes
 		--	if the default is a non-bind-default (ie does not use y),
 		--	then we should simply jump to the default join point;
 
-		case maybe_deflt of
-		    Nothing -> performReturn AbsCNop {- No reg assts -} jump_to_join_point
-		    Just _  -> build_it_then jump_to_join_point
+		if isDeadBinder deflt_bndr
+		then performReturn AbsCNop {- No reg assts -} jump_to_join_point
+		else build_it_then jump_to_join_point
 	where
 	  is_elem = isIn "cgReturnDataCon"
 	  jump_to_join_point sequel = absC (CJump (CLbl deflt_lbl CodePtrRep))

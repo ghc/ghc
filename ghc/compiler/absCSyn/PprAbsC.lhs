@@ -28,7 +28,7 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 
 import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe,
 			  playThreadSafe, ccallConvAttribute,
-			  ForeignCall(..), Safety(..), DNCallSpec(..),
+			  ForeignCall(..), DNCallSpec(..),
 			  DNType(..), DNKind(..) )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel, mkClosureLabel,
@@ -1411,7 +1411,7 @@ pprMagicId SpLim		    = ptext SLIT("SpLim")
 pprMagicId Hp			    = ptext SLIT("Hp")
 pprMagicId HpLim		    = ptext SLIT("HpLim")
 pprMagicId CurCostCentre	    = ptext SLIT("CCCS")
-pprMagicId VoidReg		    = panic "pprMagicId:VoidReg!"
+pprMagicId VoidReg		    = ptext SLIT("VoidReg")
 
 pprVanillaReg :: Int# -> SDoc
 pprVanillaReg n = char 'R' <> int (I# n)

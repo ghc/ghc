@@ -38,8 +38,7 @@ data CounterType
   | ConstructorApps
   | PrimitiveApps
   | LetNoEscapes
-  | AlgCases
-  | PrimCases
+  | StgCases
   | FreeVariables
   | ConstructorBinds Bool{-True<=>top-level-}
   | ReEntrantBinds   Bool{-ditto-}
@@ -88,8 +87,7 @@ showStgStats prog
     s ConstructorApps	      = "ConstructorApps            "
     s PrimitiveApps	      = "PrimitiveApps              "
     s LetNoEscapes	      = "LetNoEscapes               "
-    s AlgCases		      = "AlgCases                   "
-    s PrimCases		      = "PrimCases                  "
+    s StgCases		      = "StgCases                   "
     s FreeVariables	      = "FreeVariables              "
     s (ConstructorBinds True) = "ConstructorBinds_Top       "
     s (ReEntrantBinds True)   = "ReEntrantBinds_Top         "
@@ -163,24 +161,12 @@ statExpr (StgLet binds body)
   = statBinding False{-not top-level-} binds	`combineSE`
     statExpr body
 
-statExpr (StgCase expr lve lva bndr srt alts)
+statExpr (StgCase expr lve lva bndr srt alt_type alts)
   = statExpr expr	`combineSE`
+    stat_alts alts	`combineSE`
+    countOne StgCases
+  where
     stat_alts alts
-    where
-      stat_alts (StgAlgAlts ty alts def)
 	= combineSEs (map statExpr [ e | (_,_,_,e) <- alts ])
-					`combineSE`
-	  stat_deflt def		`combineSE`
-	  countOne AlgCases
-
-      stat_alts (StgPrimAlts ty alts def)
-	= combineSEs (map statExpr [ e | (_,e) <- alts ])
-					`combineSE`
-	  stat_deflt def		`combineSE`
-	  countOne PrimCases
-
-      stat_deflt StgNoDefault = emptySE
-
-      stat_deflt (StgBindDefault expr) = statExpr expr
 \end{code}
 

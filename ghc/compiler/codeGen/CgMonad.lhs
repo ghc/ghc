@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.38 2003/05/14 09:13:56 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.39 2003/07/02 13:12:38 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -151,9 +151,8 @@ data Sequel
 type SemiTaggingStuff
   = Maybe			    -- Maybe[1] we don't have any semi-tagging stuff...
      ([(ConTag, JoinDetails)],	    -- Alternatives
-      Maybe (Maybe Id, JoinDetails) -- Default (but Maybe[2] we don't have one)
-				    -- Maybe[3] the default is a
-				    -- bind-default (Just b); that is,
+      Maybe (Id, JoinDetails)	    -- Default (but Maybe[2] we don't have one)
+				    -- The default branch expects a 
 				    -- it expects a ptr to the thing
 				    -- in Node, bound to b
      )
@@ -446,19 +445,16 @@ that
 	- the virtual Hp is moved on to the worst virtual Hp for the branches
 
 \begin{code}
-forkAlts :: [FCode a] -> FCode b -> FCode ([a],b)
+forkAlts :: [FCode a] -> FCode [a]
 
-forkAlts branch_fcodes (FCode deflt_fcode) = 
-	do
-		info_down <- getInfoDown
-		in_state <- getState
-		let compile (FCode fc) = fc info_down in_state
-		let (branch_results, branch_out_states) = unzip (map compile branch_fcodes)
-		let (deflt_result, deflt_out_state) = deflt_fcode info_down in_state
-		setState $ foldl stateIncUsage in_state (deflt_out_state:branch_out_states)
-				-- NB foldl.  in_state is the *left* argument to stateIncUsage
-		return (branch_results, deflt_result)
-
+forkAlts branch_fcodes
+  = do	info_down <- getInfoDown
+	in_state  <- getState
+	let compile (FCode fc)			= fc info_down in_state
+	let (branch_results, branch_out_states) = unzip (map compile branch_fcodes)
+	setState $ foldl stateIncUsage in_state branch_out_states
+			-- NB foldl.  in_state is the *left* argument to stateIncUsage
+	return branch_results
 \end{code}
 
 @forkEval@ takes two blocks of code.

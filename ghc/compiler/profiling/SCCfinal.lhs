@@ -173,33 +173,14 @@ stgMassageForProfiling mod_name us stg_binds
 	do_expr expr		`thenMM` \ expr' ->
 	returnMM (StgSCC cc expr')
 
-    do_expr (StgCase expr fv1 fv2 bndr srt alts)
+    do_expr (StgCase expr fv1 fv2 bndr srt alt_type alts)
       = do_expr expr		`thenMM` \ expr' ->
-	do_alts alts		`thenMM` \ alts' ->
-	returnMM (StgCase expr' fv1 fv2 bndr srt alts')
+	mapMM do_alt alts 	`thenMM` \ alts' ->
+	returnMM (StgCase expr' fv1 fv2 bndr srt alt_type alts')
       where
-	do_alts (StgAlgAlts tycon alts def) 
-	  = mapMM do_alt alts 	`thenMM` \ alts' ->
-	    do_deflt def	`thenMM` \ def' ->
-	    returnMM (StgAlgAlts tycon alts' def')
-	  where
-	    do_alt (id, bs, use_mask, e)
-	      = do_expr e `thenMM` \ e' ->
-		returnMM (id, bs, use_mask, e')
-
-	do_alts (StgPrimAlts tycon alts def) 
-	  = mapMM do_alt alts	`thenMM` \ alts' ->
-	    do_deflt def	`thenMM` \ def' ->
-	    returnMM (StgPrimAlts tycon alts' def')
-	  where
-	    do_alt (l,e)
-	      = do_expr e `thenMM` \ e' ->
-		returnMM (l,e')
-
-	do_deflt StgNoDefault = returnMM StgNoDefault
-	do_deflt (StgBindDefault e) 
-	  = do_expr e			`thenMM` \ e' ->
-	    returnMM (StgBindDefault e')
+	do_alt (id, bs, use_mask, e)
+	  = do_expr e `thenMM` \ e' ->
+	    returnMM (id, bs, use_mask, e')
 
     do_expr (StgLet b e)
 	= do_let b e `thenMM` \ (b,e) ->

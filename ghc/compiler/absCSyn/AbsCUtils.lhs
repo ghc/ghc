@@ -22,7 +22,7 @@ module AbsCUtils (
 import AbsCSyn
 import CLabel		( mkMAP_FROZEN_infoLabel )
 import Digraph		( stronglyConnComp, SCC(..) )
-import DataCon		( fIRST_TAG, ConTag )
+import DataCon		( fIRST_TAG, dataConTag )
 import Literal		( literalPrimRep, mkMachWord, mkMachInt )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
@@ -34,13 +34,12 @@ import CmdLineOpts      ( opt_EmitCExternDecls, opt_Unregisterised )
 import ForeignCall	( ForeignCall(..), CCallSpec(..),
 			  isDynamicTarget, isCasmTarget )
 import StgSyn		( StgOp(..) )
+import CoreSyn		( AltCon(..) )
 import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
 import Outputable
 import Panic		( panic )
 import FastTypes
 import Constants	( wORD_SIZE, wORD_SIZE_IN_BITS )
-
-import Maybe		( isJust )
 
 infixr 9 `thenFlt`
 \end{code}
@@ -108,18 +107,14 @@ mkAbsCStmtList' other r = other : r
 \end{code}
 
 \begin{code}
-mkAlgAltsCSwitch :: CAddrMode -> [(ConTag, AbstractC)] -> AbstractC -> AbstractC
+mkAlgAltsCSwitch :: CAddrMode -> [(AltCon, AbstractC)] -> AbstractC
 
-mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
- | isJust (nonemptyAbsC deflt_absc) 
-	= CSwitch scrutinee (adjust tagged_alts) deflt_absc
- | otherwise 
-	= CSwitch scrutinee (adjust rest) first_alt
+mkAlgAltsCSwitch scrutinee ((_,first_alt) : rest_alts)
+ = CSwitch scrutinee (adjust rest_alts) first_alt
  where
-   -- it's ok to convert one of the alts into a default if we don't already have
-   -- one, because this is an algebraic case and we're guaranteed that the tag 
-   -- will match one of the branches.
-   ((_,first_alt):rest) = tagged_alts
+   -- We use the first alt as the default.  Either it *is* the DEFAULT,
+   -- (which is always first if present), or the case is exhaustive,
+   -- in which case we can use the first as the default anyway
 
    -- Adjust the tags in the switch to start at zero.
    -- This is the convention used by primitive ops which return algebraic
@@ -128,8 +123,8 @@ mkAlgAltsCSwitch scrutinee tagged_alts deflt_absc
 
    -- We also need to convert to Literals to keep the CSwitch happy
    adjust tagged_alts
-     = [ (mkMachWord (toInteger (tag - fIRST_TAG)), abs_c)
-       | (tag, abs_c) <- tagged_alts ]
+     = [ (mkMachWord (toInteger (dataConTag dc - fIRST_TAG)), abs_c)
+       | (DataAlt dc, abs_c) <- tagged_alts ]
 \end{code}
 
 %************************************************************************

@@ -14,7 +14,7 @@ module StgSyn (
 	GenStgLiveVars,
 
 	GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
-	GenStgCaseAlts(..), GenStgCaseDefault(..),
+	GenStgAlt, AltType(..),
 
 	UpdateFlag(..), isUpdatable,
 
@@ -24,8 +24,7 @@ module StgSyn (
 
 	-- a set of synonyms for the most common (only :-) parameterisation
 	StgArg, StgLiveVars,
-	StgBinding, StgExpr, StgRhs,
-	StgCaseAlts, StgCaseDefault,
+	StgBinding, StgExpr, StgRhs, StgAlt, 
 
 	-- StgOp
 	StgOp(..),
@@ -38,7 +37,7 @@ module StgSyn (
 	isLitLitArg, isDllConApp, isStgTypeArg,
 	stgArgType, stgBinders,
 
-	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs, pprStgAlts
+	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs
 
 #ifdef DEBUG
 	, pprStgLVs
@@ -56,6 +55,7 @@ import Name		( isDllName )
 import Literal		( Literal, literalType, isLitLitLit, literalPrimRep )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
+import CoreSyn		( AltCon )
 import PrimOp		( PrimOp )
 import Outputable
 import Util             ( count )
@@ -227,7 +227,10 @@ This has the same boxed/unboxed business as Core case expressions.
 
 	SRT		-- The SRT for the continuation
 
-	(GenStgCaseAlts bndr occ)
+	AltType 
+
+	[GenStgAlt bndr occ]	-- The DEFAULT case is always *first* 
+				-- if it is there at all
 \end{code}
 
 %************************************************************************
@@ -456,53 +459,32 @@ pp_binder_info SatCallsOnly    = ptext SLIT("sat-only")
 %*									*
 %************************************************************************
 
-Just like in @CoreSyntax@ (except no type-world stuff).
+Very like in @CoreSyntax@ (except no type-world stuff).
 
-* Algebraic cases are done using
-	StgAlgAlts (Just tc) alts deflt
-
-* Polymorphic cases, or case of a function type, are done using
-	StgAlgAlts Nothing [] (StgBindDefault e)
-
-* Primitive cases are done using 
-	StgPrimAlts tc alts deflt
-
-We thought of giving polymorphic cases their own constructor,
-but we get a bit more code sharing this way
-
-The type constructor in StgAlgAlts/StgPrimAlts is guaranteed not
-to be abstract; that is, we can see its representation.  This is
-important because the code generator uses it to determine return
-conventions etc.  But it's not trivial where there's a moduule loop 
-involved, because some versions of a type constructor might not have
-all the constructors visible.  So mkStgAlgAlts (in CoreToStg) ensures
-that it gets the TyCon from the constructors or literals (which are
-guaranteed to have the Real McCoy) rather than from the scrutinee type.
+The type constructor is guaranteed not to be abstract; that is, we can
+see its representation.  This is important because the code generator
+uses it to determine return conventions etc.  But it's not trivial
+where there's a moduule loop involved, because some versions of a type
+constructor might not have all the constructors visible.  So
+mkStgAlgAlts (in CoreToStg) ensures that it gets the TyCon from the
+constructors or literals (which are guaranteed to have the Real McCoy)
+rather than from the scrutinee type.
 
 \begin{code}
-data GenStgCaseAlts bndr occ
-  = StgAlgAlts	(Maybe TyCon)			-- Just tc => scrutinee type is 
-						--	      an algebraic data type
-						-- Nothing => scrutinee type is a type
-						--	      variable or function type
-		[(DataCon,			-- alts: data constructor,
-		  [bndr],			-- constructor's parameters,
-		  [Bool],			-- "use mask", same length as
-						-- parameters; a True in a
-						-- param's position if it is
-						-- used in the ...
-		  GenStgExpr bndr occ)]	-- ...right-hand side.
-		(GenStgCaseDefault bndr occ)
+type GenStgAlt bndr occ
+  = (AltCon,		-- alts: data constructor,
+     [bndr],		-- constructor's parameters,
+     [Bool],		-- "use mask", same length as
+			-- parameters; a True in a
+			-- param's position if it is
+			-- used in the ...
+     GenStgExpr bndr occ)	-- ...right-hand side.
 
-  | StgPrimAlts	TyCon
-		[(Literal,			-- alts: unboxed literal,
-		  GenStgExpr bndr occ)]	-- rhs.
-		(GenStgCaseDefault bndr occ)
-
-data GenStgCaseDefault bndr occ
-  = StgNoDefault				-- small con family: all
-						-- constructor accounted for
-  | StgBindDefault (GenStgExpr bndr occ)
+data AltType
+  = PolyAlt		-- Polymorphic (a type variable)
+  | UbxTupAlt TyCon	-- Unboxed tuple
+  | AlgAlt    TyCon	-- Algebraic data type; the AltCons will be DataAlts
+  | PrimAlt   TyCon	-- Primitive data type; the AltCons will be LitAlts
 \end{code}
 
 %************************************************************************
@@ -519,8 +501,7 @@ type StgArg         = GenStgArg		Id
 type StgLiveVars    = GenStgLiveVars	Id
 type StgExpr        = GenStgExpr	Id Id
 type StgRhs         = GenStgRhs		Id Id
-type StgCaseAlts    = GenStgCaseAlts	Id Id
-type StgCaseDefault = GenStgCaseDefault	Id Id
+type StgAlt	    = GenStgAlt		Id Id
 \end{code}
 
 %************************************************************************
@@ -740,19 +721,15 @@ pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
 			     ptext SLIT("]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
 			     char ']']))))
 		2 (ppr expr)]
-\end{code}
 
-\begin{code}
 pprStgExpr (StgSCC cc expr)
   = sep [ hsep [ptext SLIT("_scc_"), ppr cc],
 	  pprStgExpr expr ]
-\end{code}
 
-\begin{code}
-pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alts)
+pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alt_type alts)
   = sep [sep [ptext SLIT("case"),
 	   nest 4 (hsep [pprStgExpr expr,
-	     ifPprDebug (dcolon <+> pp_ty alts)]),
+	     ifPprDebug (dcolon <+> ppr alt_type)]),
 	   ptext SLIT("of"), ppr bndr, char '{'],
 	   ifPprDebug (
 	   nest 4 (
@@ -760,34 +737,21 @@ pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alts)
 		    ptext SLIT("]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
 		    ptext SLIT("]; "),
 		    pprMaybeSRT srt])),
-	   nest 2 (pprStgAlts alts),
+	   nest 2 (vcat (map pprStgAlt alts)),
 	   char '}']
-  where
-    pp_ty (StgAlgAlts  maybe_tycon _ _) = ppr maybe_tycon
-    pp_ty (StgPrimAlts tycon       _ _) = ppr tycon
 
-pprStgAlts (StgAlgAlts _ alts deflt)
-      = vcat [ vcat (map (ppr_bxd_alt) alts),
-	       pprStgDefault deflt ]
-      where
-	ppr_bxd_alt (con, params, use_mask, expr)
-	  = hang (hsep [ppr con, interppSP params, ptext SLIT("->")])
-		   4 ((<>) (ppr expr) semi)
-
-pprStgAlts (StgPrimAlts _ alts deflt)
-      = vcat [ vcat (map (ppr_ubxd_alt) alts),
-	       pprStgDefault deflt ]
-      where
-	ppr_ubxd_alt (lit, expr)
-	  = hang (hsep [ppr lit, ptext SLIT("->")])
-		 4 ((<>) (ppr expr) semi)
-
-pprStgDefault StgNoDefault	    = empty
-pprStgDefault (StgBindDefault expr) = hang (hsep [ptext SLIT("DEFAULT"), ptext SLIT("->")]) 
-					 4 (ppr expr)
+pprStgAlt (con, params, use_mask, expr)
+  = hang (hsep [ppr con, interppSP params, ptext SLIT("->")])
+	 4 (ppr expr <> semi)
 
 pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgFCallOp op _) = ppr op
+
+instance Outputable AltType where
+  ppr PolyAlt 	     = ptext SLIT("Polymorphic")
+  ppr (UbxTupAlt tc) = ptext SLIT("UbxTup") <+> ppr tc
+  ppr (AlgAlt tc)    = ptext SLIT("Alg")    <+> ppr tc
+  ppr (PrimAlt tc)   = ptext SLIT("Prim")   <+> ppr tc
 \end{code}
 
 \begin{code}

@@ -20,6 +20,7 @@ import TyCon		( isAlgTyCon )
 import Literal
 import Id
 import Var		( Var, globalIdDetails, varType )
+import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon )
 #ifdef ILX
 import MkId		( unsafeCoerceId )
 #endif
@@ -333,7 +334,7 @@ coreToStgExpr (Note other_note expr)
 coreToStgExpr (Case scrut bndr alts)
   = extendVarEnvLne [(bndr, LambdaBound)]	(
 	 mapAndUnzip3Lne vars_alt alts	`thenLne` \ (alts2, fvs_s, escs_s) ->
-	 returnLne ( mkStgAlts (idType bndr) alts2,
+	 returnLne ( alts2,
 		     unionFVInfos fvs_s,
 		     unionVarSets escs_s )
     )			   		`thenLne` \ (alts2, alts_fvs, alts_escs) ->
@@ -367,6 +368,7 @@ coreToStgExpr (Case scrut bndr alts)
 		     (getLiveVars alts_lv_info)
 		     bndr'
 		     (mkSRT alts_lv_info)
+		     (mkStgAltType (idType bndr)) 
 		     alts2,
       scrut_fvs `unionFVInfo` alts_fvs_wo_bndr,
       alts_escs_wo_bndr `unionVarSet` getFVSet scrut_fvs
@@ -406,28 +408,14 @@ coreToStgExpr (Let bind body)
 \end{code}
 
 \begin{code}
-mkStgAlts scrut_ty orig_alts
- | is_prim_case = StgPrimAlts (tyConAppTyCon scrut_ty) prim_alts deflt
- | otherwise    = StgAlgAlts  maybe_tycon	       alg_alts  deflt
-  where
-    is_prim_case = isUnLiftedType scrut_ty && not (isUnboxedTupleType scrut_ty)
-
-    prim_alts    = [(lit, rhs) 		   | (LitAlt lit, _, _, rhs)	    <- other_alts]
-    alg_alts	 = [(con, bndrs, use, rhs) | (DataAlt con, bndrs, use, rhs) <- other_alts]
-
-    (other_alts, deflt) 
-	= case orig_alts of	-- DEFAULT is always first if it's there at all
-	    (DEFAULT, _, _, rhs) : other_alts -> (other_alts, StgBindDefault rhs)
-	    other			      -> (orig_alts,  StgNoDefault)
-
-    maybe_tycon = case alg_alts of 
-			-- Get the tycon from the data con
-			(dc, _, _, _) : _rest -> Just (dataConTyCon dc)
-
-			-- Otherwise just do your best
-			[] -> case splitTyConApp_maybe (repType scrut_ty) of
-				Just (tc,_) | isAlgTyCon tc -> Just tc
-				_other			    -> Nothing
+mkStgAltType scrut_ty
+  = case splitTyConApp_maybe (repType scrut_ty) of
+	Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
+		    | isPrimTyCon tc	     -> PrimAlt tc
+		    | isAlgTyCon tc	     -> AlgAlt tc
+		    | isFunTyCon tc	     -> PolyAlt
+		    | otherwise		     -> pprPanic "mkStgAlts" (ppr tc)
+	Nothing				     -> PolyAlt
 \end{code}
 
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.52 2003/05/14 09:13:52 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.53 2003/07/02 13:12:33 simonpj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -14,27 +14,7 @@ From @AbstractC@, one may convert to real C (for portability) or to
 raw assembler/machine code.
 
 \begin{code}
-module AbsCSyn {- (
-	-- export everything
-	AbstractC(..),
-	C_SRT(..)
-	CStmtMacro(..),
-	CExprMacro(..),
-	CAddrMode(..),
-	ReturnInfo(..),
-	mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
-	mkIntCLit,
-	mkAbsCStmtList,
-	mkCCostCentre,
-
-	-- RegRelatives
-	RegRelative(..),
-
-	-- registers
-	MagicId(..), node, infoptr,
-	isVolatileReg,
-	CostRes(Cost)
-    )-} where
+module AbsCSyn where	-- export everything
 
 #include "HsVersions.h"
 

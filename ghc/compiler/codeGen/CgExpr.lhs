@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.53 2003/05/14 09:13:55 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.54 2003/07/02 13:12:36 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -22,10 +22,10 @@ import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CLabel		( mkClosureTblLabel )
 
 import SMRep		( fixedHdrSize )
+import CoreSyn		( AltCon(..) )
 import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, 
 			  nukeDeadBindings, addBindC, addBindsC )
-import CgCase		( cgCase, saveVolatileVarsAndRegs, 
-			  restoreCurrentCostCentre )
+import CgCase		( cgCase, saveVolatileVarsAndRegs, restoreCurrentCostCentre )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
 import CgLetNoEscape	( cgLetNoEscapeClosure )
@@ -138,6 +138,7 @@ cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty)
 	    (\ sequel -> mkDynamicAlgReturnCode tycon dyn_tag sequel)
    where
         dyn_tag = CTemp (mkBuiltinUnique 0) IntRep
+		-- The '0' is just to get a random spare temp
 	  --
 	  -- if you're reading this code in the attempt to figure
 	  -- out why the compiler panic'ed here, it is probably because
@@ -199,8 +200,8 @@ Case-expression conversion is complicated enough to have its own
 module, @CgCase@.
 \begin{code}
 
-cgExpr (StgCase expr live_vars save_vars bndr srt alts)
-  = cgCase expr live_vars save_vars bndr srt alts
+cgExpr (StgCase expr live_vars save_vars bndr srt alt_type alts)
+  = cgCase expr live_vars save_vars bndr srt alt_type alts
 \end{code}
 
 
@@ -232,7 +233,10 @@ cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
     nukeDeadBindings live_in_whole_let	`thenC`
     saveVolatileVarsAndRegs live_in_rhss
     	    `thenFC` \ (save_assts, rhs_eob_info, maybe_cc_slot) ->
-    -- ToDo: cost centre???
+
+	-- TEMP: put back in for line-by-line compatibility
+	-- Doesn't look right; surely should restore in the branch!
+	-- And the code isn't used....
     restoreCurrentCostCentre maybe_cc_slot `thenFC` \ restore_cc ->
 
 	-- Save those variables right now!
@@ -316,10 +320,9 @@ mkRhsClosure	bndr cc	bi srt
 		[]			-- A thunk
 		body@(StgCase (StgApp scrutinee [{-no args-}])
 		      _ _ _ _   -- ignore uniq, etc.
-		      (StgAlgAlts (Just tycon)
-		  	 [(con, params, use_mask,
-			    (StgApp selectee [{-no args-}]))]
-		  	 StgNoDefault))
+		      (AlgAlt tycon)
+		      [(DataAlt con, params, use_mask,
+			    (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee		-- Scrutinee is the only free variable
   && maybeToBool maybe_offset		-- Selectee is a component of the tuple
   && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
@@ -397,7 +400,7 @@ mkRhsClosure bndr cc bi srt fvs upd_flag args body
 cgLetNoEscapeBindings live_in_rhss rhs_eob_info maybe_cc_slot 
 	(StgNonRec binder rhs)
   = cgLetNoEscapeRhs live_in_rhss rhs_eob_info maybe_cc_slot 	
-			NonRecursive binder rhs 
+		     NonRecursive binder rhs 
     	    	    	    	`thenFC` \ (binder, info) ->
     addBindC binder info
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.36 2002/12/18 16:15:43 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.37 2003/07/02 13:12:36 simonpj Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -17,23 +17,24 @@ module CgHeapery (
 #include "HsVersions.h"
 
 import AbsCSyn
+import StgSyn		( AltType(..) )
 import CLabel
 import CgMonad
-
 import CgStackery	( getFinalStackHW )
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgUsages		( getVirtAndRealHp, getRealSp, setVirtHp, setRealHp,
 			  initHeapUsage
 			)
+import CgRetConv	( dataReturnConvPrim )
 import ClosureInfo	( closureSize, closureGoodStuffSize,
 			  slopSize, allocProfilingMsg, ClosureInfo
 			)
+import TyCon		( tyConPrimRep )
 import PrimRep		( PrimRep(..), isFollowableRep )
 import CmdLineOpts	( opt_GranMacros )
 import Outputable
-
 #ifdef DEBUG
-import PprAbsC		( pprMagicId ) -- tmp
+import PprAbsC		( pprMagicId ) 
 #endif
 
 import GLAEXTS
@@ -160,72 +161,57 @@ the heap check code.
 
 \begin{code}
 altHeapCheck 
-	:: Bool			-- do not enter node on return
-	-> [MagicId]		-- live registers
-	-> Code			-- continuation
-	-> Code
-
-
--- normal algebraic and primitive case alternatives:
-
-altHeapCheck no_enter regs code
-  = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
+    :: AltType	-- PolyAlt, PrimAlt, AlgAlt, but *not* UbxTupAlt
+		--	(Unboxed tuples are dealt with by ubxTupleHeapCheck)
+    -> Code	-- Continuation
+    -> Code
+altHeapCheck alt_type code
+  = initHeapUsage (\ hHw -> 
+	do_heap_chk hHw	`thenC` 
+	setRealHp hHw	`thenC`
+	code)
   where
     do_heap_chk :: HeapOffset -> Code
     do_heap_chk words_required
-      = getTickyCtrLabel `thenFC` \ ctr ->
-	absC ( if words_required == 0
-		 then  AbsCNop
-		 else  mkAbstractCs 
-		       [ checking_code,
+      = getTickyCtrLabel 	`thenFC` \ ctr ->
+	absC ( 	-- NB The conditional is inside the absC,
+		-- so the monadic stuff doesn't depend on
+		-- the value of words_required!
+	       if words_required == 0
+	       then  AbsCNop
+	       else  mkAbstractCs 
+		       [ CCheck (checking_code alt_type) 
+			    [mkIntCLit words_required] AbsCNop,
           	         profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
-		       ]
-	)  `thenC`
-	setRealHp words_required
+		       ])
 
-      where
-        non_void_regs = filter (/= VoidReg) regs
+    checking_code PolyAlt
+      = HP_CHK_UNPT_R1	-- Do *not* enter R1 after a heap check in
+			-- a polymorphic case.  It might be a function
+			-- and the entry code for a function (currently)
+			-- applies it
+			--
+			-- However R1 is guaranteed to be a pointer
 
-	checking_code = 
-          case non_void_regs of
-
-	    -- No regs live: probably a Void return
-	    [] ->
-	       CCheck HP_CHK_NOREGS [mkIntCLit words_required] AbsCNop
-
-	    [VanillaReg rep 1#]
-	    -- R1 is boxed, but unlifted: DO NOT enter R1 when we return.
-		| isFollowableRep rep && no_enter ->
-		  CCheck HP_CHK_UNPT_R1 [mkIntCLit words_required] AbsCNop
-
-	    -- R1 is lifted (the common case)
-	        | isFollowableRep rep ->
- 	          CCheck HP_CHK_NP
-			[mkIntCLit words_required]
-			AbsCNop
-
-	    -- R1 is unboxed
-		| otherwise ->
-		  CCheck HP_CHK_UNBX_R1 [mkIntCLit words_required] AbsCNop
-
-	    -- FloatReg1
-	    [FloatReg 1#] ->
-		  CCheck HP_CHK_F1 [mkIntCLit words_required] AbsCNop
-
-	    -- DblReg1
-	    [DoubleReg 1#] ->
-		  CCheck HP_CHK_D1 [mkIntCLit words_required] AbsCNop
-
-	    -- LngReg1
-	    [LongReg _ 1#] ->
-		  CCheck HP_CHK_L1 [mkIntCLit words_required] AbsCNop
-
+    checking_code (AlgAlt tc)
+      =	HP_CHK_NP	-- Enter R1 after the heap check; it's a pointer
+			-- The "NP" is short for "Node (R1) Points to it"
+ 	
+    checking_code (PrimAlt tc)
+      = case dataReturnConvPrim (tyConPrimRep tc) of
+	  VoidReg      -> HP_CHK_NOREGS
+	  FloatReg  1# -> HP_CHK_F1
+	  DoubleReg 1# -> HP_CHK_D1
+	  LongReg _ 1# -> HP_CHK_L1
+	  VanillaReg rep 1# 
+	    | isFollowableRep rep -> HP_CHK_UNPT_R1	-- R1 is boxed but unlifted: 
+	    | otherwise		  -> HP_CHK_UNBX_R1	-- R1 is unboxed
 #ifdef DEBUG
-	    _ -> panic ("CgHeapery.altHeapCheck: unimplemented heap-check, live regs = " ++ showSDoc (sep (map pprMagicId non_void_regs)))
+	  other_reg -> pprPanic "CgHeapery.altHeapCheck" (ppr tc <+> pprMagicId other_reg)
 #endif
 
--- unboxed tuple alternatives and let-no-escapes (the two most annoying
+-- Unboxed tuple alternatives and let-no-escapes (the two most annoying
 -- constructs to generate code for!):
 
 unbxTupleHeapCheck 
@@ -247,21 +233,18 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
 	absC ( if words_required == 0
 		  then  AbsCNop
 		  else  mkAbstractCs 
-			[ checking_code,
+			[ checking_code words_required,
           	          profCtrAbsC FSLIT("TICK_ALLOC_HEAP") 
 			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
 			]
 	)  `thenC`
 	setRealHp words_required
 
-      where
-	checking_code = 
-                let liveness = mkRegLiveness regs ptrs nptrs
- 		in
-		CCheck HP_CHK_UNBX_TUPLE
-		     [mkIntCLit words_required, 
-		      mkIntCLit (I# (word2Int# liveness))]
-		     fail_code
+    liveness = I# (word2Int# (mkRegLiveness regs ptrs nptrs))
+    checking_code words_required = CCheck HP_CHK_UNBX_TUPLE
+					     [mkIntCLit words_required, 
+					      mkIntCLit liveness]
+					     fail_code
 
 -- build up a bitmap of the live pointer registers
 
