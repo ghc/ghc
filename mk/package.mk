@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.1 2002/02/12 15:17:35 simonmar Exp $
+# $Id: package.mk,v 1.2 2002/02/12 15:45:46 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -93,8 +93,8 @@ ifneq "$(DONT_WANT_STD_GHCI_LIB_RULE)" "YES"
 # hslibs/Win32 uses this 'feature', which will go away soon
 # when we can use a "fixed" ld.
 #
-$(GHCI_LIBRARY) : $(OBJS)
-	$(LD) -r $(LD_X) -o $@ $(OBJS)
+$(GHCI_LIBRARY) : $(LIBOBJS)
+	$(LD) -r $(LD_X) -o $@ $(LIBOBJS)
 
 endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter
