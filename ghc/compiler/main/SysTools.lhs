@@ -54,7 +54,7 @@ import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
-import System		( system, ExitCode(..), exitWith )
+import System		( system, ExitCode(..), exitWith, getEnv )
 import CString
 import Int
 import Addr
