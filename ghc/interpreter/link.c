@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/01 14:46:47 $
+ * $Revision: 1.6 $
+ * $Date: 1999/03/09 14:51:08 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -122,6 +122,7 @@ Name nameUndefined  =BOGUS(62);                     /* generic undefined value  
 Name namePmSub  =BOGUS(63); 
 #endif
 Name namePMFail  =BOGUS(64);
+Name namePMFailBUG = BOGUS(666);
 Name nameEqChar  =BOGUS(65);
 Name nameEqInt  =BOGUS(66);
 #if !OVERLOADED_CONSTANTS
@@ -138,8 +139,6 @@ Name nameMkIO  =BOGUS(75);
 Name nameUnpackString  =BOGUS(76);
 Name nameError  =BOGUS(77);
 Name nameInd  =BOGUS(78);
-
-Name nameForce  =BOGUS(79);
 
 Name nameAnd  =BOGUS(80);
 Name nameConCmp  =BOGUS(82);
@@ -161,6 +160,11 @@ Name nameReadParen  =BOGUS(97);
 Name nameLex  =BOGUS(98);
 Name nameReadField  =BOGUS(99);
 Name nameFlip  =BOGUS(100);
+
+Name namePrimSeq =BOGUS(1000);
+Name namePrimCatch =BOGUS(1001);
+Name namePrimRaise =BOGUS(1002);
+
 Name nameFromTo  =BOGUS(101);
 Name nameFromThen  =BOGUS(102);
 Name nameFrom  =BOGUS(103);
@@ -227,6 +231,8 @@ Name nameMult =BOGUS(412);
 Name nameMFail =BOGUS(413);
 Type typeOrdering =BOGUS(414);
 Module modulePrelude =BOGUS(415);
+Name nameMap  = BOGUS(416);
+Name nameMinus = BOGUS(417);
 
 #define QQ(lval) assert(lval != 0); assert(lval <= -900000); lval 
 
@@ -254,6 +260,7 @@ static Tycon linkTycon ( String s );
 static Tycon linkClass ( String s );
 static Name  linkName  ( String s );
 static Void  mkTypes   ( void );
+static Name  predefinePrim ( String s );
 
 
 static Tycon linkTycon( String s )
@@ -286,12 +293,17 @@ static Name linkName( String s )
     EEND;
 }
 
-/* ToDo: kill this! */
-static Name  predefinePrim ( String s );
-static Name  predefinePrim ( String s )
+static Name predefinePrim ( String s )
 {
-    Name nm = newName(findText(s),NIL); 
-    name(nm).defn=PREDEFINED;
+    Name nm;
+    Text t = findText(s);
+    nm = findName(t);
+    if (nonNull(nm)) {
+       //fprintf(stderr, "predefinePrim: %s already exists\n", s );
+    } else {
+       nm = newName(t,NIL);
+       name(nm).defn=PREDEFINED;
+    }
     return nm;
 }
 
@@ -300,7 +312,6 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
     if (!initialised) {
         Int i;
         initialised = TRUE;
-        ////setCurrModule(modulePreludeHugs);
         setCurrModule(modulePrelude);
 
         QQ(typeChar      )  = linkTycon("Char");
@@ -414,7 +425,6 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         QQ(nameMkThreadId)  = addPrimCfun(findTextREP("ThreadId#"),1,0,0);
         QQ(nameMkMVar    )  = addPrimCfun(findTextREP("MVar#"),1,0,0);
 #endif
-#if 1
         /* The following primitives are referred to in derived instances and
          * hence require types; the following types are a little more general
          * than we might like, but they are the closest we can get without a
@@ -437,7 +447,13 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         name(nameEnFrTo).type
             = name(nameEnFrTh).type
             = mkPolyType(starToStar,fn(aVar,fn(aVar,listof)));
-#endif
+
+        name(namePrimSeq).type
+            = primType(MONAD_Id, "ab", "b");
+        name(namePrimCatch).type
+            = primType(MONAD_Id, "aH", "a");
+        name(namePrimRaise).type
+            = primType(MONAD_Id, "E", "a");
 #if EVAL_INSTANCES
         addEvalInst(0,typeArrow,2,NIL); /* Add Eval instances for (->)     */
 #endif
@@ -517,6 +533,7 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
         QQ(nameMult      )  = linkName("*");
         QQ(nameRangeSize )  = linkName("rangeSize");
         QQ(nameInRange   )  = linkName("inRange");
+        QQ(nameMinus     )  = linkName("-");
         /* These come before calls to implementPrim */
         for(i=0; i<NUM_TUPLES; ++i) {
             implementTuple(i);
@@ -550,44 +567,6 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
             implementPrim(n);
         }
 
-        /* hooks for handwritten bytecode */
-        {
-           StgVar vv = mkStgVar(NIL,NIL);
-           Text t = findText("primSeq");
-           Name n = newName(t,NIL);
-           name(n).line = name(n).defn = 0;
-           name(n).arity = 1;
-           name(n).type = primType(MONAD_Id, "ab", "b");
-           vv = mkStgVar(NIL,NIL);
-           stgVarInfo(vv) = mkPtr ( asm_BCO_seq() );
-           name(n).stgVar = vv;
-           stgGlobals=cons(pair(n,vv),stgGlobals);
-        }
-
-        {
-           StgVar vv = mkStgVar(NIL,NIL);
-           Text t = findText("primCatch");
-           Name n = newName(t,NIL);
-           name(n).line = name(n).defn = 0;
-           name(n).arity = 2;
-           name(n).type = primType(MONAD_Id, "aH", "a");
-           stgVarInfo(vv) = mkPtr ( asm_BCO_catch() );
-           name(n).stgVar = vv;
-           stgGlobals=cons(pair(n,vv),stgGlobals);
-        }
-
-        {
-           StgVar vv = mkStgVar(NIL,NIL);
-           Text t = findText("primRaise");
-           Name n = newName(t,NIL);
-           name(n).line = name(n).defn = 0;
-           name(n).arity = 1;
-           name(n).type = primType(MONAD_Id, "E", "a");
-           stgVarInfo(vv) = mkPtr ( asm_BCO_raise() );
-           name(n).stgVar = vv;
-           stgGlobals=cons(pair(n,vv),stgGlobals);
-        }
-
         /* static(tidyInfix)                        */
         QQ(nameNegate    )    = linkName("negate");
         /* user interface                           */
@@ -618,6 +597,7 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         ////namePmLe          = linkName("primPmLe");
         ////namePmSubtract    = linkName("primPmSubtract");
         ////namePmFromInteger = linkName("primPmFromInteger");
+        ////QQ(nameMap       )    = linkName("map");
     }
 }
 
@@ -677,11 +657,50 @@ Int what; {
                        pFun(nameComp,           ".");
                        pFun(nameAnd,            "&&");
                        pFun(nameCompAux,        "primCompAux");
+                       pFun(nameMap,            "map");
 
                        /* implementTagToCon                     */
                        pFun(namePMFail,         "primPmFail");
+                       pFun(namePMFailBUG,      "primPmFailBUG");
 		       pFun(nameError,          "error");
 		       pFun(nameUnpackString,   "primUnpackString");
+
+                       /* hooks for handwritten bytecode */
+                       pFun(namePrimSeq,        "primSeq");
+                       pFun(namePrimCatch,      "primCatch");
+                       pFun(namePrimRaise,      "primRaise");
+                       {
+                          StgVar vv = mkStgVar(NIL,NIL);
+                          Name n = namePrimSeq;
+                          name(n).line = 0;
+                          name(n).arity = 1;
+                          name(n).type = NIL;
+                          vv = mkStgVar(NIL,NIL);
+                          stgVarInfo(vv) = mkPtr ( asm_BCO_seq() );
+                          name(n).stgVar = vv;
+                          stgGlobals=cons(pair(n,vv),stgGlobals);
+                          namePrimSeq = n;
+                       }
+                       {
+                          StgVar vv = mkStgVar(NIL,NIL);
+                          Name n = namePrimCatch;
+                          name(n).line = 0;
+                          name(n).arity = 2;
+                          name(n).type = NIL;
+                          stgVarInfo(vv) = mkPtr ( asm_BCO_catch() );
+                          name(n).stgVar = vv;
+                          stgGlobals=cons(pair(n,vv),stgGlobals);
+                       }
+                       {
+                          StgVar vv = mkStgVar(NIL,NIL);
+                          Name n = namePrimRaise;
+                          name(n).line = 0;
+                          name(n).arity = 1;
+                          name(n).type = NIL;
+                          stgVarInfo(vv) = mkPtr ( asm_BCO_raise() );
+                          name(n).stgVar = vv;
+                          stgGlobals=cons(pair(n,vv),stgGlobals);
+                       }
 
                        break;
     }

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: optimise.c,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:33 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/09 14:51:09 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -45,9 +45,11 @@ static StgAtom optimiseAtom(StgAtom a)
 static StgVar optimiseVar(StgVar v)
 {
     StgRhs rhs = stgVarBody(v);
-    /* short circuit: let x = y in ...x... --> let x = y ...y... */
+fprintf(stderr,"optimiseVar ");printStg(stderr,v);fprintf(stderr,"\n");
+    /* short circuit: let x = y in ...x... --> let x = y in ...y... */
     if (whatIs(rhs) == STGVAR && rhs != v) {
 	StgVar v1 = rhs;
+fprintf(stderr, "dumpable\n");
 
 	/* find last variable in chain */
 	rhs = stgVarBody(v1);
@@ -75,7 +77,8 @@ static StgVar optimiseVar(StgVar v)
 
 void optimiseBind( StgVar v )
 {
-    StgRhs rhs = stgVarBody(v);
+    StgRhs rhs;
+    rhs = stgVarBody(v);
     switch (whatIs(rhs)) {
     case STGCON:
             mapOver(optimiseAtom,stgConArgs(rhs));
@@ -122,7 +125,9 @@ static StgExpr optimiseExpr( StgExpr e )
 			 * by optimiseVar so we can drop the binding
 			 * right now.
 			 */
+fprintf(stderr, "dropping bind ");printStg(stderr,b);fprintf(stderr, "\n");
 		    } else {
+fprintf(stderr, "retaining bind ");printStg(stderr,b);fprintf(stderr, "\n");
 			binds = cons(hd(bs),binds);
 		    }
 		}
@@ -208,6 +213,24 @@ static StgExpr optimiseExpr( StgExpr e )
             internal("optimiseExpr");
     }
     return e;
+}
+
+
+void optimiseTopBind( StgVar v )
+{
+if (lastModule() != modulePrelude) {
+fflush(stdout); fflush(stderr);
+fprintf ( stderr, "------------------------------\n" );
+fflush(stderr);
+printStg ( stderr, v );
+fprintf(stderr, "\n" );
+}
+optimiseBind ( v );
+if (lastModule() != modulePrelude) {
+printStg ( stderr,v );
+fprintf(stderr, "\n\n" );
+fflush(stderr);
+}
 }
 
 /*-------------------------------------------------------------------------*/

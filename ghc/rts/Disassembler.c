@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Disassembler.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:47:05 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:23 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -46,6 +46,14 @@ static InstrPtr disInt       ( StgBCO *bco, InstrPtr pc, char* i )
     return pc;
 }
 
+static InstrPtr disInt16      ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgInt x = bcoInstr16(bco,pc); pc+=2;
+    ASSERT(pc < bco->n_instrs);
+    fprintf(stderr,"%s %d",i,x);
+    return pc;
+}
+
 static InstrPtr disIntInt    ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgInt x = bcoInstr(bco,pc++);
@@ -54,17 +62,28 @@ static InstrPtr disIntInt    ( StgBCO *bco, InstrPtr pc, char* i )
     return pc;
 }
 
+static InstrPtr disIntInt16  ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgInt x, y;
+    x = bcoInstr16(bco,pc); pc += 2;
+    y = bcoInstr16(bco,pc); pc += 2;
+    fprintf(stderr,"%s %d %d",i,x,y);
+    return pc;
+}
+
 static InstrPtr disIntPC     ( StgBCO *bco, InstrPtr pc, char* i )
 {
-    StgInt  x = bcoInstr(bco,pc++);
-    StgWord y = bcoInstr(bco,pc++);
+    StgInt  x;
+    StgWord y;
+    x = bcoInstr(bco,pc++);
+    y = bcoInstr16(bco,pc); pc += 2;
     fprintf(stderr,"%s %d %d",i,x,pc+y);
     return pc;
 }
 
 static InstrPtr disPC        ( StgBCO *bco, InstrPtr pc, char* i )
 {
-    StgWord y = bcoInstr(bco,pc++);
+    StgWord y = bcoInstr16(bco,pc); pc += 2;
     fprintf(stderr,"%s %d",i,pc+y);
     return pc;
 }
@@ -87,12 +106,12 @@ static InstrPtr disConstPtr  ( StgBCO *bco, InstrPtr pc, char* i )
     return pc;
 }
 
-static InstrPtr disConst2Ptr ( StgBCO *bco, InstrPtr pc, char* i )
+static InstrPtr disConstPtr16 ( StgBCO *bco, InstrPtr pc, char* i )
 {
-    StgWord o1 = bcoInstr(bco,pc++);
-    StgWord o2 = bcoInstr(bco,pc++);
-    StgWord o  = o1*256 + o2;
-    StgPtr x = bcoConstPtr(bco,o);
+    StgInt o; 
+    StgPtr x;
+    o = bcoInstr16(bco,pc); pc += 2;
+    x = bcoConstPtr(bco,o);
     fprintf(stderr,"%s [%d]=",i,o); 
     printPtr(x); /* bad way to print it... */
     return pc;
@@ -105,9 +124,24 @@ static InstrPtr disConstInt  ( StgBCO *bco, InstrPtr pc, char* i )
     return pc;
 }
 
+static InstrPtr disConstInt16 ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgInt x = bcoConstInt(bco,bcoInstr16(bco,pc)); pc += 2;
+    fprintf(stderr,"%s %d",i,x);
+    return pc;
+}
+
 static InstrPtr disConstAddr ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgAddr x = bcoConstAddr(bco,bcoInstr(bco,pc++));
+    fprintf(stderr,"%s ",i);
+    printPtr(x);
+    return pc;
+}
+
+static InstrPtr disConstAddr16 ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgAddr x = bcoConstAddr(bco,bcoInstr16(bco,pc)); pc += 2;
     fprintf(stderr,"%s ",i);
     printPtr(x);
     return pc;
@@ -122,6 +156,15 @@ static InstrPtr disConstChar ( StgBCO *bco, InstrPtr pc, char* i )
     return pc;
 }
 
+static InstrPtr disConstChar16 ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgChar x = bcoConstChar(bco,bcoInstr16(bco,pc)); pc += 2;
+    if (isprint((int)x))
+       fprintf(stderr,"%s '%c'",i,x); else
+       fprintf(stderr,"%s 0x%x",i,(int)x);
+    return pc;
+}
+
 static InstrPtr disConstFloat ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgFloat x = bcoConstFloat(bco,bcoInstr(bco,pc++));
@@ -129,9 +172,23 @@ static InstrPtr disConstFloat ( StgBCO *bco, InstrPtr pc, char* i )
     return pc;
 }
 
+static InstrPtr disConstFloat16 ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgFloat x = bcoConstFloat(bco,bcoInstr16(bco,pc)); pc += 2;
+    fprintf(stderr,"%s %f",i,x);
+    return pc;
+}
+
 static InstrPtr disConstDouble ( StgBCO *bco, InstrPtr pc, char* i )
 {
     StgDouble x = bcoConstDouble(bco,bcoInstr(bco,pc++));
+    fprintf(stderr,"%s %f",i,x);
+    return pc;
+}
+
+static InstrPtr disConstDouble16 ( StgBCO *bco, InstrPtr pc, char* i )
+{
+    StgDouble x = bcoConstDouble(bco,bcoInstr16(bco,pc)); pc += 2;
     fprintf(stderr,"%s %f",i,x);
     return pc;
 }
@@ -146,8 +203,6 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disNone(bco,pc,"INTERNAL_ERROR");
     case i_PANIC:
             return disNone(bco,pc,"PANIC");
-    case i_HP_CHECK:
-            return disInt(bco,pc,"HP_CHECK");
     case i_STK_CHECK:
             return disInt(bco,pc,"STK_CHECK");
     case i_ARG_CHECK:
@@ -160,26 +215,34 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
             return disInfo(bco,pc,"ALLOC_CONSTR");
     case i_MKAP:
             return disIntInt(bco,pc,"MKAP");
+    case i_MKAP_big:
+            return disIntInt16(bco,pc,"MKAP_big");
     case i_MKPAP:
             return disIntInt(bco,pc,"MKPAP");
     case i_PACK:
             return disInt(bco,pc,"PACK");
     case i_SLIDE:
             return disIntInt(bco,pc,"SLIDE");
+    case i_SLIDE_big:
+            return disIntInt16(bco,pc,"SLIDE_big");
     case i_ENTER:
             return disNone(bco,pc,"ENTER");
     case i_RETADDR:
             return disConstPtr(bco,pc,"RETADDR");
+    case i_RETADDR_big:
+            return disConstPtr16(bco,pc,"RETADDR_big");
     case i_TEST:
             return disIntPC(bco,pc,"TEST");
     case i_UNPACK:
             return disNone(bco,pc,"UNPACK");
     case i_VAR:
             return disInt(bco,pc,"VAR");
+    case i_VAR_big:
+            return disInt16(bco,pc,"VAR_big");
     case i_CONST:
             return disConstPtr(bco,pc,"CONST");
-    case i_CONST2:
-            return disConst2Ptr(bco,pc,"CONST2");
+    case i_CONST_big:
+            return disConstPtr16(bco,pc,"CONST_big");
 
     case i_VOID:
             return disNone(bco,pc,"VOID");
@@ -188,8 +251,12 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 
     case i_VAR_INT:
             return disInt(bco,pc,"VAR_INT");
+    case i_VAR_INT_big:
+            return disInt16(bco,pc,"VAR_INT_big");
     case i_CONST_INT:
             return disConstInt(bco,pc,"CONST_INT");
+    case i_CONST_INT_big:
+            return disConstInt16(bco,pc,"CONST_INT_big");
     case i_RETURN_INT:
             return disNone(bco,pc,"RETURN_INT");
     case i_PACK_INT:
@@ -214,6 +281,8 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 #ifdef PROVIDE_INTEGER
     case i_CONST_INTEGER:
             return disConstAddr(bco,pc,"CONST_INTEGER");
+    case i_CONST_INTEGER_big:
+            return disConstAddr16(bco,pc,"CONST_INTEGER_big");
 #endif
 #ifdef PROVIDE_WORD
     case i_VAR_WORD:
@@ -230,8 +299,12 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 #ifdef PROVIDE_ADDR
     case i_VAR_ADDR:
             return disInt(bco,pc,"VAR_ADDR");
+    case i_VAR_ADDR_big:
+            return disInt16(bco,pc,"VAR_ADDR_big");
     case i_CONST_ADDR:
             return disConstAddr(bco,pc,"CONST_ADDR");
+    case i_CONST_ADDR_big:
+            return disConstAddr16(bco,pc,"CONST_ADDR_big");
     case i_RETURN_ADDR:
             return disNone(bco,pc,"RETURN_ADDR");
     case i_PACK_ADDR:
@@ -241,8 +314,12 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 #endif
     case i_VAR_CHAR:
             return disInt(bco,pc,"VAR_CHAR");
+    case i_VAR_CHAR_big:
+            return disInt16(bco,pc,"VAR_CHAR_big");
     case i_CONST_CHAR:
             return disConstChar(bco,pc,"CONST_CHAR");
+    case i_CONST_CHAR_big:
+            return disConstChar16(bco,pc,"CONST_CHAR_big");
     case i_RETURN_CHAR:
             return disNone(bco,pc,"RETURN_CHAR");
     case i_PACK_CHAR:
@@ -252,8 +329,12 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 
     case i_VAR_FLOAT:
             return disInt(bco,pc,"VAR_FLOAT");
+    case i_VAR_FLOAT_big:
+            return disInt16(bco,pc,"VAR_FLOAT_big");
     case i_CONST_FLOAT:
             return disConstFloat(bco,pc,"CONST_FLOAT");
+    case i_CONST_FLOAT_big:
+            return disConstFloat16(bco,pc,"CONST_FLOAT_big");
     case i_RETURN_FLOAT:
             return disNone(bco,pc,"RETURN_FLOAT");
     case i_PACK_FLOAT:
@@ -263,8 +344,12 @@ InstrPtr disInstr( StgBCO *bco, InstrPtr pc )
 
     case i_VAR_DOUBLE:
             return disInt(bco,pc,"VAR_DOUBLE");
+    case i_VAR_DOUBLE_big:
+            return disInt16(bco,pc,"VAR_DOUBLE_big");
     case i_CONST_DOUBLE:
             return disConstDouble(bco,pc,"CONST_DOUBLE");
+    case i_CONST_DOUBLE_big:
+            return disConstDouble16(bco,pc,"CONST_DOUBLE_big");
     case i_RETURN_DOUBLE:
             return disNone(bco,pc,"RETURN_DOUBLE");
     case i_PACK_DOUBLE:
@@ -345,7 +430,7 @@ void  disassemble( StgBCO *bco, char* prefix )
        fprintf(stderr, "\n");
     }
     else
-       fprintf(stderr, "\t(handwritten bytecode)\n" );
+       fprintf(stderr, "\t(no associated tree)\n" );
 }
 
 #endif /* INTERPRETER */

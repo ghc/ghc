@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:57 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:16 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2251,11 +2251,11 @@ Void typeCheckDefns() {                /* Type check top level bindings    */
 static Void local typeDefnGroup(bs)     /* type check group of value defns */
 List bs; {                              /* (one top level scc)             */
     List as;
-// printf("\n\n+++ DefnGroup ++++++++++++++++++++++++++++\n");
-//{ List qq; for (qq=bs;nonNull(qq);qq=tl(qq)){
-//   print(hd(qq),4);
-//   printf("\n");
-//}}
+    // printf("\n\n+++ DefnGroup ++++++++++++++++++++++++++++\n");
+    //{ List qq; for (qq=bs;nonNull(qq);qq=tl(qq)){
+    //   print(hd(qq),4);
+    //   printf("\n");
+    //}}
 
     emptySubstitution();
     hd(defnBounds) = NIL;

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:42 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:04 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -636,22 +636,25 @@ Void cgBinds( List binds )
     List b;
     int i;
 
-    //if (lastModule() != modulePrelude) {
-    //    printf("\n\ncgBinds: before ll\n\n" );
-    //    for (b=binds; nonNull(b); b=tl(b)) {
-    //       printStg ( stdout, hd(b) ); printf("\n\n");
-    //    }
-    //}
+#if 0
+    if (lastModule() != modulePrelude) {
+        printf("\n\ncgBinds: before ll\n\n" );
+        for (b=binds; nonNull(b); b=tl(b)) {
+           printStg ( stdout, hd(b) ); printf("\n\n");
+        }
+    }
+#endif
 
     binds = liftBinds(binds);
 
-    //if (lastModule() != modulePrelude) {
-    //    printf("\n\ncgBinds: after ll\n\n" );
-    //    for (b=binds; nonNull(b); b=tl(b)) {
-    //       printStg ( stdout, hd(b) ); printf("\n\n");
-    //    }
-    //}
-
+#if 0
+    if (lastModule() != modulePrelude) {
+        printf("\n\ncgBinds: after ll\n\n" );
+        for (b=binds; nonNull(b); b=tl(b)) {
+           printStg ( stdout, hd(b) ); printf("\n\n");
+        }
+    }
+#endif
 
     //mapProc(beginTop,binds);
     for (b=binds,i=0; nonNull(b); b=tl(b),i++) {

@@ -7,8 +7,8 @@
  * in the distribution for details.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:43 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:05 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -17,7 +17,6 @@
 
 extern Bool   haskell98;                /* TRUE => Haskell 98 compatibility*/
 extern Module modulePrelude;
-//extern Module modulePreludeHugs;
 
 /* --------------------------------------------------------------------------
  * Primitive constructor functions 
@@ -173,7 +172,7 @@ extern Float whnfFloat;                 /* float value of term in whnf     */
 extern Long  numCells;                  /* number of cells allocated       */
 extern Int   numGcs;                    /* number of garbage collections   */
 extern Bool  broken;                    /* indicates interrupt received    */
-/*ToDo?? extern Bool  preludeLoaded;*/             /* TRUE => prelude has been loaded */
+extern Bool  preludeLoaded;             /* TRUE => prelude has been loaded */
 
 extern Bool  gcMessages;                /* TRUE => print GC messages       */
 extern Bool  literateScripts;           /* TRUE => default lit scripts     */

@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.8 1999/03/03 19:16:29 sof Exp $
+ * $Id: Printer.c,v 1.9 1999/03/09 14:51:23 sewardj Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -39,7 +39,7 @@ static void    printZcoded   ( const char *raw );
  * Printer
  * ------------------------------------------------------------------------*/
 
-#ifdef INTERPRETER
+
 extern void* itblNames[];
 extern int   nItblNames;
 char* lookupHugsItblName ( void* v )
@@ -49,7 +49,6 @@ char* lookupHugsItblName ( void* v )
       if (itblNames[i] == v) return itblNames[i+1];
    return NULL;
 }
-#endif
 
 extern void printPtr( StgPtr p )
 {
@@ -60,9 +59,9 @@ extern void printPtr( StgPtr p )
 #ifdef INTERPRETER
     } else if ((raw = lookupHugsName(p)) != 0) {
         fprintf(stderr, "%s", raw);
+#endif
     } else if ((str = lookupHugsItblName(p)) != 0) {
         fprintf(stderr, "%p=%s", p, str);
-#endif
     } else {
         fprintf(stderr, "%p", p);
     }
@@ -349,12 +348,10 @@ StgPtr printStackObj( StgPtr sp )
     } else {
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
-#ifdef INTERPRETER
         if (c == &ret_bco_info) {
            fprintf(stderr, "\t\t");
            fprintf(stderr, "ret_bco_info\n" );
 	} else
-#endif
         if (IS_HUGS_CONSTR_INFO(GET_INFO(c))) {
            fprintf(stderr, "\t\t\t");
            fprintf(stderr, "ConstrInfoTable\n" );
@@ -380,7 +377,7 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 
     ASSERT(sp <= spBottom);
     while (sp < spBottom) {
-      if (!IS_ARG_TAG(*sp) && LOOKS_LIKE_GHC_INFO((void*)*sp)) {
+      if (!IS_ARG_TAG(*sp) && LOOKS_LIKE_GHC_INFO(*sp)) {
 	info = get_itbl((StgClosure *)sp);
 	switch (info->type) {
 
@@ -736,7 +733,6 @@ extern void DEBUG_LoadSymbols( char *name )
     bfd* abfd;
     char **matching;
 
-#ifndef _WIN32
     bfd_init();
     abfd = bfd_openr(name, "default");
     if (abfd == NULL) {
@@ -745,7 +741,6 @@ extern void DEBUG_LoadSymbols( char *name )
     if (!bfd_check_format_matches (abfd, bfd_object, &matching)) {
 	barf("mismatch");
     }
-#endif
 
     {
 	long storage_needed;

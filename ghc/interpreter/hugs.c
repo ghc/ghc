@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:45 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:07 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -112,7 +112,6 @@ static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
 static String scriptName[NUM_SCRIPTS];  /* Script file names               */
 static Time   lastChange[NUM_SCRIPTS];  /* Time of last change to script   */
 static Bool   postponed[NUM_SCRIPTS];   /* Indicates postponed load        */
-static Int    scriptBase;               /* Number of scripts in Prelude    */
 static Int    numScripts;               /* Number of scripts loaded        */
 static Int    namesUpto;                /* Number of script names set      */
 static Bool   needsImports;             /* set to TRUE if imports required */
@@ -126,8 +125,9 @@ static String lastEdit   = 0;           /* Name of script to edit (if any) */
 static Int    lastEdLine = 0;           /* Editor line number (if possible)*/
 static String prompt     = 0;           /* Prompt string                   */
 static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
-String hugsEdit = 0;                    /* String for editor command       */
-String hugsPath = 0;                    /* String for file search path     */
+       String hugsEdit   = 0;           /* String for editor command       */
+       String hugsPath   = 0;           /* String for file search path     */
+Bool   preludeLoaded     = FALSE;
 
 #if REDIRECT_OUTPUT
 static Bool disableOutput = FALSE;      /* redirect output to buffer?      */
@@ -216,7 +216,7 @@ String argv[]; {
     readOptions(readRegString(HKEY_LOCAL_MACHINE,HugsRoot,"Options",""));
     readOptions(readRegString(HKEY_CURRENT_USER, HugsRoot,"Options",""));
 #endif /* USE_REGISTRY */
-    readOptions(fromEnv("HUGSFLAGS",""));
+    readOptions(fromEnv("STGHUGSFLAGS",""));
 
    startupHaskell ( argc, argv );
    argc = prog_argc; argv = prog_argv;
@@ -262,7 +262,6 @@ String argv[]; {
         loadProject(strCopy(proj));
     }
     readScripts(0);
-    scriptBase = numScripts;
 }
 
 /* --------------------------------------------------------------------------
@@ -483,7 +482,7 @@ String s; {                             /* return FALSE if none found.     */
             case 'h' : setHeapSize(s+1);
                        return TRUE;
 
-            case 'd' : /* hack */
+            case 'D' : /* hack */
                 {
                     extern void setRtsFlags( int x );
                     setRtsFlags(argToInt(s+1));
@@ -701,7 +700,7 @@ String s; {
     currProject = s;
     projInput(currProject);
     scriptFile = currProject;
-    forgetScriptsFrom(scriptBase);
+    forgetScriptsFrom(1);
     while ((s=readFilename())!=0)
         addScriptName(s,TRUE);
     if (namesUpto<=1) {
@@ -764,6 +763,7 @@ ToDo: reinstate
     }
 #endif
     scriptFile = 0;
+    preludeLoaded = TRUE;
     return TRUE;
 }
 
@@ -822,7 +822,7 @@ Script scno; {
     for (i=scno; i<namesUpto; ++i)
         if (scriptName[i])
             free(scriptName[i]);
-    dropScriptsFrom(scno);
+    dropScriptsFrom(scno-1);
     namesUpto = scno;
     if (numScripts>namesUpto)
         numScripts = scno;
@@ -837,7 +837,7 @@ static Void local load() {           /* read filenames from command line   */
                                      /* to be read                         */
     while ((s=readFilename())!=0)
         addScriptName(s,TRUE);
-    readScripts(scriptBase);
+    readScripts(1);
 }
 
 static Void local project() {          /* read list of script names from   */
@@ -858,7 +858,7 @@ static Void local project() {          /* read list of script names from   */
         EEND;
     }
     loadProject(s);
-    readScripts(scriptBase);
+    readScripts(1);
 }
 
 static Void local readScripts(n)        /* Reread current list of scripts, */
@@ -873,7 +873,7 @@ Int n; {                                /* loading everything after and    */
     for (; n<numScripts; n++) {         /* Scan previously loaded scripts  */
         getFileInfo(scriptName[n], &timeStamp, &fileSize);
         if (timeChanged(timeStamp,lastChange[n])) {
-            dropScriptsFrom(n);
+            dropScriptsFrom(n-1);
             numScripts = n;
             break;
         }
@@ -884,16 +884,17 @@ Int n; {                                /* loading everything after and    */
     while (numScripts<namesUpto) {      /* Process any remaining scripts   */
         getFileInfo(scriptName[numScripts], &timeStamp, &fileSize);
         timeSet(lastChange[numScripts],timeStamp);
-        startNewScript(scriptName[numScripts]);
+        if (numScripts>0)               /* no new script for prelude       */
+            startNewScript(scriptName[numScripts]);
         if (addScript(scriptName[numScripts],fileSize))
             numScripts++;
         else
-            dropScriptsFrom(numScripts);
+            dropScriptsFrom(numScripts-1);
     }
 
     if (listScripts)
         whatScripts();
-    if (numScripts<=scriptBase)
+    if (numScripts<=1)
         setLastEdit((String)0, 0);
 }
 
@@ -940,11 +941,11 @@ static Void local find() {              /* edit file containing definition */
         startNewScript(0);
         if (nonNull(c=findTycon(t=findText(nm)))) {
             if (startEdit(tycon(c).line,scriptName[scriptThisTycon(c)])) {
-                readScripts(scriptBase);
+                readScripts(1);
             }
         } else if (nonNull(c=findName(t))) {
             if (startEdit(name(c).line,scriptName[scriptThisName(c)])) {
-                readScripts(scriptBase);
+                readScripts(1);
             }
         } else {
             ERRMSG(0) "No current definition for name \"%s\"", nm
@@ -955,7 +956,7 @@ static Void local find() {              /* edit file containing definition */
 
 static Void local runEditor() {         /* run editor on script lastEdit   */
     if (startEdit(lastEdLine,lastEdit)) /* at line lastEdLine              */
-        readScripts(scriptBase);
+        readScripts(1);
 }
 
 static Void local setLastEdit(fname,line)/* keep name of last file to edit */
@@ -1451,7 +1452,8 @@ String argv[]; {
     for (;;) {
         Command cmd;
         everybody(RESET);               /* reset to sensible initial state */
-        dropScriptsFrom(numScripts);    /* remove partially loaded scripts */
+        dropScriptsFrom(numScripts-1);  /* remove partially loaded scripts */
+                                        /* not counting prelude as a script*/
 
         promptForInput(textToStr(module(findEvalModule()).text));
 
@@ -1465,14 +1467,14 @@ String argv[]; {
             case FIND   : find();
                           break;
             case LOAD   : clearProject();
-                          forgetScriptsFrom(scriptBase);
+                          forgetScriptsFrom(1);
                           load();
                           break;
             case ALSO   : clearProject();
                           forgetScriptsFrom(numScripts);
                           load();
                           break;
-            case RELOAD : readScripts(scriptBase);
+            case RELOAD : readScripts(1);
                           break;
             case PROJECT: project();
                           break;
@@ -1869,15 +1871,14 @@ Int what; {                     /* system to respond as appropriate ...    */
     storage(what);              /* important for the INSTALL command       */
     substitution(what);
     input(what);
+    translateControl(what);
     linkControl(what);
     staticAnalysis(what);
     deriveControl(what);
     typeChecker(what);
-    translateControl(what);
     compiler(what);   
     codegen(what);
 }
-
 
 /* --------------------------------------------------------------------------
  * Hugs for Windows code (WinMain and related functions)

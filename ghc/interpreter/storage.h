@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:55 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:14 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -186,32 +186,14 @@ extern  Bool            isQCon      Args((Cell));
 extern  Bool            isQualIdent Args((Cell));
 extern  Bool            isIdent     Args((Cell));
 
-#if 0
-Originally ...
-#define isFloat(c)      (isPair(c) && fst(c)==FLOATCELL)
-extern  Cell            mkFloat         Args((FloatPro));
-extern  FloatPro        floatOf         Args((Cell));
-extern  String          floatToString   Args((FloatPro));
-extern  FloatPro        stringToFloat   Args((String));
-#else
-#define isFloat(c)       (isPair(c) && fst(c)==FLOATCELL)
-#define stringToFloat(s) pair(FLOATCELL,findText(s))
-#define floatToString(f) textToStr(snd(f))
-#define floatEq(f1,f2)   (snd(f1) == snd(f2))
-#define floatNegate(f)   stringToFloat(stringNegate(floatToString(f)))
-#define floatOf(f)       atof(floatToString(f))
-#endif
-
-
-
+extern  String           stringNegate Args((String));
 
 #define isFloat(c)       (isPair(c) && fst(c)==FLOATCELL)
 #define stringToFloat(s) pair(FLOATCELL,findText(s))
 #define floatToString(f) textToStr(snd(f))
-#define floatEq(f1,f2)   (snd(f1) == snd(f2))
-#define floatNegate(f)   stringToFloat(stringNegate(floatToString(f)))
 #define floatOf(f)       atof(floatToString(f))
 #define mkFloat(f)       (f)  /* ToDo: is this right? */
+#define floatNegate(f)   stringToFloat(stringNegate(floatToString(f)))
 
 #define bignumToString(b) textToStr(snd(b))
 
@@ -462,7 +444,7 @@ struct strTycon {
     Cell  defn;
     Name  conToTag;                     /* used in derived code            */
     Name  tagToCon;
-  //Tycon nextTyconHash;
+    Tycon nextTyconHash;
 };
 
 extern struct strTycon DECTABLE(tabTycon);
@@ -500,7 +482,7 @@ struct strName {
     Cell   defn;
     Cell   stgVar;        /* really StgVar   */
     const void*  primop;  /* really StgPrim* */
-  //Name   nextNameHash;
+    Name   nextNameHash;
 };
 
 extern int numNames Args(( Void ));
@@ -557,7 +539,7 @@ extern Int    sfunPos         Args((Name,Name));
 struct strInst {
     Class c;                            /* class C                         */
     Int   line;
-    Module mod;                         /* module that defines it          */
+  //Module mod;                         /* module that defines it          */
     Kinds kinds;                        /* Kinds of variables in head      */
     Cell  head;                         /* :: Pred                         */
     List  specifics;                    /* :: [Pred]                       */

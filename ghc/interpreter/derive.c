@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:44 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:06 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -19,6 +19,7 @@
 #include "Assembler.h"
 #include "link.h"
 
+#if 0
 static Cell varTrue;
 static Cell varFalse;
 #if DERIVE_ORD
@@ -64,7 +65,6 @@ static Cell varGt;
 #endif                                 
 #if DERIVE_SHOW || DERIVE_READ         
 static Cell varAppend;                 /* list append                     */
-List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
 #endif                                 
 #if DERIVE_EQ || DERIVE_IX             
 static Cell varAnd;                    /* built-in logical connectives    */
@@ -72,7 +72,9 @@ static Cell varAnd;                    /* built-in logical connectives    */
 #if DERIVE_EQ || DERIVE_ORD            
 static Cell varEq;
 #endif
+#endif /* 0 */
 
+List cfunSfuns;                        /* List of (Cfun,[SelectorVar])    */
 
 /* --------------------------------------------------------------------------
  * local function prototypes:
@@ -202,12 +204,12 @@ Type t; {                               /* for some TUPLE or DATATYPE t    */
         List cs = tycon(t).defn;
         for (; hasCfun(cs); cs=tl(cs)) {
             alts = cons(mkAltEq(tycon(t).line,
-                                makeDPats2(hd(cs),name(hd(cs)).arity)),
+                                makeDPats2(hd(cs),userArity(hd(cs)))),
                         alts);
         }
         if (cfunOf(hd(tycon(t).defn))!=0) {
             alts = cons(pair(cons(WILDCARD,cons(WILDCARD,NIL)),
-                             pair(mkInt(tycon(t).line),varFalse)),alts);
+                             pair(mkInt(tycon(t).line),nameFalse)),alts);
         }
         alts = rev(alts);
     } else {                            /* special case for tuples         */
@@ -221,12 +223,12 @@ Int  line;                              /* using patterns in pats for lhs  */
 List pats; {                            /* arguments                       */
     Cell p = hd(pats);
     Cell q = hd(tl(pats));
-    Cell e = varTrue;
+    Cell e = nameTrue;
 
     if (isAp(p)) {
-        e = ap2(varEq,arg(p),arg(q));
+        e = ap2(nameEq,arg(p),arg(q));
         for (p=fun(p), q=fun(q); isAp(p); p=fun(p), q=fun(q)) {
-            e = ap2(varAnd,ap2(varEq,arg(p),arg(q)),e);
+            e = ap2(nameAnd,ap2(nameEq,arg(p),arg(q)),e);
         }
     }
     return pair(pats,pair(mkInt(line),e));
@@ -246,18 +248,18 @@ Type t; {                               /* for some TUPLE or DATATYPE t    */
         Cell rhs = NIL;
         if (cfunOf(hd(tycon(t).defn))!=0) {
             implementConToTag(t);
-            rhs = ap2(varCompare,
+            rhs = ap2(nameCompare,
                       ap(tycon(t).conToTag,u),
                       ap(tycon(t).conToTag,w));
         } else {
-            rhs = varEQ;
+            rhs = nameEQ;
         }
         alts = singleton(pair(doubleton(u,w),pair(mkInt(tycon(t).line),rhs)));
     } else if (isTycon(t)) {            /* deal with type constrs          */
         List cs = tycon(t).defn;
         for (; hasCfun(cs); cs=tl(cs)) {
             alts = cons(mkAltOrd(tycon(t).line,
-                                 makeDPats2(hd(cs),name(hd(cs)).arity)),
+                                 makeDPats2(hd(cs),userArity(hd(cs)))),
                         alts);
         }
         if (cfunOf(hd(tycon(t).defn))!=0) {
@@ -266,7 +268,7 @@ Type t; {                               /* for some TUPLE or DATATYPE t    */
             implementConToTag(t);
             alts   = cons(pair(doubleton(u,w),
                                pair(mkInt(tycon(t).line),
-                                    ap2(varCompare,
+                                    ap2(nameCompare,
                                         ap(tycon(t).conToTag,u),
                                         ap(tycon(t).conToTag,w)))),
                           alts);
@@ -283,12 +285,12 @@ Int  line;                              /* using patterns in pats for lhs  */
 List pats; {                            /* arguments                       */
     Cell p = hd(pats);
     Cell q = hd(tl(pats));
-    Cell e = varEQ;
+    Cell e = nameEQ;
 
     if (isAp(p)) {
-        e = ap2(varCompare,arg(p),arg(q));
+        e = ap2(nameCompare,arg(p),arg(q));
         for (p=fun(p), q=fun(q); isAp(p); p=fun(p), q=fun(q)) {
-            e = ap3(varCompAux,arg(p),arg(q),e);
+            e = ap3(nameCompAux,arg(p),arg(q),e);
         }
     }
 
@@ -304,11 +306,11 @@ List pats; {                            /* arguments                       */
 #if DERIVE_ENUM
 List deriveEnum(t)              /* Construct definition of enumeration     */
 Tycon t; {
-    Int  l    = tycon(t).line;
-    Cell x    = inventVar();
-    Cell y    = inventVar();
+    Int  l     = tycon(t).line;
+    Cell x     = inventVar();
+    Cell y     = inventVar();
     Cell first = hd(tycon(t).defn);
-    Cell last = tycon(t).defn;
+    Cell last  = tycon(t).defn;
 
     if (!isEnumType(t)) {
         ERRMSG(l) "Can only derive instances of Enum for enumeration types"
@@ -324,12 +326,12 @@ Tycon t; {
            cons(mkBind("fromEnum",    mkVarAlts(l,tycon(t).conToTag)),
            cons(mkBind("enumFrom",    singleton(pair(singleton(x),  
                                         pair(mkInt(l),
-                                        ap2(varEnumFromTo,x,last))))),
+                                        ap2(nameFromTo,x,last))))),
            /* default instance of enumFromTo is good */
            cons(mkBind("enumFromThen",singleton(pair(doubleton(x,y),
                                         pair(mkInt(l),
-                                        ap3(varEnumFromThenTo,x,y,
-                                        ap(COND,triple(ap2(varLe,x,y),
+                                        ap3(nameFromThenTo,x,y,
+                                        ap(COND,triple(ap2(nameLe,x,y),
                                         last,first))))))),
            /* default instance of enumFromThenTo is good */
            NIL))));
@@ -354,7 +356,7 @@ Tycon t; {
     } else if (isTycon(t) && cfunOf(hd(tycon(t).defn))==0) {
         return mkIxBinds(tycon(t).line,
                          hd(tycon(t).defn),
-                         name(hd(tycon(t).defn)).arity);
+                         userArity(hd(tycon(t).defn)));
     }
     ERRMSG(tycon(t).line)
         "Can only derive instances of Ix for enumeration or product types"
@@ -380,21 +382,21 @@ Tycon t; {
     Cell c2 = inventVar();
     Cell ci = inventVar();
     return cons(mkBind("range",  singleton(pair(singleton(ap2(mkTuple(2),
-                                 c1,c2)), pair(mkInt(l),ap2(varMap,tagToCon,
-                                 ap2(varEnumFromTo,ap(conToTag,c1),
+                                 c1,c2)), pair(mkInt(l),ap2(nameMap,tagToCon,
+                                 ap2(nameFromTo,ap(conToTag,c1),
                                  ap(conToTag,c2))))))),
            cons(mkBind("index",  singleton(pair(doubleton(ap(ASPAT,pair(b,
                                  ap2(mkTuple(2),c1,c2))),ci), 
                                  pair(mkInt(l),ap(COND,
-                                 triple(ap2(varInRange,b,ci),
-                                 ap2(qvarMinus,ap(conToTag,ci),
+                                 triple(ap2(nameInRange,b,ci),
+                                 ap2(nameMinus,ap(conToTag,ci),
                                  ap(conToTag,c1)),
-                                 ap(varError,mkStr(findText(
+                                 ap(nameError,mkStr(findText(
                                  "Ix.index: Index out of range"))))))))),
            cons(mkBind("inRange",singleton(pair(doubleton(ap2(mkTuple(2),
-                                 c1,c2),ci), pair(mkInt(l),ap2(varAnd,
-                                 ap2(varLe,ap(conToTag,c1),ap(conToTag,ci)),
-                                 ap2(varLe,ap(conToTag,ci),
+                                 c1,c2),ci), pair(mkInt(l),ap2(nameAnd,
+                                 ap2(nameLe,ap(conToTag,c1),ap(conToTag,ci)),
+                                 ap2(nameLe,ap(conToTag,ci),
                                  ap(conToTag,c2))))))), 
                                         /* ToDo: share conToTag ci         */
            NIL)));
@@ -438,7 +440,7 @@ Cell ls, us, is; {
     List e   = NIL;
     for (; isAp(ls); ls=fun(ls), us=fun(us), is=fun(is)) {
         e = cons(ap(FROMQUAL,pair(arg(is),
-                                  ap(varRange,ap2(mkTuple(2),
+                                  ap(nameRange,ap2(mkTuple(2),
                                                    arg(ls),
                                                    arg(us))))),e);
     }
@@ -460,11 +462,11 @@ Cell ls, us, is; {
     List xs = NIL;
     Cell e  = NIL;
     for (; isAp(ls); ls=fun(ls), us=fun(us), is=fun(is)) {
-        xs = cons(ap2(varIndex,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),xs);
+        xs = cons(ap2(nameIndex,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),xs);
     }
     for (e=hd(xs); nonNull(xs=tl(xs));) {
         Cell x = hd(xs);
-        e = ap2(qvarPlus,x,ap2(varMult,ap(varRangeSize,arg(fun(x))),e));
+        e = ap2(namePlus,x,ap2(nameMult,ap(nameRangeSize,arg(fun(x))),e));
     }
     e = singleton(pair(pats,pair(mkInt(line),e)));
     return mkBind("index",e);
@@ -478,10 +480,10 @@ Cell ls, us, is; {
      * inRange (X a b c, X p q r) (X x y z)
      *          = inRange (a,p) x && inRange (b,q) y && inRange (c,r) z
      */
-    Cell e = ap2(varInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is));
+    Cell e = ap2(nameInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is));
     while (ls=fun(ls), us=fun(us), is=fun(is), isAp(ls)) {
-        e = ap2(varAnd,
-                ap2(varInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),
+        e = ap2(nameAnd,
+                ap2(nameInRange,ap2(mkTuple(2),arg(ls),arg(us)),arg(is)),
                 e);
     }
     e = singleton(pair(pats,pair(mkInt(line),e)));
@@ -1004,7 +1006,7 @@ Tycon t; {
 
 /* \ v -> case v of { ...; i -> Ci; ... } */
 Void implementTagToCon(t)
-Tycon t; {                    
+Tycon t; {
     if (isNull(tycon(t).tagToCon)) {
         String etxt;
         String tyconname;
@@ -1091,6 +1093,7 @@ Int what; {
     Text textPrelude = findText("Prelude");
     switch (what) {
         case INSTALL :
+#if 0
                 varTrue           = mkQVar(textPrelude,findText("True"));
                 varFalse          = mkQVar(textPrelude,findText("False"));
 #if DERIVE_ORD
@@ -1143,6 +1146,7 @@ Int what; {
 #if DERIVE_EQ || DERIVE_ORD            
                 varEq             = mkQVar(textPrelude,findText("=="));
 #endif
+#endif /* 0 */
                 /* deliberate fall through */
         case RESET   : 
                 diVars      = NIL;
@@ -1157,6 +1161,7 @@ Int what; {
 #if DERIVE_SHOW | DERIVE_READ
                 mark(cfunSfuns);
 #endif
+#if 0
                 mark(varTrue);        
                 mark(varFalse);        
 #if DERIVE_ORD
@@ -1209,6 +1214,7 @@ Int what; {
 #if DERIVE_EQ || DERIVE_ORD       
                 mark(varEq);             
 #endif
+#endif /* 0 */
                 break;
     }
 }

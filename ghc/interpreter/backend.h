@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: backend.h,v $
- * $Revision: 1.2 $
- * $Date: 1999/03/01 14:46:42 $
+ * $Revision: 1.3 $
+ * $Date: 1999/03/09 14:51:04 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -128,9 +128,6 @@ extern Bool    isStgVar      ( StgRhs rhs );
 extern Bool    isAtomic      ( StgRhs rhs );
 
 extern StgVar  mkStgVar      ( StgRhs rhs, Cell info );
-
-#define mkSeq(x,y) mkStgCase(mkStgApp(nameForce,singleton(x)),singleton(mkStgDefault(mkStgVar(NIL,NIL),y)))
-
 
 #define mkStgRep(c) mkChar(c)
 

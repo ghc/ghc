@@ -1,7 +1,6 @@
 
 extern Cell conCons;
 
-extern Name nameForce;
 extern Name nameRunIO;
 
 /* The following data constructors are used to box unboxed
@@ -129,6 +128,7 @@ extern Name nameSel;
 /* used in translation */
 extern Name nameEq;     
 extern Name namePMFail;
+extern Name namePMFailBUG;
 extern Name nameEqChar;
 extern Name nameEqInt;
 extern Name nameEqInteger;
@@ -141,6 +141,10 @@ extern Name namePmSubtract;
 extern Name namePmFromInteger;
 extern Name nameMkIO;
 extern Name nameUnpackString;
+extern Name namePrimSeq;
+extern Name nameMap;
+extern Name nameMinus;
+
 
 extern Type  arrow;                     /* mkOffset(0) -> mkOffset(1)      */
 extern Type  listof;                    /* [ mkOffset(0) ]                 */

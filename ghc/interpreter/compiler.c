@@ -10,8 +10,8 @@
  * in the distribution for details.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:43 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:05 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1500,7 +1500,6 @@ Void evalExp() {                    /* compile and run input expression    */
                 RevertCAFs();
                 break;
         case Success:
-                /* Nothing to do */
                 break;
         default:
                 internal("evalExp: Unrecognised SchedulerStatus");
@@ -1535,7 +1534,6 @@ Void compileDefns() {                  /* compile script definitions       */
     /* a nasty hack.  But I don't know an easier way to make */
     /* these things appear.                                  */
     if (lastModule() == modulePrelude) {
-       //printf ( "------ Adding cons (:) [] () \n" );
        implementCfun ( nameCons, NIL );
        implementCfun ( nameNil, NIL );
        implementCfun ( nameUnit, NIL );
@@ -1583,8 +1581,9 @@ Void compileDefns() {                  /* compile script definitions       */
     /* binds=revOnto(binds,NIL); *//* ToDo: maintain compilation order?? */
     binds = addGlobals(binds);
 #if USE_HUGS_OPTIMIZER
-    mapProc(optimiseBind,binds);
 #error optimiser
+    if (lastModule() != modulePrelude)
+       mapProc(optimiseTopBind,binds);
 #endif
     stgCGBinds(binds);
 

@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/03/01 14:46:57 $
+ * $Revision: 1.6 $
+ * $Date: 1999/03/09 14:51:15 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -25,7 +25,7 @@
 
 static StgVar  local stgOffset       Args((Offset,List));
 static StgVar  local stgText         Args((Text,List));
-static StgRhs  local stgRhs          Args((Cell,Int,List));
+static StgRhs  local stgRhs          Args((Cell,Int,List,StgExpr));
 static StgCaseAlt local stgCaseAlt   Args((Cell,Int,List,StgExpr));
 static StgExpr local stgExpr         Args((Cell,Int,List,StgExpr));
 
@@ -73,10 +73,11 @@ static Cell local stgText(Text t,List sc)
 
 /* ---------------------------------------------------------------- */
 
-static StgRhs local stgRhs(e,co,sc)
+static StgRhs local stgRhs(e,co,sc,failExpr)
 Cell e; 
 Int  co; 
-List sc; {
+List sc;
+StgExpr failExpr; {
     switch (whatIs(e)) {
 
     /* Identifiers */
@@ -109,11 +110,11 @@ List sc; {
             return mkStgApp(nameUnpackString,singleton(e));
 #endif
     case AP:
-            return stgExpr(e,co,sc,namePMFail);
+            return stgExpr(e,co,sc,namePMFailBUG);
     case NIL:
             internal("stgRhs2");
     default:
-            return stgExpr(e,co,sc,namePMFail);
+            return stgExpr(e,co,sc,failExpr/*namePMFail*/);
     }
 }
 
@@ -225,7 +226,7 @@ StgExpr failExpr;
                 StgVar dIntegral    = NIL;
 
                 /* bind dictionary */
-                dIntegral = stgRhs(dictIntegral,co,sc);
+                dIntegral = stgRhs(dictIntegral,co,sc,namePMFailBUG);
                 if (!isAtomic(dIntegral)) { /* wasn't atomic */
                     dIntegral = mkStgVar(dIntegral,NIL);
                     binds = cons(dIntegral,binds);
@@ -294,7 +295,7 @@ StgExpr failExpr;
                     altsc = cons(pair(mkOffset(co+i),nv),altsc);
                 }
                 /* bind dictionary */
-                d = stgRhs(dict,co,sc);
+                d = stgRhs(dict,co,sc,namePMFailBUG);
                 if (!isAtomic(d)) { /* wasn't atomic */
                     d = mkStgVar(d,NIL);
                     binds = cons(d,binds);
@@ -393,9 +394,9 @@ StgExpr failExpr;
             for(bs = fst(fst(snd(e))); nonNull(bs); bs=tl(bs), vs=tl(vs)) {
                 Cell rhs = hd(bs);
                 Cell nv  = hd(vs);
-                stgVarBody(nv) = stgRhs(rhs,co,sc);
+                stgVarBody(nv) = stgRhs(rhs,co,sc,namePMFailBUG);
             }
-            return mkStgLet(binds,stgRhs(snd(snd(e)),co,sc));
+            return mkStgLet(binds,stgRhs(snd(snd(e)),co,sc,failExpr/*namePMFailBUG*/));
         }
     default: /* convert to an StgApp or StgVar plus some bindings */
         {   
@@ -434,7 +435,7 @@ StgExpr failExpr;
             
             /* Arguments must be StgAtoms */
             for(as=args; nonNull(as); as=tl(as)) {
-                StgRhs a = stgRhs(hd(as),co,sc);
+                StgRhs a = stgRhs(hd(as),co,sc,namePMFailBUG);
 #if 1 /* optional flattening of let bindings */
                 if (whatIs(a) == LETREC) {
                     binds = appendOnto(stgLetBinds(a),binds);
@@ -450,7 +451,7 @@ StgExpr failExpr;
             }
 
             /* Function must be StgVar or Name */
-            e = stgRhs(e,co,sc);
+            e = stgRhs(e,co,sc,namePMFailBUG);
             if (!isStgVar(e) && !isName(e)) {
                 e = mkStgVar(e,NIL);
                 binds = cons(e,binds);
@@ -464,8 +465,7 @@ StgExpr failExpr;
 #if 0 /* apparently not used */
 static Void ppExp( Name n, Int arity, Cell e )
 {
-#if DEBUG_CODE
-    if (debugCode) {
+    if (1 || debugCode) {
         Int i;
         printf("%s", textToStr(name(n).text));
         for (i = arity; i > 0; i--) {
@@ -475,7 +475,6 @@ static Void ppExp( Name n, Int arity, Cell e )
         printExp(stdout,e); 
         printf("\n");
     }
-#endif
 }
 #endif
 
@@ -485,7 +484,13 @@ Void stgDefn( Name n, Int arity, Cell e )
     List vs = NIL;
     List sc = NIL;
     Int i;
-    // ppExp(n,arity,e);
+#if 0
+    if (lastModule() != modulePrelude) {
+       fprintf(stderr, "\n===========================================\n" );
+       ppExp ( n,arity,e);
+       printf("\n\n"); fflush(stdout);
+    }
+#endif
     for (i = 1; i <= arity; ++i) {
         Cell nv = mkStgVar(NIL,NIL);
         vs = cons(nv,vs);
@@ -493,40 +498,42 @@ Void stgDefn( Name n, Int arity, Cell e )
     }
     stgVarBody(name(n).stgVar) 
        = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
-    //ppStg(name(n).stgVar);
-    //printStg(stdout, name(n).stgVar);
-}
-
-static StgExpr forceArgs( List is, List args, StgExpr e );
-
-/* force the args numbered in is */
-static StgExpr forceArgs( List is, List args, StgExpr e )
-{
-    for(; nonNull(is); is=tl(is)) {
-        e = mkSeq(nth(intOf(hd(is))-1,args),e);
+#if 0
+    if (lastModule() != modulePrelude) {
+       ppStg(name(n).stgVar);
+       fprintf(stderr, "\n\n");
     }
-    return e;
+    //printStg(stdout, name(n).stgVar);
+#endif
 }
-
 
 Void implementCfun(c,scs)               /* Build implementation for constr */
 Name c;                                 /* fun c.  scs lists integers (1..)*/
 List scs; {                             /* in incr order of strict comps.  */
     Int a = name(c).arity;
-    //printf ( "implementCfun %s\n", textToStr(name(c).text) );
-    if (name(c).arity > 0) {
-        List    args = makeArgs(a);
-        StgVar  tv   = mkStgVar(mkStgCon(c,args),NIL);
-        StgExpr e1   = mkStgLet(singleton(tv),tv);
-        StgExpr e2   = forceArgs(scs,args,e1);
-        StgVar  v    = mkStgVar(mkStgLambda(args,e2),NIL);
+    //fprintf ( stderr,"implementCfun %s\n", textToStr(name(c).text) );
+    if (a > 0) {
+        StgVar  vcurr, e1, v, vsi;
+        List    args  = makeArgs(a);
+        StgVar  v0    = mkStgVar(mkStgCon(c,args),NIL);
+        List    binds = singleton(v0);
+
+        vcurr = v0;
+        for (; nonNull(scs); scs=tl(scs)) {
+           vsi   = nth(intOf(hd(scs))-1,args);
+           vcurr = mkStgVar(mkStgApp(namePrimSeq,doubleton(vsi,vcurr)), NIL);
+           binds = cons(vcurr,binds);
+        }
+        binds = rev(binds);
+        e1    = mkStgLet(binds,vcurr);
+        v     = mkStgVar(mkStgLambda(args,e1),NIL);
         name(c).stgVar = v;
     } else {
         StgVar v = mkStgVar(mkStgCon(c,NIL),NIL);
         name(c).stgVar = v;
     }
-    /* hack to make it print out */
     stgGlobals = cons(pair(c,name(c).stgVar),stgGlobals); 
+    //printStg(stderr, name(c).stgVar); fprintf(stderr,"\n\n");
 }
 
 /* --------------------------------------------------------------------------

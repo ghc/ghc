@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:34 $
+ * $Revision: 1.4 $
+ * $Date: 1999/03/09 14:51:09 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -1088,7 +1088,7 @@ Cell c; {                               /* T a1 ... a                      */
             ERRMSG(row) "Illegal left hand side in datatype definition"
             EEND;
     }
-    assert(0); return 0; /* NOTREACHED */
+    return 0; /* NOTREACHED */
 }
 
 #if !TREX

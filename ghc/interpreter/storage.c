@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:54 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -30,7 +30,9 @@ static Int  local saveText              Args((Text));
 #if !IGNORE_MODULES
 static Module local findQualifier       Args((Text));
 #endif
+static Void local hashTycon             Args((Tycon));
 static List local insertTycon           Args((Tycon,List));
+static Void local hashName              Args((Name));
 static List local insertName            Args((Name,List));
 static Void local patternError          Args((String));
 static Bool local stringMatch           Args((String,String));
@@ -127,7 +129,7 @@ Cell v; {
                           }
     }
     internal("identToStr2");
-    assert(0); return 0; /* NOTREACHED */
+    return 0; /* NOTREACHED */
 }
 
 Text inventText()     {                 /* return new unused variable name */
@@ -256,11 +258,15 @@ Text t; {
  * the most recent entry at the front of the list.
  * ------------------------------------------------------------------------*/
 
-        Tycon    tyconHw;                       /* next unused Tycon       */
+#define TYCONHSZ 256                            /* Size of Tycon hash table*/
+#define tHash(x) ((x)%TYCONHSZ)                 /* Tycon hash function     */
+static  Tycon    tyconHw;                       /* next unused Tycon       */
+static  Tycon    DEFTABLE(tyconHash,TYCONHSZ);  /* Hash table storage      */
 struct  strTycon DEFTABLE(tabTycon,NUM_TYCON);  /* Tycon storage           */
 
 Tycon newTycon(t)                       /* add new tycon to tycon table    */
 Text t; {
+    Int h = tHash(t);
     if (tyconHw-TYCMIN >= NUM_TYCON) {
         ERRMSG(0) "Type constructor storage space exhausted"
         EEND;
@@ -275,28 +281,40 @@ Text t; {
     tycon(tyconHw).mod           = currentModule;
     module(currentModule).tycons = cons(tyconHw,module(currentModule).tycons);
 #endif
+    tycon(tyconHw).nextTyconHash = tyconHash[h];
+    tyconHash[h]                 = tyconHw;
+
     return tyconHw++;
 }
 
-Tycon findTycon ( Text t )
-{
-   int n;
-   for (n = TYCMIN; n < tyconHw; n++)
-      if (tycon(n).text == t) return n;
-   return NIL;
+Tycon findTycon(t)                      /* locate Tycon in tycon table     */
+Text t; {
+    Tycon tc = tyconHash[tHash(t)];
+
+    while (nonNull(tc) && tycon(tc).text!=t)
+	tc = tycon(tc).nextTyconHash;
+    return tc;
 }
 
 Tycon addTycon(tc)  /* Insert Tycon in tycon table - if no clash is caused */
 Tycon tc; {
     Tycon oldtc = findTycon(tycon(tc).text);
     if (isNull(oldtc)) {
-      //        hashTycon(tc);
+        hashTycon(tc);
 #if !IGNORE_MODULES
         module(currentModule).tycons=cons(tc,module(currentModule).tycons);
 #endif
         return tc;
     } else
         return oldtc;
+}
+
+static Void local hashTycon(tc)         /* Insert Tycon into hash table    */
+Tycon tc; {
+    Text  t = tycon(tc).text;
+    Int   h = tHash(t);
+    tycon(tc).nextTyconHash = tyconHash[h];
+    tyconHash[h]            = tc;
 }
 
 Tycon findQualTycon(id) /*locate (possibly qualified) Tycon in tycon table */
@@ -324,7 +342,7 @@ Cell id; {
         }
         default : internal("findQualTycon2");
     }
-    assert(0); return 0; /* NOTREACHED */
+    return 0; /* NOTREACHED */
 }
 
 Tycon addPrimTycon(t,kind,ar,what,defn) /* add new primitive type constr   */
@@ -396,8 +414,7 @@ struct  strName  DEFTABLE(tabName,NUM_NAME);    /* Name table storage      */
 Name newName(t,parent)                  /* Add new name to name table      */
 Text t; 
 Cell parent; {
-    //Int h = nHash(t);
-
+    Int h = nHash(t);
     if (nameHw-NAMEMIN >= NUM_NAME) {
         ERRMSG(0) "Name storage space exhausted"
         EEND;
@@ -414,30 +431,40 @@ Cell parent; {
     name(nameHw).primop       = 0;
     name(nameHw).mod          = currentModule;
     module(currentModule).names=cons(nameHw,module(currentModule).names);
+    name(nameHw).nextNameHash = nameHash[h];
+    nameHash[h]               = nameHw;
+assert ( name(nameHw).nextNameHash != nameHash[h] );
     return nameHw++;
 }
 
-Name findName ( Text t )
-{
-   int n;
-   for (n = NAMEMIN; n < nameHw; n++)
-      if (name(n).text == t) return n;
-   return NIL;
+Name findName(t)                        /* Locate name in name table       */
+Text t; {
+    Name n = nameHash[nHash(t)];
+
+    while (nonNull(n) && name(n).text!=t)
+	n = name(n).nextNameHash;
+    return n;
 }
-
-
 
 Name addName(nm)                        /* Insert Name in name table - if  */
 Name nm; {                              /* no clash is caused              */
     Name oldnm = findName(name(nm).text);
     if (isNull(oldnm)) {
-      //        hashName(nm);
+        hashName(nm);
 #if !IGNORE_MODULES
         module(currentModule).names=cons(nm,module(currentModule).names);
 #endif
         return nm;
     } else
         return oldnm;
+}
+
+static Void local hashName(nm)          /* Insert Name into hash table	   */
+Name nm; {
+    Text t		  = name(nm).text;
+    Int  h		  = nHash(t);
+    name(nm).nextNameHash = nameHash[h];
+    nameHash[h]           = nm;
 }
 
 Name findQualName(id)              /* Locate (possibly qualified) name*/
@@ -458,13 +485,6 @@ Cell id; {                         /* in name table                   */
             Module m  = findQualifier(qmodOf(id));
             List   es = NIL;
             if (isNull(m)) return NIL;
-            if (m==currentModule) {
-                /* The Haskell report (rightly) forbids this.
-                 * We added it to let the Prelude refer to itself
-                 * without having to import itself.
-	         */
-                return findName(t);
-            }
             for(es=module(m).exports; nonNull(es); es=tl(es)) {
                 Cell e = hd(es);
                 if (isName(e) && name(e).text==t) 
@@ -478,7 +498,8 @@ Cell id; {                         /* in name table                   */
                     else if (isClass(c))
                         subentities = cclass(c).members;
                     for(; nonNull(subentities); subentities=tl(subentities)) {
-                        assert(isName(hd(subentities)));
+                       if (!isName(hd(subentities)))
+                            internal("findQualName3");
                         if (name(hd(subentities)).text == t)
                             return hd(subentities);
                     }
@@ -489,7 +510,7 @@ Cell id; {                         /* in name table                   */
         }
         default : internal("findQualName2");
     }
-    assert(0); return 0; /* NOTREACHED */
+    return 0; /* NOTREACHED */
 }
 
 /* --------------------------------------------------------------------------
@@ -743,7 +764,6 @@ Inst newInst() {                       /* Add new instance to table        */
     inst(instHw).specifics  = NIL;
     inst(instHw).implements = NIL;
     inst(instHw).builder    = NIL;
-    /* from STG */ inst(instHw).mod        = currentModule;
 
     return instHw++;
 }
@@ -905,15 +925,6 @@ Cell c; {
 static local Module findQualifier(t)    /* locate Module in import list   */
 Text t; {
     Module ms;
-    ////if (t==module(modulePreludeHugs).text) {
-    if (t==module(modulePrelude).text) {
-        /* The Haskell report (rightly) forbids this.
-         * We added it to let the Prelude refer to itself
-         * without having to import itself.
-         */
-         ////return modulePreludeHugs;
-         return modulePrelude;
-    }
     for (ms=module(currentModule).qualImports; nonNull(ms); ms=tl(ms)) {
         if (textOf(fst(hd(ms)))==t)
             return snd(hd(ms));
@@ -927,17 +938,15 @@ Text t; {
 
 Void setCurrModule(m)              /* set lookup tables for current module */
 Module m; {
-    //Int i;
+    Int i;
     if (m!=currentModule) {
         currentModule = m; /* This is the only assignment to currentModule */
-#if 0
         for (i=0; i<TYCONHSZ; ++i)
             tyconHash[i] = NIL;
         mapProc(hashTycon,module(m).tycons);
         for (i=0; i<NAMEHSZ; ++i)
             nameHash[i] = NIL;
         mapProc(hashName,module(m).names);
-#endif
         classes = module(m).classes;
     }
 }
@@ -974,7 +983,7 @@ typedef struct {                       /* record of storage state prior to */
 static Void local showUse(msg,val,mx)
 String msg;
 Int val, mx; {
-    Printf("%6s : %d of %d (%d%%)\n",msg,val,mx,(100*val)/mx);
+    Printf("%6s : %5d of %5d (%2d%%)\n",msg,val,mx,(100*val)/mx);
 }
 #endif
 
@@ -1019,9 +1028,7 @@ String f; {                             /* of status for later restoration  */
 }
 
 Bool isPreludeScript() {                /* Test whether this is the Prelude*/
-    return (scriptHw==0
-	    /*ToDo: jrs hack*/ || scriptHw==1
-           );
+    return (scriptHw==0);
 }
 
 #if !IGNORE_MODULES
@@ -1105,6 +1112,7 @@ Script sno; {                           /* to reading script sno           */
         extHw        = scripts[sno].extHw;
 #endif
 
+#if 0  //zzzzzzzzzzzzzzzzz
         for (i=moduleHw; i >= scripts[sno].moduleHw; --i) {
             if (module(i).objectFile) {
                 printf("[bogus] closing objectFile for module %d\n",i);
@@ -1112,7 +1120,7 @@ Script sno; {                           /* to reading script sno           */
             }
         }
         moduleHw = scripts[sno].moduleHw;
-
+#endif
         for (i=0; i<TEXTHSZ; ++i) {
             int j = 0;
             while (j<NUM_TEXTH && textHash[i][j]!=NOTEXT
@@ -1138,14 +1146,12 @@ Script sno; {                           /* to reading script sno           */
         }
 #else /* !IGNORE_MODULES */
         currentModule=NIL;
-#if 0
         for (i=0; i<TYCONHSZ; ++i) {
             tyconHash[i] = NIL;
         }
         for (i=0; i<NAMEHSZ; ++i) {
             nameHash[i] = NIL;
         }
-#endif
 #endif /* !IGNORE_MODULES */
 
         for (i=CLASSMIN; i<classHw; i++) {
@@ -2039,6 +2045,19 @@ Cell c;
 }
 #endif
 
+String stringNegate( s )
+String s;
+{
+    if (s[0] == '-') {
+        return &s[1];
+    } else {
+        static char t[100];
+        t[0] = '-';
+        strcpy(&t[1],s);  /* ToDo: use strncpy instead */
+        return t;
+    }
+}
+
 /* --------------------------------------------------------------------------
  * List operations:
  * ------------------------------------------------------------------------*/
@@ -2795,10 +2814,9 @@ Int what; {
 #endif
 
                        tyconHw  = TYCMIN;
-#if 0
                        for (i=0; i<TYCONHSZ; ++i)
                            tyconHash[i] = NIL;
-#endif
+
 #if GC_WEAKPTRS
                        finalizers   = NIL;
                        liveWeakPtrs = NIL;

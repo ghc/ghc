@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:53 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -160,8 +160,8 @@ StgVar mkStgVar( StgRhs rhs, Cell info )
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:53 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:13 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -533,7 +533,7 @@ Void ppStgRhs( StgRhs rhs )
 
 Void ppStgAlts( List alts )
 {
-    if (debugCode) {
+  if (1 /*debugCode*/ ) {
         beginStgPP(stdout);
         putStgAlts(0,alts);
         endStgPP(stdout);
@@ -542,7 +542,7 @@ Void ppStgAlts( List alts )
 
 extern Void ppStgPrimAlts( List alts )
 {
-    if (debugCode) {
+    if (1 /*debugCode*/ ) {
         beginStgPP(stdout);
         putStgPrimAlts(0,alts);
         endStgPP(stdout);
@@ -551,7 +551,7 @@ extern Void ppStgPrimAlts( List alts )
 
 extern Void ppStgVars( List vs )
 {
-    if (debugCode) {
+    if (1 /*debugCode*/ ) {
         beginStgPP(stdout);
         printf("Vars: ");
         putStgVars(vs);

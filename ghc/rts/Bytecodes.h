@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.4 1999/03/01 14:47:07 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.5 1999/03/09 14:51:24 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -29,7 +29,6 @@ typedef enum
     , i_PANIC           /* irrefutable pattern match failed! */
 
     , i_STK_CHECK
-    , i_HP_CHECK
 
     , i_ARG_CHECK
 
@@ -37,26 +36,32 @@ typedef enum
     , i_ALLOC_PAP
     , i_ALLOC_CONSTR
     , i_MKAP
+    , i_MKAP_big
     , i_MKPAP
     , i_PACK
 
     , i_SLIDE
+    , i_SLIDE_big
 
     , i_TEST
     , i_UNPACK
 
     , i_VAR
+    , i_VAR_big
     , i_CONST
-    , i_CONST2 /* 16 bit offsets - ad-hoc fix for general problem */
+    , i_CONST_big
     , i_ENTER
 
     , i_RETADDR
+    , i_RETADDR_big
 
     , i_VOID
     , i_RETURN_GENERIC
 
     , i_VAR_INT
+    , i_VAR_INT_big
     , i_CONST_INT
+    , i_CONST_INT_big
     , i_RETURN_INT
     , i_PACK_INT
     , i_UNPACK_INT
@@ -71,6 +76,7 @@ typedef enum
 #endif
 #ifdef PROVIDE_INTEGER
     , i_CONST_INTEGER
+    , i_CONST_INTEGER_big
 #endif
 #ifdef PROVIDE_WORD
     , i_VAR_WORD
@@ -81,25 +87,33 @@ typedef enum
 #endif
 #ifdef PROVIDE_ADDR
     , i_VAR_ADDR
+    , i_VAR_ADDR_big
     , i_CONST_ADDR
+    , i_CONST_ADDR_big
     , i_RETURN_ADDR
     , i_PACK_ADDR
     , i_UNPACK_ADDR
 #endif
     , i_VAR_CHAR
+    , i_VAR_CHAR_big
     , i_CONST_CHAR
+    , i_CONST_CHAR_big
     , i_RETURN_CHAR
     , i_PACK_CHAR
     , i_UNPACK_CHAR
 
     , i_VAR_FLOAT
+    , i_VAR_FLOAT_big
     , i_CONST_FLOAT
+    , i_CONST_FLOAT_big
     , i_RETURN_FLOAT
     , i_PACK_FLOAT
     , i_UNPACK_FLOAT
 
     , i_VAR_DOUBLE
+    , i_VAR_DOUBLE_big
     , i_CONST_DOUBLE
+    , i_CONST_DOUBLE_big
     , i_RETURN_DOUBLE
     , i_PACK_DOUBLE
     , i_UNPACK_DOUBLE

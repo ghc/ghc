@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/03/02 19:52:24 $
+ * $Revision: 1.7 $
+ * $Date: 1999/03/09 14:51:19 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -423,10 +423,23 @@ void asmEndBCO( AsmBCO bco )
  * 
  * ------------------------------------------------------------------------*/
 
-static void asmInstr( AsmBCO bco, StgWord i )
+static void asmInstr8 ( AsmBCO bco, StgWord i )
 {
+    if (i >= 256) {
+       fprintf(stderr, "too big (256)\n");
+    }
     ASSERT(i < 256); /* must be a byte */
     insertInstrs(&(bco->is),i);
+}
+
+static void asmInstr16 ( AsmBCO bco, StgWord i )
+{
+    if (i >= 65536) {
+       fprintf(stderr, "too big (65536)\n");
+    }
+    ASSERT(i < 65536); /* must be a byte */
+    insertInstrs(&(bco->is),i / 256);
+    insertInstrs(&(bco->is),i % 256);
 }
 
 static void asmPtr( AsmBCO bco, AsmObject x )
@@ -505,6 +518,231 @@ static StgWord repSizeW( AsmRep rep )
 }
 
 /* --------------------------------------------------------------------------
+ * Instruction emission
+ * ------------------------------------------------------------------------*/
+
+static void emit_i0 ( AsmBCO bco, Instr opcode )
+{
+   asmInstr8(bco,opcode);
+}
+
+static void emit_i1 ( AsmBCO bco, Instr opcode, int arg1 )
+{
+   asmInstr8(bco,opcode);
+   asmInstr8(bco,arg1);
+}
+
+static void emit_i2 ( AsmBCO bco, Instr opcode, int arg1, int arg2 )
+{
+   asmInstr8(bco,opcode);
+   asmInstr8(bco,arg1);
+   asmInstr8(bco,arg2);
+}
+
+static void emit_i_VAR_INT ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_VAR_INT);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_VAR_INT_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+#ifdef PROVIDE_ADDR
+static void emit_i_VAR_ADDR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_VAR_ADDR);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_VAR_ADDR_big);
+      asmInstr16(bco,arg1);
+   }
+}
+#endif
+
+static void emit_i_VAR_CHAR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_VAR_CHAR);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_VAR_CHAR_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_VAR_FLOAT ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_VAR_FLOAT);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_VAR_FLOAT_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_VAR_DOUBLE ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_VAR_DOUBLE);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_VAR_DOUBLE_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_VAR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_VAR);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_VAR_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_SLIDE ( AsmBCO bco, int arg1, int arg2 )
+{
+   ASSERT(arg1 >= 0);
+   ASSERT(arg2 >= 0);
+   if (arg1 < 256 && arg2 < 256) {
+      asmInstr8(bco,i_SLIDE);
+      asmInstr8(bco,arg1);
+      asmInstr8(bco,arg2);
+   } else {
+      asmInstr8(bco,i_SLIDE_big);
+      asmInstr16(bco,arg1);
+      asmInstr16(bco,arg2);
+   }
+}
+
+static void emit_i_MKAP ( AsmBCO bco, int arg1, int arg2 )
+{
+   ASSERT(arg1 >= 0);
+   ASSERT(arg2 >= 0);
+   if (arg1 < 256 && arg2 < 256) {
+      asmInstr8(bco,i_MKAP);
+      asmInstr8(bco,arg1);
+      asmInstr8(bco,arg2);
+   } else {
+      asmInstr8(bco,i_MKAP_big);
+      asmInstr16(bco,arg1);
+      asmInstr16(bco,arg2);
+   }
+}
+
+static void emit_i_CONST_INT ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST_INT);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_INT_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+#ifdef PROVIDE_INTEGER
+static void emit_i_CONST_INTEGER ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST_INTEGER);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_INTEGER_big);
+      asmInstr16(bco,arg1);
+   }
+}
+#endif
+
+static void emit_i_CONST_ADDR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST_ADDR);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_ADDR_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_CONST_CHAR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST_CHAR);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_CHAR_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_CONST_FLOAT ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST_FLOAT);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_FLOAT_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_CONST_DOUBLE ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST_DOUBLE);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_DOUBLE_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_RETADDR ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_RETADDR);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_RETADDR_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+static void emit_i_CONST ( AsmBCO bco, int arg1 )
+{
+   ASSERT(arg1 >= 0);
+   if (arg1 < 256) {
+      asmInstr8(bco,i_CONST);
+      asmInstr8(bco,arg1);
+   } else {
+      asmInstr8(bco,i_CONST_big);
+      asmInstr16(bco,arg1);
+   }
+}
+
+
+/* --------------------------------------------------------------------------
  * Arg checks.
  * ------------------------------------------------------------------------*/
 
@@ -518,8 +756,7 @@ void   asmEndArgCheck   ( AsmBCO bco, AsmSp last_arg )
 {
     nat args = bco->sp - last_arg;
     if (args != 0) { /* optimisation */
-        asmInstr(bco,i_ARG_CHECK);
-        asmInstr(bco,args);
+        emit_i1(bco,i_ARG_CHECK,args);
         grabHpNonUpd(bco,PAP_sizeW(args-1));
         resetHp(bco,0);
     }
@@ -537,38 +774,47 @@ AsmVar asmBind          ( AsmBCO bco, AsmRep rep )
 
 void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
 {
+    int offset;
+
+    if (rep == VOID_REP) {
+        emit_i0(bco,i_VOID);
+        bco->sp += repSizeW(rep);
+        return;
+    }
+
+    offset = bco->sp - v;
     switch (rep) {
     case BOOL_REP:
     case INT_REP:
-            asmInstr(bco,i_VAR_INT);
+            emit_i_VAR_INT(bco,offset);
             break;
 #ifdef PROVIDE_INT64
     case INT64_REP:
-            asmInstr(bco,i_VAR_INT64);
+            emit_i_VAR_INT64(bco,offset);
             break;
 #endif
 #ifdef PROVIDE_WORD
     case WORD_REP:
-            asmInstr(bco,i_VAR_WORD);
+            emit_i_VAR_WORD(bco,offset);
             break;
 #endif
 #ifdef PROVIDE_ADDR
     case ADDR_REP:
-            asmInstr(bco,i_VAR_ADDR);
+            emit_i_VAR_ADDR(bco,offset);
             break;
 #endif
     case CHAR_REP:
-            asmInstr(bco,i_VAR_CHAR);
+            emit_i_VAR_CHAR(bco,offset);
             break;
     case FLOAT_REP:
-            asmInstr(bco,i_VAR_FLOAT);
+            emit_i_VAR_FLOAT(bco,offset);
             break;
     case DOUBLE_REP:
-            asmInstr(bco,i_VAR_DOUBLE);
+            emit_i_VAR_DOUBLE(bco,offset);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
-            asmInstr(bco,i_VAR_STABLE);
+            emit_i_VAR_STABLE(bco,offset);
             break;
 #endif
 
@@ -598,17 +844,11 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case MVAR_REP:     /* MVar a	           */
 #endif
     case PTR_REP:
-            asmInstr(bco,i_VAR);
+            emit_i_VAR(bco,offset);
             break;
-
-    case VOID_REP:
-            asmInstr(bco,i_VOID);
-            bco->sp += repSizeW(rep);
-            return; /* NB we don't break! */
     default:
             barf("asmVar %d",rep);
     }
-    asmInstr(bco,bco->sp - v);
     bco->sp += repSizeW(rep);
 }
 
@@ -627,12 +867,10 @@ void asmEndEnter( AsmBCO bco, AsmSp sp1, AsmSp sp2 )
     int y = sp1 - sp2;
     ASSERT(x >= 0 && y >= 0);
     if (y != 0) {
-        asmInstr(bco,i_SLIDE);
-        asmInstr(bco,x);
-        asmInstr(bco,y);
+        emit_i_SLIDE(bco,x,y);
         bco->sp -= sp1 - sp2;
     }
-    asmInstr(bco,i_ENTER);
+    emit_i0(bco,i_ENTER);
 }
 
 /* --------------------------------------------------------------------------
@@ -643,42 +881,42 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
 {
     switch (rep) {
     case CHAR_REP:
-            asmInstr(bco,i_PACK_CHAR);
+            emit_i0(bco,i_PACK_CHAR);
             grabHpNonUpd(bco,Czh_sizeW);
             break;
     case INT_REP:
-            asmInstr(bco,i_PACK_INT);
+            emit_i0(bco,i_PACK_INT);
             grabHpNonUpd(bco,Izh_sizeW);
             break;
 #ifdef PROVIDE_INT64
     case INT64_REP:
-            asmInstr(bco,i_PACK_INT64);
+            emit_i0(bco,i_PACK_INT64);
             grabHpNonUpd(bco,I64zh_sizeW);
             break;
 #endif
 #ifdef PROVIDE_WORD
     case WORD_REP:
-            asmInstr(bco,i_PACK_WORD);
+            emit_i0(bco,i_PACK_WORD);
             grabHpNonUpd(bco,Wzh_sizeW);
             break;
 #endif
 #ifdef PROVIDE_ADDR
     case ADDR_REP:
-            asmInstr(bco,i_PACK_ADDR);
+            emit_i0(bco,i_PACK_ADDR);
             grabHpNonUpd(bco,Azh_sizeW);
             break;
 #endif
     case FLOAT_REP:
-            asmInstr(bco,i_PACK_FLOAT);
+            emit_i0(bco,i_PACK_FLOAT);
             grabHpNonUpd(bco,Fzh_sizeW);
             break;
     case DOUBLE_REP:
-            asmInstr(bco,i_PACK_DOUBLE);
+            emit_i0(bco,i_PACK_DOUBLE);
             grabHpNonUpd(bco,Dzh_sizeW);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
-            asmInstr(bco,i_PACK_STABLE);
+            emit_i0(bco,i_PACK_STABLE);
             grabHpNonUpd(bco,Stablezh_sizeW);
             break;
 #endif
@@ -700,35 +938,35 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
 {
     switch (rep) {
     case INT_REP:
-            asmInstr(bco,i_UNPACK_INT);
+            emit_i0(bco,i_UNPACK_INT);
             break;
 #ifdef PROVIDE_INT64
     case INT64_REP:
-            asmInstr(bco,i_UNPACK_INT64);
+            emit_i0(bco,i_UNPACK_INT64);
             break;
 #endif
 #ifdef PROVIDE_WORD
     case WORD_REP:
-            asmInstr(bco,i_UNPACK_WORD);
+            emit_i0(bco,i_UNPACK_WORD);
             break;
 #endif
 #ifdef PROVIDE_ADDR
     case ADDR_REP:
-            asmInstr(bco,i_UNPACK_ADDR);
+            emit_i0(bco,i_UNPACK_ADDR);
             break;
 #endif
     case CHAR_REP:
-            asmInstr(bco,i_UNPACK_CHAR);
+            emit_i0(bco,i_UNPACK_CHAR);
             break;
     case FLOAT_REP:
-            asmInstr(bco,i_UNPACK_FLOAT);
+            emit_i0(bco,i_UNPACK_FLOAT);
             break;
     case DOUBLE_REP:
-            asmInstr(bco,i_UNPACK_DOUBLE);
+            emit_i0(bco,i_UNPACK_DOUBLE);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
-            asmInstr(bco,i_UNPACK_STABLE);
+            emit_i0(bco,i_UNPACK_STABLE);
             break;
 #endif
     default:
@@ -747,35 +985,35 @@ void asmReturnUnboxed( AsmBCO bco, AsmRep rep )
 {
     switch (rep) {
     case CHAR_REP:
-            asmInstr(bco,i_RETURN_CHAR);
+            emit_i0(bco,i_RETURN_CHAR);
             break;
     case INT_REP:
-            asmInstr(bco,i_RETURN_INT);
+            emit_i0(bco,i_RETURN_INT);
             break;
 #ifdef PROVIDE_INT64
     case INT64_REP:
-            asmInstr(bco,i_RETURN_INT64);
+            emit_i0(bco,i_RETURN_INT64);
             break;
 #endif
 #ifdef PROVIDE_WORD
     case WORD_REP:
-            asmInstr(bco,i_RETURN_WORD);
+            emit_i0(bco,i_RETURN_WORD);
             break;
 #endif
 #ifdef PROVIDE_ADDR
     case ADDR_REP:
-            asmInstr(bco,i_RETURN_ADDR);
+            emit_i0(bco,i_RETURN_ADDR);
             break;
 #endif
     case FLOAT_REP:
-            asmInstr(bco,i_RETURN_FLOAT);
+            emit_i0(bco,i_RETURN_FLOAT);
             break;
     case DOUBLE_REP:
-            asmInstr(bco,i_RETURN_DOUBLE);
+            emit_i0(bco,i_RETURN_DOUBLE);
             break;
 #ifdef PROVIDE_STABLE
     case STABLE_REP:
-            asmInstr(bco,i_RETURN_STABLE);
+            emit_i0(bco,i_RETURN_STABLE);
             break;
 #endif
 #ifdef PROVIDE_INTEGER
@@ -798,7 +1036,7 @@ void asmReturnUnboxed( AsmBCO bco, AsmRep rep )
     case THREADID_REP: /* ThreadId                 */ 
     case MVAR_REP:     /* MVar a                   */ 
 #endif
-            asmInstr(bco,i_RETURN_GENERIC);
+            emit_i0(bco,i_RETURN_GENERIC);
             break;
     default:
             barf("asmReturnUnboxed %d",rep);
@@ -811,8 +1049,7 @@ void asmReturnUnboxed( AsmBCO bco, AsmRep rep )
 
 void asmConstInt( AsmBCO bco, AsmInt x )
 {
-    asmInstr(bco,i_CONST_INT);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_INT(bco,bco->nps.len);
     asmWords(bco,AsmInt,x);
     bco->sp += repSizeW(INT_REP);
 }
@@ -820,8 +1057,7 @@ void asmConstInt( AsmBCO bco, AsmInt x )
 #ifdef PROVIDE_INT64
 void asmConstInt64( AsmBCO bco, AsmInt64 x )
 {
-    asmInstr(bco,i_CONST_INT64);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_INT64(bco,bco->nps.len);
     asmWords(bco,AsmInt64,x);
     bco->sp += repSizeW(INT64_REP);
 }
@@ -830,8 +1066,7 @@ void asmConstInt64( AsmBCO bco, AsmInt64 x )
 #ifdef PROVIDE_INTEGER
 void asmConstInteger( AsmBCO bco, AsmString x )
 {
-    asmInstr(bco,i_CONST_INTEGER);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_INTEGER(bco,bco->nps.len);
     asmWords(bco,AsmString,x);
     bco->sp += repSizeW(INTEGER_REP);
 }
@@ -840,8 +1075,7 @@ void asmConstInteger( AsmBCO bco, AsmString x )
 #ifdef PROVIDE_ADDR
 void asmConstAddr( AsmBCO bco, AsmAddr x )
 {
-    asmInstr(bco,i_CONST_ADDR);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_ADDR(bco,bco->nps.len);
     asmWords(bco,AsmAddr,x);
     bco->sp += repSizeW(ADDR_REP);
 }
@@ -850,8 +1084,7 @@ void asmConstAddr( AsmBCO bco, AsmAddr x )
 #ifdef PROVIDE_WORD
 void asmConstWord( AsmBCO bco, AsmWord x )
 {
-    asmInstr(bco,i_CONST_INT);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_INT(bco->nps.len);
     asmWords(bco,AsmWord,x);
     bco->sp += repSizeW(WORD_REP);
 }
@@ -859,30 +1092,27 @@ void asmConstWord( AsmBCO bco, AsmWord x )
 
 void asmConstChar( AsmBCO bco, AsmChar x )
 {
-    asmInstr(bco,i_CONST_CHAR);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_CHAR(bco,bco->nps.len);
     asmWords(bco,AsmChar,x);
     bco->sp += repSizeW(CHAR_REP);
 }
 
 void asmConstFloat( AsmBCO bco, AsmFloat x )
 {
-    asmInstr(bco,i_CONST_FLOAT);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_FLOAT(bco,bco->nps.len);
     asmWords(bco,AsmFloat,x);
     bco->sp += repSizeW(FLOAT_REP);
 }
 
 void asmConstDouble( AsmBCO bco, AsmDouble x )
 {
-    asmInstr(bco,i_CONST_DOUBLE);
-    asmInstr(bco,bco->nps.len);
+    emit_i_CONST_DOUBLE(bco,bco->nps.len);
     asmWords(bco,AsmDouble,x);
     bco->sp += repSizeW(DOUBLE_REP);
 }
 
 /* --------------------------------------------------------------------------
- *
+ * Algebraic case helpers
  * ------------------------------------------------------------------------*/
 
 /* a mildly bogus pair of functions... */
@@ -897,8 +1127,7 @@ void asmEndCase( AsmBCO bco )
 
 AsmSp asmContinuation( AsmBCO bco, AsmBCO ret_addr )
 {
-    asmInstr(bco,i_RETADDR);
-    asmInstr(bco,bco->object.ptrs.len);
+    emit_i_RETADDR(bco,bco->object.ptrs.len);
     asmPtr(bco,&(ret_addr->object));
     bco->sp += 2 * sizeofW(StgPtr);
     return bco->sp;
@@ -939,9 +1168,9 @@ void asmEndAlt( AsmBCO bco, AsmSp  sp )
 
 AsmPc asmTest( AsmBCO bco, AsmWord tag )
 {
-    asmInstr(bco,i_TEST);
-    asmInstr(bco,tag);
-    asmInstr(bco,0);
+    asmInstr8(bco,i_TEST);
+    asmInstr8(bco,tag);
+    asmInstr16(bco,0);
     return bco->is.len;
 }
 
@@ -949,8 +1178,8 @@ AsmPc asmTestInt( AsmBCO bco, AsmVar v, AsmInt x )
 {
     asmVar(bco,v,INT_REP);
     asmConstInt(bco,x);
-    asmInstr(bco,i_TEST_INT);
-    asmInstr(bco,0);
+    asmInstr8(bco,i_TEST_INT);
+    asmInstr16(bco,0);
     bco->sp -= 2*repSizeW(INT_REP);
     return bco->is.len;
 }
@@ -959,12 +1188,14 @@ void asmFixBranch( AsmBCO bco, AsmPc from )
 {
     int distance = bco->is.len - from;
     ASSERT(distance >= 0);
-    setInstrs(&(bco->is),from-1,distance);
+    ASSERT(distance < 65536);
+    setInstrs(&(bco->is),from-2,distance/256);
+    setInstrs(&(bco->is),from-1,distance%256);
 }
 
 void asmPanic( AsmBCO bco )
 {
-    asmInstr(bco,i_PANIC); /* "irrefutable" pattern failed - oops! */
+    emit_i0(bco,i_PANIC); /* "irrefutable" pattern failed - oops! */
 }
 
 /* --------------------------------------------------------------------------
@@ -978,8 +1209,7 @@ AsmSp asmBeginPrim( AsmBCO bco )
 
 void   asmEndPrim( AsmBCO bco, const AsmPrim* prim, AsmSp base )
 {
-    asmInstr(bco,prim->prefix);
-    asmInstr(bco,prim->opcode);
+    emit_i1(bco,prim->prefix,prim->opcode);
     bco->sp = base;
 }
 
@@ -1421,10 +1651,10 @@ const AsmPrim* asmFindPrimop( AsmInstr prefix, AsmInstr op )
 AsmBCO asm_BCO_catch ( void )
 {
    AsmBCO bco = asmBeginBCO(0 /*NIL*/);
-   asmInstr(bco,i_ARG_CHECK); asmInstr(bco,2);
-   asmInstr(bco,i_PRIMOP1); asmInstr(bco,i_pushcatchframe);
+   emit_i1(bco,i_ARG_CHECK,2);
+   emit_i1(bco,i_PRIMOP1,i_pushcatchframe);
    bco->sp += (1-2)*sizeofW(StgPtr) + sizeofW(StgCatchFrame);
-   asmInstr(bco,i_ENTER);
+   emit_i0(bco,i_ENTER);
    asmEndBCO(bco);
    return bco;
 }
@@ -1432,8 +1662,8 @@ AsmBCO asm_BCO_catch ( void )
 AsmBCO asm_BCO_raise ( void )
 {
    AsmBCO bco = asmBeginBCO(0 /*NIL*/);
-   asmInstr(bco,i_ARG_CHECK); asmInstr(bco,1);
-   asmInstr(bco,i_PRIMOP2); asmInstr(bco,i_raise);
+   emit_i1(bco,i_ARG_CHECK,1);
+   emit_i1(bco,i_PRIMOP2,i_raise);
    asmEndBCO(bco);
    return bco;
 }
@@ -1443,22 +1673,21 @@ AsmBCO asm_BCO_seq ( void )
    AsmBCO eval, cont;
 
    cont = asmBeginBCO(0 /*NIL*/);
-   asmInstr(cont,i_ARG_CHECK); asmInstr(cont,2);
-   asmInstr(cont,i_VAR); asmInstr(cont,1);
-   asmInstr(cont,i_SLIDE); asmInstr(cont,1); asmInstr(cont,2);
-   asmInstr(cont,i_ENTER);
+   emit_i1(cont,i_ARG_CHECK,2);
+   emit_i_VAR(cont,1);
+   emit_i_SLIDE(cont,1,2);
+   emit_i0(cont,i_ENTER);
    cont->sp += 3*sizeofW(StgPtr);
    asmEndBCO(cont);
 
    eval = asmBeginBCO(0 /*NIL*/);
-   asmInstr(eval,i_ARG_CHECK); asmInstr(eval,2);
-   asmInstr(eval,i_RETADDR);
-   asmInstr(eval,eval->object.ptrs.len);
+   emit_i1(eval,i_ARG_CHECK,2);
+   emit_i_RETADDR(eval,eval->object.ptrs.len);
    asmPtr(eval,&(cont->object));
-   asmInstr(eval,i_VAR); asmInstr(eval,2);
-   asmInstr(eval,i_SLIDE); asmInstr(eval,3); asmInstr(eval,1);
-   asmInstr(eval,i_PRIMOP1); asmInstr(eval,i_pushseqframe);
-   asmInstr(eval,i_ENTER);
+   emit_i_VAR(eval,2);
+   emit_i_SLIDE(eval,3,1);
+   emit_i1(eval,i_PRIMOP1,i_pushseqframe);
+   emit_i0(eval,i_ENTER);
    eval->sp += sizeofW(StgSeqFrame) + 4*sizeofW(StgPtr);
    asmEndBCO(eval);
 
@@ -1472,8 +1701,7 @@ AsmBCO asm_BCO_seq ( void )
 AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info )
 {
     ASSERT( sizeW_fromITBL(info) >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-    asmInstr(bco,i_ALLOC_CONSTR);
-    asmInstr(bco,bco->nps.len);
+    emit_i1(bco,i_ALLOC_CONSTR,bco->nps.len);
     asmWords(bco,AsmInfo,info);
     bco->sp += sizeofW(StgClosurePtr);
     grabHpNonUpd(bco,sizeW_fromITBL(info));
@@ -1492,8 +1720,7 @@ void asmEndPack( AsmBCO bco, AsmVar v, AsmSp start, AsmInfo info )
     assert(start >= v);
     /* only reason to include info is for this assertion */
     assert(info->layout.payload.ptrs == size);
-    asmInstr(bco,i_PACK);
-    asmInstr(bco,bco->sp - v);
+    emit_i1(bco,i_PACK,bco->sp - v);
     bco->sp = start;
 }
 
@@ -1504,13 +1731,12 @@ void asmBeginUnpack( AsmBCO bco )
 
 void asmEndUnpack( AsmBCO bco )
 {
-    asmInstr(bco,i_UNPACK);
+    emit_i0(bco,i_UNPACK);
 }
 
 AsmVar asmAllocAP( AsmBCO bco, AsmNat words )
 {
-    asmInstr(bco,i_ALLOC_AP);
-    asmInstr(bco,words);
+    emit_i1(bco,i_ALLOC_AP,words);
     bco->sp += sizeofW(StgPtr);
     grabHpUpd(bco,AP_sizeW(words));
     return bco->sp;
@@ -1523,16 +1749,14 @@ AsmSp asmBeginMkAP( AsmBCO bco )
 
 void asmEndMkAP( AsmBCO bco, AsmVar v, AsmSp start )
 {
-    asmInstr(bco,i_MKAP);
-    asmInstr(bco,bco->sp-v);
-    asmInstr(bco,bco->sp-start-1);  /* -1 because fun isn't counted */
+    emit_i_MKAP(bco,bco->sp-v,bco->sp-start-1);
+            /* -1 because fun isn't counted */
     bco->sp = start;
 }
 
 AsmVar asmAllocPAP( AsmBCO bco, AsmNat size )
 {
-    asmInstr(bco,i_ALLOC_PAP);
-    asmInstr(bco,size);
+    emit_i1(bco,i_ALLOC_PAP,size);
     bco->sp += sizeofW(StgPtr);
     return bco->sp;
 }
@@ -1544,25 +1768,15 @@ AsmSp asmBeginMkPAP( AsmBCO bco )
 
 void asmEndMkPAP( AsmBCO bco, AsmVar v, AsmSp start )
 {
-    asmInstr(bco,i_MKPAP);
-    asmInstr(bco,bco->sp-v);
-    asmInstr(bco,bco->sp-start-1);  /* -1 because fun isn't counted */
+    emit_i2(bco,i_MKPAP,bco->sp-v,bco->sp-start-1);
+            /* -1 because fun isn't counted */
     bco->sp = start;
 }
 
 AsmVar asmClosure( AsmBCO bco, AsmObject p )
 {
-    StgWord o = bco->object.ptrs.len;
-    if (o < 256) {
-        asmInstr(bco,i_CONST);
-        asmInstr(bco,o);
-        asmPtr(bco,p);
-    } else {
-        asmInstr(bco,i_CONST2);
-        asmInstr(bco,o / 256);
-        asmInstr(bco,o % 256);
-        asmPtr(bco,p);
-    }
+    emit_i_CONST(bco,bco->object.ptrs.len);
+    asmPtr(bco,p);
     bco->sp += sizeofW(StgPtr);
     return bco->sp;
 }

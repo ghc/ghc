@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.4 $
- * $Date: 1999/03/01 14:46:51 $
+ * $Revision: 1.5 $
+ * $Date: 1999/03/09 14:51:10 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -674,7 +674,7 @@ Cell e; {
             EEND;
         }
     }
-    assert(0); return 0; /* NOTREACHED */
+    return 0; /* NOTREACHED */
 }
 
 static List local checkExports(exports)
@@ -1543,7 +1543,7 @@ Class c; {                              /* and other parts of class struct.*/
     List ns  = NIL;                     /* List of names                   */
     Int  mno;                           /* Member function number          */
 
-//printf ( "\naddMembers: class = %s\n", textToStr ( cclass(c).text ) );
+    //printf ( "\naddMembers: class = %s\n", textToStr ( cclass(c).text ) );
     for (mno=0; mno<cclass(c).numSupers; mno++) {
         ns = cons(newDSel(c,mno),ns);
     }
@@ -1617,9 +1617,9 @@ Class parent; {
     name(m).arity  = 1;
     name(m).number = mfunNo(no);
     name(m).type   = t;
-//printf ( "   [%d %d] %s :: ", m, m-NAMEMIN, textToStr ( name(m).text ) );
-//printType(stdout, t );
-//printf ( "\n" );
+    //printf ( "   [%d %d] %s :: ", m, m-NAMEMIN, textToStr ( name(m).text ) );
+    //printType(stdout, t );
+    //printf ( "\n" );
     return m;
 }
 
@@ -2461,9 +2461,7 @@ Inst in; {
                                         inst(in).c,
                                         extractBindings(inst(in).implements));
     inst(in).builder    = newInstImp(in);
-    /*ToDo*/
-    //fprintf(stderr, "\npreludeLoaded query\n" );
-    if (/*!preludeLoaded &&*/ isNull(nameListMonad) && isAp(inst(in).head)
+    if (!preludeLoaded && isNull(nameListMonad) && isAp(inst(in).head)
         && fun(inst(in).head)==classMonad && arg(inst(in).head)==typeList) {
         nameListMonad = inst(in).builder;
     }
@@ -3917,7 +3915,8 @@ Cell e; {                               /* :: OpExp                        */
 #endif
                             else if (isFloat(arg(temp))) {
                                 if (nneg&1)
-                                    arg(temp) = mkFloat(-floatOf(arg(temp)));
+                                    arg(temp) = floatNegate(arg(temp));
+                                                //mkFloat(-floatOf(arg(temp)));
                             }
                             else {
                                 fun(prev) = nameNegate;
@@ -4084,6 +4083,7 @@ Text t; {                               /* enclosing bindings              */
 
 static List local dependencyAnal(bs)    /* Separate lists of bindings into */
 List bs; {                              /* mutually recursive groups in    */
+					/* order of dependency		   */
     mapProc(addDepField,bs);            /* add extra field for dependents  */
     mapProc(depBinding,bs);             /* find dependents of each binding */
     bs = bscc(bs);                      /* sort to strongly connected comps*/
@@ -4245,9 +4245,6 @@ static Void local depClassBindings(bs) /* dependency analysis on list of   */
 List bs; {                             /* bindings, possibly containing    */
     for (; nonNull(bs); bs=tl(bs)) {   /* NIL bindings ...                 */
         if (nonNull(hd(bs))) {         /* No need to add extra field for   */
-
-	  //Printf("\n=========================================\n" ); print(hd(bs),1000); Printf("\n");
-
            mapProc(depAlt,snd(hd(bs)));/* dependency information...        */
         }
     }
@@ -4803,9 +4800,6 @@ Void checkDefns() {                     /* Top level static analysis       */
     mapProc(addMembers,classDefns);     /* add definitions for member funs */
     mapProc(visitClass,classDefns);     /* check class hierarchy           */
     linkPreludeCM();                    /* Get prelude cfuns and mfuns     */
-
-    /* ToDo: reinstate?
-       mapOver(checkPrimDefn,primDefns); */  /* check primitive declarations    */
     
     instDefns = rev(instDefns);         /* process instance definitions    */
     mapProc(checkInstDefn,instDefns);
