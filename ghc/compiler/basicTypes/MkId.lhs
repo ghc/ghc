@@ -386,12 +386,12 @@ Then we want
 (not f :: R -> forall a. a->a, which gives the type inference mechanism 
 problems at call sites)
 
-Similarly for newtypes
+Similarly for (recursive) newtypes
 
 	newtype N = MkN { unN :: forall a. a->a }
 
-	unN :: forall a. N -> a -> a
-	unN = /\a -> \n:N -> coerce (a->a) n
+	unN :: forall b. N -> b -> b
+	unN = /\b -> \n:N -> (coerce (forall a. a->a) n)
 
 \begin{code}
 mkRecordSelId tycon field_label
@@ -488,10 +488,10 @@ mkRecordSelId tycon field_label
 	      mkLams dict_ids $ mkLams field_dict_ids $
 	      Lam data_id     $ sel_body
 
-    sel_body | isNewTyCon tycon = mkNewTypeBody tycon field_tau (mk_result data_id)
+    sel_body | isNewTyCon tycon = mk_result (mkNewTypeBody tycon field_ty (Var data_id))
 	     | otherwise	= Case (Var data_id) data_id (default_alt ++ the_alts)
 
-    mk_result result_id = mkVarApps (mkVarApps (Var result_id) field_tyvars) field_dict_ids
+    mk_result poly_result = mkVarApps (mkVarApps poly_result field_tyvars) field_dict_ids
 	-- We pull the field lambdas to the top, so we need to 
 	-- apply them in the body.  For example:
 	--	data T = MkT { foo :: forall a. a->a }
@@ -504,7 +504,7 @@ mkRecordSelId tycon field_label
 		Nothing		-> Nothing
 		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con arg_ids body)
 				where
-			    	   body = mk_result the_arg_id
+			    	   body = mk_result (Var the_arg_id)
 	where
             arg_ids = mkTemplateLocalsNum field_base (dataConOrigArgTys data_con)
 			-- No need to instantiate; same tyvars in datacon as tycon
