@@ -28,7 +28,7 @@ import AbsCUtils	( mkAbstractCs, getAmodeRep,
 			)
 import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Vanilla_REG, mAX_Float_REG,
-			  mAX_Double_REG
+			  mAX_Double_REG, mAX_Long_REG
 			)
 import CmdLineOpts	( opt_ReturnInRegsThreshold )
 import Id		( isDataCon, dataConRawArgTys,
@@ -41,7 +41,7 @@ import PrimOp		( primOpCanTriggerGC,
 			  getPrimOpResultInfo, PrimOpResultInfo(..),
 			  PrimOp{-instance Outputable-}
 			)
-import PrimRep		( isFloatingRep, PrimRep(..) )
+import PrimRep		( isFloatingRep, is64BitRep, PrimRep(..) )
 import TyCon		( tyConDataCons, tyConFamilySize )
 import Type		( typePrimRep )
 import Util		( zipWithEqual, mapAccumL, isn'tIn )
@@ -138,6 +138,8 @@ dataReturnConvPrim :: PrimRep -> MagicId
 
 dataReturnConvPrim IntRep	= VanillaReg IntRep  ILIT(1)
 dataReturnConvPrim WordRep	= VanillaReg WordRep ILIT(1)
+dataReturnConvPrim Int64Rep	= LongReg Int64Rep  ILIT(1)
+dataReturnConvPrim Word64Rep	= LongReg Word64Rep ILIT(1)
 dataReturnConvPrim AddrRep	= VanillaReg AddrRep ILIT(1)
 dataReturnConvPrim CharRep	= VanillaReg CharRep ILIT(1)
 dataReturnConvPrim FloatRep	= FloatReg  ILIT(1)
@@ -266,22 +268,28 @@ assignRegs regs_in_use kinds
 
     assign_reg	:: [PrimRep]  -- arg kinds being scrutinized
 		-> [MagicId]	    -- accum. regs assigned so far (reversed)
-		-> ([Int], [Int], [Int])
-			-- regs still avail: Vanilla, Float, Double
+		-> ([Int], [Int], [Int], [Int])
+			-- regs still avail: Vanilla, Float, Double, Int64, Word64
 		-> ([MagicId], [PrimRep])
 
     assign_reg (VoidRep:ks) acc supply
 	= assign_reg ks (VoidReg:acc) supply -- one VoidReg is enough for everybody!
 
-    assign_reg (FloatRep:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs)
-	= assign_reg ks (FloatReg f:acc) (vanilla_rs, float_rs, double_rs)
+    assign_reg (FloatRep:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs, long_rs)
+	= assign_reg ks (FloatReg f:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs)
-	= assign_reg ks (DoubleReg d:acc) (vanilla_rs, float_rs, double_rs)
+    assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs, long_rs)
+	= assign_reg ks (DoubleReg d:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
-    assign_reg (k:ks) acc (IBOX(v):vanilla_rs, float_rs, double_rs)
-	| not (isFloatingRep k)
-	= assign_reg ks (VanillaReg k v:acc) (vanilla_rs, float_rs, double_rs)
+    assign_reg (Word64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(u):long_rs)
+	= assign_reg ks (LongReg Word64Rep u:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+
+    assign_reg (Int64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(l):long_rs)
+	= assign_reg ks (LongReg Int64Rep l:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+
+    assign_reg (k:ks) acc (IBOX(v):vanilla_rs, float_rs, double_rs, long_rs)
+	| not (isFloatingRep k || is64BitRep k)
+	= assign_reg ks (VanillaReg k v:acc) (vanilla_rs, float_rs, double_rs, long_rs)
 
     -- The catch-all.  It can happen because either
     --	(a) we've assigned all the regs so leftover_ks is []
@@ -304,15 +312,17 @@ Floats and doubles have separate register supplies.
 floatRegNos, doubleRegNos :: [Int]
 floatRegNos	= [1 .. mAX_Float_REG]
 doubleRegNos	= [1 .. mAX_Double_REG]
+longRegNos      = [1 .. mAX_Long_REG]
 
-mkRegTbl :: [MagicId] -> ([Int], [Int], [Int])
+mkRegTbl :: [MagicId] -> ([Int], [Int], [Int], [Int])
 
 mkRegTbl regs_in_use
-  = (ok_vanilla, ok_float, ok_double)
+  = (ok_vanilla, ok_float, ok_double, ok_long)
   where
     ok_vanilla = catMaybes (map (select (VanillaReg VoidRep)) (taker vanillaRegNos))
     ok_float   = catMaybes (map (select FloatReg)	       floatRegNos)
     ok_double  = catMaybes (map (select DoubleReg)	       doubleRegNos)
+    ok_long    = catMaybes (map (select (LongReg Int64Rep))    longRegNos)   -- rep isn't looked at, hence we can use any old rep.
 
     taker :: [Int] -> [Int]
     taker rs
