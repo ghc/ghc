@@ -39,6 +39,7 @@ exposed-modules:
 	Data.Dynamic,
 	Data.Either,
 	Data.FiniteMap,
+	Data.FunctorM,
 	Data.Generics,
 	Data.Generics.Aliases,
 	Data.Generics.Basics,
