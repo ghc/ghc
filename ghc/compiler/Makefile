@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.194 2001/10/23 16:33:27 rrt Exp $
+# $Id: Makefile,v 1.195 2001/10/23 16:47:30 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -389,11 +389,6 @@ ghc-inplace : $(HS_PROG)
 	echo '#!/bin/sh' >>$@
 	echo exec $(FPTOOLS_TOP_ABS_UNIX)/ghc/compiler/$(HS_PROG) -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
 	chmod 755 $@
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-	@$(RM) $@.bat
-	echo "@"$(subst /,\\,$(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG)) "-B$(FPTOOLS_TOP_ABS) %1 %2 %3 %4 %5 %6 %7 %8 %9" >$@.bat
-	chmod 755 $@.bat
-endif
 
 CLEAN_FILES += ghc-inplace
 
@@ -402,7 +397,7 @@ CLEAN_FILES += ghc-inplace
 
 # We don't want ghc treated as an ordinary executable,
 # but put it together with the libraries.
-# Also don't want any interface files intstalled
+# Also don't want any interface files installed
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_LIBEXECS += $(HS_PROG)
