@@ -310,7 +310,12 @@ stixMachOpFold mop args@[StInt x, StInt y]
     	MO_Nat_Ne   -> StInt (if x /= y then 1 else 0)
     	MO_NatS_Lt  -> StInt (if x < y  then 1 else 0)
     	MO_NatS_Le  -> StInt (if x <= y then 1 else 0)
+        MO_Nat_Shl  | y >= 0 && y < 32 -> do_shl x y
     	other       -> StMachOp mop args
+    where
+       do_shl :: Integer -> Integer -> StixExpr
+       do_shl v 0         = StInt v
+       do_shl v n | n > 0 = do_shl (v*2) (n-1)
 \end{code}
 
 When possible, shift the constants to the right-hand side, so that we

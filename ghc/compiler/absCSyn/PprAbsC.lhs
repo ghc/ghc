@@ -26,7 +26,7 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
 
-import Constants	( mIN_UPD_SIZE, wORD_SIZE )
+import Constants	( mIN_UPD_SIZE )
 import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe, ccallConvAttribute )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel,
@@ -783,7 +783,7 @@ ppr_array_expression offw scaleRep baseAmode indexAmode
    -- * (scaleRep*) (
    --      ((char*)baseAmode) + offw*bytes_per_word + indexAmode*bytes_per_scaleRep
    --   )
-   = let offb  = parens (int offw <> char '*' <> int wORD_SIZE)
+   = let offb  = parens (int offw <> char '*' <> text "sizeof(void*)")
          indb  = parens (parens (pprAmode indexAmode) 
                          <> char '*' <> int (getPrimRepArrayElemSize scaleRep))
          baseb = text "(char*)" <> parens (pprAmode baseAmode)
@@ -1308,6 +1308,9 @@ That is, the indexing is done in units of kind1, but the resulting
 amode has kind2.
 
 \begin{code}
+ppr_amode CBytesPerWord
+  = text "(sizeof(void*))"
+
 ppr_amode (CMem rep addr)
   = let txt_rep = pprPrimKind rep
     in  hcat [ char '*', parens (txt_rep <> char '*'), parens (ppr_amode addr) ]

@@ -34,7 +34,6 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety(..)
 			  isDynamicTarget, isCasmTarget, defaultCCallConv )
 import StgSyn		( StgOp(..) )
 import SMRep		( arrPtrsHdrSize, arrWordsHdrSize, fixedHdrSize )
-import Constants	( wORD_SIZE )
 import Maybes		( Maybe012(..) )
 import Outputable
 import Panic		( panic )
@@ -597,15 +596,30 @@ rrConflictsWithRR s1b s2b rr1 rr2 = rr rr1 rr2
 
 -- Assumes no volatiles
 mkHalfWord_HIADDR res arg
-#  if WORDS_BIGENDIAN
-   = CMachOpStmt (Just1 res) MO_Nat_And [arg, CLit (mkMachWord halfword_mask)] Nothing
-#  else
-   = CMachOpStmt (Just1 res) MO_Nat_Shr [arg, CLit (mkMachWord halfword_shift)] Nothing
-#  endif
-   where
-      (halfword_mask, halfword_shift)
-         | wORD_SIZE == 4  = (65535,               16)
-         | wORD_SIZE == 8  = (4294967295::Integer, 32)
+   = mkTemp IntRep			`thenFlt` \ t_hw_shift ->
+     mkTemp WordRep			`thenFlt` \ t_hw_mask1 ->
+     mkTemp WordRep			`thenFlt` \ t_hw_mask2 ->
+     let a_hw_shift 
+            = CMachOpStmt (Just1 t_hw_shift) 
+                          MO_Nat_Shl [CBytesPerWord, CLit (mkMachInt 2)] Nothing
+         a_hw_mask1
+            = CMachOpStmt (Just1 t_hw_mask1)
+                          MO_Nat_Shl [CLit (mkMachWord 1), t_hw_shift] Nothing
+         a_hw_mask2
+            = CMachOpStmt (Just1 t_hw_mask2)
+                          MO_Nat_Sub [t_hw_mask1, CLit (mkMachWord 1)] Nothing
+         final
+#        if WORDS_BIGENDIAN
+            = CSequential [ a_hw_shift, a_hw_mask1, a_hw_mask2,
+                 CMachOpStmt (Just1 res) MO_Nat_And [arg, t_hw_mask2] Nothing
+              ]
+#        else
+            = CSequential [ a_hw_shift,
+                 CMachOpStmt (Just1 res) MO_Nat_Shr [arg, t_hw_shift] Nothing
+              ]
+#        endif
+     in
+         returnFlt final
 
 
 mkTemp :: PrimRep -> FlatM CAddrMode
@@ -703,7 +717,7 @@ dscCOpStmt [res] SizeofByteArrayOp [arg] vols
      (returnFlt . CSequential) [
         CAssign w (mkDerefOff WordRep arg fixedHdrSize),
         CMachOpStmt (Just1 w) 
-           MO_NatU_Mul [w, CLit (mkMachInt (toInteger wORD_SIZE))] (Just vols),
+           MO_NatU_Mul [w, CBytesPerWord] (Just vols),
         CAssign res w
      ]
 
@@ -749,10 +763,11 @@ dscCOpStmt [res] AddrToHValueOp [arg] vols
 -- #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
 dscCOpStmt [res] DataToTagOp [arg] vols
    = mkTemps [PtrRep, WordRep]		`thenFlt` \ [t_infoptr, t_theword] ->
+     mkHalfWord_HIADDR res t_theword	`thenFlt` \ select_ops ->
      (returnFlt . CSequential) [
         CAssign t_infoptr (mkDerefOff PtrRep arg 0),
         CAssign t_theword (mkDerefOff WordRep t_infoptr (-1)),
-        mkHalfWord_HIADDR res t_theword
+        select_ops
      ]
 
 

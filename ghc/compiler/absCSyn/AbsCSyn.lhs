@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.41 2001/12/05 17:35:12 sewardj Exp $
+% $Id: AbsCSyn.lhs,v 1.42 2001/12/06 11:50:07 sewardj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -374,6 +374,8 @@ data CAddrMode
 
   | CMem   PrimRep	-- A value :: PrimRep, in memory, at the 
            CAddrMode	-- specified address
+
+  | CBytesPerWord	-- Word size, in bytes, on this platform
 \end{code}
 
 Various C macros for values which are dependent on the back-end layout.
