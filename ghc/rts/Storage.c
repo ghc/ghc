@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.67 2002/07/17 09:21:51 simonmar Exp $
+ * $Id: Storage.c,v 1.68 2002/08/16 13:20:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,6 @@ static void macosx_get_memory_layout(void)
 StgClosure    *caf_list         = NULL;
 
 bdescr *small_alloc_list;	/* allocate()d small objects */
-bdescr *large_alloc_list;	/* allocate()d large objects */
 bdescr *pinned_object_block;    /* allocate pinned objects into this block */
 nat alloc_blocks;		/* number of allocate()d blocks since GC */
 nat alloc_blocks_lim;		/* approximate limit on alloc_blocks */
@@ -231,7 +230,6 @@ initStorage( void )
    
   /* initialise the allocate() interface */
   small_alloc_list = NULL;
-  large_alloc_list = NULL;
   alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
@@ -825,9 +823,6 @@ memInventory(void)
 
   /* any blocks held by allocate() */
   for (bd = small_alloc_list; bd; bd = bd->link) {
-    total_blocks += bd->blocks;
-  }
-  for (bd = large_alloc_list; bd; bd = bd->link) {
     total_blocks += bd->blocks;
   }
 
