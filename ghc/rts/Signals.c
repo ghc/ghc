@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.6 1999/06/25 09:16:46 simonmar Exp $
+ * $Id: Signals.c,v 1.7 1999/07/14 13:39:46 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,21 +39,21 @@ more_handlers(I_ sig)
     I_ i;
 
     if (sig < nHandlers)
-	return;
+      return;
 
     if (handlers == NULL)
-	handlers = (I_ *) malloc((sig + 1) * sizeof(I_));
+      handlers = (I_ *) malloc((sig + 1) * sizeof(I_));
     else
-	handlers = (I_ *) realloc(handlers, (sig + 1) * sizeof(I_));
+      handlers = (I_ *) realloc(handlers, (sig + 1) * sizeof(I_));
 
     if (handlers == NULL) {
-	fflush(stdout);
-	fprintf(stderr, "VM exhausted (in more_handlers)\n");
-	exit(EXIT_FAILURE);
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+      fprintf(stderr, "VM exhausted (in more_handlers)\n");
+      exit(EXIT_FAILURE);
     }
     for(i = nHandlers; i <= sig; i++)
-	/* Fill in the new slots with default actions */
-	handlers[i] = STG_SIG_DFL;
+      /* Fill in the new slots with default actions */
+      handlers[i] = STG_SIG_DFL;
 
     nHandlers = sig + 1;
 }
@@ -233,10 +233,10 @@ start_signal_handlers(void)
 StgInt 
 sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 {
-    fflush(stdout);
-    fprintf(stderr,
-	    "No signal handling support in a parallel implementation.\n");
-    exit(EXIT_FAILURE);
+  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+  fprintf(stderr,
+	  "No signal handling support in a parallel implementation.\n");
+  exit(EXIT_FAILURE);
 }
 
 void
