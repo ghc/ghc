@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.3 1998/12/02 13:27:42 simonm Exp $
+ * $Id: inputReady.c,v 1.4 1999/03/01 09:23:58 sof Exp $
  *
  * hReady Runtime Support
  */
@@ -57,8 +57,10 @@ StgInt msecs;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int c, fd, maxfd, ready;
+#ifndef mingw32_TARGET_OS
     fd_set rfd;
     struct timeval tv;
+#endif
 
     if ( FILEOBJ_IS_EOF(fo) )
 	return 0;
@@ -68,6 +70,9 @@ StgInt msecs;
 	   return 1;
     }
 
+#ifdef mingw32_TARGET_OS
+    return 0;
+#else
     fd = fo->fd;
 
     /* Now try to get a character */
@@ -88,5 +93,5 @@ StgInt msecs;
 
     /* 1 => Input ready, 0 => time expired  (-1 error) */
     return (ready);
-
+#endif
 }
