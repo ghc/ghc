@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: stgio.h,v 1.13 1999/09/30 12:42:26 sof Exp $
+ * $Id: stgio.h,v 1.14 1999/09/30 15:50:03 sof Exp $
  *
  * Helper code for GHC's IO subsystem.
  */
@@ -136,7 +136,7 @@ StgInt	getClockTime (StgByteArray, StgByteArray);
 StgInt  prim_getClockTime(StgByteArray, StgByteArray);
 
 /* getCPUTime.c */
-StgByteArray getCPUTime (StgByteArray);
+StgInt getCPUTime (StgByteArray);
 StgInt clockTicks(void);
 
 /* getCurrentDirectory.c */

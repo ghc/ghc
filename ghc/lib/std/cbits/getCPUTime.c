@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getCPUTime.c,v 1.5 1999/05/03 13:22:29 sof Exp $
+ * $Id: getCPUTime.c,v 1.6 1999/09/30 15:50:02 sof Exp $
  *
  * getCPUTime Runtime Support
  */
@@ -76,7 +76,7 @@ clockTicks ()
  */
 
 #ifndef _WIN32
-StgByteArray
+StgInt
 getCPUTime(StgByteArray cpuStruct)
 {
     StgInt *cpu=(StgInt *)cpuStruct;
@@ -114,10 +114,10 @@ getCPUTime(StgByteArray cpuStruct)
     cpu[3] = (t.tms_stime - cpu[2] * ticks) * (1000000000 / ticks);
 
 # else
-    return NULL;
+    return 0;
 # endif
 #endif
-    return (StgByteArray) cpuStruct;
+    return 1;
 }
 
 #else
@@ -133,7 +133,7 @@ getCPUTime(StgByteArray cpuStruct)
 #endif
 
 /* cygwin32 or mingw32 version */
-StgByteArray
+StgInt
 getCPUTime(StgByteArray cpuStruct)
 {
     FILETIME creationTime, exitTime, kernelTime, userTime;
@@ -150,7 +150,7 @@ getCPUTime(StgByteArray cpuStruct)
         cpu[1]=0;
         cpu[2]=0;
         cpu[3]=0;
-	return (StgByteArray)cpu;
+	return 1;
     }
 
     FT2usecs(uT, userTime);
@@ -160,7 +160,7 @@ getCPUTime(StgByteArray cpuStruct)
     cpu[1] = (unsigned int)(uT * 100);
     cpu[0] = (unsigned int)(kT / NS_PER_SEC);
     cpu[1] = (unsigned int)(kT * 100);
-    return (StgByteArray)cpu;
+    return 1;
 }
 
 #endif /* _WIN32 */

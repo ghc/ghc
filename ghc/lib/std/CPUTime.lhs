@@ -20,7 +20,6 @@ import PrelArr  	( ByteArray(..), newIntArray, unsafeFreezeByteArray )
 import PrelMaybe
 import PrelNum
 import PrelNumExtra
-import PrelAddr
 import PrelIOBase
 import PrelST
 #endif
@@ -44,8 +43,8 @@ integral number of picoseconds.
 getCPUTime :: IO Integer
 getCPUTime = do
     marr <- primNewByteArray (sizeof_int * 4)
-    ptr  <- getCPUTime marr
-    if (ptr /= nullAddr) then do
+    rc   <- getCPUTime marr
+    if rc /= 0 then do
         x0 <- primReadIntArray marr 0
         x1 <- primReadIntArray marr 1
         x2 <- primReadIntArray marr 2
@@ -61,11 +60,11 @@ getCPUTime = do
 #else
 
 getCPUTime :: IO Integer
-getCPUTime = 
+getCPUTime =
     stToIO (newIntArray ((0::Int),3))	>>= \ marr ->
     stToIO (unsafeFreezeByteArray marr)	>>= \ barr@(ByteArray _ frozen#) ->
-    primGetCPUTime barr		        >>= \ ptr ->
-    if (ptr::Addr) /= nullAddr then
+    primGetCPUTime barr		        >>= \ rc ->
+    if rc /= 0 then
         return ((fromIntegral (I# (indexIntArray# frozen# 0#)) * 1000000000 + 
                  fromIntegral (I# (indexIntArray# frozen# 1#)) + 
 		 fromIntegral (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
@@ -86,7 +85,7 @@ cpuTimePrecision = round ((1000000000000::Integer) %
 sizeof_int :: Int
 sizeof_int = 4
 
-foreign import "libHS_cbits" "getCPUTime" primGetCPUTime :: ByteArray Int -> IO Addr
+foreign import "libHS_cbits" "getCPUTime" primGetCPUTime :: ByteArray Int -> IO Int
 foreign import "libHS_cbits" "clockTicks" clockTicks :: IO Int
 
 \end{code}
