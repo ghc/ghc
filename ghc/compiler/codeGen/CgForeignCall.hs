@@ -92,13 +92,22 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
       (call_args, cmm_target)
 	= case target of
 	   StaticTarget lbl -> (args, CmmLit (CmmLabel 
-					(mkForeignLabel lbl Nothing False)))
-				-- ToDo: what about the size here?
-				-- it is currently tacked on by the NCG.
+					(mkForeignLabel lbl call_size False)))
 	   DynamicTarget    ->  case args of (fn,_):rest -> (rest, fn)
 
       the_call vols = CmmCall (CmmForeignCall cmm_target cconv) 
 			  results call_args (Just vols)
+
+	-- in the stdcall calling convention, the symbol needs @size appended
+	-- to it, where size is the total number of bytes of arguments.  We
+	-- attach this info to the CLabel here, and the CLabel pretty printer
+	-- will generate the suffix when the label is printed.
+      call_size
+	| StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprRep.fst) args))
+	| otherwise            = Nothing
+
+	-- ToDo: this might not be correct for 64-bit API
+      arg_size rep = max (machRepByteWidth rep) wORD_SIZE
 
 
 emitForeignCall results (DNCall _) args live
