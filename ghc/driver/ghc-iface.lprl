@@ -131,6 +131,7 @@ sub constructNewHiFile {
     $mod_name_dec = $ModuleName{'new'};
     $mod_name_dec =~ s/zz/z/g;
     $mod_name_dec =~ s/ZZ/Z/g;
+    $mod_name_dec =~ s/zu/_/g;
 
     if ($Specific_hi_file eq '') {  # -ohi is used even if  module name != stem of filename.
         ($hiname = $hifile_target) = $1 if  $hifile_target =~ /\/?([^\/]+)\.$HiSuffix$/;
