@@ -26,7 +26,7 @@ import Type		( PredType(..), ThetaType,
                           predRepTy, isUTyVar
 			)
 import Var		( TyVar, tyVarKind )
-import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, isUnboxedTupleTyCon, 
+import TyCon		( TyCon, isPrimTyCon, isTupleTyCon, tupleTyConBoxity,
 			  maybeTyConSingleCon, isEnumerationTyCon, 
 			  tyConArity, tyConName
 			)
@@ -39,6 +39,7 @@ import Name		( getOccString, getOccName )
 import Outputable
 import PprEnv
 import Unique		( Uniquable(..) )
+import BasicTypes	( tupleParens )
 import PrelNames		-- quite a few *Keys
 \end{code}
 
@@ -132,11 +133,7 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 	-- TUPLE CASE (boxed and unboxed)
   |  isTupleTyCon tycon
   && length tys == tyConArity tycon	-- no magic if partially applied
-  = parens tys_w_commas
-
-  |  isUnboxedTupleTyCon tycon
-  && length tys == tyConArity tycon	-- no magic if partially applied
-  = parens (char '#' <+> tys_w_commas <+> char '#')
+  = tupleParens (tupleTyConBoxity tycon) tys_w_commas
 
 	-- LIST CASE
   | tycon `hasKey` listTyConKey && n_tys == 1
