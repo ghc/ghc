@@ -180,3 +180,4 @@ test('tc172', normal, compile, [''])
 test('tc173', normal, run_command, ['make tc173'])
 
 test('tc174', normal, compile, [''])
+test('tc175', normal, compile, [''])

@@ -16,3 +16,13 @@ type T a = Int -> (# Int, Int #)
 
 f :: T a -> T a
 f t = \x -> case t x of r -> r
+
+f2 :: T a -> T a
+f2 t = \x -> case t x of _ -> (# 3,4 #)
+  -- OK, because nothing is bound to the unboxed tuple
+
+g t =  case t of r -> (r :: (# Int, Int #))
+  -- Bad
+
+-- Should be ok
+h t = \x -> case t x of (# r, s #) -> r
