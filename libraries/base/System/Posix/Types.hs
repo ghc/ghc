@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
-#include "ghcconfig.h"
+#include "HsBaseConfig.h"
 
 module System.Posix.Types (
 
@@ -101,7 +101,6 @@ import GHC.Show
 import Control.Monad
 #endif
 
-#include "Typeable.h"
 #include "CTypes.h"
 
 #if defined(HTYPE_DEV_T)

@@ -1,12 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.8 2004/06/13 21:03:47 panne Exp $
- *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
  * (c) The FFI task force, 2000
  * -------------------------------------------------------------------------- */
 
-#include "MachDeps.h"
+#ifndef CTYPES__H
+#define CTYPES__H
+
+#include "Typeable.h"
 
 /* As long as there is no automatic derivation of classes for newtypes we resort
    to extremely dirty cpp-hackery.   :-P   Some care has to be taken when the
@@ -205,3 +206,5 @@ instance Show T where { \
    showList		= unsafeCoerce# (showList :: [B] -> ShowS); }
 
 #endif /* __GLASGOW_HASKELL__ */
+
+#endif

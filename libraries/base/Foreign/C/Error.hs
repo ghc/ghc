@@ -91,7 +91,7 @@ module Foreign.C.Error (
 -- calculated for us
 --
 #ifndef __NHC__
-#include "ghcconfig.h"
+#include "HsBaseConfig.h"
 #endif
 
 -- system dependent imports

@@ -10,6 +10,9 @@
  *	instance (Typeable a1, ..., Typeable an) => Typeable (tc a1 ... an)
  * -------------------------------------------------------------------------- */
 
+#ifndef TYPEABLE_H
+#define TYPEABLE_H
+
 #define INSTANCE_TYPEABLE0(tycon,tcname,str) \
 tcname = mkTyCon str; \
 instance Typeable tycon where { typeOf _ = mkTyConApp tcname [] }
@@ -57,3 +60,5 @@ instance (Typeable a, Typeable b, Typeable c) => Typeable (tycon a b c) where { 
   typeOf = typeOfDefault }
 
 #endif /* !__GLASGOW_HASKELL__ */
+
+#endif

@@ -83,7 +83,7 @@ import Control.Monad
 import Foreign.Ptr
 #endif
 
-#include "Typeable.h"
+#include "HsBaseConfig.h"
 #include "CTypes.h"
 
 -- | Haskell type representing the C @char@ type.
