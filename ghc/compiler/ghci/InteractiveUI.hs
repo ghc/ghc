@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.10 2000/11/21 16:42:58 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.11 2000/11/22 10:56:53 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -43,10 +43,12 @@ ghciWelcomeMsg = "\
 
 commands :: [(String, String -> GHCi ())]
 commands = [
+  ("add",	addModule),
   ("cd",    	changeDirectory),
   ("help",	help),
   ("?",		help),
   ("load",	loadModule),
+  ("module",	setContext),
   ("reload",	reloadModule),
   ("set",	setOptions),
   ("type",	typeOfExpr),
@@ -57,11 +59,12 @@ shortHelpText = "use :? for help.\n"
 
 helpText = "\ 
 \   <expr>		evaluate <expr>\n\ 
+\   :add <filename>     add a module to the current set\n\ 
 \   :cd <dir>		change directory to <dir>\n\ 
-\   :help		display this list of commands\n\ 
-\   :?			display this list of commands\n\ 
+\   :help, :?		display this list of commands\n\ 
 \   :load <filename>    load a module (and it dependents)\n\ 
-\   :reload		reload the current program\n\ 
+\   :module <mod>	set the context for expression evaluation to <mod>\n\ 
+\   :reload		reload the current module set\n\ 
 \   :set <opetion> ...	set options\n\ 
 \   :type <expr>	show the type of <expr>\n\ 
 \   :quit		exit GHCi\n\ 
@@ -159,6 +162,18 @@ noArgs c = io (hPutStrLn stdout ("command `:" ++ c ++ "' takes no arguments"))
 help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
+addModule :: String -> GHCi ()
+addModule _ = throwDyn (OtherError ":add not implemented")
+
+setContext :: String -> GHCi ()
+setContext ""
+  = throwDyn (OtherError "syntax: `:m <module>'")
+setContext m | not (isUpper (head m)) || not (all isAlphaNum (tail m))
+  = throwDyn (OtherError ("strange looking module name: `" ++ m ++ "'"))
+setContext m
+  = do st <- getGHCiState
+       setGHCiState st{current_module = mkModuleName m}
+
 changeDirectory :: String -> GHCi ()
 changeDirectory = io . setCurrentDirectory
 
@@ -225,7 +240,7 @@ typeOfExpr str
 				(current_module st) str)
        case maybe_ty of
 	 Nothing -> return ()
-	 Just ty -> io (putStrLn (showSDoc (ppr ty)))
+	 Just (unqual, ty) -> io (printForUser stdout unqual (ppr ty))
 
 quit :: String -> GHCi ()
 quit _ = exitGHCi

@@ -93,7 +93,7 @@ cmTypeExpr :: CmState
 	  -> DynFlags
           -> ModuleName
           -> String
-          -> IO (CmState, Maybe Type)
+          -> IO (CmState, Maybe (PrintUnqualified, Type))
 cmTypeExpr cmstate dflags modname expr
    = do (new_pcs, expr_type) <- 
 	   hscTypeExpr dflags hst hit pcs (mkHomeModule modname) expr

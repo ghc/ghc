@@ -484,13 +484,13 @@ hscTypeExpr
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> Module			-- Context for compiling
   -> String			-- The expression
-  -> IO (PersistentCompilerState, Maybe Type)
+  -> IO (PersistentCompilerState, Maybe (PrintUnqualified, Type))
 hscTypeExpr dflags hst hit pcs0 this_module expr
   = do (pcs1, maybe_tc_result)
 	  <- hscExprFrontEnd dflags hst hit pcs0 this_module expr
        case maybe_tc_result of
 	  Nothing -> return (pcs1, Nothing)
-	  Just (_,_,ty) -> return (pcs1, Just ty)
+	  Just (print_unqual,_,ty) -> return (pcs1, Just (print_unqual,ty))
 
 hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
 hscParseExpr dflags str
