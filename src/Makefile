@@ -10,6 +10,8 @@ HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
 HaddockVersion_HC_OPTS = -DHADDOCK_VERSION=$(ProjectVersion)
 
+HaddockVersion : ../mk/version.mk
+
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
 HADDOCKLIB=$$\"\"libdir/haddock
