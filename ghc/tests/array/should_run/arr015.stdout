@@ -1,0 +1,5 @@
+arr==arrS True
+arrS==arr True
+bnds arr arrS True
+bnds +id arr arrS True
+id +bnds arr arrS True
