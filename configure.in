@@ -576,6 +576,9 @@ esac
 dnl ** does #! path/to/perl work? (sometimes it's too long...)
 FPTOOLS_SHEBANG_PERL
 
+dnl ** check for Python
+AC_PATH_PROG(PythonCmd,python)
+
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 2.1
@@ -632,7 +635,6 @@ AC_PATH_PROG(SedCmd,sed)
 
 dnl ** check for time command
 AC_PATH_PROG(TimeCmd,time)
-
 
 dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.

@@ -744,6 +744,7 @@ MSMACROS 		= -ms
 MV			= mv
 NROFF			= nroff
 PERL 			= @PerlCmd@
+PYTHON			= @PythonCmd@
 PIC			= pic
 PREPROCESSCMD		= $(CC) -E
 PRINTER			= lpr
