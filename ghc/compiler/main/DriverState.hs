@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.11 2000/11/08 15:25:25 simonmar Exp $
+-- $Id: DriverState.hs,v 1.12 2000/11/09 12:54:09 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -128,6 +128,7 @@ GLOBAL_VAR(v_Static, 			True,		Bool)
 #else
 GLOBAL_VAR(v_Static,            	False,          Bool)
 #endif
+GLOBAL_VAR(v_NoHsMain, 			False, 		Bool)
 GLOBAL_VAR(v_Recomp,  			True,		Bool)
 GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(v_Do_asm_mangling,		True,		Bool)

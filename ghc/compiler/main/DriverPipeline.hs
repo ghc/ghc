@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.17 2000/11/08 16:24:34 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.18 2000/11/09 12:54:08 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -656,6 +656,10 @@ doLink :: [String] -> IO ()
 doLink o_files = do
     ln <- readIORef v_Pgm_l
     verb <- is_verbose
+    static <- readIORef v_Static
+    let imp = if static then "" else "_imp"
+    no_hs_main <- readIORef v_NoHsMain
+
     o_file <- readIORef v_Output_file
     let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 
@@ -666,7 +670,7 @@ doLink o_files = do
     let lib_path_opts = map ("-L"++) lib_paths
 
     pkg_libs <- getPackageLibraries
-    let pkg_lib_opts = map (\lib -> "-l"++lib) pkg_libs
+    let pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
 
     libs <- readIORef v_Cmdline_libraries
     let lib_opts = map ("-l"++) (reverse libs)
@@ -680,10 +684,23 @@ doLink o_files = do
 	-- opts from -optl-<blah>
     extra_ld_opts <- getStaticOpts v_Opt_l
 
+    rts_pkg <- getPackageDetails ["rts"]
+    std_pkg <- getPackageDetails ["std"]
+#ifdef mingw32_TARGET_OS
+    let extra_os = if static || no_hs_main
+                   then []
+                   else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
+                          head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
+#endif
+    (md_c_flags, _) <- machdepCCOpts
     run_something "Linker"
-       (unwords 
+       (unwords
 	 ([ ln, verb, "-o", output_fn ]
+	 ++ md_c_flags
 	 ++ o_files
+#ifdef mingw32_TARGET_OS
+	 ++ extra_os
+#endif
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ lib_opts
@@ -691,6 +708,11 @@ doLink o_files = do
 	 ++ pkg_lib_opts
 	 ++ pkg_extra_ld_opts
 	 ++ extra_ld_opts
+#ifdef mingw32_TARGET_OS
+         ++ if static then [ "-u _PrelMain_mainIO_closure" , "-u ___init_PrelMain"] else []
+#else
+	 ++ [ "-u PrelMain_mainIO_closure" , "-u __init_PrelMain"]
+#endif
 	)
        )
 
