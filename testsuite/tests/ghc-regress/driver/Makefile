@@ -94,6 +94,14 @@ test025:
 	$(TEST_HC) -c B/C.hs -hidir hi
 	test -f hi/B/C.hi
 
+# This is a hierarchical module that lives in a subdirectory.
+test026:
+	@$(RM) d1/P/Q.hi
+	@$(RM) d1/P/Q$(OBJSUFFIX)
+	$(TEST_HC) -c d1/P/Q.hs
+	test -f d1/P/Q.hi
+	test -f d1/P/Q$(OBJSUFFIX)
+
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, flat modules
 
