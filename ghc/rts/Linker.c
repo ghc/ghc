@@ -354,6 +354,7 @@ typedef struct _RtsSymbolVal {
       SymX(StackOverflowHook)			\
       SymX(__encodeDouble)			\
       SymX(__encodeFloat)			\
+      SymX(addDLL)               		\
       SymX(__gmpn_gcd_1)			\
       SymX(__gmpz_cmp)				\
       SymX(__gmpz_cmp_si)			\
@@ -390,6 +391,7 @@ typedef struct _RtsSymbolVal {
       SymX(genSymZh)				\
       SymX(getProgArgv)				\
       SymX(getStablePtr)			\
+      SymX(initLinker)  			\
       SymX(int2Integerzh_fast)			\
       SymX(integer2Intzh_fast)			\
       SymX(integer2Wordzh_fast)			\
@@ -404,6 +406,8 @@ typedef struct _RtsSymbolVal {
       SymX(isFloatNaN)				\
       SymX(isFloatNegativeZero)			\
       SymX(killThreadzh_fast)			\
+      SymX(loadObj)          			\
+      SymX(lookupSymbol)     			\
       SymX(makeStablePtrzh_fast)		\
       SymX(minusIntegerzh_fast)			\
       SymX(mkApUpd0zh_fast)			\
@@ -431,6 +435,7 @@ typedef struct _RtsSymbolVal {
       SymX(remIntegerzh_fast)			\
       SymX(resetNonBlockingFd)			\
       SymX(resumeThread)			\
+      SymX(resolveObjs)                         \
       SymX(rts_apply)				\
       SymX(rts_checkSchedStatus)		\
       SymX(rts_eval)				\
@@ -550,6 +555,7 @@ typedef struct _RtsSymbolVal {
       SymX(tryPutMVarzh_fast)			\
       SymX(tryTakeMVarzh_fast)			\
       SymX(unblockAsyncExceptionszh_fast)	\
+      SymX(unloadObj)                           \
       SymX(unsafeThawArrayzh_fast)		\
       SymX(waitReadzh_fast)			\
       SymX(waitWritezh_fast)			\
