@@ -27,7 +27,7 @@ import qualified GHC.Arr as ArrST
 import GHC.ST		( ST(..), runST )
 import GHC.Base
 import GHC.Word		( Word(..) )
-import GHC.Ptr		( Ptr(..), FunPtr(..) )
+import GHC.Ptr		( Ptr(..), FunPtr(..), nullPtr, nullFunPtr )
 import GHC.Float	( Float(..), Double(..) )
 import GHC.Stable	( StablePtr(..) )
 import GHC.Int		( Int8(..),  Int16(..),  Int32(..),  Int64(..) )
@@ -374,9 +374,9 @@ instance HasBounds UArray where
 
 {-# INLINE unsafeArrayUArray #-}
 unsafeArrayUArray :: (MArray (STUArray s) e (ST s), Ix i)
-                  => (i,i) -> [(Int, e)] -> ST s (UArray i e)
-unsafeArrayUArray (l,u) ies = do
-    marr <- newArray_ (l,u)
+                  => (i,i) -> [(Int, e)] -> e -> ST s (UArray i e)
+unsafeArrayUArray (l,u) ies default_elem = do
+    marr <- newArray (l,u) default_elem
     sequence_ [unsafeWrite marr i e | (i, e) <- ies]
     unsafeFreezeSTUArray marr
 
@@ -465,7 +465,7 @@ showsIArray p a =
 
 instance IArray UArray Bool where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies False)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) =
         (indexWordArray# arr# (bOOL_INDEX i#) `and#` bOOL_BIT i#)
@@ -479,7 +479,7 @@ instance IArray UArray Bool where
 
 instance IArray UArray Char where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies '\0')
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = C# (indexWideCharArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -491,7 +491,7 @@ instance IArray UArray Char where
 
 instance IArray UArray Int where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = I# (indexIntArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -503,7 +503,7 @@ instance IArray UArray Int where
 
 instance IArray UArray Word where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = W# (indexWordArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -515,7 +515,7 @@ instance IArray UArray Word where
 
 instance IArray UArray (Ptr a) where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies nullPtr)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = Ptr (indexAddrArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -527,7 +527,7 @@ instance IArray UArray (Ptr a) where
 
 instance IArray UArray (FunPtr a) where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies nullFunPtr)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = FunPtr (indexAddrArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -539,7 +539,7 @@ instance IArray UArray (FunPtr a) where
 
 instance IArray UArray Float where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = F# (indexFloatArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -551,7 +551,7 @@ instance IArray UArray Float where
 
 instance IArray UArray Double where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = D# (indexDoubleArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -563,7 +563,7 @@ instance IArray UArray Double where
 
 instance IArray UArray (StablePtr a) where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies nullStablePtr)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = StablePtr (indexStablePtrArray# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -573,9 +573,12 @@ instance IArray UArray (StablePtr a) where
     {-# INLINE unsafeAccumArray #-}
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
+-- bogus StablePtr value for initialising a UArray of StablePtr.
+nullStablePtr = StablePtr (unsafeCoerce# 0#)
+
 instance IArray UArray Int8 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = I8# (indexInt8Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -587,7 +590,7 @@ instance IArray UArray Int8 where
 
 instance IArray UArray Int16 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = I16# (indexInt16Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -599,7 +602,7 @@ instance IArray UArray Int16 where
 
 instance IArray UArray Int32 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = I32# (indexInt32Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -611,7 +614,7 @@ instance IArray UArray Int32 where
 
 instance IArray UArray Int64 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = I64# (indexInt64Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -623,7 +626,7 @@ instance IArray UArray Int64 where
 
 instance IArray UArray Word8 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = W8# (indexWord8Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -635,7 +638,7 @@ instance IArray UArray Word8 where
 
 instance IArray UArray Word16 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = W16# (indexWord16Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -647,7 +650,7 @@ instance IArray UArray Word16 where
 
 instance IArray UArray Word32 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = W32# (indexWord32Array# arr# i#)
     {-# INLINE unsafeReplace #-}
@@ -659,7 +662,7 @@ instance IArray UArray Word32 where
 
 instance IArray UArray Word64 where
     {-# INLINE unsafeArray #-}
-    unsafeArray lu ies = runST (unsafeArrayUArray lu ies)
+    unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
     {-# INLINE unsafeAt #-}
     unsafeAt (UArray _ _ arr#) (I# i#) = W64# (indexWord64Array# arr# i#)
     {-# INLINE unsafeReplace #-}
