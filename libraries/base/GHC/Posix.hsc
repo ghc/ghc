@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hsc,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+-- $Id: Posix.hsc,v 1.2 2001/07/31 12:48:13 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -112,6 +112,19 @@ foreign import "s_issock_wrap" s_issock :: CMode -> Bool
 s_issock :: CMode -> Bool
 s_issock cmode = False
 #endif
+
+-- It isn't clear whether ftruncate is POSIX or not (I've read several
+-- manpages and they seem to conflict), so we truncate using open/2.
+fileTruncate :: FilePath -> IO ()
+fileTruncate file = do
+  let flags = o_WRONLY .|. o_TRUNC
+  withCString file $ \file_cstr -> do
+    fd <- fromIntegral `liftM`
+	    throwErrnoIfMinus1Retry "fileTruncate"
+ 	        (c_open file_cstr (fromIntegral flags) 0o666)
+    c_close fd
+  return ()
+
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
 
@@ -289,6 +302,9 @@ foreign import "tcgetattr" unsafe
 
 foreign import "tcsetattr" unsafe
    c_tcsetattr :: CInt -> CInt -> Ptr Termios -> IO CInt
+
+foreign import "unlink" unsafe 
+   c_unlink :: CString -> IO CInt
 
 foreign import "waitpid" unsafe
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
