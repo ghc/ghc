@@ -677,7 +677,7 @@
 -- Stability   :  experimental | provisional | stable
 -- Portability :  portable | non-portable (<replaceable>reason(s)</replaceable>)
 --
--- $Id: libraries.sgml,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: libraries.sgml,v 1.2 2001/07/03 09:02:05 simonmar Exp $
 --
 -- <replaceable>Description</replaceable>
 -----------------------------------------------------------------------------
@@ -687,7 +687,7 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>$Id: libraries.sgml,v 1.1 2001/06/28 14:15:04 simonmar Exp $</literal></term>
+	  <term><literal>$Id: libraries.sgml,v 1.2 2001/07/03 09:02:05 simonmar Exp $</literal></term>
 	  <listitem>
 	    <para>is optional, but usually included if the module is
 	    under CVS or RCS control.</para>
@@ -781,7 +781,7 @@
 	    of the hierarchy has the same name as the root of that
 	    subtree, eg. <literal>Foreign</literal> re-exports
 	    <literal>Foreign.Ptr</literal>,
-	    <literal>Foreign.MarshalUtils</literal> etc.</para>
+	    <literal>Foreign.Marshal.Utils</literal> etc.</para>
 	  </listitem>
 
 	  <listitem>
@@ -811,6 +811,15 @@
 import Text.Html           -- The library
 import Text.Html.Internals -- The non-abstract library (for building other libs)
 </programlisting>
+	  </listitem>
+
+	  <listitem>
+	    <para>Acronyms are fully capitalised in a module name.
+	    eg. <literal>HTML</literal>, <literal>URI</literal>,
+	    <literal>CGI</literal>, etc.  Exceptions may be made for
+	    acronyms which have an existing well-established
+	    alternative capitalisation, or acronyms which are also
+	    valid words, and are more often used as such.</para>
 	  </listitem>
 
 	</itemizedlist>
