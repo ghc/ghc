@@ -126,6 +126,9 @@
 /* Define to Haskell type for cc_t */
 #undef HTYPE_CC_T
 
+/* Define to Haskell type for blkcnt_t */
+#undef HTYPE_BLKCNT_T
+
 /* Define to Haskell type for char */
 #undef HTYPE_CHAR
 
