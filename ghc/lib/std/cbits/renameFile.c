@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: renameFile.c,v 1.7 2000/04/06 10:26:09 rrt Exp $
+ * $Id: renameFile.c,v 1.8 2000/04/06 10:33:06 rrt Exp $
  *
  * renameFile Runtime Support
  */
@@ -23,9 +23,7 @@
 
 
 StgInt
-renameFile(opath, npath)
-StgByteArray opath;
-StgByteArray npath;
+renameFile(StgByteArray opath, StgByteArray npath)
 {
     struct stat sb;
 

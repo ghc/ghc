@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: removeFile.c,v 1.3 1998/12/02 13:27:49 simonm Exp $
+ * $Id: removeFile.c,v 1.4 2000/04/06 10:33:07 rrt Exp $
  *
  * removeFile Runtime Support
  */
@@ -18,8 +18,7 @@
 #endif
 
 StgInt
-removeFile(path)
-StgByteArray path;
+removeFile(StgByteArray path)
 {
     struct stat sb;
 
