@@ -68,7 +68,8 @@ import CmdLineOpts	( opt_InPackage, opt_SimplDoEtaReduction )
 ilxGen :: Module -> [TyCon] -> [(StgBinding,[Id])] -> SDoc
 	-- The TyCons should include those arising from classes
 ilxGen mod tycons binds_w_srts
-  =  vcat [ text ".assembly extern 'mscorlib' {}",
+  =  vcat [ text ".module '" <> (ppr (moduleName mod)) <> hscOptionQual <> text "o'",
+	    text ".assembly extern 'mscorlib' {}",
 	    vcat (map (ilxImportPackage topenv) (uniqSetToList import_packages)),
             vcat (map (ilxImportModule topenv) (uniqSetToList import_modules)),
             vcat (map (ilxImportTyCon topenv) (uniqSetToList import_tycons)),
@@ -1668,8 +1669,8 @@ ilxTypeL2 ty env = ilxTypeL env ty
 ilxTypeR2 :: Type -> IlxTyFrag
 ilxTypeR2 ty env = ilxTypeR env ty
 
-ilxMethA = ilxType "!!0"
-ilxMethB = ilxType "!!1"
+ilxMethTyVarA = ilxType "!!0"
+ilxMethTyVarB = ilxType "!!1"
 prelGHCReference :: IlxTyFrag
 prelGHCReference env =
    if ilxEnvModule env == mkHomeModule (mkModuleName "PrelGHC") then empty
@@ -1709,9 +1710,12 @@ repBCO = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_BCOzh"]
 ilxTyPair l r = ilxTyParams [l,r]
 ilxTyTriple l m r = ilxTyParams [l,m,r]
 ilxTyQuad l m1 m2 r = ilxTyParams [l,m1,m2,r]
+ilxUnboxedEmptyRep = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z0H"]
 ilxUnboxedPairRep l r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z1H",ilxTyPair l r]
 ilxUnboxedTripleRep l m r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z2H",ilxTyTriple l m r]
 ilxUnboxedQuadRep l m1 m2 r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z3H",ilxTyQuad l m1 m2 r]
+
+ilxTyIO b = ilxTypeSeq [ilxType "(func ( /* unit skipped */ ) --> ", b, ilxType ")"]
 
 ilxTyParams :: [IlxTyFrag] -> IlxTyFrag
 ilxTyParams [] env = empty
@@ -1786,12 +1790,12 @@ ilxPrimOpTable op
 	IntLtOp     -> simp_op ilxClt
 	IntLeOp     -> simp_op ilxCle
 
-        IntToInt8Op  -> simp_op  (ilxOp"conv.i1")
-        IntToInt16Op  -> simp_op (ilxOp "conv.i2")
-        IntToInt32Op  -> simp_op (ilxOp "conv.i4")
-        WordToWord8Op  -> simp_op (ilxOp "conv.u1")
-        WordToWord16Op  -> simp_op (ilxOp "conv.u2")
-        WordToWord32Op  -> simp_op (ilxOp "conv.u4")
+        Narrow8IntOp   -> simp_op  (ilxOp"conv.i1")
+        Narrow16IntOp  -> simp_op (ilxOp "conv.i2")
+        Narrow32IntOp  -> simp_op (ilxOp "conv.i4")
+        Narrow8WordOp  -> simp_op (ilxOp "conv.u1")
+        Narrow16WordOp -> simp_op (ilxOp "conv.u2")
+        Narrow32WordOp -> simp_op (ilxOp "conv.u4")
 
 	WordGtOp     -> simp_op ilxCgtUn
 	WordGeOp     -> simp_op ilxCgeUn
@@ -1829,6 +1833,14 @@ ilxPrimOpTable op
 	IntNegOp    -> simp_op (ilxOp "neg")
 	IntRemOp    -> simp_op (ilxOp "rem")
 
+    -- Addr# ops:
+        AddrNullOp -> simp_op (ilxOp "pop ldnull")
+        AddrAddOp  -> simp_op (ilxOp "add")
+	AddrSubOp  -> simp_op (ilxOp "sub")
+	AddrRemOp  -> simp_op (ilxOp "rem")
+	Int2AddrOp -> warn_op "int2Addr" (simp_op (ilxOp "/* PrimOp int2Addr */ "))
+	Addr2IntOp -> warn_op "addr2Int" (simp_op (ilxOp "/* PrimOp addr2Int */ "))
+
     -- Word#-related ops:
 	WordAddOp    -> simp_op (ilxOp "add")
 	WordSubOp    -> simp_op (ilxOp "sub")
@@ -1836,8 +1848,6 @@ ilxPrimOpTable op
 	WordQuotOp   -> simp_op (ilxOp "div")
 	WordRemOp    -> simp_op (ilxOp "rem")
 
-	Addr2IntOp  -> simp_op (ilxOp "conv.i4") -- Addresses are very dodgy for ILX.  They are used for both C-strings and 
-	Int2AddrOp  -> simp_op (ilxOp "conv.i")  -- the FFI.  This needs more work.
 	ISllOp      -> simp_op (ilxOp "shl")
 	ISraOp      -> simp_op (ilxOp "shr")
 	ISrlOp      -> simp_op (ilxOp "shr.un")
@@ -2069,6 +2079,7 @@ ilxPrimOpTable op
                   {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
 
             {- should be monadic??? -}
+	NewPinnedByteArrayOp_Char -> warn_op "newPinnedByteArray" (simp_op (ilxOp "newarr [mscorlib]System.Byte "))
 	NewByteArrayOp_Char   	 -> simp_op (ilxOp "newarr [mscorlib]System.Byte")
 --	NewByteArrayOp_Int    	 -> simp_op (ilxOp "newarr [mscorlib]System.Int32")
 --	NewByteArrayOp_Word   	 -> simp_op (ilxOp "newarr [mscorlib]System.UInt32")
@@ -2079,6 +2090,7 @@ ilxPrimOpTable op
 --      NewByteArrayOp_Int64     -> simp_op (ilxOp "newarr [mscorlib]System.Int64")  TODO: there is no unique for this one -}
 --      NewByteArrayOp_Word64    -> simp_op (ilxOp "newarr  [mscorlib]System.UInt64") -}
                   {- Int# -> State# s -> (# State# s, MutByteArr# s #) -}
+	ByteArrayContents_Char   -> warn_op "byteArrayContents" (simp_op ilxAddrOfByteArrOp)
 
 	UnsafeFreezeByteArrayOp ->   ty1_op (\ty1  -> ilxOp "nop ")
                   {- MutByteArr# s -> State# s -> (# State# s, ByteArr# #) -}
@@ -2099,7 +2111,7 @@ ilxPrimOpTable op
 	WriteMutVarOp -> ty2_op (\ty1 ty2 -> ilxOpSeq [ilxOp "stfld !0" , repMutVar ty1 ty2 , ilxOp "::contents"])
                  {- MutVar# s a -> a -> State# s -> State# s -}
 
-	NewArrayOp -> ty2_op (\ty1 ty2 -> ilxCallSuppMeth (ilxType "!!0[]") "newArray" [ty1] [repInt,ilxMethA])
+	NewArrayOp -> ty2_op (\ty1 ty2 -> ilxCallSuppMeth (ilxType "!!0[]") "newArray" [ty1] [repInt,ilxMethTyVarA])
                  {- Int# -> a -> State# s -> (# State# s, MutArr# s a #) -}
 	IndexArrayOp -> ty1_op (\ty1 -> ilxOp "ldelem.ref")
                  {- Array# a -> Int# -> (# a #) -}
@@ -2118,7 +2130,8 @@ ilxPrimOpTable op
 
 	RaiseOp -> ty2_op (\ty1 ty2 -> ilxOp "throw")
 	CatchOp -> ty2_op (\ty1 ty2 -> 
-		ilxCallSuppMeth ilxMethA "'catch'" [ty1,ty2] [ilxOp "thunk<(func ( /* unit skipped */ ) --> !!0)>", ilxOp "thunk<(func (!!1) --> (func ( /* unit skipped */ ) --> !!0))>"])
+		ilxCallSuppMeth ilxMethTyVarA "'catch'" [ty1,ty2] [ilxLift (ilxTyIO (ilxType "!!0")), 
+                                                              ilxOp "thunk<(func (!!1) --> (func ( /* unit skipped */ ) --> !!0))>"])
 	                    {-        (State# RealWorld -> (# State# RealWorld, a #) )
 	                           -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
 	                           -> State# RealWorld
@@ -2126,14 +2139,14 @@ ilxPrimOpTable op
 	                     -} 
 
 	BlockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		ilxCallSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [ilxOp "thunk<(func ( /* unit skipped */ ) --> !!0)>"])
+		ilxCallSuppMeth ilxMethTyVarA "blockAsyncExceptions" [ty1] [ilxLift (ilxTyIO (ilxType "!!0"))])
 
                 {-     (State# RealWorld -> (# State# RealWorld, a #))
                     -> (State# RealWorld -> (# State# RealWorld, a #))
                 -}
 
 	UnblockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		ilxCallSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [ilxOp "thunk<(func ( /* unit skipped */ ) --> !!0)>"])
+		ilxCallSuppMeth ilxMethTyVarA "unblockAsyncExceptions" [ty1] [ilxLift (ilxTyIO (ilxType "!!0"))])
 
                 {-
 		    State# RealWorld -> (# State# RealWorld, a #))
@@ -2145,42 +2158,42 @@ ilxPrimOpTable op
                  {- State# s -> (# State# s, MVar# s a #) -}
 
 	TakeMVarOp -> ty2_op (\sty ty -> 
-		ilxCallSuppMeth ilxMethA "takeMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth ilxMethTyVarA "takeMVar" [ty] [repMVar ilxMethTyVarA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	-- These aren't yet right
         TryTakeMVarOp -> ty2_op (\sty ty -> 
-		ilxCallSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth (ilxUnboxedPairRep repInt ilxMethTyVarA) "tryTakeMVar" [ty] [repMVar ilxMethTyVarA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	TryPutMVarOp -> ty2_op (\sty ty -> 
-		ilxCallSuppMeth repInt "tryPutMVar" [ty] [repMVar ilxMethA,ilxMethA])
+		ilxCallSuppMeth repInt "tryPutMVar" [ty] [repMVar ilxMethTyVarA,ilxMethTyVarA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	PutMVarOp -> ty2_op (\sty ty -> 
-		ilxCallSuppMeth (ilxOp "void") "putMVar" [ty] [repMVar ilxMethA, ilxMethA])
+		ilxCallSuppMeth (ilxOp "void") "putMVar" [ty] [repMVar ilxMethTyVarA, ilxMethTyVarA])
                    {- MVar# s a -> a -> State# s -> State# s -}
 
 	SameMVarOp -> ty2_op (\sty ty -> ilxCeq)
                    {- MVar# s a -> MVar# s a -> Bool -}
 
 --	TakeMaybeMVarOp -> ty2_op (\sty ty -> 
---		(ilxCallSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA]))
+--		(ilxCallSuppMeth (ilxUnboxedPairRep repInt ilxMethTyVarA) "tryTakeMVar" [ty] [repMVar ilxMethTyVarA]))
 --              {- MVar# s a -> State# s -> (# State# s, Int#, a #) -}
 
 	IsEmptyMVarOp -> ty2_op (\sty ty -> 
-		ilxCallSuppMeth repInt "isEmptyMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth repInt "isEmptyMVar" [ty] [repMVar ilxMethTyVarA])
                {- MVar# s a -> State# s -> (# State# s, Int# #) -}
 
 	TouchOp -> warn_op "touch" (ty1_op (\ty1 -> ilxOp "pop /* PrimOp touch */ "))
 
                {- a -> Int# -}
 	DataToTagOp -> ty1_op (\ty1 -> 
-		ilxCallSuppMeth repInt "dataToTag" [ty1] [ilxMethA])
+		ilxCallSuppMeth repInt "dataToTag" [ty1] [ilxMethTyVarA])
                {- a -> Int# -}
 
 	TagToEnumOp -> ty1_op (\ty1 -> 
-		ilxCallSuppMeth ilxMethA "tagToEnum" [ty1] [repInt])
+		ilxCallSuppMeth ilxMethTyVarA "tagToEnum" [ty1] [repInt])
                {- Int# -> a -}
 
 	MakeStablePtrOp -> ty1_op (\ty1 -> ilxOpSeq [ilxOp "box", ty1, ilxOp "newobj void", repStablePtr {- ty1 -}, ilxOp "::.ctor(class [mscorlib]System.Object)"])
@@ -2199,11 +2212,12 @@ ilxPrimOpTable op
 	EqStablePtrOp -> ty1_op (\ty1 -> ilxOp "ceq")
                  {-  StablePtr# a -> StablePtr# a -> Int# -}
 
-	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  ilxCall (ilxMethodRef (repWeak ilxMethB) classWeak "bake" [ilxLift ty1,ilxLift ty2,ty3] [ilxMethA, ilxMethB, ilxLift (ilxOp "!!2")]))
+            -- The 3rd argument to MkWeakOp is always a IO Monad action, i.e. passed as () --> ()
+	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  ilxCall (ilxMethodRef (repWeak ilxMethTyVarB) classWeak "bake" [ilxLift ty1,ilxLift ty2] [ilxMethTyVarA, ilxMethTyVarB, ilxLift (ilxTyIO ilxUnboxedEmptyRep)]))
                  {- o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #) -}
 
-	DeRefWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt ilxMethA) classWeak "deref" [ty1] [repWeak ilxMethA]))
-	FinalizeWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt (ilxOp "thunk<(func ( /* unit skipped */ ) --> class '()')>")) classWeak "finalizer" [ty1] [repWeak ilxMethA]))
+	DeRefWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt ilxMethTyVarA) classWeak "deref" [ty1] [repWeak ilxMethTyVarA]))
+	FinalizeWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt (ilxTyIO ilxUnboxedEmptyRep)) classWeak "finalizer" [ty1] [repWeak ilxMethTyVarA]))
                    {-    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
 	State# RealWorld -> (# State# RealWorld, Unit #)) #) -}
 
