@@ -922,6 +922,14 @@ M.o : X.hi-boot
        <command>ghc</command> traces the dependencies, just like <command>ghc --make</command>
        (a new feature in GHC 6.4).</para>
 
+    <para>Note that <literal>ghc -M</literal> needs to find a <emphasis>source
+	file</emphasis> for each module in the dependency graph, so that it can
+      parse the import declarations and follow dependencies.  Any pre-compiled
+      modules without source files must therefore belong to a
+      package<footnote><para>This is a change in behaviour relative to 6.2 and
+	earlier.</para>
+      </footnote>.</para>
+
         <para>By default, <command>ghc -M</command> generates all the
         dependencies, and then concatenates them onto the end of
         <filename>makefile</filename> (or
