@@ -269,7 +269,7 @@ report_cc_profiling(final)
 
 	    for (cc = Registered_CC; cc != REGISTERED_END; cc = cc->registered) {
 		if (cc->time_ticks != 0 && ! cc_to_ignore(cc))
-		    fprintf(serial_file, "  %0.11s:%0.16s %3ld\n",
+		    fprintf(serial_file, "  %s:%s %3ld\n",
 			cc->module, cc->label, cc->time_ticks*100 / final_ticks);
 	    }
 #endif
@@ -288,10 +288,10 @@ report_cc_profiling(final)
 		if (cc->time_ticks != 0 && !cc_to_ignore(cc)) {
 #ifdef PAR                                          
 		  /* Print _percentages_ in the parallel world */
-		    fprintf(serial_file, "  %0.11s:%0.16s %3ld\n",
+		    fprintf(serial_file, "  %s:%s %3ld\n",
 		      cc->module, cc->label, cc->time_ticks * 100/TICK_FREQUENCY);
 #else
-		    fprintf(serial_file, "  %0.11s:%0.16s %3ld\n",
+		    fprintf(serial_file, "  %s:%s %3ld\n",
 		      cc->module, cc->label, cc->time_ticks);
 #endif
 		}
@@ -364,7 +364,7 @@ report_cc_profiling(final)
     fprintf(prof_file, "  (excludes profiling overheads)\n\n");
 
 
-    fprintf(prof_file, "%-16.16s %-11.11s", "COST CENTRE", "MODULE");
+    fprintf(prof_file, "%-16s %-11s", "COST CENTRE", "MODULE");
 
     do_groups = have_interesting_groups(Registered_CC);
     if (do_groups) fprintf(prof_file, " %-11.11s", "GROUP");
@@ -396,7 +396,7 @@ report_cc_profiling(final)
 			      || cc->thunk_count || cc->function_count || cc->pap_count
 #endif
 	   ))))) {
-	    fprintf(prof_file, "%-16.16s %-11.11s", cc->label, cc->module);
+	    fprintf(prof_file, "%-16s %-11s", cc->label, cc->module);
 	    if (do_groups) fprintf(prof_file, " %-11.11s",cc->group);
 
 	    fprintf(prof_file, "%8ld  %5.1f  %5.1f %8ld %5ld %5ld",
