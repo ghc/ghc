@@ -3,7 +3,7 @@ tcfail043.hs:38:
     Ambiguous type variable(s) `a' in the constraint `Ord_ a'
     arising from use of `gt' at tcfail043.hs:38
     In the predicate expression: gt (hd bs) a
-    In a lambda abstraction:
+    In the body of a lambda:
 	if gt (hd bs) a then
 	    False
 	else

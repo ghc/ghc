@@ -2,4 +2,7 @@
 tcfail007.hs:3:
     No instance for (Num Bool)
     arising from use of `+' at tcfail007.hs:3
-    In the definition of `n': x + 1
+    In a right-hand side of function `n': x + 1
+    In the definition of `n':
+	n x | True = x + 1
+	    | False = True

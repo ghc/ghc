@@ -1,2 +1,3 @@
 
-tcfail092.hs:5: duplicate binding in parallel list comprehension
+tcfail092.hs:5:
+    Duplicate binding in parallel list comprehension for: `a'

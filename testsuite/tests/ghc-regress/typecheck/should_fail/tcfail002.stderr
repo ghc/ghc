@@ -3,4 +3,5 @@ tcfail002.hs:4:
     Occurs check: cannot construct the infinite type: a = [a]
 	Expected type: a
 	Inferred type: [a]
-    In the definition of `c': z
+    In a right-hand side of function `c': z
+    In the definition of `c': c z = z

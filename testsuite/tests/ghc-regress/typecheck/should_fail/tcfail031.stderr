@@ -1,7 +1,7 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail031.hs:3:
+tcfail031.hs:3:
     Couldn't match `Bool' against `Char'
 	Expected type: Bool
 	Inferred type: Char
     In the predicate expression: 'a'
-    In the definition of `f': if 'a' then 1 else 2
+    In a right-hand side of function `f': if 'a' then 1 else 2

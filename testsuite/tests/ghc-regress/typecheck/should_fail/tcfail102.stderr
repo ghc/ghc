@@ -6,4 +6,4 @@ tcfail102.hs:8:
 	Or add an instance declaration for (Integral (Ratio a))
     arising from a record update at tcfail102.hs:8
     In the record update: x {p = p x}
-    In the definition of `f': x {p = p x}
+    In a right-hand side of function `f': x {p = p x}

@@ -1,5 +1,6 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail085.hs:9:
-    Constructor `F' does not have the required strict field `y'
+tcfail085.hs:9:
+    Constructor `F' does not have the required strict field(s): y
     In the record construction: F {x = 2}
-    In the definition of `z': F {x = 2}
+    In a right-hand side of function `z': F {x = 2}
+    In the definition of `z': z = F {x = 2}

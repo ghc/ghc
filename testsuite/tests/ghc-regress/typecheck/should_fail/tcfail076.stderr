@@ -5,4 +5,5 @@ tcfail076.hs:18:
 	It is mentioned in the environment:
 	  cont :: a -> m res (bound at tcfail076.hs:18)
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
-    In a lambda abstraction: KContT (\ cont' -> cont a)
+    In the body of a lambda: KContT (\ cont' -> cont a)
+    In a lambda abstraction: \ a -> KContT (\ cont' -> cont a)

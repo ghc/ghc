@@ -2,4 +2,5 @@
 tcfail018.hs:5:
     No instance for (Num [a])
     arising from the literal `1' at tcfail018.hs:5
-    In a pattern binding: 1
+    In the right-hand side of a pattern binding: 1
+    In a pattern binding: (a : []) = 1

@@ -3,4 +3,5 @@ tcfail005.hs:3:
     Couldn't match `[a]' against `(t, t1)'
 	Expected type: [a]
 	Inferred type: (t, t1)
-    In a pattern binding: (1, 'a')
+    In the right-hand side of a pattern binding: (1, 'a')
+    In a pattern binding: (h : i) = (1, 'a')

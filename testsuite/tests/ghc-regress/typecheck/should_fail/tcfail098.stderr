@@ -1,0 +1,6 @@
+
+tcfail098.hs:5:
+    Ambiguous constraint `Bar a'
+	At least one of the forall'd type variables mentioned by the constraint
+	must be reachable from the type after the '=>'
+    In the instance declaration for `Bar Bool'

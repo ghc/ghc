@@ -2,4 +2,5 @@
 tcfail015.hs:7:
     No instance for (Num Bool)
     arising from the literal `2' at tcfail015.hs:7
-    In the definition of `g': 2
+    In a right-hand side of function `g': 2
+    In the definition of `g': g (ANull) = 2

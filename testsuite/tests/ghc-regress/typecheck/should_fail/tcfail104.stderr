@@ -5,7 +5,7 @@ tcfail104.hs:9:
 	Expected type: forall a1. a1 -> a1
 	Inferred type: a -> a
     When checking the pattern: x :: forall a. a -> a
-    In a lambda abstraction: (x :: forall a. a -> a) -> x
+    In a lambda abstraction: \ (x :: forall a. a -> a) -> x
 
 tcfail104.hs:15:
     Inferred type is less polymorphic than expected
@@ -13,4 +13,4 @@ tcfail104.hs:15:
 	Expected type: forall a1. a1 -> a1
 	Inferred type: a -> a
     When checking the pattern: x :: forall a. a -> a
-    In a lambda abstraction: (x :: forall a. a -> a) -> x
+    In a lambda abstraction: \ (x :: forall a. a -> a) -> x
