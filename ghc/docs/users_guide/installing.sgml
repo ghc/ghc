@@ -922,6 +922,23 @@ to <Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </Para>
 
 </Sect2>
 
+    <sect2>
+      <title>Installing DocBook on FreeBSD</title>
+
+      <para>On FreeBSD systems, the easiest way to get DocBook up and
+      running is to install it from the ports tree or a pre-compiled
+      package (packages are available from your local FreeBSD mirror
+      site).</para>
+
+      <para>To use the ports tree, do this:
+<screen>
+      $ cd /usr/ports/textproc/docproj
+      $ make install
+</screen>
+      This installs the FreeBSD documentation project tools, which
+      includes everything needed to format the GHC
+      documentation.</para>
+    </sect2>
 
 <Sect2>
 <Title>Installing from binaries on Windows</Title>
