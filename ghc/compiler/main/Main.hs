@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.130 2003/07/17 12:04:53 simonmar Exp $
+-- $Id: Main.hs,v 1.131 2003/07/21 15:14:18 ross Exp $
 --
 -- GHC Driver program
 --
@@ -266,6 +266,10 @@ main =
 checkOptions :: GhcMode -> [String] -> [String] -> IO ()
      -- Final sanity checking before kicking off a compilation (pipeline).
 checkOptions mode srcs objs = do
+     -- Complain about any unknown flags
+   let unknown_opts = [ f | f@('-':_) <- srcs ]
+   when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
+
 	-- -ohi sanity check
    ohi <- readIORef v_Output_hi
    if (isJust ohi && 
@@ -284,10 +288,6 @@ checkOptions mode srcs objs = do
    if null srcs && null objs && mode /= DoInteractive
 	then throwDyn (UsageError "no input files")
 	else do
-
-     -- Complain about any unknown flags
-   let unknown_opts = [ f | f@('-':_) <- srcs ]
-   when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
      -- Verify that output files point somewhere sensible.
    verifyOutputFiles
