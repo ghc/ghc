@@ -16,10 +16,10 @@ import StgSyn
 
 import UniqFM
 import UniqSet
+import Panic
 
 #ifdef DEBUG
 import Outputable
-import Panic
 #endif
 \end{code}
 
