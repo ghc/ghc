@@ -365,7 +365,7 @@ negateDouble#       :: Double# -&#62; Double#
 double2Int#         :: Double# -&#62; Int#
 int2Double#         :: Int#    -&#62; Double#
 
-{plus,minux,times,divide}Float# :: Float# -&#62; Float# -&#62; Float#
+{plus,minus,times,divide}Float# :: Float# -&#62; Float# -&#62; Float#
 {gt,ge,eq,ne,lt,le}Float# :: Float# -&#62; Float# -&#62; Bool
 negateFloat#        :: Float# -&#62; Float#
 float2Int#          :: Float# -&#62; Int#
