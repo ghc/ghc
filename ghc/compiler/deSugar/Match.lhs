@@ -67,8 +67,12 @@ matchCheck_really dflags ctx vars ty qs
   | otherwise             =
       match vars ty qs
   where (pats, eqns_shadow) = check qs
-        incomplete    = dopt Opt_WarnIncompletePatterns dflags
-			&& (notNull pats)
+        incomplete    = want_incomplete && (notNull pats)
+        want_incomplete = case ctx of
+                              DsMatchContext RecUpd _ _ ->
+                                  dopt Opt_WarnIncompletePatternsRecUpd dflags
+                              _ ->
+                                  dopt Opt_WarnIncompletePatterns       dflags
         shadow        = dopt Opt_WarnOverlappingPatterns dflags
 			&& not (null eqns_shadow)
 \end{code}

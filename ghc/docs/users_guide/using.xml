@@ -835,6 +835,33 @@ g [] = 2
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-incomplete-record-updates</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-incomplete-record-updates</option></primary></indexterm>
+	  <indexterm><primary>incomplete record updates, warning</primary></indexterm>
+	  <indexterm><primary>record updates, incomplete</primary></indexterm>
+
+	  <para>The function
+          <function>f</function> below will fail when applied to
+          <literal>Bar</literal>, so the compiler will emit a warning about
+          this when <option>-fwarn-incomplete-record-updates</option> is
+          enabled.</para>
+
+<programlisting>
+data Foo = Foo { x :: Int }
+         | Bar
+
+f :: Foo -> Foo
+f foo = foo { x = 6 }
+</programlisting>
+
+	  <para>This option isn't enabled be default because it can be
+          very noisy, and it often doesn't indicate a bug in the
+          program.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term>
           <option>-fwarn-misc</option>:
           <indexterm><primary><option>-fwarn-misc</option></primary></indexterm>

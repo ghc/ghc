@@ -256,6 +256,7 @@ data DynFlag
    | Opt_WarnDuplicateExports
    | Opt_WarnHiShadows
    | Opt_WarnIncompletePatterns
+   | Opt_WarnIncompletePatternsRecUpd
    | Opt_WarnMissingFields
    | Opt_WarnMissingMethods
    | Opt_WarnMissingSigs
