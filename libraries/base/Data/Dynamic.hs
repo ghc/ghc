@@ -437,7 +437,9 @@ INSTANCE_TYPEABLE1(IORef,ioRefTc,"IORef")
 --
 ---------------------------------------------
 
+#ifndef __HUGS__
 newtype Key = Key Int deriving( Eq )
+#endif
 
 data KeyPr = KeyPr !Key !Key deriving( Eq )
 
