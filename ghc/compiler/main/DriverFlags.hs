@@ -1,5 +1,7 @@
+{-# OPTIONS -#include "hschooks.h" #-}
+
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.36 2000/12/19 12:36:12 sewardj Exp $
+-- $Id: DriverFlags.hs,v 1.37 2000/12/19 13:06:50 simonmar Exp $
 --
 -- Driver flags
 --
@@ -267,6 +269,7 @@ static_flags =
 
 	----- RTS opts ------------------------------------------------------
   ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
+  ,  ( "Rghc-timing"	   , NoArg  (enableTimingStats) )
 
         ------ Compiler flags -----------------------------------------------
   ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
@@ -476,15 +479,13 @@ decodeSize str
 	pred c = isDigit c || c == '.'
 
 floatOpt :: IORef Double -> String -> IO ()
-floatOpt ref str
-  = writeIORef ref (read str :: Double)
+floatOpt ref str = writeIORef ref (read str :: Double)
 
-#if __GLASGOW_HASKELL__ >= 411
-foreign import "setHeapSize" unsafe setHeapSize :: Int -> IO ()
-#else
-setHeapSize :: Int -> IO ()		-- -H<size> is ignored
-setHeapSize _ = return ()
-#endif
+-----------------------------------------------------------------------------
+-- RTS Hooks
+
+foreign import "setHeapSize"       unsafe setHeapSize       :: Int -> IO ()
+foreign import "enableTimingStats" unsafe enableTimingStats :: IO ()
 
 -----------------------------------------------------------------------------
 -- Build the Hsc static command line opts
