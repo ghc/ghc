@@ -69,6 +69,7 @@ PrelHandle_HC_OPTS       += -H12m
 Time_HC_OPTS             += -H8m
 Complex_HC_OPTS          += -H10m
 IO_HC_OPTS	         += -H12m
+PrelMain_HC_OPTS	 += -fno-prune-tydecls # avoids an apparent bug; ToDo
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
