@@ -10,7 +10,7 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), opt_NoImplicitPrelude )
+import CmdLineOpts	( DynFlag(..) )
 
 import HsSyn		( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 			  ForeignDecl(..), ForKind(..), isDynamicExtName,
@@ -82,7 +82,9 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
 		-- PROCESS IMPORT DECLS
 		-- Do the non {- SOURCE -} ones first, so that we get a helpful
 		-- warning for {- SOURCE -} ones that are unnecessary
+	doptRn Opt_NoImplicitPrelude				`thenRn` \ opt_no_prelude -> 
 	let
+	  all_imports	     = mk_prel_imports opt_no_prelude ++ imports
 	  (source, ordinary) = partition is_source_import all_imports
 	  is_source_import (ImportDecl _ ImportByUserSource _ _ _ _) = True
 	  is_source_import other				     = False
@@ -117,22 +119,22 @@ getGlobalNames this_mod (HsModule _ _ exports imports decls _ mod_loc)
    )
   where
     this_mod_name = moduleName this_mod
-    all_imports = prel_imports ++ imports
 
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 	-- because the former doesn't even look at Prelude.hi for instance declarations,
 	-- whereas the latter does.
-    prel_imports | this_mod_name == pRELUDE_Name ||
-		   explicit_prelude_import ||
-		   opt_NoImplicitPrelude
-		 = []
+    mk_prel_imports no_prelude
+	| this_mod_name == pRELUDE_Name ||
+	  explicit_prelude_import ||
+	  no_prelude
+	= []
 
-		 | otherwise = [ImportDecl pRELUDE_Name
-					   ImportByUser
-					   False	{- Not qualified -}
-					   Nothing	{- No "as" -}
-					   Nothing	{- No import list -}
-					   mod_loc]
+	| otherwise = [ImportDecl pRELUDE_Name
+				  ImportByUser
+				  False	{- Not qualified -}
+				  Nothing	{- No "as" -}
+				  Nothing	{- No import list -}
+				  mod_loc]
     
     explicit_prelude_import
       = not (null [ () | (ImportDecl mod _ _ _ _ _) <- imports, mod == pRELUDE_Name ])
@@ -222,8 +224,7 @@ getLocalDeclBinders mod rec_exp_fn (ForD (ForeignDecl nm kind _ ext_nm _ loc))
     returnRn [avail]
 
   | otherwise 		-- a foreign export
-  = lookupOrigName nm `thenRn_` 
-    returnRn []
+  = returnRn []
   where
     binds_haskell_name (FoImport _) = True
     binds_haskell_name FoLabel      = True

@@ -45,7 +45,7 @@ module Name (
 import OccName		-- All of it
 import Module		( Module, moduleName, mkVanillaModule, 
 			  printModulePrefix, isModuleInThisPackage )
-import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
+import RdrName		( RdrName, mkRdrOrig, mkRdrIfaceUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, pprUnique, pprUnique10 )
@@ -301,7 +301,7 @@ tidyTopName mod env
 	System   -> localise		-- System local Ids
 	Local    -> localise		-- User non-exported Ids
 	Exported -> globalise		-- User-exported things
-	Global _ -> no_op		-- Constructors, class selectors etc
+	Global _ -> no_op		-- Constructors, class selectors, default methods
 
   where
     no_op     = (env, name)
@@ -354,14 +354,8 @@ hashName name = iBox (u2i (nameUnique name))
 nameRdrName :: Name -> RdrName
 -- Makes a qualified name for top-level (Global) names, whether locally defined or not
 -- and an unqualified name just for Locals
-nameRdrName (Name { n_occ = occ, n_sort = Global mod }) = mkRdrQual (moduleName mod) occ
-nameRdrName (Name { n_occ = occ })			= mkRdrUnqual occ
-
-ifaceNameRdrName :: Name -> RdrName
--- Makes a qualified naem for imported things, 
--- and an unqualified one for local things
-ifaceNameRdrName n | isLocallyDefined n = mkRdrUnqual (nameOccName n)
-		   | otherwise		= mkRdrQual   (moduleName (nameModule n)) (nameOccName n) 
+nameRdrName (Name { n_occ = occ, n_sort = Global mod }) = mkRdrOrig (moduleName mod) occ
+nameRdrName (Name { n_occ = occ })			= mkRdrIfaceUnqual occ
 
 isDllName :: Name -> Bool
 	-- Does this name refer to something in a different DLL?
@@ -477,15 +471,32 @@ pprLocal sty uniq occ pp_export
   | otherwise      = pprOccName occ
 
 pprGlobal sty uniq mod occ
-  | codeStyle sty         = ppr (moduleName mod) <> char '_' <> pprOccName occ
+  |  codeStyle sty 
+  || ifaceStyle sty       = ppr (moduleName mod) <> char '_' <> pprOccName occ
+
   | debugStyle sty        = ppr (moduleName mod) <> dot <> pprOccName occ <> 
 			    text "{-" <> pprUnique10 uniq <> text "-}"
+
   | printModulePrefix mod = ppr (moduleName mod) <> dot <> pprOccName occ
   | otherwise             = pprOccName occ
 
 pprSysLocal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
+
+{-
+pprNameBndr :: Name -> SDoc
+-- Print a binding occurrence of a name.
+-- In interface files we can omit the "M." prefix, which tides things up a lot
+pprNameBndr name
+  = getPprStyle $ \ sty ->
+    case sort of
+      Global mod | ifaceStyle sty -> pprLocal sty uniq occ empty
+		 | otherwise	  -> pprGlobal sty uniq mod occ
+      System     -> pprSysLocal sty uniq occ
+      Local      -> pprLocal sty uniq occ empty
+      Exported   -> pprLocal sty uniq occ (char 'x')
+-}
 \end{code}
 
 
@@ -514,7 +525,7 @@ isLocalOrFrom	    :: NamedThing a => Module -> a -> Bool
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = nameIsLocallyDefined . getName
 getOccString 	    = occNameString	   . getOccName
-toRdrName	    = ifaceNameRdrName	   . getName
+toRdrName	    = nameRdrName	   . getName
 isFrom mod x	    = nameIsFrom mod (getName x)
 isLocalOrFrom mod x = nameIsLocalOrFrom mod ( getName x)
 \end{code}

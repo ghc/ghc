@@ -53,7 +53,7 @@ import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..),
                           ImportVersion, WhatsImported(..),
                           RdrAvailInfo )
 
-import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
+import RdrName          ( RdrName, mkRdrIfaceUnqual, mkIfaceOrig )
 import Name		( OccName )
 import OccName          ( mkSysOccFS,
 			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
@@ -606,14 +606,14 @@ var_occ	        :: { OccName }
 		:  var_fs		{ mkSysOccFS varName $1 }
 
 var_name	:: { RdrName }
-var_name	:  var_occ		{ mkRdrUnqual $1 }
+var_name	:  var_occ		{ mkRdrIfaceUnqual $1 }
 
 qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
-		|  qvar_fs      	{ mkSysQual varName $1 }
+		|  qvar_fs      	{ mkIfaceOrig varName $1 }
 
 ipvar_name	:: { RdrName }
-		:  IPVARID		{ mkSysUnqual ipName (tailFS $1) }
+		:  IPVARID		{ mkRdrIfaceUnqual (mkSysOccFS ipName (tailFS $1)) }
 
 var_names	:: { [RdrName] }
 var_names	: 			{ [] }
@@ -640,41 +640,38 @@ data_occ	:: { OccName }
 		:  data_fs		{ mkSysOccFS dataName $1 }
 
 data_name	:: { RdrName }
-                :  data_occ             { mkRdrUnqual $1 }
+                :  data_occ             { mkRdrIfaceUnqual $1 }
 
 qdata_name	:: { RdrName }
 qdata_name	:  data_name		{ $1 }
-		|  qdata_fs 	        { mkSysQual dataName $1 }
+		|  qdata_fs 	        { mkIfaceOrig dataName $1 }
 				
 var_or_data_name :: { RdrName }
                   : var_name                    { $1 }
                   | data_name                   { $1 }
 
 ---------------------------------------------------
-tc_fs           :: { EncodedFS }
-                :  data_fs              { $1 }
-
 tc_occ	        :: { OccName }
-		:  tc_fs 		{ mkSysOccFS tcName $1 }
+		:  data_fs 		{ mkSysOccFS tcName $1 }
 
 tc_name		:: { RdrName }
-                :  tc_occ		{ mkRdrUnqual $1 }
+                :  tc_occ		{ mkRdrIfaceUnqual $1 }
 
 qtc_name	:: { RdrName }
                 : tc_name		{ $1 }
-		| qdata_fs		{ mkSysQual tcName $1 }
+		| qdata_fs		{ mkIfaceOrig tcName $1 }
 
 ---------------------------------------------------
 cls_name	:: { RdrName }
-        	:  data_fs		{ mkSysUnqual clsName $1 }
+        	:  data_fs		{ mkRdrIfaceUnqual (mkSysOccFS clsName $1) }
 
 qcls_name	:: { RdrName }
          	: cls_name		{ $1 }
-		| qdata_fs		{ mkSysQual clsName $1 }
+		| qdata_fs		{ mkIfaceOrig clsName $1 }
 
 ---------------------------------------------------
 uv_name		:: { RdrName }
-		:  VARID 		{ mkSysUnqual uvName $1 }
+		:  VARID 		{ mkRdrIfaceUnqual (mkSysOccFS uvName $1) }
 
 uv_bndr		:: { RdrName }
 		:  uv_name		{ $1 }
@@ -685,8 +682,8 @@ uv_bndrs	:: { [RdrName] }
 
 ---------------------------------------------------
 tv_name		:: { RdrName }
-		:  VARID 		{ mkSysUnqual tvName $1 }
-		|  VARSYM		{ mkSysUnqual tvName $1 {- Allow t2 as a tyvar -} }
+		:  VARID 		{ mkRdrIfaceUnqual (mkSysOccFS tvName $1) }
+		|  VARSYM		{ mkRdrIfaceUnqual (mkSysOccFS tvName $1) {- Allow t2 as a tyvar -} }
 
 tv_bndr		:: { HsTyVarBndr RdrName }
 		:  tv_name '::' akind	{ IfaceTyVar $1 $3 }

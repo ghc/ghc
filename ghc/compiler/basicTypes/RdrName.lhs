@@ -9,15 +9,14 @@ module RdrName (
 	RdrName,
 
 	-- Construction
-	mkRdrUnqual, mkRdrQual,
-	mkUnqual, mkQual, 
-	mkSysUnqual, mkSysQual,
-	mkPreludeQual, qualifyRdrName, mkRdrNameWkr,
+	mkRdrUnqual, mkRdrQual, mkRdrOrig, mkRdrIfaceUnqual,
+	mkUnqual, mkQual, mkIfaceOrig, mkOrig,
+	qualifyRdrName, mkRdrNameWkr,
 	dummyRdrVarName, dummyRdrTcName,
 
 	-- Destruction
 	rdrNameModule, rdrNameOcc, setRdrNameOcc,
-	isRdrDataCon, isRdrTyVar, isQual, isUnqual,
+	isRdrDataCon, isRdrTyVar, isQual, isSourceQual, isUnqual, isIface,
 
 	-- Environment
 	RdrNameEnv, 
@@ -31,7 +30,7 @@ module RdrName (
 #include "HsVersions.h"
 
 import OccName	( NameSpace, tcName,
-		  OccName, UserFS,
+		  OccName, UserFS, EncodedFS,
 		  mkSysOccFS,
 		  mkOccFS, mkVarOcc,
 		  isDataOcc, isTvOcc, mkWorkerOcc
@@ -55,7 +54,18 @@ import Util	( thenCmp )
 data RdrName = RdrName Qual OccName
 
 data Qual = Unqual
-	  | Qual ModuleName	-- The (encoded) module name
+
+	  | IfaceUnqual		-- An unqualified name from an interface file;
+				-- implicitly its module is that of the enclosing
+				-- interface file; don't look it up in the environment
+
+	  | Qual ModuleName	-- A qualified name written by the user in source code
+				-- The module isn't necessarily the module where
+				-- the thing is defined; just the one from which it
+				-- is imported
+
+	  | Orig ModuleName	-- This is an *original* name; the module is the place
+				-- where the thing was defined
 \end{code}
 
 
@@ -68,6 +78,7 @@ data Qual = Unqual
 \begin{code}
 rdrNameModule :: RdrName -> ModuleName
 rdrNameModule (RdrName (Qual m) _) = m
+rdrNameModule (RdrName (Orig m) _) = m
 
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (RdrName _ occ) = occ
@@ -81,8 +92,18 @@ setRdrNameOcc (RdrName q _) occ = RdrName q occ
 mkRdrUnqual :: OccName -> RdrName
 mkRdrUnqual occ = RdrName Unqual occ
 
+mkRdrIfaceUnqual :: OccName -> RdrName
+mkRdrIfaceUnqual occ = RdrName IfaceUnqual occ
+
 mkRdrQual :: ModuleName -> OccName -> RdrName
 mkRdrQual mod occ = RdrName (Qual mod) occ
+
+mkRdrOrig :: ModuleName -> OccName -> RdrName
+mkRdrOrig mod occ = RdrName (Orig mod) occ
+
+mkIfaceOrig :: NameSpace -> (EncodedFS, EncodedFS) -> RdrName
+mkIfaceOrig ns (m,n) = RdrName (Orig (mkSysModuleNameFS m)) (mkSysOccFS ns n)
+
 
 	-- These two are used when parsing source files
 	-- They do encode the module and occurrence names
@@ -92,16 +113,8 @@ mkUnqual sp n = RdrName Unqual (mkOccFS sp n)
 mkQual :: NameSpace -> (UserFS, UserFS) -> RdrName
 mkQual sp (m, n) = RdrName (Qual (mkModuleNameFS m)) (mkOccFS sp n)
 
-	-- These two are used when parsing interface files
-	-- They do not encode the module and occurrence name
-mkSysUnqual :: NameSpace -> FAST_STRING -> RdrName
-mkSysUnqual sp n = RdrName Unqual (mkSysOccFS sp n)
-
-mkSysQual :: NameSpace -> (FAST_STRING, FAST_STRING) -> RdrName
-mkSysQual sp (m,n) = RdrName (Qual (mkSysModuleNameFS m)) (mkSysOccFS sp n)
-
-mkPreludeQual :: NameSpace -> ModuleName -> FAST_STRING -> RdrName
-mkPreludeQual sp mod n = RdrName (Qual mod) (mkOccFS sp n)
+mkOrig :: NameSpace -> ModuleName -> UserFS -> RdrName
+mkOrig sp mod n = RdrName (Orig mod) (mkOccFS sp n)
 
 qualifyRdrName :: ModuleName -> RdrName -> RdrName
 	-- Sets the module name of a RdrName, even if it has one already
@@ -126,10 +139,18 @@ dummyRdrTcName  = RdrName Unqual (mkOccFS tcName SLIT("TC-DUMMY"))
 isRdrDataCon (RdrName _ occ) = isDataOcc occ
 isRdrTyVar   (RdrName _ occ) = isTvOcc occ
 
-isUnqual (RdrName Unqual _) = True
-isUnqual other		    = False
+isUnqual (RdrName Unqual _)      = True
+isUnqual (RdrName IfaceUnqual _) = True
+isUnqual other		         = False
 
 isQual rdr_name = not (isUnqual rdr_name)
+
+isSourceQual (RdrName (Qual _) _) = True
+isSourceQual _			  = False
+
+isIface (RdrName (Orig _)    _) = True
+isIface (RdrName IfaceUnqual _) = True
+isIface other			= False
 \end{code}
 
 
@@ -143,8 +164,10 @@ isQual rdr_name = not (isUnqual rdr_name)
 instance Outputable RdrName where
     ppr (RdrName qual occ) = pp_qual qual <> ppr occ
 			   where
-			     pp_qual Unqual     = empty
-			     pp_qual (Qual mod) = ppr mod <> dot
+			     pp_qual Unqual      = empty
+			     pp_qual IfaceUnqual = empty
+			     pp_qual (Qual mod)  = ppr mod <> dot
+			     pp_qual (Orig mod)  = ppr mod <> dot
 
 pprUnqualRdrName (RdrName qual occ) = ppr occ
 
@@ -162,10 +185,15 @@ instance Ord RdrName where
 	= (o1  `compare` o2) `thenCmp` 
 	  (q1  `cmpQual` q2) 
 
-cmpQual Unqual	  Unqual    = EQ
-cmpQual Unqual    (Qual _)  = LT
-cmpQual (Qual _)  Unqual    = GT
-cmpQual (Qual m1) (Qual m2) = m1 `compare` m2
+cmpQual Unqual	    Unqual      = EQ
+cmpQual IfaceUnqual IfaceUnqual = EQ
+cmpQual (Qual m1)   (Qual m2)   = m1 `compare` m2
+cmpQual (Orig m1)   (Orig m2)   = m1 `compare` m2
+cmpQual Unqual      _	        = LT
+cmpQual IfaceUnqual (Qual _)	= LT
+cmpQual IfaceUnqual (Orig _)	= LT
+cmpQual (Qual _)    (Orig _)    = LT
+cmpQual _	    _	        = GT
 \end{code}
 
 

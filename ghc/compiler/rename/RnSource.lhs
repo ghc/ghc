@@ -409,7 +409,7 @@ rnClassBinds (ClassDecl _       _     _      _   _    mbinds _     _      )	-- G
 						not (tv `elemRdrEnv` name_env)]
     in
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
-    newLocalsRn mkLocalName gen_rdr_tyvars_w_locs	`thenRn` \ gen_tyvars ->
+    newLocalsRn gen_rdr_tyvars_w_locs			`thenRn` \ gen_tyvars ->
     rnMethodBinds gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
     returnRn (ClassDecl context cname tyvars fds sigs mbinds' names src_loc, meth_fvs)
   where

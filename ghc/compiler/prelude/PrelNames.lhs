@@ -37,8 +37,8 @@ module PrelNames (
 #include "HsVersions.h"
 
 import Module	  ( ModuleName, mkPrelModule, mkModuleName )
-import OccName	  ( NameSpace, varName, dataName, tcName, clsName )
-import RdrName	  ( RdrName, mkPreludeQual )
+import OccName	  ( NameSpace, UserFS, varName, dataName, tcName, clsName )
+import RdrName	  ( RdrName, mkOrig )
 import UniqFM
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -217,7 +217,7 @@ pREL_FLOAT   	= mkPrelModule pREL_FLOAT_Name
 %************************************************************************
 
 \begin{code}
-mkTupNameStr :: Boxity -> Int -> (ModuleName, FAST_STRING)
+mkTupNameStr :: Boxity -> Int -> (ModuleName, UserFS)
 
 mkTupNameStr Boxed 0 = (pREL_BASE_Name, SLIT("()"))
 mkTupNameStr Boxed 1 = panic "Name.mkTupNameStr: 1 ???"
@@ -235,7 +235,7 @@ mkTupNameStr Unboxed n = (pREL_GHC_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"
 
 mkTupConRdrName :: NameSpace -> Boxity -> Arity -> RdrName 
 mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
-					  (mod, occ) -> mkPreludeQual space mod occ
+					  (mod, occ) -> mkOrig space mod occ
 \end{code}
 
 
@@ -245,7 +245,7 @@ mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
 %*									*
 %************************************************************************
 
-These RdrNames are not really "built in", but some parts of the
+Many of these Names are not really "built in", but some parts of the
 compiler (notably the deriving mechanism) need to mention their names,
 and it's convenient to write them all down in one place.
 
@@ -417,16 +417,21 @@ The following names are known to the compiler, but they don't require
 pre-assigned keys.  Mostly these names are used in generating deriving
 code, which is passed through the renamer anyway.
 
-\begin{code}
-unpackCString_RDR      = varQual_RDR  pREL_BASE_Name SLIT("unpackCString#")
-unpackCStringFoldr_RDR = varQual_RDR  pREL_BASE_Name SLIT("unpackFoldrCString#")
-unpackCStringUtf8_RDR  = varQual_RDR  pREL_BASE_Name SLIT("unpackCStringUtf8#")
-deRefStablePtr_RDR = varQual_RDR  pREL_STABLE_Name  SLIT("deRefStablePtr")
-makeStablePtr_RDR  = varQual_RDR  pREL_STABLE_Name  SLIT("makeStablePtr")
-bindIO_RDR	   = varQual_RDR  pREL_IO_BASE_Name SLIT("bindIO")
-returnIO_RDR	   = varQual_RDR  pREL_IO_BASE_Name SLIT("returnIO")
+	THEY ARE ALL ORIGINAL NAMES, HOWEVER
 
-main_RDR	   = varQual_RDR  mAIN_Name      SLIT("main")
+\begin{code}
+-- Lists and tuples
+tupleCon_RDR, tupleTyCon_RDR		:: Int -> RdrName
+ubxTupleCon_RDR, ubxTupleTyCon_RDR 	:: Int -> RdrName
+
+tupleCon_RDR      = mkTupConRdrName dataName Boxed  
+tupleTyCon_RDR    = mkTupConRdrName tcName   Boxed  
+ubxTupleCon_RDR   = mkTupConRdrName dataName Unboxed
+ubxTupleTyCon_RDR = mkTupConRdrName tcName   Unboxed
+
+unitCon_RDR   	  = dataQual_RDR pREL_BASE_Name SLIT("()")
+unitTyCon_RDR 	  = tcQual_RDR   pREL_BASE_Name SLIT("()")
+
 and_RDR	   	   = varQual_RDR  pREL_BASE_Name SLIT("&&")
 not_RDR	   	   = varQual_RDR  pREL_BASE_Name SLIT("not")
 compose_RDR	   = varQual_RDR  pREL_BASE_Name SLIT(".")
@@ -464,20 +469,78 @@ maxBound_RDR	   = varQual_RDR  pREL_ENUM_Name SLIT("maxBound")
 assertErr_RDR      = varQual_RDR  pREL_ERR_Name SLIT("assertError")
 \end{code}
 
+These RDR names also have known keys, so we need to get back the RDR names to
+populate the occurrence list above.
+
+\begin{code}
+funTyCon_RDR  		= nameRdrName funTyConName
+nilCon_RDR    		= nameRdrName nilDataConName
+listTyCon_RDR 		= nameRdrName listTyConName
+ioTyCon_RDR		= nameRdrName ioTyConName
+intTyCon_RDR 		= nameRdrName intTyConName
+eq_RDR 			= nameRdrName eqName
+ge_RDR 			= nameRdrName geName
+numClass_RDR 		= nameRdrName numClassName
+ordClass_RDR 		= nameRdrName ordClassName
+map_RDR 		= nameRdrName mapName
+append_RDR 		= nameRdrName appendName
+foldr_RDR 		= nameRdrName foldrName
+build_RDR 		= nameRdrName buildName
+enumFromTo_RDR 		= nameRdrName enumFromToName
+returnM_RDR 		= nameRdrName returnMName
+thenM_RDR 		= nameRdrName thenMName
+failM_RDR 		= nameRdrName failMName
+false_RDR		= nameRdrName falseDataConName
+true_RDR		= nameRdrName trueDataConName
+error_RDR		= nameRdrName errorName
+getTag_RDR		= nameRdrName getTagName
+fromEnum_RDR		= nameRdrName fromEnumName
+toEnum_RDR		= nameRdrName toEnumName
+enumFrom_RDR		= nameRdrName enumFromName
+mkInt_RDR		= nameRdrName intDataConName
+enumFromThen_RDR	= nameRdrName enumFromThenName
+enumFromThenTo_RDR	= nameRdrName enumFromThenToName
+ratioDataCon_RDR	= nameRdrName ratioDataConName
+plusInteger_RDR		= nameRdrName plusIntegerName
+timesInteger_RDR	= nameRdrName timesIntegerName
+enumClass_RDR		= nameRdrName enumClassName
+monadClass_RDR		= nameRdrName monadClassName
+ioDataCon_RDR		= nameRdrName ioDataConName
+cCallableClass_RDR	= nameRdrName cCallableClassName
+cReturnableClass_RDR	= nameRdrName cReturnableClassName
+eqClass_RDR		= nameRdrName eqClassName
+eqString_RDR		= nameRdrName eqStringName
+unpackCString_RDR      	= nameRdrName unpackCStringName
+unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
+unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
+deRefStablePtr_RDR 	= nameRdrName deRefStablePtrName
+makeStablePtr_RDR 	= nameRdrName makeStablePtrName
+bindIO_RDR	  	= nameRdrName bindIOName
+returnIO_RDR	  	= nameRdrName returnIOName
+main_RDR	   	= nameRdrName mainName
+fromInteger_RDR		= nameRdrName fromIntegerName
+fromRational_RDR	= nameRdrName fromRationalName
+minus_RDR		= nameRdrName minusName
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection{Local helpers}
 %*									*
 %************************************************************************
 
-\begin{code}
-varQual  mod str uq = mkKnownKeyGlobal (mkPreludeQual varName mod str) uq
-dataQual mod str uq = mkKnownKeyGlobal (mkPreludeQual dataName mod str) uq
-tcQual   mod str uq = mkKnownKeyGlobal (mkPreludeQual tcName mod str) uq
-clsQual  mod str uq = mkKnownKeyGlobal (mkPreludeQual clsName mod str) uq
+All these are original names; hence mkOrig
 
-varQual_RDR  mod str = mkPreludeQual varName mod str
-dataQual_RDR mod str = mkPreludeQual dataName mod str
+\begin{code}
+varQual  mod str uq = mkKnownKeyGlobal (varQual_RDR  mod str) uq
+dataQual mod str uq = mkKnownKeyGlobal (dataQual_RDR mod str) uq
+tcQual   mod str uq = mkKnownKeyGlobal (tcQual_RDR   mod str) uq
+clsQual  mod str uq = mkKnownKeyGlobal (clsQual_RDR  mod str) uq
+
+varQual_RDR  mod str = mkOrig varName  mod str
+tcQual_RDR   mod str = mkOrig tcName   mod str
+clsQual_RDR  mod str = mkOrig clsName  mod str
+dataQual_RDR mod str = mkOrig dataName mod str
 \end{code}
 
 %************************************************************************
@@ -790,43 +853,6 @@ deriving_occ_info
 	--		or for taggery.
 	-- ordClass: really it's the methods that are actually used.
 	-- numClass: for Int literals
-
--- these RDR names also have known keys, so we need to get back the RDR names to
--- populate the occurrence list above.
-ioTyCon_RDR		= nameRdrName ioTyConName
-intTyCon_RDR 		= nameRdrName intTyConName
-eq_RDR 			= nameRdrName eqName
-ge_RDR 			= nameRdrName geName
-numClass_RDR 		= nameRdrName numClassName
-ordClass_RDR 		= nameRdrName ordClassName
-map_RDR 		= nameRdrName mapName
-append_RDR 		= nameRdrName appendName
-foldr_RDR 		= nameRdrName foldrName
-build_RDR 		= nameRdrName buildName
-enumFromTo_RDR 		= nameRdrName enumFromToName
-returnM_RDR 		= nameRdrName returnMName
-thenM_RDR 		= nameRdrName thenMName
-failM_RDR 		= nameRdrName failMName
-false_RDR		= nameRdrName falseDataConName
-true_RDR		= nameRdrName trueDataConName
-error_RDR		= nameRdrName errorName
-getTag_RDR		= nameRdrName getTagName
-fromEnum_RDR		= nameRdrName fromEnumName
-toEnum_RDR		= nameRdrName toEnumName
-enumFrom_RDR		= nameRdrName enumFromName
-mkInt_RDR		= nameRdrName intDataConName
-enumFromThen_RDR	= nameRdrName enumFromThenName
-enumFromThenTo_RDR	= nameRdrName enumFromThenToName
-ratioDataCon_RDR	= nameRdrName ratioDataConName
-plusInteger_RDR		= nameRdrName plusIntegerName
-timesInteger_RDR	= nameRdrName timesIntegerName
-enumClass_RDR		= nameRdrName enumClassName
-monadClass_RDR		= nameRdrName monadClassName
-ioDataCon_RDR		= nameRdrName ioDataConName
-cCallableClass_RDR	= nameRdrName cCallableClassName
-cReturnableClass_RDR	= nameRdrName cReturnableClassName
-eqClass_RDR		= nameRdrName eqClassName
-eqString_RDR		= nameRdrName eqStringName
 \end{code}
 
 

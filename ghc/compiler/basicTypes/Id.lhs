@@ -251,9 +251,12 @@ hasNoBinding id = case idFlavour id of
 -- Don't drop a binding for an exported Id,
 -- if it otherwise looks dead.  
 isExportedId :: Id -> Bool
-isExportedId id = case idFlavour id of
+isExportedId id = isUserExportedId id	-- Try this
+{-
+  case idFlavour id of
 			VanillaId -> False
 			other	  -> True	-- All the others are no-discard
+-}
 
 -- Say if an Id was exported by the user
 -- Implies isExportedId (see mkId above)

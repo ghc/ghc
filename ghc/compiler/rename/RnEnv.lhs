@@ -10,8 +10,8 @@ module RnEnv where		-- Export everything
 
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
-import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
-			  mkRdrUnqual, qualifyRdrName, lookupRdrEnv
+import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isSourceQual, isUnqual, isIface,
+			  mkRdrUnqual, mkRdrIfaceUnqual, qualifyRdrName, lookupRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
@@ -29,7 +29,6 @@ import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, mkSysModuleNameFS, moduleNameFS )
 import FiniteMap
-import Unique		( Unique )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable
@@ -62,7 +61,7 @@ newTopBinder mod rdr_name loc
 
     	-- There should never be a qualified name in a binding position (except in instance decls)
 	-- The parser doesn't check this because the same parser parses instance decls
-    (if isQual rdr_name then
+    (if isSourceQual rdr_name then
 	qualNameErr (text "its declaration") (rdr_name,loc)
      else
 	returnRn ()
@@ -172,28 +171,15 @@ lookupBndrRn rdr_name
 	  Nothing   -> lookupTopBndrRn rdr_name
 
 lookupTopBndrRn rdr_name
-  = getModeRn	`thenRn` \ mode ->
-    case mode of 
-	InterfaceMode -> 	-- Look in the global name cache
-			    lookupOrigName rdr_name	
+  | isIface rdr_name
+  = lookupOrigName rdr_name
 
-	SourceMode    -> -- Source mode, so look up a *qualified* version
-			 -- of the name, so that we get the right one even
-			 -- if there are many with the same occ name
-			 -- There must *be* a binding
-		getModuleRn		`thenRn` \ mod ->
-		getGlobalNameEnv	`thenRn` \ global_env ->
-		case lookupRdrEnv global_env (qualifyRdrName (moduleName mod) rdr_name) of
-		  Just ((name,_):rest) -> ASSERT( null rest )
-				      	  returnRn name 
-		  Nothing	   -> 	-- Almost always this case is a compiler bug.
-					-- But consider a type signature that doesn't have 
-					-- a corresponding binder: 
-					--	module M where { f :: Int->Int }
-					-- We use lookupSigOccRn, which uses lookupBndrRn (for good reasons)
-					-- and we don't want to panic.  So we report an out-of-scope error
-					failWithRn (mkUnboundName rdr_name)
-						   (unknownNameErr rdr_name)
+  | otherwise	-- Source mode, so look up a *qualified* version
+  = 		-- of the name, so that we get the right one even
+		-- if there are many with the same occ name
+		-- There must *be* a binding
+    getModuleRn		`thenRn` \ mod ->
+    lookupSrcGlobalOcc (qualifyRdrName (moduleName mod) rdr_name)
 
 -- lookupSigOccRn is used for type signatures and pragmas
 -- Is this valid?
@@ -220,25 +206,23 @@ lookupOccRn rdr_name
 -- environment.  It's used only for
 --	record field names
 --	class op names in class and instance decls
+
 lookupGlobalOccRn rdr_name
-  = getModeRn	`thenRn` \ mode ->
-    case mode of {
-		-- When processing interface files, the global env 
-		-- is always empty, so go straight to the name cache
-	InterfaceMode -> lookupOrigName rdr_name ;
+  | isIface rdr_name
+  = lookupOrigName rdr_name
 
-	SourceMode ->
+  | otherwise
+  = lookupSrcGlobalOcc rdr_name
 
-    getGlobalNameEnv	`thenRn` \ global_env ->
+lookupSrcGlobalOcc rdr_name
+  -- Lookup a source-code rdr-name
+  = getGlobalNameEnv			`thenRn` \ global_env ->
     case lookupRdrEnv global_env rdr_name of
-	Just [(name,_)]	 -> returnRn name
-	Just stuff@((name,_):_) 
-		-> addNameClashErrRn rdr_name stuff	`thenRn_`
-       		   returnRn name
-	Nothing -> 	-- Not found when processing source code; so fail
-			failWithRn (mkUnboundName rdr_name)
-				   (unknownNameErr rdr_name)
-    }
+	Just [(name,_)]		-> returnRn name
+	Just stuff@((name,_):_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
+		       		   returnRn name
+	Nothing			-> failWithRn (mkUnboundName rdr_name)
+				   	      (unknownNameErr rdr_name)
 
 lookupGlobalRn :: GlobalRdrEnv -> RdrName -> RnM d (Maybe Name)
   -- Checks that there is exactly one
@@ -273,15 +257,15 @@ The name cache should have the correct provenance, though.
 \begin{code}
 lookupOrigName :: RdrName -> RnM d Name 
 lookupOrigName rdr_name
-  | isQual rdr_name
-  = newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
-
-  | otherwise
-  =	-- An Unqual is allowed; interface files contain 
+  = ASSERT( isIface rdr_name )
+    if isQual rdr_name then
+	newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+    else
+  	-- An Unqual is allowed; interface files contain 
 	-- unqualified names for locally-defined things, such as
 	-- constructors of a data type.
-    getModuleRn 			`thenRn ` \ mod ->
-    newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
+  	getModuleRn 			`thenRn ` \ mod ->
+	newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
 
 lookupOrigNames :: [RdrName] -> RnM d NameSet
 lookupOrigNames rdr_names
@@ -311,16 +295,15 @@ lookupSysBinder rdr_name
 %*********************************************************
 
 \begin{code}
-newLocalsRn :: (Unique -> OccName -> SrcLoc -> Name)
-	    -> [(RdrName,SrcLoc)]
+newLocalsRn :: [(RdrName,SrcLoc)]
 	    -> RnMS [Name]
-newLocalsRn mk_name rdr_names_w_loc
+newLocalsRn rdr_names_w_loc
  =  getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let
 	n	   = length rdr_names_w_loc
 	(us', us1) = splitUniqSupply us
 	uniqs	   = uniqsFromSupply n us1
-	names	   = [ mk_name uniq (rdrNameOcc rdr_name) loc
+	names	   = [ mkLocalName uniq (rdrNameOcc rdr_name) loc
 		     | ((rdr_name,loc), uniq) <- rdr_names_w_loc `zip` uniqs
 		     ]
     in
@@ -339,7 +322,7 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	-- Check for duplicate names
     checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
 
-    doptRn Opt_WarnNameShadowing `thenRn` \ warn_shadow ->
+    doptRn Opt_WarnNameShadowing 		`thenRn` \ warn_shadow ->
 
     	-- Warn about shadowing, but only in source modules
     (case mode of
@@ -347,14 +330,7 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	other				   -> returnRn ()
     )					`thenRn_`
 	
-    let
-	mk_name    = case mode of
-			SourceMode    -> mkLocalName 
-			InterfaceMode -> mkImportedLocalName 
-		     -- Keep track of whether the name originally came from 
-		     -- an interface file.
-    in
-    newLocalsRn mk_name rdr_names_w_loc		`thenRn` \ names ->
+    newLocalsRn rdr_names_w_loc		`thenRn` \ names ->
     let
 	new_local_env = addListToRdrEnv name_env (map fst rdr_names_w_loc `zip` names)
     in
@@ -395,11 +371,17 @@ bindCoreLocalsRn (b:bs) thing_inside = bindCoreLocalRn b	$ \ name' ->
 				       thing_inside (name':names')
 
 bindLocalNames names enclosed_scope
-  = getLocalNameEnv 		`thenRn` \ name_env ->
+  = getModeRn			`thenRn` \ mode ->
+    let
+	-- This is gruesome, but I can't think of a better way just now
+	mk_rdr_name = case mode of
+			SourceMode    -> mkRdrUnqual
+			InterfaceMode -> mkRdrIfaceUnqual
+	pairs = [(mk_rdr_name (nameOccName n), n) | n <- names]
+    in
+    getLocalNameEnv 		`thenRn` \ name_env ->
     setLocalNameEnv (addListToRdrEnv name_env pairs)
 		    enclosed_scope
-  where
-    pairs = [(mkRdrUnqual (nameOccName n), n) | n <- names]
 
 -------------------------------------
 bindLocalRn doc rdr_name enclosed_scope
@@ -491,7 +473,7 @@ checkDupOrQualNames doc_str rdr_names_w_loc
     mapRn_ (qualNameErr doc_str) quals 	`thenRn_`
     checkDupNames doc_str rdr_names_w_loc
   where
-    quals = filter (isQual.fst) rdr_names_w_loc
+    quals = filter (isSourceQual . fst) rdr_names_w_loc
     
 checkDupNames doc_str rdr_names_w_loc
   = 	-- Check for duplicated names in a binding group

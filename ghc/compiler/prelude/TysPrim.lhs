@@ -57,7 +57,7 @@ import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			)
 import Unique		( Unique, mkAlphaTyVarUnique )
 import Name		( mkKnownKeyGlobal )
-import RdrName		( mkPreludeQual )
+import RdrName		( mkOrig )
 import PrelNames
 import Outputable
 \end{code}
@@ -151,7 +151,7 @@ pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> ArgVrcs -> PrimRep ->
 pcPrimTyCon key str arity arg_vrcs rep
   = the_tycon
   where
-    name      = mkKnownKeyGlobal (mkPreludeQual tcName pREL_GHC_Name str) key
+    name      = mkKnownKeyGlobal (mkOrig tcName pREL_GHC_Name str) key
     the_tycon = mkPrimTyCon name kind arity arg_vrcs rep
     kind      = mkArrowKinds (take arity (repeat boxedTypeKind)) result_kind
     result_kind | isFollowableRep rep = boxedTypeKind	-- Represented by a GC-ish ptr

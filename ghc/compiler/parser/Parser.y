@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.45 2000/10/26 16:51:44 sewardj Exp $
+$Id: Parser.y,v 1.46 2000/10/31 17:30:17 simonpj Exp $
 
 Haskell grammar.
 
@@ -19,7 +19,7 @@ import RdrHsSyn
 import Lex
 import ParseUtil
 import RdrName
-import PrelInfo		( mAIN_Name )
+import PrelNames
 import OccName		( UserFS, varName, ipName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
@@ -732,8 +732,8 @@ aexp1	:: { RdrNameHsExpr }
 	: ipvar				{ HsIPVar $1 }
 	| var_or_con			{ $1 }
 	| literal			{ HsLit $1 }
-	| INTEGER			{ HsOverLit (mkHsIntegralLit $1) }
-	| RATIONAL			{ HsOverLit (mkHsFractionalLit $1) }
+	| INTEGER			{ HsOverLit (HsIntegral   $1 fromInteger_RDR) }
+	| RATIONAL			{ HsOverLit (HsFractional $1 fromRational_RDR) }
 	| '(' exp ')'			{ HsPar $2 }
 	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
 	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }

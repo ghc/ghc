@@ -50,13 +50,7 @@ module RdrHsSyn (
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl, mkClassOpSig, mkConDecl,
-	mkHsNegApp, mkHsIntegralLit, mkHsFractionalLit, mkNPlusKPatIn,
-
-	
-	-- some built-in names (all :: RdrName)
-	unitCon_RDR, unitTyCon_RDR, nilCon_RDR, listTyCon_RDR,
-	tupleCon_RDR, tupleTyCon_RDR, ubxTupleCon_RDR, ubxTupleTyCon_RDR,
-	funTyCon_RDR,
+	mkHsNegApp, 
 
 	cvBinds,
 	cvMonoBindsAndSigs,
@@ -68,18 +62,16 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn		-- Lots of it
-import CmdLineOpts	( opt_NoImplicitPrelude )
 import HsPat		( collectSigTysFromPats )
 import OccName		( mkClassTyConOcc, mkClassDataConOcc, mkWorkerOcc,
                           mkSuperDictSelOcc, mkDefaultMethodOcc, mkGenOcc1,
-			  mkGenOcc2, varName, dataName, tcName
+			  mkGenOcc2, 
                       	)
-import PrelNames	( pRELUDE_Name, mkTupNameStr )
-import RdrName		( RdrName, isRdrTyVar, mkRdrUnqual, rdrNameOcc,
-			  mkUnqual, mkPreludeQual
+import PrelNames	( negate_RDR )
+import RdrName		( RdrName, isRdrTyVar, mkRdrIfaceUnqual, rdrNameOcc,
 			)
 import List		( nub )
-import BasicTypes	( Boxity(..), RecFlag(..) )
+import BasicTypes	( RecFlag(..) )
 import Class            ( DefMeth (..) )
 \end{code}
 
@@ -224,10 +216,10 @@ mkClassDecl cxt cname tyvars fds sigs mbinds loc
   where
     cls_occ  = rdrNameOcc cname
     data_occ = mkClassDataConOcc cls_occ
-    dname    = mkRdrUnqual data_occ
-    dwname   = mkRdrUnqual (mkWorkerOcc data_occ)
-    tname    = mkRdrUnqual (mkClassTyConOcc   cls_occ)
-    sc_sel_names = [ mkRdrUnqual (mkSuperDictSelOcc n cls_occ) 
+    dname    = mkRdrIfaceUnqual data_occ
+    dwname   = mkRdrIfaceUnqual (mkWorkerOcc data_occ)
+    tname    = mkRdrIfaceUnqual (mkClassTyConOcc   cls_occ)
+    sc_sel_names = [ mkRdrIfaceUnqual (mkSuperDictSelOcc n cls_occ) 
 		   | n <- [1..length cxt]]
       -- We number off the superclass selectors, 1, 2, 3 etc so that we 
       -- can construct names for the selectors.  Thus
@@ -241,22 +233,22 @@ mkClassDecl cxt cname tyvars fds sigs mbinds loc
 -- mkTyData :: ??
 mkTyData new_or_data context tname list_var list_con i maybe src
   = let t_occ  = rdrNameOcc tname
-        name1 = mkRdrUnqual (mkGenOcc1 t_occ) 
-	name2 = mkRdrUnqual (mkGenOcc2 t_occ) 
+        name1 = mkRdrIfaceUnqual (mkGenOcc1 t_occ) 
+	name2 = mkRdrIfaceUnqual (mkGenOcc2 t_occ) 
     in TyData new_or_data context 
               tname list_var list_con i maybe src name1 name2
 
 mkClassOpSig (DefMeth x) op ty loc
   = ClassOpSig op (Just (DefMeth dm_rn)) ty loc
   where
-    dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
+    dm_rn = mkRdrIfaceUnqual (mkDefaultMethodOcc (rdrNameOcc op))
 mkClassOpSig x op ty loc =
     ClassOpSig op (Just x) ty loc
 
 mkConDecl cname ex_vars cxt details loc
   = ConDecl cname wkr_name ex_vars cxt details loc
   where
-    wkr_name = mkRdrUnqual (mkWorkerOcc (rdrNameOcc cname))
+    wkr_name = mkRdrIfaceUnqual (mkWorkerOcc (rdrNameOcc cname))
 \end{code}
 
 \begin{code}
@@ -278,19 +270,7 @@ mkHsNegApp (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i))
 
 mkHsNegApp (HsOverLit (HsIntegral   i n)) = HsOverLit (HsIntegral   (-i) n)
 mkHsNegApp (HsOverLit (HsFractional f n)) = HsOverLit (HsFractional (-f) n)
-
-mkHsNegApp expr = NegApp expr (prelQual varName SLIT("negate"))
-\end{code}
-
-\begin{code}
-mkHsIntegralLit :: Integer -> HsOverLit RdrName
-mkHsIntegralLit i = HsIntegral i (prelQual varName SLIT("fromInteger"))
-
-mkHsFractionalLit :: Rational -> HsOverLit RdrName
-mkHsFractionalLit f = HsFractional f (prelQual varName SLIT("fromRational"))
-
-mkNPlusKPatIn :: RdrName -> HsOverLit RdrName -> RdrNamePat
-mkNPlusKPatIn n k = NPlusKPatIn n k (prelQual varName SLIT("-"))
+mkHsNegApp expr 			  = NegApp expr negate_RDR
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a
@@ -300,30 +280,6 @@ variable, and we don't know the fixity yet.
 mkHsOpApp e1 op e2 = OpApp e1 (HsVar op) (error "mkOpApp:fixity") e2
 \end{code}
 
-\begin{code}
------------------------------------------------------------------------------
--- Built-in names
--- Qualified Prelude names are always in scope; so we can just say Prelude.[]
--- for the list type constructor, say.   But it's not so easy when we say
--- -fno-implicit-prelude.   Then you just get whatever "[]" happens to be in scope.
-
-unitCon_RDR, unitTyCon_RDR, nilCon_RDR, listTyCon_RDR :: RdrName
-tupleCon_RDR, tupleTyCon_RDR		:: Int -> RdrName
-ubxTupleCon_RDR, ubxTupleTyCon_RDR 	:: Int -> RdrName
-
-unitCon_RDR   		= prelQual dataName SLIT("()")
-unitTyCon_RDR 		= prelQual tcName   SLIT("()")
-nilCon_RDR    		= prelQual dataName SLIT("[]")
-listTyCon_RDR 		= prelQual tcName   SLIT("[]")
-funTyCon_RDR  		= prelQual tcName   SLIT("(->)")
-tupleCon_RDR arity      = prelQual dataName (snd (mkTupNameStr Boxed arity))
-tupleTyCon_RDR arity    = prelQual tcName   (snd (mkTupNameStr Boxed arity))
-ubxTupleCon_RDR arity   = prelQual dataName (snd (mkTupNameStr Unboxed arity))
-ubxTupleTyCon_RDR arity = prelQual tcName   (snd (mkTupNameStr Unboxed arity))
-
-prelQual ns occ | opt_NoImplicitPrelude = mkUnqual   ns occ
-		| otherwise		= mkPreludeQual ns pRELUDE_Name occ
-\end{code}
 
 %************************************************************************
 %*									*

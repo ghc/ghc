@@ -31,13 +31,13 @@ module ParseUtil (
 import Lex
 import HsSyn		-- Lots of it
 import SrcLoc
-import RdrHsSyn		( mkNPlusKPatIn, unitTyCon_RDR,
-			  RdrBinding(..),
+import RdrHsSyn		( RdrBinding(..),
 			  RdrNameHsType, RdrNameBangType, RdrNameContext,
 			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr, RdrNameGRHSs,
 			  RdrNameHsRecordBinds, RdrNameMonoBinds, RdrNameConDetails
 			)
 import RdrName
+import PrelNames	( unitTyCon_RDR, minus_RDR )
 import CallConv
 import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
@@ -202,7 +202,9 @@ checkPat e [] = case e of
 
 	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral k _)) 
 		  	   | plus == plus_RDR
-			   -> returnP (mkNPlusKPatIn n lit)
+			   -> returnP (NPlusKPatIn n lit minus_RDR)
+			   where
+			      plus_RDR = mkUnqual varName SLIT("+")	-- Hack
 
 	OpApp l op fix r   -> checkPat l [] `thenP` \l ->
 			      checkPat r [] `thenP` \r ->
@@ -334,6 +336,4 @@ groupBindings binds = group Nothing binds
 	    = case bind of
 		RdrValBinding b@(FunMonoBind _ _ _ _) -> group (Just b) binds
 		other -> bind `RdrAndBindings` group Nothing binds
-
-plus_RDR = mkUnqual varName SLIT("+")
 \end{code}

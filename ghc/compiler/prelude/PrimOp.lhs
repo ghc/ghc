@@ -33,7 +33,7 @@ import Demand		( wwLazy, wwPrim, wwStrict, StrictnessInfo(..) )
 import Var		( TyVar )
 import CallConv		( CallConv, pprCallConv )
 import Name		( Name, mkWiredInName )
-import RdrName		( RdrName, mkRdrQual )
+import RdrName		( RdrName, mkRdrOrig )
 import OccName		( OccName, pprOccName, mkVarOcc )
 import TyCon		( TyCon, tyConArity )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, mkTyVarTys,
@@ -445,7 +445,7 @@ mkPrimOpIdName op
   = mkWiredInName pREL_GHC (primOpOcc op) (mkPrimOpIdUnique (primOpTag op))
 
 primOpRdrName :: PrimOp -> RdrName 
-primOpRdrName op = mkRdrQual pREL_GHC_Name (primOpOcc op)
+primOpRdrName op = mkRdrOrig pREL_GHC_Name (primOpOcc op)
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case (primOpInfo op) of

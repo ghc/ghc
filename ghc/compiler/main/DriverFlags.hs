@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.13 2000/10/27 15:11:37 sewardj Exp $
+-- $Id: DriverFlags.hs,v 1.14 2000/10/31 17:30:17 simonpj Exp $
 --
 -- Driver flags
 --
@@ -392,6 +392,7 @@ dynamic_flags = [
         ------ Compiler flags -----------------------------------------------
 
   ,  ( "fglasgow-exts", NoArg (setDynFlag Opt_GlasgowExts) )
+  ,  ( "fno-implicit-prelude", NoArg (setDynFlag Opt_NoImplicitPrelude) )
 
   ,  ( "fallow-overlapping-instances",	
 		NoArg (setDynFlag Opt_AllowOverlappingInstances) )

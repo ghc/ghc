@@ -231,7 +231,7 @@ mkTyConGenInfo :: DynFlags -> TyCon -> Name -> Name -> Maybe (EP Id)
 -- for the fromT and toT conversion functions.
 
 mkTyConGenInfo dflags tycon from_name to_name
-  | dopt Opt_Generics dflags
+  | not (dopt Opt_Generics dflags)
   = Nothing
 
   | null datacons 	-- Abstractly imported types don't have

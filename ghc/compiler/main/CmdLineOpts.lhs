@@ -85,7 +85,6 @@ module CmdLineOpts (
 	opt_IgnoreAsserts,
 	opt_IgnoreIfacePragmas,
         opt_NoHiCheck,
-	opt_NoImplicitPrelude,
 	opt_OmitBlackHoling,
 	opt_OmitInterfacePragmas,
 	opt_NoPruneTyDecls,
@@ -273,6 +272,7 @@ data DynFlag
    | Opt_AllowUndecidableInstances
    | Opt_GlasgowExts
    | Opt_Generics
+   | Opt_NoImplicitPrelude 
 
    -- misc
    | Opt_ReportCompile
@@ -422,7 +422,6 @@ opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
-opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
 
@@ -472,7 +471,6 @@ isStaticHscFlag f =
 	"fticky-ticky",
 	"fall-strict",
 	"fdicts-strict",
-	"fgenerics",
 	"firrefutable-tuples",
 	"fnumbers-strict",
 	"fparallel",

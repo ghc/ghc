@@ -276,7 +276,7 @@ extendInstEnv dflags env infos
     go env msgs []	     = (env, msgs)
     go env msgs (dfun:dfuns) = case addToInstEnv dflags env dfun of
 				    Succeeded new_env -> go new_env msgs dfuns
-				    Failed dfun'      -> go env (msg:msgs) infos
+				    Failed dfun'      -> go env (msg:msgs) dfuns
 						     where
 							 msg = dupInstErr dfun dfun'
 
