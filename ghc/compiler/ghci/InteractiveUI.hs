@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.155 2003/07/02 14:59:07 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.156 2003/07/02 19:41:43 ross Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -45,8 +45,8 @@ import Panic 		hiding ( showException )
 import Config
 
 #ifndef mingw32_HOST_OS
-import System.Posix
 import DriverUtil( handle )
+import System.Posix
 #if __GLASGOW_HASKELL__ > 504
 	hiding (getEnv)
 #endif

@@ -45,9 +45,7 @@ import VarSet		( varSetElems )
 import Literal		( Literal )
 import Maybes		( catMaybes, maybeToBool, seqMaybe )
 import Name		( isInternalName, NamedThing(..) )
-#ifdef DEBUG
 import PprAbsC		( pprAmode, pprMagicId )
-#endif
 import PrimRep          ( PrimRep(..) )
 import StgSyn		( StgArg, StgLiveVars, GenStgArg(..), isStgTypeArg )
 import Unique           ( Unique, Uniquable(..) )
