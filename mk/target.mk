@@ -817,11 +817,12 @@ TAGS:: $(SOURCES)
 	@$(RM) TAGS
 	@touch TAGS
 ifneq "$(HS_SRCS)" ""
-	$(HSTAGS) $(HSTAGS_OPTS) -- $(HS_SRCS)
+	$(HSTAGS) $(HSTAGS_OPTS) -- $(TAGS_HS_SRCS)
 endif
 ifneq "$(C_SRCS)" ""
-	etags -a $(C_SRCS)
+	etags -a $(TAGS_C_SRCS)
 endif
+	@( DEREFFED=`ls -l Makefile | sed -e 's/.*-> \(.*\)/\1/g'` && $(RM) `dirname $$DEREFFED`/TAGS && $(CP) TAGS `dirname $$DEREFFED` ) || echo TAGS file generated, perhaps copy over to source tree?
 
 #------------------------------------------------------------
 # 			Makefile debugging
