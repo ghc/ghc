@@ -311,10 +311,6 @@ endif
 #----------------------------------------
 #	C programs
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-CC_OPTS += -mno-cygwin -mwin32
-endif
-
 ifneq "$(C_PROG)" ""
 all :: $(C_PROG)
 
