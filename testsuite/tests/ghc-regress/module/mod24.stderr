@@ -1,0 +1,4 @@
+
+mod24.hs:3:7:
+    Conflicting definitions for `a'
+    In the data type declaration for `T'
