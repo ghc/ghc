@@ -139,7 +139,14 @@ hGetChar handle = do
 -}
 
 hGetLine :: Handle -> IO String
-hGetLine h = hGetLineBuf' []
+hGetLine h = do
+    buffer_mode <- wantWriteableHandle_ "hGetLine" h
+			(\ handle_ -> do getBuffer handle_)
+    case buffer_mode of
+       (NoBuffering, _, _)          -> hGetLineUnBuffered h
+       (LineBuffering, buf, bsz)    -> hGetLineBuf' []
+       (BlockBuffering _, buf, bsz) -> hGetLineBuf' []
+
   where hGetLineBuf' xss = do
 	   (eol, xss) <- catch 
 	    ( do
@@ -161,6 +168,32 @@ hGetLine h = hGetLineBuf' []
 	   if (eol == '\n')
 		then return (concat (reverse xss))
         	else hGetLineBuf' xss
+
+
+hGetLineUnBuffered :: Handle -> IO String
+hGetLineUnBuffered h = do
+  c <- hGetChar h
+  if c == '\n' then
+     return ""
+   else do
+    l <- getRest
+    return (c:l)
+ where
+  getRest = do
+    c <- 
+      catch 
+        (hGetChar h)
+        (\ err -> do
+          if isEOFError err then
+	     return '\n'
+	   else
+	     ioError err)
+    if c == '\n' then
+       return ""
+     else do
+       s <- getRest
+       return (c:s)
+
 
 readCharOffAddr (A# a) (I# i)
   = IO $ \s -> case readCharOffAddr# a i s of { (# s,x #) -> (# s, C# x #) }
