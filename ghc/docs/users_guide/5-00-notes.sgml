@@ -113,8 +113,8 @@
       <listitem>
 	<para><function>putMVar</function> now blocks if the
 	<literal>MVar</literal> is already full.  The
-	<literal>PutFullMVar</literal> exception no longer exists.  A
-	non-blocking version of <function>putMVar</function>,
+	<literal>PutFullMVar</literal> exception no longer exists.
+	A non-blocking version of <function>putMVar</function>,
 	<function>tryPutMVar</function>, has been added (<xref
 	linkend="sec-MVars">).</para>
       </listitem>
@@ -140,6 +140,11 @@
 	<literal>fromInt</literal> instead of
 	<literal>fromIntegral</literal>, which is specialised for all
 	integral types.</para>
+      </listitem>
+      <listitem>
+	<para>New modules: DiffArray (<xref linkend="sec-DiffArray">),
+	StorableArray (<xref linkend="sec-StorableArray">),
+	MonadList, MonadCont (no documentation yet).</para>
       </listitem>
     </itemizedlist>
   </sect2>
