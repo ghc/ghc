@@ -46,7 +46,6 @@ static nat maxTasks;
 /* number of tasks currently created */
 static nat taskCount; 
 
-
 #if defined(SMP)
 void
 startTaskManager( nat maxCount, void (*taskStart)(void) )
@@ -100,6 +99,7 @@ void
 stopTaskManager ()
 {
   nat i;
+  OSThreadId tid = osThreadId();
 
   /* Don't want to use pthread_cancel, since we'd have to install
    * these silly exception handlers (pthread_cleanup_{push,pop}) around
@@ -120,9 +120,12 @@ stopTaskManager ()
 #endif
 
   /* Send 'em all a SIGHUP.  That should shut 'em up. */
-  await_death = maxCount;
+  await_death = maxCount - 1;
   for (i = 0; i < maxCount; i++) {
-    pthread_kill(taskTable[i].id,SIGTERM);
+    /* don't cancel the thread running this piece of code. */
+    if ( taskTable[i].id != tid ) {
+      pthread_kill(taskTable[i].id,SIGTERM);
+    }
   }
   while (await_death > 0) {
     sched_yield();
@@ -182,6 +185,8 @@ startTask ( void (*taskStart)(void) )
   IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: new task %ld (total_count: %d; waiting: %d)\n", tid, taskCount, rts_n_waiting_tasks););
   return;
 }
+
+
 
 void
 stopTaskManager ()
