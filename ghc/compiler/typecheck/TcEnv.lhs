@@ -12,7 +12,8 @@ module TcEnv(
 
 	-- Global environment
 	tcExtendGlobalEnv, tcExtendGlobalValEnv, 
-	tcLookupTy, tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
+	tcLookupTyCon, tcLookupClass, tcLookupGlobalId, tcLookupDataCon,
+	tcLookupGlobal_maybe,
 
 	-- Local environment
 	tcExtendKindEnv, 
@@ -55,14 +56,15 @@ import Class	( Class, ClassOpItem, ClassContext, classTyCon )
 import Subst	( substTy )
 import Name	( Name, OccName, Provenance(..), ExportFlag(..), NamedThing(..), 
 		  nameOccName, nameModule, getSrcLoc, mkGlobalName,
-		  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
+		  isLocallyDefined,
 		  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
 		  extendNameEnv, extendNameEnvList
 		)
 import OccName	( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import Module	( Module )
 import Unify	( unifyTyListsX, matchTys )
-import HscTypes	( ModDetails(..), InstEnv, lookupTypeEnv )
+import HscTypes	( ModDetails(..), InstEnv, lookupTypeEnv, TyThing(..),
+		  GlobalSymbolTable )
 import Unique	( pprUnique10, Unique, Uniquable(..) )
 import UniqFM
 import Unique	( Uniquable(..) )
@@ -71,6 +73,7 @@ import SrcLoc	( SrcLoc )
 import FastString	( FastString )
 import Maybes
 import Outputable
+import IOExts	( newIORef )
 \end{code}
 
 %************************************************************************
@@ -140,7 +143,7 @@ data TcTyThing
 
 initTcEnv :: GlobalSymbolTable -> InstEnv -> IO TcEnv
 initTcEnv gst inst_env
-  = do { gtv_var <- newIORef emptyVarSet
+  = do { gtv_var <- newIORef emptyVarSet ;
 	 return (TcEnv { tcGST    = gst,
 		      	 tcGEnv   = emptyNameEnv,
 		      	 tcInsts  = inst_env,
@@ -182,7 +185,7 @@ lookup_local env name
   = case lookupNameEnv (tcLEnv env) name of
 	Just thing -> Just thing
 	Nothing    -> case lookup_global env name of
-			Just thing -> AGlobal thing
+			Just thing -> Just (AGlobal thing)
 			Nothing	   -> Nothing
 
 explicitLookupId :: TcEnv -> Name -> Maybe Id
@@ -308,6 +311,7 @@ A variety of global lookups, when we know what we are looking for.
 
 \begin{code}
 tcLookupGlobal :: Name -> NF_TcM TyThing
+tcLookupGlobal name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_thing ->
     case maybe_thing of
 	Just thing -> returnNF_Tc thing
@@ -317,7 +321,7 @@ tcLookupGlobalId :: Name -> NF_TcM Id
 tcLookupGlobalId name
   = tcLookupGlobal_maybe name	`thenNF_Tc` \ maybe_id ->
     case maybe_id of
-	Just (AnId clas) -> returnNF_Tc id
+	Just (AnId clas) -> returnNF_Tc clas
 	other		 -> notFound "tcLookupGlobalId:" name
 	
 tcLookupDataCon :: Name -> TcM DataCon

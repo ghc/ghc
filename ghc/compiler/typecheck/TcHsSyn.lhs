@@ -41,7 +41,7 @@ import HsSyn	-- oodles of it
 -- others:
 import Id	( idName, idType, idUnfolding, setIdType, omitIfaceSigForId, isIP, Id )
 import DataCon	( dataConWrapId )	
-import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, tcGetEnv,
+import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
 		  TcEnv, TcId, tcInstId
 		)
 
@@ -54,6 +54,7 @@ import CoreUnfold( unfoldingTemplate )
 import BasicTypes ( RecFlag(..) )
 import Bag
 import Outputable
+import HscTypes	( TyThing(..) )
 \end{code}
 
 

@@ -7,7 +7,8 @@
 module HscTypes ( TyThing(..), GlobalSymbolTable, OrigNameEnv, AvailEnv,
 		  WhetherHasOrphans, ImportVersion, ExportItem,
 		  PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
-		  IfaceInsts, IfaceRules, DeprecationEnv )
+		  IfaceInsts, IfaceRules, DeprecationEnv, ModDetails(..),
+		  InstEnv, lookupTypeEnv )
 where
 
 #include "HsVersions.h"
@@ -38,7 +39,8 @@ import CoreSyn		( CoreRule )
 import NameSet		( NameSet )
 import Type		( Type )
 import VarSet		( TyVarSet )
-import {-# SOURCE #-} TcInstUtil ( emptyInstEnv )
+import {-# SOURCE #-} 
+       TcInstUtil ( emptyInstEnv )
 import Panic		( panic )
 \end{code}
 
