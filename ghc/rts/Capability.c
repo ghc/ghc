@@ -201,10 +201,8 @@ void releaseCapability(Capability* cap
     signalCondition(&thread_ready_cond);
     startSchedulerTaskIfNecessary();  // if there is more work to be done,
 				      // we'll need a new thread
-  }
-#endif
-#ifdef RTS_SUPPORTS_THREADS
     IF_DEBUG(scheduler, sched_belch("worker: released capability"));
+  }
 #endif
   return;
 }
