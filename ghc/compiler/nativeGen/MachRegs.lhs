@@ -814,8 +814,8 @@ allMachRegNos
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: [Reg]
 allocatableRegs
-   = let isFree (RealReg (I# i)) = _IS_TRUE_(freeReg i)
-     in  filter isFree (map RealReg allMachRegNos)
+   = let isFree (I# i) = _IS_TRUE_(freeReg i)
+     in  map RealReg (filter isFree allMachRegNos)
 
 -------------------------------
 -- these are the regs which we cannot assume stay alive over a
