@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.73 $
- * $Date: 2000/05/12 13:41:59 $
+ * $Revision: 1.74 $
+ * $Date: 2000/05/23 11:45:14 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -148,7 +148,7 @@ void diet_hep_initialise ( void* cstackbase )
     List   modConIds; /* :: [CONID] */
     Bool   prelOK;
     String s;
-    String fakeargv[1] = { "diet_hep" };
+    String fakeargv[2] = { "diet_hep", NULL };
 
     if (diet_hep_initialised) return;
     diet_hep_initialised = 1;
@@ -159,7 +159,7 @@ void diet_hep_initialise ( void* cstackbase )
 
     /* The following copied from interpreter() */
     setBreakAction ( HugsIgnoreBreak );
-    modConIds = initialize(1,fakeargv);
+    modConIds = initialize(0,fakeargv);
     assert(isNull(modConIds));
     setBreakAction ( HugsIgnoreBreak );
     prelOK    = loadThePrelude();
