@@ -188,7 +188,7 @@ runit cli nonopts = do
 	registerPackage filename [] db_stack auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
 	pkgid <- readPkgId pkgid_str
-	unregisterPackage db_stack pkgid
+	unregisterPackage pkgid db_stack
     ["expose", pkgid_str] -> do
 	pkgid <- readPkgId pkgid_str
 	exposePackage pkgid db_stack
@@ -212,8 +212,8 @@ runit cli nonopts = do
 
 parseCheck :: ReadP a a -> String -> String -> IO a
 parseCheck parser str what = 
-  case readP_to_S parser str of
-    [(x,ys)] | all isSpace ys -> return x
+  case [ x | (x,ys) <- readP_to_S parser str, all isSpace ys ] of
+    [x] -> return x
     _ -> die ("cannot parse \'" ++ str ++ "\' as a " ++ what)
 
 readPkgId :: String -> IO PackageIdentifier
@@ -348,29 +348,34 @@ pkgNameToId :: String -> PackageIdentifier
 pkgNameToId name = PackageIdentifier name (Version [] [])
 
 -- -----------------------------------------------------------------------------
--- Unregistering
+-- Exposing, Hiding, Unregistering are all similar
 
-unregisterPackage :: PackageDBStack -> PackageIdentifier -> IO ()
-unregisterPackage [] _ = error "unregisterPackage"
-unregisterPackage ((db_name, pkgs) : _) pkgid = do  
+exposePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+exposePackage = modifyPackage (\p -> [p{exposed=True}])
+
+hidePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+hidePackage = modifyPackage (\p -> [p{exposed=False}])
+
+unregisterPackage :: PackageIdentifier ->  PackageDBStack -> IO ()
+unregisterPackage = modifyPackage (\p -> [])
+
+modifyPackage
+  :: (InstalledPackageInfo -> [InstalledPackageInfo])
+  -> PackageIdentifier
+  -> PackageDBStack
+  -> IO ()
+modifyPackage _ _ [] = error "modifyPackage"
+modifyPackage fn pkgid ((db_name, pkgs) : _) = do
   checkConfigAccess db_name
   p <- findPackage [(db_name,pkgs)] pkgid
   let pid = package p
   savePackageConfig db_name
+  let new_config = concat (map modify pkgs)
+      modify pkg
+	| package pkg == pid = fn pkg
+	| otherwise          = [pkg]
   maybeRestoreOldConfig db_name $
-    writeNewConfig db_name (filter ((/= pid) . package) pkgs)
-
--- -----------------------------------------------------------------------------
--- Exposing
-
-exposePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
-exposePackage = error "TODO"
-
--- -----------------------------------------------------------------------------
--- Hiding
-
-hidePackage :: PackageIdentifier ->  PackageDBStack -> IO ()
-hidePackage = error "TODO"
+    writeNewConfig db_name new_config
 
 -- -----------------------------------------------------------------------------
 -- Listing packages
@@ -774,7 +779,7 @@ oldRunit clis = do
     [ OF_ListLocal ] -> listPackages db_stack
     [ OF_Add upd ]   -> registerPackage input_file defines db_stack
 				auto_ghci_libs upd force
-    [ OF_Remove p ]  -> unregisterPackage db_stack (pkgNameToId p)
+    [ OF_Remove p ]  -> unregisterPackage (pkgNameToId p) db_stack
     [ OF_Show p ]
 	| null fields -> describePackage db_stack (pkgNameToId p)
 	| otherwise   -> mapM_ (describeField db_stack (pkgNameToId p)) fields
