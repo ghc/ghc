@@ -297,7 +297,7 @@ sub init_TARGET_STUFF {
     $T_CONST_LBL    = '^\LC\d+:'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*)\n)';
     $T_COPY_DIRVS   = '\.(globl)';
 
     $T_hsc_cc_PAT   = '\.byte.*\)(hsc|cc) (.*)"\n\t\.byte \d+\n\t\.byte "(.*)"\n\t\.byte \d+';
@@ -602,22 +602,13 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
 
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.picsymbol_stub/ )
-	{
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'dyld';
-	    $chksymb[$i] = '';
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.symbol_stub/ )
-	{
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'dyld';
-	    $chksymb[$i] = '';
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.lazy_symbol_pointer/ )
-	{
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'dyld';
-	    $chksymb[$i] = '';
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.non_lazy_symbol_pointer/ )
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && ( 
+		   /^\.picsymbol_stub/
+		|| /^\.section __TEXT,__picsymbol_stub1,.*/
+		|| /^\.symbol_stub/
+		|| /^\.section __TEXT,__symbol_stub1,.*/
+		|| /^\.lazy_symbol_pointer/
+		|| /^\.non_lazy_symbol_pointer/ ))
 	{
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
