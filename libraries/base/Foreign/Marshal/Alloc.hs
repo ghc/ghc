@@ -42,7 +42,7 @@ import GHC.Ptr
 import GHC.Err
 import GHC.Base
 #elif defined(__NHC__)
-import System.IO		( bracket )
+import IO			( bracket )
 #else
 import Control.Exception	( bracket )
 #endif
