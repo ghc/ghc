@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.29 1999/11/02 17:19:16 simonmar Exp $
+ * $Id: Schedule.c,v 1.30 1999/11/08 15:30:39 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -149,7 +149,7 @@ void            addToBlockedQueue ( StgTSO *tso );
 
 static void     schedule          ( void );
 static void     initThread        ( StgTSO *tso, nat stack_size );
-static void     interruptStgRts   ( void );
+       void     interruptStgRts   ( void );
 
 #ifdef SMP
 pthread_mutex_t sched_mutex       = PTHREAD_MUTEX_INITIALIZER;
@@ -278,17 +278,13 @@ schedule( void )
       break;
     case ThreadEnterHugs:
 #ifdef INTERPRETER
-      {  
-	IF_DEBUG(scheduler,belch("schedule: entering Hugs"));	  
-	LoadThreadState();
-	/* CHECK_SENSIBLE_REGS(); */
-	{
-	  StgClosure* c = (StgClosure *)Sp[0];
-	  Sp += 1;
-	  ret = enter(c);
-	}	
-	SaveThreadState();
-	break;
+      {
+         StgClosure* c;
+	 IF_DEBUG(scheduler,belch("schedule: entering Hugs"));	  
+	 c = (StgClosure *)(cap->rCurrentTSO->sp[0]);
+	 cap->rCurrentTSO->sp += 1;
+	 ret = enter(cap,c);
+         break;
       }
 #else
       barf("Panic: entered a BCO but no bytecode interpreter in this build");

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/01 18:19:40 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/08 15:30:32 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -49,9 +49,10 @@
 #include "Bytecodes.h"
 #include "Printer.h"
 #include "Disassembler.h"
-#include "Evaluator.h"
 #include "StgMiscClosures.h"
 #include "Storage.h"
+#include "Schedule.h"
+#include "Evaluator.h"
 
 #define INSIDE_ASSEMBLER_C
 #include "Assembler.h"

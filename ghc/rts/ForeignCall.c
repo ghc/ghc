@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.10 1999/10/26 17:27:30 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.11 1999/11/08 15:30:37 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -13,6 +13,7 @@
 
 #include "RtsUtils.h"    /* barf :-) */
 #include "Assembler.h"   /* for CFun stuff */
+#include "Schedule.h"
 #include "Evaluator.h"
 #include "ForeignCall.h"
 
@@ -227,7 +228,8 @@ static void universal_call_c_generic
 int ccall ( CFunDescriptor*  d, 
             void             (*fun)(void), 
             StgBCO**         bco,
-            char             cc
+            char             cc,
+            Capability*      cap
           )
 {
    double         arg_vec [31];
@@ -235,6 +237,7 @@ int ccall ( CFunDescriptor*  d,
    unsigned int*  p;
    int            i;
    unsigned long  ul;
+   unsigned int   token;
 
    if (sizeof(int) != 4 || sizeof(double) != 8 || sizeof(float) != 4
        || (sizeof(void*) != 4 && sizeof(void*) != 8)
@@ -311,7 +314,10 @@ int ccall ( CFunDescriptor*  d,
    }
  
    PushPtr((StgPtr)(*bco));
-   SaveThreadState();
+   cap->rCurrentTSO->sp    = MainRegTable.rSp;
+   cap->rCurrentTSO->su    = MainRegTable.rSu;
+   cap->rCurrentTSO->splim = MainRegTable.rSpLim;
+   token = suspendThread(cap);
 
 #if i386_TARGET_ARCH
    if (cc == 'c')
@@ -325,7 +331,11 @@ int ccall ( CFunDescriptor*  d,
    universal_call_c_generic ( 
       d->num_args, (void*)arg_vec, argd_vec, fun );
 #endif
-   LoadThreadState();
+
+   cap = resumeThread(token);
+   MainRegTable.rSp    = cap->rCurrentTSO->sp;
+   MainRegTable.rSu    = cap->rCurrentTSO->su;
+   MainRegTable.rSpLim = cap->rCurrentTSO->splim;
    *bco=(StgBCO*)PopPtr();
 
    /* INT, WORD, ADDR, STABLE don't need to do a word-size check

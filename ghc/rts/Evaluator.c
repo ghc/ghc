@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.24 $
- * $Date: 1999/11/01 18:19:41 $
+ * $Revision: 1.25 $
+ * $Date: 1999/11/08 15:30:33 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -255,35 +255,6 @@ void setRtsFlags( int x )
     }
 }
 
-/* --------------------------------------------------------------------------
- * RTS Hooks
- *
- * ToDo: figure out why these are being used and crush them!
- * ------------------------------------------------------------------------*/
-#if 0
-void OnExitHook (void)
-{
-}
-void StackOverflowHook (unsigned long stack_size)
-{
-    fprintf(stderr,"Stack Overflow\n");
-    exit(1);
-}
-void OutOfHeapHook (unsigned long request_size, unsigned long heap_size)
-{
-    fprintf(stderr,"Out Of Heap\n");
-    exit(1);
-}
-void MallocFailHook (unsigned long request_size /* in bytes */, char *msg)
-{
-    fprintf(stderr,"Malloc Fail\n");
-    exit(1);
-}
-void defaultsHook (void)
-{
-    /* do nothing */
-}
-#endif
 
 /* --------------------------------------------------------------------------
  * Entering-objects and bytecode interpreter part of evaluator
@@ -313,13 +284,14 @@ void defaultsHook (void)
 
 /* Forward decls ... */
 static        void* enterBCO_primop1 ( int );
-static        void* enterBCO_primop2 ( int , int* /*StgThreadReturnCode* */, StgBCO** );
+static        void* enterBCO_primop2 ( int , int* /*StgThreadReturnCode* */, 
+                                       StgBCO**, Capability* );
 static inline void PopUpdateFrame ( StgClosure* obj );
 static inline void PopCatchFrame  ( void );
 static inline void PopSeqFrame    ( void );
 static inline void PopStopFrame( StgClosure* obj );
 static inline void PushTaggedRealWorld( void );
-static inline void PushTaggedInteger  ( mpz_ptr );
+/* static inline void PushTaggedInteger  ( mpz_ptr ); */
 static inline StgPtr grabHpUpd( nat size );
 static inline StgPtr grabHpNonUpd( nat size );
 static        StgClosure* raiseAnError   ( StgClosure* errObj );
@@ -341,19 +313,27 @@ void      SloppifyIntegerEnd ( StgPtr );
 
 
 
+#define gSp     MainRegTable.rSp
+#define gSu     MainRegTable.rSu
+#define gSpLim  MainRegTable.rSpLim
+
+
 /* Macros to save/load local state. */
 #ifdef DEBUG
-#define SSS { tSp=Sp = xSp; tSu=Su = xSu; tSpLim=SpLim = xSpLim; }
-#define LLL { tSp=xSp = Sp; tSu=xSu = Su; tSpLim=xSpLim = SpLim; }
+#define SSS { tSp=gSp = xSp; tSu=gSu = xSu; tSpLim=gSpLim = xSpLim; }
+#define LLL { tSp=xSp = gSp; tSu=xSu = gSu; tSpLim=xSpLim = gSpLim; }
 #else
-#define SSS { Sp = xSp; Su = xSu; SpLim = xSpLim; }
-#define LLL { xSp = Sp; xSu = Su; xSpLim = SpLim; }
+#define SSS { gSp = xSp; gSu = xSu; gSpLim = xSpLim; }
+#define LLL { xSp = gSp; xSu = gSu; xSpLim = gSpLim; }
 #endif
 
-#define RETURN(vvv) {                                         \
-           StgThreadReturnCode retVal=(vvv); SSS;             \
-           /* SaveThreadState() is done by the scheduler. */  \
-           return retVal;                                     \
+#define RETURN(vvv) {						\
+           StgThreadReturnCode retVal=(vvv); 			\
+	   SSS;							\
+           cap->rCurrentTSO->sp    = gSp;			\
+           cap->rCurrentTSO->su    = gSu;			\
+           cap->rCurrentTSO->splim = gSpLim;			\
+           return retVal;					\
         }
 
 
@@ -365,7 +345,7 @@ void      SloppifyIntegerEnd ( StgPtr );
    the macros, in particular xPopTagged*, do not make the tag
    sanity checks that their non-x cousins do, and (2) some of
    the macros depend critically on the semantics of C comma
-   expressions to work properly
+   expressions to work properly.
 */
 #define xPushPtr(ppp)           { xSp--; *xSp=(StgWord)(ppp); }
 #define xPopPtr()               ((StgPtr)(*xSp++))
@@ -427,6 +407,16 @@ void      SloppifyIntegerEnd ( StgPtr );
                                  PK_DBL(xSp-sizeofW(StgDouble))))
 
 
+#define xPushUpdateFrame(target, xSp_offset)                      \
+{                                                                 \
+   StgUpdateFrame *__frame;                                       \
+   __frame = (StgUpdateFrame *)(xSp + (xSp_offset)) - 1;          \
+   SET_INFO(__frame, (StgInfoTable *)&Upd_frame_info);            \
+   __frame->link = xSu;                                           \
+   __frame->updatee = (StgClosure *)(target);                     \
+   xSu = __frame;                                                 \
+}
+
 #define xPopUpdateFrame(ooo)                                      \
 {                                                                 \
     /* NB: doesn't assume that Sp == Su */                        \
@@ -450,7 +440,12 @@ void      SloppifyIntegerEnd ( StgPtr );
 #define PC (bciPtr - &(bcoInstr(bco,0)))
 
 
-StgThreadReturnCode enter( StgClosure* obj0 )
+/* State on entry to enter():
+ *    - current thread  is in cap->rCurrentTSO;
+ *    - allocation area is in cap->rCurrentNursery & cap->rNursery
+ */
+
+StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 {
    /* use of register here is primarily to make it clear to compilers
       that these entities are non-aliasable.
@@ -462,12 +457,16 @@ StgThreadReturnCode enter( StgClosure* obj0 )
              char             eCount; /* enter counter, for context switching */
 
 #ifdef DEBUG
-    /* use the t values to check that Su/Sp/SpLim do not change unexpectedly */
     StgPtr tSp; StgUpdateFrame* tSu; StgPtr tSpLim;
 #endif
-    /* LoadThreadState() is done by the scheduler. */
+
+    gSp    = cap->rCurrentTSO->sp;
+    gSu    = cap->rCurrentTSO->su;
+    gSpLim = cap->rCurrentTSO->splim;
+
 #ifdef DEBUG
-    tSp = Sp; tSu = Su; tSpLim = SpLim;
+    /* use the t values to check that Su/Sp/SpLim do not change unexpectedly */
+    tSp = gSp; tSu = gSu; tSpLim = gSpLim;
 #endif
 
     obj    = obj0;
@@ -482,9 +481,9 @@ StgThreadReturnCode enter( StgClosure* obj0 )
     enterLoop:
 
 #ifdef DEBUG
-    assert(Sp == tSp);
-    assert(Su == tSu);
-    assert(SpLim == tSpLim);
+    assert(gSp == tSp);
+    assert(gSu == tSu);
+    assert(gSpLim == tSpLim);
     IF_DEBUG(evaluator,
              SSS;
              enterCountI++;
@@ -494,7 +493,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
              fprintf(stderr,"(%d) Entering: ",enterCountI); printObj(obj);
              fprintf(stderr,"xSp = %p\txSu = %p\n", xSp, xSu);
              fprintf(stderr, "\n" );
-             printStack(xSp,CurrentTSO->stack+CurrentTSO->stack_size,xSu);
+             printStack(xSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,xSu);
              fprintf(stderr, "\n\n");
              LLL;
             );
@@ -558,7 +557,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
 
             LoopTopLabel
 
-            ASSERT(PC < bco->n_instrs);
+            ASSERT((StgWord)(PC) < bco->n_instrs);
             IF_DEBUG(evaluator,
             fprintf(stderr,"Sp = %p\tSu = %p\tpc = %d\t", xSp, xSu, PC);
                     SSS;
@@ -566,7 +565,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                     if (0) { int i;
                     fprintf(stderr,"\n");
                       for (i = 8; i >= 0; i--) 
-                         fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(Sp+i)));
+                         fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(gSp+i)));
                       }
                     fprintf(stderr,"\n");
                     LLL;
@@ -1167,7 +1166,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                     pc_saved = PC; 
                     bco_tmp  = bco;
                     SSS;
-                    p        = enterBCO_primop2 ( i, &trc, &bco_tmp ); 
+                    p        = enterBCO_primop2 ( i, &trc, &bco_tmp, cap ); 
                     LLL;
                     bco      = bco_tmp;
                     bciPtr   = &(bcoInstr(bco,pc_saved));
@@ -1307,7 +1306,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             if (caf->mut_link == NULL) { 
                SSS; recordOldToNewPtrs((StgMutClosure*)caf); LLL; 
             }
-            SSS; PUSH_UPD_FRAME(bh,0); LLL;
+            xPushUpdateFrame(bh,0);
             xSp -= sizeofW(StgUpdateFrame);
             caf->link = enteredCAFs;
             enteredCAFs = caf;
@@ -1328,8 +1327,8 @@ StgThreadReturnCode enter( StgClosure* obj0 )
 	    /*was StgBlackHole* */
             StgBlockingQueue* bh = (StgBlockingQueue*)obj;
             /* Put ourselves on the blocking queue for this black hole and block */
-            CurrentTSO->link = bh->blocking_queue;
-            bh->blocking_queue = CurrentTSO;
+            cap->rCurrentTSO->link = bh->blocking_queue;
+            bh->blocking_queue = cap->rCurrentTSO;
             xPushCPtr(obj); /* code to restart with */
             barf("enter: CAF_BLACKHOLE unexpected!");
             RETURN(ThreadBlocked);
@@ -1344,7 +1343,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             }
             /* ToDo: look for xSp==xSu && stackInt(0) == UPD_FRAME 
                and insert an indirection immediately  */
-            SSS; PUSH_UPD_FRAME(ap,0); LLL;
+            xPushUpdateFrame(ap,0);
             xSp -= sizeofW(StgUpdateFrame);
             while (--i >= 0) {
                 xPushWord(payloadWord(ap,i));
@@ -1418,7 +1417,8 @@ StgThreadReturnCode enter( StgClosure* obj0 )
                                  fprintf(stderr, "hit a STOP_FRAME\n");
                                  printObj(obj);
                                  fprintf(stderr,"xSp = %p\txSu = %p\n", xSp, xSu);
-                                 printStack(xSp,CurrentTSO->stack+CurrentTSO->stack_size,xSu);
+                                 printStack(xSp,cap->rCurrentTSO->stack
+                                                + cap->rCurrentTSO->stack_size,xSu);
                                  LLL;
                                  );
                         SSS; PopStopFrame(obj); LLL;
@@ -1459,7 +1459,7 @@ StgThreadReturnCode enter( StgClosure* obj0 )
             //fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
             //printObj(obj);
             //LLL;
-            CurrentTSO->whatNext = ThreadEnterGHC;
+            cap->rCurrentTSO->whatNext = ThreadEnterGHC;
             xPushCPtr(obj); /* code to restart with */
             RETURN(ThreadYielding);
         }
@@ -1505,7 +1505,8 @@ StgThreadReturnCode enter( StgClosure* obj0 )
 #undef xPushTaggedDouble
 #undef xTaggedStackDouble
 #undef xPopTaggedDouble
-
+#undef xPopUpdateFrame
+#undef xPushUpdateFrame
 
 
 /* --------------------------------------------------------------------------
@@ -1513,56 +1514,56 @@ StgThreadReturnCode enter( StgClosure* obj0 )
  * ------------------------------------------------------------------------*/
 
 static inline void            PushTag            ( StackTag    t ) 
-   { *(--Sp) = t; }
+   { *(--gSp) = t; }
        inline void            PushPtr            ( StgPtr      x ) 
-   { *(--stgCast(StgPtr*,Sp))  = x; }
+   { *(--stgCast(StgPtr*,gSp))  = x; }
 static inline void            PushCPtr           ( StgClosure* x ) 
-   { *(--stgCast(StgClosure**,Sp)) = x; }
+   { *(--stgCast(StgClosure**,gSp)) = x; }
 static inline void            PushInt            ( StgInt      x ) 
-   { *(--stgCast(StgInt*,Sp))  = x; }
+   { *(--stgCast(StgInt*,gSp))  = x; }
 static inline void            PushWord           ( StgWord     x ) 
-   { *(--stgCast(StgWord*,Sp)) = x; }
+   { *(--stgCast(StgWord*,gSp)) = x; }
                                                      
                                                  
 static inline void            checkTag           ( StackTag t1, StackTag t2 ) 
    { ASSERT(t1 == t2);}
 static inline void            PopTag             ( StackTag t ) 
-   { checkTag(t,*(Sp++));    }
+   { checkTag(t,*(gSp++));    }
        inline StgPtr          PopPtr             ( void )       
-   { return *stgCast(StgPtr*,Sp)++; }
+   { return *stgCast(StgPtr*,gSp)++; }
 static inline StgClosure*     PopCPtr            ( void )       
-   { return *stgCast(StgClosure**,Sp)++; }
+   { return *stgCast(StgClosure**,gSp)++; }
 static inline StgInt          PopInt             ( void )       
-   { return *stgCast(StgInt*,Sp)++;  }
+   { return *stgCast(StgInt*,gSp)++;  }
 static inline StgWord         PopWord            ( void )       
-   { return *stgCast(StgWord*,Sp)++; }
+   { return *stgCast(StgWord*,gSp)++; }
 
 static inline StgPtr          stackPtr           ( StgStackOffset i ) 
-   { return *stgCast(StgPtr*, Sp+i); }
+   { return *stgCast(StgPtr*, gSp+i); }
 static inline StgInt          stackInt           ( StgStackOffset i ) 
-   { return *stgCast(StgInt*, Sp+i); }
+   { return *stgCast(StgInt*, gSp+i); }
 static inline StgWord         stackWord          ( StgStackOffset i ) 
-   { return *stgCast(StgWord*,Sp+i); }
+   { return *stgCast(StgWord*,gSp+i); }
                               
 static inline void            setStackWord       ( StgStackOffset i, StgWord w ) 
-   { Sp[i] = w; }
+   { gSp[i] = w; }
 
 static inline void            PushTaggedRealWorld( void            ) 
    { PushTag(REALWORLD_TAG);  }
        inline void            PushTaggedInt      ( StgInt        x ) 
-   { Sp -= sizeofW(StgInt);        *Sp = x;          PushTag(INT_TAG);    }
+   { gSp -= sizeofW(StgInt);        *gSp = x;          PushTag(INT_TAG);    }
        inline void            PushTaggedWord     ( StgWord       x ) 
-   { Sp -= sizeofW(StgWord);       *Sp = x;          PushTag(WORD_TAG);   }
+   { gSp -= sizeofW(StgWord);       *gSp = x;          PushTag(WORD_TAG);   }
        inline void            PushTaggedAddr     ( StgAddr       x ) 
-   { Sp -= sizeofW(StgAddr);       *Sp = (W_)x;      PushTag(ADDR_TAG);   }
+   { gSp -= sizeofW(StgAddr);       *gSp = (W_)x;      PushTag(ADDR_TAG);   }
        inline void            PushTaggedChar     ( StgChar       x ) 
-   { Sp -= sizeofW(StgChar);         *Sp = stgCast(StgWord,x); PushTag(CHAR_TAG); }
+   { gSp -= sizeofW(StgChar);         *gSp = stgCast(StgWord,x); PushTag(CHAR_TAG); }
        inline void            PushTaggedFloat    ( StgFloat      x ) 
-   { Sp -= sizeofW(StgFloat);      ASSIGN_FLT(Sp,x); PushTag(FLOAT_TAG);  }
+   { gSp -= sizeofW(StgFloat);      ASSIGN_FLT(gSp,x); PushTag(FLOAT_TAG);  }
        inline void            PushTaggedDouble   ( StgDouble     x ) 
-   { Sp -= sizeofW(StgDouble);     ASSIGN_DBL(Sp,x); PushTag(DOUBLE_TAG); }
+   { gSp -= sizeofW(StgDouble);     ASSIGN_DBL(gSp,x); PushTag(DOUBLE_TAG); }
        inline void            PushTaggedStablePtr   ( StgStablePtr  x ) 
-   { Sp -= sizeofW(StgStablePtr);  *Sp = x;          PushTag(STABLE_TAG); }
+   { gSp -= sizeofW(StgStablePtr);  *gSp = x;          PushTag(STABLE_TAG); }
 static inline void            PushTaggedBool     ( int           x ) 
    { PushTaggedInt(x); }
 
@@ -1571,43 +1572,43 @@ static inline void            PushTaggedBool     ( int           x )
 static inline void            PopTaggedRealWorld ( void ) 
    { PopTag(REALWORLD_TAG); }
        inline StgInt          PopTaggedInt       ( void ) 
-   { StgInt    r; PopTag(INT_TAG);     r = *stgCast(StgInt*,  Sp);      
-     Sp += sizeofW(StgInt);        return r;}
+   { StgInt    r; PopTag(INT_TAG);     r = *stgCast(StgInt*,  gSp);      
+     gSp += sizeofW(StgInt);        return r;}
        inline StgWord         PopTaggedWord      ( void ) 
-   { StgWord   r; PopTag(WORD_TAG);    r = *stgCast(StgWord*, Sp);      
-     Sp += sizeofW(StgWord);       return r;}
+   { StgWord   r; PopTag(WORD_TAG);    r = *stgCast(StgWord*, gSp);      
+     gSp += sizeofW(StgWord);       return r;}
        inline StgAddr         PopTaggedAddr      ( void ) 
-   { StgAddr   r; PopTag(ADDR_TAG);    r = *stgCast(StgAddr*, Sp);      
-     Sp += sizeofW(StgAddr);       return r;}
+   { StgAddr   r; PopTag(ADDR_TAG);    r = *stgCast(StgAddr*, gSp);      
+     gSp += sizeofW(StgAddr);       return r;}
        inline StgChar         PopTaggedChar      ( void ) 
-   { StgChar   r; PopTag(CHAR_TAG);    r = stgCast(StgChar, *Sp);       
-     Sp += sizeofW(StgChar);       return r;}
+   { StgChar   r; PopTag(CHAR_TAG);    r = stgCast(StgChar, *gSp);       
+     gSp += sizeofW(StgChar);       return r;}
        inline StgFloat        PopTaggedFloat     ( void ) 
-   { StgFloat  r; PopTag(FLOAT_TAG);   r = PK_FLT(Sp);                  
-     Sp += sizeofW(StgFloat);      return r;}
+   { StgFloat  r; PopTag(FLOAT_TAG);   r = PK_FLT(gSp);                  
+     gSp += sizeofW(StgFloat);      return r;}
        inline StgDouble       PopTaggedDouble    ( void ) 
-   { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(Sp);                  
-     Sp += sizeofW(StgDouble);     return r;}
+   { StgDouble r; PopTag(DOUBLE_TAG);  r = PK_DBL(gSp);                  
+     gSp += sizeofW(StgDouble);     return r;}
        inline StgStablePtr    PopTaggedStablePtr    ( void ) 
-   { StgInt    r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, Sp); 
-     Sp += sizeofW(StgStablePtr);  return r;}
+   { StgInt    r; PopTag(STABLE_TAG);  r = *stgCast(StgStablePtr*, gSp); 
+     gSp += sizeofW(StgStablePtr);  return r;}
 
 
 
 static inline StgInt          taggedStackInt     ( StgStackOffset i ) 
-   { checkTag(INT_TAG,Sp[i]);     return *stgCast(StgInt*,         Sp+1+i); }
+   { checkTag(INT_TAG,gSp[i]);     return *stgCast(StgInt*,         gSp+1+i); }
 static inline StgWord         taggedStackWord    ( StgStackOffset i ) 
-   { checkTag(WORD_TAG,Sp[i]);    return *stgCast(StgWord*,        Sp+1+i); }
+   { checkTag(WORD_TAG,gSp[i]);    return *stgCast(StgWord*,        gSp+1+i); }
 static inline StgAddr         taggedStackAddr    ( StgStackOffset i ) 
-   { checkTag(ADDR_TAG,Sp[i]);    return *stgCast(StgAddr*,        Sp+1+i); }
+   { checkTag(ADDR_TAG,gSp[i]);    return *stgCast(StgAddr*,        gSp+1+i); }
 static inline StgChar         taggedStackChar    ( StgStackOffset i ) 
-   { checkTag(CHAR_TAG,Sp[i]);    return stgCast(StgChar, *(Sp+1+i))   ; }
+   { checkTag(CHAR_TAG,gSp[i]);    return stgCast(StgChar, *(gSp+1+i))   ; }
 static inline StgFloat        taggedStackFloat   ( StgStackOffset i ) 
-   { checkTag(FLOAT_TAG,Sp[i]);   return PK_FLT(Sp+1+i); }
+   { checkTag(FLOAT_TAG,gSp[i]);   return PK_FLT(gSp+1+i); }
 static inline StgDouble       taggedStackDouble  ( StgStackOffset i ) 
-   { checkTag(DOUBLE_TAG,Sp[i]);  return PK_DBL(Sp+1+i); }
+   { checkTag(DOUBLE_TAG,gSp[i]);  return PK_DBL(gSp+1+i); }
 static inline StgStablePtr    taggedStackStable  ( StgStackOffset i ) 
-   { checkTag(STABLE_TAG,Sp[i]);  return *stgCast(StgStablePtr*,   Sp+1+i); }
+   { checkTag(STABLE_TAG,gSp[i]);  return *stgCast(StgStablePtr*,   gSp+1+i); }
 
 
 /* --------------------------------------------------------------------------
@@ -1648,105 +1649,105 @@ static inline StgPtr grabHpNonUpd( nat size )
  * o Stop frames
  * ------------------------------------------------------------------------*/
 
-static inline void PopUpdateFrame( StgClosure* obj )
+static inline void PopUpdateFrame ( StgClosure* obj )
 {
-    /* NB: doesn't assume that Sp == Su */
+    /* NB: doesn't assume that gSp == gSu */
     IF_DEBUG(evaluator,
              fprintf(stderr,  "Updating ");
-             printPtr(stgCast(StgPtr,Su->updatee)); 
+             printPtr(stgCast(StgPtr,gSu->updatee)); 
              fprintf(stderr,  " with ");
              printObj(obj);
-             fprintf(stderr,"Sp = %p\tSu = %p\n\n", Sp, Su);
+             fprintf(stderr,"gSp = %p\tgSu = %p\n\n", gSp, gSu);
              );
 #ifdef EAGER_BLACKHOLING
 #warn  LAZY_BLACKHOLING is default for StgHugs
 #error Dont know if EAGER_BLACKHOLING works in StgHugs
-    ASSERT(get_itbl(Su->updatee)->type == BLACKHOLE
-           || get_itbl(Su->updatee)->type == SE_BLACKHOLE
-           || get_itbl(Su->updatee)->type == CAF_BLACKHOLE
-           || get_itbl(Su->updatee)->type == SE_CAF_BLACKHOLE
+    ASSERT(get_itbl(gSu->updatee)->type == BLACKHOLE
+           || get_itbl(gSu->updatee)->type == SE_BLACKHOLE
+           || get_itbl(gSu->updatee)->type == CAF_BLACKHOLE
+           || get_itbl(gSu->updatee)->type == SE_CAF_BLACKHOLE
            );
 #endif /* EAGER_BLACKHOLING */
-    UPD_IND(Su->updatee,obj);
-    Sp = stgCast(StgStackPtr,Su) + sizeofW(StgUpdateFrame);
-    Su = Su->link;
+    UPD_IND(gSu->updatee,obj);
+    gSp = stgCast(StgStackPtr,gSu) + sizeofW(StgUpdateFrame);
+    gSu = gSu->link;
 }
 
-static inline void PopStopFrame( StgClosure* obj )
+static inline void PopStopFrame ( StgClosure* obj )
 {
-    /* Move Su just off the end of the stack, we're about to spam the
+    /* Move gSu just off the end of the stack, we're about to gSpam the
      * STOP_FRAME with the return value.
      */
-    Su = stgCast(StgUpdateFrame*,Sp+1);  
-    *stgCast(StgClosure**,Sp) = obj;
+    gSu = stgCast(StgUpdateFrame*,gSp+1);  
+    *stgCast(StgClosure**,gSp) = obj;
 }
 
-static inline void PushCatchFrame( StgClosure* handler )
+static inline void PushCatchFrame ( StgClosure* handler )
 {
     StgCatchFrame* fp;
     /* ToDo: stack check! */
-    Sp -= sizeofW(StgCatchFrame);
-    fp = stgCast(StgCatchFrame*,Sp);
+    gSp -= sizeofW(StgCatchFrame);
+    fp = stgCast(StgCatchFrame*,gSp);
     SET_HDR(fp,(StgInfoTable*)&catch_frame_info,CCCS);
     fp->handler         = handler;
-    fp->link            = Su;
-    Su = stgCast(StgUpdateFrame*,fp);
+    fp->link            = gSu;
+    gSu = stgCast(StgUpdateFrame*,fp);
 }
 
-static inline void PopCatchFrame( void )
+static inline void PopCatchFrame ( void )
 {
-    /* NB: doesn't assume that Sp == Su */
+    /* NB: doesn't assume that gSp == gSu */
     /* fprintf(stderr,"Popping catch frame\n"); */
-    Sp = stgCast(StgStackPtr,Su) + sizeofW(StgCatchFrame);
-    Su = stgCast(StgCatchFrame*,Su)->link;		
+    gSp = stgCast(StgStackPtr,gSu) + sizeofW(StgCatchFrame);
+    gSu = stgCast(StgCatchFrame*,gSu)->link;		
 }
 
-static inline void PushSeqFrame( void )
+static inline void PushSeqFrame ( void )
 {
     StgSeqFrame* fp;
     /* ToDo: stack check! */
-    Sp -= sizeofW(StgSeqFrame);
-    fp = stgCast(StgSeqFrame*,Sp);
+    gSp -= sizeofW(StgSeqFrame);
+    fp = stgCast(StgSeqFrame*,gSp);
     SET_HDR(fp,(StgInfoTable*)&seq_frame_info,CCCS);
-    fp->link = Su;
-    Su = stgCast(StgUpdateFrame*,fp);
+    fp->link = gSu;
+    gSu = stgCast(StgUpdateFrame*,fp);
 }
 
-static inline void PopSeqFrame( void )
+static inline void PopSeqFrame ( void )
 {
-    /* NB: doesn't assume that Sp == Su */
-    Sp = stgCast(StgStackPtr,Su) + sizeofW(StgSeqFrame);
-    Su = stgCast(StgSeqFrame*,Su)->link;		
+    /* NB: doesn't assume that gSp == gSu */
+    gSp = stgCast(StgStackPtr,gSu) + sizeofW(StgSeqFrame);
+    gSu = stgCast(StgSeqFrame*,gSu)->link;		
 }
 
-static inline StgClosure* raiseAnError( StgClosure* errObj )
+static inline StgClosure* raiseAnError ( StgClosure* errObj )
 {
     StgClosure *raise_closure;
 
     /* This closure represents the expression 'raise# E' where E
      * is the exception raised.  It is used to overwrite all the
-     * thunks which are currently under evaluataion.
+     * thunks which are currently under evaluation.
      */
     raise_closure = (StgClosure *)allocate(sizeofW(StgClosure)+1);
     raise_closure->header.info = &raise_info;
-    raise_closure->payload[0] = R1.cl;
+    raise_closure->payload[0] = 0xdeadbeef; /*R1.cl;*/
 
     while (1) {
-        switch (get_itbl(Su)->type) {
+        switch (get_itbl(gSu)->type) {
         case UPDATE_FRAME:
-                UPD_IND(Su->updatee,raise_closure);
-                Sp = stgCast(StgStackPtr,Su) + sizeofW(StgUpdateFrame);
-                Su = Su->link;
+                UPD_IND(gSu->updatee,raise_closure);
+                gSp = stgCast(StgStackPtr,gSu) + sizeofW(StgUpdateFrame);
+                gSu = gSu->link;
                 break;
         case SEQ_FRAME:
                 PopSeqFrame();
                 break;
         case CATCH_FRAME:  /* found it! */
             {
-                StgCatchFrame* fp = stgCast(StgCatchFrame*,Su);
+                StgCatchFrame* fp = stgCast(StgCatchFrame*,gSu);
                 StgClosure *handler = fp->handler;
-                Su = fp->link; 
-                Sp += sizeofW(StgCatchFrame); /* Pop */
+                gSu = fp->link; 
+                gSp += sizeofW(StgCatchFrame); /* Pop */
                 PushCPtr(errObj);
                 return handler;
 	    }
@@ -2202,29 +2203,29 @@ void SloppifyIntegerEnd ( StgPtr arr0 )
 }
 
 
-void myStackCheck ( void )
+void myStackCheck ( Capability* cap )
 {
-   //StgPtr sp = (StgPtr)Sp;
-   StgPtr su = (StgPtr)Su;
-   //fprintf(stderr, "myStackCheck\n");
-   if (!(SpLim <= Sp && Sp <= stgCast(StgPtr,Su))) {
-      fprintf(stderr, "myStackCheck: invalid initial Sp/Su \n" );
+   /* fprintf(stderr, "myStackCheck\n"); */
+   if (!(gSpLim <= gSp && gSp <= stgCast(StgPtr,gSu))) {
+      fprintf(stderr, "myStackCheck: invalid initial gSp/gSu \n" );
       assert(0);
    }
    while (1) {
-      if (!(su >= CurrentTSO->stack && su <= CurrentTSO->stack + CurrentTSO->stack_size)) {
-         fprintf ( stderr, "myStackCheck: su out of stack\n" );
+      if (!(gSu >= cap->rCurrentTSO->stack 
+            && gSu <= cap->rCurrentTSO->stack 
+               + cap->rCurrentTSO->stack_size)) {
+         fprintf ( stderr, "myStackCheck: gSu out of stack\n" );
          assert(0);
       }
-      switch (get_itbl(stgCast(StgClosure*,su))->type) {
+      switch (get_itbl(stgCast(StgClosure*,gSu))->type) {
       case CATCH_FRAME:
-         su = (StgPtr) ((StgCatchFrame*)(su))->link;
+         gSu = (StgPtr) ((StgCatchFrame*)(gSu))->link;
          break;
       case UPDATE_FRAME:
-         su = (StgPtr) ((StgUpdateFrame*)(su))->link;
+         gSu = (StgPtr) ((StgUpdateFrame*)(gSu))->link;
          break;
       case SEQ_FRAME:
-         su = (StgPtr) ((StgSeqFrame*)(su))->link;
+         gSu = (StgPtr) ((StgSeqFrame*)(gSu))->link;
          break;
       case STOP_FRAME:
          goto postloop;
@@ -2638,7 +2639,8 @@ static void* enterBCO_primop1 ( int primop1code )
 */
 static void* enterBCO_primop2 ( int primop2code, 
                                 int* /*StgThreadReturnCode* */ return2,
-                                StgBCO** bco )
+                                StgBCO** bco,
+                                Capability* cap )
 {
         switch (primop2code) {
         case i_raise:  /* raise#{err} */
@@ -2757,7 +2759,7 @@ static void* enterBCO_primop2 ( int primop2code,
                 break; 
             }
 
-        /* Most of these generate alignment warnings on Sparcs and similar architectures.
+        /* Most of these generate alignment warnings on gSparcs and similar architectures.
          * These are harmless and are caused by the cast to C* in BYTE_ARR_CTS.
          */
         case i_indexCharArray:   
@@ -2935,7 +2937,7 @@ static void* enterBCO_primop2 ( int primop2code,
             {
                 StgTSO* tso = stgCast(StgTSO*,PopPtr());
                 deleteThread(tso);
-                if (tso == CurrentTSO) { /* suicide */
+                if (tso == cap->rCurrentTSO) { /* suicide */
                     *return2 = ThreadFinished;
                     return (void*)(1+(NULL));
                 }
@@ -2974,12 +2976,12 @@ off the stack.
                  */
                 if (GET_INFO(mvar) != &FULL_MVAR_info) {
                     if (mvar->head == EndTSOQueue) {
-                        mvar->head = CurrentTSO;
+                        mvar->head = cap->rCurrentTSO;
                     } else {
-                        mvar->tail->link = CurrentTSO;
+                        mvar->tail->link = cap->rCurrentTSO;
                     }
-                    CurrentTSO->link = EndTSOQueue;
-                    mvar->tail = CurrentTSO;
+                    cap->rCurrentTSO->link = EndTSOQueue;
+                    mvar->tail = cap->rCurrentTSO;
 
                     /* Hack, hack, hack.
                      * When we block, we push a restart closure
@@ -3071,7 +3073,7 @@ off the stack.
                 char cc = (primop2code == i_ccall_stdcall_Id ||
                            primop2code == i_ccall_stdcall_IO)
                           ? 's' : 'c';
-                r = ccall(descriptor,funPtr,bco,cc);
+                r = ccall(descriptor,funPtr,bco,cc,cap);
                 if (r == 0) break;
                 if (r == 1) 
                    return makeErrorCall(
@@ -3091,11 +3093,11 @@ off the stack.
  * ccall support code:
  *   marshall moves args from C stack to Haskell stack
  *   unmarshall moves args from Haskell stack to C stack
- *   argSize calculates how much space you need on the C stack
+ *   argSize calculates how much gSpace you need on the C stack
  * ---------------------------------------------------------------------------*/
 
 /* Pop arguments off the C stack and Push them onto the Hugs stack.
- * Used when preparing for C calling Haskell or in response to
+ * Used when preparing for C calling Haskell or in regSponse to
  *  Haskell calling C.
  */
 nat marshall(char arg_ty, void* arg)
@@ -3147,7 +3149,7 @@ nat marshall(char arg_ty, void* arg)
 }
 
 /* Pop arguments off the Hugs stack and Push them onto the C stack.
- * Used when preparing for Haskell calling C or in response to
+ * Used when preparing for Haskell calling C or in regSponse to
  * C calling Haskell.
  */
 nat unmarshall(char res_ty, void* res)

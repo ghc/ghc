@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.5 1999/10/22 15:58:25 sewardj Exp $
+ * $Id: Evaluator.h,v 1.6 1999/11/08 15:30:37 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,7 +26,7 @@
  * 
  * ------------------------------------------------------------------------*/
 
-extern StgThreadReturnCode enter        ( StgClosurePtr obj );
+extern StgThreadReturnCode enter ( Capability* cap, StgClosurePtr obj );
 
 extern nat marshall   ( char arg_ty, void* arg );
 extern nat unmarshall ( char res_ty, void* res );
