@@ -43,18 +43,17 @@ pFile
 
 pTopDef
    = pAlts [
-        pApply TStmt pStmt,
-        p3 (\s w expr -> TSkip expr) (pKW L_Skip) (pKW L_When) pExpr,
-        p3 (\res w expr -> TResult res expr) pResult (pKW L_When) pExpr,
-        p2 (\e res -> TExpect res) (pKW L_Expect) pResult,
         p2 (\i expr -> TInclude expr) (pKW L_Include) pExpr,
         p4 (\d mnm formals stmts -> TMacroDef mnm (MacroDef formals stmts))
-           (pKW L_Def) pText pFormals (pInBraces (pStar pStmt))
+           (pKW L_Def) pText pFormals pStmtBlock,
+        p3 (\t testname stmts -> TTest testname stmts)
+           (pKW L_Test) pString pStmtBlock
      ]
      where
         pFormals
            = pInParens (pZeroOrMoreWithSep (pKW L_Comma) pFormalVar)
-
+        pStmtBlock
+           = pInBraces (pStar pStmt)
 pStmt 
    = pAlts [
         p3 (\var eq expr -> SAssign var expr) pVar (pKW L_Assign) pExpr,
@@ -65,6 +64,9 @@ pStmt
         p4 (\var eq run expr -> SRun var expr)
            pVar (pKW L_Assign) (pKW L_Run) pExpr,
         p2 (\ret expr -> SReturn expr) (pKW L_Return) pExpr,
+        p3 (\s w expr -> SSkip expr) (pKW L_Skip) (pKW L_When) pExpr,
+        p3 (\res w expr -> SResult res expr) pResult (pKW L_When) pExpr,
+        p2 (\e res -> SExpect res) (pKW L_Expect) pResult,
         p2 (\ret expr -> SFFail expr) (pKW L_Framefail) pExpr
      ]
      where

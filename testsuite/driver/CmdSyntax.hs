@@ -29,6 +29,7 @@ my_system s
 -- command abs syntax
 
 ------------------
+type TestName  = String
 type Var       = String
 type MacroName = String
 data MacroDef  = MacroDef [Var] [Stmt]
@@ -58,15 +59,16 @@ data Stmt
    | SReturn    Expr
    | SMacro     MacroName [Expr]
    | SFFail     Expr
+   | SSkip      Expr
+   | SResult    Result Expr
+   | SExpect    Result
      deriving Show
 
 data TopDef
    = TStmt      Stmt
-   | TSkip      Expr
-   | TResult    Result Expr
-   | TExpect    Result
    | TInclude   Expr
    | TMacroDef  MacroName MacroDef
+   | TTest      TestName [Stmt]
      deriving Show
 
 data Op

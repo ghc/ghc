@@ -14,6 +14,7 @@ data Lexeme
    | LText     String		-- some_lump_of_text
    | LVar      String		-- $varname
    | LBool     Bool		-- True or False
+   | L_Test			-- test
    | L_Exists			-- exists
    | L_When			-- when
    | L_Expect			-- expect
@@ -128,6 +129,7 @@ tokenise_wrk n (c:cs)
             "else"         -> kw L_Else
             "fi"           -> kw L_Fi
             "print"        -> kw L_Print
+            "test"         -> kw L_Test
             "exists"       -> kw L_Exists
             "when"         -> kw L_When
             "expect"       -> kw L_Expect
