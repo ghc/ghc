@@ -238,9 +238,10 @@ ilxTyCon env tycon =  ilxTyConDef False env tycon
 -- filter to get only dataTyCons?
 ilxTyConDef importing env tycon = 
 	vcat [empty $$ line,
-	      text ".classunion" <+> (if importing then text "import" else empty) <+>  tyvars_text <+> text ": thunk" 
-                  <> angleBrackets((nameReference env (getName tycon)) <> (ppr tycon))   <+> alts_text]
+	      text ".classunion" <+> (if importing then text "import" else empty) <+> tycon_ref <+> tyvars_text <+> super_text   <+> alts_text]
    where
+     tycon_ref =  nameReference env (getName tycon)  <> (ppr tycon)
+     super_text = if importing then empty else text "extends thunk" <> angleBrackets (text "class" <+> tycon_ref)
      tyvars = tyConTyVars tycon
      (ilx_tvs, _) = categorizeTyVars tyvars
      alts_env = extendIlxEnvWithFormalTyVars env ilx_tvs 
@@ -728,7 +729,15 @@ ilxFunApp env fun args tail_call
 	--	ldloc x		arg of type Int
 	--	.tail callfunc <Int32> (!0) --> !0
 	--
-    vcat [pushId env fun,ilxFunAppArgs env 0 (idIlxRepType fun) args tail_call known_clo]
+    vcat [pushId env fun,ilxFunAppAfterPush env fun args tail_call]
+
+ilxFunAppAfterPush env fun args tail_call 
+  =	-- For example:
+        --	ldloc f		function of type forall a. a->a
+	--	ldloc x		arg of type Int
+	--	.tail callfunc <Int32> (!0) --> !0
+	--
+    vcat [ilxFunAppArgs env 0 (idIlxRepType fun) args tail_call known_clo]
   where
     known_clo :: KnownClosure
     known_clo =
@@ -1127,10 +1136,9 @@ deepIlxRepType ty@(TyConApp tc tys)
 	 Just rep_ty -> 
            let res = deepIlxRepType (applyTys rep_ty tys) in 
            if not (length tys == tyConArity tc ) then 
-             pprTrace "deepIlxRepType" (text "length tys <> tyConArity tc, ty = " <+> pprType ty <+> text ", length tys = " <+> ppr (length tys) <+> text ", tyConArity = " <+> ppr (tyConArity tc)) res 
+             --pprTrace "deepIlxRepType" (text "length tys <> tyConArity tc, ty = " <+> pprType ty <+> text ", length tys = " <+> ppr (length tys) <+> text ", tyConArity = " <+> ppr (tyConArity tc)) 
+             res 
            else res
-		-- The assert should hold because deepIlxRepType should
-		-- only be applied to *types* (of kind *)
 	 Nothing     -> 
            -- collapse UnboxedTupleTyCon down when it contains VoidRep types.
 	   -- e.g. 	(# State#, Int#, Int# #)  ===>   (# Int#, Int# #)
@@ -2293,7 +2301,7 @@ ilxFCall env (CCall (CCallSpec (StaticTarget c) cconv gc)) args ret_ty
 
 ilxFCall env (DNCall (DNCallSpec call_instr)) args ret_ty
   = ilxComment (text "IL call") <+> 
-    vcat [vcat (ilxMapPlaceArgs 0 pushILArg env tm_args), 
+    vcat [vcat (ilxMapPlaceArgs 0 pushEvalArg env tm_args), 
 	  ptext call_instr
 		-- In due course we'll need to pass the type arguments
 		-- and to do that we'll need to have more than just a string
@@ -2302,8 +2310,11 @@ ilxFCall env (DNCall (DNCallSpec call_instr)) args ret_ty
   where
     (ty_args,tm_args) = splitTyArgs1 args 
 
-pushILArg env arg | isUnLiftedType (stgArgType arg) = pushArg env arg
-		  | otherwise			    = pushArg env arg <+> text "EVAL!"
+-- Push and argument and force its evaluation if necessary.
+pushEvalArg _ (StgTypeArg _) = empty
+pushEvalArg env (StgVarArg arg) = ilxFunApp env arg [] False
+pushEvalArg env (StgLitArg lit) = pushLit env lit
+
 
 hasTyCon (TyConApp tc _) tc2 = tc == tc2
 hasTyCon _  _ = False

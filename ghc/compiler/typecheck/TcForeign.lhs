@@ -128,7 +128,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
 
   | otherwise 		-- Normal foreign import
   = checkCg (if isCasmTarget target
-	     then checkC else checkCOrAsm)			`thenNF_Tc_`
+	     then checkC else checkCOrAsmOrDotNet)			`thenNF_Tc_`
     checkCTarget target						`thenNF_Tc_`
     getDOptsTc							`thenNF_Tc` \ dflags ->
     checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys	`thenNF_Tc_`
@@ -137,7 +137,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport (CCallSpec target _ safety))
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
 checkCTarget (StaticTarget str) 
-  = checkCg checkCOrAsm 	`thenNF_Tc_`
+  = checkCg checkCOrAsmOrDotNet 	`thenNF_Tc_`
     check (isCLabelString str) (badCName str)
 
 checkCTarget (CasmTarget _)
@@ -242,6 +242,11 @@ checkC other = Just (text "requires C code generation (-fvia-C)")
 checkCOrAsm HscC   = Nothing
 checkCOrAsm HscAsm = Nothing
 checkCOrAsm other  = Just (text "via-C or native code generation (-fvia-C)")
+
+checkCOrAsmOrDotNet HscC   = Nothing
+checkCOrAsmOrDotNet HscAsm = Nothing
+checkCOrAsmOrDotNet HscILX = Nothing
+checkCOrAsmOrDotNet other  = Just (text "requires C, native or .NET ILX code generation")
 
 checkCg check
  = getDOptsTc		`thenNF_Tc` \ dflags ->
