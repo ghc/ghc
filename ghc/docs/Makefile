@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 
 SUBDIRS = users_guide
 
-PAGES = index.html libraries.html
+PAGES = index.html
 
 install-docs :: $(PAGES)
 	$(INSTALL_DIR) $(datadir)/html

@@ -24,9 +24,9 @@ AC_PREREQ(2.52)
 dnl * Declare subdirectories that have a private configure script
 dnl
 dnl After the toplevel configuration is complete, the script will recurse into
-dnl these subdirectories (the use of cache values makes repeated checks cheap)
-dnl (We probably have to add hslibs/{OpenGL,GLUT} here later...)
-AC_CONFIG_SUBDIRS(ghc)
+dnl these subdirectories if they exist. The use of a cache file makes repeated
+dnl checks cheap.
+AC_CONFIG_SUBDIRS([ghc libraries])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
