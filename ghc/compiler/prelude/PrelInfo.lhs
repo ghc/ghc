@@ -11,7 +11,7 @@ module PrelInfo (
 	wiredInThings, 	-- Names of wired in things
 	wiredInThingEnv,
 	ghcPrimExports,
-	cCallableClassDecl, cReturnableClassDecl, assertDecl,
+	cCallableClassDecl, cReturnableClassDecl,
 	
 	-- Random other things
 	maybeCharLikeCon, maybeIntLikeCon,
@@ -102,14 +102,6 @@ ghcPrimExports :: [RdrAvailInfo]
  where
    cCallableOcc = nameOccName cCallableClassName
    cReturnableOcc = nameOccName cReturnableClassName
-
-assertDecl
-  = IfaceSig { 
- 	tcdName = getRdrName assertName,
-	tcdType = HsForAllTy (Just [liftedAlpha]) [] (HsTyVar alpha),
-	tcdIdInfo = [],
-	tcdLoc = noSrcLoc
-    }
 
 cCallableClassDecl
   = mkClassDecl
