@@ -234,7 +234,7 @@ BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 ifeq "$(BootingFromHc)" "YES"
 GhcLibWays=
 else
-GhcLibWays=
+GhcLibWays=p
 endif
 
 # Option flags to pass to GHC when it's compiling modules in
