@@ -12,6 +12,7 @@ include $(TOP)/mk/boilerplate.mk
 
 WAYS=$(GhcLibWays)
 
+
 ifeq "$(way)" ""
 SUBDIRS = cbits
 else
@@ -41,9 +42,10 @@ BOOT_SRCS += PrelPrimopWrappers.hs
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
 
-SRC_HC_OPTS += -cpp -fvia-C -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
-
+SRC_HC_OPTS += -cpp -fglasgow-exts $(GhcLibHcOpts) $(PACKAGE)
+ifneq "$(ILXized)" "YES"
 SRC_HSC2HS_OPTS += -Icbits
+endif
 
 ifdef USE_REPORT_PRELUDE
 SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
@@ -117,4 +119,77 @@ endif
 
 INSTALL_DATAS += PrelGHC.$(way_)hi
 
+#-----------------------------------------------------------------------------
+# ILX stuff.  PLEASE IGNORE THIS UNLESS YOU'RE WORKING ON GHC.NET
+
+
+ilxstd:
+	(cd //c/devel/fcom/src; make ilxsdk)
+	(cd ../../compiler; make)
+	$(MAKE) way=ilx-Onot-mono std.ilx-Onot.mono.dll std.ilx-Onot.mono.vlb
+	$(MAKE) way=ilx-O-mono  std.ilx-O.mono.dll std.ilx-O.mono.vlb
+	$(MAKE) way=ilx-Onot-generic std.ilx-Onot.generic.dll
+	$(MAKE) way=ilx-O-generic  std.ilx-O.generic.dll 
+	$(MAKE) way=ilx-Onot-mono-traced std.ilx-Onot.mono.dll std.ilx-Onot.mono-traced.vlb
+	$(MAKE) way=ilx-O-mono-traced  std.ilx-O.mono.dll std.ilx-O.mono-traced.vlb
+	$(MAKE) way=ilx-Onot-generic-traced std.ilx-Onot.generic-traced.dll
+	$(MAKE) way=ilx-O-generic-traced  std.ilx-O.generic-traced.dll 
+	$(MAKE) way=ilx-Onot-mono-verifiable std.ilx-Onot.mono-verifiable.dll std.ilx-Onot.mono-verifiable.vlb
+	$(MAKE) way=ilx-O-mono-verifiable  std.ilx-O.mono-verifiable.dll std.ilx-O.mono-verifiable.vlb
+
+ilxcheck:
+	(cd //c/devel/fcom/src; make)
+	(cd ../../compiler; make)
+	$(MAKE) way=ilx-Onot-mono  std.ilx-Onot.mono.mvl 
+	$(MAKE) way=ilx-O-mono   std.ilx-O.mono.mvl 
+	$(MAKE) way=ilx-Onot-mono-verifiable  std.ilx-Onot.mono-verifiable.mvl 
+	$(MAKE) way=ilx-O-mono-verifiable   std.ilx-O.mono-verifiable.mvl 
+	$(MAKE) way=ilx-Onot-mono-verifiable  std.ilx-Onot.mono-verifiable.mvr 
+	$(MAKE) way=ilx-O-mono-verifiable   std.ilx-O.mono-verifiable.mvr 
+
+
+ifeq "$(ILXized)" "YES"
+
+HS_ILX+=PrelGHC.$(hs2ilx_suffix)_o
+PrelGHC.$(hs2ilx_suffix)_o: PrelGHC.ilx.real
+	sed -e "s/'PrelBase.dll'/'PrelBase.$(hs2ilx_suffix).dll'/g" $< > $@.tmp
+	mv $@.tmp $@
+
+PrelGHC.$(hs2ilx_suffix)_hi	: PrelGHC.hi-boot
+	cp $< $@
+
+std.$(ilx_way).dll: $(HS_MODS)
+	echo "call devcorb2gen free" > tmp.bat
+	echo "al -out:$@ $(HS_MODS)" >> tmp.bat
+	cmd /c tmp.bat
+
+std.$(ilx_way).mvl: $(HS_IL)
+	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb  $(HS_IL)) 2>&1) | tee $@
+
+std.$(ilx_way).vlb: std.$(ilx_way).dll
+	echo "call devcorb2gen fastchecked" > tmp.bat
+	echo "copy c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).dll ." >> tmp.bat
+	echo "copy c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).dll ." >> tmp.bat
+	echo "copy c:\\devel\\fcom\\src\\bin\\mkvlb.exe ." >> tmp.bat
+	echo ".\\mkvlb.exe -o $@.tmp std.$(ilx_way)" >> tmp.bat
+	cmd /c tmp.bat
+	mv $@.tmp $@
+
+MINI_IL=PrelBase.ilx-Onot.mono.il  Prelude.ilx-Onot.mono.il PrelGHC.ilx-Onot.mono.il PrelPrimopWrappers.ilx-Onot.mono.il PrelErr.ilx-Onot.mono.il  PrelIOBase.ilx-Onot.mono.il PrelTup.ilx-Onot.mono.il  PrelShow.ilx-Onot.mono.il   PrelList.ilx-Onot.mono.il  PrelPtr.ilx-Onot.mono.il  PrelMaybe.ilx-Onot.mono.il  PrelPack.ilx-Onot.mono.il PrelST.ilx-Onot.mono.il PrelByteArr.ilx-Onot.mono.il PrelArr.ilx-Onot.mono.il PrelNum.ilx-Onot.mono.il PrelEnum.ilx-Onot.mono.il PrelFloat.ilx-Onot.mono.il PrelReal.ilx-Onot.mono.il PrelConc.ilx-Onot.mono.il
+mini.mvl: $(MINI_IL)
+	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb  $(MINI_IL)) 2>&1) | tee $@
+
+
+std.$(ilx_way).mvlx: $(HS_ILX)
+	ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib.vlbx  $(HS_ILX) | tee $@
+
+.PRECIOUS:  $(HS_MODS) $(HS_ILX) $(HS_IL)
+
+endif # ILXized
+
+# End ILX stuff. 
+#-----------------------------------------------------------------------------
+
+
 include $(TOP)/mk/target.mk
+
