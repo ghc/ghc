@@ -14,11 +14,11 @@ main = do
         _ -> do hPutStr stderr "usage: pkgconf (install | in-place)\n"
                 exitWith (ExitFailure 1)
 
-package_details :: Bool -> [(String,Package)]
+package_details :: Bool -> [Package]
 package_details installing =
  [
-      ( "gmp",  -- GMP is at the bottom of the heap
         Package {
+	name           = "gmp",  -- GMP is at the bottom of the heap
         import_dirs    = [],
         library_dirs   = if cHaveLibGmp == "YES"
                             then []
@@ -33,11 +33,10 @@ package_details installing =
         extra_ghc_opts = [],
         extra_cc_opts  = [],
         extra_ld_opts  = []
-        }
-       ),
+        },
 
-      ( "rts",  -- The RTS is just another package!
         Package {
+	name           = "rts",  -- The RTS is just another package!
         import_dirs    = [],
         library_dirs   = if installing
                             then [ clibdir ]
@@ -85,12 +84,11 @@ package_details installing =
          , "-u __init_Prelude"
          , "-u __init_PrelMain"
          ]
-        }
-      ),
+        },
 
-      ( "std",  -- The Prelude & Standard Hs_libraries
         Package {
-        import_dirs    = if installing
+        name           = "std",  -- The Prelude & Standard Hs_libraries
+	import_dirs    = if installing
                             then [ clibdir ++ "/imports/std" ]
                             else [ ghc_src_dir cGHC_LIB_DIR ++ "/std" ],
         library_dirs   = if installing
@@ -107,12 +105,11 @@ package_details installing =
         extra_ghc_opts = [],
         extra_cc_opts  = [],
         extra_ld_opts  = [ "-lm" ]
-        }
-       ),
+        },
 
-       ( "lang",
          Package { 
-         import_dirs    = if installing
+         name           = "lang",
+	 import_dirs    = if installing
                              then [ clibdir ++ "/imports/lang" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/lang"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/lang/monads" ],
@@ -130,11 +127,10 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
-       ( "concurrent",
          Package {
+	 name           = "concurrent",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/concurrent" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/concurrent" ],
@@ -151,11 +147,10 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
-       ( "data",
          Package {
+         name           = "data",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/data" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/data"
@@ -176,11 +171,10 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
-       ( "net",
          Package {
+         name           = "net",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/net" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net" ],
@@ -200,11 +194,10 @@ package_details installing =
          extra_ld_opts  = if postfixMatch "solaris2" cTARGETPLATFORM
                              then [ "-lnsl",  "-lsocket" ]
                              else []
-        }
-       ),
+        },
 
-       ( "posix",
          Package {
+         name           = "posix",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/posix" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/posix" ],
@@ -222,11 +215,10 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
-       ( "text",
          Package {
+         name           = "text",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/text" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/text" 
@@ -247,11 +239,10 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
-       ( "util",
          Package {
+         name           = "util",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/util" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/util"
@@ -270,13 +261,12 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
         -- no cbits at the moment, we'll need to add one if this library
         -- ever calls out to any C libs.
-       ( "hssource",
          Package {
+         name           = "hssource",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/hssource" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/hssource" ],
@@ -291,12 +281,11 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = []
-        }
-       ),
+        },
 
-       ( "win32",
          Package {
-         import_dirs    = if installing
+         name         = "win32",
+	 import_dirs    = if installing
                              then [ clibdir ++ "/imports/win32" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
          library_dirs   = if installing
@@ -310,11 +299,10 @@ package_details installing =
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = [ "-luser32",  "-lgdi32" ]
-        }
-       ),
+        },
 
-       ( "com",
          Package {
+         name           = "com",
          import_dirs    = if installing
                              then [ clibdir ++ "/imports/com" ]
                              else [ cFPTOOLS_TOP_ABS ++ "/hdirect/lib" ],
@@ -330,7 +318,6 @@ package_details installing =
          extra_cc_opts  = [],
          extra_ld_opts  = [ "-luser32",  "-lole32",  "-loleaut32", "-ladvapi32" ]
         }
-       )
    ]
 
 ghc_src_dir :: String -> String

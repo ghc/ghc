@@ -3,6 +3,7 @@ module Package where
 import Pretty
 
 data Package = Package {
+		name            :: String,
 		import_dirs     :: [String],
       		library_dirs    :: [String],
       		hs_libraries    :: [String],
@@ -16,21 +17,18 @@ data Package = Package {
      		}
   deriving (Read, Show)
 
-listPkgs :: [(String,Package)] -> String
-listPkgs pkgs = render (fsep (punctuate comma (map (text . fst) pkgs)))
+listPkgs :: [Package] -> String
+listPkgs pkgs = render (fsep (punctuate comma (map (text . name) pkgs)))
 
-dumpPackages :: [(String,Package)] -> String
+dumpPackages :: [Package] -> String
 dumpPackages pkgs = 
-   render (brackets (vcat (punctuate comma (map dumpPkg pkgs))))
-
-dumpPkg :: (String,Package) -> Doc
-dumpPkg (name, pkg) =
-   parens (hang (text (show name) <> comma) 2 (dumpPkgGuts pkg))
+   render (brackets (vcat (punctuate comma (map dumpPkgGuts pkgs))))
 
 dumpPkgGuts :: Package -> Doc
 dumpPkgGuts pkg =
    text "Package" $$ nest 3 (braces (
       sep (punctuate comma [
+         text "name = " <> text (show (name pkg)),
          dumpField "import_dirs"     (import_dirs     pkg),
          dumpField "library_dirs"    (library_dirs    pkg),
          dumpField "hs_libraries"    (hs_libraries    pkg),

@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.61 2000/09/25 12:30:44 simonmar Exp $
+-- $Id: Main.hs,v 1.62 2000/10/03 16:51:57 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -73,7 +73,7 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 -----------------------------------------------------------------------------
 -- Usage Message
 
-short_usage = "Usage: For basic information, try the `-help' option."
+short_usage = "Usage: For basic information, try the `--help' option."
    
 long_usage = do
   let usage_file = "ghc-usage.txt"
@@ -605,12 +605,12 @@ newPackage = do
   details <- readIORef package_details
   hPutStr stdout "Reading package info from stdin... "
   stuff <- getContents
-  let new_pkg = read stuff :: (String,Package)
+  let new_pkg = read stuff :: Package
   catchAll new_pkg
   	(\_ -> throwDyn (OtherError "parse error in package info"))
   hPutStrLn stdout "done."
-  if (fst new_pkg `elem` map fst details)
-	then throwDyn (OtherError ("package `" ++ fst new_pkg ++ 
+  if (name new_pkg `elem` map name details)
+	then throwDyn (OtherError ("package `" ++ name new_pkg ++ 
 					"' already installed"))
 	else do
   conf_file <- readIORef package_config
@@ -623,13 +623,13 @@ deletePackage :: String -> IO ()
 deletePackage pkg = do  
   checkConfigAccess
   details <- readIORef package_details
-  if (pkg `notElem` map fst details)
+  if (pkg `notElem` map name details)
 	then throwDyn (OtherError ("package `" ++ pkg ++ "' not installed"))
 	else do
   conf_file <- readIORef package_config
   savePackageConfig conf_file
   maybeRestoreOldConfig conf_file $ do
-  writeNewConfig conf_file (filter ((/= pkg) . fst))
+  writeNewConfig conf_file (filter ((/= pkg) . name))
   exitWith ExitSuccess
 
 checkConfigAccess :: IO ()
@@ -650,7 +650,7 @@ maybeRestoreOldConfig conf_file io
 	throw e
     )
 
-writeNewConfig :: String -> ([(String,Package)] -> [(String,Package)]) -> IO ()
+writeNewConfig :: String -> ([Package] -> [Package]) -> IO ()
 writeNewConfig conf_file fn = do
   hPutStr stdout "Writing new package config file... "
   old_details <- readIORef package_details
@@ -676,7 +676,7 @@ packages = global ["std", "rts", "gmp"] :: IORef [String]
 addPackage :: String -> IO ()
 addPackage package
   = do pkg_details <- readIORef package_details
-       case lookup package pkg_details of
+       case lookupPkg package pkg_details of
 	  Nothing -> throwDyn (OtherError ("unknown package name: " ++ package))
 	  Just details -> do
 	    ps <- readIORef packages
@@ -741,9 +741,15 @@ getPackageExtraLdOpts = do
 getPackageDetails :: [String] -> IO [Package]
 getPackageDetails ps = do
   pkg_details <- readIORef package_details
-  return [ pkg | p <- ps, Just pkg <- [ lookup p pkg_details ] ]
+  return [ pkg | p <- ps, Just pkg <- [ lookupPkg p pkg_details ] ]
 
-GLOBAL_VAR(package_details, (error "package_details"), [(String,Package)])
+GLOBAL_VAR(package_details, (error "package_details"), [Package])
+
+lookupPkg :: String -> [Package] -> Maybe Package
+lookupPkg nm ps
+   = case [p | p <- ps, name p == nm] of
+        []    -> Nothing
+        (p:_) -> Just p
 
 -----------------------------------------------------------------------------
 -- Ways
@@ -1667,7 +1673,7 @@ run_phase Cpp _basename _suff input_fn output_fn
 		    ++ [ "-x", "c", input_fn, ">>", output_fn ]
 		   ))
 	  else do
-	    run_something "Inefective C pre-processor"
+	    run_something "Ineffective C pre-processor"
 	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" -}' > " 
 		    ++ output_fn ++ " && cat " ++ input_fn
 		    ++ " >> " ++ output_fn)
