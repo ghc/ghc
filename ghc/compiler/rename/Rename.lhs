@@ -50,8 +50,8 @@ import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
 			)
 import PrelInfo		( fractionalClassKeys, derivingOccurrences, wiredInThingEnv )
 import Type		( namesOfType, funTyCon )
-import ErrUtils		( printErrorsAndWarnings, dumpIfSet )
-import Bag		( isEmptyBag, bagToList )
+import ErrUtils		( dumpIfSet )
+import Bag		( bagToList )
 import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, 
 			  addToFM_C, elemFM, addToFM
 			)
@@ -77,21 +77,17 @@ renameModule :: DynFlags -> Finder
 	     -> Module -> RdrNameHsModule 
 	     -> IO (PersistentCompilerState, Maybe (ModIface, [RenamedHsDecl]))
 
-renameModule dflags finder hit hst old_pcs this_module 
-	     this_mod@(HsModule _ _ _ _ _ _ loc)
+renameModule dflags finder hit hst old_pcs this_module rdr_module
   = 	-- Initialise the renamer monad
     do {
-	((maybe_rn_stuff, dump_action), (rn_warns_bag, rn_errs_bag), new_pcs) 
-	   <- initRn dflags finder hit hst old_pcs this_module loc (rename this_module this_mod) ;
-
-	-- Check for warnings
-	printErrorsAndWarnings (rn_warns_bag, rn_errs_bag) ;
+	(new_pcs, errors_found, (maybe_rn_stuff, dump_action)) 
+	   <- initRn dflags finder hit hst old_pcs this_module (rename this_module rdr_module) ;
 
 	-- Dump any debugging output
 	dump_action ;
 
 	-- Return results
-	if not (isEmptyBag rn_errs_bag) then
+	if errors_found then
 	    return (old_pcs, Nothing)
         else
 	    return (new_pcs, maybe_rn_stuff)

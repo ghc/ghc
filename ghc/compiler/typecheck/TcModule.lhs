@@ -21,7 +21,7 @@ import TcHsSyn		( TypecheckedMonoBinds,
 			)
 
 import TcMonad
-import Inst		( emptyLIE, plusLIE )
+import Inst		( plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
@@ -47,16 +47,13 @@ import Module           ( Module, moduleName, plusModuleEnv )
 import Name		( Name, nameOccName, isLocallyDefined, isGlobalName,
 			  toRdrName, nameEnvElts, emptyNameEnv, lookupNameEnv
 			)
-import TyCon		( TyCon, isDataTyCon, tyConName, tyConGenInfo )
+import TyCon		( tyConGenInfo, isClassTyCon )
 import OccName		( isSysOcc )
-import TyCon		( TyCon, isClassTyCon )
-import Class		( Class )
 import PrelNames	( mAIN_Name, mainName )
-import UniqSupply       ( UniqSupply )
-import Maybes		( maybeToBool, thenMaybe )
+import Maybes		( thenMaybe )
 import Util
 import BasicTypes       ( EP(..), Fixity )
-import Bag		( Bag, isEmptyBag )
+import Bag		( isEmptyBag )
 import Outputable
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
 			  PackageSymbolTable, PackageIfaceTable, DFunId, ModIface(..),
@@ -135,7 +132,6 @@ tcModule pcs hst get_fixity this_mod decls unf_env
     let
         classes       = tcEnvClasses env
         tycons        = tcEnvTyCons env	-- INCLUDES tycons derived from classes
-        local_classes = filter isLocallyDefined classes
         local_tycons  = [ tc | tc <- tycons,
     			       isLocallyDefined tc,
     			       not (isClassTyCon tc)
@@ -295,8 +291,8 @@ printTcDump dflags (Just (_,results))
 
 dump_tc results
   = vcat [ppr (tc_binds results),
-	  pp_rules (tc_rules results) --,
---	  ppr_gen_tycons (tc_tycons results)
+	  pp_rules (tc_rules results),
+	  ppr_gen_tycons [tc | ATyCon tc <- nameEnvElts (tc_env results)]
     ]
 
 dump_sigs results	-- Print type signatures

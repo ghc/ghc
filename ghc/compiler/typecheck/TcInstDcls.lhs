@@ -11,11 +11,10 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
 
 import CmdLineOpts	( DynFlag(..), dopt )
 
-import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), InPat(..),
-			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), Match(..),
+import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), 
+			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), 
 			  andMonoBindList, collectMonoBinders, isClassDecl
 			)
-import HsTypes          ( HsType (..), HsTyVarBndr(..), toHsTyVar )
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, RenamedMonoBinds,
 			  RenamedTyClDecl, RenamedHsType, 
 			  extractHsTyVars, maybeGenericMatch
@@ -29,25 +28,23 @@ import Inst		( InstOrigin(..),
 			  LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( TcEnv, tcExtendGlobalValEnv, 
-			  tcExtendTyVarEnvForMeths, TyThing (..),
+			  tcExtendTyVarEnvForMeths, 
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
 			  newDFunName, tcExtendTyVarEnv
 			)
 import InstEnv		( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
  			  simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
 			  extendInstEnv )
-import TcMonoType	( tcTyVars, tcHsSigType, tcHsType, kcHsSigType )
+import TcMonoType	( tcTyVars, tcHsSigType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
 import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, DFunId,
 			  ModDetails(..) )
 
-import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
-			  foldBag, Bag, listToBag
-			)
+import Bag		( unionManyBags	)
 import Class		( Class, DefMeth(..), classBigSig )
 import Var		( idName, idType )
-import Maybes 		( maybeToBool, expectJust )
+import Maybes 		( maybeToBool )
 import MkId		( mkDictFunId )
 import Generics		( validGenericInstanceType )
 import Module		( Module, foldModuleEnv )
@@ -58,7 +55,7 @@ import PprType		( pprConstraint, pprPred )
 import TyCon		( TyCon, isSynTyCon, tyConDerivings )
 import Type		( mkTyVarTys, splitDFunTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy,
-			  splitAlgTyConApp_maybe, classesToPreds, classesOfPreds,
+			  splitAlgTyConApp_maybe, 
 			  unUsgTy, tyVarsOfTypes, mkClassPred, mkTyVarTy,
 			  getClassTys_maybe
 			)
@@ -66,12 +63,9 @@ import Subst		( mkTopTyVarSubst, substClasses, substTheta )
 import VarSet		( mkVarSet, varSetElems )
 import TysWiredIn	( genericTyCons, isFFIArgumentTy, isFFIResultTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
-import Name             ( Name, NameEnv, extendNameEnv_C, emptyNameEnv, 
-			  plusNameEnv_C, nameEnvElts )
-import FiniteMap        ( mapFM )
+import Name             ( Name )
 import SrcLoc           ( SrcLoc )
 import VarSet           ( varSetElems )
-import UniqFM           ( mapUFM )
 import Unique		( Uniquable(..) )
 import BasicTypes	( NewOrData(..), Fixity )
 import ErrUtils		( dumpIfSet_dyn )
@@ -79,7 +73,7 @@ import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc,
 			  assocElts, extendAssoc_C,
 			  equivClassesByUniq, minusList
 			)
-import List             ( intersect, (\\), partition )
+import List             ( partition )
 import Outputable
 \end{code}
 

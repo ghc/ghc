@@ -16,7 +16,7 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
-import TcEnv		( TcEnv, tcSetInstEnv, getTcGST, newDFunName )
+import TcEnv		( TcEnv, tcSetInstEnv, newDFunName )
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( InstInfo(..), InstEnv, 
 			  pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
@@ -26,33 +26,29 @@ import RnBinds		( rnMethodBinds, rnTopMonoBinds )
 import RnEnv		( bindLocatedLocalsRn )
 import RnMonad		( --RnNameSupply, 
 			  renameSourceCode, thenRn, mapRn, returnRn )
-import HscTypes		( DFunId, GlobalSymbolTable, PersistentRenamerState )
+import HscTypes		( DFunId, PersistentRenamerState )
 
 import BasicTypes	( Fixity )
-import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
 import ErrUtils		( dumpIfSet_dyn, Message )
 import MkId		( mkDictFunId )
-import Id		( mkVanillaId, idType )
+import Id		( idType )
 import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
-import Name		( Name, isLocallyDefined, getSrcLoc, NamedThing(..) )
+import Name		( Name, isLocallyDefined, getSrcLoc )
 import RdrName		( RdrName )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
-			  isEnumerationTyCon, isAlgTyCon, TyCon
+			  isEnumerationTyCon, TyCon
 			)
 import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp,
-			  mkSigmaTy, splitDFunTy, mkDictTy, 
-			  isUnboxedType, splitAlgTyConApp, classesToPreds
+			  splitDFunTy, isUnboxedType
 			)
-import TysWiredIn	( voidTy )
 import Var		( TyVar )
 import PrelNames
-import Bag		( bagToList )
 import Util		( zipWithEqual, sortLt, thenCmp )
 import ListSetOps	( removeDups,  assoc )
 import Outputable

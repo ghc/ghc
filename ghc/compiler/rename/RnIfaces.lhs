@@ -10,13 +10,15 @@ module RnIfaces
 	getImportedInstDecls, getImportedRules,
 	lookupFixityRn, 
 	importDecl, ImportDeclResult(..), recordLocalSlurps, 
-	mkImportInfo, getSlurped
+	mkImportInfo, getSlurped,
+
+	recompileRequired
        )
 where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_NoPruneDecls, opt_NoPruneTyDecls, opt_IgnoreIfacePragmas )
+import CmdLineOpts	( DynFlags, opt_NoPruneDecls, opt_NoPruneTyDecls, opt_IgnoreIfacePragmas )
 import HscTypes
 import HsSyn		( HsDecl(..), InstDecl(..),  HsType(..) )
 import HsImpExp		( ImportDecl(..) )
@@ -300,7 +302,7 @@ mkImportInfo this_mod imports
 
 	     where
 		go_for_it exports = (mod_name, has_orphans, is_boot, exports) : so_far
-	        mod_iface 	  = lookupIface hit pit mod_name
+	        mod_iface 	  = lookupTableByModName hit pit mod_name `orElse` panic "mkImportInfo"
 		mod		  = mi_module mod_iface
 	        is_lib_module     = not (isModuleInThisPackage mod)
 	        version_info      = mi_version mod_iface
@@ -495,14 +497,27 @@ that we know just what instances to bring into scope.
 %*							*
 %********************************************************
 
+@recompileRequired@ is called from the HscMain.   It checks whether
+a recompilation is required.  It needs access to the persistent state,
+finder, etc, because it may have to load lots of interface files to
+check their versions.
+
 \begin{code}
 type RecompileRequired = Bool
 upToDate  = False	-- Recompile not required
 outOfDate = True	-- Recompile required
 
-recompileRequired :: Module -> Bool -> Maybe ModIface -> RnMG RecompileRequired
-recompileRequired mod source_unchanged maybe_iface
-  = traceRn (text "Considering whether compilation is required for" <+> ppr mod <> colon)	`thenRn_`
+recompileRequired :: DynFlags -> Finder
+		  -> HomeIfaceTable -> HomeSymbolTable
+		  -> PersistentCompilerState
+		  -> Module 
+		  -> Bool 		-- Source unchanged
+		  -> Maybe ModIface 	-- Old interface, if any
+		  -> IO (PersistentCompilerState, Bool, RecompileRequired)
+				-- True <=> errors happened
+recompileRequired dflags finder hit hst pcs mod source_unchanged maybe_iface
+  = initRn dflags finder hit hst pcs mod $
+    traceRn (text "Considering whether compilation is required for" <+> ppr mod <> colon)	`thenRn_`
 
 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     if not source_unchanged then
@@ -516,8 +531,7 @@ recompileRequired mod source_unchanged maybe_iface
 		   returnRn outOfDate ;
 
 	Just iface  ->    	-- Source code unchanged and no errors yet... carry on 
-			getHomeIfaceTableRn					`thenRn` \ hit ->
-			checkList [checkModUsage hit u | u <- mi_usages iface]
+			checkList [checkModUsage u | u <- mi_usages iface]
 
 checkList :: [RnMG RecompileRequired] -> RnMG RecompileRequired
 checkList []		 = returnRn upToDate
@@ -529,12 +543,12 @@ checkList (check:checks) = check	`thenRn` \ recompile ->
 \end{code}
 	
 \begin{code}
-checkModUsage :: HomeIfaceTable -> ImportVersion Name -> RnMG RecompileRequired
+checkModUsage :: ImportVersion Name -> RnMG RecompileRequired
 -- Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
 
-checkModUsage hit (mod_name, _, _, NothingAtAll)
+checkModUsage (mod_name, _, _, NothingAtAll)
 	-- If CurrentModule.hi contains 
 	--	import Foo :: ;
 	-- then that simply records that Foo lies below CurrentModule in the
@@ -542,7 +556,7 @@ checkModUsage hit (mod_name, _, _, NothingAtAll)
 	-- In this case we don't even want to open Foo's interface.
   = up_to_date (ptext SLIT("Nothing used from:") <+> ppr mod_name)
 
-checkModUsage hit (mod_name, _, _, whats_imported)
+checkModUsage (mod_name, _, _, whats_imported)
   = tryLoadInterface doc_str mod_name ImportBySystem	`thenRn` \ (ifaces, maybe_err) ->
     case maybe_err of {
 	Just err -> out_of_date (sep [ptext SLIT("Can't find version number for module"), 
@@ -552,6 +566,8 @@ checkModUsage hit (mod_name, _, _, whats_imported)
 		-- the current module doesn't need that import and it's been deleted
 
 	Nothing -> 
+
+    getHomeIfaceTableRn					`thenRn` \ hit ->
     let
 	mod_details   = lookupTableByModName hit (iPIT ifaces) mod_name
 			`orElse` panic "checkModUsage"

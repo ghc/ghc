@@ -44,7 +44,7 @@ import HscTypes		( Finder,
 			  HomeSymbolTable, PackageSymbolTable,
 			  PersistentCompilerState(..), GlobalRdrEnv,
 			  HomeIfaceTable, PackageIfaceTable,
-			  RdrAvailInfo, ModIface )
+			  RdrAvailInfo )
 import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
@@ -59,17 +59,18 @@ import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
 			  extendNameEnvList
 			)
-import Module		( Module, ModuleName, lookupModuleEnvByName )
+import Module		( Module, ModuleName )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
-import SrcLoc		( SrcLoc, generatedSrcLoc )
+import SrcLoc		( SrcLoc, generatedSrcLoc, noSrcLoc )
 import Unique		( Unique )
 import FiniteMap	( FiniteMap, emptyFM )
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable
 import PrelNames	( mkUnboundName )
-import Maybes		( maybeToBool, seqMaybe, orElse )
+import Maybes		( maybeToBool, seqMaybe )
+import ErrUtils		( printErrorsAndWarnings )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -285,28 +286,38 @@ type IsLoaded = Bool
 %************************************************************************
 
 \begin{code}
-initRn :: DynFlags 
-       -> Finder 
-       -> HomeIfaceTable
-       -> HomeSymbolTable
+initRn :: DynFlags       -> Finder 
+       -> HomeIfaceTable -> HomeSymbolTable
        -> PersistentCompilerState
-       -> Module 
-       -> SrcLoc
+       -> Module
        -> RnMG t
-       -> IO (t, (Bag WarnMsg, Bag ErrMsg), PersistentCompilerState)
+       -> IO (PersistentCompilerState, Bool, t)	
+		-- True <=> found errors
 
-initRn dflags finder hit hst pcs mod loc do_rn
+initRn dflags finder hit hst pcs mod do_rn
   = do 
 	let prs = pcs_PRS pcs
 	let pst = pcs_PST pcs
+	let ifaces = Ifaces { iPIT   = pcs_PIT pcs,
+			      iDecls = prsDecls prs,
+		  	      iInsts = prsInsts prs,
+		 	      iRules = prsRules prs,
+
+		 	      iImpModInfo = emptyFM,
+			      iSlurp      = unitNameSet (mkUnboundName dummyRdrVarName),
+				-- Pretend that the dummy unbound name has already been
+				-- slurped.  This is what's returned for an out-of-scope name,
+				-- and we don't want thereby to try to suck it in!
+			      iVSlurp = []
+		      }
         let uniqs = prsNS prs
 
 	names_var <- newIORef (uniqs, origNames (prsOrig prs), 
 				      origIParam (prsOrig prs))
 	errs_var  <- newIORef (emptyBag,emptyBag)
-	iface_var <- newIORef (initIfaces pcs)
+	iface_var <- newIORef ifaces
 	let rn_down = RnDown { rn_mod = mod,
-			       rn_loc = loc, 
+			       rn_loc = noSrcLoc, 
 	
 			       rn_finder = finder,
 			       rn_dflags = dflags,
@@ -334,34 +345,15 @@ initRn dflags finder hit hst pcs mod loc do_rn
 	let new_pcs = pcs { pcs_PIT = iPIT new_ifaces, 
 			    pcs_PRS = new_prs }
 	
-	return (res, (warns, errs), new_pcs)
+	-- Check for warnings
+	printErrorsAndWarnings (warns, errs) ;
+
+	return (new_pcs, not (isEmptyBag errs), res)
 
 is_done :: HomeSymbolTable -> PackageSymbolTable -> Name -> Bool
 -- Returns True iff the name is in either symbol table
 is_done hst pst n = maybeToBool (lookupTypeEnv pst n `seqMaybe` lookupTypeEnv hst n)
 
-lookupIface :: HomeIfaceTable -> PackageIfaceTable -> ModuleName -> ModIface
-lookupIface hit pit mod = lookupModuleEnvByName hit mod `orElse` 
-			  lookupModuleEnvByName pit mod `orElse`
-			  pprPanic "lookupIface" (ppr mod)
-
-initIfaces :: PersistentCompilerState -> Ifaces
-initIfaces (PCS { pcs_PIT = pit, pcs_PRS = prs })
-  = Ifaces { iPIT   = pit,
-	     iDecls = prsDecls prs,
-	     iInsts = prsInsts prs,
-	     iRules = prsRules prs,
-
-	     iImpModInfo = emptyFM,
-	     iSlurp      = unitNameSet (mkUnboundName dummyRdrVarName),
-			-- Pretend that the dummy unbound name has already been
-			-- slurped.  This is what's returned for an out-of-scope name,
-			-- and we don't want thereby to try to suck it in!
-	     iVSlurp = []
-      }
-
-
-initRnMS :: GlobalRdrEnv -> LocalFixityEnv -> RnMode -> RnMS r -> RnM d r
 initRnMS rn_env fixity_env mode thing_inside rn_down g_down
   = let
 	s_down = SDown { rn_genv = rn_env, rn_lenv = emptyRdrEnv, 
