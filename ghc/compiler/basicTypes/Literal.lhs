@@ -8,7 +8,7 @@ module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
 	, mkMachInt64, mkMachWord64
-	, isLitLitLit, maybeLitLit, litIsDupable,
+	, isLitLitLit, maybeLitLit, litSize, litIsDupable,
 	, literalType, literalPrimRep
 	, hashLiteral
 
@@ -34,7 +34,7 @@ import FastTypes
 import Util		( thenCmp )
 
 import Ratio 		( numerator )
-import FastString	( uniqueOfFS )
+import FastString	( uniqueOfFS, lengthFS )
 import Char		( ord, chr )
 \end{code}
 
@@ -190,6 +190,11 @@ litIsDupable :: Literal -> Bool
 	-- False principally of strings
 litIsDupable (MachStr _) = False
 litIsDupable other	 = True
+
+litSize :: Literal -> Int
+	-- used by CoreUnfold.sizeExpr
+litSize (MachStr str) = lengthFS str `div` 4
+litSize _other	      = 1
 \end{code}
 
 	Types

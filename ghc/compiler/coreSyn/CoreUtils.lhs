@@ -44,7 +44,7 @@ import Var		( Var, isId, isTyVar )
 import VarSet
 import VarEnv
 import Name		( hashName )
-import Literal		( hashLiteral, literalType, litIsDupable )
+import Literal		( hashLiteral, literalType, litSize, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
 			  primOpIsDupable )

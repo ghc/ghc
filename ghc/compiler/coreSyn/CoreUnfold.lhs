@@ -47,7 +47,7 @@ import Id		( Id, idType, idFlavour, isId,
 			  isPrimOpId_maybe
 			)
 import VarSet
-import Literal		( isLitLitLit, litIsDupable )
+import Literal		( isLitLitLit, litSize )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
 import IdInfo		( InlinePragInfo(..), OccInfo(..), IdFlavour(..),
 			  isNeverInlinePrag
@@ -193,8 +193,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (App fun (Type t)) = size_up fun
     size_up (App fun arg)      = size_up_app fun [arg]
 
-    size_up (Lit lit) | litIsDupable lit = sizeOne
-		      | otherwise	 = sizeN opt_UF_DearOp	-- For lack of anything better
+    size_up (Lit lit) 	       = sizeN (litSize lit)
 
     size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
 		      | otherwise = size_up e
