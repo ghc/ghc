@@ -62,6 +62,7 @@ import Hugs.Directory
 import Prelude
 
 import Control.Exception       ( bracket )
+import Control.Monad           ( when )
 import System.Posix.Types
 import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
@@ -427,6 +428,29 @@ renameFile opath npath =
     withCString opath $ \s1 ->
       withCString npath $ \s2 ->
          throwErrnoIfMinus1Retry_ "renameFile" (c_rename s1 s2)
+
+{- |@'copyFile' old new@ copies the existing file from /old/ to /new/.
+If the /new/ file already exists, it is atomically replaced by the /old/ file.
+Neither path may refer to an existing directory.
+-}
+copyFile :: FilePath -> FilePath -> IO ()
+copyFile fromFPath toFPath = handle (changeFunName) $
+	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
+	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
+	 allocaBytes bufferSize $ \buffer ->
+		copyContents hFrom hTo buffer) `catch` (ioError . changeFunName)
+	where
+		bufferSize = 1024
+		
+		changeFunName (IOError h iot fun str mb_fp) = IOError h iot "copyFile" str mb_fp
+		changeFunName e                             = e
+		
+		copyContents hFrom hTo buffer = do
+			count <- hGetBuf hFrom buffer bufferSize
+			when (count > 0) $ do
+				hPutBuf hTo buffer count
+				copyContents hFrom hTo buffer
+
 
 {- |@'getDirectoryContents' dir@ returns a list of /all/ entries
 in /dir/. 
