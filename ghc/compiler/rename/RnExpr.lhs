@@ -43,9 +43,6 @@ import PrelNames	( hasKey, assertIdKey,
 			  crossPName, zipPName, toPName,
 			  enumFromToPName, enumFromThenToPName, assertErrorName,
 			  negateName, monadNames, mfixName )
-#ifdef GHCI
-import DsMeta		( qTyConName )
-#endif
 import Name		( Name, nameOccName )
 import NameSet
 import UnicodeUtil	( stringToUtf8 )
@@ -227,30 +224,26 @@ rnExpr (HsPar e)
     returnM (HsPar e', fvs_e)
 
 -- Template Haskell extensions
-#ifdef GHCI
-rnExpr (HsBracket br_body loc)
-  = addSrcLoc loc			$
-    checkGHCI (thErr "bracket")		`thenM_`
-    rnBracket br_body			`thenM` \ (body', fvs_e) ->
-    returnM (HsBracket body' loc, fvs_e `addOneFV` qTyConName)
-	-- We use the Q tycon as a proxy to haul in all the smart
-	-- constructors; see the hack in RnIfaces
+-- Don't ifdef-GHCI them because we want to fail gracefully
+-- (not with an rnExpr crash) in a stage-1 compiler.
+rnExpr e@(HsBracket br_body loc)
+  = addSrcLoc loc		$
+    checkTH e "bracket"		`thenM_`
+    rnBracket br_body		`thenM` \ (body', fvs_e) ->
+    returnM (HsBracket body' loc, fvs_e `plusFV` thProxyName)
 
-rnExpr (HsSplice n e loc)
-  = addSrcLoc loc			$
-    checkGHCI (thErr "splice")		`thenM_`
-    newLocalsRn [(n,loc)]		`thenM` \ [n'] ->
-    rnExpr e 				`thenM` \ (e', fvs_e) ->
-    returnM (HsSplice n' e' loc, fvs_e `addOneFV` qTyConName)
-	-- The qTyCon brutally pulls in all the meta stuff
+rnExpr e@(HsSplice n splice loc)
+  = addSrcLoc loc		$
+    checkTH e "splice"		`thenM_`
+    newLocalsRn [(n,loc)]	`thenM` \ [n'] ->
+    rnExpr splice 		`thenM` \ (splice', fvs_e) ->
+    returnM (HsSplice n' splice' loc, fvs_e `plusFV` thProxyName)
 
-rnExpr (HsReify (Reify flavour name))
-  = checkGHCI (thErr "reify")		`thenM_`
-    lookupGlobalOccRn name		`thenM` \ name' ->
+rnExpr e@(HsReify (Reify flavour name))
+  = checkTH e "reify"		`thenM_`
+    lookupGlobalOccRn name	`thenM` \ name' ->
 	-- For now, we can only reify top-level things
-    returnM (HsReify (Reify flavour name'), mkFVs [name', qTyConName])
-	-- The qTyCon brutally pulls in all the meta stuff
-#endif
+    returnM (HsReify (Reify flavour name'), unitFV name' `plusFV` thProxyName)
 
 rnExpr section@(SectionL expr op)
   = rnExpr expr	 				`thenM` \ (expr', fvs_expr) ->
@@ -917,9 +910,14 @@ doStmtListErr do_or_lc e
 			MDoExpr -> "mdo"
 			other   -> "do"
 
-thErr what
-  = ptext SLIT("Template Haskell") <+> text what <+>  
-    ptext SLIT("illegal in a stage-1 compiler") 
+#ifdef GHCI 
+checkTH e what = returnRn ()	-- OK
+#else
+checkTH e what 	-- Raise an error in a stage-1 compiler
+  = addErr (vcat [ptext SLIT("Template Haskell") <+> text what <+>  
+	          ptext SLIT("illegal in a stage-1 compiler"),
+	          nest 2 (ppr e)])
+#endif   
 
 badIpBinds binds
   = hang (ptext SLIT("Implicit-parameter bindings illegal in a parallel list comprehension:")) 4

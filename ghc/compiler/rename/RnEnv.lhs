@@ -581,18 +581,31 @@ implicitModuleFVs source_fvs
     namesNeededForFlattening		`plusFV`
     ubiquitousNames
 
+
+thProxyName :: NameSet
+mkTemplateHaskellFVs :: NameSet -> NameSet
 	-- This is a bit of a hack.  When we see the Template-Haskell construct
 	--	[| expr |]
 	-- we are going to need lots of the ``smart constructors'' defined in
 	-- the main Template Haskell data type module.  Rather than treat them
 	-- all as free vars at every occurrence site, we just make the Q type
 	-- consructor a free var.... and then use that here to haul in the others
-mkTemplateHaskellFVs source_fvs
+
 #ifdef GHCI
-	-- Only if Template Haskell is enabled
+---------------	Template Haskell enabled --------------
+thProxyName = unitFV qTyConName
+
+mkTemplateHaskellFVs source_fvs
   | qTyConName `elemNameSet` source_fvs = templateHaskellNames
-#endif
   | otherwise			        = emptyFVs
+
+#else
+---------------	Template Haskell disabled --------------
+
+thProxyName 			= emptyFVs
+mkTemplateHaskellFVs source_fvs = emptyFVs
+#endif
+--------------------------------------------------------
 
 -- ubiquitous_names are loaded regardless, because 
 -- they are needed in virtually every program
