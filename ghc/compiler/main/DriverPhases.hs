@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.11 2001/06/22 13:28:44 rrt Exp $
+-- $Id: DriverPhases.hs,v 1.12 2001/08/15 09:32:40 rrt Exp $
 --
 -- GHC Driver
 --
@@ -48,7 +48,11 @@ data Phase
 	| SplitMangle	-- after mangler if splitting
 	| SplitAs
 	| As
-	| Ln 
+	| Ln
+#ifdef ILX
+        | Ilx2Il
+	| Ilasm
+#endif
   deriving (Eq, Show)
 
 -- the first compilation phase for a given file is determined
@@ -77,6 +81,10 @@ phaseInputExt As          = "s"
 phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
 phaseInputExt MkDependHS  = "dep"
+#ifdef ILX
+phaseInputExt Ilx2Il      = "ilx"
+phaseInputExt Ilasm       = "il"
+#endif
 
 haskellish_suffix     = (`elem` [ "hs", "hspp", "lhs", "hc", "raw_s" ])
 haskellish_src_suffix = (`elem` [ "hs", "hspp", "lhs" ])

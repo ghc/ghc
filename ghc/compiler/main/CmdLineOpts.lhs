@@ -316,6 +316,10 @@ data DynFlags = DynFlags {
   opt_c			:: [String],
   opt_a			:: [String],
   opt_m			:: [String],
+#ifdef ILX			   
+  opt_I			:: [String],
+  opt_i			:: [String],
+#endif
 
   -- hsc dynamic flags
   flags      		:: [DynFlag]
@@ -344,6 +348,10 @@ defaultDynFlags = DynFlags {
   opt_c			= [],
   opt_a			= [],
   opt_m			= [],
+#ifdef ILX
+  opt_I                 = [],
+  opt_i                 = [],
+#endif
   flags = standardWarnings,
   }
 

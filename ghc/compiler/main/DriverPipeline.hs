@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.97 2001/08/15 00:36:54 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.98 2001/08/15 09:32:40 rrt Exp $
 --
 -- GHC Driver
 --
@@ -175,7 +175,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 	HscJava	| split	          -> not_valid
 		| otherwise       -> error "not implemented: compiling via Java"
 	HscILX  | split           -> not_valid
-		| otherwise       -> [ Unlit, Cpp, Hsc ]
+		| otherwise       -> [ Unlit, Cpp, Hsc, Ilx2Il, Ilasm ]
 
       | cish      = [ Cc, As ]
 
@@ -684,6 +684,30 @@ run_phase SplitAs basename _suff _input_fn output_fn
 	mapM_ assemble_file [1..n]
 	return (Just output_fn)
 
+#ifdef ILX
+-----------------------------------------------------------------------------
+-- Ilx2Il phase
+-- Run ilx2il over the ILX output, getting an IL file
+
+run_phase Ilx2Il _basename _suff input_fn output_fn
+  = do	ilx2il_opts <- getOpts opt_I
+        SysTools.runIlx2il (ilx2il_opts
+                           ++ [ "--no-add-suffix-to-assembly", "mscorlib",
+				"-o", output_fn, input_fn ])
+	return (Just output_fn)
+
+-----------------------------------------------------------------------------
+-- Ilasm phase
+-- Run ilasm over the IL, getting a DLL
+
+run_phase Ilasm _basename _suff input_fn output_fn
+  = do	ilasm_opts <- getOpts opt_i
+        SysTools.runIlasm (ilasm_opts
+		           ++ [ "/QUIET", "/DLL", "/OUT="++output_fn, input_fn ])
+	return (Just output_fn)
+
+#endif -- ILX
+
 -----------------------------------------------------------------------------
 -- MoveBinary sort-of-phase
 -- After having produced a binary, move it somewhere else and generate a
@@ -999,8 +1023,7 @@ compile ghci_mode summary source_unchanged have_object
 	   HscC    | keep_hc   -> return (basename ++ '.':phaseInputExt HCc)
 		   | otherwise -> newTempName (phaseInputExt HCc)
            HscJava             -> newTempName "java" -- ToDo
-	   HscILX              -> return (basename ++ ".ilx") 	
-	   			    -- newTempName "ilx"	-- ToDo
+	   HscILX              -> return (phaseInputExt Ilx2Il) 	
 	   HscInterpreted      -> return (error "no output file")
 
    let dyn_flags' = dyn_flags { hscOutName = output_fn,

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.64 2001/08/13 15:49:38 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.65 2001/08/15 09:32:40 rrt Exp $
 --
 -- Driver flags
 --
@@ -305,6 +305,10 @@ dynamic_flags = [
   ,  ( "optc",		HasArg (addOpt_c) )
   ,  ( "optm",		HasArg (addOpt_m) )
   ,  ( "opta",		HasArg (addOpt_a) )
+#ifdef ILX
+  ,  ( "optI",		HasArg (addOpt_I) )
+  ,  ( "opti",		HasArg (addOpt_i) )
+#endif
 
 	------ HsCpp opts ---------------------------------------------------
 	-- With a C compiler whose system() doesn't use a UNIX shell (i.e.
@@ -520,11 +524,15 @@ machdepCCOpts
 
 
 
-addOpt_L a = updDynFlags (\s -> s{opt_L =  a : opt_L s})
-addOpt_P a = updDynFlags (\s -> s{opt_P =  a : opt_P s})
-addOpt_c a = updDynFlags (\s -> s{opt_c =  a : opt_c s})
-addOpt_a a = updDynFlags (\s -> s{opt_a =  a : opt_a s})
-addOpt_m a = updDynFlags (\s -> s{opt_m =  a : opt_m s})
+addOpt_L a = updDynFlags (\s -> s{opt_L = a : opt_L s})
+addOpt_P a = updDynFlags (\s -> s{opt_P = a : opt_P s})
+addOpt_c a = updDynFlags (\s -> s{opt_c = a : opt_c s})
+addOpt_a a = updDynFlags (\s -> s{opt_a = a : opt_a s})
+addOpt_m a = updDynFlags (\s -> s{opt_m = a : opt_m s})
+#ifdef ILX
+addOpt_I a = updDynFlags (\s -> s{opt_I = a : opt_I s})
+addOpt_i a = updDynFlags (\s -> s{opt_i = a : opt_i s})
+#endif
 
 addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
@@ -533,8 +541,7 @@ getOpts :: (DynFlags -> [a]) -> IO [a]
 getOpts opts = dynFlag opts >>= return . reverse
 
 -- we can only change HscC to HscAsm and vice-versa with dynamic flags 
--- (-fvia-C and -fasm).
--- NB: we can also set the new lang to ILX, via -filx.  I hope this is right
+-- (-fvia-C and -fasm). We can also set the new lang to ILX, via -filx.
 setLang l = updDynFlags (\ dfs -> case hscLang dfs of
 					HscC   -> dfs{ hscLang = l }
 					HscAsm -> dfs{ hscLang = l }

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: SysTools.lhs,v 1.48 2001/08/13 15:49:38 simonmar Exp $
+-- $Id: SysTools.lhs,v 1.49 2001/08/15 09:32:40 rrt Exp $
 --
 -- (c) The University of Glasgow 2001
 --
@@ -23,6 +23,10 @@ module SysTools (
 	runMangle, runSplit,	 -- [Option] -> IO ()
 	runAs, runLink,		 -- [Option] -> IO ()
 	runMkDLL,
+#ifdef ILX
+        runIlx2il, runIlasm,     -- [String] -> IO ()
+#endif
+
 
 	touch,			-- String -> String -> IO ()
 	copy,			-- String -> String -> String -> IO ()
@@ -156,6 +160,10 @@ GLOBAL_VAR(v_Pgm_c,   	error "pgm_c",   String)	-- gcc
 GLOBAL_VAR(v_Pgm_m,   	error "pgm_m",   String)	-- asm code mangler
 GLOBAL_VAR(v_Pgm_s,   	error "pgm_s",   String)	-- asm code splitter
 GLOBAL_VAR(v_Pgm_a,   	error "pgm_a",   String)	-- as
+#ifdef ILX
+GLOBAL_VAR(v_Pgm_I,     error "pgm_I",   String)        -- ilx2il
+GLOBAL_VAR(v_Pgm_i,     error "pgm_i",   String)        -- ilasm
+#endif
 GLOBAL_VAR(v_Pgm_l,   	error "pgm_l",   String)	-- ld
 GLOBAL_VAR(v_Pgm_MkDLL, error "pgm_dll", String)	-- mkdll
 
@@ -307,6 +315,11 @@ initSysTools minusB_args
 	; let	as_path  = gcc_path
 		ld_path  = gcc_path
 
+#ifdef ILX
+       -- ilx2il and ilasm are specified in Config.hs
+       ; let    ilx2il_path = cILX2IL
+		ilasm_path  = cILASM
+#endif
 				       
 	-- Initialise the global vars
 	; writeIORef v_Path_package_config pkgconfig_path
@@ -322,6 +335,10 @@ initSysTools minusB_args
 	; writeIORef v_Pgm_m   	 	   mangle_path
 	; writeIORef v_Pgm_s   	 	   split_path
 	; writeIORef v_Pgm_a   	 	   as_path
+#ifdef ILX
+	; writeIORef v_Pgm_I               ilx2il_path
+	; writeIORef v_Pgm_i               ilasm_path
+#endif
 	; writeIORef v_Pgm_l   	 	   ld_path
 	; writeIORef v_Pgm_MkDLL 	   mkdll_path
 	; writeIORef v_Pgm_T   	 	   touch_path
@@ -333,7 +350,7 @@ initSysTools minusB_args
 
 setPgm is called when a command-line option like
 	-pgmLld
-is used to override a particular program with a new onw
+is used to override a particular program with a new one
 
 \begin{code}
 setPgm :: String -> IO ()
@@ -346,6 +363,10 @@ setPgm ('m' : pgm) = writeIORef v_Pgm_m pgm
 setPgm ('s' : pgm) = writeIORef v_Pgm_s pgm
 setPgm ('a' : pgm) = writeIORef v_Pgm_a pgm
 setPgm ('l' : pgm) = writeIORef v_Pgm_l pgm
+#ifdef ILX
+setPgm ('I' : pgm) = writeIORef v_Pgm_I pgm
+setPgm ('i' : pgm) = writeIORef v_Pgm_i pgm
+#endif
 setPgm pgm	   = unknownFlagErr ("-pgm" ++ pgm)
 \end{code}
 
@@ -466,6 +487,16 @@ runAs args = do p <- readIORef v_Pgm_a
 runLink :: [Option] -> IO ()
 runLink args = do p <- readIORef v_Pgm_l
 	          runSomething "Linker" p args
+
+#ifdef ILX
+runIlx2il :: [String] -> IO ()
+runIlx2il args = do p <- readIORef v_Pgm_I
+	            runSomething "Ilx2Il" p args
+
+runIlasm :: [String] -> IO ()
+runIlasm args = do p <- readIORef v_Pgm_i
+	           runSomething "Ilasm" p args
+#endif
 
 runMkDLL :: [Option] -> IO ()
 runMkDLL args = do p <- readIORef v_Pgm_MkDLL
@@ -683,6 +714,11 @@ unDosifyPath xs = subst '\\' '/' xs
 
 pgmPath dir pgm = dosifyPath dir ++ '\\' : pgm
 
+-- HACK!
+dosifyPath "\"/DLL\"" = "\"/DLL\""
+dosifyPath "\"/QUIET\"" = "\"/QUIET\""
+dosifyPath l@('"':'/':'O':'U':'T':_) = l
+-- end of HACK!
 dosifyPath stuff
   = subst '/' '\\' real_stuff
  where
