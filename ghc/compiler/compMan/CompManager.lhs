@@ -541,7 +541,8 @@ cmLoadModules cmstate1 dflags mg2unsorted
 	-- Sort out which linkables we wish to keep in the unlinked image.
 	-- See getValidLinkables below for details.
 	(valid_old_linkables, new_linkables)
-	    <- getValidLinkables ui1 mg2unsorted_names mg2_with_srcimps
+	    <- getValidLinkables ghci_mode ui1 
+		  mg2unsorted_names mg2_with_srcimps
 
 	-- putStrLn (showSDoc (vcat [ppr valid_old_linkables, ppr new_linkables]))
 
@@ -717,7 +718,7 @@ ppFilesFromSummaries summaries
 
 
 -----------------------------------------------------------------------------
--- getValidLin
+-- getValidLinkables
 
 -- For each module (or SCC of modules), we take:
 --
@@ -726,9 +727,11 @@ ppFilesFromSummaries summaries
 --
 --	- the old linkable, otherwise (and if one is available).
 --
--- and we throw away the linkable if it is older than the source
--- file.  We ignore the on-disk linkables unless all of the dependents
--- of this SCC also have on-disk linkables.
+-- and we throw away the linkable if it is older than the source file.
+-- In interactive mode, we also ignore the on-disk linkables unless
+-- all of the dependents of this SCC also have on-disk linkables (we
+-- can't have dynamically loaded objects that depend on interpreted
+-- modules in GHCi).
 --
 -- If a module has a valid linkable, then it may be STABLE (see below),
 -- and it is classified as SOURCE UNCHANGED for the purposes of calling
@@ -737,15 +740,16 @@ ppFilesFromSummaries summaries
 -- ToDo: this pass could be merged with the preUpsweep.
 
 getValidLinkables
-	:: [Linkable]		-- old linkables
+	:: GhciMode
+	-> [Linkable]		-- old linkables
 	-> [ModuleName]		-- all home modules
 	-> [SCC ModSummary]	-- all modules in the program, dependency order
 	-> IO ( [Linkable],	-- still-valid linkables 
 		[Linkable] 	-- new linkables we just found
 	      )
 
-getValidLinkables old_linkables all_home_mods module_graph = do
-  ls <- foldM (getValidLinkablesSCC old_linkables all_home_mods) 
+getValidLinkables mode old_linkables all_home_mods module_graph = do
+  ls <- foldM (getValidLinkablesSCC mode old_linkables all_home_mods) 
 		[] module_graph
   return (partition_it ls [] [])
  where
@@ -755,7 +759,7 @@ getValidLinkables old_linkables all_home_mods module_graph = do
 	| otherwise = partition_it ls (l:valid) new
 
 
-getValidLinkablesSCC old_linkables all_home_mods new_linkables scc0
+getValidLinkablesSCC mode old_linkables all_home_mods new_linkables scc0
    = let 
 	  scc             = flattenSCC scc0
           scc_names       = map modSummaryName scc
@@ -770,7 +774,7 @@ getValidLinkablesSCC old_linkables all_home_mods new_linkables scc0
 		    Nothing -> False
 		    Just l  -> isObjectLinkable l
 
-          objects_allowed = all has_object scc_allhomeimps
+          objects_allowed = mode == Batch || all has_object scc_allhomeimps
      in do
 
      new_linkables'
