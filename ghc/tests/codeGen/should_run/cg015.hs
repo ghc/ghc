@@ -1,4 +1,4 @@
-module GHCmain ( mainIO ) where
+module Main ( main ) where
 
 import PrelBase
 
@@ -13,7 +13,7 @@ clen :: CList -> Int#
 clen CNil = 0#
 clen (CCons _ cl) = 1# +# (clen cl)
 
-mainIO = case (clen list4) of
+main = case (clen list4) of
 		len4 ->
 		  case (len4 +# len4) of
 		    8# -> finish 65#	-- 'A'
