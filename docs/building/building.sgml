@@ -4341,20 +4341,21 @@ and <ulink url="http://www.mingw.org/msys.shtml">MSYS</ulink>:
 
 <itemizedlist>
 <listitem><para>
-MSYS is a fork of the Cygwin tree, so they
-are fundamentally similar.  However, MSYS is by design much smaller and simpler.  Access to the file system goes
-through fewer layers, so MSYS is quite a bit faster too.
-</para></listitem>
-
-<listitem><para>
 Cygwin comes with compilation tools (<command>gcc</command>, <command>ld</command> and so on), which
 compile code that has access to all of Posix.  The price is that the executables must be 
 dynamically linked with the Cygwin DLL, so that <emphasis>you cannot run a Cywin-compiled program on a machine
 that doesn't have Cygwin</emphasis>.  Worse, Cygwin is a moving target.  The name of the main DLL, <literal>cygwin1.dll</literal>
 does not change, but the implementation certainly does.  Even the interfaces to functions
 it exports seem to change occasionally. </para>
+</listitem>
 
-<para>In contrast, MSYS provides no compilation tools; it relies instead on the MinGW tools. These
+<listitem><para>
+MSYS is a fork of the Cygwin tree, so they
+are fundamentally similar.  However, MSYS is by design much smaller and simpler.  Access to the file system goes
+through fewer layers, so MSYS is quite a bit faster too.
+</para>
+
+<para>Furthermore, MSYS provides no compilation tools; it relies instead on the MinGW tools. These
 compile binaries that run with no DLL support, on any Win32 system.
 However, MSYS does come with all the make-system tools, such as <command>make</command>, <command>autoconf</command>, 
 <command>cvs</command>, <command>ssh</command> etc.  To get these, you have to download the 
@@ -4367,6 +4368,50 @@ not by programs compiled under MSYS.
 
 </itemizedlist>
 
+</para>
+</sect3>
+
+<sect3><title>Targeting MinGW</title>
+
+<para>We want GHC to compile programs that work on any Win32 system.  Hence:
+<itemizedlist>
+<listitem><para>
+GHC does invoke a C compiler, assembler, linker and so on, but we ensure that it only
+invokes the MinGW tools, not the Cygwin ones.  That means that the programs GHC compiles
+will work on any system, but it also means that the programs GHC compiles do not have access
+to all of Posix.  In particular, they cannot import the (Haskell) Posix 
+library; they have to do
+their input output using standard Haskell I/O libraries, or native Win32 bindings.</para>
+<para> We will call a GHC that targets MinGW in this way <emphasis>GHC-mingw</emphasis>.</para>
+</listitem>
+
+<listitem><para>
+To make the GHC distribution self-contained, the GHC distribution includes the MinGW <command>gcc</command>,
+<command>as</command>, <command>ld</command>, and a bunch of input/output libraries.  
+</para></listitem>
+</itemizedlist>
+So <emphasis>GHC targets MinGW</emphasis>, not Cygwin.
+It is in principle possible to build a version of GHC, <emphasis>GHC-cygwin</emphasis>, 
+that targets Cygwin instead.  The up-side of GHC-cygwin is
+that Haskell programs compiled by GHC-cygwin can import the (Haskell) Posix library.
+<emphasis>We do not support GHC-cygwin, however; it is beyond our resources.</emphasis>
+</para>
+
+<para>While GHC <emphasis>targets</emphasis> MinGW, that says nothing about 
+how GHC is <emphasis>built</emphasis>.  We use both MSYS and Cygwin as build environments for
+GHC; both work fine, though MSYS is rather lighter weight.</para>
+
+<para>In your build tree, you build a compiler called <Command>ghc-inplace</Command>.  It
+uses the <Command>gcc</Command> that you specify using the
+<option>--with-gcc</option> flag when you run
+<Command>configure</Command> (see below).
+The makefiles are careful to use <Command>ghc-inplace</Command> (not <Command>gcc</Command>)
+to compile any C files, so that it will in turn invoke the correct <Command>gcc</Command> rather that
+whatever one happens to be in your path.  However, the makefiles do use whatever <Command>ld</Command> 
+and <Command>ar</Command> happen to be in your path. This is a bit naughty, but (a) they are only
+used to glom together .o files into a bigger .o file, or a .a file, 
+so they don't ever get libraries (which would be bogus; they might be the wrong libraries), and (b)
+Cygwin and MinGW use the same .o file format.  So its ok.
 </para>
 </sect3>
 
@@ -4395,36 +4440,6 @@ Cygwin programs have a more complicated mount table, and map the lettered drives
 <para>The Cygwin shell does no argument processing when invoking non-Cygwin programs.
 </para></listitem>
 </itemizedlist>
-</para>
-</sect3>
-</sect2>
-
-<sect2><title>Building GHC on Windows</title>
-
-<sect3><title>Targeting MinGW</title>
-
-<para>We want the GHC that we distribute to work on any Win32 system.  Hence:
-<itemizedlist>
-<listitem><para>
-GHC does invoke a C compiler, assembler, linker and so on, but we ensure that it only
-invokes the MinGW tools, not the Cygwin ones.  That means that the programs GHC compiles
-will work on any system, but it also means that the programs GHC compiles do not have access
-to all of Posix.  In particular, they cannot import the (Haskell) Posix 
-library; they have to do
-their input output using standard Haskell I/O libraries, or native Win32 bindings.</para>
-<para> We will call a GHC that targets MinGW in this way <emphasis>GHC-mingw</emphasis>.</para>
-</listitem>
-
-<listitem><para>
-To make the GHC distribution self-contained, the GHC distribution includes the MinGW <command>gcc</command>,
-<command>as</command>, <command>ld</command>, and a bunch of input/output libraries.  
-</para></listitem>
-
-</itemizedlist>
-It is in principle possible to build a version of GHC that targets Cygwin instead of MinGW;
-we will call that <emphasis>GHC-cygwin</emphasis>.  The up-side of GHC-cygwin is
-that Haskell programs compiled by GHC-cygwin can import the (Haskell) Posix library.
-We do not support this build route, however.
 </para>
 </sect3>
 
@@ -4459,34 +4474,6 @@ So then it doesn't really matter whether you use the HOST_OS or TARGET_OS cpp ma
 </para>
 </sect3>
 
-<sect3><title>Summary</title>
-
-<para>Notice that "GHC-mingw" means "GHC that <emphasis>targets</emphasis> MinGW".  It says nothing about 
-how that GHC was <emphasis>built</emphasis>.  It is entirely possible to have a GHC-mingw that was built
-by compiling GHC's Haskell sources with a GHC-cygwin, or vice versa.</para>
-
-<para>We distribute only a GHC-mingw built by a GHC-mingw; supporting
-GHC-cygwin too is beyond our resources.  The GHC we distribute
-therefore does not require Cygwin to run, nor do the programs it
-compiles require Cygwin.</para>
-
-<para>The instructions that follow describe how to build GHC-mingw. It is
-possible to build GHC-cygwin, but it's not a supported route, and the build system might
-be flaky.</para>
-
-<para>In your build tree, you build a compiler called <Command>ghc-inplace</Command>.  It
-uses the <Command>gcc</Command> that you specify using the
-<option>--with-gcc</option> flag when you run
-<Command>configure</Command> (see below).
-The makefiles are careful to use <Command>ghc-inplace</Command> (not <Command>gcc</Command>)
-to compile any C files, so that it will in turn invoke the right <Command>gcc</Command> rather that
-whatever one happens to be in your path.  However, the makefiles do use whatever <Command>ld</Command> 
-and <Command>ar</Command> happen to be in your path. This is a bit naughty, but (a) they are only
-used to glom together .o files into a bigger .o file, or a .a file, 
-so they don't ever get libraries (which would be bogus; they might be the wrong libraries), and (b)
-Cygwin and Mingw use the same .o file format.  So its ok.
-</para>
-</sect3>
 </sect2>
 
 <sect2><title>Wrapper scripts</title>
@@ -4527,22 +4514,80 @@ shortcomings of the native Windows <command>cmd</command> shell.
 
 </sect1>
 
-<Sect1 id="winbuild"><Title>Notes for building under Windows</Title>
+<Sect1 id="winbuild"><Title>Instructions for building under Windows</Title>
 
 <para>
-This section summarises how to get the utilities you need on your
-Win95/98/NT/2000 machine to use CVS and build GHC. Similar notes for
+This section gives detailed instructions for how to build 
+GHC from source on your Windows machine. Similar instructions for
 installing and running GHC may be found in the user guide. In general,
 Win95/Win98 behave the same, and WinNT/Win2k behave the same.
-You should read the GHC installation guide sections on Windows (in the user
-guide) before continuing to read these notes.
+</para>
+<para>
+Make sure you read the preceding section on platforms (<xref linkend="platforms">)
+before reading section.
 </para>
 
+
+<Sect2><Title>Installing and configuring MSYS</Title>
+
+<para>
+MSYS is a lightweight alternative to Cygwin.  
+You don't need MSYS to <emphasis>use</emphasis> GHC, 
+but you do need it or Cygwin to <emphasis>build</emphasis> GHC.
+Here's how to install MSYS.
+<itemizedlist>
+<listitem><para>
+Go to <ulink url="http://www.mingw.org/download.shtml">http://www.mingw.org/download.shtml</ulink> and 
+download the following (of course, the version numbers will differ):
+<itemizedlist>
+  <listitem><para>The main MSYS package (binary is sufficient): <literal>MSYS-1.0.9.exe</literal>
+  </para></listitem>
+  <listitem><para>The MSYS developer's toolkit (binary is sufficient): <literal>msysDTK-1.0.1.exe</literal>.
+		    This provides <command>make</command>, <command>autoconf</command>, 
+		    <command>ssh</command>, <command>cvs</command> and probably more besides.
+  </para></listitem>
+</itemizedlist>
+Run both executables (in the order given above) to install them.  I put them in <literal>c:/msys</literal>
+</para></listitem>
+
+<listitem><para>
+Set the following environment variables
+<itemizedlist>
+  <listitem><para><literal>PATH</literal>: add <literal>c:/msys/1.0/bin</literal> to your path.  (Of course, the version number may differ.)
+  </para></listitem>
+
+  <listitem><para><literal>HOME</literal>: set to your home directory (e.g. <literal>c:/userid</literal>).
+  This is where, among other things, <command>ssh</command> will look for your <literal>.ssh</literal> directory.
+  </para></listitem>  
+
+  <listitem><para><literal>SHELL</literal>: set to <literal>c:/msys/1.0/bin/sh.exe</literal>
+  </para></listitem>
+
+  <listitem><para><literal>CVS_RSH</literal>: set to <literal>c:/msys/1.0/bin/ssh.exe</literal>.  Only necessary if
+	      you are using CVS.
+  </para></listitem>
+
+  <listitem><para><literal>MAKE_MODE</literal>: set to <literal>UNIX</literal>.  (I'm not certain this is necessary for MSYS.)
+  </para></listitem>
+
+</itemizedlist>
+</para></listitem>
+
+<listitem><para>
+Check that the <literal>CYGWIN</literal> environment variable is <emphasis>not</emphasis> set.  It's a bad bug
+that MSYS is affected by this, but if you have CYGWIN set to "ntsec ntea", which is right for Cygwin, it
+causes the MSYS <command>ssh</command> to bogusly fail complaining that your <filename>.ssh/identity</filename>
+file has too-liberal permissinos.
+</para></listitem>
+
+</itemizedlist>
+</para>
+</sect2>
 
 <Sect2><Title>Installing and configuring Cygwin</Title>
 
 <para>You don't need Cygwin to <emphasis>use</emphasis> GHC, 
-but you do need it to <emphasis>build</emphasis> GHC.</para>
+but you do need it or MSYS to <emphasis>build</emphasis> GHC.</para>
 
 <para> Install Cygwin from <ulink url="http://www.cygwin.com/">http://www.cygwin.com/</ulink>.
 The installation process is straightforward; we install it in <Filename>c:/cygwin</Filename>.
@@ -4674,6 +4719,7 @@ variable.  You can always invoke <command>find</command> with an absolute path, 
 </para>
 
 </Sect2>
+
 
 <Sect2 id="configure-ssh"><Title>Configuring SSH</Title>
 
