@@ -59,4 +59,4 @@ import NHC.FFI
 -- pointers.  In fact, they need not even be valid memory addresses.  The only
 -- guarantee provided is that if they are passed back to Haskell land, the
 -- function 'deRefStablePtr' will be able to reconstruct the
--- Haskell value refereed to by the stable pointer.
+-- Haskell value referred to by the stable pointer.

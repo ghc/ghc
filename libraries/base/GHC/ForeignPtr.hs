@@ -219,7 +219,7 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
 -- pointer.  This is a potentially dangerous operations, as if the
 -- argument to 'unsafeForeignPtrToPtr' is the last usage
--- occurence of the given foreign pointer, then its finaliser(s) will
+-- occurrence of the given foreign pointer, then its finaliser(s) will
 -- be run, which potentially invalidates the plain pointer just
 -- obtained.  Hence, 'touchForeignPtr' must be used
 -- wherever it has to be guaranteed that the pointer lives on - i.e.,

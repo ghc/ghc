@@ -120,7 +120,7 @@ something = everything orElse
 -- | Bottom-up synthesis of a data structure;
 --   1st argument z is the initial element for the synthesis;
 --   2nd argument o is for reduction of results from subterms;
---   3rd argument f updates the sythesised data according to the given term
+--   3rd argument f updates the synthesised data according to the given term
 --
 synthesize :: s  -> (s -> s -> s) -> GenericQ (s -> s) -> GenericQ s
 synthesize z o f x = f x (foldr o z (gmapQ (synthesize z o f) x))

@@ -95,7 +95,7 @@ minPrec = 0
 -- Operations over ReadPrec
 
 lift :: ReadP a -> ReadPrec a
--- ^ Lift a predence-insensitive 'ReadP' to a 'ReadPrec'
+-- ^ Lift a precedence-insensitive 'ReadP' to a 'ReadPrec'
 lift m = P (\_ -> m)
 
 step :: ReadPrec a -> ReadPrec a

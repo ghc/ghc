@@ -34,7 +34,7 @@ mkRegex :: String -> Regex
 mkRegex s = unsafePerformIO (RE.regcomp s RE.regExtended)
 
 -- | Makes a regular expression, where the multi-line and
--- case-sensitve options can be changed from the default settings.
+-- case-sensitive options can be changed from the default settings.
 mkRegexWithOpts
    :: String  -- ^ The regular expression to compile
    -> Bool    -- ^ 'True' @\<=>@ @\'^\'@ and @\'$\'@ match the beginning and 

@@ -126,7 +126,7 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- the action and use it after the action completes. All uses
 -- of the pointer should be inside the
 -- 'withForeignPtr' bracket.  The reason for
--- this unsafety is the same as for
+-- this unsafeness is the same as for
 -- 'unsafeForeignPtrToPtr' below: the finalizer
 -- may run earlier than expected, because the compiler can only
 -- track usage of the 'ForeignPtr' object, not

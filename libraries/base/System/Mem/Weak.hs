@@ -102,7 +102,7 @@ mkWeakPtr key finalizer = mkWeak key key finalizer
   finalizer to run earlier than you intended.  The same motivation
   justifies the existence of
   'Control.Concurrent.MVar.addMVarFinalizer' and
-  'Data.IORef.mkWeakIORef' (the non-unformity is accidental).
+  'Data.IORef.mkWeakIORef' (the non-uniformity is accidental).
 -}
 addFinalizer :: key -> IO () -> IO ()
 addFinalizer key finalizer = do

@@ -141,7 +141,7 @@ fromDyn (Dynamic t v) def
 fromDynamic
 	:: Typeable a
 	=> Dynamic	-- ^ the dynamically-typed object
-	-> Maybe a	-- ^ returns: @'Just' a@, if the dyanmically-typed
+	-> Maybe a	-- ^ returns: @'Just' a@, if the dynamically-typed
 			-- object has the correct type (and @a@ is its value), 
 			-- or 'Nothing' otherwise.
 fromDynamic (Dynamic t v) =

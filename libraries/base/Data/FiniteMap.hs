@@ -187,7 +187,7 @@ minusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt1 -> FiniteMap key elt2
 -- key.
 intersectFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt -> FiniteMap key elt
 
--- | Returns the interesction of two mappings, using the specified
+-- | Returns the intersection of two mappings, using the specified
 -- combination function to combine values.
 intersectFM_C	:: (Ord key OUTPUTABLE_key) => (elt1 -> elt2 -> elt3)
 			   -> FiniteMap key elt1 -> FiniteMap key elt2 -> FiniteMap key elt3

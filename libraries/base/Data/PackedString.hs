@@ -266,7 +266,7 @@ joinPS filler pss = concatPS (splice pss)
   * joinPS (packString [x]) (splitPS x ls) = ls
 -}
 
--- | The 'splitPS' function splits the input string on each occurance of the given 'Char'.
+-- | The 'splitPS' function splits the input string on each occurrence of the given 'Char'.
 splitPS :: Char -> PackedString -> [PackedString]
 splitPS c = splitWithPS (== c)
 
@@ -314,7 +314,7 @@ substrPS (PS ps) begin end = packString [ ps ! i | i <- [begin..end] ]
 -- | Outputs a 'PackedString' to the specified 'Handle'.
 --
 -- NOTE: the representation of the 'PackedString' in the file is assumed to
--- be in the ISO-8859-1 encoding.  In other words, only the least signficant
+-- be in the ISO-8859-1 encoding.  In other words, only the least significant
 -- byte is taken from each character in the 'PackedString'.
 hPutPS :: Handle -> PackedString -> IO ()
 hPutPS h (PS ps) = do

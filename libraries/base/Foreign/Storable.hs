@@ -81,7 +81,7 @@ All marshalling between Haskell and a foreign language ultimately
 boils down to translating Haskell data structures into the binary
 representation of a corresponding data structure of the foreign
 language and vice versa.  To code this marshalling in Haskell, it is
-necessary to manipulate primtive data types stored in unstructured
+necessary to manipulate primitive data types stored in unstructured
 memory blocks.  The class 'Storable' facilitates this manipulation on
 all types for which it is instantiated, which are the standard basic
 types of Haskell, the fixed size @Int@ types ('Int8', 'Int16',

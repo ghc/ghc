@@ -143,7 +143,7 @@ In GHC, threads may also communicate via exceptions.
 
     Scheduling may be either pre-emptive or co-operative,
     depending on the implementation of Concurrent Haskell (see below
-    for imformation related to specific compilers).  In a co-operative
+    for information related to specific compilers).  In a co-operative
     system, context switches only occur when you use one of the
     primitives defined in this module.  This means that programs such
     as:
@@ -526,7 +526,7 @@ runInUnboundThread action = do
       a thread may be pre-empted whenever it allocates some memory,
       which unfortunately means that tight loops which do no
       allocation tend to lock out other threads (this only seems to
-      happen with pathalogical benchmark-style code, however).
+      happen with pathological benchmark-style code, however).
 
       The rescheduling timer runs on a 20ms granularity by
       default, but this may be altered using the
