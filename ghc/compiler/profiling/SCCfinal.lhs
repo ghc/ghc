@@ -246,22 +246,17 @@ stgMassageForProfiling mod_name us stg_binds
 	returnMM (StgRhsCon cc con args)
 -}
 
-{-
-    do_rhs (StgRhsClosure _ bi fv u args (StgSCC ty cc expr))
-      | not (isSccCountCostCentre cc)
-      = collectCC cc 				`thenMM_`
-	set_prevailing_cc cc (do_expr expr)	`thenMM` \ expr' ->
-	returnMM (StgRhsClosure cc bi fv u args expr')
--}
-
-    do_rhs (StgRhsClosure cc bi fv u [] body)
-      = do_expr body				`thenMM` \ body' ->
-	returnMM (StgRhsClosure currentCCS bi fv u [] body')
-
-    do_rhs (StgRhsClosure cc bi fv u args body)
-      = set_lambda_cc (do_expr body)		`thenMM` \ body' ->
-	get_prevailing_cc 			`thenMM` \ prev_ccs ->
-	returnMM (StgRhsClosure currentCCS bi fv u args body')
+    do_rhs (StgRhsClosure _ bi fv u args expr)
+      = slurpSCCs currentCCS expr		`thenMM` \ (expr', ccs) ->
+	do_expr expr'				`thenMM` \ expr'' ->
+	returnMM (StgRhsClosure ccs bi fv u args expr'')
+      where
+	slurpSCCs ccs (StgSCC cc e) 
+	     = collectCC cc 			`thenMM_`
+	       slurpSCCs ccs e			`thenMM` \ (e', ccs')  ->
+	       returnMM (e', pushCCOnCCS cc ccs')
+	slurpSCCs ccs e 
+	     = returnMM (e, ccs)
 
     do_rhs (StgRhsCon cc con args)
       = returnMM (StgRhsCon currentCCS con args)
@@ -337,7 +332,7 @@ type MassageM result
   =  Module		-- module name
   -> CostCentreStack	-- prevailing CostCentre
 			-- if none, subsumedCosts at top-level
-			-- useCurrentCostCentre at nested levels
+			-- currentCostCentre at nested levels
   -> UniqSupply
   -> VarSet		-- toplevel-ish Ids for boxing
   -> CollectedCCs
