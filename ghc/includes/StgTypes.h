@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.9 2000/04/05 14:26:31 panne Exp $
+ * $Id: StgTypes.h,v 1.10 2000/04/06 13:41:16 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -17,7 +17,7 @@
 	StgInt			Signed version of StgWord
 	StgAddr			Generic address type
 	
-
+ * WARNING: Keep this file and HsFFI.h in synch!
  *
  * ---------------------------------------------------------------------------*/
 
