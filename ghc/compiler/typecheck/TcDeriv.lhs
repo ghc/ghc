@@ -320,7 +320,8 @@ makeDerivEqns tycl_decls
 		 ]
 	in
 	case chk_out clas tycon of
-	   Just err ->  addErrTc err				`thenNF_Tc_` 
+	   Just err ->  tcAddSrcLoc (getSrcLoc tycon)	$
+			addErrTc err			`thenNF_Tc_` 
 			returnNF_Tc Nothing
 	   Nothing  ->  newDFunName clas [ty] locn `thenNF_Tc` \ dfun_name ->
 			returnNF_Tc (Just (dfun_name, clas, tycon, tyvars, constraints))
@@ -330,18 +331,21 @@ makeDerivEqns tycl_decls
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> Maybe Message
     chk_out clas tycon
-	| clas `hasKey` enumClassKey    && not is_enumeration 	      = bog_out nullary_why
+	| clas `hasKey` enumClassKey    && not is_enumeration 	        = bog_out nullary_why
 	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = bog_out single_nullary_why
 	| clas `hasKey` ixClassKey      && not is_enumeration_or_single = bog_out single_nullary_why
-	| any isExistentialDataCon (tyConDataCons tycon)	      = Just (existentialErr clas tycon)
-	| otherwise						      = Nothing
+	| null data_cons		     = bog_out no_cons_why
+	| any isExistentialDataCon data_cons = Just (existentialErr clas tycon)
+	| otherwise			     = Nothing
 	where
+	    data_cons = tyConDataCons tycon
 	    is_enumeration = isEnumerationTyCon tycon
 	    is_single_con  = maybeToBool (maybeTyConSingleCon tycon)
 	    is_enumeration_or_single = is_enumeration || is_single_con
 
 	    single_nullary_why = SLIT("one constructor data type or type with all nullary constructors expected")
 	    nullary_why        = SLIT("data type with all nullary constructors expected")
+	    no_cons_why	       = SLIT("type has no data constructors")
 
 	    bog_out why = Just (derivingThingErr clas tycon why)
 \end{code}
