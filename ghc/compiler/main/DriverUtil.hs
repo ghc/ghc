@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.29 2002/01/22 14:47:52 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.30 2002/02/08 14:59:19 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -19,17 +19,12 @@ import Config		( cLeadingUnderscore )
 import IOExts
 import Exception
 import Dynamic
-import RegexString
 
 import Directory	( getDirectoryContents )
 import IO
 import List
 import Char
 import Monad
-
-
------------------------------------------------------------------------------
--- Errors
 
 -----------------------------------------------------------------------------
 -- Reading OPTIONS pragmas
@@ -49,12 +44,18 @@ getOptionsFromSource file
 		() | null l -> look h
 		   | prefixMatch "#" l -> look h
 		   | prefixMatch "{-# LINE" l -> look h   -- -}
-		   | Just (opts:_) <- matchRegex optionRegex l
+		   | Just opts <- matchOptions l
 			-> do rest <- look h
                               return (words opts ++ rest)
 		   | otherwise -> return []
 
-optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
+matchOptions s
+  | Just s1 <- my_prefix_match "{-#" s,
+    Just s2 <- my_prefix_match "OPTIONS" (remove_spaces s1),
+    Just s3 <- my_prefix_match "}-#" (reverse s2)
+  = Just (reverse s3)
+  | otherwise
+  = Nothing
 
 -----------------------------------------------------------------------------
 -- A version of getDirectoryContents that is non-fatal if the
