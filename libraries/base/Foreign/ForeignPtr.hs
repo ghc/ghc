@@ -42,6 +42,7 @@ import NHC.FFI
   ( ForeignPtr
   , FinalizerPtr
   , newForeignPtr
+  , newForeignPtr_
   , addForeignPtrFinalizer
   , withForeignPtr
   , unsafeForeignPtrToPtr
