@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: System.lhs,v 1.28 2001/01/11 17:25:57 simonmar Exp $
+% $Id: System.lhs,v 1.29 2001/01/11 17:51:02 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -30,7 +30,6 @@ import PrelPtr
 import PrelStorable
 import PrelIOBase	( IOException(..), ioException, 
 			  IOErrorType(..), constructErrorAndFailWithInfo )
-import PrelByteArr	( ByteArray )
 \end{code}
 
 %*********************************************************
@@ -152,7 +151,8 @@ exitFailure = exitWith (ExitFailure 1)
 
 \begin{code}
 unpackArgv :: Ptr (Ptr CChar) -> Int -> IO [String] -- argv[1 .. argc-1]
-unpackArgv argv argc = peekArray argc argv >>= mapM peekCString
+unpackArgv argv argc
+  = peekArray (argc-1) (advancePtr argv 1) >>= mapM peekCString
 
 unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do 
