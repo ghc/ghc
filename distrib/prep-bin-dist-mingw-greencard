@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Running 'binary-dist' gives us a tree which
+# isn't quite right for the purposes of creating
+# a mingw/win32 install tree.  This script rejigs
+# the tree.
+#
+# To use:
+#
+#   foo$ cd <top of fptools build tree>
+#   foo$ make binary-dist Project=GreenCard 
+#   foo$ cd gc-<version>
+#   foo$ ../distrib/prep-bin-dist-mingw-greencard <ghc-dir>
+#
+
+echo "In prep-bin-dist-mingw-greencard $1"
+binary_dir=../$1
+
+# Play safe
+if ! [ -d bin/i386-unknown-mingw32 ] ; then
+  echo "Doesn't look as if I'm in the toplevel directory of a mingw tree"
+  echo "Usage: cd ghc-<version> ; ../distrib/prep-bin-dist-mingw-greencard <ghc-bin-dist-dir>"
+  exit 1;
+fi;
+
+echo "rejig bin/"
+cp bin/i386-unknown-mingw32/green-card.exe $binary_dir/bin
+strip $binary_dir/bin/green-card.exe
+
+echo "rejig lib/"
+cp lib/i386-unknown-mingw32/* $binary_dir
+
+echo "rejig share/"
+cp share/* $binary_dir

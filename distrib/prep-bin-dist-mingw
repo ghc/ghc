@@ -14,22 +14,24 @@
 #
 #export gcc_lib=c:/ghc/ghc-5.02.2/gcc-lib
 
+export old_ghc_top=c:/lang/ghc-5.04.1
+export mingw_top=c:/lang/MinGW32
+
 #Directory where a (cygwin-free) perl binary resides.
-export perl_dir=c:/ghc/ghc-5.04
+# export perl_dir=c:/ghc/ghc-5.04
+export perl_dir=$old_ghc_top
 
 # The gcc-lib directory of the mingw tree you want to
 # include with the binary dist.
-export gcc_lib=f:/mingw/lib/gcc-lib/mingw32/2.95.3-6/
+# export gcc_lib=f:/mingw/lib/gcc-lib/mingw32/2.95.3-6/
+export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/2.95.3-8
 
 #
 # The mingw include, lib, and bin directories.
 #
-export mingw_include=f:/mingw/include
-export mingw_lib=f:/mingw/lib/
-export mingw_bin=f:/mingw/bin/
-
-export perl_dir=c:/ghc/ghc-5.04
-#export mingw_include=c:/ghc/ghc-5.02.2/include/mingw
+export mingw_include=$mingw_top/include
+export mingw_lib=$mingw_top/lib
+export mingw_bin=$mingw_top/bin
 
 # Play safe
 if ! [ -d bin/i386-unknown-mingw32 ] ; then
@@ -41,6 +43,7 @@ fi;
 echo "Removing configure script files...not needed"
 rm -f config.guess config.sub configure configure.in mkdirhier
 rm -f Makefile-bin.in Makefile.in aclocal.m4 install-sh
+rm -rf autom4te.cache
 
 echo "rejig bin/"
 mv bin/i386-unknown-mingw32/* bin/
@@ -83,10 +86,12 @@ cp -Rf $mingw_include/* include/mingw
 #
 # g++-3/ subdir causes problems with installer tool (+ being a 
 # troublesome character); leave out for now.
-rm -rf include/mingw/g++-3/ || echo "g++-3/ not there"
+#rm -rf include/mingw/g++-3/ || echo "g++-3/ not there"
+rm -rf include/mingw/c++ || echo "c++/ not there"
 
 echo "add gcc"
-cp ${mingw_bin}/gcc.exe .
+# cp ${mingw_bin}/gcc.exe .
+cp ${mingw_bin}/gcc-2.exe gcc.exe
 
 echo "copy in perl too"
 cp ${perl_dir}/perl.exe .
@@ -98,12 +103,6 @@ cp ${perl_dir}/perl56.dll .
 echo "formatting documentation"
 cp README README.txt
 mv share doc
-cp ../ghc/docs/users_guide/users_guide.pdf doc/
-cp ../hslibs/doc/hslibs.pdf doc/
-#mkdir doc
-#mkdir doc/user-guide
-#cp -Rf html/* doc/user-guide/
-#cp pdf/set.pdf doc/
-#rm -rf html/
-#rm -rf pdf/
+cp ../ghc/docs/users_guide/users_guide.pdf doc/ || echo "No User Guide PDF doc found"
+cp ../hslibs/doc/hslibs.pdf doc/ || echo "No HSLIBS PDF doc found"
 
