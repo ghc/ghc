@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.59 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelHandle.lhs,v 1.60 2000/07/25 15:20:10 simonmar Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -416,7 +416,6 @@ hClose handle =
 		  -- associated with this handle.
 	   else do freeBuffers (haBuffers__ handle_)
 		   return (handle_{ haType__    = ClosedHandle,
-			            haFO__      = nullFile__,
 				    haBuffers__ = [] })
 \end{code}
 

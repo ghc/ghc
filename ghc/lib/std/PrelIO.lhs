@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIO.lhs,v 1.14 2000/07/07 11:03:58 simonmar Exp $
+% $Id: PrelIO.lhs,v 1.15 2000/07/25 15:20:10 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -282,9 +282,7 @@ lazyReadBlock handle fo = do
      -1 -> -- an error occurred, close the handle
 	  withHandle handle $ \ handle_ -> do
           closeFile (haFO__ handle_) 0{-don't bother flushing-}  -- ConcHask: SAFE, won't block.
-	  return (handle_ { haType__    = ClosedHandle,
-			    haFO__      = nullFile__ }, 
-		  "")
+	  return (handle_ { haType__    = ClosedHandle }, "")
      _ -> do
       more <- unsafeInterleaveIO (lazyReadBlock handle fo)
       stToIO (unpackNBytesAccST buf bytes more)
@@ -298,9 +296,7 @@ lazyReadLine handle fo = do
        -1 -> -- an error occurred, close the handle
   	     withHandle handle $ \ handle_ -> do
              closeFile (haFO__ handle_) 0{- don't bother flushing-}  -- ConcHask: SAFE, won't block
-	     return (handle_ { haType__    = ClosedHandle,
-			       haFO__      = nullFile__ },
-		     "")
+	     return (handle_ { haType__    = ClosedHandle }, "")
        _ -> do
           more <- unsafeInterleaveIO (lazyReadLine handle fo)
           buf  <- getBufStart fo bytes  -- ConcHask: won't block
@@ -318,9 +314,7 @@ lazyReadChar handle fo = do
       -1 -> -- error, silently close handle.
  	 withHandle handle $ \ handle_ -> do
          closeFile (haFO__ handle_) 0{-don't bother flusing-}  -- ConcHask: SAFE, won't block
-	 return (handle_{ haType__  = ClosedHandle,
-			  haFO__    = nullFile__ },
-		 "")
+	 return (handle_{ haType__  = ClosedHandle }, "")
       _ -> do
 	 more <- unsafeInterleaveIO (lazyReadChar handle fo)
          return (chr char : more)
