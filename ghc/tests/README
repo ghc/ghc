@@ -35,9 +35,10 @@ options. For example,
 
   tc093_HC_OPTS = -noC -ddump-tc 
 
--noC tells not bother generating any C (not point in doing that, since we
-only want to test the typechecker).  -ddump-tc tells ghc to dump the
-typechecker state. 
+-noC tells not bother generating any C (no point in doing that, since
+we only want to test the typechecker. NOTE: Currently the driver does
+not handle the -noC flag anymore).  -ddump-tc tells ghc to dump the
+typechecker state.
 
 Depending on the tests/ subdirectory, a default exit code is
 expected from all tests therein, normally 0 (==success).
