@@ -404,9 +404,9 @@ exposed-modules: Network.BSD,
 	  <para>This option displays the currently installed
 	    packages, for each of the databases known to
 	    <literal>ghc-pkg</literal>.  That includes the global database, the
-	    user's local database, and any further files 
-	    specified using the <option>-f</option> option on the command
-	    line.</para>
+	    user's local database (if <option>--user</option> is given), and
+	    any further files specified using the <option>-f</option> option on
+	    the command line.</para>
 
 	  <para>Hidden packages (those for which the <literal>exposed</literal>
 	    flag is <literal>False</literal>) are shown in parentheses in the
