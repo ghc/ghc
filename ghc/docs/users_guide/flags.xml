@@ -123,6 +123,55 @@
       </informaltable>
     </sect2>
 
+     <sect2>
+      <title>Alternative modes of operation (<xref linkend="modes"/>)</title>
+      
+      <informaltable>
+	<tgroup cols="3" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>--interactive</option></entry>
+	      <entry>Interactive mode - normally used by just running <command>ghci</command></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--make</option></entry>
+	      <entry>Build a multi-module Haskell program, automatically figuring out dependencies. Likely to be much easier, and faster, than using <command>make</command>.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-e <replaceable>expr</replaceable></option></entry>
+	      <entry>Evaluate <replaceable>expr</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-M</option></entry>
+	      <entry>Generate dependency information suitable for use in a <filename>Makefile</filename>.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--mk-dll</option></entry>
+	      <entry>DLL-creation mode (Windows only)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
     <sect2>
       <title>Redirecting output (<xref linkend="options-output"/>)</title>
       
