@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.107 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: Linker.c,v 1.108 2002/12/19 14:33:22 simonmar Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -393,7 +393,7 @@ typedef struct _RtsSymbolVal {
       SymX(newArrayzh_fast)			\
       SymX(newBCOzh_fast)			\
       SymX(newByteArrayzh_fast)			\
-      SymX(newCAF)				\
+      SymX_redirect(newCAF, newDynCAF)		\
       SymX(newMVarzh_fast)			\
       SymX(newMutVarzh_fast)			\
       SymX(atomicModifyMutVarzh_fast)		\
@@ -553,6 +553,7 @@ typedef struct _RtsSymbolVal {
 /* entirely bogus claims about types of these symbols */
 #define Sym(vvv)  extern void (vvv);
 #define SymX(vvv) /**/
+#define SymX_redirect(vvv,xxx) /**/
 RTS_SYMBOLS
 RTS_LONG_LONG_SYMS
 RTS_EXTRA_SYMBOLS
@@ -571,6 +572,12 @@ RTS_CYGWIN_ONLY_SYMBOLS
 #define Sym(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)) },
 #define SymX(vvv) Sym(vvv)
+
+// SymX_redirect allows us to redirect references to one symbol to
+// another symbol.  See newCAF/newDynCAF for an example.
+#define SymX_redirect(vvv,xxx) \
+    { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+      (void*)(&(xxx)) },
 
 static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS

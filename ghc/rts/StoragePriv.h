@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.23 2002/12/11 15:36:54 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.24 2002/12/19 14:33:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,6 +21,7 @@ extern step *g0s0;
 extern generation *oldest_gen;
 
 extern void newCAF(StgClosure*);
+extern void newDynCAF(StgClosure *);
 
 extern void move_TSO(StgTSO *src, StgTSO *dest);
 extern StgTSO *relocate_stack(StgTSO *dest, ptrdiff_t diff);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.72 2002/12/13 19:17:02 wolfgang Exp $
+ * $Id: Storage.c,v 1.73 2002/12/19 14:33:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -269,15 +269,9 @@ newCAF(StgClosure* caf)
    */
   ACQUIRE_SM_LOCK;
 
-  if (0 /*TODO: is_dynamically_loaded_rwdata_ptr((StgPtr)caf)*/) {
-      ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
-      ((StgIndStatic *)caf)->static_link = caf_list;
-      caf_list = caf;
-  } else {
-      ((StgIndStatic *)caf)->saved_info = NULL;
-      ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
-      oldest_gen->mut_once_list = (StgMutClosure *)caf;
-  }
+  ((StgIndStatic *)caf)->saved_info = NULL;
+  ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
+  oldest_gen->mut_once_list = (StgMutClosure *)caf;
 
   RELEASE_SM_LOCK;
 
@@ -289,6 +283,25 @@ newCAF(StgClosure* caf)
     ASSERT(newGA);
   } 
 #endif /* PAR */
+}
+
+// An alternate version of newCaf which is used for dynamically loaded
+// object code in GHCi.  In this case we want to retain *all* CAFs in
+// the object code, because they might be demanded at any time from an
+// expression evaluated on the command line.
+//
+// The linker hackily arranges that references to newCaf from dynamic
+// code end up pointing to newDynCAF.
+void
+newDynCAF(StgClosure *caf)
+{
+    ACQUIRE_SM_LOCK;
+
+    ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
+    ((StgIndStatic *)caf)->static_link = caf_list;
+    caf_list = caf;
+
+    RELEASE_SM_LOCK;
 }
 
 /* -----------------------------------------------------------------------------
