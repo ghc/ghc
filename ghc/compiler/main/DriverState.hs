@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.12 2000/11/09 12:54:09 simonmar Exp $
+-- $Id: DriverState.hs,v 1.13 2000/11/14 16:28:38 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -154,12 +154,11 @@ can_split =  prefixMatch "i386" cTARGETPLATFORM
 -----------------------------------------------------------------------------
 -- Compiler output options
 
-GLOBAL_VAR(v_Hsc_Lang, if cGhcWithNativeCodeGen == "YES" && 
-			 (prefixMatch "i386" cTARGETPLATFORM ||
-			  prefixMatch "sparc" cTARGETPLATFORM)
-			then  HscAsm
-			else  HscC, 
-	   HscLang)
+defaultHscLang
+  | cGhcWithNativeCodeGen == "YES" && 
+	(prefixMatch "i386" cTARGETPLATFORM ||
+	 prefixMatch "sparc" cTARGETPLATFORM)   =  HscAsm
+  | otherwise					=  HscC
 
 GLOBAL_VAR(v_Output_dir,  Nothing, Maybe String)
 GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
@@ -232,23 +231,16 @@ GLOBAL_VAR(v_Warning_opt, W_default, WarningState)
 GLOBAL_VAR(v_OptLevel, 0, Int)
 
 setOptLevel :: String -> IO ()
-setOptLevel ""  	    = do { writeIORef v_OptLevel 1; go_via_C }
+setOptLevel ""  	    = do { writeIORef v_OptLevel 1 }
 setOptLevel "not" 	    = writeIORef v_OptLevel 0
 setOptLevel [c] | isDigit c = do
    let level = ord c - ord '0'
    writeIORef v_OptLevel level
-   when (level >= 1) go_via_C
 setOptLevel s = unknownFlagErr ("-O"++s)
 
-go_via_C = do
-   l <- readIORef v_Hsc_Lang
-   case l of { HscAsm -> writeIORef v_Hsc_Lang HscC; 
-	       _other -> return () }
-
-GLOBAL_VAR(v_minus_o2_for_C, False, Bool)
-
-GLOBAL_VAR(v_MaxSimplifierIterations, 4,     Int)
-GLOBAL_VAR(v_StgStats,                False, Bool)
+GLOBAL_VAR(v_minus_o2_for_C,            False, Bool)
+GLOBAL_VAR(v_MaxSimplifierIterations,   4,     Int)
+GLOBAL_VAR(v_StgStats,                  False, Bool)
 GLOBAL_VAR(v_UsageSPInf,  	     	False, Bool)  -- Off by default
 GLOBAL_VAR(v_Strictness,  		True,  Bool)
 GLOBAL_VAR(v_CPR,         		True,  Bool)

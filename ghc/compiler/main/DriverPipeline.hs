@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.23 2000/11/14 14:30:40 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.24 2000/11/14 16:28:38 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -120,6 +120,7 @@ genPipeline
    :: GhcMode		-- when to stop
    -> String		-- "stop after" flag (for error messages)
    -> Bool		-- True => output is persistent
+   -> HscLang		-- preferred output language for hsc
    -> String		-- original filename
    -> IO [ 		-- list of phases to run for this file
 	     (Phase,
@@ -127,11 +128,10 @@ genPipeline
 	      String)   	     -- output file suffix
          ]	
 
-genPipeline todo stop_flag persistent_output filename
+genPipeline todo stop_flag persistent_output lang filename 
  = do
    split      <- readIORef v_Split_object_files
    mangle     <- readIORef v_Do_asm_mangling
-   lang       <- readIORef v_Hsc_Lang
    keep_hc    <- readIORef v_Keep_hc_files
    keep_raw_s <- readIORef v_Keep_raw_s_files
    keep_s     <- readIORef v_Keep_s_files
@@ -146,9 +146,9 @@ genPipeline todo stop_flag persistent_output filename
     haskellish = haskellish_suffix suffix
     cish = cish_suffix suffix
 
-   -- for a .hc file, or if the -C flag is given, we need to force lang to HscC
-    real_lang | suffix == "hc"  = HscC
-	      | otherwise       = lang
+   -- for a .hc file we need to force lang to HscC
+    real_lang | start_phase == HCc  = HscC
+	      | otherwise           = lang
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
@@ -719,7 +719,8 @@ doLink o_files = do
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_file filename) 
-  do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False filename
+  do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
+			defaultHscLang filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
 
 
@@ -772,7 +773,7 @@ compile summary old_iface hst hit pcs = do
    processArgs dynamic_flags opts []
    dyn_flags <- readIORef v_DynFlags
 
-   hsc_lang <- readIORef v_Hsc_Lang
+   let hsc_lang = hscLang dyn_flags
    output_fn <- case hsc_lang of
 		    HscAsm         -> newTempName (phaseInputExt As)
 		    HscC           -> newTempName (phaseInputExt HCc)
@@ -812,7 +813,8 @@ compile summary old_iface hst hit pcs = do
 			Nothing -> panic "compile: no interpreted code"
 
 		-- we're in batch mode: finish the compilation pipeline.
-		_other -> do pipe <- genPipeline (StopBefore Ln) "" True output_fn
+		_other -> do pipe <- genPipeline (StopBefore Ln) "" True 
+					hsc_lang output_fn
 			     o_file <- runPipeline pipe output_fn False False
 			     return [ DotO o_file ]
 
@@ -853,7 +855,8 @@ dealWithStubs basename maybe_stub_h maybe_stub_c
 			])
 
 			-- compile the _stub.c file w/ gcc
-		pipeline <- genPipeline (StopBefore Ln) "" True stub_c
+		pipeline <- genPipeline (StopBefore Ln) "" True 
+				defaultHscLang stub_c
 		stub_o <- runPipeline pipeline stub_c False{-no linking-} 
 				False{-no -o option-}
 

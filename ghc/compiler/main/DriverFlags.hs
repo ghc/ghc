@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.18 2000/11/13 16:16:05 sewardj Exp $
+-- $Id: DriverFlags.hs,v 1.19 2000/11/14 16:28:38 simonmar Exp $
 --
 -- Driver flags
 --
@@ -128,8 +128,8 @@ arg_ok (Prefix _)	    rest arg = not (null rest)
 arg_ok (PrefixPred p _)     rest arg = not (null rest) && p rest
 arg_ok (OptPrefix _)	    rest arg = True
 arg_ok (PassFlag _)         rest arg = null rest 
-arg_ok (AnySuffix _)        rest arg = not (null rest)
-arg_ok (AnySuffixPred p _)  rest arg = not (null rest) && p arg
+arg_ok (AnySuffix _)        rest arg = True
+arg_ok (AnySuffixPred p _)  rest arg = p arg
 
 -----------------------------------------------------------------------------
 -- Static flags
@@ -263,11 +263,6 @@ static_flags =
   ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
   ,  ( "O"		   , OptPrefix (setOptLevel) )
 
-  ,  ( "fasm"		   , OptPrefix (\_ -> writeIORef v_Hsc_Lang HscAsm) )
-
-  ,  ( "fvia-c"		   , NoArg (writeIORef v_Hsc_Lang HscC) )
-  ,  ( "fvia-C"		   , NoArg (writeIORef v_Hsc_Lang HscC) )
-
   ,  ( "fno-asm-mangling"  , NoArg (writeIORef v_Do_asm_mangling False) )
 
   ,  ( "fmax-simplifier-iterations", 
@@ -306,6 +301,15 @@ setDynFlag f = do
 unSetDynFlag f = do
    dfs <- readIORef v_DynFlags
    writeIORef v_DynFlags dfs{ flags = filter (/= f) (flags dfs) }
+
+-- we can only change HscC to HscAsm and vice-versa with dynamic flags 
+-- (-fvia-C and -fasm).
+setLang l = do
+   dfs <- readIORef v_DynFlags
+   case hscLang dfs of
+	HscC   -> writeIORef v_DynFlags dfs{ hscLang = l }
+	HscAsm -> writeIORef v_DynFlags dfs{ hscLang = l }
+	_      -> return ()
 
 dynamic_flags = [
 
@@ -389,6 +393,11 @@ dynamic_flags = [
   ,  ( "monly-4-regs", 	NoArg (updateState (\s -> s{stolen_x86_regs = 4}) ))
 
         ------ Compiler flags -----------------------------------------------
+
+  ,  ( "fasm"		   , AnySuffix (\_ -> setLang HscAsm) )
+
+  ,  ( "fvia-c"		   , NoArg (setLang HscC) )
+  ,  ( "fvia-C"		   , NoArg (setLang HscC) )
 
   ,  ( "fglasgow-exts", NoArg (setDynFlag Opt_GlasgowExts) )
   ,  ( "fno-implicit-prelude", NoArg (setDynFlag Opt_NoImplicitPrelude) )

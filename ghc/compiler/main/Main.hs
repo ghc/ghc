@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.20 2000/11/13 12:43:20 sewardj Exp $
+-- $Id: Main.hs,v 1.21 2000/11/14 16:28:38 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -157,10 +157,6 @@ main =
    (flags2, mode, stop_flag) <- getGhcMode argv'
    writeIORef v_GhcMode mode
 
-	-- force lang to "C" if the -C flag was given
-   case mode of StopBefore HCc -> writeIORef v_Hsc_Lang HscC
-	        _ -> return ()
-
 	-- process all the other arguments, and get the source files
    non_static <- processArgs static_flags flags2 []
 
@@ -187,7 +183,16 @@ main =
    core_todo <- buildCoreToDo
    stg_todo  <- buildStgToDo
 
-   lang <- readIORef v_Hsc_Lang
+   -- set the "global" HscLang.  The HscLang can be further adjusted on a module
+   -- by module basis, using only the -fvia-C and -fasm flags.  If the global
+   -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
+   opt_level  <- readIORef v_OptLevel
+   let lang = case mode of 
+		 StopBefore HCc -> HscC
+		 DoInteractive  -> HscInterpreted
+		 _other        | opt_level >= 1  -> HscC  -- -O implies -fvia-C 
+			       | otherwise       -> defaultHscLang
+
    writeIORef v_DynFlags 
 	DynFlags{ coreToDo = core_todo,
 		  stgToDo  = stg_todo,
@@ -222,11 +227,12 @@ main =
    when (mode == DoMkDependHS) beginMkDependHS
 
 	-- make/interactive require invoking the compilation manager
-   if (mode == DoMake)        then beginMake pkg_details srcs else do
-   if (mode == DoInteractive) then beginInteractive srcs      else do
+   if (mode == DoMake)        then beginMake pkg_details srcs        else do
+   if (mode == DoInteractive) then beginInteractive pkg_details srcs else do
 
 	-- for each source file, find which phases to run
-   pipelines <- mapM (genPipeline mode stop_flag True) srcs
+   let lang = hscLang init_dyn_flags
+   pipelines <- mapM (genPipeline mode stop_flag True lang) srcs
    let src_pipelines = zip srcs pipelines
 
 	-- sanity checking
@@ -266,13 +272,33 @@ setTopDir args = do
 
 beginMake :: PackageConfigInfo -> [String] -> IO ()
 beginMake pkg_details mods
-   | null mods
-   = throwDyn (UsageError "no input files")
-   | not (null (tail mods))
-   = throwDyn (UsageError "only one module allowed with --make")
-   | otherwise
-   = do state <- cmInit pkg_details
-        cmLoadModule state (mkModuleName (head mods))
-        return ()
+  = do case mods of
+	 []    -> throwDyn (UsageError "no input files")
+	 [mod] -> do state <- cmInit pkg_details
+		     cmLoadModule state (mkModuleName mod)
+		     return ()
+	 _     -> throwDyn (UsageError "only one module allowed with --make")
 
-beginInteractive srcs = panic "`ghc --interactive' unimplemented"
+beginInteractive pkg_details mods
+  = do case mods of
+	 []    -> return ()
+	 [mod] -> do state <- cmInit pkg_details
+		     cmLoadModule state (mkModuleName mod)
+		     return ()
+	 _     -> throwDyn (UsageError 
+				"only one module allowed with --interactive")
+       interactiveUI
+
+interactiveUI :: IO ()
+interactiveUI = do
+   hPutStr stdout ghciWelcomeMsg
+   throwDyn (OtherError "GHCi not implemented yet")
+
+ghciWelcomeMsg = "\ 
+\ _____  __   __  ____          ------------------------------------------------\n\ 
+\(|	 ||   || (|  |)         GHCi: GHC Interactive, version 5.00		\n\ 
+\||  __  ||___|| ||        ()   For Haskell 98.                    		\n\ 
+\||   |) ||---|| ||       //    http://www.haskell.org/ghc         		\n\ 
+\||   || ||   || ||      //     Bug reports to: glasgow-haskell-bugs@haskell.org\n\ 
+\(|___|| ||   || (|__|) (|      ________________________________________________\n"
+
