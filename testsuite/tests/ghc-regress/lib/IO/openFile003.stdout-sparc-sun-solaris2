@@ -1,0 +1,16 @@
+Left inappropriate type
+Action: openFile
+Reason: is a directory
+File: .
+Left invalid argument
+Action: openFile
+Reason: Invalid argument
+File: .
+Left invalid argument
+Action: openFile
+Reason: Invalid argument
+File: .
+Left invalid argument
+Action: openFile
+Reason: Invalid argument
+File: .
