@@ -380,8 +380,14 @@ utils/Binary_HC_OPTS		+= -fvia-C
 endif
 
 # ByteCodeItbls uses primops that the NCG doesn't support yet.
-ghci/ByteCodeItbls_HC_OPTS	= -fvia-C
-ghci/ByteCodeLink_HC_OPTS	= -fvia-C -monly-3-regs
+ghci/ByteCodeItbls_HC_OPTS	+= -fvia-C
+ghci/ByteCodeLink_HC_OPTS	+= -fvia-C -monly-3-regs
+
+# BinIface and Binary take ages to both compile and run if you don's use -O
+main/BinIface_HC_OPTS		+= -O
+utils/Binary_HC_OPTS		+= -O
+utils/FastMutInt_HC_OPTS	+= -O
+
 
 # CSE interacts badly with top-level IORefs (reportedly in DriverState and
 # DriverMkDepend), causing some of them to be commoned up.  We have a fix for
