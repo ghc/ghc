@@ -32,7 +32,7 @@ module PosixIO (
 import GlaExts
 import ST
 import PrelIOBase
-import PrelHandle (filePtr, readHandle, writeHandle, newHandle)
+import PrelHandle (readHandle, writeHandle, newHandle, getBMode__, getHandleFd )
 import IO
 import PackedString ( unpackPS, unsafeByteArrayToPS, psToByteArrayST )
 import Addr
@@ -70,48 +70,35 @@ fdClose fd = minusone_error (_ccall_ close fd) "fdClose"
 
 handleToFd :: Handle -> IO Fd
 handleToFd h = do
- h_ <- readHandle h
- case h_ of
-   ErrorHandle ioError ->  writeHandle h h_  >> fail ioError
-   ClosedHandle	       ->  writeHandle h h_  >>
-                           fail (IOError Nothing IllegalOperation
-					 "handle is closed")
-   SemiClosedHandle _ _ -> writeHandle h h_  >>
-			   fail (IOError Nothing IllegalOperation
-					 "handle is semi-closed")
-   other ->
-    let file = filePtr h_ in
-    _casm_ `` %r=fileno((FILE *)%0); '' file   >>= \ fd@(FD# fd#) ->
-    writeHandle h h_  >>
-    if fd# /=# (negateInt# 1#) then
-       return fd
-    else
-       syserr "handleToFd"
+  fd <- getHandleFd h
+  let (I# fd#) = fd
+  return (FD# fd#)
 
 -- default is no buffering.
 fdToHandle :: Fd -> IO Handle
-fdToHandle fd@(FD# fd#) =
-    _ccall_ fcntl fd (``F_GETFL''::Int) 0	   >>= \ flags@(I# flags#) ->
-    if flags /= -1 then
+fdToHandle fd@(FD# fd#) = do
+     -- first find out what kind of file desc. this is..
+    flags <- _ccall_ fcntl fd (``F_GETFL''::Int) 0
+    if flags /= -1 
+     then do
       let
+       (I# flags#) = flags
+
        wH  = (int2Word# flags# `and#` (case ``O_WRONLY'' of { W# x -> x}))
 			`neWord#` int2Word# 0#
        aH  = (int2Word# flags# `and#` (case ``O_APPEND'' of { W# x -> x}))
 			`neWord#` int2Word# 0#
        rwH = (int2Word# flags# `and#` (case ``O_RDWR'' of { W# x -> x }))
 			`neWord#` int2Word# 0#
-       (ft,handle_t) =
-        if wH then
-	  if aH
-	  then ("a",AppendHandle)
-	  else ("w",WriteHandle)
-	else if rwH then
-          ("r+",ReadWriteHandle)
-	else
-	  ("r",ReadHandle)
-      in
-      _ccall_ openFd fd ft >>= \ file_struct@(A# ptr#) ->
-      if file_struct /= (``NULL''::Addr) then
+
+       (handle_t, flush_on_close)
+	 | wH && aH  = (AppendHandle, 1)
+	 | wH        = (WriteHandle, 1)
+	 | rwH       = (ReadWriteHandle, 1)
+	 | otherwise = (ReadHandle, 0)
+	  
+      fo <- _ccall_ openFd fd flags flush_on_close
+      if fo /= nullAddr then do
 	 {-
 	   A distinction is made here between std{Input,Output,Error} Fds
 	   and all others. The standard descriptors have a finaliser
@@ -123,18 +110,21 @@ fdToHandle fd@(FD# fd#) =
 	   (or as a result of) program termination.
 	 -}
 #ifndef __PARALLEL_HASKELL__
-	 (if fd == stdInput || fd == stdOutput || fd == stdError then
-             makeForeignObj file_struct (``&freeStdFile''::Addr)
-	  else
-	     makeForeignObj file_struct (``&freeFile''::Addr)) >>= \ fp ->
-	  newHandle (handle_t fp Nothing False)
-#else
-	  newHandle (handle_t file_struct Nothing False)
+	 fo <- 
+	   (if fd == stdInput || fd == stdOutput || fd == stdError then
+              makeForeignObj fo (``&freeStdFile''::Addr)
+	    else
+	      makeForeignObj fo (``&freeFileObject''::Addr))
 #endif
-      else
+	 (bm, bf_size)  <- getBMode__ fo
+         mkBuffer__ fo bf_size
+	 newHandle (Handle__ fo handle_t bm fd_str)
+       else
          syserr "fdToHandle"
-   else
-      syserr "fdToHandle"
+     else
+       syserr "fdToHandle"
+  where
+   fd_str = "<file descriptor: " ++ show (I# fd#) ++ ">"
 
 fdRead :: Fd -> ByteCount -> IO (String, ByteCount)
 fdRead fd 0 = return ("", 0)
@@ -143,7 +133,7 @@ fdRead fd nbytes = do
     rc    <-  _ccall_ read fd bytes nbytes
     case rc of
       -1 -> syserr "fdRead"
-      0  -> fail (IOError Nothing EOF "EOF")
+      0  -> fail (IOError Nothing EOF "fdRead" "EOF")
       n | n == nbytes -> do
 	    buf <- freeze bytes
 	    return (unpackPS (unsafeByteArrayToPS buf n), n)
@@ -300,12 +290,13 @@ bytes2ProcessIDAndLock bytes = do
     llen    <- _casm_ ``%r = ((struct flock *)%0)->l_len;'' bytes
     lpid    <- _casm_ ``%r = ((struct flock *)%0)->l_pid;'' bytes
     return (lpid, (kind ltype, mode lwhence, lstart, llen))
---  where
+
 kind :: Int -> LockRequest
 kind x
  | x == ``F_RDLCK'' = ReadLock
  | x == ``F_WRLCK'' = WriteLock
  | x == ``F_UNLCK'' = Unlock
+
 mode :: Int -> SeekMode
 mode x
  | x == ``SEEK_SET'' = AbsoluteSeek
