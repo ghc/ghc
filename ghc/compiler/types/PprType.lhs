@@ -18,7 +18,7 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import Type		( Type(..), TyNote(..), Kind, ThetaType, 
+import Type		( Type(..), TyNote(..), Kind, ThetaType, UsageAnn(..),
 			  splitDictTy_maybe,
 			  splitForAllTys, splitSigmaTy, splitRhoTy,
 			  isDictTy, splitTyConApp_maybe, splitFunTy_maybe,
@@ -163,21 +163,15 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
   = getPprStyle $ \ sty -> 
     maybeParen ctxt_prec fUN_PREC $
     if ifaceStyle sty then
-       sep [ ptext SLIT("__forall") <+> brackets pp_tyvars, pp_ctxt, pp_body ]
+       sep [ ptext SLIT("__forall") <+> brackets pp_tyvars <+> ptext SLIT("=>"), pp_body ]
     else
-       sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), pp_maybe_ctxt, pp_body ]
+       sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), pp_body ]
   where		
-    (tyvars, rho_ty) = splitForAllTys ty
-    (theta, body_ty) = splitRhoTy rho_ty
+    (tyvars, body_ty) = splitForAllTys ty  -- don't treat theta specially any more (KSW 1999-04)
     
     pp_tyvars = hsep (map (pBndr env LambdaBind) tyvars)
     pp_body   = ppr_ty env tOP_PREC body_ty
     
-    pp_maybe_ctxt | null theta = empty
-	          | otherwise  = pp_ctxt
-
-    pp_ctxt = ppr_theta env theta <+> ptext SLIT("=>") 
-
 
 ppr_ty env ctxt_prec (FunTy ty1 ty2)
   = maybeParen ctxt_prec fUN_PREC (sep (ppr_ty env fUN_PREC ty1 : pp_rest ty2))
@@ -194,8 +188,13 @@ ppr_ty env ctxt_prec (AppTy ty1 ty2)
 
 ppr_ty env ctxt_prec (NoteTy (SynNote ty) expansion)
   = ppr_ty env ctxt_prec ty
+--  = ppr_ty env ctxt_prec expansion -- if we don't want to see syntys
 
 ppr_ty env ctxt_prec (NoteTy (FTVNote _) ty) = ppr_ty env ctxt_prec ty
+
+ppr_ty env ctxt_prec (NoteTy (UsgNote u) ty)
+  = maybeParen ctxt_prec tYCON_PREC $
+    ppr u <+> ppr_ty env tYCON_PREC ty
 
 ppr_theta env []    = empty
 ppr_theta env theta = braces (hsep (punctuate comma (map (ppr_dict env tOP_PREC) theta)))
@@ -208,6 +207,13 @@ ppr_dict env ctxt (clas, tys) = ppr clas <+>
 pprTyEnv = initPprEnv b b (Just ppr) b (Just (\site -> pprTyVarBndr)) b
   where
     b = panic "PprType:init_ppr_env"
+\end{code}
+
+\begin{code}
+instance Outputable UsageAnn where
+  ppr UsOnce     = ptext SLIT("__o")
+  ppr UsMany     = ptext SLIT("__m")
+  ppr (UsVar uv) = ptext SLIT("__uv") <> ppr uv
 \end{code}
 
 %************************************************************************
@@ -255,6 +261,7 @@ getTyDescription ty
       TyConApp tycon _ -> getOccString tycon
       NoteTy (FTVNote _) ty  -> getTyDescription ty
       NoteTy (SynNote ty1) _ -> getTyDescription ty1
+      NoteTy (UsgNote _) ty  -> getTyDescription ty
       ForAllTy _ ty    -> getTyDescription ty
     }
   where
