@@ -566,7 +566,7 @@ SHELL			= /bin/sh
 # override whatever setting you have in your environment while executing. 
 
 # By default, REAL_SHELL is set equal SHELL, which is not really a smart move
-# as it SHELL that will show up the bogosity in the first place, but setting
+# as it is SHELL that will show up the bogosity in the first place, but setting
 # it to anything else isn't really portable.
 #
 #  ====> If long command lines cause you trouble, invoke `ghc' (via `make' or otherwise)
