@@ -50,9 +50,9 @@ import PrelNum		( ord_0 )
 import Array
 #endif
 
-#ifndef __HUGS__
-
 \end{code}
+
+#ifndef __HUGS__
 
 \begin{code}
 showInt :: Integral a => a -> ShowS
