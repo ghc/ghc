@@ -49,7 +49,9 @@ import NameSet
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
 import PrelRules	( builtinRules )
 import PrelNames	( mAIN_Name, pREL_MAIN_Name, pRELUDE_Name,
-			  ioTyCon_RDR, unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR
+			  ioTyCon_RDR,
+			  unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
+			  eqString_RDR
 			)
 import PrelInfo		( fractionalClassKeys, derivingOccurrences )
 import Type		( namesOfType, funTyCon )
@@ -247,7 +249,8 @@ implicitFVs mod_name decls
     implicit_occs = string_occs ++ foldr ((++) . get) implicit_main decls
 
 	-- Virtually every program has error messages in it somewhere
-    string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR]
+    string_occs = [unpackCString_RDR, unpackCStringFoldr_RDR, unpackCStringUtf8_RDR,
+		   eqString_RDR]
 
     get (TyClD (TyData _ _ _ _ _ _ (Just deriv_classes) _ _ _ _))
        = concat (map get_deriv deriv_classes)
