@@ -8,11 +8,11 @@ module CmLink ( Linkable(..),  Unlinked(..),
 		filterModuleLinkables, 
 		findModuleLinkable_maybe,
 		LinkResult(..),
-		updateClosureEnv,
                 link, 
 		unload,
                 PersistentLinkerState{-abstractly!-}, emptyPLS,
 #ifdef GHCI
+		updateClosureEnv,
 		linkExpr
 #endif
   ) where
@@ -90,10 +90,12 @@ emptyPLS = return (PersistentLinkerState { closure_env = emptyFM,
 emptyPLS = return (PersistentLinkerState {})
 #endif
 
+#ifdef GHCI
 updateClosureEnv :: PersistentLinkerState -> [(Name,HValue)] 
 	-> IO PersistentLinkerState
 updateClosureEnv pls new_bindings
   = return pls{ closure_env = addListToFM (closure_env pls) new_bindings }
+#endif
 
 -----------------------------------------------------------------------------
 -- Unloading old objects ready for a new compilation sweep.
