@@ -9,7 +9,7 @@ This is a big module, but, if you pay attention to
 structure should not be too overwhelming.
 
 \begin{code}
-module MachCode ( stmt2Instrs, InstrBlock ) where
+module MachCode ( stmtsToInstrs, InstrBlock ) where
 
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
@@ -56,9 +56,80 @@ x `bind` f = f x
 Code extractor for an entire stix tree---stix statement level.
 
 \begin{code}
-stmt2Instrs :: StixTree {- a stix statement -} -> NatM InstrBlock
+stmtsToInstrs :: [StixTree] -> NatM InstrBlock
+stmtsToInstrs stmts
+   = liftStrings stmts [] []		`thenNat` \ lifted ->
+     mapNat stmtToInstrs lifted		`thenNat` \ instrss ->
+     returnNat (concatOL instrss)
 
-stmt2Instrs stmt = case stmt of
+
+-- Lift StStrings out of top-level StDatas, putting them at the end of
+-- the block, and replacing them with StCLbls which refer to the lifted-out strings. 
+{- Motivation for this hackery provided by the following bug:
+   Stix:
+      (DataSegment)
+      Bogon.ping_closure :
+      (Data P_ Addr.A#_static_info)
+      (Data StgAddr (Str `alalal'))
+      (Data P_ (0))
+   results in:
+      .data
+              .align 8
+      .global Bogon_ping_closure
+      Bogon_ping_closure:
+              .long   Addr_Azh_static_info
+              .long   .Ln1a8
+      .Ln1a8:
+              .byte   0x61
+              .byte   0x6C
+              .byte   0x61
+              .byte   0x6C
+              .byte   0x61
+              .byte   0x6C
+              .byte   0x00
+              .long   0
+   ie, the Str is planted in-line, when what we really meant was to place
+   a _reference_ to the string there.  liftStrings will lift out all such
+   strings in top-level data and place them at the end of the block.
+-}
+
+liftStrings :: [StixTree]    -- originals
+            -> [StixTree]    -- (reverse) originals with strings lifted out
+            -> [(CLabel, FAST_STRING)]   -- lifted strs, and their new labels
+            -> NatM [StixTree]
+
+-- First, examine the original trees and lift out strings in top-level StDatas.
+liftStrings (st:sts) acc_stix acc_strs
+   = case st of
+        StData sz datas
+           -> lift datas acc_strs 	`thenNat` \ (datas_done, acc_strs1) ->
+              liftStrings sts ((StData sz datas_done):acc_stix) acc_strs1
+        other 
+           -> liftStrings sts (other:acc_stix) acc_strs
+     where
+        -- Handle a top-level StData
+        lift []     acc_strs = returnNat ([], acc_strs)
+        lift (d:ds) acc_strs
+           = lift ds acc_strs 		`thenNat` \ (ds_done, acc_strs1) ->
+             case d of
+                StString s 
+                   -> getNatLabelNCG 	`thenNat` \ lbl ->
+                      returnNat ((StCLbl lbl):ds_done, ((lbl,s):acc_strs1))
+                other
+                   -> returnNat (other:ds_done, acc_strs1)
+
+-- When we've run out of original trees, emit the lifted strings.
+liftStrings [] acc_stix acc_strs
+   = returnNat (reverse acc_stix ++ concatMap f acc_strs)
+     where
+        f (lbl,str) = [StSegment RoDataSegment, 
+                       StLabel lbl, 
+                       StString str, 
+                       StSegment TextSegment]
+
+
+stmtToInstrs :: StixTree {- a stix statement -} -> NatM InstrBlock
+stmtToInstrs stmt = case stmt of
     StComment s    -> returnNat (unitOL (COMMENT s))
     StSegment seg  -> returnNat (unitOL (SEGMENT seg))
 
@@ -92,20 +163,21 @@ stmt2Instrs stmt = case stmt of
                     `consOL`  concatOL codes)
       where
 	getData :: StixTree -> NatM (InstrBlock, Imm)
-
 	getData (StInt i)        = returnNat (nilOL, ImmInteger i)
 	getData (StDouble d)     = returnNat (nilOL, ImmDouble d)
 	getData (StFloat d)      = returnNat (nilOL, ImmFloat d)
 	getData (StCLbl l)       = returnNat (nilOL, ImmCLbl l)
-	getData (StString s)     =
-	    getNatLabelNCG 	    	    `thenNat` \ lbl ->
-	    returnNat (toOL [LABEL lbl,
-			     ASCII True (_UNPK_ s)],
-                       ImmCLbl lbl)
+	getData (StString s)     = panic "MachCode.stmtToInstrs: unlifted StString"
 	-- the linker can handle simple arithmetic...
 	getData (StIndex rep (StCLbl lbl) (StInt off)) =
 		returnNat (nilOL, 
                            ImmIndex lbl (fromInteger (off * sizeOf rep)))
+
+    -- Top-level lifted-out string.  The segment will already have been set
+    -- (see liftStrings above).
+    StString str
+      -> returnNat (unitOL (ASCII True (_UNPK_ str)))
+
 
 -- Walk a Stix tree, and insert dereferences to CLabels which are marked
 -- as labelDynamic.  stmt2Instrs calls derefDLL selectively, because
@@ -556,7 +628,7 @@ getRegister (StScratchWord i)
    = getDeltaNat `thenNat` \ current_stack_offset ->
      let j = i+1   - (current_stack_offset `div` 4)
          code dst
-           = unitOL (LEA L (OpAddr (spRel (j+1))) (OpReg dst))
+           = unitOL (LEA L (OpAddr (spRel j)) (OpReg dst))
      in 
      returnNat (Any PtrRep code)
 
@@ -907,8 +979,8 @@ getRegister (StDouble d)
 -- Below that is the spill area.
 getRegister (StScratchWord i)
    | i >= 0 && i < 6
-   = let j        = i+1
-         code dst = unitOL (fpRelEA j dst)
+   = let
+         code dst = unitOL (fpRelEA (i-6) dst)
      in 
      returnNat (Any PtrRep code)
 

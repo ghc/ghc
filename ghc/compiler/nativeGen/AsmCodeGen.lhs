@@ -112,13 +112,13 @@ nativeCodeGen absC us
 
 absCtoNat :: AbstractC -> UniqSM (SDoc, SDoc)
 absCtoNat absC
-   = _scc_ "genCodeAbstractC" genCodeAbstractC absC                `thenUs` \ stixRaw ->
-     _scc_ "genericOpt" genericOpt stixRaw                   `bind`   \ stixOpt ->
-     _scc_ "genMachCode" genMachCode stixOpt                  `thenUs` \ pre_regalloc ->
-     _scc_ "regAlloc" regAlloc pre_regalloc                `bind`   \ almost_final ->
-     _scc_ "x86fp_kludge" x86fp_kludge almost_final            `bind`   \ final_mach_code ->
-     _scc_ "vcat" vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
-     _scc_ "pprStixTrees" pprStixTrees stixOpt                 `bind`   \ stix_sdoc ->
+   = _scc_ "genCodeAbstractC" genCodeAbstractC absC        `thenUs` \ stixRaw ->
+     _scc_ "genericOpt"       genericOpt stixRaw           `bind`   \ stixOpt ->
+     _scc_ "genMachCode"      genMachCode stixOpt          `thenUs` \ pre_regalloc ->
+     _scc_ "regAlloc"         regAlloc pre_regalloc        `bind`   \ almost_final ->
+     _scc_ "x86fp_kludge"     x86fp_kludge almost_final    `bind`   \ final_mach_code ->
+     _scc_ "vcat"     vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
+     _scc_ "pprStixTrees"    pprStixTrees stixOpt          `bind`   \ stix_sdoc ->
      returnUs (stix_sdoc, final_sdoc)
      where
         bind f x = x f
@@ -150,12 +150,10 @@ supply breaks abstraction.  Is that bad?
 genMachCode :: [StixTree] -> UniqSM InstrBlock
 
 genMachCode stmts initial_us
-  = let initial_st         = mkNatM_State initial_us 0
-        (blocks, final_st) = initNat initial_st 
-                                     (mapNat stmt2Instrs stmts)
-        instr_list         = concatOL blocks
-        final_us           = uniqOfNatM_State final_st
-        final_delta        = deltaOfNatM_State final_st
+  = let initial_st             = mkNatM_State initial_us 0
+        (instr_list, final_st) = initNat initial_st (stmtsToInstrs stmts)
+        final_us               = uniqOfNatM_State final_st
+        final_delta            = deltaOfNatM_State final_st
     in
         if   final_delta == 0
         then (instr_list, final_us)
