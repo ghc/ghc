@@ -16,7 +16,7 @@ import AbsCSyn 		hiding ( spRel )
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import Constants	( uF_UPDATEE )
 import SMRep		( fixedHdrSize )
-import Literal		( Literal(..) )
+import Literal		( Literal(..), word2IntLit )
 import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
@@ -390,8 +390,9 @@ amodeToStix (CLit core)
       MachChar c     -> StInt (toInteger (ord c))
       MachStr s	     -> StString s
       MachAddr a     -> StInt a
-      MachInt i      -> StInt (toInteger i)
-      MachLitLit s _ -> {-trace (_UNPK_ s ++ "\n")-} (litLitToStix (_UNPK_ s))
+      MachInt i      -> StInt i
+      MachWord w     -> case word2IntLit core of MachInt iw -> StInt iw
+      MachLitLit s _ -> litLitToStix (_UNPK_ s)
       MachFloat d    -> StDouble d
       MachDouble d   -> StDouble d
       _ -> panic "amodeToStix:core literal"

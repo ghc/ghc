@@ -29,14 +29,14 @@ import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
 			)
-import Literal		( Literal(..) )
+import Literal		( Literal(..), word2IntLit )
 import Maybes	    	( maybeToBool )
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
 import StixMacro	( macroCode, checkCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
-import Outputable       ( pprPanic )
+import Outputable       ( pprPanic, ppr )
 import UniqSupply	( returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Util		( naturalMergeSortLe )
 import Panic		( panic )
@@ -449,14 +449,15 @@ be tuned.)
 
  intTag :: Literal -> Integer
  intTag (MachChar c)  = toInteger (ord c)
- intTag (MachInt i) = i
- intTag _ = panic "intTag"
+ intTag (MachInt i)   = i
+ intTag (MachWord w)  = intTag (word2IntLit (MachWord w))
+ intTag _             = panic "intTag"
 
  fltTag :: Literal -> Rational
 
- fltTag (MachFloat f) = f
+ fltTag (MachFloat f)  = f
  fltTag (MachDouble d) = d
- fltTag _ = panic "fltTag"
+ fltTag x              = pprPanic "fltTag" (ppr x)
 
  {-
  mkSimpleSwitches
@@ -493,9 +494,10 @@ be tuned.)
     	floating = isFloatingRep (getAmodeRep am)
     	choices = length alts
 
-    	(x@(MachChar _),_) `leAlt` (y,_) = intTag x <= intTag y
-    	(x@(MachInt _), _) `leAlt` (y,_) = intTag x <= intTag y
-    	(x,_)              `leAlt` (y,_) = fltTag x <= fltTag y
+    	(x@(MachChar _),_)  `leAlt` (y,_) = intTag x <= intTag y
+    	(x@(MachInt _), _)  `leAlt` (y,_) = intTag x <= intTag y
+    	(x@(MachWord _), _) `leAlt` (y,_) = intTag x <= intTag y
+    	(x,_)               `leAlt` (y,_) = fltTag x <= fltTag y
 
 \end{code}
 
