@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.8 2002/07/04 12:57:39 simonmar Exp $
+ * $Id: HsBase.h,v 1.9 2002/07/04 13:33:25 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -12,12 +12,6 @@
 
 #include "config.h"
 #include "HsFFI.h"
-
-// The following is required on Solaris to force the POSIX versions of
-// the various _r functions instead of the Solaris versions.
-#ifdef solaris_TARGET_OS
-#define _POSIX_PTHREAD_SEMANTICS
-#endif
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -3,6 +3,15 @@
  *
  * Directory Runtime Support
  */
+
+#include "config.h"
+
+// The following is required on Solaris to force the POSIX versions of
+// the various _r functions instead of the Solaris versions.
+#ifdef solaris2_TARGET_OS
+#define _POSIX_PTHREAD_SEMANTICS
+#endif
+
 #include "HsBase.h"
 
 #if defined(mingw32_TARGET_OS)
