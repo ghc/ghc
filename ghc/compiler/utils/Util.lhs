@@ -39,6 +39,9 @@ module Util (
 	tagCmp_,
 	TAG_(..),
 #endif
+	-- The Eager monad
+	SYN_IE(Eager), thenEager, returnEager, mapEager, appEager, runEager,
+
 	-- general list processing
 	IF_NOT_GHC(forall COMMA exists COMMA)
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -51,7 +54,7 @@ module Util (
 #endif
 
 	-- association lists
-	assoc,
+	assoc, assocUsing, assocDefault, assocDefaultUsing,
 
 	-- duplicate handling
 	hasNoDups, equivClasses, runs, removeDups,
@@ -94,12 +97,43 @@ module Util (
 CHK_Ubiq() -- debugging consistency check
 IMPORT_1_3(List(zipWith4))
 
-import Pretty
 #else
 import List(zipWith4)
 #endif
 
 infixr 9 `thenCmp`
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{The Eager monad}
+%*									*
+%************************************************************************
+
+The @Eager@ monad is just an encoding of continuation-passing style,
+used to allow you to express "do this and then that", mainly to avoid
+space leaks. It's done with a type synonym to save bureaucracy.
+
+\begin{code}
+type Eager ans a = (a -> ans) -> ans
+
+runEager :: Eager a a -> a
+runEager m = m (\x -> x)
+
+appEager :: Eager ans a -> (a -> ans) -> ans
+appEager m cont = m cont
+
+thenEager :: Eager ans a -> (a -> Eager ans b) -> Eager ans b
+thenEager m k cont = m (\r -> k r cont)
+
+returnEager :: a -> Eager ans a
+returnEager v cont = cont v
+
+mapEager :: (a -> Eager ans b) -> [a] -> Eager ans [b]
+mapEager f [] = returnEager []
+mapEager f (x:xs) = f x			`thenEager` \ y ->
+		    mapEager f xs	`thenEager` \ ys ->
+		    returnEager (y:ys)
 \end{code}
 
 %************************************************************************
@@ -276,13 +310,20 @@ isn'tIn msg x ys
 See also @assocMaybe@ and @mkLookupFun@ in module @Maybes@.
 
 \begin{code}
-assoc :: (Eq a) => String -> [(a, b)] -> a -> b
+assoc		  :: (Eq a) => String -> [(a, b)] -> a -> b
+assocDefault	  :: (Eq a) => b -> [(a, b)] -> a -> b
+assocUsing	  :: (a -> a -> Bool) -> String -> [(a, b)] -> a -> b
+assocDefaultUsing :: (a -> a -> Bool) -> b -> [(a, b)] -> a -> b
 
-assoc crash_msg lst key
-  = if (null res)
-    then panic ("Failed in assoc: " ++ crash_msg)
-    else head res
-  where res = [ val | (key', val) <- lst, key == key']
+assocDefaultUsing eq deflt ((k,v) : rest) key
+  | k `eq` key = v
+  | otherwise  = assocDefaultUsing eq deflt rest key
+
+assocDefaultUsing eq deflt [] key = deflt
+
+assoc crash_msg         list key = assocDefaultUsing (==) (panic ("Failed in assoc: " ++ crash_msg)) list key
+assocDefault deflt      list key = assocDefaultUsing (==) deflt list key
+assocUsing eq crash_msg list key = assocDefaultUsing eq (panic ("Failed in assoc: " ++ crash_msg)) list key
 \end{code}
 
 %************************************************************************
@@ -788,12 +829,14 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ "Please report it as a compiler bug "
 	      ++ "to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\n" )
 
-pprPanic heading pretty_msg = panic (heading++(ppShow 80 pretty_msg))
-pprError heading pretty_msg = error (heading++(ppShow 80 pretty_msg))
-#if __GLASGOW_HASKELL__ >= 200
-pprTrace heading pretty_msg = GHCbase.trace (heading++(ppShow 80 pretty_msg))
+pprPanic heading pretty_msg = panic (heading++(show pretty_msg))
+pprError heading pretty_msg = error (heading++(show pretty_msg))
+#if __GLASGOW_HASKELL__ == 201
+pprTrace heading pretty_msg = GHCbase.trace (heading++(show pretty_msg))
+#elif __GLASGOW_HASKELL__ >= 202
+pprTrace heading pretty_msg = GlaExts.trace (heading++(show pretty_msg))
 #else
-pprTrace heading pretty_msg = trace (heading++(ppShow 80 pretty_msg))
+pprTrace heading pretty_msg = trace (heading++(show pretty_msg))
 #endif
 
 -- #-versions because panic can't return an unboxed int, and that's
@@ -803,7 +846,7 @@ pprTrace heading pretty_msg = trace (heading++(ppShow 80 pretty_msg))
 panic# :: String -> TAG_
 panic# s = case (panic s) of () -> EQ_
 
-pprPanic# heading pretty_msg = panic# (heading++(ppShow 80 pretty_msg))
+pprPanic# heading pretty_msg = panic# (heading++(show pretty_msg))
 
 assertPanic :: String -> Int -> a
 assertPanic file line = panic ("ASSERT failed! file "++file++", line "++show line)
