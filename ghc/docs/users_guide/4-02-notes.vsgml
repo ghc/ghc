@@ -8,11 +8,13 @@
 	<itemize>
 	<item> Lazy name-clash detection.
 	<item> Scoped infix declarations.
+	<item> <tt/Eval/ class now completely removed.
 	</itemize>
 
 <item> Scoped type variables implemented.
 
 <item> Several bugs in _ccall_GC and foreign export fixed.
+
 
 <item> Warnings for unused variables should work now (they didn't before).
 
