@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.65 2003/07/21 11:01:06 simonmar Exp $
+% $Id: CgCase.lhs,v 1.66 2003/07/22 16:11:26 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -361,13 +361,15 @@ cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
     
     forkAbsC (	-- forkAbsC for the RHS, so that the envt is
 		-- not changed for the mkRetDirect call
-  	restoreCurrentCostCentre cc_slot True	`thenC` 
 	bindUnboxedTupleComponents args		`thenFC` \ (live_regs, ptrs, nptrs, _) ->
+		-- restore the CC *after* binding the tuple components, so that we
+		-- get the stack offset of the saved CC right.
+  	restoreCurrentCostCentre cc_slot True	`thenC` 
 		-- Generate a heap check if necessary
-  	unbxTupleHeapCheck live_regs ptrs nptrs AbsCNop $
+  	unbxTupleHeapCheck live_regs ptrs nptrs AbsCNop (
 		-- And finally the code for the alternative
   	cgExpr rhs
-    )						`thenFC` \ abs_c ->
+    ))						`thenFC` \ abs_c ->
     mkRetDirectTarget bndr abs_c srt		`thenFC` \ lbl ->
     returnFC (CaseAlts lbl Nothing False)
 
