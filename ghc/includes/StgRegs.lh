@@ -45,6 +45,20 @@ void SaveAllStgRegs(STG_NO_ARGS)
     /* CurrentRegTable = BaseReg; */
 # endif
 #endif
+/* Hack!!! slam the current C stack pointer into the reg. table
+   in the event that we need to copy a chunk of the C stack
+   before entering Haskell via a stable pointer (contact
+   <sof> for (gruesome) details!)
+  
+   Only save this once.
+
+   ToDo: support this across platforms.
+*/
+#if 0 && defined(CONCURRENT) && defined(i386_TARGET_ARCH)
+    if (CurrentTSO != CurrentTSOinC) {
+       __asm__ volatile (" mov %%esp,%0" : "m=" (CurrentRegTable->rCstkptr));
+    }
+#endif
 
 #ifdef REG_R1
     SAVE_R1 = R1;	
