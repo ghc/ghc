@@ -79,9 +79,9 @@
 	  single DLL on Windows is that the package system is used to
 	  tell the compiler when it should make an inter-DLL call
 	  rather than an intra-DLL call (inter-DLL calls require an
-	  extra indirection). <Strong>Building packages as DLLs
+	  extra indirection). <emphasis>Building packages as DLLs
 	  doesn't work at the moment; see <XRef
-	  LinkEnd="win32-dlls-create"> for the gory details.</Strong>
+	  LinkEnd="win32-dlls-create"> for the gory details.</emphasis>
 	  </para>
 
 	  <para>Versions of the Haskell libraries for use with GHCi
