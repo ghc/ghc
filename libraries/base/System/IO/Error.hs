@@ -10,7 +10,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.1 2002/02/05 17:32:27 simonmar Exp $
+-- $Id: Error.hs,v 1.2 2002/03/26 17:03:08 simonmar Exp $
 --
 -- Standard IO Errors.
 --
@@ -116,6 +116,10 @@ userErrorType		  = UserError
 
 -- -----------------------------------------------------------------------------
 -- IOErrorType predicates
+
+isAlreadyExistsErrorType, isDoesNotExistErrorType, isAlreadyInUseErrorType,
+  isFullErrorType, isEOFErrorType, isIllegalOperationErrorType, 
+  isPermissionErrorType, isUserErrorType :: IOErrorType -> Bool
 
 #ifdef __GLASGOW_HASKELL__
 isAlreadyExistsErrorType AlreadyExists = True
