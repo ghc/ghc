@@ -140,9 +140,9 @@ instance Enum () where
 
     fromEnum () = zeroInt
     enumFrom () 	= [()]
-    enumFromThen () () 	= [()]
+    enumFromThen () () 	= let many = ():many in many
     enumFromTo () () 	= [()]
-    enumFromThenTo () () () = [()]
+    enumFromThenTo () () () = let many = ():many in many
 \end{code}
 
 \begin{code}
