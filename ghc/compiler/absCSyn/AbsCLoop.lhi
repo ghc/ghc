@@ -21,12 +21,13 @@ import ClosureInfo	( closureKind, closureLabelFromCI,
 			  entryLabelFromCI,fastLabelFromCI,
 			  ClosureInfo
 			)
-import CLabel		( CLabel )
+import CLabel		( mkReturnPtLabel, CLabel )
 import HeapOffs		( HeapOffset )
 import Id		( Id(..) )
 import MachMisc		( fixedHdrSizeInWords, varHdrSizeInWords )
 import SMRep		( SMRep )
 import TyCon		( TyCon )
+import Unique		( Unique )
 
 closureKind :: ClosureInfo -> [Char]
 closureLabelFromCI :: ClosureInfo -> CLabel
@@ -41,6 +42,8 @@ entryLabelFromCI :: ClosureInfo -> CLabel
 fastLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI :: ClosureInfo -> CLabel
 maybeSelectorInfo :: ClosureInfo -> Maybe (Id, Int)
+
+mkReturnPtLabel :: Unique -> CLabel
 
 ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 data CtrlReturnConvention   = VectoredReturn Int | UnvectoredReturn Int
