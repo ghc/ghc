@@ -162,7 +162,8 @@ CLEAN_FILES            += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 			  $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_HCS) $(HS_SS) \
 			  a.out
 
-MAINTAINER_CLEAN_FILES += .depend $(BOOT_SRCS)
+DIST_CLEAN_FILES += .depend
+MAINTAINER_CLEAN_FILES += $(BOOT_SRCS)
 
 #
 # `Standard' set of files to clean out.
