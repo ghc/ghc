@@ -33,8 +33,10 @@ import TcRnMonad
 
 import TysWiredIn	( mkListTy )
 import DsMeta		( exprTyConName, declTyConName, decTyConName, qTyConName )
+import ErrUtils (Message)
 import Outputable
 import GHC.Base		( unsafeCoerce# )	-- Should have a better home in the module hierarchy
+import Monad (liftM)
 \end{code}
 
 
@@ -183,15 +185,19 @@ tcSpliceDecls expr
 	-- Run the expression
     traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`
     runMetaD zonked_q_expr		`thenM` \ simple_expr ->
-    let 
-	-- simple_expr :: [Meta.Dec]
-	decls :: [RdrNameHsDecl]
-	decls = convertToHsDecls simple_expr 
-    in
+    -- simple_expr :: [Meta.Dec]
+    -- decls :: [RdrNameHsDecl]
+    handleErrors (convertToHsDecls simple_expr) `thenM` \ decls ->
     traceTc (text "Got result" <+> vcat (map ppr decls))	`thenM_`
     showSplice "declarations"
 	       zonked_q_expr (vcat (map ppr decls))		`thenM_`
     returnM decls
+
+  where handleErrors :: [Either a Message] -> TcM [a]
+        handleErrors [] = return []
+        handleErrors (Left x:xs) = liftM (x:) (handleErrors xs)
+        handleErrors (Right m:xs) = do addErrTc m
+                                       handleErrors xs
 \end{code}
 
 

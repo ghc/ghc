@@ -35,28 +35,30 @@ import BasicTypes( Boxity(..), RecFlag(Recursive),
 		   NewOrData(..), StrictnessMark(..) )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
 import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignDecl(..) )
-import FastString( mkFastString, nilFS )
-import Char 	( ord, isAlphaNum )
+import FastString( FastString, mkFastString, nilFS )
+import Char 	( ord, isAscii, isAlphaNum, isAlpha )
 import List	( partition )
+import ErrUtils (Message)
 import Outputable
 
 
 -------------------------------------------------------------------
-convertToHsDecls :: [Meta.Dec] -> [HsDecl RdrName]
+convertToHsDecls :: [Meta.Dec] -> [Either (HsDecl RdrName) Message]
 convertToHsDecls ds = map cvt_top ds
 
 
-cvt_top d@(Val _ _ _) = ValD (cvtd d)
-cvt_top d@(Fun _ _)   = ValD (cvtd d)
+cvt_top :: Meta.Dec -> Either (HsDecl RdrName) Message
+cvt_top d@(Val _ _ _) = Left $ ValD (cvtd d)
+cvt_top d@(Fun _ _)   = Left $ ValD (cvtd d)
  
 cvt_top (TySyn tc tvs rhs)
-  = TyClD (TySynonym (tconName tc) (cvt_tvs tvs) (cvtType rhs) loc0)
+  = Left $ TyClD (TySynonym (tconName tc) (cvt_tvs tvs) (cvtType rhs) loc0)
 
 cvt_top (Data tc tvs constrs derivs)
-  = TyClD (mkTyData DataType 
-		    (noContext, tconName tc, cvt_tvs tvs)
-		    (DataCons (map mk_con constrs))
-		    (mk_derivs derivs) loc0)
+  = Left $ TyClD (mkTyData DataType 
+                           (noContext, tconName tc, cvt_tvs tvs)
+                           (DataCons (map mk_con constrs))
+                           (mk_derivs derivs) loc0)
   where
     mk_con (Constr c tys)
 	= ConDecl (cName c) noExistentials noContext
@@ -68,36 +70,77 @@ cvt_top (Data tc tvs constrs derivs)
     mk_derivs cs = Just [HsClassP (tconName c) [] | c <- cs]
 
 cvt_top (Class ctxt cl tvs decs)
-  = TyClD (mkClassDecl (cvt_context ctxt, tconName cl, cvt_tvs tvs)
-		       noFunDeps
-		       sigs (Just binds) loc0)
+  = Left $ TyClD (mkClassDecl (cvt_context ctxt, tconName cl, cvt_tvs tvs)
+                              noFunDeps
+                              sigs (Just binds) loc0)
   where
     (binds,sigs) = cvtBindsAndSigs decs
 
 cvt_top (Instance tys ty decs)
-  = InstD (InstDecl inst_ty binds sigs Nothing loc0)
+  = Left $ InstD (InstDecl inst_ty binds sigs Nothing loc0)
   where
     (binds, sigs) = cvtBindsAndSigs decs
     inst_ty = HsForAllTy Nothing 
 			 (cvt_context tys) 
 			 (HsPredTy (cvt_pred ty))
 
-cvt_top (Proto nm typ) = SigD (Sig (vName nm) (cvtType typ) loc0)
+cvt_top (Proto nm typ) = Left $ SigD (Sig (vName nm) (cvtType typ) loc0)
 
 cvt_top (Foreign (Import callconv safety from nm typ))
- = ForD (ForeignImport (vName nm) (cvtType typ) fi False loc0)
-    where fi = CImport callconv' safety' c_header nilFS cis
-          callconv' = case callconv of
+ = case parsed of
+       Just (c_header, cis) ->
+           let i = CImport callconv' safety' c_header nilFS cis
+           in Left $ ForD (ForeignImport (vName nm) (cvtType typ) i False loc0)
+       Nothing -> Right $     text (show from)
+                          <+> ptext SLIT("is not a valid ccall impent")
+    where callconv' = case callconv of
                           CCall -> CCallConv
                           StdCall -> StdCallConv
           safety' = case safety of
                         Unsafe     -> PlayRisky
                         Safe       -> PlaySafe False
                         Threadsafe -> PlaySafe True
-          (c_header', c_func') = break (== ' ') from
-          c_header = mkFastString c_header'
-          c_func = tail c_func'
-          cis = CFunction (StaticTarget (mkFastString c_func))
+          parsed = parse_ccall_impent nm from
+
+parse_ccall_impent :: String -> String -> Maybe (FastString, CImportSpec)
+parse_ccall_impent nm s
+ = case lex_ccall_impent s of
+       Just ["dynamic"] -> Just (nilFS, CFunction DynamicTarget)
+       Just ["wrapper"] -> Just (nilFS, CWrapper)
+       Just ("static":ts) -> parse_ccall_impent_static nm ts
+       Just ts -> parse_ccall_impent_static nm ts
+       Nothing -> Nothing
+
+parse_ccall_impent_static :: String
+                          -> [String]
+                          -> Maybe (FastString, CImportSpec)
+parse_ccall_impent_static nm ts
+ = let ts' = case ts of
+                 [       "&", cid] -> [       cid]
+                 [fname, "&"     ] -> [fname     ]
+                 [fname, "&", cid] -> [fname, cid]
+                 _                 -> ts
+   in case ts' of
+          [       cid] | is_cid cid -> Just (nilFS,              mk_cid cid)
+          [fname, cid] | is_cid cid -> Just (mkFastString fname, mk_cid cid)
+          [          ]              -> Just (nilFS,              mk_cid nm)
+          [fname     ]              -> Just (mkFastString fname, mk_cid nm)
+          _                         -> Nothing
+    where is_cid :: String -> Bool
+          is_cid x = all (/= '.') x && (isAlpha (head x) || head x == '_')
+          mk_cid :: String -> CImportSpec
+          mk_cid  = CFunction . StaticTarget . mkFastString
+
+lex_ccall_impent :: String -> Maybe [String]
+lex_ccall_impent "" = Just []
+lex_ccall_impent ('&':xs) = fmap ("&":) $ lex_ccall_impent xs
+lex_ccall_impent (' ':xs) = lex_ccall_impent xs
+lex_ccall_impent ('\t':xs) = lex_ccall_impent xs
+lex_ccall_impent xs = case span is_valid xs of
+                          ("", _) -> Nothing
+                          (t, xs') -> fmap (t:) $ lex_ccall_impent xs'
+    where is_valid :: Char -> Bool
+          is_valid c = isAscii c && (isAlphaNum c || c `elem` "._")
 
 noContext      = []
 noExistentials = []
