@@ -32,7 +32,7 @@ extern void initCapabilities(void);
 extern void grabCapability(Capability** cap);
 extern void releaseCapability(Capability* cap);
 
-#if defined(SMP)
+#if defined(RTS_SUPPORTS_THREADS)
 extern nat rts_n_free_capabilities;  /* total number of available capabilities */
 
 static inline nat getFreeCapabilities()
@@ -40,16 +40,20 @@ static inline nat getFreeCapabilities()
   return rts_n_free_capabilities;
 }
 
-static inline rtsBool noFreeCapabilities()
+static inline rtsBool noCapabilities()
 {
   return (rts_n_free_capabilities == 0);
 }
 
 static inline rtsBool allFreeCapabilities()
 {
+# if defined(SMP)
   return (rts_n_free_capabilities == RtsFlags.ParFlags.nNodes);
+# else
+  return (rts_n_free_capabilities == 1);
+# endif 
 }
 
-#endif /* SMP */
+#endif /* RTS_SUPPORTS_THREADS */
 
 #endif /* __CAPABILITY_H__ */

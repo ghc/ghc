@@ -26,6 +26,8 @@
 Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
+nat rts_n_free_capabilities;
+
 static
 void
 initCapability( Capability *cap )
@@ -64,6 +66,7 @@ static Capability *free_capabilities; /* Available capabilities for running thre
 void grabCapability(Capability** cap)
 {
 #if !defined(SMP)
+  rts_n_free_capabilities = 0;
   *cap = &MainCapability;
 #else
   *cap = free_capabilities;
@@ -79,6 +82,7 @@ void releaseCapability(Capability* cap)
   free_capabilities = cap;
   rts_n_free_capabilities++;
 #endif
+  rts_n_free_capabilities = 1;
   return;
 }
 
