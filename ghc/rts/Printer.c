@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.25 2000/04/14 15:18:06 sewardj Exp $
+ * $Id: Printer.c,v 1.26 2000/04/17 14:31:19 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -813,8 +813,7 @@ static void printZcoded( const char *raw )
 /* Causing linking trouble on Win32 plats, so I'm
    disabling this for now. 
 */
-/* For now, BFD support is unconditionally disabled -- HWL */
-#if 0 /* HWL */ && defined(HAVE_BFD_H) && !defined(_WIN32)
+#if defined(HAVE_BFD_H) && !defined(_WIN32)
 
 #include <bfd.h>
 
