@@ -34,8 +34,8 @@ import FieldLabel	( fieldLabelTyCon )
 import DataCon		( dataConTyCon )
 import TyCon		( visibleDataCons, isSynTyCon, getSynTyConDefn, tyConClass_maybe, tyConName )
 import Class		( className, classSCTheta )
-import Name		( Name {-instance NamedThing-}, isWiredInName, isInternalName, nameModule, NamedThing(..)
-			 )
+import Name		( Name {-instance NamedThing-}, isWiredInName, nameIsLocalOrFrom, 
+			  nameModule, NamedThing(..) )
 import NameEnv 		( delFromNameEnv, lookupNameEnv )
 import NameSet
 import Module		( Module, isHomeModule )
@@ -233,7 +233,7 @@ importDecl already_slurped name
   = 	-- STEP 0: Check if it's from this module
 	-- Doing this catches a common case quickly
     getModule				`thenM` \ this_mod ->
-    if isInternalName name || nameModule name == this_mod then
+    if nameIsLocalOrFrom this_mod name then
 	-- Variables defined on the GHCi command line (e.g. let x = 3)
 	-- are Internal names (which don't have a Module)
 	returnM AlreadySlurped
@@ -535,8 +535,7 @@ getImportedRules slurped
   | otherwise
   = getEps		`thenM` \ eps ->
     getInGlobalScope	`thenM` \ in_type_env ->
-    let
-		-- Slurp rules for anything that is slurped, 
+    let		-- Slurp rules for anything that is slurped, 
 		-- either now, or previously
 	available n        = n `elemNameSet` slurped || in_type_env n
 	(decls, new_rules) = selectGated available (eps_rules eps)
