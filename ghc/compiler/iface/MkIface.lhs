@@ -312,8 +312,7 @@ mkIface hsc_env location maybe_old_iface
 		writeBinIface hi_file_path new_iface
 
 		-- Debug printing
-	; when (dopt Opt_D_dump_hi_diffs dflags)
-	       (printDump (write_diffs maybe_old_iface no_change_at_all pp_diffs))
+	; when (dopt Opt_D_dump_hi_diffs dflags) (printDump pp_diffs)
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
 
@@ -378,7 +377,11 @@ addVersionInfo Nothing new_iface new_decls
 			  || anyNothing getRuleKey (mi_rules new_iface),
 		 mi_decls  = [(initialVersion, decl) | decl <- new_decls],
 		 mi_ver_fn = \n -> Just initialVersion },
-     False, text "No old interface available")
+     False, ptext SLIT("No old interface file") $$ 
+	    pprOrphans orph_insts orph_rules)
+  where
+    orph_insts = filter (isNothing . getInstKey) (mi_insts new_iface)
+    orph_rules = filter (isNothing . getRuleKey) (mi_rules new_iface)
 
 addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers, 
 					   mi_exp_vers  = old_exp_vers, 
@@ -389,8 +392,10 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 	       new_iface@(ModIface { mi_fix_fn = new_fixities })
 	       new_decls
 
-  | no_change_at_all = (old_iface, True, empty)
-  | otherwise	     = (final_iface, False, pp_diffs)
+  | no_change_at_all = (old_iface,   True,  ptext SLIT("Interface file unchanged") $$ pp_orphs)
+  | otherwise	     = (final_iface, False, vcat [ptext SLIT("Interface file has changed"),
+						  nest 2 pp_diffs,
+						  text "" $$ pp_orphs])
   where
     final_iface = new_iface { mi_mod_vers  = bump_unless no_output_change old_mod_vers,
 			      mi_exp_vers  = bump_unless no_export_change old_exp_vers,
@@ -402,8 +407,8 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     decls_w_vers = [(add_vers decl, decl) | decl <- new_decls]
 
     -------------------
-    (new_non_orph_insts, new_orph_insts) = mkRuleMap getInstKey (mi_insts new_iface)
     (old_non_orph_insts, old_orph_insts) = mkRuleMap getInstKey (mi_insts old_iface)
+    (new_non_orph_insts, new_orph_insts) = mkRuleMap getInstKey (mi_insts new_iface)
     same_insts occ = eqMaybeBy	(eqListBy eqIfInst) 
 				(lookupOccEnv old_non_orph_insts occ)
 				(lookupOccEnv new_non_orph_insts occ)
@@ -428,13 +433,13 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     no_other_changes = mi_usages new_iface == mi_usages old_iface
     no_change_at_all = no_output_change && no_other_changes
  
-    pp_diffs = vcat [pp_decl_diffs,
-		     pp_change no_export_change "Export list" 
+    pp_diffs = vcat [pp_change no_export_change "Export list" 
 			(ppr old_exp_vers <+> arrow <+> ppr (mi_exp_vers final_iface)),
  		     pp_change no_rule_change "Rules"
 			(ppr old_rule_vers <+> arrow <+> ppr (mi_rule_vers final_iface)),
  		     pp_change no_deprec_change "Deprecations" empty,
- 		     pp_change no_other_changes  "Usages" empty]
+ 		     pp_change no_other_changes  "Usages" empty,
+		     pp_decl_diffs]
     pp_change True  what info = empty
     pp_change False what info = text what <+> ptext SLIT("changed") <+> info
 
@@ -511,6 +516,13 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 			-> ppr occ <+> ptext SLIT("only in new interface")
 		    other -> pprPanic "MkIface.show_change" (ppr occ)
 	
+    pp_orphs = pprOrphans new_orph_insts new_orph_rules
+
+pprOrphans insts rules
+  = vcat [if null insts then empty else
+	     ptext SLIT("Orphan instances:") <+> vcat (map ppr insts),
+	  if null rules then empty else
+	     ptext SLIT("Orphan rules:") <+> vcat (map ppr rules)]
 
 computeChangedOccs :: [(OccName, IfaceEq)] -> OccSet
 computeChangedOccs eq_info
@@ -582,12 +594,6 @@ mkIfaceDeprec :: Deprecations -> IfaceDeprecs
 mkIfaceDeprec NoDeprecs        = NoDeprecs
 mkIfaceDeprec (DeprecAll t)    = DeprecAll t
 mkIfaceDeprec (DeprecSome env) = DeprecSome (sortLt (<) (nameEnvElts env))
-
-----------------------
-write_diffs :: Maybe ModIface -> Bool -> SDoc -> SDoc
-write_diffs Nothing  _     _     = ptext SLIT("NO OLD INTERFACE FILE")
-write_diffs (Just _) True  _     = ptext SLIT("INTERFACE UNCHANGED")
-write_diffs (Just _) False diffs = sep [ptext SLIT("INTERFACE HAS CHANGED"), nest 2 diffs]
 
 ----------------------
 bump_unless :: Bool -> Version -> Version
@@ -770,7 +776,7 @@ check_old_iface this_mod iface_path source_unchanged maybe_iface
     readIface (moduleName this_mod) iface_path False		`thenM` \ read_result ->
     case read_result of {
        Left err ->	-- Old interface file not found, or garbled; give up
-		   traceHiDiffs (text "FYI: cannot read old interface file:"
+		   traceIf (text "FYI: cannot read old interface file:"
 			   	 $$ nest 4 err) 	`thenM_`
 	           returnM (outOfDate, Nothing)
 
@@ -945,7 +951,7 @@ pprModIface iface
 		<+> doubleQuotes (ftext (mi_package iface))
 		<+> ppr (mi_module iface) <+> ppr (mi_mod_vers iface)
 		<+> pp_sub_vers
-		<+> (if mi_orphan iface then char '!' else empty)
+		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
 		<+> int opt_HiVersion
 		<+> ptext SLIT("where")
 	, vcat (map pprExport (mi_exports iface))
