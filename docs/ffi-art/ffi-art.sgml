@@ -1,0 +1,21 @@
+<!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+<!ENTITY ffi-body         SYSTEM "../ffi.sgml">
+]>
+
+<Article id="ffi-article">
+
+<ArtHeader>
+
+<Title>A Haskell foreign function interface</Title>
+<Author><OtherName>Sigbjorn Finne, Sven Panne, Manuel Chakravarty, Malcolm
+Wallace, and The GHC Team</OtherName></Author>
+<Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email>
+</Address>
+<Edition>version 0.99</Edition>
+<PubDate>May 2000</PubDate>
+
+</ArtHeader>
+
+&ffi-body;
+
+</Article>

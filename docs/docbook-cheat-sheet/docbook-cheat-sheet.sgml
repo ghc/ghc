@@ -1,0 +1,208 @@
+<!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN">
+
+<Article id="docbook-cheat-sheet">
+
+<ArtHeader>
+
+<Title>Using DocBook to write GHC documentation</Title>
+<Author><OtherName>The GHC Team</OtherName></Author>
+<Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email></Address>
+<PubDate>January 2000</PubDate>
+
+</ArtHeader>
+
+
+<Sect1 id="sec-getting-docbook"><Title>Getting the DocBook tools</Title>
+
+<Para>
+See the installation guide.
+</Para>
+
+</Sect1>
+
+
+<Sect1 id="doc-layout"><Title>Document layout</Title>
+
+<Para>
+The GHC documentation is written using DocBook 3.1, so the DTD line should be:
+</Para>
+
+<Screen>
+&lt;!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN"&gt;
+</Screen>
+
+<Para> This guide is <Emphasis>not</Emphasis> meant to teach you how to
+write DocBook; read the <ULink URL="http://www.docbook.org/">DocBook
+book</ULink> for that. It is more of a reference than a tutorial, so see the
+<ULink URL="http://www.oasis-open.org/docbook/">DocBook home page</ULink>
+for other links. </Para>
+
+<Para> However, by popular demand, here are some useful points: </Para>
+
+<ItemizedList>
+<ListItem>
+<Para>Remember to use <SGMLTag class="StartTag">Para</SGMLTag> inside
+<SGMLTag class="StartTag">ListItem</SGMLTag>s.
+</Para>
+</ListItem>
+</ItemizedList>
+
+<Para> The rest of this section outlines the use of several tags which may
+not be obvious (DocBook is rather scholastic in style: it has tags for many
+things from C function prototypes to keyboard bindings; at the same time it
+has many omissions and oddities). The current scheme has many infelicities,
+partly because it was dreamt up in a hurry while the author was learning
+DocBook and converting the documentation thereto, and partly because DocBook
+is rather C-centric. </Para>
+
+<VariableList>
+
+<VarListEntry><Term>Comments</Term>
+<ListItem>
+<Para>
+Comments in SGML look like this: <SGMLTag class=SGMLComment>This is a
+comment</SGMLTag>.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Command</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for commands typed into interactive sessions (e.g. <Command>cp foo bar</Command> and the names of programs such as <Command>gmake</Command>.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Constant</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for system constants such as <Constant>U_MAXINT</Constant> and <Filename>Makefile</Filename> variables like <Constant>SRC_FILES</Constant> (because they are usually constant for a given run of <Command>make</Command>, and hence have a constant feel to them).
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Email</SGMLTag></Term>
+<ListItem>
+<Para>
+For email addresses. This is a tag that's easy to overlook if you don't know it's there.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Filename</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for paths, filenames, file extensions.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Function</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for functions and constructors.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">IndexTerm</SGMLTag></Term>
+<ListItem>
+<Para>
+The normal way to mark up an index term is <Literal>&lt;IndexTerm&gt;&lt;Primary&gt;term&lt/Primary&gt;&lt;/IndexTerm&gt;</Literal>.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">KeyCap</SGMLTag></Term><Term><SGMLTag class="StartTag">KeyCombo</SGMLTag></Term>
+<ListItem>
+<Para>
+Some more tags you may miss. Used for combinations such as <KeyCombo><KeyCap>Control</KeyCap><KeyCap>D</KeyCap></KeyCombo>.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Literal</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for everything that should appear in typewriter font that has no other obvious tag: types, monads, small snippets of program text that are formatted inline, and the like.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Option</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for compiler options and similar.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">ProgramListing</SGMLTag></Term>
+<ListItem>
+<Para>
+For displayed program listings (including shell scripts).
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">Screen</SGMLTag></Term>
+<ListItem>
+<Para>
+For displayed screen dumps, such as portions of shell interaction. It's easy to tell the difference between these and shell scripts: the latter lack a shell prompt.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry><Term><SGMLTag class="StartTag">VarName</SGMLTag></Term>
+<ListItem>
+<Para>
+Used for variables, but not type variables.
+</Para>
+</ListItem>
+</VarListEntry>
+
+</VariableList>
+
+</Sect1>
+
+<Sect1 id="docbook-tables"><Title>Tables</Title>
+
+<Para>
+Tables are quite complicated to write in SGML (as in HTML, there are lots of fiddly tags), so here's an example you can cannibalise. In the spirit of the LaTeX short introduction I don't repeat all the markup verbatim; you have to look at the source for that.
+</Para>
+
+<Para>
+<InformalTable>
+<TGroup cols="3">
+<ColSpec Colname="one" Align="Left" Colsep="0">
+<ColSpec Colname="two" Align="Center" Colsep="0">
+<ColSpec Colname="three" Align="Right" Colsep="0">
+<TBody>
+
+<Row>
+<Entry>Here's</Entry>
+<Entry>a sample</Entry>
+<Entry>table</Entry>
+</Row>
+
+<Row>
+<Entry>With differently</Entry>
+<Entry>aligned</Entry>
+<Entry>cells</Entry>
+</Row>
+
+<Row>
+<Entry namest="one" nameend="three" morerows="1"><Para>
+There's not much else to it. Entries can span both extra rows and extra columns; just be careful when using block markup (such as <SGMLTag class="starttag">Para</SGMLTag>s) within an <SGMLTag class="starttag">Entry</SGMLTag> that there is no space between the open and close <SGMLTag class="starttag">Entry</SGMLTag> tags and the adjacent text, as otherwise you will suffer from <ULink URL="http://www.docbook.org/tdg/html/entry.html">Pernicious Mixed Content</ULink> (the parser will think you're using inline markup).</Para></Entry>
+</Row>
+
+</TBody>
+
+</TGroup>
+</InformalTable>
+</Para>
+
+</Sect1>
+
+</Article>
