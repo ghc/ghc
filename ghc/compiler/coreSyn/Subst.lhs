@@ -62,7 +62,7 @@ import Var		( Var, Id, TyVar, isTyVar )
 import Outputable
 import PprCore		()		-- Instances
 import UniqFM		( ufmToList )	-- Yuk (add a new op to VarEnv)
-import Util		( mapAccumL, foldl2, seqList, ($!) )
+import Util		( mapAccumL, foldl2, seqList )
 import FastTypes
 \end{code}
 
