@@ -150,7 +150,7 @@ labelThread (ThreadId t) str = IO $ \ s ->
        adr = byteArrayContents# ps in
      case (labelThread# t adr s) of s1 -> (# s1, () #)
 
-{- | This function is a replacement for "System.Posix.Process.forkProcessAll":
+{- | This function is a replacement for 'System.Posix.Process.forkProcessAll':
 This implementation /will stop all other Concurrent Haskell threads/ in the
 (heavyweight) forked copy.
 'forkProcessPrim' returns the pid of the child process to the parent, 0 to the
