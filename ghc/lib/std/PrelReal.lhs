@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.15 2001/09/26 16:22:04 simonpj Exp $
+% $Id: PrelReal.lhs,v 1.16 2001/09/26 16:27:04 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -62,7 +62,7 @@ their greatest common divisor.
 
 \begin{code}
 reduce ::  (Integral a) => a -> a -> Ratio a
-{#- SPECIALISE reduce :: Integer -> Integer -> Rational #-}
+{-# SPECIALISE reduce :: Integer -> Integer -> Rational #-}
 reduce _ 0		=  error "Ratio.%: zero denominator"
 reduce x y		=  (x `quot` d) :% (y `quot` d)
 			   where d = gcd x y
