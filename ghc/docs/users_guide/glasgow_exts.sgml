@@ -4250,12 +4250,12 @@ of the pragma.
     <sect2 id="unpack-pragma">
       <title>UNPACK pragma</title>
 
-      <indexterm><primary>UNPACK</primary> </indexterm>
+      <indexterm><primary>UNPACK</primary></indexterm>
       
-      <para>There is another use for the <literal>UNPACK</literal>
-      pragma: to indicate that the compiler should unpack the contents
-      of a constructor field into the constructor itself, removing a
-      level of indirection.  For example:</para>
+      <para>The <literal>UNPACK</literal> indicates to the compiler
+      that it should unpack the contents of a constructor field into
+      the constructor itself, removing a level of indirection.  For
+      example:</para>
 
 <ProgramListing>
 data T = T {-# UNPACK #-} !Float
@@ -4300,7 +4300,12 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 </ProgramListing>
 
       <para>will store two unboxed <literal>Int&num;</literal>s
-      directly in the <Function>T</Function> constructor.</para>
+      directly in the <Function>T</Function> constructor.  The
+      unpacker can see through newtypes, too.</para>
+
+      <para>If a field cannot be unpacked, you will not get a warning,
+      so it might be an idea to check the generated code with
+      <option>-ddump-simpl</option>.</para>
 
       <para>See also the <option>-funbox-strict-fields</option> flag,
       which essentially has the effect of adding
