@@ -15,7 +15,9 @@ import Literal
 import BasicTypes
 import Type
 import SrcLoc
+import PrelNames
 import FastString
+import Outputable
 
 #include "../HsVersions.h"
 
@@ -110,6 +112,8 @@ vdefs1	:: { [RdrNameCoreDecl] }
 
 vdef	:: { RdrNameCoreDecl }
 	: qname '::' ty '=' exp { CoreDecl $1 $3 $5 noSrcLoc }
+  -- NB: qname includes data constructors, because
+  --     we allow data-constructor wrappers at top level
 
 
 vbind	:: { (RdrName, RdrNameHsType) }
@@ -170,7 +174,6 @@ ty	:: { RdrNameHsType }
 
 aexp    :: { UfExpr RdrName }
 	: qname 	{ UfVar $1 }
-        | q_d_name 	{ UfVar $1 } 
 	| lit		{ UfLit $1 }
 	| '(' exp ')' 	{ $2 }
 
@@ -207,7 +210,7 @@ alt	:: { UfAlt RdrName }
 		{ (UfDefault, [], $3) }
 
 lit	:: { Literal }
-	: '(' INTEGER '::' aty ')'	{ MachInt $2 }
+	: '(' INTEGER '::' aty ')'	{ convIntLit $2 $4 }
 	| '(' RATIONAL '::' aty ')'	{ MachDouble $2 }
 	| '(' CHAR '::' aty ')'		{ MachChar (fromEnum $2) }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
@@ -224,10 +227,11 @@ mname	:: { String }
 modid	:: { ModuleName }
 	: CNAME	{ mkSysModuleNameFS (mkFastString $1) }
 
-qname	:: { RdrName }
-	: name	{ $1 }
-	| mname '.' NAME
-	  { mkIfaceOrig varName (mkFastString $1,mkFastString $3) }
+qname	:: { RdrName }           -- Includes data constructors
+	: name	                 { $1 }
+	| mname '.' NAME	 { mkIfaceOrig varName (mkFastString $1,mkFastString $3) }
+        | q_d_name               { $1 }
+
 
 -- Type constructor
 q_tc_name	:: { RdrName }
@@ -243,6 +247,19 @@ q_d_name	:: { RdrName }
 {
 convBind :: RdrNameCoreDecl -> (UfBinder RdrName, UfExpr RdrName)
 convBind (CoreDecl n ty rhs _) = (UfValBinder n ty, rhs)
+
+convIntLit :: Integer -> RdrNameHsType -> Literal
+convIntLit i (HsTyVar n)
+  | n == intPrimRdrName  = MachInt  i  
+  | n == wordPrimRdrName = MachWord i
+convIntLit i aty
+  = pprPanic "Unknown literal type" (ppr aty)
+
+wordPrimRdrName :: RdrName
+wordPrimRdrName = nameRdrName wordPrimTyConName
+
+intPrimRdrName :: RdrName
+intPrimRdrName = nameRdrName intPrimTyConName
 
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l
