@@ -1,3 +1,13 @@
+Changes in version 0.5:
+
+  * Compiles with recent versions of GHC.
+
+  * A few bugs have been fixed.
+
+  * New labelling/linking feature (see "Anchors" in the manual).
+
+-----------------------------------------------------------------------------
+
 Changes in version 0.4:
 
   * Import declarations which list entities in parentheses, or with
