@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.53 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.54 2001/11/28 14:55:34 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -426,12 +426,12 @@ usage_text[] = {
 "                 r = retainer",
 "                 b = biography (LAG,DRAG,VOID,USE)",
 "  A subset of closures may be selected thusly:",
-"    -hc{cc,cc ...}  specific cost centre(s) (NOT STACKS!)",
-"    -hm{mod,mod...} all cost centres from the specified modules(s)",
-"    -hd{des,des...} closures with specified closure descriptions",
-"    -hy{typ,typ...} closures with specified type descriptions",
-"    -hr{cc,cc...}   closures with specified retainers",
-"    -hb{bio,bio...} closures with specified biographies (lag,drag,void,use)",
+"    -hc<cc>,...  specific cost centre(s) (NOT STACKS!)",
+"    -hm<mod>...  all cost centres from the specified modules(s)",
+"    -hd<des>,... closures with specified closure descriptions",
+"    -hy<typ>...  closures with specified type descriptions",
+"    -hr<cc>...   closures with specified retainers",
+"    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
@@ -875,46 +875,49 @@ error = rtsTrue;
 			{
 			    char *left  = strchr(rts_argv[arg], '{');
 			    char *right = strrchr(rts_argv[arg], '}');
-			    if (! left || ! right ||
-				strrchr(rts_argv[arg], '{') != left ||
-				strchr(rts_argv[arg], '}') != right) {
-				prog_belch(
-				    "Invalid heap profiling selection bracketing\n   %s\n", 
-				    rts_argv[arg]);
-				error = rtsTrue;
-			    } else {
-				*right = '\0';
-				switch (rts_argv[arg][2]) {
-				case 'C':
-				case 'c': // cost centre label select
-				    RtsFlags.ProfFlags.ccSelector = left + 1;
-				    break;
-				case 'M':
-				case 'm': // cost centre module select
-				    RtsFlags.ProfFlags.modSelector = left + 1;
-				    break;
-				case 'D':
-				case 'd': // closure descr select 
-				    RtsFlags.ProfFlags.descrSelector = left + 1;
-				    break;
-				case 'Y':
-				case 'y': // closure type select
-				    RtsFlags.ProfFlags.typeSelector = left + 1;
-				    break;
-				case 'R':
-				case 'r': // retainer select
-				    RtsFlags.ProfFlags.retainerSelector = left + 1;
-				    break;
-				case 'B':
-				case 'b': // biography select
-				    RtsFlags.ProfFlags.bioSelector = left + 1;
-				    break;
-				}
+
+			    // curly braces are optional, for
+			    // backwards compat.
+			    if (left)
+				left = left+1;
+			    else
+				left = rts_argv[arg] + 3;
+
+			    if (!right)
+				right = rts_argv[arg] + strlen(rts_argv[arg]);
+
+			    *right = '\0';
+
+			    switch (rts_argv[arg][2]) {
+			    case 'C':
+			    case 'c': // cost centre label select
+				RtsFlags.ProfFlags.ccSelector = left;
+				break;
+			    case 'M':
+			    case 'm': // cost centre module select
+				RtsFlags.ProfFlags.modSelector = left;
+				break;
+			    case 'D':
+			    case 'd': // closure descr select 
+				RtsFlags.ProfFlags.descrSelector = left;
+				break;
+			    case 'Y':
+			    case 'y': // closure type select
+				RtsFlags.ProfFlags.typeSelector = left;
+				break;
+			    case 'R':
+			    case 'r': // retainer select
+				RtsFlags.ProfFlags.retainerSelector = left;
+				break;
+			    case 'B':
+			    case 'b': // biography select
+				RtsFlags.ProfFlags.bioSelector = left;
+				break;
 			    }
 			}
 			break;
 		    }
-		    
+
 		    if (RtsFlags.ProfFlags.doHeapProfile != 0) {
 			prog_belch("multiple heap profile options");
 			error = rtsTrue;
