@@ -5,24 +5,25 @@ in the top-level directory.  It contains very important caveats about
 2.02, which we do not repeat here!
 
 Information about ``what's ported to which machine'' is in the
-Installation Guide.  Since 2.01, we've added support for Windows NT.
+Installation Guide.  Since 2.01, we've added support for Win32
+(Windows NT and Windows 95).
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-02-config]{New configuration things in 2.01}
+\subsection[2-02-config]{New configuration things in 2.02}
 %*                                                                      *
 %************************************************************************
 
 %************************************************************************
 %*                                                                      *
-\subsection[2-02-user-visible]{User-visible changes in 2.01, including incompatibilities}
+\subsection[2-02-user-visible]{User-visible changes in 2.02, including incompatibilities}
 %*                                                                      *
 %************************************************************************
 
-GHC~2.01 is a compiler for Haskell~1.4 and, as such, introduces many
-user-visible changes.  The GHC user's guide has a section to help you
-upgrade your programs to Haskell~1.4; all user-visible changes
-are described there (and not repeated here).
+GHC~2.02 is a compiler for Haskell~1.4 and, as such, introduces a
+bunch of user-visible changes.  The GHC user's guide has a section to
+help you upgrade your programs to Haskell~1.4 from 1.2; all
+user-visible changes are described there (and not repeated here).
 
 %************************************************************************
 %*                                                                      *
@@ -40,7 +41,14 @@ GHC also warns of completely overlapped patterns.  You can't switch this off.
 Just occasionally this shows up 
 an otherwise hard-to-find bug.  To warn of shadowed names use @-fwarn-name-shadowing@
 
+\item You can now generate `make' dependencies via the compiler
+driver, use the option @-M@ together with the list source files to compute
+the dependencies for. By default, the dependencies will be appended to
+the file \tr{Makefile} in the current directory.
+
 \item For hackers, the flag @-dshow-rn-trace@ shows what the renamer is up to.
+Sit back and marvel.
+
 \end{itemize}
 
 
@@ -53,7 +61,8 @@ an otherwise hard-to-find bug.  To warn of shadowed names use @-fwarn-name-shado
 \begin{itemize}
 \item
 Completely new ``make-world'' system, properly documented (at last) in the
-installation guide.  No Jmakefiles; but you need Gnu make (gmake).
+installation guide.  No Jmakefiles; but you *need* Gnu make
+(gmake). The more recent the better (v 3.70+).
 
 \item
 The ``renamer''---the part of the compiler that implements
@@ -76,7 +85,7 @@ a really good chance now.
 %************************************************************************
 
 The libraries have been completely reorganised.  There's a description in
-...
+\sectionref{syslibs}.
 
 
 %************************************************************************
@@ -94,19 +103,55 @@ The libraries have been completely reorganised.  There's a description in
 
 \begin{itemize}
 \item @ForeignObjs@ are properly deallocated when execution halts, as well
-as when the @ForeignObj@ becomes unreferenced.
+as when the garbage collector spots the @ForeignObj@ as being unreferenced.
 This is important if you are using a @ForeignObj@ to refer to
-a @COM@ object or other remote resource.  You want that resource to be relased
+a @COM@ object or other remote resource. You want that resource to be relased
 when the program terminates.
 
-\item Files handles are handled using @ForeignObjs@, and closed when the file handle
-is unreferenced.  This means that if you
-open zillions of files then just letting go of the file handle is enough
-to close it.
+\item Files handles in the IO prelude are implemented using
+@ForeignObjs@, and closed when the file handle is unreferenced.  This
+means that if you open zillions of files then just letting go of the
+file handle is enough to close it. 
 \end{itemize}
 
 %************************************************************************
 %*                                                                      *
-%\subsection[2-02-new-elsewhere]{Other new stuff}
+\subsection[2-02-new-elsewhere]{Other new stuff}
 %*                                                                      *
 %************************************************************************
+
+2.02 is released together with Green Card, a foreign-language
+interface generator for Haskell. More details elsewhere...
+
+
+%************************************************************************
+%*                                                                      *
+\subsection[2-02-troublespots]{Known troublespots}
+%*                                                                      *
+%************************************************************************
+
+The 2.02 compiler has the following known deficiencies:
+
+\begin{description}
+\item[native code generator, x86:]
+
+The native code generator for x86 platforms is by default switched
+off, as the code the compiler produces with it enabled was discovered
+just before releaseing to be wonky. Rather than delay the release
+further, GHC on x86 platforms rely on \tr{GCC} as their
+backend for now. Hopefully fixed soon.
+
+\item[Simplifier looping:]
+
+The simplifier(Glasgow-speak for optimiser) has been observed to get
+into a loop in one or two cases. If you should observe this, please
+report it as a bug - the work around is to turn off optimisation.
+
+\item[Undefined @*_vap_info@ symbols:]
+
+If the linker complains about some undefined @*_vap_info@ symbols when
+linking 2.02 compiled programs (very unlikely) - fix this by compiling
+the module where the references are coming from with
+@-fno-lambda-lifting@.
+
+\end{description}

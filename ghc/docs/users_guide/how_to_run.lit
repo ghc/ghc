@@ -663,7 +663,7 @@ when pre-processing generated C (\tr{.hc}) files.
 \item[\tr{__GLASGOW_HASKELL__}:]
 \index{__GLASGOW_HASKELL__ macro}
 For version $n$ of the GHC system, this will be \tr{#define}d to
-$100 \times n$.  So, for version~2.01, it is 201.
+$100 \times n$.  So, for version~2.02, it is 202.
 
 This macro is {\em only} set when pre-processing Haskell source.
 ({\em Not} when pre-processing generated C.)
@@ -699,6 +699,7 @@ A small word of warning: \tr{-cpp} is not friendly to
 \subsection[options-C-compiler]{Options affecting the C compiler (if applicable)}
 \index{C compiler options}
 \index{GCC options}
+\index{include file option}
 %*                                                                      *
 %************************************************************************
 
@@ -724,7 +725,7 @@ command-line:
 \begin{verbatim}
 % ghc -c '-#include <X/Xlib.h>' Xstuff.lhs
 \end{verbatim}
-\index{-#include <file> option}
+
 
 %************************************************************************
 %*                                                                      *
@@ -784,8 +785,8 @@ If you are using a Haskell ``system library'' (e.g., the HBC
 library), just use the \tr{-syslib hbc} option, and the correct code
 should be linked in.
 
-Please see \sectionref{syslibs} for information about
-``system libraries.''
+%Please see \sectionref{syslibs} for information about
+%``system libraries.''
 
 \item[\tr{-L<dir>}:]
 \index{-L<dir> option}
@@ -1202,7 +1203,7 @@ Sometimes it is useful to make the connection between a source file
 and the command-line options it requires, quite tight. For instance,
 if a (Glasgow) Haskell source file uses \tr{casm}s, the C back-end
 often needs to be told about header files to use,
-\ref{-#include <file> option}. Rather than maintaining the list of
+\ref{include file option}. Rather than maintaining the list of
 files the source depends on in a \tr{Makefile}, it is possible to
 do this directly in the source file using the \tr{OPTIONS} pragma
 \index{OPTIONS pragma}:

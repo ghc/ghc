@@ -90,8 +90,6 @@ e.g., \tr{mkdependHS -help}.
 %*                                                                      *
 %************************************************************************
 
-NB: \tr{hstags} is temporarily dead at version~2.01.  Sigh.
-
 `Tags' is a facility for indexing the definitions of
 programming-language things in a multi-file program, and then using
 that index to jump around among these definitions.

@@ -1,20 +1,25 @@
+\begin{onlystandalone}
 \documentstyle[a4wide,grasp]{article}
+\begin{rawlatex}
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\floatpagefraction}{0.9}
 \renewcommand{\dblfloatpagefraction}{0.9}
 
 \sloppy
 \renewcommand{\today}{March 1997}
+\end{rawlatex}
 
 \begin{document}
-
 \title{The GHC Prelude and Libraries}
 \author{Simon L Peyton Jones \and Will Partain}
 
 \maketitle
+\begin{rawlatex}
 \tableofcontents
+\end{rawlatex}
+\end{onlystandalone}
 
-\section{Introduction}
+\section[syslibs]{Introduction}
 
 This document describes GHC's prelude and libraries.  The basic story is that of
 the Haskell 1.3 Report and Libraries document (which we do not reproduce here),
@@ -146,45 +151,47 @@ to express the result types of some primitive operations.
 \subsection{Character and numeric types}
 
 There are the following obvious primitive types:
-@
+\begin{verbatim}
 type Char#
 type Int#	-- see also Word# and Addr#, later
 type Float#
 type Double#
-@
+\end{verbatim}
 If you want to know their exact equivalents in C, see
 @ghc/includes/StgTypes.lh@ in the GHC source.
 
 Literals for these types may be written as follows:
-@
+\begin{verbatim}
 1#		an Int#
 1.2#		a Float#
 1.34##		a Double#
 'a'#		a Char#; for weird characters, use '\o<octal>'#
 "a"#		an Addr# (a `char *')
-@
+\end{verbatim}
 
 \subsubsection{Comparison operations}
-@
+\begin{verbatim}
 {gt,ge,eq,ne,lt,le}Char# :: Char# -> Char# -> Bool
     -- ditto for Int#, Word#, Float#, Double#, and Addr#
-@
+\end{verbatim}
 
 \subsubsection{Unboxed-character operations}
-@
+\begin{verbatim}
 ord# :: Char# -> Int#
 chr# :: Int# -> Char#
-@
+\end{verbatim}
+
 
 \subsubsection{Unboxed-@Int@ operations}
-@
+\begin{verbatim}
 {plus,minus,times,quot,div,rem}Int# :: Int# -> Int# -> Int#
 negateInt# :: Int# -> Int#
-@
+\end{verbatim}
+
 NB: No error/overflow checking!
 
 \subsubsection{Unboxed-@Double@ and @Float@ operations}
-@
+\begin{verbatim}
 {plus,minus,times,divide}Double# :: Double# -> Double# -> Double#
 negateDouble# :: Double# -> Double#
 
@@ -204,23 +211,26 @@ sinhDouble#	:: Double# -> Double#
 coshDouble#	:: Double# -> Double#
 tanhDouble#	:: Double# -> Double#
 powerDouble#	:: Double# -> Double# -> Double#
-@
+\end{verbatim}
+
 There's an exactly-matching set of unboxed-@Float@ ops; replace
 @Double#@ with @Float#@ in the list above.  There are two
 coercion functions for @Float#@/@Double#@:
-@
+\begin{verbatim}
 float2Double#	:: Float# -> Double#
 double2Float#	:: Double# -> Float#
-@
+\end{verbatim}
+
 The primitive versions of @encodeDouble@/@decodeDouble@:
-@
+\begin{verbatim}
 encodeDouble#	:: Int# -> Int# -> ByteArray#	-- Integer mantissa
 		-> Int#				-- Int exponent
 		-> Double#
 
 decodeDouble#	:: Double#
 		-> GHCbase.ReturnIntAndGMP
-@
+\end{verbatim}
+
 (And the same for @Float#@s.)
 
 \subsection{Operations on/for @Integers@ (interface to GMP)}
@@ -233,23 +243,25 @@ NB: some of this might change if we upgrade to using GMP~2.x.
 
 The data type for @Integer@ must mirror that for @MP_INT@ in @gmp.h@
 (see @gmp.info@).  It comes out as:
-@
+\begin{verbatim}
 data Integer = J# Int# Int# ByteArray#
-@
+\end{verbatim}
+
 So, @Integer@ is really just a ``pairing'' type for a particular
 collection of primitive types.
 
 The operations in the GMP return other combinations of
 GMP-plus-something, so we need ``pairing'' types for those, too:
-@
+\begin{verbatim}
 data Return2GMPs     = Return2GMPs Int# Int# ByteArray# Int# Int# ByteArray#
 data ReturnIntAndGMP = ReturnIntAndGMP Int# Int# Int# ByteArray#
 
 -- ????? something to return a string of bytes (in the heap?)
-@
+\end{verbatim}
+
 The primitive ops to support @Integers@ use the ``pieces'' of the
 representation, and are as follows:
-@
+\begin{verbatim}
 negateInteger#	:: Int# -> Int# -> ByteArray# -> Integer
 
 {plus,minus,times}Integer# :: Int# -> Int# -> ByteArray#
@@ -274,21 +286,23 @@ word2Integer# :: Word# -> Integer
 addr2Integer# :: Addr# -> Integer
 	-- the Addr# is taken to be a `char *' string
 	-- to be converted into an Integer
-@
+\end{verbatim}
+
 
 
 \subsection{Words and addresses}
 
 A @Word#@ is used for bit-twiddling operations.  It is the same size as
 an @Int#@, but has no sign nor any arithmetic operations.
-@
+\begin{verbatim}
 type Word#	-- Same size/etc as Int# but *unsigned*
 type Addr#	-- A pointer from outside the "Haskell world" (from C, probably);
 		-- described under "arrays"
-@
+\end{verbatim}
+
 @Word#@s and @Addr#@s have the usual comparison operations.
 Other unboxed-@Word@ ops (bit-twiddling and coercions):
-@
+\begin{verbatim}
 and#, or# :: Word# -> Word# -> Word#
 
 not# :: Word# -> Word#
@@ -301,13 +315,15 @@ iShiftL#, iShiftRA#, iShiftRL# :: Int# -> Int# -> Int#
 
 int2Word#	:: Int#  -> Word# -- just a cast, really
 word2Int#	:: Word# -> Int#
-@
+\end{verbatim}
+
 
 Unboxed-@Addr@ ops (C casts, really):
-@
+\begin{verbatim}
 int2Addr#	:: Int#  -> Addr#
 addr2Int#	:: Addr# -> Int#
-@
+\end{verbatim}
+
 Operations for indexing off of C pointers (@Addr#@s) to snatch values
 are listed under ``arrays''.
 
@@ -315,9 +331,10 @@ are listed under ``arrays''.
 
 The type @Array# elt@ is the type of primitive,
 unboxed arrays of values of type @elt@.  
-@
+\begin{verbatim}
 type Array# elt
-@
+\end{verbatim}
+
 @Array#@ is more primitive than a Haskell
 array --- indeed, Haskell arrays are implemented using @Array#@ ---
 in that an @Array#@ is indexed only by @Int#@s, starting at zero.  It is also
@@ -329,9 +346,10 @@ The components of an @Array#@ are themselves boxed.
 
 The type @ByteArray#@ is similar to @Array#@, except that it contains
 just a string of (non-pointer) bytes.
-@
+\begin{verbatim}
 type ByteArray#
-@
+\end{verbatim}
+
 Arrays of these types are useful when a Haskell program wishes to
 construct a value to pass to a C procedure.  It is also possible to
 use them to build (say) arrays of unboxed characters for internal use
@@ -375,7 +393,7 @@ array.
 If you want to read/write a @Word#@, read an @Int#@ and coerce.
 
 Immutable byte arrays are straightforward to index (all indices in bytes):
-@
+\begin{verbatim}
 indexCharArray#   :: ByteArray# -> Int# -> Char#
 indexIntArray#    :: ByteArray# -> Int# -> Int#
 indexAddrArray#   :: ByteArray# -> Int# -> Addr#
@@ -387,7 +405,8 @@ indexIntOffAddr#    :: Addr# -> Int# -> Int#
 indexFloatOffAddr#  :: Addr# -> Int# -> Float#
 indexDoubleOffAddr# :: Addr# -> Int# -> Double#
 indexAddrOffAddr#   :: Addr# -> Int# -> Addr#	-- Get an Addr# from an Addr# offset
-@
+\end{verbatim}
+
 The last of these, @indexAddrOffAddr#@, extracts an @Addr#@ using an offset
 from another @Addr#@, thereby providing the ability to follow a chain of
 C pointers.
@@ -398,9 +417,10 @@ it should be entered --- we never usually return an unevaluated
 object!  This is a pain: primitive ops aren't supposed to do
 complicated things like enter objects.  The current solution is to
 return a lifted value, but I don't like it!
-@
+\begin{verbatim}
 indexArray#       :: Array# elt -> Int# -> GHCbase.Lift elt  -- Yuk!
-@
+\end{verbatim}
+
 
 \subsubsection{The state type}
 
@@ -411,25 +431,27 @@ effect of this parameterisation is in the type system: all values of type
 @State#@ are represented in the same way.  Indeed, they are all 
 represented by nothing at all!  The code generator ``knows'' to generate no 
 code, and allocate no registers etc, for primitive states.
-@
+\begin{verbatim}
 type State# s
-@
+\end{verbatim}
+
 
 The type @GHCbuiltins.RealWorld@ is truly opaque: there are no values defined
 of this type, and no operations over it.  It is ``primitive'' in that
 sense---but it is {\em not unboxed!} Its only role in life is to be the type
 which distinguishes the @PrimIO@ state transformer (see
 Section~\ref{sect:io-spec}).
-@
+\begin{verbatim}
 data RealWorld
-@
+\end{verbatim}
 
 \subsubsection{States}
 
 A single, primitive, value of type @State# RealWorld@ is provided.
-@
+\begin{verbatim}
 realWorld# :: State# GHCbuiltins.RealWorld
-@
+\end{verbatim}
+
 (Note: in the compiler, not a @PrimOp@; just a mucho magic @Id@.)
 
 \subsection{State pairing types}
@@ -440,7 +462,7 @@ because we can define them in Haskell, are very nearly so.  They define
 constructors which pair a primitive state with a value of each primitive type.
 They are required to express the result type of the primitive operations in the 
 state monad.
-@
+\begin{verbatim}
 data StateAndPtr#    s elt = StateAndPtr#    (State# s) elt 
 
 data StateAndChar#   s     = StateAndChar#   (State# s) Char# 
@@ -458,7 +480,8 @@ data StateAndArray#            s elt = StateAndArray#        (State# s) (Array# 
 data StateAndMutableArray#     s elt = StateAndMutableArray# (State# s) (MutableArray# s elt)  
 data StateAndByteArray#        s = StateAndByteArray#        (State# s) ByteArray# 
 data StateAndMutableByteArray# s = StateAndMutableByteArray# (State# s) (MutableByteArray# s)
-@
+\end{verbatim}
+
 
 
 \subsection{Mutable arrays}
@@ -468,10 +491,11 @@ Corresponding to @Array#@ and @ByteArray#@,
 we have the types of mutable versions of each.  
 In each case, the representation is a pointer
 to a suitable block of (mutable) heap-allocated storage.
-@
+\begin{verbatim}
 type MutableArray# s elt
 type MutableByteArray# s
-@
+\end{verbatim}
+
 \subsubsection{Allocation.}
 
 Mutable arrays can be allocated.
@@ -479,7 +503,7 @@ Only pointer-arrays are initialised; arrays of non-pointers are filled
 in by ``user code'' rather than by the array-allocation primitive.
 Reason: only the pointer case has to worry about GC striking with a
 partly-initialised array.
-@
+\begin{verbatim}
 newArray#       :: Int# -> elt -> State# s -> StateAndMutableArray# s elt 
 
 newCharArray#   :: Int# -> State# s -> StateAndMutableByteArray# s 
@@ -487,13 +511,14 @@ newIntArray#    :: Int# -> State# s -> StateAndMutableByteArray# s
 newAddrArray#   :: Int# -> State# s -> StateAndMutableByteArray# s 
 newFloatArray#  :: Int# -> State# s -> StateAndMutableByteArray# s 
 newDoubleArray# :: Int# -> State# s -> StateAndMutableByteArray# s 
-@
+\end{verbatim}
+
 The size of a @ByteArray#@ is given in bytes.
 
 \subsubsection{Reading and writing}
 
 %OLD: Remember, offsets in a @MutableByteArray#@ are in bytes.
-@
+\begin{verbatim}
 readArray#       :: MutableArray# s elt -> Int# -> State# s -> StateAndPtr#    s elt
 readCharArray#   :: MutableByteArray# s -> Int# -> State# s -> StateAndChar#   s
 readIntArray#    :: MutableByteArray# s -> Int# -> State# s -> StateAndInt#    s
@@ -507,29 +532,32 @@ writeIntArray#    :: MutableByteArray# s -> Int# -> Int#    -> State# s -> State
 writeAddrArray#   :: MutableByteArray# s -> Int# -> Addr#   -> State# s -> State# s 
 writeFloatArray#  :: MutableByteArray# s -> Int# -> Float#  -> State# s -> State# s 
 writeDoubleArray# :: MutableByteArray# s -> Int# -> Double# -> State# s -> State# s 
-@
+\end{verbatim}
+
 
 \subsubsection{Equality.}
 
 One can take ``equality'' of mutable arrays.  What is compared is the
 {\em name} or reference to the mutable array, not its contents.
-@
+\begin{verbatim}
 sameMutableArray#     :: MutableArray# s elt -> MutableArray# s elt -> Bool
 sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Bool
-@
+\end{verbatim}
+
 
 \subsubsection{Freezing mutable arrays}
 
 Only unsafe-freeze has a primitive.  (Safe freeze is done directly in Haskell 
 by copying the array and then using @unsafeFreeze@.) 
-@
+\begin{verbatim}
 unsafeFreezeArray#     :: MutableArray# s elt -> State# s -> StateAndArray#     s elt
 unsafeFreezeByteArray# :: MutableByteArray# s -> State# s -> StateAndByteArray# s
-@
+\end{verbatim}
+
 
 \subsubsection{Stable pointers}
 
-{\em Andy's comment.} {\bf Errors:} The following is not strictly true: the current
+{\em Andy's comment.} \bf{Errors:} The following is not strictly true: the current
 implementation is not as polymorphic as claimed.  The reason for this
 is that the C programmer will have to use a different entry-routine
 for each type of stable pointer.  At present, we only supply a very
@@ -545,9 +573,10 @@ the Haskell garbage collector runs --- in contrast to the address of the object
 which may well change.
 
 The stable pointer type is parameterised by the type of the thing which is named.
-@
+\begin{verbatim}
 type StablePtr# a
-@
+\end{verbatim}
+
 A stable pointer is represented by an index into the (static) 
 @StablePointerTable@.  The Haskell garbage collector treats the 
 @StablePointerTable@ as a source of roots for GC.
@@ -555,11 +584,12 @@ A stable pointer is represented by an index into the (static)
 The @makeStablePointer@ function converts a value into a stable pointer.
 It is part of the @PrimIO@ monad, because we want to be sure we don't
 allocate one twice by accident, and then only free one of the copies.
-@
+\begin{verbatim}
 makeStablePointer#  :: a -> State# RealWorld -> StateAndStablePtr# RealWorld a
 freeStablePointer#  :: StablePtr# a -> State# RealWorld -> State# RealWorld
 deRefStablePointer# :: StablePtr# a -> State# RealWorld -> StateAndPtr RealWorld a
-@
+\end{verbatim}
+
 There is also a C procedure @FreeStablePtr@ which frees a stable pointer.
 
 %
@@ -573,9 +603,10 @@ machine completely.), where the Haskell world has been told ``Let me
 know when you're finished with this ...''.
 
 The @ForeignObj@ type is just a special @Addr#@ ({\em not} parameterised).
-@
+\begin{verbatim}
 type ForeignObj#
-@
+\end{verbatim}
+
 
 A typical use of @ForeignObj@ is in constructing Haskell bindings
 to external libraries. A good example is that of writing a binding to
@@ -585,11 +616,12 @@ images manipulated are not stored in the Haskell heap, either because
 the library insist on allocating them internally or we (sensibly)
 decide to spare the GC from having to heave heavy images around.
 
-@
+\begin{verbatim}
 data Image = Image ForeignObj#
 
 instance CCallable Image
-@
+\end{verbatim}
+
 
 The @ForeignObj#@ type is then used to refer to the externally
 allocated image, and to acheive some type safety, the Haskell binding
@@ -597,9 +629,10 @@ defines the @Image@ data type. So, a value of type @ForeignObj#@ is
 used to ``box'' up an external reference into a Haskell heap object
 that we can then indirectly reference:
 
-@
+\begin{verbatim}
 createImage :: (Int,Int) -> PrimIO Image
-@
+\end{verbatim}
+
 
 So far, this looks just like an @Addr#@ type, but @ForeignObj#@
 offers a bit more, namely that we can specify a {\em finalisation
@@ -614,18 +647,19 @@ currently to be written in C (the finalisation routine can in turn call on
 Associating a finalisation routine with an external object is done by 
 @makeForeignObj#@:
 
-@
+\begin{verbatim}
 makeForeignObj# :: Addr# -- foreign reference
                 -> Addr# -- pointer to finalisation routine
 		-> StateAndForeignObj# RealWorld ForeignObj#
-@
+\end{verbatim}
+
 
 (Implementation: a linked list of all @ForeignObj#@s is maintained to allow the
  garbage collector to detect when a @ForeignObj#@ becomes garbage.)
 
 Like @Array@, @ForeignObj#@s are represented by heap objects.
 
-{\bf ToDo:} Decide whether @FreeCHeapPointer@ is allowed to call on a
+\bf{ToDo:} Decide whether @FreeCHeapPointer@ is allowed to call on a
 stable pointer. (I sincerely hope not since we will still be in the
 GC at this point.)
 
@@ -633,7 +667,7 @@ GC at this point.)
 
 ToDo ToDo ToDo
 
-@
+\begin{verbatim}
 type SynchVar# s elt	-- primitive
 
 newSynchVar#:: State# s -> StateAndSynchVar# s elt
@@ -643,7 +677,8 @@ putMVar#    :: SynchVar# s elt -> State# s -> State# s
 
 readIVar#   :: SynchVar# s elt -> State# s -> StateAndPtr# s elt
 writeIVar#  :: SynchVar# s elt -> State# s -> State# s
-@
+\end{verbatim}
+
 
 \subsubsection{Controlling the garbage collector}
 
@@ -653,12 +688,13 @@ is performing a C Call.
 
 Note that this function can be used to define a Haskell IO operation
 with the same effect:
-@
+\begin{verbatim}
 >	performGCIO :: PrimIO ()
 >	performGCIO = _ccall_gc_ PerformGC
-@
+\end{verbatim}
 
-{\bf ToDo:} Is there any need for abnormal/normal termination to force
+
+\bf{ToDo:} Is there any need for abnormal/normal termination to force
 a GC too?  Is there any need for a function that provides finer
 control over GC: argument = amount of space required; result = amount
 of space recovered.
@@ -672,20 +708,22 @@ of space recovered.
 The @errorIO#@ primitive takes an argument much like @PrimIO@.  It aborts execution of
 the current program, and continues instead by performing the given @PrimIO@-like value
 on the current state of the world.
-@
+\begin{verbatim}
 errorIO# :: (State RealWorld -> ((), State RealWorld)) -> a
-@
+\end{verbatim}
+
 
 \subsection{C Calls}
 
-{\bf ToDo:} current implementation has state variable as second
+\bf{ToDo:} current implementation has state variable as second
 argument not last argument.
 
 The @ccall#@ primitive can't be given an ordinary type, because it has
 a variable number of arguments.  The nearest we can get is:
-@
+\begin{verbatim}
 ccall# :: CRoutine -> a1# -> ... -> an# -> State# RealWorld -> StateAndR# RealWorld
-@
+\end{verbatim}
+
 where the type variables @a1#@\ldots@an#@ and @r#@ can be instantiated by any
 primitive type, and @StateAndR#@ is the appropriate pairing type from 
 Section~\ref{sect:horrid-pairing-types}.  The @CRoutine@ 
@@ -701,9 +739,9 @@ identifier.  The only way it is possible to generate a @ccall#@ is via the
 @_ccall_@ construct.
 
 All this applies equally to @casm#@:
-@
+\begin{verbatim}
 casm#  :: CAsmString -> a1# -> ... -> an# -> State# RealWorld -> StateAndR# RealWorld
-@
+\end{verbatim}
 
 %------------------------------------------------------------
 \section{Library stuff built with the Really Primitive Stuff}
@@ -714,15 +752,17 @@ casm#  :: CAsmString -> a1# -> ... -> an# -> State# RealWorld -> StateAndR# Real
 
 A state transformer is a function from a state to a pair of a result and a new 
 state.  
-@
+\begin{verbatim}
 newtype ST s a = ST (State s -> (a, State s))
-@
+\end{verbatim}
+
 The @ST@ type is {\em abstract}, so that the programmer cannot see its 
 representation.  If he could, he could write bad things like:
-@
+\begin{verbatim}
 bad :: ST s a
 bad = ST $ \ s -> ...(f s)...(g s)...
-@
+\end{verbatim}
+
 Here, @s@ is duplicated, which would be bad news.
 
 A state is represented by a primitive state value, of type @State# s@, 
@@ -730,16 +770,17 @@ wrapped up in a @State@ constructor.  The reason for boxing it in this
 way is so that we can be strict or lazy in the state.  (Remember, all 
 primitive types are unboxed, and hence can't be bottom; but types built
 with @data@ are all boxed.)
-@
+\begin{verbatim}
 data State s = S# (State# s)
-@
+\end{verbatim}
+
 
 \subsubsection{The state transformer combinators}
 
 Now for the combinators, all of which live inside the @ST@
 abstraction.  Notice that @returnST@ and @thenST@ are lazy in the
 state.
-@
+\begin{verbatim}
 returnST :: a -> ST s a
 returnST a s = (a, s)
 
@@ -753,14 +794,16 @@ fixST k s = let ans = k r s
                 (r,new_s) = ans
             in
             ans
-@
+\end{verbatim}
+
 The interesting one is, of course, @runST@.  We can't infer its type!
 (It has a funny name because it must be wired into the compiler.)
-@
+\begin{verbatim}
 -- runST :: forall a. (forall s. ST s a) -> a
 runST m = case m (S# realWorld#) of
            (r,_) -> r
-@
+\end{verbatim}
+
 
 \subsubsection{Other useful combinators}
 
@@ -768,14 +811,15 @@ There are various other standard combinators, all defined in terms the
 fundamental combinators above. The @seqST@ combinator is like
 @thenST@, except that it discards the result of the first state
 transformer:
-@
+\begin{verbatim}
 seqST :: ST s a -> ST s b -> ST s b
 seqST m1 m2 = m1 `thenST` (\_ -> m2)
-@
+\end{verbatim}
+
 
 We also have {\em strict} (... in the state...) variants of the
 then/return combinators (same types as their pals):
-@
+\begin{verbatim}
 returnStrictlyST a s@(S# _) = (a, s)
 
 thenStrictlyST m k s@(S# _)
@@ -783,41 +827,45 @@ thenStrictlyST m k s@(S# _)
     k r new_s }
 
 seqStrictlyST m k = ... ditto, for seqST ...
-@
+\end{verbatim}
 
 The combinator @listST@ takes a list of state transformers, and
 composes them in sequence, returning a list of their results:
-@
+\begin{verbatim}
 listST :: [ST s a] -> ST s [a]
 listST []     = returnST []
 listST (m:ms) = m		`thenST` \ r ->
 		listST ms	`thenST` \ rs ->
 		returnST (r:rs)
-@
+\end{verbatim}
+
 The @mapST@ combinator ``lifts'' a function from a value to state
 transformers to one which works over a list of values:
-@
+\begin{verbatim}
 mapST :: (a -> ST s b) -> [a] -> ST s [b]
 mapST f ms = listST (map f ms)
-@
+\end{verbatim}
+
 The @mapAndUnzipST@ combinator is similar to @mapST@, except that here the
 function returns a pair:
-@
+\begin{verbatim}
 mapAndUnzipST :: (a -> ST s (b,c)) -> [a] -> ST s ([b],[c])
 mapAndUnzipST f (m:ms)
   = f m			`thenST` \ ( r1,  r2) ->
     mapAndUnzipST f ms	`thenST` \ (rs1, rs2) ->
     returnST (r1:rs1, r2:rs2)
-@
+\end{verbatim}
+
 
 \subsubsection{The @PrimIO@ monad}
 \label{sect:io-spec}
 
 The @PrimIO@ type is defined in as a state transformer which manipulates the 
 @RealWorld@.
-@
+\begin{verbatim}
 type PrimIO a = ST RealWorld a      -- Transparent
-@
+\end{verbatim}
+
 The @PrimIO@ type is an ordinary type synonym, transparent to the programmer.
 
 The type @RealWorld@ and value @realWorld#@ do not need to be hidden (although 
@@ -831,22 +879,24 @@ state, which propagates backwards to all the earlier combinators
 strict in the state?  Because every context in which an I/O state
 transformer is used will certainly evaluate the resulting state; it is
 the state of the real world!
-@
+\begin{verbatim}
 returnPrimIO :: a -> PrimIO a
-returnPrimIO a s@(S# _) -> (a, s)
-@
+returnPrimIO a s@(S# _) = (a, s)
+\end{verbatim}
 We provide strict versions of the other combinators too.
-@
+\begin{verbatim}
 thenPrimIO m k s = case m s of
 		     (r,s) -> k r s
-@
+\end{verbatim}
+
 @fixPrimIO@ has to be lazy, though!
-@
+\begin{verbatim}
 fixPrimIO  = fixST
-@
+\end{verbatim}
+
 The other combinators are just the same as before, but use the strict
 @thenPrimIO@ and @returnPrimIO@ for efficiency.
-@
+\begin{verbatim}
 foldrPrimIO f z []     = z
 foldrPrimIO f z (m:ms) = foldrPrimIO f z ms `thenPrimIO` \ ms' ->
 			 f m ms'
@@ -860,41 +910,45 @@ mapAndUnzipPrimIO f (m:ms)
   = f m			    `thenPrimIO` \ ( r1,  r2) ->
     mapAndUnzipPrimIO f ms  `thenPrimIO` \ (rs1, rs2) ->
     returnPrimIO (r1:rs1, r2:rs2)
-@
+\end{verbatim}
+
 
 \subsection{Arrays}
 
 \subsubsection{Types}
 
-@
+\begin{verbatim}
 data Array      ix elt = Array     (ix,ix) (Array# elt)
 data ByteArray ix      = ByteArray (ix,ix) ByteArray#
 
 data MutableArray     s ix elt = MutableArray     (ix,ix) (MutableArray# s elt)
 data MutableByteArray s ix     = MutableByteArray (ix,ix) (MutableByteArray# s)
-@
+\end{verbatim}
+
 
 \subsubsection{Operations on immutable arrays}
 
 Ordinary array indexing is straightforward.
-@
+\begin{verbatim}
 (!) :: Ix ix => Array ix elt -> ix -> elt
-@
+\end{verbatim}
+
 QUESTIONs: should @ByteArray@s be indexed by Ints or ix?  With byte offsets
 or sized ones? (sized ones [WDP])
-@
+\begin{verbatim}
 indexCharArray   :: Ix ix => ByteArray ix -> ix -> Char
 indexIntArray    :: Ix ix => ByteArray ix -> ix -> Int
 indexAddrArray   :: Ix ix => ByteArray ix -> ix -> Addr
 indexFloatArray  :: Ix ix => ByteArray ix -> ix -> Float
 indexDoubleArray :: Ix ix => ByteArray ix -> ix -> Double
-@
+\end{verbatim}
+
 @Addr@s are indexed straightforwardly by @Int@s.  Unlike the primitive
 operations, though, the offsets assume that the array consists entirely of the
 type of value being indexed, and so there's an implicit multiplication by
 the size of that value.  To access @Addr@s with mixed values requires
 you to do a DIY job using the primitives.
-@
+\begin{verbatim}
 indexAddrChar :: Addr -> Int -> Char
 ...etc...
 indexStaticCharArray   :: Addr -> Int -> Char
@@ -902,50 +956,57 @@ indexStaticIntArray    :: Addr -> Int -> Int
 indexStaticFloatArray  :: Addr -> Int -> Float
 indexStaticDoubleArray :: Addr -> Int -> Double
 indexStaticArray       :: Addr -> Int -> Addr
-@
+\end{verbatim}
+
 
 \subsubsection{Operations on mutable arrays}
-@
+\begin{verbatim}
 newArray     :: Ix ix => (ix,ix) -> elt -> ST s (MutableArray s ix elt)
 newCharArray :: Ix ix => (ix,ix) -> ST s (MutableByteArray s ix) 
 ...
-@
+\end{verbatim}
 
-@
+
+\begin{verbatim}
 readArray   :: Ix ix => MutableArray s ix elt -> ix -> ST s elt 
 readCharArray   :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
 ...
-@
+\end{verbatim}
 
-@
+\begin{verbatim}
 writeArray  :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
 writeCharArray  :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
 ...
-@
+\end{verbatim}
 
-@
+
+\begin{verbatim}
 freezeArray :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
 freezeCharArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 ...
-@
+\end{verbatim}
+
 
 We have no need on one-function-per-type for unsafe freezing:
-@
+\begin{verbatim}
 unsafeFreezeArray :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)  
 unsafeFreezeByteArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
-@
+\end{verbatim}
+
 
 Sometimes we want to snaffle the bounds of one of these beasts:
-@
+\begin{verbatim}
 boundsOfArray     :: Ix ix => MutableArray s ix elt -> (ix, ix)  
 boundsOfByteArray :: Ix ix => MutableByteArray s ix -> (ix, ix)
-@
+\end{verbatim}
+
 
 Lastly, ``equality'':
-@
+\begin{verbatim}
 sameMutableArray     :: MutableArray s ix elt -> MutableArray s ix elt -> Bool
 sameMutableByteArray :: MutableByteArray s ix -> MutableByteArray s ix -> Bool
-@
+\end{verbatim}
+
 
 
 \subsection{Variables}
@@ -954,36 +1015,38 @@ sameMutableByteArray :: MutableByteArray s ix -> MutableByteArray s ix -> Bool
 
 Mutable variables are (for now anyway) implemented as arrays.  The @MutableVar@ type
 is opaque, so we can change the implementation later if we want.
-@
+\begin{verbatim}
 type MutableVar s a = MutableArray s Int a
-@
+\end{verbatim}
+
 
 \subsubsection{Operations}
-@
+\begin{verbatim}
 newVar   :: a -> ST s (MutableVar s a)
 readVar  :: MutableVar s a -> ST s a
 writeVar :: MutableVar s a -> a -> ST s ()
 sameVar  :: MutableVar s a -> MutableVar s a -> Bool
-@
+\end{verbatim}
+
 
 \subsection{Stable pointers}
 
 Nothing exciting here, just simple boxing up.
-@
+\begin{verbatim}
 data StablePtr a = StablePtr (StablePtr# a)
 
 makeStablePointer :: a -> StablePtr a
 freeStablePointer :: StablePtr a -> PrimIO ()
-@
+\end{verbatim}
 
 \subsection{Foreign objects}
 
 Again, just boxing up.
-@
+\begin{verbatim}
 data ForeignObj = ForeignObj ForeignObj#
 
 makeForeignObj :: Addr -> Addr -> PrimIO ForeignObj
-@
+\end{verbatim}
 
 \subsection{C calls}
 
@@ -993,7 +1056,7 @@ Everything in this section goes for @_casm_@ too.
 
 The @_ccall_@ construct has the following form:
 $$@_ccall_@~croutine~a_1~\ldots~a_n$$
-This whole construct has type $@PrimIO@~res$.
+This whole construct has type @PrimIO@~$res$.
 The rules are these:
 \begin{itemize}
 \item
@@ -1003,23 +1066,25 @@ simply the name of the procedure.
 \item
 The arguments $a_1, \ldots,a_n$ must be of {\em C-callable} type.
 \item
-The whole construct has type $@PrimIO@~ty$, where $ty$ is a {\em C-returnable} type.
+The whole construct has type @PrimIO@~$ty$, where $ty$ is a {\em C-returnable} type.
 \end{itemize}
 A {\em boxed-primitive} type is both C-callable and C-returnable.
 A boxed primitive type is anything declared by:
-@
+\begin{verbatim}
 data T = C# t
-@
+\end{verbatim}
+
 where @t@ is a primitive type.  Note that
 programmer-defined boxed-primitive types are perfectly OK:
-@
+\begin{verbatim}
 data Widget = W# Int#
 data Screen = S# CHeapPtr#
-@
+\end{verbatim}
+
 
 There are other types that can be passed to C (C-callable).  This
 table summarises (including the standard boxed-primitive types):
-@
+\begin{verbatim}
 Boxed	    	  Type of transferd   Corresp.     Which is
 Type	    	  Prim. component     C type       *probably*...
 ------	    	  ---------------     ------       -------------
@@ -1039,49 +1104,56 @@ State		  State#	      nothing!
 		  		      
 StablePtr	  StablePtr#	      StgStablePtr  StgPtr
 ForeignObj	  ForeignObj#	      StgForeignObj StgPtr
-@
+\end{verbatim}
+
 
 All of the above are {\em C-returnable} except:
-@
+\begin{verbatim}
 	Array, ByteArray, MutableArray, MutableByteArray
-@
+\end{verbatim}
 
-{\bf ToDo:} I'm pretty wary of @Array@ and @MutableArray@ being in
+
+\bf{ToDo:} I'm pretty wary of @Array@ and @MutableArray@ being in
 this list, and not too happy about @State@ [WDP].
 
-{\bf ToDo:} Can code generator pass all the primitive types?  Should this be
+\bf{ToDo:} Can code generator pass all the primitive types?  Should this be
 extended to include {\tt Bool\/} (or any enumeration type?)
 
 The type checker must be able to figure out just which of the C-callable/returnable
 types is being used.  If it can't, you have to add type signatures. For example,
-@
+\begin{verbatim}
 f x = _ccall_ foo x
-@
+\end{verbatim}
+
 is not good enough, because the compiler can't work out what type @x@ is, nor 
 what type the @_ccall_@ returns.  You have to write, say:
-@
+\begin{verbatim}
 f :: Int -> PrimIO Float
 f x = _ccall_ foo x
-@
+\end{verbatim}
+
 
 \subsubsection{Implementation}
 
 The desugarer unwraps the @_ccall_@ construct by inserting the necessary 
 evaluations etc to unbox the arguments.  For example, the body of the definition 
 of @f@ above would become:
-@
+\begin{verbatim}
         (\ s -> case x of { I# x# -> 
                 case s of { S# s# ->
                 case ccall# [Int#,Float#] x# s# of { StateAndFloat# f# new_s# ->
                 (F# f#, S# new_s#)
                 }}})
-@
+\end{verbatim}
+
 Notice that the state, too, is unboxed.
 
 The code generator must deal specially with primitive objects which
 are stored on the heap.
 
+\begin{verbatim}
 ... details omitted ...
+\end{verbatim}
 
 %
 %More importantly, it must construct a C Heap Pointer heap-object after
@@ -1091,7 +1163,7 @@ are stored on the heap.
 %--------------------------------------------------------
 \section{Non-primitive stuff that must be wired into GHC}
 
-@
+\begin{verbatim}
 data Char    = C# Char#
 data Int     = I# Int#
 data Word    = W# Word#
@@ -1114,7 +1186,8 @@ data List a = [] | a : (List a)
 data Lift a = Lift a    -- used Yukkily as described elsewhere
 
 type String  = [Char]    -- convenience, only
-@
+\end{verbatim}
+
 
 %------------------------------------------------------------
 \section{Programmer interface(s)}
@@ -1131,16 +1204,18 @@ to you.
 \subsection{If you mess about with @import Prelude@...}
 
 Innocent hiding, e.g.,
-@
+\begin{verbatim}
 import Prelude hiding ( fromIntegral )
-@
+\end{verbatim}
+
 should work just fine.
 
 There are some things you can do that will make GHC crash, e.g.,
 hiding a standard class:
-@
+\begin{verbatim}
 import Prelude hiding ( Eq(..) )
-@
+\end{verbatim}
+
 Don't do that.
 
 \subsection{Turning on Glasgow extensions with @-fglasgow-exts@}

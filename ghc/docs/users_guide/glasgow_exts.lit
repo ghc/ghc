@@ -133,10 +133,11 @@ That is, GHC provides a safe way to pass Haskell pointers to C.
 Please see \Sectionref{glasgow-stablePtrs} for more details.
 
 \item[``Foreign objects'':]
-A ``foreign object'' is a safe way to pass a C~pointer to Haskell and
-have Haskell do the Right Thing when it no longer references the
-object.  So, for example, C could pass a large bitmap over to Haskell
-and say ``please free this memory when you're done with it.''
+A ``foreign object'' is a safe way to pass an external object (a
+C~allocated pointer, say) to Haskell and have Haskell do the Right
+Thing when it no longer references the object.  So, for example, C
+could pass a large bitmap over to Haskell and say ``please free this
+memory when you're done with it.'' 
 
 Please see \Sectionref{glasgow-foreignObjs} for more details.
 \end{description}
@@ -194,7 +195,7 @@ and things go, you would be well-advised to keep your C-callery
 corraled in a few modules, rather than sprinkled all over your code.
 It will then be quite easy to update later on.
 
-WARNING AS OF 2.01: Yes, the \tr{_ccall_} stuff probably {\em will
+WARNING AS OF 2.02: Yes, the \tr{_ccall_} stuff probably {\em will
 change}, to something better, of course!  We are still at the
 musing-about-it stage, however...
 
@@ -211,7 +212,7 @@ double fooC( FILE *in, char c, int i, double d, unsigned int u )
 is to provide a Haskell wrapper:
 \begin{verbatim}
 fooH :: Char -> Int -> Double -> Word -> PrimIO Double
-fooH c i d w = _ccall_ fooC ``stdin'' c i d w
+fooH c i d w = _ccall_ fooC (``stdin''::Addr) c i d w
 \end{verbatim}
 The function @fooH@ will unbox all of its arguments, call the C
 function \tr{fooC} and box the corresponding arguments.
@@ -289,7 +290,7 @@ C type name      & Haskell Type \\ \hline
 \tr{StgByteArray}     & \tr{MutableByteArray#}\\   
                                     
 \tr{StgStablePtr}     & \tr{StablePtr#}\\          
-\tr{StgForeignObj}    & \tr{MallocPtr#}
+\tr{StgForeignObj}    & \tr{ForeignObj#}
 \end{tabular}
 
 Note that this approach is only {\em essential\/} for returning
@@ -585,7 +586,7 @@ data MyVoid = MyVoid
 instance CReturnable MyVoid
 \end{verbatim}
 
-\item As at version 2.01, \tr{String} (i.e., \tr{[Char]}) is still
+\item As at version 2.02, \tr{String} (i.e., \tr{[Char]}) is still
 not a \tr{CReturnable} type.
 
 Also, the now-builtin type \tr{PackedString} is neither

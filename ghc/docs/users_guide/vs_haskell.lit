@@ -1,17 +1,17 @@
 %************************************************************************
 %*                                                                      *
-\section[vs-Haskell-defn]{Haskell~1.3 vs.~Glasgow Haskell~2.01: language non-compliance}
-\index{GHC vs the Haskell 1.3 language}
-\index{Haskell 1.3 language vs GHC}
+\section[vs-Haskell-defn]{Haskell~1.3 vs.~Glasgow Haskell~2.02: language non-compliance}
+\index{GHC vs the Haskell 1.4 language}
+\index{Haskell 1.4 language vs GHC}
 %*                                                                      *
 %************************************************************************
 
 This section lists Glasgow Haskell infelicities in its implementation
-of Haskell~1.3.  See also the ``when things go wrong'' section
+of Haskell~1.4.  See also the ``when things go wrong'' section
 (\sectionref{wrong}) for information about crashes, space leaks, and
 other undesirable phenomena.
 
-GHC~2.01 does not have a ``Haskell~1.2 compatibility mode.''  If
+GHC~2.02 does not have a ``Haskell~1.2 compatibility mode.''  If
 enough people yelled loudly and long enough, it could conceivably
 happen...
 
@@ -27,10 +27,10 @@ The limitations here are listed in Haskell-Report order (roughly).
 
 \begin{description}
 %-------------------------------------------------------------------
-\item[No @n+k@ patterns:]
-We took them out of GHC, because we thought they weren't going to
-survive into Haskell~1.3.  But they did.  And we haven't put them
-back.  Yet.
+%\item[No @n+k@ patterns:]
+%We took them out of GHC, because we thought they weren't going to
+%survive into Haskell~1.3.  But they did.  And we haven't put them
+%back.  Yet.
 
 %-------------------------------------------------------------------
 \item[Very long @String@ constants:]
@@ -140,4 +140,14 @@ HOWEVER: standard instances for tuples (@Eq@, @Ord@, @Bounded@, @Ix@
 
 These limitations are easily subvertible, so please ask if you get
 stuck on them.
+
+%-------------------------------------------------------------------
+\item[Unicode character set:]
+Haskell~1.4 embraces the Unicode character set, but GHC~2.02 does
+handle it. Yet.
+
+%-------------------------------------------------------------------
+\item[class @Enum@:]
+In Haskell~1.4, @Ord@ is dropped as a superclass of @Enum@. GHC~2.02
+still has the @Ord@ constraint.
 \end{description}
