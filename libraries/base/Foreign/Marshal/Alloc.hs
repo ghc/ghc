@@ -40,6 +40,7 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
+import GHC.Num
 #elif defined(__NHC__)
 import NHC.FFI			( FinalizerPtr, CInt(..) )
 import IO			( bracket )
@@ -120,6 +121,7 @@ realloc  = doRealloc undefined
 -- C\'s @realloc()@).
 --
 reallocBytes          :: Ptr a -> Int -> IO (Ptr a)
+reallocBytes ptr 0     = do free ptr; return nullPtr
 reallocBytes ptr size  = 
   failWhenNULL "realloc" (_realloc ptr (fromIntegral size))
 
