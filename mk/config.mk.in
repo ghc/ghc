@@ -320,6 +320,9 @@ LIBM=@LIBM@
 #
 GhcLibsWithHOpenGL=@GhcLibsWithHOpenGL@
 
+X_CFLAGS=@X_CFLAGS@
+X_LIBS=@X_LIBS@
+
 ################################################################################
 #
 #		happy project

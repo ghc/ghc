@@ -478,6 +478,8 @@ AC_ARG_WITH(glut-xlib,
 test -n "$with_glut_xlib" && CPPFLAGS="$CPPFLAGS -DGLUT_XLIB_IMPLEMENTATION=$with_glut_xlib"
 
 
+
+
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
@@ -877,6 +879,12 @@ fi
 dnl ** check for math library
 FPTOOLS_CHECK_LIBM()
 AC_SUBST(LIBM)
+
+case $HostOS_CPP in
+cygwin32) ;;
+mingw32)  ;;
+*) AC_PATH_XTRA() ;;
+esac
 
 dnl ################################################################
 dnl Check for libraries
