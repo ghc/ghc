@@ -26,7 +26,7 @@ URL: http://haskell.org/ghc/
 BuildRoot: /var/tmp/ghc-%{version}-%{release}-root
 Requires: gmp-devel
 Provides: haskell
-BuildRequires: autoconf, happy >= 1.9, ghc, stylesheets
+BuildRequires: happy >= 1.9, ghc >= 4.08, docbook-utils
 
 %description
 Haskell is a standard lazy functional programming language; the
@@ -54,7 +54,23 @@ Requires: ghc = %{PACKAGE_VERSION}
 Profiling libraries for Glorious Glasgow Haskell Compilation System (GHC).
 They should be installed when GHC's profiling subsystem is needed.
 
+%package doc
+Summary: Documentation for GHC
+Group: Documentation
+
+%description doc
+Preformatted documentation for the Glorious Glasgow Haskell Compilation System 
+(GHC) and its libraries.  It should be installed if you like to have local
+access to the documentation in PostScript and HTML format.  Alternatively,
+the documentation is available online at
+
+  http://haskell.org/ghc/documentation.html
+
 %changelog
+
+* Wed Sep 26 2001 Manuel Chakravarty
+- split documentation off into a separate package
+- adapt to new docbook setup in RH7.1
 
 * Mon Apr 16 2001 Manuel Chakravarty
 - revised for 5.00
@@ -128,6 +144,10 @@ for j in docs ghc/docs; do
   cd $dir
 done
 rm -rf $RPM_BUILD_ROOT
+
+# FIXME: this is necessary due to brokenness in ghc-5.00/mk/target.mk
+make prefix=$RPM_BUILD_ROOT%{prefix} install-dirs
+
 make prefix=$RPM_BUILD_ROOT%{prefix} install
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
@@ -152,10 +172,13 @@ cd $dir
 rm -rf $RPM_BUILD_ROOT
 
 %files -f rpm-noprof-lib-files
-%doc docs/
-%doc ghc/ANNOUNCE ghc/README ghc/docs/
+%doc ghc/ANNOUNCE ghc/README
 %{prefix}/bin/*
 
 %files prof
 %{prefix}/lib/ghc-%{version}/imports/*/*.p_hi
 %{prefix}/lib/ghc-%{version}/libHS*_p.a
+
+%files doc
+%doc docs/
+%doc ghc/docs/
