@@ -46,7 +46,11 @@ import GHC.Float
 import GHC.Err
 import GHC.IOBase
 import GHC.Base
-#elif defined(__HUGS__)
+#else
+import Foreign.Ptr
+#endif
+
+#ifdef __HUGS__
 import Hugs.Storable
 #endif
 

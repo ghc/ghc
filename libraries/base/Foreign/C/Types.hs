@@ -51,6 +51,9 @@ import GHC.Real
 import GHC.Show
 import GHC.Read
 import GHC.Num
+#else
+import Control.Monad
+import Foreign.Ptr
 #endif
 
 #include "Dynamic.h"

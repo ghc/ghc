@@ -31,6 +31,7 @@ import Data.Bits	( Bits(..) )
 import Data.Int
 import Data.Word
 import Data.Dynamic
+import Foreign.Storable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -39,6 +40,9 @@ import GHC.Real
 import GHC.Show
 import GHC.Read
 import GHC.Num
+#else
+import Control.Monad
+import Foreign.Ptr
 #endif
 
 #include "Dynamic.h"
