@@ -34,6 +34,7 @@ import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, typePrimRep,
 			  splitFunTy_maybe, tyConAppTyCon, splitTyConApp,
                           mkUTy, usOnce, usMany
 			)
+import PprType          () -- get at Outputable Type instance.
 import Unique		( mkPrimOpIdUnique )
 import BasicTypes	( Arity, Boxity(..) )
 import PrelNames	( pREL_GHC, pREL_GHC_Name )
