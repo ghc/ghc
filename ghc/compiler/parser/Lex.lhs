@@ -1190,9 +1190,6 @@ setSrcLocP new_loc p buf s =
 getSrcFile :: P FAST_STRING
 getSrcFile buf s@(PState{ loc = loc }) = POk s (srcLocFile loc)
 
-getContext :: P [LayoutContext]
-getContext buf s@(PState{ context = ctx }) = POk s ctx
-
 pushContext :: LayoutContext -> P ()
 pushContext ctxt buf s@(PState{ context = ctx }) = POk s{context = ctxt:ctx} ()
 
