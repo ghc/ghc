@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: PrelTopHandler.lhs,v 1.2 2001/05/22 15:06:47 simonmar Exp $
+-- $Id: PrelTopHandler.lhs,v 1.3 2001/07/12 10:37:55 rrt Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -62,13 +62,12 @@ reportError :: Bool -> String -> IO ()
 reportError bombOut str = do
    (hFlush stdout) `catchException` (\ _ -> return ())
    withCStringLen str $ \(cstr,len) -> do
-     writeErrString addrOf_ErrorHdrHook cstr len
+     writeErrString errorHdrHook cstr len
      if bombOut 
 	then stg_exit 1
         else return ()
 
-foreign import ccall "addrOf_ErrorHdrHook" unsafe
-        addrOf_ErrorHdrHook :: Ptr ()
+foreign label "ErrorHdrHook" errorHdrHook :: Ptr ()
 
 foreign import ccall "writeErrString__" unsafe
 	writeErrString :: Ptr () -> CString -> Int -> IO ()
