@@ -150,9 +150,7 @@ void grabCapability(Capability** cap)
   free_capabilities = (*cap)->link;
   rts_n_free_capabilities--;
 #endif
-#ifdef RTS_SUPPORTS_THREADS
-    IF_DEBUG(scheduler, sched_belch("worker: got capability"));
-#endif
+  IF_DEBUG(scheduler, sched_belch("worker: got capability"));
 }
 
 /*
@@ -362,6 +360,7 @@ passCapability(Mutex* pMutex, Capability* cap, Condition *pTargetThreadCond)
 #ifdef SMP
   #error SMP version not implemented
 #endif
+    ASSERT(rts_n_free_capabilities == 0);
     rts_n_free_capabilities = 1;
     signalCondition(pTargetThreadCond);
     passTarget = pTargetThreadCond;
