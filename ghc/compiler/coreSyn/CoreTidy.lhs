@@ -60,9 +60,6 @@ tidyBind env (Rec prs)
 
 
 ------------  Expressions  --------------
-tidyCoreExpr :: CoreExpr -> IO CoreExpr
-tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
-
 tidyExpr env (Var v)   	=  Var (tidyVarOcc env v)
 tidyExpr env (Type ty) 	=  Type (tidyType env ty)
 tidyExpr env (Lit lit) 	=  Lit lit

@@ -23,6 +23,8 @@ import CoreSyn
 import Var
 import IdInfo
 import Id( idUnfolding )
+import CoreTidy( tidyExpr )
+import VarEnv( emptyTidyEnv )
 import Literal
 import Name
 import CostCentre
@@ -68,7 +70,13 @@ implicit_ids (AClass cl) = classSelIds cl
 implicit_ids other       = []
 
 get_defn :: Id -> CoreBind
-get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
+get_defn id = NonRec id rhs
+	    where
+	      rhs  = tidyExpr emptyTidyEnv body 
+	      body = unfoldingTemplate (idUnfolding id)
+	-- Don't forget to tidy the body !  Otherwise you get silly things like
+	--	\ tpl -> case tpl of tpl -> (tpl,tpl) -> tpl
+	-- Maybe we should inject these bindings during CoreTidy?
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs tcon tdefs 
