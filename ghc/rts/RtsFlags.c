@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.67 2003/03/25 17:26:08 sof Exp $
+ * $Id: RtsFlags.c,v 1.68 2003/04/21 14:45:28 sof Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -55,25 +55,9 @@ char   *rts_argv[MAX_RTS_ARGS];
 #define RTS 1
 #define PGM 0
 
-char *debug_opts_prefix[] = {
-  "_-", /* scheduler */
-  "_.", /* interpreter */
-  "_,", /* codegen */
-  "_;", /* weak */
-  "_~", /* gccafs */
-  "_@", /* gc */
-  "_#", /* block */
-  "_&", /* sanity */
-  "_:", /* stable */
-  "_!", /* prof */
-  "_=", /* gran */
-  "_=" /* par */
-  "_*" /* linker */
-};
-
 #if defined(GRAN)
 
-char *gran_debug_opts_strs[] = {
+static char *gran_debug_opts_strs[] = {
   "DEBUG (-bDe, -bD1): event_trace; printing event trace.\n",
   "DEBUG (-bDE, -bD2): event_stats; printing event statistics.\n",
   "DEBUG (-bDb, -bD4): bq; check blocking queues\n",
@@ -92,32 +76,13 @@ char *gran_debug_opts_strs[] = {
 };
 
 /* one character codes for the available debug options */
-char gran_debug_opts_flags[] = {
+static char gran_debug_opts_flags[] = {
   'e', 'E', 'b', 'G', 'q', 'f', 'r', 'F', 'u', 'S', ':', 'o', 'z', 'P', 't'
-};
-
-/* prefix strings printed with the debug messages of the corresponding type */
-char *gran_debug_opts_prefix[] = {
-  "", /* event_trace */ 
-  "", /* event_stats */
-  "##", /* bq */
-  "**", /* pack */
-  "^^", /* checkSparkQ */
-  "==", /* thunkStealing */
-  "^^", /* randomSteal */
-  "+-", /* findWork */
-  "", /* unused */
-  "++", /* pri */
-  "::", /* checkLight */
-  "##", /* sortedQ */
-  "", /* blockOnFetch */
-  "", /* packBuffer */
-  "" /* blockOnFetch_sanity */
 };
 
 #elif defined(PAR)
 
-char *par_debug_opts_strs[] = {
+static char *par_debug_opts_strs[] = {
   "DEBUG (-qDv, -qD1): verbose; be generally verbose with parallel related stuff.\n",
   "DEBUG (-qDq, -qD2): bq; print blocking queues.\n",
   "DEBUG (-qDs, -qD4): schedule; scheduling of parallel threads.\n",
@@ -135,25 +100,8 @@ char *par_debug_opts_strs[] = {
 };
 
 /* one character codes for the available debug options */
-char par_debug_opts_flags[] = {
+static char par_debug_opts_flags[] = {
   'v', 'q', 's', 'e', 'r', 'w', 'F', 'f', 'l', 'o', 'p', 'z'
-};
-
-/* prefix strings printed with the debug messages of the corresponding type */
-char *par_debug_opts_prefix[] = {
-  "  ", /* verbose */
-  "##", /* bq */
-  "--", /* schedule */
-  "!!", /* free */
-  "[]", /* resume */
-  ";;", /* weight */
-  "%%", /* fetch */
-  //",,", /* ack */
-  "$$", /* fish */
-  "", /* tables */
-  "**", /* packet */
-  "**" /* pack */
-  ":(" /* paranoia */
 };
 
 #endif /* PAR */
