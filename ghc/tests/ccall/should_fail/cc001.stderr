@@ -1,0 +1,7 @@
+ 
+cc001.hs:5:
+    Cannot resolve the ambiguous context (PrelGHC.CCallable aJC)
+	`PrelGHC.CCallable aJC' arising from an argument in the _ccall_ to `foo', namely `(Prelude.undefined ())' at cc001.hs:5
+
+
+Compilation had errors
