@@ -7,7 +7,8 @@
 <ArtHeader>
 
 <Title>A Haskell foreign function interface</Title>
-<Author><OtherName>The GHC Team</OtherName></Author>
+<Author><OtherName>Sigbj&oslash;rn Finne, Sven Panne, Manuel Chakravarty, Malcolm
+Wallace, and The GHC Team</OtherName></Author>
 <Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email>
 </Address>
 <Edition>version 0.99</Edition>
