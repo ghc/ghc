@@ -87,7 +87,11 @@ import PrelIOBase	( Handle__(..), IOError(..), IOErrorType(..),
 import PrimPacked
 import GlaExts
 import Addr		( Addr(..) )
+#if __GLASGOW_HASKELL__ < 407
 import MutableArray	( MutableArray(..) )
+#else
+import PrelArr		( STArray(..), newSTArray )
+#endif
 
 -- ForeignObj is now exported abstractly.
 #if __GLASGOW_HASKELL__ >= 303
@@ -232,11 +236,15 @@ type FastStringTableVar = IORef FastStringTable
 string_table :: FastStringTableVar
 string_table = 
  unsafePerformIO (
-   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])
 #if __GLASGOW_HASKELL__ < 405
+   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])
 	>>= \ (MutableArray _ arr#) ->
-#else
+#elif __GLASGOW_HASKELL__ < 407
+   stToIO (newArray (0::Int,hASH_TBL_SIZE) [])
 	>>= \ (MutableArray _ _ arr#) ->
+#else
+   stToIO (newSTArray (0::Int,hASH_TBL_SIZE) [])
+	>>= \ (STArray _ _ arr#) ->
 #endif
    newIORef (FastStringTable 0# arr#))
 
