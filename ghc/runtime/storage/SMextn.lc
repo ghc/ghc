@@ -64,7 +64,7 @@ TrashMem(from, to)
 /* assertion overly strong - if free_mem == 0, sm->hp == sm->hplim */
 /*  ASSERT( from <= to ); */
     if (RTSflags.GcFlags.trace)
-	printf("Trashing from 0x%lx to 0x%lx inclusive\n", (W_) from, (W_) to);
+	fprintf(stderr,"Trashing from 0x%lx to 0x%lx inclusive\n", (W_) from, (W_) to);
     while (from <= to) {
 	*from++ = DEALLOCATED_TRASH;
     }
@@ -161,11 +161,11 @@ Trace_ForeignObj( FOptr )
   P_ FOptr;
 {
   if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
-    printf("DEBUG: ForeignObj(%0x)=<%0x,%0x,%0x,%0x>\n", (W_) FOptr, (W_) FOptr[0], (W_) FOptr[1], (W_) FOptr[2], (W_) FOptr[3]);
-    printf(" Data = %0x, Finaliser = %0x, Next = %0x\n", 
-	(W_) ForeignObj_CLOSURE_DATA(FOptr), 
-	(W_) ForeignObj_CLOSURE_FINALISER(FOptr), 
-	(W_) ForeignObj_CLOSURE_LINK(FOptr) );
+    fprintf(stderr,"DEBUG: ForeignObj(%0x)=<%0x,%0x,%0x,%0x>\n", (W_) FOptr, (W_) FOptr[0], (W_) FOptr[1], (W_) FOptr[2], (W_) FOptr[3]);
+    fprintf(stderr," Data = %0x, Finaliser = %0x, Next = %0x\n", 
+            (W_) ForeignObj_CLOSURE_DATA(FOptr), 
+	    (W_) ForeignObj_CLOSURE_FINALISER(FOptr), 
+	    (W_) ForeignObj_CLOSURE_LINK(FOptr) );
   }
 }
 
@@ -173,7 +173,7 @@ void
 Trace_FOdies()
 {
   if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
-    printf(" dying\n");
+    fprintf(stderr, " dying\n");
   }
 }
 
@@ -181,7 +181,7 @@ void
 Trace_FOlives()
 {
   if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) { 
-    printf(" lived to tell the tale\n"); 
+    fprintf(stderr," lived to tell the tale\n"); 
   }
 }
 
@@ -190,7 +190,7 @@ Trace_FOforwarded( FOPtr, newAddress )
   P_ FOPtr, newAddress;
 {
   if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
-    printf(" forwarded to %lx\n", (W_) newAddress);
+    fprintf(stderr, " forwarded to %lx\n", (W_) newAddress);
   }
 }
 

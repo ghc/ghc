@@ -563,8 +563,8 @@ EVAC_FN(ForeignObj)
 
 #if defined(DEBUG)
     if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
-      printf("DEBUG: Evacuating ForeignObj(%x)=<%x,_,%x,%x>", evac, evac[0], evac[2], evac[3]);
-      printf(" Data = %x, Finaliser= %x, Next = %x\n", 
+      fprintf(stderr,"DEBUG: Evacuating ForeignObj(%x)=<%x,_,%x,%x>", evac, evac[0], evac[2], evac[3]);
+      fprintf(stderr," Data = %x, Finaliser= %x, Next = %x\n", 
 	     ForeignObj_CLOSURE_DATA(evac), 
 	     ForeignObj_CLOSURE_FINALISER(evac), 
 	     ForeignObj_CLOSURE_LINK(evac) );
@@ -580,8 +580,8 @@ EVAC_FN(ForeignObj)
 
 #if defined(DEBUG)
     if (RTSflags.GcFlags.trace & DEBUG_TRACE_FOREIGNOBJS) {
-      printf("DEBUG: Evacuated  ForeignObj(%x)=<%x,_,%x,%x>", ToHp, ToHp[0], ToHp[2], ToHp[3]);
-      printf(" Data = %x, Finaliser = %x, Next = %x\n", 
+      fprintf(stderr,"DEBUG: Evacuated  ForeignObj(%x)=<%x,_,%x,%x>", ToHp, ToHp[0], ToHp[2], ToHp[3]);
+      fprintf(stderr," Data = %x, Finaliser = %x, Next = %x\n", 
 	     ForeignObj_CLOSURE_DATA(ToHp), 
 	     ForeignObj_CLOSURE_FINALISER(ToHp), 
 	     ForeignObj_CLOSURE_LINK(ToHp));
