@@ -1,3 +1,11 @@
+/* -----------------------------------------------------------------------------
+ * ThreadLabels.c
+ *
+ * (c) The GHC Team 2002-2003
+ *
+ * Table of thread labels.
+ *
+ * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
 #include "ThreadLabels.h"
@@ -9,8 +17,9 @@ static HashTable * threadLabels = NULL;
 void
 initThreadLabelTable(void)
 {
-  ASSERT(threadLabels == NULL);
-  threadLabels = allocHashTable();
+  if (threadLabels == NULL) {
+    threadLabels = allocHashTable();
+  }
 }
 
 void
