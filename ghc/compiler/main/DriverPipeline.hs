@@ -1052,10 +1052,14 @@ compile ghci_mode summary source_unchanged have_object
 
    writeIORef v_HCHeader cc_injects
 
+   -- -no-recomp should also work with --make
+   do_recomp <- readIORef v_Recomp
+   let source_unchanged' = source_unchanged && not do_recomp
+
    -- run the compiler
    hsc_result <- hscMain ghci_mode dyn_flags'
 			 (ms_mod summary) location
-			 source_unchanged have_object old_iface hst hit pcs
+			 source_unchanged' have_object old_iface hst hit pcs
 
    case hsc_result of
       HscFail pcs -> return (CompErrs pcs)
