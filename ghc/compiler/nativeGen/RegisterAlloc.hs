@@ -62,9 +62,12 @@ The algorithm is roughly:
 	    and mark temporaries which have been spilled due to clobbering
 	    as in memory (step (a) marks then as in both mem & reg).
 
-	(g) For each temporary *written* (only) by this instruction:
+	(g) For each temporary *written* by this instruction:
 	    Allocate a real register as for (b), spilling something
 	    else if necessary.
+		- except when updating the assignment, drop any memory
+		  locations that the temporary was previously in, since
+		  they will be no longer valid after this instruction.
 
 	(h) Delete all register assignments for temps which are
 	    written and die here (there should rarely be any).  Update
@@ -427,10 +430,7 @@ genRaInsn block_live new_instrs instr r_dying w_dying = do
     let 
 	RU read written = regUsage instr
 
-        -- we're not interested in regs written if they're also read.
-    	written' = nub (filter (`notElem` read) written)
-
-	(real_written1,virt_written) = partition isRealReg written'
+	(real_written1,virt_written) = partition isRealReg written
 
 	real_written = [ r | RealReg r <- real_written1 ]
 
@@ -592,10 +592,12 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 	allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
   -- case (1b): already in a register (and memory)
-  -- NB. if we're writing this register, update its assignemnt to be
+  -- NB1. if we're writing this register, update its assignemnt to be
   -- InReg, because the memory value is no longer valid.
+  -- NB2. This is why we must process written registers here, even if they
+  -- are also read by the same instruction.
      Just (InBoth my_reg mem) -> do
-	when (not reading) (setAssigR (addToUFM assig my_reg (InReg my_reg)))
+	when (not reading) (setAssigR (addToUFM assig r (InReg my_reg)))
    	allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
   -- Not already in a register, so we need to find a free one...
@@ -607,9 +609,9 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
       	-- case (2): we have a free register
       	  my_reg:_ -> do
     	    spills'   <- do_load reading loc my_reg spills
-	    let new_loc = case loc of
-				Just (InMem slot) -> InBoth my_reg slot
-				_other            -> InReg my_reg
+	    let new_loc 
+		 | Just (InMem slot) <- loc, reading = InBoth my_reg slot
+		 | otherwise		             = InReg my_reg
 	    setAssigR (addToUFM assig r $! new_loc)
 	    setFreeRegsR (allocateReg freeregs my_reg)
     	    allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
