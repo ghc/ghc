@@ -133,7 +133,8 @@ hscMain
 
 hscMain ghci_mode dflags mod location source_unchanged have_object 
 	maybe_old_iface hst hit pcs
- = do {
+ = {-# SCC "hscMain" #-}
+   do {
       showPass dflags ("Checking old interface for hs = " 
 			++ show (ml_hs_file location)
                 	++ ", hspp = " ++ show (ml_hspp_file location));
@@ -230,13 +231,15 @@ hscRecomp ghci_mode dflags have_object
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
       	     Just (is_exported, new_iface, rn_hs_decls) -> do {
-    
- 	    -- In interactive mode, we don't want to discard any top-level entities at
-	    -- all (eg. do not inline them away during simplification), and retain them
-	    -- all in the TypeEnv so they are available from the command line.
-	    --
-	    -- isGlobalName separates the user-defined top-level names from those
-	    -- introduced by the type checker.
+
+    	-- In interactive mode, we don't want to discard any top-level
+    	-- entities at all (eg. do not inline them away during
+    	-- simplification), and retain them all in the TypeEnv so they are
+    	-- available from the command line.
+	--
+	-- isGlobalName separates the user-defined top-level names from those
+	-- introduced by the type checker.
+
 	; let dont_discard | ghci_mode == Interactive = isGlobalName
 			   | otherwise = is_exported
 
@@ -244,7 +247,8 @@ hscRecomp ghci_mode dflags have_object
  	    -- TYPECHECK
  	    -------------------
 	; maybe_tc_result 
-	    <- _scc_ "TypeCheck" typecheckModule dflags pcs_rn hst new_iface 
+	    <- _scc_ "TypeCheck" 
+	       typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls 
 	; case maybe_tc_result of {
       	     Nothing -> return (HscFail pcs_ch{-was: pcs_rn-});
@@ -258,7 +262,8 @@ hscRecomp ghci_mode dflags have_object
 		deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
 
 	; pcs_middle
-	    <- if ghci_mode == OneShot 
+	    <- _scc_ "pcs_middle"
+	        if ghci_mode == OneShot 
 		  then do init_pcs <- initPersistentCompilerState
 			  init_prs <- initPersistentRenamerState
 		          let 
@@ -270,6 +275,12 @@ hscRecomp ghci_mode dflags have_object
 			    return init_pcs{ pcs_PRS = new_prs,
 			                     pcs_rules = rules }
 		  else return pcs_tc
+
+	-- alive at this point:  
+	--	pcs_middle
+	-- 	foreign_stuff
+	-- 	ds_details
+	--	new_iface		
 
  	    -------------------
  	    -- SIMPLIFY
@@ -304,11 +315,16 @@ hscRecomp ghci_mode dflags have_object
 	--	new_iface		
 
 	; emitExternalCore dflags new_iface tidy_details 
+
+	; let final_details = tidy_details {md_binds = []} 
+	; final_details `seq` return ()
+
  	    -------------------
  	    -- PREPARE FOR CODE GENERATION
  	    -------------------
 	      -- Do saturation and convert to A-normal form
-	; prepd_details <- _scc_ "CorePrep" corePrepPgm dflags tidy_details
+	; prepd_details <- _scc_ "CorePrep" 
+			   corePrepPgm dflags tidy_details
 
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
@@ -353,7 +369,7 @@ hscRecomp ghci_mode dflags have_object
 		    -----------------  Convert to STG ------------------
 		    (stg_binds, cost_centre_info, stg_back_end_info) 
 		    	      <- _scc_ "CoreToStg"
-		    		  myCoreToStg dflags this_mod binds
+		    		 myCoreToStg dflags this_mod binds
 		    
 		    -- Fill in the code-gen info for the earlier tidyCorePgm
 		    writeIORef cg_info_ref (Just stg_back_end_info)
@@ -362,27 +378,23 @@ hscRecomp ghci_mode dflags have_object
 		    final_iface <- _scc_ "MkFinalIface" 
 			  mkFinalIface ghci_mode dflags location 
                                    maybe_checked_iface new_iface tidy_details
-
 		    if toNothing 
                       then do
 			  return (False, False, Nothing, final_iface)
 	              else do
 		          ------------------  Code generation ------------------
 			  abstractC <- _scc_ "CodeGen"
-					codeGen dflags this_mod imported_modules
+				       codeGen dflags this_mod imported_modules
 					       cost_centre_info fe_binders
 					       local_tycons stg_binds
 			  
 			  ------------------  Code output -----------------------
 			  (stub_h_exists, stub_c_exists)
-			     <- codeOutput dflags this_mod local_tycons
+			     <- codeOutput dflags this_mod [] --local_tycons
 				   binds stg_binds
 				   c_code h_code abstractC
 			      
 			  return (stub_h_exists, stub_c_exists, Nothing, final_iface)
-
-	; let final_details = tidy_details {md_binds = []} 
-
 
       	  -- and the answer is ...
 	; return (HscRecomp pcs_final
@@ -429,13 +441,14 @@ myCoreToStg dflags this_mod tidy_binds
       -- simplifier, which for reasons I don't understand, persists
       -- thoroughout code generation
 
-      stg_binds <- _scc_ "Core2Stg" coreToStg dflags tidy_binds
+      stg_binds <- _scc_ "Core2Stg" 
+	     coreToStg dflags tidy_binds
 
-      (stg_binds2, cost_centre_info)
-	   <- _scc_ "Core2Stg" stg2stg dflags this_mod stg_binds
+      (stg_binds2, cost_centre_info) <- _scc_ "Core2Stg" 
+	     stg2stg dflags this_mod stg_binds
 
       let env_rhs :: CgInfoEnv
-	  env_rhs = mkNameEnv [ (idName bndr, CgInfo caf_info)
+	  env_rhs = mkNameEnv [ caf_info `seq` (idName bndr, CgInfo caf_info)
 			      | (bind,_) <- stg_binds2, 
 			        let caf_info 
 				     | stgBindHasCafRefs bind = MayHaveCafRefs
@@ -564,7 +577,7 @@ hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)
 hscParseStmt dflags str
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
-      _scc_ "Parser" do
+      _scc_ "Parser"  do
 
       buf <- stringToStringBuffer str
 
