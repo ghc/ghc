@@ -97,3 +97,6 @@ test "tcfail098" { $expect = "fail"
                    vtcf("") }
 
 test "tcfail099" { vtcf("") }
+
+test "tcfail100" { vtcf("") }
+test "tcfail101" { vtcf("") }
