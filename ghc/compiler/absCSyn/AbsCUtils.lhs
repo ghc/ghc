@@ -17,6 +17,7 @@ module AbsCUtils (
     ) where
 
 #include "HsVersions.h"
+#include "../includes/config.h"
 
 import AbsCSyn
 import CLabel		( mkMAP_FROZEN_infoLabel )
