@@ -676,10 +676,6 @@ HAPPY_VERSION		= @HappyVersion@
 LX			= @LxCmd@
 GREENCARD		= @GreencardCmd@
 
-ifeq "$(HAPPY)" ""
-HAPPY			= $(HAPPY_PREFIX)happy
-endif
-
 #
 # Stuff from fptools/literate
 #
