@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 2000/12/12 17:21:40 simonmar Exp $
+# $Id: Makefile,v 1.5 2001/04/24 23:51:11 andy Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -8,6 +8,7 @@ include $(TOP)/mk/should_run.mk
 SRC_HC_OPTS += -dcore-lint
 
 arr014_HC_OPTS = -package lang
+arr016_HC_OPTS = -fglasgow-exts
 
 arr003_RUNTEST_OPTS = -x 1
 arr004_RUNTEST_OPTS = -x 1
