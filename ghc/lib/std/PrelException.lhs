@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelException.lhs,v 1.23 2000/07/09 16:00:55 panne Exp $
+% $Id: PrelException.lhs,v 1.24 2000/09/14 14:24:02 simonmar Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -105,18 +105,18 @@ bracket_ before after m = do
 
 \begin{code}
 #ifndef __HUGS__
-blockAsyncExceptions :: IO a -> IO a
-blockAsyncExceptions (IO io) = IO $ blockAsyncExceptions# io
+block :: IO a -> IO a
+block (IO io) = IO $ blockAsyncExceptions# io
 
-unblockAsyncExceptions :: IO a -> IO a
-unblockAsyncExceptions (IO io) = IO $ unblockAsyncExceptions# io
+unblock :: IO a -> IO a
+unblock (IO io) = IO $ unblockAsyncExceptions# io
 #else
 -- Not implemented yet in Hugs.
-blockAsyncExceptions :: IO a -> IO a
-blockAsyncExceptions (IO io) = IO io
+block :: IO a -> IO a
+block (IO io) = IO io
 
-unblockAsyncExceptions :: IO a -> IO a
-unblockAsyncExceptions (IO io) = IO io
+unblock :: IO a -> IO a
+unblock (IO io) = IO io
 #endif
 \end{code}
 

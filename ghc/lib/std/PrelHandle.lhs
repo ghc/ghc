@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelHandle.lhs,v 1.61 2000/08/29 16:37:35 simonpj Exp $
+% $Id: PrelHandle.lhs,v 1.62 2000/09/14 14:24:02 simonmar Exp $
 %
 % (c) The AQUA Project, Glasgow University, 1994-2000
 %
@@ -116,7 +116,7 @@ but we might want to revisit this in the future --SDM ].
 withHandle :: Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
 {-# INLINE withHandle #-}
 withHandle (Handle h) act =
-   blockAsyncExceptions $ do
+   block $ do
    h_ <- takeMVar h
    (h',v)  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h'
@@ -125,7 +125,7 @@ withHandle (Handle h) act =
 withHandle_ :: Handle -> (Handle__ -> IO a) -> IO a
 {-# INLINE withHandle_ #-}
 withHandle_ (Handle h) act =
-   blockAsyncExceptions $ do
+   block $ do
    h_ <- takeMVar h
    v  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h_
@@ -134,7 +134,7 @@ withHandle_ (Handle h) act =
 withHandle__ :: Handle -> (Handle__ -> IO Handle__) -> IO ()
 {-# INLINE withHandle__ #-}
 withHandle__ (Handle h) act =
-   blockAsyncExceptions $ do
+   block $ do
    h_ <- takeMVar h
    h'  <- catchException (act h_) (\ ex -> putMVar h h_ >> throw ex)
    putMVar h h'
