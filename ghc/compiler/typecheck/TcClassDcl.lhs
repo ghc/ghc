@@ -277,7 +277,7 @@ checkValidClass cls
     checkTc (unary || no_generics) (genericMultiParamErr cls)
 
   where
-    (tyvars, theta, sel_ids, op_stuff) = classBigSig cls
+    (tyvars, theta, _, op_stuff) = classBigSig cls
     arity	= length tyvars
     unary 	= arity == 1
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
