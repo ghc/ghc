@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.20 $
- * $Date: 2000/01/06 16:33:10 $
+ * $Revision: 1.21 $
+ * $Date: 2000/01/07 10:29:59 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2295,6 +2295,7 @@ Type type; {
       Sym(mpz_cmp_si)                \
       Sym(mpz_cmp)                   \
       Sym(__mpn_gcd_1)               \
+      Sym(gcdIntegerzh_fast)         \
       Sym(newArrayzh_fast)           \
       Sym(unsafeThawArrayzh_fast)    \
       Sym(newDoubleArrayzh_fast)     \
