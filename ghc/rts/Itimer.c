@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.23 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Itimer.c,v 1.24 2001/11/13 13:38:02 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -74,11 +74,6 @@ handle_tick(int unused STG_UNUSED)
   handleProfTick();
 #endif
 
-  /* so we can get a rough indication of the current time at any point
-   * without having to call gettimeofday() (see Select.c):
-   */
-  ticks_since_timestamp++;
-
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0) {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
@@ -147,7 +142,6 @@ initialize_virtual_timer(nat ms)
     struct itimerval it;
 
     timestamp = getourtimeofday();
-    ticks_since_timestamp = 0;
 
     it.it_value.tv_sec = ms / 1000;
     it.it_value.tv_usec = 1000 * (ms - (1000 * it.it_value.tv_sec));
@@ -168,7 +162,6 @@ initialize_virtual_timer(nat ms)
     timer_t tid;
 
     timestamp = getourtimeofday();
-    ticks_since_timestamp = 0;
 
     se.sigev_notify = SIGEV_SIGNAL;
     se.sigev_signo = SIGVTALRM;

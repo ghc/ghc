@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.18 2001/10/31 10:34:29 simonmar Exp $
+ * $Id: Select.c,v 1.19 2001/11/13 13:38:02 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -31,12 +31,6 @@
 
 /* last timestamp */
 nat timestamp = 0;
-
-/* keep track of the number of ticks since we last called
- * gettimeofday(), to avoid having to call it every time we need
- * a timestamp.
- */
-nat ticks_since_timestamp = 0;
 
 /* There's a clever trick here to avoid problems when the time wraps
  * around.  Since our maximum delay is smaller than 31 bits of ticks
@@ -114,7 +108,6 @@ awaitEvent(rtsBool wait)
     do {
 
       ticks = timestamp = getourtimeofday();
-      ticks_since_timestamp = 0;
       if (wakeUpSleepingThreads(ticks)) { 
 	  return;
       }

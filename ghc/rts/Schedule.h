@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.23 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: Schedule.h,v 1.24 2001/11/13 13:38:02 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -122,7 +122,6 @@ extern rtsBool interrupted;
 
 /* In Select.c */
 extern nat timestamp;
-extern nat ticks_since_timestamp;
 
 /* Free capability list.
  * Locks required: sched_mutex.
