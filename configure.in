@@ -470,6 +470,13 @@ dnl ** check for leading underscores in symbol names
 #
 AC_UNDERSCORE
 
+#
+dnl ** check the size of various C types
+#
+AC_CHECK_SIZEOF(int,    4)
+AC_CHECK_SIZEOF(long,   4)
+AC_CHECK_SIZEOF(void *, 4)
+
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 
 echo ''

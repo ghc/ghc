@@ -188,3 +188,12 @@
 
 /* Define this if your time.h defines altzone */
 #undef HAVE_ALTZONE
+
+/* sizeof(int) */
+#undef SIZEOF_INT
+
+/* sizeof(long) */
+#undef SIZEOF_LONG
+
+/* sizeof(void *) */
+#undef SIZEOF_VOID_P
