@@ -41,7 +41,12 @@ import IOHandle		-- much of the real stuff is in here
 import PackBase		( unpackNBytesST )
 import PrelBase
 import GHC
-import Foreign          ( ForeignObj, Addr, makeForeignObj, writeForeignObj )
+import Foreign  ( Addr, 
+#ifndef __PARALLEL_HASKELL__
+                  ForeignObj, makeForeignObj, writeForeignObj 
+#endif
+		  )
+
 import Char		( ord, chr )
 \end{code}
 
