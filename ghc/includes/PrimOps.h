@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.8 1999/01/21 10:31:42 simonm Exp $
+ * $Id: PrimOps.h,v 1.9 1999/01/23 17:48:23 sof Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -20,19 +20,19 @@
 #define leCharZh(r,a,b)	r=(I_)((a)<=(b))
 
 /* Int comparisons: >#, >=# etc */
-#define ZgZh(r,a,b)	r=(I_)((a) >(b))
-#define ZgZeZh(r,a,b)	r=(I_)((a)>=(b))
-#define ZeZeZh(r,a,b)	r=(I_)((a)==(b))
-#define ZdZeZh(r,a,b)	r=(I_)((a)!=(b))
-#define ZlZh(r,a,b)	r=(I_)((a) <(b))
-#define ZlZeZh(r,a,b)	r=(I_)((a)<=(b))
+#define ZgZh(r,a,b)	r=(I_)((I_)(a) >(I_)(b))
+#define ZgZeZh(r,a,b)	r=(I_)((I_)(a)>=(I_)(b))
+#define ZeZeZh(r,a,b)	r=(I_)((I_)(a)==(I_)(b))
+#define ZdZeZh(r,a,b)	r=(I_)((I_)(a)!=(I_)(b))
+#define ZlZh(r,a,b)	r=(I_)((I_)(a) <(I_)(b))
+#define ZlZeZh(r,a,b)	r=(I_)((I_)(a)<=(I_)(b))
 
-#define gtWordZh(r,a,b)	r=(I_)((a) >(b))
-#define geWordZh(r,a,b)	r=(I_)((a)>=(b))
-#define eqWordZh(r,a,b)	r=(I_)((a)==(b))
-#define neWordZh(r,a,b)	r=(I_)((a)!=(b))
-#define ltWordZh(r,a,b)	r=(I_)((a) <(b))
-#define leWordZh(r,a,b)	r=(I_)((a)<=(b))
+#define gtWordZh(r,a,b)	r=(I_)((W_)(a) >(W_)(b))
+#define geWordZh(r,a,b)	r=(I_)((W_)(a)>=(W_)(b))
+#define eqWordZh(r,a,b)	r=(I_)((W_)(a)==(W_)(b))
+#define neWordZh(r,a,b)	r=(I_)((W_)(a)!=(W_)(b))
+#define ltWordZh(r,a,b)	r=(I_)((W_)(a) <(W_)(b))
+#define leWordZh(r,a,b)	r=(I_)((W_)(a)<=(W_)(b))
 
 #define gtAddrZh(r,a,b)	r=(I_)((a) >(b))
 #define geAddrZh(r,a,b)	r=(I_)((a)>=(b))
@@ -347,8 +347,11 @@ EF_(decodeDoubleZh_fast);
      res = (LI_)d[0];							\
   } else {								\
      res = (LI_)d[0] + (LI_)d[1] * 0x100000000LL;			\
+     if ( sa < 0 ) {                                                    \
+	   res = (LI_)-res;                                             \
+     }                                                                  \
   }									\
-  (r) = res;								\
+  (r) = res;						                \
 }
 
 /* Conversions */
