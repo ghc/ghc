@@ -410,7 +410,7 @@ hPutChar handle c =
 	LineBuffering    -> hPutcBuffered handle_ True  c
 	BlockBuffering _ -> hPutcBuffered handle_ False c
 	NoBuffering      ->
-		withObject (castCharToCChar c) $ \buf -> do
+		with (castCharToCChar c) $ \buf -> do
   		  writeRawBufferPtr "hPutChar" (fromIntegral fd) (haIsStream handle_) buf 0 1
 		  return ()
 

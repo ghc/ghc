@@ -427,14 +427,14 @@ throwAwayReturnPointer fun x y = fun x y >> return ()
 clockToCalendarTime_static :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
 	 -> IO CalendarTime
 clockToCalendarTime_static fun is_utc (TOD secs psec) = do
-  withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
+  with (fromIntegral secs :: CTime)  $ \ p_timer -> do
     p_tm <- fun p_timer 	-- can't fail, according to POSIX
     clockToCalendarTime_aux is_utc p_tm psec
 
 clockToCalendarTime_reentrant :: (Ptr CTime -> Ptr CTm -> IO ()) -> Bool -> ClockTime
 	 -> IO CalendarTime
 clockToCalendarTime_reentrant fun is_utc (TOD secs psec) = do
-  withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
+  with (fromIntegral secs :: CTime)  $ \ p_timer -> do
     allocaBytes (#const sizeof(struct tm)) $ \ p_tm -> do
       fun p_timer p_tm
       clockToCalendarTime_aux is_utc p_tm psec
