@@ -26,13 +26,16 @@ import CmTypes
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
-import Name		( Name, lookupNameEnv )
+import Name		( Name, lookupNameEnv, extendNameEnvList, 
+			  NamedThing(..) )
 import RdrName		( emptyRdrEnv )
 import Module		( Module, ModuleName, moduleName, isHomeModule,
 			  mkModuleName, moduleNameUserString, moduleUserString )
 import CmStaticInfo	( GhciMode(..) )
 import DriverPipeline
 import GetImports
+import Type		( tidyType )
+import VarEnv		( emptyTidyEnv )
 import HscTypes
 import HscMain		( initPersistentCompilerState )
 import Finder
@@ -164,10 +167,29 @@ moduleNameToModule mn
 #ifdef GHCI
 cmRunStmt :: CmState -> DynFlags -> String -> IO (CmState, [Name])
 cmRunStmt cmstate dflags expr
-   = do (new_pcs, maybe_stuff) <- hscStmt dflags hst hit pcs (ic cmstate) expr
+   = do 
+	let icontext = ic cmstate
+	    InteractiveContext { 
+	       	ic_rn_env = rn_env, 
+	       	ic_type_env = type_env,
+	       	ic_module   = this_mod } = icontext
+
+        (new_pcs, maybe_stuff) <- hscStmt dflags hst hit pcs icontext expr
         case maybe_stuff of
 	   Nothing -> return (cmstate{ pcs=new_pcs }, [])
-	   Just (new_ic, ids, bcos) -> do
+	   Just (ids, bcos) -> do
+	        let 
+		    new_rn_env   = extendLocalRdrEnv rn_env (map idName ids)
+
+			-- Extend the renamer-env from bound_ids, not
+			-- bound_names, because the latter may contain
+			-- [it] when the former is empty
+		    new_type_env = extendNameEnvList type_env 	
+			      		[ (getName id, AnId id)	| id <- ids]
+
+		    new_ic = icontext { ic_rn_env   = new_rn_env, 
+			  	  	ic_type_env = new_type_env }
+
 		hval <- linkExpr pls bcos
 		hvals <- unsafeCoerce# hval :: IO [HValue]
 		let names = map idName ids
@@ -189,9 +211,10 @@ cmTypeOfName CmState{ hit=hit, pcs=pcs, ic=ic } name
 	Just (AnId id) -> 
 	   let pit = pcs_PIT pcs
 	       modname = moduleName (ic_module ic)
+	       ty = tidyType emptyTidyEnv (idType id)
 	       str = case lookupIfaceByModName hit pit modname of
-			Nothing    -> showSDoc (ppr (idType id))
-			Just iface -> showSDocForUser unqual (ppr (idType id))
+			Nothing    -> showSDoc (ppr ty)
+			Just iface -> showSDocForUser unqual (ppr ty)
 		  	   where unqual = unQualInScope (mi_globals iface)
 	   in return (Just str)
 

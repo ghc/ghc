@@ -417,8 +417,7 @@ hscStmt
   -> InteractiveContext		-- Context for compiling
   -> String			-- The statement
   -> IO ( PersistentCompilerState, 
-	  Maybe (InteractiveContext, 
-		 [Id], 
+	  Maybe ( [Id], 
 		 UnlinkedBCOExpr) )
 \end{code}
 
@@ -493,22 +492,13 @@ hscStmt dflags hst hit pcs0 icontext stmt
 		-- important: otherwise when we come to compile an expression
 		-- using these ids later, the byte code generator will consider
 		-- the occurrences to be free rather than global.
-	     constant_bound_ids = map constantizeId bound_ids
+	     constant_bound_ids = map constantizeId bound_ids;
+
 	     constantizeId id
 		 = modifyIdInfo (`setFlavourInfo` makeConstantFlavour 
 					(idFlavour id)) id
 
-	     new_rn_env   = extendLocalRdrEnv rn_env 
-				(map idName constant_bound_ids)
-		-- Extend the renamer-env from bound_ids, not bound_names,
-		-- because the latter may contain [it] when the former is empty
-
-	     new_type_env = extendNameEnvList type_env 	
-			      [(getName id, AnId id) | id <- constant_bound_ids]
-
-	     new_icontext = icontext { ic_rn_env = new_rn_env, 
-				       ic_type_env = new_type_env }
-	; return (pcs2, Just (new_icontext, bound_ids, bcos))
+	; return (pcs2, Just (constant_bound_ids, bcos))
      }}}}}
 
 hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)
