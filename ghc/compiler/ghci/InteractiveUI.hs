@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.55 2001/03/15 11:23:19 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.56 2001/03/23 12:12:18 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -345,14 +345,9 @@ defineMacro s = do
   (new_cmstate, maybe_hv) <- io (cmCompileExpr (cmstate st) dflags new_expr)
   setGHCiState st{cmstate = new_cmstate}
   case maybe_hv of
-	Nothing -> return ()
-	Just hv -> 
-	  do funs <- io (unsafeCoerce# hv :: IO [HValue])
-	     case funs of
-		[fun] -> io (writeIORef commands 	
-		 		((macro_name, keepGoing (runMacro fun))
-				 : cmds))
-		_ -> throwDyn (OtherError "defineMacro: bizarre")
+     Nothing -> return ()
+     Just hv -> io (writeIORef commands --
+		    ((macro_name, keepGoing (runMacro hv)) : cmds))
 
 runMacro :: HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
