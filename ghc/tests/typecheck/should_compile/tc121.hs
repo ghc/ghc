@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
 
--- Implicit Parameters
+-- !!! Implicit Parameters
 
 -- If the implicit param isn't recognized as a PredType, x and y
 -- will be inferred to have two params instead of one.
