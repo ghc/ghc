@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.4 1999/02/02 14:21:32 simonm Exp $
+ * $Id: Stats.c,v 1.5 1999/02/03 16:42:18 simonm Exp $
  *
  * Statistics and timing-related functions.
  *
@@ -410,7 +410,7 @@ stat_describe_gens(void)
     for (m = generations[g].mut_once_list, mut_once = 0; m != END_MUT_LIST; 
 	 m = m->mut_link) 
       mut_once++;
-    fprintf(stderr, "%8d %8d %8d %9d %8d", g, generations[g].n_steps,
+    fprintf(stderr, "%8d %8d %8d %9d %9d", g, generations[g].n_steps,
 	    generations[g].max_blocks, mut, mut_once);
 
     for (s = 0; s < generations[g].n_steps; s++) {
@@ -422,7 +422,7 @@ stat_describe_gens(void)
 	live += (bd->free - bd->start) * sizeof(W_);
       }
       if (s != 0) {
-	fprintf(stderr,"%36s","");
+	fprintf(stderr,"%46s","");
       }
       fprintf(stderr,"%6d %8d %8d %8d\n", s, step->n_blocks,
 	      live, lge);
