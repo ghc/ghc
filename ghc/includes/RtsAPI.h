@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.23 2001/10/23 11:30:07 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.24 2001/10/29 11:33:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,10 @@
 
 #ifndef RTSAPI_H
 #define RTSAPI_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "HsFFI.h"
 
@@ -106,5 +110,11 @@ rts_evalLazyIO ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret )
 
 void
 rts_checkSchedStatus ( char* site, SchedulerStatus rc);
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* RTSAPI_H */

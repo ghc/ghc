@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.14 2001/03/28 18:48:46 qrczak Exp $
+ * $Id: HsFFI.h,v 1.15 2001/10/29 11:33:37 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -12,6 +12,10 @@
 
 #ifndef HSFFI_H
 #define HSFFI_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* get types from GHC's runtime system */
 #include "config.h"
@@ -136,5 +140,11 @@ typedef void*			HsForeignObj;   /* DEPRECATED */
 #define HS_DOUBLE_MAX		DBL_MAX
 #define HS_DOUBLE_MAX_EXP	DBL_MAX_EXP
 #define HS_DOUBLE_MAX_10_EXP	DBL_MAX_10_EXP
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* HSFFI_H */

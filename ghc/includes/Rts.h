@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.13 2000/04/05 14:26:31 panne Exp $
+ * $Id: Rts.h,v 1.14 2001/10/29 11:33:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,6 +9,10 @@
 
 #ifndef RTS_H
 #define RTS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef IN_STG_CODE
 #define IN_STG_CODE 0
@@ -100,5 +104,11 @@
 
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
 #define stg_max(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _b : _a; })
+
+/* -------------------------------------------------------------------------- */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* RTS_H */
