@@ -828,7 +828,7 @@ tcRnExpr hsc_env ictxt rdr_expr
     smpl_doc = ptext SLIT("main expression")
 \end{code}
 
-tcRnExpr just finds the kind of a type
+tcRnType just finds the kind of a type
 
 \begin{code}
 tcRnType :: HscEnv
