@@ -11,7 +11,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.3 2001/07/31 13:05:33 simonmar Exp $
+-- $Id: Time.hsc,v 1.4 2001/07/31 13:06:09 simonmar Exp $
 --
 -- The standard Time library.
 --
@@ -386,9 +386,7 @@ throwAwayReturnPointer fun x y = fun x y >> return ()
 clockToCalendarTime_static :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
 	 -> IO CalendarTime
 clockToCalendarTime_static fun is_utc (TOD secs psec) = do
-  putStrLn ("clockToCalendarTime: TOD " ++ show secs ++ " " ++ show psec)
   withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
-    case p_timer of Ptr addr -> putStrLn ("const time_t * = " ++ show (I## (addr2Int## addr)))
     p_tm <- fun p_timer 	-- can't fail, according to POSIX
     clockToCalendarTime_aux is_utc p_tm psec
 
