@@ -88,9 +88,10 @@ import Foreign
 
 import IO
 import IOExts	    ( IORef, newIORef, readIORef, writeIORef )
-import PackedString ( unpackNBytesPS, byteArrayToPS, 
+import CString      ( unpackNBytesBAIO,
 		      unpackCString, unpackCStringIO,
-		      unpackCStringLenIO
+		      unpackCStringLenIO,
+		      allocChars
 		    )
 \end{code}
 
@@ -430,13 +431,14 @@ readSocket (MkSocket s family stype protocol status) nbytes = do
     fail (userError ("readSocket: can't perform read on socket in status " ++
 	  show currentStatus))
    else do
-    ptr <- stToIO (newCharArray (1, nbytes))
+    ptr <- allocChars nbytes
     nbytes <- _ccall_ readDescriptor s ptr nbytes
     case nbytes of
       -1 -> constructErrorAndFail "readSocket"
       n  -> do
 	    barr <- stToIO (unsafeFreezeByteArray ptr)
-            return (unpackNBytesPS (byteArrayToPS barr) n, n)
+	    s    <- unpackNBytesBAIO barr n
+            return (s,n)
 
 readSocketAll :: Socket -> IO String
 readSocketAll s =
@@ -460,7 +462,7 @@ recvFrom (MkSocket s family stype protocol status) nbytes = do
     fail (userError ("recvFrom: can't perform read on socket in status " ++
 	  show currentStatus))
    else do
-    ptr      <- stToIO (newCharArray (0, nbytes))
+    ptr      <- allocChars nbytes 
     (ptr_addr,_) <- allocSockAddr AF_INET
     nbytes   <- _ccall_ recvFrom__ s ptr nbytes ptr_addr
     case nbytes of
@@ -468,7 +470,8 @@ recvFrom (MkSocket s family stype protocol status) nbytes = do
       n  -> do
 	    barr <- stToIO (unsafeFreezeByteArray ptr)
 	    addr <- unpackSockAddrInet ptr_addr
-            return (unpackNBytesPS (byteArrayToPS barr) n, n, addr)
+	    s    <- unpackNBytesBAIO barr n
+            return (s, n, addr)
 
 \end{code}
 
@@ -1113,13 +1116,13 @@ allocSockAddr :: Family -> IO (MutableByteArray RealWorld Int, Int)
 
 #ifndef cygwin32_TARGET_OS
 allocSockAddr AF_UNIX = do
-    ptr <- stToIO (newCharArray (0,``sizeof(struct sockaddr_un)''))
+    ptr <- allocChars ``sizeof(struct sockaddr_un)''
     let (_,sz) = boundsOfByteArray ptr
     return (ptr, sz)
 #endif
 
 allocSockAddr AF_INET = do
-    ptr <- stToIO (newCharArray (0,``sizeof(struct sockaddr_in)''))
+    ptr <- allocChars ``sizeof(struct sockaddr_in)''
     let (_,sz) = boundsOfByteArray ptr
     return (ptr, sz)
 
