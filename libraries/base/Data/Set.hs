@@ -8,18 +8,26 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- This implementation of sets sits squarely upon Data.FiniteMap.
+-- An implementation of sets, based on the "Data.FiniteMap".
 --
 -----------------------------------------------------------------------------
 
 module Data.Set (
+	-- * The @Set@ type
 	Set,            -- abstract, instance of: Eq
 
+	-- * Construction
 	emptySet,       -- :: Set a
 	mkSet,          -- :: Ord a => [a]  -> Set a
 	setToList,      -- :: Set a -> [a] 
 	unitSet,        -- :: a -> Set a
 
+	-- * Inspection
+	elementOf,      -- :: Ord a => a -> Set a -> Bool
+	isEmptySet,     -- :: Set a -> Bool
+	cardinality,    -- :: Set a -> Int
+
+	-- * Operations
 	union,          -- :: Ord a => Set a -> Set a -> Set a
 	unionManySets,  -- :: Ord a => [Set a] -> Set a
 	minusSet,       -- :: Ord a => Set a -> Set a -> Set a
@@ -27,11 +35,6 @@ module Data.Set (
 	intersect,      -- :: Ord a => Set a -> Set a -> Set a
 	addToSet,      	-- :: Ord a => Set a -> a -> Set a
 	delFromSet,    	-- :: Ord a => Set a -> a -> Set a
-
-	elementOf,      -- :: Ord a => a -> Set a -> Bool
-	isEmptySet,     -- :: Set a -> Bool
-	
-	cardinality     -- :: Set a -> Int
     ) where
 
 import Prelude
