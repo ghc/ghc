@@ -528,7 +528,14 @@ your machine to run GHC.
 <Sect2><Title>System requirements</Title>
 
 <Para>
-An installation of GHC requires about 50M of disk space (which can be lowered by choosing a &ldquo;compact&rdquo; installation). The Cygwin support tools take another 200M or so (though if you really need to this can be halved by installing only the following packages: bash, binutils, cygwin, diff, fileutils, findutils, gcc, grep, make, perl, mingw, sed, textutils, w32api; however, it's fiddly and not recommended). To run GHC
+An installation of GHC requires about 50M of disk space (which can be
+lowered by choosing a &ldquo;compact&rdquo; installation). The Cygwin
+support tools take another 200M or so (though if you really need to this can
+be halved by installing only the following packages: bash, binutils, cygwin,
+diff, fileutils, findutils, gcc, grep, make, perl, mingw, sed, textutils,
+w32api; however, it's fiddly and not recommended, and if you're trying to
+build rather than just use GHC, you need many more, so you might as well
+install the lot). To run GHC
 comfortably, your machine should have at least 64M of memory.
 </Para>
 
@@ -881,22 +888,6 @@ unfortunately. Anyway, better to install 4.08 binaries and use those.
 
 </QandAEntry>
 
-<QandAEntry>
-
-<Question>
-<Para>
-My programs compile fine but do nothing when run.
-</Para>
-</Question>
-
-<Answer> <Para>Some recent versions of the mingw package in Cygwin seem to
-cause this. mingwin version 20001111-1 works fine; you should be able to
-select it by clicking on the version number of the mingw package in the list
-presented by the Cygwin setup program.</Para>
-</Answer>
-
-</QAndAEntry>
-
 </QandASet>
 
 </Sect2>
@@ -908,7 +899,10 @@ presented by the Cygwin setup program.</Para>
 <Title>Building the documentation</Title>
 
 <Para>
-We use the DocBook DTD, which is widely used. Most shrink-wrapped distributions seem to be broken in one way or another; thanks to heroic efforts by Sven Panne and Manuel Chakravarty, we now support most of them, plus properly installed versions.
+We use the DocBook DTD, which is widely used. Most shrink-wrapped
+distributions seem to be broken in one way or another; thanks to
+heroic efforts by Sven Panne and Manuel Chakravarty, we now support
+most of them, plus properly installed versions.
 </Para>
 
 <Para>
@@ -918,20 +912,20 @@ Instructions on installing and configuring the DocBook tools follow.
 <Sect2>
 <Title>Installing the DocBook tools from RPMs</Title>
 
-<Para> If you're using a system that can handle RedHat RPM packages, you can
-probably use the <ULink
+<Para> If you're using a system that can handle RedHat RPM packages,
+you can probably use the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
-tools</ULink>, which is the most shrink-wrapped SGML suite that we could
-find. You need all the RPMs except for psgml (i.e.
+tools</ULink>, which is the most shrink-wrapped SGML suite that we
+could find. You need all the RPMs except for psgml (i.e.
 <Filename>docbook</Filename>, <Filename>jade</Filename>,
 <Filename>jadetex</Filename>, <Filename>sgmlcommon</Filename> and
 <Filename>stylesheets</Filename>). Note that most of these RPMs are
 architecture neutral, so are likely to be found in a
-<Filename>noarch</Filename> directory. The SuSE RPMs also work; the RedHat
-ones <Emphasis>don't</Emphasis> as of version 6.2, but they are easy to fix:
-just make a symlink from
-<Filename>/usr/lib/sgml/stylesheets/nwalsh-modular/lib/dblib.dsl</Filename> to
-<Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </Para>
+<Filename>noarch</Filename> directory. The SuSE RPMs also work; the
+RedHat ones <Emphasis>don't</Emphasis> in RedHat 6.2 (7.0 and later
+should be OK), but they are easy to fix: just make a symlink from
+<Filename>/usr/lib/sgml/stylesheets/nwalsh-modular/lib/dblib.dsl</Filename>
+to <Filename>/usr/lib/sgml/lib/dblib.dsl</Filename>. </Para>
 
 </Sect2>
 
