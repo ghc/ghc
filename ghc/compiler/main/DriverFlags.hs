@@ -194,10 +194,6 @@ static_flags =
   ,  ( "ignore-dot-ghci", NoArg (writeIORef v_Read_DotGHCi False) )
   ,  ( "read-dot-ghci"  , NoArg (writeIORef v_Read_DotGHCi True) )
 
-	------- recompilation checker --------------------------------------
-  ,  ( "recomp"		, NoArg (setRecompFlag True) )
-  ,  ( "no-recomp"  	, NoArg (setRecompFlag False) )
-
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addNoDups v_Ways	WayProf) )
   ,  ( "unreg"		, NoArg (addNoDups v_Ways	WayUnreg) )
@@ -338,6 +334,10 @@ dynamic_flags = [
   ,  ( "optI",		HasArg (addOpt_I) )
   ,  ( "opti",		HasArg (addOpt_i) )
 #endif
+
+	------- recompilation checker --------------------------------------
+  ,  ( "recomp"		, NoArg (setRecompFlag True) )
+  ,  ( "no-recomp"  	, NoArg (setRecompFlag False) )
 
         ------- Packages ----------------------------------------------------
   ,  ( "package-conf"   , HasArg extraPkgConf_ )
