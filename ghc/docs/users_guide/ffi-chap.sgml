@@ -11,12 +11,6 @@
 
   <itemizedlist>
     <listitem>
-      <para>The routines <literal>hs_init()</literal>,
-      <literal>hs_exit()</literal>, and <literal>hs_set_argv()</literal> from
-      Chapter 6.1 of the Addendum are not supported yet.</para>
-    </listitem>
-
-    <listitem>
       <para>Syntactic forms and library functions proposed in earlier versions
       of the FFI are still supported for backwards compatibility.</para>
     </listitem>
