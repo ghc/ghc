@@ -1,5 +1,6 @@
 --!!! class/instance mumble that failed Lint at one time
 --
+module Test where
 class Foo a where
    op :: Int -> a -> Bool
 

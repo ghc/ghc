@@ -1,5 +1,6 @@
 THIS TEST IS FOR TYPE SYNONIMS AND FACTORISATION IN THEIR PRESENCE.
 
+> module Test where
 > data M a = A | B a (M a)
 > data L a = N | C a (Syn a)
 > type Syn b = L b

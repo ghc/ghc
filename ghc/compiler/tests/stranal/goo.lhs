@@ -1,3 +1,4 @@
+> module Test where
 > data Goo a = Gsimpl | Gcompl ([Goo a]) 
 > data Moo a b = Msimple | Mcompl (Moo b a)
 

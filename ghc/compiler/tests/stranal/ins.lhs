@@ -1,6 +1,7 @@
 TEST OF DEFACTORISATION FOR FUNCTIONS THAT DROP 
              POLYMORPHIC VARIABLES
 
+> module Test where
 > data Boolean = FF | TT
 > data Pair a b = MkPair a b
 > data LList alpha = Nill | Conss alpha (LList alpha) 

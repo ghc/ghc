@@ -1,3 +1,4 @@
+> module Test where
 > data Boolean = FF | TT
 > data Pair a b = Mkpair a b
 > data LList alpha = Nill | Conss alpha (LList alpha) 
