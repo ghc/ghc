@@ -603,7 +603,7 @@ install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
 	@for i in $(INSTALL_PROGS); do \
 		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
-		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;;  \
+		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;  \
 	done
 endif
 
