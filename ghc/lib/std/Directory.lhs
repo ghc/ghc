@@ -346,10 +346,13 @@ getDirectoryContents path = do
       if (r == 0) 
 	 then do
 	         dEnt    <- peek ptr_dEnt
-	 	 entry   <- (d_name dEnt >>= peekCString)
-		 freeDirEnt dEnt
-		 entries <- loop ptr_dEnt dir
-		 return (entry:entries)
+		 if (dEnt == nullPtr) 
+		   then return []
+		   else do
+	 	    entry   <- (d_name dEnt >>= peekCString)
+		    freeDirEnt dEnt
+		    entries <- loop ptr_dEnt dir
+		    return (entry:entries)
 	 else do errno <- getErrno
 		 if (errno == eINTR) then loop ptr_dEnt dir else do
 		 throwErrnoIfMinus1_ "getDirectoryContents" $ closedir dir

@@ -79,7 +79,6 @@ prel_readdir(HsAddr dirPtr, HsAddr pDirEnt)
   struct dirent **pDirE = (struct dirent**)pDirEnt;
 #if HAVE_READDIR_R
   struct dirent* p;
-  struct dirent* r;
   int res;
   static unsigned int nm_max = -1;
   
@@ -96,6 +95,7 @@ prel_readdir(HsAddr dirPtr, HsAddr pDirEnt)
 #endif
   }
   p = (struct dirent*)malloc(sizeof(struct dirent) + nm_max);
+  if (p == NULL) return -1;
   res = readdir_r((DIR*)dirPtr, p, pDirE);
   if (res != 0) {
     *pDirE = NULL;
