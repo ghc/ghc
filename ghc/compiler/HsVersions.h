@@ -91,4 +91,5 @@ import qualified FastString
 #define SLIT(x)	 (FastString.mkLitString# (x#))
 #define FSLIT(x) (FastString.mkFastString# (x#))
 
-#endif // HSVERSIONS_H
+#endif /* HsVersions.h */
+
