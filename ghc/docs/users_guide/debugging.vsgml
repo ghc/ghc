@@ -124,6 +124,8 @@ Some of the most useful ones are:
 <tag>@-ddump-asm@:</tag>  assembly language from the native-code generator
 </descrip>
 
+<nidx>-ddump-all option</nidx>%
+<nidx>-ddump-most option</nidx>%
 <nidx>-ddump-rdr option</nidx>%
 <nidx>-ddump-rn option</nidx>%
 <nidx>-ddump-tc option</nidx>%
