@@ -82,12 +82,12 @@ BINDIST_DOCS_WAYS = html info dvi
 
 binary-dist ::
 	@for way in $(BINDIST_DOCS_WAYS); do \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(ProjectNameShort)-$(ProjectVersion); \
 	   for dir in $(BINDIST_DOCS); do \
 	     echo Making $$way documentation in $$dir && \
 	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way && \
-	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion) && \
-	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion) && \
+	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(ProjectNameShort)-$(ProjectVersion) && \
+	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(ProjectNameShort)-$(ProjectVersion) && \
 	     echo "Done."; \
 	   done; \
 	done
@@ -104,7 +104,7 @@ binary-dist::
 	     echo "Renaming $$i to $$i.prl"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.prl; \
 	done
-	@for i in $($(Project)BinDistLibShScripts); do \
+	@for i in $($(Project)BinDistShScripts); do \
 	     echo "Renaming $$i to $$i.sh"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion)/$$i.sh; \
 	done
