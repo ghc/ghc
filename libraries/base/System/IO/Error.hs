@@ -175,7 +175,7 @@ ioeGetHandle (IOException ioe) = ioe_handle ioe
 ioeGetHandle _ = error "System.IO.Error.ioeGetHandle: not an IO error"
 
 ioeGetErrorString (IOException ioe) 
-   | isUserErrorType (ioe_type ioe) = show (ioe_descr ioe)
+   | isUserErrorType (ioe_type ioe) = ioe_descr ioe
    | otherwise                      = show (ioe_type ioe)
 ioeGetErrorString _ = error "System.IO.Error.ioeGetErrorString: not an IO error"
 
