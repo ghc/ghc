@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.27 2001/12/26 23:08:07 sof Exp $
+# $Id: Makefile,v 1.28 2002/01/17 08:38:00 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -86,6 +86,12 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "module Config where" >>$(CONFIG_HS)
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
+	@echo "progNameSuffix        = \"$(exeext)\"" >> $(CONFIG_HS)
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+	@echo "pathSep               = '/'" >> $(CONFIG_HS)
+else
+	@echo "pathSep               = '\\\\\\'" >> $(CONFIG_HS)
+endif
 	@echo done.
 
 CLEAN_FILES += $(CONFIG_HS)

@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.34 2001/09/12 11:52:58 rrt Exp $
+-- $Id: Main.hs,v 1.35 2002/01/17 08:37:57 sof Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -10,8 +10,8 @@
 -- See the documentation in the Users' Guide for more details.
 
 import GetOpt
-import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure)
-import KludgedSystem
+import Config
+import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure, system)
 import Directory     (removeFile)
 import Monad         (MonadPlus(..), liftM, liftM2, when, unless)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
@@ -449,7 +449,7 @@ output flags name toks = do
         outCName     = outDir++outBase++"_hsc.c"
 
     let execProgName
-            | null outDir = "./"++progName
+            | null outDir = '.':pathSep:progName
             | otherwise   = progName
     
     let specials = [(pos, key, arg) | Special pos key arg <- toks]
@@ -468,7 +468,7 @@ output flags name toks = do
         _   -> onlyOne "compiler"
     
     linker <- case [l | Linker l <- flags] of
-        []  -> return defaultCompiler
+        []  -> return cGCC
         [l] -> return l
         _   -> onlyOne "linker"
     
