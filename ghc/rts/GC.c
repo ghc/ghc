@@ -4121,11 +4121,6 @@ threadSqueezeStack(StgTSO *tso)
 		    // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
 		    SET_INFO(bh,&stg_BLACKHOLE_info);
 
-		    // Set the update frame to stg_bh_upd_info, which
-		    // checks for blackholes (the normal update frame
-		    // doesn't check, for efficiency).
-		    ((StgClosure *)frame)->header.info = &stg_bh_upd_frame_info;
-
 		    // We pretend that bh has just been created.
 		    LDV_RECORD_CREATE(bh);
 		}
