@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.22 2003/06/12 16:06:07 simonmar Exp $
+ * $Id: HsBase.h,v 1.23 2003/08/19 16:39:14 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -77,6 +77,9 @@
 #endif
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
+#endif
+#ifdef HAVE_WCTYPE_H
+#include <wctype.h>
 #endif
 
 #if !defined(mingw32_TARGET_OS) && !defined(irix_TARGET_OS)

@@ -141,12 +141,12 @@ import Prelude hiding (Maybe(..))
 #endif
 
 import Data.Maybe
+import Data.Char	( isSpace )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Num
 import GHC.Real
 import GHC.List
-import GHC.Show	( lines, words, unlines, unwords )
 import GHC.Base
 #endif
 
@@ -723,3 +723,49 @@ product	l	= prod l 1
     prod (x:xs) a = prod xs (a*x)
 #endif
 #endif  /* __GLASGOW_HASKELL__ */
+
+-- -----------------------------------------------------------------------------
+-- Functions on strings
+
+-- lines breaks a string up into a list of strings at newline characters.
+-- The resulting strings do not contain newlines.  Similary, words
+-- breaks a string up into a list of words, which were delimited by
+-- white space.  unlines and unwords are the inverse operations.
+-- unlines joins lines with terminating newlines, and unwords joins
+-- words with separating spaces.
+
+lines			:: String -> [String]
+lines ""		=  []
+lines s			=  let (l, s') = break (== '\n') s
+			   in  l : case s' of
+					[]     	-> []
+					(_:s'') -> lines s''
+
+unlines			:: [String] -> String
+#ifdef USE_REPORT_PRELUDE
+unlines			=  concatMap (++ "\n")
+#else
+-- HBC version (stolen)
+-- here's a more efficient version
+unlines [] = []
+unlines (l:ls) = l ++ '\n' : unlines ls
+#endif
+
+words			:: String -> [String]
+words s			=  case dropWhile {-partain:Char.-}isSpace s of
+				"" -> []
+				s' -> w : words s''
+				      where (w, s'') = 
+                                             break {-partain:Char.-}isSpace s'
+
+unwords			:: [String] -> String
+#ifdef USE_REPORT_PRELUDE
+unwords []		=  ""
+unwords ws		=  foldr1 (\w s -> w ++ ' ':s) ws
+#else
+-- HBC version (stolen)
+-- here's a more efficient version
+unwords []		=  ""
+unwords [w]		= w
+unwords (w:ws)		= w ++ ' ' : unwords ws
+#endif

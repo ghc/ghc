@@ -42,6 +42,8 @@ module Data.Char
 import GHC.Base
 import GHC.Show
 import GHC.Read (readLitChar, lexLitChar)
+import GHC.Unicode
+import GHC.Num
 #endif
 
 #ifdef __HUGS__
@@ -53,3 +55,11 @@ import Prelude
 import Prelude(Char,String)
 import Char
 #endif
+
+
+digitToInt :: Char -> Int
+digitToInt c
+ | isDigit c		=  ord c - ord '0'
+ | c >= 'a' && c <= 'f' =  ord c - ord 'a' + 10
+ | c >= 'A' && c <= 'F' =  ord c - ord 'A' + 10
+ | otherwise	        =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh

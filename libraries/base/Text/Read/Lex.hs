@@ -34,7 +34,8 @@ import Text.ParserCombinators.ReadP
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num( Num(..), Integer )
-import GHC.Show( Show(.. ), isSpace, isAlpha, isAlphaNum )
+import GHC.Show( Show(..) )
+import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
 import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, 
 		 toInteger, (^), (^^), infinity, notANumber )
 import GHC.List

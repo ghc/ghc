@@ -51,7 +51,7 @@ module Text.ParserCombinators.ReadP
 
 import Control.Monad( MonadPlus(..) )
 #ifdef __GLASGOW_HASKELL__
-import GHC.Show( isSpace  )
+import {-# SOURCE #-} GHC.Unicode ( isSpace  )
 import GHC.Base
 #else
 import Data.Char( isSpace )

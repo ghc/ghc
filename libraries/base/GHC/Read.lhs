@@ -3,7 +3,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Read
--- Copyright   :  (c) The FFI Task Force, 1994-2002
+-- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
 -- 
 -- Maintainer  :  cvs-ghc@haskell.org
@@ -65,11 +65,12 @@ import Data.Maybe
 import Data.Either
 
 import {-# SOURCE #-} GHC.Err		( error )
+import {-# SOURCE #-} GHC.Unicode	( isDigit )
 import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.List
-import GHC.Show		-- isAlpha etc
+import GHC.Show
 import GHC.Base
 import GHC.Arr
 \end{code}
