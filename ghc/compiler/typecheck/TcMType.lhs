@@ -744,13 +744,25 @@ kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of
 %************************************************************************
 
 \begin{code}
+-- Enumerate the contexts in which a "source type", <S>, can occur
+--	Eq a 
+-- or 	?x::Int
+-- or 	r <: {x::Int}
+-- or 	(N a) where N is a newtype
+
 data SourceTyCtxt
   = ClassSCCtxt Name	-- Superclasses of clas
-  | SigmaCtxt		-- Context of a normal for-all type
-  | DataTyCtxt Name	-- Context of a data decl
+			-- 	class <S> => C a where ...
+  | SigmaCtxt		-- Theta part of a normal for-all type
+			--	f :: <S> => a -> a
+  | DataTyCtxt Name	-- Theta part of a data decl
+			--	data <S> => T a = MkT a
   | TypeCtxt 		-- Source type in an ordinary type
+			-- 	f :: N a -> N a
   | InstThetaCtxt	-- Context of an instance decl
+			--	instance <S> => C [a] where ...
   | InstHeadCtxt	-- Head of an instance decl
+			-- 	instance ... => Eq a where ...
 		
 pprSourceTyCtxt (ClassSCCtxt c) = ptext SLIT("the super-classes of class") <+> quotes (ppr c)
 pprSourceTyCtxt SigmaCtxt       = ptext SLIT("the context of a polymorphic type")
