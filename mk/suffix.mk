@@ -22,6 +22,10 @@
 
 .DELETE_ON_ERROR:
 
+# This line prevents GNU make from deleting any intermediate targets:
+
+.SECONDARY:
+
 #-----------------------------------------------------------------------------
 # Haskell Suffix Rules
 
@@ -131,8 +135,6 @@ endif # BootingFromHc
 #-----------------------------------------------------------------------------
 # Happy Suffix Rules
 #
-.SECONDARY: %.hs
-
 %.hs : %.ly
 	$(HAPPY) $(HAPPY_OPTS) $<
 
@@ -158,8 +160,6 @@ endif
 #-----------------------------------------------------------------------------
 # Green-card Suffix Rules
 #
-
-.PRECIOUS: %.gc
 
 %.hs %_stub_ffi.c %_stub_ffi.h : %.gc
 	$(GREENCARD) $(GC_OPTS) $<
