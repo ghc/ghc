@@ -1,9 +1,11 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.6 2000/03/08 21:45:03 andy Exp $ 
+# $Id: Makefile,v 1.7 2000/03/08 22:05:43 andy Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
+
+PRELUDE  = Prelude.hs
 
 STD_LIBS = Array.lhs Char.lhs Complex.lhs CPUTime.lhs \
 	   Directory.lhs IO.lhs Ix.lhs List.lhs Locale.lhs \
@@ -50,16 +52,12 @@ UTIL_LIBS = QuickCheck.hs QuickCheckBatch.hs QuickCheckPoly.hs \
 	Regex.lhs RegexString.lhs Observe.lhs Memo.lhs Readline.lhs \
 	Select.lhs 
 
-LIBS =  $(STD_LIBS) \
+LIBS =  $(PRELUDE) \
+        $(STD_LIBS) \
 	$(DATA_LIBS) \
 	$(LANG_LIBS) \
 	$(TEXT_LIBS) \
 	$(UTIL_LIBS)
-
-#List.lhs Ix.lhs Complex.lhs Char.lhs Ratio.lhs Random.lhs \
-#       Array.lhs Maybe.lhs Monad.lhs Numeric.lhs Directory.lhs \
-#       System.lhs Locale.lhs CPUTime.lhs IO.lhs Pretty.lhs \
-#       GetOpt.lhs Bits.lhs Word.lhs Addr.lhs NumExts.lhs Int.lhs \
 
 all :: $(LIBS)
 
@@ -68,6 +66,9 @@ HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE -D__HASKELL98_
 
 %.lhs :: $(GHC_LIB_DIR)/std/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
+
+%.hs :: $(GHC_LIB_DIR)/hugs/%.hs
+	$(HUGSCPP) -I../../includes $< > $*.hs
 
 %.lhs :: $(FPTOOLS_TOP)/hslibs/concurrent/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
