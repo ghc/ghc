@@ -5,8 +5,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.17 $
- * $Date: 2001/02/11 17:51:07 $
+ * $Revision: 1.18 $
+ * $Date: 2001/02/12 12:44:11 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -320,7 +320,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
 
              case SEQ_FRAME:
                 /* Too complicated ... adopt the Usual Solution. */
-                fprintf(stderr, "!!! SEQ frame in PAP update\n");
+                /* fprintf(stderr, "!!! SEQ frame in PAP update\n"); */
                 goto defer_to_sched;
 
              case CATCH_FRAME:
