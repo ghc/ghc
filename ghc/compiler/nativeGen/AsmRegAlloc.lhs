@@ -12,11 +12,8 @@ IMP_Ubiq(){-uitous-}
 
 import MachCode		( SYN_IE(InstrList) )
 import MachMisc		( Instr )
-#if __GLASGOW_HASKELL__ >= 202
-import MachRegs         hiding (Addr)
-#else
 import MachRegs
-#endif
+
 import RegAllocInfo
 
 import AbsCSyn		( MagicId )
