@@ -384,7 +384,7 @@ defaultDynFlags = DynFlags {
 	    Opt_IgnoreInterfacePragmas,
 	    Opt_OmitInterfacePragmas
 
-           ] ++ standardWarnings,
+           ] ++ standardWarnings
   }
 
 {- 
