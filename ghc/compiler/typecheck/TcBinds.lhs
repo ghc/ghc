@@ -41,7 +41,7 @@ import Name		( Name, getSrcLoc )
 import NameSet
 import Var		( tyVarKind )
 import VarSet
-import SrcLoc		( Located(..), srcLocSpan, unLoc, noLoc )
+import SrcLoc		( Located(..), srcLocSpan, unLoc, noLoc, getLoc )
 import Bag
 import Util		( isIn, equalLength )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isRec, 
@@ -268,8 +268,9 @@ tcBindWithSigs top_lvl mbind sigs is_rec
 	-- GENERALISE
 	--	(it seems a bit crude to have to do getLIE twice,
 	--	 but I can't see a better way just now)
-    addSrcSpan (srcLocSpan (minimum (map getSrcLoc binder_names)))	$
-	-- TODO: location wrong
+    addSrcSpan (getLoc (head (bagToList mbind)))		$
+	-- TODO: location a bit awkward, but the mbinds have been
+	--	 dependency analysed and may no longer be adjacent
 
     addErrCtxt (genCtxt binder_names)				$
     getLIE (generalise binder_names mbind tau_tvs lie_req tc_ty_sigs)
