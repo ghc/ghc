@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.17 1999/06/25 09:13:37 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.18 1999/07/06 16:17:39 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -102,9 +102,22 @@ extern StgFun start;
 extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
 
+#ifdef INTERPRETER
+/* Take into account code sections in dynamically loaded object files. */
+#define IS_CODE_PTR(p) (  ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER) \
+                       || is_dynamically_loaded_code_or_rodata_ptr(p) )
+#define IS_DATA_PTR(p) ( ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && \
+                          (P_)(p) < (P_)&DATA_SECTION_END_MARKER) \
+                       || is_dynamically_loaded_rwdata_ptr(p) )
+#define IS_USER_PTR(p) ( ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER) \
+                       && is_not_dynamically_loaded_ptr(p) )
+#else
 #define IS_CODE_PTR(p) ((P_)(p) < (P_)&TEXT_SECTION_END_MARKER)
 #define IS_DATA_PTR(p) ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && (P_)(p) < (P_)&DATA_SECTION_END_MARKER)
 #define IS_USER_PTR(p) ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER)
+#endif
+
+
 
 #ifdef HAVE_WIN32_DLL_SUPPORT
 extern int is_heap_alloced(const void* x);

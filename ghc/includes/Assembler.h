@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Assembler.h,v 1.6 1999/04/27 10:07:22 sewardj Exp $
+ * $Id: Assembler.h,v 1.7 1999/07/06 16:17:39 sewardj Exp $
  *
  * (c) The GHC Team 1994-1998.
  *
@@ -223,6 +223,7 @@ extern AsmBCO asm_BCO_seq   ( void );
  * ------------------------------------------------------------------------*/
 
 extern AsmVar asmClosure       ( AsmBCO bco, AsmObject p );
+extern AsmVar asmGHCClosure    ( AsmBCO bco, AsmObject p );
 
 extern AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info );
 

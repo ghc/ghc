@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.13 1999/05/21 14:46:21 sof Exp $
+ * $Id: StgMiscClosures.h,v 1.14 1999/07/06 16:17:40 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -87,7 +87,8 @@ extern DLL_IMPORT_RTS const StgInfoTable dummy_ret_info;
 #ifdef INTERPRETER
 
 EXTFUN(Hugs_CONSTR_entry);
-extern const StgInfoTable ret_bco_info;
+
+extern const vec_info_8 ret_bco_info;
 
 #endif /* INTERPRETER */
 
