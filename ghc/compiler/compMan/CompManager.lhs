@@ -144,7 +144,7 @@ cmUnload state
  = do -- Throw away the old home dir cache
       emptyHomeDirCache
       -- Throw away the HIT and the HST
-      return state{ hst=new_hst, hit=new_hit }
+      return state{ hst=new_hst, hit=new_hit, ui=emptyUI }
    where
      CmState{ hst=hst, hit=hit } = state
      (new_hst, new_hit) = retainInTopLevelEnvs [] (hst,hit)
