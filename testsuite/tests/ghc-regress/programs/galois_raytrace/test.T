@@ -6,5 +6,5 @@ include ($confdir ++ "/../multimod-test.T")
 --                  expected process return value, if not zero
 
 -- pass $testdir so it knows where its home dir is
-test "galois_raytrace" { mtr("-package lang -package text", "", "") }
+test "galois_raytrace" { mtr("-O -package lang -package text", "", "") }
 
