@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.65 2005/01/06 14:54:15 malcolm Exp $
+-- $Id: Main.hs,v 1.66 2005/01/06 14:55:02 malcolm Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -38,8 +38,6 @@ import CString
 import Compat.RawSystem 	( rawSystem )
 #elif __HUGS__ || __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
 import System.Cmd	 	( rawSystem )
-#elif BUILD_NHC && __GLASGOW_HASKELL__ >= 603
-import Compat.RawSystem 	( rawSystem )
 #else
 rawSystem prog args = system (prog++" "++unwords args)
 #endif
