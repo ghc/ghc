@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.10 2000/03/14 01:43:27 sof Exp $
+ * $Id: Itimer.c,v 1.11 2000/03/20 09:42:49 andy Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -158,7 +158,7 @@ nat
 initialize_virtual_timer(nat ms)
 {
 # ifndef HAVE_SETITIMER
-    fprintf(stderr, "No virtual timer on this system\n");
+  /*    fprintf(stderr, "No virtual timer on this system\n"); */
     return -1;
 # else
     struct itimerval it;
@@ -238,3 +238,11 @@ unblock_vtalrm_signal(void)
     (void) sigprocmask(SIG_UNBLOCK, &signals, NULL);
 }
 #endif
+
+unsigned int 
+getourtimeofday(void)
+{
+  struct timeval tv;
+  gettimeofday(&tv, (struct timezone *) NULL);
+  return (tv.tv_sec * 1000000 + tv.tv_usec);
+}

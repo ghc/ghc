@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.46 2000/03/14 09:55:05 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.47 2000/03/20 09:42:49 andy Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -19,6 +19,7 @@
 #include "StablePriv.h"
 #include "HeapStackCheck.h"
 #include "StgRun.h"
+#include "ITimer.h"
 #include "Prelude.h"
 
 /* ** temporary **
@@ -1016,7 +1017,11 @@ FN_(delayzh_fast)
     /* Add on ticks_since_select, since these will be subtracted at
      * the next awaitEvent call.
      */
+#if defined(HAVE_SETITIMER)
     CurrentTSO->block_info.delay = R1.i + ticks_since_select;
+#else
+    CurrentTSO->block_info.target = R1.i + getourtimeofday();
+#endif
 
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
 

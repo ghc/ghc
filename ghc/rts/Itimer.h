@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.4 1999/08/25 16:11:48 simonmar Exp $
+ * $Id: Itimer.h,v 1.5 2000/03/20 09:42:49 andy Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -16,3 +16,4 @@ nat  initialize_virtual_timer  ( nat ms );
 int  install_vtalrm_handler    ( void );
 void block_vtalrm_signal       ( void );
 void unblock_vtalrm_signal     ( void );
+unsigned int getourtimeofday   ( void );

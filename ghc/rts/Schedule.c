@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.56 2000/03/17 14:37:21 simonmar Exp $
+ * $Id: Schedule.c,v 1.57 2000/03/20 09:42:50 andy Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -72,6 +72,7 @@
 #include "Sanity.h"
 #include "Stats.h"
 #include "Sparks.h"
+#include "Itimer.h"
 #include "Prelude.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
@@ -2393,7 +2394,12 @@ printThreadBlockage(StgTSO *tso)
     fprintf(stderr,"blocked on write to fd %d", tso->block_info.fd);
     break;
   case BlockedOnDelay:
+#if defined(HAVE_SETITIMER)
     fprintf(stderr,"blocked on delay of %d ms", tso->block_info.delay);
+#else
+    fprintf(stderr,"blocked on delay of %d ms", 
+	    tso->block_info.target - getourtimeofday());
+#endif
     break;
   case BlockedOnMVar:
     fprintf(stderr,"blocked on an MVar");
@@ -2614,6 +2620,7 @@ sched_belch(char *s, ...)
 }
 
 #endif /* DEBUG */
+
 
 //@node Index,  , Debugging Routines, Main scheduling code
 //@subsection Index

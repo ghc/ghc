@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.43 $
- * $Date: 2000/03/20 04:26:24 $
+ * $Revision: 1.44 $
+ * $Date: 2000/03/20 09:42:49 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -24,6 +24,7 @@
 #include "ForeignCall.h"
 #include "PrimOps.h"   /* for __{encode,decode}{Float,Double} */
 #include "Prelude.h"
+#include "ITimer.h"
 #include "Evaluator.h"
 #include "sainteger.h"
 
@@ -529,8 +530,13 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 	   cap->rCurrentTSO->why_blocked = BlockedOnDelay;
 	   ACQUIRE_LOCK(&sched_mutex);
 	   
+#if defined(HAVE_SETITIMER)
 	   cap->rCurrentTSO->block_info.delay 
 	     = hugsBlock.delay + ticks_since_select;
+#else
+	   cap->rCurrentTSO->block_info.target
+	     = hugsBlock.delay + getourtimeofday();
+#endif
 	   APPEND_TO_BLOCKED_QUEUE(cap->rCurrentTSO);
 	   
 	   RELEASE_LOCK(&sched_mutex);

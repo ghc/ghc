@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.9 2000/03/16 17:24:08 simonmar Exp $
+ * $Id: Select.c,v 1.10 2000/03/20 09:42:50 andy Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -105,8 +105,18 @@ awaitEvent(rtsBool wait)
 
 	case BlockedOnDelay:
 	  {
-	    if (tso->block_info.delay < min)
-	      min = tso->block_info.delay;
+	    int candidate; /* signed int is intentional */
+#if defined(HAVE_SETITIMER)
+	    candidate = tso->block_info.delay;
+#else
+	    candidate = tso->block_info.target - getourtimeofday();
+	    if (candidate < 0) {
+	      candidate = 0;
+	    }
+#endif
+	    if ((nat)candidate < min) {
+	      min = candidate;
+	    }
 	    continue;
 	  }
 
@@ -207,14 +217,29 @@ awaitEvent(rtsBool wait)
 	  break;
 	
 	case BlockedOnDelay:
-	  if (tso->block_info.delay > delta) {
-	    tso->block_info.delay -= delta;
-	    ready = 0;
-	  } else {
-	    tso->block_info.delay = 0;
-	    ready = 1;
+	  {
+	    int candidate; /* signed int is intentional */
+#if defined(HAVE_SETITIMER)
+	    if (tso->block_info.delay > delta) {
+	      tso->block_info.delay -= delta;
+	      ready = 0;
+	    } else {
+	      tso->block_info.delay = 0;
+	      ready = 1;
+	    }
+#else
+	    candidate = tso->block_info.target - getourtimeofday();
+	    if (candidate < 0) {
+	      candidate = 0;
+	    }
+	    if ((nat)candidate > delta) {
+	      ready = 0;
+	    } else {
+	      ready = 1;
+	    }
+#endif
+	    break;
 	  }
-	  break;
 	
 	default:
 	  barf("awaitEvent");

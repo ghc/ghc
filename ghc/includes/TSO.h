@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.13 2000/03/17 13:30:23 simonmar Exp $
+ * $Id: TSO.h,v 1.14 2000/03/20 09:42:49 andy Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -130,7 +130,11 @@ typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
   int fd;
+#if defined(INTERPRETER) && !defined(HAVE_SETITIMER)
+  unsigned int target;
+#else
   unsigned int delay;
+#endif
 #if defined(PAR)
   globalAddr ga;
 #endif
