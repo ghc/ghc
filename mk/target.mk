@@ -309,7 +309,8 @@ _cbits := _cbits
 endif
 
 ifneq "$(HSLIB)" ""
-LIBRARY = libHS$(HSLIB)$(_cbits)$(_way).a
+LIBRARY      = libHS$(HSLIB)$(_cbits)$(_way).a
+GHCI_LIBRARY = HS$(HSLIB)$(_cbits)$(_way).o
 ifeq "$(LIBOBJS)" ""
   ifneq "$(IS_CBITS_LIB)" "YES"
   LIBOBJS = $(HS_OBJS)
@@ -398,6 +399,31 @@ endif
 
 $(LIBRARY) :: $(STUBOBJS) $(LIBOBJS)
 	$(BUILD_LIB)
+endif
+
+#--------------------------------------------------------------
+#	Build dynamically-linkable libraries for GHCi
+#
+
+ifneq "$(GHCI_LIBRARY)" ""
+ifeq "$(GhcWithInterpreter)" "YES"
+
+all :: $(GHCI_LIBRARY)
+
+ifeq "$(GHCI_LIBOBJS)" ""
+GHCI_LIBOBJS = $(LIBOBJS)
+endif
+
+ifeq "$(SplitObjs)" "YES"
+$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
+	( echo $(STUBOBJS) ; $(FIND) $(patsubst %.$(way_)o,%,$(LIBOBJS)) -name '*.$(way_)o' -print ) | xargs ld -r -x -o $@
+else
+$(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
+	ld -r -x -o $@ $(GHCI_LIBOBJS)
+endif
+
+CLEAN_FILES += $(GHCI_LIBRARY)
+endif
 endif
 
 #----------------------------------------
