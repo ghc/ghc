@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.54 2001/07/23 23:27:50 ken Exp $
+# $Id: Makefile,v 1.55 2001/10/19 09:33:28 sewardj Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -187,6 +187,8 @@ gmp/libgmp.a ::
 	@$(CP) gmp/.libs/libgmp.a gmp
 	@$(RANLIB) gmp/libgmp.a
 endif
+
+CLEAN_FILES += gmp/libgmp.a
 
 #-----------------------------------------------------------------------------
 #
