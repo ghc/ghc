@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.15 1999/03/02 19:59:40 sof Exp $
+ * $Id: StgMiscClosures.hc,v 1.16 1999/03/09 14:24:45 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -98,7 +98,7 @@ STGFUN(IND_OLDGEN_PERM_entry)
    This code assumes R1 is in a register for now.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(CAF_UNENTERED_info,CAF_UNENTERED_entry,1,2,CAF_UNENTERED,const,EF_,0,0);
+INFO_TABLE(CAF_UNENTERED_info,CAF_UNENTERED_entry,1,3,CAF_UNENTERED,const,EF_,0,0);
 STGFUN(CAF_UNENTERED_entry)
 {
     FB_
@@ -109,7 +109,8 @@ STGFUN(CAF_UNENTERED_entry)
     FE_
 }
 
-INFO_TABLE(CAF_ENTERED_info,CAF_ENTERED_entry,2,1,CAF_ENTERED,const,EF_,0,0);
+/* 0,4 is entirely bogus; _do not_ rely on this info */
+INFO_TABLE(CAF_ENTERED_info,CAF_ENTERED_entry,0,4,CAF_ENTERED,const,EF_,0,0);
 STGFUN(CAF_ENTERED_entry)
 {
     FB_

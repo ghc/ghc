@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.47 1999/03/03 18:58:53 sof Exp $
+ * $Id: GC.c,v 1.48 1999/03/09 14:24:43 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -176,6 +176,10 @@ void GarbageCollect(void (*get_roots)(void))
   allocated = (nursery_blocks * BLOCK_SIZE_W) + allocated_bytes();
   for ( bd = current_nursery->link; bd != NULL; bd = bd->link ) {
     allocated -= BLOCK_SIZE_W;
+  }
+  if (current_nursery->free < current_nursery->start + BLOCK_SIZE_W) {
+    allocated -= (current_nursery->start + BLOCK_SIZE_W)
+      - current_nursery->free;
   }
 
   /* Figure out which generation to collect
@@ -354,22 +358,7 @@ void GarbageCollect(void (*get_roots)(void))
        * the CAF document.
        */
       extern void markHugsObjects(void);
-#if 0
-      /* ToDo: This (undefined) function should contain the scavenge
-       * loop immediately below this block of code - but I'm not sure
-       * enough of the details to do this myself.
-       */
-      scavengeEverything();
-      /* revert dead CAFs and update enteredCAFs list */
-      revert_dead_CAFs();
-#endif      
       markHugsObjects();
-#if 0
-      /* This will keep the CAFs and the attached BCOs alive 
-       * but the values will have been reverted
-       */
-      scavengeEverything();
-#endif
   }
 #endif
 
@@ -437,6 +426,9 @@ void GarbageCollect(void (*get_roots)(void))
    */
   gcStablePtrTable(major_gc);
 
+  /* revert dead CAFs and update enteredCAFs list */
+  revert_dead_CAFs();
+  
   /* Set the maximum blocks for the oldest generation, based on twice
    * the amount of live data now, adjusted to fit the maximum heap
    * size if necessary.  
@@ -665,10 +657,7 @@ void GarbageCollect(void (*get_roots)(void))
     }
   }
 
-  /* revert dead CAFs and update enteredCAFs list */
-  revert_dead_CAFs();
-  
-  /* mark the garbage collected CAFs as dead */
+ /* mark the garbage collected CAFs as dead */
 #ifdef DEBUG
   if (major_gc) { gcCAFs(); }
 #endif
@@ -1663,7 +1652,6 @@ scavenge(step *step)
     case IND_PERM:
     case IND_OLDGEN_PERM:
     case CAF_UNENTERED:
-    case CAF_ENTERED:
       {
 	StgPtr end;
 
@@ -1672,6 +1660,20 @@ scavenge(step *step)
 	  (StgClosure *)*p = evacuate((StgClosure *)*p);
 	}
 	p += info->layout.payload.nptrs;
+	break;
+      }
+
+    case CAF_ENTERED:
+      {
+	StgCAF *caf = (StgCAF *)p;
+
+	caf->body = evacuate(caf->body);
+	caf->value = evacuate(caf->value);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  recordOldToNewPtrs((StgMutClosure *)p);
+	}
+        p += sizeofW(StgCAF);
 	break;
       }
 
@@ -1869,7 +1871,6 @@ scavenge_one(StgClosure *p)
   case IND_PERM:
   case IND_OLDGEN_PERM:
   case CAF_UNENTERED:
-  case CAF_ENTERED:
     {
       StgPtr q, end;
       
@@ -2022,6 +2023,19 @@ scavenge_mut_once_list(generation *gen)
       } 
       continue;
       
+    case CAF_ENTERED:
+      { 
+	StgCAF *caf = (StgCAF *)p;
+	caf->body  = evacuate(caf->body);
+	caf->value = evacuate(caf->value);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  p->mut_link = new_list;
+	  new_list = p;
+	}
+      }
+      continue;
+
     default:
       /* shouldn't have anything else on the mutables list */
       barf("scavenge_mut_once_list: strange object?");
@@ -2562,28 +2576,18 @@ void revert_dead_CAFs(void)
     StgCAF* caf = enteredCAFs;
     enteredCAFs = END_CAF_LIST;
     while (caf != END_CAF_LIST) {
-	StgCAF* next = caf->link;
-
-	switch(GET_INFO(caf)->type) {
-	case EVACUATED:
-	    {
-		/* This object has been evacuated, it must be live. */
-		StgCAF* new = stgCast(StgCAF*,stgCast(StgEvacuated*,caf)->evacuee);
-		new->link = enteredCAFs;
-		enteredCAFs = new;
-		break;
-	    }
-	case CAF_ENTERED:
-	    {
-		SET_INFO(caf,&CAF_UNENTERED_info);
-		caf->value = stgCast(StgClosure*,0xdeadbeef);
-		caf->link  = stgCast(StgCAF*,0xdeadbeef);
-		break;
-	    }
-	default:
-		barf("revert_dead_CAFs: enteredCAFs list corrupted");
-	} 
-	caf = next;
+        StgCAF* next = caf->link;
+        StgCAF* new = (StgCAF*)isAlive((StgClosure*)caf);
+        if (new) {
+           new->link = enteredCAFs;
+           enteredCAFs = new;
+        } else {
+           ASSERT(0);
+           SET_INFO(caf,&CAF_UNENTERED_info);
+           caf->value = (StgClosure*)0xdeadbeef;
+           caf->link  = (StgCAF*)0xdeadbeef;
+        } 
+        caf = next;
     }
 }
 
