@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.50 2001/02/12 13:33:46 simonmar Exp $
+-- $Id: Main.hs,v 1.51 2001/02/13 15:51:57 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -49,6 +49,7 @@ import Exception
 import IO
 import Monad
 import List
+import Char		( toLower )
 import System
 import Maybe
 
@@ -313,12 +314,20 @@ beginInteractive :: [String] -> IO ()
 #ifndef GHCI
 beginInteractive = throwDyn (OtherError "not built for interactive use")
 #else
-beginInteractive mods
-  = do state <- cmInit Interactive
-       let mod = case mods of
-	        []    -> Nothing
-	        [mod] -> Just mod
-	        _     -> throwDyn (UsageError 
-				    "only one module allowed with --interactive")
-       interactiveUI state mod
+beginInteractive fileish_args
+  = let is_libraryish nm
+           = let nmr = map toLower (reverse nm)
+                 in take 2 nmr == "o." ||
+                    take 3 nmr == "os." ||
+                    take 4 nmr == "lld."
+        libs = filter is_libraryish fileish_args
+        mods = filter (not.is_libraryish) fileish_args
+        mod = case mods of
+	         []    -> Nothing
+	         [mod] -> Just mod
+	         _     -> throwDyn (UsageError 
+                                    "only one module allowed with --interactive")
+    in
+    do state <- cmInit Interactive
+       interactiveUI state mod libs
 #endif

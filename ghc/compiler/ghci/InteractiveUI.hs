@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.45 2001/02/13 13:09:36 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.46 2001/02/13 15:51:57 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -107,8 +107,8 @@ helpText = "\
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
 
-interactiveUI :: CmState -> Maybe FilePath -> IO ()
-interactiveUI cmstate mod = do
+interactiveUI :: CmState -> Maybe FilePath -> [String] -> IO ()
+interactiveUI cmstate mod cmdline_libs = do
    hPutStrLn stdout ghciWelcomeMsg
    hFlush stdout
    hSetBuffering stdout NoBuffering
@@ -116,7 +116,7 @@ interactiveUI cmstate mod = do
    -- link in the available packages
    pkgs <- getPackageInfo
    initLinker
-   linkPackages (reverse pkgs)
+   linkPackages cmdline_libs (reverse pkgs)
 
    (cmstate, ok, mods) <-
    	case mod of
@@ -664,8 +664,48 @@ ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 -----------------------------------------------------------------------------
 -- package loader
 
-linkPackages :: [Package] -> IO ()
-linkPackages pkgs = mapM_ linkPackage pkgs
+linkPackages :: [String] -> [Package] -> IO ()
+linkPackages cmdline_libs pkgs
+   = do mapM preloadLib cmdline_libs
+        mapM_ linkPackage pkgs
+     where
+        preloadLib orig_name
+           = do putStr ("Loading object " ++ orig_name ++ " ... ")
+                case classify orig_name of
+                   Left static_ish
+                      -> do b <- doesFileExist static_ish
+                            if    not b
+                             then do putStr "not found.\n"
+                                     croak
+                             else do loadObj static_ish
+                                     putStr "done.\n"
+                   Right dll_unadorned
+                      -> do dll_ok <- ocAddDLL (packString dll_unadorned)
+                            if    dll_ok == 1
+                             then putStr "done.\n"
+                             else do putStr "not found.\n"
+                                     croak
+
+        croak = throwDyn (OtherError "user specified .o/.so/.DLL cannot be found.")
+
+        classify a_lib
+           = let a_libr = reverse a_lib
+             in  
+             case map toLower a_libr of
+                ('o':'.':_) 
+                   -> Left a_lib
+                ('o':'s':'.':_) 
+                   -> (Right . zap_leading_lib
+                             . reverse . drop 3 . reverse) a_lib
+                ('l':'l':'d':'.':_) 
+                   -> (Right . reverse . drop 4 . reverse) a_lib
+                other 
+                   -> -- Main.beginInteractive should not have let this through
+                      pprPanic "linkPackages" (text (show a_lib))
+                      
+        zap_leading_lib str
+           = if take 3 str == "lib" then drop 3 str else str
+
 
 linkPackage :: Package -> IO ()
 -- ignore rts and gmp for now (ToDo; better?)
@@ -689,18 +729,15 @@ linkPackage pkg
         isRight (Right _) = True
         isRight (Left _)  = False
 
-
 loadClassified :: Either FilePath String -> IO ()
 loadClassified (Left obj_absolute_filename)
-   = do --putStr ("Left  " ++ obj_absolute_filename ++ "\n")
-        loadObj obj_absolute_filename
+   = do loadObj obj_absolute_filename
 loadClassified (Right dll_unadorned)
-   = do --putStr ("Right " ++ dll_unadorned ++ "\n")
-        dll_ok <- ocAddDLL (packString dll_unadorned)
-        if    dll_ok /= 1
-         then throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
+   = do dll_ok <- ocAddDLL (packString dll_unadorned)
+        if    dll_ok == 1
+         then return ()
+         else throwDyn (OtherError ("can't find .o or .so/.DLL for: " 
                                     ++ dll_unadorned))
-         else return ()
 
 locateOneObj :: [FilePath] -> String -> IO (Either FilePath String)
 locateOneObj []     obj 
