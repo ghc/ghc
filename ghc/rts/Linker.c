@@ -388,10 +388,11 @@ typedef struct _RtsSymbolVal {
       SymX(barf)				\
       SymX(blockAsyncExceptionszh_fast)		\
       SymX(catchzh_fast)			\
+      SymX(closure_flags)                       \
       SymX(cmp_thread)				\
-      SymX(complementIntegerzh_fast)		\
       SymX(cmpIntegerzh_fast)	        	\
       SymX(cmpIntegerIntzh_fast)	      	\
+      SymX(complementIntegerzh_fast)		\
       SymX(createAdjustor)			\
       SymX(decodeDoublezh_fast)			\
       SymX(decodeFloatzh_fast)			\
