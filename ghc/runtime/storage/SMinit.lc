@@ -25,8 +25,14 @@ exitSM (smInfo *sm_info)
 {
 #ifndef PAR
     int rc;
-     /* Upon closing down the storage manager, we free all foreign objects */
+     /* Upon closing down the storage manager, we free all foreign objects 
+        (in new *and* old generations) 
+     */
     rc = freeForeigns(sm_info->ForeignObjList);
+# if defined(GCap) || defined(GCgn)
+    rc = freeForeigns(sm_info->OldForeignObjList);
+# endif
+
 #endif
      /* Return code ignored for now */
     stat_exit(sm_info->hp - hp_start);
