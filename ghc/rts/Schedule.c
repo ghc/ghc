@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.183 2003/12/16 13:27:32 simonmar Exp $
+ * $Id: Schedule.c,v 1.184 2003/12/18 12:24:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -491,6 +491,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
                 // return, so let's pass our capability directly to
                 // that thread.
 		passCapability(&m->bound_thread_cond);
+		continue;
             }
           }
 	}
