@@ -138,7 +138,6 @@ ghcPrimIds
     realWorldPrimId,
     unsafeCoerceId,
     nullAddrId,
-    getTagId,
     seqId
     ]
 \end{code}
@@ -850,10 +849,10 @@ seqId
     info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
 
-    ty  = mkForAllTys [alphaTyVar,betaTyVar]
-		      (mkFunTy alphaTy (mkFunTy betaTy betaTy))
-    [x,y] = mkTemplateLocals [alphaTy, betaTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x [(DEFAULT, [], Var y)])
+    ty  = mkForAllTys [alphaTyVar,openBetaTyVar]
+		      (mkFunTy alphaTy (mkFunTy openBetaTy openBetaTy))
+    [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
+    rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x [(DEFAULT, [], Var y)])
 
 -- lazy :: forall a?. a? -> a?	 (i.e. works for unboxed types too)
 -- Used to lazify pseq:		pseq a b = a `seq` lazy b
@@ -871,24 +870,6 @@ lazyIdUnfolding :: CoreExpr	-- Used to expand LazyOp after strictness anal
 lazyIdUnfolding = mkLams [openAlphaTyVar,x] (Var x)
 		where
 		  [x] = mkTemplateLocals [openAlphaTy]
-\end{code}
-
-@getTag#@ is another function which can't be defined in Haskell.  It needs to
-evaluate its argument and call the dataToTag# primitive.
-
-\begin{code}
-getTagId
-  = pcMiscPrelId getTagName ty info
-  where
-    info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
-	-- We don't provide a defn for this; you must inline it
-
-    ty = mkForAllTys [alphaTyVar] (mkFunTy alphaTy intPrimTy)
-    [x,y] = mkTemplateLocals [alphaTy,alphaTy]
-    rhs = mkLams [alphaTyVar,x] $
-	  Case (Var x) y [ (DEFAULT, [], mkApps (Var dataToTagId) [Type alphaTy, Var y]) ]
-
-dataToTagId = mkPrimOpId DataToTagOp
 \end{code}
 
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get

@@ -318,8 +318,6 @@ mkTupNameStr Unboxed n = (gHC_PRIM_Name, mkFastString ("(#" ++ nOfThem (n-1) ','
 %************************************************************************
 
 \begin{code}
-getTag_RDR		= nameRdrName getTagName
-
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
 ne_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT("/=")
@@ -387,6 +385,7 @@ plus_RDR                = varQual_RDR pREL_NUM_Name FSLIT("+")
 compose_RDR		= varQual_RDR pREL_BASE_Name FSLIT(".")
 
 not_RDR 		= varQual_RDR pREL_BASE_Name FSLIT("not")
+getTag_RDR	 	= varQual_RDR pREL_BASE_Name FSLIT("getTag")
 succ_RDR 		= varQual_RDR pREL_ENUM_Name FSLIT("succ")
 pred_RDR                = varQual_RDR pREL_ENUM_Name FSLIT("pred")
 minBound_RDR            = varQual_RDR pREL_ENUM_Name FSLIT("minBound")
@@ -479,7 +478,6 @@ threadIdPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("ThreadId#") threadI
 cCallableClassName   	      = clsQual gHC_PRIM_Name FSLIT("CCallable") cCallableClassKey
 cReturnableClassName 	      = clsQual gHC_PRIM_Name FSLIT("CReturnable") cReturnableClassKey
 
-getTagName 	 = wVarQual gHC_PRIM_Name FSLIT("getTag#")	getTagIdKey
 unsafeCoerceName = wVarQual gHC_PRIM_Name FSLIT("unsafeCoerce#") unsafeCoerceIdKey 
 nullAddrName     = wVarQual gHC_PRIM_Name FSLIT("nullAddr#")	nullAddrIdKey
 seqName		 = wVarQual gHC_PRIM_Name FSLIT("seq")		seqIdKey
@@ -873,7 +871,6 @@ parrDataConKey				= mkPreludeDataConUnique 24
 
 \begin{code}
 absentErrorIdKey	      = mkPreludeMiscIdUnique  1
-getTagIdKey		      = mkPreludeMiscIdUnique  2
 augmentIdKey		      = mkPreludeMiscIdUnique  3
 appendIdKey		      = mkPreludeMiscIdUnique  4
 buildIdKey		      = mkPreludeMiscIdUnique  5
