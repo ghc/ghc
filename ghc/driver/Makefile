@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.26 1999/11/08 14:45:52 simonmar Exp $
+# $Id: Makefile,v 1.27 1999/11/25 10:38:59 simonpj Exp $
 
 # We create two driver scripts: 
 #	- one to run in-place in the build tree for building libraries
@@ -54,7 +54,7 @@ SCRIPT_SUBST_VARS := \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
   GHC_UNLIT GHC_HSCPP GHC_MKDEPENDHS GHC_HSC GHC_SYSMAN EnableWin32DLLs \
   CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised \
-  USER_WAY_NAMES USER_WAY_OPTS
+  $(USER_WAY_NAMES) $(USER_WAY_OPTS)
 
 #
 # When creating a binary distribution, we prefix the driver script
