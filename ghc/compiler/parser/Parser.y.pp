@@ -46,46 +46,55 @@ import GLAEXTS
 
 {-
 -----------------------------------------------------------------------------
-Conflicts: 33 shift/reduce, [SDM 19/9/2002]
+Conflicts: 34 shift/reduce (1.15)
 
-10 for abiguity in 'if x then y else z + 1'		[State 136]
+10 for abiguity in 'if x then y else z + 1'		[State 178]
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
 	10 because op might be: : - ! * . `x` VARSYM CONSYM QVARSYM QCONSYM
 
-1 for ambiguity in 'if x then y else z with ?x=3' 	[State 136]
-	(shift parses as 'if x then y else (z with ?x=3)'
-
-1 for ambiguity in 'if x then y else z :: T'		[State 136]
+1 for ambiguity in 'if x then y else z :: T'		[State 178]
 	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
 
-4 for ambiguity in 'if x then y else z -< e'
+4 for ambiguity in 'if x then y else z -< e'		[State 178]
 	(shift parses as 'if x then y else (z -< T)', as per longest-parse rule)
+	There are four such operators: -<, >-, -<<, >>-
 
-8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 160,246]
+
+2 for ambiguity in 'case v of { x :: T -> T ... } ' 	[States 11, 253]
+ 	Which of these two is intended?
+	  case v of
+	    (x::T) -> T		-- Rhs is T
+    or
+	  case v of
+	    (x::T -> T) -> ..	-- Rhs is ...
+
+8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 11, 253]
 	(e::a) `b` c, or 
 	(e :: (a `b` c))
+    As well as `b` we can have !, QCONSYM, and CONSYM, hence 3 cases
+    Same duplication between states 11 and 253 as the previous case
 
-1 for ambiguity in 'let ?x ...'				[State 268]
+1 for ambiguity in 'let ?x ...'				[State 329]
 	the parser can't tell whether the ?x is the lhs of a normal binding or
 	an implicit binding.  Fortunately resolving as shift gives it the only
 	sensible meaning, namely the lhs of an implicit binding.
 
-1 for ambiguity in '{-# RULES "name" [ ... #-}		[State 332]
+1 for ambiguity in '{-# RULES "name" [ ... #-}		[State 382]
 	we don't know whether the '[' starts the activation or not: it
   	might be the start of the declaration with the activation being
 	empty.  --SDM 1/4/2002
 
-1 for ambiguity in '{-# RULES "name" forall = ... #-}' 	[State 394]
+6 for conflicts between `fdecl' and `fdeclDEPRECATED', 	[States 393,394]
+  	which are resolved correctly, and moreover, 
+  	should go away when `fdeclDEPRECATED' is removed.
+
+1 for ambiguity in '{-# RULES "name" forall = ... #-}' 	[State 474]
 	since 'forall' is a valid variable name, we don't know whether
 	to treat a forall on the input as the beginning of a quantifier
 	or the beginning of the rule itself.  Resolving to shift means
 	it's always treated as a quantifier, hence the above is disallowed.
 	This saves explicitly defining a grammar for the rule lhs that
 	doesn't include 'forall'.
-
-6 for conflicts between `fdecl' and `fdeclDEPRECATED', 	[States 384,385]
-  	which are resolved correctly, and moreover, 
-  	should go away when `fdeclDEPRECATED' is removed.
 
 -- ---------------------------------------------------------------------------
 -- Adding location info
