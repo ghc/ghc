@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.140 2002/09/06 09:56:12 simonmar Exp $
+ * $Id: GC.c,v 1.141 2002/09/10 10:43:52 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -130,7 +130,7 @@ static lnat g0s0_pcnt_kept = 30; // percentage of g0s0 live at last minor GC
 /* Used to avoid long recursion due to selector thunks
  */
 static lnat thunk_selector_depth = 0;
-#define MAX_THUNK_SELECTOR_DEPTH 256
+#define MAX_THUNK_SELECTOR_DEPTH 8
 
 /* -----------------------------------------------------------------------------
    Static function declarations
@@ -1916,7 +1916,10 @@ loop:
    Evaluate a THUNK_SELECTOR if possible.
 
    returns: NULL if we couldn't evaluate this THUNK_SELECTOR, or
-   a closure pointer if we evaluated it and this is the result
+   a closure pointer if we evaluated it and this is the result.  Note
+   that "evaluating" the THUNK_SELECTOR doesn't necessarily mean
+   reducing it to HNF, just that we have eliminated the selection.
+   The result might be another thunk, or even another THUNK_SELECTOR.
 
    If the return value is non-NULL, the original selector thunk has
    been BLACKHOLE'd, and should be updated with an indirection or a
@@ -1930,11 +1933,19 @@ eval_thunk_selector( nat field, StgSelector * p )
     StgInfoTable *info;
     const StgInfoTable *info_ptr;
     StgClosure *selectee;
-
+    
     selectee = p->selectee;
 
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = p->header.info;
+
+    // If the THUNK_SELECTOR is in a generation that we are not
+    // collecting, then bail out early.  We won't be able to save any
+    // space in any case, and updating with an indirection is trickier
+    // in an old gen.
+    if (Bdescr((StgPtr)p)->gen_no > N) {
+	return NULL;
+    }
 
     // BLACKHOLE the selector thunk, since it is now under evaluation.
     // This is important to stop us going into an infinite loop if
@@ -1942,6 +1953,7 @@ eval_thunk_selector( nat field, StgSelector * p )
     SET_INFO(p,&stg_BLACKHOLE_info);
 
 selector_loop:
+
     info = get_itbl(selectee);
     switch (info->type) {
       case CONSTR:
@@ -1991,9 +2003,13 @@ selector_loop:
 	  if (val == NULL) { 
 	      break;
 	  } else {
-	      // we evaluated this selector thunk, so update it with
-	      // an indirection.
-	      UPD_IND_NOLOCK(selectee, val);
+	      // We evaluated this selector thunk, so update it with
+	      // an indirection.  NOTE: we don't use UPD_IND here,
+	      // because we are guaranteed that p is in a generation
+	      // that we are collecting, and we never want to put the
+	      // indirection on a mutable list.
+	      ((StgInd *)selectee)->indirectee = val;
+	      SET_INFO(selectee,&stg_IND_info);
 	      selectee = val;
 	      goto selector_loop;
 	  }
