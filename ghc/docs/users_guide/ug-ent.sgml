@@ -17,7 +17,7 @@
 <!ENTITY phases         SYSTEM "phases.sgml" >
 <!ENTITY primitives     SYSTEM "primitives.sgml" >
 <!ENTITY separate       SYSTEM "separate_compilation.sgml" >
-<!ENTITY vs-hs          SYSTEM "vs_haskell.sgml" >
+<!ENTITY bugs           SYSTEM "bugs.sgml" >
 <!ENTITY wrong          SYSTEM "gone_wrong.sgml" >
 <!ENTITY utils          SYSTEM "utils.sgml" >
 <!ENTITY win32-dll      SYSTEM "win32-dlls.sgml">

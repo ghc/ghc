@@ -152,7 +152,222 @@ with GHC.
 
 <!-- UNBOXED TYPES AND PRIMITIVE OPERATIONS -->
 <!--    included from primitives.sgml  -->
-&primitives;
+<!-- &primitives; -->
+<sect1 id="primitives">
+  <title>Unboxed types and primitive operations</title>
+
+<para>GHC is built on a raft of primitive data types and operations.
+While you really can use this stuff to write fast code,
+  we generally find it a lot less painful, and more satisfying in the
+  long run, to use higher-level language features and libraries.  With
+  any luck, the code you write will be optimised to the efficient
+  unboxed version in any case.  And if it isn't, we'd like to know
+  about it.</para>
+
+<para>We do not currently have good, up-to-date documentation about the
+primitives, perhaps because they are mainly intended for internal use.
+There used to be a long section about them here in the User Guide, but it
+became out of date, and wrong information is worse than none.</para>
+
+<para>The Real Truth about what primitive types there are, and what operations
+work over those types, is held in the file
+<filename>fptools/ghc/compiler/prelude/primops.txt</filename>.
+This file is used directly to generate GHC's primitive-operation definitions, so
+it is always correct!  It is also intended for processing into text.</para>
+
+<para> Indeed,
+the result of such processing is part of the description of the 
+ <ulink
+      url="http://haskell.cs.yale.edu/ghc/docs/papers/core.ps.gz">External
+	 Core language</ulink>.
+So that document is a good place to look for a type-set version.
+We would be very happy if someone wanted to volunteer to produce an SGML
+back end to the program that processes <filename>primops.txt</filename> so that
+we could include the results here in the User Guide.</para>
+
+<para>What follows here is a brief summary of some main points.</para>
+  
+<sect2 id="glasgow-unboxed">
+<title>Unboxed types
+</title>
+
+<para>
+<indexterm><primary>Unboxed types (Glasgow extension)</primary></indexterm>
+</para>
+
+<para>Most types in GHC are <firstterm>boxed</firstterm>, which means
+that values of that type are represented by a pointer to a heap
+object.  The representation of a Haskell <literal>Int</literal>, for
+example, is a two-word heap object.  An <firstterm>unboxed</firstterm>
+type, however, is represented by the value itself, no pointers or heap
+allocation are involved.
+</para>
+
+<para>
+Unboxed types correspond to the &ldquo;raw machine&rdquo; types you
+would use in C: <literal>Int&num;</literal> (long int),
+<literal>Double&num;</literal> (double), <literal>Addr&num;</literal>
+(void *), etc.  The <emphasis>primitive operations</emphasis>
+(PrimOps) on these types are what you might expect; e.g.,
+<literal>(+&num;)</literal> is addition on
+<literal>Int&num;</literal>s, and is the machine-addition that we all
+know and love&mdash;usually one instruction.
+</para>
+
+<para>
+Primitive (unboxed) types cannot be defined in Haskell, and are
+therefore built into the language and compiler.  Primitive types are
+always unlifted; that is, a value of a primitive type cannot be
+bottom.  We use the convention that primitive types, values, and
+operations have a <literal>&num;</literal> suffix.
+</para>
+
+<para>
+Primitive values are often represented by a simple bit-pattern, such
+as <literal>Int&num;</literal>, <literal>Float&num;</literal>,
+<literal>Double&num;</literal>.  But this is not necessarily the case:
+a primitive value might be represented by a pointer to a
+heap-allocated object.  Examples include
+<literal>Array&num;</literal>, the type of primitive arrays.  A
+primitive array is heap-allocated because it is too big a value to fit
+in a register, and would be too expensive to copy around; in a sense,
+it is accidental that it is represented by a pointer.  If a pointer
+represents a primitive value, then it really does point to that value:
+no unevaluated thunks, no indirections&hellip;nothing can be at the
+other end of the pointer than the primitive value.
+</para>
+
+<para>
+There are some restrictions on the use of primitive types, the main
+one being that you can't pass a primitive value to a polymorphic
+function or store one in a polymorphic data type.  This rules out
+things like <literal>[Int&num;]</literal> (i.e. lists of primitive
+integers).  The reason for this restriction is that polymorphic
+arguments and constructor fields are assumed to be pointers: if an
+unboxed integer is stored in one of these, the garbage collector would
+attempt to follow it, leading to unpredictable space leaks.  Or a
+<function>seq</function> operation on the polymorphic component may
+attempt to dereference the pointer, with disastrous results.  Even
+worse, the unboxed value might be larger than a pointer
+(<literal>Double&num;</literal> for instance).
+</para>
+
+<para>
+Nevertheless, A numerically-intensive program using unboxed types can
+go a <emphasis>lot</emphasis> faster than its &ldquo;standard&rdquo;
+counterpart&mdash;we saw a threefold speedup on one example.
+</para>
+
+</sect2>
+
+<sect2 id="unboxed-tuples">
+<title>Unboxed Tuples
+</title>
+
+<para>
+Unboxed tuples aren't really exported by <literal>GHC.Exts</literal>,
+they're available by default with <option>-fglasgow-exts</option>.  An
+unboxed tuple looks like this:
+</para>
+
+<para>
+
+<programlisting>
+(# e_1, ..., e_n #)
+</programlisting>
+
+</para>
+
+<para>
+where <literal>e&lowbar;1..e&lowbar;n</literal> are expressions of any
+type (primitive or non-primitive).  The type of an unboxed tuple looks
+the same.
+</para>
+
+<para>
+Unboxed tuples are used for functions that need to return multiple
+values, but they avoid the heap allocation normally associated with
+using fully-fledged tuples.  When an unboxed tuple is returned, the
+components are put directly into registers or on the stack; the
+unboxed tuple itself does not have a composite representation.  Many
+of the primitive operations listed in this section return unboxed
+tuples.
+</para>
+
+<para>
+There are some pretty stringent restrictions on the use of unboxed tuples:
+</para>
+
+<para>
+
+<itemizedlist>
+<listitem>
+
+<para>
+ Unboxed tuple types are subject to the same restrictions as
+other unboxed types; i.e. they may not be stored in polymorphic data
+structures or passed to polymorphic functions.
+
+</para>
+</listitem>
+<listitem>
+
+<para>
+ Unboxed tuples may only be constructed as the direct result of
+a function, and may only be deconstructed with a <literal>case</literal> expression.
+eg. the following are valid:
+
+
+<programlisting>
+f x y = (# x+1, y-1 #)
+g x = case f x x of { (# a, b #) -&#62; a + b }
+</programlisting>
+
+
+but the following are invalid:
+
+
+<programlisting>
+f x y = g (# x, y #)
+g (# x, y #) = x + y
+</programlisting>
+
+
+</para>
+</listitem>
+<listitem>
+
+<para>
+ No variable can have an unboxed tuple type.  This is illegal:
+
+
+<programlisting>
+f :: (# Int, Int #) -&#62; (# Int, Int #)
+f x = x
+</programlisting>
+
+
+because <literal>x</literal> has an unboxed tuple type.
+
+</para>
+</listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>
+Note: we may relax some of these restrictions in the future.
+</para>
+
+<para>
+The <literal>IO</literal> and <literal>ST</literal> monads use unboxed
+tuples to avoid unnecessary allocation during sequences of operations.
+</para>
+
+</sect2>
+</sect1>
+
 
 <!-- ====================== SYNTACTIC EXTENSIONS =======================  -->
 

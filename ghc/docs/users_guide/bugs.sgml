@@ -1,3 +1,7 @@
+<Chapter id="bugs-and-infelicities">
+  <title>Known bugs and infelicities
+</title>
+
 <sect1 id="vs-Haskell-defn">
   <title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
 </title>
@@ -264,6 +268,37 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
   </sect2>
 
 </sect1>
+
+
+<sect1 id="bugs">
+  <title>Known bugs</title>
+
+<para>GHC has the following known bugs:
+<itemizedlist>
+
+<listitem><para>
+GHC's inliner can be persuaded into non-termination using the standard way to encode
+recursion via a data type:
+<programlisting>
+  data U = MkU (U -> Bool)
+       
+  russel :: U -> Bool
+  russel u@(MkU p) = not $ p u
+  
+  x :: Bool
+  x = russel (MkU russel)
+</programlisting>
+We have never found another program, other than this contrived one, that makes GHC
+diverge, and fixing the problem would impose an extra overhead on every compilation.  So the
+bug remains un-fixed.  There is more background in
+<ulink
+url="http://research.microsoft.com/~simonpj/Papers/inlining">
+Secrets of the GHC inliner</ulink>.
+</para></listitem>
+</itemizedlist></para>
+</sect1>
+
+</Chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
