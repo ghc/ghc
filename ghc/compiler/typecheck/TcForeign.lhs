@@ -28,7 +28,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 import TcMonad
 import TcEnv		( newLocalId )
 import TcType		( tcSplitRhoTy, zonkTcTypeToType )
-import TcMonoType	( tcHsSigType, tcHsBoxedSigType )
+import TcMonoType	( tcHsBoxedSigType )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
 import TcExpr		( tcId, tcPolyExpr )			
@@ -115,7 +115,7 @@ tcFImport fo@(ForeignDecl nm imp_exp@(FoImport isUnsafe) hs_ty ext_nm cconv src_
    tcAddSrcLoc src_loc		     $
    tcAddErrCtxt (foreignDeclCtxt fo) $
 
-   tcHsSigType hs_ty		     `thenTc` \ ty ->
+   tcHsBoxedSigType hs_ty		     `thenTc` \ ty ->
     -- Check that the type has the right shape
     -- and that the argument and result types are acceptable.
    let
