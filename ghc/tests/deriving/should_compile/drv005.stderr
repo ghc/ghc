@@ -1,0 +1,188 @@
+
+
+================================================================================
+Typechecked:
+{- nonrec -}
+Foo1{-r4,x-}{i} =
+    Foo1{-r4,x-}{i}
+	{}
+Foo2{-r3,x-}{i} =
+    Foo2{-r3,x-}{i}
+	{}
+Foo3{-r6,x-}{i} =
+    Foo3{-r6,x-}{i}
+	{}
+Foo4{-r8,x-}{i} =
+    Foo4{-r8,x-}{i}
+	{}
+Foo5{-ra,x-}{i} =
+    Foo5{-ra,x-}{i}
+	{}
+Foo6{-rc,x-}{i} =
+    Foo6{-rc,x-}{i}
+	{}
+Foo7{-re,x-}{i} =
+    Foo7{-re,x-}{i}
+	{}
+Foo8{-rg,x-}{i} =
+    Foo8{-rg,x-}{i}
+	{}
+{- rec -}
+AbsBinds [] [] [([], $d1{-rJK,x-}, d.Enum_aHX)]
+    map_aJU =
+	map_aJP
+    AbsBinds [] [] [([], toEnum_aJT, toEnum_aI0)]
+	toEnum_aI0
+	    a_rH5   =   tag2con_Foo#_rGH
+			    a_rH5
+    AbsBinds [] [] [([], fromEnum_aJS, fromEnum_aI5)]
+	fromEnum_aI5
+	    a_rHp   =   case
+			    con2tag_Foo#_rGJ
+				a_rHp
+			of
+			  a#_rHr  ->  PrelBase.I#{-5b,p-}{i}
+					  a#_rHr
+    AbsBinds [] [] [([], enumFrom_aJR, enumFrom_aIc)]
+	enumFrom_aIc
+	    a_rH9   =   case
+			    con2tag_Foo#_rGJ
+				a_rH9
+			of
+			  a#_rHb  ->  map_aJP
+					  [PrelBase.Int{-3g,p-}, Foo{-rZ,x-}]
+					  tag2con_Foo#_rGH
+					  enumFromTo_aJO
+					      PrelBase.I#{-5b,p-}{i}
+						  a#_rHb
+					      maxtag_Foo#_rGI
+    AbsBinds [] [] [([], enumFromThen_aJQ, enumFromThen_aIA)]
+	enumFromThen_aIA
+	    a_rHf b_rHh
+		    =   case
+			    con2tag_Foo#_rGJ
+				a_rHf
+			of
+			  a#_rHj  ->  case
+					  con2tag_Foo#_rGJ
+					      b_rHh
+				      of
+					b#_rHl  ->  map_aJU
+							[PrelBase.Int{-3g,p-}, Foo{-rZ,x-}]
+							tag2con_Foo#_rGH
+							enumFromThenTo_aJN
+							    PrelBase.I#{-5b,p-}{i}
+								a#_rHj
+							    PrelBase.I#{-5b,p-}{i}
+								b#_rHl
+							    maxtag_Foo#_rGI
+    AbsBinds [] [] [([], enumFromTo_aJ1, enumFromTo_aJ3)]
+	enumFromTo_aJ3
+	    =   $menumFromTo_aJM
+    AbsBinds [] [] [([], enumFromThenTo_aJa, enumFromThenTo_aJc)]
+	enumFromThenTo_aJc
+	    =   $menumFromThenTo_aJL
+    d.Enum_aHX =
+	({-dict-}
+	 []
+	 [toEnum_aJT, fromEnum_aJS, enumFrom_aJR, enumFromThen_aJQ, enumFromTo_aJ1, enumFromThenTo_aJa])
+{- rec -}
+AbsBinds [] [] [([], $d2{-rJW,x-}, d.Eval_aJw)]
+    d.Eval_aJw =
+	({-dict-} [] [])
+{- nonrec -}
+d.Functor_aJy =
+    PrelBase.$d25{-rbd,p-}
+map_aJP =
+    PrelBase.map{-rY,p-}
+	PrelBase.[]{-3j,p-}
+	d.Functor_aJy
+d.Enum_aJB =
+    PrelBase.$d5{-rbE,p-}
+enumFromTo_aJO =
+    PrelBase.enumFromTo{-8W,p-}
+	PrelBase.Int{-3g,p-}
+	d.Enum_aJB
+d.Enum_aJE =
+    d.Enum_aJB
+enumFromThenTo_aJN =
+    PrelBase.enumFromThenTo{-8X,p-}
+	PrelBase.Int{-3g,p-}
+	d.Enum_aJE
+d.Enum_aJG =
+    $d1{-rJK,x-}
+$menumFromTo_aJM =
+    PrelBase.$menumFromTo{-rc8,p-}
+	Foo{-rZ,x-}
+	d.Enum_aJG
+d.Enum_aJJ =
+    d.Enum_aJG
+$menumFromThenTo_aJL =
+    PrelBase.$menumFromThenTo{-rc7,p-}
+	Foo{-rZ,x-}
+	d.Enum_aJJ
+{- nonrec -}
+AbsBinds [] [] [([], con2tag_Foo#_rGJ, con2tag_Foo#_aHG)]
+    con2tag_Foo#_aHG
+	Foo1{-r4,x-}{i}
+		=   0#
+    con2tag_Foo#_aHG
+	Foo2{-r3,x-}{i}
+		=   1#
+    con2tag_Foo#_aHG
+	Foo3{-r6,x-}{i}
+		=   2#
+    con2tag_Foo#_aHG
+	Foo4{-r8,x-}{i}
+		=   3#
+    con2tag_Foo#_aHG
+	Foo5{-ra,x-}{i}
+		=   4#
+    con2tag_Foo#_aHG
+	Foo6{-rc,x-}{i}
+		=   5#
+    con2tag_Foo#_aHG
+	Foo7{-re,x-}{i}
+		=   6#
+    con2tag_Foo#_aHG
+	Foo8{-rg,x-}{i}
+		=   7#
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [([], maxtag_Foo#_rGI, maxtag_Foo#_aHK)]
+    maxtag_Foo#_aHK
+		=   PrelBase.I#{-5b,p-}{i}
+			7#
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [([], tag2con_Foo#_rGH, tag2con_Foo#_aHO)]
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 0#)
+		=   Foo1{-r4,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 1#)
+		=   Foo2{-r3,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 2#)
+		=   Foo3{-r6,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 3#)
+		=   Foo4{-r8,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 4#)
+		=   Foo5{-ra,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 5#)
+		=   Foo6{-rc,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 6#)
+		=   Foo7{-re,x-}{i}
+    tag2con_Foo#_aHO
+	(PrelBase.I#{-5b,p-}{i} 7#)
+		=   Foo8{-rg,x-}{i}
+    tag2con_Foo#_aHO
+	_       =   IOBase.error{-87,p-}
+			Foo{-rZ,x-}
+			"Urk! in TcGenDeriv"
+{- nonrec -}
+ghc: module version changed to 1; reason: no old .hi file

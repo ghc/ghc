@@ -1,0 +1,514 @@
+
+
+================================================================================
+Typechecked:
+{- nonrec -}
+{- nonrec -}
+E1{-r3K,x-}{i} =
+    _/\_ a{-r3A-} ->
+	E1{-r3K,x-}{i}
+	    {_@_ a{-r3A-}}
+{- nonrec -}
+D1{-r6,x-}{i} =
+    _/\_ b{-r3C-} ->
+	D1{-r6,x-}{i}
+	    {_@_ b{-r3C-}}
+D2{-r5,x-}{i} =
+    _/\_ b{-r3C-} -> \ tpl_B1 ->
+	D2{-r5,x-}{i}
+	    {_@_ b{-r3C-} tpl_B1}
+{- nonrec -}
+C1{-rb,x-}{i} =
+    _/\_ a{-r3H-} b{-r3I-} -> \ tpl_B1 ->
+	C1{-rb,x-}{i}
+	    {_@_ a{-r3H-} _@_ b{-r3I-} tpl_B1}
+C2{-ra,x-}{i} =
+    _/\_ a{-r3H-} b{-r3I-} -> \ tpl_B1 ->
+	C2{-ra,x-}{i}
+	    {_@_ a{-r3H-} _@_ b{-r3I-} tpl_B1}
+C3{-rd,x-}{i} =
+    _/\_ a{-r3H-} b{-r3I-} -> \ tpl_B1 ->
+	C3{-rd,x-}{i}
+	    {_@_ a{-r3H-} _@_ b{-r3I-} tpl_B1}
+{- rec -}
+AbsBinds [a{-a1fw-}] [] [([a{-a1fw-}], $d3{-r1fM,x-}, d.Eval_a15O)]
+    d.Eval_a15O =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds [b{-a1fx-}] [] [([b{-a1fx-}], $d4{-r1ge,x-}, d.Eval_a15U)]
+    d.Eval_a15U =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds
+[a{-a1fy-}, b{-a1fz-}]
+[]
+[([a{-a1fy-}, b{-a1fz-}], $d5{-r1gf,x-}, d.Eval_a161)]
+    d.Eval_a161 =
+	({-dict-} [] [])
+{- rec -}
+AbsBinds
+[b{-a178-}]
+[d.Eq_a17C]
+[([b{-a178-}], $d6{-r1gg,x-}, d.Read_a167)]
+    d.Eq_a17Y =
+	PrelBase.$d7{-rc5,p-}
+    d.Eq_a17Z =
+	d.Eq_a17C
+    d.Read_a17W =
+	$d7{-r1gl,x-}
+	    [PrelBase.Int{-3g,p-}, b{-a178-}]
+	    [d.Eq_a17Y, d.Eq_a17Z]
+    readsPrec_a1gk =
+	PrelRead.readsPrec{-rlS,p-}
+	    (X{-r3N,x-} PrelBase.Int{-3g,p-} b{-a178-})
+	    d.Read_a17W
+    readsPrec_a1gj =
+	readsPrec_a1gi
+    AbsBinds [] [] [([], readsPrec_a1gi, readsPrec_a16a)]
+	==_a1gp =
+	    ==_a1gc
+	>>=_a1go =
+	    >>=_a1gb
+	return_a1gn =
+	    return_a1ga
+	zero_a1gm =
+	    zero_a1g9
+	readsPrec_a16a
+	    a_r12Z b_r131
+		    =   ++_a1gd
+			    (Y{-r3M,x-} b{-a178-}, PrelBase.String{-rdl,p-})
+			    (PrelRead.readParen{-rmu,p-}
+				 (Y{-r3M,x-} b{-a178-})
+				 PrelBase.False{-58,p-}{i}
+				 \ c_r133  ->  [ (D1{-r6,x-}{i}
+						      b{-a178-},
+						  d_r135) |
+						   ("D1", d_r135) <- PrelRead.lex{-rmh,p-}
+									 c_r133
+						   ]
+				 b_r131)
+			    (PrelRead.readParen{-rmu,p-}
+				 (Y{-r3M,x-} b{-a178-})
+				 a_r12Z >_a1g8 lit_a1g6
+				 \ c_r137  ->  [ (D2{-r5,x-}{i}
+						      b{-a178-}
+						      a1_r13b,
+						  b1_r13c) |
+						   ("D2", d_r139) <- PrelRead.lex{-rmh,p-}
+									 c_r137, (a1_r13b, b1_r13c) <- readsPrec_a1gk
+													   lit_a1g4
+													   d_r139
+						   ]
+				 b_r131)
+    AbsBinds [] [] [([], readList_a1gh, readList_a17x)]
+	readList_a17x
+		    =   PrelRead.readList__{-rjw,p-}
+			    (Y{-r3M,x-} b{-a178-})
+			    readsPrec_a1gj
+				lit_a1g2
+    d.Read_a167 =
+	({-dict-} [] [readsPrec_a1gi, readList_a1gh])
+{- rec -}
+AbsBinds
+[a{-a1ah-}, b{-a1ai-}]
+[d.Eq_a1aM, d.Eq_a1aN]
+[([a{-a1ah-}, b{-a1ai-}], $d7{-r1gl,x-}, d.Read_a18a)]
+    d.Eq_a1b3 =
+	d.Eq_a1aM
+    d.Read_a1b1 =
+	$d1{-r1gw,x-}
+	    a{-a1ah-}
+	    d.Eq_a1b3
+    readsPrec_a1gv =
+	PrelRead.readsPrec{-rlS,p-}
+	    (T{-r3L,x-} a{-a1ah-})
+	    d.Read_a1b1
+    d.Eq_a1be =
+	d.Eq_a1aN
+    d.Read_a1bc =
+	$d6{-r1gg,x-}
+	    b{-a1ai-}
+	    d.Eq_a1be
+    readsPrec_a1gu =
+	PrelRead.readsPrec{-rlS,p-}
+	    (Y{-r3M,x-} b{-a1ai-})
+	    d.Read_a1bc
+    d.Eq_a1bi =
+	d.Eq_a1aN
+    d.Eq_a1bj =
+	d.Eq_a1aM
+    d.Read_a1bg =
+	$d7{-r1gl,x-}
+	    [b{-a1ai-}, a{-a1ah-}]
+	    [d.Eq_a1bi, d.Eq_a1bj]
+    readsPrec_a1gt =
+	PrelRead.readsPrec{-rlS,p-}
+	    (X{-r3N,x-} b{-a1ai-} a{-a1ah-})
+	    d.Read_a1bg
+    readsPrec_a1gs =
+	readsPrec_a1gr
+    AbsBinds [] [] [([], readsPrec_a1gr, readsPrec_a18d)]
+	++_a1gL =
+	    ++_a1g1
+	>_a1gK =
+	    >_a1g0
+	lit_a1gJ =
+	    lit_a1fZ
+	==_a1gI =
+	    ==_a1fY
+	lit_a1gH =
+	    lit_a1fX
+	>>=_a1gG =
+	    >>=_a1fW
+	return_a1gF =
+	    return_a1fV
+	zero_a1gE =
+	    zero_a1fU
+	>_a1gD =
+	    >_a1g0
+	lit_a1gC =
+	    lit_a1fZ
+	==_a1gB =
+	    ==_a1fY
+	lit_a1gA =
+	    lit_a1fX
+	>>=_a1gz =
+	    >>=_a1fW
+	return_a1gy =
+	    return_a1fV
+	zero_a1gx =
+	    zero_a1fU
+	readsPrec_a18d
+	    a_r13j b_r13l
+		    =   ++_a1g1
+			    (X{-r3N,x-} a{-a1ah-} b{-a1ai-}, PrelBase.String{-rdl,p-})
+			    (PrelRead.readParen{-rmu,p-}
+				 (X{-r3N,x-} a{-a1ah-} b{-a1ai-})
+				 a_r13j >_a1g0 lit_a1fZ
+				 \ c_r13n  ->  [ (C1{-rb,x-}{i}
+						      [a{-a1ah-}, b{-a1ai-}]
+						      a1_r13r,
+						  b1_r13s) |
+						   ("C1", d_r13p) <- PrelRead.lex{-rmh,p-}
+									 c_r13n, (a1_r13r, b1_r13s) <- readsPrec_a1gv
+													   lit_a1fX
+													   d_r13p
+						   ]
+				 b_r13l)
+			    (++_a1gL
+				 (X{-r3N,x-} a{-a1ah-} b{-a1ai-}, PrelBase.String{-rdl,p-})
+				 (PrelRead.readParen{-rmu,p-}
+				      (X{-r3N,x-} a{-a1ah-} b{-a1ai-})
+				      a_r13j >_a1gK lit_a1gJ
+				      \ c_r13u  ->  [ (C2{-ra,x-}{i}
+							   [a{-a1ah-}, b{-a1ai-}]
+							   a1_r13y,
+						       b1_r13z) |
+							("C2", d_r13w) <- PrelRead.lex{-rmh,p-}
+									      c_r13u, (a1_r13y, b1_r13z) <- readsPrec_a1gu
+														lit_a1gH
+														d_r13w
+							]
+				      b_r13l)
+				 (PrelRead.readParen{-rmu,p-}
+				      (X{-r3N,x-} a{-a1ah-} b{-a1ai-})
+				      a_r13j >_a1gD lit_a1gC
+				      \ c_r13B  ->  [ (C3{-rd,x-}{i}
+							   [a{-a1ah-}, b{-a1ai-}]
+							   a1_r13F,
+						       b1_r13G) |
+							("C3", d_r13D) <- PrelRead.lex{-rmh,p-}
+									      c_r13B, (a1_r13F, b1_r13G) <- readsPrec_a1gt
+														lit_a1gA
+														d_r13D
+							]
+				      b_r13l))
+    AbsBinds [] [] [([], readList_a1gq, readList_a1aH)]
+	readList_a1aH
+		    =   PrelRead.readList__{-rjw,p-}
+			    (X{-r3N,x-} a{-a1ah-} b{-a1ai-})
+			    readsPrec_a1gs
+				lit_a1fT
+    d.Read_a18a =
+	({-dict-} [] [readsPrec_a1gr, readList_a1gq])
+{- rec -}
+AbsBinds
+[b{-a1bz-}]
+[d.Eq_a1c4]
+[([b{-a1bz-}], $d8{-r1gM,x-}, d.Show_a1bs)]
+    d.Eq_a1cg =
+	PrelBase.$d7{-rc5,p-}
+    d.Eq_a1ch =
+	d.Eq_a1c4
+    d.Show_a1ce =
+	$d9{-r1gR,x-}
+	    [PrelBase.Int{-3g,p-}, b{-a1bz-}]
+	    [d.Eq_a1cg, d.Eq_a1ch]
+    showsPrec_a1gQ =
+	PrelBase.showsPrec{-rdi,p-}
+	    (X{-r3N,x-} PrelBase.Int{-3g,p-} b{-a1bz-})
+	    d.Show_a1ce
+    showsPrec_a1gP =
+	showsPrec_a1gO
+    AbsBinds [] [] [([], showsPrec_a1gO, showsPrec_a1bv)]
+	lit_a1gS =
+	    lit_a1fR
+	showsPrec_a1bv
+	    a_r13N D1{-r6,x-}{i}
+		    =   PrelBase.showString{-rhV,p-}
+			    "D1"
+	showsPrec_a1bv
+	    a_r13Q (D2{-r5,x-}{i} b1_r13S)
+		    =   PrelBase.showParen{-rhS,p-}
+			    a_r13Q >=_a1fS lit_a1fR
+			    PrelBase..{-rd1,p-}
+				[PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}]
+				PrelBase.showString{-rhV,p-}
+				    "D2 "
+				showsPrec_a1gQ
+				    lit_a1gS b1_r13S
+    AbsBinds [] [] [([], showList_a1gN, showList_a1bZ)]
+	showList_a1bZ
+		    =   PrelBase.showList__{-r3J,p-}
+			    (Y{-r3M,x-} b{-a1bz-})
+			    showsPrec_a1gP
+				lit_a1fQ
+    d.Show_a1bs =
+	({-dict-} [] [showsPrec_a1gO, showList_a1gN])
+{- rec -}
+AbsBinds
+[a{-a1cA-}, b{-a1cD-}]
+[d.Eq_a1dJ, d.Eq_a1dK]
+[([a{-a1cA-}, b{-a1cD-}], $d9{-r1gR,x-}, d.Show_a1cr)]
+    d.Eq_a1dW =
+	d.Eq_a1dJ
+    d.Show_a1dU =
+	$d2{-r1gZ,x-}
+	    a{-a1cA-}
+	    d.Eq_a1dW
+    showsPrec_a1gY =
+	PrelBase.showsPrec{-rdi,p-}
+	    (T{-r3L,x-} a{-a1cA-})
+	    d.Show_a1dU
+    d.Eq_a1e0 =
+	d.Eq_a1dK
+    d.Show_a1dY =
+	$d8{-r1gM,x-}
+	    b{-a1cD-}
+	    d.Eq_a1e0
+    showsPrec_a1gX =
+	PrelBase.showsPrec{-rdi,p-}
+	    (Y{-r3M,x-} b{-a1cD-})
+	    d.Show_a1dY
+    d.Eq_a1e4 =
+	d.Eq_a1dK
+    d.Eq_a1e5 =
+	d.Eq_a1dJ
+    d.Show_a1e2 =
+	$d9{-r1gR,x-}
+	    [b{-a1cD-}, a{-a1cA-}]
+	    [d.Eq_a1e4, d.Eq_a1e5]
+    showsPrec_a1gW =
+	PrelBase.showsPrec{-rdi,p-}
+	    (X{-r3N,x-} b{-a1cD-} a{-a1cA-})
+	    d.Show_a1e2
+    showsPrec_a1gV =
+	showsPrec_a1gU
+    AbsBinds [] [] [([], showsPrec_a1gU, showsPrec_a1cu)]
+	lit_a1h6 =
+	    lit_a1fO
+	>=_a1h5 =
+	    >=_a1fP
+	lit_a1h4 =
+	    lit_a1fO
+	lit_a1h3 =
+	    lit_a1fO
+	>=_a1h2 =
+	    >=_a1fP
+	lit_a1h1 =
+	    lit_a1fO
+	lit_a1h0 =
+	    lit_a1fO
+	showsPrec_a1cu
+	    a_r13Z (C1{-rb,x-}{i} b1_r141)
+		    =   PrelBase.showParen{-rhS,p-}
+			    a_r13Z >=_a1fP lit_a1fO
+			    PrelBase..{-rd1,p-}
+				[PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}]
+				PrelBase.showString{-rhV,p-}
+				    "C1 "
+				showsPrec_a1gY
+				    lit_a1h6 b1_r141
+	showsPrec_a1cu
+	    a_r143 (C2{-ra,x-}{i} b1_r145)
+		    =   PrelBase.showParen{-rhS,p-}
+			    a_r143 >=_a1h5 lit_a1h4
+			    PrelBase..{-rd1,p-}
+				[PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}]
+				PrelBase.showString{-rhV,p-}
+				    "C2 "
+				showsPrec_a1gX
+				    lit_a1h3 b1_r145
+	showsPrec_a1cu
+	    a_r147 (C3{-rd,x-}{i} b1_r149)
+		    =   PrelBase.showParen{-rhS,p-}
+			    a_r147 >=_a1h2 lit_a1h1
+			    PrelBase..{-rd1,p-}
+				[PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}, PrelBase.String{-rdl,p-}]
+				PrelBase.showString{-rhV,p-}
+				    "C3 "
+				showsPrec_a1gW
+				    lit_a1h0 b1_r149
+    AbsBinds [] [] [([], showList_a1gT, showList_a1dE)]
+	showList_a1dE
+		    =   PrelBase.showList__{-r3J,p-}
+			    (X{-r3N,x-} a{-a1cA-} b{-a1cD-})
+			    showsPrec_a1gV
+				lit_a1fN
+    d.Show_a1cr =
+	({-dict-} [] [showsPrec_a1gU, showList_a1gT])
+{- rec -}
+AbsBinds
+[a{-a1ek-}]
+[d.Eq_a1es]
+[([a{-a1ek-}], $d1{-r1gw,x-}, d.Read_a1ee)]
+    d.Read_a1ew =
+	d.Read_a1ee
+    $mreadList_a1h8 =
+	PrelRead.$mreadList{-rlO,p-}
+	    (T{-r3L,x-} a{-a1ek-})
+	    d.Read_a1ew
+    AbsBinds [] [] [([], readsPrec_a1h7, readsPrec_a1eh)]
+	readsPrec_a1eh
+	    =   IOBase.error{-87,p-}
+		    (PrelBase.Int{-3g,p-}
+		     -> PrelBase.String{-rdl,p-}
+		     -> [(T{-r3L,x-} a{-a1ek-}, PrelBase.String{-rdl,p-})])
+		    "read"
+    AbsBinds [] [] [([], readList_a1en, readList_a1ep)]
+	readList_a1ep
+	    =   $mreadList_a1h8
+    d.Read_a1ee =
+	({-dict-} [] [readsPrec_a1h7, readList_a1en])
+{- rec -}
+AbsBinds
+[a{-a1eJ-}]
+[d.Eq_a1eR]
+[([a{-a1eJ-}], $d2{-r1gZ,x-}, d.Show_a1eD)]
+    d.Show_a1eV =
+	d.Show_a1eD
+    $mshowList_a1ha =
+	PrelBase.$mshowList{-rcA,p-}
+	    (T{-r3L,x-} a{-a1eJ-})
+	    d.Show_a1eV
+    AbsBinds [] [] [([], showsPrec_a1h9, showsPrec_a1eG)]
+	showsPrec_a1eG
+	    =   IOBase.error{-87,p-}
+		    (PrelBase.Int{-3g,p-}
+		     -> T{-r3L,x-} a{-a1eJ-}
+		     -> PrelBase.String{-rdl,p-}
+		     -> PrelBase.String{-rdl,p-})
+		    "show"
+    AbsBinds [] [] [([], showList_a1eM, showList_a1eO)]
+	showList_a1eO
+	    =   $mshowList_a1ha
+    d.Show_a1eD =
+	({-dict-} [] [showsPrec_a1h9, showList_a1eM])
+{- nonrec -}
+d.MonadPlus_a1eY =
+    PrelBase.$d22{-rbr,p-}
+++_a1gd =
+    PrelBase.++{-rfN,p-}
+	PrelBase.[]{-3j,p-}
+	d.MonadPlus_a1eY
+d.Eq_a1f3 =
+    PrelBase.$d33{-rbD,p-}
+d.Eq_a1f1 =
+    PrelBase.$d27{-rbw,p-}
+	PrelBase.Char{-38,p-}
+	d.Eq_a1f3
+==_a1gc =
+    PrelBase.=={-8Y,p-}
+	[PrelBase.Char{-38,p-}]
+	d.Eq_a1f1
+d.Monad_a1f6 =
+    PrelBase.$d24{-rbt,p-}
+>>=_a1gb =
+    PrelBase.>>={-811,p-}
+	PrelBase.[]{-3j,p-}
+	d.Monad_a1f6
+d.Monad_a1f9 =
+    d.Monad_a1f6
+return_a1ga =
+    PrelBase.return{-816,p-}
+	PrelBase.[]{-3j,p-}
+	d.Monad_a1f9
+d.MonadZero_a1fb =
+    PrelBase.$d23{-rbs,p-}
+zero_a1g9 =
+    PrelBase.zero{-810,p-}
+	PrelBase.[]{-3j,p-}
+	d.MonadZero_a1fb
+d.Ord_a1fe =
+    PrelBase.$d6{-rc4,p-}
+>_a1g8 =
+    PrelBase.>{-rdf,p-}
+	PrelBase.Int{-3g,p-}
+	d.Ord_a1fe
+d.Num_a1fi =
+    PrelBase.$d3{-rbz,p-}
+fromInt_a1g7 =
+    PrelBase.fromInt{-8R,p-}
+	PrelBase.Int{-3g,p-}
+	d.Num_a1fi
+lit_a1g6 =
+    fromInt_a1g7
+	PrelBase.I#{-5b,p-}{i}
+	    9#
+fromInt_a1g5 =
+    fromInt_a1g7
+lit_a1g4 =
+    fromInt_a1g5
+	PrelBase.I#{-5b,p-}{i}
+	    10#
+fromInt_a1g3 =
+    fromInt_a1g7
+lit_a1g2 =
+    fromInt_a1g3
+	PrelBase.I#{-5b,p-}{i}
+	    0#
+++_a1g1 =
+    ++_a1gd
+>_a1g0 =
+    >_a1g8
+lit_a1fZ =
+    lit_a1g6
+==_a1fY =
+    ==_a1gc
+lit_a1fX =
+    lit_a1g4
+>>=_a1fW =
+    >>=_a1gb
+return_a1fV =
+    return_a1ga
+zero_a1fU =
+    zero_a1g9
+lit_a1fT =
+    lit_a1g2
+d.Ord_a1fn =
+    d.Ord_a1fe
+>=_a1fS =
+    PrelBase.>={-8Z,p-}
+	PrelBase.Int{-3g,p-}
+	d.Ord_a1fn
+lit_a1fR =
+    lit_a1g4
+lit_a1fQ =
+    lit_a1g2
+>=_a1fP =
+    >=_a1fS
+lit_a1fO =
+    lit_a1g4
+lit_a1fN =
+    lit_a1g2
+ghc: module version changed to 1; reason: no old .hi file
