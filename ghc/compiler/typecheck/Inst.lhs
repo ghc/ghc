@@ -39,7 +39,7 @@ import TcHsSyn	( TcExpr, TcId, TypecheckedHsExpr,
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId, tcLookupGlobalId )
+import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
@@ -393,7 +393,11 @@ tcInstDataCon orig data_con
 
 newMethodFromName :: InstOrigin -> TcType -> Name -> NF_TcM Inst
 newMethodFromName origin ty name
-  = tcLookupGlobalId name		`thenNF_Tc` \ id ->
+  = tcLookupId name		`thenNF_Tc` \ id ->
+	-- Use tcLookupId not tcLookupGlobalId; the method is almost
+	-- always a class op, but with -fno-implicit-prelude GHC is
+	-- meant to find whatever thing is in scope, and that may
+	-- be an ordinary function. 
     newMethod origin id [ty]
 
 newMethod :: InstOrigin
