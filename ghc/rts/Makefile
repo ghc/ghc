@@ -110,11 +110,6 @@ ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif
 
-ifeq "$(BootingFromHc)" "YES"
-# use the normal $(CC) when booting from .hc files
-SRC_CC_OPTS += $(HC_OPTS)
-endif
-
 # Currently, you only get 'threads support' in the normal
 # way.
 ifeq "$(GhcRtsThreaded)" "YES"
