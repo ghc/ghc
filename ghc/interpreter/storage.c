@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.38 $
- * $Date: 2000/01/11 15:40:57 $
+ * $Revision: 1.39 $
+ * $Date: 2000/01/11 17:23:39 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -352,6 +352,19 @@ Text enZcodeThenFindText ( String s )
           && (isalnum((int)(*s)) || *s == '_')) { 
          p[n] = *s; n++; s++;
          continue;
+      }
+      if (*s == '(') {
+         int tup = 0;
+         char num[12];
+         s++;
+         while (*s && *s==',') { s++; tup++; };
+         if (*s != ')') internal("enZcodeThenFindText: invalid tuple type");
+         s++;
+         p[n++] = 'Z';
+         sprintf(num,"%d",tup);
+         p[n] = 0; strcat ( &(p[n]), num ); n += strlen(num);
+         p[n++] = 'T';
+         continue;         
       }
       switch (*s++) {
          case '(': p[n++] = 'Z'; p[n++] = 'L'; break;
