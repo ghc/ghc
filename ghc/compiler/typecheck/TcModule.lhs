@@ -27,7 +27,7 @@ import RnHsSyn		( RenamedHsModule(..), RenamedFixityDecl(..) )
 import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..),
 			  TcIdOcc(..), zonkBinds, zonkInst, zonkId )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, plusLIE )
 import TcBinds		( tcBindsAndThen )
 import TcClassDcl	( tcClassDecls2 )

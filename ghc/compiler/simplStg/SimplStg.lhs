@@ -53,7 +53,7 @@ stg2stg :: [StgToDo]		-- spec of what stg-to-stg passes to do
 	      [CostCentre]))	-- "extern" cost-centres
 
 stg2stg stg_todos module_name ppr_style us binds
-  = BSCC("Stg2Stg")
+  = _scc_ "Stg2Stg"
     case (splitUniqSupply us)	of { (us4now, us4later) ->
 
     (if do_verbose_stg2stg then
@@ -103,7 +103,6 @@ stg2stg stg_todos module_name ppr_style us binds
     in
     return (setStgVarInfo do_let_no_escapes binds_to_mangle, cost_centres)
     }}
-    ESCC
   where
     do_let_no_escapes  = opt_StgDoLetNoEscapes
     do_verbose_stg2stg = opt_D_verbose_stg2stg
@@ -130,43 +129,39 @@ stg2stg stg_todos module_name ppr_style us binds
 	case to_do of
 	  StgDoStaticArgs ->
 	     ASSERT(null (fst ccs) && null (snd ccs))
-	     BSCC("StgStaticArgs")
+	     _scc_ "StgStaticArgs"
 	     let
 		 binds3 = doStaticArgs binds us1
 	     in
 	     end_pass us2 "StgStaticArgs" ccs binds3
-	     ESCC
 
 	  StgDoUpdateAnalysis ->
 	     ASSERT(null (fst ccs) && null (snd ccs))
-	     BSCC("StgUpdAnal")
+	     _scc_ "StgUpdAnal"
 		-- NB We have to do setStgVarInfo first!  (There's one
 		-- place free-var info is used) But no let-no-escapes,
 		-- because update analysis doesn't care.
 	     end_pass us2 "UpdAnal" ccs (updateAnalyse (setStgVarInfo False binds))
-	     ESCC
 
 	  D_stg_stats ->
 	     trace (showStgStats binds)
 	     end_pass us2 "StgStats" ccs binds
 
 	  StgDoLambdaLift ->
-	     BSCC("StgLambdaLift")
+	     _scc_ "StgLambdaLift"
 		-- NB We have to do setStgVarInfo first!
 	     let
 		binds3 = liftProgram us1 (setStgVarInfo do_let_no_escapes binds)
 	     in
 	     end_pass us2 "LambdaLift" ccs binds3
-	     ESCC
 
 	  StgDoMassageForProfiling ->
-	     BSCC("ProfMassage")
+	     _scc_ "ProfMassage"
 	     let
 		 (collected_CCs, binds3)
 		   = stgMassageForProfiling module_name grp_name us1 binds
 	     in
 	     end_pass us2 "ProfMassage" collected_CCs binds3
-	     ESCC
 
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
@@ -225,10 +220,9 @@ unlocaliseStgBinds :: FAST_STRING -> UnlocalEnv -> [StgBinding] -> (UnlocalEnv, 
 unlocaliseStgBinds mod uenv [] = (uenv, [])
 
 unlocaliseStgBinds mod uenv (b : bs)
-  = BIND unlocal_top_bind mod uenv b	    _TO_ (new_uenv, new_b) ->
-    BIND unlocaliseStgBinds mod new_uenv bs _TO_ (uenv3, new_bs) ->
-    (uenv3, new_b : new_bs)
-    BEND BEND
+  = case (unlocal_top_bind mod uenv b)	      of { (new_uenv, new_b) ->
+    case (unlocaliseStgBinds mod new_uenv bs) of { (uenv3, new_bs) ->
+    (uenv3, new_b : new_bs) }}
 
 ------------------
 

@@ -16,7 +16,7 @@ import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
 import RnHsSyn		( RenamedMatch(..) )
 import TcHsSyn		( TcIdOcc(..), TcMatch(..) )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, LIE(..), plusLIE )
 import TcEnv		( newMonoIds )
 import TcLoop		( tcGRHSsAndBinds )

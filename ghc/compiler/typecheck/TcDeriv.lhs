@@ -8,9 +8,7 @@ Handles @deriving@ clauses on @data@ declarations.
 \begin{code}
 #include "HsVersions.h"
 
-module TcDeriv (
-	tcDeriving
-    ) where
+module TcDeriv ( tcDeriving ) where
 
 import Ubiq
 
@@ -21,7 +19,7 @@ import HsPragmas	( InstancePragmas(..) )
 import RnHsSyn		( RenamedHsBinds(..), RenamedFixityDecl(..) )
 import TcHsSyn		( TcIdOcc )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstOrigin(..), InstanceMapper(..) )
 import TcEnv		( getEnv_TyCons )
 import TcKind		( TcKind )

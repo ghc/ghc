@@ -10,7 +10,7 @@ module TcIfaceSig ( tcInterfaceSigs ) where
 
 import Ubiq
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import TcMonoType	( tcPolyType )
 
 import HsSyn		( Sig(..), PolyType )

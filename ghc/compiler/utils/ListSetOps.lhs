@@ -14,11 +14,9 @@ module ListSetOps (
    ) where
 
 #if defined(COMPILING_GHC)
-import Util
-# ifdef USE_ATTACK_PRAGMAS
-import Type
-import Id		( Id )
-# endif
+import Ubiq{-uitous-}
+
+import Util	( isIn, isn'tIn )
 #endif
 \end{code}
 
@@ -75,21 +73,5 @@ disjointLists (a:as) bs
   | otherwise   = disjointLists as bs
 
 intersectingLists xs ys = not (disjointLists xs ys)
-#endif
-\end{code}
-
-\begin{code}
-#if defined(COMPILING_GHC)
-# ifdef USE_ATTACK_PRAGMAS
-
-{-# SPECIALIZE unionLists     :: [TyVar] -> [TyVar] -> [TyVar] #-}
-{-# SPECIALIZE intersectLists :: [TyVar] -> [TyVar] -> [TyVar] #-}
-
-{-# SPECIALIZE minusList :: [TyVar] -> [TyVar] -> [TyVar],
-			    [Id]    -> [Id]    -> [Id],
-			    [Int]   -> [Int]   -> [Int]
- #-}
-
-# endif
 #endif
 \end{code}

@@ -12,9 +12,7 @@ module RnIfaces (
 	cachedDecl,
 	readIface,
 	rnIfaces,
-	finalIfaceInfo,
-	IfaceCache(..),
-	VersionInfo(..)
+	IfaceCache(..)
     ) where
 
 import Ubiq
@@ -31,13 +29,16 @@ import RnMonad
 import RnSource		( rnTyDecl, rnClassDecl, rnInstDecl, rnPolyType )
 import RnUtils		( RnEnv(..), emptyRnEnv, lookupRnEnv, lookupTcRnEnv, extendGlobalRnEnv )
 import ParseIface	( parseIface )
-import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..) )
+import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
+			  VersionsMap(..), UsagesMap(..)
+			)
 
 import Bag		( emptyBag, consBag, snocBag, unionBags, unionManyBags, isEmptyBag, bagToList )
 import CmdLineOpts	( opt_HiSuffix, opt_SysHiSuffix )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
-			  fmToList, delListFromFM, sizeFM, keysFM{-ToDo:rm-} )
+			  fmToList, delListFromFM, sizeFM, keysFM{-ToDo:rm-}
+			)
 import Maybes		( maybeToBool )
 import Name		( moduleNamePair, origName, isRdrLexCon,
 			  RdrName(..){-instance NamedThing-}
@@ -182,7 +183,7 @@ cachedDecl iface_cache class_or_tycon orig
   = cachedIface iface_cache mod 	>>= \ maybe_iface ->
     case maybe_iface of
       Failed err -> return (Failed err)
-      Succeeded (ParsedIface _ _ _ _ exps _ _ tdefs vdefs _ _) -> 
+      Succeeded (ParsedIface _ _ _ _ _ exps _ _ tdefs vdefs _ _) -> 
 	case (lookupFM (if class_or_tycon then tdefs else vdefs) str) of
 	  Just decl -> return (Succeeded decl)
 	  Nothing   -> return (Failed (noDeclInIfaceErr mod str))
@@ -275,6 +276,7 @@ rnIfaces :: IfaceCache			-- iface cache (mutvar)
 	 -> IO (RenamedHsModule,	-- extended module
 		RnEnv,			-- final env (for renaming derivings)
 		ImplicitEnv,		-- implicit names used (for usage info)
+		(UsagesMap,VersionsMap,[Module]),	-- usage info
 		(Bag Error, Bag Warning))
 
 rnIfaces iface_cache imp_mods us
@@ -287,14 +289,14 @@ rnIfaces iface_cache imp_mods us
   = {-
     pprTrace "rnIfaces:going after:" (ppCat (map (ppr PprDebug) todo)) $
 
-    pprTrace "rnIfaces:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (m,n) <- keysFM qual]) $
+    pprTrace "rnIfaces:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM qual]) $
     pprTrace "rnIfaces:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
-    pprTrace "rnIfaces:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (m,n) <- keysFM tc_qual]) $
+    pprTrace "rnIfaces:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
     pprTrace "rnIfaces:tc_unqual:" (ppCat (map ppPStr (keysFM tc_unqual))) $
 
-    pprTrace "rnIfaces:dqual:"     (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (m,n) <- keysFM dqual]) $
+    pprTrace "rnIfaces:dqual:"     (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM dqual]) $
     pprTrace "rnIfaces:dunqual:"   (ppCat (map ppPStr (keysFM dunqual))) $
-    pprTrace "rnIfaces:dtc_qual:"  (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (m,n) <- keysFM dtc_qual]) $
+    pprTrace "rnIfaces:dtc_qual:"  (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM dtc_qual]) $
     pprTrace "rnIfaces:dtc_unqual:"(ppCat (map ppPStr (keysFM dtc_unqual))) $
     -}
 
@@ -306,6 +308,11 @@ rnIfaces iface_cache imp_mods us
 	        if_errs_warns),
 	       if_final_env) ->
 
+    -- finalize what we want to say we learned about the
+    -- things we used
+    finalIfaceInfo iface_cache if_final_env if_instdecls {-all_imports_used imp_mods-} >>=
+	\ usage_stuff@(usage_info, version_info, instance_mods) ->
+
     return (HsModule modname iface_version exports imports fixities
 		 (typedecls ++ if_typedecls)
 		 typesigs
@@ -316,6 +323,7 @@ rnIfaces iface_cache imp_mods us
 		 src_loc,
 	    if_final_env,
 	    if_implicits,
+	    usage_stuff,
 	    if_errs_warns)
   where
     decls_and_insts todo def_env occ_env to_return us
@@ -571,7 +579,7 @@ cacheInstModules iface_cache imp_mods
     let
 	imp_ifaces      = [ iface | Just iface <- map (lookupFM iface_fm) imp_mods ]
 	(imp_imods, _)  = removeDups cmpPString (bagToList (unionManyBags (map get_ims imp_ifaces)))
-        get_ims (ParsedIface _ _ _ _ _ ims _ _ _ _ _) = ims
+        get_ims (ParsedIface _ _ _ _ _ _ ims _ _ _ _ _) = ims
     in
     accumulate (map (cachedIface iface_cache) imp_imods) >>= \ err_or_ifaces ->
 
@@ -651,7 +659,7 @@ rnIfaceInstStuff iface_cache modname us occ_env done_inst_env to_return
 		eltsFM (fst if_implicits) ++ eltsFM (snd if_implicits))
     }
   where
-    get_insts (ParsedIface _ _ _ _ _ _ _ _ _ insts _) = insts
+    get_insts (ParsedIface _ _ _ _ _ _ _ _ _ _ insts _) = insts
 
     add_done_inst (InstSig clas tycon _ _) inst_env
       = addToFM_C (+) inst_env (tycon,clas) 1
@@ -700,15 +708,22 @@ rnIfaceInst (InstSig _ _ _ inst_decl) = rnInstDecl inst_decl
 \begin{code}
 finalIfaceInfo ::
 	   IfaceCache			-- iface cache
-	-> [RnName]			-- all imported names required
-	-> [Module]			-- directly imported modules
-	-> IO (VersionInfo,		-- info about version numbers
+	-> RnEnv
+	-> [RenamedInstDecl]
+--	-> [RnName]			-- all imported names required
+--	-> [Module]			-- directly imported modules
+	-> IO (UsagesMap,
+	       VersionsMap,		-- info about version numbers
 	       [Module])		-- special instance modules
 
-type VersionInfo = [(Module, Version, [(FAST_STRING, Version)])]
+finalIfaceInfo iface_cache if_final_env@((qual, unqual, tc_qual, tc_unqual), stack) if_instdecls
+  =
+    pprTrace "usageIf:qual:"      (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM qual]) $
+--  pprTrace "usageIf:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
+    pprTrace "usageIf:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
+--  pprTrace "usageIf:tc_unqual:" (ppCat (map ppPStr (keysFM tc_unqual))) $
 
-finalIfaceInfo iface_cache imps_reqd imp_mods
-  = return ([], [])
+    return (emptyFM, emptyFM, [])
 \end{code}
 
 

@@ -14,7 +14,7 @@ module GenSpecEtc (
 
 import Ubiq
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE, 
 			  newDicts, tyVarsOfInst, instToId )
 import TcEnv		( tcGetGlobalTyVars )
@@ -36,6 +36,7 @@ import Id		( GenId, Id(..), mkUserId, idType )
 import Kind		( isUnboxedKind, isTypeKind, mkBoxedTypeKind )
 import ListSetOps	( minusList, unionLists, intersectLists )
 import Maybes		( Maybe(..), allMaybes )
+import Name		( Name{--O only-} )
 import Outputable	( interppSP, interpp'SP )
 import Pretty
 import PprType		( GenClass, GenType, GenTyVar )

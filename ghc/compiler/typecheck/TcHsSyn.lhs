@@ -42,7 +42,7 @@ import Id	( GenId(..), IdDetails, PragmaInfo,	-- Can meddle modestly with Ids
 		)
 
 -- others:
-import TcMonad
+import TcMonad	hiding ( rnMtoTcM )
 import TcType	( TcType(..), TcMaybe, TcTyVar(..),
 		  zonkTcTypeToType, zonkTcTyVarToTyVar,
 		  tcInstType

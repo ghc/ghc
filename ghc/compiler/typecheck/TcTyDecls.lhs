@@ -32,7 +32,7 @@ import TcType		( tcInstTyVars, tcInstType, tcInstId )
 import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 			  newLocalId, newLocalIds
 			)
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
 
 import Class		( GenClass{-instance Eq-} )

@@ -20,7 +20,7 @@ import RnHsSyn		( isRnTyCon, RenamedTyDecl(..), RenamedClassDecl(..),
 			)
 import TcHsSyn		( TcHsBinds(..), TcIdOcc(..) )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstanceMapper(..) )
 import TcClassDcl	( tcClassDecl1 )
 import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,

@@ -10,10 +10,6 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
-#define MkInt I#
-#define MkChar C#
-#define MkArray _Array
-
 #ifdef __GLASGOW_HASKELL__
 #define TAG_ Int#
 #define LT_ -1#
@@ -22,58 +18,14 @@ you will screw up the layout where they are used in case expressions!
 #endif
 #define GT__ _
 
-#ifdef __HBC__
-#define IMPORT_Trace import Trace
-#define BSCC(l) (
-#define ESCC 	)
-#else
-#define IMPORT_Trace {--}
-#define BSCC(l) (_scc_ l (
-#define ESCC 	))
-#endif
-
--- these are overridable
-#ifndef BIND
-#define BIND case
-#endif /* BIND */
-#ifndef _TO_
-#define _TO_ of {
-#endif /* _TO_ */
-#ifndef BEND
-#define BEND }
-#endif /* BEND */
-#ifndef RETN
-#define RETN {--}
-#endif /* RETN */
-#ifndef RETN_TYPE
-#define RETN_TYPE {--}
-#endif /* RETN_TYPE */
-
 #define COMMA ,
 
 #ifdef DEBUG
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
-#define CHK_Ubiq() import Ubiq
 #else
 #define ASSERT(e)
-#define CHK_Ubiq()
 #endif
-
--- ToDo: ghci needs to load far too many bits of the backend because
---       this ATTACK_PRAGMA stuff encourages Utils.lhs to tell
---       everyone about everyone else.  I guess we need to add some
---       more conditional stuff in.
-#ifdef USE_ATTACK_PRAGMAS
-#define IF_ATTACK_PRAGMAS(x) x
-#else
-#define IF_ATTACK_PRAGMAS(x) {--}
-#endif
-
-#if GHCI
-#define IF_GHCI(stuff) stuff
-#else 
-#define IF_GHCI(stuff) {-nothing-}
-#endif
+#define CHK_Ubiq() import Ubiq
 
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 26
 #define trace _trace
@@ -155,26 +107,6 @@ you will screw up the layout where they are used in case expressions!
 #define _SUBSTR_    substr{-from Utils-}
 #define _APPEND_    ++
 #define _CONCAT_    concat
-#endif
-
-#if __HASKELL1__ < 3
-{- To avoid confusion with Haskell 1.3, we use Swahili.
-
-   data Maybe a = Nothing | Just a
-   data Labda a = Hamna   | Ni   a
-
-   Should we ever need to increase confusion with HBC, we will
-   use Swedish:
-
-   data Kanske a = Ingenting | Bara a
--}
-# define Maybe Labda
-# define Just Ni
-# define Nothing Hamna
-#else
-# define MAYBE Labda
-# define JUST Ni
-# define NOTHING Hamna
 #endif
 
 #endif

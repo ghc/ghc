@@ -36,7 +36,7 @@ import RnHsSyn	( RenamedArithSeqInfo(..), RenamedHsExpr(..) )
 import TcHsSyn	( TcIdOcc(..), TcExpr(..), TcIdBndr(..),
 		  mkHsTyApp, mkHsDictApp )
 
-import TcMonad
+import TcMonad	hiding ( rnMtoTcM )
 import TcEnv	( tcLookupGlobalValueByKey )
 import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
 		  tcInstType, tcInstTcType, zonkTcType )

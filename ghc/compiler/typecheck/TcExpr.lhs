@@ -24,7 +24,7 @@ import TcHsSyn		( TcExpr(..), TcQual(..), TcStmt(..),
 			  mkHsTyApp
 			)
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  LIE(..), emptyLIE, plusLIE, plusLIEs, newOverloadedLit,
 			  newMethod, newMethodWithGivenTy, newDicts )

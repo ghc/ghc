@@ -54,7 +54,7 @@ Checks for
 lintStgBindings :: PprStyle -> String -> [StgBinding] -> [StgBinding]
 
 lintStgBindings sty whodunnit binds
-  = BSCC("StgLint")
+  = _scc_ "StgLint"
     case (initL (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (ppAboves [
@@ -63,7 +63,6 @@ lintStgBindings sty whodunnit binds
 			ppStr "*** Offending Program ***",
 			ppAboves (map (pprPlainStgBinding sty) binds),
 			ppStr "*** End of Offense ***"])
-    ESCC
   where
     lint_binds :: [StgBinding] -> LintM ()
 

@@ -26,11 +26,13 @@ import Pretty
 import FiniteMap
 import Util (pprPanic, pprTrace)
 
-import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..) )
+import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
+			  UsagesMap(..), VersionsMap(..)
+			)
 import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
-import RnIfaces		( findHiFiles, rnIfaces, finalIfaceInfo, VersionInfo(..) )
+import RnIfaces		( findHiFiles, rnIfaces )
 import RnUtils		( RnEnv(..), extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
 
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
@@ -39,7 +41,7 @@ import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, mkBuiltinName, Name, RdrName(..) )
-import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
+import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
 import PrelMods		( pRELUDE )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
@@ -47,17 +49,16 @@ import Util		( panic, assertPanic )
 \end{code}
 
 \begin{code}
-renameModule :: BuiltinNames
-	     -> BuiltinKeys
-	     -> UniqSupply
+renameModule :: UniqSupply
 	     -> RdrNameHsModule
 
 	     -> IO (RenamedHsModule, 	-- output, after renaming
 		    RnEnv,		-- final env (for renaming derivings)
 		    [Module],	   	-- imported modules; for profiling
 
-	            VersionInfo,      	-- version info; for usage
-		    [Module],	   	-- instance modules; for iface
+		    (UsagesMap,
+	            VersionsMap,      	-- version info; for usage
+		    [Module]),	   	-- instance modules; for iface
 
 		    Bag Error,
 		    Bag Warning)
@@ -68,10 +69,12 @@ ToDo: Builtin names which must be read.
 ToDo: Deal with instances (instance version, this module on instance list ???)
 
 \begin{code}
-renameModule b_names b_keys us
-   	     input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
+renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
-  = --pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
+  = let
+	(b_names, b_keys, _) = builtinNameInfo
+    in
+    --pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
     --			    ppAboves [ ppCat (map ppPStr (keysFM builtin_ids))
     --				     , ppCat (map ppPStr (keysFM builtin_tcs))
     --				     , ppCat (map ppPStr (keysFM b_keys))
@@ -128,7 +131,7 @@ renameModule b_names b_keys us
     }) >>= \ (rn_module, imp_mods, errs_so_far, warns_so_far, occ_fm, _) ->
 
     if not (isEmptyBag errs_so_far) then
-	return (rn_panic, rn_panic, rn_panic, rn_panic, rn_panic, errs_so_far, warns_so_far)
+	return (rn_panic, rn_panic, rn_panic, rn_panic, errs_so_far, warns_so_far)
     else
 
     -- No errors renaming source so rename the interfaces ...
@@ -175,19 +178,13 @@ renameModule b_names b_keys us
 	     rn_module (must_haves ++ imports_used) >>=
 	\ (rn_module_with_imports, final_env,
 	   (implicit_val_fm, implicit_tc_fm),
+	   usage_stuff,
 	   (iface_errs, iface_warns)) ->
-    let
-        all_imports_used = imports_used ++ eltsFM implicit_tc_fm
-					++ eltsFM implicit_val_fm
-    in
-    finalIfaceInfo iface_cache all_imports_used imp_mods >>=
-	\ (version_info, instance_mods) ->
 
     return (rn_module_with_imports,
 	    final_env,
 	    imp_mods,
-	    version_info,
-	    instance_mods, 
+	    usage_stuff,
 	    errs_so_far  `unionBags` iface_errs,
 	    warns_so_far `unionBags` iface_warns)
   where
@@ -198,7 +195,8 @@ renameModule b_names b_keys us
 \end{code}
 
 \begin{code}
-pprPIface (ParsedIface m v mv lcm exm ims lfx ltdm lvdm lids ldp)
+{- TESTING:
+pprPIface (ParsedIface m v mv usgs lcm exm ims lfx ltdm lvdm lids ldp)
   = ppAboves [
 	ppCat [ppPStr SLIT("interface"), ppPStr m, ppInt v,
 	       case mv of { Nothing -> ppNil; Just n -> ppInt n }],
@@ -258,4 +256,5 @@ pprRdrIfaceDecl (ValSig f _ ty)
 pprRdrInstDecl (InstSig c t _ decl)
   = ppBesides [ppStr "class=", ppr PprDebug c, ppStr " type=", ppr PprDebug t, ppStr "; ",
 		ppr PprDebug decl]
+-}
 \end{code}

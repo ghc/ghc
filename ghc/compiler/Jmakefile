@@ -377,7 +377,7 @@ ALLINTS=$(ALLSRCS_LHS:.lhs=.hi) $(ALLSRCS_HS:.hs=.hi)
 #endif
 
 #if GhcWithHscOptimised == YES
-#define __version_sensitive_flags -DUSE_ATTACK_PRAGMAS -fshow-pragma-name-errs -fomit-reexported-instances -fshow-import-specs
+#define __version_sensitive_flags -O /*-DUSE_ATTACK_PRAGMAS -fshow-pragma-name-errs*/ -fomit-reexported-instances -fshow-import-specs
 #else
 #define __version_sensitive_flags -fomit-reexported-instances
 #endif

@@ -25,7 +25,7 @@ module ClosureInfo (
 
 	layOutDynClosure, layOutDynCon, layOutStaticClosure,
 	layOutStaticNoFVClosure, layOutPhantomClosure,
-	mkVirtHeapOffsets, -- for GHCI
+	mkVirtHeapOffsets,
 
 	nodeMustPointToIt, getEntryConvention,
 	blackHoleOnEntry,

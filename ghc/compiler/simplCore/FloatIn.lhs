@@ -14,11 +14,7 @@ then discover that they aren't needed in the chosen branch.
 \begin{code}
 #include "HsVersions.h"
 
-module FloatIn (
-	floatInwards
-
-	-- and to make the interface self-sufficient...
-    ) where
+module FloatIn ( floatInwards ) where
 
 import Ubiq{-uitous-}
 
@@ -391,9 +387,9 @@ sepBindsByDropPoint drop_pts floaters
     -------------------------
     fvsOfBind (_,fvs)	= fvs
 
---floatedBindsFVs ::
+floatedBindsFVs :: FloatingBinds -> FreeVarsSet
 floatedBindsFVs binds = unionManyIdSets (map snd binds)
 
---mkCoLets' :: [FloatingBinds] -> CoreExpr -> CoreExpr
+mkCoLets' :: FloatingBinds -> CoreExpr -> CoreExpr
 mkCoLets' to_drop e = mkCoLetsNoUnboxed (reverse (map fst to_drop)) e
 \end{code}

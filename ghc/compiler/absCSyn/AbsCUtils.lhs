@@ -66,39 +66,14 @@ mkAbsCStmts :: AbstractC -> AbstractC -> AbstractC
 mkAbsCStmts = AbsCStmts
 
 {- Discarded SLPJ June 95; it calls nonemptyAbsC too much!
-  = BIND (case (nonemptyAbsC abc2) of
+  = case (case (nonemptyAbsC abc2) of
 	    Nothing -> AbsCNop
-	    Just d2 -> d2)	_TO_ abc2b ->
+	    Just d2 -> d2)	of { abc2b ->
 
     case (nonemptyAbsC abc1) of {
       Nothing -> abc2b;
       Just d1 -> AbsCStmts d1 abc2b
-    } BEND
--}
-{-
-  = case (nonemptyAbsC abc1) of
-      Nothing -> abc2
-      Just d1 -> AbsCStmts d1 abc2
--}
-{- old2:
-  = case (nonemptyAbsC abc1) of
-      Nothing -> case (nonemptyAbsC abc2) of
-		   Nothing -> AbsCNop
-		   Just d2 -> d2
-      Just d1 -> AbsCStmts d1 abc2
--}
-{- old:
-    if abc1_empty then
-	if abc2_empty
-	then AbsCNop
-	else abc2
-    else if {- abc1 not empty but -} abc2_empty then
-	abc1
-    else {- neither empty -}
-	AbsCStmts abc1 abc2
-  where
-    abc1_empty = noAbsCcode abc1
-    abc2_empty = noAbsCcode abc2
+    } }
 -}
 \end{code}
 
@@ -539,14 +514,13 @@ flatAmode (CCode abs_C)
       _ ->
 	-- de-anonymous-ise the code and push it (labelled) to the top level
 	getUniqFlt 		`thenFlt` \ new_uniq ->
-	BIND (mkReturnPtLabel new_uniq)    _TO_ return_pt_label ->
+	case (mkReturnPtLabel new_uniq)    of { return_pt_label ->
 	flatAbsC abs_C	`thenFlt` \ (body_code, tops) ->
 	returnFlt (
 	    CLbl return_pt_label CodePtrRep,
 	    tops `mkAbsCStmts` CCodeBlock return_pt_label body_code
 	    -- DO NOT TOUCH the stuff sent to the top...
-	)
-	BEND
+	) }
 
 flatAmode (CTableEntry base index kind)
   = flatAmode base    	`thenFlt` \ (base_amode, base_tops) ->

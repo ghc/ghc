@@ -34,7 +34,7 @@ import Type	( tyVarsOfTypes )
 import TyCon	( TyCon, Arity(..), tyConKind, synTyConArity )
 import Class	( Class(..), GenClass, classSig )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 
 import Name		( getOccName, getSrcLoc, Name{-instance NamedThing-} )
 import PprStyle

@@ -19,7 +19,7 @@ import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit,
 			  GRHSsAndBinds, Stmt, Fake )
 import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcExpr(..), TcMonoBinds(..) )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( lookupInst, tyVarsOfInst, isTyVarDict, isDict, matchesInst,
 			  instToId, instBindingRequired, instCanBeGeneralised, newDictsAtLoc,
 			  Inst(..), LIE(..), zonkLIE, emptyLIE, plusLIE, unitLIE, consLIE,

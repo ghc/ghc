@@ -22,7 +22,7 @@ import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, IdEnv(..),
 import Outputable	( Outputable(..){-instance (,)-} )
 import PprCore		( GenCoreBinding{-instance-} )
 import PprStyle		( PprStyle(..) )
-import PprType		-- too lazy to type in all the instances
+import PprType		( GenTyVar )
 import Pretty		( ppInt, ppStr, ppBesides, ppAboves )
 import SetLevels	-- all of it
 import TyVar		( GenTyVar{-instance Eq-} )

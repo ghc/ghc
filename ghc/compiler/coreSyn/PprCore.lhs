@@ -17,7 +17,7 @@ module PprCore (
 	pprTypedCoreBinder
 	
 	-- these are here to make the instances go in 0.26:
-#if __GLASGOW_HASKELL__ <= 26
+#if __GLASGOW_HASKELL__ <= 30
 	, GenCoreBinding, GenCoreExpr, GenCoreCaseAlts
 	, GenCoreCaseDefault, GenCoreArg
 #endif

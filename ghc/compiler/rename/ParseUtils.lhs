@@ -31,7 +31,12 @@ import Util		( startsWith, isIn, panic, assertPanic )
 \end{code}
 
 \begin{code}
-type LocalVersionsMap = FiniteMap FAST_STRING Version
+type UsagesMap	      = FiniteMap Module (Version, VersionsMap)
+			-- module => its version, then to all its entities
+			-- and their versions; "instance" is a magic entity
+			-- representing all the instances def'd in that module
+type VersionsMap      = FiniteMap FAST_STRING Version
+			-- Versions for things def'd in this module
 type ExportsMap       = FiniteMap FAST_STRING (RdrName, ExportFlag)
 type FixitiesMap      = FiniteMap FAST_STRING RdrNameFixityDecl
 type LocalTyDefsMap   = FiniteMap FAST_STRING RdrIfaceDecl -- for TyCon/Class
@@ -45,7 +50,8 @@ data ParsedIface
       Module		-- Module name
       Version		-- Module version number
       (Maybe Version)	-- Source version number
-      LocalVersionsMap  -- Local version numbers
+      UsagesMap		-- Used when compiling this module
+      VersionsMap	-- Version numbers of things from this module
       ExportsMap	-- Exported names
       (Bag Module)	-- Special instance modules
       FixitiesMap	-- fixities of local things
@@ -71,6 +77,7 @@ data RdrIfaceInst
 -----------------------------------------------------------------
 data IfaceToken
   = ITinterface		-- keywords
+  | ITusages
   | ITversions
   | ITexports
   | ITinstance_modules
@@ -330,6 +337,7 @@ lexIface str
     keywordsFM = listToFM [
 	("interface",	 ITinterface)
 
+       ,("__usages__",		ITusages)
        ,("__versions__",	ITversions)
        ,("__exports__",		ITexports)
        ,("__instance_modules__",ITinstance_modules)

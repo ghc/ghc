@@ -20,7 +20,7 @@ import RnHsSyn		( RenamedHsBinds(..), RenamedBind(..), RenamedSig(..),
 import TcHsSyn		( TcHsBinds(..), TcBind(..), TcMonoBinds(..),
 			  TcIdOcc(..), TcIdBndr(..) )
 
-import TcMonad	
+import TcMonad		hiding ( rnMtoTcM )	
 import GenSpecEtc	( checkSigTyVars, genBinds, TcSigInfo(..) )
 import Inst		( Inst, LIE(..), emptyLIE, plusLIE, InstOrigin(..) )
 import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds )

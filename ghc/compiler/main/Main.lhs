@@ -33,7 +33,6 @@ import Bag		( emptyBag, isEmptyBag )
 import CmdLineOpts
 import ErrUtils		( pprBagOfErrors, ghcExit )
 import Maybes		( maybeToBool, MaybeErr(..) )
-import PrelInfo		( builtinNameInfo )
 import RdrHsSyn		( getRawExportees )
 import Specialise	( SpecialiseData(..) )
 import StgSyn		( pprPlainStgBinding, GenStgBinding )
@@ -70,6 +69,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- ******* READER
     show_pass "Reader"	>>
+    _scc_     "Reader"
     rdModule		>>= \ (mod_name, rdr_module) ->
 
     doDump opt_D_dump_rdr "Reader:"
@@ -79,24 +79,22 @@ doIt (core_cmds, stg_cmds) input_pgm
 	(pp_show (ppSourceStats rdr_module)) 	>>
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
-    mkSplitUniqSupply 'r'	>>= \ rn_uniqs ->	-- renamer
-    mkSplitUniqSupply 'a'	>>= \ tc_uniqs ->	-- typechecker
-    mkSplitUniqSupply 'd'	>>= \ ds_uniqs ->	-- desugarer
-    mkSplitUniqSupply 's'	>>= \ sm_uniqs ->	-- core-to-core simplifier
-    mkSplitUniqSupply 'c'	>>= \ c2s_uniqs ->	-- core-to-stg
-    mkSplitUniqSupply 'g'	>>= \ st_uniqs ->	-- stg-to-stg passes
-    mkSplitUniqSupply 'f'	>>= \ fl_uniqs ->	-- absC flattener
+    mkSplitUniqSupply 'r'	>>= \ rn_uniqs 	-> -- renamer
+    mkSplitUniqSupply 'a'	>>= \ tc_uniqs 	-> -- typechecker
+    mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
+    mkSplitUniqSupply 's'	>>= \ sm_uniqs 	-> -- core-to-core simplifier
+    mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
+    mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
+    mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
     mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
     -- ******* RENAMER
     show_pass "Renamer" 			>>
+    _scc_     "Renamer"
 
-    case builtinNameInfo
-    of { (wiredin_fm, key_fm, idinfo_fm) ->
-
-    renameModule wiredin_fm key_fm rn_uniqs rdr_module >>=
+    renameModule rn_uniqs rdr_module >>=
 	\ (rn_mod, rn_env, import_names,
-	   version_info, instance_modules,
+	   usage_stuff,
 	   rn_errs_bag, rn_warns_bag) ->
 
     if (not (isEmptyBag rn_errs_bag)) then
@@ -122,7 +120,11 @@ doIt (core_cmds, stg_cmds) input_pgm
     -- (the iface file is produced incrementally, as we have
     -- the information that we need...; we use "iface<blah>")
     -- "endIface" finishes the job.
+    let
+	(usages_map, version_info, instance_modules) = usage_stuff
+    in
     startIface mod_name				    >>= \ if_handle ->
+    ifaceUsages		 if_handle usages_map	    >>
     ifaceVersions	 if_handle version_info	    >>
     ifaceExportList	 if_handle rn_mod	    >>
     ifaceFixities	 if_handle rn_mod	    >>
@@ -130,6 +132,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- ******* TYPECHECKER
     show_pass "TypeCheck" 			>>
+    _scc_     "TypeCheck"
     case (case (typecheckModule tc_uniqs {-idinfo_fm-} rn_env rn_mod) of
 	    Succeeded (stuff, warns)
 		-> (emptyBag, warns, stuff)
@@ -176,6 +179,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- ******* DESUGARER
     show_pass "DeSugar" 			>>
+    _scc_     "DeSugar"
     let
 	(desugared,ds_warnings)
 	  = deSugar ds_uniqs mod_name typechecked_quint
@@ -192,6 +196,8 @@ doIt (core_cmds, stg_cmds) input_pgm
 						>>
 
     -- ******* CORE-TO-CORE SIMPLIFICATION (NB: I/O op)
+    show_pass "Core2Core" 			>>
+    _scc_     "Core2Core"
     core2core core_cmds mod_name pprStyle
 	      sm_uniqs local_tycons pragma_tycon_specs desugared
 						>>=
@@ -205,11 +211,13 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- ******* STG-TO-STG SIMPLIFICATION
     show_pass "Core2Stg" 			>>
+    _scc_     "Core2Stg"
     let
 	stg_binds   = topCoreBindsToStg c2s_uniqs simplified
     in
 
     show_pass "Stg2Stg" 			>>
+    _scc_     "Stg2Stg"
     stg2stg stg_cmds mod_name pprStyle st_uniqs stg_binds
 						>>=
 
@@ -225,6 +233,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- ******* "ABSTRACT", THEN "FLAT", THEN *REAL* C!
     show_pass "CodeGen" 			>>
+    _scc_     "CodeGen"
     let
 	abstractC      = codeGen mod_name     -- module name for CC labelling
 				 cost_centre_info
@@ -272,7 +281,7 @@ doIt (core_cmds, stg_cmds) input_pgm
     doOutput opt_ProduceC c_output_w 		>>
 
     ghcExit 0
-    } ) } }
+    } ) }
   where
     -------------------------------------------------------------
     -- ****** printing styles and column width:

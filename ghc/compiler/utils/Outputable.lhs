@@ -49,17 +49,6 @@ interpp'SP sty xs
   = ppIntersperse sep (map (ppr sty) xs)
   where
     sep = ppBeside ppComma ppSP
-
-#ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE interppSP :: PprStyle -> [Id] -> Pretty #-}
-{-# SPECIALIZE interppSP :: PprStyle -> [TyVar] -> Pretty #-}
-
-{-# SPECIALIZE interpp'SP :: PprStyle -> [(Id, Id)] -> Pretty #-}
-{-# SPECIALIZE interpp'SP :: PprStyle -> [Id] -> Pretty #-}
-{-# SPECIALIZE interpp'SP :: PprStyle -> [TyVarTemplate] -> Pretty #-}
-{-# SPECIALIZE interpp'SP :: PprStyle -> [TyVar] -> Pretty #-}
-{-# SPECIALIZE interpp'SP :: PprStyle -> [Type] -> Pretty #-}
-#endif
 \end{code}
 
 \begin{code}

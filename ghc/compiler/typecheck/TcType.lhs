@@ -45,7 +45,7 @@ import Class	( GenClass )
 import Id	( idType )
 import Kind	( Kind )
 import TcKind	( TcKind )
-import TcMonad
+import TcMonad	hiding ( rnMtoTcM )
 import Usage	( Usage(..), GenUsage, UVar(..), duffUsage )
 
 import Ubiq

@@ -8,7 +8,7 @@
 
 module TcClassSig ( tcClassSigs ) where
 
-import TcMonad		-- typechecking monadic machinery
+import TcMonad		hiding ( rnMtoTcM )
 import HsSyn		-- the stuff being typechecked
 
 import Type

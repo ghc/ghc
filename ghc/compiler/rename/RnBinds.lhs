@@ -410,12 +410,12 @@ reconstructRec cycles edges mbi
     reconstructCycle :: FlatMonoBindsInfo -> Cycle -> RenamedHsBinds
 
     reconstructCycle mbi2 cycle
-      = BIND [(binds,sigs) | (vertex, _, _, binds, sigs) <- mbi2, vertex `is_elem` cycle]
-		  _TO_ relevant_binds_and_sigs ->
+      = case [(binds,sigs) | (vertex, _, _, binds, sigs) <- mbi2, vertex `is_elem` cycle]
+		  of { relevant_binds_and_sigs ->
 
-	BIND (unzip relevant_binds_and_sigs) _TO_ (binds, sig_lists) ->
+	case (unzip relevant_binds_and_sigs) of { (binds, sig_lists) ->
 
-	BIND (foldr AndMonoBinds EmptyMonoBinds binds) _TO_ this_gp_binds ->
+	case (foldr AndMonoBinds EmptyMonoBinds binds) of { this_gp_binds ->
 	let
 	    this_gp_sigs	= foldr1 (++) sig_lists
 	    have_sigs		= not (null sig_lists)
@@ -424,7 +424,7 @@ reconstructRec cycles edges mbi
 		-- e.g. "have_sigs [[], [], []]" ???????????
 	in
 	mk_binds this_gp_binds this_gp_sigs (isCyclic edges cycle) have_sigs
-	BEND BEND BEND
+	}}}
       where
 	is_elem = isIn "reconstructRec"
 

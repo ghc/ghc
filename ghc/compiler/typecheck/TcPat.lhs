@@ -16,7 +16,7 @@ import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
 import RnHsSyn		( RenamedPat(..) )
 import TcHsSyn		( TcPat(..), TcIdOcc(..) )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			  emptyLIE, plusLIE, plusLIEs, LIE(..),
 			  newMethod, newOverloadedLit

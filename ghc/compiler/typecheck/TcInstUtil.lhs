@@ -20,7 +20,7 @@ import HsSyn		( MonoBinds, Fake, InPat, Sig )
 import RnHsSyn		( RenamedMonoBinds(..), RenamedSig(..), 
 			  RenamedInstancePragmas(..) )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstanceMapper(..) )
 
 import Bag		( bagToList )
@@ -30,7 +30,7 @@ import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
 import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
 import MatchEnv		( nullMEnv, insertMEnv )
 import Maybes		( MaybeErr(..), mkLookupFunDef )
-import Name		( getSrcLoc )
+import Name		( getSrcLoc, Name{--O only-} )
 import PprType		( GenClass, GenType, GenTyVar )
 import Pretty
 import SpecEnv		( SpecEnv(..), nullSpecEnv, addOneToSpecEnv )

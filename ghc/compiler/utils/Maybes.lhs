@@ -12,7 +12,7 @@ module Maybes (
 --	Maybe(..), -- no, it's in 1.3
 	MaybeErr(..),
 
-	allMaybes,	-- GHCI only
+	allMaybes,
 	catMaybes,
 	firstJust,
 	expectJust,
@@ -24,11 +24,11 @@ module Maybes (
 	failMaB,
 	failMaybe,
 	seqMaybe,
-	mapMaybe,	-- GHCI only
+	mapMaybe,
 	returnMaB,
-	returnMaybe,	-- GHCI only
+	returnMaybe,
 	thenMaB,
-	thenMaybe	-- GHCI only
+	thenMaybe
 
 #if ! defined(COMPILING_GHC)
 	, findJust
@@ -41,9 +41,6 @@ module Maybes (
 
 CHK_Ubiq() -- debugging consistency check
 
-#if USE_ATTACK_PRAGMAS
-import Util
-#endif
 #endif
 \end{code}
 

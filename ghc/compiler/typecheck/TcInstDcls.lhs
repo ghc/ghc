@@ -32,7 +32,7 @@ import TcHsSyn		( TcIdOcc(..), TcHsBinds(..),
 			  mkHsDictLam, mkHsDictApp )
 
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import GenSpecEtc	( checkSigTyVars )
 import Inst		( Inst, InstOrigin(..), InstanceMapper(..),
 			  newDicts, newMethod, LIE(..), emptyLIE, plusLIE )
@@ -64,7 +64,7 @@ import Class		( GenClass, GenClassOp,
 import Id		( GenId, idType, isDefaultMethodId_maybe )
 import ListSetOps	( minusList )
 import Maybes 		( maybeToBool, expectJust )
-import Name		( getLocalName, origName, nameOf )
+import Name		( getLocalName, origName, nameOf, Name{--O only-} )
 import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID )
 import PrelMods		( pRELUDE )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,

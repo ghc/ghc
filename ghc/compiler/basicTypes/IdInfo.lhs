@@ -728,7 +728,7 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 \begin{code}
 mkUnfolding guide expr
   = GenForm False (mkFormSummary NoStrictnessInfo expr)
-	(BSCC("OccurExpr") occurAnalyseGlobalExpr expr ESCC)
+	(occurAnalyseGlobalExpr expr)
 	guide
 \end{code}
 

@@ -18,7 +18,6 @@
 
 > import Type		( applyTypeEnvToTy, isPrimType,
 >			  SigmaType(..), Type
->			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
 >			)
 > import CmdLineOpts	( SwitchResult, switchIsOn )
 > import CoreUnfold	( UnfoldingDetails(..) )

@@ -25,7 +25,7 @@ import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, unZonkId )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds)
 import TcInstDcls	( processInstBinds )

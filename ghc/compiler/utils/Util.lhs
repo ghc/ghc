@@ -80,9 +80,7 @@ module Util (
 	-- error handling
 #if defined(COMPILING_GHC)
 	, panic, panic#, pprPanic, pprPanic#, pprError, pprTrace
-# ifdef DEBUG
 	, assertPanic
-# endif
 #endif {- COMPILING_GHC -}
 
 	-- and to make the interface self-sufficient...
@@ -258,27 +256,6 @@ isn'tIn msg x ys
 
 # endif {- DEBUG -}
 
-# ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE isIn :: String -> Literal -> [Literal] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> Class -> [Class] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> Id -> [Id] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> Int -> [Int] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> MagicId -> [MagicId] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> Name -> [Name] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> TyCon -> [TyCon] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> TyVar -> [TyVar] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> TyVarTemplate -> [TyVarTemplate] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> Unique -> [Unique] -> Bool #-}
-{-# SPECIALIZE isIn :: String -> _PackedString -> [_PackedString] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> (Id, Id) -> [(Id, Id)] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> Int -> [Int] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> Id -> [Id] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> MagicId -> [MagicId] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> TyCon -> [TyCon] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> TyVar -> [TyVar] -> Bool #-}
-{-# SPECIALIZE isn'tIn :: String -> TyVarTemplate -> [TyVarTemplate] -> Bool #-}
-# endif
-
 #endif {- COMPILING_GHC -}
 \end{code}
 
@@ -298,21 +275,6 @@ assoc crash_msg lst key
     then panic ("Failed in assoc: " ++ crash_msg)
     else head res
   where res = [ val | (key', val) <- lst, key == key']
-
-#if defined(COMPILING_GHC)
-# ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE assoc :: String -> [(Id,            a)] -> Id		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(Class,         a)] -> Class		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(Name,          a)] -> Name		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(PrimRep,      a)] -> PrimRep	-> a #-}
-{-# SPECIALIZE assoc :: String -> [(String,        a)] -> String        -> a #-}
-{-# SPECIALIZE assoc :: String -> [(TyCon,         a)] -> TyCon		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(TyVar,         a)] -> TyVar		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(TyVarTemplate, a)] -> TyVarTemplate -> a #-}
-{-# SPECIALIZE assoc :: String -> [(Type,          a)] -> Type		-> a #-}
-{-# SPECIALIZE assoc :: String -> [(_PackedString, a)] -> _PackedString -> a #-}
-# endif
-#endif
 \end{code}
 
 %************************************************************************
@@ -336,11 +298,6 @@ hasNoDups xs = f [] xs
     is_elem = isIn "hasNoDups"
 #else
     is_elem = elem
-#endif
-#if defined(COMPILING_GHC)
-# ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE hasNoDups :: [TyVar] -> Bool #-}
-# endif
 #endif
 \end{code}
 
@@ -844,9 +801,8 @@ panic# s = case (panic s) of () -> EQ_
 
 pprPanic# heading pretty_msg = panic# (heading++(ppShow 80 pretty_msg))
 
-# ifdef DEBUG
 assertPanic :: String -> Int -> a
 assertPanic file line = panic ("ASSERT failed! file "++file++", line "++show line)
-# endif
+
 #endif {- COMPILING_GHC -}
 \end{code}

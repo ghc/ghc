@@ -14,7 +14,7 @@ import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 import RnHsSyn		( RenamedGRHSsAndBinds(..), RenamedGRHS(..) )
 import TcHsSyn		( TcGRHSsAndBinds(..), TcGRHS(..), TcIdOcc(..) )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, LIE(..), plusLIE )
 import TcBinds		( tcBindsAndThen )
 import TcExpr		( tcExpr )

@@ -15,7 +15,7 @@ import HsSyn		( DefaultDecl(..), MonoType,
 import RnHsSyn		( RenamedDefaultDecl(..) )
 import TcHsSyn		( TcIdOcc )
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstOrigin(..) )
 import TcEnv		( tcLookupClassByKey )
 import TcMonoType	( tcMonoType )

@@ -16,7 +16,7 @@ import RnHsSyn		( RenamedPolyType(..), RenamedMonoType(..),
 			)
 
 
-import TcMonad
+import TcMonad		hiding ( rnMtoTcM )
 import TcEnv		( tcLookupTyVar, tcLookupClass, tcLookupTyCon, 
 			  tcTyVarScope, tcTyVarScopeGivenKinds
 			)

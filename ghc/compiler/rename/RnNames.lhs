@@ -508,16 +508,16 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
         (vals, tcs, ies_left) = do_builtin ies
 
 
-getOrigIEs (ParsedIface _ _ _ _ exps _ _ _ _ _ _) Nothing		-- import all
+getOrigIEs (ParsedIface _ _ _ _ _ exps _ _ _ _ _ _) Nothing		-- import all
   = (map mkAllIE (eltsFM exps), [], emptyBag)
 
-getOrigIEs (ParsedIface _ _ _ _ exps _ _ _ _ _ _) (Just (True, ies))	-- import hiding
+getOrigIEs (ParsedIface _ _ _ _ _ exps _ _ _ _ _ _) (Just (True, ies))	-- import hiding
   = (map mkAllIE (eltsFM exps_left), found_ies, errs)
   where
     (found_ies, errs) = lookupIEs exps ies
     exps_left = delListFromFM exps (map (getLocalName.ie_name.fst) found_ies)
 
-getOrigIEs (ParsedIface _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))	-- import these
+getOrigIEs (ParsedIface _ _ _ _ _ exps _ _ _ _ _ _) (Just (False, ies))	-- import these
   = (map fst found_ies, found_ies, errs)
   where
     (found_ies, errs) = lookupIEs exps ies
@@ -622,7 +622,7 @@ getFixityDecl iface_cache rn
     case maybe_iface of
       Failed err ->
 	return (Nothing, unitBag err)
-      Succeeded (ParsedIface _ _ _ _ _ _ fixes _ _ _ _) ->
+      Succeeded (ParsedIface _ _ _ _ _ _ _ fixes _ _ _ _) ->
 	case lookupFM fixes str of
 	  Nothing 	    -> return (Nothing, emptyBag)
 	  Just (InfixL _ i) -> return (Just (InfixL rn i), emptyBag)

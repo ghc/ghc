@@ -34,6 +34,7 @@ parseIface = parseIToks . lexIface
 
 %token
 	INTERFACE	    { ITinterface }
+	USAGES_PART	    { ITusages }
 	VERSIONS_PART	    { ITversions }
 	EXPORTS_PART	    { ITexports }
 	INSTANCE_MODULES_PART { ITinstance_modules }
@@ -79,31 +80,51 @@ parseIface = parseIToks . lexIface
 
 iface		:: { ParsedIface }
 iface		: INTERFACE CONID INTEGER
-		  versions_part exports_part inst_modules_part
+		  usages_part versions_part
+		  exports_part inst_modules_part
 		  fixities_part decls_part instances_part pragmas_part
-		  { case $8 of { (tm, vm) ->
+		  { case $9 of { (tm, vm) ->
 		    ParsedIface $2 (fromInteger $3) Nothing{-src version-}
-			$4  -- local versions
-			$5  -- exports map
-			$6  -- instance modules
-			$7  -- fixities map
+			$4  -- usages
+			$5  -- local versions
+			$6  -- exports map
+			$7  -- instance modules
+			$8  -- fixities map
 			tm  -- decls maps
 			vm
-			$9  -- local instances
-			$10 -- pragmas map
+			$10  -- local instances
+			$11 -- pragmas map
 		    }
 --------------------------------------------------------------------------
 		  }
 
-versions_part	    :: { LocalVersionsMap }
-versions_part	    :  VERSIONS_PART name_version_pairs
-			{ bagToFM $2 }
+usages_part	    :: { UsagesMap }
+usages_part	    :  USAGES_PART module_stuff_pairs	{ bagToFM $2 }
+		    |					{ emptyFM }
+
+versions_part	    :: { VersionsMap }
+versions_part	    :  VERSIONS_PART name_version_pairs { bagToFM $2 }
+		    |					{ emptyFM }
+
+module_stuff_pairs  :: { Bag (Module, (Version, FiniteMap FAST_STRING Version)) }
+module_stuff_pairs  :  module_stuff_pair
+			{ unitBag $1 }
+		    |  module_stuff_pairs module_stuff_pair
+			{ $1 `snocBag` $2 }
+
+module_stuff_pair   ::  { (Module, (Version, FiniteMap FAST_STRING Version)) }
+module_stuff_pair   :  CONID INTEGER DCOLON name_version_pairs SEMI
+			{ ($1, (fromInteger $2, bagToFM $4)) }
 
 name_version_pairs  ::	{ Bag (FAST_STRING, Int) }
-name_version_pairs  :  iname OPAREN INTEGER CPAREN
-			{ unitBag ($1, fromInteger $3) }
-		    |  name_version_pairs iname OPAREN INTEGER CPAREN
-			{ $1 `snocBag` ($2, fromInteger $4)
+name_version_pairs  :  name_version_pair
+			{ unitBag $1 }
+		    |  name_version_pairs COMMA name_version_pair
+			{ $1 `snocBag` $3 }
+
+name_version_pair   ::	{ (FAST_STRING, Int) }
+name_version_pair   :  iname INTEGER
+			{ ($1, fromInteger $2)
 --------------------------------------------------------------------------
 			}
 
@@ -111,10 +132,11 @@ exports_part	:: { ExportsMap }
 exports_part	:  EXPORTS_PART export_items { bagToFM $2 }
 
 export_items	:: { Bag (FAST_STRING, (RdrName, ExportFlag)) }
-export_items	:  qiname maybe_dotdot
-		   { unitBag (de_qual $1, ($1, $2)) }
-		|  export_items qiname maybe_dotdot
-		   { $1 `snocBag` (de_qual $2, ($2, $3)) }
+export_items	:  export_item		    { unitBag $1 }
+		|  export_items export_item { $1 `snocBag` $2 }
+
+export_item	:: { (FAST_STRING, (RdrName, ExportFlag)) }
+export_item	:  qiname maybe_dotdot	    { (de_qual $1, ($1, $2)) }
 
 maybe_dotdot	:: { ExportFlag }
 maybe_dotdot	:  DOTDOT { ExportAll }

@@ -67,7 +67,7 @@ getUniques :: Int -> UniqSupply -> [Unique]
 \end{code}
 
 \begin{code}
-mkSplitUniqSupply (MkChar c#)
+mkSplitUniqSupply (C# c#)
   = let
 	mask# = (i2w (ord# c#)) `shiftL#` (i2w_s 24#)
 
@@ -91,7 +91,7 @@ mkSplitUniqSupply (MkChar c#)
 		(r, s)
 
 	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (W# u#) ->
-		    returnPrimIO (MkInt (w2i (mask# `or#` u#)))
+		    returnPrimIO (I# (w2i (mask# `or#` u#)))
     in
     mk_supply#	`thenPrimIO` \ s ->
     return s
@@ -100,13 +100,13 @@ splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
 
 \begin{code}
-getUnique (MkSplitUniqSupply (MkInt n) _ _) = mkUniqueGrimily n
+getUnique (MkSplitUniqSupply (I# n) _ _) = mkUniqueGrimily n
 
-getUniques i@(MkInt i#) supply = i# `get_from` supply
+getUniques (I# i) supply = i `get_from` supply
   where
     get_from 0# _ = []
-    get_from n# (MkSplitUniqSupply (MkInt u#) _ s2)
-      = mkUniqueGrimily u# : get_from (n# `minusInt#` 1#) s2
+    get_from n (MkSplitUniqSupply (I# u) _ s2)
+      = mkUniqueGrimily u : get_from (n `minusInt#` 1#) s2
 \end{code}
 
 %************************************************************************

@@ -13,12 +13,10 @@ module TcPragmas (
 	tcGenPragmas
     ) where
 
-import TcMonad		-- typechecking monadic machinery
+import TcMonad		hiding ( rnMtoTcM )
 import HsSyn		-- the stuff being typechecked
 
 import PrelInfo		( PrimOp(..)	-- to see CCallOp
-			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
-			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
 import Type
 import CmdLineOpts

@@ -22,7 +22,6 @@
 
 > import Type		( cloneTyVar, mkTyVarTy, applyTypeEnvToTy,
 > 			  tyVarsOfType, TyVar, SigmaType(..)
->			  IF_ATTACK_PRAGMAS(COMMA cmpTyVar)
 >			)
 > import Literal	( Literal )	-- for Eq Literal
 > import CoreSyn

@@ -350,12 +350,6 @@ exportFlagOn NotExported = False
 exportFlagOn _		 = True
 
 isExported a = exportFlagOn (getExportFlag a)
-
-#ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE isExported :: Class -> Bool #-}
-{-# SPECIALIZE isExported :: Id -> Bool #-}
-{-# SPECIALIZE isExported :: TyCon -> Bool #-}
-#endif
 \end{code}
 
 %************************************************************************
@@ -409,12 +403,6 @@ comparison.]
 
 \begin{code}
 a `ltLexical` b = origName a < origName b
-
-#ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE ltLexical :: Class -> Class -> Bool #-}
-{-# SPECIALIZE ltLexical :: Id    -> Id    -> Bool #-}
-{-# SPECIALIZE ltLexical :: TyCon -> TyCon -> Bool #-}
-#endif
 \end{code}
 
 These functions test strings to see if they fit the lexical categories
@@ -502,11 +490,4 @@ pprNonSym sty var
   = if isSymLexeme var
     then ppParens (ppr sty var)
     else ppr sty var
-
-#ifdef USE_ATTACK_PRAGMAS
-{-# SPECIALIZE isSymLexeme :: Id -> Bool #-}
-{-# SPECIALIZE pprNonSym :: PprStyle -> Id -> Pretty #-}
-{-# SPECIALIZE pprNonSym :: PprStyle -> TyCon -> Pretty #-}
-{-# SPECIALIZE pprSym :: PprStyle -> Id -> Pretty #-}
-#endif
 \end{code}

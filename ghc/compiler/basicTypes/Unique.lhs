@@ -252,13 +252,13 @@ w2i x = word2Int# x
 i2w x = int2Word# x
 i2w_s x = (x::Int#)
 
-mkUnique (MkChar c#) (MkInt i#)
-  = MkUnique (w2i (((i2w (ord# c#)) `shiftL#` (i2w_s 24#)) `or#` (i2w i#)))
+mkUnique (C# c) (I# i)
+  = MkUnique (w2i (((i2w (ord# c)) `shiftL#` (i2w_s 24#)) `or#` (i2w i)))
 
 unpkUnique (MkUnique u)
   = let
-	tag = MkChar (chr# (w2i ((i2w u) `shiftr` (i2w_s 24#))))
-	i   = MkInt  (w2i ((i2w u) `and#` (i2w 16777215#){-``0x00ffffff''-}))
+	tag = C# (chr# (w2i ((i2w u) `shiftr` (i2w_s 24#))))
+	i   = I#  (w2i ((i2w u) `and#` (i2w 16777215#){-``0x00ffffff''-}))
     in
     (tag, i)
   where

@@ -13,14 +13,20 @@ import SimplEnv	    ( SimplEnv, InBinding(..), InExpr(..),
 		      OutArg(..), OutExpr(..), OutType(..)
 		    )
 import Simplify	    ( simplExpr, simplBind )
-import SimplMonad   ( SmplM(..) )
+
+import BinderInfo(BinderInfo)
+import CoreSyn(GenCoreArg, GenCoreBinding, GenCoreExpr)
+import Id(GenId)
+import SimplMonad(SimplCount)
+import TyVar(GenTyVar)
+import Type(GenType)
+import UniqSupply(UniqSupply)
+import Unique(Unique)
+import Usage(GenUsage)
 
 data MagicUnfoldingFun
+data SimplCount 
 
-simplExpr :: SimplEnv -> InExpr -> [OutArg] -> SmplM OutExpr
-simplBind :: SimplEnv
-	  -> InBinding
-	  -> (SimplEnv -> SmplM OutExpr)
-	  -> OutType
-	  -> SmplM OutExpr
+simplBind :: SimplEnv -> GenCoreBinding (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> (SimplEnv -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)) -> GenType (GenTyVar (GenUsage Unique)) Unique -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)
+simplExpr :: SimplEnv -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique -> [GenCoreArg (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique] -> UniqSupply -> SimplCount -> (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique, SimplCount)
 \end{code}

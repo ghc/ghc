@@ -89,7 +89,7 @@ core2core :: [CoreToDo]			-- spec of what core-to-core passes to do
 	      SpecialiseData)		--  specialisation data
 
 core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
-  = BSCC("Core2Core")
+  = _scc_ "Core2Core"
     if null core_todos then -- very rare, I suspect...
 	-- well, we still must do some renumbering
 	return (
@@ -118,7 +118,6 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	) >>
 
 	return (processed_binds, inline_env, spec_data)
-    ESCC
   where
     init_specdata = initSpecData local_tycons tycon_specs
 
@@ -142,7 +141,7 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
     	in
     	case to_do of
 	  CoreDoSimplify simpl_sw_chkr
-	    -> BSCC("CoreSimplify")
+	    -> _scc_ "CoreSimplify"
 	       begin_pass ("Simplify" ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
 					 then " (foldr/build)" else "") >>
 	       case (simplifyPgm binds simpl_sw_chkr simpl_stats us1) of
@@ -151,76 +150,66 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 			       ("Simplify (" ++ show it_cnt ++ ")"
 				 ++ if switchIsOn simpl_sw_chkr SimplDoFoldrBuild
 				    then " foldr/build" else "")
-	       ESCC
 
 	  CoreDoFoldrBuildWorkerWrapper
-	    -> BSCC("CoreDoFoldrBuildWorkerWrapper")
+	    -> _scc_ "CoreDoFoldrBuildWorkerWrapper"
 	       begin_pass "FBWW" >>
 	       case (mkFoldrBuildWW us1 binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FBWW"
-	       } ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FBWW" }
 
 	  CoreDoFoldrBuildWWAnal
-	    -> BSCC("CoreDoFoldrBuildWWAnal")
+	    -> _scc_ "CoreDoFoldrBuildWWAnal"
 	       begin_pass "AnalFBWW" >>
 	       case (analFBWW binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AnalFBWW"
-	       } ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AnalFBWW" }
 
 	  CoreLiberateCase
-	    -> BSCC("LiberateCase")
+	    -> _scc_ "LiberateCase"
 	       begin_pass "LiberateCase" >>
 	       case (liberateCase lib_case_threshold binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "LiberateCase"
-	       } ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "LiberateCase" }
 
 	  CoreDoCalcInlinings1	-- avoid inlinings w/ cost-centres
-	    -> BSCC("CoreInlinings1")
+	    -> _scc_ "CoreInlinings1"
 	       begin_pass "CalcInlinings" >>
 	       case (calcInlinings False inline_env binds) of { inline_env2 ->
-	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings"
-	       } ESCC
+	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings" }
 
 	  CoreDoCalcInlinings2  -- allow inlinings w/ cost-centres
-	    -> BSCC("CoreInlinings2")
+	    -> _scc_ "CoreInlinings2"
 	       begin_pass "CalcInlinings" >>
 	       case (calcInlinings True inline_env binds) of { inline_env2 ->
-	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings"
-	       } ESCC
+	       end_pass False us2 binds inline_env2 spec_data simpl_stats "CalcInlinings" }
 
 	  CoreDoFloatInwards
-	    -> BSCC("FloatInwards")
+	    -> _scc_ "FloatInwards"
 	       begin_pass "FloatIn" >>
 	       case (floatInwards binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatIn"
-	       } ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatIn" }
 
 	  CoreDoFullLaziness
-	    -> BSCC("CoreFloating")
+	    -> _scc_ "CoreFloating"
 	       begin_pass "FloatOut" >>
 	       case (floatOutwards us1 binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatOut"
-	       } ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "FloatOut" }
 
 	  CoreDoStaticArgs
-	    -> BSCC("CoreStaticArgs")
+	    -> _scc_ "CoreStaticArgs"
 	       begin_pass "StaticArgs" >>
 	       case (doStaticArgs binds us1) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StaticArgs"
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StaticArgs" }
 		-- Binds really should be dependency-analysed for static-
 		-- arg transformation... Not to worry, they probably are.
 		-- (I don't think it *dies* if they aren't [WDP 94/04/15])
-	       } ESCC
 
 	  CoreDoStrictness
-	    -> BSCC("CoreStranal")
+	    -> _scc_ "CoreStranal"
 	       begin_pass "StrAnal" >>
 	       case (saWwTopBinds us1 binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StrAnal"
-	       } ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "StrAnal" }
 
 	  CoreDoSpecialising
-	    -> BSCC("Specialise")
+	    -> _scc_ "Specialise"
 	       begin_pass "Specialise" >>
 	       case (specProgram us1 binds spec_data) of {
 		 (p, spec_data2@(SpecData _ spec_noerrs _ _ _
@@ -242,27 +231,22 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 
 		   end_pass False us2 p inline_env spec_data2 simpl_stats "Specialise"
 	       }
-	       ESCC
 
 	  CoreDoDeforest
 #if OMIT_DEFORESTER
 	    -> error "ERROR: CoreDoDeforest: not built into compiler\n"
 #else
-	    -> BSCC("Deforestation")
+	    -> _scc_ "Deforestation"
 	       begin_pass "Deforestation" >>
 	       case (deforestProgram binds us1) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation"
-	       }
-	       ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation" }
 #endif
 
 	  CoreDoAutoCostCentres
-	    -> BSCC("AutoSCCs")
+	    -> _scc_ "AutoSCCs"
 	       begin_pass "AutoSCCs" >>
 	       case (addAutoCostCentres module_name binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AutoSCCs"
-	       }
-	       ESCC
+	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AutoSCCs" }
 
 	  CoreDoPrintCore	-- print result of last pass
 	    -> end_pass True us2 binds inline_env spec_data simpl_stats "Print"

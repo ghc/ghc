@@ -14,7 +14,7 @@ import Ubiq{-uitous-}
 
 import HsLoop		( HsExpr, nullBinds, HsBinds )
 import Outputable	( ifPprShowAll )
-import PprType
+import PprType		( GenType{-instance Outputable-} )
 import Pretty
 import SrcLoc		( SrcLoc{-instances-} )
 import Util		( panic )

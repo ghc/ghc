@@ -14,7 +14,7 @@ module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy ) where
 import Ubiq
 
 -- friends: 
-import TcMonad
+import TcMonad	hiding ( rnMtoTcM )
 import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe )
 import TyCon	( TyCon, mkFunTyCon )
 import TyVar	( GenTyVar(..), TyVar(..), tyVarKind )

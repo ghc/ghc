@@ -15,7 +15,7 @@ module TcKind (
   ) where
 
 import Kind
-import TcMonad
+import TcMonad	hiding ( rnMtoTcM )
 
 import Ubiq
 import Unique	( Unique, pprUnique10 )

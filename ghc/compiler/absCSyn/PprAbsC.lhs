@@ -210,7 +210,7 @@ pprAbsC sty stmt@(COpStmt results op args liveness_mask vol_regs) _
     	the_op = ppr_op_call non_void_results non_void_args
 		-- liveness mask is *in* the non_void_args
     in
-    BIND (ppr_vol_regs sty vol_regs) _TO_ (pp_saves, pp_restores) ->
+    case (ppr_vol_regs sty vol_regs) of { (pp_saves, pp_restores) ->
     if primOpNeedsWrapper op then
     	uppAboves [  pp_saves,
     	    	    the_op,
@@ -218,7 +218,7 @@ pprAbsC sty stmt@(COpStmt results op args liveness_mask vol_regs) _
     	    	 ]
     else
     	the_op
-    BEND
+    }
   where
     ppr_op_call results args
       = uppBesides [ prettyToUn (pprPrimOp sty op), uppLparen,
@@ -246,7 +246,7 @@ pprAbsC sty stmt@(CCallProfCCMacro op as) _
 
 pprAbsC sty (CCodeBlock label abs_C) _
   = ASSERT( maybeToBool(nonemptyAbsC abs_C) )
-    BIND (pprTempAndExternDecls abs_C) _TO_ (pp_temps, pp_exts) ->
+    case (pprTempAndExternDecls abs_C) of { (pp_temps, pp_exts) ->
     uppAboves [
 	uppBesides [uppStr (if (externallyVisibleCLabel label)
 			  then "FN_("	-- abbreviations to save on output
@@ -259,7 +259,7 @@ pprAbsC sty (CCodeBlock label abs_C) _
 	uppNest 8 (pprAbsC sty abs_C (costs abs_C)),
 	uppNest 8 (uppPStr SLIT("FE_")),
 	uppChar '}' ]
-    BEND
+    }
 
 pprAbsC sty (CInitHdr cl_info reg_rel cost_centre inplace_upd) _
   = uppBesides [ pp_init_hdr, uppStr "_HDR(",
@@ -279,7 +279,7 @@ pprAbsC sty (CInitHdr cl_info reg_rel cost_centre inplace_upd) _
 			    getSMInitHdrStr sm_rep)
 
 pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
-  = BIND (pprTempAndExternDecls stmt) _TO_ (_, pp_exts) ->
+  = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
     uppAboves [
 	case sty of
 	  PprForC -> pp_exts
@@ -296,7 +296,7 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 	uppNest 2 (uppBesides (map (ppr_item sty) amodes)),
 	uppNest 2 (uppBesides (map (ppr_item sty) padding_wds)),
 	uppStr "};" ]
-    BEND
+    }
   where
     info_lbl = infoTableLabelFromCI cl_info
 
@@ -309,9 +309,8 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 	if not (closureUpdReqd cl_info) then
 	    []
     	else
-	    BIND (max 0 (mIN_UPD_SIZE - length amodes)) _TO_ still_needed ->
-	    nOfThem still_needed (mkIntCLit 0) -- a bunch of 0s
-	    BEND
+	    case (max 0 (mIN_UPD_SIZE - length amodes)) of { still_needed ->
+	    nOfThem still_needed (mkIntCLit 0) } -- a bunch of 0s
 
 {-
    STATIC_INIT_HDR(c,i,localness) blows into:
@@ -420,7 +419,7 @@ pprAbsC sty stmt@(CRetUnVector label amode) _
     pp_static = if externallyVisibleCLabel label then uppNil else uppPStr SLIT("static")
 
 pprAbsC sty stmt@(CFlatRetVector label amodes) _
-  =	BIND (pprTempAndExternDecls stmt) _TO_ (_, pp_exts) ->
+  =	case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
 	uppAboves [
 	    case sty of
 	      PprForC -> pp_exts
@@ -428,8 +427,7 @@ pprAbsC sty stmt@(CFlatRetVector label amodes) _
 	    uppBesides [ppLocalness label, uppPStr SLIT(" W_ "),
     	    	       pprCLabel sty label, uppStr "[] = {"],
 	    uppNest 2 (uppInterleave uppComma (map (ppr_item sty) amodes)),
-	    uppStr "};" ]
-	BEND
+	    uppStr "};" ] }
   where
     ppr_item sty item = uppBeside (uppStr "(W_) ") (ppr_amode sty item)
 
@@ -444,12 +442,12 @@ ppLocalness label
     const  = if not (isReadOnly label)	        then uppNil else uppPStr SLIT("const")
 
 ppLocalnessMacro for_fun{-vs data-} clabel
-  = BIND (if externallyVisibleCLabel clabel then "E" else "I") _TO_ prefix ->
-    BIND (if isReadOnly clabel then "RO_" else "")	      _TO_ suffix ->
+  = case (if externallyVisibleCLabel clabel then "E" else "I") of { prefix ->
+    case (if isReadOnly clabel then "RO_" else "")	      of { suffix ->
     if for_fun
        then uppStr (prefix ++ "F_")
        else uppStr (prefix ++ "D_" ++ suffix)
-    BEND BEND
+    } }
 \end{code}
 
 \begin{code}
@@ -1109,10 +1107,9 @@ pprTempAndExternDecls AbsCNop = (uppNil, uppNil)
 pprTempAndExternDecls (AbsCStmts stmt1 stmt2)
   = initTE (ppr_decls_AbsC stmt1	`thenTE` \ (t_p1, e_p1) ->
 	    ppr_decls_AbsC stmt2	`thenTE` \ (t_p2, e_p2) ->
-	    BIND (catMaybes [t_p1, t_p2])	 _TO_ real_temps ->
-	    BIND (catMaybes [e_p1, e_p2])	 _TO_ real_exts ->
-	    returnTE (uppAboves real_temps, uppAboves real_exts)
-	    BEND BEND
+	    case (catMaybes [t_p1, t_p2])	 of { real_temps ->
+	    case (catMaybes [e_p1, e_p2])	 of { real_exts ->
+	    returnTE (uppAboves real_temps, uppAboves real_exts) }}
 	   )
 
 pprTempAndExternDecls other_stmt
@@ -1214,14 +1211,14 @@ pprExternDecl clabel kind
   = if not (needsCDecl clabel) then
 	uppNil -- do not print anything for "known external" things (e.g., < PreludeCore)
     else
-	BIND (
+	case (
 	    case kind of
 	      CodePtrRep -> ppLocalnessMacro True{-function-} clabel
-	      _		  -> ppLocalnessMacro False{-data-}    clabel
-	) _TO_ pp_macro_str ->
+	      _		 -> ppLocalnessMacro False{-data-}    clabel
+	) of { pp_macro_str ->
 
 	uppBesides [ pp_macro_str, uppLparen, pprCLabel PprForC clabel, pp_paren_semi ]
-	BEND
+	}
 \end{code}
 
 \begin{code}
@@ -1385,12 +1382,12 @@ ppr_decls_Amode other = returnTE (Nothing, Nothing)
 
 maybe_uppAboves :: [(Maybe Unpretty, Maybe Unpretty)] -> (Maybe Unpretty, Maybe Unpretty)
 maybe_uppAboves ps
-  = BIND (unzip ps)	_TO_ (ts, es) ->
-    BIND (catMaybes ts)	_TO_ real_ts ->
-    BIND (catMaybes es)	_TO_ real_es ->
+  = case (unzip ps)	of { (ts, es) ->
+    case (catMaybes ts)	of { real_ts  ->
+    case (catMaybes es)	of { real_es  ->
     (if (null real_ts) then Nothing else Just (uppAboves real_ts),
      if (null real_es) then Nothing else Just (uppAboves real_es))
-    BEND BEND BEND
+    } } }
 \end{code}
 
 \begin{code}

@@ -47,7 +47,7 @@ module FiniteMap (
 
 	plusFM,
 	plusFM_C,
-	minusFM, 		-- exported for GHCI only
+	minusFM,
 
 	IF_NOT_GHC(intersectFM COMMA)
 	IF_NOT_GHC(intersectFM_C COMMA)
@@ -60,7 +60,7 @@ module FiniteMap (
 #ifdef COMPILING_GHC
 	, bagToFM
 	, FiniteSet(..), emptySet, mkSet, isEmptySet
-	, elementOf, setToList, union, minusSet{-exported for GHCI-}
+	, elementOf, setToList, union, minusSet
 #endif
 
 	-- To make it self-sufficient

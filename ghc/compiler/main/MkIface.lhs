@@ -8,6 +8,7 @@
 
 module MkIface (
 	startIface, endIface,
+	ifaceUsages,
 	ifaceVersions,
 	ifaceExportList,
 	ifaceFixities,
@@ -35,12 +36,12 @@ import Name		( nameOrigName, origName, nameOf,
 			  RdrName(..){-instance Outputable-},
 			  Name{-instance NamedThing-}
 			)
+import ParseUtils	( UsagesMap(..), VersionsMap(..) )
 import PprEnv		-- not sure how much...
 import PprStyle		( PprStyle(..) )
 import PprType		-- most of it (??)
 import Pretty		-- quite a bit
 import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
-import RnIfaces		( VersionInfo(..) )
 import TcModule		( TcIfaceInfo(..) )
 import TcInstUtil	( InstInfo(..) )
 import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
@@ -78,9 +79,13 @@ to the handle provided by @startIface@.
 startIface  :: Module
 	    -> IO (Maybe Handle) -- Nothing <=> don't do an interface
 endIface    :: Maybe Handle -> IO ()
+ifaceUsages
+	    :: Maybe Handle
+	    -> UsagesMap
+	    -> IO ()
 ifaceVersions
 	    :: Maybe Handle
-	    -> VersionInfo
+	    -> VersionsMap
 	    -> IO ()
 ifaceExportList
 	    :: Maybe Handle
@@ -121,10 +126,17 @@ endIface (Just if_hdl)	= hPutStr if_hdl "\n" >> hClose if_hdl
 \end{code}
 
 \begin{code}
+ifaceUsages Nothing{-no iface handle-} _ = return ()
+
+ifaceUsages (Just if_hdl) version_info
+  = hPutStr if_hdl "__usages__\nFoo 1" -- a stub, obviously
+\end{code}
+
+\begin{code}
 ifaceVersions Nothing{-no iface handle-} _ = return ()
 
 ifaceVersions (Just if_hdl) version_info
-  = hPutStr if_hdl "__versions__\nFoo(1)" -- a stub, obviously
+  = hPutStr if_hdl "\n__versions__\nFoo 1" -- a stub, obviously
 \end{code}
 
 \begin{code}

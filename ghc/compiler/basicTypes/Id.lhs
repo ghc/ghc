@@ -116,7 +116,7 @@ import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
 import PprEnv		-- ( NmbrM(..), NmbrEnv(..) )
 import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
-			  nmbrType, addTyVar,
+			  nmbrType, nmbrTyVar,
 			  GenType, GenTyVar
 			)
 import PprStyle
@@ -1098,11 +1098,10 @@ getIdNamePieces show_uniqs id
 
 get_fullname_pieces :: Name -> [FAST_STRING]
 get_fullname_pieces n
-  = BIND (moduleNamePair n) _TO_ (mod, name) ->
+  = case (moduleNamePair n) of { (mod, name) ->
     if isPreludeDefinedName n
     then [name]
-    else [mod, name]
-    BEND
+    else [mod, name] }
 \end{code}
 
 %************************************************************************
@@ -1375,11 +1374,11 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
 	    (tyvars, dict_vars, vars) = mk_uf_bits tvs ctxt args_tys tycon
 	    tyvar_tys = mkTyVarTys tyvars
 	in
-	BIND (Con data_con tyvar_tys [VarArg v | v <- vars]) _TO_ plain_Con ->
+	case (Con data_con tyvar_tys [VarArg v | v <- vars]) of { plain_Con ->
 
 	mkUnfolding EssentialUnfolding -- for data constructors
 		    (mkLam tyvars (dict_vars ++ vars) plain_Con)
-	BEND
+	}
 
     mk_uf_bits tvs ctxt arg_tys tycon
       = let
@@ -1390,19 +1389,19 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
 	    -- the "context" and "arg_tys" have TyVarTemplates in them, so
 	    -- we instantiate those types to have the right TyVars in them
 	    -- instead.
-	BIND (map (instantiateTauTy inst_env) (map ctxt_ty ctxt))
-						       	_TO_ inst_dict_tys ->
-	BIND (map (instantiateTauTy inst_env) arg_tys) 	_TO_ inst_arg_tys ->
+	case (map (instantiateTauTy inst_env) (map ctxt_ty ctxt))
+						       	of { inst_dict_tys ->
+	case (map (instantiateTauTy inst_env) arg_tys) 	of { inst_arg_tys ->
 
 	    -- We can only have **ONE** call to mkTemplateLocals here;
 	    -- otherwise, we get two blobs of locals w/ mixed-up Uniques
 	    -- (Mega-Sigh) [ToDo]
-	BIND (mkTemplateLocals (inst_dict_tys ++ inst_arg_tys)) _TO_ all_vars ->
+	case (mkTemplateLocals (inst_dict_tys ++ inst_arg_tys)) of { all_vars ->
 
-	BIND (splitAt (length ctxt) all_vars)	_TO_ (dict_vars, vars) ->
+	case (splitAt (length ctxt) all_vars)	of { (dict_vars, vars) ->
 
 	(tyvars, dict_vars, vars)
-	BEND BEND BEND BEND
+	}}}}
       where
 	-- these are really dubious Types, but they are only to make the
 	-- binders for the lambdas for tossed-away dicts.
@@ -1439,17 +1438,14 @@ mkTupleCon arity
 	    (tyvars, dict_vars, vars) = mk_uf_bits arity
 	    tyvar_tys = mkTyVarTys tyvars
 	in
-	BIND (Con data_con tyvar_tys [VarArg v | v <- vars]) _TO_ plain_Con ->
-
+	case (Con data_con tyvar_tys [VarArg v | v <- vars]) of { plain_Con ->
 	mkUnfolding
 	    EssentialUnfolding    -- data constructors
-	    (mkLam tyvars (dict_vars ++ vars) plain_Con)
-	BEND
+	    (mkLam tyvars (dict_vars ++ vars) plain_Con) }
 
     mk_uf_bits arity
-      = BIND (mkTemplateLocals tyvar_tys)		 _TO_ vars ->
-	(tyvars, [], vars)
-	BEND
+      = case (mkTemplateLocals tyvar_tys) of { vars ->
+	(tyvars, [], vars) }
       where
 	tyvar_tmpls	= take arity alphaTyVars
 	(_, tyvars, tyvar_tys) = instantiateTyVarTemplates tyvar_tmpls (map uniqueOf tyvar_tmpls)
@@ -1824,35 +1820,32 @@ instance NamedThing (GenId ty) where
 				    mod -> (mod, classOpString op)
 
 	get (SpecId unspec ty_maybes _)
-	  = BIND moduleNamePair unspec	      _TO_ (mod, unspec_nm) ->
-	    BIND specMaybeTysSuffix ty_maybes _TO_ tys_suffix ->
+	  = case moduleNamePair unspec	      of { (mod, unspec_nm) ->
+	    case specMaybeTysSuffix ty_maybes of { tys_suffix ->
 	    (mod,
 	     unspec_nm _APPEND_
 		(if not (toplevelishId unspec)
 		 then showUnique u
 		 else tys_suffix)
-	    )
-	    BEND BEND
+	    ) }}
 
 	get (WorkerId unwrkr)
-	  = BIND moduleNamePair unwrkr	_TO_ (mod, unwrkr_nm) ->
+	  = case moduleNamePair unwrkr	of { (mod, unwrkr_nm) ->
 	    (mod,
 	     unwrkr_nm _APPEND_
 		(if not (toplevelishId unwrkr)
 		 then showUnique u
 		 else SLIT(".wrk"))
-	    )
-	    BEND
+	    ) }
 
 	get other_details
 	    -- the remaining internally-generated flavours of
 	    -- Ids really do not have meaningful "original name" stuff,
 	    -- but we need to make up something (usually for debugging output)
 
-	  = BIND (getIdNamePieces True this_id)  _TO_ (piece1:pieces) ->
-	    BIND [ _CONS_ '.' p | p <- pieces ]  _TO_ dotted_pieces ->
-	    (_NIL_, _CONCAT_ (piece1 : dotted_pieces))
-	    BEND BEND
+	  = case (getIdNamePieces True this_id)  of { (piece1:pieces) ->
+	    case [ _CONS_ '.' p | p <- pieces ]  of { dotted_pieces ->
+	    (_NIL_, _CONCAT_ (piece1 : dotted_pieces)) }}
 -}
 \end{code}
 
@@ -1989,7 +1982,7 @@ nmbrId id@(Id u ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
 nmbr_details :: IdDetails -> NmbrM IdDetails
 
 nmbr_details (DataConId n tag marks fields tvs theta arg_tys tc)
-  = mapNmbr addTyVar   tvs	`thenNmbr` \ new_tvs ->
+  = mapNmbr nmbrTyVar  tvs	`thenNmbr` \ new_tvs ->
     mapNmbr nmbrField  fields	`thenNmbr` \ new_fields ->
     mapNmbr nmbr_theta theta	`thenNmbr` \ new_theta ->
     mapNmbr nmbrType   arg_tys	`thenNmbr` \ new_arg_tys ->
