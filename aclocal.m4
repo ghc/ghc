@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.113 2003/01/27 16:41:18 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.114 2003/03/21 10:59:20 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -337,7 +337,13 @@ if test -z "$ArCmdRaw"; then
     echo "You don't seem to have ar in your PATH...I have no idea how to make a library"
     exit 1;
 fi
-if $ArCmdRaw clqsZ conftest.a >/dev/null 2>/dev/null; then
+dnl GNU ar needs special treatment: it appears to have problems with
+dnl object files with the same name if you use the 's' modifier, but
+dnl simple 'ar q' works fine, and doesn't need a separate ranlib.
+if $ArCmdRaw --version | grep 'GNU' >/dev/null 2>/dev/null; then
+    ArCmdArgs='q'
+    NeedRanLib=''
+elif $ArCmdRaw clqsZ conftest.a >/dev/null 2>/dev/null; then
     ArCmdArgs="clqsZ"
     NeedRanLib=''
 elif $ArCmdRaw clqs conftest.a >/dev/null 2>/dev/null; then
