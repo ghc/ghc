@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.9 2000/01/13 12:40:15 simonmar Exp $
+ * $Id: RtsAPI.h,v 1.10 2000/03/30 12:03:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,7 +26,7 @@ typedef StgClosure *HaskellObj;
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
    ------------------------------------------------------------------------- */
-extern void startupHaskell  ( int argc, char *argv[] );
+extern void startupHaskell  ( int argc, char *argv[], void *init_root );
 extern void shutdownHaskell ( void );
 extern void shutdownHaskellAndExit ( int exitCode );
 

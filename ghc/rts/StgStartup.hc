@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.9 2000/03/21 14:33:18 simonmar Exp $
+ * $Id: StgStartup.hc,v 1.10 2000/03/30 12:03:30 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -146,15 +146,15 @@ STGFUN(stg_init_ret)
   FE_
 }
 
+/* On entry to stg_init:
+ *    init_stack[0] = &stg_init_ret;
+ *    init_stack[1] = __init_Something;
+ */
 STGFUN(stg_init)
 {
-  EF_(__init_PrelMain);
-  EF_(__init_Prelude);
   FB_
-  Sp = (P_)init_stack;
-  PUSH_INIT_STACK(stg_init_ret);
-  PUSH_INIT_STACK(__init_Prelude);
-  JMP_(__init_PrelMain);
+  Sp = MainRegTable.rSp;
+  JMP_(POP_INIT_STACK());
   FE_
 }
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.35 2000/03/21 14:33:18 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.36 2000/03/30 12:03:30 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -49,10 +49,11 @@ static int rts_has_started_up = 0;
 static ullong startTime = 0;
 #endif
 
-static void initModules ( void );
+EXTFUN(__init_Prelude);
+static void initModules ( void * );
 
 void
-startupHaskell(int argc, char *argv[])
+startupHaskell(int argc, char *argv[], void *init_root)
 {
     /* To avoid repeated initialisations of the RTS */
    if (rts_has_started_up)
@@ -131,7 +132,7 @@ startupHaskell(int argc, char *argv[])
 
     /* run the per-module initialisation code */
 #if !defined(INTERPRETER)
-    initModules();
+    initModules(init_root);
 #endif
 
 #if defined(PROFILING) || defined(DEBUG)
@@ -200,16 +201,21 @@ startupHaskell(int argc, char *argv[])
 /* The init functions use an explicit stack... 
  */
 #define INIT_STACK_SIZE  (BLOCK_SIZE * 4)
-F_ *init_stack;
+F_ *init_stack = NULL;
+nat init_sp = 0;
 
 static void
-initModules ( void )
+initModules ( void *init_root )
 {
-  /* this storage will be reclaimed by the garbage collector,
-   * as a large block.
-   */
+  init_sp = 0;
   init_stack = (F_ *)allocate(INIT_STACK_SIZE / sizeof(W_));
+  init_stack[init_sp++] = (F_)stg_init_ret;
+  init_stack[init_sp++] = (F_)__init_Prelude;
+  if (init_root != NULL) {
+    init_stack[init_sp++] = (F_)init_root;
+  }
 
+  MainRegTable.rSp = (P_)(init_stack + init_sp);
   StgRun((StgFunPtr)stg_init, NULL/* no reg table */);
 }
 
