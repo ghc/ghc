@@ -523,7 +523,7 @@ findExecutable binary = do
   path <- getEnv "PATH"
   search (parseSearchPath path)
   where
-    fileName = binary `joinFileExt` drop 1 exeExt
+    fileName = binary `joinFileExt` drop 1 exeExtension
 
     search :: [FilePath] -> IO (Maybe FilePath)
     search [] = return Nothing
@@ -532,14 +532,6 @@ findExecutable binary = do
 	b <- doesFileExist path
 	if b then return (Just path)
              else search ds
-
--- ToDo: This should be determined via autoconf (AC_EXEEXT)
-exeExt :: String
-#ifdef mingw32_TARGET_OS
-exeExt = ".exe"
-#else
-exeExt = ""
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 {- |@'getDirectoryContents' dir@ returns a list of /all/ entries

@@ -36,6 +36,11 @@ module System.FilePath
          , isPathSeparator
          , pathSeparator
          , searchPathSeparator
+
+	 -- * Filename extensions
+	 , exeExtension
+	 , objExtension
+	 , dllExtension
          ) where
 
 import Prelude -- necessary to get dependencies right
@@ -377,4 +382,28 @@ searchPathSeparator :: Char
 searchPathSeparator = ';'
 #else
 searchPathSeparator = ':'
+#endif
+
+-- ToDo: This should be determined via autoconf (AC_EXEEXT)
+-- | Extension for executable files
+-- (typically @""@ on Unix and @".exe"@ on Windows or OS/2)
+exeExtension :: String
+
+-- ToDo: This should be determined via autoconf (AC_OBJEXT)
+-- | Extension for object files
+-- (typically @".o"@ on Unix and @".obj"@ on Windows)
+objExtension :: String
+
+-- | Extension for dynamically linked (or shared) libraries
+-- (typically @".so"@ on Unix and @".dll"@ on Windows)
+dllExtension :: String
+
+#ifdef mingw32_TARGET_OS
+exeExtension = ".exe"
+objExtension = ".obj"
+dllExtension = ".dll"
+#else
+exeExtension = ""
+objExtension = ".o"
+dllExtension = ".so"
 #endif
