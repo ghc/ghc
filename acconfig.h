@@ -33,6 +33,9 @@
 /* Define as the symbol which marks the end of the data section */
 #undef DATA_SECTION_END_MARKER
 
+/* Define as the decl which terminates the data section */
+#undef DATA_SECTION_END_MARKER_DECL
+
 /* Define if time.h or sys/time.h define the altzone variable */
 #undef HAVE_ALTZONE
 
@@ -59,6 +62,9 @@
 
 /* Define as the symbol which marks the end of the text section */
 #undef TEXT_SECTION_END_MARKER
+
+/* Define to decl that terminates text section. */
+#undef TEXT_SECTION_END_MARKER_DECL
 
 /* Define to the type of the timezone variable (usually long or time_t) */
 #undef TYPE_TIMEZONE
