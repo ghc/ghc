@@ -357,6 +357,9 @@
 /* Define if the HaskellSupport.framework is installed (Mac OS X only) */
 #undef HAVE_FRAMEWORK_HASKELLSUPPORT
 
+/* Define if gcc supports -mno-omit-leaf-frame-pointer */
+#undef HAVE_GCC_MNO_OMIT_LFPTR
+
 /* Define if you have the GetModuleFileName function.  */
 #undef HAVE_GETMODULEFILENAME
 
@@ -410,6 +413,12 @@
 
 /* Define if readline has version >= 4.2. */
 #undef HAVE_READLINE_4_2
+
+/* Define if <unistd.h> defines _SC_GETGR_R_SIZE_MAX */
+#undef HAVE_SC_GETGR_R_SIZE_MAX
+
+/* Define if <unistd.h> defines _SC_GETPW_R_SIZE_MAX */
+#undef HAVE_SC_GETPW_R_SIZE_MAX
 
 /* Define if you have the sigpoll() function */
 #undef HAVE_SIGPOLL

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.110 2002/12/19 11:28:58 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.111 2003/01/08 12:03:28 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -417,10 +417,10 @@ AC_DEFUN(FPTOOLS_HAVE_GCC,
     fptools_cv_have_gcc='no'
 else
 changequote(, )dnl
-    is_gcc_v1="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 2000 \\\>= \1 \\\* 1000 + \2/g' `"
+    gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1\.\2/g' `"
 changequote([, ])dnl
     fptools_cv_have_gcc='yes'
-    if test `eval $is_gcc_v1 2>/dev/null` = "1"; then
+    FPTOOLS_PROG_CHECK_VERSION($gcc_version_str, -lt, "2.0",
         fptools_cv_have_gcc='no'
         echo ""
 	echo "your gcc version appears to be ..."
@@ -428,11 +428,29 @@ changequote([, ])dnl
         echo "gcc prior to 2.0 and have never worked with ghc."
         echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
         AC_MSG_ERROR([gcc 1.X has never been supported])
-    fi
+    )
 fi
 ])
 HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
 AC_SUBST(HaveGcc)
+])
+
+dnl
+dnl Some OSs (Mandrake Linux, in particular) configure GCC with
+dnl -momit-leaf-frame-pointer on by default.  If this is the case, we
+dnl need to turn it off for mangling to work.  The test is currently a bit
+dnl crude, using only the version number of gcc.
+dnl
+AC_DEFUN(FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR,
+[AC_CACHE_CHECK([whether gcc needs -mno-omit-leaf-frame-pointer], fptools_cv_gcc_needs_no_omit_lfptr,
+[
+ fptools_cv_gcc_needs_no_omit_lfptr='no'
+ FPTOOLS_PROG_CHECK_VERSION($gcc_version_str, -ge, "3.2",
+     fptools_cv_gcc_needs_no_omit_lfptr='yes')
+])
+if test "$fptools_cv_gcc_needs_no_omit_lfptr" = "yes"; then
+   AC_DEFINE(HAVE_GCC_MNO_OMIT_LFPTR)
+fi
 ])
 
 dnl Small feature test for perl version. Assumes PerlCmd

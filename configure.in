@@ -594,6 +594,7 @@ dnl     If gcc, make sure it's at least 2.1
 dnl
 AC_PROG_CC
 FPTOOLS_HAVE_GCC
+FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
