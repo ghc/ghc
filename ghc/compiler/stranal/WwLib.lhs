@@ -26,7 +26,7 @@ import Literal		( Literal(MachStr) )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )
-import Util		( zipWithEqual )
+import Util		( zipWithEqual, notNull )
 import Outputable
 import List		( zipWith4 )
 \end{code}
@@ -241,7 +241,7 @@ mkWWargs fun_ty demands one_shots
 	      work_fn_args . Note (Coerce rep_ty fun_ty),
 	      res_ty)
 
-  | not (null demands)
+  | notNull demands
   = getUniquesUs 		`thenUs` \ wrap_uniqs ->
     let
       (tyvars, tau)      = splitForAllTys fun_ty
@@ -258,7 +258,7 @@ mkWWargs fun_ty demands one_shots
       val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
     in
-{-     ASSERT( not (null tyvars) || not (null arg_tys) ) -}
+{-     ASSERT( notNull tyvars || notNull arg_tys ) -}
     if (null tyvars) && (null arg_tys) then
 	pprTrace "mkWWargs" (ppr fun_ty $$ ppr demands) 
 		returnUs ([], id, id, fun_ty)

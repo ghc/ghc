@@ -24,6 +24,7 @@ import Name		( NamedThing(..), Name )
 import BasicTypes	( Arity )
 import Unique		( Unique, Uniquable(..) )
 import Outputable
+import Util             ( notNull )
 \end{code}
 
 %************************************************************************
@@ -116,7 +117,7 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
   = (tyvars, fundeps, sc_theta, sc_sels, op_stuff)
 
 classHasFDs :: Class -> Bool
-classHasFDs (Class {classFunDeps = fundeps}) = not (null fundeps)
+classHasFDs (Class {classFunDeps = fundeps}) = notNull fundeps
 \end{code}
 
 

@@ -29,7 +29,7 @@ import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import CmdLineOpts
 import WwLib
-import Util		( lengthIs )
+import Util		( lengthIs, notNull )
 import Outputable
 \end{code}
 
@@ -235,7 +235,7 @@ tryWW is_rec fn_id rhs
 	   | otherwise	       = fn_id `setIdNewStrictness` 
 				   StrictSig (mkTopDmdType wrap_dmds res_info)
 
-    is_fun    = not (null wrap_dmds)
+    is_fun    = notNull wrap_dmds
     is_thunk  = not is_fun && not (exprIsValue rhs)
 
 ---------------------

@@ -66,7 +66,7 @@ import Outputable
 
 import Maybe
 import PrimOp
-import Util     ( lengthIs )
+import Util     ( lengthIs, notNull )
 
 #include "HsVersions.h"
 
@@ -267,7 +267,7 @@ javaCase :: (Expr -> Statement) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 -- If we've got the wrong one, this is _|_, and the
 -- casting will catch this with an exception.
 
-javaCase r e x [(DataAlt d,bs,rhs)] | not (null bs)
+javaCase r e x [(DataAlt d,bs,rhs)] | notNull bs
   = java_expr PushExpr e ++
     [ var [Final] (javaName x)
 	          (whnf primRep (vmPOP (primRepToType primRep))) ] ++

@@ -51,7 +51,7 @@ import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, getClassPredTys_mayb
 import Var		( TyVar, tyVarKind )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
-import Util		( zipWithEqual, sortLt )
+import Util		( zipWithEqual, sortLt, notNull )
 import ListSetOps	( removeDups,  assoc )
 import Outputable
 import Maybe		( isJust )
@@ -441,7 +441,7 @@ makeDerivEqns tycl_decls
     ------------------------------------------------------------------
     chk_out :: Class -> TyCon -> [TcType] -> Maybe FastString
     chk_out clas tycon tys
-	| not (null tys)						= Just non_std_why
+	| notNull tys						        = Just non_std_why
 	| not (getUnique clas `elem` derivableClassKeys)		= Just non_std_why
 	| clas `hasKey` enumClassKey    && not is_enumeration 	        = Just nullary_why
 	| clas `hasKey` boundedClassKey && not is_enumeration_or_single = Just single_nullary_why

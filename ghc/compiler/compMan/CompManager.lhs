@@ -933,7 +933,7 @@ findPartiallyCompletedCycles modsDone theGraph
                                    done `elem` names_in_this_cycle])
                  chewed_rest = chew rest
              in 
-             if   not (null mods_in_this_cycle) 
+             if   notNull mods_in_this_cycle
                   && length mods_in_this_cycle < length names_in_this_cycle
              then mods_in_this_cycle ++ chewed_rest
              else chewed_rest

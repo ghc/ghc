@@ -539,7 +539,7 @@ addErrL msg loc scope errs warns = (Nothing, addErr errs msg loc, warns)
 addErr :: Bag ErrMsg -> Message -> [LintLocInfo] -> Bag ErrMsg
 -- errors or warnings, actually... they're the same type.
 addErr errs_so_far msg locs
-  = ASSERT( not (null locs) )
+  = ASSERT( notNull locs )
     errs_so_far `snocBag` mk_msg msg
   where
    (loc, cxt1) = dumpLoc (head locs)

@@ -34,7 +34,7 @@ import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
 import Class		( Class, classTyCon )
 import Type		( Type, repType, splitFunTys, dropForAlls )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem,
-			  isSingleton, lengthIs )
+			  isSingleton, lengthIs, notNull )
 import DataCon		( dataConRepArity )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
@@ -94,7 +94,7 @@ byteCodeGen dflags binds local_tycons local_classes
 			--               ^^
 			-- better be no free vars in these top-level bindings
 
-        when (not (null mallocd))
+        when (notNull mallocd)
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
@@ -127,7 +127,7 @@ coreExprToBCOs dflags expr
          <- runBc (BcM_State [] 0 []) 
                   (schemeR True fvs (invented_id, annexpr))
 
-      when (not (null mallocd))
+      when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
 
       dumpIfSet_dyn dflags Opt_D_dump_BCOs
@@ -1015,7 +1015,7 @@ atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
 -- as a consequence.
 implement_tagToId :: [Name] -> BcM BCInstrList
 implement_tagToId names
-   = ASSERT(not (null names))
+   = ASSERT( notNull names )
      getLabelsBc (length names)			`thenBc` \ labels ->
      getLabelBc					`thenBc` \ label_fail ->
      getLabelBc 				`thenBc` \ label_exit ->
@@ -1450,7 +1450,7 @@ emitBc bco st
 
 newbcoBc :: BcM ()
 newbcoBc st
-   | not (null (malloced st)) 
+   | notNull (malloced st)
    = panic "ByteCodeGen.newbcoBc: missed prior emitBc?"
    | otherwise
    = return (st, ())

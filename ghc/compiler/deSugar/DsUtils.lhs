@@ -63,7 +63,7 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  lengthPName, indexPName )
 import Outputable
 import UnicodeUtil      ( stringToUtf8 )
-import Util             ( isSingleton )
+import Util             ( isSingleton, notNull )
 \end{code}
 
 
@@ -581,7 +581,7 @@ mkTupleSelector [var] should_be_the_same_var scrut_var scrut
     scrut
 
 mkTupleSelector vars the_var scrut_var scrut
-  = ASSERT( not (null vars) )
+  = ASSERT( notNull vars )
     Case scrut scrut_var [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
 \end{code}
 

@@ -42,7 +42,7 @@ import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
 import Maybe
 import ListSetOps	( assoc )
-import Util		( zipEqual, zipWithEqual, equalLength )
+import Util		( zipEqual, zipWithEqual, equalLength, notNull )
 \end{code}
 
 
@@ -417,7 +417,7 @@ isUnboxedTupleCon :: DataCon -> Bool
 isUnboxedTupleCon (MkData {dcTyCon = tc}) = isUnboxedTupleTyCon tc
 
 isExistentialDataCon :: DataCon -> Bool
-isExistentialDataCon (MkData {dcExTyVars = tvs}) = not (null tvs)
+isExistentialDataCon (MkData {dcExTyVars = tvs}) = notNull tvs
 \end{code}
 
 

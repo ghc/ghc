@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.117 2002/04/02 10:18:07 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.118 2002/04/05 23:24:28 sof Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -234,7 +234,7 @@ runGHCi paths dflags = do
   		  Right hdl -> fileLoop hdl False
 
   -- perform a :load for files given on the GHCi command line
-  when (not (null paths)) $
+  when (notNull paths) $
      ghciHandle showException $
 	loadModule (unwords paths)
 
@@ -810,7 +810,7 @@ setOptions wds =
         leftovers <- processArgs dynamic_flags leftovers []
 	saveDynFlags
 
-        if (not (null leftovers))
+        if (notNull leftovers)
 		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
 		else return ()
@@ -823,14 +823,14 @@ unsetOptions str
 	   (minus_opts, rest1) = partition isMinus opts
 	   (plus_opts, rest2)  = partition isPlus rest1
 
-       if (not (null rest2)) 
+       if (notNull rest2) 
 	  then io (putStrLn ("unknown option: `" ++ head rest2 ++ "'"))
 	  else do
 
        mapM unsetOpt plus_opts
  
        -- can't do GHC flags for now
-       if (not (null minus_opts))
+       if (notNull minus_opts)
 	  then throwDyn (CmdLineError "can't unset GHC command-line flags")
 	  else return ()
 

@@ -15,6 +15,7 @@ import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
 import VarEnv
 import Outputable
+import Util             ( notNull )
 \end{code}
 
 This module walks over @Core@, and looks for @case@ on free variables.
@@ -236,7 +237,7 @@ Ids
 libCaseId :: LibCaseEnv -> Id -> CoreExpr
 libCaseId env v
   | Just the_bind <- lookupRecId env v	-- It's a use of a recursive thing
-  , not (null free_scruts)		-- with free vars scrutinised in RHS
+  , notNull free_scruts 		-- with free vars scrutinised in RHS
   = Let the_bind (Var v)
 
   | otherwise

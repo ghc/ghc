@@ -56,6 +56,7 @@ import PrelNames	( hasKey, buildIdKey, augmentIdKey )
 import Bag
 import FastTypes
 import Outputable
+import Util
 
 #if __GLASGOW_HASKELL__ >= 404
 import GlaExts		( Int# )
@@ -591,7 +592,7 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 			-- If (not in_lam) && one_br then PreInlineUnconditionally
 			-- should have caught it, shouldn't it?  Unless it's a top
 			-- level thing.
-	    not (null arg_infos) || interesting_cont
+	    notNull arg_infos || interesting_cont
 
 	  | otherwise
 	  = case guidance of

@@ -257,7 +257,7 @@ bindUnboxedTupleComponents args
 
     bindArgsToRegs reg_args arg_regs 		`thenC`
     mapCs bindNewToStack stk_offsets 		`thenC`
-    returnFC (arg_regs,tags, not (null stk_offsets))
+    returnFC (arg_regs,tags, notNull stk_offsets)
 \end{code}
 
 %************************************************************************

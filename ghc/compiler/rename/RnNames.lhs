@@ -40,7 +40,7 @@ import NameSet		( elemNameSet, emptyNameSet )
 import Outputable
 import Maybes		( maybeToBool, catMaybes )
 import ListSetOps	( removeDups )
-import Util		( sortLt )
+import Util		( sortLt, notNull )
 import List		( partition )
 \end{code}
 
@@ -113,7 +113,7 @@ getGlobalNames this_mod (HsModule _ _ _ imports decls _ mod_loc)
 				  mod_loc]
     
     explicit_prelude_import
-      = not (null [ () | (ImportDecl mod _ _ _ _ _) <- imports, mod == pRELUDE_Name ])
+      = notNull [ () | (ImportDecl mod _ _ _ _ _) <- imports, mod == pRELUDE_Name ]
 \end{code}
 	
 \begin{code}

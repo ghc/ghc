@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.75 2002/04/05 16:43:56 sof Exp $
+-- $Id: DriverState.hs,v 1.76 2002/04/05 23:24:29 sof Exp $
 --
 -- Settings for the driver
 --
@@ -54,7 +54,7 @@ setMode :: GhcMode -> String -> IO ()
 setMode m flag = do
   old_mode <- readIORef v_GhcMode
   old_flag <- readIORef v_GhcModeFlag
-  when (not (null (old_flag))) $
+  when (notNull (old_flag)) $
       throwDyn (UsageError 
           ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
   writeIORef v_GhcMode m
@@ -389,7 +389,7 @@ addToDirList :: IORef [String] -> String -> IO ()
 addToDirList ref path
   = do paths           <- readIORef ref
        shiny_new_ones  <- splitUp path
-       writeIORef ref (paths ++ filter (not.null) shiny_new_ones)
+       writeIORef ref (paths ++ filter notNull shiny_new_ones)
 		-- empty paths are ignored: there might be a trailing
 		-- ':' in the initial list, for example.  Empty paths can
 		-- cause confusion when they are translated into -I options
@@ -488,23 +488,23 @@ addPackage package
 getPackageImportPath   :: IO [String]
 getPackageImportPath = do
   ps <- getPackageInfo
-  return (nub (filter (not.null) (concatMap import_dirs ps)))
+  return (nub (filter notNull (concatMap import_dirs ps)))
 
 getPackageIncludePath   :: IO [String]
 getPackageIncludePath = do
   ps <- getPackageInfo
-  return (nub (filter (not.null) (concatMap include_dirs ps)))
+  return (nub (filter notNull (concatMap include_dirs ps)))
 
 	-- includes are in reverse dependency order (i.e. rts first)
 getPackageCIncludes   :: IO [String]
 getPackageCIncludes = do
   ps <- getPackageInfo
-  return (reverse (nub (filter (not.null) (concatMap c_includes ps))))
+  return (reverse (nub (filter notNull (concatMap c_includes ps))))
 
 getPackageLibraryPath  :: IO [String]
 getPackageLibraryPath = do
   ps <- getPackageInfo
-  return (nub (filter (not.null) (concatMap library_dirs ps)))
+  return (nub (filter notNull (concatMap library_dirs ps)))
 
 getPackageLibraries    :: IO [String]
 getPackageLibraries = do

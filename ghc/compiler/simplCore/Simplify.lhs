@@ -60,6 +60,7 @@ import BasicTypes	( TopLevelFlag(..), isTopLevel,
 import OrdList
 import Maybe		( Maybe )
 import Outputable
+import Util             ( notNull )
 \end{code}
 
 
@@ -922,8 +923,8 @@ completeCall env var occ_info cont
     let
 	arg_infos = [ interestingArg arg | arg <- args, isValArg arg]
 
-	interesting_cont = interestingCallContext (not (null args)) 
-						  (not (null arg_infos))
+	interesting_cont = interestingCallContext (notNull args)
+						  (notNull arg_infos)
 						  call_cont
 
     	active_inline = activeInline env var occ_info

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.90 2002/03/29 21:39:37 sof Exp $
+-- $Id: DriverFlags.hs,v 1.91 2002/04/05 23:24:29 sof Exp $
 --
 -- Driver flags
 --
@@ -138,8 +138,8 @@ findArg spec arg
 arg_ok (NoArg _)            rest arg = null rest
 arg_ok (HasArg _)           rest arg = True
 arg_ok (SepArg _)           rest arg = null rest
-arg_ok (Prefix _)	    rest arg = not (null rest)
-arg_ok (PrefixPred p _)     rest arg = not (null rest) && p rest
+arg_ok (Prefix _)	    rest arg = notNull rest
+arg_ok (PrefixPred p _)     rest arg = notNull rest && p rest
 arg_ok (OptPrefix _)	    rest arg = True
 arg_ok (PassFlag _)         rest arg = null rest 
 arg_ok (AnySuffix _)        rest arg = True

@@ -41,7 +41,7 @@ import BasicTypes	( Activation( AlwaysActive ) )
 import Bag
 import List		( partition )
 import Util		( zipEqual, zipWithEqual, cmpList, lengthIs,
-			  equalLength, lengthAtLeast )
+			  equalLength, lengthAtLeast, notNull )
 import Outputable
 
 
@@ -786,7 +786,7 @@ specDefn subst calls (fn, rhs)
 	-- The first case is the interesting one
   |  rhs_tyvars `lengthIs` n_tyvars 	-- Rhs of fn's defn has right number of big lambdas
   && rhs_bndrs  `lengthAtLeast` n_dicts	-- and enough dict args
-  && not (null calls_for_me)		-- And there are some calls to specialise
+  && notNull calls_for_me		-- And there are some calls to specialise
   && not (isDataConWrapId fn)		-- And it's not a data con wrapper, which have
 					-- stupid overloading that simply discard the dictionary
 

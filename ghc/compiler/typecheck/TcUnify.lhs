@@ -61,7 +61,7 @@ import VarEnv
 import Name		( isSystemName, getSrcLoc )
 import ErrUtils		( Message )
 import BasicTypes	( Boxity, Arity, isBoxed )
-import Util		( equalLength )
+import Util		( equalLength, notNull )
 import Maybe		( isNothing )
 import Outputable
 \end{code}
@@ -1186,7 +1186,7 @@ find_thing ignore_it tidy_env (ATyVar tv)
 -----------------------
 escape_msg sig_tv tv globs
   = mk_msg sig_tv <+> ptext SLIT("escapes") $$
-    if not (null globs) then
+    if notNull globs then
 	vcat [pp_it <+> ptext SLIT("is mentioned in the environment:"), 
 	      nest 2 (vcat globs)]
      else

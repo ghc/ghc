@@ -22,6 +22,7 @@ import SetLevels	( setLevels, Level(..), ltMajLvl, ltLvl, isTopLvl )
 import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable
+import Util             ( notNull )
 \end{code}
 
 	-----------------
@@ -150,7 +151,7 @@ floatTopBind bind@(NonRec _ _)
 
 floatTopBind bind@(Rec _)
   = case (floatBind bind) of { (fs, floats, Rec pairs') ->
-    WARN( not (null floats), ppr bind $$ ppr floats )
+    WARN( notNull floats, ppr bind $$ ppr floats )
     (fs, [Rec (floatsToBindPairs floats ++ pairs')]) }
 \end{code}
 

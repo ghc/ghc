@@ -33,6 +33,7 @@ import ByteCodeInstr	( BCInstr(..), ProtoBCO(..) )
 import ByteCodeItbls	( ItblEnv, ItblPtr )
 import FiniteMap
 import Panic            ( GhcException(..) )
+import Util             ( notNull )
 
 import Control.Monad	( when, foldM )
 import Control.Monad.ST	( runST )
@@ -206,7 +207,7 @@ assembleBCO (ProtoBCO nm instrs origin malloced)
          -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
          -- objects, since they might get run too early.  Disable this until
          -- we figure out what to do.
-         -- when (not (null malloced)) (addFinalizer ul_bco (mapM_ zonk malloced))
+         -- when (notNull malloced) (addFinalizer ul_bco (mapM_ zonk malloced))
 
          return ul_bco
      where

@@ -862,7 +862,7 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
 checkProcessArgsResult flags basename suff
-  = do when (not (null flags)) (throwDyn (ProgramError (
+  = do when (notNull flags) (throwDyn (ProgramError (
            basename ++ "." ++ suff 
            ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
            ++ unwords flags)) (ExitFailure 1))

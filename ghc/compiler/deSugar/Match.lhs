@@ -29,7 +29,7 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 import BasicTypes	( Boxity(..) )
 import UniqSet
 import ErrUtils		( addWarnLocHdrLine, dontAddErrLoc )
-import Util             ( lengthExceeds )
+import Util             ( lengthExceeds, notNull )
 import Outputable
 \end{code}
 
@@ -65,7 +65,7 @@ matchExport_really dflags vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
       match vars qs
   where (pats,indexs) = check qs
         incomplete    = dopt Opt_WarnIncompletePatterns dflags
-			&& (not (null pats))
+			&& (notNull pats)
         shadow        = dopt Opt_WarnOverlappingPatterns dflags
 			&& sizeUniqSet indexs < no_eqns
         no_eqns       = length qs

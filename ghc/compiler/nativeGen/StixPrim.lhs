@@ -28,6 +28,7 @@ import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..),
 			  CCallConv(..), playSafe, playThreadSafe )
 import Outputable
+import Util             ( notNull )
 import FastTypes
 
 #include "NCG.h"
@@ -93,7 +94,7 @@ foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
     (cargs, stix_target)
         = case ctarget of
              StaticTarget nm -> (rhs, Left nm)
-             DynamicTarget |  not (null rhs) -- an assertion
+             DynamicTarget |  notNull rhs -- an assertion
                            -> (tail rhs, Right (amodeToStix (head rhs)))
              CasmTarget _
                 -> ncgPrimopMoan "Native code generator can't handle foreign call" 

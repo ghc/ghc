@@ -28,7 +28,7 @@ import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( noSrcLoc )
 import UniqSet
-import Util             ( takeList, splitAtList )
+import Util             ( takeList, splitAtList, notNull )
 import Outputable
 
 #include "HsVersions.h"
@@ -287,8 +287,8 @@ same constructor.
 split_by_constructor :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
 
 split_by_constructor qs 
-  | not (null unused_cons) = need_default_case used_cons unused_cons qs 
-  | otherwise              = no_need_default_case used_cons qs 
+  | notNull unused_cons = need_default_case used_cons unused_cons qs 
+  | otherwise           = no_need_default_case used_cons qs 
                        where 
                           used_cons   = get_used_cons qs 
                           unused_cons = get_unused_cons used_cons 

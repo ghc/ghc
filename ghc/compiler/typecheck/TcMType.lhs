@@ -90,7 +90,7 @@ import BasicTypes	( Boxity(Boxed) )
 import CmdLineOpts	( dopt, DynFlag(..) )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
-import Util		( nOfThem, isSingleton, equalLength )
+import Util		( nOfThem, isSingleton, equalLength, notNull )
 import ListSetOps	( equivClasses, removeDups )
 import Outputable
 \end{code}
@@ -658,7 +658,7 @@ checkTypeCtxt ctxt ty
 	-- This shows up in the complaint about
 	--	case C a where
 	--	  op :: Eq a => a -> a
-ppr_ty ty | null forall_tvs && not (null theta) = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
+ppr_ty ty | null forall_tvs && notNull theta = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
           | otherwise	 		     = ppr ty
           where
 	    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
@@ -882,7 +882,7 @@ check_valid_theta ctxt []
   = returnTc ()
 check_valid_theta ctxt theta
   = getDOptsTc					`thenNF_Tc` \ dflags ->
-    warnTc (not (null dups)) (dupPredWarn dups)	`thenNF_Tc_`
+    warnTc (notNull dups) (dupPredWarn dups)	`thenNF_Tc_`
     mapTc_ (check_source_ty dflags ctxt) theta
   where
     (_,dups) = removeDups tcCmpPred theta
@@ -1021,7 +1021,7 @@ checkValidClass cls
     doptsTc Opt_GlasgowExts				`thenTc` \ gla_exts ->
 
     	-- Check that the class is unary, unless GlaExs
-    checkTc (not (null tyvars))		(nullaryClassErr cls)	`thenTc_`
+    checkTc (notNull tyvars)	(nullaryClassErr cls)	`thenTc_`
     checkTc (gla_exts || unary) (classArityErr cls)	`thenTc_`
 
    	-- Check the super-classes

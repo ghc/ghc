@@ -373,7 +373,7 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
     let
 	bad_fields = badFields rbinds data_con
     in
-    if not (null bad_fields) then
+    if notNull bad_fields then
 	mapNF_Tc (addErrTc . badFieldCon con_name) bad_fields	`thenNF_Tc_`
 	failTc	-- Fail now, because tcRecordBinds will crash on a bad field
     else
@@ -388,7 +388,7 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
 	(mapNF_Tc (addErrTc . missingStrictFieldCon con_name) missing_s_fields `thenNF_Tc_`
 	 returnNF_Tc ())  `thenNF_Tc_`
     doptsTc Opt_WarnMissingFields `thenNF_Tc` \ warn ->
-    checkTcM (not (warn && not (null missing_fields)))
+    checkTcM (not (warn && notNull missing_fields))
 	(mapNF_Tc ((warnTc True) . missingFieldCon con_name) missing_fields `thenNF_Tc_`
 	 returnNF_Tc ())  `thenNF_Tc_`
 
@@ -425,7 +425,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 
 	-- STEP 0
 	-- Check that the field names are really field names
-    ASSERT( not (null rbinds) )
+    ASSERT( notNull rbinds )
     let 
 	field_names = [field_name | (field_name, _, _) <- rbinds]
     in
@@ -820,7 +820,7 @@ tcExpr_id expr         = newHoleTyVarTy			`thenNF_Tc` \ id_ty ->
 --
 tcDoStmts PArrComp stmts src_loc res_ty
   =
-    ASSERT( not (null stmts) )
+    ASSERT( notNull stmts )
     tcAddSrcLoc src_loc	$
 
     unifyPArrTy res_ty			      `thenTc` \elt_ty              ->
@@ -836,7 +836,7 @@ tcDoStmts PArrComp stmts src_loc res_ty
 tcDoStmts do_or_lc stmts src_loc res_ty
   =	-- get the Monad and MonadZero classes
 	-- create type consisting of a fresh monad tyvar
-    ASSERT( not (null stmts) )
+    ASSERT( notNull stmts )
     tcAddSrcLoc src_loc	$
 
 	-- If it's a comprehension we're dealing with, 

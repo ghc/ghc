@@ -20,6 +20,8 @@ module Util (
 	nOfThem, 
 	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
 	isSingleton, only,
+	notNull,
+
 	snocView,
 	isIn, isn'tIn,
 
@@ -258,10 +260,10 @@ atLength atLenPred atEndPred ls n
 -- special cases.
 lengthExceeds :: [a] -> Int -> Bool
 -- (lengthExceeds xs n) = (length xs > n)
-lengthExceeds = atLength (not.null) (const False)
+lengthExceeds = atLength notNull (const False)
 
 lengthAtLeast :: [a] -> Int -> Bool
-lengthAtLeast = atLength (not.null) (== 0)
+lengthAtLeast = atLength notNull (== 0)
 
 lengthIs :: [a] -> Int -> Bool
 lengthIs = atLength null (==0)
@@ -280,6 +282,10 @@ listLengthCmp = atLength atLen atEnd
 isSingleton :: [a] -> Bool
 isSingleton [x] = True
 isSingleton  _  = False
+
+notNull :: [a] -> Bool
+notNull [] = False
+notNull _  = True
 
 only :: [a] -> a
 #ifdef DEBUG

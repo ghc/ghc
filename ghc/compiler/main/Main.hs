@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.103 2002/04/05 16:43:56 sof Exp $
+-- $Id: Main.hs,v 1.104 2002/04/05 23:24:29 sof Exp $
 --
 -- GHC Driver program
 --
@@ -165,7 +165,7 @@ main =
       do putStr "warning: -O conflicts with --interactive; -O turned off.\n"
          writeIORef v_OptLevel 0
    orig_ways <- readIORef v_Ways
-   when (not (null orig_ways) && mode == DoInteractive) $
+   when (notNull orig_ways && mode == DoInteractive) $
       do throwDyn (UsageError 
                    "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
 
@@ -338,7 +338,7 @@ checkOptions :: [String] -> IO ()
 checkOptions srcs = do
      -- complain about any unknown flags
    let unknown_opts = [ f | f@('-':_) <- srcs ]
-   when (not (null unknown_opts)) (unknownFlagsErr unknown_opts)
+   when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
      -- verify that output files point somewhere sensible.
    verifyOutputFiles
      -- and anything else that it might be worth checking for

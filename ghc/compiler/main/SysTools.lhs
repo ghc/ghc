@@ -65,7 +65,7 @@ import DriverUtil
 import Config
 import Outputable
 import Panic		( progName, GhcException(..) )
-import Util		( global, dropList )
+import Util		( global, dropList, notNull )
 import CmdLineOpts	( dynFlag, verbosity )
 
 import Exception	( throwDyn )
@@ -475,7 +475,7 @@ findTopDir minusbs
        }
   where
     -- get_proto returns a Unix-format path (relying on getExecDir to do so too)
-    get_proto | not (null minusbs)
+    get_proto | notNull minusbs
 	      = return (unDosifyPath (drop 2 (last minusbs)))	-- 2 for "-B"
 	      | otherwise	   
 	      = do { maybe_exec_dir <- getExecDir -- Get directory of executable

@@ -34,6 +34,7 @@ import UniqFM		( UniqFM, lookupWithDefaultUFM, addToUFM, emptyUFM, eltsUFM )
 import Id		( idType )
 import ErrUtils		( Message )
 import CmdLineOpts
+import Util             ( notNull )
 \end{code}
 
 
@@ -326,7 +327,7 @@ addToInstEnv :: DynFlags
 addToInstEnv dflags (inst_env, errs) dfun_id
 	-- Check first that the new instance doesn't 
 	-- conflict with another.  See notes below about fundeps.
-  | not (null bad_fundeps)
+  | notNull bad_fundeps
   = (inst_env, fundep_err : errs)		-- Bad fundeps; report the first only
 
   | otherwise
@@ -426,7 +427,7 @@ badFunDeps :: ClsInstEnv -> Class
 badFunDeps cls_inst_env clas ins_tv_set ins_tys 
   = [ dfun_id | fd <- fds,
 	       (tvs, tys, dfun_id) <- cls_inst_env,
-	       not (null (checkClsFD (tvs `unionVarSet` ins_tv_set) fd clas_tvs tys ins_tys))
+	       notNull (checkClsFD (tvs `unionVarSet` ins_tv_set) fd clas_tvs tys ins_tys)
     ]
   where
     (clas_tvs, fds) = classTvsFds clas

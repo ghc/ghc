@@ -33,7 +33,7 @@ import BasicTypes	( Activation(..) )
 import Outputable
 
 import Maybes		( orElse )
-import Util		( mapAccumL, lengthAtLeast )
+import Util		( mapAccumL, lengthAtLeast, notNull )
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
@@ -374,7 +374,7 @@ scExpr env e@(App _ _)
 ----------------------
 scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec [(fn,rhs)])
-  | not (null val_bndrs)
+  | notNull val_bndrs
   = scExpr env_fn_body body		`thenUs` \ (usg, body') ->
     let
 	SCU { calls = calls, occs = occs } = usg
