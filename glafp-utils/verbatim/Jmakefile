@@ -1,4 +1,0 @@
-BuildPgmFromCFiles(verbatim,verbatim.o,$(LEX_LIB),)
-InstallBinaryTarget(verbatim,$(INSTBINDIR))
-
-CDependTarget( $(SRCS_C) )
