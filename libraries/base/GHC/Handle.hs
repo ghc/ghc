@@ -1188,6 +1188,14 @@ hIsTerminalDevice handle = do
 -- -----------------------------------------------------------------------------
 -- hSetBinaryMode
 
+-- | On Windows, reading a file in text mode (which is the default) will
+-- translate CRLF to LF, and writing will translate LF to CRLF. This
+-- is usually what you want with text files. With binary files this is
+-- undesirable; also, as usual under Microsoft operating systems, text
+-- mode treats control-Z as EOF.  Setting binary mode using
+-- 'hSetBinaryMode' turns off all special treatment of end-of-line and
+-- end-of-file characters.
+--
 hSetBinaryMode :: Handle -> Bool -> IO ()
 hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
