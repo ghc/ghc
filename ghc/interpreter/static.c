@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:07:01 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:35 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -65,7 +65,6 @@ static List   local classBindings       Args((String,Class,List));
 static Name   local memberName          Args((Class,Text));
 static List   local numInsert           Args((Int,Cell,List));
 
-static List   local typeVarsIn          Args((Cell,List,List));
 static List   local maybeAppendVar      Args((Cell,List));
 
 static Type   local checkSigType        Args((Int,String,Cell,Type));
@@ -1588,7 +1587,7 @@ List xs; {
  * occur in the type expression when read from left to right.
  * ------------------------------------------------------------------------*/
 
-static List local typeVarsIn(ty,us,vs)  /* Calculate list of type variables*/
+List typeVarsIn(ty,us,vs)               /* Calculate list of type variables*/
 Cell ty;                                /* used in type expression, reading*/
 List us;                                /* from left to right ignoring any */
 List vs; {                              /* listed in us.                   */

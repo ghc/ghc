@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: codegen.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:06:48 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:53 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -106,15 +106,21 @@ static void cgBind( AsmBCO bco, StgVar v )
 
 static Void pushVar( AsmBCO bco, StgVar v )
 {
-    Cell info = stgVarInfo(v);
+    Cell info;
     assert(isStgVar(v));
-    if (isPtr(info)) {
-        asmClosure(bco,ptrOf(info));
-    } else if (isInt(info)) {
-        asmVar(bco,intOf(info),repOf(v));
+
+    if (isCPtr(v)) {
+fprintf ( stderr, "push cptr %p\n", (void*)cptrOf(v) );
     } else {
-        internal("pushVar");
-    }        
+       info = stgVarInfo(v);
+       if (isPtr(info)) {
+           asmClosure(bco,ptrOf(info));
+       } else if (isInt(info)) {
+           asmVar(bco,intOf(info),repOf(v));
+       } else {
+           internal("pushVar");
+       }        
+    }
 }
 
 static Void pushAtom( AsmBCO bco, StgAtom e )
@@ -153,6 +159,9 @@ static Void pushAtom( AsmBCO bco, StgAtom e )
 #else
             asmClosure(bco,asmStringObj(textToStr(textOf(e))));
 #endif
+            break;
+    case CPTRCELL:
+            asmConstWord(bco,cptrOf(e));
             break;
     case PTRCELL: 
             asmConstAddr(bco,ptrOf(e));
@@ -483,9 +492,13 @@ static Void build( AsmBCO bco, StgVar v )
             if (isName(fun)) {
                 fun = name(fun).stgVar;
             }
-            if (nonNull(stgVarBody(fun))
-                && whatIs(stgVarBody(fun)) == LAMBDA 
-                && length(stgLambdaArgs(stgVarBody(fun))) > length(args)) {
+            if (isCPtr(fun) 
+                ||
+                (nonNull(stgVarBody(fun))
+                 && whatIs(stgVarBody(fun)) == LAMBDA 
+                 && length(stgLambdaArgs(stgVarBody(fun))) > length(args)
+                )
+               ) {
                 AsmSp  start = asmBeginMkPAP(bco);
                 map1Proc(pushAtom,bco,reverse(args));
                 pushAtom(bco,fun);

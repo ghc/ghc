@@ -11,8 +11,8 @@
  * in the distribution for details.
  *
  * $RCSfile: parser.y,v $
- * $Revision: 1.5 $
- * $Date: 1999/04/27 10:06:58 $
+ * $Revision: 1.6 $
+ * $Date: 1999/06/07 17:22:41 $
  * ------------------------------------------------------------------------*/
 
 %{
@@ -28,7 +28,8 @@
 #define only(t)                  ap(ONLY,t)
 #define letrec(bs,e)             (nonNull(bs) ? ap(LETREC,pair(bs,e)) : e)
 #define qualify(ps,t)            (nonNull(ps) ? ap(QUAL,pair(ps,t)) : t)
-#define exportSelf()             singleton(ap(MODULEENT,mkCon(module(currentModule).text)))
+#define exportSelf()             singleton(ap(MODULEENT, \
+                                    mkCon(module(currentModule).text)))
 #define yyerror(s)               /* errors handled elsewhere */
 #define YYSTYPE                  Cell
 
@@ -36,6 +37,7 @@ static Cell   local gcShadow     Args((Int,Cell));
 static Void   local syntaxError  Args((String));
 static String local unexpected   Args((Void));
 static Cell   local checkPrec    Args((Cell));
+static Void   local fixDefn      Args((Syntax,Cell,Cell,List));
 static Cell   local buildTuple   Args((List));
 static List   local checkContext Args((List));
 static Cell   local checkPred    Args((Cell));
@@ -87,17 +89,295 @@ static Void   local noTREX       Args((String));
 %token '!'        IMPLIES    '('        ','        ')'
 %token '['        ';'        ']'        '`'        '.'
 %token TMODULE    IMPORT     HIDING     QUALIFIED  ASMOD
-%token EXPORT     UNSAFE
+%token EXPORT     INTERFACE  REQUIRES   UNSAFE     INSTIMPORT
 
 %%
 /*- Top level script/module structure -------------------------------------*/
 
 start     : EXPR exp wherePart          {inputExpr = letrec($3,$2); sp-=2;}
           | SCRIPT topModule            {valDefns  = $2;            sp-=1;}
+          | INTERFACE iface             {sp-=1;}
           | error                       {syntaxError("input");}
           ;
 
+
+/*- GHC interface file parsing: -------------------------------------------*/
+
+/* Reading in an interface file is surprisingly like reading
+ * a normal Haskell module: we read in a bunch of declarations,
+ * construct symbol table entries, etc.  The "only" differences
+ * are that there's no syntactic sugar to deal with and we don't
+ * have to read in expressions.
+ */
+
+/*- Top-level interface files -----------------------------*/
+iface     : INTERFACE ifName NUMLIT checkVersion WHERE ifDecls 
+                                        {$$ = gc6(NIL); }
+          | INTERFACE error             {syntaxError("interface file");}
+          ;
+ifDecls:                                {$$=gc0(NIL);}
+          | ifDecl ';' ifDecls          {$$=gc3(cons($1,$3));}
+          ;
+varid_or_conid
+          : VARID                       { $$=gc1($1); }
+          | CONID                       { $$=gc1($1); }
+          ;
+opt_bang  : '!'                         {$$=gc1(NIL);}
+          |                             {$$=gc0(NIL);}
+          ;
+ifName    : CONID                       {openGHCIface(textOf($1)); 
+                                         $$ = gc1(NIL);}
+checkVersion
+          : NUMLIT                      {$$ = gc1(NIL); }
+          ;
+ifDecl    
+          : IMPORT CONID opt_bang NUMLIT COCO version_list_junk
+                                        { addGHCImports(intOf($4),textOf($2),
+                                                       $6);
+                                          $$ = gc6(NIL); 
+                                        }
+
+          | INSTIMPORT CONID            {$$=gc2(NIL);}
+
+          | EXPORT CONID ifEntities     { addGHCExports($2,$3);
+                                          $$=gc3(NIL);}
+
+          | NUMLIT INFIXL optDigit varid_or_conid   
+                                        {$$ = gc4(fixdecl($2,singleton($4),
+                                                          LEFT_ASS,$3)); }
+          | NUMLIT INFIXR optDigit varid_or_conid   
+                                        {$$ = gc4(fixdecl($2,singleton($4),
+                                                          RIGHT_ASS,$3)); }
+          | NUMLIT INFIXN optDigit varid_or_conid   
+                                        {$$ = gc4(fixdecl($2,singleton($4),
+                                                          NON_ASS,$3)); }
+
+          | TINSTANCE ifCtxInst ifInstHd '=' ifVar
+                                        { addGHCInstance(intOf($1),$2,$3,
+                                          textOf($5)); 
+                                          $$ = gc5(NIL); }
+          | NUMLIT TYPE ifCon ifKindedTyvarL '=' ifType
+                                        { addGHCSynonym(intOf($2),$3,$4,$6);
+                                          $$ = gc6(NIL); }
+
+          | NUMLIT DATA ifCtxDecl ifConData ifKindedTyvarL ifConstrs
+                                        { addGHCDataDecl(intOf($2),
+                                                         $3,$4,$5,$6);
+                                          $$ = gc6(NIL); }
+
+          | NUMLIT TNEWTYPE ifCtxDecl ifConData ifKindedTyvarL ifNewTypeConstr
+                                        { addGHCNewType(intOf($2),
+                                                        $3,$4,$5,$6);
+                                          $$ = gc6(NIL); }
+          | NUMLIT TCLASS ifCtxDecl ifCon ifTyvar ifCmeths
+                                        { addGHCClass(intOf($2),$3,$4,$5,$6);
+                                          $$ = gc6(NIL); }
+          | NUMLIT ifVar COCO ifType
+                                        { addGHCVar(intOf($3),textOf($2),$4);
+                                          $$ = gc4(NIL); }
+          | error                       { syntaxError(
+                                             "interface declaration"); }
+          ;
+
+
+/*- Interface variable and constructor ids ----------------*/
+ifTyvar   : VARID                       {$$ = $1;}
+          ;
+ifVar     : VARID                       {$$ = gc1($1);}
+          ;
+ifCon     : CONID                       {$$ = gc1($1);}
+          ;
+ifQCon    : CONID                       {$$ = gc1($1);}
+          | QCONID                      {$$ = gc1($1);}
+          ;
+ifConData : ifCon                       {$$ = gc1($1);}
+          | '(' ')'                     {$$ = gc2(typeUnit);}
+          | '[' ']'                     {$$ = gc2(typeList);}
+          | '(' ARROW ')'               {$$ = gc3(typeArrow);}
+          ;
+ifTCName  : CONID                       { $$ = gc1($1); }
+          | CONOP                       { $$ = gc1($1); }
+          | '(' ARROW ')'               { $$ = gc3(typeArrow); }
+          | '[' ']'                     { $$ = gc1(typeList);  }
+          ; 
+ifQTCName : ifTCName                    { $$ = gc1($1); }
+          | QCONID                      { $$ = gc1($1); }
+          | QCONOP                      { $$ = gc1($1); }
+          ; 
+
+
+/*- Interface contexts ------------------------------------*/
+ifCtxInst /* __forall [a b] {M.C1 a, M.C2 b} =>  */
+          /* :: [(QConId, VarId)]                */
+          : ALL ifForall ifCtxDecl      {$$=gc3($3);}
+          | ALL ifForall IMPLIES        {$$=gc3(NIL);}
+          |                             {$$=gc0(NIL);}
+          ;
+ifInstHd  /* { Class aType }    :: (ConId, Type) */
+          : '{' ifCon ifAType '}'       {$$=gc4(pair($2,$3));}
+          ;
+
+ifCtxDecl /* {M.C1 a, C2 b} :: [(QConId, VarId)] */ 
+          :                             { $$ = gc0(NIL); }
+          | '{' ifCtxDeclL '}' IMPLIES  { $$ = gc4($2);  }
+          ;					
+ifCtxDeclT /* {M.C1 a, C2 b} :: [(QConId, VarId)] */ 
+          :                             { $$ = gc0(NIL); }
+          | '{' ifCtxDeclL '}'          { $$ = gc3($2);  }
+          ;					
+ifCtxDeclL /* M.C1 a, C2 b :: [(QConId, VarId)] */
+          : ifCtxDeclLE ',' ifCtxDeclL  {$$=gc3(cons($1,$3));}
+          | ifCtxDeclLE                 {$$=gc1(cons($1,NIL));}
+          |                             {$$=gc0(NIL);}
+          ;
+ifCtxDeclLE /* M.C1 a   :: (QConId,VarId) */
+          : ifQCon ifTyvar              {$$=gc2(pair($1,$2));}
+          ;
+
+
+/*- Interface data declarations - constructor lists -------*/
+ifConstrs /* = Con1 | ... | ConN  :: [(ConId,[(Type,Text)],NIL)] */
+          :                             {$$ = gc0(NIL);}
+          | '=' ifConstrL               {$$ = gc2($2);}
+          ;
+ifConstrL /* [(ConId,[(Type,Text)],NIL)] */
+          : ifConstr                    {$$ = gc1(singleton($1));}
+          | ifConstr '|' ifConstrL      {$$ = gc3(cons($1,$3));}
+          ;
+ifConstr /* (ConId,[(Type,Text)],NIL) */
+          : ifConData ifDataAnonFieldL  {$$ = gc2(triple($1,$2,NIL));}
+          | ifConData '{' ifDataNamedFieldL '}' 
+                                        {$$ = gc4(triple($1,$3,NIL));}
+          ;
+ifDataAnonFieldL /* [(Type,Text)] */
+          :                             {$$=gc0(NIL);}
+          | ifDataAnonField ifDataAnonFieldL
+                                        {$$=gc2(cons($1,$2));}
+          ;
+ifDataNamedFieldL /* [(Type,Text)] */
+          :                             {$$=gc0(NIL);}
+          | ifDataNamedField            {$$=gc1(cons($1,NIL));}
+          | ifDataNamedField ',' ifDataNamedFieldL 
+                                        {$$=gc3(cons($1,$3));}
+          ;
+ifDataAnonField /* (Type,Text) */
+          : ifAType                     {$$=gc1(pair($1,NIL));}
+          ;
+ifDataNamedField  /* (Type,Text) */
+          : VARID COCO ifAType          {$$=gc3(pair($3,$1));}
+          ;
+
+
+/*- Interface class declarations - methods ----------------*/
+ifCmeths /* [(VarId,Type)] */
+          :                             { $$ = gc0(NIL); }
+          | WHERE '{' ifCmethL '}'      { $$ = gc4($3); }
+          ;
+ifCmethL /* [(VarId,Type)] */
+          : ifCmeth                     { $$ = gc1(singleton($1)); }
+          | ifCmeth ';' ifCmethL        { $$ = gc3(cons($1,$3));    }
+          ;
+ifCmeth /* (VarId,Type) */
+          : ifVar     COCO ifType       { $$ = gc3(pair($1,$3)); }
+          | ifVar '=' COCO ifType       { $$ = gc4(pair($1,$4)); } 
+                                              /* has default method */
+          ;
+
+
+/*- Interface newtype declararions ------------------------*/
+ifNewTypeConstr /* (ConId,Type) */
+          : '=' ifCon ifAType           { $$ = gc3(pair($2,$3)); }
+          ;
+
+
+/*- Interface type expressions ----------------------------*/
+ifType    : ALL ifForall ifCtxDeclT IMPLIES ifType 
+                                        { if ($3 == NIL)
+                                           $$=gc5($5); else
+                                           $$=gc5(pair(QUAL,pair($3,$5)));
+                                        }
+          | ifBType ARROW ifType        { $$ = gc3(fn($1,$3)); }
+          | ifBType                     { $$ = gc1($1); }
+          ;					
+ifForall /* [(VarId,Kind)] */
+          : '[' ifKindedTyvarL ']'      { $$ = gc3($2); }
+          ;					
+ifTypes2  : ifType ',' ifType           { $$ = gc3(doubleton($1,$3)); }
+          | ifType ',' ifTypes2         { $$ = gc3(cons($1,$3));      }
+          ;
+ifBType   : ifAType                     { $$ = gc1($1);        } 
+          | ifBType ifAType             { $$ = gc2(ap($1,$2)); }
+          ;
+ifAType   : ifQTCName                   { $$ = gc1($1); }
+          | ifTyvar                     { $$ = gc1($1); }
+          | '(' ')'                     { $$ = gc2(typeUnit); }
+          | '(' ifTypes2 ')'            { $$ = gc3(buildTuple($2)); }
+          | '[' ifType ']'              { $$ = gc3(ap(typeList,$2));}
+          | '{' ifQTCName ifATypes '}'  { $$ = gc4(ap(DICTAP,
+                                                      pair($2,$3))); }
+          | '(' ifType ')'              { $$ = gc3($2); }
+          ;
+ifATypes  :                             { $$ = gc0(NIL);         }
+          | ifAType ifATypes            { $$ = gc2(cons($1,$2)); }
+          ;
+
+
+/*- Interface kinds ---------------------------------------*/
+ifKindedTyvarL /* [(VarId,Kind)] */
+          :                              { $$ = gc0(NIL);         }
+          | ifKindedTyvar ifKindedTyvarL { $$ = gc2(cons($1,$2)); }
+          ;
+ifKindedTyvar /* (VarId,Kind) */
+          : ifTyvar                     { $$ = gc1(pair($1,STAR)); }
+          | ifTyvar COCO ifAKind        { $$ = gc3(pair($1,$3));   }
+          ; 
+ifKind    : ifAKind                     { $$ = gc1($1);        }
+          | ifAKind ARROW ifKind        { $$ = gc3(fn($1,$3)); }
+          ;
+ifAKind   : VAROP                       { $$ = gc1(STAR); } 
+                                            /* should be '*' */
+          | '(' ifKind ')'              { $$ = gc3($2);   }
+          ;
+
+
+/*- Interface version/export/import stuff -----------------*/
+ifEntities				        
+          :                             { $$ = gc0(NIL);         }
+          | ifEntity ifEntities         { $$ = gc2(cons($1,$2)); }
+          ;
+ifEntity
+          : ifEntityOcc                 {$$=gc1($1);}
+          | ifEntityOcc ifStuffInside   {$$=gc2($1);}
+          | ifEntityOcc '|' ifStuffInside {$$=gc3($1);} 
+                                       /* exporting datacons but not tycon */
+          ;
+ifEntityOcc
+          : ifVar                       { $$ = gc1($1); }
+          | ifCon                       { $$ = gc1($1); }
+          | ARROW                       { $$ = gc1(typeArrow); }
+          | '(' ARROW ')'               { $$ = gc3(typeArrow); }  
+                                        /* why allow both? */
+          ;
+ifStuffInside
+          : '{' ifValOccs '}'           { $$ = gc3($2); }
+          ;
+ifValOccs
+          : ifValOcc                    { $$ = gc1(singleton($1)); }
+          | ifValOcc ifValOccs          { $$ = gc2(cons($1,$2));   }
+          ;
+ifValOcc
+          : ifVar                       {$$ = gc1($1); }
+          | ifCon                       {$$ = gc1($1); }
+          ;
+version_list_junk
+          :                                {$$=gc0(NIL);}
+          | VARID NUMLIT version_list_junk {$$=gc3(cons($1,$3));} 
+          | CONID NUMLIT version_list_junk {$$=gc3(cons($1,$3));}
+          ;
+
+
 /*- Haskell module header/import parsing: -----------------------------------
+
  * Syntax for Haskell modules (module headers and imports) is parsed but
  * most of it is ignored.  However, module names in import declarations
  * are used, of course, if import chasing is turned on.
@@ -108,7 +388,10 @@ start     : EXPR exp wherePart          {inputExpr = letrec($3,$2); sp-=2;}
  * We use the 1.2 header because it breaks much less pre-module code.
  */
 topModule : startMain begin modBody end {
-                                         setExportList(singleton(ap(MODULEENT,mkCon(module(currentModule).text))));
+                                         setExportList(singleton(
+                                            ap(MODULEENT,
+                                            mkCon(module(currentModule).text)
+                                            )));
                                          $$ = gc3($3);
                                         }
           | TMODULE modname expspec WHERE '{' modBody end
@@ -126,8 +409,11 @@ modname   : CONID                       {startModule($1); $$ = gc1(NIL);}
           ;
 modid     : CONID                       {$$ = $1;}
           | STRINGLIT                   { extern String scriptFile;
-                                          String modName = findPathname(scriptFile,textToStr(textOf($1)));
-                                          if (modName) { /* fillin pathname if known */
+                                          String modName 
+                                             = findPathname(scriptFile,
+                                                 textToStr(textOf($1)));
+                                          if (modName) { 
+                                              /* fillin pathname if known */
                                               $$ = mkStr(findText(modName));
                                           } else {
                                               $$ = $1;
@@ -252,7 +538,7 @@ topDecl   : TYPE tyLhs '=' type         {defTycon(4,$3,$2,$4,SYNONYM);}
           | TYPE error                  {syntaxError("type definition");}
           | DATA btype2 '=' constrs deriving
                                         {defTycon(5,$3,checkTyLhs($2),
-                                                    ap(rev($4),$5),DATATYPE);}
+                                                   ap(rev($4),$5),DATATYPE);}
           | DATA context IMPLIES tyLhs '=' constrs deriving
                                         {defTycon(7,$5,$4,
                                                   ap(qualify($2,rev($6)),
@@ -280,7 +566,7 @@ invars    : invars ',' invar            {$$ = gc3(cons($3,$1));}
           | invar                       {$$ = gc1(cons($1,NIL));}
           ;
 invar     : var COCO topType            {$$ = gc3(sigdecl($2,singleton($1),
-                                                                        $3));}
+                                                                       $3));}
           | var                         {$$ = $1;}
           ;
 constrs   : constrs '|' pconstr         {$$ = gc3(cons($3,$1));}
@@ -880,12 +1166,13 @@ varid1    : VARID                       {$$ = gc1($1);}
 
 /*- Tricks to force insertion of leading and closing braces ---------------*/
 
-begin     : error                       {yyerrok; goOffside(startColumn);}
+begin     : error                       {yyerrok; 
+                                         if (offsideON) goOffside(startColumn);}
           ;
                                         /* deal with trailing semicolon    */
 end       : '}'                         {$$ = $1;}
           | error                       {yyerrok; 
-                                         if (canUnOffside()) {
+                                         if (offsideON && canUnOffside()) {
                                              unOffside();
                                              /* insert extra token on stack*/
                                              push(NIL);
@@ -910,7 +1197,7 @@ Cell e; {
      *           x1  |  ...  |  xn  |  la   ===>  e  |  la
      *                                top()            top()
      *
-     * Othwerwise, the transformation is:
+     * Otherwise, the transformation is:
      *   pushed: n-1             0        0
      *           x1  |  ...  |  xn  ===>  e
      *                         top()     top()
@@ -962,7 +1249,7 @@ static String local unexpected() {     /* find name for unexpected token   */
         case DEFAULT   : keyword("default");
         case IMPORT    : keyword("import");
         case TMODULE   : keyword("module");
-        case ALL       : keyword("forall");
+        case ALL       : keyword("__forall");
 #undef keyword
 
         case ARROW     : return "`->'";

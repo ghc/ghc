@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:07:09 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:31 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -724,8 +724,6 @@ Cell e; {                               /* requires polymorphism, qualified*/
     Cell p = NIL;
     Cell a = e;
     Int  i;
-    //print(h,1000);
-    //printf("\n");
 
     switch (whatIs(h)) {
         case NAME      : typeIs = name(h).type;
@@ -757,9 +755,6 @@ Cell e; {                               /* requires polymorphism, qualified*/
     }
 
     if (isNull(typeIs)) {
-        //printf("\n NAME " );
-        //print(h,1000);
-        //printf(" TYPE " ); print(typeIs,1000);
         internal("typeAp1");
     }
 
@@ -1709,7 +1704,7 @@ Class c; {                              /* defaults for class c            */
         body = ap(LETREC,pair(singleton(locs),body));
     name(cclass(c).dbuild).defn
              = singleton(pair(args,body));
-    //--------- Default
+
     name(cclass(c).dbuild).inlineMe = TRUE;
     genDefns = cons(cclass(c).dbuild,genDefns);
     cclass(c).defaults = NIL;
@@ -1854,7 +1849,7 @@ Inst in; {                              /* member functions for instance in*/
 
     name(inst(in).builder).defn                 /* Register builder imp    */
              = singleton(pair(args,ap(LETREC,pair(singleton(locs),d))));
-    //--------- Actual
+
     name(inst(in).builder).inlineMe   = TRUE;
     name(inst(in).builder).isDBuilder = TRUE;
     genDefns = cons(inst(in).builder,genDefns);
@@ -2250,11 +2245,6 @@ Void typeCheckDefns() {                /* Type check top level bindings    */
 static Void local typeDefnGroup(bs)     /* type check group of value defns */
 List bs; {                              /* (one top level scc)             */
     List as;
-    // printf("\n\n+++ DefnGroup ++++++++++++++++++++++++++++\n");
-    //{ List qq; for (qq=bs;nonNull(qq);qq=tl(qq)){
-    //   print(hd(qq),4);
-    //   printf("\n");
-    //}}
 
     emptySubstitution();
     hd(defnBounds) = NIL;

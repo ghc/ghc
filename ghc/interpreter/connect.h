@@ -7,8 +7,8 @@
  * in the distribution for details.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:06:50 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:45 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -497,4 +497,35 @@ extern List offsetTyvarsIn          Args((Type,List));
 extern Void optimiseTopBinds  Args((List));
 extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */
 
+extern Void  interface        Args((Int));
+
+extern List typeVarsIn        Args((Cell,List,List));
+
+extern Void getFileSize       Args((String, Long *));
+
+extern Void loadInterface     Args((String,Long));
+
+extern Void openGHCIface      Args((Text));
+extern Void loadSharedLib     Args((String));
+extern Void addGHCImports     Args((Int,Text,List));
+extern Void addGHCExports     Args((Cell,List));
+extern Void addGHCVar         Args((Int,Text,Type));
+extern Void addGHCSynonym     Args((Int,Cell,List,Type));
+extern Void addGHCDataDecl    Args((Int,List,Cell,List,List));
+extern Void addGHCNewType     Args((Int,List,Cell,List,Cell));
+extern Void addGHCClass       Args((Int,List,Cell,List,List));
+extern Void addGHCInstance    Args((Int,List,Pair,Text));
+extern Void finishInterfaces  Args((Void));
+
+extern Void hi_o_namesFromSrcName Args((String,String*,String* oName));
+extern Void parseInterface        Args((String,Long));
+
+
 #define SMALL_INLINE_SIZE 9
+
+
+// nasty hack, but seems an easy to convey the object name
+// and size to openGHCIface
+char nameObj[FILENAME_MAX+1];
+int  sizeObj;
+

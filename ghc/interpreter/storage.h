@@ -9,8 +9,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:07:06 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:47 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -150,12 +150,33 @@ extern  Cell         whatIs    Args((Cell));
 #define BIGCELL      16           /* Integer literal:         snd :: Text  */
 #if PTR_ON_HEAP
 #define PTRCELL      17           /* C Heap Pointer           snd :: Ptr   */
+#define CPTRCELL     18           /* Native code pointer      snd :: Ptr   */
 #endif
 #if TREX
-#define EXTCOPY      18           /* Copy of an Ext:          snd :: Text  */
+#define EXTCOPY      19           /* Copy of an Ext:          snd :: Text  */
 #endif
 
-#define textOf(c)       ((Text)(snd(c)))         /* c ::  (VAR|CON)(ID|OP) */
+//#define textOf(c)       ((Text)(snd(c)))         /* c ::  (VAR|CON)(ID|OP) */
+
+#if 1
+static Text textOf( Cell c )
+{
+   Bool ok = 
+          (whatIs(c)==VARIDCELL
+           || whatIs(c)==CONIDCELL
+           || whatIs(c)==VAROPCELL
+           || whatIs(c)==CONOPCELL
+           || whatIs(c)==STRCELL
+           || whatIs(c)==DICTVAR
+          );
+   if (!ok) {
+fprintf(stderr, "\ntextOf -- tag %d\n",whatIs(c) );
+      assert(ok);
+   }
+   return snd(c);
+}
+#endif
+
 #define qmodOf(c)       (textOf(fst(snd(c))))    /* c ::  QUALIDENT        */
 #define qtextOf(c)      (textOf(snd(snd(c))))    /* c ::  QUALIDENT        */
 #define mkVar(t)        ap(VARIDCELL,t)
@@ -195,6 +216,9 @@ extern  String           stringNegate Args((String));
 #define isPtr(c)        (isPair(c) && fst(c)==PTRCELL)
 extern  Cell            mkPtr           Args((Ptr));
 extern  Ptr             ptrOf           Args((Cell));
+#define isCPtr(c)       (isPair(c) && fst(c)==CPTRCELL)
+extern  Cell            mkCPtr          Args((Ptr));
+extern  Ptr             cptrOf          Args((Cell));
 #endif
 
 /* --------------------------------------------------------------------------
@@ -264,6 +288,9 @@ extern  Ptr             ptrOf           Args((Cell));
 #define INFIX        80           /* INFIX      snd :: (see tidyInfix)     */
 #define ONLY         81           /* ONLY       snd :: Exp                 */
 #define NEG          82           /* NEG        snd :: Exp                 */
+
+/* Used when parsing GHC interface files */
+#define DICTAP       85           /* DICTTYPE   snd :: (QClassId,[Type])   */
 
 #if SIZEOF_INTP != SIZEOF_INT
 #define PTRCELL      90           /* C Heap Pointer snd :: (Int,Int)       */
@@ -392,7 +419,10 @@ struct Module {
      * evaluating an expression in the context of the current module.
      */
     List  qualImports;
-    ObjectFile objectFile; /* usually unused */
+    /* ptr to malloc'd lump of memory holding the obj file */
+    void* oImage;
+
+
 };
 
 extern Module currentModule;           /* Module currently being processed */
@@ -416,16 +446,16 @@ extern Void   setCurrModule Args((Module));
 #define tycon(n)     tabTycon[(n)-TYCMIN]
 
 struct strTycon {
-    Text  text;
-    Int   line;
+    Text   text;
+    Int    line;
     Module mod;                         /* module that defines it          */
-    Int   arity;
-    Kind  kind;                         /* kind (includes arity) of Tycon  */
-    Cell  what;                         /* DATATYPE/SYNONYM/RESTRICTSYN... */
-    Cell  defn;
-    Name  conToTag;                     /* used in derived code            */
-    Name  tagToCon;
-    Tycon nextTyconHash;
+    Int    arity;
+    Kind   kind;                        /* kind (includes arity) of Tycon  */
+    Cell   what;                        /* DATATYPE/SYNONYM/RESTRICTSYN... */
+    Cell   defn;
+    Name   conToTag;                    /* used in derived code            */
+    Name   tagToCon;
+    Tycon  nextTyconHash;
 };
 
 extern struct strTycon DECTABLE(tabTycon);
@@ -467,6 +497,7 @@ struct strName {
     Bool   simplified;    /* TRUE => already simplified */
     Bool   isDBuilder;    /* TRUE => is a dictionary builder */
     const void*  primop;  /* really StgPrim* */
+    List   ghc_names;     /* [(Text,Ptr)] */
     Name   nextNameHash;
 };
 
@@ -511,6 +542,7 @@ extern Name   addPrimCfun     Args((Text,Int,Int,Cell));
 extern Name   addPrimCfunREP  Args((Text,Int,Int,Int));
 extern Int    sfunPos         Args((Name,Name));
 extern Name   nameFromStgVar  Args((Cell));
+extern Name   jrsFindQualName Args((Text,Text));
 
 /* --------------------------------------------------------------------------
  * Type class values:
@@ -523,15 +555,15 @@ extern Name   nameFromStgVar  Args((Cell));
 #define inst(in)     tabInst[(in)-INSTMIN]
 
 struct strInst {
-    Class c;                            /* class C                         */
-    Int   line;
-  //Module mod;                         /* module that defines it          */
-    Kinds kinds;                        /* Kinds of variables in head      */
-    Cell  head;                         /* :: Pred                         */
-    List  specifics;                    /* :: [Pred]                       */
-    Int   numSpecifics;                 /* length(specifics)               */
-    List  implements;
-    Name  builder;                      /* Dictionary constructor function */
+    Class  c;                           /* class C                         */
+    Int    line;
+    Module mod;                         /* module that defines it          */
+    Kinds  kinds;                       /* Kinds of variables in head      */
+    Cell   head;                        /* :: Pred                         */
+    List   specifics;                   /* :: [Pred]                       */
+    Int    numSpecifics;                /* length(specifics)               */
+    List   implements;
+    Name   builder;                     /* Dictionary constructor function */
 };
 
 /* a predicate (an element :: Pred) is an application of a Class to one or
@@ -646,6 +678,7 @@ extern  List         splitAt      Args((Int,List));     /* non-destructive */
 extern  Cell         nth          Args((Int,List));
 extern  List         removeCell   Args((Cell,List));    /* destructive     */
 extern  List         dupListOnto  Args((List,List));    /* non-destructive */ 
+extern  List         nubList      Args((List));         /* non-destructive */
 
 /* The following macros provide `inline expansion' of some common ways of
  * traversing, using and modifying lists:
@@ -714,7 +747,7 @@ extern  StackPtr sp;
     chkStack(1);     \
     onto(c);         \
   } while (0)
-#define onto(c)      stack(++sp)=(c)
+#define onto(c)      stack(++sp)=(c);
 #define pop()        stack(sp--)
 #define drop()       sp--
 #define top()        stack(sp)

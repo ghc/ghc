@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:06:52 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:43 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -77,12 +77,12 @@ static Int    local argToInt          Args((String));
 
 static Void   local loadProject       Args((String));
 static Void   local clearProject      Args((Void));
-static Void   local addScriptName     Args((String,Bool));
-static Bool   local addScript         Args((String,Long));
+static Bool   local addScript         Args((Int));
 static Void   local forgetScriptsFrom Args((Script));
 static Void   local setLastEdit       Args((String,Int));
 static Void   local failed            Args((Void));
 static String local strCopy           Args((String));
+
 
 /* --------------------------------------------------------------------------
  * Machine dependent code for Hugs interpreter:
@@ -101,19 +101,38 @@ static Bool   printing     = FALSE;     /* TRUE => currently printing value*/
 static Bool   showStats    = FALSE;     /* TRUE => print stats after eval  */
 static Bool   listScripts  = TRUE;      /* TRUE => list scripts after loading*/
 static Bool   addType      = FALSE;     /* TRUE => print type with value   */
-static Bool   chaseImports = TRUE;      /* TRUE => chase imports on load   */
 static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
        Bool   preludeLoaded = FALSE;
-       Bool   optimise      = TRUE;
+       Bool   optimise      = FALSE;
 
-static String scriptName[NUM_SCRIPTS];  /* Script file names               */
-static Time   lastChange[NUM_SCRIPTS];  /* Time of last change to script   */
-static Bool   postponed[NUM_SCRIPTS];   /* Indicates postponed load        */
+typedef 
+   struct { 
+      String modName;                   /* Module name                     */
+      Bool   details;             /* FALSE => remaining fields are invalid */
+      String path;                      /* Path to module                  */
+      String srcExt;                    /* ".hs" or ".lhs" if fromSource   */
+      Time   lastChange;                /* Time of last change to script   */
+      Bool   fromSource;                /* FALSE => load object code       */
+      Bool   postponed;                 /* Indicates postponed load        */
+      Bool   objLoaded;
+      Long   size;
+      Long   oSize;
+   }
+   ScriptInfo;
+
+static Void   local makeStackEntry    Args((ScriptInfo*,String));
+static Void   local addStackEntry     Args((String));
+
+static ScriptInfo scriptInfo[NUM_SCRIPTS];
+
 static Int    numScripts;               /* Number of scripts loaded        */
+static Int    nextNumScripts;
 static Int    namesUpto;                /* Number of script names set      */
 static Bool   needsImports;             /* set to TRUE if imports required */
        String scriptFile;               /* Name of current script (if any) */
+
+
 
 static Text   evalModule  = 0;          /* Name of module we eval exprs in */
 static String currProject = 0;          /* Name of current project file    */
@@ -130,6 +149,41 @@ static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
 #if REDIRECT_OUTPUT
 static Bool disableOutput = FALSE;      /* redirect output to buffer?      */
 #endif
+
+String bool2str ( Bool b )
+{
+   if (b) return "Yes"; else return "No ";
+}
+
+void ppSmStack ( String who )
+{
+   int i, j;
+   fflush(stdout);fflush(stderr);
+   printf ( "\n" );
+   printf ( "ppSmStack %s:  numScripts = %d   namesUpto = %d  needsImports = %s\n",
+            who, numScripts, namesUpto, bool2str(needsImports) );
+   assert (namesUpto >= numScripts);
+   printf ( "     Det FrS Pst ObL           Module Ext   Size ModTime  Path\n" );
+   for (i = namesUpto-1; i >= 0; i--) {
+      printf ( "%c%2d: %3s %3s %3s %3s %16s %-4s %5ld %8lx %s\n",
+               (i==numScripts ? '*' : ' '),
+               i, bool2str(scriptInfo[i].details), 
+                  bool2str(scriptInfo[i].fromSource),
+                  bool2str(scriptInfo[i].postponed), 
+                  bool2str(scriptInfo[i].objLoaded),
+                  scriptInfo[i].modName, 
+                  scriptInfo[i].fromSource ? scriptInfo[i].srcExt : "",
+                  scriptInfo[i].size, 
+                  scriptInfo[i].lastChange,
+                  scriptInfo[i].path
+             );
+   }
+   //   printf ( "\n" );
+   fflush(stdout);fflush(stderr);
+ppScripts();
+ppModules();
+   printf ( "\n" );
+}
 
 /* --------------------------------------------------------------------------
  * Hugs entry point:
@@ -228,6 +282,9 @@ String argv[]; {
    startupHaskell (argc,argv);
    argc = prog_argc; argv = prog_argv;
 
+    namesUpto = numScripts = 0;
+    addStackEntry("Prelude");
+
    for (i=1; i<argc; ++i) {            /* process command line arguments  */
         if (strcmp(argv[i], "--")==0) break;
         if (strcmp(argv[i],"+")==0 && i+1<argc) {
@@ -239,7 +296,7 @@ String argv[]; {
             }
         } else if (argv[i] && argv[i][0]/* workaround for /bin/sh silliness*/
                  && !processOption(argv[i])) {
-            addScriptName(argv[i],TRUE);
+            addStackEntry(argv[i]);
         }
     }
 
@@ -247,12 +304,15 @@ String argv[]; {
     DEBUG_LoadSymbols(argv_0_orig);
 #endif
 
-    scriptName[0] = strCopy(findMPathname(NULL,STD_PRELUDE,hugsPath));
+
+
+#if 0
     if (!scriptName[0]) {
         Printf("Prelude not found on current path: \"%s\"\n",
                hugsPath ? hugsPath : "");
         fatal("Unable to load prelude");
     }
+#endif
 
     if (haskell98) {
         Printf("Haskell 98 mode: Restart with command line option -98 to enable extensions\n\n");
@@ -655,7 +715,6 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'w', "Always show which modules are loaded",  &listScripts},
     {'k', "Show kind errors in full",              &kindExpert},
     {'o', "Allow overlapping instances",           &allowOverlap},
-    {'i', "Chase imports while loading modules",   &chaseImports},
     {'O', "Optimise (improve?) generated code",    &optimise},
 #if DEBUG_CODE
     {'D', "Debug: show generated code",            &debugCode},
@@ -705,7 +764,7 @@ String s; {
     scriptFile = currProject;
     forgetScriptsFrom(1);
     while ((s=readFilename())!=0)
-        addScriptName(s,TRUE);
+        addStackEntry(s);
     if (namesUpto<=1) {
         ERRMSG(0) "Empty project file"
         EEND;
@@ -724,107 +783,216 @@ static Void local clearProject() {      /* clear name for current project  */
 #endif
 }
 
-static Void local addScriptName(s,sch)  /* Add script to list of scripts   */
-String s;                               /* to be read in ...               */
-Bool   sch; {                           /* TRUE => requires pathname search*/
+
+
+static Void local makeStackEntry ( ScriptInfo* ent, String iname )
+{
+   Bool   ok, fromObj;
+   Bool   sAvail, iAvail, oAvail;
+   Time   sTime,  iTime,  oTime;
+   Long   sSize,  iSize,  oSize;
+   String path,   sExt;
+
+   ok = findFilesForModule (
+           iname,
+           &path,
+           &sExt,
+           &sAvail, &sTime, &sSize,
+           &iAvail, &iTime, &iSize,
+           &oAvail, &oTime, &oSize
+        );
+   if (!ok) {
+      ERRMSG(0) 
+         "Can't file source or object+interface for module \"%s\"",
+         iname
+      EEND;
+   }
+   /* findFilesForModule should enforce this */
+   if (!(sAvail || (oAvail && iAvail))) 
+      internal("chase");
+   /* Load objects in preference to sources if both are available */
+   fromObj = sAvail
+                ? (oAvail && iAvail && timeEarlier(sTime,oTime))
+                : TRUE;
+   /* ToDo: namesUpto overflow */
+   ent->modName     = strCopy(iname);
+   ent->details     = TRUE;
+   ent->path        = path;
+   ent->fromSource  = !fromObj;
+   ent->srcExt      = sExt;
+   ent->postponed   = FALSE;
+   ent->lastChange  = sTime; /* ToDo: is this right? */
+   ent->size        = fromObj ? iSize : sSize;
+   ent->oSize       = fromObj ? oSize : 0;
+   ent->objLoaded   = FALSE;
+}
+
+
+
+static Void nukeEnding( String s )
+{
+    Int l = strlen(s);
+    if (l > 2 && strncmp(s+l-2,".o"  ,3)==0) s[l-2] = 0; else
+    if (l > 3 && strncmp(s+l-3,".hi" ,3)==0) s[l-3] = 0; else
+    if (l > 3 && strncmp(s+l-3,".hs" ,3)==0) s[l-3] = 0; else
+    if (l > 4 && strncmp(s+l-4,".lhs",4)==0) s[l-4] = 0; else
+    if (l > 4 && strncmp(s+l-4,".dll",4)==0) s[l-4] = 0; else
+    if (l > 4 && strncmp(s+l-4,".DLL",4)==0) s[l-4] = 0;
+}
+
+static Void local addStackEntry(s)     /* Add script to list of scripts    */
+String s; {                            /* to be read in ...                */
+    String s2;
+    Bool   found;
+    Int    i;
+
     if (namesUpto>=NUM_SCRIPTS) {
         ERRMSG(0) "Too many module files (maximum of %d allowed)",
                   NUM_SCRIPTS
         EEND;
     }
-    else
-        scriptName[namesUpto++] = strCopy(sch ? findPathname(NULL,s) : s);
+
+    s = strCopy(s);
+    nukeEnding(s);
+    for (s2 = s; *s2; s2++)
+       if (*s2 == SLASH && *(s2+1)) s = s2+1;
+
+    found = FALSE;
+    for (i = 0; i < namesUpto; i++)
+       if (strcmp(scriptInfo[i].modName,s)==0)
+          found = TRUE;
+
+    if (!found) {
+       makeStackEntry ( &scriptInfo[namesUpto], strCopy(s) );
+       namesUpto++;
+    }
+    free(s);
 }
 
-static Bool local addScript(fname,len)  /* read single script file         */
-String fname;                           /* name of script file             */
-Long   len; {                           /* length of script file           */
-    scriptFile = fname;
+/* Return TRUE if no imports were needed; FALSE otherwise. */
+static Bool local addScript(stacknum)   /* read single file                */
+Int stacknum; {
+   static char name[FILENAME_MAX+1];
+   Int len = scriptInfo[stacknum].size;
 
 #if HUGS_FOR_WINDOWS                    /* Set clock cursor while loading  */
     allowBreak();
     SetCursor(LoadCursor(NULL, IDC_WAIT));
 #endif
 
-    Printf("Reading file \"%s\":\n",fname);
-    setLastEdit(fname,0);
+    //   setLastEdit(name,0);
 
-#if 0
-ToDo: reinstate
-    if (isInterfaceFile(fname)) {
-        loadInterface(fname);
-    } else
-#else
-           {
-        needsImports = FALSE;
-        parseScript(fname,len);         /* process script file             */
-        if (needsImports)
-            return FALSE;
-        checkDefns();
-        typeCheckDefns();
-        compileDefns();
-    }
-#endif
-    scriptFile = 0;
-    preludeLoaded = TRUE;
-    return TRUE;
+   nameObj[0] = 0;
+   strcpy(name, scriptInfo[stacknum].path);
+   strcat(name, scriptInfo[stacknum].modName);
+   if (scriptInfo[stacknum].fromSource)
+      strcat(name, scriptInfo[stacknum].srcExt); else
+      strcat(name, ".hi");
+
+   scriptFile = name;
+
+   if (scriptInfo[stacknum].fromSource) {
+      Printf("Reading script \"%s\":\n",name);
+      needsImports = FALSE;
+      parseScript(name,len);
+      if (needsImports) return FALSE;
+      checkDefns();
+      typeCheckDefns();
+      compileDefns();
+   } else {
+      Printf("Reading  iface \"%s\":\n", name);
+      scriptFile = name;
+      needsImports = FALSE;
+
+      // set nameObj for the benefit of openGHCIface
+      strcpy(nameObj, scriptInfo[stacknum].path);
+      strcat(nameObj, scriptInfo[stacknum].modName);
+      strcat(nameObj, DLL_ENDING);
+      sizeObj = scriptInfo[stacknum].oSize;
+
+      loadInterface(name,len);
+      scriptFile = 0;
+      if (needsImports) return FALSE;
+   }
+ 
+   scriptFile = 0;
+   preludeLoaded = TRUE;
+   return TRUE;
 }
+
 
 Bool chase(imps)                        /* Process list of import requests */
 List imps; {
-    if (chaseImports) {
-        Int    origPos  = numScripts;   /* keep track of original position */
-        String origName = scriptName[origPos];
-        for (; nonNull(imps); imps=tl(imps)) {
-            String iname = findPathname(origName,textToStr(textOf(hd(imps))));
-            Int    i     = 0;
-            for (; i<namesUpto; i++)
-                if (pathCmp(scriptName[i],iname)==0)
-                    break;
-            if (i>=origPos) {           /* Neither loaded or queued        */
-                String theName;
-                Time   theTime;
-                Bool   thePost;
+    Int    dstPosn;
+    ScriptInfo tmp;
+    Int    origPos  = numScripts;       /* keep track of original position */
+    String origName = scriptInfo[origPos].modName;
+    for (; nonNull(imps); imps=tl(imps)) {
+        String iname = textToStr(textOf(hd(imps)));
+        Int    i     = 0;
+        for (; i<namesUpto; i++)
+            if (strcmp(scriptInfo[i].modName,iname)==0)
+                break;
+	//fprintf(stderr, "import name = %s   num = %d\n", iname, i );
 
-                postponed[origPos] = TRUE;
-                needsImports       = TRUE;
-
-                if (i>=namesUpto)       /* Name not found (i==namesUpto)   */
-                    addScriptName(iname,FALSE);
-                else if (postponed[i]) {/* Check for recursive dependency  */
-                    ERRMSG(0)
-                      "Recursive import dependency between \"%s\" and \"%s\"",
-                      scriptName[origPos], iname
-                    EEND;
-                }
-                /* Right rotate section of tables between numScripts and i so
-                 * that i ends up with other imports in front of orig. script
-                 */
-                theName = scriptName[i];
-                thePost = postponed[i];
-                timeSet(theTime,lastChange[i]);
-                for (; i>numScripts; i--) {
-                    scriptName[i] = scriptName[i-1];
-                    postponed[i]  = postponed[i-1];
-                    timeSet(lastChange[i],lastChange[i-1]);
-                }
-                scriptName[numScripts] = theName;
-                postponed[numScripts]  = thePost;
-                timeSet(lastChange[numScripts],theTime);
-                origPos++;
-            }
+        if (i<namesUpto) {
+           /* We should have filled in the details of each module
+              the first time we hear about it.
+	   */
+           assert(scriptInfo[i].details);
         }
-        return needsImports;
+
+        if (i>=origPos) {               /* Neither loaded or queued        */
+            String theName;
+            Time   theTime;
+            Bool   thePost;
+            Bool   theFS;
+
+            needsImports = TRUE;
+            if (scriptInfo[origPos].fromSource)
+               scriptInfo[origPos].postponed  = TRUE;
+
+            if (i==namesUpto) {         /* Name not found (i==namesUpto)   */
+                 /* Find out where it lives, whether source or object, etc */
+               makeStackEntry ( &scriptInfo[i], iname );
+               namesUpto++;
+            }
+            else 
+            if (scriptInfo[i].postponed && scriptInfo[i].fromSource) {
+                                        /* Check for recursive dependency  */
+                ERRMSG(0)
+                  "Recursive import dependency between \"%s\" and \"%s\"",
+                  scriptInfo[origPos].modName, iname
+                EEND;
+            }
+            /* Move stack entry i to somewhere below origPos.  If i denotes 
+             * an object, destination is immediately below origPos.  
+             * Otherwise, it's underneath the queue of objects below origPos.
+             */
+            dstPosn = origPos-1;
+            if (scriptInfo[i].fromSource)
+               while (!scriptInfo[dstPosn].fromSource && dstPosn > 0)
+                  dstPosn--;
+
+            dstPosn++;
+            tmp = scriptInfo[i];
+            for (; i > dstPosn; i--) scriptInfo[i] = scriptInfo[i-1];
+            scriptInfo[dstPosn] = tmp;
+            if (dstPosn < nextNumScripts) nextNumScripts = dstPosn;
+            origPos++;
+        }
     }
-    return FALSE;
+    return needsImports;
 }
 
 static Void local forgetScriptsFrom(scno)/* remove scripts from system     */
 Script scno; {
     Script i;
+#if 0
     for (i=scno; i<namesUpto; ++i)
         if (scriptName[i])
             free(scriptName[i]);
+#endif
     dropScriptsFrom(scno-1);
     namesUpto = scno;
     if (numScripts>namesUpto)
@@ -839,7 +1007,7 @@ static Void local load() {           /* read filenames from command line   */
     String s;                        /* and add to list of scripts waiting */
                                      /* to be read                         */
     while ((s=readFilename())!=0)
-        addScriptName(s,TRUE);
+        addStackEntry(s);
     readScripts(1);
 }
 
@@ -868,12 +1036,16 @@ static Void local readScripts(n)        /* Reread current list of scripts, */
 Int n; {                                /* loading everything after and    */
     Time timeStamp;                     /* including the first script which*/
     Long fileSize;                      /* has been either changed or added*/
+    static char name[FILENAME_MAX+1];
 
+    ppSmStack("readscripts-begin");
 #if HUGS_FOR_WINDOWS
     SetCursor(LoadCursor(NULL, IDC_WAIT));
 #endif
 
+#if 0
     for (; n<numScripts; n++) {         /* Scan previously loaded scripts  */
+        ppSmStack("readscripts-loop1");
         getFileInfo(scriptName[n], &timeStamp, &fileSize);
         if (timeChanged(timeStamp,lastChange[n])) {
             dropScriptsFrom(n-1);
@@ -883,8 +1055,10 @@ Int n; {                                /* loading everything after and    */
     }
     for (; n<NUM_SCRIPTS; n++)          /* No scripts have been postponed  */
         postponed[n] = FALSE;           /* at this stage                   */
+    numScripts = 0;
 
     while (numScripts<namesUpto) {      /* Process any remaining scripts   */
+        ppSmStack("readscripts-loop2");
         getFileInfo(scriptName[numScripts], &timeStamp, &fileSize);
         timeSet(lastChange[numScripts],timeStamp);
         if (numScripts>0)               /* no new script for prelude       */
@@ -894,11 +1068,85 @@ Int n; {                                /* loading everything after and    */
         else
             dropScriptsFrom(numScripts-1);
     }
+#endif
+
+    interface(RESET);
+
+    for (; n<numScripts; n++) {
+        ppSmStack("readscripts-loop2");
+        strcpy(name, scriptInfo[n].path);
+        strcat(name, scriptInfo[n].modName);
+        if (scriptInfo[n].fromSource)
+           strcat(name, scriptInfo[n].srcExt); else
+           strcat(name, ".hi");  //ToDo: should be .o
+        getFileInfo(name,&timeStamp, &fileSize);
+        if (timeChanged(timeStamp,scriptInfo[n].lastChange)) {
+           dropScriptsFrom(n-1);
+           numScripts = n;
+           break;
+        }
+    }
+    for (; n<NUM_SCRIPTS; n++)
+        scriptInfo[n].postponed = FALSE;
+
+    //numScripts = 0;
+
+    while (numScripts < namesUpto) {
+ppSmStack ( "readscripts-loop2" );
+
+       if (scriptInfo[numScripts].fromSource) {
+
+          if (numScripts>0)
+              startNewScript(scriptInfo[numScripts].modName);
+          nextNumScripts = NUM_SCRIPTS; //bogus initialisation
+          if (addScript(numScripts)) {
+             numScripts++;
+assert(nextNumScripts==NUM_SCRIPTS);
+          }
+          else
+             dropScriptsFrom(numScripts-1);
+       } else {
+      
+          if (scriptInfo[numScripts].objLoaded) {
+             numScripts++;
+          } else {
+             scriptInfo[numScripts].objLoaded = TRUE;
+             /* new */
+             if (numScripts>0)
+                 startNewScript(scriptInfo[numScripts].modName);
+	     /* end */
+             nextNumScripts = NUM_SCRIPTS;
+             if (addScript(numScripts)) {
+                numScripts++;
+assert(nextNumScripts==NUM_SCRIPTS);
+             } else {
+	        //while (!scriptInfo[numScripts].fromSource && numScripts > 0)
+	        //   numScripts--;
+	        //if (scriptInfo[numScripts].fromSource)
+	        //   numScripts++;
+                numScripts = nextNumScripts;
+assert(nextNumScripts<NUM_SCRIPTS);
+             }
+          }
+       }
+if (numScripts==namesUpto) ppSmStack( "readscripts-final") ;
+    }
+
+    finishInterfaces();
+
+    { Int  m     = namesUpto-1;
+      Text mtext = findText(scriptInfo[m].modName);
+      setCurrModule(mtext);
+      evalModule = mtext;
+    }
+
+    
 
     if (listScripts)
         whatScripts();
     if (numScripts<=1)
         setLastEdit((String)0, 0);
+    ppSmStack("readscripts-end  ");
 }
 
 static Void local whatScripts() {       /* list scripts in current session */
@@ -907,7 +1155,7 @@ static Void local whatScripts() {       /* list scripts in current session */
     if (projectLoaded)
         Printf(" (project: %s)",currProject);
     for (i=0; i<numScripts; ++i)
-        Printf("\n%s",scriptName[i]);
+        Printf("\n%s",scriptInfo[i].modName);
     Putchar('\n');
 }
 
@@ -928,6 +1176,9 @@ static Void local editor() {            /* interpreter-editor interface    */
 }
 
 static Void local find() {              /* edit file containing definition */
+#if 0
+This just plain wont work no more.
+ToDo: Fix!
     String nm = readFilename();         /* of specified name               */
     if (!nm) {
         ERRMSG(0) "No name specified"
@@ -955,6 +1206,7 @@ static Void local find() {              /* edit file containing definition */
             EEND;
         }
     }
+#endif
 }
 
 static Void local runEditor() {         /* run editor on script lastEdit   */
@@ -1158,7 +1410,7 @@ Cell   c; {
 
 extern Name nameHw;
 
-static Void local dumpStg() {           /* print STG stuff                 */
+static Void local dumpStg( void ) {       /* print STG stuff                 */
     String s;
     Text   t;
     Name   n;
@@ -1201,8 +1453,9 @@ static Void local dumpStg() {           /* print STG stuff                 */
         if (isNull(name(n).stgVar)) {
            Printf ( "Doesn't have a STG tree: %s\n", s );
         } else {
-           printf ( "\n{- stgVar of `%s' is id%d -}\n", s, -name(n).stgVar);
-           Printf ( "{- stgSize of body is %d -}\n\n", stgSize(stgVarBody(name(n).stgVar)));
+           Printf ( "\n{- stgVar of `%s' is id%d -}\n", s, -name(n).stgVar);
+           Printf ( "{- stgSize of body is %d -}\n\n", 
+                    stgSize(stgVarBody(name(n).stgVar)));
            printStg(stderr, name(n).stgVar);
         }
     }
@@ -1222,12 +1475,13 @@ static Void local info() {              /* describe objects                */
     }
 }
 
+
 static Void local describe(t)           /* describe an object              */
 Text t; {
     Tycon  tc  = findTycon(t);
     Class  cl  = findClass(t);
     Name   nm  = findName(t);
-    //Module mod = findEvalModule();
+    Module mod = findModule(t);
 
     if (nonNull(tc)) {                  /* as a type constructor           */
         Type t = tc;
@@ -1361,16 +1615,35 @@ Text t; {
         } else if (isSfun(nm)) {
             Printf("  -- selector function");
         }
-#if 0
-    ToDo: reinstate
-        if (name(nm).primDef) {
-            Printf("   -- primitive");
-        }
-#endif
         Printf("\n\n");
     }
 
-    if (isNull(tc) && isNull(cl) && isNull(nm)) {
+    if (nonNull(mod)) {                 /* as a module                     */
+        List t;
+        Printf("-- module\n");
+
+        Printf("\n-- values\n");
+        for (t=module(mod).names; nonNull(t); t=tl(t)) {
+           Name nm = hd(t);
+           Printf ( "%s ", textToStr(name(nm).text));
+        }
+
+        Printf("\n\n-- type constructors\n");
+        for (t=module(mod).tycons; nonNull(t); t=tl(t)) {
+           Tycon tc = hd(t);
+           Printf ( "%s ", textToStr(tycon(tc).text));
+        }
+
+        Printf("\n\n-- classes\n");
+        for (t=module(mod).classes; nonNull(t); t=tl(t)) {
+           Class cl = hd(t);
+           Printf ( "%s ", textToStr(cclass(cl).text));
+        }
+
+        Printf("\n\n");
+    }
+
+    if (isNull(tc) && isNull(cl) && isNull(nm) && isNull(mod)) {
         Printf("Unknown reference `%s'\n",textToStr(t));
     }
 }

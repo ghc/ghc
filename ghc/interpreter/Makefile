@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.8 1999/04/27 10:59:29 sewardj Exp $                         #
+# $Id: Makefile,v 1.9 1999/06/07 17:22:54 sewardj Exp $                         #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -17,6 +17,7 @@ YACC = bison -y
 %.c: %.y
 	-$(YACC) $<
 	mv y.tab.c $@
+	rm -f input.o
 
 
 HS_SRCS =
@@ -24,9 +25,9 @@ HS_SRCS =
 Y_SRCS = parser.y
 C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
-     hugs.c dynamic.c stg.c sainteger.c
+     hugs.c dynamic.c stg.c sainteger.c interface.c
 
-SRC_CC_OPTS = -O2 -g -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused
+SRC_CC_OPTS = -g -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a
 
@@ -49,7 +50,7 @@ cleanish:
 
 snapshot:
 	/bin/rm -f snapshot.tar
-	tar cvf snapshot.tar Makefile *.[chy] *-ORIG-* \
+	tar cvf snapshot.tar Makefile *.[chy] \
              ../rts/Assembler.c ../rts/Evaluator.c ../rts/Disassembler.c \
              ../rts/ForeignCall.c ../rts/Printer.c ../rts/QueueTemplate.h \
              ../includes/options.h ../includes/Assembler.h nHandle.c \

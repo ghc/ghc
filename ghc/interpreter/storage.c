@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:07:05 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:49 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -415,6 +415,7 @@ Cell parent; {
     name(nameHw).type         = NIL;
     name(nameHw).primop       = 0;
     name(nameHw).mod          = currentModule;
+    name(nameHw).ghc_names    = NIL;
     module(currentModule).names=cons(nameHw,module(currentModule).names);
     name(nameHw).nextNameHash = nameHash[h];
     nameHash[h]               = nameHw;
@@ -443,8 +444,11 @@ Name nm; {                              /* no clash is caused              */
 
 static Void local hashName(nm)          /* Insert Name into hash table	   */
 Name nm; {
-    Text t		  = name(nm).text;
-    Int  h		  = nHash(t);
+    Text t;
+    Int  h;
+    assert(isName(nm));
+    t = name(nm).text;
+    h = nHash(t);
     name(nm).nextNameHash = nameHash[h];
     nameHash[h]           = nm;
 }
@@ -499,6 +503,7 @@ Name nameFromStgVar ( StgVar v )
       if (name(n).stgVar == v) return n;
    return NIL;
 }
+
 
 /* --------------------------------------------------------------------------
  * Primitive functions:
@@ -743,6 +748,7 @@ Inst newInst() {                       /* Add new instance to table        */
     inst(instHw).specifics  = NIL;
     inst(instHw).implements = NIL;
     inst(instHw).builder    = NIL;
+    inst(instHw).mod        = currentModule;
 
     return instHw++;
 }
@@ -874,9 +880,23 @@ Text t; {
     module(moduleHw).tycons        = NIL;
     module(moduleHw).names         = NIL;
     module(moduleHw).classes       = NIL;
-    module(moduleHw).objectFile    = 0;
+    module(moduleHw).oImage        = NULL;
     return moduleHw++;
 }
+
+void ppModules ( void )
+{
+   Int i;
+   fflush(stderr); fflush(stdout);
+   printf ( "begin MODULES\n" );
+   for (i = moduleHw-1; i >= MODMIN; i--)
+      printf ( " %2d: %16s\n",
+               i-MODMIN, textToStr(module(i).text)
+             );
+   printf ( "end   MODULES\n" );
+   fflush(stderr); fflush(stdout);
+}
+
 
 Module findModule(t)                    /* locate Module in module table  */
 Text t; {
@@ -903,6 +923,7 @@ Cell c; {
 static local Module findQualifier(t)    /* locate Module in import list   */
 Text t; {
     Module ms;
+printf ( "findQualifier %s\n", textToStr(t));
     for (ms=module(currentModule).qualImports; nonNull(ms); ms=tl(ms)) {
         if (textOf(fst(hd(ms)))==t)
             return snd(hd(ms));
@@ -927,6 +948,21 @@ Module m; {
         mapProc(hashName,module(m).names);
         classes = module(m).classes;
     }
+}
+
+Name jrsFindQualName ( Text mn, Text sn )
+{
+   Module m;
+   List   ns;
+
+   for (m=MODMIN; m<moduleHw; m++)
+      if (module(m).text == mn) break;
+   if (m == moduleHw) return NIL;
+   
+   for (ns = module(m).names; nonNull(ns); ns=tl(ns)) 
+      if (name(hd(ns)).text == sn) return hd(ns);
+
+   return NIL;
 }
 
 /* --------------------------------------------------------------------------
@@ -964,6 +1000,25 @@ Int val, mx; {
 
 static Script scriptHw;                 /* next unused script number       */
 static script scripts[NUM_SCRIPTS];     /* storage for script records      */
+
+
+void ppScripts ( void )
+{
+   Int i;
+   fflush(stderr); fflush(stdout);
+   printf ( "begin SCRIPTS\n" );
+   for (i = scriptHw-1; i >= 0; i--)
+      printf ( " %2d: %16s  tH=%d  mH=%d  yH=%d  "
+               "nH=%d  cH=%d  iH=%d  nnS=%d,%d\n",
+               i, textToStr(scripts[i].file),
+               scripts[i].textHw, scripts[i].moduleHw,
+               scripts[i].tyconHw, scripts[i].nameHw, 
+               scripts[i].classHw, scripts[i].instHw,
+               scripts[i].nextNewText, scripts[i].nextNewDText 
+             );
+   printf ( "end   SCRIPTS\n" );
+   fflush(stderr); fflush(stdout);
+}
 
 Script startNewScript(f)                /* start new script, keeping record */
 String f; {                             /* of status for later restoration  */
@@ -1537,6 +1592,10 @@ Int  depth; {
                 Printf("Polytype");
                 print(snd(c),depth-1);
                 break;
+        case QUAL:
+                Printf("Qualtype");
+                print(snd(c),depth-1);
+                break;
         case RANK2:
                 Printf("Rank2(");
                 if (isPair(snd(c)) && isInt(fst(snd(c)))) {
@@ -1755,6 +1814,22 @@ Cell c;
     x.i = snd(c);
     return x.p;
 }
+Cell mkCPtr(p)
+Ptr p;
+{
+    IntOrPtr x;
+    x.p = p;
+    return pair(CPTRCELL,x.i);
+}
+
+Ptr cptrOf(c)
+Cell c;
+{
+    IntOrPtr x;
+    assert(fst(c) == CPTRCELL);
+    x.i = snd(c);
+    return x.p;
+}
 #elif SIZEOF_INTP == 2*SIZEOF_INT
 typedef union {struct {Int i1; Int i2;} i; Ptr p;} IntOrPtr;
 Cell mkPtr(p)
@@ -1969,7 +2044,7 @@ List xs; {
     return ys;
 }
 
-List splitAt(n,xs)                         /* drop n things from front of list*/
+List splitAt(n,xs)                      /* drop n things from front of list*/
 Int  n;       
 List xs; {
     for(; n>0; --n) {
@@ -1978,7 +2053,7 @@ List xs; {
     return xs;
 }
 
-Cell nth(n,xs)                         /* extract n'th element of list    */
+Cell nth(n,xs)                          /* extract n'th element of list    */
 Int  n;
 List xs; {
     for(; n>0 && nonNull(xs); --n, xs=tl(xs)) {
@@ -2005,6 +2080,16 @@ List xs; {
         }
     }
     return xs;                          /* here if element not found       */
+}
+
+List nubList(xs)                        /* nuke dups in list               */
+List xs; {                              /* non destructive                 */
+   List outs = NIL;
+   for (; nonNull(xs); xs=tl(xs))
+      if (isNull(cellIsMember(hd(xs),outs)))
+         outs = cons(hd(xs),outs);
+   outs = rev(outs);
+   return outs;
 }
 
 /* --------------------------------------------------------------------------
@@ -2188,6 +2273,7 @@ Int what; {
                            mark(name(i).defn);
                            mark(name(i).stgVar);
                            mark(name(i).type);
+                           mark(name(i).ghc_names);
                        }
                        end("Names", nameHw-NAMEMIN);
 

@@ -10,8 +10,8 @@
  * in the distribution for details.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/04/27 10:06:48 $
+ * $Revision: 1.7 $
+ * $Date: 1999/06/07 17:22:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -181,7 +181,7 @@ Cell e; {
                                              nv));
                           }
 
-        default         : internal("translate");
+        default         : fprintf(stderr, "stuff=%d\n",whatIs(e));internal("translate");
     }
     return e;
 }

@@ -12,8 +12,8 @@
  * in the distribution for details.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/04/27 10:06:55 $
+ * $Revision: 1.6 $
+ * $Date: 1999/06/07 17:22:37 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -133,14 +133,16 @@ static String local readRegChildStrings Args((HKEY, String, String, Char, String
 typedef struct { unsigned hi, lo; } Time;
 #define timeChanged(now,thn)    (now.hi!=thn.hi || now.lo!=thn.lo)
 #define timeSet(var,tm)         var.hi = tm.hi; var.lo = tm.lo
+error  timeEarlier not defined
 #else
 typedef time_t Time;
-#define timeChanged(now,thn)    (now!=thn)
-#define timeSet(var,tm)         var = tm
+#define timeChanged(now,thn)      (now!=thn)
+#define timeSet(var,tm)           var = tm
+#define timeEarlier(earlier,now)  (earlier < now)
 #endif
 
-static Void local getFileInfo   Args((String, Time *, Long *));
 static Bool local readable      Args((String));
+static Void local getFileInfo   Args((String, Time *, Long *));
 
 static Void local getFileInfo(f,tm,sz)  /* find time stamp and size of file*/
 String f;
@@ -149,10 +151,10 @@ Long   *sz; {
 #if defined HAVE_SYS_STAT_H || defined HAVE_STAT_H || defined HAVE_UNIX_H
     struct stat scbuf;
     if (!stat(f,&scbuf)) {
-        *tm = scbuf.st_mtime;
+        if (tm) *tm = scbuf.st_mtime;
         *sz = (Long)(scbuf.st_size);
     } else {
-        *tm = 0;
+        if (tm) *tm = 0;
         *sz = 0;
     }
 #else                                   /* normally just use stat()        */
@@ -161,13 +163,18 @@ Long   *sz; {
     r.r[1] = (int)s;
     os_swi(OS_File, &r);
     if(r.r[0] == 1 && (r.r[2] & 0xFFF00000) == 0xFFF00000) {
-        tm->hi = r.r[2] & 0xFF;         /* Load address (high byte)        */
-        tm->lo = r.r[3];                /* Execution address (low 4 bytes) */
+        if (tm) tm->hi = r.r[2] & 0xFF; /* Load address (high byte)        */
+        if (tm) tm->lo = r.r[3];        /* Execution address (low 4 bytes) */
     } else {                            /* Not found, or not time-stamped  */
-        tm->hi = tm->lo = 0;
+        if (tm) tm->hi = tm->lo = 0;
     }
     *sz = (Long)(r.r[0] == 1 ? r.r[4] : 0);
 #endif
+}
+
+Void getFileSize ( String f, Long* sz )
+{
+   getFileInfo ( f, NULL, sz );
 }
 
 #if defined HAVE_GETFINFO               /* Mac971031 */
@@ -210,6 +217,7 @@ String f; {
     return (0 == access(f,4));
 #elif defined HAVE_SYS_STAT_H || defined HAVE_STAT_H
     struct stat scbuf;
+    //fprintf(stderr, "readable: %s\n", f );
     return (  !stat(f,&scbuf) 
            && (scbuf.st_mode & S_IREAD) /* readable     */
            && (scbuf.st_mode & S_IFREG) /* regular file */
@@ -255,7 +263,7 @@ static Bool   local tryEndings    Args((String));
 # define SLASH                   '/'
 # define isSLASH(c)              ((c)==SLASH)
 # define PATHSEP                 ':'
-# define DLL_ENDING              ".so"
+# define DLL_ENDING              ".o"
 #endif
 
 static String local hugsdir() {     /* directory containing lib/Prelude.hs */
@@ -367,9 +375,9 @@ String s; {                     /* a pathname in some appropriate manner.  */
 }
 
 #if HSCRIPT
-static String endings[] = { "", ".hs", ".lhs", ".hsx", ".hash", 0 };
+static String endings[] = { "", ".hi", ".hs", ".lhs", ".hsx", ".hash", 0 };
 #else
-static String endings[] = { "", ".hs", ".lhs", 0 };
+static String endings[] = { "", ".hi", ".hs", ".lhs", 0 };
 #endif
 static char   searchBuf[FILENAME_MAX+1];
 static Int    searchPos;
@@ -413,9 +421,9 @@ String s; {
    searches the base directory and its direct subdirectories for a file
 
    input: searchbuf contains SLASH terminated base directory
-              argument s contains the (base) filename
+          argument s contains the (base) filename
    output: TRUE: searchBuf contains the full filename
-                   FALSE: searchBuf is garbage, file not found
+           FALSE: searchBuf is garbage, file not found
 */
           
 
@@ -586,6 +594,124 @@ String path; {
     searchReset(0);  /* As a last resort, look for file in the current dir */
     return (tryEndings(nm) ? normPath(searchBuf) : 0);
 }
+
+/* --------------------------------------------------------------------------
+ * New path handling stuff for the Combined System (tm)
+ * ------------------------------------------------------------------------*/
+
+Bool findFilesForModule ( 
+        String  modName,
+        String* path,
+        String* sExt,
+        Bool* sAvail, Time* sTime, Long* sSize,
+        Bool* iAvail, Time* iTime, Long* iSize,
+        Bool* oAvail, Time* oTime, Long* oSize
+     )
+{
+   /* Let the module name given be M.
+      For each path entry P,
+        a  s(rc)       file will be P/M.hs or P/M.lhs
+        an i(nterface) file will be P/M.hi
+        an o(bject)    file will be P/M.o
+      If there is a s file or (both i and o files)
+        use P to fill in the path names.
+      Otherwise, move on to the next path entry.
+      If all path entries are exhausted, return False.
+   */
+   Int    nPath;
+   Bool   literate;
+   String peStart, peEnd;
+   String augdPath;       /* . and then hugsPath */
+
+   *path = *sExt = NULL;
+   *sAvail = *iAvail = *oAvail = FALSE;
+   *sSize  = *iSize  = *oSize  = 0;
+
+   augdPath = malloc(3+strlen(hugsPath));
+   if (!augdPath)
+      internal("moduleNameToFileNames: malloc failed(2)");
+   augdPath[0] = '.';
+   augdPath[1] = PATHSEP;
+   augdPath[2] = 0;
+   strcat(augdPath,hugsPath);
+
+   peEnd = augdPath-1;
+   while (1) {
+      /* Advance peStart and peEnd very paranoically, giving up at
+         the first sign of mutancy in the path string.
+      */
+      if (peEnd >= augdPath && !(*peEnd)) { free(augdPath); return FALSE; }
+      peStart = peEnd+1;
+      peEnd = peStart;
+      while (*peEnd && *peEnd != PATHSEP) peEnd++;
+      
+      /* Now peStart .. peEnd-1 bracket the next path element. */
+      nPath = peEnd-peStart;
+      if (nPath + strlen(modName) + 10 /*slush*/ > FILENAME_MAX) {
+         ERRMSG(0) "Hugs path \"%s\" contains excessively long component", 
+                   hugsPath
+         EEND;
+         free(augdPath); 
+         return FALSE;
+      }
+
+      strncpy(searchBuf, peStart, nPath); 
+      searchBuf[nPath] = 0;
+      if (nPath > 0 && !isSLASH(searchBuf[nPath-1])) 
+         searchBuf[nPath++] = SLASH;
+
+      strcpy(searchBuf+nPath, modName);
+      nPath += strlen(modName);
+
+      /* searchBuf now holds 'P/M'.  Try out the various endings. */
+      *path = *sExt = NULL;
+      *sAvail = *iAvail = *oAvail = FALSE;
+      *sSize  = *iSize  = *oSize  = 0;
+
+      strcpy(searchBuf+nPath, DLL_ENDING);
+      if (readable(searchBuf)) {
+         *oAvail = TRUE;
+         getFileInfo(searchBuf, oTime, oSize);
+      }
+
+      strcpy(searchBuf+nPath, ".hi");
+      if (readable(searchBuf)) {
+         *iAvail = TRUE;
+         getFileInfo(searchBuf, iTime, iSize);
+      }
+
+      strcpy(searchBuf+nPath, ".hs");
+      if (readable(searchBuf)) {
+         *sAvail = TRUE;
+         literate = FALSE;
+         getFileInfo(searchBuf, sTime, sSize);
+         *sExt = ".hs";
+      } else {
+         strcpy(searchBuf+nPath, ".lhs");
+         if (readable(searchBuf)) {
+            *sAvail = TRUE;
+            literate = TRUE;
+            getFileInfo(searchBuf, sTime, sSize);
+            *sExt = ".lhs";
+         }
+      }
+
+      /* Success? */
+      if (*sAvail || (*oAvail && *iAvail)) {
+         nPath -= strlen(modName);
+         *path = malloc(nPath+1);
+         if (!(*path))
+            internal("moduleNameToFileNames: malloc failed(1)");
+         strncpy(*path, searchBuf, nPath);
+         (*path)[nPath] = 0;
+         free(augdPath); 
+         return TRUE;
+      }
+
+   }
+   
+}
+
 
 /* --------------------------------------------------------------------------
  * Substitute old value of path into empty entries in new path

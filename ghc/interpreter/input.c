@@ -8,8 +8,8 @@
  * in the distribution for details.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/04/27 10:06:53 $
+ * $Revision: 1.6 $
+ * $Date: 1999/06/07 17:22:32 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -18,6 +18,7 @@
 #include "connect.h"
 #include "command.h"
 #include "errors.h"
+#include "link.h"
 #include <ctype.h>
 #if HAVE_GETDELIM_H
 #include "getdelim.h"
@@ -48,6 +49,7 @@ List evalDefaults    = NIL;             /* defaults for evaluator          */
 Cell inputExpr       = NIL;             /* input expression                */
 Bool literateScripts = FALSE;           /* TRUE => default to lit scripts  */
 Bool literateErrors  = TRUE;            /* TRUE => report errs in lit scrs */
+Bool offsideON       = TRUE;            /* TRUE => implement offside rule  */
 
 String repeatStr     = 0;               /* Repeat last expr                */
 
@@ -120,9 +122,9 @@ static Text textBar,     textMinus,    textFrom,   textArrow,  textLazy;
 static Text textBang,    textDot,      textAll,    textImplies;
 static Text textWildcard;
 
-static Text textModule,  textImport;
+static Text textModule,  textImport,    textInterface,  textInstImport;
 static Text textHiding,  textQualified, textAsMod;
-static Text textExport,  textUnsafe;
+static Text textExport,  textUnsafe,    text__All;
 
 Text   textNum;                         /* Num                             */
 Text   textPrelude;                     /* Prelude                         */
@@ -249,7 +251,8 @@ static String nextStringChar;          /* next char in string buffer       */
 #if     USE_READLINE                   /* for command line editors         */
 static  String currentLine;            /* editline or GNU readline         */
 static  String nextChar;
-#define nextConsoleChar() (unsigned char)(*nextChar=='\0' ? '\n' : *nextChar++)
+#define nextConsoleChar() \
+           (unsigned char)(*nextChar=='\0' ? '\n' : *nextChar++)
 extern  Void add_history  Args((String));
 extern  String readline   Args((String));
 #else
@@ -398,6 +401,35 @@ String nm; {
 }
 
 
+Void hi_o_namesFromSrcName ( String srcName, String* hiName, String* oName )
+{
+   Int len;
+   String dot;
+   len = 1 + strlen ( srcName );
+   *hiName = malloc(len);
+   *oName  = malloc(len);
+   if (!(*hiName && *oName)) internal("hi_o_namesFromSource");
+   (*hiName)[0] = (*oName)[0] = 0;
+   dot = strrchr(srcName, '.');
+   if (!dot) return;
+   if (filenamecmp(dot+1, "hs")==0 &&
+       filenamecmp(dot+1, "lhs")==0 &&
+       filenamecmp(dot+1, "verb")==0) return;
+
+   strcpy(*hiName, srcName);
+   dot = strrchr(*hiName, '.');
+   dot[1] = 'h';
+   dot[2] = 'i';
+   dot[3] = 0;
+
+   strcpy(*oName, srcName);
+   dot = strrchr(*oName, '.');
+   dot[1] = 'o';
+   dot[2] = 0;
+}
+
+
+
 /* This code originally came from Sigbjorn Finne (sof@dcs.gla.ac.uk).
  * I've removed the loop (since newLineSkip contains a loop too) and
  * replaced the warnings with errors. ADR
@@ -449,7 +481,8 @@ static Int local nextLine()
     if (lineLength <= 0) { /* EOF / IO error, who knows.. */
         return lineLength;
     }
-    else if (lineLength >= 2 && lineBuffer[0] == '#' && lineBuffer[1] == '!') {
+    else if (lineLength >= 2 && lineBuffer[0] == '#' && 
+             lineBuffer[1] == '!') {
         lineBuffer[0]='\n'; /* pretend it's a blank line */
         lineBuffer[1]='\0';
         lineLength=1;
@@ -1215,6 +1248,7 @@ static  Int        indentDepth = (-1); /* current indentation nesting      */
 
 static Void local goOffside(col)       /* insert offside marker            */
 Int col; {                             /* for specified column             */
+assert(offsideON);
     if (indentDepth>=MAXINDENT) {
         ERRMSG(row) "Too many levels of program nesting"
         EEND;
@@ -1223,10 +1257,12 @@ Int col; {                             /* for specified column             */
 }
 
 static Void local unOffside() {        /* leave layout rule area           */
+assert(offsideON);
     indentDepth--;
 }
 
 static Bool local canUnOffside() {     /* Decide if unoffside permitted    */
+assert(offsideON);
     return indentDepth>=0 && layout[indentDepth]!=HARD;
 }
 
@@ -1298,7 +1334,7 @@ static Int local yylex() {             /* Read next input token ...        */
         return firstTokenIs;
     }
 
-    if (insertOpen) {                  /* insert `soft' opening brace      */
+    if (offsideON && insertOpen) {     /* insert `soft' opening brace      */
         insertOpen    = FALSE;
         insertedToken = TRUE;
         goOffside(column);
@@ -1319,7 +1355,7 @@ static Int local yylex() {             /* Read next input token ...        */
         if (insertedToken)             /* avoid inserting multiple `;'s    */
             insertedToken = FALSE;     /* or putting `;' after `{'         */
         else
-        if (layout[indentDepth]!=HARD) {
+        if (offsideON && layout[indentDepth]!=HARD) {
             if (column<layout[indentDepth]) {
                 unOffside();
                 return '}';
@@ -1346,16 +1382,17 @@ static Int local yylex() {             /* Read next input token ...        */
         case '['  : skip(); return '['; 
         case ']'  : skip(); return ']';
         case '`'  : skip(); return '`';
-        case '{'  : goOffside(HARD);
+        case '{'  : if (offsideON) goOffside(HARD);
                     skip();
                     return '{';
-        case '}'  : if (indentDepth<0) {
+        case '}'  : if (offsideON && indentDepth<0) {
                         ERRMSG(row) "Misplaced `}'"
                         EEND;
                     }
-                    if (layout[indentDepth]==HARD)      /* skip over hard }*/
-                        skip();
-                    unOffside();        /* otherwise, we have to insert a }*/
+                    if (!(offsideON && layout[indentDepth]!=HARD))
+                        skip();                         /* skip over hard }*/
+                    if (offsideON) 
+                        unOffside();    /* otherwise, we have to insert a }*/
                     return '}';         /* to (try to) avoid an error...   */
 
         /* Character and string literals                                   */
@@ -1429,6 +1466,8 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textClass)             return TCLASS;
         if (it==textInstance)          return TINSTANCE;
         if (it==textModule)            return TMODULE;
+        if (it==textInterface)         return INTERFACE;
+        if (it==textInstImport)        return INSTIMPORT;
         if (it==textImport)            return IMPORT;
         if (it==textExport)            return EXPORT;
         if (it==textHiding)            return HIDING;
@@ -1436,6 +1475,7 @@ static Int local yylex() {             /* Read next input token ...        */
         if (it==textAsMod)             return ASMOD;
         if (it==textWildcard)          return '_';
         if (it==textAll && !haskell98) return ALL;
+        if (it==text__All)             return ALL;
         if (it==textRepeat && reading==KEYBOARD)
             return repeatLast();
 
@@ -1472,7 +1512,8 @@ static Int local yylex() {             /* Read next input token ...        */
         return NUMLIT;
     }
 
-    ERRMSG(row) "Unrecognised character `\\%d' in column %d", ((int)c0), column
+    ERRMSG(row) "Unrecognised character `\\%d' in column %d", 
+                ((int)c0), column
     EEND;
     return 0; /*NOTREACHED*/
 }
@@ -1506,6 +1547,9 @@ static Void local parseInput(startWith)/* Parse input with given first tok,*/
 Int startWith; {                       /* determining whether to read a    */
     firstToken   = TRUE;               /* script or an expression          */
     firstTokenIs = startWith;
+    if (startWith==INTERFACE) 
+       offsideON = FALSE; else 
+       offsideON = TRUE;
 
     clearStack();
     if (yyparse()) {                   /* This can only be parser overflow */
@@ -1570,6 +1614,15 @@ Void parseExp() {                      /* Read an expression to evaluate   */
     setLastExpr(inputExpr);
 }
 
+Void parseInterface(nm,len)            /* Read a GHC interface file        */
+String nm;
+Long   len; {                          /* Used to set a target for reading */
+    input(RESET);
+    fileInput(nm,len);
+    parseInput(INTERFACE);
+}
+
+
 /* --------------------------------------------------------------------------
  * Input control:
  * ------------------------------------------------------------------------*/
@@ -1616,12 +1669,16 @@ Int what; {
                        textPrelude    = findText("Prelude");
                        textNum        = findText("Num");
                        textModule     = findText("module");
+                       textInterface  = findText("__interface");
+                       textInstImport = findText("__instimport");
+                       textExport     = findText("__export");
                        textImport     = findText("import");
                        textHiding     = findText("hiding");
                        textQualified  = findText("qualified");
                        textAsMod      = findText("as");
                        textWildcard   = findText("_");
                        textAll        = findText("forall");
+                       text__All      = findText("__forall");
                        varMinus       = mkVar(textMinus);
                        varPlus        = mkVar(textPlus);
                        varBang        = mkVar(textBang);
