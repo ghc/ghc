@@ -43,7 +43,6 @@ import CmdLineOpts	( opt_Static )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
 import Maybes		( orElse )
-import FastTypes
 import Outputable
 \end{code}
 
@@ -321,19 +320,16 @@ instance OutputableBndr Name where
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      WiredIn mod _ _ BuiltInSyntax -> pprOccName occ	-- Built-in syntax is never qualified
-      WiredIn mod _ _ UserSyntax    -> pprExternal sty uniq mod occ True
-      External mod _  	            -> pprExternal sty uniq mod occ False
-      System   		 	    -> pprSystem sty uniq occ
-      Internal    	 	    -> pprInternal sty uniq occ
+      WiredIn mod _ _ builtin -> pprExternal sty uniq mod occ True  builtin
+      External mod _  	      -> pprExternal sty uniq mod occ False UserSyntax
+      System   		      -> pprSystem sty uniq occ
+      Internal    	      -> pprInternal sty uniq occ
 
-pprExternal sty uniq mod occ is_wired
+pprExternal sty uniq mod occ is_wired is_builtin
   | codeStyle sty        = ppr mod_name <> char '_' <> pprOccName occ
 	-- In code style, always qualify
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
-  | unqualStyle sty mod_name occ = pprOccName occ
-	-- Never qualify built-in syntax otherwise
   | debugStyle sty       = sep [ppr mod_name <> dot <> pprOccName occ,
 				hsep [text "{-" 
 				     , if is_wired then ptext SLIT("(w)") else empty
@@ -342,6 +338,9 @@ pprExternal sty uniq mod occ is_wired
 --				 	 Nothing -> empty
 --					 Just n  -> brackets (ppr n)
 				     , text "-}"]]
+  | BuiltInSyntax <- is_builtin  = pprOccName occ
+	-- never qualify builtin syntax
+  | unqualStyle sty mod_name occ = pprOccName occ
   | otherwise		 	 = ppr mod_name <> dot <> pprOccName occ
   where
     mod_name = moduleName mod
