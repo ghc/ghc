@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.16 2002/02/13 11:51:40 simonmar Exp $
+# $Id: Makefile,v 1.17 2002/02/14 14:08:25 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -39,12 +39,14 @@ ALL_DIRS = \
 
 PACKAGE = base
 
-ifneq "$(HavePosixRegex)" "YES"
-EXCLUDED_SRCS += Text/Regex/Posix.hsc Text/Regex.hs
-endif
-
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
 SRC_HSC2HS_OPTS += -Iinclude
+
+# Make sure we can get hold of regex.h
+ifneq "$(HavePosixRegex)" "YES"
+SRC_HC_OPTS     += -Icbits/regex
+SRC_HSC2HS_OPTS += -Icbits/regex
+endif
 
 # -----------------------------------------------------------------------------
 # Per-module flags
