@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.17 2000/11/27 12:04:00 rrt Exp $
+# 	$Id: opts.mk,v 1.18 2000/12/20 15:00:01 rrt Exp $
 #
 #################################################################################
 
@@ -61,7 +61,7 @@ WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
 SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32
 
 # Flags for CPP when running GreenCard on .pgc files
-GC_CPP_OPTS += -D__GLASGOW_HASKELL__
+GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
 
 
 #################################################################################
@@ -88,7 +88,7 @@ CTAGS_OPTS         = $(SRC_CTAGS_OPTS) $(WAY$(_way)_CTAGS_OPTS) $(EXTRA_CTAGS_OP
 CC_OPTS            = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
 FLEX_OPTS          = $(SRC_FLEX_OPTS) $(WAY$(_way)_FLEX_OPTS) $(EXTRA_FLEX_OPTS)
 HAPPY_OPTS         = $(SRC_HAPPY_OPTS) $(WAY$(_way)_HAPPY_OPTS) $($*_HAPPY_OPTS) $(EXTRA_HAPPY_OPTS)
-GREENCARD_OPTS     = $(SRC_GREENCARD_OPTS) $(WAY$(_way)_GREENCARD_OPTS) $($*_GREENCARD_OPTS) $(EXTRA_GREENCARD_OPTS)
+GC_OPTS            = $(SRC_GC_OPTS) $(WAY$(_way)_GC_OPTS) $($*_GC_OPTS) $(EXTRA_GC_OPTS)
 HSTAGS_OPTS        = $(SRC_HSTAGS_OPTS) $(WAY$(_way)_HSTAGS_OPTS) $(EXTRA_HSTAGS_OPTS)
 INSTALL_OPTS       = $(SRC_INSTALL_OPTS) $(WAY$(_way)_INSTALL_OPTS) $(EXTRA_INSTALL_OPTS)
 INSTALL_BIN_OPTS   = $(INSTALL_OPTS) $(SRC_INSTALL_BIN_OPTS)

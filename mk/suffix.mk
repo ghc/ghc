@@ -113,10 +113,10 @@ endif
 .PRECIOUS: %.gc
 
 %.hs : %.gc
-	$(GREENCARD) $(GREENCARD_OPTS) $< -o $@
+	$(GREENCARD) $(GC_OPTS) $< -o $@
 
 %.lhs : %.gc
-	$(GREENCARD) $(GREENCARD_OPTS) $< -o $@
+	$(GREENCARD) $(GC_OPTS) $< -o $@
 
 %.gc : %.pgc
 	$(CPP) $(GC_CPP_OPTS) $< | perl -pe 's#\\n#\n#g' > $@
