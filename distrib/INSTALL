@@ -7,7 +7,7 @@ To start using the bundle, you can either:
 
 * use it in-place, i.e., don't go ahead with a
   full install, but just set it up to use the unpacked
-  distribution from where it was unpacked.
+  distribution in-situ.
 
 * get it over with, and do the full install (details of how are ahead).
 
@@ -18,7 +18,17 @@ the script with --help to see what options it supports).
 
 This will figure out what platform you're running on, and a couple of other
 interesting pieces of trivia, which it will then fill in the Makefile.in
-template to give you a real Makefile.
+template to give you a real Makefile. 
+
+[Win32 users: don't be alarmed if you should encounter the following
+ message from the configure script:
+  
+      not updating unwritable cache ./config.cache
+
+This is a known problem of generated autoconf configure scripts running
+on cygwin32, but harmless (it only means you get to re-do all the configure
+tests should you decide to re-run the script.)
+]
 
 Have a look at the Makefile to see if you agree with the information
 therein. If you want to use the bundle in-place, now run `make in-place'.
@@ -65,10 +75,23 @@ this port is by no means complete, but is sufficient for our needs.
 (more complete perl5 cygwin32 binary bundles are available
  elsewhere - search the web if you need it.)
 
-Install both cygwin32&perl5 before continuing.
+Install both cygwin32&perl5 before continuing. Couple of things
+to remember doing while installing these two:
+
+  - Create a toplevel /bin directory, and copy bash.exe into it
+    as sh.exe (we'll need this for running the configure script.)
+    Add /bin to your PATH.
+  - Create a toplevel /tmp directory.
+  - If you don't have a good reason not to, it is also recommended
+    that you also put the perl binary inside /bin as well. Don't
+    put it inside the bin/ directory inside the installed cygwin32
+    tree, as this is likely to cause #! not to work on perl scripts
+    (path is likely to exceed 32 chars.)
 
 NOTE: If you're planning to install ghc on a drive different from
-where you're going to compile programs, you need to change the TMPDIR
-variable in the Makefile to "."
+where you're going to compile programs, you either need to
+change the TMPDIR variable in the Makefile to "." or the
+environment variable TMPDIR to "." when running ghc. This is clearly
+not desirable, but the only solution known to work under beta18.
 
 -------Win32 users only----------------------------------------
