@@ -22,7 +22,7 @@ import SimplUtils	( findDefault )
 import CostCentre	( noCCS )
 import Id		( Id, mkSysLocal, idType, idStrictness, isExportedId, 
 			  mkVanillaId, idName, idDemandInfo, idArity, setIdType,
-			  idFlavour, idUnique
+			  idFlavour
 			)
 import IdInfo		( StrictnessInfo(..), IdFlavour(..) )
 import DataCon		( dataConWrapId )
@@ -228,7 +228,22 @@ coreBindToStg top_lev env (NonRec binder rhs)
 		-- But we don't want to discard exported things.  They can
 		-- occur; e.g. an exported user binding f = g
 
-	other -> newLocalId top_lev env binder		`thenUs` \ (new_env, new_binder) ->
+{-
+	([], StgLam _ bndrs (StgApp var args))
+		| bndrs `eqArgs` args && not (isExportedId binder)
+		     -> returnUs (NoBindF, extendVarEnv env binder var)
+		-- a binding of the form  z = \x1..xn -> f x1..xn we can
+	  	-- eta-reduce to z = f, which will be inlined as above
+		-- These bindings sometimes occur after things like type 
+		-- coercions have been removed.
+
+		where eqArgs [] [] = True
+		      eqArgs (x:xs) (StgVarArg y : ys) = x == y && eqArgs xs ys
+		      eqArgs _ _ = False
+-}
+
+	other -> newLocalId top_lev env binder 
+			`thenUs` \ (new_env, new_binder) ->
 		 returnUs (NonRecF new_binder stg_rhs dem floats, new_env)
   where
     dem = bdrDem binder
@@ -655,11 +670,10 @@ mkStgApp env fn args ty
 		-- Sigh...make a guaranteed unique name for a dynamic ccall
 		-- Done here, not earlier, because it's a code-gen thing
 	-> saturate fn_alias args ty	$ \ args' ty' ->
-           returnUs (StgPrimApp (CCallOp ccall') args' ty')
-	where
-	   ccall' = setCCallUnique ccall (idUnique fn)	
-			-- The particular unique doesn't matter
-
+	   getUniqueUs	 		`thenUs` \ uniq ->
+           let ccall' = setCCallUnique ccall uniq in
+	   returnUs (StgPrimApp (CCallOp ccall') args' ty')
+	   
       PrimOpId op 
 	-> saturate fn_alias args ty	$ \ args' ty' ->
 	   returnUs (StgPrimApp op args' ty')
