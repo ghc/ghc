@@ -63,7 +63,8 @@ import GlaExts
 
 import PrelIOBase
 
-import Foreign  -- Addr..
+import Foreign
+import Addr
 import PackedString ( byteArrayToPS, unpackPS )
   
 import PosixUtil  ( strcpy, unvectorize )
