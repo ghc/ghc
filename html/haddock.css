@@ -1,0 +1,111 @@
+BODY { 
+  background-color: #ffffff;
+  color: #000000
+  } 
+
+TD.topbar {
+  background-color: #000099;
+  padding: 5px
+  }
+
+TD.title {
+  color: #ffffff;
+  padding-left: 10px;
+  }
+
+TD.topbut {
+  padding-left: 5px;
+  padding-right: 5px;
+  border-left-width: 1;
+  border-left-color: #ffffff;
+  border-left-style: solid
+  }
+TD.topbut A:link {
+  color: #ffffff
+  }
+TD.topbut A:visited {
+  color: #ffff00
+  }
+TD.topbut A:hover {
+  background-color: #6060ff;
+  }
+TD.topbut:hover {
+  background-color: #6060ff
+  }
+
+TD.modulebar { 
+  background-color: #0077dd;
+  padding: 5
+  }
+
+TD.synopsis {
+  padding: 2px;
+  background-color: #f0f0f0;
+  font-family: monospace
+ }
+
+TD.decl { 
+  padding: 2px;
+  background-color: #f0f0f0; 
+  font-family: monospace
+  }
+
+TD.condecl  { padding-left: 10px }
+TD.recfield { padding-left: 20px }
+
+TD.doc  { 
+  padding-top: 2px;
+  font-family: sans-serif;  
+  padding-left: 10px
+  }
+
+TD.cbody  { 
+  padding-left: 10px
+  }
+
+A:link    { color: #0000e0; text-decoration: none }
+A:visited { color: #0000a0 }
+A:hover { background-color: #e0e0ff; text-decoration: none }
+
+TD.botbar {
+  background-color: #000099;
+  color: #ffffff;
+  padding: 5px
+  }
+TD.botbar A:link {
+  color: #ffffff;
+  text-decoration: underline
+  }
+TD.botbar A:visited {
+  color: #ffff00
+  }
+TD.botbar A:hover {
+  background-color: #6060ff
+  }
+
+TD.section1 {
+  padding-top: 15px;
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 150%
+  }
+
+TD.section2 {
+  padding-top: 10px;
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 130%
+  }
+
+TD.section3 {
+  padding-top: 5px;
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 110%
+  }
+
+TD.section4 {
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 100%
+  }

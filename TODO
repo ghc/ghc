@@ -1,0 +1,35 @@
+* pay attention to import specs!
+
+* instances: list relevant instances in the documentation for classes and
+  datatypes.
+
+* parse module headers, augment Interface with info from header
+
+* include file revision info in module headers
+
+* handle scoped type variables in the parser
+
+* For a re-exported declaration, remap its original names to names that are
+  "closer" to the current module (might need to rename decls twice: once
+  for docs with import_env, and once for export with orig_env).  This is
+  the final support needed to fully "hide" modules from the output.
+
+* fixities
+
+* we don't deal with records properly - exporting record selectors etc.
+
+* doc strings for: function arguments
+
+* remove the s/r conflicts I added to the grammar
+
+* check handling of special types ([], (), (,) etc.)
+
+* enhance the doc string parser:
+	* @...@ for monospaced text
+	* an apostrophe inside a string shouldn't be considered to be a quote
+	* `..' instead of '..' ?
+
+* Handle parse errors better in doc strings
+
+* Do proper dependency analysis rather than relying on laziness to
+  sort it out.
