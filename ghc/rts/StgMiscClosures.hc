@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.55 2000/12/14 16:32:40 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.56 2000/12/15 10:37:51 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -160,7 +160,7 @@ VEC_POLY_INFO_TABLE(stg_ctoi_ret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, 
 
 /* Entering a BCO.  Heave it on the stack and defer to the
    scheduler. */
-INFO_TABLE(stg_BCO_info,stg_BCO_entry,3,0,BCO,,EF_,"BCO","BCO");
+INFO_TABLE(stg_BCO_info,stg_BCO_entry,4,0,BCO,,EF_,"BCO","BCO");
 STGFUN(stg_BCO_entry) {
   FB_
     Sp -= 1;
