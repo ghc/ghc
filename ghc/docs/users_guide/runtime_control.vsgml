@@ -254,7 +254,8 @@ default heap and/or stack size that is greater than the default.  For
 example, to set @-H8m -K1m@:
 
 <tscreen><verb>
-#include "rtsdefs.h"
+#include "Rts.h"
+#include "RtsFlags.h"
 void defaultsHook (void) {
    RTSflags.GcFlags.stksSize =  1000002 / sizeof(W_);
    RTSflags.GcFlags.heapSize =  8000002 / sizeof(W_);
@@ -263,7 +264,7 @@ void defaultsHook (void) {
 
 Don't use powers of two for heap/stack sizes: these are more likely to
 interact badly with direct-mapped caches.  The full set of flags is
-defined in @ghc/includes/RtsFlags.lh@ the the GHC source tree.
+defined in @ghc/rts/RtsFlags.h@ the the GHC source tree.
 
 You can also change the messages printed when the runtime system
 ``blows up,'' e.g., on stack overflow.  The hooks for these are as
