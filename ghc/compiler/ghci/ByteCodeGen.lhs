@@ -27,13 +27,14 @@ import Type		( typePrimRep )
 import DataCon		( DataCon, dataConTag, fIRST_TAG )
 import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe )
 import VarSet		( VarSet, varSetElems )
+import PrimRep		( getPrimRepSize, isFollowableRep )
 --import FastTypes
 \end{code}
 
 Entry point.
 
 \begin{code}
-byteCodeGen :: [CoreBind] -> [BCO Name]
+byteCodeGen :: [CoreBind] -> [ProtoBCO Name]
 byteCodeGen binds
    = let flatBinds = concatMap getBind binds
          getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
@@ -43,7 +44,6 @@ byteCodeGen binds
      in  
          case final_state of
             BcM_State bcos final_ctr -> bcos
-
 \end{code}
 
 The real machinery.
@@ -53,35 +53,60 @@ type LocalLabel = Int
 
 data BCInstr
    -- Messing with the stack
-   = ARGCHECK Int
-   | PUSH_L Int{-size-} Int{-offset-}
-   | PUSH_G Name
-   | PUSH_I Integer
-   | SLIDE Int{-this many-} Int{-down by this much-}
+   = ARGCHECK  Int
+   | PUSH_L    Int{-size-} Int{-offset-}
+   | PUSH_G    Name
+   | PUSHT_I   Int
+   | PUSHT_F   Float
+   | PUSHT_D   Double
+   | PUSHU_I   Int
+   | PUSHU_F   Float
+   | PUSHU_D   Double
+   | SLIDE     Int{-this many-} Int{-down by this much-}
    -- To do with the heap
-   | ALLOC Int
-   | MKAP Int{-place ptr to heap this far down stack-} Int{-# words-}
-   | UNPACK Int
-   | PACK DataCon Int
+   | ALLOC     Int
+   | MKAP      Int{-place ptr to heap this far down stack-} Int{-# words-}
+   | UNPACK    Int
+   | PACK      DataCon Int
    -- For doing case trees
-   | LABEL       LocalLabel
-   | TESTLT_I    Int LocalLabel
-   | TESTEQ_I    Int LocalLabel
-   | TESTLT_F    Float LocalLabel
-   | TESTEQ_F    Float LocalLabel
-   | TESTLT_D    Double LocalLabel
-   | TESTEQ_D    Double LocalLabel
-   | TESTLT_P    Int LocalLabel
-   | TESTEQ_P    Int LocalLabel
+   | LABEL     LocalLabel
+   | TESTLT_I  Int    LocalLabel
+   | TESTEQ_I  Int    LocalLabel
+   | TESTLT_F  Float  LocalLabel
+   | TESTEQ_F  Float  LocalLabel
+   | TESTLT_D  Double LocalLabel
+   | TESTEQ_D  Double LocalLabel
+   | TESTLT_P  Int    LocalLabel
+   | TESTEQ_P  Int    LocalLabel
    | CASEFAIL
    -- To Infinity And Beyond
    | ENTER
+\end{code}
+
+The object format for this is: 16 bits for the opcode, and 16 for each
+field -- so the code can be considered a sequence of 16-bit ints.
+Each field denotes either a stack offset or number of items on the
+stack (eg SLIDE), and index into the pointer table (eg PUSH_G), an
+index into the literal table (eg PUSH_I/D/L), or a bytecode address in
+this BCO.
+
+\begin{code}
+
+--data BCO a = BCO [Word16] 	-- instructions
+--                 [Word8] 	-- literal pool
+--                 [a] 		-- Names or HValues
+
+--assembleBCO :: ProtoBCO -> BCO
+--assembleBCO (ProtoBCO nm instrs)
+--   = -- pass 1: collect up the offsets of the local labels,
+--     -- and also the literals and 
+
 
 instance Outputable BCInstr where
    ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
    ppr (PUSH_L sz offset)    = text "PUSH_L  " <+> int sz <+> int offset
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
-   ppr (PUSH_I i)            = text "PUSH_I  " <+> integer i
+   ppr (PUSHT_I i)           = text "PUSHT_I " <+> int i
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
@@ -96,11 +121,11 @@ pprAltCode discrs_n_codes
 
 type BCInstrList = OrdList BCInstr
 
-data BCO a = BCO a BCInstrList
+data ProtoBCO a = ProtoBCO a BCInstrList
 
-instance Outputable a => Outputable (BCO a) where
-   ppr (BCO name instrs)
-      = (text "BCO" <+> ppr name <> colon)
+instance Outputable a => Outputable (ProtoBCO a) where
+   ppr (ProtoBCO name instrs)
+      = (text "ProtoBCO" <+> ppr name <> colon)
         $$ nest 6 (vcat (map ppr (fromOL instrs)))
 
 
@@ -139,17 +164,22 @@ instance Outputable Discr where
    ppr NoDiscr    = text "DEF"
 
 
--- Hmm.  This isn't really right (ie on Alpha, idSizeW Double -> 2)
--- There must be an Officially Approved way to do this somewhere.
-idSizeW :: Id -> Int
-idSizeW nm 
-   = let pr = typePrimRep (idType nm) 
-     in  case pr of IntRep -> 2
-                    FloatRep -> 2
-                    DoubleRep -> 3
-                    PtrRep -> 1
-                    other -> pprPanic "ByteCodeGen.idSizeW" (ppr pr)
 
+-- When I push one of these on the stack, how much does Sp move by?
+taggedSizeW :: PrimRep -> Int
+taggedSizeW pr
+   | isFollowableRep pr = 1
+   | otherwise          = 1{-the tag-} + getPrimRepSize pr
+
+-- The plain size of something, without tag.
+untaggedSizeW :: PrimRep -> Int
+untaggedSizeW pr
+   | isFollowableRep pr = 1
+   | otherwise          = getPrimRepSize pr
+
+taggedIdSizeW, untaggedIdSizeW :: Id -> Int
+taggedIdSizeW   = taggedSizeW   . typePrimRep . idType
+untaggedIdSizeW = untaggedSizeW . typePrimRep . idType
 
 
 -- Compile code for the right hand side of a let binding.
@@ -165,13 +195,13 @@ collect xs not_lambda      = (reverse xs, not_lambda)
 schemeR_wrk nm (args, body)
    = let fvs       = fst body
          all_args  = varSetElems fvs ++ args
-         szsw_args = map idSizeW all_args
+         szsw_args = map taggedIdSizeW all_args
          szw_args  = sum szsw_args
          p_init    = listToFM (zip all_args (scanl (+) 0 szsw_args))
          argcheck  = if null args then nilOL else unitOL (ARGCHECK szw_args)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
-     emitBc (BCO (getName nm) (appOL argcheck body_code))
+     emitBc (ProtoBCO (getName nm) (appOL argcheck body_code))
 
 
 -- Compile code to apply the given expression to the remaining args
@@ -179,8 +209,10 @@ schemeR_wrk nm (args, body)
 schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
 
 -- Delegate tail-calls to schemeT.
-schemeE d s p (fvs, AnnApp f a) = returnBc (schemeT d s 0 p (fvs, AnnApp f a))
-schemeE d s p (fvs, AnnVar v)   = returnBc (schemeT d s 0 p (fvs, AnnVar v))
+schemeE d s p e@(fvs, AnnApp f a) 
+   = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnApp f a))
+schemeE d s p e@(fvs, AnnVar v)
+   = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnVar v))
 
 schemeE d s p (fvs, AnnLet binds b)
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
@@ -189,7 +221,7 @@ schemeE d s p (fvs, AnnLet binds b)
      mapBc schemeR (zip xs rhss)			`thenBc_`
      let n     = length xs
          fvss  = map (varSetElems.fst) rhss
-         sizes = map (\rhs_fvs -> 1 + sum (map idSizeW rhs_fvs)) fvss
+         sizes = map (\rhs_fvs -> 1 + sum (map taggedIdSizeW rhs_fvs)) fvss
          p'    = addListToFM p (zipE xs [d .. d+n-1])
          d'    = d + n
          infos = zipE4 fvss sizes xs [n, n-1 .. 1]
@@ -198,7 +230,7 @@ schemeE d s p (fvs, AnnLet binds b)
 
          -- ToDo: don't build thunks for things with no free variables
          buildThunk (fvs, size, id, off)
-            = case unzip (map (pushAtom d' p . AnnVar) (reverse fvs)) of
+            = case unzip (map (pushAtom True d' p . AnnVar) (reverse fvs)) of
                 (push_codes, pushed_szsw) 
                    -> ASSERT(sum pushed_szsw == size - 1)
                             (toOL push_codes `snocOL` PUSH_G (getName id) 
@@ -222,7 +254,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
 
         -- Env and depth in which to compile the alts, not including
         -- any vars bound by the alts themselves
-        d' = d + ret_frame_sizeW + idSizeW bndr
+        d' = d + ret_frame_sizeW + taggedIdSizeW bndr
         p' = addToFM p bndr d'
 
         isAlgCase
@@ -234,7 +266,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         -- given an alt, return a discr and code for it.
         codeAlt alt@(discr, binds, rhs)
            | isAlgCase 
-           = let binds_szsw = map idSizeW binds
+           = let binds_szsw = map untaggedIdSizeW binds
                  binds_szw  = sum binds_szsw
                  p'' = addListToFM p' (zip binds (scanl (+) d' binds_szsw))
                  d'' = d' + binds_szw
@@ -257,7 +289,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
      mkMultiBranch alt_stuff				`thenBc` \ alt_final ->
      let 
          alt_bco_name = getName bndr
-         alt_bco      = BCO alt_bco_name alt_final
+         alt_bco      = ProtoBCO alt_bco_name alt_final
      in
      schemeE (d + ret_frame_sizeW) 
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
@@ -265,6 +297,83 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
      emitBc alt_bco 					`thenBc_`
      returnBc (PUSH_G alt_bco_name `consOL` scrut_code)
 
+
+-- Compile code to do a tail call.  Doesn't need to be monadic.
+schemeT :: Bool 	-- do tagging?
+        -> Int 		-- Stack depth
+        -> Sequel 	-- Sequel depth
+        -> Int 		-- # arg words so far
+        -> BCEnv 	-- stack env
+        -> AnnExpr Id VarSet -> BCInstrList
+
+schemeT enTag d s narg_words p (_, AnnApp f a) 
+   = let (push, arg_words) = pushAtom enTag d p (snd a)
+     in push 
+        `consOL` schemeT enTag (d+arg_words) s (narg_words+arg_words) p f
+
+schemeT enTag d s narg_words p (_, AnnVar f)
+   | Just con <- isDataConId_maybe f
+   = ASSERT(enTag == False)
+     PACK con narg_words `consOL` SLIDE 1 (d-s-1) `consOL` unitOL ENTER
+   | otherwise
+   = ASSERT(enTag == True)
+     let (push, arg_words) = pushAtom True d p (AnnVar f)
+     in push 
+        `consOL` SLIDE (narg_words+arg_words) (d - s - narg_words)
+        `consOL` unitOL ENTER
+
+should_args_be_tagged (_, AnnVar v)
+   = case isDataConId_maybe v of
+        Just dcon -> False; Nothing -> True
+should_args_be_tagged (_, AnnApp f a)
+   = should_args_be_tagged f
+should_args_be_tagged (_, other)
+   = panic "should_args_be_tagged: tail call to non-con, non-var"
+
+-- Push an atom onto the stack, returning suitable code & number of
+-- stack words used.  Pushes it either tagged or untagged, since 
+-- pushAtom is used to set up the stack prior to copying into the
+-- heap for both APs (requiring tags) and constructors (which don't).
+--
+-- NB this means NO GC between pushing atoms for a constructor and
+-- copying them into the heap.  It probably also means that 
+-- tail calls MUST be of the form atom{atom ... atom} since if the
+-- expression head was allowed to be arbitrary, there could be GC
+-- in between pushing the arg atoms and completing the head.
+-- (not sure; perhaps the allocate/doYouWantToGC interface means this
+-- isn't a problem; but only if arbitrary graph construction for the
+-- head doesn't leave this BCO, since GC might happen at the start of
+-- each BCO (we consult doYouWantToGC there).
+--
+-- Blargh.  JRS 001206
+--
+pushAtom True{-tagged-} d p (AnnVar v) 
+   = case lookupBCEnv_maybe p v of
+        Just offset -> (PUSH_L sz offset, sz)
+        Nothing     -> ASSERT(sz == 1) (PUSH_G nm, sz)
+     where
+        nm = getName v
+        sz = taggedIdSizeW v
+
+pushAtom False{-not tagged-} d p (AnnVar v) 
+   = case lookupBCEnv_maybe p v of
+        Just offset -> (PUSH_L sz (offset+1), sz-1)
+        Nothing     -> ASSERT(sz == 1) (PUSH_G nm, sz)
+     where
+        nm = getName v
+        sz = untaggedIdSizeW v
+
+pushAtom True d p (AnnLit lit)
+   = case lit of
+        MachInt i    -> (PUSHT_I (fromInteger i),  taggedSizeW IntRep)
+        MachFloat r  -> (PUSHT_F (fromRational r), taggedSizeW FloatRep)
+        MachDouble r -> (PUSHT_D (fromRational r), taggedSizeW DoubleRep)
+
+pushAtom False d p (AnnLit lit)
+   = case lit of
+        MachInt i    -> (PUSHU_I (fromInteger i),  untaggedSizeW IntRep)
+        MachFloat r  -> (PUSHU_F (fromRational r), untaggedSizeW FloatRep)
+        MachDouble r -> (PUSHU_D (fromRational r), untaggedSizeW DoubleRep)
 
 -- Given a bunch of alts code and their discrs, do the donkey work
 -- of making a multiway branch using a switch tree.
@@ -362,51 +471,18 @@ mkMultiBranch raw_ways
          maxD =  1.0e308
      in
          mkTree notd_ways init_lo init_hi
-
-
--- Compile code to do a tail call.  Doesn't need to be monadic.
-schemeT :: Int -> Sequel -> Int -> BCEnv -> AnnExpr Id VarSet -> BCInstrList
-
-schemeT d s narg_words p (_, AnnApp f a) 
-   = let (push, arg_words) = pushAtom d p (snd a)
-     in push 
-        `consOL` schemeT (d+arg_words) s (narg_words+arg_words) p f
-
-schemeT d s narg_words p (_, AnnVar f)
-   | Just con <- isDataConId_maybe f
-   = PACK con narg_words `consOL` SLIDE 1 (d-s-1) `consOL` unitOL ENTER
-   | otherwise
-   = let (push, arg_words) = pushAtom d p (AnnVar f)
-     in push 
-        `consOL` SLIDE (narg_words+arg_words) (d - s - narg_words)
-        `consOL` unitOL ENTER
-
-
--- Push an atom onto the stack, returning suitable code & number of
--- stack words used.
-pushAtom d p (AnnVar v) 
-   = case lookupBCEnv_maybe p v of
-        Just offset -> (PUSH_L sz offset, sz)
-        Nothing     -> ASSERT(sz == 1) (PUSH_G nm, 1)
-     where
-        nm = getName v
-        sz = idSizeW v
-
-pushAtom d p (AnnLit lit)
-   = case lit of
-        MachInt i -> (PUSH_I i, 2)
 \end{code}
 
 The bytecode generator's monad.
 
 \begin{code}
 data BcM_State 
-   = BcM_State { bcos      :: [BCO Name],	-- accumulates completed BCOs
+   = BcM_State { bcos      :: [ProtoBCO Name],	-- accumulates completed BCOs
                  nextlabel :: Int }		-- for generating local labels
 
 type BcM result = BcM_State -> (result, BcM_State)
 
-mkBcM_State :: [BCO Name] -> Int -> BcM_State
+mkBcM_State :: [ProtoBCO Name] -> Int -> BcM_State
 mkBcM_State = BcM_State
 
 runBc :: BcM_State -> BcM () -> BcM_State
@@ -430,7 +506,7 @@ mapBc f (x:xs)
     mapBc f xs   `thenBc` \ rs ->
     returnBc (r:rs)
 
-emitBc :: BCO Name -> BcM ()
+emitBc :: ProtoBCO Name -> BcM ()
 emitBc bco st
    = ((), st{bcos = bco : bcos st})
 
