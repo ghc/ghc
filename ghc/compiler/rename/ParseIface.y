@@ -152,6 +152,7 @@ import Ratio ( (%) )
  STRING		{ ITstring   $$ }
  INTEGER	{ ITinteger  $$ }
  RATIONAL	{ ITrational $$ }
+ CLITLIT	{ ITlitlit   $$ }
 
  UNKNOWN	{ ITunknown  $$ }
 %%
@@ -737,6 +738,7 @@ core_tv_bndr	:  '@' tv_name '::' akind		{ UfTyBinder $2 $4 }
 
 ccall_string	:: { FAST_STRING }
 		: STRING					{ $1 }
+		| CLITLIT					{ $1 }
 		| VARID						{ $1 }
 		| CONID						{ $1 }
 
