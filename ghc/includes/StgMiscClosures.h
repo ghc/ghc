@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.9 1999/02/05 16:02:29 simonm Exp $
+ * $Id: StgMiscClosures.h,v 1.10 1999/02/11 17:40:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,7 +28,7 @@ STGFUN(BCO_entry);
 STGFUN(EVACUATED_entry);
 STGFUN(FOREIGN_entry);
 STGFUN(WEAK_entry);
-STGFUN(NO_FINALISER_entry);
+STGFUN(NO_FINALIZER_entry);
 STGFUN(DEAD_WEAK_entry);
 STGFUN(STABLE_NAME_entry);
 STGFUN(TSO_entry);
@@ -60,7 +60,7 @@ extern const StgInfoTable EVACUATED_info;
 extern const StgInfoTable FOREIGN_info;
 extern const StgInfoTable WEAK_info;
 extern const StgInfoTable DEAD_WEAK_info;
-extern const StgInfoTable NO_FINALISER_info;
+extern const StgInfoTable NO_FINALIZER_info;
 extern const StgInfoTable STABLE_NAME_info;
 extern const StgInfoTable FULL_MVAR_info;
 extern const StgInfoTable EMPTY_MVAR_info;
@@ -87,7 +87,7 @@ extern const StgInfoTable ret_bco_info;
 
 extern StgClosure END_TSO_QUEUE_closure;
 extern StgClosure END_MUT_LIST_closure;
-extern StgClosure NO_FINALISER_closure;
+extern StgClosure NO_FINALIZER_closure;
 extern StgClosure dummy_ret_closure;
 
 extern StgIntCharlikeClosure CHARLIKE_closure[];

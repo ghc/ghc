@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.6 1999/02/05 16:02:50 simonm Exp $
+ * $Id: RtsStartup.c,v 1.7 1999/02/11 17:40:27 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -114,8 +114,8 @@ extern void startupHaskell(int argc, char *argv[])
 void
 shutdownHaskell(void)
 {
-  /* Finalise any remaining weak pointers */
-  finaliseWeakPointersNow();
+  /* Finalize any remaining weak pointers */
+  finalizeWeakPointersNow();
 
 #if defined(GRAN)
   #error FixMe.

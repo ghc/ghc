@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.9 1999/02/05 16:02:52 simonm Exp $
+ * $Id: Sanity.c,v 1.10 1999/02/11 17:40:28 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -264,7 +264,7 @@ checkClosure( StgClosure* p )
       { StgWeak *w = (StgWeak *)p;
 	ASSERT(LOOKS_LIKE_PTR(w->key));
 	ASSERT(LOOKS_LIKE_PTR(w->value));
-	ASSERT(LOOKS_LIKE_PTR(w->finaliser));
+	ASSERT(LOOKS_LIKE_PTR(w->finalizer));
 	if (w->link) {
 	  ASSERT(LOOKS_LIKE_PTR(w->link));
 	}

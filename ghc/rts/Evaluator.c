@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.c,v 1.8 1999/02/05 16:02:38 simonm Exp $
+ * $Id: Evaluator.c,v 1.9 1999/02/11 17:40:24 simonm Exp $
  *
  * Copyright (c) The GHC Team 1994-1999.
  *
@@ -202,7 +202,7 @@ static /*inline*/ void            PushTaggedInteger  ( mpz_ptr    x )
     SET_HDR(w, &WEAK_info, CCCS);
     w->key        = stgCast(StgClosure*,result);
     w->value      = stgCast(StgClosure*,result); /* or any other closure you have handy */
-    w->finaliser  = funPtrToIO(mpz_free);
+    w->finalizer  = funPtrToIO(mpz_free);
     w->link       = weak_ptr_list;
     weak_ptr_list = w;
     IF_DEBUG(weak, fprintf(stderr,"New weak pointer watching Foreign MPZ at %p\n",w));
@@ -2330,7 +2330,7 @@ enterLoop:
                                 SET_HDR(w, &WEAK_info, CCCS);
                                 w->key        = PopCPtr();
                                 w->value      = PopCPtr();
-                                w->finaliser  = PopCPtr();
+                                w->finalizer  = PopCPtr();
                                 w->link       = weak_ptr_list;
                                 weak_ptr_list = w;
                                 IF_DEBUG(weak, fprintf(stderr,"New weak pointer at %p\n",w));
