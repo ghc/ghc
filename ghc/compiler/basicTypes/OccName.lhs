@@ -366,7 +366,7 @@ Here's our convention for splitting up the interface file name space:
 			(local variables, so no name-clash worries)
 
 	$f...		dict-fun identifiers (from inst decls)
-	$m...		default methods
+	$dm...		default methods
 	$p...		superclass selectors
 	$w...		workers
 	$T...		compiler-generated tycons for dictionaries
@@ -619,6 +619,8 @@ encode_ch '\'' = "zq"
 encode_ch '\\' = "zr"
 encode_ch '/'  = "zs"
 encode_ch '*'  = "zt"
+encode_ch '^'  = "zu"
+encode_ch '%'  = "zv"
 encode_ch c    = ['z', 'x', intToDigit hi, intToDigit lo]
 	       where
 		 (hi,lo) = ord c `quotRem` 16
@@ -661,6 +663,8 @@ decode_escape ('q' : rest) = '\'' : decode rest
 decode_escape ('r' : rest) = '\\' : decode rest
 decode_escape ('s' : rest) = '/' : decode rest
 decode_escape ('t' : rest) = '*' : decode rest
+decode_escape ('u' : rest) = '^' : decode rest
+decode_escape ('v' : rest) = '%' : decode rest
 decode_escape ('x' : d1 : d2 : rest) = chr (digitToInt d1 * 16 + digitToInt d2)  : decode rest
 
 -- Tuples are coded as Z23T
