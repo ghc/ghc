@@ -60,55 +60,24 @@ binary-dist::
 	#-(cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
 
 #
-# Creating and copying the documentation into the bin-dist tree.
-# (this tries to be oh-so-general about copying docs, but isn't really
-# suited for anything other than ghc/)
+# binary dist'ing the documentation.  
+# Which documentation to build/install is hardcoded below.
 #
-# Needless to say, the rule below could be cleaned up somewhat.
-#
-binary-dist::
-	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/$(GhcProjectNameShort)-$(GhcProjectVersion)
-	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/$(GhcProjectNameShort)-$(GhcProjectVersion)
-	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/$(GhcProjectNameShort)-$(GhcProjectVersion)
-	@echo "Making html documentation.."
-	@echo "For fptools.."
-	#$(MAKE) -C docs --no-print-directory $(MFLAGS) html
-	#cp -f docs/html/* docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/$(GhcProjectNameShort)-$(GhcProjectVersion)
-	#@echo "Done."
-	#@for i in $(BIN_DIST_DIRS); do \
-	#   echo "For $$i.."; \
-	#   echo cp -f $$i/docs/users_guide/html/* $$i/docs/users_guide/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   cp -f $$i/docs/users_guide/html/* $$i/docs/users_guide/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   echo cp -f $$i/docs/html/* $$i/docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   cp -f $$i/docs/html/* $$i/docs/*.html $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/html/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   echo "Done."; \
-	#done
-	##@echo "Making dvi files.."
-	#@echo "For fptools.."
-	#-$(MAKE) -C docs --no-print-directory $(MFLAGS) dvi
-	#-cp -f docs/*.dvi  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/$(GhcProjectNameShort)-$(GhcProjectVersion)
-	#@echo "Done."
-	#@for i in $(BIN_DIST_DIRS); do \
-	#   echo "For $$i.."; \
-	#   echo cp -f $$i/docs/users_guide/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   cp -f $$i/docs/users_guide/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   echo cp -f $$i/docs/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   cp -f $$i/docs/*.dvi $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/dvi/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   echo "Done."; \
-	#done
-	#@echo "Making info files.."
-	#@echo "For fptools.."
-	#-$(MAKE) -C docs --no-print-directory $(MFLAGS) info
-	#-cp -f docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/$(GhcProjectNameShort)-$(GhcProjectVersion)/
-	#@echo "Done."
-	#@for i in $(BIN_DIST_DIRS); do \
-	#   echo "For $$i docs.."; \
-	#   echo cp -f $$i/docs/users_guide/*.info  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   cp -f $$i/docs/users_guide/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   echo cp -f $$i/docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   cp -f $$i/docs/*.info $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/info/$(GhcProjectNameShort)-$(GhcProjectVersion); \
-	#   echo "Done."; \
-	#done
+
+BINDIST_DOCS = docs ghc/docs/users_guide
+BINDIST_DOCS_WAYS = html info dvi
+
+binary-dist ::
+	@for way in $(BINDIST_DOCS_WAYS); do \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
+	   for dir in $(BINDIST_DOCS); do \
+	     echo Making $$way documentation in $$dir; \
+	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way; \
+	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
+	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way/$(GhcProjectNameShort)-$(GhcProjectVersion); \
+	     echo "Done."; \
+	   done; \
+	done
 
 #
 # binary dist'ing hslibs/, hackily.
