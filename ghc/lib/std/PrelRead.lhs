@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.21 2001/08/28 09:55:35 simonmar Exp $
+% $Id: PrelRead.lhs,v 1.22 2001/11/23 16:20:08 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -371,7 +371,7 @@ instance  (Integral a, Read a)  => Read (Ratio a)  where
 				(x,s)   <- reads r
 				("%",t) <- lex s
 				(y,u)   <- reads t
-				return (x%y,u))
+				return (x % y,u))
 
 instance  (Read a) => Read [a]  where
     readsPrec _         = readList
