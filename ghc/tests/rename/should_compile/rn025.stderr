@@ -1,0 +1,6 @@
+ghc: module version changed to 1; reason: no old .hi file
+__export List delete deleteBy deleteFirstsBy elemIndex elemIndices find findIndex findIndices genericDrop genericIndex genericLength genericReplicate genericSplitAt genericTake group groupBy inits insert insertBy intersect intersectBy intersperse isPrefixOf isSuffixOf mapAccumL mapAccumR maximumBy minimumBy nub nubBy partition sortBy tails transpose unfoldr union unionBy unzzip4 unzzip5 unzzip6 unzzip7 zrzr zzip4 zzip5 zzip6 zzip7 zzipWith4 zzipWith5 zzipWith6 zzipWith7;
+__export PrelBase ZMZN{ZMZN ZC} foldr map zpzp;
+__export PrelList all and any break concat concatMap cycle drop dropWhile elem filter foldl foldl1 foldr1 head init iterate last length lookup maximum minimum notElem null or repeat replicate reverse scanl scanl1 scanr scanr1 span splitAt tail take takeWhile unzzip unzzip3 znzn zzip zzip3 zzipWith zzipWith3;
+__export PrelShow lines unlines unwords words;
+__export Prelude product sum;
