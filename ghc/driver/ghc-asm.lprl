@@ -404,7 +404,7 @@ sub mangle_asm {
 	# we use global variables to pass arguments from C to STG land.
 	# These declarations live in the .hc file and not in the generated C
 	# stub file, so we let them pass through here.
-	} elsif ( /^\t\.comm\t__fexp_.*$/ ) {
+	} elsif ( /^[\t]?\.comm[\t ]+${TUS}__fexp_.*$/ ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
@@ -532,7 +532,7 @@ sub mangle_asm {
 	# we use global variables to pass arguments from C to STG land.
 	# These declarations live in the .hc file and not in the generated C
 	# stub file, so we let them pass through here.
-	} elsif ( /^[\t ]+\.comm[\t ]+__fexp_.*$/ ) {
+	} elsif ( /^[\t ]*\.comm[\t ]+${TUS}__fexp_.*$/ ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
