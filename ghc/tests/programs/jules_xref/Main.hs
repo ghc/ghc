@@ -1,4 +1,4 @@
---!!! a performance-problem test from Jules.
+-- !!! a performance-problem test from Jules.
 --  further comment at the end
 -- 
 module Main where 
@@ -40,7 +40,7 @@ avAdd (ABranch l yk yv r hy) xk xv
       
 
 
---==========================================================--
+-- ==========================================================--
 --
 {-
 avLookup :: Ord a  =>  ATree a b -> 
@@ -56,7 +56,7 @@ avLookup (ABranch l k v r _) kk
 
 
 
---==========================================================--
+-- ==========================================================--
 --
 avCombine :: ATree a b -> 
              Int -> 
@@ -86,9 +86,9 @@ avCombine t1 h1 t2 h2 t3 h3 ak av ck cv
       max1 n m = 1 + (if n > m then n else m)
 
 
---==========================================================--
---=== end                                     AVLTree.hs ===--
---==========================================================--
+-- ==========================================================--
+-- === end                                     AVLTree.hs ===--
+-- ==========================================================--
 
 
 
@@ -99,7 +99,7 @@ xref stab lineno [] = stab
 xref stab lineno ('\n':cs) = xref stab (lineno+1) cs
 xref stab lineno (c:cs) 
    = if isAlpha c then 
-        let (word, rest) = span isAlphanum cs
+        let (word, rest) = span isAlphaNum cs
         in  xref (avAdd stab (c:word) lineno) lineno rest
      else xref stab lineno cs
 

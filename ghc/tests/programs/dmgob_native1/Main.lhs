@@ -33,7 +33,7 @@ blank line, etc.
 >                  let
 >                    vs = readVectors bs
 >                  in
->                  putStr (display vs)
+>                  putStrLn (display vs)
 >
 >       _       -> error " need a binary file name"
 

@@ -56,7 +56,7 @@ u `quo` v		=  Bin Quo u v
 term0,term1,term2	:: Term
 term0			=  Con 6 `mul` Con 9
 term1			=  (Con 4 `mul` Con 13) `add` Con 2
-term2			=  (Con 1 `quo` Con 0) `add` Con 2
+term2			=  (Con 1 `quo` Con 2) `add` Con 2
 term3                   =  ((((((((((((((((((((((((((((((((
                            ((((((((((((((((((((((((((((((
                                  Con 7777 `mul` Con  13) `quo` Con  13)

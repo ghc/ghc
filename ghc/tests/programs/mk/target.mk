@@ -8,7 +8,7 @@
 
 # Link step
 $(TEST_PROG) : $(OBJS)
-	$(HC) $(HC_FLAGS) $(OBJS) -o $(TEST_PROG)
+	$(HC) $(HC_OPTS) $(OBJS) -o $(TEST_PROG)
 
 # Run test
 runtest : $(TEST_PROG)

@@ -7,7 +7,7 @@ module Word2 (
 	byteToInt, shortToInt, wordToInt
     ) where
 
-import GHC
+import PrelGHC
 import PrelBase
 
 infixl 8 `bitLsh`, `bitRsh`
@@ -32,10 +32,10 @@ instance Bits Word where
 	bitXor (Word x) (Word y) = error "later..." -- Word (XOR x y)
 	bitCompl (Word x)        = case not# x of x' -> Word x'
 	bitLsh (Word x) (I# y)	 = case shiftL# x y of z -> Word z
-	bitRsh (Word x) (I# y)	 = case shiftRA# x y of z -> Word z
+	bitRsh (Word x) (I# y)	 = case shiftRL# x y of z -> Word z
         bitSwap (Word x)         = --Word (OR (LSH x 16) (AND (RSH x 16) 65535))
 				   case shiftL# x 16# of { a# ->
-				   case shiftRA# x 16# of { b# ->
+				   case shiftRL# x 16# of { b# ->
 				   case and# b# (i2w 65535#) of { c# ->
 				   case or#  a# c# of  { r# ->
 				   Word r# }}}}
@@ -46,9 +46,9 @@ w2i x = word2Int# x
 i2w x = int2Word# x
 
 instance Num Word where
-	Word x + Word y = case plusInt#  (w2i x) (w2i y) of z -> Word (i2w z)
-	Word x - Word y = case minusInt# (w2i x) (w2i y) of z -> Word (i2w z)
-	Word x * Word y = case timesInt# (w2i x) (w2i y) of z -> Word (i2w z)
+	Word x + Word y = case (w2i x) +# (w2i y) of z -> Word (i2w z)
+	Word x - Word y = case (w2i x) -# (w2i y) of z -> Word (i2w z)
+	Word x * Word y = case (w2i x) *# (w2i y) of z -> Word (i2w z)
 	negate (Word x) = case negateInt# (w2i x)  of z -> Word (i2w z)
 	fromInteger (J# a# s# d#)
 	  = case integer2Int# a# s# d# of { z# ->
@@ -56,7 +56,7 @@ instance Num Word where
 
 instance Show Word where
 	showsPrec _ (Word w) =
-		let i = toInteger (I# (w2i w)) + (if geWord# w (i2w 0#) then 0 else  2*(toInteger maxBound + 1))
+		let i = toInteger (I# (w2i w)) + (if geWord# w (i2w 0#) then 0 else  2*(toInteger (maxBound::Int) + 1))
 		in  showString (conv 8 i)
 
 conv :: Int -> Integer -> String

@@ -1,4 +1,4 @@
---!!! Defines functions as an instance of Num
+-- !!! Defines functions as an instance of Num
 
 module Main where
 
@@ -20,4 +20,4 @@ cc = cos * cos
 tt = ss + cc
 -- sin**2 + cos**2 = 1
 
-main = putStr ((show (tt 0.4))++ "  "++(show (tt 1.652)))
+main = putStrLn ((show (tt 0.4))++ "  "++(show (tt 1.652)))

@@ -9,7 +9,7 @@ type DF a = Vector a -> Vector a
 \end{code}
 
 \begin{code}
-data (Eval a) => ScgData a = ScgData {k :: !Int, err :: !a,
+data {-(Eval a) =>-} ScgData a = ScgData {k :: !Int, err :: !a,
                           w, p, r :: !(Vector a),
                           delta, pnorm2, lambda, lambdabar :: !a,
                           success :: !Bool}

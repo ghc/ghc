@@ -34,7 +34,7 @@ ar_list = [[1,2,3],
            [6,7,8],
            [10,12,15]]
 
-main = putStr (show ar)
+main = putStrLn (show ar)
 
 {-
 What it tries to do is turn a list of lists into a 2-d array in an incremental

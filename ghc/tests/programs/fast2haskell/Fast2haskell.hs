@@ -6,7 +6,7 @@
             land_i, lnot_i, lor_i, lshift_i, rshift_i,
             descr,
             destr_update, indassoc, lowbound, tabulate, upbound, update, valassoc) where {
-            import Word;
+            import Word2;
 	    import Complex; -- 1.3
 	    import Array; -- 1.3
             type Complex_type   = Complex Double;

@@ -20,6 +20,11 @@ Need to use modules for matrix and vector operations.
 > import List(transpose)
 > infixl 7 $$
 
+> randomInts :: a -> Int -> [Int]
+> randomInts _ l = randoms (mkStdGen l)
+> randomDoubles :: a -> Int -> [Double]
+> randomDoubles _ l = randoms (mkStdGen l)
+
 -------------------------------------------------------------------------------
 |				Data Types				      |
 -------------------------------------------------------------------------------

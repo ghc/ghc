@@ -46,7 +46,7 @@ fromVector :: Vector a -> Array Int a
 fromVector (Vector x) = x
 
 instance Functor (Vector) where
-  map fn x = toVector (map fn (fromVector x))    
+  fmap fn x = toVector (fmap fn (fromVector x))    
 
 {-instance Eq a => Eq (Vector a) where
 --  (Vector x) == (Vector y) = x == y
@@ -62,11 +62,11 @@ instance Read a => Read (Vector a) where
 instance Num b => Num (Vector b) where
   (+) = zipVector "+" (+)
   (-) = zipVector "-" (-)
-  negate = map negate
-  abs = map abs
-  signum = map signum
+  negate = fmap negate
+  abs = fmap abs
+  signum = fmap signum
 --   (*) = matMult -- works only for matrices!
---  fromInteger = map fromInteger
+--  fromInteger = fmap fromInteger
 \end{code}
 
 
@@ -88,7 +88,7 @@ zipVector s f (Vector a) (Vector b)
   | otherwise            = error ("zipVector: " ++ s ++ ": unconformable arrays")
 
 scaleVector :: Num a => a -> Vector a -> Vector a
-scaleVector a = map (* a)
+scaleVector a = fmap (* a)
 
 sumVector :: Num a => Vector a -> a
 sumVector = sum . elems . fromVector
@@ -113,7 +113,7 @@ fromMatrix :: Matrix a -> Array (Int, Int) a
 fromMatrix (Matrix x) = x
 
 instance Functor (Matrix) where
-  map fn x = toMatrix (map fn (fromMatrix x))    
+  fmap fn x = toMatrix (fmap fn (fromMatrix x))    
 
 --instance Eq a => Eq (Matrix a) where
 --  (Matrix x) == (Matrix y) = x == y
@@ -133,11 +133,11 @@ instance Read a => Read (Matrix a) where
 instance Num b => Num (Matrix b) where
   (+) = zipMatrix "+" (+)
   (-) = zipMatrix "-" (-)
-  negate = map negate
-  abs = map abs
-  signum = map signum
+  negate = fmap negate
+  abs = fmap abs
+  signum = fmap signum
   x * y = toMatrix (matMult (fromMatrix x) (fromMatrix y)) -- works only for matrices!
---  fromInteger = map fromInteger
+--  fromInteger = fmap fromInteger
 \end{code}
 
 Convert a nested list to a matrix.
@@ -159,7 +159,7 @@ zipMatrix s f (Matrix a) (Matrix b)
   | otherwise            = error ("zipMatrix: " ++ s ++ ": unconformable arrays")
 
 scaleMatrix :: Num a => a -> Matrix a -> Matrix a
-scaleMatrix a = map (* a)
+scaleMatrix a = fmap (* a)
 
 sumMatrix :: Num a => Matrix a -> a
 sumMatrix = sum . elems . fromMatrix
@@ -204,9 +204,9 @@ Overload arithmetical operators to work on lists.
 instance Num a => Num [a] where
   (+) = safezipWith "+" (+)
   (-) = safezipWith "-" (-)
-  negate = map negate
-  abs = map abs
-  signum = map signum
+  negate = fmap negate
+  abs = fmap abs
+  signum = fmap signum
 --   (*) = undefined
 --   fromInteger = undefined
 \end{code}
@@ -219,8 +219,8 @@ sum1 = foldl1 (+)
 \end{code}
 
 \begin{code}
-map2 f = map (map f) 
-map3 f = map (map2 f) 
+map2 f = fmap (fmap f) 
+map3 f = fmap (map2 f) 
 \end{code}
 
 Map function f at position n only.  Out of range indices are silently
@@ -260,16 +260,16 @@ Overload arithmetical operators to work on arrays.
 instance (Ix a, Show a, Num b) => Num (Array a b) where
   (+) = zipArr "+" (+)
   (-) = zipArr "-" (-)
-  negate = map negate
-  abs = map abs
-  signum = map signum
+  negate = fmap negate
+  abs = fmap abs
+  signum = fmap signum
 --   (*) = matMult -- works only for matrices!
 --   fromInteger = map fromInteger
 \end{code}
 
 \begin{xcode}
 scaleArr :: (Ix i, Num a) => a -> Array i a -> Array i a
-scaleArr a = map (*a)
+scaleArr a = fmap (*a)
 
 sumArr :: (Ix i, Num a) => Array i a -> a
 sumArr = sum . elems
@@ -362,23 +362,23 @@ padleft n x | n <= length x = x
 
 \begin{code}
 padMatrix :: RealFloat a => Int -> Matrix a -> Matrix String
-padMatrix n x = let ss = map (\a -> showFFloat (Just n) a "") x 
-                    maxw = maximum (map length (elems (fromMatrix ss)))
-              in map (padleft maxw) ss
+padMatrix n x = let ss = fmap (\a -> showFFloat (Just n) a "") x 
+                    maxw = maximum (fmap length (elems (fromMatrix ss)))
+              in fmap (padleft maxw) ss
 \end{code}
 
 \begin{xcode}
 showsVector :: (RealFloat a) => Int -> Vector a -> ShowS
 showsVector n x z1 = let x' = padArr n x
                          (l,u) = bounds x' in
-                  concat (map (\ (i, s) -> if i == u then s ++ "\n" else s ++ " ") (assocs x')) ++ z1
+                  concat (fmap (\ (i, s) -> if i == u then s ++ "\n" else s ++ " ") (assocs x')) ++ z1
 \end{xcode}
 
 \begin{xcode}
 showsMatrix :: RealFloat a => Int -> Matrix a -> ShowS
 showsMatrix n x z1 = let x' = padMatrix n x
                          ((l,l'),(u,u')) = bounds x' in
-                   concat (map (\ ((i,j), s) -> if j == u' then s ++ "\n" else s ++ " ") (assocs x')) ++ z1
+                   concat (fmap (\ ((i,j), s) -> if j == u' then s ++ "\n" else s ++ " ") (assocs x')) ++ z1
 \end{xcode}
 
 {-

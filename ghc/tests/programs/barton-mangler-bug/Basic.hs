@@ -223,8 +223,7 @@ makeWin st wid sig =
              nullWindow
   in PieceContRep wins
 instance Signal BasicSignal where
-  toSig Overshoot{start_delay,pulse_width,
-                  ringing,oscillation,damp_fac} =
+  toSig (Overshoot start_delay pulse_width ringing oscillation damp_fac) =
     let ring = sine ringing oscillation 0.0
         cond = asTypeOf (expc damp_fac) ring
         sig = temp ring cond
@@ -237,8 +236,16 @@ instance Signal BasicSignal where
                Window LocalZero (TimeEvent (fromPhysical pulse_width)) sig |>
                nullWindow
     in PieceContRep wins
-  toSig Pulse_dc{start_delay,rise_time,pulse_width,fall_time,
-                 dc_offset,period,amplitude,over,under} =
+  toSig Pulse_dc{ start_delay = start_delay
+                , rise_time   = rise_time
+		, pulse_width = pulse_width
+		, fall_time   = fall_time
+		, dc_offset   = dc_offset
+		, period      = period
+		, amplitude   = amplitude
+		, over        = over
+		, under       = under
+		} =
     let pul = trap start_delay rise_time pulse_width fall_time amplitude
         so = toPhysical ((fromPhysical start_delay) + (fromPhysical rise_time))
         su = toPhysical ((fromPhysical so) + (fromPhysical pulse_width) + (fromPhysical fall_time))
