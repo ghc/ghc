@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.3 1999/01/21 10:31:43 simonm Exp $
+ * $Id: StgMacros.h,v 1.4 1999/01/23 17:51:27 sof Exp $
  *
  * Macros used for writing STG-ish C code.
  *
@@ -22,16 +22,28 @@
 
   The macros can be used either to define the function itself, or to provide
   prototypes (by following with a ';').
+
+  Note: the various I*_ shorthands in the second block below are used to
+  declare forward references to local symbols. These shorthands *have* to
+  use the 'extern' type specifier and not 'static'. The reason for this is
+  that 'static' declares a reference as being a static/local variable,
+  and *not* as a forward reference to a static variable.
+
+  This might seem obvious, but it had me stumped as to why my info tables
+  were suddenly all filled with 0s.
+
+    -- sof 1/99 
+
   --------------------------------------------------------------------------- */
 
 #define STGFUN(f)       StgFunPtr f(void)
 #define STATICFUN(f)    static StgFunPtr f(void)
 #define EXTFUN(f)	extern StgFunPtr f(void)
-
 #define FN_(f)		F_ f(void)
 #define IFN_(f)		static F_ f(void)
 #define IF_(f)		static F_ f(void)
 #define EF_(f)		extern F_ f(void)
+
 #define ED_		extern
 #define ED_RO_		extern const
 #define ID_		extern
