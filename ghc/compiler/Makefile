@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.65 1999/09/17 09:11:20 simonpj Exp $
+# $Id: Makefile,v 1.66 1999/11/24 10:03:32 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -102,7 +102,7 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(WithGhcHc)
 else
-HC=$(GHC_DRIVER_DIR)/ghc
+HC=$(GHC)
 endif
 
 # magic from GNU make manual to convert a list of values
@@ -149,11 +149,10 @@ usageSP/UsageSPInf_HC_OPTS	= -Onot
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 parser/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 
-# -dcore-lint is *temporary* to work around ghc space leak.
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -dcore-lint -fno-warn-incomplete-patterns
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
 
-parser/Parser_HC_OPTS 		+= -Onot -H45m -K2m -dcore-lint -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -H64m -K2m -fno-warn-incomplete-patterns
 parser/Parser_HAPPY_OPTS    	+= -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
@@ -286,7 +285,8 @@ endif
 CLEAN_FILES += $(wildcard */*.$(way_)o */*.$(way_)hi)
 
 # Extra tidy, remove the .hc files (if you've got them).
-MAINTAINER_CLEAN_FILES += $(wildcard */*.hc)
+MAINTAINER_CLEAN_FILES += $(wildcard */*.hc) \
+	parser/Parser.hs rename/ParseIface.hs
 
 
 #-----------------------------------------------------------------------------
