@@ -26,9 +26,8 @@ import Maybes		( maybeToBool )
 import UniqFM
 import Unique		( Unique )
 import SrcLoc		( SrcLoc )
-import Outputable	( Outputable(..) )
+import Outputable	( PprStyle, Outputable(..) )
 import Pretty		( Doc )
-import PprStyle		( PprStyle )
 import Util		( Ord3(..) )
 
 #if ! OMIT_NATIVE_CODEGEN

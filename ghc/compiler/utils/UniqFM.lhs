@@ -62,8 +62,7 @@ IMP_Ubiq()
 import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
 import Pretty		( Doc )
-import Outputable	( Outputable(..) )
-import PprStyle		( PprStyle )
+import Outputable	( PprStyle, Outputable(..) )
 import SrcLoc		( SrcLoc )
 
 #if ! OMIT_NATIVE_CODEGEN
