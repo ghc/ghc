@@ -441,6 +441,8 @@ CLEAN_FILES += $(PRIMOP_BITS)
 
 SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CPP_OPTS += ${GhcCppOpts}
+# to avoid complaints about unterminated char constants when processing .pp files.
+SRC_CPP_OPTS += -traditional
 
 ifneq "$(BootingFromHc)" "YES"
 prelude/PrimOp.lhs $(odir)/prelude/PrimOp.o: $(PRIMOP_BITS)
