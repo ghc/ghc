@@ -10,6 +10,7 @@ This module exports some utility functions of no great interest.
 
 module DsUtils (
 	CanItFail(..), EquationInfo(..), MatchResult(..),
+        SYN_IE(EqnNo), SYN_IE(EqnSet),
 
 	combineGRHSMatchResults,
 	combineMatchResults,
@@ -64,6 +65,7 @@ import TysWiredIn	( tupleTyCon, unitDataCon, tupleCon )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( panic, assertPanic{-, pprTrace ToDo:rm-} )
 import Unique		( Unique )
+import UniqSet
 import Usage		( SYN_IE(UVar) )
 import SrcLoc		( SrcLoc {- instance Outputable -} )
 
@@ -107,8 +109,17 @@ The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
 
 \begin{code}
+
+type EqnNo   = Int
+type EqnSet  = UniqSet EqnNo
+
 data EquationInfo
   = EqnInfo
+	EqnNo               -- The number of the equation
+	DsMatchContext	-- The context info is used when producing warnings
+			-- about shadowed patterns.  It's the context
+			-- of the *first* thing matched in this group.
+			-- Should perhaps be a list of them all!
 	[TypecheckedPat]    -- the patterns for an eqn
       	MatchResult	    -- Encapsulates the guards and bindings
 \end{code}
@@ -124,11 +135,6 @@ data MatchResult
 			-- failure point(s). The expression should
 			-- be duplicatable!
 
-	DsMatchContext	-- The context info is used when producing warnings
-			-- about shadowed patterns.  It's the context
-			-- of the *first* thing matched in this group.
-			-- Should perhaps be a list of them all!
-
 data CanItFail = CanFail | CantFail
 
 orFail CantFail CantFail = CantFail
@@ -136,15 +142,14 @@ orFail _        _	 = CanFail
 
 
 mkCoLetsMatchResult :: [CoreBinding] -> MatchResult -> MatchResult
-mkCoLetsMatchResult binds (MatchResult can_it_fail ty body_fn cxt)
-  = MatchResult can_it_fail ty (\body -> mkCoLetsAny binds (body_fn body)) cxt
+mkCoLetsMatchResult binds (MatchResult can_it_fail ty body_fn)
+  = MatchResult can_it_fail ty (\body -> mkCoLetsAny binds (body_fn body))
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> DsM MatchResult
-mkGuardedMatchResult pred_expr (MatchResult can_it_fail ty body_fn cxt)
+mkGuardedMatchResult pred_expr (MatchResult can_it_fail ty body_fn)
   = returnDs (MatchResult CanFail
 			  ty
 			  (\fail -> mkCoreIfThenElse pred_expr (body_fn fail) fail)
-			  cxt
     )
 
 mkCoPrimCaseMatchResult :: Id				-- Scrutinee
@@ -154,16 +159,15 @@ mkCoPrimCaseMatchResult var alts
   = newSysLocalDs (idType var)	`thenDs` \ wild ->
     returnDs (MatchResult CanFail
 			  ty1
-			  (mk_case alts wild)
-			  cxt1)
+			  (mk_case alts wild))
   where
-    ((_,MatchResult _ ty1 _ cxt1) : _) = alts
+    ((_,MatchResult _ ty1 _) : _) = alts
 
     mk_case alts wild fail_expr
       = Case (Var var) (PrimAlts final_alts (BindDefault wild fail_expr))
       where
 	final_alts = [ (lit, body_fn fail_expr)
-		     | (lit, MatchResult _ _ body_fn _) <- alts
+		     | (lit, MatchResult _ _ body_fn) <- alts
 		     ]
 
 
@@ -183,8 +187,7 @@ mkCoAlgCaseMatchResult var alts
 	[] ->	-- All constructors mentioned, so no default needed
 		returnDs (MatchResult can_any_alt_fail
 			  	      ty1
-				      (mk_case alts (\ignore -> NoDefault))
-				      cxt1)
+				      (mk_case alts (\ignore -> NoDefault)))
 
 	[con] ->     -- Just one constructor missing, so add a case for it
 		     -- We need to build new locals for the args of the constructor,
@@ -196,19 +199,17 @@ mkCoAlgCaseMatchResult var alts
 
 		     -- Now we are ready to construct the new alternative
 		let
-			new_alt = (con, arg_ids, MatchResult CanFail ty1 id NoMatchContext)
+			new_alt = (con, arg_ids, MatchResult CanFail ty1 id)
 		in
 		returnDs (MatchResult CanFail
 			  	      ty1
-				      (mk_case (new_alt:alts) (\ignore -> NoDefault))
-				      cxt1)
+				      (mk_case (new_alt:alts) (\ignore -> NoDefault)))
 
 	other ->      -- Many constructors missing, so use a default case
 		newSysLocalDs scrut_ty		`thenDs` \ wild ->
 		returnDs (MatchResult CanFail
 			  	      ty1
-				      (mk_case alts (\fail_expr -> BindDefault wild fail_expr))
-				      cxt1)
+				      (mk_case alts (\fail_expr -> BindDefault wild fail_expr)))
   where
 	-- Common stuff
     scrut_ty = idType var
@@ -230,28 +231,28 @@ mkCoAlgCaseMatchResult var alts
       = uniqSetToList (mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- alts] )
 
     match_results = [match_result | (_,_,match_result) <- alts]
-    (MatchResult _ ty1 _ cxt1 : _) = match_results
-    can_any_alt_fail = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ _ _ <- match_results]
+    (MatchResult _ ty1 _ : _) = match_results
+    can_any_alt_fail = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ _ <- match_results]
 
     mk_case alts deflt_fn fail_expr
       = Case (Var var) (AlgAlts final_alts (deflt_fn fail_expr))
       where
 	final_alts = [ (con, args, body_fn fail_expr)
-		     | (con, args, MatchResult _ _ body_fn _) <- alts
+		     | (con, args, MatchResult _ _ body_fn) <- alts
 		     ]
 
 
 combineMatchResults :: MatchResult -> MatchResult -> DsM MatchResult
-combineMatchResults (MatchResult CanFail      ty1 body_fn1 cxt1)
-		    (MatchResult can_it_fail2 ty2 body_fn2 cxt2)
+combineMatchResults (MatchResult CanFail      ty1 body_fn1)
+		    (MatchResult can_it_fail2 ty2 body_fn2)
   = mkFailurePair ty1		`thenDs` \ (bind_fn, duplicatable_expr) ->
     let
 	new_body_fn1 = \body1 -> Let (bind_fn body1) (body_fn1 duplicatable_expr)
 	new_body_fn2 = \body2 -> new_body_fn1 (body_fn2 body2)
     in
-    returnDs (MatchResult can_it_fail2 ty1 new_body_fn2 cxt1)
+    returnDs (MatchResult can_it_fail2 ty1 new_body_fn2)
 
-combineMatchResults match_result1@(MatchResult CantFail ty body_fn1 cxt1)
+combineMatchResults match_result1@(MatchResult CantFail ty body_fn1)
 				  match_result2
   = returnDs match_result1
 
@@ -259,9 +260,9 @@ combineMatchResults match_result1@(MatchResult CantFail ty body_fn1 cxt1)
 -- The difference in combineGRHSMatchResults is that there is no
 -- need to let-bind to avoid code duplication
 combineGRHSMatchResults :: MatchResult -> MatchResult -> DsM MatchResult
-combineGRHSMatchResults (MatchResult CanFail     ty1 body_fn1 cxt1)
-			(MatchResult can_it_fail ty2 body_fn2 cxt2)
-  = returnDs (MatchResult can_it_fail ty1 (\ body -> body_fn1 (body_fn2 body)) cxt1)
+combineGRHSMatchResults (MatchResult CanFail     ty1 body_fn1)
+			(MatchResult can_it_fail ty2 body_fn2)
+  = returnDs (MatchResult can_it_fail ty1 (\ body -> body_fn1 (body_fn2 body)))
 
 combineGRHSMatchResults match_result1 match_result2
   = 	-- Delegate to avoid duplication of code
@@ -394,8 +395,8 @@ mkSelectorBinds pat val_expr
   = mkTupleBind binders val_expr
 
   | otherwise
-  = mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty pat_string		`thenDs` \ error_msg ->
-    matchSimply val_expr pat res_ty local_tuple error_msg	`thenDs` \ tuple_expr ->
+  = mkErrorAppDs iRREFUT_PAT_ERROR_ID res_ty pat_string		`thenDs` \ error_expr ->
+    matchSimply val_expr LetMatch pat res_ty local_tuple error_expr	`thenDs` \ tuple_expr ->
     mkTupleBind binders tuple_expr
 
   where
