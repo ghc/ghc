@@ -933,9 +933,9 @@ isEmptyMVarzh_fast
     /* args: R1 = MVar closure */
 
     if (GET_INFO(R1) == stg_EMPTY_MVAR_info) {
-	RET_N(0);
-    } else {
 	RET_N(1);
+    } else {
+	RET_N(0);
     }
 }
 
