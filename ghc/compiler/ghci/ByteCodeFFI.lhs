@@ -484,7 +484,104 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      ++ [mkRET,
          mkRESTORE_TRIVIAL]  -- this is in the delay slot of the RET
      )
+#elif powerpc_TARGET_ARCH
 
+   = let
+         bytes_per_word = 4
+
+         -- speaks for itself
+         w32_to_w8s_bigEndian :: Word32 -> [Word8]
+         w32_to_w8s_bigEndian w
+            =  [fromIntegral (0xFF .&. (w `shiftR` 24)),
+                fromIntegral (0xFF .&. (w `shiftR` 16)),
+                fromIntegral (0xFF .&. (w `shiftR` 8)),
+                fromIntegral (0xFF .&. w)]
+
+         -- addr and result bits offsetsW
+         a_off = (addr_offW + sizeOfTagW AddrRep) * bytes_per_word
+         result_off  = (r_offW + sizeOfTagW r_rep) * bytes_per_word
+
+         linkageArea = 24
+         parameterArea = sum [ untaggedSizeW a_rep * bytes_per_word
+                        | (_, a_rep) <- arg_offs_n_reps ]
+         savedRegisterArea = 4
+         frameSize = padTo16 (linkageArea + min parameterArea 32 + savedRegisterArea)
+         padTo16 x = case x `mod` 16 of
+            0 -> x
+            y -> x - y + 16
+             
+         pass_parameters [] _ _ = []
+         pass_parameters ((a_offW, a_rep):args) nextFPR offsetW =
+            let
+               haskellArgOffset = (a_offW + sizeOfTagW a_rep)
+                                  * bytes_per_word
+               offsetW' = offsetW + untaggedSizeW a_rep
+               
+               pass_word w 
+                   | w < 8 =
+                      [0x801f0000    -- lwz rX, src(r31)
+                        .|. (fromIntegral src .&. 0xFFFF)
+                        .|. (fromIntegral (offsetW+w+3) `shiftL` 21)]
+                   | otherwise =
+                      [0x801f0000    -- lwz r0, src(r31)
+                        .|. (fromIntegral src .&. 0xFFFF),
+                       0x90010000    -- stw r0, dst(r1)
+                        .|. (fromIntegral dst .&. 0xFFFF)]
+                  where
+                     src = haskellArgOffset + w*bytes_per_word
+                     dst = linkageArea + (offsetW+w) * bytes_per_word
+            in
+               case a_rep of
+                  FloatRep | nextFPR < 14 ->
+                      (0xc01f0000    -- lfs fX, haskellArgOffset(r31)
+                        .|. (fromIntegral haskellArgOffset .&. 0xFFFF)
+                        .|. (fromIntegral nextFPR `shiftL` 21))
+                      : pass_parameters args (nextFPR+1) offsetW'
+                  DoubleRep | nextFPR < 14 ->
+                      (0xc81f0000    -- lfd fX, haskellArgOffset(r31)
+                        .|. (fromIntegral haskellArgOffset .&. 0xFFFF)
+                        .|. (fromIntegral nextFPR `shiftL` 21))
+                      : pass_parameters args (nextFPR+1) offsetW'
+                  _ ->
+                      concatMap pass_word [0 .. untaggedSizeW a_rep - 1]
+                      ++ pass_parameters args nextFPR offsetW'              
+               
+         gather_result = case r_rep of
+            VoidRep -> []
+            FloatRep -> 
+               [0xd03f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
+               -- stfs f1, result_off(r31)
+            DoubleRep -> 
+               [0xd83f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
+               -- stfs f1, result_off(r31)
+            _ | untaggedSizeW r_rep == 2 ->
+               [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF),
+                0x909f0000 .|. (fromIntegral (result_off+4) .&. 0xFFFF)]
+               -- stw r3, result_off(r31)
+               -- stw r4, result_off+4(r31)
+            _ | untaggedSizeW r_rep == 1 ->
+               [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
+               -- stw r3, result_off(r31)
+     in
+         concatMap w32_to_w8s_bigEndian $ [
+            0x7c0802a6,         -- mflr r0
+            0x93e1fffc,         -- stw r31,-4(r1)
+            0x90010008,         -- stw r0,8(r1)
+            0x94210000 .|. (fromIntegral (-frameSize) .&. 0xFFFF),
+                                -- stwu r1, -frameSize(r1)
+            0x7c7f1b78          -- mr r31, r3
+         ] ++ pass_parameters arg_offs_n_reps 1 0 ++ [
+            0x819f0000 .|. (fromIntegral a_off .&. 0xFFFF),
+                                -- lwz r12, a_off(r31)
+            0x7d8903a6,         -- mtctr r12
+            0x4e800421          -- bctrl
+         ] ++ gather_result ++ [
+            0x80210000,         -- lwz r1, 0(r1)
+            0x83e1fffc,         -- lwz r31, -4(r1)
+            0x80010008,         -- lwz r0, 8(r1)
+            0x7c0803a6,         -- mtlr r0
+            0x4e800020          -- blr
+         ]
 #else 
 
    = undefined
