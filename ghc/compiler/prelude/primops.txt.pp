@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.10 2001/12/05 17:35:14 sewardj Exp $
+-- $Id: primops.txt.pp,v 1.11 2001/12/07 11:34:48 sewardj Exp $
 --
 -- Primitive Operations
 --
@@ -226,12 +226,15 @@ primop   Int2IntegerOp    "int2Integer#"
    GenPrimOp Int# -> (# Int#, ByteArr# #)
    with out_of_line = True
 
-primop   ISllOp   "iShiftL#" GenPrimOp  Int# -> Int# -> Int#
-	 {Shift left. Return 0 if shifted by more than size of an Int\#.} 
-primop   ISraOp   "iShiftRA#" GenPrimOp Int# -> Int# -> Int#
-	 {Shift right arithemetic. Return 0 if shifted by more than size of an Int\#.}
-primop   ISrlOp   "iShiftRL#" GenPrimOp Int# -> Int# -> Int#
-	 {Shift right logical. Return 0 if shifted by more than size of an Int\#.}
+primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
+	 {Shift left.  Result undefined if shift amount equals 
+          or exceeds word size.} 
+primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
+	 {Shift right arithmetic.  Result undefined if shift amount equals 
+          or exceeds word size.} 
+primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
+	 {Shift right logical.  Result undefined if shift amount equals 
+          or exceeds word size.} 
 
 ------------------------------------------------------------------------
 section "Word#"
@@ -263,10 +266,12 @@ primop   XorOp   "xor#"   Dyadic   Word# -> Word# -> Word#
 
 primop   NotOp   "not#"   Monadic   Word# -> Word#
 
-primop   SllOp   "shiftL#"   GenPrimOp   Word# -> Int# -> Word#
-	 {Shift left logical. Return 0 if shifted by more than number of bits in a Word\#.}
-primop   SrlOp   "shiftRL#"   GenPrimOp   Word# -> Int# -> Word#
-	 {Shift right logical. Return 0 if shifted by more than number of bits in a Word\#.}
+primop   SllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
+	 {Shift left logical.   Result undefined if shift amount equals 
+          or exceeds word size.}
+primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
+	 {Shift right logical.   Result undefined if shift amount equals 
+          or exceeds word size.}
 
 primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
 

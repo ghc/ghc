@@ -154,14 +154,21 @@ instance Bits Word where
     (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
     complement (W# x#)       = W# (x# `xor#` mb#) where W# mb# = maxBound
     (W# x#) `shift` (I# i#)
-        | i# >=# 0#          = W# (x# `shiftL#` i#)
-        | otherwise          = W# (x# `shiftRL#` negateInt# i#)
+        | i# ==# 0#     = W# x#
+        | i# >=# wsib   = W# (int2Word# 0#)
+        | i# ># 0#      = W# (x# `uncheckedShiftL#` i#)
+        | i# <=# nwsib  = W# (int2Word# 0#)
+        | otherwise     = W# (x# `uncheckedShiftRL#` negateInt# i#)
+          where
+	     wsib  = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
+             nwsib = negateInt# wsib
     (W# x#) `rotate` (I# i#)
         | i'# ==# 0# = W# x#
-        | otherwise  = W# ((x# `shiftL#` i'#) `or#` (x# `shiftRL#` (wsib -# i'#)))
+        | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` 
+                           (x# `uncheckedShiftRL#` (wsib -# i'#)))
         where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
-	wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
+           i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+	   wsib = WORD_SIZE_IN_BITS#
     bitSize  _               = WORD_SIZE_IN_BITS
     isSigned _               = False
 
@@ -255,12 +262,14 @@ instance Bits Word8 where
     (W8# x#) `xor` (W8# y#)   = W8# (x# `xor#` y#)
     complement (W8# x#)       = W8# (x# `xor#` mb#) where W8# mb# = maxBound
     (W8# x#) `shift` (I# i#)
-        | i# >=# 0#           = W8# (narrow8Word# (x# `shiftL#` i#))
-        | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
+        | i# ==# 0#                = W8# x#
+        | i# >=# 8# || i# <=# -8#  = W8# (int2Word# 0#)
+        | i# ># 0#                 = W8# (narrow8Word# (x# `uncheckedShiftL#` i#))
+        | otherwise                = W8# (x# `uncheckedShiftRL#` negateInt# i#)
     (W8# x#) `rotate` (I# i#)
         | i'# ==# 0# = W8# x#
-        | otherwise  = W8# (narrow8Word# ((x# `shiftL#` i'#) `or#`
-                                          (x# `shiftRL#` (8# -# i'#))))
+        | otherwise  = W8# (narrow8Word# ((x# `uncheckedShiftL#` i'#) `or#`
+                                          (x# `uncheckedShiftRL#` (8# -# i'#))))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
@@ -357,12 +366,14 @@ instance Bits Word16 where
     (W16# x#) `xor` (W16# y#)  = W16# (x# `xor#` y#)
     complement (W16# x#)       = W16# (x# `xor#` mb#) where W16# mb# = maxBound
     (W16# x#) `shift` (I# i#)
-        | i# >=# 0#            = W16# (narrow16Word# (x# `shiftL#` i#))
-        | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
+        | i# ==# 0#                  = W16# x#
+        | i# >=# 16# || i# <=# -16#  = W16# (int2Word# 0#)
+        | i# ># 0#                   = W16# (narrow16Word# (x# `uncheckedShiftL#` i#))
+        | otherwise                  = W16# (x# `uncheckedShiftRL#` negateInt# i#)
     (W16# x#) `rotate` (I# i#)
         | i'# ==# 0# = W16# x#
-        | otherwise  = W16# (narrow16Word# ((x# `shiftL#` i'#) `or#`
-                                            (x# `shiftRL#` (16# -# i'#))))
+        | otherwise  = W16# (narrow16Word# ((x# `uncheckedShiftL#` i'#) `or#`
+                                            (x# `uncheckedShiftRL#` (16# -# i'#))))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
     bitSize  _                = 16
@@ -453,12 +464,14 @@ instance Bits Word32 where
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor32#` y#)
     complement (W32# x#)       = W32# (not32# x#)
     (W32# x#) `shift` (I# i#)
-        | i# >=# 0#            = W32# (x# `shiftL32#` i#)
-        | otherwise            = W32# (x# `shiftRL32#` negateInt# i#)
+        | i# ==# 0#                  = W32# x#
+        | i# >=# 32# || i# <=# -32#  = W32# (int2Word# 0#)
+        | i# ># 0#                   = W32# (x# `uncheckedShiftL32#` i#)
+        | otherwise                  = W32# (x# `uncheckedShiftRL32#` negateInt# i#)
     (W32# x#) `rotate` (I# i#)
         | i'# ==# 0# = W32# x#
-        | otherwise  = W32# ((x# `shiftL32#` i'#) `or32#`
-                             (x# `shiftRL32#` (32# -# i'#)))
+        | otherwise  = W32# ((x# `uncheckedShiftL32#` i'#) `or32#`
+                             (x# `uncheckedShiftRL32#` (32# -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
@@ -485,8 +498,8 @@ foreign import "stg_and32"         unsafe and32#         :: Word32# -> Word32# -
 foreign import "stg_or32"          unsafe or32#          :: Word32# -> Word32# -> Word32#
 foreign import "stg_xor32"         unsafe xor32#         :: Word32# -> Word32# -> Word32#
 foreign import "stg_not32"         unsafe not32#         :: Word32# -> Word32#
-foreign import "stg_shiftL32"      unsafe shiftL32#      :: Word32# -> Int# -> Word32#
-foreign import "stg_shiftRL32"     unsafe shiftRL32#     :: Word32# -> Int# -> Word32#
+foreign import "stg_uncheckedShiftL32"      unsafe uncheckedShiftL32#  :: Word32# -> Int# -> Word32#
+foreign import "stg_uncheckedShiftRL32"     unsafe uncheckedShiftRL32# :: Word32# -> Int# -> Word32#
 
 {-# RULES
 "fromIntegral/Int->Word32"    fromIntegral = \(I#   x#) -> W32# (int32ToWord32# (intToInt32# x#))
@@ -581,12 +594,14 @@ instance Bits Word32 where
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor#` y#)
     complement (W32# x#)       = W32# (x# `xor#` mb#) where W32# mb# = maxBound
     (W32# x#) `shift` (I# i#)
-        | i# >=# 0#            = W32# (narrow32Word# (x# `shiftL#` i#))
-        | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
+        | i# ==# 0#                  = W32# x#
+        | i# >=# 32# || i# <=# -32#  = W32# (int2Word# 0#)
+        | i# ># 0#                   = W32# (narrow32Word# (x# `uncheckedShiftL#` i#))
+        | otherwise                  = W32# (x# `uncheckedShiftRL#` negateInt# i#)
     (W32# x#) `rotate` (I# i#)
         | i'# ==# 0# = W32# x#
-        | otherwise  = W32# (narrow32Word# ((x# `shiftL#` i'#) `or#`
-                                            (x# `shiftRL#` (32# -# i'#))))
+        | otherwise  = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
+                                            (x# `uncheckedShiftRL#` (32# -# i'#))))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
@@ -711,12 +726,14 @@ instance Bits Word64 where
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor64#` y#)
     complement (W64# x#)       = W64# (not64# x#)
     (W64# x#) `shift` (I# i#)
-        | i# >=# 0#            = W64# (x# `shiftL64#` i#)
-        | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
+        | i# ==# 0#                  = W64# x#
+        | i# >=# 64# || i# <=# -64#  = 0
+        | i# ># 0#                   = W64# (x# `uncheckedShiftL64#` i#)
+        | otherwise                  = W64# (x# `uncheckedShiftRL64#` negateInt# i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
-        | otherwise  = W64# ((x# `shiftL64#` i'#) `or64#`
-                             (x# `shiftRL64#` (64# -# i'#)))
+        | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
+                             (x# `uncheckedShiftRL64#` (64# -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
@@ -743,8 +760,8 @@ foreign import "stg_and64"         unsafe and64#         :: Word64# -> Word64# -
 foreign import "stg_or64"          unsafe or64#          :: Word64# -> Word64# -> Word64#
 foreign import "stg_xor64"         unsafe xor64#         :: Word64# -> Word64# -> Word64#
 foreign import "stg_not64"         unsafe not64#         :: Word64# -> Word64#
-foreign import "stg_shiftL64"      unsafe shiftL64#      :: Word64# -> Int# -> Word64#
-foreign import "stg_shiftRL64"     unsafe shiftRL64#     :: Word64# -> Int# -> Word64#
+foreign import "stg_uncheckedShiftL64"  unsafe uncheckedShiftL64#  :: Word64# -> Int# -> Word64#
+foreign import "stg_uncheckedShiftRL64" unsafe uncheckedShiftRL64# :: Word64# -> Int# -> Word64#
 
 foreign import "stg_integerToWord64" unsafe integerToWord64# :: Int# -> ByteArray# -> Word64#
 
@@ -826,12 +843,14 @@ instance Bits Word64 where
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
     complement (W64# x#)       = W64# (x# `xor#` mb#) where W64# mb# = maxBound
     (W64# x#) `shift` (I# i#)
-        | i# >=# 0#            = W64# (x# `shiftL#` i#)
-        | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
+        | i# ==# 0#                  = W64# x#
+        | i# >=# 64# || i# <=# -64#  = 0
+        | i# ># 0#                   = W64# (x# `uncheckedShiftL#` i#)
+        | otherwise                  = W64# (x# `uncheckedShiftRL#` negateInt# i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
-        | otherwise  = W64# ((x# `shiftL#` i'#) `or#`
-                             (x# `shiftRL#` (64# -# i'#)))
+        | otherwise  = W64# ((x# `uncheckedShiftL#` i'#) `or#`
+                             (x# `uncheckedShiftRL#` (64# -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.55 2001/10/17 15:40:02 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.56 2001/12/07 11:34:48 sewardj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -746,18 +746,18 @@ unpackCStringUtf8# addr
       | ch `eqChar#` '\0'#   = []
       | ch `leChar#` '\x7F'# = C# ch : unpack (nh +# 1#)
       | ch `leChar#` '\xDF'# =
-          C# (chr# ((ord# ch                                  -# 0xC0#) `iShiftL#`  6# +#
+          C# (chr# ((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6# +#
                     (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#))) :
           unpack (nh +# 2#)
       | ch `leChar#` '\xEF'# =
-          C# (chr# ((ord# ch                                  -# 0xE0#) `iShiftL#` 12# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `iShiftL#`  6# +#
+          C# (chr# ((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6# +#
                     (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#))) :
           unpack (nh +# 3#)
       | otherwise            =
-          C# (chr# ((ord# ch                                  -# 0xF0#) `iShiftL#` 18# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `iShiftL#` 12# +#
-                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `iShiftL#`  6# +#
+          C# (chr# ((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12# +#
+                    (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6# +#
                     (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
           unpack (nh +# 4#)
       where

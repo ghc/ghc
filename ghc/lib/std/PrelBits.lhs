@@ -61,15 +61,21 @@ instance Bits Int where
     (I# x#) `xor` (I# y#)  = I# (word2Int# (int2Word# x# `xor#` int2Word# y#))
     complement (I# x#)     = I# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
     (I# x#) `shift` (I# i#)
-        | i# >=# 0#            = I# (x# `iShiftL#` i#)
-        | otherwise            = I# (x# `iShiftRA#` negateInt# i#)
+        | i# ==# 0#     = I# x#
+        | i# >=# wsib   = 0
+        | i# ># 0#      = I# (x# `uncheckedIShiftL#` i#)
+        | i# <=# nwsib  = I# (if x# <# 0# then -1# else 0#)
+        | otherwise     = I# (x# `uncheckedIShiftRA#` negateInt# i#)
+          where
+	     wsib  = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
+             nwsib = negateInt# wsib
     (I# x#) `rotate` (I# i#) =
-        I# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                       (x'# `shiftRL#` (wsib -# i'#))))
+        I# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+                       (x'# `uncheckedShiftRL#` (wsib -# i'#))))
         where
-        x'# = int2Word# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
-	wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
+           x'#   = int2Word# x#
+           i'#   = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+	   wsib  = WORD_SIZE_IN_BITS#
     bitSize  _                 = WORD_SIZE_IN_BITS
     isSigned _                 = True
 \end{code}

@@ -90,9 +90,9 @@ __export PrelGHC
   remIntzh
   gcdIntzh
   negateIntzh
-  iShiftLzh
-  iShiftRAzh
-  iShiftRLzh
+  uncheckedIShiftLzh
+  uncheckedIShiftRAzh
+  uncheckedIShiftRLzh
   addIntCzh
   subIntCzh
   mulIntCzh
@@ -113,8 +113,8 @@ __export PrelGHC
   orzh
   notzh
   xorzh
-  shiftLzh
-  shiftRLzh
+  uncheckedShiftLzh
+  uncheckedShiftRLzh
   int2Wordzh
   word2Intzh
 

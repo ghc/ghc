@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.86 2001/12/05 17:35:14 sewardj Exp $
+ * $Id: PrimOps.h,v 1.87 2001/12/07 11:34:48 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -210,11 +210,11 @@ LW_ stg_or64   (StgWord64, StgWord64);
 LW_ stg_xor64  (StgWord64, StgWord64);
 LW_ stg_not64  (StgWord64);
 
-LW_ stg_shiftL64   (StgWord64, StgInt);
-LW_ stg_shiftRL64  (StgWord64, StgInt);
-LI_ stg_iShiftL64  (StgInt64, StgInt);
-LI_ stg_iShiftRL64 (StgInt64, StgInt);
-LI_ stg_iShiftRA64 (StgInt64, StgInt);
+LW_ stg_uncheckedShiftL64   (StgWord64, StgInt);
+LW_ stg_uncheckedShiftRL64  (StgWord64, StgInt);
+LI_ stg_uncheckedIShiftL64  (StgInt64, StgInt);
+LI_ stg_uncheckedIShiftRL64 (StgInt64, StgInt);
+LI_ stg_uncheckedIShiftRA64 (StgInt64, StgInt);
 
 LI_ stg_intToInt64    (StgInt);
 I_  stg_int64ToInt    (StgInt64);
