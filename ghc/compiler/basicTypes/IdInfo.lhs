@@ -134,15 +134,18 @@ To be removed later
 
 \begin{code}
 mkNewStrictnessInfo :: Id -> Arity -> Demand.StrictnessInfo -> CprInfo -> StrictSig
-mkNewStrictnessInfo id arity Demand.NoStrictnessInfo cpr
-  = mkStrictSig id arity $
-    mkTopDmdType (replicate arity lazyDmd) (newRes False cpr)
-
 mkNewStrictnessInfo id arity (Demand.StrictnessInfo ds res) cpr
-  = mkStrictSig id arity $
-    mkTopDmdType (take arity (map newDemand ds)) (newRes res cpr)
+  | length ds <= arity
 	-- Sometimes the old strictness analyser has more
 	-- demands than the arity justifies
+  = mkStrictSig id arity $
+    mkTopDmdType (map newDemand ds) (newRes res cpr)
+
+mkNewStrictnessInfo id arity other cpr
+  =	-- Either no strictness info, or arity is too small
+	-- In either case we can't say anything useful
+    mkStrictSig id arity $
+    mkTopDmdType (replicate arity lazyDmd) (newRes False cpr)
 
 newRes True  _ 	        = BotRes
 newRes False ReturnsCPR = RetCPR
