@@ -188,7 +188,7 @@ mkImpInstEnv dflags eps hpt
   where
 	  -- We shouldn't get instance conflict errors from
 	  -- the package and home type envs
-    add dfuns inst_env = WARN( not (null errs), vcat errs ) inst_env'
+    add dfuns inst_env = WARN( not (null errs), vcat (map snd errs) ) inst_env'
 		       where
 			 (inst_env', errs) = extendInstEnv dflags inst_env dfuns
 
@@ -327,8 +327,10 @@ add_err loc msg
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
-addErrs :: [Message] -> TcRn m ()
-addErrs msgs = mappM_ addErr msgs
+addErrs :: [(SrcLoc,Message)] -> TcRn m ()
+addErrs msgs = mappM_ add msgs
+	     where
+	       add (loc,msg) = add_err loc msg
 
 addWarn :: Message -> TcRn m ()
 addWarn msg
@@ -563,7 +565,7 @@ getInstLoc origin
 	 return (origin, loc, (tcl_ctxt env)) }
 \end{code}
 
-    The addErr functions add an error message, but do not cause failure.
+    The addErrTc functions add an error message, but do not cause failure.
     The 'M' variants pass a TidyEnv that has already been used to
     tidy up the message; we then use it to tidy the context messages
 

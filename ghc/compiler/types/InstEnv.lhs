@@ -22,7 +22,7 @@ import VarSet
 import VarEnv
 import Maybes		( MaybeErr(..), returnMaB, failMaB, thenMaB, maybeToBool )
 import Name		( getSrcLoc, nameModule )
-import SrcLoc		( isGoodSrcLoc )
+import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import TcType		( Type, tcTyConAppTyCon, mkTyVarTy,
 			  tcSplitDFunTy, tyVarsOfTypes,
 			  matchTys, unifyTyListsX, allDistinctTyVars
@@ -315,15 +315,15 @@ True => overlap is permitted, but only if one template matches the other;
         not if they unify but neither is 
 
 \begin{code}
-extendInstEnv :: DynFlags -> InstEnv -> [DFunId] -> (InstEnv, [Message])
+extendInstEnv :: DynFlags -> InstEnv -> [DFunId] -> (InstEnv, [(SrcLoc,Message)])
   -- Similar, but all we have is the DFuns
 extendInstEnv dflags env dfun_ids = foldl (addToInstEnv dflags) (env, []) dfun_ids
 
 
 addToInstEnv :: DynFlags
-             -> (InstEnv, [Message])
+             -> (InstEnv, [(SrcLoc,Message)])
 	     -> DFunId
-	     -> (InstEnv, [Message])	-- Resulting InstEnv and augmented error messages
+	     -> (InstEnv, [(SrcLoc,Message)])	-- Resulting InstEnv and augmented error messages
 
 addToInstEnv dflags (inst_env, errs) dfun_id
 	-- Check first that the new instance doesn't 
@@ -441,9 +441,11 @@ overlapErr dfun1 dfun2 = addInstErr (ptext SLIT("Overlapping instance declaratio
 fundepErr  dfun1 dfun2 = addInstErr (ptext SLIT("Functional dependencies conflict between instance declarations:")) 
 				    dfun1 dfun2
 
+addInstErr :: SDoc -> DFunId -> DFunId -> (SrcLoc, Message)
 addInstErr what dfun1 dfun2 
- = hang what 2 (ppr_dfun dfun1 $$ ppr_dfun dfun2)
+ = (getSrcLoc dfun1, hang what 2 (ppr_dfun dfun1 $$ ppr_dfun dfun2))
   where
+   
     ppr_dfun dfun = pp_loc <> colon <+> pprClassPred clas tys
       where
 	(_,_,clas,tys) = tcSplitDFunTy (idType dfun)
