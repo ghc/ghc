@@ -9,7 +9,7 @@ SRC_CC_OPTS += -O
 boot :: all
 
 #
-# Install until in lib/.*
+# Install unlit in lib/
 #
 INSTALL_LIBEXECS += $(C_PROG)
 
