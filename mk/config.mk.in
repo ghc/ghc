@@ -506,7 +506,7 @@ HBC		= @HBC@
 NHC		= @NHC@
 
 HC	        = @WithHc@
-MKDEPENDHS	= $(GHC)
+MKDEPENDHS	= $(HC)
 
 # Sometimes we want to invoke ghc from the build tree in different
 # projects (eg. it's handy to have a nofib & a ghc build in the same
@@ -720,6 +720,7 @@ HSTAGS			= $(HSTAGS_PREFIX)hstags
 # The ways currently defined.
 #
 ALL_WAYS=p t u s mp mg a b c d e f g h i j k l m n o A B
+USER_WAYS=a b c d e f g h i j k l m n o A B
 
 #
 # The following ways currently have treated specially, p u t mg,
