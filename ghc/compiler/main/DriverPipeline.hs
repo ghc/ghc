@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.38 2000/12/05 12:19:49 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.39 2000/12/05 16:59:03 rrt Exp $
 --
 -- GHC Driver
 --
@@ -430,7 +430,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef v_Recomp
 	todo <- readIORef v_GhcMode
-        o_file' <- odir_ify (basename ++ '.':phase_input_ext Ln)
+        o_file' <- odir_ify (basename ++ '.':phaseInputExt Ln)
         o_file <- osuf_ify o_file'
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
