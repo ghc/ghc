@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.11 2001/04/07 14:58:44 lewie Exp $
+-- $Id: Time.hsc,v 1.12 2001/04/25 14:36:48 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -69,6 +69,9 @@ module Time
      ,  Day(..)
 
      ,  ClockTime(..) -- non-standard, lib. report gives this as abstract
+	-- instance Eq, Ord
+	-- instance Show (non-standard)
+
      ,	getClockTime
 
      ,  TimeDiff(..)
@@ -157,24 +160,13 @@ data ClockTime = TOD Integer 		-- Seconds since 00:00:00 on 1 Jan 1970
 		     Integer		-- Picoseconds with the specified second
 	       deriving (Eq, Ord)
 
--- When a @ClockTime@ is shown, it is converted to a string of the form
--- @"Mon Nov 28 21:45:41 GMT 1994"@.
-
--- For now, we are restricted to roughly:
--- Fri Dec 13 20:45:52 1901 through Tue Jan 19 03:14:07 2038, because
--- we use the C library routines based on 32 bit integers.
+-- When a ClockTime is shown, it is converted to a CalendarTime in the current
+-- timezone and then printed.  FIXME: This is arguably wrong, since we can't
+-- get the current timezone without being in the IO monad.
 
 instance Show ClockTime where
-    showsPrec _ (TOD secs _nsec) = 
-      showString $ unsafePerformIO $ do
-	    withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
-	      p_tm <- localtime p_timer -- can't fail, according to POSIX
-	      allocaBytes 64 $ \ p_buf -> do  -- big enough for error message
-	        r <- strftime p_buf 50 "%a %b %d %H:%M:%S %Z %Y"## p_tm
-                if r == 0 
-	          then return "ClockTime.show{Time}: internal error"
-		  else peekCString p_buf
-
+    showsPrec _ t = showString (calendarTimeToString 
+	  			 (unsafePerformIO (toCalendarTime t)))
     showList = showList__ (showsPrec 0)
 
 {-
@@ -486,7 +478,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec
         -- result.
         -- 
         gmtoff <- gmtoff p_tm
-	let res = fromIntegral t + tz - fromIntegral gmtoff
+	let res = fromIntegral t - tz + fromIntegral gmtoff
 	return (TOD (fromIntegral res) 0)
 
 -- -----------------------------------------------------------------------------
@@ -630,7 +622,6 @@ type CTm = () -- struct tm
 
 foreign import unsafe localtime :: Ptr CTime -> IO (Ptr CTm)
 foreign import unsafe gmtime    :: Ptr CTime -> IO (Ptr CTm)
-foreign import unsafe strftime  :: Ptr CChar -> CSize -> Addr## -> Ptr CTm -> IO CSize
 foreign import unsafe mktime    :: Ptr CTm   -> IO CTime
 foreign import unsafe time      :: Ptr CTime -> IO CTime
 
