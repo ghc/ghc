@@ -10,8 +10,17 @@ module NumExts
        (
          doubleToFloat   -- :: Double -> Float
        , floatToDouble   -- :: Double -> Float
+
        , showHex         -- :: Integral a => a -> ShowS
        , showOct         -- :: Integral a => a -> ShowS
+       , showBin         -- :: Integral a => a -> ShowS
+
+	 -- general purpose number->string converter.
+       , showIntAtBase   -- :: Integral a 
+			 -- => a		-- base
+			 -- -> (a -> Char)      -- digit to char
+			 -- -> a                -- number to show.
+			 -- -> ShowS
        ) where
 
 import Char (ord, chr)
@@ -77,4 +86,10 @@ showOct n r =
  showString "0o" $
  showIntAtBase 8 (toChrOct) n r
  where toChrOct d = chr (ord_0   + fromIntegral d)
+
+showBin :: Integral a => a -> ShowS
+showBin n r = 
+ showString "0b" $
+ showIntAtBase 2 (toChrOct) n r
+ where toChrOct d = chr (ord_0 + fromIntegral d)
 \end{code}
