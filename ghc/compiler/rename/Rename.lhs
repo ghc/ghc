@@ -277,13 +277,10 @@ slurpSourceRefs source_binders source_fvs
 		-- No declaration... (already slurped, or local)
 	    Nothing   -> go decls fvs gates refs
 	    Just decl -> rnIfaceDecl decl		`thenRn` \ (new_decl, fvs1) ->
-			 let
-			    new_gates = getGates source_fvs new_decl
-			 in
 			 go (new_decl : decls)
 			    (fvs1 `plusFV` fvs)
-			    (gates `plusFV` new_gates)
-			    (nameSetToList new_gates ++ refs)
+			    (gates `plusFV` getGates source_fvs new_decl)
+			    refs
 
 	-- When we find a wired-in name we must load its
 	-- home module so that we find any instance decls therein
@@ -312,14 +309,17 @@ but not @Foo@; so we need to chase @Foo@ too.
 
 \begin{code}
 slurpInstDecls decls needed gates
-  | isEmptyFVs gates
-  = returnRn (decls, needed)
-
-  | otherwise
-  = getImportedInstDecls gates				`thenRn` \ inst_decls ->
-    rnInstDecls decls needed emptyFVs inst_decls	`thenRn` \ (decls1, needed1, gates1) ->
-    slurpInstDecls decls1 needed1 gates1
+  = go decls needed gates gates
   where
+    go decls needed all_gates new_gates
+	| isEmptyFVs new_gates
+	= returnRn (decls, needed)
+
+	| otherwise
+	= getImportedInstDecls all_gates		`thenRn` \ inst_decls ->
+	  rnInstDecls decls needed emptyFVs inst_decls	`thenRn` \ (decls1, needed1, new_gates) ->
+	  go decls1 needed1 (all_gates `plusFV` new_gates) new_gates
+
     rnInstDecls decls fvs gates []
 	= returnRn (decls, fvs, gates)
     rnInstDecls decls fvs gates (d:ds) 

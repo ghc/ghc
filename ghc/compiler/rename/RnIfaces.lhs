@@ -80,9 +80,19 @@ import List	( nub )
 %*********************************************************
 
 \begin{code}
-loadHomeInterface :: SDoc -> Name -> RnM d (Module, Ifaces)
+loadHomeInterface :: SDoc -> Name -> RnM d Ifaces
 loadHomeInterface doc_str name
-  = loadInterface doc_str (moduleName (nameModule name)) ImportBySystem
+  = loadInterface doc_str (moduleName (nameModule name)) ImportBySystem		`thenRn` \ (_, ifaces) ->
+    returnRn ifaces
+
+loadOrphanModules :: [ModuleName] -> RnM d ()
+loadOrphanModules mods
+  | null mods = returnRn ()
+  | otherwise = traceRn (text "Loading orphan modules:" <+> fsep (map pprModuleName mods))	`thenRn_` 
+		mapRn_ load mods	`thenRn_`
+		returnRn ()
+  where
+    load mod = loadInterface (pprModuleName mod <+> ptext SLIT("is a orphan-instance module")) mod ImportBySystem
 
 loadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Module, Ifaces)
 loadInterface doc_str mod_name from
@@ -445,13 +455,9 @@ importDecl name
     if name `elemNameSet` already_slurped then
 	returnRn Nothing	-- Already dealt with
     else
-	getModuleRn 		`thenRn` \ this_mod ->
-	let
-	  mod = moduleName (nameModule name)
-	in
-	if mod == this_mod then		-- Don't bring in decls from
+	if isLocallyDefined name then	-- Don't bring in decls from
 					-- the renamed module's own interface file
-		  addWarnRn (importDeclWarn mod name) `thenRn_`
+		  addWarnRn (importDeclWarn name) `thenRn_`
 		  returnRn Nothing
 	else
 	getNonWiredInDecl name
@@ -461,7 +467,7 @@ importDecl name
 getNonWiredInDecl :: Name -> RnMG (Maybe (Module, RdrNameHsDecl))
 getNonWiredInDecl needed_name 
   = traceRn doc_str				`thenRn_`
-    loadHomeInterface doc_str needed_name	`thenRn` \ (_, ifaces) ->
+    loadHomeInterface doc_str needed_name	`thenRn` \ ifaces ->
     case lookupNameEnv (iDecls ifaces) needed_name of
 
       Just (version,avail,_,decl)
@@ -531,33 +537,40 @@ getInterfaceExports mod_name from
 \begin{code}
 getImportedInstDecls :: NameSet -> RnMG [(Module,RdrNameHsDecl)]
 getImportedInstDecls gates
-  = 	-- First load any orphan-instance modules that aren't aready loaded
+  = 	-- First, ensure that the home module of each gate is loaded
+    mapRn_ load_home gate_list				`thenRn_`	
+
+   	-- Next, load any orphan-instance modules that aren't aready loaded
 	-- Orphan-instance modules are recorded in the module dependecnies
-    getIfacesRn 						`thenRn` \ ifaces ->
+    getIfacesRn 					`thenRn` \ ifaces ->
     let
 	orphan_mods =
 	  [mod | (mod, (_, True, Nothing)) <- fmToList (iImpModInfo ifaces)]
     in
-    traceRn (text "Loading orphan modules" <+> fsep (map pprModuleName orphan_mods))
-    `thenRn_` mapRn_ load_it orphan_mods 	`thenRn_`
+    loadOrphanModules orphan_mods			`thenRn_` 
 
 	-- Now we're ready to grab the instance declarations
 	-- Find the un-gated ones and return them, 
 	-- removing them from the bag kept in Ifaces
-    getIfacesRn 						`thenRn` \ ifaces ->
+    getIfacesRn 					`thenRn` \ ifaces ->
     let
 	(decls, new_insts) = selectGated gates (iInsts ifaces)
     in
     setIfacesRn (ifaces { iInsts = new_insts })		`thenRn_`
 
     traceRn (sep [text "getImportedInstDecls:", 
-		  nest 4 (fsep (map ppr (nameSetToList gates))),
+		  nest 4 (fsep (map ppr gate_list)),
 		  text "Slurped" <+> int (length decls)
 			         <+> text "instance declarations"]) `thenRn_`
     returnRn decls
   where
-    load_it mod = loadInterface (doc_str mod) mod ImportBySystem
-    doc_str mod = sep [pprModuleName mod, ptext SLIT("is a orphan-instance module")]
+    gate_list      = nameSetToList gates
+
+    load_home gate | isLocallyDefined gate
+		   = returnRn ()
+		   | otherwise
+		   = loadHomeInterface (ppr gate <+> text "is an instance gate") gate	`thenRn_`
+		     returnRn ()
 
 getImportedRules :: RnMG [(Module,RdrNameHsDecl)]
 getImportedRules
@@ -572,6 +585,7 @@ getImportedRules
     returnRn decls
 
 selectGated gates decl_bag
+	-- Select only those decls whose gates are *all* in 'gates'
 #ifdef DEBUG
   | opt_NoPruneDecls	-- Just to try the effect of not gating at all
   = (foldrBag (\ (_,d) ds -> d:ds) [] decl_bag, emptyBag)	-- Grab them all
@@ -593,7 +607,7 @@ lookupFixity name
 	Nothing		  	 -> returnRn defaultFixity
 
   | otherwise	-- Imported
-  = loadHomeInterface doc name		`thenRn` \ (_, ifaces) ->
+  = loadHomeInterface doc name		`thenRn` \ ifaces ->
     case lookupNameEnv (iFixes ifaces) name of
 	Just (FixitySig _ fix _) -> returnRn fix 
 	Nothing 		 -> returnRn defaultFixity
@@ -933,14 +947,13 @@ getDeclWarn name loc
   = sep [ptext SLIT("Failed to find (optional) interface decl for") <+> quotes (ppr name),
 	 ptext SLIT("desired at") <+> ppr loc]
 
-importDeclWarn mod name
+importDeclWarn name
   = sep [ptext SLIT(
     "Compiler tried to import decl from interface file with same name as module."), 
 	 ptext SLIT(
     "(possible cause: module name clashes with interface file already in scope.)")
 	] $$
-    hsep [ptext SLIT("Interface:"), quotes (pprModuleName mod), 
-	  comma, ptext SLIT("name:"), quotes (ppr name)]
+    hsep [ptext SLIT("name:"), quotes (ppr name)]
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")

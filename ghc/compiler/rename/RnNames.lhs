@@ -153,8 +153,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	Nothing -> returnRn Nothing ;
 	Just all_avails ->
 
-   traceRn (text "updateProv" <+> fsep (map ppr (rdrEnvElts gbl_env)))	`thenRn_`
-    
 	-- DEAL WITH FIXITIES
    fixitiesFromLocalDecls gbl_env decls		`thenRn` \ local_fixity_env ->
    let
