@@ -150,7 +150,7 @@ mangleIndexTree (StIndex pk base off)
 		   StPrim SllOp [off, StInt s]
     ]
   where
-    shift DoubleRep 	= 3
+    shift DoubleRep 	= 3::Integer
     shift _ 	       	= IF_ARCH_alpha(3,2)
 \end{code}
 
