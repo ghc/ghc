@@ -200,8 +200,12 @@ loadInterface doc_str load_mod as_source
 	Just (ParsedIface _ mod_vers usages exports rd_inst_mods fixs rd_decls rd_insts) ->
 
 	-- LOAD IT INTO Ifaces
-    mapRn (loadExport as_source) exports		 `thenRn` \ avails_s ->
+	-- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
+	---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
+	--     If we do loadExport first the wrong info gets into the cache (unless we
+	-- 	explicitly tag each export which seems a bit of a bore)
     foldlRn (loadDecl load_mod as_source) decls rd_decls `thenRn` \ new_decls ->
+    mapRn loadExport exports				 `thenRn` \ avails_s ->
     foldlRn (loadInstDecl load_mod) insts rd_insts	 `thenRn` \ new_insts ->
     let
 	 mod_details = (as_source, mod_vers, concat avails_s, fixs)
@@ -226,8 +230,8 @@ as_good_as any    HiBootFile = True
 as_good_as _      _	     = False
 
 
-loadExport :: IfaceFlavour -> ExportItem -> RnMG [AvailInfo]
-loadExport as_source (mod, hif, entities)
+loadExport :: ExportItem -> RnMG [AvailInfo]
+loadExport (mod, hif, entities)
   = mapRn load_entity entities
   where
     new_name occ = newGlobalName mod occ hif
@@ -327,7 +331,7 @@ checkUpToDate mod_name
 		    checkModUsage usages
   where
 	-- Only look in current directory, with suffix .hi
-    doc_str = sep [ptext SLIT("Need usage info from"), pprModule PprDebug mod_name]
+    doc_str = sep [ptext SLIT("need usage info from"), pprModule PprDebug mod_name]
 
 checkModUsage [] = returnRn True		-- Yes!  Everything is up to date!
 
@@ -371,7 +375,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
     case lookupFM decls name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
-			  traceRn (sep [ptext SLIT("...and this no longer exported:"), ppr PprDebug name])	`thenRn_`
+			  putDocRn (sep [ptext SLIT("No longer exported:"), ppr PprDebug name])	`thenRn_`
 			  returnRn False
 
 	Just (new_vers,_,_) 	-- It's there, but is it up to date?
@@ -381,7 +385,7 @@ checkEntityUsage mod decls ((occ_name,old_vers) : rest)
 
 		| otherwise
 			-- Out of date, so bale out
-		-> traceRn (sep [ptext SLIT("...and this is out of date:"), ppr PprDebug name])  `thenRn_`
+		-> putDocRn (sep [ptext SLIT("Out of date:"), ppr PprDebug name])  `thenRn_`
 		   returnRn False
 \end{code}
 
@@ -442,7 +446,7 @@ getNonWiredInDecl needed_name necessity
 		   }						`thenRn_` 
 		   returnRn Nothing
   where
-     doc_str = sep [ptext SLIT("Need decl for"), ppr PprDebug needed_name]
+     doc_str = sep [ptext SLIT("need decl for"), ppr PprDebug needed_name]
      mod = nameModule needed_name
 
      is_data_or_newtype (TyData _ _ _ _ _ _ _ _) = True
@@ -497,7 +501,7 @@ getWiredInDecl name necessity
 	main_name  = availName avail
 	main_is_tc = case avail of { AvailTC _ _ -> True; Avail _ -> False }
 	mod        = nameModule main_name
-	doc_str    = sep [ptext SLIT("Need home module for wired in thing"), ppr PprDebug name]
+	doc_str    = sep [ptext SLIT("need home module for wired in thing"), ppr PprDebug name]
     in
     (if not main_is_tc || mod == gHC__ then
 	returnRn ()		
@@ -923,16 +927,15 @@ findAndReadIface doc_str mod_name as_source
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   case as_source of { HiBootFile -> ptext SLIT("[boot]"); other -> empty},
 			   ptext SLIT("interface for"), 
-			   ptext mod_name, 
-			   semi],
-		     nest 4 (ptext SLIT("reason:") <> doc_str)]
+			   ptext mod_name <> semi],
+		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 
 	-- For import {-# SOURCE #-} Foo, "as_source" will be True
 	-- and we read Foo.hi-boot, not Foo.hi.  This is used to break
 	-- loops among modules.
-    boot_suffix = case as_source of
-			HiBootFile -> "-boot"
-			HiFile     -> ""
+    mod_suffix hi = case as_source of
+			HiBootFile -> ".hi-boot" -- Ignore `ways' for boot files.
+			HiFile     -> hi
 
     try all_dirs [] = traceRn (ptext SLIT("...failed"))	`thenRn_`
 		      returnRn Nothing
@@ -944,7 +947,7 @@ findAndReadIface doc_str mod_name as_source
 	      Just iface -> traceRn (ptext SLIT("...done"))	`thenRn_`
 			    returnRn (Just iface)
 	where
-	  file_path = dir ++ '/' : moduleString mod_name ++ hisuf ++ boot_suffix
+	  file_path = dir ++ '/' : moduleString mod_name ++ (mod_suffix hisuf)
 \end{code}
 
 @readIface@ trys just one file.
@@ -1017,7 +1020,6 @@ mkSearchPath (Just s)
 noIfaceErr filename sty
   = hcat [ptext SLIT("Could not find valid interface file "), 
           quotes (pprModule sty filename)]
---	, text " in"]) 4 (vcat (map text dirs))
 
 cannaeReadFile file err sty
   = hcat [ptext SLIT("Failed in reading file: "), 
