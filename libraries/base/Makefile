@@ -115,7 +115,7 @@ EXCLUDED_HADDOCK_SRCS = \
 	GHC/PrimopWrappers.hs \
 	GHC/PArr.hs
 
-SRC_HADDOCK_OPTS += -t "Haskell Core Libraries (base package)" \
+SRC_HADDOCK_OPTS += -t "Haskell Hierarchical Libraries ($(PACKAGE) package)" \
 	--no-implicit-prelude -p prologue.txt
 
 # -----------------------------------------------------------------------------
