@@ -23,7 +23,7 @@ import CoreSyn
 
 import FreeVars
 import Id		( emptyIdSet, unionIdSets, unionManyIdSets,
-			  elementOfIdSet, SYN_IE(IdSet), GenId
+			  elementOfIdSet, SYN_IE(IdSet), GenId, SYN_IE(Id)
 			)
 import Util		( nOfThem, panic, zipEqual )
 \end{code}

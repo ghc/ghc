@@ -25,8 +25,7 @@ import SimplMonad
 import TysWiredIn	( trueDataCon, falseDataCon )
 
 #ifdef REALLY_HASKELL_1_3
-ord = fromEnum :: Char -> Int
-chr = toEnum   :: Int -> Char
+import Char(ord,chr)
 #endif
 \end{code}
 
