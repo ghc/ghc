@@ -16,6 +16,9 @@ lib/IO/hReady001
 parser/should_fail/read002
 		-- we don't disallow certain characters in strings (eg. newline)
 
+rename/should_fail/rnfail034
+		-- duplicated "in" in an error message
+
 rename/should_compile/rn038
 		-- hiding a non-exported identifer is now legal in the revised
 	 	-- Haskell 98 report.
