@@ -81,6 +81,8 @@ Version.hs : Makefile $(TOP)/mk/version.mk
 	@echo "targetOS   = \"$(TargetOS_CPP)\"" >> $(VERSION_HS)
 	@echo "targetARCH = \"$(TargetArch_CPP)\"" >> $(VERSION_HS)
 
+DIST_CLEAN_FILES += $(VERSION_HS)
+
 # -----------------------------------------------------------------------------
 # ghc-pkg script
 
