@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.183 2005/01/18 12:18:19 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.184 2005/01/26 12:58:09 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -68,6 +68,7 @@ import Control.Monad as Monad
 import Foreign.StablePtr	( newStablePtr )
 
 import GHC.Exts		( unsafeCoerce# )
+import GHC.IOBase	( IOErrorType(InvalidArgument) )
 
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 
@@ -308,8 +309,14 @@ fileLoop hdl prompt = do
    when prompt (io (putStr (mkPrompt mod imports)))
    l <- io (IO.try (hGetLine hdl))
    case l of
-	Left e | isEOFError e -> return ()
-	       | otherwise    -> io (ioError e)
+	Left e | isEOFError e		   -> return ()
+	       | InvalidArgument <- etype  -> return ()
+	       | otherwise		   -> io (ioError e)
+		where etype = ioeGetErrorType e
+		-- treat InvalidArgument in the same way as EOF:
+		-- this can happen if the user closed stdin, or
+		-- perhaps did getContents which closes stdin at
+		-- EOF.
 	Right l -> 
 	  case remove_spaces l of
 	    "" -> fileLoop hdl prompt
