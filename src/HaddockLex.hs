@@ -12,7 +12,7 @@ module HaddockLex (
 import IOExts --tmp
 import Char
 
-special = "\'\"/[]"
+special = "\'\"/[]<>"
 
 data Token
   = TokPara

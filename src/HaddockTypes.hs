@@ -158,6 +158,7 @@ data GenDoc id
   | DocUnorderedList [GenDoc id]
   | DocOrderedList [GenDoc id]
   | DocCodeBlock (GenDoc id)
+  | DocURL String
 
 type Doc = GenDoc HsQName
 type ParsedDoc = GenDoc String
@@ -177,7 +178,8 @@ data DocMarkup id a = Markup {
   markupMonospaced    :: a -> a,
   markupUnorderedList :: [a] -> a,
   markupOrderedList   :: [a] -> a,
-  markupCodeBlock     :: a -> a
+  markupCodeBlock     :: a -> a,
+  markupURL	      :: String -> a
   }
 
 markup :: DocMarkup id a -> GenDoc id -> a
@@ -192,6 +194,7 @@ markup m (DocMonospaced d)	= markupMonospaced m (markup m d)
 markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
 markup m (DocOrderedList ds)	= markupOrderedList m (map (markup m) ds)
 markup m (DocCodeBlock d)	= markupCodeBlock m (markup m d)
+markup m (DocURL url)		= markupURL m url
 
 -- | Since marking up is just a matter of mapping 'Doc' into some
 -- other type, we can \'rename\' documentation by marking up 'Doc' into
@@ -207,7 +210,8 @@ mapIdent f = Markup {
   markupMonospaced    = DocMonospaced,
   markupUnorderedList = DocUnorderedList,
   markupOrderedList   = DocOrderedList,
-  markupCodeBlock     = DocCodeBlock
+  markupCodeBlock     = DocCodeBlock,
+  markupURL	      = DocURL
   }
 
 -- -----------------------------------------------------------------------------

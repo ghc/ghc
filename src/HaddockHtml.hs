@@ -11,7 +11,7 @@ import HaddockVersion
 import HaddockTypes
 import HsSyn
 
-import Maybe	( fromJust, isJust )
+import Maybe	( fromJust, isNothing )
 import FiniteMap
 import List 	( sortBy )
 import Char	( toUpper, toLower )
@@ -253,8 +253,6 @@ ppHtmlIndex title ifaces = do
 		       else
 			 anchor ! [href (linkId mod nm)] << toHtml mod
 	             | (Module mod, defining) <- entries ])
-     where
-	defining_mods = [ m | (Module m, True) <- entries ]
 
 nameBeginsWith (HsTyClsName id) c = idBeginsWith id c
 nameBeginsWith (HsVarName   id) c = idBeginsWith id c
@@ -379,47 +377,46 @@ keepDecl _ = False
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
 
+ppShortDataDecl doc_map summary (HsDataDecl loc ctx nm args [con] drv) =
+   declBox (  -- single constructor special case
+      ppHsDataHeader summary nm args      
+      <+> equals <+> ppShortConstr summary con
+   )
+ppShortDataDecl doc_map summary (HsDataDecl loc ctx nm args cons drv) = 
+   declBox << vanillaTable << (
+     aboves (
+	(declBox (ppHsDataHeader summary nm args) :
+ 	zipWith do_constr ('=':repeat '|') cons
+     )
+    )
+  )
+  where do_constr c con = tda [theclass "condecl"] << (
+				toHtml [c] <+> ppShortConstr summary con)
+
 -- First, the abstract case:
 
 ppHsDataDecl doc_map summary (HsDataDecl loc ctx nm args [] drv) = 
    declWithDoc summary (lookupFM doc_map nm)
      (ppHsDataHeader summary nm args)
 
--- Second, the summary cases:
+-- The rest of the cases:
 
-ppHsDataDecl doc_map True (HsDataDecl loc ctx nm args [con] drv) = 
-   declBox (  -- single constructor special case
-      ppHsDataHeader True nm args      
-      <+> equals <+> ppHsSummaryConstr con
-   )
-ppHsDataDecl doc_map True (HsDataDecl loc ctx nm args cons drv) = 
-   td << (
-    vanillaTable << (
-     aboves (
-	(declBox (ppHsDataHeader True nm args) :
- 	zipWith do_constr ('=':repeat '|') cons
-     )
-    )
-  ))
-  where do_constr c con = tda [theclass "condecl"] << (
-				toHtml [c] <+> ppHsSummaryConstr con)
+ppHsDataDecl doc_map summary decl@(HsDataDecl loc ctx nm args cons drv)
+  | summary || (isNothing doc && all constr_has_no_doc cons)
+	= ppShortDataDecl doc_map summary decl
 
--- Now, the full expanded documented version:
-
-ppHsDataDecl doc_map False decl@(HsDataDecl loc ctx nm args cons drv) =
-  td << (
-    vanillaTable << (
-	if isJust doc
-	  then aboves [header, datadoc, constrs]
-	  else aboves [header, constrs]
-     )
-    )
+  | otherwise
+        = td << vanillaTable << (header </> datadoc </> constrs)
   where
 	header = declBox (ppHsDataHeader False nm args)
 	datadoc = docBox (markup htmlMarkup (fromJust doc))
+
 	constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
 
-	constrs = tda [theclass "databody"] << (
+	constrs
+	  | null cons = Html.emptyTable
+	  | otherwise = 
+		tda [theclass "databody"] << (
 	    	    table ! [width "100%", cellpadding 0, cellspacing 10] <<
 			aboves (constr_hdr : map do_constr cons)
            	  )
@@ -429,13 +426,16 @@ ppHsDataDecl doc_map False decl@(HsDataDecl loc ctx nm args cons drv) =
 	Just c = declMainBinder decl
 	doc = lookupFM doc_map c
 
+	constr_has_no_doc (HsConDecl _ nm _ _) 
+	   = isNothing (lookupFM doc_map nm)
 
-ppHsSummaryConstr :: HsConDecl -> Html
-ppHsSummaryConstr (HsConDecl pos nm typeList _maybe_doc) = 
-   hsep (ppHsBinder True nm : map ppHsBangType typeList)
-ppHsSummaryConstr (HsRecDecl pos nm fields maybe_doc) =
-   ppHsBinder True nm +++
-   braces (vanillaTable << aboves (map ppSummaryField fields))
+
+ppShortConstr :: Bool -> HsConDecl -> Html
+ppShortConstr summary (HsConDecl pos nm typeList _maybe_doc) = 
+   hsep (ppHsBinder summary nm : map ppHsBangType typeList)
+ppShortConstr summary (HsRecDecl pos nm fields maybe_doc) =
+   ppHsBinder summary nm +++
+   braces (vanillaTable << aboves (map (ppShortField summary) fields))
 
 ppHsFullConstr doc_map (HsConDecl pos nm typeList _maybe_doc) = 
      declWithDoc False doc (
@@ -461,9 +461,9 @@ ppHsFullConstr doc_map (HsRecDecl pos nm fields maybe_doc) =
         doc = lookupFM doc_map nm
 
 
-ppSummaryField (HsFieldDecl ns ty _doc) 
+ppShortField summary (HsFieldDecl ns ty _doc) 
   = tda [theclass "recfield"] << (
-	  hsep (punctuate comma (map (ppHsBinder True) ns))
+	  hsep (punctuate comma (map (ppHsBinder summary) ns))
 	    <+> toHtml "::" <+> ppHsBangType ty
    )
 
@@ -487,40 +487,58 @@ ppHsBangType (HsUnBangedTy ty) = ppHsAType ty
 
 ppClassHdr ty = keyword "class" <+> ppHsType ty
 
-ppHsClassDecl doc_map True (HsClassDecl loc ty decls) =
-  if null decls 
-    then declBox (ppClassHdr ty)
+ppShortClassDecl doc_map summary decl@(HsClassDecl loc ty decls) = 
+  if null decls
+    then declBox hdr
     else td << (
 	  vanillaTable << (
-           declBox (ppClassHdr ty <+> keyword "where")
+           declBox (hdr <+> keyword "where")
 	    </> 
            tda [theclass "cbody"] << (
 	    vanillaTable << (
-	       aboves (map (doDecl doc_map True) (filter keepDecl decls))
+	       aboves (map (doDecl doc_map summary) (filter keepDecl decls))
            ))
          ))
+   where
+	Just c = declMainBinder decl
+	hdr | not summary = linkTarget c +++ ppClassHdr ty
+	    | otherwise   = ppClassHdr ty
 
-ppHsClassDecl doc_map False decl@(HsClassDecl loc ty decls) =
-  if null decls
-    then declBox (linkTarget c +++ ppClassHdr ty)
-    else td << (
-	   vanillaTable << (
-	     if isJust doc
-		then aboves [header, classdoc, body]
-		else aboves [header, body]
-        ))
-   where header = declBox (linkTarget c +++ ppClassHdr ty <+> keyword "where")
-	 classdoc = docBox (markup htmlMarkup (fromJust doc))
-	 meth_hdr = tda [ theclass "section4" ] << toHtml "Methods"
-	 body   = td << (
-	    	    table ! [width "100%", cellpadding 0, cellspacing 8] << (
+ppHsClassDecl doc_map summary decl@(HsClassDecl loc ty decls)
+  |  summary || (isNothing doc && all decl_has_no_doc kept_decls)
+	= ppShortClassDecl doc_map summary decl
+
+  | otherwise
+        = td << vanillaTable << (header </> classdoc </> body)
+
+   where 
+	doc    = lookupFM doc_map c
+	Just c = declMainBinder decl
+
+	header
+	   | null decls = declBox (linkTarget c +++ ppClassHdr ty)
+	   | otherwise  = declBox (linkTarget c +++ ppClassHdr ty <+> 
+					keyword "where")
+
+	classdoc
+	   | Just d <- doc = docBox (markup htmlMarkup d)
+	   | otherwise     = Html.emptyTable
+
+	meth_hdr = tda [ theclass "section4" ] << toHtml "Methods"
+
+	body
+	   | null decls = Html.emptyTable
+	   | otherwise  = 
+		td << table ! [width "100%", cellpadding 0, cellspacing 8] << (
 			meth_hdr </>
-	       		aboves (map (doDecl doc_map False) 
-					(filter keepDecl decls))
-           	  ))
+	       		aboves (map (doDecl doc_map False) kept_decls)
+           	      )
 
- 	 Just c = declMainBinder decl
-         doc = lookupFM doc_map c
+	kept_decls = filter keepDecl decls
+
+        decl_has_no_doc decl
+	 | Just b <- declMainBinder decl = isNothing (lookupFM doc_map b)
+	 | otherwise = True
 
 -- -----------------------------------------------------------------------------
 -- Types and contexts
@@ -614,7 +632,8 @@ htmlMarkup = Markup {
   markupMonospaced    = tt . toHtml,
   markupUnorderedList = ulist . concatHtml . map (li <<),
   markupOrderedList   = olist . concatHtml . map (li <<),
-  markupCodeBlock     = pre
+  markupCodeBlock     = pre,
+  markupURL	      = \url -> anchor ! [href url] << toHtml url
   }
 
 -- -----------------------------------------------------------------------------
@@ -635,8 +654,6 @@ comma  = char ','
 char c = toHtml [c]
 empty  = toHtml ""
 
-quotes p        = char '`' +++ p +++ char '\''
-doubleQuotes p  = char '"' +++ p +++ char '"'
 parens p        = char '(' +++ p +++ char ')'
 brackets p      = char '[' +++ p +++ char ']'
 braces p        = char '{' +++ p +++ char '}'

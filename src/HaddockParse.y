@@ -12,6 +12,8 @@ import HaddockTypes
 	'/'	{ TokSpecial '/' }
 	'['	{ TokSpecial '[' }
 	']'	{ TokSpecial ']' }
+	'<'	{ TokSpecial '<' }
+	'>'	{ TokSpecial '>' }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	PARA    { TokPara }
@@ -46,6 +48,7 @@ seq	:: { ParsedDoc }
 elem	:: { ParsedDoc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
+	| '<' STRING '>'	{ DocURL $2 }
 	| SQUO STRING SQUO	{ DocIdentifier $2 }
 	| DQUO STRING DQUO	{ DocModule $2 }
 	| '[' seq ']'		{ DocMonospaced $2 }
