@@ -1220,9 +1220,13 @@ genPipeline stop_after stop_after_flag filename
     haskell_ish_file = suffix `elem` [ "hs", "lhs", "hc" ]
     c_ish_file       = suffix `elem` [ "c", "s", "S" ]  -- maybe .cc et al.??
 
+	-- hack for .hc files
+    real_lang | suffix == "hc" = HscC
+	      | otherwise      = lang
+
     pipeline
       | haskell_ish_file = 
-       case lang of
+       case real_lang of
 	HscC    | split && mangle -> [ Unlit, Cpp, Hsc, HCc, Mangle, 
 					SplitMangle, SplitAs ]
 	        | mangle          -> [ Unlit, Cpp, Hsc, HCc, Mangle, As ]
