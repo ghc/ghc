@@ -21,8 +21,9 @@ module FreeVars (
 import AnnCoreSyn	-- output
 
 import CoreSyn
+import CoreUtils	( idSpecVars )
 import Id		( idType, getIdArity, isBottomingId,
-			  emptyIdSet, unitIdSet, mkIdSet,
+			  emptyIdSet, unitIdSet, mkIdSet, unionIdSets,
 			  elementOfIdSet, minusIdSet, unionManyIdSets,
 			  IdSet, Id
 			)
@@ -36,6 +37,7 @@ import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 import BasicTypes	( Unused )
 import UniqSet		( unionUniqSets, addOneToUniqSet )
 import Util		( panic, assertPanic )
+
 \end{code}
 
 %************************************************************************
@@ -111,6 +113,7 @@ Main public interface:
 freeVars :: CoreExpr -> CoreExprWithFVs
 
 freeVars expr = fvExpr noIdCands noTyVarCands expr
+
 \end{code}
 
 %************************************************************************
@@ -132,13 +135,18 @@ fvExpr :: IdCands	    -- In-scope Ids
        -> CoreExprWithFVs
 
 fvExpr id_cands tyvar_cands (Var v)
-  = (FVInfo (if (v `is_among` id_cands)
-	     then aFreeId v
-	     else noFreeIds)
-	    noFreeTyVars
-	    leakiness,
-     AnnVar v)
+  = (FVInfo fvs noFreeTyVars leakiness, AnnVar v)
   where
+    {-
+     ToDo: insert motivating example for why we *need*
+     to include the idSpecVars in the FV list.
+    -}
+    fvs = fvs_v `unionIdSets` mkIdSet (idSpecVars v)
+
+    fvs_v
+     | v `is_among` id_cands = aFreeId v
+     | otherwise	     = noFreeIds
+     
     leakiness
       | isBottomingId v = lEAK_FREE_BIG	-- Hack
       | otherwise       = case getIdArity v of
@@ -305,9 +313,11 @@ fvExpr id_cands tyvar_cands (Note other_note expr)
 -- free vars of the RHS the idSpecVars of the binder,
 -- since those are, in truth, free in the definition.
 fvRhs id_cands tyvar_cands (bndr,rhs)
-  = (FVInfo (fvs `unionIdSets` idSpecVars bndr) ftvs leak, rhs')
+  = (FVInfo fvs' ftvs leak, rhs')
   where
     (FVInfo fvs ftvs leak, rhs') = fvExpr id_cands tyvar_cands rhs
+    fvs' = fvs `unionIdSets` mkIdSet (idSpecVars bndr)
+
 \end{code}
 
 \begin{code}
