@@ -31,7 +31,7 @@ import TyVar		( TyVar, mkTyVar, mkSysTyVar,
 			)
 import Kind		( mkBoxedTypeKind )
 import CoreSyn
-import FreeVars		( exprFreeVars )
+import FreeVars		( exprFreeVars, exprFreeTyVars )
 import PprCore		()	-- Instances 
 import Name		( NamedThing(..), getSrcLoc, mkSysLocalName, isLocallyDefined )
 import SrcLoc		( noSrcLoc )
@@ -965,8 +965,8 @@ plusUDList = foldr plusUDs emptyUDs
 
 mkDB dict rhs = (dict, rhs, db_ftvs, db_fvs)
 	      where
-		db_ftvs	= tyVarsOfType (idType dict)	-- Superset of RHS fvs
-		db_fvs  = dictRhsFVs rhs
+		db_ftvs	= exprFreeTyVars rhs
+		db_fvs  = exprFreeVars isLocallyDefined rhs
 
 addDictBind uds dict rhs = uds { dict_binds = mkDB dict rhs `consBag` dict_binds uds }
 
@@ -1091,9 +1091,6 @@ lookupId:: IdEnv Id -> Id -> Id
 lookupId env id = case lookupIdEnv env id of
 			Nothing  -> id
 			Just id' -> id'
-
-dictRhsFVs :: CoreExpr -> IdSet
-dictRhsFVs e = exprFreeVars isLocallyDefined e
 
 addIdSpecialisations id spec_stuff
   = (if not (null errs) then

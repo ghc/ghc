@@ -6,7 +6,7 @@ Taken quite directly from the Peyton Jones/Lester paper.
 \begin{code}
 module FreeVars (
 	-- Cheap and cheerful variant...
-	exprFreeVars,
+	exprFreeVars, exprFreeTyVars,
 
 	-- Complicated and expensive variant for float-out
 	freeVars,
@@ -31,11 +31,11 @@ import IdInfo		( ArityInfo(..) )
 import PrimOp		( PrimOp(..) )
 import Type		( tyVarsOfType, Type )
 import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
-			  intersectTyVarSets,
+			  intersectTyVarSets, unionManyTyVarSets,
 			  TyVarSet, TyVar
 			)
 import BasicTypes	( Unused )
-import UniqSet		( unionUniqSets, addOneToUniqSet )
+import UniqSet		( unionUniqSets, addOneToUniqSet, delOneFromUniqSet )
 import Util		( panic, assertPanic )
 
 \end{code}
@@ -77,6 +77,7 @@ aFreeTyVar t   = unitTyVarSet t
 is_among       = elementOfIdSet
 munge_id_ty  i = tyVarsOfType (idType i)
 combine	       = unionUniqSets -- used both for {Id,TyVar}Sets
+without	       = delOneFromUniqSet
 add	       = addOneToUniqSet
 
 combineFVInfo (FVInfo fvs1 tfvs1 leak1) (FVInfo fvs2 tfvs2 leak2)
@@ -449,4 +450,61 @@ id_fvs fv_cand in_scope v
   | v `elementOfIdSet` in_scope = noFreeIds
   | fv_cand v		        = aFreeId v
   | otherwise			= noFreeIds
+\end{code}
+
+
+\begin{code}
+exprFreeTyVars ::  CoreExpr -> TyVarSet
+exprFreeTyVars = expr_ftvs
+
+expr_ftvs :: CoreExpr -> TyVarSet
+expr_ftvs (Var v)        = noFreeTyVars
+expr_ftvs (Lit lit)      = noFreeTyVars
+expr_ftvs (Con con args) = args_ftvs args
+expr_ftvs (Prim op args) = args_ftvs args
+expr_ftvs (Note _ expr)  = expr_ftvs expr
+expr_ftvs (App fun arg)  = expr_ftvs fun `combine` arg_ftvs arg
+
+expr_ftvs (Lam (ValBinder b) body) = expr_ftvs body
+expr_ftvs (Lam (TyBinder b)  body) = expr_ftvs body `without` b
+
+expr_ftvs (Case scrut alts)
+  = expr_ftvs scrut `combine` alts_ftvs
+  where
+    alts_ftvs
+      = case alts of
+	  AlgAlts alg_alts deflt -> unionManyTyVarSets (deflt_ftvs : alt_ftvs)
+	    where
+	      alt_ftvs   = map do_alg_alt alg_alts
+	      deflt_ftvs = do_deflt deflt
+
+	  PrimAlts prim_alts deflt -> unionManyTyVarSets (deflt_ftvs : alt_ftvs)
+	    where
+	      alt_ftvs   = map do_prim_alt prim_alts
+	      deflt_ftvs = do_deflt deflt
+
+    do_alg_alt :: (Id, [Id], CoreExpr) -> TyVarSet
+    do_alg_alt (con, args, rhs) = expr_ftvs rhs
+
+    do_prim_alt (lit, rhs) = expr_ftvs rhs
+
+    do_deflt NoDefault		 = noFreeTyVars
+    do_deflt (BindDefault b rhs) = expr_ftvs rhs
+
+expr_ftvs (Let (NonRec b r) body)
+  = bind_ftvs (b,r) `combine` expr_ftvs body
+
+expr_ftvs (Let (Rec pairs) body)
+  = foldr (combine . bind_ftvs) noFreeTyVars pairs `combine`
+    expr_ftvs body
+
+--------------------------------------
+bind_ftvs (b,e) = tyVarsOfType (idType b) `combine` expr_ftvs e
+
+--------------------------------------
+arg_ftvs (TyArg ty) = tyVarsOfType ty
+arg_ftvs other_arg  = noFreeTyVars
+
+--------------------------------------
+args_ftvs args = foldr (combine . arg_ftvs) noFreeTyVars args
 \end{code}
