@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: ghcconfig.mk.in,v 1.3 1996/11/22 14:12:39 simonm Exp $
+# $Id: ghcconfig.mk.in,v 1.4 1997/01/21 11:05:37 sof Exp $
 
 # This stuff should be split into separate files: that which can be 
 # messed with, and that which can't.
@@ -62,15 +62,15 @@ PROJECT_MSUB_OPTS	= -f $(TOP)/ghc/mk/ghcconfig.mk -f $(TOP)/ghc/mk/buildinfo.mk 
 # MkDependHS
 
 ifdef UseInstalledUtils
-MKDEPENDHS		= mkdependHS
+MKDEPENDHS		= $(GHC_DRIVER_INST_NAME) -M
 else
-MKDEPENDHS 		= $(MKDEPENDHSSRC)/mkdependHS
+MKDEPENDHS 		= $(GHC_DRIVERSRC)/ghc -M
 MKDEPENDHSSRC 		= $(GHC_UTILSRC)/mkdependHS
 endif
 
 # Temp until we bootstrap to 2.01 properly
 ifeq ($(Ghc2_0),YES)
-  MKDEPENDHS = mkdependHS
+  MKDEPENDHS = $(GHC_DRIVERSRC)/ghc -M
 else
   MKDEPENDHS = mkdependHS-1.2
 endif
