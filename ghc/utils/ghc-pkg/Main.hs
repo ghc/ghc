@@ -7,6 +7,7 @@
 module Main where
 
 import Package
+import Version	 ( version )
 
 #if __GLASGOW_HASKELL__ >= 504
 import System.Console.GetOpt
@@ -81,10 +82,6 @@ isAction _              = True
 
 copyright :: String
 copyright = "GHC package manager version " ++ version ++ "\n"
-
--- hackery to convice cpp to splice GHC_PKG_VERSION into a string
-version :: String
-version = GHC_PKG_VERSION
 
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...]\n"
