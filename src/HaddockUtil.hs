@@ -10,7 +10,7 @@ module HaddockUtil (
   -- * Misc utilities
   nameOfQName, collectNames, declBinders, declMainBinder, declSubBinders, 
   splitTyConApp, restrictTo, declDoc, parseModuleHeader, freeTyCons, unbang,
-  addFieldDoc, addFieldDocs, addConDoc, addConDocs,toDescription,
+  addFieldDoc, addFieldDocs, addConDoc, addConDocs,toDescription, unQual,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -50,6 +50,10 @@ import System.IO.Unsafe	 ( unsafePerformIO )
 nameOfQName :: HsQName -> HsName
 nameOfQName (Qual _ n) = n
 nameOfQName (UnQual n) = n
+
+unQual :: HsQName -> HsQName
+unQual (Qual _ n) = UnQual n
+unQual n = n
 
 collectNames :: [HsDecl] -> [HsName]
 collectNames ds = concat (map declBinders ds)

@@ -28,7 +28,7 @@ import Control.Monad ( when )
 import Control.Monad.Writer ( Writer, runWriter, tell )
 import Data.Char ( isSpace )
 import Data.IORef ( writeIORef )
-import Data.List ( nub )
+import Data.List ( nub, (\\), foldl' )
 import Data.Maybe ( isJust, maybeToList )
 --import Debug.Trace
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
@@ -188,15 +188,20 @@ run flags files = do
 		
   prologue <- getPrologue flags
 
-  read_ifaces_s <- mapM readIface (map snd ifaces_to_read)
+  read_iface_stuff <- mapM readIface (map snd ifaces_to_read)
 
-  let read_ifaces = concat read_ifaces_s
-      visible_read_ifaces = filter ((OptHide `notElem`) . iface_options . snd) 
+  let 
+      (read_ifacess, doc_envs) = unzip read_iface_stuff
+      read_ifaces = concat read_ifacess
+
+      ext_doc_env = Map.unions doc_envs
+      
+      visible_read_ifaces = filter ((OptHide `notElem`) . iface_options) 
 				read_ifaces
-      external_mods = map fst read_ifaces
+      external_mods = map iface_module read_ifaces
       pkg_paths = map fst ifaces_to_read
 
-  updateHTMLXRefs pkg_paths read_ifaces_s
+  updateHTMLXRefs pkg_paths read_ifacess
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
 	&& Flag_Html `elem` flags) $
@@ -221,34 +226,54 @@ run flags files = do
   -- process the modules in sorted order, building up a mapping from
   -- modules to interfaces.
   let 
-	loop ifaces [] = return ifaces
-	loop ifaces ((hsmod,file):mdls)  = do 
-	   let ((mdl,iface),msgs) = runWriter $
-		   mkInterface no_implicit_prelude verbose ifaces 
+	loop mod_env ifaces [] = return (reverse ifaces)
+	loop mod_env ifaces ((hsmod,file):mdls)  = do 
+	   let (iface,msgs) = runWriter $
+		   mkInterfacePhase1 no_implicit_prelude verbose mod_env
 			file package hsmod
-	       new_ifaces = Map.insert mdl iface ifaces
-	   mapM (hPutStrLn stderr) msgs
-	   loop new_ifaces mdls
+	       new_mod_env = Map.insert (iface_module iface) iface mod_env
+	   mapM_ (hPutStrLn stderr) msgs
+	   loop new_mod_env (iface:ifaces) mdls
 
-  module_map <- loop (Map.fromList read_ifaces) sorted_mod_files
-  let mod_ifaces = Map.toAscList module_map
+  let 
+	mod_map = Map.fromList [ (iface_module iface,iface) 
+			       | iface <- read_ifaces ]
+  
+  ifaces <- loop mod_map read_ifaces sorted_mod_files
+  let 
+      these_ifaces0 = [ iface | iface <- ifaces,
+		    	        iface_module iface `notElem` external_mods ]
 
-      these_mod_ifaces0 = [ (mdl, iface) 
-			  | (mdl, iface) <- mod_ifaces,
-			    mdl `notElem` external_mods ]
+  let these_ifaces1  = attachInstances these_ifaces0
+      this_doc_env   = buildGlobalDocEnv these_ifaces1
+      global_doc_env = this_doc_env `Map.union`
+		       ext_doc_env `Map.union`
+		       builtinDocEnv
+
+
+--  Now do phase 2
+  let
+	loop2 ifaces [] = return (reverse ifaces)
+	loop2 ifaces (iface:rest) = do
+	   let (iface',msgs) = runWriter $
+		    mkInterfacePhase2 verbose iface global_doc_env
+	   mapM_ (hPutStrLn stderr) msgs
+	   loop2 (iface':ifaces) rest
+
+  these_ifaces <- loop2 [] these_ifaces1  
 
 --  when (Flag_DocBook `elem` flags) $
 --    putStr (ppDocBook odir mod_ifaces)
 
-  let these_mod_ifaces = attachInstances these_mod_ifaces0
 
   when (Flag_Debug `elem` flags) $ do
-    mapM_ putStrLn (map show [ (mdl, Map.toAscList (iface_env i), 
+    mapM_ putStrLn (map show [ (iface_module i, 
+				     Map.toAscList (iface_env i), 
 				     Map.toAscList (iface_sub i))
-			     | (mdl, i) <-  these_mod_ifaces ])
+			     | i <-  these_ifaces ])
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title package source_url these_mod_ifaces odir
+    ppHtml title package source_url these_ifaces odir
 		prologue maybe_html_help_format
 		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
@@ -256,7 +281,7 @@ run flags files = do
   -- dump an interface if requested
   case dump_iface of
      Nothing -> return ()
-     Just fn -> dumpInterfaces these_mod_ifaces fn
+     Just fn -> dumpInterfaces these_ifaces this_doc_env fn
 
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
@@ -265,13 +290,13 @@ parseIfaceOption s =
 	(file, _)        -> ("", file)
 		
 
-updateHTMLXRefs :: [FilePath] -> [[(Module,Interface)]] -> IO ()
+updateHTMLXRefs :: [FilePath] -> [[Interface]] -> IO ()
 updateHTMLXRefs paths ifaces_s =
   writeIORef html_xrefs_ref (Map.fromList mapping)
  where
-  mapping = [ (mdl, fpath)
+  mapping = [ (iface_module iface, fpath)
 	    | (fpath, ifaces) <- zip paths ifaces_s,
-	      (mdl, _iface) <- ifaces
+	      iface <- ifaces
 	    ]
 
 parse_file :: FilePath -> IO HsModule
@@ -299,16 +324,21 @@ getPrologue flags
 -----------------------------------------------------------------------------
 -- Figuring out the definitions that are exported from a module
 
-mkInterface
+-- We're going to make interfaces in two passes:
+--
+--   1. Rename the code.  This basically involves resolving all
+--      the names to "original names".
+--
+--   2. Convert all the entity references to "doc names".  These are
+--      the names we want to link to in the documentation.
+
+mkInterfacePhase1
    :: Bool				-- no implicit prelude
    -> Bool				-- verbose
    -> ModuleMap -> FilePath -> Maybe String -> HsModule
-   -> ErrMsgM (
-	       Module, 		-- the module name
-	       Interface	-- its "interface"
-	      )
+   -> ErrMsgM Interface			-- the "interface" of the module
 
-mkInterface no_implicit_prelude verbose mod_map filename package
+mkInterfacePhase1 no_implicit_prelude verbose mod_map filename package
 	(HsModule mdl exps imps decls maybe_opts maybe_info maybe_doc) = do  
 
   -- Process the options, if available
@@ -358,95 +388,140 @@ mkInterface no_implicit_prelude verbose mod_map filename package
      (orig_decls, missing_names2)
 	= runRnFM orig_env (mapM renameDecl annotated_decls)
 
+     (orig_module_doc, missing_names3)
+        = runRnFM orig_env (renameMaybeDoc maybe_doc)
+
+     decl_map :: Map HsName HsDecl
+     decl_map = Map.fromList [ (n,d) | d <- orig_decls, n <- declBinders d ]
+
+     instances = [ d | d@HsInstDecl{} <- orig_decls ] ++
+		 [ d | decl <- orig_decls, d <- derivedInstances mdl decl]
+
+  -- trace (show (Map.toAscList orig_env)) $ do
+
      -- gather up a list of entities that are exported (original names)
   (exported_names, exported_visible_names)
 	 <- exportedNames mdl mod_map
 			locally_defined_names orig_env sub_map
 			orig_exports opts
-  let
 
-     -- build the import env, which maps original names to import names
-     local_import_env = Map.fromList (zip qual_local_names qual_local_names)
+  let
+     -- maps exported HsNames to orig HsQNames
+     name_env = Map.fromList [ (nameOfQName n, n) | n <- exported_names ]
 
      -- find the names exported by this module that other modules should *not*
-     -- link to (and point them to where they should).
-     reexports = getReExports mdl exported_names exported_visible_names
-			import_env
+     -- link to.
+     reexports = [ nm | n@(Qual _ nm) <- exported_names, 
+			n `notElem` exported_visible_names ]
 
-     import_env = buildImportEnv mod_map mdl exported_visible_names implicit_imps
-                  `Map.union` local_import_env
-
---   trace (show (Map.toAscList orig_env)) $ do
---  trace (show (Map.toAscList import_env)) $ do
-  let
-     final_decls = orig_decls
-
-     decl_map :: Map HsName HsDecl
-     decl_map = Map.fromList [ (n,d) | d <- final_decls, n <- declBinders d ]
-
-     instances = [ d | d@HsInstDecl{} <- final_decls ] ++
-		 [ d | decl <- orig_decls, d <- derivedInstances mdl decl]
+  -- in
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list <- mkExportItems mod_map mdl exported_names decl_map sub_map
-			 		final_decls opts orig_exports
-
+  orig_export_items <- mkExportItems mod_map mdl exported_names decl_map sub_map
+			 		orig_decls opts orig_exports
   let
      -- prune the export list to just those declarations that have
      -- documentation, if the 'prune' option is on.
      pruned_export_list
-	| OptPrune `elem` opts = pruneExportItems orig_export_list
-	| otherwise = orig_export_list
-
-     -- rename names in the exported declarations to point to things that
-     -- are closer, or maybe even exported by, the current module.
-     (renamed_export_list, _missing_names3)
-        = runRnFM import_env (renameExportItems pruned_export_list)
-
-     name_env = Map.fromList [ (nameOfQName n, n) | n <- exported_names ]
-
-  let
-     (orig_module_doc, missing_names4)
-        = runRnFM orig_env (renameMaybeDoc maybe_doc)
-
-     (final_module_doc, _missing_names5)
-        = runRnFM import_env (renameMaybeDoc orig_module_doc)
+	| OptPrune `elem` opts = pruneExportItems orig_export_items
+	| otherwise = orig_export_items
+  -- in
 
   -- report any names we couldn't find/resolve
-
-  let missing_names = missing_names1 ++ missing_names2 ++ missing_names4
+  let
+      missing_names = missing_names1 ++ missing_names2 ++ missing_names3
 			 --ignore missing_names3 & missing_names5 for now
-      filtered_missing_names = filter (`notElem` ignore) missing_names
-
-      -- ignore certain builtin names ((),[], etc.), because these
-      -- cannot be exported anyway.
-      ignore = [unit_tycon_qname, fun_tycon_qname, list_tycon_qname,
-		unit_con_name, nil_con_name]	
+      filtered_missing_names = filter (`notElem` builtinNames) missing_names
 
       name_strings = nub (map show filtered_missing_names)
+  -- in
 
-  when (not (null name_strings)) $
+  when (OptHide `notElem` opts &&
+	not (null name_strings)) $
 	  tell ["Warning: " ++ show mdl ++ 
 		": the following names could not be resolved:\n"++
 		"   " ++ concat (map (' ':) name_strings)
 		]
 
-  return (mdl, Interface { 
+  return (Interface { 
 		   iface_filename     = filename,
+		   iface_module	      = mdl,
 		   iface_package      = package,
 		   iface_env          = name_env,
-		   iface_import_env   = import_env,
 		   iface_reexported   = reexports,
-		   iface_exports      = renamed_export_list,
 		   iface_sub	      = sub_map,
 		   iface_orig_exports = pruned_export_list,
-		   iface_insts	      = instances,
 		   iface_decls        = decl_map,
 		   iface_info	      = maybe_info,
-		   iface_doc          = final_module_doc,
-		   iface_options      = opts
+		   iface_doc          = orig_module_doc,
+		   iface_options      = opts,
+		   iface_exports      = error "iface_exports",
+		   iface_insts	      = instances
 		}
       	  )
+
+-- -----------------------------------------------------------------------------
+-- Phase 2
+
+mkInterfacePhase2
+   :: Bool			-- verbose
+   -> Interface
+   -> Map HsQName HsQName	-- global doc-name mapping
+   -> ErrMsgM Interface
+
+mkInterfacePhase2 verbose iface gbl_doc_env =
+  case iface of {
+    Interface {
+	iface_module = this_mdl,
+	iface_env = env,
+	iface_reexported = reexports,
+	iface_orig_exports = orig_export_items,
+	iface_doc = orig_module_doc } ->
+
+   let
+     exported_visible_names = 
+	[orig | (nm,orig) <- Map.toAscList env, nm `notElem` reexports ]
+
+     -- build the import_env.
+     import_env = foldl fn gbl_doc_env exported_visible_names
+	where fn env qnm@(Qual _ nm) = Map.insert qnm (Qual this_mdl nm) env
+	      fn env (UnQual nm) = env
+
+     -- rename names in the exported declarations to point to things that
+     -- are closer, or maybe even exported by, the current module.
+     (renamed_export_list, missing_names1)
+        = runRnUnqualFM import_env (renameExportItems orig_export_items)
+
+     (final_module_doc, missing_names2)
+        = runRnUnqualFM import_env (renameMaybeDoc orig_module_doc)
+
+	-- we're only interested in reporting missing *qualfied*
+	-- names, the unqualified ones are the ones that couldn't
+	-- be resolved in phase 1 and have already been reported.
+     filtered_missing_names = 
+	filter isQual (missing_names1 ++ missing_names2)
+	where isQual (Qual _ _) = True
+	      isQual _ = False
+
+     missing_names = map show (nub filtered_missing_names)
+   in do
+
+	-- report things that we couldn't link to.  Only do this
+	-- for non-hidden modules.
+   when (OptHide `notElem` iface_options iface &&
+	 not (null missing_names)) $
+	  tell ["Warning: " ++ show this_mdl ++ 
+		": could not find link destinations for:\n"++
+		"   " ++ concat (map (' ':) missing_names)
+		]
+
+   --  trace (show (Map.toAscList import_env)) $ do
+
+   return iface{ iface_exports = renamed_export_list,
+	  	 iface_doc = final_module_doc }
+ }
+
+-- -----------------------------------------------------------------------------
 
 -- Try to generate instance declarations for derived instances.
 -- We can't do this properly without instance inference, but if a type
@@ -782,29 +857,6 @@ all_subs_of_qname _ n@(UnQual _) =
     error $ "Main.all_subs_of_qname: unexpected unqual'd name:" ++ show n
 
 -- ----------------------------------------------------------------------------
--- Get a list of names exported by this module that are not actually
--- documented here, and build a mapping to point to where the
--- documentation for those names can be found.  This is used for
--- constructing the iface_reexports field of the Interface.
-
-getReExports :: Module
-   -> [HsQName]   -- all exported names
-   -> [HsQName]   -- exported names which are documented here
-   -> Map HsQName HsQName
-   -> Map HsName HsQName
-getReExports mdl exported exported_visible import_env
-  = Map.fromList (concat invisible_names)  
-  where
-   invisible_names = [ get_name n | n <- exported, 
-				       n `notElem` exported_visible ]
-
-   get_name (UnQual _) = []
-   get_name n@(Qual m un) = 
-	case Map.lookup n import_env of
-	    Nothing -> []
-	    Just n' -> [(un,n')]
- 
--- ----------------------------------------------------------------------------
 -- Building name environments
 
 -- The orig env maps names in the current source file to
@@ -839,46 +891,6 @@ buildOrigEnv this_mdl verbose mod_map imp_decls
         qual_module
 	  | Just m <- maybe_as = m
 	  | otherwise          = mdl
-
-
--- The import env maps each "original" name referred to in the current
--- module to the qualified name that we want to link to in the
--- documentation.
-
-buildImportEnv :: ModuleMap -> Module
-        -> [HsQName]	   -- a list of names exported from here *with docs*
-	-> [HsImportDecl]  -- the import decls
-	-> Map HsQName HsQName
-buildImportEnv mod_map this_mod exported_names imp_decls
-  = foldr (flip (Map.unionWith (flip best_name))) Map.empty (map build imp_decls)
-  where
-	-- choose qualified results over unqualified ones.  In the future
-	-- we might make more intelligent decisions about which name to
-	-- link to.
-	best_name n@(Qual _ _) _ = n
-	best_name _ n@(Qual _ _) = n
-	best_name n _ = n
-
-	build imp_decl@(HsImportDecl _ mdl _ _ _) = 
-	  case Map.lookup mdl mod_map of
-       	    Nothing    -> Map.empty
-            Just iface -> Map.fromList (map import_map imported_names)
-	     where
-	      imported_names = processImportDecl mod_map imp_decl
-	      reexport_env = iface_reexported iface
-
-	      import_map (nm,qnm) = (qnm, maps_to)
- 	       where 
-		maps_to
-		 -- we re-export it, with docs
-		 | qnm `elem` exported_names = Qual this_mod nm
-		 -- re-exported from the other module, but not documented there:
-		 -- find the right place using the iface_reexported environment.
-		 | Just new_qnm <- Map.lookup nm reexport_env = new_qnm
-		 -- if the destination is hidden, we have nowhere to link to
-		 | OptHide `elem` iface_options iface  = UnQual nm
-		 -- otherwise, it's documented in the other module
-		 | otherwise = Qual mdl nm
 
 
 processImportDecl :: ModuleMap -> HsImportDecl -> [(HsName,HsQName)]
@@ -918,6 +930,49 @@ processImportDecl mod_map (HsImportDecl _ mdl is_qualified maybe_as imp_specs)
 	  case Map.lookup nm env of
 	    Just qnm -> filter (`Map.member` env) (all_subs_of_qname mod_map qnm)
 	    _ -> []
+
+-- -----------------------------------------------------------------------------
+
+-- | Build a mapping which for each original name, points to the "best"
+-- place to link to in the documentation.  For the definition of
+-- "best", we use "the module nearest the bottom of the dependency
+-- graph which exports this name", not including hidden modules.  When
+-- there are multiple choices, we pick a random one.
+-- 
+-- The interfaces are passed in in topologically sorted order, but we start
+-- by reversing the list so we can do a foldl.
+-- 
+buildGlobalDocEnv :: [Interface] -> Map HsQName HsQName
+buildGlobalDocEnv ifaces
+ = foldl upd Map.empty (reverse ifaces)
+ where
+  upd old_env iface
+     | OptHide `elem` iface_options iface
+     = old_env
+     | OptNotDefinitive `elem` iface_options iface
+     = foldl' keep_old old_env exported_names
+     | otherwise
+     = foldl' keep_new old_env exported_names
+     where
+	mdl = iface_module iface
+	exported_names = filter not_reexported (Map.elems (iface_env iface))
+
+	not_reexported (Qual _ n) = n `notElem` iface_reexported iface
+	not_reexported (UnQual n) = n `notElem` iface_reexported iface
+		-- UnQual probably shouldn't happen
+
+	keep_old env qnm = Map.insertWith const qnm (Qual mdl nm) env
+		where nm = nameOfQName qnm
+	keep_new env qnm = Map.insert qnm (Qual mdl nm) env 
+		where nm = nameOfQName qnm
+
+builtinDocEnv = Map.fromList (map (\a -> (a,a)) builtinNames)
+
+-- These names cannot be explicitly exported, so we need to treat
+-- them specially.
+builtinNames = 
+     [unit_tycon_qname, fun_tycon_qname, list_tycon_qname,
+      unit_con_name, nil_con_name]	
 
 -- -----------------------------------------------------------------------------
 -- Expand multiple type signatures
@@ -1039,36 +1094,32 @@ sortModules mdls = mapM for_each_scc sccs
 -- -----------------------------------------------------------------------------
 -- Collect instances and attach them to declarations
 
-attachInstances :: [(Module,Interface)] -> [(Module,Interface)]
+attachInstances :: [Interface] -> [Interface]
 attachInstances mod_ifaces
   = map attach mod_ifaces
   where
   inst_map = collectInstances mod_ifaces
 
-  attach (mod,iface) = (mod, iface{ iface_exports = new_exports })
+  attach iface = iface{ iface_orig_exports = new_exports }
    where
-	new_exports = map attach_export (iface_exports iface)
-
-	rename_insts :: [InstHead] -> [InstHead]
-	rename_insts insts = fst (runRnFM (iface_import_env iface)
-				    (mapM renameInstHead insts))
+	new_exports = map attach_export (iface_orig_exports iface)
 
 	attach_export (ExportDecl nm decl _) =
 	    ExportDecl nm decl (case Map.lookup nm inst_map of
 				  Nothing -> []
-				  Just instheads -> rename_insts instheads)
+				  Just instheads -> instheads)
 	attach_export other_export =
 	    other_export
 
-collectInstances
-   :: [(Module,Interface)]
+collectInstances 
+   :: [Interface]
    -> Map HsQName [InstHead]  -- maps class/type names to instances
 
-collectInstances mod_ifaces
+collectInstances ifaces
   = Map.fromListWith (flip (++)) ty_inst_pairs `Map.union`
     Map.fromListWith (flip (++)) class_inst_pairs
   where
-    all_instances = concat (map (iface_insts.snd) mod_ifaces)
+    all_instances = concat (map iface_insts ifaces)
 
     class_inst_pairs = [ (cls, [(ctxt,(cls,args))])
 		       | HsInstDecl _ ctxt (cls,args) _ <- all_instances ]
@@ -1085,10 +1136,15 @@ collectInstances mod_ifaces
 -- FormatVersion hack to work out which one the interface file contains.
 
 thisFormatVersion :: FormatVersion
-thisFormatVersion = mkFormatVersion 1
+thisFormatVersion = mkFormatVersion 2
 
 -- | How we store interfaces.  Not everything is stored.
-type StoredInterface =
+type StoredInterface2 =
+   (Module,Maybe Doc,Maybe String,Bool,[(HsName,Module)],[HsName],
+      [(HsName,[HsName])])
+
+-- | How we store interfaces.  Not everything is stored.
+type StoredInterface1 =
    (Module,Maybe Doc,Maybe String,Bool,[(HsName,HsQName)],[(HsName,HsQName)],
       [(HsName,[HsName])])
 
@@ -1097,60 +1153,75 @@ type NullVersionStoredInterface =
    (Module,Maybe String,Bool,[(HsName,HsQName)],[(HsName,HsQName)],
       [(HsName,[HsName])])
 
-dumpInterfaces :: [(Module,Interface)] -> FilePath -> IO ()
-dumpInterfaces interfaces fileName =
+dumpInterfaces :: [Interface] -> Map HsQName HsQName -> FilePath -> IO ()
+dumpInterfaces interfaces global_doc_env fileName =
    do
       let
-         preparedInterfaces :: [StoredInterface]
+         preparedInterfaces :: [StoredInterface2]
          preparedInterfaces = map from_interface interfaces
 
       bh <- openBinMem 100000
       put_ bh thisFormatVersion
       put_ bh preparedInterfaces
+      putDocEnv bh global_doc_env
       writeBinMem bh fileName
 
 
-readIface :: FilePath -> IO [(Module,Interface)]
+readIface :: FilePath -> IO ([Interface], Map HsQName HsQName)
 readIface fileName = do
    bh <- readBinMem fileName
    formatVersion <- get bh
-   if formatVersion == thisFormatVersion
-      then
-         do
-            (stuff :: [StoredInterface]) <- get bh
-            return (map to_interface stuff)
-      else
-         if formatVersion == nullFormatVersion
-            then
-               do
-                  (stuff :: [NullVersionStoredInterface]) <- get bh
-                  return (map nullVersion_to_interface stuff)
-               else
-                  do
-                     noDieMsg (
-                        "Warning: The interface file " ++ show fileName 
-                           ++ " could not be read.\n"
-                           ++ "Maybe it's from a later version of Haddock?\n")
-                     return [] 
+   case formatVersion of
+     v | v == thisFormatVersion -> do
+            (stuff :: [StoredInterface2]) <- get bh
+	    doc_env <- getDocEnv bh
+            return (map to_interface2 stuff, doc_env)
+     v | v == mkFormatVersion 1 -> do
+            (stuff :: [StoredInterface1]) <- get bh
+            return (map to_interface1 stuff, Map.empty)
+     v | v == nullFormatVersion -> do
+            (stuff :: [NullVersionStoredInterface]) <- get bh
+            return (map nullVersion_to_interface stuff, Map.empty)
+     otherwise -> do
+            noDieMsg (
+               "Warning: The interface file " ++ show fileName 
+                  ++ " could not be read.\n"
+                  ++ "Maybe it's from a later version of Haddock?\n")
+            return ([], Map.empty)
 
-from_interface :: (Module,Interface) -> StoredInterface
-from_interface (mdl,iface) =
-   (mdl, toDescription iface,iface_package iface,
+from_interface :: Interface -> StoredInterface2
+from_interface iface =
+   (  iface_module iface,
+      toDescription iface,iface_package iface,
       OptHide `elem` iface_options iface,
-      Map.toAscList (iface_env iface), 
-      Map.toAscList (iface_reexported iface),
+      [(n,mdl) | (n,Qual mdl n') <- Map.toAscList (iface_env iface),
+		 if n /= n' then error "help!" else True], 
+      iface_reexported iface,
       Map.toAscList (iface_sub iface)
       )
 
-to_interface :: StoredInterface -> (Module,Interface)
-to_interface (mdl,descriptionOpt,package, hide, env, reexported, sub) = 
-   (mdl, Interface { 
+getDocEnv :: BinHandle -> IO (Map HsQName HsQName)
+getDocEnv bh = do
+   doc_env_list <- get bh
+   return (Map.fromList [(Qual mdl1 nm,Qual mdl2 nm) | 
+			 (mdl1,nm,mdl2) <- doc_env_list])
+
+putDocEnv :: BinHandle -> Map HsQName HsQName -> IO ()
+putDocEnv bh env = do
+   let doc_env_list = 
+	 [(mdl1,nm,mdl2) | (Qual mdl1 nm, Qual mdl2 _) <- Map.toAscList env]
+   put_ bh doc_env_list
+  
+
+to_interface1 :: StoredInterface1 -> Interface
+to_interface1 (mdl,descriptionOpt,package, hide, env, reexported, sub) = 
+   Interface { 
+      iface_module	 = mdl,
       iface_filename     = "",
       iface_package      = package,
       iface_env          = Map.fromList env,
-      iface_import_env   = Map.empty,
       iface_sub          = Map.fromList sub,
-      iface_reexported   = Map.fromList reexported,
+      iface_reexported   = map fst reexported,
       iface_exports      = [],
       iface_orig_exports = [],
       iface_insts        = [],
@@ -1158,17 +1229,36 @@ to_interface (mdl,descriptionOpt,package, hide, env, reexported, sub) =
       iface_info         = toModuleInfo descriptionOpt,
       iface_doc          = Nothing,
       iface_options      = if hide then [OptHide] else []
-      })
+      }
 
-nullVersion_to_interface :: NullVersionStoredInterface -> (Module,Interface)
+to_interface2 :: StoredInterface2 -> Interface
+to_interface2 (mdl,descriptionOpt,package, hide, env, reexported, sub) =
+   Interface { 
+      iface_module	 = mdl,
+      iface_filename     = "",
+      iface_package      = package,
+      iface_env          = 
+	Map.fromList [(n,Qual mdl n) | (n,mdl) <- env],
+      iface_sub          = Map.fromList sub,
+      iface_reexported   = reexported,
+      iface_exports      = [],
+      iface_orig_exports = [],
+      iface_insts        = [],
+      iface_decls        = Map.empty,
+      iface_info         = toModuleInfo descriptionOpt,
+      iface_doc          = Nothing,
+      iface_options      = if hide then [OptHide] else []
+      }
+
+nullVersion_to_interface :: NullVersionStoredInterface -> Interface
 nullVersion_to_interface (mdl, package, hide, env, reexported, sub) = 
-   (mdl, Interface { 
+   Interface { 
+      iface_module	 = mdl,
       iface_filename     = "",
       iface_package      = package,
       iface_env          = Map.fromList env,
-      iface_import_env   = Map.empty,
       iface_sub          = Map.fromList sub,
-      iface_reexported   = Map.fromList reexported,
+      iface_reexported   = map fst reexported,
       iface_exports      = [],
       iface_orig_exports = [],
       iface_insts        = [],
@@ -1176,7 +1266,7 @@ nullVersion_to_interface (mdl, package, hide, env, reexported, sub) =
       iface_info         = emptyModuleInfo,
       iface_doc          = Nothing,
       iface_options      = if hide then [OptHide] else []
-      })
+      }
 
 toModuleInfo :: Maybe Doc -> ModuleInfo
 toModuleInfo descriptionOpt = 

@@ -1,16 +1,6 @@
 -----------------------------------------------------------------------------
 -- bugs
 
-* I've been thinking of a solution along these lines: Haddock
-  processes the modules in two phases.  The first phase resolves all the
-  names and determines the "definitive" documentation for each entity.
-  The second phase makes all the links point to the definitive
-  documentation, with certain exceptions: if the entity is also
-  documented in the local module, then point there instead.  Perhaps
-  there are other exceptions.  We might need a way to indicate
-  "definitive", or maybe just the module(s) furthest up the dependency
-  tree would do.
-
 * The lexer should handle "...." in doc strings, only recognising it if the
   contents looks like a module name.
 
@@ -38,9 +28,6 @@
 
 * derived instance support isn't quite right (doing it properly is 
   hard, though).
-
-* Referring to something that has a defn but no type signature doesn't
-  elicit a useful message.
 
 * The synopsis generated for a module with no docs should not attempt to
   link to the doc for each entity.  We need a different kind of summary

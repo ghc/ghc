@@ -10,11 +10,13 @@ import Data.Maybe ( fromMaybe )
 import Text.PrettyPrint
 
 
-ppDevHelpFile :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> IO ()
+ppDevHelpFile :: FilePath -> String -> Maybe String -> [Interface] -> IO ()
 ppDevHelpFile odir doctitle maybe_package ifaces = do
   let devHelpFile = package++".devhelp"
-      tree = mkModuleTree [ (mod, iface_package iface, toDescription iface)
-			  | (mod, iface) <- ifaces ]
+      tree = mkModuleTree [ (iface_module iface, 
+			     iface_package iface, 
+			     toDescription iface)
+			  | iface <- ifaces ]
       doc =
         text "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>" $$
         (text "<book xmlns=\"http://www.devhelp.net/book\" title=\""<>text doctitle<>
@@ -56,9 +58,10 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
     index :: [(HsName, [Module])]
     index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
 
-    getIfaceIndex (mdl,iface) fm =
+    getIfaceIndex iface fm =
 		Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
-	
+		where mdl = iface_module iface
+
     ppList [] = empty
     ppList ((name,refs):mdls)  =
       ppReference name refs $$

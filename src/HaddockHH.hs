@@ -71,7 +71,7 @@ ppHHContents odir doctitle maybe_package tree = do
 			-- reconstruct the module name
 		
 -------------------------------
-ppHHIndex :: FilePath -> Maybe String -> [(Module,Interface)] -> IO ()
+ppHHIndex :: FilePath -> Maybe String -> [Interface] -> IO ()
 ppHHIndex odir maybe_package ifaces = do
   let indexHHFile = package++".hhk"
   
@@ -93,8 +93,9 @@ ppHHIndex odir maybe_package ifaces = do
 	index :: [(HsName, [Module])]
 	index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
 
-	getIfaceIndex (mdl,iface) fm =
+	getIfaceIndex iface fm =
 		foldl (\m (k,e) -> Map.insertWith (++) k e m) fm [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']
+		where mdl = iface_module iface
 	
 	ppList [] = empty
 	ppList ((name,refs):mdls)  =
@@ -112,7 +113,7 @@ ppHHIndex odir maybe_package ifaces = do
 		ppReference name refs
 
 
-ppHHProject :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> [FilePath] -> IO ()
+ppHHProject :: FilePath -> String -> Maybe String -> [Interface] -> [FilePath] -> IO ()
 ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
   let projectHHFile = package++".hhp"
       doc =
@@ -136,7 +137,8 @@ ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
     package = fromMaybe "pkg" maybe_package
 	
     ppMods [] = empty
-    ppMods ((Module mdl,_):ifaces) =
+    ppMods (iface:ifaces) =
+	let Module mdl = iface_module iface in
         text (moduleHtmlFile mdl) $$
         ppMods ifaces
 		
@@ -161,5 +163,6 @@ ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
     chars :: [Char]
     chars = map fst (Map.toAscList (foldr getIfaceIndex Map.empty ifaces))
 
-    getIfaceIndex (mdl,iface) fm =
+    getIfaceIndex iface fm =
         Map.union (Map.fromList [(toUpper (head (show name)),()) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
+	where mdl = iface_module iface

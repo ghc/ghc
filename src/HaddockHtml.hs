@@ -40,7 +40,7 @@ import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 ppHtml	:: String
 	-> Maybe String				-- package
 	-> Maybe String
-	-> [(Module, Interface)]
+	-> [Interface]
 	-> FilePath			-- destination directory
 	-> Maybe Doc			-- prologue text, maybe
 	-> Maybe String		-- the Html Help format (--html-help)
@@ -52,11 +52,11 @@ ppHtml doctitle maybe_package source_url ifaces odir prologue maybe_html_help_fo
 	maybe_contents_url maybe_index_url =  do
   let
 	visible_ifaces = filter visible ifaces
-	visible (_, i) = OptHide `notElem` iface_options i
+	visible i = OptHide `notElem` iface_options i
 
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_url 
-	[ (m,iface{iface_package=Nothing}) | (m,iface) <- visible_ifaces ]
+	[ iface{iface_package=Nothing} | iface <- visible_ifaces ]
 	-- we don't want to display the packages in a single-package contents
 	prologue
 
@@ -72,7 +72,7 @@ ppHtml doctitle maybe_package source_url ifaces odir prologue maybe_html_help_fo
 ppHtmlHelpFiles	
     :: String                   -- doctitle
     -> Maybe String				-- package
-	-> [(Module, Interface)]
+	-> [Interface]
 	-> FilePath                 -- destination directory
 	-> Maybe String             -- the Html Help format (--html-help)
 	-> [FilePath]               -- external packages paths
@@ -80,7 +80,7 @@ ppHtmlHelpFiles
 ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_paths =  do
   let
 	visible_ifaces = filter visible ifaces
-	visible (_, i) = OptHide `notElem` iface_options i
+	visible i = OptHide `notElem` iface_options i
 
   -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
@@ -217,12 +217,14 @@ ppHtmlContents
    -> Maybe String
    -> Maybe String
    -> Maybe String
-   -> [(Module,Interface)] -> Maybe Doc
+   -> [Interface] -> Maybe Doc
    -> IO ()
 ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_url
   mdls prologue = do
   let tree = mkModuleTree 
-         [(mod,iface_package iface,toDescription iface) | (mod,iface) <- mdls]
+         [(iface_module iface,
+	   iface_package iface,
+	   toDescription iface) | iface <- mdls]
       html = 
 	header 
 		(documentCharacterEncoding +++
@@ -313,7 +315,7 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> Maybe String
             -> Maybe String
-            -> [(Module,Interface)] 
+            -> [Interface] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_url ifaces = do
   let html = 
@@ -386,10 +388,11 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
   full_index = Map.fromListWith (flip (Map.unionWith (++)))
 		(concat (map getIfaceIndex ifaces))
 
-  getIfaceIndex (mdl,iface) = 
+  getIfaceIndex iface = 
     [ (hsNameStr nm, 
-	Map.fromList [(orig, [(mdl, not (nm `Map.member` iface_reexported iface))])])
+	Map.fromList [(orig, [(mdl, not (nm `elem` iface_reexported iface))])])
     | (nm, orig) <- Map.toAscList (iface_env iface) ]
+    where mdl = iface_module iface
 
   indexElt :: (String, Map HsQName [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
@@ -433,10 +436,12 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
 
 ppHtmlModule
 	:: FilePath -> String -> Maybe String -> Maybe String -> Maybe String
-	-> (Module,Interface) -> IO ()
+	-> Interface -> IO ()
 ppHtmlModule odir doctitle source_url 
-  maybe_contents_url maybe_index_url (Module mdl,iface) = do
-  let html = 
+  maybe_contents_url maybe_index_url iface = do
+  let 
+      Module mdl = iface_module iface
+      html = 
 	header (documentCharacterEncoding +++
 		thetitle (toHtml mdl) +++
 		styleSheet +++

@@ -34,13 +34,13 @@ insert :: Ord k => k -> a -> Map k a -> Map k a
 insert k a m = addToFM m k a
 
 insertWith :: Ord k => (a -> a -> a) -> k -> a -> Map k a -> Map k a
-insertWith c k a m = addToFM_C c m k a
+insertWith c k a m = addToFM_C (flip c) m k a
 
 union :: Ord k => Map k a -> Map k a -> Map k a
 union = flip plusFM
 
 unionWith :: Ord k => (a -> a -> a) -> Map k a -> Map k a -> Map k a
-unionWith c l r = plusFM_C c r l
+unionWith c l r = plusFM_C (flip c) r l
 
 unions :: Ord k => [Map k a] -> Map k a
 unions = foldl (flip plusFM) emptyFM

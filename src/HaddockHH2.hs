@@ -56,7 +56,7 @@ ppHH2Contents odir doctitle maybe_package tree = do
 
 -----------------------------------------------------------------------------------
 
-ppHH2Index :: FilePath -> Maybe String -> [(Module,Interface)] -> IO ()
+ppHH2Index :: FilePath -> Maybe String -> [Interface] -> IO ()
 ppHH2Index odir maybe_package ifaces = do
   let 
 	indexKHH2File     = package++"K.HxK"
@@ -83,8 +83,9 @@ ppHH2Index odir maybe_package ifaces = do
 	index :: [(HsName, [Module])]
 	index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
 
-	getIfaceIndex (mdl,iface) fm =
+	getIfaceIndex iface fm =
 	    Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
+	    where mdl = iface_module iface
 	
 	ppList [] = empty
 	ppList ((name,mdls):vs)  =
@@ -98,7 +99,7 @@ ppHH2Index odir maybe_package ifaces = do
 
 -----------------------------------------------------------------------------------
 
-ppHH2Files :: FilePath -> Maybe String -> [(Module,Interface)] -> [FilePath] -> IO ()
+ppHH2Files :: FilePath -> Maybe String -> [Interface] -> [FilePath] -> IO ()
 ppHH2Files odir maybe_package ifaces pkg_paths = do
   let filesHH2File = package++".HxF"
       doc =
@@ -116,9 +117,10 @@ ppHH2Files odir maybe_package ifaces pkg_paths = do
     package = fromMaybe "pkg" maybe_package
 	
     ppMods [] = empty
-    ppMods ((Module mdl,_):ifaces) =
+    ppMods (iface:ifaces) =
 		text "<File Url=\"" <> text (moduleHtmlFile mdl) <> text "\"/>" $$
 		ppMods ifaces
+		where Module mdl = iface_module iface
 		
     ppIndexFiles []     = empty
     ppIndexFiles (c:cs) =
@@ -141,8 +143,9 @@ ppHH2Files odir maybe_package ifaces pkg_paths = do
     chars :: [Char]
     chars = map fst (Map.toAscList (foldr getIfaceIndex Map.empty ifaces))
 
-    getIfaceIndex (mdl,iface) fm =
+    getIfaceIndex iface fm =
         Map.union (Map.fromList [(toUpper (head (show name)),()) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
+	where mdl = iface_module iface
 
 -----------------------------------------------------------------------------------
 

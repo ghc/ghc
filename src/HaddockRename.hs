@@ -5,7 +5,7 @@
 --
 
 module HaddockRename (
-	RnM, runRn, runRnFM,	-- the monad (instance of Monad)
+	RnM, runRn, runRnFM, runRnUnqualFM, -- the monad (instance of Monad)
 
 	renameExportList, 
 	renameDecl,
@@ -14,6 +14,7 @@ module HaddockRename (
   ) where
 
 import HaddockTypes
+import HaddockUtil	( unQual )
 import HsSyn
 import Map ( Map )
 import qualified Map hiding ( Map )
@@ -27,7 +28,10 @@ import Monad
 -- renaming, and it returns a list of names which couldn't be found in 
 -- the environment.
 
-newtype GenRnM n a = RnM {unRn :: (n -> Maybe HsQName) -> (a,[n])}
+newtype GenRnM n a = 
+  RnM { unRn :: (n -> (Bool,HsQName))	-- name lookup function
+             -> (a,[n])
+      }
 
 type RnM a = GenRnM HsQName a
 
@@ -42,7 +46,7 @@ m `thenRn` k = RnM (\lkp -> case unRn m lkp of
 				(a,out1) -> case unRn (k a) lkp of
 						(b,out2) -> (b,out1++out2))
 
-getLookupRn :: RnM (HsQName -> Maybe HsQName)
+getLookupRn :: RnM (HsQName -> (Bool,HsQName))
 getLookupRn = RnM (\lkp -> (lkp,[]))
 outRn :: HsQName -> RnM ()
 outRn name = RnM (\_ -> ((),[name]))
@@ -51,13 +55,24 @@ lookupRn :: (HsQName -> a) -> HsQName -> RnM a
 lookupRn and_then name = do
   lkp <- getLookupRn
   case lkp name of
-	Nothing -> do outRn name; return (and_then name)
-	Just maps_to -> return (and_then maps_to)
+	(False,maps_to) -> do outRn name; return (and_then maps_to)
+	(True, maps_to) -> return (and_then maps_to)
 
 runRnFM :: Map HsQName HsQName -> RnM a -> (a,[HsQName])
-runRnFM env rn = unRn rn (flip Map.lookup env)
+runRnFM env rn = unRn rn lkp 
+  where lkp n = case Map.lookup n env of
+		  Nothing -> (False, n) -- leave the qualified name
+		  Just q  -> (True,  q)
 
-runRn :: (n -> Maybe HsQName) -> GenRnM n a -> (a,[n])
+-- like runRnFM, but if it can't find a mapping for a name,
+-- it leaves an unqualified name in place instead.
+runRnUnqualFM :: Map HsQName HsQName -> RnM a -> (a,[HsQName])
+runRnUnqualFM env rn = unRn rn lkp 
+  where lkp n = case Map.lookup n env of
+		  Nothing -> (False, unQual n) -- remove the qualifier
+		  Just q  -> (True, q)
+
+runRn :: (n -> (Bool,HsQName)) -> GenRnM n a -> (a,[n])
 runRn lkp rn = unRn rn lkp
 
 -- -----------------------------------------------------------------------------
@@ -230,7 +245,7 @@ renameMaybeDoc (Just doc) = Just `liftM` renameDoc doc
 lookupForDoc :: [HsQName] -> RnM Doc
 lookupForDoc qns = do
   lkp <- getLookupRn
-  case [ n | Just n <- map lkp qns ] of
+  case [ n | (True,n) <- map lkp qns ] of
 	ns@(_:_) -> return (DocIdentifier ns)
 	[] -> -- if we were given a qualified name, but there's nothing
 	      -- matching that name in scope, then just assume its existence
@@ -239,7 +254,8 @@ lookupForDoc qns = do
 	      let quals = filter isQualified qns in
 	      if (not (null quals)) then
 		return (DocIdentifier quals)
-	      else
+	      else do
+		outRn (head qns)
 		-- no qualified names: just replace this name with its
 		-- string representation.
 		return (DocString (show (head qns)))

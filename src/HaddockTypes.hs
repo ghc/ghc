@@ -25,14 +25,14 @@ data Interface
 	iface_filename :: FilePath,
 		-- ^ the filename that contains the source code for this module
 
+	iface_module :: Module,
+
 	iface_package :: Maybe String,
 
 	iface_env :: NameEnv,
-		-- ^ environment mapping names to *original* names
+		-- ^ environment mapping exported names to *original* names
 
-	iface_import_env :: Map HsQName HsQName,
-
-	iface_reexported :: NameEnv,
+	iface_reexported :: [HsName],
 		-- ^ For names exported by this module, but not
 		-- actually documented in this module's documentation
 		-- (perhaps because they are reexported via 'module M'
@@ -69,7 +69,12 @@ data Interface
 		-- ^ module-wide doc options
   }
 
-data DocOption = OptHide | OptPrune | OptIgnoreExports 
+data DocOption
+  = OptHide		-- this module should not appear in the docs
+  | OptPrune
+  | OptIgnoreExports	-- pretend everything is exported
+  | OptNotDefinitive	-- not the best place to get docs for things
+		 	-- exported by this module.
   deriving (Eq)
 
 data ExportItem 
