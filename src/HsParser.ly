@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.9 2002/05/08 14:48:41 simonmar Exp $
+$Id: HsParser.ly,v 1.10 2002/05/09 12:43:06 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -298,7 +298,7 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| topdecl			{ [$1] }
 
 > topdecl :: { HsDecl }
->	: 'type' simpletype srcloc '=' type	
+>	: 'type' simpletype srcloc '=' ctype
 >			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
 >	| 'data' ctype srcloc constrs deriving
 >			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
