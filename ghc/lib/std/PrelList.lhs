@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.25 2001/07/31 10:48:02 simonmar Exp $
+% $Id: PrelList.lhs,v 1.26 2001/08/28 15:07:58 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -447,10 +447,10 @@ concat = foldr (++) []
 -- List index (subscript) operator, 0-origin
 (!!)                    :: [a] -> Int -> a
 #ifdef USE_REPORT_PRELUDE
-(x:_)  !! 0             =  x
-(_:xs) !! n | n > 0     =  xs !! (minusInt n 1)
-(_:_)  !! _             =  error "Prelude.(!!): negative index"
-[]     !! _             =  error "Prelude.(!!): index too large"
+xs     !! n | n < 0 =  error "Prelude.!!: negative index"
+[]     !! _         =  error "Prelude.!!: index too large"
+(x:_)  !! 0         =  x
+(_:xs) !! n         =  xs !! (n-1)
 #else
 -- HBC version (stolen), then unboxified
 -- The semantics is not quite the same for error conditions
