@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.183 2001/08/08 13:21:04 qrczak Exp $
+# $Id: Makefile,v 1.184 2001/08/15 09:33:41 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -62,6 +62,10 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_CP               = \"$(GHC_CP)\"" >> $(CONFIG_HS)
 	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $(CONFIG_HS)
+ifeq ($(GhcWithIlx),YES)
+	@echo "cILX2IL               = \"$(ILX2IL)\"" >> $(CONFIG_HS)
+	@echo "cILASM                = \"$(ILASM)\"" >> $(CONFIG_HS)
+endif
 	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $(CONFIG_HS)
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> $(CONFIG_HS)
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
