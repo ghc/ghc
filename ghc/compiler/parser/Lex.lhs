@@ -127,6 +127,7 @@ data Token
   | ITlabel
   | ITdynamic
   | ITsafe
+  | ITthreadsafe
   | ITunsafe
   | ITwith
   | ITstdcallconv
@@ -305,6 +306,7 @@ isSpecial ITexport    	= True
 isSpecial ITlabel     	= True
 isSpecial ITdynamic   	= True
 isSpecial ITsafe    	= True
+isSpecial ITthreadsafe 	= True
 isSpecial ITunsafe    	= True
 isSpecial ITwith      	= True
 isSpecial ITccallconv   = True
@@ -320,15 +322,16 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "label",	ITlabel ),
 	( "dynamic",	ITdynamic ),
 	( "safe",	ITsafe ),
+	( "threadsafe",	ITthreadsafe ),
 	( "unsafe",	ITunsafe ),
 	( "with",	ITwith ),
 	( "stdcall",    ITstdcallconv),
 	( "ccall",      ITccallconv),
 	( "dotnet",     ITdotnet),
         ("_ccall_",	ITccall (False, False, PlayRisky)),
-        ("_ccall_GC_",	ITccall (False, False, PlaySafe)),
+        ("_ccall_GC_",	ITccall (False, False, PlaySafe False)),
         ("_casm_",	ITccall (False, True,  PlayRisky)),
-        ("_casm_GC_",	ITccall (False, True,  PlaySafe)),
+        ("_casm_GC_",	ITccall (False, True,  PlaySafe False)),
 
 	-- interface keywords
         ("__interface",		ITinterface),
@@ -363,13 +366,13 @@ ghcExtensionKeywordsFM = listToUFM $
         ("__U",			ITunfold),
 	
         ("__ccall",		ITccall (False, False, PlayRisky)),
-        ("__ccall_GC",		ITccall (False, False, PlaySafe)),
+        ("__ccall_GC",		ITccall (False, False, PlaySafe False)),
         ("__dyn_ccall",		ITccall (True,  False, PlayRisky)),
-        ("__dyn_ccall_GC",	ITccall (True,  False, PlaySafe)),
+        ("__dyn_ccall_GC",	ITccall (True,  False, PlaySafe False)),
         ("__casm",		ITccall (False, True,  PlayRisky)),
         ("__dyn_casm",		ITccall (True,  True,  PlayRisky)),
-        ("__casm_GC",		ITccall (False, True,  PlaySafe)),
-        ("__dyn_casm_GC",	ITccall (True,  True,  PlaySafe)),
+        ("__casm_GC",		ITccall (False, True,  PlaySafe False)),
+        ("__dyn_casm_GC",	ITccall (True,  True,  PlaySafe False)),
 
         ("/\\",			ITbiglam)
      ]

@@ -6,7 +6,7 @@
 \begin{code}
 module ForeignCall (
 	ForeignCall(..),
-	Safety(..), playSafe,
+	Safety(..), playSafe, playThreadSafe,
 
 	CExportSpec(..),
 	CCallSpec(..), 
@@ -52,6 +52,10 @@ data Safety
   = PlaySafe		-- Might invoke Haskell GC, or do a call back, or
 			-- switch threads, etc.  So make sure things are
 			-- tidy before the call
+	Bool            -- => True, external function is also re-entrant.
+			--    [if supported, RTS arranges for the external call
+			--    to be executed by a separate OS thread, i.e.,
+			--    _concurrently_ to the execution of other Haskell threads.]
 
   | PlayRisky		-- None of the above can happen; the call will return
 			-- without interacting with the runtime system at all
@@ -59,11 +63,17 @@ data Safety
 	-- Show used just for Show Lex.Token, I think
 
 instance Outputable Safety where
-  ppr PlaySafe  = ptext SLIT("safe")
+  ppr (PlaySafe False) = ptext SLIT("safe")
+  ppr (PlaySafe True)  = ptext SLIT("threadsafe")
   ppr PlayRisky = ptext SLIT("unsafe")
 
-playSafe PlaySafe  = True
-playSafe PlayRisky = False
+playSafe :: Safety -> Bool
+playSafe PlaySafe{} = True
+playSafe PlayRisky  = False
+
+playThreadSafe :: Safety -> Bool
+playThreadSafe (PlaySafe x) = x
+playThreadSafe _ = False
 \end{code}
 
 

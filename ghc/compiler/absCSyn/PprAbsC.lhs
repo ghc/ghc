@@ -26,7 +26,8 @@ import AbsCUtils	( getAmodeRep, nonemptyAbsC,
 			  mixedPtrLocn, mixedTypeLocn
 			)
 
-import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe, ccallConvAttribute )
+import ForeignCall	( CCallSpec(..), CCallTarget(..), playSafe,
+			  playThreadSafe, ccallConvAttribute )
 import CLabel		( externallyVisibleCLabel,
 			  needsCDecl, pprCLabel,
 			  mkReturnInfoLabel, mkReturnPtLabel, mkClosureTblLabel,
@@ -937,11 +938,14 @@ pprFCall call@(CCall (CCallSpec target cconv safety)) uniq args results vol_regs
     ]
   where
     (pp_saves, pp_restores) = ppr_vol_regs vol_regs
+
+    thread_macro_args = ppr_uniq_token <> comma <+> 
+    		        text "rts" <> ppr (playThreadSafe safety)
     ppr_uniq_token = text "tok_" <> ppr uniq
     (pp_save_context, pp_restore_context)
 	| playSafe safety = ( text "{ I_" <+> ppr_uniq_token <> 
-				text "; SUSPEND_THREAD" <> parens ppr_uniq_token <> semi
-			    , text "RESUME_THREAD" <> parens ppr_uniq_token <> text ";}"
+				text "; SUSPEND_THREAD" <> parens thread_macro_args <> semi
+			    , text "RESUME_THREAD" <> parens thread_macro_args <> text ";}"
 			    )
 	| otherwise = (	pp_basic_saves $$ pp_saves,
 			pp_basic_restores $$ pp_restores)

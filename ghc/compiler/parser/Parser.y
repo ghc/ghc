@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.89 2002/02/13 15:19:19 simonpj Exp $
+$Id: Parser.y,v 1.90 2002/02/15 22:13:33 sof Exp $
 
 Haskell grammar.
 
@@ -111,15 +111,16 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
  'label'	{ ITlabel } 
  'dynamic'	{ ITdynamic }
  'safe'		{ ITsafe }
+ 'threadsafe'	{ ITthreadsafe }
  'unsafe'	{ ITunsafe }
  'with' 	{ ITwith }
  'stdcall'      { ITstdcallconv }
  'ccall'        { ITccallconv }
  'dotnet'       { ITdotnet }
  '_ccall_'	{ ITccall (False, False, PlayRisky) }
- '_ccall_GC_'	{ ITccall (False, False, PlaySafe)  }
+ '_ccall_GC_'	{ ITccall (False, False, PlaySafe False) }
  '_casm_'	{ ITccall (False, True,  PlayRisky) }
- '_casm_GC_'	{ ITccall (False, True,  PlaySafe)  }
+ '_casm_GC_'	{ ITccall (False, True,  PlaySafe False) }
 
  '{-# SPECIALISE'  { ITspecialise_prag }
  '{-# SOURCE'	   { ITsource_prag }
@@ -515,7 +516,7 @@ deprecation :: { RdrBinding }
 --
 fdecl :: { RdrNameHsDecl }
 fdecl : srcloc 'import' callconv safety1 fspec	{% mkImport $3 $4       $5 $1 }
-      | srcloc 'import' callconv         fspec	{% mkImport $3 PlaySafe $4 $1 }
+      | srcloc 'import' callconv         fspec	{% mkImport $3 (PlaySafe False) $4 $1 }
       | srcloc 'export'	callconv         fspec  {% mkExport $3          $4 $1 }
         -- the following syntax is DEPRECATED
       | srcloc fdecl1DEPRECATED			{ ForD ($2 True $1) }
@@ -525,7 +526,7 @@ fdecl1DEPRECATED :: { Bool -> SrcLoc -> ForeignDecl RdrName }
 fdecl1DEPRECATED 
   ----------- DEPRECATED label decls ------------
   : 'label' ext_name varid '::' sigtype
-    { ForeignImport $3 $5 (CImport defaultCCallConv PlaySafe _NIL_ _NIL_ 
+    { ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) _NIL_ _NIL_ 
 				   (CLabel ($2 `orElse` mkExtName $3))) }
 
   ----------- DEPRECATED ccall/stdcall decls ------------
@@ -595,7 +596,7 @@ fdecl1DEPRECATED
     -- DEPRECATED variant #8: use of the special identifier `dynamic' without
     --			      an explicit calling convention (export)
   | 'export' {-no callconv-} 'dynamic' varid '::' sigtype
-    { ForeignImport $3 $5 (CImport defaultCCallConv PlaySafe _NIL_ _NIL_ 
+    { ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) _NIL_ _NIL_ 
 				   CWrapper) }
 
     -- DEPRECATED variant #9: use of the special identifier `dynamic' (export)
@@ -603,7 +604,7 @@ fdecl1DEPRECATED
     {% case $2 of
          DNCall      -> parseError "Illegal format of .NET foreign import"
 	 CCall cconv -> returnP $
-	   ForeignImport $4 $6 (CImport cconv PlaySafe _NIL_ _NIL_ CWrapper) }
+	   ForeignImport $4 $6 (CImport cconv (PlaySafe False) _NIL_ _NIL_ CWrapper) }
 
   ----------- DEPRECATED .NET decls ------------
   -- NB: removed the .NET call declaration, as it is entirely subsumed
@@ -624,12 +625,14 @@ callconv :: { CallConv }
 
 safety :: { Safety }
 	: 'unsafe'			{ PlayRisky }
-	| 'safe'			{ PlaySafe  }
-	| {- empty -}			{ PlaySafe  }
+	| 'safe'			{ PlaySafe False }
+	| 'threadsafe'			{ PlaySafe True  }
+	| {- empty -}			{ PlaySafe False }
 
 safety1 :: { Safety }
 	: 'unsafe'			{ PlayRisky }
-	| 'safe'			{ PlaySafe  }
+	| 'safe'			{ PlaySafe  False }
+	| 'threadsafe'			{ PlaySafe  True }
 	  -- only needed to avoid conflicts with the DEPRECATED rules
 
 fspec :: { (FAST_STRING, RdrName, RdrNameHsType) }
@@ -897,9 +900,9 @@ exp10 :: { RdrNameHsExpr }
 						   returnP (HsDo DoExpr stmts $1) }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False placeHolderType }
-	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 PlaySafe  False placeHolderType }
+	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 (PlaySafe False) False placeHolderType }
 	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 PlayRisky True  placeHolderType }
-	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 PlaySafe  True  placeHolderType }
+	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 (PlaySafe False) True  placeHolderType }
 
         | scc_annot exp		    		{ if opt_SccProfilingOn
 							then HsSCC $1 $2

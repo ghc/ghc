@@ -26,7 +26,7 @@ import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkEMPTY_MVAR_infoLabel,
 			  mkForeignLabel )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..),
-			  CCallConv(..), playSafe )
+			  CCallConv(..), playSafe, playThreadSafe )
 import Outputable
 import FastTypes
 
@@ -70,18 +70,22 @@ foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
   = returnUs (\xs -> ccall : xs)
 
   | otherwise
-  = save_thread_state	`thenUs` \ save ->
-    load_thread_state	`thenUs` \ load -> 
-    getUniqueUs		`thenUs` \ uniq -> 
+  = save_thread_state `thenUs` \ save ->
+    load_thread_state `thenUs` \ load -> 
+    getUniqueUs	      `thenUs` \ uniq -> 
     let
        id  = StixTemp (StixVReg uniq IntRep)
+       
+       is_threadSafe
+        | playThreadSafe safety = 1
+	| otherwise             = 0
     
        suspend = StAssignReg IntRep id 
    		 (StCall (Left SLIT("suspendThread")) {-no:cconv-} CCallConv
-                         IntRep [StReg stgBaseReg])
+                         IntRep [StReg stgBaseReg, StInt is_threadSafe ])
        resume  = StVoidable 
                  (StCall (Left SLIT("resumeThread")) {-no:cconv-} CCallConv
-                         VoidRep [StReg id])
+                         VoidRep [StReg id, StInt is_threadSafe ])
     in
     returnUs (\xs -> save (suspend : ccall : resume : load xs))
 

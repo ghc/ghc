@@ -401,7 +401,7 @@ flatAbsC stmt@(COpStmt results (StgPrimOp op) args vol_regs)
                 []
                 (StgFCallOp
                     (CCall (CCallSpec (CasmTarget (_PK_ (mktxt op_str))) 
-                                      defaultCCallConv PlaySafe))
+                                      defaultCCallConv (PlaySafe False)))
                     uu
                 )
                 [CReg VoidReg]
