@@ -10,21 +10,14 @@ import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_cpranal )
 import CoreLint		( beginPass, endPass )
 import CoreSyn
 import CoreUtils	( exprIsValue )
-import CoreUnfold	( maybeUnfoldingTemplate )
-import Var		( Var, Id, TyVar, idType, varName, varType )
 import Id               ( setIdCprInfo, idCprInfo, idArity,
 			  isBottomingId )
 import IdInfo           ( CprInfo(..) )
 import VarEnv
-import Type             ( Type, splitFunTys, splitFunTy_maybe, splitForAllTys )
-import TyCon            ( isNewTyCon, isUnLiftedTyCon )
-import DataCon          ( dataConTyCon )
-import Util		( zipEqual, zipWithEqual, nTimes, mapAccumL )
+import Util		( nTimes, mapAccumL )
 import Outputable
 
-import UniqFM (ufmToList)
 import Maybe
-import PprType( pprType )	-- Only called in debug messages
 \end{code}
 
 This module performs an analysis of a set of Core Bindings for the
