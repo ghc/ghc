@@ -20,6 +20,7 @@ dnl * Declare subdirectories that have a private configure script
 dnl
 dnl After the toplevel configuration is complete, the script will recurse into
 dnl these subdirectories (the use of cache values makes repeated checks cheap)
+dnl (We probably have to add hslibs/{OpenGL,GLUT} here later...)
 AC_CONFIG_SUBDIRS(ghc)
 
 # -------------------------------------------------------------------------
@@ -414,6 +415,36 @@ if test x"$EnableWin32DLLs" = "xYES" ; then
  AC_DEFINE(HAVE_WIN32_DLL_SUPPORT)
 fi
 
+dnl ** Enable the building of the OpenGL/GLUT binding in hslibs?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(hopengl,
+[  --enable-hopengl
+        Build HOpenGL, a Haskell binding for OpenGL/GLUT, too.
+        (This option is only relevant when hslibs are built.)
+],
+[GhcLibsWithHOpenGL=YES],
+[GhcLibsWithHOpenGL=NO]
+)
+AC_SUBST(GhcLibsWithHOpenGL)
+
+dnl ** Use a specific version of the GLUT API
+dnl --------------------------------------------------------------
+AC_ARG_WITH(glut-api,
+[  --with-glut-api=<version>
+        Use a specific version of the GLUT API when building HOpenGL.
+])
+test -n "$with_glut_api"  && CPPFLAGS="$CPPFLAGS -DGLUT_API_VERSION=$with_glut_api"
+
+
+dnl ** Use a specific version of the GLUT API
+dnl --------------------------------------------------------------
+AC_ARG_WITH(glut-xlib,
+[  --with-glut-xlib=<version>
+        Use a specific version of the GLUT Xlib implementation when building HOpenGL.
+])
+test -n "$with_glut_xlib" && CPPFLAGS="$CPPFLAGS -DGLUT_XLIB_IMPLEMENTATION=$with_glut_xlib"
+
+
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
@@ -562,7 +593,12 @@ dnl ** check for DOS include files
 AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
 
 dnl ** check for Windows include files
+if test $GhcLibsWithHOpenGL = YES ; then
 AC_CHECK_HEADERS(windows.h)
+fi
+
+dnl ** check for OpenGL include files
+AC_CHECK_HEADERS(GL/gl.h)
 
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
@@ -654,6 +690,24 @@ dnl Int32 is a HACK for non-ISO C compilers
 FPTOOLS_CHECK_HTYPE(sig_atomic_t, Int32)
 FPTOOLS_CHECK_HTYPE(clock_t)
 FPTOOLS_CHECK_HTYPE(time_t)
+
+dnl ** Map OpenGL data types to Haskell types
+if test $GhcLibsWithHOpenGL = YES ; then
+FPTOOLS_CHECK_HTYPE(GLboolean)
+FPTOOLS_CHECK_HTYPE(GLbyte)
+FPTOOLS_CHECK_HTYPE(GLubyte)
+FPTOOLS_CHECK_HTYPE(GLshort)
+FPTOOLS_CHECK_HTYPE(GLushort)
+FPTOOLS_CHECK_HTYPE(GLint)
+FPTOOLS_CHECK_HTYPE(GLuint)
+FPTOOLS_CHECK_HTYPE(GLsizei)
+FPTOOLS_CHECK_HTYPE(GLenum)
+FPTOOLS_CHECK_HTYPE(GLbitfield)
+FPTOOLS_CHECK_HTYPE(GLfloat)
+FPTOOLS_CHECK_HTYPE(GLclampf)
+FPTOOLS_CHECK_HTYPE(GLdouble)
+FPTOOLS_CHECK_HTYPE(GLclampd)
+fi
 
 dnl ** can we open files in binary mode?
 FPTOOLS_O_BINARY

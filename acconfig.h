@@ -90,11 +90,11 @@
 /* Define if time.h or sys/time.h define the timezone variable */
 #undef HAVE_TIMEZONE
 
-/* Define if you have the WinExec function.  */
-#define HAVE_WINEXEC 0
-
 /* Define if you support the production (and use) of Win32 DLLs. */
 #undef HAVE_WIN32_DLL_SUPPORT
+
+/* Define if you have the WinExec function.  */
+#define HAVE_WINEXEC 0
 
 /* Define to Haskell type for char */
 #undef HTYPE_CHAR
@@ -107,6 +107,48 @@
 
 /* Define to Haskell type for float */
 #undef HTYPE_FLOAT
+
+/* Define to Haskell type for GLbitfield */
+#undef HTYPE_GLBITFIELD
+
+/* Define to Haskell type for GLboolean */
+#undef HTYPE_GLBOOLEAN
+
+/* Define to Haskell type for GLbyte */
+#undef HTYPE_GLBYTE
+
+/* Define to Haskell type for GLclampd */
+#undef HTYPE_GLCLAMPD
+ 
+/* Define to Haskell type for GLclampf */
+#undef HTYPE_GLCLAMPF
+
+/* Define to Haskell type for GLdouble */
+#undef HTYPE_GLDOUBLE
+
+/* Define to Haskell type for GLenum */
+#undef HTYPE_GLENUM
+
+/* Define to Haskell type for GLfloat */
+#undef HTYPE_GLFLOAT
+
+/* Define to Haskell type for GLint */
+#undef HTYPE_GLINT
+
+/* Define to Haskell type for GLshort */
+#undef HTYPE_GLSHORT
+
+/* Define to Haskell type for GLsizei */
+#undef HTYPE_GLSIZEI
+
+/* Define to Haskell type for GLubyte */
+#undef HTYPE_GLUBYTE
+
+/* Define to Haskell type for GLuint */
+#undef HTYPE_GLUINT
+
+/* Define to Haskell type for GLushort */
+#undef HTYPE_GLUSHORT
 
 /* Define to Haskell type for int */
 #undef HTYPE_INT

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.55 2000/07/13 09:17:57 michaelw Exp $
+dnl $Id: aclocal.m4,v 1.56 2000/09/10 17:39:26 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -467,6 +467,9 @@ AC_CACHE_VAL(AC_CV_NAME,
 #ifdef HAVE_TIME_H
 #include <time.h>
 #endif
+#ifdef HAVE_GL_GL_H
+#include <GL/gl.h>
+#endif
 
 typedef $1 testing;
 
@@ -754,5 +757,223 @@ if test $fptools_cv_sgml_catalog != "no"; then
 fi
 ])
 
+dnl ######################################################################
+dnl FPTOOLS_SEARCH_LIBS(INCLUDES, FUNCTION, SEARCH-LIBS [, ACTION-IF-FOUND
+dnl                     [, ACTION-IF-NOT-FOUND [, OTHER-LIBRARIES]]])
+dnl Search for a library defining FUNC, if it's not already available.
+dnl This is almost the same as AC_SEARCH_LIBS, but the INCLUDES can be
+dnl specified.
+dnl ######################################################################
+
+AC_DEFUN(FPTOOLS_SEARCH_LIBS,
+[AC_PREREQ([2.13])
+AC_CACHE_CHECK([for library containing $2], [ac_cv_search_$2],
+[ac_func_search_save_LIBS="$LIBS"
+ac_cv_search_$2="no"
+AC_TRY_LINK([$1], [$2()], [ac_cv_search_$2="none required"])
+test "$ac_cv_search_$2" = "no" && for i in $3; do
+LIBS="-l$i $6 $ac_func_search_save_LIBS"
+AC_TRY_LINK([$1], [$2()],
+[ac_cv_search_$2="-l$i"
+break])
+done
+LIBS="$ac_func_search_save_LIBS"])
+if test "$ac_cv_search_$2" != "no"; then
+  test "$ac_cv_search_$2" = "none required" || LIBS="$ac_cv_search_$2 $LIBS"
+  $4
+else :
+  $5
+fi])
+
+dnl ####################### -*- Mode: M4 -*- ###########################
+dnl Copyright (C) 98, 1999 Matthew D. Langston <langston@SLAC.Stanford.EDU>
+dnl
+dnl This file is free software; you can redistribute it and/or modify it
+dnl under the terms of the GNU General Public License as published by
+dnl the Free Software Foundation; either version 2 of the License, or
+dnl (at your option) any later version.
+dnl
+dnl This file is distributed in the hope that it will be useful, but
+dnl WITHOUT ANY WARRANTY; without even the implied warranty of
+dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+dnl General Public License for more details.
+dnl
+dnl You should have received a copy of the GNU General Public License
+dnl along with this file; if not, write to:
+dnl
+dnl   Free Software Foundation, Inc.
+dnl   Suite 330
+dnl   59 Temple Place
+dnl   Boston, MA 02111-1307, USA.
+dnl ####################################################################
+
+
+dnl @synopsis FPTOOLS_CHECK_LIBM
+dnl 
+dnl Search for math library (typically -lm).
+dnl
+dnl The variable LIBM (which is not an output variable by default) is
+dnl set to a value which is suitable for use in a Makefile (for example,
+dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
+dnl
+dnl @version 0.01 $Id: aclocal.m4,v 1.56 2000/09/10 17:39:26 panne Exp $
+dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
+
+# FPTOOLS_CHECK_LIBM - check for math library
+AC_DEFUN(FPTOOLS_CHECK_LIBM,
+[AC_REQUIRE([AC_CANONICAL_HOST])dnl
+LIBM=
+case "$host" in
+*-*-beos* | *-*-cygwin*)
+  # These system don't have libm
+  ;;
+*-ncr-sysv4.3*)
+  AC_CHECK_LIB(mw, _mwvalidcheckl, LIBM="-lmw")
+  AC_CHECK_LIB(m, main, LIBM="$LIBM -lm")
+  ;;
+*)
+  AC_CHECK_LIB(m, main, LIBM="-lm")
+  ;;
+esac
+])
+
+dnl ######################################################################
+dnl NOTE: Because of portability issues between different autoconf
+dnl versions the AC_HELP_STRING macro has been removed from FPTOOLS_HAVE_OPENGL.
+dnl Furthermore, caching has been completely rewritten.
+dnl ######################################################################
+
+dnl ########################### -*- Mode: M4 -*- #######################
+dnl Copyright (C) 98, 1999 Matthew D. Langston <langston@SLAC.Stanford.EDU>
+dnl
+dnl This file is free software; you can redistribute it and/or modify it
+dnl under the terms of the GNU General Public License as published by
+dnl the Free Software Foundation; either version 2 of the License, or
+dnl (at your option) any later version.
+dnl
+dnl This file is distributed in the hope that it will be useful, but
+dnl WITHOUT ANY WARRANTY; without even the implied warranty of
+dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+dnl General Public License for more details.
+dnl
+dnl You should have received a copy of the GNU General Public License
+dnl along with this file; if not, write to:
+dnl
+dnl   Free Software Foundation, Inc.
+dnl   Suite 330
+dnl   59 Temple Place
+dnl   Boston, MA 02111-1307, USA.
+dnl ####################################################################
+
+dnl @synopsis FPTOOLS_HAVE_OPENGL
+dnl 
+dnl Search for OpenGL.  We search first for Mesa (a GPL'ed version of
+dnl OpenGL) before a vendor's version of OpenGL, unless we were
+dnl specifically asked not to with `--with-Mesa=no' or `--without-Mesa'.
+dnl
+dnl The four "standard" OpenGL libraries are searched for: "-lGL",
+dnl "-lGLU", "-lGLX" (or "-lMesaGL", "-lMesaGLU" as the case may be) and
+dnl "-lglut".
+dnl
+dnl All of the libraries that are found (since "-lglut" or "-lGLX" might
+dnl be missing) are added to the shell output variable "GL_LIBS", along
+dnl with any other libraries that are necessary to successfully link an
+dnl OpenGL application (e.g. the X11 libraries).  Care has been taken to
+dnl make sure that all of the libraries in "GL_LIBS" are listed in the
+dnl proper order.
+dnl
+dnl Additionally, the shell output variable "GL_CFLAGS" is set to any
+dnl flags (e.g. "-I" flags) that are necessary to successfully compile
+dnl an OpenGL application.
+dnl
+dnl The following shell variable (which are not output variables) are
+dnl also set to either "yes" or "no" (depending on which libraries were
+dnl found) to help you determine exactly what was found.
+dnl
+dnl   have_GL
+dnl   have_GLU
+dnl   have_GLX
+dnl   have_glut
+dnl
+dnl A complete little toy "Automake `make distcheck'" package of how to
+dnl use this macro is available at:
+dnl
+dnl   ftp://ftp.slac.stanford.edu/users/langston/autoconf/ac_opengl-0.01.tar.gz
+dnl
+dnl Please note that as the ac_opengl macro and the toy example evolves,
+dnl the version number increases, so you may have to adjust the above
+dnl URL accordingly.
+dnl
+dnl @version 0.01 $Id: aclocal.m4,v 1.56 2000/09/10 17:39:26 panne Exp $
+dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
+
+AC_DEFUN(FPTOOLS_HAVE_OPENGL,
+[
+  AC_REQUIRE([AC_PROG_CC])
+  AC_REQUIRE([AC_PATH_X])
+  AC_REQUIRE([AC_PATH_XTRA])
+  AC_REQUIRE([FPTOOLS_CHECK_LIBM])
+
+dnl Check for Mesa first, unless we were asked not to.
+dnl    AC_HELP_STRING([--with-Mesa],
+dnl                   [Prefer the Mesa library over a vendors native OpenGL library (default=yes)],
+dnl                   with_Mesa_help_string)
+dnl    AC_ARG_ENABLE(Mesa, $with_Mesa_help_string, use_Mesa=$enableval, use_Mesa=yes)
+  AC_ARG_ENABLE(Mesa, [  --with-Mesa             Prefer the Mesa library over a vendors native OpenGL library (default=yes)], use_Mesa=$enableval, use_Mesa=yes)
+
+  if test x"$use_Mesa" = xyes; then
+     GL_search_list="MesaGL  GL  opengl32"
+    GLU_search_list="MesaGLU GLU glu32"
+    GLX_search_list="MesaGLX GLX"
+  else
+     GL_search_list="GL  opengl32 MesaGL"
+    GLU_search_list="GLU glu32    MesaGLU"
+    GLX_search_list="GLX          MesaGLX"
+  fi      
+
+  AC_LANG_SAVE
+  AC_LANG_C
+
+dnl If we are running under X11 then add in the appropriate libraries.
+  if ! test x"$no_x" = xyes; then
+dnl Add everything we need to compile and link X programs to GL_CFLAGS
+dnl and GL_X_LIBS.
+    GL_CFLAGS="$X_CFLAGS"
+    GL_X_LIBS="$X_PRE_LIBS $X_LIBS -lX11 -lXext -lXmu -lXt -lXi $X_EXTRA_LIBS $LIBM"
+  fi
+  GL_save_CPPFLAGS="$CPPFLAGS"
+  CPPFLAGS="$GL_CFLAGS"
+
+  GL_save_LIBS="$LIBS"
+  LIBS="$GL_X_LIBS"
+
+  FPTOOLS_SEARCH_LIBS([#include <GL/gl.h>],   glEnd,           $GL_search_list,  have_GL=yes,   have_GL=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>],  gluNewQuadric,   $GLU_search_list, have_GLU=yes,  have_GLU=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXChooseVisual, $GLX_search_list, have_GLX=yes,  have_GLX=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,    glut glut32,      have_glut=yes, have_glut=no)
+
+  if test -n "$LIBS"; then
+    GL_LIBS="$LIBS"
+  else
+    GL_LIBS=
+    GL_CFLAGS=
+  fi
+
+  AC_CACHE_CHECK([OpenGL flags], mdl_cv_gl_cflags, [mdl_cv_gl_cflags="$GL_CFLAGS"])
+  GL_CFLAGS="$mdl_cv_gl_cflags"
+  AC_SUBST(GL_CFLAGS)
+  AC_CACHE_CHECK([OpenGL libs],  mdl_cv_gl_libs,   [mdl_cv_gl_libs="$GL_LIBS"])
+  GL_LIBS="$mdl_cv_gl_libs"
+  AC_SUBST(GL_LIBS)
+
+dnl Reset GL_X_LIBS regardless, since it was just a temporary variable
+dnl and we don't want to be global namespace polluters.
+  GL_X_LIBS=
+
+  LIBS="$GL_save_LIBS"
+  CPPFLAGS="$GL_save_CPPFLAGS"
+
+  AC_LANG_RESTORE
+])
 
 # LocalWords:  fi

@@ -285,6 +285,10 @@ LibsReadline=@LibsReadline@
 #
 ReadlineIncludePath=
 
+# Build the Haskell OpenGL/GLUT binding?
+#
+GhcLibsWithHOpenGL=@GhcLibsWithHOpenGL@
+
 ################################################################################
 #
 #		happy project
