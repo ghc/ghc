@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.19 2003/10/20 17:19:23 sof Exp $
+$Id: HsParser.ly,v 1.20 2004/04/20 13:08:04 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -305,7 +305,7 @@ Top-Level Declarations
 >	| {- empty -}			{ [] }
 
 > topdecl :: { HsDecl }
->	: 'type' simpletype srcloc '=' ctype
+>	: 'type' simpletype srcloc '=' ctypedoc
 >		{ HsTypeDecl $3 (fst $2) (snd $2) $5 Nothing }
 >	| 'data' ctype srcloc constrs deriving
 >		{% checkDataHeader $2 `thenP` \(cs,c,t) ->
