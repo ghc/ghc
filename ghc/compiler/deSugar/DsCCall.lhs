@@ -37,7 +37,7 @@ unboxing any boxed primitive arguments and boxing the result if
 desired.
 
 The state stuff just consists of adding in
-@\ s -> case s of { S# s# -> ... }@ in an appropriate place.
+@PrimIO (\ s -> case s of { S# s# -> ... })@ in an appropriate place.
 
 The unboxing is straightforward, as all information needed to unbox is
 available from the type.  For each boxed-primitive argument, we
@@ -68,10 +68,10 @@ follows:
 \end{verbatim}
 
 \begin{code}
-dsCCall :: FAST_STRING		-- C routine to invoke
+dsCCall :: FAST_STRING	-- C routine to invoke
 	-> [CoreExpr]	-- Arguments (desugared)
-	-> Bool			-- True <=> might cause Haskell GC
-	-> Bool			-- True <=> really a "_casm_"
+	-> Bool		-- True <=> might cause Haskell GC
+	-> Bool		-- True <=> really a "_casm_"
 	-> Type		-- Type of the result (a boxed-prim type)
 	-> DsM CoreExpr
 
@@ -89,11 +89,9 @@ dsCCall label args may_gc is_asm result_ty
     in
     mkPrimDs the_ccall_op (map VarArg final_args) `thenDs` \ the_prim_app ->
     let
-	the_body = foldr apply (res_wrapper the_prim_app) arg_wrappers
+	the_body = foldr ($) (res_wrapper the_prim_app) arg_wrappers
     in
     returnDs (Lam (ValBinder old_s) the_body)
-  where
-    apply f x = f x
 \end{code}
 
 \begin{code}

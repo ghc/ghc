@@ -1,0 +1,8 @@
+\begin{code}
+interface SmplLoop_1_3 1
+__exports__
+SimplUtils  simplIdWantsToBeINLINEd (..)
+Simplify    simplExpr (..)
+Simplify    simplBind (..)
+MagicUFs    MagicUnfoldingFun
+\end{code}

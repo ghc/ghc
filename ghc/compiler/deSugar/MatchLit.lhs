@@ -16,7 +16,7 @@ import HsSyn		( HsLit(..), OutPat(..), HsExpr(..),
 import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
 			  TypecheckedPat(..)
 			)
-import CoreSyn		( CoreExpr(..), CoreBinding(..) )
+import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding) )
 
 import DsMonad
 import DsUtils

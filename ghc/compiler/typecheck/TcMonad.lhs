@@ -39,23 +39,23 @@ IMP_Ubiq(){-uitous-}
 
 IMPORT_DELOOPER(TcMLoop)		( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
 
-import Type		( Type(..), GenType )
-import TyVar		( TyVar(..), GenTyVar )
-import Usage		( Usage(..), GenUsage )
-import ErrUtils		( Error(..), Message(..), ErrCtxt(..),
-			  Warning(..) )
+import Type		( SYN_IE(Type), GenType )
+import TyVar		( SYN_IE(TyVar), GenTyVar )
+import Usage		( SYN_IE(Usage), GenUsage )
+import ErrUtils		( SYN_IE(Error), SYN_IE(Message), ErrCtxt(..),
+			  SYN_IE(Warning) )
 
 import SST
-import RnMonad		( RnM(..), RnDown, initRn, setExtraRn,
+import RnMonad		( SYN_IE(RnM), RnDown, initRn, setExtraRn,
 			  returnRn, thenRn, getImplicitUpRn
 			)
-import RnUtils		( RnEnv(..) )
+import RnUtils		( SYN_IE(RnEnv) )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import FiniteMap	( FiniteMap, emptyFM, isEmptyFM )
+import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, keysFM{-ToDo:rm-} )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
-import ErrUtils		( Error(..) )
+import ErrUtils		( SYN_IE(Error) )
 import Maybes		( MaybeErr(..) )
 --import Name		( Name )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
@@ -79,8 +79,8 @@ type TcM    s r =  TcDown s -> TcEnv s -> FSST s r ()
 \end{code}
 
 \begin{code}
--- With a builtin polymorphic type for _runSST the type for
--- initTc should use  TcM s r  instead of  TcM _RealWorld r 
+-- With a builtin polymorphic type for runSST the type for
+-- initTc should use  TcM s r  instead of  TcM RealWorld r 
 
 initTc :: UniqSupply
        -> TcM _RealWorld r
@@ -88,7 +88,7 @@ initTc :: UniqSupply
 		   (Bag Error, Bag  Warning)
 
 initTc us do_this
-  = _runSST (
+  = runSST (
       newMutVarSST us 			`thenSST` \ us_var ->
       newMutVarSST (emptyBag,emptyBag)	`thenSST` \ errs_var ->
       newMutVarSST emptyUFM		`thenSST` \ tvs_var ->
@@ -233,7 +233,7 @@ forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
 	(us1, us2) = splitUniqSupply us
     in
     writeMutVarSST u_var us1	`thenSST_`
-    returnSST (_runSST (
+    returnSST ( runSST (
 	newMutVarSST us2 			`thenSST` \ u_var'   ->
       	newMutVarSST (emptyBag,emptyBag)	`thenSST` \ err_var' ->
       	newMutVarSST emptyUFM			`thenSST` \ tv_var'  ->
@@ -310,8 +310,20 @@ recoverNF_Tc recover m down env
 tryTc :: TcM s r -> TcM s r -> TcM s r
 tryTc recover m down env
   = recoverFSST (\ _ -> recover down env) $
+
     newMutVarSST (emptyBag,emptyBag)	`thenSST` \ new_errs_var ->
-    m (setTcErrs down new_errs_var) env
+
+    m (setTcErrs down new_errs_var) env	`thenFSST` \ result ->
+
+	-- Check that m has no errors; if it has internal recovery
+	-- mechanisms it might "succeed" but having found a bunch of
+	-- errors along the way. If so we want tryTc to use 
+	-- "recover" instead
+    readMutVarSST new_errs_var		`thenSST` \ (_,errs) ->
+    if isEmptyBag errs then
+	returnFSST result
+    else
+	recover down env
 
 checkTc :: Bool -> Message -> TcM s ()		-- Check that the boolean is true
 checkTc True  err = returnTc ()
@@ -473,7 +485,9 @@ rnMtoTcM rn_env rn_action down env
 		getImplicitUpRn	`thenRn` \ implicit_env@(v_env,tc_env) ->
 		if (isEmptyFM v_env && isEmptyFM tc_env)
 		then returnRn result
-		else panic "rnMtoTcM: non-empty ImplicitEnv!"
+		else pprPanic "rnMtoTcM: non-empty ImplicitEnv!"
+			(ppAboves ([ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM v_env]
+				++ [ ppCat [ppPStr m, ppPStr n] | (OrigName m n) <- keysFM tc_env]))
 	    )
     in
     returnSST (rn_result, rn_errs)

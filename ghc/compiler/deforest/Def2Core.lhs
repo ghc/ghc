@@ -9,7 +9,7 @@
 > 	def2core, d2c,
 >
 >	-- and to make the interface self-sufficient, all this stuff:
->	DefBinding(..), UniqSM(..),
+>	DefBinding(..), SYN_IE(UniqSM),
 >	GenCoreBinding, Id, DefBindee,
 >	defPanic
 >	) where
@@ -17,7 +17,6 @@
 > import DefSyn
 > import DefUtils
 >
-> import Maybes		( Maybe(..) )
 > import Outputable
 > import Pretty
 > import UniqSupply

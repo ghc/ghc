@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module SpecEnv (
-	SpecEnv(..), MatchEnv,
+	SYN_IE(SpecEnv), MatchEnv,
 	nullSpecEnv, isNullSpecEnv,
 	addOneToSpecEnv, lookupSpecEnv,
 	specEnvToList
@@ -17,7 +17,7 @@ IMP_Ubiq()
 
 import MatchEnv
 import Type		( matchTys, isTyVarTy )
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 \end{code}
 
 
@@ -36,6 +36,22 @@ then
 \begin{verbatim}
 	f (List Int) Bool d  ===>  f' Int Bool
 \end{verbatim}
+All the stuff about how many dictionaries to discard, and what types
+to apply the specialised function to, are handled by the fact that the
+SpecEnv contains a template for the result of the specialisation.
+
+There is one more exciting case, which is dealt with in exactly the same
+way.  If the specialised value is unboxed then it is lifted at its
+definition site and unlifted at its uses.  For example:
+
+	pi :: forall a. Num a => a
+
+might have a specialisation
+
+	[Int#] ===>  (case pi' of Lift pi# -> pi#)
+
+where pi' :: Lift Int# is the specialised version of pi.
+
 
 \begin{code}
 nullSpecEnv :: SpecEnv

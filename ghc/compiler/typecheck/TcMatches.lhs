@@ -158,6 +158,9 @@ tcMatch (PatMatch pat match)
   = let binders = collectPatBinders pat
     in
     newMonoIds binders mkTypeKind (\ _ -> 
+	-- NB TypeKind; lambda-bound variables are allowed 
+	-- to unify with unboxed types.
+
 	tcPat pat		`thenTc`   \ (pat',   lie_pat,   pat_ty) ->
 	tcMatch match		`thenTc`   \ (match', lie_match, match_ty) ->
 	returnTc (PatMatch pat' match',

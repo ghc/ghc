@@ -18,10 +18,10 @@ import StgSyn
 import Id		( emptyIdSet, mkIdSet, minusIdSet,
 			  unionIdSets, unionManyIdSets, isEmptyIdSet,
 			  unitIdSet, intersectIdSets,
-			  addOneToIdSet, IdSet(..),
+			  addOneToIdSet, SYN_IE(IdSet),
 			  nullIdEnv, growIdEnvList, lookupIdEnv,
 			  unitIdEnv, combineIdEnvs, delManyFromIdEnv,
-			  rngIdEnv, IdEnv(..),
+			  rngIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Eq-}
 			)
 import Maybes		( maybeToBool )
@@ -622,12 +622,12 @@ returnLne :: a -> LneM a
 returnLne e sw env lvs_cont = e
 
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
-(m `thenLne` k) sw env lvs_cont
+thenLne m k sw env lvs_cont
   = case (m sw env lvs_cont) of
       m_result -> k m_result sw env lvs_cont
 
 thenLne_ :: LneM a -> LneM b -> LneM b
-(m `thenLne_` k) sw env lvs_cont
+thenLne_ m k sw env lvs_cont
   = case (m sw env lvs_cont) of
       _ -> k sw env lvs_cont
 

@@ -16,7 +16,7 @@ import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 import TcHsSyn		( TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
 			  TypecheckedPat(..), TypecheckedHsBinds(..),
 			  TypecheckedHsExpr(..)	)
-import CoreSyn		( CoreBinding(..), CoreExpr(..), mkCoLetsAny )
+import CoreSyn		( SYN_IE(CoreBinding), SYN_IE(CoreExpr), mkCoLetsAny )
 
 import DsMonad
 import DsUtils
@@ -45,7 +45,7 @@ dsGuarded :: TypecheckedGRHSsAndBinds
 	  -> DsM CoreExpr
 
 dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
-  = dsBinds binds				`thenDs` \ core_binds ->
+  = dsBinds False binds				`thenDs` \ core_binds ->
     dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn _) ->
     case can_it_fail of
 	CantFail -> returnDs (mkCoLetsAny core_binds (core_grhss_fn (panic "It can't fail")))

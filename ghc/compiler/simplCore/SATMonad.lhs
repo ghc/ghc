@@ -32,12 +32,11 @@ module SATMonad (
 
 import Type		( mkTyVarTy, mkSigmaTy, TyVarTemplate,
 			  splitSigmaTy, splitFunTy,
-			  glueTyArgs, instantiateTy, TauType(..),
-			  Class, ThetaType(..), SigmaType(..),
+			  glueTyArgs, instantiateTy, SYN_IE(TauType),
+			  Class, SYN_IE(ThetaType), SYN_IE(SigmaType),
 			  InstTyEnv(..)
 			)
 import Id		( mkSysLocal, idType )
-import Maybes		( Maybe(..) )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqSupply
 import Util

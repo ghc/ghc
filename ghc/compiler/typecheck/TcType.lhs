@@ -22,7 +22,7 @@ module TcType (
 
   tcInstTyVars,
   tcInstSigTyVars, 
-  tcInstType, tcInstSigType, tcInstTcType,
+  tcInstType, tcInstSigType, tcInstTcType, tcInstSigTcType,
   tcInstTheta, tcInstId,
 
   zonkTcTyVars,
@@ -36,13 +36,13 @@ module TcType (
 
 
 -- friends:
-import Type	( Type(..), ThetaType(..), GenType(..),
+import Type	( SYN_IE(Type), SYN_IE(ThetaType), GenType(..),
 		  tyVarsOfTypes, getTyVar_maybe,
 		  splitForAllTy, splitRhoTy,
 		  mkForAllTys, instantiateTy
 		)
-import TyVar	( TyVar(..), GenTyVar(..), TyVarSet(..), GenTyVarSet(..), 
-		  TyVarEnv(..), lookupTyVarEnv, addOneToTyVarEnv,
+import TyVar	( SYN_IE(TyVar), GenTyVar(..), SYN_IE(TyVarSet), SYN_IE(GenTyVarSet), 
+		  SYN_IE(TyVarEnv), lookupTyVarEnv, addOneToTyVarEnv,
 		  nullTyVarEnv, mkTyVarEnv,
 		  tyVarSetToList
 		)
@@ -53,7 +53,7 @@ import Id	( idType )
 import Kind	( Kind )
 import TcKind	( TcKind )
 import TcMonad	hiding ( rnMtoTcM )
-import Usage	( Usage(..), GenUsage, UVar(..), duffUsage )
+import Usage	( SYN_IE(Usage), GenUsage, SYN_IE(UVar), duffUsage )
 
 import TysPrim		( voidTy )
 
@@ -166,6 +166,15 @@ tcInstTcType ty
   = case tyvars of
 	[]    -> returnNF_Tc ([], ty)	-- Nothing to do
 	other -> tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
+		 returnNF_Tc (tyvars', instantiateTy tenv rho)
+  where
+    (tyvars, rho) = splitForAllTy ty
+
+tcInstSigTcType :: TcType s -> NF_TcM s ([TcTyVar s], TcType s)
+tcInstSigTcType ty
+  = case tyvars of
+	[]    -> returnNF_Tc ([], ty)	-- Nothing to do
+	other -> tcInstSigTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
 		 returnNF_Tc (tyvars', instantiateTy tenv rho)
   where
     (tyvars, rho) = splitForAllTy ty

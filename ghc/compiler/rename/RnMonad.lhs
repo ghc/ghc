@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module RnMonad (
-	RnMonad(..), RnM(..), RnM_Fixes(..), RnDown, SST_R,
+	SYN_IE(RnMonad), SYN_IE(RnM), SYN_IE(RnM_Fixes), RnDown, SST_R,
 	initRn, thenRn, thenRn_, andRn, returnRn,
 	mapRn, mapAndUnzipRn, mapAndUnzip3Rn,
 
@@ -16,7 +16,7 @@ module RnMonad (
 	setExtraRn, getExtraRn, getRnEnv,
 	getModuleRn, pushSrcLocRn, getSrcLocRn,
 	getSourceRn, getOccurrenceUpRn,
-	getImplicitUpRn, ImplicitEnv(..), emptyImplicitEnv,
+	getImplicitUpRn, SYN_IE(ImplicitEnv), emptyImplicitEnv,
 	rnGetUnique, rnGetUniques,
 
 	newLocalNames,
@@ -24,13 +24,14 @@ module RnMonad (
 	lookupTyCon, lookupClass, lookupTyConOrClass,
 	extendSS2, extendSS,
 
-	TyVarNamesEnv(..), mkTyVarNamesEnv, domTyVarNamesEnv,
+	SYN_IE(TyVarNamesEnv), mkTyVarNamesEnv, domTyVarNamesEnv,
 	lookupTyVarName, nullTyVarNamesEnv, catTyVarNamesEnvs,
 
 	fixIO
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(GHCbase(fixIO))
 
 import SST
 
@@ -40,7 +41,7 @@ import RnHsSyn		( RnName, mkRnName, mkRnUnbound, mkRnImplicit,
 			  isRnLocal, isRnWired, isRnTyCon, isRnClass,
 			  isRnTyConOrClass, isRnConstr, isRnField,
 			  isRnClassOp, RenamedFixityDecl(..) )
-import RnUtils		( RnEnv(..), extendLocalRnEnv,
+import RnUtils		( SYN_IE(RnEnv), extendLocalRnEnv,
 			  lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
 			  qualNameErr, dupNamesErr
 			)
@@ -48,22 +49,22 @@ import RnUtils		( RnEnv(..), extendLocalRnEnv,
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import CmdLineOpts	( opt_WarnNameShadowing )
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine,
-			  Error(..), Warning(..)
+			  SYN_IE(Error), SYN_IE(Warning)
 			)
 import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM, fmToList{-ToDo:rm-} )
 import Maybes		( assocMaybe )
-import Name		( Module(..), RdrName(..), isQual,
+import Name		( SYN_IE(Module), RdrName(..), isQual,
 			  OrigName(..), Name, mkLocalName, mkImplicitName,
 			  getOccName, pprNonSym
 			)
-import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
+import PrelInfo		( builtinNameInfo, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import PrelMods		( pRELUDE )
 import PprStyle{-ToDo:rm-}
 import Outputable{-ToDo:rm-}
-import Pretty--ToDo:rm		( Pretty(..), PrettyRep )
+import Pretty--ToDo:rm		( SYN_IE(Pretty), PrettyRep )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
-import UniqSet		( UniqSet(..), mkUniqSet, minusUniqSet )
+import UniqSet		( SYN_IE(UniqSet), mkUniqSet, minusUniqSet )
 import UniqSupply	( UniqSupply, getUnique, getUniques, splitUniqSupply )
 import Unique		( Unique )
 import Util
@@ -101,18 +102,23 @@ type ImplicitEnv = (FiniteMap OrigName RnName, FiniteMap OrigName RnName)
 emptyImplicitEnv :: ImplicitEnv
 emptyImplicitEnv = (emptyFM, emptyFM)
 
--- With a builtin polymorphic type for _runSST the type for
--- initTc should use  RnM s r  instead of  RnM _RealWorld r 
+-- With a builtin polymorphic type for runSST the type for
+-- initTc should use  RnM s r  instead of  RnM RealWorld r 
+#if __GLASGOW_HASKELL__ >= 200
+# define REAL_WORLD GHCbuiltins.RealWorld
+#else
+# define REAL_WORLD _RealWorld
+#endif
 
 initRn :: Bool		-- True => Source; False => Iface
        -> Module
        -> RnEnv
        -> UniqSupply
-       -> RnM _RealWorld r
+       -> RnM REAL_WORLD r
        -> (r, Bag Error, Bag Warning)
 
 initRn source mod env us do_rn
-  = _runSST (
+  = runSST (
 	newMutVarSST emptyBag			`thenSST` \ occ_var ->
 	newMutVarSST emptyImplicitEnv		`thenSST` \ imp_var ->
 	newMutVarSST us 			`thenSST` \ us_var ->
@@ -541,12 +547,17 @@ lookupTyVarName env occ
 
 
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 200
+    -- can get it from GHCbase
+#else
 fixIO :: (a -> IO a) -> IO a
+
 fixIO k s = let
 		result          = k loop s
 		(Right loop, _) = result
 	    in
 	    result
+#endif
 \end{code}
 
 *********************************************************

@@ -31,7 +31,7 @@ import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable )
 import StixMacro	( macroCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import Util		( naturalMergeSortLe, panic )
 
 #ifdef REALLY_HASKELL_1_3

@@ -35,7 +35,7 @@ import Unify		( unifyTauTy )
 import Kind		( mkBoxedTypeKind, mkTypeKind )
 import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
-import Maybes		( assocMaybe, catMaybes, Maybe(..) )
+import Maybes		( assocMaybe, catMaybes )
 import Name		( pprNonSym )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty

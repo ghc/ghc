@@ -23,7 +23,7 @@ import CoreSyn
 
 import FreeVars
 import Id		( emptyIdSet, unionIdSets, unionManyIdSets,
-			  elementOfIdSet, IdSet(..)
+			  elementOfIdSet, SYN_IE(IdSet), GenId
 			)
 import Util		( nOfThem, panic, zipEqual )
 \end{code}
@@ -198,7 +198,7 @@ fiExpr to_drop (_, AnnSCC cc expr)
 
 \begin{code}
 fiExpr to_drop (_, AnnCoerce c ty expr)
-  = _trace "fiExpr:Coerce:wimping out" $
+  = trace "fiExpr:Coerce:wimping out" $
     mkCoLets' to_drop (Coerce c ty (fiExpr [] expr))
 \end{code}
 

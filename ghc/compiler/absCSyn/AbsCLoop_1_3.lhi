@@ -1,0 +1,8 @@
+\begin{code}
+interface AbsCLoop_1_3 1
+__exports__
+MachMisc fixedHdrSizeInWords (..)
+MachMisc varHdrSizeInWords   (..)
+CgRetConv ctrlReturnConvAlg (..)
+CgRetConv CtrlReturnConvention(..)
+\end{code}

@@ -9,14 +9,14 @@
 module PrelInfo (
 
 	-- finite maps for built-in things (for the renamer and typechecker):
-	builtinNameInfo, BuiltinNames(..),
-	BuiltinKeys(..), BuiltinIdInfos(..),
+	builtinNameInfo, SYN_IE(BuiltinNames),
+	SYN_IE(BuiltinKeys), SYN_IE(BuiltinIdInfos),
 
 	maybeCharLikeTyCon, maybeIntLikeTyCon
     ) where
 
 IMP_Ubiq()
-IMPORT_DELOOPER(PrelLoop)		( primOpNameInfo )
+IMPORT_DELOOPER(PrelLoop) ( primOpNameInfo )
 
 -- friends:
 import PrelMods		-- Prelude module names
@@ -32,9 +32,9 @@ import CmdLineOpts	( opt_HideBuiltinNames,
 			  opt_ForConcurrent
 			)
 import FiniteMap	( FiniteMap, emptyFM, listToFM )
-import Id		( mkTupleCon, GenId, Id(..) )
+import Id		( mkTupleCon, GenId, SYN_IE(Id) )
 import Maybes		( catMaybes )
-import Name		( origName, OrigName(..) )
+import Name		( origName, OrigName(..), Name )
 import RnHsSyn		( RnName(..) )
 import TyCon		( tyConDataCons, mkFunTyCon, mkTupleTyCon, TyCon )
 import Type
@@ -225,11 +225,11 @@ wired_in_ids
   = [ aBSENT_ERROR_ID
     , augmentId
     , buildId
-    , copyableId
+--  , copyableId
     , eRROR_ID
     , foldlId
     , foldrId
-    , forkId
+--  , forkId
     , iRREFUT_PAT_ERROR_ID
     , integerMinusOneId
     , integerPlusOneId
@@ -238,23 +238,22 @@ wired_in_ids
     , nON_EXHAUSTIVE_GUARDS_ERROR_ID
     , nO_DEFAULT_METHOD_ERROR_ID
     , nO_EXPLICIT_METHOD_ERROR_ID
-    , noFollowId
+--  , noFollowId
     , pAR_ERROR_ID
     , pAT_ERROR_ID
     , packStringForCId
-    , parAtAbsId
-    , parAtForNowId
-    , parAtId
-    , parAtRelId
-    , parGlobalId
-    , parId
-    , parLocalId
+--    , parAtAbsId
+--    , parAtForNowId
+--    , parAtId
+--    , parAtRelId
+--    , parGlobalId
+--    , parId
+--    , parLocalId
     , rEC_CON_ERROR_ID
     , rEC_UPD_ERROR_ID
     , realWorldPrimId
     , runSTId
-    , seqId
-    , tRACE_ID
+--    , seqId
     , tRACE_ID
     , unpackCString2Id
     , unpackCStringAppendId
@@ -313,13 +312,13 @@ For the Ids we may also have some builtin IdInfo.
 id_keys_infos :: [(OrigName, Unique, Maybe IdInfo)]
 id_keys_infos
   = [ -- here so we can check the type of main/mainPrimIO
-      (OrigName SLIT("Main") SLIT("main"),	  mainIdKey,	  Nothing)
-    , (OrigName SLIT("Main") SLIT("mainPrimIO"), mainPrimIOIdKey, Nothing)
+      (OrigName SLIT("Main")    SLIT("main"),	    mainIdKey,	     Nothing)
+    , (OrigName SLIT("GHCmain") SLIT("mainPrimIO"), mainPrimIOIdKey, Nothing)
 
       -- here because we use them in derived instances
     , (OrigName pRELUDE SLIT("&&"),		andandIdKey,	Nothing)
     , (OrigName pRELUDE SLIT("."),		composeIdKey,	Nothing)
-    , (OrigName pRELUDE SLIT("lex"),		lexIdKey,	Nothing)
+    , (OrigName gHC__   SLIT("lex"),		lexIdKey,	Nothing)
     , (OrigName pRELUDE SLIT("not"),		notIdKey,	Nothing)
     , (OrigName pRELUDE SLIT("readParen"),	readParenIdKey,	Nothing)
     , (OrigName pRELUDE SLIT("showParen"),	showParenIdKey,	Nothing)

@@ -12,7 +12,7 @@ you get part of GHC.
 
 module HsTypes (
 	PolyType(..), MonoType(..),
-	Context(..), ClassAssertion(..)
+	SYN_IE(Context), SYN_IE(ClassAssertion)
 
 #ifdef COMPILING_GHC
 	, pprParendPolyType
@@ -27,7 +27,6 @@ IMP_Ubiq()
 
 import Outputable	( interppSP, ifnotPprForUser )
 import Pretty
-import Type		( Kind )
 import Util		( thenCmp, cmpList, isIn, panic# )
 
 #endif {- COMPILING_GHC -}

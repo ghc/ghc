@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module TcSimplify (
-	tcSimplify, tcSimplifyAndCheck, tcSimplifyWithExtraGlobals,
+	tcSimplify, tcSimplifyAndCheck,
 	tcSimplifyTop, tcSimplifyThetas, tcSimplifyCheckThetas, tcSimplifyRank2,
 	bindInstsOfLocalFuns
     ) where
@@ -34,22 +34,22 @@ import Unify		( unifyTauTy )
 
 import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 
 			  snocBag, consBag, unionBags, isEmptyBag )
-import Class		( GenClass, Class(..), ClassInstEnv(..),
+import Class		( GenClass, SYN_IE(Class), SYN_IE(ClassInstEnv),
 			  isNumericClass, isStandardClass, isCcallishClass,
 			  isSuperClassOf, classSuperDictSelId, classInstEnv
 			)
 import Id		( GenId )
-import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool, Maybe(..) )
+import Maybes		( expectJust, firstJust, catMaybes, seqMaybe, maybeToBool )
 import Outputable	( Outputable(..){-instance * []-} )
 import PprStyle--ToDo:rm
 import PprType		( GenType, GenTyVar, GenClass{-instance Outputable;ToDo:rm-} )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )
 import Util
-import Type		( GenType, Type(..), TauType(..), mkTyVarTy, getTyVar, eqSimpleTy,
+import Type		( GenType, SYN_IE(Type), SYN_IE(TauType), mkTyVarTy, getTyVar, eqSimpleTy,
 			  getTyVar_maybe )
 import TysWiredIn	( intTy )
-import TyVar		( GenTyVar, GenTyVarSet(..), 
+import TyVar		( GenTyVar, SYN_IE(GenTyVarSet), 
 			  elementOfTyVarSet, emptyTyVarSet, unionTyVarSets,
 			  isEmptyTyVarSet, tyVarSetToList )
 import Unique		( Unique )
@@ -160,26 +160,6 @@ tcSimplify
 tcSimplify local_tvs wanteds
   = tcGetGlobalTyVars			`thenNF_Tc` \ global_tvs ->
     tcSimpl False global_tvs local_tvs emptyBag wanteds
-\end{code}
-
-@tcSimplifyWithExtraGlobals@ is just like @tcSimplify@ except that you get
-to specify some extra global type variables that the simplifer will treat
-as free in the environment.
-
-\begin{code}
-tcSimplifyWithExtraGlobals
-	:: TcTyVarSet s			-- Extra ``Global'' type variables
-	-> TcTyVarSet s			-- ``Local''  type variables
-	-> LIE s			-- Wanted
-	-> TcM s (LIE s,			-- Free
-		  [(TcIdOcc s,TcExpr s)],	-- Bindings
-		  LIE s)			-- Remaining wanteds; no dups
-
-tcSimplifyWithExtraGlobals extra_global_tvs local_tvs wanteds
-  = tcGetGlobalTyVars			`thenNF_Tc` \ global_tvs ->
-    tcSimpl False
-	    (global_tvs `unionTyVarSets` extra_global_tvs)
-	    local_tvs emptyBag wanteds
 \end{code}
 
 @tcSimplifyAndCheck@ is similar to the above, except that it checks

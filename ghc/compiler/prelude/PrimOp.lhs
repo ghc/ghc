@@ -37,7 +37,7 @@ import TysWiredIn
 
 import CStrings		( identToC )
 import CgCompInfo   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
-import HeapOffs		( addOff, intOff, totHdrSize )
+import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
 import PprStyle		( codeStyle, PprStyle(..){-ToDo:rm-} )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
@@ -1292,30 +1292,31 @@ primOpInfo ForkOp	-- fork# :: a -> Int#
 \begin{code}
 -- HWL: The first 4 Int# in all par... annotations denote:
 --   name, granularity info, size of result, degree of parallelism
+--      Same  structure as _seq_ i.e. returns Int#
 
 primOpInfo ParGlobalOp	-- parGlobal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = AlgResult SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
+  = PrimResult SLIT("parGlobal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTyCon IntRep []   -- liftTyCon [betaTy]
 
 primOpInfo ParLocalOp	-- parLocal# :: Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = AlgResult SLIT("parLocal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
+  = PrimResult SLIT("parLocal#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTyCon IntRep []   -- liftTyCon [betaTy]
 
 primOpInfo ParAtOp	-- parAt# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
-  = AlgResult SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [alphaTy,betaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] liftTyCon [gammaTy]
+  = PrimResult SLIT("parAt#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTyCon IntRep []   -- liftTyCon [gammaTy]
 
 primOpInfo ParAtAbsOp	-- parAtAbs# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = AlgResult SLIT("parAtAbs#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
+  = PrimResult SLIT("parAtAbs#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTyCon IntRep []   -- liftTyCon [betaTy]
 
 primOpInfo ParAtRelOp	-- parAtRel# :: Int# -> Int# -> Int# -> Int# -> Int# -> a -> b -> b
-  = AlgResult SLIT("parAtRel#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] liftTyCon [betaTy]
+  = PrimResult SLIT("parAtRel#")	[alphaTyVar,betaTyVar] [alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,betaTy] intPrimTyCon IntRep []   -- liftTyCon [betaTy]
 
 primOpInfo ParAtForNowOp	-- parAtForNow# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
-  = AlgResult SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [alphaTy,betaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] liftTyCon [gammaTy]
+  = PrimResult SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [betaTy,alphaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] intPrimTyCon IntRep []   -- liftTyCon [gammaTy]
 
 primOpInfo CopyableOp	-- copyable# :: a -> a
-  = AlgResult SLIT("copyable#")	[alphaTyVar] [alphaTy] liftTyCon [alphaTy]
+  = PrimResult SLIT("copyable#")	[alphaTyVar] [alphaTy] intPrimTyCon IntRep []   -- liftTyCon [alphaTy]
 
 primOpInfo NoFollowOp	-- noFollow# :: a -> a
-  = AlgResult SLIT("noFollow#")	[alphaTyVar] [alphaTy] liftTyCon [alphaTy]
+  = PrimResult SLIT("noFollow#")	[alphaTyVar] [alphaTy] intPrimTyCon IntRep []   -- liftTyCon [alphaTy]
 \end{code}
 
 %************************************************************************
@@ -1327,8 +1328,11 @@ primOpInfo NoFollowOp	-- noFollow# :: a -> a
 \begin{code}
 primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
   = PrimResult SLIT("errorIO#") []
-	[mkPrimIoTy unitTy]
+	[primio_ish_ty unitTy]
 	statePrimTyCon VoidRep [realWorldTy]
+  where
+    primio_ish_ty result
+      = mkFunTys [mkStateTy realWorldTy] (mkTupleTy 2 [result, mkStateTy realWorldTy])
 \end{code}
 
 %************************************************************************
@@ -1341,7 +1345,7 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 primOpInfo (CCallOp _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
-    (result_tycon, tys_applied, _) = -- _trace "PrimOp.getAppDataTyConExpandingDicts" $
+    (result_tycon, tys_applied, _) = -- trace "PrimOp.getAppDataTyConExpandingDicts" $
 				     getAppDataTyConExpandingDicts result_ty
 
 #ifdef DEBUG
@@ -1757,9 +1761,7 @@ pprPrimOp sty other_op
   = let
 	str = primOp_str other_op
     in
-    if codeStyle sty
-    then identToC str
-    else ppPStr str
+    (if codeStyle sty then identToC else ppPStr) str
 
 instance Outputable PrimOp where
     ppr sty op = pprPrimOp sty op

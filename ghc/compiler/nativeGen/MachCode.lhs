@@ -31,7 +31,7 @@ import Stix		( getUniqLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..)
 			)
 import UniqSupply	( returnUs, thenUs, mapUs, mapAndUnzipUs,
-			  mapAccumLUs, UniqSM(..)
+			  mapAccumLUs, SYN_IE(UniqSM)
 			)
 import Unpretty		( uppPStr )
 import Util		( panic, assertPanic )

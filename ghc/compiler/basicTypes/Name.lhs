@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module Name (
-	Module(..),
+	SYN_IE(Module),
 
 	OrigName(..), -- glorified pair
 	qualToOrigName, -- a Qual to an OrigName
@@ -58,18 +58,21 @@ module Name (
     ) where
 
 IMP_Ubiq()
+IMPORT_1_3(Char(isUpper,isLower))
 
-import CmdLineOpts	( maybe_CompilingPrelude )
-import CStrings		( identToC, cSEP )
+import CmdLineOpts	( maybe_CompilingGhcInternals )
+import CStrings		( identToC, modnameToC, cSEP )
 import Outputable	( Outputable(..) )
 import PprStyle		( PprStyle(..), codeStyle )
 import PrelMods		( pRELUDE )
 import Pretty
-import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc )
+import SrcLoc		( mkBuiltinSrcLoc, mkUnknownSrcLoc, SrcLoc )
 import Unique		( funTyConKey, mkTupleDataConUnique, mkTupleTyConUnique,
 			  pprUnique, Unique
 			)
-import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic )
+import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic, pprTrace{-ToDo:rm-} )
+import {-hide from mkdependHS-}
+	RnHsSyn		( RnName ) -- instance for specializing only
 
 #ifdef REALLY_HASKELL_1_3
 ord = fromEnum :: Char -> Int
@@ -145,7 +148,7 @@ instance NamedThing RdrName where
 	locn = panic "NamedThing.RdrName:locn"
 
     getName rdr_name@(Qual m n)
-      = Global u m n prov ex [rdr_name]
+      = Global u m (Left n) prov ex [rdr_name]
       where
 	u    = panic "NamedThing.RdrName:Unique"
 	prov = panic "NamedThing.RdrName:Provenance"
@@ -155,13 +158,24 @@ instance Outputable RdrName where
     ppr sty (Unqual n) = pp_name sty n
     ppr sty (Qual m n) = ppBeside (pp_mod sty m) (pp_name sty n)
 
-pp_mod PprForC             m = ppBesides [identToC m, ppPStr cSEP]
-pp_mod (PprForAsm False _) m = ppBesides [identToC m, ppPStr cSEP]
-pp_mod (PprForAsm True  _) m = ppBesides [ppPStr cSEP, identToC m, ppPStr cSEP]
-pp_mod _                   m = ppBesides [ppPStr m, ppChar '.']
+pp_mod sty m
+  = case sty of
+      PprForC		-> pp_code
+      PprForAsm False _ -> pp_code
+      PprForAsm True  _ -> ppBeside (ppPStr cSEP) pp_code
+      _			-> ppBeside (ppPStr m)    (ppChar '.')
+  where
+    pp_code = ppBeside (ppPStr (modnameToC m)) (ppPStr cSEP)
 
-pp_name sty n | codeStyle sty = identToC n
-              | otherwise     = ppPStr n	      
+pp_name sty n = (if codeStyle sty then identToC else ppPStr) n
+
+pp_name2 sty pieces
+  = ppIntersperse sep (map pp_piece pieces)
+  where
+    sep = if codeStyle sty then ppPStr cSEP else ppChar '.'
+
+    pp_piece (Left (OrigName m n)) = ppBeside (pp_mod sty m) (pp_name sty n)
+    pp_piece (Right n)		   = pp_name sty n
 
 showRdr sty rdr = ppShow 100 (ppr sty rdr)
 
@@ -202,7 +216,10 @@ data Name
 
   | Global   Unique
              Module	-- original name
-	     FAST_STRING
+	     (Either
+		FAST_STRING -- just an ordinary M.n name... or...
+		([Either OrigName FAST_STRING]))
+			    -- "dot" these bits of name together...
              Provenance -- where it came from
              ExportFlag -- is it exported?
              [RdrName]  -- ordered occurrence names (usually just one);
@@ -227,21 +244,21 @@ data Provenance
 \begin{code}
 mkLocalName = Local
 
-mkTopLevName   u (OrigName m n) locn exp occs = Global u m n (LocalDef locn) exp occs
-mkImportedName u (OrigName m n) imp locn imp_locs exp occs = Global u m n (Imported imp locn imp_locs) exp occs
+mkTopLevName   u (OrigName m n) locn exp occs = Global u m (Left n) (LocalDef locn) exp occs
+mkImportedName u (OrigName m n) imp locn imp_locs exp occs = Global u m (Left n) (Imported imp locn imp_locs) exp occs
 
 mkImplicitName :: Unique -> OrigName -> Name
-mkImplicitName u (OrigName m n) = Global u m n Implicit NotExported []
+mkImplicitName u (OrigName m n) = Global u m (Left n) Implicit NotExported []
 
 mkPrimitiveName :: Unique -> OrigName -> Name
-mkPrimitiveName u (OrigName m n)  = Global u m n Primitive NotExported []
+mkPrimitiveName u (OrigName m n)  = Global u m (Left n) Primitive NotExported []
 
-mkWiredInName :: Unique -> OrigName -> Name
-mkWiredInName u (OrigName m n)
-  = Global u m n (WiredIn from_here) (if from_here then ExportAll else NotExported) []
+mkWiredInName :: Unique -> OrigName -> ExportFlag -> Name
+mkWiredInName u (OrigName m n) exp
+  = Global u m (Left n) (WiredIn from_here) exp []
   where
     from_here
-      = case maybe_CompilingPrelude of
+      = case maybe_CompilingGhcInternals of
           Nothing  -> False
 	  Just mod -> mod == _UNPK_ m
 
@@ -254,11 +271,14 @@ mkCompoundName :: Unique
 
 mkCompoundName u m str ns (Local _ _ _ _) = panic "mkCompoundName:Local?"
 mkCompoundName u m str ns (Global _ _ _ prov exp _)
-  = Global u m (_CONCAT_ (glue ns [str])) prov exp []
+  = Global u m (Right (Right str : ns)) prov exp []
 
-glue []                       acc = reverse acc
-glue (Left (OrigName m n):ns) acc = glue ns (_CONS_ '.' n : _CONS_ '.' m : acc)
-glue (Right n            :ns) acc = glue ns (_CONS_ '.' n : acc)
+glue = glue1
+glue1 (Left (OrigName m n):ns) = m : _CONS_ '.' n : glue2 ns
+glue1 (Right n            :ns) = n 		  : glue2 ns
+glue2 []		       = []
+glue2 (Left (OrigName m n):ns) = _CONS_ '.' m : _CONS_ '.' n : glue2 ns
+glue2 (Right n            :ns) = _CONS_ '.' n		     : glue2 ns
 
 -- this ugly one is used for instance-y things
 mkCompoundName2 :: Unique
@@ -270,7 +290,7 @@ mkCompoundName2 :: Unique
 		-> Name		-- result!
 
 mkCompoundName2 u m str ns from_here locn
-  = Global u m (_CONCAT_ (glue ns [str]))
+  = Global u m (Right (Right str : ns))
 	     (if from_here then LocalDef locn else Imported ExportAll locn [])
 	     ExportAll{-instances-}
 	     []
@@ -278,9 +298,9 @@ mkCompoundName2 u m str ns from_here locn
 mkFunTyConName
   = mkPrimitiveName funTyConKey		       (OrigName pRELUDE SLIT("->"))
 mkTupleDataConName arity
-  = mkWiredInName (mkTupleDataConUnique arity) (OrigName pRELUDE (mkTupNameStr arity))
+  = mkWiredInName (mkTupleDataConUnique arity) (OrigName pRELUDE (mkTupNameStr arity)) ExportAll
 mkTupleTyConName   arity
-  = mkWiredInName (mkTupleTyConUnique   arity) (OrigName pRELUDE (mkTupNameStr arity))
+  = mkWiredInName (mkTupleTyConUnique   arity) (OrigName pRELUDE (mkTupNameStr arity)) ExportAll
 
 mkTupNameStr 0 = SLIT("()")
 mkTupNameStr 1 = panic "Name.mkTupNameStr: 1 ???"
@@ -354,14 +374,21 @@ nameUnique (Global u _ _ _ _ _) = u
 changeUnique (Local      _ n b l)    u = Local u n b l
 changeUnique (Global   _ m n p e os) u = Global u m n p e os
 
-nameOrigName msg (Global _ m n _ _ _) = OrigName m n
+nameOrigName msg (Global _ m (Left  n) _ _ _) = OrigName m n
+nameOrigName msg (Global _ m (Right n) _ _ _) = let str = _CONCAT_ (glue n) in
+						pprTrace ("nameOrigName:"++msg) (ppPStr str) $
+						OrigName m str
 #ifdef DEBUG
 nameOrigName msg (Local  _ n _ _)     = panic ("nameOrigName:Local:"++msg++":"++ _UNPK_ n)
 #endif
 
 nameOccName (Local  _ n _ _)	     = Unqual n
-nameOccName (Global _ m n _ _ []  )  = Qual m n
-nameOccName (Global _ m n _ _ (o:_)) = o
+nameOccName (Global _ m (Left  n) _ _ []  )  = Qual m n
+nameOccName (Global _ m (Right n) _ _ []  )  =  let str = _CONCAT_ (glue n) in
+						pprTrace "nameOccName:" (ppPStr str) $
+						Qual m str
+nameOccName (Global _ m (Left  _) _ _ (o:_)) = o
+nameOccName (Global _ m (Right _) _ _ (o:_)) = panic "nameOccName:compound name"
 
 nameExportFlag (Local  _ _ _ _)       = NotExported
 nameExportFlag (Global _ _ _ _ exp _) = exp
@@ -401,11 +428,18 @@ instance Outputable Name where
       | emph_uniq     = ppBesides [pprUnique u, ppStr "{-", ppPStr n, ppStr "-}"]
       | otherwise     = ppBesides [ppPStr n, ppStr "{-", pprUnique u, ppStr "-}"]
 
-    ppr PprDebug   (Global   u m n  _ _ _)	  = ppBesides [ppr PprDebug (Qual m n), ppStr "{-", pprUnique u, ppStr "-}"]
-    ppr PprForUser (Global   u m n _ _ []  )      = ppr PprForUser (Qual m n)
-    ppr PprForUser (Global   u m n _ _ occs)      = ppr PprForUser (head occs)
-    ppr PprShowAll (Global   u m n prov exp occs) = pp_all (Qual m n) prov exp occs
-    ppr sty        (Global   u m n _ _ _)         = ppr sty (Qual m n)
+    ppr PprDebug   (Global   u m (Left  n) _ _ _) = ppBesides [pp_mod PprDebug m, pp_name  PprDebug n, ppStr "{-", pprUnique u, ppStr "-}"]
+    ppr PprDebug   (Global   u m (Right n) _ _ _) = ppBesides [pp_mod PprDebug m, pp_name2 PprDebug n, ppStr "{-", pprUnique u, ppStr "-}"]
+
+    ppr PprForUser (Global   u m (Left  n) _ _ []  ) = ppBeside (pp_mod PprForUser m) (pp_name  PprForUser n)
+    ppr PprForUser (Global   u m (Right n) _ _ []  ) = ppBeside (pp_mod PprForUser m) (pp_name2 PprForUser n)
+    ppr PprForUser (Global   u m (Left  _) _ _ occs) = ppr PprForUser (head occs)
+
+-- LATER:?
+--  ppr PprShowAll (Global   u m n prov exp occs) = pp_all (Qual m n) prov exp occs
+
+    ppr sty (Global u m (Left  n) _ _ _) = ppBeside (pp_mod sty m) (pp_name  sty n)
+    ppr sty (Global u m (Right n) _ _ _) = ppBeside (pp_mod sty m) (pp_name2 sty n)
 
 pp_all orig prov exp occs
   = ppBesides [ppr PprShowAll orig, ppr PprShowAll occs, pp_prov prov, pp_exp exp]
@@ -442,6 +476,9 @@ data ExportFlag
 exportFlagOn NotExported = False
 exportFlagOn _		 = True
 
+-- Be very wary about using "isExported"; perhaps you
+-- really mean "externallyVisibleId"?
+
 isExported a = exportFlagOn (getExportFlag a)
 \end{code}
 
@@ -475,14 +512,35 @@ nameOf   (OrigName m n) = n
 
 getLocalName n
   = case (getName n) of
-      Global _ m n _ _ _ -> n
-      Local  _ n _ _	 -> n
+      Local  _ n _ _	         -> n
+      Global _ m (Left  n) _ _ _ -> n
+      Global _ m (Right n) _ _ _ -> let str = _CONCAT_ (glue n) in
+				    -- pprTrace "getLocalName:" (ppPStr str) $
+				    str
 
 getOccName	    = nameOccName  	   . getName
 getExportFlag	    = nameExportFlag	   . getName
 getSrcLoc	    = nameSrcLoc	   . getName
 getImpLocs	    = nameImpLocs	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
+\end{code}
+
+\begin{code}
+{-# SPECIALIZE getLocalName
+	:: Name     -> FAST_STRING
+	 , OrigName -> FAST_STRING
+	 , RdrName  -> FAST_STRING
+	 , RnName   -> FAST_STRING
+  #-}
+{-# SPECIALIZE isLocallyDefined
+	:: Name	    -> Bool
+	 , RnName   -> Bool
+  #-}
+{-# SPECIALIZE origName
+	:: String -> Name     -> OrigName
+	 , String -> RdrName  -> OrigName
+	 , String -> RnName   -> OrigName
+  #-}
 \end{code}
 
 These functions test strings to see if they fit the lexical categories

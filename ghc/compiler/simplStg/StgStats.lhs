@@ -29,7 +29,7 @@ IMP_Ubiq(){-uitous-}
 
 import StgSyn
 
-import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList )
+import FiniteMap	( emptyFM, plusFM_C, unitFM, fmToList, FiniteMap )
 \end{code}
 
 \begin{code}

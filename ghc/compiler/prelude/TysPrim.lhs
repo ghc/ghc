@@ -18,12 +18,10 @@ import Name		( mkPrimitiveName )
 import PrelMods		( gHC_BUILTINS )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon, NewOrData(..) )
-import Type		( mkTyConTy )
+import Type		( applyTyCon, mkTyVarTys, mkTyConTy )
 import TyVar		( GenTyVar(..), alphaTyVars )
-import Type		( applyTyCon, mkTyVarTys )
 import Usage		( usageOmega )
 import Unique
-
 \end{code}
 
 \begin{code}

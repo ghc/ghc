@@ -41,6 +41,7 @@ module ClosureInfo (
 	closureSingleEntry, closureSemiTag, closureType,
 	closureReturnsUnboxedType, getStandardFormThunkInfo,
 
+	isToplevClosure,
 	closureKind, closureTypeDescr,		-- profiling
 
 	isStaticClosure, allocProfilingMsg,
@@ -76,13 +77,13 @@ import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
 import CmdLineOpts	( opt_SccProfilingOn, opt_ForConcurrent )
 import HeapOffs		( intOff, addOff, totHdrSize, varHdrSize,
 			  intOffsetIntoGoods,
-			  VirtualHeapOffset(..)
+			  SYN_IE(VirtualHeapOffset)
 			)
 import Id		( idType, idPrimRep, getIdArity,
 			  externallyVisibleId,
 			  dataConTag, fIRST_TAG,
 			  isDataCon, isNullaryDataCon, dataConTyCon,
-			  isTupleCon, DataCon(..),
+			  isTupleCon, SYN_IE(DataCon),
 			  GenId{-instance Eq-}
 			)
 import IdInfo		( arityMaybe )
@@ -90,11 +91,12 @@ import Maybes		( assocMaybe, maybeToBool )
 import Name		( isLocallyDefined, nameOf, origName )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
+import Pretty--ToDo:rm
 import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
 import SMRep		-- all of it
 import TyCon		( maybeTyConSingleCon, TyCon{-instance NamedThing-} )
-import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDicts,
+import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
 			  mkFunTys, maybeAppSpecDataTyConExpandingDicts
 			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
@@ -1159,9 +1161,10 @@ closureReturnsUnboxedType other_closure = False
 fun_result_ty arity id
   = let
 	(_, de_foralld_ty) = splitForAllTy (idType id)
-	(arg_tys, res_ty)  = splitFunTyExpandingDicts de_foralld_ty
+	(arg_tys, res_ty)  = splitFunTyExpandingDictsAndPeeking de_foralld_ty
     in
-    ASSERT(arity >= 0 && length arg_tys >= arity)
+    -- ASSERT(arity >= 0 && length arg_tys >= arity)
+    (if (arity >= 0 && length arg_tys >= arity) then (\x->x) else pprPanic "fun_result_ty:" (ppCat [ppInt arity, ppr PprShowAll id, ppr PprDebug (idType id)])) $
     mkFunTys (drop arity arg_tys) res_ty
 \end{code}
 
@@ -1173,6 +1176,16 @@ closureSemiTag (MkClosureInfo _ lf_info _)
       LFCon data_con _ -> dataConTag data_con - fIRST_TAG
       LFTuple _ _      -> 0
       _	    	       -> fromInteger oTHER_TAG
+\end{code}
+
+\begin{code}
+isToplevClosure :: ClosureInfo -> Bool
+
+isToplevClosure (MkClosureInfo _ lf_info _)
+  = case lf_info of
+      LFReEntrant top _ _ -> top
+      LFThunk top _ _ _   -> top
+      _ -> panic "ClosureInfo:isToplevClosure"
 \end{code}
 
 Label generation.

@@ -24,7 +24,7 @@ import Bag		( emptyBag, snocBag, bagToList )
 import Class		( GenClass(..){-instance NamedThing-}, GenClassOp(..) )
 import CmdLineOpts	( opt_ProduceHi )
 import FieldLabel	( FieldLabel{-instance NamedThing-} )
-import FiniteMap	( fmToList )
+import FiniteMap	( fmToList, eltsFM )
 import HsSyn
 import Id		( idType, dataConRawArgTys, dataConFieldLabels,
 			  dataConStrictMarks, StrictnessMark(..),
@@ -32,7 +32,6 @@ import Id		( idType, dataConRawArgTys, dataConFieldLabels,
 			)
 import Name		( origName, nameOf, moduleOf,
 			  exportFlagOn, nameExportFlag, ExportFlag(..),
-			  isExported, getExportFlag,
 			  isLexSym, isLocallyDefined, isWiredInName,
 			  RdrName(..){-instance Outputable-},
 			  OrigName(..){-instance Ord-},
@@ -42,14 +41,15 @@ import ParseUtils	( UsagesMap(..), VersionsMap(..) )
 import PprEnv		-- not sure how much...
 import PprStyle		( PprStyle(..) )
 import PprType		-- most of it (??)
-import PrelMods		( modulesWithBuiltins )
+--import PrelMods	( modulesWithBuiltins )
+import PrelInfo		( builtinNameInfo )
 import Pretty		( prettyToUn )
 import Unpretty		-- ditto
 import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
 import TcModule		( TcIfaceInfo(..) )
 import TcInstUtil	( InstInfo(..) )
 import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
-import Type		( mkSigmaTy, mkDictTy, getAppTyCon )
+import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy )
 import Util		( sortLt, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}, pprTrace{-ToDo:rm-} )
 
 uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
@@ -82,6 +82,7 @@ ifaceVersions
 	    -> IO ()
 ifaceExportList
 	    :: Maybe Handle
+	    -> (Name -> ExportFlag)
 	    -> RenamedHsModule
 	    -> IO ()
 ifaceFixities
@@ -128,12 +129,12 @@ ifaceUsages (Just if_hdl) usages
   = hPutStr if_hdl "\n__usages__\n"   >>
     hPutStr if_hdl (uppShow 0 (uppAboves (map upp_uses usages_list)))
   where
-    usages_list = filter has_no_builtins (fmToList usages)
+    usages_list = fmToList usages -- NO: filter has_no_builtins (...)
 
-    has_no_builtins (m, _)
-      = m `notElem` modulesWithBuiltins
-      -- Don't *have* to do this; save gratuitous spillage in
-      -- every interface.  Could be flag-controlled...
+--  has_no_builtins (m, _)
+--    = m `notElem` modulesWithBuiltins
+--    -- Don't *have* to do this; save gratuitous spillage in
+--    -- every interface.  Could be flag-controlled...
 
     upp_uses (m, (mv, versions))
       = uppBesides [uppPStr m, uppSP, uppInt mv, uppPStr SLIT(" :: "),
@@ -178,20 +179,32 @@ next...), and print.  Note that the ``module'' now contains all the
 imported things that we are dealing with, thus including any entities
 that we are re-exporting from somewhere else.
 \begin{code}
-ifaceExportList Nothing{-no iface handle-} _ = return ()
+ifaceExportList Nothing{-no iface handle-} _ _ = return ()
 
 ifaceExportList (Just if_hdl)
+		export_fn -- sadly, just the HsModule isn't enough,
+			  -- because it will have no record of exported
+			  -- wired-in names.
 		(HsModule _ _ _ _ _ typedecls _ classdecls _ _ _ binds sigs _)
   = let
+	(vals_wired, tcs_wired)
+	  = case builtinNameInfo of { ((vals_fm,tcs_fm), _, _) ->
+	    ([ getName rn | rn <- eltsFM vals_fm ]
+	    ,[ getName rn | rn <- eltsFM tcs_fm  ]) }
+
 	name_flag_pairs :: Bag (OrigName, ExportFlag)
 	name_flag_pairs
-	  = foldr from_ty
+	  = foldr from_wired
+	   (foldr from_wired
+	   (foldr from_ty
 	   (foldr from_cls
 	   (foldr from_sig
 	   (from_binds binds emptyBag{-init accum-})
 	     sigs)
 	     classdecls)
-	     typedecls
+	     typedecls)
+	     tcs_wired)
+	     vals_wired
 
 	sorted_pairs = sortLt lexical_lt (bagToList name_flag_pairs)
 
@@ -208,6 +221,13 @@ ifaceExportList (Just if_hdl)
     from_sig (Sig n _ _ _) acc = maybe_add acc n
 
     from_binds bs acc = maybe_add_list acc (collectTopLevelBinders bs)
+
+    --------------
+    from_wired n acc
+      | exportFlagOn ef = acc `snocBag` (origName "maybe_add" n, ef)
+      | otherwise       = acc
+      where
+	ef = export_fn n
 
     --------------
     maybe_add :: Bag (OrigName, ExportFlag) -> RnName -> Bag (OrigName, ExportFlag)
@@ -256,6 +276,8 @@ ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
 \end{code}
 
 \begin{code}
+non_wired x = not (isWiredInName (getName x)) --ToDo:move?
+
 ifaceDecls Nothing{-no iface handle-} _ = return ()
 
 ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
@@ -263,8 +285,6 @@ ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
     ASSERT(all isLocallyDefined tycons)
     ASSERT(all isLocallyDefined classes)
     let
-	non_wired x = not (isWiredInName (getName x))
-
 	nonwired_classes = filter non_wired classes
 	nonwired_tycons  = filter non_wired tycons
 	nonwired_vals    = filter non_wired vals
@@ -276,7 +296,7 @@ ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
 	sorted_vals    = sortLt lt_lexical nonwired_vals
     in
     if (null sorted_classes && null sorted_tycons && null sorted_vals) then
-	--  You could have a module with just instances in it
+	--  You could have a module with just (re-)exports/instances in it
 	return ()
     else
     hPutStr if_hdl "\n__declarations__\n" >>
@@ -322,7 +342,8 @@ ifaceInstances (Just if_hdl) (_, _, _, insts)
 	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas ty)
 	    renumbered_ty = initNmbr (nmbrType forall_ty)
 	in
-	uppBesides [uppPStr SLIT("instance "), ppr_ty renumbered_ty, uppSemi]
+	case (splitForAllTy renumbered_ty) of { (rtvs, rrho_ty) ->
+	uppBesides [uppPStr SLIT("instance "), ppr_forall rtvs, ppr_ty rrho_ty, uppSemi] }
 \end{code}
 
 %************************************************************************
@@ -368,7 +389,11 @@ ppr_val v ty -- renumber the type first!
     pp_sig v (initNmbr (nmbrType ty))
 
 pp_sig op ty
-  = uppBesides [ppr_name op, uppPStr SLIT(" :: "), ppr_ty ty, uppSemi]
+  = case (splitForAllTy ty) of { (tvs, rho_ty) ->
+    uppBesides [ppr_name op, uppPStr SLIT(" :: "), ppr_forall tvs, ppr_ty rho_ty, uppSemi] }
+
+ppr_forall []  = uppNil
+ppr_forall tvs = uppBesides [ uppStr "__forall__ [", uppInterleave uppComma (map ppr_tyvar tvs), uppStr "] " ]
 \end{code}
 
 \begin{code}

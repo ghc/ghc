@@ -10,7 +10,8 @@ module FoldrBuildWW ( mkFoldrBuildWW ) where
 
 IMP_Ubiq(){-uitous-}
 
-import CoreSyn		( CoreBinding(..) )
+import CoreSyn		( SYN_IE(CoreBinding) )
+import UniqSupply	( UniqSupply )
 import Util		( panic{-ToDo:rm?-} )
 
 --import Type		( cloneTyVarFromTemplate, mkTyVarTy,
@@ -18,7 +19,7 @@ import Util		( panic{-ToDo:rm?-} )
 --import TysPrim		( alphaTy )
 --import TyVar		( alphaTyVar )
 --
---import Type		( Type(..) ) -- **** CAN SEE THE CONSTRUCTORS ****
+--import Type		( SYN_IE(Type) ) -- **** CAN SEE THE CONSTRUCTORS ****
 --import UniqSupply	( runBuiltinUs )
 --import WwLib            -- share the same monad (is this eticit ?)
 --import PrelInfo		( listTyCon, mkListTy, nilDataCon, consDataCon,

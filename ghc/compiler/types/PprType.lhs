@@ -34,10 +34,10 @@ import Type		( GenType(..), maybeAppTyCon,
 			  splitForAllTy, splitSigmaTy, splitRhoTy, splitAppTy )
 import TyVar		( GenTyVar(..) )
 import TyCon		( TyCon(..), NewOrData )
-import Class		( Class(..), GenClass(..),
-			  ClassOp(..), GenClassOp(..) )
+import Class		( SYN_IE(Class), GenClass(..),
+			  SYN_IE(ClassOp), GenClassOp(..) )
 import Kind		( Kind(..) )
-import Usage		( GenUsage(..) )
+import Usage		( pprUVar, GenUsage(..), SYN_IE(Usage), SYN_IE(UVar) )
 
 -- others:
 import CStrings		( identToC )
@@ -53,7 +53,6 @@ import Pretty
 import TysWiredIn	( listTyCon )
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly, ufmToList{-ToDo:rm-} )
 import Unique		( pprUnique10, pprUnique, incrUnique, listTyConKey )
-import Usage		( UVar(..), pprUVar )
 import Util
 \end{code}
 
@@ -167,13 +166,12 @@ ppr_ty sty env ctxt_prec ty@(AppTy _ _)
   where
     (fun_ty, arg_tys) = splitAppTy ty
 
-{- OLD:
-ppr_ty PprInterface env ctxt_prec (SynTy tycon tys expansion)
-  -- always expand types in an interface
-  = ppr_ty PprInterface env ctxt_prec expansion
--}
-
 ppr_ty sty env ctxt_prec (SynTy tycon tys expansion)
+  | codeStyle sty
+	-- always expand types that squeak into C-variable names
+  = ppr_ty sty env ctxt_prec expansion
+
+  | otherwise
   = ppBeside
      (ppr_app sty env ctxt_prec (ppr sty tycon) tys)
      (ifPprShowAll sty (ppCat [ppStr " {- expansion:",
@@ -183,7 +181,6 @@ ppr_ty sty env ctxt_prec (SynTy tycon tys expansion)
 ppr_ty sty env ctxt_prec (DictTy clas ty usage)
   = ppr_dict sty env ctxt_prec (clas, ty)
 
-
 -- Some help functions
 ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
   | length arg_tys == 2
@@ -192,6 +189,7 @@ ppr_corner sty env ctxt_prec (TyConTy FunTyCon usage) arg_tys
     (ty1:ty2:_) = arg_tys
 
 ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
+  | not (codeStyle sty) -- no magic in that case
   = --ASSERT(length arg_tys == a)
     (if (length arg_tys /= a) then pprTrace "ppr_corner:" (ppCat [ppInt a, ppInterleave ppComma (map (pprGenType PprDebug) arg_tys)]) else id) $
     ppBesides [ppLparen, arg_tys_w_commas, ppRparen]
@@ -199,7 +197,7 @@ ppr_corner sty env ctxt_prec (TyConTy (TupleTyCon _ _ a) usage) arg_tys
     arg_tys_w_commas = ppIntersperse pp'SP (map (ppr_ty sty env tOP_PREC) arg_tys)
 
 ppr_corner sty env ctxt_prec (TyConTy tycon usage) arg_tys
-  | tycon == listTyCon
+  | not (codeStyle sty) && tycon == listTyCon
   = ASSERT(length arg_tys == 1)
     ppBesides [ppLbrack, ppr_ty sty env tOP_PREC ty1, ppRbrack]		    
   where
@@ -210,7 +208,7 @@ ppr_corner sty env ctxt_prec (TyConTy tycon usage) arg_tys
 		      
 ppr_corner sty env ctxt_prec (TyVarTy tyvar) arg_tys
   = ppr_app sty env ctxt_prec (ppr_tyvar env tyvar) arg_tys
-   
+  
 
 ppr_app sty env ctxt_prec pp_fun []      
   = pp_fun
@@ -267,6 +265,9 @@ maybeParen ctxt_prec inner_prec pretty
 
 \begin{code}
 pprGenTyVar sty (TyVar uniq kind name usage)
+  | codeStyle sty
+  = pp_u
+  | otherwise
   = case sty of
       PprInterface -> pp_u
       _		   -> ppBesides [pp_name, ppStr "{-", pp_u, ppStr "-}"]
@@ -293,32 +294,42 @@ ToDo; all this is suspiciously like getOccName!
 showTyCon :: PprStyle -> TyCon -> String
 showTyCon sty tycon = ppShow 80 (pprTyCon sty tycon)
 
-maybe_code sty = if codeStyle sty then identToC else ppPStr
+maybe_code sty x
+  = if codeStyle sty
+    then ppBesides (ppPStr SLIT("Prelude_") : map mangle x)
+    else ppStr x
+  where
+    -- ToDo: really should be in CStrings
+    mangle '(' = ppPStr SLIT("Z40") -- decimal ascii #s
+    mangle ')' = ppPStr SLIT("Z41")
+    mangle '[' = ppPStr SLIT("Z91")
+    mangle ']' = ppPStr SLIT("Z93")
+    mangle ',' = ppPStr SLIT("Z44")
+    mangle '-' = ppPStr SLIT("Zm")
+    mangle '>' = ppPStr SLIT("Zg")
 
 pprTyCon :: PprStyle -> TyCon -> Pretty
 
 pprTyCon sty (PrimTyCon _ name _ _) = ppr sty name
 
-pprTyCon sty FunTyCon 		    = maybe_code sty SLIT("(->)")
+pprTyCon sty FunTyCon 		    = maybe_code sty "->"
 pprTyCon sty (TupleTyCon _ _ arity) = case arity of
-					0 -> maybe_code sty SLIT("()")
-					2 -> maybe_code sty SLIT("(,)")
-					3 -> maybe_code sty SLIT("(,,)")
-					4 -> maybe_code sty SLIT("(,,,)")
-					5 -> maybe_code sty SLIT("(,,,,)")
-					n -> maybe_code sty (_PK_ ( "(" ++ nOfThem (n-1) ',' ++ ")"))
+					0 -> maybe_code sty "()"
+					2 -> maybe_code sty "(,)"
+					3 -> maybe_code sty "(,,)"
+					4 -> maybe_code sty "(,,,)"
+					5 -> maybe_code sty "(,,,,)"
+					n -> maybe_code sty ( "(" ++ nOfThem (n-1) ',' ++ ")" )
 
 pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
   | uniq == listTyConKey
-  = maybe_code sty SLIT("[]")
+  = maybe_code sty "[]"
   | otherwise
   = ppr sty name
 
 pprTyCon sty (SpecTyCon tc ty_maybes)
   = ppBeside (pprTyCon sty tc)
-	     (if (codeStyle sty)
-	      then identToC tys_stuff
-	      else ppPStr   tys_stuff)
+	     ((if (codeStyle sty) then identToC else ppPStr) tys_stuff)
   where
     tys_stuff = specMaybeTysSuffix ty_maybes
 
@@ -348,14 +359,15 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
   = case sty of
       PprForC 	    -> pp_C
       PprForAsm _ _ -> pp_C
-      PprInterface  -> ppCat [pp_user, ppPStr SLIT("::"), ppr sty ty]
-      PprShowAll    -> ppCat [pp_user, ppPStr SLIT("::"), ppr sty ty]
+      PprInterface  -> pp_sigd
+      PprShowAll    -> pp_sigd
       _		    -> pp_user
   where
     pp_C    = ppPStr op_name
     pp_user = if isLexVarSym op_name && not (isLexSpecialSym op_name)
 	      then ppParens pp_C
 	      else pp_C
+    pp_sigd = ppCat [pp_user, ppPStr SLIT("::"), ppr sty ty]
 \end{code}
 
 
@@ -368,18 +380,30 @@ ppr_class_op sty tyvars (ClassOp op_name i ty)
 \begin{code}
     -- Shallowly magical; converts a type into something
     -- vaguely close to what can be used in C identifier.
-    -- Don't forget to include the module name!!!
-getTypeString :: Type -> [FAST_STRING]
-getTypeString ty = [mod, string]
-  where
-    string = _PK_ (tidy (ppShow 1000 ppr_t))
-    ppr_t  = pprGenType PprForC ty
-			-- PprForC expands type synonyms as it goes
+    -- Produces things like what we have in mkCompoundName,
+    -- which can be "dot"ted together...
 
-    mod
-      = case (maybeAppTyCon ty) of
-	  Nothing -> panic "getTypeString"
-	  Just (tycon,_) -> moduleOf (origName "getTypeString" tycon)
+getTypeString :: Type -> [Either OrigName FAST_STRING]
+
+getTypeString ty
+  = case (splitAppTy ty) of { (tc, args) ->
+    do_tc tc : map do_arg_ty args }
+  where
+    do_tc (TyConTy tc _) = Left (origName "do_tc" tc)
+    do_tc (SynTy _ _ ty) = do_tc ty
+    do_tc other = pprTrace "getTypeString:do_tc:" (pprType PprDebug other) $
+		  Right (_PK_ (ppShow 1000 (pprType PprForC other)))
+
+    do_arg_ty (TyConTy tc _) = Left (origName "do_arg_ty" tc)
+    do_arg_ty (TyVarTy tv)   = Right (_PK_ (ppShow 80 (ppr PprForC tv)))
+    do_arg_ty (SynTy _ _ ty) = do_arg_ty ty
+    do_arg_ty other	     = pprTrace "getTypeString:do_arg_ty:" (pprType PprDebug other) $
+			       Right (_PK_ (ppShow 1000 (pprType PprForC other)))
+
+	-- PprForC expands type synonyms as it goes;
+	-- it also forces consistent naming of tycons
+	-- (e.g., can't have both "(,) a b" and "(a,b)":
+	-- must be consistent!
 
     --------------------------------------------------
     -- tidy: very ad-hoc
@@ -399,17 +423,20 @@ getTypeString ty = [mod, string]
     no_leading_sps (' ':xs) = no_leading_sps xs
     no_leading_sps other = other
 
-typeMaybeString :: Maybe Type -> [FAST_STRING]
-typeMaybeString Nothing  = [SLIT("!")]
+typeMaybeString :: Maybe Type -> [Either OrigName FAST_STRING]
+typeMaybeString Nothing  = [Right SLIT("!")]
 typeMaybeString (Just t) = getTypeString t
 
 specMaybeTysSuffix :: [Maybe Type] -> FAST_STRING
 specMaybeTysSuffix ty_maybes
+  = panic "PprType.specMaybeTysSuffix"
+{- LATER:
   = let
 	ty_strs  = concat (map typeMaybeString ty_maybes)
 	dotted_tys = [ _CONS_ '.' str | str <- ty_strs ]
     in
     _CONCAT_ dotted_tys
+-}
 \end{code}
 
 ToDo: possibly move:
@@ -557,7 +584,7 @@ addUVar, nmbrUVar :: UVar -> NmbrM UVar
 
 addUVar u nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly uvenv u) of
-      Just xx -> _trace "addUVar: already in map!" $
+      Just xx -> trace "addUVar: already in map!" $
 		 (nenv, xx)
       Nothing ->
 	let
@@ -573,6 +600,6 @@ nmbrUVar u nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly uvenv u) of
       Just xx -> (nenv, xx)
       Nothing ->
-	_trace "nmbrUVar: lookup failed" $
+	trace "nmbrUVar: lookup failed" $
 	(nenv, u)
 \end{code}

@@ -46,6 +46,32 @@ import Util		( pprTrace, assertPanic, panic )
 
 This where all the heavy-duty unfolding stuff comes into its own.
 
+
+completeVar env var args
+  | has_magic_unfolding
+  = tick MagicUnfold	`thenSmpl_`
+    doMagicUnfold
+
+  | has_unfolding && ok_to_inline
+  = tick UnfoldingDone	`thenSmpl_`
+    simplExpr env the_unfolding args
+
+  | has_specialisation
+  = tick SpecialisationDone	`thenSmpl_`
+    simplExpr (extendTyEnvList env spec_bindings) 
+	      the_specialisation 
+	      remaining_args
+
+  | otherwise
+  = mkGenApp (Var var) args
+
+  where
+    unfolding = lookupUnfolding env var
+
+    (has_magic_unfolding, do_magic_unfold)
+	= case unfolding of
+	    MagicForm str magic_fn
+		   
 \begin{code}
 completeVar :: SimplEnv -> OutId -> [OutArg] -> SmplM OutExpr
 

@@ -22,7 +22,7 @@ import PrimOp		( commutableOp, PrimOp(..) )
 import PrimRep		( PrimRep{-instance Eq-} )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
-import UniqSupply	( returnUs, thenUs, mapUs, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, mapUs, SYN_IE(UniqSM) )
 import Unpretty		( uppPutStr, uppShow, uppAboves, Unpretty(..) )
 \end{code}
 

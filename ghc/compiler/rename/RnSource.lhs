@@ -17,13 +17,14 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnBinds		( rnTopBinds, rnMethodBinds )
-import RnUtils		( lookupGlobalRnEnv, lubExportFlag )
+import RnUtils		( getLocalsFromRnEnv, lookupGlobalRnEnv, lubExportFlag )
 
 import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
 import Class		( derivableClassKeys )
-import CmdLineOpts	( opt_CompilingPrelude )
+import CmdLineOpts	( opt_CompilingGhcInternals )
 import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
+import Id		( GenId{-instance NamedThing-} )
 import ListSetOps	( unionLists, minusList )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..), 
@@ -32,11 +33,12 @@ import Outputable	-- ToDo:rm
 import PprStyle 	-- ToDo:rm 
 import Pretty
 import SrcLoc		( SrcLoc )
+import TyCon		( tyConDataCons, TyCon{-instance NamedThing-} )
 import Unique		( Unique )
 import UniqFM		( emptyUFM, addListToUFM_C, listToUFM, plusUFM, lookupUFM, eltsUFM )
-import UniqSet		( UniqSet(..) )
+import UniqSet		( SYN_IE(UniqSet) )
 import Util		( isIn, isn'tIn, thenCmp, sortLt, removeDups, mapAndUnzip3, cmpPString,
-			  assertPanic, pprTrace{-ToDo:rm-} )
+			  panic, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 rnSource `renames' the source module and export list.
@@ -121,7 +123,9 @@ rnExports mods unqual_imps Nothing
   = returnRn (\n -> if isLocallyDefined n then ExportAll else NotExported)
 
 rnExports mods unqual_imps (Just exps)
-  = mapAndUnzipRn (rnIE mods) exps `thenRn` \ (mod_maybes, exp_bags) ->
+  = getModuleRn			   `thenRn` \ this_mod ->
+    getRnEnv			   `thenRn` \ rn_env ->
+    mapAndUnzipRn (rnIE mods) exps `thenRn` \ (mod_maybes, exp_bags) ->
     let 
 	(tc_bags, val_bags) = unzip exp_bags
 	tc_names  = bagToList (unionManyBags tc_bags)
@@ -134,11 +138,17 @@ rnExports mods unqual_imps (Just exps)
 	cmp_fst (x,_) (y,_) = x `cmp` y
 
 	(uniq_mods, dup_mods) = removeDups cmpPString exp_mods
+	(expmods_this, expmods_imps) = partition (== this_mod) uniq_mods
 
-	-- Get names for exported modules
+	-- Get names for module This_Mod export
+	(this_tcs, this_vals)
+	  = if null expmods_this 
+	    then ([], [])
+	    else getLocalsFromRnEnv rn_env
 
+	-- Get names for exported imported modules
 	(mod_tcs, mod_vals, empty_mods)
-	  = case mapAndUnzip3 get_mod_names uniq_mods of
+	  = case mapAndUnzip3 get_mod_names expmods_imps of
 	      (tcs, vals, emptys) -> (concat tcs, concat vals, catMaybes emptys)
 		
 	(unqual_tcs, unqual_vals) = partition (isRnTyConOrClass.snd) (bagToList unqual_imps)
@@ -156,12 +166,15 @@ rnExports mods unqual_imps (Just exps)
 							    
 	-- Build finite map of exported names to export flag
 	tc_map0  = addListToUFM_C lub_expflag emptyUFM (map pair_fst tc_names)
-	tc_map   = addListToUFM_C lub_expflag tc_map0  (map pair_fst mod_tcs)
+	tc_map1  = addListToUFM_C lub_expflag tc_map0  (map pair_fst mod_tcs)
+	tc_map   = addListToUFM_C lub_expflag tc_map1  (map (pair_fst.exp_all) this_tcs)
 	
         val_map0 = addListToUFM_C lub_expflag emptyUFM (map pair_fst val_names)
-        val_map  = addListToUFM_C lub_expflag val_map0 (map pair_fst mod_vals)
+        val_map1 = addListToUFM_C lub_expflag val_map0 (map pair_fst mod_vals)
+        val_map  = addListToUFM_C lub_expflag val_map1 (map (pair_fst.exp_all) this_vals)
 
-	pair_fst p@(f,_) = (f,p)
+	pair_fst pr@(n,_) = (n,pr)
+	exp_all rn = (getName rn, ExportAll)
 	lub_expflag (n, flag1) (_, flag2) = (n, lubExportFlag flag1 flag2)
 
 	-- Check for exporting of duplicate local names
@@ -174,8 +187,8 @@ rnExports mods unqual_imps (Just exps)
 	-- Build export flag function
 	final_exp_map = plusUFM tc_map val_map
 	exp_fn n = case lookupUFM final_exp_map n of
-		     Nothing       -> NotExported
-		     Just (_,flag) -> flag
+		      Nothing       -> NotExported
+		      Just (_,flag) -> flag
     in
     getSrcLocRn 							`thenRn` \ src_loc ->
     mapRn (addWarnRn . dupNameExportWarn  src_loc) dup_tc_names 	`thenRn_`
@@ -192,20 +205,26 @@ rnIE mods (IEVar name)
     checkIEVar rn	`thenRn` \ exps ->
     returnRn (Nothing, exps)
   where
-    checkIEVar (RnName n)         = returnRn (emptyBag, unitBag (n,ExportAll))
+    checkIEVar (RnName    n)      = returnRn (emptyBag, unitBag (n,ExportAll))
+    checkIEVar (WiredInId i)	  = returnRn (emptyBag, unitBag (getName i, ExportAll))
     checkIEVar rn@(RnClassOp _ _) = getSrcLocRn `thenRn` \ src_loc ->
 			            failButContinueRn (emptyBag, emptyBag) (classOpExportErr rn src_loc)
-    checkIEVar rn		  = returnRn (emptyBag, emptyBag)
+    checkIEVar rn@(RnField _ _)	  = getSrcLocRn `thenRn` \ src_loc ->
+			            failButContinueRn (emptyBag, emptyBag) (fieldExportErr rn src_loc)
+    checkIEVar rn		  = --pprTrace "rnIE:IEVar:panic? ToDo?:" (ppr PprDebug rn) $
+				    returnRn (emptyBag, emptyBag)
 
 rnIE mods (IEThingAbs name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
     checkIEAbs rn		`thenRn` \ exps ->
     returnRn (Nothing, exps)
   where
-    checkIEAbs (RnSyn n)      = returnRn (unitBag (n,ExportAbs), emptyBag)
-    checkIEAbs (RnData n _ _) = returnRn (unitBag (n,ExportAbs), emptyBag)
-    checkIEAbs (RnClass n _)  = returnRn (unitBag (n,ExportAbs), emptyBag)
-    checkIEAbs rn             = returnRn (emptyBag, emptyBag)
+    checkIEAbs (RnSyn n)      	= returnRn (unitBag (n,ExportAbs), emptyBag)
+    checkIEAbs (RnData n _ _) 	= returnRn (unitBag (n,ExportAbs), emptyBag)
+    checkIEAbs (RnClass n _)  	= returnRn (unitBag (n,ExportAbs), emptyBag)
+    checkIEAbs (WiredInTyCon t) = returnRn (unitBag (getName t,ExportAbs), emptyBag)
+    checkIEAbs rn               = --pprTrace "rnIE:IEAbs:panic? ToDo?:" (ppr PprDebug rn) $
+				  returnRn (emptyBag, emptyBag)
 
 rnIE mods (IEThingAll name)
   = lookupTyConOrClass name	`thenRn` \ rn ->
@@ -213,14 +232,24 @@ rnIE mods (IEThingAll name)
     checkImportAll rn           `thenRn_`
     returnRn (Nothing, exps)
   where
-    checkIEAll (RnData n cons fields) = returnRn (unitBag (exp_all n), listToBag (map exp_all cons)
-						    			 `unionBags`
-						  		       listToBag (map exp_all fields))
-    checkIEAll (RnClass n ops)        = returnRn (unitBag (exp_all n), listToBag (map exp_all ops))
-    checkIEAll rn@(RnSyn n)           = getSrcLocRn `thenRn` \ src_loc ->
-			                warnAndContinueRn (unitBag (n, ExportAbs), emptyBag)
-					    (synAllExportErr False{-warning-} rn src_loc)
-    checkIEAll rn                     = returnRn (emptyBag, emptyBag)
+    checkIEAll (RnData n cons fields)
+      = returnRn (unitBag (exp_all n),
+	    listToBag (map exp_all cons) `unionBags` listToBag (map exp_all fields))
+
+    checkIEAll (WiredInTyCon t)
+      = returnRn (unitBag (exp_all (getName t)), listToBag (map exp_all cons))
+      where
+	cons   = map getName (tyConDataCons t)
+
+    checkIEAll (RnClass n ops)
+      = returnRn (unitBag (exp_all n), listToBag (map exp_all ops))
+    checkIEAll rn@(RnSyn n)
+      = getSrcLocRn `thenRn` \ src_loc ->
+	warnAndContinueRn (unitBag (n, ExportAbs), emptyBag)
+			  (synAllExportErr False{-warning-} rn src_loc)
+
+    checkIEAll rn = pprTrace "rnIE:IEAll:panic? ToDo?:" (ppr PprDebug rn) $
+		    returnRn (emptyBag, emptyBag)
 
     exp_all n = (n, ExportAll)
 
@@ -246,8 +275,10 @@ rnIE mods (IEThingWith name names)
     checkIEWith rn@(RnSyn _) rns
 	= getSrcLocRn `thenRn` \ src_loc ->
 	  failButContinueRn (emptyBag, emptyBag) (synAllExportErr True{-error-} rn src_loc)
+    checkIEWith (WiredInTyCon _) rns = panic "RnSource.rnIE:checkIEWith:WiredInTyCon:ToDo (boring)"
     checkIEWith rn rns
-	= returnRn (emptyBag, emptyBag)
+	= pprTrace "rnIE:IEWith:panic? ToDo?:" (ppr PprDebug rn) $
+	  returnRn (emptyBag, emptyBag)
 
     exp_all n = (n, ExportAll)
 
@@ -590,8 +621,8 @@ rnFixes fixities
     	rn_fixity_pieces mk_fixity name i fix
       	  = getRnEnv `thenRn` \ env ->
 	      case lookupGlobalRnEnv env name of
-	  	Just res | isLocallyDefined res || opt_CompilingPrelude
-		  -- the opt_CompilingPrelude thing is a *HACK* to get (:)'s
+	  	Just res | isLocallyDefined res || opt_CompilingGhcInternals
+		  -- the opt_CompilingGhcInternals thing is a *HACK* to get (:)'s
 		  -- fixity decl to go through.  It has a builtin name, which
 		  -- doesn't respond to isLocallyDefined...  sigh.
 	  	  -> returnRn (Just (mk_fixity res i))
@@ -716,7 +747,11 @@ dupLocalsExportErr locn locals@((str,_):_)
 
 classOpExportErr op locn
   = addShortErrLocLine locn $ \ sty ->
-    ppBesides [ppStr "class operation `", ppr sty op, ppStr "' can only be exported with class"]
+    ppBesides [ppStr "class operation `", ppr sty op, ppStr "' can only be exported with its class"]
+
+fieldExportErr op locn
+  = addShortErrLocLine locn $ \ sty ->
+    ppBesides [ppStr "field name `", ppr sty op, ppStr "' can only be exported with its data type"]
 
 synAllExportErr is_error syn locn
   = (if is_error then addShortErrLocLine else addShortWarnLocLine) locn $ \ sty ->

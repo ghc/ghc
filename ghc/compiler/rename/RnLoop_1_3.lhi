@@ -1,0 +1,5 @@
+\begin{code}
+interface RnLoop_1_3 1
+__exports__
+Outputable Outputable (..)
+\end{code}

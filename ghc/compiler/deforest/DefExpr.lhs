@@ -16,8 +16,8 @@
 > import TreelessForm
 > import Cyclic
 
-> import Type		( applyTypeEnvToTy, isPrimType,
->			  SigmaType(..), Type
+> import Type		( applyTypeEnvToTy,
+>			  SYN_IE(SigmaType), Type
 >			)
 > import CmdLineOpts	( SwitchResult, switchIsOn )
 > import CoreUnfold	( UnfoldingDetails(..) )
@@ -27,7 +27,6 @@
 >			)
 > import Inst		-- Inst(..)
 > import IdInfo
-> import Maybes		( Maybe(..) )
 > import Outputable
 > import UniqSupply
 > import Util

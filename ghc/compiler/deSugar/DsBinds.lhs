@@ -29,10 +29,11 @@ import DsGRHSs		( dsGuarded )
 import DsUtils
 import Match		( matchWrapper )
 
-import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingPrelude )
-import CostCentre	( mkAllDictsCC, preludeDictsCostCentre )
-import Id		( idType, DictVar(..), GenId )
+import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, opt_CompilingGhcInternals )
+import CostCentre	( mkAutoCC, IsCafCC(..), mkAllDictsCC, preludeDictsCostCentre )
+import Id		( idType, SYN_IE(DictVar), GenId )
 import ListSetOps	( minusList, intersectLists )
+import Name		( isExported )
 import PprType		( GenType )
 import PprStyle		( PprStyle(..) )
 import Pretty		( ppShow )
@@ -60,7 +61,7 @@ that some of the binders are of unboxed type.  This is sorted out when
 the caller wraps the bindings round an expression.
 
 \begin{code}
-dsBinds :: TypecheckedHsBinds -> DsM [CoreBinding]
+dsBinds :: Bool -> TypecheckedHsBinds -> DsM [CoreBinding]
 \end{code}
 
 All ``real'' bindings are expressed in terms of the
@@ -96,12 +97,12 @@ But there are lots of special cases.
 %==============================================
 
 \begin{code}
-dsBinds (BindWith _ _)		= panic "dsBinds:BindWith"
-dsBinds EmptyBinds		= returnDs []
-dsBinds (SingleBind bind)	= dsBind [] [] id [] bind
+dsBinds auto_scc (BindWith _ _)	   = panic "dsBinds:BindWith"
+dsBinds auto_scc EmptyBinds	   = returnDs []
+dsBinds auto_scc (SingleBind bind) = dsBind auto_scc [] [] id [] bind
 
-dsBinds (ThenBinds  binds_1 binds_2)
-  = andDs (++) (dsBinds binds_1) (dsBinds binds_2)
+dsBinds auto_scc (ThenBinds  binds_1 binds_2)
+  = andDs (++) (dsBinds auto_scc binds_1) (dsBinds auto_scc binds_2)
 \end{code}
 
 
@@ -130,7 +131,7 @@ definitions, which don't mention the type variables at all, so making them
 polymorphic is really overkill.  @dsInstBinds@ deals with this case.
 
 \begin{code}
-dsBinds (AbsBinds tyvars [] local_global_prs inst_binds val_binds)
+dsBinds auto_scc (AbsBinds tyvars [] local_global_prs inst_binds val_binds)
   = mapDs mk_poly_private_binder private_binders
 					`thenDs` \ poly_private_binders ->
     let
@@ -149,7 +150,7 @@ dsBinds (AbsBinds tyvars [] local_global_prs inst_binds val_binds)
     dsInstBinds tyvars inst_binds	`thenDs` \ (inst_bind_pairs, inst_env) ->
     extendEnvDs inst_env			 (
 
-    dsBind tyvars [] (lookupId full_local_global_prs) inst_bind_pairs val_binds
+    dsBind auto_scc tyvars [] (lookupId full_local_global_prs) inst_bind_pairs val_binds
     ))
   where
 	-- "private_binders" is the list of binders in val_binds
@@ -195,7 +196,7 @@ the defn of f' can get floated out, notably if f gets specialised
 to a particular type for a.
 
 \begin{code}
-dsBinds (AbsBinds all_tyvars dicts local_global_prs dict_binds val_binds)
+dsBinds auto_scc (AbsBinds all_tyvars dicts local_global_prs dict_binds val_binds)
   = 	-- If there is any non-overloaded polymorphism, make new locals with
 	-- appropriate polymorphism
     (if null non_overloaded_tyvars
@@ -231,7 +232,7 @@ dsBinds (AbsBinds all_tyvars dicts local_global_prs dict_binds val_binds)
 
       extendEnvDs inst_env		 (
 
-	dsBind non_overloaded_tyvars [] binder_subst_fn inst_bind_pairs val_binds
+	dsBind auto_scc non_overloaded_tyvars [] binder_subst_fn inst_bind_pairs val_binds
     ))							`thenDs` \ core_binds ->
 
     let
@@ -358,21 +359,20 @@ dsInstBinds tyvars ((inst, expr) : bs)
 
        -- if profiling, wrap the dict in "_scc_ DICT <dict>":
     ds_dict_cc expr
-      | not opt_SccProfilingOn ||
-	not (isDictTy inst_ty) 
+      | not ( opt_SccProfilingOn || opt_AutoSccsOnAllToplevs)
+	    -- the latter is so that -unprof-auto-scc-all adds dict sccs
+      || not (isDictTy inst_ty) 
       = returnDs expr	-- that's easy: do nothing
 
-      | opt_CompilingPrelude
+      | opt_CompilingGhcInternals
       = returnDs (SCC prel_dicts_cc expr)
 
       | otherwise
-      = getModuleAndGroupDs 	`thenDs` \ (mod_name, grp_name) ->
-	    -- ToDo: do -dicts-all flag (mark dict things
-	    -- with individual CCs)
-	let
-		dict_cc = mkAllDictsCC mod_name grp_name False{-not dupd-}
-	in
-	returnDs (SCC dict_cc expr)
+      = getModuleAndGroupDs 	`thenDs` \ (mod, grp) ->
+
+	-- ToDo: do -dicts-all flag (mark dict things with individual CCs)
+
+	returnDs (SCC (mkAllDictsCC mod grp False) expr)
 \end{code}
 
 %************************************************************************
@@ -387,22 +387,23 @@ some of the binders are of unboxed type.
 For an explanation of the first three args, see @dsMonoBinds@.
 
 \begin{code}
-dsBind	:: [TyVar] -> [DictVar]		-- Abstract wrt these
+dsBind	:: Bool				-- Add auto sccs to binds
+	-> [TyVar] -> [DictVar]		-- Abstract wrt these
 	-> (Id -> Id)			-- Binder substitution
 	-> [(Id,CoreExpr)]		-- Inst bindings already dealt with
 	-> TypecheckedBind
 	-> DsM [CoreBinding]
 
-dsBind tyvars dicts binder_subst inst_bind_pairs EmptyBind
+dsBind auto_scc tyvars dicts binder_subst inst_bind_pairs EmptyBind
   = returnDs [NonRec binder rhs | (binder,rhs) <- inst_bind_pairs]
 
-dsBind tyvars dicts binder_subst inst_bind_pairs (NonRecBind monobinds)
-  = dsMonoBinds False tyvars dicts binder_subst monobinds   `thenDs` ( \ val_bind_pairs ->
-    returnDs [NonRec binder rhs | (binder,rhs) <- inst_bind_pairs ++ val_bind_pairs] )
+dsBind auto_scc tyvars dicts binder_subst inst_bind_pairs (NonRecBind monobinds)
+  = dsMonoBinds auto_scc False tyvars dicts binder_subst monobinds   `thenDs` \ val_bind_pairs ->
+    returnDs [NonRec binder rhs | (binder,rhs) <- inst_bind_pairs ++ val_bind_pairs]
 
-dsBind tyvars dicts binder_subst inst_bind_pairs (RecBind monobinds)
-  = dsMonoBinds True tyvars dicts binder_subst monobinds   `thenDs` ( \ val_bind_pairs ->
-    returnDs [Rec (inst_bind_pairs ++ val_bind_pairs)] )
+dsBind auto_scc tyvars dicts binder_subst inst_bind_pairs (RecBind monobinds)
+  = dsMonoBinds auto_scc True tyvars dicts binder_subst monobinds   `thenDs` \ val_bind_pairs ->
+    returnDs [Rec (inst_bind_pairs ++ val_bind_pairs)]
 \end{code}
 
 
@@ -425,7 +426,8 @@ of these binders into applications of the new binder to suitable type variables
 and dictionaries.
 
 \begin{code}
-dsMonoBinds :: Bool			-- True <=> recursive binding group
+dsMonoBinds :: Bool			-- True <=> add auto sccs
+	    -> Bool			-- True <=> recursive binding group
 	    -> [TyVar] -> [DictVar]	-- Abstract wrt these
 	    -> (Id -> Id)		-- Binder substitution
 	    -> TypecheckedMonoBinds
@@ -439,11 +441,11 @@ dsMonoBinds :: Bool			-- True <=> recursive binding group
 %==============================================
 
 \begin{code}
-dsMonoBinds is_rec tyvars dicts binder_subst EmptyMonoBinds = returnDs []
+dsMonoBinds auto_scc is_rec tyvars dicts binder_subst EmptyMonoBinds = returnDs []
 
-dsMonoBinds is_rec tyvars dicts binder_subst (AndMonoBinds  binds_1 binds_2)
-  = andDs (++) (dsMonoBinds is_rec tyvars dicts binder_subst binds_1)
-	       (dsMonoBinds is_rec tyvars dicts binder_subst binds_2)
+dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (AndMonoBinds  binds_1 binds_2)
+  = andDs (++) (dsMonoBinds auto_scc is_rec tyvars dicts binder_subst binds_1)
+	       (dsMonoBinds auto_scc is_rec tyvars dicts binder_subst binds_2)
 \end{code}
 
 
@@ -451,45 +453,28 @@ dsMonoBinds is_rec tyvars dicts binder_subst (AndMonoBinds  binds_1 binds_2)
 \subsubsection{Simple base cases: function and variable bindings}
 %==============================================
 
-For the simplest bindings, we just heave them in the substitution env:
-
 \begin{code}
-{-	THESE TWO ARE PLAIN WRONG.
-	The extendEnvDs only scopes over the nested call!
-	Let the simplifier do this.
-
-dsMonoBinds is_rec tyvars dicts binder_subst (VarMonoBind was_var (HsVar new_var))
-  | not (is_rec || isExported was_var)
-  = extendEnvDs [(was_var, Var new_var)] (
-    returnDs [] )
-
-dsMonoBinds is_rec tyvars dicts binder_subst (VarMonoBind was_var expr@(Lit _))
-  | not (isExported was_var)
-  = dsExpr expr			`thenDs` ( \ core_lit ->
-    extendEnvDs [(was_var, core_lit)]	 (
-    returnDs [] ))
--}
-
-dsMonoBinds is_rec tyvars dicts binder_subst (VarMonoBind var expr)
+dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (VarMonoBind var expr)
   = dsExpr expr		`thenDs` \ core_expr ->
-    returnDs [(binder_subst var, mkLam tyvars dicts core_expr)]
-\end{code}
+    doSccAuto auto_scc [var] core_expr	`thenDs` \ sccd_core_expr -> 
+    returnDs [(binder_subst var, mkLam tyvars dicts sccd_core_expr)]
 
-\begin{code}
-dsMonoBinds is_rec tyvars dicts binder_subst (FunMonoBind fun _ matches locn)
+dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (FunMonoBind fun _ matches locn)
   = putSrcLocDs locn	$
     let
 	new_fun      = binder_subst fun
 	error_string = "function " ++ showForErr fun
     in
     matchWrapper (FunMatch fun) matches error_string	`thenDs` \ (args, body) ->
+    doSccAuto auto_scc [fun] body 			`thenDs` \ sccd_body -> 
     returnDs [(new_fun,
-	       mkLam tyvars (dicts ++ args) body)]
+	       mkLam tyvars (dicts ++ args) sccd_body)]
 
-dsMonoBinds is_rec tyvars dicts binder_subst (PatMonoBind (VarPat v) grhss_and_binds locn)
+dsMonoBinds auto_scc is_rec tyvars dicts binder_subst (PatMonoBind (VarPat v) grhss_and_binds locn)
   = putSrcLocDs locn	$
     dsGuarded grhss_and_binds 		`thenDs` \ body_expr ->
-    returnDs [(binder_subst v, mkLam tyvars dicts body_expr)]
+    doSccAuto auto_scc [v] body_expr	`thenDs` \ sccd_body_expr -> 
+    returnDs [(binder_subst v, mkLam tyvars dicts sccd_body_expr)]
 \end{code}
 
 %==============================================
@@ -503,7 +488,7 @@ be empty.  (Simple pattern bindings were handled above.)
 First, the paranoia check.
 
 \begin{code}
-dsMonoBinds is_rec tyvars (_:_) binder_subst (PatMonoBind pat grhss_and_binds locn)
+dsMonoBinds auto_scc is_rec tyvars (_:_) binder_subst (PatMonoBind pat grhss_and_binds locn)
   = panic "Non-empty dict list in for pattern binding"
 \end{code}
 
@@ -531,10 +516,11 @@ Then we transform to:
 \end{description}
 
 \begin{code}
-dsMonoBinds is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
+dsMonoBinds auto_scc is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
   = putSrcLocDs locn $
 
-    dsGuarded grhss_and_binds		`thenDs` \ body_expr ->
+    dsGuarded grhss_and_binds			`thenDs` \ body_expr ->
+    doSccAuto auto_scc pat_binders body_expr	`thenDs` \ sccd_body_expr ->
 
 {- KILLED by Sansom. 95/05
 	-- make *sure* there are no primitive types in the pattern
@@ -547,11 +533,11 @@ dsMonoBinds is_rec tyvars [] binder_subst (PatMonoBind pat grhss_and_binds locn)
 	-- we can just use the rhs directly
     else
 -}
---  pprTrace "dsMonoBinds:PatMonoBind:" (ppr PprDebug body_expr) $
+--  pprTrace "dsMonoBinds:PatMonoBind:" (ppr PprDebug sccd_body_expr) $
 
     mkSelectorBinds tyvars pat
 	[(binder, binder_subst binder) | binder <- pat_binders]
-	body_expr
+	sccd_body_expr
   where
     pat_binders = collectTypedPatBinders pat
 	-- NB For a simple tuple pattern, these binders
@@ -565,4 +551,39 @@ extra work to benefit only rather unusual constructs like
 \end{verbatim}
 Better to extend the whole thing for any irrefutable constructor, at least.
 
+%************************************************************************
+%*									*
+\subsection[doSccAuto]{Adding automatic sccs}
+%*									*
+%************************************************************************
 
+\begin{code}
+doSccAuto :: Bool -> [Id] -> CoreExpr -> DsM CoreExpr
+
+doSccAuto False binders core_expr
+  = returnDs core_expr
+
+doSccAuto True [] core_expr		-- no binders
+  = returnDs core_expr
+
+doSccAuto True _ core_expr@(SCC _ _)	-- already sccd
+  = returnDs core_expr
+
+doSccAuto True _ core_expr@(Con _ _)	-- dont bother for simple Con
+  = returnDs core_expr
+
+doSccAuto True binders core_expr 
+  = let
+	scc_all    = opt_AutoSccsOnAllToplevs
+        scc_export = not (null export_binders)
+
+        export_binders = filter isExported binders
+
+	scc_binder = head (if scc_all then binders else export_binders)
+    in
+    if scc_all || scc_export then
+	getModuleAndGroupDs `thenDs` \ (mod,grp) ->
+	returnDs (SCC (mkAutoCC scc_binder mod grp IsNotCafCC) core_expr)
+    else
+	returnDs core_expr
+\end{code}

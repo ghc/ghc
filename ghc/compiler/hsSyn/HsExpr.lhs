@@ -18,7 +18,7 @@ import HsMatches	( pprMatches, pprMatch, Match )
 import HsTypes		( PolyType )
 
 -- others:
-import Id		( DictVar(..), GenId, Id(..) )
+import Id		( SYN_IE(DictVar), GenId, SYN_IE(Id) )
 import Name		( pprNonSym, pprSym )
 import Outputable	( interppSP, interpp'SP, ifnotPprForUser )
 import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )

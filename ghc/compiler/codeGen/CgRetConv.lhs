@@ -35,7 +35,7 @@ import CgCompInfo	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			)
 import CmdLineOpts	( opt_ReturnInRegsThreshold )
 import Id		( isDataCon, dataConRawArgTys,
-			  DataCon(..), GenId{-instance Eq-}
+			  SYN_IE(DataCon), GenId{-instance Eq-}
 			)
 import Maybes		( catMaybes )
 import PprStyle		( PprStyle(..) )

@@ -38,8 +38,8 @@ IMP_Ubiq(){-uitous-}
 -- friends:
 import HsSyn	-- oodles of it
 import Id	( GenId(..), IdDetails, PragmaInfo,	-- Can meddle modestly with Ids
-		  DictVar(..), idType,
-		  IdEnv(..), growIdEnvList, lookupIdEnv
+		  SYN_IE(DictVar), idType,
+		  SYN_IE(IdEnv), growIdEnvList, lookupIdEnv
 		)
 
 -- others:
@@ -48,13 +48,13 @@ import TcMonad	hiding ( rnMtoTcM )
 import TcType	( TcType(..), TcMaybe, TcTyVar(..),
 		  zonkTcTypeToType, zonkTcTyVarToTyVar
 		)
-import Usage	( UVar(..) )
+import Usage	( SYN_IE(UVar) )
 import Util	( zipEqual, panic, pprPanic, pprTrace )
 
 import PprType  ( GenType, GenTyVar ) 	-- instances
 import Type	( mkTyVarTy, tyVarsOfType )
 import TyVar	( GenTyVar {- instances -},
-		  TyVarEnv(..), growTyVarEnvList, emptyTyVarSet )
+		  SYN_IE(TyVarEnv), growTyVarEnvList, emptyTyVarSet )
 import TysPrim	( voidTy )
 import Unique	( Unique )		-- instances
 import UniqFM

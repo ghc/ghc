@@ -26,9 +26,9 @@ module HeapOffs (
 	hpRelToInt,
 #endif
 
-	VirtualHeapOffset(..), HpRelOffset(..),
-	VirtualSpAOffset(..), VirtualSpBOffset(..),
-	SpARelOffset(..), SpBRelOffset(..)
+	SYN_IE(VirtualHeapOffset), SYN_IE(HpRelOffset),
+	SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
+	SYN_IE(SpARelOffset), SYN_IE(SpBRelOffset)
     ) where
 
 IMP_Ubiq(){-uitous-}

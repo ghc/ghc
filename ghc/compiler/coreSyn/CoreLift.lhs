@@ -12,8 +12,7 @@ module CoreLift (
 	mkLiftedId,
 	liftExpr,
 	bindUnlift,
-	applyBindUnlifts,
-	isUnboxedButNotState
+	applyBindUnlifts
 
     ) where
 
@@ -22,7 +21,7 @@ IMP_Ubiq(){-uitous-}
 import CoreSyn
 import CoreUtils	( coreExprType )
 import Id		( idType, mkSysLocal,
-			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv(..),
+			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instances-}
 			)
 import Name		( isLocallyDefined, getSrcLoc )

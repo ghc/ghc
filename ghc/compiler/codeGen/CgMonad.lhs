@@ -49,6 +49,7 @@ module CgMonad (
 
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(CgLoop1)		-- stuff from CgBindery and CgUsages
+IMPORT_1_3(List(nub))
 
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
@@ -56,19 +57,19 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling,
 			  opt_OmitBlackHoling
 			)
 import HeapOffs		( maxOff,
-			  VirtualSpAOffset(..), VirtualSpBOffset(..)
+			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset)
 			)
 import Id		( idType,
 			  nullIdEnv, mkIdEnv, addOneToIdEnv,
-			  modifyIdEnv, lookupIdEnv, rngIdEnv, IdEnv(..),
-			  ConTag(..), GenId{-instance Outputable-}
+			  modifyIdEnv, lookupIdEnv, rngIdEnv, SYN_IE(IdEnv),
+			  SYN_IE(ConTag), GenId{-instance Outputable-}
 			)
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( ppAboves, ppCat, ppStr )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
-import StgSyn		( StgLiveVars(..) )
+import StgSyn		( SYN_IE(StgLiveVars) )
 import Type		( typePrimRep )
 import UniqSet		( elementOfUniqSet )
 import Util		( sortLt, panic, pprPanic )
@@ -323,7 +324,7 @@ thenC :: Code
 -- thenC :: Code -> Code    -> Code
 -- thenC :: Code -> FCode a -> FCode a
 
-(m `thenC` k) info_down state
+thenC m k info_down state
   = k info_down new_state
   where
     new_state  = m info_down state
@@ -353,7 +354,7 @@ thenFC	:: FCode a
 -- thenFC :: FCode a -> (a -> FCode b) -> FCode b
 -- thenFC :: FCode a -> (a -> Code)    -> Code
 
-(m `thenFC` k) info_down state
+thenFC m k info_down state
   = k m_result info_down new_state
   where
     (m_result, new_state) = m info_down state
@@ -649,7 +650,7 @@ is just a wrapper for its lower-level @Bind@ routine (drop the \tr{C}
 on the end of each function name).
 
 A @Id@ is bound to a @(VolatileLoc, StableLoc)@ triple.
-The name should not already be bound.
+The name should not already be bound. (nice ASSERT, eh?)
 \begin{code}
 addBindC :: Id -> CgIdInfo -> Code
 addBindC name stuff_to_bind info_down (MkCgState absC binds usage)

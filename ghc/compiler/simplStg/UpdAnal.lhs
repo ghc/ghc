@@ -22,11 +22,10 @@
 >
 > {- LATER: to end of file:
 > --import Type		( splitFunTy, splitSigmaTy, Class, TyVarTemplate,
-> --			  TauType(..)
+> --			  SYN_IE(TauType)
 > --			)
 > --import Id
 > --import IdInfo
-> --import Outputable	( isExported )
 > --import Pretty
 > --import SrcLoc 	( mkUnknownSrcLoc )
 > --import StgSyn
@@ -507,7 +506,7 @@ suffice for now.
 >	StgRec bs 	-> StgRec [ (attachOne v, rhs) | (v, rhs) <- bs ]
 >
 >   where attachOne v
->		| isExported v
+>		| externallyVisibleId v
 >			= let c = lookup v p in
 >		 		addIdUpdateInfo v
 >					(mkUpdateInfo (mkUpdateSpec v c))

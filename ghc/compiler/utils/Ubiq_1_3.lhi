@@ -1,0 +1,67 @@
+\begin{code}
+interface Ubiq_1_3 1
+__exports__
+GHCbase trace (..)
+GHCbase PrimIO -- this is here because of the bug preventing it getting into PreludeGlaST
+GHCps nilPS (..)
+-- GHCps substrPS (..)
+-- GHCps tailPS (..)
+GHCps appendPS (..)
+GHCps concatPS (..)
+GHCps consPS (..)
+GHCps headPS (..)
+GHCps lengthPS (..)
+GHCps nullPS (..)
+GHCps packCString (..)
+GHCps packCBytes (..)
+GHCps packString (..)
+GHCps unpackPS (..)
+Bag Bag
+BinderInfo BinderInfo
+CLabel CLabel
+Class Class
+ClosureInfo ClosureInfo
+CoreSyn GenCoreExpr
+CoreUnfold UnfoldingDetails
+CoreUnfold UnfoldingGuidance
+CostCentre CostCentre
+HeapOffs HeapOffset
+HsCore UnfoldingCoreExpr
+HsPragmas ClassOpPragmas
+HsPragmas ClassPragmas
+HsPragmas DataPragmas
+HsPragmas GenPragmas
+HsPragmas InstancePragmas
+Id Id
+IdInfo ArityInfo
+IdInfo DeforestInfo
+IdInfo Demand
+IdInfo IdInfo
+IdInfo OptIdInfo(..)
+IdInfo StrictnessInfo
+IdInfo UpdateInfo
+Kind Kind
+Literal Literal
+Maybes MaybeErr
+Name ExportFlag
+Name Module
+Name NamedThing (..)
+Name OrigName (..)
+Name RdrName (..)
+Outputable Outputable (..)
+PprStyle PprStyle
+PrimOp PrimOp
+PrimRep PrimRep
+SrcLoc SrcLoc
+TyCon Arity
+TyCon TyCon
+TyVar TyVar
+Type GenType
+Type Type
+UniqFM UniqFM
+UniqFM Uniquable (..)
+UniqSupply UniqSupply
+Unique Unique
+Usage GenUsage
+Util Ord3 (..)
+\end{code}

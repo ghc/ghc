@@ -11,23 +11,24 @@
 module FloatOut ( floatOutwards ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(partition))
 
 import CoreSyn
 
 import CmdLineOpts	( opt_D_verbose_core2core, opt_D_simplifier_stats )
 import CostCentre	( dupifyCC )
-import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, IdEnv(..),
+import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}
 			)
 import Outputable	( Outputable(..){-instance (,)-} )
-import PprCore		( GenCoreBinding{-instance-} )
+import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenTyVar )
 import Pretty		( ppInt, ppStr, ppBesides, ppAboves )
 import SetLevels	-- all of it
 import TyVar		( GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Util		( pprTrace, panic )
 \end{code}
 

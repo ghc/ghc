@@ -323,11 +323,25 @@ pprUnique, pprUnique10 :: Unique -> Pretty
 
 pprUnique uniq
   = case unpkUnique uniq of
-      (tag, u) -> ppBeside (ppChar tag) (iToBase62 u)
+      (tag, u) -> finish_ppr tag u (iToBase62 u)
 
 pprUnique10 uniq	-- in base-10, dudes
   = case unpkUnique uniq of
-      (tag, u) -> ppBeside (ppChar tag) (ppInt u)
+      (tag, u) -> finish_ppr tag u (ppInt u)
+
+finish_ppr tag u pp_u
+  = if tag /= 't' -- this is just to make v common tyvars, t1, t2, ...
+		  -- come out as a, b, ... (shorter, easier to read)
+    then pp_all
+    else case u of
+	   1 -> ppChar 'a'
+	   2 -> ppChar 'b'
+	   3 -> ppChar 'c'
+	   4 -> ppChar 'd'
+	   5 -> ppChar 'e'
+	   _ -> pp_all
+  where
+    pp_all = ppBeside (ppChar tag) pp_u
 
 showUnique :: Unique -> FAST_STRING
 showUnique uniq = _PK_ (ppShow 80 (pprUnique uniq))
@@ -349,12 +363,26 @@ A character-stingy way to read/write numbers (notably Uniques).
 The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 200
+# define BYTE_ARRAY GHCbase.ByteArray
+# define RUN_ST	    GHCbase.runST
+# define AND_THEN   >>=
+# define AND_THEN_  >>
+# define RETURN	    return
+#else
+# define BYTE_ARRAY _ByteArray
+# define RUN_ST	    _runST
+# define AND_THEN   `thenStrictlyST`
+# define AND_THEN_  `seqStrictlyST`
+# define RETURN	    returnStrictlyST
+#endif
+
 iToBase62 :: Int -> Pretty
 
 iToBase62 n@(I# n#)
   = ASSERT(n >= 0)
     let
-	bytes = case chars62 of { _ByteArray bounds_who_needs_'em bytes -> bytes }
+	bytes = case chars62 of { BYTE_ARRAY bounds_who_needs_'em bytes -> bytes }
     in
     if n# <# 62# then
 	case (indexCharArray# bytes n#) of { c ->
@@ -365,20 +393,20 @@ iToBase62 n@(I# n#)
 	ppBeside (iToBase62 q) (ppChar (C# c)) }}
 
 -- keep this at top level! (bug on 94/10/24 WDP)
-chars62 :: _ByteArray Int
+chars62 :: BYTE_ARRAY Int
 chars62
-  = _runST (
-	newCharArray (0, 61)	`thenStrictlyST` \ ch_array ->
+  = RUN_ST (
+	newCharArray (0, 61)	AND_THEN \ ch_array ->
 	fill_in ch_array 0 62 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				`seqStrictlyST`
+				AND_THEN_
 	unsafeFreezeByteArray ch_array
     )
   where
     fill_in ch_array i lim str
       | i == lim
-      = returnStrictlyST ()
+      = RETURN ()
       | otherwise
-      = writeCharArray ch_array i (str !! i)	`seqStrictlyST`
+      = writeCharArray ch_array i (str !! i)	AND_THEN_
 	fill_in ch_array (i+1) lim str
 \end{code}
 

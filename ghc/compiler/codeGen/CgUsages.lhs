@@ -26,11 +26,11 @@ IMPORT_DELOOPER(CgLoop1)	-- here for paranoia-checking
 import AbsCSyn		( RegRelative(..), AbstractC, CAddrMode )
 import CgMonad
 import HeapOffs		( zeroOff,
-			  VirtualHeapOffset(..),
-			  VirtualSpAOffset(..),
-			  VirtualSpBOffset(..)
+			  SYN_IE(VirtualHeapOffset),
+			  SYN_IE(VirtualSpAOffset),
+			  SYN_IE(VirtualSpBOffset)
 			)
-import Id		( IdEnv(..) )
+import Id		( SYN_IE(IdEnv) )
 \end{code}
 
 %************************************************************************

@@ -28,14 +28,14 @@ import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnMonad
-import RnUtils		( RnEnv(..), extendGlobalRnEnv )
+import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv )
 import RnBinds		( rnMethodBinds, rnTopBinds )
 
 import Bag		( emptyBag{-ToDo:rm-}, Bag, isEmptyBag, unionBags, listToBag )
 import Class		( classKey, needsDataDeclCtxtClassKeys, GenClass )
-import ErrUtils		( pprBagOfErrors, addErrLoc, Error(..) )
+import ErrUtils		( pprBagOfErrors, addErrLoc, SYN_IE(Error) )
 import Id		( dataConArgTys, isNullaryDataCon, mkDictFunId )
-import Maybes		( maybeToBool, Maybe(..) )
+import Maybes		( maybeToBool )
 import Name		( isLocallyDefined, getSrcLoc,
 			  mkTopLevName, origName, mkImplicitName, ExportFlag(..),
 			  RdrName(..), Name{--O only-}
@@ -43,7 +43,7 @@ import Name		( isLocallyDefined, getSrcLoc,
 import Outputable	( Outputable(..){-instances e.g., (,)-} )
 import PprType		( GenType, GenTyVar, GenClass, TyCon )
 import PprStyle		( PprStyle(..) )
-import Pretty		( ppAbove, ppAboves, ppCat, ppBesides, ppStr, ppHang, Pretty(..) )
+import Pretty		( ppAbove, ppAboves, ppCat, ppBesides, ppStr, ppHang, SYN_IE(Pretty) )
 import Pretty--ToDo:rm
 import FiniteMap--ToDo:rm
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
@@ -51,7 +51,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon,
 			  isEnumerationTyCon, isDataTyCon, TyCon
 			)
-import Type		( GenType(..), TauType(..), mkTyVarTys, applyTyCon,
+import Type		( GenType(..), SYN_IE(TauType), mkTyVarTys, applyTyCon,
 			  mkSigmaTy, mkDictTy, isPrimType, instantiateTy,
 			  getAppDataTyCon, getAppTyCon
 			)

@@ -1,0 +1,6 @@
+\begin{code}
+interface NcgLoop_1_3 1
+__exports__
+MachMisc underscorePrefix (..)
+MachMisc fmtAsmLbl (..)
+\end{code}

@@ -20,7 +20,7 @@ IMP_Ubiq(){-uitous-}
 import AbsCSyn		( node, infoptr, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CLabel		( mkAsmTempLabel )
-import UniqSupply	( returnUs, thenUs, getUnique, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, getUnique, SYN_IE(UniqSM) )
 import Unpretty		( uppPStr, Unpretty(..) )
 \end{code}
 

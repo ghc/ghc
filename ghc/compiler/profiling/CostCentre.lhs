@@ -16,9 +16,10 @@ module CostCentre (
 	overheadCostCentre, dontCareCostCentre,
 
 	mkUserCC, mkAutoCC, mkDictCC, mkAllCafsCC, mkAllDictsCC,
-	cafifyCC, unCafifyCC, dupifyCC,
+	cafifyCC, dupifyCC,
 	isCafCC, isDictCC, isDupdCC,
-	setToAbleCostCentre,
+	isSccCountCostCentre,
+	sccAbleCostCentre,
 	ccFromThisModule,
 	ccMentionsId,
 
@@ -29,9 +30,8 @@ module CostCentre (
 
 IMP_Ubiq(){-uitous-}
 
-import Id		( externallyVisibleId, GenId, Id(..) )
+import Id		( externallyVisibleId, GenId, SYN_IE(Id) )
 import CStrings		( identToC, stringToC )
-import Maybes		( Maybe(..) )
 import Name		( showRdr, getOccName, RdrName )
 import Pretty		( ppShow, prettyToUn )
 import PprStyle		( PprStyle(..) )
@@ -180,10 +180,10 @@ mkAllCafsCC  m g   = AllCafsCC  m g
 mkAllDictsCC m g is_dupd
   = AllDictsCC m g (if is_dupd then ADupdCC else AnOriginalCC)
 
-cafifyCC, unCafifyCC, dupifyCC  :: CostCentre -> CostCentre
+cafifyCC, dupifyCC  :: CostCentre -> CostCentre
 
-cafifyCC cc@(AllDictsCC _ _ _) = cc -- ???????? ToDo
-cafifyCC cc@(PreludeDictsCC _) = cc -- ditto
+cafifyCC cc@(AllDictsCC _ _ _) = cc -- ToDo ???
+cafifyCC cc@(PreludeDictsCC _) = cc --    ditto
 cafifyCC (NormalCC kind m g is_dupd is_caf)
   = ASSERT(not_a_calf_already is_caf)
     NormalCC kind m g is_dupd IsCafCC
@@ -191,14 +191,6 @@ cafifyCC (NormalCC kind m g is_dupd is_caf)
     not_a_calf_already IsCafCC = False
     not_a_calf_already _       = True
 cafifyCC cc = panic ("cafifyCC"++(showCostCentre PprDebug False cc))
-
--- WDP 95/07: pretty dodgy
-unCafifyCC (NormalCC kind m g is_dupd IsCafCC) = NormalCC kind m g is_dupd IsNotCafCC
-unCafifyCC (AllCafsCC _ _)	= CurrentCC
-unCafifyCC PreludeCafsCC	= CurrentCC
-unCafifyCC (AllDictsCC _ _ _)	= CurrentCC
-unCafifyCC (PreludeDictsCC _)	= CurrentCC
-unCafifyCC other_cc		= other_cc
 
 dupifyCC (AllDictsCC m g _) = AllDictsCC m g ADupdCC
 dupifyCC (PreludeDictsCC _) = PreludeDictsCC ADupdCC
@@ -223,20 +215,33 @@ isDupdCC (PreludeDictsCC ADupdCC)   = True
 isDupdCC (NormalCC _ _ _ ADupdCC _) = True
 isDupdCC _		            = False
 
-setToAbleCostCentre :: CostCentre -> Bool
-  -- Is this a cost-centre to which CCC might reasonably
-  -- be set?  setToAbleCostCentre is allowed to panic on
-  -- "nonsense" cases, too...
+isSccCountCostCentre :: CostCentre -> Bool
+  -- Is this a cost-centre which records scc counts
 
-#ifdef DEBUG
-setToAbleCostCentre NoCostCentre    = panic "setToAbleCC:NoCostCentre"
-setToAbleCostCentre SubsumedCosts   = panic "setToAbleCC:SubsumedCosts"
-setToAbleCostCentre CurrentCC	    = panic "setToAbleCC:CurrentCC"
-setToAbleCostCentre DontCareCC	    = panic "setToAbleCC:DontCareCC"
+#if DEBUG
+isSccCountCostCentre NoCostCentre  = panic "isSccCount:NoCostCentre"
+isSccCountCostCentre SubsumedCosts = panic "isSccCount:SubsumedCosts"
+isSccCountCostCentre CurrentCC	   = panic "isSccCount:CurrentCC"
+isSccCountCostCentre DontCareCC    = panic "isSccCount:DontCareCC"
 #endif
+isSccCountCostCentre OverheadCC       = False
+isSccCountCostCentre cc | isCafCC cc  = False
+                        | isDupdCC cc = False
+			| isDictCC cc = True
+			| otherwise   = True
 
-setToAbleCostCentre OverheadCC	    = False -- see comments in type defn
-setToAbleCostCentre other	    = not (isCafCC other || isDictCC other)
+sccAbleCostCentre :: CostCentre -> Bool
+  -- Is this a cost-centre which can be sccd ?
+
+#if DEBUG
+sccAbleCostCentre NoCostCentre  = panic "sccAbleCC:NoCostCentre"
+sccAbleCostCentre SubsumedCosts = panic "sccAbleCC:SubsumedCosts"
+sccAbleCostCentre CurrentCC	= panic "sccAbleCC:CurrentCC"
+sccAbleCostCentre DontCareCC	= panic "sccAbleCC:DontCareCC"
+#endif
+sccAbleCostCentre OverheadCC	  = False
+sccAbleCostCentre cc | isCafCC cc = False
+		     | otherwise  = True
 
 ccFromThisModule :: CostCentre -> FAST_STRING{-module name-} -> Bool
 
@@ -270,8 +275,8 @@ cmpCostCentre DontCareCC       	  DontCareCC	      = EQ_
 
 cmpCostCentre (NormalCC k1 m1 _ _ c1) (NormalCC k2 m2 _ _ c2)
     -- first key is module name, then we use "kinds" (which include
-    -- names)
-  = _CMP_STRING_ m1 m2 `thenCmp` cmp_kind k1 k2
+    -- names) and finally the caf flag
+  = _CMP_STRING_ m1 m2 `thenCmp` cmp_kind k1 k2 `thenCmp` cmp_caf c1 c2
 
 cmpCostCentre other_1 other_2
   = let
@@ -307,6 +312,11 @@ cmp_kind other_1     other_2
     tag_CcKind (UserCC _) = (ILIT(1) :: FAST_INT)
     tag_CcKind (AutoCC _) = ILIT(2)
     tag_CcKind (DictCC _) = ILIT(3)
+
+cmp_caf IsNotCafCC IsCafCC     = LT_
+cmp_caf IsNotCafCC IsNotCafCC  = EQ_
+cmp_caf IsCafCC    IsCafCC     = EQ_
+cmp_caf IsCafCC    IsNotCafCC  = GT_
 \end{code}
 
 \begin{code}
@@ -344,8 +354,7 @@ uppCostCentre sty print_as_string cc
   = let
 	prefix_CC = uppPStr SLIT("CC_")
 
-	basic_thing -- (basic_thing, suffix_CAF)
-	  = do_cc cc
+	basic_thing = do_cc cc
 
 	basic_thing_string
 	  = if friendly_sty then basic_thing else stringToC basic_thing
@@ -360,9 +369,6 @@ uppCostCentre sty print_as_string cc
 		    prettyToUn (identToC (_PK_ basic_thing))]
   where
     friendly_sty = friendly_style sty
-
-    add_module_name_maybe m str
-      = if print_as_string then str else (str ++ ('.' : m))
 
     ----------------
     do_cc OverheadCC	     = "OVERHEAD"
@@ -384,14 +390,16 @@ uppCostCentre sty print_as_string cc
 
     do_cc (NormalCC kind mod_name grp_name is_dupd is_caf)
       = let
-	    basic_kind = do_kind kind
-	    is_a_calf  = do_calved is_caf
+	    basic_kind = do_caf is_caf ++ do_kind kind
 	in
 	if friendly_sty then
-	    do_dupd is_dupd (basic_kind ++ ('/': _UNPK_ mod_name) ++ ('/': _UNPK_ grp_name) ++ is_a_calf)
+	    do_dupd is_dupd (basic_kind ++ ('/': _UNPK_ mod_name) ++ ('/': _UNPK_ grp_name))
 	else
 	    basic_kind
       where
+	do_caf IsCafCC = "CAF:"
+	do_caf _       = ""
+
     	do_kind (UserCC name) = _UNPK_ name
 	do_kind (AutoCC id)   = do_id id ++ (if friendly_sty then "/AUTO" else "")
 	do_kind (DictCC id)   = do_id id ++ (if friendly_sty then "/DICT" else "")
@@ -401,9 +409,6 @@ uppCostCentre sty print_as_string cc
 	  = if print_as_string
 	    then showRdr sty (getOccName id)	-- use occ name
 	    else showId sty id	      		-- we really do
-
-	do_calved IsCafCC = "/CAF"
-	do_calved _   	  = ""
 
     ---------------
     do_dupd ADupdCC str = if friendly_sty then str ++ "/DUPD" else str
@@ -419,7 +424,7 @@ friendly_style sty -- i.e., probably for human consumption
 
 Printing unfoldings is sufficiently weird that we do it separately.
 This should only apply to CostCentres that can be ``set to'' (cf
-@setToAbleCostCentre@).  That excludes CAFs and
+@sccAbleCostCentre@).  That excludes CAFs and 
 `overhead'---which are added at the very end---but includes dictionaries.
 Dict \tr{_scc_}s may cross module boundaries to show ``scope'' info;
 even if we won't ultimately do a \tr{SET_CCC} from it.
@@ -430,7 +435,7 @@ upp_cc_uf (AllDictsCC m g d)
   = uppCat [uppPStr SLIT("_ALL_DICTS_CC_"), uppStr (show (_UNPK_ m)), uppStr (show (_UNPK_ g)), upp_dupd d]
 
 upp_cc_uf cc@(NormalCC cc_kind m g is_dupd is_caf)
-  = ASSERT(isDictCC cc || setToAbleCostCentre cc)
+  = ASSERT(sccAbleCostCentre cc)
     uppCat [pp_kind cc_kind, uppStr (show (_UNPK_ m)), uppStr (show (_UNPK_ g)),
 	    upp_dupd is_dupd, pp_caf is_caf]
   where

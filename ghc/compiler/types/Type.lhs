@@ -2,11 +2,12 @@
 #include "HsVersions.h"
 
 module Type (
-	GenType(..), Type(..), TauType(..),
+	GenType(..), SYN_IE(Type), SYN_IE(TauType),
 	mkTyVarTy, mkTyVarTys,
 	getTyVar, getTyVar_maybe, isTyVarTy,
 	mkAppTy, mkAppTys, splitAppTy,
-	mkFunTy, mkFunTys, splitFunTy, splitFunTyExpandingDicts,
+	mkFunTy, mkFunTys,
+	splitFunTy, splitFunTyExpandingDicts, splitFunTyExpandingDictsAndPeeking,
 	getFunTy_maybe, getFunTyExpandingDicts_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
 	mkSynTy,
@@ -18,7 +19,7 @@ module Type (
 #endif
 	isPrimType, isUnboxedType, typePrimRep,
 
-	RhoType(..), SigmaType(..), ThetaType(..),
+	SYN_IE(RhoType), SYN_IE(SigmaType), SYN_IE(ThetaType),
 	mkDictTy,
 	mkRhoTy, splitRhoTy, mkTheta,
 	mkSigmaTy, splitSigmaTy,
@@ -46,14 +47,15 @@ IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 -- friends:
 import Class	( classSig, classOpLocalType, GenClass{-instances-} )
-import Kind	( mkBoxedTypeKind, resultKind, notArrowKind )
-import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, isSynTyCon,
+import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
+import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon,
+		  isPrimTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
-import TyVar	( tyVarKind, GenTyVar{-instances-}, GenTyVarSet(..),
+import TyVar	( tyVarKind, GenTyVar{-instances-}, SYN_IE(GenTyVarSet),
 		  emptyTyVarSet, unionTyVarSets, minusTyVarSet,
 		  unitTyVarSet, nullTyVarEnv, lookupTyVarEnv,
-		  addOneToTyVarEnv, TyVarEnv(..) )
-import Usage	( usageOmega, GenUsage, Usage(..), UVar(..), UVarEnv(..),
+		  addOneToTyVarEnv, SYN_IE(TyVarEnv), SYN_IE(TyVar) )
+import Usage	( usageOmega, GenUsage, SYN_IE(Usage), SYN_IE(UVar), SYN_IE(UVarEnv),
 		  nullUVarEnv, addOneToUVarEnv, lookupUVarEnv, eqUVar,
 		  eqUsage )
 
@@ -233,19 +235,36 @@ getFunTy_maybe (AppTy (AppTy (TyConTy tycon _) arg) res)
 getFunTy_maybe (SynTy _ _ t)        = getFunTy_maybe t
 getFunTy_maybe other		    = Nothing
 
-getFunTyExpandingDicts_maybe :: Type -> Maybe (Type, Type)
-getFunTyExpandingDicts_maybe (FunTy arg result _) = Just (arg,result)
-getFunTyExpandingDicts_maybe
+getFunTyExpandingDicts_maybe :: Bool -- True <=> peek inside newtype applicatons
+			     -> Type
+			     -> Maybe (Type, Type)
+
+getFunTyExpandingDicts_maybe peek (FunTy arg result _) = Just (arg,result)
+getFunTyExpandingDicts_maybe peek
 	(AppTy (AppTy (TyConTy tycon _) arg) res) | isFunTyCon tycon = Just (arg, res)
-getFunTyExpandingDicts_maybe (SynTy _ _ t)        = getFunTyExpandingDicts_maybe t
-getFunTyExpandingDicts_maybe ty@(DictTy _ _ _)	  = getFunTyExpandingDicts_maybe (expandTy ty)
-getFunTyExpandingDicts_maybe other		  = Nothing
+getFunTyExpandingDicts_maybe peek (SynTy _ _ t)	    = getFunTyExpandingDicts_maybe peek t
+getFunTyExpandingDicts_maybe peek ty@(DictTy _ _ _) = getFunTyExpandingDicts_maybe peek (expandTy ty)
+getFunTyExpandingDicts_maybe peek other
+  | not peek = Nothing -- that was easy
+  | otherwise
+  = case (maybeAppTyCon other) of
+      Nothing -> Nothing
+      Just (tc, arg_tys)
+        | not (isNewTyCon tc) -> Nothing
+	| otherwise ->
+	  let
+	     [newtype_con] = tyConDataCons tc -- there must be exactly one...
+	     [inside_ty]   = dataConArgTys newtype_con arg_tys
+	  in
+	  getFunTyExpandingDicts_maybe peek inside_ty
 
-splitFunTy		 :: GenType t u -> ([GenType t u], GenType t u)
-splitFunTyExpandingDicts :: Type	-> ([Type], Type)
+splitFunTy			   :: GenType t u -> ([GenType t u], GenType t u)
+splitFunTyExpandingDicts	   :: Type	  -> ([Type], Type)
+splitFunTyExpandingDictsAndPeeking :: Type	  -> ([Type], Type)
 
-splitFunTy		 t = split_fun_ty getFunTy_maybe	       t
-splitFunTyExpandingDicts t = split_fun_ty getFunTyExpandingDicts_maybe t
+splitFunTy		           t = split_fun_ty getFunTy_maybe			 t
+splitFunTyExpandingDicts           t = split_fun_ty (getFunTyExpandingDicts_maybe False) t
+splitFunTyExpandingDictsAndPeeking t = split_fun_ty (getFunTyExpandingDicts_maybe True)  t
 
 split_fun_ty get t = go t []
   where
@@ -606,7 +625,7 @@ applyTypeEnvToTy tenv ty
     deflt_forall_tv tv  = case (lookup_tv tv) of
 			    Nothing -> tv
 			    Just (TyVarTy tv2) -> tv2
-			    _ -> panic "applyTypeEnvToTy"
+			    _ -> pprPanic "applyTypeEnvToTy:" (ppAbove (ppr PprShowAll tv) (ppr PprShowAll ty))
 \end{code}
 
 \begin{code}
@@ -616,15 +635,25 @@ instantiateUsage
 instantiateUsage = panic "instantiateUsage: not implemented"
 \end{code}
 
+
 At present there are no unboxed non-primitive types, so
 isUnboxedType is the same as isPrimType.
 
+We're a bit cavalier about finding out whether something is
+primitive/unboxed or not.  Rather than deal with the type
+arguemnts we just zoom into the function part of the type.
+That is, given (T a) we just recurse into the "T" part,
+ignoring "a".
+
 \begin{code}
-isPrimType, isUnboxedType :: GenType tyvar uvar -> Bool
+isPrimType, isUnboxedType :: Type -> Bool
 
 isPrimType (AppTy ty _)      = isPrimType ty
 isPrimType (SynTy _ _ ty)    = isPrimType ty
-isPrimType (TyConTy tycon _) = isPrimTyCon tycon
+isPrimType (TyConTy tycon _) = case maybeNewTyCon tycon of
+				  Just (tyvars, ty) -> isPrimType ty
+				  Nothing 	    -> isPrimTyCon tycon
+
 isPrimType _ 		     = False
 
 isUnboxedType = isPrimType
@@ -632,16 +661,18 @@ isUnboxedType = isPrimType
 
 This is *not* right: it is a placeholder (ToDo 96/03 WDP):
 \begin{code}
-typePrimRep :: GenType tyvar uvar -> PrimRep
+typePrimRep :: Type -> PrimRep
 
 typePrimRep (SynTy _ _ ty)  = typePrimRep ty
 typePrimRep (AppTy ty _)    = typePrimRep ty
-typePrimRep (TyConTy tc _)  = if not (isPrimTyCon tc) then
-				 PtrRep
-			      else
-				 case (assocMaybe tc_primrep_list (uniqueOf tc)) of
+typePrimRep (TyConTy tc _)  
+  | isPrimTyCon tc	    = case (assocMaybe tc_primrep_list (uniqueOf tc)) of
 				   Just xx -> xx
 				   Nothing -> pprPanic "typePrimRep:" (pprTyCon PprDebug tc)
+
+  | otherwise		    = case maybeNewTyCon tc of
+				  Just (tyvars, ty) | isPrimType ty -> typePrimRep ty
+				  _ -> PtrRep 	-- Default
 
 typePrimRep _		    = PtrRep -- the "default"
 

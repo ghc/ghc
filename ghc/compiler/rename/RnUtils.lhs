@@ -7,10 +7,11 @@
 #include "HsVersions.h"
 
 module RnUtils (
-	RnEnv(..), QualNames(..),
-	UnqualNames(..), ScopeStack(..),
+	SYN_IE(RnEnv), SYN_IE(QualNames),
+	SYN_IE(UnqualNames), SYN_IE(ScopeStack),
 	emptyRnEnv, extendGlobalRnEnv, extendLocalRnEnv,
 	lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
+	getLocalsFromRnEnv,
 
 	lubExportFlag,
 
@@ -19,14 +20,16 @@ module RnUtils (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(partition))
 
 import Bag		( Bag, emptyBag, snocBag, unionBags )
-import CmdLineOpts	( opt_CompilingPrelude )
+import CmdLineOpts	( opt_CompilingGhcInternals )
 import ErrUtils		( addShortErrLocLine )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
-			  lookupFM, addListToFM, addToFM )
+			  lookupFM, addListToFM, addToFM, eltsFM )
 import Maybes		( maybeToBool )
-import Name		( RdrName(..), isQual, pprNonSym, getLocalName, ExportFlag(..) )
+import Name		( RdrName(..),  ExportFlag(..),
+			  isQual, pprNonSym, getLocalName, isLocallyDefined )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import RnHsSyn		( RnName )
@@ -56,6 +59,9 @@ extendLocalRnEnv  :: Bool -> RnEnv -> [RnName] -> (RnEnv, [RnName])
 lookupRnEnv 	  :: RnEnv -> RdrName -> Maybe RnName
 lookupGlobalRnEnv :: RnEnv -> RdrName -> Maybe RnName
 lookupTcRnEnv 	  :: RnEnv -> RdrName -> Maybe RnName
+
+getLocalsFromRnEnv :: RnEnv -> ([RnName], [RnName])
+	-- grabs the locally defined names from the unqual envs
 \end{code}
 
 If the @RdrName@ is a @Qual@, @lookupValue@ looks it up in the global
@@ -129,8 +135,9 @@ lookupRnEnv ((qual, unqual, _, _), stack) rdr
   = case rdr of 
       Unqual str   -> lookup stack str (lookup unqual str Nothing)
       Qual mod str -> lookup qual (str,mod)
-			(if not opt_CompilingPrelude -- see below
-			 then Nothing
+			(if not opt_CompilingGhcInternals -- see below
+			 then -- pprTrace "lookupRnEnv:" (ppAboves (ppCat [ppPStr mod, ppPStr str] : [ ppCat [ppPStr m, ppPStr s] | (s,m) <- keysFM qual ])) $
+			      Nothing
 			 else lookup unqual str Nothing)
   where
     lookup fm thing do_on_fail
@@ -143,7 +150,7 @@ lookupGlobalRnEnv ((qual, unqual, _, _), _) rdr
       Unqual str   -> lookupFM unqual str
       Qual mod str -> case (lookupFM qual (str,mod)) of
 			Just xx -> Just xx
-			Nothing -> if not opt_CompilingPrelude then
+			Nothing -> if not opt_CompilingGhcInternals then
 				      Nothing
 				   else -- "[]" may have turned into "Prelude.[]" and
 				        -- we are actually compiling "data [] a = ...";
@@ -156,10 +163,14 @@ lookupTcRnEnv ((_, _, tc_qual, tc_unqual), _) rdr
       Unqual str   -> lookupFM tc_unqual str
       Qual mod str -> case (lookupFM tc_qual (str,mod)) of -- as above
 			Just xx -> Just xx
-			Nothing -> if not opt_CompilingPrelude then
+			Nothing -> if not opt_CompilingGhcInternals then
 				      Nothing
 				   else
 				      lookupFM tc_unqual str
+
+getLocalsFromRnEnv ((_, vals, _, tcs), _)
+  = (filter isLocallyDefined (eltsFM vals),
+     filter isLocallyDefined (eltsFM tcs))
 \end{code}
 
 *********************************************************

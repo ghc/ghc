@@ -29,12 +29,12 @@ import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 
 import Bag	
-import Class		( Class(..), classSelIds )
+import Class		( SYN_IE(Class), classSelIds )
 import Digraph		( findSCCs, SCC(..) )
 import Name		( getSrcLoc )
 import PprStyle
 import Pretty
-import UniqSet		( UniqSet(..), emptyUniqSet,
+import UniqSet		( SYN_IE(UniqSet), emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )

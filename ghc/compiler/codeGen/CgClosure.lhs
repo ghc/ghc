@@ -13,7 +13,7 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 module CgClosure ( cgTopRhsClosure, cgRhsClosure ) where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(CgLoop2)		( cgExpr, cgSccExpr )
+IMPORT_DELOOPER(CgLoop2)	( cgExpr )
 
 import CgMonad
 import AbsCSyn
@@ -50,9 +50,9 @@ import ClosureInfo	-- lots and lots of stuff
 import CmdLineOpts	( opt_ForConcurrent, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre, currentOrSubsumedCosts,
 			  noCostCentreAttached, costsAreSubsumed,
-			  isCafCC, overheadCostCentre
+			  isCafCC, isDictCC, overheadCostCentre
 			)
-import HeapOffs		( VirtualHeapOffset(..) )
+import HeapOffs		( SYN_IE(VirtualHeapOffset) )
 import Id		( idType, idPrimRep, 
 			  showId, getIdStrictness, dataConTag,
 			  emptyIdSet,
@@ -411,7 +411,7 @@ closureCodeBody binder_info closure_info cc [] body
     body_addr   = CLbl (entryLabelFromCI closure_info) CodePtrRep
     body_code   = profCtrC SLIT("ENT_THK") [] 			`thenC`
 		  enterCostCentreCode closure_info cc IsThunk	`thenC`
-		  thunkWrapper closure_info (cgSccExpr body)
+		  thunkWrapper closure_info (cgExpr body)
 
     stdUpd      = CLbl mkErrorStdEntryLabel CodePtrRep
 \end{code}
@@ -581,6 +581,9 @@ Node is guaranteed to point to it, if profiling and not inherited.
 
 \begin{code}
 data IsThunk = IsThunk | IsFunction -- Bool-like, local
+#ifdef DEBUG
+	deriving Eq
+#endif
 
 enterCostCentreCode :: ClosureInfo -> CostCentre -> IsThunk -> Code
 
@@ -588,37 +591,31 @@ enterCostCentreCode closure_info cc is_thunk
   = costCentresFlag	`thenFC` \ profiling_on ->
     if not profiling_on then
 	nopC
-    else -- down to business
+    else
 	ASSERT(not (noCostCentreAttached cc))
 
 	if costsAreSubsumed cc then
-	    nopC
+	    ASSERT(isToplevClosure closure_info)
+	    ASSERT(is_thunk == IsFunction)
+	    costCentresC SLIT("ENTER_CC_FSUB") []
 
-	else if is_current_CC cc then -- fish the CC out of the closure,
-				      -- where we put it when we alloc'd;
-				      -- NB: chk defn of "is_current_CC"
-				      -- if you go to change this! (WDP 94/12)
-	    costCentresC
-		(case is_thunk of
-		   IsThunk    -> SLIT("ENTER_CC_TCL")
-		   IsFunction -> SLIT("ENTER_CC_FCL"))
-		[CReg node]
+	else if currentOrSubsumedCosts cc then 
+	    -- i.e. current; subsumed dealt with above
+	    -- get CCC out of the closure, where we put it when we alloc'd
+	    case is_thunk of 
+		IsThunk    -> costCentresC SLIT("ENTER_CC_TCL") [CReg node]
+		IsFunction -> costCentresC SLIT("ENTER_CC_FCL") [CReg node]
 
-	else if isCafCC cc then
-	    costCentresC
-		SLIT("ENTER_CC_CAF")
-		[mkCCostCentre cc]
+	else if isCafCC cc && isToplevClosure closure_info then
+	    ASSERT(is_thunk == IsThunk)
+	    costCentresC SLIT("ENTER_CC_CAF") [mkCCostCentre cc]
 
 	else -- we've got a "real" cost centre right here in our hands...
-	    costCentresC
-		(case is_thunk of
-		   IsThunk    -> SLIT("ENTER_CC_T")
-		   IsFunction -> SLIT("ENTER_CC_F"))
-		[mkCCostCentre cc]
-  where
-    is_current_CC cc
-      = currentOrSubsumedCosts cc
-	-- but we've already ruled out "subsumed", so it must be "current"!
+	    case is_thunk of 
+		IsThunk    -> costCentresC SLIT("ENTER_CC_T") [mkCCostCentre cc]
+		IsFunction -> if isCafCC cc || isDictCC cc
+			      then costCentresC SLIT("ENTER_CC_FCAF") [mkCCostCentre cc]
+			      else costCentresC SLIT("ENTER_CC_FLOAD") [mkCCostCentre cc]
 \end{code}
 
 %************************************************************************
@@ -933,6 +930,7 @@ chooseDynCostCentres cc args fvs body
 		| just1 == fun
 		-> mkCCostCentre overheadCostCentre
 	      _ -> use_cc
+
 	    -- if it's an utterly trivial RHS, then it must be
 	    -- one introduced by boxHigherOrderArgs for profiling,
 	    -- so we charge it to "OVERHEAD".

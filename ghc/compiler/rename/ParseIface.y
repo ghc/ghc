@@ -12,7 +12,7 @@ import RdrHsSyn		-- oodles of synonyms
 import HsPragmas	( noGenPragmas )
 
 import Bag		( emptyBag, unitBag, snocBag )
-import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM )
+import FiniteMap	( emptyFM, unitFM, addToFM, plusFM, bagToFM, FiniteMap )
 import Name		( ExportFlag(..), mkTupNameStr, preludeQual,
 			  RdrName(..){-instance Outputable:ToDo:rm-}
 			)
@@ -54,6 +54,7 @@ parseIface = parseIToks . lexIface
 	DCOLON		    { ITdcolon }
 	DOTDOT		    { ITdotdot }
 	EQUAL		    { ITequal }
+	FORALL		    { ITforall }
 	INFIX		    { ITinfix }
 	INFIXL		    { ITinfixl }
 	INFIXR		    { ITinfixr }
@@ -228,8 +229,10 @@ class		:: { (RdrName, RdrName) }
 class		:  gtycon VARID			{ ($1, Unqual $2) }
 
 ctype		:: { RdrNamePolyType }
-ctype		: context DARROW type  { HsPreForAllTy $1 $3 }
-		| type		       { HsPreForAllTy [] $1 }
+ctype		: FORALL OBRACK tyvars CBRACK context DARROW type  { HsForAllTy (map Unqual $3) $5 $7 }
+		| FORALL OBRACK tyvars CBRACK type		       { HsForAllTy (map Unqual $3) [] $5 }
+		| context DARROW type	{{-ToDo:rm-} HsPreForAllTy $1 $3 }
+		| type		        {{-ToDo:change-} HsPreForAllTy [] $1 }
 
 type		:: { RdrNameMonoType }
 type		:  btype		{ $1 }
@@ -313,13 +316,9 @@ btyconapp	:: { (RdrName, [RdrNameBangType]) }
 btyconapp	:  gtycon			{ ($1, []) }
 		|  btyconapp batype		{ case $1 of (tc,tys) -> (tc, tys ++ [$2]) }
 
-bbtype		:: { RdrNameBangType }
-bbtype		:  btype			{ Unbanged (HsPreForAllTy [] $1) }
-		|  BANG atype			{ Banged   (HsPreForAllTy [] $2) }
-
 batype		:: { RdrNameBangType }
-batype		:  atype			{ Unbanged (HsPreForAllTy [] $1) }
-		|  BANG atype			{ Banged   (HsPreForAllTy [] $2) }
+batype		:  atype			{ Unbanged (HsForAllTy [{-ToDo:tvs-}] [] $1) }
+		|  BANG atype			{ Banged   (HsForAllTy [{-ToDo:tvs-}] [] $2) }
 
 batypes		:: { [RdrNameBangType] }
 batypes		:  batype			{ [$1] }
@@ -330,8 +329,8 @@ fields		: field				{ [$1] }
 		| fields COMMA field		{ $1 ++ [$3] }
 
 field		:: { ([RdrName], RdrNameBangType) }
-field		:  var DCOLON type	    { ([$1], Unbanged (HsPreForAllTy [] $3)) }
-		|  var DCOLON BANG atype    { ([$1], Banged   (HsPreForAllTy [] $4)) }
+field		:  var DCOLON type	    { ([$1], Unbanged (HsForAllTy [{-ToDo:tvs-}] [] $3)) }
+		|  var DCOLON BANG atype    { ([$1], Banged   (HsForAllTy [{-ToDo:tvs-}] [] $4)) }
 
 constr1		:: { (RdrName, RdrNameMonoType) }
 constr1		:  gtycon atype	{ ($1, $2) }
@@ -347,11 +346,14 @@ qname		:  QVARID		{ $1 }
 		|  QCONSYM		{ $1 }
 
 name		:: { FAST_STRING }
-name		:  VARID	{ $1 }
-		|  CONID	{ $1 }
-		|  VARSYM	{ $1 }
-		|  BANG  	{ SLIT("!"){-sigh, double-sigh-} }
-		|  CONSYM	{ $1 }
+name		:  VARID		{ $1 }
+		|  CONID		{ $1 }
+		|  VARSYM		{ $1 }
+		|  BANG  		{ SLIT("!"){-sigh, double-sigh-} }
+		|  CONSYM		{ $1 }  
+		|  OBRACK CBRACK	{ SLIT("[]") }
+		|  OPAREN CPAREN	{ SLIT("()") }
+		|  OPAREN commas CPAREN	{ mkTupNameStr $2 }
 
 instances_part	:: { Bag RdrIfaceInst }
 instances_part	:  INSTANCES_PART instdecls { $2 }
@@ -362,13 +364,15 @@ instdecls	:  instd		    { unitBag $1 }
 		|  instdecls instd	    { $1 `snocBag` $2 }
 
 instd		:: { RdrIfaceInst }
-instd		:  INSTANCE context DARROW gtycon restrict_inst	SEMI { mk_inst $2 $4 $5 }
-		|  INSTANCE		   gtycon general_inst	SEMI { mk_inst [] $2 $3 }
+instd		:  INSTANCE FORALL OBRACK tyvars CBRACK context DARROW gtycon restrict_inst SEMI { mk_inst (Just (map Unqual $4)) $6 $8 $9 }
+		|  INSTANCE FORALL OBRACK tyvars CBRACK		       gtycon general_inst  SEMI { mk_inst (Just (map Unqual $4)) [] $6 $7 }
+		|  INSTANCE context DARROW gtycon restrict_inst	SEMI {{-ToDo:rm-} mk_inst Nothing $2 $4 $5 }
+		|  INSTANCE		   gtycon general_inst	SEMI {{-ToDo:rm-} mk_inst Nothing [] $2 $3 }
 
 restrict_inst	:: { RdrNameMonoType }
 restrict_inst	:  gtycon				{ MonoTyApp $1 [] }
-		|  OPAREN gtyconvars CPAREN		{ case $2 of (tc,tvs) -> MonoTyApp tc (map en_mono tvs) }
-		|  OPAREN VARID COMMA tyvar_list CPAREN	{ MonoTupleTy (map en_mono ($2:$4)) }
+		|  OPAREN gtyconvars CPAREN		{ case $2 of (tc,tvs) -> MonoTyApp tc (map en_mono (reverse tvs)) }
+		|  OPAREN VARID COMMA tyvars CPAREN	{ MonoTupleTy (map en_mono ($2:$4)) }
 		|  OBRACK VARID CBRACK			{ MonoListTy (en_mono $2) }
 		|  OPAREN VARID RARROW VARID CPAREN	{ MonoFunTy (en_mono $2) (en_mono $4) }
 
@@ -379,9 +383,9 @@ general_inst	:  gtycon				{ MonoTyApp $1 [] }
 		|  OBRACK type CBRACK			{ MonoListTy $2 }
 		|  OPAREN btype RARROW type CPAREN	{ MonoFunTy $2 $4 }
 
-tyvar_list	:: { [FAST_STRING] }
-tyvar_list	:  VARID		    { [$1] }
-		|  tyvar_list COMMA VARID   { $1 ++ [$3]
+tyvars		:: { [FAST_STRING] }
+tyvars		:  VARID		    { [$1] }
+		|  tyvars COMMA VARID   { $1 ++ [$3]
 --------------------------------------------------------------------------
 					    }
 

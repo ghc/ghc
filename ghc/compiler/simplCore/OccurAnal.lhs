@@ -25,16 +25,16 @@ import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnComp )
 import Id		( idWantsToBeINLINEd, isConstMethodId,
+			  externallyVisibleId,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  unitIdSet, elementOfIdSet,
-			  addOneToIdSet, IdSet(..),
+			  addOneToIdSet, SYN_IE(IdSet),
 			  nullIdEnv, unitIdEnv, combineIdEnvs,
 			  delOneFromIdEnv, delManyFromIdEnv,
-			  mapIdEnv, lookupIdEnv, IdEnv(..),
+			  mapIdEnv, lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Eq-}
 			)
 import Maybes		( maybeToBool )
-import Name		( isExported )
 import Outputable	( Outputable(..){-instance * (,) -} )
 import PprCore
 import PprStyle		( PprStyle(..) )
@@ -138,7 +138,7 @@ tagBinder usage binder
     )
 
 usage_of usage binder
-  | isExported binder = ManyOcc	0 -- Exported things count as many
+  | externallyVisibleId binder = ManyOcc 0 -- Visible-elsewhere things count as many
   | otherwise
   = case (lookupIdEnv usage binder) of
       Nothing   -> DeadCode
@@ -171,7 +171,7 @@ occurAnalyseBinds binds simplifier_sw_chkr
 				     binds'
   | otherwise		  = binds'
   where
-    (_, binds') = do initial_env binds
+    (_, binds') = doo initial_env binds
 
     initial_env = OccEnv (simplifier_sw_chkr KeepUnusedBindings)
 			 (simplifier_sw_chkr KeepSpecPragmaIds)
@@ -179,12 +179,12 @@ occurAnalyseBinds binds simplifier_sw_chkr
 			 (simplifier_sw_chkr IgnoreINLINEPragma)
 			 emptyIdSet
 
-    do env [] = (emptyDetails, [])
-    do env (bind:binds)
+    doo env [] = (emptyDetails, [])
+    doo env (bind:binds)
       = (final_usage, new_binds ++ the_rest)
       where
 	new_env			 = env `addNewCands` (bindersOf bind)
-	(binds_usage, the_rest)  = do new_env binds
+	(binds_usage, the_rest)  = doo new_env binds
 	(final_usage, new_binds) = occAnalBind env bind binds_usage
 \end{code}
 

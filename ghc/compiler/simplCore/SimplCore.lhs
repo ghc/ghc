@@ -41,7 +41,7 @@ import FoldrBuildWW	( mkFoldrBuildWW )
 import Id		( idType, toplevelishId, idWantsToBeINLINEd,
 			  unfoldingUnfriendlyId,
 			  nullIdEnv, addOneToIdEnv, delOneFromIdEnv,
-			  lookupIdEnv, IdEnv(..),
+			  lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}
 			)
 import IdInfo		( mkUnfolding )
@@ -49,12 +49,11 @@ import LiberateCase	( liberateCase )
 import MagicUFs		( MagicUnfoldingFun )
 import Maybes		( maybeToBool )
 import Outputable	( Outputable(..){-instance * (,) -} )
-import PprCore		( pprCoreBinding, GenCoreExpr{-instance Outputable-} )
+import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import Pretty		( ppShow, ppAboves, ppAbove, ppCat, ppStr )
 import SAT		( doStaticArgs )
-import SCCauto		( addAutoCostCentres )
 import SimplMonad	( zeroSimplCount, showSimplCount, SimplCount )
 import SimplPgm		( simplifyPgm )
 import SimplVar		( leastItCouldCost )
@@ -241,15 +240,8 @@ core2core core_todos module_name ppr_style us local_tycons tycon_specs binds
 	       end_pass False us2 binds2 inline_env spec_data simpl_stats "Deforestation" }
 #endif
 
-	  CoreDoAutoCostCentres
-	    -> _scc_ "AutoSCCs"
-	       begin_pass "AutoSCCs" >>
-	       case (addAutoCostCentres module_name binds) of { binds2 ->
-	       end_pass False us2 binds2 inline_env spec_data simpl_stats "AutoSCCs" }
-
 	  CoreDoPrintCore	-- print result of last pass
 	    -> end_pass True us2 binds inline_env spec_data simpl_stats "Print"
-
 
     -------------------------------------------------
 

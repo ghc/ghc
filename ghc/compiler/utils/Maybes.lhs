@@ -39,6 +39,8 @@ module Maybes (
 
 CHK_Ubiq() -- debugging consistency check
 
+import Unique (Unique) -- only for specialising
+
 #endif
 \end{code}
 
@@ -129,14 +131,11 @@ assocMaybe alist key
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
 
 #if defined(COMPILING_GHC)
-{-? SPECIALIZE assocMaybe
-	:: [(String,        b)] -> String        -> Maybe b,
-	   [(Id,            b)] -> Id            -> Maybe b,
-	   [(Class,         b)] -> Class         -> Maybe b,
-	   [(Int,           b)] -> Int           -> Maybe b,
-	   [(Name,          b)] -> Name          -> Maybe b,
-	   [(TyVar,         b)] -> TyVar         -> Maybe b,
-	   [(TyVarTemplate, b)] -> TyVarTemplate -> Maybe b
+{-# SPECIALIZE assocMaybe
+	:: [(FAST_STRING,   b)] -> FAST_STRING -> Maybe b
+	 , [(Int,           b)] -> Int         -> Maybe b
+	 , [(Unique,        b)] -> Unique      -> Maybe b
+	 , [(RdrName,       b)] -> RdrName     -> Maybe b
   #-}
 #endif
 \end{code}

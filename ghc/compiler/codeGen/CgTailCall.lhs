@@ -37,14 +37,14 @@ import ClosureInfo	( nodeMustPointToIt,
 			  getEntryConvention, EntryConvention(..)
 			)
 import CmdLineOpts	( opt_DoSemiTagging )
-import HeapOffs		( zeroOff, VirtualSpAOffset(..) )
+import HeapOffs		( zeroOff, SYN_IE(VirtualSpAOffset) )
 import Id		( idType, dataConTyCon, dataConTag,
 			  fIRST_TAG
 			)
 import Literal		( mkMachInt )
 import Maybes		( assocMaybe )
 import PrimRep		( PrimRep(..) )
-import StgSyn		( StgArg(..), GenStgArg(..), StgLiveVars(..) )
+import StgSyn		( SYN_IE(StgArg), GenStgArg(..), SYN_IE(StgLiveVars) )
 import Type		( isPrimType )
 import Util		( zipWithEqual, panic, assertPanic )
 \end{code}

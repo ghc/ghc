@@ -2,7 +2,7 @@ Break loops caused by cgExpr and getPrimOpArgAmodes.
 \begin{code}
 interface CgLoop2 where
 
-import CgExpr	( cgExpr, cgSccExpr, getPrimOpArgAmodes )
+import CgExpr	( cgExpr, getPrimOpArgAmodes )
 
 import AbsCSyn	( CAddrMode )
 import CgMonad	( Code(..), FCode(..) )
@@ -10,6 +10,5 @@ import PrimOp	( PrimOp )
 import StgSyn	( StgExpr(..), StgArg(..) )
 
 cgExpr		   :: StgExpr -> Code
-cgSccExpr	   :: StgExpr -> Code
 getPrimOpArgAmodes :: PrimOp -> [StgArg] -> FCode [CAddrMode]
 \end{code}

@@ -43,10 +43,12 @@ module TysWiredIn (
 	mkLiftTy,
 	mkListTy,
 	mkPrimIoTy,
+	mkStateTy,
 	mkStateTransformerTy,
 	mkTupleTy,
 	nilDataCon,
 	primIoTyCon,
+	primIoDataCon,
 	realWorldStateTy,
 	return2GMPsTyCon,
 	returnIntAndGMPTyCon,
@@ -91,16 +93,16 @@ import PrelMods
 import TysPrim
 
 -- others:
-import SpecEnv		( SpecEnv(..) )
+import SpecEnv		( SYN_IE(SpecEnv) )
 import Kind		( mkBoxedTypeKind, mkArrowKind )
-import Name		( mkWiredInName )
+import Name		( mkWiredInName, ExportFlag(..) )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 			  NewOrData(..), TyCon
 			)
 import Type		( mkTyConTy, applyTyCon, mkSigmaTy,
 			  mkFunTys, maybeAppTyCon,
-			  GenType(..), ThetaType(..), TauType(..) )
+			  GenType(..), SYN_IE(ThetaType), SYN_IE(TauType) )
 import TyVar		( tyVarKind, alphaTyVar, betaTyVar )
 import Unique
 import Util		( assoc, panic )
@@ -122,7 +124,7 @@ pcDataTyCon = pc_tycon DataType
 pcNewTyCon  = pc_tycon NewType
 
 pc_tycon new_or_data key mod str tyvars cons
-  = mkDataTyCon (mkWiredInName key (OrigName mod str)) tycon_kind 
+  = mkDataTyCon (mkWiredInName key (OrigName mod str) ExportAll) tycon_kind 
 		tyvars [{-no context-}] cons [{-no derivings-}]
 		new_or_data
   where
@@ -131,7 +133,7 @@ pc_tycon new_or_data key mod str tyvars cons
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
 	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
 pcDataCon key mod str tyvars context arg_tys tycon specenv
-  = mkDataCon (mkWiredInName key (OrigName mod str))
+  = mkDataCon (mkWiredInName key (OrigName mod str) ExportAll)
 	[ NotMarkedStrict | a <- arg_tys ]
 	[ {- no labelled fields -} ]
 	tyvars context arg_tys tycon
@@ -453,17 +455,15 @@ stTyCon = pcNewTyCon stTyConKey gHC__ SLIT("ST") alpha_beta_tyvars [stDataCon]
 %*									*
 %************************************************************************
 
-@PrimIO@ and @IO@ really are just plain synonyms.
-
 \begin{code}
 mkPrimIoTy a = applyTyCon primIoTyCon [a]
 
 primIoTyCon = pcNewTyCon primIoTyConKey gHC__ SLIT("PrimIO") alpha_tyvar [primIoDataCon]
+
+primIoDataCon = pcDataCon primIoDataConKey gHC__ SLIT("PrimIO")
+		    alpha_tyvar [] [ty] primIoTyCon nullSpecEnv
   where
     ty = mkFunTys [mkStateTy realWorldTy] (mkTupleTy 2 [alphaTy, mkStateTy realWorldTy])
-
-    primIoDataCon = pcDataCon primIoDataConKey gHC__ SLIT("PrimIO")
-			alpha_tyvar [] [ty] primIoTyCon nullSpecEnv
 \end{code}
 
 %************************************************************************
@@ -530,12 +530,12 @@ trueDataCon  = pcDataCon trueDataConKey	 pRELUDE SLIT("True")  [] [] [] boolTyCo
 %************************************************************************
 
 Special syntax, deeply wired in, but otherwise an ordinary algebraic
-data type:
+data types:
 \begin{verbatim}
-data List a = Nil | a : (List a)
-ToDo: data [] a = [] | a : (List a)
-ToDo: data () = ()
-      data (,,) a b c = (,,) a b c
+data [] a = [] | a : (List a)
+data () = ()
+data (,) a b = (,,) a b
+...
 \end{verbatim}
 
 \begin{code}

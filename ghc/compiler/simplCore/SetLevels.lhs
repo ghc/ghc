@@ -32,7 +32,7 @@ import Id		( idType, mkSysLocal, toplevelishId,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
 			  unionManyIdSets, minusIdSet, mkIdSet,
 			  idSetToList,
-			  lookupIdEnv, IdEnv(..)
+			  lookupIdEnv, SYN_IE(IdEnv)
 			)
 import Pretty		( ppStr, ppBesides, ppChar, ppInt )
 import SrcLoc		( mkUnknownSrcLoc )
@@ -40,13 +40,14 @@ import Type		( isPrimType, mkTyVarTys, mkForAllTys )
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv,
 			  growTyVarEnvList, lookupTyVarEnv,
 			  tyVarSetToList,
-			  TyVarEnv(..),
+			  SYN_IE(TyVarEnv),
 			  unionManyTyVarSets
 			)
 import UniqSupply	( thenUs, returnUs, mapUs, mapAndUnzipUs,
-			  mapAndUnzip3Us, getUnique, UniqSM(..)
+			  mapAndUnzip3Us, getUnique, SYN_IE(UniqSM),
+			  UniqSupply
 			)
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Util		( mapAccumL, zipWithEqual, zipEqual, panic, assertPanic )
 
 isLeakFreeType x y = False -- safe option; ToDo
@@ -406,7 +407,7 @@ setFloatLevel alreadyLetBound ctxt_lvl envs@(venv, tenv)
 -- any harm, and not floating it may pin something important.  For
 -- example
 --
---	x = let v = Nil
+--	x = let v = []
 --	        w = 1:v
 --	    in ...
 --

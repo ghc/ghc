@@ -6,14 +6,99 @@
 \begin{code}
 #include "HsVersions.h"
 
-module CmdLineOpts where
+module CmdLineOpts (
+	CoreToDo(..),
+	SimplifierSwitch(..),
+	StgToDo(..),
+	SwitchResult(..),
+	classifyOpts,
 
+	intSwitchSet,
+	switchIsOn,
+
+	maybe_CompilingGhcInternals,
+	opt_AllDemanded,
+	opt_AllStrict,
+	opt_AutoSccsOnAllToplevs,
+	opt_AutoSccsOnExportedToplevs,
+	opt_AutoSccsOnIndividualCafs,
+	opt_CompilingGhcInternals,
+	opt_UsingGhcInternals,
+	opt_D_dump_absC,
+	opt_D_dump_asm,
+	opt_D_dump_deforest,
+	opt_D_dump_deriv,
+	opt_D_dump_ds,
+	opt_D_dump_flatC,
+	opt_D_dump_occur_anal,
+	opt_D_dump_rdr,
+	opt_D_dump_realC,
+	opt_D_dump_rn,
+	opt_D_dump_simpl,
+	opt_D_dump_spec,
+	opt_D_dump_stg,
+	opt_D_dump_stranal,
+	opt_D_dump_tc,
+	opt_D_show_passes,
+	opt_D_simplifier_stats,
+	opt_D_source_stats,
+	opt_D_verbose_core2core,
+	opt_D_verbose_stg2stg,
+	opt_DoCoreLinting,
+	opt_DoSemiTagging,
+	opt_DoTickyProfiling,
+	opt_EnsureSplittableC,
+	opt_FoldrBuildOn,
+	opt_FoldrBuildTrace,
+	opt_ForConcurrent,
+	opt_GlasgowExts,
+	opt_GranMacros,
+	opt_Haskell_1_3,
+	opt_HiMap,
+	opt_HideBuiltinNames,
+	opt_HideMostBuiltinNames,
+	opt_IgnoreIfacePragmas,
+	opt_IgnoreStrictnessPragmas,
+	opt_IrrefutableEverything,
+	opt_IrrefutableTuples,
+	opt_NoImplicitPrelude,
+	opt_NumbersStrict,
+	opt_OmitBlackHoling,
+	opt_OmitDefaultInstanceMethods,
+	opt_OmitInterfacePragmas,
+	opt_PprStyle_All,
+	opt_PprStyle_Debug,
+	opt_PprStyle_User,
+	opt_ProduceC,
+	opt_ProduceHi,
+	opt_ProduceS,
+	opt_ReportWhyUnfoldingsDisallowed,
+	opt_ReturnInRegsThreshold,
+	opt_SccGroup,
+	opt_SccProfilingOn,
+	opt_ShowImportSpecs,
+	opt_ShowPragmaNameErrs,
+	opt_SigsRequired,
+	opt_SpecialiseAll,
+	opt_SpecialiseImports,
+	opt_SpecialiseOverloaded,
+	opt_SpecialiseTrace,
+	opt_SpecialiseUnboxed,
+	opt_StgDoLetNoEscapes,
+	opt_UnfoldingCreationThreshold,
+	opt_UnfoldingOverrideThreshold,
+	opt_UnfoldingUseThreshold,
+	opt_Verbose,
+	opt_WarnNameShadowing
+    ) where
+
+IMPORT_1_3(Array(array, (//)))
 import PreludeGlaST	-- bad bad bad boy, Will (_Array internals)
 import Argv
 
 CHK_Ubiq() -- debugging consistency check
 
-import Maybes		( assocMaybe, firstJust, maybeToBool, Maybe(..) )
+import Maybes		( assocMaybe, firstJust, maybeToBool )
 import Util		( startsWith, panic, panic#, assertPanic )
 \end{code}
 
@@ -63,7 +148,6 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreDoStrictness
   | CoreDoSpecialising
   | CoreDoDeforest
-  | CoreDoAutoCostCentres
   | CoreDoFoldrBuildWorkerWrapper
   | CoreDoFoldrBuildWWAnal
 \end{code}
@@ -139,11 +223,11 @@ data SimplifierSwitch
 %************************************************************************
 
 \begin{code}
-lookup	   :: FAST_STRING -> Bool
+lookUp	   :: FAST_STRING -> Bool
 lookup_int :: String -> Maybe Int
 lookup_str :: String -> Maybe String
 
-lookup     sw = maybeToBool (assoc_opts sw)
+lookUp     sw = maybeToBool (assoc_opts sw)
 	
 lookup_str sw = firstJust (map (startsWith sw) unpacked_opts)
 
@@ -156,67 +240,68 @@ unpacked_opts = map _UNPK_ argv
 \end{code}
 
 \begin{code}
-opt_AllDemanded			= lookup  SLIT("-fall-demanded")
-opt_AllStrict			= lookup  SLIT("-fall-strict")
-opt_AutoSccsOnAllToplevs	= lookup  SLIT("-fauto-sccs-on-all-toplevs")
-opt_AutoSccsOnExportedToplevs	= lookup  SLIT("-fauto-sccs-on-exported-toplevs")
-opt_AutoSccsOnIndividualCafs	= lookup  SLIT("-fauto-sccs-on-individual-cafs")
-opt_D_dump_absC			= lookup  SLIT("-ddump-absC")
-opt_D_dump_asm			= lookup  SLIT("-ddump-asm")
-opt_D_dump_deforest		= lookup  SLIT("-ddump-deforest")
-opt_D_dump_deriv		= lookup  SLIT("-ddump-deriv")
-opt_D_dump_ds			= lookup  SLIT("-ddump-ds")
-opt_D_dump_flatC		= lookup  SLIT("-ddump-flatC")
-opt_D_dump_occur_anal		= lookup  SLIT("-ddump-occur-anal")
-opt_D_dump_rdr			= lookup  SLIT("-ddump-rdr")
-opt_D_dump_realC		= lookup  SLIT("-ddump-realC")
-opt_D_dump_rn			= lookup  SLIT("-ddump-rn")
-opt_D_dump_simpl		= lookup  SLIT("-ddump-simpl")
-opt_D_dump_spec			= lookup  SLIT("-ddump-spec")
-opt_D_dump_stg			= lookup  SLIT("-ddump-stg")
-opt_D_dump_stranal		= lookup  SLIT("-ddump-stranal")
-opt_D_dump_tc			= lookup  SLIT("-ddump-tc")
-opt_D_show_passes		= lookup  SLIT("-dshow-passes")
-opt_D_simplifier_stats		= lookup  SLIT("-dsimplifier-stats")
-opt_D_source_stats		= lookup  SLIT("-dsource-stats")
-opt_D_verbose_core2core		= lookup  SLIT("-dverbose-simpl")
-opt_D_verbose_stg2stg		= lookup  SLIT("-dverbose-stg")
-opt_DoCoreLinting		= lookup  SLIT("-dcore-lint")
-opt_DoSemiTagging		= lookup  SLIT("-fsemi-tagging")
-opt_DoTickyProfiling		= lookup  SLIT("-fticky-ticky")
-opt_FoldrBuildOn		= lookup  SLIT("-ffoldr-build-on")
-opt_FoldrBuildTrace		= lookup  SLIT("-ffoldr-build-trace")
-opt_ForConcurrent		= lookup  SLIT("-fconcurrent")
-opt_GranMacros			= lookup  SLIT("-fgransim")
-opt_GlasgowExts			= lookup  SLIT("-fglasgow-exts")
-opt_Haskell_1_3			= lookup  SLIT("-fhaskell-1.3")
-opt_HideBuiltinNames		= lookup  SLIT("-fhide-builtin-names")
-opt_HideMostBuiltinNames	= lookup  SLIT("-fmin-builtin-names")
-opt_IgnoreStrictnessPragmas	= lookup  SLIT("-fignore-strictness-pragmas")
-opt_IrrefutableEverything	= lookup  SLIT("-firrefutable-everything")
-opt_IrrefutableTuples		= lookup  SLIT("-firrefutable-tuples")
-opt_WarnNameShadowing		= lookup  SLIT("-fwarn-name-shadowing")
-opt_NumbersStrict		= lookup  SLIT("-fnumbers-strict")
-opt_OmitBlackHoling		= lookup  SLIT("-dno-black-holing")
-opt_OmitDefaultInstanceMethods	= lookup  SLIT("-fomit-default-instance-methods")
-opt_OmitInterfacePragmas	= lookup  SLIT("-fomit-interface-pragmas")
-opt_PprStyle_All		= lookup  SLIT("-dppr-all")
-opt_PprStyle_Debug		= lookup  SLIT("-dppr-debug")
-opt_PprStyle_User		= lookup  SLIT("-dppr-user")
-opt_ReportWhyUnfoldingsDisallowed= lookup SLIT("-freport-disallowed-unfoldings")
-opt_SccProfilingOn		= lookup  SLIT("-fscc-profiling")
-opt_ShowImportSpecs		= lookup  SLIT("-fshow-import-specs")
-opt_ShowPragmaNameErrs		= lookup  SLIT("-fshow-pragma-name-errs")
-opt_SigsRequired		= lookup  SLIT("-fsignatures-required")
-opt_SpecialiseAll		= lookup  SLIT("-fspecialise-all")
-opt_SpecialiseImports		= lookup  SLIT("-fspecialise-imports")
-opt_SpecialiseOverloaded	= lookup  SLIT("-fspecialise-overloaded")
-opt_SpecialiseTrace		= lookup  SLIT("-ftrace-specialisation")
-opt_SpecialiseUnboxed		= lookup  SLIT("-fspecialise-unboxed")
-opt_StgDoLetNoEscapes		= lookup  SLIT("-flet-no-escape")
-opt_Verbose			= lookup  SLIT("-v")
-opt_CompilingPrelude		= maybeToBool maybe_CompilingPrelude
-maybe_CompilingPrelude		= lookup_str "-fcompiling-prelude="
+opt_AllDemanded			= lookUp  SLIT("-fall-demanded")
+opt_AllStrict			= lookUp  SLIT("-fall-strict")
+opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
+opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
+opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
+opt_D_dump_absC			= lookUp  SLIT("-ddump-absC")
+opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
+opt_D_dump_deforest		= lookUp  SLIT("-ddump-deforest")
+opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
+opt_D_dump_ds			= lookUp  SLIT("-ddump-ds")
+opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
+opt_D_dump_occur_anal		= lookUp  SLIT("-ddump-occur-anal")
+opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
+opt_D_dump_realC		= lookUp  SLIT("-ddump-realC")
+opt_D_dump_rn			= lookUp  SLIT("-ddump-rn")
+opt_D_dump_simpl		= lookUp  SLIT("-ddump-simpl")
+opt_D_dump_spec			= lookUp  SLIT("-ddump-spec")
+opt_D_dump_stg			= lookUp  SLIT("-ddump-stg")
+opt_D_dump_stranal		= lookUp  SLIT("-ddump-stranal")
+opt_D_dump_tc			= lookUp  SLIT("-ddump-tc")
+opt_D_show_passes		= lookUp  SLIT("-dshow-passes")
+opt_D_simplifier_stats		= lookUp  SLIT("-dsimplifier-stats")
+opt_D_source_stats		= lookUp  SLIT("-dsource-stats")
+opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
+opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
+opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
+opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
+opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
+opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
+opt_FoldrBuildTrace		= lookUp  SLIT("-ffoldr-build-trace")
+opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
+opt_GranMacros			= lookUp  SLIT("-fgransim")
+opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
+opt_Haskell_1_3			= lookUp  SLIT("-fhaskell-1.3")
+opt_HideBuiltinNames		= lookUp  SLIT("-fhide-builtin-names")
+opt_HideMostBuiltinNames	= lookUp  SLIT("-fmin-builtin-names")
+opt_IgnoreStrictnessPragmas	= lookUp  SLIT("-fignore-strictness-pragmas")
+opt_IrrefutableEverything	= lookUp  SLIT("-firrefutable-everything")
+opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
+opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
+opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
+opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
+opt_OmitDefaultInstanceMethods	= lookUp  SLIT("-fomit-default-instance-methods")
+opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
+opt_PprStyle_All		= lookUp  SLIT("-dppr-all")
+opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
+opt_PprStyle_User		= lookUp  SLIT("-dppr-user")
+opt_ReportWhyUnfoldingsDisallowed= lookUp SLIT("-freport-disallowed-unfoldings")
+opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
+opt_ShowImportSpecs		= lookUp  SLIT("-fshow-import-specs")
+opt_ShowPragmaNameErrs		= lookUp  SLIT("-fshow-pragma-name-errs")
+opt_SigsRequired		= lookUp  SLIT("-fsignatures-required")
+opt_SpecialiseAll		= lookUp  SLIT("-fspecialise-all")
+opt_SpecialiseImports		= lookUp  SLIT("-fspecialise-imports")
+opt_SpecialiseOverloaded	= lookUp  SLIT("-fspecialise-overloaded")
+opt_SpecialiseTrace		= lookUp  SLIT("-ftrace-specialisation")
+opt_SpecialiseUnboxed		= lookUp  SLIT("-fspecialise-unboxed")
+opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
+opt_Verbose			= lookUp  SLIT("-v")
+opt_UsingGhcInternals		= lookUp  SLIT("-fusing-ghc-internals")
+opt_CompilingGhcInternals	= maybeToBool maybe_CompilingGhcInternals
+maybe_CompilingGhcInternals	= lookup_str "-fcompiling-ghc-internals="
 opt_SccGroup  			= lookup_str "-G="
 opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="
@@ -228,8 +313,8 @@ opt_UnfoldingCreationThreshold	= lookup_int "-funfolding-creation-threshold"
 opt_UnfoldingOverrideThreshold	= lookup_int "-funfolding-override-threshold"
 opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 
-opt_NoImplicitPrelude		= lookup  SLIT("-fno-implicit-prelude")
-opt_IgnoreIfacePragmas		= lookup  SLIT("-fignore-interface-pragmas")
+opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
+opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 \end{code}
 
 \begin{code}
@@ -268,7 +353,6 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fstrictness"     -> CORE_TD(CoreDoStrictness)
 	  "-fspecialise"     -> CORE_TD(CoreDoSpecialising)
 	  "-fdeforest"	     -> CORE_TD(CoreDoDeforest)
-	  "-fadd-auto-sccs"  -> CORE_TD(CoreDoAutoCostCentres)
 	  "-ffoldr-build-worker-wrapper"  -> CORE_TD(CoreDoFoldrBuildWorkerWrapper)
 	  "-ffoldr-build-ww-anal"  -> CORE_TD(CoreDoFoldrBuildWWAnal)
 
@@ -411,6 +495,17 @@ lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplDontFoldBackAppend)
 %************************************************************************
 
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 200
+# define ARRAY	    Array
+# define LIFT	    GHCbase.Lift
+# define SET_TO	    =:
+(=:) a b = (a,b)
+#else
+# define ARRAY	    _Array
+# define LIFT	    _Lift
+# define SET_TO	    :=
+#endif
+
 isAmongSimpl :: [SimplifierSwitch] -> SimplifierSwitch -> SwitchResult
 
 isAmongSimpl on_switches
@@ -423,22 +518,22 @@ isAmongSimpl on_switches
 			all_undefined)
 		 // defined_elems
 
-	all_undefined = [ i := SwBool False | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
+	all_undefined = [ i SET_TO SwBool False | i <- [0 .. lAST_SIMPL_SWITCH_TAG ] ]
 
 	defined_elems = map mk_assoc_elem tidied_on_switches
     in
     -- (avoid some unboxing, bounds checking, and other horrible things:)
-    case sw_tbl of { _Array bounds_who_needs_'em stuff ->
+    case sw_tbl of { ARRAY bounds_who_needs_'em stuff ->
     \ switch ->
 	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
-	  _Lift v -> v
+	  LIFT v -> v
     }
   where
-    mk_assoc_elem k@(MaxSimplifierIterations lvl) = IBOX(tagOf_SimplSwitch k) := SwInt lvl
-    mk_assoc_elem k@(SimplUnfoldingUseThreshold      i) = IBOX(tagOf_SimplSwitch k) := SwInt i
-    mk_assoc_elem k@(SimplUnfoldingCreationThreshold i) = IBOX(tagOf_SimplSwitch k) := SwInt i
+    mk_assoc_elem k@(MaxSimplifierIterations lvl)       = IBOX(tagOf_SimplSwitch k) SET_TO SwInt lvl
+    mk_assoc_elem k@(SimplUnfoldingUseThreshold      i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
+    mk_assoc_elem k@(SimplUnfoldingCreationThreshold i) = IBOX(tagOf_SimplSwitch k) SET_TO SwInt i
 
-    mk_assoc_elem k = IBOX(tagOf_SimplSwitch k) := SwBool   True -- I'm here, Mom!
+    mk_assoc_elem k = IBOX(tagOf_SimplSwitch k) SET_TO SwBool   True -- I'm here, Mom!
 
     -- cannot have duplicates if we are going to use the array thing
 

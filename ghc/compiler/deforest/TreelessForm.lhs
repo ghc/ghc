@@ -16,9 +16,8 @@
 > import CoreUtils	( coreExprType )
 > import Id		( replaceIdInfo, getIdInfo )
 > import IdInfo
-> import Maybes		( Maybe(..) )
 > import Outputable
-> import SimplEnv	( SwitchChecker(..) )
+> import SimplEnv	( SYN_IE(SwitchChecker) )
 > import UniqSupply
 > import Util
 

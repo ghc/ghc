@@ -34,13 +34,13 @@ import CostCentre	( isDictCC )
 import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
 			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
-			  isNullIdEnv, IdEnv(..),
+			  isNullIdEnv, SYN_IE(IdEnv),
 			  GenId{-instances-}
 			)
 import IdInfo		( arityMaybe )
 import Literal		( literalType, isNoRepLit, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
-import PprCore		( GenCoreExpr{-instances-}, GenCoreArg{-instances-} )
+import PprCore
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instances-} )
 import Pretty		( ppAboves )
@@ -48,7 +48,7 @@ import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpType, fragilePrimOp, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
 import TyVar		( cloneTyVar,
-			  isNullTyVarEnv, addOneToTyVarEnv, TyVarEnv(..)
+			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv)
 			)
 import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  getFunTy_maybe, applyTy, isPrimType,
@@ -57,9 +57,9 @@ import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 import TysWiredIn	( trueDataCon, falseDataCon )
 import UniqSupply	( initUs, returnUs, thenUs,
 			  mapUs, mapAndUnzipUs, getUnique,
-			  UniqSM(..), UniqSupply
+			  SYN_IE(UniqSM), UniqSupply
 			)
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Util		( zipEqual, panic, pprPanic, assertPanic )
 
 type TypeEnv = TyVarEnv Type

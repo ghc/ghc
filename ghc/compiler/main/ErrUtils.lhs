@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module ErrUtils (
-	Error(..), Warning(..), Message(..),
+	SYN_IE(Error), SYN_IE(Warning), SYN_IE(Message),
 	addErrLoc,
 	addShortErrLocLine, addShortWarnLocLine,
 	dontAddErrLoc,

@@ -9,6 +9,7 @@
 module ReadPrefix ( rdModule )  where
 
 IMP_Ubiq()
+IMPORT_1_3(IO(hPutStr, stderr))
 
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
@@ -77,13 +78,21 @@ cvFlag 1 = True
 %************************************************************************
 
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 200
+# define PACK_STR packCString
+# define CCALL_THEN `GHCbase.ccallThen`
+#else
+# define PACK_STR _packCString
+# define CCALL_THEN `thenPrimIO`
+#endif
+
 rdModule :: IO (Module,		    -- this module's name
 	        RdrNameHsModule)    -- the main goods
 
 rdModule
-  = _ccall_ hspmain `thenPrimIO` \ pt -> -- call the Yacc parser!
+  = _ccall_ hspmain CCALL_THEN \ pt -> -- call the Yacc parser!
     let
-	srcfile  = _packCString ``input_filename'' -- What A Great Hack! (TM)
+	srcfile  = PACK_STR ``input_filename'' -- What A Great Hack! (TM)
     in
     initUgn 		  $
     rdU_tree pt `thenUgn` \ (U_hmodule modname himplist hexplist hfixlist
@@ -91,12 +100,12 @@ rdModule
 
     setSrcFileUgn srcfile $
     setSrcModUgn  modname $
-    mkSrcLocUgn srcline	  $			    \ src_loc	->
+    mkSrcLocUgn srcline	  $		   \ src_loc	->
 
-    wlkMaybe rdEntities		 hexplist `thenUgn` \ exports	->
-    wlkList  rdImport            himplist `thenUgn` \ imports	->
-    wlkList  rdFixOp		 hfixlist `thenUgn` \ fixities 	->
-    wlkBinding			 hmodlist `thenUgn` \ binding	->
+    wlkMaybe rdEntities	hexplist `thenUgn` \ exports	->
+    wlkList  rdImport   himplist `thenUgn` \ imports	->
+    wlkList  rdFixOp	hfixlist `thenUgn` \ fixities 	->
+    wlkBinding		hmodlist `thenUgn` \ binding	->
 
     case sepDeclsForTopBinds binding of
     (tydecls, tysigs, classdecls, instdecls, instsigs, defaultdecls, binds) ->
@@ -471,7 +480,11 @@ wlkLiteral ulit
   where
     as_char s     = _HEAD_ s
     as_integer s  = readInteger (_UNPK_ s)
+#if __GLASGOW_HASKELL__ >= 200
+    as_rational s = GHCbase.readRational__ (_UNPK_ s) -- non-std
+#else
     as_rational s = _readRational (_UNPK_ s) -- non-std
+#endif
     as_string s   = s
 \end{code}
 
@@ -565,7 +578,7 @@ wlkBinding binding
 	    ctxt_inst_ty = HsPreForAllTy ctxt inst_ty
 	in
 	returnUgn (RdrInstDecl
-          (InstDecl clas ctxt_inst_ty binds True modname uprags noInstancePragmas src_loc))
+          (InstDecl clas ctxt_inst_ty binds True{-from here-} modname uprags noInstancePragmas src_loc))
 
 	-- "default" declaration
       U_dbind dbindts srcline ->

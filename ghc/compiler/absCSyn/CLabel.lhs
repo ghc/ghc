@@ -61,16 +61,16 @@ import Id		( externallyVisibleId, cmpId_withSpecDataCon,
 			  isConstMethodId_maybe,
 			  isDefaultMethodId_maybe,
 			  isSuperDictSelId_maybe, fIRST_TAG,
-			  ConTag(..), GenId{-instance Outputable-}
+			  SYN_IE(ConTag), GenId{-instance Outputable-}
 			)
 import Maybes		( maybeToBool )
 import PprStyle		( PprStyle(..) )
 import PprType		( showTyCon, GenType{-instance Outputable-} )
-import Pretty		( prettyToUn )
+import Pretty		( prettyToUn, ppPStr{-ToDo:rm-} )
 import TyCon		( TyCon{-instance Eq-} )
 import Unique		( showUnique, pprUnique, Unique{-instance Eq-} )
 import Unpretty		-- NOTE!! ********************
-import Util		( assertPanic )
+import Util		( assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 things we want to find out:
@@ -335,11 +335,11 @@ pprCLabel (PprForAsm prepend_cSEP _) lbl
     prLbl = pprCLabel PprForC lbl
 
 pprCLabel sty (TyConLabel tc UnvecConUpdCode)
-  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, uppStr (showTyCon sty tc),
+  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, ppr_tycon sty tc,
 	       pp_cSEP, uppPStr SLIT("upd")]
 
 pprCLabel sty (TyConLabel tc (VecConUpdCode tag))
-  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, uppStr (showTyCon sty tc), pp_cSEP,
+  = uppBesides [uppPStr SLIT("ret"), pp_cSEP, ppr_tycon sty tc, pp_cSEP,
 		     uppInt tag, pp_cSEP, uppPStr SLIT("upd")]
 
 pprCLabel sty (TyConLabel tc (StdUpdCode tag))
@@ -348,10 +348,10 @@ pprCLabel sty (TyConLabel tc (StdUpdCode tag))
     	VectoredReturn _ -> uppBeside (uppPStr SLIT("IndUpdRetV")) (uppInt (tag - fIRST_TAG))
 
 pprCLabel sty (TyConLabel tc InfoTblVecTbl)
-  = uppBesides [uppStr (showTyCon sty tc), pp_cSEP, uppPStr SLIT("itblvtbl")]
+  = uppBesides [ppr_tycon sty tc, pp_cSEP, uppPStr SLIT("itblvtbl")]
 
 pprCLabel sty (TyConLabel tc StdUpdVecTbl)
-  = uppBesides [uppPStr SLIT("vtbl"), pp_cSEP, uppStr (showTyCon sty tc),
+  = uppBesides [uppPStr SLIT("vtbl"), pp_cSEP, ppr_tycon sty tc,
     	       pp_cSEP, uppPStr SLIT("upd")]
 
 pprCLabel sty (CaseLabel u CaseReturnPt)
@@ -381,6 +381,13 @@ pprCLabel sty (IdLabel (CLabelId id) flavor)
   = uppBeside (prettyToUn (ppr sty id)) (ppFlavor flavor)
 
 ppr_u u = prettyToUn (pprUnique u)
+
+ppr_tycon sty tc
+  = let
+	str = showTyCon sty tc
+    in
+    --pprTrace "ppr_tycon:" (ppStr str) $
+    uppStr str
 
 ppFlavor :: IdLabelInfo -> Unpretty
 

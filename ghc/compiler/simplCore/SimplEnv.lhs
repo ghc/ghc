@@ -31,16 +31,16 @@ module SimplEnv (
 	setEnclosingCC,
 
 	-- Types
-	SwitchChecker(..),
+	SYN_IE(SwitchChecker),
 	SimplEnv, EnclosingCcDetails(..),
-	InIdEnv(..), IdVal(..), InTypeEnv(..),
+	SYN_IE(InIdEnv), IdVal(..), SYN_IE(InTypeEnv),
 	UnfoldEnv, UnfoldItem, UnfoldConApp,
 
-	InId(..),  InBinder(..),  InBinding(..),  InType(..),
-	OutId(..), OutBinder(..), OutBinding(..), OutType(..),
+	SYN_IE(InId),  SYN_IE(InBinder),  SYN_IE(InBinding),  SYN_IE(InType),
+	SYN_IE(OutId), SYN_IE(OutBinder), SYN_IE(OutBinding), SYN_IE(OutType),
 
-	InExpr(..),  InAlts(..),  InDefault(..),  InArg(..),
-	OutExpr(..), OutAlts(..), OutDefault(..), OutArg(..)
+	SYN_IE(InExpr),  SYN_IE(InAlts),  SYN_IE(InDefault),  SYN_IE(InArg),
+	SYN_IE(OutExpr), SYN_IE(OutAlts), SYN_IE(OutDefault), SYN_IE(OutArg)
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -63,7 +63,7 @@ import Id		( idType, getIdUnfolding, getIdStrictness,
 			  applyTypeEnvToId,
 			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
 			  addOneToIdEnv, modifyIdEnv, mkIdSet,
-			  IdEnv(..), IdSet(..), GenId )
+			  SYN_IE(IdEnv), SYN_IE(IdSet), GenId )
 import IdInfo		( bottomIsGuaranteed, StrictnessInfo )
 import Literal		( isNoRepLit, Literal{-instances-} )
 import Maybes		( maybeToBool )
@@ -75,16 +75,15 @@ import PprStyle		( PprStyle(..) )
 import PprType		( GenType, GenTyVar )
 import Pretty
 import Type		( eqTy, getAppDataTyConExpandingDicts, applyTypeEnvToTy )
-import TyVar		( nullTyVarEnv, addOneToIdEnv, addOneToTyVarEnv,
-			  growTyVarEnvList,
-			  TyVarEnv(..), GenTyVar{-instance Eq-}
+import TyVar		( nullTyVarEnv, addOneToTyVarEnv, growTyVarEnvList,
+			  SYN_IE(TyVarEnv), GenTyVar{-instance Eq-}
 			)
 import Unique		( Unique{-instance Outputable-} )
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly, delFromUFM_Directly,
 			  delFromUFM, ufmToList
 			)
 --import UniqSet		-- lots of things
-import Usage		( UVar(..), GenUsage{-instances-} )
+import Usage		( SYN_IE(UVar), GenUsage{-instances-} )
 import Util		( zipEqual, thenCmp, cmpList, panic, panic#, assertPanic )
 
 type TypeEnv = TyVarEnv Type
@@ -453,9 +452,6 @@ type OutAlts	= CoreCaseAlts
 type OutDefault	= CoreCaseDefault
 type OutArg	= CoreArg
 
-\end{code}
-
-\begin{code}
 type SwitchChecker = SimplifierSwitch -> SwitchResult
 \end{code}
 

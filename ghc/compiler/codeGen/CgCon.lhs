@@ -44,7 +44,7 @@ import CostCentre	( currentOrSubsumedCosts, useCurrentCostCentre,
 			  dontCareCostCentre
 			)
 import Id		( idPrimRep, dataConTag, dataConTyCon,
-			  isDataCon, DataCon(..),
+			  isDataCon, SYN_IE(DataCon),
 			  emptyIdSet
 			)
 import Literal		( Literal(..) )

@@ -26,7 +26,7 @@ import AbsCSyn
 import CLabel		( mkReturnPtLabel )
 import Digraph		( stronglyConnComp )
 import HeapOffs		( possiblyEqualHeapOffset )
-import Id		( fIRST_TAG, ConTag(..) )
+import Id		( fIRST_TAG, SYN_IE(ConTag) )
 import Literal		( literalPrimRep, Literal(..) )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Unique		( Unique{-instance Eq-} )

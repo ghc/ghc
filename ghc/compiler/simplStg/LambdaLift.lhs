@@ -15,8 +15,8 @@ import StgSyn
 import Bag		( emptyBag, unionBags, unitBag, snocBag, bagToList )
 import Id		( idType, mkSysLocal, addIdArity,
 			  mkIdSet, unitIdSet, minusIdSet,
-			  unionManyIdSets, idSetToList, IdSet(..),
-			  nullIdEnv, growIdEnvList, lookupIdEnv, IdEnv(..)
+			  unionManyIdSets, idSetToList, SYN_IE(IdSet),
+			  nullIdEnv, growIdEnvList, lookupIdEnv, SYN_IE(IdEnv)
 			)
 import SrcLoc		( mkUnknownSrcLoc )
 import Type		( splitForAllTy, mkForAllTys, mkFunTys )
@@ -148,7 +148,7 @@ liftExpr expr@(StgPrim op args lvs) = returnLM (expr, emptyLiftInfo)
 
 liftExpr expr@(StgApp (StgLitArg lit) args lvs) = returnLM (expr, emptyLiftInfo)
 liftExpr expr@(StgApp (StgVarArg v)  args lvs)
-  = lookup v		`thenLM` \ ~(sc, sc_args) ->	-- NB the ~.  We don't want to
+  = lookUp v		`thenLM` \ ~(sc, sc_args) ->	-- NB the ~.  We don't want to
 							-- poke these bindings too early!
     returnLM (StgApp (StgVarArg sc) (map StgVarArg sc_args ++ args) lvs,
 	      emptyLiftInfo)
@@ -447,8 +447,8 @@ newSupercombinator ty arity ci us idenv
   where
     uniq = getUnique us
 
-lookup :: Id -> LiftM (Id,[Id])
-lookup v ci us idenv
+lookUp :: Id -> LiftM (Id,[Id])
+lookUp v ci us idenv
   = case (lookupIdEnv idenv v) of
       Just result -> result
       Nothing     -> (v, [])

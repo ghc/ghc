@@ -9,7 +9,7 @@
 module GenSpecEtc (
 	TcSigInfo(..), 
 	genBinds, 
-	checkSigTyVars, checkSigTyVarsGivenGlobals
+	checkSigTyVars
     ) where
 
 IMP_Ubiq()
@@ -17,8 +17,8 @@ IMP_Ubiq()
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE, 
 			  newDicts, tyVarsOfInst, instToId )
-import TcEnv		( tcGetGlobalTyVars )
-import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyWithExtraGlobals )
+import TcEnv		( tcGetGlobalTyVars, tcExtendGlobalTyVars )
+import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
 import TcType		( TcType(..), TcThetaType(..), TcTauType(..), 
 			  TcTyVarSet(..), TcTyVar(..),
 			  newTyVarTy, zonkTcType, zonkTcTyVar, zonkTcTyVars 
@@ -32,19 +32,19 @@ import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(.
 
 import Bag		( Bag, foldBag, bagToList, listToBag, isEmptyBag )
 import Class		( GenClass )
-import Id		( GenId, Id(..), mkUserId, idType )
+import Id		( GenId, SYN_IE(Id), mkUserId, idType )
 import Kind		( isUnboxedKind, isTypeKind, mkBoxedTypeKind )
 import ListSetOps	( minusList, unionLists, intersectLists )
-import Maybes		( Maybe(..), allMaybes )
+import Maybes		( allMaybes )
 import Name		( Name{--O only-} )
 import Outputable	( interppSP, interpp'SP )
 import Pretty
 import PprType		( GenClass, GenType, GenTyVar )
 import Type		( mkTyVarTy, splitSigmaTy, mkForAllTys, mkFunTys,
 			  getTyVar, getTyVar_maybe, tyVarsOfTypes, eqSimpleTheta )
-import TyVar		( GenTyVar, TyVar(..), tyVarKind, minusTyVarSet, emptyTyVarSet,
+import TyVar		( GenTyVar, SYN_IE(TyVar), tyVarKind, minusTyVarSet, emptyTyVarSet,
 			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList )
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Unique		( Unique )
 import Util
 \end{code}
@@ -150,10 +150,11 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
     let
 	mentioned_tyvars = tyVarsOfTypes mono_id_types
 	tyvars_to_gen    = mentioned_tyvars `minusTyVarSet` free_tyvars
+	tysig_vars       = [sig_var | (TySigInfo sig_var _ _ _ _) <- sig_infos]
     in
 
 	-- DEAL WITH OVERLOADING
-    resolveOverloading tyvars_to_gen lie bind sig_infos
+    resolveOverloading tyvars_to_gen lie bind tysig_vars (head thetas)
 		 `thenTc` \ (lie', reduced_tyvars_to_gen, dict_binds, dicts_bound) ->
 
 	-- Check for generaliseation over unboxed types, and
@@ -173,6 +174,7 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
 					-- and it's better done there because we have more
 					-- precise origin information
 
+	-- Default any TypeKind variables to BoxedTypeKind
     mapTc box_it unresolved_kind_tyvars			`thenTc_`
 
 	 -- BUILD THE NEW LOCALS
@@ -203,14 +205,16 @@ resolveOverloading
 	:: TcTyVarSet s		-- Tyvars over which we are going to generalise
 	-> LIE s		-- The LIE to deal with
 	-> TcBind s		-- The binding group
-	-> [TcSigInfo s]	-- And its real type-signature information
+	-> [TcIdBndr s]		-- Variables in type signatures
+	-> TcThetaType s	-- *Zonked* theta for the overloading in type signature
+				-- (if there are any type signatures; error otherwise)
 	-> TcM s (LIE s,			-- LIE to pass up the way; a fixed point of
 						-- the current substitution
 	    	  TcTyVarSet s,			-- Revised tyvars to generalise
 	    	  [(TcIdOcc s, TcExpr s)],	-- Dict bindings
 	    	  [TcIdOcc s])			-- List of dicts to bind here
 
-resolveOverloading tyvars_to_gen dicts bind ty_sigs
+resolveOverloading tyvars_to_gen dicts bind tysig_vars theta
   | not (isUnRestrictedGroup tysig_vars bind)
   = 	-- Restricted group, so bind no dictionaries, and
 	-- remove from tyvars_to_gen any constrained type variables
@@ -256,7 +260,9 @@ resolveOverloading tyvars_to_gen dicts bind ty_sigs
 	-- may gratuitouslyconstrain some tyvars over which we *are* going 
 	-- to generalise. 
 	-- For example d::Eq (Foo a b), where Foo is instanced as above.
-	tcSimplifyWithExtraGlobals constrained_tyvars reduced_tyvars_to_gen dicts
+	tcExtendGlobalTyVars constrained_tyvars (
+		tcSimplify reduced_tyvars_to_gen dicts
+	)
 				    `thenTc` \ (dicts_free, dicts_binds, dicts_sig2) ->
 	ASSERT(isEmptyBag dicts_sig2)
 
@@ -267,32 +273,29 @@ resolveOverloading tyvars_to_gen dicts bind ty_sigs
 
 		-- The returned LIE should be a fixed point of the substitution
 
-  | otherwise	-- An unrestricted group
-  = case ty_sigs of
-	[] ->	-- NO TYPE SIGNATURES
+  | null tysig_vars 	-- An unrestricted group with no type signaturs
+  = tcSimplify tyvars_to_gen dicts  `thenTc` \ (dicts_free, dict_binds, dicts_sig) ->
+    returnTc (dicts_free, tyvars_to_gen, dict_binds, 
+	      map instToId (bagToList dicts_sig))
 
-	    tcSimplify tyvars_to_gen dicts  `thenTc` \ (dicts_free, dict_binds, dicts_sig) ->
-	    returnTc (dicts_free, tyvars_to_gen, dict_binds, 
-		      map instToId (bagToList dicts_sig))
+  | otherwise		-- An unrestricted group with type signatures
+  = tcAddErrCtxt (sigsCtxt tysig_vars) $
+    newDicts SignatureOrigin theta	`thenNF_Tc` \ (dicts_sig, dict_ids) ->
+	-- It's important that theta is pre-zonked, because
+	-- dict_id is later used to form the type of the polymorphic thing,
+	-- and forall-types must be zonked so far as their bound variables
+	-- are concerned
 
-	(TySigInfo _ _ theta _ _ : other) -> -- TYPE SIGNATURES PRESENT!
-
-	    tcAddErrCtxt (sigsCtxt tysig_vars) $
-
-	    newDicts SignatureOrigin theta	`thenNF_Tc` \ (dicts_sig, dict_ids) ->
-
-		    -- Check that the needed dicts can be expressed in
-		    -- terms of the signature ones
-	    tcSimplifyAndCheck
+	    -- Check that the needed dicts can be expressed in
+	    -- terms of the signature ones
+    tcSimplifyAndCheck
 		tyvars_to_gen 	-- Type vars over which we will quantify
 		dicts_sig	-- Available dicts
 		dicts		-- Want bindings for these dicts
 
 				    `thenTc` \ (dicts_free, dict_binds) ->
 
-	    returnTc (dicts_free, tyvars_to_gen, dict_binds, dict_ids)
-  where
-    tysig_vars   = [sig_var | (TySigInfo sig_var _ _ _ _) <- ty_sigs]
+    returnTc (dicts_free, tyvars_to_gen, dict_binds, dict_ids)
 \end{code}
 
 @checkSigMatch@ does the next step in checking signature matching.
@@ -378,19 +381,8 @@ checkSigTyVars :: [TcTyVar s]		-- The original signature type variables
 	       -> TcM s ()
 
 checkSigTyVars sig_tyvars sig_tau
-  = checkSigTyVarsGivenGlobals emptyTyVarSet sig_tyvars sig_tau
-
-checkSigTyVarsGivenGlobals
-	 :: TcTyVarSet s	-- Consider these tyvars as global in addition to envt ones
-	 -> [TcTyVar s]		-- The original signature type variables
-	 -> TcType s		-- signature type (for err msg)
-	 -> TcM s ()
-
-checkSigTyVarsGivenGlobals extra_globals sig_tyvars sig_tau
-  = zonkTcTyVars extra_globals		`thenNF_Tc` \ extra_tyvars' ->
-    tcGetGlobalTyVars			`thenNF_Tc` \ env_tyvars ->
+  = tcGetGlobalTyVars			`thenNF_Tc` \ globals ->
     let
-	globals     = env_tyvars `unionTyVarSets` extra_tyvars'
 	mono_tyvars = filter (`elementOfTyVarSet` globals) sig_tyvars
     in
 	-- TEMPORARY FIX

@@ -24,7 +24,7 @@ import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
 			  unTagBindersAlts
 			)
 import Id		( idType, isDataCon, getIdDemandInfo,
-			  DataCon(..), GenId{-instance Eq-}
+			  SYN_IE(DataCon), GenId{-instance Eq-}
 			)
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit, Literal{-instance Eq-} )

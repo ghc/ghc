@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module SimplMonad (
-	SmplM(..),
+	SYN_IE(SmplM),
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
 	mapSmpl, mapAndUnzipSmpl,
 
@@ -21,6 +21,7 @@ module SimplMonad (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(Ix)
 
 IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
 
@@ -140,9 +141,9 @@ data TickType
   | Foldr_Cons_Nil	-- foldr (:) [] => id
   | Foldr_Cons		-- foldr (:) => flip (++)
 
-  | Str_FoldrStr	-- foldr f z "hello" => unpackFoldrPS# f z "hello"
-  | Str_UnpackCons	-- unpackFoldrPS# (:) z "hello" => unpackAppendPS# z "hello"
-  | Str_UnpackNil	-- unpackAppendPS# [] "hello" => "hello"
+  | Str_FoldrStr	-- foldr f z "hello" => unpackFoldrPS__ f z "hello"
+  | Str_UnpackCons	-- unpackFoldrPS# (:) z "hello" => unpackAppendPS__ z "hello"
+  | Str_UnpackNil	-- unpackAppendPS__ [] "hello" => "hello"
   {- END F/B ENTRIES -}
   deriving (Eq, Ord, Ix)
 

@@ -2,8 +2,8 @@
 #include "HsVersions.h"
 
 module TyVar (
-	GenTyVar(..), TyVar(..),
-	mkTyVar,
+	GenTyVar(..), SYN_IE(TyVar),
+	mkTyVar, mkSysTyVar,
 	tyVarKind,		-- TyVar -> Kind
 	cloneTyVar,
 
@@ -12,11 +12,11 @@ module TyVar (
 
 	-- We also export "environments" keyed off of
 	-- TyVars and "sets" containing TyVars:
-	TyVarEnv(..),
+	SYN_IE(TyVarEnv),
 	nullTyVarEnv, mkTyVarEnv, addOneToTyVarEnv,
 	growTyVarEnvList, isNullTyVarEnv, lookupTyVarEnv,
 
-	GenTyVarSet(..), TyVarSet(..),
+	SYN_IE(GenTyVarSet), SYN_IE(TyVarSet),
 	emptyTyVarSet, unitTyVarSet, unionTyVarSets,
 	unionManyTyVarSets, intersectTyVarSets, mkTyVarSet,
 	tyVarSetToList, elementOfTyVarSet, minusTyVarSet,
@@ -27,7 +27,7 @@ CHK_Ubiq() 	-- debugging consistency check
 IMPORT_DELOOPER(IdLoop) 	-- for paranoia checking
 
 -- friends
-import Usage		( GenUsage, Usage(..), usageOmega )
+import Usage		( GenUsage, SYN_IE(Usage), usageOmega )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 
 -- others
@@ -35,9 +35,8 @@ import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, UniqFM
 			)
-import Maybes		( Maybe(..) )
 import Name		( mkLocalName, changeUnique, Name, RdrName(..) )
-import Pretty		( Pretty(..), PrettyRep, ppBeside, ppPStr )
+import Pretty		( SYN_IE(Pretty), PrettyRep, ppBeside, ppPStr )
 import PprStyle		( PprStyle )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag(..) )
 import SrcLoc		( mkUnknownSrcLoc, SrcLoc )
@@ -61,11 +60,17 @@ type TyVar = GenTyVar Usage	-- Usage slot makes sense only if Kind = Type
 Simple construction and analysis functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-mkTyVar :: Name -> Unique -> Kind -> TyVar
-mkTyVar name uniq kind = TyVar  uniq
-				kind
-				(Just (changeUnique name uniq))
-				usageOmega
+mkTyVar :: Name -> Kind -> TyVar
+mkTyVar name kind = TyVar  (uniqueOf name)
+			   kind
+			   (Just name)
+			   usageOmega
+
+mkSysTyVar :: Unique -> Kind -> TyVar
+mkSysTyVar uniq kind = TyVar uniq
+			     kind
+			     Nothing
+			     usageOmega
 
 tyVarKind :: GenTyVar flexi -> Kind
 tyVarKind (TyVar _ kind _ _) = kind

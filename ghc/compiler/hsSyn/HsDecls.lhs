@@ -260,7 +260,7 @@ instance (NamedThing name, Outputable name, Outputable pat,
 	  Eq tyvar, Outputable tyvar, Eq uvar, Outputable uvar)
 	      => Outputable (InstDecl tyvar uvar name pat) where
 
-    ppr sty (InstDecl clas ty binds local modname uprags pragmas src_loc)
+    ppr sty (InstDecl clas ty binds from_here modname uprags pragmas src_loc)
       = let
 	    (context, inst_ty)
 	      = case ty of

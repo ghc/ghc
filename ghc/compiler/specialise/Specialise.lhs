@@ -14,30 +14,32 @@ module Specialise (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(partition))
 
 import Bag		( emptyBag, unitBag, isEmptyBag, unionBags,
 			  partitionBag, listToBag, bagToList
 			)
 import Class		( GenClass{-instance Eq-} )
 import CmdLineOpts	( opt_SpecialiseImports, opt_D_simplifier_stats,
-			  opt_CompilingPrelude, opt_SpecialiseTrace,
+			  opt_CompilingGhcInternals, opt_SpecialiseTrace,
 			  opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
 			  opt_SpecialiseAll
 			)
 import CoreLift		( mkLiftedId, liftExpr, bindUnlift, applyBindUnlifts )
 import CoreSyn
 import CoreUtils	( coreExprType, squashableDictishCcExpr )
-import FiniteMap	( addListToFM_C )
+import FiniteMap	( addListToFM_C, FiniteMap )
+import Kind		( mkBoxedTypeKind )
 import Id		( idType, isDefaultMethodId_maybe, toplevelishId,
 			  isSuperDictSelId_maybe, isBottomingId,
 			  isConstMethodId_maybe, isDataCon,
 			  isImportedId, mkIdWithNewUniq,
 			  dataConTyCon, applyTypeEnvToId,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  lookupIdEnv, IdEnv(..),
+			  lookupIdEnv, SYN_IE(IdEnv),
 			  emptyIdSet, mkIdSet, unitIdSet,
 			  elementOfIdSet, minusIdSet,
-			  unionIdSets, unionManyIdSets, IdSet(..),
+			  unionIdSets, unionManyIdSets, SYN_IE(IdSet),
 			  GenId{-instance Eq-}
 			)
 import Literal		( Literal{-instance Outputable-} )
@@ -50,7 +52,7 @@ import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}
 			)
 import Pretty		( ppHang, ppCat, ppStr, ppAboves, ppBesides,
-			  ppInt, ppSP, ppInterleave, ppNil, Pretty(..)
+			  ppInt, ppSP, ppInterleave, ppNil, SYN_IE(Pretty)
 			)
 import PrimOp		( PrimOp(..) )
 import SpecUtils
@@ -58,9 +60,9 @@ import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy, getAppDataTyConExpandingDicts,
 			  tyVarsOfTypes, applyTypeEnvToTy, isUnboxedType
 			)
 import TyCon		( TyCon{-instance Eq-} )
-import TyVar		( cloneTyVar,
-			  elementOfTyVarSet, TyVarSet(..),
-			  nullTyVarEnv, growTyVarEnvList, TyVarEnv(..),
+import TyVar		( cloneTyVar, mkSysTyVar,
+			  elementOfTyVarSet, SYN_IE(TyVarSet),
+			  nullTyVarEnv, growTyVarEnvList, SYN_IE(TyVarEnv),
 			  GenTyVar{-instance Eq-}
 			)
 import TysWiredIn	( liftDataCon )
@@ -87,7 +89,6 @@ isSpecId_maybe = panic "Specialise.isSpecId_maybe (ToDo)"
 isSpecPragmaId_maybe = panic "Specialise.isSpecPragmaId_maybe (ToDo)"
 lookupClassInstAtSimpleType = panic "Specialise.lookupClassInstAtSimpleType (ToDo)"
 lookupSpecEnv = panic "Specialise.lookupSpecEnv (ToDo)"
-mkPolySysTyVar = panic "Specialise.mkPolySysTyVar (ToDo)"
 mkSpecEnv = panic "Specialise.mkSpecEnv (ToDo)"
 mkSpecId = panic "Specialise.mkSpecId (ToDo)"
 selectIdInfoForSpecId = panic "Specialise.selectIdInfoForSpecId (ToDo)"
@@ -1198,7 +1199,7 @@ specTyConsAndScope scopeM
   = scopeM			`thenSM` \ (binds, scope_uds) ->
     let
        (tycons_cis, gotci_scope_uds)
-	 = getLocalSpecTyConIs opt_CompilingPrelude scope_uds
+	 = getLocalSpecTyConIs opt_CompilingGhcInternals scope_uds
 
        tycon_specs_list = collectTyConSpecs tycons_cis
     in
@@ -2418,10 +2419,8 @@ newSpecIds new_ids maybe_tys dicts_to_ignore tvenv idenv us
     spec_id_ty id = specialiseTy (idType id) maybe_tys dicts_to_ignore
 
 newTyVars :: Int -> SpecM [TyVar]
-newTyVars n tvenv idenv us
- = map mkPolySysTyVar uniqs
- where
-   uniqs = getUniques n us
+newTyVars n tvenv idenv us 
+  = [mkSysTyVar uniq mkBoxedTypeKind | uniq <- getUniques n us]
 \end{code}
 
 @cloneLambdaOrCaseBinders@ and @cloneLetBinders@ take a bunch of

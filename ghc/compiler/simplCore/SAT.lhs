@@ -49,7 +49,6 @@ doStaticArgs = panic "SAT.doStaticArgs (ToDo)"
 
 {- LATER: to end of file:
 
-import Maybes		( Maybe(..) )
 import SATMonad
 import Util
 \end{code}

@@ -1,0 +1,23 @@
+\begin{code}
+interface IdLoop_1_3 1
+__exports__
+CoreSyn CoreExpr
+CoreUnfold FormSummary (..)
+CoreUnfold UnfoldingDetails (..)
+CoreUnfold UnfoldingGuidance (..)
+CoreUtils unTagBinders (..)
+Id IdEnv
+Id externallyVisibleId (..)
+Id getIdInfo (..)
+Id isDataCon (..)
+Id isWorkerId (..)
+Id lookupIdEnv (..)
+Id nmbrId (..)
+Id nullIdEnv (..)
+Id unfoldingUnfriendlyId (..)
+MagicUFs MagicUnfoldingFun
+MagicUFs mkMagicUnfoldingFun (..)
+OccurAnal occurAnalyseGlobalExpr (..)
+PprType pprParendGenType (..)
+WwLib mAX_WORKER_ARGS (..)
+\end{code}

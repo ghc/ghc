@@ -9,15 +9,25 @@ module UgenUtil (
 	returnPrimIO, thenPrimIO,
 
 	-- stuff defined here
-	UgenUtil..
+	EXP_MODULE(UgenUtil)
     ) where
-
-import PreludeGlaST
 
 IMP_Ubiq()
 
+import PreludeGlaST
+
+#if __GLASGOW_HASKELL__ >= 200
+# define ADDR	    GHCbase.Addr
+# define PACK_STR   packCString
+# define PACK_BYTES packCBytes
+#else
+# define ADDR	    _Addr
+# define PACK_STR   _packCString
+# define PACK_BYTES _packCBytes
+#endif
+
 import Name		( RdrName(..) )
-import SrcLoc		( mkSrcLoc2, mkUnknownSrcLoc )
+import SrcLoc		( mkSrcLoc2, mkUnknownSrcLoc, SrcLoc )
 \end{code}
 
 \begin{code}
@@ -36,18 +46,25 @@ thenUgn x y stuff
 
 initUgn :: UgnM a -> IO a
 initUgn action
-  = action (SLIT(""),SLIT(""),mkUnknownSrcLoc) `thenPrimIO` \ result ->
+  = let
+	do_it = action (SLIT(""),SLIT(""),mkUnknownSrcLoc)
+    in
+#if __GLASGOW_HASKELL__ >= 200
+    primIOToIO do_it
+#else
+    do_it	`thenPrimIO` \ result ->
     return result
+#endif
 
 ioToUgnM :: PrimIO a -> UgnM a
 ioToUgnM x stuff = x
 \end{code}
 
 \begin{code}
-type ParseTree = _Addr
+type ParseTree = ADDR
 
-type U_VOID_STAR = _Addr
-rdU_VOID_STAR ::  _Addr -> UgnM U_VOID_STAR
+type U_VOID_STAR = ADDR
+rdU_VOID_STAR ::  ADDR -> UgnM U_VOID_STAR
 rdU_VOID_STAR x = returnUgn x
 
 type U_long = Int
@@ -55,20 +72,20 @@ rdU_long ::  Int -> UgnM U_long
 rdU_long x = returnUgn x
 
 type U_stringId = FAST_STRING
-rdU_stringId :: _Addr -> UgnM U_stringId
+rdU_stringId :: ADDR -> UgnM U_stringId
 {-# INLINE rdU_stringId #-}
-rdU_stringId s = returnUgn (_packCString s)
+rdU_stringId s = returnUgn (PACK_STR s)
 
 type U_numId = Int -- ToDo: Int
-rdU_numId :: _Addr -> UgnM U_numId
+rdU_numId :: ADDR -> UgnM U_numId
 rdU_numId i = rdU_stringId i `thenUgn` \ y -> returnUgn ((read (_UNPK_ y))::Int)
 
 type U_hstring = FAST_STRING
-rdU_hstring :: _Addr -> UgnM U_hstring
+rdU_hstring :: ADDR -> UgnM U_hstring
 rdU_hstring x
   = ioToUgnM (_ccall_ get_hstring_len   x)  `thenUgn` \ len ->
     ioToUgnM (_ccall_ get_hstring_bytes x)  `thenUgn` \ bytes ->
-    returnUgn (_packCBytes len bytes)
+    returnUgn (PACK_BYTES len bytes)
 \end{code}
 
 \begin{code}

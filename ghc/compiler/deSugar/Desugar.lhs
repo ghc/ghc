@@ -19,7 +19,7 @@ import DsBinds		( dsBinds, dsInstBinds )
 import DsUtils
 
 import Bag		( unionBags )
-import CmdLineOpts	( opt_DoCoreLinting )
+import CmdLineOpts	( opt_DoCoreLinting, opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )
 import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
 import Id		( nullIdEnv, mkIdEnv )
@@ -52,25 +52,29 @@ deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst
 	(us3, us3a) = splitUniqSupply us2a
 	(us4, us5)  = splitUniqSupply us3a
 
+	auto_meth = opt_AutoSccsOnAllToplevs 
+	auto_top  = opt_AutoSccsOnAllToplevs
+		    || opt_AutoSccsOnExportedToplevs
+
 	((core_const_prs, consts_pairs), shadows1)
 	    = initDs us0 nullIdEnv mod_name (dsInstBinds [] const_inst_pairs)
 
 	consts_env = mkIdEnv consts_pairs
 
 	(core_clas_binds, shadows2)
-			= initDs us1 consts_env mod_name (dsBinds clas_binds)
+			= initDs us1 consts_env mod_name (dsBinds False clas_binds)
 	core_clas_prs	= pairsFromCoreBinds core_clas_binds
 
 	(core_inst_binds, shadows3)
-			= initDs us2 consts_env mod_name (dsBinds inst_binds)
+			= initDs us2 consts_env mod_name (dsBinds auto_meth inst_binds)
 	core_inst_prs	= pairsFromCoreBinds core_inst_binds
 
 	(core_val_binds, shadows4)
-			= initDs us3 consts_env mod_name (dsBinds val_binds)
+			= initDs us3 consts_env mod_name (dsBinds auto_top val_binds)
 	core_val_pairs	= pairsFromCoreBinds core_val_binds
 
 	(core_recsel_binds, shadows5)
-			= initDs us4 consts_env mod_name (dsBinds recsel_binds)
+			= initDs us4 consts_env mod_name (dsBinds ({-trace "Desugar:core_recsel_binds"-} False) recsel_binds)
 	core_recsel_prs	= pairsFromCoreBinds core_recsel_binds
 
     	final_binds

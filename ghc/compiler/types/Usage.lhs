@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module Usage (
-	GenUsage(..), Usage(..), UVar(..), UVarEnv(..),
+	GenUsage(..), SYN_IE(Usage), SYN_IE(UVar), SYN_IE(UVarEnv),
 	usageOmega, pprUVar, duffUsage,
 	nullUVarEnv, mkUVarEnv, addOneToUVarEnv,
 	growUVarEnvList, isNullUVarEnv, lookupUVarEnv,
@@ -16,7 +16,7 @@ module Usage (
 
 IMP_Ubiq(){-uitous-}
 
-import Pretty	( Pretty(..), PrettyRep, ppPStr, ppBeside )
+import Pretty	( SYN_IE(Pretty), PrettyRep, ppPStr, ppBeside )
 import UniqFM	( emptyUFM, listToUFM, addToUFM, lookupUFM,
 		  plusUFM, sizeUFM, UniqFM
 		)

@@ -11,7 +11,7 @@ Basically, the things need to be in class @Uniquable@.
 #include "HsVersions.h"
 
 module UniqSet (
-	UniqSet(..),    -- abstract type: NOT
+	SYN_IE(UniqSet),    -- abstract type: NOT
 
 	mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
 	addOneToUniqSet,
@@ -22,14 +22,16 @@ module UniqSet (
 
 IMP_Ubiq(){-uitous-}
 
-import Maybes		( maybeToBool, Maybe )
+import Maybes		( maybeToBool )
 import UniqFM
 import Unique		( Unique )
---import Outputable	( Outputable(..), ExportFlag )
 import SrcLoc		( SrcLoc )
-import Pretty		( Pretty(..), PrettyRep )
+import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PprStyle		( PprStyle )
 import Util		( Ord3(..) )
+
+import {-hide from mkdependHS-}
+	RnHsSyn	( RnName ) -- specialising only
 
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a
@@ -98,52 +100,22 @@ mapUniqSet f (MkUniqSet set)
 			| thing <- eltsUFM set ])
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{The @IdSet@ and @TyVarSet@ specialisations for sets of Ids/TyVars}
-%*									*
-%************************************************************************
-
-@IdSet@ is a specialised version, optimised for sets of Ids.
-
 \begin{code}
---type NameSet           = UniqSet Name
---type GenTyVarSet flexi = UniqSet (GenTyVar flexi)
---type GenIdSet ty       = UniqSet (GenId ty)
-
-#if ! OMIT_NATIVE_CODEGEN
---type RegSet   = UniqSet Reg
-#endif
-
-#if 0
 #if __GLASGOW_HASKELL__
 {-# SPECIALIZE
-    unitUniqSet :: GenId ty       -> GenIdSet ty,
-			GenTyVar flexi -> GenTyVarSet flexi,
-			Name  -> NameSet
-    IF_NCG(COMMA	Reg   -> RegSet)
+    addOneToUniqSet :: UniqSet Unique -> Unique -> UniqSet Unique
+    #-}
+{-# SPECIALIZE
+    elementOfUniqSet :: RnName -> UniqSet RnName -> Bool
+		      , Unique -> UniqSet Unique -> Bool
+    #-}
+{-# SPECIALIZE
+    mkUniqSet :: [RnName] -> UniqSet RnName
     #-}
 
 {-# SPECIALIZE
-    mkUniqSet :: [GenId ty]    -> GenIdSet ty,
-		 [GenTyVar flexi] -> GenTyVarSet flexi,
-		 [Name]  -> NameSet
-    IF_NCG(COMMA [Reg]   -> RegSet)
+    unitUniqSet :: RnName -> UniqSet RnName
+		 , Unique -> UniqSet Unique
     #-}
-
-{-# SPECIALIZE
-    elementOfUniqSet :: GenId ty       -> GenIdSet ty       -> Bool,
-		    	GenTyVar flexi -> GenTyVarSet flexi -> Bool,
-			Name  -> NameSet  -> Bool
-    IF_NCG(COMMA	Reg   -> RegSet   -> Bool)
-    #-}
-
-{-# SPECIALIZE
-    mapUniqSet :: (GenId ty       -> GenId ty)       -> GenIdSet ty        -> GenIdSet ty,
-		  (GenTyVar flexi -> GenTyVar flexi) -> GenTyVarSet flexi -> GenTyVarSet flexi,
-		  (Name  -> Name)  -> NameSet  -> NameSet
-    IF_NCG(COMMA  (Reg  -> Reg)    -> RegSet   -> RegSet)
-    #-}
-#endif
 #endif
 \end{code}

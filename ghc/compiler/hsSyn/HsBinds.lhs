@@ -21,7 +21,7 @@ import HsPragmas	( GenPragmas, ClassOpPragmas )
 import HsTypes		( PolyType )
 
 --others:
-import Id		( DictVar(..), Id(..), GenId )
+import Id		( SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Name		( pprNonSym )
 import Outputable	( interpp'SP, ifnotPprForUser,
 			  Outputable(..){-instance * (,)-}

@@ -25,9 +25,9 @@ import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
-import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts )
-import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds)
-import TcInstDcls	( processInstBinds, newMethodId )
+import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts, newMethod )
+import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcExtendGlobalTyVars )
+import TcInstDcls	( processInstBinds )
 import TcKind		( TcKind )
 import TcKind		( unifyKind )
 import TcMonad		hiding ( rnMtoTcM )
@@ -48,12 +48,12 @@ import PrelVals		( nO_DEFAULT_METHOD_ERROR_ID )
 import PprStyle
 import Pretty
 import PprType		( GenType, GenTyVar, GenClassOp )
-import SpecEnv		( SpecEnv(..) )
+import SpecEnv		( SYN_IE(SpecEnv) )
 import SrcLoc		( mkGeneratedSrcLoc )
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
 			  mkForAllTy, mkSigmaTy, splitSigmaTy)
 import TysWiredIn	( stringTy )
-import TyVar		( mkTyVarSet, GenTyVar )
+import TyVar		( unitTyVarSet, GenTyVar )
 import Unique		( Unique )			 
 import Util
 
@@ -551,20 +551,22 @@ buildDefaultMethodBinds clas clas_tyvar
   = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
     mapAndUnzipNF_Tc mk_method default_method_ids	`thenNF_Tc` \ (insts_s, local_defm_ids) ->
     let
-	avail_insts = this_dict `plusLIE` unionManyBags insts_s 	-- Insts available
+	avail_insts    = this_dict `plusLIE` unionManyBags insts_s 	-- Insts available
+	clas_tyvar_set = unitTyVarSet clas_tyvar
     in
-    processInstBinds
-	 clas
-	 (makeClassDeclDefaultMethodRhs clas local_defm_ids)
-	 [clas_tyvar]	-- Tyvars in scope
-	 avail_insts
-	 local_defm_ids
-	 default_binds					`thenTc` \ (insts_needed, default_binds') ->
+    tcExtendGlobalTyVars clas_tyvar_set (
+	processInstBinds
+	   clas
+	   (makeClassDeclDefaultMethodRhs clas local_defm_ids)
+	   avail_insts
+	   local_defm_ids
+	   default_binds
+    )					`thenTc` \ (insts_needed, default_binds') ->
 
     tcSimplifyAndCheck
-	(mkTyVarSet [clas_tyvar])
+	clas_tyvar_set
 	avail_insts
-	insts_needed					`thenTc` \ (const_lie, dict_binds) ->
+	insts_needed			`thenTc` \ (const_lie, dict_binds) ->
 	
 
     let
@@ -578,7 +580,7 @@ buildDefaultMethodBinds clas clas_tyvar
     returnTc (const_lie, defm_binds)
   where
     inst_ty = mkTyVarTy clas_tyvar
-    mk_method defm_id = newMethodId defm_id inst_ty origin
+    mk_method defm_id = newMethod origin (RealId defm_id) [inst_ty]
     origin = ClassDeclOrigin
 \end{code}
 

@@ -21,7 +21,7 @@
 >#endif
 
 > import Type		( cloneTyVar, mkTyVarTy, applyTypeEnvToTy,
-> 			  tyVarsOfType, TyVar, SigmaType(..)
+> 			  tyVarsOfType, TyVar, SYN_IE(SigmaType)
 >			)
 > import Literal	( Literal )	-- for Eq Literal
 > import CoreSyn

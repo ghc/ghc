@@ -29,7 +29,7 @@ import Stix		( getUniqLabelNCG, sStLitLbl, stgHp, stgHpLim,
 			  CodeSegment, StixReg
 			)
 import StixMacro	( macroCode, heapCheck )
-import UniqSupply	( returnUs, thenUs, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
 import Util		( panic )
 \end{code}
 

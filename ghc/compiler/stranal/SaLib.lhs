@@ -11,8 +11,8 @@ See also: the ``library'' for the ``back end'' (@SaBackLib@).
 module SaLib (
 	AbsVal(..),
 	AnalysisKind(..),
-	AbsValEnv{-abstract-}, StrictEnv(..), AbsenceEnv(..),
-	StrAnalFlags(..), getStrAnalFlags,
+	AbsValEnv{-abstract-}, SYN_IE(StrictEnv), SYN_IE(AbsenceEnv),
+	SYN_IE(StrAnalFlags), getStrAnalFlags,
 	nullAbsValEnv, addOneToAbsValEnv, growAbsValEnvList,
 	lookupAbsValEnv,
 	absValFromStrictness
@@ -20,9 +20,9 @@ module SaLib (
 
 IMP_Ubiq(){-uitous-}
 
-import CoreSyn		( CoreExpr(..) )
+import CoreSyn		( SYN_IE(CoreExpr) )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  lookupIdEnv, IdEnv(..),
+			  lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}
 			)
 import IdInfo		( StrictnessInfo(..), Demand{-instance Outputable-} )

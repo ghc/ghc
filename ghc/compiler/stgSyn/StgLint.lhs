@@ -16,7 +16,7 @@ import Bag		( emptyBag, isEmptyBag, snocBag, foldBag )
 import Id		( idType, isDataCon, dataConArgTys,
 			  emptyIdSet, isEmptyIdSet, elementOfIdSet,
 			  mkIdSet, intersectIdSets,
-			  unionIdSets, idSetToList, IdSet(..),
+			  unionIdSets, idSetToList, SYN_IE(IdSet),
 			  GenId{-instanced NamedThing-}
 			)
 import Literal		( literalType, Literal{-instance Outputable-} )
@@ -522,7 +522,7 @@ pp_expr sty expr = ppr sty expr
 
 sleazy_eq_ty ty1 ty2
 	-- NB: probably severe overkill (WDP 95/04)
-  = _trace "StgLint.sleazy_eq_ty:use eqSimplTy?" $
+  = trace "StgLint.sleazy_eq_ty:use eqSimplTy?" $
     case (splitFunTyExpandingDicts ty1) of { (tyargs1,tyres1) ->
     case (splitFunTyExpandingDicts ty2) of { (tyargs2,tyres2) ->
     let

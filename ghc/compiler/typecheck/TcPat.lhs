@@ -37,7 +37,7 @@ import Pretty
 import RnHsSyn		( RnName{-instance Outputable-} )
 import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
 			  getFunTy_maybe, maybeAppDataTyCon,
-			  Type(..), GenType
+			  SYN_IE(Type), GenType
 			)
 import TyVar		( GenTyVar )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,

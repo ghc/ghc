@@ -9,10 +9,10 @@
 module TyCon(
 	TyCon(..), 	-- NB: some pals need to see representation
 
-	Arity(..), NewOrData(..),
+	SYN_IE(Arity), NewOrData(..),
 
 	isFunTyCon, isPrimTyCon, isBoxedTyCon,
-	isDataTyCon, isSynTyCon, isNewTyCon,
+	isDataTyCon, isSynTyCon, isNewTyCon, maybeNewTyCon,
 
 	mkDataTyCon,
 	mkFunTyCon,
@@ -40,15 +40,16 @@ module TyCon(
 
 CHK_Ubiq()	-- debugging consistency check
 
-IMPORT_DELOOPER(TyLoop)		( Type(..), GenType,
-			  Class(..), GenClass,
-			  Id(..), GenId,
-			  mkTupleCon, isNullaryDataCon,
-			  specMaybeTysSuffix
+IMPORT_DELOOPER(TyLoop)	( SYN_IE(Type), GenType,
+			  SYN_IE(Class), GenClass,
+			  SYN_IE(Id), GenId,
+			  splitSigmaTy, splitFunTy,
+			  mkTupleCon, isNullaryDataCon, idType
+			  --LATER: specMaybeTysSuffix
 			)
 
-import TyVar		( GenTyVar, alphaTyVars, alphaTyVar, betaTyVar )
-import Usage		( GenUsage, Usage(..) )
+import TyVar		( GenTyVar, alphaTyVars, alphaTyVar, betaTyVar, SYN_IE(TyVar) )
+import Usage		( GenUsage, SYN_IE(Usage) )
 import Kind		( Kind, mkBoxedTypeKind, mkArrowKind, resultKind, argKind )
 
 import Maybes
@@ -56,10 +57,10 @@ import Name		( Name, RdrName(..), appendRdr, nameUnique,
 			  mkTupleTyConName, mkFunTyConName
 			)
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
-import Pretty		( Pretty(..), PrettyRep )
+import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
-import Util		( panic, panic#, pprPanic{-ToDo:rm-}, nOfThem, isIn, Ord3(..) )
+import Util		( nOfThem, isIn, Ord3(..), panic, panic#, assertPanic, pprPanic{-ToDo:rm-} )
 import {-hide me-}
 	PprType (pprTyCon)
 import {-hide me-}
@@ -132,12 +133,9 @@ mkTupleTyCon arity
     n = mkTupleTyConName arity
     u = uniqueOf n
 
-mkDataTyCon name
-  = DataTyCon (nameUnique name) name
-mkPrimTyCon name
-  = PrimTyCon (nameUnique name) name
-mkSynTyCon name
-  = SynTyCon (nameUnique name) name
+mkDataTyCon name = DataTyCon (nameUnique name) name
+mkPrimTyCon name = PrimTyCon (nameUnique name) name
+mkSynTyCon  name = SynTyCon  (nameUnique name) name
 
 isFunTyCon FunTyCon = True
 isFunTyCon _ = False
@@ -154,6 +152,16 @@ isBoxedTyCon = not . isPrimTyCon
 isDataTyCon (DataTyCon _ _ _ _ _ _ _ DataType) = True
 isDataTyCon (TupleTyCon _ _ _)		       = True
 isDataTyCon other 			       = False
+
+maybeNewTyCon :: TyCon -> Maybe ([TyVar], Type) 	-- Returns representation type info
+maybeNewTyCon (DataTyCon _ _ _ _ _ (con:null_cons) _ NewType) 
+  = ASSERT( null null_cons && null null_tys)
+    Just (tyvars, rep_ty)
+  where
+    (tyvars, theta, tau)      = splitSigmaTy (idType con)
+    (rep_ty:null_tys, res_ty) = splitFunTy tau
+
+maybeNewTyCon other = Nothing
 
 isNewTyCon (DataTyCon _ _ _ _ _ _ _ NewType) = True 
 isNewTyCon other			     = False

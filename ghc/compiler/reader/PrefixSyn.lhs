@@ -12,17 +12,18 @@ order that follows the \tr{Prefix_Form} document.
 
 module PrefixSyn (
 	RdrBinding(..),
-	RdrId(..),
+	SYN_IE(RdrId),
 	RdrMatch(..),
-	SigConverter(..),
-	SrcFile(..),
-	SrcFun(..),
-	SrcLine(..),
+	SYN_IE(SigConverter),
+	SYN_IE(SrcFile),
+	SYN_IE(SrcFun),
+	SYN_IE(SrcLine),
 
 	readInteger
     ) where
 
 IMP_Ubiq()
+IMPORT_1_3(Char(isDigit))
 
 import HsSyn
 import RdrHsSyn

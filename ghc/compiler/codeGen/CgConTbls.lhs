@@ -34,9 +34,9 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			)
 import CostCentre	( dontCareCostCentre )
 import FiniteMap	( fmToList )
-import HeapOffs		( zeroOff, VirtualHeapOffset(..) )
+import HeapOffs		( zeroOff, SYN_IE(VirtualHeapOffset) )
 import Id		( dataConTag, dataConRawArgTys,
-			  dataConArity, fIRST_TAG,
+			  dataConNumFields, fIRST_TAG,
 			  emptyIdSet,
 			  GenId{-instance NamedThing-}
 			)
@@ -241,7 +241,6 @@ genConInfo comp_info tycon data_con
     zero_size arg_ty = getPrimRepSize (typePrimRep arg_ty) == 0
 
     arg_tys	    = dataConRawArgTys 	   data_con
-    con_arity	    = dataConArity 	   data_con
     entry_label     = mkConEntryLabel      data_con
     closure_label   = mkStaticClosureLabel data_con
 \end{code}
@@ -339,7 +338,7 @@ genPhantomUpdInfo comp_info tycon data_con
 
 	    con_descr = _UNPK_ (nameOf (origName "con_descr2" data_con))
 
-	    con_arity = dataConArity data_con
+	    con_arity = dataConNumFields data_con
 
 	    upd_code = CLabelledCode upd_label (mkAbsCStmts build_closure perform_return)
     	    upd_label = mkConUpdCodePtrVecLabel tycon tag

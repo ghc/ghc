@@ -16,18 +16,17 @@ import CmdLineOpts	( opt_D_verbose_core2core,
 import CoreSyn
 import CoreUtils	( substCoreExpr )
 import Id		( externallyVisibleId,
-			  mkIdEnv, lookupIdEnv, IdEnv(..),
+			  mkIdEnv, lookupIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Ord3-}
 			)
 import Maybes		( catMaybes )
-import Name		( isExported )
 import OccurAnal	( occurAnalyseBinds )
 import Pretty		( ppAboves, ppBesides, ppInt, ppChar, ppStr )
 import SimplEnv
 import SimplMonad
 import Simplify		( simplTopBinds )
-import TyVar		( nullTyVarEnv, TyVarEnv(..) )
-import UniqSupply	( thenUs, returnUs, mapUs, splitUniqSupply, UniqSM(..) )
+import TyVar		( nullTyVarEnv, SYN_IE(TyVarEnv) )
+import UniqSupply	( thenUs, returnUs, mapUs, splitUniqSupply, SYN_IE(UniqSM) )
 import Util		( isIn, isn'tIn, removeDups, pprTrace )
 \end{code}
 
@@ -144,7 +143,7 @@ tidy_top binds_in
     find_cand blast_list (Rec _) = blast_list	-- recursively paranoid, as usual
 
     find_cand blast_list (NonRec binder rhs)
-      = if not (isExported binder) then
+      = if not (externallyVisibleId binder) then
 	   blast_list
     	else
 	   case rhs_equiv_to_local_var rhs of

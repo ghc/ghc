@@ -13,10 +13,10 @@ module FreeVars (
 	addTopBindsFVs,
 
 	freeVarsOf, freeTyVarsOf,
-	FVCoreExpr(..), FVCoreBinding(..),
+	SYN_IE(FVCoreExpr), SYN_IE(FVCoreBinding),
 
-	CoreExprWithFVs(..),		-- For the above functions
-	AnnCoreExpr(..),		-- Dito
+	SYN_IE(CoreExprWithFVs),		-- For the above functions
+	SYN_IE(AnnCoreExpr),		-- Dito
 	FVInfo(..), LeakInfo(..)
     ) where
 
@@ -28,17 +28,17 @@ import CoreSyn
 import Id		( idType, getIdArity, isBottomingId,
 			  emptyIdSet, unitIdSet, mkIdSet,
 			  elementOfIdSet, minusIdSet, unionManyIdSets,
-			  IdSet(..)
+			  SYN_IE(IdSet)
 			)
 import IdInfo		( arityMaybe )
 import PrimOp		( PrimOp(..) )
 import Type		( tyVarsOfType )
 import TyVar		( emptyTyVarSet, unitTyVarSet, minusTyVarSet,
 			  intersectTyVarSets,
-			  TyVarSet(..)
+			  SYN_IE(TyVarSet)
 			)
 import UniqSet		( unionUniqSets )
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Util		( panic, assertPanic )
 \end{code}
 

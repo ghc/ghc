@@ -25,7 +25,6 @@ SUBDIRS = __ghc_compiler_tests_dir
 */
 SuffixRules_flexish()
 SuffixRule_c_o()
-LitSuffixRule(.lprl,.prl) /* for makeSymbolList.prl */
 
 .SUFFIXES: .lhi
 .lhi.hi:
@@ -231,9 +230,7 @@ stranal/StrictAnal.lhs \
 stranal/SaLib.lhs \
 stranal/SaAbsInt.lhs \
 stranal/WwLib.lhs \
-stranal/WorkWrap.lhs \
-\
-profiling/SCCauto.lhs DEFORESTER_SRCS_LHS
+stranal/WorkWrap.lhs DEFORESTER_SRCS_LHS
 
 #define STG_SRCS_LHS \
 stgSyn/CoreToStg.lhs \
@@ -606,7 +603,6 @@ compile(prelude/PrimOp,lhs,-K3m -H10m)
 compile(prelude/TysPrim,lhs,)
 compile(prelude/TysWiredIn,lhs,)
 
-compile(profiling/SCCauto,lhs,)
 compile(profiling/SCCfinal,lhs,)
 compile(profiling/CostCentre,lhs,)
 
@@ -819,6 +815,11 @@ InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
 #endif /* DoInstall... */
 
 YaccRunWithExpectMsg(parser/hsparser,12,0)
+
+parser/hslexer.o : parser/hslexer.c parser/hsparser.tab.h
+	$(RM) $@
+	$(CC) $(CFLAGS) -c $<
+	@if [ \( $(@D) != '.' \) -a \( $(@D) != './' \) ] ; then echo mv $(@F) $@ ; mv $(@F) $@ ; else exit 0 ;	fi
 
 UgenTarget(parser,constr)
 UgenTarget(parser,binding)

@@ -38,7 +38,7 @@ import PprStyle--ToDo:rm
 import Pretty
 import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
 			  unionUniqSets, unionManyUniqSets,
-			  elementOfUniqSet, uniqSetToList, UniqSet(..) )
+			  elementOfUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 

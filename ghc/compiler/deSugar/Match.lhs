@@ -335,7 +335,7 @@ tidy1 v (RecPat con_id pat_ty rpats) match_result
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (_, inst_tys, _) = {-_trace "Match.getAppDataTyConExpandingDicts" $-} getAppDataTyConExpandingDicts pat_ty
+    (_, inst_tys, _) = {-trace "Match.getAppDataTyConExpandingDicts" $-} getAppDataTyConExpandingDicts pat_ty
     con_arg_tys'     = dataConArgTys con_id inst_tys 
     tagged_arg_tys   = con_arg_tys' `zip` allFieldLabelTags
 
@@ -607,7 +607,7 @@ matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
 
 matchWrapper kind [(GRHSMatch
 		     (GRHSsAndBindsOut [OtherwiseGRHS expr _] binds _))] error_string
-  = dsBinds binds	`thenDs` \ core_binds ->
+  = dsBinds False binds	`thenDs` \ core_binds ->
     dsExpr  expr	`thenDs` \ core_expr ->
     returnDs ([], mkCoLetsAny core_binds core_expr)
 
@@ -698,7 +698,7 @@ flattenMatches kind (match : matches)
       = flatten_match (pat:pats_so_far) match
 
     flatten_match pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-      = dsBinds binds				`thenDs` \ core_binds ->
+      = dsBinds False binds			`thenDs` \ core_binds ->
 	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
 	returnDs (EqnInfo pats (mkCoLetsMatchResult core_binds match_result))
       where

@@ -25,7 +25,7 @@
 > import Id		( getIdInfo, Id )
 > import IdInfo
 > import Outputable
-> import SimplEnv	( SwitchChecker(..) )
+> import SimplEnv	( SYN_IE(SwitchChecker) )
 > import UniqSupply
 > import Util
 

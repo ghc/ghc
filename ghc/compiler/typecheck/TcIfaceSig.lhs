@@ -16,7 +16,7 @@ import TcMonoType	( tcPolyType )
 import HsSyn		( Sig(..), PolyType )
 import RnHsSyn		( RenamedSig(..), RnName(..) )
 
-import CmdLineOpts	( opt_CompilingPrelude )
+import CmdLineOpts	( opt_CompilingGhcInternals )
 import Id		( mkImported )
 --import Name		( Name(..) )
 import Maybes		( maybeToBool )
@@ -56,7 +56,7 @@ tcInterfaceSigs (Sig name ty pragmas src_loc : sigs)
 
   | otherwise -- odd name...
   = case name of
-      WiredInId _ | opt_CompilingPrelude
+      WiredInId _ | opt_CompilingGhcInternals
         -> tcInterfaceSigs sigs
       _ -> tcAddSrcLoc src_loc	$
 	   failTc (ifaceSigNameErr name)

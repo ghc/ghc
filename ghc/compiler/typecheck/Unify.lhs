@@ -17,7 +17,7 @@ IMP_Ubiq()
 import TcMonad	hiding ( rnMtoTcM )
 import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe )
 import TyCon	( TyCon, mkFunTyCon )
-import TyVar	( GenTyVar(..), TyVar(..), tyVarKind )
+import TyVar	( GenTyVar(..), SYN_IE(TyVar), tyVarKind )
 import TcType	( TcType(..), TcMaybe(..), TcTauType(..), TcTyVar(..),
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
@@ -123,6 +123,14 @@ uTys ps_ty1 (TyConTy con1 _) ps_ty2 (TyConTy con2 _)
 	-- Always expand synonyms (see notes at end)
 uTys ps_ty1 (SynTy con1 args1 ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
 uTys ps_ty1 ty1 ps_ty2 (SynTy con2 args2 ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
+
+	-- Not expecting for-alls in unification
+#ifdef DEBUG
+uTys ps_ty1 (ForAllTy _ _)	  ps_ty2 ty2 = panic "Unify.uTys:ForAllTy (1st arg)"
+uTys ps_ty1 ty1 ps_ty2	      (ForAllTy _ _) = panic "Unify.uTys:ForAllTy (2nd arg)"
+uTys ps_ty1 (ForAllUsageTy _ _ _) ps_ty2 ty2 = panic "Unify.uTys:ForAllUsageTy (1st arg)"
+uTys ps_ty1 ty1 ps_ty2 (ForAllUsageTy _ _ _) = panic "Unify.uTys:ForAllUsageTy (2nd arg)"
+#endif
 
 	-- Anything else fails
 uTys ps_ty1 ty1 ps_ty2 ty2  = failTc (unifyMisMatch ps_ty1 ps_ty2)

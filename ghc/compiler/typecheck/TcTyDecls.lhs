@@ -45,7 +45,7 @@ import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			)
 import FieldLabel
 import Kind		( Kind, mkArrowKind, mkBoxedTypeKind )
-import SpecEnv		( SpecEnv(..), nullSpecEnv )
+import SpecEnv		( SYN_IE(SpecEnv), nullSpecEnv )
 import Name		( nameSrcLoc, isLocallyDefinedName, getSrcLoc,
 			  Name{-instance Ord3-}
 			)
@@ -62,7 +62,7 @@ import Type		( GenType, -- instances
 import PprType		( GenTyVar{-instance Outputable-}{-ToDo:possibly rm-} )
 import TyVar		( tyVarKind, elementOfTyVarSet, GenTyVar{-instance Eq-} )
 import Unique		( Unique {- instance Eq -}, evalClassKey )
-import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, UniqSet(..) )
+import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, SYN_IE(UniqSet) )
 import Util		( equivClasses, zipEqual, nOfThem, panic, assertPanic )
 \end{code}
 

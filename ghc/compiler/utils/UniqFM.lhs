@@ -55,12 +55,15 @@ module UniqFM (
 
 #if defined(COMPILING_GHC)
 IMP_Ubiq(){-uitous-}
+import {-hide from mkdependHS-}
+	Name	( Name )   -- specialising only
+import {-hide from mkdependHS-}
+	RnHsSyn	( RnName ) -- specialising only
 #endif
 
 import Unique		( Unique, u2i, mkUniqueGrimily )
 import Util
---import Outputable	( Outputable(..), ExportFlag )
-import Pretty		( Pretty(..), PrettyRep )
+import Pretty		( SYN_IE(Pretty), PrettyRep )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
 
@@ -139,89 +142,34 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 %************************************************************************
 
 \begin{code}
-#if 0
-
-type IdFinMap	 elt = UniqFM elt
-type TyVarFinMap elt = UniqFM elt
-type NameFinMap  elt = UniqFM elt
-type RegFinMap   elt = UniqFM elt
-
 #ifdef __GLASGOW_HASKELL__
 -- I don't think HBC was too happy about this (WDP 94/10)
 
 {-# SPECIALIZE
-    unitUFM :: Id	  -> elt -> IdFinMap elt,
-		    TyVar -> elt -> TyVarFinMap elt,
-		    Name  -> elt -> NameFinMap elt
-    IF_NCG(COMMA    Reg   -> elt -> RegFinMap elt)
+    addListToUFM :: UniqFM elt -> [(Name,   elt)] -> UniqFM elt
+		  , UniqFM elt -> [(RnName, elt)] -> UniqFM elt
   #-}
 {-# SPECIALIZE
-    listToUFM	:: [(Id,   elt)]     -> IdFinMap elt,
-		   [(TyVar,elt)]     -> TyVarFinMap elt,
-		   [(Name, elt)]     -> NameFinMap elt
-    IF_NCG(COMMA   [(Reg COMMA elt)] -> RegFinMap elt)
+    addListToUFM_C :: (elt -> elt -> elt) -> UniqFM elt -> [(Name,  elt)] -> UniqFM elt
+		    , (elt -> elt -> elt) -> UniqFM elt -> [(RnName,elt)] -> UniqFM elt
   #-}
 {-# SPECIALIZE
-    addToUFM	:: IdFinMap    elt -> Id    -> elt  -> IdFinMap elt,
-		   TyVarFinMap elt -> TyVar -> elt  -> TyVarFinMap elt,
-		   NameFinMap  elt -> Name  -> elt  -> NameFinMap elt
-    IF_NCG(COMMA   RegFinMap   elt -> Reg   -> elt  -> RegFinMap elt)
+    addToUFM	:: UniqFM elt -> Unique -> elt  -> UniqFM elt
   #-}
 {-# SPECIALIZE
-    addListToUFM :: IdFinMap	elt -> [(Id,   elt)] -> IdFinMap elt,
-		    TyVarFinMap elt -> [(TyVar,elt)] -> TyVarFinMap elt,
-		    NameFinMap  elt -> [(Name,elt)]  -> NameFinMap elt
-    IF_NCG(COMMA    RegFinMap   elt -> [(Reg COMMA elt)] -> RegFinMap elt)
+    listToUFM	:: [(Unique, elt)]     -> UniqFM elt
+		 , [(RnName, elt)]     -> UniqFM elt
   #-}
 {-# SPECIALIZE
-    addToUFM_C	:: (elt -> elt -> elt)
-		-> IdFinMap elt -> Id -> elt -> IdFinMap elt,
-		   (elt -> elt -> elt)
-		-> TyVarFinMap elt -> TyVar -> elt -> TyVarFinMap elt,
-		   (elt -> elt -> elt)
-		-> NameFinMap elt -> Name -> elt -> NameFinMap elt
-    IF_NCG(COMMA   (elt -> elt -> elt)
-    		-> RegFinMap elt -> Reg -> elt -> RegFinMap elt)
+    lookupUFM	:: UniqFM elt -> Name   -> Maybe elt
+		 , UniqFM elt -> RnName -> Maybe elt
+		 , UniqFM elt -> Unique -> Maybe elt
   #-}
 {-# SPECIALIZE
-    addListToUFM_C :: (elt -> elt -> elt)
-		-> IdFinMap elt -> [(Id,elt)] -> IdFinMap elt,
-		   (elt -> elt -> elt)
-		-> TyVarFinMap elt -> [(TyVar,elt)] -> TyVarFinMap elt,
-		   (elt -> elt -> elt)
-		-> NameFinMap elt -> [(Name,elt)] -> NameFinMap elt
-    IF_NCG(COMMA   (elt -> elt -> elt)
-		-> RegFinMap elt -> [(Reg COMMA elt)] -> RegFinMap elt)
-  #-}
-{-# SPECIALIZE
-    delFromUFM	:: IdFinMap elt	   -> Id    -> IdFinMap elt,
-		   TyVarFinMap elt -> TyVar -> TyVarFinMap elt,
-		   NameFinMap elt  -> Name  -> NameFinMap elt
-    IF_NCG(COMMA    RegFinMap elt   -> Reg   -> RegFinMap elt)
-  #-}
-{-# SPECIALIZE
-    delListFromUFM :: IdFinMap elt    -> [Id]	 -> IdFinMap elt,
-		      TyVarFinMap elt -> [TyVar] -> TyVarFinMap elt,
-		      NameFinMap elt  -> [Name]  -> NameFinMap elt
-    IF_NCG(COMMA      RegFinMap elt   -> [Reg]   -> RegFinMap elt)
-  #-}
-
-{-# SPECIALIZE
-    lookupUFM	:: IdFinMap elt	   -> Id    -> Maybe elt,
-		   TyVarFinMap elt -> TyVar -> Maybe elt,
-		   NameFinMap elt  -> Name  -> Maybe elt
-    IF_NCG(COMMA   RegFinMap elt   -> Reg   -> Maybe elt)
-  #-}
-{-# SPECIALIZE
-    lookupWithDefaultUFM
-		:: IdFinMap elt	   -> elt -> Id	   -> elt,
-		   TyVarFinMap elt -> elt -> TyVar -> elt,
-		   NameFinMap elt  -> elt -> Name  -> elt
-    IF_NCG(COMMA   RegFinMap elt   -> elt -> Reg   -> elt)
+    lookupWithDefaultUFM :: UniqFM elt -> elt -> RnName -> elt
   #-}
 
 #endif {- __GLASGOW_HASKELL__ -}
-#endif {- 0 -}
 \end{code}
 
 %************************************************************************
@@ -441,8 +389,8 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 	--
 	-- Notice the asymetry of subtraction
 	--
-	minus_trees lf@(LeafUFM i a) t2	       =
-		case lookup t2 i of
+	minus_trees lf@(LeafUFM i a) t2 =
+		case lookUp t2 i of
 		  Nothing -> lf
 		  Just b -> EmptyUFM
 
@@ -513,12 +461,12 @@ intersectUFM_C f _ EmptyUFM = EmptyUFM
 intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
     where
 	intersect_trees (LeafUFM i a) t2 =
-		case lookup t2 i of
+		case lookUp t2 i of
 		  Nothing -> EmptyUFM
 		  Just b -> mkLeafUFM i (f a b)
 
 	intersect_trees t1 (LeafUFM i a) =
-		case lookup t1 i of
+		case lookUp t1 i of
 		  Nothing -> EmptyUFM
 		  Just b -> mkLeafUFM i (f b a)
 
@@ -601,21 +549,21 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
-lookupUFM	  fm key = lookup fm (u2i (uniqueOf key))
-lookupUFM_Directly fm key = lookup fm (u2i key)
+lookupUFM	   fm key = lookUp fm (u2i (uniqueOf key))
+lookupUFM_Directly fm key = lookUp fm (u2i key)
 
 lookupWithDefaultUFM fm deflt key
-  = case lookup fm (u2i (uniqueOf key)) of
+  = case lookUp fm (u2i (uniqueOf key)) of
       Nothing  -> deflt
       Just elt -> elt
 
 lookupWithDefaultUFM_Directly fm deflt key
-  = case lookup fm (u2i key) of
+  = case lookUp fm (u2i key) of
       Nothing  -> deflt
       Just elt -> elt
 
-lookup EmptyUFM _   = Nothing
-lookup fm i	    = lookup_tree fm
+lookUp EmptyUFM _   = Nothing
+lookUp fm i	    = lookup_tree fm
   where
 	lookup_tree :: UniqFM a -> Maybe a
 

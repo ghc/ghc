@@ -29,39 +29,35 @@ module CoreSyn (
 	rhssOfAlts,
 
 	-- Common type instantiation...
-	CoreBinding(..),
-	CoreExpr(..),
-	CoreBinder(..),
-	CoreArg(..),
-	CoreCaseAlts(..),
-	CoreCaseDefault(..),
+	SYN_IE(CoreBinding),
+	SYN_IE(CoreExpr),
+	SYN_IE(CoreBinder),
+	SYN_IE(CoreArg),
+	SYN_IE(CoreCaseAlts),
+	SYN_IE(CoreCaseDefault),
 
 	-- And not-so-common type instantiations...
-	TaggedCoreBinding(..),
-	TaggedCoreExpr(..),
-	TaggedCoreBinder(..),
-	TaggedCoreArg(..),
-	TaggedCoreCaseAlts(..),
-	TaggedCoreCaseDefault(..),
+	SYN_IE(TaggedCoreBinding),
+	SYN_IE(TaggedCoreExpr),
+	SYN_IE(TaggedCoreBinder),
+	SYN_IE(TaggedCoreArg),
+	SYN_IE(TaggedCoreCaseAlts),
+	SYN_IE(TaggedCoreCaseDefault),
 
-	SimplifiableCoreBinding(..),
-	SimplifiableCoreExpr(..),
-	SimplifiableCoreBinder(..),
-	SimplifiableCoreArg(..),
-	SimplifiableCoreCaseAlts(..),
-	SimplifiableCoreCaseDefault(..)
+	SYN_IE(SimplifiableCoreBinding),
+	SYN_IE(SimplifiableCoreExpr),
+	SYN_IE(SimplifiableCoreBinder),
+	SYN_IE(SimplifiableCoreArg),
+	SYN_IE(SimplifiableCoreCaseAlts),
+	SYN_IE(SimplifiableCoreCaseDefault)
     ) where
 
 IMP_Ubiq(){-uitous-}
 
--- ToDo:rm:
---import PprCore		( GenCoreExpr{-instance-} )
---import PprStyle		( PprStyle(..) )
-
 import CostCentre	( showCostCentre, CostCentre )
 import Id		( idType, GenId{-instance Eq-} )
 import Type		( isUnboxedType )
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Util		( panic, assertPanic {-pprTrace:ToDo:rm-} )
 \end{code}
 
@@ -238,13 +234,9 @@ mkCoLetAny bind@(NonRec binder rhs) body
 \end{code}
 
 \begin{code}
---mkCoLetNoUnboxed ::
---  GenCoreBinding val_bdr val_occ tyvar uvar ->
---  GenCoreExpr val_bdr val_occ tyvar uvar ->
---  GenCoreExpr val_bdr val_occ tyvar uvar
-
 mkCoLetNoUnboxed bind@(Rec binds) body
   = mkCoLetrecNoUnboxed binds body
+
 mkCoLetNoUnboxed bind@(NonRec binder rhs) body
   = --ASSERT (not (isUnboxedType (idType binder)))
     case body of
@@ -256,10 +248,6 @@ mkCoLetNoUnboxed bind@(NonRec binder rhs) body
 mkCoLetsNoUnboxed []    expr = expr
 mkCoLetsNoUnboxed binds expr = foldr mkCoLetNoUnboxed expr binds
 
-mkCoLetrecNoUnboxed :: [(GenId (GenType a b), GenCoreExpr (GenId (GenType a b)) c d e)]
-		    -> GenCoreExpr (GenId (GenType a b)) c d e
-		    -> GenCoreExpr (GenId (GenType a b)) c d e
-
 mkCoLetrecNoUnboxed []    body = body
 mkCoLetrecNoUnboxed binds body
   = ASSERT (all is_boxed_bind binds)
@@ -270,13 +258,9 @@ mkCoLetrecNoUnboxed binds body
 \end{code}
 
 \begin{code}
---mkCoLetUnboxedToCase ::
---  GenCoreBinding val_bdr val_occ tyvar uvar ->
---  GenCoreExpr val_bdr val_occ tyvar uvar ->
---  GenCoreExpr val_bdr val_occ tyvar uvar
-
 mkCoLetUnboxedToCase bind@(Rec binds) body
   = mkCoLetrecNoUnboxed binds body
+
 mkCoLetUnboxedToCase bind@(NonRec binder rhs) body
   = case body of
       Var binder2 | binder == binder2

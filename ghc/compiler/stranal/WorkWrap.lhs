@@ -14,13 +14,13 @@ import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..) )
 import CoreUtils	( coreExprType )
 import Id		( idWantsToBeINLINEd, getIdStrictness, mkWorkerId,
-			  getIdInfo
+			  getIdInfo, GenId
 			)
 import IdInfo		( noIdInfo, addInfo_UF, indicatesWorker,
 			  mkStrictnessInfo, StrictnessInfo(..)
 			)
 import SaLib
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import WwLib
 import Util		( panic{-ToDo:rm-} )
 

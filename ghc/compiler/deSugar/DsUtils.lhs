@@ -44,14 +44,14 @@ import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
 import Pretty		( ppShow )
 import Id		( idType, dataConArgTys, mkTupleCon,
 			  pprId{-ToDo:rm-},
-			  DataCon(..), DictVar(..), Id(..), GenId )
+			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
 			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
 			)
 import TysPrim		( voidTy )
-import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
+import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
 import PprCore{-ToDo:rm-}
 --import PprType--ToDo:rm

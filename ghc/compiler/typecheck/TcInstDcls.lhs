@@ -9,8 +9,7 @@
 module TcInstDcls (
 	tcInstDecls1,
 	tcInstDecls2,
-	processInstBinds,
-	newMethodId
+	processInstBinds
     ) where
 
 
@@ -34,19 +33,19 @@ import TcHsSyn		( TcIdOcc(..), TcHsBinds(..),
 
 
 import TcMonad		hiding ( rnMtoTcM )
-import GenSpecEtc	( checkSigTyVarsGivenGlobals )
+import GenSpecEtc	( checkSigTyVars )
 import Inst		( Inst, InstOrigin(..), InstanceMapper(..),
 			  newDicts, newMethod, LIE(..), emptyLIE, plusLIE )
 import TcBinds		( tcPragmaSigs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcLookupClass, tcTyVarScope, newLocalId )
+import TcEnv		( tcLookupClass, tcTyVarScope, newLocalId, tcExtendGlobalTyVars )
 import TcGRHSs		( tcGRHSsAndBinds )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcKind		( TcKind, unifyKind )
 import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcContext, tcMonoTypeKind )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcType(..), TcTyVar(..),
+import TcType		( TcType(..), TcTyVar(..), TcTyVarSet(..), 
 			  tcInstSigTyVars, tcInstType, tcInstTheta, tcInstTcType
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )
@@ -54,7 +53,7 @@ import Unify		( unifyTauTy, unifyTauTyLists )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  concatBag, foldBag, bagToList )
-import CmdLineOpts	( opt_GlasgowExts,
+import CmdLineOpts	( opt_GlasgowExts, opt_CompilingGhcInternals,
 			  opt_OmitDefaultInstanceMethods,
 			  opt_SpecialiseOverloaded
 			)
@@ -74,13 +73,13 @@ import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			)
 import PprStyle
 import Pretty
-import RnUtils		( RnEnv(..) )
+import RnUtils		( SYN_IE(RnEnv) )
 import TyCon		( isSynTyCon, derivedFor )
-import Type		( GenType(..),  ThetaType(..), mkTyVarTys,
+import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys,
 			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
-			  getTyCon_maybe, maybeBoxedPrimType, splitRhoTy
+			  getTyCon_maybe, maybeBoxedPrimType, splitRhoTy, eqTy
 			)
-import TyVar		( GenTyVar, mkTyVarSet, unionTyVarSets )
+import TyVar		( GenTyVar, GenTyVarSet(..), mkTyVarSet, unionTyVarSets )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
 import Util		( zipEqual, panic )
@@ -369,7 +368,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     let
 	sc_theta'        = super_classes `zip` repeat inst_ty'
  	origin    	 = InstanceDeclOrigin
-	mk_method sel_id = newMethodId sel_id inst_ty' origin
+	mk_method sel_id = newMethod origin (RealId sel_id) [inst_ty']
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -382,6 +381,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 
 	 -- Collect available Insts
     let
+	inst_tyvars_set' = mkTyVarSet inst_tyvars'
+
 	avail_insts	 -- These insts are in scope; quite a few, eh?
 	  = unionManyBags (this_dict : dfun_arg_dicts : meth_insts_s) 
 
@@ -391,8 +392,9 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	    else
 		makeInstanceDeclDefaultMethodExpr origin meth_ids defm_ids inst_ty' this_dict_id 
     in
-    processInstBinds clas mk_method_expr inst_tyvars' avail_insts meth_ids monobinds
-					 	`thenTc` \ (insts_needed, method_mbinds) ->
+    tcExtendGlobalTyVars inst_tyvars_set' (
+	processInstBinds clas mk_method_expr avail_insts meth_ids monobinds
+    )				 	`thenTc` \ (insts_needed, method_mbinds) ->
     let
 	-- Create the dict and method binds
 	dict_bind
@@ -401,7 +403,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	dict_and_method_binds
 	    = dict_bind `AndMonoBinds` method_mbinds
 
-	inst_tyvars_set' = mkTyVarSet inst_tyvars'
     in
 	-- Check the overloading constraints of the methods and superclasses
     tcAddErrCtxt (bindSigCtxt meth_ids) (
@@ -446,62 +447,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     in
 
     returnTc (const_lie `plusLIE` spec_lie, inst_binds)
-\end{code}
-
-============= OLD ================
-
-@mkMethodId@ manufactures an id for a local method.
-It's rather turgid stuff, because there are two cases:
-
-  (a) For methods with no local polymorphism, we can make an Inst of the 
-      class-op selector function and a corresp InstId; 
-      which is good because then other methods which call
-      this one will do so directly.
-
-  (b) For methods with local polymorphism, we can't do this.  For example,
-
-	 class Foo a where
-		op :: (Num b) => a -> b -> a
-
-      Here the type of the class-op-selector is
-
-	forall a b. (Foo a, Num b) => a -> b -> a
-
-      The locally defined method at (say) type Float will have type
-
-	forall b. (Num b) => Float -> b -> Float
-
-      and the one is not an instance of the other.
-
-      So for these we just make a local (non-Inst) id with a suitable type.
-
-How disgusting.
-=============== END OF OLD ===================
-
-\begin{code}
-newMethodId sel_id inst_ty origin
-  = newMethod origin (RealId sel_id) [inst_ty]
-
-
-{- REMOVE SOON:		(this was pre-split-poly selector types)
-let (sel_tyvars,sel_theta,sel_tau) = splitSigmaTy (idType sel_id)
-	(_:meth_theta) = sel_theta	-- The local theta is all except the
-					-- first element of the context
-    in 
-       case sel_tyvars of
-	-- Ah! a selector for a class op with no local polymorphism
-	-- Build an Inst for this
-	[clas_tyvar] -> newMethod origin (RealId sel_id) [inst_ty]
-
-	-- Ho! a selector for a class op with local polymorphism.
-	-- Just make a suitably typed local id for this
-	(clas_tyvar:local_tyvars) -> 
-		tcInstType [(clas_tyvar,inst_ty)]
-			   (mkSigmaTy local_tyvars meth_theta sel_tau)
-								`thenNF_Tc` \ method_ty ->
-		newLocalId (getLocalName sel_id) method_ty	`thenNF_Tc` \ meth_id ->
-		returnNF_Tc (emptyLIE, meth_id)
--}
 \end{code}
 
 The next function makes a default method which calls the global default method, at
@@ -583,7 +528,6 @@ do differs between instance and class decls.
 processInstBinds
 	:: Class
 	-> (Int -> NF_TcM s (TcExpr s))    -- Function to make default method
-	-> [TcTyVar s]			   -- Tyvars for this instance decl
 	-> LIE s			   -- available Insts
 	-> [TcIdOcc s]			   -- Local method ids in tag order
 					   --	(instance tyvars are free in their types)
@@ -591,10 +535,10 @@ processInstBinds
 	-> TcM s (LIE s,		   -- These are required
 		  TcMonoBinds s)
 
-processInstBinds clas mk_default_method_rhs inst_tyvars avail_insts method_ids monobinds
+processInstBinds clas mk_default_method_rhs avail_insts method_ids monobinds
   =
 	 -- Process the explicitly-given method bindings
-    processInstBinds1 clas inst_tyvars avail_insts method_ids monobinds
+    processInstBinds1 clas avail_insts method_ids monobinds
 	 		`thenTc` \ (tags, insts_needed_in_methods, method_binds) ->
 
 	 -- Find the methods not handled, and make default method bindings for them.
@@ -616,7 +560,6 @@ processInstBinds clas mk_default_method_rhs inst_tyvars avail_insts method_ids m
 \begin{code}
 processInstBinds1
 	:: Class
-	-> [TcTyVar s]		-- Tyvars for this instance decl
 	-> LIE s		-- available Insts
 	-> [TcIdOcc s]		-- Local method ids in tag order (instance tyvars are free),
 	-> RenamedMonoBinds
@@ -624,13 +567,13 @@ processInstBinds1
 		  LIE s,	-- These are required
 		  TcMonoBinds s)
 
-processInstBinds1 clas inst_tyvars avail_insts method_ids EmptyMonoBinds
+processInstBinds1 clas avail_insts method_ids EmptyMonoBinds
   = returnTc ([], emptyLIE, EmptyMonoBinds)
 
-processInstBinds1 clas inst_tyvars avail_insts method_ids (AndMonoBinds mb1 mb2)
-  = processInstBinds1 clas inst_tyvars avail_insts method_ids mb1
+processInstBinds1 clas avail_insts method_ids (AndMonoBinds mb1 mb2)
+  = processInstBinds1 clas avail_insts method_ids mb1
 				 `thenTc`	\ (op_tags1,dicts1,method_binds1) ->
-    processInstBinds1 clas inst_tyvars avail_insts method_ids mb2
+    processInstBinds1 clas avail_insts method_ids mb2
 				 `thenTc`	\ (op_tags2,dicts2,method_binds2) ->
     returnTc (op_tags1 ++ op_tags2,
 	      dicts1 `unionBags` dicts2,
@@ -638,7 +581,7 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids (AndMonoBinds mb1 mb2)
 \end{code}
 
 \begin{code}
-processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
+processInstBinds1 clas avail_insts method_ids mbind
   =
     -- Find what class op is being defined here.  The complication is
     -- that we could have a PatMonoBind or a FunMonoBind.  If the
@@ -693,13 +636,14 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
 	newLocalId occ method_tau		`thenNF_Tc` \ local_id ->
 	newLocalId occ method_ty		`thenNF_Tc` \ copy_id ->
 	let
-	    inst_tyvar_set = mkTyVarSet inst_tyvars
-	    inst_method_tyvar_set = inst_tyvar_set `unionTyVarSets` (mkTyVarSet sig_tyvars)
+	    sig_tyvar_set = mkTyVarSet sig_tyvars
 	in
 		-- Typecheck the method
 	tcMethodBind local_id method_tau mbind `thenTc` \ (mbind', lieIop) ->
 
 		-- Check the overloading part of the signature.
+
+	-- =========== POSSIBLE BUT NOT DONE =================
 		-- Simplify everything fully, even though some
 		-- constraints could "really" be left to the next
 		-- level out. The case which forces this is
@@ -708,13 +652,18 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
 		--
 		-- Here we must simplify constraints on "a" to catch all
 		-- the Bar-ish things.
+
+		-- We don't do this because it's currently illegal Haskell (not sure why),
+		-- and because the local type of the method would have a context at
+		-- the front with no for-all, which confuses the hell out of everything!
+	-- ====================================================
+
 	tcAddErrCtxt (methodSigCtxt op method_ty) (
-	    checkSigTyVarsGivenGlobals
-		inst_tyvar_set
+	    checkSigTyVars
 		sig_tyvars method_tau				`thenTc_`
 
 	  tcSimplifyAndCheck
-		inst_method_tyvar_set
+		sig_tyvar_set
 		(method_dicts `plusLIE` avail_insts)
 		lieIop
 	) 					 `thenTc` \ (f_dicts, dict_binds) ->
@@ -906,12 +855,11 @@ scrutiniseInstanceType from_here clas inst_tau
   = failTc (instTypeErr inst_tau)
 
   	-- IMPORTED INSTANCES ARE OK (but see tcInstDecl1)
-  | from_here
+  | not from_here
   = returnTc (inst_tycon,arg_tys)
 
 	-- TYVARS CHECK
   | not (all isTyVarTy arg_tys ||
-         not from_here	       ||
 	 opt_GlasgowExts)
   = failTc (instTypeErr inst_tau)
 
@@ -928,7 +876,9 @@ scrutiniseInstanceType from_here clas inst_tau
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     isCcallishClass clas
-    && not (maybeToBool (maybeBoxedPrimType inst_tau))
+    && not (maybeToBool (maybeBoxedPrimType inst_tau)
+	    || opt_CompilingGhcInternals) -- this lets us get up to mischief;
+				     -- e.g., instance CCallable ()
   = failTc (nonBoxedPrimCCallErr clas inst_tau)
 
   | otherwise

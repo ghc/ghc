@@ -13,7 +13,7 @@ suited to spineless tagless code generation.
 
 module StgSyn (
 	GenStgArg(..),
-	GenStgLiveVars(..),
+	SYN_IE(GenStgLiveVars),
 
 	GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
 	GenStgCaseAlts(..), GenStgCaseDefault(..),
@@ -26,23 +26,23 @@ module StgSyn (
 	combineStgBinderInfo,
 
 	-- a set of synonyms for the most common (only :-) parameterisation
-	StgArg(..), StgLiveVars(..),
-	StgBinding(..), StgExpr(..), StgRhs(..),
-	StgCaseAlts(..), StgCaseDefault(..),
+	SYN_IE(StgArg), SYN_IE(StgLiveVars),
+	SYN_IE(StgBinding), SYN_IE(StgExpr), SYN_IE(StgRhs),
+	SYN_IE(StgCaseAlts), SYN_IE(StgCaseDefault),
 
 	pprPlainStgBinding,
 	getArgPrimRep,
 	isLitLitArg,
 	stgArity,
-	collectExportedStgBinders
+	collectFinalStgBinders
     ) where
 
 IMP_Ubiq(){-uitous-}
 
 import CostCentre	( showCostCentre )
-import Id		( idPrimRep, GenId{-instance NamedThing-} )
+import Id		( externallyVisibleId, idPrimRep, GenId{-instance NamedThing-} )
 import Literal		( literalPrimRep, isLitLitLit, Literal{-instance Outputable-} )
-import Name		( isExported, isSymLexeme )
+import Name		( isSymLexeme )
 import Outputable	( ifPprDebug, interppSP, interpp'SP,
 			  Outputable(..){-instance * Bool-}
 			)
@@ -51,7 +51,7 @@ import PprType		( GenType{-instance Outputable-} )
 import Pretty		-- all of it
 import PrimOp		( PrimOp{-instance Outputable-} )
 import Unique		( pprUnique )
-import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet(..) )
+import UniqSet		( isEmptyUniqSet, uniqSetToList, SYN_IE(UniqSet) )
 import Util		( panic )
 \end{code}
 
@@ -476,17 +476,17 @@ final pre-codegen STG code, so as to be sure we have the
 latest/greatest pragma info.
 
 \begin{code}
-collectExportedStgBinders
+collectFinalStgBinders
 	:: [StgBinding]	-- input program
-	-> [Id]			-- exported top-level Ids
+	-> [Id]		-- final externally-visible top-level Ids
 
-collectExportedStgBinders binds
+collectFinalStgBinders binds
   = ex [] binds
   where
     ex es [] = es
 
     ex es ((StgNonRec b _) : binds)
-      = if not (isExported b) then
+      = if not (externallyVisibleId b) then
 	    ex es binds
 	else
 	    ex (b:es) binds
@@ -706,7 +706,7 @@ pprStgRhs sty (StgRhsClosure cc bi free_vars upd_flag args body)
 
 pprStgRhs sty (StgRhsCon cc con args)
   = ppBesides [ ppStr (showCostCentre sty True{-as String-} cc),
-		ppSP, ppr sty con, ppStr " [", interppSP sty args, ppStr "]" ]
+		ppSP, ppr sty con, ppStr "! [", interppSP sty args, ppStr "]" ]
 
 --------------
 pp_binder_info PprForUser _ = ppNil

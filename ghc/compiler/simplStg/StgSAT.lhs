@@ -36,7 +36,7 @@ module StgSAT (	doStaticArgs ) where
 IMP_Ubiq(){-uitous-}
 
 import StgSyn
-import UniqSupply	( UniqSM(..) )
+import UniqSupply	( SYN_IE(UniqSM) )
 import Util		( panic )
 \end{code}
 

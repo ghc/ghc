@@ -23,7 +23,7 @@ import Type		( isPrimType, mkTyVarTys, mkForAllTys, mkFunTys,
 			  maybeAppDataTyConExpandingDicts
 			)
 import UniqSupply	( returnUs, thenUs, thenMaybeUs,
-			  getUniques, UniqSM(..)
+			  getUniques, SYN_IE(UniqSM)
 			)
 import Util		( zipWithEqual, assertPanic, panic )
 \end{code}

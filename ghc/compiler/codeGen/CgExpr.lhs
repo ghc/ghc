@@ -10,7 +10,7 @@
 \begin{code}
 #include "HsVersions.h"
 
-module CgExpr ( cgExpr, cgSccExpr, getPrimOpArgAmodes ) where
+module CgExpr ( cgExpr, getPrimOpArgAmodes ) where
 
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(CgLoop2)	-- here for paranoia-checking
@@ -35,8 +35,8 @@ import CgTailCall	( cgTailCall, performReturn,
 			)
 import CLabel		( mkPhantomInfoTableLabel, mkInfoTableVecTblLabel )
 import ClosureInfo	( mkClosureLFInfo )
-import CostCentre	( setToAbleCostCentre, isDupdCC )
-import HeapOffs		( VirtualSpBOffset(..) )
+import CostCentre	( sccAbleCostCentre, isDictCC, isSccCountCostCentre )
+import HeapOffs		( SYN_IE(VirtualSpBOffset) )
 import Id		( mkIdSet, unionIdSets, GenId{-instance Outputable-} )
 import PprStyle		( PprStyle(..) )
 import PrimOp		( primOpCanTriggerGC, primOpHeapReq, HeapRequirement(..),
@@ -270,30 +270,17 @@ cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
 
 SCC expressions are treated specially. They set the current cost
 centre.
-
-For evaluation scoping we also need to save the cost centre in an
-``restore CC frame''. We only need to do this once before setting all
-nested SCCs.
-
 \begin{code}
-cgExpr scc_expr@(StgSCC ty cc expr) = cgSccExpr scc_expr
+cgExpr (StgSCC ty cc expr)
+  = ASSERT(sccAbleCostCentre cc)
+    costCentresC
+	(if isDictCC cc then SLIT("SET_DICT_CCC") else SLIT("SET_CCC"))
+	[mkCCostCentre cc, mkIntCLit (if isSccCountCostCentre cc then 1 else 0)]
+    `thenC`
+    cgExpr expr
 \end{code}
 
-@cgSccExpr@ (also used in \tr{CgClosure}):
-We *don't* set the cost centre for CAF/Dict cost centres
-[Likewise Subsumed and NoCostCentre, but they probably
-don't exist in an StgSCC expression.]
-\begin{code}
-cgSccExpr (StgSCC ty cc expr)
-  = (if setToAbleCostCentre cc then
-	costCentresC SLIT("SET_CCC")
-	    [mkCCostCentre cc, mkIntCLit (if isDupdCC cc then 1 else 0)]
-     else
-	nopC)		`thenC`
-    cgSccExpr expr
-cgSccExpr other
-  = cgExpr other
-\end{code}
+ToDo: counting of dict sccs ...
 
 %********************************************************
 %*							*

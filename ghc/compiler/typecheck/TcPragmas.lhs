@@ -26,7 +26,7 @@ import HsPragmas	-- ****** NEED TO SEE CONSTRUCTORS ******
 import Id
 import IdInfo
 --import WwLib		( mkWwBodies )
-import Maybes		( assocMaybe, catMaybes, Maybe(..) )
+import Maybes		( assocMaybe, catMaybes )
 --import CoreLint		( lintUnfolding )
 import TcMonoType	( tcMonoType, tcPolyType )
 import Util

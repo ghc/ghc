@@ -72,7 +72,7 @@ import Stix		( sStLitLbl, StixTree(..), StixReg(..),
 import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Unique{-instance Ord3-}
 			)
-import UniqSupply	( getUnique, returnUs, thenUs, UniqSM(..) )
+import UniqSupply	( getUnique, returnUs, thenUs, SYN_IE(UniqSM) )
 import Unpretty		( uppStr, Unpretty(..) )
 import Util		( panic )
 \end{code}

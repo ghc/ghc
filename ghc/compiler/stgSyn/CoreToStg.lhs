@@ -9,13 +9,13 @@
 
 Convert a @CoreSyntax@ program to a @StgSyntax@ program.
 
-
 \begin{code}
 #include "HsVersions.h"
 
 module CoreToStg ( topCoreBindsToStg ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(Ratio(numerator,denominator))
 
 import CoreSyn		-- input
 import StgSyn		-- output
@@ -24,11 +24,11 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags, bagToList )
 import CoreUtils	( coreExprType )
 import CostCentre	( noCostCentre )
 import Id		( mkSysLocal, idType, isBottomingId,
+			  externallyVisibleId,
 			  nullIdEnv, addOneToIdEnv, lookupIdEnv,
-			  IdEnv(..), GenId{-instance NamedThing-}
+			  SYN_IE(IdEnv), GenId{-instance NamedThing-}
 			)
 import Literal		( mkMachInt, Literal(..) )
-import Name		( isExported )
 import PrelVals		( unpackCStringId, unpackCString2Id,
 			  integerZeroId, integerPlusOneId,
 			  integerPlusTwoId, integerMinusOneId
@@ -197,12 +197,13 @@ coreBindToStg env (NonRec binder rhs)
 
     let
 	-- Binds to return if RHS is trivial
-	triv_binds = if isExported binder then
+	triv_binds = if externallyVisibleId binder then
+			-- pprTrace "coreBindToStg:keeping:" (ppCat [ppr PprDebug binder, ppr PprDebug (externallyVisibleId binder)]) $
 			[StgNonRec binder stg_rhs]	-- Retain it
 		     else
+			-- pprTrace "coreBindToStg:tossing:" (ppCat [ppr PprDebug binder, ppr PprDebug (externallyVisibleId binder)]) $
 			[]				-- Discard it
     in
-    -- pprTrace "coreBindToStg:" (ppCat [ppr PprDebug binder, ppr PprDebug (isExported binder)]) $
     case stg_rhs of
       StgRhsClosure cc bi fvs upd [] (StgApp atom [] lvs) ->
 		-- Trivial RHS, so augment envt, and ditch the binding
@@ -645,9 +646,7 @@ coreExprToStg env (SCC cc expr)
 \end{code}
 
 \begin{code}
-coreExprToStg env (Coerce c ty expr)
-  = coreExprToStg env expr  -- `thenUs` \ (stg_expr, binds) ->
---  returnUs (StgSCC (coreExprType expr) cc stg_expr, binds)
+coreExprToStg env (Coerce c ty expr) = coreExprToStg env expr
 \end{code}
 
 

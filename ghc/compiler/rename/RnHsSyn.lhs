@@ -12,7 +12,7 @@ IMP_Ubiq()
 
 import HsSyn
 
-import Id		( isDataCon, GenId, Id(..) )
+import Id		( isDataCon, GenId, SYN_IE(Id) )
 import Name		( isLocalName, nameUnique, Name, RdrName(..){-ToDo: rm ..-},
 			  mkLocalName{-ToDo:rm-}
 			)
@@ -92,6 +92,14 @@ isRnImplicit _			 = False
 isRnUnbound (RnUnbound _) = True
 isRnUnbound _		  = False
 
+isRnEntity (WiredInId _)       = True
+isRnEntity (WiredInTyCon _)    = True
+isRnEntity (RnName n)	       = not (isLocalName n)
+isRnEntity (RnSyn _)           = True
+isRnEntity (RnData _ _ _)      = True
+isRnEntity (RnClass _ _)       = True
+isRnEntity _                   = False
+
 -- Very general NamedThing comparison, used when comparing
 -- Uniquable things with different types
 
@@ -120,7 +128,7 @@ instance NamedThing RnName where
     getName (RnImplicit n)      = n
     getName (RnImplicitTyCon n) = n
     getName (RnImplicitClass n) = n
-    getName (RnUnbound occ)     = pprTrace "getRnName:RnUnbound: " (ppr PprDebug occ)
+    getName (RnUnbound occ)     = --pprTrace "getRnName:RnUnbound: " (ppr PprDebug occ)
 				  (case occ of
 				     Unqual n -> mkLocalName bottom n False bottom2
 				     Qual m n -> mkLocalName bottom n False bottom2)

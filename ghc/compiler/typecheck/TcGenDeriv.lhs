@@ -63,17 +63,18 @@ module TcGenDeriv (
     ) where
 
 IMP_Ubiq()
+IMPORT_1_3(List(partition))
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), Match(..), GRHSsAndBinds(..),
 			  GRHS(..), HsExpr(..), HsLit(..), InPat(..), Qualifier(..), Stmt,
 			  ArithSeqInfo, Sig, PolyType, FixityDecl, Fake )
-import RdrHsSyn		( RdrNameMonoBinds(..), RdrNameHsExpr(..), RdrNamePat(..) )
+import RdrHsSyn		( SYN_IE(RdrNameMonoBinds), SYN_IE(RdrNameHsExpr), SYN_IE(RdrNamePat) )
 import RnHsSyn		( RenamedFixityDecl(..) )
 --import RnUtils
 
-import Id		( GenId, dataConArity, isNullaryDataCon, dataConTag,
+import Id		( GenId, dataConNumFields, isNullaryDataCon, dataConTag,
 			  dataConRawArgTys, fIRST_TAG,
-			  isDataCon, DataCon(..), ConTag(..) )
+			  isDataCon, SYN_IE(DataCon), SYN_IE(ConTag) )
 import IdUtils		( primOpId )
 import Maybes		( maybeToBool )
 import Name		( origName, preludeQual, nameOf, RdrName(..), OrigName(..) )
@@ -200,7 +201,7 @@ gen_Eq_binds tycon
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
 	    data_con_PN = qual_orig_name data_con
-	    con_arity   = dataConArity data_con
+	    con_arity   = length tys_needed
 	    as_needed   = take con_arity as_PNs
 	    bs_needed   = take con_arity bs_PNs
 	    tys_needed  = dataConRawArgTys data_con
@@ -212,15 +213,6 @@ gen_Eq_binds tycon
 	  = foldr1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
 	  where
 	    nested_eq ty a b = HsPar (eq_Expr ty (HsVar a) (HsVar b))
-{-OLD:
-	nested_eq_expr []     []     []  = true_Expr
-	nested_eq_expr [ty]   [a]    [b] = 
-	nested_eq_expr (t:ts) (a:as) (b:bs)
-	  = let
-		rest_expr = nested_eq_expr ts as bs
-	    in
-	    and_Expr (eq_Expr t (HsVar a) (HsVar b)) rest_expr
--}
 
 boring_ne_method
   = mk_easy_FunMonoBind ne_PN [a_Pat, b_Pat] [] $
@@ -347,7 +339,7 @@ gen_Ord_binds tycon
 		    (cmp_tags_Expr ltH_Int_PN ah_PN bh_PN ltTag_Expr gtTag_Expr)))
 
     (nullary_cons, nonnullary_cons)
-      = partition (\ con -> dataConArity con == 0) (tyConDataCons tycon)
+      = partition isNullaryDataCon (tyConDataCons tycon)
 
     cmp_eq
       = mk_FunMonoBind cmp_eq_PN (map pats_etc nonnullary_cons ++ deflt_pats_etc)
@@ -360,7 +352,7 @@ gen_Ord_binds tycon
 	    con2_pat = ConPatIn data_con_PN (map VarPatIn bs_needed)
 
 	    data_con_PN = qual_orig_name data_con
-	    con_arity   = dataConArity data_con
+	    con_arity   = length tys_needed
 	    as_needed   = take con_arity as_PNs
 	    bs_needed   = take con_arity bs_PNs
 	    tys_needed  = dataConRawArgTys data_con
@@ -491,7 +483,7 @@ gen_Bounded_binds tycon
     data_con_N_PN = qual_orig_name data_con_N
 
     ----- single-constructor-flavored: -------------
-    arity	   = dataConArity data_con_1
+    arity	   = dataConNumFields data_con_1
 
     min_bound_1con = mk_easy_FunMonoBind minBound_PN [] [] $
 		     mk_easy_App data_con_1_PN (nOfThem arity minBound_PN)
@@ -622,7 +614,7 @@ gen_Ix_binds tycon
 		     else
 			 dc
 
-    con_arity   = dataConArity data_con
+    con_arity   = dataConNumFields data_con
     data_con_PN = qual_orig_name data_con
     con_pat  xs = ConPatIn data_con_PN (map VarPatIn xs)
     con_expr xs = mk_easy_App data_con_PN xs
@@ -684,7 +676,7 @@ gen_Read_binds fixities tycon
   where
     -----------------------------------------------------------------------
     read_list = mk_easy_FunMonoBind readList_PN [] []
-		  (HsApp (HsVar _readList_PN) (HsPar (HsApp (HsVar readsPrec_PN) (HsLit (HsInt 0)))))
+		  (HsApp (HsVar readList___PN) (HsPar (HsApp (HsVar readsPrec_PN) (HsLit (HsInt 0)))))
     -----------------------------------------------------------------------
     reads_prec
       = let
@@ -699,7 +691,7 @@ gen_Read_binds fixities tycon
 	  = let
 		data_con_PN = qual_orig_name data_con
 		data_con_str= nameOf (origName "gen_Read_binds" data_con)
-		con_arity   = dataConArity data_con
+		con_arity   = dataConNumFields data_con
 		as_needed   = take con_arity as_PNs
 		bs_needed   = take con_arity bs_PNs
 		con_expr    = mk_easy_App data_con_PN as_needed
@@ -749,7 +741,7 @@ gen_Show_binds fixities tycon
   where
     -----------------------------------------------------------------------
     show_list = mk_easy_FunMonoBind showList_PN [] []
-		  (HsApp (HsVar _showList_PN) (HsPar (HsApp (HsVar showsPrec_PN) (HsLit (HsInt 0)))))
+		  (HsApp (HsVar showList___PN) (HsPar (HsApp (HsVar showsPrec_PN) (HsLit (HsInt 0)))))
     -----------------------------------------------------------------------
     shows_prec
       = mk_FunMonoBind showsPrec_PN (map pats_etc (tyConDataCons tycon))
@@ -757,7 +749,7 @@ gen_Show_binds fixities tycon
 	pats_etc data_con
 	  = let
 		data_con_PN = qual_orig_name data_con
-		con_arity   = dataConArity data_con
+		con_arity   = dataConNumFields data_con
 		bs_needed   = take con_arity bs_PNs
 		con_pat     = ConPatIn data_con_PN (map VarPatIn bs_needed)
 		nullary_con = isNullaryDataCon data_con
@@ -823,7 +815,7 @@ gen_tag_n_con_monobind (pn, tycon, GenCon2Tag)
       = ASSERT(isDataCon var)
 	([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
-	pat    = ConPatIn var_PN (nOfThem (dataConArity var) WildPatIn)
+	pat    = ConPatIn var_PN (nOfThem (dataConNumFields var) WildPatIn)
 	var_PN = qual_orig_name var
 
 gen_tag_n_con_monobind (pn, tycon, GenTag2Con)
@@ -1115,10 +1107,10 @@ error_PN	= preludeQual SLIT("error")
 showString_PN	= preludeQual SLIT("showString")
 showParen_PN	= preludeQual SLIT("showParen")
 readParen_PN	= preludeQual SLIT("readParen")
-lex_PN		= preludeQual SLIT("lex")
+lex_PN		= Qual gHC__  SLIT("lex")
 showSpace_PN	= Qual gHC__  SLIT("showSpace")
-_showList_PN    = Qual gHC__  SLIT("showList__")
-_readList_PN    = Qual gHC__  SLIT("readList__")
+showList___PN   = Qual gHC__  SLIT("showList__")
+readList___PN   = Qual gHC__  SLIT("readList__")
 
 a_Expr		= HsVar a_PN
 b_Expr		= HsVar b_PN

@@ -28,11 +28,11 @@ IMP_Ubiq()
 
 import Bag		( emptyBag, snocBag, bagToList )
 import CmdLineOpts	( opt_SccGroup )
-import CoreSyn		( CoreExpr(..) )
+import CoreSyn		( SYN_IE(CoreExpr) )
 import CoreUtils	( substCoreExpr )
 import HsSyn		( OutPat )
 import Id		( mkSysLocal, mkIdWithNewUniq,
-			  lookupIdEnv, growIdEnvList, GenId, IdEnv(..)
+			  lookupIdEnv, growIdEnvList, GenId, SYN_IE(IdEnv)
 			)
 import PprType		( GenType, GenTyVar )
 import PprStyle		( PprStyle(..) )
@@ -42,7 +42,7 @@ import TcHsSyn		( TypecheckedPat(..) )
 import TyVar		( nullTyVarEnv, cloneTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instances-} )
 import UniqSupply	( splitUniqSupply, getUnique, getUniques,
-			  mapUs, thenUs, returnUs, UniqSM(..) )
+			  mapUs, thenUs, returnUs, SYN_IE(UniqSM) )
 import Util		( assoc, mapAccumL, zipWithEqual, panic )
 
 infixr 9 `thenDs`

@@ -28,7 +28,7 @@ import ClosureInfo	( closureSize, closureHdrSize, closureGoodStuffSize,
 			  slopSize, allocProfilingMsg, closureKind
 			)
 import HeapOffs		( isZeroOff, addOff, intOff,
-			  VirtualHeapOffset(..)
+			  SYN_IE(VirtualHeapOffset)
 			)
 import PrimRep		( PrimRep(..) )
 \end{code}

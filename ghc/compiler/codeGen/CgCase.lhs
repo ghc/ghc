@@ -46,10 +46,10 @@ import CLabel		( mkVecTblLabel, mkReturnPtLabel, mkDefaultLabel,
 import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( useCurrentCostCentre )
-import HeapOffs		( VirtualSpBOffset(..), VirtualHeapOffset(..) )
+import HeapOffs		( SYN_IE(VirtualSpBOffset), SYN_IE(VirtualHeapOffset) )
 import Id		( idPrimRep, toplevelishId,
-			  dataConTag, fIRST_TAG, ConTag(..),
-			  isDataCon, DataCon(..),
+			  dataConTag, fIRST_TAG, SYN_IE(ConTag),
+			  isDataCon, SYN_IE(DataCon),
 			  idSetToList, GenId{-instance Uniquable,Eq-}
 			)
 import Maybes		( catMaybes )

@@ -776,7 +776,11 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 
 pprPanic heading pretty_msg = panic (heading++(ppShow 80 pretty_msg))
 pprError heading pretty_msg = error (heading++(ppShow 80 pretty_msg))
+#if __GLASGOW_HASKELL__ >= 200
+pprTrace heading pretty_msg = GHCbase.trace (heading++(ppShow 80 pretty_msg))
+#else
 pprTrace heading pretty_msg = trace (heading++(ppShow 80 pretty_msg))
+#endif
 
 -- #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)

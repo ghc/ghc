@@ -17,7 +17,7 @@
 > import BinderInfo	-- ( BinderInfo(..), isFun, isDupDanger )
 > import CmdLineOpts	( switchIsOn, SwitchResult, SimplifierSwitch )
 > import OccurAnal	( occurAnalyseBinds )
-> import SimplEnv	( SwitchChecker(..) )
+> import SimplEnv	( SYN_IE(SwitchChecker) )
 > import Util
 > import Pretty
 > import Outputable

@@ -21,7 +21,6 @@
 > 			  getIdInfo, replaceIdInfo, eqId, Id
 >			)
 > import IdInfo
-> import Maybes		( Maybe(..) )
 > import Outputable
 > import Pretty
 > import UniqSupply

@@ -20,8 +20,8 @@ import RdrHsSyn
 import RnHsSyn
 
 import RnMonad
-import RnIfaces		( IfaceCache(..), cachedIface, cachedDecl )
-import RnUtils		( RnEnv(..), emptyRnEnv, extendGlobalRnEnv,
+import RnIfaces		( IfaceCache, cachedIface, cachedDecl, CachingResult(..) )
+import RnUtils		( SYN_IE(RnEnv), emptyRnEnv, extendGlobalRnEnv,
 			  lubExportFlag, qualNameErr, dupNamesErr
 			)
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), ExportsMap(..), RdrIfaceInst )
@@ -29,8 +29,8 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), ExportsMap(..), RdrIfaceI
 
 import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
 			  unionManyBags, mapBag, filterBag, listToBag, bagToList )
-import CmdLineOpts	( opt_NoImplicitPrelude, opt_CompilingPrelude )
-import ErrUtils		( Error(..), Warning(..), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
+import CmdLineOpts	( opt_NoImplicitPrelude, opt_CompilingGhcInternals )
+import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
 import FiniteMap	( emptyFM, addToFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, keysFM{-ToDo:rm-} )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
@@ -41,7 +41,7 @@ import Name		( RdrName(..), Name, isQual, mkTopLevName, mkWiredInName, origName,
 			  moduleNamePair, pprNonSym,
 			  isLexCon, ExportFlag(..), OrigName(..)
 			)
-import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
+import PrelInfo		( SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import PrelMods		( pRELUDE, gHC_BUILTINS, modulesWithBuiltins )
 import Pretty
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
@@ -302,7 +302,7 @@ newGlobalName locn maybe_exp is_val_name (Unqual name)
 	(uniq, is_toplev)
 	  = case (lookupFM b_keys orig) of
 	      Just (key,_) -> (key, True)
-	      Nothing	   -> if not opt_CompilingPrelude then (u,True) else -- really here just to save gratuitous lookup
+	      Nothing	   -> if not opt_CompilingGhcInternals then (u,True) else -- really here just to save gratuitous lookup
 			      case (lookupFM (if is_val_name then b_val_names else b_tc_names) orig) of
 			        Nothing -> (u, True)
 				Just xx -> (uniqueOf xx, False{-builtin!-})
@@ -313,12 +313,12 @@ newGlobalName locn maybe_exp is_val_name (Unqual name)
 
 	n = if is_toplev
 	    then mkTopLevName  uniq orig locn exp (rec_occ_fn n) -- NB: two "n"s
-	    else mkWiredInName uniq orig
+	    else mkWiredInName uniq orig exp
     in
     returnRn n    
 
 newGlobalName locn maybe_exp is_val_name rdr@(Qual mod name)
-  | opt_CompilingPrelude
+  | opt_CompilingGhcInternals
   -- we are actually defining something that compiler knows about (e.g., Bool)
 
   = getExtraRn		`thenRn` \ ((b_val_names,b_tc_names),b_keys,rec_exp_fn,rec_occ_fn) ->
@@ -338,7 +338,7 @@ newGlobalName locn maybe_exp is_val_name rdr@(Qual mod name)
 
 	n = if is_toplev
 	    then mkTopLevName  uniq orig locn exp (rec_occ_fn n) -- NB: two "n"s
-	    else mkWiredInName uniq orig
+	    else mkWiredInName uniq orig exp
     in
     returnRn n    
 
@@ -395,7 +395,7 @@ doImportDecls iface_cache g_info us src_imps
 	-- this ensures that all directly imported modules
 	-- will have their original name iface in scope
 	-- pprTrace "doImportDecls:" (ppCat (map ppPStr imp_mods)) $
-	accumulate (map (cachedIface False iface_cache) imp_mods) >>
+	accumulate (map (cachedIface iface_cache False SLIT("doImportDecls")) imp_mods) >>
 
 	-- process the imports
 	doImports iface_cache i_info us all_imps
@@ -521,7 +521,7 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
     			 \ iface -> ([], [], emptyBag))
      else
 	--pprTrace "doImport:" (ppPStr mod) $
-	cachedIface False iface_cache mod >>= \ maybe_iface ->
+	cachedIface iface_cache False SLIT("doImport") mod >>= \ maybe_iface ->
 	return (maybe_iface, \ iface -> getOrigIEs iface maybe_spec')
     )	>>= \ (maybe_iface, do_ies) ->
 
@@ -748,6 +748,7 @@ doOrigIE :: IfaceCache
 
 doOrigIE iface_cache info mod src_loc us ie
   = with_decl iface_cache (ie_name ie)
+	avoided_fn
 	(\ err  -> (emptyBag, emptyBag, emptyBag, unitBag err, emptyBag))
 	(\ decl -> case initRn True mod emptyRnEnv us
 		    	       (setExtraRn info $
@@ -755,6 +756,14 @@ doOrigIE iface_cache info mod src_loc us ie
 		     		getIfaceDeclNames ie decl)
 		   of
 		   ((vals, tcs, imps), errs, warns) -> (vals, tcs, imps, errs, warns))
+  where
+    avoided_fn Nothing -- the thing should be in the source
+      = (emptyBag, emptyBag, emptyBag, emptyBag, emptyBag)
+    avoided_fn (Just (Left  rn)) -- a builtin value brought into scope
+      = (unitBag rn, emptyBag, emptyBag, emptyBag, emptyBag)
+    avoided_fn (Just (Right rn)) -- a builtin tc/class brought into scope
+      = --pprTrace "avoided:Right:" (ppr PprShowAll rn) $
+	(emptyBag, unitBag rn, emptyBag, emptyBag, emptyBag)
 
 -------------------------
 checkOrigIE :: IfaceCache
@@ -763,6 +772,7 @@ checkOrigIE :: IfaceCache
 
 checkOrigIE iface_cache (IEThingAll n, ExportAbs)
   = with_decl iface_cache n
+	(\ _    -> (emptyBag, emptyBag))
 	(\ err  -> (unitBag (\ mod locn -> err), emptyBag))
 	(\ decl -> case decl of
 		TypeSig _ _ _ -> (emptyBag, unitBag (allWhenSynImpSpecWarn n))
@@ -773,6 +783,7 @@ checkOrigIE iface_cache (IEThingWith n ns, ExportAbs)
 
 checkOrigIE iface_cache (IEThingWith n ns, ExportAll)
   = with_decl iface_cache n
+	(\ _    -> (emptyBag, emptyBag))
 	(\ err  -> (unitBag (\ mod locn -> err), emptyBag))
 	(\ decl -> case decl of
 	     	NewTypeSig _ con _ _         -> (check_with "constructors" [con] ns, emptyBag)
@@ -791,15 +802,17 @@ checkOrigIE iface_cache other
 -----------------------
 with_decl :: IfaceCache
 	  -> OrigName
-	  -> (Error        -> something)	-- if an error...
-	  -> (RdrIfaceDecl -> something)	-- if OK...
+	  -> (Maybe (Either RnName RnName) -> something) -- if avoided..
+	  -> (Error        -> something)		 -- if an error...
+	  -> (RdrIfaceDecl -> something)		 -- if OK...
 	  -> IO something
 
-with_decl iface_cache n do_err do_decl
+with_decl iface_cache n do_avoid do_err do_decl
   = cachedDecl iface_cache (isLexCon (nameOf n)) n   >>= \ maybe_decl ->
     case maybe_decl of
-      Failed err     -> return (do_err  err)
-      Succeeded decl -> return (do_decl decl)
+      CachingAvoided info -> return (do_avoid info)
+      CachingFail    err  -> return (do_err   err)
+      CachingHit     decl -> return (do_decl  decl)
 
 -------------
 getFixityDecl :: IfaceCache
@@ -812,7 +825,7 @@ getFixityDecl iface_cache rn
 
 	succeeded infx i = return (Just (infx rn i), emptyBag)
     in
-    cachedIface True iface_cache mod	>>= \ maybe_iface ->
+    cachedIface iface_cache True str mod >>= \ maybe_iface ->
     case maybe_iface of
       Failed err ->
 	return (Nothing, unitBag err)

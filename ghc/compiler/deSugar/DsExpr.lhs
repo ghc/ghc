@@ -59,7 +59,7 @@ import TysWiredIn	( mkTupleTy, nilDataCon, consDataCon,
 			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
-import Usage		( UVar(..) )
+import Usage		( SYN_IE(UVar) )
 import Util		( zipEqual, pprError, panic, assertPanic )
 
 mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
@@ -269,7 +269,7 @@ dsExpr (ListComp expr quals)
     dsListComp core_expr quals
 
 dsExpr (HsLet binds expr)
-  = dsBinds binds	`thenDs` \ core_binds ->
+  = dsBinds False binds	`thenDs` \ core_binds ->
     dsExpr expr		`thenDs` \ core_expr ->
     returnDs ( mkCoLetsAny core_binds core_expr )
 
@@ -425,7 +425,7 @@ dsExpr (RecordUpdOut record_expr dicts rbinds)
     dsRbinds rbinds		$ \ rbinds' ->
     let
 	record_ty		= coreExprType record_expr'
-	(tycon, inst_tys, cons) = _trace "DsExpr.getAppDataTyConExpandingDicts" $
+	(tycon, inst_tys, cons) = trace "DsExpr.getAppDataTyConExpandingDicts" $
 				  getAppDataTyConExpandingDicts record_ty
 	cons_to_upd  	 	= filter has_all_fields cons
 
@@ -657,8 +657,8 @@ dsDo then_id zero_id (stmt:stmts)
 			       VarArg (mkValLam [ignored_result_id] rest)]
 
       LetStmt binds ->
-        dsBinds binds	`thenDs` \ binds2 ->
-	ds_rest		`thenDs` \ rest   ->
+        dsBinds False binds	`thenDs` \ binds2 ->
+	ds_rest			`thenDs` \ rest   ->
 	returnDs (mkCoLetsAny binds2 rest)
 
       BindStmtOut pat expr locn a b ->

@@ -24,7 +24,7 @@ import TcMonad		hiding ( rnMtoTcM )
 import Inst		( InstanceMapper(..) )
 
 import Bag		( bagToList )
-import Class		( GenClass, GenClassOp, ClassInstEnv(..),
+import Class		( GenClass, GenClassOp, SYN_IE(ClassInstEnv),
 			  classBigSig, classOps, classOpLocalType )
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
 import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
@@ -33,10 +33,10 @@ import Maybes		( MaybeErr(..), mkLookupFunDef )
 import Name		( getSrcLoc, Name{--O only-} )
 import PprType		( GenClass, GenType, GenTyVar )
 import Pretty
-import SpecEnv		( SpecEnv(..), nullSpecEnv, addOneToSpecEnv )
+import SpecEnv		( SYN_IE(SpecEnv), nullSpecEnv, addOneToSpecEnv )
 import SrcLoc		( SrcLoc )
 import Type		( mkSigmaTy, mkForAllTys, mkDictTy, mkTyVarTys,
-			  splitForAllTy, instantiateTy, matchTy, ThetaType(..) )
+			  splitForAllTy, instantiateTy, matchTy, SYN_IE(ThetaType) )
 import TyVar		( GenTyVar )
 import Unique		( Unique )
 import Util		( equivClasses, zipWithEqual, panic )

@@ -16,6 +16,7 @@ module Literal (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(Ratio)
 
 -- friends:
 import PrimRep		( PrimRep(..) ) -- non-abstract

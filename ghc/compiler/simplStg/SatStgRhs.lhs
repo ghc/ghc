@@ -67,12 +67,12 @@ import StgSyn
 import CostCentre	( isCafCC, subsumedCosts, useCurrentCostCentre )
 import Id		( idType, getIdArity, addIdArity, mkSysLocal,
 			  nullIdEnv, addOneToIdEnv, growIdEnvList,
-			  lookupIdEnv, IdEnv(..)
+			  lookupIdEnv, SYN_IE(IdEnv)
 			)
 import IdInfo		( arityMaybe )
 import SrcLoc		( mkUnknownSrcLoc )
 import Type		( splitSigmaTy, splitForAllTy, splitFunTyExpandingDicts )
-import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, mapUs, getUnique, SYN_IE(UniqSM) )
 import Util		( panic, assertPanic )
 
 type Count = Int
@@ -292,10 +292,10 @@ saturate other 		    _  = panic "SatStgRhs: saturate"
 
 \begin{code}
 lookupArgs :: SatEnv -> [StgArg] -> [StgArg]
-lookupArgs env args = map do args
+lookupArgs env args = map doo args
   where
-    do    (StgVarArg v)  = StgVarArg (lookupVar env v)
-    do a@(StgLitArg lit) = a
+    doo    (StgVarArg v)  = StgVarArg (lookupVar env v)
+    doo a@(StgLitArg lit) = a
 
 lookupVar :: SatEnv -> Id -> Id
 lookupVar env v = case lookupIdEnv env v of

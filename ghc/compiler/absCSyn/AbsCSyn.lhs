@@ -42,8 +42,8 @@ import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  lIVENESS_R3, lIVENESS_R4, lIVENESS_R5,
 			  lIVENESS_R6, lIVENESS_R7, lIVENESS_R8
 			)
-import HeapOffs		( VirtualSpAOffset(..), VirtualSpBOffset(..),
-			  VirtualHeapOffset(..)
+import HeapOffs		( SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset),
+			  SYN_IE(VirtualHeapOffset)
 			)
 import Literal		( mkMachInt )
 import PrimRep		( isFollowableRep, PrimRep(..) )

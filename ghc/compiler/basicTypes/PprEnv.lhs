@@ -15,7 +15,7 @@ module PprEnv (
 	pTy, pTyVar, pUVar, pUse,
 	
 	NmbrEnv(..),
-	NmbrM(..), initNmbr,
+	SYN_IE(NmbrM), initNmbr,
 	returnNmbr, thenNmbr,
 	mapNmbr, mapAndUnzipNmbr
 --	nmbr1, nmbr2, nmbr3
@@ -25,7 +25,7 @@ module PprEnv (
 
 IMP_Ubiq(){-uitous-}
 
-import Pretty		( Pretty(..) )
+import Pretty		( SYN_IE(Pretty) )
 import Unique		( initRenumberingUniques )
 import UniqFM		( emptyUFM )
 import Util		( panic )

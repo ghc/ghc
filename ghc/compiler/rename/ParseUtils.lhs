@@ -10,13 +10,16 @@ module ParseUtils where
 
 IMP_Ubiq(){-uitous-}
 
+IMPORT_1_3(Char(isDigit, isAlpha, isAlphanum, isUpper))
+IMPORT_1_3(List(partition))
+
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
 import HsPragmas	( noDataPragmas, noClassPragmas, noClassOpPragmas,
 			  noInstancePragmas
 			)
 
-import ErrUtils		( Error(..) )
+import ErrUtils		( SYN_IE(Error) )
 import FiniteMap	( unitFM, listToFM, lookupFM, plusFM, FiniteMap )
 import Maybes		( maybeToBool, MaybeErr(..) )
 import Name		( isLexConId, isLexVarId, isLexConSym,
@@ -27,7 +30,7 @@ import PprStyle		( PprStyle(..) ) -- ToDo: rm debugging
 import PrelMods		( pRELUDE )
 import Pretty		( ppCat, ppPStr, ppInt, ppShow, ppStr )
 import SrcLoc		( mkIfaceSrcLoc )
-import Util		( startsWith, isIn, panic, assertPanic )
+import Util		( startsWith, isIn, panic, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 \begin{code}
@@ -96,6 +99,7 @@ data IfaceToken
   | ITinfixl
   | ITinfixr
   | ITinfix
+  | ITforall
   | ITbang		-- magic symbols
   | ITvbar
   | ITdcolon
@@ -205,15 +209,22 @@ mk_class ctxt (qclas@(Qual mod clas), tyvar) ops_and_sigs
   where
     opify (Sig f ty _ loc) = ClassOpSig f ty noClassOpPragmas loc
 
-mk_inst	:: RdrNameContext
+mk_inst	:: Maybe [RdrName] -- ToDo: de-maybe
+	-> RdrNameContext
 	-> RdrName -- class
 	-> RdrNameMonoType  -- fish the tycon out yourself...
 	-> RdrIfaceInst
 
-mk_inst	ctxt qclas@(Qual cmod cname) mono_ty
-  = InstSig qclas (tycon_name mono_ty) mkIfaceSrcLoc $ \ mod ->
-	InstDecl qclas (HsPreForAllTy ctxt mono_ty)
-	    EmptyMonoBinds False mod [{-sigs-}]
+mk_inst	tvs ctxt qclas@(Qual cmod cname) mono_ty
+  = let
+	ty = case tvs of
+	       Nothing -> HsPreForAllTy ctxt mono_ty -- ToDo: get rid of this
+	       Just ts -> HsForAllTy ts ctxt mono_ty
+    in
+    -- pprTrace "mk_inst:" (ppr PprDebug ty) $
+    InstSig qclas (tycon_name mono_ty) mkIfaceSrcLoc $ \ mod ->
+	InstDecl qclas ty
+	    EmptyMonoBinds False{-not from_here-} mod [{-sigs-}]
 	    noInstancePragmas mkIfaceSrcLoc
   where
     tycon_name (MonoTyApp tc _) = tc
@@ -277,10 +288,8 @@ lexIface input
 	ITinteger (read num) : lexIface rest }
 
     -----------
-    is_var_sym '_'  = True
-    is_var_sym '\'' = True
-    is_var_sym '#'  = True -- for Glasgow-extended names
-    is_var_sym c    = isAlphanum c
+    is_var_sym c    = isAlphanum c || c `elem` "_'#"
+	 -- the last few for for Glasgow-extended names
 
     is_var_sym1 '\'' = False
     is_var_sym1 '#'  = False
@@ -288,6 +297,15 @@ lexIface input
     is_var_sym1 c    = is_var_sym c
 
     is_sym_sym c = c `elem` ":!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
+
+    is_list_sym '[' = True
+    is_list_sym ']' = True
+    is_list_sym _   = False
+
+    is_tuple_sym '(' = True
+    is_tuple_sym ')' = True
+    is_tuple_sym ',' = True
+    is_tuple_sym _   = False
 
     ------------
     lex_word str@(c:cs) -- we know we have a capital letter to start
@@ -299,6 +317,8 @@ lexIface input
 	in_the_club []    = panic "lex_word:in_the_club"
 	in_the_club (x:_) | isAlpha    x = is_var_sym
 			  | is_sym_sym x = is_sym_sym
+			  | x == '['	 = is_list_sym
+			  | x == '('	 = is_tuple_sym
 			  | otherwise    = panic ("lex_word:in_the_club="++[x])
 
     module_dot (c:cs)
@@ -338,18 +358,20 @@ lexIface input
 	     in
 	     case module_dot of
 	       Nothing ->
-		 categ n (ITconid  n) (ITvarid  n) (ITconsym  n) (ITvarsym  n)
+		 categ f n (ITconid  n) (ITvarid  n) (ITconsym  n) (ITvarsym  n)
 	       Just m ->
 		 let
 		     q = Qual m n
 		 in
-		 categ n (ITqconid q) (ITqvarid q) (ITqconsym q) (ITqvarsym q)
+		 categ f n (ITqconid q) (ITqvarid q) (ITqconsym q) (ITqvarsym q)
 
 	     ) : lexIface rest ;
 	}
     ------------
-    categ n conid varid consym varsym
-      = if      isLexConId  n then conid
+    categ f n conid varid consym varsym
+      = if f == '[' || f == '(' then
+	   conid
+	else if isLexConId  n then conid
 	else if isLexVarId  n then varid
 	else if isLexConSym n then consym
 	else			   varsym
@@ -367,6 +389,7 @@ lexIface input
        ,("fixities__",		ITfixities)
        ,("declarations__",	ITdeclarations)
        ,("pragmas__",		ITpragmas)
+       ,("forall__",		ITforall)
 
        ,("data",		ITdata)
        ,("type",		ITtype)

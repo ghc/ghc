@@ -25,7 +25,7 @@ import SMRep		( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..),
 			)
 import Stix		-- all of it
 import StixPrim		( amodeToStix )
-import UniqSupply	( returnUs, UniqSM(..) )
+import UniqSupply	( returnUs, SYN_IE(UniqSM) )
 import Unpretty		( uppBesides, uppPStr, uppInt, uppChar )
 \end{code}
 

@@ -1,0 +1,10 @@
+\begin{code}
+interface HsLoop_1_3 1
+__exports__
+HsBinds HsBinds
+HsBinds nullBinds (..)
+HsBinds MonoBinds
+HsBinds Sig
+HsBinds nullMonoBinds (..)
+HsExpr  HsExpr
+\end{code}

@@ -17,14 +17,14 @@ module TcEnv(
 	tcLookupGlobalValue, tcLookupGlobalValueByKey,
 
 	newMonoIds, newLocalIds, newLocalId,
-	tcGetGlobalTyVars
+	tcGetGlobalTyVars, tcExtendGlobalTyVars
   ) where
 
 
 IMP_Ubiq()
 IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
 
-import Id	( Id(..), GenId, idType, mkUserLocal )
+import Id	( SYN_IE(Id), GenId, idType, mkUserLocal )
 import TcHsSyn	( TcIdBndr(..), TcIdOcc(..) )
 import TcKind	( TcKind, newKindVars, tcDefaultKind, kindToTcKind )
 import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
@@ -33,7 +33,7 @@ import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
 import TyVar	( mkTyVar, tyVarKind, unionTyVarSets, emptyTyVarSet )
 import Type	( tyVarsOfTypes )
 import TyCon	( TyCon, tyConKind, synTyConArity )
-import Class	( Class(..), GenClass, classSig )
+import Class	( SYN_IE(Class), GenClass, classSig )
 
 import TcMonad		hiding ( rnMtoTcM )
 
@@ -100,8 +100,7 @@ tcTyVarScopeGivenKinds names kinds thing_inside
 
 		-- Construct the real TyVars
 	let
-	  tyvars	     = zipWithEqual "tcTyVarScopeGivenKinds" mk_tyvar names kinds'
-	  mk_tyvar name kind = mkTyVar name (uniqueOf name) kind
+	  tyvars = zipWithEqual "tcTyVarScopeGivenKinds" mkTyVar names kinds'
 	in
 	returnTc (tyvars, result)
     )					`thenTc` \ (_,result) ->
@@ -232,6 +231,15 @@ tcGetGlobalTyVars
     zonkTcTyVars global_tvs		`thenNF_Tc` \ global_tvs' ->
     tcWriteMutVar gtvs global_tvs'	`thenNF_Tc_`
     returnNF_Tc global_tvs'
+
+tcExtendGlobalTyVars extra_global_tvs scope
+  = tcGetEnv				`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    tcReadMutVar gtvs			`thenNF_Tc` \ global_tvs ->
+    let
+	new_global_tyvars = global_tvs `unionTyVarSets` extra_global_tvs
+    in
+    tcNewMutVar new_global_tyvars	`thenNF_Tc` \ gtvs' ->
+    tcSetEnv (TcEnv tve tce ce gve lve gtvs') scope
 \end{code}
 
 \begin{code}

@@ -8,7 +8,7 @@
 
 module Rename ( renameModule ) where
 
-import PreludeGlaST	( thenPrimIO, newVar, MutableVar(..) )
+import PreludeGlaST	( thenPrimIO )
 
 IMP_Ubiq()
 
@@ -32,16 +32,16 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
 import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
-import RnIfaces		( rnIfaces )
-import RnUtils		( RnEnv(..), extendGlobalRnEnv, emptyRnEnv )
+import RnIfaces		( rnIfaces, initIfaceCache, IfaceCache )
+import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv, emptyRnEnv )
 
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
 import CmdLineOpts	( opt_HiMap, opt_NoImplicitPrelude )
-import ErrUtils		( Error(..), Warning(..) )
+import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, mkWiredInName, Name, RdrName(..) )
-import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
+import Name		( isLocallyDefined, mkWiredInName, Name, RdrName(..), ExportFlag(..) )
+import PrelInfo		( builtinNameInfo, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
 import Unique		( ixClassKey )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
@@ -56,6 +56,7 @@ renameModule :: UniqSupply
 		    RnEnv,		-- final env (for renaming derivings)
 		    [Module],	   	-- imported modules; for profiling
 
+		    Name -> ExportFlag,	-- export info
 		    (UsagesMap,
 	            VersionsMap,      	-- version info; for usage
 		    [Module]),	   	-- instance modules; for iface
@@ -83,7 +84,7 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
     -}
     makeHiMap opt_HiMap	    >>=	         \ hi_files ->
 --  pprTrace "HiMap:\n" (ppAboves [ ppCat [ppPStr m, ppStr p] | (m,p) <- fmToList hi_files])
-    newVar (emptyFM,emptyFM,hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->
+    initIfaceCache modname hi_files  >>= \ iface_cache ->
 
     fixIO ( \ ~(_, _, _, _, rec_occ_fm, rec_export_fn) ->
     let
@@ -130,10 +131,10 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
 	    top_warns `unionBags` src_warns `unionBags` listToBag occ_warns,
 	    occ_fm, export_fn)
 
-    }) >>= \ (rn_module, imp_mods, errs_so_far, warns_so_far, occ_fm, _) ->
+    }) >>= \ (rn_module, imp_mods, errs_so_far, warns_so_far, occ_fm, export_fn) ->
 
     if not (isEmptyBag errs_so_far) then
-	return (rn_panic, rn_panic, rn_panic, rn_panic, errs_so_far, warns_so_far)
+	return (rn_panic, rn_panic, rn_panic, rn_panic, rn_panic, errs_so_far, warns_so_far)
     else
 
     -- No errors renaming source so rename the interfaces ...
@@ -181,7 +182,7 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
 	  | opt_NoImplicitPrelude
 	  = [{-no Prelude.hi, no point looking-}]
 	  | otherwise
-	  = [ name_fn (mkWiredInName u orig)
+	  = [ name_fn (mkWiredInName u orig ExportAll)
 	    | (orig@(OrigName mod str), (u, name_fn)) <- fmToList b_keys,
 	      str `notElem` [ SLIT("main"), SLIT("mainPrimIO")] ]
     in
@@ -200,6 +201,7 @@ renameModule us input@(HsModule modname _ _ imports _ _ _ _ _ _ _ _ _ _)
     return (rn_module_with_imports,
 	    final_env,
 	    imp_mods,
+	    export_fn,
 	    usage_stuff,
 	    errs_so_far  `unionBags` iface_errs,
 	    warns_so_far `unionBags` iface_warns)

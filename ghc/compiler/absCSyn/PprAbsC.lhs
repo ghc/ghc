@@ -48,7 +48,7 @@ import SMRep		( getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr,
 			)
 import Unique		( pprUnique, Unique{-instance NamedThing-} )
 import UniqSet		( emptyUniqSet, elementOfUniqSet,
-			  addOneToUniqSet, UniqSet(..)
+			  addOneToUniqSet, SYN_IE(UniqSet)
 			)
 import Unpretty		-- ********** NOTE **********
 import Util		( nOfThem, panic, assertPanic )

@@ -31,7 +31,7 @@ import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
 import ClosureInfo	( mkClosureLFInfo )
-import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingPrelude,
+import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingGhcInternals,
 			  opt_EnsureSplittableC, opt_SccGroup
 			)
 import CStrings		( modnameToC )
@@ -54,7 +54,7 @@ codeGen :: FAST_STRING		-- module name
 codeGen mod_name (local_CCs, extern_CCs) import_names gen_tycons tycon_specs stg_pgm
   = let
 	doing_profiling   = opt_SccProfilingOn
-	compiling_prelude = opt_CompilingPrelude
+	compiling_prelude = opt_CompilingGhcInternals
 	maybe_split       = if maybeToBool (opt_EnsureSplittableC)
 			    then CSplitMarker
 			    else AbsCNop

@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module Class (
-	GenClass(..), Class(..),
+	GenClass(..), SYN_IE(Class),
 
 	mkClass,
 	classKey, classOps, classSelIds,
@@ -20,12 +20,12 @@ module Class (
 	cCallishClassKeys, isNoDictClass,
 	isNumericClass, isStandardClass, isCcallishClass,
 
-	GenClassOp(..), ClassOp(..),
+	GenClassOp(..), SYN_IE(ClassOp),
 	mkClassOp,
 	classOpTag, classOpString,
 	classOpLocalType,
 
-	ClassInstEnv(..)
+	SYN_IE(ClassInstEnv)
     ) where
 
 CHK_Ubiq() -- debugging consistency check
@@ -33,13 +33,14 @@ CHK_Ubiq() -- debugging consistency check
 IMPORT_DELOOPER(TyLoop)
 
 import TyCon		( TyCon )
-import TyVar		( TyVar(..), GenTyVar )
-import Usage		( GenUsage, Usage(..), UVar(..) )
+import TyVar		( SYN_IE(TyVar), GenTyVar )
+import Usage		( GenUsage, SYN_IE(Usage), SYN_IE(UVar) )
 
-import Maybes		( assocMaybe, Maybe )
-import Name		( changeUnique )
+import MatchEnv		( MatchEnv )
+import Maybes		( assocMaybe )
+import Name		( changeUnique, Name )
 import Unique		-- Keys for built-in classes
-import Pretty		( Pretty(..), ppCat{-ToDo:rm-}, ppPStr{-ditto-} )
+import Pretty		( SYN_IE(Pretty), ppCat{-ToDo:rm-}, ppPStr{-ditto-} )
 import PprStyle		( PprStyle )
 import SrcLoc		( SrcLoc )
 import Util

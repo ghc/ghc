@@ -14,6 +14,7 @@ IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )
 import ConFold		( completePrim )
+import CostCentre 	( isSccCountCostCentre, cmpCostCentre )
 import CoreSyn
 import CoreUtils	( coreExprType, nonErrorRHSs, maybeErrorApp,
 			  unTagBinders, squashableDictishCcExpr,
@@ -482,32 +483,45 @@ simplExpr env (Coerce coercion ty body) args
 Set-cost-centre
 ~~~~~~~~~~~~~~~
 
-A special case we do:
-\begin{verbatim}
-	scc "foo" (\x -> e)  ===>   \x -> scc "foo" e
-\end{verbatim}
-Simon thinks it's OK, at least for lexical scoping; and it makes
-interfaces change less (arities).
+1) Eliminating nested sccs ...
+We must be careful to maintain the scc counts ...
 
 \begin{code}
+simplExpr env (SCC cc1 (SCC cc2 expr)) args
+  | not (isSccCountCostCentre cc2) && case cmpCostCentre cc1 cc2 of { EQ_ -> True; _ -> False }
+    	-- eliminate inner scc if no call counts and same cc as outer
+  = simplExpr env (SCC cc1 expr) args
+
+  | not (isSccCountCostCentre cc2) && not (isSccCountCostCentre cc1)
+    	-- eliminate outer scc if no call counts associated with either ccs
+  = simplExpr env (SCC cc2 expr) args
+\end{code}
+
+2) Moving sccs inside lambdas ...
+  
+\begin{code}
+simplExpr env (SCC cc (Lam binder@(ValBinder _) body)) args
+  | not (isSccCountCostCentre cc)
+	-- move scc inside lambda only if no call counts
+  = simplExpr env (Lam binder (SCC cc body)) args
+
 simplExpr env (SCC cc (Lam binder body)) args
+	-- always ok to move scc inside type/usage lambda
   = simplExpr env (Lam binder (SCC cc body)) args
 \end{code}
 
-Some other slightly turgid SCC tidying-up cases:
-\begin{code}
-simplExpr env (SCC cc1 expr@(SCC _ _)) args
-  = simplExpr env expr args
-    -- the outer _scc_ serves no purpose
+3) Eliminating dict sccs ...
 
+\begin{code}
 simplExpr env (SCC cc expr) args
   | squashableDictishCcExpr cc expr
+    	-- eliminate dict cc if trivial dict expression
   = simplExpr env expr args
-    -- the DICT-ish CC is no longer serving any purpose
 \end{code}
 
-NB: for other set-cost-centre we move arguments inside the body.
-ToDo: check with Patrick that this is ok.
+4) Moving arguments inside the body of an scc ...
+This moves the cost of doing the application inside the scc
+(which may include the cost of extracting methods etc)
 
 \begin{code}
 simplExpr env (SCC cost_centre body) args

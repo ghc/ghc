@@ -12,7 +12,7 @@ module UniqSupply (
 
 	getUnique, getUniques,	-- basic ops
 
-	UniqSM(..),		-- type: unique supply monad
+	SYN_IE(UniqSM),		-- type: unique supply monad
 	initUs, thenUs, returnUs,
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
@@ -27,6 +27,12 @@ import Unique
 import Util
 
 import PreludeGlaST
+
+#if __GLASGOW_HASKELL__ >= 200
+# define WHASH	    GHCbase.W#
+#else
+# define WHASH	    W#
+#endif
 
 w2i x = word2Int# x
 i2w x = int2Word# x
@@ -74,27 +80,34 @@ mkSplitUniqSupply (C# c#)
 	-- here comes THE MAGIC:
 
 	mk_supply#
-	  = unsafe_interleave (
+	  = unsafeInterleavePrimIO {-unsafe_interleave-} (
 		mk_unique   `thenPrimIO` \ uniq ->
 		mk_supply#  `thenPrimIO` \ s1 ->
 		mk_supply#  `thenPrimIO` \ s2 ->
 		returnPrimIO (MkSplitUniqSupply uniq s1 s2)
 	    )
 	  where
+{-
 	    -- inlined copy of unsafeInterleavePrimIO;
 	    -- this is the single-most-hammered bit of code
 	    -- in the compiler....
+	    -- Too bad it's not 1.3-portable...
 	    unsafe_interleave m s
 	      = let
 		    (r, new_s) = m s
 		in
 		(r, s)
+-}
 
-	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (W# u#) ->
+	mk_unique = _ccall_ genSymZh		`thenPrimIO` \ (WHASH u#) ->
 		    returnPrimIO (I# (w2i (mask# `or#` u#)))
     in
+#if __GLASGOW_HASKELL__ >= 200
+    primIOToIO mk_supply#
+#else
     mk_supply#	`thenPrimIO` \ s ->
     return s
+#endif
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}

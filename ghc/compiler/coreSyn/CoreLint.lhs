@@ -21,7 +21,7 @@ import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId,
 			  dataConArgTys, GenId{-instances-},
 			  emptyIdSet, mkIdSet, intersectIdSets,
-			  unionIdSets, elementOfIdSet, IdSet(..)
+			  unionIdSets, elementOfIdSet, SYN_IE(IdSet)
 			)
 import Maybes		( catMaybes )
 import Name		( isLocallyDefined, getSrcLoc, Name{-instance NamedThing-} )
@@ -44,7 +44,7 @@ import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
 import TyCon		( isPrimTyCon )
 import TyVar		( tyVarKind, GenTyVar{-instances-} )
 import Unique		( Unique )
-import Usage		( GenUsage )
+import Usage		( GenUsage, SYN_IE(Usage) )
 import Util		( zipEqual, pprTrace, pprPanic, assertPanic, panic )
 
 infixr 9 `thenL`, `seqL`, `thenMaybeL`, `seqMaybeL`
@@ -264,7 +264,7 @@ lintCoreArg :: {-Bool ->-} CoreExpr -> Type -> CoreArg -> LintM (Maybe Type)
 
 lintCoreArg e ty (LitArg lit)
   = -- Make sure function type matches argument
-    case (getFunTyExpandingDicts_maybe ty) of
+    case (getFunTyExpandingDicts_maybe False{-no peeking in newtypes-} ty) of
       Just (arg,res) | (lit_ty `eqTy` arg) -> returnL(Just res)
       _ -> addErrL (mkAppMsg ty lit_ty e) `seqL` returnL Nothing
   where
@@ -274,7 +274,7 @@ lintCoreArg e ty (VarArg v)
   = -- Make sure variable is bound
     checkInScope v `seqL`
     -- Make sure function type matches argument
-    case (getFunTyExpandingDicts_maybe ty) of
+    case (getFunTyExpandingDicts_maybe False{-as above-} ty) of
       Just (arg,res) | (var_ty `eqTy` arg) -> returnL(Just res)
       _ -> addErrL (mkAppMsg ty var_ty e) `seqL` returnL Nothing
   where

@@ -30,7 +30,7 @@ module IdInfo (
 	mkDemandInfo,
 	willBeDemanded,
 
-	MatchEnv,		-- the SpecEnv
+	MatchEnv,		-- the SpecEnv (why is this exported???)
 	StrictnessInfo(..), 	-- non-abstract
 	Demand(..),	    	-- non-abstract
 
@@ -47,14 +47,14 @@ module IdInfo (
 
 	UpdateInfo,
 	mkUpdateInfo,
-	UpdateSpec(..),
+	SYN_IE(UpdateSpec),
 	updateInfoMaybe,
 
 	DeforestInfo(..),
 
 	ArgUsageInfo,
 	ArgUsage(..),
-	ArgUsageType(..),
+	SYN_IE(ArgUsageType),
 	mkArgUsageInfo,
 	getArgUsage,
 
@@ -68,6 +68,7 @@ module IdInfo (
     ) where
 
 IMP_Ubiq()
+IMPORT_1_3(Char(toLower))
 
 IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 			-- we break those loops by using IdLoop and
@@ -76,7 +77,7 @@ IMPORT_DELOOPER(IdLoop)	-- IdInfo is a dependency-loop ranch, and
 
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( firstJust )
-import MatchEnv		( nullMEnv, isEmptyMEnv, mEnvToList )
+import MatchEnv		( nullMEnv, isEmptyMEnv, mEnvToList, MatchEnv )
 import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
@@ -565,7 +566,7 @@ or an Absent {\em that we accept}.
 indicatesWorker :: [Demand] -> Bool
 
 indicatesWorker dems
-  = fake_mk_ww (_trace "mAX_WORKER_ARGS" 6 - nonAbsentArgs dems) dems
+  = fake_mk_ww (trace "mAX_WORKER_ARGS" 6 - nonAbsentArgs dems) dems
   where
     fake_mk_ww _ [] = False
     fake_mk_ww _ (WwLazy True : _) = True -- we accepted an Absent

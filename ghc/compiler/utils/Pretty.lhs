@@ -149,6 +149,7 @@ ppInt  n width is_vert = MkPrettyRep (cStr s) (MkDelay ls) False (width >= ls)
 ppInteger n  = ppStr (show n)
 ppDouble  n  = ppStr (show n)
 ppFloat   n  = ppStr (show n)
+
 ppRational n = ppStr (show (fromRationalX n)) -- _showRational 30 n)
 
 ppSP	  = ppChar ' '

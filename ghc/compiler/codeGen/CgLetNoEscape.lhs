@@ -28,7 +28,7 @@ import CgStackery	( mkVirtStkOffsets )
 import CgUsages		( setRealAndVirtualSps, getVirtSps )
 import CLabel		( mkStdEntryLabel )
 import ClosureInfo	( mkLFLetNoEscape )
-import HeapOffs		( VirtualSpBOffset(..) )
+import HeapOffs		( SYN_IE(VirtualSpBOffset) )
 import Id		( idPrimRep )
 \end{code}
 

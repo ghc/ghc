@@ -17,10 +17,12 @@ module Digraph (
     ) where
 
 CHK_Ubiq() -- debugging consistency check
+IMPORT_1_3(List(partition))
 
-import Maybes		( Maybe, MaybeErr(..), maybeToBool )
+import Maybes		( MaybeErr(..), maybeToBool )
 import Bag		( Bag, filterBag, bagToList, listToBag )
 import FiniteMap	( FiniteMap, listToFM, lookupFM, lookupWithDefaultFM )
+import Unique		( Unique )
 import Util
 \end{code}
 
@@ -105,6 +107,8 @@ dfs eq r (vs,ns) (x:xs)
 \end{code}
 
 \begin{code}
+{-# SPECIALIZE findSCCs :: (a -> (Unique, Bag Unique)) -> Bag a -> [SCC a] #-}
+
 findSCCs :: Ord key
 	 => (vertex -> (key, Bag key))	-- Give key of vertex, and keys of thing's
 					-- immediate neighbours.  It's ok for the

@@ -9,6 +9,7 @@
 module SimplStg ( stg2stg ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(IO(hPutStr,stderr))
 
 import StgSyn
 import StgUtils
@@ -27,12 +28,12 @@ import CmdLineOpts	( opt_EnsureSplittableC, opt_SccGroup,
 			  opt_StgDoLetNoEscapes, opt_D_verbose_stg2stg,
 			  StgToDo(..)
 			)
-import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
-			  growIdEnvList, isNullIdEnv, IdEnv(..),
+import Id		( externallyVisibleId,
+			  nullIdEnv, lookupIdEnv, addOneToIdEnv,
+			  growIdEnvList, isNullIdEnv, SYN_IE(IdEnv),
 			  GenId{-instance Eq/Outputable -}
 			)
 import Maybes		( maybeToBool )
-import Name		( isExported )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty		( ppShow, ppAbove, ppAboves, ppStr )
 import UniqSupply	( splitUniqSupply )
@@ -320,8 +321,8 @@ elimIndirections binds_in
 				lambda_args
 				(StgApp (StgVarArg local_binder) fun_args _)
 	     ))
-	| isExported exported_binder &&	    -- Only if this is exported
-	  not (isExported local_binder) &&  -- Only if this one is defined in this
+	| externallyVisibleId exported_binder && -- Only if this is exported
+	  not (externallyVisibleId local_binder) && -- Only if this one is defined in this
 	  isLocallyDefined local_binder &&  -- module, so that we *can* change its
 					    -- binding to be the exported thing!
 	  not (in_dom env_so_far local_binder) && -- Only if we havn't seen it before

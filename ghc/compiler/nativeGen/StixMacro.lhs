@@ -21,7 +21,7 @@ import OrdList		( OrdList )
 import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..) )
 import Stix
-import UniqSupply	( returnUs, thenUs, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
 \end{code}
 
 The @ARGS_CHK_A{_LOAD_NODE}@ macros check for sufficient arguments on

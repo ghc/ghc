@@ -31,7 +31,7 @@ import Pretty
 import UniqFM		( lookupUFM, ufmToList{-ToDo:rm-} )
 import UniqSet		( emptyUniqSet, unitUniqSet,
 			  unionUniqSets, unionManyUniqSets,
-			  UniqSet(..)
+			  SYN_IE(UniqSet)
 			)
 import Util		( Ord3(..), removeDups, panic )
 \end{code}

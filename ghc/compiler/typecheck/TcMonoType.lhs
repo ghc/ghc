@@ -24,11 +24,11 @@ import TcKind		( TcKind, mkTcTypeKind, mkBoxedTypeKind,
 			  mkTcArrowKind, unifyKind, newKindVar,
 			  kindToTcKind
 			)
-import Type		( GenType, Type(..), ThetaType(..), 
+import Type		( GenType, SYN_IE(Type), SYN_IE(ThetaType), 
 			  mkTyVarTy, mkTyConTy, mkFunTy, mkAppTy, mkSynTy,
 			  mkSigmaTy
 			)
-import TyVar		( GenTyVar, TyVar(..), mkTyVar )
+import TyVar		( GenTyVar, SYN_IE(TyVar) )
 import Type		( mkDictTy )
 import Class		( cCallishClassKeys )
 import TyCon		( TyCon )

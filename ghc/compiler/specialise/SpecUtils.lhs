@@ -8,7 +8,7 @@
 
 module SpecUtils (
 	specialiseCallTys,
-	ConstraintVector(..),
+	SYN_IE(ConstraintVector),
 	getIdOverloading,
 	mkConstraintVector,
 	isUnboxedSpecialisation,

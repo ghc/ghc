@@ -10,7 +10,7 @@ module AnalFBWW ( analFBWW ) where
 
 IMP_Ubiq(){-uitous-}
 
-import CoreSyn		( CoreBinding(..) )
+import CoreSyn		( SYN_IE(CoreBinding) )
 import Util		( panic{-ToDo:rm-} )
 
 --import Util

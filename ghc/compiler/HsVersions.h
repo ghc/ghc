@@ -10,14 +10,6 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
-#ifdef __GLASGOW_HASKELL__
-#define TAG_ Int#
-#define LT_ -1#
-#define EQ_ 0#
-#define GT_ 1#
-#endif
-#define GT__ _
-
 #define COMMA ,
 
 #ifdef DEBUG
@@ -35,24 +27,37 @@ you will screw up the layout where they are used in case expressions!
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 200
 # define REALLY_HASKELL_1_3
 # define SYN_IE(a) a
+# define EXP_MODULE(a) module a
 # define IMPORT_DELOOPER(mod) import CAT2(mod,_1_3)
 # define IMPORT_1_3(mod) import mod
 # define _tagCmp compare
 # define _LT LT
 # define _EQ EQ
 # define _GT GT
+# define _Addr GHCbase.Addr
 # define Text Show
+# define IMP_Ubiq() IMPORT_DELOOPER(Ubiq); import qualified GHCbase
+# define CHK_Ubiq() IMPORT_DELOOPER(Ubiq); import qualified GHCbase
+# define minInt (minBound::Int)
+# define maxInt (maxBound::Int)
 #else
 # define SYN_IE(a) a(..)
+# define EXP_MODULE(a) a..
 # define IMPORT_DELOOPER(mod) import mod
 # define IMPORT_1_3(mod) {--}
+# define IMP_Ubiq() IMPORT_DELOOPER(Ubiq)
+# define CHK_Ubiq() IMPORT_DELOOPER(Ubiq)
 #endif
-#define IMP_Ubiq() IMPORT_DELOOPER(Ubiq)
-#define CHK_Ubiq() IMPORT_DELOOPER(Ubiq)
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 26
+#if __GLASGOW_HASKELL__ >= 26 && __GLASGOW_HASKELL__ < 200
 #define trace _trace
 #endif
+
+#define TAG_ Int#
+#define LT_ -1#
+#define EQ_ 0#
+#define GT_ 1#
+#define GT__ _
 
 #if defined(__GLASGOW_HASKELL__)
 #define FAST_INT Int#
@@ -100,36 +105,53 @@ you will screw up the layout where they are used in case expressions!
 #endif  {- ! __GLASGOW_HASKELL__ -}
 
 #if __GLASGOW_HASKELL__ >= 23
-#define USE_FAST_STRINGS 1
-#define FAST_STRING _PackedString
-#define SLIT(x)	    (_packCString (A# x#))
-#define _CMP_STRING_ cmpPString
-#define _NULL_	    _nullPS
-#define _NIL_	    _nilPS
-#define _CONS_	    _consPS
-#define _HEAD_	    _headPS
-#define _TAIL_	    _tailPS
-#define _LENGTH_    _lengthPS
-#define _PK_	    _packString
-#define _UNPK_	    _unpackPS
-#define _SUBSTR_    _substrPS
-#define _APPEND_    `_appendPS`
-#define _CONCAT_    _concatPS
+# define USE_FAST_STRINGS 1
+# if __GLASGOW_HASKELL__ < 200
+#  define FAST_STRING	_PackedString
+#  define SLIT(x)	(_packCString (A# x#))
+#  define _CMP_STRING_	cmpPString
+#  define _NULL_	_nullPS
+#  define _NIL_		_nilPS
+#  define _CONS_	_consPS
+#  define _HEAD_	_headPS
+#  define _TAIL_	_tailPS
+#  define _LENGTH_	_lengthPS
+#  define _PK_		_packString
+#  define _UNPK_	_unpackPS
+#  define _SUBSTR_	_substrPS
+#  define _APPEND_	`_appendPS`
+#  define _CONCAT_	_concatPS
+# else
+#  define FAST_STRING	GHCbase.PackedString
+#  define SLIT(x)	(packCString (GHCbase.A# x#))
+#  define _CMP_STRING_	cmpPString
+#  define _NULL_	nullPS
+#  define _NIL_		nilPS
+#  define _CONS_	consPS
+#  define _HEAD_	headPS
+#  define _TAIL_	tailPS
+#  define _LENGTH_	lengthPS
+#  define _PK_		packString
+#  define _UNPK_	unpackPS
+#  define _SUBSTR_	substrPS
+#  define _APPEND_	`appendPS`
+#  define _CONCAT_	concatPS
+# endif
 #else
-#define FAST_STRING String
-#define SLIT(x)	    (x)
-#define _CMP_STRING_ cmpString
-#define _NULL_	    null
-#define _NIL_	    ""
-#define _CONS_	    (:)
-#define _HEAD_	    head
-#define _TAIL_	    tail
-#define _LENGTH_    length
-#define _PK_	    (\x->x)
-#define _UNPK_	    (\x->x)
-#define _SUBSTR_    substr{-from Utils-}
-#define _APPEND_    ++
-#define _CONCAT_    concat
+# define FAST_STRING String
+# define SLIT(x)      (x)
+# define _CMP_STRING_ cmpString
+# define _NULL_	      null
+# define _NIL_	      ""
+# define _CONS_	      (:)
+# define _HEAD_	      head
+# define _TAIL_	      tail
+# define _LENGTH_     length
+# define _PK_	      (\x->x)
+# define _UNPK_	      (\x->x)
+# define _SUBSTR_     substr{-from Utils-}
+# define _APPEND_     ++
+# define _CONCAT_     concat
 #endif
 
 #endif

@@ -22,7 +22,7 @@ import CgMonad
 import AbsCSyn
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, getAmodeRep )
-import HeapOffs		( VirtualSpAOffset(..), VirtualSpBOffset(..) )
+import HeapOffs		( SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset) )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness,
 			  PrimRep(..)
 			)

@@ -10,7 +10,7 @@ module PrelVals where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..) )
-import Id		( Id(..), GenId, mkImported, mkUserId, mkTemplateLocals )
+import Id		( SYN_IE(Id), GenId, mkImported, mkUserId, mkTemplateLocals )
 IMPORT_DELOOPER(PrelLoop)
 
 -- friends:
@@ -19,21 +19,19 @@ import TysPrim
 import TysWiredIn
 
 -- others:
-import CmdLineOpts	( maybe_CompilingPrelude )
+import CmdLineOpts	( maybe_CompilingGhcInternals )
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
+import Name		( ExportFlag(..) )
 import PragmaInfo
 import PrimOp		( PrimOp(..) )
-import SpecEnv		( SpecEnv(..), nullSpecEnv )
+import SpecEnv		( SYN_IE(SpecEnv), nullSpecEnv )
 import Type		( mkTyVarTy )
 import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}
-
-
-
 
 \begin{code}
 -- only used herein:
@@ -41,23 +39,15 @@ pcMiscPrelId :: Unique{-IdKey-} -> FAST_STRING -> FAST_STRING -> Type -> IdInfo 
 
 pcMiscPrelId key m n ty info
   = let
-	name = mkWiredInName key (OrigName m n)
+	name = mkWiredInName key (OrigName m n) ExportAll
 	imp  = mkImported name ty info -- the usual case...
     in
     imp
     -- We lie and say the thing is imported; otherwise, we get into
     -- a mess with dependency analysis; e.g., core2stg may heave in
-    -- random calls to GHCbase.unpackPS.  If GHCbase is the module
+    -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
     -- being compiled, then it's just a matter of luck if the definition
     -- will be in "the right place" to be in scope.
-{- ???
-    case maybe_CompilingPrelude of
-      Nothing -> imp
-      Just modname ->
-	if modname == _UNPK_ m -- we are compiling the module where this thing is defined...
-	then mkUserId name ty NoPragmaInfo
-	else imp
--}
 \end{code}
 
 %************************************************************************
@@ -120,13 +110,10 @@ errorTy  :: Type
 errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] (mkTyVarTy openAlphaTyVar))
 \end{code}
 
-We want \tr{_trace} (NB: name not in user namespace) to be wired in
+We want \tr{GHCbase.trace} to be wired in
 because we don't want the strictness analyser to get ahold of it,
 decide that the second argument is strict, evaluate that first (!!),
-and make a jolly old mess.  Having \tr{_trace} wired in also helps when
-attempting to re-export it---because it's in \tr{PreludeBuiltin}, it
-won't get an \tr{import} declaration in the interface file, so the
-importing-subsequently module needs to know it's magic.
+and make a jolly old mess.
 \begin{code}
 tRACE_ID
   = pcMiscPrelId traceIdKey gHC__ SLIT("trace") traceTy
@@ -143,33 +130,33 @@ tRACE_ID
 
 \begin{code}
 packStringForCId
-  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} gHC__ SLIT("packStringForC")
+  = pcMiscPrelId packCStringIdKey{-ToDo:rename-} gHC__ SLIT("packStringForC__")
 	(mkFunTys [stringTy] byteArrayPrimTy) noIdInfo
 
 --------------------------------------------------------------------
 
 unpackCStringId
-  = pcMiscPrelId unpackCStringIdKey gHC__ SLIT("unpackPS")
+  = pcMiscPrelId unpackCStringIdKey gHC__ SLIT("unpackPS__")
 		 (mkFunTys [addrPrimTy{-a char *-}] stringTy) noIdInfo
 -- Andy says:
 --	(FunTy addrPrimTy{-a char *-} stringTy) (noIdInfo `addInfo` mkArityInfo 1)
 -- but I don't like wired-in IdInfos (WDP)
 
 unpackCString2Id -- for cases when a string has a NUL in it
-  = pcMiscPrelId unpackCString2IdKey gHC__ SLIT("unpackPS2")
+  = pcMiscPrelId unpackCString2IdKey gHC__ SLIT("unpackPS2__")
 		 (mkFunTys [addrPrimTy{-a char *-}, intPrimTy{-length-}] stringTy)
 		 noIdInfo
 
 --------------------------------------------------------------------
 unpackCStringAppendId
-  = pcMiscPrelId unpackCStringAppendIdKey gHC__ SLIT("unpackAppendPS")
+  = pcMiscPrelId unpackCStringAppendIdKey gHC__ SLIT("unpackAppendPS__")
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},stringTy] stringTy)
 		((noIdInfo
 		 {-LATER:`addInfo_UF` mkMagicUnfolding unpackCStringAppendIdKey-})
 		 `addInfo` mkArityInfo 2)
 
 unpackCStringFoldrId
-  = pcMiscPrelId unpackCStringFoldrIdKey gHC__ SLIT("unpackFoldrPS")
+  = pcMiscPrelId unpackCStringFoldrIdKey gHC__ SLIT("unpackFoldrPS__")
 		(mkSigmaTy [alphaTyVar] []
 		(mkFunTys [addrPrimTy{-a "char *" pointer-},
 			   mkFunTys [charTy, alphaTy] alphaTy,
@@ -200,6 +187,7 @@ integerMinusOneId
 %************************************************************************
 
 \begin{code}
+{- OUT:
 --------------------------------------------------------------------
 -- seqId :: "seq", used w/ GRIP, etc., is really quite similar to
 -- dangerousEval
@@ -291,11 +279,12 @@ forkId = pcMiscPrelId forkIdKey gHC__ SLIT("fork")
 		  PrimAlts
 		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
 		    (BindDefault z (Var y))))
-
+-}
 \end{code}
 
 GranSim ones:
 \begin{code}
+{- OUT:
 parLocalId = pcMiscPrelId parLocalIdKey gHC__ SLIT("parLocal")
 		  (mkSigmaTy [alphaTyVar, betaTyVar] []
 		    (mkFunTys [intPrimTy, intPrimTy, intPrimTy, intPrimTy, alphaTy, betaTy] betaTy))
@@ -368,7 +357,7 @@ parAtId = pcMiscPrelId parAtIdKey gHC__ SLIT("parAt")
       = mkLam [alphaTyVar, betaTyVar, gammaTyVar] [w, g, s, p, v, x, y] (
 		Case (Prim ParAtOp [TyArg alphaTy, TyArg betaTy, TyArg gammaTy, VarArg x, VarArg v, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
 		  PrimAlts
-		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [gammaTy])]
 		    (BindDefault z (Var y))))
 
 parAtAbsId = pcMiscPrelId parAtAbsIdKey gHC__ SLIT("parAtAbs")
@@ -444,7 +433,7 @@ parAtForNowId = pcMiscPrelId parAtForNowIdKey gHC__ SLIT("parAtForNow")
       = mkLam [alphaTyVar, betaTyVar, gammaTyVar] [w, g, s, p, v, x, y] (
 		Case (Prim ParAtForNowOp [TyArg alphaTy, TyArg betaTy, TyArg gammaTy, VarArg x, VarArg v, VarArg w, VarArg g, VarArg s, VarArg p, VarArg y]) (
 		  PrimAlts
-		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [betaTy])]
+		    [(mkMachInt 0, mkTyApp (Var pAR_ERROR_ID) [gammaTy])]
 		    (BindDefault z (Var y))))
 
 -- copyable and noFollow are currently merely hooks: they are translated into
@@ -479,41 +468,25 @@ noFollowId = pcMiscPrelId noFollowIdKey gHC__ SLIT("noFollow")
 
     noFollow_template
       = mkLam [alphaTyVar] [x] ( Prim NoFollowOp [TyArg alphaTy, VarArg x] )
+-}
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[PrelVals-deriving]{Values known about mainly for doing derived instance decls}
+\subsection[PrelVals-runST]{@runST@: Magic start-state-transformer function}
 %*									*
 %************************************************************************
 
-map		:: (a -> b) -> [a] -> [b]
-	-- this is up in the here-because-of-unfolding list
-
---??showChar	:: Char -> ShowS
-showSpace	:: ShowS	-- non-std: == "showChar ' '"
-showString	:: String -> ShowS
-showParen	:: Bool -> ShowS -> ShowS
-
-(++)		:: [a] -> [a] -> [a]
-readParen	:: Bool -> ReadS a -> ReadS a
-lex		:: ReadS String
-
-%************************************************************************
-%*									*
-\subsection[PrelVals-runST]{@_runST@: Magic start-state-transformer function}
-%*									*
-%************************************************************************
-
-@_runST@ has a non-Haskell-able type:
+@runST@ has a non-Haskell-able type:
 \begin{verbatim}
--- _runST :: forall a. (forall s. _ST s a) -> a
+-- runST :: forall a. (forall s. _ST s a) -> a
 -- which is to say ::
 --	     forall a. (forall s. (_State s -> (a, _State s))) -> a
 
-_runST a m = case m _RealWorld (S# _RealWorld realWorld#) of
+runST a m = case m _RealWorld (S# _RealWorld realWorld#) of
 	       (r :: a, wild :: _State _RealWorld) -> r
 \end{verbatim}
+
 We unfold always, just for simplicity:
 \begin{code}
 runSTId
@@ -554,16 +527,16 @@ runSTId
 -}
 \end{code}
 
-SLPJ 95/04: Why @_runST@ must not have an unfolding; consider:
+SLPJ 95/04: Why @runST@ must not have an unfolding; consider:
 \begin{verbatim}
 f x =
-  _runST ( \ s -> let
+  runST ( \ s -> let
 		    (a, s')  = newArray# 100 [] s
 		    (_, s'') = fill_in_array_or_something a x s'
 		  in
 		  freezeArray# a s'' )
 \end{verbatim}
-If we inline @_runST@, we'll get:
+If we inline @runST@, we'll get:
 \begin{verbatim}
 f x = let
 	(a, s')  = newArray# 100 [] realWorld#{-NB-}

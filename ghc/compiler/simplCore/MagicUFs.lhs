@@ -18,7 +18,7 @@ IMPORT_DELOOPER(IdLoop)		-- paranoia checking
 
 import CoreSyn
 import SimplEnv		( SimplEnv )
-import SimplMonad	( SmplM(..), SimplCount )
+import SimplMonad	( SYN_IE(SmplM), SimplCount )
 import Type		( mkFunTys )
 import TysWiredIn	( mkListTy )
 import Unique		( Unique{-instances-} )
@@ -79,8 +79,8 @@ magic_UFs_table
      (SLIT("build"),   		MUF build_fun),
      (SLIT("foldl"),   		MUF foldl_fun),
      (SLIT("foldr"),   		MUF foldr_fun),
-     (SLIT("unpackFoldrPS#"),   MUF unpack_foldr_fun),
-     (SLIT("unpackAppendPS#"),	MUF unpack_append_fun)]
+     (SLIT("unpackFoldrPS__"),  MUF unpack_foldr_fun),
+     (SLIT("unpackAppendPS__"),	MUF unpack_append_fun)]
 \end{code}
 
 %************************************************************************
@@ -227,7 +227,7 @@ foldr_fun env (TypeArg ty1:TypeArg ty2:ValArg arg_k:ValArg arg_z:ValArg arg_list
 	--
 
  | do_fb_red && arg_list_isStringForm	-- ok, its a string!
-	-- foldr f z "foo" => unpackFoldrPS# f z "foo"#
+	-- foldr f z "foo" => unpackFoldrPS__ f z "foo"#
    = tick Str_FoldrStr				`thenSmpl_`
      returnSmpl (Just (mkGenApp (Var unpackCStringFoldrId)
 				(TypeArg ty2:

@@ -30,23 +30,24 @@ import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 			  newMethod, newMethodWithGivenTy, newDicts )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
-			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars
+			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
+			  tcExtendGlobalTyVars
 			)
 import TcMatches	( tcMatchesCase, tcMatch )
 import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( TcType(..), TcMaybe(..),
-			  tcInstId, tcInstType, tcInstSigTyVars,
+			  tcInstId, tcInstType, tcInstSigTcType,
 			  tcInstSigType, tcInstTcType, tcInstTheta,
 			  newTyVarTy, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
-import Class		( Class(..), classSig )
+import Class		( SYN_IE(Class), classSig )
 import FieldLabel	( fieldLabelName )
-import Id		( idType, dataConFieldLabels, dataConSig, Id(..), GenId )
+import Id		( idType, dataConFieldLabels, dataConSig, SYN_IE(Id), GenId )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
-import GenSpecEtc	( checkSigTyVars, checkSigTyVarsGivenGlobals )
+import GenSpecEtc	( checkSigTyVars )
 import Name		( Name{-instance Eq-} )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
 			  getTyVar_maybe, getFunTy_maybe, instantiateTy,
@@ -54,13 +55,13 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
 			  isTauTy, mkFunTys, tyVarsOfType, getForAllTy_maybe,
 			  getAppDataTyCon, maybeAppDataTyCon
 			)
-import TyVar		( GenTyVar, TyVarSet(..), unionTyVarSets, mkTyVarSet )
+import TyVar		( GenTyVar, SYN_IE(TyVarSet), unionTyVarSets, mkTyVarSet )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy
 			)
 import TysWiredIn	( addrTy,
 			  boolTy, charTy, stringTy, mkListTy,
-			  mkTupleTy, mkPrimIoTy
+			  mkTupleTy, mkPrimIoTy, primIoDataCon
 			)
 import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
@@ -68,7 +69,6 @@ import Unique		( Unique, cCallableClassKey, cReturnableClassKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
 			  thenMClassOpKey, zeroClassOpKey
 			)
---import Name		( Name )		-- Instance 
 import Outputable	( interpp'SP )
 import PprType		( GenType, GenTyVar )	-- Instances
 import Maybes		( maybeToBool )
@@ -269,7 +269,8 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty)
     mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args arg_tys)    `thenNF_Tc` \ ccarg_dicts_s ->
     newDicts result_origin [(cReturnableClass, result_ty)]	    `thenNF_Tc` \ (ccres_dict, _) ->
 
-    returnTc (CCall lbl args' may_gc is_asm result_ty,
+    returnTc (HsCon primIoDataCon [result_ty] [CCall lbl args' may_gc is_asm result_ty],
+	      -- do the wrapping in the newtype constructor here
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie,
 	      mkPrimIoTy result_ty)
 \end{code}
@@ -375,7 +376,7 @@ tcExpr (RecordUpd record_expr rbinds)
 	-- Check that the field names are plausible
     zonkTcType record_ty		`thenNF_Tc` \ record_ty' ->
     let
-	(tycon, inst_tys, data_cons) = _trace "TcExpr.getAppDataTyCon" $ getAppDataTyCon record_ty'
+	(tycon, inst_tys, data_cons) = trace "TcExpr.getAppDataTyCon" $ getAppDataTyCon record_ty'
 	-- The record binds are non-empty (syntax); so at least one field
 	-- label will have been unified with record_ty by tcRecordBinds;
 	-- field labels must be of data type; hencd the getAppDataTyCon must succeed.
@@ -571,16 +572,15 @@ tcArg expected_arg_ty arg
 	-- To ensure that the forall'd type variables don't get unified with each
 	-- other or any other types, we make fresh *signature* type variables
 	-- and unify them with the tyvars.
+    tcInstSigTcType expected_arg_ty 	`thenNF_Tc` \ (sig_tyvars, sig_rho) ->
     let
-	(expected_tyvars, expected_theta, expected_tau) = splitSigmaTy expected_arg_ty
+	(sig_theta, sig_tau) = splitRhoTy sig_rho
     in
-    ASSERT( null expected_theta )	-- And expected_tyvars are all DontBind things
-    tcInstSigTyVars expected_tyvars		`thenNF_Tc` \ (sig_tyvars, sig_tyvar_tys, _) ->
-    unifyTauTyLists (mkTyVarTys expected_tyvars) sig_tyvar_tys	`thenTc_`
+    ASSERT( null sig_theta )	-- And expected_tyvars are all DontBind things
 	
 	-- Type-check the arg and unify with expected type
     tcExpr arg					`thenTc` \ (arg', lie_arg, actual_arg_ty) ->
-    unifyTauTy expected_tau actual_arg_ty	`thenTc_`  (
+    unifyTauTy sig_tau actual_arg_ty		`thenTc_`
 
 	-- Check that the arg_tyvars havn't been constrained
 	-- The interesting bit here is that we must include the free variables
@@ -593,22 +593,22 @@ tcArg expected_arg_ty arg
 	-- Conclusion: include the free vars of the expected arg type in the
 	-- list of "free vars" for the signature check.
 
-    tcAddErrCtxt (rank2ArgCtxt arg expected_arg_ty) $
-    checkSigTyVarsGivenGlobals
-	(tyVarsOfType expected_arg_ty)
-	expected_tyvars expected_tau				`thenTc_`
+    tcAddErrCtxt (rank2ArgCtxt arg expected_arg_ty) (
+	tcExtendGlobalTyVars (tyVarsOfType expected_arg_ty) (
+		checkSigTyVars sig_tyvars sig_tau
+	)						`thenTc_`
 
-	-- Check that there's no overloading involved
-	-- Even if there isn't, there may be some Insts which mention the expected_tyvars,
-	-- but which, on simplification, don't actually need a dictionary involving
-	-- the tyvar.  So we have to do a proper simplification right here.
-    tcSimplifyRank2 (mkTyVarSet expected_tyvars) 
-		    lie_arg				`thenTc` \ (free_insts, inst_binds) ->
+	    -- Check that there's no overloading involved
+	    -- Even if there isn't, there may be some Insts which mention the expected_tyvars,
+	    -- but which, on simplification, don't actually need a dictionary involving
+	    -- the tyvar.  So we have to do a proper simplification right here.
+	tcSimplifyRank2 (mkTyVarSet sig_tyvars) 
+			lie_arg				`thenTc` \ (free_insts, inst_binds) ->
 
-	-- This HsLet binds any Insts which came out of the simplification.
-	-- It's a bit out of place here, but using AbsBind involves inventing
-	-- a couple of new names which seems worse.
-    returnTc (TyLam expected_tyvars (HsLet (mk_binds inst_binds) arg'), free_insts)
+	    -- This HsLet binds any Insts which came out of the simplification.
+	    -- It's a bit out of place here, but using AbsBind involves inventing
+	    -- a couple of new names which seems worse.
+	returnTc (TyLam sig_tyvars (HsLet (mk_binds inst_binds) arg'), free_insts)
     )
   where
 

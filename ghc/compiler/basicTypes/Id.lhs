@@ -6,102 +6,138 @@
 \begin{code}
 #include "HsVersions.h"
 
-module Id {- (
-	GenId, Id(..),		-- Abstract
-	StrictnessMark(..),	-- An enumaration
-	ConTag(..), DictVar(..), DictFun(..), DataCon(..),
+module Id (
+	-- TYPES
+	GenId(..), -- *naughtily* used in some places (e.g., TcHsSyn)
+	SYN_IE(Id), IdDetails,
+	StrictnessMark(..),
+	SYN_IE(ConTag), fIRST_TAG,
+	SYN_IE(DataCon), SYN_IE(DictFun), SYN_IE(DictVar),
 
 	-- CONSTRUCTION
-	mkSysLocal, mkUserLocal,
-	mkSpecPragmaId,
-	mkSpecId, mkSameSpecCon,
-	selectIdInfoForSpecId,
-	mkTemplateLocals,
-	mkImported,
-	mkDataCon, mkTupleCon,
+	mkConstMethodId,
+	mkDataCon,
+	mkDefaultMethodId,
+	mkDictFunId,
 	mkIdWithNewUniq,
-	mkMethodSelId, mkSuperDictSelId, mkDefaultMethodId,
-	mkConstMethodId, getConstMethodId,
-
-	updateIdType,
-	mkId, mkDictFunId, mkInstId,
+	mkImported,
+	mkInstId,
+	mkMethodSelId,
+	mkRecordSelId,
+	mkSuperDictSelId,
+	mkSysLocal,
+	mkTemplateLocals,
+	mkTupleCon,
+	mkUserId,
+	mkUserLocal,
 	mkWorkerId,
-	localiseId,
 
-	-- DESTRUCTION
+	-- MANGLING
+	unsafeGenId2Id,
+
+	-- DESTRUCTION (excluding pragmatic info)
+	idPrimRep,
 	idType,
-	getIdInfo, replaceIdInfo,
-	getPragmaInfo,
-	idPrimRep, getInstIdModule,
-	getMentionedTyConsAndClassesFromId,
+	idUnique,
 
-	dataConTag, dataConStrictMarks,
-	dataConSig, dataConRawArgTys, dataConArgTys,
-	dataConTyCon, dataConArity,
+	dataConArgTys,
+	dataConArity,
+	dataConNumFields,
 	dataConFieldLabels,
+	dataConRawArgTys,
+	dataConSig,
+	dataConStrictMarks,
+	dataConTag,
+	dataConTyCon,
 
 	recordSelectorFieldLabel,
 
 	-- PREDICATES
-	isDataCon, isTupleCon,
-	isNullaryDataCon,
-	isSpecId_maybe, isSpecPragmaId_maybe,
-	toplevelishId, externallyVisibleId,
-	isTopLevId, isWorkerId, isWrapperId,
-	isImportedId, isSysLocalId,
-	isBottomingId,
-	isMethodSelId, isDefaultMethodId_maybe, isSuperDictSelId_maybe,
-	isDictFunId,
---???	isInstId_maybe,
-	isConstMethodId_maybe,
+	cmpEqDataCon,
+	cmpId,
 	cmpId_withSpecDataCon,
-	myWrapperMaybe,
-	whatsMentionedInId,
-	unfoldingUnfriendlyId,	-- ToDo: rm, eventually
+	externallyVisibleId,
+	idHasNoFreeTyVars,
 	idWantsToBeINLINEd,
---	dataConMentionsNonPreludeTyCon,
+	isBottomingId,
+	isConstMethodId,
+	isConstMethodId_maybe,
+	isDataCon,
+	isDefaultMethodId,
+	isDefaultMethodId_maybe,
+	isDictFunId,
+	isImportedId,
+	isMethodSelId,
+	isNullaryDataCon,
+	isSpecPragmaId,
+	isSuperDictSelId_maybe,
+	isSysLocalId,
+	isTopLevId,
+	isTupleCon,
+	isWorkerId,
+	toplevelishId,
+	unfoldingUnfriendlyId,
 
 	-- SUBSTITUTION
-	applySubstToId, applyTypeEnvToId,
--- not exported:	apply_to_Id, -- please don't use this, generally
+	applyTypeEnvToId,
+	apply_to_Id,
+	
+	-- PRINTING and RENUMBERING
+	addId,
+	nmbrDataCon,
+	nmbrId,
+	pprId,
+	showId,
 
 	-- UNFOLDING, ARITY, UPDATE, AND STRICTNESS STUFF (etc)
-	getIdArity, addIdArity,
-	getIdDemandInfo, addIdDemandInfo,
-	getIdSpecialisation, addIdSpecialisation,
-	getIdStrictness, addIdStrictness,
-	getIdUnfolding, addIdUnfolding,
-	getIdUpdateInfo, addIdUpdateInfo,
-	getIdArgUsageInfo, addIdArgUsageInfo,
-	getIdFBTypeInfo, addIdFBTypeInfo,
-	-- don't export the types, lest OptIdInfo be dragged in!
+	addIdArity,
+	addIdDemandInfo,
+	addIdStrictness,
+	addIdUpdateInfo,
+	getIdArity,
+	getIdDemandInfo,
+	getIdInfo,
+	getIdStrictness,
+	getIdUnfolding,
+	getIdUpdateInfo,
+	getPragmaInfo,
 
-	-- MISCELLANEOUS
-	unlocaliseId,
-	fIRST_TAG,
-	showId,
-	pprIdInUnfolding,
-
-	nmbrId,
-
-	-- "Environments" keyed off of Ids, and sets of Ids
-	IdEnv(..),
-	lookupIdEnv, lookupNoFailIdEnv, nullIdEnv, unitIdEnv, mkIdEnv,
-	growIdEnv, growIdEnvList, isNullIdEnv, addOneToIdEnv,
-	delOneFromIdEnv, delManyFromIdEnv, modifyIdEnv, combineIdEnvs,
-	rngIdEnv, mapIdEnv,
-
-	-- and to make the interface self-sufficient...
-	GenIdSet(..), IdSet(..)
-    )-} where
+	-- IdEnvs AND IdSets
+	SYN_IE(IdEnv), SYN_IE(GenIdSet), SYN_IE(IdSet),
+	addOneToIdEnv,
+	addOneToIdSet,
+	combineIdEnvs,
+	delManyFromIdEnv,
+	delOneFromIdEnv,
+	elementOfIdSet,
+	emptyIdSet,
+	growIdEnv,
+	growIdEnvList,
+	idSetToList,
+	intersectIdSets,
+	isEmptyIdSet,
+	isNullIdEnv,
+	lookupIdEnv,
+	lookupNoFailIdEnv,
+	mapIdEnv,
+	minusIdSet,
+	mkIdEnv,
+	mkIdSet,
+	modifyIdEnv,
+	nullIdEnv,
+	rngIdEnv,
+	unionIdSets,
+	unionManyIdSets,
+	unitIdEnv,
+	unitIdSet
+    ) where
 
 IMP_Ubiq()
 IMPORT_DELOOPER(IdLoop)   -- for paranoia checking
 IMPORT_DELOOPER(TyLoop)   -- for paranoia checking
 
 import Bag
-import Class		( classOpString, Class(..), GenClass, ClassOp(..), GenClassOp )
-import CStrings		( identToC, cSEP )
+import Class		( classOpString, SYN_IE(Class), GenClass, SYN_IE(ClassOp), GenClassOp )
 import IdInfo
 import Maybes		( maybeToBool )
 import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
@@ -115,7 +151,7 @@ import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
 			)
 import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
-import PprEnv		-- ( NmbrM(..), NmbrEnv(..) )
+import PprEnv		-- ( SYN_IE(NmbrM), NmbrEnv(..) )
 import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
 			  nmbrType, nmbrTyVar,
 			  GenType, GenTyVar
@@ -125,11 +161,11 @@ import Pretty
 import SrcLoc		( mkBuiltinSrcLoc )
 import TyCon		( TyCon, mkTupleTyCon, tyConDataCons )
 import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
-			  applyTyCon, isPrimType, instantiateTy,
+			  applyTyCon, instantiateTy,
 			  tyVarsOfType, applyTypeEnvToTy, typePrimRep,
-			  GenType, ThetaType(..), TauType(..), Type(..)
+			  GenType, SYN_IE(ThetaType), SYN_IE(TauType), SYN_IE(Type)
 			)
-import TyVar		( alphaTyVars, isEmptyTyVarSet, TyVarEnv(..) )
+import TyVar		( alphaTyVars, isEmptyTyVarSet, SYN_IE(TyVarEnv) )
 import UniqFM
 import UniqSet		-- practically all of it
 import Unique		( getBuiltinUniques, pprUnique, showUnique,
@@ -797,30 +833,15 @@ externallyVisibleId :: Id -> Bool
 
 externallyVisibleId id@(Id _ _ _ details _ _)
   = if isLocallyDefined id then
-	toplevelishId id && isExported id && not (weird_datacon details)
+	toplevelishId id && (isExported id || isDataCon id)
+	-- NB: the use of "isExported" is most dodgy;
+	-- We may eventually move to a situation where
+	-- every Id is "externallyVisible", even if the
+	-- module system's namespace control renders it
+	-- "not exported".
     else
-	not (weird_tuplecon details)
+	True
 	-- if visible here, it must be visible elsewhere, too.
-  where
-    -- If it's a DataCon, it's not enough to know it (meaning
-    -- its TyCon) is exported; we need to know that it might
-    -- be visible outside.  Consider:
-    --
-    --	data Foo a = Mumble | BigFoo a WeirdLocalType
-    --
-    -- We can't tell the outside world *anything* about Foo, because
-    -- of WeirdLocalType; but we need to know this when asked if
-    -- "Mumble" is externally visible...
-
-{- LATER: if at all:
-    weird_datacon (DataConId _ _ _ _ _ _ tycon)
-      = maybeToBool (maybePurelyLocalTyCon tycon)
--}
-    weird_datacon not_a_datacon_therefore_not_weird = False
-
-    weird_tuplecon (TupleConId arity)
-      = arity > 32 -- sigh || isBigTupleTyCon tycon -- generated *purely* for local use
-    weird_tuplecon _ = False
 \end{code}
 
 \begin{code}
@@ -1050,12 +1071,19 @@ mk_classy_id details str op_str u rec_c ty info
 mkDictFunId u c ity full_ty from_here locn mod info
   = Id u n full_ty (DictFunId c ity mod) NoPragmaInfo info
   where
-    n = mkCompoundName2 u mod SLIT("dfun") (Left (origName "mkDictFunId" c) : map Right (getTypeString ity)) from_here locn
+    n = mkCompoundName2 u mod SLIT("dfun") (Left (origName "mkDictFunId" c) : renum_type_string full_ty ity) from_here locn
 
 mkConstMethodId	u c op ity full_ty from_here locn mod info
   = Id u n full_ty (ConstMethodId c ity op mod) NoPragmaInfo info
   where
-    n = mkCompoundName2 u mod SLIT("const") (Left (origName "mkConstMethodId" c) : Right (classOpString op) : map Right (getTypeString ity)) from_here locn
+    n = mkCompoundName2 u mod SLIT("const") (Left (origName "mkConstMethodId" c) : Right (classOpString op) : renum_type_string full_ty ity) from_here locn
+
+renum_type_string full_ty ity
+  = initNmbr (
+	nmbrType full_ty    `thenNmbr` \ _ -> -- so all the tyvars get added to renumbering...
+	nmbrType ity	    `thenNmbr` \ rn_ity ->
+	returnNmbr (getTypeString rn_ity)
+    )
 
 mkWorkerId u unwrkr ty info
   = Id u n ty (WorkerId unwrkr) NoPragmaInfo info
@@ -1209,16 +1237,24 @@ besides the code-generator need arity info!)
 
 \begin{code}
 getIdArity :: Id -> ArityInfo
-getIdArity (Id _ _ _ _ _ id_info) = getInfo id_info
+getIdArity id@(Id _ _ _ _ _ id_info)
+  = --ASSERT( not (isDataCon id))
+    getInfo id_info
 
-dataConArity :: DataCon -> Int
+dataConArity, dataConNumFields :: DataCon -> Int
+
 dataConArity id@(Id _ _ _ _ _ id_info)
   = ASSERT(isDataCon id)
     case (arityMaybe (getInfo id_info)) of
-      Nothing -> pprPanic "dataConArity:Nothing:" (pprId PprDebug id)
       Just  i -> i
+      Nothing -> pprPanic "dataConArity:Nothing:" (pprId PprDebug id)
 
-isNullaryDataCon con = dataConArity con == 0 -- function of convenience
+dataConNumFields id
+  = ASSERT(isDataCon id)
+    case (dataConSig id) of { (_, _, arg_tys, _) ->
+    length arg_tys }
+
+isNullaryDataCon con = dataConNumFields con == 0 -- function of convenience
 
 addIdArity :: Id -> Int -> Id
 addIdArity (Id u n ty details pinfo info) arity
@@ -1250,7 +1286,7 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
 	   n
 	   type_of_constructor
 	   (DataConId data_con_tag stricts fields tvs ctxt args_tys tycon)
-	   NoPragmaInfo
+	   IWantToBeINLINEd	-- Always inline constructors if possible
 	   datacon_info
 
     data_con_tag    = position_within fIRST_TAG data_con_family
@@ -1274,7 +1310,7 @@ mkDataCon n stricts fields tvs ctxt args_tys tycon
 			    `addInfo` mkArityInfo arity
 --ToDo: 		    `addInfo` specenv
 
-    arity = length args_tys
+    arity = length ctxt + length args_tys
 
     unfolding
       = noInfo_UF
@@ -1740,15 +1776,15 @@ mkIdSet		= mkUniqSet
 \end{code}
 
 \begin{code}
-addId, nmbrId :: Id -> NmbrM Id
+addId, nmbrId, nmbrDataCon :: Id -> NmbrM Id
 
 addId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = case (lookupUFM_Directly idenv u) of
-      Just xx -> _trace "addId: already in map!" $
+      Just xx -> trace "addId: already in map!" $
 		 (nenv, xx)
       Nothing ->
 	if toplevelishId id then
-	    _trace "addId: can't add toplevelish!" $
+	    trace "addId: can't add toplevelish!" $
 	    (nenv, id)
 	else -- alloc a new unique for this guy
 	     -- and add an entry in the idenv
@@ -1770,7 +1806,7 @@ nmbrId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
       Just xx -> (nenv, xx)
       Nothing ->
 	if not (toplevelishId id) then
-	    _trace "nmbrId: lookup failed" $
+	    trace "nmbrId: lookup failed" $
 	    (nenv, id)
 	else
 	    let
@@ -1780,6 +1816,25 @@ nmbrId id@(Id u n ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
 		new_id = Id u n new_ty new_det prag info
 	    in
 	    (nenv3, new_id)
+
+    -- used when renumbering TyCons to produce data decls...
+nmbrDataCon id@(Id _ _ _ (TupleConId _) _ _) nenv
+  = (nenv, id) -- nothing to do for tuples
+
+nmbrDataCon id@(Id u n ty (DataConId tag marks fields tvs theta arg_tys tc) prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
+  = case (lookupUFM_Directly idenv u) of
+      Just xx -> trace "nmbrDataCon: in env???\n" (nenv, xx)
+      Nothing ->
+	let
+	    (nenv2, new_fields)  = (mapNmbr nmbrField  fields)  nenv
+	    (nenv3, new_arg_tys) = (mapNmbr nmbrType   arg_tys) nenv2
+
+	    new_det = DataConId tag marks new_fields (bottom "tvs") (bottom "theta") new_arg_tys tc
+	    new_id  = Id u n (bottom "ty") new_det prag info
+	in
+	(nenv3, new_id)
+  where
+    bottom msg = panic ("nmbrDataCon"++msg)
 
 ------------
 nmbr_details :: IdDetails -> NmbrM IdDetails

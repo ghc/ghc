@@ -43,16 +43,16 @@ import TcTyDecls	( mkDataBinds )
 
 import Bag		( listToBag )
 import Class		( GenClass, classSelIds )
-import ErrUtils		( Warning(..), Error(..) )
-import Id		( idType, isMethodSelId, isTopLevId, GenId, IdEnv(..), nullIdEnv )
+import ErrUtils		( SYN_IE(Warning), SYN_IE(Error) )
+import Id		( idType, isMethodSelId, isTopLevId, GenId, SYN_IE(IdEnv), nullIdEnv )
 import Maybes		( catMaybes )
-import Name		( isExported, isLocallyDefined )
+import Name		( isLocallyDefined )
 import Pretty
-import RnUtils		( RnEnv(..) )
+import RnUtils		( SYN_IE(RnEnv) )
 import TyCon		( TyCon )
 import Type		( applyTyCon )
 import TysWiredIn	( unitTy, mkPrimIoTy )
-import TyVar		( TyVarEnv(..), nullTyVarEnv )
+import TyVar		( SYN_IE(TyVarEnv), nullTyVarEnv )
 import Unify		( unifyTauTy )
 import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 		          filterUFM, eltsUFM )
@@ -269,42 +269,46 @@ tcModule rn_env
 %************************************************************************
 
 
-checkTopLevelIds checks that Main.main or Main.mainPrimIO has correct type.
+checkTopLevelIds checks that Main.main or GHCmain.mainPrimIO has correct type.
 
 \begin{code}
 checkTopLevelIds :: FAST_STRING -> TcEnv s -> TcM s ()
+
 checkTopLevelIds mod final_env
-  | mod /= SLIT("Main")
+  | mod /= SLIT("Main") && mod /= SLIT("GHCmain")
   = returnTc ()
 
-  | otherwise
+  | mod == SLIT("Main")
   = tcSetEnv final_env (
 	tcLookupLocalValueByKey mainIdKey	`thenNF_Tc` \ maybe_main ->
-	tcLookupLocalValueByKey mainPrimIOIdKey	`thenNF_Tc` \ maybe_prim ->
 	tcLookupTyConByKey iOTyConKey		`thenNF_Tc` \ io_tc ->
+
+	case maybe_main of
+	  Just main ->  tcAddErrCtxt mainCtxt $
+			unifyTauTy (applyTyCon io_tc [unitTy])
+				   (idType main)
+
+	  Nothing -> failTc (mainNoneIdErr "Main" "main")
+    )
+
+  | mod == SLIT("GHCmain")
+  = tcSetEnv final_env (
+	tcLookupLocalValueByKey mainPrimIOIdKey	`thenNF_Tc` \ maybe_prim ->
 	
-	case (maybe_main, maybe_prim) of
-	  (Just main, Nothing) -> tcAddErrCtxt mainCtxt $
-		                  unifyTauTy (applyTyCon io_tc [unitTy])
-					     (idType main)
+	case maybe_prim of
+	  Just prim -> tcAddErrCtxt primCtxt $
+		       unifyTauTy (mkPrimIoTy unitTy)
+				  (idType prim)
 
-	  (Nothing, Just prim) -> tcAddErrCtxt primCtxt $
-		                  unifyTauTy (mkPrimIoTy unitTy)
-					     (idType prim)
-
-	  (Just _ , Just _ )   -> failTc mainBothIdErr
-	  (Nothing, Nothing)   -> failTc mainNoneIdErr
+	  Nothing -> failTc (mainNoneIdErr "GHCmain" "mainPrimIO")
     )
 
 mainCtxt sty
-  = ppStr "main should have type IO ()"
+  = ppStr "Main.main should have type IO ()"
 
 primCtxt sty
-  = ppStr "mainPrimIO should have type PrimIO ()"
+  = ppStr "GHCmain.mainPrimIO should have type PrimIO ()"
 
-mainBothIdErr sty
-  = ppStr "module Main contains definitions for both main and mainPrimIO"
-
-mainNoneIdErr sty
-  = ppStr "module Main does not contain a definition for main (or mainPrimIO)"
+mainNoneIdErr mod n sty
+  = ppCat [ppPStr SLIT("module"), ppStr mod, ppPStr SLIT("does not contain a definition for"), ppStr n]
 \end{code}

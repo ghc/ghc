@@ -35,11 +35,11 @@ import CgMonad
 import CgUsages		( getHpRelOffset, getSpARelOffset, getSpBRelOffset )
 import CLabel		( mkClosureLabel )
 import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument )
-import HeapOffs		( VirtualHeapOffset(..),
-			  VirtualSpAOffset(..), VirtualSpBOffset(..)
+import HeapOffs		( SYN_IE(VirtualHeapOffset),
+			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset)
 			)
 import Id		( idPrimRep, toplevelishId, isDataCon,
-			  mkIdEnv, rngIdEnv, IdEnv(..),
+			  mkIdEnv, rngIdEnv, SYN_IE(IdEnv),
 			  idSetToList,
 			  GenId{-instance NamedThing-}
 			)
@@ -49,7 +49,7 @@ import Name		( isLocallyDefined, oddlyImportedName, Name{-instance NamedThing-} 
 import PprAbsC		( pprAmode )
 #endif
 import PprStyle		( PprStyle(..) )
-import StgSyn		( StgArg(..), StgLiveVars(..), GenStgArg(..) )
+import StgSyn		( SYN_IE(StgArg), SYN_IE(StgLiveVars), GenStgArg(..) )
 import Unpretty		( uppShow )
 import Util		( zipWithEqual, panic )
 \end{code}
@@ -196,10 +196,16 @@ getCAddrModeAndInfo :: Id -> FCode (CAddrMode, LambdaFormInfo)
 
 getCAddrModeAndInfo id
   | not (isLocallyDefined name) || oddlyImportedName name
+    {- Why the "oddlyImported"?
+	Imagine you are compiling GHCbase.hs (a module that
+	supplies some of the wired-in values).  What can
+	happen is that the compiler will inject calls to
+	(e.g.) GHCbase.unpackPS, where-ever it likes -- it
+	assumes those values are ubiquitously available.
+	The main point is: it may inject calls to them earlier
+	in GHCbase.hs than the actual definition...
+    -}
   = returnFC (global_amode, mkLFImported id)
-
-  | isDataCon id
-  = returnFC (global_amode, mkConLFInfo id)
 
   | otherwise = -- *might* be a nested defn: in any case, it's something whose
 		-- definition we will know about...

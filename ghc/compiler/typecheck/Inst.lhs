@@ -44,9 +44,9 @@ import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
 import Class	( isCcallishClass, isNoDictClass, classInstEnv,
-		  Class(..), GenClass, ClassInstEnv(..)
+		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv)
 		)
-import ErrUtils ( addErrLoc, Error(..) )
+import ErrUtils ( addErrLoc, SYN_IE(Error) )
 import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
 import Name	( mkLocalName, getLocalName, Name )
@@ -55,7 +55,7 @@ import PprType	( GenClass, TyCon, GenType, GenTyVar )
 import PprStyle	( PprStyle(..) )
 import Pretty
 import RnHsSyn	( RnName{-instance NamedThing-} )
-import SpecEnv	( SpecEnv(..) )
+import SpecEnv	( SYN_IE(SpecEnv) )
 import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
 import Type	( GenType, eqSimpleTy, instantiateTy,
 		  isTyVarTy, mkDictTy, splitForAllTy, splitSigmaTy,

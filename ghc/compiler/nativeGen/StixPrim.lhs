@@ -29,7 +29,7 @@ import SMRep		( SMRep(..), SMSpecRepKind, SMUpdateKind )
 import Stix
 import StixMacro	( heapCheck, smStablePtrTable )
 import StixInteger	{- everything -}
-import UniqSupply	( returnUs, thenUs, UniqSM(..) )
+import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
 import Unpretty		( uppBeside, uppPStr, uppInt )
 import Util		( panic )
 

@@ -478,6 +478,16 @@ NL  	    	    	[\n\r]
     	    		 hsnewid(yytext, yyleng);
 			 RETURN(isconstr(yytext) ? CONSYM : VARSYM);
 			}
+<Code,GlaExt,UserPragma>{Mod}"."{Id}"#"	{
+			 BOOLEAN is_constr;
+			 if (! nonstandardFlag) {
+			    char errbuf[ERR_BUF_SIZE];
+			    sprintf(errbuf, "Non-standard identifier (trailing `#'): %s\n", yytext);
+			    hsperror(errbuf);
+			 }
+			 is_constr = hsnewqid(yytext, yyleng);
+			 RETURN(is_constr ? QCONID : QVARID);
+			}
 <Code,GlaExt,UserPragma>{Mod}"."{Id}	{
 			 BOOLEAN is_constr = hsnewqid(yytext, yyleng);
 			 RETURN(is_constr ? QCONID : QVARID);

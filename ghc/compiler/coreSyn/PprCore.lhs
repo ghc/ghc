@@ -28,7 +28,7 @@ IMP_Ubiq(){-uitous-}
 import CoreSyn
 import CostCentre	( showCostCentre )
 import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
-			  nullIdEnv, DataCon(..), GenId{-instances-}
+			  nullIdEnv, SYN_IE(DataCon), GenId{-instances-}
 			)
 import IdInfo		( ppIdInfo, StrictnessInfo(..) )
 import Literal		( Literal{-instances-} )

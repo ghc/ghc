@@ -11,7 +11,7 @@ really is} just like @CoreSyntax@.)
 #include "HsVersions.h"
 
 module AnnCoreSyn (
-	AnnCoreBinding(..), AnnCoreExpr(..),
+	AnnCoreBinding(..), SYN_IE(AnnCoreExpr),
 	AnnCoreExpr'(..),	-- v sad that this must be exported
 	AnnCoreCaseAlts(..), AnnCoreCaseDefault(..),
 

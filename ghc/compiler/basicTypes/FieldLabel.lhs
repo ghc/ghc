@@ -11,7 +11,7 @@ module FieldLabel where
 IMP_Ubiq(){-uitous-}
 
 import Name		( Name{-instance Eq/Outputable-} )
-import Type		( Type(..) )
+import Type		( SYN_IE(Type) )
 \end{code}
 
 \begin{code}
