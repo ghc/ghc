@@ -61,7 +61,7 @@ findModuleDep name is_source
   = do	{ j <- maybeHomeModule name is_source
 	; case j of
 	    Just home_module -> return (Just home_module)
-	    Nothing	     -> findPackageMod name False
+	    Nothing	     -> findPackageMod name False is_source
 	}
 
 maybeHomeModule :: ModuleName -> Bool -> IO (Maybe (Module, ModuleLocation))
@@ -103,6 +103,7 @@ maybeHomeModule mod_name is_source = do
 			-- for SOURCE imports, check the hi-boot extensions
 			-- before the source/iface ones, to avoid
 			-- creating circ Makefile deps.
+   	
 
 mkHiOnlyModuleLocn mod_name hi_file =
  return
@@ -147,8 +148,9 @@ mkHomeModuleLocn mod_name
 
 findPackageMod :: ModuleName
 	       -> Bool
+	       -> Bool
 	       -> IO (Maybe (Module, ModuleLocation))
-findPackageMod mod_name hiOnly = do
+findPackageMod mod_name hiOnly is_source = do
   pkgs <- getPackageInfo
 
    -- hi-suffix for packages depends on the build tag.
@@ -169,18 +171,26 @@ findPackageMod mod_name hiOnly = do
 			       , ml_obj_file  = Nothing
 			       })
 
+       -- last chance: .hi-boot-<ver> and .hi-boot
+      hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
+
+      boot_exts = 
+      	[ (hi_boot_ver, \ fName path -> mkHiOnlyModuleLocn mod_name fName)
+	, ("hi-boot",   \ fName path -> mkHiOnlyModuleLocn mod_name fName)
+	]
+
   searchPathExts
   	imp_dirs basename
-        ((package_hisuf,\ fName path -> retPackageModule mod_name Nothing path) :
-      	  -- can packages contain hi-boots?
-	 (if hiOnly then [] else
-	  [ ("hs",  \ fName path -> retPackageModule mod_name (Just fName) path)
-	  , ("lhs", \ fName path -> retPackageModule mod_name (Just fName) path)
-	  ]))
+        (if is_source then boot_exts else 	
+          ((package_hisuf,\ fName path -> retPackageModule mod_name Nothing path) :
+     	   (if hiOnly then [] else
+	     [ ("hs",  \ fName path -> retPackageModule mod_name (Just fName) path)
+	     , ("lhs", \ fName path -> retPackageModule mod_name (Just fName) path)
+	     ])))
  where
 
 findPackageModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-findPackageModule mod_name = findPackageMod mod_name True
+findPackageModule mod_name = findPackageMod mod_name True False
 
 searchPathExts :: [FilePath]
 	       -> String
