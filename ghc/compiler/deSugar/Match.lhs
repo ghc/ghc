@@ -113,9 +113,6 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn
 	  dots | pats `lengthExceeds` maximum_output = ptext SLIT("...")
 	       | otherwise                           = empty
 
-pp_context NoMatchContext msg rest_of_msg_fun
-  = (noSrcSpan, ptext SLIT("Some match(es)") <+> hang msg 8 (rest_of_msg_fun id))
-
 pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
   = (loc, vcat [ptext SLIT("Pattern match(es)") <+> msg,
 	        sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]])

@@ -1,6 +1,6 @@
 \begin{code}
 module TcExpr where
-import HsSyn	( LHsExpr )
+import HsSyn	( HsExpr, LHsExpr )
 import Name	( Name )
 import Var	( Id )
 import TcType	( TcType, Expected )
