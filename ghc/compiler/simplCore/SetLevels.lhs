@@ -353,7 +353,7 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
   | null abs_vars
   =	-- No type abstraction; clone existing binder
-    lvlExpr ctxt_lvl env rhs			`thenLvl` \ rhs' ->
+    lvlExpr dest_lvl env rhs			`thenLvl` \ rhs' ->
     cloneVar top_lvl env bndr ctxt_lvl dest_lvl	`thenLvl` \ (env', bndr') ->
     returnLvl (NonRec (bndr', dest_lvl) rhs', env') 
 

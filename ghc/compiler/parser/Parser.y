@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.34 2000/08/01 09:08:27 simonpj Exp $
+$Id: Parser.y,v 1.35 2000/09/14 13:46:40 simonpj Exp $
 
 Haskell grammar.
 
@@ -588,9 +588,9 @@ constr_stuff :: { (RdrName, RdrNameConDetails) }
 	| con '{' fielddecls '}' 	{ ($1, RecCon (reverse $3)) }
 
 newconstr :: { RdrNameConDecl }
-	: srcloc conid atype	{ mkConDecl $2 [] [] (NewCon $3 Nothing) $1 }
+	: srcloc conid atype	{ mkConDecl $2 [] [] (VanillaCon [Unbanged $3]) $1 }
 	| srcloc conid '{' var '::' type '}'
-				{ mkConDecl $2 [] [] (NewCon $6 (Just $4)) $1 }
+				{ mkConDecl $2 [] [] (RecCon [([$4], Unbanged $6)]) $1 }
 
 scontype :: { (RdrName, [RdrNameBangType]) }
 	: btype				{% splitForConApp $1 [] }

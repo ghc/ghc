@@ -72,10 +72,15 @@ deSugar mod_name us (TcResults {tc_env = global_val_env,
 
 dsProgram mod_name all_binds rules fo_decls
   = dsMonoBinds auto_scc all_binds []	`thenDs` \ core_prs ->
-    dsForeigns mod_name fo_decls	`thenDs` \ (fi_binds, fe_binds, h_code, c_code) ->
+    dsForeigns mod_name fo_decls	`thenDs` \ (fe_binders, foreign_binds, h_code, c_code) ->
     let
-	ds_binds      = fi_binds ++ [Rec core_prs] ++ fe_binds
-	fe_binders    = bindersOfBinds fe_binds
+	ds_binds      = [Rec (foreign_binds ++ core_prs)]
+	-- Notice that we put the whole lot in a big Rec, even the foreign binds
+	-- When compiling PrelFloat, which defines data Float = F# Float#
+	-- we want F# to be in scope in the foreign marshalling code!
+	-- You might think it doesn't matter, but the simplifier brings all top-level
+	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
+
 	local_binders = mkVarSet (bindersOfBinds ds_binds)
     in
     mapDs (dsRule local_binders) rules	`thenDs` \ rules' ->

@@ -63,31 +63,35 @@ is the same as
 so we reuse the desugaring code in @DsCCall@ to deal with these.
 
 \begin{code}
+type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
+				-- the occurrence analyser will sort it all out
+
 dsForeigns :: Module
            -> [TypecheckedForeignDecl] 
-	   -> DsM ( [CoreBind]        -- desugared foreign imports
-                  , [CoreBind]        -- helper functions for foreign exports
+	   -> DsM ( [Id]		-- Foreign-exported binders; 
+					-- we have to generate code to register these
+		  , [Binding]
 		  , SDoc	      -- Header file prototypes for
                                       -- "foreign exported" functions.
 		  , SDoc 	      -- C stubs to use when calling
                                       -- "foreign exported" functions.
 		  )
-dsForeigns mod_name fos = foldlDs combine ([],[],empty,empty) fos
+dsForeigns mod_name fos = foldlDs combine ([], [], empty, empty) fos
  where
-  combine (acc_fi, acc_fe, acc_h, acc_c) fo@(ForeignDecl i imp_exp _ ext_nm cconv _) 
+  combine (acc_feb, acc_f, acc_h, acc_c) fo@(ForeignDecl i imp_exp _ ext_nm cconv _) 
     | isForeignImport =   -- foreign import (dynamic)?
         dsFImport i (idType i) uns ext_nm cconv  `thenDs` \ bs -> 
-	returnDs (bs ++ acc_fi, acc_fe, acc_h, acc_c)
+	returnDs (acc_feb, bs ++ acc_f, acc_h, acc_c)
     | isForeignLabel = 
         dsFLabel i (idType i) ext_nm `thenDs` \ b -> 
-	returnDs (b:acc_fi, acc_fe, acc_h, acc_c)
+	returnDs (acc_feb, b:acc_f, acc_h, acc_c)
     | isDynamicExtName ext_nm =
-        dsFExportDynamic i (idType i) mod_name ext_nm cconv  `thenDs` \ (fi,fe,h,c) -> 
-	returnDs (fi:acc_fi, fe:acc_fe, h $$ acc_h, c $$ acc_c)
+        dsFExportDynamic i (idType i) mod_name ext_nm cconv  `thenDs` \ (feb,bs,h,c) -> 
+	returnDs (feb:acc_feb, bs ++ acc_f, h $$ acc_h, c $$ acc_c)
 
     | otherwise	       =  -- foreign export
-        dsFExport i (idType i) mod_name ext_nm cconv False   `thenDs` \ (fe,h,c) ->
-	returnDs (acc_fi, fe:acc_fe, h $$ acc_h, c $$ acc_c)
+        dsFExport i (idType i) mod_name ext_nm cconv False   `thenDs` \ (feb,fe,h,c) ->
+	returnDs (feb:acc_feb, fe:acc_f, h $$ acc_h, c $$ acc_c)
    where
     isForeignImport = 
 	case imp_exp of
@@ -128,7 +132,7 @@ dsFImport :: Id
 	  -> Bool		-- True <=> might cause Haskell GC
 	  -> ExtName
 	  -> CallConv
-	  -> DsM [CoreBind]
+	  -> DsM [Binding]
 dsFImport fn_id ty may_not_gc ext_name cconv 
   = let
 	(tvs, fun_ty)        = splitForAllTys ty
@@ -158,16 +162,16 @@ dsFImport fn_id ty may_not_gc ext_name cconv
 	wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
     in
-    returnDs [NonRec work_id work_rhs, NonRec fn_id wrap_rhs]
+    returnDs [(work_id, work_rhs), (fn_id, wrap_rhs)]
 \end{code}
 
 Foreign labels 
 
 \begin{code}
-dsFLabel :: Id -> Type -> ExtName -> DsM CoreBind
+dsFLabel :: Id -> Type -> ExtName -> DsM Binding
 dsFLabel nm ty ext_name = 
    ASSERT(fromJust res_ty == addrPrimTy) -- typechecker ensures this
-   returnDs (NonRec nm (fo_rhs (mkLit (MachLabel enm))))
+   returnDs (nm, fo_rhs (mkLit (MachLabel enm)))
   where
    (res_ty, fo_rhs) = resultWrapper ty
    enm    = extNameStatic ext_name
@@ -192,7 +196,8 @@ dsFExport :: Id
 	  -> CallConv
 	  -> Bool		-- True => invoke IO action that's hanging off 
 				-- the first argument's stable pointer
-	  -> DsM ( CoreBind
+	  -> DsM ( Id		-- The foreign-exported Id
+		 , Binding
 		 , SDoc
 		 , SDoc
 		 )
@@ -277,7 +282,7 @@ dsFExport fn_id ty mod_name ext_name cconv isDyn
       				      c_nm f_helper_glob
                                       wrapper_arg_tys res_ty cconv isDyn
      in
-     returnDs (NonRec f_helper_glob the_body, h_stub, c_stub)
+     returnDs (f_helper_glob, (f_helper_glob, the_body), h_stub, c_stub)
 
   where
    (tvs,sans_foralls)			= splitForAllTys ty
@@ -321,7 +326,7 @@ dsFExportDynamic :: Id
 		 -> Module
 		 -> ExtName
 		 -> CallConv
-		 -> DsM (CoreBind, CoreBind, SDoc, SDoc)
+		 -> DsM (Id, [Binding], SDoc, SDoc)
 dsFExportDynamic i ty mod_name ext_name cconv =
      newSysLocalDs ty					 `thenDs` \ fe_id ->
      let 
@@ -330,7 +335,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
        fe_ext_name = ExtName (_PK_ fe_nm) Nothing
      in
      dsFExport  i export_ty mod_name fe_ext_name cconv True
-     	`thenDs` \ (fe@(NonRec fe_helper fe_expr), h_code, c_code) ->
+     	`thenDs` \ (feb, fe, h_code, c_code) ->
      newSysLocalDs arg_ty			`thenDs` \ cback ->
      dsLookupGlobalValue makeStablePtrIdKey	`thenDs` \ makeStablePtrId ->
      let
@@ -371,10 +376,11 @@ dsFExportDynamic i ty mod_name ext_name cconv =
      let io_app = mkLams tvs	 $
 		  mkLams [cback] $
 		  stbl_app ccall_io_adj res_ty
+	 fed = (i `setInlinePragma` neverInlinePrag, io_app)
+		-- Never inline the f.e.d. function, because the litlit
+		-- might not be in scope in other modules.
      in
-	-- Never inline the f.e.d. function, because the litlit might not be in scope
-	-- in other modules.
-     returnDs (NonRec (i `setInlinePragma` neverInlinePrag) io_app, fe, h_code, c_code)
+     returnDs (feb, [fed, fe], h_code, c_code)
 
  where
   (tvs,sans_foralls)		   = splitForAllTys ty

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelList.lhs,v 1.21 2000/08/29 16:35:56 simonpj Exp $
+% $Id: PrelList.lhs,v 1.22 2000/09/14 13:46:42 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -435,8 +435,11 @@ concatMap               :: (a -> [b]) -> [a] -> [b]
 concatMap f             =  foldr ((++) . f) []
 
 concat :: [[a]] -> [a]
-{-# INLINE concat #-}
 concat = foldr (++) []
+
+{-# RULES
+  "concat" forall xs. concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
+ #-}
 \end{code}
 
 

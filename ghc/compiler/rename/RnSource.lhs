@@ -476,16 +476,6 @@ rnConDetails doc locn (InfixCon ty1 ty2)
     rnBangTy doc ty2  		`thenRn` \ (new_ty2, fvs2) ->
     returnRn (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2)
 
-rnConDetails doc locn (NewCon ty mb_field)
-  = rnHsType doc ty			`thenRn` \ (new_ty, fvs) ->
-    rn_field mb_field			`thenRn` \ new_mb_field  ->
-    returnRn (NewCon new_ty new_mb_field, fvs)
-  where
-    rn_field Nothing  = returnRn Nothing
-    rn_field (Just f) =
-       lookupTopBndrRn f	    `thenRn` \ new_f ->
-       returnRn (Just new_f)
-
 rnConDetails doc locn (RecCon fields)
   = checkDupOrQualNames doc field_names	`thenRn_`
     mapFvRn (rnField doc) fields	`thenRn` \ (new_fields, fvs) ->
@@ -724,7 +714,6 @@ rnIdInfo (HsWorker worker)
 rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ (expr', fvs) ->
 				  returnRn (HsUnfold inline expr', fvs)
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity, emptyFVs)
-rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update, emptyFVs)
 rnIdInfo HsNoCafRefs		= returnRn (HsNoCafRefs, emptyFVs)
 rnIdInfo HsCprInfo		= returnRn (HsCprInfo, emptyFVs)
 

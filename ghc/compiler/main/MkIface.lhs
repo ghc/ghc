@@ -66,6 +66,7 @@ import Util		( sortLt, mapAccumL )
 import SrcLoc		( noSrcLoc )
 import Bag
 import Outputable
+import ErrUtils		( dumpIfSet )
 
 import Maybe 		( isNothing )
 import List		( partition )
@@ -100,21 +101,22 @@ writeIface this_mod old_iface new_iface
 		}}
     in
 
-    case checkIface old_iface full_new_iface of {
-	Nothing -> when opt_D_dump_rn_trace $
-			putStrLn "Interface file unchanged" ;  -- No need to update .hi file
+    do maybe_final_iface <- checkIface old_iface full_new_iface 	
+       case maybe_final_iface of {
+	  Nothing -> when opt_D_dump_rn_trace $
+		     putStrLn "Interface file unchanged" ;  -- No need to update .hi file
 
-	Just final_iface ->
+	  Just final_iface ->
 
-    do  let mod_vers_unchanged = case old_iface of
+       do  let mod_vers_unchanged = case old_iface of
 				   Just iface -> pi_vers iface == pi_vers final_iface
 				   Nothing -> False
-     	when (mod_vers_unchanged && opt_D_dump_rn_trace) $
-	     putStrLn "Module version unchanged, but usages differ; hence need new hi file"
+     	   when (mod_vers_unchanged && opt_D_dump_rn_trace) $
+	        putStrLn "Module version unchanged, but usages differ; hence need new hi file"
 
-	if_hdl <- openFile filename WriteMode
-	printForIface if_hdl (pprIface final_iface)
-	hClose if_hdl
+	   if_hdl <- openFile filename WriteMode
+	   printForIface if_hdl (pprIface final_iface)
+	   hClose if_hdl
     }   
   where
     full_new_iface = completeIface new_iface local_tycons local_classes
@@ -132,9 +134,10 @@ writeIface this_mod old_iface new_iface
 \begin{code}
 checkIface :: Maybe ParsedIface		-- The old interface, read from M.hi
 	   -> ParsedIface		-- The new interface; but with all version numbers = 1
-	   -> Maybe ParsedIface		-- Nothing => no change; no need to write new Iface
+	   -> IO (Maybe ParsedIface)	-- Nothing => no change; no need to write new Iface
 					-- Just pi => Here is the new interface to write
 					-- 	      with correct version numbers
+		-- The I/O part is just so it can print differences
 
 -- NB: the fixities, declarations, rules are all assumed
 -- to be sorted by increasing order of hsDeclName, so that 
@@ -142,29 +145,22 @@ checkIface :: Maybe ParsedIface		-- The old interface, read from M.hi
 
 checkIface Nothing new_iface
 -- No old interface, so definitely write a new one!
-  = Just new_iface
+  = return (Just new_iface)
 
 checkIface (Just iface) new_iface
   | no_output_change && no_usage_change
-  = Nothing
+  = return Nothing
 
   | otherwise		-- Add updated version numbers
-  = 
-{-  pprTrace "checkIface" (
-	vcat [ppr no_decl_changed <+> ppr no_export_change <+> ppr no_usage_change,
-	      text "--------",
-	      vcat (map ppr (pi_decls iface)),
-	      text "--------",
-	      vcat (map ppr (pi_decls new_iface))
-	]) $
--}
-    Just (new_iface { pi_vers = new_mod_vers,
-		      pi_fixity = (new_fixity_vers, new_fixities),
-		      pi_rules  = (new_rules_vers,  new_rules),
-		      pi_decls  = final_decls
-    })
+  = do { dumpIfSet opt_D_dump_hi_diffs "Interface file changes" pp_diffs ;
+	 return (Just new_iface )}
 	
   where
+    final_iface = new_iface { pi_vers = new_mod_vers,
+		      	      pi_fixity = (new_fixity_vers, new_fixities),
+		      	      pi_rules  = (new_rules_vers,  new_rules),
+		      	      pi_decls  = final_decls }
+
     no_usage_change = pi_usages iface == pi_usages new_iface
 
     no_output_change = no_decl_changed && 
@@ -189,24 +185,29 @@ checkIface (Just iface) new_iface
     new_rules_vers  | rules == new_rules = rules_vers
 		    | otherwise		 = bumpVersion rules_vers
 
-    (no_decl_changed, final_decls) = merge_decls True [] (pi_decls iface) (pi_decls new_iface)
+    (no_decl_changed, pp_diffs, final_decls) = merge_decls True empty [] (pi_decls iface) (pi_decls new_iface)
 
 	-- Fill in the version number on the new declarations
 	-- by looking at the old declarations.
 	-- Set the flag if anything changes. 
 	-- Assumes that the decls are sorted by hsDeclName
-    merge_decls ok_so_far acc []  []        = (ok_so_far, reverse acc)
-    merge_decls ok_so_far acc old []        = (False, reverse acc)
-    merge_decls ok_so_far acc [] (nvd:nvds) = merge_decls False (nvd:acc) [] nvds
-    merge_decls ok_so_far acc (vd@(v,d):vds) (nvd@(_,nd):nvds)
+    merge_decls ok_so_far pp acc []  []        = (ok_so_far, pp, reverse acc)
+    merge_decls ok_so_far pp acc old []        = (False,     pp, reverse acc)
+    merge_decls ok_so_far pp acc [] (nvd:nvds) = merge_decls False (pp $$ only_new nvd) (nvd:acc) [] nvds
+    merge_decls ok_so_far pp acc (vd@(v,d):vds) (nvd@(_,nd):nvds)
 	= case d_name `compare` nd_name of
-		LT -> merge_decls False acc       vds      (nvd:nvds)
-		GT -> merge_decls False (nvd:acc) (vd:vds) nvds
-		EQ | d == nd   -> merge_decls ok_so_far (vd:acc) vds nvds
-		   | otherwise -> merge_decls False	((bumpVersion v, nd):acc) vds nvds
+		LT -> merge_decls False (pp $$ only_old vd)  acc       vds      (nvd:nvds)
+		GT -> merge_decls False (pp $$ only_new nvd) (nvd:acc) (vd:vds) nvds
+		EQ | d == nd   -> merge_decls ok_so_far pp 		     (vd:acc) 		       vds nvds
+		   | otherwise -> merge_decls False	(pp $$ changed d nd) ((bumpVersion v, nd):acc) vds nvds
 	where
  	  d_name  = hsDeclName d
  	  nd_name = hsDeclName nd
+
+    only_old (_,d) = ptext SLIT("Only in old iface:") <+> ppr d
+    only_new (_,d) = ptext SLIT("Only in new iface:") <+> ppr d
+    changed d nd   = ptext SLIT("Changed in iface: ") <+> ((ptext SLIT("Old:") <+> ppr d) $$ 
+							   (ptext SLIT("New:") <+> ppr nd))
 \end{code}
 
 

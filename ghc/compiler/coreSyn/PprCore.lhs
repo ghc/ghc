@@ -25,7 +25,7 @@ import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
 import Var		( isTyVar )
 import IdInfo		( IdInfo, megaSeqIdInfo, occInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
-			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
+			  demandInfo, specInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
 			  cprInfo, ppCprInfo, lbvarInfo,
 			  workerInfo, ppWorkerInfo
@@ -340,7 +340,6 @@ ppIdInfo b info
   = hsep [
 	    ppFlavourInfo (flavourInfo info),
 	    ppArityInfo a,
-	    ppUpdateInfo u,
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
 	    ppCafInfo c,
@@ -353,7 +352,6 @@ ppIdInfo b info
   where
     a = arityInfo info
     s = strictnessInfo info
-    u = updateInfo info
     c = cafInfo info
     m = cprInfo info
     p = specInfo info

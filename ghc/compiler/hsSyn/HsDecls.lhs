@@ -211,7 +211,7 @@ instance Ord name => Eq (TyClDecl name pat) where
     = n1 == n2 &&
       nd1 == nd2 &&
       eqWithHsTyVars tvs1 tvs2 (\ env -> 
-   	  eq_hsContext env cxt1 cxt2 &&
+   	  eq_hsContext env cxt1 cxt2  &&
 	  eqListBy (eq_ConDecl env) cons1 cons2
       )
 
@@ -364,10 +364,6 @@ data ConDetails name
   | RecCon			-- record-style con decl
 		[([name], BangType name)]	-- list of "fields"
 
-  | NewCon	 		-- newtype con decl, possibly with a labelled field.
-		(HsType name)
-		(Maybe name)	-- Just x => labelled field 'x'
-
 eq_ConDecl env (ConDecl n1 _ tvs1 cxt1 cds1 _)
 	       (ConDecl n2 _ tvs2 cxt2 cds2 _)
   = n1 == n2 &&
@@ -381,8 +377,6 @@ eq_ConDetails env (InfixCon bta1 btb1) (InfixCon bta2 btb2)
   = eq_btype env bta1 bta2 && eq_btype env btb1 btb2
 eq_ConDetails env (RecCon fs1) (RecCon fs2)
   = eqListBy (eq_fld env) fs1 fs2
-eq_ConDetails env (NewCon t1 mn1) (NewCon t2 mn2)
-  = eq_hsType env t1 t2 && mn1 == mn2
 eq_ConDetails env _ _ = False
 
 eq_fld env (ns1,bt1) (ns2, bt2) = ns1==ns2 && eq_btype env bt1 bt2
@@ -414,14 +408,6 @@ ppr_con_details con (InfixCon ty1 ty2)
 ppr_con_details con (VanillaCon tys)
   = ppr con <+> hsep (map (ppr_bang) tys)
 
-ppr_con_details con (NewCon ty Nothing)
-  = ppr con <+> pprParendHsType ty
-
-ppr_con_details con (NewCon ty (Just x))
-  = ppr con <+> braces pp_field 
-   where
-    pp_field = ppr x <+> dcolon <+> pprParendHsType ty
- 
 ppr_con_details con (RecCon fields)
   = ppr con <+> braces (hsep (punctuate comma (map ppr_field fields)))
   where

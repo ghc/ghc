@@ -34,7 +34,7 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 -- others:
 import Id		( idArity, idType, isDataConId_maybe, isPrimOpId_maybe )
 import Var		( varType, isId )
-import IdInfo		( ArityInfo, UpdateInfo, InlinePragInfo, 
+import IdInfo		( ArityInfo, InlinePragInfo, 
 			  pprInlinePragInfo, ppArityInfo, ppStrictnessInfo
 			)
 import RdrName		( RdrName )
@@ -347,7 +347,6 @@ data HsIdInfo name
   = HsArity		ArityInfo
   | HsStrictness	StrictnessInfo
   | HsUnfold		InlinePragInfo (UfExpr name)
-  | HsUpdate		UpdateInfo
   | HsNoCafRefs
   | HsCprInfo
   | HsWorker		name		-- Worker, if any

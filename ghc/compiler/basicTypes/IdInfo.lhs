@@ -13,7 +13,7 @@ module IdInfo (
 	vanillaIdInfo, mkIdInfo, seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
-	zapFragileInfo,	zapLamInfo, zapSpecPragInfo, copyIdInfo,
+	zapFragileInfo,	zapLamInfo, zapSpecPragInfo, shortableIdInfo, copyIdInfo,
 
 	-- Flavour
 	IdFlavour(..), flavourInfo, 
@@ -55,10 +55,6 @@ module IdInfo (
 	-- Specialisation
 	specInfo, setSpecInfo,
 
-	-- Update
-	UpdateInfo, UpdateSpec,
-	mkUpdateInfo, updateInfo, updateInfoMaybe, ppUpdateInfo, setUpdateInfo,
-
 	-- CAF info
 	CafInfo(..), cafInfo, setCafInfo, ppCafInfo,
 
@@ -86,8 +82,7 @@ import Demand		-- Lots of stuff
 import Outputable	
 import Maybe            ( isJust )
 
-infixl 	1 `setUpdateInfo`,
-	  `setDemandInfo`,
+infixl 	1 `setDemandInfo`,
 	  `setStrictnessInfo`,
 	  `setSpecInfo`,
 	  `setArityInfo`,
@@ -127,7 +122,6 @@ data IdInfo
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
         workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
 	unfoldingInfo	:: Unfolding,		-- Its unfolding
-	updateInfo	:: UpdateInfo,		-- Which args should be updated
 	cafInfo		:: CafInfo,
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
@@ -185,7 +179,6 @@ setUnfoldingInfo  info uf
 	-- actually increases residency significantly. 
   = info { unfoldingInfo = uf }
 
-setUpdateInfo	  info ud = info { updateInfo = ud }
 setDemandInfo	  info dd = info { demandInfo = dd }
 setArityInfo	  info ar = info { arityInfo = ar  }
 setCafInfo        info cf = info { cafInfo = cf }
@@ -214,7 +207,6 @@ mkIdInfo flv = IdInfo {
 		    workerInfo		= NoWorker,
 		    strictnessInfo	= NoStrictnessInfo,
 		    unfoldingInfo	= noUnfolding,
-		    updateInfo		= NoUpdateInfo,
 		    cafInfo		= MayHaveCafRefs,
 		    cprInfo		= NoCPRInfo,
 		    lbvarInfo		= NoLBVarInfo,
@@ -399,40 +391,6 @@ wrapperArity :: WorkerInfo -> Arity
 wrapperArity (HasWorker _ a) = a
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection[update-IdInfo]{Update-analysis info about an @Id@}
-%*									*
-%************************************************************************
-
-\begin{code}
-data UpdateInfo
-  = NoUpdateInfo
-  | SomeUpdateInfo UpdateSpec
-  deriving (Eq, Ord)
-      -- we need Eq/Ord to cross-chk update infos in interfaces
-
--- the form in which we pass update-analysis info between modules:
-type UpdateSpec = [Int]
-\end{code}
-
-\begin{code}
-mkUpdateInfo = SomeUpdateInfo
-
-updateInfoMaybe NoUpdateInfo	    = Nothing
-updateInfoMaybe (SomeUpdateInfo []) = Nothing
-updateInfoMaybe (SomeUpdateInfo	 u) = Just u
-\end{code}
-
-Text instance so that the update annotations can be read in.
-
-\begin{code}
-ppUpdateInfo NoUpdateInfo	   = empty
-ppUpdateInfo (SomeUpdateInfo [])   = empty
-ppUpdateInfo (SomeUpdateInfo spec) = (<>) (ptext SLIT("__UA ")) (hcat (map int spec))
-  -- was "__U "; changed to avoid conflict with unfoldings.  KSW 1999-07.
-\end{code}
 
 %************************************************************************
 %*									*
@@ -649,26 +607,60 @@ copyIdInfo is used when shorting out a top-level binding
 where f is exported.  We are going to swizzle it around to
 	f = BIG
 	f_local = f
-but we must be careful to combine their IdInfos right.
-The fact that things can go wrong here is a bad sign, but I can't see
-how to make it 'patently right', so copyIdInfo is derived (pretty much) by trial and error
 
-Here 'from' is f_local, 'to' is f, and the result is attached to f
+BUT (a) we must be careful about messing up rules
+    (b) we must ensure f's IdInfo ends up right
+
+(a) Messing up the rules
+~~~~~~~~~~~~~~~~~~~~
+The example that went bad on me was this one:
+	
+    iterate :: (a -> a) -> a -> [a]
+    iterate = iterateList
+    
+    iterateFB c f x = x `c` iterateFB c f (f x)
+    iterateList f x =  x : iterateList f (f x)
+    
+    {-# RULES
+    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
+    "iterateFB" 		iterateFB (:) = iterateList
+     #-}
+
+This got shorted out to:
+
+    iterateList :: (a -> a) -> a -> [a]
+    iterateList = iterate
+    
+    iterateFB c f x = x `c` iterateFB c f (f x)
+    iterate f x =  x : iterate f (f x)
+    
+    {-# RULES
+    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
+    "iterateFB" 		iterateFB (:) = iterate
+     #-}
+
+And now we get an infinite loop in the rule system 
+	iterate f x -> build (\cn -> iterateFB c f x
+		    -> iterateFB (:) f x
+		    -> iterate f x
+
+Tiresome solution: don't do shorting out if f has rewrite rules.
+Hence shortableIdInfo.
+
+(b) Keeping the IdInfo right
+~~~~~~~~~~~~~~~~~~~~~~~~
+We want to move strictness/worker info from f_local to f, but keep the rest.
+Hence copyIdInfo.
 
 \begin{code}
-copyIdInfo :: IdInfo	-- From
-  	   -> IdInfo	-- To
-	   -> IdInfo	-- To, updated with stuff from From; except flavour unchanged
-copyIdInfo from to = from { flavourInfo = flavourInfo to,
-			    specInfo = specInfo to,
-			    inlinePragInfo = inlinePragInfo to
+shortableIdInfo :: IdInfo -> Bool
+shortableIdInfo info = isEmptyCoreRules (specInfo info)
+
+copyIdInfo :: IdInfo	-- f_local
+  	   -> IdInfo	-- f (the exported one)
+	   -> IdInfo	-- New info for f
+copyIdInfo f_local f = f { strictnessInfo = strictnessInfo f_local,
+			   workerInfo     = workerInfo     f_local,
+			   cprInfo        = cprInfo        f_local
 			  }
-	-- It's important to preserve the inline pragma on 'f'; e.g. consider
-	--	{-# NOINLINE f #-}
-	--	f = local
-	--
-	-- similarly, transformation rules may be attached to f
-	-- and we want to preserve them.  
-	--
-	-- On the other hand, we want the strictness info from f_local.
 \end{code}

@@ -29,7 +29,7 @@ import Id		( Id, idType, idInfo, isDataConId,
 			  zapLamIdInfo, setOneShotLambda, 
 			)
 import IdInfo		( OccInfo(..), isDeadOcc, isLoopBreaker,
-			  ArityInfo, setArityInfo, atLeastArity,
+			  ArityInfo, setArityInfo, unknownArity,
 			  setUnfoldingInfo,
 			  occInfo
 			)
@@ -497,69 +497,6 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
   =  thing_inside
 
   | exprIsTrivial new_rhs
-  = completeTrivialBinding old_bndr new_bndr 
-			   black_listed loop_breaker new_rhs
-			   thing_inside
-
-  | Note coercion@(Coerce _ inner_ty) inner_rhs <- new_rhs
-	-- x = coerce t e  ==>  c = e; x = inline_me (coerce t c)
-	-- Now x can get inlined, which moves the coercion
-	-- to the usage site.  This is a bit like worker/wrapper stuff,
-	-- but it's useful to do it very promptly, so that
-	--	x = coerce T (I# 3)
-	-- get's w/wd to
-	--	c = I# 3
-	--	x = coerce T $wx
-	-- This in turn means that
-	--	case (coerce Int x) of ...
-	-- will inline x.  
-	-- Also the full-blown w/w thing isn't set up for non-functions
-	--
-	-- The inline_me note is so that the simplifier doesn't 
-	-- just substitute c back inside x's rhs!  (Typically, x will
-	-- get substituted away, but not if it's exported.)
-  = newId SLIT("c") inner_ty 					$ \ c_id ->
-    completeBinding c_id c_id top_lvl False inner_rhs		$
-    completeTrivialBinding old_bndr new_bndr black_listed loop_breaker
-		   	   (Note InlineMe (Note coercion (Var c_id)))	$
-    thing_inside
-
-
-  |  otherwise
-  =  transformRhs new_rhs	$ \ arity new_rhs' ->
-     getSubst			`thenSmpl` \ subst ->
-     let
-	-- We make new IdInfo for the new binder by starting from the old binder, 
-	-- doing appropriate substitutions.
-	-- Then we add arity and unfolding info to get the new binder
-	new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
-		        `setArityInfo` atLeastArity arity
-
-	-- Add the unfolding *only* for non-loop-breakers
-	-- Making loop breakers not have an unfolding at all 
-	-- means that we can avoid tests in exprIsConApp, for example.
-	-- This is important: if exprIsConApp says 'yes' for a recursive
-	-- thing, then we can get into an infinite loop
-	info_w_unf | loop_breaker = new_bndr_info
-		   | otherwise	  = new_bndr_info `setUnfoldingInfo` mkUnfolding top_lvl new_rhs'
-
-	final_id = new_bndr `setIdInfo` info_w_unf
-     in
-	-- These seqs forces the Id, and hence its IdInfo,
-	-- and hence any inner substitutions
-     final_id				`seq`
-     addLetBind (NonRec final_id new_rhs') 	$
-     modifyInScope new_bndr final_id thing_inside
-
-  where
-    old_info     = idInfo old_bndr
-    occ_info     = occInfo old_info
-    loop_breaker = isLoopBreaker occ_info
-\end{code}    
-
-
-\begin{code}
-completeTrivialBinding old_bndr new_bndr black_listed loop_breaker new_rhs thing_inside
 	-- We're looking at a binding with a trivial RHS, so
 	-- perhaps we can discard it altogether!
 	--
@@ -567,14 +504,6 @@ completeTrivialBinding old_bndr new_bndr black_listed loop_breaker new_rhs thing
 	-- and non-loop-breakers only have *forward* references
 	-- Hence, it's safe to discard the binding
 	--	
-	-- NB: You might think that postInlineUnconditionally is an optimisation,
-	-- but if we have
-	--	let x = f Bool in (x, y)
-	-- then because of the constructor, x will not be *inlined* in the pair,
-	-- so the trivial binding will stay.  But in this postInlineUnconditionally 
-	-- gag we use the *substitution* to substitute (f Bool) for x, and that *will*
-	-- happen.
-
 	-- NOTE: This isn't our last opportunity to inline.
 	-- We're at the binding site right now, and
 	-- we'll get another opportunity when we get to the ocurrence(s)
@@ -591,27 +520,79 @@ completeTrivialBinding old_bndr new_bndr black_listed loop_breaker new_rhs thing
 	-- NB: Even NOINLINEis ignored here: if the rhs is trivial
 	-- it's best to inline it anyway.  We often get a=E; b=a
 	-- from desugaring, with both a and b marked NOINLINE.
+  = if  must_keep_binding then	-- Keep the binding
+	finally_bind_it	unknownArity new_rhs
+		-- Arity doesn't really matter because for a trivial RHS
+		-- we will inline like crazy at call sites
+		-- If this turns out be false, we can easily compute arity
+    else 			-- Drop the binding
+	extendSubst old_bndr (DoneEx new_rhs)	$
+		-- Use the substitution to make quite, quite sure that the substitution
+		-- will happen, since we are going to discard the binding
+	tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
+	thing_inside
 
-  |  not keep_binding	-- Can discard binding, inlining everywhere
-  =  extendSubst old_bndr (DoneEx new_rhs)	$
-     tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
-     thing_inside
-    
-  | otherwise		-- We must keep the binding, but we may still inline
-  = getSubst			`thenSmpl` \ subst ->
-    let
-	new_bndr_info = substIdInfo subst (idInfo old_bndr) (idInfo new_bndr)
- 	final_id      = new_bndr `setIdInfo` new_bndr_info
-    in
-    addLetBind (NonRec final_id new_rhs) 	$
-    if dont_inline then
-	modifyInScope new_bndr final_id	thing_inside
-    else
-	extendSubst old_bndr (DoneEx new_rhs) thing_inside
+  | Note coercion@(Coerce _ inner_ty) inner_rhs <- new_rhs
+	-- 	[NB inner_rhs is guaranteed non-trivial by now]
+	-- x = coerce t e  ==>  c = e; x = inline_me (coerce t c)
+	-- Now x can get inlined, which moves the coercion
+	-- to the usage site.  This is a bit like worker/wrapper stuff,
+	-- but it's useful to do it very promptly, so that
+	--	x = coerce T (I# 3)
+	-- get's w/wd to
+	--	c = I# 3
+	--	x = coerce T c
+	-- This in turn means that
+	--	case (coerce Int x) of ...
+	-- will inline x.  
+	-- Also the full-blown w/w thing isn't set up for non-functions
+	--
+	-- The inline_me note is so that the simplifier doesn't 
+	-- just substitute c back inside x's rhs!  (Typically, x will
+	-- get substituted away, but not if it's exported.)
+  = newId SLIT("c") inner_ty 					$ \ c_id ->
+    completeBinding c_id c_id top_lvl False inner_rhs		$
+    completeBinding old_bndr new_bndr top_lvl black_listed
+		    (Note InlineMe (Note coercion (Var c_id)))	$
+    thing_inside
+
+
+  |  otherwise
+  = transformRhs new_rhs finally_bind_it
+
   where
-    dont_inline  = black_listed || loop_breaker
-    keep_binding = dont_inline || isExportedId old_bndr
-\end{code}
+    old_info          = idInfo old_bndr
+    occ_info          = occInfo old_info
+    loop_breaker      = isLoopBreaker occ_info
+    trivial_rhs	      = exprIsTrivial new_rhs 
+    must_keep_binding = black_listed || loop_breaker || isExportedId old_bndr
+
+    finally_bind_it arity_info new_rhs
+      = getSubst			`thenSmpl` \ subst ->
+        let
+		-- We make new IdInfo for the new binder by starting from the old binder, 
+		-- doing appropriate substitutions.
+		-- Then we add arity and unfolding info to get the new binder
+  	    new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
+		            `setArityInfo` arity_info
+
+		-- Add the unfolding *only* for non-loop-breakers
+		-- Making loop breakers not have an unfolding at all 
+		-- means that we can avoid tests in exprIsConApp, for example.
+		-- This is important: if exprIsConApp says 'yes' for a recursive
+		-- thing, then we can get into an infinite loop
+	    info_w_unf | loop_breaker = new_bndr_info
+		       | otherwise    = new_bndr_info `setUnfoldingInfo` mkUnfolding top_lvl new_rhs
+
+	    final_id = new_bndr `setIdInfo` info_w_unf
+	in
+		-- These seqs forces the Id, and hence its IdInfo,
+		-- and hence any inner substitutions
+	final_id				`seq`
+	addLetBind (NonRec final_id new_rhs) 	$
+	modifyInScope new_bndr final_id thing_inside
+\end{code}    
+
 
 
 %************************************************************************

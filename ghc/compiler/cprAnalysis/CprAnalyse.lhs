@@ -10,9 +10,10 @@ import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_cpranal )
 import CoreLint		( beginPass, endPass )
 import CoreSyn
 import CoreUtils	( exprIsValue )
-import Id               ( setIdCprInfo, idCprInfo, idArity,
-			  isBottomingId )
+import Id               ( Id, setIdCprInfo, idCprInfo, idArity,
+			  isBottomingId, idDemandInfo )
 import IdInfo           ( CprInfo(..) )
+import Demand		( isStrict )
 import VarEnv
 import Util		( nTimes, mapAccumL )
 import Outputable
@@ -158,16 +159,16 @@ cprAnalBind :: CPREnv -> CoreBind -> (CPREnv, CoreBind)
 cprAnalBind rho (NonRec b e) 
   = (extendVarEnv rho b absval, NonRec b' e')
   where
-    (e', absval) = cprAnalRhs rho e
-    b' = setIdCprInfo b (absToCprInfo absval)
+    (e', absval) = cprAnalExpr rho e
+    b' = addIdCprInfo b e' absval
 
 cprAnalBind rho (Rec prs)
   = (final_rho, Rec (map do_pr prs))
   where
     do_pr (b,e) = (b', e') 
 		where
-		  b'           = setIdCprInfo b (absToCprInfo absval)
-		  (e', absval) = cprAnalRhs final_rho e
+		  b'           = addIdCprInfo b e' absval
+		  (e', absval) = cprAnalExpr final_rho e
 
 	-- When analyzing mutually recursive bindings the iterations to find
 	-- a fixpoint is bounded by the number of bindings in the group.
@@ -176,17 +177,11 @@ cprAnalBind rho (Rec prs)
     init_rho  = rho `extendVarEnvList` [(b,Bot) | (b,e) <- prs]
 
     do_one_pass :: CPREnv -> CPREnv
-    do_one_pass rho = foldl (\ rho (b,e) -> extendVarEnv rho b (snd (cprAnalRhs rho e)))
+    do_one_pass rho = foldl (\ rho (b,e) -> extendVarEnv rho b (snd (cprAnalExpr rho e)))
 			    rho prs
-
-cprAnalRhs :: CPREnv -> CoreExpr -> (CoreExpr, AbsVal)
-cprAnalRhs rho e
-  = case cprAnalExpr rho e of
-	(e_pluscpr, e_absval) -> (e_pluscpr, pinCPR e e_absval)
 
 
 cprAnalExpr :: CPREnv -> CoreExpr -> (CoreExpr, AbsVal)
-
 
 -- If Id will always diverge when given sufficient arguments then
 -- we can just set its abs val to Bot.  Any other CPR info
@@ -264,55 +259,46 @@ cprAnalCaseAlts rho alts
 		  rho' = rho `extendVarEnvList` (zip binds (repeat Top))
 
 
--- take a binding pair and the abs val calculated from the rhs and
--- calculate a new absval taking into account sufficient manifest
--- lambda condition 
--- Also we pin the var's CPR property to it.  A var only has the CPR property if
--- it is a function
+addIdCprInfo :: Id -> CoreExpr -> AbsVal -> Id
+addIdCprInfo bndr rhs absval
+  | useful_info && ok_to_add = setIdCprInfo bndr cpr_info
+  | otherwise		     = bndr
+  where
+    cpr_info    = absToCprInfo absval
+    useful_info = case cpr_info of { ReturnsCPR -> True; NoCPRInfo -> False }
+		
+    ok_to_add = case absval of
+                  Fun _ -> idArity bndr >= n_fun_tys absval
+		      -- Enough visible lambdas
 
-pinCPR :: CoreExpr -> AbsVal -> AbsVal
-pinCPR e av = case av of
-                    -- is v a function with insufficent lambdas?
-                 Fun _ | n_fun_tys av /= length val_binders ->  
-                      -- argtys must be greater than val_binders.  So stripped_exp
-		      -- has a function type.  The head of this expr can't be lambda 
-		      -- a note, because we stripped them off before.  It can't be a 
-		      -- constructor because it has a function type.  It can't be a Type. 
-		      -- If its an app, let or case then there is work to get the 
-		      -- and we can't do anything because we may lose laziness. *But*
-		      -- if its a var (i.e. a function name) then we are fine.  Note 
-		      -- that I don't think this case is at all interesting,  but I have
-		      -- a test program that generates it.
-
-                      -- UPDATE: 20 Jul 1999
-                      -- I've decided not to allow this (useless) optimisation.  It will make
-                      -- the w/w split more complex.
-		      -- if isVar stripped_exp then
-                      --    (addCpr av, av)
-		      -- else
-			    Top
-
-		 Tuple | exprIsValue e -> av
-		       | otherwise     -> Top
+		  Tuple  -> exprIsValue rhs || isStrict (idDemandInfo bndr)
 			-- If the rhs is a value, and returns a constructed product,
 			-- it will be inlined at usage sites, so we give it a Tuple absval
 			-- If it isn't a value, we won't inline it (code/work dup worries), so
 			-- we discard its absval.
+			-- 
+			-- Also, if the strictness analyser has figured out that it's strict,
+			-- the let-to-case transformation will happen, so again it's good.
+			-- (CPR analysis runs before the simplifier has had a chance to do
+			--  the let-to-case transform.)
+			-- This made a big difference to PrelBase.modInt, which had something like
+			--	modInt = \ x -> let r = ... -> I# v in
+		 	--			...body strict in r...
+			-- r's RHS isn't a value yet; but modInt returns r in various branches, so
+			-- if r doesn't have the CPR property then neither does modInt
 
-		 _ -> av
-    where
-      n_fun_tys :: AbsVal -> Int
-      n_fun_tys (Fun av) = 1 + n_fun_tys av
-      n_fun_tys other    = 0
+		  _ -> False
 
-	-- val_binders are the explicit lambdas at the head of the expression
-	-- Don't get confused by inline pragamas
-      val_binders = filter isId (fst (collectBindersIgnoringNotes e))
+    n_fun_tys :: AbsVal -> Int
+    n_fun_tys (Fun av) = 1 + n_fun_tys av
+    n_fun_tys other    = 0
+
 
 absToCprInfo :: AbsVal -> CprInfo
 absToCprInfo Tuple   = ReturnsCPR
 absToCprInfo (Fun r) = absToCprInfo r
 absToCprInfo _       = NoCPRInfo
+
 
 -- Cpr Info doesn't store the number of arguments a function has,  so the caller
 -- must take care to add the appropriate number of Funs.

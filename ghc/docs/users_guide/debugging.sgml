@@ -222,6 +222,16 @@ intended to reduce the labour.
 </VarListEntry>
 
 <VarListEntry>
+<Term><Option>-ddump-hi-diffs</Option>:</Term>
+<ListItem>
+<Para>
+Dump to stdout a summary of the differences between the existing interface file (if any)
+for this module, and the new one.
+</Para>
+</ListItem>
+</VarListEntry>
+
+<VarListEntry>
 <Term><Option>-ddump-tc</Option>:</Term>
 <ListItem>
 <Para>

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelShow.lhs,v 1.11 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelShow.lhs,v 1.12 2000/09/14 13:46:42 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -112,13 +112,13 @@ instance  Show Int  where
 
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
-    showsPrec p@(I# p#) (Just x) s
+    showsPrec (I# p#) (Just x) s
                           = (showParen (p# >=# 10#) $ 
     			     showString "Just " . 
 			     showsPrec (I# 10#) x) s
 
 instance (Show a, Show b) => Show (Either a b) where
-    showsPrec p@(I# p#) e s =
+    showsPrec (I# p#) e s =
        (showParen (p# >=# 10#) $
         case e of
          Left  a -> showString "Left "  . showsPrec (I# 10#) a
@@ -196,22 +196,21 @@ Code specific for characters
 
 \begin{code}
 showLitChar 		   :: Char -> ShowS
-showLitChar c | c > '\DEL' =  \s -> showChar '\\' (protectEsc isDigit (shows (ord c)) s)
-showLitChar '\DEL'	   =  showString "\\DEL"
-showLitChar '\\'	   =  showString "\\\\"
-showLitChar c | c >= ' '   =  showChar c
-showLitChar '\a'	   =  showString "\\a"
-showLitChar '\b'	   =  showString "\\b"
-showLitChar '\f'	   =  showString "\\f"
-showLitChar '\n'	   =  showString "\\n"
-showLitChar '\r'	   =  showString "\\r"
-showLitChar '\t'	   =  showString "\\t"
-showLitChar '\v'	   =  showString "\\v"
-showLitChar '\SO'	   =  \s -> protectEsc (== 'H') (showString "\\SO") s
-showLitChar c		   =  \s -> showString ('\\' : asciiTab!!ord c) s
-	-- The "\s ->" here means that GHC knows it's ok to put the
-	-- asciiTab!!ord c inside the lambda.  Otherwise we get an extra
-	-- lambda allocated, and that can be pretty bad
+showLitChar c s | c > '\DEL' =  showChar '\\' (protectEsc isDigit (shows (ord c)) s)
+showLitChar '\DEL'	   s =  showString "\\DEL" s
+showLitChar '\\'	   s =  showString "\\\\" s
+showLitChar c s | c >= ' '   =  showChar c s
+showLitChar '\a'	   s =  showString "\\a" s
+showLitChar '\b'	   s =  showString "\\b" s
+showLitChar '\f'	   s =  showString "\\f" s
+showLitChar '\n'	   s =  showString "\\n" s
+showLitChar '\r'	   s =  showString "\\r" s
+showLitChar '\t'	   s =  showString "\\t" s
+showLitChar '\v'	   s =  showString "\\v" s
+showLitChar '\SO'	   s =  protectEsc (== 'H') (showString "\\SO") s
+showLitChar c		   s =  showString ('\\' : asciiTab!!ord c) s
+	-- I've done manual eta-expansion here, becuase otherwise it's
+	-- impossible to stop (asciiTab!!ord) getting floated out as an MFE
 
 protectEsc :: (Char -> Bool) -> ShowS -> ShowS
 protectEsc p f		   = f . cont
@@ -257,7 +256,8 @@ itos n r
 
 \begin{code}
 isAscii, isLatin1, isControl, isPrint, isSpace, isUpper,
- isLower, isAlpha, isDigit, isOctDigit, isHexDigit, isAlphaNum :: Char -> Bool
+ isLower, isAlpha, isDigit, isOctDigit, isHexDigit, isAlphaNum,
+ isAsciiUpper, isAsciiLower :: Char -> Bool
 isAscii c	 	=  c <  '\x80'
 isLatin1 c              =  c <= '\xff'
 isControl c		=  c < ' ' || c >= '\DEL' && c <= '\x9f'

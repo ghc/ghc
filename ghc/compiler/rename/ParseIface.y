@@ -463,9 +463,9 @@ constr		:  src_loc ex_stuff data_name batypes		{ mk_con_decl $3 $2 (VanillaCon $
                 -- We use "data_fs" so as to include ()
 
 newtype_constr	:: { [RdrNameConDecl] {- Not allowed to be empty -} }
-newtype_constr	: src_loc '=' ex_stuff data_name atype	{ [mk_con_decl $4 $3 (NewCon $5 Nothing) $1] }
+newtype_constr	: src_loc '=' ex_stuff data_name atype	{ [mk_con_decl $4 $3 (VanillaCon [Unbanged $5]) $1] }
 		| src_loc '=' ex_stuff data_name '{' var_name '::' atype '}'
-							{ [mk_con_decl $4 $3 (NewCon $8 (Just $6)) $1] }
+							{ [mk_con_decl $4 $3 (RecCon [([$6], Unbanged $8)]) $1] }
 
 ex_stuff :: { ([HsTyVarBndr RdrName], RdrNameContext) }
 ex_stuff	:                                       { ([],[]) }

@@ -27,7 +27,7 @@ import Id		( isSpecPragmaId, isDataConId, isOneShotLambda, setOneShotLambda,
 			  idSpecialisation, 
 			  idType, idUnique, Id
 			)
-import IdInfo		( OccInfo(..), insideLam, copyIdInfo )
+import IdInfo		( OccInfo(..), insideLam, shortableIdInfo, copyIdInfo )
 
 import VarSet
 import VarEnv
@@ -187,27 +187,34 @@ zapBind ind_env (Rec pairs)
 
 zapBind ind_env bind = bind
 
-zap ind_env pair@(bndr,rhs)
-  = case lookupVarEnv ind_env bndr of
+zap ind_env pair@(local_id,rhs)
+  = case lookupVarEnv ind_env local_id of
 	Nothing          -> [pair]
-	Just exported_id -> [(bndr, Var exported_id),
-			     (exported_id_w_info, rhs)]
-		         where
-			   exported_id_w_info = modifyIdInfo (copyIdInfo (idInfo bndr)) exported_id
-				-- See notes with copyIdInfo about propagating IdInfo from
-				-- one to t'other
+	Just exported_id -> [(local_id, Var exported_id),
+			     (exported_id', rhs)]
+			 where
+			    exported_id' = modifyIdInfo (copyIdInfo (idInfo local_id)) exported_id
 			
 shortMeOut ind_env exported_id local_id
-  = isExportedId exported_id &&		-- Only if this is exported
+-- The if-then-else stuff is just so I can get a pprTrace to see
+-- how often I don't get shorting out becuase of IdInfo stuff
+  = if isExportedId exported_id &&		-- Only if this is exported
 
-    isLocallyDefined local_id &&	-- Only if this one is defined in this
-					-- 	module, so that we *can* change its
-				  	-- 	binding to be the exported thing!
+       isLocallyDefined local_id &&		-- Only if this one is defined in this
+						-- 	module, so that we *can* change its
+				 	 	-- 	binding to be the exported thing!
 
-    not (isExportedId local_id) &&	-- Only if this one is not itself exported,
-					--	since the transformation will nuke it
-
-    not (local_id `elemVarEnv` ind_env)		-- Only if not already substituted for
+       not (isExportedId local_id) &&		-- Only if this one is not itself exported,
+					   	--	since the transformation will nuke it
+   
+       not (local_id `elemVarEnv` ind_env)	-- Only if not already substituted for
+    then
+	if shortableIdInfo (idInfo exported_id) 	-- Only if its IdInfo is 'shortable'
+							-- (see the defn of IdInfo.shortableIdInfo
+	then True
+	else pprTrace "shortMeOut:" (ppr exported_id) False
+    else
+	False
 \end{code}
 
 

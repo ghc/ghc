@@ -258,10 +258,6 @@ mkDataConWrapId data_con
 	       mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $
 	       Note (Coerce result_ty (head orig_arg_tys)) (Var id_arg1)
 
-{-	I nuked this because map (:) xs would create a
-	new local lambda for the (:) in core-to-stg.  
-	There isn't a defn for the worker!
-
 	     | null dict_args && all not_marked_strict strict_marks
 	     = Var work_id	-- The common case.  Not only is this efficient,
 				-- but it also ensures that the wrapper is replaced
@@ -270,10 +266,16 @@ mkDataConWrapId data_con
 				-- becomes 
 				--		f $w: x
 				-- This is really important in rule matching,
-				-- which is a bit sad.  (We could match on the wrappers,
+				-- (We could match on the wrappers,
 				-- but that makes it less likely that rules will match
-				-- when we bring bits of unfoldings together
--}
+				-- when we bring bits of unfoldings together.)
+		--
+		-- NB:	because of this special case, (map (:) ys) turns into
+		--	(map $w: ys), and thence into (map (\x xs. $w: x xs) ys)
+		--	in core-to-stg.  The top-level defn for (:) is never used.
+		--	This is somewhat of a bore, but I'm currently leaving it 
+		--	as is, so that there still is a top level curried (:) for
+		--	the interpreter to call.
 
 	     | otherwise
 	     = mkLams all_tyvars $ mkLams dict_args $ 

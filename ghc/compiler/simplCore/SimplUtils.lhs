@@ -19,7 +19,8 @@ module SimplUtils (
 #include "HsVersions.h"
 
 import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
-			  opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge, opt_DictsStrict
+			  opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge, opt_DictsStrict,
+			  opt_UF_UpdateInPlace
 			)
 import CoreSyn
 import CoreUnfold	( isValueUnfolding )
@@ -29,7 +30,7 @@ import Id		( Id, idType, isId, idName,
 			  idOccInfo, idUnfolding, idStrictness,
 			  mkId, idInfo
 			)
-import IdInfo		( StrictnessInfo(..), arityLowerBound, setOccInfo, vanillaIdInfo )
+import IdInfo		( StrictnessInfo(..), ArityInfo, atLeastArity, setOccInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocalName, setNameUnique )
 import Demand		( Demand, isStrict, wwLazy, wwLazy )
@@ -399,7 +400,10 @@ canUpdateInPlace :: Type -> Bool
 
 -- Note the repType: we want to look through newtypes for this purpose
 
-canUpdateInPlace ty = case splitTyConApp_maybe (repType ty) of {
+canUpdateInPlace ty 
+  | not opt_UF_UpdateInPlace = False
+  | otherwise
+  = case splitTyConApp_maybe (repType ty) of {
 			Nothing		-> False ;
 			Just (tycon, _) -> 
 
@@ -472,7 +476,7 @@ Try (a) eta expansion
 
 \begin{code}
 transformRhs :: OutExpr 
-	     -> (Arity -> OutExpr -> SimplM (OutStuff a))
+	     -> (ArityInfo -> OutExpr -> SimplM (OutStuff a))
 	     -> SimplM (OutStuff a)
 
 transformRhs rhs thing_inside 
@@ -689,7 +693,7 @@ what the final test in the first equation is for.
 
 \begin{code}
 tryEtaExpansion :: OutExpr 
-		-> (Arity -> OutExpr -> SimplM (OutStuff a))
+		-> (ArityInfo -> OutExpr -> SimplM (OutStuff a))
 		-> SimplM (OutStuff a)
 tryEtaExpansion rhs thing_inside
   |  not opt_SimplDoLambdaEtaExpansion
@@ -727,8 +731,8 @@ tryEtaExpansion rhs thing_inside
 
     fun_arity	     = exprEtaExpandArity fun
 
-    final_arity | all_trivial_args = x_arity + extra_args_wanted
-	        | otherwise	   = x_arity
+    final_arity | all_trivial_args = atLeastArity (x_arity + extra_args_wanted)
+	        | otherwise	   = atLeastArity x_arity
 	-- Arity can be more than the number of lambdas
 	-- because of coerces. E.g.  \x -> coerce t (\y -> e) 
 	-- will have arity at least 2

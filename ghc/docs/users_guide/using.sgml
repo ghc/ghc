@@ -2114,27 +2114,22 @@ apply (see <Option>-funfolding-con-discount</Option>).
 </Para>
 </ListItem>
 </VarListEntry>
-<VarListEntry>
-<Term><Option>-funfolding-con-discount&lt;n&gt;</Option>:</Term>
-<ListItem>
-<Para>
-<IndexTerm><Primary>-funfolding-con-discount option</Primary></IndexTerm>
-<IndexTerm><Primary>inlining, controlling</Primary></IndexTerm>
-<IndexTerm><Primary>unfolding, controlling</Primary></IndexTerm>
-(Default: 2) If the compiler decides that it can eliminate some
-computation by performing an unfolding, then this is a discount factor
-that it applies to the funciton size before deciding whether to unfold
-it or not.
-</Para>
 
-<Para>
-OK, folks, these magic numbers `30', `8', and '2' are mildly
-arbitrary; they are of the &ldquo;seem to be OK&rdquo; variety.  The `8' is the
-more critical one; it's what determines how eager GHC is about
-expanding unfoldings.
+<VarListEntry>
+<Term><Option>-funfolding-update-in-place&lt;n&gt;</Option>:</Term>
+<ListItem>
+Switches on an experimental "optimisation".  Switching it on makes the compiler
+a little keener to inline a function that returns a constructor, if the context is
+that of a thunk.
+<ProgramListing>
+   x = plusInt a b
+</ProgramListing>
+If we inlined plusInt we might get an opportunity to use update-in-place for
+the thunk 'x'.
 </Para>
 </ListItem>
 </VarListEntry>
+
 <VarListEntry>
 <Term><Option>-funbox-strict-fields</Option>:</Term>
 <ListItem>

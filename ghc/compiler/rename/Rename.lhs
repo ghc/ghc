@@ -548,7 +548,6 @@ getGates source_fvs (TyClD (TyData _ ctxt tycon tvs cons _ _ _ _))
     get_details (VanillaCon tys) = plusFVs (map get_bang tys)
     get_details (InfixCon t1 t2) = get_bang t1 `plusFV` get_bang t2
     get_details (RecCon fields)  = plusFVs [get_bang t | (_, t) <- fields]
-    get_details (NewCon t _)	 = extractHsTyNames t
 
     get_field (fs,t) | any (`elemNameSet` source_fvs) fs = get_bang t
 		     | otherwise			 = emptyFVs

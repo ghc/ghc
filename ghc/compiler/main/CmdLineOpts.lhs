@@ -25,6 +25,7 @@ module CmdLineOpts (
 	opt_D_dump_ds,
 	opt_D_dump_flatC,
 	opt_D_dump_foreign,
+	opt_D_dump_hi_diffs,
 	opt_D_dump_inlinings,
 	opt_D_dump_occur_anal,
 	opt_D_dump_parsed,
@@ -113,10 +114,9 @@ module CmdLineOpts (
 	opt_UF_HiFileThreshold,
 	opt_UF_CreationThreshold,
 	opt_UF_UseThreshold,
-	opt_UF_ScrutConDiscount,
 	opt_UF_FunAppDiscount,
-	opt_UF_PrimArgDiscount,
 	opt_UF_KeenessFactor,
+	opt_UF_UpdateInPlace,
 	opt_UF_CheapOp,
 	opt_UF_DearOp,
 
@@ -343,6 +343,8 @@ opt_D_dump_simpl_stats		= opt_D_dump_most || lookUp  SLIT("-ddump-simpl-stats")
 opt_D_source_stats		= opt_D_dump_most || lookUp  SLIT("-dsource-stats")
 opt_D_verbose_core2core		= opt_D_dump_all  || lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= opt_D_dump_all  || lookUp  SLIT("-dverbose-stg")
+opt_D_dump_hi_diffs		= opt_D_dump_all  || lookUp  SLIT("-ddump-hi-diffs")
+
 opt_D_dump_minimal_imports	= lookUp  SLIT("-ddump-minimal-imports")
 
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
@@ -453,10 +455,9 @@ opt_SimplExcessPrecision	= lookUp SLIT("-fexcess-precision")
 opt_UF_HiFileThreshold		= lookup_def_int "-funfolding-interface-threshold" (45::Int)
 opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45::Int)
 opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
-opt_UF_ScrutConDiscount		= lookup_def_int "-funfolding-con-discount"	   (2::Int)
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
-opt_UF_PrimArgDiscount		= lookup_def_int "-funfolding-prim-discount"	   (1::Int)
 opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::Float)
+opt_UF_UpdateInPlace		= lookUp  SLIT("-funfolding-update-in-place")
 
 opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)

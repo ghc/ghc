@@ -10,9 +10,7 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlyWillInline )
-import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core, 
-                          opt_D_dump_worker_wrapper
-			)
+import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_worker_wrapper )
 import CoreLint		( beginPass, endPass )
 import CoreUtils	( exprType, exprEtaExpandArity )
 import MkId		( mkWorkerId )

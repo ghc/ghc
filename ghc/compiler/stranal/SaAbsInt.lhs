@@ -605,7 +605,9 @@ findStrictness id (AbsApproxFun str_ds str_res) (AbsApproxFun abs_ds _)
 	-- See notes with WwLib.worthSplitting
   = find_strictness id str_ds str_res abs_ds
 
-findStrictness id str_val abs_val = NoStrictnessInfo
+findStrictness id str_val abs_val 
+  | isBot str_val = mkStrictnessInfo ([], True)
+  | otherwise     = NoStrictnessInfo
 
 -- The list of absence demands passed to combineDemands 
 -- can be shorter than the list of absence demands

@@ -48,7 +48,6 @@ module Id (
 	setIdStrictness,
 	setIdWorkerInfo,
 	setIdSpecialisation,
-	setIdUpdateInfo,
 	setIdCafInfo,
 	setIdCprInfo,
 	setIdOccInfo,
@@ -60,7 +59,6 @@ module Id (
 	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation,
-	idUpdateInfo,
 	idCafInfo,
 	idCprInfo,
 	idLBVarInfo,
@@ -106,7 +104,6 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdStrictness`,
 	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
-	  `setIdUpdateInfo`,
 	  `setInlinePragma`,
 	  `idCafInfo`,
 	  `idCprInfo`
@@ -351,14 +348,6 @@ idDemandInfo id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand -> Id
 setIdDemandInfo id demand_info = modifyIdInfo (`setDemandInfo` demand_info) id
-
-	---------------------------------
-	-- UPDATE INFO
-idUpdateInfo :: Id -> UpdateInfo
-idUpdateInfo id = updateInfo (idInfo id)
-
-setIdUpdateInfo :: Id -> UpdateInfo -> Id
-setIdUpdateInfo id upd_info = modifyIdInfo (`setUpdateInfo` upd_info) id
 
 	---------------------------------
 	-- SPECIALISATION

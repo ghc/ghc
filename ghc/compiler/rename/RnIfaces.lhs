@@ -1071,13 +1071,8 @@ getConFieldNames new_name (ConDecl con _ _ _ (RecCon fielddecls) src_loc : rest)
 
 getConFieldNames new_name (ConDecl con _ _ _ condecl src_loc : rest)
   = new_name con src_loc		`thenRn` \ n ->
-    (case condecl of
-      NewCon _ (Just f) -> 
-        new_name f src_loc `thenRn` \ new_f ->
-	returnRn [n,new_f]
-      _ -> returnRn [n])		`thenRn` \ nn ->
     getConFieldNames new_name rest	`thenRn` \ ns -> 
-    returnRn (nn ++ ns)
+    returnRn (n : ns)
 
 getConFieldNames new_name [] = returnRn []
 

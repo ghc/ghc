@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelTup.lhs,v 1.9 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelTup.lhs,v 1.10 2000/09/14 13:46:42 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -13,7 +13,6 @@ This modules defines the typle data types.
 
 module PrelTup where
 
-import {-# SOURCE #-} PrelErr ( error )
 import PrelBase
 
 default ()		-- Double isn't available yet

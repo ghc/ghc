@@ -78,7 +78,6 @@ tcIdInfo unf_env in_scope_vars name ty info info_ins
   = foldlTc tcPrag vanillaIdInfo info_ins
   where
     tcPrag info (HsArity arity) = returnTc (info `setArityInfo`  arity)
-    tcPrag info (HsUpdate upd)  = returnTc (info `setUpdateInfo` upd)
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
     tcPrag info HsCprInfo       = returnTc (info `setCprInfo`	 ReturnsCPR)
 

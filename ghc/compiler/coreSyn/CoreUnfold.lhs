@@ -33,10 +33,8 @@ module CoreUnfold (
 
 import CmdLineOpts	( opt_UF_CreationThreshold,
 			  opt_UF_UseThreshold,
-			  opt_UF_ScrutConDiscount,
 			  opt_UF_FunAppDiscount,
-			  opt_UF_PrimArgDiscount,
-			  opt_UF_KeenessFactor,
+		  	  opt_UF_KeenessFactor,
 			  opt_UF_CheapOp, opt_UF_DearOp,
 			  opt_UnfoldCasms, opt_PprStyle_Debug,
 			  opt_D_dump_inlinings
@@ -78,9 +76,12 @@ mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
 mkUnfolding top_lvl expr
   = CoreUnfolding (occurAnalyseGlobalExpr expr)
 		  top_lvl
-		  (exprIsCheap expr)
 		  (exprIsValue expr)
-		  (exprIsBottom expr)
+			-- Already evaluated
+
+		  (exprIsCheap expr)
+			-- OK to inline inside a lambda
+
 		  (calcUnfoldingGuidance opt_UF_CreationThreshold expr)
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
@@ -444,7 +445,7 @@ certainlyWillInline :: Id -> Bool
 certainlyWillInline v
   = case idUnfolding v of
 
-	CoreUnfolding _ _ _ is_value _ g@(UnfoldIfGoodArgs n_vals _ size _)
+	CoreUnfolding _ _ is_value _ g@(UnfoldIfGoodArgs n_vals _ size _)
 	   ->    is_value 
 	      && size - (n_vals +1) <= opt_UF_UseThreshold
 
@@ -526,7 +527,7 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 		-- Constructors have compulsory unfoldings, but
 		-- may have rules, in which case they are 
 		-- black listed till later
-	CoreUnfolding unf_template is_top is_cheap is_value is_bot guidance ->
+	CoreUnfolding unf_template is_top is_value is_cheap guidance ->
 
     let
 	result | yes_or_no = Just unf_template
@@ -534,16 +535,13 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 
 	n_val_args  = length arg_infos
 
-	ok_inside_lam = is_value || is_bot || (is_cheap && not is_top)
-				-- I'm experimenting with is_cheap && not is_top
-
  	yes_or_no 
 	  | black_listed = False
 	  | otherwise    = case occ of
 				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
 				IAmALoopBreaker      -> False
-				OneOcc in_lam one_br -> (not in_lam || ok_inside_lam) && consider_safe in_lam True  one_br
-				NoOccInfo	     -> ok_inside_lam 		      && consider_safe True   False False
+				OneOcc in_lam one_br -> (not in_lam || is_cheap) && consider_safe in_lam True  one_br
+				NoOccInfo	     -> is_cheap 		 && consider_safe True   False False
 
 	consider_safe in_lam once once_in_one_branch
 		-- consider_safe decides whether it's a good idea to inline something,
@@ -622,8 +620,6 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 				   text "interesting continuation" <+> ppr interesting_cont,
 				   text "is value:" <+> ppr is_value,
 				   text "is cheap:" <+> ppr is_cheap,
-				   text "is bottom:" <+> ppr is_bot,
-				   text "is top-level:"    <+> ppr is_top,
 				   text "guidance" <+> ppr guidance,
 				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO",
 				   if yes_or_no then

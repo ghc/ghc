@@ -180,12 +180,11 @@ data Unfolding
 
   | CoreUnfolding			-- An unfolding with redundant cached information
 		CoreExpr		-- Template; binder-info is correct
-		Bool			-- This is a top-level binding
-		Bool			-- exprIsCheap template (cached); it won't duplicate (much) work 
-					--	if you inline this in more than one place
+		Bool			-- True <=> top level binding
 		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
 					--	this variable
-		Bool			-- exprIsBottom template (cached)
+		Bool			-- True <=> doesn't waste (much) work to expand inside an inlining
+					-- 	Basically it's exprIsCheap
 		UnfoldingGuidance	-- Tells about the *size* of the template.
 
 
@@ -208,8 +207,8 @@ noUnfolding = NoUnfolding
 mkOtherCon  = OtherCon
 
 seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding e top b1 b2 b3 g)
-  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` seqGuidance g
+seqUnfolding (CoreUnfolding e top b1 b2 g)
+  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` seqGuidance g
 seqUnfolding other = ()
 
 seqGuidance (UnfoldIfGoodArgs n ns a b) = n `seq` sum ns `seq` a `seq` b `seq` ()
@@ -218,14 +217,14 @@ seqGuidance other			= ()
 
 \begin{code}
 unfoldingTemplate :: Unfolding -> CoreExpr
-unfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = expr
-unfoldingTemplate (CompulsoryUnfolding expr)     = expr
+unfoldingTemplate (CoreUnfolding expr _ _ _ _) = expr
+unfoldingTemplate (CompulsoryUnfolding expr)   = expr
 unfoldingTemplate other = panic "getUnfoldingTemplate"
 
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
-maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _ _) = Just expr
-maybeUnfoldingTemplate (CompulsoryUnfolding expr)     = Just expr
-maybeUnfoldingTemplate other 			      = Nothing
+maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _) = Just expr
+maybeUnfoldingTemplate (CompulsoryUnfolding expr)   = Just expr
+maybeUnfoldingTemplate other 			    = Nothing
 
 otherCons :: Unfolding -> [AltCon]
 otherCons (OtherCon cons) = cons
@@ -233,27 +232,27 @@ otherCons other		  = []
 
 isValueUnfolding :: Unfolding -> Bool
 	-- Returns False for OtherCon
-isValueUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
-isValueUnfolding other			            = False
+isValueUnfolding (CoreUnfolding _ _ is_evald _ _) = is_evald
+isValueUnfolding other			          = False
 
 isEvaldUnfolding :: Unfolding -> Bool
 	-- Returns True for OtherCon
-isEvaldUnfolding (OtherCon _)		            = True
-isEvaldUnfolding (CoreUnfolding _ _ _ is_evald _ _) = is_evald
-isEvaldUnfolding other			            = False
+isEvaldUnfolding (OtherCon _)		          = True
+isEvaldUnfolding (CoreUnfolding _ _ is_evald _ _) = is_evald
+isEvaldUnfolding other			          = False
 
 isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding _ _ is_cheap _ _ _) = is_cheap
-isCheapUnfolding other				    = False
+isCheapUnfolding (CoreUnfolding _ _ _ is_cheap _) = is_cheap
+isCheapUnfolding other			  	  = False
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CompulsoryUnfolding _) = True
 isCompulsoryUnfolding other		      = False
 
 hasUnfolding :: Unfolding -> Bool
-hasUnfolding (CoreUnfolding _ _ _ _ _ _) = True
-hasUnfolding (CompulsoryUnfolding _)     = True
-hasUnfolding other 	 	         = False
+hasUnfolding (CoreUnfolding _ _ _ _ _) = True
+hasUnfolding (CompulsoryUnfolding _)   = True
+hasUnfolding other 	 	       = False
 
 hasSomeUnfolding :: Unfolding -> Bool
 hasSomeUnfolding NoUnfolding = False
