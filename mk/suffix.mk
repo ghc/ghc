@@ -121,6 +121,9 @@ HASKELL_POST_COMPILE=$(patsubst %,$(HASKELL_SPLIT_POST),$(filter -split-objs,$(H
 %.c : %.flex
 	@$(RM) $@
 	$(FLEX) -t $(FLEX_OPTS) $< > $@ || ( $(RM) $@ && exit 1 )
+%.c : %.lex
+	@$(RM) $@
+	$(FLEX) -t $(FLEX_OPTS) $< > $@ || ( $(RM) $@ && exit 1 )
 
 #-----------------------------------------------------------------------------
 # Yacc stuff
