@@ -61,10 +61,11 @@ occurAnalyseBinds
 
 occurAnalyseBinds binds simplifier_sw_chkr
   | opt_D_dump_occur_anal = pprTrace "OccurAnal:"
-				     (pprGenericBindings binds')
-				     binds'
-  | otherwise		  = binds'
+				     (pprGenericBindings new_binds)
+				     new_binds
+  | otherwise		  = new_binds
   where
+    new_binds	= concat binds'
     (_, _, binds') = occAnalTop initial_env binds
 
     initial_env = OccEnv (simplifier_sw_chkr IgnoreINLINEPragma)
@@ -153,32 +154,27 @@ unfolding for something.
 occAnalTop :: OccEnv 			-- What's in scope
 	   -> [CoreBinding]
 	   -> (IdEnv BinderInfo, 	-- Occurrence info
-	       IdEnv Id,		-- Indirection elimination info
-	       [SimplifiableCoreBinding]
+	       IdEnv Id,	        -- Indirection elimination info
+	       [[SimplifiableCoreBinding]]
 	      )
-
 occAnalTop env [] = (emptyDetails, nullIdEnv, [])
+occAnalTop env (bind : binds)
+  = case bind of
+	NonRec exported_id (Var local_id)
+	  | isExported exported_id &&		-- Only if this is exported
 
--- Special case for eliminating indirections
---   Note: it's a shortcoming that this only works for
---	   non-recursive bindings.  Elminating indirections
---	   makes perfect sense for recursive bindings too, but
---	   it's more complicated to implement, so I haven't done so
+	    isLocallyDefined local_id &&	-- Only if this one is defined in this
+						-- 	module, so that we *can* change its
+					  	-- 	binding to be the exported thing!
 
-occAnalTop env (NonRec exported_id (Var local_id) : binds)
-  | isExported exported_id &&		-- Only if this is exported
+	    not (isExported local_id) &&	-- Only if this one is not itself exported,
+						--	since the transformation will nuke it
 
-    isLocallyDefined local_id &&	-- Only if this one is defined in this
-					-- 	module, so that we *can* change its
-				  	-- 	binding to be the exported thing!
-
-    not (isExported local_id) &&	-- Only if this one is not itself exported,
-					--	since the transformation will nuke it
-
-    not (omitIfaceSigForId local_id) &&	-- Don't do the transformation if rhs_id is
-					-- 	something like a constructor, whose 
-					--	definition is implicitly exported and 
-					-- 	which must not vanish.
+	    not (omitIfaceSigForId local_id) &&	-- Don't do the transformation if rhs_id is
+						-- 	something like a constructor, whose 
+						--	definition is implicitly exported and 
+						-- 	which must not vanish.
+    
 		-- To illustrate the preceding check consider
 		--	data T = MkT Int
 		--	mkT = MkT
@@ -192,23 +188,21 @@ occAnalTop env (NonRec exported_id (Var local_id) : binds)
 		-- the MkT constructor.
 		-- Slightly gruesome, this.
 
+	    not (maybeToBool (lookupIdEnv ind_env local_id))
+						-- Only if not already substituted for
+	    -> 	-- Aha!  An indirection; let's eliminate it!
+	       (scope_usage, ind_env', binds')
+	    where
+	        ind_env' = addOneToIdEnv ind_env local_id exported_id
 
-    not (maybeToBool (lookupIdEnv ind_env local_id))
-					-- Only if not already substituted for
-    
-  = 	-- Aha!  An indirection; let's eliminate it!
-    (scope_usage, ind_env', binds')
+	other 
+	    ->  -- The normal case
+		(final_usage, ind_env, (new_binds : binds'))
+	    where
+		(final_usage, new_binds) = occAnalBind env (zap_bind bind) scope_usage
   where
-    (scope_usage, ind_env, binds') = occAnalTop env binds
-    ind_env' = addOneToIdEnv ind_env local_id exported_id
-
--- The normal case
-occAnalTop env (bind : binds)
-  = (final_usage, ind_env, new_binds ++ binds')
-  where
-    new_env			   = env `addNewCands` (bindersOf bind)
+    new_env		           = env `addNewCands` (bindersOf bind)
     (scope_usage, ind_env, binds') = occAnalTop new_env binds
-    (final_usage, new_binds)       = occAnalBind env (zap_bind bind) scope_usage
 
 	-- Deal with any indirections
     zap_bind (NonRec bndr rhs) 
@@ -223,6 +217,7 @@ occAnalTop env (bind : binds)
 			    Nothing          -> [pair]
 			    Just exported_id -> [(bndr, Var exported_id),
 					         (exported_id, rhs)]
+
 \end{code}
 
 
