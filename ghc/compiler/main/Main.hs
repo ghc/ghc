@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.135 2003/10/22 14:31:10 simonmar Exp $
+-- $Id: Main.hs,v 1.136 2003/11/01 01:01:18 sof Exp $
 --
 -- GHC Driver program
 --
@@ -222,7 +222,9 @@ main =
     normal_fileish_paths = map normalisePath fileish_args
     (srcs, objs)         = partition looks_like_an_input normal_fileish_paths
 
-   mapM_ (add v_Ld_inputs) objs
+    -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
+    --       the command-line.
+   mapM_ (add v_Ld_inputs) (reverse objs)
 
 	---------------- Display banners and configuration -----------
    showBanners mode conf_file static_opts
