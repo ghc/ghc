@@ -39,6 +39,10 @@ SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
 
 SRC_HC_OPTS +=  -fglasgow-exts
 
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+Compat/Directory_HC_OPTS += -\#include shlobj.h
+endif
+
 # libghccompat is needed to build ghc-pkg, which is built during 'make boot',
 # so we must build this library during 'make boot' too.
 # Do a recursive 'make all' after generating dependencies, because this
