@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.19 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: Constants.h,v 1.20 2001/11/28 14:31:27 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -144,7 +144,7 @@
    -------------------------------------------------------------------------- */
 
 /* The size of a block (2^BLOCK_SHIFT bytes) */
-#define BLOCK_SHIFT  11
+#define BLOCK_SHIFT  12
 
 /* The size of a megablock (2^MBLOCK_SHIFT bytes) */
 #define MBLOCK_SHIFT   20
