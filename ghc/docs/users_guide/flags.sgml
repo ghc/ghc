@@ -510,12 +510,6 @@
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-th</option></entry>
 	    </row>
-	    <row>
-	      <entry><option>-fwith</option></entry>
-	      <entry>Enable deprecated <literal>with</literal> keyword</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-with</option></entry>
-	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>

@@ -65,18 +65,6 @@ with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwith</option>:</term>
-	<indexterm><primary><option>-fwith</option></primary></indexterm>
-	<listitem>
-	  <para>This option enables the deprecated <literal>with</literal>
-	  keyword for implicit parameters; it is merely provided for backwards
-	  compatibility.
-          It is independent of the <option>-fglasgow-exts</option>
-          flag. </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term><option>-fno-monomorphism-restriction</option>:</term>
 	<indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
 	<listitem>
