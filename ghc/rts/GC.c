@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.82 2000/05/23 13:57:53 simonmar Exp $
+ * $Id: GC.c,v 1.83 2000/05/26 08:42:59 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1456,6 +1456,7 @@ loop:
 	selectee = ((StgEvacuated *)selectee)->evacuee;
 	goto selector_loop;
 
+      case AP_UPD:
       case THUNK:
       case THUNK_1_0:
       case THUNK_0_1:
