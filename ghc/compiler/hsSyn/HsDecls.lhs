@@ -226,7 +226,7 @@ tyClDeclName tycl_decl = tcdName tycl_decl
 
 --------------------------------
 tyClDeclNames :: Eq name => TyClDecl name pat -> [(name, SrcLoc)]
--- Returns all the binding names of the decl, along with their SrcLocs
+-- Returns all the *binding* names of the decl, along with their SrcLocs
 -- The first one is guaranteed to be the name of the decl
 -- For record fields, the first one counts as the SrcLoc
 -- We use the equality to filter out duplicate field names
@@ -242,7 +242,7 @@ tyClDeclNames (TyData {tcdName = tc_name, tcdCons = cons, tcdLoc = loc})
 
 
 --------------------------------
--- The "system names" are extra implicit names.
+-- The "system names" are extra implicit names *bound* by the decl.
 -- They are kept in a list rather than a tuple 
 -- to make the renamer easier.
 
@@ -262,8 +262,7 @@ tyClDeclSysNames :: TyClDecl name pat -> [(name, SrcLoc)]
 -- or "system" names of the declaration
 
 tyClDeclSysNames (ClassDecl {tcdSysNames = names, tcdLoc = loc, tcdSigs = sigs})
-  = [(n,loc) | n <- names] ++ 
-    [(n,loc) | ClassOpSig _ (DefMeth n) _ loc <- sigs]
+  = [(n,loc) | n <- names]
 tyClDeclSysNames (TyData {tcdCons = cons, tcdSysNames = names, tcdLoc = loc})
   = [(n,loc) | n <- names] ++ 
     [(wkr_name,loc) | ConDecl _ wkr_name _ _ _ loc <- cons]

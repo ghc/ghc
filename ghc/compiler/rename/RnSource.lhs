@@ -396,12 +396,18 @@ rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op dm_stuff ty locn)
     returnRn (ClassOpSig op_name dm_stuff' new_ty locn)
 
 rnClassBinds :: RdrNameTyClDecl -> RenamedTyClDecl -> RnMS (RenamedTyClDecl, FreeVars)
-  -- Rename the mbinds only; the rest is done already
-rnClassBinds (ClassDecl {tcdMeths = Nothing}) rn_cls_decl
-  = returnRn (rn_cls_decl, emptyFVs)	-- No meth binds; decl came from interface file
+rnClassBinds (ClassDecl {tcdMeths = Nothing})
+ rn_cls_decl@(ClassDecl {tcdSigs = sigs})
+  -- No method bindings, so this class decl comes from an interface file, 
+  -- However we want to treat the default-method names as free (they should
+  -- be defined somewhere else).  [In source code this is not so; the class
+  -- decl will bind whatever default-methods are necessary.]
+  = returnRn (rn_cls_decl, mkFVs [v | ClassOpSig _ (DefMeth v) _ _ <- sigs])
 
-rnClassBinds (ClassDecl {tcdMeths = Just mbinds})				-- Get mbinds from here
-	     rn_cls_decl@(ClassDecl {tcdTyVars = tyvars, tcdLoc = src_loc})	-- Everything else is here
+rnClassBinds (ClassDecl {tcdMeths = Just mbinds})		-- Get mbinds from here
+ rn_cls_decl@(ClassDecl {tcdTyVars = tyvars, tcdLoc = src_loc})	-- Everything else is here
+  -- There are some default-method bindings (abeit possibly empty) so 
+  -- this is a source-code class declaration
   = 	-- The newLocals call is tiresome: given a generic class decl
 	--	class C a where
 	--	  op :: a -> a

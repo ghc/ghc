@@ -142,16 +142,10 @@ tyClDeclFVs (ClassDecl {tcdCtxt = context, tcdTyVars = tyvars, tcdFDs = fds, tcd
 ----------------
 hsSigsFVs sigs = plusFVs (map hsSigFVs sigs)
 
-hsSigFVs (Sig v ty _) 	    	    = extractHsTyNames ty `addOneFV` v
-hsSigFVs (SpecInstSig ty _) 	    = extractHsTyNames ty
-hsSigFVs (SpecSig v ty _)   	    = extractHsTyNames ty `addOneFV` v
-hsSigFVs (FixSig (FixitySig v _ _)) = unitFV v
-hsSigFVs (InlineSig v p _) 	    = unitFV v
-hsSigFVs (NoInlineSig v p _)	    = unitFV v
-hsSigFVs (ClassOpSig v dm ty _)	    = dmFVs dm `plusFV` extractHsTyNames ty `addOneFV` v
-
-dmFVs (DefMeth v) = unitFV v
-dmFVs other	  = emptyFVs
+hsSigFVs (Sig v ty _) 	    = extractHsTyNames ty
+hsSigFVs (SpecInstSig ty _) = extractHsTyNames ty
+hsSigFVs (SpecSig v ty _)   = extractHsTyNames ty
+hsSigFVs other		    = emptyFVs
 
 ----------------
 instDeclFVs (InstDecl inst_ty _ _ maybe_dfun _)
