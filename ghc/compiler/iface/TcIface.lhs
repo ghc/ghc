@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcIface ( 
-	tcImportDecl, typecheckIface,
+	tcImportDecl, typecheckIface, tcIfaceDecl, tcIfaceGlobal,
 	loadImportedInsts, loadImportedRules,
 	tcExtCoreBindings
  ) where
@@ -13,10 +13,9 @@ module TcIface (
 
 import IfaceSyn
 import LoadIface	( loadHomeInterface, predInstGates, discardDeclPrags )
-import IfaceEnv		( lookupIfaceTop, newGlobalBinder, lookupOrig,
+import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, lookupOrig,
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
-			  tcIfaceTyVar, tcIfaceTyCon, tcIfaceClass, tcIfaceExtId,
-			  tcIfaceDataCon, tcIfaceLclId,
+			  tcIfaceTyVar, tcIfaceLclId,
 			  newIfaceName, newIfaceNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
@@ -25,11 +24,12 @@ import Type		( liftedTypeKind, splitTyConApp,
 			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType, pprClassPred )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
-import HscTypes		( ExternalPackageState(..), PackageInstEnv, 
-			  HscEnv, TyThing(..), implicitTyThings, typeEnvIds,
+import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
+			  HscEnv, TyThing(..), implicitTyThings, tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), InstPool, ModGuts,
-			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
-			  RulePool, Pool(..) )
+			  TypeEnv, mkTypeEnv, extendTypeEnv, extendTypeEnvList, 
+			  lookupTypeEnv, lookupType, typeEnvIds,
+			  RulePool )
 import InstEnv		( extendInstEnv )
 import CoreSyn
 import PprCore		( pprIdRules )
@@ -47,10 +47,11 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  vanillaIdInfo, newStrictnessInfo )
 import Class		( Class )
 import TyCon		( tyConDataCons, tyConTyVars, isTupleTyCon, mkForeignTyCon )
-import DataCon		( dataConWorkId, dataConExistentialTyVars, dataConArgTys )
-import TysWiredIn	( tupleCon )
+import DataCon		( DataCon, dataConWorkId, dataConExistentialTyVars, dataConArgTys )
+import TysWiredIn	( intTyCon, boolTyCon, charTyCon, listTyCon, parrTyCon, 
+			  tupleTyCon, tupleCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
-import Name		( Name, NamedThing(..), nameModuleName, nameModule, nameOccName, 
+import Name		( Name, NamedThing(..), nameModuleName, nameModule, nameOccName, nameIsLocalOrFrom, 
 			  isWiredInName, wiredInNameTyThing_maybe, nameParent, nameParent_maybe )
 import NameEnv
 import OccName		( OccName )
@@ -61,6 +62,9 @@ import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength, zipLazy )
 import Maybes		( expectJust )
 import CmdLineOpts	( DynFlag(..) )
+
+import UniqFM (sizeUFM)
+
 \end{code}
 
 This module takes
@@ -110,122 +114,33 @@ also turn out to be needed by the code that e2 expands to.
 tcImportDecl :: Name -> IfG TyThing
 -- Get the TyThing for this Name from an interface file
 tcImportDecl name
-  = do	{ 
-    -- Make sure the interface is loaded
-	; let { nd_doc = ptext SLIT("Need decl for") <+> ppr name }
-	; traceIf (nd_doc <+> char '{')		-- Brace matches the later message
-	; loadHomeInterface nd_doc name
-
-    -- Get the real name of the thing, with a correct nameParent field.
-    -- Before the interface is loaded, we may have a non-committal 'Nothing'
-    -- in the namePareent field (made up by IfaceEnv.lookupOrig), but 
-    -- loading the interface updates the name cache.
-    -- We need the right nameParent field in getThing
-  	; real_name <- lookupOrig (nameModuleName name) (nameOccName name)
-
-    -- Get the decl out of the EPS
-	; main_thing <- ASSERT( real_name == name )	-- Unique should not change!
-			getThing real_name
-
-    -- Record the import in the type env, 
-    -- slurp any rules it allows in
-	; recordImportOf main_thing
-
-	; let { extra | getName main_thing == real_name = empty
-		      | otherwise = brackets (ptext SLIT("when seeking") <+> ppr real_name) }
-	; traceIf (ptext SLIT(" ...imported decl for") <+> ppr main_thing <+> extra <+> char '}')
-
-
-    -- Look up the wanted Name in the type envt; it might be
-    -- one of the subordinate members of the input thing
-	; if real_name == getName main_thing 
-	  then return main_thing
-	  else do
-	{ eps <- getEps
-	; return (expectJust "tcImportDecl" $
-		  lookupTypeEnv (eps_PTE eps) real_name) }}
-
-recordImportOf :: TyThing -> IfG ()
--- Update the EPS to record the import of the Thing
---   (a) augment the type environment; this is done even for wired-in 
---	 things, so that we don't go through this rigmarole a second time
---   (b) slurp in any rules to maintain the invariant that any rule
---	     whose gates are all in the type envt, is in eps_rule_base
-
-recordImportOf thing
-  = do 	{ new_things <- updateEps (\ eps -> 
-	    let { new_things   = thing : implicitTyThings thing 
-	 	; new_type_env = extendTypeEnvList (eps_PTE eps) new_things
-		-- NB: opportunity for a very subtle loop here!
-		-- If working out what the implicitTyThings are involves poking
-		-- any of the fork'd thunks in 'thing', then here's what happens	
-		--	* recordImportOf succeed, extending type-env with a thunk
-		--	* the next guy to pull on type-env forces the thunk
-		--	* which pokes the suspended forks
-		--	* which, to execute, need to consult type-env (to check
-		--	  entirely unrelated types, perhaps)
-	    }
-	    in (eps { eps_PTE = new_type_env }, new_things)
-	  )
-	; traceIf (text "tcImport: extend type env" <+> ppr new_things)
-	}
-	
-getThing :: Name -> IfG TyThing
--- Find and typecheck the thing; the Name might be a "subordinate name"
--- of the "main thing" (e.g. the constructor of a data type declaration)
--- The Thing we return is the parent "main thing"
-
-getThing name
   | Just thing <- wiredInNameTyThing_maybe name
-   = return thing
+	-- This case only happens for tuples, because we pre-populate the eps_PTE
+	-- with other wired-in things.  We can't do that for tuples because we
+	-- don't know how many of them we'll find
+  = do 	{ updateEps_ (\ eps -> eps { eps_PTE = extendTypeEnv (eps_PTE eps) thing })
+	; return thing }
 
-  | otherwise = do	-- The normal case, not wired in
-  {	-- Get the decl from the pool
-    mb_decl <- updateEps (\ eps -> selectDecl eps name)
+  | otherwise
+  = do	{ traceIf nd_doc
 
-    ; case mb_decl of
-	Just decl -> initIfaceLcl (nameModuleName name) (tcIfaceDecl decl)
-		-- Typecheck it
-		-- Side-effects EPS by faulting in any needed decls
-		-- (via nested calls to tcImportDecl)
-		     
+	-- Load the interface, which should populate the PTE
+	; loadHomeInterface nd_doc name	
 
-	Nothing -> do { ioToIOEnv (printErrs (msg defaultErrStyle)); failM }
-		-- Declaration not found
-		-- No errors-var to accumulate errors in, so just
-		-- print out the error right now
-		     
+	-- Now look it up again; this time we should find it
+	; eps <- getEps	
+	; case lookupTypeEnv (eps_PTE eps) name of
+	    Just thing -> return thing
+	    Nothing    -> do { ioToIOEnv (printErrs (msg defaultErrStyle)); failM }
+				-- Declaration not found!
+				-- No errors-var to accumulate errors in, so just
+				-- print out the error right now
     }
   where
-     msg = hang (ptext SLIT("Can't find interface-file declaration for") <+> ppr (nameParent name))
-	      2 (vcat [ptext SLIT("Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
+    nd_doc = ptext SLIT("Need decl for") <+> ppr name
+    msg = hang (ptext SLIT("Can't find interface-file declaration for") <+> ppr (nameParent name))
+	     2 (vcat [ptext SLIT("Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
 		       ptext SLIT("Use -ddump-if-trace to get an idea of which file caused the error")])
-
-selectDecl :: ExternalPackageState -> Name -> (ExternalPackageState, Maybe IfaceDecl)
--- Use nameParent to get the parent name of the thing
-selectDecl eps@(EPS { eps_decls = Pool decls_map n_in n_out}) name
-   = case lookupNameEnv decls_map name of {
-		-- This first lookup will usually fail for subordinate names, because
-		-- the relevant decl is the parent decl.
-		-- But, if we export a data type decl abstractly, its selectors
-		-- get separate type signatures in the interface file
-	Just decl -> let 
-			decls' = delFromNameEnv decls_map name
-		     in
-		     (eps {eps_decls = Pool decls' n_in (n_out+1)}, Just decl) ;
-
-	Nothing -> 
-    case nameParent_maybe name of {
-	Nothing        -> (eps, Nothing ) ;	-- No "parent" 
-	Just main_name -> 			-- Has a parent; try that
-
-    case lookupNameEnv decls_map main_name of {
-	Just decl -> let 
-			decls' = delFromNameEnv decls_map main_name
-		     in
-		     (eps {eps_decls = Pool decls' n_in (n_out+1)}, Just decl) ;
-	Nothing   -> (eps, Nothing)
-    }}}
 \end{code}
 
 %************************************************************************
@@ -496,34 +411,14 @@ loadImportedInsts cls tys
 	; if null wired_tcs then returnM ()
 	  else initIfaceTcRn (mapM_ (loadHomeInterface wired_doc) wired_tcs)
 
-	; eps_var <- getEpsVar
-	; eps <- readMutVar eps_var
-
-	-- For interest: report the no-type-constructor case.
-	-- Don't report when -fallow-undecidable-instances is on, because then
-	-- we call loadImportedInsts when looking up even predicates like (C a)
-	-- But without undecidable instances it's rare to see C (a b) and 
-	-- somethat interesting
-{- (comment out; happens a lot in some code)
-#ifdef DEBUG
-	; dflags  <- getDOpts
-	; WARN( not (dopt Opt_AllowUndecidableInstances dflags) && null tc_gates, 
-		ptext SLIT("Interesting! No tycons in Inst:") 
-			<+> pprClassPred cls tys )
- 	  return ()
-#endif
--}
-	-- Suck in the instances
-	; let { (inst_pool', iface_insts) 
-		    = selectInsts (eps_insts eps) cls_gate tc_gates }
+		-- Now suck in the relevant instances
+	; iface_insts <- updateEps (selectInsts cls_gate tc_gates)
 
 	-- Empty => finish up rapidly, without writing to eps
 	; if null iface_insts then
-		return (eps_inst_env eps)
+		do { eps <- getEps; return (eps_inst_env eps) }
 	  else do
-	{ writeMutVar eps_var (eps {eps_insts = inst_pool'})
-
-	; traceIf (sep [ptext SLIT("Importing instances for") <+> pprClassPred cls tys, 
+	{ traceIf (sep [ptext SLIT("Importing instances for") <+> pprClassPred cls tys, 
 			nest 2 (vcat (map ppr iface_insts))])
 
 	-- Typecheck the new instances
@@ -545,10 +440,14 @@ tcIfaceInst :: IfaceInst -> IfL DFunId
 tcIfaceInst (IfaceInst { ifDFun = dfun_occ })
   = tcIfaceExtId (LocalTop dfun_occ)
 
-selectInsts :: InstPool -> Name -> [Name] -> (InstPool, [(ModuleName, IfaceInst)])
-selectInsts pool@(Pool insts n_in n_out) cls tycons
-  = (Pool insts' n_in (n_out + length iface_insts), iface_insts)
+selectInsts :: Name -> [Name] -> ExternalPackageState -> (ExternalPackageState, [(ModuleName, IfaceInst)])
+selectInsts cls tycons eps
+  = (eps { eps_insts = insts', eps_stats = stats' }, iface_insts)
   where
+    insts  = eps_insts eps
+    stats  = eps_stats eps
+    stats' = stats { n_insts_out = n_insts_out stats + length iface_insts } 
+
     (insts', iface_insts) 
 	= case lookupNameEnv insts cls of {
 		Nothing -> (insts, []) ;
@@ -589,9 +488,7 @@ loadImportedRules :: HscEnv -> ModGuts -> IO [IdCoreRule]
 loadImportedRules hsc_env guts
   = initIfaceRules hsc_env guts $ do 
 	{ -- Get new rules
-	  if_rules <- updateEps (\ eps ->
-		let { (new_pool, if_rules) = selectRules (eps_rules eps) (eps_PTE eps) }
-		in (eps { eps_rules = new_pool }, if_rules) )
+	  if_rules <- updateEps selectRules
 
 	; traceIf (ptext SLIT("Importing rules:") <+> vcat (map ppr if_rules))
 
@@ -615,13 +512,18 @@ loadImportedRules hsc_env guts
     }
 
 
-selectRules :: RulePool -> TypeEnv -> (RulePool, [(ModuleName, IfaceRule)])
+selectRules :: ExternalPackageState -> (ExternalPackageState, [(ModuleName, IfaceRule)])
 -- Not terribly efficient.  Look at each rule in the pool to see if
 -- all its gates are in the type env.  If so, take it out of the pool.
 -- If not, trim its gates for next time.
-selectRules (Pool rules n_in n_out) type_env
-  = (Pool rules' n_in (n_out + length if_rules), if_rules)
+selectRules eps
+  = (eps { eps_rules = rules', eps_stats = stats' }, if_rules)
   where
+    stats    = eps_stats eps
+    rules    = eps_rules eps
+    type_env = eps_PTE eps
+    stats'   = stats { n_rules_out = n_rules_out stats + length if_rules }
+
     (rules', if_rules) = foldl do_one ([], []) rules
 
     do_one (pool, if_rules) (gates, rule)
@@ -944,6 +846,67 @@ tcPragExpr name expr
 
 %************************************************************************
 %*									*
+		Getting from Names to TyThings
+%*									*
+%************************************************************************
+
+\begin{code}
+tcIfaceGlobal :: Name -> IfM a TyThing
+tcIfaceGlobal name
+  = do	{ (eps,hpt) <- getEpsAndHpt
+	; case lookupType hpt (eps_PTE eps) name of {
+	    Just thing -> return thing ;
+	    Nothing    -> 
+
+	setLclEnv () $ do	-- This gets us back to IfG, mainly to 
+				-- pacify get_type_env; rather untidy
+	{ env <- getGblEnv
+	; case if_rec_types env of
+	    Just (mod, get_type_env) 
+		| nameIsLocalOrFrom mod name
+		-> do 		-- It's defined in the module being compiled
+	  	{ type_env <- get_type_env
+		; case lookupNameEnv type_env name of
+			Just thing -> return thing
+			Nothing	   -> pprPanic "tcIfaceGlobal (local): not found:"  
+						(ppr name $$ ppr type_env) }
+
+	    other -> tcImportDecl name 	-- It's imported; go get it
+    }}}
+
+tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
+tcIfaceTyCon IfaceIntTc  = return intTyCon
+tcIfaceTyCon IfaceBoolTc = return boolTyCon
+tcIfaceTyCon IfaceCharTc = return charTyCon
+tcIfaceTyCon IfaceListTc = return listTyCon
+tcIfaceTyCon IfacePArrTc = return parrTyCon
+tcIfaceTyCon (IfaceTupTc bx ar) = return (tupleTyCon bx ar)
+tcIfaceTyCon (IfaceTc ext_nm) = do { name <- lookupIfaceExt ext_nm
+				   ; thing <- tcIfaceGlobal name
+				   ; return (tyThingTyCon thing) }
+
+tcIfaceClass :: IfaceExtName -> IfL Class
+tcIfaceClass rdr_name = do { name <- lookupIfaceExt rdr_name
+			   ; thing <- tcIfaceGlobal name
+			   ; return (tyThingClass thing) }
+
+tcIfaceDataCon :: IfaceExtName -> IfL DataCon
+tcIfaceDataCon gbl = do { name <- lookupIfaceExt gbl
+			; thing <- tcIfaceGlobal name
+		 	; case thing of
+				ADataCon dc -> return dc
+				other   -> pprPanic "tcIfaceExtDC" (ppr gbl $$ ppr name$$ ppr thing) }
+
+tcIfaceExtId :: IfaceExtName -> IfL Id
+tcIfaceExtId gbl = do { name <- lookupIfaceExt gbl
+		      ; thing <- tcIfaceGlobal name
+		      ; case thing of
+			  AnId id -> return id
+			  other   -> pprPanic "tcIfaceExtId" (ppr gbl $$ ppr name$$ ppr thing) }
+\end{code}
+
+%************************************************************************
+%*									*
 		Bindings
 %*									*
 %************************************************************************
@@ -1004,3 +967,4 @@ bindIfaceTyVars bndrs thing_inside
 
 mk_iface_tyvar name kind = mkTyVar name kind
 \end{code}
+

@@ -256,21 +256,29 @@ getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
 getEps :: TcRnIf gbl lcl ExternalPackageState
 getEps = do { env <- getTopEnv; readMutVar (hsc_EPS env) }
 
-setEps :: ExternalPackageState -> TcRnIf gbl lcl ()
-setEps eps = do { env <- getTopEnv; writeMutVar (hsc_EPS env) eps }
+-- Updating the EPS.  This should be an atomic operation.
+-- Note the delicate 'seq' which forces the EPS before putting it in the
+-- variable.  Otherwise what happens is that we get
+--	write eps_var (....(unsafeRead eps_var)....)
+-- and if the .... is strict, that's obviously bottom.  By forcing it beforehand
+-- we make the unsafeRead happen before we update the variable.
 
 updateEps :: (ExternalPackageState -> (ExternalPackageState, a))
 	  -> TcRnIf gbl lcl a
-updateEps upd_fn = do	{ eps_var <- getEpsVar
+updateEps upd_fn = do	{ traceIf (text "updating EPS")
+			; eps_var <- getEpsVar
 			; eps <- readMutVar eps_var
 			; let { (eps', val) = upd_fn eps }
-			; writeMutVar eps_var eps'
+			; seq eps' (writeMutVar eps_var eps')
 			; return val }
 
 updateEps_ :: (ExternalPackageState -> ExternalPackageState)
 	   -> TcRnIf gbl lcl ()
-updateEps_ upd_fn = do	{ eps_var <- getEpsVar
-			; updMutVar eps_var upd_fn }
+updateEps_ upd_fn = do	{ traceIf (text "updating EPS_")
+			; eps_var <- getEpsVar
+			; eps <- readMutVar eps_var
+			; let { eps' = upd_fn eps }
+			; seq eps' (writeMutVar eps_var eps') }
 
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
@@ -805,8 +813,7 @@ initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv 
 	; let { if_env = IfGblEnv { 
-			if_rec_types = Just (tcg_mod tcg_env, get_type_env),
-			if_is_boot   = imp_dep_mods (tcg_imports tcg_env) }
+			if_rec_types = Just (tcg_mod tcg_env, get_type_env) }
 	      ; get_type_env = readMutVar (tcg_type_env_var tcg_env) }
 	; setEnvs (if_env, ()) thing_inside }
 
@@ -815,8 +822,7 @@ initIfaceExtCore thing_inside
   = do  { tcg_env <- getGblEnv 
 	; let { mod = tcg_mod tcg_env
 	      ; if_env = IfGblEnv { 
-			if_rec_types = Just (mod, return (tcg_type_env tcg_env)), 
-			if_is_boot   = imp_dep_mods (tcg_imports tcg_env) }
+			if_rec_types = Just (mod, return (tcg_type_env tcg_env)) }
 	      ; if_lenv = IfLclEnv { if_mod     = moduleName mod,
 				     if_tv_env  = emptyOccEnv,
 				     if_id_env  = emptyOccEnv }
@@ -827,8 +833,7 @@ initIfaceCheck :: HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
 initIfaceCheck hsc_env do_this
- = do	{ let { gbl_env = IfGblEnv { if_is_boot   = emptyModuleEnv,
-				     if_rec_types = Nothing } ;
+ = do	{ let { gbl_env = IfGblEnv { if_rec_types = Nothing } ;
 	   }
 	; initTcRnIf 'i' hsc_env gbl_env () do_this
     }
@@ -839,8 +844,7 @@ initIfaceTc :: HscEnv -> ModIface
 -- No type envt from the current module, but we do know the module dependencies
 initIfaceTc hsc_env iface do_this
  = do	{ tc_env_var <- newIORef emptyTypeEnv
-	; let { gbl_env = IfGblEnv { if_is_boot   = mkModDeps (dep_mods (mi_deps iface)),
-				     if_rec_types = Just (mod, readMutVar tc_env_var) } ;
+	; let { gbl_env = IfGblEnv { if_rec_types = Just (mod, readMutVar tc_env_var) } ;
 	      ; if_lenv = IfLclEnv { if_mod     = moduleName mod,
 				     if_tv_env  = emptyOccEnv,
 				     if_id_env  = emptyOccEnv }
@@ -855,13 +859,8 @@ initIfaceRules :: HscEnv -> ModGuts -> IfG a -> IO a
 -- We have available the type envt of the module being compiled, and we must use it
 initIfaceRules hsc_env guts do_this
  = do	{ let {
-	     is_boot = mkModDeps (dep_mods (mg_deps guts))
-			-- Urgh!  But we do somehow need to get the info
-			-- on whether (for this particular compilation) we should
-			-- import a hi-boot file or not.
-	   ; type_info = (mg_module guts, return (mg_types guts))
-	   ; gbl_env = IfGblEnv { if_is_boot   = is_boot,
-				  if_rec_types = Just type_info } ;
+	     type_info = (mg_module guts, return (mg_types guts))
+	   ; gbl_env = IfGblEnv { if_rec_types = Just type_info } ;
 	   }
 
 	-- Run the thing; any exceptions just bubble out from here

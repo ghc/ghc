@@ -51,7 +51,8 @@ module Outputable (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} 	Name( Name )
+import {-# SOURCE #-} 	Module( ModuleName )
+import {-# SOURCE #-} 	OccName( OccName )
 
 import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
@@ -90,13 +91,13 @@ data Depth = AllTheWay
            | PartWay Int	-- 0 => stop
 
 
-type PrintUnqualified = Name -> Bool
+type PrintUnqualified = ModuleName -> OccName -> Bool
 	-- This function tells when it's ok to print 
 	-- a (Global) name unqualified
 
 alwaysQualify,neverQualify :: PrintUnqualified
-alwaysQualify n = False
-neverQualify  n = True
+alwaysQualify m n = False
+neverQualify  m n = True
 
 defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
 
@@ -149,9 +150,9 @@ getPprStyle df sty = df sty sty
 \end{code}
 
 \begin{code}
-unqualStyle :: PprStyle -> Name -> Bool
-unqualStyle (PprUser    unqual _) n = unqual n
-unqualStyle other		  n = False
+unqualStyle :: PprStyle -> PrintUnqualified
+unqualStyle (PprUser    unqual _) m n = unqual m n
+unqualStyle other		  m n = False
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)	  = True

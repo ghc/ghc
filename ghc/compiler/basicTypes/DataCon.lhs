@@ -86,7 +86,7 @@ Each data constructor C has two, and possibly three, Names associated with it:
   ---------------------------------------------------------------------------
   * The "source data con" 	C	DataName	The DataCon itself
   * The "real data con"		C	VarName		Its worker Id
-  * The "wrapper data con"	$wC	VarName		Wrapper Id (optional)
+  * The "wrapper data con"	$WC	VarName		Wrapper Id (optional)
 
 Each of these three has a distinct Unique.  The "source data con" name
 appears in the output of the renamer, and names the Haskell-source

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.173 2004/08/13 13:06:42 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.174 2004/08/16 09:53:57 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -19,7 +19,7 @@ import CompManager
 import HscTypes		( TyThing(..), HomeModInfo(hm_linkable), HomePackageTable,
 			  isObjectLinkable, GhciMode(..) )
 import IfaceSyn		( IfaceType, IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..), IfaceConDecl(..), 
-		   	  pprIfaceDeclHead, pprParendIfaceType, pprIfaceForAllPart )
+		   	  IfaceInst(..), pprIfaceDeclHead, pprParendIfaceType, pprIfaceForAllPart )
 import FunDeps		( pprFundeps )
 import DriverFlags
 import DriverState
@@ -478,23 +478,32 @@ info s  = do { let names = words s
 	     ; mapM_ (infoThing init_cms) names }
   where
     infoThing cms name
-	= do { stuff <- io (cmInfoThing cms name)
+	= do { stuff <- io (cmGetInfo cms name)
 	     ; io (putStrLn (showSDocForUser (cmGetPrintUnqual cms) $
-     		   vcat (intersperse (text "") (map (showThing name) stuff)))) }
+     		   vcat (intersperse (text "") (map showThing stuff)))) }
 
-showThing :: String -> (IfaceDecl, Fixity, SrcLoc) -> SDoc
-showThing name (thing, fixity, src_loc) 
-    = vcat [ showDecl (\occ -> name == occNameUserString occ) thing, 
-	     showFixity fixity,
-	     text "-- " <> showLoc src_loc]
+showThing :: GetInfoResult -> SDoc
+showThing  (wanted_str, (thing, fixity, src_loc, insts)) 
+    = vcat [ showDecl want_name thing, 
+	     show_fixity fixity,
+	     show_loc src_loc,
+	     vcat (map show_inst insts)]
   where
-    showFixity fix 
-	| fix == defaultFixity = empty
-	| otherwise            = ppr fix <+> text name
+    want_name occ = wanted_str == occNameUserString occ
 
-    showLoc loc	-- The ppr function for SrcLocs is a bit wonky
-	| isGoodSrcLoc loc = ptext SLIT("Defined at") <+> ppr loc
-	| otherwise	   = ppr loc
+    show_fixity fix 
+	| fix == defaultFixity = empty
+	| otherwise            = ppr fix <+> text wanted_str
+
+    show_loc loc	-- The ppr function for SrcLocs is a bit wonky
+	| isGoodSrcLoc loc = comment <+> ptext SLIT("Defined at") <+> ppr loc
+	| otherwise	   = comment <+> ppr loc
+    comment = ptext SLIT("--")
+
+    show_inst (iface_inst, loc)
+	= hang (ptext SLIT("instance") <+> ppr (ifInstHead iface_inst))
+	     2 (char '\t' <> show_loc loc)
+		-- The tab tries to make them line up a bit
 
 -- Now there is rather a lot of goop just to print declarations in a
 -- civilised way with "..." for the parts we are less interested in.

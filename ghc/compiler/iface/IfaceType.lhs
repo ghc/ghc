@@ -18,7 +18,6 @@ module IfaceType (
 	-- Printing
 	pprIfaceType, pprParendIfaceType, pprIfaceContext, 
 	pprIfaceIdBndr, pprIfaceTvBndr, pprIfaceTvBndrs, pprIfaceBndrs,
-	getIfaceExt,
 	tOP_PREC, tYCON_PREC, noParens, maybeParen, pprIfaceForAllPart
 
     ) where
@@ -86,10 +85,10 @@ type IfaceTvBndr  = (OccName, IfaceKind)
 type IfaceKind = Kind			-- Re-use the Kind type, but no KindVars in it
 
 data IfaceType
-  = IfaceTyVar    OccName		-- Type variable only, not tycon
+  = IfaceTyVar    OccName			-- Type variable only, not tycon
   | IfaceAppTy    IfaceType IfaceType
   | IfaceForAllTy IfaceTvBndr IfaceType
-  | IfacePredTy IfacePredType
+  | IfacePredTy   IfacePredType
   | IfaceTyConApp IfaceTyCon [IfaceType]	-- Not necessarily saturated
 						-- Includes newtypes, synonyms, tuples
   | IfaceFunTy  IfaceType IfaceType
@@ -175,28 +174,21 @@ maybeParen ctxt_prec inner_prec pretty
 ----------------------------- Printing binders ------------------------------------
 
 \begin{code}
+-- These instances are used only when printing for the user, either when
+-- debugging, or in GHCi when printing the results of a :info command
 instance Outputable IfaceExtName where
-    ppr (ExtPkg mod occ)       = ppr mod <> dot <> ppr occ
-    ppr (HomePkg mod occ vers) = ppr mod <> dot <> ppr occ <> braces (ppr vers)
+    ppr (ExtPkg mod occ)       = pprExt mod occ
+    ppr (HomePkg mod occ vers) = pprExt mod occ <> braces (ppr vers)
     ppr (LocalTop occ)	       = ppr occ	-- Do we want to distinguish these 
     ppr (LocalTopSub occ _)    = ppr occ	-- from an ordinary occurrence?
 
-getIfaceExt :: ((Name -> IfaceExtName) -> SDoc) -> SDoc
--- Uses the print-unqual info from the SDoc to make an 'ext'
--- which in turn tells toIfaceType when to make a qualified name
--- This is only used when making Iface stuff to print out for the user;
--- e.g. we use this in pprType
-getIfaceExt thing_inside
-  = getPprStyle 	$ \ sty ->
-    let
-	ext nm | unqualStyle sty nm = LocalTop (nameOccName nm)
-	       | isInternalName nm  = LocalTop (nameOccName nm)
-			-- This only happens for Kind constructors, which
-			-- don't come from any particular module and are unqualified
-			-- This hack will go away when kinds are separated from types
-	       | otherwise	    = ExtPkg (nameModuleName nm) (nameOccName nm)
-    in
-    thing_inside ext
+pprExt :: ModuleName -> OccName -> SDoc
+pprExt mod occ
+  = getPprStyle $ \ sty ->
+    if unqualStyle sty mod occ then
+	ppr occ
+    else 
+	ppr mod <> dot <> ppr occ
 
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
@@ -220,36 +212,42 @@ pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
 \begin{code}
 ---------------------------------
 instance Outputable IfaceType where
-  ppr ty = ppr_ty ty
+  ppr ty = pprIfaceTypeForUser ty
 
-ppr_ty             = pprIfaceType tOP_PREC
-pprParendIfaceType = pprIfaceType tYCON_PREC
+pprIfaceTypeForUser ::IfaceType -> SDoc
+-- Drop top-level for-alls; if that's not what you want, use pprIfaceType dire
+pprIfaceTypeForUser ty
+  = pprIfaceForAllPart [] theta (pprIfaceType tau)
+ where		
+    (_tvs, theta, tau) = splitIfaceSigmaTy ty
 
-pprIfaceType :: Int -> IfaceType -> SDoc
+pprIfaceType, pprParendIfaceType ::IfaceType -> SDoc
+pprIfaceType       = ppr_ty tOP_PREC
+pprParendIfaceType = ppr_ty tYCON_PREC
 
 
-	-- Simple cases
-pprIfaceType ctxt_prec (IfaceTyVar tyvar)     = ppr tyvar
-pprIfaceType ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
-pprIfaceType ctxt_prec (IfacePredTy st)       = braces (ppr st)
+ppr_ty :: Int -> IfaceType -> SDoc
+ppr_ty ctxt_prec (IfaceTyVar tyvar)     = ppr tyvar
+ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
+ppr_ty ctxt_prec (IfacePredTy st)       = ppr st
 
 	-- Function types
-pprIfaceType ctxt_prec (IfaceFunTy ty1 ty2)
+ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec fUN_PREC $
-    sep (pprIfaceType fUN_PREC ty1 : ppr_fun_tail ty2)
+    sep (ppr_ty fUN_PREC ty1 : ppr_fun_tail ty2)
   where
     ppr_fun_tail (IfaceFunTy ty1 ty2) 
-      = (arrow <+> pprIfaceType fUN_PREC ty1) : ppr_fun_tail ty2
+      = (arrow <+> ppr_ty fUN_PREC ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty
-      = [arrow <+> ppr_ty other_ty]
+      = [arrow <+> pprIfaceType other_ty]
 
-pprIfaceType ctxt_prec (IfaceAppTy ty1 ty2)
+ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
   = maybeParen ctxt_prec tYCON_PREC $
-    pprIfaceType fUN_PREC ty1 <+> pprParendIfaceType ty2
+    ppr_ty fUN_PREC ty1 <+> pprParendIfaceType ty2
 
-pprIfaceType ctxt_prec ty@(IfaceForAllTy _ _)
-  = maybeParen ctxt_prec fUN_PREC (pprIfaceForAllPart tvs theta (ppr_ty tau))
+ppr_ty ctxt_prec ty@(IfaceForAllTy _ _)
+  = maybeParen ctxt_prec fUN_PREC (pprIfaceForAllPart tvs theta (pprIfaceType tau))
  where		
     (tvs, theta, tau) = splitIfaceSigmaTy ty
     
@@ -263,11 +261,11 @@ pprIfaceForAllPart tvs ctxt doc
 
 -------------------
 ppr_tc_app ctxt_prec tc 	 []   = ppr tc
-ppr_tc_app ctxt_prec IfaceListTc [ty] = brackets   (ppr_ty ty)
-ppr_tc_app ctxt_prec IfacePArrTc [ty] = pabrackets (ppr_ty ty)
+ppr_tc_app ctxt_prec IfaceListTc [ty] = brackets   (pprIfaceType ty)
+ppr_tc_app ctxt_prec IfacePArrTc [ty] = pabrackets (pprIfaceType ty)
 ppr_tc_app ctxt_prec (IfaceTupTc bx arity) tys
   | arity == length tys 
-  = tupleParens bx (sep (punctuate comma (map ppr_ty tys)))
+  = tupleParens bx (sep (punctuate comma (map pprIfaceType tys)))
 ppr_tc_app ctxt_prec tc tys 
   = maybeParen ctxt_prec tYCON_PREC 
 	       (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])

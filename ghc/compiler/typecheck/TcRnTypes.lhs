@@ -210,17 +210,10 @@ data IfGblEnv
 	-- was originally a hi-boot file.
 	-- We need the module name so we can test when it's appropriate
 	-- to look in this env.
-	if_rec_types :: Maybe (Module, IfG TypeEnv),
+	if_rec_types :: Maybe (Module, IfG TypeEnv)
 		-- Allows a read effect, so it can be in a mutable
 		-- variable; c.f. handling the external package type env
 		-- Nothing => interactive stuff, no loops possible
-
-	if_is_boot   :: ModuleEnv (ModuleName, IsBootInterface)
-	-- Tells what we know about boot interface files
-	-- When we're importing a module we know absolutely
-	-- nothing about, so we assume it's from
-	-- another package, where we aren't doing 
-	-- dependency tracking. So it won't be a hi-boot file.
     }
 
 data IfLclEnv

@@ -15,8 +15,6 @@ module TcEnv(
 	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
 	tcLookupLocatedClass, tcLookupLocatedDataCon,
 	
-	getInGlobalScope,
-
 	-- Local environment
 	tcExtendKindEnv,
 	tcExtendTyVarEnv,    tcExtendTyVarEnv2, 
@@ -173,21 +171,6 @@ tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
 tcExtendGlobalValEnv ids thing_inside 
   = tcExtendGlobalEnv [AnId id | id <- ids] thing_inside
 \end{code}
-
-A variety of global lookups, when we know what we are looking for.
-
-\begin{code}
-getInGlobalScope :: TcM (Name -> Bool)
--- Get all things in the global environment; used for deciding what 
--- rules to suck in.  Anything defined in this module (nameIsLocalOrFrom)
--- is certainly in the envt, so we don't bother to look.
-getInGlobalScope 
-  = do { mod <- getModule
-       ; (eps,hpt) <- getEpsAndHpt
-       ; return (\n -> nameIsLocalOrFrom mod n || 
-		       isJust (lookupType hpt (eps_PTE eps) n)) }
-\end{code}
-
 
 \begin{code}
 tcExtendRecEnv :: [(Name,TyThing)] -> TcM r -> TcM r

@@ -29,7 +29,7 @@ import Module		( Module, ModuleName, moduleName, mkPackageModule,
 			  moduleNameUserString, isHomeModule,
 			  unitModuleEnvByName, unitModuleEnv, 
 			  lookupModuleEnvByName, moduleEnvElts )
-import Name		( Name, nameSrcLoc, nameOccName, nameModuleName,
+import Name		( Name, nameSrcLoc, nameOccName, nameModuleName, isWiredInName,
 			  nameParent, nameParent_maybe, isExternalName, nameModule )
 import NameSet
 import NameEnv
@@ -71,32 +71,32 @@ rnImports :: [LImportDecl RdrName]
 	  -> RnM (GlobalRdrEnv, ImportAvails)
 
 rnImports imports
-  = 		-- PROCESS IMPORT DECLS
+  = do	{	-- PROCESS IMPORT DECLS
 		-- Do the non {- SOURCE -} ones first, so that we get a helpful
 		-- warning for {- SOURCE -} ones that are unnecessary
-	getModule				`thenM` \ this_mod ->
-	doptM Opt_NoImplicitPrelude		`thenM` \ opt_no_prelude -> 
-	let
-	  all_imports	     = mk_prel_imports this_mod opt_no_prelude ++ imports
-	  (source, ordinary) = partition is_source_import all_imports
-	  is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
+	  this_mod <- getModule
+	; opt_no_prelude <- doptM Opt_NoImplicitPrelude
+	; let
+	    all_imports	     = mk_prel_imports this_mod opt_no_prelude ++ imports
+	    (source, ordinary) = partition is_source_import all_imports
+	    is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
 
-	  get_imports = importsFromImportDecl this_mod
-	in
-	mappM get_imports ordinary	`thenM` \ stuff1 ->
-	mappM get_imports source	`thenM` \ stuff2 ->
+	    get_imports = importsFromImportDecl this_mod
+
+	; stuff1 <- mappM get_imports ordinary
+	; stuff2 <- mappM get_imports source
 
 		-- COMBINE RESULTS
-	let
+	; let
 	    (imp_gbl_envs, imp_avails) = unzip (stuff1 ++ stuff2)
 	    gbl_env :: GlobalRdrEnv
 	    gbl_env = foldr plusGlobalRdrEnv emptyGlobalRdrEnv imp_gbl_envs
 
 	    all_avails :: ImportAvails
 	    all_avails = foldr plusImportAvails emptyImportAvails imp_avails
-	in
+
 		-- ALL DONE
-	returnM (gbl_env, all_avails)
+	; return (gbl_env, all_avails) }
   where
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 	-- because the former doesn't even look at Prelude.hi for instance 
@@ -764,7 +764,13 @@ lookupDeprec hpt pit n
   = case lookupIface hpt pit (nameModule n) of
 	Just iface -> mi_dep_fn iface n `seqMaybe` 	-- Bleat if the thing, *or
 		      mi_dep_fn iface (nameParent n)	-- its parent*, is deprec'd
-	Nothing    -> pprPanic "lookupDeprec" (ppr n)	
+	Nothing    
+	  | isWiredInName n -> Nothing
+		-- We have not necessarily loaded the .hi file for a 
+		-- wired-in name (yet), although we *could*.
+		-- And we never deprecate them
+
+	 | otherwise -> pprPanic "lookupDeprec" (ppr n)	
 		-- By now all the interfaces should have been loaded
 
 gre_is_used :: NameSet -> GlobalRdrElt -> Bool

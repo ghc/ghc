@@ -8,7 +8,8 @@
 module HscMain ( 
 	HscResult(..), hscMain, newHscEnv, hscCmmFile, hscBufferFrontEnd
 #ifdef GHCI
-	, hscStmt, hscTcExpr, hscKcType, hscThing, 
+	, hscStmt, hscTcExpr, hscKcType
+	, hscGetInfo, GetInfoResult
 	, compileExpr
 #endif
 	) where
@@ -17,15 +18,16 @@ module HscMain (
 
 #ifdef GHCI
 import HsSyn		( Stmt(..), LStmt, LHsExpr, LHsType )
-import IfaceSyn		( IfaceDecl )
+import IfaceSyn		( IfaceDecl, IfaceInst )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
 import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
-import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnThing, tcRnType ) 
-import RdrName		( RdrName )
+import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, tcRnType ) 
+import RdrName		( RdrName, rdrNameOcc )
+import OccName		( occNameUserString )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
@@ -177,7 +179,7 @@ hscMain hsc_env msg_act mod location
 -- hscNoRecomp definitely expects to have the old interface available
 hscNoRecomp hsc_env msg_act have_object 
 	    mod location (Just old_iface)
- | hsc_mode hsc_env == OneShot
+ | isOneShot (hsc_mode hsc_env)
  = do {
       when (verbosity (hsc_dflags hsc_env) > 0) $
 	  hPutStrLn stderr "compilation IS NOT required";
@@ -203,7 +205,7 @@ hscRecomp hsc_env msg_act have_object
 	  mod location maybe_checked_iface
  = do	{
       	  -- what target are we shooting for?
-	; let one_shot  = hsc_mode hsc_env == OneShot
+	; let one_shot  = isOneShot (hsc_mode hsc_env)
       	; let dflags    = hsc_dflags hsc_env
 	; let toInterp  = dopt_HscLang dflags == HscInterpreted
 	; let toCore    = isJust (ml_hs_file location) &&
@@ -640,23 +642,29 @@ hscParseThing parser dflags str
 
 \begin{code}
 #ifdef GHCI
-hscThing -- like hscStmt, but deals with a single identifier
+type GetInfoResult = (String, (IfaceDecl, Fixity, SrcLoc, [(IfaceInst,SrcLoc)]))
+
+hscGetInfo -- like hscStmt, but deals with a single identifier
   :: HscEnv
   -> InteractiveContext		-- Context for compiling
   -> String			-- The identifier
-  -> IO [(IfaceDecl, Fixity, SrcLoc)]
+  -> IO [GetInfoResult]
 
-hscThing hsc_env ic str
+hscGetInfo hsc_env ic str
    = do maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
 	case maybe_rdr_name of {
 	  Nothing -> return [];
 	  Just (L _ rdr_name) -> do
 
-	maybe_tc_result <- tcRnThing hsc_env ic rdr_name
+	maybe_tc_result <- tcRnGetInfo hsc_env ic rdr_name
+
+	let 	-- str' is the the naked occurrence name
+		-- after stripping off qualification and parens (+)
+	   str' = occNameUserString (rdrNameOcc rdr_name)
 
 	case maybe_tc_result of {
 	     Nothing     -> return [] ;
-	     Just things -> return things
+	     Just things -> return [(str', t) | t <- things]
  	}}
 #endif
 \end{code}

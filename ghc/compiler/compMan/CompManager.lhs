@@ -24,7 +24,8 @@ module CompManager (
     cmSetContext,  -- :: CmState -> DynFlags -> [String] -> [String] -> IO CmState
     cmGetContext,  -- :: CmState -> IO ([String],[String])
 
-    cmInfoThing,    -- :: CmState -> String -> IO (CmState, [(TyThing,Fixity)])
+    cmGetInfo,    -- :: CmState -> String -> IO (CmState, [(TyThing,Fixity)])
+    GetInfoResult,
     cmBrowseModule, -- :: CmState -> IO [TyThing]
 
     CmRunResult(..),
@@ -81,9 +82,9 @@ import Maybes		( expectJust, orElse, mapCatMaybes )
 import DATA_IOREF	( readIORef )
 
 #ifdef GHCI
-import HscMain		( hscThing, hscStmt, hscTcExpr, hscKcType )
+import HscMain		( hscGetInfo, GetInfoResult, hscStmt, hscTcExpr, hscKcType )
 import TcRnDriver	( mkExportEnv, getModuleContents )
-import IfaceSyn		( IfaceDecl )
+import IfaceSyn		( IfaceDecl, IfaceInst )
 import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
 import Name		( Name )
 import NameEnv
@@ -187,7 +188,7 @@ cmSetContext cmstate toplevs exports = do
 
   let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
   return cmstate{ cm_ic = old_ic { ic_toplev_scope = toplevs,
-		     		   ic_exports      = exports,
+ 		     		   ic_exports      = exports,
 			       	   ic_rn_gbl_env   = all_env } }
 
 mkTopLevEnv :: HomePackageTable -> String -> IO GlobalRdrEnv
@@ -219,9 +220,8 @@ cmSetDFlags cm_state dflags
 -- A string may refer to more than one TyThing (eg. a constructor,
 -- and type constructor), so we return a list of all the possible TyThings.
 
-cmInfoThing :: CmState -> String -> IO [(IfaceDecl,Fixity,SrcLoc)]
-cmInfoThing cmstate id
-   = hscThing (cm_hsc cmstate) (cm_ic cmstate) id
+cmGetInfo :: CmState -> String -> IO [GetInfoResult]
+cmGetInfo cmstate id = hscGetInfo (cm_hsc cmstate) (cm_ic cmstate) id
 
 -- ---------------------------------------------------------------------------
 -- cmBrowseModule: get all the TyThings defined in a module

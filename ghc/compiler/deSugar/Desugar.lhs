@@ -73,8 +73,7 @@ deSugar hsc_env
   = do	{ showPass dflags "Desugar"
 
 	-- Do desugaring
-	; let { is_boot = imp_dep_mods imports }
-	; (results, warnings) <- initDs hsc_env mod type_env is_boot $
+	; (results, warnings) <- initDs hsc_env mod type_env $
 				 dsProgram ghci_mode tcg_env
 
 	; let { (ds_binds, ds_rules, ds_fords) = results
@@ -145,9 +144,7 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 	; us <- mkSplitUniqSupply 'd'
 
 	-- Do desugaring
-	; let { is_boot = emptyModuleEnv }	-- Assume no hi-boot files when
-						-- doing stuff from the command line
-	; (core_expr, ds_warns) <- initDs hsc_env this_mod type_env is_boot $
+	; (core_expr, ds_warns) <- initDs hsc_env this_mod type_env $
 				   dsLExpr tc_expr
 
 	-- Display any warnings 

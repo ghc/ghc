@@ -300,17 +300,17 @@ instance Outputable Name where
 instance OutputableBndr Name where
     pprBndr _ name = pprName name
 
-pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
+pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      External mod mb_p      -> pprExternal sty name uniq mod occ mb_p False
-      WiredIn mod mb_p thing -> pprExternal sty name uniq mod occ mb_p True
+      External mod mb_p      -> pprExternal sty uniq mod occ mb_p False
+      WiredIn mod mb_p thing -> pprExternal sty uniq mod occ mb_p True
       System   		     -> pprSystem sty uniq occ
       Internal    	     -> pprInternal sty uniq occ
 
-pprExternal sty name uniq mod occ mb_p is_wired
-  | codeStyle sty        = ppr (moduleName mod) <> char '_' <> pprOccName occ
-  | debugStyle sty       = sep [ppr (moduleName mod) <> dot <> pprOccName occ,
+pprExternal sty uniq mod occ mb_p is_wired
+  | codeStyle sty        = ppr mod_name <> char '_' <> pprOccName occ
+  | debugStyle sty       = sep [ppr mod_name <> dot <> pprOccName occ,
 				hsep [text "{-" 
 				     , if is_wired then ptext SLIT("(w)") else empty
 				     , pprUnique uniq
@@ -318,8 +318,10 @@ pprExternal sty name uniq mod occ mb_p is_wired
 --				 	 Nothing -> empty
 --					 Just n  -> brackets (ppr n)
 				     , text "-}"]]
-  | unqualStyle sty name = pprOccName occ
-  | otherwise		 = ppr (moduleName mod) <> dot <> pprOccName occ
+  | unqualStyle sty mod_name occ = pprOccName occ
+  | otherwise		 	 = ppr mod_name <> dot <> pprOccName occ
+  where
+    mod_name = moduleName mod
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq

@@ -514,11 +514,13 @@ tyThingToIfaceDecl dis abstr ext (ADataCon dc)
 
 
 --------------------------
-dfunToIfaceInst :: ModuleName -> DFunId -> IfaceInst
-dfunToIfaceInst mod dfun_id
-  = IfaceInst { ifDFun     = getOccName dfun_id, 
+dfunToIfaceInst :: DFunId -> IfaceInst
+dfunToIfaceInst dfun_id
+  = IfaceInst { ifDFun     = nameOccName dfun_name, 
 		ifInstHead = toIfaceType (mkLhsNameFn mod) tidy_ty }
   where
+    dfun_name = idName dfun_id
+    mod = nameModuleName dfun_name
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
     head_ty = mkForAllTys tvs (mkPredTy (mkClassPred cls tys))
 	-- No need to record the instance context; 

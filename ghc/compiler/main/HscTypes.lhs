@@ -6,14 +6,14 @@
 \begin{code}
 module HscTypes ( 
 	HscEnv(..), hscEPS,
-	GhciMode(..),
+	GhciMode(..), isOneShot,
 
 	ModDetails(..),	
 	ModGuts(..), ModImports(..), ForeignStubs(..),
 
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
 
-	ExternalPackageState(..),  
+	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
 	lookupIface, lookupIfaceByModName, moduleNameToModule,
 	emptyModIface,
@@ -32,14 +32,13 @@ module HscTypes (
 
 	TyThing(..), tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId,
 	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
-	extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
+	extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
 
 	WhetherHasOrphans, IsBootInterface, Usage(..), 
 	Dependencies(..), noDependencies,
-	Pool(..), emptyPool, DeclPool, InstPool, 
-	Gated,
-	RulePool, RulePoolContents, addRuleToPool, 
+	InstPool, Gated, addInstsToPool, 
+	RulePool, addRulesToPool, 
 	NameCache(..), OrigNameCache, OrigIParamCache,
 	Avails, availsToNameSet, availName, availNames,
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
@@ -64,8 +63,8 @@ import ByteCodeAsm	( CompiledByteCode )
 
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv,
 			  LocalRdrEnv, emptyLocalRdrEnv,
-			  GlobalRdrElt(..), unQualOK )
-import Name		( Name, NamedThing, getName, nameOccName, nameModule )
+			  GlobalRdrElt(..), mkRdrUnqual, lookupGRE_RdrName )
+import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameModuleName )
 import NameEnv
 import NameSet	
 import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv, 
@@ -139,8 +138,15 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 The GhciMode is self-explanatory:
 
 \begin{code}
-data GhciMode = Batch | Interactive | OneShot | IDE
+data GhciMode = Batch 		-- ghc --make Main
+	      | Interactive	-- ghc --interactive
+	      | OneShot		-- ghc Foo.hs
+	      | IDE		-- Visual Studio etc
 	      deriving Eq
+
+isOneShot :: GhciMode -> Bool
+isOneShot OneShot = True
+isOneShot _other  = False
 \end{code}
 
 \begin{code}
@@ -405,22 +411,16 @@ the @Name@'s provenance to guide whether or not to print the name qualified
 in error messages.
 
 \begin{code}
-unQualInScope :: GlobalRdrEnv -> Name -> Bool
+unQualInScope :: GlobalRdrEnv -> PrintUnqualified
 -- True if 'f' is in scope, and has only one binding,
 -- and the thing it is bound to is the name we are looking for
 -- (i.e. false if A.f and B.f are both in scope as unqualified 'f')
 --
--- Also checks for built-in syntax, which is always 'in scope'
---
--- This fn is only efficient if the shared 
--- partial application is used a lot.
-unQualInScope env
-  = \n -> n `elemNameSet` unqual_names || isBuiltInSyntaxName n
-  where
-    unqual_names :: NameSet
-    unqual_names = foldOccEnv add emptyNameSet env
-    add [gre] unquals | unQualOK gre = addOneToNameSet unquals (gre_name gre)
-    add _     unquals	 	     = unquals
+-- [Out of date] Also checks for built-in syntax, which is always 'in scope'
+unQualInScope env mod occ
+  = case lookupGRE_RdrName (mkRdrUnqual occ) env of
+	[gre] -> nameModuleName (gre_name gre) == mod
+	other -> False
 \end{code}
 
 
@@ -484,12 +484,12 @@ mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
 		
 lookupTypeEnv = lookupNameEnv
 
-extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
 -- Extend the type environment
-extendTypeEnvList env things
-  = foldl extend env things
-  where
-    extend env thing = extendNameEnv env (getName thing) thing
+extendTypeEnv :: TypeEnv -> TyThing -> TypeEnv
+extendTypeEnv env thing = extendNameEnv env (getName thing) thing 
+
+extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
+extendTypeEnvList env things = foldl extendTypeEnv env things
 \end{code}
 
 \begin{code}
@@ -701,6 +701,17 @@ type PackageInstEnv  = InstEnv
 
 data ExternalPackageState
   = EPS {
+	eps_is_boot :: !(ModuleEnv (ModuleName, IsBootInterface)),
+		-- In OneShot mode (only), home-package modules accumulate in the
+		-- external package state, and are sucked in lazily.
+		-- For these home-pkg modules (only) we need to record which are
+		-- boot modules.  We set this field after loading all the 
+		-- explicitly-imported interfaces, but before doing anything else
+		--
+		-- The ModuleName part is not necessary, but it's useful for
+		-- debug prints, and it's convenient because this field comes
+		-- direct from TcRnTypes.ImportAvails.imp_dep_mods
+
 	eps_PIT :: !PackageIfaceTable,
 		-- The ModuleIFaces for modules in external packages
 		-- whose interfaces we have opened
@@ -723,19 +734,24 @@ data ExternalPackageState
 
 	-- Holding pens for stuff that has been read in from file,
 	-- but not yet slurped into the renamer
-	eps_decls :: !DeclPool,
-		-- A single, global map of Names to unslurped decls
-		-- Decls move from here to eps_PTE
-
 	eps_insts :: !InstPool,
 		-- The as-yet un-slurped instance decls
 		-- Decls move from here to eps_inst_env
 		-- Each instance is 'gated' by the names that must be 
 		-- available before this instance decl is needed.
 
-	eps_rules :: !RulePool
+	eps_rules :: !RulePool,
 		-- The as-yet un-slurped rules
+
+	eps_stats :: !EpsStats
   }
+
+-- "In" means read from iface files
+-- "Out" means actually sucked in and type-checked
+data EpsStats = EpsStats { n_ifaces_in
+			 , n_decls_in, n_decls_out 
+			 , n_rules_in, n_rules_out
+			 , n_insts_in, n_insts_out :: !Int }
 \end{code}
 
 The NameCache makes sure that there is just one Unique assigned for
@@ -765,41 +781,44 @@ type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
 \end{code}
 
 \begin{code}
-data Pool p = Pool p	 	-- The pool itself
-		   Int		-- Number of decls slurped into the map
-		   Int		-- Number of decls slurped out of the map
-
-emptyPool p = Pool p 0 0
-
-instance Outputable p => Outputable (Pool p) where
-  ppr (Pool p n_in n_out) 	-- Debug printing only
-	= vcat [ptext SLIT("Pool") <+> int n_in <+> int n_out,
-		nest 2 (ppr p)]
-  
-type DeclPool = Pool (NameEnv IfaceDecl)	-- Keyed by the "main thing" of the decl
-
--------------------------
-type Gated d = ([Name], (ModuleName, d))	-- The [Name] 'gate' the declaration
+type Gated d = ([Name], (ModuleName, d))	-- The [Name] 'gate' the declaration; always non-empty
 						-- ModuleName records which iface file this
 						-- decl came from
 
-type RulePool = Pool RulePoolContents
-type RulePoolContents = [Gated IfaceRule]
+type RulePool = [Gated IfaceRule]
 
-addRuleToPool :: RulePoolContents
-	      -> (ModuleName, IfaceRule)
-	      -> [Name] 	-- Free vars of rule; always non-empty
-	      -> RulePoolContents
-addRuleToPool rules rule fvs = (fvs,rule) : rules
+addRulesToPool :: RulePool
+	      -> [Gated IfaceRule]
+	      -> RulePool
+addRulesToPool rules new_rules = new_rules ++ rules
 
 -------------------------
-type InstPool = Pool (NameEnv [Gated IfaceInst])
+addEpsInStats :: EpsStats -> Int -> Int -> Int -> EpsStats
+-- Add stats for one newly-read interface
+addEpsInStats stats n_decls n_insts n_rules
+  = stats { n_ifaces_in = n_ifaces_in stats + 1
+	  , n_decls_in  = n_decls_in stats + n_decls
+	  , n_insts_in  = n_insts_in stats + n_insts
+	  , n_rules_in  = n_rules_in stats + n_rules }
+
+-------------------------
+type InstPool = NameEnv [Gated IfaceInst]
 	-- The key of the Pool is the Class
 	-- The Names are the TyCons in the instance head
 	-- For example, suppose this is in an interface file
 	--	instance C T where ...
 	-- We want to slurp this decl if both C and T are "visible" in 
 	-- the importing module.  See "The gating story" in RnIfaces for details.
+
+
+addInstsToPool :: InstPool -> [(Name, Gated IfaceInst)] -> InstPool
+addInstsToPool insts new_insts
+  = foldr add insts new_insts
+  where
+    add :: (Name, Gated IfaceInst) -> NameEnv [Gated IfaceInst] -> NameEnv [Gated IfaceInst]
+    add (cls,new_inst) insts = extendNameEnv_C combine insts cls [new_inst]
+	where
+	  combine old_insts _ = new_inst : old_insts
 \end{code}
 
 

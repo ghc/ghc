@@ -186,7 +186,7 @@ import TcRnTypes	( ImportAvails(..), mkModDeps )
 import TcType		( isFFITy )
 import HscTypes		( ModIface(..), TyThing(..),
 			  ModGuts(..), ModGuts, IfaceExport,
-			  GhciMode(..), 
+			  GhciMode(..), isOneShot,
 			  HscEnv(..), hscEPS,
 			  Dependencies(..), FixItem(..), 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
@@ -288,7 +288,7 @@ mkIface hsc_env location maybe_old_iface
 		     | omit_prags = []
 		     | otherwise  = sortLt lt_rule $
 				    map (coreRuleToIfaceRule this_mod_name ext_nm) rules
-		; iface_insts = sortLt lt_inst (map (dfunToIfaceInst this_mod_name) insts)
+		; iface_insts = sortLt lt_inst (map dfunToIfaceInst insts)
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -857,18 +857,22 @@ checkVersions source_unchanged iface
   | not source_unchanged
   = returnM outOfDate
   | otherwise
-  = traceHiDiffs (text "Considering whether compilation is required for" <+> 
-		  ppr (mi_module iface) <> colon)	`thenM_`
+  = do	{ traceHiDiffs (text "Considering whether compilation is required for" <+> 
+		        ppr (mi_module iface) <> colon)
 
 	-- Source code unchanged and no errors yet... carry on 
+
 	-- First put the dependent-module info in the envt, just temporarily,
 	-- so that when we look for interfaces we look for the right one (.hi or .hi-boot)
 	-- It's just temporary because either the usage check will succeed 
 	-- (in which case we are done with this module) or it'll fail (in which
 	-- case we'll compile the module from scratch anyhow).
-    updGblEnv (\ gbl -> gbl { if_is_boot = mod_deps }) (
-	checkList [checkModUsage u | u <- mi_usages iface]
-    )
+	; mode <- getGhciMode
+	; ifM (isOneShot mode) 
+	      (updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps })
+
+	; checkList [checkModUsage u | u <- mi_usages iface]
+    }
   where
 	-- This is a bit of a hack really
     mod_deps :: ModuleEnv (ModuleName, IsBootInterface)

@@ -7,8 +7,7 @@ module IfaceEnv (
 	lookupOrig, lookupIfaceTc,
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv,
-	tcIfaceGlobal, tcIfaceTyCon, tcIfaceClass, tcIfaceExtId,
-	tcIfaceTyVar, tcIfaceDataCon, tcIfaceLclId,
+	tcIfaceLclId,     tcIfaceTyVar, 
 
 	-- Name-cache stuff
 	allocateGlobalBinder, initNameCache
@@ -16,28 +15,24 @@ module IfaceEnv (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcIface( tcImportDecl )
-
 import TcRnMonad
 import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
+import TysWiredIn	( tupleTyCon, tupleCon )
 import HscTypes		( NameCache(..), HscEnv(..), 
-			  TyThing, tyThingClass, tyThingTyCon, 
-			  ExternalPackageState(..), OrigNameCache, lookupType )
+			  TyThing, ExternalPackageState(..), OrigNameCache )
 import TyCon		( TyCon, tyConName )
 import Class		( Class )
-import DataCon		( DataCon, dataConWorkId, dataConName )
+import DataCon		( dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
 import Name		( Name, nameUnique, nameModule, 
 			  nameOccName, nameSrcLoc,
 			  getOccName, nameParent_maybe,
-		  	  isWiredInName, nameIsLocalOrFrom, mkIPName,
+		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
 import NameEnv
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM_Name, pREL_TUP_Name )
-import TysWiredIn	( intTyCon, boolTyCon, charTyCon, listTyCon, parrTyCon, 
-			  tupleTyCon, tupleCon )
 import HscTypes		( ExternalPackageState, NameCache, TyThing(..) )
 import Module		( Module, ModuleName, moduleName, mkPackageModule, 
 			  emptyModuleEnv, lookupModuleEnvByName, extendModuleEnv_C )
@@ -250,67 +245,14 @@ initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
 \end{code}
 
 
+
 %************************************************************************
 %*									*
-		Getting from Names to TyThings
+		Type variables and local Ids
 %*									*
 %************************************************************************
 
 \begin{code}
-tcIfaceGlobal :: Name -> IfM a TyThing
-tcIfaceGlobal name
-  = do	{ (eps,hpt) <- getEpsAndHpt
-	; case lookupType hpt (eps_PTE eps) name of {
-	    Just thing -> return thing ;
-	    Nothing    -> 
-
-	setLclEnv () $ do	-- This gets us back to IfG, mainly to 
-				-- pacify get_type_env; rather untidy
-	{ env <- getGblEnv
-	; case if_rec_types env of
-	    Just (mod, get_type_env) 
-		| nameIsLocalOrFrom mod name
-		-> do 		-- It's defined in the module being compiled
-	  	{ type_env <- get_type_env
-		; case lookupNameEnv type_env name of
-			Just thing -> return thing
-			Nothing	   -> pprPanic "tcIfaceGlobal (local): not found:"  
-						(ppr name $$ ppr type_env) }
-
-	    other -> tcImportDecl name 	-- It's imported; go get it
-    }}}
-
-tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon IfaceIntTc  = return intTyCon
-tcIfaceTyCon IfaceBoolTc = return boolTyCon
-tcIfaceTyCon IfaceCharTc = return charTyCon
-tcIfaceTyCon IfaceListTc = return listTyCon
-tcIfaceTyCon IfacePArrTc = return parrTyCon
-tcIfaceTyCon (IfaceTupTc bx ar) = return (tupleTyCon bx ar)
-tcIfaceTyCon (IfaceTc ext_nm) = do { name <- lookupIfaceExt ext_nm
-				   ; thing <- tcIfaceGlobal name
-				   ; return (tyThingTyCon thing) }
-
-tcIfaceClass :: IfaceExtName -> IfL Class
-tcIfaceClass rdr_name = do { name <- lookupIfaceExt rdr_name
-			   ; thing <- tcIfaceGlobal name
-			   ; return (tyThingClass thing) }
-
-tcIfaceDataCon :: IfaceExtName -> IfL DataCon
-tcIfaceDataCon gbl = do { name <- lookupIfaceExt gbl
-			; thing <- tcIfaceGlobal name
-		 	; case thing of
-				ADataCon dc -> return dc
-				other   -> pprPanic "tcIfaceExtDC" (ppr gbl $$ ppr name$$ ppr thing) }
-
-tcIfaceExtId :: IfaceExtName -> IfL Id
-tcIfaceExtId gbl = do { name <- lookupIfaceExt gbl
-		      ; thing <- tcIfaceGlobal name
-		      ; case thing of
-			  AnId id -> return id
-			  other   -> pprPanic "tcIfaceExtId" (ppr gbl $$ ppr name$$ ppr thing) }
-
-------------------------------------------
 tcIfaceLclId :: OccName -> IfL Id
 tcIfaceLclId occ
   = do	{ lcl <- getLclEnv
@@ -318,19 +260,20 @@ tcIfaceLclId occ
 		  `orElse` 
 		  pprPanic "tcIfaceLclId" (ppr occ)) }
 
-tcIfaceTyVar :: OccName -> IfL TyVar
-tcIfaceTyVar occ
-  = do	{ lcl <- getLclEnv
-	; return (lookupOccEnv (if_tv_env lcl) occ
-		  `orElse`
-		  pprPanic "tcIfaceTyVar" (ppr occ)) }
-
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a
 extendIfaceIdEnv ids thing_inside
   = do	{ env <- getLclEnv
 	; let { id_env' = extendOccEnvList (if_id_env env) pairs
 	      ;	pairs   = [(getOccName id, id) | id <- ids] }
 	; setLclEnv (env { if_id_env = id_env' }) thing_inside }
+
+
+tcIfaceTyVar :: OccName -> IfL TyVar
+tcIfaceTyVar occ
+  = do	{ lcl <- getLclEnv
+	; return (lookupOccEnv (if_tv_env lcl) occ
+		  `orElse`
+		  pprPanic "tcIfaceTyVar" (ppr occ)) }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars thing_inside

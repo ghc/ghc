@@ -10,7 +10,7 @@ module InstEnv (
 	DFunId, InstEnv,
 
 	emptyInstEnv, extendInstEnv,
-	lookupInstEnv, 
+	lookupInstEnv, instEnvElts,
 	classInstances, simpleDFunClassTyCon, checkFunDeps
     ) where
 
@@ -27,7 +27,7 @@ import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
-import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C )
+import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
 import Id		( idType )
 import CmdLineOpts
 import Util             ( notNull )
@@ -58,10 +58,16 @@ type InstEnvElt = (TyVarSet, [Type], DFunId)
 emptyInstEnv :: InstEnv
 emptyInstEnv = emptyUFM
 
-classInstances :: InstEnv -> Class -> [InstEnvElt]
-classInstances env cls = case lookupUFM env cls of
-			  Just (ClsIE insts _) -> insts
-			  Nothing	       -> []
+instEnvElts :: InstEnv -> [InstEnvElt]
+instEnvElts ie = [elt | ClsIE elts _ <- eltsUFM ie, elt <- elts]
+
+classInstances :: (InstEnv,InstEnv) -> Class -> [InstEnvElt]
+classInstances (pkg_ie, home_ie) cls 
+  = get home_ie ++ get pkg_ie
+  where
+    get env = case lookupUFM env cls of
+		Just (ClsIE insts _) -> insts
+		Nothing		     -> []
 
 extendInstEnv :: InstEnv -> DFunId -> InstEnv
 extendInstEnv inst_env dfun_id
@@ -398,13 +404,13 @@ checkFunDeps :: (InstEnv, InstEnv) -> DFunId
 	     -> Maybe [DFunId]	-- Nothing  <=> ok
 				-- Just dfs <=> conflict with dfs
 -- Check wheher adding DFunId would break functional-dependency constraints
-checkFunDeps (pkg_ie, home_ie) dfun
+checkFunDeps inst_envs dfun
   | null bad_fundeps = Nothing
   | otherwise	     = Just bad_fundeps
   where
     (ins_tvs, _, clas, ins_tys) = tcSplitDFunTy (idType dfun)
     ins_tv_set   = mkVarSet ins_tvs
-    cls_inst_env = classInstances home_ie clas ++ classInstances pkg_ie clas
+    cls_inst_env = classInstances inst_envs clas
     bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys
 
 badFunDeps :: [InstEnvElt] -> Class

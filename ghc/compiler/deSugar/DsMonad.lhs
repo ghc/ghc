@@ -29,7 +29,7 @@ module DsMonad (
 
 import TcRnMonad
 import HsSyn		( HsExpr, HsMatchContext, Pat )
-import IfaceEnv		( tcIfaceGlobal )
+import TcIface		( tcIfaceGlobal )
 import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
 			  IsBootInterface,
 			  tyThingId, tyThingTyCon, tyThingDataCon  )
@@ -102,14 +102,12 @@ data DsMetaVal
 
 initDs  :: HscEnv
 	-> Module -> TypeEnv
-	-> ModuleEnv (ModuleName,IsBootInterface)	
 	-> DsM a
 	-> IO (a, Bag DsWarning)
 
-initDs hsc_env mod type_env is_boot thing_inside
+initDs hsc_env mod type_env thing_inside
   = do 	{ warn_var <- newIORef emptyBag
-	; let { if_env = IfGblEnv { if_rec_types = Just (mod, return type_env),
-				    if_is_boot = is_boot }
+	; let { if_env = IfGblEnv { if_rec_types = Just (mod, return type_env) }
 	      ; gbl_env = DsGblEnv { ds_mod = mod, 
 				     ds_if_env = if_env, 
 				     ds_warns = warn_var }

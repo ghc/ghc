@@ -766,10 +766,10 @@ record_dfun_usage dfun_id
     dfun_name = idName dfun_id
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
--- Gets both the home-pkg inst env (includes module being compiled)
--- and the external-package inst-env
+-- Gets both the external-package inst-env
+-- and the home-pkg inst env (includes module being compiled)
 tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
-		     return (tcg_inst_env env, eps_inst_env eps) }
+		     return (eps_inst_env eps, tcg_inst_env env) }
 \end{code}
 
 

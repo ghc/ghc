@@ -1530,7 +1530,7 @@ reduceContextWithoutImprovement doc try_me wanteds
 tcImprove :: Avails -> TcM Bool		-- False <=> no change
 -- Perform improvement using all the predicates in Avails
 tcImprove avails
- =  tcGetInstEnvs 			`thenM` \ (home_ie, pkg_ie) ->
+ =  tcGetInstEnvs 			`thenM` \ inst_envs -> 
     let
 	preds = [ (pred, pp_loc)
 		| inst <- keysFM avails,
@@ -1543,7 +1543,7 @@ tcImprove avails
 		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
 		--    so that improve will see them separate
 	eqns = improve get_insts preds
-	get_insts clas = classInstances home_ie clas ++ classInstances pkg_ie clas
+	get_insts clas = classInstances inst_envs clas
      in
      if null eqns then
 	returnM True

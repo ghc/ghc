@@ -1,4 +1,4 @@
 module TcIface where
 
-tcImportDecl         :: Name.Name   -> TcRnTypes.IfG TypeRep.TyThing
+tcIfaceDecl  :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL TypeRep.TyThing
 

@@ -14,6 +14,8 @@ module LoadIface (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-}	TcIface( tcIfaceDecl )
+
 import DriverState	( v_GhcMode, isCompManagerMode )
 import DriverUtil	( replaceFilenameSuffix )
 import CmdLineOpts	( DynFlags( verbosity ), DynFlag( Opt_IgnoreInterfacePragmas ), 
@@ -24,21 +26,21 @@ import IfaceSyn		( IfaceDecl(..), IfaceConDecls(..), IfaceConDecl(..), IfaceClas
 			  IfaceInst(..), IfaceRule(..), IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
 			  IfaceType(..), IfacePredType(..), IfaceExtName, visibleIfConDecls, mkIfaceExtName )
 import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc )
-import HscTypes		( HscEnv(..), ModIface(..), emptyModIface,
-			  ExternalPackageState(..), emptyTypeEnv, emptyPool, 
+import HscTypes		( HscEnv(..), ModIface(..), TyThing, emptyModIface, EpsStats(..), addEpsInStats,
+			  ExternalPackageState(..), PackageTypeEnv, emptyTypeEnv, 
 			  lookupIfaceByModName, emptyPackageIfaceTable,
-			  IsBootInterface, mkIfaceFixCache, 
-			  Pool(..), DeclPool, InstPool, 
-			  RulePool, addRuleToPool, RulePoolContents
+			  IsBootInterface, mkIfaceFixCache, mkTypeEnv,
+			  Gated, implicitTyThings,
+			  addRulesToPool, addInstsToPool
 			 )
 
-import BasicTypes	( Version, Fixity(..), FixityDirection(..) )
+import BasicTypes	( Version, Fixity(..), FixityDirection(..), isMarkedStrict )
 import TcType		( Type, tcSplitTyConApp_maybe )
 import Type		( funTyCon )
 import TcRnMonad
 
 import PrelNames	( gHC_PRIM_Name )
-import PrelInfo		( ghcPrimExports )
+import PrelInfo		( ghcPrimExports, wiredInThings )
 import PrelRules	( builtinRules )
 import Rules		( emptyRuleBase )
 import InstEnv		( emptyInstEnv )
@@ -48,12 +50,11 @@ import NameEnv
 import MkId		( seqId )
 import Packages		( basePackage )
 import Module		( Module, ModuleName, ModLocation(ml_hi_file),
-			  moduleName, isHomeModule, moduleEnvElts,
+			  moduleName, isHomeModule, emptyModuleEnv, moduleEnvElts,
 			  extendModuleEnv, lookupModuleEnvByName, moduleUserString
 			)
-import OccName		( OccName, mkClassTyConOcc, mkClassDataConOcc,
-			  mkSuperDictSelOcc, 
-			  mkDataConWrapperOcc, mkDataConWorkerOcc )
+import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
+			  mkSuperDictSelOcc, mkDataConWrapperOcc, mkDataConWorkerOcc )
 import Class		( Class, className )
 import TyCon		( tyConName )
 import SrcLoc		( mkSrcLoc, importedSrcLoc )
@@ -67,6 +68,7 @@ import Lexer
 import Outputable
 import BinIface		( readBinIface )
 import Panic
+import List		( nub )
 
 import DATA_IOREF	( readIORef )
 
@@ -159,14 +161,10 @@ loadInterface :: SDoc -> ModuleName -> WhereFrom
 
 loadInterface doc_str mod_name from
   = do	{ 	-- Read the state
-	  env <- getTopEnv 
-	; let { hpt	= hsc_HPT env
-	      ; eps_var = hsc_EPS env }
-	; eps <- readMutVar eps_var
-	; let { pit = eps_PIT eps }
+	  (eps,hpt) <- getEpsAndHpt
 
 		-- Check whether we have the interface already
-	; case lookupIfaceByModName hpt pit mod_name of {
+	; case lookupIfaceByModName hpt (eps_PIT eps) mod_name of {
 	    Just iface 
 		-> returnM (Right iface) ;	-- Already loaded
 			-- The (src_imp == mi_boot iface) test checks that the already-loaded
@@ -174,12 +172,11 @@ loadInterface doc_str mod_name from
 			-- if an earlier import had a before we got to real imports.   I think.
 	    other -> do
 
-	{ if_gbl_env <- getGblEnv
-	; let { hi_boot_file = case from of
+	{ let { hi_boot_file = case from of
 				ImportByUser usr_boot -> usr_boot
 				ImportBySystem        -> sys_boot
 
-	      ; mb_dep   = lookupModuleEnvByName (if_is_boot if_gbl_env) mod_name
+	      ; mb_dep   = lookupModuleEnvByName (eps_is_boot eps) mod_name
 	      ; sys_boot = case mb_dep of
 				Just (_, is_boot) -> is_boot
 				Nothing		  -> False
@@ -190,27 +187,29 @@ loadInterface doc_str mod_name from
 	; read_result <- findAndReadIface doc_str mod_name hi_boot_file
 	; case read_result of {
 	    Left err -> do
-	  	{ let {	-- Not found, so add an empty iface to 
+	  	{ let fake_iface = emptyModIface opt_InPackage mod_name
+
+		; updateEps_ $ \eps ->
+			eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
+			-- Not found, so add an empty iface to 
 			-- the EPS map so that we don't look again
-		      	fake_iface = emptyModIface opt_InPackage mod_name
-		      ; new_pit    = extendModuleEnv pit (mi_module fake_iface) fake_iface
-		      ; new_eps    = eps { eps_PIT = new_pit } }
-		; writeMutVar eps_var new_eps
+				
 		; returnM (Left err) } ;
 
 	-- Found and parsed!
 	    Right iface -> 
 
-	let { mod = mi_module iface } in
+	let { mod      = mi_module iface
+	    ; mod_name = moduleName mod } in
 
 	-- Sanity check.  If we're system-importing a module we know nothing at all
 	-- about, it should be from a different package to this one
 	WARN(   case from of { ImportBySystem -> True; other -> False } &&
 		not (isJust mb_dep) && 
 	 	isHomeModule mod,
-		ppr mod $$ ppr mb_dep)
+		ppr mod $$ ppr mb_dep $$ ppr (eps_is_boot eps) )
 
-	initIfaceLcl (moduleName mod) $ do
+	initIfaceLcl mod_name $ do
 	-- 	Load the new ModIface into the External Package State
 	-- Even home-package interfaces loaded by loadInterface 
 	-- 	(which only happens in OneShot mode; in Batch/Interactive 
@@ -228,19 +227,24 @@ loadInterface doc_str mod_name from
 	-- 	explicitly tag each export which seems a bit of a bore)
 
 	{ ignore_prags <- doptM Opt_IgnoreInterfacePragmas
-	; new_eps_decls <- loadDecls ignore_prags mod (eps_decls eps) (mi_decls iface)
-	; new_eps_rules <- loadRules ignore_prags mod (eps_rules eps) (mi_rules iface)
-	; new_eps_insts <- loadInsts              mod (eps_insts eps) (mi_insts iface)
+	; new_eps_decls <- loadDecls ignore_prags mod      (mi_decls iface)
+	; new_eps_rules <- loadRules ignore_prags mod_name (mi_rules iface)
+	; new_eps_insts <- loadInsts              mod_name (mi_insts iface)
 
 	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
 					mi_insts = panic "No mi_insts in PIT",
-					mi_rules = panic "No mi_rules in PIT" }
+					mi_rules = panic "No mi_rules in PIT" } }
 
-	      ;	new_eps = eps { eps_PIT	  = extendModuleEnv pit mod final_iface,
-				eps_decls = new_eps_decls,
-				eps_rules = new_eps_rules,
-				eps_insts = new_eps_insts } }
-	; writeMutVar eps_var new_eps
+	; traceIf (text "Extending PTE" <+> ppr (map fst (concat new_eps_decls)))
+
+	; updateEps_  $ \ eps -> 
+		eps {	eps_PIT   = extendModuleEnv (eps_PIT eps) mod final_iface,
+			eps_PTE   = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+			eps_rules = addRulesToPool  (eps_rules eps) new_eps_rules,
+			eps_insts = addInstsToPool  (eps_insts eps) new_eps_insts,
+			eps_stats = addEpsInStats   (eps_stats eps) (length new_eps_decls)
+						    (length new_eps_insts) (length new_eps_rules) }
+
 	; return (Right final_iface)
     }}}}}
 
@@ -253,25 +257,37 @@ loadInterface doc_str mod_name from
 -- the declaration itself, will find the fully-glorious Name
 -----------------------------------------------------
 
+addDeclsToPTE :: PackageTypeEnv -> [[(Name,TyThing)]] -> PackageTypeEnv
+addDeclsToPTE pte things = foldl extendNameEnvList pte things
+
 loadDecls :: Bool	-- Don't load pragmas into the decl pool
-	  -> Module -> DeclPool
+	  -> Module
 	  -> [(Version, IfaceDecl)]
-	  -> IfM lcl DeclPool
-loadDecls ignore_prags mod (Pool decls_map n_in n_out) decls
-  = do	{ decls_map' <- foldlM (loadDecl ignore_prags mod) decls_map decls
-	; returnM (Pool decls_map' (n_in + length decls) n_out) }
+	  -> IfL [[(Name,TyThing)]]	-- The list can be poked eagerly, but the
+					-- TyThings are forkM'd thunks
+loadDecls ignore_prags mod decls = mapM (loadDecl ignore_prags mod) decls
 
-loadDecl ignore_prags mod decls_map (_version, decl)
-  = do 	{ main_name <- mk_new_bndr Nothing (ifName decl)
-	; let decl' | ignore_prags = discardDeclPrags decl
-		    | otherwise    = decl
+loadDecl ignore_prags mod (_version, decl)
+  = do 	{ 	-- Populate the name cache with final versions of all 
+		-- the names associated with the decl
+	  main_name      <- mk_new_bndr Nothing (ifName decl)
+	; implicit_names <- mapM (mk_new_bndr (Just main_name)) (ifaceDeclSubBndrs decl)
 
-	-- Populate the name cache with final versions of all the subordinate names
-	; mapM_ (mk_new_bndr (Just main_name)) (ifaceDeclSubBndrs decl')
+	-- Typecheck the thing, lazily
+	; thing <- forkM doc (bumpDeclStats main_name >> tcIfaceDecl decl)
+	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
+	      lookup n = case lookupOccEnv mini_env (getOccName n) of
+			   Just thing -> thing
+			   Nothing    -> pprPanic "loadDecl" (ppr main_name <+> ppr n)
 
-	-- Extend the decls pool with a mapping for the main name (only)
-	; returnM (extendNameEnv decls_map main_name decl') }
+	; returnM ((main_name, thing) : [(n, lookup n) | n <- implicit_names]) }
+		-- We build a list from the *known* names, with (lookup n) thunks
+		-- as the TyThings.  That way we can extend the PTE without poking the
+		-- thunks
   where
+    decl' | ignore_prags = discardDeclPrags decl
+	  | otherwise    = decl
+
 	-- mk_new_bndr allocates in the name cache the final canonical
 	-- name for the thing, with the correct 
 	--	* package info
@@ -280,49 +296,69 @@ loadDecl ignore_prags mod decls_map (_version, decl)
 	-- imported name, to fix the module correctly in the cache
     mk_new_bndr mb_parent occ = newGlobalBinder mod occ mb_parent loc
     loc = importedSrcLoc (moduleUserString mod)
+    doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 
 discardDeclPrags :: IfaceDecl -> IfaceDecl
 discardDeclPrags decl@(IfaceId {ifIdInfo = HasInfo _}) = decl { ifIdInfo = NoInfo }
 discardDeclPrags decl 		    	  	       = decl
 
+bumpDeclStats :: Name -> IfL ()		-- Record that one more declaration has actually been used
+bumpDeclStats name
+  = do	{ traceIf (text "Loading decl for" <+> ppr name)
+	; updateEps_ (\eps -> let stats = eps_stats eps
+			      in eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } })
+	}
 
 -----------------
 ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 -- *Excludes* the 'main' name, but *includes* the implicitly-bound names
--- Rather revolting, because it has to predict what gets bound
+-- Deeply revolting, because it has to predict what gets bound,
+-- especially the question of whether there's a wrapper for a datacon
 
 ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, ifSigs = sigs })
-  = [tc_occ, dc_occ] ++ 
+  = [tc_occ, dc_occ, dcww_occ] ++
     [op | IfaceClassOp op _ _ <- sigs] ++
-    [mkSuperDictSelOcc n cls_occ | n <- [1..length sc_ctxt]] ++
-	-- The worker and wrapper for the DataCon of the class TyCon
-	-- are based off the data-con name
-    [mkDataConWrapperOcc dc_occ, mkDataConWorkerOcc dc_occ]
+    [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
   where
+    n_ctxt = length sc_ctxt
+    n_sigs = length sigs
     tc_occ  = mkClassTyConOcc cls_occ
     dc_occ  = mkClassDataConOcc cls_occ	
+    dcww_occ | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
+	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
+    is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
 
-ifaceDeclSubBndrs (IfaceData {ifCons = cons}) = foldr ((++) . conDeclBndrs) [] 
-						      (visibleIfConDecls cons)
-ifaceDeclSubBndrs other 		      = []
+ifaceDeclSubBndrs (IfaceData {ifCons = IfAbstractTyCon}) 
+  = []
+ifaceDeclSubBndrs (IfaceData {ifCons = IfNewTyCon (IfaceConDecl con_occ _ _ _ _ _ fields)}) 
+  = fields ++ [con_occ, mkDataConWrapperOcc con_occ] 	
+	-- Wrapper, no worker; see MkId.mkDataConIds
 
-conDeclBndrs (IfaceConDecl con_occ _ _ _ _ _ fields)
-  = fields ++ 
-    [con_occ, mkDataConWrapperOcc con_occ, mkDataConWorkerOcc con_occ]
+ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
+  = nub (concatMap fld_occs cons) 	-- Eliminate duplicate fields
+    ++ concatMap dc_occs cons
+  where
+    fld_occs (IfaceConDecl _ _ _ _ _ _ fields) = fields
+    dc_occs (IfaceConDecl con_occ _ _ _ _ strs _)
+	| has_wrapper = [con_occ, work_occ, wrap_occ]
+	| otherwise   = [con_occ, work_occ]
+	where
+	  wrap_occ = mkDataConWrapperOcc con_occ
+	  work_occ = mkDataConWorkerOcc con_occ
+	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
+		-- ToDo: may miss strictness in existential dicts
+
+ifaceDeclSubBndrs _other = []
 
 
 -----------------------------------------------------
 --	Loading instance decls
 -----------------------------------------------------
 
-loadInsts :: Module -> InstPool -> [IfaceInst] -> IfL InstPool
-loadInsts mod (Pool pool n_in n_out) decls
-  = do	{ new_pool <- foldlM (loadInstDecl (moduleName mod)) pool decls
- 	; returnM (Pool new_pool
-			(n_in + length decls) 
-			n_out) }
+loadInsts :: ModuleName -> [IfaceInst] -> IfL [(Name, Gated IfaceInst)]
+loadInsts mod decls = mapM (loadInstDecl mod) decls
 
-loadInstDecl mod pool decl@(IfaceInst {ifInstHead = inst_ty})
+loadInstDecl mod decl@(IfaceInst {ifInstHead = inst_ty})
   = do 	{
 	-- Find out what type constructors and classes are "gates" for the
 	-- instance declaration.  If all these "gates" are slurped in then
@@ -352,9 +388,7 @@ loadInstDecl mod pool decl@(IfaceInst {ifInstHead = inst_ty})
 	  let { (cls_ext, tc_exts) = ifaceInstGates inst_ty }
 	; cls <- lookupIfaceExt cls_ext
 	; tcs <- mapM lookupIfaceTc tc_exts
-	; let {	new_pool = extendNameEnv_C combine pool cls [(tcs, (mod,decl))]
-	      ; combine old _ = (tcs,(mod,decl)) : old }
-	; returnM new_pool
+	; returnM (cls, (tcs, (mod,decl)))
 	}
 
 -----------------------------------------------------
@@ -362,21 +396,21 @@ loadInstDecl mod pool decl@(IfaceInst {ifInstHead = inst_ty})
 -----------------------------------------------------
 
 loadRules :: Bool	-- Don't load pragmas into the decl pool
-	  -> Module -> RulePool -> [IfaceRule] -> IfL RulePool
-loadRules ignore_prags mod pool@(Pool rule_pool n_in n_out) rules
-  | ignore_prags = returnM pool
-  | otherwise
-  = do	{ new_pool <- foldlM (loadRule (moduleName mod)) rule_pool rules
-	; returnM (Pool new_pool (n_in + length rules) n_out) }
+	  -> ModuleName
+	  -> [IfaceRule] -> IfL [Gated IfaceRule]
+loadRules ignore_prags mod rules
+  | ignore_prags = returnM []
+  | otherwise    = mapM (loadRule mod) rules
 
-loadRule :: ModuleName -> RulePoolContents -> IfaceRule -> IfL RulePoolContents
+loadRule :: ModuleName -> IfaceRule -> IfL (Gated IfaceRule)
 -- "Gate" the rule simply by a crude notion of the free vars of
 -- the LHS.  It can be crude, because having too few free vars is safe.
-loadRule mod_name pool decl@(IfaceRule {ifRuleHead = fn, ifRuleArgs = args})
+loadRule mod decl@(IfaceRule {ifRuleHead = fn, ifRuleArgs = args})
   = do	{ names <- mapM lookupIfaceExt (fn : arg_fvs)
-	; returnM (addRuleToPool pool (mod_name, decl) names) }
+	; returnM (names, (mod, decl)) }
   where
     arg_fvs = [n | arg <- args, n <- crudeIfExprGblFvs arg]
+
 
 ---------------------------
 crudeIfExprGblFvs :: IfaceExpr -> [IfaceExtName]
@@ -588,21 +622,21 @@ read_iface dflags wanted_mod file_path is_hi_boot_file
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState
   = EPS { 
+      eps_is_boot    = emptyModuleEnv,
       eps_PIT        = emptyPackageIfaceTable,
       eps_PTE        = emptyTypeEnv,
       eps_inst_env   = emptyInstEnv,
       eps_rule_base  = emptyRuleBase,
-      eps_decls      = emptyPool emptyNameEnv,
-      eps_insts      = emptyPool emptyNameEnv,
-      eps_rules      = foldr add (emptyPool []) builtinRules
+      eps_insts      = emptyNameEnv,
+      eps_rules      = addRulesToPool [] (map mk_gated_rule builtinRules),
+	-- Initialise the EPS rule pool with the built-in rules
+      eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
+			   , n_insts_in = 0, n_insts_out = 0
+			   , n_rules_in = length builtinRules, n_rules_out = 0 }
     }
   where
-	-- Initialise the EPS rule pool with the built-in rules
-    add (fn_name, core_rule) (Pool rules n_in n_out) 
-      = Pool rules' (n_in+1) n_out
-      where
- 	rules' = addRuleToPool rules iface_rule [fn_name]
-	iface_rule = (nameModuleName fn_name, IfaceBuiltinRule (mkIfaceExtName fn_name) core_rule)
+    mk_gated_rule (fn_name, core_rule)
+	= ([fn_name], (nameModuleName fn_name, IfaceBuiltinRule (mkIfaceExtName fn_name) core_rule))
 \end{code}
 
 
@@ -635,23 +669,17 @@ ghcPrimIface
 \begin{code}
 ifaceStats :: ExternalPackageState -> SDoc
 ifaceStats eps 
-  = hcat [text "Renamer stats: ", stats]
+  = hcat [text "Renamer stats: ", msg]
   where
-    n_mods = length [() | _ <- moduleEnvElts (eps_PIT eps)]
-	-- This is really only right for a one-shot compile
-
-    Pool _ n_decls_in n_decls_out = eps_decls eps
-    Pool _ n_insts_in n_insts_out = eps_insts eps
-    Pool _ n_rules_in n_rules_out = eps_rules eps
-    
-    stats = vcat 
-    	[int n_mods <+> text "interfaces read",
-    	 hsep [ int n_decls_out, text "type/class/variable imported, out of", 
-    	        int n_decls_in, text "read"],
-    	 hsep [ int n_insts_out, text "instance decls imported, out of",  
-    	        int n_insts_in, text "read"],
-    	 hsep [ int n_rules_out, text "rule decls imported, out of",  
-    	        int n_rules_in, text "read"]
+    stats = eps_stats eps
+    msg = vcat 
+    	[int (n_ifaces_in stats) <+> text "interfaces read",
+    	 hsep [ int (n_decls_out stats), text "type/class/variable imported, out of", 
+    	        int (n_decls_in stats), text "read"],
+    	 hsep [ int (n_insts_out stats), text "instance decls imported, out of",  
+    	        int (n_insts_in stats), text "read"],
+    	 hsep [ int (n_rules_out stats), text "rule decls imported, out of",  
+    	        int (n_rules_in stats), text "read"]
 	]
 \end{code}    
 

@@ -7,7 +7,7 @@
 module TcRnDriver (
 #ifdef GHCI
 	mkExportEnv, getModuleContents, tcRnStmt, 
-	tcRnThing, tcRnExpr, tcRnType,
+	tcRnGetInfo, tcRnExpr, tcRnType,
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -41,7 +41,7 @@ import TcEnv		( tcExtendGlobalValEnv )
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcIface		( tcExtCoreBindings )
+import TcIface		( tcExtCoreBindings, loadImportedInsts )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
@@ -61,11 +61,11 @@ import NameSet
 import TyCon		( tyConHasGenerics )
 import SrcLoc		( SrcLoc, srcLocSpan, Located(..), noLoc )
 import Outputable
-import HscTypes		( ModGuts(..), HscEnv(..),
-			  GhciMode(..), Dependencies(..), noDependencies,
+import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState( eps_is_boot ),
+			  GhciMode(..), isOneShot, Dependencies(..), noDependencies,
 			  Deprecs( NoDeprecs ), plusDeprecs,
 			  ForeignStubs(NoStubs), TypeEnv, 
-			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons,
+			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, 
 			  emptyFixityEnv
 			)
 #ifdef GHCI
@@ -83,21 +83,23 @@ import TcExpr		( tcCheckRho )
 import TcMType		( zonkTcType )
 import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
-import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType )
+import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, tyClsNamesOfDFunHead )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
-import Inst		( tcStdSyntaxName )
+import Inst		( tcStdSyntaxName, tcGetInstEnvs )
+import InstEnv		( DFunId, classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
 import LoadIface	( loadSrcInterface )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
-			  IfaceExtName(..), IfaceConDecls(..),
-			  tyThingToIfaceDecl )
+			  IfaceExtName(..), IfaceConDecls(..), IfaceInst(..),
+			  tyThingToIfaceDecl, dfunToIfaceInst )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId, globalIdDetails )
 import FieldLabel	( fieldLabelTyCon )
 import MkId		( unsafeCoerceId )
 import DataCon		( dataConTyCon )
+import TyCon		( tyConName )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
@@ -107,8 +109,8 @@ import Name		( nameOccName, nameModuleName )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
 import Module		( ModuleName, lookupModuleEnvByName )
-import HscTypes		( InteractiveContext(..),
-			  HomeModInfo(..), typeEnvElts, 
+import HscTypes		( InteractiveContext(..), ExternalPackageState( eps_PTE ),
+			  HomeModInfo(..), typeEnvElts, typeEnvClasses,
 			  TyThing(..), availName, availNames, icPrintUnqual,
 			  ModIface(..), ModDetails(..) )
 import BasicTypes	( RecFlag(..), Fixity )
@@ -152,6 +154,12 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
    addSrcSpan loc $
    do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
+
+		-- In one-shot mode, record boot-file info in the EPS
+	ifM (isOneShot (hsc_mode hsc_env)) $
+	    updateEps_ (\eps -> eps { eps_is_boot = imp_dep_mods imports }) ;
+
+		-- Update the gbl env
 	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,
 				   tcg_imports = tcg_imports gbl `plusImportAvails` imports }) 
 		     $ do {
@@ -216,330 +224,6 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
     }}}}
 \end{code}
 
-
-%************************************************************************
-%*									*
-		The interactive interface 
-%*									*
-%************************************************************************
-
-\begin{code}
-#ifdef GHCI
-tcRnStmt :: HscEnv
-	 -> InteractiveContext
-	 -> LStmt RdrName
-	 -> IO (Maybe (InteractiveContext, [Name], LHsExpr Id))
-		-- The returned [Name] is the same as the input except for
-		-- ExprStmt, in which case the returned [Name] is [itName]
-		--
-		-- The returned TypecheckedHsExpr is of type IO [ () ],
-		-- a list of the bound values, coerced to ().
-
-tcRnStmt hsc_env ictxt rdr_stmt
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext ictxt $ do {
-
-    -- Rename; use CmdLineMode because tcRnStmt is only used interactively
-    ([rn_stmt], fvs) <- rnStmts DoExpr [rdr_stmt] ;
-    traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
-    failIfErrsM ;
-    
-    -- The real work is done here
-    (bound_ids, tc_expr) <- tcUserStmt rn_stmt ;
-    
-    traceTc (text "tcs 1") ;
-    let {	-- Make all the bound ids "global" ids, now that
-    		-- they're notionally top-level bindings.  This is
-	    	-- important: otherwise when we come to compile an expression
-	    	-- using these ids later, the byte code generator will consider
-	    	-- the occurrences to be free rather than global.
-	global_ids     = map (globaliseId VanillaGlobal) bound_ids ;
-    
-		-- Update the interactive context
-	rn_env   = ic_rn_local_env ictxt ;
-	type_env = ic_type_env ictxt ;
-
-	bound_names = map idName global_ids ;
-	new_rn_env  = extendLocalRdrEnv rn_env bound_names ;
-
-		-- Remove any shadowed bindings from the type_env;
-		-- they are inaccessible but might, I suppose, cause 
-		-- a space leak if we leave them there
-	shadowed = [ n | name <- bound_names,
-			 let rdr_name = mkRdrUnqual (nameOccName name),
-			 Just n <- [lookupLocalRdrEnv rn_env rdr_name] ] ;
-
-	filtered_type_env = delListFromNameEnv type_env shadowed ;
-	new_type_env = extendTypeEnvWithIds filtered_type_env global_ids ;
-
-	new_ic = ictxt { ic_rn_local_env = new_rn_env, 
-		  	 ic_type_env     = new_type_env }
-    } ;
-
-    dumpOptTcRn Opt_D_dump_tc 
-    	(vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
-    	       text "Typechecked expr" <+> ppr tc_expr]) ;
-
-    returnM (new_ic, bound_names, tc_expr)
-    }
-\end{code}
-
-
-Here is the grand plan, implemented in tcUserStmt
-
-	What you type			The IO [HValue] that hscStmt returns
-	-------------			------------------------------------
-	let pat = expr		==> 	let pat = expr in return [coerce HVal x, coerce HVal y, ...]
-					bindings: [x,y,...]
-
-	pat <- expr		==> 	expr >>= \ pat -> return [coerce HVal x, coerce HVal y, ...]
-					bindings: [x,y,...]
-
-	expr (of IO type)	==>	expr >>= \ it -> return [coerce HVal it]
-	  [NB: result not printed]	bindings: [it]
-	  
-	expr (of non-IO type,	==>	let it = expr in print it >> return [coerce HVal it]
-	  result showable)		bindings: [it]
-
-	expr (of non-IO type, 
-	  result not showable)	==>	error
-
-
-\begin{code}
----------------------------
-tcUserStmt :: LStmt Name -> TcM ([Id], LHsExpr Id)
-tcUserStmt (L _ (ExprStmt expr _))
-  = newUnique 		`thenM` \ uniq ->
-    let 
-	fresh_it = itName uniq
-        the_bind = noLoc $ FunBind (noLoc fresh_it) False 
-			[ mkSimpleMatch [] expr placeHolderType ]
-    in
-    tryTcLIE_ (do { 	-- Try this if the other fails
-		traceTc (text "tcs 1b") ;
-		tc_stmts [
-		    nlLetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
-		    nlExprStmt (nlHsApp (nlHsVar printName) 
-					      (nlHsVar fresh_it)) 	
-	] })
-	  (do { 	-- Try this first 
-		traceTc (text "tcs 1a") ;
-		tc_stmts [nlBindStmt (nlVarPat fresh_it) expr] })
-
-tcUserStmt stmt = tc_stmts [stmt]
-
----------------------------
-tc_stmts stmts
- = do { ioTyCon <- tcLookupTyCon ioTyConName ;
-	let {
-	    ret_ty    = mkListTy unitTy ;
-	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-
-	    names = map unLoc (collectStmtsBinders stmts) ;
-
-	    stmt_ctxt = SC { sc_what = DoExpr, 
-			     sc_rhs  = check_rhs,
-			     sc_body = check_body,
-			     sc_ty   = ret_ty } ;
-
-	    check_rhs rhs rhs_ty = tcCheckRho rhs  (mkTyConApp ioTyCon [rhs_ty]) ;
-	    check_body body      = tcCheckRho body io_ret_ty ;
-
-		-- mk_return builds the expression
-		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
-		--
-		-- Despite the inconvenience of building the type applications etc,
-		-- this *has* to be done in type-annotated post-typecheck form
-		-- because we are going to return a list of *polymorphic* values
-		-- coerced to type (). If we built a *source* stmt
-		--	return [coerce x, ..., coerce z]
-		-- then the type checker would instantiate x..z, and we wouldn't
-		-- get their *polymorphic* values.  (And we'd get ambiguity errs
-		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ret_id ids = nlHsApp (noLoc $ TyApp (nlHsVar ret_id) [ret_ty]) 
-			      		   (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
-	    mk_item id = nlHsApp (noLoc $ TyApp (nlHsVar unsafeCoerceId) [idType id, unitTy])
-		    	       (nlHsVar id) ;
-
-	    io_ty = mkTyConApp ioTyCon []
-	 } ;
-
-	-- OK, we're ready to typecheck the stmts
-	traceTc (text "tcs 2") ;
-	((ids, tc_expr), lie) <- getLIE $ do {
-	    (ids, tc_stmts) <- tcStmtsAndThen combine stmt_ctxt stmts	$ 
-			do {
-			    -- Look up the names right in the middle,
-			    -- where they will all be in scope
-			    ids <- mappM tcLookupId names ;
-			    ret_id <- tcLookupId returnIOName ;		-- return @ IO
-			    return (ids, [nlResultStmt (mk_return ret_id ids)]) } ;
-
-	    io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
-	    return (ids, noLoc (HsDo DoExpr tc_stmts io_ids io_ret_ty))
-	} ;
-
-	-- Simplify the context right here, so that we fail
-	-- if there aren't enough instances.  Notably, when we see
-	--		e
-	-- we use recoverTc_ to try	it <- e
-	-- and then			let it = e
-	-- It's the simplify step that rejects the first.
-	traceTc (text "tcs 3") ;
-	const_binds <- tcSimplifyInteractive lie ;
-
-	-- Build result expression and zonk it
-	let { expr = mkHsLet const_binds tc_expr } ;
-	zonked_expr <- zonkTopLExpr expr ;
-	zonked_ids  <- zonkTopBndrs ids ;
-
-	-- None of the Ids should be of unboxed type, because we
-	-- cast them all to HValues in the end!
-	mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
-
-	return (zonked_ids, zonked_expr)
-	}
-  where
-    combine stmt (ids, stmts) = (ids, stmt:stmts)
-    bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
-				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
-\end{code}
-
-
-tcRnExpr just finds the type of an expression
-
-\begin{code}
-tcRnExpr :: HscEnv
-	 -> InteractiveContext
-	 -> LHsExpr RdrName
-	 -> IO (Maybe Type)
-tcRnExpr hsc_env ictxt rdr_expr
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext ictxt $ do {
-
-    (rn_expr, fvs) <- rnLExpr rdr_expr ;
-    failIfErrsM ;
-
-	-- Now typecheck the expression; 
-	-- it might have a rank-2 type (e.g. :t runST)
-    ((tc_expr, res_ty), lie)	   <- getLIE (tcInferRho rn_expr) ;
-    ((qtvs, _, dict_ids), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
-    tcSimplifyInteractive lie_top ;
-
-    let { all_expr_ty = mkForAllTys qtvs 		$
-    		        mkFunTys (map idType dict_ids)	$
-    		        res_ty } ;
-    zonkTcType all_expr_ty
-    }
-  where
-    smpl_doc = ptext SLIT("main expression")
-\end{code}
-
-tcRnExpr just finds the kind of a type
-
-\begin{code}
-tcRnType :: HscEnv
-	 -> InteractiveContext
-	 -> LHsType RdrName
-	 -> IO (Maybe Kind)
-tcRnType hsc_env ictxt rdr_type
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext ictxt $ do {
-
-    rn_type <- rnLHsType doc rdr_type ;
-    failIfErrsM ;
-
-	-- Now kind-check the type
-    (ty', kind) <- kcHsType rn_type ;
-    return kind
-    }
-  where
-    doc = ptext SLIT("In GHCi input")
-\end{code}
-
-\begin{code}
-tcRnThing :: HscEnv
-	  -> InteractiveContext
-	  -> RdrName
-	  -> IO (Maybe [(IfaceDecl, Fixity, SrcLoc)])
--- Look up a RdrName and return all the TyThings it might be
--- A capitalised RdrName is given to us in the DataName namespace,
--- but we want to treat it as *both* a data constructor 
--- *and* as a type or class constructor; 
--- hence the call to dataTcOccs, and we return up to two results
-tcRnThing hsc_env ictxt rdr_name
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext ictxt $ do {
-
-	-- If the identifier is a constructor (begins with an
-	-- upper-case letter), then we need to consider both
-	-- constructor and type class identifiers.
-    let { rdr_names = dataTcOccs rdr_name } ;
-
-	-- results :: [(Messages, Maybe Name)]
-    results <- mapM (tryTc . lookupOccRn) rdr_names ;
-
-	-- The successful lookups will be (Just name)
-    let { (warns_s, good_names) = unzip [ (msgs, name) 
-					| (msgs, Just name) <- results] ;
-	  errs_s = [msgs | (msgs, Nothing) <- results] } ;
-
-	-- Fail if nothing good happened, else add warnings
-    if null good_names then
-		-- No lookup succeeded, so
-		-- pick the first error message and report it
-		-- ToDo: If one of the errors is "could be Foo.X or Baz.X",
-		--	 while the other is "X is not in scope", 
-		--	 we definitely want the former; but we might pick the latter
-	do { addMessages (head errs_s) ; failM }
-      else 			-- Add deprecation warnings
-	mapM_ addMessages warns_s ;
-	
-	-- And lookup up the entities, avoiding duplicates, which arise
-	-- because constructors and record selectors are represented by
-	-- their parent declaration
-    let { do_one name = do { thing <- tcLookupGlobal name
-			   ; let decl = toIfaceDecl ictxt thing
-		           ; fixity <- lookupFixityRn name
-		           ; return (decl, fixity, getSrcLoc thing) } ;
-		-- For the SrcLoc, the 'thing' has better info than
-		-- the 'name' because getting the former forced the
-		-- declaration to be loaded into the cache
-	  cmp (d1,_,_) (d2,_,_) = ifName d1 `compare` ifName d2 } ;
-    results <- mapM do_one good_names ;
-    return (fst (removeDups cmp results))
-    }
-
-toIfaceDecl :: InteractiveContext -> TyThing -> IfaceDecl
-toIfaceDecl ictxt thing
-  = tyThingToIfaceDecl True 		-- Discard IdInfo
-		       emptyNameSet	-- Show data cons
-		       ext_nm (munge thing)
-  where
-    unqual = icPrintUnqual ictxt
-    ext_nm n | unqual n  = LocalTop (nameOccName n)	-- What a hack
-	     | otherwise = ExtPkg (nameModuleName n) (nameOccName n)
-
-	-- munge transforms a thing to it's "parent" thing
-    munge (ADataCon dc) = ATyCon (dataConTyCon dc)
-    munge (AnId id) = case globalIdDetails id of
-			RecordSelId lbl -> ATyCon (fieldLabelTyCon lbl)
-			ClassOpId cls   -> AClass cls
-			other		-> AnId id
-    munge other_thing = other_thing
-\end{code}
-
-
-\begin{code}
-setInteractiveContext :: InteractiveContext -> TcRn a -> TcRn a
-setInteractiveContext icxt thing_inside 
-  = traceTc (text "setIC" <+> ppr (ic_type_env icxt))	`thenM_`
-    (updGblEnv (\env -> env {tcg_rdr_env  = ic_rn_gbl_env icxt,
-			     tcg_type_env = ic_type_env   icxt}) $
-     updLclEnv (\env -> env {tcl_rdr = ic_rn_local_env icxt})	$
-	       thing_inside)
-#endif /* GHCI */
-\end{code}
 
 %************************************************************************
 %*									*
@@ -840,112 +524,6 @@ tcTopSrcDecls
 \end{code}
 
 
-%*********************************************************
-%*						 	 *
-	mkGlobalContext: make up an interactive context
-
-	Used for initialising the lexical environment
-	of the interactive read-eval-print loop
-%*							 *
-%*********************************************************
-
-\begin{code}
-#ifdef GHCI
-mkExportEnv :: HscEnv -> [ModuleName]	-- Expose these modules' exports only
- 	    -> IO GlobalRdrEnv
-
-mkExportEnv hsc_env exports
-  = do	{ mb_envs <- initTcPrintErrors hsc_env iNTERACTIVE $
-		     mappM getModuleExports exports 
-	; case mb_envs of
-	     Just envs -> return (foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs)
-	     Nothing   -> return emptyGlobalRdrEnv
-			     -- Some error; initTc will have printed it
-    }
-
-getModuleExports :: ModuleName -> TcM GlobalRdrEnv
-getModuleExports mod 
-  = do	{ iface <- load_iface mod
-	; loadOrphanModules (dep_orphs (mi_deps iface))
-			-- Load any orphan-module interfaces,
-			-- so their instances are visible
-	; avails <- exportsToAvails (mi_exports iface)
-	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
-			| avail <- avails, name <- availNames avail ] }
-	; returnM (mkGlobalRdrEnv gres) }
-
-vanillaProv :: ModuleName -> Provenance
--- We're building a GlobalRdrEnv as if the user imported
--- all the specified modules into the global interactive module
-vanillaProv mod = Imported [ImportSpec mod mod False 
-			     (srcLocSpan interactiveSrcLoc)] False
-\end{code}
-
-\begin{code}
-getModuleContents
-  :: HscEnv
-  -> InteractiveContext
-  -> ModuleName			-- Module to inspect
-  -> Bool			-- Grab just the exports, or the whole toplev
-  -> IO (Maybe [IfaceDecl])
-
-getModuleContents hsc_env ictxt mod exports_only
- = initTcPrintErrors hsc_env iNTERACTIVE (get_mod_contents exports_only)
- where
-   get_mod_contents exports_only
-      | not exports_only  -- We want the whole top-level type env
- 			  -- so it had better be a home module
-      = do { hpt <- getHpt
- 	   ; case lookupModuleEnvByName hpt mod of
- 	       Just mod_info -> return (map (toIfaceDecl ictxt) $
-					filter wantToSee $
- 				        typeEnvElts $
- 				        md_types (hm_details mod_info))
- 	       Nothing -> ghcError (ProgramError (showSDoc (noRdrEnvErr mod)))
- 			  -- This is a system error; the module should be in the HPT
- 	   }
-  
-      | otherwise		-- Want the exports only
-      = do { iface <- load_iface mod
- 	   ; avails <- exportsToAvails (mi_exports iface)
- 	   ; mappM get_decl avails
-    	}
-
-   get_decl avail 
-	= do { thing <- tcLookupGlobal (availName avail)
-	     ; return (filter_decl (availOccs avail) (toIfaceDecl ictxt thing)) }
-
----------------------
-filter_decl occs decl@(IfaceClass {ifSigs = sigs})
-  = decl { ifSigs = filter (keep_sig occs) sigs }
-filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon cons})
-  = decl { ifCons = IfDataTyCon (filter (keep_con occs) cons) }
-filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
-  | keep_con occs con = decl
-  | otherwise	      = decl {ifCons = IfAbstractTyCon}	-- Hmm?
-filter_decl occs decl
-  = decl
-
-keep_sig occs (IfaceClassOp occ _ _)	     = occ `elem` occs
-keep_con occs (IfaceConDecl occ _ _ _ _ _ _) = occ `elem` occs
-
-availOccs avail = map nameOccName (availNames avail)
-
-wantToSee (AnId id)    = not (isImplicitId id)
-wantToSee (ADataCon _) = False	-- They'll come via their TyCon
-wantToSee _ 	       = True
-
----------------------
-load_iface mod = loadSrcInterface doc mod False {- Not boot iface -}
-	       where
-		 doc = ptext SLIT("context for compiling statements")
-
----------------------
-noRdrEnvErr mod = ptext SLIT("No top-level environment available for module") 
-		  <+> quotes (ppr mod)
-#endif
-\end{code}
-
 %************************************************************************
 %*									*
 	Checking for 'main'
@@ -1020,6 +598,463 @@ check_main ghci_mode tcg_env main_mod main_fn
 		<+> ptext SLIT("is not defined in module") <+> quotes (ppr main_mod)
 \end{code}
 
+
+%*********************************************************
+%*						 	 *
+		GHCi stuff
+%*							 *
+%*********************************************************
+
+\begin{code}
+#ifdef GHCI
+setInteractiveContext :: InteractiveContext -> TcRn a -> TcRn a
+setInteractiveContext icxt thing_inside 
+  = traceTc (text "setIC" <+> ppr (ic_type_env icxt))	`thenM_`
+    (updGblEnv (\env -> env {tcg_rdr_env  = ic_rn_gbl_env icxt,
+			     tcg_type_env = ic_type_env   icxt}) $
+     updLclEnv (\env -> env {tcl_rdr = ic_rn_local_env icxt})	$
+	       thing_inside)
+\end{code}
+
+
+\begin{code}
+tcRnStmt :: HscEnv
+	 -> InteractiveContext
+	 -> LStmt RdrName
+	 -> IO (Maybe (InteractiveContext, [Name], LHsExpr Id))
+		-- The returned [Name] is the same as the input except for
+		-- ExprStmt, in which case the returned [Name] is [itName]
+		--
+		-- The returned TypecheckedHsExpr is of type IO [ () ],
+		-- a list of the bound values, coerced to ().
+
+tcRnStmt hsc_env ictxt rdr_stmt
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext ictxt $ do {
+
+    -- Rename; use CmdLineMode because tcRnStmt is only used interactively
+    ([rn_stmt], fvs) <- rnStmts DoExpr [rdr_stmt] ;
+    traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
+    failIfErrsM ;
+    
+    -- The real work is done here
+    (bound_ids, tc_expr) <- tcUserStmt rn_stmt ;
+    
+    traceTc (text "tcs 1") ;
+    let {	-- Make all the bound ids "global" ids, now that
+    		-- they're notionally top-level bindings.  This is
+	    	-- important: otherwise when we come to compile an expression
+	    	-- using these ids later, the byte code generator will consider
+	    	-- the occurrences to be free rather than global.
+	global_ids     = map (globaliseId VanillaGlobal) bound_ids ;
+    
+		-- Update the interactive context
+	rn_env   = ic_rn_local_env ictxt ;
+	type_env = ic_type_env ictxt ;
+
+	bound_names = map idName global_ids ;
+	new_rn_env  = extendLocalRdrEnv rn_env bound_names ;
+
+		-- Remove any shadowed bindings from the type_env;
+		-- they are inaccessible but might, I suppose, cause 
+		-- a space leak if we leave them there
+	shadowed = [ n | name <- bound_names,
+			 let rdr_name = mkRdrUnqual (nameOccName name),
+			 Just n <- [lookupLocalRdrEnv rn_env rdr_name] ] ;
+
+	filtered_type_env = delListFromNameEnv type_env shadowed ;
+	new_type_env = extendTypeEnvWithIds filtered_type_env global_ids ;
+
+	new_ic = ictxt { ic_rn_local_env = new_rn_env, 
+		  	 ic_type_env     = new_type_env }
+    } ;
+
+    dumpOptTcRn Opt_D_dump_tc 
+    	(vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
+    	       text "Typechecked expr" <+> ppr tc_expr]) ;
+
+    returnM (new_ic, bound_names, tc_expr)
+    }
+\end{code}
+
+
+Here is the grand plan, implemented in tcUserStmt
+
+	What you type			The IO [HValue] that hscStmt returns
+	-------------			------------------------------------
+	let pat = expr		==> 	let pat = expr in return [coerce HVal x, coerce HVal y, ...]
+					bindings: [x,y,...]
+
+	pat <- expr		==> 	expr >>= \ pat -> return [coerce HVal x, coerce HVal y, ...]
+					bindings: [x,y,...]
+
+	expr (of IO type)	==>	expr >>= \ it -> return [coerce HVal it]
+	  [NB: result not printed]	bindings: [it]
+	  
+	expr (of non-IO type,	==>	let it = expr in print it >> return [coerce HVal it]
+	  result showable)		bindings: [it]
+
+	expr (of non-IO type, 
+	  result not showable)	==>	error
+
+
+\begin{code}
+---------------------------
+tcUserStmt :: LStmt Name -> TcM ([Id], LHsExpr Id)
+tcUserStmt (L _ (ExprStmt expr _))
+  = newUnique 		`thenM` \ uniq ->
+    let 
+	fresh_it = itName uniq
+        the_bind = noLoc $ FunBind (noLoc fresh_it) False 
+			[ mkSimpleMatch [] expr placeHolderType ]
+    in
+    tryTcLIE_ (do { 	-- Try this if the other fails
+		traceTc (text "tcs 1b") ;
+		tc_stmts [
+		    nlLetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
+		    nlExprStmt (nlHsApp (nlHsVar printName) 
+					      (nlHsVar fresh_it)) 	
+	] })
+	  (do { 	-- Try this first 
+		traceTc (text "tcs 1a") ;
+		tc_stmts [nlBindStmt (nlVarPat fresh_it) expr] })
+
+tcUserStmt stmt = tc_stmts [stmt]
+
+---------------------------
+tc_stmts stmts
+ = do { ioTyCon <- tcLookupTyCon ioTyConName ;
+	let {
+	    ret_ty    = mkListTy unitTy ;
+	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
+
+	    names = map unLoc (collectStmtsBinders stmts) ;
+
+	    stmt_ctxt = SC { sc_what = DoExpr, 
+			     sc_rhs  = check_rhs,
+			     sc_body = check_body,
+			     sc_ty   = ret_ty } ;
+
+	    check_rhs rhs rhs_ty = tcCheckRho rhs  (mkTyConApp ioTyCon [rhs_ty]) ;
+	    check_body body      = tcCheckRho body io_ret_ty ;
+
+		-- mk_return builds the expression
+		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
+		--
+		-- Despite the inconvenience of building the type applications etc,
+		-- this *has* to be done in type-annotated post-typecheck form
+		-- because we are going to return a list of *polymorphic* values
+		-- coerced to type (). If we built a *source* stmt
+		--	return [coerce x, ..., coerce z]
+		-- then the type checker would instantiate x..z, and we wouldn't
+		-- get their *polymorphic* values.  (And we'd get ambiguity errs
+		-- if they were overloaded, since they aren't applied to anything.)
+	    mk_return ret_id ids = nlHsApp (noLoc $ TyApp (nlHsVar ret_id) [ret_ty]) 
+			      		   (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
+	    mk_item id = nlHsApp (noLoc $ TyApp (nlHsVar unsafeCoerceId) [idType id, unitTy])
+		    	       (nlHsVar id) ;
+
+	    io_ty = mkTyConApp ioTyCon []
+	 } ;
+
+	-- OK, we're ready to typecheck the stmts
+	traceTc (text "tcs 2") ;
+	((ids, tc_expr), lie) <- getLIE $ do {
+	    (ids, tc_stmts) <- tcStmtsAndThen combine stmt_ctxt stmts	$ 
+			do {
+			    -- Look up the names right in the middle,
+			    -- where they will all be in scope
+			    ids <- mappM tcLookupId names ;
+			    ret_id <- tcLookupId returnIOName ;		-- return @ IO
+			    return (ids, [nlResultStmt (mk_return ret_id ids)]) } ;
+
+	    io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
+	    return (ids, noLoc (HsDo DoExpr tc_stmts io_ids io_ret_ty))
+	} ;
+
+	-- Simplify the context right here, so that we fail
+	-- if there aren't enough instances.  Notably, when we see
+	--		e
+	-- we use recoverTc_ to try	it <- e
+	-- and then			let it = e
+	-- It's the simplify step that rejects the first.
+	traceTc (text "tcs 3") ;
+	const_binds <- tcSimplifyInteractive lie ;
+
+	-- Build result expression and zonk it
+	let { expr = mkHsLet const_binds tc_expr } ;
+	zonked_expr <- zonkTopLExpr expr ;
+	zonked_ids  <- zonkTopBndrs ids ;
+
+	-- None of the Ids should be of unboxed type, because we
+	-- cast them all to HValues in the end!
+	mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
+
+	return (zonked_ids, zonked_expr)
+	}
+  where
+    combine stmt (ids, stmts) = (ids, stmt:stmts)
+    bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
+				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
+\end{code}
+
+
+tcRnExpr just finds the type of an expression
+
+\begin{code}
+tcRnExpr :: HscEnv
+	 -> InteractiveContext
+	 -> LHsExpr RdrName
+	 -> IO (Maybe Type)
+tcRnExpr hsc_env ictxt rdr_expr
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext ictxt $ do {
+
+    (rn_expr, fvs) <- rnLExpr rdr_expr ;
+    failIfErrsM ;
+
+	-- Now typecheck the expression; 
+	-- it might have a rank-2 type (e.g. :t runST)
+    ((tc_expr, res_ty), lie)	   <- getLIE (tcInferRho rn_expr) ;
+    ((qtvs, _, dict_ids), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
+    tcSimplifyInteractive lie_top ;
+
+    let { all_expr_ty = mkForAllTys qtvs 		$
+    		        mkFunTys (map idType dict_ids)	$
+    		        res_ty } ;
+    zonkTcType all_expr_ty
+    }
+  where
+    smpl_doc = ptext SLIT("main expression")
+\end{code}
+
+tcRnExpr just finds the kind of a type
+
+\begin{code}
+tcRnType :: HscEnv
+	 -> InteractiveContext
+	 -> LHsType RdrName
+	 -> IO (Maybe Kind)
+tcRnType hsc_env ictxt rdr_type
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext ictxt $ do {
+
+    rn_type <- rnLHsType doc rdr_type ;
+    failIfErrsM ;
+
+	-- Now kind-check the type
+    (ty', kind) <- kcHsType rn_type ;
+    return kind
+    }
+  where
+    doc = ptext SLIT("In GHCi input")
+
+#endif /* GHCi */
+\end{code}
+
+
+%************************************************************************
+%*									*
+	More GHCi stuff, to do with browsing and getting info
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef GHCI
+mkExportEnv :: HscEnv -> [ModuleName]	-- Expose these modules' exports only
+ 	    -> IO GlobalRdrEnv
+mkExportEnv hsc_env exports
+  = do	{ mb_envs <- initTcPrintErrors hsc_env iNTERACTIVE $
+		     mappM getModuleExports exports 
+	; case mb_envs of
+	     Just envs -> return (foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs)
+	     Nothing   -> return emptyGlobalRdrEnv
+			     -- Some error; initTc will have printed it
+    }
+
+getModuleExports :: ModuleName -> TcM GlobalRdrEnv
+getModuleExports mod 
+  = do	{ iface <- load_iface mod
+	; loadOrphanModules (dep_orphs (mi_deps iface))
+			-- Load any orphan-module interfaces,
+			-- so their instances are visible
+	; avails <- exportsToAvails (mi_exports iface)
+	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
+			| avail <- avails, name <- availNames avail ] }
+	; returnM (mkGlobalRdrEnv gres) }
+
+vanillaProv :: ModuleName -> Provenance
+-- We're building a GlobalRdrEnv as if the user imported
+-- all the specified modules into the global interactive module
+vanillaProv mod = Imported [ImportSpec mod mod False 
+			     (srcLocSpan interactiveSrcLoc)] False
+\end{code}
+
+\begin{code}
+getModuleContents
+  :: HscEnv
+  -> InteractiveContext
+  -> ModuleName			-- Module to inspect
+  -> Bool			-- Grab just the exports, or the whole toplev
+  -> IO (Maybe [IfaceDecl])
+
+getModuleContents hsc_env ictxt mod exports_only
+ = initTcPrintErrors hsc_env iNTERACTIVE (get_mod_contents exports_only)
+ where
+   get_mod_contents exports_only
+      | not exports_only  -- We want the whole top-level type env
+ 			  -- so it had better be a home module
+      = do { hpt <- getHpt
+ 	   ; case lookupModuleEnvByName hpt mod of
+ 	       Just mod_info -> return (map toIfaceDecl $
+					filter wantToSee $
+ 				        typeEnvElts $
+ 				        md_types (hm_details mod_info))
+ 	       Nothing -> ghcError (ProgramError (showSDoc (noRdrEnvErr mod)))
+ 			  -- This is a system error; the module should be in the HPT
+ 	   }
+  
+      | otherwise		-- Want the exports only
+      = do { iface <- load_iface mod
+ 	   ; avails <- exportsToAvails (mi_exports iface)
+ 	   ; mappM get_decl avails
+    	}
+
+   get_decl avail 
+	= do { thing <- tcLookupGlobal (availName avail)
+	     ; return (filter_decl (availOccs avail) (toIfaceDecl thing)) }
+
+---------------------
+filter_decl occs decl@(IfaceClass {ifSigs = sigs})
+  = decl { ifSigs = filter (keep_sig occs) sigs }
+filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon cons})
+  = decl { ifCons = IfDataTyCon (filter (keep_con occs) cons) }
+filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
+  | keep_con occs con = decl
+  | otherwise	      = decl {ifCons = IfAbstractTyCon}	-- Hmm?
+filter_decl occs decl
+  = decl
+
+keep_sig occs (IfaceClassOp occ _ _)	     = occ `elem` occs
+keep_con occs (IfaceConDecl occ _ _ _ _ _ _) = occ `elem` occs
+
+availOccs avail = map nameOccName (availNames avail)
+
+wantToSee (AnId id)    = not (isImplicitId id)
+wantToSee (ADataCon _) = False	-- They'll come via their TyCon
+wantToSee _ 	       = True
+
+---------------------
+load_iface mod = loadSrcInterface doc mod False {- Not boot iface -}
+	       where
+		 doc = ptext SLIT("context for compiling statements")
+
+---------------------
+noRdrEnvErr mod = ptext SLIT("No top-level environment available for module") 
+		  <+> quotes (ppr mod)
+\end{code}
+
+\begin{code}
+tcRnGetInfo :: HscEnv
+	    -> InteractiveContext
+	    -> RdrName
+	    -> IO (Maybe [(IfaceDecl, 
+			   Fixity, SrcLoc, 
+			   [(IfaceInst, SrcLoc)])])
+-- Used to implemnent :info in GHCi
+--
+-- Look up a RdrName and return all the TyThings it might be
+-- A capitalised RdrName is given to us in the DataName namespace,
+-- but we want to treat it as *both* a data constructor 
+-- *and* as a type or class constructor; 
+-- hence the call to dataTcOccs, and we return up to two results
+tcRnGetInfo hsc_env ictxt rdr_name
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext ictxt $ do {
+
+	-- If the identifier is a constructor (begins with an
+	-- upper-case letter), then we need to consider both
+	-- constructor and type class identifiers.
+    let { rdr_names = dataTcOccs rdr_name } ;
+
+	-- results :: [(Messages, Maybe Name)]
+    results <- mapM (tryTc . lookupOccRn) rdr_names ;
+
+    traceRn (text "xx" <+> vcat [ppr rdr_names, ppr (map snd results)]);
+	-- The successful lookups will be (Just name)
+    let { (warns_s, good_names) = unzip [ (msgs, name) 
+					| (msgs, Just name) <- results] ;
+	  errs_s = [msgs | (msgs, Nothing) <- results] } ;
+
+	-- Fail if nothing good happened, else add warnings
+    if null good_names then
+		-- No lookup succeeded, so
+		-- pick the first error message and report it
+		-- ToDo: If one of the errors is "could be Foo.X or Baz.X",
+		--	 while the other is "X is not in scope", 
+		--	 we definitely want the former; but we might pick the latter
+	do { addMessages (head errs_s) ; failM }
+      else 			-- Add deprecation warnings
+	mapM_ addMessages warns_s ;
+	
+	-- And lookup up the entities, avoiding duplicates, which arise
+	-- because constructors and record selectors are represented by
+	-- their parent declaration
+    let { do_one name = do { thing <- tcLookupGlobal name
+			   ; let decl = toIfaceDecl thing
+		           ; fixity <- lookupFixityRn name
+			   ; insts  <- lookupInsts thing
+		           ; return (decl, fixity, getSrcLoc thing, 
+				     map mk_inst insts) } ;
+		-- For the SrcLoc, the 'thing' has better info than
+		-- the 'name' because getting the former forced the
+		-- declaration to be loaded into the cache
+	  mk_inst dfun = (dfunToIfaceInst dfun, getSrcLoc dfun) ;
+	  cmp (d1,_,_,_) (d2,_,_,_) = ifName d1 `compare` ifName d2 } ;
+    results <- mapM do_one good_names ;
+    return (fst (removeDups cmp results))
+    }
+
+lookupInsts :: TyThing -> TcM [DFunId]
+lookupInsts (AClass cls)
+  = do	{ loadImportedInsts cls []	-- [] means load all instances for cls
+	; inst_envs <- tcGetInstEnvs
+	; return [df | (_,_,df) <- classInstances inst_envs cls] }
+
+lookupInsts (ATyCon tc)
+  = do 	{ eps <- getEps	-- Load all instances for all classes that are
+			-- in the type environment (which are all the ones
+			-- we've seen in any interface file so far
+	; mapM_ (\c -> loadImportedInsts c [])
+		(typeEnvClasses (eps_PTE eps))
+	; (pkg_ie, home_ie) <- tcGetInstEnvs	-- Search all
+	; return (get home_ie ++ get pkg_ie) }
+  where
+    get ie = [df | (_,_,df) <- instEnvElts ie, relevant df]
+    relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
+    tc_name = tyConName tc		  
+
+lookupInsts other = return []
+
+
+toIfaceDecl :: TyThing -> IfaceDecl
+toIfaceDecl thing
+  = tyThingToIfaceDecl True 		-- Discard IdInfo
+		       emptyNameSet	-- Show data cons
+		       ext_nm (munge thing)
+  where
+    ext_nm n = ExtPkg (nameModuleName n) (nameOccName n)
+
+	-- munge transforms a thing to it's "parent" thing
+    munge (ADataCon dc) = ATyCon (dataConTyCon dc)
+    munge (AnId id) = case globalIdDetails id of
+			RecordSelId lbl -> ATyCon (fieldLabelTyCon lbl)
+			ClassOpId cls   -> AClass cls
+			other		-> AnId id
+    munge other_thing = other_thing
+
+#endif /* GHCI */
+\end{code}
 
 %************************************************************************
 %*									*
