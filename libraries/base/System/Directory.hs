@@ -881,10 +881,17 @@ environment variable or \"\/tmp\" if the variable isn\'t defined.
 On Windows, the function checks for the existence of environment variables in 
 the following order and uses the first path found:
 
-* TMP environment variable. 
-* TEMP environment variable. 
-* USERPROFILE environment variable. 
-* The Windows directory
+* 
+TMP environment variable. 
+
+*
+TEMP environment variable. 
+
+*
+USERPROFILE environment variable. 
+
+*
+The Windows directory
 
 The operation may fail with:
 
