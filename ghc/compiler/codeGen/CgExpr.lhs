@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.56 2003/07/02 13:19:28 simonpj Exp $
+% $Id: CgExpr.lhs,v 1.57 2004/03/31 15:23:16 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -480,7 +480,7 @@ primRetUnboxedTuple op args res_ty
       temp_uniqs  = map mkBuiltinUnique [ n_args .. n_args + length ty_args - 1]
       temp_amodes = zipWith CTemp temp_uniqs prim_reps
     in
-    ccallReturnUnboxedTuple temp_amodes 	
+    ccallReturnUnboxedTuple temp_amodes
 	(absC (COpStmt temp_amodes op arg_temps []))
 
 

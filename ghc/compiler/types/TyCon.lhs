@@ -9,7 +9,7 @@ module TyCon(
 
 	AlgTyConRhs(..), visibleDataCons,
 
-	isFunTyCon, isUnLiftedTyCon, isProductTyCon,
+	isFunTyCon, isUnLiftedTyCon, isProductTyCon, isAbstractTyCon,
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
 	isEnumerationTyCon, 
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
@@ -312,6 +312,10 @@ mkSynTyCon name kind tyvars rhs argvrcs
 isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
+
+isAbstractTyCon :: TyCon -> Bool
+isAbstractTyCon (AlgTyCon { algTyConRhs = AbstractTyCon }) = True
+isAbstractTyCon _ = False
 
 isPrimTyCon :: TyCon -> Bool
 isPrimTyCon (PrimTyCon {}) = True

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.61 2003/11/17 14:23:31 simonmar Exp $
+% $Id: ClosureInfo.lhs,v 1.62 2004/03/31 15:23:17 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -76,7 +76,7 @@ import PrimRep
 import SMRep		-- all of it
 import Type		( isUnLiftedType, Type, repType, splitTyConApp_maybe )
 import TcType		( tcSplitSigmaTy )
-import TyCon		( isFunTyCon )
+import TyCon		( isFunTyCon, isAbstractTyCon )
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel, ipNameName )
 import Util		( mapAccumL, listLengthCmp, lengthIs )
 import FastString
@@ -241,7 +241,9 @@ mkClosureLFInfo bndr top fvs upd_flag []
 might_be_a_function :: Type -> Bool
 might_be_a_function ty
   | Just (tc,_) <- splitTyConApp_maybe (repType ty), 
-    not (isFunTyCon tc) = False
+    not (isFunTyCon tc) && not (isAbstractTyCon tc) = False
+	-- don't forget to check for abstract types, which might
+	-- be functions too.
   | otherwise = True
 \end{code}
 
