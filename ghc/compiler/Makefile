@@ -177,9 +177,9 @@ ifeq "$(Ghc2_0)" "NO"
 reader/Lex_HC_OPTS		+= -fomit-derived-read
 endif
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"'
-rename/ParseIface_HC_OPTS 	= -Onot -H16m
-rename/ParseType_HC_OPTS 	= -Onot -H16m
-rename/ParseUnfolding_HC_OPTS 	= -Onot -H16m
+rename/ParseIface_HC_OPTS 	+= -Onot -H16m
+rename/ParseType_HC_OPTS 	+= -Onot -H16m
+rename/ParseUnfolding_HC_OPTS 	+= -Onot -H16m
 ifeq "$(Ghc2_0)" "YES"
 rename/ParseIface_HC_OPTS       += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
 rename/ParseType_HC_OPTS        += -fno-warn-incomplete-patterns -fno-warn-overlapped-patterns
@@ -199,7 +199,7 @@ rename/RnIfaces_HC_OPTS		= -H8m -fvia-C
 rename/RnNames_HC_OPTS		= -H12m
 rename/RnMonad_HC_OPTS		= -fvia-C
 # Urk!  Really big heap for ParseUnfolding
-rename/ParseUnfolding_HC_OPTS	= -H45m		
+#rename/ParseUnfolding_HC_OPTS	= -H45m		
 specialise/Specialise_HC_OPTS 	= -Onot -H12m
 stgSyn/StgSyn_HC_OPTS 		= -fno-omit-reexported-instances
 typecheck/TcGenDeriv_HC_OPTS	= -H10m
