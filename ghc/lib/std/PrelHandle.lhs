@@ -450,10 +450,11 @@ hSetBuffering handle mode =
                 ClosedHandle -> do
 		    writeHandle handle htype
 	            ioe_closedHandle handle
-                SemiClosedHandle _ _ -> do
-		    writeHandle handle htype
-	            ioe_closedHandle handle
                 other -> do
+		    {-
+		      We're being non-standard here, and allow the buffering
+		      of a semi-closed handle to be changed.   -- sof 6/98
+		    -}
                     rc <- _ccall_ setBuffering (filePtr other) bsize
                     if rc == 0 then
                         writeHandle handle ((hcon other) (filePtr other) 
@@ -829,10 +830,11 @@ hGetBuffering handle = do
       ClosedHandle -> do
 	  writeHandle handle htype
           ioe_closedHandle handle
-      SemiClosedHandle _ _ -> do
-	  writeHandle handle htype
-          ioe_closedHandle handle
       other -> do
+	  {-
+	   We're being non-standard here, and allow the buffering
+	   of a semi-closed handle to be queried.   -- sof 6/98
+          -}
 	  other <- getBufferMode other
           case bufferMode other of
             Just v -> do
@@ -869,11 +871,82 @@ hIsSeekable handle = do
 
 %*********************************************************
 %*							*
+\subsection{Changing echo status}
+%*							*
+%*********************************************************
+
+\begin{code}
+hSetEcho :: Handle -> Bool -> IO ()
+hSetEcho hdl on = do
+    isT   <- hIsTerminalDevice hdl
+    if not isT
+     then return ()
+     else do
+      htype <- readHandle hdl
+      case htype of 
+         ErrorHandle ioError ->  do 
+            writeHandle hdl htype
+	    fail ioError
+         ClosedHandle	   ->  do
+            writeHandle hdl htype
+	    ioe_closedHandle hdl
+         other -> do
+            rc <- _ccall_ setTerminalEcho (filePtr htype) (if on then 1 else 0)
+	    writeHandle hdl htype
+	    if rc /= -1
+	     then return ()
+	     else constructErrorAndFail "hSetEcho"
+
+hGetEcho :: Handle -> IO Bool
+hGetEcho hdl = do
+    isT   <- hIsTerminalDevice hdl
+    if not isT
+     then return False
+     else do
+       htype <- readHandle hdl
+       case htype of 
+         ErrorHandle ioError ->  do 
+            writeHandle hdl htype
+	    fail ioError
+         ClosedHandle	   ->  do
+            writeHandle hdl htype
+	    ioe_closedHandle hdl
+         other -> do
+            rc <- _ccall_ getTerminalEcho (filePtr htype)
+	    writeHandle hdl htype
+	    case rc of
+	      1 -> return True
+	      0 -> return False
+	      _ -> constructErrorAndFail "hSetEcho"
+
+hIsTerminalDevice :: Handle -> IO Bool
+hIsTerminalDevice hdl = do
+    htype <- readHandle hdl
+    case htype of 
+       ErrorHandle ioError ->  do 
+            writeHandle hdl htype
+	    fail ioError
+       ClosedHandle	   ->  do
+            writeHandle hdl htype
+	    ioe_closedHandle hdl
+       other -> do
+          rc <- _ccall_ isTerminalDevice (filePtr htype)
+	  writeHandle hdl htype
+	  case rc of
+	    1 -> return True
+	    0 -> return False
+	    _ -> constructErrorAndFail "hIsTerminalDevice"
+\end{code}
+
+
+
+%*********************************************************
+%*							*
 \subsection{Miscellaneous}
 %*							*
 %*********************************************************
 
-These two functions are meant to get things out of @IOErrors@.  They don't!
+These two functions are meant to get things out of @IOErrors@.
 
 \begin{code}
 ioeGetFileName        :: IOError -> Maybe FilePath

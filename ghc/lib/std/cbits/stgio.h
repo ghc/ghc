@@ -17,6 +17,11 @@ StgInt createDirectory PROTO((StgByteArray));
 StgAddr openDir__ PROTO((StgByteArray));
 StgAddr readDir__ PROTO((StgAddr));
 
+/* echoAux.lc */
+StgInt setTerminalEcho PROTO((StgForeignObj, StgInt));
+StgInt getTerminalEcho PROTO((StgForeignObj));
+StgInt isTerminalDevice PROTO((StgForeignObj));
+
 /* env.lc */
 char *	strDup		PROTO((const char *));
 int	setenviron	PROTO((char **));
