@@ -1569,7 +1569,7 @@ assignIntCode, assignFltCode
 assignIntCode pk (StInd _ dst) src
   = getNewRegNCG IntRep    	    `thenUs` \ tmp ->
     getAmode dst    	    	    `thenUs` \ amode ->
-    getRegister src	    	    	    `thenUs` \ register ->
+    getRegister src	     	    `thenUs` \ register ->
     let
     	code1   = amodeCode amode asmVoid
     	dst__2  = amodeAddr amode
@@ -1796,45 +1796,49 @@ assignFltCode pk dst src
 #if sparc_TARGET_ARCH
 
 assignFltCode pk (StInd _ dst) src
-  = getNewRegNCG pk        	    `thenUs` \ tmp ->
+  = getNewRegNCG pk        	    `thenUs` \ tmp1 ->
     getAmode dst    	    	    `thenUs` \ amode ->
-    getRegister src	    	    	    `thenUs` \ register ->
+    getRegister src	      	    `thenUs` \ register ->
     let
     	sz      = primRepToSize pk
     	dst__2  = amodeAddr amode
 
     	code1   = amodeCode amode asmVoid
-    	code2   = registerCode register tmp asmVoid
+    	code2   = registerCode register tmp1 asmVoid
 
-    	src__2  = registerName register tmp
+    	src__2  = registerName register tmp1
     	pk__2   = registerRep register
     	sz__2   = primRepToSize pk__2
 
     	code__2 = asmParThen [code1, code2] .
 	    if pk == pk__2 then
-		mkSeqInstr (ST sz src__2 dst__2)
+		    mkSeqInstr (ST sz src__2 dst__2)
 	    else
-		mkSeqInstrs [FxTOy sz__2 sz src__2 tmp, ST sz tmp dst__2]
+		mkSeqInstrs [FxTOy sz__2 sz src__2 tmp1, ST sz tmp1 dst__2]
     in
     returnUs code__2
 
 assignFltCode pk dst src
   = getRegister dst	    	    	    `thenUs` \ register1 ->
     getRegister src	    	    	    `thenUs` \ register2 ->
-    getNewRegNCG (registerRep register2)
-    	    	        	    `thenUs` \ tmp ->
+    let 
+        pk__2   = registerRep register2 
+        sz__2   = primRepToSize pk__2
+    in
+    getNewRegNCG pk__2                      `thenUs` \ tmp ->
     let
     	sz     	= primRepToSize pk
     	dst__2 	= registerName register1 g0    -- must be Fixed
  
+
     	reg__2 	= if pk /= pk__2 then tmp else dst__2
  
     	code   	= registerCode register2 reg__2
-    	src__2 	= registerName register2 reg__2
-    	pk__2  	= registerRep register2
-    	sz__2  	= primRepToSize pk__2
 
-	code__2 = if pk /= pk__2 then
+    	src__2 	= registerName register2 reg__2
+
+	code__2 = 
+	        if pk /= pk__2 then
 		     code . mkSeqInstr (FxTOy sz__2 sz src__2 dst__2)
     	    	else if isFixed register2 then
 		     code . mkSeqInstr (FMOV sz src__2 dst__2)
@@ -3260,3 +3264,4 @@ absIntCode x
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
+
