@@ -186,7 +186,7 @@ if ($PostScript ne '') {
 # OK, so we're gonna do the normal thing...
 
 if ($Cachegrind eq 'yes') {
-  $CachegrindPrefix = "cachegrind --logfile-fd=99 99>$CachegrindStats";
+  $CachegrindPrefix = "valgrind --skin=cachegrind --logfile-fd=99 99>$CachegrindStats";
 } else {
   $CachegrindPrefix = '';
 }
