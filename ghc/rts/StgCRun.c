@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.27 2002/01/07 22:35:55 ken Exp $
+ * $Id: StgCRun.c,v 1.28 2002/02/06 15:48:56 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -115,6 +115,8 @@ EXTFUN(StgReturn)
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
+    static volatile void* stg_esp_saved_before_stack_align;
+
     unsigned char space[ RESERVED_C_STACK_BYTES + 4*sizeof(void *) ];
     StgThreadReturnCode r;
 
@@ -123,7 +125,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	 * save callee-saves registers on behalf of the STG code.
 	 */
 	"movl %%esp, %%eax\n\t"
-	"addl %4, %%eax\n\t"
+	"addl %5, %%eax\n\t"
         "movl %%ebx,0(%%eax)\n\t"
         "movl %%esi,4(%%eax)\n\t"
         "movl %%edi,8(%%eax)\n\t"
@@ -131,30 +133,53 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	/*
 	 * Set BaseReg
 	 */
-	"movl %3,%%ebx\n\t"
+	"movl %4,%%ebx\n\t"
 	/*
-	 * grab the function argument from the stack, and jump to it.
+	 * grab the function argument from the stack
 	 */
-        "movl %2,%%eax\n\t"
+        "movl %3,%%eax\n\t"
+	/* 
+         * Get %%esp 8-aligned, first saving the current value.  This
+         * moves it down another zero or four bytes, depending on
+         * whether it was already aligned or not.  This is a bit
+         * subtle -- we must not have a swizzled %esp at any place
+         * where we might refer to one of the %digit parameters to
+         * this piece of assembly code, since gcc may generate
+         * %esp-relative stack offsets which will then be wrong.
+	 */
+        "movl %%esp, %6\n\t"
+        "subl $4, %%esp\n\t"
+        "andl $0xFFFFFFF8, %%esp\n\t"
+	/* 
+	 * And finally, jump to the function argument. 
+	 */
         "jmp *%%eax\n\t"
 
 	".global " STG_RETURN "\n"
        	STG_RETURN ":\n\t"
-
-	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
-
+	/* 
+         * Restore %%esp to pre-alignment state. 
+         */
+        "movl %2, %%esp\n"
+        /* 
+         * Move return value from R1 to %%eax 
+         */
+	"movl %%esi, %%eax\n\t"
 	/*
 	 * restore callee-saves registers.  (Don't stomp on %%eax!)
 	 */
 	"movl %%esp, %%edx\n\t"
-	"addl %4, %%edx\n\t"
+	"addl %5, %%edx\n\t"
         "movl 0(%%edx),%%ebx\n\t"	/* restore the registers saved above */
         "movl 4(%%edx),%%esi\n\t"
         "movl 8(%%edx),%%edi\n\t"
         "movl 12(%%edx),%%ebp\n\t"
 
-      : "=&a" (r), "=m" (space)
-      : "m" (f), "m" (basereg), "i" (RESERVED_C_STACK_BYTES)
+	: "=&a" (r), "=m" (space),
+          "=m" (stg_esp_saved_before_stack_align)
+        : "m" (f), "m" (basereg), "i" (RESERVED_C_STACK_BYTES),
+          "m" (stg_esp_saved_before_stack_align)
+
       : "edx" /* stomps on %edx */
     );
 
