@@ -538,7 +538,7 @@ coreToStgArgs (arg : args)	-- Non-type argument
 	fvs = args_fvs `unionFVInfo` arg_fvs
 	stg_arg = case arg' of
 		       StgApp v []      -> StgVarArg v
-		       StgConApp con [] -> StgVarArg (dataConWrapId con)
+		       StgConApp con [] -> StgVarArg (dataConWorkId con)
 		       StgLit lit       -> StgLitArg lit
 		       _ 		-> pprPanic "coreToStgArgs" (ppr arg)
     in
