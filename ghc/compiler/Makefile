@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.43 1998/07/02 08:44:24 simonm Exp $
+# $Id: Makefile,v 1.44 1998/08/14 12:13:06 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -137,8 +137,11 @@ absCSyn/PprAbsC_HC_OPTS 	= -H10m
 
 basicTypes/IdInfo_HC_OPTS 	= -K2m
 hsSyn/HsExpr_HC_OPTS 		= -K2m
-main/Main_HC_OPTS 		= -fvia-C -DPROJECTVERSION=$(GhcProjectVersion)
-main/MkIface_HC_OPTS            = -DPROJECTVERSION=$(GhcProjectVersionInt)
+main/Main_HC_OPTS 		= -fvia-C
+ifeq "$(GhcReportCompiles)" "YES"
+main/Main_HC_OPTS 		+= -syslib misc -DREPORT_TO_MOTHERLODE
+endif
+
 main/CmdLineOpts_HC_OPTS 	= -fvia-C
 nativeGen/PprMach_HC_OPTS 	= -K2m
 nativeGen/MachMisc_HC_OPTS 	= -K2m -fvia-C
@@ -157,7 +160,7 @@ parser/U_qid_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 parser/U_tree_HC_OPTS 		= -H12m -fvia-C '-\#include"hspincl.h"'
 parser/U_ttype_HC_OPTS 		= -fvia-C '-\#include"hspincl.h"'
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
-reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C -DPROJECTVERSION=$(GhcProjectVersionInt)
+reader/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 
 # Heap was 6m with 2.10
 reader/ReadPrefix_HC_OPTS 	= -fvia-C '-\#include"hspincl.h"' -H10m
@@ -237,7 +240,7 @@ SRC_FLEX_OPTS += -s
 
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
-	$(HC) -c -o $@ $(HCFLAGS) parser/hschooks.c
+	$(HC) -c -o $@ $(HC_OPTS) parser/hschooks.c
 
 
 # Interface-file parser uses Happy
@@ -263,6 +266,9 @@ CLEAN_FILES += hsp
 # 		Linking
 
 SRC_LD_OPTS += -no-link-chk
+ifeq "$(GhcReportCompiles)" "YES"
+SRC_LD_OPTS += -syslib misc
+endif
 
 #-----------------------------------------------------------------------------
 # 		install
