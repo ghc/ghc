@@ -13,7 +13,8 @@ import {-# SOURCE #-}	TcExpr( tcCheckRho )
 import HsSyn
 import TcHsSyn	( TcCmd, TcCmdTop, TcExpr, TcPat, mkHsLet )
 
-import TcMatches ( TcStmtCtxt(..), tcMatchPats, matchCtxt, tcStmts )
+import TcMatches ( TcStmtCtxt(..), tcMatchPats, matchCtxt, tcStmts,
+		  TcMatchCtxt(..), tcMatchesCase )
 
 import TcType	( TcType, TcTauType, TcRhoType, mkFunTys, mkTyConApp,
 		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType )
@@ -98,6 +99,20 @@ tcCmd env (HsPar cmd) res_ty
 tcCmd env (HsLet binds body) res_ty
   = tcBindsAndThen HsLet binds $
     tcCmd env body res_ty
+
+tcCmd env in_cmd@(HsCase scrut matches src_loc) (stk, res_ty)
+  = addSrcLoc src_loc			$
+    addErrCtxt (cmdCtxt in_cmd)		$
+    tcMatchesCase match_ctxt matches (Check res_ty)
+					`thenM`	\ (scrut_ty, matches') ->
+    addErrCtxt (caseScrutCtxt scrut)	(
+      tcCheckRho scrut scrut_ty
+    )					`thenM`	\ scrut' ->
+    returnM (HsCase scrut' matches' src_loc)
+  where
+    match_ctxt = MC { mc_what = CaseAlt,
+                      mc_body = mc_body }
+    mc_body body (Check res_ty') = tcCmd env body (stk, res_ty')
 
 tcCmd env (HsIf pred b1 b2 src_loc) res_ty
   = addSrcLoc src_loc	$ 
@@ -321,6 +336,9 @@ arrowTyConKind = mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind
 
 \begin{code}
 cmdCtxt cmd = ptext SLIT("In the command:") <+> ppr cmd
+
+caseScrutCtxt cmd
+  = hang (ptext SLIT("In the scrutinee of a case command:")) 4 (ppr cmd)
 
 nonEmptyCmdStkErr cmd
   = hang (ptext SLIT("Non-empty command stack at command:"))

@@ -4,10 +4,11 @@
 \section[TcMatches]{Typecheck some @Matches@}
 
 \begin{code}
-module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda, matchCtxt,
-		   tcDoStmts, tcStmtsAndThen, tcStmts, tcGRHSs, tcThingWithSig,
+module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
+		   matchCtxt,
+		   tcDoStmts, tcStmtsAndThen, tcStmts, tcThingWithSig,
 		   tcMatchPats,
-		   TcStmtCtxt(..)
+		   TcStmtCtxt(..), TcMatchCtxt(..)
        ) where
 
 #include "HsVersions.h"
@@ -91,29 +92,33 @@ tcMatchesFun fun_name matches@(first_match:_) expected_ty
 	-- may show up as something wrong with the (non-existent) type signature
 
 	-- No need to zonk expected_ty, because subFunTys does that on the fly
-    tcMatches (FunRhs fun_name) matches expected_ty
+    tcMatches match_ctxt matches expected_ty
+  where
+    match_ctxt = MC { mc_what = FunRhs fun_name,
+		      mc_body = tcMonoExpr }
 \end{code}
 
 @tcMatchesCase@ doesn't do the argument-count check because the
 parser guarantees that each equation has exactly one argument.
 
 \begin{code}
-tcMatchesCase :: [RenamedMatch]		-- The case alternatives
+tcMatchesCase :: TcMatchCtxt		-- Case context
+	      -> [RenamedMatch]		-- The case alternatives
 	      -> Expected TcRhoType 	-- Type of whole case expressions
 	      -> TcM (TcRhoType,	-- Inferred type of the scrutinee
 		      [TcMatch]) 	-- Translated alternatives
 
-tcMatchesCase matches (Check expr_ty)
+tcMatchesCase ctxt matches (Check expr_ty)
   = 	-- This case is a bit yukky, because it prevents the
 	-- scrutinee being higher-ranked, which might just possible
 	-- matter if we were seq'ing on it.  But it's awkward to fix.
     newTyVarTy openTypeKind 						`thenM` \ scrut_ty ->
-    tcMatches CaseAlt matches (Check (mkFunTy scrut_ty expr_ty))	`thenM` \ matches' ->
+    tcMatches ctxt matches (Check (mkFunTy scrut_ty expr_ty))	`thenM` \ matches' ->
     returnM (scrut_ty, matches')
 
-tcMatchesCase matches (Infer hole)
+tcMatchesCase ctxt matches (Infer hole)
   = newHole					`thenM` \ fun_hole ->
-    tcMatches CaseAlt matches (Infer fun_hole)	`thenM` \ matches' ->
+    tcMatches ctxt matches (Infer fun_hole)	`thenM` \ matches' ->
     readMutVar fun_hole				`thenM` \ fun_ty ->
 	-- The result of tcMatches is bound to be a function type
     unifyFunTy fun_ty				`thenM` \ (scrut_ty, res_ty) ->
@@ -122,12 +127,30 @@ tcMatchesCase matches (Infer hole)
     
 
 tcMatchLambda :: RenamedMatch -> Expected TcRhoType -> TcM TcMatch
-tcMatchLambda match res_ty = tcMatch LambdaExpr match res_ty
+tcMatchLambda match res_ty = tcMatch match_ctxt match res_ty
+  where
+    match_ctxt = MC { mc_what = LambdaExpr,
+		      mc_body = tcMonoExpr }
 \end{code}
 
+@tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
 \begin{code}
-tcMatches :: RenamedMatchContext 
+tcGRHSsPat :: RenamedGRHSs
+	   -> Expected TcRhoType
+	   -> TcM TcGRHSs
+tcGRHSsPat grhss exp_ty = tcGRHSs match_ctxt grhss exp_ty
+  where
+    match_ctxt = MC { mc_what = PatBindRhs,
+		      mc_body = tcMonoExpr }
+\end{code}
+
+\begin{code}
+data TcMatchCtxt 
+  = MC { mc_what :: RenamedMatchContext,		-- What kind of thing this is
+    	 mc_body :: RenamedHsExpr -> Expected TcRhoType -> TcM TcExpr }	-- Type checker for a body of an alternative
+
+tcMatches :: TcMatchCtxt
 	  -> [RenamedMatch]
 	  -> Expected TcRhoType
 	  -> TcM [TcMatch]
@@ -150,7 +173,7 @@ tcMatches ctxt matches exp_ty
 %************************************************************************
 
 \begin{code}
-tcMatch :: RenamedMatchContext
+tcMatch :: TcMatchCtxt
 	-> RenamedMatch
 	-> Expected TcRhoType 	-- Expected result-type of the Match.
 			-- Early unification with this guy gives better error messages
@@ -161,7 +184,7 @@ tcMatch :: RenamedMatchContext
 
 tcMatch ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
   = addSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
-    addErrCtxt (matchCtxt ctxt match)		$	-- I'm not sure why, so I put it back
+    addErrCtxt (matchCtxt (mc_what ctxt) match)	$	-- I'm not sure why, so I put it back
     subFunTys pats expected_ty			$ \ pats_w_tys rhs_ty ->
 	-- This is the unique place we call subFunTys
 	-- The point is that if expected_y is a "hole", we want 
@@ -194,8 +217,8 @@ lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
 	      
     lift_stmt (ResultStmt e l) = ResultStmt (co_fn <$> e) l
     lift_stmt stmt	       = stmt
-   
-tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
+
+tcGRHSs :: TcMatchCtxt -> RenamedGRHSs
 	-> Expected TcRhoType
 	-> TcM TcGRHSs
 
@@ -207,7 +230,7 @@ tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
   -- not a Expected TcType, a decision we could revisit if necessary
 tcGRHSs ctxt (GRHSs [GRHS [ResultStmt rhs loc1] loc2] binds _) exp_ty
   = tcBindsAndThen glueBindsOnGRHSs binds 	$
-    tcMonoExpr rhs exp_ty			`thenM` \ rhs' ->
+    mc_body ctxt rhs exp_ty			`thenM` \ rhs' ->
     readExpectedType exp_ty			`thenM` \ exp_ty' ->
     returnM (GRHSs [GRHS [ResultStmt rhs' loc1] loc2] EmptyBinds exp_ty')
 
@@ -218,10 +241,11 @@ tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
 	-- a monotype.  Reason: it makes tcStmts much easier,
 	-- and even a one-armed guard has a notional second arm
     let
-      stmt_ctxt = SC { sc_what = PatGuard ctxt, 
+      stmt_ctxt = SC { sc_what = PatGuard (mc_what ctxt), 
 		       sc_rhs  = tcCheckRho, 
-		       sc_body = \ body -> tcCheckRho body exp_ty',
+		       sc_body = sc_body,
 		       sc_ty   = exp_ty' }
+      sc_body body = mc_body ctxt body (Check exp_ty')
 
       tc_grhs (GRHS guarded locn)
 	= addSrcLoc locn		$

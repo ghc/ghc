@@ -8,12 +8,12 @@ module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds, tcSpecSigs ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
+import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 
 import CmdLineOpts	( DynFlag(Opt_NoMonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), 
-			  Match(..), HsMatchContext(..), mkMonoBind,
+			  Match(..), mkMonoBind,
 			  collectMonoBinders, andMonoBinds,
 			  collectSigTysFromMonoBinds
 			)
@@ -719,7 +719,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	let
 	   complete_it = addSrcLoc locn		 			$
 			 addErrCtxt (patMonoBindsCtxt bind)		$
-			 tcGRHSs PatBindRhs grhss (Check pat_ty)	`thenM` \ grhss' ->
+			 tcGRHSsPat grhss (Check pat_ty)	`thenM` \ grhss' ->
 			 returnM (PatMonoBind pat' grhss' locn, ids)
 	in
 	returnM (complete_it, if isRec is_rec then ids else emptyBag)

@@ -1,7 +1,6 @@
 module TcMatches where
 
-tcGRHSs       :: HsExpr.HsMatchContext Name.Name
-	      -> RnHsSyn.RenamedGRHSs
+tcGRHSsPat    :: RnHsSyn.RenamedGRHSs
 	      -> TcUnify.Expected TcType.TcType
 	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs
 

@@ -17,7 +17,8 @@ import Name		( isExternalName )
 import qualified DsMeta
 #endif
 
-import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields )
+import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), recBindFields,
+			  HsMatchContext(..) )
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, hsLitType, mkHsDictApp, mkHsTyApp, mkHsLet, (<$>) )
 import TcRnMonad
@@ -34,7 +35,7 @@ import TcEnv		( tcLookupClass, tcLookupGlobal_maybe, tcLookup,
 			  tcLookupTyCon, tcLookupDataCon, tcLookupId, checkProcLevel
 			)
 import TcArrows		( tcProc )
-import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig )
+import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig, TcMatchCtxt(..) )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon )
 import TcMType		( tcInstTyVars, tcInstType, newTyVarTy, newTyVarTys, zonkTcType )
@@ -257,13 +258,16 @@ tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
 	--	  (x:xs) -> ...
 	-- will report that map is applied to too few arguments
 
-    tcMatchesCase matches res_ty	`thenM`    \ (scrut_ty, matches') ->
+    tcMatchesCase match_ctxt matches res_ty	`thenM`    \ (scrut_ty, matches') ->
 
     addErrCtxt (caseScrutCtxt scrut)	(
       tcCheckRho scrut scrut_ty
     )					`thenM`    \ scrut' ->
 
     returnM (HsCase scrut' matches' src_loc)
+  where
+    match_ctxt = MC { mc_what = CaseAlt,
+		      mc_body = tcMonoExpr }
 
 tcMonoExpr (HsIf pred b1 b2 src_loc) res_ty
   = addSrcLoc src_loc	$

@@ -1,10 +1,9 @@
 _interface_ TcMatches 2
 _exports_
-TcMatches tcGRHSs tcMatchesFun;
+TcMatches tcGRHSsPat tcMatchesFun;
 _declarations_
-2 tcGRHSs _:_ _forall_ [s] => 
-	      HsExpr.HsMatchContext Name.Name
-	      -> RnHsSyn.RenamedGRHSs
+2 tcGRHSsPat _:_ _forall_ [s] => 
+	         RnHsSyn.RenamedGRHSs
 	      -> TcType.TcType
 	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, TcMonad.LIE) ;;
 3 tcMatchesFun _:_ _forall_ [s] => 
