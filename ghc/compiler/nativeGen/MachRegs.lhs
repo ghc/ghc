@@ -913,7 +913,9 @@ freeReg g5 = fastBool False  --	%g5 is reserved (ABI).
 freeReg g6 = fastBool False  --	%g6 is reserved (ABI).
 freeReg g7 = fastBool False  --	%g7 is reserved (ABI).
 freeReg i6 = fastBool False  --	%i6 is our frame pointer.
+freeReg i7 = fastBool False  --	%i7 tends to have ret-addr-ish things
 freeReg o6 = fastBool False  --	%o6 is our stack pointer.
+freeReg o7 = fastBool False  --	%o7 holds ret addrs (???)
 freeReg f0 = fastBool False  --  %f0/%f1 are the C fp return registers.
 freeReg f1 = fastBool False
 #endif
