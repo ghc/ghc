@@ -18,7 +18,8 @@ import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
 import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
-import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConResTy )
+import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConResTy, dataConWorkId )
+import TysWiredIn	( tupleCon )
 import Var		( Var, Id, TyVar, idType, tyVarKind, mustHaveLocalBinding )
 import VarSet
 import Name		( getSrcLoc )
@@ -35,7 +36,7 @@ import Type		( Type, tyVarsOfType, eqType,
 			  TvSubst, TvSubstEnv, setTvSubstEnv, substTy,
 			  extendTvSubst, isInScope )
 import TyCon		( isPrimTyCon )
-import BasicTypes	( RecFlag(..), isNonRec )
+import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import CmdLineOpts
 import Outputable
 
@@ -590,7 +591,12 @@ extendSubstL tv ty m
 \begin{code}
 checkIdInScope :: Var -> LintM ()
 checkIdInScope id 
-  = checkInScope (ptext SLIT("is out of scope")) id
+  = do { checkL (not (id == oneTupleDataConId))
+		(ptext SLIT("Illegal one-tuple"))
+       ; checkInScope (ptext SLIT("is out of scope")) id }
+
+oneTupleDataConId :: Id	-- Should not happen
+oneTupleDataConId = dataConWorkId (tupleCon Boxed 1)
 
 checkBndrIdInScope :: Var -> Var -> LintM ()
 checkBndrIdInScope binder id 
