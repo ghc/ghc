@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Storable.hs,v 1.1 2001/07/04 10:48:39 simonmar Exp $
+-- $Id: Storable.hs,v 1.2 2001/07/04 10:51:09 simonmar Exp $
 --
 -- A storable array is an IO-mutable array which stores its
 -- contents in a contiguous memory block living in the C
@@ -44,6 +44,8 @@ module Data.Array.Storable (
     touchStorableArray -- :: StorableArray i e -> IO ()
     )
     where
+
+import Prelude
 
 import Data.Array.Base
 import Data.Array.MArray
