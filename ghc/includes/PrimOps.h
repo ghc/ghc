@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.72 2001/01/15 09:55:41 sewardj Exp $
+ * $Id: PrimOps.h,v 1.73 2001/01/24 15:37:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -950,9 +950,9 @@ EXTFUN_RTS(mkApUpd0zh_fast);
 #define STG_SIG_ERR  (-3)
 #define STG_SIG_HAN  (-4)
 
-extern StgInt sig_install (StgInt, StgInt, StgStablePtr, sigset_t *);
-#define stg_sig_default(sig,mask) sig_install(sig,STG_SIG_DFL,0,(sigset_t *)mask)
-#define stg_sig_ignore(sig,mask) sig_install(sig,STG_SIG_IGN,0,(sigset_t *)mask)
-#define stg_sig_catch(sig,ptr,mask) sig_install(sig,STG_SIG_HAN,ptr,(sigset_t *)mask)
+extern StgInt stg_sig_install (StgInt, StgInt, StgStablePtr, sigset_t *);
+#define stg_sig_default(sig,mask) stg_sig_install(sig,STG_SIG_DFL,0,(sigset_t *)mask)
+#define stg_sig_ignore(sig,mask) stg_sig_install(sig,STG_SIG_IGN,0,(sigset_t *)mask)
+#define stg_sig_catch(sig,ptr,mask) stg_sig_install(sig,STG_SIG_HAN,ptr,(sigset_t *)mask)
 
 #endif /* PRIMOPS_H */

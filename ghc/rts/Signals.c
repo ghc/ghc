@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.18 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: Signals.c,v 1.19 2001/01/24 15:38:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -146,7 +146,7 @@ unblockUserSignals(void)
    -------------------------------------------------------------------------- */
 
 StgInt 
-sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
+stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 {
     sigset_t signals;
     struct sigaction action;
@@ -182,7 +182,7 @@ sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
     	break;
 
     default:
-        barf("sig_install: bad spi");
+        barf("stg_sig_install: bad spi");
     }
 
     if (mask != 0)
@@ -230,7 +230,7 @@ start_signal_handlers(void)
 
 #else /* PAR */
 StgInt 
-sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
+stg_sig_install(StgInt sig, StgInt spi, StgStablePtr handler, sigset_t *mask)
 {
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   barf("no signal handling support in a parallel implementation");
