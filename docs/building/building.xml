@@ -3540,20 +3540,19 @@ $ make install</screen>
 
       <para>Bootstrapping GHC on a system without GHC already
       installed is achieved by taking the intermediate C files (known
-      as HC files) from a GHC compilation on a supported system to the
-      target machine, and compiling them using gcc to get a working
-      GHC.</para>
+      as HC files) from another GHC compilation, compiling them using gcc to
+	get a working GHC.</para>
 
       <para><emphasis>NOTE: GHC versions 5.xx were hard to bootstrap
       from C.  We recommend using GHC 6.0.1 or
       later.</emphasis></para>
 
       <para>HC files are platform-dependent, so you have to get a set
-      that were generated on similar hardware.  There may be some
-      supplied on the GHC download page, otherwise you'll have to
-      compile some up yourself, or start from
-      <emphasis>unregisterised</emphasis> HC files - see <xref
-      linkend="unregisterised-porting"/>.</para>
+	that were generated on <emphasis>the same platform</emphasis>.  There
+	may be some supplied on the GHC download page, otherwise you'll have to
+	compile some up yourself, or start from
+	<emphasis>unregisterised</emphasis> HC files - see <xref
+	  linkend="unregisterised-porting"/>.</para>
 
       <para>The following steps should result in a working GHC build
       with full libraries:</para>
