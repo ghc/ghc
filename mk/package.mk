@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.6 2002/02/17 13:46:39 panne Exp $
+# $Id: package.mk,v 1.7 2002/02/17 17:41:44 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -61,8 +61,6 @@ all :: $(LIBRARY)
 # -----------------------------------------------------------------------------
 # Installation; need to install .hi files as well as libraries
 
-INSTALL_LIBS  += $(LIBRARY)
-
 ifeq "$(DLLized)" "YES"
 INSTALL_PROGS += $(DLL_NAME)
 INSTALL_LIBS += $(patsubst %.a,%_imp.a, $(LIBRARY))
@@ -96,6 +94,9 @@ MKDEPENDHS = $(GHC_INPLACE)
 SRC_MKDEPENDC_OPTS += $(patsubst %,-I%,$(ALL_DIRS)) -I$(GHC_INCLUDE_DIR)
 
 endif # $(PACKAGE) /= ""
+
+# install library (could be implicitly specified or explicitly, like libHS*_cbits.a)
+INSTALL_LIBS  += $(LIBRARY)
 
 #--------------------------------------------------------------
 # Building dynamically-linkable libraries for GHCi
