@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.50 2001/08/31 11:42:44 sewardj Exp $
+ * $Id: RtsFlags.c,v 1.51 2001/10/01 11:36:28 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -485,6 +485,32 @@ strequal(const char *a, const char * b)
     return(strcmp(a, b) == 0);
 }
 
+static void
+splitRtsFlags(char *s, int *rts_argc, char *rts_argv[])
+{
+    char *c1, *c2;
+
+    c1 = s;
+    do {
+	while (isspace(*c1)) { c1++; };
+	c2 = c1;
+	while (!isspace(*c2) && *c2 != '\0') { c2++; };
+	
+	if (c1 == c2) { break; }
+	
+	if (*rts_argc < MAX_RTS_ARGS-1) {
+	    s = malloc(c2-c1+1);
+	    strncpy(s, c1, c2-c1);
+	    s[c2-c1] = '\0';
+	    rts_argv[(*rts_argc)++] = s;
+	} else {
+	    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
+	}
+	
+	c1 = c2;
+    } while (*c1 != '\0');
+}
+    
 void
 setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 {
@@ -504,32 +530,22 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     *argc = 1;
     *rts_argc = 0;
 
+    // process arguments from the ghc_rts_opts global variable first.
+    // (arguments from the GHCRTS environment variable and the command
+    // line override these).
+    {
+	if (ghc_rts_opts != NULL) {
+	    splitRtsFlags(ghc_rts_opts, rts_argc, rts_argv);
+	}
+    }
+
     // process arguments from the GHCRTS environment variable first
     // (arguments from the command line override these).
     {
 	char *ghc_rts = getenv("GHCRTS");
-	char *c1, *c2, *s;
 
 	if (ghc_rts != NULL) {
-	    c1 = ghc_rts;
-	    do {
-		while (isspace(*c1)) { c1++; };
-		c2 = c1;
-		while (!isspace(*c2) && *c2 != '\0') { c2++; };
-
-		if (c1 == c2) { break; }
-
-		if (*rts_argc < MAX_RTS_ARGS-1) {
-		    s = malloc(c2-c1+1);
-		    strncpy(s, c1, c2-c1);
-		    s[c2-c1] = '\0';
-		    rts_argv[(*rts_argc)++] = s;
-		} else {
-		    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
-		}
-
-		c1 = c2;
-	    } while (*c1 != '\0');
+	    splitRtsFlags(ghc_rts, rts_argc, rts_argv);
 	}
     }
 

@@ -1,11 +1,13 @@
 /* -----------------------------------------------------------------------------
- * $Id: Hooks.h,v 1.5 2001/04/01 05:56:29 chak Exp $
+ * $Id: Hooks.h,v 1.6 2001/10/01 11:36:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
  * User-overridable RTS hooks.
  *
  * ---------------------------------------------------------------------------*/
+
+extern char *ghc_rts_opts;
 
 extern void OnExitHook (void);
 extern void ErrorHdrHook (long fd);
