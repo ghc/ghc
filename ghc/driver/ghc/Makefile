@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 2001/03/26 16:51:26 simonmar Exp $
+# $Id: Makefile,v 1.2 2001/03/26 22:42:42 qrczak Exp $
 #
 
 TOP=../..
@@ -22,7 +22,7 @@ INTERP		  = $(SHELL)
 TOPDIROPT	  = -B$(GHCLIB)
 SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
 LINK 		  = ghc
-INSTALL_SCRIPTS  += $(SCRIPT_PROG) ghc
+INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 
 # -----------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 2001/03/26 16:51:27 simonmar Exp $
+# $Id: Makefile,v 1.2 2001/03/26 22:42:42 qrczak Exp $
 #
 
 TOP=../..
@@ -13,10 +13,10 @@ INSTALLING=1
 
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
-GHCBIN=$$\"\"libdir/ghc
+GHCBIN=$$\"\"libdir/ghc-$(ProjectVersion)
 GHCLIB=$$\"\"libdir
 else
-GHCBIN=$(libdir)/ghc
+GHCBIN=$(libdir)/ghc-$(ProjectVersion)
 GHCLIB=$(libdir)
 endif # BIN_DIST
 else
@@ -30,7 +30,7 @@ INPLACE_SCRIPT_PROG    = ghci-inplace
 SCRIPT_OBJS	  = ghci.sh
 INTERP		  = $(SHELL)
 SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
-INSTALL_SCRIPTS  += $(SCRIPT_PROG) ghc5
+INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 TOPDIROPT 	  = -B$(GHCLIB)
 
 ifeq "$(INSTALLING)" "1"

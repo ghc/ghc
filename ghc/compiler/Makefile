@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.145 2001/03/24 14:58:04 simonmar Exp $
+# $Id: Makefile,v 1.146 2001/03/26 22:42:41 qrczak Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -22,8 +22,6 @@ HS_PROG=ghc$(_way)-$(ProjectVersion)
 else
 HS_PROG=ghc-$(ProjectVersion)
 endif
-
-LINK = ghc
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration
@@ -303,7 +301,7 @@ CLEAN_FILES += ghc-inplace
 # but put it together with the libraries.
 # Also don't want any interface files intstalled
 
-INSTALL_PROGS += $(HS_PROG)
+INSTALL_LIBEXECS += $(HS_PROG)
 
 #-----------------------------------------------------------------------------
 # 		clean
