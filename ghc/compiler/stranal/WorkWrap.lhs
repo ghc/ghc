@@ -16,9 +16,10 @@ import CoreUtils	( coreExprType )
 import MkId		( mkWorkerId )
 import Id		( getInlinePragma, getIdStrictness,
 			  addIdStrictness, addInlinePragma, idWantsToBeINLINEd,
-			  IdSet, emptyIdSet, addOneToIdSet,
+			  IdSet, emptyIdSet, addOneToIdSet, unionIdSets,
 			  GenId, Id
 			)
+import Type		( splitAlgTyConApp_maybe )
 import IdInfo		( noIdInfo, mkStrictnessInfo, setStrictnessInfo, StrictnessInfo(..) )
 import SaLib
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM )
@@ -230,21 +231,32 @@ tryWW fn_id rhs
 -- make the wrapper.
 -- These are needed when we write an interface file.
 getWorkerIdAndCons wrap_id wrapper_fn
-  = go wrapper_fn
+  = (get_work_id wrapper_fn, get_cons wrapper_fn)
   where
-    go (Lam _ body)		      	  = go body
-    go (Case _ (AlgAlts [(con,_,rhs)] _)) = let (wrap_id, cons) = go rhs
-					    in  (wrap_id, cons `addOneToIdSet` con)
-{-
-	-- Coercions don't mention the construtor now,
-	-- so I don't think we need this
-    go (Let (NonRec _ (Coerce (CoerceOut con) _ _)) body) 
-					  = let (wrap_id, cons) = go body
-					    in  (wrap_id, cons `addOneToIdSet` con)
--}
-    go other	 		      	  = (get_work_id other, emptyIdSet)
+    get_work_id (Lam _ body)			 = get_work_id body
+    get_work_id (Case _ (AlgAlts [(_,_,rhs)] _)) = get_work_id rhs
+    get_work_id (Note _ body)			 = get_work_id body
+    get_work_id (Let _ body)			 = get_work_id body
+    get_work_id (App fn _)   			 = get_work_id fn
+    get_work_id (Var work_id)			 = work_id
+    get_work_id other	   			 = pprPanic "getWorkerIdAndCons" (ppr wrap_id)
 
-    get_work_id (App fn _)    = get_work_id fn
-    get_work_id (Var work_id) = work_id
-    get_work_id other	      = pprPanic "getWorkerIdAndCons" (ppr wrap_id)
+
+    get_cons (Lam _ body)			= get_cons body
+    get_cons (Let (NonRec _ rhs) body)		= get_cons rhs `unionIdSets` get_cons body
+
+    get_cons (Case e (AlgAlts [(con,_,rhs)] _)) = (get_cons e `unionIdSets` get_cons rhs)
+						  `addOneToIdSet` con
+
+	-- Coercions don't mention the construtor now,
+	-- but we must still put the constructor in the interface
+	-- file so that the RHS of the newtype decl is imported
+    get_cons (Note (Coerce to_ty from_ty) body)
+	= get_cons body `addOneToIdSet` con
+	where
+	  con = case splitAlgTyConApp_maybe from_ty of
+			Just (_, _, [con]) -> con
+			other		   -> pprPanic "getWorkerIdAndCons" (ppr to_ty)
+
+    get_cons other = emptyIdSet
 \end{code}

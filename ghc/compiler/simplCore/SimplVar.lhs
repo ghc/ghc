@@ -130,7 +130,7 @@ completeVar env inline_call var args result_ty
 
     	---------- Specialisation stuff
     (ty_args, remaining_args) = initialTyArgs args
-    maybe_specialisation      = lookupSpecEnv (getIdSpecialisation var) ty_args
+    maybe_specialisation      = lookupSpecEnv (ppr var) (getIdSpecialisation var) ty_args
     Just (spec_bindings, spec_template) = maybe_specialisation
 
 

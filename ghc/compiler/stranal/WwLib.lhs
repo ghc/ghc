@@ -324,9 +324,11 @@ mkWW ((arg,WwUnpack new_or_data True cs) : ds)
 	unpk_args_w_ds   = zipEqual "mkWW" unpk_args cs
     in
     mkWW (unpk_args_w_ds ++ ds)		`thenUs` \ (wrap_fn, worker_args, work_fn) ->
-    returnUs (\ wrapper_body -> mk_unpk_case new_or_data arg unpk_args data_con arg_tycon (wrap_fn wrapper_body),
+    returnUs (\ wrapper_body -> mk_unpk_case new_or_data arg unpk_args data_con arg_tycon
+					     (wrap_fn wrapper_body),
 	      worker_args,
-	      \ worker_body  -> work_fn (mk_pk_let new_or_data arg data_con tycon_arg_tys unpk_args worker_body))
+	      \ worker_body  -> work_fn (mk_pk_let new_or_data arg data_con 
+						   tycon_arg_tys unpk_args worker_body))
   where
     inst_con_arg_tys = dataConArgTys data_con tycon_arg_tys
     (arg_tycon, tycon_arg_tys, data_con)

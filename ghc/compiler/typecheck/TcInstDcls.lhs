@@ -33,7 +33,7 @@ import RnMonad		( RnNameSupply )
 import Inst		( Inst, InstOrigin(..),
 			  newDicts, LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcExtendGlobalValEnv, tcAddImportedIdInfo )
+import TcEnv		( GlobalValueEnv, tcExtendGlobalValEnv, tcAddImportedIdInfo )
 import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, classDataCon )
 import TcKind		( TcKind, unifyKind )
 import TcMonoType	( tcHsType )
@@ -45,7 +45,7 @@ import TcType		( TcType, TcTyVar, TcTyVarSet,
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  foldBag, bagToList, Bag
 			)
-import CmdLineOpts	( opt_GlasgowExts, opt_WarnMissingMethods )
+import CmdLineOpts	( opt_GlasgowExts )
 import Class		( classBigSig, Class )
 import Id		( isNullaryDataCon, dataConArgTys, replaceIdInfo, idName, Id )
 import Maybes 		( maybeToBool, seqMaybe, catMaybes )
@@ -53,7 +53,7 @@ import Name		( nameOccName, mkLocalName,
 			  isLocallyDefined, Module,
 			  NamedThing(..)
 			)
-import PrelVals		( nO_METHOD_BINDING_ERROR_ID, eRROR_ID )
+import PrelVals		( eRROR_ID )
 import PprType		( pprParendType,  pprConstraint )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import TyCon		( isSynTyCon, isDataTyCon, tyConDerivings )
@@ -144,7 +144,7 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \end{enumerate}
 
 \begin{code}
-tcInstDecls1 :: TcEnv s			-- Contains IdInfo for dfun ids
+tcInstDecls1 :: GlobalValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
 	     -> Module			-- module name for deriving
 	     -> RnNameSupply			-- for renaming derivings
@@ -171,7 +171,7 @@ tcInstDecls1 unf_env decls mod_name rn_name_supply
     returnTc (full_inst_info, deriv_binds, ddump_deriv)
 
 
-tcInstDecl1 :: TcEnv s -> Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
+tcInstDecl1 :: GlobalValueEnv -> Module -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
 
 tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
   = 	-- Prime error recovery, set source location
@@ -352,7 +352,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     tcExtendGlobalValEnv (catMaybes defm_ids) (
 
 		-- Default-method Ids may be mentioned in synthesised RHSs 
-	mapAndUnzip3Tc (tcInstMethodBind clas inst_tys' inst_tyvars' monobinds uprags) 
+	mapAndUnzip3Tc (tcMethodBind clas origin inst_tys' inst_tyvars' monobinds uprags True) 
 		       (op_sel_ids `zip` defm_ids)
     )		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
@@ -459,77 +459,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     returnTc (const_lie,
 	      main_bind `AndMonoBinds` prag_binds)
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Processing each method}
-%*									*
-%************************************************************************
-
-\begin{code}
-tcInstMethodBind 
-	:: Class
-	-> [TcType s]					-- Instance types
-	-> [TcTyVar s]					-- and their free (sig) tyvars
-	-> RenamedMonoBinds				-- Method binding
-	-> [RenamedSig]					-- Pragmas
-	-> (Id, Maybe Id)				-- Selector id and default-method id
-	-> TcM s (TcMonoBinds s, LIE s, (LIE s, TcIdOcc s))
-
-tcInstMethodBind clas inst_tys inst_tyvars meth_binds prags (sel_id, maybe_dm_id)
-  = tcGetSrcLoc			`thenNF_Tc` \ loc ->
-    tcGetUnique			`thenNF_Tc` \ uniq ->
-    let
-	sel_name	  = idName sel_id
-	meth_occ	  = getOccName sel_name
-	default_meth_name = mkLocalName uniq meth_occ loc
-	maybe_meth_bind   = find sel_name meth_binds 
-        the_meth_bind     = case maybe_meth_bind of
-				  Just stuff -> stuff
-				  Nothing    -> mk_default_bind default_meth_name loc
-	meth_prags	  = sigsForMe (== sel_name) prags
-    in
-
-	-- Warn if no method binding, only if -fwarn-missing-methods
-    
-    warnTc (opt_WarnMissingMethods &&
-	    not (maybeToBool maybe_meth_bind) &&
-	    not (maybeToBool maybe_dm_id))	
-	(omittedMethodWarn sel_id clas)		`thenNF_Tc_`
-
-	-- Typecheck the method binding
-    tcMethodBind clas origin inst_tys inst_tyvars sel_id the_meth_bind meth_prags
-  where
-    origin = InstanceDeclOrigin 	-- Poor
-
-    find sel EmptyMonoBinds 	  = Nothing
-    find sel (AndMonoBinds b1 b2) = find sel b1 `seqMaybe` find sel b2
-
-    find sel b@(FunMonoBind op_name _ _ _)          | op_name == sel = Just b
-						    | otherwise	     = Nothing
-    find sel b@(PatMonoBind (VarPatIn op_name) _ _) | op_name == sel = Just b
-						    | otherwise      = Nothing
-    find sel other = panic "Urk! Bad instance method binding"
-
-
-    mk_default_bind local_meth_name loc
-      = PatMonoBind (VarPatIn local_meth_name)
-		    (GRHSsAndBindsIn (unguardedRHS (default_expr loc) loc) EmptyBinds)
-		    loc
-
-    default_expr loc 
-      = case maybe_dm_id of
-	  Just dm_id -> HsVar (getName dm_id)	-- There's a default method
-   	  Nothing    -> error_expr loc		-- No default method
-
-    error_expr loc
-      = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
-	             (HsLit (HsString (_PK_ (error_msg loc))))
-
-    error_msg loc = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
-\end{code}
-
 
 
 %************************************************************************
@@ -654,10 +583,6 @@ nonBoxedPrimCCallErr clas inst_ty
   = hang (ptext SLIT("Unacceptable instance type for ccall-ish class"))
 	 4 (hsep [ ptext SLIT("class"), ppr clas, ptext SLIT("type"),
     		        ppr inst_ty])
-
-omittedMethodWarn sel_id clas
-  = sep [ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id), 
-	 ptext SLIT("in an instance declaration for") <+> quotes (ppr clas)]
 
 {-
   Declaring CCallable & CReturnable instances in a module different

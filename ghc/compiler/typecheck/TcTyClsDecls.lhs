@@ -23,7 +23,7 @@ import BasicTypes	( RecFlag(..) )
 import TcMonad
 import Inst		( InstanceMapper )
 import TcClassDcl	( tcClassDecl1 )
-import TcEnv		( TcIdOcc(..), tcExtendTyConEnv, tcExtendClassEnv )
+import TcEnv		( TcIdOcc(..), GlobalValueEnv, tcExtendTyConEnv, tcExtendClassEnv )
 import TcKind		( TcKind, newKindVar, newKindVars, tcDefaultKind, kindToTcKind )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 import TcMonoType	( tcTyVarScope )
@@ -49,7 +49,7 @@ import Util		( panic{-, pprTrace-} )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyAndClassDecls1 :: TcEnv s -> InstanceMapper	-- Knot tying stuff
+tcTyAndClassDecls1 :: GlobalValueEnv -> InstanceMapper	-- Knot tying stuff
 		   -> [RenamedHsDecl]
 		   -> TcM s (TcEnv s)
 
@@ -90,7 +90,7 @@ that the knot-tied TyVars, TyCons and Classes aren't looked at too early.
 
     
 \begin{code}
-tcGroup :: TcEnv s -> InstanceMapper -> SCC RenamedHsDecl -> TcM s ([TyCon], [Class])
+tcGroup :: GlobalValueEnv -> InstanceMapper -> SCC RenamedHsDecl -> TcM s ([TyCon], [Class])
 tcGroup unf_env inst_mapper scc
   = 	-- TIE THE KNOT
     fixTc ( \ ~(rec_tycons, rec_classes) ->
@@ -138,7 +138,7 @@ Dealing with one decl
 ~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tcDecl  :: RecFlag 			-- True => recursive group
-	-> TcEnv s -> InstanceMapper
+	-> GlobalValueEnv -> InstanceMapper
 	-> ([TyCon], [Class])		-- Accumulating parameter
 	-> RenamedHsDecl
 	-> TcM s ([TyCon], [Class])

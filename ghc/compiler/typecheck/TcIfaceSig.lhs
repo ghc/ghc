@@ -11,9 +11,10 @@ module TcIfaceSig ( tcInterfaceSigs ) where
 import HsSyn		( HsDecl(..), IfaceSig(..) )
 import TcMonad
 import TcMonoType	( tcHsType, tcHsTypeKind, tcTyVarScope )
-import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv,
+import TcEnv		( tcExtendTyVarEnv, tcExtendGlobalValEnv, tcSetGlobalValEnv,
 			  tcLookupTyConByKey, tcLookupGlobalValueMaybe,
-			  tcExplicitLookupGlobal
+			  tcExplicitLookupGlobal,
+			  GlobalValueEnv
 			)
 import TcKind		( TcKind, kindToTcKind )
 
@@ -52,7 +53,7 @@ As always, we do not have to worry about user-pragmas in interface
 signatures.
 
 \begin{code}
-tcInterfaceSigs :: TcEnv s		-- Envt to use when checking unfoldings
+tcInterfaceSigs :: GlobalValueEnv	-- Envt to use when checking unfoldings
 		-> [RenamedHsDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM s [Id]
 		
@@ -159,7 +160,7 @@ an unfolding that isn't going to be looked at.
 tcPragExpr unf_env name core_expr
   = forkNF_Tc (
 	recoverNF_Tc no_unfolding (
-		tcSetEnv unf_env $
+		tcSetGlobalValEnv unf_env $
 		tcCoreExpr core_expr	`thenTc` \ core_expr' ->
 		returnTc (Just core_expr')
     ))			

@@ -16,6 +16,7 @@ module SpecEnv (
 import Type		( Type, GenType, mkTyVarTy, matchTys, tyVarsOfTypes, applyToTyVars )
 import TyVar		( TyVar, GenTyVar, TyVarEnv, tyVarFlexi, setTyVarFlexi, lookupTyVarEnv, tyVarSetToList )
 import Unify		( Subst, unifyTyListsX )
+import Outputable
 import Maybes
 import Util		( assertPanic )
 \end{code}
@@ -84,17 +85,25 @@ The thing we are looking up can have an
 arbitrary "flexi" part.
 
 \begin{code}
-lookupSpecEnv :: SpecEnv value	-- The envt
+lookupSpecEnv :: SDoc		-- For error report
+	      -> SpecEnv value	-- The envt
 	      -> [GenType flexi]		-- Key
 	      -> Maybe (TyVarEnv (GenType flexi), value)
 		     
-lookupSpecEnv EmptySE key = Nothing
-lookupSpecEnv (SpecEnv alist) key
+lookupSpecEnv doc EmptySE key = Nothing
+lookupSpecEnv doc (SpecEnv alist) key
   = find alist
   where
     find [] = Nothing
     find ((tpl, val) : rest)
-      = case matchTys tpl key of
+      = 
+#ifdef DEBUG
+	if length tpl > length key then
+		pprTrace "lookupSpecEnv" (doc <+> ppr tpl <+> ppr key) $
+		Nothing
+	else
+#endif
+	case matchTys tpl key of
 	  Nothing                 -> find rest
 	  Just (subst, leftovers) -> ASSERT( null leftovers )
 				     Just (subst, val)

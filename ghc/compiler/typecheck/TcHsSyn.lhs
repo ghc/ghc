@@ -42,8 +42,9 @@ import Id	( idType, dataConArgTys, mkIdWithNewType, Id
 -- others:
 import Name	( NamedThing(..) )
 import BasicTypes ( IfaceFlavour, Unused )
-import TcEnv	( tcLookupGlobalValueMaybe, tcExtendGlobalValEnv,
-		  TcIdOcc(..), TcIdBndr, tcIdType, tcIdTyVars, tcInstId
+import TcEnv	( tcLookupGlobalValueMaybe, tcExtendGlobalValEnv, tcGetGlobalValEnv,
+		  TcIdOcc(..), TcIdBndr, GlobalValueEnv,
+		  tcIdType, tcIdTyVars, tcInstId
 		)
 
 import TcMonad
@@ -199,12 +200,12 @@ zonkIdOcc (TcId id)
 
 
 \begin{code}
-zonkTopBinds :: TcMonoBinds s -> NF_TcM s (TypecheckedMonoBinds, TcEnv s)
+zonkTopBinds :: TcMonoBinds s -> NF_TcM s (TypecheckedMonoBinds, GlobalValueEnv)
 zonkTopBinds binds	-- Top level is implicitly recursive
   = fixNF_Tc (\ ~(_, new_ids) ->
 	tcExtendGlobalValEnv (bagToList new_ids)	$
 	zonkMonoBinds emptyTyVarEnv binds		`thenNF_Tc` \ (binds', new_ids) ->
-	tcGetEnv					`thenNF_Tc` \ env ->
+	tcGetGlobalValEnv				`thenNF_Tc` \ env ->
 	returnNF_Tc ((binds', env), new_ids)
     )					`thenNF_Tc` \ (stuff, _) ->
     returnNF_Tc stuff

@@ -2,7 +2,7 @@
 module TcEnv(
 	TcIdOcc(..), TcIdBndr, tcIdType, tcIdTyVars, tcInstId,
 
-	TcEnv, 
+	TcEnv, GlobalValueEnv,
 
 	initEnv, getEnv_LocalIds, getEnv_TyCons, getEnv_Classes,
 	
@@ -12,7 +12,7 @@ module TcEnv(
 	tcExtendClassEnv, tcLookupClass, tcLookupClassByKey,
 	tcGetTyConsAndClasses,
 
-	tcExtendGlobalValEnv, tcExtendLocalValEnv,
+	tcExtendGlobalValEnv, tcExtendLocalValEnv, tcGetGlobalValEnv, tcSetGlobalValEnv,
 	tcLookupLocalValue, tcLookupLocalValueOK, tcLookupLocalValueByKey, 
 	tcLookupGlobalValue, tcLookupGlobalValueByKey, tcLookupGlobalValueMaybe,
 	tcAddImportedIdInfo, tcExplicitLookupGlobal,
@@ -123,7 +123,7 @@ data TcEnv s = TcEnv
 		  (TyVarEnv s)
 		  (TyConEnv s)
 		  (ClassEnv s)
-		  (ValueEnv Id)			-- Globals
+		  GlobalValueEnv
 		  (ValueEnv (TcIdBndr s))	-- Locals
 		  (TcRef s (TcTyVarSet s))	-- Free type variables of locals
 						-- ...why mutable? see notes with tcGetGlobalTyVars
@@ -133,6 +133,7 @@ type TyConEnv s  = UniqFM (TcKind s, Maybe Arity, TyCon)	-- Arity present for Sy
 type ClassEnv s  = UniqFM ([TcKind s], Class)		-- The kinds are the kinds of the args
 							-- to the class
 type ValueEnv id = UniqFM id
+type GlobalValueEnv = ValueEnv Id			-- Globals
 
 initEnv :: TcRef s (TcTyVarSet s) -> TcEnv s
 initEnv mut = TcEnv emptyUFM emptyUFM emptyUFM emptyUFM emptyUFM mut 
@@ -349,16 +350,26 @@ tcLookupGlobalValueByKeyMaybe uniq
   = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
     returnNF_Tc (lookupUFM_Directly gve uniq)
 
+tcGetGlobalValEnv :: NF_TcM s GlobalValueEnv
+tcGetGlobalValEnv
+  = tcGetEnv 		`thenNF_Tc` \ (TcEnv tve tce ce gve lve gtvs) ->
+    returnNF_Tc gve
+
+tcSetGlobalValEnv :: GlobalValueEnv -> TcM s a -> TcM s a
+tcSetGlobalValEnv gve scope
+  = tcGetEnv		`thenNF_Tc` \ (TcEnv tve tce ce _ lve gtvs) ->
+    tcSetEnv (TcEnv tve tce ce gve lve gtvs) scope
+
 
 -- Non-monadic version, environment given explicitly
-tcExplicitLookupGlobal :: TcEnv s -> Name -> Maybe Id
-tcExplicitLookupGlobal (TcEnv tve tce ce gve lve gtvs) name
+tcExplicitLookupGlobal :: GlobalValueEnv -> Name -> Maybe Id
+tcExplicitLookupGlobal gve name
   = case maybeWiredInIdName name of
 	Just id -> Just id
 	Nothing -> lookupUFM gve name
 
 	-- Extract the IdInfo from an IfaceSig imported from an interface file
-tcAddImportedIdInfo :: TcEnv s -> Id -> Id
+tcAddImportedIdInfo :: GlobalValueEnv -> Id -> Id
 tcAddImportedIdInfo unf_env id
   | isLocallyDefined id		-- Don't look up locally defined Ids, because they
 				-- have explicit local definitions, so we get a black hole!

@@ -556,6 +556,14 @@ rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
 rnIdInfo (HsUpdate update)	= returnRn (HsUpdate update)
 rnIdInfo (HsFBType fb)		= returnRn (HsFBType fb)
 rnIdInfo (HsArgUsage au)	= returnRn (HsArgUsage au)
+rnIdInfo (HsSpecialise tyvars tys expr)
+  = bindTyVarsRn doc tyvars	$ \ tyvars' ->
+    rnCoreExpr expr		`thenRn` \ expr' ->
+    mapRn rnHsType tys		`thenRn` \ tys' ->
+    returnRn (HsSpecialise tyvars' tys' expr')
+  where
+    doc = text "Specialise in interface pragma"
+    
 
 rnStrict (HsStrictnessInfo demands (Just (worker,cons)))
 	-- The sole purpose of the "cons" field is so that we can mark the constructors

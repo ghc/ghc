@@ -159,6 +159,11 @@ occAnalTop :: OccEnv 			-- What's in scope
 occAnalTop env [] = (emptyDetails, nullIdEnv, [])
 
 -- Special case for eliminating indirections
+--   Note: it's a shortcoming that this only works for
+--	   non-recursive bindings.  Elminating indirections
+--	   makes perfect sense for recursive bindings too, but
+--	   it's more complicated to implement, so I haven't done so
+
 occAnalTop env (NonRec exported_id (Var local_id) : binds)
   | isExported exported_id &&		-- Only if this is exported
 

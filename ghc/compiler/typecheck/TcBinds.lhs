@@ -875,7 +875,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
     tcExpr (HsVar name) sig_ty			`thenTc` \ (spec_expr, spec_lie) ->
 
     case maybe_spec_name of
-	Nothing -> 	-- Just specialise "f" by building a pecPragmaId binding
+	Nothing -> 	-- Just specialise "f" by building a SpecPragmaId binding
 			-- It is the thing that makes sure we don't prematurely 
 			-- dead-code-eliminate the binding we are really interested in.
 		   newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_id ->

@@ -1092,6 +1092,15 @@ completeBind env binder@(_,occ_info) new_id new_rhs
     in
     (env2, [])
 
+{-	This case is WRONG.  It attempts to exploit knowledge that indirections
+	are eliminated (by OccurAnal), but they *aren't* for recursive bindings.
+	If this case is enabled, then 
+		rec { local = (a,b)
+		      global = local
+		      ... = case global of ...
+		    }
+	never gets simplified
+
   |  atomic_rhs 		-- Rhs is atomic, and new_id is exported
   && case eta'd_rhs of { Var v -> isLocallyDefined v && not (isExported v); other -> False }
   =	-- The local variable v will be eliminated next time round
@@ -1099,6 +1108,7 @@ completeBind env binder@(_,occ_info) new_id new_rhs
 	-- this time round.
 	-- This case is an optional improvement; saves a simplifier iteration
     (env, [(new_id, eta'd_rhs)])
+-}
 
   | otherwise				-- Non-atomic
   = let

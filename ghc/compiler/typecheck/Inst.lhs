@@ -469,7 +469,7 @@ lookupInst :: Inst s
 -- Dictionaries
 
 lookupInst dict@(Dict _ clas tys orig loc)
-  = case lookupSpecEnv (classInstEnv clas) tys of
+  = case lookupSpecEnv (ppr clas) (classInstEnv clas) tys of
 
       Just (tenv, dfun_id)
 	-> let
@@ -549,7 +549,7 @@ lookupSimpleInst :: ClassInstEnv
 	         -> NF_TcM s (Maybe ThetaType)		-- Here are the needed (c,t)s
 
 lookupSimpleInst class_inst_env clas tys
-  = case lookupSpecEnv class_inst_env tys of
+  = case lookupSpecEnv (ppr clas) class_inst_env tys of
       Nothing	 -> returnNF_Tc Nothing
 
       Just (tenv, dfun)

@@ -268,7 +268,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     prag_pretty 
      | opt_OmitInterfacePragmas = empty
-     | otherwise		= hsep [arity_pretty, strict_pretty, unfold_pretty, spec_pretty, pp_double_semi]
+     | otherwise		= hsep [arity_pretty, strict_pretty, unfold_pretty, 
+					spec_pretty, pp_double_semi]
 
     ------------  Arity  --------------
     arity_pretty  = ppArityInfo (arityInfo idinfo)
@@ -313,15 +314,16 @@ ifaceId get_idinfo needed_ids is_rec id rhs
     guidance = calcUnfoldingGuidance opt_InterfaceUnfoldThreshold rhs
 
     ------------  Specialisations --------------
-    spec_pretty = hsep (map pp_spec (specEnvToList (getIdSpecialisation id)))
+    spec_list = specEnvToList (getIdSpecialisation id)
+    spec_pretty = hsep (map pp_spec spec_list)
     pp_spec (tyvars, tys, rhs) = hsep [ptext SLIT("_P_"),
 				       if null tyvars then ptext SLIT("[ ]")
-						      else brackets (interpp'SP tyvars),
+						      else brackets (interppSP tyvars),
 					-- The lexer interprets "[]" as a CONID.  Sigh.
 				       hsep (map pprParendType tys),
 				       ptext SLIT("="),
 				       pprIfaceUnfolding rhs
-				 ]					
+				 ]
     
     ------------  Extra free Ids  --------------
     new_needed_ids = (needed_ids `minusIdSet` unitIdSet id)	`unionIdSets` 
@@ -329,18 +331,25 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     extra_ids | opt_OmitInterfacePragmas = emptyIdSet
 	      | otherwise		 = worker_ids	`unionIdSets`
-					   unfold_ids
+					   unfold_ids	`unionIdSets`
+					   spec_ids
 
     worker_ids | has_worker = unitIdSet work_id
 	       | otherwise  = emptyIdSet
 
-    unfold_ids | show_unfold = free_vars
+    spec_ids = foldr add emptyIdSet spec_list
+	     where
+	       add (_, _, rhs) = unionIdSets (find_fvs rhs)
+
+    unfold_ids | show_unfold = find_fvs rhs
 	       | otherwise   = emptyIdSet
-			     where
-			       (_,free_vars) = addExprFVs interesting emptyIdSet rhs
-			       interesting bound id = isLocallyDefined id &&
-						      not (id `elementOfIdSet` bound) &&
-						      not (omitIfaceSigForId id)
+
+    find_fvs expr = free_vars
+		  where
+		    (_,free_vars) = addExprFVs interesting emptyIdSet expr
+		    interesting bound id = isLocallyDefined id &&
+				           not (id `elementOfIdSet` bound) &&
+					   not (omitIfaceSigForId id)
 \end{code}
 
 \begin{code}

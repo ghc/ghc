@@ -120,7 +120,8 @@ tcModule rn_name_supply
 	-- which is done lazily [ie failure just drops the pragma
 	-- without having any global-failure effect].
 	-- 
-	-- unf_env is also used to get the pragam info for dfuns.
+	-- unf_env is also used to get the pragam info
+	-- for imported dfuns and default methods
 
     	    -- The knot for instance information.  This isn't used at all
 	    -- till we type-check value declarations
