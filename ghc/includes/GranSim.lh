@@ -384,11 +384,11 @@ void PerformReschedule              PROTO((W_, rtsBool));
 #define GRAN_FETCH()			   /*nothing */
 
 #define GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter)	\
-	do { if(liveness_mask&LIVENESS_R1)  		        \
-	     SaveAllStgRegs();		   	                \
-             GranSimFetch(Node); 			        \
-	     PerformReschedule(liveness_mask,reenter);	        \
-	     RestoreAllStgRegs();			        \
+	do { if(liveness_mask&LIVENESS_R1){   		        \
+	      SaveAllStgRegs();		   	                \
+              GranSimFetch(Node); 			        \
+	      PerformReschedule(liveness_mask,reenter);	        \
+	      RestoreAllStgRegs();} 			        \
 	   } while(0)
 
 #define GRAN_RESCHEDULE(liveness_mask,reenter)	 GRAN_FETCH_AND_RESCHEDULE(liveness_mask,reenter)
