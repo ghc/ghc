@@ -139,8 +139,11 @@ isOrphanModule :: Module -> ModDetails -> Bool
 isOrphanModule this_mod (ModDetails {md_insts = insts, md_rules = rules})
   = any orphan_inst insts || any orphan_rule rules
   where
+	-- A rule is an orphan if the LHS mentions nothing defined locally
     orphan_inst dfun_id = no_locals (namesOfDFunHead (idType dfun_id))
+	-- A instance is an orphan if its head mentions nothing defined locally
     orphan_rule rule    = no_locals (ruleLhsFreeNames rule)
+
     no_locals names     = isEmptyNameSet (filterNameSet (nameIsLocalOrFrom this_mod) names)
 \end{code}
 
