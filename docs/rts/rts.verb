@@ -743,59 +743,108 @@ May have to revert black holes - ouch!
 @
 
 \section{Switching Worlds}
+\label{sect:switching-worlds}
 
 Because this is a combined compiled/interpreted system, the
 interpreter will sometimes encounter compiled code, and vice-versa.
 
+All world-switches go via the scheduler, ensuring that the world is in
+a known state ready to enter either compiled code or the interpreter.
+When a thread is run from the scheduler, the @whatNext@ field is
+checked to find out how to execute the thread.
+
+\begin{itemize}
+\item If @whatNext@ is set to @RunGHC@, we load up the required
+registers from the TSO and jump to the address at the top of the user
+stack.
+\item If @whatNext@ is set to @RunHugs@, we execute the byte-code
+object pointed to by the top word of the stack.
+\end{itemize}
+
+Sometimes instead of returning to the address at the top of the stack,
+we need to enter a closure instead.  This is achieved by pushing a
+pointer to the closure to be entered on the stack, followed by a
+pointer to a canned code sequence called @ghc_entertop@, or the dual
+byte-code object @hugs_entertop@.  Both code sequences do the following:
+
+\begin{itemize}
+\item pop the top word (either @ghc_entertop@ or @hugs_entertop@) from
+the stack.
+\item pop the next word off the stack and enter it.
+\end{itemize}
+
 There are six cases we need to consider:
 
 \begin{enumerate}
-\item A GHC thread enters a Hugs-built thunk.
+\item A GHC thread enters a Hugs-built closure.
 \item A GHC thread calls a Hugs-compiled function.
 \item A GHC thread returns to a Hugs-compiled return address.
-\item A Hugs thread enters a GHC-built thunk.
+\item A Hugs thread enters a GHC-built closure.
 \item A Hugs thread calls a GHC-compiled function.
 \item A Hugs thread returns to a Hugs-compiled return address.
 \end{enumerate}
 
-\subsection{A GHC thread enters a Hugs-built thunk}
+We now examine the various cases one by one and describe how the
+switch happens in each situation.
 
-A Hugs-built thunk looks like this:
+\subsection{A GHC thread enters a Hugs-built closure}
+
+All Hugs-built closures look like this:
 
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
-\emph{Hugs} & \emph{Hugs-specific information} \\
-\hline
+\emph{Hugs} & \emph{Hugs-specific payload} \\
+\hline 
 \end{tabular}
 \end{center}
 
-\noindent where \emph{Hugs} is a pointer to a small
-statically-compiled piece of code that does the following:
+\noindent where \emph{Hugs} is a pointer to a small statically
+compiled-piece of code that does the following:
 
 \begin{itemize}
-\item Push the address of the thunk on the stack.
-\item Push @entertop@ on the stack.
+\item Push the address of this thunk on the stack.
+\item Push @hugs_entertop@ on the stack.
 \item Save the current state of the thread in the TSO.
-\item Return to the scheduler, with the @whatNext@ field set to
-@RunHugs@.
+\item Return to the scheduler, with @whatNext@ set to @RunHugs@.
 \end{itemize}
 
-\noindent where @entertop@ is a small statically-compiled piece of
-code that does the following:
-
-\begin{itemize}
-\item pop the return address from the stack.
-\item pop the next word off the stack into \Arg{1}.
-\item enter \Arg{1}.
-\end{itemize}
-
-The infotable for @entertop@ has some byte-codes attached that do
-essentially the same thing if the code is entered from Hugs.
+\ToDo{What about static thunks?  If all code lives on the heap, we'll
+need an extra level of indirection for GHC references to Hugs
+closures.}
 
 \subsection{A GHC thread calls a Hugs-compiled function}
 
-How do we do this?
+In order to call the fast entry point for a function, GHC needs arity
+information from the defining module's interface file.  Hugs doesn't
+supply this information, so GHC will always call the slow entry point
+for functions in Hugs-compiled modules.
+
+When a GHC module is linked into a running system, the calls to
+external Hugs-compiled functions will be resolved to point to
+dynamically-generated code that does the following:
+
+\begin{itemize}
+\item Push a pointer to the Hugs byte code object for the function on
+the stack.
+\item Push @hugs_entertop@ on the stack.
+\item Save the current thread state in the TSO.
+\item Return to the scheduler with @whatNext@ set to @RunHugs@
+\end{itemize}
+
+Ok, but how does Hugs find the byte code object for the function?
+These live on the heap, and can therefore move around.  One solution
+is to use a jump table, where each element in the table has two
+elements:
+
+\begin{itemize}
+\item A call instruction pointing to the code fragment above.
+\item A pointer to the byte-code object for the function.
+\end{itemize}
+
+When GHC jumps to the address in the jump table, the call takes it to
+the statically-compiled code fragment, leaving a pointer to a pointer
+to the byte-code object on the C stack, which can then be retrieved.
 
 \subsection{A GHC thread returns to a Hugs-compiled return address}
 
@@ -807,37 +856,35 @@ When Hugs pushes return addresses on the stack, they look like this:
 	|               |  -----> bytecode object
 	|_______________|
 	|               |  _____
-	|_______________|	|___ GHC-friendly return code
-					_____
-					|    |
-					|    | Info Table
-					|____|
-					.    .
+	|_______________|	| 
+				|	_____
+				|	|    | Info Table
+				|	|    | 
+				|_____\	|____| hugs_return
+				      /	.    .
 					.    . Code
 					.    .
 @
 
 If GHC is returning, it will return to the address at the top of the
-stack.  The code at this address
+stack.  This address a pointer to a statically compiled code fragment
+called @hugs_return@, which:
 
 \begin{itemize}
+\item pops the return address off the user stack.
 \item saves the thread state in the TSO
-\item returns to the scheduler with a @whatNext@ field of @RunHugs@.
+\item returns to the scheduler with @whatNext@ set to @RunHugs@.
 \end{itemize}
 
-If Hugs is returning to one of these addresses, it can spot the
-special return address at the top and instead jump to the bytecodes
-pointed to by the second word on the stack.
+\subsection{A Hugs thread enters a GHC-compiled closure}
 
-\subsection{A Hugs thread enters a GHC-compiled thunk}
-
-When Hugs is called on to enter a non-Hugs closure (these are
-recognisable by the lack of a \emph{Hugs} pointer at the front), the
-following sequence of instructions is executed:
+When Hugs is called on to enter a GHC closure (these are recognisable
+by the lack of a \emph{Hugs} pointer at the front), the following
+sequence of instructions is executed:
 
 \begin{itemize}
 \item Push the address of the thunk on the stack.
-\item Push @entertop@ on the stack.
+\item Push @ghc_entertop@ on the stack.
 \item Save the current state of the thread in the TSO.
 \item Return to the scheduler, with the @whatNext@ field set to
 @RunGHC@.
@@ -847,10 +894,19 @@ following sequence of instructions is executed:
 
 Hugs never calls GHC-functions directly, it only enters closures
 (which point to the slow entry point for the function).  Hence in this
-case, we just push the arguments on the stack and proceed as for a
-thunk.
+case, we just push the arguments on the stack and proceed as above.
 
 \subsection{A Hugs thread returns to a GHC-compiled return address}
+
+The return address at the top of the stack is recognisable as a
+GHC-return address by virtue of not being @hugs_return@.  In this
+case, hugs recognises that it needs to do a world-switch and performs
+the following sequence:
+
+\begin{itemize}
+\item save the state of the thread in the TSO.
+\item return to the scheduler, setting @whatNext@ to @RunGHC@.
+\end{itemize}
 
 \section{Heap objects}
 \label{sect:fixed-header}
