@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.17 2002/02/13 07:48:18 sof Exp $
+ * $Id: Rts.h,v 1.18 2002/02/14 16:58:13 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -44,6 +44,14 @@ extern "C" {
 
 /* declarations for runtime flags/values */
 #define MAX_RTS_ARGS 32
+
+#ifdef _WIN32
+/* On the yucky side..suppress -Wmissing-declarations warnings when
+ * including <windows.h>
+ */
+extern void* GetCurrentFiber ( void );
+extern void* GetFiberData ( void );
+#endif
 
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery
