@@ -79,10 +79,10 @@ we use the C library routines based on 32 bit integers.
 
 \begin{code}
 instance Show ClockTime where
-    showsPrec p (TOD sec@(J# a# s# d#) nsec) = showString $ unsafePerformIO $
-	    allocChars 32		>>= \ buf ->
-	    _ccall_ showTime (I# s#) (ByteArray bottom d#) buf
-					>>= \ str ->
+    showsPrec p (TOD sec@(J# a# s# d#) nsec) = 
+      showString $ unsafePerformIO $ do
+	    buf <- allocChars 32
+	    str <- _ccall_ showTime (I# s#) d# buf
 	    return (unpackCString str)
 
     showList = showList__ (showsPrec 0)
@@ -238,7 +238,7 @@ toCalendarTime (TOD sec@(J# a# s# d#) psec) = do
     res    <- allocWords (``sizeof(struct tm)''::Int)
     zoneNm <- allocChars 32
     _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
-    tm     <- _ccall_ toLocalTime (I# s#) (ByteArray bottom d#) res
+    tm     <- _ccall_ toLocalTime (I# s#) d# res
     if tm == nullAddr
      then constructErrorAndFail "Time.toCalendarTime: out of range"
      else do
@@ -262,7 +262,7 @@ toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformIO $ do
        res    <- allocWords (``sizeof(struct tm)''::Int)
        zoneNm <- allocChars 32
        _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm
-       tm     <-  _ccall_ toUTCTime (I# s#) (ByteArray bottom d#) res
+       tm     <-  _ccall_ toUTCTime (I# s#) d# res
        if tm == (``NULL''::Addr) 
 	then error "Time.toUTCTime: out of range"
         else do
