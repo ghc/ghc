@@ -1,26 +1,26 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.99 2000/10/27 14:40:40 simonmar Exp $
+# $Id: Makefile,v 1.100 2000/10/27 16:24:31 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 #-----------------------------------------------------------------------------
-# Building hsc different ways (default is just `normal' sequential)
+# Building ghc different ways (default is just `normal' sequential)
 WAYS=$(GhcCompilerWays)
 
 # -----------------------------------------------------------------------------
 #		Set HS_PROG, LIBRARY
 
 # Note: there have been reports of people running up against the ARG_MAX limit
-# when linking hsc with all its constituent object files. The likely source of 
+# when linking ghc with all its constituent object files. The likely source of 
 # the problem is that the environment is a bit too big, so a workaround could
-# be to do ` env PATH=$(PATH) make hsc 'to minimise the environment. (or the
+# be to do ` env PATH=$(PATH) make ghc 'to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
 ifneq "$(way)" "dll"
-HS_PROG=hsc$(_way)
+HS_PROG=ghc$(_way)
 else
-HS_PROG=hsc
+HS_PROG=ghc
 endif
 
 # -----------------------------------------------------------------------------
@@ -50,7 +50,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
 	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> $(CONFIG_HS)
-	@echo "cGHC_HSC              = \"$(GHC_HSC)\"" >> $(CONFIG_HS)
 	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> $(CONFIG_HS)
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> $(CONFIG_HS)
 	@echo "cGHC_STATS            = \"$(GHC_STATS)\"" >> $(CONFIG_HS)
@@ -145,7 +144,7 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 # 		Haskell compilations
 
 #
-# Compiler to use for building hsc, use the build tree
+# Compiler to use for building ghc, use the build tree
 # driver when booting.
 #
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
@@ -190,7 +189,6 @@ basicTypes/IdInfo_HC_OPTS 	= -K2m
 codeGen/CgCase_HC_OPTS		= -fno-prune-tydecls
 hsSyn/HsExpr_HC_OPTS 		= -K2m
 main/Main_HC_OPTS 		= 
-main/Constants_HC_OPTS		= -DHscIfaceFileVersion=$(HscIfaceFileVersion)
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 ifeq "$(GhcReportCompiles)" "YES"
@@ -379,10 +377,10 @@ endif
 
 all :: ghc-inplace
 
-ghc-inplace : hsc
+ghc-inplace : ghc
 	@$(RM) $@
 	echo '#!/bin/sh' >>$@
-	echo exec $(FPTOOLS_TOP_ABS)/ghc/compiler/hsc -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
+	echo exec $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc -B$(FPTOOLS_TOP_ABS) '"$$@"' >>$@
 	chmod 755 $@
 
 CLEAN_FILES += ghc-inplace
@@ -390,11 +388,11 @@ CLEAN_FILES += ghc-inplace
 #-----------------------------------------------------------------------------
 # 		install
 
-# We don't want hsc treated as an ordinary executable,
+# We don't want ghc treated as an ordinary executable,
 # but put it together with the libraries.
 # Also don't want any interface files intstalled
 
-INSTALL_LIBEXECS += hsc
+INSTALL_PROGS += $(HS_PROG)
 
 #-----------------------------------------------------------------------------
 # 		depend
