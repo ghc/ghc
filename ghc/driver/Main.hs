@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.50 2000/08/04 12:04:08 simonmar Exp $
+-- $Id: Main.hs,v 1.51 2000/08/06 12:19:21 panne Exp $
 --
 -- GHC Driver program
 --
@@ -1068,7 +1068,7 @@ getOptionsFromSource
 	-> IO [String]		-- options, if any
 getOptionsFromSource file
   = do h <- openFile file ReadMode
-       catchIO justIoErrors (look h)
+       catchJust ioErrors (look h)
 	  (\e -> if isEOFError e then return [] else ioError e)
   where
 	look h = do
@@ -1500,9 +1500,9 @@ beginMkDependHS = do
 			then return ()
 			else chuck
 	 
-	   catchIO justIoErrors slurp 
+	   catchJust ioErrors slurp 
 		(\e -> if isEOFError e then return () else ioError e)
-	   catchIO justIoErrors chuck
+	   catchJust ioErrors chuck
 		(\e -> if isEOFError e then return () else ioError e)
 
 
@@ -1547,7 +1547,7 @@ endMkDependHS = do
 		hPutStrLn tmp_hdl l
 		slurp
 	 
-  	catchIO justIoErrors slurp 
+  	catchJust ioErrors slurp 
 		(\e -> if isEOFError e then return () else ioError e)
 
 	hClose hdl
