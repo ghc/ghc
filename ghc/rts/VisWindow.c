@@ -340,7 +340,7 @@ create_GHC_Front_Panel (void)
   gtk_label_set_justify (GTK_LABEL (label14), GTK_JUSTIFY_RIGHT);
   gtk_misc_set_alignment (GTK_MISC (label14), 1, 0.5);
 
-  label15 = gtk_label_new ("\t\tFootprint");
+  label15 = gtk_label_new ("Footprint");
   gtk_widget_ref (label15);
   gtk_object_set_data_full (GTK_OBJECT (GHC_Front_Panel), "label15", label15,
                             (GtkDestroyNotify) gtk_widget_unref);
