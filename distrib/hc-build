@@ -45,9 +45,12 @@ $MAKE -C ghc all
 echo "*** Building libraries..."
 ./configure
 
+# make ghc/utils while we still have libraries in ghc/lib
+$MAKE -C ghc/utils clean boot
+$MAKE -C ghc/utils all
+
+# now, clean and build the libraries
 $MAKE -C ghc/lib   clean boot
 $MAKE -C ghc/lib   all
 $MAKE -C hslibs    clean boot
 $MAKE -C hslibs    all
-$MAKE -C ghc/utils clean boot
-$MAKE -C ghc/utils all
