@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.23 2001/01/26 14:17:01 simonpj Exp $
+ * $Id: Storage.h,v 1.24 2001/01/26 14:36:40 simonpj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -275,6 +275,10 @@ void printMutableList(generation *gen);
 
      HEAP    Dynamically-allocated closures
 
+     USER    None of the above.  The only way USER things arise right 
+             now is when GHCi allocates a constructor info table, which
+	     it does by mallocing them.
+
    Three macros identify these three areas:
      IS_CODE(p), IS_DATA(p), HEAP_ALLOCED(p)
 
@@ -317,7 +321,7 @@ void printMutableList(generation *gen);
        TEXT_SECTION_END_MARKER   (usually _etext)
            DATA section
        DATA_SECTION_END_MARKER   (usually _end)
-           ???
+           USER section
        HEAP_BASE
            HEAP section
 
@@ -389,6 +393,9 @@ extern int is_heap_alloced(const void* x);
   walks over the "pending arguments" on its way to the next return address.
   It is called moderately often, but not as often as HEAP_ALLOCED
 
+  ToDo: LOOKS_LIKE_GHC_INFO(p) does not return True when p points to a
+  constructor info table allocated by GHCi.  We should really rename 
+  LOOKS_LIKE_GHC_INFO to LOOKS_LIKE_GHC_RETURN_INFO.
 
   Implementation
   ~~~~~~~~~~~~~~
