@@ -498,25 +498,28 @@ line_prag cont buf s@PState{loc=loc} =
   }}}}
 
 nested_comment :: P a -> P a
-nested_comment cont buf = loop buf
+nested_comment cont buf orig_state@PState{loc=loc} = loop buf orig_state
  where
    loop buf = 
      case currentChar# buf of
-	'\NUL'# | bufferExhausted (stepOn buf) -> 
-		lexError "unterminated `{-'" buf -- -}
-	'-'# | lookAhead# buf 1# `eqChar#` '}'# ->
-		cont (stepOnBy# buf 2#)
+	'-'# | lookAhead# buf 1# `eqChar#` '}'# -> cont (stepOnBy# buf 2#)
 
 	'{'# | lookAhead# buf 1# `eqChar#` '-'# ->
 	      nested_comment (nested_comment cont) (stepOnBy# buf 2#)
 
 	'\n'# -> \ s@PState{loc=loc} ->
 		 let buf' = stepOn buf in
-		 nested_comment cont buf'
-			s{loc = incSrcLine loc, bol = currentIndex# buf',
-			  atbol = 1#}
+		 loop buf' s{loc = incSrcLine loc, 
+			     bol = currentIndex# buf',
+			     atbol = 1#}
 
-	_   -> nested_comment cont (stepOn buf)
+	-- pass the original state to lexError so that the error is
+	-- reported at the line it was originally on, not the line at
+	-- the end of the file.
+	'\NUL'# | bufferExhausted (stepOn buf) -> 
+		\_ -> lexError "unterminated `{-'" buf orig_state -- -}
+
+	_   -> loop (stepOn buf)
 
 -- When we are lexing the first token of a line, check whether we need to
 -- insert virtual semicolons or close braces due to layout.
