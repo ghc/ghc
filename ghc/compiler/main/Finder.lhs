@@ -52,10 +52,6 @@ initFinder pkgs
 	; writeIORef v_HomeDirCache Nothing
 		-- lazilly fill in the package cache
 	; writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
-	
--- Debug output
---	; pkg_dbg_info <- readIORef v_PkgDirCache
---	; putStrLn (unlines (map show (fmToList pkg_dbg_info)))
 	}
 
 emptyHomeDirCache :: IO ()
@@ -64,16 +60,6 @@ emptyHomeDirCache
 
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findModule name
-  = do 	{ hPutStr stderr ("findModule: " ++ moduleNameUserString name ++ " ... ")
-	; maybe_m <- findModule_wrk name
-	; case maybe_m of
-	     Nothing -> hPutStrLn stderr "Not Found"
-	     Just mm -> hPutStrLn stderr (showSDoc (ppr (snd mm)))
-	; return maybe_m
-	}
-
-findModule_wrk :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-findModule_wrk name
   = do	{ j <- maybeHomeModule name
 	; case j of
 	    Just home_module -> return (Just home_module)
