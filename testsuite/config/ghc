@@ -6,8 +6,11 @@ config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ['-no-recomp', '-dcore-lint']
 
-config.compile_ways	     = ['normal', 'opt', 'optasm']
-config.run_ways		     = ['normal', 'opt', 'optasm']
+# By default, we test the 'normal' and 'opt' ways.
+# 'optasm' is added by mk/test.mk if the compiler has a native code gen,
+# 'prof'   is added by mk/test.mk if the profiling way is enabled.
+config.compile_ways	     = ['normal', 'opt']
+config.run_ways		     = ['normal', 'opt']
 
 config.way_flags	     = { 'normal' : [],
 		   		 'opt'    : ['-O'],
