@@ -2307,15 +2307,14 @@ genCCall fn cconv kind args
     get_call_arg arg old_sz
       = get_op arg		`thenUs` \ (code, reg, sz) ->
         let new_sz = old_sz + arg_size sz
-        in
-        case sz of
-           DF -> returnUs (new_sz,
+        in  if   (case sz of DF -> True; F -> True; _ -> False)
+            then returnUs (new_sz,
                            code .
-                           mkSeqInstr (GST DF reg
+                           mkSeqInstr (GST sz reg
                                               (AddrBaseIndex (Just esp) 
                                                   Nothing (ImmInt (- new_sz))))
                           )
-	   _  -> returnUs (new_sz,
+	    else returnUs (new_sz,
                            code . 
                            mkSeqInstr (MOV sz (OpReg reg)
                                               (OpAddr 
