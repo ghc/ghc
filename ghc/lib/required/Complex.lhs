@@ -116,7 +116,7 @@ instance  (Prelude.RealFloat a) => Floating (Complex a)	where
                             coshx = cosh x
 
     asin z@(x:+y)  =  y':+(-x')
-                      where  (x':+y') = log ((-y:+x) + sqrt (1 - z*z))
+                      where  (x':+y') = log (((-y):+x) + sqrt (1 - z*z))
     acos z@(x:+y)  =  y'':+(-x'')
                       where (x'':+y'') = log (z + ((-y'):+x'))
                             (x':+y')   = sqrt (1 - z*z)
