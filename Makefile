@@ -83,16 +83,16 @@ binary-dist ::
 # binary dist'ing hslibs/, hackily.
 #
 binary-dist ::
-	@echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/hslibs;
-	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/hslibs;
+	@echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs;
+	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs;
 	$(MAKE) -C hslibs $(MFLAGS) install \
 		BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
 		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(ProjectVersion) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/hslibs \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/hslibs \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/ghc-$(ProjectVersion) ;
+		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
+		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs \
+		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hslibs \
+		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/ghc-$(GhcProjectVersion) ;
 
 # Even more of a hack, but I'm too tired to fix this up right now..
 BIN_DIST_SCRIPTS_NEEDING_RENAMING=ghc stat2resid hstags mkdependHS
@@ -100,10 +100,26 @@ BIN_DIST_SCRIPTS_NEEDING_RENAMING=ghc stat2resid hstags mkdependHS
 binary-dist::
 	@for i in $(BIN_DIST_SCRIPTS_NEEDING_RENAMING); do \
 	     echo "Renaming $$i to $$i.prl"; \
-	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/$$i.prl; \
+	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/$$i.prl; \
 	done
 	@echo "Renaming hscpp to hscpp.prl"
-	@$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/hscpp  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(ProjectVersion)/hscpp.prl
+	@$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hscpp  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/hscpp.prl
+
+# binary-disting happy, hackily again
+
+binary-dist ::
+	@echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy;
+	@$(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy;
+	$(MAKE) -C happy $(MFLAGS) install \
+		BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) \
+		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
+		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
+		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion) \
+		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/ghc-$(GhcProjectVersion) ;
+	@echo "Renaming happy to happy.sh"
+	@$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/ghc-$(GhcProjectVersion)/happy.sh
 
 dist :: dist-pre
 include $(TOP)/mk/target.mk
