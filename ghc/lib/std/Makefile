@@ -34,6 +34,7 @@ endif
 PACKAGE = std
 
 BOOT_SRCS += PrelPrimopWrappers.hs
+CLEAN_FILES += PrelPrimopWrappers.hs
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
