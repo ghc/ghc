@@ -1,0 +1,24 @@
+Testing positioning with buffer mode set to: NoBuffering
+First ten chars: --!!! file
+First ten chars: --!!! file
+First ten chars: --!!! file
+Testing positioning with buffer mode set to: LineBuffering
+First ten chars: --!!! file
+First ten chars: --!!! file
+First ten chars: --!!! file
+Testing positioning with buffer mode set to: BlockBuffering Nothing
+First ten chars: --!!! file
+First ten chars: --!!! file
+First ten chars: --!!! file
+Testing positioning with buffer mode set to: BlockBuffering (Just 511)
+First ten chars: --!!! file
+First ten chars: --!!! file
+First ten chars: --!!! file
+Testing positioning with buffer mode set to: BlockBuffering (Just 3)
+First ten chars: --!!! file
+First ten chars: --!!! file
+First ten chars: --!!! file
+Testing positioning with buffer mode set to: BlockBuffering (Just 11)
+First ten chars: --!!! file
+First ten chars: --!!! file
+First ten chars: --!!! file
