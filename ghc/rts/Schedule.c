@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.125 2002/02/15 14:49:08 simonmar Exp $
+ * $Id: Schedule.c,v 1.126 2002/02/15 14:53:32 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3089,6 +3089,14 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       /* throw away the stack from Sp up to the CATCH_FRAME.
        */
       sp = (P_)su - 1;
+
+      /* Ensure that async excpetions are blocked now, so we don't get
+       * a surprise exception before we get around to executing the
+       * handler.
+       */
+      if (tso->blocked_exceptions == NULL) {
+	  tso->blocked_exceptions = END_TSO_QUEUE;
+      }
 
       /* Put the newly-built THUNK on top of the stack, ready to execute
        * when the thread restarts.
