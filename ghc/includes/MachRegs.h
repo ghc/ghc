@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.11 2002/06/07 09:40:10 matthewc Exp $
+ * $Id: MachRegs.h,v 1.12 2002/10/02 09:08:44 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -374,13 +374,13 @@
 #define REG_R7    	r20
 #define REG_R8    	r21
 
-#define REG_F1		fr14
-#define REG_F2		fr15
-#define REG_F3		fr16
-#define REG_F4		fr17
+#define REG_F1		f14
+#define REG_F2		f15
+#define REG_F3		f16
+#define REG_F4		f17
 
-#define REG_D1		fr18
-#define REG_D2		fr19
+#define REG_D1		f18
+#define REG_D2		f19
 
 #define REG_Sp    	r22
 #define REG_Su    	r23
@@ -388,6 +388,12 @@
 
 #define REG_Hp	    	r25
 #define REG_HpLim	r26
+
+#define NCG_SpillTmp_I1	r27
+#define NCG_SpillTmp_I2	r28
+
+#define NCG_SpillTmp_D1	f20
+#define NCG_SpillTmp_D2	f21
 
 #endif /* powerpc */
 
