@@ -479,26 +479,20 @@ INLINE mode_t __hscore_S_IWUSR() { return S_IWUSR; }
 INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
 #endif
 
-#if !defined(_MSC_VER)
 INLINE HsAddr
 __hscore_d_name( struct dirent* d )
 {
-#if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER)
+#if defined(STRUCT_DIRENT_FLAT_LAYOUT)
   return (HsAddr)(&d->d_name);
 #else
   return (HsAddr)(d->d_name);
 #endif
 }
-#endif
 
 INLINE HsInt
 __hscore_end_of_dir( void )
 {
-#ifndef mingw32_TARGET_OS
-  return 0;
-#else
-  return ENOENT;
-#endif
+  return READDIR_ERRNO_EOF;
 }
 
 INLINE void
