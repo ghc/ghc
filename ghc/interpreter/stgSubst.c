@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stgSubst.c,v $
- * $Revision: 1.8 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.9 $
+ * $Date: 2000/04/28 13:03:47 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -107,6 +107,7 @@ StgExpr substExpr( List sub, StgExpr e )
             break;
     case STGVAR:
     case NAME:
+    case TUPLE:
             return substVar(sub,e);
     default:
             internal("substExpr");
