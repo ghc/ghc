@@ -112,8 +112,10 @@ endif # BootingViaC
 #-----------------------------------------------------------------------------
 # hsc2hs Suffix Rules
 #
+ifneq "$(BootingFromHc)" "YES"
 %_hsc.c %_hsc.h %.hs : %.hsc
 	$(HSC2HS) $<
+endif
 
 #-----------------------------------------------------------------------------
 # Lx Suffix Rules
