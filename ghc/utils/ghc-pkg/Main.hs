@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.15 2001/08/21 14:38:04 sewardj Exp $
+-- $Id: Main.hs,v 1.16 2001/09/18 11:07:58 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -32,10 +32,13 @@ main = do
 	(_,_,errors) -> die (concat errors ++ 
 			     usageInfo usageHeader flags)
 
-data Flag = Config String | List | Add | Remove String | Show String | Field String
-isConfigOrField (Config _) = True
-isConfigOrField (Field _) = True
-isConfigOrField _ = False
+data Flag = Config String | List | Add | Remove String | Show String 
+		| Field String | AutoGHCiLibs
+
+isAction (Config _)     = False
+isAction (Field _)      = False
+isAction (AutoGHCiLibs) = False
+isAction _              = True
 
 usageHeader = "ghc-pkg [OPTION...]"
 
@@ -51,7 +54,9 @@ flags = [
   Option [] ["field"] (ReqArg Field "FIELD")
  	"(with --show-package) Show field FIELD only",
   Option ['r'] ["remove-package"] (ReqArg Remove "NAME")
- 	"Remove an installed package"
+ 	"Remove an installed package",
+  Option ['g'] ["auto-ghci-libs"] (NoArg AutoGHCiLibs)
+	"Automatically build libs for GHCi (with -a)"
   ]
 
 #ifdef mingw32_TARGET_OS
@@ -91,9 +96,12 @@ runit clis = do
   let details = read s :: [PackageConfig]
   eval_catch details (\_ -> die "parse error in package config file")
 
-  case [ c | c <- clis, not (isConfigOrField c) ] of
+  let auto_ghci_libs = any isAuto clis 
+	 where isAuto AutoGHCiLibs = True; isAuto _ = False
+
+  case [ c | c <- clis, isAction c ] of
     [ List ]     -> listPackages details
-    [ Add  ]     -> addPackage details conf_file
+    [ Add  ]     -> addPackage details conf_file auto_ghci_libs
     [ Remove p ] -> removePackage details conf_file p
     [ Show p ]   -> showPackage details conf_file p fields
     _            -> die (usageInfo usageHeader flags)
@@ -114,17 +122,15 @@ showPackage details pkgconf pkg_name fields =
 				(map (vcat . map text) (map ($pkg) fields))))
     _     -> die "showPackage: internal error"
 
-addPackage :: [PackageConfig] -> FilePath -> IO ()
-addPackage details pkgconf = do
+addPackage :: [PackageConfig] -> FilePath -> Bool -> IO ()
+addPackage details pkgconf auto_ghci_libs = do
   checkConfigAccess pkgconf
   hPutStr stdout "Reading package info from stdin... "
   s <- getContents
   let new_pkg = read s :: PackageConfig
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
-  if (name new_pkg `elem` map name details)
-	then die ("package `" ++ name new_pkg ++ "' already installed")
-	else do
+  checkPackageConfig new_pkg details auto_ghci_libs
   savePackageConfig pkgconf
   maybeRestoreOldConfig pkgconf $
     writeNewConfig pkgconf (details ++ [new_pkg])
@@ -172,6 +178,67 @@ savePackageConfig conf_file = do
     -- unless we move the old one out of the way...
   renameFile conf_file (conf_file ++ ".old") 
   hPutStrLn stdout "done."
+
+-----------------------------------------------------------------------------
+-- Sanity-check a new package config, and automatically build GHCi libs
+-- if requested.
+
+checkPackageConfig :: PackageConfig -> [PackageConfig] -> Bool -> IO ()
+checkPackageConfig pkg pkgs auto_ghci_libs = do
+  if (name pkg `elem` map name pkgs)
+	then die ("package `" ++ name pkg ++ "' is already installed")
+	else do
+  mapM_	(checkDep pkgs) (package_deps pkg)
+  mapM_	checkDir (import_dirs pkg)
+  mapM_	checkDir (source_dirs pkg)
+  mapM_	checkDir (library_dirs pkg)
+  mapM_	checkDir (include_dirs pkg)
+  mapM_ (checkHSLib (library_dirs pkg) auto_ghci_libs) (hs_libraries pkg)
+  -- ToDo: check these somehow?
+  --	extra_libraries :: [String],
+  --	c_includes      :: [String],
+
+checkDir d = do
+  b <- doesDirectoryExist d
+  if b then return ()
+       else die ("`" ++ d ++ "' doesn't exist or isn't a directory")
+
+checkDep :: [PackageConfig] -> String -> IO ()
+checkDep pkgs n
+  | n `elem` map name pkgs = return ()
+  | otherwise = die ("dependency `" ++ n ++ "' doesn't exist")
+
+checkHSLib :: [String] -> Bool -> String -> IO ()
+checkHSLib dirs auto_ghci_libs lib = do
+  let batch_lib_file = "lib" ++ lib ++ ".a"
+  bs <- mapM (\d -> doesFileExist (d ++ '/':batch_lib_file)) dirs
+  case [ dir | (exists,dir) <- zip bs dirs, exists ] of
+	[] -> die ("cannot find `" ++ batch_lib_file ++ "' on library path") 
+	(dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
+
+checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
+checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build = do
+  let ghci_lib_file = lib ++ ".o"
+      ghci_lib_path = batch_lib_dir ++ '/':ghci_lib_file
+  bs <- mapM (\d -> doesFileExist (d ++ '/':ghci_lib_file)) dirs
+  case [ dir | (exists,dir) <- zip bs dirs, exists ] of
+        [] | auto_build -> 
+		autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
+	   | otherwise  -> 
+		hPutStrLn stderr ("warning: can't find GHCi lib `"
+					 ++ ghci_lib_file ++ "'")
+   	(dir:_) -> return ()
+
+-- automatically build the GHCi version of a batch lib, 
+-- using ld --whole-archive.
+
+autoBuildGHCiLib dir batch_file ghci_file = do
+  let ghci_lib_file  = dir ++ '/':ghci_file
+      batch_lib_file = dir ++ '/':batch_file
+  hPutStr stderr ("building GHCi library `" ++ ghci_lib_file ++ "'...")
+  system("ld -r -x -o " ++ ghci_lib_file ++ 
+	 " --whole-archive " ++ batch_lib_file)
+  hPutStrLn stderr (" done.")
 
 -----------------------------------------------------------------------------
 
