@@ -109,12 +109,12 @@ LeadingUnderscore=@LeadingUnderscore@
 #		* ghc&hslibs next
 #		then it's up to you
 
-ProjectsToBuild   = glafp-utils literate ghc hslibs
+ProjectsToBuild   = glafp-utils literate happy ghc hslibs
 #
 # Make a distinction between building and installing, ProjectsToInstall
 # does not include the literate bits..
 #
-ProjectsToInstall = glafp-utils ghc hslibs
+ProjectsToInstall = glafp-utils happy ghc hslibs
 
 #
 # Should the various project tests directories be built?
@@ -155,18 +155,23 @@ ProjectPatchLevel =$(GhcProjectPatchLevel)
 # Variables that control how the compiler itself is built
 
 # Specify the Haskell compiler to be used to compile the compiler itself
-#   WithGhcHc	Path name of the compiler to use
-#   Ghc2_0	Whether this compiler is GHC 2.0 or later
-#		(which affects gruesome details about
-# 		 how mutually recursive modules are handled)
-#   WithGhcHcType	What "type" of compiler is being used
-#			Valid options:
+#
+#   WithGhcHc	   Path name of the compiler to use
+#
+#   Ghc2_0	   Whether this compiler is GHC 2.0 or later
+#		   (which affects gruesome details about
+# 		   how mutually recursive modules are handled)
+#
+#   WithGhcHcType  What "type" of compiler is being used
+#		   Valid options:
 #		       	     HC_CHALMERS_HBC
 #		       	     HC_GLASGOW_GHC
 #		       	     HC_ROJEMO_NHC
 #		       	     HC_UNSPECIFIED
+
 WithGhcHc = ghc-0.29
 Ghc2_0=NO
+
 # Unused, we think
 # WithGhcHcType=HC_GLASGOW_GHC
 
