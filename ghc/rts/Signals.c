@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.4 1999/02/05 16:02:54 simonm Exp $
+ * $Id: Signals.c,v 1.5 1999/03/02 20:01:55 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,8 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "StablePriv.h"
+
+#ifndef mingw32_TARGET_OS
 
 #ifndef PAR
 
@@ -237,3 +239,5 @@ start_signal_handlers(void)
 {
 }
 #endif
+
+#endif /*! mingw32_TARGET_OS */
