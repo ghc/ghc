@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.7 2001/05/29 01:07:00 sof Exp $
+-- $Id: GetImports.hs,v 1.8 2001/06/27 11:11:03 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -60,7 +60,7 @@ getImports s
         f si ni me [] = (nub si, nub ni, me)
 
         mkMN str = mkModuleName (takeWhile isModId (reverse str))
-        isModId c = isAlphaNum c || c `elem` "'_"
+        isModId c = isAlphaNum c || c `elem` "'._"
 
 
 -- remove literals and comments from a string, producing a 
