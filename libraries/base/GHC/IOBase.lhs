@@ -715,7 +715,7 @@ data IOException
 				     -- the error.
      ioe_type     :: IOErrorType,    -- what it was.
      ioe_location :: String,	     -- location.
-     ioe_descr    :: String,         -- error type specific information.
+     ioe_description :: String,      -- error type specific information.
      ioe_filename :: Maybe FilePath  -- filename the error is related to.
    }
 

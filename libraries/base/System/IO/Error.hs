@@ -16,9 +16,7 @@
 
 module System.IO.Error (
     IOError,			-- abstract
-#ifdef __GLASGOW_HASKELL__
     IOErrorType,		-- abstract
-#endif
 
     catch,			-- :: IO a -> (IOError -> IO a) -> IO a
     try,			-- :: IO a -> IO (Either IOError a)
@@ -26,12 +24,13 @@ module System.IO.Error (
     ioError,		       	-- :: IOError -> IO a
     userError,		       	-- :: String  -> IOError
 
-#ifdef __GLASGOW_HASKELL__
+#ifndef __NHC__
     mkIOError,			-- :: IOErrorType -> String -> Maybe Handle
 				--    -> Maybe FilePath -> IOError
 
     annotateIOError,		-- :: IOError -> String -> Maybe FilePath 
 				--    -> Maybe Handle -> IOError 
+#endif
 
     alreadyExistsErrorType,	-- :: IOErrorType
     doesNotExistErrorType,
@@ -50,7 +49,6 @@ module System.IO.Error (
     isIllegalOperationErrorType, 
     isPermissionErrorType,
     isUserErrorType, 
-#endif  /* __GLASGOW_HASKELL__ */
 
     isAlreadyExistsError,	-- :: IOError -> Bool
     isDoesNotExistError,
@@ -61,7 +59,7 @@ module System.IO.Error (
     isPermissionError,
     isUserError,
 
-#ifdef __GLASGOW_HASKELL__
+#ifndef __NHC__
     ioeGetErrorType,		-- :: IOError -> IOErrorType
 #endif
     ioeGetErrorString,		-- :: IOError -> String
@@ -71,17 +69,17 @@ module System.IO.Error (
   ) where
 
 import Data.Either
+import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import Data.Maybe
 import GHC.IOBase
 import GHC.Exception
 import Text.Show
 #endif
 
 #ifdef __HUGS__
-import Hugs.IO
+import Hugs.Prelude(Handle, IOException(..), IOErrorType(..))
 #endif
 
 #ifdef __NHC__
@@ -118,7 +116,7 @@ try f          =  catch (do r <- f
                         (return . Left)
 #endif
 
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 -- -----------------------------------------------------------------------------
 -- Constructing an IOError
 
@@ -126,7 +124,7 @@ mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> IOError
 mkIOError t location maybe_hdl maybe_filename =
                IOError{ ioe_type = t, 
 			ioe_location = location,
-	   		ioe_descr = "",
+	   		ioe_description = "",
 			ioe_handle = maybe_hdl, 
 			ioe_filename = maybe_filename
  			}
@@ -145,7 +143,9 @@ mkIOError t         location maybe_hdl maybe_filename =
     ioeTypeToInt IllegalOperation  = fromEnum EPERM
     ioeTypeToInt PermissionDenied  = fromEnum EACCES
 #endif
+#endif /* __GLASGOW_HASKELL__ || __HUGS__ */
 
+#ifndef __NHC__
 -- -----------------------------------------------------------------------------
 -- IOErrorType
 
@@ -161,7 +161,7 @@ isEOFError           = isEOFErrorType              . ioeGetErrorType
 isIllegalOperation   = isIllegalOperationErrorType . ioeGetErrorType
 isPermissionError    = isPermissionErrorType       . ioeGetErrorType
 isUserError          = isUserErrorType             . ioeGetErrorType
-#endif
+#endif /* __NHC__ */
 
 -- -----------------------------------------------------------------------------
 -- IOErrorTypes
@@ -172,7 +172,6 @@ data IOErrorType = AlreadyExists | NoSuchThing | ResourceBusy
 		 | PermissionDenied | UserError
 #endif
 
-#ifdef __GLASGOW_HASKELL__
 alreadyExistsErrorType, doesNotExistErrorType, alreadyInUseErrorType,
  fullErrorType, eofErrorType, illegalOperationErrorType,
  permissionErrorType, userErrorType :: IOErrorType
@@ -185,18 +184,14 @@ eofErrorType              = EOF
 illegalOperationErrorType = IllegalOperation
 permissionErrorType       = PermissionDenied
 userErrorType		  = UserError
-#endif
 
 -- -----------------------------------------------------------------------------
 -- IOErrorType predicates
 
-#ifdef __GLASGOW_HASKELL__
 isAlreadyExistsErrorType, isDoesNotExistErrorType, isAlreadyInUseErrorType,
   isFullErrorType, isEOFErrorType, isIllegalOperationErrorType, 
   isPermissionErrorType, isUserErrorType :: IOErrorType -> Bool
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 isAlreadyExistsErrorType AlreadyExists = True
 isAlreadyExistsErrorType _ = False
 
@@ -220,12 +215,11 @@ isPermissionErrorType _ = False
 
 isUserErrorType UserError = True
 isUserErrorType _ = False
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Miscellaneous
 
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 ioeGetErrorType	      :: IOError -> IOErrorType
 ioeGetHandle          :: IOError -> Maybe Handle
 ioeGetErrorString     :: IOError -> String
@@ -236,16 +230,14 @@ ioeGetErrorType ioe = ioe_type ioe
 ioeGetHandle ioe = ioe_handle ioe
 
 ioeGetErrorString ioe
-   | isUserErrorType (ioe_type ioe) = ioe_descr ioe
+   | isUserErrorType (ioe_type ioe) = ioe_description ioe
    | otherwise                      = show (ioe_type ioe)
 
 ioeGetFileName ioe = ioe_filename ioe
-#endif
 
 -- -----------------------------------------------------------------------------
 -- annotating an IOError
 
-#ifdef __GLASGOW_HASKELL__
 annotateIOError :: IOError 
               -> String 
               -> Maybe FilePath 
@@ -256,7 +248,7 @@ annotateIOError (IOError hdl errTy _ str path) loc opath ohdl =
   where
     Nothing `mplus` ys = ys
     xs      `mplus` _  = xs
-#endif
+#endif /* __GLASGOW_HASKELL__ || __HUGS__ */
 
 #ifdef 0 /*__NHC__*/
 annotateIOError (IOError msg file hdl code) msg' file' hdl' =
