@@ -98,6 +98,7 @@ $white_no_nl+		;
   CurrentTSO		{ global_reg CurrentTSO }
   CurrentNursery	{ global_reg CurrentNursery }
   HpAlloc		{ global_reg HpAlloc }
+  BaseReg		{ global_reg BaseReg }
   
   $namebegin $namechar*	{ name }
   
