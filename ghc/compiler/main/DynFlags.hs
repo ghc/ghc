@@ -60,7 +60,9 @@ import Util		( notNull, splitLongestPrefix, split, normalisePath )
 import DATA_IOREF	( readIORef )
 import EXCEPTION	( throwDyn )
 import Monad		( when )
+#ifdef mingw32_TARGET_OS
 import Data.List	( isPrefixOf )
+#endif
 import Maybe		( fromJust )
 import Char		( isDigit, isUpper )
 
@@ -168,6 +170,7 @@ data DynFlag
    | Opt_NoHsMain
    | Opt_SplitObjs
    | Opt_StgStats
+   | Opt_HideAllPackages
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -819,6 +822,7 @@ dynamic_flags = [
   ,  ( "package-name"   , HasArg ignorePackage ) -- for compatibility
   ,  ( "package"        , HasArg exposePackage )
   ,  ( "hide-package"   , HasArg hidePackage )
+  ,  ( "hide-all-packages", NoArg (setDynFlag Opt_HideAllPackages) )
   ,  ( "ignore-package" , HasArg ignorePackage )
   ,  ( "syslib"         , HasArg exposePackage )  -- for compatibility
 

@@ -228,9 +228,16 @@ readPackageConfig dflags pkg_map conf_file = do
   debugTraceMsg dflags 2 ("Using package config file: " ++ conf_file)
   proto_pkg_configs <- loadPackageConfig conf_file
   top_dir 	    <- getTopDir
-  let pkg_configs = mungePackagePaths top_dir proto_pkg_configs
-  return (extendPackageConfigMap pkg_map pkg_configs)
+  let pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs
+      pkg_configs2 = maybeHidePackages dflags pkg_configs1
+  return (extendPackageConfigMap pkg_map pkg_configs2)
 
+maybeHidePackages :: DynFlags -> [PackageConfig] -> [PackageConfig]
+maybeHidePackages dflags pkgs
+  | dopt Opt_HideAllPackages dflags = map hide pkgs
+  | otherwise 			    = pkgs
+  where
+    hide pkg = pkg{ exposed = False }
 
 mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
 -- Replace the string "$topdir" at the beginning of a path
@@ -257,7 +264,7 @@ mkPackageState :: DynFlags -> PackageConfigMap -> IO PackageState
 mkPackageState dflags pkg_db = do
   --
   -- Modify the package database according to the command-line flags
-  -- (-package, -hide-package, -ignore-package).
+  -- (-package, -hide-package, -ignore-package, -hide-all-packages).
   --
   -- Also, here we build up a set of the packages mentioned in -package
   -- flags on the command line; these are called the "explicit" packages.

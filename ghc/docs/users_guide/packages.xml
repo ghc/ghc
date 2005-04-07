@@ -131,6 +131,23 @@ exposed-modules: Network.BSD,
       </varlistentry>
       
       <varlistentry>
+	<term><option>-hide-all-packages</option>
+	<indexterm><primary><option>-hide-package</option></primary>
+	  </indexterm></term>
+	<listitem>
+	  <para>Ignore the exposed flag on installed packages, and hide them
+	    all by default.  If you use
+	    this flag, then any packages you require (including
+	    <literal>base</literal>) need to be explicitly exposed using
+	    <option>-package</option> options.</para>
+
+	  <para>This is a good way to insulate your program from differences
+	    in the globally exposed packages, and being explicit about package
+	    dependencies is a Good Thing.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-hide-package</option> <replaceable>P</replaceable>
 	<indexterm><primary><option>-hide-package</option></primary>
 	  </indexterm></term>

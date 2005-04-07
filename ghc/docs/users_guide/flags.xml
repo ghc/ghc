@@ -481,6 +481,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-hide-all-packages</option></entry>
+	      <entry>Hide all packages by default</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-hide-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Hide package <replaceable>P</replaceable></entry>
 	      <entry>static</entry>
