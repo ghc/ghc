@@ -3925,7 +3925,7 @@ static void machoInitSymbolsWithoutUnderscore()
 {
     extern void* symbolsWithoutUnderscore[];
     void **p = symbolsWithoutUnderscore;
-    __asm__ volatile(".data\n_symbolsWithoutUnderscore:");
+    __asm__ volatile(".globl _symbolsWithoutUnderscore\n.data\n_symbolsWithoutUnderscore:");
 
 #undef Sym
 #define Sym(x)  \
