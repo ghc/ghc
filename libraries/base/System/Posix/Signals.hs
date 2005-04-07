@@ -98,6 +98,7 @@ import Prelude -- necessary to get dependencies right
 
 #ifdef __GLASGOW_HASKELL__
 #include "Signals.h"
+import GHC.Conc	( ensureIOManagerIsRunning )
 #endif
 
 import Foreign
@@ -306,6 +307,7 @@ installHandler =
 #else
 
 installHandler int handler maybe_mask = do
+    ensureIOManagerIsRunning  -- for the threaded RTS
     case maybe_mask of
 	Nothing -> install' nullPtr
         Just (SignalSet x) -> withForeignPtr x $ install' 

@@ -68,6 +68,10 @@ module GHC.Conc
 	, asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
 	, asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
 #endif
+
+#ifndef mingw32_HOST_OS
+	, ensureIOManagerIsRunning
+#endif
         ) where
 
 import System.Posix.Types
@@ -524,20 +528,26 @@ pendingDelays :: IORef [DelayReq]
 {-# NOINLINE pendingEvents #-}
 {-# NOINLINE pendingDelays #-}
 (pendingEvents,pendingDelays) = unsafePerformIO $ do
-  startIOServiceThread
+  startIOManagerThread
   reqs <- newIORef []
   dels <- newIORef []
   return (reqs, dels)
 	-- the first time we schedule an IO request, the service thread
 	-- will be created (cool, huh?)
 
-startIOServiceThread :: IO ()
-startIOServiceThread = do
+ensureIOManagerIsRunning :: IO ()
+ensureIOManagerIsRunning 
+  | threaded  = seq pendingEvents $ return ()
+  | otherwise = return ()
+
+startIOManagerThread :: IO ()
+startIOManagerThread = do
         allocaArray 2 $ \fds -> do
-	throwErrnoIfMinus1 "startIOServiceThread" (c_pipe fds)
+	throwErrnoIfMinus1 "startIOManagerThread" (c_pipe fds)
 	rd_end <- peekElemOff fds 0
 	wr_end <- peekElemOff fds 1
 	writeIORef stick (fromIntegral wr_end)
+	c_setIOManagerPipe wr_end
 	quickForkIO $ do
 	    allocaBytes sizeofFdSet   $ \readfds -> do
 	    allocaBytes sizeofFdSet   $ \writefds -> do 
@@ -595,9 +605,17 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
   (res,delays') <- do_select delays
   -- ToDo: check result
 
-  b <- takeMVar prodding
-  if b then alloca $ \p -> do c_read (fromIntegral wakeup) p 1; return ()
-       else return ()
+  b <- fdIsSet wakeup readfds
+  if b == 0 
+    then return ()
+    else alloca $ \p -> do 
+	    c_read (fromIntegral wakeup) p 1; return ()
+	    s <- peek p		
+	    if (s == 0xff) 
+	      then return ()
+	      else c_startSignalHandler (fromIntegral s)
+
+  takeMVar prodding
   putMVar prodding False
 
   reqs' <- completeRequests reqs readfds writefds []
@@ -616,9 +634,15 @@ prodServiceThread = do
   b <- takeMVar prodding
   if (not b) 
     then do fd <- readIORef stick
-	    with 42 $ \pbuf -> do c_write (fromIntegral fd) pbuf 1; return ()
+	    with 0xff $ \pbuf -> do c_write (fromIntegral fd) pbuf 1; return ()
     else return ()
   putMVar prodding True
+
+foreign import ccall unsafe "startSignalHandler"
+  c_startSignalHandler :: CInt -> IO ()
+
+foreign import ccall "setIOManagerPipe"
+  c_setIOManagerPipe :: CInt -> IO ()
 
 -- -----------------------------------------------------------------------------
 -- IO requests
