@@ -96,11 +96,6 @@ module System.Posix.Signals (
 
 import Prelude -- necessary to get dependencies right
 
-#ifdef __GLASGOW_HASKELL__
-#include "Signals.h"
-import GHC.Conc	( ensureIOManagerIsRunning )
-#endif
-
 import Foreign
 import Foreign.C
 import System.IO.Unsafe
@@ -109,6 +104,11 @@ import System.Posix.Internals
 
 #ifndef mingw32_HOST_OS
 -- WHOLE FILE...
+
+#ifdef __GLASGOW_HASKELL__
+#include "Signals.h"
+import GHC.Conc	( ensureIOManagerIsRunning )
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Specific signals
