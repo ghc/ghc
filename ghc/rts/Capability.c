@@ -22,7 +22,6 @@
 #include "OSThreads.h"
 #include "Capability.h"
 #include "Schedule.h"  /* to get at EMPTY_RUN_QUEUE() */
-#include "Signals.h" /* to get at handleSignalsInThisThread() */
 
 #if !defined(SMP)
 Capability MainCapability;     /* for non-SMP, we have one global capability */
@@ -184,7 +183,6 @@ grabCapability( Capability** cap )
   rts_n_free_capabilities = 0;
 # endif
   *cap = &MainCapability;
-  handleSignalsInThisThread();
 #endif
 #if defined(RTS_SUPPORTS_THREADS)
   IF_DEBUG(scheduler, sched_belch("worker: got capability"));
@@ -304,7 +302,6 @@ waitForReturnCapability( Mutex* pMutex, Capability** pCap )
 	*pCap = &MainCapability;
 	ASSERT(rts_n_free_capabilities == 0);
 #endif
-	handleSignalsInThisThread();
     } else {
 	grabCapability(pCap);
     }

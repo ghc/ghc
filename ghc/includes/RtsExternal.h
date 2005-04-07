@@ -68,6 +68,9 @@ extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
 extern int stg_sig_install (int, int, StgStablePtr *, void *);
 #endif
 
+extern void startSignalHandler(int sig);
+extern void setIOManagerPipe (int fd);
+
 /* -----------------------------------------------------------------------------
    Storage manager stuff exported
    -------------------------------------------------------------------------- */

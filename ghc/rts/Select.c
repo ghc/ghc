@@ -6,7 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-
 /* we're outside the realms of POSIX here... */
 /* #include "PosixSource.h" */
 
@@ -36,6 +35,11 @@
 
 /* last timestamp */
 lnat timestamp = 0;
+
+#if !defined(RTS_SUPPORTS_THREADS)
+/* 
+ * The threaded RTS uses an IO-manager thread in Haskell instead (see GHC.Conc) 
+ */
 
 /* There's a clever trick here to avoid problems when the time wraps
  * around.  Since our maximum delay is smaller than 31 bits of ticks
@@ -262,3 +266,5 @@ awaitEvent(rtsBool wait)
       
     } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
 }
+
+#endif /* RTS_SUPPORTS_THREADS */

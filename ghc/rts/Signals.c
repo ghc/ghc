@@ -37,9 +37,12 @@
 /* This curious flag is provided for the benefit of the Haskell binding
  * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
  * installing a SIGCHLD handler. 
- * 
  */
 StgInt nocldstop = 0;
+
+/* -----------------------------------------------------------------------------
+ * The table of signal handlers
+ * -------------------------------------------------------------------------- */
 
 #if defined(RTS_USER_SIGNALS)
 
@@ -48,30 +51,6 @@ static StgInt *handlers = NULL; /* Dynamically grown array of signal handlers */
 static StgInt nHandlers = 0;    /* Size of handlers array */
 
 static nat n_haskell_handlers = 0;
-
-#define N_PENDING_HANDLERS 16
-
-StgPtr pending_handler_buf[N_PENDING_HANDLERS];
-StgPtr *next_pending_handler = pending_handler_buf;
-
-/* -----------------------------------------------------------------------------
- * Signal handling
- * -------------------------------------------------------------------------- */
-
-#ifdef RTS_SUPPORTS_THREADS
-pthread_t signalHandlingThread;
-#endif
-
-// Handle all signals in the current thread.
-// Called from Capability.c whenever the main capability is granted to a thread
-// and in installDefaultHandlers
-void
-handleSignalsInThisThread(void)
-{
-#ifdef RTS_SUPPORTS_THREADS
-    signalHandlingThread = pthread_self();
-#endif
-}
 
 /* -----------------------------------------------------------------------------
  * Allocate/resize the table of signal handlers.
@@ -96,6 +75,53 @@ more_handlers(I_ sig)
 
     nHandlers = sig + 1;
 }
+
+/* -----------------------------------------------------------------------------
+ * Pending Handlers
+ *
+ * The mechanism for starting handlers differs between the threaded
+ * (RTS_SUPPORTS_THREADS) and non-threaded versions of the RTS.
+ *
+ * When the RTS is single-threaded, we just write the pending signal
+ * handlers into a buffer, and start a thread for each one in the
+ * scheduler loop.
+ *
+ * When RTS_SUPPORTS_THREADS, the problem is that signals might be
+ * delivered to multiple threads, so we would need to synchronise
+ * access to pending_handler_buf somehow.  Using thread
+ * synchronisation from a signal handler isn't possible in general
+ * (some OSs support it, eg. MacOS X, but not all).  So instead:
+ *
+ *   - the signal handler writes the signal number into the pipe
+ *     managed by the IO manager thread (see GHC.Conc).
+ *   - the IO manager picks up the signal number and calls
+ *     startSignalHandler() to start the thread.
+ *
+ * This also has the nice property that we don't need to arrange to
+ * wake up a worker task to start the signal handler: the IO manager
+ * wakes up when we write into the pipe.
+ *
+ * -------------------------------------------------------------------------- */
+
+// Here's the pipe into which we will send our signals
+static int io_manager_pipe = -1;
+
+void
+setIOManagerPipe (int fd)
+{
+    // only called when RTS_SUPPORTS_THREADS, but unconditionally
+    // compiled here because GHC.Conc depends on it.
+    io_manager_pipe = fd;
+}
+
+#if !defined(RTS_SUPPORTS_THREADS)
+
+#define N_PENDING_HANDLERS 16
+
+StgPtr pending_handler_buf[N_PENDING_HANDLERS];
+StgPtr *next_pending_handler = pending_handler_buf;
+
+#endif /* RTS_SUPPORTS_THREADS */
 
 /* -----------------------------------------------------------------------------
  * SIGCONT handler
@@ -125,18 +151,20 @@ generic_handler(int sig)
 {
     sigset_t signals;
 
-#if defined(THREADED_RTS)
-	// Make the thread that currently holds the main capability
-	// handle the signal.
-	// This makes sure that awaitEvent() is interrupted
-	// and it (hopefully) prevents race conditions
-	// (signal handlers are not atomic with respect to other threads)
+#if defined(RTS_SUPPORTS_THREADS)
 
-    if(pthread_self() != signalHandlingThread) {
-        pthread_kill(signalHandlingThread, sig);
-        return;
+    if (io_manager_pipe != -1)
+    {
+	// Write the signal number into the pipe as a single byte.  We
+	// hope that signals fit into a byte...
+	StgWord8 csig = (StgWord8)sig;
+	write(io_manager_pipe, &csig, 1);
     }
-#endif
+    // If the IO manager hasn't told us what the FD of the write end
+    // of its pipe is, there's not much we can do here, so just ignore
+    // the signal..
+
+#else /* not RTS_SUPPORTS_THREADS */
 
     /* Can't call allocate from here.  Probably can't call malloc
        either.  However, we have to schedule a new thread somehow.
@@ -174,6 +202,8 @@ generic_handler(int sig)
 	stg_exit(EXIT_FAILURE);
     }
     
+#endif /* RTS_SUPPORTS_THREADS */
+
     // re-establish the signal handler, and carry on
     sigemptyset(&signals);
     sigaddset(&signals, sig);
@@ -218,6 +248,7 @@ anyUserHandlers(void)
     return n_haskell_handlers != 0;
 }
 
+#if !defined(RTS_SUPPORTS_THREADS)
 void
 awaitUserSignals(void)
 {
@@ -225,6 +256,7 @@ awaitUserSignals(void)
 	pause();
     }
 }
+#endif
 
 /* -----------------------------------------------------------------------------
  * Install a Haskell signal handler.
@@ -307,11 +339,27 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 }
 
 /* -----------------------------------------------------------------------------
- * Creating new threads for the pending signal handlers.
+ * Creating new threads for signal handlers.
  * -------------------------------------------------------------------------- */
+
+void
+startSignalHandler(int sig)  // called by the IO manager, see GHC.Conc
+{
+#if defined(RTS_SUPPORTS_THREADS)
+    // ToDo: fix race window between the time at which the signal is
+    // delivered and the deRefStablePtr() call here.  There's no way
+    // to safely uninstall a signal handler.
+    scheduleThread(
+	createIOThread(RtsFlags.GcFlags.initialStkSize, 
+		       (StgClosure *)deRefStablePtr((StgStablePtr)handlers[sig]))
+	);
+#endif
+}
+
 void
 startSignalHandlers(void)
 {
+#if !defined(RTS_SUPPORTS_THREADS)
   blockUserSignals();
   
   while (next_pending_handler != pending_handler_buf) {
@@ -324,6 +372,7 @@ startSignalHandlers(void)
   }
 
   unblockUserSignals();
+#endif
 }
 
 /* ----------------------------------------------------------------------------
@@ -335,6 +384,7 @@ startSignalHandlers(void)
  * avoid race conditions.
  * -------------------------------------------------------------------------- */
 
+#if !defined(RTS_SUPPORTS_THREADS)
 void
 markSignalHandlers (evac_fn evac)
 {
@@ -346,6 +396,12 @@ markSignalHandlers (evac_fn evac)
 	evac((StgClosure **)p);
     }
 }
+#else
+void
+markSignalHandlers (evac_fn evac STG_UNUSED)
+{
+}
+#endif
 
 #else /* !RTS_USER_SIGNALS */
 StgInt 
@@ -383,17 +439,6 @@ shutdown_handler(int sig STG_UNUSED)
 	pthread_kill(startup_guy, sig);
 	return;
     }
-    // ToDo: The code for the threaded RTS below does something very
-    // similar. Maybe the SMP special case is not needed
-    // -- Wolfgang Thaller
-#elif defined(THREADED_RTS)
-	// Make the thread that currently holds the main capability
-	// handle the signal.
-	// This makes sure that awaitEvent() is interrupted
-    if(pthread_self() != signalHandlingThread) {
-        pthread_kill(signalHandlingThread, sig);
-        return;
-    }
 #endif
 
     // If we're already trying to interrupt the RTS, terminate with
@@ -428,9 +473,6 @@ initDefaultHandlers()
 
 #ifdef SMP
     startup_guy = pthread_self();
-#endif
-#ifdef RTS_SUPPORTS_THREADS
-    handleSignalsInThisThread();
 #endif
 
     // install the SIGINT handler

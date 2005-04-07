@@ -816,7 +816,7 @@ schedulePreLoop(void)
 static void
 scheduleStartSignalHandlers(void)
 {
-#if defined(RTS_USER_SIGNALS)
+#if defined(RTS_USER_SIGNALS) && !defined(RTS_SUPPORTS_THREADS)
     if (signals_pending()) {
       RELEASE_LOCK(&sched_mutex); /* ToDo: kill */
       startSignalHandlers();
@@ -901,11 +901,13 @@ scheduleDetectDeadlock(void)
 
 	    awaitUserSignals();
 
+#if !defined(RTS_SUPPORTS_THREADS)
 	    if (signals_pending()) {
 		RELEASE_LOCK(&sched_mutex);
 		startSignalHandlers();
 		ACQUIRE_LOCK(&sched_mutex);
 	    }
+#endif
 
 	    // either we have threads to run, or we were interrupted:
 	    ASSERT(!EMPTY_RUN_QUEUE() || interrupted);
