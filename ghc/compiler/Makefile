@@ -409,6 +409,16 @@ PKG_DEPENDS += template-haskell
 
 ALL_DIRS += ghci
 
+# If we are going to use dynamic libraries instead of .o files for ghci,
+# we will need to always retain CAFs in the compiler.
+# ghci/keepCAFsForGHCi contains a GNU C __attribute__((constructor))
+# function which sets the keepCAFs flag for the RTS before any Haskell
+# code is run.
+ifeq "$(GhcBuildDylibs)" "YES"
+else
+EXCLUDED_SRCS += ghci/keepCAFsForGHCi.c
+endif
+
 # Enable readline if either:
 #   - we're building stage 1 and $(GhcHasReadline)="YES"
 #   - we're building stage 2/3, and we have built the readline package
