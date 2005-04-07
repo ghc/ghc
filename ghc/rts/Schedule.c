@@ -289,7 +289,7 @@ static rtsBool scheduleHandleYield( StgTSO *t, nat prev_what_next );
 static void scheduleHandleThreadBlocked( StgTSO *t );
 static rtsBool scheduleHandleThreadFinished( StgMainThread *mainThread, 
 					     Capability *cap, StgTSO *t );
-static rtsBool scheduleDoHeapProfile(void);
+static rtsBool scheduleDoHeapProfile(rtsBool ready_to_gc);
 static void scheduleDoGC(Capability *cap);
 
 static void unblockThread(StgTSO *tso);
@@ -757,7 +757,7 @@ run_thread:
       barf("schedule: invalid thread return code %d", (int)ret);
     }
 
-    if (scheduleDoHeapProfile()) { ready_to_gc = rtsFalse; }
+    if (scheduleDoHeapProfile(ready_to_gc)) { ready_to_gc = rtsFalse; }
     if (ready_to_gc) { scheduleDoGC(cap); }
   } /* end of while() */
 
@@ -1839,7 +1839,7 @@ scheduleHandleThreadFinished( StgMainThread *mainThread
  * -------------------------------------------------------------------------- */
 
 static rtsBool
-scheduleDoHeapProfile(void)
+scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
 {
 #if defined(PROFILING)
     // When we have +RTS -i0 and we're heap profiling, do a census at
@@ -1862,7 +1862,7 @@ scheduleDoHeapProfile(void)
  * -------------------------------------------------------------------------- */
 
 static void
-scheduleDoGC( Capability *cap )
+scheduleDoGC( Capability *cap STG_UNUSED )
 {
     StgTSO *t;
 #ifdef SMP
