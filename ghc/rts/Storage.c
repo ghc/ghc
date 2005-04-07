@@ -368,13 +368,16 @@ void
 resetNurseries( void )
 {
   bdescr *bd;
-#ifdef SMP
   Capability *cap;
-  
+
+#ifdef SMP
   /* All tasks must be stopped */
   ASSERT(rts_n_free_capabilities == RtsFlags.ParFlags.nNodes);
-
-  for (cap = free_capabilities; cap != NULL; cap = cap->link) {
+  for (cap = free_capabilities; cap != NULL; cap = cap->link)
+#else
+  cap = &MainCapability;
+#endif
+  {
     for (bd = cap->r.rNursery; bd; bd = bd->link) {
       bd->free = bd->start;
       ASSERT(bd->gen_no == 0);
@@ -383,16 +386,6 @@ resetNurseries( void )
     }
     cap->r.rCurrentNursery = cap->r.rNursery;
   }
-#else
-  for (bd = g0s0->blocks; bd; bd = bd->link) {
-    bd->free = bd->start;
-    ASSERT(bd->gen_no == 0);
-    ASSERT(bd->step == g0s0);
-    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
-  }
-  MainCapability.r.rNursery = g0s0->blocks;
-  MainCapability.r.rCurrentNursery = g0s0->blocks;
-#endif
 }
 
 bdescr *
