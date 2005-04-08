@@ -17,7 +17,8 @@ module InteractiveUI (
 import qualified GHC
 import GHC		( Session, verbosity, dopt, DynFlag(..),
 			  mkModule, pprModule, Type, Module, SuccessFlag(..),
-			  TyThing(..), Name, LoadHowMuch(..) )
+			  TyThing(..), Name, LoadHowMuch(..),
+			  GhcException(..), showGhcException )
 import Outputable
 
 -- following all needed for :info... ToDo: remove
@@ -31,7 +32,7 @@ import OccName		( OccName, parenSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity )
 
 -- Other random utilities
-import Panic 		hiding ( showException )
+import Panic 		( panic, installSignalHandlers )
 import Config
 import StaticFlags	( opt_IgnoreDotGhci )
 import Linker		( showLinkerState )
