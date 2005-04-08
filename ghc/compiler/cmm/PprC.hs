@@ -640,6 +640,7 @@ isStrangeTypeReg (CmmGlobal g) 	= isStrangeTypeGlobal g
 isStrangeTypeGlobal :: GlobalReg -> Bool
 isStrangeTypeGlobal CurrentTSO		= True
 isStrangeTypeGlobal CurrentNursery 	= True
+isStrangeTypeGlobal BaseReg	 	= True
 isStrangeTypeGlobal r 			= isPtrGlobalReg r
 
 strangeRegType :: CmmReg -> Maybe SDoc
