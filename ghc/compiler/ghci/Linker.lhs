@@ -43,6 +43,7 @@ import Outputable
 import Panic            ( GhcException(..) )
 import Util             ( zipLazy, global )
 import StaticFlags	( v_Ld_inputs )
+import ErrUtils         ( debugTraceMsg )
 
 -- Standard libraries
 import Control.Monad	( when, filterM, foldM )
@@ -620,11 +621,9 @@ unload dflags linkables
 	new_pls <- unload_wkr dflags linkables pls
 	writeIORef v_PersistentLinkerState new_pls
 
-       	let verb = verbosity dflags
-       	when (verb >= 3) $ do
-	    hPutStrLn stderr (showSDoc
+	debugTraceMsg dflags 3 (showSDoc
 		(text "unload: retaining objs" <+> ppr (objs_loaded new_pls)))
-	    hPutStrLn stderr (showSDoc
+	debugTraceMsg dflags 3 (showSDoc
 		(text "unload: retaining bcos" <+> ppr (bcos_loaded new_pls)))
 
        	return ()
