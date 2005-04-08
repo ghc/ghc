@@ -258,11 +258,13 @@ regUsage instr = case instr of
     use_R (OpAddr ea)  = use_EA ea
 
     -- Registers used to compute an effective address.
-    use_EA (ImmAddr _ _)                           = []
-    use_EA (AddrBaseIndex Nothing  Nothing      _) = []
-    use_EA (AddrBaseIndex (Just b) Nothing      _) = [b]
-    use_EA (AddrBaseIndex Nothing  (Just (i,_)) _) = [i]
-    use_EA (AddrBaseIndex (Just b) (Just (i,_)) _) = [b,i]
+    use_EA (ImmAddr _ _) = []
+    use_EA (AddrBaseIndex base index _) = 
+	use_base base $! use_index index
+	where use_base (EABaseReg r) x = r : x
+	      use_base _ x             = x
+	      use_index EAIndexNone   = []
+	      use_index (EAIndex i _) = [i]
 
     mkRU src dst = RU (filter interesting src)
   	    	      (filter interesting dst)
@@ -555,19 +557,20 @@ patchRegs instr env = case instr of
     patch1 insn op      = insn $! patchOp op
     patch2 insn src dst = (insn $! patchOp src) $! patchOp dst
 
-    patchOp (OpReg  reg) = OpReg (env reg)
+    patchOp (OpReg  reg) = OpReg $! env reg
     patchOp (OpImm  imm) = OpImm imm
-    patchOp (OpAddr ea)  = OpAddr (lookupAddr ea)
+    patchOp (OpAddr ea)  = OpAddr $! lookupAddr ea
 
     lookupAddr (ImmAddr imm off) = ImmAddr imm off
     lookupAddr (AddrBaseIndex base index disp)
-      = AddrBaseIndex (lookupBase base) (lookupIndex index) disp
+      = ((AddrBaseIndex $! lookupBase base) $! lookupIndex index) disp
       where
-	lookupBase Nothing       = Nothing
-	lookupBase (Just r)      = Just (env r)
+	lookupBase EABaseNone       = EABaseNone
+	lookupBase EABaseRip        = EABaseRip
+	lookupBase (EABaseReg r)    = EABaseReg (env r)
 				 
-	lookupIndex Nothing      = Nothing
-	lookupIndex (Just (r,i)) = Just (env r, i)
+	lookupIndex EAIndexNone     = EAIndexNone
+	lookupIndex (EAIndex r i)   = EAIndex (env r) i
 
 #endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH*/
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

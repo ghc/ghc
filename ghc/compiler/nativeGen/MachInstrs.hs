@@ -85,6 +85,8 @@ data Cond
   | POS
   | CARRY
   | OFLO
+  | PARITY
+  | NOTPARITY
 #endif
 #if sparc_TARGET_ARCH
   = ALWAYS	-- What's really used? ToDo

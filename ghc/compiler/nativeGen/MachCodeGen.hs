@@ -809,8 +809,7 @@ getRegister (CmmLit (CmmFloat f rep)) = do
 	    LDATA ReadOnlyData
 			[CmmDataLabel lbl,
 			 CmmStaticLit (CmmFloat f rep)],
-	    MOV rep (OpAddr (ImmAddr (ImmCLbl lbl) 0)) (OpReg dst)
-	-- ToDo: should use %rip-relative
+	    MOV rep (OpAddr (ripRel (ImmCLbl lbl))) (OpReg dst)
 	    ]
     -- in
     return (Any rep code)
@@ -882,7 +881,7 @@ getRegister (CmmMachOp (MO_S_Neg F32) [x]) = do
 		CmmStaticLit (CmmInt 0 I32),
 		CmmStaticLit (CmmInt 0 I32)
 	],
-	XOR F32 (OpAddr (ImmAddr (ImmCLbl lbl) 0)) (OpReg dst)
+	XOR F32 (OpAddr (ripRel (ImmCLbl lbl))) (OpReg dst)
 		-- xorps, so we need the 128-bit constant
 		-- ToDo: rip-relative
 	]
@@ -902,9 +901,8 @@ getRegister (CmmMachOp (MO_S_Neg F64) [x]) = do
 		CmmStaticLit (CmmInt 0 I64)
 	],
 		-- gcc puts an unpck here.  Wonder if we need it.
-	XOR F64 (OpAddr (ImmAddr (ImmCLbl lbl) 0)) (OpReg dst)
+	XOR F64 (OpAddr (ripRel (ImmCLbl lbl))) (OpReg dst)
 		-- xorpd, so we need the 128-bit constant
-		-- ToDo: rip-relative
 	]
   --
   return (Any F64 code)
@@ -1155,7 +1153,7 @@ getRegister e@(CmmMachOp mop [x, y]) -- dyadic MachOps
 	    code dst
                = x_code `snocOL`
 		 LEA rep
-			(OpAddr (AddrBaseIndex (Just x_reg) Nothing imm))
+			(OpAddr (AddrBaseIndex (EABaseReg x_reg) EAIndexNone imm))
                         (OpReg dst)
 	-- 
 	return (Any rep code)
@@ -1841,14 +1839,14 @@ getAmode (CmmMachOp (MO_Sub rep) [x, CmmLit lit@(CmmInt i _)])
   -- ASSERT(rep == I32)???
   = do (x_reg, x_code) <- getSomeReg x
        let off = ImmInt (-(fromInteger i))
-       return (Amode (AddrBaseIndex (Just x_reg) Nothing off) x_code)
+       return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
   
 getAmode (CmmMachOp (MO_Add rep) [x, CmmLit lit@(CmmInt i _)])
   | not (is64BitLit lit)
   -- ASSERT(rep == I32)???
   = do (x_reg, x_code) <- getSomeReg x
        let off = ImmInt (fromInteger i)
-       return (Amode (AddrBaseIndex (Just x_reg) Nothing off) x_code)
+       return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
 -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be 
 -- recognised by the next rule.
@@ -1866,7 +1864,7 @@ getAmode (CmmMachOp (MO_Add rep) [x, CmmMachOp (MO_Shl _)
        let
     	   code = x_code `appOL` y_code
            base = case shift of 0 -> 1; 1 -> 2; 2 -> 4; 3 -> 8
-       return (Amode (AddrBaseIndex (Just x_reg) (Just (y_reg,base)) (ImmInt 0))
+       return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg base) (ImmInt 0))
                code)
 
 getAmode (CmmLit lit) | not (is64BitLit lit)
@@ -1874,7 +1872,7 @@ getAmode (CmmLit lit) | not (is64BitLit lit)
 
 getAmode expr = do
   (reg,code) <- getSomeReg expr
-  return (Amode (AddrBaseIndex (Just reg) Nothing (ImmInt 0)) code)
+  return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
 
 #endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 
@@ -2008,7 +2006,7 @@ getNonClobberedOperand (CmmLoad mem pk)
 	if (amodeCouldBeClobbered src) 
 		then do
 		   tmp <- getNewRegNat wordRep
-		   return (AddrBaseIndex (Just tmp) Nothing (ImmInt 0),
+		   return (AddrBaseIndex (EABaseReg tmp) EAIndexNone (ImmInt 0),
 			   unitOL (LEA I32 (OpAddr src) (OpReg tmp)))
 		else
 		   return (src, nilOL)
@@ -2238,10 +2236,10 @@ condFltCode cond x y = do
 	code = x_code `appOL`
 	       y_code `snocOL`
     	    	  CMP (cmmExprRep x) y_op (OpReg x_reg)
-  -- in
-  return (CondCode False (condToUnsigned cond) code)
-	-- we need to use the unsigned comparison operators on the
+	-- NB(1): we need to use the unsigned comparison operators on the
 	-- result of this comparison.
+  -- in
+  return (CondCode True (condToUnsigned cond) code)
 #endif
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2888,14 +2886,51 @@ genCondJump lbl (StPrim op [x, y])
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if i386_TARGET_ARCH
 
 genCondJump id bool = do
   CondCode _ cond code <- getCondCode bool
   return (code `snocOL` JXX cond id)
 
-#endif /* i386_TARGET_ARCH */
+#endif
 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+#if x86_64_TARGET_ARCH
+
+genCondJump id bool = do
+  CondCode is_float cond cond_code <- getCondCode bool
+  if not is_float
+    then
+	return (cond_code `snocOL` JXX cond id)
+    else do
+	lbl <- getBlockIdNat
+
+	-- see comment with condFltReg
+	let code = case cond of
+	  		NE  -> or_unordered
+			GU  -> plain_test
+			GEU -> plain_test
+			_   -> and_ordered
+
+	    plain_test = unitOL (
+		  JXX cond id
+		)
+	    or_unordered = toOL [
+		  JXX cond id,
+		  JXX PARITY id
+		]
+	    and_ordered = toOL [
+		  JXX PARITY lbl,
+		  JXX cond id,
+		  JXX ALWAYS lbl,
+		  NEWBLOCK lbl
+		]
+	return (cond_code `appOL` code)
+
+#endif
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if sparc_TARGET_ARCH
 
@@ -3762,7 +3797,7 @@ genSwitch expr ids = do
   lbl <- getNewLabelNat
   let
 	jumpTable = map jumpTableEntry ids
-	op = OpAddr (AddrBaseIndex Nothing (Just (reg,wORD_SIZE)) (ImmCLbl lbl))
+	op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
 	code = e_code `appOL` toOL [
 		LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
 	        JMP_TBL op [ id | Just id <- ids ]
@@ -3854,38 +3889,57 @@ condIntReg cond x y = do
   let 
 	code dst = cond_code `appOL` toOL [
 		    SETCC cond (OpReg tmp),
-		    MOV I32 (OpReg tmp) (OpReg dst),
-		    AND I32 (OpImm (ImmInt 1)) (OpReg dst)
+		    MOVZxL I8 (OpReg tmp) (OpReg dst)
 		  ]
-		   -- NB. (1) Tha AND is needed here because the x86 only
-		   -- sets the low byte in the SETCC instruction.
-		   -- NB. (2) The extra temporary register is a hack to
-		   -- work around the fact that the setcc instructions only
-		   -- accept byte registers.  dst might not be a byte-able reg,
-		   -- but currently all free registers are byte-able, so we're
-		   -- guaranteed that a new temporary is byte-able.
   -- in
   return (Any I32 code)
-
 
 condFltReg cond x y = do
-  lbl1 <- getBlockIdNat
-  lbl2 <- getBlockIdNat
   CondCode _ cond cond_code <- condFltCode cond x y
-  let
-    	code dst = cond_code `appOL` toOL [
-	    JXX cond lbl1,
-	    MOV I32 (OpImm (ImmInt 0)) (OpReg dst),
-	    JXX ALWAYS lbl2,
-	    NEWBLOCK lbl1,
-	    MOV I32 (OpImm (ImmInt 1)) (OpReg dst),
-	    JXX ALWAYS lbl2,
-	    NEWBLOCK lbl2]
-		-- SIGH, have to split up this block somehow...
+  tmp1 <- getNewRegNat wordRep
+  tmp2 <- getNewRegNat wordRep
+  let 
+	-- We have to worry about unordered operands (eg. comparisons
+	-- against NaN).  If the operands are unordered, the comparison
+	-- sets the parity flag, carry flag and zero flag.
+	-- All comparisons are supposed to return false for unordered
+	-- operands except for !=, which returns true.
+	--
+	-- Optimisation: we don't have to test the parity flag if we
+	-- know the test has already excluded the unordered case: eg >
+	-- and >= test for a zero carry flag, which can only occur for
+	-- ordered operands.
+	--
+	-- ToDo: by reversing comparisons we could avoid testing the
+	-- parity flag in more cases.
+
+	code dst = 
+	   cond_code `appOL` 
+	     (case cond of
+	  	NE  -> or_unordered dst
+		GU  -> plain_test   dst
+		GEU -> plain_test   dst
+		_   -> and_ordered  dst)
+
+	plain_test dst = toOL [
+		    SETCC cond (OpReg tmp1),
+		    MOVZxL I8 (OpReg tmp1) (OpReg dst)
+		 ]
+	or_unordered dst = toOL [
+		    SETCC cond (OpReg tmp1),
+		    SETCC PARITY (OpReg tmp2),
+		    OR I8 (OpReg tmp1) (OpReg tmp2),
+		    MOVZxL I8 (OpReg tmp2) (OpReg dst)
+		  ]
+	and_ordered dst = toOL [
+		    SETCC cond (OpReg tmp1),
+		    SETCC NOTPARITY (OpReg tmp2),
+		    AND I8 (OpReg tmp1) (OpReg tmp2),
+		    MOVZxL I8 (OpReg tmp2) (OpReg dst)
+		  ]
   -- in
   return (Any I32 code)
-
-#endif /* i386_TARGET_ARCH */
+#endif
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 

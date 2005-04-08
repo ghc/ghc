@@ -46,11 +46,13 @@ module MachRegs (
 	gp, pv, ra, sp, t9, t10, t11, t12, v0, f0, zeroh,
 #endif
 #if i386_TARGET_ARCH
+	EABase(..), EAIndex(..),
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
 	fake0, fake1, fake2, fake3, fake4, fake5,
 	addrModeRegs,
 #endif
 #if x86_64_TARGET_ARCH
+	EABase(..), EAIndex(..), ripRel,
 	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
 	eax, ebx, ecx, edx, esi, edi, ebp, esp,
 	r8, r9, r10, r11, r12, r13, r14, r15,
@@ -150,11 +152,11 @@ data AddrMode
 #endif
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-  = AddrBaseIndex	Base Index Displacement
+  = AddrBaseIndex	EABase EAIndex Displacement
   | ImmAddr		Imm Int
 
-type Base         = Maybe Reg
-type Index        = Maybe (Reg, Int)	-- Int is 2, 4 or 8
+data EABase       = EABaseNone  | EABaseReg Reg | EABaseRip
+data EAIndex      = EAIndexNone | EAIndex Reg Int
 type Displacement = Imm
 #endif
 
@@ -172,8 +174,8 @@ type Displacement = Imm
 addrModeRegs :: AddrMode -> [Reg]
 addrModeRegs (AddrBaseIndex b i _) =  b_regs ++ i_regs
   where
-   b_regs = case b of { Just r -> [r]; _ -> [] }
-   i_regs = case i of { Just (r,_) -> [r]; _ -> [] }
+   b_regs = case b of { EABaseReg r -> [r]; _ -> [] }
+   i_regs = case i of { EAIndex r _ -> [r]; _ -> [] }
 addrModeRegs _ = []
 #endif
 
@@ -289,9 +291,9 @@ spRel :: Int	-- desired stack offset in words, positive or negative
 
 spRel n
 #if defined(i386_TARGET_ARCH)
-  = AddrBaseIndex (Just esp) Nothing (ImmInt (n * wORD_SIZE))
+  = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE))
 #elif defined(x86_64_TARGET_ARCH)
-  = AddrBaseIndex (Just rsp) Nothing (ImmInt (n * wORD_SIZE))
+  = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE))
 #else
   = AddrRegImm sp (ImmInt (n * wORD_SIZE))
 #endif
@@ -304,6 +306,9 @@ fpRel n
   = AddrRegImm fp (ImmInt (n * wORD_SIZE))
 #endif
 
+#if x86_64_TARGET_ARCH
+ripRel imm = AddrBaseIndex EABaseRip EAIndexNone imm
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Global registers

@@ -446,6 +446,7 @@ pprCond c = ptext (case c of {
 	LEU	-> SLIT("be");	NE    -> SLIT("ne");
 	NEG	-> SLIT("s");	POS   -> SLIT("ns");
         CARRY   -> SLIT("c");   OFLO  -> SLIT("o");
+	PARITY  -> SLIT("p");   NOTPARITY -> SLIT("np");
 	ALWAYS	-> SLIT("mp")	-- hack
 #endif
 #if sparc_TARGET_ARCH
@@ -480,8 +481,8 @@ pprImm (ImmCLbl l)    = pprCLabel_asm l
 pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
-pprImm (ImmFloat _) = panic "pprImm:ImmFloat"
-pprImm (ImmDouble _) = panic "pprImm:ImmDouble"
+pprImm (ImmFloat _) = ptext SLIT("naughty float immediate")
+pprImm (ImmDouble _) = ptext SLIT("naughty double immediate")
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
@@ -560,10 +561,11 @@ pprAddr (AddrBaseIndex base index displacement)
 	pp_reg r = pprReg wordRep r
     in
     case (base,index) of
-      (Nothing, Nothing)    -> pp_disp
-      (Just b,  Nothing)    -> pp_off (pp_reg b)
-      (Nothing, Just (r,i)) -> pp_off (comma <> pp_reg r <> comma <> int i)
-      (Just b,  Just (r,i)) -> pp_off (pp_reg b <> comma <> pp_reg r 
+      (EABaseNone,  EAIndexNone) -> pp_disp
+      (EABaseReg b, EAIndexNone) -> pp_off (pp_reg b)
+      (EABaseRip,   EAIndexNone) -> pp_off (ptext SLIT("%rip"))
+      (EABaseNone,  EAIndex r i) -> pp_off (comma <> pp_reg r <> comma <> int i)
+      (EABaseReg b, EAIndex r i) -> pp_off (pp_reg b <> comma <> pp_reg r 
                                        <> comma <> int i)
   where
     ppr_disp (ImmInt 0) = empty
@@ -1202,18 +1204,22 @@ pprInstr (MOVZxL I32 src dst) = pprSizeOpOp SLIT("mov") I32 src dst
 	-- the reg alloc would tend to throw away a plain reg-to-reg
 	-- move, and we still want it to do that.
 
-pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce SLIT("movz") sizes wordRep src dst
+pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce SLIT("movz") sizes I32 src dst
+	-- zero-extension only needs to extend to 32 bits: on x86_64, 
+	-- the remaining zero-extension to 64 bits is automatic, and the 32-bit
+	-- instruction is shorter.
+
 pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce SLIT("movs") sizes wordRep src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
-pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
   | reg1 == reg3
   = pprSizeOpOp SLIT("add") size (OpReg reg2) dst
-pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(Just reg1) (Just (reg2,1)) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
   | reg2 == reg3
   = pprSizeOpOp SLIT("add") size (OpReg reg1) dst
-pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(Just reg1) Nothing displ)) dst@(OpReg reg3))
+pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3))
   | reg1 == reg3
   = pprInstr (ADD size (OpImm displ) dst)
 pprInstr (LEA size src dst) = pprSizeOpOp SLIT("lea") size src dst
