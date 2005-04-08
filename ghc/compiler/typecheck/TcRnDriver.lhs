@@ -81,8 +81,8 @@ import Outputable
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
 			  LStmt, LHsExpr, LHsType, mkMatchGroup,
-			  collectLStmtsBinders, mkSimpleMatch, 
-			  mkExprStmt, mkBindStmt, nlVarPat )
+			  collectLStmtsBinders, mkSimpleMatch, nlVarPat,
+		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..),
 			  lookupLocalRdrEnv, extendLocalRdrEnv )
@@ -121,7 +121,8 @@ import Var		( globaliseId )
 import Name		( nameOccName )
 import OccName		( occNameUserString )
 import NameEnv		( delListFromNameEnv )
-import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, returnIOName )
+import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
+			  bindIOName, thenIOName, returnIOName )
 import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
 			  availNames, availName, ModIface(..), icPrintUnqual,
 			  ModDetails(..), Dependencies(..) )
@@ -891,11 +892,13 @@ tcUserStmt (L loc (ExprStmt expr _ _))
 		traceTc (text "tcs 1b") ;
 		tc_stmts (map (L loc) [
 		    LetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
-		    mkExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
+		    ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
+			     (HsVar thenIOName) placeHolderType
 	]) })
 	  (do { 	-- Try this first 
 		traceTc (text "tcs 1a") ;
-		tc_stmts [L loc (mkBindStmt (nlVarPat fresh_it) expr)] })
+		tc_stmts [L loc (BindStmt (nlVarPat fresh_it) expr
+					  (HsVar bindIOName) noSyntaxExpr) ] })
 
 tcUserStmt stmt = tc_stmts [stmt]
 
