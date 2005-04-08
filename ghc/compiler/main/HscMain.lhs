@@ -9,6 +9,7 @@ module HscMain (
 	HscResult(..),
 	hscMain, newHscEnv, hscCmmFile, 
 	hscFileCheck,
+	hscParseIdentifier,
 #ifdef GHCI
 	hscStmt, hscTcExpr, hscKcType,
 	hscGetInfo, GetInfoResult,
@@ -19,7 +20,7 @@ module HscMain (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LStmt, LHsExpr, LHsType )
+import HsSyn		( Stmt(..), LHsExpr )
 import IfaceSyn		( IfaceDecl, IfaceInst )
 import Module		( Module )
 import CodeOutput	( outputForeignStubs )
@@ -33,7 +34,6 @@ import RdrName		( rdrNameOcc )
 import OccName		( occNameUserString )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
-import StringBuffer	( stringToStringBuffer )
 import Kind		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
@@ -44,9 +44,9 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 import Var		( Id )
 import Module		( emptyModuleEnv )
 import RdrName		( GlobalRdrEnv, RdrName )
-import HsSyn		( HsModule, LHsBinds )
+import HsSyn		( HsModule, LHsBinds, LStmt, LHsType )
 import SrcLoc		( Located(..) )
-import StringBuffer	( hGetStringBuffer )
+import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
 import Lexer		( P(..), ParseResult(..), mkPState )
 import SrcLoc		( mkSrcLoc )
@@ -648,6 +648,7 @@ hscKcType hsc_env str
 	     Just other -> do { errorMsg ("not an type: `" ++ str ++ "'") ;
 			        return Nothing } ;
       	     Nothing    -> return Nothing } }
+#endif
 \end{code}
 
 \begin{code}
@@ -686,7 +687,6 @@ hscParseThing parser dflags str
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing);
       return (Just thing)
       }}
-#endif
 \end{code}
 
 %************************************************************************

@@ -42,6 +42,13 @@ module GHC (
 	isLoaded,
 	topSortModuleGraph,
 
+	-- * Inspecting modules
+	ModuleInfo,
+	getModuleInfo,
+	modInfoTyThings,
+	modInfoInstances,
+	lookupName,
+
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
 #ifdef GHCI
@@ -50,7 +57,7 @@ module GHC (
 	getInfo, GetInfoResult,
 	exprType,
 	typeKind,
-	lookupName,
+	parseName,
 	RunResult(..),
 	runStmt,
 	browseModule,
@@ -75,6 +82,9 @@ module GHC (
 
 	-- ** Classes
 	Class, 
+
+	-- ** Instances
+	Instance,
 
 	-- ** Types and Kinds
 	Type, dropForAlls,
@@ -109,9 +119,9 @@ module GHC (
 import qualified Linker
 import Linker		( HValue, extendLinkEnv )
 import NameEnv		( lookupNameEnv )
-import TcRnDriver	( mkExportEnv, getModuleContents )
+import TcRnDriver	( mkExportEnv, getModuleContents, tcRnLookupRdrName )
 import RdrName		( plusGlobalRdrEnv )
-import HscMain		( hscGetInfo, GetInfoResult, 
+import HscMain		( hscGetInfo, GetInfoResult, hscParseIdentifier,
 			  hscStmt, hscTcExpr, hscKcType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
@@ -130,7 +140,7 @@ import DataCon		( DataCon )
 import Name		( Name )
 import RdrName		( RdrName )
 import NameEnv		( nameEnvElts )
-import SrcLoc		( Located )
+import SrcLoc		( Located(..) )
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
@@ -1427,21 +1437,64 @@ getBindings s = withSession s (return . nameEnvElts . ic_type_env . hsc_IC)
 getPrintUnqual :: Session -> IO PrintUnqualified
 getPrintUnqual s = withSession s (return . icPrintUnqual . hsc_IC)
 
+#ifdef GHCI
+-- | Parses a string as an identifier, and returns the list of 'Name's that
+-- the identifier can refer to in the current interactive context.
+parseName :: Session -> String -> IO [Name]
+parseName s str = withSession s $ \hsc_env -> do
+   maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
+   case maybe_rdr_name of
+	Nothing -> return []
+	Just (L _ rdr_name) -> do
+	    mb_names <- tcRnLookupRdrName hsc_env rdr_name
+	    case mb_names of
+		Nothing -> return []
+		Just ns -> return ns
+		-- ToDo: should return error messages
+#endif
+
+-- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
+-- entity known to GHC, including 'Name's defined using 'runStmt'.
+lookupName :: Session -> Name -> IO (Maybe TyThing)
+lookupName s name = withSession s $ \hsc_env -> do
+  case lookupTypeEnv (ic_type_env (hsc_IC hsc_env)) name of
+	Just tt -> return (Just tt)
+	Nothing -> do
+	    eps <- readIORef (hsc_EPS hsc_env)
+	    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
+
+
+-- | Container for information about a 'Module'.
+newtype ModuleInfo = ModuleInfo ModDetails
+	-- ToDo: this should really contain the ModIface too
+	-- We don't want HomeModInfo here, because a ModuleInfo applies
+	-- to package modules too.
+
+-- | Request information about a loaded 'Module'
+getModuleInfo :: Session -> Module -> IO (Maybe ModuleInfo)
+getModuleInfo s mdl = withSession s $ \hsc_env -> do
+  case lookupModuleEnv (hsc_HPT hsc_env) mdl of
+    Nothing  -> return Nothing
+    Just hmi -> return (Just (ModuleInfo (hm_details hmi)))
+	-- ToDo: we should be able to call getModuleInfo on a package module,
+	-- even one that isn't loaded yet.
+
+-- | The list of top-level entities defined in a module
+modInfoTyThings :: ModuleInfo -> [TyThing]
+modInfoTyThings (ModuleInfo md) = typeEnvElts (md_types md)
+
+-- | An instance of a class
+newtype Instance = Instance DFunId
+
+-- | The list of 'Instance's defined in a module
+modInfoInstances :: ModuleInfo -> [Instance]
+modInfoInstances (ModuleInfo md) = map Instance (md_insts md)
+
 #if 0
-getModuleInfo :: Session -> Module -> IO ModuleInfo
 
 data ObjectCode
   = ByteCode
   | BinaryCode FilePath
-
-data ModuleInfo = ModuleInfo {
-  lm_modulename :: Module,
-  lm_summary    :: ModSummary,
-  lm_interface  :: ModIface,
-  lm_tc_code    :: Maybe TypecheckedCode,
-  lm_rn_code    :: Maybe RenamedCode,
-  lm_obj        :: Maybe ObjectCode
-  }
 
 type TypecheckedCode = HsTypecheckedGroup
 type RenamedCode     = [HsGroup Name]
@@ -1560,6 +1613,7 @@ moduleIsInterpreted s modl = withSession s $ \h ->
       _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
+{-# DEPRECATED getInfo "we should be using parseName/lookupName instead" #-}
 getInfo :: Session -> String -> IO [GetInfoResult]
 getInfo s id = withSession s $ \hsc_env -> hscGetInfo hsc_env id
 
@@ -1587,14 +1641,6 @@ typeKind s str = withSession s $ \hsc_env -> do
    case maybe_stuff of
 	Nothing -> return Nothing
 	Just kind -> return (Just kind)
-
------------------------------------------------------------------------------
--- lookupName: returns the TyThing for a Name in the interactive context.
--- ToDo: should look it up in the full environment
-
-lookupName :: Session -> Name -> IO (Maybe TyThing)
-lookupName s name = withSession s $ \hsc_env -> do
-  return $! lookupNameEnv (ic_type_env (hsc_IC hsc_env)) name
 
 -----------------------------------------------------------------------------
 -- cmCompileExpr: compile an expression and deliver an HValue
@@ -1696,6 +1742,7 @@ foreign import "rts_evalStableIO"  {- safe -}
 -- ---------------------------------------------------------------------------
 -- cmBrowseModule: get all the TyThings defined in a module
 
+{-# DEPRECATED browseModule "we should be using getModuleInfo instead" #-}
 browseModule :: Session -> Module -> Bool -> IO [IfaceDecl]
 browseModule s modl exports_only = withSession s $ \hsc_env -> do
   mb_decls <- getModuleContents hsc_env modl exports_only

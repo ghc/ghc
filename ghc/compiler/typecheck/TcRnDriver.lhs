@@ -9,6 +9,7 @@ module TcRnDriver (
 	mkExportEnv, getModuleContents, tcRnStmt, 
 	tcRnGetInfo, GetInfoResult,
 	tcRnExpr, tcRnType,
+	tcRnLookupRdrName,
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -757,7 +758,6 @@ check_main ghci_mode tcg_env main_mod main_fn
 		<+> ptext SLIT("is not defined in module") <+> quotes (ppr main_mod)
 \end{code}
 
-
 %*********************************************************
 %*						 	 *
 		GHCi stuff
@@ -1129,22 +1129,15 @@ type GetInfoResult = (String, IfaceDecl, Fixity, SrcLoc,
 			      [(IfaceType,SrcLoc)]	-- Instances
 		     )
 
-tcRnGetInfo :: HscEnv
-	    -> InteractiveContext
-	    -> RdrName
-	    -> IO (Maybe [GetInfoResult])
+tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Maybe [Name])
 
--- Used to implemnent :info in GHCi
---
--- Look up a RdrName and return all the TyThings it might be
--- A capitalised RdrName is given to us in the DataName namespace,
--- but we want to treat it as *both* a data constructor 
---  *and* as a type or class constructor; 
--- hence the call to dataTcOccs, and we return up to two results
-tcRnGetInfo hsc_env ictxt rdr_name
+tcRnLookupRdrName hsc_env rdr_name 
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext hsc_env ictxt $ do {
+    setInteractiveContext hsc_env (hsc_IC hsc_env) $ 
+    lookup_rdr_name rdr_name
 
+
+lookup_rdr_name rdr_name = do {
 	-- If the identifier is a constructor (begins with an
 	-- upper-case letter), then we need to consider both
 	-- constructor and type class identifiers.
@@ -1169,7 +1162,29 @@ tcRnGetInfo hsc_env ictxt rdr_name
 	do { addMessages (head errs_s) ; failM }
       else 			-- Add deprecation warnings
 	mapM_ addMessages warns_s ;
-	
+    
+    return good_names
+ }
+
+
+tcRnGetInfo :: HscEnv
+	    -> InteractiveContext
+	    -> RdrName
+	    -> IO (Maybe [GetInfoResult])
+
+-- Used to implemnent :info in GHCi
+--
+-- Look up a RdrName and return all the TyThings it might be
+-- A capitalised RdrName is given to us in the DataName namespace,
+-- but we want to treat it as *both* a data constructor 
+--  *and* as a type or class constructor; 
+-- hence the call to dataTcOccs, and we return up to two results
+tcRnGetInfo hsc_env ictxt rdr_name
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext hsc_env ictxt $ do {
+
+    good_names <- lookup_rdr_name rdr_name ;
+
 	-- And lookup up the entities, avoiding duplicates, which arise
 	-- because constructors and record selectors are represented by
 	-- their parent declaration
