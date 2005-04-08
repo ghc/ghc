@@ -183,6 +183,10 @@ getPackageDetails dflags ps = expectJust "getPackageDetails" (lookupPackage (pkg
 -- ----------------------------------------------------------------------------
 -- Loading the package config files and building up the package state
 
+-- | Call this after parsing the DynFlags.  It reads the package
+-- configuration files, and sets up various internal tables of package
+-- information, according to the package-related flags on the
+-- command-line (@-package@, @-hide-package@ etc.)
 initPackages :: DynFlags -> IO DynFlags
 initPackages dflags = do 
   pkg_map <- readPackageConfigs dflags; 
