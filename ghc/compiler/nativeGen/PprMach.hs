@@ -386,8 +386,8 @@ pprSize x = ptext (case x of
 	I64  -> SLIT("q")
 #endif
 #if i386_TARGET_ARCH
-	F32  -> SLIT("l")
-	F64  -> SLIT("q")
+	F32  -> SLIT("s")
+	F64  -> SLIT("l")
 	F80  -> SLIT("t")
 #endif
 #if x86_64_TARGET_ARCH
