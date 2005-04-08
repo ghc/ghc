@@ -3157,8 +3157,8 @@ genCCall target dest_regs args vols = do
                         code `appOL`
                         toOL [SUB I32 (OpImm (ImmInt size)) (OpReg esp),
                               DELTA (delta-size),
-                              GST sz reg (AddrBaseIndex (Just esp) 
-                                                        Nothing 
+                              GST sz reg (AddrBaseIndex (EABaseReg esp) 
+                                                        EAIndexNone
                                                         (ImmInt 0))]
                        )
            else return (size,
