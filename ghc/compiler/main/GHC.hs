@@ -17,6 +17,7 @@ module GHC (
 	-- * Flags and settings
 	DynFlags(..), DynFlag(..), GhcMode(..), HscTarget(..), dopt,
 	parseDynamicFlags,
+	initPackages,
 	getSessionDynFlags,
 	setSessionDynFlags,
 	setMsgHandler,
@@ -58,19 +59,36 @@ module GHC (
 #endif
 
 	-- * Abstract syntax elements
+
+	-- ** Modules
 	Module, mkModule, pprModule,
+
+	-- ** Identifiers
+	Name,
+	Id, idType,
+
+	-- ** Type constructors
+	TyCon, 
+
+	-- ** Data constructors
+	DataCon,
+
+	-- ** Classes
+	Class, 
+
+	-- ** Types and Kinds
 	Type, dropForAlls,
 	Kind,
-	Name, Id, TyCon, Class, DataCon,
-	TyThing(..), 
-	idType,
 
-	-- used by DriverMkDepend:
+	-- ** Entities
+	TyThing(..), 
+
+	-- * Exceptions
+	GhcException(..), showGhcException,
+
+	-- * Miscellaneous
 	sessionHscEnv,
 	cyclicModuleErr,
-	
-	-- Exceptions
-	GhcException(..)
   ) where
 
 {-
@@ -101,6 +119,7 @@ import GHC.Exts		( unsafeCoerce# )
 import IfaceSyn		( IfaceDecl )
 #endif
 
+import Packages		( initPackages )
 import RdrName		( GlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds )
 import Type		( Kind, Type, dropForAlls )
@@ -576,6 +595,7 @@ ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
 
 data CheckedModule = 
   CheckedModule { parsedSource      :: ParsedSource,
+		-- ToDo: renamedSource
 		  typecheckedSource :: Maybe TypecheckedSource
 	        }
 
