@@ -376,6 +376,7 @@ resetNurseries( void )
   for (cap = free_capabilities; cap != NULL; cap = cap->link)
 #else
   cap = &MainCapability;
+  ASSERT(cap->r.rNursery == g0s0->blocks);
 #endif
   {
     for (bd = cap->r.rNursery; bd; bd = bd->link) {
@@ -465,6 +466,8 @@ resizeNursery ( nat blocks )
   
   g0s0->n_blocks = blocks;
   ASSERT(countBlocks(g0s0->blocks) == g0s0->n_blocks);
+
+  MainCapability.r.rNursery = g0s0->blocks;
 }
 
 /* -----------------------------------------------------------------------------
