@@ -1997,6 +1997,12 @@ getAmode other
 
 getNonClobberedOperand :: CmmExpr -> NatM (Operand, InstrBlock)
 getNonClobberedOperand (CmmLit lit)
+  | isSuitableFloatingPointLit lit = do
+    lbl <- getNewLabelNat
+    let code = unitOL (LDATA ReadOnlyData  [CmmDataLabel lbl,
+					   CmmStaticLit lit])
+    return (OpAddr (ripRel (ImmCLbl lbl)), code)
+getNonClobberedOperand (CmmLit lit)
   | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) =
     return (OpImm (litToImm lit), nilOL)
 getNonClobberedOperand (CmmLoad mem pk) 
@@ -2025,21 +2031,34 @@ regClobbered _ = False
 -- computation of an arbitrary expression.
 getOperand :: CmmExpr -> NatM (Operand, InstrBlock)
 getOperand (CmmLit lit)
-  | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) =
+  | isSuitableFloatingPointLit lit = do
+    lbl <- getNewLabelNat
+    let code = unitOL (LDATA ReadOnlyData  [CmmDataLabel lbl,
+					   CmmStaticLit lit])
+    return (OpAddr (ripRel (ImmCLbl lbl)), code)
+getOperand (CmmLit lit)
+  | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) = do
     return (OpImm (litToImm lit), nilOL)
 getOperand (CmmLoad mem pk)
   | IF_ARCH_i386(not (isFloatingRep pk) && pk /= I64, True) = do
     Amode src mem_code <- getAmode mem
     return (OpAddr src, mem_code)
 getOperand e = do
-    (reg, code) <- getNonClobberedReg e
+    (reg, code) <- getSomeReg e
     return (OpReg reg, code)
 
 isOperand :: CmmExpr -> Bool
 isOperand (CmmLoad _ _) = True
-isOperand (CmmLit lit)  = not (is64BitLit lit) && 
-			  not (isFloatingRep (cmmLitRep lit))
+isOperand (CmmLit lit)  = not (is64BitLit lit)
+			  || isSuitableFloatingPointLit lit
 isOperand _             = False
+
+-- if we want a floating-point literal as an operand, we can
+-- use it directly from memory.  However, if the literal is
+-- zero, we're better off generating it into a register using
+-- xor.
+isSuitableFloatingPointLit (CmmFloat f _) = f /= 0.0
+isSuitableFloatingPointLit _ = False
 
 getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)
 getRegOrMem (CmmLoad mem pk)
@@ -4277,7 +4296,10 @@ trivialCode rep instr (Just revinstr) (CmmLit lit_a) b
   -- in
   return (Any rep code)
 
-trivialCode rep instr maybe_revinstr a b = do
+trivialCode rep instr maybe_revinstr a b = genTrivialCode rep instr a b
+
+-- This is re-used for floating pt instructions too.
+genTrivialCode rep instr a b = do
   (b_op, b_code) <- getNonClobberedOperand b
   a_code <- getAnyReg a
   tmp <- getNewRegNat rep
@@ -4289,7 +4311,7 @@ trivialCode rep instr maybe_revinstr a b = do
      -- as the destination reg.  In this case, we have to save b in a
      -- new temporary across the computation of a.
      code dst
-	| dst `clashesWith` b_op =
+	| dst `regClashesWithOp` b_op =
 		b_code `appOL`
 		unitOL (MOV rep b_op (OpReg tmp)) `appOL`
 		a_code dst `snocOL`
@@ -4300,10 +4322,10 @@ trivialCode rep instr maybe_revinstr a b = do
 		instr b_op (OpReg dst)
   -- in
   return (Any rep code)
- where
-  reg `clashesWith` OpReg reg2   = reg == reg2
-  reg `clashesWith` OpAddr amode = any (==reg) (addrModeRegs amode)
-  reg `clashesWith` _            = False
+
+reg `regClashesWithOp` OpReg reg2   = reg == reg2
+reg `regClashesWithOp` OpAddr amode = any (==reg) (addrModeRegs amode)
+reg `regClashesWithOp` _            = False
 
 -----------
 
@@ -4335,19 +4357,7 @@ trivialFCode pk instr x y = do
 
 #if x86_64_TARGET_ARCH
 
--- We use the 2-operand SSE2 floating pt instructions.  ToDo: improve on
--- this by using some of the special cases in trivialCode above.
-trivialFCode pk instr x y = do
-  (y_reg, y_code) <- getNonClobberedReg y -- these work for float regs too
-  x_code <- getAnyReg x
-  let
-     code dst =
-	y_code `appOL`
-	x_code dst `snocOL`
-	instr pk (IF_ARCH_x86_64(OpReg,) y_reg)
-		 (IF_ARCH_x86_64(OpReg,) dst)
-  -- in
-  return (Any pk code)
+trivialFCode pk instr x y = genTrivialCode  pk (instr pk) x y
 
 #endif
 
