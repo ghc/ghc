@@ -636,7 +636,8 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 			    | (temp, InReg reg) <- ufmToList assig,
 			      temp `notElem` keep', regClass (RealReg reg) == regClass r  ]
 	    -- in
-	    ASSERT2(not (null candidates1 && null candidates2), ppr assig) do
+	    ASSERT2(not (null candidates1 && null candidates2), 
+		    text (show freeregs) <+> ppr r <+> ppr assig) do
 
 	    case candidates1 of
 
@@ -656,7 +657,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 	     -- resides in a register.
 	     [] -> do
 	        let
-	          (temp_to_push_out, my_reg) = head candidates2
+	          (temp_to_push_out, my_reg) = myHead "regalloc" candidates2
 	          -- TODO: plenty of room for optimisation in choosing which temp
 	          -- to spill.  We just pick the first one that isn't used in 
 	          -- the current instruction for now.
@@ -677,6 +678,9 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 	   return (insn : spills)
 	do_load _ _ _ spills = 
 	   return spills
+
+myHead s [] = panic s
+myHead s (x:xs) = x
 
 -- -----------------------------------------------------------------------------
 -- Joining a jump instruction to its targets
@@ -703,18 +707,28 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
   let
 	-- adjust the assignment to remove any registers which are not
 	-- live on entry to the destination block.
-	adjusted_assig = 
-	  listToUFM [ (reg,loc) | reg <- live, 
-				  Just loc <- [lookupUFM assig reg] ]
+	adjusted_assig = filterUFM_Directly still_live assig
+	still_live uniq _ = uniq `elemUniqSet_Directly` live_set
+
+	-- and free up those registers which are now free.
+	to_free =
+	  [ r | (reg, loc) <- ufmToList assig, 
+		not (elemUniqSet_Directly reg live_set), 
+		r <- regsOfLoc loc ]
+
+	regsOfLoc (InReg r)    = [r]
+	regsOfLoc (InBoth r _) = [r]
+	regsOfLoc (InMem _)    = []
   -- in
   case lookupUFM block_assig dest of
 	-- Nothing <=> this is the first time we jumped to this
 	-- block.
 	Nothing -> do
 	  freeregs <- getFreeRegsR
+	  let freeregs' = foldr releaseReg freeregs to_free 
  	  stack <- getStackR
 	  setBlockAssigR (addToUFM block_assig dest 
-				(freeregs,stack,adjusted_assig))
+				(freeregs',stack,adjusted_assig))
 	  joinToTargets block_live new_blocks instr dests
 
 	Just (freeregs,stack,dest_assig)
@@ -725,7 +739,7 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	   -> -- need fixup code
 	     panic "joinToTargets: ToDo: need fixup code"
   where
-	live = uniqSetToList (lookItUp "joinToTargets" block_live dest)
+	live_set = lookItUp "joinToTargets" block_live dest
 
 -- -----------------------------------------------------------------------------
 -- The register allocator's monad.  
