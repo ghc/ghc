@@ -1996,12 +1996,14 @@ getAmode other
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 getNonClobberedOperand :: CmmExpr -> NatM (Operand, InstrBlock)
+#if x86_64_TARGET_ARCH
 getNonClobberedOperand (CmmLit lit)
   | isSuitableFloatingPointLit lit = do
     lbl <- getNewLabelNat
     let code = unitOL (LDATA ReadOnlyData  [CmmDataLabel lbl,
 					   CmmStaticLit lit])
     return (OpAddr (ripRel (ImmCLbl lbl)), code)
+#endif
 getNonClobberedOperand (CmmLit lit)
   | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) =
     return (OpImm (litToImm lit), nilOL)
@@ -2030,12 +2032,14 @@ regClobbered _ = False
 -- getOperand: the operand is not required to remain valid across the
 -- computation of an arbitrary expression.
 getOperand :: CmmExpr -> NatM (Operand, InstrBlock)
+#if x86_64_TARGET_ARCH
 getOperand (CmmLit lit)
   | isSuitableFloatingPointLit lit = do
     lbl <- getNewLabelNat
     let code = unitOL (LDATA ReadOnlyData  [CmmDataLabel lbl,
 					   CmmStaticLit lit])
     return (OpAddr (ripRel (ImmCLbl lbl)), code)
+#endif
 getOperand (CmmLit lit)
   | not (is64BitLit lit) && not (isFloatingRep (cmmLitRep lit)) = do
     return (OpImm (litToImm lit), nilOL)
