@@ -45,7 +45,7 @@ import CLabel
 import CmmUtils
 import MachOp		( MachRep(..), wordRep, MachOp(..),  MachHint(..),
 			  mo_wordOr, mo_wordAnd, mo_wordNe, mo_wordEq,
-			  mo_wordULt, mo_wordUGt, machRepByteWidth )
+			  mo_wordULt, mo_wordUGt, mo_wordUGe, machRepByteWidth )
 import ForeignCall	( CCallConv(..) )
 import Literal		( Literal(..) )
 import CLabel		( CLabel, mkStringLitLabel )
@@ -153,6 +153,7 @@ cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
 cmmNeWord  e1 e2 = CmmMachOp mo_wordNe  [e1, e2]
 cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
 cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
+cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
 cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
@@ -456,11 +457,18 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 				lo_tag (mid_tag-1) via_C
 	; hi_stmts <- mk_switch tag_expr' hi_branches mb_deflt 
 				mid_tag hi_tag via_C
-	; lo_id <- forkCgStmts lo_stmts
-	; let cond = cmmULtWord tag_expr' (CmmLit (mkIntCLit mid_tag))
-	      branch_stmt = CmmCondBranch cond lo_id
-	; return (assign_tag `consCgStmt` (branch_stmt `consCgStmt` hi_stmts)) 
+	; hi_id <- forkCgStmts hi_stmts
+	; let cond = cmmUGeWord tag_expr' (CmmLit (mkIntCLit mid_tag))
+	      branch_stmt = CmmCondBranch cond hi_id
+	; return (assign_tag `consCgStmt` (branch_stmt `consCgStmt` lo_stmts)) 
 	}
+	-- we test (e >= mid_tag) rather than (e < mid_tag), because
+	-- the former works better when e is a comparison, and there
+	-- are two tags 0 & 1 (mid_tag == 1).  In this case, the code
+	-- generator can reduce the condition to e itself without
+	-- having to reverse the sense of the comparison: comparisons
+	-- can't always be easily reversed (eg. floating
+	-- pt. comparisons).
   where
     use_switch 	 = {- pprTrace "mk_switch" (
 			ppr tag_expr <+> text "n_tags:" <+> int n_tags <+>
