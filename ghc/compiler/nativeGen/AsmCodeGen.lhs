@@ -379,6 +379,9 @@ Ideas for other things we could do (ToDo):
 
   - shortcut jumps-to-jumps
   - eliminate dead code blocks
+  - simple CSE: if an expr is assigned to a temp, then replace later occs of
+    that expr with the temp, until the expr is no longer valid (can push through
+    temp assignments, and certain assigns to mem...)
 -}
 
 cmmToCmm :: CmmTop -> (CmmTop, [CLabel])
