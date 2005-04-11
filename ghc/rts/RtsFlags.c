@@ -152,7 +152,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.maxStkSize		= (8 * 1024 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
 
-    RtsFlags.GcFlags.minAllocAreaSize   = (256 * 1024)        / BLOCK_SIZE;
+    RtsFlags.GcFlags.minAllocAreaSize   = (512 * 1024)        / BLOCK_SIZE;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize	= 0;    /* off by default */
     RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
