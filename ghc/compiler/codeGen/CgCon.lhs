@@ -72,7 +72,10 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 cgTopRhsCon id con args
   = do { 
 	; dflags <- getDynFlags
-	; ASSERT( not (isDllConApp dflags con args) ) return ()
+#if mingw32_TARGET_OS
+        -- Windows DLLs have a problem with static cross-DLL refs.
+        ; ASSERT( not (isDllConApp dflags con args) ) return ()
+#endif
 	; ASSERT( args `lengthIs` dataConRepArity con ) return ()
 
 	-- LAY IT OUT

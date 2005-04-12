@@ -1175,6 +1175,8 @@ rhsIsStatic :: DynFlags -> CoreExpr -> Bool
 -- BUT watch out for
 --  (i)	Any cross-DLL references kill static-ness completely
 --	because they must be 'executed' not statically allocated
+--      ("DLL" here really only refers to Windows DLLs, on other platforms,
+--      this is not necessary)
 --
 -- (ii) We treat partial applications as redexes, because in fact we 
 --	make a thunk for them that runs and builds a PAP
@@ -1244,7 +1246,9 @@ rhsIsStatic dflags rhs = is_static False rhs
   is_static in_arg other_expr = go other_expr 0
    where
     go (Var f) n_val_args
-	| not (isDllName dflags (idName f))
+#if mingw32_TARGET_OS
+        | not (isDllName dflags (idName f))
+#endif
 	=  saturated_data_con f n_val_args
 	|| (in_arg && n_val_args == 0)	
 		-- A naked un-applied variable is *not* deemed a static RHS
