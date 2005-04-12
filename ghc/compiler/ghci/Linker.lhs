@@ -616,6 +616,9 @@ unload :: DynFlags -> [Linkable] -> IO ()
 
 unload dflags linkables
   = block $ do -- block, so we're safe from Ctrl-C in here
+  
+	-- Initialise the linker (if it's not been done already)
+	initDynLinker dflags
 
 	pls	<- readIORef v_PersistentLinkerState
 	new_pls <- unload_wkr dflags linkables pls
