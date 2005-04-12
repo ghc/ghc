@@ -522,7 +522,9 @@ typedef struct _RtsSymbolVal {
       SymX(run_queue_hd)			\
       SymX(__hscore_get_saved_termios)		\
       SymX(__hscore_set_saved_termios)		\
+      SymX(setIOManagerPipe)			\
       SymX(setProgArgv)				\
+      SymX(startSignalHandler)			\
       SymX(startupHaskell)			\
       SymX(shutdownHaskell)			\
       SymX(shutdownHaskellAndExit)		\
