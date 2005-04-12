@@ -92,6 +92,9 @@ typedef struct StgRegTable_ {
 #if defined(SMP) || defined(PAR)
   StgSparkPool   rSparks;	/* per-task spark pool */
 #endif
+  StgWord        rInHaskell;    /* non-zero if we're in Haskell code */
+    // If this flag is set, we are running Haskell code.  Used to detect
+    // uses of 'foreign import unsafe' that should be 'safe'.
 } StgRegTable;
 
 

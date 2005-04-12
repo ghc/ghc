@@ -177,11 +177,6 @@ int context_switch = 0;
 /* if this flag is set as well, give up execution */
 rtsBool interrupted = rtsFalse;
 
-/* If this flag is set, we are running Haskell code.  Used to detect
- * uses of 'foreign import unsafe' that should be 'safe'.
- */
-static rtsBool in_haskell = rtsFalse;
-
 /* Next thread ID to allocate.
  * Locks required: thread_id_mutex
  */
@@ -482,7 +477,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
     // call).
-    if (in_haskell) {
+    if (cap->r.rInHaskell) {
     	  errorBelch("schedule: re-entered unsafely.\n"
     		     "   Perhaps a 'foreign import unsafe' should be 'safe'?");
     	  stg_exit(1);
@@ -671,7 +666,7 @@ run_thread:
     prev_what_next = t->what_next;
 
     errno = t->saved_errno;
-    in_haskell = rtsTrue;
+    cap->r.rInHaskell = rtsTrue;
 
     switch (prev_what_next) {
 
@@ -699,7 +694,7 @@ run_thread:
 	blackholes_need_checking = rtsTrue;
     }
 
-    in_haskell = rtsFalse;
+    cap->r.rInHaskell = rtsFalse;
 
     // The TSO might have moved, eg. if it re-entered the RTS and a GC
     // happened.  So find the new location:
@@ -2131,6 +2126,7 @@ suspendThread( StgRegTable *reg )
   tok = cap->r.rCurrentTSO->id;
 
   /* Hand back capability */
+  cap->r.rInHaskell = rtsFalse;
   releaseCapability(cap);
   
 #if defined(RTS_SUPPORTS_THREADS)
@@ -2140,7 +2136,6 @@ suspendThread( StgRegTable *reg )
   IF_DEBUG(scheduler, sched_belch("worker (token %d): leaving RTS", tok));
 #endif
 
-  in_haskell = rtsFalse;
   RELEASE_LOCK(&sched_mutex);
   
   errno = saved_errno;
@@ -2188,7 +2183,7 @@ resumeThread( StgInt tok )
   tso->why_blocked  = NotBlocked;
 
   cap->r.rCurrentTSO = tso;
-  in_haskell = rtsTrue;
+  cap->r.rInHaskell = rtsTrue;
   RELEASE_LOCK(&sched_mutex);
   errno = saved_errno;
   return &cap->r;
