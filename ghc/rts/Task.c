@@ -78,10 +78,11 @@ stopTaskManager (void)
 	    IF_DEBUG(scheduler, sched_belch("all tasks stopped"));
 	    return;
 	}
+	IF_DEBUG(scheduler, sched_belch("yielding"));
 	prodWorker();
 	yieldThread();
     }
-    IF_DEBUG(scheduler, sched_belch("%d tasks still running, exiting anyway", tasksRunning));
+    errorBelch("%d tasks still running, exiting anyway", tasksRunning);
 
     /* 
        OLD CODE follows:
@@ -200,9 +201,6 @@ taskStop (void)
     }
     ASSERT(task_info->id == id);
 
-    task_info->stopped = rtsTrue;
-    tasksRunning--;
-
     stat_getTimes(&currentElapsedTime, &currentUserTime, &elapsedGCTime);
     
     task_info->mut_time = 
@@ -212,6 +210,9 @@ taskStop (void)
 
     if (task_info->mut_time < 0.0)  { task_info->mut_time = 0.0;  }
     if (task_info->mut_etime < 0.0) { task_info->mut_etime = 0.0; }
+
+    task_info->stopped = rtsTrue;
+    tasksRunning--;
 }
 
 void
