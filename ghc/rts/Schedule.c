@@ -313,13 +313,13 @@ StgTSO * activateSpark (rtsSpark spark);
  * ------------------------------------------------------------------------- */
 
 #if defined(RTS_SUPPORTS_THREADS)
-static rtsBool startingWorkerThread = rtsFalse;
+static nat startingWorkerThread = 0;
 
 static void
 taskStart(void)
 {
   ACQUIRE_LOCK(&sched_mutex);
-  startingWorkerThread = rtsFalse;
+  startingWorkerThread--;
   schedule(NULL,NULL);
   taskStop();
   RELEASE_LOCK(&sched_mutex);
@@ -330,14 +330,14 @@ startSchedulerTaskIfNecessary(void)
 {
     if ( !EMPTY_RUN_QUEUE()
 	 && !shutting_down_scheduler // not if we're shutting down
-	 && !startingWorkerThread)
+	 && startingWorkerThread==0)
     {
 	// we don't want to start another worker thread
 	// just because the last one hasn't yet reached the
 	// "waiting for capability" state
-	startingWorkerThread = rtsTrue;
+	startingWorkerThread++;
 	if (!maybeStartNewWorker(taskStart)) {
-	    startingWorkerThread = rtsFalse;
+	    startingWorkerThread--;
 	}
     }
 }
@@ -1466,7 +1466,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 		       g0s0->blocks == cap->r.rNursery);
 		g0s0->blocks = bd;
 #endif
-		cap->r.rNursery = bd;
+		cap->r.rNursery->blocks = bd;
 	    }		  
 	    cap->r.rCurrentNursery->u.back = bd;
 	    
@@ -1860,6 +1860,7 @@ scheduleDoGC( Capability *cap STG_UNUSED )
 {
     StgTSO *t;
 #ifdef SMP
+    static rtsBool waiting_for_gc;
     int n_capabilities = RtsFlags.ParFlags.nNodes - 1; 
            // subtract one because we're already holding one.
     Capability *caps[n_capabilities];
@@ -1877,6 +1878,10 @@ scheduleDoGC( Capability *cap STG_UNUSED )
     // the other tasks to sleep and stay asleep.
     //
 	
+    // Someone else is already trying to GC
+    if (waiting_for_gc) return;
+    waiting_for_gc = rtsTrue;
+
     caps[n_capabilities] = cap;
     while (n_capabilities > 0) {
 	IF_DEBUG(scheduler, sched_belch("ready_to_gc, grabbing all the capabilies (%d left)", n_capabilities));
@@ -1884,6 +1889,8 @@ scheduleDoGC( Capability *cap STG_UNUSED )
 	n_capabilities--;
 	caps[n_capabilities] = cap;
     }
+
+    waiting_for_gc = rtsFalse;
 #endif
 
     /* Kick any transactions which are invalid back to their
@@ -2625,6 +2632,7 @@ initScheduler(void)
 
 #if defined(SMP)
   /* eagerly start some extra workers */
+  startingWorkerThread = RtsFlags.ParFlags.nNodes;
   startTasks(RtsFlags.ParFlags.nNodes, taskStart);
 #endif
 
