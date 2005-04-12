@@ -15,11 +15,14 @@ LIBRARY = libghccompat.a
 # We don't want this installed
 NO_INSTALL_LIBRARY = YES
 
+# Needed so that the libraries can #include relative to this directory.
+INCLUDE_DIRS=-I. -Iinclude
+
+SRC_HC_OPTS    += $(INCLUDE_DIRS) 
+MKDEPENDC_OPTS += $(INCLUDE_DIRS)
+
 # Just to silence warnings
 MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
-
-# Needed so that the libraries can #include relative to this directory.
-SRC_HC_OPTS += -I. -Iinclude
 
 UseGhcForCc = YES
 
