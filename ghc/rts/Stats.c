@@ -77,8 +77,6 @@
 static int TicksPerSecond = 0;
 
 static TICK_TYPE ElapsedTimeStart = 0;
-static TICK_TYPE CurrentElapsedTime = 0;
-static TICK_TYPE CurrentUserTime    = 0;
 
 static TICK_TYPE InitUserTime     = 0;
 static TICK_TYPE InitElapsedTime  = 0;
@@ -119,7 +117,7 @@ static lnat GC_start_faults = 0, GC_end_faults = 0;
 
 static TICK_TYPE *GC_coll_times;
 
-static void  getTimes(void);
+static void  getTimes( long *elapsed, long *user );
 static nat   pageFaults(void);
 
 static void statsPrintf( char *s, ... ) 
@@ -143,7 +141,7 @@ static void statsClose( void );
 #if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
 /* cygwin32 or mingw32 version */
 static void
-getTimes(void)
+getTimes( TICK_TYPE *elapsed, TICK_TYPE *user )
 {
     static int is_win9x = -1;
 
@@ -175,29 +173,29 @@ getTimes(void)
       if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
 		          &exitTime, &kernelTime, &userTime)) {
 	/* Probably on a Win95 box..*/
-	CurrentElapsedTime = 0;
-	CurrentUserTime = 0;
+	*elapsed = 0;
+	*user = 0;
 	return;
       }
     }
 
     FT2longlong(kT,kernelTime);
     FT2longlong(uT,userTime);
-    CurrentElapsedTime = uT + kT;
-    CurrentUserTime = uT;
+    *elapsed = uT + kT;
+    *user = uT;
 
     if (is_win9x) {
       /* Adjust for the fact that we're using system time & not
 	 process time on Win9x. */
-      CurrentUserTime    -= ElapsedTimeStart;
-      CurrentElapsedTime -= ElapsedTimeStart;
+      *user    -= ElapsedTimeStart;
+      *elapsed -= ElapsedTimeStart;
     }
 }
 
 #else /* !win32 */
 
 static void
-getTimes(void)
+getTimes( TICK_TYPE *user, TICK_TYPE *elapsed )
 {
 
 #ifndef HAVE_TIMES
@@ -211,10 +209,9 @@ getTimes(void)
     struct tms t;
     clock_t r = times(&t);
 
-    CurrentElapsedTime = r;
-    CurrentUserTime = t.tms_utime;
+    *elapsed = r;
+    *user = t.tms_utime;
 #endif
-
 }
 #endif /* !win32 */
 
@@ -239,8 +236,9 @@ mut_user_time_during_GC( void )
 double
 mut_user_time( void )
 {
-    getTimes();
-    return TICK_TO_DBL(CurrentUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time));
+    TICK_TYPE user, elapsed;
+    getTimes(&user, &elapsed);
+    return TICK_TO_DBL(user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time));
 }
 
 #ifdef PROFILING
@@ -302,6 +300,8 @@ initStats(void)
 void
 stat_startInit(void)
 {
+    TICK_TYPE user, elapsed;
+
     /* Determine TicksPerSecond ... */
 #if defined(CLK_TCK)		/* defined by POSIX */
     TicksPerSecond = CLK_TCK;
@@ -331,20 +331,21 @@ stat_startInit(void)
     TicksPerSecond = 60;
 #endif
 
-    getTimes();
-    ElapsedTimeStart = CurrentElapsedTime;
+    getTimes( &user, &elapsed );
+    ElapsedTimeStart = elapsed;
 }
 
 void 
 stat_endInit(void)
 {
-    getTimes();
-    InitUserTime = CurrentUserTime;
-    InitElapsedStamp = CurrentElapsedTime; 
-    if (ElapsedTimeStart > CurrentElapsedTime) {
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+    InitUserTime = user;
+    InitElapsedStamp = elapsed; 
+    if (ElapsedTimeStart > elapsed) {
 	InitElapsedTime = 0;
     } else {
-	InitElapsedTime = CurrentElapsedTime - ElapsedTimeStart;
+	InitElapsedTime = elapsed - ElapsedTimeStart;
     }
 }
 
@@ -357,9 +358,11 @@ stat_endInit(void)
 void
 stat_startExit(void)
 {
-    getTimes();
-    MutElapsedStamp = CurrentElapsedTime;
-    MutElapsedTime = CurrentElapsedTime - GCe_tot_time -
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+
+    MutElapsedStamp = elapsed;
+    MutElapsedTime = elapsed - GCe_tot_time -
 	PROF_VAL(RPe_tot_time + HCe_tot_time) - InitElapsedStamp;
     if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
 
@@ -370,9 +373,9 @@ stat_startExit(void)
      * in stat_exit below.
      */
 #if defined(RTS_SUPPORTS_THREADS)
-    MutUserTime = CurrentUserTime;
+    MutUserTime = user;
 #else
-    MutUserTime = CurrentUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
+    MutUserTime = user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
     if (MutUserTime < 0) { MutUserTime = 0; }
 #endif
 }
@@ -380,13 +383,15 @@ stat_startExit(void)
 void
 stat_endExit(void)
 {
-    getTimes();
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+
 #if defined(RTS_SUPPORTS_THREADS)
-    ExitUserTime = CurrentUserTime - MutUserTime;
+    ExitUserTime = user - MutUserTime;
 #else
-    ExitUserTime = CurrentUserTime - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
+    ExitUserTime = user - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
 #endif
-    ExitElapsedTime = CurrentElapsedTime - MutElapsedStamp;
+    ExitElapsedTime = elapsed - MutElapsedStamp;
     if (ExitUserTime < 0) {
 	ExitUserTime = 0;
     }
@@ -410,6 +415,8 @@ void
 stat_startGC(void)
 {
     nat bell = RtsFlags.GcFlags.ringBell;
+    TICK_TYPE user, elapsed;
+
 
     if (bell) {
 	if (bell > 1) {
@@ -421,16 +428,16 @@ stat_startGC(void)
     }
 
 #if defined(PROFILING) || defined(DEBUG)
-    getTimes();
-    GC_start_time = CurrentUserTime;  /* needed in mut_user_time_during_GC() */
+    getTimes( &user, &elapsed );
+    GC_start_time = user;  /* needed in mut_user_time_during_GC() */
 #endif
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 #if !defined(PROFILING) && !defined(DEBUG)
-	getTimes();
-        GC_start_time = CurrentUserTime;
+	getTimes( &user, &elapsed );
+        GC_start_time = user;
 #endif
-	GCe_start_time = CurrentElapsedTime;
+	GCe_start_time = elapsed;
 	if (RtsFlags.GcFlags.giveStats) {
 	    GC_start_faults = pageFaults();
 	}
@@ -444,12 +451,14 @@ stat_startGC(void)
 void
 stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 {
+    TICK_TYPE user, elapsed;
+
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 	TICK_TYPE time, etime, gc_time, gc_etime;
 	
-	getTimes();
-	time     = CurrentUserTime;
-	etime    = CurrentElapsedTime;
+	getTimes( &user, &elapsed );
+	time     = user;
+	etime    = elapsed;
 	gc_time  = time - GC_start_time;
 	gc_etime = etime - GCe_start_time;
 	
@@ -511,9 +520,11 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 void
 stat_startRP(void)
 {
-  getTimes();
-  RP_start_time = CurrentUserTime;
-  RPe_start_time = CurrentElapsedTime;
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+
+    RP_start_time = user;
+    RPe_start_time = elapsed;
 }
 #endif /* PROFILING */
 
@@ -531,9 +542,11 @@ stat_endRP(
 #endif
   double averageNumVisit)
 {
-  getTimes();
-  RP_tot_time += CurrentUserTime - RP_start_time;
-  RPe_tot_time += CurrentElapsedTime - RPe_start_time;
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+
+    RP_tot_time += user - RP_start_time;
+    RPe_tot_time += elapsed - RPe_start_time;
 
   fprintf(prof_file, "Retainer Profiling: %d, at %f seconds\n", 
     retainerGeneration, mut_user_time_during_RP());
@@ -552,9 +565,11 @@ stat_endRP(
 void
 stat_startHeapCensus(void)
 {
-  getTimes();
-  HC_start_time = CurrentUserTime;
-  HCe_start_time = CurrentElapsedTime;
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+
+    HC_start_time = user;
+    HCe_start_time = elapsed;
 }
 #endif /* PROFILING */
 
@@ -565,9 +580,11 @@ stat_startHeapCensus(void)
 void
 stat_endHeapCensus(void) 
 {
-  getTimes();
-  HC_tot_time += CurrentUserTime - HC_start_time;
-  HCe_tot_time += CurrentElapsedTime - HCe_start_time;
+    TICK_TYPE user, elapsed;
+    getTimes( &user, &elapsed );
+
+    HC_tot_time += user - HC_start_time;
+    HCe_tot_time += elapsed - HCe_start_time;
 }
 #endif /* PROFILING */
 
@@ -583,9 +600,7 @@ stat_getTimes ( long *currentElapsedTime,
 		long *currentUserTime,
 		long *elapsedGCTime )
 {
-  getTimes();
-  *currentElapsedTime = CurrentElapsedTime;
-  *currentUserTime = CurrentUserTime;
+  getTimes(currentUserTime, currentElapsedTime);
   *elapsedGCTime = GCe_tot_time;
 }
 
@@ -600,6 +615,8 @@ stat_getTimes ( long *currentElapsedTime,
 void
 stat_exit(int alloc)
 {
+    TICK_TYPE user, elapsed;
+
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 
 	char temp[BIG_STRING_LEN];
@@ -607,8 +624,8 @@ stat_exit(int alloc)
 	TICK_TYPE etime;
 	nat g, total_collections = 0;
 
-	getTimes();
-	etime = CurrentElapsedTime - ElapsedTimeStart;
+	getTimes( &user, &elapsed );
+	etime = elapsed - ElapsedTimeStart;
 
 	GC_tot_alloc += alloc;
 
@@ -630,7 +647,7 @@ stat_exit(int alloc)
 	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
 	if (MutUserTime < 0) { MutUserTime = 0; }
 #else
-	time = CurrentUserTime;
+	time = user;
 #endif
 
 	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
