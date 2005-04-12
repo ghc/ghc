@@ -212,19 +212,11 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 	} else {
 	    signalCondition(passTarget);
 	}
-#if defined(SMP)
 	rts_n_free_capabilities++;
-#else
-	rts_n_free_capabilities = 1;
-#endif
 	IF_DEBUG(scheduler, sched_belch("worker: released capability, passing it"));
 
     } else {
-#if defined(SMP)
 	rts_n_free_capabilities++;
-#else
-	rts_n_free_capabilities = 1;
-#endif
 	// Signal that a capability is available
 	if (rts_n_waiting_tasks > 0 && ANY_WORK_TO_DO()) {
 	    signalCondition(&thread_ready_cond);
