@@ -34,7 +34,6 @@ module GHC (
 	depanal,
 	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
 	workingDirectoryChanged,
-	checkModule, CheckedModule(..),
 
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..),
@@ -46,8 +45,8 @@ module GHC (
 	ModuleInfo,
 	getModuleInfo,
 	modInfoTyThings,
-	modInfoInstances,
 	lookupName,
+	allNamesInScope,
 
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
@@ -70,21 +69,28 @@ module GHC (
 	-- ** Modules
 	Module, mkModule, pprModule,
 
-	-- ** Identifiers
+	-- ** Names
 	Name,
+	
+	-- ** Identifiers
 	Id, idType,
+	isImplicitId, isDeadBinder,
+	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
+	isRecordSelector,
+	isPrimOpId, isFCallId,
+	isDataConWorkId, idDataCon,
+	isBottomingId, isDictonaryId,
 
 	-- ** Type constructors
 	TyCon, 
+	isClassTyCon, isSynTyCon, isNewTyCon,
 
 	-- ** Data constructors
 	DataCon,
 
 	-- ** Classes
 	Class, 
-
-	-- ** Instances
-	Instance,
+	classSCTheta, classTvsFds,
 
 	-- ** Types and Kinds
 	Type, dropForAlls,
@@ -133,12 +139,17 @@ import Packages		( initPackages )
 import RdrName		( GlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds )
 import Type		( Kind, Type, dropForAlls )
-import Id		( Id, idType )
-import TyCon		( TyCon )
-import Class		( Class )
+import Id		( Id, idType, isImplicitId, isDeadBinder,
+                          isSpecPragmaId, isExportedId, isLocalId, isGlobalId,
+                          isRecordSelector,
+                          isPrimOpId, isFCallId,
+                          isDataConWorkId, idDataCon,
+                          isBottomingId )
+import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon )
+import Class		( Class, classSCTheta, classTvsFds )
 import DataCon		( DataCon )
-import Name		( Name )
-import RdrName		( RdrName )
+import Name		( Name, getName, nameModule_maybe )
+import RdrName		( RdrName, gre_name, globalRdrEnvElts )
 import NameEnv		( nameEnvElts )
 import SrcLoc		( Located(..) )
 import DriverPipeline
@@ -163,9 +174,10 @@ import Outputable
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Maybes		( orElse, expectJust, mapCatMaybes )
+import TcType           ( tcSplitSigmaTy, isDictTy )
 
 import Directory        ( getModificationTime, doesFileExist )
-import Maybe		( isJust, isNothing, fromJust )
+import Maybe		( isJust, isNothing, fromJust, fromMaybe, catMaybes )
 import Maybes		( expectJust )
 import List		( partition, nub )
 import qualified List
@@ -380,7 +392,6 @@ data ErrMsg = ErrMsg {
 data LoadHowMuch
    = LoadAllTargets
    | LoadUpTo Module
-   | LoadDependenciesOf Module
 
 -- | Try to load the program.  If a Module is supplied, then just
 -- attempt to load up to this target.  If no Module is supplied,
@@ -464,22 +475,10 @@ load s@(Session ref) how_much
 
 	    maybe_top_mod = case how_much of
 				LoadUpTo m           -> Just m
-			  	LoadDependenciesOf m -> Just m
 			  	_		     -> Nothing
 
-	    partial_mg0 :: [SCC ModSummary]
-	    partial_mg0 = topSortModuleGraph False mod_graph maybe_top_mod
-
-	    -- LoadDependenciesOf m: we want the upsweep to stop just
-	    -- short of the specified module (unless the specified module
-	    -- is stable).
-	    partial_mg
-		| LoadDependenciesOf mod <- how_much
-		= ASSERT( case last partial_mg0 of 
-			    AcyclicSCC ms -> ms_mod ms == mod; _ -> False )
-		  List.init partial_mg0
-		| otherwise
-		= partial_mg0
+	    partial_mg :: [SCC ModSummary]
+	    partial_mg = topSortModuleGraph False mod_graph maybe_top_mod
 
 	    stable_mg = 
 		[ AcyclicSCC ms
@@ -599,42 +598,6 @@ discardProg hsc_env
 -- cleaning up.  The preprocessed file *might* be the same as the
 -- source file, but that doesn't do any harm.
 ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
-
--- -----------------------------------------------------------------------------
--- Check module
-
-data CheckedModule = 
-  CheckedModule { parsedSource      :: ParsedSource,
-		-- ToDo: renamedSource
-		  typecheckedSource :: Maybe TypecheckedSource
-	        }
-
-type ParsedSource  = Located (HsModule RdrName)
-type TypecheckedSource = (LHsBinds Id, GlobalRdrEnv)
-
--- | This is the way to get access to parsed and typechecked source code
--- for a module.  'checkModule' loads all the dependencies of the specified
--- module in the Session, and then attempts to typecheck the module.  If
--- successful, it returns the abstract syntax for the module.
-checkModule :: Session -> Module -> (Messages -> IO ()) 
-	-> IO (Maybe CheckedModule)
-checkModule session@(Session ref) mod msg_act = do
-	-- load up the dependencies first
-   r <- load session (LoadDependenciesOf mod)
-   if (failed r) then return Nothing else do
-
-	-- now parse & typecheck the module
-   hsc_env <- readIORef ref   
-   let mg  = hsc_mod_graph hsc_env
-   case [ ms | ms <- mg, ms_mod ms == mod ] of
-	[] -> return Nothing
-	(ms:_) -> do 
-	   r <- hscFileCheck hsc_env msg_act ms
-	   case r of
-		HscFail -> 
-		   return Nothing
-		HscChecked parsed tcd -> 
-		   return (Just (CheckedModule parsed tcd)   )
 
 -----------------------------------------------------------------------------
 -- Unloading
@@ -1453,6 +1416,11 @@ parseName s str = withSession s $ \hsc_env -> do
 		-- ToDo: should return error messages
 #endif
 
+allNamesInScope :: Session -> IO [Name]
+allNamesInScope s = withSession s $ \hsc_env -> do
+  eps <- readIORef (hsc_EPS hsc_env)
+  return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
+
 -- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
 -- entity known to GHC, including 'Name's defined using 'runStmt'.
 lookupName :: Session -> Name -> IO (Maybe TyThing)
@@ -1462,7 +1430,6 @@ lookupName s name = withSession s $ \hsc_env -> do
 	Nothing -> do
 	    eps <- readIORef (hsc_EPS hsc_env)
 	    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
-
 
 -- | Container for information about a 'Module'.
 newtype ModuleInfo = ModuleInfo ModDetails
@@ -1483,12 +1450,9 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
 modInfoTyThings :: ModuleInfo -> [TyThing]
 modInfoTyThings (ModuleInfo md) = typeEnvElts (md_types md)
 
--- | An instance of a class
-newtype Instance = Instance DFunId
-
--- | The list of 'Instance's defined in a module
-modInfoInstances :: ModuleInfo -> [Instance]
-modInfoInstances (ModuleInfo md) = map Instance (md_insts md)
+isDictonaryId :: Id -> Bool
+isDictonaryId id
+  = case tcSplitSigmaTy (idType id) of { (tvs, theta, tau) -> isDictTy tau }
 
 #if 0
 
