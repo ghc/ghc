@@ -317,6 +317,14 @@ typedef struct _RtsSymbolVal {
 # define MAIN_CAP_SYM
 #endif
 
+#if !defined(mingw32_HOST_OS)
+#define RTS_USER_SIGNALS_SYMBOLS \
+   SymX(startSignalHandler) \
+   SymX(setIOManagerPipe)
+#else
+#define RTS_USER_SIGNALS_SYMBOLS /* nothing */
+#endif
+
 #ifdef TABLES_NEXT_TO_CODE
 #define RTS_RET_SYMBOLS /* nothing */
 #else
@@ -522,9 +530,7 @@ typedef struct _RtsSymbolVal {
       SymX(run_queue_hd)			\
       SymX(__hscore_get_saved_termios)		\
       SymX(__hscore_set_saved_termios)		\
-      SymX(setIOManagerPipe)			\
       SymX(setProgArgv)				\
-      SymX(startSignalHandler)			\
       SymX(startupHaskell)			\
       SymX(shutdownHaskell)			\
       SymX(shutdownHaskellAndExit)		\
@@ -592,7 +598,8 @@ typedef struct _RtsSymbolVal {
       SymX(word2Integerzh_fast)			\
       SymX(writeTVarzh_fast)			\
       SymX(xorIntegerzh_fast)			\
-      SymX(yieldzh_fast)
+      SymX(yieldzh_fast)                        \
+      RTS_USER_SIGNALS_SYMBOLS
 
 #ifdef SUPPORT_LONG_LONGS
 #define RTS_LONG_LONG_SYMS			\
