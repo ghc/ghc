@@ -38,12 +38,8 @@
 
 /* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
  * single-entry thunks.
- *
- * SMP needs EAGER_BLACKHOLING because it has to lock thunks
- * synchronously, in case another thread is trying to evaluate the
- * same thunk simultaneously.
  */
-#if defined(SMP) || defined(TICKY_TICKY)
+#if defined(TICKY_TICKY)
 #  define EAGER_BLACKHOLING
 #else
 #  define LAZY_BLACKHOLING

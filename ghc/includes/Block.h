@@ -56,7 +56,7 @@ typedef struct bdescr_ {
       StgWord *bitmap;
   } u;
   unsigned int gen_no;		/* generation */
-  struct _step *step;		/* step */
+  struct step_ *step;		/* step */
   StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
   StgWord32 flags;              /* block is in to-space */
 #if SIZEOF_VOID_P == 8

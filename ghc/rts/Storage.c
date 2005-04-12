@@ -45,6 +45,9 @@ step *g0s0 		= NULL; /* generation 0, step 0, for convenience */
 
 ullong total_allocated = 0;	/* total memory allocated during run */
 
+nat n_nurseries         = 0;    /* == RtsFlags.ParFlags.nNodes, convenience */
+step *nurseries         = NULL; /* array of nurseries, >1 only if SMP */
+
 /*
  * Storage manager mutex:  protects all the above state from
  * simultaneous access by two STG threads.
@@ -72,11 +75,33 @@ extern Mutex sm_mutex;
 #define RELEASE_SM_LOCK
 #endif
 
+static void
+initStep (step *stp, int g, int s)
+{
+    stp->no = s;
+    stp->blocks = NULL;
+    stp->n_to_blocks = 0;
+    stp->n_blocks = 0;
+    stp->gen = &generations[g];
+    stp->gen_no = g;
+    stp->hp = NULL;
+    stp->hpLim = NULL;
+    stp->hp_bd = NULL;
+    stp->scan = NULL;
+    stp->scan_bd = NULL;
+    stp->large_objects = NULL;
+    stp->n_large_blocks = 0;
+    stp->new_large_objects = NULL;
+    stp->scavenged_large_objects = NULL;
+    stp->n_scavenged_large_blocks = 0;
+    stp->is_compacted = 0;
+    stp->bitmap = NULL;
+}
+
 void
 initStorage( void )
 {
   nat g, s;
-  step *stp;
   generation *gen;
 
   if (generations != NULL) {
@@ -112,7 +137,7 @@ initStorage( void )
 
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations 
-					     * sizeof(struct _generation),
+					     * sizeof(struct generation_),
 					     "initStorage: gens");
 
   /* Initialise all generations */
@@ -136,46 +161,43 @@ initStorage( void )
     /* Oldest generation: one step */
     oldest_gen->n_steps = 1;
     oldest_gen->steps = 
-      stgMallocBytes(1 * sizeof(struct _step), "initStorage: last step");
+      stgMallocBytes(1 * sizeof(struct step_), "initStorage: last step");
 
     /* set up all except the oldest generation with 2 steps */
     for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
       generations[g].n_steps = RtsFlags.GcFlags.steps;
       generations[g].steps  = 
-	stgMallocBytes (RtsFlags.GcFlags.steps * sizeof(struct _step),
+	stgMallocBytes (RtsFlags.GcFlags.steps * sizeof(struct step_),
 			"initStorage: steps");
     }
     
   } else {
     /* single generation, i.e. a two-space collector */
     g0->n_steps = 1;
-    g0->steps = stgMallocBytes (sizeof(struct _step), "initStorage: steps");
+    g0->steps = stgMallocBytes (sizeof(struct step_), "initStorage: steps");
   }
+
+#ifdef SMP
+  n_nurseries = RtsFlags.ParFlags.nNodes;
+  nurseries = stgMallocBytes (n_nurseries * sizeof(struct step_),
+			      "initStorage: nurseries");
+#else
+  n_nurseries = 1;
+  nurseries = g0->steps; // just share nurseries[0] with g0s0
+#endif  
 
   /* Initialise all steps */
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (s = 0; s < generations[g].n_steps; s++) {
-      stp = &generations[g].steps[s];
-      stp->no = s;
-      stp->blocks = NULL;
-      stp->n_to_blocks = 0;
-      stp->n_blocks = 0;
-      stp->gen = &generations[g];
-      stp->gen_no = g;
-      stp->hp = NULL;
-      stp->hpLim = NULL;
-      stp->hp_bd = NULL;
-      stp->scan = NULL;
-      stp->scan_bd = NULL;
-      stp->large_objects = NULL;
-      stp->n_large_blocks = 0;
-      stp->new_large_objects = NULL;
-      stp->scavenged_large_objects = NULL;
-      stp->n_scavenged_large_blocks = 0;
-      stp->is_compacted = 0;
-      stp->bitmap = NULL;
+	initStep(&generations[g].steps[s], g, s);
     }
   }
+  
+#ifdef SMP
+  for (s = 0; s < n_nurseries; s++) {
+      initStep(&nurseries[s], 0, s);
+  }
+#endif
   
   /* Set up the destination pointers in each younger gen. step */
   for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
@@ -184,8 +206,15 @@ initStorage( void )
     }
     generations[g].steps[s].to = &generations[g+1].steps[0];
   }
+  oldest_gen->steps[0].to = &oldest_gen->steps[0];
   
-  /* The oldest generation has one step and it is compacted. */
+#ifdef SMP
+  for (s = 0; s < n_nurseries; s++) {
+      nurseries[s].to = generations[0].steps[0].to;
+  }
+#endif
+  
+  /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact) {
       if (RtsFlags.GcFlags.generations == 1) {
 	  errorBelch("WARNING: compaction is incompatible with -G1; disabled");
@@ -193,7 +222,18 @@ initStorage( void )
 	  oldest_gen->steps[0].is_compacted = 1;
       }
   }
-  oldest_gen->steps[0].to = &oldest_gen->steps[0];
+
+#ifdef SMP
+  if (RtsFlags.GcFlags.generations == 1) {
+      errorBelch("-G1 is incompatible with SMP");
+      stg_exit(1);
+  }
+  // No -H, for now
+  if (RtsFlags.GcFlags.heapSizeSuggestion > 0) {
+      errorBelch("-H<size> is incompatible with SMP");
+      stg_exit(1);
+  }
+#endif
 
   /* generation 0 is special: that's the nursery */
   generations[0].max_blocks = 0;
@@ -341,114 +381,123 @@ newDynCAF(StgClosure *caf)
    Nursery management.
    -------------------------------------------------------------------------- */
 
+static bdescr *
+allocNursery (step *stp, bdescr *tail, nat blocks)
+{
+    bdescr *bd;
+    nat i;
+
+    // Allocate a nursery: we allocate fresh blocks one at a time and
+    // cons them on to the front of the list, not forgetting to update
+    // the back pointer on the tail of the list to point to the new block.
+    for (i=0; i < blocks; i++) {
+	// @LDV profiling
+	/*
+	  processNursery() in LdvProfile.c assumes that every block group in
+	  the nursery contains only a single block. So, if a block group is
+	  given multiple blocks, change processNursery() accordingly.
+	*/
+	bd = allocBlock();
+	bd->link = tail;
+	// double-link the nursery: we might need to insert blocks
+	if (tail != NULL) {
+	    tail->u.back = bd;
+	}
+	bd->step = stp;
+	bd->gen_no = 0;
+	bd->flags = 0;
+	bd->free = bd->start;
+	tail = bd;
+    }
+    tail->u.back = NULL;
+    return tail;
+}
+
+static void
+assignNurseriesToCapabilities (void)
+{
+#ifdef SMP
+    nat i;
+
+    for (i = 0; i < n_nurseries; i++) {
+	capabilities[i].r.rNursery        = &nurseries[i];
+	capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
+    }
+#else /* SMP */
+    MainCapability.r.rNursery        = &nurseries[0];
+    MainCapability.r.rCurrentNursery = nurseries[0].blocks;
+#endif
+}
+
 void
 allocNurseries( void )
 { 
-#ifdef SMP
-  Capability *cap;
+    nat i;
 
-  g0s0->blocks = NULL;
-  g0s0->n_blocks = 0;
-  for (cap = free_capabilities; cap != NULL; cap = cap->link) {
-    cap->r.rNursery = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-    cap->r.rCurrentNursery = cap->r.rNursery;
-  }
-#else /* SMP */
-  g0s0->blocks      = allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-  g0s0->n_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
-  g0s0->to_blocks   = NULL;
-  g0s0->n_to_blocks = 0;
-  MainCapability.r.rNursery        = g0s0->blocks;
-  MainCapability.r.rCurrentNursery = g0s0->blocks;
-  /* hp, hpLim, hp_bd, to_space etc. aren't used in G0S0 */
-#endif
+    for (i = 0; i < n_nurseries; i++) {
+	nurseries[i].blocks = 
+	    allocNursery(&nurseries[i], NULL, 
+			 RtsFlags.GcFlags.minAllocAreaSize);
+	nurseries[i].n_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
+	nurseries[i].to_blocks   = NULL;
+	nurseries[i].n_to_blocks = 0;
+	/* hp, hpLim, hp_bd, to_space etc. aren't used in the nursery */
+    }
+    assignNurseriesToCapabilities();
 }
       
 void
 resetNurseries( void )
 {
-  bdescr *bd;
-  Capability *cap;
+    nat i;
+    bdescr *bd;
+    step *stp;
 
-#ifdef SMP
-  /* All tasks must be stopped */
-  ASSERT(rts_n_free_capabilities == RtsFlags.ParFlags.nNodes);
-  for (cap = free_capabilities; cap != NULL; cap = cap->link)
-#else
-  cap = &MainCapability;
-  ASSERT(cap->r.rNursery == g0s0->blocks);
-#endif
-  {
-    for (bd = cap->r.rNursery; bd; bd = bd->link) {
-      bd->free = bd->start;
-      ASSERT(bd->gen_no == 0);
-      ASSERT(bd->step == g0s0);
-      IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
+    for (i = 0; i < n_nurseries; i++) {
+	stp = &nurseries[i];
+	for (bd = stp->blocks; bd; bd = bd->link) {
+	    bd->free = bd->start;
+	    ASSERT(bd->gen_no == 0);
+	    ASSERT(bd->step == stp);
+	    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
+	}
     }
-    cap->r.rCurrentNursery = cap->r.rNursery;
-  }
+    assignNurseriesToCapabilities();
 }
 
-bdescr *
-allocNursery (bdescr *tail, nat blocks)
+lnat
+countNurseryBlocks (void)
 {
-  bdescr *bd;
-  nat i;
+    nat i;
+    lnat blocks = 0;
 
-  // Allocate a nursery: we allocate fresh blocks one at a time and
-  // cons them on to the front of the list, not forgetting to update
-  // the back pointer on the tail of the list to point to the new block.
-  for (i=0; i < blocks; i++) {
-    // @LDV profiling
-    /*
-      processNursery() in LdvProfile.c assumes that every block group in
-      the nursery contains only a single block. So, if a block group is
-      given multiple blocks, change processNursery() accordingly.
-     */
-    bd = allocBlock();
-    bd->link = tail;
-    // double-link the nursery: we might need to insert blocks
-    if (tail != NULL) {
-	tail->u.back = bd;
+    for (i = 0; i < n_nurseries; i++) {
+	blocks += nurseries[i].n_blocks;
     }
-    bd->step = g0s0;
-    bd->gen_no = 0;
-    bd->flags = 0;
-    bd->free = bd->start;
-    tail = bd;
-  }
-  tail->u.back = NULL;
-  return tail;
+    return blocks;
 }
 
-void
-resizeNursery ( nat blocks )
+static void
+resizeNursery ( step *stp, nat blocks )
 {
   bdescr *bd;
   nat nursery_blocks;
 
-#ifdef SMP
-  barf("resizeNursery: can't resize in SMP mode");
-#endif
+  nursery_blocks = stp->n_blocks;
+  if (nursery_blocks == blocks) return;
 
-  nursery_blocks = g0s0->n_blocks;
-  if (nursery_blocks == blocks) {
-    return;
-  }
-
-  else if (nursery_blocks < blocks) {
+  if (nursery_blocks < blocks) {
     IF_DEBUG(gc, debugBelch("Increasing size of nursery to %d blocks\n", 
 			 blocks));
-    g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
+    stp->blocks = allocNursery(stp, stp->blocks, blocks-nursery_blocks);
   } 
-
   else {
     bdescr *next_bd;
     
     IF_DEBUG(gc, debugBelch("Decreasing size of nursery to %d blocks\n", 
 			 blocks));
 
-    bd = g0s0->blocks;
+    bd = stp->blocks;
     while (nursery_blocks > blocks) {
 	next_bd = bd->link;
 	next_bd->u.back = NULL;
@@ -456,18 +505,28 @@ resizeNursery ( nat blocks )
 	freeGroup(bd);
 	bd = next_bd;
     }
-    g0s0->blocks = bd;
+    stp->blocks = bd;
     // might have gone just under, by freeing a large block, so make
     // up the difference.
     if (nursery_blocks < blocks) {
-	g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
+	stp->blocks = allocNursery(stp, stp->blocks, blocks-nursery_blocks);
     }
   }
   
-  g0s0->n_blocks = blocks;
-  ASSERT(countBlocks(g0s0->blocks) == g0s0->n_blocks);
+  stp->n_blocks = blocks;
+  ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
+}
 
-  MainCapability.r.rNursery = g0s0->blocks;
+// 
+// Resize each of the nurseries to the specified size.
+//
+void
+resizeNurseries (nat blocks)
+{
+    nat i;
+    for (i = 0; i < n_nurseries; i++) {
+	resizeNursery(&nurseries[i], blocks);
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -684,41 +743,36 @@ calcAllocated( void )
 {
   nat allocated;
   bdescr *bd;
+  nat i;
 
-#ifdef SMP
-  Capability *cap;
-
-  /* All tasks must be stopped.  Can't assert that all the
-     capabilities are owned by the scheduler, though: one or more
-     tasks might have been stopped while they were running (non-main)
-     threads. */
-  /*  ASSERT(n_free_capabilities == RtsFlags.ParFlags.nNodes); */
-
-  allocated = 
-    rts_n_free_capabilities * RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W
-    + allocated_bytes();
-
-  for (cap = free_capabilities; cap != NULL; cap = cap->link) {
-    for ( bd = cap->r.rCurrentNursery->link; bd != NULL; bd = bd->link ) {
-      allocated -= BLOCK_SIZE_W;
-    }
-    if (cap->r.rCurrentNursery->free < cap->r.rCurrentNursery->start 
-	+ BLOCK_SIZE_W) {
-      allocated -= (cap->r.rCurrentNursery->start + BLOCK_SIZE_W)
-	- cap->r.rCurrentNursery->free;
-    }
+  allocated = allocated_bytes();
+  for (i = 0; i < n_nurseries; i++) {
+      allocated += nurseries[i].n_blocks * BLOCK_SIZE_W;
   }
-
-#else /* !SMP */
+  
+#ifdef SMP
+  for (i = 0; i < n_nurseries; i++) {
+      Capability *cap;
+      for ( bd = capabilities[i].r.rCurrentNursery; 
+	    bd != NULL; bd = bd->link ) {
+	  allocated -= BLOCK_SIZE_W;
+      }
+      cap = &capabilities[i];
+      if (cap->r.rCurrentNursery->free < 
+	  cap->r.rCurrentNursery->start + BLOCK_SIZE_W) {
+	  allocated -= (cap->r.rCurrentNursery->start + BLOCK_SIZE_W)
+	      - cap->r.rCurrentNursery->free;
+      }
+  }
+#else
   bdescr *current_nursery = MainCapability.r.rCurrentNursery;
 
-  allocated = (g0s0->n_blocks * BLOCK_SIZE_W) + allocated_bytes();
   for ( bd = current_nursery->link; bd != NULL; bd = bd->link ) {
-    allocated -= BLOCK_SIZE_W;
+      allocated -= BLOCK_SIZE_W;
   }
   if (current_nursery->free < current_nursery->start + BLOCK_SIZE_W) {
-    allocated -= (current_nursery->start + BLOCK_SIZE_W)
-      - current_nursery->free;
+      allocated -= (current_nursery->start + BLOCK_SIZE_W)
+	  - current_nursery->free;
   }
 #endif
 
@@ -802,10 +856,31 @@ calcNeeded(void)
 
 #ifdef DEBUG
 
+static lnat
+stepBlocks (step *stp)
+{
+    lnat total_blocks;
+    bdescr *bd;
+
+    total_blocks = stp->n_blocks;    
+    for (bd = stp->large_objects; bd; bd = bd->link) {
+	total_blocks += bd->blocks;
+	/* hack for megablock groups: they have an extra block or two in
+	   the second and subsequent megablocks where the block
+	   descriptors would normally go.
+	*/
+	if (bd->blocks > BLOCKS_PER_MBLOCK) {
+	    total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
+		* (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
+	}
+    }
+    return total_blocks;
+}
+
 void
 memInventory(void)
 {
-  nat g, s;
+  nat g, s, i;
   step *stp;
   bdescr *bd;
   lnat total_blocks = 0, free_blocks = 0;
@@ -817,24 +892,19 @@ memInventory(void)
 	  total_blocks += bd->blocks;
       }
       for (s = 0; s < generations[g].n_steps; s++) {
+	  if (g==0 && s==0) continue;
 	  stp = &generations[g].steps[s];
-	  total_blocks += stp->n_blocks;
-	  if (RtsFlags.GcFlags.generations == 1) {
-	      /* two-space collector has a to-space too :-) */
-	      total_blocks += g0s0->n_to_blocks;
-	  }
-	  for (bd = stp->large_objects; bd; bd = bd->link) {
-	      total_blocks += bd->blocks;
-	      /* hack for megablock groups: they have an extra block or two in
-		 the second and subsequent megablocks where the block
-		 descriptors would normally go.
-	      */
-	      if (bd->blocks > BLOCKS_PER_MBLOCK) {
-		  total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
-		      * (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
-	      }
-	  }
+	  total_blocks += stepBlocks(stp);
       }
+  }
+
+  for (i = 0; i < n_nurseries; i++) {
+      total_blocks += stepBlocks(&nurseries[i]);
+  }
+
+  if (RtsFlags.GcFlags.generations == 1) {
+      /* two-space collector has a to-space too :-) */
+      total_blocks += g0s0->n_to_blocks;
   }
 
   /* any blocks held by allocate() */
@@ -888,11 +958,11 @@ checkSanity( void )
 	
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 	    for (s = 0; s < generations[g].n_steps; s++) {
+		if (g == 0 && s == 0) { continue; }
 		ASSERT(countBlocks(generations[g].steps[s].blocks)
 		       == generations[g].steps[s].n_blocks);
 		ASSERT(countBlocks(generations[g].steps[s].large_objects)
 		       == generations[g].steps[s].n_large_blocks);
-		if (g == 0 && s == 0) { continue; }
 		checkHeap(generations[g].steps[s].blocks);
 		checkChain(generations[g].steps[s].large_objects);
 		if (g > 0) {
@@ -900,6 +970,14 @@ checkSanity( void )
 		}
 	    }
 	}
+
+	for (s = 0; s < n_nurseries; s++) {
+	    ASSERT(countBlocks(generations[g].steps[s].blocks)
+		   == generations[g].steps[s].n_blocks);
+	    ASSERT(countBlocks(generations[g].steps[s].large_objects)
+		   == generations[g].steps[s].n_large_blocks);
+	}
+	    
 	checkFreeListSanity();
     }
 }

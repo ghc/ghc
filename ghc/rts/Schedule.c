@@ -1466,13 +1466,12 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    if (cap->r.rCurrentNursery->u.back != NULL) {
 		cap->r.rCurrentNursery->u.back->link = bd;
 	    } else {
-#ifdef SMP
-		cap->r.rNursery = g0s0->blocks = bd;
-#else
+#if !defined(SMP)
 		ASSERT(g0s0->blocks == cap->r.rCurrentNursery &&
 		       g0s0->blocks == cap->r.rNursery);
-		cap->r.rNursery = g0s0->blocks = bd;
+		g0s0->blocks = bd;
 #endif
+		cap->r.rNursery = bd;
 	    }		  
 	    cap->r.rCurrentNursery->u.back = bd;
 	    

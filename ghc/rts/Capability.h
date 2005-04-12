@@ -23,6 +23,9 @@
 #ifndef __CAPABILITY_H__
 #define __CAPABILITY_H__
 
+// All the capabilities
+extern Capability *capabilities;
+
 // Initialised the available capabilities.
 //
 extern void initCapabilities( void );

@@ -47,6 +47,12 @@
 
 #include <string.h>
 
+// Turn off inlining when debugging - it obfuscates things
+#ifdef DEBUG
+# undef  STATIC_INLINE
+# define STATIC_INLINE static
+#endif
+
 /* STATIC OBJECT LIST.
  *
  * During GC:
@@ -978,7 +984,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
       }
     }
-    resizeNursery(blocks);
+    resizeNurseries(blocks);
     
   } else {
     /* Generational collector:
@@ -995,7 +1001,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
        * percentage of g0s0 that was live at the last minor GC.
        */
       if (N == 0) {
-	g0s0_pcnt_kept = (new_blocks * 100) / g0s0->n_blocks;
+	g0s0_pcnt_kept = (new_blocks * 100) / countNurseryBlocks();
       }
 
       /* Estimate a size for the allocation area based on the
@@ -1018,12 +1024,12 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	blocks = RtsFlags.GcFlags.minAllocAreaSize;
       }
       
-      resizeNursery((nat)blocks);
+      resizeNurseries((nat)blocks);
 
     } else {
       // we might have added extra large blocks to the nursery, so
       // resize back to minAllocAreaSize again.
-      resizeNursery(RtsFlags.GcFlags.minAllocAreaSize);
+      resizeNurseries(RtsFlags.GcFlags.minAllocAreaSize);
     }
   }
 
@@ -3938,7 +3944,7 @@ threadLazyBlackHole(StgTSO *tso)
 	    
 	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);
+		debugBelch("Unexpected lazy BHing required at 0x%04x\n",(int)bh);
 #endif
 #ifdef PROFILING
 		// @LDV profiling

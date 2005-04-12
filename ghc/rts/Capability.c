@@ -27,6 +27,7 @@
 Capability MainCapability;     /* for non-SMP, we have one global capability */
 #endif
 
+Capability *capabilities = NULL;
 nat rts_n_free_capabilities;
 
 #if defined(RTS_SUPPORTS_THREADS)
@@ -105,35 +106,6 @@ initCapability( Capability *cap )
     cap->f.stgGCFun        = (F_)__stg_gc_fun;
 }
 
-/* -----------------------------------------------------------------------------
- * Function: initCapabilities_(nat)
- *
- * Purpose:  upon startup, allocate and fill in table
- *           holding 'n' Capabilities. Only for SMP, since
- *           it is the only build that supports multiple
- *           capabilities within the RTS.
- * -------------------------------------------------------------------------- */
-#if defined(SMP)
-static void
-initCapabilities_(nat n)
-{
-  nat i;
-  Capability *cap, *prev;
-  cap  = NULL;
-  prev = NULL;
-  for (i = 0; i < n; i++) {
-    cap = stgMallocBytes(sizeof(Capability), "initCapabilities");
-    initCapability(cap);
-    cap->link = prev;
-    prev = cap;
-  }
-  free_capabilities = cap;
-  rts_n_free_capabilities = n;
-  IF_DEBUG(scheduler,
-	   sched_belch("allocated %d capabilities", rts_n_free_capabilities));
-}
-#endif /* SMP */
-
 /* ---------------------------------------------------------------------------
  * Function:  initCapabilities()
  *
@@ -146,17 +118,31 @@ void
 initCapabilities( void )
 {
 #if defined(SMP)
-  initCapabilities_(RtsFlags.ParFlags.nNodes);
+    nat i,n;
+
+    n = RtsFlags.ParFlags.nNodes;
+    capabilities = stgMallocBytes(n * sizeof(Capability), "initCapabilities");
+
+    for (i = 0; i < n; i++) {
+	initCapability(&capabilities[i]);
+	capabilities[i].link = &capabilities[i+1];
+    }
+    capabilities[n-1].link = NULL;
+    
+    free_capabilities = &capabilities[0];
+    rts_n_free_capabilities = n;
+
+    IF_DEBUG(scheduler, sched_belch("allocated %d capabilities", n));
 #else
-  initCapability(&MainCapability);
+    capabilities = &MainCapability;
+    initCapability(&MainCapability);
+    rts_n_free_capabilities = 1;
 #endif
 
 #if defined(RTS_SUPPORTS_THREADS)
-  initCondition(&returning_worker_cond);
-  initCondition(&thread_ready_cond);
+    initCondition(&returning_worker_cond);
+    initCondition(&thread_ready_cond);
 #endif
-
-  rts_n_free_capabilities = 1;
 }
 
 /* ----------------------------------------------------------------------------

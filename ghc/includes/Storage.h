@@ -50,12 +50,12 @@
  *
  * ------------------------------------------------------------------------- */
 
-typedef struct _step {
+typedef struct step_ {
   unsigned int         no;		/* step number */
   bdescr *             blocks;		/* blocks in this step */
   unsigned int         n_blocks;	/* number of blocks */
-  struct _step *       to;		/* destination step for live objects */
-  struct _generation * gen;		/* generation this step belongs to */
+  struct step_ *       to;		/* destination step for live objects */
+  struct generation_ * gen;		/* generation this step belongs to */
   unsigned int         gen_no;          /* generation number (cached) */
   bdescr *             large_objects;	/* large objects (doubly linked) */
   unsigned int         n_large_blocks;  /* no. of blocks used by large objs */
@@ -75,7 +75,7 @@ typedef struct _step {
   bdescr *     bitmap;  		/* bitmap for compacting collection */
 } step;
 
-typedef struct _generation {
+typedef struct generation_ {
   unsigned int   no;			/* generation number */
   step *         steps;			/* steps */
   unsigned int   n_steps;		/* number of steps */
@@ -332,11 +332,11 @@ INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
    Nursery manipulation
    -------------------------------------------------------------------------- */
 
-extern void     allocNurseries ( void );
-extern void     resetNurseries ( void );
-extern bdescr * allocNursery   ( bdescr *last_bd, nat blocks );
-extern void     resizeNursery  ( nat blocks );
-extern void     tidyAllocateLists ( void );
+extern void     allocNurseries     ( void );
+extern void     resetNurseries     ( void );
+extern void     resizeNurseries    ( nat blocks );
+extern void     tidyAllocateLists  ( void );
+extern lnat     countNurseryBlocks ( void );
 
 /* -----------------------------------------------------------------------------
    Functions from GC.c 

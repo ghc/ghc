@@ -86,7 +86,7 @@ typedef struct StgRegTable_ {
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
   struct StgTSO_ *rCurrentTSO;
-  struct bdescr_ *rNursery;
+  struct step_   *rNursery;
   struct bdescr_ *rCurrentNursery;
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
 #if defined(SMP) || defined(PAR)
