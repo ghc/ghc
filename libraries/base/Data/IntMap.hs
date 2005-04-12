@@ -296,11 +296,11 @@ singleton k x
 
 {--------------------------------------------------------------------
   Insert
-  'insert' is the inlined version of 'insertWith (\k x y -> x)'
 --------------------------------------------------------------------}
--- | /O(min(n,W))/. Insert a new key\/value pair in the map. When the key 
--- is already an element of the set, its value is replaced by the new value, 
--- ie. 'insert' is left-biased.
+-- | /O(min(n,W))/. Insert a new key\/value pair in the map.
+-- If the key is already present in the map, the associated value is
+-- replaced with the supplied value, i.e. 'insert' is equivalent to
+-- @'insertWith' 'const'@.
 insert :: Key -> a -> IntMap a -> IntMap a
 insert k x t
   = case t of
@@ -432,7 +432,9 @@ unionsWith :: (a->a->a) -> [IntMap a] -> IntMap a
 unionsWith f ts
   = foldlStrict (unionWith f) empty ts
 
--- | /O(n+m)/. The (left-biased) union of two sets. 
+-- | /O(n+m)/. The (left-biased) union of two maps. 
+-- It prefers the first map when duplicate keys are encountered,
+-- i.e. (@'union' == 'unionWith' 'const'@).
 union :: IntMap a -> IntMap a -> IntMap a
 union t1@(Bin p1 m1 l1 r1) t2@(Bin p2 m2 l2 r2)
   | shorter m1 m2  = union1

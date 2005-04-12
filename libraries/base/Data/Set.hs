@@ -207,6 +207,8 @@ singleton x
   Insertion, Deletion
 --------------------------------------------------------------------}
 -- | /O(log n)/. Insert an element in a set.
+-- If the set already contains an element equal to the given value,
+-- it is replaced with the new value.
 insert :: Ord a => a -> Set a -> Set a
 insert x t
   = case t of
@@ -289,7 +291,9 @@ unions ts
   = foldlStrict union empty ts
 
 
--- | /O(n+m)/. The union of two sets. Uses the efficient /hedge-union/ algorithm.
+-- | /O(n+m)/. The union of two sets, preferring the first set when
+-- equal elements are encountered.
+-- The implementation uses the efficient /hedge-union/ algorithm.
 -- Hedge-union is more efficient on (bigset `union` smallset).
 union :: Ord a => Set a -> Set a -> Set a
 union Tip t2  = t2

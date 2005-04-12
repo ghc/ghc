@@ -278,9 +278,11 @@ singleton k x
 
 {--------------------------------------------------------------------
   Insertion
-  [insert] is the inlined version of [insertWith (\k x y -> x)]
 --------------------------------------------------------------------}
 -- | /O(log n)/. Insert a new key and value in the map.
+-- If the key is already present in the map, the associated value is
+-- replaced with the supplied value, i.e. 'insert' is equivalent to
+-- @'insertWith' 'const'@.
 insert :: Ord k => k -> a -> Map k a -> Map k a
 insert kx x t
   = case t of
