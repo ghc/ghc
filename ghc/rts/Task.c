@@ -82,7 +82,7 @@ stopTaskManager (void)
 	prodWorker();
 	yieldThread();
     }
-    errorBelch("%d tasks still running, exiting anyway", tasksRunning);
+    IF_DEBUG(scheduler, sched_belch("%d tasks still running, exiting anyway", tasksRunning));
 
     /* 
        OLD CODE follows:
