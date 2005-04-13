@@ -3917,6 +3917,25 @@ condIntReg cond x y = do
   -- in
   return (Any I32 code)
 
+#endif
+
+#if i386_TARGET_ARCH
+
+condFltReg cond x y = do
+  CondCode _ cond cond_code <- condFltCode cond x y
+  tmp <- getNewRegNat I8
+  let 
+	code dst = cond_code `appOL` toOL [
+		    SETCC cond (OpReg tmp),
+		    MOVZxL I8 (OpReg tmp) (OpReg dst)
+		  ]
+  -- in
+  return (Any I32 code)
+
+#endif
+
+#if x86_64_TARGET_ARCH
+
 condFltReg cond x y = do
   CondCode _ cond cond_code <- condFltCode cond x y
   tmp1 <- getNewRegNat wordRep
@@ -3962,6 +3981,7 @@ condFltReg cond x y = do
 		  ]
   -- in
   return (Any I32 code)
+
 #endif
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
