@@ -137,7 +137,9 @@ data HscResult
    = HscFail
 
    -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked (Located (HsModule RdrName)) (Maybe (LHsBinds Id, GlobalRdrEnv))
+   | HscChecked 
+	(Located (HsModule RdrName))
+	(Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -318,10 +320,19 @@ hscFileCheck hsc_env msg_act mod_summary = do {
 	; msg_act tc_msgs
 	; case maybe_tc_result of {
       	     Nothing -> return (HscChecked rdr_module Nothing);
-      	     Just tc_result -> return (HscChecked rdr_module 
+      	     Just tc_result -> do
+		let md = ModDetails { 
+				md_types   = tcg_type_env tc_result,
+				md_exports = tcg_exports  tc_result,
+				md_insts   = tcg_insts    tc_result,
+				md_rules   = [panic "no rules"] }
+				   -- rules are IdCoreRules, not the
+				   -- RuleDecls we get out of the typechecker
+		return (HscChecked rdr_module 
 					(Just (tcg_binds tc_result,
-					       tcg_rdr_env tc_result)))
-	}}}}    
+					       tcg_rdr_env tc_result,
+					       md)))
+	}}}}
 
 ------------------------------
 hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
@@ -334,9 +345,10 @@ hscBootBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 			 mkIface hsc_env (ms_location mod_summary)
                          	 maybe_checked_iface ds_result
 
-	; let { final_details = ModDetails { md_types = mg_types ds_result,
-					     md_insts = mg_insts ds_result,
-					     md_rules = mg_rules ds_result } }
+	; let { final_details = ModDetails { md_types   = mg_types ds_result,
+					     md_exports = mg_exports ds_result,
+					     md_insts   = mg_insts ds_result,
+					     md_rules   = mg_rules ds_result } }
       	  -- And the answer is ...
 	; dumpIfaceStats hsc_env
 
@@ -429,9 +441,10 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 	; final_details <- 
 	     if one_shot then return (error "no final details")
 		 	 else return $! ModDetails { 
-					   md_types = mg_types tidy_result,
-					   md_insts = mg_insts tidy_result,
-					   md_rules = mg_rules tidy_result }
+					   md_types   = mg_types tidy_result,
+					   md_exports = mg_exports tidy_result,
+					   md_insts   = mg_insts tidy_result,
+					   md_rules   = mg_rules tidy_result }
 
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION

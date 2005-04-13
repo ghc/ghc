@@ -360,11 +360,13 @@ data ModDetails
    = ModDetails {
 	-- The next three fields are created by the typechecker
         md_types    :: !TypeEnv,
+	md_exports  :: NameSet,
         md_insts    :: ![DFunId],	-- Dfun-ids for the instances in this module
         md_rules    :: ![IdCoreRule]	-- Domain may include Ids from other modules
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
+			       md_exports = emptyNameSet,
 			       md_insts = [],
 			       md_rules = [] }
 

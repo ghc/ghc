@@ -34,6 +34,7 @@ module GHC (
 	depanal,
 	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
 	workingDirectoryChanged,
+	checkModule, CheckedModule(..),
 
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..),
@@ -45,13 +46,14 @@ module GHC (
 	ModuleInfo,
 	getModuleInfo,
 	modInfoTyThings,
+	modInfoTopLevelScope,
 	lookupName,
-	allNamesInScope,
 
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
 #ifdef GHCI
 	setContext, getContext,	
+	getNamesInScope,
 	moduleIsInterpreted,
 	getInfo, GetInfoResult,
 	exprType,
@@ -136,6 +138,7 @@ import IfaceSyn		( IfaceDecl )
 #endif
 
 import Packages		( initPackages )
+import NameSet		( NameSet, nameSetToList )
 import RdrName		( GlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds )
 import Type		( Kind, Type, dropForAlls )
@@ -392,6 +395,7 @@ data ErrMsg = ErrMsg {
 data LoadHowMuch
    = LoadAllTargets
    | LoadUpTo Module
+   | LoadDependenciesOf Module
 
 -- | Try to load the program.  If a Module is supplied, then just
 -- attempt to load up to this target.  If no Module is supplied,
@@ -475,11 +479,23 @@ load s@(Session ref) how_much
 
 	    maybe_top_mod = case how_much of
 				LoadUpTo m           -> Just m
+			  	LoadDependenciesOf m -> Just m
 			  	_		     -> Nothing
 
-	    partial_mg :: [SCC ModSummary]
-	    partial_mg = topSortModuleGraph False mod_graph maybe_top_mod
+	    partial_mg0 :: [SCC ModSummary]
+	    partial_mg0 = topSortModuleGraph False mod_graph maybe_top_mod
 
+	    -- LoadDependenciesOf m: we want the upsweep to stop just
+	    -- short of the specified module (unless the specified module
+	    -- is stable).
+	    partial_mg
+		| LoadDependenciesOf mod <- how_much
+		= ASSERT( case last partial_mg0 of 
+			    AcyclicSCC ms -> ms_mod ms == mod; _ -> False )
+		  List.init partial_mg0
+		| otherwise
+		= partial_mg0
+  
 	    stable_mg = 
 		[ AcyclicSCC ms
 	        | AcyclicSCC ms <- full_mg,
@@ -599,7 +615,53 @@ discardProg hsc_env
 -- source file, but that doesn't do any harm.
 ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
 
------------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- Check module
+
+data CheckedModule = 
+  CheckedModule { parsedSource      :: ParsedSource,
+		-- ToDo: renamedSource
+		  typecheckedSource :: Maybe TypecheckedSource,
+		  checkedModuleInfo :: Maybe ModuleInfo
+	        }
+
+type ParsedSource  = Located (HsModule RdrName)
+type TypecheckedSource = LHsBinds Id
+
+-- | This is the way to get access to parsed and typechecked source code
+-- for a module.  'checkModule' loads all the dependencies of the specified
+-- module in the Session, and then attempts to typecheck the module.  If
+-- successful, it returns the abstract syntax for the module.
+checkModule :: Session -> Module -> (Messages -> IO ()) 
+	-> IO (Maybe CheckedModule)
+checkModule session@(Session ref) mod msg_act = do
+	-- load up the dependencies first
+   r <- load session (LoadDependenciesOf mod)
+   if (failed r) then return Nothing else do
+
+	-- now parse & typecheck the module
+   hsc_env <- readIORef ref   
+   let mg  = hsc_mod_graph hsc_env
+   case [ ms | ms <- mg, ms_mod ms == mod ] of
+	[] -> return Nothing
+	(ms:_) -> do 
+	   r <- hscFileCheck hsc_env msg_act ms
+	   case r of
+		HscFail -> 
+		   return Nothing
+		HscChecked parsed Nothing ->
+		   return (Just (CheckedModule parsed Nothing Nothing))
+		HscChecked parsed (Just (tc_binds, rdr_env, details)) -> do
+		   let minf = ModuleInfo {
+				minf_details  = details,
+				minf_rdr_env  = Just rdr_env
+			      }
+		   return (Just (CheckedModule {
+					parsedSource = parsed,
+					typecheckedSource = Just tc_binds,
+					checkedModuleInfo = Just minf }))
+
+-- ---------------------------------------------------------------------------
 -- Unloading
 
 unload :: HscEnv -> [Linkable] -> IO ()
@@ -1416,11 +1478,6 @@ parseName s str = withSession s $ \hsc_env -> do
 		-- ToDo: should return error messages
 #endif
 
-allNamesInScope :: Session -> IO [Name]
-allNamesInScope s = withSession s $ \hsc_env -> do
-  eps <- readIORef (hsc_EPS hsc_env)
-  return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
-
 -- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
 -- entity known to GHC, including 'Name's defined using 'runStmt'.
 lookupName :: Session -> Name -> IO (Maybe TyThing)
@@ -1432,7 +1489,10 @@ lookupName s name = withSession s $ \hsc_env -> do
 	    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
 
 -- | Container for information about a 'Module'.
-newtype ModuleInfo = ModuleInfo ModDetails
+data ModuleInfo = ModuleInfo {
+	minf_details  :: ModDetails,
+	minf_rdr_env  :: Maybe GlobalRdrEnv
+  }
 	-- ToDo: this should really contain the ModIface too
 	-- We don't want HomeModInfo here, because a ModuleInfo applies
 	-- to package modules too.
@@ -1442,13 +1502,25 @@ getModuleInfo :: Session -> Module -> IO (Maybe ModuleInfo)
 getModuleInfo s mdl = withSession s $ \hsc_env -> do
   case lookupModuleEnv (hsc_HPT hsc_env) mdl of
     Nothing  -> return Nothing
-    Just hmi -> return (Just (ModuleInfo (hm_details hmi)))
+    Just hmi -> 
+	return (Just (ModuleInfo {
+			minf_details = hm_details hmi,
+			minf_rdr_env = mi_globals $! hm_iface hmi
+			}))
+
 	-- ToDo: we should be able to call getModuleInfo on a package module,
 	-- even one that isn't loaded yet.
 
 -- | The list of top-level entities defined in a module
 modInfoTyThings :: ModuleInfo -> [TyThing]
-modInfoTyThings (ModuleInfo md) = typeEnvElts (md_types md)
+modInfoTyThings minf = typeEnvElts (md_types (minf_details minf))
+
+modInfoTopLevelScope :: ModuleInfo -> Maybe [Name]
+modInfoTopLevelScope minf
+  = fmap (map gre_name . globalRdrEnvElts) (minf_rdr_env minf)
+
+modInfoExports :: ModuleInfo -> [Name]
+modInfoExports minf = nameSetToList $! (md_exports $! minf_details minf)
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id
@@ -1580,6 +1652,11 @@ moduleIsInterpreted s modl = withSession s $ \h ->
 {-# DEPRECATED getInfo "we should be using parseName/lookupName instead" #-}
 getInfo :: Session -> String -> IO [GetInfoResult]
 getInfo s id = withSession s $ \hsc_env -> hscGetInfo hsc_env id
+
+-- | Returns all names in scope in the current interactive context
+getNamesInScope :: Session -> IO [Name]
+getNamesInScope s = withSession s $ \hsc_env -> do
+  return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression
