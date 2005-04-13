@@ -1463,7 +1463,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    } else {
 #if !defined(SMP)
 		ASSERT(g0s0->blocks == cap->r.rCurrentNursery &&
-		       g0s0->blocks == cap->r.rNursery);
+		       g0s0 == cap->r.rNursery);
 		g0s0->blocks = bd;
 #endif
 		cap->r.rNursery->blocks = bd;
