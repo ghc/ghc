@@ -33,6 +33,7 @@ module GHC (
 	-- * Loading\/compiling the program
 	depanal,
 	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
+	loadMsgs,
 	workingDirectoryChanged,
 	checkModule, CheckedModule(..),
 
@@ -401,7 +402,13 @@ data LoadHowMuch
 -- attempt to load up to this target.  If no Module is supplied,
 -- then try to load all targets.
 load :: Session -> LoadHowMuch -> IO SuccessFlag
-load s@(Session ref) how_much
+load session how_much = 
+   loadMsgs session how_much ErrUtils.printErrorsAndWarnings
+
+-- | Version of 'load' that takes a callback function to be invoked
+-- on compiler errors and warnings as they occur during compilation.
+loadMsgs :: Session -> LoadHowMuch -> (Messages-> IO ()) -> IO SuccessFlag
+loadMsgs s@(Session ref) how_much msg_act
    = do 
 	-- Dependency analysis first.  Note that this fixes the module graph:
 	-- even if we don't get a fully successful upsweep, the full module
@@ -511,7 +518,7 @@ load s@(Session ref) how_much
 
         (upsweep_ok, hsc_env1, modsUpswept)
            <- upsweep (hsc_env { hsc_HPT = emptyHomePackageTable })
-			   pruned_hpt stable_mods cleanup mg
+			   pruned_hpt stable_mods cleanup msg_act mg
 
 	-- Make modsDone be the summaries for each home module now
 	-- available; this should equal the domain of hpt3.
@@ -636,7 +643,7 @@ checkModule :: Session -> Module -> (Messages -> IO ())
 	-> IO (Maybe CheckedModule)
 checkModule session@(Session ref) mod msg_act = do
 	-- load up the dependencies first
-   r <- load session (LoadDependenciesOf mod)
+   r <- loadMsgs session (LoadDependenciesOf mod) msg_act
    if (failed r) then return Nothing else do
 
 	-- now parse & typecheck the module
@@ -859,27 +866,28 @@ upsweep
     -> HomePackageTable		-- HPT from last time round (pruned)
     -> ([Module],[Module])	-- stable modules (see checkStability)
     -> IO ()			-- How to clean up unwanted tmp files
+    -> (Messages -> IO ())	-- Compiler error message callback
     -> [SCC ModSummary]		-- Mods to do (the worklist)
     -> IO (SuccessFlag,
            HscEnv,		-- With an updated HPT
            [ModSummary])	-- Mods which succeeded
 
-upsweep hsc_env old_hpt stable_mods cleanup
+upsweep hsc_env old_hpt stable_mods cleanup msg_act
      []
    = return (Succeeded, hsc_env, [])
 
-upsweep hsc_env old_hpt stable_mods cleanup
+upsweep hsc_env old_hpt stable_mods cleanup msg_act
      (CyclicSCC ms:_)
    = do putMsg (showSDoc (cyclicModuleErr ms))
         return (Failed, hsc_env, [])
 
-upsweep hsc_env old_hpt stable_mods cleanup
+upsweep hsc_env old_hpt stable_mods cleanup msg_act
      (AcyclicSCC mod:mods)
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
 	--		       (moduleEnvElts (hsc_HPT hsc_env)))
 
-        mb_mod_info <- upsweep_mod hsc_env old_hpt stable_mods mod 
+        mb_mod_info <- upsweep_mod hsc_env old_hpt stable_mods msg_act mod 
 
 	cleanup		-- Remove unwanted tmp files between compilations
 
@@ -903,7 +911,8 @@ upsweep hsc_env old_hpt stable_mods cleanup
 			       | otherwise = delModuleEnv old_hpt this_mod
 
 		; (restOK, hsc_env2, modOKs) 
-			<- upsweep hsc_env1 old_hpt1 stable_mods cleanup mods
+			<- upsweep hsc_env1 old_hpt1 stable_mods cleanup 
+				msg_act mods
 		; return (restOK, hsc_env2, mod:modOKs)
 		}
 
@@ -913,10 +922,11 @@ upsweep hsc_env old_hpt stable_mods cleanup
 upsweep_mod :: HscEnv
             -> HomePackageTable
 	    -> ([Module],[Module])
+	    -> (Messages -> IO ())
             -> ModSummary
             -> IO (Maybe HomeModInfo)	-- Nothing => Failed
 
-upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary
+upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary
    = do 
         let 
 	    this_mod    = ms_mod summary
@@ -925,7 +935,8 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary
 	    hs_date     = ms_hs_date summary
 
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
-	    compile_it  = upsweep_compile hsc_env old_hpt this_mod summary
+	    compile_it  = upsweep_compile hsc_env old_hpt this_mod 
+				msg_act summary
 
 	case ghcMode (hsc_dflags hsc_env) of
 	    BatchCompile ->
@@ -978,7 +989,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary
 		    old_hmi = lookupModuleEnv old_hpt this_mod
 
 -- Run hsc to compile a module
-upsweep_compile hsc_env old_hpt this_mod summary mb_old_linkable = do
+upsweep_compile hsc_env old_hpt this_mod msg_act summary mb_old_linkable = do
   let
 	-- The old interface is ok if it's in the old HPT 
 	--	a) we're compiling a source file, and the old HPT
@@ -998,7 +1009,7 @@ upsweep_compile hsc_env old_hpt this_mod summary mb_old_linkable = do
 				   where 
 				     iface = hm_iface hm_info
 
-  compresult <- compile hsc_env summary mb_old_linkable mb_old_iface
+  compresult <- compile hsc_env msg_act summary mb_old_linkable mb_old_iface
 
   case compresult of
         -- Compilation failed.  Compile may still have updated the PCS, tho.

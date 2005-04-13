@@ -89,6 +89,7 @@ preprocess dflags filename =
 -- NB.  No old interface can also mean that the source has changed.
 
 compile :: HscEnv
+	-> (Messages -> IO ())	-- error message callback
 	-> ModSummary
 	-> Maybe Linkable	-- Just linkable <=> source unchanged
         -> Maybe ModIface       -- Old interface, if available
@@ -102,7 +103,7 @@ data CompResult
    | CompErrs 
 
 
-compile hsc_env mod_summary maybe_old_linkable old_iface = do 
+compile hsc_env msg_act mod_summary maybe_old_linkable old_iface = do 
 
    let dflags0     = hsc_dflags hsc_env
        this_mod    = ms_mod mod_summary
@@ -157,7 +158,7 @@ compile hsc_env mod_summary maybe_old_linkable old_iface = do
        hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- run the compiler
-   hsc_result <- hscMain hsc_env' printErrorsAndWarnings mod_summary
+   hsc_result <- hscMain hsc_env' msg_act mod_summary
 			 source_unchanged have_object old_iface
 
    case hsc_result of
