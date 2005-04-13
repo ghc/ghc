@@ -1402,7 +1402,7 @@ preprocessFile dflags src_fn (Just (buf, time))
 	when needs_preprocessing $
 	   ghcError (ProgramError "buffer needs preprocesing; interactive check disabled")
 
-	return (dflags', "<buffer>", buf)
+	return (dflags', src_fn, buf)
 
 
 -----------------------------------------------------------------------------
