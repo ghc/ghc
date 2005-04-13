@@ -872,22 +872,26 @@ upsweep
            HscEnv,		-- With an updated HPT
            [ModSummary])	-- Mods which succeeded
 
+upsweep hsc_env old_hpt stable_mods cleanup msg_act mods
+   = upsweep' hsc_env old_hpt stable_mods cleanup msg_act mods 1 (length mods)
+
 upsweep hsc_env old_hpt stable_mods cleanup msg_act
-     []
+     [] _ _
    = return (Succeeded, hsc_env, [])
 
 upsweep hsc_env old_hpt stable_mods cleanup msg_act
-     (CyclicSCC ms:_)
+     (CyclicSCC ms:_) _ _
    = do putMsg (showSDoc (cyclicModuleErr ms))
         return (Failed, hsc_env, [])
 
 upsweep hsc_env old_hpt stable_mods cleanup msg_act
-     (AcyclicSCC mod:mods)
+     (AcyclicSCC mod:mods) mod_index nmods
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
 	--		       (moduleEnvElts (hsc_HPT hsc_env)))
 
         mb_mod_info <- upsweep_mod hsc_env old_hpt stable_mods msg_act mod 
+                       mod_index nmods
 
 	cleanup		-- Remove unwanted tmp files between compilations
 
@@ -912,7 +916,7 @@ upsweep hsc_env old_hpt stable_mods cleanup msg_act
 
 		; (restOK, hsc_env2, modOKs) 
 			<- upsweep hsc_env1 old_hpt1 stable_mods cleanup 
-				msg_act mods
+				msg_act mods (mod_index+1) nmods
 		; return (restOK, hsc_env2, mod:modOKs)
 		}
 
@@ -924,9 +928,11 @@ upsweep_mod :: HscEnv
 	    -> ([Module],[Module])
 	    -> (Messages -> IO ())
             -> ModSummary
+            -> Int  -- index of module
+            -> Int  -- total number of modules
             -> IO (Maybe HomeModInfo)	-- Nothing => Failed
 
-upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary
+upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary mod_index nmods
    = do 
         let 
 	    this_mod    = ms_mod summary
@@ -936,7 +942,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary
 
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
 	    compile_it  = upsweep_compile hsc_env old_hpt this_mod 
-				msg_act summary
+				msg_act summary mod_index nmods
 
 	case ghcMode (hsc_dflags hsc_env) of
 	    BatchCompile ->
@@ -989,7 +995,9 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary
 		    old_hmi = lookupModuleEnv old_hpt this_mod
 
 -- Run hsc to compile a module
-upsweep_compile hsc_env old_hpt this_mod msg_act summary mb_old_linkable = do
+upsweep_compile hsc_env old_hpt this_mod msg_act summary
+                mod_index nmods
+                mb_old_linkable = do
   let
 	-- The old interface is ok if it's in the old HPT 
 	--	a) we're compiling a source file, and the old HPT
@@ -1010,6 +1018,7 @@ upsweep_compile hsc_env old_hpt this_mod msg_act summary mb_old_linkable = do
 				     iface = hm_iface hm_info
 
   compresult <- compile hsc_env msg_act summary mb_old_linkable mb_old_iface
+                        mod_index nmods
 
   case compresult of
         -- Compilation failed.  Compile may still have updated the PCS, tho.

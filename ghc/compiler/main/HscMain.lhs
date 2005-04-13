@@ -166,10 +166,12 @@ hscMain
   -> Bool		-- True <=> source unchanged
   -> Bool		-- True <=> have an object file (for msgs only)
   -> Maybe ModIface	-- Old interface, if available
+  -> Maybe (Int, Int)   -- Just (i,n) <=> module i of n (for msgs)
   -> IO HscResult
 
 hscMain hsc_env msg_act mod_summary
 	source_unchanged have_object maybe_old_iface
+        mb_mod_index
  = do {
       (recomp_reqd, maybe_checked_iface) <- 
 		{-# SCC "checkOldIface" #-}
@@ -182,6 +184,7 @@ hscMain hsc_env msg_act mod_summary
 
       ; what_next hsc_env msg_act mod_summary have_object 
 		  maybe_checked_iface
+                  mb_mod_index
       }
 
 
@@ -189,6 +192,7 @@ hscMain hsc_env msg_act mod_summary
 -- hscNoRecomp definitely expects to have the old interface available
 hscNoRecomp hsc_env msg_act mod_summary 
 	    have_object (Just old_iface)
+            mb_mod_index
  | isOneShot (ghcMode (hsc_dflags hsc_env))
  = do {
       compilationProgressMsg (hsc_dflags hsc_env) $
@@ -200,7 +204,8 @@ hscNoRecomp hsc_env msg_act mod_summary
       }
  | otherwise
  = do	{ compilationProgressMsg (hsc_dflags hsc_env) $
-		("Skipping  " ++ showModMsg have_object mod_summary)
+		(showModuleIndex mb_mod_index ++ 
+                 "Skipping  " ++ showModMsg have_object mod_summary)
 
 	; new_details <- {-# SCC "tcRnIface" #-}
 		     typecheckIface hsc_env old_iface ;
@@ -212,13 +217,14 @@ hscNoRecomp hsc_env msg_act mod_summary
 ------------------------------
 hscRecomp hsc_env msg_act mod_summary
 	  have_object maybe_checked_iface
+          mb_mod_index
  = case ms_hsc_src mod_summary of
      HsSrcFile -> do 
-	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
+	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index
 	hscBackEnd hsc_env mod_summary maybe_checked_iface front_res
 
      HsBootFile -> do
-	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary
+	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index
 	hscBootBackEnd hsc_env mod_summary maybe_checked_iface front_res
 
      ExtCoreFile -> do
@@ -246,7 +252,7 @@ hscCoreFrontEnd hsc_env msg_act mod_summary = do {
 	}}
 	 
 
-hscFileFrontEnd hsc_env msg_act mod_summary = do {
+hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
  	    -------------------
  	    -- DISPLAY PROGRESS MESSAGE
  	    -------------------
@@ -255,7 +261,8 @@ hscFileFrontEnd hsc_env msg_act mod_summary = do {
 	; let toInterp  = hscTarget dflags == HscInterpreted
       	; when (not one_shot) $
 		 compilationProgressMsg dflags $
-		 ("Compiling " ++ showModMsg (not toInterp) mod_summary)
+		 (showModuleIndex mb_mod_index ++
+                  "Compiling " ++ showModMsg (not toInterp) mod_summary)
 			
  	    -------------------
  	    -- PARSE
@@ -801,3 +808,19 @@ dumpIfaceStats hsc_env
     dump_rn_stats = dopt Opt_D_dump_rn_stats dflags
     dump_if_trace = dopt Opt_D_dump_if_trace dflags
 \end{code}
+
+%************************************************************************
+%*									*
+	Progress Messages: Module i of n
+%*									*
+%************************************************************************
+
+\begin{code}
+showModuleIndex Nothing = ""
+showModuleIndex (Just (i,n)) = "[" ++ padded ++ " of " ++ n_str ++ "] "
+    where
+        n_str = show n
+        i_str = show i
+        padded = replicate (length n_str - length i_str) ' ' ++ i_str
+\end{code}
+

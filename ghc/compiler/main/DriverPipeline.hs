@@ -93,6 +93,7 @@ compile :: HscEnv
 	-> ModSummary
 	-> Maybe Linkable	-- Just linkable <=> source unchanged
         -> Maybe ModIface       -- Old interface, if available
+        -> Int -> Int
         -> IO CompResult
 
 data CompResult
@@ -103,7 +104,7 @@ data CompResult
    | CompErrs 
 
 
-compile hsc_env msg_act mod_summary maybe_old_linkable old_iface = do 
+compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods = do 
 
    let dflags0     = hsc_dflags hsc_env
        this_mod    = ms_mod mod_summary
@@ -160,6 +161,7 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface = do
    -- run the compiler
    hsc_result <- hscMain hsc_env' msg_act mod_summary
 			 source_unchanged have_object old_iface
+                         (Just (mod_index, nmods))
 
    case hsc_result of
       HscFail -> return CompErrs
@@ -702,6 +704,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			  mod_summary source_unchanged 
 			  False		-- No object file
 			  Nothing	-- No iface
+                          Nothing       -- No "module i of n" progress info
 
 	case result of
 
