@@ -77,7 +77,7 @@ onIOComplete(unsigned int reqID,
 	issued_reqs--;
 	if (completed_hw == 1) {
 	    /* The event is used to wake up the scheduler thread should it
-	     * be blocked waiting for requests to complete. It reset once
+	     * be blocked waiting for requests to complete. The event resets once
 	     * that thread has cleared out the request queue/table.
 	     */
 	    SetEvent(completed_req_event);
@@ -204,6 +204,11 @@ start:
 	    case WAIT_OBJECT_0 + 1:
 	    case WAIT_TIMEOUT:
 		return 0;
+	    case WAIT_FAILED: {
+		DWORD dw = GetLastError();
+		fprintf(stderr, "awaitRequests: wait failed -- error code: %lu\n", dw); fflush(stderr);
+		return 0;
+	    }
 	    default:
 		fprintf(stderr, "awaitRequests: unexpected wait return code %lu\n", dwRes); fflush(stderr);
 		return 0;
@@ -228,7 +233,6 @@ start:
 	     *
 	     */
 	    unsigned int rID = completedTable[i].reqID;
-	    prev = NULL;
 	    
 	    prev = NULL;
 	    for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; prev = tso, tso = tso->link) {

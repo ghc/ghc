@@ -57,8 +57,13 @@ TimerProc(PVOID param)
       /* tick */
       tickProc(0);
       break;
+    case WAIT_FAILED: {
+	DWORD dw = GetLastError();
+	fprintf(stderr, "TimerProc: wait failed -- error code: %lu\n", dw); fflush(stderr);
+	break; 
+    }
     default:
-      fprintf(stderr, "timer: unexpected result %lu\n", waitRes); fflush(stderr);
+      fprintf(stderr, "TimerProc: unexpected result %lu\n", waitRes); fflush(stderr);
       break;
     }
   }
