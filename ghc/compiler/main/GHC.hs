@@ -875,16 +875,16 @@ upsweep
 upsweep hsc_env old_hpt stable_mods cleanup msg_act mods
    = upsweep' hsc_env old_hpt stable_mods cleanup msg_act mods 1 (length mods)
 
-upsweep hsc_env old_hpt stable_mods cleanup msg_act
+upsweep' hsc_env old_hpt stable_mods cleanup msg_act
      [] _ _
    = return (Succeeded, hsc_env, [])
 
-upsweep hsc_env old_hpt stable_mods cleanup msg_act
+upsweep' hsc_env old_hpt stable_mods cleanup msg_act
      (CyclicSCC ms:_) _ _
    = do putMsg (showSDoc (cyclicModuleErr ms))
         return (Failed, hsc_env, [])
 
-upsweep hsc_env old_hpt stable_mods cleanup msg_act
+upsweep' hsc_env old_hpt stable_mods cleanup msg_act
      (AcyclicSCC mod:mods) mod_index nmods
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
@@ -915,7 +915,7 @@ upsweep hsc_env old_hpt stable_mods cleanup msg_act
 			       | otherwise = delModuleEnv old_hpt this_mod
 
 		; (restOK, hsc_env2, modOKs) 
-			<- upsweep hsc_env1 old_hpt1 stable_mods cleanup 
+			<- upsweep' hsc_env1 old_hpt1 stable_mods cleanup 
 				msg_act mods (mod_index+1) nmods
 		; return (restOK, hsc_env2, mod:modOKs)
 		}
