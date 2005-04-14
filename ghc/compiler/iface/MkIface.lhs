@@ -1020,7 +1020,7 @@ checkList (check:checks) = check	`thenM` \ recompile ->
 
 \begin{code}
 showIface :: FilePath -> IO ()
--- Raad binary interface, and print it out
+-- Read binary interface, and print it out
 showIface filename = do
    -- skip the version check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
