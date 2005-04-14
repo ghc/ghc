@@ -3,7 +3,7 @@
 module RebindableCase1 where
 	{
 --	import Prelude;
-	import Prelude(String,undefined,Maybe(..));
+	import Prelude(String,undefined,Maybe(..), (==), (>=) );
 
 	return :: a;
 	return = undefined;

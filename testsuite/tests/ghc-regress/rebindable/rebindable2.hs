@@ -4,7 +4,8 @@ module Main where
 	{
 --	import Prelude;
 	import qualified Prelude;
-	import Prelude(String,undefined,Maybe(..),IO,putStrLn,Integer,(++),Rational);
+	import Prelude(String,undefined,Maybe(..),IO,putStrLn,
+		Integer,(++),Rational, (==), (>=) );
 	
 	import Prelude(Monad(..));
 
