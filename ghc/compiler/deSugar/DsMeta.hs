@@ -514,13 +514,13 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 -- FIXME: I haven't got the types here right yet
 repE (HsDo DoExpr sts body ty) 
  = do { (ss,zs) <- repLSts sts; 
-	body'	<- repLE body;
+	body'	<- addBinds ss $ repLE body;
 	ret	<- repNoBindSt body';	
         e       <- repDoE (nonEmptyCoreList (zs ++ [ret]));
         wrapGenSyns ss e }
 repE (HsDo ListComp sts body ty) 
  = do { (ss,zs) <- repLSts sts; 
-	body'	<- repLE body;
+	body'	<- addBinds ss $ repLE body;
 	ret	<- repNoBindSt body';	
         e       <- repComp (nonEmptyCoreList (zs ++ [ret]));
         wrapGenSyns ss e }
@@ -610,7 +610,7 @@ repGuards other
                   return ([], x) }
     process (L _ (GRHS ss rhs))
            = do (gs, ss') <- repLSts ss
-		rhs' <- repLE rhs
+		rhs' <- addBinds gs $ repLE rhs
                 g <- repPatGE (nonEmptyCoreList ss') rhs'
                 return (gs, g)
 
@@ -669,7 +669,7 @@ repSts (ExprStmt e _ _ : ss) =
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
-repSts [] = panic "repSts ran out of statements"      
+repSts [] = return ([],[])
 repSts other = panic "Exotic Stmt in meta brackets"      
 
 
