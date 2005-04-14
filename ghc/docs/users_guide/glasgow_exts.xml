@@ -3180,7 +3180,7 @@ classes <literal>Eq</literal>, <literal>Ord</literal>,
 GHC extends this list with two more classes that may be automatically derived 
 (provided the <option>-fglasgow-exts</option> flag is specified):
 <literal>Typeable</literal>, and <literal>Data</literal>.  These classes are defined in the library
-modules <literal>Data.Dynamic</literal> and <literal>Data.Generics</literal> respectively, and the
+modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively, and the
 appropriate class must be in scope before it can be mentioned in the <literal>deriving</literal> clause.
 </para>
 </sect2>
@@ -3807,7 +3807,7 @@ proc x -> f x -&lt;&lt; x+1
 </screen>
 which is equivalent to
 <screen>
-arr (\ x -> (f, x+1)) >>> app
+arr (\ x -> (f x, x+1)) >>> app
 </screen>
 so in this case the arrow must belong to the <literal>ArrowApply</literal>
 class.
