@@ -49,7 +49,11 @@ int main(int argc, char *argv[])
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
+#if defined(PROFILING)
     startupHaskell(argc,argv,__stginit_ZCMain);
+#else
+    startupHaskell(argc,argv,NULL);
+#endif
 
     /* Register this thread as a task, so we can get timing stats about it */
 #if defined(RTS_SUPPORTS_THREADS)

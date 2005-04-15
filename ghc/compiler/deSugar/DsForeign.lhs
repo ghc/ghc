@@ -530,6 +530,19 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
           Nothing -> empty
           Just hs_fn -> text "extern StgClosure " <> ppr hs_fn <> text "_closure" <> semi
 
+  initialiser
+     = case maybe_target of
+          Nothing -> empty
+          Just hs_fn ->
+            vcat
+             [ text "static void stginit_export_" <> ppr hs_fn
+                  <> text "() __attribute__((constructor));"
+             , text "static void stginit_export_" <> ppr hs_fn <> text "()"
+             , braces (text "getStablePtr"
+                <> parens (text "(StgPtr) &" <> ppr hs_fn <> text "_closure")
+                <> semi)
+             ]
+
   -- finally, the whole darn thing
   c_bits =
     space $$
@@ -560,7 +573,8 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   if res_hty_is_unit then empty
             else text "return cret;"
      , rbrace
-     ]
+     ] $$
+    initialiser
 
 -- NB. the calculation here isn't strictly speaking correct.
 -- We have a primitive Haskell type (eg. Int#, Double#), and

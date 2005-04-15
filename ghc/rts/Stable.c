@@ -137,6 +137,9 @@ initStablePtrTable(void)
     // Nothing to do:
     // the table will be allocated the first time makeStablePtr is
     // called, and we want the table to persist through multiple inits.
+    //
+    // Also, getStablePtr is now called from __attribute__((constructor))
+    // functions, so initialising things here wouldn't work anyway.
 }
 
 /*

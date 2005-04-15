@@ -68,6 +68,18 @@ sub split_asm_file {
 	  || &tidy_up_and_die(1,"$Pgm:Failed writing ${Tmp_prefix}__${octr}.s\n");
     }
 
+    # Make sure that we still have some output when the input file is empty
+    if ( $octr == 0 ) {
+        $octr = 1;
+	$ofname = "${Tmp_prefix}__${octr}.s";
+	open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
+
+	print OUTF $prologue_stuff;
+
+	close(OUTF)
+	  || &tidy_up_and_die(1,"$Pgm:Failed writing ${Tmp_prefix}__${octr}.s\n");
+    }
+
     $NoOfSplitFiles = $octr;
 
     close(TMPI) || &tidy_up_and_die(1,"Failed reading $asm_file\n");

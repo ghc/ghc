@@ -99,7 +99,6 @@ ld-options:
          , "-u", "_GHCziIOBase_BlockedIndefinitely_closure"
          , "-u", "_GHCziIOBase_Deadlock_closure"
          , "-u", "_GHCziWeak_runFinalizzerBatch_closure"
-         , "-u", "___stginit_Prelude"
 #else
            "-u", "GHCziBase_Izh_static_info"
          , "-u", "GHCziBase_Czh_static_info"
@@ -133,7 +132,6 @@ ld-options:
          , "-u", "GHCziIOBase_BlockedIndefinitely_closure"
          , "-u", "GHCziIOBase_Deadlock_closure"
          , "-u", "GHCziWeak_runFinalizzerBatch_closure"
-         , "-u", "__stginit_Prelude"
 #endif
 
 framework-dirs:

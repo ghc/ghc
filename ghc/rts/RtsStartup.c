@@ -237,7 +237,8 @@ void
 startupHaskell(int argc, char *argv[], void (*init_root)(void))
 {
     hs_init(&argc, &argv);
-    hs_add_root(init_root);
+    if(init_root)
+        hs_add_root(init_root);
 }
 
 
