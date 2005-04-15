@@ -407,12 +407,12 @@ setsockopt IPTOS_THROUGHPUT: Invalid argument</screen>
           result in checking out the entire repository instead of just
           the <literal>fpconfig</literal> bit.</para>
 <screen>$ cd <replaceable>directory</replaceable>
-$ cvs checkout ghc hslibs libraries</screen>
+$ cvs checkout ghc libraries</screen>
 
 	  <para>The second command here checks out the relevant
           modules you want to work on. For a GHC build, for instance,
           you need at least the <literal>ghc</literal>,
-          <literal>hslibs</literal> and <literal>libraries</literal>
+          and <literal>libraries</literal>
           modules (for a full list of the projects available, see
           <xref linkend="projects"/>).</para>
 
@@ -605,7 +605,7 @@ $ lndir <replaceable>source-tree</replaceable></screen>
 
 <screen>$ cvs co -r ghc-4-06 fpconfig
 $ cd fptools
-$ cvs co -r ghc-4-06 ghc hslibs</screen>
+$ cvs co -r ghc-4-06 ghc libraries</screen>
     </sect2>
 
     <sect2 id="cvs-hints">
@@ -793,8 +793,7 @@ $ cvs checkout nofib/spectral</screen>
           <indexterm><primary><literal>hslibs</literal></primary><secondary>project</secondary></indexterm>
         </term>
 	<listitem>
-	  <para>Supplemental libraries for GHC
-	  (<emphasis>required</emphasis> for building GHC).</para>
+	  <para>Old, now deprecated, libraries.  Everything in here is in <literal>libraries</literal>.
 	</listitem>
       </varlistentry>
 
@@ -843,8 +842,8 @@ $ cvs checkout nofib/spectral</screen>
     </variablelist>
 
     <para>So, to build GHC you need at least the
-    <literal>ghc</literal>, <literal>libraries</literal> and
-    <literal>hslibs</literal> projects (a GHC source distribution will
+    <literal>ghc</literal> and <literal>libraries</literal>
+    projects (a GHC source distribution will
     already include the bits you need).</para>
   </sect1>
 
@@ -3618,7 +3617,7 @@ $ make install</screen>
           corresponding Haskell source (<filename>.hs</filename> or
           <filename>.lhs</filename>) in the compiler subdirectory
           <filename>ghc/compiler</filename> and in the libraries
-          (subdirectories of <filename>hslibs</filename> and
+          (subdirectories of 
           <literal>libraries</literal>).</para>
 	</listitem>
 
