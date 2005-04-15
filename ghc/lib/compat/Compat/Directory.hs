@@ -55,7 +55,7 @@ getAppUserDataDirectory appName = do
 #endif
 
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
-foreign import ccall unsafe "directory.h __hscore_getFolderPath"
+foreign import stdcall unsafe "SHGetFolderPathA"
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 
                               -> Ptr () 
