@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.52 2005/03/29 14:06:02 simonmar Exp $
+# $Id: package.mk,v 1.53 2005/04/15 18:13:34 sof Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -184,7 +184,9 @@ ifeq "$(NON_HS_PACKAGE)" ""
 SRC_HC_OPTS	+= -fgenerics
 endif
 
+ifndef LIBRARY
 LIBRARY      	= libHS$(PACKAGE)$(_way).a
+endif
 
 ifeq "$(WAYS)" ""
 WAYS = $(GhcLibWays)
@@ -276,7 +278,9 @@ ifneq "$(LIBRARY)" ""
 ifeq "$(way)" ""
 ifeq "$(GhcWithInterpreter)" "YES"
 
+ifndef GHCI_LIBRARY
 GHCI_LIBRARY = $(patsubst lib%.a,%.o,$(LIBRARY))
+endif
 
 ifneq "$(NO_INSTALL_LIBRARY)" "YES"
 INSTALL_LIBS += $(GHCI_LIBRARY)
