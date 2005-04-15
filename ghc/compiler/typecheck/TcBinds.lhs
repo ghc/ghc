@@ -714,7 +714,7 @@ checkDistinctTyVars sig_tvs
     bomb_out sig_tv1 sig_tv2
        = failWithTc (ptext SLIT("Quantified type variable") <+> quotes (ppr tidy_tv1) 
 		     <+> ptext SLIT("is unified with another quantified type variable") 
-		     <+> ppr tidy_tv2)
+		     <+> quotes (ppr tidy_tv2))
        where
 	 (env1,  tidy_tv1) = tidyOpenTyVar emptyTidyEnv sig_tv1
 	 (_env2, tidy_tv2) = tidyOpenTyVar env1	        sig_tv2
