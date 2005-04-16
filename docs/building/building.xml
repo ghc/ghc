@@ -793,7 +793,7 @@ $ cvs checkout nofib/spectral</screen>
           <indexterm><primary><literal>hslibs</literal></primary><secondary>project</secondary></indexterm>
         </term>
 	<listitem>
-	  <para>Old, now deprecated, libraries.  Everything in here is in <literal>libraries</literal>.
+	  <para>Old, now deprecated, libraries.  Everything in here is in <literal>libraries</literal>.</para>
 	</listitem>
       </varlistentry>
 
