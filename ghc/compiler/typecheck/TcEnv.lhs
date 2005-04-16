@@ -499,8 +499,8 @@ other modules
 \begin{code}
 newDFunName :: Class -> [Type] -> SrcLoc -> TcM Name
 newDFunName clas (ty:_) loc
-  = newUnique			`thenM` \ uniq ->
-    returnM (mkInternalName uniq (mkDFunOcc dfun_string) loc)
+  = do	{ uniq <- newUnique
+	; return (mkInternalName uniq (mkDFunOcc dfun_string) loc) }
   where
 	-- Any string that is somewhat unique will do
     dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)

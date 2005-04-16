@@ -17,7 +17,7 @@ import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
-import HscTypes		( implicitTyThings )
+import HscTypes		( implicitTyThings, ModDetails )
 import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
 			  mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
@@ -109,15 +109,15 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcTyAndClassDecls :: [Name] -> [LTyClDecl Name]
+tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
    	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
 					-- and their implicit Ids,DataCons
-tcTyAndClassDecls boot_names decls
+tcTyAndClassDecls boot_details decls
   = do	{ 	-- First check for cyclic type synonysm or classes
 		-- See notes with checkCycleErrs
 	  checkCycleErrs decls
 	; mod <- getModule
-	; traceTc (text "tcTyAndCl" <+> ppr mod <+> ppr boot_names)
+	; traceTc (text "tcTyAndCl" <+> ppr mod)
 	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
 	  do	{ let {	-- Calculate variances and rec-flag
 		      ; (syn_decls, alg_decls) = partition (isSynDecl . unLoc) decls }
@@ -135,7 +135,7 @@ tcTyAndClassDecls boot_names decls
 		{ (kc_syn_decls, kc_alg_decls) <- kcTyClDecls syn_decls alg_decls
 
 		; let {	calc_vrcs = calcTyConArgVrcs (rec_syn_tycons ++ rec_alg_tyclss)
-		      ; calc_rec  = calcRecFlags boot_names rec_alg_tyclss
+		      ; calc_rec  = calcRecFlags boot_details rec_alg_tyclss
 		      ; tc_decl   = addLocM (tcTyClDecl calc_vrcs calc_rec) }
 			-- Type-check the type synonyms, and extend the envt
 		; syn_tycons <- tcSynDecls calc_vrcs kc_syn_decls

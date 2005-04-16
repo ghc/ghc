@@ -836,16 +836,16 @@ initIfaceCheck hsc_env do_this
 	; initTcRnIf 'i' hsc_env gbl_env () do_this
     }
 
-initIfaceTc :: HscEnv -> ModIface 
- 	    -> (TcRef TypeEnv -> IfL a) -> IO a
+initIfaceTc :: ModIface 
+ 	    -> (TcRef TypeEnv -> IfL a) -> TcRnIf gbl lcl a
 -- Used when type-checking checking an up-to-date interface file
 -- No type envt from the current module, but we do know the module dependencies
-initIfaceTc hsc_env iface do_this
- = do	{ tc_env_var <- newIORef emptyTypeEnv
+initIfaceTc iface do_this
+ = do	{ tc_env_var <- newMutVar emptyTypeEnv
 	; let { gbl_env = IfGblEnv { if_rec_types = Just (mod, readMutVar tc_env_var) } ;
 	      ; if_lenv = mkIfLclEnv mod doc
 	   }
-	; initTcRnIf 'i' hsc_env gbl_env if_lenv (do_this tc_env_var)
+	; setEnvs (gbl_env, if_lenv) (do_this tc_env_var)
     }
   where
     mod = mi_module iface

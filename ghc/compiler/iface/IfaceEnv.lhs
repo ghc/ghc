@@ -4,10 +4,12 @@
 module IfaceEnv (
 	newGlobalBinder, newIPName, newImplicitBinder, 
 	lookupIfaceTop, lookupIfaceExt,
-	lookupOrig, lookupAvail, lookupIfaceTc,
+	lookupOrig, lookupIfaceTc,
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv,
 	tcIfaceLclId,     tcIfaceTyVar, 
+
+	lookupAvail, ifaceExportNames,
 
 	-- Name-cache stuff
 	allocateGlobalBinder, initNameCache, 
@@ -18,7 +20,8 @@ module IfaceEnv (
 import TcRnMonad
 import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
 import TysWiredIn	( tupleTyCon, tupleCon )
-import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), OrigNameCache )
+import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), 
+			  IfaceExport, OrigNameCache )
 import TyCon		( TyCon, tyConName )
 import DataCon		( dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
@@ -27,7 +30,7 @@ import Name		( Name, nameUnique, nameModule,
 			  getOccName, nameParent_maybe,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
-
+import NameSet		( NameSet, emptyNameSet, addListToNameSet )
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM, pREL_TUP )
@@ -126,6 +129,14 @@ newImplicitBinder base_name mk_sys_occ
     parent_name = case nameParent_maybe base_name of
 		    Just parent_name  -> parent_name
 		    Nothing 	      -> base_name
+
+ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl NameSet
+ifaceExportNames exports 
+  = foldlM do_one emptyNameSet exports
+  where
+    do_one acc (mod, exports)  = foldlM (do_avail mod) acc exports
+    do_avail mod acc avail = do { ns <- lookupAvail mod avail
+				; return (addListToNameSet acc ns) }
 
 lookupAvail :: Module -> GenAvailInfo OccName -> TcRnIf a b [Name]
 -- Find all the names arising from an import

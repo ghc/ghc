@@ -23,7 +23,7 @@ import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
 import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
 import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep )
-import HscTypes		( TyThing(..) )
+import HscTypes		( TyThing(..), ModDetails(..) )
 import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars,
                           getSynTyConDefn, isSynTyCon, isAlgTyCon, 
 			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs, newTyConRhs )
@@ -213,16 +213,16 @@ recursiveness, because we need only look at the type decls in the module being
 compiled, plus the outer structure of directly-mentioned types.
 
 \begin{code}
-calcRecFlags :: [Name] -> [TyThing] -> (Name -> RecFlag)
+calcRecFlags :: ModDetails -> [TyThing] -> (Name -> RecFlag)
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
-calcRecFlags boot_names tyclss
+calcRecFlags boot_details tyclss
   = is_rec
   where
     is_rec n | n `elemNameSet` rec_names = Recursive
 	     | otherwise		 = NonRecursive
 
-    boot_name_set = mkNameSet boot_names
+    boot_name_set = md_exports boot_details
     rec_names = boot_name_set	  `unionNameSets` 
 		nt_loop_breakers  `unionNameSets`
 	        prod_loop_breakers

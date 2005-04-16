@@ -7,7 +7,7 @@
 module RnNames (
 	rnImports, importsFromLocalDecls, 
 	reportUnusedNames, reportDeprecations, 
-	mkModDeps, exportsToAvails, exportsFromAvail
+	mkModDeps, exportsFromAvail
     ) where
 
 #include "HsVersions.h"
@@ -18,7 +18,7 @@ import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  Sig(..), collectGroupBinders, tyClDeclNames 
 			)
 import RnEnv
-import IfaceEnv		( lookupAvail )
+import IfaceEnv		( ifaceExportNames )
 import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
@@ -183,7 +183,7 @@ importsFromImportDecl this_mod
 		  		 is_loc = loc, is_as = qual_mod_name }
     in
 	-- Get the total imports, and filter them according to the import list
-    exportsToAvails filtered_exports		`thenM` \ total_avails ->
+    ifaceExportNames filtered_exports		`thenM` \ total_avails ->
     filterImports iface imp_spec
 		  imp_details total_avails	`thenM` \ (avail_env, gbl_env) ->
 
@@ -245,14 +245,6 @@ importsFromImportDecl this_mod
     )							`thenM_`
 
     returnM (gbl_env, imports)
-
-exportsToAvails :: [IfaceExport] -> TcRnIf gbl lcl NameSet
-exportsToAvails exports 
-  = foldlM do_one emptyNameSet exports
-  where
-    do_one acc (mod, exports)  = foldlM (do_avail mod) acc exports
-    do_avail mod acc avail = do { ns <- lookupAvail mod avail
-				; return (addListToNameSet acc ns) }
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")

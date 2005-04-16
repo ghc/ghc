@@ -6,8 +6,8 @@
 \begin{code}
 module LoadIface (
 	loadHomeInterface, loadInterface, loadDecls,
-	loadSrcInterface, loadOrphanModules, loadHiBootInterface,
-	readIface,	-- Used when reading the module's old interface
+	loadSrcInterface, loadOrphanModules, 
+	findAndReadIface, readIface,	-- Used when reading the module's old interface
 	predInstGates, ifaceInstGates, ifaceStats, discardDeclPrags,
 	initExternalPackageState
    ) where
@@ -83,52 +83,16 @@ loadSrcInterface :: SDoc -> Module -> IsBootInterface -> RnM ModIface
 -- This is called for each 'import' declaration in the source code
 -- On a failure, fail in the monad with an error message
 
-loadSrcInterface doc mod_name want_boot
-  = do 	{ mb_iface <- initIfaceTcRn $ loadInterface doc mod_name 
-					   (ImportByUser want_boot)
+loadSrcInterface doc mod want_boot
+  = do 	{ mb_iface <- initIfaceTcRn $ 
+		      loadInterface doc mod (ImportByUser want_boot)
 	; case mb_iface of
-	    Failed err      -> failWithTc (elaborate err) 
+	    Failed err      -> failWithTc (elaborate err)
 	    Succeeded iface -> return iface
 	}
   where
     elaborate err = hang (ptext SLIT("Failed to load interface for") <+> 
-			 quotes (ppr mod_name) <> colon) 4 err
-
-loadHiBootInterface :: TcRn [Name]
--- Load the hi-boot iface for the module being compiled,
--- if it indeed exists in the transitive closure of imports
--- Return the list of names exported by the hi-boot file
-loadHiBootInterface
-  = do 	{ eps <- getEps
-	; mod <- getModule
-
-	; traceIf (text "loadHiBootInterface" <+> ppr mod)
-
-	-- We're read all the direct imports by now, so eps_is_boot will
-	-- record if any of our imports mention us by way of hi-boot file
-	; case lookupModuleEnv (eps_is_boot eps) mod of {
-	    Nothing             -> return [] ;	-- The typical case
-
-	    Just (_, False) -> 		-- Someone below us imported us!
-		-- This is a loop with no hi-boot in the way
-		failWithTc (moduleLoop mod) ;
-
-	    Just (mod_nm, True) -> 	-- There's a hi-boot interface below us
-		
-
-    do	{ 	-- Load it (into the PTE), and return the exported names
-	  iface <- loadSrcInterface (mk_doc mod_nm) mod_nm True
-	; ns_s <-  sequenceM [ lookupAvail mod_nm avail
-		   	     | (mod,avails) <- mi_exports iface, 
-			       avail <- avails ]
-	; return (concat ns_s)
-    }}}
-  where
-    mk_doc mod = ptext SLIT("Need the hi-boot interface for") <+> ppr mod
-		 <+> ptext SLIT("to compare against the Real Thing")
-
-    moduleLoop mod = ptext SLIT("Circular imports: module") <+> quotes (ppr mod) 
-		     <+> ptext SLIT("depends on itself")
+			  quotes (ppr mod) <> colon) 4 err
 
 loadOrphanModules :: [Module] -> TcM ()
 loadOrphanModules mods
@@ -551,7 +515,7 @@ findAndReadIface :: Bool 		-- True <=> explicit user import
 		 -> SDoc -> Module 
 		 -> IsBootInterface	-- True  <=> Look for a .hi-boot file
 					-- False <=> Look for .hi file
-		 -> IfM lcl (MaybeErr Message (ModIface, FilePath))
+		 -> TcRnIf gbl lcl (MaybeErr Message (ModIface, FilePath))
 	-- Nothing <=> file not found, or unreadable, or illegible
 	-- Just x  <=> successfully found and parsed 
 
@@ -626,7 +590,7 @@ findHiFile hsc_env explicit mod_name hi_boot_file
 
 \begin{code}
 readIface :: Module -> String -> IsBootInterface 
-	  -> IfM lcl (MaybeErr Message ModIface)
+	  -> TcRnIf gbl lcl (MaybeErr Message ModIface)
 	-- Failed err    <=> file not found, or unreadable, or illegible
 	-- Succeeded iface <=> successfully found and parsed 
 

@@ -51,8 +51,8 @@ import Parser
 import Lexer		( P(..), ParseResult(..), mkPState )
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( tcRnModule, tcRnExtCore )
-import TcRnTypes	( TcGblEnv(..) )
 import TcIface		( typecheckIface )
+import TcRnMonad	( initIfaceCheck, TcGblEnv(..) )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
@@ -208,7 +208,8 @@ hscNoRecomp hsc_env msg_act mod_summary
                  "Skipping  " ++ showModMsg have_object mod_summary)
 
 	; new_details <- {-# SCC "tcRnIface" #-}
-		     typecheckIface hsc_env old_iface ;
+		         initIfaceCheck hsc_env $
+			 typecheckIface old_iface ;
 	; dumpIfaceStats hsc_env
 
 	; return (HscNoRecomp new_details old_iface)

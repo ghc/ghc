@@ -37,7 +37,7 @@ import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
 import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, 
 			  mkInternalName, nameIsLocalOrFrom )
 import NameEnv		( lookupNameEnv )
-import HscTypes		( lookupType, ExternalPackageState(..) )
+import HscTypes		( lookupType, ExternalPackageState(..), emptyModDetails )
 import OccName
 import Var		( Id, TyVar, idType )
 import Module		( moduleUserString, mkModule )
@@ -141,7 +141,7 @@ tc_bracket (TypBr typ)
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
-  = tcTopSrcDecls [{- no boot-names -}] decls		`thenM_`
+  = tcTopSrcDecls emptyModDetails decls		`thenM_`
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
 

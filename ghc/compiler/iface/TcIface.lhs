@@ -5,7 +5,8 @@
 
 \begin{code}
 module TcIface ( 
-	tcImportDecl, typecheckIface, tcIfaceDecl, tcIfaceGlobal,
+	tcImportDecl, tcHiBootIface, typecheckIface, 
+	tcIfaceDecl, tcIfaceGlobal, 
 	loadImportedInsts, loadImportedRules,
 	tcExtCoreBindings
  ) where
@@ -14,11 +15,11 @@ module TcIface (
 
 import IfaceSyn
 import LoadIface	( loadHomeInterface, loadInterface, predInstGates,
-			  loadDecls )
+			  loadDecls, findAndReadIface )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
-			  tcIfaceTyVar, tcIfaceLclId,
-			  newIfaceName, newIfaceNames )
+			  tcIfaceTyVar, tcIfaceLclId, 
+			  newIfaceName, newIfaceNames, ifaceExportNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
@@ -30,6 +31,7 @@ import TyCon		( TyCon, tyConName, isSynTyCon )
 import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
 			  HscEnv, TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), ModGuts,
+			  emptyModDetails,
 			  extendTypeEnv, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( extendInstEnvList )
 import CoreSyn
@@ -55,7 +57,7 @@ import Name		( Name, nameModule, nameIsLocalOrFrom,
 			  isWiredInName, wiredInNameTyThing_maybe, nameParent )
 import NameEnv
 import OccName		( OccName )
-import Module		( Module )
+import Module		( Module, lookupModuleEnv )
 import UniqSupply	( initUs_ )
 import Outputable	
 import ErrUtils		( Message )
@@ -167,11 +169,12 @@ knot.  Remember, the decls aren't necessarily in dependency order --
 and even if they were, the type decls might be mutually recursive.
 
 \begin{code}
-typecheckIface :: HscEnv
-	       -> ModIface 	-- Get the decls from here
-	       -> IO ModDetails
-typecheckIface hsc_env iface
-  = initIfaceTc hsc_env iface $ \ tc_env_var -> do
+typecheckIface :: ModIface 	-- Get the decls from here
+	       -> TcRnIf gbl lcl ModDetails
+typecheckIface iface
+  = initIfaceTc iface $ \ tc_env_var -> do
+	-- The tc_env_var is freshly allocated, private to 
+	-- type-checking this particular interface
 	{ 	-- Get the right set of decls and rules.  If we are compiling without -O
 		-- we discard pragmas before typechecking, so that we don't "see"
 		-- information that we shouldn't.  From a versioning point of view
@@ -193,9 +196,62 @@ typecheckIface hsc_env iface
 	; dfuns <- mapM tcIfaceInst dfuns
 	; rules <- mapM tcIfaceRule rules
 
+		-- Exports
+	; exports <-  ifaceExportNames (mi_exports iface)
+
 		-- Finished
-	; return (ModDetails { md_types = type_env, md_insts = dfuns, md_rules = rules }) 
+	; return (ModDetails {	md_types = type_env, 
+				md_insts = dfuns,
+				md_rules = rules,
+				md_exports = exports }) 
     }
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Type and class declarations
+%*									*
+%************************************************************************
+
+\begin{code}
+tcHiBootIface :: Module -> TcRn ModDetails
+-- Load the hi-boot iface for the module being compiled,
+-- if it indeed exists in the transitive closure of imports
+-- Return the ModDetails, empty if no hi-boot iface
+tcHiBootIface mod
+  = do 	{ traceIf (text "loadHiBootInterface" <+> ppr mod)
+
+	-- We're read all the direct imports by now, so eps_is_boot will
+	-- record if any of our imports mention us by way of hi-boot file
+	; eps <- getEps
+	; case lookupModuleEnv (eps_is_boot eps) mod of {
+	    Nothing -> return emptyModDetails ;	-- The typical case
+
+	    Just (_, False) -> failWithTc moduleLoop ;
+ 		-- Someone below us imported us!
+		-- This is a loop with no hi-boot in the way
+		
+	    Just (mod, True) -> 	-- There's a hi-boot interface below us
+		
+    do	{ read_result <- findAndReadIface 
+				True	-- Explicit import? 
+				need mod
+				True	-- Hi-boot file
+
+	; case read_result of
+		Failed err               -> failWithTc (elaborate err)
+		Succeeded (iface, _path) -> typecheckIface iface
+    }}}
+  where
+    need = ptext SLIT("Need the hi-boot interface for") <+> ppr mod
+		 <+> ptext SLIT("to compare against the Real Thing")
+
+    moduleLoop = ptext SLIT("Circular imports: module") <+> quotes (ppr mod) 
+		     <+> ptext SLIT("depends on itself")
+
+    elaborate err = hang (ptext SLIT("Could not find hi-boot interface for") <+> 
+		          quotes (ppr mod) <> colon) 4 err
 \end{code}
 
 
