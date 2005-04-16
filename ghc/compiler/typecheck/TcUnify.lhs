@@ -1266,11 +1266,14 @@ checkExpectedKind ty act_kind exp_kind
 		<+> ptext SLIT("is lifted")
 
 	    | otherwise 		-- E.g. Monad [Int]
-	    = sep [ ptext SLIT("Expecting kind") <+> quotes (pprKind exp_kind) <> comma,
-		    ptext SLIT("but") <+> quotes (ppr ty) <+> 
-		    ptext SLIT("has kind") <+> quotes (pprKind act_kind)]
+	    = ptext SLIT("Kind mis-match")
+
+	more_info = sep [ ptext SLIT("Expected kind") <+> 
+				quotes (pprKind exp_kind) <> comma,
+		   	  ptext SLIT("but") <+> quotes (ppr ty) <+> 
+			  	ptext SLIT("has kind") <+> quotes (pprKind act_kind)]
    in
-   failWithTc (ptext SLIT("Kind error:") <+> err) 
+   failWithTc (err $$ more_info)
    }
 \end{code}
 
