@@ -39,9 +39,8 @@ import TcUnify		( unifyFunKind, checkExpectedKind )
 import TcType		( Type, PredType(..), ThetaType, 
 			  MetaDetails(Flexi), hoistForAllTys,
 			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
-		 	  mkFunTy, 
-			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
-			  typeKind )
+		 	  mkFunTy, mkSigmaTy, mkPredTy, mkGenTyConApp, 
+			  mkTyConApp, mkAppTys, typeKind )
 import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
 			  openTypeKind, argTypeKind, splitKindFunTys )
 import Id		( idName )
@@ -238,9 +237,13 @@ kcCheckHsType :: LHsType Name -> TcKind -> TcM (LHsType Name)
 -- with OpenTypeKind, because it gives better error messages
 kcCheckHsType (L span ty) exp_kind 
   = setSrcSpan span				$
-    kc_hs_type ty				`thenM` \ (ty', act_kind) ->
-    checkExpectedKind ty act_kind exp_kind	`thenM_`
-    returnM (L span ty')
+    do	{ (ty', act_kind) <- addErrCtxt (typeCtxt ty) $
+		    	     kc_hs_type ty
+		-- Add the context round the inner check only
+		-- because checkExpectedKind already mentions
+		-- 'ty' by name in any error message
+	; checkExpectedKind ty act_kind exp_kind
+	; return (L span ty') }
 \end{code}
 
 	Here comes the main function
@@ -576,6 +579,8 @@ gadtSigCtxt ty
 badGadtDecl ty
   = hang (ptext SLIT("Malformed constructor signature:"))
        2 (ppr ty)
+
+typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)
 \end{code}
 
 %************************************************************************
