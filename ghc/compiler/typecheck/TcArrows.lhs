@@ -54,9 +54,9 @@ tcProc pat cmd exp_ty
 	; [arg_ty, res_ty] <- newTyFlexiVarTys 2 liftedTypeKind
 	; zapExpectedTo exp_ty (mkAppTys arr_ty [arg_ty,res_ty])
 
-	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; ([pat'], cmd') <- incProcLevel $
-			    tcMatchPats [pat] [Check arg_ty] (Check res_ty) $
+	; proc_env <- getEnv
+	; let cmd_env = CmdEnv { cmd_arr = arr_ty, cmd_proc_env = proc_env }
+	; ([pat'], cmd') <- tcMatchPats [pat] [Check arg_ty] (Check res_ty) $
 			    tcCmdTop cmd_env cmd ([], res_ty)
 		-- The False says don't do GADT type refinement
 		-- This is a conservative choice, but I'm not sure of the consequences
@@ -72,12 +72,35 @@ tcProc pat cmd exp_ty
 %*									*
 %************************************************************************
 
+In arrow notation, a variable bound by a proc (or enclosed let/kappa)
+is not in scope to the left of an arrow tail (-<) or the head of (|..|).
+For example
+
+	proc x -> (e1 -< e2)
+
+Here, x is not in scope in e1, but it is in scope in e2.  This can get 
+a bit complicated:
+
+	let x = 3 in
+	proc y -> (proc z -> e1) -< e2
+
+Here, x and z are in scope in e1, but y is not.  We implement this by
+recording the environment when passing a proc, and returning to that
+(using popArrowBinders) on the left of -< and the head of (|..|).
+
 \begin{code}
 type CmdStack = [TcTauType]
-data CmdEnv   = CmdEnv { cmd_arr   :: TcType }		-- The arrow type constructor, of kind *->*->*
+data CmdEnv
+  = CmdEnv {
+	cmd_arr		:: TcType, -- arrow type constructor, of kind *->*->*
+	cmd_proc_env	:: Env TcGblEnv TcLclEnv -- environment of the proc
+    }
 
 mkCmdArrTy :: CmdEnv -> TcTauType -> TcTauType -> TcTauType
 mkCmdArrTy env t1 t2 = mkAppTys (cmd_arr env) [t1, t2]
+
+popArrowBinders :: CmdEnv -> TcM a -> TcM a
+popArrowBinders env tc = setEnv (cmd_proc_env env) tc
 
 ---------------------------------------
 tcCmdTop :: CmdEnv 
@@ -154,7 +177,7 @@ tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
 	-- inside f.  In the higher-order case (-<<), they are.
     pop_arrow_binders tc = case ho_app of
 	HsHigherOrderApp -> tc
-	HsFirstOrderApp  -> popArrowBinders tc
+	HsFirstOrderApp  -> popArrowBinders env tc
 
 -------------------------------------------
 -- 		Command application
@@ -250,7 +273,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 			      e_res_ty
 
 		-- Check expr
-	; (expr', lie) <- popArrowBinders (getLIE (tcCheckRho expr e_ty))
+	; (expr', lie) <- popArrowBinders env (getLIE (tcCheckRho expr e_ty))
 	; inst_binds <- tcSimplifyCheck sig_msg [w_tv] [] lie
 
 		-- Check that the polymorphic variable hasn't been unified with anything
@@ -289,7 +312,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		      not (w_tv `elemVarSet` tyVarsOfTypes arg_tys))
 		     (badFormFun i tup_ty')
 
-	   ; tcCmdTop (CmdEnv { cmd_arr = b }) cmd (arg_tys, s) }
+	   ; tcCmdTop (env { cmd_arr = b }) cmd (arg_tys, s) }
 
     unscramble :: TcType -> (TcType, [TcType])
     -- unscramble ((w,s1) .. sn)	=  (w, [s1..sn])

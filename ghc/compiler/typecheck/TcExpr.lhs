@@ -32,7 +32,7 @@ import BasicTypes	( isMarkedStrict )
 import Inst		( tcOverloadedLit, newMethodFromName, newIPDict,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta, tcInstCall )
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( tcLookup, tcLookupId, checkProcLevel,
+import TcEnv		( tcLookup, tcLookupId,
 			  tcLookupDataCon, tcLookupGlobalId
 			)
 import TcArrows		( tcProc )
@@ -787,9 +787,7 @@ tcId orig id_name	-- Look up the Id and instantiate its type
 		-- A global cannot possibly be ill-staged
 		-- nor does it need the 'lifting' treatment
 
-    ;	ATcId id th_level proc_level 
-	  -> do	{ checkProcLevel id proc_level
-		; tc_local_id id th_level }
+    ;	ATcId id th_level -> tc_local_id id th_level
 
     ;	other -> failWithTc (ppr other <+> ptext SLIT("used where a value identifer was expected"))
     }

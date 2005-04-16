@@ -106,7 +106,6 @@ initTc hsc_env hsc_src mod do_this
 		tcl_ctxt       = [],
 		tcl_rdr	       = emptyLocalRdrEnv,
 		tcl_th_ctxt    = topStage,
-		tcl_arrow_ctxt = topArrowCtxt,
 		tcl_env        = emptyNameEnv,
 		tcl_tyvars     = tvs_var,
 		tcl_lie	       = panic "initTc:LIE",	-- LIE only valid inside a getLIE
@@ -779,33 +778,6 @@ getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 
 setStage :: ThStage -> TcM a -> TcM a 
 setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
-\end{code}
-
-
-%************************************************************************
-%*									*
-	     Arrow context
-%*									*
-%************************************************************************
-
-\begin{code}
-popArrowBinders :: TcM a -> TcM a	-- Move to the left of a (-<); see comments in TcRnTypes
-popArrowBinders 
-  = updLclEnv (\ env -> env { tcl_arrow_ctxt = pop (tcl_arrow_ctxt env)  })
-  where
-    pop (ArrCtxt {proc_level = curr_lvl, proc_banned = banned})
-	= ASSERT( not (curr_lvl `elem` banned) )
-	  ArrCtxt {proc_level = curr_lvl + 1, proc_banned = curr_lvl : banned}
-
-getBannedProcLevels :: TcM [ProcLevel]
-getBannedProcLevels
-  = do { env <- getLclEnv; return (proc_banned (tcl_arrow_ctxt env)) }
-
-incProcLevel :: TcM a -> TcM a
-incProcLevel 
-  = updLclEnv (\ env -> env { tcl_arrow_ctxt = inc (tcl_arrow_ctxt env) })
-  where
-    inc ctxt = ctxt { proc_level = proc_level ctxt + 1 }
 \end{code}
 
 

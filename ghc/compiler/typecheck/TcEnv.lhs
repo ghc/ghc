@@ -36,9 +36,6 @@ module TcEnv(
 	checkWellStaged, spliceOK, bracketOK, tcMetaTy, thLevel, 
 	topIdLvl, 
 
-	-- Arrow stuff
-	checkProcLevel,
-
 	-- New Ids
 	newLocalName, newDFunName
   ) where
@@ -210,7 +207,7 @@ tcLookupId :: Name -> TcM Id
 tcLookupId name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id _ _	  -> returnM tc_id
+	ATcId tc_id _	  -> returnM tc_id
 	AGlobal (AnId id) -> returnM id
 	other		  -> pprPanic "tcLookupId" (ppr name)
 
@@ -223,8 +220,8 @@ tcLookupLocalIds ns
   where
     lookup lenv lvl name 
 	= case lookupNameEnv lenv name of
-		Just (ATcId id lvl1 _) -> ASSERT( lvl == lvl1 ) id
-		other		       -> pprPanic "tcLookupLocalIds" (ppr name)
+		Just (ATcId id lvl1) -> ASSERT( lvl == lvl1 ) id
+		other		     -> pprPanic "tcLookupLocalIds" (ppr name)
 
 lclEnvElts :: TcLclEnv -> [TcTyThing]
 lclEnvElts env = nameEnvElts (tcl_env env)
@@ -291,8 +288,7 @@ tcExtendIdEnv2 names_w_ids thing_inside
     let
 	extra_global_tyvars = tyVarsOfTypes [idType id | (name,id) <- names_w_ids]
 	th_lvl		    = thLevel    (tcl_th_ctxt   env)
-	proc_lvl	    = proc_level (tcl_arrow_ctxt env)
-	extra_env	    = [(name, ATcId id th_lvl proc_lvl) | (name,id) <- names_w_ids]
+	extra_env	    = [(name, ATcId id th_lvl) | (name,id) <- names_w_ids]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
 	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) (map fst names_w_ids)
     in
@@ -326,7 +322,7 @@ findGlobals tvs tidy_env
     ignore_it ty = not (tvs `intersectsVarSet` tyVarsOfType ty)
 
 -----------------------
-find_thing ignore_it tidy_env (ATcId id _ _)
+find_thing ignore_it tidy_env (ATcId id _)
   = zonkTcType  (idType id)	`thenM` \ id_ty ->
     if ignore_it id_ty then
 	returnM (tidy_env, Nothing)
@@ -403,25 +399,6 @@ tcExtendRules lcl_rules thing_inside
       ; setGblEnv env' thing_inside }
 \end{code}
 
-
-%************************************************************************
-%*									*
-		Arrow notation proc levels
-%*									*
-%************************************************************************
-
-\begin{code}
-checkProcLevel :: TcId -> ProcLevel -> TcM ()
-checkProcLevel id id_lvl
-  = do	{ banned <- getBannedProcLevels
-	; checkTc (not (id_lvl `elem` banned))
-		  (procLevelErr id id_lvl) }
-
-procLevelErr id id_lvl
-  = hang (ptext SLIT("Command-bound variable") <+> quotes (ppr id) <+> ptext SLIT("is not in scope here"))
-	 4 (ptext SLIT("Reason: it is used in the left argument of (-<)"))
-\end{code}
-		
 
 %************************************************************************
 %*									*

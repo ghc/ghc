@@ -544,7 +544,7 @@ reifyThing (AGlobal (ADataCon dc))
 	; fix <- reifyFixity name
 	; return (TH.DataConI (reifyName name) ty (reifyName (dataConTyCon dc)) fix) }
 
-reifyThing (ATcId id _ _) 
+reifyThing (ATcId id _) 
   = do	{ ty1 <- zonkTcType (idType id)	-- Make use of all the info we have, even
 					-- though it may be incomplete
 	; ty2 <- reifyType ty1

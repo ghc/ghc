@@ -26,9 +26,6 @@ module TcRnTypes(
 	ThStage(..), topStage, topSpliceStage,
 	ThLevel, impLevel, topLevel,
 
-	-- Arrows
-	ArrowCtxt(..), topArrowCtxt, ProcLevel, topProcLevel, 
-
 	-- Insts
 	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, 
 	instLocSrcLoc, instLocSrcSpan,
@@ -278,7 +275,6 @@ data TcLclEnv		-- Changes as we move inside an expression
 	tcl_errs :: TcRef Messages,	-- Place to accumulate errors
 
 	tcl_th_ctxt    :: ThStage,	-- Template Haskell context
-	tcl_arrow_ctxt :: ArrowCtxt,	-- Arrow-notation context
 
 	tcl_rdr :: LocalRdrEnv,		-- Local name envt
 		-- Maintained during renaming, of course, but also during
@@ -357,49 +353,13 @@ topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level spli
 
 
 ---------------------------
--- Arrow-notation stages
----------------------------
-
--- In arrow notation, a variable bound by a proc (or enclosed let/kappa)
--- is not in scope to the left of an arrow tail (-<) or the head of (|..|).
--- For example
---
---	proc x -> (e1 -< e2)
---
--- Here, x is not in scope in e1, but it is in scope in e2.  This can get 
--- a bit complicated:
---
---	let x = 3 in
---	proc y -> (proc z -> e1) -< e2
---
--- Here, x and z are in scope in e1, but y is not.  Here's how we track this:
---	a) Assign an "proc level" to each proc, being the number of
---	   lexically-enclosing procs + 1.  
---	b) Assign to each local variable the proc-level of its lexically
---	   enclosing proc.
---	c) Keep a list of out-of-scope procs.  When moving to the left of
---	   an arrow-tail, add the proc-level of the immediately enclosing
---	   proc to the list, and increment the proc-level so that variables
---	   bound inside the expression are in scope.
---	d) When looking up a variable, complain if its proc-level is in
---	   the banned list
-
-type ProcLevel = Int	-- Always >= 0
-topProcLevel = 0	-- Not inside any proc
-
-data ArrowCtxt = ArrCtxt { proc_level :: ProcLevel, 	-- Current level
-			   proc_banned :: [ProcLevel] }	-- Out of scope proc-levels
-
-topArrowCtxt = ArrCtxt { proc_level = topProcLevel, proc_banned = [] }
-
----------------------------
 -- TcTyThing
 ---------------------------
 
 data TcTyThing
   = AGlobal TyThing			-- Used only in the return type of a lookup
 
-  | ATcId   TcId ThLevel ProcLevel 	-- Ids defined in this module; may not be fully zonked
+  | ATcId   TcId ThLevel	 	-- Ids defined in this module; may not be fully zonked
 
   | ATyVar  Name TcType			-- Type variables; tv -> type.  It can't just be a TyVar
 					-- that is mutated to point to the type it is bound to,
@@ -412,15 +372,15 @@ data TcTyThing
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = ppr g
-   ppr (ATcId g tl pl)  = text "Identifier" <> 
-			  ifPprDebug (brackets (ppr g <> comma <> ppr tl <> comma <> ppr pl))
+   ppr (ATcId g tl)     = text "Identifier" <> 
+			  ifPprDebug (brackets (ppr g <> comma <> ppr tl))
    ppr (ATyVar tv ty)   = text "Type variable" <+> quotes (ppr tv) <+> pprParendType ty
    ppr (AThing k)       = text "AThing" <+> ppr k
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
 pprTcTyThingCategory (ATyVar _ _)    = ptext SLIT("Type variable")
-pprTcTyThingCategory (ATcId _ _ _)   = ptext SLIT("Local identifier")
+pprTcTyThingCategory (ATcId _ _)     = ptext SLIT("Local identifier")
 pprTcTyThingCategory (AThing _)	     = ptext SLIT("Kinded thing")
 \end{code}
 
