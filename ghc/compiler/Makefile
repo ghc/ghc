@@ -772,6 +772,9 @@ GhcLibHcOpts =
 
 # override default definition of HS_IFACES so we can add $(odir)
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
+
+# Haddock can't handle recursive modules currently, so we disable it for now.
+NO_HADDOCK_DOCS = YES
 endif
 
 #-----------------------------------------------------------------------------
