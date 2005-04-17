@@ -197,7 +197,7 @@ longOpt ls rs optDescr = long ads arg rs
          long [ReqArg f _] ('=':xs) rest     = (Opt (f xs),rest)
          long [OptArg f _] []       rest     = (Opt (f Nothing),rest)
          long [OptArg f _] ('=':xs) rest     = (Opt (f (Just xs)),rest)
-         long _            _        rest     = (UnreqOpt optStr,rest)
+         long _            _        rest     = (UnreqOpt ("--"++ls),rest)
 
 -- handle short option
 shortOpt :: Char -> String -> [String] -> [OptDescr a] -> (OptKind a,[String])
