@@ -822,7 +822,7 @@ dsCmdStmt ids local_vars env_ids out_ids (LetStmt binds)
 --			arr (\((xs1),(xs2)) -> (xs')) >>> ss'
 
 dsCmdStmt ids local_vars env_ids out_ids (RecStmt stmts later_ids rec_ids rhss binds)
-  = let		-- ****** binds not desugared; ROSS PLEASE FIX ********
+  = let		-- ToDo: ****** binds not desugared; ROSS PLEASE FIX ********
 	env2_id_set = mkVarSet out_ids `minusVarSet` mkVarSet later_ids
 	env2_ids = varSetElems env2_id_set
 	env2_ty = mkTupleType env2_ids
