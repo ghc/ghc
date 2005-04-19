@@ -1807,7 +1807,7 @@ scheduleHandleThreadFinished( StgMainThread *mainThread
 	      mainThread->prev->link = mainThread->link;
 	  }
 	  if (mainThread->link != NULL) {
-	      mainThread->link->prev = NULL;
+	      mainThread->link->prev = mainThread->prev;
 	  }
 	  releaseCapability(cap);
 	  return rtsTrue; // tells schedule() to return
