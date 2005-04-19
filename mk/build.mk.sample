@@ -5,14 +5,16 @@
 # overall build type, and then tweak the options in the relevant section
 # below.
 
-BuildFlavour = devel
+# Uncomment one of these to select a build profile below:
+
+#BuildFlavour = devel
 #BuildFlavour = perf
 
 # -------- Misc. settings -----------------------------------------------------
 
 # Not necessary to set this, but useful if you have other projects checked-out
-# in your source tree.
-ProjectsToBuild = glafp-utils ghc libraries hslibs
+# in your source tree:
+# ProjectsToBuild = glafp-utils ghc libraries hslibs
 
 # Which warnings we like to use
 MyWarningOpts   = -W -fno-warn-unused-matches -fwarn-unused-imports
