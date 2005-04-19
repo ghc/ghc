@@ -900,6 +900,7 @@ scheduleDetectDeadlock(void)
 	    StgMainThread *m;
 	    m = main_threads;
 	    switch (m->tso->why_blocked) {
+	    case BlockedOnSTM:
 	    case BlockedOnBlackHole:
 	    case BlockedOnException:
 	    case BlockedOnMVar:
