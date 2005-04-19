@@ -68,3 +68,5 @@ test('ffi012', f, compile_and_run, [''])
 
 # Doesn't work with External Core due to __labels
 test('ffi013', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
+
+test('ffi014', only_ways(['threaded']), compile_and_run, ['ffi014_cbits.c'])
