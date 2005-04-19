@@ -45,7 +45,8 @@ main = do
 	dieProg "syntax: runghc [-f GHCPATH] FILE ARG..."
 
 doIt ghc filename args = do
-  res <- rawSystem ghc ["-e","System.Environment.withProgName "++show filename++" (System.Environment.withArgs ["
+  res <- rawSystem ghc ["-ignore-dot-ghci", 
+			"-e","System.Environment.withProgName "++show filename++" (System.Environment.withArgs ["
 			++ concat (intersperse "," (map show args))
 			++ "] Main.main)", filename]
   exitWith res
