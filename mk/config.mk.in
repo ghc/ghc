@@ -362,7 +362,10 @@ endif
 ifeq "$(GhcUnregisterised)" "YES"
 SplitObjs=NO
 endif
-ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
+ifeq "$(TargetArch_CPP)" "ia64"
+SplitObjs=NO
+endif
+ifeq "$(TargetArch_CPP)" "x86_64"
 SplitObjs=NO
 endif
 
