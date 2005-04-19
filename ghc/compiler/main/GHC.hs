@@ -155,7 +155,7 @@ import DataCon		( DataCon )
 import Name		( Name, getName, nameModule_maybe )
 import RdrName		( RdrName, gre_name, globalRdrEnvElts )
 import NameEnv		( nameEnvElts )
-import SrcLoc		( Located(..) )
+import SrcLoc		( Located(..), mkSrcLoc, srcLocSpan )
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
@@ -179,6 +179,8 @@ import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Maybes		( orElse, expectJust, mapCatMaybes )
 import TcType           ( tcSplitSigmaTy, isDictTy )
+import Bag		( unitBag, emptyBag )
+import FastString	( mkFastString )
 
 import Directory        ( getModificationTime, doesFileExist )
 import Maybe		( isJust, isNothing, fromJust, fromMaybe, catMaybes )
@@ -652,7 +654,21 @@ checkModule session@(Session ref) mod msg_act = do
    case [ ms | ms <- mg, ms_mod ms == mod ] of
 	[] -> return Nothing
 	(ms:_) -> do 
-	   r <- hscFileCheck hsc_env msg_act ms
+	   -- Add in the OPTIONS from the source file This is nasty:
+	   -- we've done this once already, in the compilation manager
+	   -- It might be better to cache the flags in the
+	   -- ml_hspp_file field, say
+	   let dflags0 = hsc_dflags hsc_env
+	       hspp_buf = expectJust "GHC.checkModule" (ms_hspp_buf ms)
+	       opts = getOptionsFromStringBuffer hspp_buf
+	   (dflags1,leftovers) <- parseDynamicFlags dflags0 (map snd opts)
+	   if (not (null leftovers))
+		then do let filename = fromJust (ml_hs_file (ms_location ms))
+			msg_act (optionsErrorMsgs leftovers opts filename)
+		        return Nothing
+		else do
+
+	   r <- hscFileCheck hsc_env{hsc_dflags=dflags1} msg_act ms
 	   case r of
 		HscFail -> 
 		   return Nothing
@@ -1398,7 +1414,7 @@ preprocessFile dflags src_fn (Just (buf, time))
 	let 
 	    local_opts = getOptionsFromStringBuffer buf
 	--
-	(dflags', errs) <- parseDynamicFlags dflags local_opts
+	(dflags', errs) <- parseDynamicFlags dflags (map snd local_opts)
 
 	let
 	    needs_preprocessing

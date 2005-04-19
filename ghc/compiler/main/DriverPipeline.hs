@@ -22,7 +22,8 @@ module DriverPipeline (
         -- DLL building
    doMkDLL,
 
-   getOptionsFromStringBuffer, -- used in module GHC
+   getOptionsFromStringBuffer,	-- used in module GHC
+   optionsErrorMsgs,	  	-- ditto
   ) where
 
 #include "HsVersions.h"
@@ -50,6 +51,9 @@ import Maybes		( expectJust )
 import Ctype		( is_ident )
 import StringBuffer	( StringBuffer(..), lexemeToString )
 import ParserCoreUtils	( getCoreModuleName )
+import SrcLoc		( srcLocSpan, mkSrcLoc )
+import FastString	( mkFastString )
+import Bag		( listToBag, emptyBag )
 
 import EXCEPTION
 import DATA_IOREF	( readIORef, writeIORef, IORef )
@@ -127,8 +131,11 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
    -- It might be better to cache the flags in the ml_hspp_file field,say
    let hspp_buf = expectJust "compile:hspp_buf" (ms_hspp_buf mod_summary)
        opts = getOptionsFromStringBuffer hspp_buf
-   (dflags1,unhandled_flags) <- parseDynamicFlags dflags0 opts
-   checkProcessArgsResult unhandled_flags input_fn
+   (dflags1,unhandled_flags) <- parseDynamicFlags dflags0 (map snd opts)
+   if (not (null unhandled_flags))
+	then do msg_act (optionsErrorMsgs unhandled_flags opts input_fn)
+		return CompErrs
+	else do
 
    let (basename, _) = splitFilename input_fn
 
@@ -1307,22 +1314,22 @@ getOptionsFromSource file
                               return (opts ++ rest)
 		       | otherwise -> return []
 
-getOptionsFromStringBuffer :: StringBuffer -> [String]
+getOptionsFromStringBuffer :: StringBuffer -> [(Int,String)]
 getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) = 
   let 
 	ls = lines (lexemeToString buffer (I# len#))  -- lazy, so it's ok
   in
-  look ls
+  look 1 ls
   where
-	look [] = []
-	look (l':ls) = do
+	look i [] = []
+	look i (l':ls) = do
 	    let l = removeSpaces l'
 	    case () of
-		() | null l -> look ls
-		   | prefixMatch "#" l -> look ls
-		   | prefixMatch "{-# LINE" l -> look ls   -- -}
+		() | null l -> look (i+1) ls
+		   | prefixMatch "#" l -> look (i+1) ls
+		   | prefixMatch "{-# LINE" l -> look (i+1) ls   -- -}
 		   | Just opts <- matchOptions l
-			-> opts ++ look ls
+			-> zip (repeat i) opts ++ look (i+1) ls
 		   | otherwise -> []
 
 -- detect {-# OPTIONS_GHC ... #-}.  For the time being, we accept OPTIONS
@@ -1350,6 +1357,19 @@ matchOptions s
     | Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (words (reverse s3))
     | otherwise = Nothing
 
+
+optionsErrorMsgs :: [String] -> [(Int,String)] -> FilePath -> Messages
+optionsErrorMsgs unhandled_flags flags_lines filename
+  = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
+  where
+	unhandled_flags_lines = [ (l,f) | f <- unhandled_flags, 
+					  (l,f') <- flags_lines, f == f' ]
+	mkMsg (line,flag) = 
+	    ErrUtils.mkPlainErrMsg (srcLocSpan loc) $
+		text "unknown flag in  {-# OPTIONS #-} pragma:" <+> text flag
+	  where
+		loc = mkSrcLoc (mkFastString filename) line 0
+		-- ToDo: we need a better SrcSpan here
 
 -- -----------------------------------------------------------------------------
 -- Misc.
