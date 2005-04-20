@@ -36,6 +36,7 @@ module GHC (
 	loadMsgs,
 	workingDirectoryChanged,
 	checkModule, CheckedModule(..),
+	TypecheckedSource, ParsedSource,
 
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..),
@@ -48,6 +49,8 @@ module GHC (
 	getModuleInfo,
 	modInfoTyThings,
 	modInfoTopLevelScope,
+	modInfoPrintUnqualified,
+	modInfoExports,
 	lookupName,
 
 	-- * Interactive evaluation
@@ -1557,6 +1560,9 @@ modInfoTopLevelScope minf
 
 modInfoExports :: ModuleInfo -> [Name]
 modInfoExports minf = nameSetToList $! (md_exports $! minf_details minf)
+
+modInfoPrintUnqualified :: ModuleInfo -> Maybe PrintUnqualified
+modInfoPrintUnqualified minf = fmap unQualInScope (minf_rdr_env minf)
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id
