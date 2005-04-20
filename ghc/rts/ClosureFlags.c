@@ -73,15 +73,14 @@ StgWord16 closure_flags[] = {
 /* STOP_FRAME	   	= */ (     _BTM                                  ),
 /* CAF_BLACKHOLE   	= */ ( 	   _BTM|_NS|              _UPT           ),
 /* BLACKHOLE		= */ ( 	        _NS|              _UPT           ),
-/* BLACKHOLE_BQ	   	= */ ( 	        _NS|         _MUT|_UPT           ),
 /* SE_BLACKHOLE		= */ ( 	        _NS|              _UPT           ),
 /* SE_CAF_BLACKHOLE	= */ ( 	        _NS|              _UPT           ),
 /* MVAR		   	= */ (_HNF|     _NS|         _MUT|_UPT           ),
 /* ARR_WORDS		= */ (_HNF|     _NS|              _UPT           ),
 /* MUT_ARR_PTRS	   	= */ (_HNF|     _NS|         _MUT|_UPT           ),
+/* MUT_ARR_PTRS_FROZEN0	= */ (_HNF|     _NS|              _UPT           ),
 /* MUT_ARR_PTRS_FROZEN 	= */ (_HNF|     _NS|              _UPT           ),
 /* MUT_VAR		= */ (_HNF|     _NS|         _MUT|_UPT           ),
-/* MUT_CONS		= */ (_HNF|     _NS|              _UPT           ),
 /* WEAK		   	= */ (_HNF|     _NS|              _UPT           ),
 /* FOREIGN		= */ (_HNF|     _NS|              _UPT           ),
 /* STABLE_NAME	   	= */ (_HNF|     _NS|              _UPT           ),
@@ -98,6 +97,10 @@ StgWord16 closure_flags[] = {
 /* TREC_HEADER          = */ (          _NS|         _MUT|_UPT           ),
 /* ATOMICALLY_FRAME     = */ (     _BTM                                  ),
 /* CATCH_RETRY_FRAME    = */ (     _BTM                                  ),
-/* CATCH_STM_FRAME      = */ (     _BTM                                  ),
-/* STACK		= */ (_HNF|     _NS|         _MUT                )
+/* CATCH_STM_FRAME      = */ (     _BTM                                  )
 };
+
+#if N_CLOSURE_TYPES != 72
+#error Closure types changed: update ClosureFlags.c!
+#endif
+
