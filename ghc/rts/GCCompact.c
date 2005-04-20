@@ -841,11 +841,6 @@ update_bkwd_compact( step *stp )
 		move(free,p,size);
 	    }
 
-	    // Rebuild the mutable list for the old generation.
-	    if (ip_MUTABLE(info)) {
-		recordMutable((StgClosure *)free);
-	    }
-
 	    // relocate TSOs
 	    if (info->type == TSO) {
 		move_TSO((StgTSO *)p, (StgTSO *)free);
