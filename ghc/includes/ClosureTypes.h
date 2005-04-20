@@ -1,15 +1,24 @@
 /* ----------------------------------------------------------------------------
  * 
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2005
  *
- * Closure Type Constants
+ * Closure Type Constants: out here because the native code generator
+ * needs to get at them.
  *
  * -------------------------------------------------------------------------- */
 
 #ifndef CLOSURETYPES_H
 #define CLOSURETYPES_H
 
-/* Out here because the native code generator needs to get at them. */
+/* 
+ * WARNING WARNING WARNING
+ *
+ * Keep the closure tags contiguous: rts/ClosureFlags.c relies on
+ * this.
+ *
+ * If you add or delete any closure types, don't forget to update
+ * the closure flags table in rts/ClosureFlags.c.
+ */
 
 /* Object tag 0 raises an internal error */
 #define INVALID_OBJECT          0
@@ -59,31 +68,31 @@
 #define STOP_FRAME	        44
 #define CAF_BLACKHOLE		45
 #define BLACKHOLE	        46
-#define SE_BLACKHOLE		48
-#define SE_CAF_BLACKHOLE	49
-#define MVAR		        50
-#define ARR_WORDS	        51
-#define MUT_ARR_PTRS	        52
-#define MUT_ARR_PTRS_FROZEN0    53
-#define MUT_ARR_PTRS_FROZEN     54
-#define MUT_VAR		        55
-#define WEAK		        56
-#define FOREIGN		        57
-#define STABLE_NAME	        58
-#define TSO		        59
-#define BLOCKED_FETCH	        60
-#define FETCH_ME                61
-#define FETCH_ME_BQ             62
-#define RBH                     63
-#define EVACUATED               64
-#define REMOTE_REF              65
-#define TVAR_WAIT_QUEUE         66
-#define TVAR                    67
-#define TREC_CHUNK              68
-#define TREC_HEADER             69
-#define ATOMICALLY_FRAME        70
-#define CATCH_RETRY_FRAME       71
-#define CATCH_STM_FRAME         72
-#define N_CLOSURE_TYPES         73
+#define SE_BLACKHOLE		47
+#define SE_CAF_BLACKHOLE	48
+#define MVAR		        59
+#define ARR_WORDS	        50
+#define MUT_ARR_PTRS	        51
+#define MUT_ARR_PTRS_FROZEN0    52
+#define MUT_ARR_PTRS_FROZEN     53
+#define MUT_VAR		        54
+#define WEAK		        55
+#define FOREIGN		        56
+#define STABLE_NAME	        57
+#define TSO		        58
+#define BLOCKED_FETCH	        69
+#define FETCH_ME                60
+#define FETCH_ME_BQ             61
+#define RBH                     62
+#define EVACUATED               63
+#define REMOTE_REF              64
+#define TVAR_WAIT_QUEUE         65
+#define TVAR                    66
+#define TREC_CHUNK              67
+#define TREC_HEADER             68
+#define ATOMICALLY_FRAME        79
+#define CATCH_RETRY_FRAME       70
+#define CATCH_STM_FRAME         71
+#define N_CLOSURE_TYPES         72
 
 #endif /* CLOSURETYPES_H */
