@@ -34,22 +34,30 @@ import Compat.Directory 	( findExecutable )
 main = do 
   args <- getArgs
   case args of
-    ('-':'f' : ghc) : filename : args -> do
-	doIt (dropWhile isSpace ghc) filename args
-    filename : args -> do
+    ('-':'f' : ghc) : args -> do
+	doIt (dropWhile isSpace ghc) args
+    args -> do
 	mb_ghc <- findExecutable "ghc"
 	case mb_ghc of
 	  Nothing  -> dieProg ("cannot find ghc")
-	  Just ghc -> doIt ghc filename args
-    _other -> do
-	dieProg "syntax: runghc [-f GHCPATH] FILE ARG..."
+	  Just ghc -> doIt ghc args
 
-doIt ghc filename args = do
-  res <- rawSystem ghc ["-ignore-dot-ghci", 
-			"-e","System.Environment.withProgName "++show filename++" (System.Environment.withArgs ["
-			++ concat (intersperse "," (map show args))
-			++ "] Main.main)", filename]
-  exitWith res
+doIt ghc args = do
+  let
+    (ghc_args, rest) = break notArg args
+  --
+  case rest of
+     [] -> dieProg "syntax: runghc [-f GHCPATH] [GHC-ARGS] FILE ARG..."
+     filename : prog_args -> do
+	  res <- rawSystem ghc (
+			"-ignore-dot-ghci" : ghc_args ++ 
+			[ "-e","System.Environment.withProgName "++show filename++" (System.Environment.withArgs ["
+			  ++ concat (intersperse "," (map show prog_args))
+			  ++ "] Main.main)", filename])
+  	  exitWith res
+
+notArg ('-':_) = False
+notArg _       = True
 
 dieProg :: String -> IO a
 dieProg msg = do
