@@ -18,8 +18,8 @@ GhcBinDistShScripts =
 endif
 
 GhcBinDistPrlScripts = 
-GhcBinDistLibPrlScripts = ghc-asm ghc-split
-GhcBinDistBins = hp2ps ghcprof runghc
+GhcBinDistLibPrlScripts = ghc-asm ghc-split ghcprof
+GhcBinDistBins = hp2ps runghc
 GhcBinDistOptBins = runhaskell
 GhcBinDistLinks = ghc ghci ghc-pkg
 GhcBinDistLibSplicedFiles = package.conf
