@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.68 2005/03/31 10:16:34 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.69 2005/04/21 15:28:20 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -119,7 +119,8 @@ cgStdRhsClosure bndr cc bndr_info fvs args body lf_info payload
   {	-- LAY OUT THE OBJECT
     amodes <- getArgAmodes payload
   ; mod_name <- moduleName
-  ; let (tot_wds, ptr_wds, amodes_w_offsets) = mkVirtHeapOffsets amodes
+  ; let (tot_wds, ptr_wds, amodes_w_offsets) 
+	    = mkVirtHeapOffsets (isLFThunk lf_info) amodes
 
 	descr	     = closureDescription mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
@@ -170,7 +171,9 @@ cgRhsClosure bndr cc bndr_info srt fvs upd_flag args body = do
   ; srt_info <- getSRTInfo name srt
   ; mod_name <- moduleName
   ; let	bind_details :: [(CgIdInfo, VirtualHpOffset)]
-	(tot_wds, ptr_wds, bind_details) = mkVirtHeapOffsets (map add_rep fv_infos)
+	(tot_wds, ptr_wds, bind_details) 
+	   = mkVirtHeapOffsets (isLFThunk lf_info) (map add_rep fv_infos)
+
 	add_rep info = (cgIdInfoArgRep info, info)
 
 	descr	     = closureDescription mod_name name

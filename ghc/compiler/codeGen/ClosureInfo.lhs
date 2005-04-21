@@ -29,8 +29,8 @@ module ClosureInfo (
 
 	closureName, infoTableLabelFromCI,
 	closureLabelFromCI, closureSRT,
-	closureLFInfo, closureSMRep, closureUpdReqd, 
-	closureNeedsUpdSpace,
+	closureLFInfo, isLFThunk,closureSMRep, closureUpdReqd, 
+	closureNeedsUpdSpace, closureIsThunk,
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
 
@@ -297,6 +297,16 @@ mkLFImported id
       other -> mkLFArgument id -- Not sure of exact arity
 \end{code}
 
+\begin{code}
+isLFThunk :: LambdaFormInfo -> Bool
+isLFThunk (LFThunk _ _ _ _ _)  = True
+isLFThunk (LFBlackHole _)      = True
+	-- return True for a blackhole: this function is used to determine
+	-- whether to use the thunk header in SMP mode, and a blackhole
+	-- must have one.
+isLFThunk _ = False
+\end{code}
+
 %************************************************************************
 %*									*
 	Building ClosureInfos
@@ -343,29 +353,20 @@ mkConInfo dflags is_static data_con tot_wds ptr_wds
 
 \begin{code}
 closureSize :: ClosureInfo -> WordOff
-closureSize cl_info = fixedHdrSize + closureNonHdrSize cl_info
+closureSize cl_info = hdr_size + closureNonHdrSize cl_info
+  where hdr_size  | closureIsThunk cl_info = thunkHdrSize
+  		  | otherwise      	   = fixedHdrSize
+	-- All thunks use thunkHdrSize, even if they are non-updatable.
+	-- this is because we don't have separate closure types for
+	-- updatable vs. non-updatable thunks, so the GC can't tell the
+	-- difference.  If we ever have significant numbers of non-
+	-- updatable thunks, it might be worth fixing this.
 
 closureNonHdrSize :: ClosureInfo -> WordOff
 closureNonHdrSize cl_info
-  = tot_wds + computeSlopSize tot_wds 
-			      (closureSMRep cl_info)
-			      (closureNeedsUpdSpace cl_info) 
+  = tot_wds + computeSlopSize tot_wds cl_info
   where
     tot_wds = closureGoodStuffSize cl_info
-
--- we leave space for an update if either (a) the closure is updatable
--- or (b) it is a static thunk.  This is because a static thunk needs
--- a static link field in a predictable place (after the slop), regardless
--- of whether it is updatable or not.
-closureNeedsUpdSpace (ClosureInfo { closureLFInfo = 
-					LFThunk TopLevel _ _ _ _ }) = True
-closureNeedsUpdSpace cl_info = closureUpdReqd cl_info
-
-slopSize :: ClosureInfo -> WordOff
-slopSize cl_info
-  = computeSlopSize (closureGoodStuffSize cl_info)
-		    (closureSMRep cl_info)
-		    (closureNeedsUpdSpace cl_info)
 
 closureGoodStuffSize :: ClosureInfo -> WordOff
 closureGoodStuffSize cl_info
@@ -388,43 +389,51 @@ knowledge of what the storage manager does with the various
 representations...
 
 Slop Requirements:
-\begin{itemize}
-\item
-Updateable closures must be @mIN_UPD_SIZE@.
-	\begin{itemize}
-	\item
-	Indirections require 1 word
-	\item
-	Appels collector indirections 2 words
-	\end{itemize}
-THEREFORE: @mIN_UPD_SIZE = 2@.
 
-\item
-Collectable closures which are allocated in the heap
-must be	@mIN_SIZE_NonUpdHeapObject@.
+ - Updatable closures must be mIN_UPD_SIZE.
 
-Copying collector forward pointer requires 1 word
+ - Heap-resident Closures must be mIN_SIZE_NonUpdHeapObject
+   (to make room for an StgEvacuated during GC).
 
-THEREFORE: @mIN_SIZE_NonUpdHeapObject = 1@
-\end{itemize}
-
-Static closures have an extra ``static link field'' at the end, but we
-don't bother taking that into account here.
+In SMP mode, we don't play the mIN_UPD_SIZE game.  Instead, every
+thunk gets an extra padding word in the header, which takes the
+the updated value.
 
 \begin{code}
-computeSlopSize :: WordOff -> SMRep -> Bool -> WordOff
+slopSize cl_info = computeSlopSize payload_size cl_info
+  where payload_size = closureGoodStuffSize cl_info
 
-computeSlopSize tot_wds (GenericRep _ _ _ _) True		-- Updatable
-  = max 0 (mIN_UPD_SIZE - tot_wds)
+computeSlopSize :: WordOff -> ClosureInfo -> WordOff
+computeSlopSize payload_size cl_info
+  = max 0 (minPayloadSize smrep updatable - payload_size)
+  where
+	smrep        = closureSMRep cl_info
+	updatable    = closureNeedsUpdSpace cl_info
 
-computeSlopSize tot_wds (GenericRep True _ _ _) False	-- Non updatable
-  = 0							-- Static
+-- we leave space for an update if either (a) the closure is updatable
+-- or (b) it is a static thunk.  This is because a static thunk needs
+-- a static link field in a predictable place (after the slop), regardless
+-- of whether it is updatable or not.
+closureNeedsUpdSpace (ClosureInfo { closureLFInfo = 
+					LFThunk TopLevel _ _ _ _ }) = True
+closureNeedsUpdSpace cl_info = closureUpdReqd cl_info
 
-computeSlopSize tot_wds (GenericRep False _ _ _) False	-- Non updatable
-  = max 0 (mIN_SIZE_NonUpdHeapObject - tot_wds)		-- Dynamic
-
-computeSlopSize tot_wds BlackHoleRep _			-- Updatable
-  = max 0 (mIN_UPD_SIZE - tot_wds)
+minPayloadSize :: SMRep -> Bool -> WordOff
+minPayloadSize smrep updatable
+  = case smrep of
+	BlackHoleRep		 		-> min_upd_size
+	GenericRep _ _ _ _      | updatable     -> min_upd_size
+	GenericRep True _ _ _                   -> 0 -- static
+	GenericRep False _ _ _                  -> mIN_SIZE_NonUpdHeapObject
+          --       ^^^^^___ dynamic
+  where
+   min_upd_size
+	| opt_SMP   = ASSERT(mIN_SIZE_NonUpdHeapObject <= 
+				sIZEOF_StgSMPThunkHeader)
+		      0 	-- check that we already have enough
+				-- room for mIN_SIZE_NonUpdHeapObject,
+				-- due to the extra header word in SMP
+	| otherwise = mIN_UPD_SIZE
 \end{code}
 
 %************************************************************************
@@ -766,11 +775,19 @@ isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 
 closureUpdReqd :: ClosureInfo -> Bool
-closureUpdReqd (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _ }) = upd
-closureUpdReqd (ClosureInfo { closureLFInfo = LFBlackHole _ })     = True
+closureUpdReqd ClosureInfo{ closureLFInfo = lf_info } = lfUpdatable lf_info
+closureUpdReqd ConInfo{} = False
+
+lfUpdatable :: LambdaFormInfo -> Bool
+lfUpdatable (LFThunk _ _ upd _ _)  = upd
+lfUpdatable (LFBlackHole _)	   = True
 	-- Black-hole closures are allocated to receive the results of an
 	-- alg case with a named default... so they need to be updated.
-closureUpdReqd other_closure = False
+lfUpdatable _ = False
+
+closureIsThunk :: ClosureInfo -> Bool
+closureIsThunk ClosureInfo{ closureLFInfo = lf_info } = isLFThunk lf_info
+closureIsThunk ConInfo{} = False
 
 closureSingleEntry :: ClosureInfo -> Bool
 closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd

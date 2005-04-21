@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.45 2005/03/31 10:16:34 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.46 2005/04/21 15:28:20 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -40,7 +40,8 @@ import ClosureInfo	( closureSize, staticClosureNeedsLink,
 			  nodeMustPointToIt, closureLFInfo, 			
 			  ClosureInfo )
 import SMRep		( CgRep(..), cgRepSizeW, separateByPtrFollowness,
-			  WordOff, fixedHdrSize, isVoidArg, primRepToCgRep )
+			  WordOff, fixedHdrSize, thunkHdrSize,
+			  isVoidArg, primRepToCgRep )
 
 import Cmm		( CmmLit(..), CmmStmt(..), CmmExpr(..), GlobalReg(..),
 			  CmmReg(..), hpReg, nodeReg, spReg )
@@ -140,7 +141,7 @@ layOutConstr  is_static dflags data_con args
   where
     (tot_wds,		 --  #ptr_wds + #nonptr_wds
      ptr_wds,		 --  #ptr_wds
-     things_w_offsets) = mkVirtHeapOffsets args
+     things_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} args
 \end{code}
 
 @mkVirtHeapOffsets@ always returns boxed things with smaller offsets
@@ -149,7 +150,8 @@ list
 
 \begin{code}
 mkVirtHeapOffsets
-	  :: [(CgRep,a)]	-- Things to make offsets for
+	  :: Bool		-- True <=> is a thunk
+	  -> [(CgRep,a)]	-- Things to make offsets for
 	  -> (WordOff,		-- _Total_ number of words allocated
 	      WordOff,		-- Number of words allocated for *pointers*
 	      [(a, VirtualHpOffset)])
@@ -158,7 +160,7 @@ mkVirtHeapOffsets
 
 -- First in list gets lowest offset, which is initial offset + 1.
 
-mkVirtHeapOffsets things
+mkVirtHeapOffsets is_thunk things
   = let non_void_things		      = filterOut (isVoidArg . fst) things
 	(ptrs, non_ptrs)    	      = separateByPtrFollowness non_void_things
     	(wds_of_ptrs, ptrs_w_offsets) = mapAccumL computeOffset 0 ptrs
@@ -166,8 +168,11 @@ mkVirtHeapOffsets things
     in
     (tot_wds, wds_of_ptrs, ptrs_w_offsets ++ non_ptrs_w_offsets)
   where
+    hdr_size 	| is_thunk   = thunkHdrSize
+		| otherwise  = fixedHdrSize
+
     computeOffset wds_so_far (rep, thing)
-      = (wds_so_far + cgRepSizeW rep, (thing, fixedHdrSize + wds_so_far))
+      = (wds_so_far + cgRepSizeW rep, (thing, hdr_size + wds_so_far))
 \end{code}
 
 
@@ -226,6 +231,7 @@ mkStaticClosureFields cl_info ccs caf_refs payload
     static_link_value
 	| caf_refs	= mkIntCLit 0
 	| otherwise	= mkIntCLit 1
+
 
 mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
