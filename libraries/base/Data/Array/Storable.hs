@@ -34,7 +34,9 @@ module Data.Array.Storable (
     -- * Accessing the pointer to the array contents
     withStorableArray, -- :: StorableArray i e -> (Ptr e -> IO a) -> IO a
     
-    touchStorableArray -- :: StorableArray i e -> IO ()
+    touchStorableArray, -- :: StorableArray i e -> IO ()
+
+    unsafeForeignPtrToStorableArray
     )
     where
 
@@ -82,3 +84,11 @@ withStorableArray (StorableArray _ _ fp) f = withForeignPtr fp f
 -- so the array is not freed too early.
 touchStorableArray :: StorableArray i e -> IO ()
 touchStorableArray (StorableArray _ _ fp) = touchForeignPtr fp
+
+-- |Construct a 'StorableArray' from an arbitrary 'ForeignPtr'.  It is
+-- the caller's responsibility to ensure that the 'ForeignPtr' points to
+-- an area of memory sufficient for the specified bounds.
+unsafeForeignPtrToStorableArray 
+   :: ForeignPtr e -> (i,i) -> IO (StorableArray i e)
+unsafeForeignPtrToStorableArray p (l,u) =
+   return (StorableArray l u p)
