@@ -1958,7 +1958,7 @@ scheduleDoGC( Capability *cap STG_UNUSED )
 StgBool
 rtsSupportsBoundThreads(void)
 {
-#ifdef THREADED_RTS
+#if defined(RTS_SUPPORTS_THREADS)
   return rtsTrue;
 #else
   return rtsFalse;
@@ -1972,7 +1972,7 @@ rtsSupportsBoundThreads(void)
 StgBool
 isThreadBound(StgTSO* tso USED_IN_THREADED_RTS)
 {
-#ifdef THREADED_RTS
+#if defined(RTS_SUPPORTS_THREADS)
   return (tso->main != NULL);
 #endif
   return rtsFalse;
