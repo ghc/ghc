@@ -366,8 +366,8 @@ pprLit :: CmmLit -> SDoc
 pprLit lit = case lit of
     CmmInt i rep      -> pprHexVal i rep
     CmmFloat f rep     -> parens (machRepCType rep) <> (rational f)
-    CmmLabel clbl      -> mkW_ <> pprCLabel clbl
-    CmmLabelOff clbl i -> mkW_ <> pprCLabel clbl <> char '+' <> int i
+    CmmLabel clbl      -> mkW_ <> pprCLabelAddr clbl
+    CmmLabelOff clbl i -> mkW_ <> pprCLabelAddr clbl <> char '+' <> int i
     CmmLabelDiffOff clbl1 clbl2 i
         -- WARNING:
         --  * the lit must occur in the info table clbl2
@@ -375,7 +375,9 @@ pprLit lit = case lit of
         -- The Mangler is expected to convert any reference to an SRT,
         -- a slow entry point or a large bitmap
         -- from an info table to an offset.
-        -> mkW_ <> pprCLabel clbl1 <> char '+' <> int i
+        -> mkW_ <> pprCLabelAddr clbl1 <> char '+' <> int i
+
+pprCLabelAddr lbl = char '&' <> pprCLabel lbl
 
 pprLit1 :: CmmLit -> SDoc
 pprLit1 lit@(CmmLabelOff _ _) = parens (pprLit lit)
