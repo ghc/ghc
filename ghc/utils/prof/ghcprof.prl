@@ -1,16 +1,16 @@
 # -----------------------------------------------------------------------------
-# $Id: ghcprof.prl,v 1.4 2000/09/05 10:16:41 simonmar Exp $
+# $Id: ghcprof.prl,v 1.5 2005/04/22 08:41:00 simonmar Exp $
 #
 # (c) The GHC Team 2000
 #
-# needs: FPTOOLS_TOP_ABS, INSTALLING, DEFAULT_TMPDIR, TARGETPLATFORM, libdir, libexecdir
+# needs: FPTOOLS_TOP_ABS, INSTALLING, DEFAULT_TMPDIR, TARGETPLATFORM, libexecdir
 #
 
-if ($ENV{'DAVINCIHOME'}) {
-    $davincihome = $ENV{'DAVINCIHOME'};
-    $davinci     = $davincihome . "/daVinci";
+if ($ENV{'UDG_HOME'}) {
+    $udrawgraphhome = $ENV{'UDG_HOME'};
+    $udrawgraph     = $udrawgraphhome . "/bin/uDrawGraph";
 } else {
-    print STDERR "ghcprof: DAVINCIHOME environment variable not set";
+    print STDERR "ghcprof: UDG_HOME environment variable not set\n";
     exit(1);
 }
 
@@ -20,7 +20,7 @@ $bsp_l         = 12;
 $bsp_g         = 13;
 $MaxNoNodes    = 1900;
 
-$icondir    = ( $INSTALLING ? "$libdir/icons" 
+$icondir    = ( $INSTALLING ? "$libexecdir/icons" 
 	                    : "$FPTOOLS_TOP_ABS/ghc/utils/prof/icons" );
  
 $xmlparser  = ( $INSTALLING ? "$libexecdir/xmlparser"
@@ -37,20 +37,32 @@ if ( $ENV{'TMPDIR'} ) {
     $ENV{'TMPDIR'} = "${DEFAULT_TMPDIR}"; # set the env var as well
 }
 
-# Create an new temporary filename.
+# Create a new temporary filename.
 $i = $$;
 $tempfile = "";
 while (-e ($tempfile = "$Tmp_prefix" . "$i")) {
     $i++;
 };
 
+# Create a second temporary filename.
+$i = $$;
+$tempfile2 = "";
+while (-e ($tempfile2 = "$Tmp_prefix" . "$i" . ".sh")) {
+    $i++;
+};
+
 # Delete temp. file if script is halted.
 sub quit_upon_signal { 
-    if ($tempfile ne "") {
-	print STDERR "Deleting $tempfile .. \n"; 
+    if ($tempfile ne "" && -e $tempfile) {
+	print STDERR "Deleting $tempfile .. \n" if $Verbose; 
 	unlink "$tempfile"; 
+    };
+    if ($tempfile2 ne "" && -e $tempfile2) {
+	print STDERR "Deleting $tempfile2 .. \n" if $Verbose; 
+	unlink "$tempfile2"; 
     }
 }
+
 $SIG{'INT'}  = 'quit_upon_signal';
 $SIG{'QUIT'} = 'quit_upon_signal';
 
@@ -58,10 +70,7 @@ sub tidy_up_and_die {
     local($msg) = @_;
     
     print STDERR "$Pgm: $msg\n";
-    if ($tempfile ne "" && -e $tempfile) {
-	print STDERR "Deleting $tempfile .. \n" if $Verbose; 
-	unlink "$tempfile"; 
-    }
+    quit_upon_signal;
     exit(1);
 }
 
@@ -220,13 +229,21 @@ close(INPUT);
 close(TEMPFILE);
 
 &readProfileHeader();
-$cmd = sprintf("%s -startappl %s 'cgprof %s %d \"%s\" ".
-	       "\"%s\" %.1f %.1f %.1f %.1f %d %d %d %d %d'",
-	       $davinci,$cgprof_dir,$tempfile,$nprocs,$machname,$date,
+open(TEMPFILE2, ">$tempfile2") 
+                || tidy_up_and_die("can't create `$tempfile2'");
+
+$shcmd = sprintf("%s/cgprof %s %d \"%s\" " .
+	       "\"%s\" %.1f %.1f %.1f %.1f %d %d %d %d %d",
+	       $cgprof_dir,$tempfile,$nprocs,$machname,$date,
 	       $bsp_s,$bsp_l,$bsp_g,$hide,$Verbose,$Logo,$Colour,
 	       $DeltaNormalise,$MaxNoNodes);
-$cmd = "env DAVINCI_ICONDIR=$icondir TCL_LIBRARY=$davincihome/lib/tcl ".
-    "TK_LIBRARY=$davincihome/lib/tk DAVINCIHOME=$davincihome " . $cmd;
+print TEMPFILE2 "#!/bin/sh\n";
+print TEMPFILE2 "$shcmd\n";
+close(TEMPFILE2);
+
+chmod 0755, $tempfile2;
+$cmd = "env UDG_ICONDIR=$icondir UDG_HOME=$udrawgraphhome " . 
+         $udrawgraph . " -startappl . $tempfile2";
 print STDERR "$Pgm: exec $cmd\n" if $Verbose;
 exec $cmd;
 exit(0);
