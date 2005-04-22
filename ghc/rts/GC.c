@@ -1996,6 +1996,48 @@ loop:
    been BLACKHOLE'd, and should be updated with an indirection or a
    forwarding pointer.  If the return value is NULL, then the selector
    thunk is unchanged.
+
+   ***
+   ToDo: the treatment of THUNK_SELECTORS could be improved in the
+   following way (from a suggestion by Ian Lynagh):
+
+   We can have a chain like this:
+
+      sel_0 --> (a,b)
+                 |
+                 |-----> sel_0 --> (a,b)
+                                    |
+                                    |-----> sel_0 --> ...
+
+   and the depth limit means we don't go all the way to the end of the
+   chain, which results in a space leak.  This affects the recursive
+   call to evacuate() in the THUNK_SELECTOR case in evacuate(): *not*
+   the recursive call to eval_thunk_selector() in
+   eval_thunk_selector().
+
+   We could eliminate the depth bound in this case, in the following
+   way:
+
+      - traverse the chain once to discover the *value* of the 
+        THUNK_SELECTOR.  Mark all THUNK_SELECTORS that we
+        visit on the way as having been visited already (somehow).
+
+      - in a second pass, traverse the chain again updating all
+        THUNK_SEELCTORS that we find on the way with indirections to
+        the value.
+
+      - if we encounter a "marked" THUNK_SELECTOR in a normal 
+        evacuate(), we konw it can't be updated so just evac it.
+
+   Program that illustrates the problem:
+
+	foo [] = ([], [])
+	foo (x:xs) = let (ys, zs) = foo xs
+	             in if x >= 0 then (x:ys, zs) else (ys, x:zs)
+
+	main = bar [1..(100000000::Int)]
+	bar xs = (\(ys, zs) -> print ys >> print zs) (foo xs)
+
    -------------------------------------------------------------------------- */
 
 static inline rtsBool
