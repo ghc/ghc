@@ -1,1 +1,1 @@
-Fail: nonexistent: IO.openFile: does not exist (file does not exist)
+openFile002: nonexistent: IO.openFile: does not exist (file does not exist)
