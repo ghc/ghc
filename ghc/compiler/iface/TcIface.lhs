@@ -30,7 +30,7 @@ import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName, isSynTyCon )
 import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
 			  HscEnv, TyThing(..), tyThingClass, tyThingTyCon, 
-			  ModIface(..), ModDetails(..), ModGuts,
+			  ModIface(..), ModDetails(..), ModGuts, HomeModInfo(..),
 			  emptyModDetails,
 			  extendTypeEnv, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( extendInstEnvList )
@@ -64,7 +64,7 @@ import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength )
-import DynFlags	( DynFlag(..) )
+import DynFlags		( DynFlag(..), isOneShot )
 \end{code}
 
 This module takes
@@ -222,9 +222,21 @@ tcHiBootIface :: Module -> TcRn ModDetails
 tcHiBootIface mod
   = do 	{ traceIf (text "loadHiBootInterface" <+> ppr mod)
 
-	-- We're read all the direct imports by now, so eps_is_boot will
-	-- record if any of our imports mention us by way of hi-boot file
-	; eps <- getEps
+	; mode <- getGhciMode
+	; if not (isOneShot mode)
+		-- In --make and interactive mode, if this module has an hs-boot file
+		-- we'll have compiled it already, and it'll be in the HPT
+	  then do { hpt <- getHpt
+		  ; case lookupModuleEnv hpt mod of
+		      Just info -> return (hm_details info)
+		      Nothing   -> return emptyModDetails }
+	  else do
+
+	-- OK, so we're in one-shot mode.  
+	-- In that case, we're read all the direct imports by now, 
+	-- so eps_is_boot will record if any of our imports mention us by 
+	-- way of hi-boot file
+	{ eps <- getEps
 	; case lookupModuleEnv (eps_is_boot eps) mod of {
 	    Nothing -> return emptyModDetails ;	-- The typical case
 
@@ -242,7 +254,7 @@ tcHiBootIface mod
 	; case read_result of
 		Failed err               -> failWithTc (elaborate err)
 		Succeeded (iface, _path) -> typecheckIface iface
-    }}}
+    }}}}
   where
     need = ptext SLIT("Need the hi-boot interface for") <+> ppr mod
 		 <+> ptext SLIT("to compare against the Real Thing")
