@@ -22,6 +22,7 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
+#include "StoragePriv.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -62,18 +63,6 @@ Mutex sm_mutex = INIT_MUTEX_VAR;
 static void *stgAllocForGMP   (size_t size_in_bytes);
 static void *stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
 static void  stgDeallocForGMP (void *ptr, size_t size);
-
-/*
- * Storage manager mutex
- */
-#if defined(SMP)
-extern Mutex sm_mutex;
-#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex)
-#define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex)
-#else
-#define ACQUIRE_SM_LOCK
-#define RELEASE_SM_LOCK
-#endif
 
 static void
 initStep (step *stp, int g, int s)

@@ -8,7 +8,6 @@
 #ifndef __TIMER_H__
 #define __TIMER_H__
 
-# define TICK_FREQUENCY   50                      /* ticks per second */
 # define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
 
 /* Context switch timing constants. Context switches happen after a

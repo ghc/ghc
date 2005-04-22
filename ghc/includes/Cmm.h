@@ -505,4 +505,10 @@
     TICK_BUMP(ALLOC_HEAP_ctr);			\
     TICK_BUMP_BY(ALLOC_HEAP_tot,n)
 
+/* -----------------------------------------------------------------------------
+   Misc junk
+   -------------------------------------------------------------------------- */
+
+#define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
+
 #endif /* CMM_H */

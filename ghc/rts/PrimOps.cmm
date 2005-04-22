@@ -166,6 +166,10 @@ atomicModifyMutVarzh_fast
     W_ mv, z, x, y, r;
     /* Args: R1 :: MutVar#,  R2 :: a -> (a,b) */
 
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+#endif
+
     /* If x is the current contents of the MutVar#, then 
        We want to make the new contents point to
 
@@ -183,18 +187,18 @@ atomicModifyMutVarzh_fast
     */
 
 #if MIN_UPD_SIZE > 1
-#define THUNK_1_SIZE (SIZEOF_StgHeader + WDS(MIN_UPD_SIZE))
+#define THUNK_1_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
 #define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),WDS(MIN_UPD_SIZE-1))
 #else
-#define THUNK_1_SIZE (SIZEOF_StgHeader + WDS(1))
+#define THUNK_1_SIZE (SIZEOF_StgThunkHeader + WDS(1))
 #define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),0)
 #endif
 
 #if MIN_UPD_SIZE > 2
-#define THUNK_2_SIZE (SIZEOF_StgHeader + WDS(MIN_UPD_SIZE))
+#define THUNK_2_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
 #define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),WDS(MIN_UPD_SIZE-2))
 #else
-#define THUNK_2_SIZE (SIZEOF_StgHeader + WDS(2))
+#define THUNK_2_SIZE (SIZEOF_StgThunkHeader + WDS(2))
 #define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),0)
 #endif
 
@@ -209,15 +213,15 @@ atomicModifyMutVarzh_fast
    z = Hp - THUNK_2_SIZE + WDS(1);
    SET_HDR(z, stg_ap_2_upd_info, W_[CCCS]);
    LDV_RECORD_CREATE(z);
-   StgClosure_payload(z,0) = R2;
-   StgClosure_payload(z,1) = x;
+   StgThunk_payload(z,0) = R2;
+   StgThunk_payload(z,1) = x;
 
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);
    y = z - THUNK_1_SIZE;
    SET_HDR(y, stg_sel_0_upd_info, W_[CCCS]);
    LDV_RECORD_CREATE(y);
-   StgClosure_payload(y,0) = z;
+   StgThunk_payload(y,0) = z;
 
    StgMutVar_var(R1) = y;
 
@@ -226,7 +230,11 @@ atomicModifyMutVarzh_fast
    r = y - THUNK_1_SIZE;
    SET_HDR(r, stg_sel_1_upd_info, W_[CCCS]);
    LDV_RECORD_CREATE(r);
-   StgClosure_payload(r,0) = z;
+   StgThunk_payload(r,0) = z;
+
+#if defined(SMP)
+    foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 
    RET_P(r);
 }

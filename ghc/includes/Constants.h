@@ -266,4 +266,10 @@
 #error RESERVED_STACK_WORDS may be wrong!
 #endif
 
+/* -----------------------------------------------------------------------------
+   How often our context-switch timer ticks
+   -------------------------------------------------------------------------- */
+
+#define TICK_FREQUENCY   50                      /* ticks per second */
+
 #endif /* CONSTANTS_H */
