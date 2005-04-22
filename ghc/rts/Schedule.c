@@ -3739,12 +3739,12 @@ raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically)
 #ifdef PROFILING
 	    StgCatchFrame *cf = (StgCatchFrame *)frame;
 #endif
-	    StgClosure *raise;
+	    StgThunk *raise;
 	    
 	    // we've got an exception to raise, so let's pass it to the
 	    // handler in this frame.
 	    //
-	    raise = (StgClosure *)allocate(sizeofW(StgClosure)+1);
+	    raise = (StgThunk *)allocate(sizeofW(StgThunk)+1);
 	    TICK_ALLOC_SE_THK(1,0);
 	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
 	    raise->payload[0] = exception;
@@ -3849,7 +3849,7 @@ raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically)
 StgWord
 raiseExceptionHelper (StgTSO *tso, StgClosure *exception)
 {
-    StgClosure *raise_closure = NULL;
+    StgThunk *raise_closure = NULL;
     StgPtr p, next;
     StgRetInfoTable *info;
     //
@@ -3886,11 +3886,11 @@ raiseExceptionHelper (StgTSO *tso, StgClosure *exception)
 	    // Only create raise_closure if we need to.
 	    if (raise_closure == NULL) {
 		raise_closure = 
-		    (StgClosure *)allocate(sizeofW(StgClosure)+MIN_UPD_SIZE);
+		    (StgThunk *)allocate(sizeofW(StgThunk)+MIN_UPD_SIZE);
 		SET_HDR(raise_closure, &stg_raise_info, CCCS);
 		raise_closure->payload[0] = exception;
 	    }
-	    UPD_IND(((StgUpdateFrame *)p)->updatee,raise_closure);
+	    UPD_IND(((StgUpdateFrame *)p)->updatee,(StgClosure *)raise_closure);
 	    p = next;
 	    continue;
 
