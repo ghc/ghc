@@ -10,6 +10,7 @@ ALL_DIRS = \
 	System/Directory \
 	cbits
 
+SplitObjs=NO
 LIBRARY = libghccompat.a
 
 # We don't want this installed
