@@ -38,7 +38,7 @@ initUserSignals(void)
     if (hConsoleEvent == INVALID_HANDLE_VALUE) {
 	hConsoleEvent = 
 	    CreateEvent ( NULL,  /* default security attributes */
-			  FALSE, /* auto-reset event */
+			  TRUE,  /* manual-reset event */
 			  FALSE, /* initially non-signalled */
 			  NULL); /* no name */
     }
@@ -291,7 +291,9 @@ rts_ConsoleHandlerDone(int ev)
     if ( (DWORD)ev == CTRL_BREAK_EVENT ||
 	 (DWORD)ev == CTRL_C_EVENT ) {
 	/* only these two cause stdin system calls to abort.. */
-	SetEvent(hConsoleEvent); /* event is auto-reset */
+	SetEvent(hConsoleEvent); /* event is manual-reset */
+	Sleep(0); /* yield */
+	ResetEvent(hConsoleEvent); /* turn it back off again */
     }
 }
 
