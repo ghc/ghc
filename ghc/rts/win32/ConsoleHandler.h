@@ -99,4 +99,12 @@ extern void markSignalHandlers (evac_fn evac);
  */
 extern void handleSignalsInThisThread(void);
 
+/*
+ * Function: rts_waitConsoleHandlerCompletion()
+ *
+ * Esoteric entry point used by worker thread that got woken
+ * up as part Ctrl-C delivery.
+ */
+extern int rts_waitConsoleHandlerCompletion(void);
+
 #endif /* __CONSOLEHANDLER_H__ */

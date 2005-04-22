@@ -296,7 +296,8 @@ typedef struct _RtsSymbolVal {
       SymX(log)                                 \
       SymX(sqrt)                                \
       SymX(memcpy)                              \
-      SymX(stg_InstallConsoleEvent)             \
+      SymX(rts_InstallConsoleEvent)             \
+      SymX(rts_ConsoleHandlerDone)              \
       Sym(mktime)                               \
       Sym(_imp___timezone)                      \
       Sym(_imp___tzname)                        \
@@ -1981,7 +1982,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           && 0 != strcmp(".stab", sectab_i->Name)
           && 0 != strcmp(".stabstr", sectab_i->Name)
          ) {
-         errorBelch("Unknown PEi386 section name `%s'", sectab_i->Name);
+         errorBelch("Unknown PEi386 section name `%s' (while processing: %s)", sectab_i->Name, oc->fileName);
          return 0;
       }
 

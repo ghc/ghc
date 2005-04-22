@@ -19,6 +19,8 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType);
 static rtsBool deliver_event = rtsTrue;
 static StgInt console_handler = STG_SIG_DFL;
 
+static HANDLE hConsoleEvent = INVALID_HANDLE_VALUE;
+
 #define N_PENDING_EVENTS 16
 StgInt stg_pending_events = 0;           /* number of undelivered events */
 DWORD stg_pending_buf[N_PENDING_EVENTS]; /* their associated event numbers. */
@@ -33,6 +35,13 @@ initUserSignals(void)
 {
     stg_pending_events = 0;
     console_handler = STG_SIG_DFL;
+    if (hConsoleEvent == INVALID_HANDLE_VALUE) {
+	hConsoleEvent = 
+	    CreateEvent ( NULL,  /* default security attributes */
+			  FALSE, /* auto-reset event */
+			  FALSE, /* initially non-signalled */
+			  NULL); /* no name */
+    }
     return;
 }
 
@@ -216,12 +225,12 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 
 
 /*
- * Function: stg_InstallConsoleEvent()
+ * Function: rts_InstallConsoleEvent()
  *
  * Install/remove a console event handler.
  */
 int
-stg_InstallConsoleEvent(int action, StgStablePtr *handler)
+rts_InstallConsoleEvent(int action, StgStablePtr *handler)
 {
     StgInt previous_hdlr = console_handler;
 
@@ -256,4 +265,47 @@ stg_InstallConsoleEvent(int action, StgStablePtr *handler)
 	*handler = (StgStablePtr)previous_hdlr;
 	return STG_SIG_HAN;
     }
+}
+
+/*
+ * Function: rts_HandledConsoleEvent()
+ *
+ * Signal that a Haskell console event handler has completed its run.
+ * The explicit notification that a Haskell handler has completed is 
+ * required to better handle the delivery of Ctrl-C/Break events whilst
+ * an async worker thread is handling a read request on stdin. The 
+ * Win32 console implementation will abort such a read request when Ctrl-C
+ * is delivered. That leaves the worker thread in a bind: should it 
+ * abandon the request (the Haskell thread reading from stdin has been 
+ * thrown an exception to signal the delivery of Ctrl-C & hence have 
+ * aborted the I/O request) or simply ignore the aborted read and retry?
+ * (the Haskell thread reading from stdin isn't concerned with the
+ * delivery and handling of Ctrl-C.) With both scenarios being
+ * possible, the worker thread needs to be told -- that is, did the
+ * console event handler cause the IO request to be abandoned? 
+ *
+ */
+void
+rts_ConsoleHandlerDone(int ev)
+{
+    if ( (DWORD)ev == CTRL_BREAK_EVENT ||
+	 (DWORD)ev == CTRL_C_EVENT ) {
+	/* only these two cause stdin system calls to abort.. */
+	SetEvent(hConsoleEvent); /* event is auto-reset */
+    }
+}
+
+/*
+ * Function: rts_waitConsoleHandlerCompletion()
+ *
+ * Esoteric entry point used by worker thread that got woken
+ * up as part Ctrl-C delivery.
+ */
+int
+rts_waitConsoleHandlerCompletion()
+{
+    /* As long as the worker doesn't need to do a multiple wait,
+     * let's keep this HANDLE private to this 'module'.
+     */
+    return (WaitForSingleObject(hConsoleEvent, INFINITE) == WAIT_OBJECT_0);
 }

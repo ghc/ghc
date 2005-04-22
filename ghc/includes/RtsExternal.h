@@ -63,7 +63,8 @@ extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
 extern void   freeHaskellFunctionPtr(void* ptr);
 
 #if defined(mingw32_HOST_OS)
-extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
+extern int  rts_InstallConsoleEvent ( int action, StgStablePtr *handler );
+extern void rts_ConsoleHandlerDone  ( int ev );
 #else
 extern int stg_sig_install (int, int, StgStablePtr *, void *);
 #endif

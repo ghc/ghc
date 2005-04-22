@@ -60,10 +60,12 @@ typedef union workData {
 } WorkData;
 
 typedef struct WorkItem {
-  unsigned int   workKind;
-  WorkData       workData;
-  unsigned int   requestID;
-  CompletionProc onCompletion;
+  unsigned int     workKind;
+  WorkData         workData;
+  unsigned int     requestID;
+  CompletionProc   onCompletion;
+  unsigned int     abandonOp;
+  struct WorkItem  *link;
 } WorkItem;
 
 extern CompletionProc onComplete;
@@ -102,5 +104,7 @@ extern int AddIORequest ( int            fd,
 extern int AddProcRequest ( void*          proc,
 			    void*          data,
 			    CompletionProc onCompletion);
+
+extern void abandonWorkRequest ( int reqID );
 
 #endif /* __IOMANAGER_H__ */

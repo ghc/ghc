@@ -261,7 +261,11 @@ runGHCi paths maybe_expr = do
 interactiveLoop is_tty show_prompt = do
   -- Ignore ^C exceptions caught here
   ghciHandleDyn (\e -> case e of 
-			Interrupted -> ghciUnblock (interactiveLoop is_tty show_prompt)
+			Interrupted -> ghciUnblock (
+#if defined(mingw32_HOST_OS)
+						io (putStrLn "") >> 
+#endif
+						interactiveLoop is_tty show_prompt)
 			_other      -> return ()) $ do
 
   -- read commands from stdin

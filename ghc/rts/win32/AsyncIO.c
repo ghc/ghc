@@ -200,9 +200,11 @@ start:
 	    DWORD dwRes = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
 	    switch (dwRes) {
 	    case WAIT_OBJECT_0:
+		/* a request was completed */
 		break;
 	    case WAIT_OBJECT_0 + 1:
 	    case WAIT_TIMEOUT:
+		/* timeout (unlikely) or told to abandon waiting */
 		return 0;
 	    case WAIT_FAILED: {
 		DWORD dw = GetLastError();

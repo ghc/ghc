@@ -4,8 +4,10 @@
  *
  * (c) sof, 2002-2003.
  */
+#include "Rts.h"
 #include "IOManager.h"
 #include "WorkQueue.h"
+#include "ConsoleHandler.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <io.h>
@@ -23,10 +25,16 @@ typedef struct IOManagerState {
     int              workersIdle;
     HANDLE           hExitEvent;
     unsigned int     requestID;
+    /* fields for keeping track of active WorkItems */
+    CritSection      active_work_lock;
+    WorkItem*        active_work_items;
 } IOManagerState;
 
 /* ToDo: wrap up this state via a IOManager handle instead? */
 static IOManagerState* ioMan;
+
+static void RegisterWorkItem  ( IOManagerState* iom, WorkItem* wi);
+static void DeregisterWorkItem( IOManagerState* iom, WorkItem* wi);
 
 /*
  * The routine executed by each worker thread.
@@ -86,6 +94,8 @@ IOWorkerProc(PVOID param)
 	if ( rc == (WAIT_OBJECT_0 + 1) ) {
 	    /* work item available, fetch it. */
 	    if (FetchWork(pq,(void**)&work)) {
+		work->abandonOp = 0;
+		RegisterWorkItem(iom,work);
 		if ( work->workKind & WORKER_READ ) {
 		    if ( work->workKind & WORKER_FOR_SOCKET ) {
 			len = recv(work->workData.ioData.fd, 
@@ -96,14 +106,11 @@ IOWorkerProc(PVOID param)
 			    errCode = WSAGetLastError();
 			}
 		    } else {
-			DWORD dw;
-
 			while (1) {
 			/* Do the read(), with extra-special handling for Ctrl+C */
 			len = read(work->workData.ioData.fd,
 				   work->workData.ioData.buf,
 				   work->workData.ioData.len);
-			dw = GetLastError();
 			if ( len == 0 && work->workData.ioData.len != 0 ) {
 			    /* Given the following scenario:
 			     *     - a console handler has been registered that handles Ctrl+C
@@ -116,28 +123,33 @@ IOWorkerProc(PVOID param)
 			     * The OS will invoke the console handler (in a separate OS thread),
 			     * and the above read() (i.e., under the hood, a ReadFile() op) returns
 			     * 0, with the error set to ERROR_OPERATION_ABORTED. We don't
-			     * want to percolate this non-EOF condition too far back up, but ignore
-			     * it. 
-			     *
-			     * However, we do want to give the RTS an opportunity to deliver the
-			     * console event. Take care of this in the low-level console handler
-			     * in ConsoleHandler.c which wakes up the RTS thread that's blocked
-			     * waiting for I/O results from this worker (and possibly others).
-			     * It won't see any I/O, but notices and dispatches the queued up
-			     * signals/console events while in the Scheduler.
-			     *
-			     * The original, and way hackier scheme, was to have the worker
-			     * return a special return code representing aborted-due-to-ctrl-C-on-stdin,
-			     * which GHC.Conc.asyncRead would look out for and retry the I/O
-			     * call if encountered.
+			     * want to percolate this error condition back to the Haskell user.
+			     * Do this by waiting for the completion of the Haskell console handler.
+			     * If upon completion of the console handler routine, the Haskell thread 
+			     * that issued the request is found to have been thrown an exception, 
+			     * the worker abandons the request (since that's what the Haskell thread 
+			     * has done.) If the Haskell thread hasn't been interrupted, the worker 
+			     * retries the read request as if nothing happened.
 			     */
-			    if ( dw == ERROR_OPERATION_ABORTED ) {
-				/* Only do the retry when dealing with the standard input handle. */
+			    if ( (GetLastError()) == ERROR_OPERATION_ABORTED ) {
+				/* For now, only abort when dealing with the standard input handle.
+				 * i.e., for all others, an error is raised.
+				 */
 				HANDLE h  = (HANDLE)GetStdHandle(STD_INPUT_HANDLE);
 				if ( _get_osfhandle(work->workData.ioData.fd) == (long)h ) {
-				    Sleep(0);
-				} else {
-				    break;
+				    if (rts_waitConsoleHandlerCompletion()) {
+					/* If the Scheduler has set work->abandonOp, the Haskell thread has 
+					 * been thrown an exception (=> the worker must abandon this request.)
+					 * We test for this below before invoking the on-completion routine.
+					 */
+					if (work->abandonOp) {
+					    break;
+					} else {
+					    continue;
+					}
+				    } 
+				} else { 
+				    break; /* Treat it like an error */
 				}
 			    } else {
 				break;
@@ -193,19 +205,22 @@ IOWorkerProc(PVOID param)
 		    fflush(stderr);
 		    continue;
 		}
-		work->onCompletion(work->requestID,
-				   fd,
-				   len,
-				   complData,
-				   errCode);
+		if (!work->abandonOp) {
+		    work->onCompletion(work->requestID,
+				       fd,
+				       len,
+				       complData,
+				       errCode);
+		}
 		/* Free the WorkItem */
+		DeregisterWorkItem(iom,work);
 		free(work);
 	    } else {
 		fprintf(stderr, "unable to fetch work; fatal.\n"); fflush(stderr);
 		return 1;
 	    }
 	} else {
-	    fprintf(stderr, "waiting failed; fatal.\n"); fflush(stderr);
+	    fprintf(stderr, "waiting failed (%lu); fatal.\n", rc); fflush(stderr);
 	    return 1;
 	}
     }
@@ -256,6 +271,8 @@ StartIOManager(void)
     ioMan->workersIdle = 0;
     ioMan->queueSize   = 0;
     ioMan->requestID   = 1;
+    InitializeCriticalSection(&ioMan->active_work_lock);
+    ioMan->active_work_items = NULL;
  
     return TRUE;
 }
@@ -358,6 +375,7 @@ AddIORequest ( int   fd,
     wItem->workData.ioData.fd  = fd;
     wItem->workData.ioData.len = len;
     wItem->workData.ioData.buf = buffer;
+    wItem->link = NULL;
 
     wItem->onCompletion        = onCompletion;
     wItem->requestID           = reqID;
@@ -384,6 +402,7 @@ AddDelayRequest ( unsigned int   msecs,
     wItem->workData.delayData.msecs = msecs;
     wItem->onCompletion = onCompletion;
     wItem->requestID    = reqID;
+    wItem->link         = NULL;
 
     return depositWorkItem(reqID, wItem);
 }
@@ -408,6 +427,8 @@ AddProcRequest ( void* proc,
     wItem->workData.procData.param = param;
     wItem->onCompletion = onCompletion;
     wItem->requestID    = reqID;
+    wItem->abandonOp    = 0;
+    wItem->link         = NULL;
 
     return depositWorkItem(reqID, wItem);
 }
@@ -420,4 +441,70 @@ void ShutdownIOManager ( void )
   // have a reference count or something.
   // free(ioMan);
   // ioMan = NULL;
+}
+
+/* Keep track of WorkItems currently being serviced. */
+static 
+void
+RegisterWorkItem(IOManagerState* ioMan, 
+		 WorkItem* wi)
+{
+    EnterCriticalSection(&ioMan->active_work_lock);
+    wi->link = ioMan->active_work_items;
+    ioMan->active_work_items = wi;
+    LeaveCriticalSection(&ioMan->active_work_lock);
+}
+
+static 
+void
+DeregisterWorkItem(IOManagerState* ioMan, 
+		   WorkItem* wi)
+{
+    WorkItem *ptr, *prev;
+    
+    EnterCriticalSection(&ioMan->active_work_lock);
+    for(prev=NULL,ptr=ioMan->active_work_items;ptr;prev=ptr,ptr=ptr->link) {
+	if (wi->requestID == ptr->requestID) {
+	    if (prev==NULL) {
+		ioMan->active_work_items = ptr->link;
+	    } else {
+		prev->link = ptr->link;
+	    }
+	    LeaveCriticalSection(&ioMan->active_work_lock);
+	    return;
+	}
+    }
+    fprintf(stderr, "DeregisterWorkItem: unable to locate work item %d\n", wi->requestID);
+    LeaveCriticalSection(&ioMan->active_work_lock);
+}
+
+
+/*
+ * Function: abandonWorkRequest()
+ *
+ * Signal that a work request isn't of interest. Called by the Scheduler
+ * if a blocked Haskell thread has an exception thrown to it.
+ *
+ * Note: we're not aborting the system call that a worker might be blocked on
+ * here, just disabling the propagation of its result once its finished. We
+ * may have to go the whole hog here and switch to overlapped I/O so that we
+ * can abort blocked system calls.
+ */
+void
+abandonWorkRequest ( int reqID )
+{
+    WorkItem *ptr;
+    EnterCriticalSection(&ioMan->active_work_lock);
+    for(ptr=ioMan->active_work_items;ptr;ptr=ptr->link) {
+	if (ptr->requestID == (unsigned int)reqID ) {
+	    ptr->abandonOp = 1;
+	    LeaveCriticalSection(&ioMan->active_work_lock);
+	    return;
+	}
+    }
+    /* Note: if the request ID isn't present, the worker will have
+     * finished sometime since awaitRequests() last drained the completed
+     * request table; i.e., not an error.
+     */
+    LeaveCriticalSection(&ioMan->active_work_lock);
 }

@@ -3343,6 +3343,12 @@ unblockThread(StgTSO *tso)
 	      blocked_queue_tl = (StgTSO *)prev;
 	    }
 	  }
+#if defined(mingw32_HOST_OS)
+	  /* (Cooperatively) signal that the worker thread should abort
+	   * the request.
+	   */
+	  abandonWorkRequest(tso->block_info.async_result->reqID);
+#endif
 	  goto done;
 	}
       }
@@ -3477,6 +3483,12 @@ unblockThread(StgTSO *tso)
 	      blocked_queue_tl = prev;
 	    }
 	  }
+#if defined(mingw32_HOST_OS)
+	  /* (Cooperatively) signal that the worker thread should abort
+	   * the request.
+	   */
+	  abandonWorkRequest(tso->block_info.async_result->reqID);
+#endif
 	  goto done;
 	}
       }
