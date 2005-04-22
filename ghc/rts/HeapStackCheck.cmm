@@ -711,7 +711,7 @@ INFO_TABLE_RET( stg_gc_fun, 0/*framesize*/, 0/*bitmap*/, RET_FUN )
     Sp(5) = R3;					\
     Sp(4) = R2;					\
     Sp(3) = R1;					\
-    Sp(2) = R10.w;    /* return address */	\
+    Sp(2) = R10;    /* return address */	\
     Sp(1) = R9;     /* liveness mask  */	\
     Sp(0) = stg_gc_gen_info;
 
