@@ -221,6 +221,7 @@ sub process_asm_block {
     return(&process_asm_block_m68k($str))  if $TargetPlatform =~ /^m68k-/;
     return(&process_asm_block_sparc($str)) if $TargetPlatform =~ /^sparc-/;
     return(&process_asm_block_iX86($str))  if $TargetPlatform =~ /^i[34]86-/;
+    return(&process_asm_block_x86_64($str))  if $TargetPlatform =~ /^x86_64-/;
     return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
     return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
     return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
@@ -388,6 +389,44 @@ sub process_asm_block_iX86 {
     }
 
    print STDERR "### STRIPPED BLOCK (iX86):\n$str" if $Dump_asm_splitting_info;
+
+   $str;
+}
+\end{code}
+
+\begin{code}
+sub process_asm_block_x86_64 {
+    local($str) = @_;
+
+    # remove/record any literal constants defined here
+    # [perl made uglier to work around the perl 5.7/5.8 bug documented at
+    # http://bugs6.perl.org/rt2/Ticket/Display.html?id=1760 and illustrated
+    # by the seg fault of perl -e '("x\n" x 5000) =~ /(.*\n)+/'
+    # -- ccshan 2002-09-05]
+    while ( ($str =~ /(\.?(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
+	local($label) = $2;
+	local($body)  = $1;
+	local($prefix, $suffix, $*) = ($`, $', 0);
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	while ( $suffix =~ /^((\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ ) {
+	    $body .= $1;
+	    $suffix = $';
+	}
+	$LocalConstant{$label} = $body;
+	$str = $prefix . $suffix;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k\b/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+   print STDERR "### STRIPPED BLOCK (x86_64):\n$str" if $Dump_asm_splitting_info;
 
    $str;
 }
