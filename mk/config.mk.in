@@ -370,7 +370,7 @@ endif
 # Options for GHC's RTS
 
 # For an optimised RTS (you probably don't want to change these; we build
-# a debugging RTS by default now.  Use -package rts_debug to get it).
+# a debugging RTS by default now.  Use -debug to get it).
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-fomit-frame-pointer
 
