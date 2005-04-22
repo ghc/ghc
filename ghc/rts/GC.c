@@ -1747,8 +1747,10 @@ loop:
   case CONSTR_2_0:
     return copy(q,sizeofW(StgHeader)+2,stp);
 
-  case FUN:
   case THUNK:
+    return copy(q,thunk_sizeW_fromITBL(info),stp);
+
+  case FUN:
   case CONSTR:
   case IND_PERM:
   case IND_OLDGEN_PERM:
