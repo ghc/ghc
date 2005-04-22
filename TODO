@@ -1,14 +1,17 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* For a non-home occurrence of an entity, we should point to the home
+  location in the doc somehow.  This would help to distinguish
+  multiple functions with the same name (eg. we don't know whether
+  Prelude.catch is Control.Exception.catch vs. System.IO.Error.catch).
+
 * The lexer should handle "...." in doc strings, only recognising it if the
   contents looks like a module name.
 
 * Mentioning a qualified identifer in doc loses the qualifier, even when
   it is required?  (see "[Haskell] auto-qualification of identifiers in
   Haddock").
-
-* doc --gen-contents and --use-contents
 
 * A module re-export should only reference the target module if the
   target module is imported without hiding any of its exports (otherwise
@@ -45,21 +48,16 @@
 -----------------------------------------------------------------------------
 -- features
 
-* Command-line flag to give the effect of --#ignore-exports on all modules
-  (request by Chris Ryder, for generating implementation docs.)
+* Something equivalent to JavaDoc's @since
 
-* Command-line flags to hide modules (easier for Cabal to use than requiring
-  #hide directives in the source).
+* Source code: various people want to get at the source code from the docs.
+  * Optionally include source code for a function in its docs?
+  * Suggestion from Benjamin Pierce: generat separate HTML pages with the
+    source code, with anchors that you can link to from the docs.
+    Sounds fairly easy to implement...
 
 * Parse and remember {-# SOURCE #-} imports, possibly do something sensible
   with them?
-
-* In theory there's no reason why we have to only link to modules which
-  are imported by the current module.  This is an artificial
-  restriction.  We might try doing a two-pass strategy: first find out
-  what everything exports, and then resolve all the links in the
-  documentation.  We could mark some modules as "definitive" destinations
-  for links to their entities, or even give a priority for each module.
 
 * nested itemized and enumerated lists.
 
