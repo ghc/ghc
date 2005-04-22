@@ -97,10 +97,34 @@ printStdObjPayload( StgClosure *obj )
 }
 
 static void
+printThunkPayload( StgThunk *obj )
+{
+    StgWord i, j;
+    const StgInfoTable* info;
+
+    info = get_itbl(obj);
+    for (i = 0; i < info->layout.payload.ptrs; ++i) {
+        debugBelch(", ");
+        printPtr((StgPtr)obj->payload[i]);
+    }
+    for (j = 0; j < info->layout.payload.nptrs; ++j) {
+        debugBelch(", %pd#",obj->payload[i+j]);
+    }
+    debugBelch(")\n");
+}
+
+static void
 printStdObject( StgClosure *obj, char* tag )
 {
     printStdObjHdr( obj, tag );
     printStdObjPayload( obj );
+}
+
+static void
+printThunkObject( StgThunk *obj, char* tag )
+{
+    printStdObjHdr( (StgClosure *)obj, tag );
+    printThunkPayload( obj );
 }
 
 void
@@ -163,9 +187,9 @@ printClosure( StgClosure *obj )
     case THUNK_STATIC:
             /* ToDo: will this work for THUNK_STATIC too? */
 #ifdef PROFILING
-	    printStdObject(obj,info->prof.closure_desc);
+	    printThunkObject((StgThunk *)obj,info->prof.closure_desc);
 #else
-            printStdObject(obj,"THUNK");
+            printThunkObject((StgThunk *)obj,"THUNK");
 #endif
             break;
 
@@ -180,7 +204,7 @@ printClosure( StgClosure *obj )
 
     case AP:
         {
-	    StgPAP* ap = stgCast(StgPAP*,obj);
+	    StgAP* ap = stgCast(StgAP*,obj);
             StgWord i;
             debugBelch("AP("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->n_args; ++i) {

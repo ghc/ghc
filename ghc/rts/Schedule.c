@@ -3782,7 +3782,7 @@ raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically)
 	    // fun field.
 	    //
 	    words = frame - sp - 1;
-	    ap = (StgAP_STACK *)allocate(PAP_sizeW(words));
+	    ap = (StgAP_STACK *)allocate(AP_STACK_sizeW(words));
 	    
 	    ap->size = words;
 	    ap->fun  = (StgClosure *)sp[0];

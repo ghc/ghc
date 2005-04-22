@@ -202,6 +202,40 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
     // ASSERT( p == stack_end ); -- HWL
 }
 
+static void
+checkPAP (StgClosure *fun, StgClosure** payload, StgWord n_args)
+{ 
+    StgClosure *p;
+    StgFunInfoTable *fun_info;
+    
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
+    fun_info = get_fun_itbl(fun);
+    
+    p = (StgClosure *)payload;
+    switch (fun_info->f.fun_type) {
+    case ARG_GEN:
+	checkSmallBitmap( (StgPtr)payload, 
+			  BITMAP_BITS(fun_info->f.b.bitmap), n_args );
+	break;
+    case ARG_GEN_BIG:
+	checkLargeBitmap( (StgPtr)payload, 
+			  GET_FUN_LARGE_BITMAP(fun_info), 
+			  n_args );
+	break;
+    case ARG_BCO:
+	checkLargeBitmap( (StgPtr)payload, 
+			  BCO_BITMAP(fun), 
+			  n_args );
+	break;
+    default:
+	checkSmallBitmap( (StgPtr)payload, 
+			  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
+			  n_args );
+	break;
+    }
+}
+
+
 StgOffset 
 checkClosure( StgClosure* p )
 {
@@ -244,9 +278,9 @@ checkClosure( StgClosure* p )
       {
 	nat i;
 	for (i = 0; i < info->layout.payload.ptrs; i++) {
-	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
+	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
 	}
-	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
+	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader)+MIN_UPD_SIZE);
       }
 
     case FUN:
@@ -345,39 +379,19 @@ checkClosure( StgClosure* p )
     case CATCH_STM_FRAME:
 	    barf("checkClosure: stack frame");
 
-    case AP: /* we can treat this as being the same as a PAP */
+    case AP:
+    {
+	StgAP* ap = (StgAP *)p;
+	checkPAP (ap->fun, ap->payload, ap->n_args);
+	return ap_sizeW(ap);
+    }
+
     case PAP:
-	{ 
-	    StgFunInfoTable *fun_info;
-	    StgPAP* pap = (StgPAP *)p;
-
-	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(pap->fun));
-	    fun_info = get_fun_itbl(pap->fun);
-
-	    p = (StgClosure *)pap->payload;
-	    switch (fun_info->f.fun_type) {
-	    case ARG_GEN:
-		checkSmallBitmap( (StgPtr)pap->payload, 
-				  BITMAP_BITS(fun_info->f.b.bitmap), pap->n_args );
-		break;
-	    case ARG_GEN_BIG:
-		checkLargeBitmap( (StgPtr)pap->payload, 
-				  GET_FUN_LARGE_BITMAP(fun_info), 
-				  pap->n_args );
-		break;
-	    case ARG_BCO:
-		checkLargeBitmap( (StgPtr)pap->payload, 
-				  BCO_BITMAP(pap->fun), 
-				  pap->n_args );
-		break;
-	    default:
-		checkSmallBitmap( (StgPtr)pap->payload, 
-				  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
-				  pap->n_args );
-		break;
-	    }
-	    return pap_sizeW(pap);
-	}
+    {
+	StgPAP* pap = (StgPAP *)p;
+	checkPAP (pap->fun, pap->payload, pap->n_args);
+	return pap_sizeW(pap);
+    }
 
     case AP_STACK:
     { 
@@ -791,20 +805,20 @@ checkStaticObjects ( StgClosure* static_objects )
 
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
 	ASSERT(LOOKS_LIKE_INFO_PTR(indirectee->header.info));
-	p = IND_STATIC_LINK((StgClosure *)p);
+	p = *IND_STATIC_LINK((StgClosure *)p);
 	break;
       }
 
     case THUNK_STATIC:
-      p = THUNK_STATIC_LINK((StgClosure *)p);
+      p = *THUNK_STATIC_LINK((StgClosure *)p);
       break;
 
     case FUN_STATIC:
-      p = FUN_STATIC_LINK((StgClosure *)p);
+      p = *FUN_STATIC_LINK((StgClosure *)p);
       break;
 
     case CONSTR_STATIC:
-      p = STATIC_LINK(info,(StgClosure *)p);
+      p = *STATIC_LINK(info,(StgClosure *)p);
       break;
 
     default:

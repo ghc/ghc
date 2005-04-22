@@ -867,9 +867,24 @@ heapCensusChain( Census *census, bdescr *bd )
 	    
 	    switch (info->type) {
 
+	    case THUNK:
+		size = thunk_sizeW_fromITBL(info);
+		break;
+
+	    case THUNK_1_1:
+	    case THUNK_0_2:
+	    case THUNK_2_0:
+		size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE,2);
+		break;
+
+	    case THUNK_1_0:
+	    case THUNK_0_1:
+	    case THUNK_SELECTOR:
+		size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE,1);
+		break;
+
 	    case CONSTR:
 	    case FUN:
-	    case THUNK:
 	    case IND_PERM:
 	    case IND_OLDGEN:
 	    case IND_OLDGEN_PERM:
@@ -884,9 +899,6 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case FUN_1_1:
 	    case FUN_0_2:
 	    case FUN_2_0:
-	    case THUNK_1_1:
-	    case THUNK_0_2:
-	    case THUNK_2_0:
 	    case CONSTR_1_0:
 	    case CONSTR_0_1:
 	    case CONSTR_1_1:
@@ -909,13 +921,10 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = sizeW_fromITBL(info);
 		break;
 
-	    case THUNK_1_0:		/* ToDo - shouldn't be here */
-	    case THUNK_0_1:		/* "  ditto  " */
-	    case THUNK_SELECTOR:
-		size = sizeofW(StgHeader) + MIN_UPD_SIZE;
+	    case AP:
+		size = ap_sizeW((StgAP *)p);
 		break;
 
-	    case AP:
 	    case PAP:
 		size = pap_sizeW((StgPAP *)p);
 		break;

@@ -35,6 +35,17 @@ typedef struct {
 } StgGranHeader;
 
 /* -----------------------------------------------------------------------------
+   The SMP header
+
+   In SMP mode, we have an extra word of padding in a thunk's header.
+   (Note: thunks only; other closures do not have this padding word).
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+    StgWord pad;
+} StgSMPThunkHeader;
+
+/* -----------------------------------------------------------------------------
    The full fixed-size closure header
 
    The size of the fixed header is the sum of the optional parts plus a single
@@ -42,14 +53,34 @@ typedef struct {
    -------------------------------------------------------------------------- */
 
 typedef struct {
-	const struct _StgInfoTable* info;
+    const struct _StgInfoTable* info;
 #ifdef PROFILING
-	StgProfHeader         prof;
+    StgProfHeader         prof;
 #endif
 #ifdef GRAN
-	StgGranHeader         gran;
+    StgGranHeader         gran;
 #endif
 } StgHeader;
+
+/*
+ * In SMP mode, a thunk has a padding word to take the updated value.
+ * This is so that the update doesn't overwrite the payload, so we can
+ * avoid needing to lock the thunk during entry and update.
+ *
+ * Note: this doesn't apply to THUNK_STATICs, which have no payload.
+ */
+typedef struct {
+    const struct _StgInfoTable* info;
+#ifdef PROFILING
+    StgProfHeader         prof;
+#endif
+#ifdef GRAN
+    StgGranHeader         gran;
+#endif
+#ifdef SMP
+    StgSMPThunkHeader     smp;
+#endif
+} StgThunkHeader;
 
 /* -----------------------------------------------------------------------------
    Closure Types
@@ -67,7 +98,12 @@ struct StgClosure_ {
 };
 
 typedef struct {
-    StgHeader   header;
+    StgThunkHeader  header;
+    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
+} StgThunk;
+
+typedef struct {
+    StgThunkHeader   header;
     StgClosure *selectee;
 } StgSelector;
 
@@ -79,11 +115,16 @@ typedef struct {
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgPAP;
 
-/* AP closures have the same layout, for convenience */
-typedef StgPAP StgAP;
+typedef struct {
+    StgThunkHeader   header;
+    StgHalfWord arity;		/* zero if it is an AP */
+    StgHalfWord n_args;
+    StgClosure *fun;		/* really points to a fun */
+    StgClosure *payload[FLEXIBLE_ARRAY];
+} StgAP;
 
 typedef struct {
-    StgHeader   header;
+    StgThunkHeader   header;
     StgWord     size;                    /* number of words in payload */
     StgClosure *fun;
     StgClosure *payload[FLEXIBLE_ARRAY]; /* contains a chunk of *stack* */

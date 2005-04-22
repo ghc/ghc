@@ -161,23 +161,28 @@
 
 /* -----------------------------------------------------------------------------
    How to get hold of the static link field for a static closure.
-   
-   Note that we have to use (*cast(T*,&e)) instead of cast(T,e)
-   because C won't let us take the address of a casted
-   expression. Huh?
    -------------------------------------------------------------------------- */
 
-#define STATIC_LINK(info,p)						\
-   (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +		\
-					info->layout.payload.nptrs])))
+/* These are hard-coded. */
+#define FUN_STATIC_LINK(p)   (&(p)->payload[0])
+#define THUNK_STATIC_LINK(p) (&(p)->payload[1])
+#define IND_STATIC_LINK(p)   (&(p)->payload[1])
 
-/* These macros are optimised versions of the above for certain
- * closure types.  They *must* be equivalent to the generic
- * STATIC_LINK.
- */
-#define FUN_STATIC_LINK(p)   ((p)->payload[0])
-#define THUNK_STATIC_LINK(p) ((p)->payload[1])
-#define IND_STATIC_LINK(p)   ((p)->payload[1])
+INLINE_HEADER StgClosure **
+STATIC_LINK(const StgInfoTable *info, StgClosure *p)
+{ 
+    switch (info->type) {
+    case THUNK_STATIC:
+	return THUNK_STATIC_LINK(p);
+    case FUN_STATIC:
+	return FUN_STATIC_LINK(p);
+    case IND_STATIC:
+	return IND_STATIC_LINK(p);
+    default:
+	return &(p)->payload[info->layout.payload.ptrs +
+			     info->layout.payload.nptrs];
+    }
+}
 
 #define STATIC_LINK2(info,p)							\
    (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +			\

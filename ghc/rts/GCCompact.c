@@ -110,20 +110,22 @@ STATIC_INLINE nat
 obj_sizeW( StgClosure *p, StgInfoTable *info )
 {
     switch (info->type) {
+    case THUNK_0_1:
+    case THUNK_1_0:
+	return sizeofW(StgThunk) + 1;
     case FUN_0_1:
     case CONSTR_0_1:
     case FUN_1_0:
     case CONSTR_1_0:
-    case THUNK_0_1:
-    case THUNK_1_0:
 	return sizeofW(StgHeader) + 1;
     case THUNK_0_2:
+    case THUNK_1_1:
+    case THUNK_2_0:
+	return sizeofW(StgThunk) + 2;
     case FUN_0_2:
     case CONSTR_0_2:
-    case THUNK_1_1:
     case FUN_1_1:
     case CONSTR_1_1:
-    case THUNK_2_0:
     case FUN_2_0:
     case CONSTR_2_0:
 	return sizeofW(StgHeader) + 2;
@@ -171,17 +173,17 @@ thread_static( StgClosure* p )
       
     case IND_STATIC:
 	thread((StgPtr)&((StgInd *)p)->indirectee);
-	p = IND_STATIC_LINK(p);
+	p = *IND_STATIC_LINK(p);
 	continue;
       
     case THUNK_STATIC:
-	p = THUNK_STATIC_LINK(p);
+	p = *THUNK_STATIC_LINK(p);
 	continue;
     case FUN_STATIC:
-	p = FUN_STATIC_LINK(p);
+	p = *FUN_STATIC_LINK(p);
 	continue;
     case CONSTR_STATIC:
-	p = STATIC_LINK(info,p);
+	p = *STATIC_LINK(info,p);
 	continue;
       
     default:
@@ -366,17 +368,16 @@ thread_stack(StgPtr p, StgPtr stack_end)
 }
 
 STATIC_INLINE StgPtr
-thread_PAP (StgPAP *pap)
+thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 {
     StgPtr p;
-    StgWord bitmap, size;
+    StgWord bitmap;
     StgFunInfoTable *fun_info;
-    
-    fun_info = itbl_to_fun_itbl(get_threaded_info((StgPtr)pap->fun));
+
+    fun_info = itbl_to_fun_itbl(get_threaded_info((StgPtr)fun));
     ASSERT(fun_info->i.type != PAP);
 
-    p = (StgPtr)pap->payload;
-    size = pap->n_args;
+    p = (StgPtr)payload;
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
@@ -387,13 +388,12 @@ thread_PAP (StgPAP *pap)
 	p += size;
 	break;
     case ARG_BCO:
-	thread_large_bitmap((StgPtr)pap->payload, BCO_BITMAP(pap->fun), size);
+	thread_large_bitmap((StgPtr)payload, BCO_BITMAP(fun), size);
 	p += size;
 	break;
     default:
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-	size = pap->n_args;
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
 		thread(p);
@@ -405,9 +405,26 @@ thread_PAP (StgPAP *pap)
 	break;
     }
 
+    return p;
+}
+
+STATIC_INLINE StgPtr
+thread_PAP (StgPAP *pap)
+{
+    StgPtr p;
+    p = thread_PAP_payload(pap->fun, pap->payload, pap->n_args);
     thread((StgPtr)&pap->fun);
     return p;
 }
+    
+STATIC_INLINE StgPtr
+thread_AP (StgAP *ap)
+{
+    StgPtr p;
+    p = thread_PAP_payload(ap->fun, ap->payload, ap->n_args);
+    thread((StgPtr)&ap->fun);
+    return p;
+}    
 
 STATIC_INLINE StgPtr
 thread_AP_STACK (StgAP_STACK *ap)
@@ -497,9 +514,11 @@ STATIC_INLINE StgPtr
 thread_obj (StgInfoTable *info, StgPtr p)
 {
     switch (info->type) {
+    case THUNK_0_1:
+	return p + sizeofW(StgThunk) + 1;
+
     case FUN_0_1:
     case CONSTR_0_1:
-    case THUNK_0_1:
 	return p + sizeofW(StgHeader) + 1;
 	
     case FUN_1_0:
@@ -508,21 +527,30 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	return p + sizeofW(StgHeader) + 1;
 	
     case THUNK_1_0:
-	thread((StgPtr)&((StgClosure *)p)->payload[0]);
-	return p + sizeofW(StgHeader) + 1;
+	thread((StgPtr)&((StgThunk *)p)->payload[0]);
+	return p + sizeofW(StgThunk) + 1;
 	
     case THUNK_0_2:
+	return p + sizeofW(StgThunk) + 2;
+
     case FUN_0_2:
     case CONSTR_0_2:
 	return p + sizeofW(StgHeader) + 2;
 	
     case THUNK_1_1:
+	thread((StgPtr)&((StgThunk *)p)->payload[0]);
+	return p + sizeofW(StgThunk) + 2;
+
     case FUN_1_1:
     case CONSTR_1_1:
 	thread((StgPtr)&((StgClosure *)p)->payload[0]);
 	return p + sizeofW(StgHeader) + 2;
 	
     case THUNK_2_0:
+	thread((StgPtr)&((StgThunk *)p)->payload[0]);
+	thread((StgPtr)&((StgThunk *)p)->payload[1]);
+	return p + sizeofW(StgThunk) + 2;
+
     case FUN_2_0:
     case CONSTR_2_0:
 	thread((StgPtr)&((StgClosure *)p)->payload[0]);
@@ -538,8 +566,19 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	return p + bco_sizeW(bco);
     }
 
-    case FUN:
     case THUNK:
+    {
+	StgPtr end;
+	
+	end = (P_)((StgThunk *)p)->payload + 
+	    info->layout.payload.ptrs;
+	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
+	    thread(p);
+	}
+	return p + info->layout.payload.nptrs;
+    }
+
+    case FUN:
     case CONSTR:
     case FOREIGN:
     case STABLE_NAME:
@@ -597,8 +636,10 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	return thread_AP_STACK((StgAP_STACK *)p);
 	
     case PAP:
-    case AP:
 	return thread_PAP((StgPAP *)p);
+
+    case AP:
+	return thread_AP((StgAP *)p);
 	
     case ARR_WORDS:
 	return p + arr_words_sizeW((StgArrWords *)p);

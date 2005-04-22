@@ -1721,9 +1721,11 @@ loop:
   case FUN_1_0:
   case FUN_0_1:
   case CONSTR_1_0:
+    return copy(q,sizeofW(StgHeader)+1,stp);
+
   case THUNK_1_0:
   case THUNK_0_1:
-    return copy(q,sizeofW(StgHeader)+1,stp);
+    return copy(q,sizeofW(StgThunk)+1,stp);
 
   case THUNK_1_1:
   case THUNK_0_2:
@@ -1735,7 +1737,7 @@ loop:
       stp = bd->step;
     }
 #endif
-    return copy(q,sizeofW(StgHeader)+2,stp);
+    return copy(q,sizeofW(StgThunk)+2,stp);
 
   case FUN_1_1:
   case FUN_0_2:
@@ -1801,16 +1803,16 @@ loop:
 
   case THUNK_STATIC:
     if (info->srt_bitmap != 0 && major_gc && 
-	THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
-      THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
+	*THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
+      *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
       static_objects = (StgClosure *)q;
     }
     return q;
 
   case FUN_STATIC:
     if (info->srt_bitmap != 0 && major_gc && 
-	FUN_STATIC_LINK((StgClosure *)q) == NULL) {
-      FUN_STATIC_LINK((StgClosure *)q) = static_objects;
+	*FUN_STATIC_LINK((StgClosure *)q) == NULL) {
+      *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
       static_objects = (StgClosure *)q;
     }
     return q;
@@ -1822,15 +1824,15 @@ loop:
      */
     if (major_gc
 	  && ((StgIndStatic *)q)->saved_info == NULL
- 	  && IND_STATIC_LINK((StgClosure *)q) == NULL) {
-	IND_STATIC_LINK((StgClosure *)q) = static_objects;
+ 	  && *IND_STATIC_LINK((StgClosure *)q) == NULL) {
+	*IND_STATIC_LINK((StgClosure *)q) = static_objects;
 	static_objects = (StgClosure *)q;
     }
     return q;
 
   case CONSTR_STATIC:
-    if (major_gc && STATIC_LINK(info,(StgClosure *)q) == NULL) {
-      STATIC_LINK(info,(StgClosure *)q) = static_objects;
+    if (major_gc && *STATIC_LINK(info,(StgClosure *)q) == NULL) {
+      *STATIC_LINK(info,(StgClosure *)q) = static_objects;
       static_objects = (StgClosure *)q;
     }
     return q;
@@ -1859,8 +1861,10 @@ loop:
     barf("evacuate: stack frame at %p\n", q);
 
   case PAP:
-  case AP:
       return copy(q,pap_sizeW((StgPAP*)q),stp);
+
+  case AP:
+      return copy(q,ap_sizeW((StgAP*)q),stp);
 
   case AP_STACK:
       return copy(q,ap_stack_sizeW((StgAP_STACK*)q),stp);
@@ -2343,15 +2347,6 @@ scavenge_fun_srt(const StgInfoTable *info)
     scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), fun_info->i.srt_bitmap);
 }
 
-STATIC_INLINE void
-scavenge_ret_srt(const StgInfoTable *info)
-{
-    StgRetInfoTable *ret_info;
-
-    ret_info = itbl_to_ret_itbl(info);
-    scavenge_srt((StgClosure **)GET_SRT(ret_info), ret_info->i.srt_bitmap);
-}
-
 /* -----------------------------------------------------------------------------
    Scavenge a TSO.
    -------------------------------------------------------------------------- */
@@ -2424,18 +2419,15 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 }
 
 STATIC_INLINE StgPtr
-scavenge_PAP (StgPAP *pap)
+scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 {
     StgPtr p;
-    StgWord bitmap, size;
+    StgWord bitmap;
     StgFunInfoTable *fun_info;
-
-    pap->fun = evacuate(pap->fun);
-    fun_info = get_fun_itbl(pap->fun);
+    
+    fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
-
-    p = (StgPtr)pap->payload;
-    size = pap->n_args;
+    p = (StgPtr)payload;
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
@@ -2446,13 +2438,12 @@ scavenge_PAP (StgPAP *pap)
 	p += size;
 	break;
     case ARG_BCO:
-	scavenge_large_bitmap((StgPtr)pap->payload, BCO_BITMAP(pap->fun), size);
+	scavenge_large_bitmap((StgPtr)payload, BCO_BITMAP(fun), size);
 	p += size;
 	break;
     default:
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-	size = pap->n_args;
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
 		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
@@ -2464,6 +2455,20 @@ scavenge_PAP (StgPAP *pap)
 	break;
     }
     return p;
+}
+
+STATIC_INLINE StgPtr
+scavenge_PAP (StgPAP *pap)
+{
+    pap->fun = evacuate(pap->fun);
+    return scavenge_PAP_payload (pap->fun, pap->payload, pap->n_args);
+}
+
+STATIC_INLINE StgPtr
+scavenge_AP (StgAP *ap)
+{
+    ap->fun = evacuate(ap->fun);
+    return scavenge_PAP_payload (ap->fun, ap->payload, ap->n_args);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2535,6 +2540,11 @@ scavenge(step *stp)
 
     case THUNK_2_0:
 	scavenge_thunk_srt(info);
+	((StgThunk *)p)->payload[1] = evacuate(((StgThunk *)p)->payload[1]);
+	((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	p += sizeofW(StgThunk) + 2;
+	break;
+
     case CONSTR_2_0:
 	((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
 	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
@@ -2543,8 +2553,8 @@ scavenge(step *stp)
 	
     case THUNK_1_0:
 	scavenge_thunk_srt(info);
-	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
-	p += sizeofW(StgHeader) + 1;
+	((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	p += sizeofW(StgThunk) + 1;
 	break;
 	
     case FUN_1_0:
@@ -2556,7 +2566,7 @@ scavenge(step *stp)
 	
     case THUNK_0_1:
 	scavenge_thunk_srt(info);
-	p += sizeofW(StgHeader) + 1;
+	p += sizeofW(StgThunk) + 1;
 	break;
 	
     case FUN_0_1:
@@ -2567,7 +2577,7 @@ scavenge(step *stp)
 	
     case THUNK_0_2:
 	scavenge_thunk_srt(info);
-	p += sizeofW(StgHeader) + 2;
+	p += sizeofW(StgThunk) + 2;
 	break;
 	
     case FUN_0_2:
@@ -2578,8 +2588,8 @@ scavenge(step *stp)
 	
     case THUNK_1_1:
 	scavenge_thunk_srt(info);
-	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
-	p += sizeofW(StgHeader) + 2;
+	((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	p += sizeofW(StgThunk) + 2;
 	break;
 
     case FUN_1_1:
@@ -2594,8 +2604,17 @@ scavenge(step *stp)
 	goto gen_obj;
 
     case THUNK:
+    {
+	StgPtr end;
+
 	scavenge_thunk_srt(info);
-	// fall through 
+	end = (P_)((StgThunk *)p)->payload + info->layout.payload.ptrs;
+	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
+	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	}
+	p += info->layout.payload.nptrs;
+	break;
+    }
 	
     gen_obj:
     case CONSTR:
@@ -2680,8 +2699,11 @@ scavenge(step *stp)
     }
 
     case PAP:
-    case AP:
 	p = scavenge_PAP((StgPAP *)p);
+	break;
+
+    case AP:
+	p = scavenge_AP((StgAP *)p);
 	break;
 
     case ARR_WORDS:
@@ -2914,6 +2936,10 @@ linear_scan:
 
 	case THUNK_2_0:
 	    scavenge_thunk_srt(info);
+	    ((StgThunk *)p)->payload[1] = evacuate(((StgThunk *)p)->payload[1]);
+	    ((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	    break;
+
 	case CONSTR_2_0:
 	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
@@ -2928,6 +2954,9 @@ linear_scan:
 	case THUNK_1_0:
 	case THUNK_1_1:
 	    scavenge_thunk_srt(info);
+	    ((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	    break;
+
 	case CONSTR_1_0:
 	case CONSTR_1_1:
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
@@ -2952,8 +2981,16 @@ linear_scan:
 	    goto gen_obj;
 
 	case THUNK:
+	{
+	    StgPtr end;
+	    
 	    scavenge_thunk_srt(info);
-	    // fall through 
+	    end = (P_)((StgThunk *)p)->payload + info->layout.payload.ptrs;
+	    for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
+		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    }
+	    break;
+	}
 	
 	gen_obj:
 	case CONSTR:
@@ -3023,8 +3060,11 @@ linear_scan:
 	}
 
 	case PAP:
-	case AP:
 	    scavenge_PAP((StgPAP *)p);
+	    break;
+
+	case AP:
+	    scavenge_AP((StgAP *)p);
 	    break;
       
 	case MUT_ARR_PTRS:
@@ -3254,18 +3294,28 @@ scavenge_one(StgPtr p)
 	break;
     }
 
-    case FUN:
-    case FUN_1_0:			// hardly worth specialising these guys
-    case FUN_0_1:
-    case FUN_1_1:
-    case FUN_0_2:
-    case FUN_2_0:
     case THUNK:
     case THUNK_1_0:
     case THUNK_0_1:
     case THUNK_1_1:
     case THUNK_0_2:
     case THUNK_2_0:
+    {
+	StgPtr q, end;
+	
+	end = (StgPtr)((StgThunk *)p)->payload + info->layout.payload.ptrs;
+	for (q = (StgPtr)((StgThunk *)p)->payload; q < end; q++) {
+	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
+	}
+	break;
+    }
+
+    case FUN:
+    case FUN_1_0:			// hardly worth specialising these guys
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
     case CONSTR:
     case CONSTR_1_0:
     case CONSTR_0_1:
@@ -3316,6 +3366,9 @@ scavenge_one(StgPtr p)
     }
 
     case PAP:
+	p = scavenge_AP((StgAP *)p);
+	break;
+
     case AP:
 	p = scavenge_PAP((StgPAP *)p);
 	break;
@@ -3582,8 +3635,8 @@ scavenge_static(void)
     /* Take this object *off* the static_objects list,
      * and put it on the scavenged_static_objects list.
      */
-    static_objects = STATIC_LINK(info,p);
-    STATIC_LINK(info,p) = scavenged_static_objects;
+    static_objects = *STATIC_LINK(info,p);
+    *STATIC_LINK(info,p) = scavenged_static_objects;
     scavenged_static_objects = p;
     
     switch (info -> type) {
@@ -3852,8 +3905,8 @@ zero_static_object_list(StgClosure* first_static)
 
   for (p = first_static; p != END_OF_STATIC_LIST; p = link) {
     info = get_itbl(p);
-    link = STATIC_LINK(info, p);
-    STATIC_LINK(info,p) = NULL;
+    link = *STATIC_LINK(info, p);
+    *STATIC_LINK(info,p) = NULL;
   }
 }
 

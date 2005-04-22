@@ -232,6 +232,8 @@ main(int argc, char *argv[])
     struct_field_("StgHeader_ccs",  StgHeader, prof.ccs);
     struct_field_("StgHeader_ldvw", StgHeader, prof.hp.ldvw);
 
+    struct_size(StgSMPThunkHeader);
+
     closure_payload(StgClosure,payload);
 
     struct_field(StgEntCounter, allocs);

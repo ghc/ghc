@@ -325,6 +325,26 @@
    }
 
 /* -----------------------------------------------------------------------------
+   Closure headers
+   -------------------------------------------------------------------------- */
+
+/*
+ * This is really ugly, since we don't do the rest of StgHeader this
+ * way.  The problem is that values from DerivedConstants.h cannot be 
+ * dependent on the way (SMP, PROF etc.).  For SIZEOF_StgHeader we get
+ * the value from GHC, but it seems like too much trouble to do that
+ * for StgThunkHeader.
+ */
+#ifdef SMP
+#define SIZEOF_StgThunkHeader SIZEOF_StgHeader+SIZEOF_StgSMPThunkHeader
+#else
+#define SIZEOF_StgThunkHeader SIZEOF_StgHeader
+#endif
+
+#define StgThunk_payload(__ptr__,__ix__) \
+    W_[__ptr__+SIZEOF_StgThunkHeader+ WDS(__ix__)]
+
+/* -----------------------------------------------------------------------------
    Closures
    -------------------------------------------------------------------------- */
 

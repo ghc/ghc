@@ -543,7 +543,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     case THUNK:
     case THUNK_2_0:
-	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
+	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, 
+		  (StgPtr)((StgThunk *)c)->payload);
 	*first_child = find_ptrs(&se.info);
 	if (*first_child == NULL)
 	    // no child from ptrs, so check SRT
@@ -560,7 +561,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     case THUNK_1_0:
     case THUNK_1_1:
-	*first_child = c->payload[0];
+	*first_child = ((StgThunk *)c)->payload[0];
 	ASSERT(*first_child != NULL);
 	init_srt_thunk(&se.info, get_thunk_itbl(c));
 	break;
@@ -1409,39 +1410,38 @@ retainStack( StgClosure *c, retainer c_child_r,
  * ------------------------------------------------------------------------- */
 
 static INLINE StgPtr
-retain_PAP (StgPAP *pap, retainer c_child_r)
+retain_PAP_payload (StgClosure *pap,  retainer c_child_r, StgClosure *fun, 
+		    StgClosure** payload, StgWord n_args)
 {
     StgPtr p;
-    StgWord bitmap, size;
+    StgWord bitmap;
     StgFunInfoTable *fun_info;
 
-    retainClosure(pap->fun, (StgClosure *)pap, c_child_r);
-    fun_info = get_fun_itbl(pap->fun);
+    retainClosure(fun, pap, c_child_r);
+    fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
 
-    p = (StgPtr)pap->payload;
-    size = pap->n_args;
+    p = (StgPtr)payload;
 
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
 	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
-	p = retain_small_bitmap(p, pap->n_args, bitmap, 
-				(StgClosure *)pap, c_child_r);
+	p = retain_small_bitmap(p, n_args, bitmap, 
+				pap, c_child_r);
 	break;
     case ARG_GEN_BIG:
 	retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info),
-			    size, (StgClosure *)pap, c_child_r);
-	p += size;
+			    n_args, pap, c_child_r);
+	p += n_args;
 	break;
     case ARG_BCO:
-	retain_large_bitmap((StgPtr)pap->payload, BCO_BITMAP(pap->fun),
-			    size, (StgClosure *)pap, c_child_r);
-	p += size;
+	retain_large_bitmap((StgPtr)payload, BCO_BITMAP(fun),
+			    n_args, pap, c_child_r);
+	p += n_args;
 	break;
     default:
 	bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
-	p = retain_small_bitmap(p, pap->n_args, bitmap, 
-				(StgClosure *)pap, c_child_r);
+	p = retain_small_bitmap(p, n_args, bitmap, pap, c_child_r);
 	break;
     }
     return p;
@@ -1679,9 +1679,18 @@ inner_loop:
 	goto loop;
 
     case PAP:
-    case AP:
-	retain_PAP((StgPAP *)c, c_child_r);
+    {
+	StgPAP *pap = (StgPAP *)c;
+	retain_PAP_payload(c, c_child_r, pap->fun, pap->payload, pap->n_args);
 	goto loop;
+    }
+
+    case AP:
+    {
+	StgAP *ap = (StgAP *)c;
+	retain_PAP_payload(c, c_child_r, ap->fun, ap->payload, ap->n_args);
+	goto loop;
+    }
 
     case AP_STACK:
 	retainClosure(((StgAP_STACK *)c)->fun, c, c_child_r);

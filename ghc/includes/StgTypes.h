@@ -48,7 +48,6 @@ typedef unsigned char            StgWord8;
 typedef signed   short           StgInt16;
 typedef unsigned short           StgWord16;
 
-
 #if SIZEOF_UNSIGNED_INT == 4
 typedef signed   int             StgInt32;
 typedef unsigned int             StgWord32;

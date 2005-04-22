@@ -48,22 +48,25 @@ LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
 	switch (info->type) {
 	case THUNK_1_0:
 	case THUNK_0_1:
+	    nw = stg_max(MIN_UPD_SIZE,1);
+	    break;
+
 	case THUNK_2_0:
 	case THUNK_1_1:
 	case THUNK_0_2:
 	case THUNK_SELECTOR:
-	    nw = MIN_UPD_SIZE;
+	    nw = stg_max(MIN_UPD_SIZE,2);
 	    break;
+
 	case THUNK:
-	    nw = info->layout.payload.ptrs + info->layout.payload.nptrs;
-	    if (nw < MIN_UPD_SIZE)
-		nw = MIN_UPD_SIZE;
+	    nw = stg_max(info->layout.payload.ptrs + info->layout.payload.nptrs,
+			 MIN_UPD_SIZE);
 	    break;
 	case AP:
-	    nw = sizeofW(StgPAP) - sizeofW(StgHeader) + ((StgPAP *)p)->n_args;
+	    nw = sizeofW(StgAP) - sizeofW(StgThunkHeader) + ((StgPAP *)p)->n_args;
 	    break;
 	case AP_STACK:
-	    nw = sizeofW(StgAP_STACK) - sizeofW(StgHeader)
+	    nw = sizeofW(StgAP_STACK) - sizeofW(StgThunkHeader)
 		+ ((StgAP_STACK *)p)->size;
 	    break;
 	case CAF_BLACKHOLE:
@@ -150,14 +153,20 @@ processHeapClosureForDead( StgClosure *c )
 
     case THUNK_1_0:
     case THUNK_0_1:
+    case THUNK_SELECTOR:
+	size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE, 1);
+	break;
+
     case THUNK_2_0:
     case THUNK_1_1:
     case THUNK_0_2:
-    case THUNK_SELECTOR:
-	size = sizeofW(StgHeader) + MIN_UPD_SIZE;
+	size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE, 2);
 	break;
 
     case AP:
+	size = ap_sizeW((StgAP *)c);
+	break;
+
     case PAP:
 	size = pap_sizeW((StgPAP *)c);
 	break;

@@ -255,6 +255,9 @@ extern rtsBool keepCAFs;
 INLINE_HEADER StgOffset PAP_sizeW   ( nat n_args )
 { return sizeofW(StgPAP) + n_args; }
 
+INLINE_HEADER StgOffset AP_sizeW   ( nat n_args )
+{ return sizeofW(StgAP) + n_args; }
+
 INLINE_HEADER StgOffset AP_STACK_sizeW ( nat size )
 { return sizeofW(StgAP_STACK) + size; }
 
@@ -276,8 +279,16 @@ INLINE_HEADER StgOffset sizeW_fromITBL( const StgInfoTable* itbl )
        + sizeofW(StgPtr)  * itbl->layout.payload.ptrs 
        + sizeofW(StgWord) * itbl->layout.payload.nptrs; }
 
+INLINE_HEADER StgOffset thunk_sizeW_fromITBL( const StgInfoTable* itbl ) 
+{ return sizeofW(StgThunk) 
+       + sizeofW(StgPtr)  * itbl->layout.payload.ptrs 
+       + sizeofW(StgWord) * itbl->layout.payload.nptrs; }
+
 INLINE_HEADER StgOffset ap_stack_sizeW( StgAP_STACK* x )
 { return AP_STACK_sizeW(x->size); }
+
+INLINE_HEADER StgOffset ap_sizeW( StgAP* x )
+{ return AP_sizeW(x->n_args); }
 
 INLINE_HEADER StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }

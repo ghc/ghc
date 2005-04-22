@@ -44,7 +44,7 @@
 #define SELECTOR_CODE_UPD(offset) \
   INFO_TABLE_RET(stg_sel_ret_##offset##_upd, RET_FRAMESIZE, RET_BITMAP, RET_SMALL)	\
   {									\
-      R1 = StgClosure_payload(R1,offset);						\
+      R1 = StgClosure_payload(R1,offset);				\
       GET_SAVED_CCCS;							\
       Sp = Sp + SIZEOF_StgHeader;					\
       ENTER();								\
@@ -60,7 +60,7 @@
       ENTER_CCS_THUNK(R1);						\
       SAVE_CCCS(WITHUPD_FRAME_SIZE);					\
       W_[Sp-WITHUPD_FRAME_SIZE] = stg_sel_ret_##offset##_upd_info;	\
-      R1 = StgClosure_payload(R1,0);					\
+      R1 = StgThunk_payload(R1,0);					\
       Sp = Sp - WITHUPD_FRAME_SIZE;					\
       jump %GET_ENTRY(R1);						\
   }
@@ -87,7 +87,7 @@ SELECTOR_CODE_UPD(15)
 #define SELECTOR_CODE_NOUPD(offset) \
   INFO_TABLE_RET(stg_sel_ret_##offset##_noupd, RET_FRAMESIZE, RET_BITMAP, RET_SMALL)	\
   {									\
-      R1 = StgClosure_payload(R1,offset);						\
+      R1 = StgClosure_payload(R1,offset);				\
       GET_SAVED_CCCS;							\
       Sp = Sp + SIZEOF_StgHeader;					\
       jump %GET_ENTRY(R1);						\
@@ -100,10 +100,10 @@ SELECTOR_CODE_UPD(15)
       UPD_BH_SINGLE_ENTRY();						\
       LDV_ENTER(R1);							\
       TICK_UPDF_OMITTED();						\
-      ENTER_CCS_THUNK(R1);							\
+      ENTER_CCS_THUNK(R1);						\
       SAVE_CCCS(NOUPD_FRAME_SIZE);					\
       W_[Sp-NOUPD_FRAME_SIZE] = stg_sel_ret_##offset##_noupd_info;	\
-      R1 = StgClosure_payload(R1,0);						\
+      R1 = StgThunk_payload(R1,0);					\
       Sp = Sp - NOUPD_FRAME_SIZE;					\
       jump %GET_ENTRY(R1);						\
   }
@@ -151,7 +151,7 @@ INFO_TABLE(stg_ap_1_upd,1,1,THUNK_1_0,"stg_ap_1_upd_info","stg_ap_1_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  R1 = StgClosure_payload(R1,0);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame;
   Sp_adj(-1); // for stg_ap_0_ret
   jump RET_LBL(stg_ap_0);
@@ -165,8 +165,8 @@ INFO_TABLE(stg_ap_2_upd,2,0,THUNK_2_0,"stg_ap_2_upd_info","stg_ap_2_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgClosure_payload(R1,1);
-  R1 = StgClosure_payload(R1,0);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,1);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(1);
   Sp_adj(-1); // for stg_ap_0_ret
   TICK_UNKNOWN_CALL();
@@ -182,9 +182,9 @@ INFO_TABLE(stg_ap_3_upd,3,0,THUNK,"stg_ap_3_upd_info","stg_ap_3_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgClosure_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgClosure_payload(R1,1);
-  R1 = StgClosure_payload(R1,0);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,2);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,1);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(2);
   Sp_adj(-1); // for stg_ap_0_ret
   TICK_UNKNOWN_CALL();
@@ -200,10 +200,10 @@ INFO_TABLE(stg_ap_4_upd,4,0,THUNK,"stg_ap_4_upd_info","stg_ap_4_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgClosure_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgClosure_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgClosure_payload(R1,1);
-  R1 = StgClosure_payload(R1,0);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,3);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,2);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,1);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(3);
   Sp_adj(-1); // for stg_ap_0_ret
   TICK_UNKNOWN_CALL();
@@ -219,11 +219,11 @@ INFO_TABLE(stg_ap_5_upd,5,0,THUNK,"stg_ap_5_upd_info","stg_ap_5_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgClosure_payload(R1,4);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgClosure_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgClosure_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgClosure_payload(R1,1);
-  R1 = StgClosure_payload(R1,0);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,4);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,3);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,2);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgThunk_payload(R1,1);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(4);
   Sp_adj(-1); // for stg_ap_0_ret
   TICK_UNKNOWN_CALL();
@@ -239,12 +239,12 @@ INFO_TABLE(stg_ap_6_upd,6,0,THUNK,"stg_ap_6_upd_info","stg_ap_6_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgClosure_payload(R1,5);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgClosure_payload(R1,4);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgClosure_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgClosure_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(5)] = StgClosure_payload(R1,1);
-  R1 = StgClosure_payload(R1,0);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,5);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,4);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,3);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgThunk_payload(R1,2);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(5)] = StgThunk_payload(R1,1);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(5);
   Sp_adj(-1); // for stg_ap_0_ret
   TICK_UNKNOWN_CALL();
@@ -260,13 +260,13 @@ INFO_TABLE(stg_ap_7_upd,7,0,THUNK,"stg_ap_7_upd_info","stg_ap_7_upd_info")
   LDV_ENTER(R1);
   ENTER_CCS_THUNK(R1);
   PUSH_UPD_FRAME(Sp-SIZEOF_StgUpdateFrame,R1);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgClosure_payload(R1,6);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgClosure_payload(R1,5);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgClosure_payload(R1,4);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgClosure_payload(R1,3);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(5)] = StgClosure_payload(R1,2);
-  W_[Sp-SIZEOF_StgUpdateFrame-WDS(6)] = StgClosure_payload(R1,1);
-  R1 = StgClosure_payload(R1,0);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(1)] = StgThunk_payload(R1,6);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(2)] = StgThunk_payload(R1,5);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(3)] = StgThunk_payload(R1,4);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(4)] = StgThunk_payload(R1,3);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(5)] = StgThunk_payload(R1,2);
+  W_[Sp-SIZEOF_StgUpdateFrame-WDS(6)] = StgThunk_payload(R1,1);
+  R1 = StgThunk_payload(R1,0);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(6);
   Sp_adj(-1); // for stg_ap_0_ret
   TICK_UNKNOWN_CALL();
