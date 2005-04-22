@@ -961,10 +961,10 @@ checkSanity( void )
 	}
 
 	for (s = 0; s < n_nurseries; s++) {
-	    ASSERT(countBlocks(generations[g].steps[s].blocks)
-		   == generations[g].steps[s].n_blocks);
-	    ASSERT(countBlocks(generations[g].steps[s].large_objects)
-		   == generations[g].steps[s].n_large_blocks);
+	    ASSERT(countBlocks(nurseries[s].blocks)
+		   == nurseries[s].n_blocks);
+	    ASSERT(countBlocks(nurseries[s].large_objects)
+		   == nurseries[s].n_large_blocks);
 	}
 	    
 	checkFreeListSanity();
