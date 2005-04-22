@@ -84,9 +84,13 @@ installHandler handler =
 
    toHandler hdlr ev = do
       case toConsoleEvent ev of
-        Just x  -> hdlr x
+	 -- see rts/win32/ConsoleHandler.c for comments as to why
+	 -- rts_ConsoleHandlerDone is called here.
+        Just x  -> hdlr x >> rts_ConsoleHandlerDone ev
 	Nothing -> return () -- silently ignore..
 
-foreign import ccall unsafe "Signals.h stg_InstallConsoleEvent" 
+foreign import ccall unsafe "RtsExternal.h rts_InstallConsoleEvent" 
   rts_installHandler :: CInt -> Ptr (StablePtr (CInt -> IO ())) -> IO CInt
+foreign import ccall unsafe "RtsExternal.h rts_ConsoleHandlerDone"
+  rts_ConsoleHandlerDone :: CInt -> IO ()
 #endif /* mingw32_HOST_OS */
