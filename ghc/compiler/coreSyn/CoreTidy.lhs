@@ -1,11 +1,6 @@
 %
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
-%************************************************************************
-%*									*
-\section[PprCore]{Printing of Core syntax, including for interfaces}
-%*									*
-%************************************************************************
 
 \begin{code}
 module CoreTidy (
