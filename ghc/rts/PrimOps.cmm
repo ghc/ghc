@@ -289,7 +289,7 @@ mkWeakzh_fast
   StgWeak_link(w)	= W_[weak_ptr_list];
   W_[weak_ptr_list] 	= w;
 
-  IF_DEBUG(weak, foreign "C" fprintf(stderr,stg_weak_msg,w));
+  IF_DEBUG(weak, foreign "C" fprintf(W_[stderr] "ptr",stg_weak_msg,w));
 
   RET_P(w);
 }
