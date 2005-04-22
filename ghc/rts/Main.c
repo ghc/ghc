@@ -49,7 +49,8 @@ int main(int argc, char *argv[])
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
-#if defined(PROFILING)
+#if defined(PROFILING) || defined(mingw32_HOST_OS)
+    /* mingw32 and PROFILING (still) define __stginits in .text */
     startupHaskell(argc,argv,__stginit_ZCMain);
 #else
     startupHaskell(argc,argv,NULL);

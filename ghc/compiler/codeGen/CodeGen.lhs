@@ -87,9 +87,14 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
 		; cmm_tycons <- mapM cgTyCon data_tycons
 		; cmm_init   <- getCmm (mkModuleInit dflags way cost_centre_info 
 					     this_mod mb_main_mod
-				  	     imported_mods)
+				  	     foreign_stubs imported_mods)
 		; return (cmm_binds ++ concat cmm_tycons
-                        ++ if opt_SccProfilingOn then [cmm_init] else [])
+                        ++ if opt_SccProfilingOn 
+#if defined(mingw32_HOST_OS)
+			      || True
+#endif
+			    then [cmm_init] 
+			    else [])
 		}
 		-- Put datatype_stuff after code_stuff, because the
 		-- datatype closure table (for enumeration types) to
@@ -151,9 +156,10 @@ mkModuleInit
 	-> CollectedCCs         -- cost centre info
 	-> Module
 	-> Maybe String		-- Just m ==> we have flag: -main-is Foo.baz 
+	-> ForeignStubs
 	-> [Module]
 	-> Code
-mkModuleInit dflags way cost_centre_info this_mod mb_main_mod imported_mods
+mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
   = do	{ 	
 
 	-- Allocate the static boolean that records if this
@@ -212,6 +218,9 @@ mkModuleInit dflags way cost_centre_info this_mod mb_main_mod imported_mods
 	  stmtC (CmmStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1)))
 
 		-- Now do local stuff
+#if defined(mingw32_HOST_OS)
+	; registerForeignExports foreign_stubs
+#endif
 	; initCostCentres cost_centre_info
 	; mapCs (registerModuleImport dflags way) 
 		(imported_mods++extra_imported_mods)
@@ -227,6 +236,17 @@ registerModuleImport dflags way mod
   = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
 	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel dflags mod way)) ]
 
+-----------------------
+registerForeignExports :: ForeignStubs -> Code
+registerForeignExports NoStubs 
+  = nopC
+registerForeignExports (ForeignStubs _ _ _ fe_bndrs)
+  = mapM_ mk_export_register fe_bndrs
+  where
+	mk_export_register bndr
+	  = emitRtsCall SLIT("getStablePtr") 
+		[ (CmmLit (CmmLabel (mkLocalClosureLabel (idName bndr))), 
+		   PtrHint) ]
 \end{code}
 
 
