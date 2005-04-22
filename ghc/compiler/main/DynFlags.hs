@@ -1278,6 +1278,7 @@ picCCOpts dflags
 can_split :: Bool
 can_split =  
 #if    defined(i386_TARGET_ARCH)     \
+    || defined(x86_64_TARGET_ARCH)   \
     || defined(alpha_TARGET_ARCH)    \
     || defined(hppa_TARGET_ARCH)     \
     || defined(m68k_TARGET_ARCH)     \

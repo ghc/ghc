@@ -365,9 +365,6 @@ endif
 ifeq "$(TargetArch_CPP)" "ia64"
 SplitObjs=NO
 endif
-ifeq "$(TargetArch_CPP)" "x86_64"
-SplitObjs=NO
-endif
 
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
