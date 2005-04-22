@@ -76,6 +76,9 @@ import GHC.Enum
 import GHC.Num		( Integer(..), Num(..) )
 import GHC.Show
 import GHC.Real		( toInteger )
+#if defined(DEBUG_DUMP)
+import GHC.Pack
+#endif
 
 import GHC.Conc
 
@@ -512,7 +515,7 @@ fillReadBufferWithoutBlocking fd is_stream
   -- buffer better be empty:
   assert (r == 0 && w == 0) $ do
 #ifdef DEBUG_DUMP
-  puts ("fillReadBufferLoopNoBlock: bytes = " ++ show bytes ++ "\n")
+  puts ("fillReadBufferLoopNoBlock: bytes = " ++ show size ++ "\n")
 #endif
   res <- readRawBufferNoBlock "fillReadBuffer" fd is_stream b
   		       0 (fromIntegral size)
@@ -1208,6 +1211,8 @@ hSetBuffering handle mode =
 	-- 'raw' mode under win32 is a bit too specialised (and troublesome
 	-- for most common uses), so simply disable its use here.
 		  NoBuffering -> setCooked (haFD handle_) False
+#else
+		  NoBuffering -> return ()
 #endif
 		  _           -> setCooked (haFD handle_) True
 
@@ -1628,10 +1633,10 @@ showHandle' filepath is_duplex h =
 -- ---------------------------------------------------------------------------
 -- debugging
 
-#ifdef DEBUG_DUMP
+#if defined(DEBUG_DUMP)
 puts :: String -> IO ()
-puts s = withCString s $ \cstr -> do write_rawBuffer 1 False cstr 0 (fromIntegral (length s))
-				     return ()
+puts s = do write_rawBuffer 1 (unsafeCoerce# (packCString# s)) 0 (fromIntegral (length s))
+	    return ()
 #endif
 
 -- -----------------------------------------------------------------------------
