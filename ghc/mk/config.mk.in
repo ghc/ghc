@@ -50,15 +50,18 @@ endif
 ifeq "$(UseStage1)" "YES"
 ghc_ge_504 = YES
 ghc_ge_601 = YES
+ghc_ge_602 = YES
 ghc_ge_603 = YES
 else
 ifeq "$(BootingFromHc)" "YES"
 ghc_ge_504 = YES
 ghc_ge_601 = YES
+ghc_ge_602 = YES
 ghc_ge_603 = YES
 else
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 ghc_ge_601 = $(shell if (test $(GhcCanonVersion) -ge 601); then echo YES; else echo NO; fi)
+ghc_ge_602 = $(shell if (test $(GhcCanonVersion) -ge 602); then echo YES; else echo NO; fi)
 ghc_ge_603 = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
 endif
 endif
