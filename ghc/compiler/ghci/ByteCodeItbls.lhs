@@ -89,7 +89,7 @@ make_constr_itbls cons
         mk_itbl dcon conNo entry_addr
            = let rep_args = [ (typeCgRep arg,arg) 
 			    | arg <- dataConRepArgTys dcon ]
-		 (tot_wds, ptr_wds, _) = mkVirtHeapOffsets rep_args
+		 (tot_wds, ptr_wds, _) = mkVirtHeapOffsets False {- TODO: WILD GUESS!!! -} rep_args
 
                  ptrs  = ptr_wds
                  nptrs = tot_wds - ptr_wds
