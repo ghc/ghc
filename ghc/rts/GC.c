@@ -4308,20 +4308,4 @@ printMutableList(generation *gen)
     }
     debugBelch("\n");
 }
-
-STATIC_INLINE rtsBool
-maybeLarge(StgClosure *closure)
-{
-  StgInfoTable *info = get_itbl(closure);
-
-  /* closure types that may be found on the new_large_objects list; 
-     see scavenge_large */
-  return (info->type == MUT_ARR_PTRS ||
-	  info->type == MUT_ARR_PTRS_FROZEN ||
-	  info->type == MUT_ARR_PTRS_FROZEN0 ||
-	  info->type == TSO ||
-	  info->type == ARR_WORDS);
-}
-
-  
 #endif /* DEBUG */

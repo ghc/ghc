@@ -33,7 +33,6 @@ int fixed_hs = sizeof(StgHeader), itbl_sz = sizeofW(StgInfoTable),
  * local function decls
  * ------------------------------------------------------------------------*/
 
-static void    printStdObject( StgClosure *obj, char* tag );
 static void    printStdObjPayload( StgClosure *obj );
 #ifdef USING_LIBBFD
 static void    reset_table   ( int size );
@@ -114,13 +113,6 @@ printThunkPayload( StgThunk *obj )
 }
 
 static void
-printStdObject( StgClosure *obj, char* tag )
-{
-    printStdObjHdr( obj, tag );
-    printStdObjPayload( obj );
-}
-
-static void
 printThunkObject( StgThunk *obj, char* tag )
 {
     printStdObjHdr( (StgClosure *)obj, tag );
@@ -146,9 +138,6 @@ printClosure( StgClosure *obj )
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
         {
-            /* We can't use printStdObject because we want to print the
-             * tag as well.
-	     */
             StgWord i, j;
 #ifdef PROFILING
 	    debugBelch("%s(", info->prof.closure_desc);
