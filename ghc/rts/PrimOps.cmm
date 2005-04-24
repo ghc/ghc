@@ -1673,15 +1673,15 @@ makeStableNamezh_fast
     index = foreign "C" lookupStableName(R1 "ptr");
 
     /* Is there already a StableName for this heap object?
-     *  stable_ptr_table is an array of snEntry structs.
+     *  stable_ptr_table is a pointer to an array of snEntry structs.
      */
-    if ( snEntry_sn_obj(stable_ptr_table + index*SIZEOF_snEntry) == NULL ) {
+    if ( snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) == NULL ) {
 	sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
 	SET_HDR(sn_obj, stg_STABLE_NAME_info, W_[CCCS]);
 	StgStableName_sn(sn_obj) = index;
-	snEntry_sn_obj(stable_ptr_table + index*SIZEOF_snEntry) = sn_obj;
+	snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) = sn_obj;
     } else {
-	sn_obj = snEntry_sn_obj(stable_ptr_table + index*SIZEOF_snEntry);
+	sn_obj = snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry);
     }
     
     RET_P(sn_obj);
@@ -1702,7 +1702,7 @@ deRefStablePtrzh_fast
     /* Args: R1 = the stable ptr */
     W_ r, sp;
     sp = R1;
-    r = snEntry_addr(stable_ptr_table + sp*SIZEOF_snEntry);
+    r = snEntry_addr(W_[stable_ptr_table] + sp*SIZEOF_snEntry);
     RET_P(r);
 }
 
