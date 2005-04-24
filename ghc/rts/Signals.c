@@ -353,6 +353,8 @@ startSignalHandler(int sig)  // called by the IO manager, see GHC.Conc
 	createIOThread(RtsFlags.GcFlags.initialStkSize, 
 		       (StgClosure *)deRefStablePtr((StgStablePtr)handlers[sig]))
 	);
+#else
+    (void)sig;   /* keep gcc -Wall happy */
 #endif
 }
 
