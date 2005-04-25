@@ -166,10 +166,6 @@ atomicModifyMutVarzh_fast
     W_ mv, z, x, y, r;
     /* Args: R1 :: MutVar#,  R2 :: a -> (a,b) */
 
-#if defined(SMP)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
-#endif
-
     /* If x is the current contents of the MutVar#, then 
        We want to make the new contents point to
 
@@ -205,6 +201,10 @@ atomicModifyMutVarzh_fast
 #define SIZE (THUNK_2_SIZE + THUNK_1_SIZE + THUNK_1_SIZE)
 
    HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
+
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+#endif
 
    x = StgMutVar_var(R1);
 
@@ -1429,6 +1429,10 @@ takeMVarzh_fast
 {
     W_ mvar, val, info, tso;
 
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+#endif
+
     /* args: R1 = MVar closure */
     mvar = R1;
 
@@ -1448,6 +1452,10 @@ takeMVarzh_fast
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
+
 	jump stg_block_takemvar;
   }
 
@@ -1476,6 +1484,11 @@ takeMVarzh_fast
       if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
       }
+
+#if defined(SMP)
+      foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
+
       RET_P(val);
   } 
   else
@@ -1487,6 +1500,11 @@ takeMVarzh_fast
        */
       SET_INFO(mvar,stg_EMPTY_MVAR_info);
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
+
+#if defined(SMP)
+      foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
+
       RET_P(val);
   }
 }
@@ -1495,6 +1513,10 @@ takeMVarzh_fast
 tryTakeMVarzh_fast
 {
     W_ mvar, val, info, tso;
+
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+#endif
 
     /* args: R1 = MVar closure */
 
@@ -1506,6 +1528,9 @@ tryTakeMVarzh_fast
 	/* HACK: we need a pointer to pass back, 
 	 * so we abuse NO_FINALIZER_closure
 	 */
+#if defined(SMP)
+       foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	RET_NP(0, stg_NO_FINALIZER_closure);
     }
 
@@ -1539,13 +1564,13 @@ tryTakeMVarzh_fast
     {
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-	
-	/* do this last... we might have locked the MVar in the SMP case,
-	 * and writing the info pointer will unlock it.
-	 */
 	SET_INFO(mvar,stg_EMPTY_MVAR_info);
     }
     
+#if defined(SMP)
+    foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
+
     RET_NP(1, val);
 }
 
@@ -1553,6 +1578,10 @@ tryTakeMVarzh_fast
 putMVarzh_fast
 {
     W_ mvar, info, tso;
+
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+#endif
 
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
@@ -1570,6 +1599,9 @@ putMVarzh_fast
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	jump stg_block_putmvar;
     }
   
@@ -1595,6 +1627,9 @@ putMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     else
@@ -1603,6 +1638,10 @@ putMVarzh_fast
 	StgMVar_value(mvar) = R2;
 	/* unlocks the MVar in the SMP case */
 	SET_INFO(mvar,stg_FULL_MVAR_info);
+
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     
@@ -1614,12 +1653,19 @@ tryPutMVarzh_fast
 {
     W_ mvar, info, tso;
 
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+#endif
+
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
 
     info = GET_INFO(mvar);
 
     if (info == stg_FULL_MVAR_info) {
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	RET_N(0);
     }
   
@@ -1645,6 +1691,9 @@ tryPutMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     else
@@ -1653,6 +1702,9 @@ tryPutMVarzh_fast
 	StgMVar_value(mvar) = R2;
 	/* unlocks the MVar in the SMP case */
 	SET_INFO(mvar,stg_FULL_MVAR_info);
+#if defined(SMP)
+	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     
