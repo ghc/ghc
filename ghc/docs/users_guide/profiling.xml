@@ -917,14 +917,12 @@ x = nfib 25
       </footnote></para>
 
     <para>To run <command>ghcprof</command>, you need
-    <productname>daVinci</productname> installed, which can be
+    <productname>uDraw(Graph)</productname> installed, which can be
     obtained from <ulink
-    url="http://www.informatik.uni-bremen.de/daVinci/"><citetitle>The Graph
-    Visualisation Tool daVinci</citetitle></ulink>.  Install one of
+    url="http://www.informatik.uni-bremen.de/uDrawGraph/en/uDrawGraph/uDrawGraph.html"><citetitle>uDraw(Graph)</citetitle></ulink>.  Install one of
     the binary
-    distributions<footnote><para><productname>daVinci</productname> is
-    sadly not open-source :-(.</para></footnote>, and set your
-    <envar>DAVINCIHOME</envar> environment variable to point to the
+    distributions, and set your
+    <envar>UDG_HOME</envar> environment variable to point to the
     installation directory.</para>
 
     <para><command>ghcprof</command> uses an XML-based profiling log
