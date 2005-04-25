@@ -3368,11 +3368,11 @@ scavenge_one(StgPtr p)
     }
 
     case PAP:
-	p = scavenge_AP((StgAP *)p);
+	p = scavenge_PAP((StgPAP *)p);
 	break;
 
     case AP:
-	p = scavenge_PAP((StgPAP *)p);
+	p = scavenge_AP((StgAP *)p);
 	break;
 
     case ARR_WORDS:
