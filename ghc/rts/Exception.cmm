@@ -311,7 +311,7 @@ catchzh_fast
 
 INFO_TABLE(stg_raise,1,0,THUNK,"raise","raise")
 {
-  R1 = StgClosure_payload(R1,0);
+  R1 = StgThunk_payload(R1,0);
   jump raisezh_fast;
 }
 
