@@ -199,9 +199,9 @@ rts_mkString (char *s)
 HaskellObj
 rts_apply (HaskellObj f, HaskellObj arg)
 {
-    StgClosure *ap;
+    StgThunk *ap;
 
-    ap = (StgClosure *)allocate(sizeofW(StgClosure) + 2);
+    ap = (StgThunk *)allocate(sizeofW(StgThunk) + 2);
     SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_SYSTEM);
     ap->payload[0] = f;
     ap->payload[1] = arg;
