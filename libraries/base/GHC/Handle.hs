@@ -813,15 +813,21 @@ openFile' filepath mode binary =
 	      throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    h <- openFd fd Nothing False filepath mode binary
+    fd_type <- fdType fd
+
+    h <- openFd fd (Just fd_type) False filepath mode binary
             `catchException` \e -> do c_close (fromIntegral fd); throw e
 	-- NB. don't forget to close the FD if openFd fails, otherwise
 	-- this FD leaks.
 	-- ASSERT: if we just created the file, then openFd won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
+
 #ifndef mingw32_HOST_OS
-    if mode == WriteMode
+	-- we want to truncate() if this is an open in WriteMode, but only
+	-- if the target is a RegularFile.  ftruncate() fails on special files
+	-- like /dev/null.
+    if mode == WriteMode && fd_type == RegularFile
       then throwErrnoIf (/=0) "openFile" 
               (c_ftruncate (fromIntegral fd) 0)
       else return 0
