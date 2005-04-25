@@ -3220,6 +3220,7 @@ interruptStgRts(void)
 {
     interrupted    = 1;
     context_switch = 1;
+    threadRunnable();
 }
 
 /* -----------------------------------------------------------------------------
