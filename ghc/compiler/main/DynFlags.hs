@@ -766,7 +766,7 @@ dynamic_flags = [
   ,  ( "optL"		, HasArg (upd . addOptL) )  
   ,  ( "optP"		, HasArg (upd . addOptP) )  
   ,  ( "optF"           , HasArg (upd . addOptF) )  
-  ,  ( "optc"		, HasArg (upd . addOptc) )  
+  ,  ( "optc"		, HasArg (\f -> upd (addOptc f . addOpta f)) )
   ,  ( "optm"		, HasArg (upd . addOptm) )  
   ,  ( "opta"		, HasArg (upd . addOpta) )  
   ,  ( "optl"		, HasArg (upd . addOptl) )  
