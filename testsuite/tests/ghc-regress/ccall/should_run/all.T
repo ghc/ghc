@@ -70,3 +70,5 @@ test('ffi012', f, compile_and_run, [''])
 test('ffi013', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 test('ffi014', only_ways(['threaded']), compile_and_run, ['ffi014_cbits.c'])
+
+test('ffi015', normal, compile_and_run, ['ffi015_cbits.c'])
