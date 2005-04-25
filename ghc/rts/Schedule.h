@@ -133,6 +133,15 @@ void    initThread(StgTSO *tso, nat stack_size);
 extern int RTS_VAR(context_switch);
 extern rtsBool RTS_VAR(interrupted);
 
+/* 
+ * flag that tracks whether we have done any execution in this time slice.
+ */
+#define ACTIVITY_YES      0 /* there has been activity in the current slice */
+#define ACTIVITY_MAYBE_NO 1 /* no activity in the current slice */
+#define ACTIVITY_INACTIVE 2 /* a complete slice has passed with no activity */
+#define ACTIVITY_DONE_GC  3 /* like 2, but we've done a GC too */
+extern nat recent_activity;
+
 /* In Select.c */
 extern lnat RTS_VAR(timestamp);
 

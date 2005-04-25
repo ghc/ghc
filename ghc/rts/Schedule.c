@@ -174,6 +174,9 @@ static StgTSO *suspended_ccalling_threads;
 /* flag set by signal handler to precipitate a context switch */
 int context_switch = 0;
 
+/* flag that tracks whether we have done any execution in this time slice. */
+nat recent_activity = ACTIVITY_YES;
+
 /* if this flag is set as well, give up execution */
 rtsBool interrupted = rtsFalse;
 
@@ -668,6 +671,8 @@ run_thread:
     errno = t->saved_errno;
     cap->r.rInHaskell = rtsTrue;
 
+    recent_activity = ACTIVITY_YES;
+
     switch (prev_what_next) {
 
     case ThreadKilled:
@@ -850,6 +855,12 @@ scheduleCheckBlackHoles( void )
 static void
 scheduleDetectDeadlock(void)
 {
+
+#if defined(PARALLEL_HASKELL)
+    // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
+    return;
+#endif
+
     /* 
      * Detect deadlock: when we have no threads to run, there are no
      * threads blocked, waiting for I/O, or sleeping, and all the
@@ -858,7 +869,16 @@ scheduleDetectDeadlock(void)
      */
     if ( EMPTY_THREAD_QUEUES() )
     {
-#if !defined(PARALLEL_HASKELL) && !defined(RTS_SUPPORTS_THREADS)
+#if defined(RTS_SUPPORTS_THREADS)
+	/* 
+	 * In the threaded RTS, we only check for deadlock if there
+	 * has been no activity in a complete timeslice.  This means
+	 * we won't eagerly start a full GC just because we don't have
+	 * any threads to run currently.
+	 */
+	if (recent_activity != ACTIVITY_INACTIVE) return;
+#endif
+
 	IF_DEBUG(scheduler, sched_belch("deadlocked, forcing major GC..."));
 
 	// Garbage collection can release some new threads due to
@@ -867,9 +887,10 @@ scheduleDetectDeadlock(void)
 	// exception.  Any threads thus released will be immediately
 	// runnable.
 	GarbageCollect(GetRoots,rtsTrue);
+	recent_activity = ACTIVITY_DONE_GC;
 	if ( !EMPTY_RUN_QUEUE() ) return;
 
-#if defined(RTS_USER_SIGNALS)
+#if defined(RTS_USER_SIGNALS) && !defined(RTS_SUPPORTS_THREADS)
 	/* If we have user-installed signal handlers, then wait
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
@@ -891,6 +912,7 @@ scheduleDetectDeadlock(void)
 	}
 #endif
 
+#if !defined(RTS_SUPPORTS_THREADS)
 	/* Probably a real deadlock.  Send the current main thread the
 	 * Deadlock exception (or in the SMP build, send *all* main
 	 * threads the deadlock exception, since none of them can make
@@ -910,11 +932,6 @@ scheduleDetectDeadlock(void)
 		barf("deadlock: main thread blocked in a strange way");
 	    }
 	}
-
-#elif defined(RTS_SUPPORTS_THREADS)
-    // ToDo: add deadlock detection in threaded RTS
-#elif defined(PARALLEL_HASKELL)
-    // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
 #endif
     }
 }
@@ -3221,6 +3238,10 @@ interruptStgRts(void)
     interrupted    = 1;
     context_switch = 1;
     threadRunnable();
+    /* ToDo: if invoked from a signal handler, this threadRunnable
+     * only works if there's another thread (not this one) waiting to
+     * be woken up.
+     */
 }
 
 /* -----------------------------------------------------------------------------

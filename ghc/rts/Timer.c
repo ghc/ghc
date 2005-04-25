@@ -19,6 +19,7 @@
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "Timer.h"
+#include "Capability.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "Itimer.h"
@@ -47,6 +48,30 @@ handle_tick(int unused STG_UNUSED)
       if (ticks_to_ctxt_switch <= 0) {
 	  ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
 	  context_switch = 1;	/* schedule a context switch */
+
+#if defined(RTS_SUPPORTS_THREADS)
+	  /* 
+	   * If we've been inactive for a whole time slice, tell the
+	   * scheduler to wake up and do a GC, to check for threads
+	   * that are deadlocked.
+	   */
+	  switch (recent_activity) {
+	  case ACTIVITY_YES:
+	      recent_activity = ACTIVITY_MAYBE_NO;
+	      break;
+	  case ACTIVITY_MAYBE_NO:
+	      recent_activity = ACTIVITY_INACTIVE;
+	      blackholes_need_checking = rtsTrue;
+	      /* hack: re-use the blackholes_need_checking flag */
+	      threadRunnable();
+	      /* ToDo: this threadRunnable only works if there's
+	       * another thread (not this one) waiting to be woken up
+	       */
+	      break;
+	  default:
+	      break;
+	  }
+#endif
       }
   }
 }
