@@ -482,6 +482,31 @@ GHCi runtime linker: fatal error: I found a duplicate definition for symbol
 	  the <option>-x</option> option to <literal>ld</literal>.</para>
       </listitem>
     </varlistentry>
+
+    <varlistentry>
+      <term>GHC puts <literal>stdin</literal> and <literal>stdout</literal> in
+	non-blocking mode, which causes problems when I try to invoke a text
+	editor (for example) using <literal>System.Cmd.system</literal> or
+	<literal>System.Cmd.rawSystem</literal>.</term>
+
+      <listitem>
+	<para>The real problem is that Unix shares the non-blocking flag
+	  between all processes accessing a file or stream.  It's impossible to
+	  set this flag locally to a single process.  GHC's I/O library needs
+	  non-blocking mode to properly support multithreaded I/O.</para>
+	
+	<para>Here's one possible fix, if you know that your program isn't
+	  going to be accessing <literal>stdin</literal> from another thread
+	  while the sub-process is running:</para>
+
+<programlisting>
+> main = do stdin `seq` return ()
+>           bracket (setFdOption stdInput NonBlockingRead False)
+>                   (\_ -> setFdOption stdInput NonBlockingRead True)
+>                   (\_ -> rawSystem "nvi" [])</programlisting>
+      </listitem>
+    </varlistentry>
+
   </variablelist>
 
 </chapter>
