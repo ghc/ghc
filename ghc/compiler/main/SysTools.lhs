@@ -61,8 +61,8 @@ import DATA_INT
 import Monad		( when, unless )
 import System		( ExitCode(..), getEnv, system )
 import IO		( try, catch,
-			  openFile, hPutStr, hClose, hFlush, IOMode(..),
-			  stderr )
+			  openFile, hPutStr, hClose, hFlush, IOMode(..), 
+			  stderr, ioError, isDoesNotExistError )
 import Directory	( doesFileExist, removeFile )
 import List             ( partition )
 
@@ -88,6 +88,8 @@ import CString		( CString, peekCString )
 #if __GLASGOW_HASKELL__ < 603
 -- rawSystem comes from libghccompat.a in stage1
 import Compat.RawSystem	( rawSystem )
+import GHC.IOBase       ( IOErrorType(..) ) 
+import System.IO.Error  ( ioeGetErrorType )
 #else
 import System.Cmd	( rawSystem )
 #endif
@@ -596,19 +598,36 @@ runSomething :: DynFlags
 runSomething dflags phase_name pgm args = do
   let real_args = filter notNull (map showOpt args)
   traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
-  exit_code <- rawSystem pgm real_args
-  case exit_code of
-     ExitSuccess -> 
-	return ()
-     -- rawSystem returns (ExitFailure 127) if the exec failed for any
-     -- reason (eg. the program doesn't exist).  This is the only clue
-     -- we have, but we need to report something to the user because in
-     -- the case of a missing program there will otherwise be no output
-     -- at all.
-     ExitFailure 127 -> 
-	throwDyn (InstallationError ("could not execute: " ++ pgm))
-     ExitFailure _other ->
-	throwDyn (PhaseFailed phase_name exit_code)
+  (exit_code, doesn'tExist) <- 
+     IO.catch (do
+         rc <- rawSystem pgm real_args
+	 case rc of
+	   ExitSuccess{} -> return (rc, False)
+	   ExitFailure n 
+             -- rawSystem returns (ExitFailure 127) if the exec failed for any
+             -- reason (eg. the program doesn't exist).  This is the only clue
+             -- we have, but we need to report something to the user because in
+             -- the case of a missing program there will otherwise be no output
+             -- at all.
+	    | n == 127  -> return (rc, True)
+	    | otherwise -> return (rc, False))
+		-- Should 'rawSystem' generate an IO exception indicating that
+		-- 'pgm' couldn't be run rather than a funky return code, catch
+		-- this here (the win32 version does this, but it doesn't hurt
+		-- to test for this in general.)
+              (\ err -> 
+	        if IO.isDoesNotExistError err 
+#if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ < 604
+		-- the 'compat' version of rawSystem under mingw32 always
+		-- maps 'errno' to EINVAL to failure.
+		   || case (ioeGetErrorType err ) of { InvalidArgument{} -> True ; _ -> False}
+#endif
+	         then return (ExitFailure 1, True)
+	         else IO.ioError err)
+  case (doesn'tExist, exit_code) of
+     (True, _)        -> throwDyn (InstallationError ("could not execute: " ++ pgm))
+     (_, ExitSuccess) -> return ()
+     _                -> throwDyn (PhaseFailed phase_name exit_code)
 
 showOpt (FileOption pre f) = pre ++ platformPath f
 showOpt (Option "") = ""
