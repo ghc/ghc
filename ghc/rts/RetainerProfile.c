@@ -1851,19 +1851,19 @@ resetStaticObjectForRetainerProfiling( void )
 	    // Since we do not compute the retainer set of any
 	    // IND_STATIC object, we don't have to reset its retainer
 	    // field.
-	    p = (StgClosure*)IND_STATIC_LINK(p);
+	    p = (StgClosure*)*IND_STATIC_LINK(p);
 	    break;
 	case THUNK_STATIC:
 	    maybeInitRetainerSet(p);
-	    p = (StgClosure*)THUNK_STATIC_LINK(p);
+	    p = (StgClosure*)*THUNK_STATIC_LINK(p);
 	    break;
 	case FUN_STATIC:
 	    maybeInitRetainerSet(p);
-	    p = (StgClosure*)FUN_STATIC_LINK(p);
+	    p = (StgClosure*)*FUN_STATIC_LINK(p);
 	    break;
 	case CONSTR_STATIC:
 	    maybeInitRetainerSet(p);
-	    p = (StgClosure*)STATIC_LINK(get_itbl(p), p);
+	    p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
 	    break;
 	default:
 	    barf("resetStaticObjectForRetainerProfiling: %p (%s)",
