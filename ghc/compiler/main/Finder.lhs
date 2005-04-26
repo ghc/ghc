@@ -75,7 +75,7 @@ lookupFinderCache finder_cache mod_name = do
   return $! lookupModuleEnv fm mod_name
 
 -- -----------------------------------------------------------------------------
--- Locating modules
+-- The two external entry points
 
 -- This is the main interface to the finder, which maps ModuleNames to
 -- Modules and ModLocations.
@@ -90,6 +90,8 @@ lookupFinderCache finder_cache mod_name = do
 data FindResult
   = Found ModLocation PackageIdH
 	-- the module was found
+  | FoundMultiple ModLocation PackageId
+	-- *error*: both a home module and a package module
   | PackageHidden PackageId
 	-- for an explicit source import: the package containing the module is
 	-- not exposed.
@@ -99,42 +101,93 @@ data FindResult
   | NotFound [FilePath]
 	-- the module was not found, the specified places were searched.
 
+findModule :: HscEnv -> Module -> Bool -> IO FindResult
+findModule = findModule' True
+  
+findPackageModule :: HscEnv -> Module -> Bool -> IO FindResult
+findPackageModule = findModule' False
+
+
 type LocalFindResult = MaybeErr [FilePath] FinderCacheEntry
 	-- LocalFindResult is used for internal functions which 
 	-- return a more informative type; it's munged into
 	-- the external FindResult by 'cached'
 
-cached :: Bool
-       -> (DynFlags -> Module -> IO LocalFindResult)
-       -> HscEnv -> Module -> Bool -> IO FindResult
-cached home_allowed wrapped_fn hsc_env name explicit 
-  = do	{ 	-- First try the cache
-	  let cache = hsc_FC hsc_env
-	; mb_entry <- lookupFinderCache cache name
-	; case mb_entry of {
-	    Just old_entry -> return (found old_entry) ;
-	    Nothing    -> do
+findModule' :: Bool -> HscEnv -> Module -> Bool -> IO FindResult
+findModule' home_allowed hsc_env name explicit 
+  = do	-- First try the cache
+  mb_entry <- lookupFinderCache cache name
+  case mb_entry of
+     Just old_entry -> return $! found old_entry
+     Nothing        -> not_cached
 
-	{ 	-- Now try the wrapped function
-	  mb_entry <- wrapped_fn (hsc_dflags hsc_env) name
-	; case mb_entry of
-	    Failed paths  	-> return (NotFound paths)
-	    Succeeded new_entry -> do { addToFinderCache cache name new_entry
-			      	      ; return (found new_entry) }
-	}}} 
-  where
+ where
+  cache  = hsc_FC hsc_env
+  dflags = hsc_dflags hsc_env
+
 	-- We've found the module, so the remaining question is
 	-- whether it's visible or not
-    found :: FinderCacheEntry -> FindResult
-    found (loc, Nothing)
+  found :: FinderCacheEntry -> FindResult
+  found (loc, Nothing)
 	| home_allowed  = Found loc HomePackage
 	| otherwise     = NotFound []
-    found (loc, Just (pkg, exposed_mod))
+  found (loc, Just (pkg, exposed_mod))
 	| explicit && not exposed_mod   = ModuleHidden pkg_name
 	| explicit && not (exposed pkg) = PackageHidden pkg_name
-	| otherwise			= Found loc (ExtPackage (mkPackageId (package pkg)))
+	| otherwise = 
+		Found loc (ExtPackage (mkPackageId (package pkg)))
 	where
 	  pkg_name = packageConfigId pkg
+
+  found_new entry = do
+	addToFinderCache cache name entry
+	return $! found entry
+
+  not_cached
+	| not home_allowed = do
+	    j <- findPackageModule' dflags name
+	    case j of
+	       Failed paths    -> return (NotFound paths)
+	       Succeeded entry -> found_new entry
+
+	| home_allowed && explicit = do
+		-- for an explict home import, we try looking for
+		-- both a package module and a home module, and report
+		-- a FoundMultiple if we find both.
+	    j <- findHomeModule' dflags name
+	    case j of
+		Failed home_files -> do
+	    	    r <- findPackageModule' dflags name
+    	    	    case r of
+			Failed pkg_files ->
+				return (NotFound (home_files ++ pkg_files))
+			Succeeded entry -> 
+				found_new entry
+		Succeeded entry@(loc,_) -> do
+		    r <- findPackageModule' dflags name
+		    case r of
+			Failed pkg_files -> found_new entry
+			Succeeded (_,Just (pkg,_)) -> 
+				return (FoundMultiple loc (packageConfigId pkg))
+			Succeeded _ -> 
+				panic "findModule: shouldn't happen"
+
+		-- implicit home imports: check for package modules first,
+		-- because that's the quickest (doesn't involve filesystem
+		-- operations).
+	| home_allowed && not explicit = do
+	    r <- findPackageModule' dflags name
+	    case r of
+		Failed pkg_files -> do
+		    j <- findHomeModule' dflags name
+		    case j of
+			Failed home_files ->
+				return (NotFound (home_files ++ pkg_files))
+			Succeeded entry ->
+				found_new entry
+		Succeeded entry ->
+		    found_new entry
+
 
 addHomeModuleToFinder :: HscEnv -> Module -> ModLocation -> IO ()
 addHomeModuleToFinder hsc_env mod loc 
@@ -142,32 +195,7 @@ addHomeModuleToFinder hsc_env mod loc
 
 
 -- -----------------------------------------------------------------------------
--- 	The two external entry points
-
-
-findModule :: HscEnv -> Module -> Bool -> IO FindResult
-findModule = cached True findModule' 
-  
-findPackageModule :: HscEnv -> Module -> Bool -> IO FindResult
-findPackageModule = cached False findPackageModule'
-
--- -----------------------------------------------------------------------------
 -- 	The internal workers
-
-findModule' :: DynFlags -> Module -> IO LocalFindResult
--- Find home or package module
-findModule' dflags name = do
-    r <- findPackageModule' dflags name
-    case r of
-	Failed pkg_files -> do
-	   j <- findHomeModule' dflags name
-	   case j of
-		Failed home_files -> 
-			return (Failed (home_files ++ pkg_files))
-		other_result
-			-> return other_result
-	other_result
-		-> return other_result
 
 findHomeModule' :: DynFlags -> Module -> IO LocalFindResult
 findHomeModule' dflags mod = do
@@ -422,6 +450,14 @@ dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 -- Error messages
 
 cantFindError :: DynFlags -> Module -> FindResult -> SDoc
+cantFindError dflags mod_name (FoundMultiple loc pkg)
+  = hang (ptext SLIT("Cannot import") <+> quotes (ppr mod_name) <> colon) 2 (
+       sep [ptext SLIT("it was found in both") <+>
+		(case ml_hs_file loc of Nothing -> ptext SLIT("<unkonwn file>")
+					Just f  -> text f),
+	    ptext SLIT("and package") <+> ppr pkg <> char '.'] $$
+       ptext SLIT("Possible fix: -ignore-package") <+> ppr pkg
+    )
 cantFindError dflags mod_name find_result
   = hang (ptext SLIT("Could not find module") <+> quotes (ppr mod_name) <> colon)
        2 more_info
