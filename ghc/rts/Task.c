@@ -28,7 +28,8 @@
 TaskInfo* taskTable;
 static nat taskTableSize;
 
-HashTable *taskHash; // maps OSThreadID to TaskInfo*
+// maps OSThreadID to TaskInfo*
+HashTable *taskHash;
 
 nat taskCount;
 static nat tasksRunning;
@@ -43,7 +44,12 @@ initTaskManager (void)
     static int initialized = 0;
 
     if (!initialized) {
+#if defined(SMP)
+	taskTableSize = stg_max(INIT_TASK_TABLE_SIZE, 
+				RtsFlags.ParFlags.nNodes * 2);
+#else
 	taskTableSize = INIT_TASK_TABLE_SIZE;
+#endif
 	taskTable = stgMallocBytes( taskTableSize * sizeof(TaskInfo),
 				    "initTaskManager");
     
@@ -62,9 +68,17 @@ initTaskManager (void)
 static void
 expandTaskTable (void)
 {
+    nat i;
+
     taskTableSize *= 2;
     taskTable = stgReallocBytes(taskTable, taskTableSize * sizeof(TaskInfo),
 				"expandTaskTable");
+
+    /* Have to update the hash table now... */
+    for (i = 0; i < taskCount; i++) {
+	removeHashTable( taskHash, taskTable[i].id, NULL );
+	insertHashTable( taskHash, taskTable[i].id, &taskTable[i] );
+    }
 }
 
 void
