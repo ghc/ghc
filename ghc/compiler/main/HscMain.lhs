@@ -44,7 +44,7 @@ import SrcLoc		( SrcLoc, noSrcLoc )
 import Var		( Id )
 import Module		( emptyModuleEnv )
 import RdrName		( GlobalRdrEnv, RdrName )
-import HsSyn		( HsModule, LHsBinds, LStmt, LHsType )
+import HsSyn		( HsModule, LHsBinds, LStmt, LHsType, HsGroup )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
@@ -138,8 +138,9 @@ data HscResult
 
    -- In IDE mode: we just do the static/dynamic checks
    | HscChecked 
-	(Located (HsModule RdrName))
-	(Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
+	(Located (HsModule RdrName))			-- parsed
+	(Maybe (HsGroup Name))				-- renamed
+	(Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails)) -- typechecked
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -283,7 +284,7 @@ hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
  	    -------------------
 	  (tc_msgs, maybe_tc_result) 
 		<- {-# SCC "Typecheck-Rename" #-}
-		   tcRnModule hsc_env (ms_hsc_src mod_summary) rdr_module
+		   tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
 
 	; msg_act tc_msgs
 	; case maybe_tc_result of {
@@ -323,11 +324,13 @@ hscFileCheck hsc_env msg_act mod_summary = do {
  	    -------------------
 	  (tc_msgs, maybe_tc_result) 
 		<- _scc_ "Typecheck-Rename" 
-		   tcRnModule hsc_env (ms_hsc_src mod_summary) rdr_module
+		   tcRnModule hsc_env (ms_hsc_src mod_summary) 
+			True{-save renamed syntax-}
+			rdr_module
 
 	; msg_act tc_msgs
 	; case maybe_tc_result of {
-      	     Nothing -> return (HscChecked rdr_module Nothing);
+      	     Nothing -> return (HscChecked rdr_module Nothing Nothing);
       	     Just tc_result -> do
 		let md = ModDetails { 
 				md_types   = tcg_type_env tc_result,
@@ -337,9 +340,10 @@ hscFileCheck hsc_env msg_act mod_summary = do {
 				   -- rules are IdCoreRules, not the
 				   -- RuleDecls we get out of the typechecker
 		return (HscChecked rdr_module 
-					(Just (tcg_binds tc_result,
-					       tcg_rdr_env tc_result,
-					       md)))
+				   (tcg_rn_decls tc_result)
+				   (Just (tcg_binds tc_result,
+					  tcg_rdr_env tc_result,
+					  md)))
 	}}}}
 
 ------------------------------

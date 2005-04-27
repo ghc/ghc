@@ -252,16 +252,13 @@ has_args ((L _ (Match args _ _)) : _) = not (null args)
 \end{code}
 
 \begin{code}
-emptyGroup = HsGroup { hs_valds = [HsBindGroup emptyBag [] Recursive],
-		       hs_tyclds = [], hs_instds = [],
-		       hs_fixds = [], hs_defds = [], hs_fords = [], 
-		       hs_depds = [] ,hs_ruleds = [] }
-
 findSplice :: [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
-findSplice ds = addl emptyGroup ds
+findSplice ds = addl oneEmptyBindGroup ds
 
 mkGroup :: [LHsDecl a] -> HsGroup a
-mkGroup ds = addImpDecls emptyGroup ds
+mkGroup ds = addImpDecls oneEmptyBindGroup ds
+
+oneEmptyBindGroup = emptyGroup{ hs_valds = [HsBindGroup emptyBag [] Recursive] }
 
 addImpDecls :: HsGroup a -> [LHsDecl a] -> HsGroup a
 -- The decls are imported, and should not have a splice

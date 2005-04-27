@@ -11,11 +11,12 @@ module HsDecls (
 	HsDecl(..), LHsDecl, TyClDecl(..), LTyClDecl, 
 	InstDecl(..), LInstDecl, NewOrData(..),
 	RuleDecl(..), LRuleDecl, RuleBndr(..),
-	DefaultDecl(..), LDefaultDecl, HsGroup(..), SpliceDecl(..),
+	DefaultDecl(..), LDefaultDecl, SpliceDecl(..),
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
 	ConDecl(..), LConDecl,	
 	DeprecDecl(..),  LDeprecDecl,
+	HsGroup(..),  emptyGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, 
 	countTyClDecls,
@@ -29,7 +30,7 @@ module HsDecls (
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
-import HsBinds		( HsBindGroup, HsBind, LHsBinds, 
+import HsBinds		( HsBindGroup(..), HsBind, LHsBinds, 
 			  Sig(..), LSig, LFixitySig, pprLHsBinds )
 import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
@@ -37,7 +38,7 @@ import HsTypes
 import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
 import Kind		( Kind, pprKind )
-import BasicTypes	( Activation(..) )
+import BasicTypes	( Activation(..), RecFlag(..) )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 			  CExportSpec(..), CLabelString ) 
 
@@ -46,6 +47,7 @@ import FunDeps		( pprFundeps )
 import Class		( FunDep )
 import Outputable	
 import Util		( count )
+import Bag		( emptyBag )
 import SrcLoc		( Located(..), unLoc )
 import FastString
 \end{code}
@@ -106,6 +108,42 @@ data HsGroup id
 	hs_depds  :: [LDeprecDecl id],
 	hs_ruleds :: [LRuleDecl id]
   }
+
+emptyGroup = HsGroup { hs_valds = [],
+		       hs_tyclds = [], hs_instds = [],
+		       hs_fixds = [], hs_defds = [], hs_fords = [], 
+		       hs_depds = [] ,hs_ruleds = [] }
+
+appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
+appendGroups 
+    HsGroup { 
+	hs_valds  = val_groups1,
+	hs_tyclds = tyclds1, 
+	hs_instds = instds1,
+	hs_fixds  = fixds1, 
+	hs_defds  = defds1,
+	hs_fords  = fords1, 
+	hs_depds  = depds1,
+	hs_ruleds = rulds1 }
+    HsGroup { 
+	hs_valds  = val_groups2,
+	hs_tyclds = tyclds2, 
+	hs_instds = instds2,
+	hs_fixds  = fixds2, 
+	hs_defds  = defds2,
+	hs_fords  = fords2, 
+	hs_depds  = depds2,
+	hs_ruleds = rulds2 }
+  = 
+    HsGroup { 
+	hs_valds  = val_groups1 ++ val_groups2,
+	hs_tyclds = tyclds1 ++ tyclds2, 
+	hs_instds = instds1 ++ instds2,
+	hs_fixds  = fixds1 ++ fixds2, 
+	hs_defds  = defds1 ++ defds2,
+	hs_fords  = fords1 ++ fords2, 
+	hs_depds  = depds1 ++ depds2,
+	hs_ruleds = rulds1 ++ rulds2 }
 \end{code}
 
 \begin{code}

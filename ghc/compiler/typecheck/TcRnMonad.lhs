@@ -93,6 +93,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_exports  = emptyNameSet,
 		tcg_imports  = init_imports,
 		tcg_dus      = emptyDUs,
+		tcg_rn_decls = Nothing,
 		tcg_binds    = emptyLHsBinds,
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],

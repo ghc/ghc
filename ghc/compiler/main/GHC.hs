@@ -36,7 +36,7 @@ module GHC (
 	loadMsgs,
 	workingDirectoryChanged,
 	checkModule, CheckedModule(..),
-	TypecheckedSource, ParsedSource,
+	TypecheckedSource, ParsedSource, RenamedSource,
 
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..),
@@ -105,6 +105,9 @@ module GHC (
 	-- ** Entities
 	TyThing(..), 
 
+	-- ** Syntax
+	module HsSyn, -- ToDo: remove extraneous bits
+
 	-- * Exceptions
 	GhcException(..), showGhcException,
 
@@ -116,10 +119,8 @@ module GHC (
 {-
  ToDo:
 
-  * return error messages rather than printing them.
   * inline bits of HscMain here to simplify layering: hscGetInfo,
     hscTcExpr, hscStmt.
-  * implement second argument to load.
   * we need to expose DynFlags, so should parseDynamicFlags really be
     part of this interface?
   * what StaticFlags should we expose, if any?
@@ -144,7 +145,7 @@ import IfaceSyn		( IfaceDecl )
 import Packages		( initPackages )
 import NameSet		( NameSet, nameSetToList )
 import RdrName		( GlobalRdrEnv )
-import HsSyn		( HsModule, LHsBinds )
+import HsSyn
 import Type		( Kind, Type, dropForAlls )
 import Id		( Id, idType, isImplicitId, isDeadBinder,
                           isSpecPragmaId, isExportedId, isLocalId, isGlobalId,
@@ -632,12 +633,13 @@ ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
 
 data CheckedModule = 
   CheckedModule { parsedSource      :: ParsedSource,
-		-- ToDo: renamedSource
+		  renamedSource     :: Maybe RenamedSource,
 		  typecheckedSource :: Maybe TypecheckedSource,
 		  checkedModuleInfo :: Maybe ModuleInfo
 	        }
 
-type ParsedSource  = Located (HsModule RdrName)
+type ParsedSource      = Located (HsModule RdrName)
+type RenamedSource     = HsGroup Name
 type TypecheckedSource = LHsBinds Id
 
 -- | This is the way to get access to parsed and typechecked source code
@@ -675,15 +677,21 @@ checkModule session@(Session ref) mod msg_act = do
 	   case r of
 		HscFail -> 
 		   return Nothing
-		HscChecked parsed Nothing ->
-		   return (Just (CheckedModule parsed Nothing Nothing))
-		HscChecked parsed (Just (tc_binds, rdr_env, details)) -> do
+		HscChecked parsed renamed Nothing ->
+		   return (Just (CheckedModule {
+					parsedSource = parsed,
+					renamedSource = renamed,
+					typecheckedSource = Nothing,
+					checkedModuleInfo = Nothing }))
+		HscChecked parsed renamed
+			   (Just (tc_binds, rdr_env, details)) -> do
 		   let minf = ModuleInfo {
 				minf_details  = details,
 				minf_rdr_env  = Just rdr_env
 			      }
 		   return (Just (CheckedModule {
 					parsedSource = parsed,
+					renamedSource = renamed,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf }))
 
@@ -1573,9 +1581,6 @@ isDictonaryId id
 data ObjectCode
   = ByteCode
   | BinaryCode FilePath
-
-type TypecheckedCode = HsTypecheckedGroup
-type RenamedCode     = [HsGroup Name]
 
 -- ToDo: typechecks abstract syntax or renamed abstract syntax.  Issues:
 --   - typechecked syntax includes extra dictionary translation and

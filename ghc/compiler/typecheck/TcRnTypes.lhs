@@ -39,7 +39,7 @@ module TcRnTypes(
 #include "HsVersions.h"
 
 import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
-			  ArithSeqInfo, DictBinds, LHsBinds )
+			  ArithSeqInfo, DictBinds, LHsBinds, HsGroup )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
@@ -193,9 +193,14 @@ data TcGblEnv
 		-- tcg_inst_uses; the reference is implicit rather than explicit,
 		-- so we have to zap a mutable variable.
 
-		-- The next fields accumulate the payload of the module
-		-- The binds, rules and foreign-decl fiels are collected
-		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
+		-- The next fields accumulate the payload of the
+		-- module The binds, rules and foreign-decl fiels are
+		-- collected initially in un-zonked form and are
+		-- finally zonked in tcRnSrcDecls
+
+	tcg_rn_decls :: Maybe (HsGroup Name),	-- renamed decls, maybe
+		-- Nothing <=> Don't retain renamed decls
+
 	tcg_binds   :: LHsBinds Id,		-- Value bindings in this module
 	tcg_deprecs :: Deprecations,		-- ...Deprecations 
 	tcg_insts   :: [DFunId],		-- ...Instances

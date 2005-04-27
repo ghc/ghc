@@ -27,7 +27,9 @@ import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
 import StaticFlags	( opt_PprStyle_Debug )
 import Packages		( moduleToPackageConfig, mkPackageId, package,
 			  isHomeModule )
-import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl, SpliceDecl(..), HsBind(..),
+import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
+			  SpliceDecl(..), HsBind(..),
+			  emptyGroup, appendGroups,
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
 
@@ -153,11 +155,13 @@ import Maybe		( isJust )
 \begin{code}
 tcRnModule :: HscEnv 
 	   -> HscSource
+	   -> Bool 		-- True <=> save renamed syntax
 	   -> Located (HsModule RdrName)
 	   -> IO (Messages, Maybe TcGblEnv)
 
-tcRnModule hsc_env hsc_src (L loc (HsModule maybe_mod export_ies 
-				import_decls local_decls mod_deprec))
+tcRnModule hsc_env hsc_src save_rn_decls
+	 (L loc (HsModule maybe_mod export_ies 
+			  import_decls local_decls mod_deprec))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_mod = case maybe_mod of
@@ -191,7 +195,11 @@ tcRnModule hsc_env hsc_src (L loc (HsModule maybe_mod export_ies
 	updGblEnv ( \ gbl -> 
 		gbl { tcg_rdr_env  = rdr_env,
 		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
-		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports }) 
+		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports,
+		      tcg_rn_decls = if save_rn_decls then
+					Just emptyGroup
+				     else
+					Nothing })
 		$ do {
 
 	traceRn (text "rn1" <+> ppr (imp_dep_mods imports)) ;
@@ -624,10 +632,17 @@ rnTopSrcDecls group
 	(tcg_env, rn_decls) <- rnSrcDecls group ;
 	failIfErrsM ;
 
+		-- save the renamed syntax, if we want it
+	let { tcg_env'
+	        | Just grp <- tcg_rn_decls tcg_env
+	          = tcg_env{ tcg_rn_decls = Just (appendGroups grp rn_decls) }
+	        | otherwise
+	           = tcg_env };
+
 		-- Dump trace of renaming part
 	rnDump (ppr rn_decls) ;
 
-	return (tcg_env, rn_decls)
+	return (tcg_env', rn_decls)
    }}
 
 ------------------------------------------------
