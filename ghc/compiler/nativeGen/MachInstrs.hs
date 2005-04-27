@@ -532,9 +532,9 @@ i386_insert_ffrees insns
 
 ffree_before_nonlocal_transfers insn
    = case insn of
-        CALL _  -> [GFREE, insn]
-        JMP _   -> [GFREE, insn]
-        other   -> [insn]
+        CALL _ _ -> [GFREE, insn]
+        JMP _    -> [GFREE, insn]
+        other    -> [insn]
 
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
