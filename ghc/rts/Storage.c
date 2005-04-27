@@ -216,11 +216,6 @@ initStorage( void )
       errorBelch("-G1 is incompatible with SMP");
       stg_exit(1);
   }
-  // No -H, for now
-  if (RtsFlags.GcFlags.heapSizeSuggestion > 0) {
-      errorBelch("-H<size> is incompatible with SMP");
-      stg_exit(1);
-  }
 #endif
 
   /* generation 0 is special: that's the nursery */
@@ -509,12 +504,23 @@ resizeNursery ( step *stp, nat blocks )
 // Resize each of the nurseries to the specified size.
 //
 void
-resizeNurseries (nat blocks)
+resizeNurseriesFixed (nat blocks)
 {
     nat i;
     for (i = 0; i < n_nurseries; i++) {
 	resizeNursery(&nurseries[i], blocks);
     }
+}
+
+// 
+// Resize the nurseries to the total specified size.
+//
+void
+resizeNurseries (nat blocks)
+{
+    // If there are multiple nurseries, then we just divide the number
+    // of available blocks between them.
+    resizeNurseriesFixed(blocks / n_nurseries);
 }
 
 /* -----------------------------------------------------------------------------

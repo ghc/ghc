@@ -369,11 +369,12 @@ INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
    Nursery manipulation
    -------------------------------------------------------------------------- */
 
-extern void     allocNurseries     ( void );
-extern void     resetNurseries     ( void );
-extern void     resizeNurseries    ( nat blocks );
-extern void     tidyAllocateLists  ( void );
-extern lnat     countNurseryBlocks ( void );
+extern void     allocNurseries       ( void );
+extern void     resetNurseries       ( void );
+extern void     resizeNurseries      ( nat blocks );
+extern void     resizeNurseriesFixed ( nat blocks );
+extern void     tidyAllocateLists    ( void );
+extern lnat     countNurseryBlocks   ( void );
 
 /* -----------------------------------------------------------------------------
    Functions from GC.c 

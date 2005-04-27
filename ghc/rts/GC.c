@@ -1029,7 +1029,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     } else {
       // we might have added extra large blocks to the nursery, so
       // resize back to minAllocAreaSize again.
-      resizeNurseries(RtsFlags.GcFlags.minAllocAreaSize);
+      resizeNurseriesFixed(RtsFlags.GcFlags.minAllocAreaSize);
     }
   }
 
