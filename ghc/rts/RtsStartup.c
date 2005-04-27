@@ -88,6 +88,7 @@ __hscore_set_saved_termios(int fd, void* ts)
 
 /* -----------------------------------------------------------------------------
    Initialise floating point unit on x86 (currently disabled. why?)
+   (see comment in ghc/compiler/nativeGen/MachInstrs.lhs).
    -------------------------------------------------------------------------- */
 
 #define X86_INIT_FPU 0
