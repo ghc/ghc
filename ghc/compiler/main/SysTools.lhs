@@ -544,12 +544,12 @@ cleanTempFilesExcept dflags dont_delete
 newTempName :: DynFlags -> Suffix -> IO FilePath
 newTempName DynFlags{tmpDir=tmp_dir} extn
   = do x <- getProcessID
-       findTempName tmp_dir x
+       findTempName (tmp_dir ++ "/ghc" ++ show x ++ "_") 0
   where 
-    findTempName tmp_dir x
-      = do let filename = tmp_dir ++ "/ghc" ++ show x ++ '.':extn
+    findTempName prefix x
+      = do let filename = prefix ++ show x ++ '.':extn
   	   b  <- doesFileExist filename
-	   if b then findTempName tmp_dir (x+1)
+	   if b then findTempName prefix (x+1)
 		else do consIORef v_FilesToClean filename -- clean it up later
 		        return filename
 
