@@ -611,7 +611,7 @@ __stg_gc_fun
         Sp(2) = R1;
         Sp(1) = size;
         Sp(0) = stg_gc_fun_info;
-        // DEBUG_ONLY(foreign "C" fprintf(stderr, "stg_fun_gc_gen(ARG_GEN)"););
+        // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
         GC_GENERIC
     } else { 
 	jump W_[stg_stack_save_entries + WDS(type)];

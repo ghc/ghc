@@ -916,6 +916,13 @@ fprintCCS( FILE *f, CostCentreStack *ccs )
   fprintf(f,">");
 }
 
+/* For calling from .cmm code, where we can't reliably refer to stderr */
+void
+fprintCCS_stderr( CostCentreStack *ccs )
+{
+    fprintCCS(stderr, ccs);
+}
+
 #ifdef DEBUG
 void
 debugCCS( CostCentreStack *ccs )

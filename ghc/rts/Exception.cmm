@@ -330,7 +330,7 @@ raisezh_fast
      * the info was only displayed for an *uncaught* exception.
      */
     if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags)) {
-      foreign "C" fprintCCS(W_[stderr] "ptr",W_[CCCS] "ptr");
+      foreign "C" fprintCCS_stderr(W_[CCCS] "ptr");
     }
 #endif
 

@@ -41,7 +41,7 @@ INFO_TABLE_RET( stg_ap_0,
     // fn is in R1, no args on the stack
 
     IF_DEBUG(apply,
-	foreign "C" fprintf(W_[stderr] "ptr", stg_ap_0_ret_str);
+	foreign "C" debugBelch(stg_ap_0_ret_str);
 	foreign "C" printClosure(R1 "ptr"));
 
     IF_DEBUG(sanity,
