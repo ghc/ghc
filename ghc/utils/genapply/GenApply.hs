@@ -304,7 +304,7 @@ genApply regstatus args =
 --        print "  };"
     
        text "",
-       text "IF_DEBUG(apply,foreign \"C\" fprintf(stderr, \"" <> fun_ret_label <> 
+       text "IF_DEBUG(apply,foreign \"C\" debugBelch(\"" <> fun_ret_label <> 
 	  text "... \"); foreign \"C\" printClosure(R1 \"ptr\"));",
 
        text "IF_DEBUG(sanity,foreign \"C\" checkStackFrame(Sp+WDS(" <> int (1 + all_args_size)
