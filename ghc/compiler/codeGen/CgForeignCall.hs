@@ -80,7 +80,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
     emitSaveThreadState
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) [(id,NoHint)]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
-			Nothing{-save all; ToDo-}
+			(Just vols)
 			)
     stmtC (the_call vols)
     stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) []
