@@ -22,7 +22,6 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
-#include "StoragePriv.h"
 
 #include <stdlib.h>
 #include <string.h>

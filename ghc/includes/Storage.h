@@ -10,6 +10,7 @@
 #define STORAGE_H
 
 #include <stddef.h>
+#include "OSThreads.h"
 
 /* -----------------------------------------------------------------------------
  * Generational GC
@@ -187,10 +188,18 @@ extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
 
    -------------------------------------------------------------------------- */
 
-/* ToDo: shouldn't recordMutable acquire some
- * kind of lock in the SMP case?  Or do we need per-processor
- * mutable lists?
+/*
+ * Storage manager mutex
  */
+#if defined(SMP)
+extern Mutex sm_mutex;
+#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex);
+#define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex);
+#else
+#define ACQUIRE_SM_LOCK
+#define RELEASE_SM_LOCK
+#endif
+
 INLINE_HEADER void
 recordMutableGen(StgClosure *p, generation *gen)
 {
@@ -205,6 +214,15 @@ recordMutableGen(StgClosure *p, generation *gen)
 	gen->mut_list = bd;
     }
     *bd->free++ = (StgWord)p;
+
+}
+
+INLINE_HEADER void
+recordMutableGenLock(StgClosure *p, generation *gen)
+{
+    ACQUIRE_SM_LOCK;
+    recordMutableGen(p,gen);
+    RELEASE_SM_LOCK;
 }
 
 INLINE_HEADER void
@@ -214,6 +232,14 @@ recordMutable(StgClosure *p)
     ASSERT(closure_MUTABLE(p));
     bd = Bdescr((P_)p);
     if (bd->gen_no > 0) recordMutableGen(p, &RTS_DEREF(generations)[bd->gen_no]);
+}
+
+INLINE_HEADER void
+recordMutableLock(StgClosure *p)
+{
+    ACQUIRE_SM_LOCK;
+    recordMutable(p);
+    RELEASE_SM_LOCK;
 }
 
 /* -----------------------------------------------------------------------------

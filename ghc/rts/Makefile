@@ -318,7 +318,6 @@ SRC_HC_OPTS += \
   -\#include ProfHeap.h \
   -\#include LdvProfile.h \
   -\#include Profiling.h \
-  -\#include StoragePriv.h \
   -\#include OSThreads.h \
   -\#include Apply.h
 

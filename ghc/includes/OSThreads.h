@@ -4,11 +4,12 @@
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
  * manner. 
- *
  * 
  * --------------------------------------------------------------------------*/
+
 #ifndef __OSTHREADS_H__
 #define __OSTHREADS_H__
+
 #if defined(RTS_SUPPORTS_THREADS) /* to the end */
 
 # if defined(HAVE_PTHREAD_H) && !defined(WANT_NATIVE_WIN32_THREADS)
@@ -21,8 +22,12 @@ typedef pthread_t       OSThreadId;
 #define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
 
 #ifdef LOCK_DEBUG
-#define ACQUIRE_LOCK(mutex) debugBelch("ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); pthread_mutex_lock(mutex)
-#define RELEASE_LOCK(mutex) debugBelch("RELEASE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); pthread_mutex_unlock(mutex)
+#define ACQUIRE_LOCK(mutex) \
+  debugBelch("ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
+  pthread_mutex_lock(mutex)
+#define RELEASE_LOCK(mutex) \
+  debugBelch("RELEASE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
+  pthread_mutex_unlock(mutex)
 #else
 #define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex)
 #define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex)
@@ -31,8 +36,6 @@ typedef pthread_t       OSThreadId;
 # elif defined(HAVE_WINDOWS_H)
 #include <windows.h>
 
-#include "RtsUtils.h"
-
 typedef HANDLE Condition;
 typedef HANDLE Mutex;
 typedef DWORD OSThreadId;
@@ -40,7 +43,7 @@ typedef DWORD OSThreadId;
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
 
-static inline void
+INLINE_HEADER void
 ACQUIRE_LOCK(Mutex *mutex)
 {
     if (WaitForSingleObject(*mutex,INFINITE) == WAIT_FAILED) {
@@ -48,7 +51,7 @@ ACQUIRE_LOCK(Mutex *mutex)
     }
 }
 
-static inline void
+INLINE_HEADER void
 RELEASE_LOCK(Mutex *mutex)
 {
     if (ReleaseMutex(*mutex) == 0) {

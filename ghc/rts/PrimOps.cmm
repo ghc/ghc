@@ -135,7 +135,7 @@ unsafeThawArrayzh_fast
   // maintains this invariant.
   //
   if (%INFO_TYPE(%GET_STD_INFO(R1)) != HALF_W_(MUT_ARR_PTRS_FROZEN0)) {
-	foreign "C" recordMutable(R1 "ptr");
+	foreign "C" recordMutableLock(R1 "ptr");
   }
 
   SET_INFO(R1,stg_MUT_ARR_PTRS_info);

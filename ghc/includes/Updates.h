@@ -256,7 +256,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
       and_then;							\
     } else {							\
       DEBUG_FILL_SLOP(p1);					\
-      foreign "C" recordMutableGen(p1 "ptr", 			\
+      foreign "C" recordMutableGenLock(p1 "ptr",		\
 		 generation(TO_W_(bdescr_gen_no(bd))) "ptr");	\
       StgInd_indirectee(p1) = p2;				\
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
@@ -280,7 +280,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
       and_then;								\
     } else {								\
       DEBUG_FILL_SLOP(p1);						\
-      recordMutableGen(p1, &generations[bd->gen_no]);			\
+      recordMutableGenLock(p1, &generations[bd->gen_no]);		\
       ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1, &stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
@@ -319,7 +319,7 @@ updateWithPermIndirection(StgClosure *p1,
     LDV_RECORD_CREATE(p1);
     TICK_UPD_NEW_PERM_IND(p1);
   } else {
-    recordMutableGen(p1, &generations[bd->gen_no]);
+    recordMutableGenLock(p1, &generations[bd->gen_no]);
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
     /*
