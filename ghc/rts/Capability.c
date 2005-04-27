@@ -102,6 +102,7 @@ Capability *free_capabilities;
 static void
 initCapability( Capability *cap )
 {
+    cap->r.rInHaskell      = rtsFalse;
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
     cap->f.stgGCFun        = (F_)__stg_gc_fun;
 }
