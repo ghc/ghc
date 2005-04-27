@@ -3108,12 +3108,12 @@ genCCall target dest_regs args vols = do
 	-- CmmPrim -> ...
         CmmForeignCall (CmmLit (CmmLabel lbl)) conv
            -> -- ToDo: stdcall arg sizes
-	      return (unitOL (CALL (Left fn_imm)), conv)
+	      return (unitOL (CALL (Left fn_imm) []), conv)
 	   where fn_imm = ImmCLbl lbl
         CmmForeignCall expr conv
            -> do (dyn_c, dyn_r, dyn_rep) <- get_op expr
                  ASSERT(dyn_rep == I32)
-                  return (dyn_c `snocOL` CALL (Right dyn_r), conv)
+                  return (dyn_c `snocOL` CALL (Right dyn_r) [], conv)
 
     let	push_code = concatOL push_codes
 	call = callinsns `appOL`
@@ -3270,10 +3270,17 @@ genCCall (CmmPrim op) [(r,_)] args vols =
 genCCall target dest_regs args vols = do
 
 	-- load up the register arguments
-    (stack_args, sse_regs, load_args_code)
-	 <- load_args args allArgRegs allFPArgRegs 0 nilOL
+    (stack_args, aregs, fregs, load_args_code)
+	 <- load_args args allArgRegs allFPArgRegs nilOL
 
     let
+	fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
+	int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
+	arg_regs = int_regs_used ++ fp_regs_used
+		-- for annotating the call instruction with
+
+	sse_regs = length fp_regs_used
+
 	tot_arg_size = arg_size * length stack_args
 
 	-- On entry to the called function, %rsp should be aligned
@@ -3305,11 +3312,11 @@ genCCall target dest_regs args vols = do
 	-- CmmPrim -> ...
         CmmForeignCall (CmmLit (CmmLabel lbl)) conv
            -> -- ToDo: stdcall arg sizes
-	      return (unitOL (CALL (Left fn_imm)), conv)
+	      return (unitOL (CALL (Left fn_imm) arg_regs), conv)
 	   where fn_imm = ImmCLbl lbl
         CmmForeignCall expr conv
            -> do (dyn_r, dyn_c) <- getSomeReg expr
-		 return (dyn_c `snocOL` CALL (Right dyn_r), conv)
+		 return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
 
     let
 	-- The x86_64 ABI requires us to set %al to the number of SSE
@@ -3360,31 +3367,31 @@ genCCall target dest_regs args vols = do
     load_args :: [(CmmExpr,MachHint)]
 	      -> [Reg] 			-- int regs avail for args
 	      -> [Reg] 			-- FP regs avail for args
-	      -> Int -> InstrBlock
-	      -> NatM ([(CmmExpr,MachHint)],Int,InstrBlock)
-    load_args args [] [] sse_regs code = return (args, sse_regs, code)
+	      -> InstrBlock
+	      -> NatM ([(CmmExpr,MachHint)],[Reg],[Reg],InstrBlock)
+    load_args args [] [] code     =  return (args, [], [], code)
 	-- no more regs to use
-    load_args [] aregs fregs sse_regs code = return ([],sse_regs,code)
+    load_args [] aregs fregs code =  return ([], aregs, fregs, code)
 	-- no more args to push
-    load_args ((arg,hint) : rest) aregs fregs sse_regs code
+    load_args ((arg,hint) : rest) aregs fregs code
 	| isFloatingRep arg_rep = 
 	case fregs of
 	  [] -> push_this_arg
 	  (r:rs) -> do
 	     arg_code <- getAnyReg arg
-	     load_args rest aregs rs (sse_regs+1) (code `appOL` arg_code r)
+	     load_args rest aregs rs (code `appOL` arg_code r)
 	| otherwise =
 	case aregs of
 	  [] -> push_this_arg
 	  (r:rs) -> do
 	     arg_code <- getAnyReg arg
-	     load_args rest rs fregs sse_regs (code `appOL` arg_code r)
+	     load_args rest rs fregs (code `appOL` arg_code r)
 	where
 	  arg_rep = cmmExprRep arg
 
 	  push_this_arg = do
-	    (args',sse',code') <- load_args rest aregs fregs sse_regs code
-	    return ((arg,hint):args', sse', code')
+	    (args',ars,frs,code') <- load_args rest aregs fregs code
+	    return ((arg,hint):args', ars, frs, code')
 
     push_args [] code = return code
     push_args ((arg,hint):rest) code

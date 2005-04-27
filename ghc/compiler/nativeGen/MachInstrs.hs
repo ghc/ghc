@@ -504,7 +504,7 @@ bit or 64 bit precision.
 	| JMP	      Operand
 	| JXX	      Cond BlockId  -- includes unconditional branches
 	| JMP_TBL     Operand [BlockId]  -- table jump
-	| CALL	      (Either Imm Reg)
+	| CALL	      (Either Imm Reg) [Reg]
 
 -- Other things.
 	| CLTD MachRep	 -- sign extend %eax into %edx:%eax

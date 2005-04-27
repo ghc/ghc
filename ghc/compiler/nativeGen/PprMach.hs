@@ -1283,8 +1283,8 @@ pprInstr (JXX cond (BlockId id))
 pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand wordRep op)
 pprInstr (JMP_TBL op ids)  = pprInstr (JMP op)
-pprInstr (CALL (Left imm))      = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
-pprInstr (CALL (Right reg))     = (<>) (ptext SLIT("\tcall *")) (pprReg wordRep reg)
+pprInstr (CALL (Left imm) _)    = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
+pprInstr (CALL (Right reg) _)   = (<>) (ptext SLIT("\tcall *")) (pprReg wordRep reg)
 
 pprInstr (IDIV sz op)	= pprSizeOp SLIT("idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp SLIT("div")  sz op

@@ -171,13 +171,8 @@ regUsage instr = case instr of
     JXX    cond lbl	-> mkRU [] []
     JMP    op		-> mkRU (use_R op) []
     JMP_TBL op ids      -> mkRU (use_R op) []
-#if i386_TARGET_ARCH
-    CALL   (Left imm)	-> mkRU [] callClobberedRegs
-    CALL   (Right reg)	-> mkRU [reg] callClobberedRegs
-#else
-    CALL   (Left imm)	-> mkRU params callClobberedRegs
-    CALL   (Right reg)	-> mkRU (reg:params) callClobberedRegs
-#endif
+    CALL (Left imm)  params -> mkRU params callClobberedRegs
+    CALL (Right reg) params -> mkRU (reg:params) callClobberedRegs
     CLTD   sz		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
 
@@ -540,8 +535,8 @@ patchRegs instr env = case instr of
     FDIV sz src dst	-> FDIV sz (patchOp src) (patchOp dst)
 #endif    
 
-    CALL (Left imm)	-> instr
-    CALL (Right reg)	-> CALL (Right (env reg))
+    CALL (Left imm)  _	-> instr
+    CALL (Right reg) p	-> CALL (Right (env reg)) p
     
     FETCHGOT reg        -> FETCHGOT (env reg)
     
