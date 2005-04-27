@@ -476,6 +476,15 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
       // We now have a capability...
 #endif
+      
+#if 0 /* extra sanity checking */
+      { 
+	  StgMainThread *m;
+	  for (m = main_threads; m != NULL; m = m->link) {
+	      ASSERT(get_itbl(m->tso)->type == TSO);
+	  }
+      }
+#endif
 
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
@@ -1819,6 +1828,7 @@ scheduleHandleThreadFinished( StgMainThread *mainThread
 	  removeThreadLabel((StgWord)mainThread->tso->id);
 #endif
 	  if (mainThread->prev == NULL) {
+	      ASSERT(mainThread == main_threads);
 	      main_threads = mainThread->link;
 	  } else {
 	      mainThread->prev->link = mainThread->link;
