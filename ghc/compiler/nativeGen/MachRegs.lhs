@@ -587,7 +587,7 @@ regNames
 
 showReg :: RegNo -> String
 showReg n
-  | n >= 16 = "%xmm" ++ show n  
+  | n >= 16 = "%xmm" ++ show (n-16)
   | n >= 8  = "%r" ++ show n
   | otherwise = regNames !! n
 
@@ -1242,72 +1242,72 @@ baseRegOffset _			  = panic "baseRegOffset:other"
 callerSaves :: GlobalReg -> Bool
 
 #ifdef CALLER_SAVES_Base
-callerSaves BaseReg			= True
+callerSaves BaseReg		= True
 #endif
 #ifdef CALLER_SAVES_R1
-callerSaves (VanillaReg _ ILIT(1))	= True
+callerSaves (VanillaReg 1)	= True
 #endif
 #ifdef CALLER_SAVES_R2
-callerSaves (VanillaReg _ ILIT(2))    	= True
+callerSaves (VanillaReg 2)	= True
 #endif
 #ifdef CALLER_SAVES_R3
-callerSaves (VanillaReg _ ILIT(3))    	= True
+callerSaves (VanillaReg 3)	= True
 #endif
 #ifdef CALLER_SAVES_R4
-callerSaves (VanillaReg _ ILIT(4))	= True
+callerSaves (VanillaReg 4)	= True
 #endif
 #ifdef CALLER_SAVES_R5
-callerSaves (VanillaReg _ ILIT(5))	= True
+callerSaves (VanillaReg 5)	= True
 #endif
 #ifdef CALLER_SAVES_R6
-callerSaves (VanillaReg _ ILIT(6))	= True
+callerSaves (VanillaReg 6)	= True
 #endif
 #ifdef CALLER_SAVES_R7
-callerSaves (VanillaReg _ ILIT(7))	= True
+callerSaves (VanillaReg 7)	= True
 #endif
 #ifdef CALLER_SAVES_R8
-callerSaves (VanillaReg _ ILIT(8))	= True
+callerSaves (VanillaReg 8)	= True
 #endif
 #ifdef CALLER_SAVES_F1
-callerSaves (FloatReg 1#)		= True
+callerSaves (FloatReg 1)	= True
 #endif
 #ifdef CALLER_SAVES_F2
-callerSaves (FloatReg 2#)		= True
+callerSaves (FloatReg 2)	= True
 #endif
 #ifdef CALLER_SAVES_F3
-callerSaves (FloatReg 3#)		= True
+callerSaves (FloatReg 3)	= True
 #endif
 #ifdef CALLER_SAVES_F4
-callerSaves (FloatReg 4#)		= True
+callerSaves (FloatReg 4)	= True
 #endif
 #ifdef CALLER_SAVES_D1
-callerSaves (DoubleReg 1#)		= True
+callerSaves (DoubleReg 1)	= True
 #endif
 #ifdef CALLER_SAVES_D2
-callerSaves (DoubleReg 2#)		= True
+callerSaves (DoubleReg 2)	= True
 #endif
 #ifdef CALLER_SAVES_L1
-callerSaves (LongReg _ ILIT(1))		= True
+callerSaves (LongReg 1)		= True
 #endif
 #ifdef CALLER_SAVES_Sp
-callerSaves Sp				= True
+callerSaves Sp			= True
 #endif
 #ifdef CALLER_SAVES_SpLim
-callerSaves SpLim			= True
+callerSaves SpLim		= True
 #endif
 #ifdef CALLER_SAVES_Hp
-callerSaves Hp				= True
+callerSaves Hp			= True
 #endif
 #ifdef CALLER_SAVES_HpLim
-callerSaves HpLim			= True
+callerSaves HpLim		= True
 #endif
 #ifdef CALLER_SAVES_CurrentTSO
-callerSaves CurrentTSO			= True
+callerSaves CurrentTSO		= True
 #endif
 #ifdef CALLER_SAVES_CurrentNursery
-callerSaves CurrentNursery		= True
+callerSaves CurrentNursery	= True
 #endif
-callerSaves _				= False
+callerSaves _			= False
 
 
 --  | Returns 'Nothing' if this global register is not stored
