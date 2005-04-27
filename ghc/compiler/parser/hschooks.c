@@ -5,7 +5,7 @@ in instead of the defaults.
 */
 
 /* For GHC 4.08, we are relying on the fact that RtsFlags has
- * compatibile layout with the current version, because we're
+ * compatible layout with the current version, because we're
  * #including the current version of RtsFlags.h below.  4.08 didn't
  * ship with its own RtsFlags.h, unfortunately.   For later GHC
  * versions, we #include the correct RtsFlags.h.
