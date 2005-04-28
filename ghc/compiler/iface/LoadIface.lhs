@@ -5,10 +5,10 @@
 
 \begin{code}
 module LoadIface (
-	loadHomeInterface, loadInterface, loadDecls,
+	loadHomeInterface, loadInterface, loadWiredInHomeIface, 
 	loadSrcInterface, loadOrphanModules, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
-	ifaceStats, discardDeclPrags,
+	loadDecls, ifaceStats, discardDeclPrags,
 	initExternalPackageState
    ) where
 
@@ -20,8 +20,7 @@ import Packages		( PackageState(..), PackageIdH(..), isHomePackage )
 import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ),
 			  isOneShot )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
-			  IfaceConDecls(..), IfaceExpr(..), IfaceIdInfo(..), 
-			  IfaceType(..), IfaceExtName )
+			  IfaceConDecls(..), IfaceIdInfo(..) )
 import IfaceEnv		( newGlobalBinder )
 import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..),
 			  addEpsInStats, ExternalPackageState(..),
@@ -41,7 +40,7 @@ import PrelRules	( builtinRules )
 import Rules		( extendRuleBaseList, mkRuleBase )
 import InstEnv		( emptyInstEnv, extendInstEnvList )
 import Name		( Name {-instance NamedThing-}, getOccName,
-			  nameModule, isInternalName )
+			  nameModule, isInternalName, isWiredInName )
 import NameEnv
 import MkId		( seqId )
 import Module		( Module, ModLocation(ml_hi_file), emptyModuleEnv, 
@@ -104,6 +103,16 @@ loadHomeInterface :: SDoc -> Name -> TcRn ModIface
 loadHomeInterface doc name
   = ASSERT2( not (isInternalName name), ppr name <+> parens doc )
     initIfaceTcRn $ loadSysInterface doc (nameModule name)
+
+---------------
+loadWiredInHomeIface :: Name -> IfM lcl ()
+-- A IfM function to load the home interface for a wired-in thing,
+-- so that we're sure that we see its instance declarations and rules
+loadWiredInHomeIface name
+  = ASSERT( isWiredInName name )
+    do { loadSysInterface doc (nameModule name); return () }
+  where
+    doc = ptext SLIT("Need home interface for wired-in thing") <+> ppr name
 
 ---------------
 loadSysInterface :: SDoc -> Module -> IfM lcl ModIface

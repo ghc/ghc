@@ -13,7 +13,8 @@ module TcIface (
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadInterface, loadHomeInterface, loadDecls, findAndReadIface )
+import LoadIface	( loadInterface, loadWiredInHomeIface,
+			  loadDecls, findAndReadIface )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, 
@@ -110,7 +111,8 @@ tcImportDecl :: Name -> TcM TyThing
 -- Entry point for *source-code* uses of importDecl
 tcImportDecl name 
   | Just thing <- wiredInNameTyThing_maybe name
-  = do	{ checkWiredInName name; return thing }
+  = do	{ initIfaceTcRn (loadWiredInHomeIface name) 
+	; return thing }
   | otherwise
   = do 	{ traceIf (text "tcLookupGlobal" <+> ppr name)
 	; mb_thing <- initIfaceTcRn (importDecl name)
@@ -119,30 +121,23 @@ tcImportDecl name
 	    Failed err      -> failWithTc err }
 
 checkWiredInTyCon :: TyCon -> TcM ()
--- Ensure its instances are loaded
--- It might not be a wired-in tycon (see the calls in TcUnify)
+-- Ensure that the home module of the TyCon (and hence its instances)
+-- are loaded. It might not be a wired-in tycon (see the calls in TcUnify),
+-- in which case this is a no-op.
 checkWiredInTyCon tc	
-  | not (isWiredInName tc_name) = return ()
-  | otherwise			= checkWiredInName tc_name
-  where
-    tc_name = tyConName tc
-
-checkWiredInName :: Name -> TcM ()
--- We "check" a wired-in name solely to check that its
--- interface file is loaded, so that we're sure that we see
--- its instance declarations and rules
-checkWiredInName name
-  = ASSERT( isWiredInName name )
-    do	{ mod <- getModule
-	; if nameIsLocalOrFrom mod name then
+  | not (isWiredInName tc_name) 
+  = return ()
+  | otherwise
+  = do	{ mod <- getModule
+	; if nameIsLocalOrFrom mod tc_name then
 		-- Don't look for (non-existent) Float.hi when
 		-- compiling Float.lhs, which mentions Float of course
 		return ()
 	  else	-- A bit yukky to call initIfaceTcRn here
-	  do { loadHomeInterface doc name; return () }
+		initIfaceTcRn (loadWiredInHomeIface tc_name) 
 	}
   where
-    doc = ptext SLIT("Need home interface for wired-in thing") <+> ppr name
+    tc_name = tyConName tc
 
 importDecl :: Name -> IfM lcl (MaybeErr Message TyThing)
 -- Get the TyThing for this Name from an interface file
@@ -834,7 +829,10 @@ tcPragExpr name expr
 tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
   | Just thing <- wiredInNameTyThing_maybe name
-  = return thing
+  = do { loadWiredInHomeIface name; return thing }
+	-- Even though we are in an interface file, we want to make
+	-- sure its instances are loaded (imagine f :: Double -> Double)
+	-- and its RULES are loaded too
   | otherwise
   = do	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of {
