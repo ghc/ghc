@@ -280,6 +280,14 @@ test080:
 
 
 # -----------------------------------------------------------------------------
+# --make tests
+
+# Test for overlap between home module and package module
+test100:
+	@$(RM) A.hi A.o A.hc
+	$(TEST_HC) --make -ioverlap Overlap
+
+# -----------------------------------------------------------------------------
 # dependency-generation tests
 
 DEPFILE= depend
