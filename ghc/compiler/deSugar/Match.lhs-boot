@@ -2,7 +2,7 @@
 module Match where
 import Var	( Id )
 import TcType	( TcType )
-import DsMonad	( DsM, DsMatchContext, EquationInfo, MatchResult )
+import DsMonad	( DsM, EquationInfo, MatchResult )
 import CoreSyn	( CoreExpr )
 import HsSyn	( LPat, HsMatchContext, MatchGroup )
 import Name	( Name )

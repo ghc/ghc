@@ -1,9 +1,13 @@
 \begin{code}
 module TcIface where
-import IfaceSyn	 ( IfaceDecl )
+import IfaceSyn	 ( IfaceDecl, IfaceInst, IfaceRule )
 import TypeRep	 ( TyThing )
 import TcRnTypes ( IfL )
+import InstEnv	 ( Instance )
+import CoreSyn	 ( CoreRule )
 
 tcIfaceDecl  :: IfaceDecl -> IfL TyThing
+tcIfaceInst  :: IfaceInst -> IfL Instance
+tcIfaceRule  :: IfaceRule -> IfL CoreRule
 \end{code}
 
