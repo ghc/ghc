@@ -30,8 +30,8 @@ import Type		( isUnLiftedType, splitTyConApp_maybe )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
                           isUnboxedTupleCon, isNullaryRepDataCon, dataConWorkId,
 			  dataConRepArity )
-import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
-			  isUnboxedTupleTyCon )
+import TyCon		( TyCon, tyConFamilySize, isDataTyCon, 
+			  tyConDataCons, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
 import Type		( Type, repType, splitFunTys, dropForAlls, pprType )
 import Util
