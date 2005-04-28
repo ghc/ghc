@@ -108,6 +108,8 @@ argBits (PtrArg : args) = False : argBits args
 argBits (arg    : args) = take (cgRepSizeW arg) (repeat True) ++ argBits args
 
 stdPattern :: [CgRep] -> Maybe Int
+stdPattern []          = Just ARG_NONE	-- just void args, probably
+
 stdPattern [PtrArg]    = Just ARG_P
 stdPattern [FloatArg]  = Just ARG_F
 stdPattern [DoubleArg] = Just ARG_D

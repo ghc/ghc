@@ -557,6 +557,7 @@ applyTypes = [
 -- between N and P (they both live in the same register), only the bitmap
 -- changes, so we could share the apply/save code between lots of cases.
 stackApplyTypes = [
+	[],
 	[N],
 	[P],
 	[F],
