@@ -471,6 +471,9 @@ NoFibWays = $(GhcLibWays)
 # Haskell compiler options for nofib
 NoFibHcOpts = -O
 
+# Number of times to run each program
+NoFibRuns = 5
+
 # ==============================================================================
 #
 #			END OF PROJECT-SPECIFIC STUFF
