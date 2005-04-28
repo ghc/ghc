@@ -14,7 +14,7 @@ module IfaceType (
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
-	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, 
+	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, toIfaceTyCon,
 
 	-- Printing
 	pprIfaceType, pprParendIfaceType, pprIfaceContext, 
@@ -338,15 +338,15 @@ toIfaceType :: (Name -> IfaceExtName) -> Type -> IfaceType
 toIfaceType ext (TyVarTy tv)     	     = IfaceTyVar (getOccName tv)
 toIfaceType ext (AppTy t1 t2)    	     = IfaceAppTy (toIfaceType ext t1) (toIfaceType ext t2)
 toIfaceType ext (FunTy t1 t2)    	     = IfaceFunTy (toIfaceType ext t1) (toIfaceType ext t2)
-toIfaceType ext (TyConApp tc tys) 	     = IfaceTyConApp (mkIfaceTc ext tc) (toIfaceTypes ext tys)
+toIfaceType ext (TyConApp tc tys) 	     = IfaceTyConApp (toIfaceTyCon ext tc) (toIfaceTypes ext tys)
 toIfaceType ext (ForAllTy tv t)  	     = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType ext t)
 toIfaceType ext (PredTy st)     	     = IfacePredTy (toIfacePred ext st)
 toIfaceType ext (NoteTy (SynNote tc_app) ty) = toIfaceType ext tc_app	-- Retain synonyms
 toIfaceType ext (NoteTy other_note ty)	     = toIfaceType ext ty
 
 ----------------
-mkIfaceTc :: (Name -> IfaceExtName) -> TyCon -> IfaceTyCon
-mkIfaceTc ext tc 
+toIfaceTyCon :: (Name -> IfaceExtName) -> TyCon -> IfaceTyCon
+toIfaceTyCon ext tc 
   | isTupleTyCon tc     = IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
   | nm == intTyConName  = IfaceIntTc
   | nm == boolTyConName = IfaceBoolTc 

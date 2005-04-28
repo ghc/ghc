@@ -55,8 +55,6 @@ import Panic		( assertPanic )
 #ifdef DEBUG
 import Outputable
 #endif
-
-import DATA_IOREF	( readIORef )
 \end{code}
 
 \begin{code}

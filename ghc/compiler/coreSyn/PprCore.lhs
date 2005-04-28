@@ -11,7 +11,7 @@
 module PprCore (
 	pprCoreExpr, pprParendExpr,
 	pprCoreBinding, pprCoreBindings, pprCoreAlt,
-	pprIdRules
+	pprRules
     ) where
 
 #include "HsVersions.h"
@@ -29,7 +29,7 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  arityInfo, ppArityInfo, 
 			  specInfo, pprNewStrictness,
 			  workerInfo, ppWorkerInfo,
-			  newStrictnessInfo, cafInfo, ppCafInfo,
+			  newStrictnessInfo, cafInfo, ppCafInfo, specInfoRules
 			)
 
 #ifdef OLD_STRICTNESS
@@ -331,7 +331,7 @@ ppIdInfo b info
 #endif
 	    pprNewStrictness (newStrictnessInfo info),
 	    if null rules then empty
-	    else ptext SLIT("RULES:") <+> vcat (map (pprCoreRule (ppr b)) rules)
+	    else ptext SLIT("RULES:") <+> vcat (map pprRule rules)
 	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 
 	-- see PprCore.pprIdBndr
@@ -342,26 +342,28 @@ ppIdInfo b info
     s = strictnessInfo info
     m = cprInfo info
 #endif
-    rules = rulesRules (specInfo info)
+    rules = specInfoRules (specInfo info)
 \end{code}
 
 
 \begin{code}
-pprIdRules :: [IdCoreRule] -> SDoc
-pprIdRules rules = vcat (map pprIdRule rules)
+instance Outputable CoreRule where
+   ppr = pprRule
 
-pprIdRule :: IdCoreRule -> SDoc
-pprIdRule (IdCoreRule id _ rule) = pprCoreRule (ppr id) rule
+pprRules :: [CoreRule] -> SDoc
+pprRules rules = vcat (map pprRule rules)
 
-pprCoreRule :: SDoc -> CoreRule -> SDoc
-pprCoreRule pp_fn (BuiltinRule name _)
-  = ptext SLIT("Built in rule for") <+> pp_fn <> colon <+> doubleQuotes (ftext name)
+pprRule :: CoreRule -> SDoc
+pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
+  = ptext SLIT("Built in rule for") <+> ppr fn <> colon <+> doubleQuotes (ftext name)
 
-pprCoreRule pp_fn (Rule name act tpl_vars tpl_args rhs)
+pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
+		ru_bndrs = tpl_vars, ru_args = tpl_args,
+		ru_rhs = rhs })
   = doubleQuotes (ftext name) <+> ppr act <+>
     sep [
 	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
-	  nest 2 (pp_fn <+> sep (map pprArg tpl_args)),
+	  nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
 	  nest 2 (ptext SLIT("=") <+> pprCoreExpr rhs)
     ] <+> semi
 \end{code}

@@ -8,7 +8,7 @@ module CoreSubst (
 	-- Substitution stuff
 	Subst, TvSubstEnv, IdSubstEnv, InScopeSet,
 
-	substTy, substExpr, substRules, substWorker,
+	substTy, substExpr, substSpec, substWorker,
 	lookupIdSubst, lookupTvSubst, 
 
 	emptySubst, mkEmptySubst, mkSubst, substInScope, isEmptySubst, 
@@ -24,8 +24,7 @@ module CoreSubst (
 #include "HsVersions.h"
 
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
-			  CoreRules(..), CoreRule(..), 
-			  isEmptyCoreRules, seqRules, hasUnfolding, noUnfolding
+			  CoreRule(..), hasUnfolding, noUnfolding
 			)
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( exprIsTrivial )
@@ -36,8 +35,8 @@ import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
 import Id		( idType, setIdType, maybeModifyIdInfo, isLocalId )
-import IdInfo		( IdInfo, specInfo, setSpecInfo, 
-			  unfoldingInfo, setUnfoldingInfo,
+import IdInfo		( IdInfo, SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo,
+			  unfoldingInfo, setUnfoldingInfo, seqSpecInfo,
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
 			)
 import Unique		( Unique )
@@ -339,13 +338,13 @@ substIdInfo :: Subst -> IdInfo -> Maybe IdInfo
 -- Always zaps the unfolding, to save substitution work
 substIdInfo  subst info
   | nothing_to_do = Nothing
-  | otherwise     = Just (info `setSpecInfo`   	  substRules  subst old_rules
+  | otherwise     = Just (info `setSpecInfo`   	  substSpec  subst old_rules
 			       `setWorkerInfo` 	  substWorker subst old_wrkr
 			       `setUnfoldingInfo` noUnfolding)
   where
     old_rules 	  = specInfo info
     old_wrkr  	  = workerInfo info
-    nothing_to_do = isEmptyCoreRules old_rules &&
+    nothing_to_do = isEmptySpecInfo old_rules &&
 		    not (workerExists old_wrkr) &&
 		    not (hasUnfolding (unfoldingInfo info))
     
@@ -366,22 +365,23 @@ substWorker subst (HasWorker w a)
 				--  via postInlineUnconditionally, hence warning)
 
 ------------------
-substRules :: Subst -> CoreRules -> CoreRules
+substSpec :: Subst -> SpecInfo -> SpecInfo
 
-substRules subst rules
- | isEmptySubst subst = rules
-substRules subst (Rules rules rhs_fvs)
-  = seqRules new_rules `seq` new_rules
+substSpec subst spec@(SpecInfo rules rhs_fvs)
+  | isEmptySubst subst
+  = spec
+  | otherwise
+  = seqSpecInfo new_rules `seq` new_rules
   where
-    new_rules = Rules (map do_subst rules) (substVarSet subst rhs_fvs)
+    new_rules = SpecInfo (map do_subst rules) (substVarSet subst rhs_fvs)
 
-    do_subst rule@(BuiltinRule _ _) = rule
-    do_subst (Rule name act tpl_vars lhs_args rhs)
-	= Rule name act tpl_vars' 
-	       (map (substExpr subst') lhs_args)
-	       (substExpr subst' rhs)
+    do_subst rule@(BuiltinRule {}) = rule
+    do_subst rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
+	= rule { ru_bndrs = bndrs',
+		 ru_args  = map (substExpr subst') args,
+		 ru_rhs   = substExpr subst' rhs }
 	where
-	  (subst', tpl_vars') = substBndrs subst tpl_vars
+	  (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
 substVarSet subst fvs 

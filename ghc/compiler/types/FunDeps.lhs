@@ -8,21 +8,26 @@ It's better to read it as: "if we know these, then we're going to know these"
 \begin{code}
 module FunDeps (
  	Equation, pprEquation, pprEquationDoc,
-	oclose, grow, improve, checkInstFDs, checkClsFD, pprFundeps
+	oclose, grow, improve, 
+	checkInstFDs, checkFunDeps,
+	pprFundeps
     ) where
 
 #include "HsVersions.h"
 
-import Name		( getSrcLoc )
-import Var		( Id, TyVar )
+import Name		( Name, getSrcLoc )
+import Var		( TyVar )
 import Class		( Class, FunDep, classTvsFds )
 import Unify		( tcUnifyTys, BindFlag(..) )
 import Type		( substTys, notElemTvSubst )
-import TcType		( Type, ThetaType, PredType(..), tcEqType,
+import TcType		( Type, ThetaType, PredType(..), tcEqType, 
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
+import InstEnv		( Instance(..), InstEnv, instanceHead, classInstances,
+			  instanceCantMatch, roughMatchTcs )
 import VarSet
 import VarEnv
 import Outputable
+import Util             ( notNull )
 import List		( tails )
 import Maybe		( isJust )
 import ListSetOps	( equivClassesByUniq )
@@ -174,18 +179,11 @@ pprEquation (qtvs, pairs)
 	  nest 2 (vcat [ ppr t1 <+> ptext SLIT(":=:") <+> ppr t2 | (t1,t2) <- pairs])]
 
 ----------
-improve :: InstEnv Id		-- Gives instances for given class
+improve :: (Class -> [Instance])	-- Gives instances for given class
 	-> [(PredType,SDoc)]	-- Current constraints; doc says where they come from
 	-> [(Equation,SDoc)]	-- Derived equalities that must also hold
 				-- (NB the above INVARIANT for type Equation)
 				-- The SDoc explains why the equation holds (for error messages)
-
-type InstEnv a = Class -> [(TyVarSet, [Type], a)]
--- This is a bit clumsy, because InstEnv is really
--- defined in module InstEnv.  However, we don't want
--- to define it here because InstEnv
--- is their home.  Nor do we want to make a recursive
--- module group (InstEnv imports stuff from FunDeps).
 \end{code}
 
 Given a bunch of predicates that must hold, such as
@@ -223,7 +221,9 @@ improve inst_env preds
 	    eqn   <- checkGroup inst_env group ]
 
 ----------
-checkGroup :: InstEnv Id -> [(PredType,SDoc)] -> [(Equation, SDoc)]
+checkGroup :: (Class -> [Instance])
+	   -> [(PredType,SDoc)]
+	   -> [(Equation, SDoc)]
   -- The preds are all for the same class or implicit param
 
 checkGroup inst_env (p1@(IParam _ ty, _) : ips)
@@ -249,7 +249,7 @@ checkGroup inst_env clss@((ClassP cls _, _) : _)
 
   where
     (cls_tvs, cls_fds) = classTvsFds cls
-    cls_inst_env       = inst_env cls
+    instances	       = inst_env cls
 
 	-- NOTE that we iterate over the fds first; they are typically
 	-- empty, which aborts the rest of the loop.
@@ -265,12 +265,17 @@ checkGroup inst_env clss@((ClassP cls _, _) : _)
     instance_eqns :: [(Equation,SDoc)]
     instance_eqns	-- This group comes from comparing with instance decls
       = [ (eqn, mkEqnMsg p1 p2)
-	| fd <- cls_fds,
-	  (qtvs, tys1, dfun_id)  <- cls_inst_env,
-	  let p1 = (mkClassPred cls tys1, 
-		    ptext SLIT("arising from the instance declaration at") <+> ppr (getSrcLoc dfun_id)),
+	| fd <- cls_fds,	-- Iterate through the fundeps first, 
+				-- because there often are none!
 	  p2@(ClassP _ tys2, _) <- clss,
-	  eqn <- checkClsFD qtvs fd cls_tvs tys1 tys2
+	  let rough_tcs2 = trimRoughMatchTcs cls_tvs fd (roughMatchTcs tys2),
+	  ispec@(Instance { is_tvs = qtvs, is_tys = tys1, 
+		 	    is_tcs = mb_tcs1 }) <- instances,
+	  not (instanceCantMatch mb_tcs1 rough_tcs2),
+	  eqn <- checkClsFD qtvs fd cls_tvs tys1 tys2,
+	  let p1 = (mkClassPred cls tys1, 
+		    ptext SLIT("arising from the instance declaration at") <+> 
+			ppr (getSrcLoc ispec))
 	]
 
 mkEqnMsg (pred1,from1) (pred2,from2)
@@ -373,6 +378,87 @@ checkInstFDs theta clas inst_taus
 		   (ls,rs) = instFD fd tyvars inst_taus
 \end{code}
 
+
+%************************************************************************
+%*									*
+	Check that a new instance decl is OK wrt fundeps
+%*									*
+%************************************************************************
+
+Here is the bad case:
+	class C a b | a->b where ...
+	instance C Int Bool where ...
+	instance C Int Char where ...
+
+The point is that a->b, so Int in the first parameter must uniquely
+determine the second.  In general, given the same class decl, and given
+
+	instance C s1 s2 where ...
+	instance C t1 t2 where ...
+
+Then the criterion is: if U=unify(s1,t1) then U(s2) = U(t2).
+
+Matters are a little more complicated if there are free variables in
+the s2/t2.  
+
+	class D a b c | a -> b
+	instance D a b => D [(a,a)] [b] Int
+	instance D a b => D [a]     [b] Bool
+
+The instance decls don't overlap, because the third parameter keeps
+them separate.  But we want to make sure that given any constraint
+	D s1 s2 s3
+if s1 matches 
+
+
+\begin{code}
+checkFunDeps :: (InstEnv, InstEnv) -> Instance
+	     -> Maybe [Instance]	-- Nothing  <=> ok
+					-- Just dfs <=> conflict with dfs
+-- Check wheher adding DFunId would break functional-dependency constraints
+-- Used only for instance decls defined in the module being compiled
+checkFunDeps inst_envs ispec
+  | null bad_fundeps = Nothing
+  | otherwise	     = Just bad_fundeps
+  where
+    (ins_tvs, _, clas, ins_tys) = instanceHead ispec
+    ins_tv_set   = mkVarSet ins_tvs
+    cls_inst_env = classInstances inst_envs clas
+    bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys
+
+badFunDeps :: [Instance] -> Class
+	   -> TyVarSet -> [Type]	-- Proposed new instance type
+	   -> [Instance]
+badFunDeps cls_insts clas ins_tv_set ins_tys 
+  = [ ispec | fd <- fds,	-- fds is often empty
+	      let trimmed_tcs = trimRoughMatchTcs clas_tvs fd rough_tcs,
+	      ispec@(Instance { is_tcs = mb_tcs, is_tvs = tvs, 
+				is_tys = tys }) <- cls_insts,
+		-- Filter out ones that can't possibly match, 
+		-- based on the head of the fundep
+	      not (instanceCantMatch trimmed_tcs mb_tcs),	
+	      notNull (checkClsFD (tvs `unionVarSet` ins_tv_set) 
+				   fd clas_tvs tys ins_tys)
+    ]
+  where
+    (clas_tvs, fds) = classTvsFds clas
+    rough_tcs = roughMatchTcs ins_tys
+
+trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [Maybe Name] -> [Maybe Name]
+-- Computing rough_tcs for a particular fundep
+--	class C a b c | a c -> b where ... 
+-- For each instance .... => C ta tb tc
+-- we want to match only on the types ta, tb; so our
+-- rough-match thing must similarly be filtered.  
+-- Hence, we Nothing-ise the tb type right here
+trimRoughMatchTcs clas_tvs (ltvs,_) mb_tcs
+  = zipWith select clas_tvs mb_tcs
+  where
+    select clas_tv mb_tc | clas_tv `elem` ltvs = mb_tc
+			 | otherwise	       = Nothing
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection{Miscellaneous}
@@ -386,3 +472,4 @@ pprFundeps fds = hsep (ptext SLIT("|") : punctuate comma (map ppr_fd fds))
 
 ppr_fd (us, vs) = hsep [interppSP us, ptext SLIT("->"), interppSP vs]
 \end{code}
+

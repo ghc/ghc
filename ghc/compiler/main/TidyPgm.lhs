@@ -4,41 +4,47 @@
 \section{Tidying up Core}
 
 \begin{code}
-module TidyPgm( tidyCorePgm, tidyCoreExpr ) where
+module TidyPgm( simpleTidyPgm, optTidyPgm ) where
 
 #include "HsVersions.h"
 
-import DynFlags	( DynFlags, DynFlag(..), dopt )
+import DynFlags	( DynFlags, DynFlag(..) )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )
-import CoreTidy		( tidyExpr, tidyVarOcc, tidyIdRules )
-import PprCore 		( pprIdRules )
+import CoreTidy		( tidyExpr, tidyVarOcc, tidyRules )
+import PprCore 		( pprRules )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprArity, rhsIsStatic )
 import VarEnv
 import VarSet
 import Var		( Id, Var )
-import Id		( idType, idInfo, idName, idCoreRules, 
+import Id		( idType, idInfo, idName, idCoreRules, isGlobalId,
 			  isExportedId, mkVanillaGlobal, isLocalId, 
-			  isImplicitId, idArity, setIdInfo, idCafInfo
+			  idArity, idCafInfo
 			) 
 import IdInfo		{- loads of stuff -}
+import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( Arity, isNeverActive )
 import Name		( Name, getOccName, nameOccName, mkInternalName,
-		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe
+		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe,
+			  isWiredInName, getName
 			)
+import NameSet		( NameSet, elemNameSet )
 import IfaceEnv		( allocateGlobalBinder )
-import NameEnv		( lookupNameEnv, filterNameEnv )
+import NameEnv		( filterNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
+import TcType		( isFFITy )
+import DataCon		( dataConName, dataConFieldLabels )
+import TyCon		( TyCon, makeTyConAbstract, tyConDataCons, isNewTyCon, newTyConRep )
 import Module		( Module )
 import HscTypes		( HscEnv(..), NameCache( nsUniqs ),
-			  TypeEnv, extendTypeEnvList, typeEnvIds,
-			  ModGuts(..), ModGuts, TyThing(..)
+			  TypeEnv, typeEnvIds, typeEnvElts, extendTypeEnvWithIds, mkTypeEnv,
+			  ModGuts(..), ModGuts, TyThing(..) 
 			)
-import Maybes		( orElse )
+import Maybes		( orElse, mapCatMaybes )
 import ErrUtils		( showPass, dumpIfSet_core )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
@@ -49,15 +55,160 @@ import FastTypes  hiding ( fastOr )
 \end{code}
 
 
+Constructing the TypeEnv, Instances, Rules from which the ModIface is
+constructed, and which goes on to subsequent modules in --make mode.
+
+Most of the interface file is obtained simply by serialising the
+TypeEnv.  One important consequence is that if the *interface file*
+has pragma info if and only if the final TypeEnv does. This is not so
+important for *this* module, but it's essential for ghc --make:
+subsequent compilations must not see (e.g.) the arity if the interface
+file does not contain arity If they do, they'll exploit the arity;
+then the arity might change, but the iface file doesn't change =>
+recompilation does not happen => disaster. 
+
+For data types, the final TypeEnv will have a TyThing for the TyCon,
+plus one for each DataCon; the interface file will contain just one
+data type declaration, but it is de-serialised back into a collection
+of TyThings.
+
 %************************************************************************
 %*				 					*
-\subsection{What goes on}
+		Plan A: simpleTidyPgm
 %*				 					* 
 %************************************************************************
 
-[SLPJ: 19 Nov 00]
 
-The plan is this.  
+Plan A: simpleTidyPgm: omit pragmas, make interfaces small
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Ignore the bindings
+
+* Drop all WiredIn things from the TypeEnv 
+	(we never want them in interface files)
+	(why are they there?  I think mainly as a memo
+	 to avoid repeatedly checking that we've loaded their
+	 home interface; but I'm not certain)
+
+* Retain all TyCons and Classes in the TypeEnv, to avoid
+	having to find which ones are mentioned in the
+	types of exported Ids
+
+* Trim off the constructors of non-exported TyCons, both
+	from the TyCon and from the TypeEnv
+
+* Drop non-exported Ids from the TypeEnv
+
+* Tidy the types of the DFunIds of Instances, 
+  make them into GlobalIds, (they already have External Names)
+  and add them to the TypeEnv
+
+* Tidy the types of the (exported) Ids in the TypeEnv,
+  make them into GlobalIds (they already have External Names)
+
+* Drop rules altogether
+
+* Leave the bindings untouched.  There's no need to make the Ids 
+  in the bindings into Globals, think, ever.
+
+
+\begin{code}
+simpleTidyPgm :: HscEnv -> ModGuts -> IO ModGuts
+-- This is Plan A: make a small type env when typechecking only,
+-- or when compiling a hs-boot file, or simply when not using -O
+
+simpleTidyPgm hsc_env mod_impl@(ModGuts { mg_exports = exports,
+					  mg_types = type_env, 	
+					  mg_insts = ispecs })
+  = do	{ let dflags = hsc_dflags hsc_env 
+	; showPass dflags "Tidy Type Env"
+
+	; let { ispecs' = tidyInstances tidyExternalId ispecs
+	      	
+	      ; things' = mapCatMaybes (tidyThing exports) 
+				       (typeEnvElts type_env)
+
+	      ; type_env' = extendTypeEnvWithIds (mkTypeEnv things')
+						 (map instanceDFunId ispecs')
+	      }
+
+	; return (mod_impl { mg_types = type_env'
+		  	   , mg_insts = ispecs'
+			   , mg_rules = [] })
+	}
+
+tidyInstances :: (DFunId -> DFunId) -> [Instance] -> [Instance]
+tidyInstances tidy_dfun ispecs
+  = map tidy ispecs
+  where
+    tidy ispec = setInstanceDFunId ispec (tidy_dfun (instanceDFunId ispec))
+
+tidyThing :: NameSet 	-- Exports
+	  -> TyThing -> Maybe TyThing	-- Nothing => drop it
+tidyThing exports thing
+  | isWiredInName (getName thing)
+  = Nothing
+  | otherwise
+  = case thing of
+      AClass cl -> Just thing
+
+      ATyCon tc 
+	| mustExposeTyCon exports tc -> Just thing
+	| otherwise -> Just (ATyCon (makeTyConAbstract tc))
+
+      ADataCon dc
+	| getName dc `elemNameSet` exports -> Just thing
+	| otherwise			   -> Nothing
+
+      AnId id 
+	| not (getName id `elemNameSet` exports) -> Nothing
+	| not (isLocalId id) -> Just thing	-- Implicit Ids such as class ops, 
+						-- data-con wrappers etc
+	| otherwise -> Just (AnId (tidyExternalId id))
+
+tidyExternalId :: Id -> Id
+-- Takes an LocalId with an External Name, 
+-- makes it into a GlobalId with VanillaIdInfo, and tidies its type
+-- (NB: vanillaIdInfo makes a conservative assumption about Caf-hood.)
+tidyExternalId id 
+  = ASSERT2( isLocalId id && isExternalName (idName id), ppr id )
+    mkVanillaGlobal (idName id) (tidyTopType (idType id)) vanillaIdInfo
+
+mustExposeTyCon :: NameSet	-- Exports
+		-> TyCon	-- The tycon
+		-> Bool 	-- Can its rep be hidden?
+-- We are compiling without -O, and thus trying to write as little as 
+-- possible into the interface file.  But we must expose the details of
+-- any data types whose constructors or fields are exported
+mustExposeTyCon exports tc
+  = any exported_con (tyConDataCons tc)
+	-- Expose rep if any datacon or field is exported
+
+  || (isNewTyCon tc && isFFITy (snd (newTyConRep tc)))
+	-- Expose the rep for newtypes if the rep is an FFI type.  
+	-- For a very annoying reason.  'Foreign import' is meant to
+	-- be able to look through newtypes transparently, but it
+	-- can only do that if it can "see" the newtype representation
+  where
+    exported_con con = any (`elemNameSet` exports) 
+			   (dataConName con : dataConFieldLabels con)
+\end{code}
+
+
+%************************************************************************
+%*				 					*
+	Plan B: tidy bindings, make TypeEnv full of IdInfo
+%*				 					* 
+%************************************************************************
+
+Plan B: include pragmas, make interfaces 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Figure out which Ids are externally visible
+
+* Tidy the bindings, externalising appropriate Ids
+
+* Drop all Ids from the TypeEnv, and add all the External Ids from 
+  the bindings.  (This adds their IdInfo to the TypeEnv; and adds
+  floated-out Ids that weren't even in the TypeEnv before.)
 
 Step 1: Figure out external Ids
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,7 +229,9 @@ Step 2: Tidy the program
 Next we traverse the bindings top to bottom.  For each *top-level*
 binder
 
- 1. Make it into a GlobalId
+ 1. Make it into a GlobalId; its IdDetails becomes VanillaGlobal, 
+    reflecting the fact that from now on we regard it as a global, 
+    not local, Id
 
  2. Give it a system-wide Unique.
     [Even non-exported things need system-wide Uniques because the
@@ -91,19 +244,16 @@ binder
     to ensure that the unique assigned is the same as the Id had 
     in any previous compilation run.
   
- 3. If it's an external Id, make it have a global Name, otherwise
-    make it have a local Name.
+ 3. If it's an external Id, make it have a External Name, otherwise
+    make it have an Internal Name.
     This is used by the code generator to decide whether
     to make the label externally visible
 
- 4. Give external Ids a "tidy" occurrence name.  This means
+ 4. Give external Ids a "tidy" OccName.  This means
     we can print them in interface files without confusing 
     "x" (unique 5) with "x" (unique 10).
   
  5. Give it its UTTERLY FINAL IdInfo; in ptic, 
-	* Its IdDetails becomes VanillaGlobal, reflecting the fact that
-	  from now on we regard it as a global, not local, Id
-
   	* its unfolding, if it should have one
 	
 	* its arity, computed from the number of visible lambdas
@@ -116,101 +266,55 @@ throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 
 \begin{code}
-tidyCorePgm :: HscEnv -> ModGuts -> IO ModGuts
+optTidyPgm :: HscEnv -> ModGuts -> IO ModGuts
 
-tidyCorePgm hsc_env
-	    mod_impl@(ModGuts { mg_module = mod, 
+optTidyPgm hsc_env
+	   mod_impl@(ModGuts {	mg_module = mod, 
 				mg_types = env_tc, mg_insts = insts_tc, 
-				mg_binds = binds_in, mg_rules = orphans_in })
-  = do	{ let { dflags = hsc_dflags hsc_env
-	      ; nc_var = hsc_NC hsc_env }
+				mg_binds = binds_in, 
+				mg_rules = imp_rules })
+  = do	{ let dflags = hsc_dflags hsc_env
 	; showPass dflags "Tidy Core"
 
-	; let omit_iface_prags = dopt Opt_OmitInterfacePragmas dflags
-	; let ext_ids   = findExternalSet   omit_iface_prags binds_in
-	; let ext_rules = findExternalRules omit_iface_prags binds_in orphans_in ext_ids
-		-- findExternalRules filters ext_rules to avoid binders that 
+	; let ext_ids   = findExternalIds   binds_in
+	; let ext_rules = findExternalRules binds_in imp_rules ext_ids
+		-- findExternalRules filters imp_rules to avoid binders that 
 		-- aren't externally visible; but the externally-visible binders 
-		-- are computed (by findExternalSet) assuming that all orphan
+		-- are computed (by findExternalIds) assuming that all orphan
 		-- rules are exported (they get their Exported flag set in the desugarer)
 		-- So in fact we may export more than we need. 
 		-- (It's a sort of mutual recursion.)
 
-	-- We also make sure to avoid any exported binders.  Consider
-	--	f{-u1-} = 1	-- Local decl
-	--	...
-	--	f{-u2-} = 2	-- Exported decl
-	--
-	-- The second exported decl must 'get' the name 'f', so we
-	-- have to put 'f' in the avoids list before we get to the first
-	-- decl.  tidyTopId then does a no-op on exported binders.
-	; let   init_env = (initTidyOccEnv avoids, emptyVarEnv)
-		avoids   = [getOccName name | bndr <- typeEnvIds env_tc,
-						   let name = idName bndr,
-						   isExternalName name]
-		-- In computing our "avoids" list, we must include
-		--	all implicit Ids
-		--	all things with global names (assigned once and for
-		--					all by the renamer)
-		-- since their names are "taken".
-		-- The type environment is a convenient source of such things.
+	; (final_env, tidy_binds) <- tidyTopBinds hsc_env mod env_tc 
+						  ext_ids binds_in
 
-	; (final_env, tidy_binds)
-		<- tidyTopBinds dflags mod nc_var ext_ids init_env binds_in
-
-	; let tidy_rules = tidyIdRules final_env ext_rules
-
-	; let tidy_type_env = mkFinalTypeEnv omit_iface_prags env_tc tidy_binds
-
-		-- Dfuns are local Ids that might have
-		-- changed their unique during tidying.  Remember
-		-- to lookup the id in the TypeEnv too, because
-		-- those Ids have had their IdInfo stripped if
-		-- necessary.
-	; let (_, subst_env ) = final_env
-	      lookup_dfun_id id = 
-		 case lookupVarEnv subst_env id of
-		   Nothing -> dfun_panic
-		   Just id -> 
-		      case lookupNameEnv tidy_type_env (idName id) of
-			Just (AnId id) -> id
-			_other -> dfun_panic
-	      	where 
-		   dfun_panic = pprPanic "lookup_dfun_id" (ppr id)
-
-	      tidy_dfun_ids = map lookup_dfun_id insts_tc
-
-	; let tidy_result = mod_impl { mg_types = tidy_type_env,
-				       mg_rules = tidy_rules,
-				       mg_insts = tidy_dfun_ids,
-				       mg_binds = tidy_binds }
+	; let { tidy_rules    = tidyRules final_env ext_rules
+	      ; tidy_type_env = tidyTypeEnv env_tc tidy_binds
+	      ; tidy_ispecs   = tidyInstances (tidyVarOcc final_env) insts_tc
+		-- A DFunId will have a binding in tidy_binds, and so
+		-- will now be in final_env, replete with IdInfo
+		-- Its name will be unchanged since it was born, but
+		-- we want Global, IdInfo-rich DFunId in the tidy_ispecs
+	      }
 
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
 	; dumpIfSet_core dflags Opt_D_dump_simpl
 		"Tidy Core Rules"
-		(pprIdRules tidy_rules)
+		(pprRules tidy_rules)
 
-	; return tidy_result
+	; return (mod_impl { mg_types = tidy_type_env,
+			     mg_rules = tidy_rules,
+			     mg_insts = tidy_ispecs,
+			     mg_binds = tidy_binds })
 	}
 
-tidyCoreExpr :: CoreExpr -> IO CoreExpr
-tidyCoreExpr expr = return (tidyExpr emptyTidyEnv expr)
-\end{code}
 
-
-%************************************************************************
-%*				 					*
-\subsection{Write a new interface file}
-%*				 					*
-%************************************************************************
-
-\begin{code}
-mkFinalTypeEnv :: Bool		-- Omit interface pragmas
-	       -> TypeEnv 	-- From typechecker
-	       -> [CoreBind]	-- Final Ids
-	       -> TypeEnv
+tidyTypeEnv :: TypeEnv 		-- From typechecker
+	    -> [CoreBind]	-- Final Ids
+	    -> TypeEnv
 
 -- The competed type environment is gotten from
+--	Dropping any wired-in things, and then
 -- 	a) keeping the types and classes
 --	b) removing all Ids, 
 --	c) adding Ids with correct IdInfo, including unfoldings,
@@ -220,81 +324,21 @@ mkFinalTypeEnv :: Bool		-- Omit interface pragmas
 --	    the externally-accessible ones
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
---
--- However, we do keep things like constructors, which should not appear 
--- in interface files, because they are needed by importing modules when
--- using the compilation manager
 
-mkFinalTypeEnv omit_iface_prags type_env tidy_binds
-  = extendTypeEnvList (filterNameEnv keep_it type_env) final_ids
+tidyTypeEnv type_env tidy_binds
+  = extendTypeEnvWithIds (filterNameEnv keep_it type_env) final_ids
   where
-    final_ids  = [ AnId (strip_id_info id)
+    final_ids  = [ id
 		 | bind <- tidy_binds,
 		   id <- bindersOf bind,
 		   isExternalName (idName id)]
 
-    strip_id_info id
-	  | omit_iface_prags = id `setIdInfo` vanillaIdInfo
-	  | otherwise	     = id
-	-- If the interface file has no pragma info then discard all
-	-- info right here.
-	--
-	-- This is not so important for *this* module, but it's
-	-- vital for ghc --make:
-	--   subsequent compilations must not see (e.g.) the arity if
-	--   the interface file does not contain arity
-	-- If they do, they'll exploit the arity; then the arity might
-	-- change, but the iface file doesn't change => recompilation
-	-- does not happen => disaster
-	--
-	-- This IdInfo will live long-term in the Id => vanillaIdInfo makes
-	-- a conservative assumption about Caf-hood
-	-- 
-	-- We're not worried about occurrences of these Ids in unfoldings,
-	-- because in OmitInterfacePragmas mode we're stripping all the
-	-- unfoldings anyway.
-
-	-- We keep implicit Ids, because they won't appear 
+	-- We keep GlobalIds, because they won't appear 
 	-- in the bindings from which final_ids are derived!
-    keep_it (AnId id) = isImplicitId id	-- Remove all Ids except implicit ones
-    keep_it other     = True		-- Keep all TyCons and Classes
-\end{code}
-
-\begin{code}
-findExternalRules :: Bool	  -- Omit interface pragmas 
-		  -> [CoreBind]
-		  -> [IdCoreRule] -- Orphan rules
-	          -> IdEnv a	  -- Ids that are exported, so we need their rules
-	          -> [IdCoreRule]
-  -- The complete rules are gotten by combining
-  --	a) the orphan rules
-  --	b) rules embedded in the top-level Ids
-findExternalRules omit_iface_prags binds orphan_rules ext_ids
-  | omit_iface_prags = []
-  | otherwise
-  = filter (not . internal_rule) (orphan_rules ++ local_rules)
-  where
-    local_rules  = [ rule
- 		   | id <- bindersOfBinds binds,
-		     id `elemVarEnv` ext_ids,
-		     rule <- idCoreRules id
-		   ]
-    internal_rule (IdCoreRule id is_orphan rule)
-	=  isBuiltinRule rule
-	 	-- We can't print builtin rules in interface files
-		-- Since they are built in, an importing module
-		-- will have access to them anyway
-
-	|| (not is_orphan && internal_id id)
-		-- Rule for an Id in this module; internal if the
-		-- Id is not exported
-
-	|| any internal_id (varSetElems (ruleLhsFreeIds rule))
-		-- Don't export a rule whose LHS mentions an Id that
-		-- is completely internal (i.e. not visible to an
-		-- importing module)
-
-    internal_id id = not (id `elemVarEnv` ext_ids)
+	-- (The bindings bind LocalIds.)
+    keep_it thing | isWiredInName (getName thing) = False
+    keep_it (AnId id) = isGlobalId id	-- Keep GlobalIds (e.g. class ops)
+    keep_it other     = True		-- Keep all TyCons, DataCons, and Classes
 \end{code}
 
 %************************************************************************
@@ -304,16 +348,15 @@ findExternalRules omit_iface_prags binds orphan_rules ext_ids
 %************************************************************************
 
 \begin{code}
-findExternalSet :: Bool		-- Omit interface pragmas
-		-> [CoreBind]
+findExternalIds :: [CoreBind]
 		-> IdEnv Bool	-- In domain => external
 				-- Range = True <=> show unfolding
 	-- Step 1 from the notes above
-findExternalSet omit_iface_prags binds
+findExternalIds binds
   = foldr find emptyVarEnv binds
   where
     find (NonRec id rhs) needed
-	| need_id needed id = addExternal omit_iface_prags (id,rhs) needed
+	| need_id needed id = addExternal (id,rhs) needed
 	| otherwise 	    = needed
     find (Rec prs) needed   = find_prs prs needed
 
@@ -323,7 +366,7 @@ findExternalSet omit_iface_prags binds
 	| otherwise	  = find_prs other_prs new_needed
 	where
 	  (needed_prs, other_prs) = partition (need_pr needed) prs
-	  new_needed = foldr (addExternal omit_iface_prags) needed needed_prs
+	  new_needed = foldr addExternal needed needed_prs
 
 	-- The 'needed' set contains the Ids that are needed by earlier
 	-- interface file emissions.  If the Id isn't in this set, and isn't
@@ -331,10 +374,10 @@ findExternalSet omit_iface_prags binds
     need_id needed_set id       = id `elemVarEnv` needed_set || isExportedId id 
     need_pr needed_set (id,rhs)	= need_id needed_set id
 
-addExternal :: Bool -> (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
+addExternal :: (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
 -- The Id is needed; extend the needed set
 -- with it and its dependents (free vars etc)
-addExternal omit_iface_prags (id,rhs) needed
+addExternal (id,rhs) needed
   = extendVarEnv (foldVarSet add_occ needed new_needed_ids)
 		 id show_unfold
   where
@@ -342,16 +385,15 @@ addExternal omit_iface_prags (id,rhs) needed
 	-- "False" because we don't know we need the Id's unfolding
 	-- We'll override it later when we find the binding site
 
-    new_needed_ids | omit_iface_prags = emptyVarSet
-	           | otherwise	      = worker_ids	`unionVarSet`
-					unfold_ids	`unionVarSet`
-					spec_ids
+    new_needed_ids = worker_ids	`unionVarSet`
+		     unfold_ids	`unionVarSet`
+		     spec_ids
 
     idinfo	   = idInfo id
     dont_inline	   = isNeverActive (inlinePragInfo idinfo)
     loop_breaker   = isLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
-    spec_ids	   = rulesRhsFreeVars (specInfo idinfo)
+    spec_ids	   = specInfoFreeVars (specInfo idinfo)
     worker_info	   = workerInfo idinfo
 
 	-- Stuff to do with the Id's unfolding
@@ -378,6 +420,34 @@ addExternal omit_iface_prags (id,rhs) needed
 \end{code}
 
 
+\begin{code}
+findExternalRules :: [CoreBind]
+		  -> [CoreRule]	-- Non-local rules (i.e. ones for imported fns)
+	          -> IdEnv a	-- Ids that are exported, so we need their rules
+	          -> [CoreRule]
+  -- The complete rules are gotten by combining
+  --	a) the non-local rules
+  --	b) rules embedded in the top-level Ids
+findExternalRules binds non_local_rules ext_ids
+  = filter (not . internal_rule) (non_local_rules ++ local_rules)
+  where
+    local_rules  = [ rule
+ 		   | id <- bindersOfBinds binds,
+		     id `elemVarEnv` ext_ids,
+		     rule <- idCoreRules id
+		   ]
+
+    internal_rule rule
+	=  any internal_id (varSetElems (ruleLhsFreeIds rule))
+		-- Don't export a rule whose LHS mentions a locally-defined
+		--  Id that is completely internal (i.e. not visible to an
+		-- importing module)
+
+    internal_id id = not (id `elemVarEnv` ext_ids)
+\end{code}
+
+
+
 %************************************************************************
 %*									*
 \subsection{Step 2: top-level tidying}
@@ -400,20 +470,43 @@ addExternal omit_iface_prags (id,rhs) needed
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
-tidyTopBinds :: DynFlags
+tidyTopBinds :: HscEnv
 	     -> Module
-	     -> IORef NameCache	-- For allocating new unique names
+	     -> TypeEnv 
 	     -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
-	     -> TidyEnv -> [CoreBind]
+	     -> [CoreBind]
 	     -> IO (TidyEnv, [CoreBind])
-tidyTopBinds dflags mod nc_var ext_ids tidy_env []
-  = return (tidy_env, [])
 
-tidyTopBinds dflags mod nc_var ext_ids tidy_env (b:bs)
-  = do	{ (tidy_env1, b')  <- tidyTopBind  dflags mod nc_var ext_ids tidy_env b
-	; (tidy_env2, bs') <- tidyTopBinds dflags mod nc_var ext_ids tidy_env1 bs
-	; return (tidy_env2, b':bs') }
+tidyTopBinds hsc_env mod env_tc ext_ids binds
+  = go init_env binds
+  where
+    dflags = hsc_dflags hsc_env
+    nc_var = hsc_NC hsc_env 
+
+	-- We also make sure to avoid any exported binders.  Consider
+	--	f{-u1-} = 1	-- Local decl
+	--	...
+	--	f{-u2-} = 2	-- Exported decl
+	--
+	-- The second exported decl must 'get' the name 'f', so we
+	-- have to put 'f' in the avoids list before we get to the first
+	-- decl.  tidyTopId then does a no-op on exported binders.
+    init_env = (initTidyOccEnv avoids, emptyVarEnv)
+    avoids   = [getOccName name | bndr <- typeEnvIds env_tc,
+				  let name = idName bndr,
+				  isExternalName name]
+		-- In computing our "avoids" list, we must include
+		--	all implicit Ids
+		--	all things with global names (assigned once and for
+		--					all by the renamer)
+		-- since their names are "taken".
+		-- The type environment is a convenient source of such things.
+
+    go env []     = return (env, [])
+    go env (b:bs) = do	{ (env1, b')  <- tidyTopBind dflags mod nc_var ext_ids env b
+			; (env2, bs') <- go env1 bs
+			; return (env2, b':bs') }
 
 ------------------------
 tidyTopBind  :: DynFlags
@@ -510,7 +603,7 @@ tidyTopName mod nc_var ext_ids occ_env id
 	-- whether we have already assigned a unique for it.
 	-- If so, use it; if not, extend the table.
 	-- All this is done by allcoateGlobalBinder.
-	-- This is needed when *re*-compiling a module in GHCi; we want to
+	-- This is needed when *re*-compiling a module in GHCi; we must
 	-- use the same name for externally-visible things as we did before.
 
 

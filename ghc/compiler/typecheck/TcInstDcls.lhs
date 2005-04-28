@@ -18,7 +18,9 @@ import TcMType		( tcSkolSigType, checkValidTheta, checkValidInstHead, instTypeEr
 import TcType		( mkClassPred, tyVarsOfType, 
 			  tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
 			  SkolemInfo(InstSkol), tcSplitDFunTy, pprClassPred )
-import Inst		( tcInstClassOp, newDicts, instToId, showLIE, tcExtendLocalInstEnv )
+import Inst		( tcInstClassOp, newDicts, instToId, showLIE, 
+			  getOverlapFlag, tcExtendLocalInstEnv )
+import InstEnv		( mkLocalInstance, instanceDFunId )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv,
  			  InstInfo(..), InstBindings(..), 
@@ -148,7 +150,7 @@ tcInstDecls1 tycl_decls inst_decls
 	clas_decls	= filter (isClassDecl.unLoc) tycl_decls
     in
 	-- (2) Instances from generic class declarations
-    getGenericInstances clas_decls		`thenM` \ generic_inst_info -> 
+    getGenericInstances clas_decls	`thenM` \ generic_inst_info -> 
 
 	-- Next, construct the instance environment so far, consisting of
 	--	a) local instance decls
@@ -169,7 +171,7 @@ tcInstDecls1 tycl_decls inst_decls
 
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside
-  = tcExtendLocalInstEnv (map iDFunId infos) thing_inside
+  = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 \end{code} 
 
 \begin{code}
@@ -202,8 +204,11 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
     checkTc (checkInstFDs theta clas inst_tys)
 	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenM_`
     newDFunName clas inst_tys (srcSpanStart loc)		`thenM` \ dfun_name ->
-    returnM (Just (InstInfo { iDFunId = mkDictFunId dfun_name tyvars theta clas inst_tys,
-			      iBinds = VanillaInst binds uprags }))
+    getOverlapFlag						`thenM` \ overlap_flag ->
+    let dfun  = mkDictFunId dfun_name tyvars theta clas inst_tys
+	ispec = mkLocalInstance dfun overlap_flag
+    in
+    returnM (Just (InstInfo { iSpec = ispec, iBinds = VanillaInst binds uprags }))
   where
     msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
 \end{code}
@@ -308,17 +313,18 @@ First comes the easy case of a non-local instance decl.
 \begin{code}
 tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 
-tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
-  =	 -- Prime error recovery
+tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
+  = let 
+	dfun_id    = instanceDFunId ispec
+	rigid_info = InstSkol dfun_id
+	inst_ty    = idType dfun_id
+    in
+	 -- Prime error recovery
     recoverM (returnM emptyLHsBinds)		$
     setSrcSpan (srcLocSpan (getSrcLoc dfun_id))	$
     addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
 
 	-- Instantiate the instance decl with skolem constants 
-    let
-	rigid_info = InstSkol dfun_id
-	inst_ty    = idType dfun_id
-    in
     tcSkolSigType rigid_info inst_ty	`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
 		-- These inst_tyvars' scope over the 'where' part
 		-- Those tyvars are inside the dfun_id's type, which is a bit

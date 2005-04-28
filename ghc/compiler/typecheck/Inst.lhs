@@ -7,7 +7,7 @@
 module Inst ( 
 	Inst, 
 
-	pprDFuns, pprDictsTheta, pprDictsInFull,	-- User error messages
+	pprInstances, pprDictsTheta, pprDictsInFull,	-- User error messages
 	showLIE, pprInst, pprInsts, pprInstInFull,	-- Debugging messages
 
 	tidyInsts, tidyMoreInsts,
@@ -23,7 +23,7 @@ module Inst (
 	instLoc, getDictClassTys, dictPred,
 
 	lookupInst, LookupInstResult(..), lookupPred, 
-	tcExtendLocalInstEnv, tcGetInstEnvs, 
+	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
 
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
@@ -49,15 +49,17 @@ import TcHsSyn	( TcId, TcIdSet,
 		)
 import TcRnMonad
 import TcEnv	( tcLookupId, checkWellStaged, topIdLvl, tcMetaTy )
-import InstEnv	( DFunId, InstEnv, lookupInstEnv, checkFunDeps, extendInstEnv )
-import TcIface	( loadImportedInsts )
+import InstEnv	( DFunId, InstEnv, Instance(..), OverlapFlag(..),
+		  lookupInstEnv, extendInstEnv, pprInstances, 
+		  instanceHead, instanceDFunId, setInstanceDFunId )
+import FunDeps	( checkFunDeps )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zonkTcThetaType, 
 		  tcInstTyVar, tcInstType, tcSkolType
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar, TcPredType,
-		  PredType(..), SkolemInfo(..), Expected(..), typeKind, mkSigmaTy,
+		  PredType(..), SkolemInfo(..), typeKind, mkSigmaTy,
 		  tcSplitForAllTys, tcSplitForAllTys, mkFunTy,
-		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy, tcSplitDFunHead,
+		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunHead,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
@@ -65,7 +67,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar, TcPredType,
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
-		  pprPred, pprParendType, pprThetaArrow, pprTheta, pprClassPred
+		  pprPred, pprParendType, pprTheta 
 		)
 import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSubst,
 		  notElemTvSubst, extendTvSubstList )
@@ -89,7 +91,7 @@ import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rational
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
-import DynFlags( DynFlags )
+import DynFlags	( DynFlag(..), dopt )
 import Maybes	( isJust )
 import Outputable
 \end{code}
@@ -519,15 +521,6 @@ pprInst m@(Method inst_id id tys theta tau loc)
 pprInstInFull inst
   = sep [quotes (pprInst inst), nest 2 (pprInstLoc (instLoc inst))]
 
-pprDFuns :: [DFunId] -> SDoc
--- Prints the dfun as an instance declaration
-pprDFuns dfuns = vcat [ hang (ppr (getSrcLoc dfun) <> colon)
-			2 (ptext SLIT("instance") <+> sep [pprThetaArrow theta,
-							   pprClassPred clas tys])
-		      | dfun <- dfuns
-		      , let (_, theta, clas, tys) = tcSplitDFunTy (idType dfun) ]
-	-- Print without the for-all, which the programmer doesn't write
-
 tidyInst :: TidyEnv -> Inst -> Inst
 tidyInst env (LitInst nm lit ty loc) 	     = LitInst nm lit (tidyType env ty) loc
 tidyInst env (Dict nm pred loc)     	     = Dict nm (tidyPred env pred) loc
@@ -559,21 +552,20 @@ showLIE str
 %************************************************************************
 
 \begin{code}
-tcExtendLocalInstEnv :: [DFunId] -> TcM a -> TcM a
+tcExtendLocalInstEnv :: [Instance] -> TcM a -> TcM a
   -- Add new locally-defined instances
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
       ; env <- getGblEnv
-      ; dflags  <- getDOpts
-      ; inst_env' <- foldlM (addInst dflags) (tcg_inst_env env) dfuns
+      ; inst_env' <- foldlM addLocalInst (tcg_inst_env env) dfuns
       ; let env' = env { tcg_insts = dfuns ++ tcg_insts env,
 			 tcg_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 
-addInst :: DynFlags -> InstEnv -> DFunId -> TcM InstEnv
+addLocalInst :: InstEnv -> Instance -> TcM InstEnv
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
-addInst dflags home_ie dfun
+addLocalInst home_ie ispec
   = do	{ 	-- Instantiate the dfun type so that we extend the instance
 		-- envt with completely fresh template variables
 		-- This is important because the template variables must
@@ -581,51 +573,67 @@ addInst dflags home_ie dfun
 		-- (since we do unification).  
 		-- We use tcSkolType because we don't want to allocate fresh
 		--  *meta* type variables.  
-	  (tvs', theta', tau') <- tcSkolType (InstSkol dfun) (idType dfun)
+	  let dfun = instanceDFunId ispec
+	; (tvs', theta', tau') <- tcSkolType (InstSkol dfun) (idType dfun)
 	; let	(cls, tys') = tcSplitDFunHead tau'
 		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
+	  	ispec'      = setInstanceDFunId ispec dfun'
 
 		-- Load imported instances, so that we report
 		-- duplicates correctly
-	; pkg_ie  <- loadImportedInsts cls tys'
+	; eps <- getEps
+	; let inst_envs = (eps_inst_env eps, home_ie)
 
 		-- Check functional dependencies
-	; case checkFunDeps (pkg_ie, home_ie) dfun' of
-		Just dfuns -> funDepErr dfun dfuns
+	; case checkFunDeps inst_envs ispec' of
+		Just specs -> funDepErr ispec' specs
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
-	; let { (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys'
-	      ;	dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			  		isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)] }
-		-- Find memebers of the match list which 
-		-- dfun itself matches. If the match is 2-way, it's a duplicate
-	; case dup_dfuns of
-	    dup_dfun : _ -> dupInstErr dfun dup_dfun
-	    []           -> return ()
+	; let { (matches, _) = lookupInstEnv inst_envs cls tys'
+	      ;	dup_ispecs = [ dup_ispec 
+			     | (_, dup_ispec) <- matches
+			     , let (_,_,_,dup_tys) = instanceHead dup_ispec
+			     , isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)] }
+		-- Find memebers of the match list which ispec itself matches.
+		-- If the match is 2-way, it's a duplicate
+	; case dup_ispecs of
+	    dup_ispec : _ -> dupInstErr ispec' dup_ispec
+	    []            -> return ()
 
 		-- OK, now extend the envt
-	; return (extendInstEnv home_ie dfun') }
+	; return (extendInstEnv home_ie ispec') }
 
+getOverlapFlag :: TcM OverlapFlag
+getOverlapFlag 
+  = do 	{ dflags <- getDOpts
+	; let overlap_ok    = dopt Opt_AllowOverlappingInstances dflags
+	      incoherent_ok = dopt Opt_AllowIncoherentInstances  dflags
+	      overlap_flag | incoherent_ok = Incoherent
+			   | overlap_ok    = OverlapOk
+			   | otherwise     = NoOverlap
+			   
+	; return overlap_flag }
 
-traceDFuns dfuns
-  = traceTc (text "Adding instances:" <+> vcat (map pp dfuns))
+traceDFuns ispecs
+  = traceTc (hang (text "Adding instances:") 2 (vcat (map pp ispecs)))
   where
-    pp dfun = ppr dfun <+> dcolon <+> ppr (idType dfun)
+    pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
+	-- Print the dfun name itself too
 
-funDepErr dfun dfuns
-  = addDictLoc dfun $
+funDepErr ispec ispecs
+  = addDictLoc ispec $
     addErr (hang (ptext SLIT("Functional dependencies conflict between instance declarations:"))
-	       2 (pprDFuns (dfun:dfuns)))
-dupInstErr dfun dup_dfun
-  = addDictLoc dfun $
+	       2 (pprInstances (ispec:ispecs)))
+dupInstErr ispec dup_ispec
+  = addDictLoc ispec $
     addErr (hang (ptext SLIT("Duplicate instance declarations:"))
-	       2 (pprDFuns [dfun, dup_dfun]))
+	       2 (pprInstances [ispec, dup_ispec]))
 
-addDictLoc dfun thing_inside
+addDictLoc ispec thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
-   loc = getSrcLoc dfun
+   loc = getSrcLoc ispec
 \end{code}
     
 
@@ -738,13 +746,13 @@ lookupInst (Dict _ pred loc)
 lookupPred :: TcPredType -> TcM (Maybe (TvSubst, DFunId))
 -- Look up a class constraint in the instance environment
 lookupPred pred@(ClassP clas tys)
-  = do	{ pkg_ie <- loadImportedInsts clas tys
-		-- Suck in any instance decls that may be relevant
+  = do	{ eps     <- getEps
 	; tcg_env <- getGblEnv
-	; dflags  <- getDOpts
-	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
-	    ([(tenv, (_,_,dfun_id))], []) 
-		-> do	{ traceTc (text "lookupInst success" <+> 
+	; let inst_envs = (eps_inst_env eps, tcg_inst_env tcg_env)
+	; case lookupInstEnv inst_envs clas tys of {
+	    ([(tenv, ispec)], []) 
+		-> do	{ let dfun_id = is_dfun ispec
+			; traceTc (text "lookupInst success" <+> 
 				   vcat [text "dict" <+> ppr pred, 
 				         text "witness" <+> ppr dfun_id
 					 <+> ppr (idType dfun_id) ])
@@ -771,7 +779,8 @@ record_dfun_usage dfun_id
   = do	{ dflags <- getDOpts
 	; let  dfun_name = idName dfun_id
 	       dfun_mod  = nameModule dfun_name
-	; if isInternalName dfun_name || not (isHomeModule dflags dfun_mod)
+	; if isInternalName dfun_name ||    -- Internal name => defined in this module
+	     not (isHomeModule dflags dfun_mod)
 	  then return () -- internal, or in another package
 	   else do { tcg_env <- getGblEnv
 	  	   ; updMutVar (tcg_inst_uses tcg_env)

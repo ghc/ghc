@@ -26,7 +26,6 @@ module TcUnify (
 
 #include "HsVersions.h"
 
--- gaw 2004
 import HsSyn		( HsExpr(..) , MatchGroup(..), hsLMatchPats )
 import TcHsSyn		( mkHsLet, mkHsDictLam,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
@@ -52,14 +51,15 @@ import TcMType		( condLookupTcTyVar, LookupTyVarResult(..),
 			  newTyFlexiVarTy, zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
 			  readKindVar, writeKindVar )
 import TcSimplify	( tcSimplifyCheck )
+import TcIface		( checkWiredInTyCon )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
-import TyCon		( TyCon, tyConArity, tyConTyVars )
+import TyCon		( TyCon, tyConArity, tyConTyVars, tyConName )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
 import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
-import Name		( isSystemName, mkSysTvName )
+import Name		( isSystemName, mkSysTvName, isWiredInName )
 import ErrUtils		( Message )
 import SrcLoc		( noLoc )
 import BasicTypes	( Arity )
@@ -233,12 +233,15 @@ zapToTyConApp :: TyCon			-- T :: k1 -> ... -> kn -> *
 	      -> Expected TcSigmaType 	-- Expected type (T a b c)
 	      -> TcM [TcType]      	-- Element types, a b c
   -- Insists that the Expected type is not a forall-type
-
+  -- It's used for wired-in tycons, so we call checkWiredInTyCOn
 zapToTyConApp tc (Check ty)
-   = unifyTyConApp tc ty	 -- NB: fails for a forall-type
+   = do { checkWiredInTyCon tc ; unifyTyConApp tc ty }	 -- NB: fails for a forall-type
+
 zapToTyConApp tc (Infer hole) 
   = do	{ (tc_app, elt_tys) <- newTyConApp tc
 	; writeMutVar hole tc_app
+	; traceTc (text "zap" <+> ppr tc)
+	; checkWiredInTyCon tc
 	; return elt_tys }
 
 zapToListTy :: Expected TcType -> TcM TcType	-- Special case for lists

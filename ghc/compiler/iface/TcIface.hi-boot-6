@@ -1,4 +1,7 @@
 module TcIface where
 
 tcIfaceDecl  :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL TypeRep.TyThing
+tcIfaceInst  :: IfaceSyn.IfaceInst -> TcRnTypes.IfL InstEnv.Instance
+tcIfaceRule  :: IfaceSyn.IfaceRule -> TcRnTypes.IfL CoreSyn.CoreRule
+
 

@@ -64,7 +64,7 @@ import Id		( Id, idType, mkSysLocalUnencoded,
 			  isOneShotLambda, zapDemandIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
-import IdInfo		( workerExists, vanillaIdInfo, )
+import IdInfo		( workerExists, vanillaIdInfo, isEmptySpecInfo )
 import Var		( Var )
 import VarSet
 import VarEnv
@@ -773,7 +773,7 @@ absVarsOf dest_lvl (_, lvl_env, _, id_env) v
 	-- We are going to lambda-abstract, so nuke any IdInfo,
 	-- and add the tyvars of the Id (if necessary)
     zap v | isId v = WARN( workerExists (idWorkerInfo v) ||
-		           not (isEmptyCoreRules (idSpecialisation v)),
+		           not (isEmptySpecInfo (idSpecialisation v)),
 		           text "absVarsOf: discarding info on" <+> ppr v )
 		     setIdInfo v vanillaIdInfo
 	  | otherwise = v

@@ -63,7 +63,8 @@ module IdInfo (
 	occInfo, setOccInfo, 
 
 	-- Specialisation
-	specInfo, setSpecInfo,
+	SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo, 
+	specInfoFreeVars, specInfoRules, seqSpecInfo,
 
 	-- CAF info
 	CafInfo(..), cafInfo, ppCafInfo, setCafInfo, mayHaveCafRefs,
@@ -79,6 +80,7 @@ import CoreSyn
 import Class		( Class )
 import PrimOp	 	( PrimOp )
 import Var              ( Id )
+import VarSet		( VarSet, emptyVarSet, seqVarSet )
 import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
 			  InsideLam, insideLam, notInsideLam, 
 			  OneBranch, oneBranch, notOneBranch,
@@ -282,7 +284,7 @@ case.  KSW 1999-04).
 data IdInfo
   = IdInfo {
 	arityInfo 	:: !ArityInfo,		-- Its arity
-	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
+	specInfo 	:: SpecInfo,		-- Specialisations of this function which exist
 #ifdef OLD_STRICTNESS
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
 	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
@@ -317,7 +319,7 @@ seqIdInfo (IdInfo {}) = ()
 
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
-  = seqRules (specInfo info)			`seq`
+  = seqSpecInfo (specInfo info)			`seq`
     seqWorker (workerInfo info)			`seq`
 
 -- Omitting this improves runtimes a little, presumably because
@@ -385,7 +387,7 @@ vanillaIdInfo
 	    demandInfo		= wwLazy,
 	    strictnessInfo	= NoStrictnessInfo,
 #endif
-	    specInfo		= emptyCoreRules,
+	    specInfo		= emptySpecInfo,
 	    workerInfo		= NoWorker,
 	    unfoldingInfo	= noUnfolding,
 	    lbvarInfo		= NoLBVarInfo,
@@ -440,6 +442,33 @@ type InlinePragInfo = Activation
 	--
 	-- If there was an INLINE pragma, then as a separate matter, the
 	-- RHS will have been made to look small with a CoreSyn Inline Note
+\end{code}
+
+
+%************************************************************************
+%*									*
+	SpecInfo
+%*									*
+%************************************************************************
+
+\begin{code}
+-- CoreRules is used only in an idSpecialisation (move to IdInfo?)
+data SpecInfo 
+  = SpecInfo [CoreRule] VarSet	-- Locally-defined free vars of RHSs
+
+emptySpecInfo :: SpecInfo
+emptySpecInfo = SpecInfo [] emptyVarSet
+
+isEmptySpecInfo :: SpecInfo -> Bool
+isEmptySpecInfo (SpecInfo rs _) = null rs
+
+specInfoFreeVars :: SpecInfo -> VarSet
+specInfoFreeVars (SpecInfo _ fvs) = fvs
+
+specInfoRules :: SpecInfo -> [CoreRule]
+specInfoRules (SpecInfo rules _) = rules
+
+seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 \end{code}
 
 

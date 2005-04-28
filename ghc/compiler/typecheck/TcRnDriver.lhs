@@ -28,7 +28,7 @@ import StaticFlags	( opt_PprStyle_Debug )
 import Packages		( moduleToPackageConfig, mkPackageId, package,
 			  isHomeModule )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
-			  SpliceDecl(..), HsBind(..),
+			  SpliceDecl(..), HsBind(..), LHsBinds,
 			  emptyGroup, appendGroups,
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
@@ -42,7 +42,7 @@ import TcExpr 		( tcInferRho )
 import TcRnMonad
 import TcType		( tidyTopType, tcEqType, mkTyVarTys, substTyWith )
 import Inst		( showLIE )
-import InstEnv		( extendInstEnvList )
+import InstEnv		( extendInstEnvList, Instance, pprInstances, instanceDFunId )
 import TcBinds		( tcTopBinds, tcHsBootSigs )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, iDFunId )
@@ -57,11 +57,11 @@ import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail,
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
-import PprCore		( pprIdRules, pprCoreBindings )
-import CoreSyn		( IdCoreRule, bindersOfBinds )
+import PprCore		( pprRules, pprCoreBindings )
+import CoreSyn		( CoreRule, bindersOfBinds )
 import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
-import Id		( mkExportedLocalId, isLocalId, idName, idType )
+import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, lookupModuleEnv )
 import OccName		( mkVarOcc )
@@ -107,7 +107,7 @@ import RnExpr		( rnStmts, rnLExpr )
 import LoadIface	( loadSrcInterface, ifaceInstGates )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
 			  IfaceExtName(..), IfaceConDecls(..), IfaceInst(..),
-			  tyThingToIfaceDecl, dfunToIfaceInst )
+			  tyThingToIfaceDecl, instanceToIfaceInst )
 import IfaceType	( IfaceTyCon(..), IfaceType, toIfaceType, 
 			  interactiveExtNameFun, isLocalIfaceExtName )
 import IfaceEnv		( lookupOrig, ifaceExportNames )
@@ -130,7 +130,6 @@ import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnv
 			  availNames, availName, ModIface(..), icPrintUnqual,
 			  ModDetails(..), Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
-import Bag		( unitBag )
 import ListSetOps	( removeDups )
 import Panic		( ghcError, GhcException(..) )
 import SrcLoc		( SrcLoc )
@@ -138,7 +137,7 @@ import SrcLoc		( SrcLoc )
 
 import FastString	( mkFastString )
 import Util		( sortLe )
-import Bag		( unionBags, snocBag )
+import Bag		( unionBags, snocBag, emptyBag, unitBag, unionManyBags )
 
 import Maybe		( isJust )
 \end{code}
@@ -398,16 +397,17 @@ tcRnSrcDecls decls
 
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
 	    ; tcg_env' = tcg_env { tcg_type_env = final_type_env,
-			 	   tcg_binds = binds', tcg_rules = rules', 
+			 	   tcg_binds = binds',
+				   tcg_rules = rules', 
 				   tcg_fords = fords' } } ;
-
-	-- Compare the hi-boot iface (if any) with the real thing
- 	checkHiBootIface tcg_env' boot_iface ;
 
 	-- Make the new type env available to stuff slurped from interface files
 	writeMutVar (tcg_type_env_var tcg_env) final_type_env ;
 
-	return tcg_env'
+	-- Compare the hi-boot iface (if any) with the real thing
+ 	dfun_binds <- checkHiBootIface tcg_env' boot_iface ;
+
+	return (tcg_env' { tcg_binds = tcg_binds tcg_env' `unionBags` dfun_binds }) 
    }
 
 tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
@@ -510,23 +510,25 @@ spliceInHsBootErr (SpliceDecl (L loc _), _)
   = addErrAt loc (ptext SLIT("Splices are not allowed in hs-boot files"))
 \end{code}
 
-In both one-shot mode and GHCi mode, hi-boot interfaces are demand-loaded
-into the External Package Table.  Once we've typechecked the body of the
-module, we want to compare what we've found (gathered in a TypeEnv) with
-the hi-boot stuff in the EPT.  We do so here, using the export list of 
-the hi-boot interface as our checklist.
+Once we've typechecked the body of the module, we want to compare what
+we've found (gathered in a TypeEnv) with the hi-boot details (if any).
 
 \begin{code}
-checkHiBootIface :: TcGblEnv -> ModDetails -> TcM ()
+checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
 -- Compare the hi-boot file for this module (if there is one)
 -- with the type environment we've just come up with
 -- In the common case where there is no hi-boot file, the list
 -- of boot_names is empty.
+--
+-- The bindings we return give bindings for the dfuns defined in the
+-- hs-boot file, such as 	$fbEqT = $fEqT
+
 checkHiBootIface
 	(TcGblEnv { tcg_insts = local_insts, tcg_type_env = local_type_env })
 	(ModDetails { md_insts = boot_insts, md_types = boot_type_env })
-  = do	{ mapM_ check_inst  boot_insts
-	; mapM_ check_one (typeEnvElts boot_type_env) }
+  = do	{ mapM_ check_one (typeEnvElts boot_type_env)
+	; dfun_binds <- mapM check_inst boot_insts
+	; return (unionManyBags dfun_binds) }
   where
     check_one boot_thing
       | no_check name
@@ -544,11 +546,15 @@ checkHiBootIface
 		  || name `elem` dfun_names
     dfun_names = map getName boot_insts
 
-    check_inst inst
-	| null [i | i <- local_insts, idType i `tcEqType` idType inst]
-	= addErrTc (instMisMatch inst)
-	| otherwise 
-	= return ()
+    check_inst boot_inst
+	= case [dfun | inst <- local_insts, 
+		       let dfun = instanceDFunId inst,
+		       idType dfun `tcEqType` boot_inst_ty ] of
+	    [] -> do { addErrTc (instMisMatch boot_inst); return emptyBag }
+	    (dfun:_) -> return (unitBag $ noLoc $ VarBind boot_dfun (nlHsVar dfun))
+	where
+	  boot_dfun = instanceDFunId boot_inst
+	  boot_inst_ty = idType boot_dfun
 
 ----------------
 check_thing (ATyCon boot_tc) (ATyCon real_tc)
@@ -582,7 +588,7 @@ missingBootThing thing
 bootMisMatch thing
   = ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file")
 instMisMatch inst
-  = hang (ptext SLIT("instance") <+> ppr (idType inst))
+  = hang (ptext SLIT("instance") <+> ppr inst)
        2 (ptext SLIT("is defined in the hs-boot file, but not in the module"))
 \end{code}
 
@@ -1135,8 +1141,8 @@ getModuleContents hsc_env mod exports_only
 ---------------------
 filter_decl occs decl@(IfaceClass {ifSigs = sigs})
   = decl { ifSigs = filter (keep_sig occs) sigs }
-filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon th cons})
-  = decl { ifCons = IfDataTyCon th (filter (keep_con occs) cons) }
+filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon cons})
+  = decl { ifCons = IfDataTyCon (filter (keep_con occs) cons) }
 filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
   | keep_con occs con = decl
   | otherwise	      = decl {ifCons = IfAbstractTyCon}	-- Hmm?
@@ -1226,10 +1232,11 @@ tcRnGetInfo hsc_env ictxt rdr_name
 	-- their parent declaration
     let { do_one name = do { thing  <- tcLookupGlobal name
 		           ; fixity <- lookupFixityRn name
-			   ; dfuns  <- lookupInsts ext_nm thing
+			   ; ispecs <- lookupInsts ext_nm thing
 		           ; return (str, toIfaceDecl ext_nm thing, fixity, 
 				     getSrcLoc thing, 
-				     [(toIfaceType ext_nm (idType dfun), getSrcLoc dfun) | dfun <- dfuns]
+				     [(toIfaceType ext_nm (idType dfun), getSrcLoc dfun) 
+				     | dfun <- map instanceDFunId ispecs ]
 			     ) } 
 		where
 		 	-- str is the the naked occurrence name
@@ -1249,15 +1256,15 @@ tcRnGetInfo hsc_env ictxt rdr_name
     ext_nm = interactiveExtNameFun (icPrintUnqual ictxt)
 
 
-lookupInsts :: (Name -> IfaceExtName) -> TyThing -> TcM [DFunId]
+lookupInsts :: (Name -> IfaceExtName) -> TyThing -> TcM [Instance]
 -- Filter the instances by the ones whose tycons (or clases resp) 
 -- are in scope unqualified.  Otherwise we list a whole lot too many!
 lookupInsts ext_nm (AClass cls)
   = do	{ loadImportedInsts cls []	-- [] means load all instances for cls
 	; inst_envs <- tcGetInstEnvs
-	; return [ dfun
-		 | (_,_,dfun) <- classInstances inst_envs cls
-		 , let (_, tycons) = ifaceInstGates (ifInstHead (dfunToIfaceInst ext_nm dfun))
+	; return [ ispec
+		 | ispec <- classInstances inst_envs cls
+		 , let (_, tycons) = ifaceInstGates (ifInstHead (instanceToIfaceInst ext_nm ispec))
 			-- Rather an indirect/inefficient test, but there we go
 		 , all print_tycon_unqual tycons ] }
   where
@@ -1275,10 +1282,10 @@ lookupInsts ext_nm (ATyCon tc)
 	; return [ dfun
 		 | (_, _, dfun) <- instEnvElts home_ie ++ instEnvElts pkg_ie
 		 , relevant dfun
-		 , let (cls, _) = ifaceInstGates (ifInstHead (dfunToIfaceInst ext_nm dfun))
+		 , let (cls, _) = ifaceInstGates (ifInstHead (instanceToIfaceInst ext_nm dfun))
 		 , isLocalIfaceExtName cls ]  }
   where
-    relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
+    relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType (instanceDFunId df))
     tc_name     = tyConName tc		  
 
 lookupInsts ext_nm other = return []
@@ -1358,10 +1365,11 @@ pprModGuts (ModGuts { mg_types = type_env,
 	   ppr_rules rules ]
 
 
-ppr_types :: [Var] -> TypeEnv -> SDoc
-ppr_types dfun_ids type_env
+ppr_types :: [Instance] -> TypeEnv -> SDoc
+ppr_types ispecs type_env
   = text "TYPE SIGNATURES" $$ nest 4 (ppr_sigs ids)
   where
+    dfun_ids = map instanceDFunId ispecs
     ids = [id | id <- typeEnvIds type_env, want_sig id]
     want_sig id | opt_PprStyle_Debug = True
 	        | otherwise	     = isLocalId id && 
@@ -1372,9 +1380,9 @@ ppr_types dfun_ids type_env
 	-- that the type checker has invented.  Top-level user-defined things 
 	-- have External names.
 
-ppr_insts :: [Var] -> SDoc
-ppr_insts []       = empty
-ppr_insts dfun_ids = text "INSTANCES" $$ nest 4 (ppr_sigs dfun_ids)
+ppr_insts :: [Instance] -> SDoc
+ppr_insts []     = empty
+ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
 
 ppr_sigs :: [Var] -> SDoc
 ppr_sigs ids
@@ -1384,10 +1392,10 @@ ppr_sigs ids
     le_sig id1 id2 = getOccName id1 <= getOccName id2
     ppr_sig id = ppr id <+> dcolon <+> ppr (tidyTopType (idType id))
 
-ppr_rules :: [IdCoreRule] -> SDoc
+ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
 ppr_rules rs = vcat [ptext SLIT("{-# RULES"),
-		      nest 4 (pprIdRules rs),
+		      nest 4 (pprRules rs),
 		      ptext SLIT("#-}")]
 
 ppr_gen_tycons []  = empty

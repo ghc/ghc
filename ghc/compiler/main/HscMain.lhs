@@ -20,13 +20,13 @@ module HscMain (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LHsExpr )
+import HsSyn		( Stmt(..), LHsExpr, LStmt, LHsType )
 import IfaceSyn		( IfaceDecl, IfaceInst )
 import Module		( Module )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
-import TidyPgm		( tidyCoreExpr )
+import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, GetInfoResult, tcRnType ) 
@@ -39,12 +39,13 @@ import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
 import BasicTypes	( Fixity )
 import SrcLoc		( SrcLoc, noSrcLoc )
+import VarEnv		( emptyTidyEnv )
 #endif
 
 import Var		( Id )
 import Module		( emptyModuleEnv )
 import RdrName		( GlobalRdrEnv, RdrName )
-import HsSyn		( HsModule, LHsBinds, LStmt, LHsType, HsGroup )
+import HsSyn		( HsModule, LHsBinds, HsGroup )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
@@ -56,11 +57,11 @@ import TcRnMonad	( initIfaceCheck, TcGblEnv(..) )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
-import MkIface		( checkOldIface, mkIface )
+import MkIface		( checkOldIface, mkIface, writeIfaceFile )
 import Desugar
 import Flattening       ( flatten )
 import SimplCore
-import TidyPgm		( tidyCorePgm )
+import TidyPgm		( optTidyPgm, simpleTidyPgm )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
 import Name		( Name, NamedThing(..) )
@@ -82,9 +83,7 @@ import ParserCore
 import ParserCoreUtils
 import FastString
 import Maybes		( expectJust )
-import StringBuffer	( StringBuffer )
 import Bag		( unitBag, emptyBag )
-
 import Monad		( when )
 import Maybe		( isJust )
 import IO
@@ -190,7 +189,6 @@ hscMain hsc_env msg_act mod_summary
 
 
 ------------------------------
--- hscNoRecomp definitely expects to have the old interface available
 hscNoRecomp hsc_env msg_act mod_summary 
 	    have_object (Just old_iface)
             mb_mod_index
@@ -216,22 +214,28 @@ hscNoRecomp hsc_env msg_act mod_summary
 	; return (HscNoRecomp new_details old_iface)
     }
 
+hscNoRecomp hsc_env msg_act mod_summary 
+	    have_object Nothing
+	    mb_mod_index
+  = panic "hscNoRecomp"	-- hscNoRecomp definitely expects to 
+			-- have the old interface available
+
 ------------------------------
 hscRecomp hsc_env msg_act mod_summary
-	  have_object maybe_checked_iface
+	  have_object maybe_old_iface
           mb_mod_index
  = case ms_hsc_src mod_summary of
      HsSrcFile -> do 
 	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index
-	hscBackEnd hsc_env mod_summary maybe_checked_iface front_res
+	hscBackEnd hsc_env mod_summary maybe_old_iface front_res
 
      HsBootFile -> do
 	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index
-	hscBootBackEnd hsc_env mod_summary maybe_checked_iface front_res
+	hscBootBackEnd hsc_env mod_summary maybe_old_iface front_res
 
      ExtCoreFile -> do
 	front_res <- hscCoreFrontEnd hsc_env msg_act mod_summary
-	hscBackEnd hsc_env mod_summary maybe_checked_iface front_res
+	hscBackEnd hsc_env mod_summary maybe_old_iface front_res
 
 hscCoreFrontEnd hsc_env msg_act mod_summary = do {
  	    -------------------
@@ -297,9 +301,7 @@ hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
 	; (warns, maybe_ds_result) <- {-# SCC "DeSugar" #-}
 		 	     deSugar hsc_env tc_result
 	; msg_act (warns, emptyBag)
-	; case maybe_ds_result of
-	    Nothing        -> return Nothing
-	    Just ds_result -> return (Just ds_result)
+	; return maybe_ds_result
 	}}}}}
 
 ------------------------------
@@ -337,7 +339,7 @@ hscFileCheck hsc_env msg_act mod_summary = do {
 				md_exports = tcg_exports  tc_result,
 				md_insts   = tcg_insts    tc_result,
 				md_rules   = [panic "no rules"] }
-				   -- rules are IdCoreRules, not the
+				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker
 		return (HscChecked rdr_module 
 				   (tcg_rn_decls tc_result)
@@ -350,12 +352,16 @@ hscFileCheck hsc_env msg_act mod_summary = do {
 hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
 -- For hs-boot files, there's no code generation to do
 
-hscBootBackEnd hsc_env mod_summary maybe_checked_iface Nothing 
+hscBootBackEnd hsc_env mod_summary maybe_old_iface Nothing 
   = return HscFail
-hscBootBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
-  = do	{ final_iface <- {-# SCC "MkFinalIface" #-}
-			 mkIface hsc_env (ms_location mod_summary)
-                         	 maybe_checked_iface ds_result
+hscBootBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
+  = do	{ tidy_pgm <- simpleTidyPgm hsc_env ds_result
+
+	; (new_iface, no_change) 
+		<- {-# SCC "MkFinalIface" #-}
+		   mkIface hsc_env maybe_old_iface tidy_pgm
+
+	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
 
 	; let { final_details = ModDetails { md_types   = mg_types ds_result,
 					     md_exports = mg_exports ds_result,
@@ -365,17 +371,17 @@ hscBootBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 	; dumpIfaceStats hsc_env
 
 	; return (HscRecomp final_details
-			    final_iface
+			    new_iface
                             False False Nothing)
  	}
 
 ------------------------------
 hscBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
 
-hscBackEnd hsc_env mod_summary maybe_checked_iface Nothing 
+hscBackEnd hsc_env mod_summary maybe_old_iface Nothing 
   = return HscFail
 
-hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result) 
+hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result) 
   = do 	{ 	-- OMITTED: 
 		-- ; seqList imported_modules (return ())
 
@@ -421,8 +427,11 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
  	    -------------------
  	    -- TIDY
  	    -------------------
+	; let omit_prags = dopt Opt_OmitInterfacePragmas dflags
 	; tidy_result <- {-# SCC "CoreTidy" #-}
-		         tidyCorePgm hsc_env simpl_result
+		         if omit_prags 
+		         then simpleTidyPgm hsc_env simpl_result
+			 else optTidyPgm    hsc_env simpl_result
 
 	-- Emit external core
 	; emitExternalCore dflags tidy_result
@@ -437,15 +446,15 @@ hscBackEnd hsc_env mod_summary maybe_checked_iface (Just ds_result)
 	    -- This has to happen *after* code gen so that the back-end
 	    -- info has been set.  Not yet clear if it matters waiting
 	    -- until after code output
-	; new_iface <- {-# SCC "MkFinalIface" #-}
-			mkIface hsc_env (ms_location mod_summary)
-                         	maybe_checked_iface tidy_result
+	; (new_iface, no_change) <- {-# SCC "MkFinalIface" #-}
+				    mkIface hsc_env maybe_old_iface tidy_result
+
+	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
 
 	    -- Space leak reduction: throw away the new interface if
 	    -- we're in one-shot mode; we won't be needing it any
 	    -- more.
-	; final_iface <-
-	     if one_shot then return (error "no final iface")
+	; final_iface <- if one_shot then return (error "no final iface")
 			 else return new_iface
 
 	    -- Build the final ModDetails (except in one-shot mode, where
@@ -677,11 +686,13 @@ hscKcType hsc_env str
 \end{code}
 
 \begin{code}
+#ifdef GHCI
 hscParseStmt :: DynFlags -> String -> IO (Maybe (Maybe (LStmt RdrName)))
 hscParseStmt = hscParseThing parseStmt
 
 hscParseType :: DynFlags -> String -> IO (Maybe (LHsType RdrName))
 hscParseType = hscParseThing parseType
+#endif
 
 hscParseIdentifier :: DynFlags -> String -> IO (Maybe (Located RdrName))
 hscParseIdentifier = hscParseThing parseIdentifier
@@ -769,7 +780,7 @@ compileExpr hsc_env this_mod rdr_env type_env tc_expr
 	; simpl_expr <- simplifyExpr dflags flat_expr
 
 		-- Tidy it (temporary, until coreSat does cloning)
-	; tidy_expr <- tidyCoreExpr simpl_expr
+	; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
 
 		-- Prepare for codegen
 	; prepd_expr <- corePrepExpr dflags tidy_expr

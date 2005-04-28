@@ -12,8 +12,8 @@ module TcTyClsDecls (
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), , NewOrData(..), 
-			  tyClDeclTyVars, isSynDecl, LConDecl,
-			  LTyClDecl, tcdName, LHsTyVarBndr, LHsContext
+			  tyClDeclTyVars, isSynDecl, 
+			  LTyClDecl, tcdName, LHsTyVarBndr
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
@@ -33,7 +33,7 @@ import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType,
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcUnify		( unifyKind )
-import TcType		( TcKind, ThetaType, TcType, tyVarsOfType, 
+import TcType		( TcKind, TcType, tyVarsOfType, 
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, tcEqTypes,
 			  tcSplitSigmaTy, tcEqType )
 import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
@@ -374,8 +374,7 @@ tcTyClDecl1 calc_vrcs calc_isrec
   = tcTyVarBndrs tvs	$ \ tvs' -> do 
   { extra_tvs <- tcDataKindSig mb_ksig
   ; let final_tvs = tvs' ++ extra_tvs
-  ; stupid_theta <- tcStupidTheta ctxt cons
-
+  ; stupid_theta <- tcHsKindedContext ctxt
   ; want_generic <- doptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; gla_exts     <- doptM Opt_GlasgowExts
@@ -398,10 +397,10 @@ tcTyClDecl1 calc_vrcs calc_isrec
 		= AbstractTyCon		-- "don't know"; hence Abstract
 		| otherwise
 		= case new_or_data of
-			DataType -> mkDataTyConRhs stupid_theta data_cons
+			DataType -> mkDataTyConRhs data_cons
 			NewType  -> ASSERT( isSingleton data_cons )
 				    mkNewTyConRhs tycon (head data_cons)
-	; buildAlgTyCon tc_name final_tvs tc_rhs arg_vrcs is_rec
+	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs arg_vrcs is_rec
 			(want_generic && canDoGenerics data_cons)
 	})
   ; return (ATyCon tycon)
@@ -516,15 +515,6 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- GADTs
 		-- NB:	we put data_tc, the type constructor gotten from the constructor 
 		--	type signature into the data constructor; that way checkValidDataCon 
 		--	can complain if it's wrong.
-
--------------------
-tcStupidTheta :: LHsContext Name -> [LConDecl Name] -> TcM (Maybe ThetaType)
--- For GADTs we don't allow a context on the data declaration
--- whereas for standard Haskell style data declarations, we do
-tcStupidTheta ctxt (L _ (ConDecl _ _ _ _) : _)
-  = do { theta <- tcHsKindedContext ctxt; return (Just theta) }
-tcStupidTheta ctxt other	-- Includes an empty constructor list
-  = ASSERT( null (unLoc ctxt) ) return Nothing
 
 -------------------
 argStrictness :: Bool		-- True <=> -funbox-strict_fields

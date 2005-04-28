@@ -16,17 +16,18 @@ import DynFlags	( DynFlag(..) )
 import Generics		( mkTyConGenericBinds )
 import TcRnMonad
 import TcEnv		( newDFunName, pprInstInfoDetails, 
-			  InstInfo(..), InstBindings(..),
+			  InstInfo(..), InstBindings(..), simpleInstInfoClsTy,
 			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( simpleDFunClassTyCon, extendInstEnvList )
+import InstEnv		( Instance, OverlapFlag, mkLocalInstance, instanceHead, extendInstEnvList )
+import Inst		( getOverlapFlag )
 import TcHsType		( tcHsDeriv )
 import TcSimplify	( tcSimplifyDeriv )
 
 import RnBinds		( rnMethodBinds, rnTopBinds )
 import RnEnv		( bindLocalNames )
-import HscTypes		( DFunId, FixityEnv )
+import HscTypes		( FixityEnv )
 
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
 import Type		( zipOpenTvSubst, substTheta )
@@ -44,8 +45,8 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfTypes, isArgTypeKind,
-			  tcEqTypes, tcSplitAppTys, mkAppTys, tcSplitDFunTy )
-import Var		( TyVar, tyVarKind, idType, varName )
+			  tcEqTypes, tcSplitAppTys, mkAppTys )
+import Var		( TyVar, tyVarKind, varName )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
 import SrcLoc		( srcLocSpan, Located(..) )
@@ -211,15 +212,16 @@ tcDeriving tycl_decls
   = recoverM (returnM ([], [])) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
-	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns tycl_decls
+	  overlap_flag <- getOverlapFlag
+	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns overlap_flag tycl_decls
 
 	; (ordinary_inst_info, deriv_binds) 
-		<- extendLocalInstEnv (map iDFunId newtype_inst_info)  $
-		   deriveOrdinaryStuff ordinary_eqns
+		<- extendLocalInstEnv (map iSpec newtype_inst_info)  $
+		   deriveOrdinaryStuff overlap_flag ordinary_eqns
 		-- Add the newtype-derived instances to the inst env
 		-- before tacking the "ordinary" ones
 
-	; let inst_info  = newtype_inst_info ++ ordinary_inst_info
+	; let inst_info = newtype_inst_info ++ ordinary_inst_info
 
 	-- If we are compiling a hs-boot file, 
 	-- don't generate any derived bindings
@@ -256,22 +258,22 @@ tcDeriving tycl_decls
       = vcat (map pprInstInfoDetails inst_infos) $$ vcat (map ppr extra_binds)
 
 -----------------------------------------
-deriveOrdinaryStuff []	-- Short cut
+deriveOrdinaryStuff overlap_flag []	-- Short cut
   = returnM ([], emptyLHsBinds)
 
-deriveOrdinaryStuff eqns
+deriveOrdinaryStuff overlap_flag eqns
   = do	{	-- Take the equation list and solve it, to deliver a list of
 		-- solutions, a.k.a. the contexts for the instance decls
 		-- required for the corresponding equations.
-	; new_dfuns <- solveDerivEqns eqns
+	  inst_specs <- solveDerivEqns overlap_flag eqns
 
 	-- Generate the InstInfo for each dfun, 
 	-- plus any auxiliary bindings it needs
-	; (inst_infos, aux_binds_s) <- mapAndUnzipM genInst new_dfuns
+	; (inst_infos, aux_binds_s) <- mapAndUnzipM genInst inst_specs
 
 	-- Generate any extra not-one-inst-decl-specific binds, 
 	-- notably "con2tag" and/or "tag2con" functions.  
-	; extra_binds <- genTaggeryBinds new_dfuns
+	; extra_binds <- genTaggeryBinds inst_infos
 
 	-- Done
 	; returnM (inst_infos, unionManyBags (extra_binds : aux_binds_s))
@@ -311,11 +313,12 @@ or} has just one data constructor (e.g., tuples).
 all those.
 
 \begin{code}
-makeDerivEqns :: [LTyClDecl Name] 
+makeDerivEqns :: OverlapFlag
+	      -> [LTyClDecl Name] 
 	      -> TcM ([DerivEqn],	-- Ordinary derivings
 		      [InstInfo])	-- Special newtype derivings
 
-makeDerivEqns tycl_decls
+makeDerivEqns overlap_flag tycl_decls
   = mapAndUnzipM mk_eqn derive_these	 	`thenM` \ (maybe_ordinaries, maybe_newtypes) ->
     returnM (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
   where
@@ -358,7 +361,7 @@ makeDerivEqns tycl_decls
       =		-- Go ahead and use the isomorphism
 	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
-	   returnM (Nothing, Just (InstInfo { iDFunId = mk_dfun dfun_name,
+	   returnM (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
 					      iBinds = NewTypeDerived rep_tys }))
       | std_class gla_exts clas
       = mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys	-- Go via bale-out route
@@ -451,7 +454,10 @@ makeDerivEqns tycl_decls
 		  | otherwise     = rep_pred : sc_theta
 
 		-- Finally! Here's where we build the dictionary Id
-	mk_dfun dfun_name = mkDictFunId dfun_name dict_tvs dict_args clas inst_tys
+	mk_inst_spec dfun_name 
+	  = mkLocalInstance dfun overlap_flag
+	  where
+	    dfun = mkDictFunId dfun_name dict_tvs dict_args clas inst_tys
 
 	-------------------------------------------------------------------
 	--  Figuring out whether we can only do this newtype-deriving thing
@@ -675,11 +681,12 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \end{itemize}
 
 \begin{code}
-solveDerivEqns :: [DerivEqn]
-	       -> TcM [DFunId]	-- Solns in same order as eqns.
+solveDerivEqns :: OverlapFlag
+	       -> [DerivEqn]
+	       -> TcM [Instance]-- Solns in same order as eqns.
 				-- This bunch is Absolutely minimal...
 
-solveDerivEqns orig_eqns
+solveDerivEqns overlap_flag orig_eqns
   = iterateDeriv 1 initial_solutions
   where
 	-- The initial solutions for the equations claim that each
@@ -693,7 +700,7 @@ solveDerivEqns orig_eqns
 	-- compares it with the current one; finishes if they are the
 	-- same, otherwise recurses with the new solutions.
 	-- It fails if any iteration fails
-    iterateDeriv :: Int -> [DerivSoln] ->TcM [DFunId]
+    iterateDeriv :: Int -> [DerivSoln] -> TcM [Instance]
     iterateDeriv n current_solns
       | n > 20 	-- Looks as if we are in an infinite loop
 		-- This can happen if we have -fallow-undecidable-instances
@@ -702,33 +709,36 @@ solveDerivEqns orig_eqns
 		 (vcat (map pprDerivEqn orig_eqns) $$ ppr current_solns)
       | otherwise
       =	let 
-	    dfuns = zipWithEqual "add_solns" mk_deriv_dfun orig_eqns current_solns
+	    inst_specs = zipWithEqual "add_solns" mk_inst_spec 
+				      orig_eqns current_solns
         in
         checkNoErrs (
 		  -- Extend the inst info from the explicit instance decls
 		  -- with the current set of solutions, and simplify each RHS
-	    extendLocalInstEnv dfuns $
+	    extendLocalInstEnv inst_specs $
 	    mappM gen_soln orig_eqns
 	)				`thenM` \ new_solns ->
 	if (current_solns == new_solns) then
-	    returnM dfuns
+	    returnM inst_specs
 	else
 	    iterateDeriv (n+1) new_solns
 
     ------------------------------------------------------------------
-
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
       = setSrcSpan (srcLocSpan (getSrcLoc tc))		$
 	addErrCtxt (derivCtxt (Just clas) tc)	$
 	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
 	returnM (sortLe (<=) theta)	-- Canonicalise before returning the soluction
 
-mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
-  = mkDictFunId dfun_name tyvars theta
-		clas [mkTyConApp tycon (mkTyVarTys tyvars)] 
+    ------------------------------------------------------------------
+    mk_inst_spec (dfun_name, clas, tycon, tyvars, _) theta
+	= mkLocalInstance dfun overlap_flag
+	where
+	  dfun = mkDictFunId dfun_name tyvars theta clas
+			     [mkTyConApp tycon (mkTyVarTys tyvars)]
 
-extendLocalInstEnv :: [DFunId] -> TcM a -> TcM a
--- Add new locall-defined instances; don't bother to check
+extendLocalInstEnv :: [Instance] -> TcM a -> TcM a
+-- Add new locally-defined instances; don't bother to check
 -- for functional dependency errors -- that'll happen in TcInstDcls
 extendLocalInstEnv dfuns thing_inside
  = do { env <- getGblEnv
@@ -802,23 +812,25 @@ the renamer.  What a great hack!
 \begin{code}
 -- Generate the InstInfo for the required instance,
 -- plus any auxiliary bindings required
-genInst :: DFunId -> TcM (InstInfo, LHsBinds RdrName)
-genInst dfun
-  = getFixityEnv		`thenM` \ fix_env -> 
-    let
-	(tyvars,_,clas,[ty]) 	= tcSplitDFunTy (idType dfun)
-	clas_nm			= className clas
-	tycon  	      	     	= tcTyConAppTyCon ty 
-    	(meth_binds, aux_binds) = genDerivBinds clas fix_env tycon
-    in
+genInst :: Instance -> TcM (InstInfo, LHsBinds RdrName)
+genInst spec
+  = do	{ fix_env <- getFixityEnv
+	; let
+	    (tyvars,_,clas,[ty])    = instanceHead spec
+	    clas_nm		    = className clas
+	    tycon  	      	    = tcTyConAppTyCon ty 
+	    (meth_binds, aux_binds) = genDerivBinds clas fix_env tycon
+
 	-- Bring the right type variables into 
 	-- scope, and rename the method binds
-    bindLocalNames (map varName tyvars)		$
-    rnMethodBinds clas_nm [] meth_binds		`thenM` \ (rn_meth_binds, _fvs) ->
+	; (rn_meth_binds, _fvs) <- bindLocalNames (map varName tyvars)	$
+			 	   rnMethodBinds clas_nm [] meth_binds
 
 	-- Build the InstInfo
-    returnM (InstInfo { iDFunId = dfun, iBinds = VanillaInst rn_meth_binds [] }, 
-	     aux_binds)
+	; return (InstInfo { iSpec = spec, 
+		  	     iBinds = VanillaInst rn_meth_binds [] }, 
+		  aux_binds)
+	}
 
 genDerivBinds clas fix_env tycon
   | className clas `elem` typeableClassNames
@@ -881,13 +893,15 @@ We're deriving @Enum@, or @Ix@ (enum type only???)
 If we have a @tag2con@ function, we also generate a @maxtag@ constant.
 
 \begin{code}
-genTaggeryBinds :: [DFunId] -> TcM (LHsBinds RdrName)
-genTaggeryBinds dfuns
+genTaggeryBinds :: [InstInfo] -> TcM (LHsBinds RdrName)
+genTaggeryBinds infos
   = do	{ names_so_far <- foldlM do_con2tag []           tycons_of_interest
 	; nm_alist_etc <- foldlM do_tag2con names_so_far tycons_of_interest
 	; return (listToBag (map gen_tag_n_con_monobind nm_alist_etc)) }
   where
-    all_CTs = map simpleDFunClassTyCon dfuns
+    all_CTs = [ (cls, tcTyConAppTyCon ty)
+	      | info <- infos, 
+		let (cls,ty) = simpleInstInfoClsTy info ]
     all_tycons		    = map snd all_CTs
     (tycons_of_interest, _) = removeDups compare all_tycons
     

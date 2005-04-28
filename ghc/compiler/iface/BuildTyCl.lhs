@@ -48,13 +48,14 @@ buildSynTyCon name tvs rhs_ty arg_vrcs
 
 ------------------------------------------------------
 buildAlgTyCon :: Name -> [TyVar] 
+	      -> ThetaType		-- Stupid theta
 	      -> AlgTyConRhs
 	      -> ArgVrcs -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs rhs arg_vrcs is_rec want_generics
-  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs arg_vrcs
+buildAlgTyCon tc_name tvs stupid_theta rhs arg_vrcs is_rec want_generics
+  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs arg_vrcs stupid_theta
 				   rhs fields is_rec want_generics
 	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 	      ; fields  = mkTyConFields tycon rhs
@@ -65,9 +66,9 @@ buildAlgTyCon tc_name tvs rhs arg_vrcs is_rec want_generics
 mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon
 
-mkDataTyConRhs :: Maybe ThetaType -> [DataCon] -> AlgTyConRhs
-mkDataTyConRhs mb_theta cons
-  = DataTyCon mb_theta cons (all isNullarySrcDataCon cons)
+mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
+mkDataTyConRhs cons
+  = DataTyCon cons (all isNullarySrcDataCon cons)
 
 mkNewTyConRhs :: TyCon -> DataCon -> AlgTyConRhs
 mkNewTyConRhs tycon con 
@@ -230,7 +231,7 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 
  	      ; rhs = case dict_component_tys of
 			    [rep_ty] -> mkNewTyConRhs tycon dict_con
-			    other    -> mkDataTyConRhs Nothing [dict_con]
+			    other    -> mkDataTyConRhs [dict_con]
 	      }
 	; return clas
 	})}

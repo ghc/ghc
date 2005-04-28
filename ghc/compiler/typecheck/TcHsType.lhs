@@ -28,7 +28,7 @@ import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, HsBang,
 			  getBangStrictness, collectSigTysFromHsBinds )
 import RnHsSyn		( extractHsTyVars )
 import TcRnMonad
-import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv,
+import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, 
 			  tcLookup, tcLookupClass, tcLookupTyCon,
 		 	  TyThing(..), getInLocalScope, wrongThingErr
 			)
@@ -36,6 +36,7 @@ import TcMType		( newKindVar, newMetaTyVar, zonkTcKindToKind,
 			  checkValidType, UserTypeCtxt(..), pprHsSigCtxt
 			)
 import TcUnify		( unifyFunKind, checkExpectedKind )
+import TcIface		( checkWiredInTyCon )
 import TcType		( Type, PredType(..), ThetaType, 
 			  MetaDetails(Flexi), hoistForAllTys,
 			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
@@ -51,7 +52,7 @@ import Name		( Name, mkInternalName )
 import OccName		( mkOccName, tvName )
 import NameSet
 import PrelNames	( genUnitTyConName )
-import TysWiredIn	( mkListTy, mkPArrTy, mkTupleTy )
+import TysWiredIn	( mkListTy, listTyCon, mkPArrTy, parrTyCon, tupleTyCon )
 import Bag		( bagToList )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( Located(..), unLoc, noLoc, srcSpanStart )
@@ -443,16 +444,21 @@ ds_type (HsKindSig ty k)
   = dsHsType ty	-- Kind checking done already
 
 ds_type (HsListTy ty)
-  = dsHsType ty				`thenM` \ tau_ty ->
+  = dsHsType ty			`thenM` \ tau_ty ->
+    checkWiredInTyCon listTyCon	`thenM_`
     returnM (mkListTy tau_ty)
 
 ds_type (HsPArrTy ty)
-  = dsHsType ty				`thenM` \ tau_ty ->
+  = dsHsType ty			`thenM` \ tau_ty ->
+    checkWiredInTyCon parrTyCon	`thenM_`
     returnM (mkPArrTy tau_ty)
 
 ds_type (HsTupleTy boxity tys)
-  = dsHsTypes tys			`thenM` \ tau_tys ->
-    returnM (mkTupleTy boxity (length tys) tau_tys)
+  = dsHsTypes tys		`thenM` \ tau_tys ->
+    checkWiredInTyCon tycon	`thenM_`
+    returnM (mkTyConApp tycon tau_tys)
+  where
+    tycon = tupleTyCon boxity (length tys)
 
 ds_type (HsFunTy ty1 ty2)
   = dsHsType ty1			`thenM` \ tau_ty1 ->

@@ -428,10 +428,10 @@ lookupFixityRn name
       --
       -- loadHomeInterface will find B.hi even if B is a hidden module,
       -- and that's what we want.
-        initIfaceTcRn (loadHomeInterface doc name)	`thenM` \ iface ->
+        loadHomeInterface doc name	`thenM` \ iface ->
 	returnM (mi_fix_fn iface (nameOccName name))
   where
-    doc      = ptext SLIT("Checking fixity for") <+> ppr name
+    doc = ptext SLIT("Checking fixity for") <+> ppr name
 
 dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type

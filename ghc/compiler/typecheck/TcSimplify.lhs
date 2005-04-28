@@ -37,15 +37,16 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  getDictClassTys, isTyVarDict, instLoc,
 			  zonkInst, tidyInsts, tidyMoreInsts,
 			  Inst, pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
-			  isInheritableInst, pprDFuns, pprDictsTheta
+			  isInheritableInst, pprDictsTheta
 			)
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders )
-import InstEnv		( lookupInstEnv, classInstances )
+import InstEnv		( lookupInstEnv, classInstances, pprInstances )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, 
                           mkClassPred, isOverloadedTy, mkTyConApp, isSkolemTyVar,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
 			  tyVarsOfPred, tcEqType, pprPred, mkPredTy )
+import TcIface		( checkWiredInTyCon )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
 import Name		( Name, getOccName, getSrcLoc )
@@ -56,7 +57,7 @@ import PrelInfo		( isNumericClass )
 import PrelNames	( splitName, fstName, sndName, integerTyConName,
 			  showClassKey, eqClassKey, ordClassKey )
 import Type		( zipTopTvSubst, substTheta, substTy )
-import TysWiredIn	( pairTyCon, doubleTy )
+import TysWiredIn	( pairTyCon, doubleTy, doubleTyCon )
 import ErrUtils		( Message )
 import BasicTypes	( TopLevelFlag, isNotTopLevel )
 import VarSet
@@ -2180,6 +2181,7 @@ get_default_tys
 		Nothing  -> 	-- No use-supplied default;
 				-- use [Integer, Double]
 			    do { integer_ty <- tcMetaTy integerTyConName
+			       ; checkWiredInTyCon doubleTyCon
 			       ; return [integer_ty, doubleTy] } }
 \end{code}
 
@@ -2381,7 +2383,6 @@ addNoInstanceErrs mb_what givens []
 addNoInstanceErrs mb_what givens dicts
   =	-- Some of the dicts are here because there is no instances
 	-- and some because there are too many instances (overlap)
-    getDOpts		`thenM` \ dflags ->
     tcGetInstEnvs	`thenM` \ inst_envs ->
     let
     	(tidy_env1, tidy_givens) = tidyInsts givens
@@ -2394,7 +2395,7 @@ addNoInstanceErrs mb_what givens dicts
     	check_overlap (overlap_doc, no_inst_dicts) dict 
 	  | not (isClassDict dict) = (overlap_doc, dict : no_inst_dicts)
 	  | otherwise
-	  = case lookupInstEnv dflags inst_envs clas tys of
+	  = case lookupInstEnv inst_envs clas tys of
 		-- The case of exactly one match and no unifiers means
 		-- a successful lookup.  That can't happen here, becuase
 		-- dicts only end up here if they didn't match in Inst.lookupInst
@@ -2424,7 +2425,7 @@ addNoInstanceErrs mb_what givens dicts
       = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
 					<+> pprPred (dictPred dict))),
     		sep [ptext SLIT("Matching instances") <> colon,
-    		     nest 2 (vcat [pprDFuns dfuns, pprDFuns unifiers])],
+    		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])],
 		ASSERT( not (null matches) )
 		if not (isSingleton matches)
     		then 	-- Two or more matches
@@ -2435,7 +2436,7 @@ addNoInstanceErrs mb_what givens dicts
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
 			      ptext SLIT("Use -fallow-incoherent-instances to use the first choice above")])]
       where
-    	dfuns = [df | (_, (_,_,df)) <- matches]
+    	ispecs = [ispec | (_, ispec) <- matches]
 
     mk_probable_fix tidy_env dicts	
       = returnM (tidy_env, sep [ptext SLIT("Probable fix:"), nest 2 (vcat fixes)])

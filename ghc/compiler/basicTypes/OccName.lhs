@@ -62,6 +62,7 @@ import Char	( isDigit, isUpper, isLower, isAlphaNum, ord, chr, digitToInt )
 import Util	( thenCmp )
 import Unique	( Unique, mkUnique, Uniquable(..) )
 import BasicTypes ( Boxity(..), Arity )
+import StaticFlags ( opt_PprStyle_Debug )
 import UniqFM
 import UniqSet
 import FastString
@@ -524,9 +525,22 @@ mkLocalOcc uniq occ
 
 \begin{code}
 mkDFunOcc :: EncodedString	-- Typically the class and type glommed together e.g. "OrdMaybe"
-	  -> OccName		-- "$fOrdMaybe"
+				-- Only used in debug mode, for extra clarity
+	  -> Bool		-- True <=> hs-boot instance dfun
+	  -> Int		-- Unique index
+	  -> OccName		-- "$f3OrdMaybe"
 
-mkDFunOcc string = mk_deriv VarName "$f" string
+-- In hs-boot files we make dict funs like $fx7ClsTy, which get bound to the real
+-- thing when we compile the mother module. Reason: we don't know exactly
+-- what the  mother module will call it.
+
+mkDFunOcc info_str is_boot index 
+  = mk_deriv VarName prefix string
+  where
+    prefix | is_boot   = "$fx"
+	   | otherwise = "$f"
+    string | opt_PprStyle_Debug = show index ++ info_str
+	   | otherwise		= show index
 \end{code}
 
 We used to add a '$m' to indicate a method, but that gives rise to bad

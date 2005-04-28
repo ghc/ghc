@@ -88,7 +88,7 @@ tcCheckSigma :: LHsExpr Name		-- Expession to type check
        	     -> TcM (LHsExpr TcId)	-- Generalised expr with expected type
 
 tcCheckSigma expr expected_ty 
-  = traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenM_`
+  = -- traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenM_`
     tc_expr' expr expected_ty
 
 tc_expr' expr sigma_ty

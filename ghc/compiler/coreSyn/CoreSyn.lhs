@@ -32,19 +32,16 @@ module CoreSyn (
 	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
 	-- Seq stuff
-	seqRules, seqExpr, seqExprs, seqUnfolding,
+	seqExpr, seqExprs, seqUnfolding, 
 
 	-- Annotated expressions
 	AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt, 
 	deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
 
 	-- Core rules
-	CoreRules(..), 	-- Representation needed by friends
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
-	IdCoreRule(..), isOrphanRule,
-	RuleName,
-	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules,
-	isBuiltinRule, ruleName
+	RuleName, seqRules, 
+	isBuiltinRule, ruleName, isLocalRule, ruleIdName
     ) where
 
 #include "HsVersions.h"
@@ -53,6 +50,8 @@ import StaticFlags	( opt_RuntimeTypes )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
+import Name		( Name )
+import OccName		( OccName )
 import Literal	        ( Literal, mkMachInt )
 import DataCon		( DataCon, dataConWorkId, dataConTag )
 import BasicTypes	( Activation )
@@ -171,56 +170,65 @@ INVARIANTS:
 The CoreRule type and its friends are dealt with mainly in CoreRules,
 but CoreFVs, Subst, PprCore, CoreTidy also inspect the representation.
 
-\begin{code}
-data CoreRules 
-  = Rules [CoreRule]
-	  VarSet		-- Locally-defined free vars of RHSs
+A Rule is 
 
-emptyCoreRules :: CoreRules
-emptyCoreRules = Rules [] emptyVarSet
+  "local"  if the function it is a rule for is defined in the
+	   same module as the rule itself.
 
-isEmptyCoreRules :: CoreRules -> Bool
-isEmptyCoreRules (Rules rs _) = null rs
-
-rulesRhsFreeVars :: CoreRules -> VarSet
-rulesRhsFreeVars (Rules _ fvs) = fvs
-
-rulesRules :: CoreRules -> [CoreRule]
-rulesRules (Rules rules _) = rules
-\end{code}
+  "orphan" if nothing on the LHS is defined in the same module
+	   as the rule itself
 
 \begin{code}
 type RuleName = FastString
-data IdCoreRule = IdCoreRule Id 	-- A rule for this Id
-			     Bool 	-- True <=> orphan rule
-			     CoreRule	-- The rule itself
-
-isOrphanRule :: IdCoreRule -> Bool
-isOrphanRule (IdCoreRule _ is_orphan _) = is_orphan
 
 data CoreRule
-  = Rule RuleName
-	 Activation	-- When the rule is active
-	 [CoreBndr]	-- Forall'd variables
-	 [CoreExpr]	-- LHS args
-	 CoreExpr	-- RHS
+  = Rule { 
+	ru_name :: RuleName,
+	ru_act  :: Activation,	-- When the rule is active
+	
+	-- Rough-matching stuff
+	-- see comments with InstEnv.Instance( is_cls, is_rough )
+	ru_fn    :: Name,	-- Name of the Id at the head of this rule
+	ru_rough :: [Maybe Name],	-- Name at the head of each argument
+	
+	-- Proper-matching stuff
+	-- see comments with InstEnv.Instance( is_tvs, is_tys )
+	ru_bndrs :: [CoreBndr],	-- Forall'd variables
+	ru_args  :: [CoreExpr],	-- LHS args
+	
+	-- And the right-hand side
+	ru_rhs   :: CoreExpr,
 
-  | BuiltinRule		-- Built-in rules are used for constant folding
-	RuleName	-- and suchlike.  It has no free variables.
-	([CoreExpr] -> Maybe CoreExpr)
+	-- Locality
+	ru_local :: Bool,	-- The fn at the head of the rule is
+				-- defined in the same module as the rule
 
-isBuiltinRule (BuiltinRule _ _) = True
-isBuiltinRule _		        = False
+	-- Orphan-hood; see comments is InstEnv.Instance( is_orph )
+	ru_orph  :: Maybe OccName }
+
+  | BuiltinRule {		-- Built-in rules are used for constant folding
+	ru_name :: RuleName,	-- and suchlike.  It has no free variables.
+	ru_fn :: Name,		-- Name of the Id at 
+				-- the head of this rule
+	ru_try  :: [CoreExpr] -> Maybe CoreExpr }
+
+isBuiltinRule (BuiltinRule {}) = True
+isBuiltinRule _		       = False
 
 ruleName :: CoreRule -> RuleName
-ruleName (Rule n _ _ _ _)  = n
-ruleName (BuiltinRule n _) = n
+ruleName = ru_name
+
+ruleIdName :: CoreRule -> Name
+ruleIdName = ru_fn
+
+isLocalRule :: CoreRule -> Bool
+isLocalRule = ru_local
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{@Unfolding@ type}
+		Unfoldings
 %*									*
 %************************************************************************
 
@@ -618,12 +626,10 @@ seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
 seqAlts [] = ()
 seqAlts ((c,bs,e):alts) = seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
 
-seqRules :: CoreRules -> ()
-seqRules (Rules rules fvs) = seq_rules rules `seq` seqVarSet fvs
-
-seq_rules [] = ()
-seq_rules (Rule fs _ bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` seq_rules rules
-seq_rules (BuiltinRule _ _   : rules) = seq_rules rules
+seqRules [] = ()
+seqRules (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs } : rules) 
+  = seqBndrs bndrs `seq` seqExprs (rhs:args) `seq` seqRules rules
+seqRules (BuiltinRule {} : rules) = seqRules rules
 \end{code}
 
 

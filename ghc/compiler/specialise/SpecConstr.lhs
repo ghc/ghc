@@ -14,18 +14,18 @@ import CoreSyn
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, tcEqExpr, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
-import CoreTidy		( pprTidyIdRules )
+import CoreTidy		( tidyRules )
+import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity )
 import Type		( tyConAppArgs )
-import Id		( Id, idName, idType, 
-			  isDataConWorkId_maybe, 
+import Id		( Id, idName, idType, isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal )
 import Var		( Var )
 import VarEnv
 import VarSet
 import Name		( nameOccName, nameSrcLoc )
-import Rules		( addIdSpecialisations )
+import Rules		( addIdSpecialisations, mkLocalRule, rulesOfBinds )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags	( DynFlags, DynFlag(..) )
@@ -182,7 +182,7 @@ specConstrProgram dflags us binds
 	endPass dflags "SpecConstr" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (vcat (map pprTidyIdRules (concat (map bindersOf binds'))))
+		  (pprRules (tidyRules emptyTidyEnv (rulesOfBinds binds')))
 
 	return binds'
   where
@@ -512,8 +512,8 @@ spec_one env fn rhs (pats, rule_number)
 	rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
 	spec_rhs  = mkLams spec_lam_args spec_body
 	spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
-	rule      = Rule rule_name specConstrActivation
-			 bndrs pats (mkVarApps (Var spec_id) spec_call_args)
+	rhs	  = mkVarApps (Var spec_id) spec_call_args
+	rule      = mkLocalRule rule_name specConstrActivation fn_name bndrs pats rhs
     in
     returnUs (rule, (spec_id, spec_rhs))
 

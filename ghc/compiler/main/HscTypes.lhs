@@ -45,8 +45,6 @@ module HscTypes (
 
 	WhetherHasOrphans, IsBootInterface, Usage(..), 
 	Dependencies(..), noDependencies,
-	InstPool, Gated, addInstsToPool, 
-	RulePool, addRulesToPool, 
 	NameCache(..), OrigNameCache, OrigIParamCache,
 	Avails, availsToNameSet, availName, availNames,
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
@@ -54,7 +52,6 @@ module HscTypes (
 
 	Deprecations, DeprecTxt, lookupDeprec, plusDeprecs,
 
-	InstEnv, DFunId,
 	PackageInstEnv, PackageRuleBase,
 
 	-- Linker stuff
@@ -78,7 +75,7 @@ import NameSet
 import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv, 
 			  extendOccEnv )
 import Module
-import InstEnv		( InstEnv, DFunId )
+import InstEnv		( InstEnv, Instance )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
@@ -96,7 +93,7 @@ import BasicTypes	( Version, initialVersion, IPName,
 import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
-import CoreSyn		( IdCoreRule )
+import CoreSyn		( CoreRule )
 import Maybes		( orElse, fromJust, expectJust )
 import Outputable
 import SrcLoc		( SrcSpan )
@@ -245,18 +242,18 @@ lookupIfaceByModule hpt pit mod
 
 
 \begin{code}
-hptInstances :: HscEnv -> (Module -> Bool) -> [DFunId]
+hptInstances :: HscEnv -> (Module -> Bool) -> [Instance]
 -- Find all the instance declarations that are in modules imported 
 -- by this one, directly or indirectly, and are in the Home Package Table
 -- This ensures that we don't see instances from modules --make compiled 
 -- before this one, but which are not below this one
 hptInstances hsc_env want_this_module
-  = [ dfun 
+  = [ ispec 
     | mod_info <- moduleEnvElts (hsc_HPT hsc_env)
     , want_this_module (mi_module (hm_iface mod_info))
-    , dfun <- md_insts (hm_details mod_info) ]
+    , ispec <- md_insts (hm_details mod_info) ]
 
-hptRules :: HscEnv -> [(Module, IsBootInterface)] -> [IdCoreRule]
+hptRules :: HscEnv -> [(Module, IsBootInterface)] -> [CoreRule]
 -- Get rules from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
 hptRules hsc_env deps
@@ -359,10 +356,10 @@ data ModIface
 data ModDetails
    = ModDetails {
 	-- The next three fields are created by the typechecker
-        md_types    :: !TypeEnv,
 	md_exports  :: NameSet,
-        md_insts    :: ![DFunId],	-- Dfun-ids for the instances in this module
-        md_rules    :: ![IdCoreRule]	-- Domain may include Ids from other modules
+        md_types    :: !TypeEnv,
+        md_insts    :: ![Instance],	-- Dfun-ids for the instances in this module
+        md_rules    :: ![CoreRule]	-- Domain may include Ids from other modules
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
@@ -390,8 +387,8 @@ data ModGuts
 	mg_deprecs  :: !Deprecations,	-- Deprecations declared in the module
 
 	mg_types    :: !TypeEnv,
-	mg_insts    :: ![DFunId],	-- Instances 
-        mg_rules    :: ![IdCoreRule],	-- Rules from this module
+	mg_insts    :: ![Instance],	-- Instances 
+        mg_rules    :: ![CoreRule],	-- Rules from this module
 	mg_binds    :: ![CoreBind],	-- Bindings for this module
 	mg_foreign  :: !ForeignStubs
     }
@@ -817,7 +814,7 @@ data ExternalPackageState
 		-- The ModuleIFaces for modules in external packages
 		-- whose interfaces we have opened
 		-- The declarations in these interface files are held in
-		-- eps_decls, eps_insts, eps_rules (below), not in the 
+		-- eps_decls, eps_inst_env, eps_rules (below), not in the 
 		-- mi_decls fields of the iPIT.  
 		-- What _is_ in the iPIT is:
 		--	* The Module 
@@ -832,18 +829,6 @@ data ExternalPackageState
 						--   all the external-package modules
 	eps_rule_base :: !PackageRuleBase,	-- Ditto RuleEnv
 
-
-	-- Holding pens for stuff that has been read in from file,
-	-- but not yet slurped into the renamer
-	eps_insts :: !InstPool,
-		-- The as-yet un-slurped instance decls
-		-- Decls move from here to eps_inst_env
-		-- Each instance is 'gated' by the names that must be 
-		-- available before this instance decl is needed.
-
-	eps_rules :: !RulePool,
-		-- The as-yet un-slurped rules
-
 	eps_stats :: !EpsStats
   }
 
@@ -853,6 +838,14 @@ data EpsStats = EpsStats { n_ifaces_in
 			 , n_decls_in, n_decls_out 
 			 , n_rules_in, n_rules_out
 			 , n_insts_in, n_insts_out :: !Int }
+
+addEpsInStats :: EpsStats -> Int -> Int -> Int -> EpsStats
+-- Add stats for one newly-read interface
+addEpsInStats stats n_decls n_insts n_rules
+  = stats { n_ifaces_in = n_ifaces_in stats + 1
+	  , n_decls_in  = n_decls_in stats + n_decls
+	  , n_insts_in  = n_insts_in stats + n_insts
+	  , n_rules_in  = n_rules_in stats + n_rules }
 \end{code}
 
 The NameCache makes sure that there is just one Unique assigned for
@@ -862,10 +855,6 @@ Actually that's not quite right.  When we first encounter the original
 name, we might not be at its binding site (e.g. we are reading an
 interface file); so we give it 'noSrcLoc' then.  Later, when we find
 its binding site, we fix it up.
-
-Exactly the same is true of the Module stored in the Name.  When we first
-encounter the occurrence, we may not know the details of the module, so
-we just store junk.  Then when we find the binding site, we fix it up.
 
 \begin{code}
 data NameCache
@@ -881,47 +870,6 @@ type OrigNameCache   = ModuleEnv (OccEnv Name)
 type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
 \end{code}
 
-\begin{code}
-type Gated d = ([Name], (Module, SDoc, d))
-	-- The [Name] 'gate' the declaration; always non-empty
-	-- Module records which module this decl belongs to
-	-- SDoc records the pathname of the file, or similar err-ctxt info
-
-type RulePool = [Gated IfaceRule]
-
-addRulesToPool :: RulePool
-	      -> [Gated IfaceRule]
-	      -> RulePool
-addRulesToPool rules new_rules = new_rules ++ rules
-
--------------------------
-addEpsInStats :: EpsStats -> Int -> Int -> Int -> EpsStats
--- Add stats for one newly-read interface
-addEpsInStats stats n_decls n_insts n_rules
-  = stats { n_ifaces_in = n_ifaces_in stats + 1
-	  , n_decls_in  = n_decls_in stats + n_decls
-	  , n_insts_in  = n_insts_in stats + n_insts
-	  , n_rules_in  = n_rules_in stats + n_rules }
-
--------------------------
-type InstPool = NameEnv [Gated IfaceInst]
-	-- The key of the Pool is the Class
-	-- The Names are the TyCons in the instance head
-	-- For example, suppose this is in an interface file
-	--	instance C T where ...
-	-- We want to slurp this decl if both C and T are "visible" in 
-	-- the importing module.  See "The gating story" in RnIfaces for details.
-
-
-addInstsToPool :: InstPool -> [(Name, Gated IfaceInst)] -> InstPool
-addInstsToPool insts new_insts
-  = foldr add insts new_insts
-  where
-    add :: (Name, Gated IfaceInst) -> NameEnv [Gated IfaceInst] -> NameEnv [Gated IfaceInst]
-    add (cls,new_inst) insts = extendNameEnv_C combine insts cls [new_inst]
-	where
-	  combine old_insts _ = new_inst : old_insts
-\end{code}
 
 
 %************************************************************************

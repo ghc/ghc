@@ -42,7 +42,7 @@ import SimplMonad
 import Id		( Id, idType, idOccInfo, idUnfolding, setIdUnfolding )
 import IdInfo		( IdInfo, vanillaIdInfo, occInfo, setOccInfo, specInfo, setSpecInfo,
 			  arityInfo, setArityInfo, workerInfo, setWorkerInfo, 
-			  unfoldingInfo, setUnfoldingInfo, 
+			  unfoldingInfo, setUnfoldingInfo, isEmptySpecInfo,
 			  unknownArity, workerExists
 			    )
 import CoreSyn
@@ -52,10 +52,10 @@ import CoreUtils	( needsCaseBinding )
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Var	
 import VarEnv
-import VarSet		( isEmptyVarSet, elemVarSetByKey, mkVarSet )
+import VarSet		( isEmptyVarSet )
 import OrdList
 
-import qualified CoreSubst	( Subst, mkSubst, substExpr, substRules, substWorker )
+import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substWorker )
 import qualified Type		( substTy, substTyVarBndr )
 
 import Type             ( Type, TvSubst(..), TvSubstEnv, composeTvSubst,
@@ -563,7 +563,7 @@ substIdInfo env info
   | nothing_to_do = Nothing
   | otherwise     = Just (info `setOccInfo`    	  (if keep_occ then old_occ else NoOccInfo)
 			       `setArityInfo`     (if keep_arity then old_arity else unknownArity)
-			       `setSpecInfo`   	  CoreSubst.substRules  subst old_rules
+			       `setSpecInfo`   	  CoreSubst.substSpec   subst old_rules
 			       `setWorkerInfo` 	  CoreSubst.substWorker subst old_wrkr
 			       `setUnfoldingInfo` noUnfolding)
 			-- setSpecInfo does a seq
@@ -571,7 +571,7 @@ substIdInfo env info
   where
     subst = mkCoreSubst env
     nothing_to_do = keep_occ && keep_arity &&
-		    isEmptyCoreRules old_rules &&
+		    isEmptySpecInfo old_rules &&
 		    not (workerExists old_wrkr) &&
 		    not (hasUnfolding (unfoldingInfo info))
     

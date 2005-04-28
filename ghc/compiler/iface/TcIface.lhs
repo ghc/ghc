@@ -5,43 +5,38 @@
 
 \begin{code}
 module TcIface ( 
-	tcImportDecl, tcHiBootIface, typecheckIface, 
-	tcIfaceDecl, tcIfaceGlobal, 
-	loadImportedInsts, loadImportedRules,
+	tcImportDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
+	tcIfaceDecl, tcIfaceInst, tcIfaceRule, tcIfaceGlobal, 
 	tcExtCoreBindings
  ) where
 
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadHomeInterface, loadInterface, predInstGates,
-			  loadDecls, findAndReadIface )
+import LoadIface	( loadInterface, loadHomeInterface, loadDecls, findAndReadIface )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
-			  tcIfaceTyVar, tcIfaceLclId, 
+			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, 
 			  newIfaceName, newIfaceNames, ifaceExportNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
 import TcType		( hoistForAllTys )	-- TEMPORARY HACK
 import Type		( liftedTypeKind, splitTyConApp, mkSynTy, mkTyConApp,
-			  mkTyVarTys, mkGenTyConApp, ThetaType, pprClassPred )
+			  mkTyVarTys, ThetaType, 
+			  mkGenTyConApp )	-- Don't remove this... see mkIfTcApp
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName, isSynTyCon )
-import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
-			  HscEnv, TyThing(..), tyThingClass, tyThingTyCon, 
-			  ModIface(..), ModDetails(..), ModGuts, HomeModInfo(..),
-			  emptyModDetails,
-			  extendTypeEnv, lookupTypeEnv, lookupType, typeEnvIds )
-import InstEnv		( extendInstEnvList )
+import HscTypes		( ExternalPackageState(..), 
+			  TyThing(..), tyThingClass, tyThingTyCon, 
+			  ModIface(..), ModDetails(..), HomeModInfo(..),
+			  emptyModDetails, lookupTypeEnv, lookupType, typeEnvIds )
+import InstEnv		( Instance(..), mkImportedInstance )
 import CoreSyn
-import PprCore		( pprIdRules )
-import Rules		( extendRuleBaseList )
 import CoreUtils	( exprType )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
-import InstEnv		( DFunId )
 import Id		( Id, mkVanillaGlobal, mkLocalId )
 import MkId		( mkFCallId )
 import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
@@ -53,8 +48,8 @@ import TyCon		( tyConDataCons, isTupleTyCon, mkForeignTyCon )
 import DataCon		( DataCon, dataConWorkId, dataConTyVars, dataConArgTys, isVanillaDataCon )
 import TysWiredIn	( tupleCon, tupleTyCon, listTyCon, intTyCon, boolTyCon, charTyCon, parrTyCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
-import Name		( Name, nameModule, nameIsLocalOrFrom, 
-			  isWiredInName, wiredInNameTyThing_maybe, nameParent )
+import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
+			  wiredInNameTyThing_maybe, nameParent )
 import NameEnv
 import OccName		( OccName )
 import Module		( Module, lookupModuleEnv )
@@ -112,28 +107,49 @@ also turn out to be needed by the code that e2 expands to.
 
 \begin{code}
 tcImportDecl :: Name -> TcM TyThing
--- Entry point for source-code uses of importDecl
+-- Entry point for *source-code* uses of importDecl
 tcImportDecl name 
+  | Just thing <- wiredInNameTyThing_maybe name
+  = do	{ checkWiredInName name; return thing }
+  | otherwise
   = do 	{ traceIf (text "tcLookupGlobal" <+> ppr name)
 	; mb_thing <- initIfaceTcRn (importDecl name)
 	; case mb_thing of
 	    Succeeded thing -> return thing
 	    Failed err      -> failWithTc err }
 
+checkWiredInTyCon :: TyCon -> TcM ()
+-- Ensure its instances are loaded
+-- It might not be a wired-in tycon (see the calls in TcUnify)
+checkWiredInTyCon tc	
+  | not (isWiredInName tc_name) = return ()
+  | otherwise			= checkWiredInName tc_name
+  where
+    tc_name = tyConName tc
+
+checkWiredInName :: Name -> TcM ()
+-- We "check" a wired-in name solely to check that its
+-- interface file is loaded, so that we're sure that we see
+-- its instance declarations and rules
+checkWiredInName name
+  = ASSERT( isWiredInName name )
+    do	{ mod <- getModule
+	; if nameIsLocalOrFrom mod name then
+		-- Don't look for (non-existent) Float.hi when
+		-- compiling Float.lhs, which mentions Float of course
+		return ()
+	  else	-- A bit yukky to call initIfaceTcRn here
+	  do { loadHomeInterface doc name; return () }
+	}
+  where
+    doc = ptext SLIT("Need home interface for wired-in thing") <+> ppr name
+
 importDecl :: Name -> IfM lcl (MaybeErr Message TyThing)
 -- Get the TyThing for this Name from an interface file
-importDecl name 
-  | Just thing <- wiredInNameTyThing_maybe name
-	-- This case definitely happens for tuples, because we
-	-- don't know how many of them we'll find
-	-- It also now happens for all other wired in things.  We used
-	-- to pre-populate the eps_PTE with other wired-in things, but
-	-- we don't seem to do that any more.  I guess it keeps the PTE smaller?
-  = do 	{ updateEps_ (\ eps -> eps { eps_PTE = extendTypeEnv (eps_PTE eps) thing })
-	; return (Succeeded thing) }
-
-  | otherwise
-  = do	{ traceIf nd_doc
+-- It's not a wired-in thing -- the caller caught that
+importDecl name
+  = ASSERT( not (isWiredInName name) )
+    do	{ traceIf nd_doc
 
 	-- Load the interface, which should populate the PTE
 	; mb_iface <- loadInterface nd_doc (nameModule name) ImportBySystem
@@ -328,6 +344,7 @@ tcIfaceDecl (IfaceId {ifName = occ_name, ifType = iface_type, ifIdInfo = info})
 
 tcIfaceDecl (IfaceData {ifName = occ_name, 
 			ifTyVars = tv_bndrs, 
+			ifCtxt = ctxt,
 			ifCons = rdr_cons, 
 			ifVrcs = arg_vrcs, ifRec = is_rec, 
 			ifGeneric = want_generic })
@@ -335,10 +352,10 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 	; bindIfaceTyVars tv_bndrs $ \ tyvars -> do
 
 	{ tycon <- fixM ( \ tycon -> do
-	    { cons  <- tcIfaceDataCons tycon tyvars rdr_cons
-	    ; tycon <- buildAlgTyCon tc_name tyvars cons 
-			    arg_vrcs is_rec want_generic
-	    ; return tycon
+	    { stupid_theta <- tcIfaceCtxt ctxt
+	    ; cons  <- tcIfaceDataCons tycon tyvars rdr_cons
+	    ; buildAlgTyCon tc_name tyvars stupid_theta
+			    cons arg_vrcs is_rec want_generic
 	    })
         ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
 	; return (ATyCon tycon)
@@ -384,16 +401,12 @@ tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
 
 tcIfaceDataCons tycon tc_tyvars if_cons
   = case if_cons of
-	IfAbstractTyCon		 -> return mkAbstractTyConRhs
-	IfDataTyCon mb_ctxt cons -> do 	{ mb_theta <- tc_ctxt mb_ctxt
-					; data_cons <- mappM tc_con_decl cons
-					; return (mkDataTyConRhs mb_theta data_cons) }
-	IfNewTyCon con		 -> do 	{ data_con <- tc_con_decl con
-					; return (mkNewTyConRhs tycon data_con) }
+	IfAbstractTyCon	 -> return mkAbstractTyConRhs
+	IfDataTyCon cons -> do 	{ data_cons <- mappM tc_con_decl cons
+				; return (mkDataTyConRhs data_cons) }
+	IfNewTyCon con	 -> do 	{ data_con <- tc_con_decl con
+				; return (mkNewTyConRhs tycon data_con) }
   where
-    tc_ctxt Nothing     = return Nothing
-    tc_ctxt (Just ctxt) = do { theta <- tcIfaceCtxt ctxt; return (Just theta) }
-
     tc_con_decl (IfVanillaCon {	ifConOcc = occ, ifConInfix = is_infix, ifConArgTys = args, 
 				ifConStricts = stricts, ifConFields = field_lbls})
       = do { name  <- lookupIfaceTop occ
@@ -443,117 +456,21 @@ tcIfaceDataCons tycon tc_tyvars if_cons
 %*									*
 %************************************************************************
 
-The gating story for instance declarations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we are looking for a dict (C t1..tn), we slurp in instance decls for
-C that 
-	mention at least one of the type constructors 
-	at the roots of t1..tn
-
-Why "at least one" rather than "all"?  Because functional dependencies 
-complicate the picture.  Consider
-	class C a b | a->b where ...
-	instance C Foo Baz where ...
-Here, the gates are really only C and Foo, *not* Baz.
-That is, if C and Foo are visible, even if Baz isn't, we must
-slurp the decl, even if Baz is thus far completely unknown to the
-system.
-
-Why "roots of the types"?  Reason is overlap.  For example, suppose there 
-are interfaces in the pool for
-  (a)	C Int b
- (b)	C a [b]
-  (c)	C a [T] 
-Then, if we are trying to resolve (C Int x), we need (a)
-if we are trying to resolve (C x [y]), we need *both* (b) and (c),
-even though T is not involved yet, so that we spot the overlap.
-
-
-NOTE: if you use an instance decl with NO type constructors
-	instance C a where ...
-and look up an Inst that only has type variables such as (C (n o))
-then GHC won't necessarily suck in the instances that overlap with this.
-
-
 \begin{code}
-loadImportedInsts :: Class -> [Type] -> TcM PackageInstEnv
-loadImportedInsts cls tys
-  = do	{ 	-- Get interfaces for wired-in things, such as Integer
-		-- Any non-wired-in tycons will already be loaded, else
-		-- we couldn't have them in the Type
-	; this_mod <- getModule 
-	; let { (cls_gate, tc_gates) = predInstGates cls tys
-	      ; imp_wi n = isWiredInName n && this_mod /= nameModule n
-	      ;	wired_tcs = filter imp_wi tc_gates }
-			-- Wired-in tycons not from this module.  The "this-module"
-			-- test bites only when compiling Base etc, because loadHomeInterface
-			-- barfs if it's asked to load a non-existent interface
-	; if null wired_tcs then returnM ()
-	  else initIfaceTcRn (mapM_ (loadHomeInterface wired_doc) wired_tcs)
-
-		-- Now suck in the relevant instances
-	; iface_insts <- updateEps (selectInsts cls_gate tc_gates)
-
-	-- Empty => finish up rapidly, without writing to eps
-	; if null iface_insts then
-		do { eps <- getEps; return (eps_inst_env eps) }
-	  else do
-	{ traceIf (sep [ptext SLIT("Importing instances for") <+> pprClassPred cls tys, 
-			nest 2 (vcat [ppr i | (_,_,i) <- iface_insts])])
-
-	-- Typecheck the new instances
-	; dfuns <- initIfaceTcRn (mappM tc_inst iface_insts)
-
-	-- And put them in the package instance environment
-	; updateEps ( \ eps ->
-	    let 
-		inst_env' = extendInstEnvList (eps_inst_env eps) dfuns
-	    in
-	    (eps { eps_inst_env = inst_env' }, inst_env')
-	)}}
+tcIfaceInst :: IfaceInst -> IfL Instance
+tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
+			 ifInstCls = cls, ifInstTys = mb_tcs,
+			 ifInstOrph = orph })
+  = do	{ dfun    <- forkM (ptext SLIT("Dict fun") <+> ppr dfun_occ) $
+		     tcIfaceExtId (LocalTop dfun_occ)
+	; cls'    <- lookupIfaceExt cls
+	; mb_tcs' <- mapM do_tc mb_tcs
+	; return (mkImportedInstance cls' mb_tcs' orph dfun oflag) }
   where
-    wired_doc = ptext SLIT("Need home inteface for wired-in thing")
-
-tc_inst (mod, loc, inst) = initIfaceLcl mod full_loc (tcIfaceInst inst)
-  where
-    full_loc = loc $$ (nest 2 (ptext SLIT("instance decl") <+> ppr inst))
-
-tcIfaceInst :: IfaceInst -> IfL DFunId
-tcIfaceInst (IfaceInst { ifDFun = dfun_occ })
-  = tcIfaceExtId (LocalTop dfun_occ)
-
-selectInsts :: Name -> [Name] -> ExternalPackageState 
-	    -> (ExternalPackageState, [(Module, SDoc, IfaceInst)])
-selectInsts cls tycons eps
-  = (eps { eps_insts = insts', eps_stats = stats' }, iface_insts)
-  where
-    insts  = eps_insts eps
-    stats  = eps_stats eps
-    stats' = stats { n_insts_out = n_insts_out stats + length iface_insts } 
-
-    (insts', iface_insts) 
-	= case lookupNameEnv insts cls of {
-		Nothing -> (insts, []) ;
-		Just gated_insts ->
-	
-	  case choose1 gated_insts  of {
-	    (_, []) -> (insts, []) ;	-- None picked
-	    (gated_insts', iface_insts') -> 
-
-	  (extendNameEnv insts cls gated_insts', iface_insts') }}
-
-    choose1 gated_insts
-	| null tycons 			-- Bizarre special case of C (a b); then there are no tycons
-	= ([], map snd gated_insts)	-- Just grab all the instances, no real alternative
-	| otherwise 			-- Normal case
-	= foldl choose2 ([],[]) gated_insts
-
-	-- Reverses the gated decls, but that doesn't matter
-    choose2 (gis, decls) (gates, decl)
-	|  null gates 	-- Happens when we have 'instance T a where ...'
-        || any (`elem` tycons) gates = (gis, 	           decl:decls)
-	| otherwise		     = ((gates,decl) : gis, decls)
+    do_tc Nothing   = return Nothing
+    do_tc (Just tc) = do { tc' <- lookupIfaceTc tc; return (Just tc') }
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -566,77 +483,40 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 
 \begin{code}
-loadImportedRules :: HscEnv -> ModGuts -> IO [IdCoreRule]
--- Returns just the new rules added
-loadImportedRules hsc_env guts
-  = initIfaceRules hsc_env guts $ do 
-	{ -- Get new rules
-	  if_rules <- updateEps selectRules
-
-	; traceIf (ptext SLIT("Importing rules:") <+> vcat [ppr r | (_,_,r) <- if_rules])
-
-	; core_rules <- mapM tc_rule if_rules
-
-	-- Debug print
-	; traceIf (ptext SLIT("Imported rules:") <+> pprIdRules core_rules)
-	
-	-- Update the rule base and return it
-	; updateEps (\ eps -> 
-	    let { new_rule_base = extendRuleBaseList (eps_rule_base eps) core_rules }
-	    in (eps { eps_rule_base = new_rule_base }, new_rule_base)
-	  ) 
-
-	-- Strictly speaking, at this point we should go round again, since
-	-- typechecking one set of rules may bring in new things which enable
-	-- some more rules to come in.  But we call loadImportedRules several
-	-- times anyway, so I'm going to be lazy and ignore this.
-	; return core_rules
-    }
-
-tc_rule (mod, loc, rule) = initIfaceLcl mod full_loc (tcIfaceRule rule)
+tcIfaceRule :: IfaceRule -> IfL CoreRule
+tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
+			ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
+			ifRuleOrph = orph })
+  = do	{ fn' <- lookupIfaceExt fn
+	; ~(bndrs', args', rhs') <- 
+		-- Typecheck the payload lazily, in the hope it'll never be looked at
+		forkM (ptext SLIT("Rule") <+> ftext name) $
+		bindIfaceBndrs bndrs 			  $ \ bndrs' ->
+		do { args' <- mappM tcIfaceExpr args
+		   ; rhs'  <- tcIfaceExpr rhs
+		   ; return (bndrs', args', rhs') }
+	; mb_tcs <- mapM ifTopFreeName args
+	; returnM (Rule { ru_name = name, ru_fn = fn', ru_act = act, 
+			  ru_bndrs = bndrs', ru_args = args', 
+			  ru_rhs = rhs', ru_orph = orph,
+			  ru_rough = mb_tcs,
+			  ru_local = isLocalIfaceExtName fn }) }
   where
-    full_loc = loc $$ (nest 2 (ptext SLIT("rule") <+> ppr rule))
-   
-selectRules :: ExternalPackageState -> (ExternalPackageState, [(Module, SDoc, IfaceRule)])
--- Not terribly efficient.  Look at each rule in the pool to see if
--- all its gates are in the type env.  If so, take it out of the pool.
--- If not, trim its gates for next time.
-selectRules eps
-  = (eps { eps_rules = rules', eps_stats = stats' }, if_rules)
-  where
-    stats    = eps_stats eps
-    rules    = eps_rules eps
-    type_env = eps_PTE eps
-    stats'   = stats { n_rules_out = n_rules_out stats + length if_rules }
-
-    (rules', if_rules) = foldl do_one ([], []) rules
-
-    do_one (pool, if_rules) (gates, rule)
-	| null gates' = (pool, rule:if_rules)
-	| otherwise   = ((gates',rule) : pool, if_rules)
-	where
-	  gates' = filter (not . (`elemNameEnv` type_env)) gates
-
-
-tcIfaceRule :: IfaceRule -> IfL IdCoreRule
-tcIfaceRule (IfaceRule {ifRuleName = rule_name, ifActivation = act, ifRuleBndrs = bndrs,
-			ifRuleHead = fn_rdr, ifRuleArgs = args, ifRuleRhs = rhs })
-  = bindIfaceBndrs bndrs 	$ \ bndrs' ->
-    do	{ fn <- tcIfaceExtId fn_rdr
-	; args' <- mappM tcIfaceExpr args
-	; rhs'  <- tcIfaceExpr rhs
-	; let rule = Rule rule_name act bndrs' args' rhs'
-	; returnM (IdCoreRule fn (isOrphNm fn_rdr) rule) }
-  where
-
-tcIfaceRule (IfaceBuiltinRule fn_rdr core_rule)
-  = do	{ fn <- tcIfaceExtId fn_rdr
-	; returnM (IdCoreRule fn (isOrphNm fn_rdr) core_rule) }
-
-isOrphNm :: IfaceExtName -> Bool
--- An orphan name comes from somewhere other than this module,
--- so it has a non-local name
-isOrphNm name = not (isLocalIfaceExtName name)
+	-- This function *must* mirror exactly what Rules.topFreeName does
+	-- We could have stored the ru_rough field in the iface file
+	-- but that would be redundant, I think.
+	-- The only wrinkle is that we must not be deceived by
+	-- type syononyms at the top of a type arg.  Since
+	-- we can't tell at this point, we are careful not
+	-- to write them out in coreRuleToIfaceRule
+    ifTopFreeName :: IfaceExpr -> IfL (Maybe Name)
+    ifTopFreeName (IfaceType (IfaceTyConApp tc _ ))
+	= do { n <- lookupIfaceTc tc
+	     ; return (Just n) }
+    ifTopFreeName (IfaceApp f a) = ifTopFreeName f
+    ifTopFreeName (IfaceExt ext) = do { n <- lookupIfaceExt ext
+				      ; return (Just n) }
+    ifTopFreeName other = return Nothing
 \end{code}
 
 
@@ -662,6 +542,7 @@ mkIfTcApp :: TyCon -> [Type] -> Type
 -- messages), but type synonyms can expand into non-hoisted types (ones with
 -- foralls to the right of an arrow), so we must be careful to hoist them here.
 -- This hack should go away when we get rid of hoisting.
+-- Then we should go back to mkGenTyConApp or something like it
 mkIfTcApp tc tys
   | isSynTyCon tc = hoistForAllTys (mkSynTy tc tys)
   | otherwise	  = mkTyConApp tc tys
@@ -952,6 +833,9 @@ tcPragExpr name expr
 \begin{code}
 tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
+  | Just thing <- wiredInNameTyThing_maybe name
+  = return thing
+  | otherwise
   = do	{ (eps,hpt) <- getEpsAndHpt
 	; case lookupType hpt (eps_PTE eps) name of {
 	    Just thing -> return thing ;

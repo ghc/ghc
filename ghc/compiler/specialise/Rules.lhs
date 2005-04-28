@@ -5,32 +5,44 @@
 
 \begin{code}
 module Rules (
-	RuleBase, emptyRuleBase, 
-	extendRuleBaseList, 
-	ruleBaseIds, pprRuleBase, ruleCheckProgram,
+	RuleBase, emptyRuleBase, mkRuleBase, extendRuleBaseList, 
+	unionRuleBase, pprRuleBase, ruleCheckProgram,
 
-        lookupRule, addRule, addRules, addIdSpecialisations
+	mkSpecInfo, extendSpecInfo, addSpecInfo,
+	rulesOfBinds, addIdSpecialisations, 
+
+        lookupRule, mkLocalRule, roughTopNames
     ) where
 
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
-import OccurAnal	( occurAnalyseRule )
-import CoreFVs		( exprFreeVars, exprsFreeVars, ruleRhsFreeVars )
+import OccurAnal	( occurAnalyseGlobalExpr )
+import CoreFVs		( exprFreeVars, exprsFreeVars, rulesRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX )
+import PprCore		( pprRules )
 import Type		( Type )
-import CoreTidy		( pprTidyIdRules )
-import Id		( Id, idUnfolding, isLocalId, idSpecialisation, setIdSpecialisation ) 
+import TcType		( tcSplitTyConApp_maybe )
+import CoreTidy		( tidyRules )
+import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName,
+			  idSpecialisation, idCoreRules, setIdSpecialisation ) 
+import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
+import VarEnv		( IdEnv, TyVarEnv, InScopeSet, emptyTidyEnv,
+			  emptyInScopeSet, mkInScopeSet, extendInScopeSetList, 
+			  emptyVarEnv, lookupVarEnv, extendVarEnv, 
+			  nukeRnEnvL, mkRnEnv2, rnOccR, rnOccL, inRnEnvR,
+			  rnBndrR, rnBndr2, rnBndrL, rnBndrs2 )
 import VarSet
-import VarEnv
+import Name		( Name, NamedThing(..), nameOccName )
+import NameEnv
 import Unify 		( tcMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 
 import Outputable
 import FastString
-import Maybe		( isJust, fromMaybe )
+import Maybe		( isJust )
 import Bag
 import List		( isPrefixOf )
 \end{code}
@@ -70,6 +82,109 @@ might have a specialisation
 
 where pi' :: Lift Int# is the specialised version of pi.
 
+\begin{code}
+mkLocalRule :: RuleName -> Activation 
+	    -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
+-- Used to make CoreRule for an Id defined in this module
+mkLocalRule name act fn bndrs args rhs
+  = Rule { ru_name = name, ru_fn = fn, ru_act = act,
+	   ru_bndrs = bndrs, ru_args = args,
+	   ru_rhs = rhs, ru_rough = roughTopNames args,
+	   ru_orph = Just (nameOccName fn), ru_local = True }
+
+--------------
+roughTopNames :: [CoreExpr] -> [Maybe Name]
+roughTopNames args = map roughTopName args
+
+roughTopName :: CoreExpr -> Maybe Name
+-- Find the "top" free name of an expression
+-- a) the function in an App chain (if a GlobalId)
+-- b) the TyCon in a type
+-- This is used for the fast-match-check for rules; 
+--	if the top names don't match, the rest can't
+roughTopName (Type ty) = case tcSplitTyConApp_maybe ty of
+			  Just (tc,_) -> Just (getName tc)
+			  Nothing     -> Nothing
+roughTopName (App f a) = roughTopName f
+roughTopName (Var f) | isGlobalId f = Just (idName f)
+		     | otherwise    = Nothing
+roughTopName other = Nothing
+
+ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
+-- (ruleCantMatch tpl actual) returns True only if 'actual'
+-- definitely can't match 'tpl' by instantiating 'tpl'.  
+-- It's only a one-way match; unlike instance matching we 
+-- don't consider unification
+ruleCantMatch (Just n1 : ts) (Just n2 : as) = n1 /= n2 || ruleCantMatch ts as
+ruleCantMatch (Just n1 : ts) (Nothing : as) = True
+ruleCantMatch (t       : ts) (a       : as) = ruleCantMatch ts as
+ruleCantMatch ts	     as		    = False
+\end{code}
+
+
+%************************************************************************
+%*									*
+		SpecInfo: the rules in an IdInfo
+%*									*
+%************************************************************************
+
+\begin{code}
+mkSpecInfo :: [CoreRule] -> SpecInfo
+mkSpecInfo rules = SpecInfo rules (rulesRhsFreeVars rules)
+
+extendSpecInfo :: SpecInfo -> [CoreRule] -> SpecInfo
+extendSpecInfo (SpecInfo rs1 fvs1) rs2
+  = SpecInfo (rs2 ++ rs1) (rulesRhsFreeVars rs2 `unionVarSet` fvs1)
+
+addSpecInfo :: SpecInfo -> SpecInfo -> SpecInfo
+addSpecInfo (SpecInfo rs1 fvs1) (SpecInfo rs2 fvs2) 
+  = SpecInfo (rs1 ++ rs2) (fvs1 `unionVarSet` fvs2)
+
+addIdSpecialisations :: Id -> [CoreRule] -> Id
+addIdSpecialisations id rules
+  = setIdSpecialisation id $
+    extendSpecInfo (idSpecialisation id) rules
+
+rulesOfBinds :: [CoreBind] -> [CoreRule]
+rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
+\end{code}
+
+
+%************************************************************************
+%*									*
+		RuleBase
+%*									*
+%************************************************************************
+
+\begin{code}
+type RuleBase = NameEnv [CoreRule]
+	-- Maps (the name of) an Id to its rules
+	-- The rules are are unordered; 
+	-- we sort out any overlaps on lookup
+
+emptyRuleBase = emptyNameEnv
+
+mkRuleBase :: [CoreRule] -> RuleBase
+mkRuleBase rules = extendRuleBaseList emptyRuleBase rules
+
+extendRuleBaseList :: RuleBase -> [CoreRule] -> RuleBase
+extendRuleBaseList rule_base new_guys
+  = foldl extendRuleBase rule_base new_guys
+
+unionRuleBase :: RuleBase -> RuleBase -> RuleBase
+unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
+
+extendRuleBase :: RuleBase -> CoreRule -> RuleBase
+extendRuleBase rule_base rule
+  = extendNameEnv_C add rule_base (ruleIdName rule) [rule]
+  where
+    add rules _ = rule : rules
+
+pprRuleBase :: RuleBase -> SDoc
+pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs) 
+			 | rs <- nameEnvElts rules ]
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -78,20 +193,70 @@ where pi' :: Lift Int# is the specialised version of pi.
 %************************************************************************
 
 \begin{code}
+lookupRule :: (Activation -> Bool) -> InScopeSet
+	   -> RuleBase	-- Imported rules
+	   -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+lookupRule is_active in_scope rule_base fn args
+  = matchRules is_active in_scope fn args rules
+  where
+    rules | isLocalId fn = idCoreRules fn
+	  | otherwise    = case lookupNameEnv rule_base (idName fn) of
+				Just rules -> rules
+				Nothing    -> []
+
 matchRules :: (Activation -> Bool) -> InScopeSet
-	   -> [CoreRule] -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+	   -> Id -> [CoreExpr]
+	   -> [CoreRule] -> Maybe (RuleName, CoreExpr)
 -- See comments on matchRule
-matchRules is_active in_scope [] args = Nothing
-matchRules is_active in_scope (rule:rules) args
-  = case matchRule is_active in_scope rule args of
-	Just result -> Just result
-	Nothing	    -> matchRules is_active in_scope rules args
+matchRules is_active in_scope fn args rules
+  = case go [] rules of
+	[]     -> Nothing
+	(m:ms) -> Just (case findBest (fn,args) m ms of
+			  (rule, ans) -> (ru_name rule, ans))
+  where
+    rough_args = map roughTopName args
+
+    go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
+    go ms []	       = ms
+    go ms (r:rs) = case (matchRule is_active in_scope args rough_args r) of
+			Just e  -> go ((r,e):ms) rs
+			Nothing -> go ms         rs
+
+findBest :: (Id, [CoreExpr])
+	 -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
+-- All these pairs matched the expression
+-- Return the pair the the most specific rule
+-- The (fn,args) is just for overlap reporting
+
+findBest target (rule,ans)   [] = (rule,ans)
+findBest target (rule1,ans1) ((rule2,ans2):prs)
+  | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
+  | rule2 `isMoreSpecific` rule1 = findBest target (rule1,ans1) prs
+  | otherwise = pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
+			 (vcat [ptext SLIT("Expression to match:") <+> ppr fn <+> sep (map ppr args),
+				ptext SLIT("Rule 1:") <+> ppr rule1, 
+				ptext SLIT("Rule 2:") <+> ppr rule2]) $
+		findBest target (rule1,ans1) prs
+  where
+    (fn,args) = target
+
+isMoreSpecific :: CoreRule -> CoreRule -> Bool
+isMoreSpecific (BuiltinRule {}) r2 = True
+isMoreSpecific r1 (BuiltinRule {}) = False
+isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
+	       (Rule { ru_bndrs = bndrs2, ru_args = args2 })
+  = isJust (matchN in_scope bndrs2 args2 args1)
+  where
+   in_scope = mkInScopeSet (mkVarSet bndrs1)
+	-- Actually we should probably include the free vars 
+	-- of rule1's args, but I can't be bothered
 
 noBlackList :: Activation -> Bool
 noBlackList act = False		-- Nothing is black listed
 
 matchRule :: (Activation -> Bool) -> InScopeSet
-	  -> CoreRule -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+	  -> [CoreExpr] -> [Maybe Name]
+	  -> CoreRule -> Maybe CoreExpr
 
 -- If (matchRule rule args) returns Just (name,rhs)
 -- then (f args) matches the rule, and the corresponding
@@ -115,18 +280,27 @@ matchRule :: (Activation -> Bool) -> InScopeSet
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule is_active in_scope rule@(BuiltinRule name match_fn) args
+matchRule is_active in_scope args rough_args
+	  (BuiltinRule { ru_name = name, ru_try = match_fn })
   = case match_fn args of
-	Just expr -> Just (name,expr)
+	Just expr -> Just expr
 	Nothing   -> Nothing
 
-matchRule is_active in_scope rule@(Rule rn act tpl_vars tpl_args rhs) args
-  | not (is_active act)
-  = Nothing
+matchRule is_active in_scope args rough_args
+          (Rule { ru_name = rn, ru_act = act, ru_rough = tpl_tops,
+		  ru_bndrs = tpl_vars, ru_args = tpl_args,
+		  ru_rhs = rhs })
+  | not (is_active act)		      = Nothing
+  | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
   = case matchN in_scope tpl_vars tpl_args args of
-	Just (tpl_vals, leftovers) -> Just (rn, mkLams tpl_vars rhs `mkApps` tpl_vals `mkApps` leftovers)
 	Nothing			   -> Nothing
+	Just (tpl_vals, leftovers) -> Just (rule_fn
+					    `mkApps` tpl_vals
+					    `mkApps` leftovers)
+  where
+    rule_fn = occurAnalyseGlobalExpr (mkLams tpl_vars rhs)
+	-- We could do this when putting things into the rulebase, I guess
 \end{code}
 
 \begin{code}
@@ -342,87 +516,6 @@ match_ty menv (tv_subst, id_subst) ty1 ty2
 
 %************************************************************************
 %*									*
-\subsection{Adding a new rule}
-%*									*
-%************************************************************************
-
-\begin{code}
-addRules :: Id -> CoreRules -> [CoreRule] -> CoreRules
-addRule  :: Id -> CoreRules -> CoreRule -> CoreRules
-
--- Add a new rule to an existing bunch of rules.
--- The rules are for the given Id; the Id argument is needed only
--- so that we can exclude the Id from its own RHS free-var set
-
--- Insert the new rule just before a rule that is *less specific*
--- than the new one; or at the end if there isn't such a one.
--- In this way we make sure that when looking up, the first match
--- is the most specific.
---
--- We make no check for rules that unify without one dominating
--- the other.   Arguably this would be a bug.
-
-addRules id rules rule_list = foldl (addRule id) rules rule_list
-
-addRule id (Rules rules rhs_fvs) rule@(BuiltinRule _ _)
-  = Rules (rule:rules) rhs_fvs
-	-- Put it at the start for lack of anything better
-
-addRule id (Rules rules rhs_fvs) rule
-  = Rules (insertRule rules new_rule) (rhs_fvs `unionVarSet` new_rhs_fvs)
-  where
-    new_rule    = occurAnalyseRule rule
-    new_rhs_fvs = ruleRhsFreeVars new_rule `delVarSet` id
-	-- Hack alert!
-	-- Don't include the Id in its own rhs free-var set.
-	-- Otherwise the occurrence analyser makes bindings recursive
-	-- that shoudn't be.  E.g.
-	--	RULE:  f (f x y) z  ==>  f x (f y z)
-
-insertRule rules new_rule@(Rule _ _ tpl_vars tpl_args _)
-  = go rules
-  where
-    tpl_var_set = mkInScopeSet (mkVarSet tpl_vars)
-	-- Actually we should probably include the free vars of tpl_args,
-	-- but I can't be bothered
-
-    go []					= [new_rule]
-    go (rule:rules) | new_is_more_specific rule = (new_rule:rule:rules)
-		    | otherwise		        = rule : go rules
-
-    new_is_more_specific rule = isJust (matchRule noBlackList tpl_var_set rule tpl_args)
-
-addIdSpecialisations :: Id -> [CoreRule] -> Id
-addIdSpecialisations id rules
-  = setIdSpecialisation id new_specs
-  where
-    new_specs = addRules id (idSpecialisation id) rules
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Looking up a rule}
-%*									*
-%************************************************************************
-
-\begin{code}
-lookupRule :: (Activation -> Bool) 
-	   -> InScopeSet
-	   -> RuleBase		-- Ids from other modules
-	   -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
-lookupRule is_active in_scope rules fn args
-  = case idSpecialisation fn' of
-	Rules rules _ -> matchRules is_active in_scope rules args
-  where
-    fn' | isLocalId fn					     = fn
-	| Just ext_fn <- lookupVarSet (ruleBaseIds rules) fn = ext_fn
-	| otherwise					     = fn
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Checking a program for failing rule applications}
 %*									*
 %************************************************************************
@@ -487,8 +580,7 @@ ruleCheckFun (phase, pat) fn args
   | null name_match_rules = emptyBag
   | otherwise		  = unitBag (ruleAppCheck_help phase fn args name_match_rules)
   where
-    name_match_rules = case idSpecialisation fn of
-			  Rules rules _ -> filter match rules
+    name_match_rules = filter match (idCoreRules fn)
     match rule = pat `isPrefixOf` unpackFS (ruleName rule)
 
 ruleAppCheck_help :: CompilerPhase -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
@@ -499,21 +591,23 @@ ruleAppCheck_help phase fn args rules
   where
     n_args = length args
     i_args = args `zip` [1::Int ..]
+    rough_args = map roughTopName args
 
     check_rule rule = rule_herald rule <> colon <+> rule_info rule
 
-    rule_herald (BuiltinRule name _) = 
-	ptext SLIT("Builtin rule") <+> doubleQuotes (ftext name)
-    rule_herald (Rule name _ _ _ _)  = 
-	ptext SLIT("Rule") <+> doubleQuotes (ftext name)
+    rule_herald (BuiltinRule { ru_name = name })
+	= ptext SLIT("Builtin rule") <+> doubleQuotes (ftext name)
+    rule_herald (Rule { ru_name = name })
+	= ptext SLIT("Rule") <+> doubleQuotes (ftext name)
 
     rule_info rule
-	| Just (name,_) <- matchRule noBlackList emptyInScopeSet rule args
+	| Just _ <- matchRule noBlackList emptyInScopeSet args rough_args rule
 	= text "matches (which is very peculiar!)"
 
-    rule_info (BuiltinRule name fn) = text "does not match"
+    rule_info (BuiltinRule {}) = text "does not match"
 
-    rule_info (Rule name act rule_bndrs rule_args _)
+    rule_info (Rule { ru_name = name, ru_act = act, 
+		      ru_bndrs = rule_bndrs, ru_args = rule_args})
 	| not (isActive phase act)    = text "active only in later phase"
 	| n_args < n_rule_args	      = text "too few arguments"
 	| n_mismatches == n_rule_args = text "no arguments match"
@@ -533,39 +627,3 @@ ruleAppCheck_help phase fn args rules
 			    , me_tmpls = mkVarSet rule_bndrs }
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{Getting the rules ready}
-%*									*
-%************************************************************************
-
-\begin{code}
-data RuleBase = RuleBase
-		    IdSet	-- Ids with their rules in their specialisations
-				-- Held as a set, so that it can simply be the initial
-				-- in-scope set in the simplifier
-	-- This representation is a bit cute, and I wonder if we should
-	-- change it to use (IdEnv CoreRule) which seems a bit more natural
-
-ruleBaseIds (RuleBase ids) = ids
-emptyRuleBase = RuleBase emptyVarSet
-
-extendRuleBaseList :: RuleBase -> [IdCoreRule] -> RuleBase
-extendRuleBaseList rule_base new_guys
-  = foldl extendRuleBase rule_base new_guys
-
-extendRuleBase :: RuleBase -> IdCoreRule -> RuleBase
-extendRuleBase (RuleBase rule_ids) (IdCoreRule id _ rule)
-  = RuleBase (extendVarSet rule_ids new_id)
-  where
-    new_id    = setIdSpecialisation id (addRule id old_rules rule)
-    old_rules = idSpecialisation (fromMaybe id (lookupVarSet rule_ids id))
-	-- Get the old rules from rule_ids if the Id is already there, but
-	-- if not, use the Id from the incoming rule.  If may be a PrimOpId,
-	-- in which case it may have rules in its belly already.  Seems
-	-- dreadfully hackoid.
-
-pprRuleBase :: RuleBase -> SDoc
-pprRuleBase (RuleBase rules) = vcat [ pprTidyIdRules id | id <- varSetElems rules ]
-\end{code}

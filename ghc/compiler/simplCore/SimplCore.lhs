@@ -12,18 +12,18 @@ import DynFlags		( CoreToDo(..), SimplifierSwitch(..),
 			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
 			  getCoreToDo )
 import CoreSyn
-import TcIface		( loadImportedRules )
 import HscTypes		( HscEnv(..), ModGuts(..), ExternalPackageState(..),
 			  Dependencies( dep_mods ), 
 			  hscEPS, hptRules )
 import CSE		( cseProgram )
-import Rules		( RuleBase, ruleBaseIds, emptyRuleBase,
-			  extendRuleBaseList, pprRuleBase, ruleCheckProgram )
-import PprCore		( pprCoreBindings, pprCoreExpr, pprIdRules )
+import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
+			  extendRuleBaseList, pprRuleBase, ruleCheckProgram,
+			  mkSpecInfo, addSpecInfo )
+import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
 import OccurAnal	( occurAnalysePgm, occurAnalyseGlobalExpr )
 import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
 			  setWorkerInfo, workerInfo,
-			  setSpecInfo, specInfo )
+			  setSpecInfo, specInfo, specInfoRules )
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
@@ -33,11 +33,11 @@ import CoreLint		( endPass )
 import VarEnv		( mkInScopeSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
-import Id		( Id, modifyIdInfo, idInfo, idIsFrom, isExportedId, isLocalId,
-			  idSpecialisation, setIdSpecialisation )
-import Rules		( addRules )
+import Id		( Id, modifyIdInfo, idInfo, isExportedId, isLocalId,
+			  idSpecialisation, setIdSpecialisation, idName )
 import VarSet
 import VarEnv
+import NameEnv		( lookupNameEnv )
 import LiberateCase	( liberateCase )
 import SAT		( doStaticArgs )
 import Specialise	( specProgram)
@@ -79,9 +79,9 @@ core2core hsc_env guts
 	(imp_rule_base, guts') <- prepareRules hsc_env guts ru_us
 
 		-- DO THE BUSINESS
-	(stats, guts'') <- doCorePasses hsc_env cp_us
+	(stats, guts'') <- doCorePasses hsc_env imp_rule_base cp_us
 			 		(zeroSimplCount dflags) 
-					imp_rule_base guts' core_todos
+					guts' core_todos
 
 	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
 		  "Grand total simplifier statistics"
@@ -116,21 +116,21 @@ gentleSimplEnv = mkSimplEnv SimplGently
 			    emptyRuleBase
 
 doCorePasses :: HscEnv
+             -> RuleBase        -- the imported main rule base
              -> UniqSupply      -- uniques
 	     -> SimplCount      -- simplifier stats
-             -> RuleBase        -- the main rule base
              -> ModGuts	        -- local binds in (with rules attached)
              -> [CoreToDo]      -- which passes to do
              -> IO (SimplCount, ModGuts)
 
-doCorePasses hsc_env us stats rb guts []
+doCorePasses hsc_env rb us stats guts []
   = return (stats, guts)
 
-doCorePasses hsc_env us stats rb guts (to_do : to_dos) 
+doCorePasses hsc_env rb us stats guts (to_do : to_dos) 
   = do
 	let (us1, us2) = splitUniqSupply us
-	(stats1, rb1, guts1) <- doCorePass to_do hsc_env us1 rb guts
-	doCorePasses hsc_env us2 (stats `plusSimplCount` stats1) rb1 guts1 to_dos
+	(stats1, guts1) <- doCorePass to_do hsc_env us1 rb guts
+	doCorePasses hsc_env rb us2 (stats `plusSimplCount` stats1) guts1 to_dos
 
 doCorePass (CoreDoSimplify mode sws)   = _scc_ "Simplify"      simplifyPgm mode sws
 doCorePass CoreCSE		       = _scc_ "CommonSubExpr" trBinds  cseProgram
@@ -165,29 +165,29 @@ ruleCheck phase pat dflags binds = do showPass dflags "RuleCheck"
 -- Most passes return no stats and don't change rules
 trBinds :: (DynFlags -> [CoreBind] -> IO [CoreBind])
 	-> HscEnv -> UniqSupply -> RuleBase -> ModGuts
-	-> IO (SimplCount, RuleBase, ModGuts)
+	-> IO (SimplCount, ModGuts)
 trBinds do_pass hsc_env us rb guts
   = do	{ binds' <- do_pass dflags (mg_binds guts)
-	; return (zeroSimplCount dflags, rb, guts { mg_binds = binds' }) }
+	; return (zeroSimplCount dflags, guts { mg_binds = binds' }) }
   where
     dflags = hsc_dflags hsc_env
 
 trBindsU :: (DynFlags -> UniqSupply -> [CoreBind] -> IO [CoreBind])
 	-> HscEnv -> UniqSupply -> RuleBase -> ModGuts
-	-> IO (SimplCount, RuleBase, ModGuts)
+	-> IO (SimplCount, ModGuts)
 trBindsU do_pass hsc_env us rb guts
   = do	{ binds' <- do_pass dflags us (mg_binds guts)
-	; return (zeroSimplCount dflags, rb, guts { mg_binds = binds' }) }
+	; return (zeroSimplCount dflags, guts { mg_binds = binds' }) }
   where
     dflags = hsc_dflags hsc_env
 
 -- Observer passes just peek; don't modify the bindings at all
 observe :: (DynFlags -> [CoreBind] -> IO a)
 	-> HscEnv -> UniqSupply -> RuleBase -> ModGuts
-	-> IO (SimplCount, RuleBase, ModGuts)
+	-> IO (SimplCount, ModGuts)
 observe do_pass hsc_env us rb guts 
   = do	{ binds <- do_pass dflags (mg_binds guts)
-	; return (zeroSimplCount dflags, rb, guts) }
+	; return (zeroSimplCount dflags, guts) }
   where
     dflags = hsc_dflags hsc_env
 \end{code}
@@ -210,8 +210,9 @@ prepareRules :: HscEnv
 	     -> UniqSupply
 	     -> IO (RuleBase, 		-- Rule base for imported things, incl
 					-- (a) rules defined in this module (orphans)
-					-- (b) rules from other packages
-					-- (c) rules from other modules in home package
+					-- (b) rules from other modules in home package
+					-- but not things from other packages
+
 		    ModGuts)		-- Modified fields are 
 					--	(a) Bindings have rules attached,
 					-- 	(b) Rules are now just orphan rules
@@ -219,36 +220,15 @@ prepareRules :: HscEnv
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	     guts@(ModGuts { mg_binds = binds, mg_deps = deps, mg_rules = local_rules })
 	     us 
-  = do	{ eps <- hscEPS hsc_env
-
-	; let 	-- Simplify the local rules; boringly, we need to make an in-scope set
+  = do	{ let 	-- Simplify the local rules; boringly, we need to make an in-scope set
 		-- from the local binders, to avoid warnings from Simplify.simplVar
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
 	      env	       = setInScopeSet gentleSimplEnv local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
 	      home_pkg_rules   = hptRules hsc_env (dep_mods deps)
 
-	      (orphan_rules, rules_for_locals) = partition isOrphanRule better_rules
-		-- Get the rules for locally-defined Ids out of the RuleBase
-		-- If we miss any rules for Ids defined here, then we end up
-		-- giving the local decl a new Unique (because the in-scope-set is (hackily) the
-		-- same as the non-local-rule-id set, so the Id looks as if it's in scope
-		-- and hence should be cloned), and now the binding for the class method 
-		-- doesn't have the same Unique as the one in the Class and the tc-env
-		--	Example:	class Foo a where
-		--			  op :: a -> a
-		--			{-# RULES "op" op x = x #-}
-
-		-- NB: we assume that the imported rules dont include 
-		--     rules for Ids in this module; if there is, the above bad things may happen
-
-	      pkg_rule_base = eps_rule_base eps
-	      hpt_rule_base = extendRuleBaseList pkg_rule_base home_pkg_rules
-	      imp_rule_base = extendRuleBaseList hpt_rule_base orphan_rules
-
-		-- Update the binders in the local bindings with the lcoal rules
-		-- Update the binders of top-level bindings by
-		-- attaching the rules for each locally-defined Id to that Id.
+		-- Find the rules for locally-defined Ids; then we can attach them
+		-- to the binders in the top-level bindings
 		-- 
 		-- Reason
 		-- 	- It makes the rules easier to look up
@@ -262,34 +242,32 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 		--	  which is extended on each iteration by the new wave of
 		--	  local binders; any rules which aren't on the binding will
 		--	  thereby get dropped
+	      (rules_for_locals, rules_for_imps) = partition isLocalRule better_rules
 	      local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
 	      binds_w_rules   = updateBinders local_rule_base binds
 
+	      hpt_rule_base = mkRuleBase home_pkg_rules
+	      imp_rule_base = extendRuleBaseList hpt_rule_base rules_for_imps
+
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"
-		(vcat [text "Local rules", pprIdRules better_rules,
+		(vcat [text "Local rules", pprRules better_rules,
 		       text "",
 		       text "Imported rules", pprRuleBase imp_rule_base])
 
-#ifdef DEBUG
-	; let bad_rules = filter (idIsFrom (mg_module guts)) 
-				 (varSetElems (ruleBaseIds imp_rule_base))
-	; WARN( not (null bad_rules), ppr bad_rules ) return ()
-#endif
-	; return (imp_rule_base, guts { mg_binds = binds_w_rules, mg_rules = orphan_rules })
+	; return (imp_rule_base, guts { mg_binds = binds_w_rules, 
+					mg_rules = rules_for_imps })
     }
 
 updateBinders :: RuleBase -> [CoreBind] -> [CoreBind]
-updateBinders rule_base binds
+updateBinders local_rules binds
   = map update_bndrs binds
   where
-    rule_ids = ruleBaseIds rule_base
-
     update_bndrs (NonRec b r) = NonRec (update_bndr b) r
     update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
-    update_bndr bndr = case lookupVarSet rule_ids bndr of
-			  Nothing -> bndr
-			  Just id -> bndr `setIdSpecialisation` idSpecialisation id
+    update_bndr bndr = case lookupNameEnv local_rules (idName bndr) of
+			  Nothing    -> bndr
+			  Just rules -> bndr `setIdSpecialisation` mkSpecInfo rules
 \end{code}
 
 
@@ -300,13 +278,13 @@ which without simplification looked like:
 This doesn't match unless you do eta reduction on the build argument.
 
 \begin{code}
-simplRule env rule@(IdCoreRule id _ (BuiltinRule _ _))
+simplRule env rule@(BuiltinRule {})
   = returnSmpl rule
-simplRule env (IdCoreRule id is_orph (Rule act name bndrs args rhs))
+simplRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
   = simplBinders env bndrs		`thenSmpl` \ (env, bndrs') -> 
     mapSmpl (simplExprGently env) args	`thenSmpl` \ args' ->
     simplExprGently env rhs		`thenSmpl` \ rhs' ->
-    returnSmpl (IdCoreRule id is_orph (Rule act name bndrs' args' rhs'))
+    returnSmpl (rule { ru_bndrs = bndrs', ru_args = args', ru_rhs = rhs' })
 
 -- It's important that simplExprGently does eta reduction.
 -- For example, in a rule like:
@@ -394,14 +372,14 @@ simplifyPgm :: SimplifierMode
 	    -> UniqSupply
 	    -> RuleBase
 	    -> ModGuts
-	    -> IO (SimplCount, RuleBase, ModGuts)  -- New bindings
+	    -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgm mode switches hsc_env us rule_base guts
+simplifyPgm mode switches hsc_env us imp_rule_base guts
   = do {
 	showPass dflags "Simplify";
 
-	(termination_msg, it_count, counts_out, rule_base', binds') 
-	   <- do_iteration us rule_base 1 (zeroSimplCount dflags) (mg_binds guts) ;
+	(termination_msg, it_count, counts_out, binds') 
+	   <- do_iteration us 1 (zeroSimplCount dflags) (mg_binds guts) ;
 
 	dumpIfSet (dopt Opt_D_verbose_core2core dflags 
                    && dopt Opt_D_dump_simpl_stats dflags)
@@ -412,18 +390,18 @@ simplifyPgm mode switches hsc_env us rule_base guts
 
 	endPass dflags "Simplify" Opt_D_verbose_core2core binds';
 
-	return (counts_out, rule_base', guts { mg_binds = binds' })
+	return (counts_out, guts { mg_binds = binds' })
     }
   where
-    dflags 	      = hsc_dflags hsc_env
-    phase_info	      = case mode of
-			  SimplGently  -> "gentle"
-			  SimplPhase n -> show n
-
-    sw_chkr	      = isAmongSimpl switches
-    max_iterations    = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
+    dflags 	   = hsc_dflags hsc_env
+    phase_info	   = case mode of
+		   	  SimplGently  -> "gentle"
+		   	  SimplPhase n -> show n
+		   
+    sw_chkr	   = isAmongSimpl switches
+    max_iterations = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
  
-    do_iteration us rule_base iteration_no counts binds
+    do_iteration us iteration_no counts binds
 	-- iteration_no is the number of the iteration we are
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
@@ -438,7 +416,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 #endif
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    return ("Simplifier baled out", iteration_no - 1, counts, rule_base, binds)
+	    return ("Simplifier baled out", iteration_no - 1, counts, binds)
 	}
 
       -- Try and force thunks off the binds; significantly reduces
@@ -451,20 +429,13 @@ simplifyPgm mode switches hsc_env us rule_base guts
 		     (pprCoreBindings tagged_binds);
 
 	   	-- Get any new rules, and extend the rule base
-		-- (on the side this extends the package rule base in the
-		--  ExternalPackageTable, ready for the next complation 
-		--  in --make mode)
 		-- We need to do this regularly, because simplification can
 		-- poke on IdInfo thunks, which in turn brings in new rules
 		-- behind the scenes.  Otherwise there's a danger we'll simply
 		-- miss the rules for Ids hidden inside imported inlinings
-	   new_rules <- loadImportedRules hsc_env guts ;
-	   let	{ rule_base' = extendRuleBaseList rule_base new_rules
+	   eps <- hscEPS hsc_env ;
+	   let	{ rule_base' = unionRuleBase imp_rule_base (eps_rule_base eps)
 		; simpl_env  = mkSimplEnv mode sw_chkr rule_base' } ;
-			-- The new rule base Ids are used to initialise
-			-- the in-scope set.  That way, the simplifier will change any
-			-- occurrences of the imported id to the one in the imported_rule_ids
-			-- set, which are decorated with their rules.
 	   
 		-- Simplify the program
 		-- We do this with a *case* not a *let* because lazy pattern
@@ -489,7 +460,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 		-- Stop if nothing happened; don't dump output
 	   if isZeroSimplCount counts' then
 		return ("Simplifier reached fixed point", iteration_no, 
-			all_counts, rule_base', binds')
+			all_counts, binds')
 	   else do {
 		-- Short out indirections
 		-- We do this *after* at least one run of the simplifier 
@@ -504,7 +475,7 @@ simplifyPgm mode switches hsc_env us rule_base guts
 	   endPass dflags herald Opt_D_dump_simpl_iterations binds'' ;
 
 		-- Loop
-  	   do_iteration us2 rule_base' (iteration_no + 1) all_counts binds''
+  	   do_iteration us2 (iteration_no + 1) all_counts binds''
 	}  } } }
       where
   	  (us1, us2) = splitUniqSupply us
@@ -634,7 +605,7 @@ shortOutIndirections binds
     ind_env 	       = makeIndEnv binds
     exp_ids 	       = varSetElems ind_env	-- These exported Ids are the subjects
     exp_id_set	       = mkVarSet exp_ids	-- of the indirection-elimination
-    no_need_to_flatten = all (null . rulesRules . idSpecialisation) exp_ids
+    no_need_to_flatten = all (null . specInfoRules . idSpecialisation) exp_ids
     binds' 	       = concatMap zap binds
 
     zap (NonRec bndr rhs) = [NonRec b r | (b,r) <- zapPair (bndr,rhs)]
@@ -677,7 +648,7 @@ shortMeOut ind_env exported_id local_id
 	True
 
 {- No longer needed
-	if isEmptyCoreRules (specInfo (idInfo exported_id)) 	-- Only if no rules
+	if isEmptySpecInfo (specInfo (idInfo exported_id)) 	-- Only if no rules
 	then True	-- See note on "Messing up rules"
 	else 
 #ifdef DEBUG 
@@ -697,6 +668,6 @@ transferIdInfo exported_id local_id
     local_info = idInfo local_id
     transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
 				 `setWorkerInfo`        workerInfo local_info
-				 `setSpecInfo`	        addRules exported_id (specInfo exp_info)
-					 		         (rulesRules (specInfo local_info))
+				 `setSpecInfo`	        addSpecInfo (specInfo exp_info)
+							            (specInfo local_info)
 \end{code}

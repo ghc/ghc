@@ -608,8 +608,6 @@ zonkStmts env (s:ss) = do { (env1, s')  <- wrapLocSndM (zonkStmt env) s
 			  ; (env2, ss') <- zonkStmts env1 ss
 			  ; return (env2, s' : ss') }
 
-get (ZonkEnv _ env) = env
-
 zonkStmt :: ZonkEnv -> Stmt TcId -> TcM (ZonkEnv, Stmt Id)
 zonkStmt env (ParStmt stmts_w_bndrs)
   = mappM zonk_branch stmts_w_bndrs	`thenM` \ new_stmts_w_bndrs ->

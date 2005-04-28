@@ -77,6 +77,7 @@ initTc hsc_env hsc_src mod do_this
 	dfuns_var    <- newIORef emptyNameSet ;
 	keep_var     <- newIORef emptyNameSet ;
 	th_var	     <- newIORef False ;
+	dfun_n_var   <- newIORef 1 ;
 
       	let {
 	     gbl_env = TcGblEnv {
@@ -99,6 +100,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_insts    = [],
 		tcg_rules    = [],
 		tcg_fords    = [],
+		tcg_dfun_n   = dfun_n_var,
 		tcg_keep     = keep_var
 	     } ;
 	     lcl_env = TcLclEnv {
@@ -714,6 +716,13 @@ debugTc thing = return ()
 %************************************************************************
 
 \begin{code}
+nextDFunIndex :: TcM Int	-- Get the next dfun index
+nextDFunIndex = do { env <- getGblEnv
+		   ; let dfun_n_var = tcg_dfun_n env
+		   ; n <- readMutVar dfun_n_var
+		   ; writeMutVar dfun_n_var (n+1)
+		   ; return n }
+
 getLIEVar :: TcM (TcRef LIE)
 getLIEVar = do { env <- getLclEnv; return (tcl_lie env) }
 

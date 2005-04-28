@@ -23,7 +23,7 @@ module IfaceSyn (
 	visibleIfConDecls,
 
 	-- Converting things to IfaceSyn
-	tyThingToIfaceDecl, dfunToIfaceInst, coreRuleToIfaceRule, 
+	tyThingToIfaceDecl, instanceToIfaceInst, coreRuleToIfaceRule, 
 
 	-- Equality
 	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
@@ -40,10 +40,9 @@ import IfaceType
 
 import FunDeps		( pprFundeps )
 import NewDemand	( StrictSig, pprIfaceStrictSig )
-import TcType		( deNoteType, tcSplitDFunTy, mkClassPred )
-import Type		( TyThing(..), mkForAllTys, splitForAllTys, funResultTy,
-			  mkPredTy, tidyTopType )
-import InstEnv		( DFunId )
+import TcType		( deNoteType )
+import Type		( TyThing(..), splitForAllTys, funResultTy )
+import InstEnv		( Instance(..), OverlapFlag )
 import Id		( Id, idName, idType, idInfo, idArity, isDataConWorkId_maybe, isFCallId_maybe )
 import NewDemand	( isTopSig )
 import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
@@ -51,7 +50,7 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  workerInfo, unfoldingInfo, inlinePragInfo )
 import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCon,
 			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
-			  isTupleTyCon, tupleTyConBoxity,
+			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
 			  tyConHasGenerics, tyConArgVrcs, getSynTyConDefn,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
@@ -60,7 +59,8 @@ import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
 import OccName		( OccName, OccEnv, emptyOccEnv, 
 			  lookupOccEnv, extendOccEnv, parenSymOcc,
 			  OccSet, unionOccSets, unitOccSet )
-import Name		( Name, NamedThing(..), nameOccName, isExternalName )
+import Name		( Name, NamedThing(..), nameOccName, isExternalName,
+			  wiredInNameTyThing_maybe )
 import NameSet		( NameSet, elemNameSet )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
@@ -93,6 +93,7 @@ data IfaceDecl
 
   | IfaceData { ifName     :: OccName,		-- Type constructor
 		ifTyVars   :: [IfaceTvBndr],	-- Type variables
+		ifCtxt	   :: IfaceContext,	-- The "stupid theta"
 		ifCons	   :: IfaceConDecls,	-- Includes new/data info
 	        ifRec	   :: RecFlag,		-- Recursive or not?
 		ifVrcs     :: ArgVrcs,
@@ -126,15 +127,13 @@ data IfaceClassOp = IfaceClassOp OccName DefMeth IfaceType
 
 data IfaceConDecls
   = IfAbstractTyCon		-- No info
-  | IfDataTyCon 		-- data type decls
-	(Maybe IfaceContext) 	-- See TyCon.AlgTyConRhs; H98 or GADT
-	[IfaceConDecl]
+  | IfDataTyCon [IfaceConDecl]	-- data type decls
   | IfNewTyCon  IfaceConDecl	-- newtype decls
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
-visibleIfConDecls IfAbstractTyCon    = []
-visibleIfConDecls (IfDataTyCon _ cs) = cs
-visibleIfConDecls (IfNewTyCon c)     = [c]
+visibleIfConDecls IfAbstractTyCon  = []
+visibleIfConDecls (IfDataTyCon cs) = cs
+visibleIfConDecls (IfNewTyCon c)   = [c]
 
 data IfaceConDecl 
   = IfVanillaCon {
@@ -151,9 +150,12 @@ data IfaceConDecl
 	ifConResTys  :: [IfaceType],		-- Result type args
 	ifConStricts :: [StrictnessMark] }	-- Empty (meaning all lazy), or 1-1 corresp with arg types
 			
-data IfaceInst = IfaceInst { ifInstHead :: IfaceType,	-- Just the instance head type, quantified
-							-- so that it'll compare alpha-wise
-			     ifDFun  :: OccName }	-- And the dfun
+data IfaceInst 
+  = IfaceInst { ifInstCls  :: IfaceExtName,		-- See comments with
+		ifInstTys  :: [Maybe IfaceTyCon],	-- the defn of Instance
+		ifDFun     :: OccName, 			-- The dfun
+		ifOFlag    :: OverlapFlag,		-- Overlap flag
+		ifInstOrph :: Maybe OccName }		-- See is_orph in defn of Instance
 	-- There's always a separate IfaceDecl for the DFun, which gives 
 	-- its IdInfo with its full type and version number.
 	-- The instance declarations taken together have a version number,
@@ -165,13 +167,12 @@ data IfaceRule
   = IfaceRule { 
 	ifRuleName   :: RuleName,
 	ifActivation :: Activation,
-	ifRuleBndrs  :: [IfaceBndr],		-- Tyvars and term vars
-	ifRuleHead   :: IfaceExtName,		-- Head of lhs
-	ifRuleArgs   :: [IfaceExpr],		-- Args of LHS
-	ifRuleRhs    :: IfaceExpr	
+	ifRuleBndrs  :: [IfaceBndr],	-- Tyvars and term vars
+	ifRuleHead   :: IfaceExtName,	-- Head of lhs
+	ifRuleArgs   :: [IfaceExpr],	-- Args of LHS
+	ifRuleRhs    :: IfaceExpr,
+	ifRuleOrph   :: Maybe OccName	-- Just like IfaceInst
     }
-  | IfaceBuiltinRule IfaceExtName CoreRule	-- So that built-in rules can
-						-- wait in the RulePol
 
 data IfaceIdInfo
   = NoInfo			-- When writing interface file without -O
@@ -207,7 +208,6 @@ data IfaceExpr
   | IfaceTuple 	Boxity [IfaceExpr]		-- Saturated; type arguments omitted
   | IfaceLam 	IfaceBndr IfaceExpr
   | IfaceApp 	IfaceExpr IfaceExpr
--- gaw 2004
   | IfaceCase	IfaceExpr OccName IfaceType [IfaceAlt]
   | IfaceLet	IfaceBinding  IfaceExpr
   | IfaceNote	IfaceNote IfaceExpr
@@ -260,18 +260,16 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty, i
        4 (vcat [equals <+> ppr mono_ty,
 		pprVrcs vrcs])
 
-pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen,
+pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 			 ifTyVars = tyvars, ifCons = condecls, 
 			 ifRec = isrec, ifVrcs = vrcs})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
        4 (vcat [pprVrcs vrcs, pprRec isrec, pprGen gen, pp_condecls tycon condecls])
   where
-    (context, pp_nd) 
- 	= case condecls of
-		IfAbstractTyCon        -> ([], ptext SLIT("data"))
-		IfDataTyCon Nothing _  -> ([], ptext SLIT("data"))
-		IfDataTyCon (Just c) _ -> (c, ptext SLIT("data"))
-		IfNewTyCon _  	       -> ([], ptext SLIT("newtype"))
+    pp_nd = case condecls of
+		IfAbstractTyCon -> ptext SLIT("data")
+		IfDataTyCon _   -> ptext SLIT("data")
+		IfNewTyCon _  	-> ptext SLIT("newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifSigs = sigs, ifVrcs = vrcs, ifRec = isrec})
@@ -292,9 +290,9 @@ pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pprIfaceDeclHead context thing tyvars 
   = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), pprIfaceTvBndrs tyvars]
 
-pp_condecls tc IfAbstractTyCon    = ptext SLIT("{- abstract -}")
-pp_condecls tc (IfNewTyCon c)     = equals <+> pprIfaceConDecl tc c
-pp_condecls tc (IfDataTyCon _ cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
+pp_condecls tc IfAbstractTyCon  = ptext SLIT("{- abstract -}")
+pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
+pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
 						     (map (pprIfaceConDecl tc) cs))
 
 pprIfaceConDecl tc (IfVanillaCon { 
@@ -322,19 +320,23 @@ pprIfaceConDecl tc (IfGadtCon {
 	-- Gruesome, but jsut for debug print
 
 instance Outputable IfaceRule where
-  ppr (IfaceRule name act bndrs fn args rhs) 
+  ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
+		   ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs }) 
     = sep [hsep [doubleQuotes (ftext name), ppr act,
 		 ptext SLIT("forall") <+> pprIfaceBndrs bndrs],
 	   nest 2 (sep [ppr fn <+> sep (map (pprIfaceExpr parens) args),
 		        ptext SLIT("=") <+> ppr rhs])
       ]
-  ppr (IfaceBuiltinRule name rule)
-    = ptext SLIT("Built-in rule for") <+> ppr name
 
 instance Outputable IfaceInst where
-  ppr (IfaceInst {ifDFun = dfun_id, ifInstHead = ty})
-    = hang (ptext SLIT("instance") <+> ppr ty)
+  ppr (IfaceInst {ifDFun = dfun_id, ifOFlag = flag, 
+		  ifInstCls = cls, ifInstTys = mb_tcs})
+    = hang (ptext SLIT("instance") <+> ppr flag 
+		<+> ppr cls <+> brackets (pprWithCommas ppr_mb mb_tcs))
          2 (equals <+> ppr dfun_id)
+    where
+      ppr_mb Nothing   = dot
+      ppr_mb (Just tc) = ppr tc
 \end{code}
 
 
@@ -415,9 +417,10 @@ instance Outputable IfaceNote where
     ppr (IfaceCoreNote s) = ptext SLIT("__core_note") <+> pprHsString (mkFastString s)
 
 instance Outputable IfaceConAlt where
-    ppr IfaceDefault	      = text "DEFAULT"
-    ppr (IfaceLitAlt l)       = ppr l
-    ppr (IfaceDataAlt d)      = ppr d
+    ppr IfaceDefault	  = text "DEFAULT"
+    ppr (IfaceLitAlt l)   = ppr l
+    ppr (IfaceDataAlt d)  = ppr d
+    ppr (IfaceTupleAlt b) = panic "ppr IfaceConAlt" 
 	-- IfaceTupleAlt is handled by the case-alternative printer
 
 ------------------
@@ -442,22 +445,21 @@ ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
 
 		 
 \begin{code}
-tyThingToIfaceDecl :: Bool 
-		   -> NameSet		-- Tycons and classes to export abstractly
-		   -> (Name -> IfaceExtName) -> TyThing -> IfaceDecl
+tyThingToIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
 -- Assumption: the thing is already tidied, so that locally-bound names
 -- 	       (lambdas, for-alls) already have non-clashing OccNames
 -- Reason: Iface stuff uses OccNames, and the conversion here does
 --	   not do tidying on the way
-tyThingToIfaceDecl discard_id_info _ ext (AnId id)
+tyThingToIfaceDecl ext (AnId id)
   = IfaceId { ifName   = getOccName id, 
 	      ifType   = toIfaceType ext (idType id),
 	      ifIdInfo = info }
   where
-    info | discard_id_info = NoInfo
-	 | otherwise	   = HasInfo (toIfaceIdInfo ext (idInfo id))
+    info = case toIfaceIdInfo ext (idInfo id) of
+		[]    -> NoInfo
+		items -> HasInfo items
 
-tyThingToIfaceDecl _ _ ext (AClass clas)
+tyThingToIfaceDecl ext (AClass clas)
   = IfaceClass { ifCtxt	  = toIfaceContext ext sc_theta,
 		 ifName	  = getOccName clas,
 		 ifTyVars = toIfaceTvBndrs clas_tyvars,
@@ -483,7 +485,7 @@ tyThingToIfaceDecl _ _ ext (AClass clas)
 
     toIfaceFD (tvs1, tvs2) = (map getOccName tvs1, map getOccName tvs2)
 
-tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
+tyThingToIfaceDecl ext (ATyCon tycon)
   | isSynTyCon tycon
   = IfaceSyn {	ifName   = getOccName tycon,
 		ifTyVars = toIfaceTvBndrs tyvars,
@@ -493,6 +495,7 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
   | isAlgTyCon tycon
   = IfaceData {	ifName    = getOccName tycon,
 		ifTyVars  = toIfaceTvBndrs tyvars,
+		ifCtxt    = toIfaceContext ext (tyConStupidTheta tycon),
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifVrcs    = tyConArgVrcs tycon,
@@ -504,32 +507,26 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
 
   | isPrimTyCon tycon || isFunTyCon tycon
 	-- Needed in GHCi for ':info Int#', for example
-  = IfaceData { ifName   = getOccName tycon,
-	  	ifTyVars = toIfaceTvBndrs (take (tyConArity tycon) alphaTyVars),
-		ifCons   = IfAbstractTyCon,
-		ifGeneric  = False,
-		ifRec      = NonRecursive,
-		ifVrcs     = tyConArgVrcs tycon }
+  = IfaceData { ifName    = getOccName tycon,
+	  	ifTyVars  = toIfaceTvBndrs (take (tyConArity tycon) alphaTyVars),
+		ifCtxt	  = [],
+		ifCons    = IfAbstractTyCon,
+		ifGeneric = False,
+		ifRec     = NonRecursive,
+		ifVrcs    = tyConArgVrcs tycon }
 
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
     tyvars      = tyConTyVars tycon
     (_, syn_ty) = getSynTyConDefn tycon
-    abstract    = getName tycon `elemNameSet` abstract_tcs
 
-    ifaceConDecls _ | abstract       = IfAbstractTyCon
-    ifaceConDecls (NewTyCon con _ _) = IfNewTyCon (ifaceConDecl con)
-    ifaceConDecls (DataTyCon mb_theta cons _) = IfDataTyCon (ifaceDataCtxt mb_theta)
-							    (map ifaceConDecl cons)
+    ifaceConDecls (NewTyCon con _ _) = IfNewTyCon  (ifaceConDecl con)
+    ifaceConDecls (DataTyCon cons _) = IfDataTyCon (map ifaceConDecl cons)
     ifaceConDecls AbstractTyCon	     = IfAbstractTyCon
-	-- The last case should never happen when we are generating an
-	-- interface file (we're exporting this thing, so it's locally defined 
-	-- and should not be abstract).  But tyThingToIfaceDecl is also used
+	-- The last case happens when a TyCon has been trimmed during tidying
+	-- Furthermore, tyThingToIfaceDecl is also used
 	-- in TcRnDriver for GHCi, when browsing a module, in which case the
 	-- AbstractTyCon case is perfectly sensible.
-
-    ifaceDataCtxt Nothing      = Nothing
-    ifaceDataCtxt (Just theta) = Just (toIfaceContext ext theta)
 
     ifaceConDecl data_con 
 	| isVanillaDataCon data_con
@@ -550,33 +547,26 @@ tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
           field_labels = dataConFieldLabels data_con
           strict_marks = dataConStrictMarks data_con
 
-tyThingToIfaceDecl dis abstr ext (ADataCon dc)
- = pprPanic "toIfaceDecl" (ppr dc)
+tyThingToIfaceDecl ext (ADataCon dc)
+ = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
 
 
 --------------------------
-dfunToIfaceInst :: (Name -> IfaceExtName) -> DFunId -> IfaceInst
-dfunToIfaceInst ext_lhs dfun_id
-  = IfaceInst { ifDFun     = nameOccName dfun_name, 
-		ifInstHead = toIfaceType ext_lhs tidy_ty }
+instanceToIfaceInst :: (Name -> IfaceExtName) -> Instance -> IfaceInst
+instanceToIfaceInst ext_lhs ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
+					      is_cls = cls, is_tcs = mb_tcs, 
+					      is_orph = orph })
+  = IfaceInst { ifDFun    = getOccName dfun_id, 
+		ifOFlag   = oflag,
+		ifInstCls = ext_lhs cls,
+		ifInstTys = map do_rough mb_tcs,
+		ifInstOrph = orph }
   where
-    dfun_name = idName dfun_id
-    (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
-    head_ty = mkForAllTys tvs (mkPredTy (mkClassPred cls tys))
-	-- No need to record the instance context; 
-	-- it's in the dfun anyway
-
-    tidy_ty = tidyTopType (deNoteType head_ty)
-		-- The deNoteType is very important.   It removes all type
-		-- synonyms from the instance type in interface files.
-		-- That in turn makes sure that when reading in instance decls
-		-- from interface files that the 'gating' mechanism works properly.
-		-- Otherwise you could have
-		--	type Tibble = T Int
-		--	instance Foo Tibble where ...
-		-- and this instance decl wouldn't get imported into a module
-		-- that mentioned T but not Tibble.
-
+    do_rough Nothing = Nothing
+    do_rough (Just n) | Just (ATyCon tc) <- wiredInNameTyThing_maybe n
+		      = Just (toIfaceTyCon ext_lhs tc)
+		      | otherwise   
+		      = Just (IfaceTc (ext_lhs n))
 
 --------------------------
 toIfaceIdInfo :: (Name -> IfaceExtName) -> IdInfo -> [IfaceInfoItem]
@@ -621,20 +611,33 @@ toIfaceIdInfo ext id_info
 --------------------------
 coreRuleToIfaceRule :: (Name -> IfaceExtName) 	-- For the LHS names
 		    -> (Name -> IfaceExtName) 	-- For the RHS names
-		    -> IdCoreRule -> IfaceRule
-coreRuleToIfaceRule ext_lhs ext_rhs (IdCoreRule id _ (BuiltinRule _ _))
-  = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule (mkIfaceExtName (getName id)))
+		    -> CoreRule -> IfaceRule
+coreRuleToIfaceRule ext_lhs ext_rhs (BuiltinRule { ru_fn = fn})
+  = pprTrace "toHsRule: builtin" (ppr fn) $
+    bogusIfaceRule (mkIfaceExtName fn)
 
-coreRuleToIfaceRule ext_lhs ext_rhs (IdCoreRule id _ (Rule name act bndrs args rhs))
+coreRuleToIfaceRule ext_lhs ext_rhs
+    (Rule { ru_name = name, ru_fn = fn, ru_act = act, ru_bndrs = bndrs,
+	    ru_args = args, ru_rhs = rhs, ru_orph = orph })
   = IfaceRule { ifRuleName  = name, ifActivation = act, 
 		ifRuleBndrs = map (toIfaceBndr ext_lhs) bndrs,
-		ifRuleHead  = ext_lhs (idName id), 
-		ifRuleArgs  = map (toIfaceExpr ext_lhs) args,
-		ifRuleRhs = toIfaceExpr ext_rhs rhs }
+		ifRuleHead  = ext_lhs fn, 
+		ifRuleArgs  = map do_arg args,
+		ifRuleRhs   = toIfaceExpr ext_rhs rhs,
+		ifRuleOrph  = orph }
+  where
+	-- For type args we must remove synonyms from the outermost
+	-- level.  Reason: so that when we read it back in we'll
+	-- construct the same ru_rough field as we have right now;
+	-- see tcIfaceRule
+    do_arg (Type ty) = IfaceType (toIfaceType ext_lhs (deNoteType ty))
+    do_arg arg       = toIfaceExpr ext_lhs arg
 
 bogusIfaceRule :: IfaceExtName -> IfaceRule
 bogusIfaceRule id_name
-  = IfaceRule FSLIT("bogus") NeverActive [] id_name [] (IfaceExt id_name)
+  = IfaceRule { ifRuleName = FSLIT("bogus"), ifActivation = NeverActive,  
+	ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [], 
+	ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing }
 
 ---------------------
 toIfaceExpr :: (Name -> IfaceExtName) -> CoreExpr -> IfaceExpr
@@ -763,7 +766,8 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	  ifVrcs d1    == ifVrcs   d2 && 
 	  ifGeneric d1 == ifGeneric d2) &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
-	    eq_hsCD env (ifCons d1) (ifCons d2) 
+	    eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
+    	    eq_hsCD env (ifCons d1) (ifCons d2) 
 	)
 	-- The type variables of the data type do not scope
 	-- over the constructors (any more), but they do scope
@@ -792,23 +796,20 @@ eqWith :: [IfaceTvBndr] -> [IfaceTvBndr] -> (EqEnv -> IfaceEq) -> IfaceEq
 eqWith = eq_ifTvBndrs emptyEqEnv
 
 -----------------------
-eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2) &&&
-		 zapEq (ifInstHead d1 `eqIfType` ifInstHead d2)
-		-- zapEq: for instances, ignore the EqBut part
+eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2)
+-- All other changes are handled via the version info on the dfun
 
-eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1)
-	 (IfaceRule n2 a2 bs2 f2 es2 rhs2)
-       = bool (n1==n2 && a1==a2) &&&
+eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1 o1)
+	 (IfaceRule n2 a2 bs2 f2 es2 rhs2 o2)
+       = bool (n1==n2 && a1==a2 && o1 == o2) &&&
 	 f1 `eqIfExt` f2 &&&
          eq_ifBndrs emptyEqEnv bs1 bs2 (\env -> 
 	 zapEq (eqListBy (eq_ifaceExpr env) es1 es2) &&&
 		-- zapEq: for the LHSs, ignore the EqBut part
          eq_ifaceExpr env rhs1 rhs2)
-eqIfRule _ _ = NotEqual
 
-eq_hsCD env (IfDataTyCon st1 c1) (IfDataTyCon st2 c2) 
-  = eqMaybeBy (eq_ifContext env) st1 st2 &&& 
-    eqListBy (eq_ConDecl env) c1 c2
+eq_hsCD env (IfDataTyCon c1) (IfDataTyCon c2) 
+  = eqListBy (eq_ConDecl env) c1 c2
 
 eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
 eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal

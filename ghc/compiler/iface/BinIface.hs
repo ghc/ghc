@@ -14,6 +14,7 @@ import BasicTypes
 import NewDemand
 import IfaceSyn
 import VarEnv
+import InstEnv		( OverlapFlag(..) )
 import Packages		( PackageIdH(..) )
 import Class		( DefMeth(..) )
 import CostCentre
@@ -635,17 +636,25 @@ instance Binary IfaceType where
 
 instance Binary IfaceTyCon where
 	-- Int,Char,Bool can't show up here because they can't not be saturated
-   put_ bh IfaceListTc = putByte bh 1
-   put_ bh IfacePArrTc = putByte bh 2
-   put_ bh (IfaceTupTc bx ar) = do { putByte bh 3; put_ bh bx; put_ bh ar }
-   put_ bh tc = pprPanic "BinIface.put:" (ppr tc)	-- Dealt with by the IfaceType instance
+
+   put_ bh IfaceIntTc  	      = putByte bh 1
+   put_ bh IfaceBoolTc 	      = putByte bh 2
+   put_ bh IfaceCharTc 	      = putByte bh 3
+   put_ bh IfaceListTc 	      = putByte bh 4
+   put_ bh IfacePArrTc 	      = putByte bh 5
+   put_ bh (IfaceTupTc bx ar) = do { putByte bh 6; put_ bh bx; put_ bh ar }
+   put_ bh (IfaceTc ext)      = do { putByte bh 7; put_ bh ext }
 
    get bh = do
 	h <- getByte bh
 	case h of
-	  1 -> return IfaceListTc
-	  2 -> return IfacePArrTc
-	  _ -> do { bx <- get bh; ar <- get bh; return (IfaceTupTc bx ar) }
+	  1 -> return IfaceIntTc
+	  2 -> return IfaceBoolTc
+	  3 -> return IfaceCharTc
+	  4 -> return IfaceListTc
+	  5 -> return IfacePArrTc
+	  6 -> do { bx <- get bh; ar <- get bh; return (IfaceTupTc bx ar) }
+	  _ -> do { ext <- get bh; return (IfaceTc ext) }
 
 instance Binary IfacePredType where
     put_ bh (IfaceClassP aa ab) = do
@@ -796,13 +805,13 @@ instance Binary IfaceIdInfo where
     put_ bh NoInfo = putByte bh 0
     put_ bh (HasInfo i) = do
 	    putByte bh 1
-	    lazyPut bh i
+	    lazyPut bh i			-- NB lazyPut
 
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> return NoInfo
-	      _ -> do info <- lazyGet bh
+	      _ -> do info <- lazyGet bh	-- NB lazyGet
 		      return (HasInfo info)
 
 instance Binary IfaceInfoItem where
@@ -876,7 +885,7 @@ instance Binary IfaceDecl where
 	    put_ bh idinfo
     put_ bh (IfaceForeign ae af) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 2
 	    put_ bh a1
 	    put_ bh a2
@@ -884,6 +893,7 @@ instance Binary IfaceDecl where
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
+	    put_ bh a7
 
     put_ bh (IfaceSyn aq ar as at) = do
 	    putByte bh 3
@@ -915,7 +925,8 @@ instance Binary IfaceDecl where
 		    a4 <- get bh
 		    a5 <- get bh
 		    a6 <- get bh
-		    return (IfaceData a1 a2 a3 a4 a5 a6)
+		    a7 <- get bh
+		    return (IfaceData a1 a2 a3 a4 a5 a6 a7)
 	      3 -> do
 		    aq <- get bh
 		    ar <- get bh
@@ -933,27 +944,41 @@ instance Binary IfaceDecl where
 		    return (IfaceClass a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceInst where
-    put_ bh (IfaceInst ty dfun) = do
-	    put_ bh ty
+    put_ bh (IfaceInst cls tys dfun flag orph) = do
+	    put_ bh cls
+	    put_ bh tys
 	    put_ bh dfun
-    get bh = do ty   <- get bh
+	    put_ bh flag
+	    put_ bh orph
+    get bh = do cls  <- get bh
+		tys  <- get bh
 		dfun <- get bh
-		return (IfaceInst ty dfun)
+		flag <- get bh
+		orph <- get bh
+		return (IfaceInst cls tys dfun flag orph)
+
+instance Binary OverlapFlag where
+    put_ bh NoOverlap  = putByte bh 0
+    put_ bh OverlapOk  = putByte bh 1
+    put_ bh Incoherent = putByte bh 2
+    get bh = do h <- getByte bh
+		case h of
+		  0 -> return NoOverlap
+		  1 -> return OverlapOk
+		  2 -> return Incoherent
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon = putByte bh 0
-    put_ bh (IfDataTyCon st cs) = do { putByte bh 1
-				     ; put_ bh st
-				     ; put_ bh cs }
+    put_ bh (IfDataTyCon cs) = do { putByte bh 1
+				  ; put_ bh cs }
     put_ bh (IfNewTyCon c)  = do { putByte bh 2
 				  ; put_ bh c }
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> return IfAbstractTyCon
-	      1 -> do st <- get bh
-		      cs <- get bh
-		      return (IfDataTyCon st cs)
+	      1 -> do cs <- get bh
+		      return (IfDataTyCon cs)
 	      _ -> do aa <- get bh
 		      return (IfNewTyCon aa)
 
@@ -1002,14 +1027,14 @@ instance Binary IfaceClassOp where
 	return (IfaceClassOp n def ty)
 
 instance Binary IfaceRule where
-	-- IfaceBuiltinRule should not happen here
-    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7) = do
 	    put_ bh a1
 	    put_ bh a2
 	    put_ bh a3
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
+	    put_ bh a7
     get bh = do
 	    a1 <- get bh
 	    a2 <- get bh
@@ -1017,6 +1042,7 @@ instance Binary IfaceRule where
 	    a4 <- get bh
 	    a5 <- get bh
 	    a6 <- get bh
-	    return (IfaceRule a1 a2 a3 a4 a5 a6)
+	    a7 <- get bh
+	    return (IfaceRule a1 a2 a3 a4 a5 a6 a7)
 
 

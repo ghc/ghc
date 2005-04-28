@@ -24,10 +24,10 @@ import VarEnv
 import CoreSyn
 import CoreUtils	( applyTypeToArgs, mkPiTypes )
 import CoreFVs		( exprFreeVars, exprsFreeVars )
-import CoreTidy		( pprTidyIdRules )
+import CoreTidy		( tidyRules )
 import CoreLint		( showPass, endPass )
-import Rules		( addIdSpecialisations, lookupRule, emptyRuleBase )
-
+import Rules		( addIdSpecialisations, mkLocalRule, lookupRule, emptyRuleBase, rulesOfBinds )
+import PprCore		( pprRules )
 import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, returnUs, getUniqueUs, 
 			  getUs, mapUs
@@ -586,7 +586,7 @@ specProgram dflags us binds
 	endPass dflags "Specialise" Opt_D_dump_spec binds'
 
 	dumpIfSet_dyn dflags Opt_D_dump_rules "Top-level specialisations"
-		  (vcat (map pprTidyIdRules (concat (map bindersOf binds'))))
+		  (pprRules (tidyRules emptyTidyEnv (rulesOfBinds binds')))
 
 	return binds'
   where
@@ -888,8 +888,8 @@ specDefn subst calls (fn, rhs)
 	let
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
-           spec_env_rule = Rule (mkFastString ("SPEC " ++ showSDoc (ppr fn)))
-				AlwaysActive
+           spec_env_rule = mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr fn)))
+				AlwaysActive (idName fn)
 			        (poly_tyvars ++ rhs_dicts')
 				inst_args 
 				(mkVarApps (Var spec_f) app_args)

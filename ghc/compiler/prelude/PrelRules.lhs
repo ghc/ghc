@@ -31,7 +31,6 @@ import Literal		( Literal(..), mkMachInt, mkMachWord
 			, float2DoubleLit, double2FloatLit
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
--- gaw 2004
 import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
@@ -56,14 +55,19 @@ import DATA_WORD	( Word64 )
 
 
 \begin{code}
-primOpRules :: PrimOp -> [CoreRule]
-primOpRules op = primop_rule op
+primOpRules :: PrimOp -> Name -> [CoreRule]
+primOpRules op op_name = primop_rule op
   where
-    op_name = mkFastString (occNameUserString (primOpOcc op))
-    op_name_case = op_name `appendFS` FSLIT("->case")
+    rule_name = mkFastString (occNameUserString (primOpOcc op))
+    rule_name_case = rule_name `appendFS` FSLIT("->case")
 
 	-- A useful shorthand
-    one_rule rule_fn = [BuiltinRule op_name rule_fn]
+    one_rule rule_fn = [BuiltinRule { ru_name = rule_name, 
+				      ru_fn = op_name, 
+				      ru_try = rule_fn }]
+    case_rule rule_fn = [BuiltinRule { ru_name = rule_name_case, 
+				       ru_fn = op_name, 
+				       ru_try = rule_fn }]
 
     -- ToDo:	something for integer-shift ops?
     --		NotOp
@@ -127,10 +131,10 @@ primOpRules op = primop_rule op
     primop_rule DoubleNegOp   = one_rule (oneLit  negOp)
 
 	-- Relational operators
-    primop_rule IntEqOp  = [BuiltinRule op_name (relop (==)), BuiltinRule op_name_case (litEq True)]
-    primop_rule IntNeOp  = [BuiltinRule op_name (relop (/=)), BuiltinRule op_name_case (litEq False)]
-    primop_rule CharEqOp = [BuiltinRule op_name (relop (==)), BuiltinRule op_name_case (litEq True)]
-    primop_rule CharNeOp = [BuiltinRule op_name (relop (/=)), BuiltinRule op_name_case (litEq False)]
+    primop_rule IntEqOp  = one_rule (relop (==)) ++ case_rule (litEq True)
+    primop_rule IntNeOp  = one_rule (relop (/=)) ++ case_rule (litEq False)
+    primop_rule CharEqOp = one_rule (relop (==)) ++ case_rule (litEq True)
+    primop_rule CharNeOp = one_rule (relop (/=)) ++ case_rule (litEq False)
 
     primop_rule IntGtOp		= one_rule (relop (>))
     primop_rule IntGeOp		= one_rule (relop (>=))
@@ -401,11 +405,11 @@ dataToTagRule other = Nothing
 %************************************************************************
 
 \begin{code}
-builtinRules :: [(Name, CoreRule)]
+builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ (unpackCStringFoldrName, BuiltinRule FSLIT("AppendLitString") match_append_lit),
-      (eqStringName,	       BuiltinRule FSLIT("EqString") match_eq_string)
+  = [ BuiltinRule FSLIT("AppendLitString") unpackCStringFoldrName match_append_lit,
+      BuiltinRule FSLIT("EqString") eqStringName match_eq_string
     ]
 
 

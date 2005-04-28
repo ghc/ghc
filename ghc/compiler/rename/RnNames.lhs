@@ -606,6 +606,7 @@ filterAvail (IEThingWith _ rdrs) n subs
   where
     env = mkOccEnv [(nameOccName s, s) | s <- subNames subs n]
     mb_names = map (lookupOccEnv env . rdrNameOcc) rdrs
+filterAvail (IEModuleContents _) _ _ = panic "filterAvail"
 
 subNames :: NameEnv [Name] -> Name -> [Name]
 subNames env n = lookupNameEnv env n `orElse` []
@@ -874,6 +875,8 @@ warnDuplicateImports gres
     warn (GRE { gre_name = name, gre_prov = Imported imps _ })
 	= addWarn ((quotes (ppr name) <+> ptext SLIT("is imported more than once:")) 
 	       $$ nest 2 (vcat (map ppr imps)))
+    warn gre = panic "warnDuplicateImports"
+	-- The GREs should all have Imported provenance
 			      
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses

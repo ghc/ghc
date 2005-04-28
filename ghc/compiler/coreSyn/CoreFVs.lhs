@@ -9,9 +9,11 @@ module CoreFVs (
 	exprsFreeVars,	-- [CoreExpr] -> VarSet
 
 	exprSomeFreeVars, exprsSomeFreeVars,
+	exprFreeNames, exprsFreeNames,
 
-	idRuleVars, idFreeVars, idFreeTyVars,
-	ruleRhsFreeVars, ruleLhsFreeNames, ruleLhsFreeIds, 
+	idRuleVars, idFreeVars, idFreeTyVars, 
+	ruleRhsFreeVars, rulesRhsFreeVars,
+	ruleLhsFreeNames, ruleLhsFreeIds, 
 
 	CoreExprWithFVs,	-- = AnnExpr Id VarSet
 	CoreBindWithFVs,	-- = AnnBind Id VarSet
@@ -22,8 +24,11 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idType, idSpecialisation )
+import Id		( Id, idType, idSpecialisation, isLocalId )
+import IdInfo		( specInfoFreeVars )
 import NameSet
+import UniqFM		( delFromUFM )
+import Name		( isExternalName )
 import VarSet
 import Var		( Var, isId, isLocalVar, varName )
 import Type		( tyVarsOfType )
@@ -70,8 +75,8 @@ type InterestingVarFun = Var -> Bool	-- True <=> interesting
 
 \begin{code}
 type FV = InterestingVarFun 
-	  -> VarSet		-- In scope
-	  -> VarSet		-- Free vars
+	-> VarSet		-- In scope
+	-> VarSet		-- Free vars
 
 union :: FV -> FV -> FV
 union fv1 fv2 fv_cand in_scope = fv1 fv_cand in_scope `unionVarSet` fv2 fv_cand in_scope
@@ -127,7 +132,6 @@ expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
 
--- gaw 2004
 expr_fvs (Case scrut bndr ty alts)
   = expr_fvs scrut `union` someVars (tyVarsOfType ty) `union` addBndr bndr  
       (foldr (union . alt_fvs) noVars alts)
@@ -141,6 +145,9 @@ expr_fvs (Let (Rec pairs) body)
   = addBndrs bndrs (foldr (union . expr_fvs) (expr_fvs body) rhss)
   where
     (bndrs,rhss) = unzip pairs
+
+---------
+exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
 \end{code}
 
 
@@ -150,7 +157,7 @@ expr_fvs (Let (Rec pairs) body)
 %*									*
 %************************************************************************
 
-exprFreeNames finds the free *names* of an expression, notably
+exprFreeNames finds the free *external* *names* of an expression, notably
 including the names of type constructors (which of course do not show
 up in exprFreeVars).  Similarly ruleLhsFreeNames.  The latter is used
 when deciding whether a rule is an orphan.  In particular, suppose that
@@ -159,40 +166,37 @@ T is defined in this module; we want to avoid declaring that a rule like
 is an orphan.  Of course it isn't, an declaring it an orphan would
 make the whole module an orphan module, which is bad.
 
+There's no need to delete local binders, because they will all
+be *internal* names.
+
 \begin{code}
-ruleLhsFreeNames :: IdCoreRule -> NameSet
-ruleLhsFreeNames (IdCoreRule fn _ (BuiltinRule _ _)) = unitNameSet (varName fn)
-ruleLhsFreeNames (IdCoreRule fn _ (Rule _ _ tpl_vars tpl_args rhs))
-  = addOneToNameSet (exprsFreeNames tpl_args `del_binders` tpl_vars) (varName fn)
+ruleLhsFreeNames :: CoreRule -> NameSet
+ruleLhsFreeNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
+ruleLhsFreeNames (Rule { ru_fn = fn, ru_bndrs = tpl_vars, ru_args = tpl_args })
+  = addOneToNameSet (exprsFreeNames tpl_args) fn
 
 exprFreeNames :: CoreExpr -> NameSet
-exprFreeNames (Var v) 	  = unitNameSet (varName v)
-exprFreeNames (Lit _) 	  = emptyNameSet
-exprFreeNames (Type ty)   = tyClsNamesOfType ty	-- Don't need free tyvars
-exprFreeNames (App e1 e2) = exprFreeNames e1 `unionNameSets` exprFreeNames e2
-exprFreeNames (Lam v e)   = exprFreeNames e `delFromNameSet` varName v
-exprFreeNames (Note n e)  = exprFreeNames e
+-- Find the free *external* names of an expression
+exprFreeNames e
+  = go e
+  where
+    go (Var v) 
+      | isExternalName n    = unitNameSet n
+      | otherwise	    = emptyNameSet
+      where n = varName v
+    go (Lit _) 	   	    = emptyNameSet
+    go (Type ty)   	    = tyClsNamesOfType ty	-- Don't need free tyvars
+    go (App e1 e2) 	    = go e1 `unionNameSets` go e2
+    go (Lam v e)   	    = go e `delFromNameSet` varName v
+    go (Note n e)  	    = go e   
+    go (Let (NonRec b r) e) = go e `unionNameSets` go r
+    go (Let (Rec prs) e)    = exprsFreeNames (map snd prs) `unionNameSets` go e
+    go (Case e b ty as)     = go e `unionNameSets` tyClsNamesOfType ty 
+                              `unionNameSets` unionManyNameSets (map go_alt as)
 
-exprFreeNames (Let (NonRec b r) e) = (exprFreeNames e `delFromNameSet` varName b)
-				     `unionNameSets` exprFreeNames r
-
-exprFreeNames (Let (Rec prs) e) = (exprsFreeNames rs `unionNameSets` exprFreeNames e)
-				  `del_binders` bs
-				where
-				  (bs, rs) = unzip prs
-
--- gaw 2004
-exprFreeNames (Case e b ty as) = exprFreeNames e `unionNameSets` tyClsNamesOfType ty 
-                                 `unionNameSets`
-			         (unionManyNameSets (map altFreeNames as) `delFromNameSet` varName b)
-
--- Helpers
-altFreeNames (_,bs,r) = exprFreeNames r `del_binders` bs
+    go_alt (_,_,r) = go r
 
 exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
-
-del_binders :: NameSet -> [Var] -> NameSet
-del_binders names bndrs = foldl (\s b -> delFromNameSet s (varName b)) names bndrs
 \end{code}
 
 %************************************************************************
@@ -204,17 +208,26 @@ del_binders names bndrs = foldl (\s b -> delFromNameSet s (varName b)) names bnd
 
 \begin{code}
 ruleRhsFreeVars :: CoreRule -> VarSet
-ruleRhsFreeVars (BuiltinRule _ _) = noFVs
-ruleRhsFreeVars (Rule str _ tpl_vars tpl_args rhs)
-  = rule_fvs isLocalVar emptyVarSet
+ruleRhsFreeVars (BuiltinRule {}) = noFVs
+ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
+  = delFromUFM fvs fn
+	-- Hack alert!
+	-- Don't include the Id in its own rhs free-var set.
+	-- Otherwise the occurrence analyser makes bindings recursive
+	-- that shoudn't be.  E.g.
+	--	RULE:  f (f x y) z  ==>  f x (f y z)
   where
-    rule_fvs = addBndrs tpl_vars (expr_fvs rhs)
+    fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
+
+rulesRhsFreeVars :: [CoreRule] -> VarSet
+rulesRhsFreeVars rules
+  = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet rules
 
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- This finds all locally-defined free Ids on the LHS of the rule
-ruleLhsFreeIds (BuiltinRule _ _) = noFVs
-ruleLhsFreeIds (Rule _ _ tpl_vars tpl_args rhs)
-  = foldl delVarSet (exprsFreeVars tpl_args) tpl_vars
+ruleLhsFreeIds (BuiltinRule {}) = noFVs
+ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
+  = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
 \end{code}
 
 
@@ -288,7 +301,7 @@ idFreeTyVars id = tyVarsOfType (idType id)
 --  | otherwise    = emptyVarSet
 
 idRuleVars ::Id -> VarSet
-idRuleVars id = ASSERT( isId id) rulesRhsFreeVars (idSpecialisation id)
+idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
 \end{code}
 
 

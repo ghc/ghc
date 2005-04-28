@@ -79,7 +79,7 @@ module Id (
 #include "HsVersions.h"
 
 
-import CoreSyn		( Unfolding, CoreRules, IdCoreRule(..), rulesRules )
+import CoreSyn		( Unfolding, CoreRule )
 import BasicTypes	( Arity )
 import Var		( Id, DictId,
 			  isId, isExportedId, isSpecPragmaId, isLocalId,
@@ -403,13 +403,13 @@ setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` Just dmd) id
 
 	---------------------------------
 	-- SPECIALISATION
-idSpecialisation :: Id -> CoreRules
+idSpecialisation :: Id -> SpecInfo
 idSpecialisation id = specInfo (idInfo id)
 
-idCoreRules :: Id -> [IdCoreRule]
-idCoreRules id = [IdCoreRule id False rule | rule <- rulesRules (idSpecialisation id)]
+idCoreRules :: Id -> [CoreRule]
+idCoreRules id = specInfoRules (idSpecialisation id)
 
-setIdSpecialisation :: Id -> CoreRules -> Id
+setIdSpecialisation :: Id -> SpecInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
 
 	---------------------------------

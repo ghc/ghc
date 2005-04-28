@@ -562,7 +562,7 @@ showDecl exts want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs =
        2 (equals <+> ppr mono_ty)
 
 showDecl exts want_name (IfaceData {ifName = tycon, 
-		     ifTyVars = tyvars, ifCons = condecls})
+		     ifTyVars = tyvars, ifCons = condecls, ifCtxt = context})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
        2 (add_bars (ppr_trim show_con cs))
   where
@@ -593,11 +593,10 @@ showDecl exts want_name (IfaceData {ifName = tycon,
 			      = Just (ppr_bndr fld <+> dcolon <+> ppr_bangty bty)
 			      | otherwise = Nothing
 
-    (pp_nd, context, cs) = case condecls of
-		    IfAbstractTyCon 	      -> (ptext SLIT("data"), [],   [])
-		    IfDataTyCon (Just cxt) cs -> (ptext SLIT("data"), cxt, cs)
-		    IfDataTyCon Nothing cs    -> (ptext SLIT("data"), [],  cs)
-		    IfNewTyCon c    	      -> (ptext SLIT("newtype"), [], [c])
+    (pp_nd, cs) = case condecls of
+		    IfAbstractTyCon 	   -> (ptext SLIT("data"),   [])
+		    IfDataTyCon cs         -> (ptext SLIT("data"),   cs)
+		    IfNewTyCon c    	   -> (ptext SLIT("newtype"),[c])
 
     add_bars []      = empty
     add_bars [c]     = equals <+> c

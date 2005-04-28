@@ -156,6 +156,7 @@ import Id		( Id, idType, isImplicitId, isDeadBinder,
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon )
 import Class		( Class, classSCTheta, classTvsFds )
 import DataCon		( DataCon )
+import InstEnv		( Instance )
 import Name		( Name, getName, nameModule_maybe )
 import RdrName		( RdrName, gre_name, globalRdrEnvElts )
 import NameEnv		( nameEnvElts )
@@ -1028,7 +1029,7 @@ upsweep_compile hsc_env old_hpt this_mod msg_act summary
   let
 	-- The old interface is ok if it's in the old HPT 
 	--	a) we're compiling a source file, and the old HPT
-	--	entry is for a source file
+	--	   entry is for a source file
 	--	b) we're compiling a hs-boot file
 	-- Case (b) allows an hs-boot file to get the interface of its
 	-- real source file on the second iteration of the compilation

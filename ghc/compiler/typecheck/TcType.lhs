@@ -753,18 +753,9 @@ hoistForAllTys ty
 
 \begin{code}
 deNoteType :: Type -> Type
-	-- Remove synonyms, but not predicate types
-deNoteType ty@(TyVarTy tyvar)	= ty
-deNoteType (TyConApp tycon tys) = TyConApp tycon (map deNoteType tys)
-deNoteType (PredTy p)		= PredTy (deNotePredType p)
-deNoteType (NoteTy _ ty)	= deNoteType ty
-deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
-deNoteType (FunTy fun arg)	= FunTy (deNoteType fun) (deNoteType arg)
-deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
-
-deNotePredType :: PredType -> PredType
-deNotePredType (ClassP c tys)   = ClassP c (map deNoteType tys)
-deNotePredType (IParam n ty)    = IParam n (deNoteType ty)
+-- Remove *outermost* type synonyms and other notes
+deNoteType (NoteTy _ ty) = deNoteType ty
+deNoteType ty		 = ty
 \end{code}
 
 Find the free tycons and classes of a type.  This is used in the front
@@ -776,8 +767,8 @@ tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
 tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (NoteTy (SynNote ty1) ty2) = tyClsNamesOfType ty1
 tyClsNamesOfType (NoteTy other_note    ty2) = tyClsNamesOfType ty2
-tyClsNamesOfType (PredTy (IParam n ty))   = tyClsNamesOfType ty
-tyClsNamesOfType (PredTy (ClassP cl tys)) = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (PredTy (IParam n ty))     = tyClsNamesOfType ty
+tyClsNamesOfType (PredTy (ClassP cl tys))   = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
 tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
 tyClsNamesOfType (ForAllTy tyvar ty)	    = tyClsNamesOfType ty

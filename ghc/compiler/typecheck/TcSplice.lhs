@@ -46,7 +46,7 @@ import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
 import TyCon		( TyCon, AlgTyConRhs(..), tyConTyVars, getSynTyConDefn, 
 			  isSynTyCon, isNewTyCon, tyConDataCons, algTyConRhs, isPrimTyCon, isFunTyCon,
-			  tyConArity, isUnLiftedTyCon )
+			  tyConArity, tyConStupidTheta, isUnLiftedTyCon )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
 			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix, 
 			  isVanillaDataCon )
@@ -569,12 +569,13 @@ reifyTyCon tc
 reifyTyCon tc
   = case algTyConRhs tc of
       NewTyCon data_con _ _ 
-	-> do	{ con <- reifyDataCon data_con
-		; return (TH.TyConI $ TH.NewtypeD [] (reifyName tc) (reifyTyVars (tyConTyVars tc))
+	-> do	{ cxt <- reifyCxt (tyConStupidTheta tc)
+		; con <- reifyDataCon data_con
+		; return (TH.TyConI $ TH.NewtypeD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
 				      		  con [{- Don't know about deriving -}]) }
 
-      DataTyCon mb_cxt cons _
-	-> do	{ cxt <- reifyCxt (mb_cxt `orElse` [])
+      DataTyCon cons _
+	-> do	{ cxt <- reifyCxt (tyConStupidTheta tc)
 		; cons <- mapM reifyDataCon (tyConDataCons tc)
 		; return (TH.TyConI $ TH.DataD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
 				      	       cons [{- Don't know about deriving -}]) }

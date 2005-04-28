@@ -12,7 +12,7 @@ core expression with (hopefully) improved usage information.
 
 \begin{code}
 module OccurAnal (
-	occurAnalysePgm, occurAnalyseGlobalExpr, occurAnalyseRule, 
+	occurAnalysePgm, occurAnalyseGlobalExpr
     ) where
 
 #include "HsVersions.h"
@@ -25,6 +25,7 @@ import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda,
 			  isExportedId, idArity, idSpecialisation, 
 			  idType, idUnique, Id
 			)
+import IdInfo		( isEmptySpecInfo )
 import BasicTypes	( OccInfo(..), isOneOcc )
 
 import VarSet
@@ -68,15 +69,6 @@ occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
     snd (occAnal initOccEnv expr)
-
-occurAnalyseRule :: CoreRule -> CoreRule
-occurAnalyseRule rule@(BuiltinRule _ _) = rule
-occurAnalyseRule (Rule str act tpl_vars tpl_args rhs)
-		-- Add occ info to tpl_vars, rhs
-  = Rule str act tpl_vars' tpl_args rhs'
-  where
-    (rhs_uds, rhs') = occAnal initOccEnv rhs
-    (_, tpl_vars')  = tagBinders rhs_uds tpl_vars
 \end{code}
 
 
@@ -332,7 +324,7 @@ reOrderRec env (CyclicSCC (bind : binds))
 
 	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
 
-	| not (isEmptyCoreRules (idSpecialisation bndr)) = 1
+	| not (isEmptySpecInfo (idSpecialisation bndr)) = 1
 		-- Avoid things with specialisations; we'd like
 		-- to take advantage of them in the subsequent bindings
 
@@ -434,7 +426,7 @@ occAnal env (Var v)
 
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.
-    -- But that went wrong right after specialisation, when
+    -- Btu that went wrong right after specialisation, when
     -- the *occurrences* of the overloaded function didn't have any
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.

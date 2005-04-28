@@ -48,7 +48,7 @@ import Packages		( PackageId )
 import Type		( Type, TvSubstEnv, pprParendType, pprTyThingCategory )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes, pprSkolInfo )
-import InstEnv		( DFunId, InstEnv )
+import InstEnv		( Instance, InstEnv )
 import IOEnv
 import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
@@ -193,6 +193,17 @@ data TcGblEnv
 		-- tcg_inst_uses; the reference is implicit rather than explicit,
 		-- so we have to zap a mutable variable.
 
+	tcg_dfun_n  :: TcRef Int,	-- Allows us to number off the names of DFuns
+		-- It's convenient to allocate an External Name for a DFun, with
+		-- a permanently-fixed unique, just like other top-level functions
+		-- defined in this module.  But that means we need a canonical 
+		-- occurrence name, distinct from all other dfuns in this module,
+		-- and this name supply serves that purpose (df1, df2, etc).
+
+		-- The next fields accumulate the payload of the module
+		-- The binds, rules and foreign-decl fiels are collected
+		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
+
 		-- The next fields accumulate the payload of the
 		-- module The binds, rules and foreign-decl fiels are
 		-- collected initially in un-zonked form and are
@@ -203,7 +214,7 @@ data TcGblEnv
 
 	tcg_binds   :: LHsBinds Id,		-- Value bindings in this module
 	tcg_deprecs :: Deprecations,		-- ...Deprecations 
-	tcg_insts   :: [DFunId],		-- ...Instances
+	tcg_insts   :: [Instance],		-- ...Instances
 	tcg_rules   :: [LRuleDecl Id],		-- ...Rules
 	tcg_fords   :: [LForeignDecl Id]	-- ...Foreign import & exports
     }

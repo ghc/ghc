@@ -21,7 +21,7 @@ module Name (
 	setNameOcc, 
 	hashName, localiseName,
 
-	nameSrcLoc, nameParent, nameParent_maybe,
+	nameSrcLoc, nameParent, nameParent_maybe, isImplicitName, 
 
 	isSystemName, isInternalName, isExternalName,
 	isTyVarName, isWiredInName, isBuiltInSyntax,
@@ -41,7 +41,7 @@ import OccName		-- All of it
 import Module		( Module )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
-import Maybes		( orElse )
+import Maybes		( orElse, isJust )
 import Outputable
 \end{code}
 
@@ -158,6 +158,11 @@ nameParent :: Name -> Name
 nameParent name = case nameParent_maybe name of
 			Just parent -> parent
 			Nothing     -> name
+
+isImplicitName :: Name -> Bool
+-- An Implicit Name is one has a parent; that is, one whose definition
+-- derives from tehe paren thing
+isImplicitName name = isJust (nameParent_maybe name)
 
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
 nameModule_maybe (Name { n_sort = External mod _})    = Just mod

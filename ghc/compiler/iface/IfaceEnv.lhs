@@ -63,7 +63,7 @@ newGlobalBinder :: Module -> OccName -> Maybe Name -> SrcLoc -> TcRnIf a b Name
 
 newGlobalBinder mod occ mb_parent loc
   = do	{ mod `seq` occ `seq` return ()	-- See notes with lookupOrig_help
-	; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
+	-- ; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
     	; name_supply <- getNameCache
 	; let (name_supply', name) = allocateGlobalBinder 
 					name_supply mod occ

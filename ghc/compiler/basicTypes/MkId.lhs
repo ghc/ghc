@@ -37,12 +37,12 @@ module MkId (
 
 
 import BasicTypes	( Arity, StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
+import Rules		( mkSpecInfo )
 import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
 			  realWorldStatePrimTy, addrPrimTy
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Rules		( addRules )
 import Type		( TyThing(..) )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, tcEqPred,
@@ -665,12 +665,9 @@ mkPrimOpId prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
     info = noCafIdInfo
-	   `setSpecInfo`	rules
-	   `setArityInfo` 	arity
+	   `setSpecInfo`	  mkSpecInfo (primOpRules prim_op name)
+	   `setArityInfo` 	  arity
 	   `setAllStrictnessInfo` Just strict_sig
-
-    rules = addRules id emptyCoreRules (primOpRules prim_op)
-
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
 -- a fresh unique, a type that is correct for this particular ccall,
@@ -717,11 +714,9 @@ Dict funs and default methods are *not* ImplicitIds.  Their definition
 involves user-written code, so we can't figure out their strictness etc
 based on fixed info, as we can for constructors and record selectors (say).
 
-We build them as GlobalIds, but when in the module where they are
-bound, we turn the Id at the *binding site* into an exported LocalId.
-This ensures that they are taken to account by free-variable finding
-and dependency analysis (e.g. CoreFVs.exprFreeVars).   The simplifier
-will propagate the LocalId to all occurrence sites. 
+We build them as LocalIds, but with External Names.  This ensures that
+they are taken to account by free-variable finding and dependency
+analysis (e.g. CoreFVs.exprFreeVars).
 
 Why shouldn't they be bound as GlobalIds?  Because, in particular, if
 they are globals, the specialiser floats dict uses above their defns,

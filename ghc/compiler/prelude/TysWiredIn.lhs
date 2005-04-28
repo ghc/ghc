@@ -21,9 +21,9 @@ module TysWiredIn (
 	charTy, stringTy, charTyConName,
 
 	
-	doubleTyCon, doubleDataCon, doubleTy,
+	doubleTyCon, doubleDataCon, doubleTy, doubleTyConName, 
 	
-	floatTyCon, floatDataCon, floatTy,
+	floatTyCon, floatDataCon, floatTy, floatTyConName,
 
 	intTyCon, intDataCon, intTyCon_RDR, intDataCon_RDR, intTyConName,
 	intTy,
@@ -176,7 +176,8 @@ pcTyCon is_enum is_rec name tyvars argvrcs cons
 		(mkArrowKinds (map tyVarKind tyvars) liftedTypeKind)
                 tyvars
                 argvrcs
-                (DataTyCon (Just []) cons is_enum)
+                []		-- No stupid theta
+		(DataTyCon cons is_enum)
 		[] 		-- No record selectors
                 is_rec
 		True		-- All the wired-in tycons have generics

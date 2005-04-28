@@ -8,42 +8,38 @@ module LoadIface (
 	loadHomeInterface, loadInterface, loadDecls,
 	loadSrcInterface, loadOrphanModules, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
-	predInstGates, ifaceInstGates, ifaceStats, discardDeclPrags,
+	ifaceStats, discardDeclPrags,
 	initExternalPackageState
    ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcIface( tcIfaceDecl )
+import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRule, tcIfaceInst )
 
 import Packages		( PackageState(..), PackageIdH(..), isHomePackage )
 import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ),
 			  isOneShot )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
-			  IfaceConDecls(..), IfaceInst(..), IfaceRule(..),
-			  IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
-			  IfaceType(..), IfacePredType(..), IfaceExtName,
-			  mkIfaceExtName )
-import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc, lookupAvail )
+			  IfaceConDecls(..), IfaceExpr(..), IfaceIdInfo(..), 
+			  IfaceType(..), IfaceExtName )
+import IfaceEnv		( newGlobalBinder )
 import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..),
 			  addEpsInStats, ExternalPackageState(..),
 			  PackageTypeEnv, emptyTypeEnv,  HscEnv(..),
 			  lookupIfaceByModule, emptyPackageIfaceTable,
-			  IsBootInterface, mkIfaceFixCache, Gated,
-			  implicitTyThings, addRulesToPool, addInstsToPool
+			  IsBootInterface, mkIfaceFixCache, 
+			  implicitTyThings 
 			 )
 
 import BasicTypes	( Version, Fixity(..), FixityDirection(..),
 			  isMarkedStrict )
-import TcType		( Type, tcSplitTyConApp_maybe )
-import Type		( funTyCon )
 import TcRnMonad
 
 import PrelNames	( gHC_PRIM )
 import PrelInfo		( ghcPrimExports )
 import PrelRules	( builtinRules )
-import Rules		( emptyRuleBase )
-import InstEnv		( emptyInstEnv )
+import Rules		( extendRuleBaseList, mkRuleBase )
+import InstEnv		( emptyInstEnv, extendInstEnvList )
 import Name		( Name {-instance NamedThing-}, getOccName,
 			  nameModule, isInternalName )
 import NameEnv
@@ -54,10 +50,8 @@ import Module		( Module, ModLocation(ml_hi_file), emptyModuleEnv,
 			)
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
 			  mkSuperDictSelOcc, mkDataConWrapperOcc, mkDataConWorkerOcc )
-import Class		( Class, className )
-import TyCon		( tyConName )
 import SrcLoc		( importedSrcLoc )
-import Maybes		( mapCatMaybes, MaybeErr(..) )
+import Maybes		( MaybeErr(..) )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
 import Finder		( findModule, findPackageModule,  FindResult(..), cantFindError )
@@ -65,16 +59,14 @@ import Outputable
 import BinIface		( readBinIface )
 import Panic		( ghcError, tryMost, showException, GhcException(..) )
 import List		( nub )
-
-import DATA_IOREF	( readIORef )
 \end{code}
 
 
 %************************************************************************
 %*									*
-		loadSrcInterface, loadOrphanModules
+	loadSrcInterface, loadOrphanModules, loadHomeInterface
 
-		These two are called from TcM-land	
+		These three are called from TcM-land	
 %*									*
 %************************************************************************
 
@@ -94,6 +86,7 @@ loadSrcInterface doc mod want_boot
     elaborate err = hang (ptext SLIT("Failed to load interface for") <+> 
 			  quotes (ppr mod) <> colon) 4 err
 
+---------------
 loadOrphanModules :: [Module] -> TcM ()
 loadOrphanModules mods
   | null mods = returnM ()
@@ -105,21 +98,14 @@ loadOrphanModules mods
   where
     load mod   = loadSysInterface (mk_doc mod) mod
     mk_doc mod = ppr mod <+> ptext SLIT("is a orphan-instance module")
-\end{code}
 
-%*********************************************************
-%*							*
-		loadHomeInterface
-		Called from Iface-land
-%*							*
-%*********************************************************
-
-\begin{code}
-loadHomeInterface :: SDoc -> Name -> IfM lcl ModIface
+---------------
+loadHomeInterface :: SDoc -> Name -> TcRn ModIface
 loadHomeInterface doc name
   = ASSERT2( not (isInternalName name), ppr name <+> parens doc )
-    loadSysInterface doc (nameModule name)
+    initIfaceTcRn $ loadSysInterface doc (nameModule name)
 
+---------------
 loadSysInterface :: SDoc -> Module -> IfM lcl ModIface
 -- A wrapper for loadInterface that Throws an exception if it fails
 loadSysInterface doc mod_name
@@ -143,6 +129,7 @@ loadSysInterface doc mod_name
 \begin{code}
 loadInterface :: SDoc -> Module -> WhereFrom 
 	      -> IfM lcl (MaybeErr Message ModIface)
+
 -- If it can't find a suitable interface file, we
 --	a) modify the PackageIfaceTable to have an empty entry
 --		(to avoid repeated complaints)
@@ -226,22 +213,22 @@ loadInterface doc_str mod from
 
 	; ignore_prags <- doptM Opt_IgnoreInterfacePragmas
 	; new_eps_decls <- loadDecls ignore_prags (mi_decls iface)
-	; new_eps_insts <- mapM loadInst (mi_insts iface)
+	; new_eps_insts <- mapM tcIfaceInst (mi_insts iface)
 	; new_eps_rules <- if ignore_prags 
 			   then return []
-			   else mapM loadRule (mi_rules iface)
+			   else mapM tcIfaceRule (mi_rules iface)
 
 	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
 					mi_insts = panic "No mi_insts in PIT",
 					mi_rules = panic "No mi_rules in PIT" } }
 
 	; updateEps_  $ \ eps -> 
-		eps {	eps_PIT   = extendModuleEnv (eps_PIT eps) mod final_iface,
-			eps_PTE   = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-			eps_rules = addRulesToPool  (eps_rules eps) new_eps_rules,
-			eps_insts = addInstsToPool  (eps_insts eps) new_eps_insts,
-			eps_stats = addEpsInStats   (eps_stats eps) (length new_eps_decls)
-						    (length new_eps_insts) (length new_eps_rules) }
+	    eps { eps_PIT       = extendModuleEnv (eps_PIT eps) mod final_iface,
+		  eps_PTE       = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+		  eps_rule_base = extendRuleBaseList (eps_rule_base eps) new_eps_rules,
+		  eps_inst_env  = extendInstEnvList  (eps_inst_env eps)  new_eps_insts,
+		  eps_stats     = addEpsInStats (eps_stats eps) (length new_eps_decls)
+						(length new_eps_insts) (length new_eps_rules) }
 
 	; return (Succeeded final_iface)
     }}}}
@@ -352,7 +339,7 @@ ifaceDeclSubBndrs (IfaceData {ifCons = IfNewTyCon (IfVanillaCon { ifConOcc = con
   = fields ++ [con_occ, mkDataConWrapperOcc con_occ] 	
 	-- Wrapper, no worker; see MkId.mkDataConIds
 
-ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon _ cons})
+ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
   = nub (concatMap fld_occs cons) 	-- Eliminate duplicate fields
     ++ concatMap dc_occs cons
   where
@@ -371,136 +358,6 @@ ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon _ cons})
 
 ifaceDeclSubBndrs _other 		      = []
 
------------------------------------------------------
---	Loading instance decls
------------------------------------------------------
-
-loadInst :: IfaceInst -> IfL (Name, Gated IfaceInst)
-
-loadInst decl@(IfaceInst {ifInstHead = inst_ty})
-  = do 	{
-	-- Find out what type constructors and classes are "gates" for the
-	-- instance declaration.  If all these "gates" are slurped in then
-	-- we should slurp the instance decl too.
-	-- 
-	-- We *don't* want to count names in the context part as gates, though.
-	-- For example:
-	--		instance Foo a => Baz (T a) where ...
-	--
-	-- Here the gates are Baz and T, but *not* Foo.
-	-- 
-	-- HOWEVER: functional dependencies make things more complicated
-	--	class C a b | a->b where ...
-	--	instance C Foo Baz where ...
-	-- Here, the gates are really only C and Foo, *not* Baz.
-	-- That is, if C and Foo are visible, even if Baz isn't, we must
-	-- slurp the decl.
-	--
-	-- Rather than take fundeps into account "properly", we just slurp
-	-- if C is visible and *any one* of the Names in the types
-	-- This is a slightly brutal approximation, but most instance decls
-	-- are regular H98 ones and it's perfect for them.
-	--
-	-- NOTICE that we rename the type before extracting its free
-	-- variables.  The free-variable finder for a renamed HsType 
-	-- does the Right Thing for built-in syntax like [] and (,).
-	  let { (cls_ext, tc_exts) = ifaceInstGates inst_ty }
-	; cls <- lookupIfaceExt cls_ext
-	; tcs <- mapM lookupIfaceTc tc_exts
-	; (mod, doc) <- getIfCtxt 
-	; returnM (cls, (tcs, (mod, doc, decl)))
-	}
-
------------------------------------------------------
---	Loading Rules
------------------------------------------------------
-
-loadRule :: IfaceRule -> IfL (Gated IfaceRule)
--- "Gate" the rule simply by a crude notion of the free vars of
--- the LHS.  It can be crude, because having too few free vars is safe.
-loadRule decl@(IfaceRule {ifRuleHead = fn, ifRuleArgs = args})
-  = do	{ names <- mapM lookupIfaceExt (fn : arg_fvs)
-	; (mod, doc) <- getIfCtxt 
-	; returnM (names, (mod, doc, decl)) }
-  where
-    arg_fvs = [n | arg <- args, n <- crudeIfExprGblFvs arg]
-
-
----------------------------
-crudeIfExprGblFvs :: IfaceExpr -> [IfaceExtName]
--- A crude approximation to the free external names of an IfExpr
--- Returns a subset of the true answer
-crudeIfExprGblFvs (IfaceType ty) = get_tcs ty
-crudeIfExprGblFvs (IfaceExt v)   = [v]
-crudeIfExprGblFvs other	         = []	-- Well, I said it was crude
-
-get_tcs :: IfaceType -> [IfaceExtName]
--- Get a crude subset of the TyCons of an IfaceType
-get_tcs (IfaceTyVar _) 	    = []
-get_tcs (IfaceAppTy t1 t2)  = get_tcs t1 ++ get_tcs t2
-get_tcs (IfaceFunTy t1 t2)  = get_tcs t1 ++ get_tcs t2
-get_tcs (IfaceForAllTy _ t) = get_tcs t
-get_tcs (IfacePredTy st)    = case st of
-				 IfaceClassP cl ts -> get_tcs_s ts
-				 IfaceIParam _ t   -> get_tcs t
-get_tcs (IfaceTyConApp (IfaceTc tc) ts) = tc : get_tcs_s ts
-get_tcs (IfaceTyConApp other        ts) = get_tcs_s ts
-
--- The lists are always small => appending is fine
-get_tcs_s :: [IfaceType] -> [IfaceExtName]
-get_tcs_s tys = foldr ((++) . get_tcs) [] tys
-
-
-----------------
-getIfCtxt :: IfL (Module, SDoc)
-getIfCtxt = do { env <- getLclEnv; return (if_mod env, if_loc env) }
-\end{code}
-
-
-%*********************************************************
-%*							*
-		Gating
-%*							*
-%*********************************************************
-
-Extract the gates of an instance declaration
-
-\begin{code}
-ifaceInstGates :: IfaceType -> (IfaceExtName, [IfaceTyCon])
--- Return the class, and the tycons mentioned in the rest of the head
--- We only pick the TyCon at the root of each type, to avoid
--- difficulties with overlap.  For example, suppose there are interfaces
--- in the pool for
---	C Int b
---	C a [b]
---	C a [T] 
--- Then, if we are trying to resolve (C Int x), we need the first
---       if we are trying to resolve (C x [y]), we need *both* the latter
---	 two, even though T is not involved yet, so that we spot the overlap
-
-ifaceInstGates (IfaceForAllTy _ t) 		   = ifaceInstGates t
-ifaceInstGates (IfaceFunTy _ t)    		   = ifaceInstGates t
-ifaceInstGates (IfacePredTy (IfaceClassP cls tys)) = (cls, instHeadTyconGates tys)
-ifaceInstGates other = pprPanic "ifaceInstGates" (ppr other)
-	-- The other cases should not happen
-
-instHeadTyconGates tys = mapCatMaybes root_tycon tys
-  where
-    root_tycon (IfaceFunTy _ _)      = Just (IfaceTc funTyConExtName)
-    root_tycon (IfaceTyConApp tc _)  = Just tc
-    root_tycon other		     = Nothing
-
-funTyConExtName = mkIfaceExtName (tyConName funTyCon)
-
-
-predInstGates :: Class -> [Type] -> (Name, [Name])
--- The same function, only this time on the predicate found in a dictionary
-predInstGates cls tys
-  = (className cls, mapCatMaybes root_tycon tys)
-  where
-    root_tycon ty = case tcSplitTyConApp_maybe ty of
-			Just (tc, _) -> Just (tyConName tc)
-			Nothing	     -> Nothing
 \end{code}
 
 
@@ -625,18 +482,12 @@ initExternalPackageState
       eps_PIT        = emptyPackageIfaceTable,
       eps_PTE        = emptyTypeEnv,
       eps_inst_env   = emptyInstEnv,
-      eps_rule_base  = emptyRuleBase,
-      eps_insts      = emptyNameEnv,
-      eps_rules      = addRulesToPool [] (map mk_gated_rule builtinRules),
+      eps_rule_base  = mkRuleBase builtinRules,
 	-- Initialise the EPS rule pool with the built-in rules
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
 			   , n_insts_in = 0, n_insts_out = 0
 			   , n_rules_in = length builtinRules, n_rules_out = 0 }
     }
-  where
-    mk_gated_rule (fn_name, core_rule)
-	= ([fn_name], (nameModule fn_name, ptext SLIT("<built-in rule>"),
-	   IfaceBuiltinRule (mkIfaceExtName fn_name) core_rule))
 \end{code}
 
 

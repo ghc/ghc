@@ -11,6 +11,8 @@ module MkIface (
 	mkIface, 	-- Build a ModIface from a ModGuts, 
 			-- including computing version information
 
+	writeIfaceFile,	-- Write the interface file
+
 	checkOldIface	-- See if recompilation is required, by
 			-- comparing version information
  ) where
@@ -176,16 +178,15 @@ compiled with -O.  I think this is the case.]
 import HsSyn
 import Packages		( isHomeModule, PackageIdH(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
-			  IfaceRule(..), IfaceInst(..), IfaceExtName(..), IfaceTyCon(..),
+			  IfaceRule(..), IfaceInst(..), IfaceExtName(..), 
 			  eqIfDecl, eqIfRule, eqIfInst, IfaceEq(..), (&&&), bool, 
 			  eqMaybeBy, eqListBy, visibleIfConDecls,
-			  tyThingToIfaceDecl, dfunToIfaceInst, coreRuleToIfaceRule )
-import LoadIface	( readIface, loadInterface, ifaceInstGates )
+			  tyThingToIfaceDecl, instanceToIfaceInst, coreRuleToIfaceRule )
+import LoadIface	( readIface, loadInterface )
 import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( mkModDeps )
-import TcType		( isFFITy )
-import HscTypes		( ModIface(..), TyThing(..), 
+import HscTypes		( ModIface(..), 
 			  ModGuts(..), ModGuts, IfaceExport,
 			  HscEnv(..), hscEPS, Dependencies(..), FixItem(..), 
 			  ModSummary(..), msHiFilePath, 
@@ -202,8 +203,8 @@ import HscTypes		( ModIface(..), TyThing(..),
 import DynFlags		( GhcMode(..), DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_HiVersion )
 import Name		( Name, nameModule, nameOccName, nameParent,
-			  isExternalName, nameParent_maybe, isWiredInName,
-			  NamedThing(..) )
+			  isExternalName, isInternalName, nameParent_maybe, isWiredInName,
+			  isImplicitName, NamedThing(..) )
 import NameEnv
 import NameSet
 import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
@@ -212,9 +213,6 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
 			  extendOccSet, extendOccSetList,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
-import TyCon		( tyConDataCons, isNewTyCon, newTyConRep )
-import Class		( classSelIds )
-import DataCon		( dataConName, dataConFieldLabels )
 import Module		( Module, moduleFS,
 			  ModLocation(..), mkSysModuleFS, moduleUserString,
 			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
@@ -249,52 +247,42 @@ import Maybes		( orElse, mapCatMaybes, isNothing, isJust,
 
 \begin{code}
 mkIface :: HscEnv
-	-> ModLocation
 	-> Maybe ModIface	-- The old interface, if we have it
 	-> ModGuts		-- The compiled, tidied module
-	-> IO ModIface		-- The new one, complete with decls and versions
--- mkIface 
---	a) Builds the ModIface
---	b) Writes it out to a file if necessary
+	-> IO (ModIface, 	-- The new one, complete with decls and versions
+	       Bool)		-- True <=> there was an old Iface, and the new one
+				--	    is identical, so no need to write it
 
-mkIface hsc_env location maybe_old_iface 
-	guts@ModGuts{ mg_module = this_mod,
-		      mg_boot   = is_boot,
-		      mg_usages = usages,
-		      mg_deps   = deps,
+mkIface hsc_env maybe_old_iface 
+	guts@ModGuts{ mg_module  = this_mod,
+		      mg_boot    = is_boot,
+		      mg_usages  = usages,
+		      mg_deps    = deps,
 		      mg_exports = exports,
 		      mg_rdr_env = rdr_env,
 		      mg_fix_env = fix_env,
 		      mg_deprecs = src_deprecs,
-		      mg_insts = insts, 
-		      mg_rules = rules,
-		      mg_types = type_env }
+		      mg_insts 	 = insts, 
+		      mg_rules 	 = rules,
+		      mg_types 	 = type_env }
+-- NB:	notice that mkIface does not look at the bindings
+--	only at the TypeEnv.  The previous Tidy phase has
+--	put exactly the info into the TypeEnv that we want
+--	to expose in the interface
+
   = do	{ eps <- hscEPS hsc_env
 	; let	{ ext_nm_rhs = mkExtNameFn hsc_env eps this_mod
 		; ext_nm_lhs = mkLhsNameFn this_mod
-		; local_things = [thing | thing <- typeEnvElts type_env,
-					  not (isWiredInName (getName thing)) ]
-			-- Do not export anything about wired-in things
-			--  (GHC knows about them already)
 
-		; abstract_tcs :: NameSet -- TyCons and Classes whose representation is not exposed
-		; abstract_tcs
-		    | not omit_prags = emptyNameSet		-- In the -O case, nothing is abstract
-	    	    | otherwise	     = mkNameSet [ getName thing 
-						 | thing <- local_things
-				 		 , not (mustExposeThing exports thing)]
+		; decls  = [ tyThingToIfaceDecl ext_nm_rhs thing 
+			   | thing <- typeEnvElts type_env, 
+			     not (isImplicitName (getName thing)) ]
+		    	-- Don't put implicit Ids and class tycons in the interface file
 
-		; decls  = [ tyThingToIfaceDecl omit_prags abstract_tcs ext_nm_rhs thing 
-			   | thing <- local_things, wantDeclFor exports abstract_tcs thing ]
-			    	-- Don't put implicit Ids and class tycons in the interface file
-
-		; fixities = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
-		; deprecs  = mkIfaceDeprec src_deprecs
-		; iface_rules 
-		     | omit_prags = []
-		     | otherwise  = sortLe le_rule $
-				    map (coreRuleToIfaceRule ext_nm_lhs ext_nm_rhs) rules
-		; iface_insts = sortLe le_inst (map (dfunToIfaceInst ext_nm_lhs) insts)
+		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
+		; deprecs     = mkIfaceDeprec src_deprecs
+		; iface_rules = map (coreRuleToIfaceRule ext_nm_lhs ext_nm_rhs) rules
+		; iface_insts = map (instanceToIfaceInst ext_nm_lhs) insts
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -303,8 +291,8 @@ mkIface hsc_env location maybe_old_iface
 			mi_deps     = deps,
 			mi_usages   = usages,
 			mi_exports  = mkIfaceExports exports,
-			mi_insts    = iface_insts,
-			mi_rules    = iface_rules,
+			mi_insts    = sortLe le_inst iface_insts,
+			mi_rules    = sortLe le_rule iface_rules,
 			mi_fixities = fixities,
 			mi_deprecs  = deprecs,
 			mi_globals  = Just rdr_env,
@@ -328,11 +316,6 @@ mkIface hsc_env location maybe_old_iface
 			 addVersionInfo maybe_old_iface intermediate_iface decls
 		}
 
-		-- Write the interface file, if necessary
-	; when (not no_change_at_all && ghci_mode /= Interactive) $ do
-		createDirectoryHierarchy (directoryOf hi_file_path)
-		writeBinIface hi_file_path new_iface
-
 		-- Debug printing
 	; when (isJust pp_orphs && dopt Opt_WarnOrphans dflags) 
 	       (printDump (fromJust pp_orphs))
@@ -340,56 +323,28 @@ mkIface hsc_env location maybe_old_iface
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
 
-	; return new_iface }
+	; return (new_iface, no_change_at_all) }
   where
      r1 `le_rule` r2 = ifRuleName r1 <= ifRuleName r2
      i1 `le_inst` i2 = ifDFun     i1 <= ifDFun     i2
 
-     dflags    	  = hsc_dflags hsc_env
-     ghci_mode 	  = ghcMode (hsc_dflags hsc_env)
-     omit_prags   = dopt Opt_OmitInterfacePragmas dflags
-     hi_file_path = ml_hi_file location
+     dflags = hsc_dflags hsc_env
+     deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
 					      
-mustExposeThing :: NameSet -> TyThing -> Bool
--- We are compiling without -O, and thus trying to write as little as 
--- possible into the interface file.  But we must expose the details of
--- any data types and classes whose constructors, fields, methods are 
--- visible to an importing module
-mustExposeThing exports (ATyCon tc) 
-  =  any exported_data_con (tyConDataCons tc)
-	-- Expose rep if any datacon or field is exported
-
-  || (isNewTyCon tc && isFFITy (snd (newTyConRep tc)))
-	-- Expose the rep for newtypes if the rep is an FFI type.  
-	-- For a very annoying reason.  'Foreign import' is meant to
-	-- be able to look through newtypes transparently, but it
-	-- can only do that if it can "see" the newtype representation
-  where	 	
-     exported_data_con con 
-	= any (`elemNameSet` exports) (dataConName con : dataConFieldLabels con)
-     		
-mustExposeThing exports (AClass cls) 
-  = any exported_class_op (classSelIds cls)
-  where	 	-- Expose rep if any classs op is exported
-     exported_class_op op = getName op `elemNameSet` exports
-
-mustExposeThing exports other = False
-
-
-wantDeclFor :: NameSet	-- User-exported things
-	    -> NameSet	-- Abstract things
-	    -> TyThing -> Bool
-wantDeclFor exports abstracts thing
-  | Just parent <- nameParent_maybe name	-- An implicit thing
-  = parent `elemNameSet` abstracts && name `elemNameSet` exports
+-----------------------------
+writeIfaceFile :: HscEnv -> ModLocation -> ModIface -> Bool -> IO ()
+-- Write the interface file, if necessary
+writeIfaceFile hsc_env location new_iface no_change_at_all
+  | no_change_at_all 	    = return ()
+  | ghc_mode == Interactive = return ()
   | otherwise
-  = True
+  = do	{ createDirectoryHierarchy (directoryOf hi_file_path)
+	; writeBinIface hi_file_path new_iface }
   where
-    name = getName thing
-  
+     ghc_mode = ghcMode (hsc_dflags hsc_env)
+     hi_file_path = ml_hi_file location
 
-deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
 -----------------------------
 mkExtNameFn :: HscEnv -> ExternalPackageState -> Module -> Name -> IfaceExtName
@@ -431,6 +386,8 @@ mkExtNameFn hsc_env eps this_mod
 -- there's no point in recording version info
 mkLhsNameFn :: Module -> Name -> IfaceExtName
 mkLhsNameFn this_mod name	
+  | isInternalName name = pprTrace "mkLhsNameFn: unexpected internal" (ppr name) $
+			  LocalTop occ	-- Should not happen
   | mod == this_mod = LocalTop occ
   | otherwise	    = ExtPkg mod occ
   where
@@ -451,16 +408,16 @@ addVersionInfo :: Maybe ModIface	-- The old interface, read from M.hi
 
 addVersionInfo Nothing new_iface new_decls
 -- No old interface, so definitely write a new one!
-  = (new_iface { mi_orphan = anyNothing getInstKey (mi_insts new_iface)
-			  || anyNothing getRuleKey (mi_rules new_iface),
+  = (new_iface { mi_orphan = anyNothing ifInstOrph (mi_insts new_iface)
+			  || anyNothing ifRuleOrph (mi_rules new_iface),
 		 mi_decls  = [(initialVersion, decl) | decl <- new_decls],
 		 mi_ver_fn = \n -> Just initialVersion },
      False, 
      ptext SLIT("No old interface file"),
      pprOrphans orph_insts orph_rules)
   where
-    orph_insts = filter (isNothing . getInstKey) (mi_insts new_iface)
-    orph_rules = filter (isNothing . getRuleKey) (mi_rules new_iface)
+    orph_insts = filter (isNothing . ifInstOrph) (mi_insts new_iface)
+    orph_rules = filter (isNothing . ifRuleOrph) (mi_rules new_iface)
 
 addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers, 
 					   mi_exp_vers  = old_exp_vers, 
@@ -485,14 +442,14 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     decls_w_vers = [(add_vers decl, decl) | decl <- new_decls]
 
     -------------------
-    (old_non_orph_insts, old_orph_insts) = mkRuleMap getInstKey (mi_insts old_iface)
-    (new_non_orph_insts, new_orph_insts) = mkRuleMap getInstKey (mi_insts new_iface)
+    (old_non_orph_insts, old_orph_insts) = mkOrphMap ifInstOrph (mi_insts old_iface)
+    (new_non_orph_insts, new_orph_insts) = mkOrphMap ifInstOrph (mi_insts new_iface)
     same_insts occ = eqMaybeBy	(eqListBy eqIfInst) 
 				(lookupOccEnv old_non_orph_insts occ)
 				(lookupOccEnv new_non_orph_insts occ)
   
-    (old_non_orph_rules, old_orph_rules) = mkRuleMap getRuleKey (mi_rules old_iface)
-    (new_non_orph_rules, new_orph_rules) = mkRuleMap getRuleKey (mi_rules new_iface)
+    (old_non_orph_rules, old_orph_rules) = mkOrphMap ifRuleOrph (mi_rules old_iface)
+    (new_non_orph_rules, new_orph_rules) = mkOrphMap ifRuleOrph (mi_rules new_iface)
     same_rules occ = eqMaybeBy	(eqListBy eqIfRule)
 				(lookupOccEnv old_non_orph_rules occ)
 				(lookupOccEnv new_non_orph_rules occ)
@@ -635,39 +592,23 @@ changedWrt so_far NotEqual     = True
 changedWrt so_far (EqBut kids) = so_far `intersectsOccSet` kids
 
 ----------------------
--- mkRuleMap partitions instance decls or rules into
+-- mkOrphMap partitions instance decls or rules into
 -- 	(a) an OccEnv for ones that are not orphans, 
 --	    mapping the local OccName to a list of its decls
 --	(b) a list of orphan decls
-mkRuleMap :: (decl -> Maybe OccName)	-- (Just occ) for a non-orphan decl, keyed by occ
+mkOrphMap :: (decl -> Maybe OccName)	-- (Just occ) for a non-orphan decl, keyed by occ
 					-- Nothing for an orphan decl
 	  -> [decl] 			-- Sorted into canonical order
 	  -> (OccEnv [decl],	 	-- Non-orphan decls associated with their key;
 					--	each sublist in canonical order
 	      [decl])			-- Orphan decls; in canonical order
-mkRuleMap get_key decls
+mkOrphMap get_key decls
   = foldl go (emptyOccEnv, []) decls
   where
     go (non_orphs, orphs) d
 	| Just occ <- get_key d
 	= (extendOccEnv_C (\ ds _ -> d:ds) non_orphs occ [d], orphs)
 	| otherwise = (non_orphs, d:orphs)
-
--- getXxKey: find at least one local OccName that belongs to this decl
-
-getInstKey :: IfaceInst -> Maybe OccName
-getInstKey (IfaceInst {ifInstHead = inst_ty})
-  = case [occ | LocalTop occ <- cls_ext : tc_exts] of
-	[]      -> Nothing
-	(occ:_) -> Just occ
-  where
-    (cls_ext, tcs) = ifaceInstGates inst_ty
-    tc_exts = [tc | IfaceTc tc <- tcs]
-	-- Ignore the wired-in IfaceTyCons; the class will do as the key
-
-getRuleKey :: IfaceRule -> Maybe OccName
-getRuleKey (IfaceRule {ifRuleHead = LocalTop occ}) = Just occ
-getRuleKey other				   = Nothing
 
 anyNothing :: (a -> Maybe b) -> [a] -> Bool
 anyNothing p []     = False

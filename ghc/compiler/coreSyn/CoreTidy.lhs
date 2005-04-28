@@ -4,8 +4,7 @@
 
 \begin{code}
 module CoreTidy (
-	tidyExpr, tidyVarOcc,
-	tidyIdRules, pprTidyIdRules
+	tidyExpr, tidyVarOcc, tidyRule, tidyRules 
     ) where
 
 #include "HsVersions.h"
@@ -13,17 +12,17 @@ module CoreTidy (
 import CoreSyn
 import CoreUtils	( exprArity )
 import Unify		( coreRefineTys )
-import PprCore		( pprIdRules )
 import DataCon		( DataCon, isVanillaDataCon )
 import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique,
-			  idType, setIdType, idCoreRules )
+			  idType, setIdType )
 import IdInfo		( setArityInfo, vanillaIdInfo,
 			  newStrictnessInfo, setAllStrictnessInfo,
 			  newDemandInfo, setNewDemandInfo )
 import Type		( Type, tidyType, tidyTyVarBndr, substTy, mkTvSubst )
-import Var		( Var, TyVar )
+import Var		( Var, TyVar, varName )
 import VarEnv
-import Name		( getOccName )
+import UniqFM		( lookupUFM )
+import Name		( Name, getOccName )
 import OccName		( tidyOccName )
 import SrcLoc		( noSrcLoc )
 import Maybes		( orElse )
@@ -118,24 +117,24 @@ refineTidyEnv tidy_env@(occ_env, var_env)  con tvs scrut_ty
 tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
 tidyNote env note            = note
 
-
 ------------  Rules  --------------
-tidyIdRules :: TidyEnv -> [IdCoreRule] -> [IdCoreRule]
-tidyIdRules env [] = []
-tidyIdRules env (IdCoreRule fn is_orph rule : rules)
+tidyRules :: TidyEnv -> [CoreRule] -> [CoreRule]
+tidyRules env [] = []
+tidyRules env (rule : rules)
   = tidyRule env rule  		=: \ rule ->
-    tidyIdRules env rules 	=: \ rules ->
-    (IdCoreRule (tidyVarOcc env fn) is_orph rule : rules)
+    tidyRules env rules 	=: \ rules ->
+    (rule : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
-tidyRule env rule@(BuiltinRule _ _) = rule
-tidyRule env (Rule name act vars tpl_args rhs)
-  = tidyBndrs env vars			=: \ (env', vars) ->
-    map (tidyExpr env') tpl_args  	=: \ tpl_args ->
-     (Rule name act vars tpl_args (tidyExpr env' rhs))
-
-pprTidyIdRules :: Id -> SDoc
-pprTidyIdRules id = pprIdRules (tidyIdRules emptyTidyEnv (idCoreRules id))
+tidyRule env rule@(BuiltinRule {}) = rule
+tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
+			  ru_fn = fn, ru_rough = mb_ns })
+  = tidyBndrs env bndrs		=: \ (env', bndrs) ->
+    map (tidyExpr env') args  	=: \ args ->
+    rule { ru_bndrs = bndrs, ru_args = args, 
+	   ru_rhs   = tidyExpr env' rhs,
+	   ru_fn    = tidyNameOcc env fn, 
+	   ru_rough = map (fmap (tidyNameOcc env')) mb_ns }
 \end{code}
 
 
@@ -146,6 +145,13 @@ pprTidyIdRules id = pprIdRules (tidyIdRules emptyTidyEnv (idCoreRules id))
 %************************************************************************
 
 \begin{code}
+tidyNameOcc :: TidyEnv -> Name -> Name
+-- In rules and instances, we have Names, and we must tidy them too
+-- Fortunately, we can lookup in the VarEnv with a name
+tidyNameOcc (_, var_env) n = case lookupUFM var_env n of
+				Nothing -> n
+				Just v  -> varName v
+
 tidyVarOcc :: TidyEnv -> Var -> Var
 tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 

@@ -164,6 +164,7 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
    let do_recomp = dopt Opt_RecompChecking dflags
        source_unchanged = isJust maybe_old_linkable && do_recomp
        hsc_env' = hsc_env { hsc_dflags = dflags' }
+       object_filename = ml_obj_file location
 
    -- run the compiler
    hsc_result <- hscMain hsc_env' msg_act mod_summary
@@ -177,13 +178,16 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 	  ASSERT(isJust maybe_old_linkable)
 	  return (CompOK details iface maybe_old_linkable)
 
-      HscRecomp details iface
-		stub_h_exists stub_c_exists maybe_interpreted_code 
+      HscRecomp details iface stub_h_exists stub_c_exists maybe_interpreted_code 
 
 	| isHsBoot src_flavour	-- No further compilation to do
-	-> return (CompOK details iface Nothing)
+	-> do	case hsc_lang of
+		   HscInterpreted -> return ()
+		   _other -> SysTools.touch dflags' "Touching object file" 
+					    object_filename
+		return (CompOK details iface Nothing)
 
-	| otherwise		-- Normal Haskell source files
+	| otherwise	-- Normal source file
 	-> do
 	   maybe_stub_o <- compileStub dflags' stub_c_exists
 	   let stub_unlinked = case maybe_stub_o of
@@ -195,8 +199,8 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 
 		-- in interpreted mode, just return the compiled code
 		-- as our "unlinked" object.
-		HscInterpreted -> 
-		    case maybe_interpreted_code of
+		HscInterpreted
+		  -> case maybe_interpreted_code of
 #ifdef GHCI
 		       Just comp_bc -> return ([BCOs comp_bc], ms_hs_date mod_summary)
 			-- Why do we use the timestamp of the source file here,
@@ -208,16 +212,14 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 #endif
 		       Nothing -> panic "compile: no interpreted code"
 
-		-- we're in batch mode: finish the compilation pipeline.
-		_other -> do
-		   let object_filename = ml_obj_file location
+		-- We're in --make mode: finish the compilation pipeline.
+		_other
+		  -> do	runPipeline StopLn dflags output_fn Persistent
+				    (Just location)
+				-- The object filename comes from the ModLocation
 
-		   runPipeline StopLn dflags output_fn Persistent
-			       (Just location)
-			-- the object filename comes from the ModLocation
-
-		   o_time <- getModificationTime object_filename
-		   return ([DotO object_filename], o_time)
+			o_time <- getModificationTime object_filename
+			return ([DotO object_filename], o_time)
 
 	   let linkable = LM unlinked_time this_mod
 			     (hs_unlinked ++ stub_unlinked)
@@ -719,6 +721,9 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 
             HscNoRecomp details iface -> do
 		SysTools.touch dflags' "Touching object file" o_file
+			-- The .o file must have a later modification date
+			-- than the source file (else we wouldn't be in HscNoRecomp)
+			-- but we touch it anyway, to keep 'make' happy (we think).
 		return (StopLn, dflags', Just location4, o_file)
 
 	    HscRecomp _details _iface 

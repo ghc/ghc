@@ -3,8 +3,8 @@ module TcEnv(
 	TyThing(..), TcTyThing(..), TcId,
 
 	-- Instance environment, and InstInfo type
-	InstInfo(..), pprInstInfo, pprInstInfoDetails,
-	simpleInstInfoTy, simpleInstInfoTyCon, 
+	InstInfo(..), iDFunId, pprInstInfo, pprInstInfoDetails,
+	simpleInstInfoClsTy, simpleInstInfoTy, simpleInstInfoTyCon, 
 	InstBindings(..),
 
 	-- Global environment
@@ -44,11 +44,12 @@ module TcEnv(
 
 import HsSyn		( LRuleDecl, LHsBinds, LSig, pprLHsBinds )
 import TcIface		( tcImportDecl )
+import IfaceEnv		( newGlobalBinder )
 import TcRnTypes	( pprTcTyThingCategory )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
 import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
-			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
+			  tyVarsOfType, tyVarsOfTypes, mkGenTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
 			  tidyOpenType 
 			)
@@ -58,13 +59,14 @@ import Var		( TyVar, Id, idType, tyVarName )
 import VarSet
 import VarEnv
 import RdrName		( extendLocalRdrEnv )
+import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
 import Name		( Name, NamedThing(..), getSrcLoc, mkInternalName, nameIsLocalOrFrom )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
-import HscTypes		( DFunId, extendTypeEnvList, lookupType,
+import HscTypes		( extendTypeEnvList, lookupType,
 			  TyThing(..), tyThingId, tyThingDataCon,
 			  ExternalPackageState(..) )
 
@@ -105,9 +107,7 @@ tcLookupGlobal name
 	    Just thing -> return thing 
 	    Nothing    -> tcImportDecl name
     }}
-\end{code}
 
-\begin{code}
 tcLookupGlobalId :: Name -> TcM Id
 -- Never used for Haskell-source DataCons, hence no ADataCon case
 tcLookupGlobalId name
@@ -490,20 +490,20 @@ newLocalName name	-- Make a clone
     returnM (mkInternalName uniq (getOccName name) (getSrcLoc name))
 \end{code}
 
-Make a name for the dict fun for an instance decl.  It's a *local*
-name for the moment.  The CoreTidy pass will externalise it.  Even in
---make and ghci stuff, we rebuild the instance environment each time,
-so the dfun id is internal to begin with, and external when compiling
-other modules
+Make a name for the dict fun for an instance decl.  It's an *external*
+name, like otber top-level names, and hence must be made with newGlobalBinder.
 
 \begin{code}
 newDFunName :: Class -> [Type] -> SrcLoc -> TcM Name
 newDFunName clas (ty:_) loc
-  = do	{ uniq <- newUnique
-	; return (mkInternalName uniq (mkDFunOcc dfun_string) loc) }
-  where
-	-- Any string that is somewhat unique will do
-    dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
+  = do	{ index   <- nextDFunIndex
+	; is_boot <- tcIsHsBoot
+	; mod     <- getModule
+	; let info_string = occNameString (getOccName clas) ++ 
+			    occNameString (getDFunTyKey ty)
+	      dfun_occ = mkDFunOcc info_string is_boot index
+
+	; newGlobalBinder mod dfun_occ Nothing loc }
 
 newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \end{code}
@@ -528,9 +528,12 @@ as well as explicit user written ones.
 \begin{code}
 data InstInfo
   = InstInfo {
-      iDFunId :: DFunId,		-- The dfun id.  Its forall'd type variables 
-      iBinds  :: InstBindings		-- scope over the stuff in InstBindings!
+      iSpec  :: Instance,		-- Includes the dfun id.  Its forall'd type 
+      iBinds :: InstBindings		-- variables scope over the stuff in InstBindings!
     }
+
+iDFunId :: InstInfo -> DFunId
+iDFunId info = instanceDFunId (iSpec info)
 
 data InstBindings
   = VanillaInst 		-- The normal case
@@ -551,9 +554,12 @@ pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
     details (VanillaInst b _)  = pprLHsBinds b
     details (NewTypeDerived _) = text "Derived from the representation type"
 
+simpleInstInfoClsTy :: InstInfo -> (Class, Type)
+simpleInstInfoClsTy info = case instanceHead (iSpec info) of
+			  (_, _, cls, [ty]) -> (cls, ty)
+
 simpleInstInfoTy :: InstInfo -> Type
-simpleInstInfoTy info = case tcSplitDFunTy (idType (iDFunId info)) of
-			  (_, _, _, [ty]) -> ty
+simpleInstInfoTy info = snd (simpleInstInfoClsTy info)
 
 simpleInstInfoTyCon :: InstInfo -> TyCon
   -- Gets the type constructor for a simple instance declaration,

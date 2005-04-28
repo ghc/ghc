@@ -17,10 +17,10 @@ import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
-import Id		( Id, setIdExported, idName, idIsFrom )
-import Name		( Name, isExternalName )
+import Id		( Id, setIdExported, idName )
+import Name		( Name, isExternalName, nameIsLocalOrFrom, nameOccName )
 import CoreSyn
-import PprCore		( pprIdRules, pprCoreExpr )
+import PprCore		( pprRules, pprCoreExpr )
 import CoreSubst	( substExpr, mkSubst )
 import DsMonad
 import DsExpr		( dsLExpr )
@@ -35,8 +35,9 @@ import NameSet
 import VarEnv
 import VarSet
 import Bag		( Bag, isEmptyBag, emptyBag, bagToList )
+import Rules		( roughTopNames )
 import CoreLint		( showPass, endPass )
-import CoreFVs		( ruleRhsFreeVars )
+import CoreFVs		( ruleRhsFreeVars, exprsFreeNames )
 import Packages	  	( PackageState(thPackageId), PackageIdH(..) )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
 			  errorsFound, WarnMsg )
@@ -222,11 +223,12 @@ addExportFlags ghci_mode exports keep_alive prs rules
 	| otherwise	    = bndr
 
     orph_rhs_fvs = unionVarSets [ ruleRhsFreeVars rule
-			        | IdCoreRule _ is_orphan_rule rule <- rules, 
-				  is_orphan_rule ]
-	-- An orphan rule keeps alive the free vars of its right-hand side.  
-	-- Non-orphan rules are (later, after gentle simplification) 
-	-- attached to the Id and that keeps the rhs free vars alive
+			        | rule <- rules, 
+				  not (isLocalRule rule) ]
+	-- A non-local rule keeps alive the free vars of its right-hand side. 
+	-- (A "non-local" is one whose head function is not locally defined.)
+	-- Local rules are (later, after gentle simplification) 
+	-- attached to the Id, and that keeps the rhs free vars alive.
 
     dont_discard bndr = is_exported name
 		     || name `elemNameSet` keep_alive
@@ -248,7 +250,7 @@ addExportFlags ghci_mode exports keep_alive prs rules
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
   = text "" $$ text "-------------- DESUGARED RULES -----------------" $$
-    pprIdRules rules
+    pprRules rules
 \end{code}
 
 
@@ -260,49 +262,49 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM IdCoreRule
+dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM CoreRule
 dsRule mod in_scope (L loc (HsRule name act vars lhs rhs))
   = putSrcSpanDs loc $ 
-    ds_lhs all_vars lhs		`thenDs` \ (fn, args) ->
-    dsLExpr rhs			`thenDs` \ core_rhs ->
-    returnDs (IdCoreRule fn (is_orphan fn) (Rule name act tpl_vars args core_rhs))
-  where
-    tpl_vars  = [var | RuleBndr (L _ var) <- vars]
-    all_vars  = mkInScopeSet (extendVarSetList in_scope tpl_vars)
-    is_orphan id = not (idIsFrom mod id)
-	-- NB we can't use isLocalId in the orphan test, 
-	-- because isLocalId isn't true of class methods
+    do	{ let (dict_binds, body)
+		= case unLoc lhs of
+		    (HsLet [HsBindGroup dbs _ _] body) -> (dbs, body)
+		    other			       -> (emptyBag, lhs)
 
-ds_lhs all_vars lhs
-  = let
-	(dict_binds, body) = 
-	   case unLoc lhs of
-		(HsLet [HsBindGroup dict_binds _ _] body) -> (dict_binds, body)
-		other			 	       -> (emptyBag, lhs)
-    in
-    mappM ds_dict_bind (bagToList dict_binds) 	`thenDs` \ dict_binds' ->
-    dsLExpr body				`thenDs` \ body' ->
+	      ds_dict_bind (L _ (VarBind id rhs))
+		  = do	{ rhs' <- dsLExpr rhs ; returnDs (id,rhs') }
+
+	; dict_binds' <- mappM ds_dict_bind (bagToList dict_binds)
+	; body'       <- dsLExpr body
+	; rhs'        <- dsLExpr rhs
 
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
-    let
-	subst = mkSubst all_vars emptyVarEnv (mkVarEnv id_pairs)
-	id_pairs = [(id, substExpr subst rhs) | (id,rhs) <- dict_binds']
+	; let bndrs     = [var | RuleBndr (L _ var) <- vars]
+	      in_scope' = mkInScopeSet (extendVarSetList in_scope bndrs)
+	      subst    	= mkSubst in_scope' emptyVarEnv (mkVarEnv id_pairs)
+	      id_pairs 	= [(id, substExpr subst rhs) | (id,rhs) <- dict_binds']
 			-- Note recursion here... substitution won't terminate
 			-- if there is genuine recursion... which there isn't
 
-	body'' = substExpr subst body'
-    in
-	
-	-- Now unpack the resulting body
-    let
-	pair = case collectArgs body'' of
-			(Var fn, args) -> (fn, args)
-			other	       -> pprPanic "dsRule" (ppr lhs)
-    in
-    returnDs pair
+	      body'' = substExpr subst body'
 
-ds_dict_bind (L _ (VarBind id rhs)) =
-  dsLExpr rhs `thenDs` \ rhs' ->
-  returnDs (id,rhs')
+	      (fn, args) = case collectArgs body'' of
+				(Var fn_id, args) -> (idName fn_id, args)
+				other -> pprPanic "dsRule" (ppr lhs) 
+
+	      local_rule = nameIsLocalOrFrom mod fn
+		-- NB we can't use isLocalId in the orphan test, 
+		-- because isLocalId isn't true of class methods
+	      lhs_names = fn : nameSetToList (exprsFreeNames args)
+		-- No need to delete bndrs, because
+		-- exprsFreeNams finds only External names
+	      orph = case filter (nameIsLocalOrFrom mod) lhs_names of
+			(n:ns) -> Just (nameOccName n)
+			[]     -> Nothing
+
+	; return (Rule { ru_name = name, ru_fn = fn, ru_act = act,
+			 ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs', 
+			 ru_rough = roughTopNames args, 
+			 ru_local = local_rule, ru_orph = orph })
+	}
 \end{code}

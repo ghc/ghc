@@ -759,8 +759,8 @@ rnStmt ctxt (ParStmt stmtss) thing_inside
 			   return ((), emptyFVs)
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
-    dupErr (v:_) = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
-			    <+> quotes (ppr v))
+    dupErr vs = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
+		        <+> quotes (ppr (head vs)))
 
 rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
   = bindLocatedLocalsRn doc (collectLStmtsBinders rec_stmts)	$ \ _ ->

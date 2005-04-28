@@ -17,8 +17,8 @@ import BasicTypes	( RecFlag(..) )
 import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupTopBndrRn, lookupImportedName )
-
-import Inst		( instToId, newDicts, newDictsAtLoc, newMethod )
+import Inst		( instToId, newDicts, newDictsAtLoc, newMethod, getOverlapFlag )
+import InstEnv		( Instance, mkLocalInstance )
 import TcEnv		( tcLookupLocatedClass, tcExtendIdEnv2, 
 			  tcExtendTyVarEnv, 
 			  InstInfo(..), pprInstInfoDetails,
@@ -738,13 +738,14 @@ mkGenericInstance clas (hs_ty, binds)
 
 	-- Make the dictionary function.
     getSrcSpanM						`thenM` \ span -> 
+    getOverlapFlag					`thenM` \ overlap_flag -> 
     newDFunName clas [inst_ty] (srcSpanStart span)	`thenM` \ dfun_name ->
     let
 	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
 	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]
+	ispec	   = mkLocalInstance dfun_id overlap_flag
     in
-
-    returnM (InstInfo { iDFunId = dfun_id, iBinds = VanillaInst binds [] })
+    returnM (InstInfo { iSpec = ispec, iBinds = VanillaInst binds [] })
 \end{code}
 
 
@@ -806,7 +807,7 @@ dupGenericInsts tc_inst_infos
 	  ptext SLIT("All the type patterns for a generic type constructor must be identical")
     ]
   where 
-    ppr_inst_ty (tc,inst) = ppr tc <+> ppr (simpleInstInfoTy inst)
+    ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
 
 mixedGenericErr op
   = ptext SLIT("Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)
