@@ -383,8 +383,8 @@
  */
         
 #define StgFunInfoExtra_slow_apply(fun_info)    \
-        (StgFunInfoExtraRev_slow_apply_offset(fun_info)    \
-        + (fun_info) + SIZEOF_StgFunInfoExtraRev + SIZEOF_StgInfoTable)
+        (TO_W_(StgFunInfoExtraRev_slow_apply_offset(fun_info))    \
+               + (fun_info) + SIZEOF_StgFunInfoExtraRev + SIZEOF_StgInfoTable)
 
 #define StgFunInfoExtra_fun_type(i)   StgFunInfoExtraRev_fun_type(i)
 #define StgFunInfoExtra_arity(i)      StgFunInfoExtraRev_arity(i)
