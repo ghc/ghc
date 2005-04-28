@@ -747,7 +747,7 @@ calcAllocated( void )
 #ifdef SMP
   for (i = 0; i < n_nurseries; i++) {
       Capability *cap;
-      for ( bd = capabilities[i].r.rCurrentNursery; 
+      for ( bd = capabilities[i].r.rCurrentNursery->link; 
 	    bd != NULL; bd = bd->link ) {
 	  allocated -= BLOCK_SIZE_W;
       }
