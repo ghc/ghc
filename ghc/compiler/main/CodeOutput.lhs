@@ -54,11 +54,11 @@ import IO
 codeOutput :: DynFlags
 	   -> Module
 	   -> ForeignStubs
-	   -> Dependencies
+	   -> [PackageId]
 	   -> [Cmm]			-- Compiled C--
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 
-codeOutput dflags this_mod foreign_stubs deps flat_abstractC
+codeOutput dflags this_mod foreign_stubs pkg_deps flat_abstractC
   = 
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
@@ -83,7 +83,7 @@ codeOutput dflags this_mod foreign_stubs deps flat_abstractC
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm flat_abstractC stubs_exist
-					deps foreign_stubs;
+					pkg_deps foreign_stubs;
              HscJava        -> 
 #ifdef JAVA
 			       outputJava dflags filenm mod_name tycons core_binds;
@@ -114,7 +114,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 
 \begin{code}
 outputC dflags filenm flat_absC 
-	(stub_h_exists, _) dependencies foreign_stubs
+	(stub_h_exists, _) packages foreign_stubs
   = do 
        -- figure out which header files to #include in the generated .hc file:
        --
@@ -122,7 +122,6 @@ outputC dflags filenm flat_absC
        --   * -#include options from the cmdline and OPTIONS pragmas
        --   * the _stub.h file, if there is one.
        --
-       let packages = dep_pkgs dependencies
        pkg_configs <- getExplicitPackagesAnd dflags packages
        let pkg_names = map (showPackageId.package) pkg_configs
 

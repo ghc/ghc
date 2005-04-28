@@ -67,13 +67,10 @@ import Data.Char	( ord, chr )
 
 byteCodeGen :: DynFlags
             -> [CoreBind]
-	    -> TypeEnv
+	    -> [TyCon]
             -> IO CompiledByteCode
-byteCodeGen dflags binds type_env
+byteCodeGen dflags binds tycs
    = do showPass dflags "ByteCodeGen"
-        let  local_tycons  = typeEnvTyCons  type_env
-	     local_classes = typeEnvClasses type_env
-	     tycs = local_tycons ++ map classTyCon local_classes
 
         let flatBinds = [ (bndr, freeVars rhs) 
 			| (bndr, rhs) <- flattenBinds binds]

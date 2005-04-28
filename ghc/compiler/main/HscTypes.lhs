@@ -12,7 +12,7 @@ module HscTypes (
 	ModuleGraph, emptyMG,
 
 	ModDetails(..),	emptyModDetails,
-	ModGuts(..), ModImports(..), ForeignStubs(..),
+	ModGuts(..), CgGuts(..), ModImports(..), ForeignStubs(..),
 
 	ModSummary(..), showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath, 
@@ -398,24 +398,35 @@ data ModGuts
 -- After simplification, the following fields change slightly:
 --	mg_rules	Orphan rules only (local ones now attached to binds)
 --	mg_binds	With rules attached
---
--- After CoreTidy, the following fields change slightly:
---	mg_types	Now contains Ids as well, replete with final IdInfo
---			   The Ids are only the ones that are visible from
---			   importing modules.  Without -O that means only
---			   exported Ids, but with -O importing modules may
---			   see ids mentioned in unfoldings of exported Ids
---
---	mg_insts	Same DFunIds as before, but with final IdInfo,
---			   and the unique might have changed; remember that
---			   CoreTidy links up the uniques of old and new versions
---
---	mg_rules	All rules for exported things, substituted with final Ids
---
---	mg_binds	Tidied
 
 
+---------------------------------------------------------
+-- The Tidy pass forks the information about this module: 
+--	* one lot goes to interface file generation (ModIface)
+--	  and later compilations (ModDetails)
+--	* the other lot goes to code generation (CgGuts)
+data CgGuts 
+  = CgGuts {
+	cg_module   :: !Module,
 
+	cg_tycons   :: [TyCon],		-- Algebraic data types (including ones that started life
+					-- as classes); generate constructors and info tables
+					-- Includes newtypes, just for the benefit of External Core
+
+	cg_binds    :: [CoreBind],	-- The tidied main bindings, including previously-implicit 
+					-- bindings for record and class selectors, and
+					-- data construtor wrappers.  
+					-- But *not* data constructor workers; reason: we
+					-- we regard them as part of the code-gen of tycons
+
+	cg_dir_imps :: ![Module],	-- Directly-imported modules; used to generate
+					-- initialisation code
+
+	cg_foreign  :: !ForeignStubs,	
+	cg_dep_pkgs :: ![PackageId]	-- Used to generate #includes for C code gen
+    }
+
+-----------------------------------
 data ModImports
   = ModImports {
 	imp_direct     :: ![(Module,Bool)],	-- Explicitly-imported modules
@@ -427,6 +438,7 @@ data ModImports
 						--	directly or indirectly
     }
 
+-----------------------------------
 data ForeignStubs = NoStubs
 		  | ForeignStubs
 			SDoc 		-- Header file prototypes for

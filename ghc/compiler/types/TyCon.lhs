@@ -397,11 +397,11 @@ isDataTyCon :: TyCon -> Bool
 --	True for all @data@ types
 --	False for newtypes
 --		  unboxed tuples
-isDataTyCon (AlgTyCon {algTcRhs = rhs})  
+isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})  
   = case rhs of
 	DataTyCon _ _  -> True
 	NewTyCon _ _ _ -> False
-	AbstractTyCon  -> panic "isDataTyCon"
+	AbstractTyCon  -> pprPanic "isDataTyCon" (ppr tc)
 
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False

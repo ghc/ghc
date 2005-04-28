@@ -64,6 +64,7 @@ import SimplCore
 import TidyPgm		( optTidyPgm, simpleTidyPgm )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
+import TyCon		( isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -355,11 +356,11 @@ hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO 
 hscBootBackEnd hsc_env mod_summary maybe_old_iface Nothing 
   = return HscFail
 hscBootBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
-  = do	{ tidy_pgm <- simpleTidyPgm hsc_env ds_result
+  = do	{ (_cg_guts, details) <- simpleTidyPgm hsc_env ds_result
 
 	; (new_iface, no_change) 
 		<- {-# SCC "MkFinalIface" #-}
-		   mkIface hsc_env maybe_old_iface tidy_pgm
+		   mkIface hsc_env maybe_old_iface ds_result details
 
 	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
 
@@ -428,13 +429,10 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
  	    -- TIDY
  	    -------------------
 	; let omit_prags = dopt Opt_OmitInterfacePragmas dflags
-	; tidy_result <- {-# SCC "CoreTidy" #-}
-		         if omit_prags 
-		         then simpleTidyPgm hsc_env simpl_result
-			 else optTidyPgm    hsc_env simpl_result
-
-	-- Emit external core
-	; emitExternalCore dflags tidy_result
+	; (cg_guts, details) <- {-# SCC "CoreTidy" #-}
+			         if omit_prags 
+			         then simpleTidyPgm hsc_env simpl_result
+				 else optTidyPgm    hsc_env simpl_result
 
 	-- Alive at this point:  
 	--	tidy_result, pcs_final
@@ -446,8 +444,9 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
 	    -- This has to happen *after* code gen so that the back-end
 	    -- info has been set.  Not yet clear if it matters waiting
 	    -- until after code output
-	; (new_iface, no_change) <- {-# SCC "MkFinalIface" #-}
-				    mkIface hsc_env maybe_old_iface tidy_result
+	; (new_iface, no_change)
+		<- {-# SCC "MkFinalIface" #-}
+		   mkIface hsc_env maybe_old_iface simpl_result details
 
 	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
 
@@ -459,18 +458,16 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
 
 	    -- Build the final ModDetails (except in one-shot mode, where
 	    -- we won't need this information after compilation).
-	; final_details <- 
-	     if one_shot then return (error "no final details")
-		 	 else return $! ModDetails { 
-					   md_types   = mg_types tidy_result,
-					   md_exports = mg_exports tidy_result,
-					   md_insts   = mg_insts tidy_result,
-					   md_rules   = mg_rules tidy_result }
+	; final_details <- if one_shot then return (error "no final details")
+		 	   else return $! details
+
+	-- Emit external core
+	; emitExternalCore dflags cg_guts
 
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
 	; (stub_h_exists, stub_c_exists, maybe_bcos)
-		<- hscCodeGen dflags tidy_result
+		<- hscCodeGen dflags cg_guts
 
       	  -- And the answer is ...
 	; dumpIfaceStats hsc_env
@@ -484,20 +481,24 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
 
 
 hscCodeGen dflags 
-    ModGuts{  -- This is the last use of the ModGuts in a compilation.
+    CgGuts{  -- This is the last use of the ModGuts in a compilation.
 	      -- From now on, we just use the bits we need.
-        mg_module   = this_mod,
-	mg_binds    = core_binds,
-	mg_types    = type_env,
-	mg_dir_imps = dir_imps,
-	mg_foreign  = foreign_stubs,
-	mg_deps     = dependencies     }  = do {
+        cg_module   = this_mod,
+	cg_binds    = core_binds,
+	cg_tycons   = tycons,
+	cg_dir_imps = dir_imps,
+	cg_foreign  = foreign_stubs,
+	cg_dep_pkgs = dependencies     }  = do {
+
+  let { data_tycons = filter isDataTyCon tycons } ;
+	-- cg_tycons includes newtypes, for the benefit of External Core,
+	-- but we don't generate any code for newtypes
 
  	    -------------------
  	    -- PREPARE FOR CODE GENERATION
 	    -- Do saturation and convert to A-normal form
   prepd_binds <- {-# SCC "CorePrep" #-}
-		 corePrepPgm dflags core_binds type_env;
+		 corePrepPgm dflags core_binds data_tycons ;
 
   case hscTarget dflags of
       HscNothing -> return (False, False, Nothing)
@@ -505,7 +506,7 @@ hscCodeGen dflags
       HscInterpreted ->
 #ifdef GHCI
 	do  -----------------  Generate byte code ------------------
-	    comp_bc <- byteCodeGen dflags prepd_binds type_env
+	    comp_bc <- byteCodeGen dflags prepd_binds data_tycons
 	
 	    ------------------ Create f-x-dynamic C-side stuff ---
 	    (istub_h_exists, istub_c_exists) 
@@ -524,7 +525,7 @@ hscCodeGen dflags
 
             ------------------  Code generation ------------------
 	    abstractC <- {-# SCC "CodeGen" #-}
-		         codeGen dflags this_mod type_env foreign_stubs
+		         codeGen dflags this_mod data_tycons foreign_stubs
 				 dir_imps cost_centre_info stg_binds
 
 	    ------------------  Code output -----------------------
@@ -542,7 +543,7 @@ hscCmmFile dflags filename = do
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-	codeOutput dflags no_mod NoStubs noDependencies [cmm]
+	codeOutput dflags no_mod NoStubs [] [cmm]
 	return True
   where
 	no_mod = panic "hscCmmFile: no_mod"

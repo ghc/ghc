@@ -34,7 +34,7 @@ import NameEnv
 import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
 			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo,
-			  IfaceExport, HomePackageTable, PackageIfaceTable, 
+			  HomePackageTable, PackageIfaceTable, 
 			  availNames, unQualInScope, 
 			  Deprecs(..), ModIface(..), Dependencies(..), 
 			  lookupIface, ExternalPackageState(..)

@@ -18,7 +18,7 @@ import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupTopBndrRn, lookupImportedName )
 import Inst		( instToId, newDicts, newDictsAtLoc, newMethod, getOverlapFlag )
-import InstEnv		( Instance, mkLocalInstance )
+import InstEnv		( mkLocalInstance )
 import TcEnv		( tcLookupLocatedClass, tcExtendIdEnv2, 
 			  tcExtendTyVarEnv, 
 			  InstInfo(..), pprInstInfoDetails,

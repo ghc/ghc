@@ -16,18 +16,18 @@ import CoreLint	( endPass )
 import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, 
 		  isUnLiftedType, isUnboxedTupleType, seqType )
+import TyCon	( TyCon, tyConDataCons )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
 import Id	( mkSysLocal, idType, idNewDemandInfo, idArity, setIdUnfolding, setIdType,
-		  isFCallId, isGlobalId, isImplicitId,
+		  isFCallId, isGlobalId, 
 		  isLocalId, hasNoBinding, idNewStrictness, 
-		  idUnfolding, isDataConWorkId_maybe, isPrimOpId_maybe
+		  isPrimOpId_maybe
 		)
-import DataCon	  ( isVanillaDataCon )
+import DataCon	  ( isVanillaDataCon, dataConWorkId )
 import PrimOp	  ( PrimOp( DataToTagOp ) )
-import HscTypes   ( TypeEnv, typeEnvElts, TyThing( AnId ) )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -98,12 +98,12 @@ any trivial or useless bindings.
 -- -----------------------------------------------------------------------------
 
 \begin{code}
-corePrepPgm :: DynFlags -> [CoreBind] -> TypeEnv -> IO [CoreBind]
-corePrepPgm dflags binds types
+corePrepPgm :: DynFlags -> [CoreBind] -> [TyCon] -> IO [CoreBind]
+corePrepPgm dflags binds data_tycons
   = do	showPass dflags "CorePrep"
 	us <- mkSplitUniqSupply 's'
 
-	let implicit_binds = mkImplicitBinds types
+	let implicit_binds = mkDataConWorkers data_tycons
 		-- NB: we must feed mkImplicitBinds through corePrep too
 		-- so that they are suitably cloned and eta-expanded
 
@@ -130,16 +130,8 @@ corePrepExpr dflags expr
 -- Implicit bindings
 -- -----------------------------------------------------------------------------
 
-Create any necessary "implicit" bindings (data constructors etc).
-Namely:
-	* Constructor workers
-	* Constructor wrappers
-	* Data type record selectors
-	* Class op selectors
-
-In the latter three cases, the Id contains the unfolding to use for
-the binding.  In the case of data con workers we create the rather 
-strange (non-recursive!) binding
+Create any necessary "implicit" bindings for data con workers.  We
+create the rather strange (non-recursive!) binding
 
 	$wC = \x y -> $wC x y
 
@@ -154,20 +146,11 @@ always fully applied, and the bindings are just there to support
 partial applications. But it's easier to let them through.
 
 \begin{code}
-mkImplicitBinds type_env
-  = [ NonRec id (get_unfolding id)
-    | AnId id <- typeEnvElts type_env, isImplicitId id ]
-	-- The type environment already contains all the implicit Ids, 
-	-- so we just filter them out
-	--
-	-- The etaExpand is so that the manifest arity of the
-	-- binding matches its claimed arity, which is an 
-	-- invariant of top level bindings going into the code gen
-
-get_unfolding id 	-- See notes above
-  | Just data_con <- isDataConWorkId_maybe id = Var id	-- The ice is thin here, but it works
-							-- CorePrep will eta-expand it
-  | otherwise			     	      = unfoldingTemplate (idUnfolding id)
+mkDataConWorkers data_tycons
+  = [ NonRec id (Var id)	-- The ice is thin here, but it works
+    | tycon <- data_tycons, 	-- CorePrep will eta-expand it
+      data_con <- tyConDataCons tycon,
+      let id = dataConWorkId data_con ]
 \end{code}
 	
 

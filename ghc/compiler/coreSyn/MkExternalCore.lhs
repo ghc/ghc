@@ -15,34 +15,29 @@ import Module
 import CoreSyn
 import HscTypes	
 import TyCon
-import Class
 import TypeRep
 import Type
 import PprExternalCore	-- Instances
 import DataCon	( DataCon, dataConTyVars, dataConRepArgTys, 
-		  dataConName, dataConTyCon, dataConWrapId_maybe )
+		  dataConName, dataConTyCon )
 import CoreSyn
 import Var
 import IdInfo
-import Id	( idUnfolding )
 import Kind
-import CoreTidy	( tidyExpr )
-import VarEnv	( emptyTidyEnv )
 import Literal
 import Name
 import Outputable
 import ForeignCall
 import DynFlags	( DynFlags(..) )
 import StaticFlags	( opt_EmitExternalCore )
-import Maybes	( mapCatMaybes )
 import IO
 import FastString
 
-emitExternalCore :: DynFlags -> ModGuts -> IO ()
-emitExternalCore dflags mod_impl
+emitExternalCore :: DynFlags -> CgGuts -> IO ()
+emitExternalCore dflags cg_guts
  | opt_EmitExternalCore 
  = (do handle <- openFile corename WriteMode
-       hPutStrLn handle (show (mkExternalCore mod_impl))      
+       hPutStrLn handle (show (mkExternalCore cg_guts))      
        hClose handle)
    `catch` (\err -> pprPanic "Failed to open or write external core output file" 
 	                     (text corename))
@@ -52,44 +47,16 @@ emitExternalCore _ _
  = return ()
 
 
-mkExternalCore :: ModGuts -> C.Module
+mkExternalCore :: CgGuts -> C.Module
 -- The ModGuts has been tidied, but the implicit bindings have
 -- not been injected, so we have to add them manually here
 -- We don't include the strange data-con *workers* because they are
 -- implicit in the data type declaration itself
-mkExternalCore (ModGuts {mg_module=this_mod, mg_types = type_env, mg_binds = binds})
-  = C.Module mname tdefs (map make_vdef all_binds)
+mkExternalCore (CgGuts {cg_module=this_mod, cg_tycons = tycons, cg_binds = binds})
+  = C.Module mname tdefs (map make_vdef binds)
   where
     mname  = make_mid this_mod
     tdefs  = foldr collect_tdefs [] tycons
-
-    all_binds  = implicit_con_wrappers ++ other_implicit_binds ++ binds
-		-- Put the constructor wrappers first, because
-		-- other implicit bindings (notably the fromT functions arising 
-		-- from generics) use the constructor wrappers.
-
-    tycons = map classTyCon (typeEnvClasses type_env) ++ typeEnvTyCons type_env
-
-    implicit_con_wrappers = map get_defn (concatMap implicit_con_ids   (typeEnvElts type_env))
-    other_implicit_binds  = map get_defn (concatMap other_implicit_ids (typeEnvElts type_env))
-
-implicit_con_ids :: TyThing -> [Id]
-implicit_con_ids (ATyCon tc) | isAlgTyCon tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-implicit_con_ids other       		     = []
-
-other_implicit_ids :: TyThing -> [Id]
-other_implicit_ids (ATyCon tc) = tyConSelIds tc
-other_implicit_ids (AClass cl) = classSelIds cl
-other_implicit_ids other       = []
-
-get_defn :: Id -> CoreBind
-get_defn id = NonRec id rhs
-	    where
-	      rhs  = tidyExpr emptyTidyEnv body 
-	      body = unfoldingTemplate (idUnfolding id)
-	-- Don't forget to tidy the body !  Otherwise you get silly things like
-	--	\ tpl -> case tpl of tpl -> (tpl,tpl) -> tpl
-	-- Maybe we should inject these bindings during CoreTidy?
 
 collect_tdefs :: TyCon -> [C.Tdef] -> [C.Tdef]
 collect_tdefs tcon tdefs 

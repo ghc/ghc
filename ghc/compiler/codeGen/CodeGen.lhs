@@ -47,7 +47,7 @@ import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
 import OccName		( mkLocalOcc )
-import TyCon            ( isDataTyCon )
+import TyCon            ( TyCon )
 import Module		( Module, mkModule )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
@@ -60,22 +60,19 @@ import Outputable
 \begin{code}
 codeGen :: DynFlags
 	-> Module
-	-> TypeEnv
+	-> [TyCon]
 	-> ForeignStubs
 	-> [Module]		-- directly-imported modules
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	-> IO [Cmm]		-- Output
 
-codeGen dflags this_mod type_env foreign_stubs imported_mods 
+codeGen dflags this_mod data_tycons foreign_stubs imported_mods 
 	cost_centre_info stg_binds
   = do	
   { showPass dflags "CodeGen"
   ; let way = buildTag dflags
         mb_main_mod = mainModIs dflags
-
-  ; let     tycons	= typeEnvTyCons type_env
-	    data_tycons = filter isDataTyCon tycons
 
 -- Why?
 --   ; mapM_ (\x -> seq x (return ())) data_tycons

@@ -186,7 +186,7 @@ import LoadIface	( readIface, loadInterface )
 import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( mkModDeps )
-import HscTypes		( ModIface(..), 
+import HscTypes		( ModIface(..), ModDetails(..), 
 			  ModGuts(..), ModGuts, IfaceExport,
 			  HscEnv(..), hscEPS, Dependencies(..), FixItem(..), 
 			  ModSummary(..), msHiFilePath, 
@@ -248,23 +248,25 @@ import Maybes		( orElse, mapCatMaybes, isNothing, isJust,
 \begin{code}
 mkIface :: HscEnv
 	-> Maybe ModIface	-- The old interface, if we have it
-	-> ModGuts		-- The compiled, tidied module
+	-> ModGuts		-- Usages, deprecations, etc
+	-> ModDetails		-- The trimmed, tidied interface
 	-> IO (ModIface, 	-- The new one, complete with decls and versions
 	       Bool)		-- True <=> there was an old Iface, and the new one
 				--	    is identical, so no need to write it
 
 mkIface hsc_env maybe_old_iface 
-	guts@ModGuts{ mg_module  = this_mod,
+	(ModGuts{     mg_module  = this_mod,
 		      mg_boot    = is_boot,
 		      mg_usages  = usages,
 		      mg_deps    = deps,
-		      mg_exports = exports,
 		      mg_rdr_env = rdr_env,
 		      mg_fix_env = fix_env,
-		      mg_deprecs = src_deprecs,
-		      mg_insts 	 = insts, 
-		      mg_rules 	 = rules,
-		      mg_types 	 = type_env }
+		      mg_deprecs = src_deprecs })
+	(ModDetails{  md_insts 	 = insts, 
+		      md_rules 	 = rules,
+		      md_types 	 = type_env,
+		      md_exports = exports })
+	
 -- NB:	notice that mkIface does not look at the bindings
 --	only at the TypeEnv.  The previous Tidy phase has
 --	put exactly the info into the TypeEnv that we want
