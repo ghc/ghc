@@ -11,7 +11,7 @@ module NameEnv (
 	foldNameEnv, filterNameEnv,
 	plusNameEnv, plusNameEnv_C, 
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
-	elemNameEnv
+	elemNameEnv, mapNameEnv
     ) where
 
 #include "HsVersions.h"
@@ -47,6 +47,7 @@ lookupNameEnv  	   :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF   :: NameEnv a -> Name -> a
 foldNameEnv	   :: (a -> b -> b) -> b -> NameEnv a -> b
 filterNameEnv	   :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
+mapNameEnv	   :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 
 emptyNameEnv   	    = emptyUFM
 foldNameEnv	    = foldUFM
@@ -63,6 +64,7 @@ delListFromNameEnv  = delListFromUFM
 elemNameEnv    	    = elemUFM
 unitNameEnv    	    = unitUFM
 filterNameEnv	    = filterUFM
+mapNameEnv	    = mapUFM
 
 lookupNameEnv  	       = lookupUFM
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupUFM env n)

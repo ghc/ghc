@@ -61,7 +61,7 @@ import MkIface		( checkOldIface, mkIface, writeIfaceFile )
 import Desugar
 import Flattening       ( flatten )
 import SimplCore
-import TidyPgm		( optTidyPgm, simpleTidyPgm )
+import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
 import TyCon		( isDataTyCon )
@@ -356,7 +356,7 @@ hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO 
 hscBootBackEnd hsc_env mod_summary maybe_old_iface Nothing 
   = return HscFail
 hscBootBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
-  = do	{ (_cg_guts, details) <- simpleTidyPgm hsc_env ds_result
+  = do	{ details <- mkBootModDetails hsc_env ds_result
 
 	; (new_iface, no_change) 
 		<- {-# SCC "MkFinalIface" #-}
@@ -428,11 +428,8 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
  	    -------------------
  	    -- TIDY
  	    -------------------
-	; let omit_prags = dopt Opt_OmitInterfacePragmas dflags
 	; (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-			         if omit_prags 
-			         then simpleTidyPgm hsc_env simpl_result
-				 else optTidyPgm    hsc_env simpl_result
+			         tidyProgram hsc_env simpl_result
 
 	-- Alive at this point:  
 	--	tidy_result, pcs_final

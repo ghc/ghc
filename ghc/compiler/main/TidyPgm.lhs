@@ -4,11 +4,11 @@
 \section{Tidying up Core}
 
 \begin{code}
-module TidyPgm( simpleTidyPgm, optTidyPgm ) where
+module TidyPgm( mkBootModDetails, tidyProgram ) where
 
 #include "HsVersions.h"
 
-import DynFlags	( DynFlags, DynFlag(..) )
+import DynFlags	( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )
@@ -21,30 +21,29 @@ import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, idCoreRules, isGlobalId,
 			  isExportedId, mkVanillaGlobal, isLocalId, 
-			  idArity, idCafInfo, idUnfolding
+			  idArity, idCafInfo, idUnfolding, isImplicitId, setIdInfo
 			) 
 import IdInfo		{- loads of stuff -}
 import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( Arity, isNeverActive )
 import Name		( Name, getOccName, nameOccName, mkInternalName,
-		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe,
-			  isWiredInName, getName
+		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe
 			)
 import NameSet		( NameSet, elemNameSet )
 import IfaceEnv		( allocateGlobalBinder )
-import NameEnv		( filterNameEnv )
+import NameEnv		( filterNameEnv, mapNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType )
 import TcType		( isFFITy )
 import DataCon		( dataConName, dataConFieldLabels, dataConWrapId_maybe )
 import TyCon		( TyCon, makeTyConAbstract, tyConDataCons, isNewTyCon, 
-			  newTyConRep, isDataTyCon, tyConSelIds, isAlgTyCon )
+			  newTyConRep, tyConSelIds, isAlgTyCon )
 import Class		( classSelIds )
 import Module		( Module )
 import HscTypes		( HscEnv(..), NameCache( nsUniqs ), CgGuts(..),
 			  TypeEnv, typeEnvIds, typeEnvElts, typeEnvTyCons, 
-			  extendTypeEnvWithIds, mkTypeEnv,
+			  extendTypeEnvWithIds, lookupTypeEnv,
 			  ModGuts(..), TyThing(..), ModDetails(..), Dependencies(..)
 			)
 import Maybes		( orElse, mapCatMaybes )
@@ -82,15 +81,12 @@ of TyThings.
 %************************************************************************
 
 
-Plan A: simpleTidyPgm: omit pragmas, make interfaces small
+Plan A: mkBootModDetails: omit pragmas, make interfaces small
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Ignore the bindings
 
 * Drop all WiredIn things from the TypeEnv 
 	(we never want them in interface files)
-	(why are they there?  I think mainly as a memo
-	 to avoid repeatedly checking that we've loaded their
-	 home interface; but I'm not certain)
 
 * Retain all TyCons and Classes in the TypeEnv, to avoid
 	having to find which ones are mentioned in the
@@ -116,65 +112,35 @@ Plan A: simpleTidyPgm: omit pragmas, make interfaces small
   distinct OccNames in case of object-file splitting
 
 \begin{code}
-simpleTidyPgm :: HscEnv -> ModGuts 
-	      -> IO (CgGuts, ModDetails)
+mkBootModDetails :: HscEnv -> ModGuts -> IO ModDetails
 -- This is Plan A: make a small type env when typechecking only,
 -- or when compiling a hs-boot file, or simply when not using -O
+--
+-- We don't look at the bindings at all -- there aren't any
+-- for hs-boot files
 
-simpleTidyPgm hsc_env mod_impl@(ModGuts { mg_module = mod, 
-					  mg_exports = exports,
-					  mg_types = type_env, 	
-					  mg_insts = ispecs,
-					  mg_binds = binds })
+mkBootModDetails hsc_env (ModGuts { mg_module = mod, 
+				    mg_exports = exports,
+				    mg_types = type_env, 	
+				    mg_insts = ispecs })
   = do	{ let dflags = hsc_dflags hsc_env 
-	; showPass dflags "Tidy Type Env"
+	; showPass dflags "Tidy [hoot] type env"
 
 	; let { ispecs' = tidyInstances tidyExternalId ispecs
-	      	
-	      ; things' = mapCatMaybes (tidyThing exports) 
-				       (typeEnvElts type_env)
-
-	      ; type_env' = extendTypeEnvWithIds (mkTypeEnv things')
-						 (map instanceDFunId ispecs')
-	      ; ext_ids = mkVarEnv [ (id, False) | id <- typeEnvIds type_env']
+	      ; type_env1 = mapNameEnv tidyBootThing type_env
+	      ; type_env' = extendTypeEnvWithIds type_env1
+				(map instanceDFunId ispecs')
 	      }
-
-	; (_, cg_guts) <- tidyCgStuff hsc_env ext_ids mod_impl
-
-	; return (cg_guts, ModDetails { md_types = type_env'
-				      , md_insts = ispecs'
-				      , md_rules = []
-				      , md_exports = exports })
+	; return (ModDetails { md_types = type_env',
+			       md_insts = ispecs',
+			       md_rules = [],
+			       md_exports = exports })
 	}
 
-tidyInstances :: (DFunId -> DFunId) -> [Instance] -> [Instance]
-tidyInstances tidy_dfun ispecs
-  = map tidy ispecs
-  where
-    tidy ispec = setInstanceDFunId ispec (tidy_dfun (instanceDFunId ispec))
-
-tidyThing :: NameSet 	-- Exports
-	  -> TyThing -> Maybe TyThing	-- Nothing => drop it
-tidyThing exports thing
-  | isWiredInName (getName thing)
-  = Nothing
-  | otherwise
-  = case thing of
-      AClass cl -> Just thing
-
-      ATyCon tc 
-	| mustExposeTyCon exports tc -> Just thing
-	| otherwise -> Just (ATyCon (makeTyConAbstract tc))
-
-      ADataCon dc
-	| getName dc `elemNameSet` exports -> Just thing
-	| otherwise			   -> Nothing
-
-      AnId id 
-	| not (getName id `elemNameSet` exports) -> Nothing
-	| not (isLocalId id) -> Just thing	-- Implicit Ids such as class ops, 
-						-- data-con wrappers etc
-	| otherwise -> Just (AnId (tidyExternalId id))
+tidyBootThing :: TyThing -> TyThing
+-- Just externalise the Ids; keep everything
+tidyBootThing (AnId id) | isLocalId id = AnId (tidyExternalId id)
+tidyBootThing thing		       = thing
 
 tidyExternalId :: Id -> Id
 -- Takes an LocalId with an External Name, 
@@ -183,28 +149,6 @@ tidyExternalId :: Id -> Id
 tidyExternalId id 
   = ASSERT2( isLocalId id && isExternalName (idName id), ppr id )
     mkVanillaGlobal (idName id) (tidyTopType (idType id)) vanillaIdInfo
-
-mustExposeTyCon :: NameSet	-- Exports
-		-> TyCon	-- The tycon
-		-> Bool 	-- Can its rep be hidden?
--- We are compiling without -O, and thus trying to write as little as 
--- possible into the interface file.  But we must expose the details of
--- any data types whose constructors or fields are exported
-mustExposeTyCon exports tc
-  | not (isAlgTyCon tc) 	-- Synonyms
-  = True
-  | otherwise			-- Newtype, datatype
-  = any exported_con (tyConDataCons tc)
-	-- Expose rep if any datacon or field is exported
-
-  || (isNewTyCon tc && isFFITy (snd (newTyConRep tc)))
-	-- Expose the rep for newtypes if the rep is an FFI type.  
-	-- For a very annoying reason.  'Foreign import' is meant to
-	-- be able to look through newtypes transparently, but it
-	-- can only do that if it can "see" the newtype representation
-  where
-    exported_con con = any (`elemNameSet` exports) 
-			   (dataConName con : dataConFieldLabels con)
 \end{code}
 
 
@@ -280,52 +224,72 @@ throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 
 \begin{code}
-optTidyPgm :: HscEnv -> ModGuts
-	   -> IO (CgGuts, ModDetails)
+tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
+tidyProgram hsc_env
+	    mod_impl@(ModGuts {	mg_module = mod, mg_exports = exports, 
+				mg_types = type_env, mg_insts = insts_tc, 
+				mg_binds = binds, 
+				mg_rules = imp_rules,
+				mg_dir_imps = dir_imps, mg_deps = deps, 
+				mg_foreign = foreign_stubs })
 
-optTidyPgm hsc_env
-	   mod_impl@(ModGuts {	mg_module = mod, mg_exports = exports, 
-				mg_types = env_tc, mg_insts = insts_tc, 
-				mg_binds = binds_in, 
-				mg_rules = imp_rules })
   = do	{ let dflags = hsc_dflags hsc_env
 	; showPass dflags "Tidy Core"
 
-	; let ext_ids   = findExternalIds   binds_in
-	; let ext_rules = findExternalRules binds_in imp_rules ext_ids
+	; let { omit_prags = dopt Opt_OmitInterfacePragmas dflags
+	      ; ext_ids = findExternalIds omit_prags binds
+	      ; ext_rules 
+		   | omit_prags = []
+		   | otherwise  = findExternalRules binds imp_rules ext_ids
 		-- findExternalRules filters imp_rules to avoid binders that 
 		-- aren't externally visible; but the externally-visible binders 
 		-- are computed (by findExternalIds) assuming that all orphan
 		-- rules are exported (they get their Exported flag set in the desugarer)
 		-- So in fact we may export more than we need. 
 		-- (It's a sort of mutual recursion.)
+  	}
 
-	; (final_env, cg_guts) <- tidyCgStuff hsc_env ext_ids mod_impl
+	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod type_env ext_ids binds
 
-	; let { tidy_rules    = tidyRules final_env ext_rules
-	      ; tidy_type_env = tidyTypeEnv env_tc (cg_binds cg_guts)
-	      ; tidy_ispecs   = tidyInstances (tidyVarOcc final_env) insts_tc
+	; let { tidy_type_env = tidyTypeEnv omit_prags exports type_env tidy_binds
+	      ; tidy_ispecs   = tidyInstances (lookup_dfun tidy_type_env) insts_tc
 		-- A DFunId will have a binding in tidy_binds, and so
 		-- will now be in final_env, replete with IdInfo
 		-- Its name will be unchanged since it was born, but
-		-- we want Global, IdInfo-rich DFunId in the tidy_ispecs
+		-- we want Global, IdInfo-rich (or not) DFunId in the tidy_ispecs
+
+	      ; tidy_rules = tidyRules tidy_env ext_rules
+		-- You might worry that the tidy_env contains IdInfo-rich stuff
+		-- and indeed it does, but if omit_prags is on, ext_rules is empty
+
+	      ; implicit_binds = getImplicitBinds type_env
+	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
 	      }
 
-   	; endPass dflags "Tidy Core" Opt_D_dump_simpl (cg_binds cg_guts)
+   	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
 	; dumpIfSet_core dflags Opt_D_dump_simpl
 		"Tidy Core Rules"
 		(pprRules tidy_rules)
 
-	; return (cg_guts, ModDetails { md_types = tidy_type_env
-				      ,	md_rules = tidy_rules
-				      , md_insts = tidy_ispecs
-				      , md_exports = exports })
+	; return (CgGuts { cg_module   = mod, 
+			   cg_tycons   = alg_tycons,
+			   cg_binds    = implicit_binds ++ tidy_binds,
+			   cg_dir_imps = dir_imps,
+			   cg_foreign  = foreign_stubs,
+			   cg_dep_pkgs = dep_pkgs deps }, 
+
+		   ModDetails { md_types = tidy_type_env,
+				md_rules = tidy_rules,
+				md_insts = tidy_ispecs,
+				md_exports = exports })
 	}
 
+lookup_dfun type_env dfun_id
+  = case lookupTypeEnv type_env (idName dfun_id) of
+	Just (AnId dfun_id') -> dfun_id'
+	other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
-tidyTypeEnv :: TypeEnv 		-- From typechecker
-	    -> [CoreBind]	-- Final Ids
-	    -> TypeEnv
+tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [CoreBind] -> TypeEnv
 
 -- The competed type environment is gotten from
 --	Dropping any wired-in things, and then
@@ -339,21 +303,85 @@ tidyTypeEnv :: TypeEnv 		-- From typechecker
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
 
-tidyTypeEnv type_env tidy_binds
-  = extendTypeEnvWithIds (filterNameEnv keep_it type_env) final_ids
+tidyTypeEnv omit_prags exports type_env tidy_binds
+  = let type_env1 = filterNameEnv keep_it type_env
+	type_env2 = extendTypeEnvWithIds type_env1 final_ids
+	type_env3 | omit_prags = mapNameEnv trim_thing type_env2
+		  | otherwise  = type_env2
+    in 
+    type_env3
   where
-    final_ids  = [ id
-		 | bind <- tidy_binds,
-		   id <- bindersOf bind,
-		   isExternalName (idName id)]
+    final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
+			isExternalName (idName id)]
 
-	-- We keep GlobalIds, because they won't appear 
+   	-- We keep GlobalIds, because they won't appear 
 	-- in the bindings from which final_ids are derived!
 	-- (The bindings bind LocalIds.)
-    keep_it thing | isWiredInName (getName thing) = False
     keep_it (AnId id) = isGlobalId id	-- Keep GlobalIds (e.g. class ops)
     keep_it other     = True		-- Keep all TyCons, DataCons, and Classes
+
+    trim_thing thing
+	= case thing of
+	    ATyCon tc | mustExposeTyCon exports tc -> thing
+		      | otherwise -> ATyCon (makeTyConAbstract tc)
+
+	    AnId id | isImplicitId id -> thing
+		    | otherwise	      -> AnId (id `setIdInfo` vanillaIdInfo)
+
+	    other -> thing
+
+mustExposeTyCon :: NameSet	-- Exports
+		-> TyCon	-- The tycon
+		-> Bool 	-- Can its rep be hidden?
+-- We are compiling without -O, and thus trying to write as little as 
+-- possible into the interface file.  But we must expose the details of
+-- any data types whose constructors or fields are exported
+mustExposeTyCon exports tc
+  | not (isAlgTyCon tc) 	-- Synonyms
+  = True
+  | otherwise			-- Newtype, datatype
+  = any exported_con (tyConDataCons tc)
+	-- Expose rep if any datacon or field is exported
+
+  || (isNewTyCon tc && isFFITy (snd (newTyConRep tc)))
+	-- Expose the rep for newtypes if the rep is an FFI type.  
+	-- For a very annoying reason.  'Foreign import' is meant to
+	-- be able to look through newtypes transparently, but it
+	-- can only do that if it can "see" the newtype representation
+  where
+    exported_con con = any (`elemNameSet` exports) 
+			   (dataConName con : dataConFieldLabels con)
+
+tidyInstances :: (DFunId -> DFunId) -> [Instance] -> [Instance]
+tidyInstances tidy_dfun ispecs
+  = map tidy ispecs
+  where
+    tidy ispec = setInstanceDFunId ispec $
+		 tidy_dfun (instanceDFunId ispec)
+
+getImplicitBinds :: TypeEnv -> [CoreBind]
+getImplicitBinds type_env
+  = map get_defn (concatMap implicit_con_ids (typeEnvTyCons type_env)
+		  ++ concatMap other_implicit_ids (typeEnvElts type_env))
+	-- Put the constructor wrappers first, because
+	-- other implicit bindings (notably the fromT functions arising 
+	-- from generics) use the constructor wrappers.  At least that's
+	-- what External Core likes
+  where
+    implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
+    
+    other_implicit_ids (ATyCon tc) = tyConSelIds tc
+    other_implicit_ids (AClass cl) = classSelIds cl
+    other_implicit_ids other       = []
+    
+    get_defn :: Id -> CoreBind
+    get_defn id = NonRec id (tidyExpr emptyTidyEnv rhs)
+	where
+	  rhs = unfoldingTemplate (idUnfolding id)
+	-- Don't forget to tidy the body !  Otherwise you get silly things like
+	--	\ tpl -> case tpl of tpl -> (tpl,tpl) -> tpl
 \end{code}
+
 
 %************************************************************************
 %*				 					*
@@ -362,11 +390,16 @@ tidyTypeEnv type_env tidy_binds
 %************************************************************************
 
 \begin{code}
-findExternalIds :: [CoreBind]
+findExternalIds :: Bool
+		-> [CoreBind]
 		-> IdEnv Bool	-- In domain => external
 				-- Range = True <=> show unfolding
 	-- Step 1 from the notes above
-findExternalIds binds
+findExternalIds omit_prags binds
+  | omit_prags
+  = mkVarEnv [ (id,False) | id <- bindersOfBinds binds, isExportedId id ]
+
+  | otherwise
   = foldr find emptyVarEnv binds
   where
     find (NonRec id rhs) needed
@@ -484,27 +517,16 @@ findExternalRules binds non_local_rules ext_ids
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
-tidyCgStuff :: HscEnv
-	    -> IdEnv Bool	-- Domain = Ids that should be external
+tidyTopBinds :: HscEnv
+	     -> Module
+	     -> TypeEnv
+	     -> IdEnv Bool	-- Domain = Ids that should be external
 				-- True <=> their unfolding is external too
-	    -> ModGuts
-	    -> IO (TidyEnv, CgGuts)
+	     -> [CoreBind]
+	     -> IO (TidyEnv, [CoreBind])
 
--- * Tidy the bindings
--- * Add bindings for the "implicit" Ids
-
-tidyCgStuff hsc_env ext_ids 
-	    (ModGuts  { mg_module = mod, mg_binds = binds, mg_types = type_env,
-			mg_dir_imps = dir_imps, mg_deps = deps, 
-			mg_foreign = foreign_stubs })
-  = do	{ (env, binds') <- tidy init_env (map get_defn implicit_ids ++ binds)
-	; return (env, CgGuts { cg_module   = mod, 
-			   	cg_tycons   = filter isAlgTyCon tycons,
-			   	cg_binds    = binds',
-			   	cg_dir_imps = dir_imps,
-			   	cg_foreign  = foreign_stubs,
-			   	cg_dep_pkgs = dep_pkgs deps }) 
-	}
+tidyTopBinds hsc_env mod type_env ext_ids binds
+  = tidy init_env binds
   where
     dflags = hsc_dflags hsc_env
     nc_var = hsc_NC hsc_env 
@@ -532,24 +554,6 @@ tidyCgStuff hsc_env ext_ids
     tidy env (b:bs) = do { (env1, b')  <- tidyTopBind dflags mod nc_var ext_ids env b
 			 ; (env2, bs') <- tidy env1 bs
 			 ; return (env2, b':bs') }
-
-    tycons = typeEnvTyCons type_env
-
-    implicit_ids :: [Id]
-    implicit_ids =  concatMap implicit_con_ids   tycons
-		 ++ concatMap other_implicit_ids (typeEnvElts type_env)   
-	--Put the constructor wrappers first, because
-	-- other implicit bindings (notably the fromT functions arising 
-	-- from generics) use the constructor wrappers.
-
-    implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-    
-    other_implicit_ids (ATyCon tc) = tyConSelIds tc
-    other_implicit_ids (AClass cl) = classSelIds cl
-    other_implicit_ids other       = []
-    
-    get_defn :: Id -> CoreBind
-    get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
 
 ------------------------
 tidyTopBind  :: DynFlags
