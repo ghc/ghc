@@ -65,8 +65,7 @@ import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, lookupModuleEnv )
 import OccName		( mkVarOcc )
-import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, 
-			  getOccName, isWiredInName )
+import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName )
 import NameSet
 import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
@@ -93,26 +92,25 @@ import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
-import TcIface		( loadImportedInsts )
 import TcMType		( zonkTcType, zonkQuantifiedTyVar )
 import TcMatches	( tcStmts, tcDoStmt )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
 import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, 
-			  isUnLiftedType, tyClsNamesOfDFunHead )
+			  isUnLiftedType, tyClsNamesOfDFunHead, tyClsNamesOfType )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
 import Inst		( tcGetInstEnvs )
-import InstEnv		( DFunId, classInstances, instEnvElts )
+import InstEnv		( classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
-import LoadIface	( loadSrcInterface, ifaceInstGates )
+import LoadIface	( loadSrcInterface )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
-			  IfaceExtName(..), IfaceConDecls(..), IfaceInst(..),
-			  tyThingToIfaceDecl, instanceToIfaceInst )
-import IfaceType	( IfaceTyCon(..), IfaceType, toIfaceType, 
-			  interactiveExtNameFun, isLocalIfaceExtName )
+			  IfaceExtName(..), IfaceConDecls(..), 
+			  tyThingToIfaceDecl )
+import IfaceType	( IfaceType, toIfaceType, 
+			  interactiveExtNameFun )
 import IfaceEnv		( lookupOrig, ifaceExportNames )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( Id, isImplicitId, setIdType, globalIdDetails )
+import Id		( isImplicitId, setIdType, globalIdDetails )
 import MkId		( unsafeCoerceId )
 import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
@@ -121,14 +119,14 @@ import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName )
+import Name		( nameOccName, nameModule )
 import OccName		( occNameUserString )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
 			  bindIOName, thenIOName, returnIOName )
-import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
+import HscTypes		( InteractiveContext(..), HomeModInfo(..), 
 			  availNames, availName, ModIface(..), icPrintUnqual,
-			  ModDetails(..), Dependencies(..) )
+			  Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import ListSetOps	( removeDups )
 import Panic		( ghcError, GhcException(..) )
@@ -1232,7 +1230,7 @@ tcRnGetInfo hsc_env ictxt rdr_name
 	-- their parent declaration
     let { do_one name = do { thing  <- tcLookupGlobal name
 		           ; fixity <- lookupFixityRn name
-			   ; ispecs <- lookupInsts ext_nm thing
+			   ; ispecs <- lookupInsts print_unqual thing
 		           ; return (str, toIfaceDecl ext_nm thing, fixity, 
 				     getSrcLoc thing, 
 				     [(toIfaceType ext_nm (idType dfun), getSrcLoc dfun) 
@@ -1253,49 +1251,43 @@ tcRnGetInfo hsc_env ictxt rdr_name
     }
   where
     cmp (_,d1,_,_,_) (_,d2,_,_,_) = ifName d1 `compare` ifName d2
-    ext_nm = interactiveExtNameFun (icPrintUnqual ictxt)
+    ext_nm = interactiveExtNameFun print_unqual
+    print_unqual = icPrintUnqual ictxt
 
-
-lookupInsts :: (Name -> IfaceExtName) -> TyThing -> TcM [Instance]
+lookupInsts :: PrintUnqualified -> TyThing -> TcM [Instance]
 -- Filter the instances by the ones whose tycons (or clases resp) 
 -- are in scope unqualified.  Otherwise we list a whole lot too many!
-lookupInsts ext_nm (AClass cls)
-  = do	{ loadImportedInsts cls []	-- [] means load all instances for cls
-	; inst_envs <- tcGetInstEnvs
+lookupInsts print_unqual (AClass cls)
+  = do	{ inst_envs <- tcGetInstEnvs
 	; return [ ispec
 		 | ispec <- classInstances inst_envs cls
-		 , let (_, tycons) = ifaceInstGates (ifInstHead (instanceToIfaceInst ext_nm ispec))
-			-- Rather an indirect/inefficient test, but there we go
-		 , all print_tycon_unqual tycons ] }
-  where
-    print_tycon_unqual (IfaceTc nm) = isLocalIfaceExtName nm
-    print_tycon_unqual other		= True 	-- Int etc
-   
+		 , plausibleDFun print_unqual (instanceDFunId ispec) ] }
 
-lookupInsts ext_nm (ATyCon tc)
+lookupInsts print_unqual (ATyCon tc)
   = do 	{ eps <- getEps	-- Load all instances for all classes that are
 			-- in the type environment (which are all the ones
 			-- we've seen in any interface file so far)
-	; mapM_ (\c -> loadImportedInsts c [])
-		(typeEnvClasses (eps_PTE eps))
 	; (pkg_ie, home_ie) <- tcGetInstEnvs	-- Search all
-	; return [ dfun
-		 | (_, _, dfun) <- instEnvElts home_ie ++ instEnvElts pkg_ie
+	; return [ ispec
+		 | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie
+		 , let dfun = instanceDFunId ispec
 		 , relevant dfun
-		 , let (cls, _) = ifaceInstGates (ifInstHead (instanceToIfaceInst ext_nm dfun))
-		 , isLocalIfaceExtName cls ]  }
+		 , plausibleDFun print_unqual dfun ] }
   where
-    relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType (instanceDFunId df))
+    relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
     tc_name     = tyConName tc		  
 
-lookupInsts ext_nm other = return []
+lookupInsts print_unqual other = return []
 
+plausibleDFun print_unqual dfun	-- Dfun involving only names that print unqualified
+  = all ok (nameSetToList (tyClsNamesOfType (idType dfun)))
+  where
+    ok name | isExternalName name = print_unqual (nameModule name) (nameOccName name)
+	    | otherwise		  = True
 
 toIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
 toIfaceDecl ext_nm thing
-  = tyThingToIfaceDecl True 		-- Discard IdInfo
-		       emptyNameSet	-- Show data cons
-		       ext_nm (munge thing)
+  = tyThingToIfaceDecl ext_nm (munge thing)
   where
 	-- munge transforms a thing to its "parent" thing
     munge (ADataCon dc) = ATyCon (dataConTyCon dc)
