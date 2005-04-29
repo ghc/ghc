@@ -110,7 +110,7 @@ import IfaceType	( IfaceType, toIfaceType,
 			  interactiveExtNameFun )
 import IfaceEnv		( lookupOrig, ifaceExportNames )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( isImplicitId, setIdType, globalIdDetails )
+import Id		( isImplicitId, setIdType, globalIdDetails, mkExportedLocalId )
 import MkId		( unsafeCoerceId )
 import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
@@ -549,10 +549,11 @@ checkHiBootIface
 		       let dfun = instanceDFunId inst,
 		       idType dfun `tcEqType` boot_inst_ty ] of
 	    [] -> do { addErrTc (instMisMatch boot_inst); return emptyBag }
-	    (dfun:_) -> return (unitBag $ noLoc $ VarBind boot_dfun (nlHsVar dfun))
+	    (dfun:_) -> return (unitBag $ noLoc $ VarBind local_boot_dfun (nlHsVar dfun))
 	where
 	  boot_dfun = instanceDFunId boot_inst
 	  boot_inst_ty = idType boot_dfun
+	  local_boot_dfun = mkExportedLocalId (idName boot_dfun) boot_inst_ty
 
 ----------------
 check_thing (ATyCon boot_tc) (ATyCon real_tc)
