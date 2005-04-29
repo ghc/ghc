@@ -114,6 +114,11 @@ cp -Rf $mingw_include/* include/mingw
 # troublesome character); leave out for now.
 #rm -rf include/mingw/g++-3/ || echo "g++-3/ not there"
 rm -rf include/mingw/c++/ || echo "c++/ not there"
+rm -rf include/mingw/ddk/ || echo "ddk/ not there"
+rm -rf include/mingw/gnu/ || echo "gnu/ not there"
+rm -rf include/mingw/javax/ || echo "javax/ not there"
+rm -rf include/mingw/java/ || echo "java/ not there"
+rm -rf include/mingw/gcj/ || echo "gcj/ not there"
 
 echo "add gcc"
 cp ${mingw_bin}/gcc.exe .
@@ -129,9 +134,12 @@ cp ${perl_dir}/perl56.dll .
 echo "formatting documentation"
 cp README README.txt
 mv share doc
-cp ../ghc/docs/users_guide/users_guide.pdf doc/ || 
-  (make -C ../ghc/docs/users_guide/ pdf ; cp ../ghc/docs/users_guide/users_guide.pdf doc/) || 
-  echo "No User Guide PDF doc found"
-cp ../hslibs/doc/hslibs.pdf doc/ || 
-  (make -C ../hslibs/doc/ pdf ; cp ../hslibs/doc/hslibs.pdf doc/) ||
-  echo "No HSLIBS PDF doc found"
+
+# Leave out pdf users_guide documentation for now; problematic to build with the versions
+# of 'xsltproc' and 'fop' I've been able to lay my hands on.
+#cp ../ghc/docs/users_guide/users_guide.pdf doc/ || 
+#  (make -C ../ghc/docs/users_guide/ pdf ; cp ../ghc/docs/users_guide/users_guide.pdf doc/) || 
+#  echo "No User Guide PDF doc found"
+#cp ../hslibs/doc/hslibs.pdf doc/ || 
+#  (make -C ../hslibs/doc/ pdf ; cp ../hslibs/doc/hslibs.pdf doc/) ||
+#  echo "No HSLIBS PDF doc found"
