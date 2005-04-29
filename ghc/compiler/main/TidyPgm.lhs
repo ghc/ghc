@@ -28,7 +28,8 @@ import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( Arity, isNeverActive )
 import Name		( Name, getOccName, nameOccName, mkInternalName,
-		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe
+		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe,
+			  isWiredInName, getName
 			)
 import NameSet		( NameSet, elemNameSet )
 import IfaceEnv		( allocateGlobalBinder )
@@ -126,9 +127,10 @@ mkBootModDetails hsc_env (ModGuts { mg_module = mod,
   = do	{ let dflags = hsc_dflags hsc_env 
 	; showPass dflags "Tidy [hoot] type env"
 
-	; let { ispecs' = tidyInstances tidyExternalId ispecs
-	      ; type_env1 = mapNameEnv tidyBootThing type_env
-	      ; type_env' = extendTypeEnvWithIds type_env1
+	; let { ispecs'   = tidyInstances tidyExternalId ispecs
+	      ; type_env1 = filterNameEnv (not . isWiredInThing) type_env
+	      ; type_env2 = mapNameEnv tidyBootThing type_env1
+	      ; type_env' = extendTypeEnvWithIds type_env2
 				(map instanceDFunId ispecs')
 	      }
 	; return (ModDetails { md_types = type_env',
@@ -136,6 +138,10 @@ mkBootModDetails hsc_env (ModGuts { mg_module = mod,
 			       md_rules = [],
 			       md_exports = exports })
 	}
+  where
+
+isWiredInThing :: TyThing -> Bool
+isWiredInThing thing = isWiredInName (getName thing)
 
 tidyBootThing :: TyThing -> TyThing
 -- Just externalise the Ids; keep everything
@@ -317,6 +323,7 @@ tidyTypeEnv omit_prags exports type_env tidy_binds
    	-- We keep GlobalIds, because they won't appear 
 	-- in the bindings from which final_ids are derived!
 	-- (The bindings bind LocalIds.)
+    keep_it thing | isWiredInThing thing = False
     keep_it (AnId id) = isGlobalId id	-- Keep GlobalIds (e.g. class ops)
     keep_it other     = True		-- Keep all TyCons, DataCons, and Classes
 
