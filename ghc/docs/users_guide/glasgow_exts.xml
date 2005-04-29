@@ -1762,7 +1762,8 @@ these declarations:
   instance context3 => C Int [a]   where ...  -- (C)
   instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-The instances (A) and (B) match the constraint <literal>C Int Bool</literal>, but (C) and (D) do not.  When matching, GHC takes
+The instances (A) and (B) match the constraint <literal>C Int Bool</literal>, 
+but (C) and (D) do not.  When matching, GHC takes
 no account of the context of the instance declaration
 (<literal>context1</literal> etc).
 GHC's default behaviour is that <emphasis>exactly one instance must match the
@@ -1795,10 +1796,33 @@ GHC will instead pick (C), without complaining about
 the problem of subsequent instantiations.
 </para>
 <para>
-Because overlaps are checked and reported lazily, as described above, you need
-the <option>-fallow-overlapping-instances</option> in the module that <emphasis>calls</emphasis> 
-the overloaded function, rather than in the module that <emphasis>defines</emphasis> it.</para>
-
+The willingness to be overlapped or incoherent is a property of 
+the <emphasis>instance declaration</emphasis> itself, controlled by the
+presence or otherwise of the <option>-fallow-overlapping-instances</option> 
+and <option>-fallow-incoherent-instances</option> flags when that mdodule is
+being defined.  Neither flag is required in a module that imports and uses the
+instance declaration.  Specifically, during the lookup process:
+<itemizedlist>
+<listitem><para>
+An instance declaration is ignored during the lookup process if (a) a more specific
+match is found, and (b) the instance declaration was compiled with 
+<option>-fallow-overlapping-instances</option>.  The flag setting for the
+more-specific instance does not matter.
+</para></listitem>
+<listitem><para>
+Suppose an instance declaration does not matche the constraint being looked up, but
+does unify with it, so that it might match when the constraint is further 
+instantiated.  Usually GHC will regard this as a reason for not committing to
+some other constraint.  But if the instance declaration was compiled with
+<option>-fallow-incoherent-instances</option>, GHC will skip the "does-it-unify?" 
+check for that declaration.
+</para></listitem>
+</itemizedlist>
+All this makes it possible for a library author to design a library that relies on 
+overlapping instances without the library client having to know.
+</para>
+<para>The <option>-fallow-incoherent-instances</option> flag implies the
+<option>-fallow-overlapping-instances</option> flag, but not vice versa.
 </sect3>
 
 <sect3>
