@@ -13,7 +13,7 @@ module TcTyClsDecls (
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), , NewOrData(..), 
 			  tyClDeclTyVars, isSynDecl, 
-			  LTyClDecl, tcdName, LHsTyVarBndr
+			  LTyClDecl, tcdName, hsTyVarName, LHsTyVarBndr
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
@@ -23,7 +23,7 @@ import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
 import TcRnMonad
 import TcEnv		( TyThing(..), 
 			  tcLookupLocated, tcLookupLocatedGlobal, 
-			  tcExtendGlobalEnv, tcExtendKindEnv,
+			  tcExtendGlobalEnv, tcExtendKindEnv, tcExtendKindEnvTvs,
 			  tcExtendRecEnv, tcLookupTyVar )
 import TcTyDecls	( calcTyConArgVrcs, calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
@@ -32,11 +32,11 @@ import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType,
 			  kcHsSigType, tcHsBangType, tcLHsConSig, tcDataKindSig )
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
-import TcUnify		( unifyKind )
 import TcType		( TcKind, TcType, tyVarsOfType, 
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, tcEqTypes,
 			  tcSplitSigmaTy, tcEqType )
 import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
+import Kind		( mkArrowKinds, splitKindFunTys )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, ArgVrcs, AlgTyConRhs( AbstractTyCon ),
@@ -229,10 +229,22 @@ kcTyClDecls syn_decls alg_decls
 
 ------------------------------------------------------------------------
 getInitialKind :: LTyClDecl Name -> TcM (Name, TcKind)
+-- Only for data type and class declarations
+-- Get as much info as possible from the data or class decl,
+-- so as to maximise usefulness of error messages
+getInitialKind (L _ decl)
+  = do 	{ arg_kinds <- mapM (mk_arg_kind . unLoc) (tyClDeclTyVars decl)
+	; res_kind  <- mk_res_kind decl
+	; return (tcdName decl, mkArrowKinds arg_kinds res_kind) }
+  where
+    mk_arg_kind (UserTyVar _)        = newKindVar
+    mk_arg_kind (KindedTyVar _ kind) = return kind
 
-getInitialKind decl
- = newKindVar			`thenM` \ kind  ->
-   returnM (unLoc (tcdLName (unLoc decl)), kind)
+    mk_res_kind (TyData { tcdKindSig = Just kind }) = return kind
+	-- On GADT-style declarations we allow a kind signature
+	--	data T :: *->* where { ... }
+    mk_res_kind other = return liftedTypeKind
+
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)] 
@@ -263,6 +275,8 @@ kcSynDecl (AcyclicSCC ldecl@(L loc decl))
 kcSynDecl (CyclicSCC decls)
   = do { recSynErr decls; failM }	-- Fail here to avoid error cascade
 					-- of out-of-scope tycons
+
+kindedTyVarKind (L _ (KindedTyVar _ k)) = k
 
 ------------------------------------------------------------------------
 kcTyClDecl :: TyClDecl Name -> TcM (TyClDecl Name)
@@ -316,27 +330,21 @@ kcTyClDecl decl@(ForeignType {})
 kcTyClDeclBody :: TyClDecl Name
 	       -> ([LHsTyVarBndr Name] -> TcM a)
 	       -> TcM a
-  -- Extend the env with bindings for the tyvars, taken from
-  -- the kind of the tycon/class.  Give it to the thing inside, and 
-  -- check the result kind matches
+-- getInitialKind has made a suitably-shaped kind for the type or class
+-- Unpack it, and attribute those kinds to the type variables
+-- Extend the env with bindings for the tyvars, taken from
+-- the kind of the tycon/class.  Give it to the thing inside, and 
+ -- check the result kind matches
 kcTyClDeclBody decl thing_inside
   = tcAddDeclCtxt decl		$
-    kcHsTyVars (tyClDeclTyVars decl)	$ \ kinded_tvs ->
     do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
-	; let tc_kind = case tc_ty_thing of { AThing k -> k }
-	; 
-	; traceTc (text "kcbody" <+> ppr decl <+> ppr tc_kind <+> ppr (map kindedTyVarKind kinded_tvs)  <+> ppr (result_kind decl))
-	; unifyKind tc_kind (foldr (mkArrowKind . kindedTyVarKind) 
-				   (result_kind decl)
-				   kinded_tvs)
-	; thing_inside kinded_tvs }
-  where
-    result_kind (TyData { tcdKindSig = Just kind }) = kind
-    result_kind other				    = liftedTypeKind
-	-- On GADT-style declarations we allow a kind signature
-	--	data T :: *->* where { ... }
-
-kindedTyVarKind (L _ (KindedTyVar _ k)) = k
+	; let tc_kind	 = case tc_ty_thing of { AThing k -> k }
+	      (kinds, _) = splitKindFunTys tc_kind
+	      hs_tvs 	 = tcdTyVars decl
+	      kinded_tvs = ASSERT( length kinds >= length hs_tvs )
+			   [ L loc (KindedTyVar (hsTyVarName tv) k)
+			   | (L loc tv, k) <- zip hs_tvs kinds]
+	; tcExtendKindEnvTvs kinded_tvs (thing_inside kinded_tvs) }
 \end{code}
 
 

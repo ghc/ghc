@@ -28,7 +28,7 @@ import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, HsBang,
 			  getBangStrictness, collectSigTysFromHsBinds )
 import RnHsSyn		( extractHsTyVars )
 import TcRnMonad
-import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnv, 
+import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnvTvs, 
 			  tcLookup, tcLookupClass, tcLookupTyCon,
 		 	  TyThing(..), getInLocalScope, wrongThingErr
 			)
@@ -603,8 +603,7 @@ kcHsTyVars :: [LHsTyVarBndr Name]
 	   -> TcM r
 kcHsTyVars tvs thing_inside 
   = mappM (wrapLocM kcHsTyVar) tvs	`thenM` \ bndrs ->
-    tcExtendKindEnv [(n,k) | L _ (KindedTyVar n k) <- bndrs]
-		    (thing_inside bndrs)
+    tcExtendKindEnvTvs bndrs (thing_inside bndrs)
 
 kcHsTyVar :: HsTyVarBndr Name -> TcM (HsTyVarBndr Name)
 	-- Return a *kind-annotated* binder, and a tyvar with a mutable kind in it	

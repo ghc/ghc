@@ -16,7 +16,7 @@ module TcEnv(
 	tcLookupLocatedClass, 
 	
 	-- Local environment
-	tcExtendKindEnv,
+	tcExtendKindEnv, tcExtendKindEnvTvs,
 	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
@@ -42,7 +42,8 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsSyn		( LRuleDecl, LHsBinds, LSig, pprLHsBinds )
+import HsSyn		( LRuleDecl, LHsBinds, LSig, 
+			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds )
 import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
 import TcRnTypes	( pprTcTyThingCategory )
@@ -242,6 +243,14 @@ tcExtendKindEnv things thing_inside
   where
     upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
     extend env  = extendNameEnvList env [(n, AThing k) | (n,k) <- things]
+
+tcExtendKindEnvTvs :: [LHsTyVarBndr Name] -> TcM r -> TcM r
+tcExtendKindEnvTvs bndrs thing_inside
+  = updLclEnv upd thing_inside
+  where
+    upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
+    extend env  = extendNameEnvList env pairs
+    pairs       = [(n, AThing k) | L _ (KindedTyVar n k) <- bndrs]
 
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
