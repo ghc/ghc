@@ -289,10 +289,12 @@ binary-dist::
 	fi
 #
 # binary dist'ing the documentation.  
-# Which documentation to build/install is hardcoded below.
-#
+# The default documentation to build/install is given below; overrideable
+# via build.mk or the 'make' command-line.
 
+ifndef BINDIST_DOC_WAYS
 BINDIST_DOC_WAYS = html ps
+endif
 # BINDIST_DOC_WAYS =
 
 binary-dist ::
