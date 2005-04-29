@@ -1823,6 +1823,7 @@ overlapping instances without the library client having to know.
 </para>
 <para>The <option>-fallow-incoherent-instances</option> flag implies the
 <option>-fallow-overlapping-instances</option> flag, but not vice versa.
+</para>
 </sect3>
 
 <sect3>
