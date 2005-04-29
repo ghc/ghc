@@ -512,8 +512,8 @@ spec_one env fn rhs (pats, rule_number)
 	rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
 	spec_rhs  = mkLams spec_lam_args spec_body
 	spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
-	rhs	  = mkVarApps (Var spec_id) spec_call_args
-	rule      = mkLocalRule rule_name specConstrActivation fn_name bndrs pats rhs
+	rule_rhs  = mkVarApps (Var spec_id) spec_call_args
+	rule      = mkLocalRule rule_name specConstrActivation fn_name bndrs pats rule_rhs
     in
     returnUs (rule, (spec_id, spec_rhs))
 
