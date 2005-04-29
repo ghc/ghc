@@ -364,15 +364,10 @@ hscBootBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
 
 	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
 
-	; let { final_details = ModDetails { md_types   = mg_types ds_result,
-					     md_exports = mg_exports ds_result,
-					     md_insts   = mg_insts ds_result,
-					     md_rules   = mg_rules ds_result } }
       	  -- And the answer is ...
 	; dumpIfaceStats hsc_env
 
-	; return (HscRecomp final_details
-			    new_iface
+	; return (HscRecomp details new_iface
                             False False Nothing)
  	}
 

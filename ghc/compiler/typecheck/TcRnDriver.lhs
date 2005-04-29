@@ -63,7 +63,7 @@ import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
-import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, lookupModuleEnv )
+import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, elemModuleEnv )
 import OccName		( mkVarOcc )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName )
 import NameSet
@@ -109,6 +109,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 import IfaceType	( IfaceType, toIfaceType, 
 			  interactiveExtNameFun )
 import IfaceEnv		( lookupOrig, ifaceExportNames )
+import Module		( lookupModuleEnv )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( isImplicitId, setIdType, globalIdDetails, mkExportedLocalId )
 import MkId		( unsafeCoerceId )
@@ -176,11 +177,14 @@ tcRnModule hsc_env hsc_src save_rn_decls
 	let { dep_mods :: ModuleEnv (Module, IsBootInterface)
 	    ; dep_mods = imp_dep_mods imports
 
-	    ; is_dep_mod :: Module -> Bool
-	    ; is_dep_mod mod = case lookupModuleEnv dep_mods mod of
-				Nothing		  -> False
-				Just (_, is_boot) -> not is_boot 
-	    ; home_insts = hptInstances hsc_env is_dep_mod
+		-- We want instance declarations from all home-package
+		-- modules below this one, including boot modules, except
+		-- ourselves.  The 'except ourselves' is so that we don't
+		-- get the instances from this module's hs-boot file
+	    ; want_instances :: Module -> Bool
+	    ; want_instances mod = mod `elemModuleEnv` dep_mods
+				   && mod /= this_mod
+	    ; home_insts = hptInstances hsc_env want_instances
 	    } ;
 
 		-- Record boot-file info in the EPS, so that it's 
@@ -587,7 +591,7 @@ missingBootThing thing
 bootMisMatch thing
   = ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file")
 instMisMatch inst
-  = hang (ptext SLIT("instance") <+> ppr inst)
+  = hang (ppr inst)
        2 (ptext SLIT("is defined in the hs-boot file, but not in the module"))
 \end{code}
 

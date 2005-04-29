@@ -27,7 +27,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 		   	  pprIfaceDeclHead, pprParendIfaceType,
 			  pprIfaceForAllPart, pprIfaceType )
 import FunDeps		( pprFundeps )
-import SrcLoc		( SrcLoc, isGoodSrcLoc )
+import SrcLoc		( SrcLoc, pprDefnLoc )
 import OccName		( OccName, parenSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity )
 
@@ -538,12 +538,9 @@ showThing exts (wanted_str, thing, fixity, src_loc, insts)
 
 showWithLoc :: SrcLoc -> SDoc -> SDoc
 showWithLoc loc doc 
-    = hang doc 2 (char '\t' <> show_loc loc)
+    = hang doc 2 (char '\t' <> comment <+> pprDefnLoc loc)
 		-- The tab tries to make them line up a bit
   where
-    show_loc loc	-- The ppr function for SrcLocs is a bit wonky
-	| isGoodSrcLoc loc = comment <+> ptext SLIT("Defined at") <+> ppr loc
-	| otherwise	   = comment <+> ppr loc
     comment = ptext SLIT("--")
 
 

@@ -23,7 +23,7 @@ module SrcLoc (
 	srcLocFile,		-- return the file name part
 	srcLocLine,		-- return the line part
 	srcLocCol,		-- return the column part
-
+	pprDefnLoc,
 
 	SrcSpan,		-- Abstract
 	noSrcSpan,
@@ -303,6 +303,12 @@ combineSrcSpans	start end
 	line2 = srcSpanEndLine end
 	col2  = srcSpanEndCol end
 	file  = srcSpanFile start
+
+pprDefnLoc :: SrcLoc -> SDoc
+-- "defined at ..." or "imported from ..."
+pprDefnLoc loc
+  | isGoodSrcLoc loc = ptext SLIT("Defined at") <+> ppr loc
+  | otherwise	     = ppr loc
 
 instance Outputable SrcSpan where
     ppr span

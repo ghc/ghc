@@ -37,6 +37,7 @@ import Unify		( tcMatchTys, tcUnifyTys, BindFlag(..) )
 import Outputable
 import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
 import Id		( idType, idName )
+import SrcLoc		( pprDefnLoc )
 import Maybe		( isJust, isNothing )
 \end{code}
 
@@ -154,7 +155,7 @@ pprInstance :: Instance -> SDoc
 pprInstance ispec@(Instance { is_flag = flag })
   = hang (ptext SLIT("instance") <+> ppr flag
 	  <+> sep [pprThetaArrow theta, pprClassPred clas tys])
-	2 (ppr (getSrcLoc ispec))
+	2 (parens (pprDefnLoc (getSrcLoc ispec)))
   where
     (_, theta, clas, tys) = instanceHead ispec
 	-- Print without the for-all, which the programmer doesn't write
