@@ -1963,6 +1963,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 #     endif
 
       if (0==strcmp(".text",sectab_i->Name) ||
+          0==strcmp(".rdata",sectab_i->Name)||
           0==strcmp(".rodata",sectab_i->Name))
          kind = SECTIONKIND_CODE_OR_RODATA;
       if (0==strcmp(".data",sectab_i->Name) ||
