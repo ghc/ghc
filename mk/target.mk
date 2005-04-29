@@ -19,7 +19,7 @@
 #       install-docs*
 #	clean* distclean* mostlyclean* maintainer-clean*
 #	tags*
-#	dvi ps (no info) FPTOOLS adds: pdf rtf html
+#	dvi ps (no info) FPTOOLS adds: pdf rtf html chm HxS
 #	check
 #
 # 3. Some of the above targets have a version that
@@ -178,7 +178,7 @@ endif
 # `TAGS'
 #      Update a tags table for this program.
 # 
-# `dvi' `ps' `pdf' `html' `rtf' 
+# `dvi' `ps' `pdf' `html' `chm' `HxS' `rtf' 
 #      Generate DVI/PS/PDF files for LaTeX/DocBook docs. Not everything is
 #      supported everywhere, but the intention is to standardise on DocBook
 #      producing all formats.
@@ -844,7 +844,7 @@ endif
 # TODO: The following could be an entry for an Obfuscated Makefile Contest...
 ifneq "$(strip $(INSTALL_XML_DOC))" ""
 ifneq "$(XMLDocWays)" ""
-install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%.chm,$(patsubst %.html,%/index.html,.$(i)))))
+install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.html,%/index.html,.$(i))))
 	@$(INSTALL_DIR) $(datadir)	
 	@for i in $(XMLDocWays); do \
 		if [ $$i = "html" ]; then \
@@ -853,12 +853,13 @@ install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-
 			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html/$(INSTALL_XML_DOC) )" ; \
 			( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html/$(INSTALL_XML_DOC) ) ; \
 		else \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.htmlhelp/.chm/ | sed s/\.html-no-chunks/.html/` $(datadir); \
+			$(INSTALL_DIR) $(datadir)/doc; \
+			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir)/doc; \
+			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir)/doc; \
 		fi; \
 		if [ $$i = "html-no-chunks" ]; then \
-			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
-			$(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
+			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir)/doc; \
+			$(CP) $(FPTOOLS_CSS_ABS) $(datadir)/doc; \
 		fi \
 	done
 endif
@@ -951,7 +952,7 @@ show:
 #
 ################################################################################
 
-.PHONY: html html-no-chunks htmlhelp fo dvi ps pdf
+.PHONY: html html-no-chunks chm HxS fo dvi ps pdf
 
 ifneq "$(XML_DOC)" ""
 
@@ -966,7 +967,8 @@ endif
 
 XML_HTML           = $(addsuffix /index.html,$(basename $(XML_DOC)))
 XML_HTML_NO_CHUNKS = $(addsuffix .html,$(XML_DOC))
-XML_HTMLHELP       = $(addsuffix -htmlhelp/index.html,$(basename $(XML_DOC)))
+XML_CHM            = $(addsuffix .chm,$(XML_DOC))
+XML_HxS            = $(addsuffix .HxS,$(XML_DOC))
 XML_FO             = $(addsuffix .fo,$(XML_DOC))
 XML_DVI            = $(addsuffix .dvi,$(XML_DOC))
 XML_PS             = $(addsuffix .ps,$(XML_DOC))
@@ -976,7 +978,8 @@ $(XML_HTML) $(XML_NO_CHUNKS_HTML) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF) :: $
 
 html           :: $(XML_HTML)
 html-no-chunks :: $(XML_HTML_NO_CHUNKS)
-htmlhelp       :: $(XML_HTMLHELP)
+chm            :: $(XML_CHM)
+HxS            :: $(XML_HxS)
 fo             :: $(XML_FO)
 dvi            :: $(XML_DVI)
 ps             :: $(XML_PS)
@@ -1194,7 +1197,7 @@ INSTALL_TARGET = install
 INSTALL_DOCS_TARGET = install-docs
 endif
 
-$(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html ps dvi txt::
+$(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html chm HxS ps dvi txt::
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"

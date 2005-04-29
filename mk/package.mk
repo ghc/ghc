@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.53 2005/04/15 18:13:34 sof Exp $
+# $Id: package.mk,v 1.54 2005/04/29 13:09:28 krasimir Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -361,7 +361,7 @@ ifneq "$(NO_HADDOCK_DOCS)" "YES"
 
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
 
-HTML_DIR = html
+HTML_DIR = ../html/$(PACKAGE)
 HTML_DOC = $(HTML_DIR)/haddock.css $(HTML_DIR)/haddock.js
 
 ifneq "$(HS_PPS)" ""
@@ -402,11 +402,15 @@ HTML_INSTALL_DIR = $(datadir)/html/libraries/$(PACKAGE)
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(HTML_INSTALL_DIR)
-	@for i in $(HTML_DIR)/*; do \
-	   echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
-	   $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
+	@for i in $(XMLDocWays); do \
+		if [ $$i = "html" ]; then \
+		   for i in $(HTML_DIR)/*; do \
+		     echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
+		     $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
+		   done; \
+		   $(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(HTML_INSTALL_DIR); \
+		fi \
 	done
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(HTML_INSTALL_DIR)
 
 endif # HS_PPS
 endif # NO_HADDOCK_DOCS

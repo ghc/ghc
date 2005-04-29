@@ -277,7 +277,15 @@ endif
 		    $(XSLTPROC_OPTS) \
 		    $(DIR_DOCBOOK_XSL)/htmlhelp/htmlhelp.xsl $<
 
-# TODO: Detect hhc via autoconf
+%-htmlhelp2/collection.HxC : %.xml
+	$(RM) -rf $(dir $@)
+	$(XSLTPROC) --stringparam base.dir $(dir $@) \
+		    --stringparam use.id.as.filename 1 \
+		    --stringparam manifest.in.base.dir 1 \
+		    $(XSLTPROC_OPTS) \
+		    $(DIR_DOCBOOK_XSL)/htmlhelp2/htmlhelp2.xsl $<
+
+# TODO: Detect hhc & Hxcomp via autoconf
 #
 # Two obstacles here:
 #
@@ -289,6 +297,9 @@ endif
 #
 %.chm : %-htmlhelp/index.html
 	( cd $(dir $<) && if hhc htmlhelp.hhp ; then false ; else true ; fi ) || true
+
+%.HxS : %-htmlhelp2/collection.HxC
+	( cd $(dir $<) && if Hxcomp -p collection.HxC -o ../$@ ; then false ; else true ; fi )
 
 %.fo : %.xml
 	$(XSLTPROC) --output $@ \

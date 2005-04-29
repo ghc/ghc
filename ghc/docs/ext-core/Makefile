@@ -36,5 +36,7 @@ boot:
 install:
 install-docs:
 html:
+chm:
+HxS:
 
 # End of file
