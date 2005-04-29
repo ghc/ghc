@@ -41,7 +41,7 @@ import qualified Exception
 import Data.Char	( isSpace )
 import Monad
 import Directory
-import System	( getArgs, getProgName,
+import System	( getArgs, getProgName, getEnv,
 		  exitWith, ExitCode(..)
 		)
 import System.IO
@@ -98,6 +98,7 @@ data Flag
   | FlagGlobalConfig FilePath
   | FlagForce
   | FlagAutoGHCiLibs
+  | FlagDefinedName String String
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -116,9 +117,16 @@ flags = [
 	"automatically build libs for GHCi (with register)",
   Option ['?'] ["help"] (NoArg FlagHelp)
 	"display this help and exit",
-   Option ['V'] ["version"] (NoArg FlagVersion)
+  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
+  	"define NAME as VALUE",
+  Option ['V'] ["version"] (NoArg FlagVersion)
 	"output version information and exit"
   ]
+ where
+  toDefined str = 
+    case break (=='=') str of
+      (nm,[])    -> FlagDefinedName nm []
+      (nm,_:val) -> FlagDefinedName nm val
 
 ourCopyright :: String
 ourCopyright = "GHC package manager version " ++ version ++ "\n"
@@ -173,13 +181,14 @@ runit cli nonopts = do
   let
 	force = FlagForce `elem` cli
 	auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
+        defines = [ (nm,val) | FlagDefinedName nm val <- cli ]
   --
   -- first, parse the command
   case nonopts of
     ["register", filename] -> 
-	registerPackage filename [] cli auto_ghci_libs False force
+	registerPackage filename defines cli auto_ghci_libs False force
     ["update", filename] -> 
-	registerPackage filename [] cli auto_ghci_libs True force
+	registerPackage filename defines cli auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
 	pkgid <- readGlobPkgId pkgid_str
 	unregisterPackage pkgid cli
@@ -318,7 +327,7 @@ emptyPackageConfig = "[]"
 -- Registering
 
 registerPackage :: FilePath
-		-> [(String,String)] --  defines, ToDo: maybe remove?
+		-> [(String,String)] -- defines
 	        -> [Flag]
 		-> Bool		-- auto_ghci_libs
 		-> Bool		-- update
@@ -335,13 +344,15 @@ registerPackage input defines flags auto_ghci_libs update force = do
   s <-
     case input of
       "-" -> do
-	putStr "Reading package info from stdin... "
+	putStr "Reading package info from stdin ... "
         getContents
       f   -> do
-        putStr ("Reading package info from " ++ show f ++ " ")
+        putStr ("Reading package info from " ++ show f ++ " ... ")
 	readFile f
 
-  pkg <- parsePackageInfo s defines force
+  expanded <- expandEnvVars s defines force
+
+  pkg <- parsePackageInfo expanded defines force
   putStrLn "done."
 
   validatePackageConfig pkg db_stack auto_ghci_libs update force
@@ -843,63 +854,18 @@ my_head s [] = error s
 my_head s (x:xs) = x
 
 -- ---------------------------------------------------------------------------
+-- expanding environment variables in the package configuration
 
-#ifdef OLD_STUFF
--- ToDo: reinstate
-expandEnvVars :: PackageConfig -> [(String, String)]
-	-> Bool -> IO PackageConfig
-expandEnvVars pkg defines force = do
-   -- permit _all_ strings to contain ${..} environment variable references,
-   -- arguably too flexible.
-  nm       <- expandString  (name pkg)
-  imp_dirs <- expandStrings (import_dirs pkg) 
-  src_dirs <- expandStrings (source_dirs pkg) 
-  lib_dirs <- expandStrings (library_dirs pkg) 
-  hs_libs  <- expandStrings (hs_libraries pkg)
-  ex_libs  <- expandStrings (extra_libraries pkg)
-  inc_dirs <- expandStrings (include_dirs pkg)
-  c_incs   <- expandStrings (c_includes pkg)
-  p_deps   <- expandStrings (package_deps pkg)
-  e_g_opts <- expandStrings (extra_ghc_opts pkg)
-  e_c_opts <- expandStrings (extra_cc_opts pkg)
-  e_l_opts <- expandStrings (extra_ld_opts pkg)
-  f_dirs   <- expandStrings (framework_dirs pkg)
-  e_frames <- expandStrings (extra_frameworks pkg)
-  return (pkg { name            = nm
-  	      , import_dirs     = imp_dirs
-	      , source_dirs     = src_dirs
-	      , library_dirs    = lib_dirs
-	      , hs_libraries    = hs_libs
-	      , extra_libraries = ex_libs
-	      , include_dirs    = inc_dirs
-	      , c_includes      = c_incs
-	      , package_deps    = p_deps
-	      , extra_ghc_opts  = e_g_opts
-	      , extra_cc_opts   = e_c_opts
-	      , extra_ld_opts   = e_l_opts
-	      , framework_dirs  = f_dirs
-	      , extra_frameworks= e_frames
-	      })
-  where
-   expandStrings :: [String] -> IO [String]
-   expandStrings = liftM concat . mapM expandSpecial
-
-   -- Permit substitutions for list-valued variables (but only when
-   -- they occur alone), e.g., package_deps["${deps}"] where env var
-   -- (say) 'deps' is "base,haskell98,network"
-   expandSpecial :: String -> IO [String]
-   expandSpecial str =
-      let expand f = liftM f $ expandString str
-      in case splitString str of
-         [Var _] -> expand (wordsBy (== ','))
-         _ -> expand (\x -> [x])
-
-   expandString :: String -> IO String
-   expandString = liftM concat . mapM expandElem . splitString
-
-   expandElem :: Elem -> IO String
-   expandElem (String s) = return s
-   expandElem (Var v)    = lookupEnvVar v
+expandEnvVars :: String -> [(String, String)] -> Bool -> IO String
+expandEnvVars str defines force = go str ""
+ where
+   go "" acc = return $! reverse acc
+   go ('$':'{':str) acc | (var, '}':rest) <- break close str
+        = do value <- lookupEnvVar var
+	     go rest (reverse value ++ acc)
+	where close c = c == '}' || c == '\n' -- don't span newlines
+   go (c:str) acc
+	= go str (c:acc)
 
    lookupEnvVar :: String -> IO String
    lookupEnvVar nm = 
@@ -910,26 +876,6 @@ expandEnvVars pkg defines force = do
 	   (\ _ -> do dieOrForce force ("Unable to expand variable " ++ 
 					show nm)
 		      return "")
-
-data Elem = String String | Var String
-
-splitString :: String -> [Elem]
-splitString "" = []
-splitString str =
-   case break (== '$') str of
-      (pre, _:'{':xs) ->
-         case span (/= '}') xs of
-            (var, _:suf) ->
-               (if null pre then id else (String pre :)) (Var var : splitString suf)
-            _ -> [String str]   -- no closing brace
-      _ -> [String str]   -- no dollar/opening brace combo
-
--- wordsBy isSpace == words
-wordsBy :: (Char -> Bool) -> String -> [String]
-wordsBy p s = case dropWhile p s of
-  "" -> []
-  s' -> w : wordsBy p s'' where (w,s'') = break p s'
-#endif
 
 -----------------------------------------------------------------------------
 
