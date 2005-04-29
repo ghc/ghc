@@ -17,8 +17,8 @@ else
 GhcBinDistShScripts =
 endif
 
-GhcBinDistPrlScripts = 
-GhcBinDistLibPrlScripts = ghc-asm ghc-split ghcprof
+GhcBinDistPrlScripts = ghcprof
+GhcBinDistLibPrlScripts = ghc-asm ghc-split
 GhcBinDistBins = hp2ps runghc
 GhcBinDistOptBins = runhaskell
 GhcBinDistLinks = ghc ghci ghc-pkg
