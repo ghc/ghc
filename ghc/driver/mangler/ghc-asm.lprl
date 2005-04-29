@@ -550,6 +550,21 @@ sub mangle_asm {
             # code.
             # The .no_dead_strip directives are actually put there by
             # the gcc3 "used" attribute on entry points.
+        
+        } elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && ( 
+		   /^\s*\.picsymbol_stub/
+		|| /^\s*\.section __TEXT,__picsymbol_stub1,.*/
+		|| /^\s*\.section __TEXT,__picsymbolstub1,.*/
+		|| /^\s*\.symbol_stub/
+		|| /^\s*\.section __TEXT,__symbol_stub1,.*/
+		|| /^\s*\.section __TEXT,__symbolstub1,.*/
+		|| /^\s*\.lazy_symbol_pointer/
+		|| /^\s*\.non_lazy_symbol_pointer/ ))
+	{
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
+
 	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
 	    # duplicated from the bottom
 
@@ -696,19 +711,6 @@ sub mangle_asm {
 	    	$chkcat[$i]  = 'unknown';
 	    }
 
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && ( 
-		   /^\.picsymbol_stub/
-		|| /^\.section __TEXT,__picsymbol_stub1,.*/
-		|| /^\.section __TEXT,__picsymbolstub1,.*/
-		|| /^\.symbol_stub/
-		|| /^\.section __TEXT,__symbol_stub1,.*/
-		|| /^\.section __TEXT,__symbolstub1,.*/
-		|| /^\.lazy_symbol_pointer/
-		|| /^\.non_lazy_symbol_pointer/ ))
-	{
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'dyld';
-	    $chksymb[$i] = '';
 	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.data/ && $chkcat[$i] eq 'dyld')
 	{	# non_lazy_symbol_ptrs that point to local symbols
 	    $chk[++$i]   = $_;
