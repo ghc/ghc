@@ -565,6 +565,12 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
 
+	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && $chkcat[$i] eq 'dyld' && /^\s*\.data/)
+	{	# non_lazy_symbol_ptrs that point to local symbols
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
+
 	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
 	    # duplicated from the bottom
 
@@ -711,11 +717,6 @@ sub mangle_asm {
 	    	$chkcat[$i]  = 'unknown';
 	    }
 
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && /^\.data/ && $chkcat[$i] eq 'dyld')
-	{	# non_lazy_symbol_ptrs that point to local symbols
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'dyld';
-	    $chksymb[$i] = '';
 	} elsif ( $TargetPlatform =~ /^powerpc-.*-linux/ && /^\.LCTOC1 = /o ) {
 		# PowerPC Linux's large-model PIC (-fPIC) generates a gobal offset
 		# table "by hand". Be sure to copy it over.
