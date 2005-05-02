@@ -823,7 +823,10 @@ genInst spec
 
 	-- Bring the right type variables into 
 	-- scope, and rename the method binds
-	; (rn_meth_binds, _fvs) <- bindLocalNames (map varName tyvars)	$
+	-- It's a bit yukky that we return *renamed* InstInfo, but
+	-- *non-renamed* auxiliary bindings
+	; (rn_meth_binds, _fvs) <- discardWarnings $ 
+				   bindLocalNames (map varName tyvars)	$
 			 	   rnMethodBinds clas_nm [] meth_binds
 
 	-- Build the InstInfo
