@@ -1,0 +1,6 @@
+
+tcfail137.hs:8:4:
+    No instance for (Floating Bool)
+      arising from use of `Test' at tcfail137.hs:8:4-7
+    Probable fix: add an instance declaration for (Floating Bool)
+    In the definition of `x': x = Test [False, True]
