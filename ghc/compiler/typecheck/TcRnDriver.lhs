@@ -87,8 +87,8 @@ import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..),
 			  collectLStmtsBinders, mkSimpleMatch, nlVarPat,
 		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
-			  Provenance(..), ImportSpec(..),
-			  lookupLocalRdrEnv, extendLocalRdrEnv )
+			  Provenance(..), ImportSpec(..), globalRdrEnvElts,
+			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
 import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
@@ -102,16 +102,16 @@ import RnTypes		( rnLHsType )
 import Inst		( tcGetInstEnvs )
 import InstEnv		( classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
-import LoadIface	( loadSrcInterface )
+import LoadIface	( loadSrcInterface, loadSysInterface )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
 			  IfaceExtName(..), IfaceConDecls(..), 
 			  tyThingToIfaceDecl )
 import IfaceType	( IfaceType, toIfaceType, 
 			  interactiveExtNameFun )
 import IfaceEnv		( lookupOrig, ifaceExportNames )
-import Module		( lookupModuleEnv )
+import Module		( lookupModuleEnv, moduleSetElts, mkModuleSet )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( isImplicitId, setIdType, globalIdDetails, mkExportedLocalId )
+import Id		( isImplicitId, setIdType, globalIdDetails )
 import MkId		( unsafeCoerceId )
 import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
@@ -121,7 +121,7 @@ import SrcLoc		( interactiveSrcLoc, unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
 import Name		( nameOccName, nameModule )
-import OccName		( occNameUserString )
+import OccName		( occNameUserString, isTcOcc )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
 			  bindIOName, thenIOName, returnIOName )
@@ -1228,6 +1228,12 @@ tcRnGetInfo hsc_env ictxt rdr_name
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env ictxt $ do {
 
+	-- Load the interface for all unqualified types and classes
+	-- That way we will find all the instance declarations
+	-- (Packages have not orphan modules, and we assume that
+	--  in the home package all relevant modules are loaded.)
+    loadUnqualIfaces ictxt ;
+
     good_names <- lookup_rdr_name rdr_name ;
 
 	-- And lookup up the entities, avoiding duplicates, which arise
@@ -1301,6 +1307,21 @@ toIfaceDecl ext_nm thing
 			ClassOpId cls      -> AClass cls
 			other		   -> AnId id
     munge other_thing = other_thing
+
+loadUnqualIfaces :: InteractiveContext -> TcM ()
+-- Load the home module for everything that is in scope unqualified
+-- This is so that we can accurately report the instances for 
+-- something
+loadUnqualIfaces ictxt
+  = initIfaceTcRn $
+    mapM_ (loadSysInterface doc) (moduleSetElts (mkModuleSet unqual_mods))
+  where
+    unqual_mods = [ nameModule name
+		  | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt),
+		    let name = gre_name gre,
+		    isTcOcc (nameOccName name),  -- Types and classes only
+		    unQualOK gre ]		 -- In scope unqualified
+    doc = ptext SLIT("Need interface for module whose export(s) are in scope unqualified")
 #endif /* GHCI */
 \end{code}
 

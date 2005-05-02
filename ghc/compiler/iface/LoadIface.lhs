@@ -5,8 +5,8 @@
 
 \begin{code}
 module LoadIface (
-	loadHomeInterface, loadInterface, loadWiredInHomeIface, 
-	loadSrcInterface, loadOrphanModules, 
+	loadInterface, loadHomeInterface, loadWiredInHomeIface, 
+	loadSrcInterface, loadSysInterface, loadOrphanModules, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
 	loadDecls, ifaceStats, discardDeclPrags,
 	initExternalPackageState
