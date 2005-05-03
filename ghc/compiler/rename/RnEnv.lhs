@@ -745,12 +745,11 @@ warnUnusedName (name, prov)
 	-- TODO should be a proper span
   where
     (loc,msg) = case prov of
-		  Just (Imported is _) -> 
-		     ( is_loc (head is), imp_from (is_mod imp_spec) )
-		     where
-			 imp_spec = head is
-		  other -> 
-		     ( srcLocSpan (nameSrcLoc name), unused_msg )
+		  Just (Imported is)
+		        -> (is_loc imp_spec, imp_from (is_mod imp_spec))
+		        where
+			  imp_spec = head is
+		  other -> (srcLocSpan (nameSrcLoc name), unused_msg)
 
     unused_msg   = text "Defined but not used"
     imp_from mod = text "Imported from" <+> quotes (ppr mod) <+> text "but not used"

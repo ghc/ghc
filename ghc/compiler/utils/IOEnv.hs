@@ -8,7 +8,8 @@ module IOEnv (
 
 	-- Standard combinators, specialised
 	returnM, thenM, thenM_, failM,
-	mappM, mappM_, mapSndM, sequenceM, foldlM, 
+	mappM, mappM_, mapSndM, sequenceM, sequenceM_, 
+	foldlM, 
 	mapAndUnzipM, mapAndUnzip3M, 
 	checkM, ifM, zipWithM, zipWithM_,
 
@@ -151,6 +152,7 @@ mappM_ 	      :: (a -> IOEnv env b) -> [a] -> IOEnv env ()
 mapSndM       :: (b -> IOEnv env c) -> [(a,b)] -> IOEnv env [(a,c)]
 	-- Funny names to avoid clash with Prelude
 sequenceM     :: [IOEnv env a] -> IOEnv env [a]
+sequenceM_    :: [IOEnv env a] -> IOEnv env ()
 foldlM        :: (a -> b -> IOEnv env a)  -> a -> [b] -> IOEnv env a
 mapAndUnzipM  :: (a -> IOEnv env (b,c))   -> [a] -> IOEnv env ([b],[c])
 mapAndUnzip3M :: (a -> IOEnv env (b,c,d)) -> [a] -> IOEnv env ([b],[c],[d])
@@ -178,6 +180,9 @@ zipWithM_ f (a:as) (b:bs) = do { f a b; zipWithM_ f as bs }
 
 sequenceM [] = return []
 sequenceM (x:xs) = do { r <- x; rs <- sequenceM xs; return (r:rs) }
+
+sequenceM_ []     = return ()
+sequenceM_ (x:xs) = do { x; sequenceM_ xs }
 
 foldlM k z [] = return z
 foldlM k z (x:xs) = do { r <- k z x; foldlM k r xs }

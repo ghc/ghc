@@ -53,7 +53,8 @@ import SrcLoc		( Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc, srcLocSpan, SrcSpan )
 import BasicTypes	( DeprecTxt )
 import DriverPhases	( isHsBoot )
-import Util		( notNull, isSingleton )
+import Util		( notNull, isSingleton, thenCmp )
+import ListSetOps	( equivClasses )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
 \end{code}
@@ -181,7 +182,7 @@ importsFromImportDecl this_mod
 			  Nothing  	    -> imp_mod_name
 			  Just another_name -> another_name
 	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
-		  		 is_loc = loc, is_as = qual_mod_name }
+		  		 is_loc = loc, is_as = qual_mod_name, is_explicit = False }
     in
 	-- Get the total imports, and filter them according to the import list
     ifaceExportNames filtered_exports		`thenM` \ total_avails ->
@@ -388,7 +389,7 @@ filterImports :: ModIface
         -- Warns/informs if import spec contains duplicates.
 			
 mkGenericRdrEnv imp_spec names
-  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] False }
+  = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] }
 		   | name <- nameSetToList names ]
 
 filterImports iface imp_spec Nothing all_names
@@ -428,9 +429,10 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) all_names
 	   ; returnM (map (mk_gre loc) names) }
       where
 	mk_gre loc name = GRE { gre_name = name, 
-				gre_prov = Imported [this_imp_spec loc] (explicit name) }
-	this_imp_spec loc = imp_spec { is_loc = loc }
-	explicit name = all_explicit || isNothing (nameParent_maybe name)
+				gre_prov = Imported [imp_spec'] }
+	  where
+	    imp_spec' = imp_spec { is_loc = loc, is_explicit = explicit }
+	    explicit = all_explicit || isNothing (nameParent_maybe name)
 
     get_item :: IE RdrName -> RnM [GlobalRdrElt]
 	-- Empty result for a bad item.
@@ -673,7 +675,7 @@ reportDeprecations tcg_env
     used_names = findUses (tcg_dus tcg_env) emptyNameSet
     all_gres   = globalRdrEnvElts (tcg_rdr_env tcg_env)
 
-    check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_) _})
+    check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
       | name `elemNameSet` used_names
       ,	Just deprec_txt <- lookupDeprec hpt pit name
       = setSrcSpan (is_loc imp_spec) $
@@ -729,7 +731,7 @@ reportUnusedNames export_decls gbl_env
   = do	{ warnUnusedTopBinds   unused_locals
 	; warnUnusedModules    unused_imp_mods
 	; warnUnusedImports    unused_imports	
-	; warnDuplicateImports dup_imps
+	; warnDuplicateImports defined_and_used
 	; printMinimalImports  minimal_imports }
   where
     used_names, all_used_names :: NameSet
@@ -750,11 +752,6 @@ reportUnusedNames export_decls gbl_env
     (defined_and_used, defined_but_not_used) 
 	= partition (gre_is_used all_used_names) defined_names
     
-	-- Find the duplicate imports
-    dup_imps = filter is_dup defined_and_used
-    is_dup (GRE {gre_prov = Imported imp_spec True}) = not (isSingleton imp_spec)
-    is_dup other				     = False
-
 	-- Filter out the ones that are 
 	--  (a) defined in this module, and
 	--  (b) not defined by a 'deriving' clause 
@@ -766,8 +763,9 @@ reportUnusedNames export_decls gbl_env
     
     unused_imports :: [GlobalRdrElt]
     unused_imports = filter unused_imp defined_but_not_used
-    unused_imp (GRE {gre_prov = Imported imp_specs True}) 
+    unused_imp (GRE {gre_prov = Imported imp_specs}) 
 	= not (all (module_unused . is_mod) imp_specs)
+	  && any is_explicit imp_specs
 		-- Don't complain about unused imports if we've already said the
 		-- entire import is unused
     unused_imp other = False
@@ -799,7 +797,7 @@ reportUnusedNames export_decls gbl_env
 	-- We've carefully preserved the provenance so that we can
 	-- construct minimal imports that import the name by (one of)
 	-- the same route(s) as the programmer originally did.
-    add_name (GRE {gre_name = n, gre_prov = Imported imp_specs _}) acc 
+    add_name (GRE {gre_name = n, gre_prov = Imported imp_specs}) acc 
 	= addToFM_C plusAvailEnv acc (is_mod (head imp_specs))
 		    (unitAvailEnv (mk_avail n (nameParent_maybe n)))
     add_name other acc 
@@ -864,16 +862,53 @@ reportUnusedNames export_decls gbl_env
 
 ---------------------
 warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
-warnDuplicateImports gres
-  = ifOptM Opt_WarnUnusedImports (mapM_ warn gres)
-  where
-    warn (GRE { gre_name = name, gre_prov = Imported imps _ })
-	= addWarn ((quotes (ppr name) <+> ptext SLIT("is imported more than once:")) 
-	       $$ nest 2 (vcat (map ppr imps)))
-    warn gre = panic "warnDuplicateImports"
-	-- The GREs should all have Imported provenance
-			      
+-- Given the GREs for names that are used, figure out which imports 
+-- could be omitted without changing the top-level environment.
+--
+-- NB: Given import Foo( T )
+--     	     import qualified Foo
+-- we do not report a duplicate import, even though Foo.T is brought
+-- into scope by both, because there's nothing you can *omit* without
+-- changing the top-level environment.  So we complain only if it's
+-- explicitly named in both imports or neither.
+--
+-- Furthermore, we complain about Foo.T only if 
+-- there is no complaint about (unqualified) T
 
+warnDuplicateImports gres
+  = ifOptM Opt_WarnUnusedImports $ 
+    sequenceM_	[ warn name (head dup_imps) 
+			-- The 'head' picks the first offending group
+			-- for this particular name
+		| GRE { gre_name = name, gre_prov = Imported imps } <- gres
+		, let dup_imps = dups imps
+		, not (null dup_imps) ]	
+  where
+    warn name [] 
+	= panic "warnDuplicateImports"	-- equivClasses never returns empty lists
+    warn name dup_imps@(imp1:_)
+	= addWarnAt (is_loc imp1)
+		 ((quotes pp_name <+> ptext SLIT("is imported more than once:")) 
+	           $$ nest 2 (vcat (map ppr dup_imps)))
+	where
+	  pp_name | is_qual imp1 = ppr (is_as imp1) <> dot <> ppr occ
+		  | otherwise	 = ppr occ
+	  occ = nameOccName name
+    
+    dups :: [ImportSpec] -> [[ImportSpec]]
+    dups [imp] = []	-- Very common case
+    dups imps  = filter (not . isSingleton) (unqual_dups ++ qual_dups)
+	where
+	  unqual_dups = equivClasses cmp_unqual (filter (not . is_qual) imps)
+	  qual_dups   = equivClasses cmp_qual   imps
+
+    cmp_unqual imp1 imp2	-- Make explicit come first
+	= not (is_explicit imp1) `compare` not (is_explicit imp2)
+		
+    cmp_qual imp1 imp2		-- Group by explicit-ness, then by module qualifier
+	= (imp1 `cmp_unqual` imp2) `thenCmp` 
+	  (is_as imp1 `compare` is_as imp2)
+	
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports :: FiniteMap Module AvailEnv	-- Minimal imports
 		    -> RnM ()

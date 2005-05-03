@@ -372,13 +372,13 @@ isLocalGRE other    		         = False
 
 unQualOK :: GlobalRdrElt -> Bool
 -- An unqualifed version of this thing is in scope
-unQualOK (GRE {gre_prov = LocalDef _})    = True
-unQualOK (GRE {gre_prov = Imported is _}) = not (all is_qual is)
+unQualOK (GRE {gre_prov = LocalDef _})  = True
+unQualOK (GRE {gre_prov = Imported is}) = not (all is_qual is)
 
 hasQual :: Module -> GlobalRdrElt -> Bool
 -- A qualified version of this thing is in scope
-hasQual mod (GRE {gre_prov = LocalDef m})    = m == mod
-hasQual mod (GRE {gre_prov = Imported is _}) = any ((== mod) . is_as) is
+hasQual mod (GRE {gre_prov = LocalDef m})  = m == mod
+hasQual mod (GRE {gre_prov = Imported is}) = any ((== mod) . is_as) is
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
@@ -422,27 +422,34 @@ data Provenance
 
   | Imported 		-- Imported
 	[ImportSpec]	-- INVARIANT: non-empty
-	Bool		-- True iff the thing was named *explicitly* 
-			-- in *any* of the import specs rather than being 
-			-- imported as part of a group; 
-	-- e.g.
-	--	import B
-	--	import C( T(..) )
+
+data ImportSpec		-- Describes a particular import declaration
+			-- Shared among all the Provenaces for a
+			-- import-all declaration; otherwise it's done
+			-- per explictly-named item
+  = ImportSpec {
+	is_mod      :: Module,	-- 'import Muggle'
+				-- Note the Muggle may well not be 
+				-- the defining module for this thing!
+	is_as       :: Module,	-- 'as M' (or 'Muggle' if there is no 'as' clause)
+	is_qual     :: Bool,	-- True <=> qualified (only)
+	is_explicit :: Bool,	-- True <=> explicit import (see below)
+	is_loc      :: SrcSpan	-- Location of import item
+    }
+	-- The is_explicit field is True iff the thing was named 
+	-- *explicitly* in the import specs rather 
+	-- than being imported as part of a group 
+	-- e.g.		import B
+	--		import C( T(..) )
 	-- Here, everything imported by B, and the constructors of T
 	-- are not named explicitly; only T is named explicitly.
 	-- This info is used when warning of unused names.
+	--
+	-- We keep ImportSpec separate from the Bool so that the
+	-- former can be shared between all Provenances for a particular
+	-- import declaration.  
 
-data ImportSpec		-- Describes a particular import declaration
-			-- Shared among all the Provenaces for a particular
-			-- import declaration
-  = ImportSpec {
-	is_mod  :: Module,		-- 'import Muggle'
-					-- Note the Muggle may well not be 
-					-- the defining module for this thing!
-	is_as   :: Module,		-- 'as M' (or 'Muggle' if there is no 'as' clause)
-	is_qual :: Bool,		-- True <=> qualified (only)
-	is_loc  :: SrcSpan }		-- Location of import statment
-
+-- Note [Comparing provenance]
 -- Comparison of provenance is just used for grouping 
 -- error messages (in RnEnv.warnUnusedBinds)
 instance Eq Provenance where
@@ -452,10 +459,11 @@ instance Eq ImportSpec where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
 
 instance Ord Provenance where
-   compare (LocalDef _) (LocalDef _)   = EQ
-   compare (LocalDef _) (Imported _ _) = LT
-   compare (Imported _ _) (LocalDef _) = GT
-   compare (Imported is1 _) (Imported is2 _) = compare (head is1) (head is2)
+   compare (LocalDef _) (LocalDef _)   	 = EQ
+   compare (LocalDef _) (Imported _) 	 = LT
+   compare (Imported _ ) (LocalDef _)    = GT
+   compare (Imported is1) (Imported is2) = compare (head is1) 
+	{- See Note [Comparing provenance] -}	   (head is2)
 
 instance Ord ImportSpec where
    compare is1 is2 = (is_mod is1 `compare` is_mod is2) `thenCmp` 
@@ -470,17 +478,15 @@ plusProv :: Provenance -> Provenance -> Provenance
 -- defined, and one might refer to it with a qualified name from
 -- the import -- but I'm going to ignore that because it makes
 -- the isLocalGRE predicate so much nicer this way
-plusProv (LocalDef m1) (LocalDef m2) 
-  = pprPanic "plusProv" (ppr m1 <+> ppr m2)
-plusProv p1@(LocalDef _) p2 = p1
-plusProv p1 p2@(LocalDef _) = p2
-plusProv (Imported is1 ex1) (Imported is2 ex2) 
-  = Imported (is1++is2) (ex1 || ex2)
+plusProv (LocalDef m1) (LocalDef m2)     = pprPanic "plusProv" (ppr m1 <+> ppr m2)
+plusProv p1@(LocalDef _) p2		 = p1
+plusProv p1 		 p2@(LocalDef _) = p2
+plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
 pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef _})
   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
-pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys) _})
+pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys)})
   = sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
 
 -- If we know the exact definition point (which we may do with GHCi)

@@ -87,7 +87,8 @@ import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..),
 		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  Provenance(..), ImportSpec(..), globalRdrEnvElts,
-			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
+			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv,
+			  plusGlobalRdrEnv )
 import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
@@ -1095,8 +1096,9 @@ getModuleExports mod
 vanillaProv :: Module -> Provenance
 -- We're building a GlobalRdrEnv as if the user imported
 -- all the specified modules into the global interactive module
-vanillaProv mod = Imported [ImportSpec mod mod False 
-			     (srcLocSpan interactiveSrcLoc)] False
+vanillaProv mod = Imported [ImportSpec { is_mod = mod, is_as = mod, 
+					 is_qual = False, is_explicit = False,
+					 is_loc = srcLocSpan interactiveSrcLoc }]
 \end{code}
 
 \begin{code}
