@@ -6,6 +6,7 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, 
+	getLocalDeclBinders, extendRdrEnvRn,
 	reportUnusedNames, reportDeprecations, 
 	mkModDeps, exportsFromAvail
     ) where
@@ -35,7 +36,7 @@ import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv,
 			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo,
 			  HomePackageTable, PackageIfaceTable, 
-			  availNames, unQualInScope, 
+			  unQualInScope, 
 			  Deprecs(..), ModIface(..), Dependencies(..), 
 			  lookupIface, ExternalPackageState(..)
 			)
@@ -43,16 +44,16 @@ import Packages		( PackageIdH(..) )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
 			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
-			  unQualOK, lookupGRE_Name,
+			  extendGlobalRdrEnv, lookupGlobalRdrEnv, unQualOK, lookupGRE_Name,
 			  Provenance(..), ImportSpec(..), 
 			  isLocalGRE, pprNameProvenance )
 import Outputable
 import Maybes		( isNothing, catMaybes, mapCatMaybes, seqMaybe, orElse )
 import SrcLoc		( Located(..), mkGeneralSrcSpan,
-			  unLoc, noLoc, srcLocSpan, combineSrcSpans, SrcSpan )
+			  unLoc, noLoc, srcLocSpan, SrcSpan )
 import BasicTypes	( DeprecTxt )
-import ListSetOps	( removeDups )
-import Util		( sortLe, notNull, isSingleton )
+import DriverPhases	( isHsBoot )
+import Util		( notNull, isSingleton )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
 \end{code}
@@ -266,32 +267,14 @@ created by its bindings.
 Complain about duplicate bindings
 
 \begin{code}
-importsFromLocalDecls :: HsGroup RdrName
-		      -> RnM (GlobalRdrEnv, ImportAvails)
+importsFromLocalDecls :: HsGroup RdrName -> RnM TcGblEnv
 importsFromLocalDecls group
-  = getModule				`thenM` \ this_mod ->
-    getLocalDeclBinders this_mod group	`thenM` \ avails ->
-	-- The avails that are returned don't include the "system" names
-    let
-	all_names :: [Name]	-- All the defns; no dups eliminated
-	all_names = [name | avail <- avails, name <- availNames avail]
+  = do	{ gbl_env  <- getGblEnv
 
-	dups :: [[Name]]
-	(_, dups) = removeDups compare all_names
-    in
-	-- Check for duplicate definitions
-	-- The complaint will come out as "Multiple declarations of Foo.f" because
-	-- since 'f' is in the env twice, the unQualInScope used by the error-msg
-	-- printer returns False.  It seems awkward to fix, unfortunately.
-    mappM_ addDupDeclErr dups			`thenM_` 
+	; names <- getLocalDeclBinders gbl_env group
 
-    doptM Opt_ImplicitPrelude 		`thenM` \ implicit_prelude ->
-    let
-	prov     = LocalDef this_mod
-	gbl_env  = mkGlobalRdrEnv gres
-	gres     = [ GRE { gre_name = name, gre_prov = prov}
-		   | name <- all_names]
-
+	; implicit_prelude <- doptM Opt_ImplicitPrelude
+	; let {
 	    -- Optimisation: filter out names for built-in syntax
 	    -- They just clutter up the environment (esp tuples), and the parser
 	    -- will generate Exact RdrNames for them, so the cluttered
@@ -310,24 +293,42 @@ importsFromLocalDecls group
 	    -- Ditto in fixity decls; e.g. 	infix 5 :
 	    -- Sigh. It doesn't matter because it only affects the Data.Tuple really.
 	    -- The important thing is to trim down the exports.
- 	filtered_names 
-	  | implicit_prelude = all_names
-	  | otherwise	     = filter (not . isBuiltInSyntax) all_names
+	      filtered_names 
+	        | implicit_prelude = names
+	        | otherwise	   = filter (not . isBuiltInSyntax) names ;
 
-	imports = emptyImportAvails {
-			imp_env = unitModuleEnv this_mod $
+	    ; this_mod = tcg_mod gbl_env
+	    ; imports = emptyImportAvails {
+			  imp_env = unitModuleEnv this_mod $
 				  mkNameSet filtered_names
-		    }
-    in
-    returnM (gbl_env, imports)
+		        }
+	    }
+
+	; rdr_env' <- extendRdrEnvRn this_mod (tcg_rdr_env gbl_env) names
+
+	; returnM (gbl_env { tcg_rdr_env = rdr_env',
+			     tcg_imports = imports `plusImportAvails` tcg_imports gbl_env }) 
+	}
+
+extendRdrEnvRn :: Module -> GlobalRdrEnv -> [Name] -> RnM GlobalRdrEnv
+-- Add the new locally-bound names one by one, checking for duplicates as
+-- we do so.  Remember that in Template Haskell the duplicates
+-- might *already be* in the GlobalRdrEnv from higher up the module
+extendRdrEnvRn mod rdr_env names
+  = foldlM add_local rdr_env names
+  where
+    add_local rdr_env name
+	| gres <- lookupGlobalRdrEnv rdr_env (nameOccName name)
+	, (dup_gre:_) <- filter isLocalGRE gres	-- Check for existing *local* defns
+	= do { addDupDeclErr (gre_name dup_gre) name
+	     ; return rdr_env }
+	| otherwise
+	= return (extendGlobalRdrEnv rdr_env new_gre)
+	where
+	  new_gre = GRE {gre_name = name, gre_prov = prov}
+
+    prov = LocalDef mod
 \end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Getting binders out of a declaration}
-%*							*
-%*********************************************************
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
 used for source code.
@@ -335,27 +336,21 @@ used for source code.
 	*** See "THE NAMING STORY" in HsDecls ****
 
 \begin{code}
-getLocalDeclBinders :: Module -> HsGroup RdrName -> RnM [AvailInfo]
-getLocalDeclBinders mod (HsGroup {hs_valds = val_decls, 
-				  hs_tyclds = tycl_decls, 
-				  hs_fords = foreign_decls })
-  =	-- For type and class decls, we generate Global names, with
-	-- no export indicator.  They need to be global because they get
-	-- permanently bound into the TyCons and Classes.  They don't need
-	-- an export indicator because they are all implicitly exported.
-
-    mappM new_tc     tycl_decls				`thenM` \ tc_avails ->
-	
+getLocalDeclBinders :: TcGblEnv -> HsGroup RdrName -> RnM [Name]
+getLocalDeclBinders gbl_env (HsGroup {hs_valds = val_decls, 
+				      hs_tyclds = tycl_decls, 
+				      hs_fords = foreign_decls })
+  = do	{ tc_names_s <- mappM new_tc tycl_decls
+	; val_names  <- mappM new_simple val_bndrs
+	; return (foldr (++) val_names tc_names_s) }
+  where
+    mod        = tcg_mod gbl_env
+    is_hs_boot = isHsBoot (tcg_src gbl_env) ;
+    val_bndrs | is_hs_boot = sig_hs_bndrs
+	      | otherwise  = for_hs_bndrs ++ val_hs_bndrs
 	-- In a hs-boot file, the value binders come from the
 	--  *signatures*, and there should be no foreign binders 
-    tcIsHsBoot						`thenM` \ is_hs_boot ->
-    let val_bndrs | is_hs_boot = sig_hs_bndrs
-		  | otherwise  = for_hs_bndrs ++ val_hs_bndrs
-    in
-    mappM new_simple val_bndrs				`thenM` \ names ->
 
-    returnM (tc_avails ++ map Avail names)
-  where
     new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name
 
     sig_hs_bndrs = [nm | HsBindGroup _ lsigs _  <- val_decls, 
@@ -364,9 +359,9 @@ getLocalDeclBinders mod (HsGroup {hs_valds = val_decls,
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 
     new_tc tc_decl 
-	= newTopSrcBinder mod Nothing main_rdr			`thenM` \ main_name ->
-	  mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs	`thenM` \ sub_names ->
-	  returnM (AvailTC main_name (main_name : sub_names))
+	= do { main_name <- newTopSrcBinder mod Nothing main_rdr
+	     ; sub_names <- mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs
+	     ; return (main_name : sub_names) }
 	where
 	  (main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
 \end{code}
@@ -974,16 +969,13 @@ exportClashErr global_env name1 name2 ie1 ie2
 	     (gre:_) -> gre
 	     []	     -> pprPanic "exportClashErr" (ppr name)
 
-addDupDeclErr :: [Name] -> TcRn ()
-addDupDeclErr names
-  = addErrAt big_loc $
+addDupDeclErr :: Name -> Name -> TcRn ()
+addDupDeclErr name1 name2
+  = addErrAt (srcLocSpan loc2) $
     vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr name1),
-	  ptext SLIT("Declared at:") <+> vcat (map ppr sorted_locs)]
+	  ptext SLIT("Declared at:") <+> vcat [ppr (nameSrcLoc name1), ppr loc2]]
   where
-    locs    = map nameSrcLoc names
-    big_loc = foldr1 combineSrcSpans (map srcLocSpan locs)
-    name1   = head names
-    sorted_locs = sortLe (<=) (sortLe (<=) locs)
+    loc2    = nameSrcLoc name2
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 

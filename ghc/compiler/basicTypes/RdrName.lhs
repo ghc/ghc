@@ -27,7 +27,8 @@ module RdrName (
 
 	-- GlobalRdrEnv
 	GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv, 
-	lookupGlobalRdrEnv, pprGlobalRdrEnv, globalRdrEnvElts,
+	lookupGlobalRdrEnv, extendGlobalRdrEnv,
+	pprGlobalRdrEnv, globalRdrEnvElts,
 	lookupGRE_RdrName, lookupGRE_Name,
 
 	-- GlobalRdrElt, Provenance, ImportSpec
@@ -342,6 +343,12 @@ lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
 lookupGlobalRdrEnv env rdr_name = case lookupOccEnv env rdr_name of
 					Nothing   -> []
 					Just gres -> gres
+
+extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
+extendGlobalRdrEnv env gre = extendOccEnv_C add env occ [gre]
+  where
+    occ = nameOccName (gre_name gre)
+    add gres _ = gre:gres
 
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env

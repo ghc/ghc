@@ -35,8 +35,7 @@ import RdrHsSyn		( findSplice )
 
 import PrelNames	( runMainIOName, rootMainName, mAIN,
 			  main_RDR_Unqual )
-import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv, 
-			  plusGlobalRdrEnv )
+import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv )
 import TcHsSyn		( zonkTopDecls )
 import TcExpr 		( tcInferRho )
 import TcRnMonad
@@ -293,11 +292,9 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 	-- Deal with the type declarations; first bring their stuff
 	-- into scope, then rname them, then type check them
-   (rdr_env, imports) <- importsFromLocalDecls (mkFakeGroup ldecls) ;
+   tcg_env  <- importsFromLocalDecls (mkFakeGroup ldecls) ;
 
-   updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl,
-			    tcg_imports = imports `plusImportAvails` tcg_imports gbl }) 
-		  $ do {
+   setGblEnv tcg_env $ do {
 
    rn_decls <- rnTyClDecls ldecls ;
    failIfErrsM ;
@@ -629,12 +626,9 @@ tcRnGroup boot_details decls
 rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 rnTopSrcDecls group
  = do { 	-- Bring top level binders into scope
-	(rdr_env, imports) <- importsFromLocalDecls group ;
-	updGblEnv (\gbl -> gbl { tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env gbl,
-				 tcg_imports = imports `plusImportAvails` tcg_imports gbl }) 
-		  $ do {
+	tcg_env <- importsFromLocalDecls group ;
+	setGblEnv tcg_env $ do {
 
-	traceRn (ptext SLIT("rnTopSrcDecls") <+> ppr rdr_env) ;
 	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
 
 		-- Rename the source decls

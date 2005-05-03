@@ -28,7 +28,7 @@ import RnHsSyn
 import TcRnMonad
 import RnEnv
 import OccName		( plusOccEnv )
-import RnNames		( importsFromLocalDecls )
+import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr,
 			  checkTupSize )
@@ -39,7 +39,7 @@ import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  negateName, thenMName, bindMName, failMName )
 import Name		( Name, nameOccName )
 import NameSet
-import RdrName		( RdrName )
+import RdrName		( RdrName, emptyGlobalRdrEnv )
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
@@ -640,22 +640,23 @@ rnBracket (TypBr t) = rnHsTypeFVs doc t	`thenM` \ (t', fvs) ->
 		    where
 		      doc = ptext SLIT("In a Template-Haskell quoted type")
 rnBracket (DecBr group) 
-  = importsFromLocalDecls group `thenM` \ (rdr_env, avails) ->
-	-- Discard avails (not useful here)
+  = do 	{ gbl_env  <- getGblEnv
+	; names    <- getLocalDeclBinders gbl_env group
+	; rdr_env' <- extendRdrEnvRn (tcg_mod gbl_env) emptyGlobalRdrEnv names
 
-    updGblEnv (\gbl -> gbl { tcg_rdr_env = tcg_rdr_env gbl `plusOccEnv` rdr_env}) $
-	-- Notice plusOccEnv, not plusGlobalRdrEnv.  In this situation we want
-	-- to *shadow* top-level bindings.  E.g.
-	--	foo = 1
-	--	bar = [d| foo = 1|]
-	-- So we drop down to plusOccEnv.  (Perhaps there should be a fn in RdrName.)
+	; setGblEnv (gbl_env { tcg_rdr_env = tcg_rdr_env gbl_env `plusOccEnv` rdr_env',
+			       tcg_dus = emptyDUs }) $ do
+		-- Notice plusOccEnv, not plusGlobalRdrEnv.  In this situation we want
+		-- to *shadow* top-level bindings.  E.g.
+		--	foo = 1
+		--	bar = [d| foo = 1|]
+		-- So we drop down to plusOccEnv.  (Perhaps there should be a fn in RdrName.)
+		--	
+		-- The emptyDUs is so that we just collect uses for this group alone
 
-    rnSrcDecls group	`thenM` \ (tcg_env, group') ->
-	-- Discard the tcg_env; it contains only extra info about fixity
-    let 
-	dus = tcg_dus tcg_env 
-    in
-    returnM (DecBr group', allUses dus)
+	{ (tcg_env, group') <- rnSrcDecls group
+		-- Discard the tcg_env; it contains only extra info about fixity
+	; return (DecBr group', allUses (tcg_dus tcg_env)) } }
 \end{code}
 
 %************************************************************************
