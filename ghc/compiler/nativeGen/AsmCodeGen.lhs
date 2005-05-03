@@ -547,9 +547,13 @@ cmmMachOpFold op arg@[CmmLit (CmmInt x rep)]
 	-- "from" type, in order to truncate to the correct size.
 	-- The final narrow/widen to the destination type
 	-- is implicit in the CmmLit.
-      MO_S_Conv from to -> CmmLit (CmmInt (narrowS from x) to)
+      MO_S_Conv from to
+	   | isFloatingRep to -> CmmLit (CmmFloat (fromInteger x) to)
+	   | otherwise        -> CmmLit (CmmInt (narrowS from x) to)
       MO_U_Conv from to -> CmmLit (CmmInt (narrowU from x) to)
-      _  -> panic "cmmMachOpFold: unknown unary op"
+
+      _ -> panic "cmmMachOpFold: unknown unary op"
+
 
 -- Eliminate conversion NOPs
 cmmMachOpFold (MO_S_Conv rep1 rep2) [x] | rep1 == rep2 = x
@@ -576,10 +580,14 @@ cmmMachOpFold conv_outer args@[CmmMachOp conv_inner [x]]
 	| otherwise ->
 	    CmmMachOp conv_outer args
   where
-	isIntConversion (MO_U_Conv rep1 rep2) = Just (rep1,rep2,False)
-	isIntConversion (MO_S_Conv rep1 rep2) = Just (rep1,rep2,True)
+	isIntConversion (MO_U_Conv rep1 rep2) 
+	  | not (isFloatingRep rep1) && not (isFloatingRep rep2) 
+	  = Just (rep1,rep2,False)
+	isIntConversion (MO_S_Conv rep1 rep2)
+	  | not (isFloatingRep rep1) && not (isFloatingRep rep2) 
+	  = Just (rep1,rep2,True)
 	isIntConversion _ = Nothing
- 
+
 	intconv True  = MO_S_Conv
 	intconv False = MO_U_Conv
 
