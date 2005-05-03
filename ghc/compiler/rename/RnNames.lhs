@@ -53,8 +53,7 @@ import SrcLoc		( Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc, srcLocSpan, SrcSpan )
 import BasicTypes	( DeprecTxt )
 import DriverPhases	( isHsBoot )
-import Util		( notNull, isSingleton, thenCmp )
-import ListSetOps	( equivClasses )
+import Util		( notNull )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
 \end{code}
@@ -877,38 +876,44 @@ warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
 
 warnDuplicateImports gres
   = ifOptM Opt_WarnUnusedImports $ 
-    sequenceM_	[ warn name (head dup_imps) 
+    sequenceM_	[ warn name pr
 			-- The 'head' picks the first offending group
 			-- for this particular name
 		| GRE { gre_name = name, gre_prov = Imported imps } <- gres
-		, let dup_imps = dups imps
-		, not (null dup_imps) ]	
+		, pr <- redundants imps ]
   where
-    warn name [] 
-	= panic "warnDuplicateImports"	-- equivClasses never returns empty lists
-    warn name dup_imps@(imp1:_)
-	= addWarnAt (is_loc imp1)
-		 ((quotes pp_name <+> ptext SLIT("is imported more than once:")) 
-	           $$ nest 2 (vcat (map ppr dup_imps)))
+    warn name (red_imp, cov_imp)
+	= addWarnAt (is_loc red_imp)
+	    (vcat [ptext SLIT("Redundant import of:") <+> quotes pp_name,
+	           ptext SLIT("It is also") <+> ppr cov_imp])
 	where
-	  pp_name | is_qual imp1 = ppr (is_as imp1) <> dot <> ppr occ
-		  | otherwise	 = ppr occ
+	  pp_name | is_qual red_imp = ppr (is_as red_imp) <> dot <> ppr occ
+		  | otherwise	    = ppr occ
 	  occ = nameOccName name
     
-    dups :: [ImportSpec] -> [[ImportSpec]]
-    dups [imp] = []	-- Very common case
-    dups imps  = filter (not . isSingleton) (unqual_dups ++ qual_dups)
-	where
-	  unqual_dups = equivClasses cmp_unqual (filter (not . is_qual) imps)
-	  qual_dups   = equivClasses cmp_qual   imps
+    redundants :: [ImportSpec] -> [(ImportSpec,ImportSpec)]
+	-- The returned pair is (redundant-import, covering-import)
+    redundants imps 
+	= [ (red_imp, cov_imp) 
+	  | red_imp <- imps
+	  , cov_imp <- take 1 (filter (covers red_imp) imps) ]
 
-    cmp_unqual imp1 imp2	-- Make explicit come first
-	= not (is_explicit imp1) `compare` not (is_explicit imp2)
-		
-    cmp_qual imp1 imp2		-- Group by explicit-ness, then by module qualifier
-	= (imp1 `cmp_unqual` imp2) `thenCmp` 
-	  (is_as imp1 `compare` is_as imp2)
-	
+    covers red_imp cov_imp
+	| red_loc == cov_loc
+  	= False		-- The diagonal elements
+	| not $ (is_qual red_imp && is_as red_imp == is_as cov_imp)
+		|| not (is_qual cov_imp)
+	= False		-- Covering one doesn't cover!
+	| is_explicit red_imp		-- Tie-breaking
+	= not cov_explicit || red_later
+	| otherwise
+	= not cov_explicit && red_later
+	where
+	  cov_explicit = is_explicit cov_imp
+	  red_loc   = is_loc red_imp
+	  cov_loc   = is_loc cov_imp
+	  red_later = red_loc > cov_loc
+
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports :: FiniteMap Module AvailEnv	-- Minimal imports
 		    -> RnM ()
