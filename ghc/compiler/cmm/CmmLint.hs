@@ -68,6 +68,9 @@ lintCmmExpr (CmmRegOff reg offset)
   = lintCmmExpr (CmmMachOp (MO_Add rep) 
 		[CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
   where rep = cmmRegRep reg
+lintCmmExpr lit@(CmmLit (CmmInt _ rep))
+  | isFloatingRep rep
+  = cmmLintErr (text "integer literal with floating MachRep: " <> ppr lit)
 lintCmmExpr expr = 
   return (cmmExprRep expr)
 
@@ -77,6 +80,10 @@ cmmCheckMachOp  op args@[CmmReg reg, CmmLit (CmmInt i _)]
   = cmmLintDubiousWordOffset (CmmMachOp op args)
 cmmCheckMachOp op [lit@(CmmLit (CmmInt i _)), reg@(CmmReg _)]
   = cmmCheckMachOp op [reg, lit]
+cmmCheckMachOp op@(MO_U_Conv from to) args
+  | isFloatingRep from || isFloatingRep to
+  = cmmLintErr (text "unsigned conversion from/to floating rep: " 
+		<> ppr (CmmMachOp op args))
 cmmCheckMachOp op args
   = return (resultRepOfMachOp op)
 
