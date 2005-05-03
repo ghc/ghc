@@ -9,7 +9,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 #include "HsVersions.h"
 
 import HsSyn
-import TcBinds		( tcSpecSigs )
+import TcBinds		( tcSpecSigs, badBootDeclErr )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
@@ -208,6 +208,11 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
     let dfun  = mkDictFunId dfun_name tyvars theta clas inst_tys
 	ispec = mkLocalInstance dfun overlap_flag
     in
+
+    tcIsHsBoot						`thenM` \ is_boot ->
+    checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
+	    badBootDeclErr				`thenM_`
+
     returnM (Just (InstInfo { iSpec = ispec, iBinds = VanillaInst binds uprags }))
   where
     msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))

@@ -4,7 +4,9 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBinds, tcHsBootSigs, tcMonoBinds, tcSpecSigs ) where
+module TcBinds ( tcBindsAndThen, tcTopBinds, 
+		 tcHsBootSigs, tcMonoBinds, tcSpecSigs,
+		 badBootDeclErr ) where
 
 #include "HsVersions.h"
 
@@ -52,6 +54,7 @@ import NameSet
 import VarSet
 import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
 import Bag
+import ErrUtils		( Message )
 import Util		( isIn )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNonRec, isRec, 
 			  isNotTopLevel, isAlwaysActive )
@@ -110,13 +113,17 @@ tcTopBinds binds
 tcHsBootSigs :: [HsBindGroup Name] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
 -- signatures in it.  The renamer checked all this
-tcHsBootSigs [HsBindGroup _ sigs _]
-  = mapM (addLocM tc_boot_sig) (filter isVanillaLSig sigs)
+tcHsBootSigs [HsBindGroup binds sigs _]
+  = do	{ checkTc (isEmptyLHsBinds binds) badBootDeclErr
+	; mapM (addLocM tc_boot_sig) (filter isVanillaLSig sigs) }
   where
     tc_boot_sig (Sig (L _ name) ty)
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
 	   ; return (mkVanillaGlobal name sigma_ty vanillaIdInfo) }
 	-- Notice that we make GlobalIds, not LocalIds
+
+badBootDeclErr :: Message
+badBootDeclErr = ptext SLIT("Illegal declarations in an hs-boot file")
 
 tcBindsAndThen
 	:: (HsBindGroup TcId -> thing -> thing)		-- Combinator
