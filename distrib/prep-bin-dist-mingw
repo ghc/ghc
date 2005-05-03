@@ -44,15 +44,23 @@ else
 fi
 
 #Directory where a (cygwin-free) perl binary resides.
-export perl_dir=$old_ghc_top
+if [ "x${perl_dir}" == "x" ]; then
+  export perl_dir=$old_ghc_top
+fi
 
 #
 # The mingw include, lib, and bin directories; all derived
 # from ${mingw_top}.
 #
-export mingw_include=$mingw_top/include
-export mingw_lib=$mingw_top/lib
-export mingw_bin=$mingw_top/bin
+if [ "x${mingw_include}" == "x" ]; then
+  export mingw_include=$mingw_top/include
+fi
+if [ "x${mingw_lib}" == "x" ]; then
+  export mingw_lib=$mingw_top/lib
+fi
+if [ "x${mingw_bin}" == "x" ]; then
+  export mingw_bin=$mingw_top/bin
+fi
 
 # Check that we're in an OK place before starting to re-org
 # the directory tree..
