@@ -829,6 +829,7 @@ tcPragExpr name expr
 tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
   | Just thing <- wiredInNameTyThing_maybe name
+	-- Wired-in things include TyCons, DataCons, and Ids
   = do { loadWiredInHomeIface name; return thing }
 	-- Even though we are in an interface file, we want to make
 	-- sure its instances are loaded (imagine f :: Double -> Double)
@@ -859,15 +860,30 @@ tcIfaceGlobal name
     }}}}}
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon IfaceIntTc  = return intTyCon
-tcIfaceTyCon IfaceBoolTc = return boolTyCon
-tcIfaceTyCon IfaceCharTc = return charTyCon
-tcIfaceTyCon IfaceListTc = return listTyCon
-tcIfaceTyCon IfacePArrTc = return parrTyCon
-tcIfaceTyCon (IfaceTupTc bx ar) = return (tupleTyCon bx ar)
-tcIfaceTyCon (IfaceTc ext_nm) = do { name <- lookupIfaceExt ext_nm
-				   ; thing <- tcIfaceGlobal name
-				   ; return (tyThingTyCon thing) }
+tcIfaceTyCon IfaceIntTc       	= tcWiredInTyCon intTyCon
+tcIfaceTyCon IfaceBoolTc      	= tcWiredInTyCon boolTyCon
+tcIfaceTyCon IfaceCharTc      	= tcWiredInTyCon charTyCon
+tcIfaceTyCon IfaceListTc      	= tcWiredInTyCon listTyCon
+tcIfaceTyCon IfacePArrTc      	= tcWiredInTyCon parrTyCon
+tcIfaceTyCon (IfaceTupTc bx ar) = tcWiredInTyCon (tupleTyCon bx ar)
+tcIfaceTyCon (IfaceTc ext_nm)   = do { name <- lookupIfaceExt ext_nm
+				     ; thing <- tcIfaceGlobal name 
+				     ; return (check_tc (tyThingTyCon thing)) }
+  where
+#ifdef DEBUG
+    check_tc tc = case toIfaceTyCon (error "urk") tc of
+		   IfaceTc _ -> tc
+		   other     -> pprTrace "check_tc" (ppr tc) tc
+#else
+    check_tc tc = tc
+#endif
+
+-- Even though we are in an interface file, we want to make
+-- sure the instances and RULES of this tycon are loaded 
+-- Imagine: f :: Double -> Double
+tcWiredInTyCon :: TyCon -> IfL TyCon
+tcWiredInTyCon tc = do { loadWiredInHomeIface (tyConName tc)
+		       ; return tc }
 
 tcIfaceClass :: IfaceExtName -> IfL Class
 tcIfaceClass rdr_name = do { name <- lookupIfaceExt rdr_name
