@@ -1,8 +1,2 @@
 
-arrow2.hs:6:16:
-    GHC internal error: `x' is not in scope
-    In the first argument of `f', namely `x'
-    In the definition of `g':
-	g = proc x -> f x -< x + 1
-	  where
-	      f = (*)
+arrow2.hs:6:16: Not in scope: `x'
