@@ -352,19 +352,25 @@ rnExpr e@(ELazyPat _) = addErr (patSynErr e)	`thenM_`
 
 \begin{code}
 rnExpr (HsProc pat body)
-  = rnPatsAndThen ProcExpr True [pat] $ \ [pat'] ->
+  = newArrowScope $
+    rnPatsAndThen ProcExpr True [pat] $ \ [pat'] ->
     rnCmdTop body	              `thenM` \ (body',fvBody) ->
     returnM (HsProc pat' body', fvBody)
 
 rnExpr (HsArrApp arrow arg _ ho rtl)
-  = rnLExpr arrow	`thenM` \ (arrow',fvArrow) ->
-    rnLExpr arg		`thenM` \ (arg',fvArg) ->
+  = select_arrow_scope (rnLExpr arrow)	`thenM` \ (arrow',fvArrow) ->
+    rnLExpr arg				`thenM` \ (arg',fvArg) ->
     returnM (HsArrApp arrow' arg' placeHolderType ho rtl,
 	     fvArrow `plusFV` fvArg)
+  where
+    select_arrow_scope tc = case ho of
+        HsHigherOrderApp -> tc
+        HsFirstOrderApp  -> escapeArrowScope tc
 
 -- infix form
 rnExpr (HsArrForm op (Just _) [arg1, arg2])
-  = rnLExpr op		`thenM` \ (op'@(L _ (HsVar op_name)),fv_op) ->
+  = escapeArrowScope (rnLExpr op)
+			`thenM` \ (op'@(L _ (HsVar op_name)),fv_op) ->
     rnCmdTop arg1	`thenM` \ (arg1',fv_arg1) ->
     rnCmdTop arg2	`thenM` \ (arg2',fv_arg2) ->
 
@@ -377,8 +383,8 @@ rnExpr (HsArrForm op (Just _) [arg1, arg2])
 	      fv_arg1 `plusFV` fv_op `plusFV` fv_arg2)
 
 rnExpr (HsArrForm op fixity cmds)
-  = rnLExpr op		`thenM` \ (op',fvOp) ->
-    rnCmdArgs cmds	`thenM` \ (cmds',fvCmds) ->
+  = escapeArrowScope (rnLExpr op)	`thenM` \ (op',fvOp) ->
+    rnCmdArgs cmds			`thenM` \ (cmds',fvCmds) ->
     returnM (HsArrForm op' fixity cmds', fvOp `plusFV` fvCmds)
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)

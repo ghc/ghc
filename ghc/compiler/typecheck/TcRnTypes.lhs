@@ -26,6 +26,9 @@ module TcRnTypes(
 	ThStage(..), topStage, topSpliceStage,
 	ThLevel, impLevel, topLevel,
 
+	-- Arrows
+	newArrowScope, escapeArrowScope,
+
 	-- Insts
 	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, 
 	instLocSrcLoc, instLocSrcSpan,
@@ -291,6 +294,7 @@ data TcLclEnv		-- Changes as we move inside an expression
 	tcl_errs :: TcRef Messages,	-- Place to accumulate errors
 
 	tcl_th_ctxt    :: ThStage,	-- Template Haskell context
+	tcl_arrow_ctxt :: ArrowCtxt,	-- Arrow-notation context
 
 	tcl_rdr :: LocalRdrEnv,		-- Local name envt
 		-- Maintained during renaming, of course, but also during
@@ -367,6 +371,40 @@ topStage, topSpliceStage :: ThStage
 topStage       = Comp
 topSpliceStage = Splice (topLevel - 1)	-- Stage for the body of a top-level splice
 
+---------------------------
+-- Arrow-notation context
+---------------------------
+
+{-
+In arrow notation, a variable bound by a proc (or enclosed let/kappa)
+is not in scope to the left of an arrow tail (-<) or the head of (|..|).
+For example
+
+	proc x -> (e1 -< e2)
+
+Here, x is not in scope in e1, but it is in scope in e2.  This can get
+a bit complicated:
+
+	let x = 3 in
+	proc y -> (proc z -> e1) -< e2
+
+Here, x and z are in scope in e1, but y is not.  We implement this by
+recording the environment when passing a proc (using newArrowScope),
+and returning to that (using escapeArrowScope) on the left of -< and the
+head of (|..|).
+-}
+
+newtype ArrowCtxt = ArrowCtxt { arr_proc_env :: Env TcGblEnv TcLclEnv }
+
+-- Record the current environment (outside a proc)
+newArrowScope :: TcM a -> TcM a
+newArrowScope
+  = updEnv $ \env ->
+	env { env_lcl = (env_lcl env) { tcl_arrow_ctxt = ArrowCtxt env } }
+
+-- Return to the stored environment (from the enclosing proc)
+escapeArrowScope :: TcM a -> TcM a
+escapeArrowScope = updEnv (arr_proc_env . tcl_arrow_ctxt . env_lcl)
 
 ---------------------------
 -- TcTyThing
