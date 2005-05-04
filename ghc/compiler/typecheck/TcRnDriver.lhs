@@ -10,6 +10,7 @@ module TcRnDriver (
 	tcRnGetInfo, GetInfoResult,
 	tcRnExpr, tcRnType,
 	tcRnLookupRdrName,
+	getModuleExports, 
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -1071,27 +1072,35 @@ tcRnType hsc_env ictxt rdr_type
 
 \begin{code}
 #ifdef GHCI
+getModuleExports :: HscEnv -> Module -> IO (Maybe NameSet)
+getModuleExports hsc_env mod
+  = initTcPrintErrors hsc_env iNTERACTIVE (tcGetModuleExports mod)
+
+tcGetModuleExports :: Module -> TcM NameSet
+tcGetModuleExports mod = do
+  iface <- load_iface mod
+  loadOrphanModules (dep_orphs (mi_deps iface))
+  		-- Load any orphan-module interfaces,
+  		-- so their instances are visible
+  ifaceExportNames (mi_exports iface)
+
 mkExportEnv :: HscEnv -> [Module]	-- Expose these modules' exports only
  	    -> IO GlobalRdrEnv
 mkExportEnv hsc_env exports
   = do	{ mb_envs <- initTcPrintErrors hsc_env iNTERACTIVE $
-		     mappM getModuleExports exports 
+		     mappM getModuleExportRdrEnv exports 
 	; case mb_envs of
 	     Just envs -> return (foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs)
 	     Nothing   -> return emptyGlobalRdrEnv
 			     -- Some error; initTc will have printed it
     }
 
-getModuleExports :: Module -> TcM GlobalRdrEnv
-getModuleExports mod 
-  = do	{ iface <- load_iface mod
-	; loadOrphanModules (dep_orphs (mi_deps iface))
-			-- Load any orphan-module interfaces,
-			-- so their instances are visible
-	; names <- ifaceExportNames (mi_exports iface)
-	; let { gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
-			| name <- nameSetToList names ] }
-	; returnM (mkGlobalRdrEnv gres) }
+getModuleExportRdrEnv :: Module -> TcM GlobalRdrEnv
+getModuleExportRdrEnv mod = do
+  names <- tcGetModuleExports mod
+  let gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
+  	      | name <- nameSetToList names ]
+  returnM (mkGlobalRdrEnv gres)
 
 vanillaProv :: Module -> Provenance
 -- We're building a GlobalRdrEnv as if the user imported
@@ -1099,6 +1108,7 @@ vanillaProv :: Module -> Provenance
 vanillaProv mod = Imported [ImportSpec { is_mod = mod, is_as = mod, 
 					 is_qual = False, is_explicit = False,
 					 is_loc = srcLocSpan interactiveSrcLoc }]
+
 \end{code}
 
 \begin{code}

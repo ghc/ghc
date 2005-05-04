@@ -133,7 +133,8 @@ module GHC (
 import qualified Linker
 import Linker		( HValue, extendLinkEnv )
 import NameEnv		( lookupNameEnv )
-import TcRnDriver	( mkExportEnv, getModuleContents, tcRnLookupRdrName )
+import TcRnDriver	( mkExportEnv, getModuleContents, tcRnLookupRdrName,
+			  getModuleExports )
 import RdrName		( plusGlobalRdrEnv )
 import HscMain		( hscGetInfo, GetInfoResult, hscParseIdentifier,
 			  hscStmt, hscTcExpr, hscKcType )
@@ -688,7 +689,8 @@ checkModule session@(Session ref) mod msg_act = do
 		HscChecked parsed renamed
 			   (Just (tc_binds, rdr_env, details)) -> do
 		   let minf = ModuleInfo {
-				minf_details  = details,
+				minf_type_env = md_types details,
+				minf_exports  = md_exports details,
 				minf_rdr_env  = Just rdr_env
 			      }
 		   return (Just (CheckedModule {
@@ -1513,7 +1515,8 @@ getPrintUnqual s = withSession s (return . icPrintUnqual . hsc_IC)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
-	minf_details  :: ModDetails,
+	minf_type_env :: TypeEnv,
+	minf_exports  :: NameSet,
 	minf_rdr_env  :: Maybe GlobalRdrEnv
   }
 	-- ToDo: this should really contain the ModIface too
@@ -1524,11 +1527,31 @@ data ModuleInfo = ModuleInfo {
 getModuleInfo :: Session -> Module -> IO (Maybe ModuleInfo)
 getModuleInfo s mdl = withSession s $ \hsc_env -> do
   case lookupModuleEnv (hsc_HPT hsc_env) mdl of
-    Nothing  -> return Nothing
+    Nothing  -> do
+#ifdef GHCI
+	mb_names <- getModuleExports hsc_env mdl
+	case mb_names of
+	   Nothing -> return Nothing
+	   Just names -> do
+		eps <- readIORef (hsc_EPS hsc_env)
+		let pte = eps_PTE eps
+		    tys = [ ty | name <- nameSetToList names,
+				 Just ty <- [lookupTypeEnv pte name] ]
+		return (Just (ModuleInfo {
+				minf_type_env = mkTypeEnv tys,
+				minf_exports  = names,
+				minf_rdr_env  = Nothing
+			}))
+#else
+	-- bogusly different for non-GHCI (ToDo)
+	return Nothing
+#endif
     Just hmi -> 
+	let details = hm_details hmi in
 	return (Just (ModuleInfo {
-			minf_details = hm_details hmi,
-			minf_rdr_env = mi_globals $! hm_iface hmi
+			minf_type_env = md_types details,
+			minf_exports  = md_exports details,
+			minf_rdr_env  = mi_globals $! hm_iface hmi
 			}))
 
 	-- ToDo: we should be able to call getModuleInfo on a package module,
@@ -1536,14 +1559,14 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
 
 -- | The list of top-level entities defined in a module
 modInfoTyThings :: ModuleInfo -> [TyThing]
-modInfoTyThings minf = typeEnvElts (md_types (minf_details minf))
+modInfoTyThings minf = typeEnvElts (minf_type_env minf)
 
 modInfoTopLevelScope :: ModuleInfo -> Maybe [Name]
 modInfoTopLevelScope minf
   = fmap (map gre_name . globalRdrEnvElts) (minf_rdr_env minf)
 
 modInfoExports :: ModuleInfo -> [Name]
-modInfoExports minf = nameSetToList $! (md_exports $! minf_details minf)
+modInfoExports minf = nameSetToList $! minf_exports minf
 
 modInfoPrintUnqualified :: ModuleInfo -> Maybe PrintUnqualified
 modInfoPrintUnqualified minf = fmap unQualInScope (minf_rdr_env minf)
