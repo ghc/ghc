@@ -1,5 +1,5 @@
 
-mod66.hs:3:0:
+mod66.hs:5:0:
     Multiple declarations of `M.f'
     Declared at: mod66.hs:3:0
 		 mod66.hs:5:0

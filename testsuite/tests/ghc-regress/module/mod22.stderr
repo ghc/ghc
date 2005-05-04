@@ -1,5 +1,5 @@
 
 mod22.hs:2:10:
     Multiple declarations of `Main.K'
-    Declared at: mod22.hs:2:10
-		 mod22.hs:3:10
+    Declared at: mod22.hs:3:10
+		 mod22.hs:2:10

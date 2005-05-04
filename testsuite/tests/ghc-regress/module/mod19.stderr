@@ -1,10 +1,10 @@
 
 mod19.hs:2:6:
     Multiple declarations of `Main.C'
-    Declared at: mod19.hs:2:6
-		 mod19.hs:3:6
+    Declared at: mod19.hs:3:6
+		 mod19.hs:2:6
 
 mod19.hs:2:16:
     Multiple declarations of `Main.m'
-    Declared at: mod19.hs:2:16
-		 mod19.hs:3:16
+    Declared at: mod19.hs:3:16
+		 mod19.hs:2:16
