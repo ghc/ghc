@@ -1,0 +1,5 @@
+
+arrow1.hs:15:35:
+    Ambiguous type variable `a' in the constraint:
+      `Foo a' arising from use of `foo' at arrow1.hs:15:35-37
+    Probable fix: add a type signature that fixes these type variable(s)
