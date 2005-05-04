@@ -131,6 +131,7 @@ aty	:: { IfaceType }
 bty	:: { IfaceType }
 	: tv_occ atys    { foldl IfaceAppTy (IfaceTyVar $1) $2 }
         | q_tc_name atys  { IfaceTyConApp (IfaceTc $1) $2 }
+        | '(' ty ')' { $2 }
 
 ty	:: { IfaceType }
 	: bty	                     { $1 }
