@@ -898,16 +898,23 @@ warnDuplicateImports gres
 	  | red_imp <- imps
 	  , cov_imp <- take 1 (filter (covers red_imp) imps) ]
 
+	-- "red_imp" is a putative redundant import
+	-- "cov_imp" potentially covers it
+	-- This test decides
     covers red_imp cov_imp
 	| red_loc == cov_loc
-  	= False		-- The diagonal elements
-	| not $ (is_qual red_imp && is_as red_imp == is_as cov_imp)
-		|| not (is_qual cov_imp)
-	= False		-- Covering one doesn't cover!
-	| is_explicit red_imp		-- Tie-breaking
-	= not cov_explicit || red_later
-	| otherwise
-	= not cov_explicit && red_later
+  	= False		-- Ignore diagonal elements
+	| not (is_as red_imp == is_as cov_imp)
+	= False		-- They bring into scope different qualified names
+	| not (is_qual red_imp) && is_qual cov_imp
+	= False		-- Covering one doesn't bring unqualified name into scope
+	| is_explicit red_imp	
+	= not cov_explicit 	-- Redundant one is explicit and covering one isn't
+	  || red_later		-- Both are explicit; tie-break using red_later
+	| otherwise		
+	= not cov_explicit 	-- Neither import is explicit
+	  && (is_mod red_imp == is_mod cov_imp)	-- They import the same module
+	  && red_later 		-- Tie-break
 	where
 	  cov_explicit = is_explicit cov_imp
 	  red_loc   = is_loc red_imp
