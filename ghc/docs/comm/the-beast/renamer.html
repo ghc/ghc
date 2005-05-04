@@ -2,70 +2,248 @@
 <html>
   <head>
     <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
-    <title>The GHC Commentary - The Real Story about Variables, Ids, TyVars, and the like</title>
+    <title>The GHC Commentary - The Glorious Renamer</title>
   </head>
 
   <body BGCOLOR="FFFFFF">
     <h1>The GHC Commentary - The Glorious Renamer</h1>
     <p>
+      The <em>renamer</em> sits between the parser and the typechecker.
+      However, its operation is quite tightly interwoven with the
+      typechecker.  This is partially due to support for Template Haskell,
+      where spliced code has to be renamed and type checked.  In particular,
+      top-level splices lead to multiple rounds of renaming and type
+      checking.
+    </p>
+    <p>
+      The main externally used functions of the renamer are provided by the
+      module <code>rename/RnSource.lhs</code>.  In particular, we have
+    </p>
+    <blockquote>
+      <pre>
+rnSrcDecls  :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
+rnSplice    :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)</pre>
+    </blockquote>
+    <p>
+      All of which execute in the renamer monad <code>RnM</code>.  The first
+      function, <code>rnSrcDecls</code> renames a binding group; the second,
+      <code>rnTyClDecls</code> renames a list of (toplevel) type and class
+      declarations; and the third, <code>rnSplice</code> renames a Template
+      Haskell splice.  As the types indicate, the main task of the renamer is
+      to convert converts all the <tt>RdrNames</tt> to <a
+      href="names.html"><tt>Names</tt></a>, which includes a number of
+      well-formedness checks (no duplicate declarations, all names are in
+      scope, and so on).  In addition, the renamer performs other, not
+      strictly name-related, well-formedness checks, which includes checking
+      that the appropriate flags have been supplied whenever language
+      extensions are used in the source.
+    </p>
 
-(This section is, like most of the Commentary, rather incomplete.)
-<p>
-The <em>renamer</em> sits between the parser and the typechecker.
-Roughly speaking, It has the type:
-<pre>
-   HsModule RdrName -> HsModule Name
-</pre>
-That is, it converts all the <tt>RdrNames</tt> to <a href="names.html"><tt>Names</tt></a>.
+    <h2>RdrNames</h2>
+    <p>
+      A <tt>RdrName.RdrName</tt> is pretty much just a string (for an
+      unqualified name like "<tt>f</tt>") or a pair of strings (for a
+      qualified name like "<tt>M.f</tt>"):
+    </p>
+    <blockquote>
+      <pre>
+data RdrName 
+  = Unqual OccName
+	-- Used for ordinary, unqualified occurrences 
 
-<h2> RdrNames </h2>
+  | Qual Module OccName
+	-- A qualified name written by the user in 
+	--  *source* code.  The module isn't necessarily 
+	-- the module where the thing is defined; 
+	-- just the one from which it is imported
 
-A <tt>RdrNames</tt> is pretty much just a string (for an unqualified name
-like "<tt>f</tt>") or a pair of strings (for a qualified name like "<tt>M.f</tt>"):
-<pre>
-    data RdrName = RdrName Qual OccName
-    
-    data Qual = Unqual
-    
-	      | Qual ModuleName     -- A qualified name written by the user in source code
-				    -- The module isn't necessarily the module where
-				    -- the thing is defined; just the one from which it
-				    -- is imported
-    
-	      | Orig ModuleName	    -- This is an *original* name; the module is the place
-				    -- where the thing was defined
-</pre>
-The OccName type is described in <a href="names.html#occname">"The truth about names"</a>.
-<p>
-The <tt>OrigName</tt> variant is used internally; it allows GHC to speak of <tt>RdrNames</tt>
-that refer to the original name of the thing.
+  | Orig Module OccName
+	-- An original name; the module is the *defining* module.
+	-- This is used when GHC generates code that will be fed
+	-- into the renamer (e.g. from deriving clauses), but where
+	-- we want to say "Use Prelude.map dammit".  
+ 
+  | Exact Name
+	-- We know exactly the Name. This is used 
+	--  (a) when the parser parses built-in syntax like "[]" 
+	--	and "(,)", but wants a RdrName from it
+	--  (b) when converting names to the RdrNames in IfaceTypes
+	--	Here an Exact RdrName always contains an External Name
+	--	(Internal Names are converted to simple Unquals)
+	--  (c) by Template Haskell, when TH has generated a unique name</pre>
+    </blockquote>
+    <p> 
+      The OccName type is described in <a href="names.html#occname">The
+	truth about names</a>.
+    </p>
 
+    <h2>The Renamer Monad</h2>
+    <p>
+      Due to the tight integration of the renamer with the typechecker, both
+      use the same monad in recent versions of GHC.  So, we have
+    </p>
+    <blockquote>
+      <pre>
+type RnM  a = TcRn a		-- Historical
+type TcM  a = TcRn a		-- Historical</pre>
+    </blockquote>
+    <p>
+      with the combined monad defined as
+    </p>
+    <blockquote>
+      <pre>
+type TcRn a       = TcRnIf TcGblEnv TcLclEnv a
+type TcRnIf a b c = IOEnv (Env a b) c
 
-<h2> Rebindable syntax </h2>
+data Env gbl lcl	-- Changes as we move into an expression
+  = Env {
+	env_top	 :: HscEnv,	-- Top-level stuff that never changes
+				-- Includes all info about imported things
 
-In Haskell when one writes "3" one gets "fromInteger 3", where
-"fromInteger" comes from the Prelude (regardless of whether the
-Prelude is in scope).  If you want to completely redefine numbers,
-that becomes inconvenient.  So GHC lets you say
-"-fno-implicit-prelude"; in that case, the "fromInteger" comes from
-whatever is in scope.  (This is documented in the User Guide.)
-<p>
-This feature is implemented as follows (I always forget).
-<ul>
-<li> Four HsSyn constructs (NegApp, NPlusKPat, HsIntegral, HsFractional) 
-contain a <tt>Name</tt> (i.e. it is not parameterised).
-<li> When the parser builds these constructs, it puts in the built-in Prelude
-Name (e.g. PrelNum.fromInteger).
-<li> When the renamer encounters these constructs, it calls <tt>RnEnv.lookupSyntaxName</tt>.
-This checks for <tt>-fno-implicit-prelude</tt>; if not, it just returns the same Name;
-otherwise it takes the occurrence name of the Name, turns it into an unqualified RdrName, and looks
-it up in the environment.  The returned name is plugged back into the construct.
-<li> The typechecker uses the Name to generate the appropriate typing constraints.
-</ul>
+	env_us   :: TcRef UniqSupply,	-- Unique supply for local varibles
 
+	env_gbl  :: gbl,	-- Info about things defined at the top level
+				-- of the module being compiled
+
+	env_lcl  :: lcl		-- Nested stuff; changes as we go into 
+				-- an expression
+    }</pre>
+    </blockquote>
+    <p>
+      the details of the global environment type <code>TcGblEnv</code> and
+      local environment type <code>TcLclEnv</code> are also defined in the
+      module <code>typecheck/TcRnTypes.lhs</code>.   The monad
+      <code>IOEnv</code> is defined in <code>utils/IOEnv.hs</code> and extends
+      the vanilla <code>IO</code> monad with an additional state parameter
+      <code>env</code> that is treated as in a reader monad.  (Side effecting
+      operations, such as updating the unique supply, are done with
+      <code>TcRef</code>s, which are simply a synonym for <code>IORef</code>s.)
+    </p>
+
+    <h2>Name Space Management</h2>
+    <p>
+      As anticipated by the variants <code>Orig</code> and <code>Exact</code>
+      of <code>RdrName</code> some names should not change during renaming,
+      whereas others need to be turned into unique names.  In this context,
+      the two functions <code>RnEnv.newTopSrcBinder</code> and
+      <code>RnEnv.newLocals</code> are important:
+    </p>
+    <blockquote>
+      <pre>
+newTopSrcBinder :: Module -> Maybe Name -> Located RdrName -> RnM Name
+newLocalsRn     :: [Located RdrName] -> RnM [Name]</pre>
+    </blockquote>
+    <p>
+      The two functions introduces new toplevel and new local names,
+      respectively, where the first two arguments to
+      <code>newTopSrcBinder</code> determine the currently compiled module and
+      the parent construct of the newly defined name.  Both functions create
+      new names only for <code>RdrName</code>s that are neither exact nor
+      original.
+    </p>
+
+    <h3>Introduction of Toplevel Names: Global RdrName Environment</h3>
+    <p>
+      A global <code>RdrName</code> environment
+      <code>RdrName.GlobalRdrEnv</code> is a map from <code>OccName</code>s to
+      lists of qualified names.  More precisely, the latter are
+      <code>Name</code>s with an associated <code>Provenance</code>:
+    </p>
+    <blockquote>
+      <pre>
+data Provenance
+  = LocalDef		-- Defined locally
+	Module
+
+  | Imported 		-- Imported
+	[ImportSpec]	-- INVARIANT: non-empty
+	Bool		-- True iff the thing was named *explicitly* 
+			-- in *any* of the import specs rather than being 
+			-- imported as part of a group; 
+	-- e.g.
+	--	import B
+	--	import C( T(..) )
+	-- Here, everything imported by B, and the constructors of T
+	-- are not named explicitly; only T is named explicitly.
+	-- This info is used when warning of unused names.</pre>
+    </blockquote>
+    <p>
+      The part of the global <code>RdrName</code> environment for a module
+      that contains the local definitions is created by the function
+      <code>RnNames.importsFromLocalDecls</code>, which also computes a data
+      structure recording all imported declarations in the form of a value of
+      type <code>TcRnTypes.ImportAvails</code>.
+    </p>
+    <p>
+      The function <code>importsFromLocalDecls</code>, in turn, makes use of
+      <code>RnNames.getLocalDeclBinders :: Module -> HsGroup RdrName -> RnM
+      [AvailInfo]</code> to extract all declared names from a binding group,
+      where <code>HscTypes.AvailInfo</code> is essentially a collection of
+      <code>Name</code>s; i.e., <code>getLocalDeclBinders</code>, on the fly,
+      generates <code>Name</code>s from the <code>RdrName</code>s of all
+      top-level binders of the module represented by the <code>HsGroup
+      RdrName</code> argument.
+    </p>
+    <p>
+      It is important to note that all this happens before the renamer
+      actually descends into the toplevel bindings of a module.  In other
+      words, before <code>TcRnDriver.rnTopSrcDecls</code> performs the
+      renaming of a module by way of <code>RnSource.rnSrcDecls</code>, it uses
+      <code>importsFromLocalDecls</code> to set up the global
+      <code>RdrName</code> environment, which contains <code>Name</code>s for
+      all imported <em>and</em> all locally defined toplevel binders.  Hence,
+      when the helpers of <code>rnSrcDecls</code> come across the
+      <em>defining</em> occurences of a toplevel <code>RdrName</code>, they
+      don't rename it by generating a new name, but they simply look up its
+      name in the global <code>RdrName</code> environment.
+    </p>
+
+    <h2>Rebindable syntax</h2>
+    <p>
+      In Haskell when one writes "3" one gets "fromInteger 3", where
+      "fromInteger" comes from the Prelude (regardless of whether the
+      Prelude is in scope).  If you want to completely redefine numbers,
+      that becomes inconvenient.  So GHC lets you say
+      "-fno-implicit-prelude"; in that case, the "fromInteger" comes from
+      whatever is in scope.  (This is documented in the User Guide.)
+    </p>
+    <p>
+      This feature is implemented as follows (I always forget).
+    <ul>
+      <li>Names that are implicitly bound by the Prelude, are marked by the
+	type <code>HsExpr.SyntaxExpr</code>.  Moreover, the association list
+	<code>HsExpr.SyntaxTable</code> is set up by the renamer to map
+	rebindable names to the value they are bound to.
+      </li>
+      <li>Currently, five constructs related to numerals
+	(<code>HsExpr.NegApp</code>, <code>HsPat.NPat</code>,
+	<code>HsPat.NPlusKPat</code>,  	<code>HsLit.HsIntegral</code>, and
+	<code>HsLit.HsFractional</code>)  and 
+	two constructs related to code>do</code> expressions
+	(<code>HsExpr.BindStmt</code> and 
+	<code>HsExpr.ExprStmt</code>) have rebindable syntax.
+      </li> 
+      <li> When the parser builds these constructs, it puts in the
+	built-in Prelude Name (e.g. PrelNum.fromInteger).
+      </li>
+      <li> When the renamer encounters these constructs, it calls
+      <tt>RnEnv.lookupSyntaxName</tt>. 
+	This checks for <tt>-fno-implicit-prelude</tt>; if not, it just
+	returns the same Name; otherwise it takes the occurrence name of the
+	Name, turns it into an unqualified RdrName, and looks it up in the
+	environment.  The returned name is plugged back into the construct.
+      </li>
+      <li> The typechecker uses the Name to generate the appropriate typing
+	constraints. 
+      </li>
+    </ul>
+
+    <p><small>
 <!-- hhmts start -->
-Last modified: Tue Nov 13 14:11:35 EST 2001
+Last modified: Wed May  4 17:16:15 EST 2005
 <!-- hhmts end -->
     </small>
   </body>
 </html>
+
