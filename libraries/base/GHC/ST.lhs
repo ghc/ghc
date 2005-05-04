@@ -145,7 +145,14 @@ runST st = runSTRep (case st of { ST st_rep -> st_rep })
 -- I'm only letting runSTRep be inlined right at the end, in particular *after* full laziness
 -- That's what the "INLINE [0]" says.
 -- 		SLPJ Apr 99
-{-# INLINE [0] runSTRep #-}
+-- {-# INLINE [0] runSTRep #-}
+
+-- SDM: further to the above, inline phase 0 is run *before*
+-- full-laziness at the moment, which means that the above comment is
+-- invalid.  Inlining runSTRep doesn't make a huge amount of
+-- difference, anyway.  Hence:
+
+{-# NOINLINE runSTRep #-}
 runSTRep :: (forall s. STRep s a) -> a
 runSTRep st_rep = case st_rep realWorld# of
 	      		(# _, r #) -> r
