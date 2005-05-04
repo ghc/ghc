@@ -51,7 +51,7 @@ module GHC (
 	modInfoTopLevelScope,
 	modInfoPrintUnqualified,
 	modInfoExports,
-	lookupName,
+	lookupGlobalName,
 
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
@@ -68,6 +68,7 @@ module GHC (
 	browseModule,
 	showModule,
 	compileExpr, HValue,
+	lookupName,
 #endif
 
 	-- * Abstract syntax elements
@@ -1510,32 +1511,6 @@ getBindings s = withSession s (return . nameEnvElts . ic_type_env . hsc_IC)
 getPrintUnqual :: Session -> IO PrintUnqualified
 getPrintUnqual s = withSession s (return . icPrintUnqual . hsc_IC)
 
-#ifdef GHCI
--- | Parses a string as an identifier, and returns the list of 'Name's that
--- the identifier can refer to in the current interactive context.
-parseName :: Session -> String -> IO [Name]
-parseName s str = withSession s $ \hsc_env -> do
-   maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
-   case maybe_rdr_name of
-	Nothing -> return []
-	Just (L _ rdr_name) -> do
-	    mb_names <- tcRnLookupRdrName hsc_env rdr_name
-	    case mb_names of
-		Nothing -> return []
-		Just ns -> return ns
-		-- ToDo: should return error messages
-#endif
-
--- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
--- entity known to GHC, including 'Name's defined using 'runStmt'.
-lookupName :: Session -> Name -> IO (Maybe TyThing)
-lookupName s name = withSession s $ \hsc_env -> do
-  case lookupTypeEnv (ic_type_env (hsc_IC hsc_env)) name of
-	Just tt -> return (Just tt)
-	Nothing -> do
-	    eps <- readIORef (hsc_EPS hsc_env)
-	    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
-
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
 	minf_details  :: ModDetails,
@@ -1577,6 +1552,15 @@ isDictonaryId :: Id -> Bool
 isDictonaryId id
   = case tcSplitSigmaTy (idType id) of { (tvs, theta, tau) -> isDictTy tau }
 
+-- | Looks up a global name: that is, any top-level name in any
+-- visible module.  Unlike 'lookupName', lookupGlobalName does not use
+-- the interactive context, and therefore does not require a preceding
+-- 'setContext'.
+lookupGlobalName :: Session -> Name -> IO (Maybe TyThing)
+lookupGlobalName s name = withSession s $ \hsc_env -> do
+   eps <- readIORef (hsc_EPS hsc_env)
+   return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
+
 #if 0
 
 data ObjectCode
@@ -1587,9 +1571,6 @@ data ObjectCode
 --   - typechecked syntax includes extra dictionary translation and
 --     AbsBinds which need to be translated back into something closer to
 --     the original source.
---   - renamed syntax currently doesn't exist in a single blob, since
---     renaming and typechecking are interleaved at splice points.  We'd
---     need a restriction that there are no splices in the source module.
 
 -- ToDo:
 --   - Data and Typeable instances for HsSyn.
@@ -1619,10 +1600,6 @@ data ObjectCode
 
 -- :browse will use either lm_toplev or inspect lm_interface, depending
 -- on whether the module is interpreted or not.
-
--- various abstract syntax types (perhaps IfaceBlah)
-data Type = ...
-data Kind = ...
 
 -- This is for reconstructing refactored source code
 -- Calls the lexer repeatedly.
@@ -1705,6 +1682,30 @@ getInfo s id = withSession s $ \hsc_env -> hscGetInfo hsc_env id
 getNamesInScope :: Session -> IO [Name]
 getNamesInScope s = withSession s $ \hsc_env -> do
   return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
+
+-- | Parses a string as an identifier, and returns the list of 'Name's that
+-- the identifier can refer to in the current interactive context.
+parseName :: Session -> String -> IO [Name]
+parseName s str = withSession s $ \hsc_env -> do
+   maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
+   case maybe_rdr_name of
+	Nothing -> return []
+	Just (L _ rdr_name) -> do
+	    mb_names <- tcRnLookupRdrName hsc_env rdr_name
+	    case mb_names of
+		Nothing -> return []
+		Just ns -> return ns
+		-- ToDo: should return error messages
+
+-- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
+-- entity known to GHC, including 'Name's defined using 'runStmt'.
+lookupName :: Session -> Name -> IO (Maybe TyThing)
+lookupName s name = withSession s $ \hsc_env -> do
+  case lookupTypeEnv (ic_type_env (hsc_IC hsc_env)) name of
+	Just tt -> return (Just tt)
+	Nothing -> do
+	    eps <- readIORef (hsc_EPS hsc_env)
+	    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression
