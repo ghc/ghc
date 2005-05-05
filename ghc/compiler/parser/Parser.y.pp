@@ -280,6 +280,14 @@ TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
 %%
 
 -----------------------------------------------------------------------------
+-- Identifiers; one of the entry points
+identifier :: { Located RdrName }
+	: qvar				{ $1 }
+	| qcon				{ $1 }
+	| qvarop			{ $1 }
+	| qconop			{ $1 }
+
+-----------------------------------------------------------------------------
 -- Module Header
 
 -- The place for module deprecation is really too restrictive, but if it
@@ -361,7 +369,7 @@ qcnames :: { [RdrName] }
 
 qcname 	:: { Located RdrName }	-- Variable or data constructor
 	:  qvar					{ $1 }
-	|  gcon					{ $1 }
+	|  qcon					{ $1 }
 
 -----------------------------------------------------------------------------
 -- Import Declarations
@@ -859,7 +867,7 @@ gadt_constrs :: { Located [LConDecl RdrName] }
         | gadt_constr                   { L1 [$1] } 
 
 gadt_constr :: { LConDecl RdrName }
-        : qcon '::' sigtype
+        : con '::' sigtype
               { LL (GadtDecl $1 $3) } 
 
 constrs :: { Located [LConDecl RdrName] }
@@ -1073,7 +1081,7 @@ aexp2	:: { LHsExpr RdrName }
 	| '$(' exp ')'   	{ LL $ HsSpliceE (mkHsSplice $2) }               -- $( exp )
 
 	| TH_VAR_QUOTE qvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
-	| TH_VAR_QUOTE gcon 	{ LL $ HsBracket (VarBr (unLoc $2)) }
+	| TH_VAR_QUOTE qcon 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_TY_QUOTE tyvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
  	| TH_TY_QUOTE gtycon	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }                       
@@ -1263,14 +1271,12 @@ dbinds 	:: { Located [LIPBind RdrName] }
 dbind	:: { LIPBind RdrName }
 dbind	: ipvar '=' exp			{ LL (IPBind (unLoc $1) $3) }
 
------------------------------------------------------------------------------
--- Variables, Constructors and Operators.
+ipvar	:: { Located (IPName RdrName) }
+	: IPDUPVARID		{ L1 (Dupable (mkUnqual varName (getIPDUPVARID $1))) }
+	| IPSPLITVARID		{ L1 (Linear  (mkUnqual varName (getIPSPLITVARID $1))) }
 
-identifier :: { Located RdrName }
-	: qvar				{ $1 }
-	| gcon				{ $1 }
-	| qvarop			{ $1 }
-	| qconop			{ $1 }
+-----------------------------------------------------------------------------
+-- Deprecations
 
 depreclist :: { Located [RdrName] }
 depreclist : deprec_var			{ L1 [unLoc $1] }
@@ -1278,49 +1284,25 @@ depreclist : deprec_var			{ L1 [unLoc $1] }
 
 deprec_var :: { Located RdrName }
 deprec_var : var			{ $1 }
-	   | tycon			{ $1 }
+	   | con			{ $1 }
 
-gcon 	:: { Located RdrName }	-- Data constructor namespace
-	: sysdcon		{ L1 $ nameRdrName (dataConName (unLoc $1)) }
- 	| qcon			{ $1 }
--- the case of '[:' ':]' is part of the production `parr'
+-----------------------------------------
+-- Data constructors
+qcon	:: { Located RdrName }
+	: qconid		{ $1 }
+	| '(' qconsym ')'	{ LL (unLoc $2) }
+	| sysdcon		{ L1 $ nameRdrName (dataConName (unLoc $1)) }
+-- The case of '[:' ':]' is part of the production `parr'
+
+con	:: { Located RdrName }
+	: conid			{ $1 }
+	| '(' consym ')'	{ LL (unLoc $2) }
+	| sysdcon		{ L1 $ nameRdrName (dataConName (unLoc $1)) }
 
 sysdcon	:: { Located DataCon }	-- Wired in data constructors
 	: '(' ')'		{ LL unitDataCon }
 	| '(' commas ')'	{ LL $ tupleCon Boxed $2 }
 	| '[' ']'		{ LL nilDataCon }
-
-var 	:: { Located RdrName }
-	: varid			{ $1 }
-	| '(' varsym ')'	{ LL (unLoc $2) }
-
-qvar 	:: { Located RdrName }
-	: qvarid		{ $1 }
-	| '(' varsym ')'	{ LL (unLoc $2) }
-	| '(' qvarsym1 ')'	{ LL (unLoc $2) }
--- We've inlined qvarsym here so that the decision about
--- whether it's a qvar or a var can be postponed until
--- *after* we see the close paren.
-
-ipvar	:: { Located (IPName RdrName) }
-	: IPDUPVARID		{ L1 (Dupable (mkUnqual varName (getIPDUPVARID $1))) }
-	| IPSPLITVARID		{ L1 (Linear  (mkUnqual varName (getIPSPLITVARID $1))) }
-
-qcon	:: { Located RdrName }
-	: qconid		{ $1 }
-	| '(' qconsym ')'	{ LL (unLoc $2) }
-
-varop	:: { Located RdrName }
-	: varsym		{ $1 }
-	| '`' varid '`'		{ LL (unLoc $2) }
-
-qvarop :: { Located RdrName }
-	: qvarsym		{ $1 }
-	| '`' qvarid '`'	{ LL (unLoc $2) }
-
-qvaropm :: { Located RdrName }
-	: qvarsym_no_minus	{ $1 }
-	| '`' qvarid '`'	{ LL (unLoc $2) }
 
 conop :: { Located RdrName }
 	: consym		{ $1 }	
@@ -1364,11 +1346,15 @@ tyconsym :: { Located RdrName }
 	: CONSYM			{ L1 $! mkUnqual tcClsName (getCONSYM $1) }
 
 -----------------------------------------------------------------------------
--- Any operator
+-- Operators
 
 op	:: { Located RdrName }   -- used in infix decls
 	: varop			{ $1 }
 	| conop 		{ $1 }
+
+varop	:: { Located RdrName }
+	: varsym		{ $1 }
+	| '`' varid '`'		{ LL (unLoc $2) }
 
 qop	:: { LHsExpr RdrName }   -- used in sections
 	: qvarop		{ L1 $ HsVar (unLoc $1) }
@@ -1378,23 +1364,16 @@ qopm	:: { LHsExpr RdrName }   -- used in sections
 	: qvaropm		{ L1 $ HsVar (unLoc $1) }
 	| qconop		{ L1 $ HsVar (unLoc $1) }
 
+qvarop :: { Located RdrName }
+	: qvarsym		{ $1 }
+	| '`' qvarid '`'	{ LL (unLoc $2) }
+
+qvaropm :: { Located RdrName }
+	: qvarsym_no_minus	{ $1 }
+	| '`' qvarid '`'	{ LL (unLoc $2) }
+
 -----------------------------------------------------------------------------
--- VarIds
-
-qvarid :: { Located RdrName }
-	: varid			{ $1 }
-	| QVARID		{ L1 $ mkQual varName (getQVARID $1) }
-
-varid :: { Located RdrName }
-	: varid_no_unsafe 	{ $1 }
-	| 'unsafe'		{ L1 $! mkUnqual varName FSLIT("unsafe") }
-	| 'safe'		{ L1 $! mkUnqual varName FSLIT("safe") }
-	| 'threadsafe'		{ L1 $! mkUnqual varName FSLIT("threadsafe") }
-
-varid_no_unsafe :: { Located RdrName }
-	: VARID			{ L1 $! mkUnqual varName (getVARID $1) }
-	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
-	| 'forall'		{ L1 $! mkUnqual varName FSLIT("forall") }
+-- Type variables
 
 tyvar   :: { Located RdrName }
 tyvar   : tyvarid		{ $1 }
@@ -1417,22 +1396,35 @@ tyvarsym :: { Located RdrName }
 --		 or "*", because that's used for kinds
 tyvarsym : VARSYM		{ L1 $! mkUnqual tvName (getVARSYM $1) }
 
--- These special_ids are treated as keywords in various places, 
--- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe' and 'forall' whose treatment differs depending on context
-special_id :: { Located UserFS }
-special_id
-	: 'as'			{ L1 FSLIT("as") }
-	| 'qualified'		{ L1 FSLIT("qualified") }
-	| 'hiding'		{ L1 FSLIT("hiding") }
-	| 'export'		{ L1 FSLIT("export") }
-	| 'label'		{ L1 FSLIT("label")  }
-	| 'dynamic'		{ L1 FSLIT("dynamic") }
-	| 'stdcall'             { L1 FSLIT("stdcall") }
-	| 'ccall'               { L1 FSLIT("ccall") }
-
 -----------------------------------------------------------------------------
 -- Variables 
+
+var 	:: { Located RdrName }
+	: varid			{ $1 }
+	| '(' varsym ')'	{ LL (unLoc $2) }
+
+qvar 	:: { Located RdrName }
+	: qvarid		{ $1 }
+	| '(' varsym ')'	{ LL (unLoc $2) }
+	| '(' qvarsym1 ')'	{ LL (unLoc $2) }
+-- We've inlined qvarsym here so that the decision about
+-- whether it's a qvar or a var can be postponed until
+-- *after* we see the close paren.
+
+qvarid :: { Located RdrName }
+	: varid			{ $1 }
+	| QVARID		{ L1 $ mkQual varName (getQVARID $1) }
+
+varid :: { Located RdrName }
+	: varid_no_unsafe 	{ $1 }
+	| 'unsafe'		{ L1 $! mkUnqual varName FSLIT("unsafe") }
+	| 'safe'		{ L1 $! mkUnqual varName FSLIT("safe") }
+	| 'threadsafe'		{ L1 $! mkUnqual varName FSLIT("threadsafe") }
+
+varid_no_unsafe :: { Located RdrName }
+	: VARID			{ L1 $! mkUnqual varName (getVARID $1) }
+	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
+	| 'forall'		{ L1 $! mkUnqual varName FSLIT("forall") }
 
 qvarsym :: { Located RdrName }
 	: varsym		{ $1 }
@@ -1454,7 +1446,20 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 	| special_sym		{ L1 $ mkUnqual varName (unLoc $1) }
 
 
--- See comments with special_id
+-- These special_ids are treated as keywords in various places, 
+-- but as ordinary ids elsewhere.   'special_id' collects all these
+-- except 'unsafe' and 'forall' whose treatment differs depending on context
+special_id :: { Located UserFS }
+special_id
+	: 'as'			{ L1 FSLIT("as") }
+	| 'qualified'		{ L1 FSLIT("qualified") }
+	| 'hiding'		{ L1 FSLIT("hiding") }
+	| 'export'		{ L1 FSLIT("export") }
+	| 'label'		{ L1 FSLIT("label")  }
+	| 'dynamic'		{ L1 FSLIT("dynamic") }
+	| 'stdcall'             { L1 FSLIT("stdcall") }
+	| 'ccall'               { L1 FSLIT("ccall") }
+
 special_sym :: { Located UserFS }
 special_sym : '!'	{ L1 FSLIT("!") }
 	    | '.' 	{ L1 FSLIT(".") }

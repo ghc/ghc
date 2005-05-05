@@ -20,7 +20,7 @@ import RnExpr		( rnLExpr, checkTH )
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnBinds, rnMethodBinds, 
 			  rnBindsAndThen, renameSigs, checkSigs )
-import RnEnv		( lookupTopBndrRn, lookupTopFixSigNames,
+import RnEnv		( lookupTopBndrRn, lookupLocalDataTcNames,
 			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
 			  lookupOccRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
@@ -164,12 +164,8 @@ rnFixityDecl fix_env (L loc (FixitySig rdr_name fixity))
 	-- for con-like things
 	-- If neither are in scope, report an error; otherwise
 	-- add both to the fixity env
-     addLocM lookupTopFixSigNames rdr_name	`thenM` \ names ->
-     if null names then
-	  addLocErr rdr_name unknownNameErr	`thenM_`
-	  returnM fix_env
-     else
-	  foldlM add fix_env names
+     addLocM lookupLocalDataTcNames rdr_name	`thenM` \ names ->
+     foldlM add fix_env names
   where
     add fix_env name
       = case lookupNameEnv fix_env name of
@@ -208,12 +204,12 @@ rnSrcDeprecDecls []
   = returnM NoDeprecs
 
 rnSrcDeprecDecls decls
-  = mappM (addLocM rn_deprec) decls	`thenM` \ pairs ->
-    returnM (DeprecSome (mkNameEnv (catMaybes pairs)))
+  = mappM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
+    returnM (DeprecSome (mkNameEnv (concat pairs_s)))
  where
    rn_deprec (Deprecation rdr_name txt)
-     = lookupTopBndrRn rdr_name	`thenM` \ name ->
-       returnM (Just (name, (rdrNameOcc rdr_name, txt)))
+     = lookupLocalDataTcNames rdr_name	`thenM` \ names ->
+       returnM [(name, (nameOccName name, txt)) | name <- names]
 
 checkModDeprec :: Maybe DeprecTxt -> Deprecations
 -- Check for a module deprecation; done once at top level

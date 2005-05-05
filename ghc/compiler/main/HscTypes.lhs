@@ -652,6 +652,11 @@ data Deprecs a
 
 type IfaceDeprecs = Deprecs [(OccName,DeprecTxt)]
 type Deprecations = Deprecs (NameEnv (OccName,DeprecTxt))
+	-- Keep the OccName so we can flatten the NameEnv to
+	-- get an IfaceDeprecs from a Deprecations
+	-- Only an OccName is needed, because a deprecation always
+	-- applies to things defined in the module in which the
+	-- deprecation appears.
 
 mkIfaceDepCache:: IfaceDeprecs -> Name -> Maybe DeprecTxt
 mkIfaceDepCache NoDeprecs     	  = \n -> Nothing

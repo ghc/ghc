@@ -10,7 +10,7 @@ module RnEnv (
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, 
 	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
-	lookupTopFixSigNames, lookupSrcOcc_maybe,
+	lookupLocalDataTcNames, lookupSrcOcc_maybe,
 	lookupFixityRn, lookupLocatedSigOccRn, 
 	lookupLocatedInstDeclBndr,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
@@ -361,16 +361,21 @@ lookupQualifiedName rdr_name
 %*********************************************************
 
 \begin{code}
-lookupTopFixSigNames :: RdrName -> RnM [Name]
+lookupLocalDataTcNames :: RdrName -> RnM [Name]
 -- GHC extension: look up both the tycon and data con 
 -- for con-like things
-lookupTopFixSigNames rdr_name
+-- Complain if neither is in scope
+lookupLocalDataTcNames rdr_name
   | Just n <- isExact_maybe rdr_name	
 	-- Special case for (:), which doesn't get into the GlobalRdrEnv
   = return [n]	-- For this we don't need to try the tycon too
   | otherwise
   = do	{ mb_gres <- mapM lookupGreLocalRn (dataTcOccs rdr_name)
-	; return [gre_name gre | Just gre <- mb_gres] }
+	; case [gre_name gre | Just gre <- mb_gres] of
+	    [] -> do { addErr (unknownNameErr rdr_name)
+		     ; return [] }
+	    names -> return names
+    }
 
 --------------------------------
 bindLocalFixities :: [FixitySig RdrName] -> RnM a -> RnM a

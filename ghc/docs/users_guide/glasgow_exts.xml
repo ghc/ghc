@@ -4331,7 +4331,7 @@ Assertion failures can be caught, see the documentation for the
 	</listitem>
 
 	<listitem>
-	  <para>You can deprecate a function, class, or type, with the
+	  <para>You can deprecate a function, class, type, or data constructor, with the
 	  following top-level declaration:</para>
 <programlisting>
    {-# DEPRECATED f, C, T "Don't use these" #-}
@@ -4339,6 +4339,13 @@ Assertion failures can be caught, see the documentation for the
 	  <para>When you compile any module that imports and uses any
           of the specified entities, GHC will print the specified
           message.</para>
+	  <para> You can only depecate entities declared at top level in the module
+	  being compiled, and you can only use unqualified names in the list of
+	  entities being deprecated.  A capitalised name, such as <literal>T</literal>
+	  refers to <emphasis>either</emphasis> the type constructor <literal>T</literal>
+	  <emphasis>or</emphasis> the data constructor <literal>T</literal>, or both if
+	  both are in scope.  If both are in scope, there is currently no way to deprecate 
+	  one without the other (c.f. fixities <xref linkend="infix-tycons"/>).</para>
 	</listitem>
       </itemizedlist>
       Any use of the deprecated item, or of anything from a deprecated
