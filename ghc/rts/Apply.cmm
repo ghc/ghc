@@ -264,7 +264,7 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
   // Reload the stack
   W_ i;
   W_ p;
-  p = ap + SIZEOF_StgHeader + OFFSET_StgAP_STACK_payload;
+  p = ap + SIZEOF_StgThunkHeader + OFFSET_StgAP_STACK_payload;
   i = 0;
 for:
   if (i < Words) {
