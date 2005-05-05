@@ -6,7 +6,7 @@
 \begin{code}
 module TcRnDriver (
 #ifdef GHCI
-	mkExportEnv, getModuleContents, tcRnStmt, 
+	getModuleContents, tcRnStmt, 
 	tcRnGetInfo, GetInfoResult,
 	tcRnExpr, tcRnType,
 	tcRnLookupRdrName,
@@ -1083,32 +1083,6 @@ tcGetModuleExports mod = do
   		-- Load any orphan-module interfaces,
   		-- so their instances are visible
   ifaceExportNames (mi_exports iface)
-
-mkExportEnv :: HscEnv -> [Module]	-- Expose these modules' exports only
- 	    -> IO GlobalRdrEnv
-mkExportEnv hsc_env exports
-  = do	{ mb_envs <- initTcPrintErrors hsc_env iNTERACTIVE $
-		     mappM getModuleExportRdrEnv exports 
-	; case mb_envs of
-	     Just envs -> return (foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs)
-	     Nothing   -> return emptyGlobalRdrEnv
-			     -- Some error; initTc will have printed it
-    }
-
-getModuleExportRdrEnv :: Module -> TcM GlobalRdrEnv
-getModuleExportRdrEnv mod = do
-  names <- tcGetModuleExports mod
-  let gres =  [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
-  	      | name <- nameSetToList names ]
-  returnM (mkGlobalRdrEnv gres)
-
-vanillaProv :: Module -> Provenance
--- We're building a GlobalRdrEnv as if the user imported
--- all the specified modules into the global interactive module
-vanillaProv mod = Imported [ImportSpec { is_mod = mod, is_as = mod, 
-					 is_qual = False, is_explicit = False,
-					 is_loc = srcLocSpan interactiveSrcLoc }]
-
 \end{code}
 
 \begin{code}

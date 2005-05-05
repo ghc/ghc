@@ -133,20 +133,25 @@ module GHC (
 import qualified Linker
 import Linker		( HValue, extendLinkEnv )
 import NameEnv		( lookupNameEnv )
-import TcRnDriver	( mkExportEnv, getModuleContents, tcRnLookupRdrName,
+import TcRnDriver	( getModuleContents, tcRnLookupRdrName,
 			  getModuleExports )
-import RdrName		( plusGlobalRdrEnv )
+import RdrName		( plusGlobalRdrEnv, Provenance(..), ImportSpec(..),
+			  emptyGlobalRdrEnv, mkGlobalRdrEnv )
 import HscMain		( hscGetInfo, GetInfoResult, hscParseIdentifier,
 			  hscStmt, hscTcExpr, hscKcType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
 import IfaceSyn		( IfaceDecl )
+import Name		( getName, nameModule_maybe )
+import SrcLoc		( mkSrcLoc, srcLocSpan, interactiveSrcLoc )
+import Bag		( unitBag, emptyBag )
 #endif
 
 import Packages		( initPackages )
 import NameSet		( NameSet, nameSetToList )
-import RdrName		( GlobalRdrEnv )
+import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, gre_name,
+			  globalRdrEnvElts )
 import HsSyn
 import Type		( Kind, Type, dropForAlls )
 import Id		( Id, idType, isImplicitId, isDeadBinder,
@@ -158,11 +163,9 @@ import Id		( Id, idType, isImplicitId, isDeadBinder,
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon )
 import Class		( Class, classSCTheta, classTvsFds )
 import DataCon		( DataCon )
-import InstEnv		( Instance )
-import Name		( Name, getName, nameModule_maybe )
-import RdrName		( RdrName, gre_name, globalRdrEnvElts )
+import Name		( Name )
 import NameEnv		( nameEnvElts )
-import SrcLoc		( Located(..), mkSrcLoc, srcLocSpan )
+import SrcLoc		( Located(..) )
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
@@ -186,7 +189,6 @@ import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Maybes		( orElse, expectJust, mapCatMaybes )
 import TcType           ( tcSplitSigmaTy, isDictTy )
-import Bag		( unitBag, emptyBag )
 import FastString	( mkFastString )
 
 import Directory        ( getModificationTime, doesFileExist )
@@ -1534,13 +1536,16 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
 	   Nothing -> return Nothing
 	   Just names -> do
 		eps <- readIORef (hsc_EPS hsc_env)
-		let pte = eps_PTE eps
-		    tys = [ ty | name <- nameSetToList names,
-				 Just ty <- [lookupTypeEnv pte name] ]
+		let 
+		    pte    = eps_PTE eps
+		    n_list = nameSetToList names
+		    tys    = [ ty | name <- n_list,
+				    Just ty <- [lookupTypeEnv pte name] ]
+		--
 		return (Just (ModuleInfo {
 				minf_type_env = mkTypeEnv tys,
 				minf_exports  = names,
-				minf_rdr_env  = Nothing
+				minf_rdr_env  = Just $! nameSetToGlobalRdrEnv names mdl
 			}))
 #else
 	-- bogusly different for non-GHCI (ToDo)
@@ -1656,6 +1661,28 @@ setContext (Session ref) toplevs exports = do
   writeIORef ref hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplevs,
 					    ic_exports      = exports,
 					    ic_rn_gbl_env   = all_env } }
+
+-- Make a GlobalRdrEnv based on the exports of the modules only.
+mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
+mkExportEnv hsc_env mods = do
+  mb_name_sets <- mapM (getModuleExports hsc_env) mods
+  let 
+	gres = [ nameSetToGlobalRdrEnv name_set mod
+  	       | (Just name_set, mod) <- zip mb_name_sets mods ]
+  --
+  return $! foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
+
+nameSetToGlobalRdrEnv :: NameSet -> Module -> GlobalRdrEnv
+nameSetToGlobalRdrEnv names mod =
+  mkGlobalRdrEnv [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
+		 | name <- nameSetToList names ]
+
+vanillaProv :: Module -> Provenance
+-- We're building a GlobalRdrEnv as if the user imported
+-- all the specified modules into the global interactive module
+vanillaProv mod = Imported [ImportSpec { is_mod = mod, is_as = mod, 
+					 is_qual = False, is_explicit = False,
+					 is_loc = srcLocSpan interactiveSrcLoc }]
 
 checkModuleExists :: HscEnv -> HomePackageTable -> Module -> IO ()
 checkModuleExists hsc_env hpt mod = 
