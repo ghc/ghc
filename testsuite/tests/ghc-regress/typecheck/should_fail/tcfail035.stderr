@@ -1,5 +1,5 @@
 
 tcfail035.hs:6:0:
     Duplicate instance declarations:
-      tcfail035.hs:6:0: instance Num NUM
-      tcfail035.hs:7:0: instance Num NUM
+      instance Num NUM (Defined at tcfail035.hs:6:0)
+      instance Num NUM (Defined at tcfail035.hs:7:0)

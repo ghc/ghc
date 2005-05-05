@@ -1,4 +1,6 @@
 
 tcfail063.hs:6:8:
-    Kind error: `Num' is not applied to enough type arguments
+    `Num' is not applied to enough type arguments
+    Expected kind `*', but `Num' has kind `* -> *'
+    In the type `(Num) => Int -> a -> Int'
     In the type signature: moby :: (Num) => Int -> a -> Int

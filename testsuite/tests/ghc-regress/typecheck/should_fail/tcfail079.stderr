@@ -1,4 +1,5 @@
 
 tcfail079.hs:9:26:
-    Kind error: Expecting a lifted type, but `Int#' is unlifted
+    Expecting a lifted type, but `Int#' is unlifted
+    Expected kind `*', but `Int#' has kind `#'
     In the newtype declaration for `Unboxed'

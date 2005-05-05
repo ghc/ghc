@@ -1,4 +1,7 @@
 
 tcfail110.hs:8:29:
-    Kind error: `Foo a' is not applied to enough type arguments
-    In the type signature: bar :: String -> (forall a. Foo a) -> IO ()
+    `Foo a' is not applied to enough type arguments
+    Expected kind `*', but `Foo a' has kind `* -> *'
+    In the type `forall a. Foo a'
+    In the type `(forall a. Foo a) -> IO ()'
+    In the type `String -> (forall a. Foo a) -> IO ()'

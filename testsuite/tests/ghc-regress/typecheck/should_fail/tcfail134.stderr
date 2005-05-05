@@ -1,4 +1,6 @@
 
-tcfail134.hs:5:18:
-    Class `XML' used as a type
+tcfail134.hs:5:32:
+    `XML' is not applied to enough type arguments
+    Expected kind `?', but `XML' has kind `* -> *'
+    In the type `a -> XML'
     In the class declaration for `XML'

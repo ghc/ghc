@@ -1,4 +1,5 @@
 
 tcfail028.hs:4:15:
-    Kind error: `A a' is not applied to enough type arguments
+    `A a' is not applied to enough type arguments
+    Expected kind `?', but `A a' has kind `k_abR -> *'
     In the data type declaration for `A'

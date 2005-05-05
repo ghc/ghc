@@ -1,5 +1,5 @@
 
 tcfail023.hs:10:0:
     Duplicate instance declarations:
-      tcfail023.hs:10:0: instance A B
-      tcfail023.hs:13:0: instance A B
+      instance A B (Defined at tcfail023.hs:10:0)
+      instance A B (Defined at tcfail023.hs:13:0)
