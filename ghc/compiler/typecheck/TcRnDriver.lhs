@@ -86,10 +86,8 @@ import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..),
 			  LStmt, LHsExpr, LHsType, mkMatchGroup,
 			  collectLStmtsBinders, mkSimpleMatch, nlVarPat,
 		   	  placeHolderType, noSyntaxExpr )
-import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
-			  Provenance(..), ImportSpec(..), globalRdrEnvElts,
-			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv,
-			  plusGlobalRdrEnv )
+import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
+			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
 import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
@@ -118,10 +116,10 @@ import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
-import SrcLoc		( interactiveSrcLoc, unLoc )
+import SrcLoc		( unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName, nameModule )
+import Name		( nameOccName, nameModule, isBuiltInSyntax, nameParent_maybe )
 import OccName		( occNameUserString, isTcOcc )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
@@ -130,7 +128,6 @@ import HscTypes		( InteractiveContext(..), HomeModInfo(..),
 			  availNames, availName, ModIface(..), icPrintUnqual,
 			  Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
-import ListSetOps	( removeDups )
 import Panic		( ghcError, GhcException(..) )
 import SrcLoc		( SrcLoc )
 #endif
@@ -1231,17 +1228,22 @@ tcRnGetInfo hsc_env ictxt rdr_name
 		 	-- str is the the naked occurrence name
 			-- after stripping off qualification and parens (+)
 		  str = occNameUserString (nameOccName name)
+
+	; parent_is_there n 
+		| Just p <- nameParent_maybe n = p `elem` good_names
+		| otherwise		       = False
 	} ;
 
-		-- For the SrcLoc, the 'thing' has better info than
-		-- the 'name' because getting the former forced the
-		-- declaration to be loaded into the cache
+	-- For the SrcLoc, the 'thing' has better info than
+	-- the 'name' because getting the former forced the
+	-- declaration to be loaded into the cache
 
-    results <- mapM do_one good_names ;
-    return (fst (removeDups cmp results))
+    mapM do_one (filter (not . parent_is_there) good_names)
+	-- Filter out names whose parent is also there
+	-- Good example is '[]', which is both a type and data constructor
+	-- in the same type
     }
   where
-    cmp (_,d1,_,_,_) (_,d2,_,_,_) = ifName d1 `compare` ifName d2
     ext_nm = interactiveExtNameFun print_unqual
     print_unqual = icPrintUnqual ictxt
 
@@ -1273,8 +1275,9 @@ lookupInsts print_unqual other = return []
 plausibleDFun print_unqual dfun	-- Dfun involving only names that print unqualified
   = all ok (nameSetToList (tyClsNamesOfType (idType dfun)))
   where
-    ok name | isExternalName name = print_unqual (nameModule name) (nameOccName name)
-	    | otherwise		  = True
+    ok name | isBuiltInSyntax name = True
+	    | isExternalName name  = print_unqual (nameModule name) (nameOccName name)
+	    | otherwise		   = True
 
 toIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
 toIfaceDecl ext_nm thing
