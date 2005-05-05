@@ -2222,9 +2222,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                   -- hence the constant 4.
                   Also I don't know if A should be added, but so
                   far it has always been zero.
+
+		  SOF 05/2005: 'A' (old contents of *pP) have been observed
+		  to contain values other than zero (the 'wx' object file
+		  that came with wxhaskell-0.9.4; dunno how it was compiled..).
+		  So, add displacement to old value instead of asserting
+		  A to be zero. Fixes wxhaskell-related crashes, and no other
+		  ill effects have been observed.
 	       */
-               ASSERT(A==0);
-               *pP = S - ((UInt32)pP) - 4;
+               *pP = S - ((UInt32)pP) - 4 + A;
                break;
             default:
                debugBelch("%s: unhandled PEi386 relocation type %d",
