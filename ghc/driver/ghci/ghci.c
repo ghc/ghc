@@ -1,6 +1,6 @@
 /*
  *
- * $Id: ghci.c,v 1.9 2005/04/22 17:15:51 sof Exp $
+ * $Id: ghci.c,v 1.10 2005/05/05 00:58:38 sof Exp $
  *
  * ghci wrapper for Win32 only
  * 
@@ -74,6 +74,12 @@ main(int argc, char** argv)
   ZeroMemory(&si, sizeof(STARTUPINFO));
   si.cb = sizeof(STARTUPINFO);
 
+  if ( getenv("_") ) {
+      printf("WARNING: GHCi invoked via 'ghci.exe' in *nix-like shells (cygwin-bash, in particular)\n");
+      printf("         doesn't handle Ctrl-C well; use the 'ghcii.sh' shell wrapper instead\n");
+      fflush(stdout);
+  }
+
   /* Locate the binary we want to start up */
   if ( !SearchPath(NULL,
 		   BINARY_NAME,
@@ -81,7 +87,7 @@ main(int argc, char** argv)
 		   dwSize,
 		   (char*)binPath,
 		   &szEnd) ) {
-    errmsg("Unable to locate ghc.exe");
+    errmsg1("%s: Unable to locate ghc.exe", argv[0]);
     return 1;
   }
   
@@ -89,7 +95,7 @@ main(int argc, char** argv)
   /* Turn the path into short form - LFN form causes problems
      when passed in argv[0]. */
   if ( !(GetShortPathName(binPath, binPathShort, dwSize)) ) {
-    errmsg("Unable to locate ghc.exe");
+    errmsg1("%s: Unable to locate ghc.exe", argv[0]);
     return 1;
   }
   
@@ -101,7 +107,7 @@ main(int argc, char** argv)
   }
   new_cmdline = (char*)malloc(sizeof(char) * (cmdline_len + 1));
   if (!new_cmdline) {
-      errmsg("failed to start up ghc.exe; insufficient memory");
+      errmsg1("%s: failed to start up ghc.exe; insufficient memory", argv[0]);
       return 1;
   }
   

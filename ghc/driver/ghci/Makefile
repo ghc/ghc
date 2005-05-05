@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 2002/01/10 10:33:48 sof Exp $
+# $Id: Makefile,v 1.11 2005/05/05 00:58:38 sof Exp $
 #
 
 TOP=../..
@@ -40,6 +40,7 @@ SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 else
+INSTALL_SCRIPTS  += ghcii.sh
 INSTALL_PROGS    += $(C_PROG)
 endif
 TOPDIROPT 	  = -B$(GHCLIB)
