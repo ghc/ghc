@@ -91,6 +91,13 @@
     printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%d)\n", size);
 #endif
 
+#if defined(GEN_HASKELL)
+#define def_thunk_size(str, size) /* nothing */
+#else
+#define def_thunk_size(str, size) \
+    printf("#define SIZEOF_" str " (SIZEOF_StgThunkHeader+%d)\n", size);
+#endif
+
 #define struct_size(s_type) \
     def_size(#s_type, sizeof(s_type));
 
@@ -102,22 +109,42 @@
     def_size(#s_type "_NoHdr", sizeof(s_type) - sizeof(StgHeader)); \
     def_closure_size(#s_type, sizeof(s_type) - sizeof(StgHeader));
 
+#define thunk_size(s_type) \
+    def_size(#s_type "_NoHdr", sizeof(s_type) - sizeof(StgHeader)); \
+    def_thunk_size(#s_type, sizeof(s_type) - sizeof(StgHeader));
+
 /* An access macro for use in C-- sources. */
 #define closure_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n");
 
+#define thunk_field_macro(str) \
+    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgThunkHeader+OFFSET_" str "]\n");
+
 #define closure_field_offset_(str, s_type,field) \
     def_offset(str, OFFSET(s_type,field) - sizeof(StgHeader));
 
+#define thunk_field_offset_(str, s_type, field) \
+    closure_field_offset_(str, s_type, field)
+
 #define closure_field_offset(s_type,field) \
-    closure_field_offset_(str(s_type,field),s_type,field);
+    closure_field_offset_(str(s_type,field),s_type,field)
+
+#define thunk_field_offset(s_type,field) \
+    thunk_field_offset_(str(s_type,field),s_type,field)
 
 #define closure_payload_macro(str) \
     printf("#define " str "(__ptr__,__ix__)  W_[__ptr__+SIZEOF_StgHeader+OFFSET_" str " + WDS(__ix__)]\n");
 
+#define thunk_payload_macro(str) \
+    printf("#define " str "(__ptr__,__ix__)  W_[__ptr__+SIZEOF_StgThunkHeader+OFFSET_" str " + WDS(__ix__)]\n");
+
 #define closure_payload(s_type,field) \
     closure_field_offset_(str(s_type,field),s_type,field); \
     closure_payload_macro(str(s_type,field));
+
+#define thunk_payload(s_type,field) \
+    thunk_field_offset_(str(s_type,field),s_type,field); \
+    thunk_payload_macro(str(s_type,field));
 
 /* Byte offset and MachRep for a closure field, minus the header */
 #define closure_field(s_type, field) \
@@ -125,12 +152,21 @@
     field_type(s_type, field); \
     closure_field_macro(str(s_type,field))
 
+#define thunk_field(s_type, field) \
+    thunk_field_offset(s_type,field) \
+    field_type(s_type, field); \
+    thunk_field_macro(str(s_type,field))
+
 /* Byte offset and MachRep for a closure field, minus the header */
 #define closure_field_(str, s_type, field) \
     closure_field_offset_(str,s_type,field) \
     field_type_(str, s_type, field); \
     closure_field_macro(str)
 
+#define thunk_field_(str, s_type, field) \
+    thunk_field_offset_(str,s_type,field) \
+    field_type_(str, s_type, field); \
+    thunk_field_macro(str)
 /*
  * Byte offset and MachRep for a TSO field, minus the header and
  * variable prof bit.
@@ -291,10 +327,10 @@ main(int argc, char *argv[])
     closure_field(StgAP, fun);
     closure_payload(StgAP, payload);
 
-    closure_size(StgAP_STACK);
-    closure_field(StgAP_STACK, size);
-    closure_field(StgAP_STACK, fun);
-    closure_payload(StgAP_STACK, payload);
+    thunk_size(StgAP_STACK);
+    thunk_field(StgAP_STACK, size);
+    thunk_field(StgAP_STACK, fun);
+    thunk_payload(StgAP_STACK, payload);
 
     closure_field(StgInd, indirectee);
 
