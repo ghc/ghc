@@ -1,9 +1,10 @@
 
 tcfail036.hs:6:0:
     Duplicate instance declarations:
-      tcfail036.hs:6:0: instance Num NUM
-      tcfail036.hs:8:0: instance Num NUM
+      instance Num NUM (Defined at tcfail036.hs:6:0)
+      instance Num NUM (Defined at tcfail036.hs:8:0)
 
 tcfail036.hs:9:12:
     Class `Num' used as a type
+    In the type `Num'
     In the instance declaration for `Eq Num'
