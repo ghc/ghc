@@ -109,7 +109,7 @@ initTc hsc_env hsc_src mod do_this
 		tcl_ctxt       = [],
 		tcl_rdr	       = emptyLocalRdrEnv,
 		tcl_th_ctxt    = topStage,
-		tcl_arrow_ctxt = panic "initTc:arrow",	-- only used inside proc
+		tcl_arrow_ctxt = NoArrowCtxt,
 		tcl_env        = emptyNameEnv,
 		tcl_tyvars     = tvs_var,
 		tcl_lie	       = panic "initTc:LIE",	-- LIE only valid inside a getLIE

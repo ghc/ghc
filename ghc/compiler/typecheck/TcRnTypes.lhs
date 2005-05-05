@@ -27,7 +27,7 @@ module TcRnTypes(
 	ThLevel, impLevel, topLevel,
 
 	-- Arrows
-	newArrowScope, escapeArrowScope,
+	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
 	-- Insts
 	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, 
@@ -394,7 +394,9 @@ and returning to that (using escapeArrowScope) on the left of -< and the
 head of (|..|).
 -}
 
-newtype ArrowCtxt = ArrowCtxt { arr_proc_env :: Env TcGblEnv TcLclEnv }
+data ArrowCtxt
+  = NoArrowCtxt
+  | ArrowCtxt (Env TcGblEnv TcLclEnv)
 
 -- Record the current environment (outside a proc)
 newArrowScope :: TcM a -> TcM a
@@ -404,7 +406,10 @@ newArrowScope
 
 -- Return to the stored environment (from the enclosing proc)
 escapeArrowScope :: TcM a -> TcM a
-escapeArrowScope = updEnv (arr_proc_env . tcl_arrow_ctxt . env_lcl)
+escapeArrowScope
+  = updEnv $ \ env -> case tcl_arrow_ctxt (env_lcl env) of
+	NoArrowCtxt -> env
+	ArrowCtxt env' -> env'
 
 ---------------------------
 -- TcTyThing
