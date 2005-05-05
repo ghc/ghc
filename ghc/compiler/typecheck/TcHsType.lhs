@@ -24,7 +24,7 @@ module TcHsType (
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, HsBang,
-			  LHsContext, HsPred(..), LHsPred, LHsBinds,
+			  LHsContext, HsPred(..), LHsPred, LHsBinds, HsExplicitForAll(..),
 			  getBangStrictness, collectSigTysFromHsBinds )
 import RnHsSyn		( extractHsTyVars )
 import TcRnMonad
@@ -238,13 +238,20 @@ kcCheckHsType :: LHsType Name -> TcKind -> TcM (LHsType Name)
 -- with OpenTypeKind, because it gives better error messages
 kcCheckHsType (L span ty) exp_kind 
   = setSrcSpan span				$
-    do	{ (ty', act_kind) <- addErrCtxt (typeCtxt ty) $
-		    	     kc_hs_type ty
+    do	{ (ty', act_kind) <- add_ctxt ty (kc_hs_type ty)
 		-- Add the context round the inner check only
 		-- because checkExpectedKind already mentions
 		-- 'ty' by name in any error message
+
 	; checkExpectedKind ty act_kind exp_kind
 	; return (L span ty') }
+  where
+	-- Wrap a context around only if we want to
+	-- show that contexts.  Omit invisble ones
+	-- and ones user's won't grok (HsPred p).
+    add_ctxt (HsPredTy p)		    	   thing = thing
+    add_ctxt (HsForAllTy Implicit tvs (L _ []) ty) thing = thing
+    add_ctxt other_ty thing = addErrCtxt (typeCtxt ty) thing
 \end{code}
 
 	Here comes the main function
