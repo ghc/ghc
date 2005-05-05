@@ -1294,6 +1294,21 @@ traverse_weak_ptr_list(void)
 	  }
       }
       
+      /* Finally, we can update the blackhole_queue.  This queue
+       * simply strings together TSOs blocked on black holes, it is
+       * not intended to keep anything alive.  Hence, we do not follow
+       * pointers on the blackhole_queue until now, when we have
+       * determined which TSOs are otherwise reachable.  We know at
+       * this point that all TSOs have been evacuated, however.
+       */
+      { 
+	  StgTSO **pt;
+	  for (pt = &blackhole_queue; *pt != END_TSO_QUEUE; pt = &((*pt)->link)) {
+	      *pt = (StgTSO *)isAlive((StgClosure *)*pt);
+	      ASSERT(*pt != NULL);
+	  }
+      }
+
       weak_stage = WeakDone;  // *now* we're done,
       return rtsTrue;         // but one more round of scavenging, please
 
@@ -2356,8 +2371,10 @@ scavenge_fun_srt(const StgInfoTable *info)
 static void
 scavengeTSO (StgTSO *tso)
 {
-    // chase the link field for any TSOs on the same queue 
-    tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
+    // We don't chase the link field: TSOs on the blackhole queue are
+    // not automatically alive, so the link field is a "weak" pointer.
+    // Queues of TSOs are traversed explicitly.
+
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException

@@ -2745,6 +2745,16 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
 	KH @ 25/10/99
 */
 
+static void
+evac_TSO_queue (evac_fn evac, StgTSO ** ptso)
+{
+    StgTSO **pt;
+    
+    for (pt = ptso; *pt != END_TSO_QUEUE; pt = &((*pt)->link)) {
+	evac((StgClosure **)pt);
+    }
+}
+
 void
 GetRoots( evac_fn evac )
 {
@@ -2769,29 +2779,29 @@ GetRoots( evac_fn evac )
   markEventQueue();
 
 #else /* !GRAN */
+
   if (run_queue_hd != END_TSO_QUEUE) {
       ASSERT(run_queue_tl != END_TSO_QUEUE);
-      evac((StgClosure **)&run_queue_hd);
+      evac_TSO_queue(evac, &run_queue_hd);
       evac((StgClosure **)&run_queue_tl);
   }
   
   if (blocked_queue_hd != END_TSO_QUEUE) {
       ASSERT(blocked_queue_tl != END_TSO_QUEUE);
-      evac((StgClosure **)&blocked_queue_hd);
+      evac_TSO_queue(evac, &blocked_queue_hd);
       evac((StgClosure **)&blocked_queue_tl);
   }
   
   if (sleeping_queue != END_TSO_QUEUE) {
-      evac((StgClosure **)&sleeping_queue);
+      evac_TSO_queue(evac, &blocked_queue_hd);
+      evac((StgClosure **)&blocked_queue_tl);
   }
 #endif 
 
-  if (blackhole_queue != END_TSO_QUEUE) {
-      evac((StgClosure **)&blackhole_queue);
-  }
+  // Don't chase the blackhole_queue just yet, we treat it as "weak"
 
   if (suspended_ccalling_threads != END_TSO_QUEUE) {
-      evac((StgClosure **)&suspended_ccalling_threads);
+      evac_TSO_queue(evac, &suspended_ccalling_threads);
   }
 
 #if defined(PARALLEL_HASKELL) || defined(GRAN)
