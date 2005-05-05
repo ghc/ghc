@@ -280,7 +280,7 @@ checkClosure( StgClosure* p )
 	for (i = 0; i < info->layout.payload.ptrs; i++) {
 	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
 	}
-	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader)+MIN_UPD_SIZE);
+	return stg_max(thunk_sizeW_fromITBL(info), sizeofW(StgHeader)+MIN_UPD_SIZE);
       }
 
     case FUN:
