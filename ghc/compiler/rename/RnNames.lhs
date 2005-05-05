@@ -671,7 +671,8 @@ reportDeprecations tcg_env
     do	{ (eps,hpt) <- getEpsAndHpt
 	; mapM_ (check hpt (eps_PIT eps)) all_gres }
   where
-    used_names = findUses (tcg_dus tcg_env) emptyNameSet
+    used_names = allUses (tcg_dus tcg_env) 
+	-- Report on all deprecated uses; hence allUses
     all_gres   = globalRdrEnvElts (tcg_rdr_env tcg_env)
 
     check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
@@ -681,7 +682,7 @@ reportDeprecations tcg_env
 	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
 			occNameFlavour (nameOccName name) <+> 
 		 	quotes (ppr name),
-		      (parens imp_msg),
+		      (parens imp_msg) <> colon,
 		      (ppr deprec_txt) ])
 	where
 	  name_mod = nameModule name
@@ -735,6 +736,9 @@ reportUnusedNames export_decls gbl_env
   where
     used_names, all_used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
+	-- NB: currently, if f x = g, we only treat 'g' as used if 'f' is used
+	-- Hence findUses
+
     all_used_names = used_names `unionNameSets` 
 		     mkNameSet (mapCatMaybes nameParent_maybe (nameSetToList used_names))
 			-- A use of C implies a use of T,
@@ -1017,12 +1021,15 @@ exportClashErr global_env name1 name2 ie1 ie2
 	     []	     -> pprPanic "exportClashErr" (ppr name)
 
 addDupDeclErr :: Name -> Name -> TcRn ()
-addDupDeclErr name1 name2
+addDupDeclErr name_a name_b
   = addErrAt (srcLocSpan loc2) $
     vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr name1),
 	  ptext SLIT("Declared at:") <+> vcat [ppr (nameSrcLoc name1), ppr loc2]]
   where
-    loc2    = nameSrcLoc name2
+    loc2 = nameSrcLoc name2
+    (name1,name2) | nameSrcLoc name_a > nameSrcLoc name_b = (name_b,name_a)
+		  | otherwise				  = (name_a,name_b)
+	-- Report the error at the later location
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 
