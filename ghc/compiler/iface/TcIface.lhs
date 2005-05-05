@@ -237,10 +237,19 @@ tcHiBootIface mod
 	; if not (isOneShot mode)
 		-- In --make and interactive mode, if this module has an hs-boot file
 		-- we'll have compiled it already, and it'll be in the HPT
+		-- 
+		-- We check wheher the interface is a *boot* interface.
+		-- It can happen (when using GHC from Visual Studio) that we
+		-- compile a module in TypecheckOnly mode, with a stable, 
+		-- fully-populated HPT.  In that case the boot interface isn't there
+		-- (it's been replaced by the mother module) so we can't check it.
+		-- And that's fine, because if M's ModInfo is in the HPT, then 
+		-- it's been compiled once, and we don't need to check the boot iface
 	  then do { hpt <- getHpt
 		  ; case lookupModuleEnv hpt mod of
-		      Just info -> return (hm_details info)
-		      Nothing   -> return emptyModDetails }
+		      Just info | mi_boot (hm_iface info) 
+				-> return (hm_details info)
+		      other -> return emptyModDetails }
 	  else do
 
 	-- OK, so we're in one-shot mode.  
