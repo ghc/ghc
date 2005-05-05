@@ -1266,6 +1266,16 @@ traverse_weak_ptr_list(void)
 		  ;
 	      }
 	      
+	      // Threads blocked on black holes: if the black hole
+	      // is alive, then the thread is alive too.
+	      if (tmp == NULL && t->why_blocked == BlockedOnBlackHole) {
+		  if (isAlive(t->block_info.closure)) {
+		      t = (StgTSO *)evacuate((StgClosure *)t);
+		      tmp = t;
+		      flag = rtsTrue;
+		  }
+	      }
+
 	      if (tmp == NULL) {
 		  // not alive (yet): leave this thread on the
 		  // old_all_threads list.
@@ -1282,6 +1292,10 @@ traverse_weak_ptr_list(void)
 	  }
       }
       
+      /* If we evacuated any threads, we need to go back to the scavenger.
+       */
+      if (flag) return rtsTrue;
+
       /* And resurrect any threads which were about to become garbage.
        */
       {
@@ -2371,10 +2385,6 @@ scavenge_fun_srt(const StgInfoTable *info)
 static void
 scavengeTSO (StgTSO *tso)
 {
-    // We don't chase the link field: TSOs on the blackhole queue are
-    // not automatically alive, so the link field is a "weak" pointer.
-    // Queues of TSOs are traversed explicitly.
-
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException
@@ -2390,6 +2400,13 @@ scavengeTSO (StgTSO *tso)
 	    (StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
     }
     
+    // We don't always chase the link field: TSOs on the blackhole
+    // queue are not automatically alive, so the link field is a
+    // "weak" pointer in that case.
+    if (tso->why_blocked != BlockedOnBlackHole) {
+	tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
+    }
+
     // scavange current transaction record
     tso->trec = (StgTRecHeader *)evacuate((StgClosure *)tso->trec);
     
