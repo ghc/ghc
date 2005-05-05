@@ -1,5 +1,5 @@
 
-rnfail010.hs:2:0:
+rnfail010.hs:6:0:
     Multiple declarations of `Main.f'
     Declared at: rnfail010.hs:2:0
 		 rnfail010.hs:6:0

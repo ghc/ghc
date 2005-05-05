@@ -1,5 +1,5 @@
 
-rnfail013.hs:5:10:
+rnfail013.hs:7:10:
     Multiple declarations of `Foo.MkT'
     Declared at: rnfail013.hs:5:10
 		 rnfail013.hs:7:10

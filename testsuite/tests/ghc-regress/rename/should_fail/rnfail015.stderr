@@ -1,5 +1,5 @@
 
-rnfail015.hs:8:8:
+rnfail015.hs:14:8:
     Multiple declarations of `ShouldFail.TokLiteral'
     Declared at: rnfail015.hs:8:8
 		 rnfail015.hs:14:8
