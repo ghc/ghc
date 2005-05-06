@@ -45,6 +45,8 @@ import System.Posix
 #if __GLASGOW_HASKELL__ > 504
 	hiding (getEnv)
 #endif
+#else
+import GHC.ConsoleHandler ( flushConsole )
 #endif
 
 #ifdef USE_READLINE
@@ -189,6 +191,13 @@ interactiveUI session srcs maybe_expr = do
    Readline.initialize
 #endif
 
+#if defined(mingw32_HOST_OS)
+    -- The win32 Console API mutates the first character of 
+    -- type-ahead when reading from it in a non-buffered manner. Work
+    -- around this by flushing the input buffer of type-ahead characters.
+    -- 
+   GHC.ConsoleHandler.flushConsole stdin
+#endif
    startGHCi (runGHCi srcs maybe_expr)
 	GHCiState{ progname = "<interactive>",
 		   args = [],
