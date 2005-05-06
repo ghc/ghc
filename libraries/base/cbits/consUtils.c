@@ -64,4 +64,17 @@ get_console_echo__(int fd)
     return -1;
 }
 
+int
+flush_input_console__(int fd)
+{
+    HANDLE h;
+    if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
+	if ( FlushConsoleInputBuffer(h) ) {
+	    return 0;
+	}
+    }
+    /* ToDo: translate GetLastError() into something errno-friendly */
+    return -1;
+}
+
 #endif /* defined(mingw32_HOST_OS) || ... */

@@ -21,6 +21,7 @@ import Prelude -- necessary to get dependencies right
 	( Handler(..)
 	, installHandler
 	, ConsoleEvent(..)
+	, flushConsole
 	) where
 
 {-
@@ -31,6 +32,8 @@ import Prelude -- necessary to get dependencies right
 
 import Foreign
 import Foreign.C
+import GHC.IOBase
+import GHC.Handle
 
 data Handler
  = Default
@@ -93,4 +96,14 @@ foreign import ccall unsafe "RtsExternal.h rts_InstallConsoleEvent"
   rts_installHandler :: CInt -> Ptr (StablePtr (CInt -> IO ())) -> IO CInt
 foreign import ccall unsafe "RtsExternal.h rts_ConsoleHandlerDone"
   rts_ConsoleHandlerDone :: CInt -> IO ()
+
+
+flushConsole :: Handle -> IO ()
+flushConsole h = 
+  wantReadableHandle "flushConsole" h $ \ h_ -> 
+     throwErrnoIfMinus1Retry_ "flushConsole"
+      (flush_console_fd (fromIntegral (haFD h_)))
+
+foreign import ccall unsafe "consUtils.h flush_input_console__"
+	flush_console_fd :: CInt -> IO CInt
 #endif /* mingw32_HOST_OS */
