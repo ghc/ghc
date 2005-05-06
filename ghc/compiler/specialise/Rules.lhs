@@ -232,11 +232,15 @@ findBest target (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule1,ans1) prs
+#ifdef DEBUG
   | otherwise = pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
 			 (vcat [ptext SLIT("Expression to match:") <+> ppr fn <+> sep (map ppr args),
 				ptext SLIT("Rule 1:") <+> ppr rule1, 
 				ptext SLIT("Rule 2:") <+> ppr rule2]) $
 		findBest target (rule1,ans1) prs
+#else
+  | otherwise = findBest target (rule1,ans1) prs
+#endif
   where
     (fn,args) = target
 
