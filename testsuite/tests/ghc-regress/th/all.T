@@ -1,5 +1,7 @@
 def f(opts):
   opts.extra_hc_opts = '-fth -package template-haskell'
+  if not ('ghci' in config.run_ways):
+	opts.skip = 1
 
 setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))
