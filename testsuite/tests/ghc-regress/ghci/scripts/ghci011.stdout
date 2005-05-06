@@ -3,6 +3,8 @@ instance Eq a => Eq [a] 	-- Imported from GHC.Base
 instance Monad [] 	-- Imported from GHC.Base
 instance Functor [] 	-- Imported from GHC.Base
 instance Ord a => Ord [a] 	-- Imported from GHC.Base
+instance Read a => Read [a] 	-- Imported from GHC.Read
+instance Show a => Show [a] 	-- Imported from GHC.Show
 data () = () 	-- <wired into compiler>
 instance Bounded () 	-- Imported from GHC.Enum
 instance Enum () 	-- Imported from GHC.Enum

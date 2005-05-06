@@ -30,7 +30,7 @@ class (RealFrac a, Floating a) => RealFloat a where
   isIEEE :: a -> Bool
   atan2 :: a -> a -> a
   	-- Imported from GHC.Float
-instance RealFloat Float 	-- Imported from GHC.Float
 instance RealFloat Double 	-- Imported from GHC.Float
+instance RealFloat Float 	-- Imported from GHC.Float
 isPrefixOf :: Eq a => [a] -> [a] -> Bool
   	-- Imported from Data.List
