@@ -157,11 +157,17 @@ pstring s = doubleQuotes(text (escape s))
 
 escape s = foldr f [] (map ord s)
     where 
-     f cv rest | (cv < 0x20 || cv > 0x7e || cv == 0x22 || cv == 0x27 || cv == 0x5c) = 
+     f cv rest
+	| cv > 0xFF = '\\':'x':hs ++ rest
+	| (cv < 0x20 || cv > 0x7e || cv == 0x22 || cv == 0x27 || cv == 0x5c) = 
 	 '\\':'x':h1:h0:rest
            where (q1,r1) = quotRem cv 16
 		 h1 = intToDigit q1
                  h0 = intToDigit r1
+		 hs = dropWhile (=='0') $ reverse $ mkHex cv
+		 mkHex 0 = ""
+		 mkHex cv = intToDigit r : mkHex q
+		    where (q,r) = quotRem cv 16
      f cv rest = (chr cv):rest
 
 \end{code}
