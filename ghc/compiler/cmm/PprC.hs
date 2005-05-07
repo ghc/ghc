@@ -701,7 +701,7 @@ pprCall ppr_fn cconv results args vols
   where 
      ppr_results []     = empty
      ppr_results [(one,hint)] 
-	 = pprExpr (CmmReg one) <> ptext SLIT(" = ")
+	 = pprReg one <> ptext SLIT(" = ")
 		 <> pprUnHint hint (cmmRegRep one)
      ppr_results _other = panic "pprCall: multiple results"
 
