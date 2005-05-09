@@ -14,7 +14,7 @@
       GHC type checks programs in their original Haskell form before the
       desugarer converts them into Core code.  This complicates the type
       checker as it has to handle the much more verbose Haskell AST, but it
-      improves error messages, as the those message are based on the same
+      improves error messages, as those message are based on the same
       structure that the user sees.
     </p>
     <p>
@@ -23,24 +23,117 @@
       using a structure that abstracts over the concrete representation of
       bound occurences of identifiers and patterns.  The module <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcHsSyn.lhs"><code>TcHsSyn</code></a>
-      instantiates this structure for the type checker using <a
+      defines a number of helper function required by the type checker.  Note
+      that the type <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnTypes.lhs"><code>TcRnTypes</code></a>.<code>TcId</code>
-      to represent identifiers - in fact, a <code>TcId</code> is currently
-      nothing but just a synonym for a <a href="vars.html">plain
+      used to represent identifiers in some signatures during type checking
+      is, in fact, nothing but a synonym for a <a href="vars.html">plain
       <code>Id</code>.</a>
     </p>
 
+    <h2>The Overall Flow of Things</h2>
+
     <h4>Entry Points Into the Type Checker</h4>
     <p>
-      The interface of the type checker (and renamer) to the rest of the
-      compiler is provided by <a
+      The interface of the type checker (and <a
+      href="renamer.html">renamer</a>) to the rest of the compiler is provided
+      by <a
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnDriver.lhs"><code>TcRnDriver</code></a>.
       Entire modules are processed by calling <code>tcRnModule</code> and GHCi
-      uses <code>tcRnStmt</code> and <code>tcRnExpr</code> to typecheck
-      statements and expressions, respectively.  Moreover,
-      <code>tcRnIface</code> and <code>tcRnExtCore</code> are provided to
-      typecheck interface files and external Core code.
+      uses <code>tcRnStmt</code>, <code>tcRnExpr</code>, and
+      <code>tcRnType</code> to typecheck statements and expressions, and to
+      kind check types, respectively.  Moreover, <code>tcRnExtCore</code> is
+      provided to typecheck external Core code.  Moreover,
+      <code>tcTopSrcDecls</code> is used by Template Haskell - more
+      specifically by <code>TcSplice.tc_bracket</code>
+      - to type check the contents of declaration brackets.
     </p>
+
+    <h4>Renaming and Type Checking a Module</h4>
+    <p>
+      The function <code>tcRnModule</code> controls the complete static
+      analysis of a Haskell module.  It sets up the combined renamer and type
+      checker monad, resolves all import statements, initiates the actual
+      renaming and type checking process, and finally, wraps off by processing
+      the export list.
+    </p>
+    <p>
+      The actual type checking and renaming process is initiated via
+      <code>TcRnDriver.tcRnSrcDecls</code>, which uses a helper called
+      <code>tc_rn_src_decls</code> to implement the iterative renaming and
+      type checking process required by <a href="../exts/th.html">Template
+      Haskell</a>.  However, before it invokes <code>tc_rn_src_decls</code>,
+      it takes care of hi-boot files; afterwards, it simplifies type
+      constraints and zonking (see below regarding the later).
+    </p>
+    <p>
+      The function <code>tc_rn_src_decls</code> partitions static analysis of
+      a whole module into multiple rounds, where the initial round is followed
+      by an additional one for each toplevel splice.  It collects all
+      declarations up to the next splice into an <code>HsDecl.HsGroup</code>
+      to rename and type check that <em>declaration group</em> by calling
+      <code>TcRnDriver.tcRnGroup</code>.  Afterwards, it executes the
+      splice (if there are any left) and proceeds to the next group, which
+      includes the declarations produced by the splice.
+    </p>
+    <p>
+      The function <code>tcRnGroup</code>, finally, gets down to invoke the
+      actual renaming and type checking via
+      <code>TcRnDriver.rnTopSrcDecls</code> and
+      <code>TcRnDriver.tcTopSrcDecls</code>, respectively.  The renamer, apart
+      from renaming, computes the global type checking environment, of type
+      <code>TcRnTypes.TcGblEnv</code>, which is stored in the type checking
+      monad before type checking commences.
+    </p>
+
+    <h2>Type Checking a Declaration Group</h2>
+    <p>
+      The type checking of a declaration group, performed by
+      <code>tcTopSrcDecls</code> starts by processing of the type and class
+      declarations of the current module, using the function
+      <code>TcTyClsDecls.tcTyAndClassDecls</code>.  This is followed by a
+      first round over instance declarations using
+      <code>TcInstDcls.tcInstDecls1</code>, which in particular generates all
+      additional bindings due to the deriving process.  Then come foreign
+      import declarations (<code>TcForeign.tcForeignImports</code>) and
+      default declarations (<code>TcDefaults.tcDefaults</code>).
+    </p>
+    <p>
+      Now, finally, toplevel value declarations (including derived ones) are
+      type checked using <code>TcBinds.tcTopBinds</code>.  Afterwards,
+      <code>TcInstDcls.tcInstDecls2</code> traverses instances for the second
+      time.  Type checking concludes with processing foreign exports
+      (<code>TcForeign.tcForeignExports</code>) and rewrite rules
+      (<code>TcRules.tcRules</code>).  Finally, the global environment is
+      extended with the new bindings.
+    </p>
+
+    <h2>Type checking Type and Class Declarations</h2>
+    <p>
+      Type and class declarations are type checked in a couple of phases that
+      contain recursive dependencies - aka <em>knots.</em> The first knot
+      encompasses almost the whole type checking of these declarations and
+      forms the main piece of <code>TcTyClsDecls.tcTyAndClassDecls</code>.
+    </p>
+    <p>
+      Inside this big knot, the first main operation is kind checking, which
+      again involves a knot.  It is implemented by <code>kcTyClDecls</code>,
+      which performs kind checking of potentially recursively-dependent type
+      and class declarations using kind variables for initially unknown kinds.
+      During processing the individual declarations some of these variables
+      will be instantiated depending on the context; the rest gets by default
+      kind <code>*</code> (during <em>zonking</em> of the kind signatures).
+      Type synonyms are treated specially in this process, because they can
+      have an unboxed type, but they cannot be recursive.  Hence, their kinds
+      are inferred in dependency order.  Moreover, in contrast to class
+      declarations and other type declarations, synonyms are not entered into
+      the global environment as a global <code>TyThing</code>.
+      (<code>TypeRep.TyThing</code> is a sum type that combines the various
+      flavours of typish entities, such that they can be stuck into type
+      environments and similar.)
+    </p>
+
+    <h2>More Details</h2>
 
     <h4>Types Variables and Zonking</h4>
     <p>
@@ -208,7 +301,7 @@ tau   -> tyvar
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Sat Sep 13 23:35:24 BST 2003
+Last modified: Mon May  9 11:02:20 EST 2005
 <!-- hhmts end -->
     </small>
   </body>
