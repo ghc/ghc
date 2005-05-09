@@ -2093,8 +2093,12 @@ deleteAllThreads ( void )
   StgTSO* t, *next;
   IF_DEBUG(scheduler,sched_belch("deleting all threads"));
   for (t = all_threads; t != END_TSO_QUEUE; t = next) {
-      next = t->global_link;
-      deleteThread(t);
+      if (t->what_next == ThreadRelocated) {
+	  next = t->link;
+      } else {
+	  next = t->global_link;
+	  deleteThread(t);
+      }
   }      
 
   // The run queue now contains a bunch of ThreadKilled threads.  We
