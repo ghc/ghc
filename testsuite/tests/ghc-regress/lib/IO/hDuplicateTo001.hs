@@ -9,7 +9,7 @@ main = do
    
    fdh <- getfd h
    fdstdout <- getfd stdout
-   hPutStrLn stderr ("h: " ++ show fdh ++ "\nstdout: " ++ show fdstdout)
+   hPutStrLn stderr ("h: " ++ show (fdh /= fdstdout) ++ "\nstdout: " ++ show fdstdout)
 
    hClose h
    putStrLn "bla"
