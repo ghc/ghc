@@ -1,5 +1,5 @@
 
 tcfail136.hs:9:34:
     `SymDict' is not applied to enough type arguments
-    Expected kind `?', but `SymDict' has kind `k_ac6 -> *'
+    Expected kind `?', but `SymDict' has kind `k_ac1 -> *'
     In the data type declaration for `SymTable'

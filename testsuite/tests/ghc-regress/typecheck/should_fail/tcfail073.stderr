@@ -1,4 +1,3 @@
-check_tc DataziTuple.Z2T{(w) tc 46}
 
 tcfail073.hs:8:0:
     Duplicate instance declarations:

@@ -1,2 +1,6 @@
-Kind error: Expecting kind `* -> * -> * -> *',
-            but `DUnit t' has kind `* -> * -> *'
+
+tcfail132.hs:21:35:
+    Kind mis-match
+    Expected kind `k_acI -> k_acM -> k_acQ -> *',
+    but `Object f' f t' has kind `k_acI -> k_acM -> *'
+    In the type synonym declaration for `LiftObject'
