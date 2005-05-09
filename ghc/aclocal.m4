@@ -22,6 +22,10 @@ AC_SUBST([ProjectVersionInt])
 
 # The project patchlevel is zero unless stated otherwise
 test -z "$ProjectPatchLevel" && ProjectPatchLevel=0
+
+# Remove dots from the patch level; this allows us to have versions like 6.4.1.20050508
+ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
+
 AC_SUBST([ProjectPatchLevel])
 ])# FP_SETUP_PROJECT_INFO
 
