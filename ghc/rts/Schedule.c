@@ -4160,7 +4160,7 @@ printAllThreads(void)
   debugBelch("all threads:\n");
 # endif
 
-  for (t = all_threads; t != END_TSO_QUEUE; t = t->global_link) {
+  for (t = all_threads; t != END_TSO_QUEUE; ) {
     debugBelch("\tthread %d @ %p ", t->id, (void *)t);
 #if defined(DEBUG)
     {
@@ -4168,8 +4168,14 @@ printAllThreads(void)
       if (label) debugBelch("[\"%s\"] ",(char *)label);
     }
 #endif
-    printThreadStatus(t);
-    debugBelch("\n");
+    if (t->what_next == ThreadRelocated) {
+	debugBelch("has been relocated...\n");
+	t = t->link;
+    } else {
+	printThreadStatus(t);
+	debugBelch("\n");
+	t = t->global_link;
+    }
   }
 }
     
