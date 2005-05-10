@@ -496,6 +496,13 @@ SRC_HC_OPTS += -package Cabal
 PKG_DEPENDS += Cabal
 endif
 
+ifeq "$(ghc_ge_603)" "YES"
+# Ignore lang, to avoid potential clash with the Generics module if
+# lang happens to be a dependency of some exposed package in the local
+# GHC installation (eg. wxHaskell did this around 6.4).
+SRC_HC_OPTS += -ignore-package lang
+endif
+
 SRC_CC_OPTS += -Iparser -I. -O
 SRC_HC_OPTS += -recomp $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
 SRC_HC_OPTS += -H16M
