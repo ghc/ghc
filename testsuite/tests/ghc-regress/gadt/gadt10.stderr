@@ -1,4 +1,5 @@
 
 gadt10.hs:6:23:
-    Kind error: `RInt' is not applied to enough type arguments
+    `RInt' is not applied to enough type arguments
+    Expected kind `?', but `RInt' has kind `k_abO -> *'
     In the data type declaration for `RInt'
