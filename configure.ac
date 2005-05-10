@@ -188,6 +188,15 @@ i[[3456]]86-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
+i[[3456]]86-*-gnu*)
+        HostPlatform=i386-unknown-gnu
+        TargetPlatform=i386-unknown-gnu
+        BuildPlatform=i386-unknown-gnu
+        HostPlatform_CPP=i386_unknown_gnu
+        HostArch_CPP=i386
+        HostVendor_CPP=unknown
+        HostOS_CPP=gnu
+        ;;
 i[[3456]]86-*-freebsd[[3-9]]*) # FreeBSD 3.0+ uses ELF
 	HostPlatform=i386-unknown-freebsd # hack again
 	TargetPlatform=i386-unknown-freebsd
