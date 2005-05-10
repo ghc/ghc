@@ -38,6 +38,10 @@ extern void releaseCapability( Capability* cap );
 //
 extern void threadRunnable ( void );
 
+// Return the capability that I own.
+// 
+extern Capability *myCapability (void);
+
 extern void prodWorker ( void );
 
 #ifdef RTS_SUPPORTS_THREADS

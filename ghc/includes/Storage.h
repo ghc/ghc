@@ -139,6 +139,7 @@ extern void exitStorage(void);
    -------------------------------------------------------------------------- */
 
 extern StgPtr  allocate        ( nat n );
+extern StgPtr  allocateLocal   ( StgRegTable *reg, nat n );
 extern StgPtr  allocatePinned  ( nat n );
 extern lnat    allocated_bytes ( void );
 
@@ -193,6 +194,9 @@ extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
  */
 #if defined(SMP)
 extern Mutex sm_mutex;
+#endif
+
+#if defined(SMP)
 #define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex);
 #define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex);
 #else

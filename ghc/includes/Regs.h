@@ -87,7 +87,8 @@ typedef struct StgRegTable_ {
   StgPtr 	  rHpLim;
   struct StgTSO_ *rCurrentTSO;
   struct step_   *rNursery;
-  struct bdescr_ *rCurrentNursery;
+  struct bdescr_ *rCurrentNursery; /* Hp/HpLim point into this block */
+  struct bdescr_ *rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
 #if defined(SMP) || defined(PAR)
   StgSparkPool   rSparks;	/* per-task spark pool */

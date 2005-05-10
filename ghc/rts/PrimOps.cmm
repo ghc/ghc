@@ -49,7 +49,7 @@ newByteArrayzh_fast
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    "ptr" p = foreign "C" allocate(words);
+    "ptr" p = foreign "C" allocateLocal(BaseReg "ptr",words);
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
@@ -97,7 +97,7 @@ newArrayzh_fast
     MAYBE_GC(R2_PTR,newArrayzh_fast);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
-    "ptr" arr = foreign "C" allocate(words);
+    "ptr" arr = foreign "C" allocateLocal(BaseReg "ptr",words);
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_info, W_[CCCS]);
@@ -1429,14 +1429,14 @@ takeMVarzh_fast
 {
     W_ mvar, val, info, tso;
 
-#if defined(SMP)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
-#endif
-
     /* args: R1 = MVar closure */
     mvar = R1;
 
+#if defined(SMP)
+    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+#else
     info = GET_INFO(mvar);
+#endif
 
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
@@ -1453,7 +1453,7 @@ takeMVarzh_fast
 	StgMVar_tail(mvar) = CurrentTSO;
 	
 #if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+        SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
 
 	jump stg_block_takemvar;
@@ -1486,7 +1486,7 @@ takeMVarzh_fast
       }
 
 #if defined(SMP)
-      foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+      SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
 
       RET_P(val);
@@ -1494,16 +1494,10 @@ takeMVarzh_fast
   else
   {
       /* No further putMVars, MVar is now empty */
-      
-      /* do this last... we might have locked the MVar in the SMP case,
-       * and writing the info pointer will unlock it.
-       */
-      SET_INFO(mvar,stg_EMPTY_MVAR_info);
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-
-#if defined(SMP)
-      foreign "C" RELEASE_LOCK(sm_mutex "ptr");
-#endif
+ 
+      /* unlocks the closure in the SMP case */
+      SET_INFO(mvar,stg_EMPTY_MVAR_info);
 
       RET_P(val);
   }
@@ -1514,23 +1508,23 @@ tryTakeMVarzh_fast
 {
     W_ mvar, val, info, tso;
 
-#if defined(SMP)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
-#endif
-
     /* args: R1 = MVar closure */
 
     mvar = R1;
 
+#if defined(SMP)
+    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+#else
     info = GET_INFO(mvar);
+#endif
 
     if (info == stg_EMPTY_MVAR_info) {
+#if defined(SMP)
+        SET_INFO(mvar,stg_EMPTY_MVAR_info);
+#endif
 	/* HACK: we need a pointer to pass back, 
 	 * so we abuse NO_FINALIZER_closure
 	 */
-#if defined(SMP)
-       foreign "C" RELEASE_LOCK(sm_mutex "ptr");
-#endif
 	RET_NP(0, stg_NO_FINALIZER_closure);
     }
 
@@ -1559,6 +1553,9 @@ tryTakeMVarzh_fast
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
+#if defined(SMP)
+        SET_INFO(mvar,stg_FULL_MVAR_info);
+#endif
     }
     else 
     {
@@ -1567,10 +1564,6 @@ tryTakeMVarzh_fast
 	SET_INFO(mvar,stg_EMPTY_MVAR_info);
     }
     
-#if defined(SMP)
-    foreign "C" RELEASE_LOCK(sm_mutex "ptr");
-#endif
-
     RET_NP(1, val);
 }
 
@@ -1579,14 +1572,14 @@ putMVarzh_fast
 {
     W_ mvar, info, tso;
 
-#if defined(SMP)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
-#endif
-
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
 
+#if defined(SMP)
+    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+#else
     info = GET_INFO(mvar);
+#endif
 
     if (info == stg_FULL_MVAR_info) {
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -1600,7 +1593,7 @@ putMVarzh_fast
 	StgMVar_tail(mvar) = CurrentTSO;
 	
 #if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+        SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
 	jump stg_block_putmvar;
     }
@@ -1628,7 +1621,7 @@ putMVarzh_fast
 	}
 
 #if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+        SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1639,9 +1632,6 @@ putMVarzh_fast
 	/* unlocks the MVar in the SMP case */
 	SET_INFO(mvar,stg_FULL_MVAR_info);
 
-#if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
-#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     
@@ -1653,18 +1643,18 @@ tryPutMVarzh_fast
 {
     W_ mvar, info, tso;
 
-#if defined(SMP)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
-#endif
-
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
 
+#if defined(SMP)
+    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+#else
     info = GET_INFO(mvar);
+#endif
 
     if (info == stg_FULL_MVAR_info) {
 #if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+        SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
 	RET_N(0);
     }
@@ -1692,7 +1682,7 @@ tryPutMVarzh_fast
 	}
 
 #if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+        SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1702,9 +1692,7 @@ tryPutMVarzh_fast
 	StgMVar_value(mvar) = R2;
 	/* unlocks the MVar in the SMP case */
 	SET_INFO(mvar,stg_FULL_MVAR_info);
-#if defined(SMP)
-	foreign "C" RELEASE_LOCK(sm_mutex "ptr");
-#endif
+
 	jump %ENTRY_CODE(Sp(0));
     }
     

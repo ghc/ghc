@@ -110,12 +110,7 @@ extern void _assertFail (char *, unsigned int);
 #include "Parallel.h"
 
 /* STG/Optimised-C related stuff */
-#include "SMP.h"
 #include "Block.h"
-
-#ifdef SMP
-#include <pthread.h>
-#endif
 
 /* GNU mp library */
 #include "gmp.h"

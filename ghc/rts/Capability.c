@@ -22,6 +22,9 @@
 #include "OSThreads.h"
 #include "Capability.h"
 #include "Schedule.h"  /* to get at EMPTY_RUN_QUEUE() */
+#if defined(SMP)
+#include "Hash.h"
+#endif
 
 #if !defined(SMP)
 Capability MainCapability;     /* for non-SMP, we have one global capability */
@@ -81,6 +84,11 @@ static rtsBool passingCapability = rtsFalse;
  * Free capability list. 
  */
 Capability *free_capabilities;
+
+/* 
+ * Maps OSThreadId to Capability *
+ */
+HashTable *capability_hash;
 #endif
 
 #ifdef SMP
@@ -133,6 +141,8 @@ initCapabilities( void )
     free_capabilities = &capabilities[0];
     rts_n_free_capabilities = n;
 
+    capability_hash = allocHashTable();
+
     IF_DEBUG(scheduler, sched_belch("allocated %d capabilities", n));
 #else
     capabilities = &MainCapability;
@@ -164,6 +174,7 @@ grabCapability( Capability** cap )
   *cap = free_capabilities;
   free_capabilities = (*cap)->link;
   rts_n_free_capabilities--;
+  insertHashTable(capability_hash, osThreadId(), *cap);
 #else
 # if defined(RTS_SUPPORTS_THREADS)
   ASSERT(rts_n_free_capabilities == 1);
@@ -173,6 +184,23 @@ grabCapability( Capability** cap )
 #endif
 #if defined(RTS_SUPPORTS_THREADS)
   IF_DEBUG(scheduler, sched_belch("worker: got capability"));
+#endif
+}
+
+/* ----------------------------------------------------------------------------
+ * Function:  myCapability(void)
+ *
+ * Purpose:   Return the capability owned by the current thread.
+ *            Should not be used if the current thread does not 
+ *            hold a Capability.
+ * ------------------------------------------------------------------------- */
+Capability *
+myCapability (void)
+{
+#if defined(SMP)
+    return lookupHashTable(capability_hash, osThreadId());
+#else
+    return &MainCapability;
 #endif
 }
 
@@ -195,6 +223,8 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 #if defined(SMP)
     cap->link = free_capabilities;
     free_capabilities = cap;
+    ASSERT(myCapability() == cap);
+    removeHashTable(capability_hash, osThreadId(), NULL);
 #endif
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..

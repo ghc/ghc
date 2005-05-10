@@ -739,7 +739,12 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	  if (stp->is_compacted) {
 	      collected += (oldgen_saved_blocks - stp->n_blocks) * BLOCK_SIZE_W;
 	  } else {
-	      collected += stp->n_blocks * BLOCK_SIZE_W;
+	      if (g == 0 && s == 0) {
+		  collected += countNurseryBlocks() * BLOCK_SIZE_W;
+		  collected += alloc_blocks;
+	      } else {
+		  collected += stp->n_blocks * BLOCK_SIZE_W;
+	      }
 	  }
 
 	/* free old memory and shift to-space into from-space for all

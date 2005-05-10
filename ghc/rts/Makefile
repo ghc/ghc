@@ -319,7 +319,8 @@ SRC_HC_OPTS += \
   -\#include LdvProfile.h \
   -\#include Profiling.h \
   -\#include OSThreads.h \
-  -\#include Apply.h
+  -\#include Apply.h \
+  -\#include SMP.h
 
 ifeq "$(Windows)" "YES"
 PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h

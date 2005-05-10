@@ -419,6 +419,12 @@ INFO_TABLE(stg_SE_CAF_BLACKHOLE,0,1,SE_CAF_BLACKHOLE,"SE_CAF_BLACKHOLE","SE_CAF_
 #endif
 
 /* ----------------------------------------------------------------------------
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_WHITEHOLE, 0,0, INVALID_OBJECT, "WHITEHOLE", "WHITEHOLE")
+{ foreign "C" barf("WHITEHOLE object entered!"); }
+
+/* ----------------------------------------------------------------------------
    Some static info tables for things that don't get entered, and
    therefore don't need entry code (i.e. boxed but unpointed objects)
    NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file

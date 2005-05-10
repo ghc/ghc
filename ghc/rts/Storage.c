@@ -26,6 +26,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 
+ * All these globals require sm_mutex to access in SMP mode.
+ */
 StgClosure    *caf_list         = NULL;
 StgClosure    *revertible_caf_list = NULL;
 rtsBool       keepCAFs;
@@ -405,10 +408,12 @@ assignNurseriesToCapabilities (void)
     for (i = 0; i < n_nurseries; i++) {
 	capabilities[i].r.rNursery        = &nurseries[i];
 	capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
+	capabilities[i].r.rCurrentAlloc   = NULL;
     }
 #else /* SMP */
     MainCapability.r.rNursery        = &nurseries[0];
     MainCapability.r.rCurrentNursery = nurseries[0].blocks;
+    MainCapability.r.rCurrentAlloc   = NULL;
 #endif
 }
 
@@ -534,49 +539,49 @@ resizeNurseries (nat blocks)
 StgPtr
 allocate( nat n )
 {
-  bdescr *bd;
-  StgPtr p;
+    bdescr *bd;
+    StgPtr p;
 
-  ACQUIRE_SM_LOCK;
+    ACQUIRE_SM_LOCK;
 
-  TICK_ALLOC_HEAP_NOCTR(n);
-  CCS_ALLOC(CCCS,n);
+    TICK_ALLOC_HEAP_NOCTR(n);
+    CCS_ALLOC(CCCS,n);
 
-  /* big allocation (>LARGE_OBJECT_THRESHOLD) */
-  /* ToDo: allocate directly into generation 1 */
-  if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-    nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
-    bd = allocGroup(req_blocks);
-    dbl_link_onto(bd, &g0s0->large_objects);
-    g0s0->n_large_blocks += req_blocks;
-    bd->gen_no  = 0;
-    bd->step = g0s0;
-    bd->flags = BF_LARGE;
-    bd->free = bd->start + n;
-    alloc_blocks += req_blocks;
-    RELEASE_SM_LOCK;
-    return bd->start;
-
-  /* small allocation (<LARGE_OBJECT_THRESHOLD) */
-  } else if (small_alloc_list == NULL || alloc_Hp + n > alloc_HpLim) {
-    if (small_alloc_list) {
-      small_alloc_list->free = alloc_Hp;
+    /* big allocation (>LARGE_OBJECT_THRESHOLD) */
+    /* ToDo: allocate directly into generation 1 */
+    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
+	bd = allocGroup(req_blocks);
+	dbl_link_onto(bd, &g0s0->large_objects);
+	g0s0->n_large_blocks += req_blocks;
+	bd->gen_no  = 0;
+	bd->step = g0s0;
+	bd->flags = BF_LARGE;
+	bd->free = bd->start + n;
+	alloc_blocks += req_blocks;
+	RELEASE_SM_LOCK;
+	return bd->start;
+	
+	/* small allocation (<LARGE_OBJECT_THRESHOLD) */
+    } else if (small_alloc_list == NULL || alloc_Hp + n > alloc_HpLim) {
+	if (small_alloc_list) {
+	    small_alloc_list->free = alloc_Hp;
+	}
+	bd = allocBlock();
+	bd->link = small_alloc_list;
+	small_alloc_list = bd;
+	bd->gen_no = 0;
+	bd->step = g0s0;
+	bd->flags = 0;
+	alloc_Hp = bd->start;
+	alloc_HpLim = bd->start + BLOCK_SIZE_W;
+	alloc_blocks++;
     }
-    bd = allocBlock();
-    bd->link = small_alloc_list;
-    small_alloc_list = bd;
-    bd->gen_no = 0;
-    bd->step = g0s0;
-    bd->flags = 0;
-    alloc_Hp = bd->start;
-    alloc_HpLim = bd->start + BLOCK_SIZE_W;
-    alloc_blocks++;
-  }
-
-  p = alloc_Hp;
-  alloc_Hp += n;
-  RELEASE_SM_LOCK;
-  return p;
+    
+    p = alloc_Hp;
+    alloc_Hp += n;
+    RELEASE_SM_LOCK;
+    return p;
 }
 
 lnat
@@ -601,6 +606,82 @@ tidyAllocateLists (void)
 	       alloc_Hp <= small_alloc_list->start + BLOCK_SIZE);
 	small_alloc_list->free = alloc_Hp;
     }
+}
+
+/* -----------------------------------------------------------------------------
+   allocateLocal()
+
+   This allocates memory in the current thread - it is intended for
+   use primarily from STG-land where we have a Capability.  It is
+   better than allocate() because it doesn't require taking the
+   sm_mutex lock in the common case.
+
+   Memory is allocated directly from the nursery if possible (but not
+   from the current nursery block, so as not to interfere with
+   Hp/HpLim).
+   -------------------------------------------------------------------------- */
+
+StgPtr
+allocateLocal( StgRegTable *reg, nat n )
+{
+    bdescr *bd;
+    StgPtr p;
+
+    TICK_ALLOC_HEAP_NOCTR(n);
+    CCS_ALLOC(CCCS,n);
+    
+    /* big allocation (>LARGE_OBJECT_THRESHOLD) */
+    /* ToDo: allocate directly into generation 1 */
+    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
+	ACQUIRE_SM_LOCK;
+	bd = allocGroup(req_blocks);
+	dbl_link_onto(bd, &g0s0->large_objects);
+	g0s0->n_large_blocks += req_blocks;
+	bd->gen_no  = 0;
+	bd->step = g0s0;
+	bd->flags = BF_LARGE;
+	bd->free = bd->start + n;
+	alloc_blocks += req_blocks;
+	RELEASE_SM_LOCK;
+	return bd->start;
+	
+	/* small allocation (<LARGE_OBJECT_THRESHOLD) */
+    } else {
+
+	bd = reg->rCurrentAlloc;
+	if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+
+	    // The CurrentAlloc block is full, we need to find another
+	    // one.  First, we try taking the next block from the
+	    // nursery:
+	    bd = reg->rCurrentNursery->link;
+
+	    if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+		// The nursery is empty, or the next block is already
+		// full: allocate a fresh block (we can't fail here).
+		ACQUIRE_SM_LOCK;
+		bd = allocBlock();
+		alloc_blocks++;
+		RELEASE_SM_LOCK;
+		bd->gen_no = 0;
+		bd->step = g0s0;
+		bd->flags = 0;
+	    } else {
+		// we have a block in the nursery: take it and put
+		// it at the *front* of the nursery list, and use it
+		// to allocate() from.
+		reg->rCurrentNursery->link = bd->link;
+	    }
+	    bd->link = reg->rNursery->blocks;
+	    reg->rNursery->blocks = bd;
+	    bd->u.back = NULL;
+	    reg->rCurrentAlloc = bd;
+	}
+    }
+    p = bd->free;
+    bd->free += n;
+    return p;
 }
 
 /* ---------------------------------------------------------------------------
@@ -690,7 +771,11 @@ stgAllocForGMP (size_t size_in_bytes)
   total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
   
   /* allocate and fill it in. */
-  arr = (StgArrWords *)allocate(total_size_in_words);
+#if defined(SMP)
+  arr = (StgArrWords *)allocateLocal(&(myCapability()->r), total_size_in_words);
+#else
+  arr = (StgArrWords *)allocateLocal(&MainCapability.r, total_size_in_words);
+#endif
   SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
   
   /* and return a ptr to the goods inside the array */
@@ -740,9 +825,7 @@ calcAllocated( void )
   nat i;
 
   allocated = allocated_bytes();
-  for (i = 0; i < n_nurseries; i++) {
-      allocated += nurseries[i].n_blocks * BLOCK_SIZE_W;
-  }
+  allocated += countNurseryBlocks() * BLOCK_SIZE_W;
   
 #ifdef SMP
   for (i = 0; i < n_nurseries; i++) {
