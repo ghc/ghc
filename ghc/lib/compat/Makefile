@@ -19,7 +19,8 @@ NO_INSTALL_LIBRARY = YES
 # Needed so that the libraries can #include relative to this directory.
 INCLUDE_DIRS=-I. -Iinclude
 
-SRC_HC_OPTS    += $(INCLUDE_DIRS) 
+SRC_HC_OPTS    += $(INCLUDE_DIRS)
+SRC_CC_OPTS    += $(INCLUDE_DIRS)
 MKDEPENDC_OPTS += $(INCLUDE_DIRS)
 
 # Just to silence warnings
