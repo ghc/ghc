@@ -673,9 +673,7 @@ allocateLocal( StgRegTable *reg, nat n )
 		// to allocate() from.
 		reg->rCurrentNursery->link = bd->link;
 	    }
-	    bd->link = reg->rNursery->blocks;
-	    reg->rNursery->blocks = bd;
-	    bd->u.back = NULL;
+	    dbl_link_onto(bd, &reg->rNursery->blocks);
 	    reg->rCurrentAlloc = bd;
 	}
     }
@@ -822,12 +820,12 @@ calcAllocated( void )
 {
   nat allocated;
   bdescr *bd;
-  nat i;
 
   allocated = allocated_bytes();
   allocated += countNurseryBlocks() * BLOCK_SIZE_W;
   
 #ifdef SMP
+  nat i;
   for (i = 0; i < n_nurseries; i++) {
       Capability *cap;
       for ( bd = capabilities[i].r.rCurrentNursery->link; 
