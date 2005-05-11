@@ -662,7 +662,7 @@ allocateLocal( StgRegTable *reg, nat n )
 		// full: allocate a fresh block (we can't fail here).
 		ACQUIRE_SM_LOCK;
 		bd = allocBlock();
-		alloc_blocks++;
+		reg->rNursery->n_blocks++;
 		RELEASE_SM_LOCK;
 		bd->gen_no = 0;
 		bd->step = g0s0;
