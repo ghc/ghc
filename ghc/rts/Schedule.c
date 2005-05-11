@@ -1475,12 +1475,13 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 		 debugBelch("--<< thread %ld (%s) stopped: requesting a large block (size %ld)\n", 
 			    (long)t->id, whatNext_strs[t->what_next], blocks));
 	
-	// don't do this if it would push us over the
-	// alloc_blocks_lim limit; we'll GC first.
-	if (alloc_blocks + blocks < alloc_blocks_lim) {
+	// don't do this if the nursery is (nearly) full, we'll GC first.
+	if (cap->r.rCurrentNursery->link != NULL ||
+	    cap->r.rNursery->n_blocks == 1) {  // paranoia to prevent infinite loop
+	                                       // if the nursery has only one block.
 	    
-	    alloc_blocks += blocks;
 	    bd = allocGroup( blocks );
+	    cap->r.rNursery->n_blocks += blocks;
 	    
 	    // link the new group into the list
 	    bd->link = cap->r.rCurrentNursery;
@@ -1491,7 +1492,6 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 #if !defined(SMP)
 		ASSERT(g0s0->blocks == cap->r.rCurrentNursery &&
 		       g0s0 == cap->r.rNursery);
-		g0s0->blocks = bd;
 #endif
 		cap->r.rNursery->blocks = bd;
 	    }		  
