@@ -29,7 +29,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 import FunDeps		( pprFundeps )
 import SrcLoc		( SrcLoc, pprDefnLoc )
 import OccName		( OccName, parenSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), defaultFixity )
+import BasicTypes	( StrictnessMark(..), defaultFixity, failed )
 
 -- Other random utilities
 import Panic 		( panic, installSignalHandlers )
@@ -63,6 +63,7 @@ import Data.Dynamic
 import Numeric
 import Data.List
 import Data.Int		( Int64 )
+import Data.Maybe	( isJust )
 import System.Cmd
 import System.CPUTime
 import System.Environment
@@ -101,7 +102,7 @@ builtin_commands = [
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("info",      keepGoing info),
-  ("load",	keepGoingPaths loadModule),
+  ("load",	keepGoingPaths loadModule_),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
   ("set",	keepGoing setCmd),
@@ -244,9 +245,13 @@ runGHCi paths maybe_expr = do
   		  Right hdl -> fileLoop hdl False
 
   -- Perform a :load for files given on the GHCi command line
-  when (not (null paths)) $
-     ghciHandle showException $
-	loadModule paths
+  -- When in -e mode, if the load fails then we want to stop
+  -- immediately rather than going on to evaluate the expression.
+  when (not (null paths)) $ do
+     ok <- ghciHandle (\e -> do showException e; return Failed) $ 
+		loadModule paths
+     when (isJust maybe_expr && failed ok) $
+	io (exitWith (ExitFailure 1))
 
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
@@ -714,10 +719,13 @@ undefineMacro macro_name = do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 
-loadModule :: [FilePath] -> GHCi ()
+loadModule :: [FilePath] -> GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
 
-loadModule' :: [FilePath] -> GHCi ()
+loadModule_ :: [FilePath] -> GHCi ()
+loadModule_ fs = do loadModule fs; return ()
+
+loadModule' :: [FilePath] -> GHCi SuccessFlag
 loadModule' files = do
   session <- getSession
 
@@ -737,6 +745,7 @@ loadModule' files = do
   io (GHC.setTargets session targets)
   ok <- io (GHC.load session LoadAllTargets)
   afterLoad ok session
+  return ok
 
 
 reloadModule :: String -> GHCi ()
