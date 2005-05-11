@@ -2229,6 +2229,13 @@ ocResolve_PEi386 ( ObjectCode* oc )
 		  So, add displacement to old value instead of asserting
 		  A to be zero. Fixes wxhaskell-related crashes, and no other
 		  ill effects have been observed.
+		  
+		  Update: the reason why we're seeing these more elaborate
+		  relocations is due to a switch in how the NCG compiles SRTs 
+		  and offsets to them from info tables. SRTs live in .(ro)data, 
+		  while info tables live in .text, causing GAS to emit REL32/DISP32 
+		  relocations with non-zero values. Adding the displacement is
+		  the right thing to do.
 	       */
                *pP = S - ((UInt32)pP) - 4 + A;
                break;
