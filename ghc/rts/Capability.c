@@ -307,6 +307,7 @@ waitForReturnCapability( Mutex* pMutex, Capability** pCap )
 	*pCap = free_capabilities;
 	free_capabilities = (*pCap)->link;
 	ASSERT(pCap != NULL);
+	insertHashTable(capability_hash, osThreadId(), *pCap);
 #else
 	*pCap = &MainCapability;
 	ASSERT(rts_n_free_capabilities == 0);
