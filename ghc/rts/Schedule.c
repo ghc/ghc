@@ -1507,20 +1507,15 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    { 
 		bdescr *x;
 		for (x = bd; x < bd + blocks; x++) {
-		    x->step = g0s0;
+		    x->step = cap->r.rNursery;
 		    x->gen_no = 0;
 		    x->flags = 0;
 		}
 	    }
 	    
-#if !defined(SMP)
-	    // don't forget to update the block count in g0s0.
-	    g0s0->n_blocks += blocks;
-
 	    // This assert can be a killer if the app is doing lots
 	    // of large block allocations.
-	    ASSERT(countBlocks(g0s0->blocks) == g0s0->n_blocks);
-#endif
+	    ASSERT(countBlocks(cap->r.rNursery->blocks) == cap->r.rNursery->n_blocks);
 	    
 	    // now update the nursery to point to the new block
 	    cap->r.rCurrentNursery = bd;
