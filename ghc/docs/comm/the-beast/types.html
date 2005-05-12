@@ -1,0 +1,122 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - Hybrid Types</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - Hybrid Types</h1>
+    <p>
+      GHC essentially supports two type systems: (1) the <em>source type
+	system</em> (which is a heavily extended version of the type system of
+      Haskell 98) and the <em>Core type system,</em> which is the type system
+      used by the by far most important intermediate language (see also <a
+      href="desugar.html">Sugar Free: From Haskell To Core</a>).
+    </p>
+    <p>
+      During parsing and renaming, type information is represented in a form
+      that is very close to Haskell's concrete syntax; it is defined by
+      <code>HsTypes.HsType</code>.  In addition, type, class, and instance
+      declarations are maintained in their source form as defined in the
+      module <code>HsDecl</code>.  The situation changes during type checking,
+      where types are translated into a second representation, which is
+      defined in the module <code>types/TypeRep.lhs</code>, as type
+      <code>Type</code>.  This second representation is peculiar in that it is
+      a hybrid between the source representation of types and the Core
+      representation of types.  Using functions, such as
+      <code>Type.coreView</code> and <code>Type.deepCoreView</code>, a value
+      of type <code>Type</code> exhibits its Core representation.  On the
+      other hand, pretty printing a <code>Type</code> with
+      <code>TypeRep.pprType</code> yields the type's source representation.
+    </p>
+    <p>
+      In fact, the <a href="typecheck.html">type checker</a> maintains type
+      environments based on <code>Type</code>, but needs to perform type
+      checking on source-level types.  As a result, we have functions
+      <code>Type.tcEqType</code> and <code>Type.tcCmpType</code>, which
+      compare types based on their source representation, as well as the
+      function <code>coreEqType</code>, which compares them based on their
+      core representation.  The latter is needed during type checking of Core
+      (as performed by the functions in the module
+      <code>coreSyn/CoreLint.lhs</code>). 
+    </p>
+
+    <h2>Type Synonyms</h2>
+    <p>
+      Type synonyms in Haskell are essentially a form of macro definitions on
+      the type level.  For example, when the type checker compares two type
+      terms, synonyms are always compared in their expanded form.  However, to
+      produce good error messages, we like to avoid expanding type synonyms
+      during pretty printing.  Hence, <code>Type</code> has a variant
+      <code>NoteTy TyNote Type</code>, where
+    </p>
+    <blockquote>
+      <pre>
+data TyNote
+  = FTVNote TyVarSet	-- The free type variables of the noted expression
+
+  | SynNote Type	-- Used for type synonyms
+			-- The Type is always a TyConApp, and is the un-expanded form.
+			-- The type to which the note is attached is the expanded form.</pre>
+    </blockquote>
+    <p>
+      In other words, a <code>NoteTy</code> represents the expanded form of a
+      type synonym together with a note stating its source form.
+    </p>
+
+    <h2>Newtypes</h2>
+    <p>
+      Slightly more involved are data types declared via a
+      <code>newtype</code> declaration.  These newtypes constitute new type
+      constructors---i.e., they are not just type macros, but introduce new
+      type names.  However, provide that a newtype is not recursive, we still
+      want to implement it by its representation type.  In other words,
+      <code>tcEqType</code> cannot see through a newtype, but
+      <code>coreEqType</code> can.
+    </p>
+
+    <h2>Predicates</h2>
+    <p>
+      The dictionary translation of type classes, translates each predicate in
+      a type context of a type signature into an additional argument, which
+      carries a dictionary with the functions overloaded by the corresponding
+      class.  The <code>Type</code> data type has a special variant
+      <code>PredTy PredType</code> for predicates, where
+    </p>
+    <blockquote>
+      <pre>
+data PredType 
+  = ClassP Class [Type]		-- Class predicate
+  | IParam (IPName Name) Type	-- Implicit parameter</pre>
+    </blockquote>
+    <p>
+      These types need to be handled as source type during type checking, but
+      turn into their representations when inspected through
+      <code>coreView</code>.  The representation is determined by
+      <code>Type.predTypeRep</code>.
+    </p>
+
+    <h2>Classes and Instances</h2>
+    <p>
+      Class declarations turn into values of type <code>Class.Class</code>.
+      They represent methods as the <code>Id</code>s of the dictionary
+      selector functions.  Similar selector functions are available for
+      superclass dictionaries.
+    </p>
+    <p>
+      Instance declarations turn into values of type
+      <code>InstEnv.Instance</code>, which in interface files are represented
+      as <code>IfaceSyn.IfaceInst</code>.  Moreover, the type
+      <code>InstEnv.InstEnv</code>, which is a synonym for <code>UniqFM
+      ClsInstEnv</code>, provides a mapping of classes to their instances -
+      <code>ClsInstEnv</code> is essentially a list of instance declarations.
+    </p>
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Thu May 12 22:47:50 EST 2005
+<!-- hhmts end -->
+    </small></p>
+  </body>
+</html>

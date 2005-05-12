@@ -28,7 +28,15 @@
       href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/typecheck/TcRnTypes.lhs"><code>TcRnTypes</code></a>.<code>TcId</code>
       used to represent identifiers in some signatures during type checking
       is, in fact, nothing but a synonym for a <a href="vars.html">plain
-      <code>Id</code>.</a>
+      <code>Id</code>.</a>  
+    </p>
+    <p>
+      It is also noteworthy, that the representations of types changes during
+      type checking from <code>HsType</code> to <code>TypeRep.Type</code>.
+      The latter is a <a href="types.html">hybrid type representation</a> that
+      is used to type Core, but still contains sufficient information to
+      recover source types.  In particular, the type checker maintains and
+      compares types in their <code>Type</code> form.
     </p>
 
     <h2>The Overall Flow of Things</h2>
@@ -301,7 +309,7 @@ tau   -> tyvar
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Mon May  9 11:02:20 EST 2005
+Last modified: Thu May 12 22:52:46 EST 2005
 <!-- hhmts end -->
     </small>
   </body>
