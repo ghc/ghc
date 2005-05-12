@@ -402,6 +402,7 @@ extern lnat calcNeeded     ( void );
 extern void memInventory(void);
 extern void checkSanity(void);
 extern nat  countBlocks(bdescr *);
+extern void checkNurserySanity( step *stp );
 #endif
 
 #if defined(DEBUG)
