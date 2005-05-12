@@ -32,7 +32,7 @@ import MachOp
 import SMRep
 import ForeignCall
 import Constants
-import StaticFlags	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn, opt_SMP )
 import Outputable
 
 import Monad		( when )
@@ -78,13 +78,20 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
     vols <- getVolatileRegs live
     id <- newTemp wordRep
     emitSaveThreadState
-    stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) [(id,NoHint)]
+    stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
+			[(id,NoHint)]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
 			(Just vols)
 			)
     stmtC (the_call vols)
-    stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) []
-			[ (CmmReg id, NoHint) ] (Just vols)
+    stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
+			(if opt_SMP then [(CmmGlobal BaseReg, PtrHint)] else [])
+				-- Assign the result to BaseReg: we might now have
+				-- a different Capability!  Small optimisation:
+				-- only do this in SMP mode, where there are >1
+				-- Capabilities.
+			[ (CmmReg id, NoHint) ]
+			(Just vols)
 			)
     emitLoadThreadState
 
