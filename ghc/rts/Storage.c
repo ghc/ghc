@@ -672,9 +672,13 @@ allocateLocal( StgRegTable *reg, nat n )
 		// it at the *front* of the nursery list, and use it
 		// to allocate() from.
 		reg->rCurrentNursery->link = bd->link;
+		if (bd->link != NULL) {
+		    bd->link->u.back = reg->rCurrentNursery;
+		}
 	    }
 	    dbl_link_onto(bd, &reg->rNursery->blocks);
 	    reg->rCurrentAlloc = bd;
+	    IF_DEBUG(sanity, checkNurserySanity(reg->rNursery));
 	}
     }
     p = bd->free;
@@ -1055,6 +1059,22 @@ checkSanity( void )
 	    
 	checkFreeListSanity();
     }
+}
+
+/* Nursery sanity check */
+void
+checkNurserySanity( step *stp )
+{
+    bdescr *bd, *prev;
+    nat blocks = 0;
+
+    prev = NULL;
+    for (bd = stp->blocks; bd != NULL; bd = bd->link) {
+	ASSERT(bd->u.back == prev);
+	prev = bd;
+	blocks += bd->blocks;
+    }
+    ASSERT(blocks == stp->n_blocks);
 }
 
 // handy function for use in gdb, because Bdescr() is inlined.

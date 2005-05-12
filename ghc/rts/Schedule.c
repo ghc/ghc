@@ -1515,7 +1515,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    
 	    // This assert can be a killer if the app is doing lots
 	    // of large block allocations.
-	    ASSERT(countBlocks(cap->r.rNursery->blocks) == cap->r.rNursery->n_blocks);
+	    IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
 	    
 	    // now update the nursery to point to the new block
 	    cap->r.rCurrentNursery = bd;
