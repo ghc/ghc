@@ -828,6 +828,7 @@ calcAllocated( void )
   allocated = allocated_bytes();
   allocated += countNurseryBlocks() * BLOCK_SIZE_W;
   
+  {
 #ifdef SMP
   nat i;
   for (i = 0; i < n_nurseries; i++) {
@@ -854,6 +855,7 @@ calcAllocated( void )
 	  - current_nursery->free;
   }
 #endif
+  }
 
   total_allocated += allocated;
   return allocated;
