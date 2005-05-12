@@ -266,7 +266,7 @@ tcExpr in_expr@(OpApp arg1 op fix arg2) res_ty
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
     addErrCtxt (exprCtxt in_expr)		$
     tcSubExp res_ty op_res_ty			`thenM` \ co_fn ->
-    returnM (OpApp arg1' op' fix arg2')
+    returnM (co_fn <$> OpApp arg1' op' fix arg2')
 \end{code}
 
 \begin{code}
