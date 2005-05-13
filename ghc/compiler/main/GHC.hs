@@ -1217,7 +1217,7 @@ downsweep hsc_env old_summaries excl_mods
 			else do
 		throwDyn (CmdLineError ("can't find file: " ++ file))	
 	getRootSummary (Target (TargetModule modl) maybe_buf)
- 	   = do maybe_summary <- summariseModule hsc_env emptyNodeMap Nothing False 
+ 	   = do maybe_summary <- summariseModule hsc_env old_summary_map Nothing False 
 					   modl maybe_buf excl_mods
 		case maybe_summary of
 		   Nothing -> packageModErr modl
