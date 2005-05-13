@@ -1212,10 +1212,12 @@ downsweep hsc_env old_summaries excl_mods
 	getRootSummary :: Target -> IO ModSummary
 	getRootSummary (Target (TargetFile file) maybe_buf)
 	   = do exists <- doesFileExist file
-		if exists then summariseFile hsc_env file maybe_buf else do
+		if exists 
+			then summariseFile hsc_env old_summaries file maybe_buf
+			else do
 		throwDyn (CmdLineError ("can't find file: " ++ file))	
 	getRootSummary (Target (TargetModule modl) maybe_buf)
- 	   = do maybe_summary <- summarise hsc_env emptyNodeMap Nothing False 
+ 	   = do maybe_summary <- summariseModule hsc_env emptyNodeMap Nothing False 
 					   modl maybe_buf excl_mods
 		case maybe_summary of
 		   Nothing -> packageModErr modl
@@ -1247,7 +1249,7 @@ downsweep hsc_env old_summaries excl_mods
 	loop [] done 	  = return (nodeMapElts done)
 	loop ((cur_path, wanted_mod, is_boot) : ss) done 
 	  | key `elemFM` done = loop ss done
-	  | otherwise	      = do { mb_s <- summarise hsc_env old_summary_map 
+	  | otherwise	      = do { mb_s <- summariseModule hsc_env old_summary_map 
 						 (Just cur_path) is_boot 
 						 wanted_mod Nothing excl_mods
 				   ; case mb_s of
@@ -1287,14 +1289,38 @@ msDeps s =  concat [ [(f, m, True), (f,m,False)] | m <- ms_srcimps s]
 --	a summary.  The finder is used to locate the file in which the module
 --	resides.
 
-summariseFile :: HscEnv -> FilePath
-   -> Maybe (StringBuffer,ClockTime)
-   -> IO ModSummary
--- Used for Haskell source only, I think
--- We know the file name, and we know it exists,
--- but we don't necessarily know the module name (might differ)
-summariseFile hsc_env file maybe_buf
-   = do let dflags = hsc_dflags hsc_env
+summariseFile
+	:: HscEnv
+	-> [ModSummary]			-- old summaries
+	-> FilePath			-- source file name
+	-> Maybe (StringBuffer,ClockTime)
+	-> IO ModSummary
+
+summariseFile hsc_env old_summaries file maybe_buf
+	-- we can use a cached summary if one is available and the
+	-- source file hasn't changed,  But we have to look up the summary
+	-- by source file, rather than module name as we do in summarise.
+   | Just old_summary <- findSummaryBySourceFile old_summaries file
+   = do
+	let location = ms_location old_summary
+
+		-- return the cached summary if the source didn't change
+	src_timestamp <- case maybe_buf of
+			   Just (_,t) -> return t
+			   Nothing    -> getModificationTime file
+
+	if ms_hs_date old_summary == src_timestamp 
+	   then do -- update the object-file timestamp
+		  obj_timestamp <- getObjTimestamp location False
+		  return old_summary{ ms_obj_date = obj_timestamp }
+	   else
+		new_summary
+
+   | otherwise
+   = new_summary
+  where
+    new_summary = do
+   	let dflags = hsc_dflags hsc_env
 
 	(dflags', hspp_fn, buf)
 	    <- preprocessFile dflags file maybe_buf
@@ -1322,8 +1348,16 @@ summariseFile hsc_env file maybe_buf
 			     ms_hs_date = src_timestamp,
 			     ms_obj_date = obj_timestamp })
 
+findSummaryBySourceFile :: [ModSummary] -> FilePath -> Maybe ModSummary
+findSummaryBySourceFile summaries file
+  = case [ ms | ms <- summaries, HsSrcFile <- [ms_hsc_src ms],
+			         fromJust (ml_hs_file (ms_location ms)) == file ] of
+	[] -> Nothing
+	(x:xs) -> Just x
+
 -- Summarise a module, and pick up source and timestamp.
-summarise :: HscEnv
+summariseModule
+	  :: HscEnv
 	  -> NodeMap ModSummary	-- Map of old summaries
 	  -> Maybe FilePath	-- Importing module (for error messages)
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
@@ -1332,7 +1366,7 @@ summarise :: HscEnv
 	  -> [Module]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
-summarise hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf excl_mods
+summariseModule hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -1340,7 +1374,7 @@ summarise hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf excl_mods
   = do	 	-- Find its new timestamp; all the 
 		-- ModSummaries in the old map have valid ml_hs_files
 	let location = ms_location old_summary
-	    src_fn = expectJust "summarise" (ml_hs_file location)
+	    src_fn = expectJust "summariseModule" (ml_hs_file location)
 
 		-- return the cached summary if the source didn't change
 	src_timestamp <- case maybe_buf of
