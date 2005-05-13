@@ -1077,6 +1077,10 @@ WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
 WAY_debug_u_NAME=debug unregisterised
 WAY_debug_u_HC_OPTS=-optc-DDEBUG -unreg
 
+# Way 'debug_s':
+WAY_debug_s_NAME=debug SMP
+WAY_debug_s_HC_OPTS=-optc-DDEBUG -smp
+
 # Way 'thr_debug':
 WAY_thr_debug_NAME=threaded
 WAY_thr_debug_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG
