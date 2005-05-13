@@ -1,6 +1,4 @@
 newThread started
-newThread back again
-mainThread
-5 secs later
+child
 
 shutting down
