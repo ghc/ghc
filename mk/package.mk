@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.54 2005/04/29 13:09:28 krasimir Exp $
+# $Id: package.mk,v 1.55 2005/05/13 10:05:33 krasimir Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -402,15 +402,11 @@ HTML_INSTALL_DIR = $(datadir)/html/libraries/$(PACKAGE)
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(HTML_INSTALL_DIR)
-	@for i in $(XMLDocWays); do \
-		if [ $$i = "html" ]; then \
-		   for i in $(HTML_DIR)/*; do \
-		     echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
-		     $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
-		   done; \
-		   $(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(HTML_INSTALL_DIR); \
-		fi \
-	done
+	for i in $(HTML_DIR)/*; do \
+	  echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
+	  $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(HTML_INSTALL_DIR); \
+	done; \
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(HTML_INSTALL_DIR); \
 
 endif # HS_PPS
 endif # NO_HADDOCK_DOCS
