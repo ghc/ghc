@@ -348,11 +348,14 @@ StripLibraries=NO
 #	Don't use -split-objs in in GhcLibHcOpts, because the build
 #		system needs to do other special magic if you are
 #		doing object-file splitting
+ifneq "$(findstring $(HostArch_CPP), i386 powerpc sparc)" ""
+SplitObjs=YES
+else
+SplitObjs=NO
+endif
 
 # Don't split object files for libs if we're building DLLs, or booting from
 # .hc files.
-SplitObjs=YES
-
 ifeq "$(DLLized)" "YES"
 SplitObjs=NO
 endif
