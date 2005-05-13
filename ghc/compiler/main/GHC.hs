@@ -77,7 +77,7 @@ module GHC (
 	Module, mkModule, pprModule,
 
 	-- ** Names
-	Name,
+	Name, nameModule,
 	
 	-- ** Identifiers
 	Id, idType,
@@ -163,7 +163,7 @@ import Id		( Id, idType, isImplicitId, isDeadBinder,
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon )
 import Class		( Class, classSCTheta, classTvsFds )
 import DataCon		( DataCon )
-import Name		( Name )
+import Name		( Name, nameModule )
 import NameEnv		( nameEnvElts )
 import SrcLoc		( Located(..) )
 import DriverPipeline
