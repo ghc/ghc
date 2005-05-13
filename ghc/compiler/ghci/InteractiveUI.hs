@@ -18,7 +18,8 @@ import qualified GHC
 import GHC		( Session, verbosity, dopt, DynFlag(..),
 			  mkModule, pprModule, Type, Module, SuccessFlag(..),
 			  TyThing(..), Name, LoadHowMuch(..),
-			  GhcException(..), showGhcException )
+			  GhcException(..), showGhcException,
+			  CheckedModule(..) )
 import Outputable
 
 -- following all needed for :info... ToDo: remove
@@ -29,7 +30,7 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 import FunDeps		( pprFundeps )
 import SrcLoc		( SrcLoc, pprDefnLoc )
 import OccName		( OccName, parenSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), defaultFixity, failed )
+import BasicTypes	( StrictnessMark(..), defaultFixity, failed, successIf )
 
 -- Other random utilities
 import Panic 		( panic, installSignalHandlers )
@@ -38,6 +39,7 @@ import StaticFlags	( opt_IgnoreDotGhci )
 import Linker		( showLinkerState )
 import Util		( removeSpaces, handle, global, toArgs,
 			  looksLikeModuleName, prefixMatch )
+import ErrUtils		( printErrorsAndWarnings )
 
 #ifndef mingw32_HOST_OS
 import Util		( handle )
@@ -105,6 +107,7 @@ builtin_commands = [
   ("load",	keepGoingPaths loadModule_),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
+  ("check",	keepGoing checkModule),
   ("set",	keepGoing setCmd),
   ("show",	keepGoing showCmd),
   ("type",	keepGoing typeOfExpr),
@@ -747,6 +750,23 @@ loadModule' files = do
   afterLoad ok session
   return ok
 
+checkModule :: String -> GHCi ()
+checkModule m = do
+  let modl = mkModule m
+  session <- getSession
+  result <- io (GHC.checkModule session modl printErrorsAndWarnings)
+  case result of
+    Nothing -> io $ putStrLn "Nothing"
+    Just r  -> io $ putStrLn (showSDoc (
+	case checkedModuleInfo r of
+	   Just cm | Just scope <- GHC.modInfoTopLevelScope cm -> 
+		let
+		    (local,global) = partition ((== modl) . GHC.nameModule) scope
+		in
+			(text "global names: " <+> ppr global) $$
+		         text "local  names: " <+> ppr local))
+	   _ -> empty
+  afterLoad (successIf (isJust result)) session
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
