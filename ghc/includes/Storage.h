@@ -421,7 +421,6 @@ extern void newDynCAF(StgClosure *);
 extern void move_TSO(StgTSO *src, StgTSO *dest);
 extern StgTSO *relocate_stack(StgTSO *dest, ptrdiff_t diff);
 
-extern StgClosure * RTS_VAR(static_objects);
 extern StgClosure * RTS_VAR(scavenged_static_objects);
 extern StgWeak    * RTS_VAR(old_weak_ptr_list);
 extern StgWeak    * RTS_VAR(weak_ptr_list);
