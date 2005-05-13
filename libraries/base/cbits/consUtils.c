@@ -67,8 +67,17 @@ get_console_echo__(int fd)
 int
 flush_input_console__(int fd)
 {
-    HANDLE h;
-    if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
+    HANDLE h = (HANDLE)_get_osfhandle(fd);
+    
+    if ( h != INVALID_HANDLE_VALUE ) {
+	/* If the 'fd' isn't connected to a console; treat the flush
+	 * operation as a NOP.
+	 */
+	DWORD unused;
+	if ( !GetConsoleMode(h,&unused) &&
+	     GetLastError() == ERROR_INVALID_HANDLE ) {
+	    return 0;
+	}
 	if ( FlushConsoleInputBuffer(h) ) {
 	    return 0;
 	}
