@@ -43,7 +43,7 @@
 
 #define BCO_NEXT      instrs[bciPtr++]
 #define BCO_PTR(n)    (W_)ptrs[n]
-#define BCO_LIT(n)    (W_)literals[n]
+#define BCO_LIT(n)    literals[n]
 #define BCO_ITBL(n)   itbls[n]
 
 #define LOAD_STACK_POINTERS					\
@@ -902,7 +902,7 @@ run_BCO:
 	    int n_words = BCO_NEXT;
 	    Sp -= n_words;
 	    for (i = 0; i < n_words; i++) {
-		Sp[i] = BCO_LIT(o_lits+i);
+		Sp[i] = (W_)BCO_LIT(o_lits+i);
 	    }
 	    goto nextInsn;
 	}
