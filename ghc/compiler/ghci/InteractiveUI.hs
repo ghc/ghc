@@ -764,8 +764,8 @@ checkModule m = do
 		    (local,global) = partition ((== modl) . GHC.nameModule) scope
 		in
 			(text "global names: " <+> ppr global) $$
-		         text "local  names: " <+> ppr local))
-	   _ -> empty
+		        (text "local  names: " <+> ppr local)
+	   _ -> empty))
   afterLoad (successIf (isJust result)) session
 
 reloadModule :: String -> GHCi ()
