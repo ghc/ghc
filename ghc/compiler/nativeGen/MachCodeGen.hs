@@ -513,16 +513,16 @@ getRegisterReg (CmmGlobal mid)
 
 getRegister :: CmmExpr -> NatM Register
 
+getRegister (CmmReg (CmmGlobal PicBaseReg))
+  = do
+      reg <- getPicBaseNat wordRep
+      return (Fixed wordRep reg nilOL)
+
 getRegister (CmmReg reg) 
   = return (Fixed (cmmRegRep reg) (getRegisterReg reg) nilOL)
 
 getRegister tree@(CmmRegOff _ _) 
   = getRegister (mangleIndexTree tree)
-
-getRegister CmmPicBaseReg
-  = do
-      reg <- getPicBaseNat wordRep
-      return (Fixed wordRep reg nilOL)
 
 -- end of machine-"independent" bit; here we go on the rest...
 

@@ -317,7 +317,6 @@ pprExpr9 e =
         CmmReg    reg       -> ppr reg
         CmmRegOff reg off   -> parens (ppr reg <+> char '+' <+> int off)
 	CmmMachOp mop args  -> genMachOp mop args
-        CmmPicBaseReg       -> text "PIC_BASE_REG"
 	e                   -> parens (pprExpr e)
 
 genMachOp :: MachOp -> [CmmExpr] -> SDoc
@@ -433,6 +432,7 @@ pprGlobalReg gr
         GCEnter1       -> ptext SLIT("stg_gc_enter_1")
         GCFun          -> ptext SLIT("stg_gc_fun")
         BaseReg        -> ptext SLIT("BaseReg")
+        PicBaseReg     -> ptext SLIT("PicBaseReg")
 
         _ -> panic $ "PprCmm.pprGlobalReg: unknown global reg"
 

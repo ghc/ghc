@@ -18,7 +18,7 @@ module PositionIndependentCode (
         CodeStub, SymbolPtr, GotSymbolPtr, GotSymbolOffset
     - labelDynamic predicate
   + module Cmm
-    - The CmmExpr datatype has a CmmPicBaseReg constructor
+    - The GlobalReg datatype has a PicBaseReg constructor
     - The CmmLit datatype has a CmmLabelDiffOff constructor
   + codeGen & RTS
     - When tablesNextToCode, no absolute addresses are stored in info tables
@@ -125,7 +125,7 @@ cmmMakePicReference :: CLabel -> CmmExpr
 
 cmmMakePicReference lbl
     | opt_PIC && absoluteLabel lbl = CmmMachOp (MO_Add wordRep) [
-            CmmPicBaseReg,
+            CmmReg (CmmGlobal PicBaseReg),
             CmmLit $ picRelative lbl
         ]
     where

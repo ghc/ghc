@@ -162,7 +162,6 @@ data CmmExpr
 	--        ** is shorthand only, meaning **
 	-- CmmMachOp (MO_S_Add rep (CmmReg reg) (CmmLit (CmmInt i rep)))
 	--	where rep = cmmRegRep reg
-  | CmmPicBaseReg               -- Base Register for PIC calculations
 
 cmmExprRep :: CmmExpr -> MachRep
 cmmExprRep (CmmLit lit)      = cmmLitRep lit
@@ -170,7 +169,6 @@ cmmExprRep (CmmLoad _ rep)   = rep
 cmmExprRep (CmmReg reg)      = cmmRegRep reg
 cmmExprRep (CmmMachOp op _)  = resultRepOfMachOp op
 cmmExprRep (CmmRegOff reg _) = cmmRegRep reg
-cmmExprRep CmmPicBaseReg     = wordRep
 
 data CmmReg 
   = CmmLocal  LocalReg
@@ -295,6 +293,11 @@ data GlobalReg
   -- will only appear after we have expanded GlobalReg into memory accesses
   -- (where necessary) in the native code generator.
   | BaseReg
+
+  -- Base Register for PIC (position-independent code) calculations
+  -- Only used inside the native code generator. It's exact meaning differs
+  -- from platform to platform (see module PositionIndependentCode).
+  | PicBaseReg
 
   deriving( Eq
 #ifdef DEBUG
