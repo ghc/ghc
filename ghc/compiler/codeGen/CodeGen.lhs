@@ -83,13 +83,7 @@ codeGen dflags this_mod data_tycons foreign_stubs imported_mods
 		; cmm_init   <- getCmm (mkModuleInit dflags way cost_centre_info 
 					     this_mod mb_main_mod
 				  	     foreign_stubs imported_mods)
-		; return (cmm_binds ++ concat cmm_tycons
-                        ++ if opt_SccProfilingOn 
-#if defined(mingw32_HOST_OS)
-			      || True
-#endif
-			    then [cmm_init] 
-			    else [])
+		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
 		}
 		-- Put datatype_stuff after code_stuff, because the
 		-- datatype closure table (for enumeration types) to
@@ -156,27 +150,24 @@ mkModuleInit
 	-> Code
 mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
   = do	{ 	
+        if need_init_code
+            then do { -- Allocate the static boolean that records if this
+                      -- module has been registered already
+	              emitData Data [CmmDataLabel moduleRegdLabel, 
+		                     CmmStaticLit zeroCLit]
 
-	-- Allocate the static boolean that records if this
-	-- module has been registered already
-	; emitData Data [CmmDataLabel moduleRegdLabel, 
-			 CmmStaticLit zeroCLit]
+                    ; emitSimpleProc real_init_lbl $ do
+                        { ret_blk <- forkLabelledCode ret_code
 
-	; emitSimpleProc real_init_lbl $ do
-	    { 	-- The return-code pops the work stack by 
-	 	-- incrementing Sp, and then jumpd to the popped item
-	      ret_blk <- forkLabelledCode $ stmtsC
-			[ CmmAssign spReg (cmmRegOffW spReg 1)
-			, CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
-
-	    ; init_blk <- forkLabelledCode $ do
-			    { mod_init_code; stmtC (CmmBranch ret_blk) }
-			
-	    ; stmtC (CmmCondBranch (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
-			ret_blk)
-	    ; stmtC (CmmBranch init_blk)	    
-	    }
-
+                        ; init_blk <- forkLabelledCode $ do
+                                        { mod_init_code; stmtC (CmmBranch ret_blk) }
+                                    
+                        ; stmtC (CmmCondBranch (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
+                                    ret_blk)
+                        ; stmtC (CmmBranch init_blk)	    
+                        }
+                    }
+            else emitSimpleProc real_init_lbl ret_code
 
  	    -- Make the "plain" procedure jump to the "real" init procedure
 	; emitSimpleProc plain_init_lbl jump_to_init
@@ -214,13 +205,24 @@ mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs impo
 
 		-- Now do local stuff
 #if defined(mingw32_HOST_OS)
-	; registerForeignExports foreign_stubs
+        -- ... until the GHCi Linker can load files with constructor functions:
+        ; registerForeignExports foreign_stubs
 #endif
 	; initCostCentres cost_centre_info
 	; mapCs (registerModuleImport dflags way) 
 		(imported_mods++extra_imported_mods)
 	} 
 
+                    -- The return-code pops the work stack by 
+                    -- incrementing Sp, and then jumpd to the popped item
+    ret_code = stmtsC [ CmmAssign spReg (cmmRegOffW spReg 1)
+                      , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
+
+#if defined(mingw32_HOST_OS)
+    need_init_code = True
+#else
+    need_init_code = opt_SccProfilingOn
+#endif
 
 -----------------------
 registerModuleImport :: DynFlags -> String -> Module -> Code

@@ -530,6 +530,16 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
           Nothing -> empty
           Just hs_fn -> text "extern StgClosure " <> ppr hs_fn <> text "_closure" <> semi
 
+   
+   -- Initialise foreign exports by registering a stable pointer from an
+   -- __attribute__((constructor)) function.
+   -- The alternative is to do this from stginit functions generated in
+   -- codeGen/CodeGen.lhs; however, stginit functions have a negative impact
+   -- on binary sizes and link times because the static linker will think that
+   -- all modules that are imported directly or indirectly are actually used by
+   -- the program.
+   -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
+
    -- the only reason for making the mingw32 (anything targetting PE, really) stick
    -- out here is that the GHCi linker isn't capable of handling .ctors sections
   useStaticConstructors 
