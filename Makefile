@@ -293,9 +293,24 @@ binary-dist::
 # via build.mk or the 'make' command-line.
 
 ifndef BINDIST_DOC_WAYS
-BINDIST_DOC_WAYS = html ps
+
+ifneq "$(XSLTPROC)" ""
+BINDIST_DOC_WAYS = html
+ifneq "$(FOP)" ""
+BINDIST_DOC_WAYS += ps pdf
+else
+ifneq "$(PDFXMLTEX)" ""
+BINDIST_DOC_WAYS += pdf
 endif
-# BINDIST_DOC_WAYS =
+ifneq "$(XMLTEX)" ""
+ifneq "$(DVIPS)" ""
+BINDIST_DOC_WAYS += ps
+endif # DVIPS
+endif # XMLTEX
+endif # FOP
+endif # XSLTPROC
+
+endif # BINDIST_DOC_WAYS
 
 binary-dist ::
 ifneq "$(DIR_DOCBOOK_XSL)" ""
