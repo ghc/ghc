@@ -702,6 +702,13 @@ run_thread:
       barf("schedule: invalid what_next field");
     }
 
+#if defined(SMP)
+    // in SMP mode, we might return with a different capability than
+    // we started with, if the Haskell thread made a foreign call.  So
+    // let's find out what our current Capability is:
+    cap = myCapability();
+#endif
+
     // We have run some Haskell code: there might be blackhole-blocked
     // threads to wake up now.
     if ( blackhole_queue != END_TSO_QUEUE ) {
@@ -1529,10 +1536,6 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	}
     }
     
-    /* make all the running tasks block on a condition variable,
-     * maybe set context_switch and wait till they all pile in,
-     * then have them wait on a GC condition variable.
-     */
     IF_DEBUG(scheduler,
 	     debugBelch("--<< thread %ld (%s) stopped: HeapOverflow\n", 
 			(long)t->id, whatNext_strs[t->what_next]));
@@ -2978,7 +2981,7 @@ unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
 #endif
 
 #if defined(GRAN)
-static StgBlockingQueueElement *
+StgBlockingQueueElement *
 unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
 {
     StgTSO *tso;
@@ -3018,7 +3021,7 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
 			     tso->id, tso));
 }
 #elif defined(PARALLEL_HASKELL)
-static StgBlockingQueueElement *
+StgBlockingQueueElement *
 unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
 {
     StgBlockingQueueElement *next;
@@ -3064,7 +3067,7 @@ unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node)
 }
 
 #else /* !GRAN && !PARALLEL_HASKELL */
-static StgTSO *
+StgTSO *
 unblockOneLocked(StgTSO *tso)
 {
   StgTSO *next;
