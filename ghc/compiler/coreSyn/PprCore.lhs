@@ -154,7 +154,8 @@ ppr_expr add_par expr@(App fun arg)
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = add_par $
-    sep [sep [ptext SLIT("case") <+> pprParendType ty <+> pprCoreExpr expr,
+    sep [sep [ptext SLIT("case") {- <+> pprParendType ty -} <+> pprCoreExpr expr,
+	-- Printing the result type is excessive!
 	      hsep [ptext SLIT("of"),
 		    ppr_bndr var, 
 		    char '{',
@@ -168,7 +169,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
 
 ppr_expr add_par (Case expr var ty alts)
   = add_par $
-    sep [sep [ptext SLIT("case") <+> pprParendType ty <+> pprCoreExpr expr,
+    sep [sep [ptext SLIT("case") {- <+> pprParendType ty -} <+> pprCoreExpr expr,
 	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
 	 nest 2 (sep (punctuate semi (map pprCoreAlt alts))),
 	 char '}'
