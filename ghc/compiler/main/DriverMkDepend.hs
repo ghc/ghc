@@ -55,7 +55,7 @@ doMkDependHS session srcs
 	; files <- beginMkDependHS dflags
 
 		-- Do the downsweep to find all the modules
-	; targets <- mapM GHC.guessTarget srcs
+	; targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
 	; GHC.setTargets session targets
 	; excl_mods <- readIORef v_Dep_exclude_mods
 	; GHC.depanal session excl_mods

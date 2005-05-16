@@ -63,7 +63,7 @@ module Util (
 
 	-- Filename utils
 	Suffix,
-	splitFilename, getFileSuffix, splitFilenameDir,
+	splitFilename, getFileSuffix, splitFilenameDir, joinFileExt,
 	splitFilename3, removeSuffix, 
 	dropLongestPrefix, takeLongestPrefix, splitLongestPrefix,
 	replaceFilenameSuffix, directoryOf, filenameOf,
@@ -870,36 +870,35 @@ splitFilename f = splitLongestPrefix f (=='.')
 getFileSuffix :: String -> Suffix
 getFileSuffix f = dropLongestPrefix f (=='.')
 
+joinFileExt :: String -> String -> FilePath
+joinFileExt path ""  = path
+joinFileExt path ext = path ++ '.':ext
+
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy.ext")
 splitFilenameDir :: String -> (String,String)
 splitFilenameDir str
-  = let (dir, rest) = splitLongestPrefix str isPathSeparator
-  	real_dir | null dir  = "."
-		 | otherwise = dir
-    in  (real_dir, rest)
+   = let (dir, rest) = splitLongestPrefix str isPathSeparator
+	 (dir', rest') | null rest = (".", dir)
+		       | otherwise = (dir, rest)
+     in  (dir', rest')
 
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,Suffix)
 splitFilename3 str
    = let (dir, rest) = splitLongestPrefix str isPathSeparator
-	 (name, ext) = splitFilename rest
-	 real_dir | null dir  = "."
-		  | otherwise = dir
-     in  (real_dir, name, ext)
+	 (dir', rest') | null rest = (".", dir)
+		       | otherwise = (dir, rest)
+	 (name, ext) = splitFilename rest'
+     in  (dir', name, ext)
 
 removeSuffix :: Char -> String -> Suffix
-removeSuffix c s
-  | null pre  = s
-  | otherwise = reverse pre
-  where (suf,pre) = break (==c) (reverse s)
+removeSuffix c s = takeLongestPrefix s (==c)
 
 dropLongestPrefix :: String -> (Char -> Bool) -> String
-dropLongestPrefix s pred = reverse suf
-  where (suf,_pre) = break pred (reverse s)
+dropLongestPrefix s pred = snd (splitLongestPrefix s pred)
 
 takeLongestPrefix :: String -> (Char -> Bool) -> String
-takeLongestPrefix s pred = reverse pre
-  where (_suf,pre) = break pred (reverse s)
+takeLongestPrefix s pred = fst (splitLongestPrefix s pred)
 
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string
@@ -913,7 +912,7 @@ takeLongestPrefix s pred = reverse pre
 splitLongestPrefix :: String -> (Char -> Bool) -> (String,String)
 splitLongestPrefix s pred
   = case pre of
-	[]      -> ([], reverse suf)
+	[]      -> (reverse suf, [])
 	(_:pre) -> (reverse pre, reverse suf)
   where (suf,pre) = break pred (reverse s)
 

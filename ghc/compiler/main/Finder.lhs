@@ -288,7 +288,7 @@ searchPathExts paths mod exts
 		  (ext,fn) <- exts,
 		  let base | path == "." = basename
 	     	           | otherwise   = path ++ '/':basename
-	              file = base ++ '.':ext
+	              file = base `joinFileExt` ext
 		]
 
     search [] = return (Failed (map fst to_search))
@@ -365,7 +365,7 @@ mkHomeModLocation2 dflags mod src_basename ext = do
    obj_fn <- mkObjPath dflags src_basename mod_basename
    hi_fn  <- mkHiPath  dflags src_basename mod_basename
 
-   return (ModLocation{ ml_hs_file   = Just (src_basename ++ '.':ext),
+   return (ModLocation{ ml_hs_file   = Just (src_basename `joinFileExt` ext),
 			ml_hi_file   = hi_fn,
 			ml_obj_file  = obj_fn })
 
@@ -374,7 +374,7 @@ hiOnlyModLocation dflags path basename hisuf
  = do let full_basename = path++'/':basename
       obj_fn <- mkObjPath dflags full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
- 	        	     ml_hi_file   = full_basename ++ '.':hisuf,
+ 	        	     ml_hi_file   = full_basename  `joinFileExt` hisuf,
 		 		-- Remove the .hi-boot suffix from
 		 		-- hi_file, if it had one.  We always
 		 		-- want the name of the real .hi file
@@ -397,7 +397,7 @@ mkObjPath dflags basename mod_basename
 		obj_basename | Just dir <- odir = dir ++ '/':mod_basename
 			     | otherwise        = basename
 
-        return (obj_basename ++ '.':osuf)
+        return (obj_basename `joinFileExt` osuf)
 
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
@@ -414,7 +414,7 @@ mkHiPath dflags basename mod_basename
 		hi_basename | Just dir <- hidir = dir ++ '/':mod_basename
 			    | otherwise         = basename
 
-        return (hi_basename ++ '.':hisuf)
+        return (hi_basename `joinFileExt` hisuf)
 
 
 -- -----------------------------------------------------------------------------

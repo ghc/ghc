@@ -19,7 +19,7 @@ import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
 import MkIface		( showIface )
-import DriverPipeline	( oneShot )
+import DriverPipeline	( oneShot, compileFile )
 import DriverMkDepend	( doMkDependHS )
 import SysTools		( getTopDir, getUsageMsgPaths )
 #ifdef GHCI
@@ -29,7 +29,8 @@ import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
 -- Various other random stuff that we need
 import Config		( cProjectVersion, cBooterVersion, cProjectName )
 import Packages		( dumpPackages, initPackages )
-import DriverPhases	( Phase(..), isSourceFilename, anyHsc )
+import DriverPhases	( Phase(..), isSourceSuffix, isSourceFilename, anyHsc,
+			  startPhase, isHaskellSrcFilename )
 import StaticFlags	( staticFlags, v_Ld_inputs )
 import BasicTypes	( failed )
 import Util
@@ -113,32 +114,11 @@ main =
   GHC.setSessionDynFlags session dflags
 
   let
-    {-
-      We split out the object files (.o, .dll) and add them
-      to v_Ld_inputs for use by the linker.
-
-      The following things should be considered compilation manager inputs:
-
-       - haskell source files (strings ending in .hs, .lhs or other 
-         haskellish extension),
-
-       - module names (not forgetting hierarchical module names),
-
-       - and finally we consider everything not containing a '.' to be
-         a comp manager input, as shorthand for a .hs or .lhs filename.
-
-      Everything else is considered to be a linker object, and passed
-      straight through to the linker.
-    -}
-    looks_like_an_input m =  isSourceFilename m 
-			  || looksLikeModuleName m
-			  || '.' `notElem` m
-
      -- To simplify the handling of filepaths, we normalise all filepaths right 
      -- away - e.g., for win32 platforms, backslashes are converted
      -- into forward slashes.
     normal_fileish_paths = map normalisePath fileish_args
-    (srcs, objs)         = partition looks_like_an_input normal_fileish_paths
+    (srcs, objs)         = partition_args normal_fileish_paths [] []
 
   -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
   --       the command-line.
@@ -162,7 +142,7 @@ main =
         ShowNumVersion  -> putStrLn cProjectVersion
         ShowInterface f -> showIface f
 	DoMake 	        -> doMake session srcs
-	DoMkDependHS    -> doMkDependHS session srcs 
+	DoMkDependHS    -> doMkDependHS session (map fst srcs)
 	StopBefore p    -> oneShot dflags p srcs
 	DoInteractive   -> interactiveUI session srcs Nothing
 	DoEval expr     -> interactiveUI session srcs (Just expr)
@@ -174,15 +154,52 @@ interactiveUI _ _ _ =
   throwDyn (CmdLineError "not built for interactive use")
 #endif
 
+-- -----------------------------------------------------------------------------
+-- Splitting arguments into source files and object files.  This is where we
+-- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
+-- file indicating the phase specified by the -x option in force, if any.
+
+partition_args [] srcs objs = (reverse srcs, reverse objs)
+partition_args ("-x":suff:args) srcs objs
+  | "none" <- suff	= partition_args args srcs objs
+  | StopLn <- phase	= partition_args args srcs (slurp ++ objs)
+  | otherwise		= partition_args rest (these_srcs ++ srcs) objs
+	where phase = startPhase suff
+	      (slurp,rest) = break (== "-x") args 
+	      these_srcs = zip slurp (repeat (Just phase))
+partition_args (arg:args) srcs objs
+  | looks_like_an_input arg = partition_args args ((arg,Nothing):srcs) objs
+  | otherwise               = partition_args args srcs (arg:objs)
+
+    {-
+      We split out the object files (.o, .dll) and add them
+      to v_Ld_inputs for use by the linker.
+
+      The following things should be considered compilation manager inputs:
+
+       - haskell source files (strings ending in .hs, .lhs or other 
+         haskellish extension),
+
+       - module names (not forgetting hierarchical module names),
+
+       - and finally we consider everything not containing a '.' to be
+         a comp manager input, as shorthand for a .hs or .lhs filename.
+
+      Everything else is considered to be a linker object, and passed
+      straight through to the linker.
+    -}
+looks_like_an_input m =  isSourceFilename m 
+		      || looksLikeModuleName m
+		      || '.' `notElem` m
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
 
-checkOptions :: CmdLineMode -> DynFlags -> [String] -> [String] -> IO ()
+checkOptions :: CmdLineMode -> DynFlags -> [(String,Maybe Phase)] -> [String] -> IO ()
      -- Final sanity checking before kicking off a compilation (pipeline).
 checkOptions cli_mode dflags srcs objs = do
      -- Complain about any unknown flags
-   let unknown_opts = [ f | f@('-':_) <- srcs ]
+   let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
 	-- -prof and --interactive are not a good combination
@@ -350,10 +367,20 @@ addFlag s = do
 -- ----------------------------------------------------------------------------
 -- Run --make mode
 
-doMake :: Session -> [String] -> IO ()
+doMake :: Session -> [(String,Maybe Phase)] -> IO ()
 doMake sess []    = throwDyn (UsageError "no input files")
 doMake sess srcs  = do 
-    targets <- mapM GHC.guessTarget srcs
+    let (hs_srcs, non_hs_srcs) = partition haskellish srcs
+
+	haskellish (f,Nothing) = looksLikeModuleName f || isHaskellSrcFilename f
+	haskellish (f,Just phase) = 
+	  phase `notElem` [As, Cc, CmmCpp, Cmm, StopLn]
+
+    dflags <- GHC.getSessionDynFlags sess
+    o_files <- mapM (compileFile dflags StopLn) non_hs_srcs
+    mapM_ (consIORef v_Ld_inputs) (reverse o_files)
+
+    targets <- mapM (uncurry GHC.guessTarget) hs_srcs
     GHC.setTargets sess targets
     ok_flag <- GHC.load sess LoadAllTargets
     when (failed ok_flag) (exitWith (ExitFailure 1))

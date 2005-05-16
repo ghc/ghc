@@ -23,7 +23,7 @@ module GHC (
 	setMsgHandler,
 
 	-- * Targets
-	Target(..), TargetId(..),
+	Target(..), TargetId(..), Phase,
 	setTargets,
 	getTargets,
 	addTarget,
@@ -353,15 +353,21 @@ removeTarget s target_id
 --	  then use that
 -- 	- otherwise interpret the string as a module name
 --
-guessTarget :: String -> IO Target
-guessTarget file
+guessTarget :: String -> Maybe Phase -> IO Target
+guessTarget file (Just phase)
+   = return (Target (TargetFile file (Just phase)) Nothing)
+guessTarget file Nothing
    | isHaskellSrcFilename file
-   = return (Target (TargetFile file) Nothing)
+   = return (Target (TargetFile file Nothing) Nothing)
    | otherwise
    = do exists <- doesFileExist hs_file
-	if exists then return (Target (TargetFile hs_file) Nothing) else do
+	if exists
+	   then return (Target (TargetFile hs_file Nothing) Nothing)
+	   else do
 	exists <- doesFileExist lhs_file
-	if exists then return (Target (TargetFile lhs_file) Nothing) else do
+	if exists
+	   then return (Target (TargetFile lhs_file Nothing) Nothing)
+	   else do
 	return (Target (TargetModule (mkModule file)) Nothing)
      where 
 	 hs_file = file ++ ".hs"
@@ -1212,11 +1218,11 @@ downsweep hsc_env old_summaries excl_mods
 	old_summary_map = mkNodeMap old_summaries
 
 	getRootSummary :: Target -> IO ModSummary
-	getRootSummary (Target (TargetFile file) maybe_buf)
+	getRootSummary (Target (TargetFile file mb_phase) maybe_buf)
 	   = do exists <- doesFileExist file
 		if exists 
-			then summariseFile hsc_env old_summaries file maybe_buf
-			else do
+		    then summariseFile hsc_env old_summaries file mb_phase maybe_buf
+		    else do
 		throwDyn (CmdLineError ("can't find file: " ++ file))	
 	getRootSummary (Target (TargetModule modl) maybe_buf)
  	   = do maybe_summary <- summariseModule hsc_env old_summary_map Nothing False 
@@ -1295,10 +1301,11 @@ summariseFile
 	:: HscEnv
 	-> [ModSummary]			-- old summaries
 	-> FilePath			-- source file name
+	-> Maybe Phase			-- start phase
 	-> Maybe (StringBuffer,ClockTime)
 	-> IO ModSummary
 
-summariseFile hsc_env old_summaries file maybe_buf
+summariseFile hsc_env old_summaries file mb_phase maybe_buf
 	-- we can use a cached summary if one is available and the
 	-- source file hasn't changed,  But we have to look up the summary
 	-- by source file, rather than module name as we do in summarise.
@@ -1325,7 +1332,7 @@ summariseFile hsc_env old_summaries file maybe_buf
    	let dflags = hsc_dflags hsc_env
 
 	(dflags', hspp_fn, buf)
-	    <- preprocessFile dflags file maybe_buf
+	    <- preprocessFile dflags file mb_phase maybe_buf
 
         (srcimps,the_imps,mod) <- getImports dflags' buf hspp_fn
 
@@ -1425,7 +1432,7 @@ summariseModule hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf exc
       = do
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
-	(dflags', hspp_fn, buf) <- preprocessFile dflags src_fn maybe_buf
+	(dflags', hspp_fn, buf) <- preprocessFile dflags src_fn Nothing maybe_buf
         (srcimps, the_imps, mod_name) <- getImports dflags' buf hspp_fn
 
 	when (mod_name /= wanted_mod) $
@@ -1453,15 +1460,15 @@ getObjTimestamp location is_boot
 	       else modificationTimeIfExists (ml_obj_file location)
 
 
-preprocessFile :: DynFlags -> FilePath -> Maybe (StringBuffer,ClockTime)
+preprocessFile :: DynFlags -> FilePath -> Maybe Phase -> Maybe (StringBuffer,ClockTime)
   -> IO (DynFlags, FilePath, StringBuffer)
-preprocessFile dflags src_fn Nothing
+preprocessFile dflags src_fn mb_phase Nothing
   = do
-	(dflags', hspp_fn) <- preprocess dflags src_fn
+	(dflags', hspp_fn) <- preprocess dflags (src_fn, mb_phase)
 	buf <- hGetStringBuffer hspp_fn
 	return (dflags', hspp_fn, buf)
 
-preprocessFile dflags src_fn (Just (buf, time))
+preprocessFile dflags src_fn mb_phase (Just (buf, time))
   = do
 	-- case we bypass the preprocessing stage?
 	let 
@@ -1471,7 +1478,8 @@ preprocessFile dflags src_fn (Just (buf, time))
 
 	let
 	    needs_preprocessing
-		| Unlit _ <- startPhase src_fn  = True
+		| Just (Unlit _) <- mb_phase    = True
+	        | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
 		  -- note: local_opts is only required if there's no Unlit phase
 		| dopt Opt_Cpp dflags'		= True
 		| dopt Opt_Pp  dflags'		= True

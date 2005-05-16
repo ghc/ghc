@@ -17,7 +17,7 @@ module InteractiveUI (
 import qualified GHC
 import GHC		( Session, verbosity, dopt, DynFlag(..),
 			  mkModule, pprModule, Type, Module, SuccessFlag(..),
-			  TyThing(..), Name, LoadHowMuch(..),
+			  TyThing(..), Name, LoadHowMuch(..), Phase,
 			  GhcException(..), showGhcException,
 			  CheckedModule(..) )
 import Outputable
@@ -163,7 +163,7 @@ helpText =
  "                         (eg. -v2, -fglasgow-exts, etc.)\n"
 
 
-interactiveUI :: Session -> [FilePath] -> Maybe String -> IO ()
+interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
 interactiveUI session srcs maybe_expr = do
 
    -- HACK! If we happen to get into an infinite loop (eg the user
@@ -214,7 +214,7 @@ interactiveUI session srcs maybe_expr = do
 
    return ()
 
-runGHCi :: [FilePath] -> Maybe String -> GHCi ()
+runGHCi :: [(FilePath, Maybe Phase)] -> Maybe String -> GHCi ()
 runGHCi paths maybe_expr = do
   let read_dot_files = not opt_IgnoreDotGhci
 
@@ -660,7 +660,7 @@ addModule :: [FilePath] -> GHCi ()
 addModule files = do
   io (revertCAFs)			-- always revert CAFs on load/add.
   files <- mapM expandPath files
-  targets <- mapM (io . GHC.guessTarget) files
+  targets <- mapM (\m -> io (GHC.guessTarget m Nothing)) files
   session <- getSession
   io (mapM_ (GHC.addTarget session) targets)
   ok <- io (GHC.load session LoadAllTargets)
@@ -722,13 +722,13 @@ undefineMacro macro_name = do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 
-loadModule :: [FilePath] -> GHCi SuccessFlag
+loadModule :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
 
 loadModule_ :: [FilePath] -> GHCi ()
-loadModule_ fs = do loadModule fs; return ()
+loadModule_ fs = do loadModule (zip fs (repeat Nothing)); return ()
 
-loadModule' :: [FilePath] -> GHCi SuccessFlag
+loadModule' :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
 loadModule' files = do
   session <- getSession
 
@@ -737,8 +737,10 @@ loadModule' files = do
   io (GHC.load session LoadAllTargets)
 
   -- expand tildes
-  files <- mapM expandPath files
-  targets <- io (mapM GHC.guessTarget files)
+  let (filenames, phases) = unzip files
+  exp_filenames <- mapM expandPath filenames
+  let files' = zip exp_filenames phases
+  targets <- io (mapM (uncurry GHC.guessTarget) files')
 
   -- NOTE: we used to do the dependency anal first, so that if it
   -- fails we didn't throw away the current set of modules.  This would

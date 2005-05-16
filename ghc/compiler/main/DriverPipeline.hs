@@ -9,7 +9,7 @@
 module DriverPipeline (
 	-- Run a series of compilation steps in a pipeline, for a
 	-- collection of source files.
-   oneShot,
+   oneShot, compileFile,
 
 	-- Interfaces for the batch-mode driver
    staticLink,
@@ -75,10 +75,10 @@ import Maybe
 -- We return the augmented DynFlags, because they contain the result
 -- of slurping in the OPTIONS pragmas
 
-preprocess :: DynFlags -> FilePath -> IO (DynFlags, FilePath)
-preprocess dflags filename =
-  ASSERT2(isHaskellSrcFilename filename, text filename) 
-  runPipeline anyHsc dflags filename Temporary Nothing{-no ModLocation-}
+preprocess :: DynFlags -> (FilePath, Maybe Phase) -> IO (DynFlags, FilePath)
+preprocess dflags (filename, mb_phase) =
+  ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename) 
+  runPipeline anyHsc dflags (filename, mb_phase) Temporary Nothing{-no ModLocation-}
 
 -- ---------------------------------------------------------------------------
 -- Compile
@@ -214,7 +214,7 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 
 		-- We're in --make mode: finish the compilation pipeline.
 		_other
-		  -> do	runPipeline StopLn dflags output_fn Persistent
+		  -> do	runPipeline StopLn dflags (output_fn,Nothing) Persistent
 				    (Just location)
 				-- The object filename comes from the ModLocation
 
@@ -235,7 +235,7 @@ compileStub dflags stub_c_exists
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
 	(_, stub_o) <- runPipeline StopLn dflags
-			    stub_c Persistent Nothing{-no ModLocation-}
+			    (stub_c,Nothing) Persistent Nothing{-no ModLocation-}
 	return (Just stub_o)
 
 
@@ -307,13 +307,13 @@ link BatchCompile dflags batch_attempt_linking hpt
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
-oneShot :: DynFlags -> Phase -> [String] -> IO ()
+oneShot :: DynFlags -> Phase -> [(String, Maybe Phase)] -> IO ()
 oneShot dflags stop_phase srcs = do
   o_files <- mapM (compileFile dflags stop_phase) srcs
   doLink dflags stop_phase o_files
 
-compileFile :: DynFlags -> Phase -> FilePath -> IO FilePath
-compileFile dflags stop_phase src = do
+compileFile :: DynFlags -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
+compileFile dflags stop_phase (src, mb_phase) = do
    exists <- doesFileExist src
    when (not exists) $ 
    	throwDyn (CmdLineError ("does not exist: " ++ src))
@@ -337,7 +337,7 @@ compileFile dflags stop_phase src = do
 			other      -> stop_phase
 
    (_, out_file) <- runPipeline stop_phase' dflags
-			  src output Nothing{-no ModLocation-}
+			  (src, mb_phase) output Nothing{-no ModLocation-}
    return out_file
 
 
@@ -382,17 +382,21 @@ data PipelineOutput
 	-- the output must go into the specified file.
 
 runPipeline
-  :: Phase		-- When to stop
-  -> DynFlags		-- Dynamic flags
-  -> FilePath 		-- Input filename
-  -> PipelineOutput	-- Output filename
-  -> Maybe ModLocation  -- A ModLocation, if this is a Haskell module
+  :: Phase		        -- When to stop
+  -> DynFlags		        -- Dynamic flags
+  -> (FilePath,Maybe Phase)     -- Input filename (and maybe -x suffix)
+  -> PipelineOutput	        -- Output filename
+  -> Maybe ModLocation          -- A ModLocation, if this is a Haskell module
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline stop_phase dflags input_fn output maybe_loc
+runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
   = do
   let (basename, suffix) = splitFilename input_fn
-      start_phase = startPhase suffix
+
+	-- If we were given a -x flag, then use that phase to start from
+      start_phase
+	| Just x_phase <- mb_phase = x_phase
+	| otherwise                = startPhase suffix
 
   -- We want to catch cases of "you can't get there from here" before
   -- we start the pipeline, because otherwise it will just run off the
@@ -500,7 +504,7 @@ getOutputFilename dflags stop_phase output basename
 		   | StopLn <- next_phase = return odir_persistent
 		   | otherwise            = return persistent
 
-		persistent = basename ++ '.':suffix
+		persistent = basename `joinFileExt` suffix
 
 		odir_persistent
 		   | Just loc <- maybe_location = ml_obj_file loc
@@ -561,7 +565,7 @@ runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_lo
 runPhase (Cpp sf) _stop dflags0 basename suff input_fn get_output_fn maybe_loc
   = do src_opts <- getOptionsFromSource input_fn
        (dflags,unhandled_flags) <- parseDynamicFlags dflags0 src_opts
-       checkProcessArgsResult unhandled_flags (basename++'.':suff)
+       checkProcessArgsResult unhandled_flags (basename `joinFileExt` suff)
 
        if not (dopt Opt_Cpp dflags) then
            -- no need to preprocess CPP, just pass input file along
@@ -582,7 +586,7 @@ runPhase (HsPp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
           return (Hsc sf, dflags, maybe_loc, input_fn)
 	else do
 	    let hspp_opts = getOpts dflags opt_F
-	    let orig_fn = basename ++ '.':suff
+	    let orig_fn = basename `joinFileExt` suff
 	    output_fn <- get_output_fn (Hsc sf) maybe_loc
 	    SysTools.runPp dflags
 			   ( [ SysTools.Option     orig_fn
@@ -652,7 +656,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 		      | otherwise = location3
 
   -- Make the ModSummary to hand to hscMain
-	src_timestamp <- getModificationTime (basename ++ '.':suff)
+	src_timestamp <- getModificationTime (basename `joinFileExt` suff)
 	let
 	    unused_field = panic "runPhase:ModSummary field"
 		-- Some fields are not looked at by hscMain
@@ -815,12 +819,12 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		| otherwise         = As
 	output_fn <- get_output_fn next_phase maybe_loc
 
-	-- force the C compiler to interpret this file as C when
-	-- compiling .hc files, by adding the -x c option.
-	let langopt | hcc = [ SysTools.Option "-x", SysTools.Option "c"]
-		    | otherwise = [ ]
-
-	SysTools.runCc dflags (langopt ++
+	SysTools.runCc dflags (
+		-- force the C compiler to interpret this file as C when
+		-- compiling .hc files, by adding the -x c option.
+		-- Also useful for plain .c files, just in case GHC saw a 
+		-- -x c option.
+			[ SysTools.Option "-x", SysTools.Option "c"] ++
 			[ SysTools.FileOption "" input_fn
 			, SysTools.Option "-o"
 			, SysTools.FileOption "" output_fn

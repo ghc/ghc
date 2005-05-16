@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
---  $Id: DriverPhases.hs,v 1.36 2005/03/31 10:16:38 simonmar Exp $
+--  $Id: DriverPhases.hs,v 1.37 2005/05/16 13:47:58 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -13,6 +13,15 @@ module DriverPhases (
    happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,		-- :: String -> Phase
    phaseInputExt, 	-- :: Phase -> String
+
+   isHaskellishSuffix, 
+   isHaskellSrcSuffix,
+   isObjectSuffix,
+   isCishSuffix,
+   isExtCoreSuffix,
+   isDynLibSuffix,
+   isHaskellUserSrcSuffix,
+   isSourceSuffix,
 
    isHaskellishFilename, 
    isHaskellSrcFilename,
@@ -74,7 +83,7 @@ data Phase
 	-- The final phase is a pseudo-phase that tells the pipeline to stop.
 	-- There is no runPhase case for it.
 	| StopLn	-- Stop, but linking will follow, so generate .o file
-  deriving (Show)
+  deriving (Eq, Show)
 
 anyHsc :: Phase
 anyHsc = Hsc (panic "anyHsc")
@@ -197,15 +206,23 @@ dynlib_suffixes = ["dylib"]
 dynlib_suffixes = ["so"]
 #endif
 
-isHaskellishFilename     f = getFileSuffix f `elem` haskellish_suffixes
-isHaskellSrcFilename     f = getFileSuffix f `elem` haskellish_src_suffixes
-isCishFilename           f = getFileSuffix f `elem` cish_suffixes
-isExtCoreFilename        f = getFileSuffix f `elem` extcoreish_suffixes
-isObjectFilename         f = getFileSuffix f `elem` objish_suffixes
-isHaskellUserSrcFilename f = getFileSuffix f `elem` haskellish_user_src_suffixes
-isDynLibFilename	 f = getFileSuffix f `elem` dynlib_suffixes
+isHaskellishSuffix     s = s `elem` haskellish_suffixes
+isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
+isCishSuffix           s = s `elem` cish_suffixes
+isExtCoreSuffix        s = s `elem` extcoreish_suffixes
+isObjectSuffix         s = s `elem` objish_suffixes
+isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
+isDynLibSuffix	       s = s `elem` dynlib_suffixes
 
-isSourceFilename :: FilePath -> Bool
-isSourceFilename f  =
-   isHaskellishFilename f ||
-   isCishFilename f
+isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
+
+isHaskellishFilename     f = isHaskellishSuffix     (getFileSuffix f)
+isHaskellSrcFilename     f = isHaskellSrcSuffix     (getFileSuffix f)
+isCishFilename           f = isCishSuffix           (getFileSuffix f)
+isExtCoreFilename        f = isExtCoreSuffix        (getFileSuffix f)
+isObjectFilename         f = isObjectSuffix         (getFileSuffix f)
+isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (getFileSuffix f)
+isDynLibFilename	 f = isDynLibSuffix         (getFileSuffix f)
+isSourceFilename 	 f = isSourceSuffix 	    (getFileSuffix f)
+
+

@@ -86,7 +86,7 @@ import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
 import Packages		( PackageIdH, PackageId, PackageConfig )
 import DynFlags		( DynFlags(..), isOneShot )
-import DriverPhases	( HscSource(..), isHsBoot, hscSourceString )
+import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
 
@@ -188,15 +188,20 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target = Target TargetId (Maybe (StringBuffer,ClockTime))
 
 data TargetId
-  = TargetModule Module	   -- ^ A module name: search for the file
-  | TargetFile   FilePath  -- ^ A filename: parse it to find the module name.
+  = TargetModule Module
+	-- ^ A module name: search for the file
+  | TargetFile FilePath (Maybe Phase)
+	-- ^ A filename: preprocess & parse it to find the module name.
+	-- If specified, the Phase indicates how to compile this file
+	-- (which phase to start from).  Nothing indicates the starting phase
+	-- should be determined from the suffix of the filename.
   deriving Eq
 
 pprTarget :: Target -> SDoc
 pprTarget (Target id _) = pprTargetId id
 
 pprTargetId (TargetModule m) = ppr m
-pprTargetId (TargetFile f)   = text f
+pprTargetId (TargetFile f _) = text f
 
 type FinderCache = ModuleEnv FinderCacheEntry
 type FinderCacheEntry = (ModLocation, Maybe (PackageConfig,Bool))
