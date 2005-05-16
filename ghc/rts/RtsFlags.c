@@ -173,6 +173,7 @@ void initRtsFlagsDefaults(void)
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
 #endif
+    RtsFlags.GcFlags.idleGCDelayTicks   = 300 / TICK_MILLISECS; /* ticks */
 
 #ifdef DEBUG
     RtsFlags.DebugFlags.scheduler	= rtsFalse;
@@ -346,6 +347,9 @@ usage_text[] = {
 "  -c<n>    Auto-enable compaction of the oldest generation when live data is",
 "           at least <n>% of the maximum heap size set with -M (default: 30%)",
 "  -c       Enable compaction for all major collections",
+#if defined(RTS_SUPPORTS_THREADS)
+"  -I<sec>  Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
+#endif
 "",
 "  -t<file> One-line GC statistics  (default file: <program>.stat)",
 "  -s<file> Summary  GC statistics  (with -Sstderr going to stderr)",
@@ -792,6 +796,23 @@ error = rtsTrue;
 		  RtsFlags.GcFlags.frontpanel = rtsTrue;
 		  break;
 #endif
+
+    	      case 'I':	/* idle GC delay */
+		if (rts_argv[arg][2] == '\0') {
+		  /* use default */
+		} else {
+		    I_ cst; /* tmp */
+
+		    /* Convert to ticks */
+		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
+		    if (cst > 0 && cst < TICK_MILLISECS) {
+			cst = TICK_MILLISECS;
+		    } else {
+			cst = cst / TICK_MILLISECS;
+		    }
+		    RtsFlags.GcFlags.idleGCDelayTicks = cst;
+		}
+		break;
 
 	      case 'S':
 		  RtsFlags.GcFlags.giveStats = VERBOSE_GC_STATS;

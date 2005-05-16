@@ -41,6 +41,8 @@ struct GC_FLAGS {
 
     rtsBool ringBell;
     rtsBool frontpanel;
+
+    int idleGCDelayTicks;	/* in milliseconds */
 };
 
 struct DEBUG_FLAGS {  

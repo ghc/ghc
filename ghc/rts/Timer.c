@@ -30,6 +30,9 @@
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
+/* idle ticks left before we perform a GC */
+static int ticks_to_gc = 0;
+
 /*
  * Function: handle_tick()
  *
@@ -51,22 +54,28 @@ handle_tick(int unused STG_UNUSED)
 
 #if defined(RTS_SUPPORTS_THREADS)
 	  /* 
-	   * If we've been inactive for a whole time slice, tell the
-	   * scheduler to wake up and do a GC, to check for threads
-	   * that are deadlocked.
+	   * If we've been inactive for idleGCDelayTicks (set by +RTS
+	   * -I), tell the scheduler to wake up and do a GC, to check
+	   * for threads that are deadlocked.
 	   */
 	  switch (recent_activity) {
 	  case ACTIVITY_YES:
 	      recent_activity = ACTIVITY_MAYBE_NO;
+	      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
 	      break;
 	  case ACTIVITY_MAYBE_NO:
-	      recent_activity = ACTIVITY_INACTIVE;
-	      blackholes_need_checking = rtsTrue;
-	      /* hack: re-use the blackholes_need_checking flag */
-	      threadRunnable();
-	      /* ToDo: this threadRunnable only works if there's
-	       * another thread (not this one) waiting to be woken up
-	       */
+	      if (ticks_to_gc == 0) break; /* 0 ==> no idle GC */
+	      ticks_to_gc--;
+	      if (ticks_to_gc == 0) {
+		  ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
+		  recent_activity = ACTIVITY_INACTIVE;
+		  blackholes_need_checking = rtsTrue;
+		  /* hack: re-use the blackholes_need_checking flag */
+		  threadRunnable();
+		  /* ToDo: this threadRunnable only works if there's
+		   * another thread (not this one) waiting to be woken up
+		   */
+	      }
 	      break;
 	  default:
 	      break;
