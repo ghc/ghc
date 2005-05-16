@@ -51,6 +51,8 @@ module GHC (
 	modInfoTopLevelScope,
 	modInfoPrintUnqualified,
 	modInfoExports,
+	modInfoIsExportedName,
+	modInfoLookupName,
 	lookupGlobalName,
 
 	-- * Interactive evaluation
@@ -149,7 +151,7 @@ import Bag		( unitBag, emptyBag )
 #endif
 
 import Packages		( initPackages )
-import NameSet		( NameSet, nameSetToList )
+import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, gre_name,
 			  globalRdrEnvElts )
 import HsSyn
@@ -1607,8 +1609,19 @@ modInfoTopLevelScope minf
 modInfoExports :: ModuleInfo -> [Name]
 modInfoExports minf = nameSetToList $! minf_exports minf
 
+modInfoIsExportedName :: ModuleInfo -> Name -> Bool
+modInfoIsExportedName minf name = elemNameSet name (minf_exports minf)
+
 modInfoPrintUnqualified :: ModuleInfo -> Maybe PrintUnqualified
 modInfoPrintUnqualified minf = fmap unQualInScope (minf_rdr_env minf)
+
+modInfoLookupName :: Session -> ModuleInfo -> Name -> IO (Maybe TyThing)
+modInfoLookupName s minf name = withSession s $ \hsc_env -> do
+   case lookupTypeEnv (minf_type_env minf) name of
+     Just tyThing -> return (Just tyThing)
+     Nothing      -> do
+       eps <- readIORef (hsc_EPS hsc_env)
+       return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id
