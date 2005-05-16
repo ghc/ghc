@@ -245,6 +245,39 @@
 
       <varlistentry>
 	<term>
+	  <option>-I</option><replaceable>seconds</replaceable>
+	  <indexterm><primary><option>-H</option></primary>
+	    <secondary>RTS option</secondary>
+	  </indexterm>
+	  <indexterm><primary>idle GC</primary>
+	  </indexterm>
+	  </term>
+	<listitem>
+	  <para>(default: 0.3) In the threaded and SMP versions of the RTS (see
+	    <option>-threaded</option>, <xref linkend="options-linker" />), a
+	    major GC is automatically performed if the runtime has been idle
+	    (no Haskell computation has been running) for a period of time.
+	    The amount of idle time which must pass before a GC is performed is
+	    set by the <option>-I</option><replaceable>seconds</replaceable>
+	    option.  Specifying <option>-I0</option> disables the idle GC.</para>
+
+	  <para>For an interactive application, it is probably a good idea to
+	    use the idle GC, because this will allow finalizers to run and
+	    deadlocked threads to be detected in the idle time when no Haskell
+	    computation is happening.  Also, it will mean that a GC is less
+	    likely to happen when the application is busy, and so
+	    responsiveness may be improved.   However, if the amount of live data in
+	    the heap is particularly large, then the idle GC can cause a
+	    significant delay, and too small an interval could adversely affect
+	    interactive responsiveness.</para>
+
+	  <para>This is an experimental feature, please let us know if it
+	    causes problems and/or could benefit from further tuning.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
          <option>-k</option><replaceable>size</replaceable>
          <indexterm><primary><option>-k</option></primary><secondary>RTS option</secondary></indexterm>
          <indexterm><primary>stack, minimum size</primary></indexterm>
