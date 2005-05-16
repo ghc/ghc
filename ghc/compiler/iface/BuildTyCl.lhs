@@ -80,6 +80,7 @@ mkNewTyConRhs tycon con
 mkNewTyConRep :: TyCon		-- The original type constructor
 	      -> Type		-- Chosen representation type
 				-- (guaranteed not to be another newtype)
+				-- Free vars of rep = tyConTyVars tc
 
 -- Find the representation type for this newtype TyCon
 -- Remember that the representation type is the *ultimate* representation
@@ -103,11 +104,12 @@ mkNewTyConRep tc
 	| tc `elem` tcs = unitTy
 	| otherwise
 	= case splitTyConApp_maybe rhs_ty of
-	    Just (tc', tys) | isNewTyCon tc'
-			   -> substTyWith tc_tvs tys (go (tc:tcs) tc')
+	    Just (tc1, tys) | isNewTyCon tc1
+			   -> ASSERT( length (tyConTyVars tc1) == length tys )
+			      substTyWith (tyConTyVars tc1) tys (go (tc:tcs) tc1)
 	    other 	   -> rhs_ty 
 	where
-	  (tc_tvs, rhs_ty) = newTyConRhs tc
+	  (_tc_tvs, rhs_ty) = newTyConRhs tc
 
 
 ------------------------------------------------------
