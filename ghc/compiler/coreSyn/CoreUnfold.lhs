@@ -609,10 +609,7 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 				   text "is value:" <+> ppr is_value,
 				   text "is cheap:" <+> ppr is_cheap,
 				   text "guidance" <+> ppr guidance,
-				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO",
-				   if yes_or_no then
-					text "Unfolding =" <+> pprCoreExpr unf_template
-				   else empty])
+				   text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
 		  result
     else
     result

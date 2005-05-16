@@ -1001,6 +1001,13 @@ completeCall env var occ_info cont
     case maybe_inline of {
 	Just unfolding  	-- There is an inlining!
 	  ->  tick (UnfoldingDone var)		`thenSmpl_`
+		(if dopt Opt_D_dump_inlinings dflags then
+		   pprTrace "Inlining done" (vcat [
+			text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
+			text "Inlined fn: " <+> ppr unfolding,
+			text "Cont:  " <+> ppr call_cont])
+		 else
+			id)		$
 	      makeThatCall env var unfolding args call_cont
 
 	;
