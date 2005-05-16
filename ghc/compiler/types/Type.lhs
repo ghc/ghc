@@ -588,8 +588,9 @@ splitRecNewType_maybe (TyConApp tc tys)
 						-- 	to *types* (of kind *)
     ASSERT( isRecursiveTyCon tc ) 		-- Guaranteed by coreView
     case newTyConRhs tc of
-	(tvs, rep_ty) -> Just (substTyWith tvs tys rep_ty)
-
+	(tvs, rep_ty) -> ASSERT( length tvs == length tys )
+			 Just (substTyWith tvs tys rep_ty)
+	
 splitRecNewType_maybe other = Nothing
 \end{code}
 
@@ -1082,6 +1083,11 @@ mkOpenTvSubst env = TvSubst (mkInScopeSet (tyVarsOfTypes (varEnvElts env))) env
 
 zipOpenTvSubst :: [TyVar] -> [Type] -> TvSubst
 zipOpenTvSubst tyvars tys 
+#ifdef DEBUG
+  | length tyvars /= length tys
+  = pprTrace "zipOpenTvSubst" (ppr tyvars $$ ppr tys) emptyTvSubst
+  | otherwise
+#endif
   = TvSubst (mkInScopeSet (tyVarsOfTypes tys)) (zipTyEnv tyvars tys)
 
 -- mkTopTvSubst is called when doing top-level substitutions.
@@ -1091,7 +1097,13 @@ mkTopTvSubst :: [(TyVar, Type)] -> TvSubst
 mkTopTvSubst prs = TvSubst emptyInScopeSet (mkVarEnv prs)
 
 zipTopTvSubst :: [TyVar] -> [Type] -> TvSubst
-zipTopTvSubst tyvars tys = TvSubst emptyInScopeSet (zipTyEnv tyvars tys)
+zipTopTvSubst tyvars tys 
+#ifdef DEBUG
+  | length tyvars /= length tys
+  = pprTrace "zipOpenTvSubst" (ppr tyvars $$ ppr tys) emptyTvSubst
+  | otherwise
+#endif
+  = TvSubst emptyInScopeSet (zipTyEnv tyvars tys)
 
 zipTyEnv :: [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys
@@ -1134,7 +1146,8 @@ instance Outputable TvSubst where
 
 \begin{code}
 substTyWith :: [TyVar] -> [Type] -> Type -> Type
-substTyWith tvs tys = substTy (zipOpenTvSubst tvs tys)
+substTyWith tvs tys = ASSERT( length tvs == length tys )
+		      substTy (zipOpenTvSubst tvs tys)
 
 substTy :: TvSubst -> Type  -> Type
 substTy subst ty | isEmptyTvSubst subst = ty

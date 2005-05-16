@@ -496,11 +496,13 @@ dataConArgTys :: DataCon
 				--     but EXCLUDE the data-decl context which is discarded
 				-- It's all post-flattening etc; this is a representation type
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
- = map (substTyWith tyvars inst_tys) arg_tys
+ = ASSERT( length tyvars == length inst_tys )
+   map (substTyWith tyvars inst_tys) arg_tys
 
 dataConResTy :: DataCon -> [Type] -> Type
 dataConResTy (MkData {dcTyVars = tyvars, dcTyCon = tc, dcResTys = res_tys}) inst_tys
- = substTy (zipTopTvSubst tyvars inst_tys) (mkTyConApp tc res_tys)
+ = ASSERT( length tyvars == length inst_tys )
+   substTy (zipTopTvSubst tyvars inst_tys) (mkTyConApp tc res_tys)
 	-- zipTopTvSubst because the res_tys can't contain any foralls
 
 -- And the same deal for the original arg tys
@@ -508,6 +510,7 @@ dataConResTy (MkData {dcTyVars = tyvars, dcTyCon = tc, dcResTys = res_tys}) inst
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
 dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, dcVanilla = is_vanilla}) inst_tys
  = ASSERT( is_vanilla ) 
+   ASSERT( length tyvars == length inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
 
 dataConStupidTheta :: DataCon -> ThetaType
