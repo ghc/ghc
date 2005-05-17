@@ -41,7 +41,7 @@ import DynFlags		( DynFlags(..), getOpts )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
-import Util             ( zipLazy, global )
+import Util             ( zipLazy, global, joinFileExt, joinFileName )
 import StaticFlags	( v_Ld_inputs )
 import ErrUtils         ( debugTraceMsg )
 
