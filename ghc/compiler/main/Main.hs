@@ -372,7 +372,8 @@ doMake sess []    = throwDyn (UsageError "no input files")
 doMake sess srcs  = do 
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
-	haskellish (f,Nothing) = looksLikeModuleName f || isHaskellSrcFilename f
+	haskellish (f,Nothing) = 
+	  looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
 	haskellish (f,Just phase) = 
 	  phase `notElem` [As, Cc, CmmCpp, Cmm, StopLn]
 
