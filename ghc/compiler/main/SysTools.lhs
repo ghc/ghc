@@ -49,8 +49,8 @@ import Config
 import Outputable
 import ErrUtils		( putMsg, debugTraceMsg )
 import Panic		( GhcException(..) )
-import Util		( Suffix, global, notNull, consIORef,
-			  normalisePath, pgmPath, platformPath )
+import Util		( Suffix, global, notNull, consIORef, joinFileName,
+			  normalisePath, pgmPath, platformPath, joinFileExt )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, Option(..),
 			  setTmpDir, defaultDynFlags )
 
@@ -212,8 +212,8 @@ initSysTools minusB_args dflags
 	; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm   =  pgmPath top_dir pgm
 	      installed     file  =  pgmPath top_dir file
-	      inplace dir   pgm   =  pgmPath (top_dir `slash` 
-						cPROJECT_DIR `slash` dir) pgm
+	      inplace dir   pgm   =  pgmPath (top_dir `joinFileName` 
+						cPROJECT_DIR `joinFileName` dir) pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"
@@ -414,7 +414,7 @@ findTopDir minusbs
   = do { top_dir <- get_proto
         -- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
-       ; am_installed <- doesFileExist (top_dir `slash` "package.conf")
+       ; am_installed <- doesFileExist (top_dir `joinFileName` "package.conf")
 
        ; return (am_installed, top_dir)
        }
@@ -547,7 +547,7 @@ newTempName DynFlags{tmpDir=tmp_dir} extn
        findTempName (tmp_dir ++ "/ghc" ++ show x ++ "_") 0
   where 
     findTempName prefix x
-      = do let filename = prefix ++ show x ++ '.':extn
+      = do let filename = (prefix ++ show x) `joinFileExt` extn
   	   b  <- doesFileExist filename
 	   if b then findTempName prefix (x+1)
 		else do consIORef v_FilesToClean filename -- clean it up later
@@ -653,15 +653,6 @@ traceCmd dflags phase_name cmd_line action
 			     ; debugTraceMsg dflags 2 ("Failed: " ++ cmd_line ++ (show exn))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
-
------------------------------------------------------------------------------
-   Path name construction
-
-\begin{code}
-slash		 :: String -> String -> String
-slash s1 s2 = s1 ++ ('/' : s2)
-\end{code}
-
 
 %************************************************************************
 %*									*

@@ -287,7 +287,7 @@ searchPathExts paths mod exts
 		| path <- paths, 
 		  (ext,fn) <- exts,
 		  let base | path == "." = basename
-	     	           | otherwise   = path ++ '/':basename
+	     	           | otherwise   = path `joinFileName` basename
 	              file = base `joinFileExt` ext
 		]
 
@@ -301,7 +301,7 @@ searchPathExts paths mod exts
 mkHomeModLocationSearched :: DynFlags -> Module -> FileExt
 		          -> FilePath -> BaseName -> IO FinderCacheEntry
 mkHomeModLocationSearched dflags mod suff path basename = do
-   loc <- mkHomeModLocation2 dflags mod (path ++ '/':basename) suff
+   loc <- mkHomeModLocation2 dflags mod (path `joinFileName` basename) suff
    return (loc, Nothing)
 
 mkHiOnlyModLocation :: DynFlags -> FileExt -> FilePath -> BaseName
@@ -371,7 +371,7 @@ mkHomeModLocation2 dflags mod src_basename ext = do
 
 hiOnlyModLocation :: DynFlags -> FilePath -> String -> Suffix -> IO ModLocation
 hiOnlyModLocation dflags path basename hisuf 
- = do let full_basename = path++'/':basename
+ = do let full_basename = path `joinFileName` basename
       obj_fn <- mkObjPath dflags full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
  	        	     ml_hi_file   = full_basename  `joinFileExt` hisuf,
@@ -394,7 +394,7 @@ mkObjPath dflags basename mod_basename
 		odir = outputDir dflags
 		osuf = objectSuf dflags
 	
-		obj_basename | Just dir <- odir = dir ++ '/':mod_basename
+		obj_basename | Just dir <- odir = dir `joinFileName` mod_basename
 			     | otherwise        = basename
 
         return (obj_basename `joinFileExt` osuf)
@@ -411,7 +411,7 @@ mkHiPath dflags basename mod_basename
 		hidir = hiDir dflags
 		hisuf = hiSuf dflags
 
-		hi_basename | Just dir <- hidir = dir ++ '/':mod_basename
+		hi_basename | Just dir <- hidir = dir `joinFileName` mod_basename
 			    | otherwise         = basename
 
         return (hi_basename `joinFileExt` hisuf)

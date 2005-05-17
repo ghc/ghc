@@ -209,8 +209,9 @@ readPackageConfigs dflags = do
    (exists, pkgconf) <- catch (do
       appdir <- getAppUserDataDirectory "ghc"
       let 
-     	 pkgconf = appdir ++ '/':TARGET_ARCH ++ '-':TARGET_OS
-			++ '-':cProjectVersion ++ "/package.conf"
+     	 pkgconf = appdir
+		   `joinFileName` (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+		   `joinFileName` "package.conf"
       flg <- doesFileExist pkgconf
       return (flg, pkgconf))
        -- gobble them all up and turn into False.

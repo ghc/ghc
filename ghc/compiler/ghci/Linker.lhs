@@ -827,8 +827,8 @@ locateOneObj dirs lib
                        Just lib_path -> return (DLL (lib ++ "_dyn"))
                        Nothing       -> return (DLL lib) }}		-- We assume
    where
-     mk_obj_path dir = dir ++ '/':lib ++ ".o"
-     mk_dyn_lib_path dir = dir ++ '/':mkSOName (lib ++ "_dyn")
+     mk_obj_path dir = dir `joinFileName` (lib `joinFileExt` "o")
+     mk_dyn_lib_path dir = dir `joinFileName` mkSOName (lib ++ "_dyn")
 
 
 -- ----------------------------------------------------------------------------
@@ -843,16 +843,16 @@ loadDynamic paths rootname
 			-- Tried all our known library paths, so let 
 			-- dlopen() search its own builtin paths now.
   where
-    mk_dll_path dir = dir ++ '/':mkSOName rootname
+    mk_dll_path dir = dir `joinFileName` mkSOName rootname
 
 #if defined(darwin_TARGET_OS)
-mkSOName root = "lib" ++ root ++ ".dylib"
+mkSOName root = ("lib" ++ root) `joinFileExt` "dylib"
 #elif defined(mingw32_TARGET_OS)
 -- Win32 DLLs have no .dll extension here, because addDLL tries
 -- both foo.dll and foo.drv
 mkSOName root = root
 #else
-mkSOName root = "lib" ++ root ++ ".so"
+mkSOName root = ("lib" ++ root) `joinFileExt` "so"
 #endif
 
 -- Darwin / MacOS X only: load a framework
@@ -867,7 +867,7 @@ loadFramework extraPaths rootname
  		-- Tried all our known library paths, but dlopen()
 		-- has no built-in paths for frameworks: give up
    where
-     mk_fwk dir = dir ++ '/' : rootname ++ ".framework/" ++ rootname
+     mk_fwk dir = dir `joinFileName` (rootname ++ ".framework/" ++ rootname)
 	-- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 #endif

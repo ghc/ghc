@@ -63,7 +63,7 @@ module Util (
 
 	-- Filename utils
 	Suffix,
-	splitFilename, getFileSuffix, splitFilenameDir, joinFileExt,
+	splitFilename, getFileSuffix, splitFilenameDir, joinFileExt, joinFileName,
 	splitFilename3, removeSuffix, 
 	dropLongestPrefix, takeLongestPrefix, splitLongestPrefix,
 	replaceFilenameSuffix, directoryOf, filenameOf,
@@ -862,6 +862,10 @@ modificationTimeIfExists f = do
 -- --------------------------------------------------------------
 -- Filename manipulation
 		
+-- Filenames are kept "normalised" inside GHC, using '/' as the path
+-- separator.  On Windows these functions will also recognise '\\' as
+-- the path separator, but will generally construct paths using '/'.
+
 type Suffix = String
 
 splitFilename :: String -> (String,Suffix)
@@ -885,11 +889,15 @@ splitFilenameDir str
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,Suffix)
 splitFilename3 str
-   = let (dir, rest) = splitLongestPrefix str isPathSeparator
-	 (dir', rest') | null rest = (".", dir)
-		       | otherwise = (dir, rest)
-	 (name, ext) = splitFilename rest'
-     in  (dir', name, ext)
+   = let (dir, rest) = splitFilenameDir str
+	 (name, ext) = splitFilename rest
+     in  (dir, name, ext)
+
+joinFileName :: String -> String -> FilePath
+joinFileName ""  fname = fname
+joinFileName "." fname = fname
+joinFileName dir ""    = dir
+joinFileName dir fname = dir ++ '/':fname
 
 removeSuffix :: Char -> String -> Suffix
 removeSuffix c s = takeLongestPrefix s (==c)
@@ -907,7 +915,7 @@ takeLongestPrefix s pred = fst (splitLongestPrefix s pred)
 -- last character).
 --
 -- If 'pred' returns False for all characters in the string, the original
--- string is returned in the second component (and the first one is just
+-- string is returned in the first component (and the second one is just
 -- empty).
 splitLongestPrefix :: String -> (Char -> Bool) -> (String,String)
 splitLongestPrefix s pred
@@ -916,8 +924,14 @@ splitLongestPrefix s pred
 	(_:pre) -> (reverse pre, reverse suf)
   where (suf,pre) = break pred (reverse s)
 
+basenameOf :: FilePath -> String
+basenameOf = fst . splitFilename
+
+suffixOf :: FilePath -> Suffix
+suffixOf = snd . splitFilename
+
 replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
-replaceFilenameSuffix s suf = removeSuffix '.' s ++ '.':suf
+replaceFilenameSuffix file suf = basenameOf file `joinFileExt` suf
 
 -- directoryOf strips the filename off the input string, returning
 -- the directory.
@@ -930,8 +944,7 @@ filenameOf :: FilePath -> String
 filenameOf = snd . splitFilenameDir
 
 replaceFilenameDirectory :: FilePath -> String -> FilePath
-replaceFilenameDirectory s dir
- = dir ++ '/':dropLongestPrefix s isPathSeparator
+replaceFilenameDirectory path dir = dir `joinFileName` filenameOf path
 
 escapeSpaces :: String -> String
 escapeSpaces = foldr (\c s -> if isSpace c then '\\':c:s else c:s) ""
