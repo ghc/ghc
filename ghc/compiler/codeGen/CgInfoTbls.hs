@@ -394,7 +394,7 @@ mkStdInfoTable type_descr closure_descr cl_type srt_len layout_lit
 
  where  
     prof_info 
-	| opt_SccProfilingOn = [closure_descr, type_descr]
+	| opt_SccProfilingOn = [type_descr, closure_descr]
 	| otherwise	     = []
 
     type_lit = packHalfWordsCLit cl_type srt_len
