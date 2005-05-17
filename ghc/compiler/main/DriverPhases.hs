@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
---  $Id: DriverPhases.hs,v 1.37 2005/05/16 13:47:58 simonmar Exp $
+--  $Id: DriverPhases.hs,v 1.38 2005/05/17 11:01:59 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -33,7 +33,7 @@ module DriverPhases (
    isSourceFilename         -- :: FilePath -> Bool
  ) where
 
-import Util		( getFileSuffix )
+import Util		( suffixOf )
 import Panic		( panic )
 
 -----------------------------------------------------------------------------
@@ -216,13 +216,13 @@ isDynLibSuffix	       s = s `elem` dynlib_suffixes
 
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
-isHaskellishFilename     f = isHaskellishSuffix     (getFileSuffix f)
-isHaskellSrcFilename     f = isHaskellSrcSuffix     (getFileSuffix f)
-isCishFilename           f = isCishSuffix           (getFileSuffix f)
-isExtCoreFilename        f = isExtCoreSuffix        (getFileSuffix f)
-isObjectFilename         f = isObjectSuffix         (getFileSuffix f)
-isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (getFileSuffix f)
-isDynLibFilename	 f = isDynLibSuffix         (getFileSuffix f)
-isSourceFilename 	 f = isSourceSuffix 	    (getFileSuffix f)
+isHaskellishFilename     f = isHaskellishSuffix     (suffixOf f)
+isHaskellSrcFilename     f = isHaskellSrcSuffix     (suffixOf f)
+isCishFilename           f = isCishSuffix           (suffixOf f)
+isExtCoreFilename        f = isExtCoreSuffix        (suffixOf f)
+isObjectFilename         f = isObjectSuffix         (suffixOf f)
+isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (suffixOf f)
+isDynLibFilename	 f = isDynLibSuffix         (suffixOf f)
+isSourceFilename 	 f = isSourceSuffix 	    (suffixOf f)
 
 

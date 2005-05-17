@@ -63,9 +63,10 @@ module Util (
 
 	-- Filename utils
 	Suffix,
-	splitFilename, getFileSuffix, splitFilenameDir, joinFileExt, joinFileName,
-	splitFilename3, removeSuffix, 
-	dropLongestPrefix, takeLongestPrefix, splitLongestPrefix,
+	splitFilename, suffixOf, basenameOf, joinFileExt,
+	splitFilenameDir, joinFileExt, joinFileName,
+	splitFilename3,
+	splitLongestPrefix,
 	replaceFilenameSuffix, directoryOf, filenameOf,
 	replaceFilenameDirectory,
 	escapeSpaces, isPathSeparator,
@@ -871,8 +872,11 @@ type Suffix = String
 splitFilename :: String -> (String,Suffix)
 splitFilename f = splitLongestPrefix f (=='.')
 
-getFileSuffix :: String -> Suffix
-getFileSuffix f = dropLongestPrefix f (=='.')
+basenameOf :: FilePath -> String
+basenameOf = fst . splitFilename
+
+suffixOf :: FilePath -> Suffix
+suffixOf = snd . splitFilename
 
 joinFileExt :: String -> String -> FilePath
 joinFileExt path ""  = path
@@ -899,15 +903,6 @@ joinFileName "." fname = fname
 joinFileName dir ""    = dir
 joinFileName dir fname = dir ++ '/':fname
 
-removeSuffix :: Char -> String -> Suffix
-removeSuffix c s = takeLongestPrefix s (==c)
-
-dropLongestPrefix :: String -> (Char -> Bool) -> String
-dropLongestPrefix s pred = snd (splitLongestPrefix s pred)
-
-takeLongestPrefix :: String -> (Char -> Bool) -> String
-takeLongestPrefix s pred = fst (splitLongestPrefix s pred)
-
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string
 -- up (but not including) the last character for which 'pred' returned
@@ -923,12 +918,6 @@ splitLongestPrefix s pred
 	[]      -> (reverse suf, [])
 	(_:pre) -> (reverse pre, reverse suf)
   where (suf,pre) = break pred (reverse s)
-
-basenameOf :: FilePath -> String
-basenameOf = fst . splitFilename
-
-suffixOf :: FilePath -> Suffix
-suffixOf = snd . splitFilename
 
 replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
 replaceFilenameSuffix file suf = basenameOf file `joinFileExt` suf

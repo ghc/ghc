@@ -255,7 +255,7 @@ insertSuffixes
 	-- Lots of other things will break first!
 
 insertSuffixes file_name extras
-  = file_name : [ basename ++ "." ++ extra ++ "_" ++ suffix | extra <- extras ]
+  = file_name : [ basename `joinFileExt` (extra ++ "_" ++ suffix) | extra <- extras ]
   where
     (basename, suffix) = splitFilename file_name
 
