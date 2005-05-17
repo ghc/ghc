@@ -64,7 +64,7 @@ module Util (
 	-- Filename utils
 	Suffix,
 	splitFilename, suffixOf, basenameOf, joinFileExt,
-	splitFilenameDir, joinFileExt, joinFileName,
+	splitFilenameDir, joinFileName,
 	splitFilename3,
 	splitLongestPrefix,
 	replaceFilenameSuffix, directoryOf, filenameOf,
