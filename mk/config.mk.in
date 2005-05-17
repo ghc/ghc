@@ -313,7 +313,7 @@ endif
 ifeq "$(BootingFromHc)" "YES"
 GhcRTSWays=
 else
-GhcRTSWays=thr thr_p debug
+GhcRTSWays=thr thr_p debug thr_debug
 endif
 
 # Option flags to pass to GHC when it's compiling modules in
