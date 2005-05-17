@@ -51,6 +51,7 @@ module GHC (
 	modInfoTopLevelScope,
 	modInfoPrintUnqualified,
 	modInfoExports,
+	modInfoInstances,
 	modInfoIsExportedName,
 	modInfoLookupName,
 	lookupGlobalName,
@@ -100,6 +101,9 @@ module GHC (
 	-- ** Classes
 	Class, 
 	classSCTheta, classTvsFds,
+
+	-- ** Instances
+	Instance,
 
 	-- ** Types and Kinds
 	Type, dropForAlls,
@@ -167,6 +171,7 @@ import Class		( Class, classSCTheta, classTvsFds )
 import DataCon		( DataCon )
 import Name		( Name, nameModule )
 import NameEnv		( nameEnvElts )
+import InstEnv		( Instance )
 import SrcLoc		( Located(..) )
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
@@ -650,6 +655,11 @@ data CheckedModule =
 		  typecheckedSource :: Maybe TypecheckedSource,
 		  checkedModuleInfo :: Maybe ModuleInfo
 	        }
+	-- ToDo: improvements that could be made here:
+	--  if the module succeeded renaming but not typechecking,
+	--  we can still get back the GlobalRdrEnv and exports, so
+	--  perhaps the ModuleInfo should be split up into separate
+	--  fields within CheckedModule.
 
 type ParsedSource      = Located (HsModule RdrName)
 type RenamedSource     = HsGroup Name
@@ -699,9 +709,10 @@ checkModule session@(Session ref) mod msg_act = do
 		HscChecked parsed renamed
 			   (Just (tc_binds, rdr_env, details)) -> do
 		   let minf = ModuleInfo {
-				minf_type_env = md_types details,
-				minf_exports  = md_exports details,
-				minf_rdr_env  = Just rdr_env
+				minf_type_env  = md_types details,
+				minf_exports   = md_exports details,
+				minf_rdr_env   = Just rdr_env,
+				minf_instances = md_insts details
 			      }
 		   return (Just (CheckedModule {
 					parsedSource = parsed,
@@ -1561,11 +1572,12 @@ getPrintUnqual s = withSession s (return . icPrintUnqual . hsc_IC)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
-	minf_type_env :: TypeEnv,
-	minf_exports  :: NameSet,
-	minf_rdr_env  :: Maybe GlobalRdrEnv
-  }
+	minf_type_env  :: TypeEnv,
+	minf_exports   :: NameSet,
+	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
+	minf_instances :: [Instance]
 	-- ToDo: this should really contain the ModIface too
+  }
 	-- We don't want HomeModInfo here, because a ModuleInfo applies
 	-- to package modules too.
 
@@ -1587,9 +1599,10 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
 				    Just ty <- [lookupTypeEnv pte name] ]
 		--
 		return (Just (ModuleInfo {
-				minf_type_env = mkTypeEnv tys,
-				minf_exports  = names,
-				minf_rdr_env  = Just $! nameSetToGlobalRdrEnv names mdl
+				minf_type_env  = mkTypeEnv tys,
+				minf_exports   = names,
+				minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names mdl,
+				minf_instances = error "getModuleInfo: instances for package module unimplemented"
 			}))
 #else
 	-- bogusly different for non-GHCI (ToDo)
@@ -1598,9 +1611,10 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
     Just hmi -> 
 	let details = hm_details hmi in
 	return (Just (ModuleInfo {
-			minf_type_env = md_types details,
-			minf_exports  = md_exports details,
-			minf_rdr_env  = mi_globals $! hm_iface hmi
+			minf_type_env  = md_types details,
+			minf_exports   = md_exports details,
+			minf_rdr_env   = mi_globals $! hm_iface hmi,
+			minf_instances = md_insts details
 			}))
 
 	-- ToDo: we should be able to call getModuleInfo on a package module,
@@ -1616,6 +1630,11 @@ modInfoTopLevelScope minf
 
 modInfoExports :: ModuleInfo -> [Name]
 modInfoExports minf = nameSetToList $! minf_exports minf
+
+-- | Returns the instances defined by the specified module.
+-- Warning: currently unimplemented for package modules.
+modInfoInstances :: ModuleInfo -> [Instance]
+modInfoInstances = minf_instances
 
 modInfoIsExportedName :: ModuleInfo -> Name -> Bool
 modInfoIsExportedName minf name = elemNameSet name (minf_exports minf)
