@@ -917,7 +917,7 @@ splitLongestPrefix s pred
   where (suf,pre) = break pred (reverse s)
 
 replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
-replaceFilenameSuffix s suf = removeSuffix '.' s ++ suf
+replaceFilenameSuffix s suf = removeSuffix '.' s ++ '.':suf
 
 -- directoryOf strips the filename off the input string, returning
 -- the directory.
