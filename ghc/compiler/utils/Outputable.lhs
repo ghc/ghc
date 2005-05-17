@@ -38,7 +38,7 @@ module Outputable (
 	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForUser,
 	pprCode, mkCodeStyle,
-	showSDoc, showSDocForUser, showSDocDebug,
+	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
 	showSDocUnqual, showsPrecSDoc,
 	pprHsChar, pprHsString,
 
@@ -209,9 +209,6 @@ printDump doc = do
    hFlush stdout
  where
    better_doc = doc $$ text ""
-    -- We used to always print in debug style, but I want
-    -- to try the effect of a more user-ish style (unless you
-    -- say -dppr-debug)
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
@@ -245,6 +242,9 @@ showSDocUnqual d = show (d (mkUserStyle neverQualify AllTheWay))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
 showsPrecSDoc p d = showsPrec p (d defaultUserStyle)
+
+showSDocDump :: SDoc -> String
+showSDocDump d = show (d PprDump)
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (d PprDebug)
