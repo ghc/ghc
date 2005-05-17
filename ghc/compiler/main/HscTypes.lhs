@@ -225,6 +225,10 @@ data HomeModInfo
 		--      the old linkable because it was out of date.
 		-- after a complete compilation (GHC.load), all hm_linkable
 		-- fields in the HPT will be Just.
+		--
+		-- When re-linking a module (hscNoRecomp), we construct
+		-- the HomModInfo by building a new ModDetails from the
+		-- old ModIface (only).
 \end{code}
 
 Simple lookups in the symbol table.
@@ -347,6 +351,9 @@ data ModIface
 		-- (We need the source file to figure out the
 		-- top-level environment, if we didn't compile this module
 		-- from source then this field contains Nothing).
+		--
+		-- Strictly speaking this field should live in the
+		-- HomeModInfo, but that leads to more plumbing.
 
 		-- Instance declarations and rules
 	mi_insts     :: [IfaceInst],	-- Sorted
