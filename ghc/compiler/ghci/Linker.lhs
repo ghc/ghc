@@ -29,7 +29,6 @@ import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
 import DriverPhases	( isObjectFilename, isDynLibFilename )
-import Util		( getFileSuffix )
 import Finder		( findModule, findObjectLinkableMaybe, FindResult(..) )
 import HscTypes
 import Name		( Name, nameModule, isExternalName, isWiredInName )
@@ -41,7 +40,7 @@ import DynFlags		( DynFlags(..), getOpts )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
-import Util             ( zipLazy, global, joinFileExt, joinFileName )
+import Util             ( zipLazy, global, joinFileExt, joinFileName, suffixOf )
 import StaticFlags	( v_Ld_inputs )
 import ErrUtils         ( debugTraceMsg )
 
