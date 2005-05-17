@@ -54,6 +54,7 @@ import ParserCoreUtils	( getCoreModuleName )
 import SrcLoc		( srcLocSpan, mkSrcLoc )
 import FastString	( mkFastString )
 import Bag		( listToBag, emptyBag )
+import SrcLoc		( Located(..) )
 
 import EXCEPTION
 import DATA_IOREF	( readIORef, writeIORef, IORef )
@@ -621,7 +622,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			          ; return (Nothing, mkModule m) }
 
 		other -> do { buf <- hGetStringBuffer input_fn
-			    ; (_,_,mod_name) <- getImports dflags buf input_fn
+			    ; (_,_,L _ mod_name) <- getImports dflags buf input_fn
 			    ; return (Just buf, mod_name) }
 
   -- Build a ModLocation to pass to hscMain.

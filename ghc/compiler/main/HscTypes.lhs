@@ -96,7 +96,7 @@ import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
 import Maybes		( orElse, fromJust, expectJust )
 import Outputable
-import SrcLoc		( SrcSpan )
+import SrcLoc		( SrcSpan, Located )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 
@@ -938,8 +938,8 @@ data ModSummary
         ms_location  :: ModLocation,		-- Location
         ms_hs_date   :: ClockTime,		-- Timestamp of source file
 	ms_obj_date  :: Maybe ClockTime,	-- Timestamp of object, maybe
-        ms_srcimps   :: [Module],		-- Source imports
-        ms_imps      :: [Module],		-- Non-source imports
+        ms_srcimps   :: [Located Module],	-- Source imports
+        ms_imps      :: [Located Module],	-- Non-source imports
         ms_hspp_file :: Maybe FilePath,		-- Filename of preprocessed source,
 						-- once we have preprocessed it.
 	ms_hspp_buf  :: Maybe StringBuffer	-- The actual preprocessed source, maybe.

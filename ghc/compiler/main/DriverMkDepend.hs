@@ -15,7 +15,7 @@ module DriverMkDepend (
 import qualified GHC
 import GHC		( Session, ModSummary(..) )
 import DynFlags		( DynFlags( verbosity, opt_dep ), getOpts )
-import Util		( escapeSpaces, splitFilename )
+import Util		( escapeSpaces, splitFilename, joinFileExt )
 import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
 import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
@@ -27,6 +27,7 @@ import Finder		( findModule, FindResult(..) )
 import Util             ( global, consIORef )
 import Outputable
 import Panic
+import SrcLoc		( unLoc )
 import CmdLineParser
 
 import DATA_IOREF	( IORef, readIORef, writeIORef )
@@ -199,8 +200,8 @@ processDeps session hdl (AcyclicSCC node)
 	; writeDependency hdl obj_files src_file
 
 		-- Emit a dependency for each import
-	; mapM_ (do_imp True)  (ms_srcimps node)	-- SOURCE imports
-	; mapM_ (do_imp False) (ms_imps node)		-- regular imports
+	; mapM_ (do_imp True . unLoc)  (ms_srcimps node)	-- SOURCE imports
+	; mapM_ (do_imp False . unLoc) (ms_imps node)		-- regular imports
 	}
 
 

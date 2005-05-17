@@ -172,7 +172,7 @@ import DataCon		( DataCon )
 import Name		( Name, nameModule )
 import NameEnv		( nameEnvElts )
 import InstEnv		( Instance )
-import SrcLoc		( Located(..) )
+import SrcLoc		( Located(..), mkGeneralSrcSpan, SrcSpan, unLoc )
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
@@ -187,7 +187,7 @@ import Module
 import FiniteMap
 import Panic
 import Digraph
-import ErrUtils		( showPass, Messages, putMsg, debugTraceMsg )
+import ErrUtils		( showPass, Messages, putMsg, debugTraceMsg, mkLocMessage )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
@@ -843,7 +843,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 			linkableTime l >= ms_hs_date ms
 
 ms_allimps :: ModSummary -> [Module]
-ms_allimps ms = ms_srcimps ms ++ ms_imps ms
+ms_allimps ms = map unLoc (ms_srcimps ms ++ ms_imps ms)
 
 -- -----------------------------------------------------------------------------
 -- Prune the HomePackageTable
@@ -1143,8 +1143,8 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
 	-- We use integers as the keys for the SCC algorithm
 	nodes :: [(ModSummary, Int, [Int])]	
 	nodes = [(s, expectJust "topSort" (lookup_key (ms_hsc_src s) (ms_mod s)), 
-		     out_edge_keys hs_boot_key (ms_srcimps s) ++
-		     out_edge_keys HsSrcFile   (ms_imps s)    )
+		     out_edge_keys hs_boot_key (map unLoc (ms_srcimps s)) ++
+		     out_edge_keys HsSrcFile   (map unLoc (ms_imps s))    )
 		| s <- summaries
 		, not (isBootSummary s && drop_hs_boot_nodes) ]
 		-- Drop the hi-boot ones if told to do so
@@ -1236,11 +1236,13 @@ downsweep hsc_env old_summaries excl_mods
 		    else do
 		throwDyn (CmdLineError ("can't find file: " ++ file))	
 	getRootSummary (Target (TargetModule modl) maybe_buf)
- 	   = do maybe_summary <- summariseModule hsc_env old_summary_map Nothing False 
-					   modl maybe_buf excl_mods
+ 	   = do maybe_summary <- summariseModule hsc_env old_summary_map False 
+					   (L rootLoc modl) maybe_buf excl_mods
 		case maybe_summary of
 		   Nothing -> packageModErr modl
 		   Just s  -> return s
+
+	rootLoc = mkGeneralSrcSpan FSLIT("<command line>")
 
 	-- In a root module, the filename is allowed to diverge from the module
 	-- name, so we have to check that there aren't multiple root files
@@ -1258,7 +1260,7 @@ downsweep hsc_env old_summaries excl_mods
 			   [ expectJust "checkDup" (ml_hs_file (ms_location summ'))
 			   | summ' <- summaries, ms_mod summ' == modl ]
 
-	loop :: [(FilePath,Module,IsBootInterface)]
+	loop :: [(Located Module,IsBootInterface)]
 			-- Work list: process these modules
 	     -> NodeMap ModSummary
 		 	-- Visited set
@@ -1266,21 +1268,18 @@ downsweep hsc_env old_summaries excl_mods
 			-- The result includes the worklist, except
 			-- for those mentioned in the visited set
 	loop [] done 	  = return (nodeMapElts done)
-	loop ((cur_path, wanted_mod, is_boot) : ss) done 
+	loop ((wanted_mod, is_boot) : ss) done 
 	  | key `elemFM` done = loop ss done
 	  | otherwise	      = do { mb_s <- summariseModule hsc_env old_summary_map 
-						 (Just cur_path) is_boot 
-						 wanted_mod Nothing excl_mods
+						 is_boot wanted_mod Nothing excl_mods
 				   ; case mb_s of
 					Nothing -> loop ss done
 					Just s  -> loop (msDeps s ++ ss) 
 							(addToFM done key s) }
 	  where
-	    key = (wanted_mod, if is_boot then HsBootFile else HsSrcFile)
+	    key = (unLoc wanted_mod, if is_boot then HsBootFile else HsSrcFile)
 
-msDeps :: ModSummary -> [(FilePath, 		-- Importing module
-			  Module,	 	-- Imported module
-			  IsBootInterface)]	 -- {-# SOURCE #-} import or not
+msDeps :: ModSummary -> [(Located Module, IsBootInterface)]
 -- (msDeps s) returns the dependencies of the ModSummary s.
 -- A wrinkle is that for a {-# SOURCE #-} import we return
 --	*both* the hs-boot file
@@ -1289,11 +1288,9 @@ msDeps :: ModSummary -> [(FilePath, 		-- Importing module
 -- modules always contains B.hs if it contains B.hs-boot.
 -- Remember, this pass isn't doing the topological sort.  It's
 -- just gathering the list of all relevant ModSummaries
-msDeps s =  concat [ [(f, m, True), (f,m,False)] | m <- ms_srcimps s] 
-	 ++ [(f,m,False) | m <- ms_imps    s] 
-	where
-	  f = msHsFilePath s	-- Keep the importing module for error reporting
-
+msDeps s = 
+    concat [ [(m,True), (m,False)] | m <- ms_srcimps s ] 
+	 ++ [ (m,False) | m <- ms_imps s ] 
 
 -----------------------------------------------------------------------------
 -- Summarising modules
@@ -1345,7 +1342,7 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 	(dflags', hspp_fn, buf)
 	    <- preprocessFile dflags file mb_phase maybe_buf
 
-        (srcimps,the_imps,mod) <- getImports dflags' buf hspp_fn
+        (srcimps,the_imps, L _ mod) <- getImports dflags' buf hspp_fn
 
 	-- Make a ModLocation for this file
 	location <- mkHomeModLocation dflags mod file
@@ -1379,14 +1376,13 @@ findSummaryBySourceFile summaries file
 summariseModule
 	  :: HscEnv
 	  -> NodeMap ModSummary	-- Map of old summaries
-	  -> Maybe FilePath	-- Importing module (for error messages)
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
-	  -> Module 		-- Imported module to be summarised
+	  -> Located Module	-- Imported module to be summarised
 	  -> Maybe (StringBuffer, ClockTime)
 	  -> [Module]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
-summariseModule hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf excl_mods
+summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -1417,7 +1413,7 @@ summariseModule hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf exc
 			-- Drop external-pkg
 		| isJust (ml_hs_file location) -> just_found location
 			-- Home package
-	     err -> noModError dflags cur_mod wanted_mod err
+	     err -> noModError dflags loc wanted_mod err
 			-- Not found
   where
     dflags = hsc_dflags hsc_env
@@ -1435,7 +1431,7 @@ summariseModule hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf exc
 	  	-- It might have been deleted since the Finder last found it
 	maybe_t <- modificationTimeIfExists src_fn
 	case maybe_t of
-	  Nothing -> noHsFileErr cur_mod src_fn
+	  Nothing -> noHsFileErr loc src_fn
 	  Just t  -> new_summary location' src_fn Nothing t
 
 
@@ -1444,12 +1440,12 @@ summariseModule hsc_env old_summary_map cur_mod is_boot wanted_mod maybe_buf exc
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
 	(dflags', hspp_fn, buf) <- preprocessFile dflags src_fn Nothing maybe_buf
-        (srcimps, the_imps, mod_name) <- getImports dflags' buf hspp_fn
+        (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn
 
 	when (mod_name /= wanted_mod) $
 		throwDyn (ProgramError 
-		   (showSDoc (text src_fn
-			      <>  text ": file name does not match module name"
+		   (showSDoc (mkLocMessage mod_loc $ 
+			      text "file name does not match module name"
 			      <+> quotes (ppr mod_name))))
 
 		-- Find the object timestamp, and return the summary
@@ -1506,21 +1502,16 @@ preprocessFile dflags src_fn mb_phase (Just (buf, time))
 -- 			Error messages
 -----------------------------------------------------------------------------
 
-noModError :: DynFlags -> Maybe FilePath -> Module -> FindResult -> IO ab
+noModError :: DynFlags -> SrcSpan -> Module -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
-noModError dflags cur_mod wanted_mod err
+noModError dflags loc wanted_mod err
   = throwDyn $ ProgramError $ showSDoc $
-    vcat [cantFindError dflags wanted_mod err,
-	  nest 2 (parens (pp_where cur_mod))]
+    mkLocMessage loc $ cantFindError dflags wanted_mod err
 				
-noHsFileErr cur_mod path
+noHsFileErr loc path
   = throwDyn $ CmdLineError $ showSDoc $
-    vcat [text "Can't find" <+> text path,
-	  nest 2 (parens (pp_where cur_mod))]
+    mkLocMessage loc $ text "Can't find" <+> text path
  
-pp_where Nothing  = text "one of the roots of the dependency analysis"
-pp_where (Just p) = text "imported from" <+> text p
-
 packageModErr mod
   = throwDyn (CmdLineError (showSDoc (text "module" <+>
 				   quotes (ppr mod) <+>
