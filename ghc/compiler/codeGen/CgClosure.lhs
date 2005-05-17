@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.69 2005/04/21 15:28:20 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.70 2005/05/17 13:47:39 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -45,7 +45,7 @@ import StgSyn
 import StaticFlags	( opt_DoTickyProfiling )
 import CostCentre	
 import Id		( Id, idName, idType )
-import Name		( Name )
+import Name		( Name, isExternalName )
 import Module		( Module, pprModule )
 import ListSetOps	( minusList )
 import Util		( isIn, mapAccumL, zipWithEqual )
@@ -589,7 +589,11 @@ closureDescription :: Module		-- Module
 	-- Not called for StgRhsCon which have global info tables built in
 	-- CgConTbls.lhs with a description generated from the data constructor
 closureDescription mod_name name
-  = showSDoc (hcat [char '<', pprModule mod_name,
-		    char '.', ppr name, char '>'])
+  = showSDocDump (char '<' <>
+		    (if isExternalName name
+		      then ppr name -- ppr will include the module name prefix
+		      else pprModule mod_name <> char '.' <> ppr name) <>
+		    char '>')
+   -- showSDocDump, because we want to see the unique on the Name.
 \end{code}
   
