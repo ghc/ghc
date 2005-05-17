@@ -370,8 +370,8 @@ guessTarget file Nothing
 	   else do
 	return (Target (TargetModule (mkModule file)) Nothing)
      where 
-	 hs_file = file ++ ".hs"
-	 lhs_file = file ++ ".lhs"
+	 hs_file  = file `joinFileExt` "hs"
+	 lhs_file = file `joinFileExt` "lhs"
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
