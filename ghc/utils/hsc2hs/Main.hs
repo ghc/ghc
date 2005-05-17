@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.72 2005/03/10 17:58:42 malcolm Exp $
+-- $Id: Main.hs,v 1.73 2005/05/17 09:48:27 krasimir Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -21,7 +21,7 @@ import System.Console.GetOpt
 import GetOpt
 #endif
 
-import System        (getProgName, getArgs, ExitCode(..), exitWith, system)
+import System        (getProgName, getArgs, ExitCode(..), exitWith)
 import Directory     (removeFile,doesFileExist)
 import Monad         (MonadPlus(..), liftM, liftM2, when)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
@@ -39,11 +39,22 @@ import CString
 
 
 #if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
+
 import Compat.RawSystem 	( rawSystem )
+import System.Process           ( runProcess, waitForProcess )
+import System.IO                ( openFile, IOMode(..), hClose )
+#define HAVE_rawSystem
+#define HAVE_runProcess
+
 #elif __HUGS__ || __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
-import System.Cmd	 	( rawSystem )
+
+import System.Cmd	 	( system, rawSystem )
+#define HAVE_rawSystem
+
 #else
-rawSystem prog args = system (prog++" "++unwords args)
+
+import System                   ( system )
+
 #endif
 
 version :: String
@@ -621,7 +632,7 @@ output flags name toks = do
         _                 -> return ()
     removeFile oProgName
     
-    progStatus <- systemL beVerbose (execProgName++" >"++outName)
+    progStatus <- rawSystemWithStdOutL beVerbose execProgName [] outName
     removeFile progName
     case progStatus of
         e@(ExitFailure _) -> exitWith e
@@ -648,15 +659,29 @@ output flags name toks = do
 	-- NB. outHFile not outHName; works better when processed
 	-- by gcc or mkdependC.
 
-rawSystemL :: Bool -> String -> [String] -> IO ExitCode
+rawSystemL :: Bool -> FilePath -> [String] -> IO ExitCode
 rawSystemL flg prog args = do
-  when flg $ hPutStrLn stderr ("Executing: " ++ prog ++ concat (map (' ':) args))
+  let cmdLine = prog++" "++unwords args
+  when flg $ hPutStrLn stderr ("Executing: " ++ cmdLine)
+#ifndef HAVE_rawSystem
+  system cmdLine
+#else
   rawSystem prog args
+#endif
 
-systemL :: Bool -> String -> IO ExitCode
-systemL flg s = do
-  when flg (hPutStrLn stderr ("Executing: " ++ s))
-  system s
+rawSystemWithStdOutL :: Bool -> FilePath -> [String] -> FilePath -> IO ExitCode
+rawSystemWithStdOutL flg prog args outFile = do
+  let cmdLine = prog++" "++unwords args++" >"++outFile
+  when flg (hPutStrLn stderr ("Executing: " ++ cmdLine))
+#ifndef HAVE_runProcess
+  system cmdLine
+#else
+  hOut <- openFile outFile WriteMode
+  process <- runProcess prog args Nothing Nothing Nothing (Just hOut) Nothing
+  res <- waitForProcess process
+  hClose hOut
+  return res
+#endif
 
 onlyOne :: String -> IO a
 onlyOne what = die ("Only one "++what++" may be specified\n")
