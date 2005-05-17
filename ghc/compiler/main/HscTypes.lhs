@@ -337,9 +337,16 @@ data ModIface
 	mi_decls :: [(Version,IfaceDecl)],	-- Sorted
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
-		-- Its top level environment or Nothing if we read this
-		-- interface from an interface file.  (We need the source
-		-- file to figure out the top-level environment.)
+		-- Binds all the things defined at the top level in
+		-- the *original source* code for this module. which
+		-- is NOT the same as mi_exports, nor mi_decls (which
+		-- may contains declarations for things not actually
+		-- defined by the user).  Used for GHCi and for inspecting
+		-- the contents of modules via the GHC API only.
+		--
+		-- (We need the source file to figure out the
+		-- top-level environment, if we didn't compile this module
+		-- from source then this field contains Nothing).
 
 		-- Instance declarations and rules
 	mi_insts     :: [IfaceInst],	-- Sorted
