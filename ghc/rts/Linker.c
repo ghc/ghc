@@ -1982,6 +1982,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
              information. */
           && 0 != strcmp(".stab", sectab_i->Name)
           && 0 != strcmp(".stabstr", sectab_i->Name)
+          /* ignore constructor section for now */
+          && 0 != strcmp(".ctors", sectab_i->Name)
          ) {
          errorBelch("Unknown PEi386 section name `%s' (while processing: %s)", sectab_i->Name, oc->fileName);
          return 0;
