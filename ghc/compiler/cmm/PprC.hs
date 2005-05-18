@@ -184,6 +184,10 @@ pprStmt stmt = case stmt of
 	-> ptext SLIT("ASSIGN_Word64") <> 
 		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
 
+	| rep == F64 && wordRep /= I64
+	-> ptext SLIT("ASSIGN_DBL") <> 
+		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
+
  	| otherwise
 	-> hsep [ pprExpr (CmmLoad dest rep), equals, pprExpr src <> semi ]
 	where
@@ -299,6 +303,9 @@ pprExpr e = case e of
 
     CmmLoad e I64 | wordRep /= I64
 	-> ptext SLIT("PK_Word64") <> parens (mkP_ <> pprExpr1 e)
+
+    CmmLoad e F64 | wordRep /= I64
+	-> ptext SLIT("PK_DBL") <> parens (mkP_ <> pprExpr1 e)
 
     CmmLoad (CmmReg r) rep 
 	| isPtrReg r && rep == wordRep
