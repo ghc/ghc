@@ -4567,11 +4567,17 @@ bzip'd dump.</para></listitem>
 </para>
 </sect2>
 
-<sect2><title>Installing and configuring Cygwin</title>
+<sect2 id="install-cygwin"><title>Installing and configuring Cygwin</title>
 
 <para> Install Cygwin from <ulink url="http://www.cygwin.com/">http://www.cygwin.com/</ulink>.
-The installation process is straightforward; we install it in <filename>c:/cygwin</filename>.
-During the installation dialogue, make sure that you select all of the following:
+The installation process is straightforward; we install it in
+<filename>c:/cygwin</filename>.</para>
+<para>
+You must install enough Cygwin <emphasis>packages</emphasis> to support
+building GHC.  If you miss out any of these, strange things will happen to you.   There are two ways to do this:
+<itemizedlist>
+<listitem><para>The direct, but laborious way is to 
+select all of the following packages in the installation dialogue:
 	      <command>cvs</command>, 
 	      <command>openssh</command>,
 	      <command>autoconf</command>,
@@ -4579,11 +4585,32 @@ During the installation dialogue, make sure that you select all of the following
 	      <command>gcc</command>,
 	      <command>flex</command>,
 	      <command>make</command>.
-If you miss out any of these, strange things will happen to you.   To see thse packages, 
+To see thse packages, 
 click on the "View" button in the "Select Packages" 
 stage of Cygwin's installation dialogue, until the view says "Full".  The default view, which is
 "Category" isn't very helpful, and the "View" button is rather unobtrousive.
 </para>
+</listitem>
+
+<listitem><para>The clever way is to point the Cygwin installer at the
+<command>ghc-depends</command> package, which is kept at <ulink
+url="http://haskell.org/ghc/cygwin">http://haskell.org/ghc/cygwin</ulink>.
+When the Cygwin installer asks you to "Choose a Download Site", choose one of
+the
+offered mirror sites; and then type "http://haskell.org/ghc/cygwin" into the
+"User URL" box and click "Add"; now two sites are selected. (The Cygwin
+installer remembers this for next time.)
+Click "Next".</para>
+<para>In the "Select Packages" dialogue box that follows, click the "+" sign by
+"Devel", scroll down to the end of the "Devel" packages, and choose
+<command>ghc-depends</command>.
+The package <command>ghc-depends</command> will not actually install anything itself, 
+but forces additional packages to be added by the Cygwin installer.
+</para>
+</listitem>
+</itemizedlist>
+</para>
+
 <para> Now set the following user environment variables:
 <itemizedlist>
 
@@ -4612,50 +4639,7 @@ file.  Ditto <command>emacs</command> looking for <filename>.emacsrc</filename>
 </itemizedlist>
 </para>
 
-<para>
-There are a few other things to do:
-<itemizedlist>
-<listitem>
-<para>
-By default, cygwin provides the command shell <filename>ash</filename>
-as <filename>sh.exe</filename>. We have often seen build-system problems that 
-turn out to be due to bugs in <filename>ash</filename>
-(to do with quoting
-and length of command lines).  On the other hand <filename>bash</filename> seems
-to be rock solid.
-So, in <filename>cygwin/bin</filename>
-remove the supplied <filename>sh.exe</filename> (or rename it as <filename>ash.exe</filename>),
-and copy <filename>bash.exe</filename> to  <filename>sh.exe</filename>.
-You'll need to do this in Windows Explorer or the Windows <command>cmd</command> shell, because
-you can't rename a running program!
-</para>
-</listitem>
-
-<listitem>
-<para>
-Some script files used in the make system start with "<command>#!/bin/perl</command>",
-(and similarly for <command>sh</command>).  Notice the hardwired path!
-So you need to ensure that your <filename>/bin</filename> directory has the following
-binaries in it:
-<itemizedlist>
-<listitem> <para><command>sh</command></para></listitem>
-<listitem> <para><command>perl</command></para></listitem>
-<listitem> <para><command>cat</command></para></listitem>
-</itemizedlist>
-All these come in Cygwin's <filename>bin</filename> directory, which you probably have
-installed as <filename>c:/cygwin/bin</filename>.  By default Cygwin mounts "<filename>/</filename>" as
-<filename>c:/cygwin</filename>, so if you just take the defaults it'll all work ok.
-(You can discover where your Cygwin
-root directory <filename>/</filename> is by typing <command>mount</command>.)
-Provided <filename>/bin</filename> points to the Cygwin <filename>bin</filename>
-directory, there's no need to copy anything.  If not, copy these binaries from the <filename>cygwin/bin</filename>
-directory (after fixing the <filename>sh.exe</filename> stuff mentioned in the previous bullet).
-</para>
-</listitem>
-</itemizedlist>
-</para>
-
-<para>Finally, here are some things to be aware of when using Cygwin:
+<para>Here are some things to be aware of when using Cygwin:
 <itemizedlist>
 <listitem> <para>Cygwin doesn't deal well with filenames that include
 spaces. "<filename>Program Files</filename>" and "<filename>Local files</filename>" are
@@ -4674,6 +4658,38 @@ they don't recognise symlinks.
 See the notes in <xref linkend="msys-install"/> about <command>find</command> and <command>bzip</command>,
 which apply to Cygwin too.
 </para></listitem>
+
+<listitem>
+<para>
+Some script files used in the make system start with "<command>#!/bin/perl</command>",
+(and similarly for <command>sh</command>).  Notice the hardwired path!
+So you need to ensure that your <filename>/bin</filename> directory has at least
+<command>sh</command>, <command>perl</command>, and <command>cat</command> in it.
+All these come in Cygwin's <filename>bin</filename> directory, which you probably have
+installed as <filename>c:/cygwin/bin</filename>.  By default Cygwin mounts "<filename>/</filename>" as
+<filename>c:/cygwin</filename>, so if you just take the defaults it'll all work ok.
+(You can discover where your Cygwin
+root directory <filename>/</filename> is by typing <command>mount</command>.)
+Provided <filename>/bin</filename> points to the Cygwin <filename>bin</filename>
+directory, there's no need to copy anything.  If not, copy these binaries from the <filename>cygwin/bin</filename>
+directory (after fixing the <filename>sh.exe</filename> stuff mentioned in the previous bullet).
+</para>
+</listitem>
+
+<listitem>
+<para>
+By default, cygwin provides the command shell <filename>ash</filename>
+as <filename>sh.exe</filename>.   It seems to be fine now, but in the past we
+saw build-system problems that turned out to be due to bugs in <filename>ash</filename>
+(to do with quoting and length of command lines).  On the other hand <filename>bash</filename> seems
+to be rock solid.
+If this happens to you (which it shouldn't), in <filename>cygwin/bin</filename>
+remove the supplied <filename>sh.exe</filename> (or rename it as <filename>ash.exe</filename>),
+and copy <filename>bash.exe</filename> to  <filename>sh.exe</filename>.
+You'll need to do this in Windows Explorer or the Windows <command>cmd</command> shell, because
+you can't rename a running program!
+</para>
+</listitem>
 </itemizedlist>
 </para>
 
@@ -4682,9 +4698,10 @@ which apply to Cygwin too.
 
 <sect2 id="configure-ssh"><title>Configuring SSH</title>
 
-<para><command>ssh</command> comes with Cygwin, provided you remember to ask for it when
-you install Cygwin.  (If not, the installer lets you update easily.)  Look for <command>openssh</command> 
-(not ssh) in the Cygwin list of applications!</para>
+<para><command>ssh</command> comes with both Cygwin and MSYS. 
+(Cygwin note: you need to ask for package <command>openssh</command> (not ssh)
+in the Cygwin list of packages; or use the <command>ghc-depends</command>
+package -- see <xref linkend="install-cygwin">Cygwin installation instructions</xref>.)</para>
 
 <para>There are several strange things about <command>ssh</command> on Windows that you need to know.
 <itemizedlist>
@@ -4802,7 +4819,11 @@ in your path.
 <para><emphasis>On Cygwin, do not</emphasis> add any of the <emphasis>mingw</emphasis> binaries to your  path.
 They are only going to get used by explicit access (via the --with-gcc flag you
 give to <command>configure</command> later).  If you do add them to your path
-you are likely to get into a mess because their names overlap with Cygwin binaries.
+you are likely to get into a mess because their names overlap with Cygwin
+binaries.
+On the other hand, you <emphasis>do</emphasis> need <command>ld</command>, <command>ar</command>
+(and perhaps one or two other things) in your path.  The Cygwin ones are fine,
+but you must have them; hence needing the  Cygwin binutils package.
 </para>
 </listitem>
 
@@ -4928,6 +4949,89 @@ Win32.</para></listitem>
 </sect2>
 
 
+<sect2><title>A Windows build log using Cygwin</title>
+
+Here is a complete, from-scratch, log of all you need to build GHC using
+Cygwin, kindly provided by Claus Reinke.  It does not discuss alternative
+choices, but it gives a single path that works.
+<programlisting>
+
+- Install some editor (vim, emacs, whatever)
+
+- Install cygwin (http://www.cygwin.com)
+    ; i used 1.5.16-1, installed in c:\cygwin
+  - run 'setup.exe'
+    Choose a Download Source:
+	select 'download from internet';
+    Select Root Install Directory:
+	root dir: c:\cygwin; 
+	install for: all users;
+	default file type: unix
+    Select Local Package Directory
+	choose a spare temporary home
+    Select Your Internet Connection
+	Use IE5 settings
+    Choose a Download Site
+	Choose your preferred main mirror and
+        Add 'http://www.haskell.org/ghc/cygwin'
+    Select Packages
+	In addition to 'Base' (default install), 
+	select 'Devel->ghc-depends'
+
+- Install mingw (http://www.mingw.org/)
+    ; i used MinGW-3.1.0-1.exe
+    ; installed in c:\mingw
+  - you probably want to add GLUT 
+    ; (http://www.xmission.com/~nate/glut.html)
+    ; i used glut-3.7.3-mingw32.tar
+
+- Get recent binary snapshot of ghc-6.4.1 for mingw 
+    ; (http://www.haskell.org/ghc/dist/stable/dist/)
+  - unpack in c:/ghc
+  - add C:\ghc\ghc-6.4.1\bin to %PATH%
+    (Start->Control Panel->System->Advanced->Environment Variables)
+
+- Get cvs version of ghc
+    ; also, subscribe to cvs-all@haskell.org, or follow the mailing list
+    ; archive, in case you checkout a version with problems
+    ; http://www.haskell.org//pipermail/cvs-all/
+  - mkdir c:/fptools; cd c:/fptools 
+    ; (or whereever you want your cvs tree to be)
+  - export CVSROOT=:pserver:anoncvs@glass.cse.ogi.edu:/cvs
+  - cvs login
+    ; pw: cvs
+  - cvs checkout fpconfig
+  - cd fptools
+  - cvs checkout ghc hslibs libraries
+
+- Build ghc, using cygwin and mingw, targetting mingw
+  - export PATH=/cygdrive/c/ghc/ghc-6.4.1/tools:$PATH
+    ; for haddock, alex, happy (*)
+  - export PATH=/cygdrive/c/mingw/bin:$PATH
+    ; without, we pick up some cygwin tools at best!
+  - cd c:/fptools/fptools
+    ; (if you aren't there already)
+  - autoreconf
+  - ./configure --host=i386-unknown-mingw32 --with-gcc=C:/Mingw/bin/gcc.exe
+    ; we use cygwin, but build for windows
+  - cp mk/build.mk.sample mk/build.mk
+  - in mk/build.mk:
+    uncomment line: BuildFlavour = perf
+    add line:       BIN_DIST=1
+    add line:       SplitObjs = NO
+  - make 2>&amp;1 | tee make.log
+    ; always useful to have a log around
+
+- Package up binary distribution
+  - make binary-dist Project=Ghc 2>&amp;1 | tee make-bin-dist.log
+    ; always useful to have a log around
+  - cd ghc-6.5
+  - chmod +x ../distrib/prep-bin-dist-mingw
+    ; if you're happy with the script's contents (*)
+  - ../distrib/prep-bin-dist-mingw
+    ; then tar up, unpack where wanted, and enjoy    
+</programlisting>
+</sect2>
 </sect1>
 
 <index/>
