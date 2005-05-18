@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.73 2005/05/17 09:48:27 krasimir Exp $
+-- $Id: Main.hs,v 1.74 2005/05/18 09:43:50 simonmar Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -38,23 +38,27 @@ import CString
 #endif
 
 
-#if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
-
-import Compat.RawSystem 	( rawSystem )
+#if __GLASGOW_HASKELL__ >= 604
 import System.Process           ( runProcess, waitForProcess )
 import System.IO                ( openFile, IOMode(..), hClose )
-#define HAVE_rawSystem
 #define HAVE_runProcess
+#endif
 
-#elif __HUGS__ || __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
-
-import System.Cmd	 	( system, rawSystem )
+#if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
+import Compat.RawSystem 	( rawSystem )
 #define HAVE_rawSystem
+#elif __HUGS__ || __NHC__ >= 117
+import System.Cmd	 	( rawSystem )
+#define HAVE_rawSystem
+#endif
 
+#if !defined(HAVE_runProcess) || !defined(HAVE_rawSystem)
+-- we need system
+#if __HUGS__ || __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
+import System.Cmd	 	( system )
 #else
-
 import System                   ( system )
-
+#endif
 #endif
 
 version :: String
