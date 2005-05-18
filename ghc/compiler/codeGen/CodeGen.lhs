@@ -150,7 +150,7 @@ mkModuleInit
 	-> Code
 mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
   = do	{ 	
-        if need_init_code
+        if opt_SccProfilingOn
             then do { -- Allocate the static boolean that records if this
                       -- module has been registered already
 	              emitData Data [CmmDataLabel moduleRegdLabel, 
@@ -204,10 +204,6 @@ mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs impo
 	  stmtC (CmmStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1)))
 
 		-- Now do local stuff
-#if defined(mingw32_HOST_OS)
-        -- ... until the GHCi Linker can load files with constructor functions:
-        ; registerForeignExports foreign_stubs
-#endif
 	; initCostCentres cost_centre_info
 	; mapCs (registerModuleImport dflags way) 
 		(imported_mods++extra_imported_mods)
@@ -218,12 +214,6 @@ mkModuleInit dflags way cost_centre_info this_mod mb_main_mod foreign_stubs impo
     ret_code = stmtsC [ CmmAssign spReg (cmmRegOffW spReg 1)
                       , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
 
-#if defined(mingw32_HOST_OS)
-    need_init_code = True
-#else
-    need_init_code = opt_SccProfilingOn
-#endif
-
 -----------------------
 registerModuleImport :: DynFlags -> String -> Module -> Code
 registerModuleImport dflags way mod 
@@ -232,18 +222,6 @@ registerModuleImport dflags way mod
   | otherwise 	-- Push the init procedure onto the work stack
   = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
 	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel dflags mod way)) ]
-
------------------------
-registerForeignExports :: ForeignStubs -> Code
-registerForeignExports NoStubs 
-  = nopC
-registerForeignExports (ForeignStubs _ _ _ fe_bndrs)
-  = mapM_ mk_export_register fe_bndrs
-  where
-	mk_export_register bndr
-	  = emitRtsCall SLIT("getStablePtr") 
-		[ (CmmLit (CmmLabel (mkLocalClosureLabel (idName bndr))), 
-		   PtrHint) ]
 \end{code}
 
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.70 2005/05/17 13:47:39 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.71 2005/05/18 04:02:39 wolfgang Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -39,7 +39,7 @@ import SMRep		( CgRep, cgRepSizeW, argMachRep, fixedHdrSize, WordOff,
 import MachOp		( MachHint(..) )
 import Cmm
 import CmmUtils		( CmmStmts, mkStmts, oneStmt, plusStmts, noStmts,
-			  mkLblExpr )
+			  mkLblExpr, mkIntCLit )
 import CLabel
 import StgSyn
 import StaticFlags	( opt_DoTickyProfiling )
@@ -84,8 +84,16 @@ cgTopRhsClosure id ccs binder_info srt upd_flag args body = do
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name
     	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
-	closure_rep   = mkStaticClosureFields closure_info ccs True []
-
+	closure_rep | not is_caf  = mkStaticClosureFields closure_info ccs True []
+                    | otherwise   = mkStaticClosure (mkRtsInfoLabel SLIT("stg_caf")) ccs
+                                     [CmmLabel (infoTableLabelFromCI closure_info)]
+                                     [mkIntCLit 0, mkIntCLit 0]
+                                     [] []
+                                     
+        is_caf = null args
+              && not (closureReEntrant closure_info)
+              && isStaticClosure closure_info 
+                                     
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
   ; forkClosureBody (closureCodeBody binder_info closure_info
@@ -480,8 +488,9 @@ setupUpdate closure_info code
 
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
-		{ upd_closure <- link_caf closure_info True
-	 	; pushUpdateFrame upd_closure code }
+		code
+                -- { upd_closure <- link_caf closure_info True
+	 	-- ; pushUpdateFrame upd_closure code }
 	  else do
 		{ 	-- No update reqd, you'd think we don't need to 
 			-- black-hole it. But when ticky-ticky is on, we 

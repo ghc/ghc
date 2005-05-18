@@ -99,9 +99,6 @@ ld-options:
          , "-u", "_GHCziIOBase_BlockedIndefinitely_closure"
          , "-u", "_GHCziIOBase_Deadlock_closure"
          , "-u", "_GHCziWeak_runFinalizzerBatch_closure"
-#if defined(mingw32_HOST_OS)
-         , "-u", "__stginit_Prelude"
-#endif
 #else
            "-u", "GHCziBase_Izh_static_info"
          , "-u", "GHCziBase_Czh_static_info"
@@ -135,9 +132,6 @@ ld-options:
          , "-u", "GHCziIOBase_BlockedIndefinitely_closure"
          , "-u", "GHCziIOBase_Deadlock_closure"
          , "-u", "GHCziWeak_runFinalizzerBatch_closure"
-#if defined(mingw32_HOST_OS)
-         , "-u", "__stginit_Prelude"
-#endif
 #endif
 
 framework-dirs:

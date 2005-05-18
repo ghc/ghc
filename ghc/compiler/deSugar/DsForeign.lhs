@@ -540,21 +540,10 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
    -- the program.
    -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
 
-   -- the only reason for making the mingw32 (anything targetting PE, really) stick
-   -- out here is that the GHCi linker isn't capable of handling .ctors sections
-  useStaticConstructors 
-#if defined(mingw32_HOST_OS)
-	= False
-#else
-	= True
-#endif  
-
   initialiser
      = case maybe_target of
           Nothing -> empty
-          Just hs_fn 
-	   | not useStaticConstructors -> empty
-	   | otherwise ->
+          Just hs_fn ->
             vcat
              [ text "static void stginit_export_" <> ppr hs_fn
                   <> text "() __attribute__((constructor));"
