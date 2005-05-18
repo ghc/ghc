@@ -4208,27 +4208,13 @@ threadSqueezeStack(StgTSO *tso)
 		    debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 #ifdef DEBUG
-		    /* zero out the slop so that the sanity checker can tell
-		     * where the next closure is.
-		     */
-		    { 
-			StgInfoTable *bh_info = get_itbl(bh);
-			nat np = bh_info->layout.payload.ptrs, 
-			    nw = bh_info->layout.payload.nptrs, i;
-			/* don't zero out slop for a THUNK_SELECTOR,
-			 * because its layout info is used for a
-			 * different purpose, and it's exactly the
-			 * same size as a BLACKHOLE in any case.
-			 */
-			if (bh_info->type != THUNK_SELECTOR) {
-			    for (i = 0; i < np + nw; i++) {
-				((StgClosure *)bh)->payload[i] = INVALID_OBJECT;
-			    }
-			}
-		    }
+		    // zero out the slop so that the sanity checker can tell
+		    // where the next closure is.
+		    DEBUG_FILL_SLOP(bh);
 #endif
 #ifdef PROFILING
 		    // We pretend that bh is now dead.
+		    // ToDo: is the slop filling the same as DEBUG_FILL_SLOP?
 		    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
 #endif
 		    // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
