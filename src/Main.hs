@@ -371,38 +371,32 @@ getPackageIfaces flags verbose =
 		  return Nothing)
 
   getPkgIface' pkg = do
-	(hin,hout,herr,p) <- runInteractiveProcess hc_pkg 
-				["field", "haddock-interfaces", pkg]
-				Nothing Nothing
-	hClose hin
-	out <- hGetContents hout
-	forkIO (hGetContents herr >> return ()) -- just sink the stderr
-	r <- waitForProcess p
-	when (r /= ExitSuccess) $
-	   throwIO (ErrorCall ("ghc-pkg failed"))
-	let iface = dropWhile isSpace (tail (dropWhile (/=':') out))
-
-	(hin,hout,herr,p) <- runInteractiveProcess hc_pkg
-	  			["field", "haddock-html", pkg]
-				Nothing Nothing
-	hClose hin
-	forkIO (hGetContents herr >> return ()) -- just sink the stderr
-	out <- hGetContents hout
-	r <- waitForProcess p
-	when (r /= ExitSuccess) $
-	   throwIO (ErrorCall ("ghc-pkg failed"))
-	let html = dropWhile isSpace (tail (dropWhile (/=':') out))
-
-	when verbose $ 
-	   putStrLn ("   interface: " ++ iface ++ "\n   html: " ++ html)
-
-	iface_exists <- doesFileExist iface
-	when (not iface_exists) $ do
-	   throwIO (ErrorCall ("interface " ++ iface ++ " does not exist."))
+	html <- getPkgField pkg "haddock-html"
 	html_exists <- doesDirectoryExist html
 	when (not html_exists) $ do
 	   throwIO (ErrorCall ("HTML directory " ++ html ++ " does not exist."))
-	return (Just (iface, html))
+
+	iface <- getPkgField pkg "haddock-interfaces"
+	iface_exists <- doesFileExist iface
+	when (not iface_exists) $ do
+	   throwIO (ErrorCall ("interface " ++ iface ++ " does not exist."))
+
+	return (Just (html, iface))
+
+  getPkgField pkg field = do
+	(hin,hout,herr,p) <- runInteractiveProcess hc_pkg 
+				["field", pkg, field]
+				Nothing Nothing
+	hClose hin
+	out <- hGetContents hout
+	forkIO (hGetContents herr >> return ()) -- just sink the stderr
+	r <- waitForProcess p
+	when (r /= ExitSuccess) $
+	   throwIO (ErrorCall ("ghc-pkg failed"))
+	let value = dropWhile isSpace $ init $ tail $ dropWhile (/=':') out
+	when verbose $ 
+	   putStrLn ("   " ++ field ++ ": " ++ value)
+	return value
 #endif
 
 -----------------------------------------------------------------------------

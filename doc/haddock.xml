@@ -280,6 +280,22 @@
 
       <varlistentry>
 	<term>
+	  <indexterm><primary><option>--use-package</option></primary></indexterm>
+          <option>--use-package</option>=<replaceable>package</replaceable>
+        </term>
+	<listitem>
+	  <para>Like <option>--read-interface</option>, but use
+	  <command>ghc-pkg</command> to locate the interface file and
+	  HTML documentation for <replaceable>package</replaceable>,
+	  to reference when generating the documentation.</para>
+
+	  <para>Multiple <option>--use-package</option> options may
+	  be given.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
   	  <indexterm><primary><option>-D</option></primary></indexterm>
           <option>-D</option> <replaceable>file</replaceable>
         </term>
@@ -619,7 +635,7 @@
 	  all the specified interfaces (interfaces are specified using
 	  <option>-i</option> or <option>--read-interface</option>).
 	  This is used to generate a single index for multiple sets of
-	  Haddock documentstation.</para>
+	  Haddock documentation.</para>
 	</listitem>
       </varlistentry>
 
