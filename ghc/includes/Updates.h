@@ -193,23 +193,25 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 
 #ifdef CMINUSMINUS
 
-#define DEBUG_FILL_SLOP(p)			\
-  W_ inf;					\
-  W_ np;					\
-  W_ nw;					\
-  W_ i;						\
-  inf = %GET_STD_INFO(p);			\
-  np = TO_W_(%INFO_PTRS(inf));			\
-  nw = TO_W_(%INFO_NPTRS(inf));			\
-  if (%INFO_TYPE(inf) != HALF_W_(THUNK_SELECTOR)) {	\
-    i = 0;					\
-    for:					\
-      if (i < np + nw) {			\
-        StgClosure_payload(p,i) = 0;		\
-        i = i + 1;				\
-        goto for;				\
-      }						\
-  }
+#define DEBUG_FILL_SLOP(p)					\
+  W_ inf;							\
+  W_ np;							\
+  W_ nw;							\
+  W_ i;								\
+  inf = %GET_STD_INFO(p);					\
+  np = TO_W_(%INFO_PTRS(inf));					\
+  nw = TO_W_(%INFO_NPTRS(inf));					\
+  if (%INFO_TYPE(inf) == HALF_W_(THUNK_SELECTOR)) {		\
+	StgThunk_payload(p,0) = 0;				\
+  } else { if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)) {		\
+    i = 0;							\
+    for:							\
+      if (i < np + nw) {					\
+        StgThunk_payload(p,i) = 0;				\
+        i = i + 1;						\
+        goto for;						\
+      }								\
+  } }
 
 
 #else /* !CMINUSMINUS */
@@ -220,9 +222,18 @@ DEBUG_FILL_SLOP(StgClosure *p)
     StgInfoTable *inf = get_itbl(p);		
     nat np = inf->layout.payload.ptrs,		
 	nw = inf->layout.payload.nptrs, i;
-    if (inf->type != THUNK_SELECTOR) {
+
+    switch (inf->type) {
+    case BLACKHOLE:
+	break;
+    case THUNK_SELECTOR:
+#ifdef SMP
+	((StgSelector *)p)->selectee = 0;
+#endif
+	break;
+    default:
 	for (i = 0; i < np + nw; i++) {
-	    ((StgClosure *)p)->payload[i] = 0;
+	    ((StgThunk *)p)->payload[i] = 0;
 	}
     }
 }
