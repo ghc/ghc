@@ -9,6 +9,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include "Schedule.h"
+#include "RtsFlags.h"
 #include "Capability.h"
 #include "win32/AsyncIO.h"
 #include "win32/IOManager.h"
