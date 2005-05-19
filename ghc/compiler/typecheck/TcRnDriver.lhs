@@ -690,12 +690,12 @@ tcTopSrcDecls boot_details
 		-- We also typecheck any extra binds that came out 
 		-- of the "deriving" process (deriv_binds)
         traceTc (text "Tc5") ;
-	(tc_val_binds, lcl_env) <- tcTopBinds (val_binds ++ deriv_binds) ;
-	setLclTypeEnv lcl_env 	$ do {
+	(tc_val_binds, tcl_env) <- tcTopBinds (val_binds ++ deriv_binds) ;
+	setLclTypeEnv tcl_env 	$ do {
 
 	     	-- Second pass over class and instance declarations, 
         traceTc (text "Tc6") ;
-	(tcl_env, inst_binds) <- tcInstDecls2 tycl_decls inst_infos ;
+	(inst_binds, tcl_env) <- tcInstDecls2 tycl_decls inst_infos ;
 	showLIE (text "after instDecls2") ;
 
 		-- Foreign exports
@@ -718,7 +718,7 @@ tcTopSrcDecls boot_details
 	      tcg_env' = tcg_env {  tcg_binds = tcg_binds tcg_env `unionBags` all_binds,
 				    tcg_rules = tcg_rules tcg_env ++ rules,
 				    tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
-  	return (tcg_env', lcl_env)
+  	return (tcg_env', tcl_env)
     }}}}}}
 \end{code}
 

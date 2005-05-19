@@ -227,7 +227,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
 
 \begin{code}
 tcInstDecls2 :: [LTyClDecl Name] -> [InstInfo] 
-	     -> TcM (TcLclEnv, LHsBinds Id)
+	     -> TcM (LHsBinds Id, TcLclEnv)
 -- (a) From each class declaration, 
 --	generate any default-method bindings
 -- (b) From each instance decl
@@ -243,9 +243,10 @@ tcInstDecls2 tycl_decls inst_decls
 	; inst_binds_s <- mappM tcInstDecl2 inst_decls
 
 		-- Done
-	; tcl_env <- getLclEnv
-	; returnM (tcl_env, unionManyBags dm_binds_s	`unionBags`
-			    unionManyBags inst_binds_s) }
+	; let binds = unionManyBags dm_binds_s `unionBags` 
+		      unionManyBags inst_binds_s
+	; tcl_env <- getLclEnv		-- Default method Ids in here
+	; returnM (binds, tcl_env) }
 \end{code}
 
 ======= New documentation starts here (Sept 92)	 ==============
