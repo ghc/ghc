@@ -23,6 +23,8 @@
 #ifndef __CAPABILITY_H__
 #define __CAPABILITY_H__
 
+#include "RtsFlags.h"
+
 // All the capabilities
 extern Capability *capabilities;
 
