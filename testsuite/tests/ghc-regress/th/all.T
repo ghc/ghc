@@ -40,3 +40,7 @@ test('TH_tuple1', normal, compile, [''])
 test('TH_genEx', normal, multimod_compile, ['TH_genEx', '-ddump-splices'])
 
 test('TH_where', normal, compile_and_run, [''])
+
+test('TH_spliceInst', normal, compile, [''])
+
+test('TH_fail', normal, compile_fail, [''])

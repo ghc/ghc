@@ -1,0 +1,16 @@
+
+TH_fail.hs:1:0:
+    Exception when trying to run compile-time code:
+      TH_fail.hs:(8,3)-(9,22): Non-exhaustive patterns in case
+
+      Code: let
+	      return = return Language.Haskell.TH.Syntax.Q $dMonad
+	      $dMonad = Language.Haskell.TH.Syntax.$f18
+	    in
+	      case reverse Char "no" of
+		[]
+		  -> return [Language.Haskell.TH.Syntax.Dec] (GHC.Base.[]
+								  Language.Haskell.TH.Syntax.Dec)
+Loading package base-1.0 ... linking ... done.
+Loading package haskell98-1.0 ... linking ... done.
+Loading package template-haskell-1.0 ... linking ... done.
