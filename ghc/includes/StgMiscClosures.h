@@ -473,7 +473,8 @@ RTS_RET_INFO(stg_stop_thread_info);
 RTS_ENTRY(stg_stop_thread_ret);
 
 RTS_FUN(stg_returnToStackTop);
-RTS_FUN(stg_enterStackTop);
+RTS_FUN(stg_returnToSched);
+RTS_FUN(stg_returnToSchedButFirst);
 
 RTS_FUN(stg_init_finish);
 RTS_FUN(stg_init);

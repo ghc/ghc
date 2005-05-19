@@ -458,8 +458,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
       CurrentTSO = event->tso;
 #endif
 
-      IF_DEBUG(scheduler, printAllThreads());
-
 #if defined(RTS_SUPPORTS_THREADS)
       // Yield the capability to higher-priority tasks if necessary.
       //
@@ -762,7 +760,6 @@ run_thread:
 
     case ThreadBlocked:
 	scheduleHandleThreadBlocked(t);
-	threadPaused(t);
 	break;
 
     case ThreadFinished:
@@ -902,6 +899,7 @@ scheduleDetectDeadlock(void)
 	// they are unreachable and will therefore be sent an
 	// exception.  Any threads thus released will be immediately
 	// runnable.
+
 	GarbageCollect(GetRoots,rtsTrue);
 	recent_activity = ACTIVITY_DONE_GC;
 	if ( !EMPTY_RUN_QUEUE() ) return;
@@ -1539,7 +1537,6 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
     IF_DEBUG(scheduler,
 	     debugBelch("--<< thread %ld (%s) stopped: HeapOverflow\n", 
 			(long)t->id, whatNext_strs[t->what_next]));
-    threadPaused(t);
 #if defined(GRAN)
     ASSERT(!is_on_queue(t,CurrentProc));
 #elif defined(PARALLEL_HASKELL)
@@ -1571,7 +1568,6 @@ scheduleHandleStackOverflow( StgTSO *t)
     /* just adjust the stack for this thread, then pop it back
      * on the run queue.
      */
-    threadPaused(t);
     { 
 	/* enlarge the stack */
 	StgTSO *new_t = threadStackOverflow(t);
@@ -1629,8 +1625,6 @@ scheduleHandleYield( StgTSO *t, nat prev_what_next )
     if (t->what_next != prev_what_next) {
 	return rtsTrue;
     }
-    
-    threadPaused(t);
     
 #if defined(GRAN)
     ASSERT(!is_on_queue(t,CurrentProc));
@@ -1704,12 +1698,19 @@ scheduleHandleThreadBlocked( StgTSO *t
     emitSchedule = rtsTrue;
     
 #else /* !GRAN */
-      /* don't need to do anything.  Either the thread is blocked on
-       * I/O, in which case we'll have called addToBlockedQueue
-       * previously, or it's blocked on an MVar or Blackhole, in which
-       * case it'll be on the relevant queue already.
-       */
+
+      // We don't need to do anything.  The thread is blocked, and it
+      // has tidied up its stack and placed itself on whatever queue
+      // it needs to be on.
+
+#if !defined(SMP)
     ASSERT(t->why_blocked != NotBlocked);
+	     // This might not be true under SMP: we don't have
+	     // exclusive access to this TSO, so someone might have
+	     // woken it up by now.  This actually happens: try
+	     // conc023 +RTS -N2.
+#endif
+
     IF_DEBUG(scheduler,
 	     debugBelch("--<< thread %d (%s) stopped: ", 
 			t->id, whatNext_strs[t->what_next]);
@@ -1943,6 +1944,8 @@ scheduleDoGC( Capability *cap STG_UNUSED )
     // so this happens periodically:
     scheduleCheckBlackHoles();
     
+    IF_DEBUG(scheduler, printAllThreads());
+
     /* everybody back, start the GC.
      * Could do it in this thread, or signal a condition var
      * to do it in another thread.  Either way, we need to

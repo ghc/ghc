@@ -69,20 +69,25 @@
         R1 = StackOverflow;					\
     }								\
   sched:							\
-    SAVE_THREAD_STATE();					\
     StgTSO_what_next(CurrentTSO) = ThreadRunGHC::I16;		\
-    jump StgReturn;
+    jump stg_returnToSched;
 
 #define RETURN_TO_SCHED(why,what_next)			\
-  SAVE_THREAD_STATE();					\
   StgTSO_what_next(CurrentTSO) = what_next::I16;	\
   R1 = why;						\
-  jump StgReturn;
+  jump stg_returnToSched;
+
+#define RETURN_TO_SCHED_BUT_FIRST(why,what_next,cont)	\
+  StgTSO_what_next(CurrentTSO) = what_next::I16;	\
+  R1 = why;						\
+  R2 = cont;						\
+  jump stg_returnToSchedButFirst;
 
 #define HP_GENERIC           RETURN_TO_SCHED(HeapOverflow,   ThreadRunGHC)
 #define YIELD_GENERIC        RETURN_TO_SCHED(ThreadYielding, ThreadRunGHC)
 #define YIELD_TO_INTERPRETER RETURN_TO_SCHED(ThreadYielding, ThreadInterpret)
 #define BLOCK_GENERIC        RETURN_TO_SCHED(ThreadBlocked,  ThreadRunGHC)
+#define BLOCK_BUT_FIRST(c)   RETURN_TO_SCHED_BUT_FIRST(ThreadBlocked, ThreadRunGHC, c)
 
 /* -----------------------------------------------------------------------------
    Heap checks in thunks/functions.
@@ -823,12 +828,22 @@ INFO_TABLE_RET( stg_block_takemvar, 1/*framesize*/, 0/*bitmap*/, RET_SMALL )
     jump takeMVarzh_fast;
 }
 
+// code fragment executed just before we return to the scheduler
+stg_block_takemvar_finally
+{
+#ifdef SMP
+    foreign "C" unlockClosure(R3 "ptr", stg_EMPTY_MVAR_info);
+#endif
+    jump StgReturn;
+}
+
 stg_block_takemvar
 {
     Sp_adj(-2);
     Sp(1) = R1;
     Sp(0) = stg_block_takemvar_info;
-    BLOCK_GENERIC;
+    R3 = R1;
+    BLOCK_BUT_FIRST(stg_block_takemvar_finally);
 }
 
 INFO_TABLE_RET( stg_block_putmvar, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
@@ -839,13 +854,23 @@ INFO_TABLE_RET( stg_block_putmvar, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
     jump putMVarzh_fast;
 }
 
+// code fragment executed just before we return to the scheduler
+stg_block_putmvar_finally
+{
+#ifdef SMP
+    foreign "C" unlockClosure(R3 "ptr", stg_FULL_MVAR_info);
+#endif
+    jump StgReturn;
+}
+
 stg_block_putmvar
 {
     Sp_adj(-3);
     Sp(2) = R2;
     Sp(1) = R1;
     Sp(0) = stg_block_putmvar_info;
-    BLOCK_GENERIC;
+    R3 = R1;
+    BLOCK_BUT_FIRST(stg_block_putmvar_finally);
 }
 
 #ifdef mingw32_HOST_OS

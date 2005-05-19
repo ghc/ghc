@@ -102,6 +102,9 @@ INFO_TABLE_RET( stg_stop_thread, STOP_THREAD_WORDS, STOP_THREAD_BITMAP,
    Start a thread from the scheduler by returning to the address on
    the top of the stack.  This is used for all entries to STG code
    from C land.
+
+   On the way back, we (usually) pass through stg_returnToSched which saves
+   the thread's state away nicely.
    -------------------------------------------------------------------------- */
 
 stg_returnToStackTop
@@ -109,6 +112,24 @@ stg_returnToStackTop
   LOAD_THREAD_STATE();
   CHECK_SENSIBLE_REGS();
   jump %ENTRY_CODE(Sp(0));
+}
+
+stg_returnToSched
+{
+  SAVE_THREAD_STATE();
+  foreign "C" threadPaused(CurrentTSO);
+  jump StgReturn;
+}
+
+// A variant of stg_returnToSched, but instead of returning directly to the
+// scheduler, we jump to the code fragment pointed to by R2.  This lets us
+// perform some final actions after making the thread safe, such as unlocking
+// the MVar on which we are about to block in SMP mode.
+stg_returnToSchedButFirst
+{
+  SAVE_THREAD_STATE();
+  foreign "C" threadPaused(CurrentTSO);
+  jump R2;
 }
 
 /* -----------------------------------------------------------------------------

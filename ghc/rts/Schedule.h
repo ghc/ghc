@@ -46,8 +46,10 @@ void awakenBlockedQueueNoLock (StgTSO *tso);
  */
 #if defined(GRAN) || defined(PAR)
 StgBlockingQueueElement *unblockOne(StgBlockingQueueElement *bqe, StgClosure *node);
+StgBlockingQueueElement *unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node);
 #else
 StgTSO *unblockOne(StgTSO *tso);
+StgTSO *unblockOneLocked(StgTSO *tso);
 #endif
 
 /* raiseAsync()

@@ -1424,6 +1424,17 @@ newMVarzh_fast
     StgTSO_sp(tso) = StgTSO_sp(tso) + WDS(3);	\
     lval = W_[StgTSO_sp(tso) - WDS(1)];
 
+/*
+ * Only in threaded mode: we have to be careful when manipulating another thread's TSO,
+ * because the scheduler might also be manipulating it.
+ */
+#if defined(RTS_SUPPORTS_THREADS)
+#define ACQUIRE_SCHED_LOCK   foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+#define RELEASE_SCHED_LOCK   foreign "C" RELEASE_LOCK(sched_mutex "ptr");
+#else
+#define ACQUIRE_SCHED_LOCK
+#define RELEASE_SCHED_LOCK
+#endif
 
 takeMVarzh_fast
 {
@@ -1452,10 +1463,6 @@ takeMVarzh_fast
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
-#if defined(SMP)
-        SET_INFO(mvar,stg_EMPTY_MVAR_info);
-#endif
-
 	jump stg_block_takemvar;
   }
 
@@ -1464,6 +1471,8 @@ takeMVarzh_fast
 
   if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure)
   {
+      ACQUIRE_SCHED_LOCK;
+
       /* There are putMVar(s) waiting... 
        * wake up the first thread on the queue
        */
@@ -1475,20 +1484,22 @@ takeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
-      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar);
+      "ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar),mvar);
       StgMVar_head(mvar) = tso;
 #else
-      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+      "ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
       StgMVar_head(mvar) = tso;
 #endif
+
+      RELEASE_SCHED_LOCK;
+
       if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
       }
 
 #if defined(SMP)
-      SET_INFO(mvar,stg_FULL_MVAR_info);
+      foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #endif
-
       RET_P(val);
   } 
   else
@@ -1496,8 +1507,11 @@ takeMVarzh_fast
       /* No further putMVars, MVar is now empty */
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
  
-      /* unlocks the closure in the SMP case */
+#if defined(SMP)
+      foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+#else
       SET_INFO(mvar,stg_EMPTY_MVAR_info);
+#endif
 
       RET_P(val);
   }
@@ -1520,7 +1534,7 @@ tryTakeMVarzh_fast
 
     if (info == stg_EMPTY_MVAR_info) {
 #if defined(SMP)
-        SET_INFO(mvar,stg_EMPTY_MVAR_info);
+        foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
 	/* HACK: we need a pointer to pass back, 
 	 * so we abuse NO_FINALIZER_closure
@@ -1532,6 +1546,9 @@ tryTakeMVarzh_fast
     val = StgMVar_value(mvar);
 
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
+
+        ACQUIRE_SCHED_LOCK;
+
 	/* There are putMVar(s) waiting... 
 	 * wake up the first thread on the queue
 	 */
@@ -1543,25 +1560,31 @@ tryTakeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr");
+	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr", mvar "ptr");
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
 	StgMVar_head(mvar) = tso;
 #endif
+
+        RELEASE_SCHED_LOCK;
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 #if defined(SMP)
-        SET_INFO(mvar,stg_FULL_MVAR_info);
+        foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #endif
     }
     else 
     {
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
+#if defined(SMP)
+    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+#else
 	SET_INFO(mvar,stg_EMPTY_MVAR_info);
+#endif
     }
     
     RET_NP(1, val);
@@ -1592,13 +1615,13 @@ putMVarzh_fast
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgMVar_tail(mvar) = CurrentTSO;
 	
-#if defined(SMP)
-        SET_INFO(mvar,stg_FULL_MVAR_info);
-#endif
 	jump stg_block_putmvar;
     }
   
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
+
+        ACQUIRE_SCHED_LOCK;
+
 	/* There are takeMVar(s) waiting: wake up the first one
 	 */
 	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
@@ -1609,19 +1632,21 @@ putMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
+	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr",mvar "ptr");
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
 	StgMVar_head(mvar) = tso;
 #endif
+
+        RELEASE_SCHED_LOCK;
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
 #if defined(SMP)
-        SET_INFO(mvar,stg_EMPTY_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1629,9 +1654,12 @@ putMVarzh_fast
     {
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = R2;
-	/* unlocks the MVar in the SMP case */
-	SET_INFO(mvar,stg_FULL_MVAR_info);
 
+#if defined(SMP)
+    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+#else
+	SET_INFO(mvar,stg_FULL_MVAR_info);
+#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     
@@ -1654,12 +1682,15 @@ tryPutMVarzh_fast
 
     if (info == stg_FULL_MVAR_info) {
 #if defined(SMP)
-        SET_INFO(mvar,stg_FULL_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #endif
 	RET_N(0);
     }
   
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
+
+        ACQUIRE_SCHED_LOCK;
+
 	/* There are takeMVar(s) waiting: wake up the first one
 	 */
 	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
@@ -1670,19 +1701,21 @@ tryPutMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
+	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr",mvar "ptr");
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
 	StgMVar_head(mvar) = tso;
 #endif
+
+        RELEASE_SCHED_LOCK;
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
 #if defined(SMP)
-        SET_INFO(mvar,stg_EMPTY_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1690,9 +1723,12 @@ tryPutMVarzh_fast
     {
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = R2;
-	/* unlocks the MVar in the SMP case */
-	SET_INFO(mvar,stg_FULL_MVAR_info);
 
+#if defined(SMP)
+    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+#else
+	SET_INFO(mvar,stg_FULL_MVAR_info);
+#endif
 	jump %ENTRY_CODE(Sp(0));
     }
     
