@@ -282,6 +282,12 @@ def _extra_run_opts( opts, v ):
 def no_clean( opts ):
     opts.cleanup = '';
 
+# -----
+
+def skip_if_no_ghci(opts):
+  if not ('ghci' in config.run_ways):
+      opts.skip = 1
+
 # ----
 # Function for composing two opt-fns together
 
