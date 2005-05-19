@@ -41,7 +41,6 @@ import HscTypes		( TyThing(..), TypeEnv, HscEnv,
 import Bag		( emptyBag, snocBag, Bag )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
-import DataCon		( DataCon )
 import Id		( mkSysLocal, setIdUnique, Id )
 import Module		( Module )
 import Var		( TyVar, setTyVarUnique )

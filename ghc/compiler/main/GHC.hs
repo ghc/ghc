@@ -138,10 +138,10 @@ module GHC (
 #ifdef GHCI
 import qualified Linker
 import Linker		( HValue, extendLinkEnv )
-import NameEnv		( lookupNameEnv )
 import TcRnDriver	( getModuleContents, tcRnLookupRdrName,
 			  getModuleExports )
-import RdrName		( plusGlobalRdrEnv, Provenance(..), ImportSpec(..),
+import RdrName		( plusGlobalRdrEnv, Provenance(..), 
+			  ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
 			  emptyGlobalRdrEnv, mkGlobalRdrEnv )
 import HscMain		( hscGetInfo, GetInfoResult, hscParseIdentifier,
 			  hscStmt, hscTcExpr, hscKcType )
@@ -149,14 +149,12 @@ import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
 import IfaceSyn		( IfaceDecl )
-import Name		( getName, nameModule_maybe )
-import SrcLoc		( mkSrcLoc, srcLocSpan, interactiveSrcLoc )
-import Bag		( unitBag, emptyBag )
+import SrcLoc		( srcLocSpan, interactiveSrcLoc )
 #endif
 
 import Packages		( initPackages )
 import NameSet		( NameSet, nameSetToList, elemNameSet )
-import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, gre_name,
+import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, 
 			  globalRdrEnvElts )
 import HsSyn
 import Type		( Kind, Type, dropForAlls )
@@ -194,16 +192,15 @@ import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
-import Maybes		( orElse, expectJust, mapCatMaybes )
 import TcType           ( tcSplitSigmaTy, isDictTy )
 import FastString	( mkFastString )
 
 import Directory        ( getModificationTime, doesFileExist )
-import Maybe		( isJust, isNothing, fromJust, fromMaybe, catMaybes )
-import Maybes		( expectJust )
+import Maybe		( isJust, isNothing, fromJust )
+import Maybes		( orElse, expectJust, mapCatMaybes )
 import List		( partition, nub )
 import qualified List
-import Monad		( unless, when, foldM )
+import Monad		( unless, when )
 import System		( exitWith, ExitCode(..) )
 import Time		( ClockTime )
 import EXCEPTION as Exception hiding (handle)
@@ -1745,9 +1742,11 @@ nameSetToGlobalRdrEnv names mod =
 vanillaProv :: Module -> Provenance
 -- We're building a GlobalRdrEnv as if the user imported
 -- all the specified modules into the global interactive module
-vanillaProv mod = Imported [ImportSpec { is_mod = mod, is_as = mod, 
-					 is_qual = False, is_explicit = False,
-					 is_loc = srcLocSpan interactiveSrcLoc }]
+vanillaProv mod = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
+  where
+    decl = ImpDeclSpec { is_mod = mod, is_as = mod, 
+			 is_qual = False, 
+			 is_dloc = srcLocSpan interactiveSrcLoc }
 
 checkModuleExists :: HscEnv -> HomePackageTable -> Module -> IO ()
 checkModuleExists hsc_env hpt mod = 

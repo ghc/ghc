@@ -75,7 +75,6 @@ import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, TyThing(..) )
 import Kind		( mkArrowKinds, liftedTypeKind, ubxTupleKind )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
-import PrelNames
 import Array
 import FastString
 import Outputable

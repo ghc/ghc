@@ -42,7 +42,6 @@ import ErrUtils
 import DynFlags
 import StaticFlags	( v_Ld_inputs, opt_Static, WayName(..) )
 import Config
-import RdrName		( GlobalRdrEnv )
 import Panic
 import Util
 import StringBuffer	( hGetStringBuffer )

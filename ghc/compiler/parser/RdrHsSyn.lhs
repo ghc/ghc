@@ -50,7 +50,7 @@ module RdrHsSyn (
 
 import HsSyn		-- Lots of it
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
-			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
+			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
 import BasicTypes	( RecFlag(..), maxPrecedence )
 import Lexer		( P, failSpanMsgP )

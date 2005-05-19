@@ -26,7 +26,6 @@ import Maybes		( maybeToBool )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, 
 			  CCallConv(..), CLabelString )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
-import ForeignCall	( ForeignCall, CCallTarget(..) )
 
 import TcType		( tcSplitTyConApp_maybe )
 import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,

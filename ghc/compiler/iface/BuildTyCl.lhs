@@ -28,7 +28,7 @@ import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( FieldLabel, mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
 			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
-			  ArgVrcs, AlgTyConRhs(..), newTyConRhs, visibleDataCons )
+			  ArgVrcs, AlgTyConRhs(..), newTyConRhs )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, tyVarsOfTypes, tyVarsOfPred,
 			  splitTyConApp_maybe, mkPredTys, mkTyVarTys, ThetaType, Type,
 			  substTyWith, zipTopTvSubst, substTheta )

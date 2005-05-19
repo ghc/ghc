@@ -32,9 +32,10 @@ module RdrName (
 	lookupGRE_RdrName, lookupGRE_Name,
 
 	-- GlobalRdrElt, Provenance, ImportSpec
-	GlobalRdrElt(..), Provenance(..), ImportSpec(..),
-	isLocalGRE, unQualOK,
-	pprNameProvenance
+	GlobalRdrElt(..), isLocalGRE, unQualOK, 
+	Provenance(..), pprNameProvenance,
+	ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
+	importSpecLoc, importSpecModule
   ) where 
 
 #include "HsVersions.h"
@@ -373,12 +374,12 @@ isLocalGRE other    		         = False
 unQualOK :: GlobalRdrElt -> Bool
 -- An unqualifed version of this thing is in scope
 unQualOK (GRE {gre_prov = LocalDef _})  = True
-unQualOK (GRE {gre_prov = Imported is}) = not (all is_qual is)
+unQualOK (GRE {gre_prov = Imported is}) = not (all (is_qual . is_decl) is)
 
 hasQual :: Module -> GlobalRdrElt -> Bool
 -- A qualified version of this thing is in scope
 hasQual mod (GRE {gre_prov = LocalDef m})  = m == mod
-hasQual mod (GRE {gre_prov = Imported is}) = any ((== mod) . is_as) is
+hasQual mod (GRE {gre_prov = Imported is}) = any ((== mod) . is_as . is_decl) is
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
@@ -414,40 +415,52 @@ plusGRE g1 g2
 %************************************************************************
 
 The "provenance" of something says how it came to be in scope.
+It's quite elaborate so that we can give accurate unused-name warnings.
 
 \begin{code}
 data Provenance
   = LocalDef		-- Defined locally
 	Module
 
-  | Imported 		-- Imported
+  | Imported 				-- Imported
 	[ImportSpec]	-- INVARIANT: non-empty
 
-data ImportSpec		-- Describes a particular import declaration
-			-- Shared among all the Provenaces for a
-			-- import-all declaration; otherwise it's done
-			-- per explictly-named item
-  = ImportSpec {
+data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
+			    is_item ::  ImpItemSpec }
+		deriving( Eq, Ord )
+
+data ImpDeclSpec	-- Describes a particular import declaration
+			-- Shared among all the Provenaces for that decl
+  = ImpDeclSpec {
 	is_mod      :: Module,	-- 'import Muggle'
 				-- Note the Muggle may well not be 
 				-- the defining module for this thing!
 	is_as       :: Module,	-- 'as M' (or 'Muggle' if there is no 'as' clause)
 	is_qual     :: Bool,	-- True <=> qualified (only)
-	is_explicit :: Bool,	-- True <=> explicit import (see below)
-	is_loc      :: SrcSpan	-- Location of import item
+	is_dloc     :: SrcSpan	-- Location of import declaration
+    }
+
+data ImpItemSpec  -- Describes import info a particular Name
+  = ImpAll		-- The import had no import list, 
+			-- or  had a hiding list
+
+  | ImpSome {		-- The import had an import list
+	is_explicit :: Bool,
+	is_iloc     :: SrcSpan	-- Location of the import item
     }
 	-- The is_explicit field is True iff the thing was named 
 	-- *explicitly* in the import specs rather 
-	-- than being imported as part of a group 
-	-- e.g.		import B
-	--		import C( T(..) )
-	-- Here, everything imported by B, and the constructors of T
-	-- are not named explicitly; only T is named explicitly.
-	-- This info is used when warning of unused names.
-	--
-	-- We keep ImportSpec separate from the Bool so that the
-	-- former can be shared between all Provenances for a particular
-	-- import declaration.  
+	-- than being imported as part of a "..." group 
+	-- e.g.		import C( T(..) )
+	-- Here the constructors of T are not named explicitly; 
+	-- only T is named explicitly.
+
+importSpecLoc :: ImportSpec -> SrcSpan
+importSpecLoc (ImpSpec decl ImpAll) = is_dloc decl
+importSpecLoc (ImpSpec _    item)   = is_iloc item
+
+importSpecModule :: ImportSpec -> Module
+importSpecModule is = is_mod (is_decl is)
 
 -- Note [Comparing provenance]
 -- Comparison of provenance is just used for grouping 
@@ -455,7 +468,10 @@ data ImportSpec		-- Describes a particular import declaration
 instance Eq Provenance where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
 
-instance Eq ImportSpec where
+instance Eq ImpDeclSpec where
+  p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
+
+instance Eq ImpItemSpec where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
 
 instance Ord Provenance where
@@ -465,9 +481,12 @@ instance Ord Provenance where
    compare (Imported is1) (Imported is2) = compare (head is1) 
 	{- See Note [Comparing provenance] -}	   (head is2)
 
-instance Ord ImportSpec where
+instance Ord ImpDeclSpec where
    compare is1 is2 = (is_mod is1 `compare` is_mod is2) `thenCmp` 
-		     (is_loc is1 `compare` is_loc is2)
+		     (is_dloc is1 `compare` is_dloc is2)
+
+instance Ord ImpItemSpec where
+   compare is1 is2 = is_iloc is1 `compare` is_iloc is2
 \end{code}
 
 \begin{code}
@@ -495,7 +514,7 @@ ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
 	     | otherwise	= empty
 
 instance Outputable ImportSpec where
-   ppr imp_spec
-     = ptext SLIT("imported from") <+> ppr (is_mod imp_spec) 
-	<+> ptext SLIT("at") <+> ppr (is_loc imp_spec)
+   ppr imp_spec@(ImpSpec imp_decl _)
+     = ptext SLIT("imported from") <+> ppr (is_mod imp_decl) 
+	<+> ptext SLIT("at") <+> ppr (importSpecLoc imp_spec)
 \end{code}

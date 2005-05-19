@@ -42,7 +42,8 @@ import RdrName		( RdrName, rdrNameModule, isQual, isUnqual, isOrig,
 			  isExact_maybe, isSrcRdrName,
 			  GlobalRdrElt(..), GlobalRdrEnv, lookupGlobalRdrEnv, 
 			  isLocalGRE, extendLocalRdrEnv, elemLocalRdrEnv, lookupLocalRdrEnv,
-			  Provenance(..), pprNameProvenance, ImportSpec(..) 
+			  Provenance(..), pprNameProvenance,
+			  importSpecLoc, importSpecModule
 			)
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
@@ -751,7 +752,7 @@ warnUnusedName (name, prov)
   where
     (loc,msg) = case prov of
 		  Just (Imported is)
-		        -> (is_loc imp_spec, imp_from (is_mod imp_spec))
+		        -> (importSpecLoc imp_spec, imp_from (importSpecModule imp_spec))
 		        where
 			  imp_spec = head is
 		  other -> (srcLocSpan (nameSrcLoc name), unused_msg)

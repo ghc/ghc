@@ -30,7 +30,6 @@ import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
 import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
-import VarEnv		( mkInScopeSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import Id		( Id, modifyIdInfo, idInfo, isExportedId, isLocalId,

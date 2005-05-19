@@ -21,7 +21,6 @@ module HscMain (
 
 #ifdef GHCI
 import HsSyn		( Stmt(..), LHsExpr, LStmt, LHsType )
-import IfaceSyn		( IfaceDecl, IfaceInst )
 import Module		( Module )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
@@ -30,15 +29,12 @@ import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, GetInfoResult, tcRnType ) 
-import RdrName		( rdrNameOcc )
-import OccName		( occNameUserString )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import Kind		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
-import BasicTypes	( Fixity )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( noSrcLoc )
 import VarEnv		( emptyTidyEnv )
 #endif
 
@@ -72,7 +68,6 @@ import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
 
 import DynFlags
-import DriverPhases     ( HscSource(..) )
 import ErrUtils
 import UniqSupply	( mkSplitUniqSupply )
 

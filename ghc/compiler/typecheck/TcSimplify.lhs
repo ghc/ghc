@@ -21,7 +21,6 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
-import TcEnv		-- temp
 import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
 import TcHsSyn		( TcId, TcDictBinds, mkHsApp, mkHsTyApp, mkHsDictApp )
 
@@ -39,7 +38,8 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  Inst, pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
 			  isInheritableInst, pprDictsTheta
 			)
-import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders )
+import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders,
+			  lclEnvElts, tcMetaTy )
 import InstEnv		( lookupInstEnv, classInstances, pprInstances )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, 

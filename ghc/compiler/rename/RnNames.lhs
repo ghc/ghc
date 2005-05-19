@@ -45,8 +45,8 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
 			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
 			  extendGlobalRdrEnv, lookupGlobalRdrEnv, unQualOK, lookupGRE_Name,
-			  Provenance(..), ImportSpec(..), 
-			  isLocalGRE, pprNameProvenance )
+			  Provenance(..), ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
+			  importSpecLoc, importSpecModule, isLocalGRE, pprNameProvenance )
 import Outputable
 import Maybes		( isNothing, catMaybes, mapCatMaybes, seqMaybe, orElse )
 import SrcLoc		( Located(..), mkGeneralSrcSpan,
@@ -180,8 +180,8 @@ importsFromImportDecl this_mod
 	qual_mod_name = case as_mod of
 			  Nothing  	    -> imp_mod_name
 			  Just another_name -> another_name
-	imp_spec  = ImportSpec { is_mod = imp_mod_name, is_qual = qual_only,  
-		  		 is_loc = loc, is_as = qual_mod_name, is_explicit = False }
+	imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,  
+		  		  is_dloc = loc, is_as = qual_mod_name }
     in
 	-- Get the total imports, and filter them according to the import list
     ifaceExportNames filtered_exports		`thenM` \ total_avails ->
@@ -378,7 +378,7 @@ available, and filters it through the import spec (if any).
 
 \begin{code}
 filterImports :: ModIface
-	      -> ImportSpec			-- The span for the entire import decl
+	      -> ImpDeclSpec			-- The span for the entire import decl
 	      -> Maybe (Bool, [Located (IE RdrName)])	-- Import spec; True => hiding
 	      -> NameSet			-- What's available
 	      -> RnM (NameSet,			-- What's imported (qualified or unqualified)
@@ -387,14 +387,16 @@ filterImports :: ModIface
 	-- Complains if import spec mentions things that the module doesn't export
         -- Warns/informs if import spec contains duplicates.
 			
-mkGenericRdrEnv imp_spec names
+mkGenericRdrEnv decl_spec names
   = mkGlobalRdrEnv [ GRE { gre_name = name, gre_prov = Imported [imp_spec] }
 		   | name <- nameSetToList names ]
+  where
+    imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
-filterImports iface imp_spec Nothing all_names
-  = returnM (all_names, mkGenericRdrEnv imp_spec all_names)
+filterImports iface decl_spec Nothing all_names
+  = returnM (all_names, mkGenericRdrEnv decl_spec all_names)
 
-filterImports iface imp_spec (Just (want_hiding, import_items)) all_names
+filterImports iface decl_spec (Just (want_hiding, import_items)) all_names
   = mappM (addLocM get_item) import_items 	`thenM` \ gres_s ->
     let
 	gres = concat gres_s
@@ -407,7 +409,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) all_names
 	keep n = not (n `elemNameSet` specified_names)
 	pruned_avails = filterNameSet keep all_names
     in
-    return (pruned_avails, mkGenericRdrEnv imp_spec pruned_avails)
+    return (pruned_avails, mkGenericRdrEnv decl_spec pruned_avails)
 
   where
     occ_env :: OccEnv Name	-- Maps OccName to corresponding Name
@@ -419,7 +421,7 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) all_names
     sub_env :: NameEnv [Name]
     sub_env = mkSubNameEnv all_names
 
-    bale_out item = addErr (badImportItemErr iface imp_spec item)  `thenM_`
+    bale_out item = addErr (badImportItemErr iface decl_spec item)  `thenM_`
 		    returnM []
 
     succeed_with :: Bool -> [Name] -> RnM [GlobalRdrElt]
@@ -428,10 +430,11 @@ filterImports iface imp_spec (Just (want_hiding, import_items)) all_names
 	   ; returnM (map (mk_gre loc) names) }
       where
 	mk_gre loc name = GRE { gre_name = name, 
-				gre_prov = Imported [imp_spec'] }
+				gre_prov = Imported [imp_spec] }
 	  where
-	    imp_spec' = imp_spec { is_loc = loc, is_explicit = explicit }
-	    explicit = all_explicit || isNothing (nameParent_maybe name)
+	    imp_spec  = ImpSpec { is_decl = decl_spec, is_item = item_spec }
+	    item_spec = ImpSome { is_explicit = explicit, is_iloc = loc }
+	    explicit  = all_explicit || isNothing (nameParent_maybe name)
 
     get_item :: IE RdrName -> RnM [GlobalRdrElt]
 	-- Empty result for a bad item.
@@ -678,7 +681,7 @@ reportDeprecations tcg_env
     check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
       | name `elemNameSet` used_names
       ,	Just deprec_txt <- lookupDeprec hpt pit name
-      = setSrcSpan (is_loc imp_spec) $
+      = setSrcSpan (importSpecLoc imp_spec) $
 	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
 			occNameFlavour (nameOccName name) <+> 
 		 	quotes (ppr name),
@@ -686,7 +689,7 @@ reportDeprecations tcg_env
 		      (ppr deprec_txt) ])
 	where
 	  name_mod = nameModule name
-	  imp_mod  = is_mod imp_spec
+	  imp_mod  = importSpecModule imp_spec
 	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
 	  extra | imp_mod == name_mod = empty
 		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
@@ -767,8 +770,8 @@ reportUnusedNames export_decls gbl_env
     unused_imports :: [GlobalRdrElt]
     unused_imports = filter unused_imp defined_but_not_used
     unused_imp (GRE {gre_prov = Imported imp_specs}) 
-	= not (all (module_unused . is_mod) imp_specs)
-	  && any is_explicit imp_specs
+	= not (all (module_unused . importSpecModule) imp_specs)
+	  && or [exp | ImpSpec { is_item = ImpSome { is_explicit = exp } } <- imp_specs]
 		-- Don't complain about unused imports if we've already said the
 		-- entire import is unused
     unused_imp other = False
@@ -801,7 +804,7 @@ reportUnusedNames export_decls gbl_env
 	-- construct minimal imports that import the name by (one of)
 	-- the same route(s) as the programmer originally did.
     add_name (GRE {gre_name = n, gre_prov = Imported imp_specs}) acc 
-	= addToFM_C plusAvailEnv acc (is_mod (head imp_specs))
+	= addToFM_C plusAvailEnv acc (importSpecModule (head imp_specs))
 		    (unitAvailEnv (mk_avail n (nameParent_maybe n)))
     add_name other acc 
 	= acc
@@ -887,13 +890,14 @@ warnDuplicateImports gres
 		, pr <- redundants imps ]
   where
     warn name (red_imp, cov_imp)
-	= addWarnAt (is_loc red_imp)
+	= addWarnAt (importSpecLoc red_imp)
 	    (vcat [ptext SLIT("Redundant import of:") <+> quotes pp_name,
 	           ptext SLIT("It is also") <+> ppr cov_imp])
 	where
-	  pp_name | is_qual red_imp = ppr (is_as red_imp) <> dot <> ppr occ
+	  pp_name | is_qual red_decl = ppr (is_as red_decl) <> dot <> ppr occ
 		  | otherwise	    = ppr occ
 	  occ = nameOccName name
+	  red_decl = is_decl red_imp
     
     redundants :: [ImportSpec] -> [(ImportSpec,ImportSpec)]
 	-- The returned pair is (redundant-import, covering-import)
@@ -904,26 +908,40 @@ warnDuplicateImports gres
 
 	-- "red_imp" is a putative redundant import
 	-- "cov_imp" potentially covers it
-	-- This test decides
-    covers red_imp cov_imp
+	-- This test decides whether red_imp could be dropped 
+	--
+	-- NOTE: currently the test does not warn about
+	--		import M( x )
+	--		imoprt N( x )
+	-- even if the same underlying 'x' is involved, because dropping
+	-- either import would change the qualified names in scope (M.x, N.x)
+	-- But if the qualified names aren't used, the import is indeed redundant
+	-- Sadly we don't know that.  Oh well.
+    covers red_imp@(ImpSpec { is_decl = red_decl, is_item = red_item }) 
+	   cov_imp@(ImpSpec { is_decl = cov_decl, is_item = cov_item })
 	| red_loc == cov_loc
   	= False		-- Ignore diagonal elements
-	| not (is_as red_imp == is_as cov_imp)
+	| not (is_as red_decl == is_as cov_decl)
 	= False		-- They bring into scope different qualified names
-	| not (is_qual red_imp) && is_qual cov_imp
+	| not (is_qual red_decl) && is_qual cov_decl
 	= False		-- Covering one doesn't bring unqualified name into scope
-	| is_explicit red_imp	
-	= not cov_explicit 	-- Redundant one is explicit and covering one isn't
+	| red_selective
+	= not cov_selective 	-- Redundant one is selective and covering one isn't
 	  || red_later		-- Both are explicit; tie-break using red_later
 	| otherwise		
-	= not cov_explicit 	-- Neither import is explicit
-	  && (is_mod red_imp == is_mod cov_imp)	-- They import the same module
+	= not cov_selective 	-- Neither import is selective
+	  && (is_mod red_decl == is_mod cov_decl)	-- They import the same module
 	  && red_later 		-- Tie-break
 	where
-	  cov_explicit = is_explicit cov_imp
-	  red_loc   = is_loc red_imp
-	  cov_loc   = is_loc cov_imp
+	  red_loc   = importSpecLoc red_imp
+	  cov_loc   = importSpecLoc cov_imp
 	  red_later = red_loc > cov_loc
+	  cov_selective = selectiveImpItem cov_item
+	  red_selective = selectiveImpItem red_item
+
+selectiveImpItem :: ImpItemSpec -> Bool
+selectiveImpItem ImpAll       = False
+selectiveImpItem (ImpSome {}) = True
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports :: FiniteMap Module AvailEnv	-- Minimal imports
@@ -983,8 +1001,8 @@ printMinimalImports imps
 %************************************************************************
 
 \begin{code}
-badImportItemErr iface imp_spec ie
-  = sep [ptext SLIT("Module"), quotes (ppr (is_mod imp_spec)), source_import,
+badImportItemErr iface decl_spec ie
+  = sep [ptext SLIT("Module"), quotes (ppr (is_mod decl_spec)), source_import,
 	 ptext SLIT("does not export"), quotes (ppr ie)]
   where
     source_import | mi_boot iface = ptext SLIT("(hi-boot interface)")

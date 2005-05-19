@@ -33,7 +33,7 @@ import TcHsSyn		( hsPatType )
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppTyCon, tcTyConAppArgs,
+import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppTyCon, 
 			  tcTyConAppArgs, isUnLiftedType, Type, mkAppTy )
 import Type		( funArgTy, splitFunTys, isUnboxedTupleType, mkFunTy )
 import CoreSyn
@@ -44,7 +44,6 @@ import Id		( Id, idType, idName, idDataCon )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isVanillaDataCon )
-import Name		( Name )
 import TyCon		( FieldLabel, tyConDataCons )
 import TysWiredIn	( tupleCon )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
@@ -53,7 +52,6 @@ import PrelNames	( toPName,
 			  mfixName )
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import Util		( zipEqual, zipWithEqual )
-import Maybe		( fromJust )
 import Bag		( bagToList )
 import Outputable
 import FastString

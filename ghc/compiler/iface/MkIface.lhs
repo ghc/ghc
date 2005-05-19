@@ -187,7 +187,7 @@ import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( mkModDeps )
 import HscTypes		( ModIface(..), ModDetails(..), 
-			  ModGuts(..), ModGuts, IfaceExport,
+			  ModGuts(..), IfaceExport,
 			  HscEnv(..), hscEPS, Dependencies(..), FixItem(..), 
 			  ModSummary(..), msHiFilePath, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,

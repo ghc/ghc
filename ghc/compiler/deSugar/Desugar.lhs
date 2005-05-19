@@ -11,7 +11,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
 import StaticFlags	( opt_SccProfilingOn )
 import DriverPhases	( isHsBoot )
-import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), 
+import HscTypes		( ModGuts(..), HscEnv(..), 
 			  Dependencies(..), TypeEnv, IsBootInterface )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
@@ -29,7 +29,6 @@ import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module		( Module, moduleEnvElts, delModuleEnv, moduleFS )
-import Id		( Id )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
 import VarEnv
