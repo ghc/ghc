@@ -11,13 +11,15 @@ some unnecessary loops in the module dependency graph.
 \begin{code}
 module Panic  
    ( 
-     GhcException(..), ghcError, progName, 
+     GhcException(..), showGhcException, ghcError, progName, 
      pgmError,
-     panic, panic#, assertPanic, trace,
-     showException, showGhcException, tryMost,
-     installSignalHandlers, 
 
-     catchJust, tryJust, ioErrors, throwTo,
+     panic, panic#, assertPanic, trace,
+     
+     Exception.Exception(..), showException, try, tryJust, tryMost, tryUser,
+     catchJust, ioErrors, throwTo,
+
+     installSignalHandlers, 
    ) where
 
 #include "HsVersions.h"
@@ -52,6 +54,7 @@ import DYNAMIC
 import qualified EXCEPTION as Exception
 import TRACE		( trace )
 import UNSAFE_IO	( unsafePerformIO )
+import IO		( isUserError )
 
 import System
 \end{code}
@@ -162,7 +165,7 @@ assertPanic file line =
 -- files, for example.
 
 tryMost :: IO a -> IO (Either Exception.Exception a)
-tryMost action = do r <- myTry action; filter r
+tryMost action = do r <- try action; filter r
   where
    filter (Left e@(Exception.DynException d))
 	    | Just ghc_ex <- fromDynamic d
@@ -173,16 +176,31 @@ tryMost action = do r <- myTry action; filter r
    filter other 
      = return other
 
-#if __GLASGOW_HASKELL__ <= 408
-myTry = Exception.tryAllIO
-#else
-myTry = Exception.try
+-- | tryUser is like try, but catches only UserErrors.
+-- These are the ones that are thrown by the TcRn monad 
+-- to signal an error in the program being compiled
+tryUser :: IO a -> IO (Either Exception.Exception a)
+tryUser action = tryJust tc_errors action
+  where 
+#if __GLASGOW_HASKELL__ > 504 || __GLASGOW_HASKELL__ < 500
+	tc_errors e@(Exception.IOException ioe) | isUserError ioe = Just e
+#elif __GLASGOW_HASKELL__ == 502
+	tc_errors e@(UserError _) = Just e
+#else 
+	tc_errors e@(Exception.IOException ioe) | isUserError e = Just e
 #endif
+	tc_errors _other = Nothing
 \end{code}	
 
 Compatibility stuff:
 
 \begin{code}
+#if __GLASGOW_HASKELL__ <= 408
+try = Exception.tryAllIO
+#else
+try = Exception.try
+#endif
+
 #if __GLASGOW_HASKELL__ <= 408
 catchJust = Exception.catchIO
 tryJust   = Exception.tryIO

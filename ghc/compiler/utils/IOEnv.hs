@@ -7,7 +7,7 @@ module IOEnv (
 	IOEnv,	-- Instance of Monad
 
 	-- Standard combinators, specialised
-	returnM, thenM, thenM_, failM,
+	returnM, thenM, thenM_, failM, failWithM,
 	mappM, mappM_, mapSndM, sequenceM, sequenceM_, 
 	foldlM, 
 	mapAndUnzipM, mapAndUnzip3M, 
@@ -17,7 +17,7 @@ module IOEnv (
 	getEnv, setEnv, updEnv,
 
 	runIOEnv, unsafeInterleaveM,			
-	tryM, fixM, 
+	tryM, tryAllM, fixM, 
 
 	-- I/O operations
 	ioToIOEnv,
@@ -25,12 +25,10 @@ module IOEnv (
   ) where
 #include "HsVersions.h"
 
-import Panic		( tryJust )
+import Panic		( try, tryUser, Exception(..) )
 import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
-import EXCEPTION	( Exception(..) )
-import IO		( isUserError )
 
 
 ----------------------------------------------------------------------
@@ -60,6 +58,9 @@ thenM_ (IOEnv m) f = IOEnv (\ env -> do { m env ; unIOEnv f env })
 failM :: IOEnv env a
 failM = IOEnv (\ env -> ioError (userError "IOEnv failure"))
 
+failWithM :: String -> IOEnv env a
+failWithM s = IOEnv (\ env -> ioError (userError s))
+
 
 
 ----------------------------------------------------------------------
@@ -86,19 +87,18 @@ fixM f = IOEnv (\ env -> fixIO (\ r -> unIOEnv (f r) env))
 
 ---------------------------
 tryM :: IOEnv env r -> IOEnv env (Either Exception r)
--- Reflect exception into IOEnv envonad
-tryM (IOEnv thing) = IOEnv (\ env -> tryJust tc_errors (thing env))
-  where 
-#if __GLASGOW_HASKELL__ > 504 || __GLASGOW_HASKELL__ < 500
-	tc_errors e@(IOException ioe) | isUserError ioe = Just e
-#elif __GLASGOW_HASKELL__ == 502
-	tc_errors e@(UserError _) = Just e
-#else 
-	tc_errors e@(IOException ioe) | isUserError e = Just e
-#endif
-	tc_errors _other = Nothing
-	-- type checker failures show up as UserErrors only
+-- Reflect UserError exceptions into IOEnv monad
+-- The idea is that errors in the program being compiled will give rise
+-- to UserErrors.  But, say, pattern-match failures in GHC itself should
+-- not be caught here, else they'll be reported as errors in the program 
+-- begin compiled!
+tryM (IOEnv thing) = IOEnv (\ env -> tryUser (thing env))
 
+tryAllM :: IOEnv env r -> IOEnv env (Either Exception r)
+-- Catch *all* exceptions
+-- This is used when running a Template-Haskell splice, when
+-- even a pattern-match failure is a programmer error
+tryAllM (IOEnv thing) = IOEnv (\ env -> try (thing env))
 
 ---------------------------
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a

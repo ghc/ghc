@@ -35,7 +35,6 @@ import ForeignCall	( CCallConv(..) )
 import OrdList
 import Pretty
 import Outputable
-import qualified Outputable
 import FastString
 import FastTypes	( isFastTrue )
 import Constants	( wORD_SIZE )

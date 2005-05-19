@@ -88,7 +88,6 @@ import Cmm
 import MachOp		( MachRep(..) )
 
 import CLabel           ( CLabel, mkMainCapabilityLabel )
-import Unique		( Unique )
 import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable

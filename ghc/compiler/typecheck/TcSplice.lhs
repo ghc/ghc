@@ -376,22 +376,29 @@ runMeta expr
 	; this_mod <- getModule
 	; let type_env = tcg_type_env tcg_env
 	      rdr_env  = tcg_rdr_env tcg_env
-	-- Wrap the compile-and-run in an exception-catcher
-	-- Compiling might fail if linking fails
-	-- Running might fail if it throws an exception
-	; either_tval <- tryM $ do
-		{ 	-- Compile it
-		  hval <- ioToTcRn (HscMain.compileExpr 
+
+	-- Compile and link it; might fail if linking fails
+	; either_hval <- tryM $ ioToTcRn $
+			 HscMain.compileExpr 
 				      hsc_env this_mod 
-			              rdr_env type_env expr)
-     	  		-- Coerce it to Q t, and run it
-		; TH.runQ (unsafeCoerce# hval) }
+			              rdr_env type_env expr
+	; case either_hval of {
+	    Left exn   -> failWithTc (mk_msg "compile and link" exn) ;
+	    Right hval -> do
+
+	{ 	-- Coerce it to Q t, and run it
+		-- Running might fail if it throws an exception of any kind (hence tryAllM)
+		-- including, say, a pattern-match exception in the code we are running
+	  either_tval <- tryAllM (TH.runQ (unsafeCoerce# hval))
 
 	; case either_tval of
-	      Left exn -> failWithTc (vcat [text "Exception when trying to run compile-time code:", 
-				            nest 4 (vcat [text "Code:" <+> ppr expr,
-						      text ("Exn: " ++ Panic.showException exn)])])
-	      Right v  -> returnM v }
+	      Left exn -> failWithTc (mk_msg "run" exn)
+	      Right v  -> returnM v
+	}}}
+  where
+    mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
+			 nest 2 (text (Panic.showException exn)),
+			 nest 2 (text "Code:" <+> ppr expr)]
 \end{code}
 
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:

@@ -93,7 +93,7 @@ import RegAllocInfo
 import Cmm
 
 import Digraph
-import Unique		( Uniquable(..), Unique, getUnique )
+import Unique		( Uniquable(getUnique), Unique )
 import UniqSet
 import UniqFM
 import Outputable
