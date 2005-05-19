@@ -567,8 +567,10 @@ way_details =
 
     (WaySMP, Way  "s" False "SMP"
 	[ "-fsmp"
+#if !defined(mingw32_TARGET_OS)
 	, "-optc-pthread"
-#ifndef freebsd_TARGET_OS
+#endif
+#if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS)
 	, "-optl-pthread"
 #endif
 	, "-optc-DSMP"
