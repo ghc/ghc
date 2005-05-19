@@ -1424,18 +1424,6 @@ newMVarzh_fast
     StgTSO_sp(tso) = StgTSO_sp(tso) + WDS(3);	\
     lval = W_[StgTSO_sp(tso) - WDS(1)];
 
-/*
- * Only in threaded mode: we have to be careful when manipulating another thread's TSO,
- * because the scheduler might also be manipulating it.
- */
-#if defined(RTS_SUPPORTS_THREADS)
-#define ACQUIRE_SCHED_LOCK   foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
-#define RELEASE_SCHED_LOCK   foreign "C" RELEASE_LOCK(sched_mutex "ptr");
-#else
-#define ACQUIRE_SCHED_LOCK
-#define RELEASE_SCHED_LOCK
-#endif
-
 takeMVarzh_fast
 {
     W_ mvar, val, info, tso;
@@ -1471,8 +1459,6 @@ takeMVarzh_fast
 
   if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure)
   {
-      ACQUIRE_SCHED_LOCK;
-
       /* There are putMVar(s) waiting... 
        * wake up the first thread on the queue
        */
@@ -1484,14 +1470,12 @@ takeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
-      "ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar),mvar);
+      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar);
       StgMVar_head(mvar) = tso;
 #else
-      "ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
+      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
       StgMVar_head(mvar) = tso;
 #endif
-
-      RELEASE_SCHED_LOCK;
 
       if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1547,8 +1531,6 @@ tryTakeMVarzh_fast
 
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
 
-        ACQUIRE_SCHED_LOCK;
-
 	/* There are putMVar(s) waiting... 
 	 * wake up the first thread on the queue
 	 */
@@ -1560,14 +1542,12 @@ tryTakeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr", mvar "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr");
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
 	StgMVar_head(mvar) = tso;
 #endif
-
-        RELEASE_SCHED_LOCK;
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1620,8 +1600,6 @@ putMVarzh_fast
   
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
 
-        ACQUIRE_SCHED_LOCK;
-
 	/* There are takeMVar(s) waiting: wake up the first one
 	 */
 	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
@@ -1632,14 +1610,12 @@ putMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr",mvar "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
 	StgMVar_head(mvar) = tso;
 #endif
-
-        RELEASE_SCHED_LOCK;
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1689,8 +1665,6 @@ tryPutMVarzh_fast
   
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
 
-        ACQUIRE_SCHED_LOCK;
-
 	/* There are takeMVar(s) waiting: wake up the first one
 	 */
 	ASSERT(StgTSO_why_blocked(StgMVar_head(mvar)) == BlockedOnMVar::I16);
@@ -1701,14 +1675,12 @@ tryPutMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr",mvar "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOneLocked(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
 	StgMVar_head(mvar) = tso;
 #endif
-
-        RELEASE_SCHED_LOCK;
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
