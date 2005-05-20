@@ -94,7 +94,7 @@ import TcHsType		( kcHsType )
 import TcMType		( zonkTcType, zonkQuantifiedTyVar )
 import TcMatches	( tcStmts, tcDoStmt )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
-import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, 
+import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, isTauTy,
 			  isUnLiftedType, tyClsNamesOfDFunHead, tyClsNamesOfType, isUnitTy )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
@@ -968,7 +968,7 @@ mkPlan stmt@(L loc _)
 	--	[stmt]
 	; runPlans [do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
 		       ; v_ty <- zonkTcType (idType v_id)
-		       ; ifM (isUnitTy v_ty) failM
+		       ; ifM (isUnitTy v_ty || not (isTauTy v_ty)) failM
 		       ; return stuff },
 		    tcGhciStmts [stmt]
 	  ]}
