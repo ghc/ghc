@@ -361,42 +361,140 @@ Ok, modules loaded: A, B, C, D.
     <title>Interactive evaluation at the prompt</title>
 
     <para>When you type an expression at the prompt, GHCi immediately
-    evaluates and prints the result.  But that's not the whole story:
-    if you type something of type <literal>IO a</literal> for some
-    <literal>a</literal>, then GHCi <emphasis>executes</emphasis> it
-    as an IO-computation, and doesn't attempt to print the
-    result:.</para>
+    evaluates and prints the result:
+<screen>
+Prelude> reverse "hello"
+"olleh"
+Prelude> 5+5
+10
+</screen>
+</para>
 
+<sect2><title>I/O actions at the prompt</title>
+
+<para>GHCi does more than simple expression evaluation at the prompt.
+If you type something of type <literal>IO a</literal> for some
+    <literal>a</literal>, then GHCi <emphasis>executes</emphasis> it
+    as an IO-computation.
 <screen>
 Prelude> "hello"
 "hello"
 Prelude> putStrLn "hello"
 hello
 </screen>
-
-    <para>What actually happens is that GHCi typechecks the
-    expression, and if it doesn't have an <literal>IO</literal> type,
-    then it transforms it as follows: an expression
-    <replaceable>e</replaceable> turns into 
-<screen>     
-             let it = <replaceable>e</replaceable>;
-             print it
+Furthermore, GHCi will print the result of the I/O action if (and only
+if):
+<itemizedlist>
+  <listitem><para>The result type is an instance of <literal>Show</literal>.</para></listitem>
+  <listitem><para>The result type is not
+  <literal>()</literal>.</para></listitem>
+</itemizedlist>
+For example, remembering that <literal>putStrLn :: String -> IO ()</literal>:
+<screen>
+Prelude> putStrLn "hello"
+hello
+Prelude> do { putStrLn "hello"; return "yes" }
+hello
+"yes"
 </screen>
-    which is then run as an IO-action.</para>
+</para></sect2>
 
-    <para>Hence, the original expression must have a type which is an
-    instance of the <literal>Show</literal> class, or GHCi will
-    complain:</para>
+    <sect2>
+      <title>Using <literal>do-</literal>notation at the prompt</title>
+      <indexterm><primary>do-notation</primary><secondary>in GHCi</secondary></indexterm>
+      <indexterm><primary>statements</primary><secondary>in GHCi</secondary></indexterm>
+      
+      <para>GHCi actually accepts <firstterm>statements</firstterm>
+      rather than just expressions at the prompt.  This means you can
+      bind values and functions to names, and use them in future
+      expressions or statements.</para>
+
+      <para>The syntax of a statement accepted at the GHCi prompt is
+      exactly the same as the syntax of a statement in a Haskell
+      <literal>do</literal> expression.  However, there's no monad
+      overloading here: statements typed at the prompt must be in the
+      <literal>IO</literal> monad.
+<screen>
+Prelude> x &lt;- return 42
+42
+Prelude> print x
+42
+Prelude>
+</screen>
+      The statement <literal>x &lt;- return 42</literal> means
+      &ldquo;execute <literal>return 42</literal> in the
+      <literal>IO</literal> monad, and bind the result to
+      <literal>x</literal>&rdquo;.  We can then use
+      <literal>x</literal> in future statements, for example to print
+      it as we did above.</para>
+
+      <para>Of course, you can also bind normal non-IO expressions
+      using the <literal>let</literal>-statement:</para>
+<screen>
+Prelude> let x = 42
+42
+Prelude> print x
+42
+Prelude>
+</screen>
+      <para>An important difference between the two types of binding
+      is that the monadic bind (<literal>p &lt;- e</literal>) is
+      <emphasis>strict</emphasis> (it evaluates <literal>e</literal>),
+      whereas with the <literal>let</literal> form, the expression
+      isn't evaluated immediately:</para>
+<screen>
+Prelude> let x = error "help!"
+Prelude> print x
+*** Exception: help!
+Prelude>
+</screen>
+      <para>Any exceptions raised during the evaluation or execution
+      of the statement are caught and printed by the GHCi command line
+      interface (for more information on exceptions, see the module
+      <literal>Control.Exception</literal> in the libraries
+      documentation).</para>
+
+<para>GHCi will print the result of a <literal>let</literal> or
+<literal>x&lt;-e</literal> statement if and only if:
+<itemizedlist>
+<listitem><para>The statement binds exactly one variable</para></listitem>
+<listitem><para>The variable's type is not polymorphic, is not
+<literal>()</literal>,
+and is an instance of <literal>Show</literal>
+</para></listitem>
+</itemizedlist>
+
+      <para>Every new binding shadows any existing bindings of the
+      same name, including entities that are in scope in the current
+      module context.</para>
+
+      <para>WARNING: temporary bindings introduced at the prompt only
+      last until the next <literal>:load</literal> or
+      <literal>:reload</literal> command, at which time they will be
+      simply lost.  However, they do survive a change of context with
+      <literal>:module</literal>: the temporary bindings just move to
+      the new location.</para>
+
+      <para>HINT: To get a list of the bindings currently in scope, use the
+      <literal>:show bindings</literal> command:</para>
 
 <screen>
-Prelude> id
-No instance for `Show (a -> a)'
-arising from use of `print'
-in a `do' expression pattern binding: print it
-</screen>
+Prelude> :show bindings
+x :: Int
+Prelude></screen>
 
-    <para>The error message contains some clues as to the
-    transformation happening internally.</para>
+      <para>HINT: if you turn on the <literal>+t</literal> option,
+      GHCi will show the type of each variable bound by a statement.
+      For example:</para>
+      <indexterm><primary><literal>+t</literal></primary></indexterm>
+<screen>
+Prelude> :set +t
+Prelude> let (x:xs) = [1..]
+x :: Integer
+xs :: [Integer]
+</screen>
+</para>
+    </sect2>
 
     <sect2 id="ghci-scope">
       <title>What's really in scope at the prompt?</title> 
@@ -505,92 +603,6 @@ Prelude,IO>
       </sect3>
     </sect2>
   
-    <sect2>
-      <title>Using <literal>do-</literal>notation at the prompt</title>
-      <indexterm><primary>do-notation</primary><secondary>in GHCi</secondary></indexterm>
-      <indexterm><primary>statements</primary><secondary>in GHCi</secondary></indexterm>
-      
-      <para>GHCi actually accepts <firstterm>statements</firstterm>
-      rather than just expressions at the prompt.  This means you can
-      bind values and functions to names, and use them in future
-      expressions or statements.</para>
-
-      <para>The syntax of a statement accepted at the GHCi prompt is
-      exactly the same as the syntax of a statement in a Haskell
-      <literal>do</literal> expression.  However, there's no monad
-      overloading here: statements typed at the prompt must be in the
-      <literal>IO</literal> monad.</para>
-
-      <para>Here's an example:</para>
-<screen>
-Prelude> x &lt;- return 42
-Prelude> print x
-42
-Prelude>
-</screen>
-      <para>The statement <literal>x &lt;- return 42</literal> means
-      &ldquo;execute <literal>return 42</literal> in the
-      <literal>IO</literal> monad, and bind the result to
-      <literal>x</literal>&rdquo;.  We can then use
-      <literal>x</literal> in future statements, for example to print
-      it as we did above.</para>
-
-      <para>Of course, you can also bind normal non-IO expressions
-      using the <literal>let</literal>-statement:</para>
-<screen>
-Prelude> let x = 42
-Prelude> print x
-42
-Prelude>
-</screen>
-      <para>An important difference between the two types of binding
-      is that the monadic bind (<literal>p &lt;- e</literal>) is
-      <emphasis>strict</emphasis> (it evaluates <literal>e</literal>),
-      whereas with the <literal>let</literal> form, the expression
-      isn't evaluated immediately:</para>
-<screen>
-Prelude> let x = error "help!"
-Prelude> print x
-*** Exception: help!
-Prelude>
-</screen>
-      <para>Any exceptions raised during the evaluation or execution
-      of the statement are caught and printed by the GHCi command line
-      interface (for more information on exceptions, see the module
-      <literal>Control.Exception</literal> in the libraries
-      documentation).</para>
-
-      <para>Every new binding shadows any existing bindings of the
-      same name, including entities that are in scope in the current
-      module context.</para>
-
-      <para>WARNING: temporary bindings introduced at the prompt only
-      last until the next <literal>:load</literal> or
-      <literal>:reload</literal> command, at which time they will be
-      simply lost.  However, they do survive a change of context with
-      <literal>:module</literal>: the temporary bindings just move to
-      the new location.</para>
-
-      <para>HINT: To get a list of the bindings currently in scope, use the
-      <literal>:show bindings</literal> command:</para>
-
-<screen>
-Prelude> :show bindings
-x :: Int
-Prelude></screen>
-
-      <para>HINT: if you turn on the <literal>+t</literal> option,
-      GHCi will show the type of each variable bound by a statement.
-      For example:</para>
-      <indexterm><primary><literal>+t</literal></primary></indexterm>
-<screen>
-Prelude> :set +t
-Prelude> let (x:xs) = [1..]
-x :: Integer
-xs :: [Integer]
-</screen>
-
-    </sect2>
 
     <sect2>
       <title>The <literal>it</literal> variable</title>
@@ -606,18 +618,31 @@ Prelude> 1+2
 Prelude> it * 2
 6
 </screen>
-
-      <para>This is a result of the translation mentioned earlier,
-      namely that an expression <replaceable>e</replaceable> is
-      translated to
+    <para>What actually happens is that GHCi typechecks the
+    expression, and if it doesn't have an <literal>IO</literal> type,
+    then it transforms it as follows: an expression
+    <replaceable>e</replaceable> turns into 
 <screen>     
              let it = <replaceable>e</replaceable>;
              print it
 </screen>
-      before execution, resulting in a binding for
-      <literal>it</literal>.</para>
+    which is then run as an IO-action.</para>
 
-      <para>If the expression was of type <literal>IO a</literal> for
+    <para>Hence, the original expression must have a type which is an
+    instance of the <literal>Show</literal> class, or GHCi will
+    complain:</para>
+
+<screen>
+Prelude> id
+No instance for `Show (a -> a)'
+arising from use of `print'
+in a `do' expression pattern binding: print it
+</screen>
+
+    <para>The error message contains some clues as to the
+    transformation happening internally.</para>
+
+      <para>If the expression was instead of type <literal>IO a</literal> for
       some <literal>a</literal>, then <literal>it</literal> will be
       bound to the result of the <literal>IO</literal> computation,
       which is of type <literal>a</literal>.  eg.:</para>
@@ -659,14 +684,25 @@ Wed Mar 14 12:23:13 GMT 2001
   []
 </programlisting>
     However, it is tiresome for the user to have to specify the type, so GHCi extends Haskell's type-defaulting
-    rules (Section 4.3.4 of the Haskell 98 Report (Revised)) as follows.  If the expression yields a set of
-    type constraints that are all from standard classes (<literal>Num</literal>, <literal>Eq</literal> etc.), 
-   and at least one is either a numeric class <emphasis>or the <literal>Show</literal>, 
-   <literal>Eq</literal>, or <literal>Ord</literal> class</emphasis>,
-   GHCi will try to use one of the <literal>default</literal> types, just as described in the Report.
-   The standard defaulting rules require that one of the classes is numeric; the difference here
-   is that defaulting is also triggered at least one is <literal>Show</literal>, 
-   <literal>Eq</literal>, or <literal>Ord</literal>.  
+    rules (Section 4.3.4 of the Haskell 98 Report (Revised)) as follows.  The
+    standard rules take each group of constraints <literal>(C1 a, C2 a, ..., Cn
+    a)</literal> for each type variable <literal>a</literal>, and defaults the
+    type variable if 
+	<itemizedlist>
+	    <listitem><para> The type variable <literal>a</literal>
+	appears in no other constraints </para></listitem>
+	    <listitem><para> All the classes <literal>Ci</literal> are standard.</para></listitem>
+	    <listitem><para> At least one of the classes <literal>Ci</literal> is
+	    numeric.</para></listitem>
+      </itemizedlist>
+   At the GHCi prompt, the second and third rules are relaxed as follows
+   (differences italicised):
+	<itemizedlist>
+	    <listitem><para> <emphasis>Any</emphasis> of the classes <literal>Ci</literal> is standard.</para></listitem>
+	    <listitem><para> At least one of the classes <literal>Ci</literal> is
+	    numeric, <emphasis>or is <literal>Show</literal>, 
+		<literal>Eq</literal>, or <literal>Ord</literal></emphasis>.</para></listitem>
+      </itemizedlist>
    </para>
     </sect2>
   </sect1>
