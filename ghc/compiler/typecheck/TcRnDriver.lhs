@@ -83,8 +83,8 @@ import Outputable
 
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
-			  LStmt, LHsExpr, LHsType, mkMatchGroup,
-			  collectLStmtsBinders, mkSimpleMatch, nlVarPat,
+			  LStmt, LHsExpr, LHsType, mkVarBind,
+			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
 		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
 			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
@@ -95,7 +95,7 @@ import TcMType		( zonkTcType, zonkQuantifiedTyVar )
 import TcMatches	( tcStmts, tcDoStmt )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
 import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, 
-			  isUnLiftedType, tyClsNamesOfDFunHead, tyClsNamesOfType )
+			  isUnLiftedType, tyClsNamesOfDFunHead, tyClsNamesOfType, isUnitTy )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
 import Inst		( tcGetInstEnvs )
@@ -116,7 +116,6 @@ import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
-import SrcLoc		( unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
 import Name		( nameOccName, nameModule, isBuiltInSyntax, nameParent_maybe )
@@ -129,7 +128,7 @@ import HscTypes		( InteractiveContext(..), HomeModInfo(..),
 			  Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Panic		( ghcError, GhcException(..) )
-import SrcLoc		( SrcLoc )
+import SrcLoc		( SrcLoc, unLoc, noSrcSpan )
 #endif
 
 import FastString	( mkFastString )
@@ -843,8 +842,14 @@ tcRnStmt hsc_env ictxt rdr_stmt
     failIfErrsM ;
     
     -- The real work is done here
-    (bound_ids, tc_expr) <- tcUserStmt rn_stmt ;
+    (bound_ids, tc_expr) <- mkPlan rn_stmt ;
+    zonked_expr <- zonkTopLExpr tc_expr ;
+    zonked_ids  <- zonkTopBndrs bound_ids ;
     
+	-- None of the Ids should be of unboxed type, because we
+	-- cast them all to HValues in the end!
+    mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
+
     traceTc (text "tcs 1") ;
     let {	-- (a) Make all the bound ids "global" ids, now that
     		--     they're notionally top-level bindings.  This is
@@ -855,7 +860,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
 		-- (b) Tidy their types; this is important, because :info may
 		--     ask to look at them, and :info expects the things it looks
 		--     up to have tidy types
-	global_ids = map globaliseAndTidy bound_ids ;
+	global_ids = map globaliseAndTidy zonked_ids ;
     
 		-- Update the interactive context
 	rn_env   = ic_rn_local_env ictxt ;
@@ -880,10 +885,13 @@ tcRnStmt hsc_env ictxt rdr_stmt
 
     dumpOptTcRn Opt_D_dump_tc 
     	(vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
-    	       text "Typechecked expr" <+> ppr tc_expr]) ;
+    	       text "Typechecked expr" <+> ppr zonked_expr]) ;
 
-    returnM (new_ic, bound_names, tc_expr)
+    returnM (new_ic, bound_names, zonked_expr)
     }
+  where
+    bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
+				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 
 globaliseAndTidy :: Id -> Id
 globaliseAndTidy id
@@ -915,33 +923,65 @@ Here is the grand plan, implemented in tcUserStmt
 
 \begin{code}
 ---------------------------
-tcUserStmt :: LStmt Name -> TcM ([Id], LHsExpr Id)
-tcUserStmt (L loc (ExprStmt expr _ _))
-  = newUnique 		`thenM` \ uniq ->
-    let 
-	fresh_it = itName uniq
-        the_bind = noLoc $ FunBind (noLoc fresh_it) False 
-			     (mkMatchGroup [mkSimpleMatch [] expr])
-    in
-    tryTcLIE_ (do { 	-- Try this if the other fails
-		traceTc (text "tcs 1b") ;
-		tc_stmts (map (L loc) [
-		    LetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive],
-		    ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
-			     (HsVar thenIOName) placeHolderType
-	]) })
-	  (do { 	-- Try this first 
-		traceTc (text "tcs 1a") ;
-		tc_stmts [L loc (BindStmt (nlVarPat fresh_it) expr
-					  (HsVar bindIOName) noSyntaxExpr) ] })
+type PlanResult = ([Id], LHsExpr Id)
+type Plan = TcM PlanResult
 
-tcUserStmt stmt = tc_stmts [stmt]
+runPlans :: [Plan] -> TcM PlanResult
+-- Try the plans in order.  If one fails (by raising an exn), try the next.
+-- If one succeeds, take it.
+runPlans []     = panic "runPlans"
+runPlans [p]    = p
+runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
+
+--------------------
+mkPlan :: LStmt Name -> TcM PlanResult
+mkPlan (L loc (ExprStmt expr _ _))
+  = do	{ uniq <- newUnique
+	; let fresh_it  = itName uniq
+	      the_bind  = mkVarBind noSrcSpan fresh_it expr
+	      let_stmt  = L loc $ LetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive]
+	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
+					   (HsVar bindIOName) noSyntaxExpr 
+	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
+			          	   (HsVar thenIOName) placeHolderType
+
+	-- The plans are:
+	--	[it <- e; print it]	but not if it::()
+	--	[it <- e]		
+	--	[let it = e; print it]	
+	--	[let it = e]
+	; runPlans [do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
+		       ; it_ty <- zonkTcType (idType it_id)
+		       ; ifM (isUnitTy it_ty) failM
+		       ; return stuff },
+		    tcGhciStmts [bind_stmt],
+		    tcGhciStmts [let_stmt, print_it],
+		    tcGhciStmts [let_stmt]
+	  ]}
+
+mkPlan stmt@(L loc _)
+  | [L _ v] <- collectLStmtBinders stmt		-- One binder
+  = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
+			          	   (HsVar thenIOName) placeHolderType
+	-- The plans are:
+	--	[stmt; print v]		but not if v::()
+	--	[stmt]
+	; runPlans [do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
+		       ; v_ty <- zonkTcType (idType v_id)
+		       ; ifM (isUnitTy v_ty) failM
+		       ; return stuff },
+		    tcGhciStmts [stmt]
+	  ]}
+  | otherwise
+  = tcGhciStmts [stmt]
 
 ---------------------------
-tc_stmts :: [LStmt Name] -> TcM ([Id], LHsExpr Id)
-tc_stmts stmts
+tcGhciStmts :: [LStmt Name] -> TcM PlanResult
+tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
+	ret_id  <- tcLookupId returnIOName ;		-- return @ IO
 	let {
+	    io_ty     = mkTyConApp ioTyCon [] ;
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
 
@@ -958,51 +998,27 @@ tc_stmts stmts
 		-- then the type checker would instantiate x..z, and we wouldn't
 		-- get their *polymorphic* values.  (And we'd get ambiguity errs
 		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ret_id ids = nlHsApp (noLoc $ TyApp (nlHsVar ret_id) [ret_ty]) 
-			      		   (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
+	    mk_return ids = nlHsApp (noLoc $ TyApp (nlHsVar ret_id) [ret_ty]) 
+			 	    (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
 	    mk_item id = nlHsApp (noLoc $ TyApp (nlHsVar unsafeCoerceId) [idType id, unitTy])
-		    	       (nlHsVar id) ;
-
-	    io_ty = mkTyConApp ioTyCon []
+		    	         (nlHsVar id) 
 	 } ;
 
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
-	((ids, tc_expr), lie) <- getLIE $ do {
-		(tc_stmts, ids) <- tcStmts DoExpr (tcDoStmt io_ty io_ret_ty) stmts $ 
-				do {
-				    -- Look up the names right in the middle,
-				    -- where they will all be in scope
-				    ids <- mappM tcLookupId names ;
-				    return ids } ;
+	((tc_stmts, ids), lie) <- getLIE $ 
+				  tcStmts DoExpr (tcDoStmt io_ty io_ret_ty) stmts $ 
+				  mappM tcLookupId names ;
+					-- Look up the names right in the middle,
+					-- where they will all be in scope
 
-	    ret_id <- tcLookupId returnIOName ;		-- return @ IO
-	    return (ids, noLoc (HsDo DoExpr tc_stmts (mk_return ret_id ids) io_ret_ty))
-	} ;
+	-- Simplify the context
+	const_binds <- checkNoErrs (tcSimplifyInteractive lie) ;
+		-- checkNoErrs ensures that the plan fails if context redn fails
 
-	-- Simplify the context right here, so that we fail
-	-- if there aren't enough instances.  Notably, when we see
-	--		e
-	-- we use recoverTc_ to try	it <- e
-	-- and then			let it = e
-	-- It's the simplify step that rejects the first.
-	traceTc (text "tcs 3") ;
-	const_binds <- tcSimplifyInteractive lie ;
-
-	-- Build result expression and zonk it
-	let { expr = mkHsLet const_binds tc_expr } ;
-	zonked_expr <- zonkTopLExpr expr ;
-	zonked_ids  <- zonkTopBndrs ids ;
-
-	-- None of the Ids should be of unboxed type, because we
-	-- cast them all to HValues in the end!
-	mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
-
-	return (zonked_ids, zonked_expr)
-	}
-  where
-    bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
-				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
+	return (ids, mkHsLet const_binds $
+		     noLoc (HsDo DoExpr tc_stmts (mk_return ids) io_ret_ty))
+    }
 \end{code}
 
 
@@ -1165,8 +1181,8 @@ lookup_rdr_name rdr_name = do {
 	-- constructor and type class identifiers.
     let { rdr_names = dataTcOccs rdr_name } ;
 
-	-- results :: [(Messages, Maybe Name)]
-    results <- mapM (tryTc . lookupOccRn) rdr_names ;
+	-- results :: [Either Messages Name]
+    results <- mapM (tryTcErrs . lookupOccRn) rdr_names ;
 
     traceRn (text "xx" <+> vcat [ppr rdr_names, ppr (map snd results)]);
 	-- The successful lookups will be (Just name)

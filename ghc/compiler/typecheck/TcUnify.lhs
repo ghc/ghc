@@ -1240,9 +1240,9 @@ checkExpectedKind ty act_kind exp_kind
   | act_kind `isSubKind` exp_kind -- Short cut for a very common case
   = returnM ()
   | otherwise
-  = tryTc (unifyKind exp_kind act_kind)	`thenM` \ (errs, mb_r) ->
+  = tryTc (unifyKind exp_kind act_kind)	`thenM` \ (_errs, mb_r) ->
     case mb_r of {
-	Just _  -> returnM () ;	-- Unification succeeded
+	Just r  -> returnM () ;	-- Unification succeeded
 	Nothing ->
 
 	-- So there's definitely an error

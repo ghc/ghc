@@ -221,12 +221,12 @@ nlHsFunTy a b		= noLoc (HsFunTy a b)
 %************************************************************************
 
 \begin{code}
-mkVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
+mkVarBind :: SrcSpan -> name -> LHsExpr name -> LHsBind name
 mkVarBind loc var rhs = mk_easy_FunBind loc var [] emptyLHsBinds rhs
 
-mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
-		    -> LHsBinds RdrName -> LHsExpr RdrName
-		    -> LHsBind RdrName
+mk_easy_FunBind :: SrcSpan -> name -> [LPat name]
+		    -> LHsBinds name -> LHsExpr name
+		    -> LHsBind name
 
 mk_easy_FunBind loc fun pats binds expr
   = L loc (FunBind (L loc fun) False{-not infix-} 
