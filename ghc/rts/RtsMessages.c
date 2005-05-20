@@ -114,21 +114,15 @@ rtsFatalInternalErrorFn(char *s, va_list ap)
   if (isGUIApp())
   {
      char title[BUFSIZE], message[BUFSIZE];
-     int r;
 
-	 r = vsnprintf(title,   BUFSIZE, "%s: internal error", prog_name);
-	 if (r > 0 && r < BUFSIZE) {
-		 strcpy(title, "internal error");
-     }
+     snprintf(title,   BUFSIZE, "%s: internal error", prog_name);
+     vsnprintf(message, BUFSIZE, s, ap);
 
-	 r = vsnprintf(message, BUFSIZE, s, ap);
-	 if (r > 0 && r < BUFSIZE) {
-	   MessageBox(NULL /* hWnd */,
-         message,
-         title,
-         MB_OK | MB_ICONERROR | MB_TASKMODAL
-         );
-     };
+     MessageBox(NULL /* hWnd */,
+	        message,
+	        title,
+	        MB_OK | MB_ICONERROR | MB_TASKMODAL
+	       );
   }
   else
 #endif
