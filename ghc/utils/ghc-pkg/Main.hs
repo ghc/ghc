@@ -45,7 +45,7 @@ import System	( getArgs, getProgName, getEnv,
 		  exitWith, ExitCode(..)
 		)
 import System.IO
-import Data.List ( isPrefixOf, isSuffixOf, intersperse )
+import Data.List ( isPrefixOf, isSuffixOf, intersperse, groupBy, sortBy )
 
 #ifdef mingw32_HOST_OS
 import Foreign
@@ -352,11 +352,12 @@ registerPackage input defines flags auto_ghci_libs update force = do
 
   expanded <- expandEnvVars s defines force
 
-  pkg <- parsePackageInfo expanded defines force
+  pkg0 <- parsePackageInfo expanded defines force
   putStrLn "done."
 
-  validatePackageConfig pkg db_stack auto_ghci_libs update force
-  new_details <- updatePackageDB db_stack (snd db_to_operate_on) pkg
+  let pkg = resolveDeps db_stack pkg0
+  overlaps <- validatePackageConfig pkg db_stack auto_ghci_libs update force
+  new_details <- updatePackageDB db_stack overlaps (snd db_to_operate_on) pkg
   savePackageConfig db_filename
   maybeRestoreOldConfig db_filename $
     writeNewConfig db_filename new_details
@@ -540,15 +541,16 @@ validatePackageConfig :: InstalledPackageInfo
 		      -> Bool	-- auto-ghc-libs
 		      -> Bool	-- update
 		      -> Bool	-- force
-		      -> IO ()
+		      -> IO [PackageIdentifier]
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
   checkPackageId pkg
-  checkDuplicates db_stack pkg update
+  overlaps <- checkDuplicates db_stack pkg update force
   mapM_	(checkDep db_stack force) (depends pkg)
   mapM_	(checkDir force) (importDirs pkg)
   mapM_	(checkDir force) (libraryDirs pkg)
   mapM_	(checkDir force) (includeDirs pkg)
   mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs force) (hsLibraries pkg)
+  return overlaps
   -- ToDo: check these somehow?
   --	extra_libraries :: [String],
   --	c_includes      :: [String],
@@ -565,31 +567,141 @@ checkPackageId ipi =
     []  -> die ("invalid package identifier: " ++ str)
     _   -> die ("ambiguous package identifier: " ++ str)
 
-checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> IO ()
-checkDuplicates db_stack pkg update = do
+resolveDeps :: PackageDBStack -> InstalledPackageInfo -> InstalledPackageInfo
+resolveDeps db_stack p = updateDeps p
+  where
+	-- The input package spec is allowed to give a package dependency
+	-- without a version number; e.g.
+	--	depends: base
+	-- Here, we update these dependencies without version numbers to
+	-- match the actual versions of the relevant packages installed.
+	updateDeps p = p{depends = map resolveDep (depends p)}
+
+	resolveDep dep_pkgid
+	   | realVersion dep_pkgid  = dep_pkgid
+	   | otherwise		    = lookupDep dep_pkgid
+
+	lookupDep dep_pkgid
+	   = let 
+		name = pkgName dep_pkgid
+	     in
+	     case [ pid | p <- concat (map snd db_stack), 
+			  let pid = package p,
+			  pkgName pid == name ] of
+		(pid:_) -> pid		-- Found installed package,
+					-- replete with its version
+		[]	-> dep_pkgid	-- No installed package; use 
+					-- the version-less one
+
+checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Bool
+	 -> IO [PackageIdentifier]
+checkDuplicates db_stack pkg update force = do
   let
 	pkgid = package pkg
-
 	(_top_db_name, pkgs) : _  = db_stack
-
-	pkgs_with_same_name = 
-		[ p | p <- pkgs, pkgName (package p) == pkgName pkgid]
-	exposed_pkgs_with_same_name =
-		filter exposed pkgs_with_same_name
   --
   -- Check whether this package id already exists in this DB
   --
-  when (not update && (package pkg `elem` map package pkgs)) $
+  when (not update && (pkgid `elem` map package pkgs)) $
        die ("package " ++ showPackageId pkgid ++ " is already installed")
+
+  -- 
+  -- Check whether any of the dependencies of the current package
+  -- conflict with each other.
   --
-  -- if we are exposing this new package, then check that
-  -- there are no other exposed packages with the same name.
+  let
+	all_pkgs = concat (map snd db_stack)
+
+	allModules p = exposedModules p ++ hiddenModules p
+
+	our_dependencies = closePackageDeps all_pkgs [pkg]
+	all_dep_modules = concat (map (\p -> zip (allModules p) (repeat p))
+					 our_dependencies)
+
+	overlaps = [ (m, map snd group) 
+		   | group@((m,_):_) <- groupBy eqfst (sortBy cmpfst all_dep_modules),
+		     length group > 1 ]
+		where eqfst  (a,_) (b,_) = a == b
+		      cmpfst (a,_) (b,_) = a `compare` b
+
+  when (not (null overlaps)) $
+    diePrettyOrForce force $ vcat [
+	text "package" <+> text (showPackageId (package pkg)) <+>
+	  text "has conflicting dependencies:",
+	let complain_about (mod,ps) =
+		text mod <+> text "is in the following packages:" <+> 
+			sep (map (text.showPackageId.package) ps)
+	in
+	nest 3 (vcat (map complain_about overlaps))
+	]
+
   --
-  when (not update && exposed pkg && not (null exposed_pkgs_with_same_name)) $
-	die ("trying to register " ++ showPackageId pkgid 
-		  ++ " as exposed, but "
-		  ++ showPackageId (package (my_head "when" exposed_pkgs_with_same_name))
-		  ++ " is also exposed.")
+  -- Now check whether exposing this package will result in conflicts, and
+  -- Figure out which packages we need to hide to resolve the conflicts.
+  --
+  let
+	closure_exposed_pkgs = closePackageDeps pkgs (filter exposed pkgs)
+
+	new_dep_modules = concat $ map allModules $
+			  filter (\p -> package p `notElem` 
+					map package closure_exposed_pkgs) $
+			  our_dependencies
+
+	pkgs_with_overlapping_modules =
+		[ (p, overlapping_mods)
+		| p <- closure_exposed_pkgs, 
+		  let overlapping_mods = 
+			filter (`elem` new_dep_modules) (allModules p),
+		  (_:_) <- [overlapping_mods] --trick to get the non-empty ones
+		]
+
+        to_hide = map package
+		 $ filter exposed
+		 $ closePackageDepsUpward pkgs
+		 $ map fst pkgs_with_overlapping_modules
+
+  when (not update && exposed pkg && not (null pkgs_with_overlapping_modules)) $ do
+    diePretty $ vcat [
+	    text "package" <+> text (showPackageId (package pkg)) <+> 
+	    	text "conflicts with the following packages, which are",
+	    text "either exposed or a dependency (direct or indirect) of an exposed package:",
+	    let complain_about (p, mods)
+	  	  = text (showPackageId (package p)) <+> text "contains modules" <+> 
+		 	sep (punctuate comma (map text mods)) in
+	    nest 3 (vcat (map complain_about pkgs_with_overlapping_modules)),
+	    text "Using 'update' instead of 'register' will cause the following packages",
+	    text "to be hidden, which will eliminate the conflict:",
+	    nest 3 (sep (map (text.showPackageId) to_hide))
+	  ]
+
+  when (not (null to_hide)) $ do
+    hPutStrLn stderr $ render $ 
+	sep [text "Warning: hiding the following packages to avoid conflict: ",
+	     nest 2 (sep (map (text.showPackageId) to_hide))]
+
+  return to_hide
+
+
+closure :: (a->[a]->Bool) -> (a -> [a]) -> [a] -> [a] -> [a]
+closure pred more []     res = res
+closure pred more (p:ps) res
+  | p `pred` res = closure pred more ps res
+  | otherwise    = closure pred more (more p ++ ps) (p:res)
+
+closePackageDeps :: [InstalledPackageInfo] -> [InstalledPackageInfo]
+	 -> [InstalledPackageInfo]
+closePackageDeps db start 
+  = closure (\p ps -> package p `elem` map package ps) getDepends start []
+  where
+	getDepends p = [ pkg | dep <- depends p, pkg <- lookupPkg dep ]
+	lookupPkg p = [ q | q <- db, p == package q ]
+
+closePackageDepsUpward :: [InstalledPackageInfo] -> [InstalledPackageInfo]
+	 -> [InstalledPackageInfo]
+closePackageDepsUpward db start
+  = closure (\p ps -> package p `elem` map package ps) getUpwardDepends start []
+  where
+	getUpwardDepends p = [ pkg | pkg <- db, package p `elem` depends pkg ]
 
 
 checkDir :: Bool -> String -> IO ()
@@ -603,8 +715,7 @@ checkDir force d
 
 checkDep :: PackageDBStack -> Bool -> PackageIdentifier -> IO ()
 checkDep db_stack force pkgid
-  | real_version && pkgid `elem` pkgids = return ()
-  | not real_version && pkgName pkgid `elem` pkg_names = return ()
+  | not real_version || pkgid `elem` pkgids = return ()
   | otherwise = dieOrForce force ("dependency " ++ showPackageId pkgid
 					++ " doesn't exist")
   where
@@ -614,7 +725,6 @@ checkDep db_stack force pkgid
 	
 	all_pkgs = concat (map snd db_stack)
 	pkgids = map package all_pkgs
-	pkg_names = map pkgName pkgids
 
 realVersion :: PackageIdentifier -> Bool
 realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
@@ -667,50 +777,25 @@ autoBuildGHCiLib dir batch_file ghci_file = do
 -- Updating the DB with the new package.
 
 updatePackageDB
-	:: PackageDBStack
-	-> [InstalledPackageInfo]
-	-> InstalledPackageInfo
+	:: PackageDBStack		-- the full stack
+	-> [PackageIdentifier]		-- packages to hide
+	-> [InstalledPackageInfo]	-- packages in *this* DB
+	-> InstalledPackageInfo		-- the new package
 	-> IO [InstalledPackageInfo]
-updatePackageDB db_stack pkgs new_pkg = do
+updatePackageDB db_stack to_hide pkgs new_pkg = do
   let
-	-- The input package spec is allowed to give a package dependency
-	-- without a version number; e.g.
-	--	depends: base
-	-- Here, we update these dependencies without version numbers to
-	-- match the actual versions of the relevant packages installed.
-	updateDeps p = p{depends = map resolveDep (depends p)}
-
-	resolveDep dep_pkgid
-	   | realVersion dep_pkgid  = dep_pkgid
-	   | otherwise		    = lookupDep dep_pkgid
-
-	lookupDep dep_pkgid
-	   = let 
-		name = pkgName dep_pkgid
-	     in
-	     case [ pid | p <- concat (map snd db_stack), 
-			  let pid = package p,
-			  pkgName pid == name ] of
-		(pid:_) -> pid		-- Found installed package,
-					-- replete with its version
-		[]	-> dep_pkgid	-- No installed package; use 
-					-- the version-less one
-
-	is_exposed = exposed new_pkg
-	pkgid      = package new_pkg
-	name       = pkgName pkgid
+	pkgid = package new_pkg
 
 	pkgs' = [ maybe_hide p | p <- pkgs, package p /= pkgid ]
 	
 	-- When update is on, and we're exposing the new package,
-	-- we hide any packages with the same name (different versions)
-	-- in the current DB.  Earlier checks will have failed if
-	-- update isn't on.
+	-- we hide any packages which conflict (see checkDuplicates)
+	-- in the current DB.
 	maybe_hide p
-	  | is_exposed && pkgName (package p) == name = p{ exposed = False }
+	  | exposed new_pkg && package p `elem` to_hide = p{ exposed = False }
 	  | otherwise = p
   --
-  return (pkgs'++[updateDeps new_pkg])
+  return (pkgs'++ [new_pkg])
 
 -- -----------------------------------------------------------------------------
 -- Searching for modules
@@ -898,8 +983,19 @@ die s = do
 dieOrForce :: Bool -> String -> IO ()
 dieOrForce force s 
   | force     = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
-  | otherwise = die s
+  | otherwise = die (s ++ " (use --force to override)")
 
+diePretty :: Doc -> IO ()
+diePretty doc = do
+  hFlush stdout
+  prog <- getProgramName
+  hPutStrLn stderr $ render $ (text prog <> colon $$ nest 2 doc)
+  exitWith (ExitFailure 1)
+
+diePrettyOrForce :: Bool -> Doc -> IO ()
+diePrettyOrForce force doc
+  | force     = do hFlush stdout; hPutStrLn stderr (render (doc $$  text "(ignoring)"))
+  | otherwise = diePretty (doc $$ text "(use --force to override)")
 
 -----------------------------------------
 --	Cut and pasted from ghc/compiler/SysTools
