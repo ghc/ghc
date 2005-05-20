@@ -3,7 +3,8 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 PKGCONF=local.package.conf
-GHC_PKG= $(FPTOOLS_TOP)/ghc/utils/ghc-pkg/ghc-pkg-inplace -f $(PKGCONF)
+GHC_PKG_INPLACE = $(FPTOOLS_TOP)/ghc/utils/ghc-pkg/ghc-pkg-inplace
+GHC_PKG= $(GHC_PKG_INPLACE) -f $(PKGCONF)
 
 # a bunch of tests for ghc-pkg
 ghcpkg01 :
@@ -35,7 +36,7 @@ ghcpkg01 :
 
 	@: # test3.pkg  depends on testpkg-2.0
 	$(GHC_PKG) register test3.pkg
-	$(GHC_PKG) unregister dep-1.0
+	$(GHC_PKG) unregister testpkg-3.0
 
 	$(GHC_PKG) unregister testpkg-2.0
 	$(GHC_PKG) describe testpkg
@@ -45,17 +46,36 @@ ghcpkg01 :
 	@: # registering test3.pkg should fail now, its dependency has gone
 	if $(GHC_PKG) register test3.pkg; then false; else true; fi
 
+ghcpkg03 :
+	@rm -f $(PKGCONF)
+	echo "[]" >$(PKGCONF)
+	@: # update should hide conflicting packages
+	$(GHC_PKG) register --force test.pkg
+	$(GHC_PKG) register --force test2.pkg
+
+	@: # test4.pkg depends on testpkg-2.0, which conflicts with testpkg-1.2.3.4,
+	@: # so ghc-pkg will refuse to install it when registering, and hide
+	@: # testpkg-1.2.3.4 when updating.
+	if $(GHC_PKG) register test4.pkg; then false; else true; fi
+	$(GHC_PKG) update test4.pkg
+
+	@: # and another update of test.pkg will now hide dep-2.0
+	$(GHC_PKG) update --force test.pkg
+
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
 # every package we know about.  This is for testing the pretty printing/parsing
 # of InstalledPackageInfo.
 
 COPY_PACKAGE_CONF = package.conf.copy
-GHC_PKG_COPY = $(FPTOOLS_TOP)/ghc/utils/ghc-pkg/ghc-pkg-inplace --global-conf=$(COPY_PACKAGE_CONF)
+GHC_PKG_COPY = $(GHC_PKG_INPLACE) --global-conf=$(COPY_PACKAGE_CONF)
 
-ghcpkg02 :
+copy :
 	cp $(FPTOOLS_TOP)/ghc/driver/package.conf.inplace $(COPY_PACKAGE_CONF)
+
+ghcpkg02 : copy
 	for i in `$(GHC_PKG_COPY) list | sed 's/^.*://;s/[,()]//g'`; do \
+		echo Updating $$i; \
 		$(GHC_PKG_COPY) describe $$i | $(GHC_PKG_COPY) update --force -; \
 	done
 
