@@ -28,7 +28,7 @@ import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
 			  tyVarsOfInst, fdPredsOfInsts, newDicts, 
 			  isDict, isClassDict, isLinearInst, linearInstType,
-			  isStdClassTyVarDict, isMethodFor, isMethod,
+			  isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
 			  instBindingRequired, fdPredsOfInst,
@@ -53,7 +53,7 @@ import Name		( Name, getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig, classKey )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
-import PrelInfo		( isNumericClass ) 
+import PrelInfo		( isNumericClass, isStandardClass ) 
 import PrelNames	( splitName, fstName, sndName, integerTyConName,
 			  showClassKey, eqClassKey, ordClassKey )
 import Type		( zipTopTvSubst, substTheta, substTy )
@@ -2021,21 +2021,32 @@ tc_simplify_top doc is_interactive want_scs wanteds
 	; (frees, binds, irreds) <- simpleReduceLoop doc try_me wanteds
 
 	; let
-		-- All the non-std ones are definite errors
-	    (stds, non_stds) = partition isStdClassTyVarDict irreds
-    
-		    -- Group by type variable
-	    std_groups = equivClasses cmp_by_tyvar stds
-    
-		    -- Pick the ones which its worth trying to disambiguate
-		    -- namely, the onese whose type variable isn't bound
-		    -- up with one of the non-standard classes
-	    (std_oks, std_bads)	= partition worth_a_try std_groups
-	    worth_a_try group@(d:_) = not (non_std_tyvars `intersectsVarSet` tyVarsOfInst d)
-	    non_std_tyvars		= unionVarSets (map tyVarsOfInst non_stds)
+		-- All the non-tv ones are definite errors
+	    (tv_dicts, non_tvs) = partition isTyVarDict irreds
+	    bad_tyvars = unionVarSets (map tyVarsOfInst non_tvs)
+
+		-- Group by type variable
+	    tv_groups = equivClasses cmp_by_tyvar tv_dicts
+
+		-- Pick the ones which its worth trying to disambiguate
+		-- namely, the ones whose type variable isn't bound
+		-- up with one of the non-tyvar classes
+	    (default_gps, non_default_gps) = partition defaultable_group tv_groups
+	    defaultable_group ds@(d:_) 
+		=  not (bad_tyvars `intersectsVarSet` tyVarsOfInst d)
+		&& defaultable_classes (map get_clas ds)
+	    defaultable_classes clss 
+		| is_interactive = any isInteractiveClass clss
+		| otherwise	 = all isStandardClass clss && any isNumericClass clss
+
+	    isInteractiveClass cls = isNumericClass cls
+				  || (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
+		 	-- In interactive mode, we default Show a to Show ()
+			-- to avoid graututious errors on "show []"
+
     
 		    -- Collect together all the bad guys
-	    bad_guys 	   = non_stds ++ concat std_bads
+	    bad_guys 	       = non_tvs ++ concat non_default_gps
     	    (non_ips, bad_ips) = partition isClassDict bad_guys
     	    (ambigs, no_insts) = partition isTyVarDict non_ips
 	    -- If the dict has no type constructors involved, it must be ambiguous,
@@ -2069,7 +2080,7 @@ tc_simplify_top doc is_interactive want_scs wanteds
 		  addTopAmbigErrs ambigs
 
 		  -- Disambiguate the ones that look feasible
-		; mappM (disambigGroup is_interactive) std_oks }
+		; mappM (disambigGroup is_interactive) default_gps }
 
 	; return (binds `unionBags` unionManyBags binds_ambig) }
 
@@ -2120,7 +2131,6 @@ disambigGroup :: Bool	-- True <=> simplifying at top-level interactive loop
 	      -> TcM TcDictBinds
 
 disambigGroup is_interactive dicts
-  |   any std_default_class classes 	-- Guaranteed all standard classes
   = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
 	-- SO, TRY DEFAULT TYPES IN ORDER
 
@@ -2146,20 +2156,9 @@ disambigGroup is_interactive dicts
     case mb_ty of
 	Left  _ 		-> bomb_out
 	Right chosen_default_ty -> choose_default chosen_default_ty
-
-  | otherwise 				-- No defaults
-  = bomb_out
-
   where
     tyvar   = get_tv (head dicts)	-- Should be non-empty
     classes = map get_clas dicts
-
-    std_default_class cls
-      =  isNumericClass cls
-      || (is_interactive && 
-	  classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
-	 	-- In interactive mode, we default Show a to Show ()
-		-- to avoid graututious errors on "show []"
 
     choose_default default_ty	-- Commit to tyvar = default_ty
       =	-- Bind the type variable 
