@@ -703,7 +703,7 @@ data Stmt id
   | LetStmt	[HsBindGroup id]
 
 	-- ParStmts only occur in a list comprehension
-  | ParStmt	[([LStmt id], [id])]	-- After remaing, the ids are the binders
+  | ParStmt	[([LStmt id], [id])]	-- After renaming, the ids are the binders
 					-- bound by the stmts and used subsequently
 
 	-- Recursive statement (see Note [RecStmt] below)
