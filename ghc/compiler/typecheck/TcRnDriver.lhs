@@ -949,14 +949,12 @@ mkPlan (L loc (ExprStmt expr _ _))
 	--	[it <- e; print it]	but not if it::()
 	--	[it <- e]		
 	--	[let it = e; print it]	
-	--	[let it = e]
 	; runPlans [do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
 		       ; it_ty <- zonkTcType (idType it_id)
 		       ; ifM (isUnitTy it_ty) failM
 		       ; return stuff },
 		    tcGhciStmts [bind_stmt],
-		    tcGhciStmts [let_stmt, print_it],
-		    tcGhciStmts [let_stmt]
+		    tcGhciStmts [let_stmt, print_it]
 	  ]}
 
 mkPlan stmt@(L loc _)
