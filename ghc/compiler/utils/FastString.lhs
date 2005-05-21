@@ -443,7 +443,7 @@ cmpFS (FastString u1# l1# b1#) (FastString u2# l2# b2#) =
     ))
 
 #ifndef __HADDOCK__
-foreign import ccall "ghc_memcmp" unsafe 
+foreign import ccall unsafe "ghc_memcmp" 
   memcmp :: ByteArray# -> ByteArray# -> Int# -> IO Int
 #endif
 
