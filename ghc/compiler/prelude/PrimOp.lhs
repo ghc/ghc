@@ -55,7 +55,6 @@ primOpTag op = iBox (tagOf_PrimOp op)
 -- supplies   
 -- tagOf_PrimOp :: PrimOp -> FastInt
 #include "primop-tag.hs-incl"
-tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 
 
 instance Eq PrimOp where
