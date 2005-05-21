@@ -317,7 +317,6 @@ pprExpr9 e =
         CmmReg    reg       -> ppr reg
         CmmRegOff reg off   -> parens (ppr reg <+> char '+' <+> int off)
 	CmmMachOp mop args  -> genMachOp mop args
-	e                   -> parens (pprExpr e)
 
 genMachOp :: MachOp -> [CmmExpr] -> SDoc
 genMachOp mop args
@@ -351,7 +350,6 @@ infixMachOp mop
             MO_Xor    _ -> Just $ char '^'
             MO_Not    _ -> Just $ char '~'
             MO_S_Neg  _ -> Just $ char '-' -- there is no unsigned neg :)
-	    MO_Not    _ -> Just $ char '~'
             _ -> Nothing
 
 -- --------------------------------------------------------------------------
@@ -433,8 +431,6 @@ pprGlobalReg gr
         GCFun          -> ptext SLIT("stg_gc_fun")
         BaseReg        -> ptext SLIT("BaseReg")
         PicBaseReg     -> ptext SLIT("PicBaseReg")
-
-        _ -> panic $ "PprCmm.pprGlobalReg: unknown global reg"
 
 -- --------------------------------------------------------------------------
 -- data sections

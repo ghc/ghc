@@ -738,9 +738,10 @@ pprGlobalRegName gr = case gr of
     VanillaReg n   -> char 'R' <> int n  -- without the .w suffix
     _              -> pprGlobalReg gr
 
+-- Currently we only have these two calling conventions, but this might
+-- change in the future...
 is_cish CCallConv   = True
 is_cish StdCallConv = True
-is_cish _	    = False
 
 -- ---------------------------------------------------------------------
 -- Find and print local and external declarations for a list of
@@ -822,11 +823,10 @@ te_Stmt _			= return ()
 
 te_Expr :: CmmExpr -> TE ()
 te_Expr (CmmLit lit)		= te_Lit lit
-te_Expr (CmmReg r)		= te_Reg r
 te_Expr (CmmLoad e _)		= te_Expr e
+te_Expr (CmmReg r)		= te_Reg r
 te_Expr (CmmMachOp _ es) 	= mapM_ te_Expr es
 te_Expr (CmmRegOff r _) 	= te_Reg r
-te_Expr _ 			= return ()
 
 te_Reg :: CmmReg -> TE ()
 te_Reg (CmmLocal l) = te_temp l

@@ -3255,8 +3255,6 @@ outOfLineFloatOp mop res args vols
 	      MO_F64_Tanh  -> FSLIT("tanh")
 	      MO_F64_Pwr   -> FSLIT("pow")
 
-              other -> pprPanic "outOfLineFloatOp" (pprCallishMachOp mop)
-
 #endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
