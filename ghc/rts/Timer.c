@@ -30,8 +30,10 @@
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
+#if defined(RTS_SUPPORTS_THREADS)
 /* idle ticks left before we perform a GC */
 static int ticks_to_gc = 0;
+#endif
 
 /*
  * Function: handle_tick()

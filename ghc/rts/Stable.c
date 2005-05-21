@@ -376,13 +376,13 @@ gcStablePtrTable( void )
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
-		    IF_DEBUG(stable, debugBelch("GC'd Stable name %ld\n", 
+		    IF_DEBUG(stable, debugBelch("GC'd Stable name %d\n", 
 						p - stable_ptr_table));
 		    continue;
 		    
 		} else {
 		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-		    IF_DEBUG(stable, debugBelch("Stable name %ld still alive at %p, ref %ld\n", p - stable_ptr_table, p->addr, p->ref));
+		    IF_DEBUG(stable, debugBelch("Stable name %d still alive at %p, ref %ld\n", p - stable_ptr_table, p->addr, p->ref));
 		}
 	    }
 	}
