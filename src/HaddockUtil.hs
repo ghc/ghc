@@ -38,7 +38,7 @@ import Data.Char ( isAlpha, isSpace, toUpper, ord )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )
 import Data.Maybe ( maybeToList, fromMaybe )
-import Network.URI ( escapeString, unreserved )
+import Network.URI
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
@@ -445,7 +445,11 @@ mapMaybeM _ Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
 
 escapeStr :: String -> String
-escapeStr str = escapeString str unreserved
+#if __GLASGOW_HASKELL__ < 603
+escapeStr = flip escapeString unreserved
+#else
+escapeStr = escapeURIString isUnreserved
+#endif
 
 -----------------------------------------------------------------------------
 -- HTML cross references
