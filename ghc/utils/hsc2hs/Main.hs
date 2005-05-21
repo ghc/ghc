@@ -1,8 +1,6 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.74 2005/05/18 09:43:50 simonmar Exp $
---
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
 -- Certain items known only to the C compiler can then be used in
@@ -898,45 +896,43 @@ showCString = concatMap showCChar
 
 
 -----------------------------------------
---	Cut and pasted from ghc/compiler/SysTools
+-- Modified version from ghc/compiler/SysTools
 -- Convert paths foo/baz to foo\baz on Windows
 
-dosifyPath, unDosifyPath :: String -> String
+subst :: Char -> Char -> String -> String
 #if defined(mingw32_HOST_OS) || defined(__CYGWIN32__)
-dosifyPath xs = subst '/' '\\' xs
-unDosifyPath xs = subst '\\' '/' xs
-
-subst :: Eq a => a -> a -> [a] -> [a]
-subst a b ls = map (\ x -> if x == a then b else x) ls
+subst a b = map (\x -> if x == a then b else x)
 #else
-dosifyPath xs = xs
-unDosifyPath xs = xs
+subst _ _ = id
 #endif
 
-getExecDir :: String -> IO (Maybe String)
+dosifyPath :: String -> String
+dosifyPath = subst '/' '\\'
+
 -- (getExecDir cmd) returns the directory in which the current
 --	  	    executable, which should be called 'cmd', is running
 -- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
 -- you'll get "/a/b/c" back as the result
-#ifdef __HUGS__
-getExecDir cmd
-  = do
-	s <- getProgName
-	return (Just (reverse (drop (length cmd) (reverse (unDosifyPath s)))))
+getExecDir :: String -> IO (Maybe String)
+getExecDir cmd =
+    getExecPath >>= maybe (return Nothing) removeCmdSuffix
+    where unDosifyPath = subst '\\' '/'
+          initN n = reverse . drop n . reverse
+          removeCmdSuffix = return . Just . initN (length cmd) . unDosifyPath
+
+getExecPath :: IO (Maybe String)
+#if defined(__HUGS__)
+getExecPath = liftM Just getProgName
 #elif defined(mingw32_HOST_OS)
-getExecDir cmd
-  = allocaArray len $ \buf -> do
-	ret <- getModuleFileName nullPtr buf len
-	if ret == 0 then return Nothing
-	            else do s <- peekCString buf
-			    return (Just (reverse (drop (length cmd) 
-							(reverse (unDosifyPath s)))))
-  where
-    len = 2048::Int -- Plenty, PATH_MAX is 512 under Win32.
+getExecPath =
+     allocaArray len $ \buf -> do
+         ret <- getModuleFileName nullPtr buf len
+         if ret == 0 then return Nothing
+	             else liftM Just $ peekCString buf
+    where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
 
 foreign import stdcall unsafe "GetModuleFileNameA"
-  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
-
+    getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
-getExecDir _ = return Nothing
+getExecPath = return Nothing
 #endif
