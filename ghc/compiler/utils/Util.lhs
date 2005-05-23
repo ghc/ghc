@@ -913,11 +913,12 @@ joinFileName dir fname = dir ++ '/':fname
 -- string is returned in the first component (and the second one is just
 -- empty).
 splitLongestPrefix :: String -> (Char -> Bool) -> (String,String)
-splitLongestPrefix s pred
-  = case pre of
-	[]      -> (reverse suf, [])
-	(_:pre) -> (reverse pre, reverse suf)
-  where (suf,pre) = break pred (reverse s)
+splitLongestPrefix str pred
+  | null r_pre = (str,           [])
+  | otherwise  = (reverse (tail r_pre), reverse r_suf)
+	-- 'tail' drops the char satisfying 'pred'
+  where 
+    (r_suf, r_pre) = break pred (reverse str)
 
 replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
 replaceFilenameSuffix file suf = basenameOf file `joinFileExt` suf
