@@ -729,6 +729,8 @@ tcTopSrcDecls boot_details
 %************************************************************************
 
 \begin{code}
+checkMain :: TcM TcGblEnv
+-- If we are in module Main, check that 'main' is defined.
 checkMain 
   = do { ghci_mode <- getGhciMode ;
 	 tcg_env   <- getGblEnv ;
@@ -745,11 +747,6 @@ checkMain
 
 
 check_main ghci_mode tcg_env main_mod main_fn
-     -- If we are in module Main, check that 'main' is defined.
-     -- It may be imported from another module!
-     --
-     -- 
-     -- Blimey: a whole page of code to do this...
  | mod /= main_mod
  = return tcg_env
 
