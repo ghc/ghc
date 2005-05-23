@@ -53,7 +53,7 @@ import TcIface		( tcExtCoreBindings, tcHiBootIface )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
-import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail,
+import RnNames		( importsFromLocalDecls, rnImports, rnExports,
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
@@ -228,7 +228,7 @@ tcRnModule hsc_env hsc_src save_rn_decls
 	reportDeprecations tcg_env ;
 
 		-- Process the export list
-	exports <- exportsFromAvail (isJust maybe_mod) export_ies ;
+	exports <- rnExports (isJust maybe_mod) export_ies ;
 
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
@@ -748,7 +748,8 @@ checkMain
 
 check_main ghci_mode tcg_env main_mod main_fn
  | mod /= main_mod
- = return tcg_env
+ = traceTc (text "checkMain not" <+> ppr main_mod <+> ppr mod) >>
+   return tcg_env
 
  | otherwise
  = addErrCtxt mainCtxt			$
@@ -756,10 +757,12 @@ check_main ghci_mode tcg_env main_mod main_fn
 		-- Check that 'main' is in scope
 		-- It might be imported from another module!
 	; case mb_main of {
-	     Nothing -> do { complain_no_main	
+	     Nothing -> do { traceTc (text "checkMain fail" <+> ppr main_mod <+> ppr main_fn)
+			   ; complain_no_main	
 			   ; return tcg_env } ;
 	     Just main_name -> do
-	{ let { rhs = nlHsApp (nlHsVar runMainIOName) (nlHsVar main_name) }
+	{ traceTc (text "checkMain found" <+> ppr main_mod <+> ppr main_fn)
+	; let { rhs = nlHsApp (nlHsVar runMainIOName) (nlHsVar main_name) }
 		   	-- :Main.main :: IO () = runMainIO main 
 
 	; (main_expr, ty) <- setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
@@ -932,8 +935,8 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 
 --------------------
 mkPlan :: LStmt Name -> TcM PlanResult
-mkPlan (L loc (ExprStmt expr _ _))
-  = do	{ uniq <- newUnique
+mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt 
+  = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
 	      the_bind  = mkVarBind noSrcSpan fresh_it expr
 	      let_stmt  = L loc $ LetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive]
@@ -946,16 +949,24 @@ mkPlan (L loc (ExprStmt expr _ _))
 	--	[it <- e; print it]	but not if it::()
 	--	[it <- e]		
 	--	[let it = e; print it]	
-	; runPlans [do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
+	; runPlans [	-- Plan A
+		    do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
 		       ; it_ty <- zonkTcType (idType it_id)
 		       ; ifM (isUnitTy it_ty) failM
 		       ; return stuff },
-		    tcGhciStmts [bind_stmt],
-		    tcGhciStmts [let_stmt, print_it]
+
+			-- Plan B; a naked bind statment
+		    tcGhciStmts [bind_stmt],	
+
+			-- Plan C; check that the let-binding is typeable all by itself.
+			-- If not, fail; if so, try to print it.
+			-- The two-step process avoids getting two errors: one from
+			-- the expression itself, and one from the 'print it' part
+		    do { tcGhciStmts [let_stmt]; tcGhciStmts [let_stmt, print_it] }
 	  ]}
 
-mkPlan stmt@(L loc _)
-  | [L _ v] <- collectLStmtBinders stmt		-- One binder
+mkPlan stmt@(L loc (BindStmt {}))
+  | [L _ v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
   = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
 			          	   (HsVar thenIOName) placeHolderType
 	-- The plans are:
@@ -967,7 +978,8 @@ mkPlan stmt@(L loc _)
 		       ; return stuff },
 		    tcGhciStmts [stmt]
 	  ]}
-  | otherwise
+
+mkPlan stmt
   = tcGhciStmts [stmt]
 
 ---------------------------
