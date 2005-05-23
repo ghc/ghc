@@ -448,13 +448,7 @@ Prelude> print x
 *** Exception: help!
 Prelude>
 </screen>
-      <para>Any exceptions raised during the evaluation or execution
-      of the statement are caught and printed by the GHCi command line
-      interface (for more information on exceptions, see the module
-      <literal>Control.Exception</literal> in the libraries
-      documentation).</para>
-
-<para>GHCi will print the result of a <literal>let</literal> or
+<para>GHCi will print the result of a 
 <literal>x&lt;-e</literal> statement if and only if:
 <itemizedlist>
 <listitem><para>The statement binds exactly one variable</para></listitem>
@@ -463,6 +457,12 @@ Prelude>
 and is an instance of <literal>Show</literal>
 </para></listitem>
 </itemizedlist>
+      <para>Any exceptions raised during the evaluation or execution
+      of the statement are caught and printed by the GHCi command line
+      interface (for more information on exceptions, see the module
+      <literal>Control.Exception</literal> in the libraries
+      documentation).</para>
+
 
       <para>Every new binding shadows any existing bindings of the
       same name, including entities that are in scope in the current
