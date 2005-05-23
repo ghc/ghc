@@ -196,6 +196,9 @@ basicKnownKeyNames
 	-- Splittable class
 	splittableClassName, splitName,
 
+	-- Other classes
+	randomClassName, randomGenClassName, monadPlusClassName,
+
 	-- Booleans
 	andName, orName
 	
@@ -257,9 +260,11 @@ lEX		= mkModule "Text.Read.Lex"
 mAIN		= mkModule "Main"
 pREL_INT	= mkModule "GHC.Int"
 pREL_WORD	= mkModule "GHC.Word"
+mONAD		= mkModule "Control.Monad"
 mONAD_FIX	= mkModule "Control.Monad.Fix"
 aRROW		= mkModule "Control.Arrow"
 aDDR		= mkModule "Addr"
+rANDOM		= mkModule "System.Random"
 
 gLA_EXTS	= mkModule "GHC.Exts"
 rOOT_MAIN	= mkModule ":Main"		-- Root module for initialisation 
@@ -614,12 +619,17 @@ monadFixClassName  = clsQual mONAD_FIX FSLIT("MonadFix") monadFixClassKey
 mfixName	   = methName monadFixClassName FSLIT("mfix") mfixIdKey
 
 -- Arrow notation
-arrAName	   = varQual aRROW FSLIT("arr")	arrAIdKey
-composeAName	   = varQual aRROW FSLIT(">>>")	composeAIdKey
-firstAName	   = varQual aRROW FSLIT("first")	firstAIdKey
-appAName	   = varQual aRROW FSLIT("app")	appAIdKey
-choiceAName	   = varQual aRROW FSLIT("|||")	choiceAIdKey
-loopAName	   = varQual aRROW FSLIT("loop")	loopAIdKey
+arrAName	   = varQual aRROW FSLIT("arr")	  arrAIdKey
+composeAName	   = varQual aRROW FSLIT(">>>")	  composeAIdKey
+firstAName	   = varQual aRROW FSLIT("first") firstAIdKey
+appAName	   = varQual aRROW FSLIT("app")	  appAIdKey
+choiceAName	   = varQual aRROW FSLIT("|||")	  choiceAIdKey
+loopAName	   = varQual aRROW FSLIT("loop")  loopAIdKey
+
+-- Other classes, needed for type defaulting
+monadPlusClassName  = clsQual mONAD FSLIT("MonadPlus")  monadPlusClassKey
+randomClassName     = clsQual rANDOM FSLIT("Random")    randomClassKey
+randomGenClassName  = clsQual rANDOM FSLIT("RandomGen") randomGenClassKey
 
 -- dotnet interop
 objectTyConName	    = tcQual   dOTNET FSLIT("Object") objectTyConKey
@@ -697,6 +707,10 @@ typeable7ClassKey	= mkPreludeClassUnique 27
 
 monadFixClassKey	= mkPreludeClassUnique 28
 splittableClassKey	= mkPreludeClassUnique 29
+
+monadPlusClassKey	= mkPreludeClassUnique 30
+randomClassKey		= mkPreludeClassUnique 31
+randomGenClassKey	= mkPreludeClassUnique 32
 \end{code}
 
 %************************************************************************
@@ -1021,7 +1035,12 @@ needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
   	[ readClassKey
     	]
 
+-- The "standard classes" are used in defaulting (Haskell 98 report 4.3.4),
+-- and are: "classes defined in the Prelude or a standard library"
 standardClassKeys = derivableClassKeys ++ numericClassKeys
+		  ++ [randomClassKey, randomGenClassKey,
+		      functorClassKey, 
+		      monadClassKey, monadPlusClassKey]
 
 noDictClassKeys = [] -- ToDo: remove?
 \end{code}
