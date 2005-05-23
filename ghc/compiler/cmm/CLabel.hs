@@ -457,7 +457,6 @@ needsCDecl (ModuleInitLabel _ _ _)	= True
 needsCDecl (PlainModuleInitLabel _ _)	= True
 needsCDecl ModuleRegdLabel		= False
 
-needsCDecl (CaseLabel _ _)		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
