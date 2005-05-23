@@ -65,7 +65,7 @@ import Data.List	( isPrefixOf )
 #endif
 import Maybe		( fromJust )
 import Char		( isDigit, isUpper )
-
+import Outputable
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -1043,18 +1043,17 @@ setOptLevel n dflags
 
 setMainIs :: String -> DynP ()
 setMainIs arg
-  | not (null main_mod)		-- The arg looked like "Foo.baz"
+  | not (null main_fn)		-- The arg looked like "Foo.baz"
   = upd $ \d -> d{ mainFunIs = Just main_fn,
 	  	   mainModIs = Just main_mod }
 
-  | isUpper (head main_fn)	-- The arg looked like "Foo"
-  = upd $ \d -> d{ mainModIs = Just main_fn }
+  | isUpper (head main_mod)	-- The arg looked like "Foo"
+  = upd $ \d -> d{ mainModIs = Just main_mod }
   
   | otherwise			-- The arg looked like "baz"
-  = upd $ \d -> d{ mainFunIs = Just main_fn }
+  = upd $ \d -> d{ mainFunIs = Just main_mod }
   where
     (main_mod, main_fn) = splitLongestPrefix arg (== '.')
-  
 
 -----------------------------------------------------------------------------
 -- Paths & Libraries
