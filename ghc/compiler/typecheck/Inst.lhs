@@ -27,7 +27,7 @@ module Inst (
 
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
-	isTyVarDict, isStdClassTyVarDict, isMethodFor, 
+	isTyVarDict, isMethodFor, 
 	instBindingRequired,
 
 	zonkInst, zonkInsts,
@@ -194,11 +194,6 @@ isLinearInst other	     = False
 
 linearInstType :: Inst -> TcType	-- %x::t  -->  t
 linearInstType (Dict _ (IParam _ ty) _) = ty
-
-
-isStdClassTyVarDict (Dict _ pred _) = case getClassPredTys_maybe pred of
-					Just (clas, [ty]) -> isStandardClass clas && tcIsTyVarTy ty
-					other		  -> False
 \end{code}
 
 Two predicates which deal with the case where class constraints don't
