@@ -6,9 +6,10 @@
 \begin{code}
 module RnNames (
 	rnImports, importsFromLocalDecls, 
+	rnExports,
 	getLocalDeclBinders, extendRdrEnvRn,
 	reportUnusedNames, reportDeprecations, 
-	mkModDeps, exportsFromAvail
+	mkModDeps
     ) where
 
 #include "HsVersions.h"
@@ -499,7 +500,7 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 
 \begin{code}
 type ExportAccum	-- The type of the accumulating parameter of
-			-- the main worker function in exportsFromAvail
+			-- the main worker function in rnExports
      = ([Module], 		-- 'module M's seen so far
 	ExportOccMap,		-- Tracks exported occurrence names
 	NameSet)		-- The accumulated exported stuff
@@ -512,14 +513,14 @@ type ExportOccMap = OccEnv (Name, IE RdrName)
 	--   that have the same occurrence name
 
 
-exportsFromAvail :: Bool  -- False => no 'module M(..) where' header at all
-		 -> Maybe [Located (IE RdrName)] -- Nothing => no explicit export list
-		 -> RnM NameSet
+rnExports :: Bool  -- False => no 'module M(..) where' header at all
+	  -> Maybe [Located (IE RdrName)] -- Nothing => no explicit export list
+	  -> RnM NameSet
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
 
-exportsFromAvail explicit_mod exports
+rnExports explicit_mod exports
  = do { TcGblEnv { tcg_rdr_env = rdr_env, 
 		   tcg_imports = imports } <- getGblEnv ;
 
@@ -534,6 +535,7 @@ exportsFromAvail explicit_mod exports
 		| explicit_mod   	   = exports
 		| ghci_mode == Interactive = Nothing
 		| otherwise 		   = Just [noLoc (IEVar main_RDR_Unqual)] } ;
+		-- ToDo: the 'noLoc' here is unhelpful if 'main' turns out to be out of scope
 	exports_from_avail real_exports rdr_env imports }
 
 
