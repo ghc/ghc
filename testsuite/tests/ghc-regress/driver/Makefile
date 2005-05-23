@@ -209,9 +209,20 @@ test061:
 	test -f A.hc
 
 # Test that -main-is works with --make
-test062:
-	@$(RM) Hello.hi Hello.o Hello.hc
+test062.1:
+	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
+	echo "module Hello where { hello = putStrLn \"ok\" }" >Hello.hs
 	$(TEST_HC) --make -main-is Hello.hello Hello -o hello
+	./hello
+test062.2:
+	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
+	echo "module Hello where { main = putStrLn \"ok\" }" >Hello.hs
+	$(TEST_HC) --make -main-is Hello Hello -o hello
+	./hello
+test062.3:
+	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
+	echo "hello = putStrLn \"ok\"" >Hello.hs
+	$(TEST_HC) --make -main-is hello Hello.hs -o hello
 	./hello
 
 # Test that -i deletes the list of search paths.
@@ -277,6 +288,7 @@ test080:
 	test -f A.o
 	$(TEST_HC) -C A.hs
 	test -f A.hc
+
 
 
 # -----------------------------------------------------------------------------

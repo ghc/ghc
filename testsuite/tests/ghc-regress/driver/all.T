@@ -23,7 +23,11 @@ test('driver053', normal, run_command_ignore_output, ['$MAKE test053'])
 
 test('driver060', normal, run_command_ignore_output, ['$MAKE test060'])
 test('driver061', normal, run_command_ignore_output, ['$MAKE test061'])
-test('driver062', normal, run_command_ignore_output, ['$MAKE test062'])
+
+test('driver062.1', normal, run_command_ignore_output, ['$MAKE test062.1'])
+test('driver062.2', normal, run_command_ignore_output, ['$MAKE test062.2'])
+test('driver062.3', normal, run_command_ignore_output, ['$MAKE test062.3'])
+
 test('driver063', normal, run_command, ['$MAKE -s --no-print-directory test063'])
 test('driver064', normal, run_command_ignore_output, ['$MAKE test064'])
 test('driver065', normal, run_command_ignore_output, ['$MAKE test065'])
