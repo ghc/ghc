@@ -60,7 +60,7 @@ test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 # Also hangs with the threaded RTS
-test('conc033', omit_ways(['ghci']), compile_and_run, [''])
+test('conc033', omit_ways(['ghci', 'threaded']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 # Also hangs with the threaded RTS
