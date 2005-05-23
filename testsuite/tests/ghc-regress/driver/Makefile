@@ -221,7 +221,7 @@ test062.2:
 	./hello
 test062.3:
 	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
-	echo "hello = putStrLn \"ok\"" >Hello.hs
+	echo "module Main (hello) where { hello = putStrLn \"ok\" }" >Hello.hs
 	$(TEST_HC) --make -main-is hello Hello.hs -o hello
 	./hello
 
