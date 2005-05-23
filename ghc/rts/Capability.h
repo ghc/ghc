@@ -59,7 +59,7 @@ extern void prodWorker ( void );
 // current worker thread should then re-acquire it using
 // waitForCapability().
 //
-extern void yieldCapability( Capability **pCap );
+extern void yieldCapability( Capability** pCap, Condition *cond );
 
 // Acquires a capability for doing some work.
 //

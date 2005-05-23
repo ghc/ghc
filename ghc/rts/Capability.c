@@ -74,9 +74,6 @@ Condition thread_ready_cond = INIT_COND_VAR;
  * Task.startTask() uses its current value.
  */
 nat rts_n_waiting_tasks = 0;
-
-static Condition *passTarget = NULL;
-static rtsBool passingCapability = rtsFalse;
 #endif
 
 #if defined(SMP)
@@ -97,11 +94,42 @@ HashTable *capability_hash;
 #define UNUSED_IF_NOT_SMP STG_UNUSED
 #endif
 
+
+#if defined(RTS_SUPPORTS_THREADS)
+INLINE_HEADER rtsBool
+ANY_WORK_FOR_ME( Condition *cond )
+{
+    // If the run queue is not empty, then we only wake up the guy who
+    // can run the thread at the head, even if there is some other
+    // reason for this task to run (eg. interrupted=rtsTrue).
+    if (!EMPTY_RUN_QUEUE()) {
+	if (run_queue_hd->main == NULL) {
+	    return (cond == NULL);
+	} else {
+	    return (&run_queue_hd->main->bound_thread_cond == cond);
+	}
+    }
+
+    return blackholes_need_checking
+	|| interrupted
 #if defined(RTS_USER_SIGNALS)
-#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted || blackholes_need_checking || signals_pending())
-#else
-#define ANY_WORK_TO_DO() (!EMPTY_RUN_QUEUE() || interrupted || blackholes_need_checking)
+	|| signals_pending()
 #endif
+	;
+}
+#endif
+
+INLINE_HEADER rtsBool
+ANY_WORK_TO_DO(void) 
+{
+    return (!EMPTY_RUN_QUEUE() 
+	    || interrupted
+	    || blackholes_need_checking
+#if defined(RTS_USER_SIGNALS)
+	    || signals_pending()
+#endif
+	);
+}
 
 /* ----------------------------------------------------------------------------
    Initialisation
@@ -232,28 +260,14 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 	// Decrement the counter here to avoid livelock where the
 	// thread that is yielding its capability will repeatedly
 	// signal returning_worker_cond.
-
 	rts_n_waiting_workers--;
 	signalCondition(&returning_worker_cond);
-	IF_DEBUG(scheduler, sched_belch("worker: released capability to returning worker"));
-    } else if (passingCapability) {
-	if (passTarget == NULL) {
-	    signalCondition(&thread_ready_cond);
-	    startSchedulerTaskIfNecessary();
-	} else {
-	    signalCondition(passTarget);
-	}
-	rts_n_free_capabilities++;
-	IF_DEBUG(scheduler, sched_belch("worker: released capability, passing it"));
-
+	IF_DEBUG(scheduler, 
+		 sched_belch("worker: released capability to returning worker"));
     } else {
 	rts_n_free_capabilities++;
-	// Signal that a capability is available
-	if (rts_n_waiting_tasks > 0 && ANY_WORK_TO_DO()) {
-	    signalCondition(&thread_ready_cond);
-	}
-	startSchedulerTaskIfNecessary();
 	IF_DEBUG(scheduler, sched_belch("worker: released capability"));
+	threadRunnable();
     }
 #endif
     return;
@@ -299,7 +313,7 @@ waitForReturnCapability( Mutex* pMutex, Capability** pCap )
 	     sched_belch("worker: returning; workers waiting: %d",
 			 rts_n_waiting_workers));
 
-    if ( noCapabilities() || passingCapability ) {
+    if ( noCapabilities() ) {
 	rts_n_waiting_workers++;
 	context_switch = 1;	// make sure it's our turn soon
 	waitCondition(&returning_worker_cond, pMutex);
@@ -327,16 +341,16 @@ waitForReturnCapability( Mutex* pMutex, Capability** pCap )
  * ------------------------------------------------------------------------- */
 
 void
-yieldCapability( Capability** pCap )
+yieldCapability( Capability** pCap, Condition *cond )
 {
     // Pre-condition:  pMutex is assumed held, the current thread
     // holds the capability pointed to by pCap.
 
-    if ( rts_n_waiting_workers > 0 || passingCapability || !ANY_WORK_TO_DO()) {
+    if ( rts_n_waiting_workers > 0 || !ANY_WORK_FOR_ME(cond)) {
 	IF_DEBUG(scheduler, 
 		 if (rts_n_waiting_workers > 0) {
 		     sched_belch("worker: giving up capability (returning wkr)");
-		 } else if (passingCapability) {
+		 } else if (!EMPTY_RUN_QUEUE()) {
 		     sched_belch("worker: giving up capability (passing capability)");
 		 } else {
 		     sched_belch("worker: giving up capability (no threads to run)");
@@ -367,7 +381,7 @@ yieldCapability( Capability** pCap )
  *           not to create a new worker thread when an external
  *           call is made.
  *           If pThreadCond is not NULL, a capability can be specifically
- *           passed to this thread using passCapability.
+ *           passed to this thread.
  * ------------------------------------------------------------------------- */
  
 void
@@ -375,9 +389,7 @@ waitForCapability( Mutex* pMutex, Capability** pCap, Condition* pThreadCond )
 {
     // Pre-condition: pMutex is held.
 
-    while ( noCapabilities() ||
-	    (passingCapability && passTarget != pThreadCond) ||
-	    !ANY_WORK_TO_DO()) {
+    while ( noCapabilities() || !ANY_WORK_FOR_ME(pThreadCond)) {
 	IF_DEBUG(scheduler,
 		 sched_belch("worker: wait for capability (cond: %p)",
 			     pThreadCond));
@@ -392,41 +404,10 @@ waitForCapability( Mutex* pMutex, Capability** pCap, Condition* pThreadCond )
 	    IF_DEBUG(scheduler, sched_belch("worker: get normal capability"));
 	}
     }
-    passingCapability = rtsFalse;
     grabCapability(pCap);
 
     // Post-condition: pMutex is held and *pCap is held by the current thread
     return;
-}
-
-/* ----------------------------------------------------------------------------
-   passCapability, passCapabilityToWorker
-   ------------------------------------------------------------------------- */
-
-void
-passCapability( Condition *pTargetThreadCond )
-{
-    // Pre-condition: pMutex is held and cap is held by the current thread
-
-    passTarget = pTargetThreadCond;
-    passingCapability = rtsTrue;
-    IF_DEBUG(scheduler, sched_belch("worker: passCapability"));
-
-    // Post-condition: pMutex is held; cap is still held, but will be
-    //                 passed to the target thread when next released.
-}
-
-void
-passCapabilityToWorker( void )
-{
-    // Pre-condition: pMutex is held and cap is held by the current thread
-
-    passTarget = NULL;
-    passingCapability = rtsTrue;
-    IF_DEBUG(scheduler, sched_belch("worker: passCapabilityToWorker"));
-
-    // Post-condition: pMutex is held; cap is still held, but will be
-    //                 passed to a worker thread when next released.
 }
 
 #endif /* RTS_SUPPORTS_THREADS */
@@ -444,10 +425,17 @@ void
 threadRunnable ( void )
 {
 #if defined(RTS_SUPPORTS_THREADS)
-    if ( !noCapabilities() && ANY_WORK_TO_DO() && rts_n_waiting_tasks > 0 ) {
-	signalCondition(&thread_ready_cond);
+    if ( !noCapabilities() && ANY_WORK_TO_DO() ) {
+	if (!EMPTY_RUN_QUEUE() && run_queue_hd->main != NULL) {
+	    signalCondition(&run_queue_hd->main->bound_thread_cond);
+	    return;
+	}
+	if (rts_n_waiting_tasks > 0) {
+	    signalCondition(&thread_ready_cond);
+	} else {
+	    startSchedulerTaskIfNecessary();
+	}
     }
-    startSchedulerTaskIfNecessary();
 #endif
 }
 

@@ -463,7 +463,8 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
       // Yield the capability to higher-priority tasks if necessary.
       //
       if (cap != NULL) {
-	  yieldCapability(&cap);
+	  yieldCapability(&cap, 
+			  mainThread ? &mainThread->bound_thread_cond : NULL );
       }
 
       // If we do not currently hold a capability, we wait for one
@@ -475,7 +476,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
       // We now have a capability...
 #endif
-      
+
 #if 0 /* extra sanity checking */
       { 
 	  StgMainThread *m;
@@ -627,21 +628,19 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	    sched_belch("### thread %d bound to another OS thread", t->id));
 	  // no, bound to a different Haskell thread: pass to that thread
 	  PUSH_ON_RUN_QUEUE(t);
-	  passCapability(&m->bound_thread_cond);
 	  continue;
 	}
       }
       else
       {
 	if(mainThread != NULL)
-        // The thread we want to run is bound.
+        // The thread we want to run is unbound.
 	{
 	  IF_DEBUG(scheduler,
 	    sched_belch("### this OS thread cannot run thread %d", t->id));
 	  // no, the current native thread is bound to a different
 	  // Haskell thread, so pass it to any worker thread
 	  PUSH_ON_RUN_QUEUE(t);
-	  passCapabilityToWorker();
 	  continue; 
 	}
       }
