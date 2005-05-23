@@ -288,7 +288,7 @@ static void scheduleHandleThreadBlocked( StgTSO *t );
 static rtsBool scheduleHandleThreadFinished( StgMainThread *mainThread, 
 					     Capability *cap, StgTSO *t );
 static rtsBool scheduleDoHeapProfile(rtsBool ready_to_gc);
-static void scheduleDoGC(Capability *cap);
+static void scheduleDoGC(rtsBool force_major);
 
 static void unblockThread(StgTSO *tso);
 static rtsBool checkBlackHoles(void);
@@ -305,6 +305,7 @@ static void raiseAsync_(StgTSO *tso, StgClosure *exception,
 
 static void printThreadBlockage(StgTSO *tso);
 static void printThreadStatus(StgTSO *tso);
+void printThreadQueue(StgTSO *tso);
 
 #if defined(PARALLEL_HASKELL)
 StgTSO * createSparkThread(rtsSpark spark);
@@ -771,7 +772,7 @@ run_thread:
     }
 
     if (scheduleDoHeapProfile(ready_to_gc)) { ready_to_gc = rtsFalse; }
-    if (ready_to_gc) { scheduleDoGC(cap); }
+    if (ready_to_gc) { scheduleDoGC(rtsFalse); }
   } /* end of while() */
 
   IF_PAR_DEBUG(verbose,
@@ -866,7 +867,7 @@ scheduleCheckBlackHoles( void )
  * ------------------------------------------------------------------------- */
 
 static void
-scheduleDetectDeadlock(void)
+scheduleDetectDeadlock()
 {
 
 #if defined(PARALLEL_HASKELL)
@@ -900,7 +901,7 @@ scheduleDetectDeadlock(void)
 	// exception.  Any threads thus released will be immediately
 	// runnable.
 
-	GarbageCollect(GetRoots,rtsTrue);
+	scheduleDoGC( rtsTrue/*force  major GC*/ );
 	recent_activity = ACTIVITY_DONE_GC;
 	if ( !EMPTY_RUN_QUEUE() ) return;
 
@@ -1883,10 +1884,11 @@ scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
  * -------------------------------------------------------------------------- */
 
 static void
-scheduleDoGC( Capability *cap STG_UNUSED )
+scheduleDoGC( rtsBool force_major )
 {
     StgTSO *t;
 #ifdef SMP
+    Capability *cap;
     static rtsBool waiting_for_gc;
     int n_capabilities = RtsFlags.ParFlags.nNodes - 1; 
            // subtract one because we're already holding one.
@@ -1909,7 +1911,6 @@ scheduleDoGC( Capability *cap STG_UNUSED )
     if (waiting_for_gc) return;
     waiting_for_gc = rtsTrue;
 
-    caps[n_capabilities] = cap;
     while (n_capabilities > 0) {
 	IF_DEBUG(scheduler, sched_belch("ready_to_gc, grabbing all the capabilies (%d left)", n_capabilities));
 	waitForReturnCapability(&sched_mutex, &cap);
@@ -1954,7 +1955,7 @@ scheduleDoGC( Capability *cap STG_UNUSED )
 #if defined(RTS_SUPPORTS_THREADS)
     IF_DEBUG(scheduler,sched_belch("doing GC"));
 #endif
-    GarbageCollect(GetRoots,rtsFalse);
+    GarbageCollect(GetRoots, force_major);
     
 #if defined(SMP)
     {
@@ -4088,7 +4089,7 @@ printThreadBlockage(StgTSO *tso)
     debugBelch("is blocked until %ld", (long)(tso->block_info.target));
     break;
   case BlockedOnMVar:
-    debugBelch("is blocked on an MVar");
+    debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
     break;
   case BlockedOnException:
     debugBelch("is blocked on delivering an exception to thread %d",
@@ -4162,7 +4163,7 @@ printAllThreads(void)
 # endif
 
   for (t = all_threads; t != END_TSO_QUEUE; ) {
-    debugBelch("\tthread %d @ %p ", t->id, (void *)t);
+    debugBelch("\tthread %4d @ %p ", t->id, (void *)t);
 #if defined(DEBUG)
     {
       void *label = lookupThreadLabel(t->id);
@@ -4179,8 +4180,26 @@ printAllThreads(void)
     }
   }
 }
-    
+
 #ifdef DEBUG
+
+// useful from gdb
+void 
+printThreadQueue(StgTSO *t)
+{
+    nat i = 0;
+    for (; t != END_TSO_QUEUE; t = t->link) {
+	debugBelch("\tthread %d @ %p ", t->id, (void *)t);
+	if (t->what_next == ThreadRelocated) {
+	    debugBelch("has been relocated...\n");
+	} else {
+	    printThreadStatus(t);
+	    debugBelch("\n");
+	}
+	i++;
+    }
+    debugBelch("%d threads on queue\n", i);
+}
 
 /* 
    Print a whole blocking queue attached to node (debugging only).
