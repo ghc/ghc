@@ -1006,7 +1006,12 @@ data Linkable = LM {
  }
 
 isObjectLinkable :: Linkable -> Bool
-isObjectLinkable l = all isObject (linkableUnlinked l)
+isObjectLinkable l = not (null unlinked) && all isObject unlinked
+  where unlinked = linkableUnlinked l
+	-- A linkable with no Unlinked's is treated as a BCO.  We can
+	-- generate a linkable with no Unlinked's as a result of
+	-- compiling a module in HscNothing mode, and this choice
+	-- happens to work well with checkStability in module GHC.
 
 instance Outputable Linkable where
    ppr (LM when_made mod unlinkeds)
