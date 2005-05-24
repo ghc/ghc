@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 {-
 Bug report from Jon Mountjoy:
 
@@ -34,34 +33,33 @@ data HappyAbsSyn t1 t2 t3
 	| HappyAbsSyn2 t2
 	| HappyAbsSyn3 t3
 
--- action_0 (6) = happyShift action_3        --- *****
--- action_0 (1) = happyGoto action_1
--- action_0 (2) = happyGoto action_2
+action_0 (6) = happyShift action_3        --- *****
+action_0 (1) = happyGoto action_1
+action_0 (2) = happyGoto action_2
 action_0 _ = happyFail
 
--- action_1 (7) = happyAccept
--- action_1 _ = happyFail
+action_1 (7) = happyAccept
+action_1 _ = happyFail
 
--- action_2 _ = happyReduce_1
+action_2 _ = happyReduce_1
 
--- action_3 (5) = happyShift action_4
--- action_3 _ = happyFail
+action_3 (5) = happyShift action_4
+action_3 _ = happyFail
 
--- action_4 (4) = happyShift action_6
--- action_4 (3) = happyGoto action_5
--- action_4 _ = happyFail
+action_4 (4) = happyShift action_6
+action_4 (3) = happyGoto action_5
+action_4 _ = happyFail
 
--- action_5 _ = happyReduce_2
+action_5 _ = happyReduce_2
 
--- action_6 _ = happyReduce_3
+action_6 _ = happyReduce_3
 
-{-
 happyReduce_1 = happySpecReduce_1 1 reduction where {    -- ##
   reduction
 	(HappyAbsSyn2  happy_var_1)
 	 =  HappyAbsSyn1
 		 (\p -> let q = map (\(x,y) -> (x,y p)) happy_var_1 in  (10.1))
-  ;
+;
   reduction _  = notHappyAtAll }
 
 happyReduce_2 = happySpecReduce_3 2 reduction where {
@@ -79,7 +77,6 @@ happyReduce_3 = happySpecReduce_1 3 reduction where {
 	 =  HappyAbsSyn3
 		 (\p -> happy_var_1);
   reduction _  = notHappyAtAll }
--}
 
 happyNewToken action sts stk [] =
 	action 7 7 (error "reading EOF!") (HappyState action) sts stk []
@@ -92,10 +89,8 @@ happyNewToken action sts stk (tk:tks) =
 	TokenVar happy_dollar_dollar -> cont 6;
 	}
 
--- happyThen = \m k -> k m
--- happyReturn = \a tks -> a
-
-myparser :: forall t. [Token] -> t -> Double
+happyThen = \m k -> k m
+happyReturn = \a tks -> a
 myparser = happyParse
 
 
@@ -111,7 +106,7 @@ data Token  =
             deriving Show
 
 main = print (myparser [] [])
--- $Id: tc095.hs,v 1.2 2005/05/16 12:53:22 simonpj Exp $
+-- $Id: tc095.hs,v 1.3 2005/05/24 11:16:47 simonmar Exp $
 
 {-
 	The stack is in the following order throughout the parse:
@@ -131,7 +126,7 @@ happyParse = happyNewToken action_0 [] []
 -- All this HappyState stuff is simply because we can't have recursive
 -- types in Haskell without an intervening data structure.
 
-data HappyState b c = HappyState
+newtype HappyState b c = HappyState
         (Int ->                         -- token number
          Int ->                         -- token number (yes, again)
          b ->                           -- token semantic value
@@ -141,7 +136,6 @@ data HappyState b c = HappyState
 
 -----------------------------------------------------------------------------
 -- Accepting the parse
-{-
 
 happyAccept j tk st sts [ HappyAbsSyn1 ans ] = happyReturn ans
 happyAccept j tk st sts _                    = notHappyAtAll
@@ -163,6 +157,7 @@ happyShift new_state i tk st sts stk =
 
 -- don't allow reductions when we're in error recovery, because this can
 -- lead to an infinite loop.
+
 happySpecReduce_0 i fn (-1) tk _ sts stk
      = case sts of
 	st@(HappyState action):sts -> action (-1) (-1) tk st sts stk
@@ -205,7 +200,7 @@ happyMonadReduce k i c fn j tk st sts stk =
 	happyThen (fn stk) (\r -> action i j tk st' sts' (c r : stk'))
        where sts'@(st'@(HappyState action):_) = drop (k::Int) (st:sts)
 	     stk' = drop (k::Int) stk
--}
+
 -----------------------------------------------------------------------------
 -- Moving to a new state after a reduction
 
