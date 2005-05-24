@@ -338,8 +338,9 @@ mkIface hsc_env maybe_old_iface
 writeIfaceFile :: HscEnv -> ModLocation -> ModIface -> Bool -> IO ()
 -- Write the interface file, if necessary
 writeIfaceFile hsc_env location new_iface no_change_at_all
-  | no_change_at_all 	    = return ()
-  | ghc_mode == Interactive = return ()
+  | no_change_at_all 	      = return ()
+  | ghc_mode == Interactive   = return ()
+  | ghc_mode == JustTypecheck = return ()
   | otherwise
   = do	{ createDirectoryHierarchy (directoryOf hi_file_path)
 	; writeBinIface hi_file_path new_iface }
@@ -783,7 +784,8 @@ check_old_iface mod_summary source_unchanged maybe_iface
      -- If the source has changed and we're in interactive mode, avoid reading
      -- an interface; just return the one we might have been supplied with.
     getGhciMode					`thenM` \ ghci_mode ->
-    if (ghci_mode == Interactive) && not source_unchanged then
+    if (ghci_mode == Interactive || ghci_mode == JustTypecheck) 
+	&& not source_unchanged then
          returnM (outOfDate, maybe_iface)
     else
 
