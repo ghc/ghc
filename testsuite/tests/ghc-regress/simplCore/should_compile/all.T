@@ -12,4 +12,5 @@ test('simpl008', only_compiler_types(['ghc']), compile_fail, [''])
 test('simpl009', normal, compile, [''])
 test('simpl010', normal, compile, [''])
 test('simpl011', normal, compile, [''])
+test('simpl012', normal, compile, [''])
 
