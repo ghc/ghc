@@ -106,7 +106,7 @@ data Token  =
             deriving Show
 
 main = print (myparser [] [])
--- $Id: tc095.hs,v 1.3 2005/05/24 11:16:47 simonmar Exp $
+-- $Id: tc095.hs,v 1.4 2005/05/24 11:33:11 simonpj Exp $
 
 {-
 	The stack is in the following order throughout the parse:
@@ -210,6 +210,9 @@ happyGoto action j tk st = action j j tk (HappyState action)
 -- Error recovery (-1 is the error token)
 
 -- fail if we are in recovery and no more states to discard
+{-# NOINLINE happyFail #-}
+-- NOINLINE else GHC diverges with the contravariant data type bug
+-- See test simplCore/should_compile/simpl012
 happyFail  (-1) tk st' [] stk = happyError
 
 -- discard a state
