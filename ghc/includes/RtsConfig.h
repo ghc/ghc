@@ -21,6 +21,10 @@
 #define SUPPORT_LONG_LONGS 1
 #endif
 
+#if defined(SMP) || defined(THREADED_RTS)
+#define RTS_SUPPORTS_THREADS 1
+#endif
+
 /*
  * Whether the runtime system will use libbfd for debugging purposes.
  */

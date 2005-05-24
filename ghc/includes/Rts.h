@@ -29,10 +29,6 @@ extern "C" {
 #define FLEXIBLE_ARRAY 0
 #endif
 
-#if defined(SMP) || defined(THREADED_RTS)
-#define RTS_SUPPORTS_THREADS 1
-#endif
-
 /* Fix for mingw stat problem (done here so it's early enough) */
 #ifdef mingw32_HOST_OS
 #define __MSVCRT__ 1
