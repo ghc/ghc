@@ -212,6 +212,9 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 #endif
 		       Nothing -> panic "compile: no interpreted code"
 
+		HscNothing
+		  -> return ([], ms_hs_date mod_summary)
+
 		-- We're in --make mode: finish the compilation pipeline.
 		_other
 		  -> do	runPipeline StopLn dflags (output_fn,Nothing) Persistent
