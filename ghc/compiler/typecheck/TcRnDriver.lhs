@@ -962,7 +962,10 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 			-- If not, fail; if so, try to print it.
 			-- The two-step process avoids getting two errors: one from
 			-- the expression itself, and one from the 'print it' part
-		    do { tcGhciStmts [let_stmt]; tcGhciStmts [let_stmt, print_it] }
+			-- This two-step story is very clunky, alas
+		    do { checkNoErrs (tcGhciStmts [let_stmt]) 
+				--- checkNoErrs defeats the error recovery of let-bindings
+		       ; tcGhciStmts [let_stmt, print_it] }
 	  ]}
 
 mkPlan stmt@(L loc (BindStmt {}))
