@@ -33,7 +33,7 @@ xchg(StgPtr p, StgWord w)
     StgWord result;
     result = w;
     __asm__ __volatile__ (
- 	  "xchgl %1,%0"
+ 	  "xchg %1,%0"
           :"+r" (result), "+m" (*p)
           : /* no input-only operands */
 	);
@@ -43,15 +43,26 @@ xchg(StgPtr p, StgWord w)
 INLINE_HEADER StgInfoTable *
 lockClosure(StgClosure *p)
 {
+#if i386_HOST_ARCH || x86_64_HOST_ARCH
     StgWord info;
-#if 0
     do {
 	info = xchg((P_)&p->header.info, (W_)&stg_WHITEHOLE_info);
 	if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
 	yieldThread();
     } while (1);
 #else
-    info = p->header.info;
+   ACQUIRE_SM_LOCK
+#endif
+}
+
+INLINE_HEADER void
+unlockClosure(StgClosure *p, StgInfoTable *info)
+{
+#if i386_HOST_ARCH || x86_64_HOST_ARCH
+    // This is safe enough, because lockClosure() does the memory barrier:
+    p->header.info = info;
+#else
+    RELEASE_SM_LOCK;
 #endif
 }
 
