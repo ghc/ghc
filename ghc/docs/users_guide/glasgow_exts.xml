@@ -1427,7 +1427,7 @@ declarations.  Define your own instances!
 <para>
 This section documents GHC's implementation of multi-parameter type
 classes.  There's lots of background in the paper <ulink
-url="http://research.microsoft.com/~simonpj/multi.ps.gz" >Type
+url="http://research.microsoft.com/~simonpj/Papers/type-class-design-space" >Type
 classes: exploring the design space</ulink > (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
 </para>
