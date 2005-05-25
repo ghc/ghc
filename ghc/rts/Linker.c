@@ -2127,7 +2127,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
       /* Ignore sections called which contain stabs debugging
          information. */
       if (0 == strcmp(".stab", sectab_i->Name)
-          || 0 == strcmp(".stabstr", sectab_i->Name))
+          || 0 == strcmp(".stabstr", sectab_i->Name)
+          || 0 == strcmp(".ctors", sectab_i->Name))
          continue;
 
       if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
