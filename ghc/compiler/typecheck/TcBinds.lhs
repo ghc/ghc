@@ -121,6 +121,7 @@ tcHsBootSigs [HsBindGroup binds sigs _]
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
 	   ; return (mkVanillaGlobal name sigma_ty vanillaIdInfo) }
 	-- Notice that we make GlobalIds, not LocalIds
+tcHsBootSits groups = pprPanic "tcHsBootSigs" (ppr groups)
 
 badBootDeclErr :: Message
 badBootDeclErr = ptext SLIT("Illegal declarations in an hs-boot file")
@@ -456,6 +457,22 @@ tcMonoBinds :: LHsBinds Name
 	    -> TcM (LHsBinds TcId, [MonoBindInfo])
 
 tcMonoBinds binds lookup_sig is_rec
+  | isNonRec is_rec,	-- Non-recursive, single function binding
+    [L b_loc (FunBind (L nm_loc name) inf matches)] <- bagToList binds,
+    Nothing <- lookup_sig name	-- ...with no type signature
+  = 	-- In this very special case we infer the type of the
+	-- right hand side first (it may have a higher-rank type)
+	-- and *then* make the monomorphic Id for the LHS
+	-- e.g.		f = \(x::forall a. a->a) -> <body>
+	-- 	We want to infer a higher-rank type for f
+    setSrcSpan b_loc  	$
+    do	{ (matches', rhs_ty) <- tcInfer (tcMatchesFun name matches)
+	; mono_name <- newLocalName name
+	; let mono_id = mkLocalId mono_name rhs_ty
+	; return (unitBag (L b_loc (FunBind (L nm_loc mono_id) inf matches')),
+		  [(name, Nothing, mono_id)]) }
+
+  | otherwise 
   = do	{ tc_binds <- mapBagM (wrapLocM (tcLhs lookup_sig)) binds
 
 	-- Bring (a) the scoped type variables, and (b) the Ids, into scope for the RHSs
@@ -537,6 +554,9 @@ tcLhs lookup_sig bind@(PatBind pat grhss _)
     lookup_infos = do { mono_ids <- tcLookupLocalIds names
 		      ; return [ (name, lookup_sig name, mono_id)
 			       | (name, mono_id) <- names `zip` mono_ids] }
+
+tcLhs lookup_sig other_bind = pprPanic "tcLhs" (ppr other_bind)
+	-- AbsBind, VarBind impossible
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
