@@ -527,6 +527,7 @@ word64ToIntegerzh_fast
 
 /* ToDo: this is shockingly inefficient */
 
+#ifndef SMP
 section "bss" {
   mp_tmp1:
     bits8 [SIZEOF_MP_INT];
@@ -538,101 +539,120 @@ section "bss" {
 }
 
 section "bss" {
-  result1:
+  mp_result1:
     bits8 [SIZEOF_MP_INT];
 }
 
 section "bss" {
-  result2:
+  mp_result2:
     bits8 [SIZEOF_MP_INT];
 }
+#endif
 
-#define GMP_TAKE2_RET1(name,mp_fun)			\
-name							\
-{							\
-  CInt s1, s2;						\
-  W_ d1, d2;						\
-							\
-  /* call doYouWantToGC() */				\
-  MAYBE_GC(R2_PTR & R4_PTR, name);			\
-							\
-  s1 = W_TO_INT(R1);					\
-  d1 = R2;						\
-  s2 = W_TO_INT(R3);					\
-  d2 = R4;						\
-							\
-  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(StgArrWords_words(d1));	\
-  MP_INT__mp_size(mp_tmp1)  = (s1);			\
-  MP_INT__mp_d(mp_tmp1)	    = BYTE_ARR_CTS(d1);		\
-  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(StgArrWords_words(d2));	\
-  MP_INT__mp_size(mp_tmp2)  = (s2);			\
-  MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);		\
-							\
-  foreign "C" mpz_init(result1);			\
-							\
-  /* Perform the operation */				\
-  foreign "C" mp_fun(result1,mp_tmp1,mp_tmp2);		\
-							\
-  RET_NP(TO_W_(MP_INT__mp_size(result1)),		\
-         MP_INT__mp_d(result1) - SIZEOF_StgArrWords);	\
+#ifdef SMP
+#define FETCH_MP_TEMP(X) \
+W_ X; \
+X = BaseReg + (OFFSET_StgRegTable_r ## X);
+#else
+#define FETCH_MP_TEMP(X) /* Nothing */
+#endif
+
+#define GMP_TAKE2_RET1(name,mp_fun)                                     \
+name                                                                    \
+{                                                                       \
+  CInt s1, s2;                                                          \
+  W_ d1, d2;                                                            \
+  FETCH_MP_TEMP(mp_tmp1);                                               \
+  FETCH_MP_TEMP(mp_tmp2);                                               \
+  FETCH_MP_TEMP(mp_result1)                                             \
+  FETCH_MP_TEMP(mp_result2);                                            \
+                                                                        \
+  /* call doYouWantToGC() */                                            \
+  MAYBE_GC(R2_PTR & R4_PTR, name);                                      \
+                                                                        \
+  s1 = W_TO_INT(R1);                                                    \
+  d1 = R2;                                                              \
+  s2 = W_TO_INT(R3);                                                    \
+  d2 = R4;                                                              \
+                                                                        \
+  MP_INT__mp_alloc(mp_tmp1) = W_TO_INT(StgArrWords_words(d1));          \
+  MP_INT__mp_size(mp_tmp1)  = (s1);                                     \
+  MP_INT__mp_d(mp_tmp1)	    = BYTE_ARR_CTS(d1);                         \
+  MP_INT__mp_alloc(mp_tmp2) = W_TO_INT(StgArrWords_words(d2));          \
+  MP_INT__mp_size(mp_tmp2)  = (s2);                                     \
+  MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);                         \
+                                                                        \
+  foreign "C" mpz_init(mp_result1 "ptr");                               \
+                                                                        \
+  /* Perform the operation */                                           \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr");   \
+                                                                        \
+  RET_NP(TO_W_(MP_INT__mp_size(mp_result1)),                            \
+         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);                \
 }
 
-#define GMP_TAKE1_RET1(name,mp_fun)				\
-name								\
-{								\
-  CInt s1;							\
-  W_ d1;							\
-								\
-  /* call doYouWantToGC() */					\
-  MAYBE_GC(R2_PTR, name);					\
-								\
-  d1 = R2;							\
-  s1 = W_TO_INT(R1);						\
-								\
-  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));	\
-  MP_INT__mp_size(mp_tmp1)	= (s1);				\
-  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);		\
-								\
-  foreign "C" mpz_init(result1);				\
-								\
-  /* Perform the operation */					\
-  foreign "C" mp_fun(result1,mp_tmp1);				\
-								\
-  RET_NP(TO_W_(MP_INT__mp_size(result1)),			\
-         MP_INT__mp_d(result1) - SIZEOF_StgArrWords);		\
+#define GMP_TAKE1_RET1(name,mp_fun)                                     \
+name                                                                    \
+{                                                                       \
+  CInt s1;                                                              \
+  W_ d1;                                                                \
+  FETCH_MP_TEMP(mp_tmp1);                                               \
+  FETCH_MP_TEMP(mp_result1)                                             \
+                                                                        \
+  /* call doYouWantToGC() */                                            \
+  MAYBE_GC(R2_PTR, name);                                               \
+                                                                        \
+  d1 = R2;                                                              \
+  s1 = W_TO_INT(R1);                                                    \
+                                                                        \
+  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));      \
+  MP_INT__mp_size(mp_tmp1)	= (s1);                                 \
+  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                     \
+                                                                        \
+  foreign "C" mpz_init(mp_result1 "ptr");                               \
+                                                                        \
+  /* Perform the operation */                                           \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1 "ptr");                   \
+                                                                        \
+  RET_NP(TO_W_(MP_INT__mp_size(mp_result1)),                            \
+         MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);                \
 }
 
-#define GMP_TAKE2_RET2(name,mp_fun)				\
-name								\
-{								\
-  CInt s1, s2;							\
-  W_ d1, d2;							\
-								\
-  /* call doYouWantToGC() */					\
-  MAYBE_GC(R2_PTR & R4_PTR, name);				\
-								\
-  s1 = W_TO_INT(R1);						\
-  d1 = R2;							\
-  s2 = W_TO_INT(R3);						\
-  d2 = R4;							\
-								\
-  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));	\
-  MP_INT__mp_size(mp_tmp1)	= (s1);				\
-  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);		\
-  MP_INT__mp_alloc(mp_tmp2)	= W_TO_INT(StgArrWords_words(d2));	\
-  MP_INT__mp_size(mp_tmp2)	= (s2);				\
-  MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);		\
-								\
-  foreign "C" mpz_init(result1);				\
-  foreign "C" mpz_init(result2);				\
-								\
-  /* Perform the operation */					\
-  foreign "C" mp_fun(result1,result2,mp_tmp1,mp_tmp2);		\
-								\
-  RET_NPNP(TO_W_(MP_INT__mp_size(result1)),			\
-           MP_INT__mp_d(result1) - SIZEOF_StgArrWords,		\
-	   TO_W_(MP_INT__mp_size(result2)),			\
-           MP_INT__mp_d(result2) - SIZEOF_StgArrWords);		\
+#define GMP_TAKE2_RET2(name,mp_fun)                                                     \
+name                                                                                    \
+{                                                                                       \
+  CInt s1, s2;                                                                          \
+  W_ d1, d2;                                                                            \
+  FETCH_MP_TEMP(mp_tmp1);                                                               \
+  FETCH_MP_TEMP(mp_tmp2);                                                               \
+  FETCH_MP_TEMP(mp_result1)                                                             \
+  FETCH_MP_TEMP(mp_result2)                                                             \
+                                                                                        \
+  /* call doYouWantToGC() */                                                            \
+  MAYBE_GC(R2_PTR & R4_PTR, name);                                                      \
+                                                                                        \
+  s1 = W_TO_INT(R1);                                                                    \
+  d1 = R2;                                                                              \
+  s2 = W_TO_INT(R3);                                                                    \
+  d2 = R4;                                                                              \
+                                                                                        \
+  MP_INT__mp_alloc(mp_tmp1)	= W_TO_INT(StgArrWords_words(d1));                      \
+  MP_INT__mp_size(mp_tmp1)	= (s1);                                                 \
+  MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                                     \
+  MP_INT__mp_alloc(mp_tmp2)	= W_TO_INT(StgArrWords_words(d2));                      \
+  MP_INT__mp_size(mp_tmp2)	= (s2);                                                 \
+  MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);                                     \
+                                                                                        \
+  foreign "C" mpz_init(mp_result1 "ptr");                                               \
+  foreign "C" mpz_init(mp_result2 "ptr");                                               \
+                                                                                        \
+  /* Perform the operation */                                                           \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr");    \
+                                                                                        \
+  RET_NPNP(TO_W_(MP_INT__mp_size(mp_result1)),                                          \
+           MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords,                               \
+	   TO_W_(MP_INT__mp_size(mp_result2)),                                          \
+           MP_INT__mp_d(mp_result2) - SIZEOF_StgArrWords);                              \
 }
 
 GMP_TAKE2_RET1(plusIntegerzh_fast,     mpz_add)
@@ -650,17 +670,20 @@ GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com)
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr)
 GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr)
 
+#ifndef SMP
 section "bss" {
-  aa:  W_; // NB. aa is really an mp_limb_t
+  mp_tmp_w:  W_; // NB. mp_tmp_w is really an here mp_limb_t
 }
+#endif
 
 gcdIntzh_fast
 {
     /* R1 = the first Int#; R2 = the second Int# */
     W_ r; 
+    FETCH_MP_TEMP(mp_tmp_w);
 
-    W_[aa] = R1;
-    r = foreign "C" mpn_gcd_1(aa, 1, R2);
+    W_[mp_tmp_w] = R1;
+    r = foreign "C" mpn_gcd_1(mp_tmp_w "ptr", 1, R2);
 
     R1 = r;
     /* Result parked in R1, return via info-pointer at TOS */
@@ -806,14 +829,12 @@ integer2Wordzh_fast
   jump %ENTRY_CODE(Sp(0));
 }
 
-section "bss" {
-  exponent:  W_;
-}
-
 decodeFloatzh_fast
 { 
     W_ p;
     F_ arg;
+    FETCH_MP_TEMP(mp_tmp1);
+    FETCH_MP_TEMP(mp_tmp_w);
     
     /* arguments: F1 = Float# */
     arg = F1;
@@ -828,10 +849,10 @@ decodeFloatzh_fast
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
     
     /* Perform the operation */
-    foreign "C" __decodeFloat(mp_tmp1,exponent,arg);
+    foreign "C" __decodeFloat(mp_tmp1 "ptr",mp_tmp_w "ptr" ,arg);
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
-    RET_NNP(W_[exponent], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
+    RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
 }
 
 #define DOUBLE_MANTISSA_SIZE SIZEOF_DOUBLE
@@ -841,6 +862,8 @@ decodeDoublezh_fast
 { 
     D_ arg;
     W_ p;
+    FETCH_MP_TEMP(mp_tmp1);
+    FETCH_MP_TEMP(mp_tmp_w);
 
     /* arguments: D1 = Double# */
     arg = D1;
@@ -855,10 +878,10 @@ decodeDoublezh_fast
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
 
     /* Perform the operation */
-    foreign "C" __decodeDouble(mp_tmp1,exponent,arg);
+    foreign "C" __decodeDouble(mp_tmp1 "ptr", mp_tmp_w "ptr",arg);
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
-    RET_NNP(W_[exponent], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
+    RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
 }
 
 /* -----------------------------------------------------------------------------
@@ -969,7 +992,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    frame = Sp;
    trec = StgTSO_trec(CurrentTSO);
    "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr");
-   r = foreign "C" stmCommitTransaction(trec "ptr");
+   r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", trec "ptr");
    if (r) {
      /* Succeeded (either first branch or second branch) */
      StgTSO_trec(CurrentTSO) = outer;
@@ -979,7 +1002,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    } else {
      /* Did not commit: retry */
      W_ new_trec;
-     "ptr" new_trec = foreign "C" stmStartTransaction(outer "ptr");
+     "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
      StgTSO_trec(CurrentTSO) = new_trec;
      if (StgCatchRetryFrame_running_alt_code(frame)) {
        R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1049,7 +1072,7 @@ INFO_TABLE_RET(stg_atomically_frame,
        jump stg_block_noregs;
      } else {
        /* Previous attempt is no longer valid: try again */
-       "ptr" trec = foreign "C" stmStartTransaction(NO_TREC "ptr");
+       "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", NO_TREC "ptr");
        StgTSO_trec(CurrentTSO) = trec;
        StgAtomicallyFrame_waiting(frame) = 0 :: CInt; /* false; */
        R1 = StgAtomicallyFrame_code(frame);
@@ -1058,7 +1081,7 @@ INFO_TABLE_RET(stg_atomically_frame,
      }
    } else {
      /* The TSO is not currently waiting: try to commit the transaction */
-     valid = foreign "C" stmCommitTransaction(trec "ptr");
+     valid = foreign "C" stmCommitTransaction(BaseReg "ptr", trec "ptr");
      if (valid) {
        /* Transaction was valid: commit succeeded */
        StgTSO_trec(CurrentTSO) = NO_TREC;
@@ -1067,7 +1090,7 @@ INFO_TABLE_RET(stg_atomically_frame,
        jump %ENTRY_CODE(Sp(SP_OFF));
      } else {
        /* Transaction was not valid: try again */
-       "ptr" trec = foreign "C" stmStartTransaction(NO_TREC "ptr");
+       "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", NO_TREC "ptr");
        StgTSO_trec(CurrentTSO) = trec;
        R1 = StgAtomicallyFrame_code(frame);
        Sp_adj(-1);
@@ -1142,6 +1165,9 @@ atomicallyzh_fast
   W_ old_trec;
   W_ new_trec;
   
+  // stmStartTransaction may allocate
+  MAYBE_GC (R1_PTR, atomicallyzh_fast); 
+
   /* Args: R1 = m :: STM a */
   STK_CHK_GEN(SIZEOF_StgAtomicallyFrame + WDS(1), R1_PTR, atomicallyzh_fast);
 
@@ -1155,7 +1181,7 @@ atomicallyzh_fast
 
   /* Start the memory transcation */
   old_trec = StgTSO_trec(CurrentTSO);
-  "ptr" new_trec = foreign "C" stmStartTransaction(old_trec "ptr");
+  "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", old_trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Apply R1 to the realworld token */
@@ -1191,13 +1217,16 @@ catchRetryzh_fast
   W_ new_trec;
   W_ trec;
 
+  // stmStartTransaction may allocate
+  MAYBE_GC (R1_PTR & R2_PTR, catchRetryzh_fast); 
+
   /* Args: R1 :: STM a */
   /* Args: R2 :: STM a */
   STK_CHK_GEN(SIZEOF_StgCatchRetryFrame + WDS(1), R1_PTR & R2_PTR, catchRetryzh_fast);
 
   /* Start a nested transaction within which to run the first code */
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" new_trec = foreign "C" stmStartTransaction(trec "ptr");
+  "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Set up the catch-retry frame */
@@ -1240,7 +1269,7 @@ retry_pop_stack:
     ASSERT(outer != NO_TREC);
     if (!StgCatchRetryFrame_running_alt_code(frame)) {
       // Retry in the first code: try the alternative
-      "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
+      "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
       StgTSO_trec(CurrentTSO) = trec;
       StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
       R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1250,9 +1279,9 @@ retry_pop_stack:
       // Retry in the alternative code: propagate
       W_ other_trec;
       other_trec = StgCatchRetryFrame_first_code_trec(frame);
-      r = foreign "C" stmMergeForWaiting(trec "ptr", other_trec "ptr");
+      r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", other_trec "ptr");
       if (r) {
-        r = foreign "C" stmCommitTransaction(trec "ptr");
+        r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", trec "ptr");
       }
       if (r) {
         // Merge between siblings succeeded: commit it back to enclosing transaction
@@ -1262,7 +1291,7 @@ retry_pop_stack:
         goto retry_pop_stack;
       } else {
         // Merge failed: we musn't propagate the retry.  Try both paths again.
-        "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
+        "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
         StgCatchRetryFrame_first_code_trec(frame) = trec;
         StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
         StgTSO_trec(CurrentTSO) = trec;
@@ -1276,7 +1305,7 @@ retry_pop_stack:
   // We've reached the ATOMICALLY_FRAME: attempt to wait 
   ASSERT(frame_type == ATOMICALLY_FRAME);
   ASSERT(outer == NO_TREC);
-  r = foreign "C" stmWait(CurrentTSO "ptr", trec "ptr");
+  r = foreign "C" stmWait(BaseReg "ptr", CurrentTSO "ptr", trec "ptr");
   if (r) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
     StgAtomicallyFrame_waiting(frame) = 1 :: CInt; // true
@@ -1288,7 +1317,7 @@ retry_pop_stack:
     jump stg_block_noregs;
   } else {
     // Transaction was not valid: retry immediately
-    "ptr" trec = foreign "C" stmStartTransaction(outer "ptr");
+    "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
     Sp = frame;
@@ -1301,6 +1330,7 @@ retry_pop_stack:
 newTVarzh_fast
 {
   W_ tv;
+  W_ trec;
 
   /* Args: R1 = initialisation value */
 
@@ -1309,6 +1339,12 @@ newTVarzh_fast
   SET_HDR(tv,stg_TVAR_info,W_[CCCS]);
   StgTVar_current_value(tv) = R1;
   StgTVar_first_wait_queue_entry(tv) = stg_END_STM_WAIT_QUEUE_closure;
+#if defined(SMP)
+  trec = StgTSO_trec(CurrentTSO);
+  StgTVar_last_update_by(tv) = trec;
+#else
+  StgTVar_last_update_by(tv) = NO_TREC;
+#endif
     
   RET_P(tv);
 }
@@ -1325,7 +1361,7 @@ readTVarzh_fast
   MAYBE_GC (R1_PTR, readTVarzh_fast); // Call to stmReadTVar may allocate
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
-  "ptr" result = foreign "C" stmReadTVar(trec "ptr", tvar "ptr");
+  "ptr" result = foreign "C" stmReadTVar(BaseReg "ptr", trec "ptr", tvar "ptr");
 
   RET_P(result);
 }
@@ -1344,7 +1380,7 @@ writeTVarzh_fast
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
   new_value = R2;
-  foreign "C" stmWriteTVar(trec "ptr", tvar "ptr", new_value "ptr");
+  foreign "C" stmWriteTVar(BaseReg "ptr", trec "ptr", tvar "ptr", new_value "ptr");
 
   jump %ENTRY_CODE(Sp(0));
 }

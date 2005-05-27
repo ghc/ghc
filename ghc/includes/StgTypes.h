@@ -114,6 +114,7 @@ typedef void               StgVoid;
 typedef struct StgClosure_ StgClosure;
 typedef StgClosure*        StgClosurePtr;
 typedef StgWord*           StgPtr;           /* pointer into closure       */
+typedef StgWord volatile*  StgVolatilePtr;   /* pointer to volatile word   */
 typedef StgWord            StgOffset;        /* byte offset within closure */
                            
 typedef struct StgTSO_*    StgTSOPtr;

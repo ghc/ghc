@@ -26,6 +26,9 @@
 /* 
  * XCHG - the atomic exchange instruction.  Used for locking closures
  * during updates (see LOCK_CLOSURE below) and the MVar primops.
+ *
+ * NB: the xchg instruction is implicitly locked, so we do not need
+ * a lock prefix here. 
  */
 INLINE_HEADER StgWord
 xchg(StgPtr p, StgWord w)
@@ -38,6 +41,20 @@ xchg(StgPtr p, StgWord w)
           : /* no input-only operands */
 	);
     return result;
+}
+
+/* 
+ * CMPXCHG - the single-word atomic compare-and-exchange instruction.  Used 
+ * in the STM implementation.
+ */
+INLINE_HEADER StgWord
+cas(StgVolatilePtr p, StgWord o, StgWord n)
+{
+    __asm__ __volatile__ (
+ 	  "lock cmpxchg %3,%1"
+          :"=a"(o), "=m" (*(volatile unsigned int *)p) 
+          :"0" (o), "r" (n));
+    return o;
 }
 
 INLINE_HEADER StgInfoTable *

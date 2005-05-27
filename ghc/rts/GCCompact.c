@@ -675,6 +675,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
         StgTVar *tvar = (StgTVar *)p;
 	thread((StgPtr)&tvar->current_value);
 	thread((StgPtr)&tvar->first_wait_queue_entry);
+	thread((StgPtr)&tvar->last_update_by);
 	return p + sizeofW(StgTVar);
     }
     

@@ -8,59 +8,37 @@
 
   STM.h defines the C-level interface to the STM.  
 
-  The interface is designed so that all of the operations return
-  directly: if the specified StgTSO should block then the Haskell
-  scheduler's data structures are updated within the STM
-  implementation, rather than blocking the native thread.
+  The design follows that of the PPoPP 2005 paper "Composable memory
+  transactions" extended to include fine-grained locking of TVars.
 
-  This interface can be supported by many different implementations,
-  in particular it is left unspecified:
-
-   - Whether nested transactions are fully supported.
+  Three different implementations can be built.  In overview:
+  
+  STM_UNIPROC  -- no locking at all: not safe for concurrent invocations
  
-     A simple implementation would count the number of
-     stmStartTransaction operations that a thread invokes and only
-     attempt to really commit it to the heap when the corresponding
-     number of stmCommitTransaction calls have been made.  This
-     prevents enclosed transactions from being aborted without also
-     aborting all of the outer ones.  
+  STM_CG_LOCK  -- coarse-grained locking : a single mutex protects all
+                  TVars
  
-     The current implementation does support proper nesting.
+  STM_FG_LOCKS -- per-TVar exclusion : each TVar can be owned by at
+                  most one TRec at any time.  This allows dynamically
+                  non-conflicting transactions to commit in parallel.
+                  The implementation treats reads optimisitcally --
+                  extra versioning information is retained in the 
+                  saw_update_by field of the TVars so that they do not 
+                  need to be locked for reading.
 
-   - Whether stmWait and stmReWait are blocking.
+  STM.C contains more details about the locking schemes used.
 
-     A simple implementation would always return 'false' from these
-     operations, signalling that the calling thread should immediately
-     retry its transaction.
-
-     A fuller implementation would block the thread and return 'True'
-     when it is safe for the thread to block.
-
-     The current implementation does provide stmWait and stmReWait 
-     operations which can block the caller's TSO.
-
-   - Whether the transactional read, write, commit and validate
-     operations are blocking or non-blocking.
-
-     A simple implementation would use an internal lock to prevent
-     concurrent execution of any STM operations.  (This does not
-     prevent multiple threads having concurrent transactions, merely
-     the concurrent execution of say stmCommitTransaction by two
-     threads at the same time). 
-
-     A fuller implementation would offer obstruction-free or lock-free
-     progress guarantees, as in our OOPSLA 2003 paper.
-
-     The current implementation is lock-free for simple uncontended
-     operations, but uses an internal lock on SMP systems in some
-     cases.  This aims to provide good performance on uniprocessors:
-     it substantially streamlines the design, when compared with the
-     OOPSLA paper, and on a uniprocessor we can be sure that threads
-     are never pre-empted within STM operations.
 */
 
 #ifndef STM_H
 #define STM_H
+
+#ifdef SMP
+//#define STM_CG_LOCK
+#define STM_FG_LOCKS
+#else
+#define STM_UNIPROC
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,7 +64,9 @@ extern void stmPreGCHook(void);
 
 /* Create and enter a new transaction context */
 
-extern StgTRecHeader *stmStartTransaction(StgTRecHeader *outer);
+extern StgTRecHeader *stmStartTransaction(StgRegTable *reg, StgTRecHeader *outer);
+extern StgTRecHeader *stmStartNestedTransaction(StgRegTable *reg, StgTRecHeader *outer
+);
 
 /*
  * Exit the current transaction context, abandoning any read/write
@@ -118,16 +98,36 @@ extern StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
 
 /*----------------------------------------------------------------------
 
-   Validate/commit/wait/rewait operations
-   --------------------------------------
+   Validation
+   ----------
 
+  Test whether the specified transaction record, and all those within which
+  it is nested, are still valid.
+
+  Note: the caller can assume that once stmValidateTransaction has
+  returned FALSE for a given trec then that transaction will never
+  again be valid -- we rely on this in Schedule.c when kicking invalid
+  threads at GC (in case they are stuck looping)
+*/
+
+extern StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
+
+/*----------------------------------------------------------------------
+
+   Commit/wait/rewait operations
+   -----------------------------
 
    These four operations return boolean results which should be interpreted
    as follows:
 
-   true  => The transaction context was definitely valid 
+   true  => The transaction record was definitely valid 
 
-   false => The transaction context may not have been valid
+   false => The transaction record may not have been valid
+
+   Note that, for nested operations, validity here is solely in terms
+   of the specified trec: it does not say whether those that it may be
+   nested are themselves valid.  Callers can check this with 
+   stmValidateNestOfTransactions.
 
    The user of the STM should ensure that it is always safe to assume that a
    transaction context is not valid when in fact it is (i.e. to return false in
@@ -152,23 +152,14 @@ extern StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec);
 */
 
 /*
- * Test whether the current transaction context is valid, i.e. whether
- * it is still possible for it to commit successfully.  Note: we assume that
- * once stmValidateTransaction has returned FALSE for a given transaction then
- * that transaction will never again be valid -- we rely on this in Schedule.c when
- * kicking invalid threads at GC (in case they are stuck looping)
- */
-
-extern StgBool stmValidateTransaction(StgTRecHeader *trec);
-
-/*
  * Test whether the current transaction context is valid and, if so,
  * commit its memory accesses to the heap.  stmCommitTransaction must
  * unblock any threads which are waiting on tvars that updates have
  * been committed to.
  */
 
-extern StgBool stmCommitTransaction(StgTRecHeader *trec);
+extern StgBool stmCommitTransaction(StgRegTable *reg, StgTRecHeader *trec);
+extern StgBool stmCommitNestedTransaction(StgRegTable *reg, StgTRecHeader *trec);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -177,7 +168,9 @@ extern StgBool stmCommitTransaction(StgTRecHeader *trec);
  * if the thread is already waiting.
  */
 
-extern StgBool stmWait(StgTSO *tso, StgTRecHeader *trec);
+extern StgBool stmWait(StgRegTable *reg,
+                       StgTSO *tso, 
+                       StgTRecHeader *trec);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -188,16 +181,6 @@ extern StgBool stmWait(StgTSO *tso, StgTRecHeader *trec);
  */
 
 extern StgBool stmReWait(StgTSO *tso);
-
-/*
- * Merge the accesses made so far in the second trec into the first trec.
- * Note that the resulting trec is only intended to be used in wait operations.
- * This avoids defining what happens if "trec" and "other" contain conflicting
- * updates.
- */
-
-extern StgBool stmMergeForWaiting(StgTRecHeader *trec, StgTRecHeader *other);
-
 
 /*----------------------------------------------------------------------
 
@@ -210,14 +193,16 @@ extern StgBool stmMergeForWaiting(StgTRecHeader *trec, StgTRecHeader *other);
  * thread's current transaction.
  */
 
-extern StgClosure *stmReadTVar(StgTRecHeader *trec, 
+extern StgClosure *stmReadTVar(StgRegTable *reg,
+                               StgTRecHeader *trec, 
 			       StgTVar *tvar);
 
 /* Update the logical contents of 'tvar' within the context of the
  * thread's current transaction.
  */
 
-extern void stmWriteTVar(StgTRecHeader *trec,
+extern void stmWriteTVar(StgRegTable *reg,
+                         StgTRecHeader *trec,
 			 StgTVar *tvar, 
 			 StgClosure *new_value);
 

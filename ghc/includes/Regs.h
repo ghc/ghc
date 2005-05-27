@@ -22,6 +22,7 @@
 #ifndef REGS_H
 #define REGS_H
 
+#include "gmp.h" // Needs MP_INT definition 
 
 /* 
  * This is the table that holds shadow-locations for all the STG
@@ -90,6 +91,13 @@ typedef struct StgRegTable_ {
   struct bdescr_ *rCurrentNursery; /* Hp/HpLim point into this block */
   struct bdescr_ *rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
+  // rmp_tmp1..rmp_result2 are only used in SMP builds to avoid per-thread temps
+  // in bss, but currently always incldue here so we just run mkDerivedConstants once
+  StgInt          rmp_tmp_w;
+  MP_INT          rmp_tmp1;      
+  MP_INT          rmp_tmp2;      
+  MP_INT          rmp_result1;
+  MP_INT          rmp_result2;
 #if defined(SMP) || defined(PAR)
   StgSparkPool   rSparks;	/* per-task spark pool */
 #endif

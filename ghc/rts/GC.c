@@ -2871,6 +2871,7 @@ scavenge(step *stp)
 	evac_gen = 0;
 	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
 	tvar->first_wait_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	tvar->last_update_by = (StgTRecHeader *)evacuate((StgClosure*)tvar->last_update_by);
 	evac_gen = saved_evac_gen;
 	failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTVar);
@@ -3216,6 +3217,7 @@ linear_scan:
 	    evac_gen = 0;
 	    tvar->current_value = evacuate((StgClosure*)tvar->current_value);
 	    tvar->first_wait_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)tvar->first_wait_queue_entry);
+            tvar->last_update_by = (StgTRecHeader *)evacuate((StgClosure*)tvar->last_update_by);
 	    evac_gen = saved_evac_gen;
 	    failed_to_evac = rtsTrue; // mutable
 	    break;
@@ -3528,6 +3530,7 @@ scavenge_one(StgPtr p)
 	evac_gen = 0;
 	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
 	tvar->first_wait_queue_entry = (StgTVarWaitQueue *)evacuate((StgClosure*)tvar->first_wait_queue_entry);
+	tvar->last_update_by = (StgTRecHeader *)evacuate((StgClosure*)tvar->last_update_by);
 	evac_gen = saved_evac_gen;
 	failed_to_evac = rtsTrue; // mutable
 	break;

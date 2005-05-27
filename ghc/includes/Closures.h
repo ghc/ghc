@@ -327,6 +327,7 @@ typedef struct {
   StgClosure*     value;
 } StgMVar;
 
+
 /* STM data structures
  *
  *  StgTVar defines the only type that can be updated through the STM
@@ -354,8 +355,9 @@ typedef struct StgTVarWaitQueue_ {
 
 typedef struct {
   StgHeader                  header;
-  StgClosure                *current_value;
-  StgTVarWaitQueue          *first_wait_queue_entry;
+  StgClosure                *volatile current_value;
+  StgTVarWaitQueue          *volatile first_wait_queue_entry;
+  struct StgTRecHeader_     *volatile last_update_by;
 } StgTVar;
 
 /* new_value == expected_value for read-only accesses */
@@ -364,6 +366,7 @@ typedef struct {
   StgTVar                   *tvar;
   StgClosure                *expected_value;
   StgClosure                *new_value; 
+  struct StgTRecHeader_     *saw_update_by;
 } TRecEntry;
 
 #define TREC_CHUNK_NUM_ENTRIES 256
@@ -377,8 +380,7 @@ typedef struct StgTRecChunk_ {
 
 typedef enum { 
   TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
-  TREC_CANNOT_COMMIT, /* Transaction in progress, inconsistent writes performed */
-  TREC_MUST_ABORT,    /* Transaction in progress, inconsistent / out of date reads */
+  TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
   TREC_COMMITTED,     /* Transaction has committed, now updating tvars */
   TREC_ABORTED,       /* Transaction has aborted, now reverting tvars */
   TREC_WAITING,       /* Transaction currently waiting */

@@ -241,6 +241,13 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rCurrentNursery);
     field_offset(StgRegTable, rHpAlloc);
 
+    // Needed for SMP builds
+    field_offset(StgRegTable, rmp_tmp_w);
+    field_offset(StgRegTable, rmp_tmp1);
+    field_offset(StgRegTable, rmp_tmp2);
+    field_offset(StgRegTable, rmp_result1);
+    field_offset(StgRegTable, rmp_result2);
+
     def_offset("stgGCEnter1", FUN_OFFSET(stgGCEnter1));
     def_offset("stgGCFun", FUN_OFFSET(stgGCFun));
 
@@ -370,6 +377,7 @@ main(int argc, char *argv[])
     closure_size(StgTVar);
     closure_field(StgTVar,current_value);
     closure_field(StgTVar,first_wait_queue_entry);
+    closure_field(StgTVar,last_update_by);
 
     closure_size(StgBCO);
     closure_field(StgBCO, instrs);

@@ -1927,7 +1927,7 @@ scheduleDoGC( rtsBool force_major )
      */
     for (t = all_threads; t != END_TSO_QUEUE; t = t -> link) {
 	if (t -> what_next != ThreadRelocated && t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
-	    if (!stmValidateTransaction (t -> trec)) {
+	    if (!stmValidateNestOfTransactions (t -> trec)) {
 		IF_DEBUG(stm, sched_belch("trec %p found wasting its time", t));
 		
 		// strip the stack back to the ATOMICALLY_FRAME, aborting
