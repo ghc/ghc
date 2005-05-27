@@ -1146,7 +1146,7 @@ hLookAhead handle = do
 
   -- fill up the read buffer if necessary
   new_buf <- if bufferEmpty buf
-		then fillReadBuffer fd is_line (haIsStream handle_) buf
+		then fillReadBuffer fd True (haIsStream handle_) buf
 		else return buf
   
   writeIORef ref new_buf
