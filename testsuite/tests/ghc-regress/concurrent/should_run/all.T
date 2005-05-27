@@ -108,3 +108,5 @@ test('conc049', only_compiler_types(['ghc']), compile_and_run, ['-package stm'])
 test('conc050', skip, compile_and_run, ['-package stm'])
 
 test('conc051', normal, compile_and_run, [''])
+
+test('conc052', normal, compile_and_run, ['-package stm'])
