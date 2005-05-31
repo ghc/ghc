@@ -149,7 +149,6 @@ import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
 import IfaceSyn		( IfaceDecl )
-import SrcLoc		( srcLocSpan, interactiveSrcLoc )
 #endif
 
 import Packages		( initPackages, isHomeModule )
@@ -170,7 +169,7 @@ import DataCon		( DataCon )
 import Name		( Name, nameModule )
 import NameEnv		( nameEnvElts )
 import InstEnv		( Instance )
-import SrcLoc		( Located(..), mkGeneralSrcSpan, SrcSpan, unLoc )
+import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
@@ -1243,8 +1242,8 @@ downsweep hsc_env old_summaries excl_mods
 	   = do exists <- doesFileExist file
 		if exists 
 		    then summariseFile hsc_env old_summaries file mb_phase maybe_buf
-		    else do
-		throwDyn (CmdLineError ("can't find file: " ++ file))	
+		    else throwDyn $ mkPlainErrMsg noSrcSpan $
+			   text "can't find file:" <+> text file
 	getRootSummary (Target (TargetModule modl) maybe_buf)
  	   = do maybe_summary <- summariseModule hsc_env old_summary_map False 
 					   (L rootLoc modl) maybe_buf excl_mods
@@ -1520,15 +1519,14 @@ noHsFileErr loc path
   = throwDyn $ mkPlainErrMsg loc $ text "Can't find" <+> text path
  
 packageModErr mod
-  = throwDyn (CmdLineError (showSDoc (text "module" <+>
-				   quotes (ppr mod) <+>
-				   text "is a package module")))
+  = throwDyn $ mkPlainErrMsg noSrcSpan $
+	text "module" <+> quotes (ppr mod) <+> text "is a package module"
 
 multiRootsErr mod files
-  = throwDyn (ProgramError (showSDoc (
+  = throwDyn $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> 
 	text "is defined in multiple files:" <+>
-	sep (map text files))))
+	sep (map text files)
 
 cyclicModuleErr :: [ModSummary] -> SDoc
 cyclicModuleErr ms
