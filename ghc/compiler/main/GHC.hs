@@ -152,7 +152,7 @@ import IfaceSyn		( IfaceDecl )
 import SrcLoc		( srcLocSpan, interactiveSrcLoc )
 #endif
 
-import Packages		( initPackages )
+import Packages		( initPackages, isHomeModule )
 import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, 
 			  globalRdrEnvElts )
@@ -185,7 +185,9 @@ import Module
 import FiniteMap
 import Panic
 import Digraph
-import ErrUtils		( showPass, Messages, putMsg, debugTraceMsg, mkLocMessage )
+import Bag		( unitBag, emptyBag )
+import ErrUtils		( showPass, Messages, putMsg, debugTraceMsg,
+			  mkPlainErrMsg, pprBagOfErrors )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
@@ -229,7 +231,12 @@ defaultErrorHandler inner =
 	   exitWith (ExitFailure 1)
          ) $
 
-  -- all error messages are propagated as exceptions
+  -- program errors: messages with locations attached.  Sometimes it is
+  -- convenient to just throw these as exceptions.
+  handleDyn (\dyn -> do printErrs (pprBagOfErrors (unitBag dyn))
+			exitWith (ExitFailure 1)) $
+
+  -- error messages propagated as exceptions
   handleDyn (\dyn -> do
   		hFlush stdout
   		case dyn of
@@ -380,7 +387,7 @@ guessTarget file Nothing
 
 -- Perform a dependency analysis starting from the current targets
 -- and update the session with the new module graph.
-depanal :: Session -> [Module] -> IO ()
+depanal :: Session -> [Module] -> IO (Either Messages ModuleGraph)
 depanal (Session ref) excluded_mods = do
   hsc_env <- readIORef ref
   let
@@ -395,8 +402,7 @@ depanal (Session ref) excluded_mods = do
 		     text "Chasing modules from: ",
 	     		hcat (punctuate comma (map pprTarget targets))]))
 
-  graph <- downsweep hsc_env old_graph excluded_mods
-  writeIORef ref hsc_env{ hsc_mod_graph=graph }
+  downsweep hsc_env old_graph excluded_mods
 
 {-
 -- | The result of load.
@@ -435,13 +441,17 @@ loadMsgs s@(Session ref) how_much msg_act
 	-- even if we don't get a fully successful upsweep, the full module
 	-- graph is still retained in the Session.  We can tell which modules
 	-- were successfully loaded by inspecting the Session's HPT.
-	depanal s []
+	mb_graph <- depanal s []
+	case mb_graph of
+	   Left msgs -> do msg_act msgs; return Failed
+	   Right mod_graph -> loadMsgs2 s how_much msg_act mod_graph 
 
+loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 	hsc_env <- readIORef ref
+	writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
 
         let hpt1      = hsc_HPT hsc_env
         let dflags    = hsc_dflags hsc_env
-	let mod_graph = hsc_mod_graph hsc_env
 
         let ghci_mode = ghcMode (hsc_dflags hsc_env) -- this never changes
         let verb      = verbosity dflags
@@ -1213,12 +1223,14 @@ downsweep :: HscEnv
 	  -> [ModSummary]	-- Old summaries
 	  -> [Module]		-- Ignore dependencies on these; treat them as
 				-- if they were package modules
-	  -> IO [ModSummary]
+	  -> IO (Either Messages [ModSummary])
 downsweep hsc_env old_summaries excl_mods
-   = do rootSummaries <- mapM getRootSummary roots
-	checkDuplicates rootSummaries
-        loop (concatMap msDeps rootSummaries) 
-	     (mkNodeMap rootSummaries)
+   = -- catch error messages and return them
+     handleDyn (\err_msg -> return (Left (emptyBag, unitBag err_msg))) $ do
+       rootSummaries <- mapM getRootSummary roots
+       checkDuplicates rootSummaries
+       summs <- loop (concatMap msDeps rootSummaries) (mkNodeMap rootSummaries)
+       return (Right summs)
      where
 	roots = hsc_targets hsc_env
 
@@ -1440,10 +1452,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
         (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn
 
 	when (mod_name /= wanted_mod) $
-		throwDyn (ProgramError 
-		   (showSDoc (mkLocMessage mod_loc $ 
+		throwDyn $ mkPlainErrMsg mod_loc $ 
 			      text "file name does not match module name"
-			      <+> quotes (ppr mod_name))))
+			      <+> quotes (ppr mod_name)
 
 		-- Find the object timestamp, and return the summary
 	obj_timestamp <- getObjTimestamp location is_boot
@@ -1502,12 +1513,10 @@ preprocessFile dflags src_fn mb_phase (Just (buf, time))
 noModError :: DynFlags -> SrcSpan -> Module -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
-  = throwDyn $ ProgramError $ showSDoc $
-    mkLocMessage loc $ cantFindError dflags wanted_mod err
+  = throwDyn $ mkPlainErrMsg loc $ cantFindError dflags wanted_mod err
 				
 noHsFileErr loc path
-  = throwDyn $ CmdLineError $ showSDoc $
-    mkLocMessage loc $ text "Can't find" <+> text path
+  = throwDyn $ mkPlainErrMsg loc $ text "Can't find" <+> text path
  
 packageModErr mod
   = throwDyn (CmdLineError (showSDoc (text "module" <+>
@@ -1572,41 +1581,54 @@ data ModuleInfo = ModuleInfo {
 -- | Request information about a loaded 'Module'
 getModuleInfo :: Session -> Module -> IO (Maybe ModuleInfo)
 getModuleInfo s mdl = withSession s $ \hsc_env -> do
-  case lookupModuleEnv (hsc_HPT hsc_env) mdl of
-    Nothing  -> do
+  let mg = hsc_mod_graph hsc_env
+  if mdl `elem` map ms_mod mg
+	then getHomeModuleInfo hsc_env mdl
+	else do
+  if isHomeModule (hsc_dflags hsc_env) mdl
+	then return Nothing
+	else getPackageModuleInfo hsc_env mdl
+   -- getPackageModuleInfo will attempt to find the interface, so
+   -- we don't want to call it for a home module, just in case there
+   -- was a problem loading the module and the interface doesn't
+   -- exist... hence the isHomeModule test here.
+
+getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
+getPackageModuleInfo hsc_env mdl = do
 #ifdef GHCI
-	mb_names <- getModuleExports hsc_env mdl
-	case mb_names of
-	   Nothing -> return Nothing
-	   Just names -> do
-		eps <- readIORef (hsc_EPS hsc_env)
-		let 
-		    pte    = eps_PTE eps
-		    n_list = nameSetToList names
-		    tys    = [ ty | name <- n_list,
-				    Just ty <- [lookupTypeEnv pte name] ]
-		--
-		return (Just (ModuleInfo {
-				minf_type_env  = mkTypeEnv tys,
-				minf_exports   = names,
-				minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names mdl,
-				minf_instances = error "getModuleInfo: instances for package module unimplemented"
-			}))
-#else
-	-- bogusly different for non-GHCI (ToDo)
-	return Nothing
-#endif
-    Just hmi -> 
-	let details = hm_details hmi in
+  (_msgs, mb_names) <- getModuleExports hsc_env mdl
+  case mb_names of
+    Nothing -> return Nothing
+    Just names -> do
+	eps <- readIORef (hsc_EPS hsc_env)
+	let 
+	    pte    = eps_PTE eps
+	    n_list = nameSetToList names
+	    tys    = [ ty | name <- n_list,
+			    Just ty <- [lookupTypeEnv pte name] ]
+	--
 	return (Just (ModuleInfo {
+			minf_type_env  = mkTypeEnv tys,
+			minf_exports   = names,
+			minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names mdl,
+			minf_instances = error "getModuleInfo: instances for package module unimplemented"
+		}))
+#else
+  -- bogusly different for non-GHCI (ToDo)
+  return Nothing
+#endif
+
+getHomeModuleInfo hsc_env mdl = 
+  case lookupModuleEnv (hsc_HPT hsc_env) mdl of
+    Nothing  -> return Nothing
+    Just hmi -> do
+      let details = hm_details hmi
+      return (Just (ModuleInfo {
 			minf_type_env  = md_types details,
 			minf_exports   = md_exports details,
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details
 			}))
-
-	-- ToDo: we should be able to call getModuleInfo on a package module,
-	-- even one that isn't loaded yet.
 
 -- | The list of top-level entities defined in a module
 modInfoTyThings :: ModuleInfo -> [TyThing]
@@ -1727,8 +1749,9 @@ setContext (Session ref) toplevs exports = do
 -- Make a GlobalRdrEnv based on the exports of the modules only.
 mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
 mkExportEnv hsc_env mods = do
-  mb_name_sets <- mapM (getModuleExports hsc_env) mods
+  stuff <- mapM (getModuleExports hsc_env) mods
   let 
+	(_msgs, mb_name_sets) = unzip stuff
 	gres = [ nameSetToGlobalRdrEnv name_set mod
   	       | (Just name_set, mod) <- zip mb_name_sets mods ]
   --

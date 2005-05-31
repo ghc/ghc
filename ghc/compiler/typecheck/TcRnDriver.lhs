@@ -1095,9 +1095,13 @@ tcRnType hsc_env ictxt rdr_type
 
 \begin{code}
 #ifdef GHCI
-getModuleExports :: HscEnv -> Module -> IO (Maybe NameSet)
+-- ASSUMES that the module is either in the HomePackageTable or is
+-- a package module with an interface on disk.  If neither of these is
+-- true, then the result will be an error indicating the interface
+-- could not be found.
+getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe NameSet)
 getModuleExports hsc_env mod
-  = initTcPrintErrors hsc_env iNTERACTIVE (tcGetModuleExports mod)
+  = initTc hsc_env HsSrcFile iNTERACTIVE (tcGetModuleExports mod)
 
 tcGetModuleExports :: Module -> TcM NameSet
 tcGetModuleExports mod = do

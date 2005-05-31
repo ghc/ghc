@@ -39,6 +39,7 @@ import StaticFlags	( opt_ErrorSpans )
 import System		( ExitCode(..), exitWith )
 import DATA_IOREF
 import IO		( hPutStrLn, stderr )
+import DYNAMIC		( TyCon, mkTyCon, Typeable(..), mkTyConApp )
 
 
 -- -----------------------------------------------------------------------------
@@ -70,6 +71,12 @@ data ErrMsg = ErrMsg {
 	-- The SrcSpan is used for sorting errors into line-number order
 	-- NB  Pretty.Doc not SDoc: we deal with the printing style (in ptic 
 	-- whether to qualify an External Name) at the error occurrence
+
+-- So we can throw these things as exceptions
+errMsgTc :: TyCon
+errMsgTc = mkTyCon "ErrMsg"
+instance Typeable ErrMsg where
+  typeOf _ = mkTyConApp errMsgTc []
 
 type WarnMsg = ErrMsg
 

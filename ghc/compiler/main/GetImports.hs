@@ -58,8 +58,7 @@ getImports dflags buf filename = do
 	      in
 	      return (source_imps, ordinary_imps, mod_name)
   
-parseError span err = throwDyn (ProgramError err_doc)
-  where err_doc = render (pprBagOfErrors (unitBag (mkPlainErrMsg span err)))
+parseError span err = throwDyn $ mkPlainErrMsg span err
 
 isSourceIdecl (ImportDecl _ s _ _ _) = s
 
