@@ -444,16 +444,17 @@ loadMsgs s@(Session ref) how_much msg_act
 	mb_graph <- depanal s []
 	case mb_graph of
 	   Left msgs -> do msg_act msgs; return Failed
-	   Right mod_graph -> loadMsgs2 s how_much msg_act mod_graph 
+	   Right mod_graph -> do
+		hsc_env <- readIORef ref
+		writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
+		loadMsgs2 s how_much msg_act mod_graph 
 
 loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 	hsc_env <- readIORef ref
-	writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
 
         let hpt1      = hsc_HPT hsc_env
         let dflags    = hsc_dflags hsc_env
-
-        let ghci_mode = ghcMode (hsc_dflags hsc_env) -- this never changes
+        let ghci_mode = ghcMode dflags -- this never changes
         let verb      = verbosity dflags
 
 	-- The "bad" boot modules are the ones for which we have
