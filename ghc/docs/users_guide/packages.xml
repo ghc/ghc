@@ -640,7 +640,7 @@ exposed-modules: System.Posix,
 import-dirs: /usr/lib/ghc-6.4/libraries/unix
 library-dirs: /usr/lib/ghc-6.4/libraries/unix
 hs-libraries: HSunix
-extra-libs: HSunix_cbits, dl
+extra-libraries: HSunix_cbits, dl
 include-dirs: /usr/lib/ghc-6.4/libraries/unix/include
 includes: HsUnix.h
 depends: base-1.0
@@ -932,13 +932,13 @@ depends: base-1.0
 
 	<varlistentry>
 	  <term>
-            <literal>extra-libs</literal>
-            <indexterm><primary><literal>extra-libs</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>extra-libraries</literal>
+            <indexterm><primary><literal>extra-libraries</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
 	    <para>(string list) A list of extra libraries for this package.  The
 	    difference between <literal>hs-libraries</literal> and
-	    <literal>extra-libs</literal> is that
+	    <literal>extra-libraries</literal> is that
 	    <literal>hs-libraries</literal> normally have several
 	    versions, to support profiling, parallel and other build
 	    options.  The various versions are given different
@@ -949,19 +949,19 @@ depends: base-1.0
 	    version.  The suffix is added automatically by GHC for
 	    <literal>hs-libraries</literal> only, no suffix is added
 	    for libraries in
-	    <literal>extra-libs</literal>.</para>
+	    <literal>extra-libraries</literal>.</para>
 
 	    <para>The libraries listed in
-	    <literal>extra-libs</literal> may be any libraries
+	    <literal>extra-libraries</literal> may be any libraries
 	    supported by your system's linker, including dynamic
 	    libraries (<literal>.so</literal> on Unix,
 	    <literal>.DLL</literal> on Windows).</para>
 
-	    <para>Also, <literal>extra-libs</literal> are placed
+	    <para>Also, <literal>extra-libraries</literal> are placed
 	    on the linker command line after the
 	    <literal>hs-libraries</literal> for the same package.  If
 	    your package has dependencies in the other direction (i.e.
-	    <literal>extra-libs</literal> depends on
+	    <literal>extra-libraries</literal> depends on
 	    <literal>hs-libraries</literal>), and the libraries are
 	    static, you might need to make two separate
 	    packages.</para>
@@ -1009,8 +1009,8 @@ depends: base-1.0
 
 	<varlistentry>
 	  <term>
-            <literal>extra-hugs-opts</literal>
-            <indexterm><primary><literal>extra-hugs-opts</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>hugs-options</literal>
+            <indexterm><primary><literal>hugs-options</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
 	    <para>(string list) Options to pass to Hugs for this package.</para>
@@ -1019,8 +1019,8 @@ depends: base-1.0
 
 	<varlistentry>
 	  <term>
-            <literal>extra-cc-opts</literal>
-            <indexterm><primary><literal>extra-cc-opts</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>cc-options</literal>
+            <indexterm><primary><literal>cc-options</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
 	    <para>(string list) Extra arguments to be added to the gcc command line
@@ -1031,8 +1031,8 @@ depends: base-1.0
 
 	<varlistentry>
 	  <term>
-            <literal>extra-ld-opts</literal>
-            <indexterm><primary><literal>extra-ld-opts</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>ld-options</literal>
+            <indexterm><primary><literal>ld-options</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
 	    <para>(string list) Extra arguments to be added to the
@@ -1056,8 +1056,8 @@ depends: base-1.0
 
 	<varlistentry>
 	  <term>
-            <literal>extra-frameworks</literal>
-            <indexterm><primary><literal>extra-frameworks</literal></primary><secondary>package specification</secondary></indexterm>
+            <literal>frameworks</literal>
+            <indexterm><primary><literal>frameworks</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
 	  <listitem>
 	    <para>(string list) On Darwin/MacOS X, a list of frameworks to link to. This
