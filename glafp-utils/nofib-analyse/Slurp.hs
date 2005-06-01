@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
--- $Id: Slurp.hs,v 1.5 2004/04/02 14:28:57 simonmar Exp $
-
--- (c) Simon Marlow 1997-1999
+--
+-- (c) Simon Marlow 1997-2005
+--
 -----------------------------------------------------------------------------
 
 module Slurp (Status(..), Results(..), ResultTable(..), parse_log) where
@@ -10,6 +10,7 @@ import CmdLine
 import FiniteMap
 import RegexString
 import Maybe
+-- import Debug.Trace
 
 -----------------------------------------------------------------------------
 -- This is the structure into which we collect our results:
@@ -74,7 +75,7 @@ Various banner lines:
 ==nofib== boyer2: time to compile Checker follows...
 -}
 
-banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9_]+):[ \t]+(size of|time to link|time to run|time to compile)[ \t]+([A-Za-z0-9_]+)(\\.o)?[ \t]+follows"
+banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9-_]+):[ \t]+(size of|time to link|time to run|time to compile)[ \t]+([A-Za-z0-9-_]+)(\\.o)?[ \t]+follows"
 
 {-
 This regexp for the output of "time" works on FreeBSD, other versions
@@ -327,7 +328,8 @@ parse_run_time prog (l:ls) res ex =
 	}}}}}}}}
   where
   got_run_result allocs init mut gc gc_work instrs mem_rs mem_ws cache_misses
-      = let 
+      = -- trace ("got_run_result: " ++ init ++ ", " ++ mut ++ ", " ++ gc) $
+	let 
 	  read_mut = read mut
 	  read_gc  = read gc
 	  time = (read init + read_mut + read_gc) :: Float 
