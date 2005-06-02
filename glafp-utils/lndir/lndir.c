@@ -243,6 +243,8 @@ int rel;			/* if true, prepend "../" to fn before using */
 		    continue;
 		if (!strcmp (dp->d_name, "CVS"))
 		    continue;
+		if (!strcmp (dp->d_name, ".svn"))
+		    continue;
 		if (!strcmp (dp->d_name, "CVS.adm"))
 		    continue;
 		ocurdir = rcurdir;
@@ -334,18 +336,17 @@ char **av;
 #endif
 
     while (++av, --ac) {
-	if (strcmp(*av, "-silent") == 0)
-	    silent = 1;
-	if (strcmp(*av, "-f") == 0)
-	    force = 1;
-	else if (strcmp(*av, "-ignorelinks") == 0)
-	    ignore_links = 1;
-	else if (strcmp(*av, "--") == 0) {
-	    ++av, --ac;
-	    break;
-	}
-	else
-	    break;
+      if (strcmp(*av, "-silent") == 0)
+	  silent = 1;
+      else if (strcmp(*av, "-f") == 0)
+	  force = 1;
+      else if (strcmp(*av, "-ignorelinks") == 0)
+	  ignore_links = 1;
+      else if (strcmp(*av, "--") == 0) {
+	  ++av, --ac;
+	  break;
+      } else
+	  break;
     }
 
     if (ac < 1 || ac > 2)
