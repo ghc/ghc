@@ -401,7 +401,11 @@ depanal (Session ref) excluded_mods = do
 		     text "Chasing modules from: ",
 	     		hcat (punctuate comma (map pprTarget targets))]))
 
-  downsweep hsc_env old_graph excluded_mods
+  r <- downsweep hsc_env old_graph excluded_mods
+  case r of
+    Right mod_graph -> writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
+    _ -> return ()
+  return r
 
 {-
 -- | The result of load.
@@ -442,11 +446,8 @@ loadMsgs s@(Session ref) how_much msg_act
 	-- were successfully loaded by inspecting the Session's HPT.
 	mb_graph <- depanal s []
 	case mb_graph of
-	   Left msgs -> do msg_act msgs; return Failed
-	   Right mod_graph -> do
-		hsc_env <- readIORef ref
-		writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
-		loadMsgs2 s how_much msg_act mod_graph 
+	   Left msgs       -> do msg_act msgs; return Failed
+	   Right mod_graph -> loadMsgs2 s how_much msg_act mod_graph 
 
 loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 	hsc_env <- readIORef ref
