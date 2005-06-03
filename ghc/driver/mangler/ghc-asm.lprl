@@ -790,7 +790,7 @@ sub mangle_asm {
 		    $p =~ s/^\tmovl\s+\%esi,\s*\d*\(\%esp\)\n//;
 		    $p =~ s/^\tmovl\s+\%edi,\s*\d*\(\%esp\)\n//;
 		    $p =~ s/^\tsubl\s+\$\d+,\s*\%esp\n//;
-                    $p =~ s/^\tmovl\s+\$\d+,\s*\%eax\n\tcall\s+__alloca\n// if ($TargetPlatform =~ /^.*-cygwin32/);
+                    $p =~ s/^\tmovl\s+\$\d+,\s*\%eax\n\tcall\s+__alloca\n// if ($TargetPlatform =~ /^.*-(cygwin32|mingw32)/);
 
 		    # GCC 3.1 is in the habit of adding spurious writes to the
 		    # stack in the prologue.  Just to be on the safe side,
