@@ -289,7 +289,7 @@ processNurseryForDead( void )
     StgPtr p, bdLimit;
     bdescr *bd;
 
-    bd = MainCapability.r.rNursery;
+    bd = MainCapability.r.rNursery->blocks;
     while (bd->start < bd->free) {
 	p = bd->start;
 	bdLimit = bd->start + BLOCK_SIZE_W;
