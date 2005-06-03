@@ -508,14 +508,12 @@ way_details =
     (WayProf, Way  "p" False "Profiling"
 	[ "-fscc-profiling"
 	, "-DPROFILING"
-	, "-optc-DPROFILING"
-	, "-fvia-C" ]),
+	, "-optc-DPROFILING" ]),
 
     (WayTicky, Way  "t" False "Ticky-ticky Profiling"  
 	[ "-fticky-ticky"
 	, "-DTICKY_TICKY"
-	, "-optc-DTICKY_TICKY"
-	, "-fvia-C" ]),
+	, "-optc-DTICKY_TICKY" ]),
 
     (WayUnreg, Way  "u" False "Unregisterised" 
 	unregFlags ),
@@ -529,8 +527,7 @@ way_details =
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3"
-	, "-fvia-C" ]),
+        , "-optl-lgpvm3" ]),
 
     -- at the moment we only change the RTS and could share compiler and libs!
     (WayPar, Way  "mt" False "Parallel ticky profiling" 
@@ -542,8 +539,7 @@ way_details =
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3"
-	, "-fvia-C" ]),
+        , "-optl-lgpvm3" ]),
 
     (WayPar, Way  "md" False "Distributed" 
 	[ "-fparallel"
@@ -555,15 +551,13 @@ way_details =
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3"
-	, "-fvia-C" ]),
+        , "-optl-lgpvm3" ]),
 
     (WayGran, Way  "mg" False "GranSim"
 	[ "-fgransim"
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"
-	, "-package concurrent"
-	, "-fvia-C" ]),
+	, "-package concurrent" ]),
 
     (WaySMP, Way  "s" False "SMP"
 	[ "-fsmp"
@@ -573,8 +567,7 @@ way_details =
 #if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS)
 	, "-optl-pthread"
 #endif
-	, "-optc-DSMP"
-	, "-fvia-C" ]),
+	, "-optc-DSMP" ]),
 
     (WayNDP, Way  "ndp" False "Nested data parallelism"
 	[ "-fparr"
