@@ -778,6 +778,12 @@ sub mangle_asm {
 		$r =~ s/^\s*\n//;
 
 		if ($TargetPlatform =~ /^i386-/) {
+		    if ($p =~ /^\tsubl\s+\$(\d+),\s*\%esp\n/) {
+			if ($1 >= 8192) {
+			    die "Error: reserved stack space exceeded!\n  Possible workarounds: compile with -fasm, or try another version of gcc.\n"
+			}
+		    }
+
 		    $p =~ s/^\tpushl\s+\%edi\n//;
 		    $p =~ s/^\tpushl\s+\%esi\n//;
 		    $p =~ s/^\tpushl\s+\%ebx\n//;
