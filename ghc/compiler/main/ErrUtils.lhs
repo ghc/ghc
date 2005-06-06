@@ -75,8 +75,13 @@ data ErrMsg = ErrMsg {
 -- So we can throw these things as exceptions
 errMsgTc :: TyCon
 errMsgTc = mkTyCon "ErrMsg"
+{-# NOINLINE errMsgTc #-}
 instance Typeable ErrMsg where
+#if __GLASGOW_HASKELL__ < 603
+  typeOf _ = mkAppTy errMsgTc []
+#else
   typeOf _ = mkTyConApp errMsgTc []
+#endif
 
 type WarnMsg = ErrMsg
 
