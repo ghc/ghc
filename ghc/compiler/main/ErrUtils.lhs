@@ -39,7 +39,7 @@ import StaticFlags	( opt_ErrorSpans )
 import System		( ExitCode(..), exitWith )
 import DATA_IOREF
 import IO		( hPutStrLn, stderr )
-import DYNAMIC		( TyCon, mkTyCon, Typeable(..), mkTyConApp )
+import DYNAMIC
 
 
 -- -----------------------------------------------------------------------------
