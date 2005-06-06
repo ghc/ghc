@@ -1,0 +1,630 @@
+***expensive e1 0
+***Arity is changed: zdwk{v s4mv} 4 3
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***Arity is changed as occur in Lambda: lvl_s3ZM{v} 3 0
+Bad eta expand
+    1
+    (case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+							       GHCziBase.Char{(w) tc 3o},
+							       [GHCziBase.Char{(w) tc 3o}])
+							      -> GHCziBase.Int{(w) tc 3J}
+							      -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) alexzuaccept{v a2A9}
+     of wild{v a4cH} Dead A { GHCziArr.Array{d r256} ds2{v a4cE} Dead A ds3{v a4cF} Dead A arrzh{v a4cG} Once L ->
+     case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+							       GHCziBase.Char{(w) tc 3o},
+							       [GHCziBase.Char{(w) tc 3o}])
+							      -> GHCziBase.Int{(w) tc 3J}
+							      -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) GHCziPrim.indexArrayzh{(w) v 92b}
+															 @ [Main.AlexAcc{tc r1NJ} ((Main.AlexPosn{tc r1Oh},
+																		    GHCziBase.Char{(w) tc 3o},
+																		    [GHCziBase.Char{(w) tc 3o}])
+																		   -> GHCziBase.Int{(w) tc 3J}
+																		   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])]
+															 arrzh{v a4cG}
+															 ds_X3q7{v}
+     of wild2{v a4cO} Dead A { (# e{v a4cQ} Once S #) ->
+     let {
+       lvl_s4o6{v} OnceInLam T :: <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+										      GHCziBase.Char{(w) tc 3o},
+										      [GHCziBase.Char{(w) tc 3o}])
+										     -> GHCziBase.Int{(w) tc 3J}
+										     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
+       [*
+	Str: DmdType A]
+       lvl_s4o6{v} = return{v a3eo}
+		       @ (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+						      GHCziBase.Char{(w) tc 3o},
+						      [GHCziBase.Char{(w) tc 3o}])
+						     -> GHCziBase.Int{(w) tc 3J}
+						     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
+		       lastzuacc{v a23z} } in
+     __letrec {
+       checkzuaccs1{v s4o8} LoopBreaker T :: [Main.AlexAcc{tc r1NJ} ((Main.AlexPosn{tc r1Oh},
+								      GHCziBase.Char{(w) tc 3o},
+								      [GHCziBase.Char{(w) tc 3o}])
+								     -> GHCziBase.Int{(w) tc 3J}
+								     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])]
+					     -> <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
+       [Arity 1
+	*
+	Str: DmdType S]
+       checkzuaccs1{v s4o8} = \ (accs{v a23S} Once S :: [Main.AlexAcc{tc r1NJ} ((Main.AlexPosn{tc r1Oh},
+										 GHCziBase.Char{(w) tc 3o},
+										 [GHCziBase.Char{(w) tc 3o}])
+										-> GHCziBase.Int{(w) tc 3J}
+										-> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])]) ->
+				case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+											  GHCziBase.Char{(w) tc 3o},
+											  [GHCziBase.Char{(w) tc 3o}])
+											 -> GHCziBase.Int{(w) tc 3J}
+											 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) accs{v a23S}
+				of wild_X3r{v} Dead A {
+				  GHCziBase.ZMZN{(w) d 6m} -> lvl_s4o6{v};
+				  GHCziBase.ZC{(w) d 64} ds_d3md{v} Once U(ALST) rest{v a242} T ->
+				    case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+											      GHCziBase.Char{(w) tc 3o},
+											      [GHCziBase.Char{(w) tc 3o}])
+											     -> GHCziBase.Int{(w) tc 3J}
+											     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) ds_d3md{v}
+				    of wild_X4Y{v} Dead A { Main.AlexAcc{d r1NL} ds_d3me{v} Dead A a{v a23Z} OnceInLam L lctx{v a240} Once S rctx{v a241} Once T ->
+				    let {
+				      checkzurctx{v s4oe} OnceEachBranch T :: <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+																  GHCziBase.Char{(w) tc 3o},
+																  [GHCziBase.Char{(w) tc 3o}])
+																 -> GHCziBase.Int{(w) tc 3J}
+																 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
+				      [*
+				       Str: DmdType]
+				      checkzurctx{v s4oe} = let {
+							      zdwok{v s4oa} T :: forall s{tv a2be}.
+										 GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
+														Main.AlexPosn{tc r1Oh}
+										 -> GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
+														   GHCziBase.String{tc rdx}
+										 -> GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
+														   GHCziBase.Char{(w) tc 3o}
+										 -> GHCziPrim.Statezh{(w) tc 32q} s{tv a2be}
+										 -> (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+										       Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														   GHCziBase.Char{(w) tc 3o},
+														   [GHCziBase.Char{(w) tc 3o}])
+														  -> GHCziBase.Int{(w) tc 3J}
+														  -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #)
+							      [Arity 5
+							       *
+							       Str: DmdType LLLL]
+							      zdwok{v s4oa} = \ (@ s{tv a2be} :: *)
+										(ww_s4lR{v} Once L :: GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
+																     Main.AlexPosn{tc r1Oh})
+										(ww_s4lV{v} Once L :: GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
+																     GHCziBase.String{tc rdx})
+										(ww_s4lZ{v} Once L :: GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
+																     GHCziBase.Char{(w) tc 3o})
+										(w_s4m3{v} Once L :: GHCziPrim.Statezh{(w) tc 32q} s{tv a2be}) ->
+										case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														    GHCziBase.Char{(w) tc 3o},
+														    [GHCziBase.Char{(w) tc 3o}])
+														   -> GHCziBase.Int{(w) tc 3J}
+														   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
+																					       @ s{tv a2be}
+																					       @ GHCziBase.String{tc rdx}
+																					       ww_s4lV{v}
+																					       w_s4m3{v}
+										of wild{v a408} Dead A { (# newzus{v a40a} Once L, r{v a40b} Once L #) ->
+										case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														    GHCziBase.Char{(w) tc 3o},
+														    [GHCziBase.Char{(w) tc 3o}])
+														   -> GHCziBase.Int{(w) tc 3J}
+														   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
+																					       @ s{tv a2be}
+																					       @ GHCziBase.Char{(w) tc 3o}
+																					       ww_s4lZ{v}
+																					       newzus{v a40a}
+										of wild{v X433} Dead A { (# newzus{v X436} Once L, r{v X438} Once L #) ->
+										case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														    GHCziBase.Char{(w) tc 3o},
+														    [GHCziBase.Char{(w) tc 3o}])
+														   -> GHCziBase.Int{(w) tc 3J}
+														   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
+																					       @ s{tv a2be}
+																					       @ Main.AlexPosn{tc r1Oh}
+																					       ww_s4lR{v}
+																					       newzus{v X436}
+										of wild{v X434} Dead A { (# newzus{v X437} Once L, r{v X439} Once L #) ->
+										(# newzus{v X437},
+										   (Main.AlexLastAcc{v r2dx}
+										      @ ((Main.AlexPosn{tc r1Oh},
+											  GHCziBase.Char{(w) tc 3o},
+											  [GHCziBase.Char{(w) tc 3o}])
+											 -> GHCziBase.Int{(w) tc 3J}
+											 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])
+										      a{v a23Z}
+										      (r{v X439},
+										       r{v X438},
+										       r{v a40b})
+										      (GHCziBase.Izh{(w) v 6d}
+											 len{v a23y})) #)
+										}
+										}
+										}
+							    } in 
+							      case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+															GHCziBase.Char{(w) tc 3o},
+															[GHCziBase.Char{(w) tc 3o}])
+														       -> GHCziBase.Int{(w) tc 3J}
+														       -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) rctx{v a241}
+							      of wild_X59{v} Dead A {
+								DataziMaybe.Nothing{d r1Qo} ->
+								  __inline_me (\ (@ s{tv a2be} :: *)
+										 (w_s4lN{v} Once U(U(L)U(L)U(L)A) :: Main.AlexState{tc r1O5} s{tv a2be})
+										 (w_s4m3{v} Once L :: GHCziPrim.Statezh{(w) tc 32q} s{tv a2be}) ->
+										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														     GHCziBase.Char{(w) tc 3o},
+														     [GHCziBase.Char{(w) tc 3o}])
+														    -> GHCziBase.Int{(w) tc 3J}
+														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) w_s4lN{v}
+										 of w_X4nL{v} Dead T { Main.AlexState{d r1O7} ww_s4lP{v} Once T ww_s4lT{v} Once T ww_s4lX{v} Once T ww_s4m1{v} Dead T ->
+										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														     GHCziBase.Char{(w) tc 3o},
+														     [GHCziBase.Char{(w) tc 3o}])
+														    -> GHCziBase.Int{(w) tc 3J}
+														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) ww_s4lP{v}
+										 of ww_X4nU{v} Dead T { GHCziSTRef.STRef{d r2cY} ww_s4lR{v} Once T ->
+										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														     GHCziBase.Char{(w) tc 3o},
+														     [GHCziBase.Char{(w) tc 3o}])
+														    -> GHCziBase.Int{(w) tc 3J}
+														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) ww_s4lT{v}
+										 of ww_X4o2{v} Dead T { GHCziSTRef.STRef{d r2cY} ww_s4lV{v} Once T ->
+										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+														     GHCziBase.Char{(w) tc 3o},
+														     [GHCziBase.Char{(w) tc 3o}])
+														    -> GHCziBase.Int{(w) tc 3J}
+														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) ww_s4lX{v}
+										 of ww_X4oa{v} Dead T { GHCziSTRef.STRef{d r2cY} ww_s4lZ{v} Once T ->
+										 zdwok{v s4oa}
+										   @ s{tv a2be}
+										   ww_s4lR{v}
+										   ww_s4lV{v}
+										   ww_s4lZ{v}
+										   w_s4m3{v}
+										 }
+										 }
+										 }
+										 });
+								DataziMaybe.Just{d r1Qc} ds_d3mg{v} Once U(L) ->
+								  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+															    GHCziBase.Char{(w) tc 3o},
+															    [GHCziBase.Char{(w) tc 3o}])
+															   -> GHCziBase.Int{(w) tc 3J}
+															   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) ds_d3mg{v}
+								  of wild_X5c{v} Dead A { GHCziBase.Izh{(w) d 6c} ds_d3mh{v} OnceInLam L ->
+								  let {
+								    lvl_s4oc{v} OnceInLam T :: <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+																		   GHCziBase.Char{(w) tc 3o},
+																		   [GHCziBase.Char{(w) tc 3o}])
+																		  -> GHCziBase.Int{(w) tc 3J}
+																		  -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
+								    [Arity 3
+								     *
+								     Str: DmdType]
+								    lvl_s4oc{v} = checkzuaccs1{v s4o8}
+										    rest{v a242}
+								  } in 
+								    \ (@ s{tv X3ho} :: *)
+								      (s{v X2ft} Once L :: Main.AlexState{tc r1O5} s{tv X3ho})
+								      (s{v X441} Once L :: GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho}) ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) s{v X2ft}
+								      of wild_X2w{v} L { Main.AlexState{d r1O7} poszur{v a21I} U(L) inpzur{v a21K} U(L) chrzur{v a21J} U(L) ds_d3mG{v} T ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) inpzur{v a21K}
+								      of wild{v a3SB} Dead D(L) { GHCziSTRef.STRef{d r2cY} varzh{v a3SD} L ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
+																				     @ s{tv X3ho}
+																				     @ GHCziBase.String{tc rdx}
+																				     varzh{v a3SD}
+																				     s{v X441}
+								      of wild{v a408} Dead A { (# newzus{v a40a} Once L, r{v a40b} Once L #) ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) chrzur{v a21J}
+								      of wild{v X3Vs} Dead D(L) { GHCziSTRef.STRef{d r2cY} varzh{v X3Vw} L ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
+																				     @ s{tv X3ho}
+																				     @ GHCziBase.Char{(w) tc 3o}
+																				     varzh{v X3Vw}
+																				     newzus{v a40a}
+								      of wild{v X433} Dead A { (# newzus{v X436} Once L, r{v X438} Once S(A) #) ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) poszur{v a21I}
+								      of wild{v X3Vt} Dead D(L) { GHCziSTRef.STRef{d r2cY} varzh{v X3Vx} L ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
+																				     @ s{tv X3ho}
+																				     @ Main.AlexPosn{tc r1Oh}
+																				     varzh{v X3Vx}
+																				     newzus{v X436}
+								      of wild{v X434} Dead A { (# newzus{v X437} Once L, r{v X439} Once L #) ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) r{v X438}
+								      of tpl_X5l{v} L { GHCziBase.Czh{(w) d 62} a_s3X9{v} A ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) alexzuscanzutkn{v a2yM}
+																				     tpl_X5l{v}
+																				     0
+																				     ds_d3mh{v}
+																				     (Main.AlexNone{v r2dg}
+																					@ ((Main.AlexPosn{tc r1Oh},
+																					    GHCziBase.Char{(w) tc 3o},
+																					    [GHCziBase.Char{(w) tc 3o}])
+																					   -> GHCziBase.Int{(w) tc 3J}
+																					   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
+																				     @ s{tv X3ho}
+																				     wild_X2w{v}
+																				     newzus{v X437}
+								      of wild{v X43n} Dead A { (# newzus{v X43q} Once L, r{v X43s} Once S #) ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.writeMutVarzh{(w) v 94s}
+																				     @ s{tv X3ho}
+																				     @ GHCziBase.String{tc rdx}
+																				     varzh{v a3SD}
+																				     r{v a40b}
+																				     newzus{v X43q}
+								      of s2zh{v a3ST} L { __DEFAULT ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.writeMutVarzh{(w) v 94s}
+																				     @ s{tv X3ho}
+																				     @ Main.AlexPosn{tc r1Oh}
+																				     varzh{v X3Vx}
+																				     r{v X439}
+																				     s2zh{v a3ST}
+								      of s2zh{v X3W1} L { __DEFAULT ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.writeMutVarzh{(w) v 94s}
+																				     @ s{tv X3ho}
+																				     @ GHCziBase.Char{(w) tc 3o}
+																				     varzh{v X3Vw}
+																				     tpl_X5l{v}
+																				     s2zh{v X3W1}
+								      of s2zh{v X3Zb} L { __DEFAULT ->
+								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
+									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+													  GHCziBase.Char{(w) tc 3o},
+													  [GHCziBase.Char{(w) tc 3o}])
+													 -> GHCziBase.Int{(w) tc 3J}
+													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) r{v X43s}
+								      of wild_X5m{v} Dead A {
+									Main.AlexNone{d r1NR} ->
+									  lvl_s4oc{v}
+									    @ s{tv X3ho}
+									    wild_X2w{v}
+									    s2zh{v X3Zb};
+									Main.AlexLastAcc{d r1NP} ds_d3mj{v} Dead A ds_d3mk{v} Dead A ds_d3ml{v} Dead A ->
+									  zdwok{v s4oa}
+									    @ s{tv X3ho}
+									    varzh{v X3Vx}
+									    varzh{v a3SD}
+									    varzh{v X3Vw}
+									    s2zh{v X3Zb}
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								      }
+								  }
+							      }
+				    } in 
+				      case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												GHCziBase.Char{(w) tc 3o},
+												[GHCziBase.Char{(w) tc 3o}])
+											       -> GHCziBase.Int{(w) tc 3J}
+											       -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) lctx{v a240}
+				      of wild_X5a{v} Dead A {
+					DataziMaybe.Nothing{d r1Qo} -> checkzurctx{v s4oe};
+					DataziMaybe.Just{d r1Qc} arr{v a24L} Once U(U(L)U(L)L) ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) arr{v a24L}
+					  of wild{v a3Rf} Dead A { GHCziArr.Array{d r256} l{v a3Rh} Once U(L) u{v a3Ri} Once U(L) ds{v a3Rj} Once L ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) l{v a3Rh}
+					  of ww_a48Q{v} Dead A { GHCziBase.Czh{(w) d 62} ww_a48S{v} Once L ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) u{v a3Ri}
+					  of ww_a48U{v} Dead A { GHCziBase.Czh{(w) d 62} ww_a48W{v} Once L ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) lc{v a23x}
+					  of w_a48Z{v} Dead A { GHCziBase.Czh{(w) d 62} ww_a491{v} Once L ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) GHCziArr.zdwindex2{v r27i}
+																			      ww_a48S{v}
+																			      ww_a48W{v}
+																			      ww_a491{v}
+					  of ww_a496{v} L { __DEFAULT ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) GHCziPrim.indexArrayzh{(w) v 92b}
+																			      @ GHCziBase.Bool{(w) tc 3c}
+																			      ds{v a3Rj}
+																			      ww_a496{v}
+					  of wild2{v a49H} Dead A { (# e{v a49J} Once S #) ->
+					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+												    GHCziBase.Char{(w) tc 3o},
+												    [GHCziBase.Char{(w) tc 3o}])
+												   -> GHCziBase.Int{(w) tc 3J}
+												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) e{v a49J}
+					  of wild_X5d{v} Dead A {
+					    GHCziBase.False{(w) d 68} ->
+					      checkzuaccs1{v s4o8} rest{v a242};
+					    GHCziBase.True{(w) d 6u} -> checkzurctx{v s4oe}
+					  }
+					  }
+					  }
+					  }
+					  }
+					  }
+					  }
+				      }
+				    }
+				};
+     } in  checkzuaccs1{v s4o8} e{v a4cQ}
+     }
+     })
+      @ s{tv a2be} eta_x1{v} eta_x2{v}
+    (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+       Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
+				   GHCziBase.Char{(w) tc 3o},
+				   [GHCziBase.Char{(w) tc 3o}])
+				  -> GHCziBase.Int{(w) tc 3J}
+				  -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #)
+Bad eta expand
+    1
+    (case (<nt>Main.Alex{tc r1NX} GHCziNum.Integer{tc 314}) GHCziNum.plusInteger{v 0F}
+							      i{v a1Rq} lit_s3Zm{v}
+     of tpl_X59{v} L { __DEFAULT ->
+     loop{v s3Zo} tpl_X59{v}
+     })
+      @ s{tv a2be} eta_x1{v} eta_x2{v}
+    (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
+       GHCziNum.Integer{tc 314} #)
+
+==================== IdInfo ====================
+$w==_s4mu :: GHC.Prim.Int#
+	     -> GHC.Base.Int
+	     -> GHC.Base.Int
+	     -> GHC.Prim.Int#
+	     -> GHC.Base.Int
+	     -> GHC.Base.Int
+	     -> GHC.Base.Bool :: [Arity 6
+				  0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
+				  Str: DmdType LLLLLL]
+a_s41g :: [GHC.Base.Char] :: [*
+			      Str: DmdType]
+$wshowsPrec_s4mt :: GHC.Prim.Int#
+		    -> GHC.Base.Int
+		    -> GHC.Base.Int
+		    -> GHC.Base.Int
+		    -> GHC.Base.String
+		    -> GHC.Base.String :: [Arity 5
+					   0 -> 0 -> 0 -> 0 -> 0 -> *
+					   Str: DmdType LLLLL]
+lvl_s3ZO :: [GHC.Base.Char] :: [*
+				Str: DmdType]
+lvl_s3ZN :: [GHC.Base.Char] :: [*
+				Str: DmdType]
+lit_s3Zm :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lit_a3kz :: GHC.Base.Int :: [*
+			     Str: DmdType m]
+return_a3eo :: forall a_a2mD. a_a2mD -> Main.Alex a_a2mD :: [Arity 2
+							     0 -> T
+							     Str: DmdType LA]
+>>_a3dX :: forall a_a2kt b_a2kv.
+	   Main.Alex a_a2kt -> Main.Alex b_a2kv -> Main.Alex b_a2kv :: [Arity 4
+									3 -> 3 -> 0 -> 0 -> *
+									Str: DmdType C(C(U(LA)))C(C(S))LL]
+>>=_a3de :: forall a_a2mS b_a2mU.
+	    Main.Alex a_a2mS -> (a_a2mS -> Main.Alex b_a2mU) -> Main.Alex b_a2mU :: [Arity 4
+										     3 -> 4 -> 0 -> 0 -> *
+										     Str: DmdType C(C(U(LL)))C(C(C(S)))LL]
+showsPrec_a3bb :: GHC.Base.Int -> Main.AlexPosn -> GHC.Show.ShowS :: [Arity 3
+								      T
+								      Worker $wshowsPrec_s4mt
+								      Str: DmdType U(L)U(LLL)L]
+showList_a3cJ :: [Main.AlexPosn] -> GHC.Show.ShowS :: [Arity 2
+						       0 -> 0 -> *
+						       Str: DmdType SL]
+$dmshow_a3kv :: Main.AlexPosn -> GHC.Base.String :: [Arity 1
+						     0 -> *
+						     Str: DmdType U(LLL)]
+==_a3aA :: Main.AlexPosn -> Main.AlexPosn -> GHC.Base.Bool :: [Arity 2
+							       T
+							       Worker $w==_s4mu
+							       Str: DmdType U(U(L)LL)U(U(L)LL)]
+/=_a3aT :: Main.AlexPosn -> Main.AlexPosn -> GHC.Base.Bool :: [Arity 2
+							       0 -> 0 -> *
+							       Str: DmdType U(U(L)LL)U(U(L)LL)]
+$fShowAlexPosn_a2iF :: {GHC.Show.Show Main.AlexPosn} :: [*
+							 Str: DmdType m]
+$fEqAlexPosn_a2iE :: {GHC.Base.Eq Main.AlexPosn} :: [*
+						     Str: DmdType m]
+$fMonadAlex_a2dC :: {GHC.Base.Monad Main.Alex} :: [*
+						   Str: DmdType m]
+fail_a3eS :: forall a_a3dd. GHC.Base.String -> Main.Alex a_a3dd :: [Arity 1
+								    *
+								    Str: DmdType Sb]
+lvl_s4oH :: GHC.Base.Int :: [*]
+lvl_s4oE :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+	    -> GHC.Base.Int
+	    -> Main.Alex [GHC.Base.Char] :: [Arity 2
+					     0 -> 0 -> T]
+lvl_s4oD :: GHC.Base.Int :: [*]
+lvl_s4oC :: Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			  -> GHC.Base.Int
+			  -> Main.Alex [GHC.Base.Char]) :: [*]
+lvl_s4oB :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			   -> GHC.Base.Int
+			   -> Main.Alex [GHC.Base.Char])] :: [*]
+lvl_s4oA :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> GHC.Base.Int
+			    -> Main.Alex [GHC.Base.Char])]] :: [*]
+$wk_s4mv :: GHC.Prim.Int#
+	    -> forall s_a2be.
+	       Main.AlexState s_a2be
+	       -> GHC.Prim.State# s_a2be
+	       -> (# GHC.Prim.State# s_a2be, [GHC.Base.Char] #) :: [Arity 3
+								    0 -> 0 -> 0 -> *
+								    Str: DmdType LS(U(L)U(L)U(L)L)L]
+lvl_s4oz :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+	    -> GHC.Base.Int
+	    -> forall s_a2be.
+	       Main.AlexState s_a2be
+	       -> GHC.Prim.State# s_a2be
+	       -> (# GHC.Prim.State# s_a2be, [GHC.Base.Char] #) :: [Arity 4
+								    T]
+lvl_s4ox :: Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			  -> GHC.Base.Int
+			  -> Main.Alex [GHC.Base.Char]) :: [*]
+lvl_s4ow :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			   -> GHC.Base.Int
+			   -> Main.Alex [GHC.Base.Char])] :: [*]
+lvl_s4ov :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> GHC.Base.Int
+			    -> Main.Alex [GHC.Base.Char])]] :: [*]
+lvl_s4ou :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> GHC.Base.Int
+			    -> Main.Alex [GHC.Base.Char])]] :: [*]
+lvl_s4ot :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> GHC.Base.Int
+			    -> Main.Alex [GHC.Base.Char])]] :: [*]
+alex_accept_a2A9 :: GHC.Arr.Array GHC.Base.Int
+				  [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+						 -> GHC.Base.Int
+						 -> Main.Alex [GHC.Base.Char])] :: [*
+										    Str: DmdType]
+alex_scan_tkn_a2yM :: GHC.Base.Char
+		      -> GHC.Prim.Int#
+		      -> GHC.Prim.Int#
+		      -> Main.AlexLastAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+					   -> GHC.Base.Int
+					   -> Main.Alex [GHC.Base.Char])
+		      -> Main.Alex (Main.AlexLastAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+						      -> GHC.Base.Int
+						      -> Main.Alex [GHC.Base.Char])) :: [Arity 5
+											 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
+											 Str: DmdType LLLL]
+loop_s3Zo :: GHC.Num.Integer -> Main.Alex GHC.Num.Integer :: [Arity 3
+							      0 -> 0 -> 0 -> *
+							      Str: DmdType L]
+lvl_s4oJ :: GHC.Num.Integer :: [*]
+Main.alexStartPos :: Main.AlexPosn :: [*
+				       Str: DmdType m]
+lvl_s4oK :: GHC.Base.Char :: [*]
+k_a4es :: GHC.Base.String -> GHC.IOBase.IO () :: [Arity 2
+						  0 -> 0 -> *
+						  Str: DmdType LL]
+Main.main :: GHC.IOBase.IO () :: [Arity 1
+				  0 -> *
+				  Str: DmdType L]
+lvl_s4oL :: GHC.Prim.State# GHC.Prim.RealWorld
+	    -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #) :: [Arity 1
+								0 -> *]
+:Main.main :: GHC.IOBase.IO () :: [Arity 1
+				   0 -> *
+				   Str: DmdType L]
+
+
