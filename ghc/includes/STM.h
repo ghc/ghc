@@ -184,6 +184,15 @@ extern StgBool stmReWait(StgTSO *tso);
 
 /*----------------------------------------------------------------------
 
+   TVar management operations
+   --------------------------
+*/
+
+extern StgTVar *stmNewTVar(StgRegTable *reg,
+                           StgClosure *new_value);
+
+/*----------------------------------------------------------------------
+
    Data access operations
    ----------------------
 */

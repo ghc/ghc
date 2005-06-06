@@ -169,7 +169,13 @@ static int shake(void) {
      
 /*......................................................................*/
 
+#define IF_STM_UNIPROC(__X)  do { } while (0)
+#define IF_STM_CG_LOCK(__X)  do { } while (0)
+#define IF_STM_FG_LOCKS(__X) do { } while (0)
+
 #if defined(STM_UNIPROC)
+#undef IF_STM_UNIPROC
+#define IF_STM_UNIPROC(__X)  do { __X } while (0)
 static const StgBool use_read_phase = FALSE;
 
 static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
@@ -204,13 +210,15 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
   StgClosure *result;
   TRACE("%p : cond_lock_tvar(%p, %p)\n", trec, s, expected);
   result = s -> current_value;
-  TRACE("%p : %d\n", (result == expected) ? "success" : "failure");
+  TRACE("%p : %s\n", trec, (result == expected) ? "success" : "failure");
   return (result == expected);
 }
 #endif
 
 #if defined(STM_CG_LOCK) /*........................................*/
 
+#undef IF_STM_CG_LOCK
+#define IF_STM_CG_LOCK(__X)  do { __X } while (0)
 static const StgBool use_read_phase = FALSE;
 static volatile StgTRecHeader *smp_locked = NULL;
 
@@ -259,6 +267,8 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
 
 #if defined(STM_FG_LOCKS) /*...................................*/
 
+#undef IF_STM_FG_LOCKS
+#define IF_STM_FG_LOCKS(__X) do { __X } while (0)
 static const StgBool use_read_phase = TRUE;
 
 static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
@@ -379,6 +389,19 @@ static StgTRecHeader *new_stg_trec_header(StgRegTable *reg,
   }
 
   return result;  
+}
+
+static StgTVar *new_tvar(StgRegTable *reg,
+                         StgClosure *new_value) {
+  StgTVar *result;
+  result = (StgTVar *)allocateLocal(reg, sizeofW(StgTVar));
+  SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
+  result -> current_value = new_value;
+  result -> first_wait_queue_entry = END_STM_WAIT_QUEUE;
+#if defined(SMP)
+  result -> last_update_by = NO_TREC;
+#endif
+  return result;
 }
 
 /*......................................................................*/
@@ -597,20 +620,23 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
           BREAK_FOR_EACH;
         }
       } else {
-        TRACE("%p : will need to check %p\n", trec, s);
-        if (s -> current_value != e -> expected_value) {
-          TRACE("%p : doesn't match\n", trec);
-          result = FALSE;
-          BREAK_FOR_EACH;
-        }
-        e -> saw_update_by = s -> last_update_by;
-        if (s -> current_value != e -> expected_value) {
-          TRACE("%p : doesn't match (race)\n", trec);
-          result = FALSE;
-          BREAK_FOR_EACH;
-        } else {
-          TRACE("%p : need to check update by %p\n", trec, e -> saw_update_by);
-        }
+        ASSERT(use_read_phase);
+        IF_STM_FG_LOCKS({
+          TRACE("%p : will need to check %p\n", trec, s);
+          if (s -> current_value != e -> expected_value) {
+            TRACE("%p : doesn't match\n", trec);
+            result = FALSE;
+            BREAK_FOR_EACH;
+          }
+          e -> saw_update_by = s -> last_update_by;
+          if (s -> current_value != e -> expected_value) {
+            TRACE("%p : doesn't match (race)\n", trec);
+            result = FALSE;
+            BREAK_FOR_EACH;
+          } else {
+            TRACE("%p : need to check update by %p\n", trec, e -> saw_update_by);
+          }
+        });
       }
     });
   }
@@ -633,21 +659,24 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
 // Keir Fraser's PhD dissertation "Practical lock-free programming" discuss
 // this kind of algorithm.
 
-static StgBool check_read_only(StgTRecHeader *trec) {
+static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
   StgBool result = TRUE;
 
-  FOR_EACH_ENTRY(trec, e, {
-    StgTVar *s;
-    s = e -> tvar;
-    if (entry_is_read_only(e)) {
-      TRACE("%p : check_read_only for TVar %p, saw %p\n", trec, s, e -> saw_update_by);
-      if (s -> last_update_by != e -> saw_update_by) {
-        // ||s -> current_value != e -> expected_value) {
-        TRACE("%p : mismatch\n", trec);
-        result = FALSE;
-        BREAK_FOR_EACH;
+  ASSERT (use_read_phase);
+  IF_STM_FG_LOCKS({
+    FOR_EACH_ENTRY(trec, e, {
+      StgTVar *s;
+      s = e -> tvar;
+      if (entry_is_read_only(e)) {
+        TRACE("%p : check_read_only for TVar %p, saw %p\n", trec, s, e -> saw_update_by);
+        if (s -> last_update_by != e -> saw_update_by) {
+          // ||s -> current_value != e -> expected_value) {
+          TRACE("%p : mismatch\n", trec);
+          result = FALSE;
+          BREAK_FOR_EACH;
+        }
       }
-    }
+    });
   });
 
   return result;
@@ -781,6 +810,7 @@ StgBool stmCommitTransaction(StgRegTable *reg STG_UNUSED, StgTRecHeader *trec) {
     if (use_read_phase) {
       TRACE("%p : doing read check\n", trec);
       result = check_read_only(trec);
+      TRACE("%p : read-check %s\n", trec, result ? "succeeded" : "failed");
     }
     
     if (result) {
@@ -788,7 +818,6 @@ StgBool stmCommitTransaction(StgRegTable *reg STG_UNUSED, StgTRecHeader *trec) {
       // at the end of the call to validate_and_acquire_ownership.  This forms the
       // linearization point of the commit.
       
-      TRACE("%p : read-check succeeded\n", trec);
       FOR_EACH_ENTRY(trec, e, {
         StgTVar *s;
         s = e -> tvar;
@@ -799,7 +828,9 @@ StgBool stmCommitTransaction(StgRegTable *reg STG_UNUSED, StgTRecHeader *trec) {
           ACQ_ASSERT(tvar_is_locked(s, trec));
           TRACE("%p : writing %p to %p, waking waiters\n", trec, e -> new_value, s);
           unpark_waiters_on(s);
-          s -> last_update_by = trec;
+          IF_STM_FG_LOCKS({
+            s -> last_update_by = trec;
+          });
           unlock_tvar(trec, s, e -> new_value, TRUE);
         } 
         ACQ_ASSERT(!tvar_is_locked(s, trec));
@@ -1056,6 +1087,15 @@ void stmWriteTVar(StgRegTable *reg,
   }
 
   TRACE("%p : stmWriteTVar done\n", trec);
+}
+
+/*......................................................................*/
+
+StgTVar *stmNewTVar(StgRegTable *reg,
+                    StgClosure *new_value) {
+  StgTVar *result;
+  result = new_tvar(reg, new_value);
+  return result;
 }
 
 /*......................................................................*/

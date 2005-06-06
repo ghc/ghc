@@ -374,11 +374,6 @@ main(int argc, char *argv[])
     closure_field(StgMVar,tail);
     closure_field(StgMVar,value);
 
-    closure_size(StgTVar);
-    closure_field(StgTVar,current_value);
-    closure_field(StgTVar,first_wait_queue_entry);
-    closure_field(StgTVar,last_update_by);
-
     closure_size(StgBCO);
     closure_field(StgBCO, instrs);
     closure_field(StgBCO, literals);

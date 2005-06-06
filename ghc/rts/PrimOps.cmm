@@ -1330,22 +1330,13 @@ retry_pop_stack:
 newTVarzh_fast
 {
   W_ tv;
-  W_ trec;
+  W_ new_value;
 
   /* Args: R1 = initialisation value */
 
-  ALLOC_PRIM( SIZEOF_StgTVar, R1_PTR, newTVarzh_fast);
-  tv = Hp - SIZEOF_StgTVar + WDS(1);
-  SET_HDR(tv,stg_TVAR_info,W_[CCCS]);
-  StgTVar_current_value(tv) = R1;
-  StgTVar_first_wait_queue_entry(tv) = stg_END_STM_WAIT_QUEUE_closure;
-#if defined(SMP)
-  trec = StgTSO_trec(CurrentTSO);
-  StgTVar_last_update_by(tv) = trec;
-#else
-  StgTVar_last_update_by(tv) = NO_TREC;
-#endif
-    
+  MAYBE_GC (R1_PTR, newTVarzh_fast); 
+  new_value = R1;
+  tv = foreign "C" stmNewTVar(BaseReg "ptr", new_value "ptr");
   RET_P(tv);
 }
 
