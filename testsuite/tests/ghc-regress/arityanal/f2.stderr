@@ -1,0 +1,18 @@
+
+==================== IdInfo ====================
+lit_s1Bh :: GHC.Num.Integer :: [*
+				Str: DmdType]
+F2.f2f :: forall t_a19s t_a19u.
+	  (t_a19u -> GHC.Num.Integer -> t_a19s) -> t_a19u -> t_a19s :: [Arity 2
+									2 -> 0 -> *
+									Str: DmdType C(C(S))L]
+lit_a1i8 :: GHC.Num.Integer :: [*
+				Str: DmdType]
+g_a1fp :: GHC.Num.Integer -> GHC.Num.Integer -> GHC.Num.Integer :: [Arity 2
+								    0 -> 0 -> *
+								    Str: DmdType SS]
+lvl_s1DV :: GHC.Num.Integer :: [*]
+F2.f2 :: GHC.Num.Integer :: [*
+			     Str: DmdType]
+
+
