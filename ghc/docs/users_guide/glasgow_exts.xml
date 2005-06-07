@@ -3571,7 +3571,7 @@ Tim Sheard is going to expand it.)
 		  <itemizedlist>
 		    <listitem><para> an expression; the spliced expression must have type <literal>Expr</literal></para></listitem>
 		    <listitem><para> a list of top-level declarations; ; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
-		    <listitem><para> a type; the spliced expression must have type <literal>Type</literal>.</para></listitem>
+		    <listitem><para> [Planned, but not implemented yet.] a type; the spliced expression must have type <literal>Type</literal>.</para></listitem>
 		    </itemizedlist>
 	   (Note that the syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>" as in
 	the paper. Also the type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>
@@ -3586,7 +3586,7 @@ Tim Sheard is going to expand it.)
                              the quotation has type <literal>Expr</literal>.</para></listitem>
 		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;
                              the quotation has type <literal>Q [Dec]</literal>.</para></listitem>
-		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type; 
+		    <listitem><para>  [Planned, but not implemented yet.]  <literal>[t| ... |]</literal>, where the "..." is a type; 
                              the quotation has type <literal>Type</literal>.</para></listitem>
 		  </itemizedlist></para></listitem>
 
