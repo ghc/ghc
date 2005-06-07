@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.9 2004/04/02 14:28:57 simonmar Exp $
+-- $Id: Main.hs,v 1.10 2005/06/07 10:58:31 simonmar Exp $
 
--- (c) Simon Marlow 1997-1999
+-- (c) Simon Marlow 1997-2005
 -----------------------------------------------------------------------------
 
 module Main where
@@ -11,18 +11,16 @@ import Printf
 import Slurp
 import CmdLine
 
-import Html hiding ((!))
-import qualified Html ((!))
-import GlaExts
-import FiniteMap
-import GetOpt
+import Text.Html hiding ((!))
+import qualified Text.Html as Html ((!))
+import Data.FiniteMap
+import System.Console.GetOpt
+import System.Exit	( exitWith, ExitCode(..) )
 
-import Maybe ( isNothing )
-import Char
-import IO
-import System
-import List
-import Data.List (foldl')
+import Data.Maybe	( isNothing )
+import Data.Char
+import System.IO
+import Data.List
 
 (<!) = (Html.!)
 
@@ -55,12 +53,27 @@ main = do
 
  results <- parse_logs other_args
 
+ summary_spec <- case [ cols | OptColumns cols <- flags ] of
+			[]       -> return (pickSummary results)
+			(cols:_) -> namedColumns (split ',' cols)
+
+ let summary_rows = case [ rows | OptRows rows <- flags ] of
+			[] -> Nothing
+			rows -> Just (split ',' (last rows))
+
  let column_headings = map (reverse . takeWhile (/= '/') . reverse) other_args
 
+ -- sanity check
+ sequence_ [ checkTimes prog res | table <- results, 
+				   (prog,res) <- fmToList table ]
+
  case () of
-   _ | html      -> putStr (renderHtml (htmlPage results column_headings))
-   _ | latex     -> putStr (latexOutput results column_headings)
-   _ | otherwise -> putStr (asciiPage results column_headings)
+   _ | html      -> 
+	putStr (renderHtml (htmlPage results column_headings))
+   _ | latex     -> 
+	putStr (latexOutput results column_headings summary_spec summary_rows)
+   _ | otherwise -> 
+	putStr (asciiPage results column_headings summary_spec summary_rows)
 
 
 parse_logs :: [String] -> IO [ResultTable]
@@ -105,10 +118,50 @@ mreads_spec  = SpecP "Memory Reads" "Reads" "mem-reads" mem_reads run_status alw
 mwrite_spec  = SpecP "Memory Writes" "Writes" "mem-writes" mem_writes run_status always_ok
 cmiss_spec   = SpecP "Cache Misses" "Misses" "cache-misses" cache_misses run_status always_ok
 
+all_specs = [
+  size_spec,
+  alloc_spec,
+  runtime_spec,
+  muttime_spec,
+  gctime_spec,
+  gcwork_spec,
+  instrs_spec,
+  mreads_spec,
+  mwrite_spec,
+  cmiss_spec
+  ]
+
+namedColumns :: [String] -> IO [PerProgTableSpec]
+namedColumns ss = mapM findSpec ss
+  where findSpec s = 
+	   case [ spec | spec@(SpecP _ short_name _ _ _ _) <- all_specs,
+			 short_name == s ] of
+		[] -> die ("unknown column: " ++ s)
+		(spec:_) -> return spec
+
 mean :: (Results -> [Float]) -> Results -> Maybe Float
 mean f results = go (f results)
   where go [] = Nothing
 	go fs = Just (foldl' (+) 0 fs / fromIntegral (length fs))
+
+-- Look for bogus-looking times: On Linux we occasionally get timing results
+-- that are bizarrely low, and skew the average.
+checkTimes :: String -> Results -> IO ()
+checkTimes prog results = do
+  check "run time" (run_time results)
+  check "mut time" (mut_time results)
+  check "GC time" (gc_time results)
+  where
+	check kind ts
+	   | any strange ts = 
+		hPutStrLn stderr ("warning: dubious " ++ kind
+				   ++ " results for " ++ prog
+				   ++ ": " ++ show ts)
+	   | otherwise = return ()
+	   where strange t = any (\r -> time_ok r && r / t > 1.4) ts
+			-- looks for times that are >40% smaller than
+			-- any other.
+
 
 -- These are the per-prog tables we want to generate
 per_prog_result_tab =
@@ -123,8 +176,6 @@ normal_summary_specs =
 cachegrind_summary_specs =
  	[ size_spec, alloc_spec, instrs_spec, mreads_spec, mwrite_spec ]
   
-latex_summary_specs = [ size_spec, instrs_spec, mreads_spec, mwrite_spec ]
-
 -- Pick an appropriate summary table: if we're cachegrinding, then
 -- we're probably not interested in the runtime, but we are interested
 -- in instructions, mem reads and mem writes (and vice-versa).
@@ -311,21 +362,22 @@ hexDig i | i > 10 = chr (i-10 + ord 'a')
 -----------------------------------------------------------------------------
 -- LaTeX table generation (just the summary for now)
 
-latexOutput results args =
+latexOutput results args summary_spec summary_rows =
    (if (length results == 2)
-	then ascii_summary_table True results latex_summary_specs . str "\n\n"
+	then ascii_summary_table True results summary_spec summary_rows
+	    . str "\n\n"
 	else id) ""
 
 
 -----------------------------------------------------------------------------
 -- ASCII page generation
 
-asciiPage results args =
+asciiPage results args summary_spec summary_rows =
   ( str reportTitle
   . str "\n\n"
      -- only show the summary table if we're comparing two runs
   . (if (length results == 2)
-	then ascii_summary_table False results (pickSummary results) . str "\n\n"
+	then ascii_summary_table False results summary_spec summary_rows . str "\n\n"
 	else id)
   . interleave "\n\n" (map (asciiGenProgTable results args) per_prog_result_tab)
   . str "\n"
@@ -381,8 +433,9 @@ ascii_summary_table
 	:: Bool				-- generate a LaTeX table?
 	-> [ResultTable]
 	-> [PerProgTableSpec]
+	-> Maybe [String]
 	-> ShowS
-ascii_summary_table latex (r1:r2:_) specs
+ascii_summary_table latex (r1:r2:_) specs mb_restrict
   | latex     = makeLatexTable (rows ++ TableLine : av_rows)
   | otherwise = 
        makeTable (table_layout (length specs) width)
@@ -394,10 +447,12 @@ ascii_summary_table latex (r1:r2:_) specs
         av_heads = [BoxString "Min", BoxString "Max", BoxString "Geometric Mean"]
 	baseline = fmToList r1
 	progs   = map BoxString (keysFM r1)
-	rows'   = map TableRow (zipWith (:) progs (transpose columns))
+	rows0   = map TableRow (zipWith (:) progs (transpose columns))
 
-	rows | latex     = mungeForLaTeX rows'
-	     | otherwise = rows'
+	rows1 = restrictRows mb_restrict rows0
+
+	rows | latex     = mungeForLaTeX rows1
+	     | otherwise = rows1
 
 	av_rows = map TableRow (zipWith (:) av_heads (transpose av_cols))
 	width   = 10
@@ -410,19 +465,24 @@ ascii_summary_table latex (r1:r2:_) specs
 		(_,mean,_) = calc_gmsd column
 		(min,max) = calc_minmax column
 
-mungeForLaTeX :: [TableRow] -> [TableRow]
-mungeForLaTeX = filter keep_it
-  where keep_it (TableRow (BoxString s: _)) = ok s
+restrictRows :: Maybe [String] -> [TableRow] -> [TableRow]
+restrictRows Nothing rows = rows
+restrictRows (Just these) rows = filter keep_it rows
+  where keep_it (TableRow (BoxString s: _)) = s `elem` these
 	keep_it TableLine = True
 	keep_it _ = False
 
-	ok s = s `elem` progs_to_keep
+mungeForLaTeX :: [TableRow] -> [TableRow]
+mungeForLaTeX = map transrow
+   where
+	transrow (TableRow boxes) = TableRow (map transbox boxes)
+	transrow row = row
 
-progs_to_keep = [
-  "anna", "cacheprof", "circsim", "compress", 
-  "fem", "fulsom", "fibheaps", "hidden",
-  "infer", "typecheck", "scs", "simple"
-  ]
+	transbox (BoxString s) = BoxString (foldr transchar "" s)
+	transbox box = box
+
+	transchar '_' s = '\\':'_':s
+	transchar c s = c:s
 
 table_layout n width =
   (str . rjustify 15) : 
@@ -637,7 +697,7 @@ instance Show BoxValue where { show = showBox }
 
 show_pcntage n = show_float_signed (n-100) ++ "%"
 
-show_float_signed = showFloat False False True False False Nothing (Just 2)
+show_float_signed = showFloat False False True False False Nothing (Just 1)
 
 show_stat Success     = "(no result)"
 show_stat WrongStdout = "(stdout)"
@@ -669,7 +729,11 @@ makeLatexTable = foldr (.) id . map do_row
 	   = str "\\hline\n"
 
 latexTableLayout :: Layout
-latexTableLayout = str : repeat (str . (" & "++))
+latexTableLayout = box : repeat (box . (" & "++))
+  where box s = str (foldr transchar "" s)
+
+	transchar '%' s = s  -- leave out the percentage signs
+	transchar c   s = c : s
 
 applyLayout :: Layout -> [BoxValue] -> ShowS
 applyLayout layout values = 
@@ -677,6 +741,12 @@ applyLayout layout values =
 
 -- -----------------------------------------------------------------------------
 -- General Utils
+
+split :: Char -> String -> [String]
+split c s = case rest of
+		[]     -> [chunk] 
+		_:rest -> chunk : split c rest
+  where (chunk, rest) = break (==c) s
 
 str = showString
 

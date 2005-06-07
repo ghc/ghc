@@ -7,9 +7,9 @@
 module Slurp (Status(..), Results(..), ResultTable(..), parse_log) where
 
 import CmdLine
-import FiniteMap
+import Data.FiniteMap
 import RegexString
-import Maybe
+import Data.Maybe
 -- import Debug.Trace
 
 -----------------------------------------------------------------------------

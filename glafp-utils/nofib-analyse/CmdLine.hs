@@ -1,14 +1,14 @@
 -----------------------------------------------------------------------------
 -- CmdLine.hs
 
--- (c) Simon Marlow 1999
+-- (c) Simon Marlow 2005
 -----------------------------------------------------------------------------
 
 module CmdLine where
 
-import GetOpt
-import System
-import IOExts
+import System.Console.GetOpt
+import System.Environment	( getArgs )
+import System.IO.Unsafe		( unsafePerformIO )
 
 -----------------------------------------------------------------------------
 -- Command line arguments
@@ -38,6 +38,8 @@ data CLIFlags
   | OptDeviations
   | OptNoDeviations
   | OptTitle String
+  | OptColumns String
+  | OptRows String
   | OptHelp
   deriving Eq
 
@@ -55,6 +57,10 @@ argInfo =
 	"Display deviations (default)"
   , Option ['l'] ["latex"]    (NoArg OptLaTeXOutput)  
 	"Produce LaTeX output"
+  , Option [] ["columns"] (ReqArg OptColumns "COLUMNS")
+	"Specify columns for summary table (comma separates)"
+  , Option [] ["rows"] (ReqArg OptRows "ROWS")
+	"Specify rows for summary table (comma separates)"
   , Option ['n'] ["nodeviations"] (NoArg OptNoDeviations)
 	"Hide deviations"
   , Option ['t'] ["title"] (ReqArg OptTitle "title")
