@@ -1,3 +1,4 @@
+
 D.hs:2:7:
     Could not find module `A':
       it is not a module in the current program, or in any known package.
