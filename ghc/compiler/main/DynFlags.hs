@@ -870,7 +870,7 @@ dynamic_flags = [
   ,  ( "dsource-stats",          setDumpFlag Opt_D_source_stats)
   ,  ( "dverbose-core2core",     setDumpFlag Opt_D_verbose_core2core)
   ,  ( "dverbose-stg2stg",       setDumpFlag Opt_D_verbose_stg2stg)
-  ,  ( "ddump-hi-diffs",         setDumpFlag Opt_D_dump_hi_diffs)
+  ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs))
   ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
   ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
