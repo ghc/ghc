@@ -1730,24 +1730,25 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
    if (hdr->Machine != 0x14c) {
-      errorBelch("Not x86 PEi386");
+      errorBelch("%s: Not x86 PEi386", oc->fileName);
       return 0;
    }
    if (hdr->SizeOfOptionalHeader != 0) {
-      errorBelch("PEi386 with nonempty optional header");
+      errorBelch("%s: PEi386 with nonempty optional header", oc->fileName);
       return 0;
    }
    if ( /* (hdr->Characteristics & MYIMAGE_FILE_RELOCS_STRIPPED) || */
         (hdr->Characteristics & MYIMAGE_FILE_EXECUTABLE_IMAGE) ||
         (hdr->Characteristics & MYIMAGE_FILE_DLL) ||
         (hdr->Characteristics & MYIMAGE_FILE_SYSTEM) ) {
-      errorBelch("Not a PEi386 object file");
+      errorBelch("%s: Not a PEi386 object file", oc->fileName);
       return 0;
    }
    if ( (hdr->Characteristics & MYIMAGE_FILE_BYTES_REVERSED_HI)
         /* || !(hdr->Characteristics & MYIMAGE_FILE_32BIT_MACHINE) */ ) {
-      errorBelch("Invalid PEi386 word size or endiannness: %d",
-            (int)(hdr->Characteristics));
+      errorBelch("%s: Invalid PEi386 word size or endiannness: %d",
+		 oc->fileName,
+		 (int)(hdr->Characteristics));
       return 0;
    }
    /* If the string table size is way crazy, this might indicate that
