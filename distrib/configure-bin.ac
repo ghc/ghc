@@ -60,6 +60,8 @@ i[[3456]]86-*-mingw32*)
 	CFLAGS="-mno-cygwin -mwin32 $CFLAGS"
 	TargetPlatform=i386-unknown-mingw32
 	;;
+i[[3456]]86-apple-darwin*)
+	TargetPlatform=i386-apple-darwin;;
 m68k-next-nextstep2)
 	TargetPlatform=m68k-next-nextstep2;;
 m68k-next-nextstep3)
