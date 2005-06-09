@@ -290,13 +290,41 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ ) {
+    } elsif ( $TargetPlatform =~ /^powerpc-apple-darwin.*/ ) {
 				# Apple PowerPC Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = 'DOESNT APPLY'; # regexp that says what comes before APP/NO_APP
     $T_CONST_LBL    = '^\LC\d+:'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
+    $T_COPY_DIRVS   = '\.(globl|lcomm)';
+
+    $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_toc      = "\.toc\n";
+    $T_HDR_literal  = "\t\.const\n\t\.align 2\n";
+    $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
+    $T_HDR_rodata   = "\t\.const\n\t\.align 2\n";
+    $T_HDR_relrodata= "\t\.const_data\n\t\.align 2\n";
+    $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
+    $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
+
+    #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/ ) {
+				# Apple PowerPC Darwin/MacOS X.
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = '_'; # _ if symbols have an underscore on the front
+    $T_PRE_APP	    = 'DOESNT APPLY'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\LC\d+:'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+    $T_X86_PRE_LLBL_PAT = 'L';
+    $T_X86_PRE_LLBL	    = 'L';
+    $T_X86_BADJMP   = '^\tjmp [^L\*]';
 
     $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|lcomm)';
@@ -551,13 +579,13 @@ sub mangle_asm {
             # The .no_dead_strip directives are actually put there by
             # the gcc3 "used" attribute on entry points.
         
-        } elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && ( 
+        } elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && ( 
 		   /^\s*\.picsymbol_stub/
-		|| /^\s*\.section __TEXT,__picsymbol_stub1,.*/
-		|| /^\s*\.section __TEXT,__picsymbolstub1,.*/
+		|| /^\s*\.section __TEXT,__picsymbol_stub\d,.*/
+		|| /^\s*\.section __TEXT,__picsymbolstub\d,.*/
 		|| /^\s*\.symbol_stub/
-		|| /^\s*\.section __TEXT,__symbol_stub1,.*/
-		|| /^\s*\.section __TEXT,__symbolstub1,.*/
+		|| /^\s*\.section __TEXT,__symbol_stub\d,.*/
+		|| /^\s*\.section __TEXT,__symbolstub\d,.*/
 		|| /^\s*\.lazy_symbol_pointer/
 		|| /^\s*\.non_lazy_symbol_pointer/ ))
 	{
@@ -565,7 +593,7 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
 
-	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && $chkcat[$i] eq 'dyld' && /^\s*\.data/)
+	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' && /^\s*\.data/)
 	{	# non_lazy_symbol_ptrs that point to local symbols
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
@@ -682,6 +710,15 @@ sub mangle_asm {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = $1;
+
+        } elsif ( $TargetPlatform =~ /^i386-apple-darwin/ && /^(___i686\.get_pc_thunk\.[abcd]x):/o) {
+                # To handle PIC on Darwin/x86, we need to appropriately pass through
+                # the get_pc_thunk functions. The need to be put into a special section
+                # marked as coalesced (otherwise the .weak_definition doesn't work
+                # on Darwin).
+            $chk[++$i]   = $_;
+            $chkcat[$i]  = 'get_pc_thunk';
+            $chksymb[$i] = $1;
 
 	} elsif ( /^${T_US}[A-Za-z0-9_]/o
 		&& ( $TargetPlatform !~ /^hppa/ # need to avoid local labels in this case
@@ -801,6 +838,20 @@ sub mangle_asm {
 			  $r = $& . $r;
 		    }
 
+                    if ($TargetPlatform =~ /^i386-apple-darwin/) {
+                        $pcrel_label = $p;
+                        $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/ or $pcrel_label = "";
+                        $pcrel_reg = $p;
+                        $pcrel_reg =~ s/(.|\n)*.*___i686\.get_pc_thunk\.([abcd]x)\n(.|\n)*/$2/ or $pcrel_reg = "";
+                        $p =~ s/^\s+call\s+___i686\.get_pc_thunk\..x//;
+                        $p =~ s/^\"?L\d+\$pb\"?:\n//;
+
+                        if ($pcrel_reg eq "bx") {
+                            # Bad gcc. Goes and uses %ebx, our BaseReg, for PIC. Bad gcc.
+                            die "Darwin/x86: -fPIC -via-C doesn't work yet, use -fasm. Aborting."
+                        }
+                    }
+
 		} elsif ($TargetPlatform =~ /^x86_64-/) {
 		    $p =~ s/^\tpushq\s+\%r(bx|bp|12|13|14)\n//g;
 		    $p =~ s/^\tmovq\s+\%r(bx|bp|12|13|14),\s*\d*\(\%rsp\)\n//g;
@@ -843,7 +894,7 @@ sub mangle_asm {
 		    $p =~ s/^\tsw\t\$fp,\d+\(\$sp\)\n//;
 		    $p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//;
 		    $p =~ s/__FRAME__/$FRAME/;
-		} elsif ($TargetPlatform =~ /^powerpc-apple-.*/) {
+		} elsif ($TargetPlatform =~ /^powerpc-apple-darwin.*/) {
 		    $pcrel_label = $p;
 		    $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/ or $pcrel_label = "";
 
@@ -921,7 +972,7 @@ sub mangle_asm {
 		die "Prologue junk?: $p\n" if $p =~ /^\s+[^\s\.]/;
 		
                 # For PIC, we want to keep part of the prologue
-		if ($TargetPlatform =~ /^powerpc-apple-.*/ && $pcrel_label ne "") {
+		if ($TargetPlatform =~ /^powerpc-apple-darwin.*/ && $pcrel_label ne "") {
 		    # Darwin: load the current instruction pointer into register r31
 		    $p .= "bcl 20,31,$pcrel_label\n";
 		    $p .= "$pcrel_label:\n";
@@ -933,6 +984,9 @@ sub mangle_asm {
                     $p .= "\tmflr 30\n";
                     $p .= "\tlwz 0,.LCL$pcrel_label-.LCF$pcrel_label(30)\n";
                     $p .= "\tadd 30,0,30\n";
+                } elsif ($TargetPlatform =~ /^i386-apple-darwin.*/ && $pcrel_label ne "") {
+                    $p .= "\tcall ___i686.get_pc_thunk.$pcrel_reg\n";
+                    $p .= "$pcrel_label:\n";
                 }
 		
 		# glue together what's left
@@ -972,7 +1026,7 @@ sub mangle_asm {
 		    $e =~ s/^\tlw\t\$fp,\d+\(\$sp\)\n//;
 		    $e =~ s/^\taddu\t\$sp,\$sp,\d+\n//;
 		    $e =~ s/^\tj\t\$31\n//;
- 		} elsif ($TargetPlatform =~ /^powerpc-apple-.*/) {
+ 		} elsif ($TargetPlatform =~ /^powerpc-apple-darwin.*/) {
   		    $e =~ s/^\taddi r1,r1,\d+\n//;
   		    $e =~ s/^\tlwz r\d+,\d+\(r1\)\n//; 
   		    $e =~ s/^\tlmw r\d+,-\d+\(r1\)\n//;
@@ -1023,9 +1077,10 @@ sub mangle_asm {
     	# toss all calls to __DISCARD__
 	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
 	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//go if $TargetPlatform =~ /^alpha-/;
-	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-.*/;
+	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-darwin.*/;
 	$c =~ s/^\tbl\s+__DISCARD__(\@plt)?\n//go if $TargetPlatform =~ /^powerpc-.*-linux/;
 	$c =~ s/^\tbl\s+\.__DISCARD__\n\s+nop\n//go if $TargetPlatform =~ /^powerpc64-.*-linux/;
+	$c =~ s/^\tcall\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /i386-apple-darwin.*/;
 
 	# IA64: mangle tailcalls into jumps here
 	if ($TargetPlatform =~ /^ia64-/) {
@@ -1321,12 +1376,16 @@ sub mangle_asm {
                 $j++;
  	    }
  	    
- 	} elsif ( $TargetPlatform =~ /^powerpc-apple-.*/ && $chkcat[$i] eq 'dyld' ) {
-	    # powerpc-apple: dynamic linker stubs
+ 	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' ) {
+	    # apple-darwin: dynamic linker stubs
 	    if($chk[$i] !~ /\.indirect_symbol ___DISCARD__/)
 	    {	# print them out unchanged, but remove the stubs for __DISCARD__
 		print OUTASM $chk[$i];
 	    }
+        } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/ && $chkcat[$i] eq 'get_pc_thunk' ) {
+            # i386-apple-darwin: __i686.get_pc_thunk.[abcd]x
+            print OUTASM ".section __TEXT,__textcoal_nt,coalesced,no_toc\n";
+            print OUTASM $chk[$i];
 	} else {
 	    &tidy_up_and_die(1,"$Pgm: unknown chkcat (ghc-asm: $TargetPlatform)\n$chkcat[$i]\n$chk[$i]\n");
 	}

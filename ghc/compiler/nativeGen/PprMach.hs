@@ -617,7 +617,9 @@ pprSectionHeader Text
     = ptext
 	IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
        ,IF_ARCH_sparc(SLIT(".text\n\t.align 4") {-word boundary-}
-       ,IF_ARCH_i386(SLIT(".text\n\t.align 4,0x90") {-needs per-OS variation!-}
+       ,IF_ARCH_i386(IF_OS_darwin(SLIT(".text\n\t.align 2"),
+                                  SLIT(".text\n\t.align 4,0x90"))
+                                  {-needs per-OS variation!-}
        ,IF_ARCH_x86_64(SLIT(".text\n\t.align 8") {-needs per-OS variation!-}
        ,IF_ARCH_powerpc(SLIT(".text\n.align 2")
        ,)))))
@@ -625,7 +627,8 @@ pprSectionHeader Data
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(SLIT(".data\n\t.align 4")
+	,IF_ARCH_i386(IF_OS_darwin(SLIT(".data\n\t.align 2"),
+                                   SLIT(".data\n\t.align 4"))
 	,IF_ARCH_x86_64(SLIT(".data\n\t.align 8")
         ,IF_ARCH_powerpc(SLIT(".data\n.align 2")
 	,)))))
@@ -633,7 +636,8 @@ pprSectionHeader ReadOnlyData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
+	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const\n.align 2"),
+                                   SLIT(".section .rodata\n\t.align 4"))
 	,IF_ARCH_x86_64(SLIT(".section .rodata\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 2"),
                                       SLIT(".section .rodata\n\t.align 2"))
@@ -642,7 +646,8 @@ pprSectionHeader RelocatableReadOnlyData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 4")
+	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const_data\n.align 2"),
+                                   SLIT(".section .rodata\n\t.align 4"))
 	,IF_ARCH_x86_64(SLIT(".section .rodata\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".data\n\t.align 2"))
@@ -651,7 +656,8 @@ pprSectionHeader UninitialisedData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.bss\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".bss\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(SLIT(".section .bss\n\t.align 4")
+	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const_data\n\t.align 2"),
+                                   SLIT(".section .bss\n\t.align 4"))
 	,IF_ARCH_x86_64(SLIT(".section .bss\n\t.align 8")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".section .bss\n\t.align 2"))
@@ -660,7 +666,8 @@ pprSectionHeader ReadOnlyData16
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 4")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 16")
-	,IF_ARCH_i386(SLIT(".section .rodata\n\t.align 16")
+	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const\n.align 4"),
+                                   SLIT(".section .rodata\n\t.align 16"))
 	,IF_ARCH_x86_64(SLIT(".section .rodata.cst16\n\t.align 16")
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 4"),
                                       SLIT(".section .rodata\n\t.align 4"))
@@ -701,7 +708,7 @@ pprASCII str
 
 pprAlign bytes =
 	IF_ARCH_alpha(ptextSLIT(".align ") <> int pow2,
-	IF_ARCH_i386(ptext SLIT(".align ") <> int bytes,
+	IF_ARCH_i386(ptext SLIT(".align ") <> int IF_OS_darwin(pow2,bytes),
 	IF_ARCH_x86_64(ptext SLIT(".align ") <> int bytes,
 	IF_ARCH_sparc(ptext SLIT(".align ") <> int bytes,
 	IF_ARCH_powerpc(ptext SLIT(".align ") <> int pow2,)))))
@@ -1303,12 +1310,24 @@ pprInstr (CVTSI2SS from to) = pprOpReg  SLIT("cvtsi2ss") from to
 pprInstr (CVTSI2SD from to) = pprOpReg  SLIT("cvtsi2sd") from to
 #endif
 
+    -- FETCHGOT for PIC on ELF platforms
 pprInstr (FETCHGOT reg)
    = vcat [ ptext SLIT("\tcall 1f"),
             hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ],
             hcat [ ptext SLIT("\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
                    pprReg I32 reg ]
           ]
+
+    -- FETCHPC for PIC on Darwin/x86
+    -- get the instruction pointer into a register
+    -- (Terminology note: the IP is called Program Counter on PPC,
+    --  and it's a good thing to use the same name on both platforms)
+pprInstr (FETCHPC reg)
+   = vcat [ ptext SLIT("\tcall 1f"),
+            hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ]
+          ]
+
+
 
 #endif
 

@@ -321,12 +321,29 @@ pprCLabel_asm l = asmSDoc (pprCLabel l)
 
 needImportedSymbols = True
 
--- We don't need to declare any offset tables
+-- We don't need to declare any offset tables.
+-- However, for PIC on x86, we need a small helper function.
+#if i386_TARGET_ARCH
+pprGotDeclaration
+    | opt_PIC
+    = vcat [
+        ptext SLIT(".section __TEXT,__textcoal_nt,coalesced,no_toc"),
+        ptext SLIT(".weak_definition ___i686.get_pc_thunk.ax"),
+        ptext SLIT(".private_extern ___i686.get_pc_thunk.ax"),
+        ptext SLIT("___i686.get_pc_thunk.ax:"),
+            ptext SLIT("\tmovl (%esp), %eax"),
+            ptext SLIT("\tret")
+    ]
+    | otherwise = Pretty.empty
+#else
 pprGotDeclaration = Pretty.empty
+#endif
 
 -- On Darwin, we have to generate our own stub code for lazy binding..
--- There are two versions, one for PIC and one for non-PIC.
+-- For each processor architecture, there are two versions, one for PIC
+-- and one for non-PIC.
 pprImportedSymbol importedLbl
+#if powerpc_TARGET_ARCH
     | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
     = case opt_PIC of
         False ->
@@ -369,7 +386,49 @@ pprImportedSymbol importedLbl
             ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
             ptext SLIT("\t.long dyld_stub_binding_helper")
     ]
-
+#elif i386_TARGET_ARCH
+    | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
+    = case opt_PIC of
+        False ->
+            vcat [
+                ptext SLIT(".symbol_stub"),
+                ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
+                    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
+                    ptext SLIT("\tjmp *L") <> pprCLabel_asm lbl
+                        <> ptext SLIT("$lazy_ptr"),
+                ptext SLIT("L") <> pprCLabel_asm lbl
+                    <> ptext SLIT("$stub_binder:"),
+                    ptext SLIT("\tpushl $L") <> pprCLabel_asm lbl
+                        <> ptext SLIT("$lazy_ptr"),
+                    ptext SLIT("\tjmp dyld_stub_binding_helper")
+            ]
+        True ->
+            vcat [
+                ptext SLIT(".section __TEXT,__picsymbolstub2,")
+                    <> ptext SLIT("symbol_stubs,pure_instructions,25"),
+                ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
+                    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
+                    ptext SLIT("\tcall ___i686.get_pc_thunk.ax"),
+                ptext SLIT("1:"),
+                    ptext SLIT("\tmovl L") <> pprCLabel_asm lbl
+                        <> ptext SLIT("$lazy_ptr-1b(%eax),%edx"),
+                    ptext SLIT("\tjmp %edx"),
+                ptext SLIT("L") <> pprCLabel_asm lbl
+                    <> ptext SLIT("$stub_binder:"),
+                    ptext SLIT("\tlea L") <> pprCLabel_asm lbl
+                        <> ptext SLIT("$lazy_ptr-1b(%eax),%eax"),
+                    ptext SLIT("\tpushl %eax"),
+                    ptext SLIT("\tjmp dyld_stub_binding_helper")
+            ]
+    $+$ vcat [        ptext SLIT(".section __DATA, __la_sym_ptr")
+                    <> (if opt_PIC then int 2 else int 3)
+                    <> ptext SLIT(",lazy_symbol_pointers"),
+        ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$lazy_ptr:"),
+            ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
+            ptext SLIT("\t.long L") <> pprCLabel_asm lbl
+                    <> ptext SLIT("$stub_binder")
+    ]
+#endif
 -- We also have to declare our symbol pointers ourselves:
     | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
     = vcat [
@@ -475,9 +534,21 @@ pprImportedSymbol _ = empty
 
 initializePicBase :: Reg -> [NatCmmTop] -> NatM [NatCmmTop]
 
-#if powerpc_TARGET_ARCH && darwin_TARGET_OS
+#if darwin_TARGET_OS
 
 -- Darwin is simple: just fetch the address of a local label.
+-- The FETCHPC pseudo-instruction is expanded to multiple instructions
+-- during pretty-printing so that we don't have to deal with the
+-- local label:
+
+-- PowerPC version:
+--          bcl 20,31,1f.
+--      1:  mflr picReg
+
+-- i386 version:
+--          call 1f
+--      1:  popl %picReg
+
 initializePicBase picReg (CmmProc info lab params blocks : statics)
     = return (CmmProc info lab params (b':tail blocks) : statics)
     where BasicBlock bID insns = head blocks
@@ -531,9 +602,4 @@ initializePicBase picReg (CmmProc info lab params blocks : statics)
 initializePicBase picReg proc = panic "initializePicBase"
 
 -- mingw32_TARGET_OS: not needed, won't be called
-
--- i386_TARGET_ARCH && darwin_TARGET_OS:
--- (just for completeness ;-)
---              call 1f
--- 1:           popl %picReg
 #endif

@@ -215,6 +215,7 @@ regUsage instr = case instr of
 #endif    
 
     FETCHGOT reg        -> mkRU [] [reg]
+    FETCHPC  reg        -> mkRU [] [reg]
 
     COMMENT _		-> noUsage
     DELTA   _           -> noUsage
@@ -539,7 +540,8 @@ patchRegs instr env = case instr of
     CALL (Right reg) p	-> CALL (Right (env reg)) p
     
     FETCHGOT reg        -> FETCHGOT (env reg)
-    
+    FETCHPC  reg        -> FETCHPC  (env reg)
+   
     NOP			-> instr
     COMMENT _		-> instr
     DELTA _ 		-> instr

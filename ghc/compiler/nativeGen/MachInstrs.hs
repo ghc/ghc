@@ -509,12 +509,17 @@ bit or 64 bit precision.
 -- Other things.
 	| CLTD MachRep	 -- sign extend %eax into %edx:%eax
 
-	| FETCHGOT    Reg  -- pseudo-insn for position-independent code
+	| FETCHGOT    Reg  -- pseudo-insn for ELF position-independent code
                            -- pretty-prints as
                            --       call 1f
                            -- 1:    popl %reg
                            --       addl __GLOBAL_OFFSET_TABLE__+.-1b, %reg
-                    
+	| FETCHPC     Reg  -- pseudo-insn for Darwin position-independent code
+                           -- pretty-prints as
+                           --       call 1f
+                           -- 1:    popl %reg
+        
+          
 data Operand
   = OpReg  Reg	        -- register
   | OpImm  Imm	        -- immediate value

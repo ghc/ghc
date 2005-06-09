@@ -114,6 +114,12 @@ StgFunPtr StgReturn(void)
 
 #ifdef i386_HOST_ARCH
 
+#ifdef darwin_TARGET_OS
+#define STG_GLOBAL ".globl "
+#else
+#define STG_GLOBAL ".global "
+#endif
+
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
@@ -140,7 +146,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         "movl %2,%%eax\n\t"
         "jmp *%%eax\n\t"
 
-	".global " STG_RETURN "\n"
+	STG_GLOBAL STG_RETURN "\n"
        	STG_RETURN ":\n\t"
 
 	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
