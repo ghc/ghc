@@ -262,6 +262,15 @@ i[[3456]]86-*-mingw32*)
         HostOS_CPP='mingw32'
 	exeext='.exe'
         ;;
+i[[3456]]86-apple-darwin*)
+	HostPlatform=i386-apple-darwin
+	TargetPlatform=i386-apple-darwin #hack
+	BuildPlatform=i386-apple-darwin #hack
+	HostPlatform_CPP='i386_apple_darwin'
+	HostArch_CPP='i386'
+	HostVendor_CPP='apple'
+	HostOS_CPP='darwin'
+	;;
 ia64-*-linux*)
         HostPlatform=ia64-unknown-linux # hack again
         TargetPlatform=ia64-unknown-linux
