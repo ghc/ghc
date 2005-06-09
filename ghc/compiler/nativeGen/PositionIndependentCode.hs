@@ -440,7 +440,7 @@ pprImportedSymbol importedLbl
 
     | otherwise = empty
 
-#elif linux_TARGET_OS && !powerpc32_TARGET_ARCH
+#elif linux_TARGET_OS && !powerpc64_TARGET_ARCH
 
 -- ELF / Linux
 --
