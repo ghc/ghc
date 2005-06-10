@@ -377,7 +377,7 @@ tuple0Constr = mkConstr tuple0DataType "()" [] Prefix
 tuple0DataType = mkDataType "Prelude.()" [tuple0Constr]
 
 instance Data () where
-  toConstr _    = tuple0Constr
+  toConstr ()   = tuple0Constr
   gunfold k z c | constrIndex c == 1 = z ()  
   gunfold _ _ _ = error "gunfold"
   dataTypeOf _  = tuple0DataType
@@ -391,7 +391,7 @@ tuple2DataType = mkDataType "Prelude.(,)" [tuple2Constr]
 
 instance (Data a, Data b) => Data (a,b) where
   gfoldl f z (a,b) = z (,) `f` a `f` b
-  toConstr _    = tuple2Constr
+  toConstr (a,b) = tuple2Constr
   gunfold k z c | constrIndex c == 1 = k (k (z (,)))
   gunfold _ _ _ = error "gunfold"
   dataTypeOf _  = tuple2DataType
@@ -406,7 +406,7 @@ tuple3DataType = mkDataType "Prelude.(,)" [tuple3Constr]
 
 instance (Data a, Data b, Data c) => Data (a,b,c) where
   gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
-  toConstr _    = tuple3Constr
+  toConstr (a,b,c) = tuple3Constr
   gunfold k z c | constrIndex c == 1 = k (k (k (z (,,))))
   gunfold _ _ _ = error "gunfold"
   dataTypeOf _  = tuple3DataType
@@ -421,7 +421,7 @@ tuple4DataType = mkDataType "Prelude.(,,,)" [tuple4Constr]
 instance (Data a, Data b, Data c, Data d)
          => Data (a,b,c,d) where
   gfoldl f z (a,b,c,d) = z (,,,) `f` a `f` b `f` c `f` d
-  toConstr _ = tuple4Constr
+  toConstr (a,b,c,d) = tuple4Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (z (,,,)))))
                     _ -> error "gunfold"
@@ -437,7 +437,7 @@ tuple5DataType = mkDataType "Prelude.(,,,,)" [tuple5Constr]
 instance (Data a, Data b, Data c, Data d, Data e)
          => Data (a,b,c,d,e) where
   gfoldl f z (a,b,c,d,e) = z (,,,,) `f` a `f` b `f` c `f` d `f` e
-  toConstr _ = tuple5Constr
+  toConstr (a,b,c,d,e) = tuple5Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (k (z (,,,,))))))
                     _ -> error "gunfold"
@@ -453,7 +453,7 @@ tuple6DataType = mkDataType "Prelude.(,,,,,)" [tuple6Constr]
 instance (Data a, Data b, Data c, Data d, Data e, Data f)
          => Data (a,b,c,d,e,f) where
   gfoldl f z (a,b,c,d,e,f') = z (,,,,,) `f` a `f` b `f` c `f` d `f` e `f` f'
-  toConstr _ = tuple6Constr
+  toConstr (a,b,c,d,e,f) = tuple6Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (k (k (z (,,,,,)))))))
                     _ -> error "gunfold"
@@ -470,7 +470,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
          => Data (a,b,c,d,e,f,g) where
   gfoldl f z (a,b,c,d,e,f',g) =
     z (,,,,,,) `f` a `f` b `f` c `f` d `f` e `f` f' `f` g
-  toConstr _ = tuple7Constr
+  toConstr  (a,b,c,d,e,f,g) = tuple7Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (k (k (k (z (,,,,,,))))))))
                     _ -> error "gunfold"
