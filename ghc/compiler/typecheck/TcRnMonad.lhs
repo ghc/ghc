@@ -27,7 +27,7 @@ import InstEnv		( emptyInstEnv )
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  mkWarnMsg, printErrorsAndWarnings,
+			  mkWarnMsg, printErrorsAndWarnings, pprBagOfErrors,
 			  mkLocMessage, mkLongErrMsg )
 import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
@@ -39,10 +39,9 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupp
 import Unique		( Unique )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set, GhcMode )
 import StaticFlags	( opt_PprStyle_Debug )
-import Bag		( snocBag, unionBags )
+import Bag		( snocBag, unionBags, unitBag )
 import Panic		( showException )
  
-import Maybe		( isJust )
 import IO		( stderr )
 import DATA_IOREF	( newIORef, readIORef )
 import EXCEPTION	( Exception )
@@ -432,6 +431,8 @@ addLongErrAt loc msg extra
 	 rdr_env <- getGlobalRdrEnv ;
 	 let { err = mkLongErrMsg loc (unQualInScope rdr_env) msg extra } ;
 	 (warns, errs) <- readMutVar errs_var ;
+	 traceTc (ptext SLIT("Adding error:") <+> \ _ -> pprBagOfErrors (unitBag err)) ;	
+		-- Ugh!  traceTc is too specific; unitBag is horrible
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
 addErrs :: [(SrcSpan,Message)] -> TcRn ()
