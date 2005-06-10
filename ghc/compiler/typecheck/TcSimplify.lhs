@@ -1314,9 +1314,8 @@ The main control over context reduction is here
 data WhatToDo
  = ReduceMe WantSCs	-- Try to reduce this
 			-- If there's no instance, behave exactly like
-			-- DontReduce: add the inst to
-			-- the irreductible ones, but don't
-			-- produce an error message of any kind.
+			-- DontReduce: add the inst to the irreductible ones, 
+			-- but don't produce an error message of any kind.
 			-- It might be quite legitimate such as (Eq a)!
 
  | KeepDictWithoutSCs	-- Return as irreducible; don't add its superclasses
@@ -1332,6 +1331,8 @@ reduceMe inst = ReduceMe AddSCs
 
 data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 				-- of a predicate when adding it to the avails
+	-- The reason for this flag is entirely the super-class loop problem
+	-- Note [SUPER-CLASS LOOP 1]
 \end{code}
 
 
@@ -1858,7 +1859,7 @@ addAvailAndSCs want_scs avails inst avail
 
     findAllDeps :: IdSet -> Avail -> IdSet
     -- Find all the Insts that this one depends on
-    -- See Note [SUPERCLASS-LOOP]
+    -- See Note [SUPERCLASS-LOOP 2]
     -- Watch out, though.  Since the avails may contain loops 
     -- (see Note [RECURSIVE DICTIONARIES]), so we need to track the ones we've seen so far
     findAllDeps so_far (Rhs _ kids) = foldl find_all so_far kids
