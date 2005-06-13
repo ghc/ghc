@@ -332,7 +332,8 @@ sub init_TARGET_STUFF {
     $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
     $T_DOT_GLOBAL   = '\.globl';
     $T_HDR_toc      = "\.toc\n";
-    $T_HDR_literal  = "\t\.const\n\t\.align 4\n"; # align for SSE
+    $T_HDR_literal16= "\t\.literal8\n\t\.align 4\n";
+    $T_HDR_literal  = "\t\.const\n\t\.align 4\n";
     $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
     $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
     $T_HDR_rodata   = "\t\.const\n\t\.align 2\n";
@@ -1211,8 +1212,9 @@ sub mangle_asm {
 
 	    # HACK: try to detect 16-byte constants and align them
 	    # on a 16-byte boundary.  x86_64 sometimes needs 128-bit
-	    # aligned constants.
-	    if ( $TargetPlatform =~ /^x86_64/ ) { 
+	    # aligned constants, and so does Darwin/x86.
+	    if ( $TargetPlatform =~ /^x86_64/
+                || $TargetPlatform =~ /^i386-apple-darwin/ ) { 
 		$z = $chk[$i];
  		if ($z =~ /(\.long.*\n.*\.long.*\n.*\.long.*\n.*\.long|\.quad.*\n.*\.quad)/) {
 		    print OUTASM $T_HDR_literal16;
