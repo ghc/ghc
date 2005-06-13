@@ -153,7 +153,7 @@ helpText =
  "   :show modules               show the currently loaded modules\n" ++
  "   :show bindings              show the current bindings made at the prompt\n" ++
  "\n" ++
- "   :tags -e|-c		 create tags file for Vi (-c) or Emacs (-e)\n" ++
+ "   :tags -e|-c                 create tags file for Vi (-c) or Emacs (-e)\n" ++
  "   :type <expr>                show the type of <expr>\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
