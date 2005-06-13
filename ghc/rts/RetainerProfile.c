@@ -2027,7 +2027,7 @@ retainerProfile(void)
 #ifdef DEBUG_RETAINER
 
 #define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
-        ((HEAP_ALLOCED(r) && Bdescr((P_)r)->free != (void *)-1))) && \
+        ((HEAP_ALLOCED(r) && ((Bdescr((P_)r)->flags & BF_FREE) == 0)))) && \
         ((StgWord)(*(StgPtr)r)!=0xaaaaaaaa))
 
 static nat

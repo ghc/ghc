@@ -400,7 +400,7 @@ updateFrontPanel( void )
 	    for (; a <= LAST_BLOCK(m); (char *)a += BLOCK_SIZE) {
 		bd = Bdescr((P_)a);
 		ASSERT(bd->start == a);
-		if (bd->free == (void *)-1) {
+                if (bd->flags & BF_FREE) {
 		    colorBlock( a, &free_color, 
 				block_width, block_height, blocks_per_line );
 		} else {
