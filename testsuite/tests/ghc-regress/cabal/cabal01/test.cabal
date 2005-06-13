@@ -5,6 +5,7 @@ Other-Modules: B.A
 C-Sources: hello.c, c_src/hello.c
 Extensions: ForeignFunctionInterface
 Build-depends: base>=1.0, haskell98
+extra-lib-dirs: /usr/local/lib
 
 Executable: testA
 Other-Modules: A, MainA
