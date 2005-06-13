@@ -110,6 +110,7 @@ static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
 
+static int machoGetMisalignment( FILE * );
 #ifdef powerpc_HOST_ARCH
 static int ocAllocateJumpIslands_MachO ( ObjectCode* oc );
 static void machoInitSymbolsWithoutUnderscore( void );
@@ -690,7 +691,7 @@ static RtsSymbolVal rtsSyms[] = {
       // dyld stub code contains references to this,
       // but it should never be called because we treat
       // lazy pointers as nonlazy.
-      { "dyld_stub_binding_helper", 0xDEADBEEF },
+      { "dyld_stub_binding_helper", (void*)0xDEADBEEF },
 #endif
       { 0, 0 } /* sentinel */
 };
@@ -1029,6 +1030,7 @@ loadObj( char *path )
    void *map_addr = NULL;
 #else
    FILE *f;
+   int misalignment;
 #endif
    initLinker();
 
@@ -1133,13 +1135,29 @@ loadObj( char *path )
 
 #else /* !USE_MMAP */
 
-   oc->image = stgMallocBytes(oc->fileSize, "loadObj(image)");
-
    /* load the image into memory */
    f = fopen(path, "rb");
    if (!f)
        barf("loadObj: can't read `%s'", path);
 
+#ifdef darwin_HOST_OS
+    // In a Mach-O .o file, all sections can and will be misaligned
+    // if the total size of the headers is not a multiple of the
+    // desired alignment. This is fine for .o files that only serve
+    // as input for the static linker, but it's not fine for us,
+    // as SSE (used by gcc for floating point) and Altivec require
+    // 16-byte alignment.
+    // We calculate the correct alignment from the header before
+    // reading the file, and then we misalign oc->image on purpose so
+    // that the actual sections end up aligned again.
+   misalignment = machoGetMisalignment(f);
+#else
+   misalignment = 0;
+#endif
+
+   oc->image = stgMallocBytes(oc->fileSize + misalignment, "loadObj(image)");
+   oc->image += misalignment;
+   
    n = fread ( oc->image, 1, oc->fileSize, f );
    if (n != oc->fileSize)
       barf("loadObj: error whilst reading `%s'", path);
@@ -4021,4 +4039,26 @@ static void machoInitSymbolsWithoutUnderscore()
 #undef Sym
 }
 #endif
+
+/*
+ * Figure out by how much to shift the entire Mach-O file in memory
+ * when loading so that its single segment ends up 16-byte-aligned
+ */
+static int machoGetMisalignment( FILE * f )
+{
+    struct mach_header header;
+    int misalignment;
+    
+    fread(&header, sizeof(header), 1, f);
+    rewind(f);
+
+    if(header.magic != MH_MAGIC)
+        return 0;
+    
+    misalignment = (header.sizeofcmds + sizeof(header))
+                    & 0xF;
+
+    return misalignment ? (16 - misalignment) : 0;
+}
+
 #endif
