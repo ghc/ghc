@@ -56,6 +56,9 @@ module GHC (
 	modInfoLookupName,
 	lookupGlobalName,
 
+	-- * Printing
+	PrintUnqualified, alwaysQualify,
+
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
 #ifdef GHCI
@@ -455,15 +458,16 @@ loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
         let hpt1      = hsc_HPT hsc_env
         let dflags    = hsc_dflags hsc_env
         let ghci_mode = ghcMode dflags -- this never changes
-        let verb      = verbosity dflags
 
 	-- The "bad" boot modules are the ones for which we have
 	-- B.hs-boot in the module graph, but no B.hs
 	-- The downsweep should have ensured this does not happen
 	-- (see msDeps)
         let all_home_mods = [ms_mod s | s <- mod_graph, not (isBootSummary s)]
+#ifdef DEBUG
 	    bad_boot_mods = [s 	      | s <- mod_graph, isBootSummary s,
 					not (ms_mod s `elem` all_home_mods)]
+#endif
 	ASSERT( null bad_boot_mods ) return ()
 
         -- mg2_with_srcimps drops the hi-boot nodes, returning a 
@@ -727,6 +731,8 @@ checkModule session@(Session ref) mod msg_act = do
 					renamedSource = renamed,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf }))
+		_other ->
+			panic "checkModule"
 
 -- ---------------------------------------------------------------------------
 -- Unloading
@@ -833,9 +839,9 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 	  | otherwise = False
 	  where
 	     same_as_prev t = case lookupModuleEnv hpt (ms_mod ms) of
-				Nothing  -> True
 				Just hmi  | Just l <- hm_linkable hmi
 				 -> isObjectLinkable l && t == linkableTime l
+				_other  -> True
 		-- why '>=' rather than '>' above?  If the filesystem stores
 		-- times to the nearset second, we may occasionally find that
 		-- the object & source have the same modification time, 
@@ -845,10 +851,10 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 
 	bco_ok ms
 	  = case lookupModuleEnv hpt (ms_mod ms) of
-	   	Nothing  -> False
 		Just hmi  | Just l <- hm_linkable hmi ->
 			not (isObjectLinkable l) && 
 			linkableTime l >= ms_hs_date ms
+		_other  -> False
 
 ms_allimps :: ModSummary -> [Module]
 ms_allimps ms = map unLoc (ms_srcimps ms ++ ms_imps ms)
@@ -1176,34 +1182,11 @@ type NodeMap a = FiniteMap NodeKey a	  -- keyed by (mod, src_file_type) pairs
 msKey :: ModSummary -> NodeKey
 msKey (ModSummary { ms_mod = mod, ms_hsc_src = boot }) = (mod,boot)
 
-emptyNodeMap :: NodeMap a
-emptyNodeMap = emptyFM
-
 mkNodeMap :: [ModSummary] -> NodeMap ModSummary
 mkNodeMap summaries = listToFM [ (msKey s, s) | s <- summaries]
 	
 nodeMapElts :: NodeMap a -> [a]
 nodeMapElts = eltsFM
-
--- -----------------------------------------------------------------
--- The unlinked image
--- 
--- The compilation manager keeps a list of compiled, but as-yet unlinked
--- binaries (byte code or object code).  Even when it links bytecode
--- it keeps the unlinked version so it can re-link it later without
--- recompiling.
-
-type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
-
-findModuleLinkable_maybe :: [Linkable] -> Module -> Maybe Linkable
-findModuleLinkable_maybe lis mod
-   = case [LM time nm us | LM time nm us <- lis, nm == mod] of
-        []   -> Nothing
-        [li] -> Just li
-        many -> pprPanic "findModuleLinkable" (ppr mod)
-
-delModuleLinkable :: [Linkable] -> Module -> [Linkable]
-delModuleLinkable ls mod = [ l | l@(LM _ nm _) <- ls, nm /= mod ]
 
 -----------------------------------------------------------------------------
 -- Downsweep (dependency analysis)
@@ -1856,7 +1839,6 @@ exprType s expr = withSession s $ \hsc_env -> do
 	Just ty -> return (Just tidy_ty)
  	     where 
 		tidy_ty = tidyType emptyTidyEnv ty
-		dflags  = hsc_dflags hsc_env
 
 -- -----------------------------------------------------------------------------
 -- Getting the kind of a type
