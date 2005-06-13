@@ -169,8 +169,7 @@ config-pkgs ::
 	@for i in $(PACKAGE_LIB_SPLICED_FILES) ""; do \
 	  if test "$$i"; then \
 	    echo "Creating a configured version of $$i .."; \
-	   if [ -f lib/$(platform)/$$i ]; then $(MV) lib/$(platform)/$$i lib/$(platform)/$$i.bak; fi; \
-	   $(SED) -e "s|\$$libdir|$(libdir)|g;s|\$$datadir|$(datadir)|g" <lib/$(platform)/$$i.bak >lib/$(platform)/$$i; \
+            $(PERL) -i.bak -lpe 's|\$$libdir|$(libdir)|g;s|\$$datadir|$(datadir)|g' lib/$(platform)/$$i; \
           fi; \
 	done
 	@if test "$(platform)" = "powerpc-apple-darwin"; then \
