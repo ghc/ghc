@@ -78,12 +78,14 @@
 #  include <windows.h>
 #  include <math.h>
 #elif defined(darwin_HOST_OS)
-#  include <mach-o/ppc/reloc.h>
 #  define OBJFORMAT_MACHO
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
 #  include <mach-o/reloc.h>
 #  include <mach-o/dyld.h>
+#if defined(powerpc_HOST_ARCH)
+#  include <mach-o/ppc/reloc.h>
+#endif
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -104,12 +106,14 @@ static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
 #elif defined(OBJFORMAT_MACHO)
-static int ocAllocateJumpIslands_MachO ( ObjectCode* oc );
 static int ocVerifyImage_MachO    ( ObjectCode* oc );
 static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
 
+#ifdef powerpc_HOST_ARCH
+static int ocAllocateJumpIslands_MachO ( ObjectCode* oc );
 static void machoInitSymbolsWithoutUnderscore( void );
+#endif
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -634,7 +638,7 @@ typedef struct _RtsSymbolVal {
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS) && defined(powerpc_HOST_ARCH)
       // Symbols that don't have a leading underscore
       // on Mac OS X. They have to receive special treatment,
       // see machoInitSymbolsWithoutUnderscore()
@@ -682,6 +686,12 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_MINGW_ONLY_SYMBOLS
       RTS_CYGWIN_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
+#if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
+      // dyld stub code contains references to this,
+      // but it should never be called because we treat
+      // lazy pointers as nonlazy.
+      { "dyld_stub_binding_helper", 0xDEADBEEF },
+#endif
       { 0, 0 } /* sentinel */
 };
 
@@ -754,7 +764,7 @@ initLinker( void )
 	ghciInsertStrHashTable("(GHCi built-in symbols)",
                                symhash, sym->lbl, sym->addr);
     }
-#   if defined(OBJFORMAT_MACHO)
+#   if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
     machoInitSymbolsWithoutUnderscore();
 #   endif
 
@@ -1020,7 +1030,6 @@ loadObj( char *path )
 #else
    FILE *f;
 #endif
-
    initLinker();
 
    /* debugBelch("loadObj %s\n", path ); */
@@ -1139,7 +1148,7 @@ loadObj( char *path )
 
 #endif /* USE_MMAP */
 
-#  if defined(OBJFORMAT_MACHO)
+#  if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
    r = ocAllocateJumpIslands_MachO ( oc );
    if (!r) { return r; }
 #  elif defined(OBJFORMAT_ELF) && defined(powerpc_HOST_ARCH)
@@ -3361,7 +3370,7 @@ static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
 #if defined(OBJFORMAT_MACHO)
 
 /*
-  Support for MachO linking on Darwin/MacOS X on PowerPC chips
+  Support for MachO linking on Darwin/MacOS X
   by Wolfgang Thaller (wolfgang.thaller@gmx.net)
 
   I hereby formally apologize for the hackish nature of this code.
@@ -3370,6 +3379,7 @@ static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
   *) add still more sanity checks.
 */
 
+#ifdef powerpc_HOST_ARCH
 static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
 {
     struct mach_header *header = (struct mach_header *) oc->image;
@@ -3414,6 +3424,7 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
     }
     return ocAllocateJumpIslands(oc,0,0);
 }
+#endif
 
 static int ocVerifyImage_MachO(ObjectCode* oc STG_UNUSED)
 {
@@ -3492,6 +3503,10 @@ static int relocateSection(
 	return 1;
     else if(!strcmp(sect->sectname,"__nl_symbol_ptr"))
 	return 1;
+    else if(!strcmp(sect->sectname,"__la_sym_ptr2"))
+	return 1;
+    else if(!strcmp(sect->sectname,"__la_sym_ptr3"))
+	return 1;
 
     n = sect->nreloc;
     relocs = (struct relocation_info*) (image + sect->reloff);
@@ -3511,6 +3526,15 @@ static int relocateSection(
 		    unsigned long* wordPtr = (unsigned long*) (image + sect->offset + scat->r_address);
 		    checkProddableBlock(oc,wordPtr);
 
+                    // Note on relocation types:
+                    // i386 uses the GENERIC_RELOC_* types,
+                    // while ppc uses special PPC_RELOC_* types.
+                    // *_RELOC_VANILLA and *_RELOC_PAIR have the same value
+                    // in both cases, all others are different.
+                    // Therefore, we use GENERIC_RELOC_VANILLA
+                    // and GENERIC_RELOC_PAIR instead of the PPC variants,
+                    // and use #ifdefs for the other types.
+                    
 		    // Step 1: Figure out what the relocated value should be
 		    if(scat->r_type == GENERIC_RELOC_VANILLA)
 		    {
@@ -3521,23 +3545,28 @@ static int relocateSection(
                                                                 scat->r_value)
                                         - scat->r_value;
 		    }
+#ifdef powerpc_HOST_ARCH
 		    else if(scat->r_type == PPC_RELOC_SECTDIFF
 		        || scat->r_type == PPC_RELOC_LO16_SECTDIFF
 		        || scat->r_type == PPC_RELOC_HI16_SECTDIFF
 		        || scat->r_type == PPC_RELOC_HA16_SECTDIFF)
+#else
+                    else if(scat->r_type == GENERIC_RELOC_SECTDIFF)
+#endif
 		    {
 		        struct scattered_relocation_info *pair =
 		                (struct scattered_relocation_info*) &relocs[i+1];
 
-		        if(!pair->r_scattered || pair->r_type != PPC_RELOC_PAIR)
+		        if(!pair->r_scattered || pair->r_type != GENERIC_RELOC_PAIR)
 		            barf("Invalid Mach-O file: "
-		                 "PPC_RELOC_*_SECTDIFF not followed by PPC_RELOC_PAIR");
+		                 "RELOC_*_SECTDIFF not followed by RELOC_PAIR");
 
 		        word = (unsigned long)
 		               (relocateAddress(oc, nSections, sections, scat->r_value)
 		              - relocateAddress(oc, nSections, sections, pair->r_value));
 		        i++;
 		    }
+#ifdef powerpc_HOST_ARCH
 		    else if(scat->r_type == PPC_RELOC_HI16
                          || scat->r_type == PPC_RELOC_LO16
                          || scat->r_type == PPC_RELOC_HA16
@@ -3576,14 +3605,21 @@ static int relocateSection(
                         
                         i++;
                     }
+ #endif
                     else
 		        continue;  // ignore the others
 
+#ifdef powerpc_HOST_ARCH
                     if(scat->r_type == GENERIC_RELOC_VANILLA
                         || scat->r_type == PPC_RELOC_SECTDIFF)
+#else
+                    if(scat->r_type == GENERIC_RELOC_VANILLA
+                        || scat->r_type == GENERIC_RELOC_SECTDIFF)
+#endif
                     {
                         *wordPtr = word;
                     }
+#ifdef powerpc_HOST_ARCH
                     else if(scat->r_type == PPC_RELOC_LO16_SECTDIFF || scat->r_type == PPC_RELOC_LO16)
                     {
                         ((unsigned short*) wordPtr)[1] = word & 0xFFFF;
@@ -3597,6 +3633,7 @@ static int relocateSection(
                         ((unsigned short*) wordPtr)[1] = ((word >> 16) & 0xFFFF)
                             + ((word & (1<<15)) ? 1 : 0);
                     }
+#endif
 		}
 	    }
 
@@ -3611,10 +3648,12 @@ static int relocateSection(
 	    if(reloc->r_length == 2)
 	    {
 		unsigned long word = 0;
+#ifdef powerpc_HOST_ARCH
                 unsigned long jumpIsland = 0;
                 long offsetToJumpIsland = 0xBADBAD42; // initialise to bad value
                                                       // to avoid warning and to catch
                                                       // bugs.
+#endif
 
 		unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
 		checkProddableBlock(oc,wordPtr);
@@ -3623,6 +3662,7 @@ static int relocateSection(
 		{
 		    word = *wordPtr;
 		}
+#ifdef powerpc_HOST_ARCH
 		else if(reloc->r_type == PPC_RELOC_LO16)
 		{
 		    word = ((unsigned short*) wordPtr)[1];
@@ -3643,7 +3683,7 @@ static int relocateSection(
 		    word = *wordPtr;
 		    word = (word & 0x03FFFFFC) | ((word & 0x02000000) ? 0xFC000000 : 0);
 		}
-
+#endif
 
 		if(!reloc->r_extern)
 		{
@@ -3667,17 +3707,19 @@ static int relocateSection(
 
 		    if(reloc->r_pcrel)
                     {  
+#ifdef powerpc_HOST_ARCH
                             // In the .o file, this should be a relative jump to NULL
-                            // and we'll change it to a jump to a relative jump to the symbol
+                            // and we'll change it to a relative jump to the symbol
                         ASSERT(-word == reloc->r_address);
-                        word = (unsigned long) symbolAddress;
-                        jumpIsland = makeJumpIsland(oc,reloc->r_symbolnum,word);
-			word -= ((long)image) + sect->offset + reloc->r_address;
+                        jumpIsland = makeJumpIsland(oc,reloc->r_symbolnum,(unsigned long) symbolAddress);
                         if(jumpIsland != 0)
                         {
-                            offsetToJumpIsland = jumpIsland
-                                - (((long)image) + sect->offset + reloc->r_address);
+                            offsetToJumpIsland = word + jumpIsland
+                                - (((long)image) + sect->offset - sect->addr);
                         }
+#endif
+			word += (unsigned long) symbolAddress
+                                - (((long)image) + sect->offset - sect->addr);
                     }
                     else
                     {
@@ -3690,6 +3732,7 @@ static int relocateSection(
 		    *wordPtr = word;
 		    continue;
 		}
+#ifdef powerpc_HOST_ARCH
 		else if(reloc->r_type == PPC_RELOC_LO16)
 		{
 		    ((unsigned short*) wordPtr)[1] = word & 0xFFFF;
@@ -3726,7 +3769,8 @@ static int relocateSection(
 		    *wordPtr = (*wordPtr & 0xFC000003) | (word & 0x03FFFFFC);
 		    continue;
 		}
-	    }
+#endif
+            }
 	    barf("\nunknown relocation %d",reloc->r_type);
 	    return 0;
 	}
@@ -3908,6 +3952,10 @@ static int ocResolve_MachO(ObjectCode* oc)
 	    la_ptrs = &sections[i];
 	else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr"))
 	    nl_ptrs = &sections[i];
+        else if(!strcmp(sections[i].sectname,"__la_sym_ptr2"))
+	    la_ptrs = &sections[i];
+        else if(!strcmp(sections[i].sectname,"__la_sym_ptr3"))
+	    la_ptrs = &sections[i];
     }
 
     if(dsymLC)
@@ -3940,6 +3988,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     return 1;
 }
 
+#ifdef powerpc_HOST_ARCH
 /*
  * The Mach-O object format uses leading underscores. But not everywhere.
  * There is a small number of runtime support functions defined in
@@ -3971,4 +4020,5 @@ static void machoInitSymbolsWithoutUnderscore()
     
 #undef Sym
 }
+#endif
 #endif
