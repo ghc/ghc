@@ -63,6 +63,7 @@ Prelude>
    :show modules              show the currently loaded modules
    :show bindings             show the current bindings made at the prompt
 
+   :tags -e|-c                create tags file for Vi (-c) or Emacs (-e)
    :type &lt;expr&gt;               show the type of &lt;expr&gt;
    :kind &lt;type&gt;               show the kind of &lt;type&gt;
    :undef &lt;cmd&gt;               undefine user-defined command :&lt;cmd&gt;
@@ -428,16 +429,30 @@ Prelude>
       <literal>x</literal> in future statements, for example to print
       it as we did above.</para>
 
+      <para>GHCi will print the result of a statement if and only if: 
+	<itemizedlist>
+	  <listitem>
+	    <para>The statement is not a binding, or it is a monadic binding 
+	      (<literal>p &lt;- e</literal>) that binds exactly one
+	      variable.</para>
+	  </listitem>
+	  <listitem>
+	    <para>The variable's type is not polymorphic, is not
+	      <literal>()</literal>, and is an instance of
+	      <literal>Show</literal></para>
+	  </listitem>
+	</itemizedlist>
+      </para>
+
       <para>Of course, you can also bind normal non-IO expressions
       using the <literal>let</literal>-statement:</para>
 <screen>
 Prelude> let x = 42
-42
-Prelude> print x
+Prelude> x
 42
 Prelude>
 </screen>
-      <para>An important difference between the two types of binding
+      <para>Another important difference between the two types of binding
       is that the monadic bind (<literal>p &lt;- e</literal>) is
       <emphasis>strict</emphasis> (it evaluates <literal>e</literal>),
       whereas with the <literal>let</literal> form, the expression
@@ -448,21 +463,15 @@ Prelude> print x
 *** Exception: help!
 Prelude>
 </screen>
-<para>GHCi will print the result of a 
-<literal>x&lt;-e</literal> statement if and only if:
-<itemizedlist>
-<listitem><para>The statement binds exactly one variable</para></listitem>
-<listitem><para>The variable's type is not polymorphic, is not
-<literal>()</literal>,
-and is an instance of <literal>Show</literal>
-</para></listitem>
-</itemizedlist>
+
+      <para>Note that <literal>let</literal> bindings do not automatically
+	print the value bound, unlike monadic bindings.</para>
+
       <para>Any exceptions raised during the evaluation or execution
       of the statement are caught and printed by the GHCi command line
       interface (for more information on exceptions, see the module
       <literal>Control.Exception</literal> in the libraries
       documentation).</para>
-
 
       <para>Every new binding shadows any existing bindings of the
       same name, including entities that are in scope in the current
@@ -493,7 +502,7 @@ Prelude> let (x:xs) = [1..]
 x :: Integer
 xs :: [Integer]
 </screen>
-</para>
+
     </sect2>
 
     <sect2 id="ghci-scope">
@@ -1124,6 +1133,23 @@ Prelude> :. cmds.ghci
         </term>
 	<listitem>
 	  <para>Show the list of modules currently load.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>:tags -c|-e</literal>
+	  <indexterm><primary><literal>:tags</literal></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Generates a &ldquo;tags&rdquo; file for either Vi-style editors
+	    (<literal>-c</literal>) or Emacs-style editors
+	    (<literal>-e</literal>).  The file generated will be called
+	    <filename>tags</filename> or <filename>TAGS</filename>
+	    respectively.</para>
+
+          <para>See also <xref linkend="hasktags" />.</para>
 	</listitem>
       </varlistentry>
 
