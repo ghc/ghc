@@ -71,7 +71,6 @@ module StaticFlags (
 
 #include "HsVersions.h"
 
-import DriverPhases
 import Util		( consIORef )
 import CmdLineParser
 import Config		( cProjectVersionInt, cProjectPatchLevel,
