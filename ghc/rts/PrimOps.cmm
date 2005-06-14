@@ -1181,6 +1181,7 @@ atomicallyzh_fast
 
   /* Start the memory transcation */
   old_trec = StgTSO_trec(CurrentTSO);
+  ASSERT(old_trec == NO_TREC);
   "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", old_trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
