@@ -1,0 +1,7 @@
+1. Compile each new example as follows to obtain the .stderr file.
+
+ ../../../../ghc/compiler/ghc-inplace -no-recomp -dcore-lint -Di386_unknown_mi
+ngw32 -c f0.hs -O -farity -ddump-idinfo >f0.stderr 2>&1
+
+2. Add one more line to all.T for each new example.
+3. make
