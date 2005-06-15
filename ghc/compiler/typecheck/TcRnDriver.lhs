@@ -6,10 +6,10 @@
 \begin{code}
 module TcRnDriver (
 #ifdef GHCI
-	getModuleContents, tcRnStmt, 
-	tcRnGetInfo, GetInfoResult,
-	tcRnExpr, tcRnType,
+	tcRnStmt, tcRnExpr, tcRnType,
 	tcRnLookupRdrName,
+	tcRnLookupName,
+	tcRnGetInfo,
 	getModuleExports, 
 #endif
 	tcRnModule, 
@@ -102,33 +102,26 @@ import Inst		( tcGetInstEnvs )
 import InstEnv		( classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
 import LoadIface	( loadSrcInterface, loadSysInterface )
-import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
-			  IfaceExtName(..), IfaceConDecls(..), 
-			  tyThingToIfaceDecl )
-import IfaceType	( IfaceType, toIfaceType, 
-			  interactiveExtNameFun )
-import IfaceEnv		( lookupOrig, ifaceExportNames )
-import Module		( lookupModuleEnv, moduleSetElts, mkModuleSet )
+import IfaceEnv		( ifaceExportNames )
+import Module		( moduleSetElts, mkModuleSet )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( isImplicitId, setIdType, globalIdDetails )
+import Id		( setIdType )
 import MkId		( unsafeCoerceId )
-import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName, nameModule, isBuiltInSyntax, nameParent_maybe )
-import OccName		( occNameUserString, isTcOcc )
+import Name		( nameOccName, nameModule, isBuiltInSyntax )
+import OccName		( isTcOcc )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
 			  bindIOName, thenIOName, returnIOName )
-import HscTypes		( InteractiveContext(..), HomeModInfo(..), 
-			  availNames, availName, ModIface(..), icPrintUnqual,
+import HscTypes		( InteractiveContext(..),
+			  ModIface(..), icPrintUnqual,
 			  Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
-import Panic		( ghcError, GhcException(..) )
-import SrcLoc		( SrcLoc, unLoc, noSrcSpan )
+import SrcLoc		( unLoc, noSrcSpan )
 #endif
 
 import FastString	( mkFastString )
@@ -1110,84 +1103,17 @@ tcGetModuleExports mod = do
   		-- Load any orphan-module interfaces,
   		-- so their instances are visible
   ifaceExportNames (mi_exports iface)
-\end{code}
 
-\begin{code}
-getModuleContents
-  :: HscEnv
-  -> Module			-- Module to inspect
-  -> Bool			-- Grab just the exports, or the whole toplev
-  -> IO (Maybe [IfaceDecl])
-
-getModuleContents hsc_env mod exports_only
- = initTcPrintErrors hsc_env iNTERACTIVE (get_mod_contents exports_only)
- where
-   get_mod_contents exports_only
-      | not exports_only  -- We want the whole top-level type env
- 			  -- so it had better be a home module
-      = do { hpt <- getHpt
- 	   ; case lookupModuleEnv hpt mod of
- 	       Just mod_info -> return (map (toIfaceDecl ext_nm) $
-					filter wantToSee $
- 				        typeEnvElts $
- 				        md_types (hm_details mod_info))
- 	       Nothing -> ghcError (ProgramError (showSDoc (noRdrEnvErr mod)))
- 			  -- This is a system error; the module should be in the HPT
- 	   }
-  
-      | otherwise		-- Want the exports only
-      = do { iface <- load_iface mod
- 	   ; mappM get_decl [ (mod,avail) | (mod, avails) <- mi_exports iface
-					  , avail <- avails ]
-    	}
-
-   get_decl (mod, avail)
-	= do { main_name <- lookupOrig mod (availName avail) 
-	     ; thing     <- tcLookupGlobal main_name
-	     ; return (filter_decl (availNames avail) (toIfaceDecl ext_nm thing)) }
-
-   ext_nm = interactiveExtNameFun (icPrintUnqual (hsc_IC hsc_env))
-
----------------------
-filter_decl occs decl@(IfaceClass {ifSigs = sigs})
-  = decl { ifSigs = filter (keep_sig occs) sigs }
-filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon cons})
-  = decl { ifCons = IfDataTyCon (filter (keep_con occs) cons) }
-filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
-  | keep_con occs con = decl
-  | otherwise	      = decl {ifCons = IfAbstractTyCon}	-- Hmm?
-filter_decl occs decl
-  = decl
-
-keep_sig occs (IfaceClassOp occ _ _) = occ `elem` occs
-keep_con occs con		     = ifConOcc con `elem` occs
-
-wantToSee (AnId id)    = not (isImplicitId id)
-wantToSee (ADataCon _) = False	-- They'll come via their TyCon
-wantToSee _ 	       = True
-
----------------------
 load_iface mod = loadSrcInterface doc mod False {- Not boot iface -}
 	       where
 		 doc = ptext SLIT("context for compiling statements")
 
----------------------
-noRdrEnvErr mod = ptext SLIT("No top-level environment available for module") 
-		  <+> quotes (ppr mod)
-\end{code}
-
-\begin{code}
-type GetInfoResult = (String, IfaceDecl, Fixity, SrcLoc, 
-			      [(IfaceType,SrcLoc)]	-- Instances
-		     )
 
 tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Maybe [Name])
-
 tcRnLookupRdrName hsc_env rdr_name 
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env (hsc_IC hsc_env) $ 
     lookup_rdr_name rdr_name
-
 
 lookup_rdr_name rdr_name = do {
 	-- If the identifier is a constructor (begins with an
@@ -1219,10 +1145,16 @@ lookup_rdr_name rdr_name = do {
  }
 
 
+tcRnLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
+tcRnLookupName hsc_env name
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext hsc_env (hsc_IC hsc_env) $
+    tcLookupGlobal name
+
+
 tcRnGetInfo :: HscEnv
-	    -> InteractiveContext
-	    -> RdrName
-	    -> IO (Maybe [GetInfoResult])
+	    -> Name
+	    -> IO (Maybe (TyThing, Fixity, [Instance]))
 
 -- Used to implemnent :info in GHCi
 --
@@ -1231,51 +1163,22 @@ tcRnGetInfo :: HscEnv
 -- but we want to treat it as *both* a data constructor 
 --  *and* as a type or class constructor; 
 -- hence the call to dataTcOccs, and we return up to two results
-tcRnGetInfo hsc_env ictxt rdr_name
+tcRnGetInfo hsc_env name
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext hsc_env ictxt $ do {
+    let ictxt = hsc_IC hsc_env in
+    setInteractiveContext hsc_env ictxt $ do
 
 	-- Load the interface for all unqualified types and classes
 	-- That way we will find all the instance declarations
 	-- (Packages have not orphan modules, and we assume that
 	--  in the home package all relevant modules are loaded.)
-    loadUnqualIfaces ictxt ;
+    loadUnqualIfaces ictxt
 
-    good_names <- lookup_rdr_name rdr_name ;
+    thing  <- tcLookupGlobal name
+    fixity <- lookupFixityRn name
+    ispecs <- lookupInsts (icPrintUnqual ictxt) thing
+    return (thing, fixity, ispecs)
 
-	-- And lookup up the entities, avoiding duplicates, which arise
-	-- because constructors and record selectors are represented by
-	-- their parent declaration
-    let { do_one name = do { thing  <- tcLookupGlobal name
-		           ; fixity <- lookupFixityRn name
-			   ; ispecs <- lookupInsts print_unqual thing
-		           ; return (str, toIfaceDecl ext_nm thing, fixity, 
-				     getSrcLoc thing, 
-				     [(toIfaceType ext_nm (idType dfun), getSrcLoc dfun) 
-				     | dfun <- map instanceDFunId ispecs ]
-			     ) } 
-		where
-		 	-- str is the the naked occurrence name
-			-- after stripping off qualification and parens (+)
-		  str = occNameUserString (nameOccName name)
-
-	; parent_is_there n 
-		| Just p <- nameParent_maybe n = p `elem` good_names
-		| otherwise		       = False
-	} ;
-
-	-- For the SrcLoc, the 'thing' has better info than
-	-- the 'name' because getting the former forced the
-	-- declaration to be loaded into the cache
-
-    mapM do_one (filter (not . parent_is_there) good_names)
-	-- Filter out names whose parent is also there
-	-- Good example is '[]', which is both a type and data constructor
-	-- in the same type
-    }
-  where
-    ext_nm = interactiveExtNameFun print_unqual
-    print_unqual = icPrintUnqual ictxt
 
 lookupInsts :: PrintUnqualified -> TyThing -> TcM [Instance]
 -- Filter the instances by the ones whose tycons (or clases resp) 
@@ -1308,18 +1211,6 @@ plausibleDFun print_unqual dfun	-- Dfun involving only names that print unqualif
     ok name | isBuiltInSyntax name = True
 	    | isExternalName name  = print_unqual (nameModule name) (nameOccName name)
 	    | otherwise		   = True
-
-toIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
-toIfaceDecl ext_nm thing
-  = tyThingToIfaceDecl ext_nm (munge thing)
-  where
-	-- munge transforms a thing to its "parent" thing
-    munge (ADataCon dc) = ATyCon (dataConTyCon dc)
-    munge (AnId id) = case globalIdDetails id of
-			RecordSelId tc lbl -> ATyCon tc
-			ClassOpId cls      -> AClass cls
-			other		   -> AnId id
-    munge other_thing = other_thing
 
 loadUnqualIfaces :: InteractiveContext -> TcM ()
 -- Load the home module for everything that is in scope unqualified

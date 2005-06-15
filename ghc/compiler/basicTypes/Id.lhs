@@ -27,6 +27,7 @@ module Id (
 	isImplicitId, isDeadBinder,
 	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector,
+	isClassOpId_maybe,
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
 	isDataConWorkId, isDataConWorkId_maybe, idDataCon,
@@ -248,6 +249,10 @@ recordSelectorFieldLabel id = case globalIdDetails id of
 isRecordSelector id = case globalIdDetails id of
 			RecordSelId _ _ -> True
 			other	  	-> False
+
+isClassOpId_maybe id = case globalIdDetails id of
+			ClassOpId cls -> Just cls
+			_other        -> Nothing
 
 isPrimOpId id = case globalIdDetails id of
 		    PrimOpId op -> True

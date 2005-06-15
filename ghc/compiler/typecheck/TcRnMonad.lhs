@@ -314,22 +314,22 @@ newUniqueSupply
 
 \begin{code}
 traceTc, traceRn :: SDoc -> TcRn ()
-traceRn      = dumpOptTcRn Opt_D_dump_rn_trace
-traceTc      = dumpOptTcRn Opt_D_dump_tc_trace
-traceSplice  = dumpOptTcRn Opt_D_dump_splices
+traceRn      = traceOptTcRn Opt_D_dump_rn_trace
+traceTc      = traceOptTcRn Opt_D_dump_tc_trace
+traceSplice  = traceOptTcRn Opt_D_dump_splices
 
 
 traceIf :: SDoc -> TcRnIf m n ()	
-traceIf      = dumpOptIf Opt_D_dump_if_trace
-traceHiDiffs = dumpOptIf Opt_D_dump_hi_diffs
+traceIf      = traceOptIf Opt_D_dump_if_trace
+traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
-dumpOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
-dumpOptIf flag doc = ifOptM flag $
+traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
+traceOptIf flag doc = ifOptM flag $
 		     ioToIOEnv (printForUser stderr alwaysQualify doc)
 
-dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
-dumpOptTcRn flag doc = ifOptM flag $ do
+traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
+traceOptTcRn flag doc = ifOptM flag $ do
 			{ ctxt <- getErrCtxt
 			; loc  <- getSrcSpanM
 			; ctxt_msgs <- do_ctxt emptyTidyEnv ctxt 
@@ -339,6 +339,9 @@ dumpOptTcRn flag doc = ifOptM flag $ do
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv ;
 		    ioToTcRn (printForUser stderr (unQualInScope rdr_env) doc) }
+
+dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
+dumpOptTcRn flag doc = ifOptM flag (dumpTcRn doc)
 \end{code}
 
 

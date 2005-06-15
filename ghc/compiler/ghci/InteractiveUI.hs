@@ -19,7 +19,8 @@ import GHC		( Session, verbosity, dopt, DynFlag(..),
 			  mkModule, pprModule, Type, Module, SuccessFlag(..),
 			  TyThing(..), Name, LoadHowMuch(..), Phase,
 			  GhcException(..), showGhcException,
-			  CheckedModule(..) )
+			  CheckedModule(..), SrcLoc )
+import PprTyThing
 import Outputable
 
 -- for createtags (should these come via GHC?)
@@ -28,17 +29,8 @@ import Name( nameSrcLoc, nameModule, nameOccName )
 import OccName( pprOccName )
 import SrcLoc( isGoodSrcLoc, srcLocFile, srcLocLine, srcLocCol )
 
--- following all needed for :info... ToDo: remove
-import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
-			  IfaceConDecl(..), IfaceType,
-		   	  pprIfaceDeclHead, pprParendIfaceType,
-			  pprIfaceForAllPart, pprIfaceType )
-import FunDeps		( pprFundeps )
-import SrcLoc		( SrcLoc, pprDefnLoc )
-import OccName		( OccName, parenSymOcc, occNameUserString )
-import BasicTypes	( StrictnessMark(..), defaultFixity, failed, successIf )
-
 -- Other random utilities
+import BasicTypes	( failed, successIf )
 import Panic 		( panic, installSignalHandlers )
 import Config
 import StaticFlags	( opt_IgnoreDotGhci )
@@ -70,7 +62,7 @@ import Data.Dynamic
 import Numeric
 import Data.List
 import Data.Int		( Int64 )
-import Data.Maybe	( isJust )
+import Data.Maybe	( isJust, fromMaybe, catMaybes )
 import System.Cmd
 import System.CPUTime
 import System.Environment
@@ -536,126 +528,32 @@ info s  = do { let names = words s
 	     ; let exts = dopt Opt_GlasgowExts dflags
 	     ; mapM_ (infoThing exts session) names }
   where
-    infoThing exts session name
-	= do { stuff <- io (GHC.getInfo session name)
-	     ; unqual <- io (GHC.getPrintUnqual session)
-	     ; io (putStrLn (showSDocForUser unqual $
-     		   vcat (intersperse (text "") (map (showThing exts) stuff)))) }
+    infoThing exts session str = io $ do
+	names <- GHC.parseName session str
+	let filtered = filterOutChildren names
+	mb_stuffs <- mapM (GHC.getInfo session) filtered
+	unqual <- GHC.getPrintUnqual session
+	putStrLn (showSDocForUser unqual $
+     		   vcat (intersperse (text "") $
+		   [ pprInfo exts stuff | Just stuff <-  mb_stuffs ]))
 
-showThing :: Bool -> GHC.GetInfoResult -> SDoc
-showThing exts (wanted_str, thing, fixity, src_loc, insts) 
-    = vcat [ showWithLoc src_loc (showDecl exts want_name thing),
-	     show_fixity fixity,
-	     vcat (map show_inst insts)]
+  -- Filter out names whose parent is also there Good
+  -- example is '[]', which is both a type and data
+  -- constructor in the same type
+filterOutChildren :: [Name] -> [Name]
+filterOutChildren names = filter (not . parent_is_there) names
+ where parent_is_there n 
+	 | Just p <- GHC.nameParent_maybe n = p `elem` names
+	 | otherwise		           = False
+
+pprInfo exts (thing, fixity, insts)
+  =  pprTyThingLoc exts thing 
+  $$ show_fixity fixity
+  $$ vcat (map GHC.pprInstance insts)
   where
-    want_name occ = wanted_str == occNameUserString occ
-
     show_fixity fix 
-	| fix == defaultFixity = empty
-	| otherwise            = ppr fix <+> text wanted_str
-
-    show_inst (inst_ty, loc)
-	= showWithLoc loc (ptext SLIT("instance") <+> ppr inst_ty)
-
-showWithLoc :: SrcLoc -> SDoc -> SDoc
-showWithLoc loc doc 
-    = hang doc 2 (char '\t' <> comment <+> pprDefnLoc loc)
-		-- The tab tries to make them line up a bit
-  where
-    comment = ptext SLIT("--")
-
-
--- Now there is rather a lot of goop just to print declarations in a
--- civilised way with "..." for the parts we are less interested in.
-
-showDecl :: Bool -> (OccName -> Bool) -> IfaceDecl -> SDoc
-showDecl exts want_name (IfaceForeign {ifName = tc})
-  = ppr tc <+> ptext SLIT("is a foreign type")
-
-showDecl exts want_name (IfaceId {ifName = var, ifType = ty})
-  = ppr var <+> dcolon <+> showIfaceType exts ty 
-
-showDecl exts want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
-  = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
-       2 (equals <+> ppr mono_ty)
-
-showDecl exts want_name (IfaceData {ifName = tycon, 
-		     ifTyVars = tyvars, ifCons = condecls, ifCtxt = context})
-  = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       2 (add_bars (ppr_trim show_con cs))
-  where
-    show_con (IfVanillaCon { ifConOcc = con_name, ifConInfix = is_infix, ifConArgTys = tys, 
-			     ifConStricts = strs, ifConFields = flds})
-	| want_name tycon || want_name con_name || any want_name flds
-	= Just (show_guts con_name is_infix tys_w_strs flds)
-	| otherwise = Nothing
-	where
-	  tys_w_strs = tys `zip` (strs ++ repeat NotMarkedStrict)
-    show_con (IfGadtCon { ifConOcc = con_name, ifConTyVars = tvs, ifConCtxt = theta, 
-			  ifConArgTys = arg_tys, ifConResTys = res_tys, ifConStricts = strs })
-	| want_name tycon || want_name con_name
-	= Just (ppr_bndr con_name <+> colon <+> pprIfaceForAllPart tvs theta pp_tau)
-	| otherwise = Nothing
-	where
-	  tys_w_strs = arg_tys `zip` (strs ++ repeat NotMarkedStrict)
-	  pp_tau = foldr add pp_res_ty tys_w_strs
-	  pp_res_ty = ppr_bndr tycon <+> hsep (map pprParendIfaceType res_tys)
-	  add bty pp_ty = ppr_bangty bty <+> arrow <+> pp_ty
-
-    show_guts con True [ty1, ty2] flds = sep [ppr_bangty ty1, ppr con, ppr_bangty ty2]
-    show_guts con _ tys []   = ppr_bndr con <+> sep (map ppr_bangty tys)
-    show_guts con _ tys flds 
-	= ppr_bndr con <+> braces (sep (punctuate comma (ppr_trim show_fld (tys `zip` flds))))
-	where
-	  show_fld (bty, fld) | want_name tycon || want_name con || want_name fld
-			      = Just (ppr_bndr fld <+> dcolon <+> ppr_bangty bty)
-			      | otherwise = Nothing
-
-    (pp_nd, cs) = case condecls of
-		    IfAbstractTyCon 	   -> (ptext SLIT("data"),   [])
-		    IfDataTyCon cs         -> (ptext SLIT("data"),   cs)
-		    IfNewTyCon c    	   -> (ptext SLIT("newtype"),[c])
-
-    add_bars []      = empty
-    add_bars [c]     = equals <+> c
-    add_bars (c:cs)  = equals <+> sep (c : map (char '|' <+>) cs)
-
-    ppr_bangty (ty, str) = ppr_str str <> pprParendIfaceType ty
-    ppr_str MarkedStrict    = char '!'
-    ppr_str MarkedUnboxed   = ptext SLIT("!!")
-    ppr_str NotMarkedStrict = empty
-
-showDecl exts want_name (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
-		      ifFDs = fds, ifSigs = sigs})
-  = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars
-		<+> pprFundeps fds <+> opt_where)
-       2 (vcat (ppr_trim show_op sigs))
-  where
-    opt_where | null sigs = empty
-	      | otherwise = ptext SLIT("where")
-    show_op (IfaceClassOp op dm ty) 
-	| want_name clas || want_name op 
-	= Just (ppr_bndr op <+> dcolon <+> showIfaceType exts ty)
-	| otherwise
-	= Nothing
-
-showIfaceType :: Bool -> IfaceType -> SDoc
-showIfaceType True  ty = pprIfaceType ty -- -fglasgow-exts: print with the foralls
-showIfaceType False ty = ppr ty	    -- otherwise, print without the foralls
-
-ppr_trim :: (a -> Maybe SDoc) -> [a] -> [SDoc]
-ppr_trim show xs
-  = snd (foldr go (False, []) xs)
-  where
-    go x (eliding, so_far)
-	| Just doc <- show x = (False, doc : so_far)
-	| otherwise = if eliding then (True, so_far)
-		                 else (True, ptext SLIT("...") : so_far)
-
-ppr_bndr :: OccName -> SDoc
--- Wrap operators in ()
-ppr_bndr occ = parenSymOcc occ (ppr occ)
-
+	| fix == GHC.defaultFixity = empty
+	| otherwise		   = ppr fix <+> ppr (GHC.getName thing)
 
 -----------------------------------------------------------------------------
 -- Commands
@@ -974,16 +872,29 @@ browseModule m exports_only = do
   (as,bs) <- io (GHC.getContext s)
   io (if exports_only then GHC.setContext s [] [prelude_mod,modl]
 		      else GHC.setContext s [modl] [])
+  unqual <- io (GHC.getPrintUnqual s)
   io (GHC.setContext s as bs)
 
-  things <- io (GHC.browseModule s modl exports_only)
-  unqual <- io (GHC.getPrintUnqual s)
+  mb_mod_info <- io $ GHC.getModuleInfo s modl
+  case mb_mod_info of
+    Nothing -> throwDyn (CmdLineError ("unknown module: " ++ m))
+    Just mod_info -> do
+        let names
+	       | exports_only = GHC.modInfoExports mod_info
+	       | otherwise    = fromMaybe [] (GHC.modInfoTopLevelScope mod_info)
 
-  dflags <- getDynFlags
-  let exts = dopt Opt_GlasgowExts dflags
-  io (putStrLn (showSDocForUser unqual (
-   	 vcat (map (showDecl exts (const True)) things)
-      )))
+	    filtered = filterOutChildren names
+	
+        things <- io $ mapM (GHC.lookupName s) filtered
+
+        dflags <- getDynFlags
+	let exts = dopt Opt_GlasgowExts dflags
+	io (putStrLn (showSDocForUser unqual (
+		vcat (map (pprTyThing exts) (catMaybes things))
+	   )))
+	-- ToDo: modInfoInstances currently throws an exception for
+	-- package modules.  When it works, we can do this:
+	--	$$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
 
 -----------------------------------------------------------------------------
 -- Setting the module context

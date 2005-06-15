@@ -12,7 +12,6 @@ module HscMain (
 	hscParseIdentifier,
 #ifdef GHCI
 	hscStmt, hscTcExpr, hscKcType,
-	hscGetInfo, GetInfoResult,
 	compileExpr,
 #endif
 	) where
@@ -28,7 +27,7 @@ import Linker		( HValue, linkExpr )
 import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
-import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, GetInfoResult, tcRnType ) 
+import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnType ) 
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import Kind		( Kind )
@@ -711,34 +710,6 @@ hscParseThing parser dflags str
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing);
       return (Just thing)
       }}
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Getting information about an identifer}
-%*									*
-%************************************************************************
-
-\begin{code}
-#ifdef GHCI
-hscGetInfo -- like hscStmt, but deals with a single identifier
-  :: HscEnv
-  -> String			-- The identifier
-  -> IO [GetInfoResult]
-
-hscGetInfo hsc_env str
-   = do maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
-	case maybe_rdr_name of {
-	  Nothing -> return [];
-	  Just (L _ rdr_name) -> do
-
-	maybe_tc_result <- tcRnGetInfo hsc_env (hsc_IC hsc_env) rdr_name
-
-	case maybe_tc_result of
-	     Nothing     -> return []
-	     Just things -> return things
- 	}
-#endif
 \end{code}
 
 %************************************************************************

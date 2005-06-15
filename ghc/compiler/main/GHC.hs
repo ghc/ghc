@@ -65,13 +65,12 @@ module GHC (
 	setContext, getContext,	
 	getNamesInScope,
 	moduleIsInterpreted,
-	getInfo, GetInfoResult,
+	getInfo,
 	exprType,
 	typeKind,
 	parseName,
 	RunResult(..),
 	runStmt,
-	browseModule,
 	showModule,
 	compileExpr, HValue,
 	lookupName,
@@ -83,40 +82,62 @@ module GHC (
 	Module, mkModule, pprModule,
 
 	-- ** Names
-	Name, nameModule,
+	Name, 
+	nameModule, nameParent_maybe, pprParenSymName, nameSrcLoc,
+	NamedThing(..),
 	
 	-- ** Identifiers
 	Id, idType,
 	isImplicitId, isDeadBinder,
 	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector,
-	isPrimOpId, isFCallId,
+	isPrimOpId, isFCallId, isClassOpId_maybe,
 	isDataConWorkId, idDataCon,
 	isBottomingId, isDictonaryId,
+	recordSelectorFieldLabel,
 
 	-- ** Type constructors
 	TyCon, 
+	tyConTyVars, tyConDataCons,
 	isClassTyCon, isSynTyCon, isNewTyCon,
+	getSynTyConDefn,
 
 	-- ** Data constructors
 	DataCon,
+	dataConSig, dataConType, dataConTyCon, dataConFieldLabels,
+	dataConIsInfix, isVanillaDataCon,
+	dataConStrictMarks,  
+	StrictnessMark(..), isMarkedStrict,
 
 	-- ** Classes
 	Class, 
-	classSCTheta, classTvsFds,
+	classMethods, classSCTheta, classTvsFds,
+	pprFundeps,
 
 	-- ** Instances
-	Instance,
+	Instance, 
+	instanceDFunId, pprInstance,
 
 	-- ** Types and Kinds
-	Type, dropForAlls,
+	Type, dropForAlls, splitForAllTys, funResultTy, pprParendType,
 	Kind,
+	PredType,
+	ThetaType, pprThetaArrow,
 
 	-- ** Entities
 	TyThing(..), 
 
 	-- ** Syntax
 	module HsSyn, -- ToDo: remove extraneous bits
+
+	-- ** Fixities
+	FixityDirection(..), 
+	defaultFixity, maxPrecedence, 
+	negateFixity,
+	compareFixity,
+
+	-- ** Source locations
+	SrcLoc, pprDefnLoc,
 
 	-- * Exceptions
 	GhcException(..), showGhcException,
@@ -129,8 +150,7 @@ module GHC (
 {-
  ToDo:
 
-  * inline bits of HscMain here to simplify layering: hscGetInfo,
-    hscTcExpr, hscStmt.
+  * inline bits of HscMain here to simplify layering: hscTcExpr, hscStmt.
   * we need to expose DynFlags, so should parseDynamicFlags really be
     part of this interface?
   * what StaticFlags should we expose, if any?
@@ -141,17 +161,15 @@ module GHC (
 #ifdef GHCI
 import qualified Linker
 import Linker		( HValue, extendLinkEnv )
-import TcRnDriver	( getModuleContents, tcRnLookupRdrName,
-			  getModuleExports )
+import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
+			  tcRnLookupName, getModuleExports )
 import RdrName		( plusGlobalRdrEnv, Provenance(..), 
 			  ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
 			  emptyGlobalRdrEnv, mkGlobalRdrEnv )
-import HscMain		( hscGetInfo, GetInfoResult, hscParseIdentifier,
-			  hscStmt, hscTcExpr, hscKcType )
+import HscMain		( hscParseIdentifier, hscStmt, hscTcExpr, hscKcType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
-import IfaceSyn		( IfaceDecl )
 #endif
 
 import Packages		( initPackages, isHomeModule )
@@ -159,19 +177,27 @@ import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, 
 			  globalRdrEnvElts )
 import HsSyn
-import Type		( Kind, Type, dropForAlls )
+import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
+			  pprThetaArrow, pprParendType, splitForAllTys,
+			  funResultTy )
 import Id		( Id, idType, isImplicitId, isDeadBinder,
                           isSpecPragmaId, isExportedId, isLocalId, isGlobalId,
-                          isRecordSelector,
-                          isPrimOpId, isFCallId,
+                          isRecordSelector, recordSelectorFieldLabel,
+                          isPrimOpId, isFCallId, isClassOpId_maybe,
                           isDataConWorkId, idDataCon,
                           isBottomingId )
-import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon )
-import Class		( Class, classSCTheta, classTvsFds )
-import DataCon		( DataCon )
-import Name		( Name, nameModule )
+import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon,
+			  tyConTyVars, tyConDataCons, getSynTyConDefn )
+import Class		( Class, classSCTheta, classTvsFds, classMethods )
+import FunDeps		( pprFundeps )
+import DataCon		( DataCon, dataConWrapId, dataConSig, dataConTyCon,
+			  dataConFieldLabels, dataConStrictMarks, 
+			  dataConIsInfix, isVanillaDataCon )
+import Name		( Name, nameModule, NamedThing(..), nameParent_maybe,
+			  nameSrcLoc )
+import OccName		( parenSymOcc )
 import NameEnv		( nameEnvElts )
-import InstEnv		( Instance )
+import InstEnv		( Instance, instanceDFunId, pprInstance )
 import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
@@ -195,7 +221,7 @@ import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
 import SysTools		( cleanTempFilesExcept )
-import BasicTypes	( SuccessFlag(..), succeeded, failed )
+import BasicTypes
 import TcType           ( tcSplitSigmaTy, isDictTy )
 import FastString	( mkFastString )
 
@@ -1794,9 +1820,8 @@ moduleIsInterpreted s modl = withSession s $ \h ->
       _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
-{-# DEPRECATED getInfo "we should be using parseName/lookupName instead" #-}
-getInfo :: Session -> String -> IO [GetInfoResult]
-getInfo s id = withSession s $ \hsc_env -> hscGetInfo hsc_env id
+getInfo :: Session -> Name -> IO (Maybe (TyThing,Fixity,[Instance]))
+getInfo s name = withSession s $ \hsc_env -> tcRnGetInfo hsc_env name
 
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: Session -> IO [Name]
@@ -1820,12 +1845,17 @@ parseName s str = withSession s $ \hsc_env -> do
 -- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
 -- entity known to GHC, including 'Name's defined using 'runStmt'.
 lookupName :: Session -> Name -> IO (Maybe TyThing)
-lookupName s name = withSession s $ \hsc_env -> do
-  case lookupTypeEnv (ic_type_env (hsc_IC hsc_env)) name of
-	Just tt -> return (Just tt)
-	Nothing -> do
-	    eps <- readIORef (hsc_EPS hsc_env)
-	    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
+lookupName s name = withSession s $ \hsc_env -> tcRnLookupName hsc_env name
+
+-- -----------------------------------------------------------------------------
+-- Misc exported utils
+
+dataConType :: DataCon -> Type
+dataConType dc = idType (dataConWrapId dc)
+
+-- | print a 'NamedThing', adding parentheses if the name is an operator.
+pprParenSymName :: NamedThing a => a -> SDoc
+pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression
@@ -1947,18 +1977,6 @@ foreign import "rts_evalStableIO"  {- safe -}
   rts_evalStableIO :: StablePtr (IO a) -> Ptr (StablePtr a) -> IO CInt
   -- more informative than the C type!
 -}
-
--- ---------------------------------------------------------------------------
--- cmBrowseModule: get all the TyThings defined in a module
-
-{-# DEPRECATED browseModule "we should be using getModuleInfo instead" #-}
-browseModule :: Session -> Module -> Bool -> IO [IfaceDecl]
-browseModule s modl exports_only = withSession s $ \hsc_env -> do
-  mb_decls <- getModuleContents hsc_env modl exports_only
-  case mb_decls of
-	Nothing -> return []		-- An error of some kind
-	Just ds -> return ds
-
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames

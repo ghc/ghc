@@ -80,6 +80,58 @@ The algorithm is roughly:
 
 -}
 
+{-
+Possible plan for x86 floating pt register alloc:
+
+  - The standard reg alloc procedure allocates pretend floating point
+    registers to the GXXX instructions.  We need to convert these GXXX
+    instructions to proper x86 FXXX instructions, using the FP stack for
+    registers.
+
+    We could do this in a separate pass, but it helps to have the
+    information about which real registers are live after the
+    instruction, so we do it at reg alloc time where that information
+    is already available.
+
+  - keep a mapping from %fakeN to FP stack slot in the monad.
+
+  - after assigning registers to the GXXX instruction, convert the
+    instruction to an FXXX instruction.  eg. 
+	- for GMOV just update the mapping, and ffree any dead regs.
+	- GLD:  just fld and update mapping
+	  GLDZ: just fldz and update mapping
+	  GLD1: just fld1 and update mapping
+	- GST: just fst and update mapping, ffree dead regs.
+	   - special case for GST reg, where reg is st(0), we can fstp.
+	- for GADD fp1, fp2, fp3:
+	  - easy way: fld fp2
+		      fld fp1
+		      faddp
+		      -- record that fp3 is now in %st(0), and all other
+		      -- slots are pushed down one.
+		      ffree fp1 -- if fp1 is dead now
+		      ffree fp2 -- if fp2 is dead now
+	  - optimisation #1
+	    - if fp1 is in %st(0) and is dead afterward
+		fadd %st(0), fp2
+		-- record fp3 is in %st(0)
+		ffree fp2 -- if fp2 is dead now
+	    - if fp2 is in %st(0) and is dead afterward
+		fadd %st(0), fp1
+		-- record fp3 is in %st(0)
+	    - if fp1 is in %st(0), fp2 is dead afterward
+		fadd fp2, %st(0)
+		-- record fp3 is in fp2's locn
+	    - if fp2 is in %st(0), fp1 is dead afterward
+		fadd fp1, %st(0)
+		-- record fp3 is in fp1's locn
+
+  - we should be able to avoid the nasty ffree problems of the current
+    scheme.  The stack should be empty before doing a non-local
+    jump/call - we can assert that this is the case.
+-}
+
+
 module RegisterAlloc (
   	regAlloc
   ) where

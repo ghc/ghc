@@ -155,7 +155,7 @@ pprInstance :: Instance -> SDoc
 pprInstance ispec@(Instance { is_flag = flag })
   = hang (ptext SLIT("instance") <+> ppr flag
 	  <+> sep [pprThetaArrow theta, pprClassPred clas tys])
-	2 (parens (pprDefnLoc (getSrcLoc ispec)))
+	2 (ptext SLIT("--") <+> (pprDefnLoc (getSrcLoc ispec)))
   where
     (_, theta, clas, tys) = instanceHead ispec
 	-- Print without the for-all, which the programmer doesn't write

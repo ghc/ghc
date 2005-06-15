@@ -9,7 +9,7 @@ module Class (
 	DefMeth (..),
 
 	mkClass, classTyVars, classArity,
-	classKey, className, classSelIds, classTyCon,
+	classKey, className, classSelIds, classTyCon, classMethods,
 	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
@@ -100,8 +100,13 @@ classArity :: Class -> Arity
 classArity clas = length (classTyVars clas)
 	-- Could memoise this
 
-classSelIds (Class {classSCSels = sc_sels, classOpStuff = op_stuff})
-  = sc_sels ++ [op_sel | (op_sel, _) <- op_stuff]
+classSelIds :: Class -> [Id]
+classSelIds c@(Class {classSCSels = sc_sels})
+  = sc_sels ++ classMethods c
+
+classMethods :: Class -> [Id]
+classMethods (Class {classOpStuff = op_stuff})
+  = [op_sel | (op_sel, _) <- op_stuff]
 
 classTvsFds c
   = (classTyVars c, classFunDeps c)
