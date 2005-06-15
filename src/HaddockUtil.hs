@@ -208,9 +208,10 @@ parseModuleHeader str0 =
       (descriptionOpt,str2) = getKey "Description" str1
       (copyrightOpt,str3) = getKey "Copyright" str2
       (licenseOpt,str4) = getKey "License" str3
-      (maintainerOpt,str5) = getKey "Maintainer" str4
-      (stabilityOpt,str6) = getKey "Stability" str5
-      (portabilityOpt,str7) = getKey "Portability" str6
+      (licenceOpt,str5) = getKey "Licence" str4
+      (maintainerOpt,str6) = getKey "Maintainer" str5
+      (stabilityOpt,str7) = getKey "Stability" str6
+      (portabilityOpt,str8) = getKey "Portability" str7
 
       description1 :: Either String (Maybe Doc)
       description1 = case descriptionOpt of
