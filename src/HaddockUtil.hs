@@ -222,7 +222,7 @@ parseModuleHeader str0 =
    in
       case description1 of
          Left mess -> Left mess
-         Right docOpt -> Right (str7,ModuleInfo {
+         Right docOpt -> Right (str8,ModuleInfo {
             description = docOpt,
             portability = portabilityOpt,
             stability = stabilityOpt,
