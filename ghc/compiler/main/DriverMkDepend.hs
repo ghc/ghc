@@ -71,7 +71,7 @@ doMkDependHS session srcs
 		
 		-- Prcess them one by one, dumping results into makefile
 		-- and complaining about cycles
-	; mapM (processDeps session (mkd_tmp_hdl files)) sorted
+	; mapM (processDeps session excl_mods (mkd_tmp_hdl files)) sorted
 
 		-- Tidy up
 	; endMkDependHS dflags files }
@@ -150,6 +150,7 @@ beginMkDependHS dflags = do
 -----------------------------------------------------------------
 
 processDeps :: Session
+	    -> [Module]
 	    -> Handle		-- Write dependencies to here
 	    -> SCC ModSummary
 	    -> IO ()
@@ -168,11 +169,11 @@ processDeps :: Session
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps session hdl (CyclicSCC nodes)
+processDeps session excl_mods hdl (CyclicSCC nodes)
   =	-- There shouldn't be any cycles; report them	
     throwDyn (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
 
-processDeps session hdl (AcyclicSCC node)
+processDeps session excl_mods hdl (AcyclicSCC node)
   = do	{ extra_suffixes   <- readIORef v_Dep_suffixes
 	; hsc_env <- GHC.sessionHscEnv session
 	; include_pkg_deps <- readIORef v_Dep_include_pkg_deps
@@ -200,8 +201,14 @@ processDeps session hdl (AcyclicSCC node)
 	; writeDependency hdl obj_files src_file
 
 		-- Emit a dependency for each import
-	; mapM_ (do_imp True . unLoc)  (ms_srcimps node)	-- SOURCE imports
-	; mapM_ (do_imp False . unLoc) (ms_imps node)		-- regular imports
+
+	-- SOURCE imports
+	; mapM_ (do_imp True)  
+		(filter (`notElem` excl_mods) (map unLoc (ms_srcimps node)))
+
+	-- regular imports
+	; mapM_ (do_imp False)
+		(filter (`notElem` excl_mods) (map unLoc (ms_imps node)))
 	}
 
 
