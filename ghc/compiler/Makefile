@@ -649,30 +649,9 @@ primop-usage.hs-incl: prelude/primops.txt
 
 # Include libghccompat in stage1 only.  In stage2 onwards, all these
 # libraries will be available from the main libraries.
+
 ifeq "$(stage)" "1"
-SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
-SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
-
-ifeq "$(Windows)" "YES"
-# not very nice, but required for -lghccompat on Windows
-SRC_LD_OPTS += -lshell32
-endif
-
-# This is horrible.  We ought to be able to omit the entire directory
-# from mkDependHS.
-SRC_MKDEPENDHS_OPTS += \
-	-optdep--exclude-module=Compat.RawSystem \
-	-optdep--exclude-module=Compat.Directory \
-	-optdep--exclude-module=Distribution.Compat.ReadP \
-	-optdep--exclude-module=Distribution.Extension \
-	-optdep--exclude-module=Distribution.GetOpt \
-	-optdep--exclude-module=Distribution.InstalledPackageInfo \
-	-optdep--exclude-module=Distribution.License \
-	-optdep--exclude-module=Distribution.Package \
-	-optdep--exclude-module=Distribution.ParseUtils \
-	-optdep--exclude-module=Distribution.Setup \
-	-optdep--exclude-module=Distribution.Version \
-	-optdep--exclude-module=System.Directory.Internals
+include $(GHC_LIB_COMPAT_DIR)/compat.mk
 endif
 
 SRC_LD_OPTS += -no-link-chk
