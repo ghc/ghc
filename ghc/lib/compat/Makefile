@@ -52,6 +52,18 @@ EXCLUDED_SRCS += \
 	Distribution/ParseUtils.hs \
 	Distribution/Compiler.hs \
 	Distribution/Version.hs
+
+SRC_MKDEPENDHS_OPTS += \
+	-optdep--exclude-module=System.Directory.Internals \
+	-optdep--exclude-module=Distribution.Compat.ReadP \
+	-optdep--exclude-module=Distribution.Extension \
+	-optdep--exclude-module=Distribution.GetOpt \
+	-optdep--exclude-module=Distribution.InstalledPackageInfo \
+	-optdep--exclude-module=Distribution.License \
+	-optdep--exclude-module=Distribution.Package \
+	-optdep--exclude-module=Distribution.ParseUtils \
+	-optdep--exclude-module=Distribution.Compiler \
+	-optdep--exclude-module=Distribution.Version
 endif
 
 # Some explicit dependencies
