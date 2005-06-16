@@ -703,6 +703,22 @@ type ParsedSource      = Located (HsModule RdrName)
 type RenamedSource     = HsGroup Name
 type TypecheckedSource = LHsBinds Id
 
+-- NOTE:
+--   - things that aren't in the output of the renamer:
+--     - the export list
+--     - the imports
+--   - things that aren't in the output of the typechecker right now:
+--     - the export list
+--     - the imports
+--     - type signatures
+--     - type/data/newtype declarations
+--     - class declarations
+--     - instances
+--   - extra things in the typechecker's output:
+--     - default methods are turned into top-level decls.
+--     - dictionary bindings
+
+
 -- | This is the way to get access to parsed and typechecked source code
 -- for a module.  'checkModule' loads all the dependencies of the specified
 -- module in the Session, and then attempts to typecheck the module.  If
@@ -1682,36 +1698,22 @@ lookupGlobalName s name = withSession s $ \hsc_env -> do
    eps <- readIORef (hsc_EPS hsc_env)
    return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
 
+-- -----------------------------------------------------------------------------
+-- Misc exported utils
+
+dataConType :: DataCon -> Type
+dataConType dc = idType (dataConWrapId dc)
+
+-- | print a 'NamedThing', adding parentheses if the name is an operator.
+pprParenSymName :: NamedThing a => a -> SDoc
+pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
+
+-- ----------------------------------------------------------------------------
+
 #if 0
-
-data ObjectCode
-  = ByteCode
-  | BinaryCode FilePath
-
--- ToDo: typechecks abstract syntax or renamed abstract syntax.  Issues:
---   - typechecked syntax includes extra dictionary translation and
---     AbsBinds which need to be translated back into something closer to
---     the original source.
 
 -- ToDo:
 --   - Data and Typeable instances for HsSyn.
-
--- ToDo:
---   - things that aren't in the output of the renamer:
---     - the export list
---     - the imports
-
--- ToDo:
---   - things that aren't in the output of the typechecker right now:
---     - the export list
---     - the imports
---     - type signatures
---     - type/data/newtype declarations
---     - class declarations
---     - instances
---   - extra things in the typechecker's output:
---     - default methods are turned into top-level decls.
---     - dictionary bindings
 
 -- ToDo: check for small transformations that happen to the syntax in
 -- the typechecker (eg. -e ==> negate e, perhaps for fromIntegral)
@@ -1846,16 +1848,6 @@ parseName s str = withSession s $ \hsc_env -> do
 -- entity known to GHC, including 'Name's defined using 'runStmt'.
 lookupName :: Session -> Name -> IO (Maybe TyThing)
 lookupName s name = withSession s $ \hsc_env -> tcRnLookupName hsc_env name
-
--- -----------------------------------------------------------------------------
--- Misc exported utils
-
-dataConType :: DataCon -> Type
-dataConType dc = idType (dataConWrapId dc)
-
--- | print a 'NamedThing', adding parentheses if the name is an operator.
-pprParenSymName :: NamedThing a => a -> SDoc
-pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression
