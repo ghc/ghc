@@ -50,7 +50,7 @@ EXCLUDED_SRCS += \
 	Distribution/License.hs \
 	Distribution/Package.hs \
 	Distribution/ParseUtils.hs \
-	Distribution/Setup.hs \
+	Distribution/Compiler.hs \
 	Distribution/Version.hs
 endif
 
@@ -63,7 +63,7 @@ Distribution/InstalledPackageInfo.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Dis
 Distribution/License.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/License.hs
 Distribution/Package.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Package.hs
 Distribution/ParseUtils.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/ParseUtils.hs
-Distribution/Setup.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Setup.hs
+Distribution/Compiler.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compiler.hs
 Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Version.hs
 
 # Make the #includes in the stubs independent of the current location
