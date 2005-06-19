@@ -169,6 +169,7 @@ exposed-modules:
 	PprCore
 	PprExternalCore
 	PprMach
+	PprTyThing
 	PrelInfo
 	PrelNames
 	PrelRules
