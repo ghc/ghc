@@ -11,6 +11,7 @@ module PprTyThing (
 	pprTyThingInContext,
 	pprTyThingLoc,
 	pprTyThingInContextLoc,
+	pprTyThingHdr
   ) where
 
 #include "HsVersions.h"
@@ -53,6 +54,15 @@ pprTyThingInContext exts (AnId id)          = pprIdInContext exts id
 pprTyThingInContext exts (ADataCon dataCon) = pprDataCon exts dataCon
 pprTyThingInContext exts (ATyCon tyCon)     = pprTyCon   exts tyCon
 pprTyThingInContext exts (AClass cls)       = pprClass   exts cls
+
+-- | Pretty-prints the 'TyThing' header. For functions and data constructors
+-- the function is equivalent to 'pprTyThing' but for type constructors
+-- and classes it prints only the header part of the declaration.
+pprTyThingHdr :: Bool -> TyThing -> SDoc
+pprTyThingHdr exts (AnId id)          = pprId         exts id
+pprTyThingHdr exts (ADataCon dataCon) = pprDataConSig exts dataCon
+pprTyThingHdr exts (ATyCon tyCon)     = pprTyConHdr   exts tyCon
+pprTyThingHdr exts (AClass cls)       = pprClassHdr   exts cls
         
 pprTyConHdr exts tyCon =
   ptext keyword <+> ppr_bndr tyCon <+> hsep (map ppr vars)
