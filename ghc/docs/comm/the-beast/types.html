@@ -90,7 +90,7 @@ data TyNote
 
     <h2>Newtypes</h2>
     <p>
-      Data types declared by a <code>newtype</code> declarationx constitute new
+      Data types declared by a <code>newtype</code> declarations constitute new
       type constructors---i.e., they are not just type macros, but introduce
       new type names.  However, provided that a newtype is not recursive, we
       still want to implement it by its representation type.  GHC realises this
@@ -134,16 +134,17 @@ data PredType
       distinguishes between function type constructors (variant
       <code>FunTyCon</code>) and algebraic type constructors (variant
       <code>AlgTyCon</code>), which arise from data and newtype declarations.
-      The variant <code>AlgTyCon</code> contains all the information contained
+      The variant <code>AlgTyCon</code> contains all the information available
       from the data/newtype declaration as well as derived information, such
       as the <code>Unique</code> and argument variance information.  This
       includes a field <code>algTcRhs :: AlgTyConRhs</code>, where
       <code>AlgTyConRhs</code> distinguishes three kinds of algebraic data
       type declarations: (1) declarations that have been exported abstractly,
       (2) <code>data</code> declarations, and (3) <code>newtype</code>
-      declarations.  The last of these both include their original right hand
-      side as well as the "ultimate" representation type, which is the right
-      hand side after expanding all type synonyms and non-recursive newtypes.
+      declarations.  The last two both include their original right hand side;
+      in addition, the third variant also caches the "ultimate" representation
+      type, which is the right hand side after expanding all type synonyms and
+      non-recursive newtypes.
     </p>
     <p>
       Both data and newtype declarations refer to their data constructors
@@ -164,13 +165,14 @@ data PredType
       <code>InstEnv.Instance</code>, which in interface files are represented
       as <code>IfaceSyn.IfaceInst</code>.  Moreover, the type
       <code>InstEnv.InstEnv</code>, which is a synonym for <code>UniqFM
-      ClsInstEnv</code>, provides a mapping of classes to their instances -
-      <code>ClsInstEnv</code> is essentially a list of instance declarations.
+      ClsInstEnv</code>, provides a mapping of classes to their
+      instances---<code>ClsInstEnv</code> is essentially a list of instance
+      declarations.
     </p>
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Tue May 24 14:44:18 EST 2005
+Last modified: Sun Jun 19 13:07:22 EST 2005
 <!-- hhmts end -->
     </small></p>
   </body>
