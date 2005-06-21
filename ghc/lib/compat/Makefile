@@ -6,6 +6,7 @@ ALL_DIRS = \
 	Compat \
 	Distribution \
 	Distribution/Compat \
+	Language/Haskell \
 	System \
 	System/Directory \
 	cbits
@@ -44,32 +45,31 @@ ifeq "$(ghc_ge_603)" "YES"
 EXCLUDED_SRCS += \
 	System/Directory/Internals.hs \
 	Distribution/Compat/ReadP.hs \
-	Distribution/Extension.hs \
 	Distribution/GetOpt.hs \
 	Distribution/InstalledPackageInfo.hs \
 	Distribution/License.hs \
 	Distribution/Package.hs \
 	Distribution/ParseUtils.hs \
 	Distribution/Compiler.hs \
-	Distribution/Version.hs
+	Distribution/Version.hs \
+	Language/Haskell/Extension.hs
 
 SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=System.Directory.Internals \
 	-optdep--exclude-module=Distribution.Compat.ReadP \
-	-optdep--exclude-module=Distribution.Extension \
 	-optdep--exclude-module=Distribution.GetOpt \
 	-optdep--exclude-module=Distribution.InstalledPackageInfo \
 	-optdep--exclude-module=Distribution.License \
 	-optdep--exclude-module=Distribution.Package \
 	-optdep--exclude-module=Distribution.ParseUtils \
 	-optdep--exclude-module=Distribution.Compiler \
-	-optdep--exclude-module=Distribution.Version
+	-optdep--exclude-module=Distribution.Version \
+	-optdep--exclude-module=Language.Haskell.Extension
 endif
 
 # Some explicit dependencies
 System/Directory/Internals.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/Directory/Internals.hs
 Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
-Distribution/Extension.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Extension.hs
 Distribution/GetOpt.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/GetOpt.hs
 Distribution/InstalledPackageInfo.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/InstalledPackageInfo.hs
 Distribution/License.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/License.hs
@@ -77,6 +77,7 @@ Distribution/Package.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Pac
 Distribution/ParseUtils.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/ParseUtils.hs
 Distribution/Compiler.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compiler.hs
 Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Version.hs
+Language/Haskell/Extension.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Language/Haskell/Extension.hs
 
 # Make the #includes in the stubs independent of the current location
 SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
