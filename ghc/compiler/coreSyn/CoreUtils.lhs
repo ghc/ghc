@@ -46,8 +46,7 @@ import Var		( Var )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName )
-import Packages		( isDllName )
-import DynFlags	( DynFlags )
+import Packages		( isDllName, HomeModules )
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
@@ -1159,7 +1158,7 @@ If this happens we simply make the RHS into an updatable thunk,
 and 'exectute' it rather than allocating it statically.
 
 \begin{code}
-rhsIsStatic :: DynFlags -> CoreExpr -> Bool
+rhsIsStatic :: HomeModules -> CoreExpr -> Bool
 -- This function is called only on *top-level* right-hand sides
 -- Returns True if the RHS can be allocated statically, with
 -- no thunks involved at all.
@@ -1220,7 +1219,7 @@ rhsIsStatic :: DynFlags -> CoreExpr -> Bool
 -- When opt_RuntimeTypes is on, we keep type lambdas and treat
 -- them as making the RHS re-entrant (non-updatable).
 
-rhsIsStatic dflags rhs = is_static False rhs
+rhsIsStatic hmods rhs = is_static False rhs
   where
   is_static :: Bool	-- True <=> in a constructor argument; must be atomic
   	  -> CoreExpr -> Bool
@@ -1247,7 +1246,7 @@ rhsIsStatic dflags rhs = is_static False rhs
    where
     go (Var f) n_val_args
 #if mingw32_TARGET_OS
-        | not (isDllName dflags (idName f))
+        | not (isDllName hmods (idName f))
 #endif
 	=  saturated_data_con f n_val_args
 	|| (in_arg && n_val_args == 0)	

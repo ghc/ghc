@@ -568,13 +568,13 @@ myParseModule dflags src_filename maybe_src_buf
       }}
 
 
-myCoreToStg dflags pkg_deps this_mod prepd_binds
+myCoreToStg dflags home_mods this_mod prepd_binds
  = do 
       stg_binds <- {-# SCC "Core2Stg" #-}
-	     coreToStg dflags prepd_binds
+	     coreToStg home_mods prepd_binds
 
       (stg_binds2, cost_centre_info) <- {-# SCC "Core2Stg" #-}
-	     stg2stg dflags pkg_deps this_mod stg_binds
+	     stg2stg dflags home_mods this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
 \end{code}

@@ -32,7 +32,7 @@ import Maybes		( maybeToBool )
 import Name		( getOccName, isExternalName, nameOccName )
 import OccName		( occNameUserString, occNameFS )
 import BasicTypes       ( Arity )
-import DynFlags		( DynFlags )
+import Packages		( HomeModules )
 import StaticFlags	( opt_RuntimeTypes )
 import Outputable
 
@@ -140,10 +140,10 @@ for x, solely to put in the SRTs lower down.
 %************************************************************************
 
 \begin{code}
-coreToStg :: DynFlags -> [CoreBind] -> IO [StgBinding]
-coreToStg dflags pgm
+coreToStg :: HomeModules -> [CoreBind] -> IO [StgBinding]
+coreToStg hmods pgm
   = return pgm'
-  where (_, _, pgm') = coreTopBindsToStg dflags emptyVarEnv pgm
+  where (_, _, pgm') = coreTopBindsToStg hmods emptyVarEnv pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
 coreExprToStg expr 
@@ -151,35 +151,35 @@ coreExprToStg expr
 
 
 coreTopBindsToStg
-    :: DynFlags
+    :: HomeModules
     -> IdEnv HowBound		-- environment for the bindings
     -> [CoreBind]
     -> (IdEnv HowBound, FreeVarsInfo, [StgBinding])
 
-coreTopBindsToStg dflags env [] = (env, emptyFVInfo, [])
-coreTopBindsToStg dflags env (b:bs)
+coreTopBindsToStg hmods env [] = (env, emptyFVInfo, [])
+coreTopBindsToStg hmods env (b:bs)
   = (env2, fvs2, b':bs')
   where
 	-- env accumulates down the list of binds, fvs accumulates upwards
-	(env1, fvs2, b' ) = coreTopBindToStg dflags env fvs1 b
-  	(env2, fvs1, bs') = coreTopBindsToStg dflags env1 bs
+	(env1, fvs2, b' ) = coreTopBindToStg hmods env fvs1 b
+  	(env2, fvs1, bs') = coreTopBindsToStg hmods env1 bs
 
 
 coreTopBindToStg
-	:: DynFlags
+	:: HomeModules
 	-> IdEnv HowBound
 	-> FreeVarsInfo		-- Info about the body
 	-> CoreBind
 	-> (IdEnv HowBound, FreeVarsInfo, StgBinding)
 
-coreTopBindToStg dflags env body_fvs (NonRec id rhs)
+coreTopBindToStg hmods env body_fvs (NonRec id rhs)
   = let 
 	env' 	  = extendVarEnv env id how_bound
 	how_bound = LetBound TopLet (manifestArity rhs)
 
         (stg_rhs, fvs') = 
 	    initLne env (
-              coreToTopStgRhs dflags body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
+              coreToTopStgRhs hmods body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
 	      returnLne (stg_rhs, fvs')
            )
 	
@@ -190,7 +190,7 @@ coreTopBindToStg dflags env body_fvs (NonRec id rhs)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
-coreTopBindToStg dflags env body_fvs (Rec pairs)
+coreTopBindToStg hmods env body_fvs (Rec pairs)
   = let 
 	(binders, rhss) = unzip pairs
 
@@ -200,7 +200,7 @@ coreTopBindToStg dflags env body_fvs (Rec pairs)
 
         (stg_rhss, fvs')
 	  = initLne env' (
-	       mapAndUnzipLne (coreToTopStgRhs dflags body_fvs) pairs
+	       mapAndUnzipLne (coreToTopStgRhs hmods body_fvs) pairs
 						`thenLne` \ (stg_rhss, fvss') ->
 	       let fvs' = unionFVInfos fvss' in
 	       returnLne (stg_rhss, fvs')
@@ -232,18 +232,18 @@ consistentCafInfo id bind
 
 \begin{code}
 coreToTopStgRhs
-	:: DynFlags
+	:: HomeModules
 	-> FreeVarsInfo		-- Free var info for the scope of the binding
 	-> (Id,CoreExpr)
 	-> LneM (StgRhs, FreeVarsInfo)
 
-coreToTopStgRhs dflags scope_fv_info (bndr, rhs)
+coreToTopStgRhs hmods scope_fv_info (bndr, rhs)
   = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, _) ->
     freeVarsToLiveVars rhs_fvs	`thenLne` \ lv_info ->
     returnLne (mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
-    is_static = rhsIsStatic dflags rhs
+    is_static = rhsIsStatic hmods rhs
 
 mkTopStgRhs :: Bool -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
 	-> StgRhs
