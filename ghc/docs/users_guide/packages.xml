@@ -69,13 +69,9 @@ exposed-modules: Network.BSD,
 
     <para>In general, packages containing hierarchical modules are usually
       exposed by default.  However, it is possible for two packages to contain
-      the same module: in this case, only one of the packages can be
-      exposed.  This might happen if you have two versions of the same package
-      installed, for example.  The general rule is:</para>
-    
-    <blockquote><para>There must be no overlaps in the modules provided by all
-	of the exposed packages, and the packages they depend on, and so
-	on.</para></blockquote>
+      the same module: in this case, only one of the packages should be
+      exposed.  It is an error to import a module that belongs to more than one
+      exposed package.</para>
 
     <para>The GHC command line options that control packages are:</para>
 
@@ -169,33 +165,43 @@ exposed-modules: Network.BSD,
 	  </indexterm></term>
 	<listitem>
 	  <para>Causes the compiler to behave as if package
-	    <replaceable>P</replaceable> is not installed at all.  This is not
-	    the same as <option>-hide-package</option>, because under
-	    <option>-hide-package</option> the package might still be present
-	    in the program if another package depends on it.</para>
-	  
-	  <para><option>-ignore-package</option> <replaceable>P</replaceable>
-	    not only causes package <replaceable>P</replaceable> to be removed,
-	    but also everything that depends on <replaceable>P</replaceable>,
-	    and so on.</para>
+	    <replaceable>P</replaceable>, and any packages that depend on
+	    <literal>P</literal>, are not installed at all.</para>
 
-	  <para>Why do we need <option>-ignore-package</option>?  Well, it is
-	    particularly useful when you're actually compiling package
-	    <replaceable>P</replaceable> itself.  The compiler will refuse to
-	    compile module <replaceable>M</replaceable> if
-	    <replaceable>M</replaceable> is already part of a package.  So we
-	    might try <option>-hide-package</option>
-	    <replaceable>P</replaceable>; but then if
-	    <replaceable>P</replaceable> is a dependency of another package
-	    <replaceable>P'</replaceable> we would have to
-	    <option>-hide-package</option> <replaceable>P'</replaceable> too;
-	    and the author of the code can't know in advance which packages are
-	    installed on the system and hence which
-	    <option>-hide-package</option> flags are required.  So, we provide
-	    <option>-ignore-package</option> which does the Right Thing.</para>
+	  <para>Saying <literal>-ignore-package P</literal> is the same as
+	    giving <literal>-hide-package</literal> flags for
+	    <literal>P</literal> and all the packages that depend on
+	    <literal>P</literal>.  Sometimes we don't know ahead of time which
+	    packages will be installed that depend on <literal>P</literal>,
+	    which is when the <literal>-ignore-package</literal> flag can be
+	    useful.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
+  </sect2>
+
+  <sect2 id="package-overlaps">
+    <title>The module overlap restriction</title>
+
+    <para>The module names in a Haskell program must be distinct.
+      This doesn't sound like a severe restriction, but in a Haskell program
+      using multiple packages with interdependencies, difficulties can start to
+      arise.  You should be aware of what the module overlap
+      restriction means, and how to avoid it.</para>
+
+    <para>GHC knows which packages are <emphasis>in use</emphasis> by your
+      program: a package is in use if you imported something from it, or if it
+      is a dependency of some other package in use.  There must be no conflicts
+      between the packages in use; a conflict is when two packages contain
+      a module with the same name.  If
+      GHC detects a conflict, it will issue a message stating which packages
+      are in conflict, and which modules are overlapping.</para>
+
+    <para>For example, a conflict might arise if you use two packages, say P
+      and Q, which respectively depend on two different versions of another
+      package, say <literal>R-1.0</literal> and <literal>R-2.0</literal>.  The
+      two versions of <literal>R</literal> are likely to contain at least some
+      of the same modules, so this situation would be a conflict.</para>
   </sect2>
 
   <sect2 id="package-databases">
@@ -334,12 +340,6 @@ exposed-modules: Network.BSD,
           dependency information.  It does remember which modules in
           other packages the current module depends on, but not which
           things within those imported things.</para>
-      </listitem>
-
-      <listitem>
-	<para>When compiling a Haskell module which is to be part of a new package
-	  <replaceable>P</replaceable>, use
-	  <option>-ignore-package</option>&nbsp;<replaceable>P</replaceable>.</para>
       </listitem>
     </itemizedlist>
     
