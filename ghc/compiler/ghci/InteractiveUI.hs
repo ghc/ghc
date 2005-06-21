@@ -547,7 +547,7 @@ filterOutChildren names = filter (not . parent_is_there) names
 	 | otherwise		           = False
 
 pprInfo exts (thing, fixity, insts)
-  =  pprTyThingLoc exts thing 
+  =  pprTyThingInContextLoc exts thing 
   $$ show_fixity fixity
   $$ vcat (map GHC.pprInstance insts)
   where
@@ -890,7 +890,7 @@ browseModule m exports_only = do
         dflags <- getDynFlags
 	let exts = dopt Opt_GlasgowExts dflags
 	io (putStrLn (showSDocForUser unqual (
-		vcat (map (pprTyThing exts) (catMaybes things))
+		vcat (map (pprTyThingInContext exts) (catMaybes things))
 	   )))
 	-- ToDo: modInfoInstances currently throws an exception for
 	-- package modules.  When it works, we can do this:
