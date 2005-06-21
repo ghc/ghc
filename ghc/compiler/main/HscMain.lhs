@@ -60,6 +60,7 @@ import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
 import TyCon		( isDataTyCon )
+import Packages		( mkHomeModules )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -474,6 +475,7 @@ hscCodeGen dflags
 	cg_tycons   = tycons,
 	cg_dir_imps = dir_imps,
 	cg_foreign  = foreign_stubs,
+	cg_home_mods = home_mods,
 	cg_dep_pkgs = dependencies     }  = do {
 
   let { data_tycons = filter isDataTyCon tycons } ;
@@ -507,12 +509,13 @@ hscCodeGen dflags
 	do
 	    -----------------  Convert to STG ------------------
 	    (stg_binds, cost_centre_info) <- {-# SCC "CoreToStg" #-}
-	    		 myCoreToStg dflags this_mod prepd_binds	
+	    		 myCoreToStg dflags home_mods this_mod prepd_binds	
 
             ------------------  Code generation ------------------
 	    abstractC <- {-# SCC "CodeGen" #-}
-		         codeGen dflags this_mod data_tycons foreign_stubs
-				 dir_imps cost_centre_info stg_binds
+		         codeGen dflags home_mods this_mod data_tycons
+				 foreign_stubs dir_imps cost_centre_info
+				 stg_binds
 
 	    ------------------  Code output -----------------------
 	    (stub_h_exists, stub_c_exists)
@@ -525,7 +528,7 @@ hscCodeGen dflags
 
 hscCmmFile :: DynFlags -> FilePath -> IO Bool
 hscCmmFile dflags filename = do
-  maybe_cmm <- parseCmmFile dflags filename
+  maybe_cmm <- parseCmmFile dflags (mkHomeModules []) filename
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
@@ -565,13 +568,13 @@ myParseModule dflags src_filename maybe_src_buf
       }}
 
 
-myCoreToStg dflags this_mod prepd_binds
+myCoreToStg dflags pkg_deps this_mod prepd_binds
  = do 
       stg_binds <- {-# SCC "Core2Stg" #-}
 	     coreToStg dflags prepd_binds
 
       (stg_binds2, cost_centre_info) <- {-# SCC "Core2Stg" #-}
-	     stg2stg dflags this_mod stg_binds
+	     stg2stg dflags pkg_deps this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
 \end{code}

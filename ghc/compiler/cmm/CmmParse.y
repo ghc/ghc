@@ -38,6 +38,7 @@ import Unique
 import UniqFM
 import SrcLoc
 import DynFlags		( DynFlags, DynFlag(..) )
+import Packages		( HomeModules )
 import StaticFlags	( opt_SccProfilingOn )
 import ErrUtils		( printError, dumpIfSet_dyn, showPass )
 import StringBuffer	( hGetStringBuffer )
@@ -861,8 +862,8 @@ initEnv = listToUFM [
         CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) )
   ]
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Maybe Cmm)
-parseCmmFile dflags filename = do
+parseCmmFile :: DynFlags -> HomeModules -> FilePath -> IO (Maybe Cmm)
+parseCmmFile dflags hmods filename = do
   showPass dflags "ParseCmm"
   buf <- hGetStringBuffer filename
   let
@@ -873,10 +874,9 @@ parseCmmFile dflags filename = do
   case unP cmmParse init_state of
     PFailed span err -> do printError span err; return Nothing
     POk _ code -> do
-	cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
+	cmm <- initC dflags hmods no_module (getCmm (unEC code initEnv [] >> return ()))
 	dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms [cmm])
 	return (Just cmm)
   where
 	no_module = panic "parseCmmFile: no module"
-
 }

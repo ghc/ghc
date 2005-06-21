@@ -12,7 +12,8 @@ import IOEnv		-- Re-export all
 
 import HsSyn		( emptyLHsBinds )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
-			  TyThing, TypeEnv, emptyTypeEnv, HscSource(..), isHsBoot,
+			  TyThing, TypeEnv, emptyTypeEnv, HscSource(..),
+			  isHsBoot, ModSummary(..),
 			  ExternalPackageState(..), HomePackageTable,
 			  Deprecs(..), FixityEnv, FixItem, 
 			  lookupType, unQualInScope )
@@ -29,6 +30,7 @@ import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
 			  mkWarnMsg, printErrorsAndWarnings, pprBagOfErrors,
 			  mkLocMessage, mkLongErrMsg )
+import Packages		( mkHomeModules )
 import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( NameSet, emptyDUs, emptyNameSet, unionNameSets, addOneToNameSet )
@@ -92,6 +94,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_th_used   = th_var,
 		tcg_exports  = emptyNameSet,
 		tcg_imports  = init_imports,
+		tcg_home_mods = home_mods,
 		tcg_dus      = emptyDUs,
 		tcg_rn_decls = Nothing,
 		tcg_binds    = emptyLHsBinds,
@@ -133,7 +136,17 @@ initTc hsc_env hsc_src mod do_this
 	return (msgs, final_res)
     }
   where
-    init_imports = emptyImportAvails { imp_env = unitModuleEnv mod emptyNameSet }
+    home_mods = mkHomeModules (map ms_mod (hsc_mod_graph hsc_env))
+	-- A guess at the home modules.  This will be correct in
+	-- --make and GHCi modes, but in one-shot mode we need to 
+	-- fix it up after we know the real dependencies of the current
+	-- module (see tcRnModule).
+	-- Setting it here is necessary for the typechecker entry points
+	-- other than tcRnModule: tcRnGetInfo, for example.  These are
+	-- all called via the GHC module, so hsc_mod_graph will contain
+	-- something sensible.
+
+    init_imports = emptyImportAvails {imp_env = unitModuleEnv mod emptyNameSet}
 	-- Initialise tcg_imports with an empty set of bindings for
 	-- this module, so that if we see 'module M' in the export
 	-- list, and there are no bindings in M, we don't bleat 

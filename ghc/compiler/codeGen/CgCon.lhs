@@ -71,10 +71,10 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
   = do { 
-	; dflags <- getDynFlags
+	; hmods <- getHomeModules
 #if mingw32_TARGET_OS
         -- Windows DLLs have a problem with static cross-DLL refs.
-        ; ASSERT( not (isDllConApp dflags con args) ) return ()
+        ; ASSERT( not (isDllConApp hmods con args) ) return ()
 #endif
 	; ASSERT( args `lengthIs` dataConRepArity con ) return ()
 
@@ -84,9 +84,9 @@ cgTopRhsCon id con args
 	; let
 	    name          = idName id
 	    lf_info	  = mkConLFInfo con
-    	    closure_label = mkClosureLabel dflags name
+    	    closure_label = mkClosureLabel hmods name
 	    caffy         = any stgArgHasCafRefs args
-	    (closure_info, amodes_w_offsets) = layOutStaticConstr dflags con amodes
+	    (closure_info, amodes_w_offsets) = layOutStaticConstr hmods con amodes
 	    closure_rep = mkStaticClosureFields
 	    		     closure_info
 	    		     dontCareCCS		-- Because it's static data
@@ -143,9 +143,9 @@ at all.
 
 \begin{code}
 buildDynCon binder cc con []
-  = do dflags <- getDynFlags
+  = do hmods <- getHomeModules
        returnFC (stableIdInfo binder
-			   (mkLblExpr (mkClosureLabel dflags (dataConName con)))
+			   (mkLblExpr (mkClosureLabel hmods (dataConName con)))
     			   (mkConLFInfo con))
 \end{code}
 
@@ -199,9 +199,9 @@ Now the general case.
 \begin{code}
 buildDynCon binder ccs con args
   = do	{ 
-	; dflags <- getDynFlags
+	; hmods <- getHomeModules
 	; let
-	    (closure_info, amodes_w_offsets) = layOutDynConstr dflags con args
+	    (closure_info, amodes_w_offsets) = layOutDynConstr hmods con args
 
 	; hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
  	; returnFC (heapIdInfo binder hp_off lf_info) }
@@ -231,10 +231,10 @@ found a $con$.
 \begin{code}
 bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
-  = do dflags <- getDynFlags
+  = do hmods <- getHomeModules
        let
 	  bind_arg (arg, offset) = bindNewToNode arg offset (mkLFArgument arg)
-	  (_, args_w_offsets)    = layOutDynConstr dflags con (addIdReps args)
+	  (_, args_w_offsets)    = layOutDynConstr hmods con (addIdReps args)
 	--
        ASSERT(not (isUnboxedTupleCon con)) return ()
        mapCs bind_arg args_w_offsets
@@ -417,7 +417,7 @@ static closure, for a constructor.
 cgDataCon :: DataCon -> Code
 cgDataCon data_con
   = do	{     -- Don't need any dynamic closure code for zero-arity constructors
-	  dflags <- getDynFlags
+	  hmods <- getHomeModules
 
 	; let
 	    -- To allow the debuggers, interpreters, etc to cope with
@@ -425,10 +425,10 @@ cgDataCon data_con
 	    -- time), we take care that info-table contains the
 	    -- information we need.
 	    (static_cl_info, _) = 
-		layOutStaticConstr dflags data_con arg_reps
+		layOutStaticConstr hmods data_con arg_reps
 
 	    (dyn_cl_info, arg_things) = 
-		layOutDynConstr    dflags data_con arg_reps
+		layOutDynConstr    hmods data_con arg_reps
 
 	    emit_info cl_info ticky_code
 		= do { code_blks <- getCgStmts the_code

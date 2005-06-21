@@ -52,7 +52,8 @@ import CLabel		( CLabel, mkStringLitLabel )
 import Digraph		( SCC(..), stronglyConnComp )
 import ListSetOps	( assocDefault )
 import Util		( filterOut, sortLe )
-import DynFlags	( DynFlags(..), HscTarget(..) )
+import DynFlags		( DynFlags(..), HscTarget(..) )
+import Packages		( HomeModules )
 import FastString	( LitString, FastString, unpackFS )
 import Outputable
 
@@ -210,11 +211,11 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: DynFlags -> TyCon -> CmmExpr -> CmmExpr
-tagToClosure dflags tycon tag
+tagToClosure :: HomeModules -> TyCon -> CmmExpr -> CmmExpr
+tagToClosure hmods tycon tag
   = CmmLoad (cmmOffsetExprW closure_tbl tag) wordRep
   where closure_tbl = CmmLit (CmmLabel lbl)
-	lbl = mkClosureTableLabel dflags (tyConName tycon)
+	lbl = mkClosureTableLabel hmods (tyConName tycon)
 
 -------------------------------------------------------------------------
 --

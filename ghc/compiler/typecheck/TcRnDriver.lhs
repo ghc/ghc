@@ -26,8 +26,7 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 
 import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
 import StaticFlags	( opt_PprStyle_Debug )
-import Packages		( moduleToPackageConfig, mkPackageId, package,
-			  isHomeModule )
+import Packages		( checkForPackageConflicts, mkHomeModules )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
 			  SpliceDecl(..), HsBind(..), LHsBinds,
 			  emptyGroup, appendGroups,
@@ -125,6 +124,7 @@ import SrcLoc		( unLoc, noSrcSpan )
 #endif
 
 import FastString	( mkFastString )
+import Maybes		( MaybeErr(..) )
 import Util		( sortLe )
 import Bag		( unionBags, snocBag, emptyBag, unitBag, unionManyBags )
 
@@ -159,8 +159,6 @@ tcRnModule hsc_env hsc_src save_rn_decls
    initTc hsc_env hsc_src this_mod $ 
    setSrcSpan loc $
    do {
-	checkForPackageModule (hsc_dflags hsc_env) this_mod;
-
 		-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 
@@ -181,6 +179,8 @@ tcRnModule hsc_env hsc_src save_rn_decls
 		-- visible to loadHiBootInterface in tcRnSrcDecls,
 		-- and any other incrementally-performed imports
 	updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
+
+	checkConflicts imports this_mod $ do {
 
 		-- Update the gbl env
 	updGblEnv ( \ gbl -> 
@@ -241,23 +241,27 @@ tcRnModule hsc_env hsc_src save_rn_decls
 		-- Dump output and return
 	tcDump final_env ;
 	return final_env
-    }}}}
+    }}}}}
 
--- This is really a sanity check that the user has given -package-name
--- if necessary.  -package-name is only necessary when the package database
--- already contains the current package, because then we can't tell
--- whether a given module is in the current package or not, without knowing
--- the name of the current package.
-checkForPackageModule dflags this_mod
-  | not (isHomeModule dflags this_mod),
-    Just (pkg,_) <- moduleToPackageConfig dflags this_mod =
-	let 
-		ppr_pkg = ppr (mkPackageId (package pkg))
-	in
-	addErr (ptext SLIT("Module") <+> quotes (ppr this_mod) <+>
-	        ptext SLIT("is a member of package") <+>  ppr_pkg <> char '.' $$
-		ptext SLIT("To compile this module, please use -ignore-package") <+> ppr_pkg <> char '.')
-  | otherwise = return ()
+
+-- The program is not allowed to contain two modules with the same
+-- name, and we check for that here.  It could happen if the home package
+-- contains a module that is also present in an external package, for example.
+checkConflicts imports this_mod and_then = do
+   dflags <- getDOpts
+   let 
+	dep_mods = this_mod : map fst (moduleEnvElts (imp_dep_mods imports))
+		-- don't forget to include the current module!
+
+	mb_dep_pkgs = checkForPackageConflicts 
+				dflags dep_mods (imp_dep_pkgs imports)
+   --
+   case mb_dep_pkgs of
+     Failed msg -> 
+	do addErr msg; failM
+     Succeeded _ -> 
+	updGblEnv (\gbl -> gbl{ tcg_home_mods = mkHomeModules dep_mods })
+	   and_then
 \end{code}
 
 
@@ -316,6 +320,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_usages   = [],		-- ToDo: compute usage
 				mg_dir_imps = [],		-- ??
 				mg_deps     = noDependencies,	-- ??
+				mg_home_mods = mkHomeModules [], -- ?? wrong!!
 				mg_exports  = my_exports,
 				mg_types    = final_type_env,
 				mg_insts    = tcg_insts tcg_env,

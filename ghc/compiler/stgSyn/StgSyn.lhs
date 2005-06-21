@@ -66,6 +66,7 @@ import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Bitmap
 import DynFlags		( DynFlags )
+import Packages		( HomeModules )
 import StaticFlags	( opt_SccProfilingOn )
 \end{code}
 
@@ -105,18 +106,18 @@ data GenStgArg occ
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg other	    = False
 
-isDllArg :: DynFlags -> StgArg -> Bool
+isDllArg :: HomeModules -> StgArg -> Bool
 	-- Does this argument refer to something in a different DLL?
-isDllArg dflags (StgTypeArg v)  = False
-isDllArg dflags (StgVarArg v)   = isDllName dflags (idName v)
-isDllArg dflags (StgLitArg lit) = False
+isDllArg hmods (StgTypeArg v)  = False
+isDllArg hmods (StgVarArg v)   = isDllName hmods (idName v)
+isDllArg hmods (StgLitArg lit) = False
 
-isDllConApp :: DynFlags -> DataCon -> [StgArg] -> Bool
+isDllConApp :: HomeModules -> DataCon -> [StgArg] -> Bool
 	-- Does this constructor application refer to 
 	-- anything in a different DLL?
 	-- If so, we can't allocate it statically
-isDllConApp dflags con args
-   = isDllName dflags (dataConName con) || any (isDllArg dflags) args
+isDllConApp hmods con args
+   = isDllName hmods (dataConName con) || any (isDllArg hmods) args
 
 stgArgType :: StgArg -> Type
 	-- Very half baked becase we have lost the type arguments

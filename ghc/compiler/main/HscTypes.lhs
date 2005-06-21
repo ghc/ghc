@@ -84,7 +84,7 @@ import Type		( TyThing(..) )
 import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
-import Packages		( PackageIdH, PackageId, PackageConfig )
+import Packages		( PackageIdH, PackageId, PackageConfig, HomeModules )
 import DynFlags		( DynFlags(..), isOneShot )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
@@ -397,6 +397,7 @@ data ModGuts
 	mg_boot     :: IsBootInterface, -- Whether it's an hs-boot module
 	mg_exports  :: !NameSet,	-- What it exports
 	mg_deps	    :: !Dependencies,	-- What is below it, directly or otherwise
+	mg_home_mods :: !HomeModules,	-- For calling isHomeModule etc.
 	mg_dir_imps :: ![Module],	-- Directly-imported modules; used to
 					--	generate initialisation code
 	mg_usages   :: ![Usage],	-- Version info for what it needed
@@ -428,20 +429,25 @@ data CgGuts
   = CgGuts {
 	cg_module   :: !Module,
 
-	cg_tycons   :: [TyCon],		-- Algebraic data types (including ones that started life
-					-- as classes); generate constructors and info tables
-					-- Includes newtypes, just for the benefit of External Core
+	cg_tycons   :: [TyCon],
+		-- Algebraic data types (including ones that started
+		-- life as classes); generate constructors and info
+		-- tables Includes newtypes, just for the benefit of
+		-- External Core
 
-	cg_binds    :: [CoreBind],	-- The tidied main bindings, including previously-implicit 
-					-- bindings for record and class selectors, and
-					-- data construtor wrappers.  
-					-- But *not* data constructor workers; reason: we
-					-- we regard them as part of the code-gen of tycons
+	cg_binds    :: [CoreBind],
+		-- The tidied main bindings, including
+		-- previously-implicit bindings for record and class
+		-- selectors, and data construtor wrappers.  But *not*
+		-- data constructor workers; reason: we we regard them
+		-- as part of the code-gen of tycons
 
-	cg_dir_imps :: ![Module],	-- Directly-imported modules; used to generate
-					-- initialisation code
+	cg_dir_imps :: ![Module],
+		-- Directly-imported modules; used to generate
+		-- initialisation code
 
 	cg_foreign  :: !ForeignStubs,	
+	cg_home_mods :: !HomeModules,	-- for calling isHomeModule etc.
 	cg_dep_pkgs :: ![PackageId]	-- Used to generate #includes for C code gen
     }
 

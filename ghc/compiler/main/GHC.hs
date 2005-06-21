@@ -172,7 +172,7 @@ import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
 #endif
 
-import Packages		( initPackages, isHomeModule )
+import Packages		( PackageIdH(..), initPackages )
 import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, 
 			  globalRdrEnvElts )
@@ -228,6 +228,7 @@ import FastString	( mkFastString )
 import Directory        ( getModificationTime, doesFileExist )
 import Maybe		( isJust, isNothing, fromJust )
 import Maybes		( orElse, expectJust, mapCatMaybes )
+import qualified Maybes (MaybeErr(..))
 import List		( partition, nub )
 import qualified List
 import Monad		( unless, when )
@@ -1360,6 +1361,10 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 	src_timestamp <- case maybe_buf of
 			   Just (_,t) -> return t
 			   Nothing    -> getModificationTime file
+		-- The file exists; we checked in getRootSummary above.
+		-- If it gets removed subsequently, then this 
+		-- getModificationTime may fail, but that's the right
+		-- behaviour.
 
 	if ms_hs_date old_summary == src_timestamp 
 	   then do -- update the object-file timestamp
@@ -1389,6 +1394,7 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
         src_timestamp <- case maybe_buf of
 			   Just (_,t) -> return t
 			   Nothing    -> getModificationTime file
+			-- getMofificationTime may fail
 
 	obj_timestamp <- modificationTimeIfExists (ml_obj_file location)
 
@@ -1427,21 +1433,41 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	let location = ms_location old_summary
 	    src_fn = expectJust "summariseModule" (ml_hs_file location)
 
-		-- return the cached summary if the source didn't change
-	src_timestamp <- case maybe_buf of
-			   Just (_,t) -> return t
-			   Nothing    -> getModificationTime src_fn
+		-- check the modification time on the source file, and
+		-- return the cached summary if it hasn't changed.  If the
+		-- file has disappeared, we need to call the Finder again.
+	case maybe_buf of
+	   Just (_,t) -> check_timestamp old_summary location src_fn t
+	   Nothing    -> do
+		m <- IO.try (getModificationTime src_fn)
+		case m of
+		   Right t -> check_timestamp old_summary location src_fn t
+		   Left e | isDoesNotExistError e -> find_it
+		          | otherwise             -> ioError e
 
-	if ms_hs_date old_summary == src_timestamp 
-	   then do -- update the object-file timestamp
-		  obj_timestamp <- getObjTimestamp location is_boot
-		  return (Just old_summary{ ms_obj_date = obj_timestamp })
-	   else
-		-- source changed: re-summarise
-		new_summary location src_fn maybe_buf src_timestamp
+  | otherwise  = find_it
+  where
+    dflags = hsc_dflags hsc_env
 
-  | otherwise
-  = do	found <- findModule hsc_env wanted_mod True {-explicit-}
+    hsc_src = if is_boot then HsBootFile else HsSrcFile
+
+    check_timestamp old_summary location src_fn src_timestamp
+	| ms_hs_date old_summary == src_timestamp = do
+		-- update the object-file timestamp
+	   	obj_timestamp <- getObjTimestamp location is_boot
+		return (Just old_summary{ ms_obj_date = obj_timestamp })
+	| otherwise = 
+		-- source changed: find and re-summarise.  We call the finder
+		-- again, because the user may have moved the source file.
+		new_summary location src_fn src_timestamp
+
+    find_it = do
+	-- Don't use the Finder's cache this time.  If the module was
+	-- previously a package module, it may have now appeared on the
+	-- search path, so we want to consider it to be a home module.  If
+	-- the module was previously a home module, it may have moved.
+	uncacheModule hsc_env wanted_mod
+	found <- findModule hsc_env wanted_mod True {-explicit-}
 	case found of
 	     Found location pkg 
 		| not (isHomePackage pkg) -> return Nothing
@@ -1450,10 +1476,6 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 			-- Home package
 	     err -> noModError dflags loc wanted_mod err
 			-- Not found
-  where
-    dflags = hsc_dflags hsc_env
-
-    hsc_src = if is_boot then HsBootFile else HsSrcFile
 
     just_found location = do
 	  	-- Adjust location to point to the hs-boot source file, 
@@ -1467,10 +1489,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	maybe_t <- modificationTimeIfExists src_fn
 	case maybe_t of
 	  Nothing -> noHsFileErr loc src_fn
-	  Just t  -> new_summary location' src_fn Nothing t
+	  Just t  -> new_summary location' src_fn t
 
 
-    new_summary location src_fn maybe_bug src_timestamp
+    new_summary location src_fn src_timestamp
       = do
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
@@ -1610,13 +1632,13 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
   if mdl `elem` map ms_mod mg
 	then getHomeModuleInfo hsc_env mdl
 	else do
-  if isHomeModule (hsc_dflags hsc_env) mdl
+  {- if isHomeModule (hsc_dflags hsc_env) mdl
 	then return Nothing
-	else getPackageModuleInfo hsc_env mdl
+	else -} getPackageModuleInfo hsc_env mdl
    -- getPackageModuleInfo will attempt to find the interface, so
    -- we don't want to call it for a home module, just in case there
    -- was a problem loading the module and the interface doesn't
-   -- exist... hence the isHomeModule test here.
+   -- exist... hence the isHomeModule test here.  (ToDo: reinstate)
 
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getPackageModuleInfo hsc_env mdl = do
@@ -1755,7 +1777,8 @@ setContext (Session ref) toplevs exports = do
   let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
   writeIORef ref hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplevs,
 					    ic_exports      = exports,
-					    ic_rn_gbl_env   = all_env } }
+					    ic_rn_gbl_env   = all_env }}
+
 
 -- Make a GlobalRdrEnv based on the exports of the modules only.
 mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv

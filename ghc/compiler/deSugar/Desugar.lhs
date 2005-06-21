@@ -64,6 +64,7 @@ deSugar hsc_env
 			    tcg_src	  = hsc_src,
 		    	    tcg_type_env  = type_env,
 		    	    tcg_imports   = imports,
+			    tcg_home_mods  = home_mods,
 		    	    tcg_exports   = exports,
 		    	    tcg_dus	  = dus, 
 		    	    tcg_inst_uses = dfun_uses_var,
@@ -132,7 +133,7 @@ deSugar hsc_env
 
 	      dir_imp_mods = imp_mods imports
 
-	; usages <- mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
+	; usages <- mkUsageInfo hsc_env home_mods dir_imp_mods dep_mods used_names
 
 	; let 
 		-- Modules don't compare lexicographically usually, 
@@ -152,6 +153,7 @@ deSugar hsc_env
 		mg_boot	    = isHsBoot hsc_src,
 		mg_exports  = exports,
 		mg_deps	    = deps,
+		mg_home_mods = home_mods,
 		mg_usages   = usages,
 		mg_dir_imps = [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
 	        mg_rdr_env  = rdr_env,

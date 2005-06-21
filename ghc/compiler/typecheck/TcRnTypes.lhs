@@ -47,7 +47,7 @@ import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
 			  availName, IsBootInterface, Deprecations )
-import Packages		( PackageId )
+import Packages		( PackageId, HomeModules )
 import Type		( Type, TvSubstEnv, pprParendType, pprTyThingCategory )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes, pprSkolInfo )
@@ -161,6 +161,10 @@ data TcGblEnv
 	tcg_imports :: ImportAvails,	-- Information about what was imported 
 					--    from where, including things bound
 					--    in this module
+
+	tcg_home_mods :: HomeModules,
+				-- Calculated from ImportAvails, allows us to
+				-- call Packages.isHomeModule
 
 	tcg_dus :: DefUses,  	-- What is defined in this module and what is used.
 				-- The latter is used to generate 

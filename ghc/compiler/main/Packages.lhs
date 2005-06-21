@@ -15,9 +15,11 @@ module Packages (
 	PackageIdH(..), isHomePackage,
 	PackageState(..), 
 	initPackages,
-	moduleToPackageConfig,
 	getPackageDetails,
-	isHomeModule,
+	checkForPackageConflicts,
+	lookupModuleInAllPackages,
+
+	HomeModules, mkHomeModules, isHomeModule,
 
 	-- * Inspecting the set of packages in scope
 	getPackageIncludePath,
@@ -43,11 +45,12 @@ import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
 import StaticFlags	( opt_Static )
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
-import Module		( Module, mkModule )
 import UniqFM
+import Module
+import FiniteMap
 import UniqSet
 import Util
-import Maybes		( expectJust )
+import Maybes		( expectJust, MaybeErr(..) )
 import Panic
 import Outputable
 
@@ -62,7 +65,7 @@ import Distribution.Package
 import Distribution.Version
 import Data.Maybe	( isNothing )
 import System.Directory	( doesFileExist )
-import Control.Monad	( when, foldM )
+import Control.Monad	( foldM )
 import Data.List	( nub, partition )
 
 #ifdef mingw32_TARGET_OS
@@ -70,9 +73,8 @@ import Data.List	( isPrefixOf )
 #endif
 
 import FastString
-import DATA_IOREF
 import EXCEPTION	( throwDyn )
-import ErrUtils         ( debugTraceMsg, putMsg )
+import ErrUtils         ( debugTraceMsg, putMsg, Message )
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -140,7 +142,7 @@ data PackageState = PackageState {
 	-- mapping derived from the package databases and
 	-- command-line package flags.
 
-  moduleToPkgConf       :: UniqFM (PackageConfig,Bool),
+  moduleToPkgConfAll 	:: ModuleEnv [(PackageConfig,Bool)],
 	-- Maps Module to (pkgconf,exposed), where pkgconf is the
 	-- PackageConfig for the package containing the module, and
 	-- exposed is True if the package exposes that module.
@@ -266,7 +268,7 @@ mungePackagePaths top_dir ps = map munge_pkg ps
 -- settings and populate the package state.
 
 mkPackageState :: DynFlags -> PackageConfigMap -> IO PackageState
-mkPackageState dflags pkg_db = do
+mkPackageState dflags orig_pkg_db = do
   --
   -- Modify the package database according to the command-line flags
   -- (-package, -hide-package, -ignore-package, -hide-all-packages).
@@ -307,7 +309,7 @@ mkPackageState dflags pkg_db = do
 		=  str == showPackageId (package p)
 		|| str == pkgName (package p)
   --
-  (pkgs1,explicit) <- procflags (eltsUFM pkg_db) emptyUniqSet flags
+  (pkgs1,explicit) <- procflags (eltsUFM orig_pkg_db) emptyUniqSet flags
   --
   let
 	elimDanglingDeps pkgs = 
@@ -362,35 +364,15 @@ mkPackageState dflags pkg_db = do
   -- Discover any conflicts at the same time, and factor in the new exposed
   -- status of each package.
   --
-  let
-	extend_modmap modmap pkgname = do
-	  let 
-		pkg = expectJust "mkPackageState" (lookupPackage pkg_db pkgname)
-	        exposed_mods = map mkModule (exposedModules pkg)
-	        hidden_mods  = map mkModule (hiddenModules pkg)
-		all_mods = exposed_mods ++ hidden_mods
-	  --
-	  -- check for overlaps
-	  --
-	  let
-		overlaps = [ (m,pkg) | m <- all_mods, 
-				       Just (pkg,_) <- [lookupUFM modmap m] ]
-	  --
-	  when (not (null overlaps)) $ overlappingError pkg overlaps
-	  --
-	  return (addListToUFM modmap 
-		    [(m, (pkg, m `elem` exposed_mods)) 
-		    | m <- all_mods])
-  --
-  mod_map <- foldM extend_modmap emptyUFM dep_exposed
+  let mod_map = mkModuleMap orig_pkg_db dep_exposed
 
-  return PackageState{ explicitPackages    = dep_explicit,
-		       pkgIdMap   	   = pkg_db,
-		       moduleToPkgConf 	   = mod_map,
-		       basePackageId	   = basePackageId,
-		       rtsPackageId	   = rtsPackageId,
-  		       haskell98PackageId  = haskell98PackageId,
-  		       thPackageId         = thPackageId
+  return PackageState{ explicitPackages     = dep_explicit,
+		       pkgIdMap   	    = orig_pkg_db,
+		       moduleToPkgConfAll   = mod_map,
+		       basePackageId	    = basePackageId,
+		       rtsPackageId	    = rtsPackageId,
+  		       haskell98PackageId   = haskell98PackageId,
+  		       thPackageId          = thPackageId
 		     }
   -- done!
 
@@ -400,22 +382,96 @@ haskell98PackageName = FSLIT("haskell98")
 thPackageName        = FSLIT("template-haskell")
 				-- Template Haskell libraries in here
 
-overlappingError pkg overlaps
-  = throwDyn (CmdLineError (showSDoc (vcat (map msg overlaps))))
-  where 
-	this_pkg = text (showPackageId (package pkg))
-	msg (mod,other_pkg) =
-	   text "Error: module '" <> ppr mod
-		 <> text "' is exposed by package "
-		 <> this_pkg <> text " and package "
-		 <> text (showPackageId (package other_pkg))
-
 multiplePackagesErr str ps =
   throwDyn (CmdLineError (showSDoc (
 		   text "Error; multiple packages match" <+> 
 			text str <> colon <+>
 		    sep (punctuate comma (map (text.showPackageId.package) ps))
 		)))
+
+mkModuleMap
+  :: PackageConfigMap
+  -> [PackageId]
+  -> ModuleEnv [(PackageConfig, Bool)]
+mkModuleMap pkg_db pkgs = foldr extend_modmap emptyUFM pkgs
+  where
+	extend_modmap pkgname modmap =
+		addListToUFM_C (++) modmap 
+		    [(m, [(pkg, m `elem` exposed_mods)]) | m <- all_mods]
+	  where
+		pkg = expectJust "mkModuleMap" (lookupPackage pkg_db pkgname)
+	        exposed_mods = map mkModule (exposedModules pkg)
+	        hidden_mods  = map mkModule (hiddenModules pkg)
+		all_mods = exposed_mods ++ hidden_mods
+
+-- -----------------------------------------------------------------------------
+-- Check for conflicts in the program.
+
+-- | A conflict arises if the program contains two modules with the same
+-- name, which can arise if the program depends on multiple packages that
+-- expose the same module, or if the program depends on a package that
+-- contains a module also present in the program (the "home package").
+--
+checkForPackageConflicts
+   :: DynFlags
+   -> [Module]		-- modules in the home package
+   -> [PackageId]	-- packages on which the program depends
+   -> MaybeErr Message ()
+
+checkForPackageConflicts dflags mods pkgs = do
+    let 
+	state   = pkgState dflags
+	pkg_db  = pkgIdMap state
+    --
+    dep_pkgs <- closeDepsErr pkg_db pkgs
+
+    let 
+	extend_modmap pkgname modmap  =
+		addListToFM_C (++) modmap
+		    [(m, [(pkg, m `elem` exposed_mods)]) | m <- all_mods]
+	  where
+		pkg = expectJust "checkForPackageConflicts" 
+				(lookupPackage pkg_db pkgname)
+	        exposed_mods = map mkModule (exposedModules pkg)
+	        hidden_mods  = map mkModule (hiddenModules pkg)
+		all_mods = exposed_mods ++ hidden_mods
+
+        mod_map = foldr extend_modmap emptyFM pkgs
+	mod_map_list :: [(Module,[(PackageConfig,Bool)])]
+        mod_map_list = fmToList mod_map
+
+	overlaps = [ (m, map fst ps) | (m,ps@(_:_:_)) <- mod_map_list ]
+    --
+    if not (null overlaps)
+	then Failed (pkgOverlapError overlaps)
+	else do
+
+    let 
+	overlap_mods = [ (mod,pkg)
+		       | mod <- mods,
+		         Just ((pkg,_):_) <- [lookupFM mod_map mod] ]    
+				-- will be only one package here
+    if not (null overlap_mods)
+	then Failed (modOverlapError overlap_mods)
+	else do
+
+    return ()
+       
+pkgOverlapError overlaps =  vcat (map msg overlaps)
+  where 
+	msg (mod,pkgs) =
+	   text "conflict: module" <+> quotes (ppr mod)
+		 <+> ptext SLIT("is present in multiple packages:")
+		 <+> hsep (punctuate comma (map (text.showPackageId.package) pkgs))
+
+modOverlapError overlaps =   vcat (map msg overlaps)
+  where 
+	msg (mod,pkg) = fsep [
+	   	text "conflict: module",
+		quotes (ppr mod),
+		ptext SLIT("belongs to the current program/library"),
+		ptext SLIT("and also to package"),
+		text (showPackageId (package pkg)) ]
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
@@ -513,15 +569,14 @@ getPackageFrameworks dflags pkgs = do
 -- -----------------------------------------------------------------------------
 -- Package Utils
 
--- Takes a Module, and if the module is in a package returns 
--- (pkgconf,exposed) where pkgconf is the PackageConfig for that package,
+-- | Takes a Module, and if the module is in a package returns 
+-- @(pkgconf,exposed)@ where pkgconf is the PackageConfig for that package,
 -- and exposed is True if the package exposes the module.
-moduleToPackageConfig :: DynFlags -> Module -> Maybe (PackageConfig,Bool)
-moduleToPackageConfig dflags m = 
-  lookupUFM (moduleToPkgConf (pkgState dflags)) m
-
-isHomeModule :: DynFlags -> Module -> Bool
-isHomeModule dflags mod = isNothing (moduleToPackageConfig dflags mod)
+lookupModuleInAllPackages :: DynFlags -> Module -> [(PackageConfig,Bool)]
+lookupModuleInAllPackages dflags m =
+  case lookupModuleEnv (moduleToPkgConfAll (pkgState dflags)) m of
+	Nothing -> []
+	Just ps -> ps
 
 getExplicitPackagesAnd :: DynFlags -> [PackageId] -> IO [PackageConfig]
 getExplicitPackagesAnd dflags pkgids =
@@ -530,44 +585,60 @@ getExplicitPackagesAnd dflags pkgids =
       pkg_map = pkgIdMap state
       expl    = explicitPackages state
   in do
-  all_pkgs <- foldM (add_package pkg_map) expl pkgids
+  all_pkgs <- throwErr (foldM (add_package pkg_map) expl pkgids)
   return (map (getPackageDetails state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
 closeDeps :: PackageConfigMap -> [PackageId] -> IO [PackageId]
-closeDeps pkg_map ps = foldM (add_package pkg_map) [] ps
+closeDeps pkg_map ps = throwErr (closeDepsErr pkg_map ps)
+
+throwErr :: MaybeErr Message a -> IO a
+throwErr m = case m of
+		Failed e    -> throwDyn (CmdLineError (showSDoc e))
+		Succeeded r -> return r
+
+closeDepsErr :: PackageConfigMap -> [PackageId]
+	-> MaybeErr Message [PackageId]
+closeDepsErr pkg_map ps = foldM (add_package pkg_map) [] ps
 
 -- internal helper
-add_package :: PackageConfigMap -> [PackageId] -> PackageId -> IO [PackageId]
+add_package :: PackageConfigMap -> [PackageId] -> PackageId 
+	-> MaybeErr Message [PackageId]
 add_package pkg_db ps p
   | p `elem` ps = return ps	-- Check if we've already added this package
   | otherwise =
       case lookupPackage pkg_db p of
-        Nothing -> missingPackageErr (packageIdString p)
+        Nothing -> Failed (missingPackageErr (packageIdString p))
         Just pkg -> do
     	   -- Add the package's dependents also
 	   let deps = map mkPackageId (depends pkg)
     	   ps' <- foldM (add_package pkg_db) ps deps
     	   return (p : ps')
 
-missingPackageErr p =  throwDyn (CmdLineError ("unknown package: " ++ p))
+missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
+missingPackageMsg p = ptext SLIT("unknown package:") <> text p
 
 -- -----------------------------------------------------------------------------
+-- The home module set
+
+newtype HomeModules = HomeModules ModuleSet
+
+mkHomeModules :: [Module] -> HomeModules
+mkHomeModules = HomeModules . mkModuleSet
+
+isHomeModule :: HomeModules -> Module -> Bool
+isHomeModule (HomeModules set) mod  = elemModuleSet mod set
+
 -- Determining whether a Name refers to something in another package or not.
 -- Cross-package references need to be handled differently when dynamically-
 -- linked libraries are involved.
 
-isDllName :: DynFlags -> Name -> Bool
-isDllName dflags name
+isDllName :: HomeModules -> Name -> Bool
+isDllName pdeps name
   | opt_Static = False
-  | otherwise =
-    case nameModule_maybe name of
-        Nothing -> False  -- no, it is not even an external name
-        Just mod ->
-            case lookupUFM (moduleToPkgConf (pkgState dflags)) mod of
-                Just _  -> True   -- yes, its a package module
-                Nothing -> False  -- no, must be a home module
+  | Just mod <- nameModule_maybe name = not (isHomeModule pdeps mod)
+  | otherwise = False  -- no, it is not even an external name
 
 -- -----------------------------------------------------------------------------
 -- Displaying packages

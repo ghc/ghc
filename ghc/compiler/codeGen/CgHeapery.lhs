@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.46 2005/04/21 15:28:20 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.47 2005/06/21 10:44:41 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -54,10 +54,8 @@ import TyCon		( tyConPrimRep )
 import CostCentre	( CostCentreStack )
 import Util		( mapAccumL, filterOut )
 import Constants	( wORD_SIZE )
-import DynFlags	( DynFlags )
+import Packages		( HomeModules )
 import Outputable
-
-import GLAEXTS
 
 \end{code}
 
@@ -126,7 +124,7 @@ getHpRelOffset virtual_offset
 
 \begin{code}
 layOutDynConstr, layOutStaticConstr
-	:: DynFlags
+	:: HomeModules
 	-> DataCon 	
 	-> [(CgRep,a)]
 	-> (ClosureInfo,
@@ -135,8 +133,8 @@ layOutDynConstr, layOutStaticConstr
 layOutDynConstr    = layOutConstr False
 layOutStaticConstr = layOutConstr True
 
-layOutConstr  is_static dflags data_con args
-   = (mkConInfo dflags is_static data_con tot_wds ptr_wds,
+layOutConstr  is_static hmods data_con args
+   = (mkConInfo hmods is_static data_con tot_wds ptr_wds,
       things_w_offsets)
   where
     (tot_wds,		 --  #ptr_wds + #nonptr_wds

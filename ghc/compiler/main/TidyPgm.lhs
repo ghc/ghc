@@ -237,6 +237,7 @@ tidyProgram hsc_env
 				mg_binds = binds, 
 				mg_rules = imp_rules,
 				mg_dir_imps = dir_imps, mg_deps = deps, 
+				mg_home_mods = home_mods,
 				mg_foreign = foreign_stubs })
 
   = do	{ let dflags = hsc_dflags hsc_env
@@ -282,6 +283,7 @@ tidyProgram hsc_env
 			   cg_binds    = implicit_binds ++ tidy_binds,
 			   cg_dir_imps = dir_imps,
 			   cg_foreign  = foreign_stubs,
+			   cg_home_mods = home_mods,
 			   cg_dep_pkgs = dep_pkgs deps }, 
 
 		   ModDetails { md_types = tidy_type_env,

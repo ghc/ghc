@@ -771,11 +771,11 @@ lookupPred pred@(ClassP clas tys)
 lookupPred ip_pred = return Nothing
 
 record_dfun_usage dfun_id 
-  = do	{ dflags <- getDOpts
+  = do	{ gbl <- getGblEnv
 	; let  dfun_name = idName dfun_id
 	       dfun_mod  = nameModule dfun_name
 	; if isInternalName dfun_name ||    -- Internal name => defined in this module
-	     not (isHomeModule dflags dfun_mod)
+	     not (isHomeModule (tcg_home_mods gbl) dfun_mod)
 	  then return () -- internal, or in another package
 	   else do { tcg_env <- getGblEnv
 	  	   ; updMutVar (tcg_inst_uses tcg_env)

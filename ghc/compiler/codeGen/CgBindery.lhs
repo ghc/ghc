@@ -240,8 +240,8 @@ getCgIdInfo id
 	    name = idName id
 	in
 	if isExternalName name then do
-	    dflags <- getDynFlags 
-	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel dflags name))
+	    hmods <- getHomeModules 
+	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel hmods name))
 	    return (stableIdInfo id ext_lbl (mkLFImported id))
 	else
 	if isVoidArg (idCgRep id) then

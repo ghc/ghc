@@ -16,6 +16,7 @@ import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import SRT		( computeSRTs )
 
+import Packages		( HomeModules )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, StgToDo(..),
 			  getStgToDo )
 import Id		( Id )
@@ -27,12 +28,13 @@ import Outputable
 
 \begin{code}
 stg2stg :: DynFlags		     -- includes spec of what stg-to-stg passes to do
+	-> HomeModules
 	-> Module		     -- module name (profiling only)
 	-> [StgBinding]		     -- input...
 	-> IO ( [(StgBinding,[(Id,[Id])])]  -- output program...
 	      , CollectedCCs)        -- cost centre information (declared and used)
 
-stg2stg dflags module_name binds
+stg2stg dflags pkg_deps module_name binds
   = do	{ showPass dflags "Stg2Stg"
 	; us <- mkSplitUniqSupply 'g'
 
@@ -72,7 +74,7 @@ stg2stg dflags module_name binds
 	     {-# SCC "ProfMassage" #-}
 	     let
 		 (collected_CCs, binds3)
-		   = stgMassageForProfiling dflags module_name us1 binds
+		   = stgMassageForProfiling pkg_deps module_name us1 binds
 	     in
 	     end_pass us2 "ProfMassage" collected_CCs binds3
 

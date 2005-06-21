@@ -200,6 +200,7 @@ import HscTypes		( ModIface(..), ModDetails(..),
 			)
 
 
+import Packages		( HomeModules )
 import DynFlags		( GhcMode(..), DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_HiVersion )
 import Name		( Name, nameModule, nameOccName, nameParent,
@@ -259,6 +260,7 @@ mkIface hsc_env maybe_old_iface
 		      mg_boot    = is_boot,
 		      mg_usages  = usages,
 		      mg_deps    = deps,
+		      mg_home_mods = home_mods,
 		      mg_rdr_env = rdr_env,
 		      mg_fix_env = fix_env,
 		      mg_deprecs = src_deprecs })
@@ -273,7 +275,7 @@ mkIface hsc_env maybe_old_iface
 --	to expose in the interface
 
   = do	{ eps <- hscEPS hsc_env
-	; let	{ ext_nm_rhs = mkExtNameFn hsc_env eps this_mod
+	; let	{ ext_nm_rhs = mkExtNameFn hsc_env home_mods eps this_mod
 		; ext_nm_lhs = mkLhsNameFn this_mod
 
 		; decls  = [ tyThingToIfaceDecl ext_nm_rhs thing 
@@ -350,11 +352,10 @@ writeIfaceFile hsc_env location new_iface no_change_at_all
 
 
 -----------------------------
-mkExtNameFn :: HscEnv -> ExternalPackageState -> Module -> Name -> IfaceExtName
-mkExtNameFn hsc_env eps this_mod
+mkExtNameFn :: HscEnv -> HomeModules -> ExternalPackageState -> Module -> Name -> IfaceExtName
+mkExtNameFn hsc_env hmods eps this_mod
   = ext_nm
   where
-    dflags = hsc_dflags hsc_env
     hpt = hsc_HPT hsc_env
     pit = eps_PIT eps
 
@@ -363,7 +364,7 @@ mkExtNameFn hsc_env eps this_mod
     				Nothing  -> LocalTop occ
     				Just par -> LocalTopSub occ (nameOccName par)
       | isWiredInName name       = ExtPkg  mod occ
-      | isHomeModule dflags mod  = HomePkg mod occ vers
+      | isHomeModule hmods mod   = HomePkg mod occ vers
       | otherwise	         = ExtPkg  mod occ
       where
     	mod      = nameModule name
@@ -639,19 +640,20 @@ bump_unless False v = bumpVersion v
 
 \begin{code}
 mkUsageInfo :: HscEnv 
+	    -> HomeModules
 	    -> ModuleEnv (Module, Maybe Bool, SrcSpan)
 	    -> [(Module, IsBootInterface)]
 	    -> NameSet -> IO [Usage]
-mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
+mkUsageInfo hsc_env hmods dir_imp_mods dep_mods used_names
   = do	{ eps <- hscEPS hsc_env
-	; let usages = mk_usage_info (eps_PIT eps) hsc_env
+	; let usages = mk_usage_info (eps_PIT eps) hsc_env hmods
 				     dir_imp_mods dep_mods used_names
 	; usages `seqList`  return usages }
 	 -- seq the list of Usages returned: occasionally these
 	 -- don't get evaluated for a while and we can end up hanging on to
 	 -- the entire collection of Ifaces.
 
-mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
+mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
   = mapCatMaybes mkUsage dep_mods
 	-- ToDo: do we need to sort into canonical order?
   where
@@ -688,7 +690,7 @@ mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
     mkUsage :: (Module, Bool) -> Maybe Usage
     mkUsage (mod_name, _)
       |  isNothing maybe_iface	-- We can't depend on it if we didn't
-      || not (isHomeModule dflags mod)	-- even open the interface!
+      || not (isHomeModule hmods mod)	-- even open the interface!
       || (null used_occs
 	  && not all_imported
 	  && not orphan_mod)
