@@ -30,18 +30,19 @@ import Panic
 import SrcLoc		( unLoc )
 import CmdLineParser
 
+#if __GLASGOW_HASKELL__ <= 408
+import Panic		( catchJust, ioErrors )
+#endif
+import ErrUtils         ( debugTraceMsg, printErrorsAndWarnings )
+
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 import EXCEPTION
 
+import System		( ExitCode(..), exitWith )
 import Directory
 import IO
 import Monad            ( when )
 import Maybe            ( isJust )
-
-#if __GLASGOW_HASKELL__ <= 408
-import Panic		( catchJust, ioErrors )
-#endif
-import ErrUtils         ( debugTraceMsg )
 
 -----------------------------------------------------------------
 --
@@ -59,22 +60,24 @@ doMkDependHS session srcs
 	; targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
 	; GHC.setTargets session targets
 	; excl_mods <- readIORef v_Dep_exclude_mods
-	; GHC.depanal session excl_mods
-	; mod_summaries <- GHC.getModuleGraph session
+	; r <- GHC.depanal session excl_mods
+	; case r of
+ 	    Left e -> do printErrorsAndWarnings e; exitWith (ExitFailure 1)
+	    Right mod_summaries -> do {
 
 		-- Sort into dependency order
 		-- There should be no cycles
-	; let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
+	  let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
 
 		-- Print out the dependencies if wanted
 	; debugTraceMsg dflags 2 (showSDoc (text "Module dependencies" $$ ppr sorted))
-		
+
 		-- Prcess them one by one, dumping results into makefile
 		-- and complaining about cycles
 	; mapM (processDeps session excl_mods (mkd_tmp_hdl files)) sorted
 
 		-- Tidy up
-	; endMkDependHS dflags files }
+	; endMkDependHS dflags files }}
 
 -----------------------------------------------------------------
 --
