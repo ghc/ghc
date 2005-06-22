@@ -138,11 +138,16 @@ data PackageState = PackageState {
 	-- should be in reverse dependency order; that is, a package
 	-- is always mentioned before the packages it depends on.
 
+  origPkgIdMap	        :: PackageConfigMap, -- PackageId   -> PackageConfig
+	-- the full package database
+
   pkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
-	-- mapping derived from the package databases and
-	-- command-line package flags.
+	-- Derived from origPkgIdMap.
+	-- The exposed flags are adjusted according to -package and
+	-- -hide-package flags, and -ignore-package removes packages.
 
   moduleToPkgConfAll 	:: ModuleEnv [(PackageConfig,Bool)],
+	-- Derived from pkgIdMap.	
 	-- Maps Module to (pkgconf,exposed), where pkgconf is the
 	-- PackageConfig for the package containing the module, and
 	-- exposed is True if the package exposes that module.
@@ -364,10 +369,11 @@ mkPackageState dflags orig_pkg_db = do
   -- Discover any conflicts at the same time, and factor in the new exposed
   -- status of each package.
   --
-  let mod_map = mkModuleMap orig_pkg_db dep_exposed
+  let mod_map = mkModuleMap pkg_db dep_exposed
 
   return PackageState{ explicitPackages     = dep_explicit,
-		       pkgIdMap   	    = orig_pkg_db,
+		       origPkgIdMap	    = orig_pkg_db,
+		       pkgIdMap   	    = pkg_db,
 		       moduleToPkgConfAll   = mod_map,
 		       basePackageId	    = basePackageId,
 		       rtsPackageId	    = rtsPackageId,
