@@ -992,11 +992,16 @@ pprHexVal w rep
   | otherwise = ptext SLIT("0x") <> go w <> repsuffix rep
   where
   	-- type suffix for literals:
-	-- on 32-bit platforms, add "LL" to 64-bit literals
-      repsuffix I64 | wORD_SIZE == 4 = ptext SLIT("LL")
+	-- Integer literals are unsigned in Cmm/C.  We explicitly cast to
+	-- signed values for doing signed operations, but at all other
+	-- times values are unsigned.  This also helps eliminate occasional
+	-- warnings about integer overflow from gcc.
+
+	-- on 32-bit platforms, add "ULL" to 64-bit literals
+      repsuffix I64 | wORD_SIZE == 4 = ptext SLIT("ULL")
       	-- on 64-bit platforms with 32-bit int, add "L" to 64-bit literals
-      repsuffix I64 | cINT_SIZE == 4 = ptext SLIT("L")
-      repsuffix _ = empty
+      repsuffix I64 | cINT_SIZE == 4 = ptext SLIT("UL")
+      repsuffix _ = char 'U'
       
       go 0 = empty
       go w' = go q <> dig
