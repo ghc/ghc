@@ -63,7 +63,8 @@ Prelude>
    :show modules              show the currently loaded modules
    :show bindings             show the current bindings made at the prompt
 
-   :tags -e|-c                create tags file for Vi (-c) or Emacs (-e)
+   :ctags [&lt;file&gt;]            create tags file for Vi (default: "tags")
+   :etags [&lt;file&gt;]            create tags file for Emacs (defauilt: "TAGS")
    :type &lt;expr&gt;               show the type of &lt;expr&gt;
    :kind &lt;type&gt;               show the kind of &lt;type&gt;
    :undef &lt;cmd&gt;               undefine user-defined command :&lt;cmd&gt;
@@ -1138,17 +1139,21 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
-	  <literal>:tags -c|-e</literal>
-	  <indexterm><primary><literal>:tags</literal></primary>
+	  <literal>:ctags</literal> <optional><replaceable>filename</replaceable></optional>
+	  <literal>:etags</literal> <optional><replaceable>filename</replaceable></optional>
+	  <indexterm><primary><literal>:etags</literal></primary>
+	  </indexterm>
+	  <indexterm><primary><literal>:etags</literal></primary>
 	  </indexterm>
 	</term>
 	<listitem>
-	  <para>Generates a &ldquo;tags&rdquo; file for either Vi-style editors
-	    (<literal>-c</literal>) or Emacs-style editors
-	    (<literal>-e</literal>).  The file generated will be called
-	    <filename>tags</filename> or <filename>TAGS</filename>
-	    respectively.</para>
-
+	  <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
+	    (<literal>:ctags</literal>) or Emacs-style editors (<literal>etags</literal>).  If
+	    no filename is specified, the defaulit <filename>tags</filename> or
+	    <filename>TAGS</filename> is
+	    used, respectively.  Tags for all the functions, constructors and
+	    types in the currently loaded modules are created.  All modules must
+	    be interpreted for these commands to work.</para>
           <para>See also <xref linkend="hasktags" />.</para>
 	</listitem>
       </varlistentry>
