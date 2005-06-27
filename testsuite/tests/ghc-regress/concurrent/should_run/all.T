@@ -70,7 +70,12 @@ test('conc034', compose(only_compiler_types(['ghc']),
 		compile_and_run, [''])
 
 test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc036', only_compiler_types(['ghc']), compile_and_run, [''])
+
+# Omit for GHCi: the main thread never gets the deadlock exception, because
+# it is waiting for a ^C interrupt.
+# Omit for threaded: deadlock detection isn't working properly.
+test('conc036', compose(omit_ways(['ghci','threaded']),
+			only_compiler_types(['ghc'])), compile_and_run, [''])
 
 test('conc037', only_ways(['threaded','smp']), compile_and_run, [''])
 test('conc038', only_ways(['threaded','smp']), compile_and_run, [''])
