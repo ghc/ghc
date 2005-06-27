@@ -37,6 +37,7 @@ import Foreign.Storable
 import GHC.List  	( null )
 import GHC.Base
 import GHC.IOBase
+import GHC.STRef	( STRef(..) )
 import GHC.Ptr		( Ptr(..) )
 import GHC.Err
 import GHC.Show
@@ -57,8 +58,19 @@ import GHC.Show
 -- type argument of 'ForeignPtr' should normally be an instance of
 -- class 'Storable'.
 --
-data ForeignPtr a 
-  = ForeignPtr ForeignObj# !(IORef [IO ()])
+data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
+	-- we cache the Addr# in the ForeignPtr object, but attach
+	-- the finalizer to the IORef (or the MutableByteArray# in
+	-- the case of a MallocPtr).  The aim of the representation
+	-- is to make withForeignPtr efficient; in fact, withForeignPtr
+	-- should be just as efficient as unpacking a Ptr, and multiple
+	-- withForeignPtrs can share an unpacked ForeignPtr.  Note
+	-- that touchForeignPtr only has to touch the ForeignPtrContents
+	-- object, because that ensures that whatever the finalizer is
+	-- attached to is kept alive.
+
+data ForeignPtrContents 
+  = PlainForeignPtr !(IORef [IO ()])
   | MallocPtr (MutableByteArray# RealWorld) !(IORef [IO ()])
 
 instance Eq (ForeignPtr a) where
@@ -108,7 +120,8 @@ mallocForeignPtr = doMalloc undefined
   	  r <- newIORef []
 	  IO $ \s ->
 	    case newPinnedByteArray# size s of { (# s, mbarr# #) ->
-	     (# s, MallocPtr mbarr# r #)
+	     (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+		     	      (MallocPtr mbarr# r) #)
             }
 	    where (I# size) = sizeOf a
 
@@ -119,7 +132,8 @@ mallocForeignPtrBytes (I# size) = do
   r <- newIORef []
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
-       (# s, MallocPtr mbarr# r #)
+       (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+		        (MallocPtr mbarr# r) #)
      }
 
 addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
@@ -145,45 +159,39 @@ addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- are finalized objects, so a finalizer should not refer to a 'Handle'
 -- (including @stdout@, @stdin@ or @stderr@).
 --
-addForeignPtrConcFinalizer f@(ForeignPtr fo r) finalizer = do
+addForeignPtrConcFinalizer (ForeignPtr a c) finalizer = 
+  addForeignPtrConcFinalizer_ c finalizer
+
+addForeignPtrConcFinalizer_ f@(PlainForeignPtr r) finalizer = do
   fs <- readIORef r
   writeIORef r (finalizer : fs)
   if (null fs)
      then IO $ \s ->
-	      let p = unsafeForeignPtrToPtr f in
-	      case mkWeak# fo () (foreignPtrFinalizer r p) s of 
-		 (# s1, w #) -> (# s1, () #)
+	      case r of { IORef (STRef r#) ->
+	      case mkWeak# r# () (foreignPtrFinalizer r) s of {  (# s1, w #) ->
+	      (# s1, () #) }}
      else return ()
-addForeignPtrConcFinalizer f@(MallocPtr fo r) finalizer = do 
+addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do 
   fs <- readIORef r
   writeIORef r (finalizer : fs)
   if (null fs)
      then  IO $ \s -> 
-	       let p = unsafeForeignPtrToPtr f in
-	       case mkWeak# fo () (do foreignPtrFinalizer r p
-				      touchPinnedByteArray# fo) s of 
+	       case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
 		  (# s1, w #) -> (# s1, () #)
      else return ()
 
 foreign import ccall "dynamic" 
   mkFinalizer :: FinalizerPtr a -> Ptr a -> IO ()
 
-foreignPtrFinalizer :: IORef [IO ()] -> Ptr a -> IO ()
-foreignPtrFinalizer r p = do
-  fs <- readIORef r
-  sequence_ fs
+foreignPtrFinalizer :: IORef [IO ()] -> IO ()
+foreignPtrFinalizer r = do fs <- readIORef r; sequence_ fs
 
 newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer that may be
 -- associated with finalizers by using 'addForeignPtrFinalizer'.
 newForeignPtr_ (Ptr obj) =  do
   r <- newIORef []
-  IO $ \ s# ->
-    case mkForeignObj# obj s# of
-      (# s1#, fo# #) -> (# s1#,  ForeignPtr fo# r #)
-
-touchPinnedByteArray# :: MutableByteArray# RealWorld -> IO ()
-touchPinnedByteArray# ba# = IO $ \s -> case touch# ba# s of s -> (# s, () #)
+  return (ForeignPtr obj (PlainForeignPtr r))
 
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
@@ -209,10 +217,9 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- performance reasons), so synchronisation between finalizers could
 -- result in artificial deadlock.
 --
-touchForeignPtr (ForeignPtr fo r)
-   = IO $ \s -> case touch# fo s of s -> (# s, () #)
-touchForeignPtr (MallocPtr fo r)
-   = touchPinnedByteArray# fo
+touchForeignPtr (ForeignPtr fo r) = touch r
+
+touch r = IO $ \s -> case touch# r s of s -> (# s, () #)
 
 unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
@@ -229,8 +236,7 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- than combinations of 'unsafeForeignPtrToPtr' and
 -- 'touchForeignPtr'.  However, the later routines
 -- are occasionally preferred in tool generated marshalling code.
-unsafeForeignPtrToPtr (ForeignPtr fo r) = Ptr (foreignObjToAddr# fo)
-unsafeForeignPtrToPtr (MallocPtr  fo r) = Ptr (byteArrayContents# (unsafeCoerce# fo))
+unsafeForeignPtrToPtr (ForeignPtr fo r) = Ptr fo
 
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'
@@ -240,11 +246,11 @@ castForeignPtr f = unsafeCoerce# f
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
-finalizeForeignPtr foreignPtr = do
+finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
 	finalizers <- readIORef refFinalizers
 	sequence_ finalizers
 	writeIORef refFinalizers []
 	where
 		refFinalizers = case foreignPtr of
-			(ForeignPtr _ ref) -> ref
+			(PlainForeignPtr ref) -> ref
 			(MallocPtr  _ ref) -> ref
