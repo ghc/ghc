@@ -1,5 +1,5 @@
 
 mod52.hs:3:5:
     Duplicate instance declarations:
-      instance Eq T (Defined at mod52.hs:3:5)
-      instance Eq T (Defined at mod52.hs:4:0)
+      instance Eq T -- Defined at mod52.hs:3:5
+      instance Eq T -- Defined at mod52.hs:4:0

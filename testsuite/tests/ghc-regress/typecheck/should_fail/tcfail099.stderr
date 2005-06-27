@@ -1,8 +1,7 @@
 
 tcfail099.hs:9:0:
     Inferred type is less polymorphic than expected
-      Quantified type variable `a' is mentioned in the environment:
-	call :: DS -> a -> Int (bound at tcfail099.hs:9:0)
+      Quantified type variable `a' escapes
     When checking an existential match that binds
 	f :: a -> Int
     The pattern(s) have type(s): DS
