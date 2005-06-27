@@ -189,10 +189,13 @@ instance  Num Float  where
 	     | otherwise = negate 1
 
     {-# INLINE fromInteger #-}
-    fromInteger n	=  encodeFloat n 0
-	-- It's important that encodeFloat inlines here, and that 
-	-- fromInteger in turn inlines,
-	-- so that if fromInteger is applied to an (S# i) the right thing happens
+    fromInteger (S# i#)    = case (int2Float# i#) of { d# -> F# d# }
+    fromInteger (J# s# d#) = encodeFloat# s# d# 0
+	-- previous code: fromInteger n	= encodeFloat n 0
+	-- doesn't work too well, because encodeFloat is defined in
+	-- terms of ccalls which can never be simplified away.  We
+	-- want simple literals like (fromInteger 3 :: Float) to turn
+	-- into (F# 3.0), hence the special case for S# here.
 
 instance  Real Float  where
     toRational x	=  (m%1)*(b%1)^^n
