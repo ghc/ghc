@@ -344,22 +344,30 @@ uVar swap subst tv1 ty
      Just ty' | swap      -> unify subst ty ty' 
               | otherwise -> unify subst ty' ty
      -- No, continue
-     Nothing          -> uUnrefined subst tv1 ty
+     Nothing          -> uUnrefined subst tv1 ty ty
 
 
 uUnrefined :: TvSubstEnv          -- An existing substitution to extend
            -> TyVar               -- Type variable to be unified
            -> Type                -- with this type
+           -> Type                -- (de-noted version)
            -> UM TvSubstEnv
 
 -- We know that tv1 isn't refined
-uUnrefined subst tv1 ty2@(TyVarTy tv2)
-  | tv1 == tv2    -- Same, do nothing
+
+uUnrefined subst tv1 ty2 (NoteTy _ ty2')
+  = uUnrefined subst tv1 ty2 ty2'	-- Unwrap synonyms
+		-- This is essential, in case we have
+		--	type Foo a = a
+		-- and then unify a :=: Foo a
+
+uUnrefined subst tv1 ty2 (TyVarTy tv2)
+  | tv1 == tv2		-- Same type variable
   = return subst
 
     -- Check to see whether tv2 is refined
   | Just ty' <- lookupVarEnv subst tv2
-  = uUnrefined subst tv1 ty'
+  = uUnrefined subst tv1 ty' ty'
 
   -- So both are unrefined; next, see if the kinds force the direction
   | k1 == k2	-- Can update either; so check the bind-flags
@@ -390,16 +398,16 @@ uUnrefined subst tv1 ty2@(TyVarTy tv2)
     k2 = tyVarKind tv2
     bind tv ty = return (extendVarEnv subst tv ty)
 
-uUnrefined subst tv1 ty2	-- ty2 is not a type variable
-  | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2)
+uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
+  | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2')
   = failWith (occursCheck tv1 ty2)	-- Occurs check
   | not (k2 `isSubKind` k1)
   = failWith (kindMisMatch tv1 ty2)	-- Kind check
   | otherwise
-  = bindTv subst tv1 ty2
+  = bindTv subst tv1 ty2		-- Bind tyvar to the synonym if poss
   where
     k1 = tyVarKind tv1
-    k2 = typeKind ty2
+    k2 = typeKind ty2'
 
 substTvSet :: TvSubstEnv -> TyVarSet -> TyVarSet
 -- Apply the non-idempotent substitution to a set of type variables,
