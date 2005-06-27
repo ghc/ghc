@@ -107,7 +107,8 @@ builtin_commands = [
   ("check",	keepGoing checkModule),
   ("set",	keepGoing setCmd),
   ("show",	keepGoing showCmd),
-  ("tags",	keepGoing createTagsFileCmd),
+  ("etags",	keepGoing createETagsFileCmd),
+  ("ctags",	keepGoing createCTagsFileCmd),
   ("type",	keepGoing typeOfExpr),
   ("kind",	keepGoing kindOfType),
   ("unset",	keepGoing unsetOptions),
@@ -145,7 +146,8 @@ helpText =
  "   :show modules               show the currently loaded modules\n" ++
  "   :show bindings              show the current bindings made at the prompt\n" ++
  "\n" ++
- "   :tags -e|-c                 create tags file for Vi (-c) or Emacs (-e)\n" ++
+ "   :ctags [<file>]          	 create tags file for Vi (default: \"tags\")\n" ++
+ "   :etags [<file>]           	 create tags file for Emacs (defauilt: \"TAGS\")\n" ++
  "   :type <expr>                show the type of <expr>\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
@@ -744,10 +746,13 @@ shellEscape str = io (system str >> return False)
 -----------------------------------------------------------------------------
 -- create tags file for currently loaded modules.
 
-createTagsFileCmd :: String -> GHCi ()
-createTagsFileCmd "-c" = ghciCreateTagsFile CTags "tags"
-createTagsFileCmd "-e" = ghciCreateTagsFile ETags "TAGS"
-createTagsFileCmd _  = throwDyn (CmdLineError "syntax:  :tags -c|-e")
+createETagsFileCmd, createCTagsFileCmd :: String -> GHCi ()
+
+createCTagsFileCmd ""   = ghciCreateTagsFile CTags "tags"
+createCTagsFileCmd file = ghciCreateTagsFile CTags file
+
+createETagsFileCmd ""    = ghciCreateTagsFile ETags "TAGS"
+createETagsFileCmd file  = ghciCreateTagsFile ETags file
 
 data TagsKind = ETags | CTags
 
