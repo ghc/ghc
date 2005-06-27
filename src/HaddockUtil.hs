@@ -385,8 +385,10 @@ isPathSeparator ch =
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mdl =
   case Map.lookup (Module mdl) html_xrefs of
-    Nothing  -> mdl ++ ".html"
-    Just fp0 -> pathJoin [fp0, mdl ++ ".html"]
+    Nothing  -> mdl' ++ ".html"
+    Just fp0 -> pathJoin [fp0, mdl' ++ ".html"]
+  where
+   mdl' = map (\c -> if c == '.' then '-' else c) mdl
 
 nameHtmlRef :: String -> HsName -> String	
 nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (hsAnchorNameStr str)
