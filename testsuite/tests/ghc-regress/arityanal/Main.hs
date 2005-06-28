@@ -237,7 +237,7 @@ alexScan = do
 
 alex_scan_tkn lc len (-1#) last_acc = return last_acc
 alex_scan_tkn lc len s last_acc = do
-  new_acc <- check_accs s
+  new_acc <- check_accs s lc len last_acc  --danaxu extends arguments
   c <- alexGetChar
   let {-# INLINE [0] join #-}
       -- This is a *hack*, the compiler doesn't eliminate the Maybe return
@@ -262,29 +262,29 @@ alex_scan_tkn lc len s last_acc = do
   case c of
     Nothing -> return new_acc    -- end of input
     Just c' -> join c'
-   where
+   -- where
          -- OPTIMISATION PROBLEM.  We need to eta-expand
          -- check_accs and check_accs1.  This needs a simple
         -- one-shot analysis of some kind, but note that
         -- check_accs1 is recursive.
-         check_accs s = check_accs1 (alex_accept `unsafeAt` (I# (s)))
-         check_accs1 accs =
+check_accs s lc len last_acc = check_accs1 (alex_accept `unsafeAt` (I# (s))) lc len last_acc
+check_accs1 accs lc len last_acc =
            case accs of
                  [] -> return last_acc
                  (AlexAcc _ a lctx rctx : rest) ->
 
                    case lctx of
-                     Nothing  -> check_rctx
-                     Just arr | arr!lc    -> check_rctx
-                              | otherwise -> check_accs1 rest
-                   where
+                     Nothing  -> check_rctx a rctx rest lc len last_acc
+                     Just arr | arr!lc    -> check_rctx a rctx rest lc len last_acc
+                              | otherwise -> check_accs1 rest lc len last_acc
+                    -- where
 
-                     ok = do inp <- alexGetInput
-                             return (AlexLastAcc a inp (I# (len)))
+ok a len = do inp <- alexGetInput
+              return (AlexLastAcc a inp (I# (len)))
 
-                     check_rctx =
+check_rctx a rctx rest lc len last_acc =
                          case rctx of
-                            Nothing -> ok
+                            Nothing -> ok a len
                             Just (I# (sn)) -> do
                                inp <- alexGetInput
                                let c = alexInputPrevChar inp
@@ -292,8 +292,8 @@ alex_scan_tkn lc len s last_acc = do
                                acc <- alex_scan_tkn c 0# sn AlexNone
                                alexSetInput inp
                                case acc of
-                                 AlexNone      -> check_accs1 rest
-                                 AlexLastAcc{} -> ok
+                                 AlexNone      -> check_accs1 rest lc len last_acc
+                                 AlexLastAcc{} -> ok a len
                                  -- TODO: there's no need to find the longest
                                  -- match when checking the right context, just
                                  -- the first match will do.

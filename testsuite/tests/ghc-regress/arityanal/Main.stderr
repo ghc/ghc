@@ -1,630 +1,1874 @@
-***expensive e1 0
-***Arity is changed: zdwk{v s4mv} 4 3
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***expensive e1 0
-***Arity is changed as occur in Lambda: lvl_s3ZM{v} 3 0
-Bad eta expand
-    1
-    (case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-							       GHCziBase.Char{(w) tc 3o},
-							       [GHCziBase.Char{(w) tc 3o}])
-							      -> GHCziBase.Int{(w) tc 3J}
-							      -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) alexzuaccept{v a2A9}
-     of wild{v a4cH} Dead A { GHCziArr.Array{d r256} ds2{v a4cE} Dead A ds3{v a4cF} Dead A arrzh{v a4cG} Once L ->
-     case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-							       GHCziBase.Char{(w) tc 3o},
-							       [GHCziBase.Char{(w) tc 3o}])
-							      -> GHCziBase.Int{(w) tc 3J}
-							      -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) GHCziPrim.indexArrayzh{(w) v 92b}
-															 @ [Main.AlexAcc{tc r1NJ} ((Main.AlexPosn{tc r1Oh},
-																		    GHCziBase.Char{(w) tc 3o},
-																		    [GHCziBase.Char{(w) tc 3o}])
-																		   -> GHCziBase.Int{(w) tc 3J}
-																		   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])]
-															 arrzh{v a4cG}
-															 ds_X3q7{v}
-     of wild2{v a4cO} Dead A { (# e{v a4cQ} Once S #) ->
-     let {
-       lvl_s4o6{v} OnceInLam T :: <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-										      GHCziBase.Char{(w) tc 3o},
-										      [GHCziBase.Char{(w) tc 3o}])
-										     -> GHCziBase.Int{(w) tc 3J}
-										     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
-       [*
-	Str: DmdType A]
-       lvl_s4o6{v} = return{v a3eo}
-		       @ (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-						      GHCziBase.Char{(w) tc 3o},
-						      [GHCziBase.Char{(w) tc 3o}])
-						     -> GHCziBase.Int{(w) tc 3J}
-						     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
-		       lastzuacc{v a23z} } in
-     __letrec {
-       checkzuaccs1{v s4o8} LoopBreaker T :: [Main.AlexAcc{tc r1NJ} ((Main.AlexPosn{tc r1Oh},
-								      GHCziBase.Char{(w) tc 3o},
-								      [GHCziBase.Char{(w) tc 3o}])
-								     -> GHCziBase.Int{(w) tc 3J}
-								     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])]
-					     -> <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
-       [Arity 1
-	*
-	Str: DmdType S]
-       checkzuaccs1{v s4o8} = \ (accs{v a23S} Once S :: [Main.AlexAcc{tc r1NJ} ((Main.AlexPosn{tc r1Oh},
-										 GHCziBase.Char{(w) tc 3o},
-										 [GHCziBase.Char{(w) tc 3o}])
-										-> GHCziBase.Int{(w) tc 3J}
-										-> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])]) ->
-				case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-											  GHCziBase.Char{(w) tc 3o},
-											  [GHCziBase.Char{(w) tc 3o}])
-											 -> GHCziBase.Int{(w) tc 3J}
-											 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) accs{v a23S}
-				of wild_X3r{v} Dead A {
-				  GHCziBase.ZMZN{(w) d 6m} -> lvl_s4o6{v};
-				  GHCziBase.ZC{(w) d 64} ds_d3md{v} Once U(ALST) rest{v a242} T ->
-				    case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-											      GHCziBase.Char{(w) tc 3o},
-											      [GHCziBase.Char{(w) tc 3o}])
-											     -> GHCziBase.Int{(w) tc 3J}
-											     -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) ds_d3md{v}
-				    of wild_X4Y{v} Dead A { Main.AlexAcc{d r1NL} ds_d3me{v} Dead A a{v a23Z} OnceInLam L lctx{v a240} Once S rctx{v a241} Once T ->
-				    let {
-				      checkzurctx{v s4oe} OnceEachBranch T :: <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-																  GHCziBase.Char{(w) tc 3o},
-																  [GHCziBase.Char{(w) tc 3o}])
-																 -> GHCziBase.Int{(w) tc 3J}
-																 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
-				      [*
-				       Str: DmdType]
-				      checkzurctx{v s4oe} = let {
-							      zdwok{v s4oa} T :: forall s{tv a2be}.
-										 GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
-														Main.AlexPosn{tc r1Oh}
-										 -> GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
-														   GHCziBase.String{tc rdx}
-										 -> GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
-														   GHCziBase.Char{(w) tc 3o}
-										 -> GHCziPrim.Statezh{(w) tc 32q} s{tv a2be}
-										 -> (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-										       Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														   GHCziBase.Char{(w) tc 3o},
-														   [GHCziBase.Char{(w) tc 3o}])
-														  -> GHCziBase.Int{(w) tc 3J}
-														  -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #)
-							      [Arity 5
-							       *
-							       Str: DmdType LLLL]
-							      zdwok{v s4oa} = \ (@ s{tv a2be} :: *)
-										(ww_s4lR{v} Once L :: GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
-																     Main.AlexPosn{tc r1Oh})
-										(ww_s4lV{v} Once L :: GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
-																     GHCziBase.String{tc rdx})
-										(ww_s4lZ{v} Once L :: GHCziPrim.MutVarzh{(w) tc 32F} s{tv a2be}
-																     GHCziBase.Char{(w) tc 3o})
-										(w_s4m3{v} Once L :: GHCziPrim.Statezh{(w) tc 32q} s{tv a2be}) ->
-										case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														    GHCziBase.Char{(w) tc 3o},
-														    [GHCziBase.Char{(w) tc 3o}])
-														   -> GHCziBase.Int{(w) tc 3J}
-														   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
-																					       @ s{tv a2be}
-																					       @ GHCziBase.String{tc rdx}
-																					       ww_s4lV{v}
-																					       w_s4m3{v}
-										of wild{v a408} Dead A { (# newzus{v a40a} Once L, r{v a40b} Once L #) ->
-										case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														    GHCziBase.Char{(w) tc 3o},
-														    [GHCziBase.Char{(w) tc 3o}])
-														   -> GHCziBase.Int{(w) tc 3J}
-														   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
-																					       @ s{tv a2be}
-																					       @ GHCziBase.Char{(w) tc 3o}
-																					       ww_s4lZ{v}
-																					       newzus{v a40a}
-										of wild{v X433} Dead A { (# newzus{v X436} Once L, r{v X438} Once L #) ->
-										case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														    GHCziBase.Char{(w) tc 3o},
-														    [GHCziBase.Char{(w) tc 3o}])
-														   -> GHCziBase.Int{(w) tc 3J}
-														   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
-																					       @ s{tv a2be}
-																					       @ Main.AlexPosn{tc r1Oh}
-																					       ww_s4lR{v}
-																					       newzus{v X436}
-										of wild{v X434} Dead A { (# newzus{v X437} Once L, r{v X439} Once L #) ->
-										(# newzus{v X437},
-										   (Main.AlexLastAcc{v r2dx}
-										      @ ((Main.AlexPosn{tc r1Oh},
-											  GHCziBase.Char{(w) tc 3o},
-											  [GHCziBase.Char{(w) tc 3o}])
-											 -> GHCziBase.Int{(w) tc 3J}
-											 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}])
-										      a{v a23Z}
-										      (r{v X439},
-										       r{v X438},
-										       r{v a40b})
-										      (GHCziBase.Izh{(w) v 6d}
-											 len{v a23y})) #)
-										}
-										}
-										}
-							    } in 
-							      case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-															GHCziBase.Char{(w) tc 3o},
-															[GHCziBase.Char{(w) tc 3o}])
-														       -> GHCziBase.Int{(w) tc 3J}
-														       -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) rctx{v a241}
-							      of wild_X59{v} Dead A {
-								DataziMaybe.Nothing{d r1Qo} ->
-								  __inline_me (\ (@ s{tv a2be} :: *)
-										 (w_s4lN{v} Once U(U(L)U(L)U(L)A) :: Main.AlexState{tc r1O5} s{tv a2be})
-										 (w_s4m3{v} Once L :: GHCziPrim.Statezh{(w) tc 32q} s{tv a2be}) ->
-										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														     GHCziBase.Char{(w) tc 3o},
-														     [GHCziBase.Char{(w) tc 3o}])
-														    -> GHCziBase.Int{(w) tc 3J}
-														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) w_s4lN{v}
-										 of w_X4nL{v} Dead T { Main.AlexState{d r1O7} ww_s4lP{v} Once T ww_s4lT{v} Once T ww_s4lX{v} Once T ww_s4m1{v} Dead T ->
-										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														     GHCziBase.Char{(w) tc 3o},
-														     [GHCziBase.Char{(w) tc 3o}])
-														    -> GHCziBase.Int{(w) tc 3J}
-														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) ww_s4lP{v}
-										 of ww_X4nU{v} Dead T { GHCziSTRef.STRef{d r2cY} ww_s4lR{v} Once T ->
-										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														     GHCziBase.Char{(w) tc 3o},
-														     [GHCziBase.Char{(w) tc 3o}])
-														    -> GHCziBase.Int{(w) tc 3J}
-														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) ww_s4lT{v}
-										 of ww_X4o2{v} Dead T { GHCziSTRef.STRef{d r2cY} ww_s4lV{v} Once T ->
-										 case (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-											 Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-														     GHCziBase.Char{(w) tc 3o},
-														     [GHCziBase.Char{(w) tc 3o}])
-														    -> GHCziBase.Int{(w) tc 3J}
-														    -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) ww_s4lX{v}
-										 of ww_X4oa{v} Dead T { GHCziSTRef.STRef{d r2cY} ww_s4lZ{v} Once T ->
-										 zdwok{v s4oa}
-										   @ s{tv a2be}
-										   ww_s4lR{v}
-										   ww_s4lV{v}
-										   ww_s4lZ{v}
-										   w_s4m3{v}
-										 }
-										 }
-										 }
-										 });
-								DataziMaybe.Just{d r1Qc} ds_d3mg{v} Once U(L) ->
-								  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-															    GHCziBase.Char{(w) tc 3o},
-															    [GHCziBase.Char{(w) tc 3o}])
-															   -> GHCziBase.Int{(w) tc 3J}
-															   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) ds_d3mg{v}
-								  of wild_X5c{v} Dead A { GHCziBase.Izh{(w) d 6c} ds_d3mh{v} OnceInLam L ->
-								  let {
-								    lvl_s4oc{v} OnceInLam T :: <nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-																		   GHCziBase.Char{(w) tc 3o},
-																		   [GHCziBase.Char{(w) tc 3o}])
-																		  -> GHCziBase.Int{(w) tc 3J}
-																		  -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
-								    [Arity 3
-								     *
-								     Str: DmdType]
-								    lvl_s4oc{v} = checkzuaccs1{v s4o8}
-										    rest{v a242}
-								  } in 
-								    \ (@ s{tv X3ho} :: *)
-								      (s{v X2ft} Once L :: Main.AlexState{tc r1O5} s{tv X3ho})
-								      (s{v X441} Once L :: GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho}) ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) s{v X2ft}
-								      of wild_X2w{v} L { Main.AlexState{d r1O7} poszur{v a21I} U(L) inpzur{v a21K} U(L) chrzur{v a21J} U(L) ds_d3mG{v} T ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) inpzur{v a21K}
-								      of wild{v a3SB} Dead D(L) { GHCziSTRef.STRef{d r2cY} varzh{v a3SD} L ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
-																				     @ s{tv X3ho}
-																				     @ GHCziBase.String{tc rdx}
-																				     varzh{v a3SD}
-																				     s{v X441}
-								      of wild{v a408} Dead A { (# newzus{v a40a} Once L, r{v a40b} Once L #) ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) chrzur{v a21J}
-								      of wild{v X3Vs} Dead D(L) { GHCziSTRef.STRef{d r2cY} varzh{v X3Vw} L ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
-																				     @ s{tv X3ho}
-																				     @ GHCziBase.Char{(w) tc 3o}
-																				     varzh{v X3Vw}
-																				     newzus{v a40a}
-								      of wild{v X433} Dead A { (# newzus{v X436} Once L, r{v X438} Once S(A) #) ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) poszur{v a21I}
-								      of wild{v X3Vt} Dead D(L) { GHCziSTRef.STRef{d r2cY} varzh{v X3Vx} L ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.readMutVarzh{(w) v 94r}
-																				     @ s{tv X3ho}
-																				     @ Main.AlexPosn{tc r1Oh}
-																				     varzh{v X3Vx}
-																				     newzus{v X436}
-								      of wild{v X434} Dead A { (# newzus{v X437} Once L, r{v X439} Once L #) ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) r{v X438}
-								      of tpl_X5l{v} L { GHCziBase.Czh{(w) d 62} a_s3X9{v} A ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) alexzuscanzutkn{v a2yM}
-																				     tpl_X5l{v}
-																				     0
-																				     ds_d3mh{v}
-																				     (Main.AlexNone{v r2dg}
-																					@ ((Main.AlexPosn{tc r1Oh},
-																					    GHCziBase.Char{(w) tc 3o},
-																					    [GHCziBase.Char{(w) tc 3o}])
-																					   -> GHCziBase.Int{(w) tc 3J}
-																					   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))
-																				     @ s{tv X3ho}
-																				     wild_X2w{v}
-																				     newzus{v X437}
-								      of wild{v X43n} Dead A { (# newzus{v X43q} Once L, r{v X43s} Once S #) ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.writeMutVarzh{(w) v 94s}
-																				     @ s{tv X3ho}
-																				     @ GHCziBase.String{tc rdx}
-																				     varzh{v a3SD}
-																				     r{v a40b}
-																				     newzus{v X43q}
-								      of s2zh{v a3ST} L { __DEFAULT ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.writeMutVarzh{(w) v 94s}
-																				     @ s{tv X3ho}
-																				     @ Main.AlexPosn{tc r1Oh}
-																				     varzh{v X3Vx}
-																				     r{v X439}
-																				     s2zh{v a3ST}
-								      of s2zh{v X3W1} L { __DEFAULT ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) GHCziPrim.writeMutVarzh{(w) v 94s}
-																				     @ s{tv X3ho}
-																				     @ GHCziBase.Char{(w) tc 3o}
-																				     varzh{v X3Vw}
-																				     tpl_X5l{v}
-																				     s2zh{v X3W1}
-								      of s2zh{v X3Zb} L { __DEFAULT ->
-								      case (# GHCziPrim.Statezh{(w) tc 32q} s{tv X3ho},
-									      Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-													  GHCziBase.Char{(w) tc 3o},
-													  [GHCziBase.Char{(w) tc 3o}])
-													 -> GHCziBase.Int{(w) tc 3J}
-													 -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #) r{v X43s}
-								      of wild_X5m{v} Dead A {
-									Main.AlexNone{d r1NR} ->
-									  lvl_s4oc{v}
-									    @ s{tv X3ho}
-									    wild_X2w{v}
-									    s2zh{v X3Zb};
-									Main.AlexLastAcc{d r1NP} ds_d3mj{v} Dead A ds_d3mk{v} Dead A ds_d3ml{v} Dead A ->
-									  zdwok{v s4oa}
-									    @ s{tv X3ho}
-									    varzh{v X3Vx}
-									    varzh{v a3SD}
-									    varzh{v X3Vw}
-									    s2zh{v X3Zb}
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								      }
-								  }
-							      }
-				    } in 
-				      case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												GHCziBase.Char{(w) tc 3o},
-												[GHCziBase.Char{(w) tc 3o}])
-											       -> GHCziBase.Int{(w) tc 3J}
-											       -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) lctx{v a240}
-				      of wild_X5a{v} Dead A {
-					DataziMaybe.Nothing{d r1Qo} -> checkzurctx{v s4oe};
-					DataziMaybe.Just{d r1Qc} arr{v a24L} Once U(U(L)U(L)L) ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) arr{v a24L}
-					  of wild{v a3Rf} Dead A { GHCziArr.Array{d r256} l{v a3Rh} Once U(L) u{v a3Ri} Once U(L) ds{v a3Rj} Once L ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) l{v a3Rh}
-					  of ww_a48Q{v} Dead A { GHCziBase.Czh{(w) d 62} ww_a48S{v} Once L ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) u{v a3Ri}
-					  of ww_a48U{v} Dead A { GHCziBase.Czh{(w) d 62} ww_a48W{v} Once L ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) lc{v a23x}
-					  of w_a48Z{v} Dead A { GHCziBase.Czh{(w) d 62} ww_a491{v} Once L ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) GHCziArr.zdwindex2{v r27i}
-																			      ww_a48S{v}
-																			      ww_a48W{v}
-																			      ww_a491{v}
-					  of ww_a496{v} L { __DEFAULT ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) GHCziPrim.indexArrayzh{(w) v 92b}
-																			      @ GHCziBase.Bool{(w) tc 3c}
-																			      ds{v a3Rj}
-																			      ww_a496{v}
-					  of wild2{v a49H} Dead A { (# e{v a49J} Once S #) ->
-					  case (<nt>Main.Alex{tc r1NX} (Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-												    GHCziBase.Char{(w) tc 3o},
-												    [GHCziBase.Char{(w) tc 3o}])
-												   -> GHCziBase.Int{(w) tc 3J}
-												   -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]))) e{v a49J}
-					  of wild_X5d{v} Dead A {
-					    GHCziBase.False{(w) d 68} ->
-					      checkzuaccs1{v s4o8} rest{v a242};
-					    GHCziBase.True{(w) d 6u} -> checkzurctx{v s4oe}
-					  }
-					  }
-					  }
-					  }
-					  }
-					  }
-					  }
-				      }
-				    }
-				};
-     } in  checkzuaccs1{v s4o8} e{v a4cQ}
-     }
-     })
-      @ s{tv a2be} eta_x1{v} eta_x2{v}
-    (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-       Main.AlexLastAcc{tc r1NN} ((Main.AlexPosn{tc r1Oh},
-				   GHCziBase.Char{(w) tc 3o},
-				   [GHCziBase.Char{(w) tc 3o}])
-				  -> GHCziBase.Int{(w) tc 3J}
-				  -> <nt>Main.Alex{tc r1NX} [GHCziBase.Char{(w) tc 3o}]) #)
-Bad eta expand
-    1
-    (case (<nt>Main.Alex{tc r1NX} GHCziNum.Integer{tc 314}) GHCziNum.plusInteger{v 0F}
-							      i{v a1Rq} lit_s3Zm{v}
-     of tpl_X59{v} L { __DEFAULT ->
-     loop{v s3Zo} tpl_X59{v}
-     })
-      @ s{tv a2be} eta_x1{v} eta_x2{v}
-    (# GHCziPrim.Statezh{(w) tc 32q} s{tv a2be},
-       GHCziNum.Integer{tc 314} #)
 
-==================== IdInfo ====================
-$w==_s4mu :: GHC.Prim.Int#
+==================== Arity analysis ====================
+$w==_s4mH :: GHC.Prim.Int#
 	     -> GHC.Base.Int
 	     -> GHC.Base.Int
 	     -> GHC.Prim.Int#
 	     -> GHC.Base.Int
 	     -> GHC.Base.Int
-	     -> GHC.Base.Bool :: [Arity 6
-				  0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
-				  Str: DmdType LLLLLL]
-a_s41g :: [GHC.Base.Char] :: [*
-			      Str: DmdType]
-$wshowsPrec_s4mt :: GHC.Prim.Int#
+	     -> GHC.Base.Bool
+[Arity 6
+ 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
+ Str: DmdType LLLLLL]
+$w==_s4mH = \ (ww_s4lF :: GHC.Prim.Int#)
+	      (ww_s4lH :: GHC.Base.Int)
+	      (ww_s4lI :: GHC.Base.Int)
+	      (ww_s4lO :: GHC.Prim.Int#)
+	      (ww_s4lQ :: GHC.Base.Int)
+	      (ww_s4lR :: GHC.Base.Int) ->
+	      case GHC.Base.Bool GHC.Prim.==# ww_s4lF ww_s4lO of wild_X45N {
+		GHC.Base.False -> GHC.Base.False;
+		GHC.Base.True ->
+		  case GHC.Base.Bool ww_s4lH of wild_X45G { GHC.Base.I# x_X45H ->
+		  case GHC.Base.Bool ww_s4lQ of wild1_X45M { GHC.Base.I# y_X45Q ->
+		  case GHC.Base.Bool GHC.Prim.==# x_X45H y_X45Q of wild_X45X {
+		    GHC.Base.False -> GHC.Base.False;
+		    GHC.Base.True ->
+		      case GHC.Base.Bool ww_s4lI of wild_X47o { GHC.Base.I# x_X47r ->
+		      case GHC.Base.Bool ww_s4lR of wild1_X47y { GHC.Base.I# y_X47E ->
+		      GHC.Prim.==# x_X47r y_X47E
+		      }
+		      }
+		  }
+		  }
+		  }
+	      }
+
+a_s40I :: [GHC.Base.Char]
+[*
+ Str: DmdType]
+a_s40I = GHC.Base.unpackCString# "AlexPn "
+
+$wshowsPrec_s4mG :: GHC.Prim.Int#
 		    -> GHC.Base.Int
 		    -> GHC.Base.Int
 		    -> GHC.Base.Int
 		    -> GHC.Base.String
-		    -> GHC.Base.String :: [Arity 5
-					   0 -> 0 -> 0 -> 0 -> 0 -> *
-					   Str: DmdType LLLLL]
-lvl_s3ZO :: [GHC.Base.Char] :: [*
-				Str: DmdType]
-lvl_s3ZN :: [GHC.Base.Char] :: [*
-				Str: DmdType]
-lit_s3Zm :: GHC.Num.Integer :: [*
-				Str: DmdType]
-lit_a3kz :: GHC.Base.Int :: [*
-			     Str: DmdType m]
-return_a3eo :: forall a_a2mD. a_a2mD -> Main.Alex a_a2mD :: [Arity 2
-							     0 -> T
-							     Str: DmdType LA]
->>_a3dX :: forall a_a2kt b_a2kv.
-	   Main.Alex a_a2kt -> Main.Alex b_a2kv -> Main.Alex b_a2kv :: [Arity 4
-									3 -> 3 -> 0 -> 0 -> *
-									Str: DmdType C(C(U(LA)))C(C(S))LL]
->>=_a3de :: forall a_a2mS b_a2mU.
-	    Main.Alex a_a2mS -> (a_a2mS -> Main.Alex b_a2mU) -> Main.Alex b_a2mU :: [Arity 4
-										     3 -> 4 -> 0 -> 0 -> *
-										     Str: DmdType C(C(U(LL)))C(C(C(S)))LL]
-showsPrec_a3bb :: GHC.Base.Int -> Main.AlexPosn -> GHC.Show.ShowS :: [Arity 3
-								      T
-								      Worker $wshowsPrec_s4mt
-								      Str: DmdType U(L)U(LLL)L]
-showList_a3cJ :: [Main.AlexPosn] -> GHC.Show.ShowS :: [Arity 2
-						       0 -> 0 -> *
-						       Str: DmdType SL]
-$dmshow_a3kv :: Main.AlexPosn -> GHC.Base.String :: [Arity 1
-						     0 -> *
-						     Str: DmdType U(LLL)]
-==_a3aA :: Main.AlexPosn -> Main.AlexPosn -> GHC.Base.Bool :: [Arity 2
-							       T
-							       Worker $w==_s4mu
-							       Str: DmdType U(U(L)LL)U(U(L)LL)]
-/=_a3aT :: Main.AlexPosn -> Main.AlexPosn -> GHC.Base.Bool :: [Arity 2
-							       0 -> 0 -> *
-							       Str: DmdType U(U(L)LL)U(U(L)LL)]
-$fShowAlexPosn_a2iF :: {GHC.Show.Show Main.AlexPosn} :: [*
-							 Str: DmdType m]
-$fEqAlexPosn_a2iE :: {GHC.Base.Eq Main.AlexPosn} :: [*
-						     Str: DmdType m]
-$fMonadAlex_a2dC :: {GHC.Base.Monad Main.Alex} :: [*
-						   Str: DmdType m]
-fail_a3eS :: forall a_a3dd. GHC.Base.String -> Main.Alex a_a3dd :: [Arity 1
-								    *
-								    Str: DmdType Sb]
-lvl_s4oH :: GHC.Base.Int :: [*]
-lvl_s4oE :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+		    -> GHC.Base.String
+[Arity 5
+ 0 -> 0 -> 0 -> 0 -> 0 -> *
+ Str: DmdType LLLLL]
+$wshowsPrec_s4mG = \ (ww_s4lp :: GHC.Prim.Int#)
+		     (ww_s4lt :: GHC.Base.Int)
+		     (ww_s4lu :: GHC.Base.Int)
+		     (ww_s4lv :: GHC.Base.Int)
+		     (w_s4lx :: GHC.Base.String) ->
+		     let {
+		       p_s4p5 :: GHC.Show.ShowS
+		       [Arity 1
+			*
+			Str: DmdType L]
+		       p_s4p5 = \ (x_a41d :: GHC.Base.String) ->
+				  GHC.Base.++
+				    @ GHC.Base.Char
+				    a_s40I
+				    (case [GHC.Base.Char] ww_s4lt of w_X42m { GHC.Base.I# ww_a40t ->
+				     GHC.Show.$wshowSignedInt
+				       11
+				       ww_a40t
+				       (GHC.Base.:
+					  @ GHC.Base.Char
+					  GHC.Show.lvl1
+					  (case [GHC.Base.Char] ww_s4lu of w_X44A { GHC.Base.I# ww_X42J ->
+					   GHC.Show.$wshowSignedInt
+					     11
+					     ww_X42J
+					     (GHC.Base.:
+						@ GHC.Base.Char
+						GHC.Show.lvl1
+						(case [GHC.Base.Char] ww_s4lv of w_X44r { GHC.Base.I# ww_X42A ->
+						 GHC.Show.$wshowSignedInt 11 ww_X42A x_a41d
+						 }))
+					   }))
+				     })
+		     } in 
+		       case GHC.Base.String GHC.Prim.>=# ww_s4lp 11 of wild_a42t {
+			 GHC.Base.False -> p_s4p5 w_s4lx;
+			 GHC.Base.True ->
+			   GHC.Base.:
+			     @ GHC.Base.Char
+			     GHC.Show.a2
+			     (p_s4p5 (GHC.Base.: @ GHC.Base.Char GHC.Show.a w_s4lx))
+		       }
+
+lvl_s3Z7 :: [GHC.Base.Char]
+[*
+ Str: DmdType]
+lvl_s3Z7 = GHC.Base.unpackCString# "error."
+
+lvl_s3Z6 :: [GHC.Base.Char]
+[*
+ Str: DmdType]
+lvl_s3Z6 = GHC.Base.unpackCString# "stopped."
+
+lit_s3Yy :: GHC.Num.Integer
+[*
+ Str: DmdType]
+lit_s3Yy = GHC.Num.S# 1
+
+lit_a3m9 :: GHC.Base.Int
+[*
+ Str: DmdType m]
+lit_a3m9 = GHC.Base.I# 0
+
+return_a3fW :: forall a_a2mR. a_a2mR -> Main.Alex a_a2mR
+[Arity 2
+ 0 -> T
+ Str: DmdType LA]
+return_a3fW = \ (@ a_a3g1)
+		(a_X2cH :: a_a3g1)
+		(@ s_a3g7)
+		(s_a2bU :: Main.AlexState s_a3g7) ->
+		GHC.ST.poly_return @ s_a3g7 @ a_a3g1 a_X2cH
+
+>>_a3fv :: forall a_a2kH b_a2kJ.
+	   Main.Alex a_a2kH -> Main.Alex b_a2kJ -> Main.Alex b_a2kJ
+[Arity 4
+ 3 -> 3 -> 0 -> 0 -> *
+ Str: DmdType C(C(U(LA)))C(C(S))LL]
+>>_a3fv = \ (@ a_a3fM)
+	    (@ b_a3fN)
+	    (eta_a3Ts :: Main.Alex a_a3fM)
+	    (eta1_a3Tr :: Main.Alex b_a3fN)
+	    (@ s_a3eY)
+	    (eta_s40h :: Main.AlexState s_a3eY)
+	    (eta_s40i :: GHC.Prim.State# s_a3eY) ->
+	    case (# GHC.Prim.State# s_a3eY, b_a3fN #) eta_a3Ts @ s_a3eY eta_s40h eta_s40i
+	    of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+	    eta1_a3Tr @ s_a3eY eta_s40h new_s_a3Zz
+	    }
+
+>>=_a3eM :: forall a_a2n6 b_a2n8.
+	    Main.Alex a_a2n6 -> (a_a2n6 -> Main.Alex b_a2n8) -> Main.Alex b_a2n8
+[Arity 4
+ 3 -> 4 -> 0 -> 0 -> *
+ Str: DmdType C(C(U(LL)))C(C(C(S)))LL]
+>>=_a3eM = \ (@ a_a3eR)
+	     (@ b_a3eS)
+	     (ds_d3nC :: Main.Alex a_a3eR)
+	     (k_X2cv :: a_a3eR -> Main.Alex b_a3eS)
+	     (@ s_a3eY)
+	     (s_a2bI :: Main.AlexState s_a3eY)
+	     (s_a3Zr :: GHC.Prim.State# s_a3eY) ->
+	     case (# GHC.Prim.State# s_a3eY, b_a3eS #) ds_d3nC @ s_a3eY s_a2bI s_a3Zr
+	     of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+	     k_X2cv r_a3ZA @ s_a3eY s_a2bI new_s_a3Zz
+	     }
+
+showsPrec_a3cJ :: GHC.Base.Int -> Main.AlexPosn -> GHC.Show.ShowS
+[T
+ Worker $wshowsPrec_s4mG
+ Str: DmdType U(L)U(LLL)L]
+showsPrec_a3cJ = __inline_me (\ (w_s4ln :: GHC.Base.Int)
+				(w_s4lr :: Main.AlexPosn)
+				(w_s4lx :: GHC.Base.String) ->
+				case GHC.Base.String w_s4ln of w_X4mv { GHC.Base.I# ww_s4lp ->
+				case GHC.Base.String w_s4lr of w_X4mD { Main.AlexPn ww_s4lt ww_s4lu ww_s4lv ->
+				$wshowsPrec_s4mG ww_s4lp ww_s4lt ww_s4lu ww_s4lv w_s4lx
+				}
+				})
+
+showList_a3eh :: [Main.AlexPosn] -> GHC.Show.ShowS
+[Arity 2
+ 0 -> 0 -> *
+ Str: DmdType SL]
+showList_a3eh = \ (ds1_a3Hj :: [Main.AlexPosn]) (s_a3Hi :: GHC.Base.String) ->
+		  case GHC.Base.String ds1_a3Hj of wild_a3Hu {
+		    [] -> GHC.Base.++ @ GHC.Base.Char GHC.Show.lvl16 s_a3Hi;
+		    : x_a3Hs xs_a3Ht ->
+		      GHC.Base.:
+			@ GHC.Base.Char
+			GHC.Show.lvl14
+			(case [GHC.Base.Char] x_a3Hs of w_X4mD { Main.AlexPn ww_s4lt ww_s4lu ww_s4lv ->
+			 $wshowsPrec_s4mG
+			   0
+			   ww_s4lt
+			   ww_s4lu
+			   ww_s4lv
+			   (__letrec {
+			      showl1_s4p9 :: [Main.AlexPosn] -> [GHC.Base.Char]
+			      [Arity 1
+			       0 -> *
+			       Str: DmdType S]
+			      showl1_s4p9 = \ (ds2_a3Hq :: [Main.AlexPosn]) ->
+					      case [GHC.Base.Char] ds2_a3Hq of wild1_a42z {
+						[] -> GHC.Base.: @ GHC.Base.Char GHC.Show.lvl15 s_a3Hi;
+						: y_a42x ys_a42y ->
+						  GHC.Base.:
+						    @ GHC.Base.Char
+						    GHC.Show.a1
+						    (case [GHC.Base.Char] y_a42x
+						     of w_X4o5 { Main.AlexPn ww_X4mX ww_X4mZ ww_X4n1 ->
+						     $wshowsPrec_s4mG 0 ww_X4mX ww_X4mZ ww_X4n1 (showl1_s4p9 ys_a42y)
+						     })
+					      };
+			    } in  showl1_s4p9 xs_a3Ht)
+			 })
+		  }
+
+$dmshow_a3m7 :: Main.AlexPosn -> GHC.Base.String
+[Arity 1
+ 0 -> *
+ Str: DmdType U(LLL)]
+$dmshow_a3m7 = \ (x_a42G :: Main.AlexPosn) ->
+		 case GHC.Base.String x_a42G of w_X4mD { Main.AlexPn ww_s4lt ww_s4lu ww_s4lv ->
+		 $wshowsPrec_s4mG 0 ww_s4lt ww_s4lu ww_s4lv (GHC.Base.[] @ GHC.Base.Char)
+		 }
+
+==_a3c8 :: Main.AlexPosn -> Main.AlexPosn -> GHC.Base.Bool
+[T
+ Worker $w==_s4mH
+ Str: DmdType U(U(L)LL)U(U(L)LL)]
+==_a3c8 = __inline_me (\ (w_s4lB :: Main.AlexPosn) (w_s4lK :: Main.AlexPosn) ->
+			 case GHC.Base.Bool w_s4lB of w_X4mO { Main.AlexPn ww_s4lD ww_s4lH ww_s4lI ->
+			 case GHC.Base.Bool ww_s4lD of ww_X4mW { GHC.Base.I# ww_s4lF ->
+			 case GHC.Base.Bool w_s4lK of w_X4n7 { Main.AlexPn ww_s4lM ww_s4lQ ww_s4lR ->
+			 case GHC.Base.Bool ww_s4lM of ww_X4nf { GHC.Base.I# ww_s4lO ->
+			 $w==_s4mH ww_s4lF ww_s4lH ww_s4lI ww_s4lO ww_s4lQ ww_s4lR
+			 }
+			 }
+			 }
+			 })
+
+/=_a3cr :: Main.AlexPosn -> Main.AlexPosn -> GHC.Base.Bool
+[Arity 2
+ 0 -> 0 -> *
+ Str: DmdType U(U(L)LL)U(U(L)LL)]
+/=_a3cr = \ (a_a2jh :: Main.AlexPosn) (b_a2ji :: Main.AlexPosn) ->
+	    case GHC.Base.Bool a_a2jh of w_X4mO { Main.AlexPn ww_s4lD ww_s4lH ww_s4lI ->
+	    case GHC.Base.Bool ww_s4lD of ww_X4mW { GHC.Base.I# ww_s4lF ->
+	    case GHC.Base.Bool b_a2ji of w_X4n7 { Main.AlexPn ww_s4lM ww_s4lQ ww_s4lR ->
+	    case GHC.Base.Bool ww_s4lM of ww_X4nf { GHC.Base.I# ww_s4lO ->
+	    case GHC.Base.Bool GHC.Prim.==# ww_s4lF ww_s4lO of wild_X45N {
+	      GHC.Base.False -> GHC.Base.True;
+	      GHC.Base.True ->
+		case GHC.Base.Bool ww_s4lH of wild_X45G { GHC.Base.I# x_X45H ->
+		case GHC.Base.Bool ww_s4lQ of wild1_X45M { GHC.Base.I# y_X45Q ->
+		case GHC.Base.Bool GHC.Prim.==# x_X45H y_X45Q of wild_X45X {
+		  GHC.Base.False -> GHC.Base.True;
+		  GHC.Base.True ->
+		    case GHC.Base.Bool ww_s4lI of wild_X47o { GHC.Base.I# x_X47r ->
+		    case GHC.Base.Bool ww_s4lR of wild1_X47y { GHC.Base.I# y_X47E ->
+		    case GHC.Base.Bool GHC.Prim.==# x_X47r y_X47E of wild_a43s {
+		      GHC.Base.False -> GHC.Base.True; GHC.Base.True -> GHC.Base.False
+		    }
+		    }
+		    }
+		}
+		}
+		}
+	    }
+	    }
+	    }
+	    }
+	    }
+
+$fShowAlexPosn_a2iT :: {GHC.Show.Show Main.AlexPosn}
+[Exported]
+[*
+ Str: DmdType m]
+$fShowAlexPosn_a2iT = GHC.Show.:DShow
+			@ Main.AlexPosn showsPrec_a3cJ $dmshow_a3m7 showList_a3eh
+
+$fEqAlexPosn_a2iS :: {GHC.Base.Eq Main.AlexPosn}
+[Exported]
+[*
+ Str: DmdType m]
+$fEqAlexPosn_a2iS = GHC.Base.:DEq @ Main.AlexPosn ==_a3c8 /=_a3cr
+
+Rec {
+$fMonadAlex_a2dQ :: {GHC.Base.Monad Main.Alex}
+[Exported]
+[*
+ Str: DmdType m]
+$fMonadAlex_a2dQ = GHC.Base.:DMonad
+		     @ Main.Alex >>=_a3eM >>_a3fv return_a3fW fail_a3gq
+fail_a3gq :: forall a_a3eL. GHC.Base.String -> Main.Alex a_a3eL
+[Arity 1
+ *
+ Str: DmdType Sb]
+fail_a3gq = \ (@ a_a3gE) (eta_x1 :: GHC.Base.String) ->
+	      GHC.Base.$dmfail @ Main.Alex $fMonadAlex_a2dQ @ a_a3gE eta_x1
+end Rec }
+
+lvl_s4pX :: GHC.Base.Int
+[*]
+lvl_s4pX = GHC.Base.I# 3
+
+lvl_s4pU :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 	    -> GHC.Base.Int
-	    -> Main.Alex [GHC.Base.Char] :: [Arity 2
-					     0 -> 0 -> T]
-lvl_s4oD :: GHC.Base.Int :: [*]
-lvl_s4oC :: Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+	    -> Main.Alex [GHC.Base.Char]
+[Arity 2
+ 0 -> 0 -> T]
+lvl_s4pU = \ (ds_d3nZ :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char]))
+	     (len_a1Rn :: GHC.Base.Int) ->
+	     case (Main.Alex [GHC.Base.Char]) ds_d3nZ
+	     of wild_X3c { (ds_d3o0, ds_d3o1, input_a1Rm) ->
+	     let {
+	       a_s4pV :: [GHC.Base.Char]
+	       [*
+		Str: DmdType]
+	       a_s4pV = GHC.List.take @ GHC.Base.Char len_a1Rn input_a1Rm
+	     } in 
+	       \ (@ s_X3jq)
+		 (s_X2fe :: Main.AlexState s_X3jq)
+		 (s_a3ZV :: GHC.Prim.State# s_X3jq) ->
+		 (# s_a3ZV, a_s4pV #)
+	     }
+
+lvl_s4pT :: GHC.Base.Int
+[*]
+lvl_s4pT = GHC.Base.I# 1
+
+lvl_s4pS :: Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			  -> GHC.Base.Int
-			  -> Main.Alex [GHC.Base.Char]) :: [*]
-lvl_s4oB :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			  -> Main.Alex [GHC.Base.Char])
+[*]
+lvl_s4pS = Main.AlexAcc
+	     @ ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+		-> GHC.Base.Int
+		-> Main.Alex [GHC.Base.Char])
+	     lvl_s4pT
+	     lvl_s4pU
+	     (Data.Maybe.Nothing @ (GHC.Arr.Array GHC.Base.Char GHC.Base.Bool))
+	     (Data.Maybe.Nothing @ GHC.Base.Int)
+
+lvl_s4pR :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			   -> GHC.Base.Int
-			   -> Main.Alex [GHC.Base.Char])] :: [*]
-lvl_s4oA :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			   -> Main.Alex [GHC.Base.Char])]
+[*]
+lvl_s4pR = GHC.Base.:
+	     @ (Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			      -> GHC.Base.Int
+			      -> Main.Alex [GHC.Base.Char]))
+	     lvl_s4pS
+	     (GHC.Base.[]
+		@ (Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+				 -> GHC.Base.Int
+				 -> Main.Alex [GHC.Base.Char])))
+
+lvl_s4pQ :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			    -> GHC.Base.Int
-			    -> Main.Alex [GHC.Base.Char])]] :: [*]
-$wk_s4mv :: GHC.Prim.Int#
-	    -> forall s_a2be.
-	       Main.AlexState s_a2be
-	       -> GHC.Prim.State# s_a2be
-	       -> (# GHC.Prim.State# s_a2be, [GHC.Base.Char] #) :: [Arity 3
-								    0 -> 0 -> 0 -> *
-								    Str: DmdType LS(U(L)U(L)U(L)L)L]
-lvl_s4oz :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> Main.Alex [GHC.Base.Char])]]
+[*]
+lvl_s4pQ = GHC.Base.:
+	     @ [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			      -> GHC.Base.Int
+			      -> Main.Alex [GHC.Base.Char])]
+	     lvl_s4pR
+	     (GHC.Base.[]
+		@ [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+				 -> GHC.Base.Int
+				 -> Main.Alex [GHC.Base.Char])])
+
+Rec {
+$wk_s4mM :: GHC.Prim.Int#
+	    -> forall s_a2bs.
+	       Main.AlexState s_a2bs
+	       -> GHC.Prim.State# s_a2bs
+	       -> (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #)
+[Arity 3
+ 0 -> 0 -> 0 -> *
+ Str: DmdType LS(U(L)U(L)U(L)L)L]
+$wk_s4mM = \ (ww_s4mz :: GHC.Prim.Int#)
+	     (@ s_a2bs)
+	     (w_s4mC :: Main.AlexState s_a2bs)
+	     (w_s4mD :: GHC.Prim.State# s_a2bs) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) w_s4mC
+	     of wild_X2B { Main.AlexState pos_r_a21Q inp_r_a21S chr_r_a21R ds_d3od ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) inp_r_a21S
+	     of wild_a43y { GHC.STRef.STRef var#_a43z ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.readMutVar#
+								  @ s_a2bs @ GHC.Base.String var#_a43z w_s4mD
+	     of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) chr_r_a21R
+	     of wild_X46u { GHC.STRef.STRef var#_X46x ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.readMutVar#
+								  @ s_a2bs @ GHC.Base.Char var#_X46x new_s_a3Zz
+	     of wild_X42B { (# new_s_X42A, r_X42C #) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) pos_r_a21Q
+	     of wild_X46v { GHC.STRef.STRef var#_X46y ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.readMutVar#
+								  @ s_a2bs @ Main.AlexPosn var#_X46y new_s_X42A
+	     of wild_X45K { (# new_s_X48T, r_X42D #) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) r_X42C
+	     of tpl_X4U { GHC.Base.C# a_s3Wm ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) alex_scan_tkn_a2zF
+								  tpl_X4U
+								  0
+								  ww_s4mz
+								  (Main.AlexNone
+								     @ (Main.AlexInput
+									-> GHC.Base.Int
+									-> Main.Alex [GHC.Base.Char]))
+								  @ s_a2bs
+								  wild_X2B
+								  new_s_X48T
+	     of wild_X42t { (# new_s_X42s, r_X42u #) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) r_X42u of wild_X4V {
+	       Main.AlexNone ->
+		 case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) r_a3ZA of wild_X4y {
+		   [] -> (# new_s_X42s, lvl_s3Z6 #); : a_s3Tv a_s3Tw -> (# new_s_X42s, lvl_s3Z7 #)
+		 };
+	       Main.AlexLastAcc k_a23z input_a23A len_a23B ->
+		 case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) input_a23A
+		 of wild_X2D { (pos_a225, chr_a226, inp_a227) ->
+		 case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.writeMutVar#
+								      @ s_a2bs
+								      @ GHC.Base.String
+								      var#_a43z
+								      inp_a227
+								      new_s_X42s
+		 of s2#_a43F { __DEFAULT ->
+		 case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.writeMutVar#
+								      @ s_a2bs
+								      @ Main.AlexPosn
+								      var#_X46y
+								      pos_a225
+								      s2#_a43F
+		 of s2#_X46S { __DEFAULT ->
+		 case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.writeMutVar#
+								      @ s_a2bs
+								      @ GHC.Base.Char
+								      var#_X46x
+								      chr_a226
+								      s2#_X46S
+		 of s2#_X46O { __DEFAULT ->
+		 k_a23z (r_X42D, tpl_X4U, r_a3ZA) len_a23B @ s_a2bs wild_X2B s2#_X46O
+		 }
+		 }
+		 }
+		 }
+	     }
+	     }
+	     }
+	     }
+	     }
+	     }
+	     }
+	     }
+	     }
+	     }
+lvl_s4pP :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 	    -> GHC.Base.Int
-	    -> forall s_a2be.
-	       Main.AlexState s_a2be
-	       -> GHC.Prim.State# s_a2be
-	       -> (# GHC.Prim.State# s_a2be, [GHC.Base.Char] #) :: [Arity 4
-								    T]
-lvl_s4ox :: Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+	    -> forall s_a2bs.
+	       Main.AlexState s_a2bs
+	       -> GHC.Prim.State# s_a2bs
+	       -> (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #)
+[Arity 4
+ T]
+lvl_s4pP = \ (input_a22z :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char]))
+	     (len_a22A :: GHC.Base.Int)
+	     (@ s_a2bs)
+	     (eta_s47H :: Main.AlexState s_a2bs)
+	     (eta_s47I :: GHC.Prim.State# s_a2bs) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) eta_s47H
+	     of wild_X34 { Main.AlexState ds_d3og ds_d3oh ds_d3oi scd_r_a22m ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) scd_r_a22m
+	     of wild_a43y { GHC.STRef.STRef var#_a43z ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) GHC.Prim.readMutVar#
+								  @ s_a2bs @ GHC.Base.Int var#_a43z eta_s47I
+	     of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+	     case (# GHC.Prim.State# s_a2bs, [GHC.Base.Char] #) r_a3ZA
+	     of w_X4o2 { GHC.Base.I# ww_s4mz ->
+	     $wk_s4mM ww_s4mz @ s_a2bs wild_X34 new_s_a3Zz
+	     }
+	     }
+	     }
+	     }
+lvl_s4pN :: Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			  -> GHC.Base.Int
-			  -> Main.Alex [GHC.Base.Char]) :: [*]
-lvl_s4ow :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			  -> Main.Alex [GHC.Base.Char])
+[*]
+lvl_s4pN = Main.AlexAcc
+	     @ ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+		-> GHC.Base.Int
+		-> Main.Alex [GHC.Base.Char])
+	     lit_a3m9
+	     lvl_s4pP
+	     (Data.Maybe.Nothing @ (GHC.Arr.Array GHC.Base.Char GHC.Base.Bool))
+	     (Data.Maybe.Nothing @ GHC.Base.Int)
+lvl_s4pM :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			   -> GHC.Base.Int
-			   -> Main.Alex [GHC.Base.Char])] :: [*]
-lvl_s4ov :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			   -> Main.Alex [GHC.Base.Char])]
+[*]
+lvl_s4pM = GHC.Base.:
+	     @ (Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			      -> GHC.Base.Int
+			      -> Main.Alex [GHC.Base.Char]))
+	     lvl_s4pN
+	     (GHC.Base.[]
+		@ (Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+				 -> GHC.Base.Int
+				 -> Main.Alex [GHC.Base.Char])))
+lvl_s4pL :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			    -> GHC.Base.Int
-			    -> Main.Alex [GHC.Base.Char])]] :: [*]
-lvl_s4ou :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> Main.Alex [GHC.Base.Char])]]
+[*]
+lvl_s4pL = GHC.Base.:
+	     @ [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			      -> GHC.Base.Int
+			      -> Main.Alex [GHC.Base.Char])]
+	     lvl_s4pM
+	     lvl_s4pQ
+lvl_s4pK :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			    -> GHC.Base.Int
-			    -> Main.Alex [GHC.Base.Char])]] :: [*]
-lvl_s4ot :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			    -> Main.Alex [GHC.Base.Char])]]
+[*]
+lvl_s4pK = GHC.Base.:
+	     @ [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			      -> GHC.Base.Int
+			      -> Main.Alex [GHC.Base.Char])]
+	     (GHC.Base.[]
+		@ (Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+				 -> GHC.Base.Int
+				 -> Main.Alex [GHC.Base.Char])))
+	     lvl_s4pL
+lvl_s4pJ :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 			    -> GHC.Base.Int
-			    -> Main.Alex [GHC.Base.Char])]] :: [*]
-alex_accept_a2A9 :: GHC.Arr.Array GHC.Base.Int
+			    -> Main.Alex [GHC.Base.Char])]]
+[*]
+lvl_s4pJ = GHC.Base.:
+	     @ [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			      -> GHC.Base.Int
+			      -> Main.Alex [GHC.Base.Char])]
+	     (GHC.Base.[]
+		@ (Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+				 -> GHC.Base.Int
+				 -> Main.Alex [GHC.Base.Char])))
+	     lvl_s4pK
+alex_accept_a2Bg :: GHC.Arr.Array GHC.Base.Int
 				  [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
 						 -> GHC.Base.Int
-						 -> Main.Alex [GHC.Base.Char])] :: [*
-										    Str: DmdType]
-alex_scan_tkn_a2yM :: GHC.Base.Char
+						 -> Main.Alex [GHC.Base.Char])]
+[*
+ Str: DmdType]
+alex_accept_a2Bg = case (GHC.Arr.Array GHC.Base.Int
+				       [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+						      -> GHC.Base.Int
+						      -> Main.Alex [GHC.Base.Char])]) GHC.Prim.newArray#
+											@ [Main.AlexAcc ((Main.AlexPosn,
+													  GHC.Base.Char,
+													  [GHC.Base.Char])
+													 -> GHC.Base.Int
+													 -> Main.Alex [GHC.Base.Char])]
+											@ GHC.Prim.RealWorld
+											4
+											(GHC.Arr.arrEleBottom
+											   @ [Main.AlexAcc ((Main.AlexPosn,
+													     GHC.Base.Char,
+													     [GHC.Base.Char])
+													    -> GHC.Base.Int
+													    -> Main.Alex [GHC.Base.Char])])
+											GHC.Prim.realWorld#
+		   of wild2_a3Up { (# s2#_a3Un, marr#_a3Uo #) ->
+		   __letrec {
+		     fillFromList_s4pc :: GHC.Prim.Int#
+					  -> [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char])]]
+					  -> GHC.Prim.State# GHC.Prim.RealWorld
+					  -> GHC.Prim.State# GHC.Prim.RealWorld
+		     [Arity 3
+		      0 -> 0 -> 0 -> *
+		      Str: DmdType LLL]
+		     fillFromList_s4pc = \ (i#_a3Ul :: GHC.Prim.Int#)
+					   (xs_a3Uk :: [[Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+								       -> GHC.Base.Int
+								       -> Main.Alex [GHC.Base.Char])]])
+					   (s3#_a3Uj :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+					   case (GHC.Prim.State# GHC.Prim.RealWorld) i#_a3Ul of wild_X3y {
+					     __DEFAULT ->
+					       case (GHC.Prim.State# GHC.Prim.RealWorld) xs_a3Uk of wild4_a47j {
+						 [] -> s3#_a3Uj;
+						 : y_a47h ys_a47i ->
+						   case (GHC.Prim.State# GHC.Prim.RealWorld) GHC.Prim.writeArray#
+											       @ GHC.Prim.RealWorld
+											       @ [Main.AlexAcc ((Main.AlexPosn,
+														 GHC.Base.Char,
+														 [GHC.Base.Char])
+														-> GHC.Base.Int
+														-> Main.Alex [GHC.Base.Char])]
+											       marr#_a3Uo
+											       wild_X3y
+											       y_a47h
+											       s3#_a3Uj
+						   of s4#_a47g { __DEFAULT ->
+						   fillFromList_s4pc (GHC.Prim.+# wild_X3y 1) ys_a47i s4#_a47g
+						   }
+					       };
+					     4 -> s3#_a3Uj
+					   };
+		   } in 
+		     case (GHC.Arr.Array GHC.Base.Int
+					 [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+							-> GHC.Base.Int
+							-> Main.Alex [GHC.Base.Char])]) fillFromList_s4pc
+											  0 lvl_s4pJ s2#_a3Un
+		     of s3#_a47k { __DEFAULT ->
+		     case (GHC.Arr.Array GHC.Base.Int
+					 [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+							-> GHC.Base.Int
+							-> Main.Alex [GHC.Base.Char])]) GHC.Prim.unsafeFreezeArray#
+											  @ GHC.Prim.RealWorld
+											  @ [Main.AlexAcc ((Main.AlexPosn,
+													    GHC.Base.Char,
+													    [GHC.Base.Char])
+													   -> GHC.Base.Int
+													   -> Main.Alex [GHC.Base.Char])]
+											  marr#_a3Uo
+											  s3#_a47k
+		     of wild_a488 { (# s2#_a48a, arr#_a48b #) ->
+		     GHC.Arr.Array
+		       @ GHC.Base.Int
+		       @ [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+					-> GHC.Base.Int
+					-> Main.Alex [GHC.Base.Char])]
+		       lit_a3m9
+		       lvl_s4pX
+		       arr#_a48b
+		     }
+		     }
+		   }
+check_rctx_a2B6 :: ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+		    -> GHC.Base.Int
+		    -> Main.Alex [GHC.Base.Char])
+		   -> Data.Maybe.Maybe GHC.Base.Int
+		   -> [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+				     -> GHC.Base.Int
+				     -> Main.Alex [GHC.Base.Char])]
+		   -> GHC.Base.Char
+		   -> GHC.Prim.Int#
+		   -> Main.AlexLastAcc (Main.AlexInput
+					-> GHC.Base.Int
+					-> Main.Alex [GHC.Base.Char])
+		   -> Main.Alex (Main.AlexLastAcc (Main.AlexInput
+						   -> GHC.Base.Int
+						   -> Main.Alex [GHC.Base.Char]))
+[Arity 8
+ 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
+ Str: DmdType LSLLLL]
+check_rctx_a2B6 = \ (a_a2aL :: (Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+			       -> GHC.Base.Int
+			       -> Main.Alex [GHC.Base.Char])
+		    (rctx_a2aM :: Data.Maybe.Maybe GHC.Base.Int)
+		    (rest_a2aN :: [Main.AlexAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+						 -> GHC.Base.Int
+						 -> Main.Alex [GHC.Base.Char])])
+		    (lc_a2aO :: GHC.Base.Char)
+		    (len_a2aP :: GHC.Prim.Int#)
+		    (last_acc_a2aQ :: Main.AlexLastAcc (Main.AlexInput
+							-> GHC.Base.Int
+							-> Main.Alex [GHC.Base.Char]))
+		    (@ s_a2bs)
+		    (eta_x1 :: Main.AlexState s_a2bs)
+		    (eta_x2 :: GHC.Prim.State# s_a2bs) ->
+		    (case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+							-> GHC.Base.Int
+							-> Main.Alex [GHC.Base.Char]))) rctx_a2aM
+		     of wild_X3t {
+		       Data.Maybe.Nothing ->
+			 \ (@ s_a2bs)
+			   (w_s4m0 :: Main.AlexState s_a2bs)
+			   (w_s4mg :: GHC.Prim.State# s_a2bs) ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) w_s4m0
+			   of w_X4n1 { Main.AlexState ww_s4m2 ww_s4m6 ww_s4ma ww_s4me ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) ww_s4m2
+			   of ww_X4na { GHC.STRef.STRef ww_s4m4 ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) ww_s4m6
+			   of ww_X4ni { GHC.STRef.STRef ww_s4m8 ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) ww_s4ma
+			   of ww_X4nq { GHC.STRef.STRef ww_s4mc ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											@ s_a2bs
+											@ GHC.Base.String
+											ww_s4m8
+											w_s4mg
+			   of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											@ s_a2bs
+											@ GHC.Base.Char
+											ww_s4mc
+											new_s_a3Zz
+			   of wild_X42B { (# new_s_X42A, r_X42C #) ->
+			   case (# GHC.Prim.State# s_a2bs,
+				   Main.AlexLastAcc (Main.AlexInput
+						     -> GHC.Base.Int
+						     -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											@ s_a2bs
+											@ Main.AlexPosn
+											ww_s4m4
+											new_s_X42A
+			   of wild_X45K { (# new_s_X48T, r_X42D #) ->
+			   (# new_s_X48T,
+			      (Main.AlexLastAcc
+				 @ (Main.AlexInput -> GHC.Base.Int -> Main.Alex [GHC.Base.Char])
+				 a_a2aL
+				 (r_X42D, r_X42C, r_a3ZA)
+				 (GHC.Base.I# len_a2aP)) #)
+			   }
+			   }
+			   }
+			   }
+			   }
+			   }
+			   };
+		       Data.Maybe.Just ds_d3nH ->
+			 case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+							    -> GHC.Base.Int
+							    -> Main.Alex [GHC.Base.Char]))) ds_d3nH
+			 of wild_X4X { GHC.Base.I# ds_d3nI ->
+			 let {
+			   lvl_s4pt :: Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								    -> GHC.Base.Int
+								    -> Main.Alex [GHC.Base.Char]))
+			   [*
+			    Str: DmdType]
+			   lvl_s4pt = check_accs1_a2B8 rest_a2aN lc_a2aO len_a2aP last_acc_a2aQ
+			 } in 
+			   \ (@ s_X3iB)
+			     (s_X2fm :: Main.AlexState s_X3iB)
+			     (s_X436 :: GHC.Prim.State# s_X3iB) ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) s_X2fm
+			     of wild_X2B { Main.AlexState pos_r_a21Q inp_r_a21S chr_r_a21R ds_d3od ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) inp_r_a21S
+			     of wild_a43y { GHC.STRef.STRef var#_a43z ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											  @ s_X3iB
+											  @ GHC.Base.String
+											  var#_a43z
+											  s_X436
+			     of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) chr_r_a21R
+			     of wild_X46u { GHC.STRef.STRef var#_X46x ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											  @ s_X3iB
+											  @ GHC.Base.Char
+											  var#_X46x
+											  new_s_a3Zz
+			     of wild_X42B { (# new_s_X42A, r_X42C #) ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) pos_r_a21Q
+			     of wild_X46v { GHC.STRef.STRef var#_X46y ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											  @ s_X3iB
+											  @ Main.AlexPosn
+											  var#_X46y
+											  new_s_X42A
+			     of wild_X45K { (# new_s_X48T, r_X42D #) ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) r_X42C
+			     of tpl_X56 { GHC.Base.C# a_s3Wu ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) alex_scan_tkn_a2zF
+											  tpl_X56
+											  0
+											  ds_d3nI
+											  (Main.AlexNone
+											     @ (Main.AlexInput
+												-> GHC.Base.Int
+												-> Main.Alex [GHC.Base.Char]))
+											  @ s_X3iB
+											  wild_X2B
+											  new_s_X48T
+			     of wild_X42y { (# new_s_X42x, r_X42z #) ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+											  @ s_X3iB
+											  @ GHC.Base.String
+											  var#_a43z
+											  r_a3ZA
+											  new_s_X42x
+			     of s2#_a43F { __DEFAULT ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+											  @ s_X3iB
+											  @ Main.AlexPosn
+											  var#_X46y
+											  r_X42D
+											  s2#_a43F
+			     of s2#_X46S { __DEFAULT ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+											  @ s_X3iB
+											  @ GHC.Base.Char
+											  var#_X46x
+											  tpl_X56
+											  s2#_X46S
+			     of s2#_X46O { __DEFAULT ->
+			     case (# GHC.Prim.State# s_X3iB,
+				     Main.AlexLastAcc (Main.AlexInput
+						       -> GHC.Base.Int
+						       -> Main.Alex [GHC.Base.Char]) #) r_X42z
+			     of wild_X57 {
+			       Main.AlexNone -> lvl_s4pt @ s_X3iB wild_X2B s2#_X46O;
+			       Main.AlexLastAcc ds_d3nK ds_d3nL ds_d3nM ->
+				 case (# GHC.Prim.State# s_X3iB,
+					 Main.AlexLastAcc (Main.AlexInput
+							   -> GHC.Base.Int
+							   -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											      @ s_X3iB
+											      @ GHC.Base.String
+											      var#_a43z
+											      s2#_X46O
+				 of wild_X42f { (# new_s_X42e, r_X42g #) ->
+				 case (# GHC.Prim.State# s_X3iB,
+					 Main.AlexLastAcc (Main.AlexInput
+							   -> GHC.Base.Int
+							   -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											      @ s_X3iB
+											      @ GHC.Base.Char
+											      var#_X46x
+											      new_s_X42e
+				 of wild_X45j { (# new_s_X482, r_X45m #) ->
+				 case (# GHC.Prim.State# s_X3iB,
+					 Main.AlexLastAcc (Main.AlexInput
+							   -> GHC.Base.Int
+							   -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											      @ s_X3iB
+											      @ Main.AlexPosn
+											      var#_X46y
+											      new_s_X482
+				 of wild_X48w { (# new_s_X4bG, r_X45r #) ->
+				 (# new_s_X4bG,
+				    (Main.AlexLastAcc
+				       @ (Main.AlexInput -> GHC.Base.Int -> Main.Alex [GHC.Base.Char])
+				       a_a2aL
+				       (r_X45r, r_X45m, r_X42g)
+				       (GHC.Base.I# len_a2aP)) #)
+				 }
+				 }
+				 }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			 }
+		     })
+		      @ s_a2bs eta_x1 eta_x2
+check_accs1_a2B8 :: [Main.AlexAcc ((Main.AlexPosn,
+				    GHC.Base.Char,
+				    [GHC.Base.Char])
+				   -> GHC.Base.Int
+				   -> Main.Alex [GHC.Base.Char])]
+		    -> GHC.Base.Char
+		    -> GHC.Prim.Int#
+		    -> Main.AlexLastAcc (Main.AlexInput
+					 -> GHC.Base.Int
+					 -> Main.Alex [GHC.Base.Char])
+		    -> Main.Alex (Main.AlexLastAcc (Main.AlexInput
+						    -> GHC.Base.Int
+						    -> Main.Alex [GHC.Base.Char]))
+[Arity 4
+ 0 -> 0 -> 0 -> 0 -> *
+ Str: DmdType SLLL]
+check_accs1_a2B8 = \ (accs_a24C :: [Main.AlexAcc ((Main.AlexPosn,
+						   GHC.Base.Char,
+						   [GHC.Base.Char])
+						  -> GHC.Base.Int
+						  -> Main.Alex [GHC.Base.Char])])
+		     (lc_a24D :: GHC.Base.Char)
+		     (len_a24E :: GHC.Prim.Int#)
+		     (last_acc_a24F :: Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char])) ->
+		     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+							-> GHC.Base.Int
+							-> Main.Alex [GHC.Base.Char]))) accs_a24C
+		     of wild_X3t {
+		       [] ->
+			 return_a3fW
+			   @ (Main.AlexLastAcc (Main.AlexInput
+						-> GHC.Base.Int
+						-> Main.Alex [GHC.Base.Char]))
+			   last_acc_a24F;
+		       : ds_d3nO rest_a24P ->
+			 case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+							    -> GHC.Base.Int
+							    -> Main.Alex [GHC.Base.Char]))) ds_d3nO
+			 of wild_X4Y { Main.AlexAcc ds_d3nP a_a24M lctx_a24N rctx_a24O ->
+			 case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+							    -> GHC.Base.Int
+							    -> Main.Alex [GHC.Base.Char]))) lctx_a24N
+			 of wild_X54 {
+			   Data.Maybe.Nothing ->
+			     check_rctx_a2B6 a_a24M rctx_a24O rest_a24P lc_a24D len_a24E last_acc_a24F;
+			   Data.Maybe.Just arr_a24W ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) arr_a24W
+			     of wild_a48O { GHC.Arr.Array l_a48P u_a48Q ds_a48R ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) l_a48P
+			     of ww_a48V { GHC.Base.C# ww_a48X ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) u_a48Q
+			     of ww_a48Z { GHC.Base.C# ww_a491 ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) lc_a24D
+			     of w_a494 { GHC.Base.C# ww_a496 ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) GHC.Arr.$windex2
+												  ww_a48X
+												  ww_a491
+												  ww_a496
+			     of ww_a49b { __DEFAULT ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) GHC.Prim.indexArray#
+												  @ GHC.Base.Bool
+												  ds_a48R
+												  ww_a49b
+			     of wild2_a49K { (# e_a49M #) ->
+			     case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								-> GHC.Base.Int
+								-> Main.Alex [GHC.Base.Char]))) e_a49M
+			     of wild_X57 {
+			       GHC.Base.False -> check_accs1_a2B8 rest_a24P w_a494 len_a24E last_acc_a24F;
+			       GHC.Base.True ->
+				 check_rctx_a2B6 a_a24M rctx_a24O rest_a24P w_a494 len_a24E last_acc_a24F
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			     }
+			 }
+			 }
+		     }
+alex_scan_tkn_a2zF :: GHC.Base.Char
 		      -> GHC.Prim.Int#
 		      -> GHC.Prim.Int#
-		      -> Main.AlexLastAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+		      -> Main.AlexLastAcc (Main.AlexInput
 					   -> GHC.Base.Int
 					   -> Main.Alex [GHC.Base.Char])
-		      -> Main.Alex (Main.AlexLastAcc ((Main.AlexPosn, GHC.Base.Char, [GHC.Base.Char])
+		      -> Main.Alex (Main.AlexLastAcc (Main.AlexInput
 						      -> GHC.Base.Int
-						      -> Main.Alex [GHC.Base.Char])) :: [Arity 5
-											 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
-											 Str: DmdType LLLL]
-loop_s3Zo :: GHC.Num.Integer -> Main.Alex GHC.Num.Integer :: [Arity 3
-							      0 -> 0 -> 0 -> *
-							      Str: DmdType L]
-lvl_s4oJ :: GHC.Num.Integer :: [*]
-Main.alexStartPos :: Main.AlexPosn :: [*
-				       Str: DmdType m]
-lvl_s4oK :: GHC.Base.Char :: [*]
-k_a4es :: GHC.Base.String -> GHC.IOBase.IO () :: [Arity 2
-						  0 -> 0 -> *
-						  Str: DmdType LL]
-Main.main :: GHC.IOBase.IO () :: [Arity 1
-				  0 -> *
-				  Str: DmdType L]
-lvl_s4oL :: GHC.Prim.State# GHC.Prim.RealWorld
-	    -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #) :: [Arity 1
-								0 -> *]
-:Main.main :: GHC.IOBase.IO () :: [Arity 1
-				   0 -> *
-				   Str: DmdType L]
+						      -> Main.Alex [GHC.Base.Char]))
+[Arity 4
+ 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
+ Str: DmdType LLLL]
+alex_scan_tkn_a2zF = \ (lc_a23F :: GHC.Base.Char)
+		       (len_a23G :: GHC.Prim.Int#)
+		       (ds_d3n1 :: GHC.Prim.Int#)
+		       (last_acc_a23H :: Main.AlexLastAcc (Main.AlexInput
+							   -> GHC.Base.Int
+							   -> Main.Alex [GHC.Base.Char])) ->
+		       case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+							  -> GHC.Base.Int
+							  -> Main.Alex [GHC.Base.Char]))) ds_d3n1
+		       of ds_X3rY {
+			 __DEFAULT ->
+			   let {
+			     ds_s4pv :: Main.Alex (Main.AlexLastAcc (Main.AlexInput
+								     -> GHC.Base.Int
+								     -> Main.Alex [GHC.Base.Char]))
+			     [*
+			      Str: DmdType]
+			     ds_s4pv = case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+									  -> GHC.Base.Int
+									  -> Main.Alex [GHC.Base.Char]))) alex_accept_a2Bg
+				       of wild_a4cx { GHC.Arr.Array ds2_a4cu ds3_a4cv arr#_a4cw ->
+				       case (Main.Alex (Main.AlexLastAcc (Main.AlexInput
+									  -> GHC.Base.Int
+									  -> Main.Alex [GHC.Base.Char]))) GHC.Prim.indexArray#
+													    @ [Main.AlexAcc ((Main.AlexPosn,
+															      GHC.Base.Char,
+															      [GHC.Base.Char])
+															     -> GHC.Base.Int
+															     -> Main.Alex [GHC.Base.Char])]
+													    arr#_a4cw
+													    ds_X3rY
+				       of wild2_a4cD { (# e_a4cF #) ->
+				       check_accs1_a2B8 e_a4cF lc_a23F len_a23G last_acc_a23H
+				       }
+				       }
+			   } in 
+			     \ (@ s_X3iz)
+			       (s_X2fk :: Main.AlexState s_X3iz)
+			       (s_X434 :: GHC.Prim.State# s_X3iz) ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) ds_s4pv @ s_X3iz s_X2fk s_X434
+			       of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) s_X2fk
+			       of wild_X2w { Main.AlexState pos_r_a21o inp_r_a21m chr_r_a21n ds_d3o7 ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) inp_r_a21m
+			       of wild_a43y { GHC.STRef.STRef var#_a43z ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											    @ s_X3iz
+											    @ GHC.Base.String
+											    var#_a43z
+											    new_s_a3Zz
+			       of wild_X420 { (# new_s_X41Z, r_X421 #) ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) pos_r_a21o
+			       of wild_X46p { GHC.STRef.STRef var#_X46s ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.readMutVar#
+											    @ s_X3iz
+											    @ Main.AlexPosn
+											    var#_X46s
+											    new_s_X41Z
+			       of wild_X42w { (# new_s_X42v, r_X42x #) ->
+			       case (# GHC.Prim.State# s_X3iz,
+				       Main.AlexLastAcc (Main.AlexInput
+							 -> GHC.Base.Int
+							 -> Main.Alex [GHC.Base.Char]) #) r_X421
+			       of wild_X4j {
+				 [] -> (# new_s_X42v, r_a3ZA #);
+				 : c_a21B s_a21C ->
+				   case (# GHC.Prim.State# s_X3iz,
+					   Main.AlexLastAcc (Main.AlexInput
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+												@ s_X3iz
+												@ GHC.Base.String
+												var#_a43z
+												s_a21C
+												new_s_X42v
+				   of s2#_a43F { __DEFAULT ->
+				   case (# GHC.Prim.State# s_X3iz,
+					   Main.AlexLastAcc (Main.AlexInput
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char]) #) chr_r_a21n
+				   of wild_X46I { GHC.STRef.STRef var#_X46M ->
+				   case (# GHC.Prim.State# s_X3iz,
+					   Main.AlexLastAcc (Main.AlexInput
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+												@ s_X3iz
+												@ GHC.Base.Char
+												var#_X46M
+												c_a21B
+												s2#_a43F
+				   of s2#_X46N { __DEFAULT ->
+				   case (# GHC.Prim.State# s_X3iz,
+					   Main.AlexLastAcc (Main.AlexInput
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char]) #) r_X42x
+				   of wild_X4p { Main.AlexPn a_a1UD l_a1UE c_a1UF ->
+				   case (# GHC.Prim.State# s_X3iz,
+					   Main.AlexLastAcc (Main.AlexInput
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char]) #) c_a21B
+				   of wild_X3V { GHC.Base.C# ds_d3my ->
+				   case (# GHC.Prim.State# s_X3iz,
+					   Main.AlexLastAcc (Main.AlexInput
+							     -> GHC.Base.Int
+							     -> Main.Alex [GHC.Base.Char]) #) ds_d3my
+				   of ds_X3qv {
+				     __DEFAULT ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) a_a1UD
+				       of wild_a437 { GHC.Base.I# x_a436 ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) c_a1UF
+				       of wild_X469 { GHC.Base.I# x_X46a ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) l_a1UE
+				       of tpl_X3b { GHC.Base.I# a_s43O ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+												    @ s_X3iz
+												    @ Main.AlexPosn
+												    var#_X46s
+												    (Main.AlexPn
+												       (GHC.Base.I#
+													  (GHC.Prim.+#
+													     x_a436 1))
+												       tpl_X3b
+												       (GHC.Base.I#
+													  (GHC.Prim.+#
+													     x_X46a 1)))
+												    s2#_X46N
+				       of s2#_X461 { __DEFAULT ->
+				       let {
+					 off'_s3XM :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 off'_s3XM = GHC.Prim.*# ds_X3rY 2 } in
+				       let {
+					 arr_a22R :: GHC.Prim.Addr#
+					 [*
+					  Str: DmdType]
+					 arr_a22R = "\248\255\253\255\STX\NULL\NUL" } in
+				       let {
+					 ds_d3nX :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 ds_d3nX = GHC.Prim.ord# ds_X3qv } in
+				       let {
+					 offset_s3XK :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 offset_s3XK = GHC.Prim.+#
+							 (GHC.Prim.narrow16Int#
+							    (GHC.Prim.word2Int#
+							       (GHC.Prim.or#
+								  (GHC.Prim.uncheckedShiftL#
+								     (GHC.Prim.int2Word#
+									(GHC.Prim.ord#
+									   (GHC.Prim.indexCharOffAddr#
+									      arr_a22R (GHC.Prim.+# off'_s3XM 1))))
+								     8)
+								  (GHC.Prim.int2Word#
+								     (GHC.Prim.ord#
+									(GHC.Prim.indexCharOffAddr#
+									   arr_a22R off'_s3XM))))))
+							 ds_d3nX } in
+				       let {
+					 $w$j_s4px :: GHC.Prim.State# GHC.Prim.RealWorld
+						      -> (# GHC.Prim.State# s_X3iz,
+							    Main.AlexLastAcc (Main.AlexInput
+									      -> GHC.Base.Int
+									      -> Main.Alex [GHC.Base.Char]) #)
+					 [Arity 1
+					  *
+					  Str: DmdType A]
+					 $w$j_s4px = \ (w_s4mk :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+						       let {
+							 arr_X26b :: GHC.Prim.Addr#
+							 [*
+							  Str: DmdType]
+							 arr_X26b = "\255\255\255\255\255\255\255\255"
+						       } in 
+							 alex_scan_tkn_a2zF
+							   lc_a23F
+							   (GHC.Prim.+# len_a23G 1)
+							   (GHC.Prim.narrow16Int#
+							      (GHC.Prim.word2Int#
+								 (GHC.Prim.or#
+								    (GHC.Prim.uncheckedShiftL#
+								       (GHC.Prim.int2Word#
+									  (GHC.Prim.ord#
+									     (GHC.Prim.indexCharOffAddr#
+										arr_X26b (GHC.Prim.+# off'_s3XM 1))))
+								       8)
+								    (GHC.Prim.int2Word#
+								       (GHC.Prim.ord#
+									  (GHC.Prim.indexCharOffAddr#
+									     arr_X26b off'_s3XM))))))
+							   r_a3ZA
+							   @ s_X3iz
+							   wild_X2w
+							   s2#_X461
+				       } in 
+					 case (# GHC.Prim.State# s_X3iz,
+						 Main.AlexLastAcc (Main.AlexInput
+								   -> GHC.Base.Int
+								   -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.>=#
+												      offset_s3XK 0
+					 of wild_a43m {
+					   GHC.Base.False -> $w$j_s4px GHC.Prim.realWorld#;
+					   GHC.Base.True ->
+					     let {
+					       off'_X40Z :: GHC.Prim.Int#
+					       [*
+						Str: DmdType]
+					       off'_X40Z = GHC.Prim.*# offset_s3XK 2 } in
+					     let {
+					       arr_X262 :: GHC.Prim.Addr#
+					       [*
+						Str: DmdType]
+					       arr_X262 = "\255\255\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255 \NUL\255\255\255\255\255\255\255\255 \NUL\255\255'\NUL\255\255\255\255 \NUL\255\255\255\255-\NUL\255\255\255\255\&0\NUL1\NUL2\NUL3\NUL4\NUL5\NUL6\NUL7\NUL8\NUL9\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255A\NULB\NULC\NULD\NULE\NULF\NULG\NULH\NULI\NULJ\NULK\NULL\NULM\NULN\NULO\NULP\NULQ\NULR\NULS\NULT\NULU\NULV\NULW\NULX\NULY\NULZ\NUL\255\255\255\255\255\255\255\255\255\255\255\255a\NULb\NULc\NULd\NULe\NULf\NULg\NULh\NULi\NULj\NULk\NULl\NULm\NULn\NULo\NULp\NULq\NULr\NULs\NULt\NULu\NULv\NULw\NULx\NULy\NULz\NUL'\NUL\255\255\255\255\255\255\255\255\255\255-\NUL\255\255\255\255\&0\NUL1\NUL2\NUL3\NUL4\NUL5\NUL6\NUL7\NUL8\NUL9\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255A\NULB\NULC\NULD\NULE\NULF\NULG\NULH\NULI\NULJ\NULK\NULL\NULM\NULN\NULO\NULP\NULQ\NULR\NULS\NULT\NULU\NULV\NULW\NULX\NULY\NULZ\NUL\255\255\255\255\255\255\255\255\255\255\255\255a\NULb\NULc\NULd\NULe\NULf\NULg\NULh\NULi\NULj\NULk\NULl\NULm\NULn\NULo\NULp\NULq\NULr\NULs\NULt\NULu\NULv\NULw\NULx\NULy\NULz\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255"
+					     } in 
+					       case (# GHC.Prim.State# s_X3iz,
+						       Main.AlexLastAcc (Main.AlexInput
+									 -> GHC.Base.Int
+									 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.==#
+													    (GHC.Prim.narrow16Int#
+													       (GHC.Prim.word2Int#
+														  (GHC.Prim.or#
+														     (GHC.Prim.uncheckedShiftL#
+															(GHC.Prim.int2Word#
+															   (GHC.Prim.ord#
+															      (GHC.Prim.indexCharOffAddr#
+																 arr_X262
+																 (GHC.Prim.+#
+																    off'_X40Z
+																    1))))
+															8)
+														     (GHC.Prim.int2Word#
+															(GHC.Prim.ord#
+															   (GHC.Prim.indexCharOffAddr#
+															      arr_X262
+															      off'_X40Z))))))
+													    ds_d3nX
+					       of wild_X8K {
+						 GHC.Base.False -> $w$j_s4px GHC.Prim.realWorld#;
+						 GHC.Base.True ->
+						   let {
+						     arr_X26c :: GHC.Prim.Addr#
+						     [*
+						      Str: DmdType]
+						     arr_X26c = "\NUL\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+						   } in 
+						     alex_scan_tkn_a2zF
+						       lc_a23F
+						       (GHC.Prim.+# len_a23G 1)
+						       (GHC.Prim.narrow16Int#
+							  (GHC.Prim.word2Int#
+							     (GHC.Prim.or#
+								(GHC.Prim.uncheckedShiftL#
+								   (GHC.Prim.int2Word#
+								      (GHC.Prim.ord#
+									 (GHC.Prim.indexCharOffAddr#
+									    arr_X26c (GHC.Prim.+# off'_X40Z 1))))
+								   8)
+								(GHC.Prim.int2Word#
+								   (GHC.Prim.ord#
+								      (GHC.Prim.indexCharOffAddr#
+									 arr_X26c off'_X40Z))))))
+						       r_a3ZA
+						       @ s_X3iz
+						       wild_X2w
+						       s2#_X461
+					       }
+					 }
+				       }
+				       }
+				       }
+				       };
+				     '\t' ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) a_a1UD
+				       of wild_a437 { GHC.Base.I# x_a436 ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) c_a1UF
+				       of wild_X469 { GHC.Base.I# x_X46a ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) GHC.Base.divInt#
+												    (GHC.Prim.+#
+												       x_X46a 7)
+												    8
+				       of x_a44T { __DEFAULT ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) l_a1UE
+				       of tpl_X3c { GHC.Base.I# a_s452 ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+												    @ s_X3iz
+												    @ Main.AlexPosn
+												    var#_X46s
+												    (Main.AlexPn
+												       (GHC.Base.I#
+													  (GHC.Prim.+#
+													     x_a436 1))
+												       tpl_X3c
+												       (GHC.Base.I#
+													  (GHC.Prim.+#
+													     (GHC.Prim.*#
+														x_a44T
+														8)
+													     1)))
+												    s2#_X46N
+				       of s2#_X461 { __DEFAULT ->
+				       let {
+					 off'_s3XM :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 off'_s3XM = GHC.Prim.*# ds_X3rY 2 } in
+				       let {
+					 arr_a22R :: GHC.Prim.Addr#
+					 [*
+					  Str: DmdType]
+					 arr_a22R = "\248\255\253\255\STX\NULL\NUL" } in
+				       let {
+					 offset_s3XK :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 offset_s3XK = GHC.Prim.+#
+							 (GHC.Prim.narrow16Int#
+							    (GHC.Prim.word2Int#
+							       (GHC.Prim.or#
+								  (GHC.Prim.uncheckedShiftL#
+								     (GHC.Prim.int2Word#
+									(GHC.Prim.ord#
+									   (GHC.Prim.indexCharOffAddr#
+									      arr_a22R (GHC.Prim.+# off'_s3XM 1))))
+								     8)
+								  (GHC.Prim.int2Word#
+								     (GHC.Prim.ord#
+									(GHC.Prim.indexCharOffAddr#
+									   arr_a22R off'_s3XM))))))
+							 9 } in
+				       let {
+					 $w$j_s4pz :: GHC.Prim.State# GHC.Prim.RealWorld
+						      -> (# GHC.Prim.State# s_X3iz,
+							    Main.AlexLastAcc (Main.AlexInput
+									      -> GHC.Base.Int
+									      -> Main.Alex [GHC.Base.Char]) #)
+					 [Arity 1
+					  *
+					  Str: DmdType A]
+					 $w$j_s4pz = \ (w_s4mo :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+						       let {
+							 arr_X26c :: GHC.Prim.Addr#
+							 [*
+							  Str: DmdType]
+							 arr_X26c = "\255\255\255\255\255\255\255\255"
+						       } in 
+							 alex_scan_tkn_a2zF
+							   lc_a23F
+							   (GHC.Prim.+# len_a23G 1)
+							   (GHC.Prim.narrow16Int#
+							      (GHC.Prim.word2Int#
+								 (GHC.Prim.or#
+								    (GHC.Prim.uncheckedShiftL#
+								       (GHC.Prim.int2Word#
+									  (GHC.Prim.ord#
+									     (GHC.Prim.indexCharOffAddr#
+										arr_X26c (GHC.Prim.+# off'_s3XM 1))))
+								       8)
+								    (GHC.Prim.int2Word#
+								       (GHC.Prim.ord#
+									  (GHC.Prim.indexCharOffAddr#
+									     arr_X26c off'_s3XM))))))
+							   r_a3ZA
+							   @ s_X3iz
+							   wild_X2w
+							   s2#_X461
+				       } in 
+					 case (# GHC.Prim.State# s_X3iz,
+						 Main.AlexLastAcc (Main.AlexInput
+								   -> GHC.Base.Int
+								   -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.>=#
+												      offset_s3XK 0
+					 of wild_a43m {
+					   GHC.Base.False -> $w$j_s4pz GHC.Prim.realWorld#;
+					   GHC.Base.True ->
+					     let {
+					       off'_X410 :: GHC.Prim.Int#
+					       [*
+						Str: DmdType]
+					       off'_X410 = GHC.Prim.*# offset_s3XK 2 } in
+					     let {
+					       arr_X263 :: GHC.Prim.Addr#
+					       [*
+						Str: DmdType]
+					       arr_X263 = "\255\255\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255 \NUL\255\255\255\255\255\255\255\255 \NUL\255\255'\NUL\255\255\255\255 \NUL\255\255\255\255-\NUL\255\255\255\255\&0\NUL1\NUL2\NUL3\NUL4\NUL5\NUL6\NUL7\NUL8\NUL9\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255A\NULB\NULC\NULD\NULE\NULF\NULG\NULH\NULI\NULJ\NULK\NULL\NULM\NULN\NULO\NULP\NULQ\NULR\NULS\NULT\NULU\NULV\NULW\NULX\NULY\NULZ\NUL\255\255\255\255\255\255\255\255\255\255\255\255a\NULb\NULc\NULd\NULe\NULf\NULg\NULh\NULi\NULj\NULk\NULl\NULm\NULn\NULo\NULp\NULq\NULr\NULs\NULt\NULu\NULv\NULw\NULx\NULy\NULz\NUL'\NUL\255\255\255\255\255\255\255\255\255\255-\NUL\255\255\255\255\&0\NUL1\NUL2\NUL3\NUL4\NUL5\NUL6\NUL7\NUL8\NUL9\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255A\NULB\NULC\NULD\NULE\NULF\NULG\NULH\NULI\NULJ\NULK\NULL\NULM\NULN\NULO\NULP\NULQ\NULR\NULS\NULT\NULU\NULV\NULW\NULX\NULY\NULZ\NUL\255\255\255\255\255\255\255\255\255\255\255\255a\NULb\NULc\NULd\NULe\NULf\NULg\NULh\NULi\NULj\NULk\NULl\NULm\NULn\NULo\NULp\NULq\NULr\NULs\NULt\NULu\NULv\NULw\NULx\NULy\NULz\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255"
+					     } in 
+					       case (# GHC.Prim.State# s_X3iz,
+						       Main.AlexLastAcc (Main.AlexInput
+									 -> GHC.Base.Int
+									 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.narrow16Int#
+													    (GHC.Prim.word2Int#
+													       (GHC.Prim.or#
+														  (GHC.Prim.uncheckedShiftL#
+														     (GHC.Prim.int2Word#
+															(GHC.Prim.ord#
+															   (GHC.Prim.indexCharOffAddr#
+															      arr_X263
+															      (GHC.Prim.+#
+																 off'_X410
+																 1))))
+														     8)
+														  (GHC.Prim.int2Word#
+														     (GHC.Prim.ord#
+															(GHC.Prim.indexCharOffAddr#
+															   arr_X263
+															   off'_X410)))))
+					       of wild_X3k {
+						 __DEFAULT -> $w$j_s4pz GHC.Prim.realWorld#;
+						 9 ->
+						   let {
+						     arr_X26d :: GHC.Prim.Addr#
+						     [*
+						      Str: DmdType]
+						     arr_X26d = "\NUL\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+						   } in 
+						     alex_scan_tkn_a2zF
+						       lc_a23F
+						       (GHC.Prim.+# len_a23G 1)
+						       (GHC.Prim.narrow16Int#
+							  (GHC.Prim.word2Int#
+							     (GHC.Prim.or#
+								(GHC.Prim.uncheckedShiftL#
+								   (GHC.Prim.int2Word#
+								      (GHC.Prim.ord#
+									 (GHC.Prim.indexCharOffAddr#
+									    arr_X26d (GHC.Prim.+# off'_X410 1))))
+								   8)
+								(GHC.Prim.int2Word#
+								   (GHC.Prim.ord#
+								      (GHC.Prim.indexCharOffAddr#
+									 arr_X26d off'_X410))))))
+						       r_a3ZA
+						       @ s_X3iz
+						       wild_X2w
+						       s2#_X461
+					       }
+					 }
+				       }
+				       }
+				       }
+				       }
+				       };
+				     '\n' ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) a_a1UD
+				       of wild_a437 { GHC.Base.I# x_a436 ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) l_a1UE
+				       of wild_X469 { GHC.Base.I# x_X46a ->
+				       case (# GHC.Prim.State# s_X3iz,
+					       Main.AlexLastAcc (Main.AlexInput
+								 -> GHC.Base.Int
+								 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.writeMutVar#
+												    @ s_X3iz
+												    @ Main.AlexPosn
+												    var#_X46s
+												    (Main.AlexPn
+												       (GHC.Base.I#
+													  (GHC.Prim.+#
+													     x_a436 1))
+												       (GHC.Base.I#
+													  (GHC.Prim.+#
+													     x_X46a 1))
+												       lvl_s4pT)
+												    s2#_X46N
+				       of s2#_X461 { __DEFAULT ->
+				       let {
+					 off'_s3XM :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 off'_s3XM = GHC.Prim.*# ds_X3rY 2 } in
+				       let {
+					 arr_a22R :: GHC.Prim.Addr#
+					 [*
+					  Str: DmdType]
+					 arr_a22R = "\248\255\253\255\STX\NULL\NUL" } in
+				       let {
+					 offset_s3XK :: GHC.Prim.Int#
+					 [*
+					  Str: DmdType]
+					 offset_s3XK = GHC.Prim.+#
+							 (GHC.Prim.narrow16Int#
+							    (GHC.Prim.word2Int#
+							       (GHC.Prim.or#
+								  (GHC.Prim.uncheckedShiftL#
+								     (GHC.Prim.int2Word#
+									(GHC.Prim.ord#
+									   (GHC.Prim.indexCharOffAddr#
+									      arr_a22R (GHC.Prim.+# off'_s3XM 1))))
+								     8)
+								  (GHC.Prim.int2Word#
+								     (GHC.Prim.ord#
+									(GHC.Prim.indexCharOffAddr#
+									   arr_a22R off'_s3XM))))))
+							 10 } in
+				       let {
+					 $w$j_s4pC :: GHC.Prim.State# GHC.Prim.RealWorld
+						      -> (# GHC.Prim.State# s_X3iz,
+							    Main.AlexLastAcc (Main.AlexInput
+									      -> GHC.Base.Int
+									      -> Main.Alex [GHC.Base.Char]) #)
+					 [Arity 1
+					  *
+					  Str: DmdType A]
+					 $w$j_s4pC = \ (w_s4ms :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+						       let {
+							 arr_X266 :: GHC.Prim.Addr#
+							 [*
+							  Str: DmdType]
+							 arr_X266 = "\255\255\255\255\255\255\255\255"
+						       } in 
+							 alex_scan_tkn_a2zF
+							   lc_a23F
+							   (GHC.Prim.+# len_a23G 1)
+							   (GHC.Prim.narrow16Int#
+							      (GHC.Prim.word2Int#
+								 (GHC.Prim.or#
+								    (GHC.Prim.uncheckedShiftL#
+								       (GHC.Prim.int2Word#
+									  (GHC.Prim.ord#
+									     (GHC.Prim.indexCharOffAddr#
+										arr_X266 (GHC.Prim.+# off'_s3XM 1))))
+								       8)
+								    (GHC.Prim.int2Word#
+								       (GHC.Prim.ord#
+									  (GHC.Prim.indexCharOffAddr#
+									     arr_X266 off'_s3XM))))))
+							   r_a3ZA
+							   @ s_X3iz
+							   wild_X2w
+							   s2#_X461
+				       } in 
+					 case (# GHC.Prim.State# s_X3iz,
+						 Main.AlexLastAcc (Main.AlexInput
+								   -> GHC.Base.Int
+								   -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.>=#
+												      offset_s3XK 0
+					 of wild_a43m {
+					   GHC.Base.False -> $w$j_s4pC GHC.Prim.realWorld#;
+					   GHC.Base.True ->
+					     let {
+					       off'_X40U :: GHC.Prim.Int#
+					       [*
+						Str: DmdType]
+					       off'_X40U = GHC.Prim.*# offset_s3XK 2 } in
+					     let {
+					       arr_X25X :: GHC.Prim.Addr#
+					       [*
+						Str: DmdType]
+					       arr_X25X = "\255\255\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\t\NUL\n\NUL\v\NUL\f\NUL\r\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255 \NUL\255\255\255\255\255\255\255\255 \NUL\255\255'\NUL\255\255\255\255 \NUL\255\255\255\255-\NUL\255\255\255\255\&0\NUL1\NUL2\NUL3\NUL4\NUL5\NUL6\NUL7\NUL8\NUL9\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255A\NULB\NULC\NULD\NULE\NULF\NULG\NULH\NULI\NULJ\NULK\NULL\NULM\NULN\NULO\NULP\NULQ\NULR\NULS\NULT\NULU\NULV\NULW\NULX\NULY\NULZ\NUL\255\255\255\255\255\255\255\255\255\255\255\255a\NULb\NULc\NULd\NULe\NULf\NULg\NULh\NULi\NULj\NULk\NULl\NULm\NULn\NULo\NULp\NULq\NULr\NULs\NULt\NULu\NULv\NULw\NULx\NULy\NULz\NUL'\NUL\255\255\255\255\255\255\255\255\255\255-\NUL\255\255\255\255\&0\NUL1\NUL2\NUL3\NUL4\NUL5\NUL6\NUL7\NUL8\NUL9\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255A\NULB\NULC\NULD\NULE\NULF\NULG\NULH\NULI\NULJ\NULK\NULL\NULM\NULN\NULO\NULP\NULQ\NULR\NULS\NULT\NULU\NULV\NULW\NULX\NULY\NULZ\NUL\255\255\255\255\255\255\255\255\255\255\255\255a\NULb\NULc\NULd\NULe\NULf\NULg\NULh\NULi\NULj\NULk\NULl\NULm\NULn\NULo\NULp\NULq\NULr\NULs\NULt\NULu\NULv\NULw\NULx\NULy\NULz\NUL\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255\255"
+					     } in 
+					       case (# GHC.Prim.State# s_X3iz,
+						       Main.AlexLastAcc (Main.AlexInput
+									 -> GHC.Base.Int
+									 -> Main.Alex [GHC.Base.Char]) #) GHC.Prim.narrow16Int#
+													    (GHC.Prim.word2Int#
+													       (GHC.Prim.or#
+														  (GHC.Prim.uncheckedShiftL#
+														     (GHC.Prim.int2Word#
+															(GHC.Prim.ord#
+															   (GHC.Prim.indexCharOffAddr#
+															      arr_X25X
+															      (GHC.Prim.+#
+																 off'_X40U
+																 1))))
+														     8)
+														  (GHC.Prim.int2Word#
+														     (GHC.Prim.ord#
+															(GHC.Prim.indexCharOffAddr#
+															   arr_X25X
+															   off'_X40U)))))
+					       of wild_X3e {
+						 __DEFAULT -> $w$j_s4pC GHC.Prim.realWorld#;
+						 10 ->
+						   let {
+						     arr_X267 :: GHC.Prim.Addr#
+						     [*
+						      Str: DmdType]
+						     arr_X267 = "\NUL\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+						   } in 
+						     alex_scan_tkn_a2zF
+						       lc_a23F
+						       (GHC.Prim.+# len_a23G 1)
+						       (GHC.Prim.narrow16Int#
+							  (GHC.Prim.word2Int#
+							     (GHC.Prim.or#
+								(GHC.Prim.uncheckedShiftL#
+								   (GHC.Prim.int2Word#
+								      (GHC.Prim.ord#
+									 (GHC.Prim.indexCharOffAddr#
+									    arr_X267 (GHC.Prim.+# off'_X40U 1))))
+								   8)
+								(GHC.Prim.int2Word#
+								   (GHC.Prim.ord#
+								      (GHC.Prim.indexCharOffAddr#
+									 arr_X267 off'_X40U))))))
+						       r_a3ZA
+						       @ s_X3iz
+						       wild_X2w
+						       s2#_X461
+					       }
+					 }
+				       }
+				       }
+				       }
+				   }
+				   }
+				   }
+				   }
+				   }
+				   }
+			       }
+			       }
+			       }
+			       }
+			       }
+			       }
+			       };
+			 (-1) ->
+			   return_a3fW
+			     @ (Main.AlexLastAcc (Main.AlexInput
+						  -> GHC.Base.Int
+						  -> Main.Alex [GHC.Base.Char]))
+			     last_acc_a23H
+		       }
+end Rec }
+
+Rec {
+loop_s3YA :: GHC.Num.Integer -> Main.Alex GHC.Num.Integer
+[Arity 1
+ 0 -> 0 -> 0 -> *
+ Str: DmdType L]
+loop_s3YA = \ (i_a1Ry :: GHC.Num.Integer) ->
+	      let {
+		lvl_s4pE :: Main.Alex GHC.Num.Integer
+		[*
+		 Str: DmdType]
+		lvl_s4pE = case (Main.Alex GHC.Num.Integer) GHC.Num.plusInteger i_a1Ry lit_s3Yy
+			   of tpl_X5k { __DEFAULT ->
+			   loop_s3YA tpl_X5k
+			   }
+	      } in 
+		\ (@ s_X3iH)
+		  (s_X2fs :: Main.AlexState s_X3iH)
+		  (s_X43c :: GHC.Prim.State# s_X3iH) ->
+		  case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) s_X2fs
+		  of wild_X34 { Main.AlexState ds_d3og ds_d3oh ds_d3oi scd_r_a22m ->
+		  case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) scd_r_a22m
+		  of wild_a43y { GHC.STRef.STRef var#_a43z ->
+		  case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) GHC.Prim.readMutVar#
+								       @ s_X3iH @ GHC.Base.Int var#_a43z s_X43c
+		  of wild_a3ZB { (# new_s_a3Zz, r_a3ZA #) ->
+		  case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) r_a3ZA
+		  of w_X4o2 { GHC.Base.I# ww_s4mz ->
+		  case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) $wk_s4mM
+								       ww_s4mz @ s_X3iH wild_X34 new_s_a3Zz
+		  of wild_X43C { (# new_s_X43B, r_X43D #) ->
+		  case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) GHC.Base.==1 r_X43D lvl_s3Z6
+		  of wild_a4d2 {
+		    GHC.Base.False ->
+		      case (# GHC.Prim.State# s_X3iH, GHC.Num.Integer #) GHC.Base.==1 r_X43D lvl_s3Z7
+		      of wild_X3O {
+			GHC.Base.False -> lvl_s4pE @ s_X3iH wild_X34 new_s_X43B;
+			GHC.Base.True -> (# new_s_X43B, i_a1Ry #)
+		      };
+		    GHC.Base.True -> (# new_s_X43B, i_a1Ry #)
+		  }
+		  }
+		  }
+		  }
+		  }
+		  }
+end Rec }
+
+lvl_s4pZ :: GHC.Num.Integer
+[*]
+lvl_s4pZ = GHC.Num.S# 0
+
+lvl_s3Z5 :: Main.Alex GHC.Num.Integer
+[0 -> 0 -> *
+ Str: DmdType]
+lvl_s3Z5 = loop_s3YA lvl_s4pZ
+
+Main.alexStartPos :: Main.AlexPosn
+[*
+ Str: DmdType m]
+Main.alexStartPos = Main.AlexPn lit_a3m9 lvl_s4pT lvl_s4pT
+
+lvl_s4q0 :: GHC.Base.Char
+[*]
+lvl_s4q0 = GHC.Base.C# '\n'
+
+k_a4es :: GHC.Base.String -> GHC.IOBase.IO ()
+[Arity 2
+ 0 -> 0 -> *
+ Str: DmdType LL]
+k_a4es = \ (s_a1Uq :: GHC.Base.String)
+	   (eta_s4ed :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+	   case (# GHC.Prim.State# GHC.Prim.RealWorld, () #) GHC.IO.hPutStr
+							       GHC.Handle.stdout
+							       (case GHC.Base.String GHC.Prim.newMutVar#
+										       @ GHC.Base.String
+										       @ GHC.Prim.RealWorld
+										       s_a1Uq
+										       GHC.Prim.realWorld#
+								of wild_a4cU { (# s2#_a4cV, var#_a4cW #) ->
+								case GHC.Base.String GHC.Prim.newMutVar#
+										       @ GHC.Base.Char
+										       @ GHC.Prim.RealWorld
+										       lvl_s4q0
+										       s2#_a4cV
+								of wild_X4fc { (# s2#_X4fe, var#_X4fg #) ->
+								case GHC.Base.String GHC.Prim.newMutVar#
+										       @ Main.AlexPosn
+										       @ GHC.Prim.RealWorld
+										       Main.alexStartPos
+										       s2#_X4fe
+								of wild_X4gU { (# s2#_X4gW, var#_X4gY #) ->
+								case GHC.Base.String GHC.Prim.newMutVar#
+										       @ GHC.Base.Int
+										       @ GHC.Prim.RealWorld
+										       lit_a3m9
+										       s2#_X4gW
+								of wild_X4gS { (# s2#_X4l2, var#_X4l5 #) ->
+								case GHC.Base.String lvl_s3Z5
+										       @ GHC.Prim.RealWorld
+										       (Main.AlexState
+											  @ GHC.Prim.RealWorld
+											  (GHC.STRef.STRef
+											     @ GHC.Prim.RealWorld
+											     @ Main.AlexPosn
+											     var#_X4gY)
+											  (GHC.STRef.STRef
+											     @ GHC.Prim.RealWorld
+											     @ GHC.Base.String
+											     var#_a4cW)
+											  (GHC.STRef.STRef
+											     @ GHC.Prim.RealWorld
+											     @ GHC.Base.Char
+											     var#_X4fg)
+											  (GHC.STRef.STRef
+											     @ GHC.Prim.RealWorld
+											     @ GHC.Base.Int
+											     var#_X4l5))
+										       s2#_X4l2
+								of wild_a4jy { (# ds_a4jz, r_a4jA #) ->
+								GHC.Num.$wshowsPrec
+								  0 r_a4jA (GHC.Base.[] @ GHC.Base.Char)
+								}
+								}
+								}
+								}
+								})
+							       eta_s4ed
+	   of wild_a4dA { (# new_s_a4dB, a89_a4dC #) ->
+	   GHC.IO.$whPutChar GHC.Handle.stdout '\n' new_s_a4dB
+	   }
+
+Main.main :: GHC.IOBase.IO ()
+[Exported]
+[Arity 1
+ 0 -> *
+ Str: DmdType L]
+Main.main = \ (s_a4er :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+	      case (# GHC.Prim.State# GHC.Prim.RealWorld, () #) GHC.IO.hGetContents
+								  GHC.Handle.stdin s_a4er
+	      of wild_a4eA { (# new_s_a4ey, a89_a4ez #) ->
+	      k_a4es a89_a4ez new_s_a4ey
+	      }
+
+lvl_s4q1 :: GHC.Prim.State# GHC.Prim.RealWorld
+	    -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+[Arity 1
+ 0 -> *]
+lvl_s4q1 = \ (s_a3VF :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+	     case (# GHC.Prim.State# GHC.Prim.RealWorld, () #) GHC.IO.hGetContents
+								 GHC.Handle.stdin s_a3VF
+	     of wild_a4eA { (# new_s_a4ey, a89_a4ez #) ->
+	     case (# GHC.Prim.State# GHC.Prim.RealWorld, () #) k_a4es a89_a4ez new_s_a4ey
+	     of wild_a4eD { (# new_s_a4eK, a89_a4eL #) ->
+	     case (# GHC.Prim.State# GHC.Prim.RealWorld, () #) GHC.Prim.catch#
+								 @ ()
+								 @ GHC.IOBase.Exception
+								 GHC.TopHandler.ds
+								 GHC.TopHandler.k
+								 new_s_a4eK
+	     of wild1_a4eE { (# new_s1_a4eI, a891_a4eJ #) ->
+	     case (# GHC.Prim.State# GHC.Prim.RealWorld, () #) GHC.Prim.catch#
+								 @ ()
+								 @ GHC.IOBase.Exception
+								 GHC.TopHandler.ds1
+								 GHC.TopHandler.k1
+								 new_s1_a4eI
+	     of wild2_a4eF { (# new_s2_a4eG, a892_a4eH #) ->
+	     (# new_s2_a4eG, a89_a4eL #)
+	     }
+	     }
+	     }
+	     }
+
+:Main.main :: GHC.IOBase.IO ()
+[Exported]
+[Arity 1
+ 0 -> *
+ Str: DmdType L]
+:Main.main = \ (eta_a3VG :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+	       GHC.Prim.catch#
+		 @ () @ GHC.IOBase.Exception lvl_s4q1 (GHC.TopHandler.topHandler @ ()) eta_a3VG
+
 
 
