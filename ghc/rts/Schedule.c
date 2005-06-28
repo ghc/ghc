@@ -1906,6 +1906,11 @@ scheduleDoGC( rtsBool force_major )
     // actually did the GC.  But it's quite hard to arrange for all
     // the other tasks to sleep and stay asleep.
     //
+    // This does mean that there will be multiple entries in the 
+    // thread->capability hash table for the current thread, but
+    // they will be removed as normal when the capabilities are
+    // released again.
+    //
 	
     // Someone else is already trying to GC
     if (waiting_for_gc) return;
