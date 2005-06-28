@@ -204,6 +204,7 @@ test('tc191', only_compiler_types(['ghc']), compile, [''])
 test('tc192', only_compiler_types(['ghc']), compile, [''])
 test('tc193', only_compiler_types(['ghc']), compile, [''])
 test('tc194', only_compiler_types(['ghc']), compile, [''])
+test('tc195', only_compiler_types(['ghc']), compile, [''])
 
 test('LoopOfTheDay1', normal, compile, [''])
 test('LoopOfTheDay2', normal, compile, [''])
