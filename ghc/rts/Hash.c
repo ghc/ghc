@@ -245,8 +245,9 @@ insertHashTable(HashTable *table, StgWord key, void *data)
     int index;
     HashList *hl;
 
-    /* We want no duplicates */
-    ASSERT(lookupHashTable(table, key) == NULL);
+    // Disable this assert; sometimes it's useful to be able to
+    // overwrite entries in the hash table.
+    // ASSERT(lookupHashTable(table, key) == NULL);
 
     /* When the average load gets too high, we expand the table */
     if (++table->kcount >= HLOAD * table->bcount)
