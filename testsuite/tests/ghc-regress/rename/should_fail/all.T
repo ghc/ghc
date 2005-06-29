@@ -45,3 +45,4 @@ test('rnfail041', normal, compile_fail, [''])
 test('rnfail042', normal, compile_fail, [''])
 
 test('rnfail043', skip_if_no_ghci, compile_fail, [''])
+test('rnfail044', normal, compile_fail, [''])
