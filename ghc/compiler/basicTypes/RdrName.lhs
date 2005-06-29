@@ -52,6 +52,7 @@ import OccName	( NameSpace, varName,
 import Module   ( Module, mkModuleFS )
 import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
+import Maybes	( mapCatMaybes )
 import SrcLoc	( isGoodSrcLoc, SrcSpan )
 import Outputable
 import Util	( thenCmp )
@@ -353,19 +354,51 @@ extendGlobalRdrEnv env gre = extendOccEnv_C add env occ [gre]
 
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env
-  = case lookupOccEnv env occ of
-	Nothing -> []
-	Just gres | isUnqual rdr_name -> filter unQualOK gres
-		  | otherwise	      -> filter (hasQual mod) gres
-  where
-    mod = rdrNameModule rdr_name
-    occ = rdrNameOcc rdr_name
+  = case lookupOccEnv env (rdrNameOcc rdr_name) of
+	Nothing   -> []
+	Just gres -> pickGREs rdr_name gres
 
 lookupGRE_Name :: GlobalRdrEnv -> Name -> [GlobalRdrElt]
 lookupGRE_Name env name
   = [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name),
 	    gre_name gre == name ]
 
+
+pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
+-- Take a list of GREs which have the right OccName
+-- Pick those GREs that are suitable for this RdrName
+-- And for those, keep only only the Provenances that are suitable
+-- 
+-- Consider
+--	 module A ( f ) where
+--	 import qualified Foo( f )
+--	 import Baz( f )
+--	 f = undefined
+-- Let's suppose that Foo.f and Baz.f are the same entity really.
+-- The export of f is ambiguous because it's in scope from the local def
+-- and the import.  The lookup of (Unqual f) should return a GRE for
+-- the locally-defined f, and a GRE for the imported f, with a *single* 
+-- provenance, namely the one for Baz(f).
+pickGREs rdr_name gres
+  = mapCatMaybes pick gres
+  where
+    is_unqual = isUnqual rdr_name
+    mod	      = rdrNameModule rdr_name
+
+    pick :: GlobalRdrElt -> Maybe GlobalRdrElt
+    pick gre@(GRE {gre_prov = LocalDef m}) 	-- Local def
+	| is_unqual || m == mod = Just gre
+	| otherwise		= Nothing
+    pick gre@(GRE {gre_prov = Imported [is]})	-- Single import (efficiency)
+	| is_unqual && not (is_qual (is_decl is)) = Just gre
+	| mod == is_as (is_decl is)		  = Just gre
+	| otherwise				  = Nothing
+    pick gre@(GRE {gre_prov = Imported is})	-- Multiple import
+	| null filtered_is = Nothing
+	| otherwise	   = Just (gre {gre_prov = Imported filtered_is})
+	where
+	  filtered_is | is_unqual = filter (not . is_qual    . is_decl) is
+		      | otherwise = filter ((== mod) . is_as . is_decl) is
 
 isLocalGRE :: GlobalRdrElt -> Bool
 isLocalGRE (GRE {gre_prov = LocalDef _}) = True
@@ -375,11 +408,6 @@ unQualOK :: GlobalRdrElt -> Bool
 -- An unqualifed version of this thing is in scope
 unQualOK (GRE {gre_prov = LocalDef _})  = True
 unQualOK (GRE {gre_prov = Imported is}) = not (all (is_qual . is_decl) is)
-
-hasQual :: Module -> GlobalRdrElt -> Bool
--- A qualified version of this thing is in scope
-hasQual mod (GRE {gre_prov = LocalDef m})  = m == mod
-hasQual mod (GRE {gre_prov = Imported is}) = any ((== mod) . is_as . is_decl) is
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
@@ -503,6 +531,7 @@ plusProv p1 		 p2@(LocalDef _) = p2
 plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
+-- Print out the place where the name was imported
 pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef _})
   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys)})
