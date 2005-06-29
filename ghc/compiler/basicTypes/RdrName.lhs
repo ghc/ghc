@@ -390,9 +390,10 @@ pickGREs rdr_name gres
 	| is_unqual || m == mod = Just gre
 	| otherwise		= Nothing
     pick gre@(GRE {gre_prov = Imported [is]})	-- Single import (efficiency)
-	| is_unqual && not (is_qual (is_decl is)) = Just gre
-	| mod == is_as (is_decl is)		  = Just gre
-	| otherwise				  = Nothing
+	| is_unqual     = if not (is_qual (is_decl is)) then Just gre
+						        else Nothing
+	| otherwise     = if mod == is_as (is_decl is)  then Just gre
+						        else Nothing
     pick gre@(GRE {gre_prov = Imported is})	-- Multiple import
 	| null filtered_is = Nothing
 	| otherwise	   = Just (gre {gre_prov = Imported filtered_is})
