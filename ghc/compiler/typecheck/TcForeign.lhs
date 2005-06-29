@@ -29,8 +29,8 @@ import ForeignCall	( CCallConv(..) )
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId, mkExportedLocalId )
 #if alpha_TARGET_ARCH
-import PrimRep		( getPrimRepSize, isFloatingRep )
 import Type		( typePrimRep )
+import SMRep		( argMachRep, primRepToCgRep, primRepHint )
 #endif
 import OccName		( mkForeignExportOcc )
 import Name		( Name, NamedThing(..), mkExternalName )
@@ -52,7 +52,7 @@ import SrcLoc		( Located(..), srcSpanStart )
 import Bag		( consBag )
 
 #if alpha_TARGET_ARCH
-import MachOp		( machRepByteWidth )
+import MachOp		( machRepByteWidth, MachHint(FloatHint) )
 #endif
 \end{code}
 
@@ -185,10 +185,10 @@ The check is needed for both via-C and native-code routes
 checkFEDArgs arg_tys
   = check (integral_args <= 32) err
   where
-    integral_args = sum [ machRepByteWidth rep
-			| (rep,hint) <- map typeMachRepRep arg_tys,
-			  hint /= FloatHint ]
-    err = ptext SLIT("On Alpha, I can only handle 4 non-floating-point arguments to foreign export dynamic")
+    integral_args = sum [ (machRepByteWidth . argMachRep . primRepToCgRep) prim_rep
+			| prim_rep <- map typePrimRep arg_tys,
+			  primRepHint prim_rep /= FloatHint ]
+    err = ptext SLIT("On Alpha, I can only handle 32 bytes of non-floating-point arguments to foreign export dynamic")
 #else
 checkFEDArgs arg_tys = returnM ()
 #endif
