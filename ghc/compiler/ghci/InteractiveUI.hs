@@ -701,7 +701,7 @@ setContextAfterLoad (m:_) = do
   session <- getSession
   b <- io (GHC.moduleIsInterpreted session m)
   if b then io (GHC.setContext session [m] []) 
-       else io (GHC.setContext session []  [m])
+       else io (GHC.setContext session []  [prelude_mod,m])
 
 modulesLoadedMsg :: SuccessFlag -> [Module] -> GHCi ()
 modulesLoadedMsg ok mods = do
