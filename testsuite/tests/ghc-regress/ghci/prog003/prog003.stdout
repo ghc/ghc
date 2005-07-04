@@ -10,10 +10,7 @@ a :: Int -> Int
 28.0
 (Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (GHC.Float.Float -> GHC.Float.Float,
- GHC.Float.Float -> GHC.Float.Float,
- GHC.Float.Float -> GHC.Float.Float,
- GHC.Float.Float -> GHC.Float.Float)
+(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 28.0
 (Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 28.0

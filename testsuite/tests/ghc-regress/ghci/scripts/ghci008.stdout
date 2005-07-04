@@ -8,12 +8,12 @@ class (Eq a, Show a) => Num a where
   ...
   	-- Imported from GHC.Num
 infixl 6 +
-data RealFloat a => Complex a = !a :+ !a
+data Data.Complex.Complex a = !a Data.Complex.:+ !a
   	-- Imported from Data.Complex
-infix 6 :+
-data RealFloat a => Complex a = !a :+ !a
+infix 6 Data.Complex.:+
+data Data.Complex.Complex a = !a Data.Complex.:+ !a
   	-- Imported from Data.Complex
-infix 6 :+
+infix 6 Data.Complex.:+
 class (RealFrac a, Floating a) => RealFloat a where
   floatRadix :: a -> Integer
   floatDigits :: a -> Int
@@ -30,7 +30,7 @@ class (RealFrac a, Floating a) => RealFloat a where
   isIEEE :: a -> Bool
   atan2 :: a -> a -> a
   	-- Imported from GHC.Float
-instance RealFloat Double 	-- Imported from GHC.Float
-instance RealFloat Float 	-- Imported from GHC.Float
-isPrefixOf :: Eq a => [a] -> [a] -> Bool
+instance RealFloat Double -- Imported from GHC.Float
+instance RealFloat Float -- Imported from GHC.Float
+Data.List.isPrefixOf :: (Eq a) => [a] -> [a] -> Bool
   	-- Imported from Data.List

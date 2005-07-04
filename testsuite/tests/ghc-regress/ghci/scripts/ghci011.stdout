@@ -1,21 +1,21 @@
 data [] a = [] | a : [a] 	-- <wired into compiler>
-instance Eq a => Eq [a] 	-- Imported from GHC.Base
-instance Monad [] 	-- Imported from GHC.Base
-instance Functor [] 	-- Imported from GHC.Base
-instance Ord a => Ord [a] 	-- Imported from GHC.Base
-instance Read a => Read [a] 	-- Imported from GHC.Read
-instance Show a => Show [a] 	-- Imported from GHC.Show
+instance (Eq a) => Eq [a] -- Imported from GHC.Base
+instance Monad [] -- Imported from GHC.Base
+instance Functor [] -- Imported from GHC.Base
+instance (Ord a) => Ord [a] -- Imported from GHC.Base
+instance (Read a) => Read [a] -- Imported from GHC.Read
+instance (Show a) => Show [a] -- Imported from GHC.Show
 data () = () 	-- <wired into compiler>
-instance Bounded () 	-- Imported from GHC.Enum
-instance Enum () 	-- Imported from GHC.Enum
-instance Eq () 	-- Imported from GHC.Base
-instance Ord () 	-- Imported from GHC.Base
-instance Read () 	-- Imported from GHC.Read
-instance Show () 	-- Imported from GHC.Show
+instance Bounded () -- Imported from GHC.Enum
+instance Enum () -- Imported from GHC.Enum
+instance Eq () -- Imported from GHC.Base
+instance Ord () -- Imported from GHC.Base
+instance Read () -- Imported from GHC.Read
+instance Show () -- Imported from GHC.Show
 data (,) a b = (,) a b 	-- <wired into compiler>
 instance (Bounded a, Bounded b) => Bounded (a, b)
-  	-- Imported from GHC.Enum
-instance (Eq a, Eq b) => Eq (a, b) 	-- Imported from Data.Tuple
-instance (Ord a, Ord b) => Ord (a, b) 	-- Imported from Data.Tuple
-instance (Read a, Read b) => Read (a, b) 	-- Imported from GHC.Read
-instance (Show a, Show b) => Show (a, b) 	-- Imported from GHC.Show
+  -- Imported from GHC.Enum
+instance (Eq a, Eq b) => Eq (a, b) -- Imported from Data.Tuple
+instance (Ord a, Ord b) => Ord (a, b) -- Imported from Data.Tuple
+instance (Read a, Read b) => Read (a, b) -- Imported from GHC.Read
+instance (Show a, Show b) => Show (a, b) -- Imported from GHC.Show
