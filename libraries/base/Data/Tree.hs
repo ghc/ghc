@@ -31,6 +31,9 @@ import Prelude
 import Control.Monad
 import Data.Maybe
 import Data.Queue
+import Data.Typeable
+
+#include "Typeable.h"
 
 -- | Multi-way trees, also known as /rose trees/.
 data Tree a   = Node {
@@ -45,6 +48,8 @@ instance Read a => Read (Tree a)
 instance Show a => Show (Tree a)
 #endif
 type Forest a = [Tree a]
+
+INSTANCE_TYPEABLE1(Tree,treeTc,"Tree")
 
 instance Functor Tree where
   fmap = mapTree
