@@ -81,7 +81,8 @@ test('conc037', only_ways(['threaded','smp']), compile_and_run, [''])
 test('conc038', only_ways(['threaded','smp']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
-test('conc039', omit_ways(['ghci']), compile_and_run, [''])
+# Omit for threaded way, relies on non-threaded execution
+test('conc039', omit_ways(['ghci', 'threaded']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
 # Omit threaded RTS: Hangs forever
