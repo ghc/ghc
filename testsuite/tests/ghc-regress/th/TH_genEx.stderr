@@ -1,14 +1,6 @@
-Chasing modules from: TH_genEx
-Compiling TH_genExLib      ( ./TH_genExLib.hs, ./TH_genExLib.o )
-Compiling TH_genEx         ( TH_genEx.hs, TH_genEx.o )
 TH_genEx.hs:1:0:
     TH_genEx.hs:1:0: Splicing declarations
 	genAny (reify 'MyInterface)
       ======>
 	data AnyMyInterface1111
 	    = forall a. (TH_genEx.MyInterface a) => AnyMyInterface1111 a
-Warning: output was redirected with -o, but no output will be generated
-because there is no Main module.
-Loading package base-1.0 ... linking ... done.
-Loading package haskell98-1.0 ... linking ... done.
-Loading package template-haskell-1.0 ... linking ... done.
