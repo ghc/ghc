@@ -122,22 +122,33 @@ mallocBytesRWX(int len)
   returning in some static piece of memory and arrange
   to return to it before tail jumping from the adjustor thunk.
 */
-__asm__ (
-   ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
-   UNDERSCORE "obscure_ccall_ret_code:\n\t"
-   "addl $0x4, %esp\n\t"
-   "ret"
-  );
+static void  GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
+{
+  __asm__ (
+     ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
+     UNDERSCORE "obscure_ccall_ret_code:\n\t"
+     "addl $0x4, %esp\n\t"
+     "ret"
+   );
+}
 extern void obscure_ccall_ret_code(void);
+
+#if defined(openbsd_HOST_OS)
+static unsigned char *obscure_ccall_ret_code_dyn;
+#endif
+
 #endif
 
 #if defined(x86_64_HOST_ARCH)
-__asm__ (
+static void GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
+{
+  __asm__ (
    ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
    UNDERSCORE "obscure_ccall_ret_code:\n\t"
    "addq $0x8, %rsp\n\t"
    "ret"
   );
+}
 extern void obscure_ccall_ret_code(void);
 #endif
 
@@ -317,7 +328,12 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	*((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
 
 	adj_code[0x0a] = (unsigned char)0x68;  /* pushl obscure_ccall_ret_code */
-	*((StgFunPtr*)(adj_code + 0x0b)) = (StgFunPtr)obscure_ccall_ret_code;
+	*((StgFunPtr*)(adj_code + 0x0b)) = 
+#if !defined(openbsd_HOST_OS)
+			(StgFunPtr)obscure_ccall_ret_code;
+#else
+			(StgFunPtr)obscure_ccall_ret_code_dyn;
+#endif
 
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
@@ -1063,4 +1079,11 @@ freeHaskellFunctionPtr(void* ptr)
 void
 initAdjustor(void)
 {
+#if defined(i386_HOST_ARCH) && defined(openbsd_HOST_OS)
+    obscure_ccall_ret_code_dyn = mallocBytesRWX(4);
+    obscure_ccall_ret_code_dyn[0] = ((unsigned char *)obscure_ccall_ret_code)[0];
+    obscure_ccall_ret_code_dyn[1] = ((unsigned char *)obscure_ccall_ret_code)[1];
+    obscure_ccall_ret_code_dyn[2] = ((unsigned char *)obscure_ccall_ret_code)[2];
+    obscure_ccall_ret_code_dyn[3] = ((unsigned char *)obscure_ccall_ret_code)[3];
+#endif
 }
