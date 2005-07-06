@@ -121,13 +121,15 @@ runProcessPosix
 
 runProcessPosix fun cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
 	mb_sigint mb_sigquit
- = withFilePathException cmd $
-     withHandle_ fun (fromMaybe stdin  mb_stdin)  $ \hndStdInput  ->
-     withHandle_ fun (fromMaybe stdout mb_stdout) $ \hndStdOutput ->
-     withHandle_ fun (fromMaybe stderr mb_stderr) $ \hndStdError ->
-     maybeWith withCEnvironment mb_env $ \pEnv ->
-     maybeWith withCString mb_cwd $ \pWorkDir ->
-     withMany withCString (cmd:args) $ \cstrs ->
+ = withFilePathException cmd $ do
+     fd_stdin  <- withHandle_ fun (fromMaybe stdin  mb_stdin)  $ return . haFD
+     fd_stdout <- withHandle_ fun (fromMaybe stdout mb_stdout) $ return . haFD
+     fd_stderr <- withHandle_ fun (fromMaybe stderr mb_stderr) $ return . haFD
+	-- some of these might refer to the same Handle, so don't do
+	-- nested withHandle_'s (that will deadlock).
+     maybeWith withCEnvironment mb_env $ \pEnv -> do
+     maybeWith withCString mb_cwd $ \pWorkDir -> do
+     withMany withCString (cmd:args) $ \cstrs -> do
      let (set_int, inthand) 
 		= case mb_sigint of
 			Nothing   -> (0, 0)
@@ -136,13 +138,10 @@ runProcessPosix fun cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
 		= case mb_sigquit of
 			Nothing   -> (0, 0)
 			Just hand -> (1, hand)
-     in
      withArray0 nullPtr cstrs $ \pargs -> do
          ph <- throwErrnoIfMinus1 fun $
 		 c_runProcess pargs pWorkDir pEnv 
-			(haFD hndStdInput)
-			(haFD hndStdOutput)
-			(haFD hndStdError)
+			fd_stdin fd_stdout fd_stderr
 			set_int inthand set_quit quithand
 	 return (ProcessHandle ph)
 
@@ -171,10 +170,12 @@ defaultSignal = CONST_SIG_DFL :: CLong
 
 runProcessWin32 fun cmd args mb_cwd mb_env
 	mb_stdin mb_stdout mb_stderr extra_cmdline
- = withFilePathException cmd $
-     withHandle_ fun (fromMaybe stdin  mb_stdin)  $ \hndStdInput  ->
-     withHandle_ fun (fromMaybe stdout mb_stdout) $ \hndStdOutput ->
-     withHandle_ fun (fromMaybe stderr mb_stderr) $ \hndStdError ->
+ = withFilePathException cmd $ do
+     fd_stdin  <- withHandle_ fun (fromMaybe stdin  mb_stdin)  $ return . haFD
+     fd_stdout <- withHandle_ fun (fromMaybe stdout mb_stdout) $ return . haFD
+     fd_stderr <- withHandle_ fun (fromMaybe stderr mb_stderr) $ return . haFD
+	-- some of these might refer to the same Handle, so don't do
+	-- nested withHandle_'s (that will deadlock).
      maybeWith withCEnvironment mb_env $ \pEnv -> do
      maybeWith withCString      mb_cwd $ \pWorkDir -> do
        let cmdline = translate cmd ++ 
@@ -183,9 +184,7 @@ runProcessWin32 fun cmd args mb_cwd mb_env
        withCString cmdline $ \pcmdline -> do
          proc_handle <- throwErrnoIfMinus1 fun
 	                  (c_runProcess pcmdline pWorkDir pEnv 
-				(haFD hndStdInput)
-				(haFD hndStdOutput)
-				(haFD hndStdError))
+				fd_stdin fd_stdout fd_stderr)
          return (ProcessHandle proc_handle)
 
 foreign import ccall unsafe "runProcess" 
