@@ -798,6 +798,7 @@ split :: Key -> IntMap a -> (IntMap a,IntMap a)
 split k t
   = case t of
       Bin p m l r
+        | nomatch k p m -> if k>p then (t,Nil) else (Nil,t)
         | zero k m  -> let (lt,gt) = split k l in (lt,union gt r)
         | otherwise -> let (lt,gt) = split k r in (union l lt,gt)
       Tip ky y 
@@ -812,6 +813,7 @@ splitLookup :: Key -> IntMap a -> (IntMap a,Maybe a,IntMap a)
 splitLookup k t
   = case t of
       Bin p m l r
+        | nomatch k p m -> if k>p then (t,Nothing,Nil) else (Nil,Nothing,t)
         | zero k m  -> let (lt,found,gt) = splitLookup k l in (lt,found,union gt r)
         | otherwise -> let (lt,found,gt) = splitLookup k r in (union l lt,found,gt)
       Tip ky y 
