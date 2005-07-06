@@ -4701,7 +4701,7 @@ you can't rename a running program!
 <para><command>ssh</command> comes with both Cygwin and MSYS. 
 (Cygwin note: you need to ask for package <command>openssh</command> (not ssh)
 in the Cygwin list of packages; or use the <command>ghc-depends</command>
-package -- see <xref linkend="install-cygwin">Cygwin installation instructions</xref>.)</para>
+package -- see <xref linkend="install-cygwin"/>.)</para>
 
 <para>There are several strange things about <command>ssh</command> on Windows that you need to know.
 <itemizedlist>
@@ -4951,12 +4951,10 @@ Win32.</para></listitem>
 
 <sect2><title>A Windows build log using Cygwin</title>
 
-Here is a complete, from-scratch, log of all you need to build GHC using
+<para>Here is a complete, from-scratch, log of all you need to build GHC using
 Cygwin, kindly provided by Claus Reinke.  It does not discuss alternative
-choices, but it gives a single path that works.
-<programlisting>
-
-- Install some editor (vim, emacs, whatever)
+choices, but it gives a single path that works.</para>
+<programlisting>- Install some editor (vim, emacs, whatever)
 
 - Install cygwin (http://www.cygwin.com)
     ; i used 1.5.16-1, installed in c:\cygwin
@@ -5029,8 +5027,7 @@ choices, but it gives a single path that works.
   - chmod +x ../distrib/prep-bin-dist-mingw
     ; if you're happy with the script's contents (*)
   - ../distrib/prep-bin-dist-mingw
-    ; then tar up, unpack where wanted, and enjoy    
-</programlisting>
+    ; then tar up, unpack where wanted, and enjoy</programlisting>
 </sect2>
 </sect1>
 
