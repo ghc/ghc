@@ -51,7 +51,7 @@ import System.Process.Internals
 
 import Foreign
 import Foreign.C 
-import System.IO 	( IOMode(..), Handle )
+import System.IO 	( IOMode(..), Handle, hClose )
 import System.Exit	( ExitCode(..) )
 
 import System.Posix.Internals
@@ -84,7 +84,7 @@ runCommand string = do
      process.  
 
      Any 'Handle's passed to 'runProcess' are placed immediately in the 
-     closed state, so may no longer be referenced by the Haskell process.
+     closed state.
 -}
 runProcess
   :: FilePath			-- ^ Filename of the executable
@@ -96,19 +96,19 @@ runProcess
   -> Maybe Handle		-- ^ Handle to use for @stderr@
   -> IO ProcessHandle
 
+runProcess cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr = do
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-
-runProcess cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
- = runProcessPosix "runProcess" cmd args mb_cwd mb_env 
+  h <- runProcessPosix "runProcess" cmd args mb_cwd mb_env 
 	mb_stdin mb_stdout mb_stderr
 	Nothing Nothing
-
 #else
-
-runProcess cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr =
-  runProcessWin32 "runProcess" cmd args mb_cwd mb_env 
+  h <- runProcessWin32 "runProcess" cmd args mb_cwd mb_env 
 	mb_stdin mb_stdout mb_stderr ""
 #endif
+  maybe (return ()) hClose mb_stdin
+  maybe (return ()) hClose mb_stdout
+  maybe (return ()) hClose mb_stderr
+  return h
 
 -- ----------------------------------------------------------------------------
 -- runInteractiveCommand
