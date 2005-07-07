@@ -413,7 +413,7 @@ mk_switch tag_expr [(tag,stmts)] (Just deflt) lo_tag hi_tag via_C
 -- time works around that problem.
 --
 mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
-  | use_switch || via_C 	-- Use a switch
+  | use_switch 	-- Use a switch
   = do	{ branch_ids <- mapM forkCgStmts (map snd branches)
 	; let 
 		tagged_blk_ids = zip (map fst branches) (map Just branch_ids)
@@ -479,7 +479,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 			text "real_lo_tag: " <+> int real_lo_tag <+>
 			text "real_hi_tag: " <+> int real_hi_tag) $ -}
 		   ASSERT( n_branches > 1 && n_tags > 1 ) 
-		   n_tags > 2 && (small || dense)
+		   n_tags > 2 && (small || dense || via_C)
 		 -- a 2-branch switch always turns into an if.
     small      	 = n_tags <= 4
     dense      	 = n_branches > (n_tags `div` 2)
