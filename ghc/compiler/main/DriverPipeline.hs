@@ -511,7 +511,7 @@ getOutputFilename dflags stop_phase output basename
 
 		odir_persistent
 		   | Just loc <- maybe_location = ml_obj_file loc
-		   | Just d <- odir = replaceFilenameDirectory persistent d
+		   | Just d <- odir = d `joinFileName` persistent
 		   | otherwise      = persistent
 
 
