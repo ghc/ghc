@@ -120,8 +120,8 @@ instance Typeable Version where
 
 instance Eq Version where
   v1 == v2  =  versionBranch v1 == versionBranch v2 
-		&& all (`elem` (versionTags v2)) (versionTags v1)
-		-- tags may be in any order
+                && sort (versionTags v1) == sort (versionTags v2)
+                -- tags may be in any order
 
 instance Ord Version where
   v1 `compare` v2 = versionBranch v1 `compare` versionBranch v2
