@@ -915,10 +915,6 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 	   ioException (IOError Nothing InappropriateType "openFile"
 			   "is a directory" Nothing) 
 
-	Stream
-	   | ReadWriteHandle <- ha_type -> mkDuplexHandle fd is_socket filepath binary
-	   | otherwise                  -> mkFileHandle fd is_socket filepath ha_type binary
-
 	-- regular files need to be locked
 	RegularFile -> do
 #ifndef mingw32_HOST_OS
@@ -928,7 +924,16 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 				   "file is locked" Nothing)
 #endif
 	   mkFileHandle fd is_socket filepath ha_type binary
-
+	 -- Stream or RawDevice
+	Stream    -> mkIt ha_type
+	RawDevice -> mkIt ha_type
+	_ ->
+	  ioException (IOError Nothing UnsupportedOperation "openFd"
+			           "unknown file type" Nothing) 
+     where
+      mkIt ht
+       | isReadWriteHandleType ht = mkDuplexHandle fd is_socket filepath binary
+       | otherwise                = mkFileHandle   fd is_socket filepath ht binary
 
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
@@ -1462,9 +1467,8 @@ hIsSeekable handle =
       SemiClosedHandle 	   -> ioe_closedHandle
       AppendHandle 	   -> return False
       _                    -> do t <- fdType (haFD handle_)
-                                 return (t == RegularFile
-                                         && (haIsBin handle_ 
-						|| tEXT_MODE_SEEK_ALLOWED))
+                                 return ((t == RegularFile    || t == RawDevice)
+                                         && (haIsBin handle_  || tEXT_MODE_SEEK_ALLOWED))
 
 -- -----------------------------------------------------------------------------
 -- Changing echo status (Non-standard GHC extensions)

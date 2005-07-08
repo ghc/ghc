@@ -85,7 +85,7 @@ fdFileSize fd =
     c_size <- st_size p_stat :: IO COff
     return (fromIntegral c_size)
 
-data FDType  = Directory | Stream | RegularFile
+data FDType  = Directory | Stream | RegularFile | RawDevice
 	       deriving (Eq)
 
 fileType :: FilePath -> IO FDType
@@ -112,6 +112,8 @@ statGetType p_stat = do
         | s_isfifo c_mode || s_issock c_mode || s_ischr  c_mode
 			  	-> return Stream
 	| s_isreg c_mode	-> return RegularFile
+	 -- Q: map char devices to RawDevice too?
+	| s_isblk c_mode        -> return RawDevice
 	| otherwise		-> ioError ioe_unknownfiletype
     
 

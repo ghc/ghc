@@ -30,7 +30,7 @@ module GHC.IOBase(
     	-- Handles, file descriptors,
     FilePath,  
     Handle(..), Handle__(..), HandleType(..), IOMode(..), FD, 
-    isReadableHandleType, isWritableHandleType, showHandle,
+    isReadableHandleType, isWritableHandleType, isReadWriteHandleType, showHandle,
   
     	-- Buffers
     Buffer(..), RawBuffer, BufferState(..), BufferList(..), BufferMode(..),
@@ -422,6 +422,9 @@ isWritableHandleType AppendHandle    = True
 isWritableHandleType WriteHandle     = True
 isWritableHandleType ReadWriteHandle = True
 isWritableHandleType _	       	     = False
+
+isReadWriteHandleType ReadWriteHandle{} = True
+isReadWriteHandleType _                 = False
 
 -- | File and directory names are values of type 'String', whose precise
 -- meaning is operating system dependent. Files can be opened, yielding a
