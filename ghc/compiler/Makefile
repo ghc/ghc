@@ -157,10 +157,10 @@ SRC_HC_OPTS += $(patsubst %, -i$(odir)/%, $(ALL_DIRS))
 HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
 C_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(C_SRCS))))
 
-# Our standard cleaning rules don't know that we're doing our output into $(odir), so
-# we have to augment CLEAN_FILES appropriateliy.
+# Our standard cleaning rules don't know that we're doing our output
+# into $(odir), so we have to augment CLEAN_FILES appropriateliy.
 
-CLEAN_FILES += $(odir)/*/*.hi
+CLEAN_FILES += $(odir)/*/*.hi $(odir)/*/*.hi-boot $(odir)/*/*.o-boot
 
 ifeq "$(UsingHsBoot)" "YES"
 CLEAN_FILES += $(odir)/*/*.hi-boot $(odir)/*/*.o-boot
