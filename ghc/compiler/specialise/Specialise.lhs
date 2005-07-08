@@ -23,7 +23,7 @@ import VarSet
 import VarEnv
 import CoreSyn
 import CoreUtils	( applyTypeToArgs, mkPiTypes )
-import CoreFVs		( exprFreeVars, exprsFreeVars )
+import CoreFVs		( exprFreeVars, exprsFreeVars, idRuleVars )
 import CoreTidy		( tidyRules )
 import CoreLint		( showPass, endPass )
 import Rules		( addIdSpecialisations, mkLocalRule, lookupRule, emptyRuleBase, rulesOfBinds )
@@ -1050,11 +1050,16 @@ zapCalls ids uds = uds {calls = delListFromFM (calls uds) ids}
 
 mkDB bind = (bind, bind_fvs bind)
 
-bind_fvs (NonRec bndr rhs) = exprFreeVars rhs
+bind_fvs (NonRec bndr rhs) = pair_fvs (bndr,rhs)
 bind_fvs (Rec prs)	   = foldl delVarSet rhs_fvs bndrs
 			   where
 			     bndrs = map fst prs
-			     rhs_fvs = unionVarSets [exprFreeVars rhs | (bndr,rhs) <- prs]
+			     rhs_fvs = unionVarSets (map pair_fvs prs)
+
+pair_fvs (bndr, rhs) = exprFreeVars rhs `unionVarSet` idRuleVars bndr
+	-- Don't forget variables mentioned in the
+	-- rules of the bndr.  C.f. OccAnal.addRuleUsage
+
 
 addDictBind (dict,rhs) uds = uds { dict_binds = mkDB (NonRec dict rhs) `consBag` dict_binds uds }
 
