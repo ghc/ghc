@@ -87,6 +87,16 @@ test024:
 	$(TEST_HC) -c B/C.hs -odir obj
 	test -f obj/B/C$(OBJSUFFIX)
 
+# test -odir with non-Haskell compilation
+test024a:
+	@$(MKDIRHIER) obj
+	@$(RM) B/stub.c
+	@$(RM) obj/B/stub$(OBJSUFFIX)
+	@-rmdir obj/B
+	@echo >B/stub.c
+	$(TEST_HC) -c B/stub.c -odir obj
+	test -f obj/B/stub$(OBJSUFFIX)
+
 # test -hidir
 test025:
 	@$(MKDIRHIER) hi
