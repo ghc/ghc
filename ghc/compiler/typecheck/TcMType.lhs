@@ -55,7 +55,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  MetaDetails(..), SkolemInfo(..), isMetaTyVar, metaTvRef,
 			  tcCmpPred, isClassPred, 
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
-			  tcSplitTyConApp_maybe, tcSplitForAllTys,
+			  tcValidInstHeadTy, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
 			  isUnLiftedType, isIPPred, isImmutableTyVar,
 			  typeKind, isFlexi, isSkolemTyVar,
@@ -82,7 +82,7 @@ import VarSet
 import VarEnv
 import DynFlags	( dopt, DynFlag(..) )
 import UniqSupply	( uniqsFromSupply )
-import Util		( nOfThem, isSingleton, equalLength, notNull )
+import Util		( nOfThem, isSingleton, notNull )
 import ListSetOps	( removeDups )
 import SrcLoc		( unLoc )
 import Outputable
@@ -1129,20 +1129,16 @@ check_inst_head dflags clas tys
   | dopt Opt_GlasgowExts dflags
   = check_tyvars dflags clas tys
 
-	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
+	-- WITH HASKELL 98, MUST HAVE C (T a b c)
   | isSingleton tys,
-    Just (tycon, arg_tys) <- tcSplitTyConApp_maybe first_ty,
-    not (isSynTyCon tycon), 		-- ...but not a synonym
-    all tcIsTyVarTy arg_tys,  		-- Applied to type variables
-    equalLength (varSetElems (tyVarsOfTypes arg_tys)) arg_tys
-          -- This last condition checks that all the type variables are distinct
+    tcValidInstHeadTy first_ty
   = returnM ()
 
   | otherwise
   = failWithTc (instTypeErr (pprClassPred clas tys) head_shape_msg)
 
   where
-    (first_ty : _)       = tys
+    (first_ty : _) = tys
 
     head_shape_msg = parens (text "The instance type must be of form (T a b c)" $$
 			     text "where T is not a synonym, and a,b,c are distinct type variables")

@@ -15,7 +15,7 @@ import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr,
 import TcRnMonad       
 import TcMType		( tcSkolSigType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  checkAmbiguity, SourceTyCtxt(..) )
-import TcType		( mkClassPred, tyVarsOfType, 
+import TcType		( mkClassPred, tyVarsOfType, tcSplitInstHeadTy_maybe,
 			  tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
 			  SkolemInfo(InstSkol), tcSplitDFunTy, pprClassPred )
 import Inst		( tcInstClassOp, newDicts, instToId, showLIE, 

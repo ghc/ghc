@@ -38,7 +38,7 @@ module TcType (
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitSigmaTy,
-  tcGetTyVar_maybe, tcGetTyVar,
+  tcValidInstHeadTy, tcGetTyVar_maybe, tcGetTyVar,
 
   ---------------------------------
   -- Predicates. 
@@ -156,7 +156,7 @@ import Type		(	-- Re-exports
 			  pprType, pprParendType, pprTyThingCategory,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
-import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
+import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, tyConUnique )
 import DataCon		( DataCon )
 import Class		( Class )
 import Var		( TyVar, Id, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
@@ -173,8 +173,9 @@ import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
 import SrcLoc		( SrcLoc, SrcSpan )
-import Util		( snocView )
-import Maybes		( maybeToBool, expectJust )
+import Util		( snocView, equalLength )
+import Maybes		( maybeToBool, expectJust, mapCatMaybes )
+import ListSetOps	( hasNoDups )
 import Outputable
 import DATA_IOREF
 \end{code}
@@ -485,6 +486,30 @@ tcSplitTyConApp_maybe (NoteTy n ty)     = tcSplitTyConApp_maybe ty
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
 tcSplitTyConApp_maybe other	        	= Nothing
+
+tcValidInstHeadTy :: Type -> Bool
+-- Used in Haskell-98 mode, for the argument types of an instance head
+-- These must not be type synonyms, but everywhere else type synonyms
+-- are transparent, so we need a special function here
+tcValidInstHeadTy ty 
+  = case ty of
+	TyConApp tc tys -> ASSERT( not (isSynTyCon tc) ) ok tys
+			   -- A synonym would be a NoteTy
+	FunTy arg res        -> ok [arg, res]
+	NoteTy (SynNote _) _ -> False
+	NoteTy other_note ty -> tcValidInstHeadTy ty
+	other		     -> False
+  where
+	-- Check that all the types are type variables,
+	-- and that each is distinct
+    ok tys = equalLength tvs tys && hasNoDups tvs
+	   where
+	     tvs = mapCatMaybes get_tv tys
+
+    get_tv (TyVarTy tv) 	  = Just tv	  -- Again, do not look
+    get_tv (NoteTy (SynNote _) _) = Nothing  	-- through synonyms
+    get_tv (NoteTy other_note ty) = get_tv ty
+    get_tv other  		  = Nothing
 
 tcSplitFunTys :: Type -> ([Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
