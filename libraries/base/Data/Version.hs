@@ -51,7 +51,7 @@ import Data.Dynamic	( Typeable(..), TyCon, mkTyCon, mkAppTy )
 import Data.Typeable 	( Typeable )
 #endif
 
-import Data.List	( intersperse )
+import Data.List	( intersperse, sort )
 import Control.Monad	( liftM )
 import Data.Char	( isDigit, isAlphaNum )
 
