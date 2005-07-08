@@ -1,0 +1,6 @@
+
+tcfail139.hs:6:0:
+    Illegal instance declaration for `Bounded Foo'
+	(The instance type must be of form (T a b c)
+	 where T is not a synonym, and a,b,c are distinct type variables)
+    In the instance declaration for `Bounded Foo'
