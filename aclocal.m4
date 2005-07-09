@@ -567,7 +567,7 @@ if test "$fp_have_gcc" = "NO" -a -d $srcdir/ghc; then
 fi
 AC_CACHE_CHECK([version of gcc], [fp_gcc_version],
 [if test "$fp_have_gcc" = "YES"; then
-   fp_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g' | sed -e 's/\([[0-9]][[0-9]]*\.[[0-9]][[0-9]]*\).*/\1/g'`"
+   fp_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
    FP_COMPARE_VERSIONS([$fp_gcc_version], [-lt], [2.0],
      [AC_MSG_ERROR([Need at least gcc version 2.0 (3.4+ recommended)])])
  else
