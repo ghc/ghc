@@ -378,7 +378,7 @@ AC_DEFUN([FP_PROG_LD_X],
 AC_CACHE_CHECK([whether ld understands -x], [fp_cv_ld_x],
 [echo 'foo() {}' > conftest.c
 ${CC-cc} -c conftest.c
-if ${LdCmd} -r -x -o conftest2.o conftest.o; then
+if ${LdCmd} -r -x -o conftest2.o conftest.o > /dev/null 2>&1; then
    fp_cv_ld_x=yes
 else
    fp_cv_ld_x=no
