@@ -188,7 +188,7 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
   *stable = getStablePtr((StgPtr)arr);
 
   /* and return a ptr to the goods inside the array */
-  return(BYTE_ARR_CTS(arr));
+  return(&(arr->payload));
 }
 #endif
 

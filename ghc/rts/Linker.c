@@ -3263,7 +3263,7 @@ ia64_extract_instruction(Elf64_Xword *target)
 {
    Elf64_Xword w1, w2;
    int slot = (Elf_Addr)target & 3;
-   (Elf_Addr)target &= ~3;
+   target = (Elf_Addr)target & ~3;
 
    w1 = *target;
    w2 = *(target+1);
@@ -3285,7 +3285,7 @@ static void
 ia64_deposit_instruction(Elf64_Xword *target, Elf64_Xword value)
 {
    int slot = (Elf_Addr)target & 3;
-   (Elf_Addr)target &= ~3;
+   target = (Elf_Addr)target & ~3;
 
    switch (slot)
    {
