@@ -37,7 +37,7 @@ fix f = let x = f x in x
 --	@'mfix' ('return' . h)  =  'return' ('fix' h)@
 --
 -- [/left shrinking/ (or /tightening/)]
---	@'mfix' (\\x -> a >>= \\y -> f x y)  =  \\y -> 'mfix' (\\x -> f x y)@
+--	@'mfix' (\\x -> a >>= \\y -> f x y)  =  a >>= \\y -> 'mfix' (\\x -> f x y)@
 --
 -- [/sliding/]
 --	@'mfix' ('Control.Monad.liftM' h . f)  =  'Control.Monad.liftM' h ('mfix' (f . h))@,
