@@ -112,7 +112,7 @@ make_constr_itbls cons
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
                     poke addr itbl
-                    return (getName dcon, addr `plusPtr` 8)
+                    return (getName dcon, addr `plusPtr` (2 * wORD_SIZE))
 
 
 -- Make code which causes a jump to the given address.  This is the
