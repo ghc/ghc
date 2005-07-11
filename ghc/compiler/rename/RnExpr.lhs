@@ -39,12 +39,14 @@ import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  negateName, thenMName, bindMName, failMName )
 import Name		( Name, nameOccName )
 import NameSet
-import RdrName		( RdrName, emptyGlobalRdrEnv )
+import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
+import List		( nub )
 import Util		( isSingleton )
 import ListSetOps	( removeDups )
+import Maybes		( fromJust )
 import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, combineLocs, cmpLocated )
 import FastString
@@ -82,8 +84,8 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
     )					`thenM` \ (maybe_rhs_sig', ty_fvs) ->
 
 	-- Now the main event
-    rnPatsAndThen ctxt True pats $ \ pats' ->
-    rnGRHSs ctxt grhss		 `thenM` \ (grhss', grhss_fvs) ->
+    rnPatsAndThen ctxt pats	$ \ pats' ->
+    rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
 
     returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
 	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
@@ -353,8 +355,8 @@ rnExpr e@(ELazyPat _) = addErr (patSynErr e)	`thenM_`
 \begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
-    rnPatsAndThen ProcExpr True [pat] $ \ [pat'] ->
-    rnCmdTop body	              `thenM` \ (body',fvBody) ->
+    rnPatsAndThen ProcExpr [pat] $ \ [pat'] ->
+    rnCmdTop body	         `thenM` \ (body',fvBody) ->
     returnM (HsProc pat' body', fvBody)
 
 rnExpr (HsArrApp arrow arg _ ho rtl)
@@ -711,16 +713,12 @@ rnStmt ctxt (BindStmt pat expr _ _) thing_inside
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
-
-	; let reportUnused = case ctxt of
-			         ParStmtCtxt{} -> False
-				 _ -> True
-	; rnPatsAndThen (StmtCtxt ctxt) reportUnused [pat] $ \ [pat'] -> do
+	; rnPatsAndThen (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
 	{ (thing, fvs3) <- thing_inside
 	; return ((BindStmt pat' expr' bind_op fail_op, thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
-	-- fv_expr shouldn't really be filtered by
-	-- the rnPatsAndThen, but it does not matter
+	-- fv_expr shouldn't really be filtered by the rnPatsAndThen
+	-- but it does not matter because the names are unique
 
 rnStmt ctxt (LetStmt binds) thing_inside
   = do	{ checkErr (ok ctxt binds) (badIpBinds binds)
@@ -735,39 +733,6 @@ rnStmt ctxt (LetStmt binds) thing_inside
 
     is_ip_bind (HsIPBinds _) = True
     is_ip_bind _	     = False
-
-rnStmt ctxt (ParStmt stmtss) thing_inside
-  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
-	; checkM opt_GlasgowExts parStmtErr
-	; (stmtss'_w_unit, fv_stmtss) <- mapFvRn rn_branch stmtss
-	; let
-	    bndrss :: [[Name]]	-- NB: Name, not RdrName
-  	    bndrss 	  = map (map unLoc . collectLStmtsBinders) stmtss'
-	    (bndrs, dups) = removeDups cmpByOcc (concat bndrss)
-	    stmtss'       = map fst stmtss'_w_unit
-	; mappM dupErr dups
-
-	; bindLocalNamesFV bndrs $ do
-	{ (thing, fvs) <- thing_inside
-	-- Note: binders are returned in scope order, so one may
-	--       shadow the next; e.g. x <- xs; x <- ys
-
-	-- Cut down the exported binders to just the ones needed in the body
-	; let	used_bndrs_s = map (filter (`elemNameSet` fvs)) bndrss
-		unused_bndrs = filter (not . (`elemNameSet` fvs)) bndrs
-
-     -- With processing of the branches and the tail of comprehension done,
-     -- we can finally compute&report any unused ParStmt binders.
-	; warnUnusedMatches unused_bndrs
-	; return ((ParStmt (stmtss' `zip` used_bndrs_s), thing),
-	          fv_stmtss `plusFV` fvs) }}
-  where
-    rn_branch (stmts, _) = rnNormalStmts (ParStmtCtxt ctxt) stmts $
-			   return ((), emptyFVs)
-
-    cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
-    dupErr vs = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
-		        <+> quotes (ppr (head vs)))
 
 rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
   = bindLocatedLocalsRn doc (collectLStmtsBinders rec_stmts)	$ \ _ ->
@@ -784,6 +749,59 @@ rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
     returnM ((rec_stmt, thing), uses `plusFV` fvs)
   where
     doc = text "In a recursive do statement"
+
+rnStmt ctxt (ParStmt segs) thing_inside
+  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
+	; checkM opt_GlasgowExts parStmtErr
+ 	; orig_lcl_env <- getLocalRdrEnv
+	; ((segs',thing), fvs) <- go orig_lcl_env [] segs
+	; return ((ParStmt segs', thing), fvs) }
+  where
+--  type ParSeg id = [([LStmt id], [id])]
+--  go :: NameSet -> [ParSeg RdrName]
+--       -> RnM (([ParSeg Name], thing), FreeVars)
+
+    go orig_lcl_env bndrs [] 
+	= do { let { (bndrs', dups) = removeDups cmpByOcc bndrs
+		   ; inner_env = extendLocalRdrEnv orig_lcl_env bndrs' }
+	     ; mappM dupErr dups
+	     ; (thing, fvs) <- setLocalRdrEnv inner_env thing_inside
+	     ; return (([], thing), fvs) }
+
+    go orig_lcl_env bndrs_so_far ((stmts, _) : segs)
+	= do { ((stmts', (bndrs, segs', thing)), fvs)
+		  <- rnNormalStmts par_ctxt stmts $ do
+		     { 	-- Find the Names that are bound by stmts
+		       lcl_env <- getLocalRdrEnv
+		     ; let { rdr_bndrs = collectLStmtsBinders stmts
+		     	   ; bndrs = map ( fromJust
+		     		         . lookupLocalRdrEnv lcl_env
+		     		         . unLoc) rdr_bndrs
+		           ; new_bndrs = nub bndrs ++ bndrs_so_far 
+				-- The nub is because there might be shadowing
+				--	x <- e1; x <- e2
+				-- So we'll look up (Unqual x) twice, getting
+				-- the second binding both times, which is the
+			}	-- one we want
+
+			-- Typecheck the thing inside, passing on all
+			-- the Names bound, but separately; revert the envt
+		     ; ((segs', thing), fvs) <- setLocalRdrEnv orig_lcl_env $
+						go orig_lcl_env new_bndrs segs
+
+			-- Figure out which of the bound names are used
+		     ; let used_bndrs = filter (`elemNameSet` fvs) bndrs
+		     ; return ((used_bndrs, segs', thing), fvs) }
+
+	     ; let seg' = (stmts', bndrs)
+	     ; return (((seg':segs'), thing), 
+		       delListFromNameSet fvs bndrs) }
+
+    par_ctxt = ParStmtCtxt ctxt
+
+    cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
+    dupErr vs = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
+		        <+> quotes (ppr (head vs)))
 \end{code}
 
 
