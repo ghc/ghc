@@ -2348,9 +2348,6 @@ groupErrs report_err (inst:insts)
 addInstLoc :: [Inst] -> Message -> Message
 addInstLoc insts msg = msg $$ nest 2 (pprInstLoc (instLoc (head insts)))
 
-plural [x] = empty
-plural xs  = char 's'
-
 addTopIPErrs :: [Name] -> [Inst] -> TcM ()
 addTopIPErrs bndrs [] 
   = return ()

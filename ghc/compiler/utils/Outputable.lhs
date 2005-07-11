@@ -33,7 +33,7 @@ module Outputable (
 	sep, cat, 
 	fsep, fcat, 
 	hang, punctuate,
-	speakNth, speakNTimes, speakN,
+	speakNth, speakNTimes, speakN, speakNOf, plural,
 
 	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForUser,
@@ -476,7 +476,8 @@ speakNth n = hcat [ int n, text suffix ]
     last_dig = n `rem` 10
 
 speakN :: Int -> SDoc
-speakN 1 = ptext SLIT("one")
+speakN 0 = ptext SLIT("none")	-- E.g.  "he has none"
+speakN 1 = ptext SLIT("one")	-- E.g.  "he has one"
 speakN 2 = ptext SLIT("two")
 speakN 3 = ptext SLIT("three")
 speakN 4 = ptext SLIT("four")
@@ -484,10 +485,18 @@ speakN 5 = ptext SLIT("five")
 speakN 6 = ptext SLIT("six")
 speakN n = int n
 
+speakNOf :: Int -> SDoc -> SDoc
+speakNOf 0 d = ptext SLIT("no") <+> d <> char 's'	-- E.g. "no arguments"
+speakNOf 1 d = ptext SLIT("one") <+> d			-- E.g. "one argument"
+speakNOf n d = speakN n <+> d <> char 's'		-- E.g. "three arguments"
+
 speakNTimes :: Int {- >=1 -} -> SDoc
 speakNTimes t | t == 1 	   = ptext SLIT("once")
               | t == 2 	   = ptext SLIT("twice")
-              | otherwise  = int t <+> ptext SLIT("times")
+              | otherwise  = speakN t <+> ptext SLIT("times")
+
+plural [x] = empty
+plural xs  = char 's'
 \end{code}
 
 
