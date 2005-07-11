@@ -121,6 +121,16 @@ stg_returnToSched
   jump StgReturn;
 }
 
+// A variant of stg_returntToSched that doesn't call threadPaused() on the
+// current thread.  This is used for switching from compiled execution to the
+// interpreter, where calling threadPaused() on every switch would be too
+// expensive.
+stg_returnToSchedNotPaused
+{
+  SAVE_THREAD_STATE();
+  jump StgReturn;
+}
+
 // A variant of stg_returnToSched, but instead of returning directly to the
 // scheduler, we jump to the code fragment pointed to by R2.  This lets us
 // perform some final actions after making the thread safe, such as unlocking

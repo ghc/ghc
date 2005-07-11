@@ -72,22 +72,30 @@
     StgTSO_what_next(CurrentTSO) = ThreadRunGHC::I16;		\
     jump stg_returnToSched;
 
-#define RETURN_TO_SCHED(why,what_next)			\
+#define PRE_RETURN(why,what_next)			\
   StgTSO_what_next(CurrentTSO) = what_next::I16;	\
-  R1 = why;						\
+  R1 = why;
+
+#define HP_GENERIC				\
+   PRE_RETURN(HeapOverflow, ThreadRunGHC)	\
   jump stg_returnToSched;
 
-#define RETURN_TO_SCHED_BUT_FIRST(why,what_next,cont)	\
-  StgTSO_what_next(CurrentTSO) = what_next::I16;	\
-  R1 = why;						\
-  R2 = cont;						\
+#define BLOCK_GENERIC				\
+   PRE_RETURN(ThreadBlocked,  ThreadRunGHC)	\
+  jump stg_returnToSched;
+
+#define YIELD_GENERIC				\
+  PRE_RETURN(ThreadYielding, ThreadRunGHC)	\
+  jump stg_returnToSched;
+
+#define BLOCK_BUT_FIRST(c)			\
+  PRE_RETURN(ThreadYielding, ThreadRunGHC)	\
+  R2 = c;					\
   jump stg_returnToSchedButFirst;
 
-#define HP_GENERIC           RETURN_TO_SCHED(HeapOverflow,   ThreadRunGHC)
-#define YIELD_GENERIC        RETURN_TO_SCHED(ThreadYielding, ThreadRunGHC)
-#define YIELD_TO_INTERPRETER RETURN_TO_SCHED(ThreadYielding, ThreadInterpret)
-#define BLOCK_GENERIC        RETURN_TO_SCHED(ThreadBlocked,  ThreadRunGHC)
-#define BLOCK_BUT_FIRST(c)   RETURN_TO_SCHED_BUT_FIRST(ThreadBlocked, ThreadRunGHC, c)
+#define YIELD_TO_INTERPRETER			\
+  PRE_RETURN(ThreadYielding, ThreadInterpret)	\
+  jump stg_returnToSchedNotPaused;
 
 /* -----------------------------------------------------------------------------
    Heap checks in thunks/functions.

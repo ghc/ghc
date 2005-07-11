@@ -55,8 +55,14 @@
     cap->r.rCurrentTSO->sp = Sp
 
 #define RETURN_TO_SCHEDULER(todo,retcode)	\
-   SAVE_STACK_POINTERS; 			\
-   cap->r.rCurrentTSO->what_next = (todo);      \
+   SAVE_STACK_POINTERS;				\
+   cap->r.rCurrentTSO->what_next = (todo);	\
+   threadPaused(cap->r.rCurrentTSO);		\
+   return (retcode);
+
+#define RETURN_TO_SCHEDULER_NO_PAUSE(todo,retcode)	\
+   SAVE_STACK_POINTERS;				\
+   cap->r.rCurrentTSO->what_next = (todo);	\
    return (retcode);
 
 
@@ -334,7 +340,7 @@ eval_obj:
 	Sp -= 2;
 	Sp[1] = (W_)obj;
 	Sp[0] = (W_)&stg_enter_info;
-	RETURN_TO_SCHEDULER(ThreadRunGHC, ThreadYielding);
+	RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
     }
 
@@ -429,7 +435,7 @@ do_return:
 	Sp -= 2;
 	Sp[1] = (W_)obj;
 	Sp[0] = (W_)&stg_enter_info;
-	RETURN_TO_SCHEDULER(ThreadRunGHC, ThreadYielding);
+	RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
     }
 
@@ -489,7 +495,7 @@ do_return_unboxed:
 		     debugBelch("returning to unknown frame -- yielding to sched\n"); 
 		     printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
 		);
-	    RETURN_TO_SCHEDULER(ThreadRunGHC, ThreadYielding);
+	    RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
 	}
 	}
     }
@@ -618,7 +624,7 @@ do_apply:
 	    Sp -= 2;
 	    Sp[1] = (W_)obj;
 	    Sp[0] = (W_)&stg_enter_info;
-	    RETURN_TO_SCHEDULER(ThreadRunGHC, ThreadYielding);
+	    RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
 
     // ------------------------------------------------------------------------
