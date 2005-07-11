@@ -624,9 +624,7 @@
 #define REG_R3    	l3
 #define REG_R4    	l4
 #define REG_R5    	l5
-#define REG_R6    	l6
-#define REG_R7    	l7
-#define REG_R8		i5
+#define REG_R6    	i5
 
 #define REG_F1	    	f22
 #define REG_F2	    	f23
