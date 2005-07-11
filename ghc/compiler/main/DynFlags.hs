@@ -1225,7 +1225,13 @@ machdepCCOpts dflags
 	= ( [], ["-fomit-frame-pointer", "-G0"] )
 
 #elif x86_64_TARGET_ARCH
-	= ( [], ["-fomit-frame-pointer"] )
+	= ( [], ["-fomit-frame-pointer",
+		 "-fno-asynchronous-unwind-tables"
+			-- the unwind tables are unnecessary for HC code,
+			-- and get in the way of -split-objs.  Another option
+			-- would be to throw them away in the mangler, but this
+			-- is easier.
+		] )
 
 #elif mips_TARGET_ARCH
 	= ( ["-static"], [] )
