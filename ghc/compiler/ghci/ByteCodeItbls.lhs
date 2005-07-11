@@ -172,11 +172,14 @@ mkJumpToAddr a =
 	0x7D8903A6, 0x4E800420
 	]
 
-#elif i386_TARGET_ARCH
+#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
 -- Let the address to jump to be 0xWWXXYYZZ.
 -- Generate   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
 -- which is
 -- B8 ZZ YY XX WW FF E0
+
+-- This works on x86_64 too, because we're assuming the small memory
+-- model, where all symbols fit into the lower 2Gb.
 
 type ItblCode = Word8
 mkJumpToAddr a
