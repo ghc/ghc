@@ -1,1 +1,26 @@
- 
+
+tcfail140.hs:10:6:
+    The function `f' is applied to two arguments,
+    but its type `Int -> Int' has only one
+    In the definition of `bar': bar = f 3 9
+
+tcfail140.hs:12:9:
+    The infix expression `3 `f` 4' requires `f' to take two arguments,
+    but its type `Int -> Int' has only one
+    In the definition of `rot': rot xs = 3 `f` 4
+
+tcfail140.hs:14:13:
+    The operator section `(3 `f`)' requires `f' to take two arguments,
+    but its type `Int -> Int' has only one
+    In the first argument of `map', namely `(3 `f`)'
+    In the definition of `bot': bot xs = map ((3 `f`)) xs
+
+tcfail140.hs:16:6:
+    The lambda expression `\ Just x -> ...' has two argumentss,
+    but its type `Maybe a -> a' has only one
+    In the expression: (\ Just x -> x) :: Maybe a -> a
+    In the definition of `t': t = ((\ Just x -> x) :: Maybe a -> a) (Just 1)
+
+tcfail140.hs:19:0:
+    The equation(s) for `g' have two arguments,
+    but its type `Int -> Int' has only one
