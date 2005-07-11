@@ -3232,6 +3232,8 @@ awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
 void
 awakenBlockedQueueNoLock(StgTSO *tso)
 {
+  if (tso == NULL) return; // hack; see bug #1235728, and comments in
+			   // Exception.cmm
   while (tso != END_TSO_QUEUE) {
     tso = unblockOneLocked(tso);
   }
@@ -3240,6 +3242,8 @@ awakenBlockedQueueNoLock(StgTSO *tso)
 void
 awakenBlockedQueue(StgTSO *tso)
 {
+  if (tso == NULL) return; // hack; see bug #1235728, and comments in
+			   // Exception.cmm
   ACQUIRE_LOCK(&sched_mutex);
   while (tso != END_TSO_QUEUE) {
     tso = unblockOneLocked(tso);

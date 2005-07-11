@@ -35,6 +35,18 @@
    it.  The action of unblocking exceptions in a thread will release all
    the threads waiting to deliver exceptions to that thread.
 
+   NB. there's a bug in here.  If a thread is inside an
+   unsafePerformIO, and inside blockAsyncExceptions# (there is an
+   unblockAsyncExceptions_ret on the stack), and it is blocked in an
+   interruptible operation, and it receives an exception, then the
+   unsafePerformIO thunk will be updated with a stack object
+   containing the unblockAsyncExceptions_ret frame.  Later, when
+   someone else evaluates this thunk, the blocked exception state is
+   not restored, and the result is that unblockAsyncExceptions_ret
+   will attempt to unblock exceptions in the current thread, but it'll
+   find that the CurrentTSO->blocked_exceptions is NULL.  Hence, we
+   work around this by checking for NULL in awakenBlockedQueue().
+
    -------------------------------------------------------------------------- */
 
 INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
