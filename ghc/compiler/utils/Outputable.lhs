@@ -14,7 +14,7 @@ module Outputable (
 	BindingSite(..),
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
-	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper,
+	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper, pprSetDepth,
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, unqualStyle, 
 	mkErrStyle, defaultErrStyle,
@@ -33,7 +33,7 @@ module Outputable (
 	sep, cat, 
 	fsep, fcat, 
 	hang, punctuate,
-	speakNth, speakNTimes,
+	speakNth, speakNTimes, speakN,
 
 	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForUser,
@@ -155,6 +155,10 @@ pprDeeper :: SDoc -> SDoc
 pprDeeper d (PprUser unqual (PartWay 0)) = Pretty.text "..."
 pprDeeper d (PprUser unqual (PartWay n)) = d (PprUser unqual (PartWay (n-1)))
 pprDeeper d other_sty        		 = d other_sty
+
+pprSetDepth :: Int -> SDoc -> SDoc
+pprSetDepth n d (PprUser unqual _) = d (PprUser unqual (PartWay n))
+pprSetDepth n d other_sty	   = d other_sty
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df sty = df sty sty
@@ -455,7 +459,6 @@ pprQuotedList xs = hsep (punctuate comma (map (quotes . ppr) xs))
 
 \begin{code}
 speakNth :: Int -> SDoc
-
 speakNth 1 = ptext SLIT("first")
 speakNth 2 = ptext SLIT("second")
 speakNth 3 = ptext SLIT("third")
@@ -471,9 +474,16 @@ speakNth n = hcat [ int n, text suffix ]
 	   | otherwise     = "th"
 
     last_dig = n `rem` 10
-\end{code}
 
-\begin{code}
+speakN :: Int -> SDoc
+speakN 1 = ptext SLIT("one")
+speakN 2 = ptext SLIT("two")
+speakN 3 = ptext SLIT("three")
+speakN 4 = ptext SLIT("four")
+speakN 5 = ptext SLIT("five")
+speakN 6 = ptext SLIT("six")
+speakN n = int n
+
 speakNTimes :: Int {- >=1 -} -> SDoc
 speakNTimes t | t == 1 	   = ptext SLIT("once")
               | t == 2 	   = ptext SLIT("twice")
