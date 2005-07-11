@@ -199,9 +199,13 @@ interactiveUI session srcs maybe_expr = do
 #if defined(mingw32_HOST_OS)
     -- The win32 Console API mutates the first character of 
     -- type-ahead when reading from it in a non-buffered manner. Work
-    -- around this by flushing the input buffer of type-ahead characters.
-    -- 
-   GHC.ConsoleHandler.flushConsole stdin
+    -- around this by flushing the input buffer of type-ahead characters,
+    -- but only if stdin is available.
+   flushed <- IO.try (GHC.ConsoleHandler.flushConsole stdin)
+   case flushed of 
+   	Left err | isDoesNotExistError err -> return ()
+   		 | otherwise -> ioError err
+   	Right () -> return ()
 #endif
    startGHCi (runGHCi srcs maybe_expr)
 	GHCiState{ progname = "<interactive>",
