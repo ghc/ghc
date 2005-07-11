@@ -647,7 +647,7 @@ pprMatch :: OutputableBndr id => HsMatchContext id -> Match id -> SDoc
 pprMatch ctxt (Match pats maybe_ty grhss)
   = pp_name ctxt <+> sep [sep (map ppr pats), 
 		     ppr_maybe_ty, 
-		     nest 2 (pprDeeper (pprGRHSs ctxt grhss))]
+		     nest 2 (pprGRHSs ctxt grhss)]
   where
     pp_name (FunRhs fun) = ppr fun	-- Not pprBndr; the AbsBinds will
 					-- have printed the signature

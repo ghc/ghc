@@ -185,11 +185,11 @@ subFunTys ctxt group@(MatchGroup (match:matches) _) (Check ty) thing_inside
     n_pats = length (hsLMatchPats match)
     msg = case ctxt of
 	    FunRhs fun -> ptext SLIT("The equation(s) for") <+> quotes (ppr fun)
-			  <+> ptext SLIT("have") <+> speakN n_pats <+> ptext SLIT("arguments")
+			  <+> ptext SLIT("have") <+> speakNOf n_pats (ptext SLIT("argument"))
 	    LambdaExpr -> sep [ ptext SLIT("The lambda expression")
 				  <+> quotes (pprSetDepth 1 $ pprMatches ctxt group),
 					-- The pprSetDepth makes the abstraction print briefly
-				ptext SLIT("has") <+> speakN n_pats <+> ptext SLIT("arguments")]
+				ptext SLIT("has") <+> speakNOf n_pats (ptext SLIT("arguments"))]
 	    other      -> pprPanic "subFunTys" (pprMatchContext ctxt)				
 
 
@@ -232,7 +232,8 @@ unifyFunTys error_herald arity ty
     mk_msg n_actual
       = error_herald <> comma $$ 
 	sep [ptext SLIT("but its type") <+> quotes (pprType ty), 
-	     ptext SLIT("has only") <+> speakN n_actual]
+	     if n_actual == 0 then ptext SLIT("has none") 
+	     else ptext SLIT("has only") <+> speakN n_actual]
 
 unify_fun_ty :: Bool -> Arity -> TcRhoType
 	     -> TcM (Bool, 		-- Arity satisfied?
