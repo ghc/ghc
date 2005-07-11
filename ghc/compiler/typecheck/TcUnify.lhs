@@ -26,7 +26,8 @@ module TcUnify (
 
 #include "HsVersions.h"
 
-import HsSyn		( HsExpr(..) , MatchGroup(..), hsLMatchPats )
+import HsSyn		( HsExpr(..) , MatchGroup(..), HsMatchContext(..), 
+			  hsLMatchPats, pprMatches, pprMatchContext )
 import TcHsSyn		( mkHsLet, mkHsDictLam,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
 import TypeRep		( Type(..), PredType(..), TyNote(..) )
@@ -35,7 +36,7 @@ import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, Expected(..), TcTyVarDetails(..),
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
-			  pprTcTyVar, isTauTy, isSigmaTy, mkFunTys, mkTyConApp,
+			  pprTcTyVar, isTauTy, isSigmaTy, mkFunTy, mkFunTys, mkTyConApp,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
@@ -59,7 +60,7 @@ import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
 import VarSet		( emptyVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems )
 import VarEnv
-import Name		( isSystemName, mkSysTvName )
+import Name		( Name, isSystemName, mkSysTvName )
 import ErrUtils		( Message )
 import SrcLoc		( noLoc )
 import BasicTypes	( Arity )
@@ -150,12 +151,13 @@ creation of type variables.
   type variables, so we should create new ordinary type variables
 
 \begin{code}
-subFunTys :: MatchGroup name
+subFunTys :: HsMatchContext Name
+	  -> MatchGroup Name
 	  -> Expected TcRhoType		-- Fail if ty isn't a function type
 	  -> ([Expected TcRhoType] -> Expected TcRhoType -> TcM a)
 	  -> TcM a
 
-subFunTys (MatchGroup (match:null_matches) _) (Infer hole) thing_inside
+subFunTys ctxt (MatchGroup (match:null_matches) _) (Infer hole) thing_inside
   = 	-- This is the interesting case
     ASSERT( null null_matches )
     do	{ pat_holes <- mapM (\ _ -> newHole) (hsLMatchPats match)
@@ -174,13 +176,24 @@ subFunTys (MatchGroup (match:null_matches) _) (Infer hole) thing_inside
 		-- And return the answer
 	; return res }
 
-subFunTys (MatchGroup (match:matches) _) (Check ty) thing_inside
-  = ASSERT( all ((== length (hsLMatchPats match)) . length . hsLMatchPats) matches )
+subFunTys ctxt group@(MatchGroup (match:matches) _) (Check ty) thing_inside
+  = ASSERT( all ((== n_pats) . length . hsLMatchPats) matches )
 	-- Assertion just checks that all the matches have the same number of pats
-    do	{ (pat_tys, res_ty) <- unifyFunTys (length (hsLMatchPats match)) ty
+    do	{ (pat_tys, res_ty) <- unifyFunTys msg n_pats ty
 	; thing_inside (map Check pat_tys) (Check res_ty) }
+  where
+    n_pats = length (hsLMatchPats match)
+    msg = case ctxt of
+	    FunRhs fun -> ptext SLIT("The equation(s) for") <+> quotes (ppr fun)
+			  <+> ptext SLIT("have") <+> speakN n_pats <+> ptext SLIT("arguments")
+	    LambdaExpr -> sep [ ptext SLIT("The lambda expression")
+				  <+> quotes (pprSetDepth 1 $ pprMatches ctxt group),
+					-- The pprSetDepth makes the abstraction print briefly
+				ptext SLIT("has") <+> speakN n_pats <+> ptext SLIT("arguments")]
+	    other      -> pprPanic "subFunTys" (pprMatchContext ctxt)				
 
-unifyFunTys :: Arity -> TcRhoType -> TcM ([TcSigmaType], TcRhoType)	 		
+
+unifyFunTys :: SDoc -> Arity -> TcRhoType -> TcM ([TcSigmaType], TcRhoType)	 		
 -- Fail if ty isn't a function type, otherwise return arg and result types
 -- The result types are guaranteed wobbly if the argument is wobbly
 --
@@ -193,12 +206,43 @@ unifyFunTys :: Arity -> TcRhoType -> TcM ([TcSigmaType], TcRhoType)
 --
 --	(b) GADTs: if the argument is not wobbly we do not want the result to be
 
-unifyFunTys arity ty = unify_fun_ty True arity ty
+{-
+	Error messages from unifyFunTys
+	The first line is passed in as error_herald
+
+   The abstraction `\Just 1 -> ...' has two arguments
+   but its type `Maybe a -> a' has only one
+
+   The equation(s) for `f' have two arguments
+   but its type `Maybe a -> a' has only one
+
+   The section `(f 3)' requires 'f' to take two arguments
+   but its type `Int -> Int' has only one
+
+   The function 'f' is applied to two arguments
+   but its type `Int -> Int' has only one
+-}
+
+unifyFunTys error_herald arity ty 
+	-- error_herald is the whole first line of the error message above
+  = do 	{ (ok, args, res) <- unify_fun_ty True arity ty
+	; if ok then return (args, res) 
+	  else failWithTc (mk_msg (length args)) }
+  where
+    mk_msg n_actual
+      = error_herald <> comma $$ 
+	sep [ptext SLIT("but its type") <+> quotes (pprType ty), 
+	     ptext SLIT("has only") <+> speakN n_actual]
+
+unify_fun_ty :: Bool -> Arity -> TcRhoType
+	     -> TcM (Bool, 		-- Arity satisfied?
+		     [TcSigmaType],	-- Arg types found; length <= arity
+		     TcRhoType)		-- Result type
 
 unify_fun_ty use_refinement arity ty
   | arity == 0 
   = do	{ res_ty <- wobblify use_refinement ty
-	; return ([], ty) }
+	; return (True, [], ty) }
 
 unify_fun_ty use_refinement arity (NoteTy _ ty)
   = unify_fun_ty use_refinement arity ty
@@ -207,24 +251,38 @@ unify_fun_ty use_refinement arity ty@(TyVarTy tv)
   = do	{ details <- condLookupTcTyVar use_refinement tv
 	; case details of
 	    IndirectTv use' ty' -> unify_fun_ty use' arity ty'
-	    other 		-> unify_fun_help arity ty
+	    DoneTv (MetaTv ref) -> ASSERT( liftedTypeKind `isSubKind` tyVarKind tv )
+					-- The argument to unifyFunTys is always a type
+					-- Occurs check can't happen, of course
+				   do { args <- mappM newTyFlexiVarTy (replicate arity argTypeKind)
+				      ; res <- newTyFlexiVarTy openTypeKind
+				      ; writeMutVar ref (Indirect (mkFunTys args res))
+		 	 	      ; return (True, args, res) }
+	    DoneTv skol  	-> return (False, [], ty)
 	}
 
 unify_fun_ty use_refinement arity ty
-  = case tcSplitFunTy_maybe ty of
-	Just (arg,res) -> do { arg'	     <- wobblify use_refinement arg
-			     ; (args', res') <- unify_fun_ty use_refinement (arity-1) res
-			     ; return (arg':args', res') }
+  | Just (arg,res) <- tcSplitFunTy_maybe ty
+  = do	{ arg' <- wobblify use_refinement arg
+	; (ok, args', res') <- unify_fun_ty use_refinement (arity-1) res
+	; return (ok, arg':args', res') }
 
-	Nothing -> unify_fun_help arity ty
-	-- Usually an error, but ty could be (a Int Bool), which can match
-
-unify_fun_help :: Arity -> TcRhoType -> TcM ([TcSigmaType], TcRhoType)	 		
-unify_fun_help arity ty
-  = do { args <- mappM newTyFlexiVarTy (replicate arity argTypeKind)
-       ; res <- newTyFlexiVarTy openTypeKind
-       ; unifyTauTy ty (mkFunTys args res)
-       ; return (args, res) }
+unify_fun_ty use_refinement arity ty
+-- Common cases are all done by now
+-- At this point we usually have an error, but ty could 
+-- be (a Int Bool), or (a Bool), which can match
+-- So just use the unifier.  But catch any error so we just
+-- return the success/fail boolean
+  = do	{ arg <- newTyFlexiVarTy argTypeKind
+	; res <- newTyFlexiVarTy openTypeKind
+	; let fun_ty = mkFunTy arg res
+	; (_, mb_unit) <- tryTc (uTys True ty ty True fun_ty fun_ty)
+	; case mb_unit of {
+	    Nothing -> return (False, [], ty) ;
+	    Just _  -> 
+    do { (ok, args', res') <- unify_fun_ty use_refinement (arity-1) res
+       ; return (ok, arg:args', res')
+    } } }
 \end{code}
 
 \begin{code}
@@ -501,11 +559,11 @@ tc_sub _ (FunTy exp_arg exp_res) _ (FunTy act_arg act_res)
 -- I'm not quite sure what to do about this!
 
 tc_sub exp_sty exp_ty@(FunTy exp_arg exp_res) _ act_ty
-  = do	{ ([act_arg], act_res) <- unifyFunTys 1 act_ty
+  = do	{ (act_arg, act_res) <- unify_fun act_ty
 	; tcSub_fun exp_arg exp_res act_arg act_res }
 
 tc_sub _ exp_ty act_sty act_ty@(FunTy act_arg act_res)
-  = do	{ ([exp_arg], exp_res) <- unifyFunTys 1 exp_ty
+  = do	{ (exp_arg, exp_res) <- unify_fun exp_ty
  	; tcSub_fun exp_arg exp_res act_arg act_res }
 
 -----------------------------------
@@ -514,6 +572,15 @@ tc_sub _ exp_ty act_sty act_ty@(FunTy act_arg act_res)
 tc_sub exp_sty expected_ty act_sty actual_ty
   = uTys True exp_sty expected_ty True act_sty actual_ty	`thenM_`
     returnM idCoercion
+
+-----------------------------------
+-- A helper to make a function type match
+-- The error message isn't very good, but that's a problem with
+-- all of this subsumption code
+unify_fun ty 
+  = do { (ok, args, res) <- unify_fun_ty True 1 ty
+	; if ok then return (head args, res)
+	  else failWithTc (ptext SLIT("Expecting a function type, but found") <+> quotes (ppr ty))}
 \end{code}    
     
 \begin{code}

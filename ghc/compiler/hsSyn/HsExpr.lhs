@@ -319,7 +319,7 @@ ppr_expr (SectionL expr op)
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
 		       4 (hsep [pp_expr, ptext SLIT("x_ )")])
-    pp_infixly v = parens (sep [pp_expr, ppr v])
+    pp_infixly v = parens (sep [pp_expr, pprInfix v])
 
 ppr_expr (SectionR op expr)
   = case unLoc op of
@@ -331,7 +331,7 @@ ppr_expr (SectionR op expr)
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext SLIT("x_")])
 		       4 ((<>) pp_expr rparen)
     pp_infixly v
-      = parens (sep [ppr v, pp_expr])
+      = parens (sep [pprInfix v, pp_expr])
 
 ppr_expr (HsLam matches) 
   = pprMatches LambdaExpr matches
@@ -647,7 +647,7 @@ pprMatch :: OutputableBndr id => HsMatchContext id -> Match id -> SDoc
 pprMatch ctxt (Match pats maybe_ty grhss)
   = pp_name ctxt <+> sep [sep (map ppr pats), 
 		     ppr_maybe_ty, 
-		     nest 2 (pprGRHSs ctxt grhss)]
+		     nest 2 (pprDeeper (pprGRHSs ctxt grhss))]
   where
     pp_name (FunRhs fun) = ppr fun	-- Not pprBndr; the AbsBinds will
 					-- have printed the signature

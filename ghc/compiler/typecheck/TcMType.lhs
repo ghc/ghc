@@ -294,7 +294,7 @@ We return Nothing iff the original box was unbound.
 
 \begin{code}
 data LookupTyVarResult	-- The result of a lookupTcTyVar call
-  = DoneTv TcTyVarDetails
+  = DoneTv TcTyVarDetails	-- Unrefined SkolemTv or virgin MetaTv/SigSkolTv
   | IndirectTv Bool TcType
 	-- 	True  => This is a non-wobbly type refinement, 
 	--		 gotten from GADT match unification

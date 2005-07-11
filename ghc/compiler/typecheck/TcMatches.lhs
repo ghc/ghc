@@ -88,12 +88,12 @@ tcMatchesFun fun_name matches exp_ty
 		-- The point is that if expected_y is a "hole", we want 
 		-- to make pat_tys and rhs_ty as "holes" too.
 	; exp_ty' <- zapExpectedBranches matches exp_ty
-	; subFunTys matches exp_ty' 	$ \ pat_tys rhs_ty -> 
+	; subFunTys ctxt matches exp_ty' 	$ \ pat_tys rhs_ty -> 
 	  tcMatches match_ctxt pat_tys rhs_ty matches
 	}
   where
-    match_ctxt = MC { mc_what = FunRhs fun_name,
-		      mc_body = tcMonoExpr }
+    ctxt = FunRhs fun_name
+    match_ctxt = MC { mc_what = ctxt, mc_body = tcMonoExpr }
 \end{code}
 
 @tcMatchesCase@ doesn't do the argument-count check because the
@@ -112,7 +112,7 @@ tcMatchesCase ctxt scrut_ty matches exp_ty
 
 tcMatchLambda :: MatchGroup Name -> Expected TcRhoType -> TcM (MatchGroup TcId)
 tcMatchLambda match exp_ty 	-- One branch so no unifyBranches needed
-  = subFunTys match exp_ty 	$ \ pat_tys rhs_ty ->
+  = subFunTys LambdaExpr match exp_ty 	$ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     match_ctxt = MC { mc_what = LambdaExpr,

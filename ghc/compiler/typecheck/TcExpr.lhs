@@ -240,7 +240,7 @@ a type error will occur if they aren't.
 
 tcExpr in_expr@(SectionL arg1 op) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
-    unifyFunTys 2 op_ty {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    unifyInfixTy op in_expr op_ty		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
     addErrCtxt (exprCtxt in_expr)		$
     tcSubExp res_ty (mkFunTy arg2_ty op_res_ty)	`thenM` \ co_fn ->
@@ -251,7 +251,7 @@ tcExpr in_expr@(SectionL arg1 op) res_ty
 
 tcExpr in_expr@(SectionR op arg2) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
-    unifyFunTys 2 op_ty {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    unifyInfixTy op in_expr op_ty		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
     addErrCtxt (exprCtxt in_expr)		$
     tcSubExp res_ty (mkFunTy arg1_ty op_res_ty)	`thenM` \ co_fn ->
@@ -261,7 +261,7 @@ tcExpr in_expr@(SectionR op arg2) res_ty
 
 tcExpr in_expr@(OpApp arg1 op fix arg2) res_ty
   = tcInferRho op				`thenM` \ (op', op_ty) ->
-    unifyFunTys 2 op_ty {- two args -}		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    unifyInfixTy op in_expr op_ty 		`thenM` \ ([arg1_ty, arg2_ty], op_res_ty) ->
     tcArg op (arg1, arg1_ty, 1)			`thenM` \ arg1' ->
     tcArg op (arg2, arg2_ty, 2)			`thenM` \ arg2' ->
     addErrCtxt (exprCtxt in_expr)		$
@@ -628,14 +628,16 @@ tcApp (L _ (HsApp e1 e2)) args res_ty
   = tcApp e1 (e2:args) res_ty		-- Accumulate the arguments
 
 tcApp fun args res_ty
-  = do	{ (fun', fun_tvs, fun_tau) <- tcFun fun		-- Type-check the function
+  = do	{ let n_args = length args
+	; (fun', fun_tvs, fun_tau) <- tcFun fun		-- Type-check the function
 
 	-- Extract its argument types
 	; (expected_arg_tys, actual_res_ty)
-	      <- addErrCtxt (wrongArgsCtxt "too many" fun args) $ do
-		 { traceTc (text "tcApp" <+> (ppr fun $$ ppr fun_tau))
-		 ; unifyFunTys (length args) fun_tau }
-
+	      <- do { traceTc (text "tcApp" <+> (ppr fun $$ ppr fun_tau))
+		    ; let msg = sep [ptext SLIT("The function") <+> quotes (ppr fun),
+				     ptext SLIT("is applied to") 
+				     <+> speakN n_args <+> ptext SLIT("arguments")]
+		    ; unifyFunTys msg n_args fun_tau }
 
 	; case res_ty of
 	    Check _ -> do 	-- Connect to result type first
@@ -738,6 +740,20 @@ checkArgsCtxt fun args (Check expected_res_ty) actual_res_ty tidy_env
 	      | otherwise		    = appCtxt fun args
     in
     returnM (env2, message)
+
+----------------
+unifyInfixTy :: LHsExpr Name -> HsExpr Name -> TcType
+	     -> TcM ([TcType], TcType)
+-- This wrapper just prepares the error message for unifyFunTys
+unifyInfixTy op expr op_ty
+  = unifyFunTys msg 2 op_ty
+  where
+    msg = sep [herald <+> quotes (ppr expr),
+	       ptext SLIT("requires") <+> quotes (ppr op)
+		 <+> ptext SLIT("to take two arguments")]
+    herald = case expr of
+		OpApp _ _ _ _ -> ptext SLIT("The infix expression")
+		other	      -> ptext SLIT("The operator section")
 \end{code}
 
 
@@ -934,6 +950,7 @@ tcRecordBinds tycon ty_args rbinds
 tyConFieldType :: TyCon -> FieldLabel -> Type
 tyConFieldType tycon field_lbl
   = case [ty | (f,ty,_) <- tyConFields tycon, f == field_lbl] of
+	[]	   -> panic "tyConFieldType"
 	(ty:other) -> ASSERT( null other) ty
 		-- This lookup and assertion will surely succeed, because
 		-- we check that the fields are indeed record selectors
@@ -998,6 +1015,7 @@ tcCheckRhos (expr:exprs) (ty:tys)
  = tcCheckRho  expr  ty		`thenM` \ expr' ->
    tcCheckRhos exprs tys	`thenM` \ exprs' ->
    returnM (expr':exprs')
+tcCheckRhos exprs tys = pprPanic "tcCheckRhos" (ppr exprs $$ ppr tys)
 \end{code}
 
 
