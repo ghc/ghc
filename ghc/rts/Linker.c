@@ -117,6 +117,10 @@ static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 #endif
 
+#if defined(x86_64_HOST_ARCH)
+static void*x86_64_high_symbol( char *lbl, void *addr );
+#endif
+
 /* -----------------------------------------------------------------------------
  * Built-in symbols from the RTS
  */
@@ -910,6 +914,16 @@ lookupSymbol( char *lbl )
 #	if defined(openbsd_HOST_OS)
 	val = dlsym(dl_prog_handle, lbl);
 	return (val != NULL) ? val : dlsym(dl_libc_handle,lbl);
+#	elif defined(x86_64_HOST_ARCH)
+	val = dlsym(dl_prog_handle, lbl);
+	if (val >= (void *)0x80000000) {
+	    void *new_val;
+	    new_val = x86_64_high_symbol(lbl, val);
+	    IF_DEBUG(linker,debugBelch("lookupSymbol: relocating out of range symbol: %s = %p, now %p\n", lbl, val, new_val));
+	    return new_val;
+	} else {
+	    return val;
+	}
 #	else /* not openbsd */
 	return dlsym(dl_prog_handle, lbl);
 #	endif
@@ -2484,6 +2498,64 @@ PLTSize(void)
 #endif
 
 
+#if x86_64_HOST_ARCH
+// On x86_64, 32-bit relocations are often used, which requires that
+// we can resolve a symbol to a 32-bit offset.  However, shared
+// libraries are placed outside the 2Gb area, which leaves us with a
+// problem when we need to give a 32-bit offset to a symbol in a
+// shared library.
+// 
+// For a function symbol, we can allocate a bounce sequence inside the
+// 2Gb area and resolve the symbol to this.  The bounce sequence is
+// simply a long jump instruction to the real location of the symbol.
+//
+// For data references, we're screwed.
+//
+typedef struct {
+    unsigned char jmp[8];  /* 6 byte instruction: jmpq *0x00000002(%rip) */
+    void *addr;
+} x86_64_bounce;
+
+#define X86_64_BB_SIZE 1024
+
+static x86_64_bounce *x86_64_bounce_buffer = NULL;
+static nat x86_64_bb_next_off;
+
+static void*
+x86_64_high_symbol( char *lbl, void *addr )
+{
+    x86_64_bounce *bounce;
+
+    if ( x86_64_bounce_buffer == NULL || 
+	 x86_64_bb_next_off >= X86_64_BB_SIZE ) {
+	x86_64_bounce_buffer = 
+	    mmap(NULL, X86_64_BB_SIZE * sizeof(x86_64_bounce), 
+		 PROT_EXEC|PROT_READ|PROT_WRITE, 
+		 MAP_PRIVATE|MAP_32BIT|MAP_ANONYMOUS, -1, 0);
+	if (x86_64_bounce_buffer == MAP_FAILED) {
+	    barf("x86_64_high_symbol: mmap failed");
+	}
+	x86_64_bb_next_off = 0;
+    }
+    bounce = &x86_64_bounce_buffer[x86_64_bb_next_off];
+    bounce->jmp[0] = 0xff;
+    bounce->jmp[1] = 0x25;
+    bounce->jmp[2] = 0x02;
+    bounce->jmp[3] = 0x00;
+    bounce->jmp[4] = 0x00;
+    bounce->jmp[5] = 0x00;
+    bounce->addr = addr;
+    x86_64_bb_next_off++;
+
+    IF_DEBUG(linker, debugBelch("x86_64: allocated bounce entry for %s->%p at %p\n",
+				lbl, addr, bounce));
+
+    insertStrHashTable(symhash, lbl, bounce);
+    return bounce;
+}
+#endif
+
+
 /*
  * Generic ELF functions
  */
@@ -3174,20 +3246,35 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             break;
 #        endif
 
-#if x86_64_HOST_OS
+#if x86_64_HOST_ARCH
       case R_X86_64_64:
 	  *(Elf64_Xword *)P = value;
 	  break;
 
       case R_X86_64_PC32:
-	  *(Elf64_Word *)P = (Elf64_Word) (value - P);
+      {
+	  StgInt64 off = value - P;
+	  if (off >= 0x7fffffffL || off < -0x80000000L) {
+	      barf("R_X86_64_PC32 relocation out of range: %s = %p",
+		   symbol, off);
+	  }
+	  *(Elf64_Word *)P = (Elf64_Word)off;
 	  break;
+      }
 
       case R_X86_64_32:
+	  if (value >= 0x7fffffffL) {
+	      barf("R_X86_64_32 relocation out of range: %s = %p\n",
+		   symbol, value);
+	  }
 	  *(Elf64_Word *)P = (Elf64_Word)value;
 	  break;
 
       case R_X86_64_32S:
+	  if ((StgInt64)value > 0x7fffffffL || (StgInt64)value < -0x80000000L) {
+	      barf("R_X86_64_32S relocation out of range: %s = %p\n",
+		   symbol, value);
+	  }
 	  *(Elf64_Sword *)P = (Elf64_Sword)value;
 	  break;
 #endif
