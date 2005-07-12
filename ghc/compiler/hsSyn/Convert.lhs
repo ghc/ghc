@@ -20,8 +20,7 @@ import Name	( mkInternalName )
 import Module   ( Module, mkModule )
 import RdrHsSyn	( mkClassDecl, mkTyData )
 import qualified OccName
-import SrcLoc	( generatedSrcLoc, noLoc, unLoc, Located(..),
-		  SrcSpan, srcLocSpan )
+import SrcLoc	( unLoc, Located(..), SrcSpan )
 import Type	( Type )
 import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon )
 import BasicTypes( Boxity(..), RecFlag(Recursive) )
@@ -39,85 +38,53 @@ import Outputable
 
 
 -------------------------------------------------------------------
-convertToHsDecls :: [TH.Dec] -> [Either (LHsDecl RdrName) Message]
-convertToHsDecls ds = map cvt_ltop ds
+convertToHsDecls :: SrcSpan -> [TH.Dec] -> [Either (LHsDecl RdrName) Message]
+-- Use the loc everywhere, for lack of anything better
+-- In particular, we want it on binding locations, so that variables bound in
+-- the spliced-in declarations get a location that at least relates to the splice point
+convertToHsDecls loc ds = map (cvt_top loc) ds
 
-mk_con con = L loc0 $ mk_nlcon con
-  where
-    mk_nlcon con = case con of
-	NormalC c strtys
-	 -> ConDecl (noLoc (cName c)) noExistentials noContext
-		  (PrefixCon (map mk_arg strtys))
-	RecC c varstrtys
-	 -> ConDecl (noLoc (cName c)) noExistentials noContext
-		  (RecCon (map mk_id_arg varstrtys))
-	InfixC st1 c st2
-	 -> ConDecl (noLoc (cName c)) noExistentials noContext
-		  (InfixCon (mk_arg st1) (mk_arg st2))
-	ForallC tvs ctxt (ForallC tvs' ctxt' con')
-	 -> mk_nlcon (ForallC (tvs ++ tvs') (ctxt ++ ctxt') con')
-	ForallC tvs ctxt con' -> case mk_nlcon con' of
-				ConDecl l [] (L _ []) x ->
-				    ConDecl l (cvt_tvs tvs) (cvt_context ctxt) x
-				c -> panic "ForallC: Can't happen"
-    mk_arg (IsStrict, ty)  = noLoc $ HsBangTy HsStrict (cvtType ty)
-    mk_arg (NotStrict, ty) = cvtType ty
-
-    mk_id_arg (i, IsStrict, ty)
-        = (noLoc (vName i), noLoc $ HsBangTy HsStrict (cvtType ty))
-    mk_id_arg (i, NotStrict, ty)
-        = (noLoc (vName i), cvtType ty)
-
-mk_derivs [] = Nothing
-mk_derivs cs = Just [noLoc $ HsPredTy $ HsClassP (tconName c) [] | c <- cs]
-
-cvt_ltop  :: TH.Dec -> Either (LHsDecl RdrName) Message
-cvt_ltop d = case cvt_top d of
-		Left d -> Left (L loc0 d)
-		Right m -> Right m
-
-cvt_top :: TH.Dec -> Either (HsDecl RdrName) Message
-cvt_top d@(TH.ValD _ _ _) = Left $ Hs.ValD (unLoc (cvtd d))
-cvt_top d@(TH.FunD _ _)   = Left $ Hs.ValD (unLoc (cvtd d))
+cvt_top :: SrcSpan -> TH.Dec -> Either (LHsDecl RdrName) Message
+cvt_top loc d@(TH.ValD _ _ _) = Left $ L loc $ Hs.ValD (unLoc (cvtd loc d))
+cvt_top loc d@(TH.FunD _ _)   = Left $ L loc $ Hs.ValD (unLoc (cvtd loc d))
+cvt_top loc (TH.SigD nm typ) = Left $ L loc $ Hs.SigD (Sig (L loc (vName nm)) (cvtType loc typ))
  
-cvt_top (TySynD tc tvs rhs)
-  = Left $ TyClD (TySynonym (noLoc (tconName tc)) (cvt_tvs tvs) (cvtType rhs))
+cvt_top loc (TySynD tc tvs rhs)
+  = Left $ L loc $ TyClD (TySynonym (L loc (tconName tc)) (cvt_tvs loc tvs) (cvtType loc rhs))
 
-cvt_top (DataD ctxt tc tvs constrs derivs)
-  = Left $ TyClD (mkTyData DataType 
-                           (noLoc (cvt_context ctxt, noLoc (tconName tc), cvt_tvs tvs))
-                           Nothing (map mk_con constrs)
-                           (mk_derivs derivs))
+cvt_top loc (DataD ctxt tc tvs constrs derivs)
+  = Left $ L loc $ TyClD (mkTyData DataType 
+                           (L loc (cvt_context loc ctxt, L loc (tconName tc), cvt_tvs loc tvs))
+                           Nothing (map (mk_con loc) constrs)
+                           (mk_derivs loc derivs))
 
-cvt_top (NewtypeD ctxt tc tvs constr derivs)
-  = Left $ TyClD (mkTyData NewType 
-                           (noLoc (cvt_context ctxt, noLoc (tconName tc), cvt_tvs tvs))
-                           Nothing [mk_con constr]
-                           (mk_derivs derivs))
+cvt_top loc (NewtypeD ctxt tc tvs constr derivs)
+  = Left $ L loc $ TyClD (mkTyData NewType 
+                           (L loc (cvt_context loc ctxt, L loc (tconName tc), cvt_tvs loc tvs))
+                           Nothing [mk_con loc constr]
+                           (mk_derivs loc derivs))
 
-cvt_top (ClassD ctxt cl tvs fds decs)
-  = Left $ TyClD $ mkClassDecl (cvt_context ctxt,
-                                noLoc (tconName cl),
-                                cvt_tvs tvs)
-                               (map (noLoc . cvt_fundep) fds)
+cvt_top loc (ClassD ctxt cl tvs fds decs)
+  = Left $ L loc $ TyClD $ mkClassDecl (cvt_context loc ctxt,
+                                L loc (tconName cl),
+                                cvt_tvs loc tvs)
+                               (map (L loc . cvt_fundep) fds)
                                sigs
                                binds
   where
-    (binds,sigs) = cvtBindsAndSigs decs
+    (binds,sigs) = cvtBindsAndSigs loc decs
 
-cvt_top (InstanceD tys ty decs)
-  = Left $ InstD (InstDecl (noLoc inst_ty) binds sigs)
+cvt_top loc (InstanceD tys ty decs)
+  = Left $ L loc $ InstD (InstDecl (L loc inst_ty) binds sigs)
   where
-    (binds, sigs) = cvtBindsAndSigs decs
-    inst_ty = mkImplicitHsForAllTy (cvt_context tys) (noLoc (HsPredTy (cvt_pred ty)))
+    (binds, sigs) = cvtBindsAndSigs loc decs
+    inst_ty = mkImplicitHsForAllTy (cvt_context loc tys) (L loc (HsPredTy (cvt_pred loc ty)))
 
-cvt_top (TH.SigD nm typ) = Left $ Hs.SigD (Sig (noLoc (vName nm)) (cvtType typ))
-
-cvt_top (ForeignD (ImportF callconv safety from nm typ))
+cvt_top loc (ForeignD (ImportF callconv safety from nm typ))
  = case parsed of
        Just (c_header, cis) ->
            let i = CImport callconv' safety' c_header nilFS cis
-           in Left $ ForD (ForeignImport (noLoc (vName nm)) (cvtType typ) i False)
+           in Left $ L loc $ ForD (ForeignImport (L loc (vName nm)) (cvtType loc typ) i False)
        Nothing -> Right $     text (show from)
                           <+> ptext SLIT("is not a valid ccall impent")
     where callconv' = case callconv of
@@ -129,12 +96,41 @@ cvt_top (ForeignD (ImportF callconv safety from nm typ))
                         Threadsafe -> PlaySafe True
           parsed = parse_ccall_impent (TH.nameBase nm) from
 
-cvt_top (ForeignD (ExportF callconv as nm typ))
+cvt_top loc (ForeignD (ExportF callconv as nm typ))
  = let e = CExport (CExportStatic (mkFastString as) callconv')
-   in Left $ ForD (ForeignExport (noLoc (vName nm)) (cvtType typ) e False)
+   in Left $ L loc $ ForD (ForeignExport (L loc (vName nm)) (cvtType loc typ) e False)
     where callconv' = case callconv of
                           CCall -> CCallConv
                           StdCall -> StdCallConv
+
+mk_con loc con = L loc $ mk_nlcon con
+  where
+    mk_nlcon con = case con of
+	NormalC c strtys
+	 -> ConDecl (L loc (cName c)) noExistentials (noContext loc)
+		  (PrefixCon (map mk_arg strtys))
+	RecC c varstrtys
+	 -> ConDecl (L loc (cName c)) noExistentials (noContext loc)
+		  (RecCon (map mk_id_arg varstrtys))
+	InfixC st1 c st2
+	 -> ConDecl (L loc (cName c)) noExistentials (noContext loc)
+		  (InfixCon (mk_arg st1) (mk_arg st2))
+	ForallC tvs ctxt (ForallC tvs' ctxt' con')
+	 -> mk_nlcon (ForallC (tvs ++ tvs') (ctxt ++ ctxt') con')
+	ForallC tvs ctxt con' -> case mk_nlcon con' of
+				ConDecl l [] (L _ []) x ->
+				    ConDecl l (cvt_tvs loc tvs) (cvt_context loc ctxt) x
+				c -> panic "ForallC: Can't happen"
+    mk_arg (IsStrict, ty)  = L loc $ HsBangTy HsStrict (cvtType loc ty)
+    mk_arg (NotStrict, ty) = cvtType loc ty
+
+    mk_id_arg (i, IsStrict, ty)
+        = (L loc (vName i), L loc $ HsBangTy HsStrict (cvtType loc ty))
+    mk_id_arg (i, NotStrict, ty)
+        = (L loc (vName i), cvtType loc ty)
+
+mk_derivs loc [] = Nothing
+mk_derivs loc cs = Just [L loc $ HsPredTy $ HsClassP (tconName c) [] | c <- cs]
 
 cvt_fundep :: FunDep -> Class.FunDep RdrName
 cvt_fundep (FunDep xs ys) = (map tName xs, map tName ys)
@@ -179,113 +175,115 @@ lex_ccall_impent xs = case span is_valid xs of
     where is_valid :: Char -> Bool
           is_valid c = isAscii c && (isAlphaNum c || c `elem` "._")
 
-noContext      = noLoc []
+noContext loc  = L loc []
 noExistentials = []
 
 -------------------------------------------------------------------
-convertToHsExpr :: TH.Exp -> LHsExpr RdrName
-convertToHsExpr = cvtl
+convertToHsExpr :: SrcSpan -> TH.Exp -> LHsExpr RdrName
+convertToHsExpr loc e = cvtl loc e
 
-cvtl e = noLoc (cvt e)
+cvtl loc e = cvt_l e
+  where
+    cvt_l e = L loc (cvt e)
 
-cvt (VarE s) 	  = HsVar (vName s)
-cvt (ConE s) 	  = HsVar (cName s)
-cvt (LitE l) 
-  | overloadedLit l = HsOverLit (cvtOverLit l)
-  | otherwise	    = HsLit (cvtLit l)
+    cvt (VarE s) 	= HsVar (vName s)
+    cvt (ConE s) 	= HsVar (cName s)
+    cvt (LitE l) 
+      | overloadedLit l = HsOverLit (cvtOverLit l)
+      | otherwise	= HsLit (cvtLit l)
 
-cvt (AppE x y)     = HsApp (cvtl x) (cvtl y)
-cvt (LamE ps e)    = HsLam (mkMatchGroup [mkSimpleMatch (map cvtlp ps) (cvtl e)])
-cvt (TupE [e])	   = cvt e
-cvt (TupE es)	   = ExplicitTuple(map cvtl es) Boxed
-cvt (CondE x y z)  = HsIf (cvtl x) (cvtl y) (cvtl z)
-cvt (LetE ds e)	   = HsLet (cvtdecs ds) (cvtl e)
-cvt (CaseE e ms)   = HsCase (cvtl e) (mkMatchGroup (map cvtm ms))
-cvt (DoE ss)	   = cvtHsDo DoExpr   ss
-cvt (CompE ss)     = cvtHsDo ListComp ss
-cvt (ArithSeqE dd) = ArithSeq noPostTcExpr (cvtdd dd)
-cvt (ListE xs)     = ExplicitList void (map cvtl xs)
-cvt (InfixE (Just x) s (Just y))
-    = HsPar (noLoc $ OpApp (cvtl x) (cvtl s) undefined (cvtl y))
-cvt (InfixE Nothing  s (Just y)) = SectionR (cvtl s) (cvtl y)
-cvt (InfixE (Just x) s Nothing ) = SectionL (cvtl x) (cvtl s)
-cvt (InfixE Nothing  s Nothing ) = cvt s	-- Can I indicate this is an infix thing?
-cvt (SigE e t)		= ExprWithTySig (cvtl e) (cvtType t)
-cvt (RecConE c flds) = RecordCon (noLoc (cName c)) noPostTcExpr
-				 (map (\(x,y) -> (noLoc (vName x), cvtl y)) flds)
-cvt (RecUpdE e flds) = RecordUpd (cvtl e) (map (\(x,y) -> (noLoc (vName x), cvtl y)) flds)
+    cvt (AppE x y)     = HsApp (cvt_l x) (cvt_l y)
+    cvt (LamE ps e)    = HsLam (mkMatchGroup [mkSimpleMatch (map (cvtlp loc) ps) (cvtl loc e)])
+    cvt (TupE [e])     = cvt e
+    cvt (TupE es)      = ExplicitTuple(map cvt_l es) Boxed
+    cvt (CondE x y z)  = HsIf (cvt_l x) (cvt_l y) (cvt_l z)
+    cvt (LetE ds e)	   = HsLet (cvtdecs loc ds) (cvt_l e)
+    cvt (CaseE e ms)   = HsCase (cvt_l e) (mkMatchGroup (map (cvtm loc) ms))
+    cvt (DoE ss)       = cvtHsDo loc DoExpr ss
+    cvt (CompE ss)     = cvtHsDo loc ListComp ss
+    cvt (ArithSeqE dd) = ArithSeq noPostTcExpr (cvtdd loc dd)
+    cvt (ListE xs)     = ExplicitList void (map cvt_l xs)
+    cvt (InfixE (Just x) s (Just y))
+        = HsPar (L loc $ OpApp (cvt_l x) (cvt_l s) undefined (cvt_l y))
+    cvt (InfixE Nothing  s (Just y)) = SectionR (cvt_l s) (cvt_l y)
+    cvt (InfixE (Just x) s Nothing ) = SectionL (cvt_l x) (cvt_l s)
+    cvt (InfixE Nothing  s Nothing ) = cvt s	-- Can I indicate this is an infix thing?
+    cvt (SigE e t)		= ExprWithTySig (cvt_l e) (cvtType loc t)
+    cvt (RecConE c flds) = RecordCon (L loc (cName c)) noPostTcExpr
+    				 (map (\(x,y) -> (L loc (vName x), cvt_l y)) flds)
+    cvt (RecUpdE e flds) = RecordUpd (cvt_l e) (map (\(x,y) -> (L loc (vName x), cvt_l y)) flds)
 				 placeHolderType placeHolderType
 
-cvtHsDo do_or_lc stmts
+cvtHsDo loc do_or_lc stmts
   = HsDo do_or_lc (init stmts') body void
   where
-    stmts' = cvtstmts stmts
+    stmts' = cvtstmts loc stmts
     body = case last stmts' of
 		L _ (ExprStmt body _ _) -> body
 
-cvtdecs :: [TH.Dec] -> [HsBindGroup RdrName]
-cvtdecs [] = []
-cvtdecs ds = [HsBindGroup binds sigs Recursive]
+cvtdecs :: SrcSpan -> [TH.Dec] -> [HsBindGroup RdrName]
+cvtdecs loc [] = []
+cvtdecs loc ds = [HsBindGroup binds sigs Recursive]
 	   where
-	     (binds, sigs) = cvtBindsAndSigs ds
+	     (binds, sigs) = cvtBindsAndSigs loc ds
 
-cvtBindsAndSigs ds 
-  = (cvtds non_sigs, map cvtSig sigs)
+cvtBindsAndSigs loc ds 
+  = (cvtds loc non_sigs, map (cvtSig loc) sigs)
   where 
     (sigs, non_sigs) = partition sigP ds
 
-cvtSig (TH.SigD nm typ) = noLoc (Hs.Sig (noLoc (vName nm)) (cvtType typ))
+cvtSig loc (TH.SigD nm typ) = L loc (Hs.Sig (L loc (vName nm)) (cvtType loc typ))
 
-cvtds :: [TH.Dec] -> LHsBinds RdrName
-cvtds []     = emptyBag
-cvtds (d:ds) = cvtd d `consBag` cvtds ds
+cvtds :: SrcSpan -> [TH.Dec] -> LHsBinds RdrName
+cvtds loc []     = emptyBag
+cvtds loc (d:ds) = cvtd loc d `consBag` cvtds loc ds
 
-cvtd :: TH.Dec -> LHsBind RdrName
+cvtd :: SrcSpan -> TH.Dec -> LHsBind RdrName
 -- Used only for declarations in a 'let/where' clause,
 -- not for top level decls
-cvtd (TH.ValD (TH.VarP s) body ds) 
-  = noLoc $ FunBind (noLoc (vName s)) False (mkMatchGroup [cvtclause (Clause [] body ds)])
-cvtd (FunD nm cls)
-  = noLoc $ FunBind (noLoc (vName nm)) False (mkMatchGroup (map cvtclause cls))
-cvtd (TH.ValD p body ds)
-  = noLoc $ PatBind (cvtlp p) (GRHSs (cvtguard body) (cvtdecs ds)) void
+cvtd loc (TH.ValD (TH.VarP s) body ds) 
+  = L loc $ FunBind (L loc (vName s)) False (mkMatchGroup [cvtclause loc (Clause [] body ds)])
+cvtd loc (FunD nm cls)
+  = L loc $ FunBind (L loc (vName nm)) False (mkMatchGroup (map (cvtclause loc) cls))
+cvtd loc (TH.ValD p body ds)
+  = L loc $ PatBind (cvtlp loc p) (GRHSs (cvtguard loc body) (cvtdecs loc ds)) void
 
-cvtd d = cvtPanic "Illegal kind of declaration in where clause" 
+cvtd loc d = cvtPanic "Illegal kind of declaration in where clause" 
 		  (text (TH.pprint d))
 
 
-cvtclause :: TH.Clause -> Hs.LMatch RdrName
-cvtclause (Clause ps body wheres)
-    = noLoc $ Hs.Match (map cvtlp ps) Nothing (GRHSs (cvtguard body) (cvtdecs wheres))
+cvtclause :: SrcSpan -> TH.Clause -> Hs.LMatch RdrName
+cvtclause loc (Clause ps body wheres)
+    = L loc $ Hs.Match (map (cvtlp loc) ps) Nothing (GRHSs (cvtguard loc body) (cvtdecs loc wheres))
 
 
 
-cvtdd :: Range -> ArithSeqInfo RdrName
-cvtdd (FromR x) 	      = (From (cvtl x))
-cvtdd (FromThenR x y)     = (FromThen (cvtl x) (cvtl y))
-cvtdd (FromToR x y)	      = (FromTo (cvtl x) (cvtl y))
-cvtdd (FromThenToR x y z) = (FromThenTo (cvtl x) (cvtl y) (cvtl z))
+cvtdd :: SrcSpan -> Range -> ArithSeqInfo RdrName
+cvtdd loc (FromR x) 	      = (From (cvtl loc x))
+cvtdd loc (FromThenR x y)     = (FromThen (cvtl loc x) (cvtl loc y))
+cvtdd loc (FromToR x y)	      = (FromTo (cvtl loc x) (cvtl loc y))
+cvtdd loc (FromThenToR x y z) = (FromThenTo (cvtl loc x) (cvtl loc y) (cvtl loc z))
 
 
-cvtstmts :: [TH.Stmt] -> [Hs.LStmt RdrName]
-cvtstmts []		     = []
-cvtstmts (NoBindS e : ss)    = noLoc (mkExprStmt (cvtl e))	     : cvtstmts ss
-cvtstmts (TH.BindS p e : ss) = noLoc (mkBindStmt (cvtlp p) (cvtl e)) : cvtstmts ss
-cvtstmts (TH.LetS ds : ss)   = noLoc (LetStmt (cvtdecs ds))	     : cvtstmts ss
-cvtstmts (TH.ParS dss : ss)  = noLoc (ParStmt [(cvtstmts ds, undefined) | ds <- dss]) : cvtstmts ss
+cvtstmts :: SrcSpan -> [TH.Stmt] -> [Hs.LStmt RdrName]
+cvtstmts loc []		     = []
+cvtstmts loc (NoBindS e : ss)    = L loc (mkExprStmt (cvtl loc e))	     : cvtstmts loc ss
+cvtstmts loc (TH.BindS p e : ss) = L loc (mkBindStmt (cvtlp loc p) (cvtl loc e)) : cvtstmts loc ss
+cvtstmts loc (TH.LetS ds : ss)   = L loc (LetStmt (cvtdecs loc ds))	     : cvtstmts loc ss
+cvtstmts loc (TH.ParS dss : ss)  = L loc (ParStmt [(cvtstmts loc ds, undefined) | ds <- dss]) : cvtstmts loc ss
 
-cvtm :: TH.Match -> Hs.LMatch RdrName
-cvtm (TH.Match p body wheres)
-    = noLoc (Hs.Match [cvtlp p] Nothing (GRHSs (cvtguard body) (cvtdecs wheres)))
+cvtm :: SrcSpan -> TH.Match -> Hs.LMatch RdrName
+cvtm loc (TH.Match p body wheres)
+    = L loc (Hs.Match [cvtlp loc p] Nothing (GRHSs (cvtguard loc body) (cvtdecs loc wheres)))
 
-cvtguard :: TH.Body -> [LGRHS RdrName]
-cvtguard (GuardedB pairs) = map cvtpair pairs
-cvtguard (NormalB e) 	 = [noLoc (GRHS [] (cvtl e))]
+cvtguard :: SrcSpan -> TH.Body -> [LGRHS RdrName]
+cvtguard loc (GuardedB pairs) = map (cvtpair loc) pairs
+cvtguard loc (NormalB e)      = [L loc (GRHS [] (cvtl loc e))]
 
-cvtpair :: (TH.Guard,TH.Exp) -> LGRHS RdrName
-cvtpair (NormalG x,y) = noLoc (GRHS [noLoc $ mkBindStmt truePat (cvtl x)]
-				    (cvtl y))
-cvtpair (PatG x,y) = noLoc (GRHS (cvtstmts x) (cvtl y))
+cvtpair :: SrcSpan -> (TH.Guard,TH.Exp) -> LGRHS RdrName
+cvtpair loc (NormalG x,y) = L loc (GRHS [L loc $ mkBindStmt truePat (cvtl loc x)]
+				    (cvtl loc y))
+cvtpair loc (PatG x,y) = L loc (GRHS (cvtstmts loc x) (cvtl loc y))
 
 cvtOverLit :: Lit -> HsOverLit RdrName
 cvtOverLit (IntegerL i)  = mkHsIntegral i
@@ -300,62 +298,63 @@ cvtLit (DoublePrimL f) = HsDoublePrim f
 cvtLit (CharL c)       = HsChar c
 cvtLit (StringL s)     = HsString (mkFastString s)
 
-cvtlp :: TH.Pat -> Hs.LPat RdrName
-cvtlp pat = noLoc (cvtp pat)
+cvtlp :: SrcSpan -> TH.Pat -> Hs.LPat RdrName
+cvtlp loc pat = L loc (cvtp loc pat)
 
-cvtp :: TH.Pat -> Hs.Pat RdrName
-cvtp (TH.LitP l)
+cvtp :: SrcSpan -> TH.Pat -> Hs.Pat RdrName
+cvtp loc (TH.LitP l)
   | overloadedLit l = mkNPat (cvtOverLit l) Nothing	-- Not right for negative
 							-- patterns; need to think
 							-- about that!
   | otherwise	    = Hs.LitPat (cvtLit l)
-cvtp (TH.VarP s)     = Hs.VarPat(vName s)
-cvtp (TupP [p])   = cvtp p
-cvtp (TupP ps)    = TuplePat (map cvtlp ps) Boxed
-cvtp (ConP s ps)  = ConPatIn (noLoc (cName s)) (PrefixCon (map cvtlp ps))
-cvtp (InfixP p1 s p2)
-                  = ConPatIn (noLoc (cName s)) (InfixCon (cvtlp p1) (cvtlp p2))
-cvtp (TildeP p)   = LazyPat (cvtlp p)
-cvtp (TH.AsP s p) = AsPat (noLoc (vName s)) (cvtlp p)
-cvtp TH.WildP   = WildPat void
-cvtp (RecP c fs)  = ConPatIn (noLoc (cName c)) $ Hs.RecCon (map (\(s,p) -> (noLoc (vName s),cvtlp p)) fs)
-cvtp (ListP ps)   = ListPat (map cvtlp ps) void
-cvtp (SigP p t)   = SigPatIn (cvtlp p) (cvtType t)
+cvtp loc (TH.VarP s)  = Hs.VarPat(vName s)
+cvtp loc (TupP [p])   = cvtp loc p
+cvtp loc (TupP ps)    = TuplePat (map (cvtlp loc) ps) Boxed
+cvtp loc (ConP s ps)  = ConPatIn (L loc (cName s)) (PrefixCon (map (cvtlp loc) ps))
+cvtp loc (InfixP p1 s p2)
+                  = ConPatIn (L loc (cName s)) (InfixCon (cvtlp loc p1) (cvtlp loc p2))
+cvtp loc (TildeP p)   = LazyPat (cvtlp loc p)
+cvtp loc (TH.AsP s p) = AsPat (L loc (vName s)) (cvtlp loc p)
+cvtp loc TH.WildP   = WildPat void
+cvtp loc (RecP c fs)  = ConPatIn (L loc (cName c)) $ Hs.RecCon (map (\(s,p) -> (L loc (vName s),cvtlp loc p)) fs)
+cvtp loc (ListP ps)   = ListPat (map (cvtlp loc) ps) void
+cvtp loc (SigP p t)   = SigPatIn (cvtlp loc p) (cvtType loc t)
 
 -----------------------------------------------------------
 --	Types and type variables
 
-cvt_tvs :: [TH.Name] -> [LHsTyVarBndr RdrName]
-cvt_tvs tvs = map (noLoc . UserTyVar . tName) tvs
+cvt_tvs :: SrcSpan -> [TH.Name] -> [LHsTyVarBndr RdrName]
+cvt_tvs loc tvs = map (L loc . UserTyVar . tName) tvs
 
-cvt_context :: Cxt -> LHsContext RdrName 
-cvt_context tys = noLoc (map (noLoc . cvt_pred) tys)
+cvt_context :: SrcSpan -> Cxt -> LHsContext RdrName 
+cvt_context loc tys = L loc (map (L loc . cvt_pred loc) tys)
 
-cvt_pred :: TH.Type -> HsPred RdrName
-cvt_pred ty = case split_ty_app ty of
-	   	(ConT tc, tys) -> HsClassP (tconName tc) (map cvtType tys)
-	   	(VarT tv, tys) -> HsClassP (tName tv) (map cvtType tys)
-		other -> cvtPanic "Malformed predicate" (text (TH.pprint ty))
+cvt_pred :: SrcSpan -> TH.Type -> HsPred RdrName
+cvt_pred loc ty 
+  = case split_ty_app ty of
+	(ConT tc, tys) -> HsClassP (tconName tc) (map (cvtType loc) tys)
+	(VarT tv, tys) -> HsClassP (tName tv) (map (cvtType loc) tys)
+	other -> cvtPanic "Malformed predicate" (text (TH.pprint ty))
 
 convertToHsType = cvtType
 
-cvtType :: TH.Type -> LHsType RdrName
-cvtType ty = trans (root ty [])
-  where root (AppT a b) zs = root a (cvtType b : zs)
+cvtType :: SrcSpan -> TH.Type -> LHsType RdrName
+cvtType loc ty = trans (root ty [])
+  where root (AppT a b) zs = root a (cvtType loc b : zs)
         root t zs 	   = (t,zs)
 
         trans (TupleT n,args)
-            | length args == n = noLoc (HsTupleTy Boxed args)
+            | length args == n = L loc (HsTupleTy Boxed args)
             | n == 0    = foldl nlHsAppTy (nlHsTyVar (getRdrName unitTyCon))	    args
             | otherwise = foldl nlHsAppTy (nlHsTyVar (getRdrName (tupleTyCon Boxed n))) args
         trans (ArrowT,   [x,y]) = nlHsFunTy x y
-        trans (ListT,    [x])   = noLoc (HsListTy x)
+        trans (ListT,    [x])   = L loc (HsListTy x)
 
 	trans (VarT nm, args)	    = foldl nlHsAppTy (nlHsTyVar (tName nm))    args
         trans (ConT tc, args)       = foldl nlHsAppTy (nlHsTyVar (tconName tc)) args
 
-	trans (ForallT tvs cxt ty, []) = noLoc $ mkExplicitHsForAllTy 
-						(cvt_tvs tvs) (cvt_context cxt) (cvtType ty)
+	trans (ForallT tvs cxt ty, []) = L loc $ mkExplicitHsForAllTy 
+						(cvt_tvs loc tvs) (cvt_context loc cxt) (cvtType loc ty)
 
 split_ty_app :: TH.Type -> (TH.Type, [TH.Type])
 split_ty_app ty = go ty []
@@ -387,9 +386,6 @@ overloadedLit l	            = False
 
 void :: Type.Type
 void = placeHolderType
-
-loc0 :: SrcSpan
-loc0 = srcLocSpan generatedSrcLoc
 
 --------------------------------------------------------------------
 --	Turning Name back into RdrName

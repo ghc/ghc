@@ -213,7 +213,7 @@ tcTopSplice expr res_ty
 	-- simple_expr :: TH.Exp
 
 	expr2 :: LHsExpr RdrName
-	expr2 = convertToHsExpr simple_expr 
+	expr2 = convertToHsExpr (getLoc expr) simple_expr 
     in
     traceTc (text "Got result" <+> ppr expr2) 	`thenM_`
 
@@ -301,7 +301,7 @@ kcTopSpliceType expr
   
 	; let 	-- simple_ty :: TH.Type
 		hs_ty2 :: LHsType RdrName
-		hs_ty2 = convertToHsType simple_ty
+		hs_ty2 = convertToHsType (getLoc expr) simple_ty
 	 
 	; traceTc (text "Got result" <+> ppr hs_ty2)
 
@@ -323,6 +323,8 @@ kcTopSpliceType expr
 
 \begin{code}
 -- Always at top level
+-- Type sig at top of file:
+-- 	tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceDecls expr
   = do	{ meta_dec_ty <- tcMetaTy decTyConName
 	; meta_q_ty <- tcMetaTy qTyConName
@@ -335,10 +337,11 @@ tcSpliceDecls expr
 
 	    -- simple_expr :: [TH.Dec]
 	    -- decls :: [RdrNameHsDecl]
-	; decls <- handleErrors (convertToHsDecls simple_expr)
+	; decls <- handleErrors (convertToHsDecls (getLoc expr) simple_expr)
 	; traceTc (text "Got result" <+> vcat (map ppr decls))
 	; showSplice "declarations"
-	  	     zonked_q_expr (vcat (map ppr decls))
+	  	     zonked_q_expr 
+		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
 	; returnM decls }
 
   where handleErrors :: [Either a Message] -> TcM [a]
