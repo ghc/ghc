@@ -708,7 +708,8 @@ Wed Mar 14 12:23:13 GMT 2001
    At the GHCi prompt, the second and third rules are relaxed as follows
    (differences italicised):
 	<itemizedlist>
-	    <listitem><para> <emphasis>Any</emphasis> of the classes <literal>Ci</literal> is standard.</para></listitem>
+	    <listitem><para> <emphasis>All</emphasis> of the classes
+	    <literal>Ci</literal> are single-parameter type classes.</para></listitem>
 	    <listitem><para> At least one of the classes <literal>Ci</literal> is
 	    numeric, <emphasis>or is <literal>Show</literal>, 
 		<literal>Eq</literal>, or <literal>Ord</literal></emphasis>.</para></listitem>
