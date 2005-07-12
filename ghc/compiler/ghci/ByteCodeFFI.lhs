@@ -11,9 +11,11 @@ module ByteCodeFFI ( mkMarshalCode, moan64 ) where
 import Outputable
 import SMRep		( CgRep(..), cgRepSizeW )
 import ForeignCall	( CCallConv(..) )
+import Panic
 
 -- DON'T remove apparently unused imports here .. 
 -- there is ifdeffery below
+import Control.Exception ( throwDyn )
 import DATA_BITS	( Bits(..), shiftR, shiftL )
 import Foreign		( newArray )
 import Data.List        ( mapAccumL )
@@ -637,7 +639,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 
 #else 
 
-   = error "mkMarshalCode not implemented for this platform."
+   = throwDyn (InstallationError "foreign import is not implemented for GHCi on this platform.")
 
 #endif
 
