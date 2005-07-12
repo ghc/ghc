@@ -126,6 +126,8 @@ tcPatBndr LamPat bndr_name pat_ty
   = do	{ pat_ty' <- zapExpectedType pat_ty argTypeKind
 		-- If pat_ty is Expected, this returns the appropriate
 		-- SigmaType.  In Infer mode, we create a fresh type variable.
+		-- Note argTypeKind: the variable can have an unboxed type,
+		--	but not an unboxed tuple.
 		-- Note the SigmaType: we can get
 		-- 	data T = MkT (forall a. a->a)
 		-- 	f t = case t of { MkT g -> ... }
