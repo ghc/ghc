@@ -52,7 +52,8 @@
 INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
  		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
-    ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
+    // Not true: see comments above
+    // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
 #if defined(GRAN) || defined(PAR)
     foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
 				   NULL "ptr"); 
@@ -73,7 +74,8 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
 INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret,
   		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
-    ASSERT(StgTSO_blocked_exceptions(CurrentTSO) == NULL);
+    // Not true: see comments above
+    // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) == NULL);
     StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
 #ifdef REG_R1
     Sp_adj(1);
