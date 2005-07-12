@@ -1930,19 +1930,28 @@ scheduleDoGC( rtsBool force_major )
      * atomically frames.  When next scheduled they will try to
      * commit, this commit will fail and they will retry.
      */
-    for (t = all_threads; t != END_TSO_QUEUE; t = t -> link) {
-	if (t -> what_next != ThreadRelocated && t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
-	    if (!stmValidateNestOfTransactions (t -> trec)) {
-		IF_DEBUG(stm, sched_belch("trec %p found wasting its time", t));
-		
-		// strip the stack back to the ATOMICALLY_FRAME, aborting
-		// the (nested) transaction, and saving the stack of any
-		// partially-evaluated thunks on the heap.
-		raiseAsync_(t, NULL, rtsTrue);
-		
+    { 
+	StgTSO *next;
+
+	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+	    if (t->what_next == ThreadRelocated) {
+		next = t->link;
+	    } else {
+		next = t->global_link;
+		if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
+		    if (!stmValidateNestOfTransactions (t -> trec)) {
+			IF_DEBUG(stm, sched_belch("trec %p found wasting its time", t));
+			
+			// strip the stack back to the ATOMICALLY_FRAME, aborting
+			// the (nested) transaction, and saving the stack of any
+			// partially-evaluated thunks on the heap.
+			raiseAsync_(t, NULL, rtsTrue);
+			
 #ifdef REG_R1
-		ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
+			ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
 #endif
+		    }
+		}
 	    }
 	}
     }
