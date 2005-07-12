@@ -134,6 +134,16 @@ getMBlock(void)
    chunk, on the grounds that this is aligned and likely to be free.
    If it turns out that we were wrong, we have to munmap() and try
    again using the general method.
+
+   Note on posix_memalign(): this interface is available on recent
+   systems and appears to provide exactly what we want.  However, it
+   turns out not to be as good as our mmap() implementation, because
+   it wastes extra space (using double the address space, in a test on
+   x86_64/Linux).  The problem seems to be that posix_memalign()
+   returns memory that can be free()'d, so the library must store
+   extra information along with the allocated block, thus messing up
+   the alignment.  Hence, we don't use posix_memalign() for now.
+
    -------------------------------------------------------------------------- */
 
 #if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
