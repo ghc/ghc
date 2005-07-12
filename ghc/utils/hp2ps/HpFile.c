@@ -304,7 +304,7 @@ GetHpTok(infp)
     } else if (IsIdChar(ch)) {
 	ASSERT(! (isdigit(ch)));	/* ch can't be a digit here */
 	GetIdent(infp);
-	if (!isupper(theident[0])) {
+	if (!isupper((int)theident[0])) {
 	    thetok = IDENTIFIER_TOK;
 	} else if (strcmp(theident, "BEGIN_SAMPLE") == 0) {
             thetok = BEGIN_SAMPLE_TOK;

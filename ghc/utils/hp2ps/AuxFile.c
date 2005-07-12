@@ -127,7 +127,7 @@ FILE* auxfp;
         return;
     } else if (IsIdChar(ch)) {          /* ch can't be a digit here */
         GetIdent(auxfp);
-	if (!isupper(theident[0])) {
+	if (!isupper((int)theident[0])) {
             thetok = IDENTIFIER_TOK;
         } else if (strcmp(theident, "X_RANGE") == 0) {
             thetok = X_RANGE_TOK;
