@@ -22,7 +22,7 @@ module TcSimplify (
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
 import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
-import TcHsSyn		( TcId, TcDictBinds, mkHsApp, mkHsTyApp, mkHsDictApp )
+import TcHsSyn		( mkHsApp, mkHsTyApp, mkHsDictApp )
 
 import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
@@ -35,7 +35,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  newDictsAtLoc, tcInstClassOp,
 			  getDictClassTys, isTyVarDict, instLoc,
 			  zonkInst, tidyInsts, tidyMoreInsts,
-			  Inst, pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
+			  pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
 			  isInheritableInst, pprDictsTheta
 			)
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders,
@@ -45,7 +45,7 @@ import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, 
                           mkClassPred, isOverloadedTy, mkTyConApp, isSkolemTyVar,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred, tcEqType, pprPred, mkPredTy )
+			  tyVarsOfPred, tcEqType, pprPred, mkPredTy, tcIsTyVarTy )
 import TcIface		( checkWiredInTyCon )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
@@ -2022,19 +2022,22 @@ tc_simplify_top doc is_interactive want_scs wanteds
 	; (frees, binds, irreds) <- simpleReduceLoop doc try_me wanteds
 
 	; let
-		-- All the non-tv ones are definite errors
-	    (tv_dicts, non_tvs) = partition isTyVarDict irreds
+		-- First get rid of implicit parameters
+    	    (non_ips, bad_ips) = partition isClassDict irreds
+
+		-- All the non-tv or multi-param ones are definite errors
+	    (unary_tv_dicts, non_tvs) = partition is_unary_tyvar_dict non_ips
 	    bad_tyvars = unionVarSets (map tyVarsOfInst non_tvs)
 
 		-- Group by type variable
-	    tv_groups = equivClasses cmp_by_tyvar tv_dicts
+	    tv_groups = equivClasses cmp_by_tyvar unary_tv_dicts
 
 		-- Pick the ones which its worth trying to disambiguate
 		-- namely, the ones whose type variable isn't bound
 		-- up with one of the non-tyvar classes
 	    (default_gps, non_default_gps) = partition defaultable_group tv_groups
-	    defaultable_group ds@(d:_) 
-		=  not (bad_tyvars `intersectsVarSet` tyVarsOfInst d)
+	    defaultable_group ds
+		=  not (bad_tyvars `intersectsVarSet` tyVarsOfInst (head ds))
 		&& defaultable_classes (map get_clas ds)
 	    defaultable_classes clss 
 		| is_interactive = any isInteractiveClass clss
@@ -2048,8 +2051,7 @@ tc_simplify_top doc is_interactive want_scs wanteds
     
 		    -- Collect together all the bad guys
 	    bad_guys 	       = non_tvs ++ concat non_default_gps
-    	    (non_ips, bad_ips) = partition isClassDict bad_guys
-    	    (ambigs, no_insts) = partition isTyVarDict non_ips
+    	    (ambigs, no_insts) = partition isTyVarDict bad_guys
 	    -- If the dict has no type constructors involved, it must be ambiguous,
 	    -- except I suppose that another error with fundeps maybe should have
 	    -- constrained those type variables
@@ -2081,17 +2083,23 @@ tc_simplify_top doc is_interactive want_scs wanteds
 		  addTopAmbigErrs ambigs
 
 		  -- Disambiguate the ones that look feasible
-		; mappM (disambigGroup is_interactive) default_gps }
+		; mappM disambigGroup default_gps }
 
 	; return (binds `unionBags` unionManyBags binds_ambig) }
 
 ----------------------------------
 d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
+is_unary_tyvar_dict :: Inst -> Bool	-- Dicts of form (C a)
+  -- Invariant: argument is a ClassDict, not IP or method
+is_unary_tyvar_dict d = case getDictClassTys d of
+			  (_, [ty]) -> tcIsTyVarTy ty
+			  other	    -> False
+
 get_tv d   = case getDictClassTys d of
 		   (clas, [ty]) -> tcGetTyVar "tcSimplify" ty
 get_clas d = case getDictClassTys d of
-		   (clas, [ty]) -> clas
+		   (clas, _) -> clas
 \end{code}
 
 If a dictionary constrains a type variable which is
@@ -2127,11 +2135,10 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambigGroup :: Bool	-- True <=> simplifying at top-level interactive loop
-	      -> [Inst]	-- All standard classes of form (C a)
+disambigGroup :: [Inst]	-- All standard classes of form (C a)
 	      -> TcM TcDictBinds
 
-disambigGroup is_interactive dicts
+disambigGroup dicts
   = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
 	-- SO, TRY DEFAULT TYPES IN ORDER
 
