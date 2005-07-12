@@ -16,13 +16,13 @@ import NameEnv
 import SMRep		( typeCgRep )
 import DataCon		( DataCon, dataConRepArgTys )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import Constants	( mIN_SIZE_NonUpdHeapObject )
+import Constants	( mIN_SIZE_NonUpdHeapObject, wORD_SIZE )
 import CgHeapery	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 import Util             ( lengthIs, listLengthCmp )
 
-import Foreign		( Storable(..), Word8, Word16, Word32, Word64,
-			  malloc, castPtr, plusPtr )
+import Foreign
+import Foreign.C
 import DATA_BITS	( Bits(..), shiftR )
 
 import GHC.Exts		( Int(I#), addr2Int# )
@@ -107,7 +107,7 @@ make_constr_itbls cons
                  -- This is the only arch-dependent bit.
                  code = mkJumpToAddr entry_addr
              in
-                 do addr <- malloc
+                 do addr <- malloc_exec (sizeOf itbl)
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
@@ -172,23 +172,42 @@ mkJumpToAddr a =
 	0x7D8903A6, 0x4E800420
 	]
 
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#elif i386_TARGET_ARCH
 -- Let the address to jump to be 0xWWXXYYZZ.
 -- Generate   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
 -- which is
 -- B8 ZZ YY XX WW FF E0
 
--- This works on x86_64 too, because we're assuming the small memory
--- model, where all symbols fit into the lower 2Gb.
+type ItblCode = Word8
+mkJumpToAddr a
+   = let w32 = fromIntegral (ptrToInt a) :: Word32
+         insnBytes :: [Word8]
+         insnBytes
+            = [0xB8, byte0 w32, byte1 w32, 
+                     byte2 w32, byte3 w32, 
+               0xFF, 0xE0]
+     in
+         insnBytes
+
+#elif x86_64_TARGET_ARCH
+-- Generates:
+-- 	jmpq *.L1(%rip)
+-- 	.align 8
+-- .L1:	
+-- 	.quad <addr>
+--
+-- We need a full 64-bit pointer (we can't assume the info table is
+-- allocated in low memory).  Assuming the info pointer is aligned to
+-- an 8-byte boundary, the addr will also be aligned.
 
 type ItblCode = Word8
 mkJumpToAddr a
-   = let w32 = fromIntegral (ptrToInt a)
+   = let w64 = fromIntegral (ptrToInt a) :: Word64
          insnBytes :: [Word8]
          insnBytes
-            = [0xB8, byte 0 w32, byte 1 w32, 
-                     byte 2 w32, byte 3 w32, 
-               0xFF, 0xE0]
+            = [0xff, 0x25, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+	       byte0 w64, byte1 w64, byte2 w64, byte3 w64,
+	       byte4 w64, byte5 w64, byte6 w64, byte7 w64]
      in
          insnBytes
 
@@ -210,11 +229,16 @@ mkJumpToAddr a
 #endif
 
 
-byte :: Int -> Word32 -> Word8
-byte 0 w = fromIntegral (w .&. 0xFF)
-byte 1 w = fromIntegral ((w `shiftR` 8) .&. 0xFF)
-byte 2 w = fromIntegral ((w `shiftR` 16) .&. 0xFF)
-byte 3 w = fromIntegral ((w `shiftR` 24) .&. 0xFF)
+byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7
+   :: (Integral w, Bits w) => w -> Word8
+byte0 w = fromIntegral w
+byte1 w = fromIntegral (w `shiftR` 8)
+byte2 w = fromIntegral (w `shiftR` 16)
+byte3 w = fromIntegral (w `shiftR` 24)
+byte4 w = fromIntegral (w `shiftR` 32)
+byte5 w = fromIntegral (w `shiftR` 40)
+byte6 w = fromIntegral (w `shiftR` 48)
+byte7 w = fromIntegral (w `shiftR` 56)
 
 
 vecret_entry 0 = stg_interp_constr1_entry
@@ -228,16 +252,16 @@ vecret_entry 7 = stg_interp_constr8_entry
 
 #ifndef __HADDOCK__
 -- entry point for direct returns for created constr itbls
-foreign label "stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
 -- and the 8 vectored ones
-foreign label "stg_interp_constr1_entry" stg_interp_constr1_entry :: Ptr ()
-foreign label "stg_interp_constr2_entry" stg_interp_constr2_entry :: Ptr ()
-foreign label "stg_interp_constr3_entry" stg_interp_constr3_entry :: Ptr ()
-foreign label "stg_interp_constr4_entry" stg_interp_constr4_entry :: Ptr ()
-foreign label "stg_interp_constr5_entry" stg_interp_constr5_entry :: Ptr ()
-foreign label "stg_interp_constr6_entry" stg_interp_constr6_entry :: Ptr ()
-foreign label "stg_interp_constr7_entry" stg_interp_constr7_entry :: Ptr ()
-foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr1_entry" stg_interp_constr1_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr2_entry" stg_interp_constr2_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr3_entry" stg_interp_constr3_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr4_entry" stg_interp_constr4_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr5_entry" stg_interp_constr5_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr6_entry" stg_interp_constr6_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr7_entry" stg_interp_constr7_entry :: Ptr ()
+foreign import ccall "&stg_interp_constr8_entry" stg_interp_constr8_entry :: Ptr ()
 #endif
 
 
@@ -332,5 +356,11 @@ store x = do addr <- advance
 load :: Storable a => PtrIO a
 load = do addr <- advance
           lift (peek addr)
+
+foreign import ccall unsafe "stgMallocBytesRWX"
+  _stgMallocBytesRWX :: CInt -> IO (Ptr a)
+
+malloc_exec :: Int -> IO (Ptr a)
+malloc_exec bytes = _stgMallocBytesRWX (fromIntegral bytes)
 
 \end{code}
