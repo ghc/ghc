@@ -20,10 +20,10 @@ import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, Sig(..),
 			  LPat, GRHSs, MatchGroup(..), emptyLHsBinds, isEmptyLHsBinds,
 			  collectHsBindBinders, collectPatBinders, pprPatBind
 			)
-import TcHsSyn		( TcId, TcDictBinds, zonkId, mkHsLet )
+import TcHsSyn		( zonkId, mkHsLet )
 
 import TcRnMonad
-import Inst		( InstOrigin(..), newDictsAtLoc, newIPDict, instToId )
+import Inst		( newDictsAtLoc, newIPDict, instToId )
 import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, 
 			  newLocalName, tcLookupLocalIds, pprBinders,
 			  tcGetGlobalTyVars )
@@ -37,9 +37,9 @@ import TcHsType		( tcHsSigType, UserTypeCtxt(..), tcAddLetBoundTyVars,
 import TcPat		( tcPat, PatCtxt(..) )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newTyFlexiVarTy, zonkQuantifiedTyVar, 
-			  tcInstSigType, zonkTcTypes, zonkTcTyVar )
+			  tcInstSigType, zonkTcType, zonkTcTypes, zonkTcTyVar )
 import TcType		( TcTyVar, SkolemInfo(SigSkol), 
-			  TcTauType, TcSigmaType, 
+			  TcTauType, TcSigmaType, isUnboxedTupleType,
 			  mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkForAllTy, isUnLiftedType, tcGetTyVar, 
 			  mkTyVarTys, tidyOpenTyVar )
@@ -121,7 +121,7 @@ tcHsBootSigs [HsBindGroup binds sigs _]
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
 	   ; return (mkVanillaGlobal name sigma_ty vanillaIdInfo) }
 	-- Notice that we make GlobalIds, not LocalIds
-tcHsBootSits groups = pprPanic "tcHsBootSigs" (ppr groups)
+tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
 
 badBootDeclErr :: Message
 badBootDeclErr = ptext SLIT("Illegal declarations in an hs-boot file")
@@ -467,8 +467,16 @@ tcMonoBinds binds lookup_sig is_rec
 	-- 	We want to infer a higher-rank type for f
     setSrcSpan b_loc  	$
     do	{ (matches', rhs_ty) <- tcInfer (tcMatchesFun name matches)
+		-- Check for an unboxed tuple type
+		--	f = (# True, False #)
+		-- Zonk first just in case it's hidden inside a meta type variable
+		-- (This shows up as a (more obscure) kind error 
+		--  in the 'otherwise' case of tcMonoBinds.)
+	; zonked_rhs_ty <- zonkTcType rhs_ty
+	; checkTc (not (isUnboxedTupleType zonked_rhs_ty))
+		  (unboxedTupleErr name zonked_rhs_ty)
 	; mono_name <- newLocalName name
-	; let mono_id = mkLocalId mono_name rhs_ty
+	; let mono_id = mkLocalId mono_name zonked_rhs_ty
 	; return (unitBag (L b_loc (FunBind (L nm_loc mono_id) inf matches')),
 		  [(name, Nothing, mono_id)]) }
 
@@ -918,6 +926,11 @@ sigContextsCtxt sig1 sig2
 unliftedBindErr flavour mbind
   = hang (text flavour <+> ptext SLIT("bindings for unlifted types aren't allowed:"))
 	 4 (ppr mbind)
+
+-----------------------------------------------
+unboxedTupleErr name ty
+  = hang (ptext SLIT("Illegal binding of unboxed tuple"))
+	 4 (ppr name <+> dcolon <+> ppr ty)
 
 -----------------------------------------------
 existentialExplode mbinds
