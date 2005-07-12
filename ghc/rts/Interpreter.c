@@ -577,7 +577,8 @@ do_apply:
 	}	    
 
 	case BCO: {
-	    nat arity, i;
+	    nat arity;
+	    int i; // arithmetic involving i might go negative below
 
 	    Sp++;
 	    arity = ((StgBCO *)obj)->arity;
