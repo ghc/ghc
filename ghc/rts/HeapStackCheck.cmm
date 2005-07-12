@@ -89,7 +89,7 @@
   jump stg_returnToSched;
 
 #define BLOCK_BUT_FIRST(c)			\
-  PRE_RETURN(ThreadYielding, ThreadRunGHC)	\
+  PRE_RETURN(ThreadBlocked, ThreadRunGHC)	\
   R2 = c;					\
   jump stg_returnToSchedButFirst;
 
