@@ -44,3 +44,5 @@ test('TH_where', normal, compile_and_run, [''])
 test('TH_spliceInst', normal, compile, [''])
 
 test('TH_fail', normal, compile_fail, [''])
+
+test('TH_dupdecl', normal, compile_fail, [''])
