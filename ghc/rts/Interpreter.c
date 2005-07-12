@@ -514,7 +514,7 @@ do_apply:
 
 	case PAP: {
 	    StgPAP *pap;
-	    nat arity, i;
+	    nat i, arity;
 
 	    pap = (StgPAP *)obj;
 
@@ -534,7 +534,8 @@ do_apply:
 		// Shuffle the args for this function down, and put
 		// the appropriate info table in the gap.
 		for (i = 0; i < arity; i++) {
-		    Sp[i-1] = Sp[i];
+		    Sp[(int)i-1] = Sp[i];
+		    // ^^^^^ careful, i-1 might be negative, but i in unsigned
 		}
 		Sp[arity-1] = app_ptrs_itbl[n-arity-1];
 		Sp--;
@@ -577,8 +578,7 @@ do_apply:
 	}	    
 
 	case BCO: {
-	    nat arity;
-	    int i; // arithmetic involving i might go negative below
+	    nat arity, i;
 
 	    Sp++;
 	    arity = ((StgBCO *)obj)->arity;
@@ -591,7 +591,8 @@ do_apply:
 		// Shuffle the args for this function down, and put
 		// the appropriate info table in the gap.
 		for (i = 0; i < arity; i++) {
-		    Sp[i-1] = Sp[i];
+		    Sp[(int)i-1] = Sp[i];
+		    // ^^^^^ careful, i-1 might be negative, but i in unsigned
 		}
 		Sp[arity-1] = app_ptrs_itbl[n-arity-1];
 		Sp--;
