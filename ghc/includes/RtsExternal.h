@@ -72,6 +72,8 @@ extern int stg_sig_install (int, int, StgStablePtr *, void *);
 extern void startSignalHandler(int sig);
 extern void setIOManagerPipe (int fd);
 
+extern void* stgMallocBytesRWX(int len);
+
 /* -----------------------------------------------------------------------------
    Storage manager stuff exported
    -------------------------------------------------------------------------- */

@@ -46,58 +46,9 @@ Haskell side.
 #include <windows.h>
 #endif
 
-#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-
-/* no C99 header stdint.h on OpenBSD? */
-#if defined(openbsd_HOST_OS)
-typedef unsigned long my_uintptr_t;
-#else
-#include <stdint.h>
-typedef uintptr_t my_uintptr_t;
-#endif
-#endif
-
 #if defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
 #include <string.h>
 #endif
-
-/* Heavily arch-specific, I'm afraid.. */
-
-/*
- * Allocate len bytes which are readable, writable, and executable.
- *
- * ToDo: If this turns out to be a performance bottleneck, one could
- * e.g. cache the last VirtualProtect/mprotect-ed region and do
- * nothing in case of a cache hit.
- */
-static void*
-mallocBytesRWX(int len)
-{
-  void *addr = stgMallocBytes(len, "mallocBytesRWX");
-#if defined(i386_HOST_ARCH) && defined(_WIN32)
-  /* This could be necessary for processors which distinguish between READ and
-     EXECUTE memory accesses, e.g. Itaniums. */
-  DWORD dwOldProtect = 0;
-  if (VirtualProtect (addr, len, PAGE_EXECUTE_READWRITE, &dwOldProtect) == 0) {
-    barf("mallocBytesRWX: failed to protect 0x%p; error=%lu; old protection: %lu\n",
-         addr, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
-  }
-#elif defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
-  /* malloced memory isn't executable by default on OpenBSD */
-  my_uintptr_t pageSize         = sysconf(_SC_PAGESIZE);
-  my_uintptr_t mask             = ~(pageSize - 1);
-  my_uintptr_t startOfFirstPage = ((my_uintptr_t)addr          ) & mask;
-  my_uintptr_t startOfLastPage  = ((my_uintptr_t)addr + len - 1) & mask;
-  my_uintptr_t size             = startOfLastPage - startOfFirstPage + pageSize;
-  if (mprotect((void*)startOfFirstPage, (size_t)size, PROT_EXEC | PROT_READ | PROT_WRITE) != 0) {
-    barf("mallocBytesRWX: failed to protect 0x%p\n", addr);
-  }
-#endif
-  return addr;
-}
 
 #ifdef LEADING_UNDERSCORE
 #define UNDERSCORE "_"
@@ -272,7 +223,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
 		# the callee cleans up the stack
     */
-    adjustor = mallocBytesRWX(14);
+    adjustor = stgMallocBytesRWX(14);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 	adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
@@ -317,7 +268,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
   */
-    adjustor = mallocBytesRWX(17);
+    adjustor = stgMallocBytesRWX(17);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 
@@ -410,7 +361,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 
 	if (i < 6) {
-	    adjustor = mallocBytesRWX(40);
+	    adjustor = stgMallocBytesRWX(40);
 
 	    *(StgInt32 *)adjustor      = 0x49c1894d;
 	    *(StgInt32 *)(adjustor+4)  = 0x8948c889;
@@ -425,7 +376,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 	else
 	{
-	    adjustor = mallocBytesRWX(48);
+	    adjustor = stgMallocBytesRWX(48);
 
 	    *(StgInt32 *)adjustor      = 0x00685141;
 	    *(StgInt32 *)(adjustor+4)  = 0x4d000000;
@@ -473,7 +424,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      similarly, and local variables should be accessed via %fp, not %sp. In a
      nutshell: This should work! (Famous last words! :-)
   */
-    adjustor = mallocBytesRWX(4*(11+1));
+    adjustor = stgMallocBytesRWX(4*(11+1));
     {
         unsigned long *const adj_code = (unsigned long *)adjustor;
 
@@ -550,7 +501,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
       4 bytes (getting rid of the nop), hence saving memory. [ccshan]
   */
     ASSERT(((StgWord64)wptr & 3) == 0);
-    adjustor = mallocBytesRWX(48);
+    adjustor = stgMallocBytesRWX(48);
     {
 	StgWord64 *const code = (StgWord64 *)adjustor;
 
@@ -655,7 +606,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
             */
                     // allocate space for at most 4 insns per parameter
                     // plus 14 more instructions.
-        adjustor = mallocBytesRWX(4 * (4*n + 14));
+        adjustor = stgMallocBytesRWX(4 * (4*n + 14));
         code = (unsigned*)adjustor;
         
         *code++ = 0x48000008; // b *+8
@@ -814,7 +765,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 #ifdef FUNDESCS
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
-        adjustorStub = mallocBytesRWX(sizeof(AdjustorStub));
+        adjustorStub = stgMallocBytesRWX(sizeof(AdjustorStub));
 #endif
         adjustor = adjustorStub;
             
@@ -1080,7 +1031,7 @@ void
 initAdjustor(void)
 {
 #if defined(i386_HOST_ARCH) && defined(openbsd_HOST_OS)
-    obscure_ccall_ret_code_dyn = mallocBytesRWX(4);
+    obscure_ccall_ret_code_dyn = stgMallocBytesRWX(4);
     obscure_ccall_ret_code_dyn[0] = ((unsigned char *)obscure_ccall_ret_code)[0];
     obscure_ccall_ret_code_dyn[1] = ((unsigned char *)obscure_ccall_ret_code)[1];
     obscure_ccall_ret_code_dyn[2] = ((unsigned char *)obscure_ccall_ret_code)[2];
