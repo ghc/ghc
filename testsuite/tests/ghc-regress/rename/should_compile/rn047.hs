@@ -1,5 +1,10 @@
 {-# OPTIONS -fglasgow-exts -fwarn-unused-matches #-}
--- Tests unused-variable warnings in parallel list comprehensions
+
+-- GHC 6.4 erroneously reported that the 
+-- bindings for q and z were unused
+--
+-- Note the parallel list comprehension,
+-- which was the cause of the trouble
 
 module ShouldCompile where
 
