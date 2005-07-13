@@ -245,7 +245,15 @@ checkGroup inst_env clss@((ClassP cls _, _) : _)
 	--
 	-- We need to do something very similar comparing each predicate
 	-- with relevant instance decls
-    pairwise_eqns ++ instance_eqns
+
+    instance_eqns ++ pairwise_eqns
+	-- NB: we put the instance equations first.   This biases the 
+	-- order so that we first improve individual constraints against the
+	-- instances (which are perhaps in a library and less likely to be
+	-- wrong; and THEN perform the pairwise checks.
+	-- The other way round, it's possible for the pairwise check to succeed
+	-- and cause a subsequent, misleading failure of one of the pair with an
+	-- instance declaration.  See tcfail143.hs for an exmample
 
   where
     (cls_tvs, cls_fds) = classTvsFds cls
