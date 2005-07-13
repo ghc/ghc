@@ -1,10 +1,8 @@
 
-def f( opts ):
-  opts.compile_to_hc = 1
-  opts.omit_ways = ['optasm']
-  opts.extra_hc_opts = '-fglasgow-exts'
+def ffi( opts ):
+  opts.extra_hc_opts = '-fffi -optc-Wno-implicit'
 
-setTestOpts(f)
+setTestOpts(ffi)
 
 test('cc001', normal, compile, [''])
 
@@ -31,3 +29,4 @@ test('cc009', expect_fail_for(['extcore','optextcore']), compile, [''])
 test('cc010', expect_fail_for(['extcore','optextcore']), compile, [''])
 test('cc011', normal, compile, [''])
 test('cc012', normal, compile, [''])
+test('ffi001', normal, compile, [''])

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fglasgow-exts #-}
 -- !!! cc004 -- foreign declarations
 module ShouldCompile where
 
