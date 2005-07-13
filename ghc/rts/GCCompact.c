@@ -504,6 +504,20 @@ update_fwd_large( bdescr *bd )
 	thread_PAP((StgPAP *)p);
 	continue;
 
+    case TREC_CHUNK:
+    {
+        StgWord i;
+        StgTRecChunk *tc = (StgTRecChunk *)p;
+	TRecEntry *e = &(tc -> entries[0]);
+	thread((StgPtr)&tc->prev_chunk);
+	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
+	  thread((StgPtr)&e->tvar);
+	  thread((StgPtr)&e->expected_value);
+	  thread((StgPtr)&e->new_value);
+	}
+	continue;
+    }
+
     default:
       barf("update_fwd_large: unknown/strange object  %d", (int)(info->type));
     }
@@ -580,7 +594,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
 
     case FUN:
     case CONSTR:
-    case FOREIGN:
     case STABLE_NAME:
     case IND_PERM:
     case MUT_VAR:
