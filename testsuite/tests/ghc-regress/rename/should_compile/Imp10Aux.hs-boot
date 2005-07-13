@@ -1,6 +1,4 @@
 module Imp10Aux where
-instance Eq (T1 Char)
-instance Eq (T1 Int)
 data T1 a 
 data T2 a b 
 data T3 a b c 
