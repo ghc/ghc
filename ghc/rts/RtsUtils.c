@@ -54,6 +54,10 @@ typedef uintptr_t my_uintptr_t;
 #endif
 #endif
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 /* -----------------------------------------------------------------------------
    Result-checking malloc wrappers.
    -------------------------------------------------------------------------- */
