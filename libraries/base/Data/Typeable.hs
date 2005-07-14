@@ -112,10 +112,12 @@ import GHC.Arr		( Array, STArray )
 #endif
 
 #ifdef __HUGS__
-import Hugs.Prelude
-import Hugs.IO
-import Hugs.IORef
-import Hugs.IOExts
+import Hugs.Prelude	( Key(..), TypeRep(..), TyCon(..), Ratio,
+			  Exception, ArithException, IOException,
+			  ArrayException, AsyncException, Handle,
+			  Ptr, FunPtr, ForeignPtr, StablePtr )
+import Hugs.IORef	( IORef, newIORef, readIORef, writeIORef )
+import Hugs.IOExts	( unsafePerformIO, unsafeCoerce )
 	-- For the Typeable instance
 import Hugs.Array	( Array )
 import Hugs.ConcBase	( MVar )
