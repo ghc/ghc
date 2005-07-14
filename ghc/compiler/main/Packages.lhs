@@ -291,9 +291,11 @@ mkPackageState dflags orig_pkg_db = do
 	procflags pkgs expl (ExposePackage str : flags) = do
 	   case partition (matches str) pkgs of
 		([],_)   -> missingPackageErr str
-		([p],ps) -> procflags (p':ps) (addOneToUniqSet expl pkgid) flags
+		([p],ps) -> procflags (p':ps') expl' flags
 		  where pkgid = packageConfigId p
 			p' = p {exposed=True}
+		        ps' = hideAll (pkgName (package p)) ps
+			expl' = addOneToUniqSet expl pkgid
 		(ps,_)   -> multiplePackagesErr str ps
 	procflags pkgs expl (HidePackage str : flags) = do
 	   case partition (matches str) pkgs of
@@ -313,8 +315,34 @@ mkPackageState dflags orig_pkg_db = do
 	matches str p
 		=  str == showPackageId (package p)
 		|| str == pkgName (package p)
+
+	-- When a package is requested to be exposed, we hide all other
+	-- packages with the same name.
+	hideAll name ps = map maybe_hide ps
+	  where maybe_hide p | pkgName (package p) == name = p {exposed=False}
+			     | otherwise                   = p
   --
   (pkgs1,explicit) <- procflags (eltsUFM orig_pkg_db) emptyUniqSet flags
+  --
+  -- hide all packages for which there is also a later version
+  -- that is already exposed.  This just makes it non-fatal to have two
+  -- versions of a package exposed, which can happen if you install a
+  -- later version of a package in the user database, for example.
+  --
+  let
+	pkgs2 = map maybe_hide pkgs1
+	   where maybe_hide p
+		   | a_later_version_is_exposed = p {exposed=False}
+		   | otherwise                  = p
+		  where myname = pkgName (package p)
+			myversion = pkgVersion (package p)
+			a_later_version_is_exposed
+			  = not (null [ p | p <- pkgs1, let pkg = package p,
+					    pkgName pkg == myname,
+					    pkgVersion pkg > myversion ])
+  --
+  -- Eliminate any packages which have dangling dependencies (perhaps
+  -- because the package was removed by -ignore-package).
   --
   let
 	elimDanglingDeps pkgs = 
@@ -326,10 +354,7 @@ mkPackageState dflags orig_pkg_db = do
 	  where dangling pid = pid `notElem` all_pids
 		all_pids = map package pkgs
   --
-  -- Eliminate any packages which have dangling dependencies (perhaps
-  -- because the package was removed by -ignore-package).
-  --
-  let pkgs = elimDanglingDeps pkgs1
+  let pkgs = elimDanglingDeps pkgs2
       pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
   --
   -- Find the transitive closure of dependencies of exposed
