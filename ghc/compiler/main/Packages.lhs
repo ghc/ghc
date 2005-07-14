@@ -66,7 +66,7 @@ import Distribution.Version
 import Data.Maybe	( isNothing )
 import System.Directory	( doesFileExist )
 import Control.Monad	( foldM )
-import Data.List	( nub, partition )
+import Data.List	( nub, partition, sortBy )
 
 #ifdef mingw32_TARGET_OS
 import Data.List	( isPrefixOf )
@@ -289,26 +289,34 @@ mkPackageState dflags orig_pkg_db = do
 
 	procflags pkgs expl [] = return (pkgs,expl)
 	procflags pkgs expl (ExposePackage str : flags) = do
-	   case partition (matches str) pkgs of
-		([],_)   -> missingPackageErr str
-		([p],ps) -> procflags (p':ps') expl' flags
+	   case pick str pkgs of
+		Nothing -> missingPackageErr str
+		Just (p,ps) -> procflags (p':ps') expl' flags
 		  where pkgid = packageConfigId p
 			p' = p {exposed=True}
 		        ps' = hideAll (pkgName (package p)) ps
 			expl' = addOneToUniqSet expl pkgid
-		(ps,_)   -> multiplePackagesErr str ps
 	procflags pkgs expl (HidePackage str : flags) = do
 	   case partition (matches str) pkgs of
 		([],_)   -> missingPackageErr str
-		([p],ps) -> procflags (p':ps) expl flags
-		  where p' = p {exposed=False}
-		(ps,_)   -> multiplePackagesErr str ps
+		(ps,qs) -> procflags (map hide ps ++ qs) expl flags
+		  where hide p = p {exposed=False}
 	procflags pkgs expl (IgnorePackage str : flags) = do
 	   case partition (matches str) pkgs of
 		(ps,qs) -> procflags qs expl flags
 		-- missing package is not an error for -ignore-package,
 		-- because a common usage is to -ignore-package P as
 		-- a preventative measure just in case P exists.
+
+	pick str pkgs
+	  = case partition (matches str) pkgs of
+		([],_) -> Nothing
+		(ps,rest) -> 
+		   case sortBy (flip (comparing (pkgVersion.package))) ps of
+			(p:ps) -> Just (p, ps ++ rest)
+			_ -> panic "Packages.pick"
+
+        comparing f a b = f a `compare` f b
 
 	-- A package named on the command line can either include the
 	-- version, or just the name if it is unambiguous.
@@ -412,13 +420,6 @@ rtsPackageName	     = FSLIT("rts")
 haskell98PackageName = FSLIT("haskell98")
 thPackageName        = FSLIT("template-haskell")
 				-- Template Haskell libraries in here
-
-multiplePackagesErr str ps =
-  throwDyn (CmdLineError (showSDoc (
-		   text "Error; multiple packages match" <+> 
-			text str <> colon <+>
-		    sep (punctuate comma (map (text.showPackageId.package) ps))
-		)))
 
 mkModuleMap
   :: PackageConfigMap
