@@ -422,15 +422,16 @@ typedef union {
 
 #else
 
-#define HALF_INT  (((I_)1) << (BITS_IN (I_) / 2))
+/* Approximate version when we don't have long arithmetic (on 64-bit archs) */
 
-#define stg_abs(a) (((I_)(a)) < 0 ? -((I_)(a)) : ((I_)(a)))
+#define HALF_POS_INT  (((I_)1) << (BITS_IN (I_) / 2))
+#define HALF_NEG_INT  (-HALF_POS_INT)
 
 #define mulIntMayOflo(a,b)			\
 ({                                              \
   I_ c; 					\
-  if (stg_abs(a) >= HALF_INT ||			\
-      stg_abs(b) >= HALF_INT) {			\
+  if ((I_)a <= HALF_NEG_INT || a >= HALF_POS_INT    \
+      || (I_)b <= HALF_NEG_INT || b >= HALF_POS_INT) {\
     c = 1;					\
   } else {					\
     c = 0;					\
