@@ -1,7 +1,0 @@
-
-simpl008.hs:8:15:
-    Couldn't match kind `??' against `(#)'
-    When matching the kinds of `t :: ??' and `(# Int#, ByteArray# #) :: (#)'
-      Expected type: t
-      Inferred type: (# Int#, ByteArray# #)
-    In the application `int2Integer# 0#'

@@ -8,7 +8,7 @@ test('simpl005', normal, compile, [''])
 # test('simpl006', normal, compile, [''])
 
 test('simpl007', normal, compile, [''])
-test('simpl008', only_compiler_types(['ghc']), compile_fail, [''])
+# Missing: simpl008
 test('simpl009', normal, compile, [''])
 test('simpl010', normal, compile, [''])
 test('simpl011', normal, compile, [''])
