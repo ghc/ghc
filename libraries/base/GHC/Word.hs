@@ -148,7 +148,6 @@ instance Ix Word where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
@@ -247,7 +246,6 @@ instance Ix Word8 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -347,7 +345,6 @@ instance Ix Word16 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -625,7 +622,6 @@ instance Ix Word32 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word32 where  
 #if WORD_SIZE_IN_BITS < 33
@@ -874,7 +870,6 @@ instance Ix Word64 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]

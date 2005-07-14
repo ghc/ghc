@@ -72,12 +72,6 @@ class (Ord a) => Ix a where
     rangeSize		:: (a,a) -> Int
     -- | like 'rangeSize', but without checking that the upper bound is
     -- in range.
-    --
-    -- As long as you don't override the default 'rangeSize', you can
-    -- specify 'unsafeRangeSize' as follows, to speed up some operations:
-    --
-    -- >  unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-    --
     unsafeRangeSize     :: (a,a) -> Int
 
 	-- Must specify one of index, unsafeIndex
@@ -131,8 +125,6 @@ instance  Ix Char  where
 
     inRange (m,n) i	=  m <= i && i <= n
 
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-
 ----------------------------------------------------------------------
 instance  Ix Int  where
     {-# INLINE range #-}
@@ -149,8 +141,6 @@ instance  Ix Int  where
     {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
 
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-
 ----------------------------------------------------------------------
 instance  Ix Integer  where
     {-# INLINE range #-}
@@ -163,8 +153,6 @@ instance  Ix Integer  where
 	      | otherwise   =  indexError b i "Integer"
 
     inRange (m,n) i	=  m <= i && i <= n
-
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
@@ -179,8 +167,6 @@ instance Ix Bool where -- as derived
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-
 ----------------------------------------------------------------------
 instance Ix Ordering where -- as derived
     {-# INLINE range #-}
@@ -194,8 +180,6 @@ instance Ix Ordering where -- as derived
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-
 ----------------------------------------------------------------------
 instance Ix () where
     {-# INLINE range #-}
@@ -206,8 +190,6 @@ instance Ix () where
     inRange ((), ()) () = True
     {-# INLINE index #-}
     index b i = unsafeIndex b i
-
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 ----------------------------------------------------------------------
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
@@ -224,8 +206,6 @@ instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     {- INLINE inRange #-}
     inRange ((l1,l2),(u1,u2)) (i1,i2) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2
-
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
     -- Default method for index
 
@@ -247,8 +227,6 @@ instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3
 
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
-
     -- Default method for index
 
 ----------------------------------------------------------------------
@@ -268,8 +246,6 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
     inRange ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3 && inRange (l4,u4) i4
-
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
     -- Default method for index
 
@@ -292,8 +268,6 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3 && inRange (l4,u4) i4 && 
       inRange (l5,u5) i5
-
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
     -- Default method for index
 \end{code}

@@ -107,7 +107,6 @@ instance Ix Int8 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Int8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -213,7 +212,6 @@ instance Ix Int16 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 instance Read Int16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -511,7 +509,6 @@ instance Ix Int32 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 
 ------------------------------------------------------------------------
 -- type Int64
@@ -782,4 +779,3 @@ instance Ix Int64 where
     range (m,n)              = [m..n]
     unsafeIndex b@(m,_) i    = fromIntegral (i - m)
     inRange (m,n) i          = m <= i && i <= n
-    unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
