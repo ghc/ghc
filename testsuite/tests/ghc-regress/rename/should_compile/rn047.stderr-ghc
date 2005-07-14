@@ -1,2 +1,2 @@
 
-rn047.hs:7:10: Warning: Defined but not used: `y'
+rn047.hs:12:10: Warning: Defined but not used: `y'
