@@ -321,6 +321,56 @@ typedef struct _RtsSymbolVal {
       Sym(closedir)
 #endif
 
+#if defined(darwin_TARGET_OS) && HAVE_PRINTF_LDBLSTUB
+#define RTS_DARWIN_ONLY_SYMBOLS			\
+     Sym(asprintf$LDBLStub)                     \
+     Sym(err$LDBLStub)                          \
+     Sym(errc$LDBLStub)                         \
+     Sym(errx$LDBLStub)                         \
+     Sym(fprintf$LDBLStub)                      \
+     Sym(fscanf$LDBLStub)                       \
+     Sym(fwprintf$LDBLStub)                     \
+     Sym(fwscanf$LDBLStub)                      \
+     Sym(printf$LDBLStub)                       \
+     Sym(scanf$LDBLStub)                        \
+     Sym(snprintf$LDBLStub)                     \
+     Sym(sprintf$LDBLStub)                      \
+     Sym(sscanf$LDBLStub)                       \
+     Sym(strtold$LDBLStub)                      \
+     Sym(swprintf$LDBLStub)                     \
+     Sym(swscanf$LDBLStub)                      \
+     Sym(syslog$LDBLStub)                       \
+     Sym(vasprintf$LDBLStub)                    \
+     Sym(verr$LDBLStub)                         \
+     Sym(verrc$LDBLStub)                        \
+     Sym(verrx$LDBLStub)                        \
+     Sym(vfprintf$LDBLStub)                     \
+     Sym(vfscanf$LDBLStub)                      \
+     Sym(vfwprintf$LDBLStub)                    \
+     Sym(vfwscanf$LDBLStub)                     \
+     Sym(vprintf$LDBLStub)                      \
+     Sym(vscanf$LDBLStub)                       \
+     Sym(vsnprintf$LDBLStub)                    \
+     Sym(vsprintf$LDBLStub)                     \
+     Sym(vsscanf$LDBLStub)                      \
+     Sym(vswprintf$LDBLStub)                    \
+     Sym(vswscanf$LDBLStub)                     \
+     Sym(vsyslog$LDBLStub)                      \
+     Sym(vwarn$LDBLStub)                        \
+     Sym(vwarnc$LDBLStub)                       \
+     Sym(vwarnx$LDBLStub)                       \
+     Sym(vwprintf$LDBLStub)                     \
+     Sym(vwscanf$LDBLStub)                      \
+     Sym(warn$LDBLStub)                         \
+     Sym(warnc$LDBLStub)                        \
+     Sym(warnx$LDBLStub)                        \
+     Sym(wcstold$LDBLStub)                      \
+     Sym(wprintf$LDBLStub)                      \
+     Sym(wscanf$LDBLStub)
+#else
+#define RTS_DARWIN_ONLY_SYMBOLS
+#endif
+
 #ifndef SMP
 # define MAIN_CAP_SYM SymX(MainCapability)
 #else
@@ -662,6 +712,7 @@ RTS_LONG_LONG_SYMS
 RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
+RTS_DARWIN_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 #undef Sym
 #undef SymX

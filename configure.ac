@@ -1270,6 +1270,21 @@ AC_TRY_COMPILE(,[__asm__ (".subsections_via_symbols");],
             [Define to 1 if Apple-style dead-stripping is supported.])
     ])
 
+dnl ** check for Apple's "interesting" long double compatibility scheme
+AC_MSG_CHECKING(for printf$LDBLStub)
+AC_TRY_LINK_FUNC(printf$LSBLStub,
+    [
+        AC_MSG_RESULT(yes)
+        AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[1],
+            [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
+    ],
+    [
+        AC_MSG_RESULT(no)
+        AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[0],
+            [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
+    ])
+
+
 AC_CONFIG_FILES([mk/config.mk])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
