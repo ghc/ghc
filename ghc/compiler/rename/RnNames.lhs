@@ -674,6 +674,8 @@ reportDeprecations :: TcGblEnv -> RnM ()
 reportDeprecations tcg_env
   = ifOptM Opt_WarnDeprecations	$
     do	{ (eps,hpt) <- getEpsAndHpt
+		-- By this time, typechecking is complete, 
+		-- so the PIT is fully populated
 	; mapM_ (check hpt (eps_PIT eps)) all_gres }
   where
     used_names = allUses (tcg_dus tcg_env) 
