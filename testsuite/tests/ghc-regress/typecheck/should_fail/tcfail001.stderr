@@ -1,7 +1,6 @@
 
 tcfail001.hs:9:1:
-    Couldn't match `[a]' against `t -> t1'
-      Expected type: [a]
-      Inferred type: t -> t1
+    The equation(s) for `op' have one argument,
+    but its type `[a]' has none
     In the definition for method `op'
     In the instance declaration for `A [a]'
