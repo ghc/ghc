@@ -143,10 +143,18 @@ INSTANCE_TYPEABLE1(Seq,seqTc,"Seq")
 
 #if __GLASGOW_HASKELL__
 instance Data a => Data (Seq a) where
-	gfoldl f z xs	= z fromList `f` toList xs
+	gfoldl f z	= gfoldSeq f z id
 	toConstr _	= error "toConstr"
 	gunfold _ _	= error "gunfold"
 	dataTypeOf _	= mkNorepType "Data.Sequence.Seq"
+
+-- Treat the type as consisting of constructors of arity 0, 1, 2, ...
+gfoldSeq :: Data a => (forall a b. Data a => c (a -> b) -> a -> c b) ->
+	(forall g. g -> c g) -> (Seq a -> r) -> Seq a -> c r
+gfoldSeq f z k s = case viewr s of
+	EmptyR -> z (k empty)
+	xs :> x -> gfoldSeq f z (snoc k) xs `f` x
+  where	snoc k xs x = k (xs |> x)
 #endif
 
 -- Finger trees
