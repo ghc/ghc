@@ -1,0 +1,17 @@
+\begin{code}
+module RnExpr where
+import HsSyn
+import Name	( Name )
+import NameSet	( FreeVars )
+import RdrName	( RdrName )
+import TcRnTypes
+
+rnLExpr :: LHsExpr RdrName
+	-> RnM (LHsExpr Name, FreeVars)
+
+rnStmts :: forall thing.
+	   HsStmtContext Name -> [LStmt RdrName] 
+	-> RnM (thing, FreeVars)
+	-> RnM (([LStmt Name], thing), FreeVars)
+\end{code}
+
