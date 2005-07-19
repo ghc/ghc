@@ -29,6 +29,9 @@ AC_CHECK_FUNCS([ftime gmtime_r localtime_r lstat readdir_r])
 
 AC_CHECK_FUNCS([_chsize ftruncate])
 
+AC_SEARCH_LIBS([gethostbyname], [nsl wsock32])
+AC_SEARCH_LIBS([recv], [socket wsock32])
+
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
 FPTOOLS_CHECK_HTYPE(signed char)
@@ -82,12 +85,7 @@ FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 # Check for idiosyncracies in some mingw impls of directory handling.
 FP_READDIR_EOF_ERRNO
 
-case "$host" in
-*-mingw32)
-	EXTRA_LIBS="wsock32, msvcrt, kernel32, user32, shell32" ;;
-*)
-	EXTRA_LIBS= ;;
-esac
+EXTRA_LIBS="`echo $LIBS | sed 's/-l//g'`"
 AC_SUBST([EXTRA_LIBS])
 
 AC_CONFIG_FILES([config.mk base.buildinfo])
