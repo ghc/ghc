@@ -66,6 +66,7 @@ exposed-modules:
 	Data.STRef,
 	Data.STRef.Lazy,
 	Data.STRef.Strict,
+	Data.Sequence,
 	Data.Set,
 	Data.Tree,
 	Data.Tuple,
