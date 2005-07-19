@@ -15,7 +15,7 @@ import Check            ( check, ExhaustivePat )
 import CoreSyn
 import CoreUtils	( bindNonRec, exprType )
 import DsMonad
-import DsBinds		( dsHsNestedBinds )
+import DsBinds		( dsLHsBinds )
 import DsGRHSs		( dsGRHSs )
 import DsUtils
 import Id		( idName, idType, Id )
@@ -90,19 +90,21 @@ The next two functions create the warning message.
 
 \begin{code}
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
-dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn 
-	where
-	  warn | qs `lengthExceeds` maximum_output
-               = pp_context ctx (ptext SLIT("are overlapped"))
-		            (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
-			    ptext SLIT("..."))
-	       | otherwise
-               = pp_context ctx (ptext SLIT("are overlapped"))
-	                    (\ f -> vcat $ map (ppr_eqn f kind) qs)
+dsShadowWarn ctx@(DsMatchContext kind _ loc) qs
+  = putSrcSpanDs loc (dsWarn warn)
+  where
+    warn | qs `lengthExceeds` maximum_output
+         = pp_context ctx (ptext SLIT("are overlapped"))
+		      (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
+		      ptext SLIT("..."))
+	 | otherwise
+         = pp_context ctx (ptext SLIT("are overlapped"))
+	              (\ f -> vcat $ map (ppr_eqn f kind) qs)
 
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
-dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn 
+dsIncompleteWarn ctx@(DsMatchContext kind _ loc) pats 
+  = putSrcSpanDs loc (dsWarn warn)
 	where
 	  warn = pp_context ctx (ptext SLIT("are non-exhaustive"))
                     	    (\f -> hang (ptext SLIT("Patterns not matched:"))
@@ -113,9 +115,9 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn
 	  dots | pats `lengthExceeds` maximum_output = ptext SLIT("...")
 	       | otherwise                           = empty
 
-pp_context (DsMatchContext kind pats loc) msg rest_of_msg_fun
-  = (loc, vcat [ptext SLIT("Pattern match(es)") <+> msg,
-	        sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]])
+pp_context (DsMatchContext kind pats _loc) msg rest_of_msg_fun
+  = vcat [ptext SLIT("Pattern match(es)") <+> msg,
+	  sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]]
   where
     (ppr_match, pref)
 	= case kind of
@@ -341,7 +343,7 @@ Float, 	Double, at least) are converted to unboxed form; e.g.,
 
 \begin{code}
 tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
-	-- DsM'd because of internal call to dsHsNestedBinds
+	-- DsM'd because of internal call to dsLHsBinds
 	-- 	and mkSelectorBinds.
 	-- "tidy1" does the interesting stuff, looking at
 	-- one pattern and fiddling the list of bindings.
@@ -399,7 +401,7 @@ tidy1 v wrap (VarPat var)
   = returnDs (wrap . wrapBind var v, WildPat (idType var)) 
 
 tidy1 v wrap (VarPatOut var binds)
-  = do	{ prs <- dsHsNestedBinds binds
+  = do	{ prs <- dsLHsBinds binds
 	; return (wrap . wrapBind var v . mkDsLet (Rec prs),
 		  WildPat (idType var)) }
 

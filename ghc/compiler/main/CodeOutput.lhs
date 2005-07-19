@@ -36,7 +36,7 @@ import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
 import Module		( Module )
-import ListSetOps	( removeDupsEq )
+import List		( nub )
 import Maybes		( firstJust )
 
 import Directory	( doesFileExist )
@@ -131,7 +131,7 @@ outputC dflags filenm flat_absC
 	   ffi_decl_headers 
 	      = case foreign_stubs of
 		  NoStubs 		  -> []
-		  ForeignStubs _ _ fdhs _ -> map unpackFS (fst (removeDupsEq fdhs))
+		  ForeignStubs _ _ fdhs _ -> map unpackFS (nub fdhs)
 			-- Remove duplicates, because distinct foreign import decls
 			-- may cite the same #include.  Order doesn't matter.
 

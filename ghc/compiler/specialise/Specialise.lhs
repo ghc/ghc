@@ -18,7 +18,6 @@ import CoreSubst	( Subst, mkEmptySubst, extendTvSubstList, lookupIdSubst,
 			  substBndr, substBndrs, substTy, substInScope,
 			  cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs
 			) 
-import Var		( zapSpecPragmaId )
 import VarSet
 import VarEnv
 import CoreSyn
@@ -801,7 +800,7 @@ specDefn subst calls (fn, rhs)
     let
 	(spec_defns, spec_uds, spec_rules) = unzip3 stuff
 
-	fn' = addIdSpecialisations zapped_fn spec_rules
+	fn' = addIdSpecialisations fn spec_rules
     in
     returnSM ((fn',rhs'), 
 	      spec_defns, 
@@ -809,14 +808,9 @@ specDefn subst calls (fn, rhs)
 
   | otherwise	-- No calls or RHS doesn't fit our preconceptions
   = specExpr subst rhs			`thenSM` \ (rhs', rhs_uds) ->
-    returnSM ((zapped_fn, rhs'), [], rhs_uds)
+    returnSM ((fn, rhs'), [], rhs_uds)
   
   where
-    zapped_fn		 = zapSpecPragmaId fn
-	-- If the fn is a SpecPragmaId, make it discardable
-	-- It's role as a holder for a call instance is o'er
-	-- But it might be alive for some other reason by now.
-
     fn_type	       = idType fn
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars

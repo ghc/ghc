@@ -17,12 +17,12 @@ import {-# SOURCE #-} HsPat  ( LPat )
 
 import HsTypes		( LHsType, PostTcType )
 import Name		( Name )
-import NameSet		( NameSet, elemNameSet, nameSetToList )
+import NameSet		( NameSet, elemNameSet )
 import BasicTypes	( IPName, RecFlag(..), Activation(..), Fixity )
 import Outputable	
 import SrcLoc		( Located(..), unLoc )
-import Var		( TyVar )
-import Bag		( Bag, emptyBag, isEmptyBag, bagToList )
+import Var		( TyVar, DictId, Id )
+import Bag		( Bag, emptyBag, isEmptyBag, bagToList, unionBags )
 \end{code}
 
 %************************************************************************
@@ -34,64 +34,24 @@ import Bag		( Bag, emptyBag, isEmptyBag, bagToList )
 Global bindings (where clauses)
 
 \begin{code}
-data HsBindGroup id
-  = HsBindGroup			-- A mutually recursive group
-	(LHsBinds id)
-	[LSig id]		-- Empty on typechecker output, Type Signatures
-	RecFlag
+data HsLocalBinds id	-- Bindings in a 'let' expression
+			-- or a 'where' clause
+  = HsValBinds (HsValBinds id)
+  | HsIPBinds  (HsIPBinds id)
+  | EmptyLocalBinds
 
-  | HsIPBinds
-	[LIPBind id]		-- Not allowed at top level
+data HsValBinds id	-- Value bindings (not implicit parameters)
+  = ValBindsIn  			-- Before typechecking
+	(LHsBinds id) [LSig id]		-- Not dependency analysed
+					-- Recursive by default
 
-instance OutputableBndr id => Outputable (HsBindGroup id) where
-  ppr (HsBindGroup binds sigs is_rec)
-     = vcat [ppr_isrec,
-     	     vcat (map ppr sigs),
-	     vcat (map ppr (bagToList binds))
-		--  *not* pprLHsBinds because we don't want braces; 'let' and
-		-- 'where' include a list of HsBindGroups and we don't want
-		-- several groups of bindings each with braces around.
-       ]
-     where
-       ppr_isrec = getPprStyle $ \ sty -> 
-		   if userStyle sty then empty else
-		   case is_rec of
-		   	Recursive    -> ptext SLIT("{- rec -}")
-			NonRecursive -> ptext SLIT("{- nonrec -}")
+  | ValBindsOut				-- After typechecking
+	[(RecFlag, LHsBinds id)]	-- Dependency analysed
 
-  ppr (HsIPBinds ipbinds)
-     = vcat (map ppr ipbinds)
-
--- -----------------------------------------------------------------------------
--- Implicit parameter bindings
-
-type LIPBind id = Located (IPBind id)
-
--- | Implicit parameter bindings.
-data IPBind id
-  = IPBind
-	(IPName id)
-	(LHsExpr id)
-
-instance (OutputableBndr id) => Outputable (IPBind id) where
-    ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
-
--- -----------------------------------------------------------------------------
 
 type LHsBinds id  = Bag (LHsBind id)
 type DictBinds id = LHsBinds id		-- Used for dictionary or method bindings
 type LHsBind  id  = Located (HsBind id)
-
-emptyLHsBinds :: LHsBinds id
-emptyLHsBinds = emptyBag
-
-isEmptyLHsBinds :: LHsBinds id -> Bool
-isEmptyLHsBinds = isEmptyBag
-
-pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
-pprLHsBinds binds 
-  | isEmptyLHsBinds binds = empty
-  | otherwise = lbrace <+> vcat (map ppr (bagToList binds)) <+> rbrace
 
 data HsBind id
   = FunBind     (Located id)
@@ -105,28 +65,102 @@ data HsBind id
 			-- change e.g. rnMethodBinds
 		Bool	-- True => infix declaration
 		(MatchGroup id)
+		NameSet		-- After the renamer, this contains a superset of the 
+				-- Names of the other binders in this binding group that 
+				-- are free in the RHS of the defn
+				-- Before renaming, and after typechecking, 
+				-- the field is unused; it's just an error thunk
 
   | PatBind     (LPat id)	-- The pattern is never a simple variable;
 				-- That case is done by FunBind
 		(GRHSs id)
 		PostTcType	-- Type of the GRHSs
+		NameSet		-- Same as for FunBind
 
-  | VarBind id (Located (HsExpr id))	-- Dictionary binding and suchlike;
-					-- located only for consistency
+  | VarBind id (Located (HsExpr id))	-- Dictionary binding and suchlike 
+					-- All VarBinds are introduced by the type checker
+					-- Located only for consistency
 
-  | AbsBinds				-- Binds abstraction; TRANSLATION
-		[TyVar]	  		-- Type variables
-		[id]			-- Dicts
-		[([TyVar], id, id)]	-- (type variables, polymorphic, momonmorphic) triples
-		NameSet			-- Set of *polymorphic* variables that have an INLINE pragma
-		(LHsBinds id)	 	-- The "business end"
+  | AbsBinds					-- Binds abstraction; TRANSLATION
+		[TyVar]	  			-- Type variables
+		[DictId]			-- Dicts
+		[([TyVar], id, id, [Prag])]	-- (tvs, poly_id, mono_id, prags)
+		(LHsBinds id)	 		-- The dictionary bindings and typechecked user bindings
+						-- mixed up together; you can tell the dict bindings because
+						-- they are all VarBinds
 
-	-- Creates bindings for *new* (polymorphic, overloaded) locals
-	-- in terms of *old* (monomorphic, non-overloaded) ones.
+	-- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
+	-- 
+	-- Creates bindings for (polymorphic, overloaded) poly_f
+	-- in terms of monomorphic, non-overloaded mono_f
+	--
+	-- Invariants: 
+	--	1. 'binds' binds mono_f
+	--	2. ftvs is a subset of tvs
+	--	3. ftvs includes all tyvars free in ds
 	--
 	-- See section 9 of static semantics paper for more details.
 	-- (You can get a PhD for explaining the True Meaning
 	--  of this last construct.)
+
+placeHolderNames :: NameSet
+-- Used for the NameSet in FunBind and PatBind prior to the renamer
+placeHolderNames = panic "placeHolderNames"
+
+------------
+instance OutputableBndr id => Outputable (HsLocalBinds id) where
+  ppr (HsValBinds bs) = ppr bs
+  ppr (HsIPBinds bs)  = ppr bs
+  ppr EmptyLocalBinds = empty
+
+instance OutputableBndr id => Outputable (HsValBinds id) where
+  ppr (ValBindsIn binds sigs)
+   = vcat [vcat (map ppr sigs),
+	   vcat (map ppr (bagToList binds))
+		--  *not* pprLHsBinds because we don't want braces; 'let' and
+		-- 'where' include a list of HsBindGroups and we don't want
+		-- several groups of bindings each with braces around.
+       ]
+  ppr (ValBindsOut sccs) = vcat (map ppr_scc sccs)
+     where
+       ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
+       pp_rec Recursive    = ptext SLIT("rec")
+       pp_rec NonRecursive = ptext SLIT("nonrec")
+
+pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
+pprLHsBinds binds 
+  | isEmptyLHsBinds binds = empty
+  | otherwise = lbrace <+> vcat (map ppr (bagToList binds)) <+> rbrace
+
+------------
+emptyLocalBinds :: HsLocalBinds a
+emptyLocalBinds = EmptyLocalBinds
+
+isEmptyLocalBinds :: HsLocalBinds a -> Bool
+isEmptyLocalBinds (HsValBinds ds) = isEmptyValBinds ds
+isEmptyLocalBinds (HsIPBinds ds)  = isEmptyIPBinds ds
+isEmptyLocalBinds EmptyLocalBinds = True
+
+isEmptyValBinds :: HsValBinds a -> Bool
+isEmptyValBinds (ValBindsIn ds sigs) = isEmptyLHsBinds ds && null sigs
+isEmptyValBinds (ValBindsOut ds)     = null ds
+
+emptyValBindsIn, emptyValBindsOut :: HsValBinds a
+emptyValBindsIn  = ValBindsIn emptyBag []
+emptyValBindsOut = ValBindsOut []
+
+emptyLHsBinds :: LHsBinds id
+emptyLHsBinds = emptyBag
+
+isEmptyLHsBinds :: LHsBinds id -> Bool
+isEmptyLHsBinds = isEmptyBag
+
+------------
+plusHsValBinds :: HsValBinds a -> HsValBinds a -> HsValBinds a
+plusHsValBinds (ValBindsIn ds1 sigs1) (ValBindsIn ds2 sigs2)
+  = ValBindsIn (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
+plusHsValBinds (ValBindsOut ds1) (ValBindsOut ds2)
+  = ValBindsOut (ds1 ++ ds2)
 \end{code}
 
 What AbsBinds means
@@ -159,23 +193,58 @@ instance OutputableBndr id => Outputable (HsBind id) where
 
 ppr_monobind :: OutputableBndr id => HsBind id -> SDoc
 
-ppr_monobind (PatBind pat grhss ty)    = pprPatBind pat grhss
-ppr_monobind (VarBind var rhs)         = ppr var <+> equals <+> pprExpr (unLoc rhs)
-ppr_monobind (FunBind fun inf matches) = pprFunBind (unLoc fun) matches
+ppr_monobind (PatBind pat grhss _ _)     = pprPatBind pat grhss
+ppr_monobind (VarBind var rhs)           = ppr var <+> equals <+> pprExpr (unLoc rhs)
+ppr_monobind (FunBind fun inf matches _) = pprFunBind (unLoc fun) matches
       -- ToDo: print infix if appropriate
 
-ppr_monobind (AbsBinds tyvars dictvars exports inlines val_binds)
+ppr_monobind (AbsBinds tyvars dictvars exports val_binds)
      = sep [ptext SLIT("AbsBinds"),
 	    brackets (interpp'SP tyvars),
 	    brackets (interpp'SP dictvars),
-	    brackets (sep (punctuate comma (map ppr exports))),
-	    brackets (interpp'SP (nameSetToList inlines))]
+	    brackets (sep (punctuate comma (map ppr_exp exports)))]
        $$
-       nest 4 ( vcat [pprBndr LetBind x | (_,x,_) <- exports]
+       nest 2 ( vcat [pprBndr LetBind x | (_,x,_,_) <- exports]
 			-- Print type signatures
-		$$
-		pprLHsBinds val_binds )
+		$$ pprLHsBinds val_binds )
+  where
+    ppr_exp (tvs, gbl, lcl, prags)
+	= vcat [ppr gbl <+> ptext SLIT("<=") <+> ppr tvs <+> ppr lcl,
+	  	nest 2 (vcat (map (pprPrag gbl) prags))]
 \end{code}
+
+%************************************************************************
+%*									*
+		Implicit parameter bindings
+%*									*
+%************************************************************************
+
+\begin{code}
+data HsIPBinds id
+  = IPBinds 
+	[LIPBind id] 
+	(DictBinds id)	-- Only in typechecker output; binds 
+			-- uses of the implicit parameters
+
+isEmptyIPBinds :: HsIPBinds id -> Bool
+isEmptyIPBinds (IPBinds is ds) = null is && isEmptyBag ds
+
+type LIPBind id = Located (IPBind id)
+
+-- | Implicit parameter bindings.
+data IPBind id
+  = IPBind
+	(IPName id)
+	(LHsExpr id)
+
+instance (OutputableBndr id) => Outputable (HsIPBinds id) where
+  ppr (IPBinds bs ds) = vcat (map ppr bs) 
+			$$ pprLHsBinds ds
+
+instance (OutputableBndr id) => Outputable (IPBind id) where
+  ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -209,11 +278,33 @@ data Sig name
 
 type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity 
+
+-- A Prag conveys pragmas from the type checker to the desugarer
+data Prag 
+  = InlinePrag 	
+	Bool 		-- True <=> INLINE, False <=> NOINLINE
+	Activation
+
+  | SpecPrag   
+	(HsExpr Id)	-- An expression, of the given specialised type, which
+	PostTcType 	-- specialises the polymorphic function
+	[Id]		-- Dicts mentioned free in the expression
+
+isInlinePrag (InlinePrag _ _) = True
+isInlinePrag prag	      = False
+
+isSpecPrag (SpecPrag _ _ _) = True
+isSpecPrag prag		    = False
 \end{code}
 
 \begin{code}
 okBindSig :: NameSet -> LSig Name -> Bool
 okBindSig ns sig = sigForThisGroup ns sig
+
+okHsBootSig :: LSig Name -> Bool
+okHsBootSig (L _ (Sig  _ _)) = True
+okHsBootSig (L _ (FixSig _)) = True
+okHsBootSig sig	      	     = False
 
 okClsDclSig :: LSig Name -> Bool
 okClsDclSig (L _ (SpecInstSig _)) = False
@@ -250,11 +341,17 @@ isVanillaLSig :: LSig name -> Bool
 isVanillaLSig (L _(Sig name _)) = True
 isVanillaLSig sig	        = False
 
+isSpecLSig :: LSig name -> Bool
+isSpecLSig (L _(SpecSig name _)) = True
+isSpecLSig sig	     		 = False
+
+isSpecInstLSig (L _ (SpecInstSig _)) = True
+isSpecInstLSig sig	       	     = False
+
 isPragLSig :: LSig name -> Bool
 	-- Identifies pragmas 
 isPragLSig (L _ (SpecSig _ _))     = True
 isPragLSig (L _ (InlineSig _ _ _)) = True
-isPragLSig (L _ (SpecInstSig _))   = True
 isPragLSig other		   = False
 
 hsSigDoc (Sig        _ _) 	  = ptext SLIT("type signature")
@@ -268,10 +365,10 @@ hsSigDoc (FixSig (FixitySig _ _)) = ptext SLIT("fixity declaration")
 Signature equality is used when checking for duplicate signatures
 
 \begin{code}
-eqHsSig :: Sig Name -> Sig Name -> Bool
-eqHsSig (FixSig (FixitySig n1 _)) (FixSig (FixitySig n2 _)) = unLoc n1 == unLoc n2
-eqHsSig (Sig n1 _)         	    (Sig n2 _)              = unLoc n1 == unLoc n2
-eqHsSig (InlineSig b1 n1 _)	    (InlineSig b2 n2 _)     = b1 == b2 && unLoc n1 == unLoc n2
+eqHsSig :: LSig Name -> LSig Name -> Bool
+eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
+eqHsSig (L _ (Sig n1 _))         	(L _ (Sig n2 _))                = unLoc n1 == unLoc n2
+eqHsSig (L _ (InlineSig b1 n1 _))	(L _ (InlineSig b2 n2 _))       = b1 == b2 && unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
 	-- specialisations here.  Check for this later, when we're in Type land
@@ -283,25 +380,29 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (Sig var ty)
-      = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
-
-ppr_sig (SpecSig var ty)
-      = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],
-	      nest 4 (ppr ty <+> text "#-}")
-	]
-
-ppr_sig (InlineSig True var phase)
-      = hsep [text "{-# INLINE", ppr phase, ppr var, text "#-}"]
-
-ppr_sig (InlineSig False var phase)
-      = hsep [text "{-# NOINLINE", ppr phase, ppr var, text "#-}"]
-
-ppr_sig (SpecInstSig ty)
-      = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]
-
-ppr_sig (FixSig fix_sig) = ppr fix_sig
+ppr_sig (Sig var ty)		  = pprVarSig (unLoc var) ty
+ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
+ppr_sig (SpecSig var ty) 	  = pragBrackets (pprSpec var ty)
+ppr_sig (InlineSig inl var phase) = pragBrackets (pprInline var inl phase)
+ppr_sig (SpecInstSig ty) 	  = pragBrackets (ptext SLIT("SPECIALIZE instance") <+> ppr ty)
 
 instance Outputable name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, ppr name]
+
+pragBrackets :: SDoc -> SDoc
+pragBrackets doc = ptext SLIT("{-#") <+> doc <+> ptext SLIT("#-}") 
+
+pprInline :: Outputable id => id -> Bool -> Activation -> SDoc
+pprInline var True  phase = hsep [ptext SLIT("INLINE"),   ppr phase, ppr var]
+pprInline var False phase = hsep [ptext SLIT("NOINLINE"), ppr phase, ppr var]
+
+pprVarSig :: (Outputable id, Outputable ty) => id -> ty -> SDoc
+pprVarSig var ty = sep [ppr var <+> dcolon, nest 2 (ppr ty)]
+
+pprSpec :: (Outputable id, Outputable ty) => id -> ty -> SDoc
+pprSpec var ty = sep [ptext SLIT("SPECIALIZE") <+> pprVarSig var ty]
+
+pprPrag :: Outputable id => id -> Prag -> SDoc
+pprPrag var (InlinePrag inl act) = pprInline var inl act
+pprPrag var (SpecPrag expr ty _) = pprSpec var ty
 \end{code}

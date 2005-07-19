@@ -10,37 +10,40 @@ they may be affected by renaming (which isn't fully worked out yet).
 
 \begin{code}
 module RnBinds (
-	rnTopBinds, rnBinds, rnBindsAndThen,
-	rnMethodBinds, renameSigs, checkSigs
+	rnTopBinds, 
+	rnLocalBindsAndThen, rnValBindsAndThen, rnValBinds, trimWith,
+	rnMethodBinds, renameSigs, 
+	rnMatchGroup, rnGRHSs
    ) where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn
 import HsBinds		( hsSigDoc, eqHsSig )
 import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
-import RnTypes		( rnHsSigType, rnLHsType, rnLPat )
-import RnExpr		( rnMatchGroup, rnMatch, rnGRHSs, checkPrecMatch )
+import RnTypes		( rnHsSigType, rnLHsType, rnHsTypeFVs, 
+			  rnLPat, rnPatsAndThen, patSigErr, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn, 
-			  lookupLocatedInstDeclBndr,
+			  lookupLocatedInstDeclBndr, newIPNameRn,
 			  lookupLocatedSigOccRn, bindPatSigTyVars, bindPatSigTyVarsFV,
 			  bindLocalFixities, bindSigTyVarsFV, 
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import DynFlags	( DynFlag(..) )
-import Digraph		( SCC(..), stronglyConnComp )
 import Name		( Name, nameOccName, nameSrcLoc )
+import NameEnv
 import NameSet
 import PrelNames	( isUnboundName )
 import RdrName		( RdrName, rdrNameOcc )
-import BasicTypes	( RecFlag(..), TopLevelFlag(..), isTopLevel )
-import List		( unzip4 )
 import SrcLoc		( mkSrcSpan, Located(..), unLoc )
+import ListSetOps	( findDupsEq )
 import Bag
 import Outputable
+import Maybes		( orElse )
 import Monad		( foldM )
 \end{code}
 
@@ -154,53 +157,102 @@ it expects the global environment to contain bindings for the binders
 contains bindings for the binders of this particular binding.
 
 \begin{code}
-rnTopBinds :: LHsBinds RdrName
-	   -> [LSig RdrName]
-	   -> RnM ([HsBindGroup Name], DefUses)
+rnTopBinds :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
 
 -- The binders of the binding are in scope already;
 -- the top level scope resolution does that
 
-rnTopBinds mbinds sigs
+rnTopBinds binds
  =  do	{ is_boot <- tcIsHsBoot
-	; if is_boot then
-		rnHsBoot mbinds sigs
-	  else  bindPatSigTyVars (collectSigTysFromHsBinds (bagToList mbinds)) $ \ _ -> 
-			-- Hmm; by analogy with Ids, this doesn't look right
-			-- Top-level bound type vars should really scope over 
-			-- everything, but we only scope them over the other bindings
-		rnBinds TopLevel mbinds sigs }
+	; if is_boot then rnTopBindsBoot binds
+		     else rnTopBindsSrc  binds }
 
-rnHsBoot :: LHsBinds RdrName
-	   -> [LSig RdrName]
-	   -> RnM ([HsBindGroup Name], DefUses)
+rnTopBindsBoot :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
 -- A hs-boot file has no bindings. 
 -- Return a single HsBindGroup with empty binds and renamed signatures
-rnHsBoot mbinds sigs
+rnTopBindsBoot (ValBindsIn mbinds sigs)
   = do	{ checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
-	; sigs' <- renameSigs sigs
-	; return ([HsBindGroup emptyLHsBinds sigs' NonRecursive], 
-		  usesOnly (hsSigsFVs sigs')) }
+	; sigs' <- renameSigs okHsBootSig sigs
+	; return (ValBindsIn emptyLHsBinds sigs', usesOnly (hsSigsFVs sigs')) }
+
+rnTopBindsSrc :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
+rnTopBindsSrc binds@(ValBindsIn mbinds _)
+  = bindPatSigTyVars (collectSigTysFromHsBinds (bagToList mbinds)) $ \ _ -> 
+	-- Hmm; by analogy with Ids, this doesn't look right
+	-- Top-level bound type vars should really scope over 
+	-- everything, but we only scope them over the other bindings
+
+    do	{ (binds', dus) <- rnValBinds noTrim binds
+
+		-- Warn about missing signatures, 
+	; let	{ ValBindsIn _ sigs' = binds'
+		; ty_sig_vars = mkNameSet [ unLoc n | L _ (Sig n _) <- sigs']
+		; un_sigd_bndrs = duDefs dus `minusNameSet` ty_sig_vars }
+
+	; warn_missing_sigs <- doptM Opt_WarnMissingSigs
+	; ifM (warn_missing_sigs)
+	      (mappM_ missingSigWarn (nameSetToList un_sigd_bndrs))
+
+	; return (binds', dus)
+	}
+\end{code}
+
+
+
+%*********************************************************
+%*							*
+		HsLocalBinds
+%*							*
+%*********************************************************
+
+\begin{code}
+rnLocalBindsAndThen 
+  :: HsLocalBinds RdrName
+  -> (HsLocalBinds Name -> RnM (result, FreeVars))
+  -> RnM (result, FreeVars)
+-- This version (a) assumes that the binding vars are not already in scope
+--		(b) removes the binders from the free vars of the thing inside
+-- The parser doesn't produce ThenBinds
+rnLocalBindsAndThen EmptyLocalBinds thing_inside
+  = thing_inside EmptyLocalBinds
+
+rnLocalBindsAndThen (HsValBinds val_binds) thing_inside
+  = rnValBindsAndThen val_binds $ \ val_binds' -> 
+    thing_inside (HsValBinds val_binds')
+
+rnLocalBindsAndThen (HsIPBinds binds) thing_inside
+  = rnIPBinds binds			`thenM` \ (binds',fv_binds) ->
+    thing_inside (HsIPBinds binds')	`thenM` \ (thing, fvs_thing) ->
+    returnM (thing, fvs_thing `plusFV` fv_binds)
+
+-------------
+rnIPBinds (IPBinds ip_binds _no_dict_binds)
+  = do	{ (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstM rnIPBind) ip_binds
+	; return (IPBinds ip_binds' emptyLHsBinds, plusFVs fvs_s) }
+
+rnIPBind (IPBind n expr)
+  = newIPNameRn  n		`thenM` \ name ->
+    rnLExpr expr		`thenM` \ (expr',fvExpr) ->
+    return (IPBind name expr', fvExpr)
 \end{code}
 
 
 %************************************************************************
 %*									*
-%* 		Nested binds
+		ValBinds
 %*									*
 %************************************************************************
 
 \begin{code}
-rnBindsAndThen :: Bag (LHsBind RdrName)
-	       -> [LSig RdrName]
-	       -> ([HsBindGroup Name] -> RnM (result, FreeVars))
-	       -> RnM (result, FreeVars)
+rnValBindsAndThen :: HsValBinds RdrName
+	          -> (HsValBinds Name -> RnM (result, FreeVars))
+	          -> RnM (result, FreeVars)
 
-rnBindsAndThen mbinds sigs thing_inside
+rnValBindsAndThen binds@(ValBindsIn mbinds sigs) thing_inside
   =	-- Extract all the binders in this group, and extend the
 	-- current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ _ ->
+    bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ bndrs ->
     bindPatSigTyVarsFV (collectSigTysFromHsBinds (bagToList mbinds))	$ 
 
 	-- Then install local fixity declarations
@@ -208,7 +260,7 @@ rnBindsAndThen mbinds sigs thing_inside
     bindLocalFixities [sig | L _ (FixSig sig) <- sigs ] 	$
 
 	-- Do the business
-    rnBinds NotTopLevel mbinds sigs	`thenM` \ (binds, bind_dus) ->
+    rnValBinds (trimWith bndrs) binds	`thenM` \ (binds, bind_dus) ->
 
 	-- Now do the "thing inside"
     thing_inside binds 			`thenM` \ (result,result_fvs) ->
@@ -216,14 +268,13 @@ rnBindsAndThen mbinds sigs thing_inside
 	-- Final error checking
     let
 	all_uses     = duUses bind_dus `plusFV` result_fvs
-	bndrs        = duDefs bind_dus
-	unused_bndrs = nameSetToList (bndrs `minusNameSet` all_uses)
+	unused_bndrs = [ b | b <- bndrs, not (b `elemNameSet` all_uses)]
     in
     warnUnusedLocalBinds unused_bndrs	`thenM_`
 
-    returnM (result, all_uses `minusNameSet` bndrs)
-	-- duUses: It's important to return all the uses, not the 'real uses' used for
-	-- warning about unused bindings.  Otherwise consider:
+    returnM (result, delListFromNameSet all_uses bndrs)
+	-- duUses: It's important to return all the uses, not the 'real uses' 
+	-- used for warning about unused bindings.  Otherwise consider:
 	--	x = 3
 	--	y = let p = x in 'x'	-- NB: p not used
 	-- If we don't "see" the dependency of 'y' on 'x', we may put the
@@ -233,120 +284,96 @@ rnBindsAndThen mbinds sigs thing_inside
     mbinders_w_srclocs = collectHsBindLocatedBinders mbinds
     doc = text "In the binding group for:"
 	  <+> pprWithCommas ppr (map unLoc mbinders_w_srclocs)
-\end{code}
 
-
-%************************************************************************
-%*									*
-\subsubsection{rnBinds -- the main work is done here}
-%*									*
-%************************************************************************
-
-@rnMonoBinds@ is used by {\em both} top-level and nested bindings.
-It assumes that all variables bound in this group are already in scope.
-This is done {\em either} by pass 3 (for the top-level bindings),
-{\em or} by @rnMonoBinds@ (for the nested ones).
-
-\begin{code}
-rnBinds :: TopLevelFlag
-	-> LHsBinds RdrName
-	-> [LSig RdrName]
-	-> RnM ([HsBindGroup Name], DefUses)
-
+---------------------
+rnValBinds :: (FreeVars -> FreeVars)
+	   -> HsValBinds RdrName
+	   -> RnM (HsValBinds Name, DefUses)
 -- Assumes the binders of the binding are in scope already
 
-rnBinds top_lvl mbinds sigs
- =  renameSigs sigs			`thenM` \ siglist ->
+rnValBinds trim (ValBindsIn mbinds sigs)
+  = do	{ sigs' <- rename_sigs sigs
 
-  	 -- Rename the bindings, returning a [HsBindVertex]
-	 -- which is a list of indivisible vertices so far as
-	 -- the strongly-connected-components (SCC) analysis is concerned
-    mkBindVertices siglist mbinds	`thenM` \ mbinds_info ->
+	; let { rn_bind = wrapLocFstM (rnBind sig_fn trim) 
+	      ;	sig_fn = mkSigTvFn sigs' }
 
-	 -- Do the SCC analysis
-    let 
-	scc_result  = rnSCC mbinds_info
-	(groups, bind_dus_s) = unzip (map reconstructCycle scc_result)
-	bind_dus    = mkDUs bind_dus_s	
-	binders     = duDefs bind_dus
-    in
-	-- Check for duplicate or mis-placed signatures
-    checkSigs (okBindSig binders) siglist	`thenM_`
+	; (mbinds', du_bag) <- mapAndUnzipBagM rn_bind mbinds
 
-	-- Warn about missing signatures, 
-	-- but only at top level, and not in interface mode
-	-- (The latter is important when renaming bindings from 'deriving' clauses.)
-    doptM Opt_WarnMissingSigs 		`thenM` \ warn_missing_sigs ->
-    (if isTopLevel top_lvl && 
-	 warn_missing_sigs
-     then let
-	    type_sig_vars   = [ unLoc n | L _ (Sig n _) <- siglist]
-	    un_sigd_binders = filter (not . (`elem` type_sig_vars)) 
-				     (nameSetToList binders)
-	  in
-          mappM_ missingSigWarn un_sigd_binders
-     else
-	returnM ()  
-    )						`thenM_`
+	; let defs, uses :: NameSet
+	      (defs, uses) = foldrBag plus (emptyNameSet, emptyNameSet) du_bag
+	      plus (ds1,us1) (ds2,us2) = (ds1 `unionNameSets` ds2, 
+					  us1 `unionNameSets` us2)
 
-    returnM (groups, bind_dus `plusDU` usesOnly (hsSigsFVs siglist))
-\end{code}
+	; check_sigs (okBindSig defs) sigs'
 
-@mkBindVertices@ is ever-so-slightly magical in that it sticks
-unique ``vertex tags'' on its output; minor plumbing required.
+	; traceRn (text "rnValBind" <+> (ppr defs $$ ppr uses))
+	; return (ValBindsIn mbinds' sigs', 
+		  [(Just defs, uses `plusFV` hsSigsFVs sigs')]) }
 
-\begin{code}
-mkBindVertices :: [LSig Name]		-- Signatures
-	       -> LHsBinds RdrName
-	       -> RnM [BindVertex]
-mkBindVertices sigs = mapM (mkBindVertex sigs) . bagToList
+---------------------
+-- Bind the top-level forall'd type variables in the sigs.
+-- E.g 	f :: a -> a
+--	f = rhs
+--	The 'a' scopes over the rhs
+--
+-- NB: there'll usually be just one (for a function binding)
+--     but if there are many, one may shadow the rest; too bad!
+--	e.g  x :: [a] -> [a]
+--	     y :: [(a,a)] -> a
+--	     (x,y) = e
+--      In e, 'a' will be in scope, and it'll be the one from 'y'!
 
-mkBindVertex :: [LSig Name] -> LHsBind RdrName -> RnM BindVertex
-mkBindVertex sigs (L loc (PatBind pat grhss ty))
-  = setSrcSpan loc $
-    rnLPat pat				`thenM` \ (pat', pat_fvs) ->
-
-	 -- Find which things are bound in this group
-    let
-	names_bound_here = mkNameSet (collectPatBinders pat')
-    in
-    sigsForMe names_bound_here sigs	`thenM` \ sigs_for_me ->
-    bindSigTyVarsFV sigs_for_me (
-        rnGRHSs PatBindRhs grhss
-    )					`thenM` \ (grhss', fvs) ->
-    returnM 
-	(names_bound_here, fvs `plusFV` pat_fvs,
-	  L loc (PatBind pat' grhss' ty), sigs_for_me
-	)
-
-mkBindVertex sigs (L loc (FunBind name inf matches))
-  = setSrcSpan loc $ 
-    lookupLocatedBndrRn name				`thenM` \ new_name ->
-    let
-	plain_name = unLoc new_name
-	names_bound_here = unitNameSet plain_name
-    in
-    sigsForMe names_bound_here sigs			`thenM` \ sigs_for_me ->
-    bindSigTyVarsFV sigs_for_me (
-    	rnMatchGroup (FunRhs plain_name) matches
-    )							`thenM` \ (new_matches, fvs) ->
-    checkPrecMatch inf plain_name new_matches		`thenM_`
-    returnM
-      (unitNameSet plain_name, fvs,
-	L loc (FunBind new_name inf new_matches), sigs_for_me
-      )
-
-sigsForMe names_bound_here sigs
-  = foldlM check [] (filter (sigForThisGroup names_bound_here) sigs)
+mkSigTvFn :: [LSig Name] -> (Name -> [Name])
+-- Return a lookup function that maps an Id Name to the names
+-- of the type variables that should scope over its body..
+mkSigTvFn sigs
+  = \n -> lookupNameEnv env n `orElse` []
   where
-	-- sigForThisGroup only returns signatures for 
-	-- which sigName returns a Just
-    eq sig1 sig2 = eqHsSig (unLoc sig1) (unLoc sig2)
+    env :: NameEnv [Name]
+    env = mkNameEnv [ (name, map hsLTyVarName ltvs)
+		    | L _ (Sig (L _ name) 
+			       (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs]
+	-- Note the pattern-match on "Explicit"; we only bind
+	-- type variables from signatures with an explicit top-level for-all
+				
+-- The trimming function trims the free vars we attach to a
+-- binding so that it stays reasonably small
+noTrim :: FreeVars -> FreeVars
+noTrim fvs = fvs	-- Used at top level
 
-    check sigs sig = case filter (eq sig) sigs of
-			[]    -> returnM (sig:sigs)
-			other -> dupSigDeclErr sig other	`thenM_`
-				 returnM sigs
+trimWith :: [Name] -> FreeVars -> FreeVars
+-- Nested bindings; trim by intersection with the names bound here
+trimWith bndrs = intersectNameSet (mkNameSet bndrs)
+
+---------------------
+rnBind :: (Name -> [Name])		-- Signature tyvar function
+       -> (FreeVars -> FreeVars)	-- Trimming function for rhs free vars
+       -> HsBind RdrName
+       -> RnM (HsBind Name, (Defs, Uses))
+rnBind sig_fn trim (PatBind pat grhss ty _)
+  = do	{ (pat', pat_fvs) <- rnLPat pat
+
+	; let bndrs = collectPatBinders pat'
+
+	; (grhss', fvs) <- bindSigTyVarsFV (concatMap sig_fn bndrs) $
+			   rnGRHSs PatBindRhs grhss
+
+	; return (PatBind pat' grhss' ty (trim fvs),
+		  (mkNameSet bndrs, pat_fvs `plusFV` fvs)) }
+
+rnBind sig_fn trim (FunBind name inf matches _)
+  = do	{ new_name <- lookupLocatedBndrRn name
+	; let { plain_name = unLoc new_name
+	      ; bndrs      = unitNameSet plain_name }
+
+	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
+			     rnMatchGroup (FunRhs plain_name) matches
+
+	; checkPrecMatch inf plain_name matches'
+
+	; return (FunBind new_name inf matches' (trim fvs),
+		  (bndrs, fvs))
+      }
 \end{code}
 
 
@@ -377,7 +404,7 @@ rnMethodBinds cls gen_tyvars binds
 	   (bind', fvs_bind) <- rnMethodBind cls gen_tyvars bind
 	   return (bind' `unionBags` binds, fvs_bind `plusFV` fvs)
 
-rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _)))
+rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _) _))
   =  setSrcSpan loc $ 
      lookupLocatedInstDeclBndr cls name			`thenM` \ sel_name -> 
      let plain_name = unLoc sel_name in
@@ -388,7 +415,8 @@ rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _)))
 	new_group = MatchGroup new_matches placeHolderType
     in
     checkPrecMatch inf plain_name new_group		`thenM_`
-    returnM (unitBag (L loc (FunBind sel_name inf new_group)), fvs `addOneFV` plain_name)
+    returnM (unitBag (L loc (FunBind sel_name inf new_group fvs)), fvs `addOneFV` plain_name)
+	-- The 'fvs' field isn't used for method binds
   where
 	-- Truly gruesome; bring into scope the correct members of the generic 
 	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
@@ -403,53 +431,9 @@ rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _)))
 
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind cls gen_tyvars mbind@(L loc (PatBind other_pat _ _))
+rnMethodBind cls gen_tyvars mbind@(L loc (PatBind other_pat _ _ _))
   = addLocErr mbind methodBindErr	`thenM_`
     returnM (emptyBag, emptyFVs) 
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Strongly connected components
-%*									*
-%************************************************************************
-
-\begin{code}
-type BindVertex = (Defs, Uses, LHsBind Name, [LSig Name])
-			-- Signatures, if any, for this vertex
-
-rnSCC :: [BindVertex] -> [SCC BindVertex]
-rnSCC nodes = stronglyConnComp (mkEdges nodes)
-
-type VertexTag	= Int
-
-mkEdges :: [BindVertex] -> [(BindVertex, VertexTag, [VertexTag])]
-	-- We keep the uses with the binding, 
-	-- so we can track unused bindings better
-mkEdges nodes
-  = [ (thing, tag, dest_vertices uses)
-    | (thing@(_, uses, _, _), tag) <- tagged_nodes
-    ]
-  where
-    tagged_nodes = nodes `zip` [0::VertexTag ..]
-
- 	 -- An edge (v,v') indicates that v depends on v'
-    dest_vertices uses = [ target_vertex
-			 | ((defs, _, _, _), target_vertex) <- tagged_nodes,
-			   defs `intersectsNameSet` uses
-			 ]
-
-reconstructCycle :: SCC BindVertex -> (HsBindGroup Name, (Defs,Uses))
-reconstructCycle (AcyclicSCC (defs, uses, bind, sigs))
-  = (HsBindGroup (unitBag bind) sigs NonRecursive, (defs, uses))
-reconstructCycle (CyclicSCC cycle)
-  = (HsBindGroup this_gp_binds this_gp_sigs Recursive, 
-     (unionManyNameSets defs_s, unionManyNameSets uses_s))
-  where
-    (defs_s, uses_s, binds_s, sigs_s) = unzip4 cycle
-    this_gp_binds = listToBag binds_s
-    this_gp_sigs  = foldr1 (++) sigs_s
 \end{code}
 
 
@@ -470,22 +454,34 @@ At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-checkSigs :: (LSig Name -> Bool)	-- OK-sig predicbate
-	  -> [LSig Name]
-	  -> RnM ()
-checkSigs ok_sig sigs
+renameSigs :: (LSig Name -> Bool) -> [LSig RdrName] -> RnM [LSig Name]
+-- Renames the signatures and performs error checks
+renameSigs ok_sig sigs 
+  = do	{ sigs' <- rename_sigs sigs
+	; check_sigs ok_sig sigs'
+	; return sigs' }
+
+----------------------
+rename_sigs :: [LSig RdrName] -> RnM [LSig Name]
+rename_sigs sigs = mappM (wrapLocM renameSig)
+			 (filter (not . isFixityLSig) sigs)
+		-- Remove fixity sigs which have been dealt with already
+
+----------------------
+check_sigs :: (LSig Name -> Bool) -> [LSig Name] -> RnM ()
+-- Used for class and instance decls, as well as regular bindings
+check_sigs ok_sig sigs 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-	-- Well, I can't see the check for (a)... ToDo!
-  = mappM_ unknownSigErr (filter bad sigs)
+  = do	{ mappM_ unknownSigErr (filter bad sigs)
+	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs) }
   where
     bad sig = not (ok_sig sig) && 
 	      case sigName sig of
 		Just n | isUnboundName n -> False
 				-- Don't complain about an unbound name again
 		other			 -> True
-
--- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
+-- We use lookupLocatedSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
 --	instance Foo T where
 --	  {-# INLINE op #-}
@@ -493,10 +489,6 @@ checkSigs ok_sig sigs
 -- We'll just rename the INLINE prag to refer to whatever other 'op'
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
-
-renameSigs :: [LSig RdrName] -> RnM [LSig Name]
-renameSigs sigs = mappM (wrapLocM renameSig) (filter (not . isFixityLSig) sigs)
-	-- Remove fixity sigs which have been dealt with already
 
 renameSig :: Sig RdrName -> RnM (Sig Name)
 -- FixitSig is renamed elsewhere.
@@ -520,6 +512,82 @@ renameSig (InlineSig b v p)
 \end{code}
 
 
+************************************************************************
+*									*
+\subsection{Match}
+*									*
+************************************************************************
+
+\begin{code}
+rnMatchGroup :: HsMatchContext Name -> MatchGroup RdrName -> RnM (MatchGroup Name, FreeVars)
+rnMatchGroup ctxt (MatchGroup ms _)
+  = mapFvRn (rnMatch ctxt) ms	`thenM` \ (new_ms, ms_fvs) ->
+    returnM (MatchGroup new_ms placeHolderType, ms_fvs)
+
+rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
+rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
+
+rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
+  = 
+	-- Deal with the rhs type signature
+    bindPatSigTyVarsFV rhs_sig_tys	$ 
+    doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
+    (case maybe_rhs_sig of
+	Nothing -> returnM (Nothing, emptyFVs)
+	Just ty | opt_GlasgowExts -> rnHsTypeFVs doc_sig ty	`thenM` \ (ty', ty_fvs) ->
+				     returnM (Just ty', ty_fvs)
+		| otherwise	  -> addLocErr ty patSigErr	`thenM_`
+				     returnM (Nothing, emptyFVs)
+    )					`thenM` \ (maybe_rhs_sig', ty_fvs) ->
+
+	-- Now the main event
+    rnPatsAndThen ctxt pats	$ \ pats' ->
+    rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
+
+    returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
+	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
+  where
+     rhs_sig_tys =  case maybe_rhs_sig of
+			Nothing -> []
+			Just ty -> [ty]
+     doc_sig = text "In a result type-signature"
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsubsection{Guarded right-hand sides (GRHSs)}
+%*									*
+%************************************************************************
+
+\begin{code}
+rnGRHSs :: HsMatchContext Name -> GRHSs RdrName -> RnM (GRHSs Name, FreeVars)
+
+rnGRHSs ctxt (GRHSs grhss binds)
+  = rnLocalBindsAndThen binds	$ \ binds' ->
+    mapFvRn (rnGRHS ctxt) grhss	`thenM` \ (grhss', fvGRHSs) ->
+    returnM (GRHSs grhss' binds', fvGRHSs)
+
+rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
+rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
+
+rnGRHS' ctxt (GRHS guards rhs)
+  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
+	; checkM (opt_GlasgowExts || is_standard_guard guards)
+	  	 (addWarn (nonStdGuardErr guards))
+
+	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
+				    rnLExpr rhs
+	; return (GRHS guards' rhs', fvs) }
+  where
+	-- Standard Haskell 1.4 guards are just a single boolean
+	-- expression, rather than a list of qualifiers as in the
+	-- Glasgow extension
+    is_standard_guard []                     = True
+    is_standard_guard [L _ (ExprStmt _ _ _)] = True
+    is_standard_guard other	      	     = False
+\end{code}
+
 %************************************************************************
 %*									*
 \subsection{Error messages}
@@ -527,10 +595,10 @@ renameSig (InlineSig b v p)
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr (L loc sig) sigs
+dupSigDeclErr sigs@(L loc sig : _)
   = addErrAt loc $
 	vcat [ptext SLIT("Duplicate") <+> what_it_is <> colon,
-	      nest 2 (vcat (map ppr_sig (L loc sig:sigs)))]
+	      nest 2 (vcat (map ppr_sig sigs))]
   where
     what_it_is = hsSigDoc sig
     ppr_sig (L loc sig) = ppr loc <> colon <+> ppr sig
@@ -554,4 +622,9 @@ methodBindErr mbind
 bindsInHsBootFile mbinds
   = hang (ptext SLIT("Bindings in hs-boot files are not allowed"))
        2 (ppr mbinds)
+
+nonStdGuardErr guard
+  = hang (ptext
+    SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)")
+    ) 4 (ppr guard)
 \end{code}

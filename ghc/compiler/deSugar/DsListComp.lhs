@@ -8,7 +8,7 @@ module DsListComp ( dsListComp, dsPArrComp ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr ( dsLExpr, dsLet )
+import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
 
 import BasicTypes	( Boxity(..) )
 import HsSyn
@@ -183,7 +183,7 @@ deListComp (ExprStmt guard _ _ : quals) body list	-- rule B above
 -- [e | let B, qs] = let B in [e | qs]
 deListComp (LetStmt binds : quals) body list
   = deListComp quals body list	`thenDs` \ core_rest ->
-    dsLet binds core_rest
+    dsLocalBinds binds core_rest
 
 deListComp (BindStmt pat list1 _ _ : quals) body core_list2 -- rule A' above
   = dsLExpr list1		    `thenDs` \ core_list1 ->
@@ -307,7 +307,7 @@ dfListComp c_id n_id (ExprStmt guard _ _  : quals) body
 dfListComp c_id n_id (LetStmt binds : quals) body
   -- new in 1.3, local bindings
   = dfListComp c_id n_id quals body	`thenDs` \ core_rest ->
-    dsLet binds core_rest
+    dsLocalBinds binds core_rest
 
 dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) body
     -- evaluate the two lists
@@ -420,11 +420,11 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea =
 --
 dePArrComp (LetStmt ds : qs) body pa cea =
   dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
-  let xs     = map unLoc (collectGroupBinders ds)
+  let xs     = map unLoc (collectLocalBinders ds)
       ty'cea = parrElemType cea
   in
   newSysLocalDs ty'cea					  `thenDs` \v       ->
-  dsLet ds (mkCoreTup (map Var xs))			  `thenDs` \clet    ->
+  dsLocalBinds ds (mkCoreTup (map Var xs))		  `thenDs` \clet    ->
   newSysLocalDs (exprType clet)				  `thenDs` \let'v   ->
   let projBody = mkDsLet (NonRec let'v clet) $ 
 		 mkCoreTup [Var v, Var let'v]

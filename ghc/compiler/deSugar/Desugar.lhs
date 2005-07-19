@@ -13,27 +13,24 @@ import StaticFlags	( opt_SccProfilingOn )
 import DriverPhases	( isHsBoot )
 import HscTypes		( ModGuts(..), HscEnv(..), 
 			  Dependencies(..), TypeEnv, IsBootInterface )
-import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
-			  HsBindGroup(..), LRuleDecl, HsBind(..) )
+import HsSyn		( RuleDecl(..), RuleBndr(..), LHsExpr, LRuleDecl )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
 import Id		( Id, setIdExported, idName )
 import Name		( Name, isExternalName, nameIsLocalOrFrom, nameOccName )
 import CoreSyn
 import PprCore		( pprRules, pprCoreExpr )
-import CoreSubst	( substExpr, mkSubst )
 import DsMonad
 import DsExpr		( dsLExpr )
-import DsBinds		( dsHsBinds, AutoScc(..) )
+import DsBinds		( dsTopLHsBinds, decomposeRuleLhs, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module		( Module, moduleEnvElts, delModuleEnv, moduleFS )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
-import VarEnv
 import VarSet
-import Bag		( Bag, isEmptyBag, emptyBag, bagToList )
+import Bag		( Bag, isEmptyBag, emptyBag )
 import Rules		( roughTopNames )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars, exprsFreeNames )
@@ -43,8 +40,9 @@ import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings,
 import ListSetOps	( insertList )
 import Outputable
 import UniqSupply	( mkSplitUniqSupply )
-import SrcLoc		( Located(..), unLoc )
+import SrcLoc		( Located(..) )
 import DATA_IOREF	( readIORef )
+import Maybes		( catMaybes )
 import FastString
 import Util		( sortLe )
 \end{code}
@@ -82,14 +80,12 @@ deSugar hsc_env
 	-- Desugar the program
 	; ((all_prs, ds_rules, ds_fords), warns) 
 		<- initDs hsc_env mod rdr_env type_env $ do
-		{ core_prs <- dsHsBinds auto_scc binds []
+		{ core_prs <- dsTopLHsBinds auto_scc binds
 		; (ds_fords, foreign_prs) <- dsForeigns fords
 		; let all_prs = foreign_prs ++ core_prs
 		      local_bndrs = mkVarSet (map fst all_prs)
 		; ds_rules <- mappM (dsRule mod local_bndrs) rules
-		; return (all_prs, ds_rules, ds_fords) }
-
-
+		; return (all_prs, catMaybes ds_rules, ds_fords) }
 
 	-- If warnings are considered errors, leave.
 	; if errorsFound dflags (warns, emptyBag)
@@ -263,49 +259,37 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM CoreRule
+dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule mod in_scope (L loc (HsRule name act vars lhs rhs))
   = putSrcSpanDs loc $ 
-    do	{ let (dict_binds, body)
-		= case unLoc lhs of
-		    (HsLet [HsBindGroup dbs _ _] body) -> (dbs, body)
-		    other			       -> (emptyBag, lhs)
+    do	{ let bndrs     = [var | RuleBndr (L _ var) <- vars]
+	; lhs'  <- dsLExpr lhs
+	; rhs'  <- dsLExpr rhs
 
-	      ds_dict_bind (L _ (VarBind id rhs))
-		  = do	{ rhs' <- dsLExpr rhs ; returnDs (id,rhs') }
-
-	; dict_binds' <- mappM ds_dict_bind (bagToList dict_binds)
-	; body'       <- dsLExpr body
-	; rhs'        <- dsLExpr rhs
-
+	; case decomposeRuleLhs bndrs lhs' of {
+		Nothing -> do { dsWarn msg; return Nothing } ;
+		Just (bndrs', fn_id, args) -> do
+	
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
-	; let bndrs     = [var | RuleBndr (L _ var) <- vars]
-	      in_scope' = mkInScopeSet (extendVarSetList in_scope bndrs)
-	      subst    	= mkSubst in_scope' emptyVarEnv (mkVarEnv id_pairs)
-	      id_pairs 	= [(id, substExpr subst rhs) | (id,rhs) <- dict_binds']
-			-- Note recursion here... substitution won't terminate
-			-- if there is genuine recursion... which there isn't
-
-	      body'' = substExpr subst body'
-
-	      (fn, args) = case collectArgs body'' of
-				(Var fn_id, args) -> (idName fn_id, args)
-				other -> pprPanic "dsRule" (ppr lhs) 
-
-	      local_rule = nameIsLocalOrFrom mod fn
+	{ let local_rule = nameIsLocalOrFrom mod fn_name
 		-- NB we can't use isLocalId in the orphan test, 
 		-- because isLocalId isn't true of class methods
-	      lhs_names = fn : nameSetToList (exprsFreeNames args)
+	      fn_name   = idName fn_id
+	      lhs_names = fn_name : nameSetToList (exprsFreeNames args)
 		-- No need to delete bndrs, because
-		-- exprsFreeNams finds only External names
+		-- exprsFreeNames finds only External names
 	      orph = case filter (nameIsLocalOrFrom mod) lhs_names of
 			(n:ns) -> Just (nameOccName n)
 			[]     -> Nothing
 
-	; return (Rule { ru_name = name, ru_fn = fn, ru_act = act,
-			 ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs', 
-			 ru_rough = roughTopNames args, 
-			 ru_local = local_rule, ru_orph = orph })
-	}
+	      rule = Rule { ru_name = name, ru_fn = fn_name, ru_act = act,
+			    ru_bndrs = bndrs', ru_args = args, ru_rhs = rhs', 
+			    ru_rough = roughTopNames args, 
+			    ru_local = local_rule, ru_orph = orph }
+	; return (Just rule)
+	} } }
+  where
+    msg = hang (ptext SLIT("RULE left-hand side too complicated to desugar; ignored"))
+	     2 (ppr lhs)
 \end{code}

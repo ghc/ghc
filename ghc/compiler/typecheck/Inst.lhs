@@ -59,12 +59,12 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zonkTcThetaType,
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar, TcPredType,
 		  PredType(..), SkolemInfo(..), typeKind, mkSigmaTy,
 		  tcSplitForAllTys, mkFunTy,
-		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunHead,
+		  tcSplitPhiTy, tcSplitDFunHead,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
 		  isClassPred, isTyVarClassPred, isLinearPred, 
-		  getClassPredTys, getClassPredTys_maybe, mkPredName,
+		  getClassPredTys, mkPredName,
 		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
 		  pprPred, pprParendType, pprTheta 
@@ -78,7 +78,7 @@ import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName, dataConWrapId )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
-import PrelInfo	( isStandardClass, isNoDictClass )
+import PrelInfo	( isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique, mkSystemVarNameEncoded )
 import NameSet	( addOneToNameSet )

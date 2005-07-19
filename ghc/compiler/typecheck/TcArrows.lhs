@@ -11,7 +11,7 @@ module TcArrows ( tcProc ) where
 import {-# SOURCE #-}	TcExpr( tcCheckRho, tcInferRho )
 
 import HsSyn
-import TcHsSyn	(  mkHsLet )
+import TcHsSyn	(  mkHsDictLet )
 
 import TcMatches ( tcMatchPats, matchCtxt, tcStmts, tcMDoStmt, tcGuardStmt,
 		   TcMatchCtxt(..), tcMatchesCase )
@@ -20,7 +20,7 @@ import TcType	( TcType, TcTauType, TcRhoType, mkFunTys, mkTyConApp,
 		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType, 
 		  SkolemInfo(..) )
 import TcMType	( newTyFlexiVarTy, newTyFlexiVarTys, tcSkolTyVars, zonkTcType )
-import TcBinds	( tcBindsAndThen )
+import TcBinds	( tcLocalBinds )
 import TcSimplify ( tcSimplifyCheck )
 import TcUnify	( Expected(..), checkSigTyVarsWrt, zapExpectedTo )
 import TcRnMonad
@@ -111,11 +111,10 @@ tc_cmd env (HsPar cmd) res_ty
 	; return (HsPar cmd') }
 
 tc_cmd env (HsLet binds (L body_loc body)) res_ty
-  = tcBindsAndThen glue binds	$
-    setSrcSpan body_loc 	$
-    tc_cmd env body res_ty
-  where
-    glue binds expr = HsLet [binds] (L body_loc expr)
+  = do	{ (binds', body') <- tcLocalBinds binds		$
+			     setSrcSpan body_loc 	$
+			     tc_cmd env body res_ty
+	; return (HsLet binds' (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCase scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd)		$
@@ -201,9 +200,9 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs grhss binds)
-	= tcBindsAndThen glueBindsOnGRHSs binds $
-	  do { grhss' <- mappM (wrapLocM tc_grhs) grhss
-	     ; return (GRHSs grhss' []) }
+	= do { (binds', grhss') <- tcLocalBinds binds $
+				   mappM (wrapLocM tc_grhs) grhss
+	     ; return (GRHSs grhss' binds') }
 
     tc_grhs (GRHS guards body)
 	= do { (guards', rhs') <- tcStmts pg_ctxt
@@ -264,7 +263,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- the s1..sm and check each cmd
 	; cmds' <- mapM (tc_cmd w_tv) cmds_w_tys
 
-	; returnM (HsArrForm (mkHsTyLam [w_tv] (mkHsLet inst_binds expr')) fixity cmds')
+	; returnM (HsArrForm (mkHsTyLam [w_tv] (mkHsDictLet inst_binds expr')) fixity cmds')
 	}
   where
  	-- Make the types	

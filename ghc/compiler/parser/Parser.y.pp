@@ -508,14 +508,14 @@ where 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 	: 'where' decllist		{ LL (unLoc $2) }
 	| {- empty -}			{ noLoc nilOL }
 
-binds 	::  { Located [HsBindGroup RdrName] } 	-- May have implicit parameters
-	: decllist			{ L1 [cvBindGroup (unLoc $1)] }
-	| '{'            dbinds '}'	{ LL [HsIPBinds (unLoc $2)] }
-	|     vocurly    dbinds close	{ L (getLoc $2) [HsIPBinds (unLoc $2)] }
+binds 	::  { Located (HsLocalBinds RdrName) } 		-- May have implicit parameters
+	: decllist			{ L1 (HsValBinds (cvBindGroup (unLoc $1))) }
+	| '{'            dbinds '}'	{ LL (HsIPBinds (IPBinds (unLoc $2) emptyLHsBinds)) }
+	|     vocurly    dbinds close	{ L (getLoc $2) (HsIPBinds (IPBinds (unLoc $2) emptyLHsBinds)) }
 
-wherebinds :: { Located [HsBindGroup RdrName] }	-- May have implicit parameters
+wherebinds :: { Located (HsLocalBinds RdrName) }	-- May have implicit parameters
 	: 'where' binds			{ LL (unLoc $2) }
-	| {- empty -}			{ noLoc [] }
+	| {- empty -}			{ noLoc emptyLocalBinds }
 
 
 -----------------------------------------------------------------------------
@@ -1001,7 +1001,7 @@ exp10 :: { LHsExpr RdrName }
 	: '\\' aexp aexps opt_asig '->' exp	
 			{% checkPatterns ($2 : reverse $3) >>= \ ps -> 
 			   return (LL $ HsLam (mkMatchGroup [LL $ Match ps $4
-					    (GRHSs (unguardedRHS $6) []
+					    (GRHSs (unguardedRHS $6) emptyLocalBinds
 							)])) }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
 	| 'if' exp 'then' exp 'else' exp	{ LL $ HsIf $2 $4 $6 }

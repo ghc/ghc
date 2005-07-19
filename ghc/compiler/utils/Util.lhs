@@ -13,7 +13,7 @@ module Util (
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, filterOut,
 	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
-	isSingleton, only,
+	isSingleton, only, singleton,
 	notNull, snocView,
 
 	isIn, isn'tIn,
@@ -298,6 +298,9 @@ listLengthCmp = atLength atLen atEnd
 
   atLen []     = EQ
   atLen _      = GT
+
+singleton :: a -> [a]
+singleton x = [x]
 
 isSingleton :: [a] -> Bool
 isSingleton [x] = True

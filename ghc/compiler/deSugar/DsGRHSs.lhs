@@ -8,7 +8,7 @@ module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLet )
+import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), 
@@ -59,7 +59,7 @@ dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty
   = mappM (dsGRHS hs_ctx pats rhs_ty) grhss	`thenDs` \ match_results ->
     let 
 	match_result1 = foldr1 combineMatchResults match_results
-	match_result2 = adjustMatchResultDs (dsLet binds) match_result1
+	match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
 		-- NB: nested dsLet inside matchResult
     in
     returnDs match_result2
@@ -105,7 +105,7 @@ matchGuards (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty
 
 matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty
   = matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
-    returnDs (adjustMatchResultDs (dsLet binds) match_result)
+    returnDs (adjustMatchResultDs (dsLocalBinds binds) match_result)
 	-- NB the dsLet occurs inside the match_result
 	-- Reason: dsLet takes the body expression as its argument
 	--	   so we can't desugar the bindings without the

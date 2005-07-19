@@ -10,10 +10,10 @@ module ListSetOps (
 	-- Association lists
 	Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 	emptyAssoc, unitAssoc, mapAssoc, plusAssoc_C, extendAssoc_C,
-	mkLookupFun, assocElts,
+	mkLookupFun, findInList, assocElts,
 
 	-- Duplicate handling
-	hasNoDups, runs, removeDups, removeDupsEq, 
+	hasNoDups, runs, removeDups, findDupsEq, 
 	equivClasses, equivClassesByUniq
 
    ) where
@@ -24,7 +24,7 @@ import Outputable
 import Unique	( Unique )
 import UniqFM	( eltsUFM, emptyUFM, addToUFM_C )
 import Util	( isn'tIn, isIn, mapAccumR, sortLe )
-import List	( union )
+import List	( partition )
 \end{code}
 
 
@@ -125,6 +125,11 @@ mkLookupFun eq alist s
   = case [a | (s',a) <- alist, s' `eq` s] of
       []    -> Nothing
       (a:_) -> Just a
+
+findInList :: (a -> Bool) -> [a] -> Maybe a
+findInList p [] = Nothing
+findInList p (x:xs) | p x	= Just x
+		    | otherwise = findInList p xs
 \end{code}
 
 
@@ -195,16 +200,12 @@ removeDups cmp xs
     collect_dups dups_so_far [x]         = (dups_so_far,      x)
     collect_dups dups_so_far dups@(x:xs) = (dups:dups_so_far, x)
 
-removeDupsEq :: Eq a => [a] -> ([a], [[a]])
--- Same, but with only equality
--- It's worst case quadratic, but we only use it on short lists
-removeDupsEq [] = ([], [])
-removeDupsEq (x:xs) | x `elem` xs = (ys, (x : filter (== x) xs) : zs)
-				  where
-				    (ys,zs) = removeDupsEq (filter (/= x) xs)
-removeDupsEq (x:xs) | otherwise   = (x:ys, zs)
-				  where
-				    (ys,zs) = removeDupsEq xs
+findDupsEq :: (a->a->Bool) -> [a] -> [[a]]
+findDupsEq eq [] = []
+findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
+		     | otherwise   = (x:eq_xs) : findDupsEq eq neq_xs
+		     where
+		       (eq_xs, neq_xs) = partition (eq x) xs
 \end{code}
 
 

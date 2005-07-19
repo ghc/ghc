@@ -12,7 +12,7 @@ core expression with (hopefully) improved usage information.
 
 \begin{code}
 module OccurAnal (
-	occurAnalysePgm, occurAnalyseGlobalExpr
+	occurAnalysePgm, occurAnalyseExpr
     ) where
 
 #include "HsVersions.h"
@@ -64,11 +64,9 @@ occurAnalysePgm binds
 	   (bs_usage, binds')   = go env binds
 	   (final_usage, bind') = occAnalBind env bind bs_usage
 
-occurAnalyseGlobalExpr :: CoreExpr -> CoreExpr
-occurAnalyseGlobalExpr expr
-  = 	-- Top level expr, so no interesting free vars, and
-	-- discard occurence info returned
-    snd (occAnal initOccEnv expr)
+occurAnalyseExpr :: CoreExpr -> CoreExpr
+	-- Do occurrence analysis, and discard occurence info returned
+occurAnalyseExpr expr = snd (occAnal initOccEnv expr)
 \end{code}
 
 

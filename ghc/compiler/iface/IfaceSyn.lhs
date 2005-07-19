@@ -59,9 +59,7 @@ import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
 import OccName		( OccName, OccEnv, emptyOccEnv, 
 			  lookupOccEnv, extendOccEnv, parenSymOcc,
 			  OccSet, unionOccSets, unitOccSet )
-import Name		( Name, NamedThing(..), nameOccName, isExternalName,
-			  wiredInNameTyThing_maybe )
-import NameSet		( NameSet, elemNameSet )
+import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
@@ -562,11 +560,8 @@ instanceToIfaceInst ext_lhs ispec@(Instance { is_dfun = dfun_id, is_flag = oflag
 		ifInstTys = map do_rough mb_tcs,
 		ifInstOrph = orph }
   where
-    do_rough Nothing = Nothing
-    do_rough (Just n) | Just (ATyCon tc) <- wiredInNameTyThing_maybe n
-		      = Just (toIfaceTyCon ext_lhs tc)
-		      | otherwise   
-		      = Just (IfaceTc (ext_lhs n))
+    do_rough Nothing  = Nothing
+    do_rough (Just n) = Just (toIfaceTyCon_name ext_lhs n)
 
 --------------------------
 toIfaceIdInfo :: (Name -> IfaceExtName) -> IdInfo -> [IfaceInfoItem]

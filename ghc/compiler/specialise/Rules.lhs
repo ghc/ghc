@@ -17,7 +17,7 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
-import OccurAnal	( occurAnalyseGlobalExpr )
+import OccurAnal	( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, rulesRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX )
@@ -44,6 +44,7 @@ import Outputable
 import FastString
 import Maybe		( isJust )
 import Bag
+import Util		( singleton )
 import List		( isPrefixOf )
 \end{code}
 
@@ -176,9 +177,7 @@ unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
 
 extendRuleBase :: RuleBase -> CoreRule -> RuleBase
 extendRuleBase rule_base rule
-  = extendNameEnv_C add rule_base (ruleIdName rule) [rule]
-  where
-    add rules _ = rule : rules
+  = extendNameEnv_Acc (:) singleton rule_base (ruleIdName rule) rule
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs) 
@@ -303,7 +302,7 @@ matchRule is_active in_scope args rough_args
 					    `mkApps` tpl_vals
 					    `mkApps` leftovers)
   where
-    rule_fn = occurAnalyseGlobalExpr (mkLams tpl_vars rhs)
+    rule_fn = occurAnalyseExpr (mkLams tpl_vars rhs)
 	-- We could do this when putting things into the rulebase, I guess
 \end{code}
 

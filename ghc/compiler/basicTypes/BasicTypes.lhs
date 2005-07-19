@@ -22,7 +22,7 @@ module BasicTypes(
 
 	Fixity(..), FixityDirection(..),
 	defaultFixity, maxPrecedence, 
-	negateFixity,
+	negateFixity, funTyFixity,
 	compareFixity,
 
 	IPName(..), ipNameName, mapIPName,
@@ -155,11 +155,10 @@ instance Outputable FixityDirection where
 maxPrecedence = (9::Int)
 defaultFixity = Fixity maxPrecedence InfixL
 
-negateFixity :: Fixity
-negateFixity     = Fixity negatePrecedence InfixL  	-- Precedence of unary negate is wired in as infixl 6!
-
-negatePrecedence :: Int
-negatePrecedence = 6
+negateFixity, funTyFixity :: Fixity
+-- Wired-in fixities
+negateFixity = Fixity 6 InfixL 	-- Fixity of unary negate
+funTyFixity  = Fixity 0	InfixR	-- Fixity of '->'
 \end{code}
 
 Consider

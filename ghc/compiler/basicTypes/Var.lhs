@@ -19,15 +19,14 @@ module Var (
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
 	setIdName, setIdUnique, setIdType, setIdInfo, lazySetIdInfo, 
-	setIdExported, setIdNotExported, zapSpecPragmaId,
+	setIdExported, setIdNotExported, 
 
 	globalIdDetails, globaliseId, 
 
-	mkLocalId, mkExportedLocalId, mkSpecPragmaId,
-	mkGlobalId, 
+	mkLocalId, mkExportedLocalId, mkGlobalId, 
 
 	isTyVar, isTcTyVar, isId, isLocalVar, isLocalId,
-	isGlobalId, isExportedId, isSpecPragmaId,
+	isGlobalId, isExportedId, 
 	mustHaveLocalBinding
     ) where
 
@@ -91,9 +90,7 @@ data Var
 data LocalIdDetails 
   = NotExported	-- Not exported
   | Exported	-- Exported
-  | SpecPragma	-- Not exported, but not to be discarded either
-		-- It's unclean that this is so deeply built in
-  -- Exported and SpecPragma Ids are kept alive; 
+  -- Exported Ids are kept alive; 
   -- NotExported things may be discarded as dead code.
 \end{code}
 
@@ -225,11 +222,6 @@ setIdNotExported :: Id -> Id
 -- We can only do this to LocalIds
 setIdNotExported id = ASSERT( isLocalId id ) id { lclDetails = NotExported }
 
-zapSpecPragmaId :: Id -> Id
-zapSpecPragmaId id
-  | isSpecPragmaId id = id {lclDetails = NotExported}
-  | otherwise         = id
-
 globaliseId :: GlobalIdDetails -> Id -> Id
 -- If it's a local, make it global
 globaliseId details id = GlobalId { varName    = varName id,
@@ -287,16 +279,13 @@ mkLocalId name ty info = mk_local_id name ty NotExported info
 
 mkExportedLocalId :: Name -> Type -> IdInfo -> Id
 mkExportedLocalId name ty info = mk_local_id name ty Exported info
-
-mkSpecPragmaId :: Name -> Type -> IdInfo -> Id
-mkSpecPragmaId name ty info = mk_local_id name ty SpecPragma info
 \end{code}
 
 \begin{code}
-isTyVar, isTcTyVar			 :: Var -> Bool
-isId, isLocalVar, isLocalId    		 :: Var -> Bool
-isGlobalId, isExportedId, isSpecPragmaId :: Var -> Bool
-mustHaveLocalBinding			 :: Var -> Bool
+isTyVar, isTcTyVar	    :: Var -> Bool
+isId, isLocalVar, isLocalId :: Var -> Bool
+isGlobalId, isExportedId    :: Var -> Bool
+mustHaveLocalBinding	    :: Var -> Bool
 
 isTyVar (TyVar {})   = True
 isTyVar (TcTyVar {}) = True
@@ -333,12 +322,8 @@ isExportedId (GlobalId {}) = True
 isExportedId (LocalId {lclDetails = details}) 
   = case details of
 	Exported   -> True
-	SpecPragma -> True
 	other	   -> False
 isExportedId other = False
-
-isSpecPragmaId (LocalId {lclDetails = SpecPragma}) = True
-isSpecPragmaId other = False
 \end{code}
 
 \begin{code}

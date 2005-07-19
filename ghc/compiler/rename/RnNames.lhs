@@ -16,8 +16,8 @@ module RnNames (
 
 import DynFlags		( DynFlag(..), GhcMode(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
-			  ForeignDecl(..), HsGroup(..), HsBindGroup(..), 
-			  Sig(..), collectGroupBinders, tyClDeclNames 
+			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
+			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames 
 			)
 import RnEnv
 import IfaceEnv		( ifaceExportNames )
@@ -338,7 +338,7 @@ used for source code.
 
 \begin{code}
 getLocalDeclBinders :: TcGblEnv -> HsGroup RdrName -> RnM [Name]
-getLocalDeclBinders gbl_env (HsGroup {hs_valds = val_decls, 
+getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs, 
 				      hs_tyclds = tycl_decls, 
 				      hs_fords = foreign_decls })
   = do	{ tc_names_s <- mappM new_tc tycl_decls
@@ -354,9 +354,8 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = val_decls,
 
     new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name
 
-    sig_hs_bndrs = [nm | HsBindGroup _ lsigs _  <- val_decls, 
-			 L _ (Sig nm _) <- lsigs]
-    val_hs_bndrs = collectGroupBinders val_decls
+    sig_hs_bndrs = [nm | L _ (Sig nm _) <- val_sigs]
+    val_hs_bndrs = collectHsBindLocatedBinders val_decls
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 
     new_tc tc_decl 
@@ -735,7 +734,8 @@ gre_is_used used_names gre = gre_name gre `elemNameSet` used_names
 reportUnusedNames :: Maybe [Located (IE RdrName)] 	-- Export list
 		  -> TcGblEnv -> RnM ()
 reportUnusedNames export_decls gbl_env 
-  = do	{ warnUnusedTopBinds   unused_locals
+  = do	{ traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
+	; warnUnusedTopBinds   unused_locals
 	; warnUnusedModules    unused_imp_mods
 	; warnUnusedImports    unused_imports	
 	; warnDuplicateImports defined_and_used

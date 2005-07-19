@@ -4,14 +4,14 @@
 \section[DsExpr]{Matching expressions (Exprs)}
 
 \begin{code}
-module DsExpr ( dsExpr, dsLExpr, dsLet, dsLit ) where
+module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
 
 
 import Match		( matchWrapper, matchSimply, matchSinglePat )
 import MatchLit		( dsLit, dsOverLit )
-import DsBinds		( dsHsNestedBinds )
+import DsBinds		( dsLHsBinds )
 import DsGRHSs		( dsGuarded )
 import DsListComp	( dsListComp, dsPArrComp )
 import DsUtils		( mkErrorAppDs, mkStringExpr, mkConsExpr, mkNilExpr,
@@ -76,24 +76,34 @@ This must be transformed to a case expression and, if the type has
 more than one constructor, may fail.
 
 \begin{code}
-dsLet :: [HsBindGroup Id] -> CoreExpr -> DsM CoreExpr
-dsLet groups body = foldlDs dsBindGroup body (reverse groups)
+dsLocalBinds :: HsLocalBinds Id -> CoreExpr -> DsM CoreExpr
+dsLocalBinds EmptyLocalBinds	body = return body
+dsLocalBinds (HsValBinds binds) body = dsValBinds binds body
+dsLocalBinds (HsIPBinds binds)  body = dsIPBinds  binds body
 
-dsBindGroup :: CoreExpr -> HsBindGroup Id -> DsM CoreExpr
-dsBindGroup body (HsIPBinds binds)
-  = foldlDs dsIPBind body binds
+-------------------------
+dsValBinds :: HsValBinds Id -> CoreExpr -> DsM CoreExpr
+dsValBinds (ValBindsOut binds) body = foldrDs ds_val_bind body binds
+
+-------------------------
+dsIPBinds (IPBinds ip_binds dict_binds) body
+  = do	{ prs <- dsLHsBinds dict_binds
+	; let inner = foldr (\(x,r) e -> Let (NonRec x r) e) body prs 
+	; foldrDs ds_ip_bind inner ip_binds }
   where
-    dsIPBind body (L _ (IPBind n e))
-        = dsLExpr e	`thenDs` \ e' ->
-	  returnDs (Let (NonRec (ipNameName n) e') body)
+    ds_ip_bind (L _ (IPBind n e)) body
+      = dsLExpr e	`thenDs` \ e' ->
+	returnDs (Let (NonRec (ipNameName n) e') body)
 
+-------------------------
+ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
--- Silently ignore INLINE pragmas...
-dsBindGroup body bind@(HsBindGroup hsbinds sigs is_rec)
-  | [L _ (AbsBinds [] [] exports inlines binds)] <- bagToList hsbinds,
-    or [isUnLiftedType (idType g) | (_, g, l) <- exports]
+-- Silently ignore INLINE and SPECIALISE pragmas...
+ds_val_bind (is_rec, hsbinds) body
+  | [L _ (AbsBinds [] [] exports binds)] <- bagToList hsbinds,
+    or [isUnLiftedType (idType g) | (_, g, _, _) <- exports]
   = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
 	-- Unlifted bindings are always non-recursive
 	-- and are always a Fun or Pat monobind
@@ -102,32 +112,32 @@ dsBindGroup body bind@(HsBindGroup hsbinds sigs is_rec)
 	--       could be dict binds in the 'binds'.  (See the notes
 	--	 below.  Then pattern-match would fail.  Urk.)
     let
-      body_w_exports		   = foldr bind_export body exports
-      bind_export (tvs, g, l) body = ASSERT( null tvs )
-				     bindNonRec g (Var l) body
+      body_w_exports		      = foldr bind_export body exports
+      bind_export (tvs, g, l, _) body = ASSERT( null tvs )
+				        bindNonRec g (Var l) body
 
       mk_error_app pat = mkErrorAppDs iRREFUT_PAT_ERROR_ID
 				    (exprType body)
 				    (showSDoc (ppr pat))
     in
     case bagToList binds of
-      [L loc (FunBind (L _ fun) _ matches)]
+      [L loc (FunBind (L _ fun) _ matches _)]
 	-> putSrcSpanDs loc					$
 	   matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
-      [L loc (PatBind pat grhss ty)]
+      [L loc (PatBind pat grhss ty _)]
 	-> putSrcSpanDs loc			$
 	   dsGuarded grhss ty 			`thenDs` \ rhs ->
 	   mk_error_app pat			`thenDs` \ error_expr ->
 	   matchSimply rhs PatBindRhs pat body_w_exports error_expr
 
-      other -> pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
+      other -> pprPanic "dsLet: unlifted" (pprLHsBinds hsbinds $$ ppr body)
 
 -- Ordinary case for bindings
-dsBindGroup body (HsBindGroup binds sigs is_rec)
-  = dsHsNestedBinds binds	`thenDs` \ prs ->
+ds_val_bind (is_rec, binds) body
+  = dsLHsBinds binds	`thenDs` \ prs ->
     returnDs (Let (Rec prs) body)
 	-- Use a Rec regardless of is_rec. 
 	-- Why? Because it allows the binds to be all
@@ -263,7 +273,7 @@ dsExpr (HsCase discrim matches)
 
 dsExpr (HsLet binds body)
   = dsLExpr body		`thenDs` \ body' ->
-    dsLet binds body'
+    dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
@@ -589,7 +599,7 @@ dsDo stmts body result_ty
     
     go (LetStmt binds : stmts)
       = do { rest <- go stmts
-	   ; dsLet binds rest }
+	   ; dsLocalBinds binds rest }
         
     go (BindStmt pat rhs bind_op fail_op : stmts)
       = do { body  <- go stmts
@@ -644,7 +654,7 @@ dsMDo tbl stmts body result_ty
     
     go (LetStmt binds : stmts)
       = do { rest <- go stmts
-	   ; dsLet binds rest }
+	   ; dsLocalBinds binds rest }
 
     go (ExprStmt rhs _ rhs_ty : stmts)
       = do { rhs2 <- dsLExpr rhs
@@ -670,7 +680,7 @@ dsMDo tbl stmts body result_ty
 	go (new_bind_stmt : let_stmt : stmts)
       where
         new_bind_stmt = mkBindStmt (mk_tup_pat later_pats) mfix_app
-	let_stmt = LetStmt [HsBindGroup binds [] Recursive]
+	let_stmt = LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)]))
 
 	
 		-- Remove the later_ids that appear (without fancy coercions) 

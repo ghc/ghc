@@ -9,9 +9,9 @@ checker.
 \begin{code}
 module TcHsSyn (
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
-	mkHsTyLam, mkHsDictLam, mkHsLet, mkHsApp,
+	mkHsTyLam, mkHsDictLam, mkHsDictLet, mkHsApp,
 	hsLitType, hsPatType, mkHsAppTy, mkSimpleHsAlt,
-	nlHsIntLit, glueBindsOnGRHSs,
+	nlHsIntLit, 
 	
 
 	-- Coercions
@@ -252,30 +252,40 @@ zonkTopDecls binds rules fords
 	; return (zonkEnvIds env, binds', fords', rules') }
 
 ---------------------------------------------
-zonkGroup :: ZonkEnv -> HsBindGroup TcId -> TcM (ZonkEnv, HsBindGroup Id)
-zonkGroup env (HsBindGroup bs sigs is_rec)
-  = ASSERT( null sigs )
-    do  { (env1, bs') <- zonkRecMonoBinds env bs
-        ; return (env1, HsBindGroup bs' [] is_rec) }
- 
-zonkGroup env (HsIPBinds binds)
+zonkLocalBinds :: ZonkEnv -> HsLocalBinds TcId -> TcM (ZonkEnv, HsLocalBinds Id)
+zonkLocalBinds env EmptyLocalBinds
+  = return (env, EmptyLocalBinds)
+
+zonkLocalBinds env (HsValBinds binds)
+  = do	{ (env1, new_binds) <- zonkValBinds env binds
+	; return (env1, HsValBinds new_binds) }
+
+zonkLocalBinds env (HsIPBinds (IPBinds binds dict_binds))
   = mappM (wrapLocM zonk_ip_bind) binds	`thenM` \ new_binds ->
     let
 	env1 = extendZonkEnv env [ipNameName n | L _ (IPBind n _) <- new_binds]
     in
-    returnM (env1, HsIPBinds new_binds)
+    zonkRecMonoBinds env1 dict_binds 	`thenM` \ (env2, new_dict_binds) -> 
+    returnM (env2, HsIPBinds (IPBinds new_binds new_dict_binds))
   where
     zonk_ip_bind (IPBind n e)
 	= mapIPNameTc (zonkIdBndr env) n	`thenM` \ n' ->
 	  zonkLExpr env e			`thenM` \ e' ->
 	  returnM (IPBind n' e')
 
+
 ---------------------------------------------
-zonkNestedBinds :: ZonkEnv -> [HsBindGroup TcId] -> TcM (ZonkEnv, [HsBindGroup Id])
-zonkNestedBinds env []     = return (env, [])
-zonkNestedBinds env (b:bs) = do	{ (env1, b') <- zonkGroup env b
-				; (env2, bs') <- zonkNestedBinds env1 bs
-				; return (env2, b':bs') }
+zonkValBinds :: ZonkEnv -> HsValBinds TcId -> TcM (ZonkEnv, HsValBinds Id)
+zonkValBinds env bs@(ValBindsIn _ _) 
+  = panic "zonkValBinds"	-- Not in typechecker output
+zonkValBinds env (ValBindsOut binds) 
+  = do 	{ (env1, new_binds) <- go env binds
+	; return (env1, ValBindsOut new_binds) }
+  where
+    go env []         = return (env, [])
+    go env ((r,b):bs) = do { (env1, b')  <- zonkRecMonoBinds env b
+			   ; (env2, bs') <- go env1 bs
+			   ; return (env2, (r,b'):bs') }
 
 ---------------------------------------------
 zonkRecMonoBinds :: ZonkEnv -> LHsBinds TcId -> TcM (ZonkEnv, LHsBinds Id)
@@ -285,41 +295,42 @@ zonkRecMonoBinds env binds
         ; binds' <- zonkMonoBinds env1 binds
         ; return (env1, binds') })
 
+---------------------------------------------
 zonkMonoBinds :: ZonkEnv -> LHsBinds TcId -> TcM (LHsBinds Id)
 zonkMonoBinds env binds = mapBagM (wrapLocM (zonk_bind env)) binds
 
 zonk_bind :: ZonkEnv -> HsBind TcId -> TcM (HsBind Id)
-zonk_bind env (PatBind pat grhss ty)
+zonk_bind env (PatBind pat grhss ty fvs)
   = do	{ (_env, new_pat) <- zonkPat env pat		-- Env already extended
 	; new_grhss <- zonkGRHSs env grhss
 	; new_ty    <- zonkTcTypeToType env ty
-	; return (PatBind new_pat new_grhss new_ty) }
+	; return (PatBind new_pat new_grhss new_ty fvs) }
 
 zonk_bind env (VarBind var expr)
   = zonkIdBndr env var 			`thenM` \ new_var ->
     zonkLExpr env expr			`thenM` \ new_expr ->
     returnM (VarBind new_var new_expr)
 
-zonk_bind env (FunBind var inf ms)
+zonk_bind env (FunBind var inf ms fvs)
   = wrapLocM (zonkIdBndr env) var	`thenM` \ new_var ->
     zonkMatchGroup env ms		`thenM` \ new_ms ->
-    returnM (FunBind new_var inf new_ms)
+    returnM (FunBind new_var inf new_ms fvs)
 
-zonk_bind env (AbsBinds tyvars dicts exports inlines val_binds)
+zonk_bind env (AbsBinds tyvars dicts exports val_binds)
   = ASSERT( all isImmutableTyVar tyvars )
     zonkIdBndrs env dicts		`thenM` \ new_dicts ->
     fixM (\ ~(new_val_binds, _) ->
 	let
-	  env1 = extendZonkEnv (extendZonkEnv env new_dicts) 
-			       (collectHsBindBinders new_val_binds)
+	  env1 = extendZonkEnv env new_dicts
+	  env2 = extendZonkEnv env1 (collectHsBindBinders new_val_binds)
 	in
-	zonkMonoBinds env1 val_binds 		`thenM` \ new_val_binds ->
-        mappM (zonkExport env1) exports		`thenM` \ new_exports ->
+	zonkMonoBinds env2 val_binds 		`thenM` \ new_val_binds ->
+        mappM (zonkExport env2) exports		`thenM` \ new_exports ->
 	returnM (new_val_binds, new_exports)
     )						`thenM` \ (new_val_bind, new_exports) ->
-    returnM (AbsBinds tyvars new_dicts new_exports inlines new_val_bind)
+    returnM (AbsBinds tyvars new_dicts new_exports new_val_bind)
   where
-    zonkExport env (tyvars, global, local)
+    zonkExport env (tyvars, global, local, prags)
 	= zonkTcTyVars tyvars		`thenM` \ tys ->
 	  let
 		new_tyvars = map (tcGetTyVar "zonkExport") tys
@@ -327,7 +338,13 @@ zonk_bind env (AbsBinds tyvars dicts exports inlines val_binds)
 		-- but they should *be* tyvars.  Hence tcGetTyVar.
 	  in
 	  zonkIdBndr env global		`thenM` \ new_global ->
-	  returnM (new_tyvars, new_global, zonkIdOcc env local)
+	  mapM zonk_prag prags		`thenM` \ new_prags -> 
+	  returnM (new_tyvars, new_global, zonkIdOcc env local, new_prags)
+    zonk_prag prag@(InlinePrag _ _) = return prag
+    zonk_prag (SpecPrag expr ty ds) = do { expr' <- zonkExpr env expr 
+					 ; ty'   <- zonkTcTypeToType env ty
+					 ; let ds' = zonkIdOccs env ds
+					 ; return (SpecPrag expr' ty' ds') }
 \end{code}
 
 %************************************************************************
@@ -353,7 +370,7 @@ zonkMatch env (L loc (Match pats _ grhss))
 zonkGRHSs :: ZonkEnv -> GRHSs TcId -> TcM (GRHSs Id)
 
 zonkGRHSs env (GRHSs grhss binds)
-  = zonkNestedBinds env binds   	`thenM` \ (new_env, new_binds) ->
+  = zonkLocalBinds env binds   	`thenM` \ (new_env, new_binds) ->
     let
 	zonk_grhs (GRHS guarded rhs)
 	  = zonkStmts new_env guarded	`thenM` \ (env2, new_guarded) ->
@@ -451,7 +468,7 @@ zonkExpr env (HsIf e1 e2 e3)
     returnM (HsIf new_e1 new_e2 new_e3)
 
 zonkExpr env (HsLet binds expr)
-  = zonkNestedBinds env binds	`thenM` \ (new_env, new_binds) ->
+  = zonkLocalBinds env binds	`thenM` \ (new_env, new_binds) ->
     zonkLExpr new_env expr	`thenM` \ new_expr ->
     returnM (HsLet new_binds new_expr)
 
@@ -643,7 +660,7 @@ zonkStmt env (ExprStmt expr then_op ty)
     returnM (env, ExprStmt new_expr new_then new_ty)
 
 zonkStmt env (LetStmt binds)
-  = zonkNestedBinds env binds	`thenM` \ (env1, new_binds) ->
+  = zonkLocalBinds env binds	`thenM` \ (env1, new_binds) ->
     returnM (env1, LetStmt new_binds)
 
 zonkStmt env (BindStmt pat expr bind_op fail_op)

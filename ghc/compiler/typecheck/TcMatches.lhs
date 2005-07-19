@@ -20,7 +20,7 @@ import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
 			  Stmt(..), LStmt, HsMatchContext(..), HsStmtContext(..),
 			  LPat, pprMatch, isIrrefutableHsPat,
 			  pprMatchContext, pprStmtContext, pprMatchRhsContext,
-			  collectPatsBinders, glueBindsOnGRHSs, noSyntaxExpr
+			  collectPatsBinders, noSyntaxExpr
 			)
 import TcHsSyn		( ExprCoFn, isIdCoercion, (<$>), (<.>) )
 
@@ -34,7 +34,7 @@ import TcMType		( newTyFlexiVarTy, newTyFlexiVarTys, zonkTcType )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, mkFunTys,
 			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy, 
 			  liftedTypeKind, openTypeKind, mkFunTy, mkAppTy )
-import TcBinds		( tcBindsAndThen )
+import TcBinds		( tcLocalBinds )
 import TcUnify		( Expected(..), zapExpectedType, readExpectedType,
 			  unifyTauTy, subFunTys, unifyTyConApp,
 			  checkSigTyVarsWrt, zapExpectedBranches, tcSubExp, tcGen,
@@ -209,28 +209,33 @@ tcGRHSs :: TcMatchCtxt -> GRHSs Name
   -- This is a consequence of the fact that tcStmts takes a TcType,
   -- not a Expected TcType, a decision we could revisit if necessary
 tcGRHSs ctxt (GRHSs [L loc1 (GRHS [] rhs)] binds) exp_ty
-  = tcBindsAndThen glueBindsOnGRHSs binds 	$
-    mc_body ctxt rhs exp_ty			`thenM` \ rhs' ->
-    returnM (GRHSs [L loc1 (GRHS [] rhs')] [])
+  = do	{ (binds', rhs') <- tcLocalBinds binds 	$
+			    mc_body ctxt rhs exp_ty
+ 	; returnM (GRHSs [L loc1 (GRHS [] rhs')] binds') }
 
 tcGRHSs ctxt (GRHSs grhss binds) exp_ty
-  = tcBindsAndThen glueBindsOnGRHSs binds 	$
-    do	{ exp_ty' <- zapExpectedType exp_ty openTypeKind
-		-- Even if there is only one guard, we zap the RHS type to
-		-- a monotype.  Reason: it makes tcStmts much easier,
-		-- and even a one-armed guard has a notional second arm
+  = do	{ exp_ty' <- zapExpectedType exp_ty openTypeKind
+			-- Even if there is only one guard, we zap the RHS type to
+			-- a monotype.  Reason: it makes tcStmts much easier,
+			-- and even a one-armed guard has a notional second arm
 
-	; let match_ctxt = mc_what ctxt
-	      stmt_ctxt  = PatGuard match_ctxt
-	      tc_grhs (GRHS guards rhs)
-		= do  { (guards', rhs')
-			    <- tcStmts stmt_ctxt (tcGuardStmt exp_ty') guards $
-			       addErrCtxt (grhsCtxt match_ctxt rhs) $
-			       tcCheckRho rhs exp_ty'
-		      ; return (GRHS guards' rhs') }
+	; (binds', grhss') <- tcLocalBinds binds $
+			      mappM (wrapLocM (tcGRHS ctxt exp_ty')) grhss
 
-	; grhss' <- mappM (wrapLocM tc_grhs) grhss
-	; returnM (GRHSs grhss' []) }
+	; returnM (GRHSs grhss' binds') }
+
+-------------
+tcGRHS :: TcMatchCtxt -> TcRhoType
+	-> GRHS Name -> TcM (GRHS TcId)
+
+tcGRHS ctxt exp_ty' (GRHS guards rhs)
+  = do  { (guards', rhs') <- tcStmts stmt_ctxt (tcGuardStmt exp_ty') guards $
+			     addErrCtxt (grhsCtxt match_ctxt rhs) $
+			     tcCheckRho rhs exp_ty'
+	; return (GRHS guards' rhs') }
+  where
+    match_ctxt = mc_what ctxt
+    stmt_ctxt  = PatGuard match_ctxt
 \end{code}
 
 
@@ -386,13 +391,9 @@ tcStmts ctxt stmt_chk [] thing_inside
 
 -- LetStmts are handled uniformly, regardless of context
 tcStmts ctxt stmt_chk (L loc (LetStmt binds) : stmts) thing_inside
-  = tcBindsAndThen	-- No error context, but a binding group is
-  	glue_binds	-- rather a large thing for an error context anyway
-  	binds
-  	(tcStmts ctxt stmt_chk stmts thing_inside)
-  where
-    glue_binds binds (stmts, thing) = (L loc (LetStmt [binds]) : stmts, thing)
-
+  = do	{ (binds', (stmts',thing)) <- tcLocalBinds binds $
+				      tcStmts ctxt stmt_chk stmts thing_inside
+	; return (L loc (LetStmt binds') : stmts', thing) }
 
 -- For the vanilla case, handle the location-setting part
 tcStmts ctxt stmt_chk (L loc stmt : stmts) thing_inside

@@ -31,7 +31,7 @@ import TcUnify		( Expected(..), tcInfer, zapExpectedType, zapExpectedTo,
 import BasicTypes	( isMarkedStrict )
 import Inst		( tcOverloadedLit, newMethodFromName, newIPDict,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta, tcInstCall )
-import TcBinds		( tcBindsAndThen )
+import TcBinds		( tcLocalBinds )
 import TcEnv		( tcLookup, tcLookupId,
 			  tcLookupDataCon, tcLookupGlobalId
 			)
@@ -270,13 +270,10 @@ tcExpr in_expr@(OpApp arg1 op fix arg2) res_ty
 \end{code}
 
 \begin{code}
-tcExpr (HsLet binds (L loc expr)) res_ty
-  = tcBindsAndThen
-	glue
-	binds 			-- Bindings to check
-	(setSrcSpan loc $ tcExpr expr res_ty)
-  where
-    glue bind expr = HsLet [bind] (L loc expr)
+tcExpr (HsLet binds expr) res_ty
+  = do	{ (binds', expr') <- tcLocalBinds binds $
+			     tcMonoExpr expr res_ty   
+	; return (HsLet binds' expr') }
 
 tcExpr in_expr@(HsCase scrut matches) exp_ty
   =	-- We used to typecheck the case alternatives first.

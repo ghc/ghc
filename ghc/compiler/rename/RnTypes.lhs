@@ -4,11 +4,21 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnTypes ( rnHsType, rnLHsType, rnLHsTypes, rnContext,
-		 rnHsSigType, rnHsTypeFVs,
-		 rnLPat, rnPat, rnPatsAndThen,		-- Here because it's not part 
-		 rnLit, rnOverLit, 			-- of any mutual recursion	
-		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
+module RnTypes ( 
+	-- Type related stuff
+	rnHsType, rnLHsType, rnLHsTypes, rnContext,
+	rnHsSigType, rnHsTypeFVs,
+
+	-- Patterns and literals
+	rnLPat, rnPat, rnPatsAndThen,	-- Here because it's not part 
+	rnLit, rnOverLit, 		-- of any mutual recursion	
+
+	-- Precence related stuff
+	mkOpAppRn, mkNegAppRn, mkOpFormRn, 
+	checkPrecMatch, checkSectionPrec, 
+	
+	-- Error messages
+	dupFieldErr, patSigErr, checkTupSize
   ) where
 
 import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
@@ -20,7 +30,8 @@ import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name,
 			)
 import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  lookupLocatedOccRn, lookupLocatedBndrRn,
-			  lookupLocatedGlobalOccRn, bindTyVarsRn, lookupFixityRn,
+			  lookupLocatedGlobalOccRn, bindTyVarsRn, 
+			  lookupFixityRn, lookupTyFixityRn,
 			  mapFvRn, warnUnusedMatches,
 			  newIPNameRn, bindPatSigTyVarsFV, bindLocatedLocalsFV )
 import TcRnMonad
@@ -32,14 +43,14 @@ import PrelNames	( eqClassName, integralClassName, geName, eqName,
 import TypeRep		( funTyCon )
 import Constants	( mAX_TUPLE_SIZE )
 import Name		( Name )
-import SrcLoc		( SrcSpan, Located(..), unLoc, noLoc )
+import SrcLoc		( SrcSpan, Located(..), unLoc, noLoc, combineLocs )
 import NameSet
 
 import Literal		( inIntRange, inCharRange )
-import BasicTypes	( compareFixity, Fixity(..), FixityDirection(..) )
+import BasicTypes	( compareFixity, funTyFixity, negateFixity, compareFixity,
+			  Fixity(..), FixityDirection(..) )
 import ListSetOps	( removeDups )
 import Outputable
-import Monad		( when )
 
 #include "HsVersions.h"
 \end{code}
@@ -201,12 +212,21 @@ rnForAll doc exp forall_tyvars ctxt ty
 \end{code}
 
 
-%*********************************************************
-%*							*
-\subsection{Fixities}
-%*							*
-%*********************************************************
+%************************************************************************
+%*									*
+	Fixities and precedence parsing
+%*									*
+%************************************************************************
 
+@mkOpAppRn@ deals with operator fixities.  The argument expressions
+are assumed to be already correctly arranged.  It needs the fixities
+recorded in the OpApp nodes, because fixity info applies to the things
+the programmer actually wrote, so you can't find it out from the Name.
+
+Furthermore, the second argument is guaranteed not to be another
+operator application.  Why? Because the parser parses all
+operator appications left-associatively, EXCEPT negation, which
+we need to handle specially.
 Infix types are read in a *right-associative* way, so that
 	a `op` b `op` c
 is always read in as
@@ -254,15 +274,202 @@ mk_hs_op_ty mk1 pp_op1 fix1 ty1
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
----------------
-lookupTyFixityRn (L loc n)
-  = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
-    when (not glaExts) 
-    	(setSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
-    lookupFixityRn n
 
----------------
-funTyFixity = Fixity 0 InfixR	-- Fixity of '->'
+---------------------------
+mkOpAppRn :: LHsExpr Name			-- Left operand; already rearranged
+	  -> LHsExpr Name -> Fixity 		-- Operator and fixity
+	  -> LHsExpr Name			-- Right operand (not an OpApp, but might
+						-- be a NegApp)
+	  -> RnM (HsExpr Name)
+
+-- (e11 `op1` e12) `op2` e2
+mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
+  | nofix_error
+  = addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
+    returnM (OpApp e1 op2 fix2 e2)
+
+  | associate_right
+  = mkOpAppRn e12 op2 fix2 e2		`thenM` \ new_e ->
+    returnM (OpApp e11 op1 fix1 (L loc' new_e))
+  where
+    loc'= combineLocs e12 e2
+    (nofix_error, associate_right) = compareFixity fix1 fix2
+
+---------------------------
+--	(- neg_arg) `op` e2
+mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
+  | nofix_error
+  = addErr (precParseErr (pp_prefix_minus,negateFixity) (ppr_op op2,fix2))	`thenM_`
+    returnM (OpApp e1 op2 fix2 e2)
+
+  | associate_right
+  = mkOpAppRn neg_arg op2 fix2 e2	`thenM` \ new_e ->
+    returnM (NegApp (L loc' new_e) neg_name)
+  where
+    loc' = combineLocs neg_arg e2
+    (nofix_error, associate_right) = compareFixity negateFixity fix2
+
+---------------------------
+--	e1 `op` - neg_arg
+mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp neg_arg _))	-- NegApp can occur on the right
+  | not associate_right				-- We *want* right association
+  = addErr (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))	`thenM_`
+    returnM (OpApp e1 op1 fix1 e2)
+  where
+    (_, associate_right) = compareFixity fix1 negateFixity
+
+---------------------------
+--	Default case
+mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
+  = ASSERT2( right_op_ok fix (unLoc e2),
+	     ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
+    )
+    returnM (OpApp e1 op fix e2)
+
+-- Parser left-associates everything, but 
+-- derived instances may have correctly-associated things to
+-- in the right operarand.  So we just check that the right operand is OK
+right_op_ok fix1 (OpApp _ _ fix2 _)
+  = not error_please && associate_right
+  where
+    (error_please, associate_right) = compareFixity fix1 fix2
+right_op_ok fix1 other
+  = True
+
+-- Parser initially makes negation bind more tightly than any other operator
+-- And "deriving" code should respect this (use HsPar if not)
+mkNegAppRn :: LHsExpr id -> SyntaxExpr id -> RnM (HsExpr id)
+mkNegAppRn neg_arg neg_name
+  = ASSERT( not_op_app (unLoc neg_arg) )
+    returnM (NegApp neg_arg neg_name)
+
+not_op_app (OpApp _ _ _ _) = False
+not_op_app other	   = True
+
+---------------------------
+mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
+	  -> LHsExpr Name -> Fixity 	-- Operator and fixity
+	  -> LHsCmdTop Name		-- Right operand (not an infix)
+	  -> RnM (HsCmd Name)
+
+-- (e11 `op1` e12) `op2` e2
+mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _))
+	op2 fix2 a2
+  | nofix_error
+  = addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
+    returnM (HsArrForm op2 (Just fix2) [a1, a2])
+
+  | associate_right
+  = mkOpFormRn a12 op2 fix2 a2		`thenM` \ new_c ->
+    returnM (HsArrForm op1 (Just fix1)
+	[a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
+	-- TODO: locs are wrong
+  where
+    (nofix_error, associate_right) = compareFixity fix1 fix2
+
+--	Default case
+mkOpFormRn arg1 op fix arg2 			-- Default case, no rearrangment
+  = returnM (HsArrForm op (Just fix) [arg1, arg2])
+
+
+--------------------------------------
+mkConOpPatRn :: Located Name -> Fixity -> LPat Name -> LPat Name
+	     -> RnM (Pat Name)
+
+mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
+  = lookupFixityRn (unLoc op1)	`thenM` \ fix1 ->
+    let
+	(nofix_error, associate_right) = compareFixity fix1 fix2
+    in
+    if nofix_error then
+	addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
+	returnM (ConPatIn op2 (InfixCon p1 p2))
+    else 
+    if associate_right then
+	mkConOpPatRn op2 fix2 p12 p2		`thenM` \ new_p ->
+	returnM (ConPatIn op1 (InfixCon p11 (L loc new_p)))  -- XXX loc right?
+    else
+    returnM (ConPatIn op2 (InfixCon p1 p2))
+
+mkConOpPatRn op fix p1 p2 			-- Default case, no rearrangment
+  = ASSERT( not_op_pat (unLoc p2) )
+    returnM (ConPatIn op (InfixCon p1 p2))
+
+not_op_pat (ConPatIn _ (InfixCon _ _)) = False
+not_op_pat other   	               = True
+
+--------------------------------------
+checkPrecMatch :: Bool -> Name -> MatchGroup Name -> RnM ()
+	-- True indicates an infix lhs
+	-- See comments with rnExpr (OpApp ...) about "deriving"
+
+checkPrecMatch False fn match 
+  = returnM ()
+checkPrecMatch True op (MatchGroup ms _)	
+  = mapM_ check ms			 	
+  where
+    check (L _ (Match (p1:p2:_) _ _))
+      = checkPrec op (unLoc p1) False	`thenM_`
+        checkPrec op (unLoc p2) True
+
+    check _ = panic "checkPrecMatch"
+
+checkPrec op (ConPatIn op1 (InfixCon _ _)) right
+  = lookupFixityRn op		`thenM` \  op_fix@(Fixity op_prec  op_dir) ->
+    lookupFixityRn (unLoc op1)	`thenM` \ op1_fix@(Fixity op1_prec op1_dir) ->
+    let
+	inf_ok = op1_prec > op_prec || 
+	         (op1_prec == op_prec &&
+		  (op1_dir == InfixR && op_dir == InfixR && right ||
+		   op1_dir == InfixL && op_dir == InfixL && not right))
+
+	info  = (ppr_op op,  op_fix)
+	info1 = (ppr_op op1, op1_fix)
+	(infol, infor) = if right then (info, info1) else (info1, info)
+    in
+    checkErr inf_ok (precParseErr infol infor)
+
+checkPrec op pat right
+  = returnM ()
+
+-- Check precedence of (arg op) or (op arg) respectively
+-- If arg is itself an operator application, then either
+--   (a) its precedence must be higher than that of op
+--   (b) its precedency & associativity must be the same as that of op
+checkSectionPrec :: FixityDirection -> HsExpr RdrName
+	-> LHsExpr Name -> LHsExpr Name -> RnM ()
+checkSectionPrec direction section op arg
+  = case unLoc arg of
+	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
+	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
+	other		 -> returnM ()
+  where
+    L _ (HsVar op_name) = op
+    go_for_it pp_arg_op arg_fix@(Fixity arg_prec assoc)
+	= lookupFixityRn op_name	`thenM` \ op_fix@(Fixity op_prec _) ->
+	  checkErr (op_prec < arg_prec
+		     || op_prec == arg_prec && direction == assoc)
+		  (sectionPrecErr (ppr_op op_name, op_fix) 	
+		  (pp_arg_op, arg_fix) section)
+\end{code}
+
+Precedence-related error messages
+
+\begin{code}
+precParseErr op1 op2 
+  = hang (ptext SLIT("precedence parsing error"))
+      4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
+	       ppr_opfix op2,
+	       ptext SLIT("in the same infix expression")])
+
+sectionPrecErr op arg_op section
+ = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
+	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
+	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
+
+pp_prefix_minus = ptext SLIT("prefix `-'")
+ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
+ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 \end{code}
 
 %*********************************************************
@@ -462,33 +669,6 @@ rnRpats rpats
 	rnLPat pat			`thenM` \ (pat', fvs) ->
 	returnM ((fieldname, pat'), fvs `addOneFV` unLoc fieldname)
 
--- -----------------------------------------------------------------------------
--- mkConOpPatRn
-
-mkConOpPatRn :: Located Name -> Fixity -> LPat Name -> LPat Name
-	     -> RnM (Pat Name)
-
-mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
-  = lookupFixityRn (unLoc op1)	`thenM` \ fix1 ->
-    let
-	(nofix_error, associate_right) = compareFixity fix1 fix2
-    in
-    if nofix_error then
-	addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
-	returnM (ConPatIn op2 (InfixCon p1 p2))
-    else 
-    if associate_right then
-	mkConOpPatRn op2 fix2 p12 p2		`thenM` \ new_p ->
-	returnM (ConPatIn op1 (InfixCon p11 (L loc new_p)))  -- XXX loc right?
-    else
-    returnM (ConPatIn op2 (InfixCon p1 p2))
-
-mkConOpPatRn op fix p1 p2 			-- Default case, no rearrangment
-  = ASSERT( not_op_pat (unLoc p2) )
-    returnM (ConPatIn op (InfixCon p1 p2))
-
-not_op_pat (ConPatIn _ (InfixCon _ _)) = False
-not_op_pat other   	               = True
 \end{code}
 
 
@@ -566,21 +746,6 @@ forAllWarn doc ty (L loc tyvar)
 bogusCharError c
   = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
 
-precParseErr op1 op2 
-  = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
-	       ppr_opfix op2,
-	       ptext SLIT("in the same infix expression")])
-
-sectionPrecErr op arg_op section
- = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
-	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
-	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
-
-infixTyConWarn op
-  = vcat [ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op),
-	  ftext FSLIT("Use -fglasgow-exts to avoid this warning")]
-
 patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
 	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
@@ -589,7 +754,4 @@ dupFieldErr str dup
   = hsep [ptext SLIT("duplicate field name"), 
           quotes (ppr dup),
 	  ptext SLIT("in record"), text str]
-
-ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
-ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 \end{code}

@@ -20,7 +20,7 @@ import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 			  extendRuleBaseList, pprRuleBase, ruleCheckProgram,
 			  mkSpecInfo, addSpecInfo )
 import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
-import OccurAnal	( occurAnalysePgm, occurAnalyseGlobalExpr )
+import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
 			  setWorkerInfo, workerInfo,
 			  setSpecInfo, specInfo, specInfoRules )
@@ -311,8 +311,8 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- enforce that; it just simplifies the expression twice
 
 simplExprGently env expr
-  = simplExpr env (occurAnalyseGlobalExpr expr) 	`thenSmpl` \ expr1 ->
-    simplExpr env (occurAnalyseGlobalExpr expr1)
+  = simplExpr env (occurAnalyseExpr expr) 	`thenSmpl` \ expr1 ->
+    simplExpr env (occurAnalyseExpr expr1)
 \end{code}
 
 

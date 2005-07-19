@@ -99,9 +99,9 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
     (inst_method_ds, method_specs, method_inlines)
 	= foldr add3 (0,0,0) (map inst_info inst_decls)
 
-    count_bind (PatBind (L _ (VarPat n)) r _) = (1,0)
-    count_bind (PatBind p r _)                = (0,1)
-    count_bind (FunBind f _ m)                = (0,1)
+    count_bind (PatBind (L _ (VarPat n)) r _ _) = (1,0)
+    count_bind (PatBind p r _ _)                = (0,1)
+    count_bind (FunBind f _ m _)                = (0,1)
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 

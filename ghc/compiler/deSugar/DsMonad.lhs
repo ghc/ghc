@@ -5,10 +5,11 @@
 
 \begin{code}
 module DsMonad (
-	DsM, mappM,
-	initDs, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, foldlDs,
+	DsM, mappM, mapAndUnzipM,
+	initDs, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, 
+	foldlDs, foldrDs,
 
-	newTyVarsDs, 
+	newTyVarsDs, newLocalName,
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
 	newFailLocalDs,
 	getSrcSpanDs, putSrcSpanDs,
@@ -119,6 +120,7 @@ thenDs   = thenM
 returnDs = returnM
 listDs   = sequenceM
 foldlDs  = foldlM
+foldrDs  = foldrM
 mapAndUnzipDs = mapAndUnzipM
 
 
@@ -239,8 +241,10 @@ getSrcSpanDs = do { env <- getLclEnv; return (ds_loc env) }
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
 
-dsWarn :: DsWarning -> DsM ()
-dsWarn (loc,warn) = do { env <- getGblEnv; updMutVar (ds_warns env) (`snocBag` (loc,msg)) }
+dsWarn :: SDoc -> DsM ()
+dsWarn warn = do { env <- getGblEnv 
+		 ; loc <- getSrcSpanDs
+		 ; updMutVar (ds_warns env) (`snocBag` (loc,msg)) }
 	    where
 	      msg = ptext SLIT("Warning:") <+> warn
 \end{code}

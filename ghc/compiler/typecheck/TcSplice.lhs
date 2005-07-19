@@ -26,7 +26,7 @@ import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe, lookupImportedName )
 import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, lookupLocalRdrEnv, isSrcRdrName )
 import RnTypes		( rnLHsType )
 import TcExpr		( tcCheckRho, tcMonoExpr )
-import TcHsSyn		( mkHsLet, zonkTopLExpr )
+import TcHsSyn		( mkHsDictLet, zonkTopLExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, TcKind, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
@@ -252,7 +252,7 @@ tcTopSpliceExpr expr meta_ty
 	; const_binds <- tcSimplifyTop lie
 	
 	-- And zonk it
-	; zonkTopLExpr (mkHsLet const_binds expr') }
+	; zonkTopLExpr (mkHsDictLet const_binds expr') }
 \end{code}
 
 

@@ -56,8 +56,7 @@ import BasicTypes ( isBoxed )
 import Outputable
 import Bag	  ( bagToList )
 import FastString ( unpackFS )
-import ForeignCall ( Safety(..), ForeignCall(..), CCallConv(..),
-                     CCallTarget(..) )
+import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
 
 import Monad ( zipWithM )
 import List ( sortBy )
@@ -112,12 +111,12 @@ repTopDs group
 
 	
 	decls <- addBinds ss (do {
-			val_ds  <- mapM rep_bind_group (hs_valds group) ;
+			val_ds  <- rep_val_binds (hs_valds group) ;
 			tycl_ds <- mapM repTyClD (hs_tyclds group) ;
 			inst_ds <- mapM repInstD' (hs_instds group) ;
 			for_ds <- mapM repForD (hs_fords group) ;
 			-- more needed
-			return (de_loc $ sort_by_loc $ concat val_ds ++ catMaybes tycl_ds ++ inst_ds ++ for_ds) }) ;
+			return (de_loc $ sort_by_loc $ val_ds ++ catMaybes tycl_ds ++ inst_ds ++ for_ds) }) ;
 
 	decl_ty <- lookupType decQTyConName ;
 	let { core_list = coreList' decl_ty decls } ;
@@ -132,7 +131,7 @@ repTopDs group
 groupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
 			hs_fords = foreign_decls })
 -- Collect the binders of a Group
-  = collectGroupBinders val_decls ++
+  = collectHsValBinders val_decls ++
     [n | d <- tycl_decls, n <- tyClDeclNames (unLoc d)] ++
     [n | L _ (ForeignImport n _ _ _) <- foreign_decls]
 
@@ -205,16 +204,16 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
  		  cxt1   <- repLContext cxt ;
  		  sigs1  <- rep_sigs sigs ;
  		  binds1 <- rep_binds meth_binds ;
-          fds1 <- repLFunDeps fds;
+	          fds1 <- repLFunDeps fds;
  		  decls1 <- coreList decQTyConName (sigs1 ++ binds1) ;
 	          bndrs1 <- coreList nameTyConName bndrs ;
  		  repClass cxt1 cls1 bndrs1 fds1 decls1 } ;
     	return $ Just (loc, dec) }
 
 -- Un-handled cases
-repTyClD (L loc d) = do { dsWarn (loc, hang ds_msg 4 (ppr d)) ;
-	          	   return Nothing
-	     		 }
+repTyClD (L loc d) = putSrcSpanDs loc $
+		     do { dsWarn (hang ds_msg 4 (ppr d))
+			; return Nothing }
 
 -- represent fundeps
 --
@@ -298,10 +297,9 @@ repC (L loc (ConDecl con tvs (L cloc ctxt) details))
          }
        }
 repC (L loc con_decl)
-  = do	{ dsWarn (loc, hang ds_msg 4 (ppr con_decl))
+  = putSrcSpanDs loc $ 
+    do	{ dsWarn (hang ds_msg 4 (ppr con_decl))
 	; return (panic "DsMeta:repC") }
-
--- gaw 2004 FIX! Need a case for GadtDecl
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
 repBangTy ty= do 
@@ -677,38 +675,39 @@ repSts other = panic "Exotic Stmt in meta brackets"
 --			Bindings
 -----------------------------------------------------------
 
-repBinds :: [HsBindGroup Name] -> DsM ([GenSymBind], Core [TH.DecQ]) 
-repBinds decs
- = do	{ let { bndrs = map unLoc (collectGroupBinders decs) }
+repBinds :: HsLocalBinds Name -> DsM ([GenSymBind], Core [TH.DecQ]) 
+repBinds EmptyLocalBinds
+  = do	{ core_list <- coreList decQTyConName []
+	; return ([], core_list) }
+
+repBinds (HsIPBinds _)
+  = panic "DsMeta:repBinds: can't do implicit parameters"
+
+repBinds (HsValBinds decs)
+ = do	{ let { bndrs = map unLoc (collectHsValBinders decs) }
 		-- No need to worrry about detailed scopes within
 		-- the binding group, because we are talking Names
 		-- here, so we can safely treat it as a mutually 
 		-- recursive group
 	; ss        <- mkGenSyms bndrs
-	; core      <- addBinds ss (rep_bind_groups decs)
-	; core_list <- coreList decQTyConName core 
+	; prs       <- addBinds ss (rep_val_binds decs)
+	; core_list <- coreList decQTyConName 
+				(de_loc (sort_by_loc prs))
 	; return (ss, core_list) }
 
-rep_bind_groups :: [HsBindGroup Name] -> DsM [Core TH.DecQ]
+rep_val_binds :: HsValBinds Name -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are alrady in the meta-env
-rep_bind_groups binds = do 
-  locs_cores_s <- mapM rep_bind_group binds
-  return $ de_loc $ sort_by_loc (concat locs_cores_s)
-
-rep_bind_group :: HsBindGroup Name -> DsM [(SrcSpan, Core TH.DecQ)]
--- Assumes: all the binders of the binding are alrady in the meta-env
-rep_bind_group (HsBindGroup bs sigs _)
- = do { core1 <- mapM rep_bind (bagToList bs)
+rep_val_binds (ValBindsIn binds sigs)
+ = do { core1 <- rep_binds' binds
       ;	core2 <- rep_sigs' sigs
       ;	return (core1 ++ core2) }
-rep_bind_group (HsIPBinds _)
-  = panic "DsMeta:repBinds: can't do implicit parameters"
 
 rep_binds :: LHsBinds Name -> DsM [Core TH.DecQ]
--- Assumes: all the binders of the binding are alrady in the meta-env
-rep_binds binds = do 
-  locs_cores <- mapM rep_bind (bagToList binds)
-  return $ de_loc $ sort_by_loc locs_cores
+rep_binds binds = do { binds_w_locs <- rep_binds' binds
+		     ; return (de_loc (sort_by_loc binds_w_locs)) }
+
+rep_binds' :: LHsBinds Name -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_binds' binds = mapM rep_bind (bagToList binds)
 
 rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- Assumes: all the binders of the binding are alrady in the meta-env
@@ -716,7 +715,7 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- Note GHC treats declarations of a variable (not a pattern) 
 -- e.g.  x = g 5 as a Fun MonoBinds. This is indicated by a single match 
 -- with an empty list of patterns
-rep_bind (L loc (FunBind fn infx (MatchGroup [L _ (Match [] ty (GRHSs guards wheres))] _)))
+rep_bind (L loc (FunBind fn infx (MatchGroup [L _ (Match [] ty (GRHSs guards wheres))] _) _))
  = do { (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
 	; fn'  <- lookupLBinder fn
@@ -725,13 +724,13 @@ rep_bind (L loc (FunBind fn infx (MatchGroup [L _ (Match [] ty (GRHSs guards whe
 	; ans' <- wrapGenSyns ss ans
 	; return (loc, ans') }
 
-rep_bind (L loc (FunBind fn infx (MatchGroup ms _)))
+rep_bind (L loc (FunBind fn infx (MatchGroup ms _) _))
  =   do { ms1 <- mapM repClauseTup ms
 	; fn' <- lookupLBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (loc, ans) }
 
-rep_bind (L loc (PatBind pat (GRHSs guards wheres) ty2))
+rep_bind (L loc (PatBind pat (GRHSs guards wheres) ty2 _))
  =   do { patcore <- repLP pat 
         ; (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
@@ -773,7 +772,7 @@ rep_bind (L loc (VarBind v e))
 -- (\ p1 .. pn -> exp) by causing an error.  
 
 repLambda :: LMatch Name -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [] e)] [])))
+repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [] e)] EmptyLocalBinds)))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (

@@ -89,7 +89,7 @@ module GHC (
 	-- ** Identifiers
 	Id, idType,
 	isImplicitId, isDeadBinder,
-	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
+	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector,
 	isPrimOpId, isFCallId, isClassOpId_maybe,
 	isDataConWorkId, idDataCon,
@@ -176,7 +176,7 @@ import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
 #endif
 
-import Packages		( PackageIdH(..), initPackages )
+import Packages		( initPackages )
 import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, 
 			  globalRdrEnvElts )
@@ -185,7 +185,7 @@ import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
 			  pprThetaArrow, pprParendType, splitForAllTys,
 			  funResultTy )
 import Id		( Id, idType, isImplicitId, isDeadBinder,
-                          isSpecPragmaId, isExportedId, isLocalId, isGlobalId,
+                          isExportedId, isLocalId, isGlobalId,
                           isRecordSelector, recordSelectorFieldLabel,
                           isPrimOpId, isFCallId, isClassOpId_maybe,
                           isDataConWorkId, idDataCon,
@@ -235,7 +235,6 @@ import FastString	( mkFastString )
 import Directory        ( getModificationTime, doesFileExist )
 import Maybe		( isJust, isNothing, fromJust )
 import Maybes		( orElse, expectJust, mapCatMaybes )
-import qualified Maybes (MaybeErr(..))
 import List		( partition, nub )
 import qualified List
 import Monad		( unless, when )

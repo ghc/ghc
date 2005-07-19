@@ -11,7 +11,7 @@ module RnEnv (
 	lookupLocatedOccRn, lookupOccRn, 
 	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
 	lookupLocalDataTcNames, lookupSrcOcc_maybe,
-	lookupFixityRn, lookupLocatedSigOccRn, 
+	lookupFixityRn, lookupTyFixityRn, lookupLocatedSigOccRn, 
 	lookupLocatedInstDeclBndr,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
 
@@ -47,7 +47,7 @@ import RdrName		( RdrName, rdrNameModule, isQual, isUnqual, isOrig,
 			)
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
-import Name		( Name, nameIsLocalOrFrom, mkInternalName, 
+import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameOccName, nameModule, nameParent, isExternalName )
 import NameSet
 import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
@@ -61,6 +61,7 @@ import Outputable
 import Util		( sortLe )
 import ListSetOps	( removeDups )
 import List		( nubBy )
+import Monad		( when )
 import DynFlags
 \end{code}
 
@@ -439,6 +440,15 @@ lookupFixityRn name
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 
+---------------
+lookupTyFixityRn :: Located Name -> RnM Fixity
+lookupTyFixityRn (L loc n)
+  = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
+    when (not glaExts) 
+    	 (setSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
+    lookupFixityRn n
+
+---------------
 dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type
 -- constructor.  This is useful when we aren't sure which we are
@@ -632,32 +642,15 @@ bindPatSigTyVarsFV tys thing_inside
     thing_inside		`thenM` \ (result,fvs) ->
     returnM (result, fvs `delListFromNameSet` tvs)
 
-bindSigTyVarsFV :: [LSig Name]
+bindSigTyVarsFV :: [Name]
 		-> RnM (a, FreeVars)
 	  	-> RnM (a, FreeVars)
--- Bind the top-level forall'd type variables in the sigs.
--- E.g 	f :: a -> a
---	f = rhs
---	The 'a' scopes over the rhs
---
--- NB: there'll usually be just one (for a function binding)
---     but if there are many, one may shadow the rest; too bad!
---	e.g  x :: [a] -> [a]
---	     y :: [(a,a)] -> a
---	     (x,y) = e
---      In e, 'a' will be in scope, and it'll be the one from 'y'!
-bindSigTyVarsFV sigs thing_inside
+bindSigTyVarsFV tvs thing_inside
   = do	{ scoped_tyvars <- doptM Opt_ScopedTypeVariables
 	; if not scoped_tyvars then 
 		thing_inside 
 	  else
 		bindLocalNamesFV tvs thing_inside }
-  where
-    tvs = [ hsLTyVarName ltv 
-	  | L _ (Sig _ (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs, ltv <- ltvs ]
-	-- Note the pattern-match on "Explicit"; we only bind
-	-- type variables from signatures with an explicit top-level for-all
-				
 
 extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 	-- This function is used only in rnSourceDecl on InstDecl
@@ -739,7 +732,11 @@ warnUnusedLocals names
 
 warnUnusedBinds :: [(Name,Maybe Provenance)] -> RnM ()
 warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
- where reportable (name,_) = reportIfUnused (nameOccName name)
+ where reportable (name,_) 
+	| isWiredInName name = False	-- Don't report unused wired-in names
+					-- Otherwise we get a zillion warnings
+					-- from Data.Tuple
+	| otherwise = reportIfUnused (nameOccName name)
 
 -------------------------
 
@@ -801,4 +798,8 @@ dupNamesErr descriptor located_names
     locations | one_line  = empty 
 	      | otherwise = ptext SLIT("Bound at:") <+> 
 			    vcat (map ppr (sortLe (<=) locs))
+
+infixTyConWarn op
+  = vcat [ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op),
+	  ftext FSLIT("Use -fglasgow-exts to avoid this warning")]
 \end{code}

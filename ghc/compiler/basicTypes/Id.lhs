@@ -8,7 +8,7 @@ module Id (
 	Id, DictId,
 
 	-- Simple construction
-	mkGlobalId, mkLocalId, mkSpecPragmaId, mkLocalIdWithInfo, 
+	mkGlobalId, mkLocalId, mkLocalIdWithInfo, 
 	mkSysLocal, mkSysLocalUnencoded, mkUserLocal, mkVanillaGlobal,
 	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
 	mkWorkerId, mkExportedLocalId,
@@ -24,8 +24,8 @@ module Id (
 	zapLamIdInfo, zapDemandIdInfo, 
 
 	-- Predicates
-	isImplicitId, isDeadBinder,
-	isSpecPragmaId,	isExportedId, isLocalId, isGlobalId,
+	isImplicitId, isDeadBinder, isDictId,
+	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector,
 	isClassOpId_maybe,
 	isPrimOpId, isPrimOpId_maybe, 
@@ -83,7 +83,7 @@ module Id (
 import CoreSyn		( Unfolding, CoreRule )
 import BasicTypes	( Arity )
 import Var		( Id, DictId,
-			  isId, isExportedId, isSpecPragmaId, isLocalId,
+			  isId, isExportedId, isLocalId,
 			  idName, idType, idUnique, idInfo, isGlobalId,
 			  setIdName, setIdType, setIdUnique, 
 			  setIdExported, setIdNotExported,
@@ -91,10 +91,11 @@ import Var		( Id, DictId,
 			  maybeModifyIdInfo,
 			  globalIdDetails
 			)
-import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId, mkExportedLocalId )
+import qualified Var	( mkLocalId, mkGlobalId, mkExportedLocalId )
 import TyCon		( FieldLabel, TyCon )
 import Type		( Type, typePrimRep, addFreeTyVars, seqType, 
 			  splitTyConApp_maybe, PrimRep )
+import TcType		( isDictTy )
 import TysPrim		( statePrimTyCon )
 import IdInfo 
 
@@ -146,9 +147,6 @@ where it can easily be found.
 \begin{code}
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name ty info = Var.mkLocalId name (addFreeTyVars ty) info
-
-mkSpecPragmaId :: Name -> Type -> Id
-mkSpecPragmaId name ty = Var.mkSpecPragmaId name (addFreeTyVars ty) vanillaIdInfo
 
 mkExportedLocalId :: Name -> Type -> Id
 mkExportedLocalId name ty = Var.mkExportedLocalId name (addFreeTyVars ty) vanillaIdInfo
@@ -229,17 +227,6 @@ idPrimRep id = typePrimRep (idType id)
 %*									*
 %************************************************************************
 
-The @SpecPragmaId@ exists only to make Ids that are
-on the *LHS* of bindings created by SPECIALISE pragmas; 
-eg:		s = f Int d
-The SpecPragmaId is never itself mentioned; it
-exists solely so that the specialiser will find
-the call to f, and make specialised version of it.
-The SpecPragmaId binding is discarded by the specialiser
-when it gathers up overloaded calls.
-Meanwhile, it is not discarded as dead code.
-
-
 \begin{code}
 recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
 recordSelectorFieldLabel id = case globalIdDetails id of
@@ -277,6 +264,9 @@ isDataConWorkId id = case globalIdDetails id of
 isDataConWorkId_maybe id = case globalIdDetails id of
 			  DataConWorkId con -> Just con
 			  other	            -> Nothing
+
+isDictId :: Id -> Bool
+isDictId id = isDictTy (idType id)
 
 idDataCon :: Id -> DataCon
 -- Get from either the worker or the wrapper to the DataCon

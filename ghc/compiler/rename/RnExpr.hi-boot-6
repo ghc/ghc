@@ -1,0 +1,11 @@
+module RnExpr where
+
+rnLExpr :: HsExpr.LHsExpr RdrName.RdrName
+	-> TcRnTypes.RnM (HsExpr.LHsExpr Name.Name, NameSet.FreeVars)
+
+rnStmts :: forall thing.
+	   HsExpr.HsStmtContext Name.Name -> [HsExpr.LStmt RdrName.RdrName] 
+	-> TcRnTypes.RnM (thing, NameSet.FreeVars)
+	-> TcRnTypes.RnM (([HsExpr.LStmt Name.Name], thing), NameSet.FreeVars)
+
+

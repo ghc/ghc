@@ -64,7 +64,7 @@ import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, mkInternalName, nameIsLocalOrFrom )
+import Name		( Name, NamedThing(..), getSrcLoc, nameIsLocalOrFrom )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( extendTypeEnvList, lookupType,
@@ -486,40 +486,6 @@ tcMetaTy tc_name
 
 %************************************************************************
 %*									*
-\subsection{Making new Ids}
-%*									*
-%************************************************************************
-
-Constructing new Ids
-
-\begin{code}
-newLocalName :: Name -> TcM Name
-newLocalName name	-- Make a clone
-  = newUnique		`thenM` \ uniq ->
-    returnM (mkInternalName uniq (getOccName name) (getSrcLoc name))
-\end{code}
-
-Make a name for the dict fun for an instance decl.  It's an *external*
-name, like otber top-level names, and hence must be made with newGlobalBinder.
-
-\begin{code}
-newDFunName :: Class -> [Type] -> SrcLoc -> TcM Name
-newDFunName clas (ty:_) loc
-  = do	{ index   <- nextDFunIndex
-	; is_boot <- tcIsHsBoot
-	; mod     <- getModule
-	; let info_string = occNameString (getOccName clas) ++ 
-			    occNameString (getDFunTyKey ty)
-	      dfun_occ = mkDFunOcc info_string is_boot index
-
-	; newGlobalBinder mod dfun_occ Nothing loc }
-
-newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{The InstInfo type}
 %*									*
 %************************************************************************
@@ -574,6 +540,24 @@ simpleInstInfoTyCon :: InstInfo -> TyCon
   -- Gets the type constructor for a simple instance declaration,
   -- i.e. one of the form 	instance (...) => C (T a b c) where ...
 simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
+\end{code}
+
+Make a name for the dict fun for an instance decl.  It's an *external*
+name, like otber top-level names, and hence must be made with newGlobalBinder.
+
+\begin{code}
+newDFunName :: Class -> [Type] -> SrcLoc -> TcM Name
+newDFunName clas (ty:_) loc
+  = do	{ index   <- nextDFunIndex
+	; is_boot <- tcIsHsBoot
+	; mod     <- getModule
+	; let info_string = occNameString (getOccName clas) ++ 
+			    occNameString (getDFunTyKey ty)
+	      dfun_occ = mkDFunOcc info_string is_boot index
+
+	; newGlobalBinder mod dfun_occ Nothing loc }
+
+newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \end{code}
 
 

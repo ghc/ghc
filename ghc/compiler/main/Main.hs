@@ -29,7 +29,7 @@ import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
 -- Various other random stuff that we need
 import Config		( cProjectVersion, cBooterVersion, cProjectName )
 import Packages		( dumpPackages, initPackages )
-import DriverPhases	( Phase(..), isSourceSuffix, isSourceFilename, anyHsc,
+import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
 import StaticFlags	( staticFlags, v_Ld_inputs )
 import BasicTypes	( failed )
@@ -39,7 +39,7 @@ import Panic
 -- Standard Haskell libraries
 import EXCEPTION	( throwDyn )
 import IO
-import Directory	( doesFileExist, doesDirectoryExist )
+import Directory	( doesDirectoryExist )
 import System		( getArgs, exitWith, ExitCode(..) )
 import Monad
 import List

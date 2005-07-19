@@ -13,21 +13,20 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 #include "HsVersions.h"
 
 import HsSyn
-import BasicTypes	( RecFlag(..) )
 import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupTopBndrRn, lookupImportedName )
 import Inst		( instToId, newDicts, newDictsAtLoc, newMethod, getOverlapFlag )
 import InstEnv		( mkLocalInstance )
-import TcEnv		( tcLookupLocatedClass, tcExtendIdEnv2, 
+import TcEnv		( tcLookupLocatedClass, 
 			  tcExtendTyVarEnv, 
 			  InstInfo(..), pprInstInfoDetails,
 			  simpleInstInfoTyCon, simpleInstInfoTy,
 			  InstBindings(..), newDFunName
 			)
-import TcBinds		( tcMonoBinds, tcSpecSigs )
+import TcBinds		( TcPragFun, tcMonoBinds, tcPrags, mkPragFun )
 import TcHsType		( TcSigInfo(..), tcHsKindedType, tcHsSigType )
-import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
+import TcSimplify	( tcSimplifyCheck )
 import TcUnify		( checkSigTyVars, sigCtxt )
 import TcMType		( tcSkolSigTyVars, UserTypeCtxt( GenPatCtxt ), tcSkolType )
 import TcType		( Type, SkolemInfo(ClsSkol, InstSkol, SigSkol), 
@@ -44,10 +43,10 @@ import Class		( classTyVars, classBigSig,
 import TyCon		( TyCon, tyConName, tyConHasGenerics )
 import Type		( substTyWith )
 import MkId		( mkDefaultMethodId, mkDictFunId )
-import Id		( Id, idType, idName, mkUserLocal, setInlinePragma )
+import Id		( Id, idType, idName, mkUserLocal )
 import Name		( Name, NamedThing(..) )
 import NameEnv		( NameEnv, lookupNameEnv, mkNameEnv )
-import NameSet		( emptyNameSet, unitNameSet, nameSetToList )
+import NameSet		( nameSetToList )
 import OccName		( reportIfUnused, mkDefaultMethodOcc )
 import RdrName		( RdrName, mkDerivedRdrName )
 import Outputable
@@ -132,7 +131,7 @@ checkDefaultBinds clas ops binds
   = do dm_infos <- mapM (addLocM (checkDefaultBind clas ops)) (bagToList binds)
        return (mkNameEnv dm_infos)
 
-checkDefaultBind clas ops (FunBind (L _ op) _ (MatchGroup matches _))
+checkDefaultBind clas ops (FunBind (L _ op) _ (MatchGroup matches _) _)
   = do {  	-- Check that the op is from this class
 	checkTc (op `elem` ops) (badMethodErr clas op)
 
@@ -246,8 +245,8 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	-- default methods.  Better to make separate AbsBinds for each
     let
 	(tyvars, _, _, op_items) = classBigSig clas
-	prags 			 = filter isPragLSig sigs
-	tc_dm			 = tcDefMeth clas tyvars default_binds prags
+	prag_fn			 = mkPragFun sigs
+	tc_dm			 = tcDefMeth clas tyvars default_binds prag_fn
 
 	dm_sel_ids		 = [sel_id | (sel_id, DefMeth) <- op_items]
 	-- Generate code for polymorphic default methods only
@@ -260,7 +259,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
     mapAndUnzipM tc_dm dm_sel_ids	`thenM` \ (defm_binds, dm_ids_s) ->
     returnM (listToBag defm_binds, concat dm_ids_s)
     
-tcDefMeth clas tyvars binds_in prags sel_id
+tcDefMeth clas tyvars binds_in prag_fn sel_id
   = do	{ dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_id)
 	; let	rigid_info  = ClsSkol clas
 		clas_tyvars = tcSkolSigTyVars rigid_info tyvars
@@ -273,7 +272,7 @@ tcDefMeth clas tyvars binds_in prags sel_id
 	; (_, meth_info) <- mkMethodBind origin clas inst_tys binds_in (sel_id, DefMeth)
 	; [this_dict] <- newDicts origin theta
 	; (defm_bind, insts_needed) <- getLIE (tcMethodBind clas_tyvars theta 
-							    [this_dict] prags meth_info)
+							    [this_dict] prag_fn meth_info)
     
 	; addErrCtxt (defltMethCtxt clas) $ do
     
@@ -292,8 +291,8 @@ tcDefMeth clas tyvars binds_in prags sel_id
 	        full_bind = AbsBinds
 		    		    clas_tyvars
 		    		    [instToId this_dict]
-		    		    [(clas_tyvars, local_dm_id, dm_inst_id)]
-		    		    emptyNameSet	-- No inlines (yet)
+		    		    [(clas_tyvars, local_dm_id, dm_inst_id, [])]
+			    		    -- No inlines (yet)
 		    		    (dict_binds `unionBags` defm_bind)
 	; returnM (noLoc full_bind, [local_dm_id]) }}
 
@@ -328,11 +327,11 @@ tcMethodBind
 	-> TcThetaType		-- Available theta; it's just used for the error message
 	-> [Inst]		-- Available from context, used to simplify constraints 
 				-- 	from the method body
-	-> [LSig Name]		-- Pragmas (e.g. inline pragmas)
+	-> TcPragFun		-- Pragmas (e.g. inline pragmas)
 	-> MethodSpec		-- Details of this method
 	-> TcM (LHsBinds Id)
 
-tcMethodBind inst_tyvars inst_theta avail_insts prags
+tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
 	     (sel_id, meth_id, meth_bind)
   = recoverM (returnM emptyLHsBinds) $
 	-- If anything fails, recover returning no bindings.
@@ -357,8 +356,8 @@ tcMethodBind inst_tyvars inst_theta avail_insts prags
     tcExtendTyVarEnv inst_tyvars (
 	addErrCtxt (methodCtxt sel_id)			$
 	getLIE 						$
-	tcMonoBinds (unitBag meth_bind) lookup_sig NonRecursive
-    )							`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
+	tcMonoBinds [meth_bind] lookup_sig True
+    )					`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
 
 	-- Now do context reduction.   We simplify wrt both the local tyvars
 	-- and the ones of the class/instance decl, so that there is
@@ -374,6 +373,7 @@ tcMethodBind inst_tyvars inst_theta avail_insts prags
 	meth_tvs   = sig_tvs meth_sig
 	all_tyvars = meth_tvs ++ inst_tyvars
 	all_insts  = avail_insts ++ meth_dicts
+	sel_name   = idName sel_id
     in
     tcSimplifyCheck
 	 (ptext SLIT("class or instance method") <+> quotes (ppr sel_id))
@@ -381,43 +381,15 @@ tcMethodBind inst_tyvars inst_theta avail_insts prags
 
     checkSigTyVars all_tyvars			`thenM_`
 
+    tcPrags meth_id (prag_fn sel_name)		`thenM` \ prags -> 
     let
-	sel_name = idName sel_id
-	inline_prags  = [ (is_inl, phase)
-		        | L _ (InlineSig is_inl (L _ name) phase) <- prags, 
-		          name == sel_name ]
-	spec_prags = [ prag 
-		     | prag@(L _ (SpecSig (L _ name) _)) <- prags, 
-		       name == sel_name]
-	
-		-- Attach inline pragmas as appropriate
-	(final_meth_id, inlines) 
-	   | ((is_inline, phase) : _) <- inline_prags
-	   = (meth_id `setInlinePragma` phase,
-	      if is_inline then unitNameSet (idName meth_id) else emptyNameSet)
-	   | otherwise
-	   = (meth_id, emptyNameSet)
-
 	[(_,_,local_meth_id)] = mono_bind_infos
 	poly_meth_bind = noLoc $ AbsBinds meth_tvs
 				  (map instToId meth_dicts)
-     				  [(meth_tvs, final_meth_id, local_meth_id)]
-				  inlines
+     				  [(meth_tvs, meth_id, local_meth_id, prags)]
 				  (lie_binds `unionBags` meth_bind)
-
     in
-	-- Deal with specialisation pragmas
-	-- The sel_name is what appears in the pragma
-    tcExtendIdEnv2 [(sel_name, final_meth_id)] (
-	getLIE (tcSpecSigs spec_prags)			`thenM` \ (spec_binds1, prag_lie) ->
-     
-	     -- The prag_lie for a SPECIALISE pragma will mention the function itself, 
-	     -- so we have to simplify them away right now lest they float outwards!
-	bindInstsOfLocalFuns prag_lie [final_meth_id]	`thenM` \ spec_binds2 ->
-	returnM (spec_binds1 `unionBags` spec_binds2)
-    )							`thenM` \ spec_binds ->
-
-    returnM (poly_meth_bind `consBag` spec_binds)
+    returnM (unitBag poly_meth_bind)
 
 
 mkMethodBind :: InstOrigin
@@ -443,7 +415,8 @@ mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
 	   mkDefMethRhs origin clas inst_tys sel_id loc dm_info	`thenM` \ rhs ->
 		-- Not infix decl
 	   returnM (noLoc $ FunBind (noLoc meth_name) False
-		            	    (mkMatchGroup [mkSimpleMatch [] rhs]))
+		            	    (mkMatchGroup [mkSimpleMatch [] rhs]) 
+				    placeHolderNames)
     )						`thenM` \ meth_bind ->
 
     returnM (mb_inst, (sel_id, meth_id, meth_bind))
@@ -582,8 +555,8 @@ isInstDecl (SigOrigin (ClsSkol _))  = False
 find_bind sel_name meth_name binds
   = foldlBag seqMaybe Nothing (mapBag f binds)
   where 
-	f (L loc1 (FunBind (L loc2 op_name) fix matches)) | op_name == sel_name
-		= Just (L loc1 (FunBind (L loc2 meth_name) fix matches))
+	f (L loc1 (FunBind (L loc2 op_name) fix matches fvs)) | op_name == sel_name
+		= Just (L loc1 (FunBind (L loc2 meth_name) fix matches fvs))
 	f _other = Nothing
 \end{code}
 
@@ -683,10 +656,10 @@ getGenericBinds :: LHsBinds Name -> [(HsType Name, LHsBind Name)]
   -- them in finite map indexed by the type parameter in the definition.
 getGenericBinds binds = concat (map getGenericBind (bagToList binds))
 
-getGenericBind (L loc (FunBind id infixop (MatchGroup matches ty)))
+getGenericBind (L loc (FunBind id infixop (MatchGroup matches ty) fvs))
   = groupWith wrap (mapCatMaybes maybeGenericMatch matches)
   where
-    wrap ms = L loc (FunBind id infixop (MatchGroup ms ty))
+    wrap ms = L loc (FunBind id infixop (MatchGroup ms ty) fvs)
 getGenericBind _
   = []
 

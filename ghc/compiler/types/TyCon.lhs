@@ -437,6 +437,11 @@ isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it
 -- If it can't be for some reason, it should be a AlgTyCon
+--
+-- NB: when compiling Data.Tuple, the tycons won't reply True to
+-- isTupleTyCon, becuase they are built as AlgTyCons.  However they
+-- get spat into the interface file as tuple tycons, so I don't think
+-- it matters.
 isTupleTyCon (TupleTyCon {}) = True
 isTupleTyCon other 	     = False
 

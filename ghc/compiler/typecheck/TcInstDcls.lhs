@@ -9,7 +9,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 #include "HsVersions.h"
 
 import HsSyn
-import TcBinds		( tcSpecSigs, badBootDeclErr )
+import TcBinds		( mkPragFun, tcPrags, badBootDeclErr )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
@@ -22,8 +22,7 @@ import Inst		( tcInstClassOp, newDicts, instToId, showLIE,
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
 import TcDeriv		( tcDeriving )
-import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv,
- 			  InstInfo(..), InstBindings(..), 
+import TcEnv		( InstInfo(..), InstBindings(..), 
 			  newDFunName, tcExtendIdEnv
 			)
 import TcHsType		( kcHsSigType, tcHsKindedType )
@@ -36,13 +35,13 @@ import Var		( Id, idName, idType )
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Name		( Name, getSrcLoc )
-import NameSet		( unitNameSet, emptyNameSet )
 import UnicodeUtil	( stringToUtf8 )
 import Maybe		( catMaybes )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
 import Bag
+import BasicTypes	( Activation( AlwaysActive ) )
 import FastString
 \end{code}
 
@@ -135,7 +134,7 @@ tcInstDecls1	-- Deal with both source-code and imported instance decls
    -> TcM (TcGblEnv,		-- The full inst env
 	   [InstInfo],		-- Source-code instance decls to process; 
 				-- contains all dfuns for this module
-	   [HsBindGroup Name])	-- Supporting bindings for derived instances
+	   HsValBinds Name)	-- Supporting bindings for derived instances
 
 tcInstDecls1 tycl_decls inst_decls
   = checkNoErrs $
@@ -370,27 +369,21 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 	-- of the inst_tyavars' with something in the envt
     checkSigTyVars inst_tyvars' 	`thenM_`
 
-	-- Deal with 'SPECIALISE instance' pragmas by making them
-	-- look like SPECIALISE pragmas for the dfun
+	-- Deal with 'SPECIALISE instance' pragmas 
     let
-	uprags = case binds of
-		       VanillaInst _ uprags -> uprags
-		       other		    -> []
-	spec_prags = [ L loc (SpecSig (L loc (idName dfun_id)) ty)
-		     | L loc (SpecInstSig ty) <- uprags ]
+	specs = case binds of
+		  VanillaInst _ prags -> filter isSpecInstLSig prags
+		  other	 	      -> []
     in
-    tcExtendGlobalValEnv [dfun_id] (
-	tcExtendTyVarEnv inst_tyvars'	$
-	tcSpecSigs spec_prags
-    )					`thenM` \ prag_binds ->
-
+    tcPrags dfun_id specs			`thenM` \ prags -> 
+    
 	-- Create the result bindings
     let
         dict_constr   = classDataCon clas
 	scs_and_meths = map instToId sc_dicts ++ meth_ids
 	this_dict_id  = instToId this_dict
-	inlines       | null dfun_arg_dicts = emptyNameSet
-		      | otherwise	    = unitNameSet (idName dfun_id)
+	inline_prag | null dfun_arg_dicts = []
+		    | otherwise	= [InlinePrag True AlwaysActive]
 		-- Always inline the dfun; this is an experimental decision
 		-- because it makes a big performance difference sometimes.
 		-- Often it means we can do the method selection, and then
@@ -432,12 +425,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 	main_bind = noLoc $ AbsBinds
 		 	    inst_tyvars'
 		 	    (map instToId dfun_arg_dicts)
-		 	    [(inst_tyvars', dfun_id, this_dict_id)] 
-		 	    inlines all_binds
+		 	    [(inst_tyvars', dfun_id, this_dict_id, 
+					    inline_prag ++ prags)] 
+		 	    all_binds
     in
     showLIE (text "instance") 		`thenM_`
-    returnM (unitBag main_bind `unionBags` 
-	     prag_binds )
+    returnM (unitBag main_bind)
 
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
@@ -485,8 +478,9 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
 	-- The trouble is that the 'meth_inst' for op, which is 'available', also
 	-- looks like 'op at Int'.  But they are not the same.
     let
+	prag_fn	       = mkPragFun uprags
 	all_insts      = avail_insts ++ catMaybes meth_insts
-	tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts uprags 
+	tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts prag_fn
 	meth_ids       = [meth_id | (_,meth_id,_) <- meth_infos]
     in
 

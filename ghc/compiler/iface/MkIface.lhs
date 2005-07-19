@@ -657,7 +657,6 @@ mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
   = mapCatMaybes mkUsage dep_mods
 	-- ToDo: do we need to sort into canonical order?
   where
-    dflags = hsc_dflags hsc_env
     hpt = hsc_HPT hsc_env
 
     used_names = mkNameSet $			-- Eliminate duplicates

@@ -80,11 +80,13 @@ dsForeigns []
 dsForeigns fos
   = foldlDs combine (ForeignStubs empty empty [] [], []) fos
  where
-  combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
-	  (L loc (ForeignImport id _ spec depr))
+  combine stubs (L loc decl) = putSrcSpanDs loc (combine1 stubs decl)
+
+  combine1 (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
+	   (ForeignImport id _ spec depr)
     = traceIf (text "fi start" <+> ppr id)	`thenDs` \ _ ->
       dsFImport (unLoc id) spec	                `thenDs` \ (bs, h, c, mbhd) -> 
-      warnDepr depr loc				`thenDs` \ _                ->
+      warnDepr depr				`thenDs` \ _                ->
       traceIf (text "fi end" <+> ppr id)	`thenDs` \ _ ->
       returnDs (ForeignStubs (h $$ acc_h)
       			     (c $$ acc_c)
@@ -92,11 +94,11 @@ dsForeigns fos
 			     acc_feb, 
 		bs ++ acc_f)
 
-  combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
-	  (L loc (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)) depr))
+  combine1 (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
+	   (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)) depr)
     = dsFExport id (idType id) 
 		ext_nm cconv False                 `thenDs` \(h, c, _, _) ->
-      warnDepr depr loc				   `thenDs` \_              ->
+      warnDepr depr				   `thenDs` \_              ->
       returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) acc_hdrs (id:acc_feb), 
 		acc_f)
 
@@ -105,8 +107,8 @@ dsForeigns fos
    | e `elem` ls = ls
    | otherwise   = e:ls
 
-  warnDepr False _   = returnDs ()
-  warnDepr True  loc = dsWarn (loc, msg)
+  warnDepr False = returnDs ()
+  warnDepr True  = dsWarn msg
      where
        msg = ptext SLIT("foreign declaration uses deprecated non-standard syntax")
 \end{code}

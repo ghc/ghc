@@ -20,7 +20,7 @@ import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 import Module		( Module, unitModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
 			  LocalRdrEnv, emptyLocalRdrEnv )
-import Name		( Name, isInternalName )
+import Name		( Name, isInternalName, mkInternalName, getOccName, getSrcLoc )
 import Type		( Type )
 import NameEnv		( extendNameEnvList )
 import InstEnv		( emptyInstEnv )
@@ -316,6 +316,11 @@ newUniqueSupply
     	let { (us1, us2) = splitUniqSupply us } ;
 	writeMutVar u_var us1 ;
 	return us2 }
+
+newLocalName :: Name -> TcRnIf gbl lcl Name
+newLocalName name	-- Make a clone
+  = newUnique		`thenM` \ uniq ->
+    returnM (mkInternalName uniq (getOccName name) (getSrcLoc name))
 \end{code}
 
 

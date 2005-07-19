@@ -433,7 +433,7 @@ mkStgAltType scrut_ty alts
 		ASSERT(null data_alts)
 		PolyAlt
 	where
-		(data_alts, deflt) = findDefault alts
+		(data_alts, _deflt) = findDefault alts
 \end{code}
 
 

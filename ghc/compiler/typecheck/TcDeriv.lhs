@@ -206,10 +206,10 @@ And then translate it to:
 \begin{code}
 tcDeriving  :: [LTyClDecl Name]	-- All type constructors
 	    -> TcM ([InstInfo],		-- The generated "instance decls"
-		    [HsBindGroup Name])	-- Extra generated top-level bindings
+		    HsValBinds Name)	-- Extra generated top-level bindings
 
 tcDeriving tycl_decls
-  = recoverM (returnM ([], [])) $
+  = recoverM (returnM ([], emptyValBindsIn)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
 	  overlap_flag <- getOverlapFlag
@@ -227,7 +227,7 @@ tcDeriving tycl_decls
 	-- don't generate any derived bindings
 	; is_boot <- tcIsHsBoot
 	; if is_boot then
-		return (inst_info, [])
+		return (inst_info, emptyValBindsIn)
 	  else do
 	{
 
@@ -239,11 +239,11 @@ tcDeriving tycl_decls
 	-- which is used in the generic binds
 	; rn_binds
 		<- discardWarnings $ setOptM Opt_GlasgowExts $ do
-			{ (rn_deriv, _dus1) <- rnTopBinds deriv_binds []
-			; (rn_gen, dus_gen) <- rnTopBinds gen_binds   []
+			{ (rn_deriv, _dus1) <- rnTopBinds (ValBindsIn deriv_binds [])
+			; (rn_gen, dus_gen) <- rnTopBinds (ValBindsIn gen_binds   [])
 			; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to
 								-- be kept alive
-			; return (rn_deriv ++ rn_gen) }
+			; return (rn_deriv `plusHsValBinds` rn_gen) }
 
 
 	; dflags <- getDOpts
@@ -253,9 +253,9 @@ tcDeriving tycl_decls
 	; returnM (inst_info, rn_binds)
 	}}
   where
-    ddump_deriving :: [InstInfo] -> [HsBindGroup Name] -> SDoc
+    ddump_deriving :: [InstInfo] -> HsValBinds Name -> SDoc
     ddump_deriving inst_infos extra_binds
-      = vcat (map pprInstInfoDetails inst_infos) $$ vcat (map ppr extra_binds)
+      = vcat (map pprInstInfoDetails inst_infos) $$ ppr extra_binds
 
 -----------------------------------------
 deriveOrdinaryStuff overlap_flag []	-- Short cut

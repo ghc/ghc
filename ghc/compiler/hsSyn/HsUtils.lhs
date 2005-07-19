@@ -27,9 +27,9 @@ import RdrName		( RdrName, getRdrName, mkRdrUnqual )
 import Var		( Id )
 import Type		( Type )
 import DataCon		( DataCon, dataConWrapId, dataConSourceArity )
-import BasicTypes	( RecFlag(..) )
 import OccName		( mkVarOcc )
 import Name		( Name )
+import BasicTypes	( RecFlag(..) )
 import SrcLoc
 import FastString	( mkFastString )
 import Outputable
@@ -56,7 +56,7 @@ mkHsPar e = L (getLoc e) (HsPar e)
 mkSimpleMatch :: [LPat id] -> LHsExpr id -> LMatch id
 mkSimpleMatch pats rhs 
   = L loc $
-    Match pats Nothing (GRHSs (unguardedRHS rhs) [])
+    Match pats Nothing (GRHSs (unguardedRHS rhs) emptyLocalBinds)
   where
     loc = case pats of
 		[]      -> getLoc rhs
@@ -93,10 +93,14 @@ mkHsTyLam tyvars expr = L (getLoc expr) (TyLam tyvars expr)
 mkHsDictLam []    expr = expr
 mkHsDictLam dicts expr = L (getLoc expr) (DictLam dicts expr)
 
-mkHsLet :: LHsBinds name -> LHsExpr name -> LHsExpr name
-mkHsLet binds expr 
+mkHsDictLet :: LHsBinds Id -> LHsExpr Id -> LHsExpr Id
+-- Used for the dictionary bindings gotten from TcSimplify
+-- We make them recursive to be on the safe side
+mkHsDictLet binds expr 
   | isEmptyLHsBinds binds = expr
-  | otherwise             = L (getLoc expr) (HsLet [HsBindGroup binds [] Recursive] expr)
+  | otherwise             = L (getLoc expr) (HsLet (HsValBinds val_binds) expr)
+			  where
+			    val_binds = ValBindsOut [(Recursive, binds)]
 
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
 -- Used for constructing dictinoary terms etc, so no locations 
@@ -109,10 +113,6 @@ mkSimpleHsAlt :: LPat id -> LHsExpr id -> LMatch id
 -- A simple lambda with a single pattern, no binds, no guards; pre-typechecking
 mkSimpleHsAlt pat expr 
   = mkSimpleMatch [pat] expr
-
-glueBindsOnGRHSs :: HsBindGroup id -> GRHSs id -> GRHSs id
-glueBindsOnGRHSs binds1 (GRHSs grhss binds2)
-  = GRHSs grhss (binds1 : binds2)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
@@ -224,34 +224,35 @@ nlHsFunTy a b		= noLoc (HsFunTy a b)
 mkVarBind :: SrcSpan -> name -> LHsExpr name -> LHsBind name
 mkVarBind loc var rhs = mk_easy_FunBind loc var [] emptyLHsBinds rhs
 
+------------
 mk_easy_FunBind :: SrcSpan -> name -> [LPat name]
-		    -> LHsBinds name -> LHsExpr name
-		    -> LHsBind name
+		-> LHsBinds name -> LHsExpr name
+		-> LHsBind name
 
 mk_easy_FunBind loc fun pats binds expr
-  = L loc (FunBind (L loc fun) False{-not infix-} 
-	  	   (mkMatchGroup [mk_easy_Match pats binds expr]))
+  = L loc (FunBind (L loc fun) False{-not infix-} matches placeHolderNames)
+  where
+    matches = mkMatchGroup [mk_easy_Match pats binds expr]
 
-mk_easy_Match pats binds expr
-  = mkMatch pats expr [HsBindGroup binds [] Recursive]
-	-- The renamer expects everything in its input to be a
-	-- "recursive" MonoBinds, and it is its job to sort things out
-	-- from there.
-
-mk_FunBind	:: SrcSpan 
-		-> RdrName
-		-> [([LPat RdrName], LHsExpr RdrName)]
-		-> LHsBind RdrName
+------------
+mk_FunBind :: SrcSpan -> RdrName
+	   -> [([LPat RdrName], LHsExpr RdrName)]
+	   -> LHsBind RdrName
 
 mk_FunBind loc fun [] = panic "TcGenDeriv:mk_FunBind"
 mk_FunBind loc fun pats_and_exprs
-  = L loc (FunBind (L loc fun) False{-not infix-} 
-		   (mkMatchGroup [mkMatch p e [] | (p,e) <-pats_and_exprs]))
+  = L loc (FunBind (L loc fun) False{-not infix-} matches placeHolderNames)
+  where
+    matches = mkMatchGroup [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
 
-mkMatch :: [LPat id] -> LHsExpr id -> [HsBindGroup id] -> LMatch id
+------------
+mk_easy_Match pats binds expr
+  = mkMatch pats expr (HsValBinds (ValBindsIn binds []))
+
+------------
+mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id
 mkMatch pats expr binds
   = noLoc (Match (map paren pats) Nothing 
--- gaw 2004
 		 (GRHSs (unguardedRHS expr) binds))
   where
     paren p = case p of
@@ -277,29 +278,30 @@ where
 it should return [x, y, f, a, b] (remember, order important).
 
 \begin{code}
-collectGroupBinders :: [HsBindGroup name] -> [Located name]
-collectGroupBinders groups = foldr collect_group [] groups
-	where
-	  collect_group (HsBindGroup bag sigs is_rec) acc
-	 	= foldrBag (collectAcc . unLoc) acc bag
-	  collect_group (HsIPBinds _) acc = acc
+collectLocalBinders :: HsLocalBinds name -> [Located name]
+collectLocalBinders (HsValBinds val_binds) = collectHsValBinders val_binds
+collectLocalBinders (HsIPBinds _)   = []
+collectLocalBinders EmptyLocalBinds = []
 
+collectHsValBinders :: HsValBinds name -> [Located name]
+collectHsValBinders (ValBindsIn binds sigs) = collectHsBindLocatedBinders binds
+collectHsValBinders (ValBindsOut binds)     = panic "collectHsValBinders"
 
 collectAcc :: HsBind name -> [Located name] -> [Located name]
-collectAcc (PatBind pat _ _) acc = collectLocatedPatBinders pat ++ acc
-collectAcc (FunBind f _ _) acc   = f : acc
-collectAcc (VarBind f _) acc  = noLoc f : acc
-collectAcc (AbsBinds _ _ dbinds _ binds) acc
-  = [noLoc dp | (_,dp,_) <- dbinds] ++ acc
+collectAcc (PatBind pat _ _ _) acc = collectLocatedPatBinders pat ++ acc
+collectAcc (FunBind f _ _ _) acc   = f : acc
+collectAcc (VarBind f _) acc       = noLoc f : acc
+collectAcc (AbsBinds _ _ dbinds binds) acc
+  = [noLoc dp | (_,dp,_,_) <- dbinds] ++ acc
 	-- ++ foldr collectAcc acc binds
 	-- I don't think we want the binders from the nested binds
 	-- The only time we collect binders from a typechecked 
 	-- binding (hence see AbsBinds) is in zonking in TcHsSyn
 
-collectHsBindBinders :: Bag (LHsBind name) -> [name]
+collectHsBindBinders :: LHsBinds name -> [name]
 collectHsBindBinders binds = map unLoc (collectHsBindLocatedBinders binds)
 
-collectHsBindLocatedBinders :: Bag (LHsBind name) -> [Located name]
+collectHsBindLocatedBinders :: LHsBinds name -> [Located name]
 collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 \end{code}
 
@@ -320,13 +322,14 @@ collectSigTysFromHsBind :: LHsBind name -> [LHsType name]
 collectSigTysFromHsBind bind
   = go (unLoc bind)
   where
-    go (PatBind pat _ _) 
+    go (PatBind pat _ _ _) 
 	= collectSigTysFromPat pat
-    go (FunBind f _ (MatchGroup ms _))
+    go (FunBind f _ (MatchGroup ms _) _)
 	= [sig | L _ (Match [] (Just sig) _) <- ms]
 	-- A binding like    x :: a = f y
 	-- is parsed as FunMonoBind, but for this purpose we 	
 	-- want to treat it as a pattern binding
+    go out_bind = panic "collectSigTysFromHsBind"
 \end{code}
 
 %************************************************************************
@@ -348,7 +351,7 @@ collectLStmtBinders = collectStmtBinders . unLoc
 collectStmtBinders :: Stmt id -> [Located id]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt pat _ _ _) = collectLocatedPatBinders pat
-collectStmtBinders (LetStmt binds)      = collectGroupBinders binds
+collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
 collectStmtBinders (ExprStmt _ _ _)   	= []
 collectStmtBinders (RecStmt ss _ _ _ _)	= collectLStmtsBinders ss
 collectStmtBinders other              	= panic "collectStmtBinders"

@@ -37,7 +37,7 @@ import StaticFlags	( opt_UF_CreationThreshold, opt_UF_UseThreshold,
 import DynFlags		( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import PprCore		( pprCoreExpr )
-import OccurAnal	( occurAnalyseGlobalExpr )
+import OccurAnal	( occurAnalyseExpr )
 import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
 import Id		( Id, idType, isId,
 			  idUnfolding, globalIdDetails
@@ -69,7 +69,7 @@ import GLAEXTS		( Int# )
 mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
 
 mkUnfolding top_lvl expr
-  = CoreUnfolding (occurAnalyseGlobalExpr expr)
+  = CoreUnfolding (occurAnalyseExpr expr)
 		  top_lvl
 
 		  (exprIsValue expr)
@@ -89,7 +89,7 @@ mkUnfolding top_lvl expr
 	-- it gets fixed up next round
 
 mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
-  = CompulsoryUnfolding (occurAnalyseGlobalExpr expr)
+  = CompulsoryUnfolding (occurAnalyseExpr expr)
 \end{code}
 
 

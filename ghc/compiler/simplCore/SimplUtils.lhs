@@ -34,7 +34,7 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
-import Id		( idType, isDataConWorkId, idOccInfo,
+import Id		( idType, isDataConWorkId, idOccInfo, isDictId,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
 			)
@@ -43,7 +43,6 @@ import SimplMonad
 import Type		( Type, splitFunTys, dropForAlls, isStrictType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
 			)
-import TcType		( isDictTy )
 import Name		( mkSysTvName )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConTyVars, dataConArgTys, isVanillaDataCon )
@@ -770,7 +769,7 @@ tryEtaReduce bndrs body
     ok_fun fun =  exprIsTrivial fun
 	       && not (any (`elemVarSet` (exprFreeVars fun)) bndrs)
 	       && (exprIsValue fun || all ok_lam bndrs)
-    ok_lam v = isTyVar v || isDictTy (idType v)
+    ok_lam v = isTyVar v || isDictId v
 	-- The exprIsValue is because eta reduction is not 
 	-- valid in general:  \x. bot  /=  bot
 	-- So we need to be sure that the "fun" is a value.

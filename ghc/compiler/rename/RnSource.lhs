@@ -7,31 +7,28 @@
 module RnSource ( 
 	rnSrcDecls, addTcgDUs, 
 	rnTyClDecls, checkModDeprec,
-	rnBindGroups, rnBindGroupsAndThen, rnSplice
+	rnSplice, checkTH
     ) where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} RnExpr( rnLExpr )
+
 import HsSyn
-import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, elemLocalRdrEnv )
+import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv )
 import RdrHsSyn		( extractGenericPatTyVars )
 import RnHsSyn
-import RnExpr		( rnLExpr, checkTH )
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
-import RnBinds		( rnTopBinds, rnBinds, rnMethodBinds, 
-			  rnBindsAndThen, renameSigs, checkSigs )
-import RnEnv		( lookupTopBndrRn, lookupLocalDataTcNames,
+import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
+import RnEnv		( lookupLocalDataTcNames,
 			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
 			  lookupOccRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
-			  bindLocalNames, newIPNameRn,
-			  checkDupNames, mapFvRn,
-			  unknownNameErr
+			  bindLocalNames, checkDupNames, mapFvRn
 			)
 import TcRnMonad
 
-import BasicTypes	( TopLevelFlag(..)  )
 import HscTypes		( FixityEnv, FixItem(..),
 			  Deprecations, Deprecs(..), DeprecTxt, plusDeprecs )
 import Class		( FunDep )
@@ -42,7 +39,7 @@ import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
-import Maybe            ( catMaybes, isNothing )
+import Maybe            ( isNothing )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -64,7 +61,7 @@ Checks the @(..)@ etc constraints in the export list.
 \begin{code}
 rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 
-rnSrcDecls (HsGroup { hs_valds  = [HsBindGroup binds sigs _],
+rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		      hs_tyclds = tycl_decls,
 		      hs_instds = inst_decls,
 		      hs_fixds  = fix_decls,
@@ -86,7 +83,7 @@ rnSrcDecls (HsGroup { hs_valds  = [HsBindGroup binds sigs _],
 
 		-- Rename other declarations
 	traceRn (text "Start rnmono") ;
-	(rn_val_decls, bind_dus) <- rnTopBinds binds sigs ;
+	(rn_val_decls, bind_dus) <- rnTopBinds val_decls ;
 	traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
 		-- You might think that we could build proper def/use information
@@ -233,63 +230,6 @@ rnDefaultDecl (DefaultDecl tys)
 
 %*********************************************************
 %*							*
-		Bindings
-%*							*
-%*********************************************************
-
-These chaps are here, rather than in TcBinds, so that there
-is just one hi-boot file (for RnSource).  rnSrcDecls is part
-of the loop too, and it must be defined in this module.
-
-\begin{code}
-rnBindGroups :: [HsBindGroup RdrName] -> RnM ([HsBindGroup Name], DefUses)
--- This version assumes that the binders are already in scope
--- It's used only in 'mdo'
-rnBindGroups []
-   = returnM ([], emptyDUs)
-rnBindGroups [HsBindGroup bind sigs _]
-   = rnBinds NotTopLevel bind sigs
-rnBindGroups b@[HsIPBinds bind]
-   = do addErr (badIpBinds b)	
-	returnM ([], emptyDUs)
-rnBindGroups _
-   = panic "rnBindGroups"
-
-rnBindGroupsAndThen 
-  :: [HsBindGroup RdrName]
-  -> ([HsBindGroup Name] -> RnM (result, FreeVars))
-  -> RnM (result, FreeVars)
--- This version (a) assumes that the binding vars are not already in scope
---		(b) removes the binders from the free vars of the thing inside
--- The parser doesn't produce ThenBinds
-rnBindGroupsAndThen [] thing_inside
-  = thing_inside []
-rnBindGroupsAndThen [HsBindGroup bind sigs _] thing_inside
-  = rnBindsAndThen bind sigs $ \ groups -> thing_inside groups
-rnBindGroupsAndThen [HsIPBinds binds] thing_inside
-  = rnIPBinds binds			`thenM` \ (binds',fv_binds) ->
-    thing_inside [HsIPBinds binds']	`thenM` \ (thing, fvs_thing) ->
-    returnM (thing, fvs_thing `plusFV` fv_binds)
-
-rnIPBinds [] = returnM ([], emptyFVs)
-rnIPBinds (bind : binds)
-  = wrapLocFstM rnIPBind bind	`thenM` \ (bind', fvBind) ->
-    rnIPBinds binds		`thenM` \ (binds',fvBinds) ->
-    returnM (bind' : binds', fvBind `plusFV` fvBinds)
-
-rnIPBind (IPBind n expr)
-  = newIPNameRn  n		`thenM` \ name ->
-    rnLExpr expr		`thenM` \ (expr',fvExpr) ->
-    return (IPBind name expr', fvExpr)
-
-badIpBinds binds
-  = hang (ptext SLIT("Implicit-parameter bindings illegal in 'mdo':")) 4
-	 (ppr binds)
-\end{code}
-
-
-%*********************************************************
-%*							*
 \subsection{Foreign declarations}
 %*							*
 %*********************************************************
@@ -346,9 +286,9 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags)
 	-- But the (unqualified) method names are in scope
     let 
 	binders = collectHsBindBinders mbinds'
+	ok_sig  = okInstDclSig (mkNameSet binders)
     in
-    bindLocalNames binders (renameSigs uprags)			`thenM` \ uprags' ->
-    checkSigs (okInstDclSig (mkNameSet binders)) uprags'	`thenM_`
+    bindLocalNames binders (renameSigs ok_sig uprags)	`thenM` \ uprags' ->
 
     returnM (InstDecl inst_ty' mbinds' uprags',
 	     meth_fvs `plusFV` hsSigsFVs uprags'
@@ -555,7 +495,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
     bindTyVarsRn cls_doc tyvars			( \ tyvars' ->
 	rnContext cls_doc context	`thenM` \ context' ->
 	rnFds cls_doc fds		`thenM` \ fds' ->
-	renameSigs sigs			`thenM` \ sigs' ->
+	renameSigs okClsDclSig sigs	`thenM` \ sigs' ->
 	returnM   (tyvars', context', fds', sigs')
     )	`thenM` \ (tyvars', context', fds', sigs') ->
 
@@ -565,7 +505,6 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	sig_rdr_names_w_locs   = [op | L _ (Sig op _) <- sigs]
     in
     checkDupNames sig_doc sig_rdr_names_w_locs	`thenM_` 
-    checkSigs okClsDclSig sigs'				`thenM_`
 	-- Typechecker is responsible for checking that we only
 	-- give default-method bindings for things in this class.
 	-- The renamer *could* check this for class decls, but can't
@@ -710,4 +649,13 @@ rnSplice (HsSplice n expr)
     newLocalsRn [L loc n]	`thenM` \ [n'] ->
     rnLExpr expr 		`thenM` \ (expr', fvs) ->
     returnM (HsSplice n' expr', fvs)
+
+#ifdef GHCI 
+checkTH e what = returnM ()	-- OK
+#else
+checkTH e what 	-- Raise an error in a stage-1 compiler
+  = addErr (vcat [ptext SLIT("Template Haskell") <+> text what <+>  
+	          ptext SLIT("illegal in a stage-1 compiler"),
+	          nest 2 (ppr e)])
+#endif   
 \end{code}

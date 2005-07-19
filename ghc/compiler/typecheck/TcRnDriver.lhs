@@ -29,7 +29,7 @@ import StaticFlags	( opt_PprStyle_Debug )
 import Packages		( checkForPackageConflicts, mkHomeModules )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
 			  SpliceDecl(..), HsBind(..), LHsBinds,
-			  emptyGroup, appendGroups,
+			  emptyRdrGroup, emptyRnGroup, appendGroups, plusHsValBinds,
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
 
@@ -81,14 +81,15 @@ import HscTypes		( ModGuts(..), ModDetails(..), emptyModDetails,
 import Outputable
 
 #ifdef GHCI
-import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
+import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), 
+			  HsLocalBinds(..), HsValBinds(..),
 			  LStmt, LHsExpr, LHsType, mkVarBind,
 			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
 		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
 			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
 import RnSource		( addTcgDUs )
-import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
+import TcHsSyn		( mkHsDictLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
 import TcMType		( zonkTcType, zonkQuantifiedTyVar )
 import TcMatches	( tcStmts, tcDoStmt )
@@ -119,7 +120,7 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName,
 import HscTypes		( InteractiveContext(..),
 			  ModIface(..), icPrintUnqual,
 			  Dependencies(..) )
-import BasicTypes	( RecFlag(..), Fixity )
+import BasicTypes	( Fixity )
 import SrcLoc		( unLoc, noSrcSpan )
 #endif
 
@@ -188,7 +189,7 @@ tcRnModule hsc_env hsc_src save_rn_decls
 		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
 		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports,
 		      tcg_rn_decls = if save_rn_decls then
-					Just emptyGroup
+					Just emptyRnGroup
 				     else
 					Nothing })
 		$ do {
@@ -340,10 +341,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
    }}}}
 
 mkFakeGroup decls -- Rather clumsy; lots of unused fields
-  = HsGroup {	hs_tyclds = decls, 	-- This is the one we want
-		hs_valds = [], hs_fords = [],
-		hs_instds = [], hs_fixds = [], hs_depds = [],
-		hs_ruleds = [], hs_defds = [] }
+  = emptyRdrGroup { hs_tyclds = decls }
 \end{code}
 
 
@@ -687,7 +685,7 @@ tcTopSrcDecls boot_details
 		-- We also typecheck any extra binds that came out 
 		-- of the "deriving" process (deriv_binds)
         traceTc (text "Tc5") ;
-	(tc_val_binds, tcl_env) <- tcTopBinds (val_binds ++ deriv_binds) ;
+	(tc_val_binds, tcl_env) <- tcTopBinds (val_binds `plusHsValBinds` deriv_binds) ;
 	setLclTypeEnv tcl_env 	$ do {
 
 	     	-- Second pass over class and instance declarations, 
@@ -937,7 +935,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
 	      the_bind  = mkVarBind noSrcSpan fresh_it expr
-	      let_stmt  = L loc $ LetStmt [HsBindGroup (unitBag the_bind) [] NonRecursive]
+	      let_stmt  = L loc $ LetStmt (HsValBinds (ValBindsIn (unitBag the_bind) []))
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
@@ -1024,7 +1022,7 @@ tcGhciStmts stmts
 	const_binds <- checkNoErrs (tcSimplifyInteractive lie) ;
 		-- checkNoErrs ensures that the plan fails if context redn fails
 
-	return (ids, mkHsLet const_binds $
+	return (ids, mkHsDictLet const_binds $
 		     noLoc (HsDo DoExpr tc_stmts (mk_return ids) io_ret_ty))
     }
 \end{code}

@@ -1,11 +1,11 @@
 \begin{code}
 module DsExpr where
-import HsSyn	( HsExpr, LHsExpr, HsBindGroup )
+import HsSyn	( HsExpr, LHsExpr, HsLocalBinds )
 import Var  	( Id )
 import DsMonad	( DsM )
 import CoreSyn	( CoreExpr )
 
 dsExpr  :: HsExpr  Id -> DsM CoreExpr
 dsLExpr :: LHsExpr Id -> DsM CoreExpr
-dsLet   :: [HsBindGroup Id] -> CoreExpr -> DsM CoreExpr
+dsLocalBinds :: HsLocalBinds Id -> CoreExpr -> DsM CoreExpr
 \end{code}

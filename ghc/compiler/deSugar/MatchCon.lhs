@@ -11,7 +11,7 @@ module MatchCon ( matchConFamily ) where
 import {-# SOURCE #-} Match	( match )
 
 import HsSyn		( Pat(..), HsConDetails(..) )
-import DsBinds		( dsHsNestedBinds )
+import DsBinds		( dsLHsBinds )
 import DataCon		( isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
 import TcType		( tcTyConAppArgs )
 import Type		( substTys, zipTopTvSubst, mkTyVarTys )
@@ -125,7 +125,7 @@ match_con vars ty eqns
 
     shift eqn@(EqnInfo { eqn_wrap = wrap, 
 		         eqn_pats = ConPatOut _ tvs ds bind (PrefixCon arg_pats) _ : pats })
-	= do { prs <- dsHsNestedBinds bind
+	= do { prs <- dsLHsBinds bind
 	     ; return (eqn { eqn_wrap = wrap . wrapBinds (tvs `zip` tvs1) 
 					     . wrapBinds (ds  `zip` dicts1)
 					     . mkDsLet (Rec prs),

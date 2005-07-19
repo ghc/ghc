@@ -24,7 +24,7 @@ import TcHsSyn		( hsPatType )
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLet )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
 
 import TcType		( Type, tcSplitAppTy, mkFunTy )
 import Type		( mkTyConApp, funArgTy )
@@ -555,14 +555,14 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
 
 dsCmd ids local_vars env_ids stack res_ty (HsLet binds body)
   = let
-	defined_vars = mkVarSet (map unLoc (collectGroupBinders binds))
+	defined_vars = mkVarSet (map unLoc (collectLocalBinders binds))
 	local_vars' = local_vars `unionVarSet` defined_vars
     in
     dsfixCmd ids local_vars' stack res_ty body
 				`thenDs` \ (core_body, free_vars, env_ids') ->
     mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
     -- build a new environment, plus the stack, using the let bindings
-    dsLet binds (buildEnvStack env_ids' stack_ids)
+    dsLocalBinds binds (buildEnvStack env_ids' stack_ids)
 					`thenDs` \ core_binds ->
     -- match the old environment and stack against the input
     matchEnvStack env_ids stack_ids core_binds
@@ -798,7 +798,7 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _ _)
 
 dsCmdStmt ids local_vars env_ids out_ids (LetStmt binds)
     -- build a new environment using the let bindings
-  = dsLet binds (mkTupleExpr out_ids)	`thenDs` \ core_binds ->
+  = dsLocalBinds binds (mkTupleExpr out_ids)	`thenDs` \ core_binds ->
     -- match the old environment against the input
     matchEnvStack env_ids [] core_binds	`thenDs` \ core_map ->
     returnDs (do_arr ids
@@ -1009,7 +1009,7 @@ leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
   = let
 	defined_vars = mkVarSet (collectPatsBinders pats)
 			`unionVarSet`
-		       mkVarSet (map unLoc (collectGroupBinders binds))
+		       mkVarSet (map unLoc (collectLocalBinders binds))
     in
     [(expr, 
       mkVarSet (map unLoc (collectLStmtsBinders stmts)) 

@@ -23,7 +23,7 @@ import qualified OccName
 import SrcLoc	( unLoc, Located(..), SrcSpan )
 import Type	( Type )
 import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon )
-import BasicTypes( Boxity(..), RecFlag(Recursive) )
+import BasicTypes( Boxity(..) ) 
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
 import Char 	( isAscii, isAlphaNum, isAlpha )
@@ -221,9 +221,9 @@ cvtHsDo loc do_or_lc stmts
     body = case last stmts' of
 		L _ (ExprStmt body _ _) -> body
 
-cvtdecs :: SrcSpan -> [TH.Dec] -> [HsBindGroup RdrName]
-cvtdecs loc [] = []
-cvtdecs loc ds = [HsBindGroup binds sigs Recursive]
+cvtdecs :: SrcSpan -> [TH.Dec] -> HsLocalBinds RdrName
+cvtdecs loc [] = EmptyLocalBinds
+cvtdecs loc ds = HsValBinds (ValBindsIn binds sigs)
 	   where
 	     (binds, sigs) = cvtBindsAndSigs loc ds
 
@@ -242,11 +242,16 @@ cvtd :: SrcSpan -> TH.Dec -> LHsBind RdrName
 -- Used only for declarations in a 'let/where' clause,
 -- not for top level decls
 cvtd loc (TH.ValD (TH.VarP s) body ds) 
-  = L loc $ FunBind (L loc (vName s)) False (mkMatchGroup [cvtclause loc (Clause [] body ds)])
+  = L loc $ FunBind (L loc (vName s)) False 
+		    (mkMatchGroup [cvtclause loc (Clause [] body ds)])
+		    placeHolderNames
 cvtd loc (FunD nm cls)
-  = L loc $ FunBind (L loc (vName nm)) False (mkMatchGroup (map (cvtclause loc) cls))
+  = L loc $ FunBind (L loc (vName nm)) False 
+		    (mkMatchGroup (map (cvtclause loc) cls))
+		    placeHolderNames
 cvtd loc (TH.ValD p body ds)
-  = L loc $ PatBind (cvtlp loc p) (GRHSs (cvtguard loc body) (cvtdecs loc ds)) void
+  = L loc $ PatBind (cvtlp loc p) (GRHSs (cvtguard loc body) (cvtdecs loc ds)) 
+		    void placeHolderNames
 
 cvtd loc d = cvtPanic "Illegal kind of declaration in where clause" 
 		  (text (TH.pprint d))

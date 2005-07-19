@@ -51,6 +51,7 @@ import Class		( Class, classTyCon )
 import Name		( Name, mkInternalName )
 import OccName		( mkOccName, tvName )
 import NameSet
+import NameEnv
 import PrelNames	( genUnitTyConName )
 import TysWiredIn	( mkListTy, listTyCon, mkPArrTy, parrTyCon, tupleTyCon )
 import Bag		( bagToList )
@@ -835,9 +836,8 @@ instance Outputable TcSigInfo where
 	= ppr id <+> ptext SLIT("::") <+> ppr tyvars <+> ppr theta <+> ptext SLIT("=>") <+> ppr tau
 
 lookupSig :: [TcSigInfo] -> TcSigFun	-- Search for a particular signature
-lookupSig [] name = Nothing
-lookupSig (sig : sigs) name
-  | name == idName (sig_id sig) = Just sig
-  | otherwise	     	 	= lookupSig sigs name
+lookupSig sigs = lookupNameEnv env
+  where
+    env = mkNameEnv [(idName (sig_id sig), sig) | sig <- sigs]
 \end{code}
 

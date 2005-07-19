@@ -8,7 +8,7 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), mkHsLet )
+import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), mkHsDictLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
 import TcMType		( newTyFlexiVarTy, zonkQuantifiedTyVar )
@@ -84,8 +84,8 @@ tcRule (HsRule name act vars lhs rhs)
 
     returnM (HsRule name act
 		    (map (RuleBndr . noLoc) (forall_tvs2 ++ tpl_ids))	-- yuk
-		    (mkHsLet lhs_binds lhs')
-		    (mkHsLet rhs_binds rhs'))
+		    (mkHsDictLet lhs_binds lhs')
+		    (mkHsDictLet rhs_binds rhs'))
   where
 
 tcRuleBndrs [] thing_inside = thing_inside []

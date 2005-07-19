@@ -22,7 +22,7 @@ import Var		( Var )
 import Id		( Id, idType, isDataConWorkId_maybe, idLBVarInfo, idArity,
 			  idInfo, idInlinePragma, idOccInfo,
 			  globalIdDetails, isGlobalId, isExportedId, 
-			  isSpecPragmaId, idNewDemandInfo
+			  idNewDemandInfo
 			)
 import Var		( TyVar, isTyVar, tyVarKind )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
@@ -317,7 +317,6 @@ pprIdBndr id = ppr id <+>
 pprIdDetails :: Id -> SDoc
 pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
 		| isExportedId id   = ptext SLIT("[Exported]")
-		| isSpecPragmaId id = ptext SLIT("[SpecPrag]")
 		| otherwise	    = empty
 
 ppIdInfo :: Id -> IdInfo -> SDoc

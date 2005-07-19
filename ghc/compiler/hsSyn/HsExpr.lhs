@@ -14,7 +14,7 @@ import HsPat		( LPat )
 import HsLit		( HsLit(..), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import HsImpExp		( isOperator, pprHsVar )
-import HsBinds		( HsBindGroup, DictBinds )
+import HsBinds		( HsLocalBinds, DictBinds, isEmptyLocalBinds )
 
 -- others:
 import Type		( Type, pprParendType )
@@ -121,7 +121,7 @@ data HsExpr id
 		(LHsExpr id)	--  then part
 		(LHsExpr id)	--  else part
 
-  | HsLet	[HsBindGroup id] -- let(rec)
+  | HsLet	(HsLocalBinds id) -- let(rec)
 		(LHsExpr  id)
 
   | HsDo	(HsStmtContext Name)	-- The parameterisation is unimportant
@@ -274,8 +274,8 @@ pprExpr :: OutputableBndr id => HsExpr id -> SDoc
 
 pprExpr  e = pprDeeper (ppr_expr e)
 
-pprBinds :: OutputableBndr id => [HsBindGroup id] -> SDoc
-pprBinds b = pprDeeper (vcat (map ppr b))
+pprBinds :: OutputableBndr id => HsLocalBinds id -> SDoc
+pprBinds b = pprDeeper (ppr b)
 
 ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
@@ -528,7 +528,7 @@ The legal constructors for commands are:
 		(HsCmd id)	--  else part
 		SrcLoc
 
-  | HsLet	(HsBinds id)	-- let(rec)
+  | HsLet	(HsLocalBinds id)	-- let(rec)
 		(HsCmd  id)
 
   | HsDo	(HsStmtContext Name)	-- The parameterisation is unimportant
@@ -619,7 +619,7 @@ hsLMatchPats (L _ (Match pats _ _)) = pats
 -- GRHSs are used both for pattern bindings and for Matches
 data GRHSs id	
   = GRHSs [LGRHS id]		-- Guarded RHSs
-	  [HsBindGroup id]	-- The where clause
+	  (HsLocalBinds id)	-- The where clause
 
 type LGRHS id = Located (GRHS id)
 
@@ -663,7 +663,7 @@ pprGRHSs :: OutputableBndr id => HsMatchContext id -> GRHSs id -> SDoc
 pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
     $$
-    (if null binds then empty
+    (if isEmptyLocalBinds binds then empty
      else text "where" $$ nest 4 (pprBinds binds))
 
 pprGRHS :: OutputableBndr id => HsMatchContext id -> GRHS id -> SDoc
@@ -700,7 +700,7 @@ data Stmt id
 		(SyntaxExpr id)		-- The (>>) operator
 		PostTcType		-- Element type of the RHS (used for arrows)
 
-  | LetStmt	[HsBindGroup id]
+  | LetStmt	(HsLocalBinds id)	
 
 	-- ParStmts only occur in a list comprehension
   | ParStmt	[([LStmt id], [id])]	-- After renaming, the ids are the binders

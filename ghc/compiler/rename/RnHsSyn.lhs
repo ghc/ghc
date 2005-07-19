@@ -4,7 +4,17 @@
 \section[RnHsSyn]{Specialisations of the @HsSyn@ syntax for the renamer}
 
 \begin{code}
-module RnHsSyn where
+module RnHsSyn( 
+	-- Names
+	charTyCon_name, listTyCon_name, parrTyCon_name, tupleTyCon_name,
+	extractHsTyVars, extractHsTyNames, extractHsTyNames_s, 
+	extractFunDepNames, extractHsCtxtTyNames, extractHsPredTyNames,
+
+	-- Free variables
+	hsSigsFVs, hsSigFVs, conDeclFVs, bangTyFVs,
+	
+	maybeGenericMatch
+  ) where
 
 #include "HsVersions.h"
 
@@ -14,7 +24,6 @@ import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
--- gaw 2004
 import SrcLoc		( Located(..), unLoc )
 \end{code}
 

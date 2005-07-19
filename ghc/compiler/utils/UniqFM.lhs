@@ -19,7 +19,7 @@ module UniqFM (
 	unitDirectlyUFM,
 	listToUFM,
 	listToUFM_Directly,
-	addToUFM,addToUFM_C,
+	addToUFM,addToUFM_C,addToUFM_Acc,
 	addListToUFM,addListToUFM_C,
 	addToUFM_Directly,
 	addListToUFM_Directly,
@@ -81,6 +81,13 @@ addToUFM_C	:: Uniquable key => (elt -> elt -> elt)	-- old -> new -> result
 			   -> UniqFM elt 		-- old
 			   -> key -> elt 		-- new
 			   -> UniqFM elt		-- result
+
+addToUFM_Acc	:: Uniquable key =>
+			      (elt -> elts -> elts)	-- Add to existing
+			   -> (elt -> elts)		-- New element
+			   -> UniqFM elts 		-- old
+			   -> key -> elt 		-- new
+			   -> UniqFM elts		-- result
 
 addListToUFM_C	:: Uniquable key => (elt -> elt -> elt)
 			   -> UniqFM elt -> [(key,elt)]
@@ -244,6 +251,11 @@ addToUFM_Directly fm u elt = insert_ele use_snd fm (getKey# u) elt
 
 addToUFM_C combiner fm key elt
   = insert_ele combiner fm (getKey# (getUnique key)) elt
+
+addToUFM_Acc add unit fm key item
+  = insert_ele combiner fm (getKey# (getUnique key)) (unit item)
+  where
+    combiner old _unit_item = add item old
 
 addListToUFM fm key_elt_pairs = addListToUFM_C use_snd fm key_elt_pairs
 addListToUFM_Directly fm uniq_elt_pairs = addListToUFM_directly_C use_snd fm uniq_elt_pairs
@@ -659,7 +671,7 @@ and if necessary do $\lambda$ lifting on our functions that are bound.
 
 \begin{code}
 insert_ele
-	:: (a -> a -> a)
+	:: (a -> a -> a)	-- old -> new -> result
 	-> UniqFM a
 	-> FastInt
 	-> a

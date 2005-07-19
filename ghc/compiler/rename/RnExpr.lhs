@@ -11,18 +11,14 @@ free variables.
 
 \begin{code}
 module RnExpr (
-	rnMatchGroup, rnMatch, rnGRHSs, rnLExpr, rnExpr, rnStmts, 
-	checkPrecMatch, checkTH
+	rnLExpr, rnExpr, rnStmts
    ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} RnSource  ( rnSrcDecls, rnBindGroupsAndThen, rnBindGroups, rnSplice ) 
-
--- 	RnSource imports RnBinds.rnTopMonoBinds, RnExpr.rnExpr
---	RnBinds	 imports RnExpr.rnMatch, etc
---	RnExpr	 imports [boot] RnSource.rnSrcDecls, RnSource.rnBinds
-
+import RnSource  ( rnSrcDecls, rnSplice, checkTH ) 
+import RnBinds	 ( rnLocalBindsAndThen, rnValBinds,
+		   rnMatchGroup, trimWith ) 
 import HsSyn
 import RnHsSyn
 import TcRnMonad
@@ -30,10 +26,10 @@ import RnEnv
 import OccName		( plusOccEnv )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
-			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr,
-			  checkTupSize )
-import DynFlags	( DynFlag(..) )
-import BasicTypes	( Fixity(..), FixityDirection(..), negateFixity, compareFixity )
+			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, 
+			  dupFieldErr, checkTupSize )
+import DynFlags		( DynFlag(..) )
+import BasicTypes	( FixityDirection(..) )
 import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
@@ -48,89 +44,12 @@ import Util		( isSingleton )
 import ListSetOps	( removeDups )
 import Maybes		( fromJust )
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc, combineLocs, cmpLocated )
+import SrcLoc		( Located(..), unLoc, getLoc, cmpLocated )
 import FastString
 
 import List		( unzip4 )
 \end{code}
 
-
-************************************************************************
-*									*
-\subsection{Match}
-*									*
-************************************************************************
-
-\begin{code}
-rnMatchGroup :: HsMatchContext Name -> MatchGroup RdrName -> RnM (MatchGroup Name, FreeVars)
-rnMatchGroup ctxt (MatchGroup ms _)
-  = mapFvRn (rnMatch ctxt) ms	`thenM` \ (new_ms, ms_fvs) ->
-    returnM (MatchGroup new_ms placeHolderType, ms_fvs)
-
-rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
-rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
-
-rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
-  = 
-	-- Deal with the rhs type signature
-    bindPatSigTyVarsFV rhs_sig_tys	$ 
-    doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
-    (case maybe_rhs_sig of
-	Nothing -> returnM (Nothing, emptyFVs)
-	Just ty | opt_GlasgowExts -> rnHsTypeFVs doc_sig ty	`thenM` \ (ty', ty_fvs) ->
-				     returnM (Just ty', ty_fvs)
-		| otherwise	  -> addLocErr ty patSigErr	`thenM_`
-				     returnM (Nothing, emptyFVs)
-    )					`thenM` \ (maybe_rhs_sig', ty_fvs) ->
-
-	-- Now the main event
-    rnPatsAndThen ctxt pats	$ \ pats' ->
-    rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
-
-    returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
-	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
-  where
-     rhs_sig_tys =  case maybe_rhs_sig of
-			Nothing -> []
-			Just ty -> [ty]
-     doc_sig = text "In a result type-signature"
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsubsection{Guarded right-hand sides (GRHSs)}
-%*									*
-%************************************************************************
-
-\begin{code}
-rnGRHSs :: HsMatchContext Name -> GRHSs RdrName -> RnM (GRHSs Name, FreeVars)
-
--- gaw 2004
-rnGRHSs ctxt (GRHSs grhss binds)
-  = rnBindGroupsAndThen binds	$ \ binds' ->
-    mapFvRn (rnGRHS ctxt) grhss	`thenM` \ (grhss', fvGRHSs) ->
-    returnM (GRHSs grhss' binds', fvGRHSs)
-
-rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
-rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
-
-rnGRHS' ctxt (GRHS guards rhs)
-  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
-	; checkM (opt_GlasgowExts || is_standard_guard guards)
-	  	 (addWarn (nonStdGuardErr guards))
-
-	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
-				    rnLExpr rhs
-	; return (GRHS guards' rhs', fvs) }
-  where
-	-- Standard Haskell 1.4 guards are just a single boolean
-	-- expression, rather than a list of qualifiers as in the
-	-- Glasgow extension
-    is_standard_guard []                     = True
-    is_standard_guard [L _ (ExprStmt _ _ _)] = True
-    is_standard_guard other	      	     = False
-\end{code}
 
 %************************************************************************
 %*									*
@@ -266,7 +185,7 @@ rnExpr (HsCase expr matches)
     returnM (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs)
 
 rnExpr (HsLet binds expr)
-  = rnBindGroupsAndThen binds		$ \ binds' ->
+  = rnLocalBindsAndThen binds		$ \ binds' ->
     rnLExpr expr			 `thenM` \ (expr',fvExpr) ->
     returnM (HsLet binds' expr', fvExpr)
 
@@ -391,36 +310,6 @@ rnExpr (HsArrForm op fixity cmds)
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
 	-- DictApp, DictLam, TyApp, TyLam
-
----------------------------
--- Deal with fixity (cf mkOpAppRn for the method)
-
-mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
-	  -> LHsExpr Name -> Fixity 	-- Operator and fixity
-	  -> LHsCmdTop Name		-- Right operand (not an infix)
-	  -> RnM (HsCmd Name)
-
----------------------------
--- (e11 `op1` e12) `op2` e2
-mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _))
-	op2 fix2 a2
-  | nofix_error
-  = addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
-    returnM (HsArrForm op2 (Just fix2) [a1, a2])
-
-  | associate_right
-  = mkOpFormRn a12 op2 fix2 a2		`thenM` \ new_c ->
-    returnM (HsArrForm op1 (Just fix1)
-	[a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
-	-- TODO: locs are wrong
-  where
-    (nofix_error, associate_right) = compareFixity fix1 fix2
-
----------------------------
---	Default case
-mkOpFormRn arg1 op fix arg2 			-- Default case, no rearrangment
-  = returnM (HsArrForm op (Just fix) [arg1, arg2])
-
 \end{code}
 
 
@@ -721,22 +610,20 @@ rnStmt ctxt (BindStmt pat expr _ _) thing_inside
 	-- but it does not matter because the names are unique
 
 rnStmt ctxt (LetStmt binds) thing_inside
-  = do	{ checkErr (ok ctxt binds) (badIpBinds binds)
-	; rnBindGroupsAndThen binds		$ \ binds' -> do
+  = do	{ checkErr (ok ctxt binds) 
+		   (badIpBinds (ptext SLIT("a parallel list comprehension:")) binds)
+	; rnLocalBindsAndThen binds		$ \ binds' -> do
 	{ (thing, fvs) <- thing_inside
 	; return ((LetStmt binds', thing), fvs) }}
   where
 	-- We do not allow implicit-parameter bindings in a parallel
 	-- list comprehension.  I'm not sure what it might mean.
-    ok (ParStmtCtxt _) binds = not (any is_ip_bind binds)
-    ok _	       _     = True
-
-    is_ip_bind (HsIPBinds _) = True
-    is_ip_bind _	     = False
+    ok (ParStmtCtxt _) (HsIPBinds _) = False
+    ok _	       _	     = True
 
 rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
-  = bindLocatedLocalsRn doc (collectLStmtsBinders rec_stmts)	$ \ _ ->
-    rn_rec_stmts rec_stmts		`thenM` \ segs ->
+  = bindLocatedLocalsRn doc (collectLStmtsBinders rec_stmts)	$ \ bndrs ->
+    rn_rec_stmts bndrs rec_stmts	`thenM` \ segs ->
     thing_inside 			`thenM` \ (thing, fvs) ->
     let
 	segs_w_fwd_refs     	 = addFwdRefs segs
@@ -829,7 +716,7 @@ rnMDoStmts stmts thing_inside
   = 	-- Step1: bring all the binders of the mdo into scope
 	-- Remember that this also removes the binders from the
 	-- finally-returned free-vars
-    bindLocatedLocalsRn doc (collectLStmtsBinders stmts)	$ \ _ ->
+    bindLocatedLocalsRn doc (collectLStmtsBinders stmts)	$ \ bndrs ->
     do	{ 
 	-- Step 2: Rename each individual stmt, making a
 	--	   singleton segment.  At this stage the FwdRefs field
@@ -837,7 +724,7 @@ rnMDoStmts stmts thing_inside
 	--	   for which it's the fwd refs within the bind itself
 	-- 	   (This set may not be empty, because we're in a recursive 
 	--	    context.)
-	  segs <- rn_rec_stmts stmts
+	  segs <- rn_rec_stmts bndrs stmts
 
 	; (thing, fvs_later) <- thing_inside
 
@@ -864,20 +751,24 @@ rnMDoStmts stmts thing_inside
   where
     doc = text "In a recursive mdo-expression"
 
+---------------------------------------------
+rn_rec_stmts :: [Name] -> [LStmt RdrName] -> RnM [Segment (LStmt Name)]
+rn_rec_stmts bndrs stmts = mappM (rn_rec_stmt bndrs) stmts	`thenM` \ segs_s ->
+		   	   returnM (concat segs_s)
 
 ----------------------------------------------------
-rn_rec_stmt :: LStmt RdrName -> RnM [Segment (LStmt Name)]
+rn_rec_stmt :: [Name] -> LStmt RdrName -> RnM [Segment (LStmt Name)]
 	-- Rename a Stmt that is inside a RecStmt (or mdo)
 	-- Assumes all binders are already in scope
 	-- Turns each stmt into a singleton Stmt
 
-rn_rec_stmt (L loc (ExprStmt expr _ _))
+rn_rec_stmt all_bndrs (L loc (ExprStmt expr _ _))
   = rnLExpr expr 		`thenM` \ (expr', fvs) ->
     lookupSyntaxName thenMName	`thenM` \ (then_op, fvs1) ->
     returnM [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
 	      L loc (ExprStmt expr' then_op placeHolderType))]
 
-rn_rec_stmt (L loc (BindStmt pat expr _ _))
+rn_rec_stmt all_bndrs (L loc (BindStmt pat expr _ _))
   = rnLExpr expr		`thenM` \ (expr', fv_expr) ->
     rnLPat pat			`thenM` \ (pat', fv_pat) ->
     lookupSyntaxName bindMName	`thenM` \ (bind_op, fvs1) ->
@@ -889,22 +780,20 @@ rn_rec_stmt (L loc (BindStmt pat expr _ _))
     returnM [(bndrs, fvs, bndrs `intersectNameSet` fvs,
 	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
-rn_rec_stmt (L loc (LetStmt binds))
-  = rnBindGroups binds		`thenM` \ (binds', du_binds) ->
+rn_rec_stmt all_bndrs (L loc (LetStmt binds@(HsIPBinds _)))
+  = do	{ addErr (badIpBinds (ptext SLIT("an mdo expression")) binds)
+	; failM }
+
+rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds)))
+  = rnValBinds (trimWith all_bndrs) binds	`thenM` \ (binds', du_binds) ->
     returnM [(duDefs du_binds, duUses du_binds, 
-	      emptyNameSet, L loc (LetStmt binds'))]
+	      emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
-rn_rec_stmt (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
-  = rn_rec_stmts stmts
+rn_rec_stmt all_bndrs (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
+  = rn_rec_stmts all_bndrs stmts
 
-rn_rec_stmt stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
+rn_rec_stmt all_bndrs stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
-
----------------------------------------------
-rn_rec_stmts :: [LStmt RdrName] -> RnM [Segment (LStmt Name)]
-rn_rec_stmts stmts = mappM rn_rec_stmt stmts	`thenM` \ segs_s ->
-		     returnM (concat segs_s)
-
 
 ---------------------------------------------
 addFwdRefs :: [Segment a] -> [Segment a]
@@ -1009,151 +898,6 @@ segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
 
 %************************************************************************
 %*									*
-\subsubsection{Precedence Parsing}
-%*									*
-%************************************************************************
-
-@mkOpAppRn@ deals with operator fixities.  The argument expressions
-are assumed to be already correctly arranged.  It needs the fixities
-recorded in the OpApp nodes, because fixity info applies to the things
-the programmer actually wrote, so you can't find it out from the Name.
-
-Furthermore, the second argument is guaranteed not to be another
-operator application.  Why? Because the parser parses all
-operator appications left-associatively, EXCEPT negation, which
-we need to handle specially.
-
-\begin{code}
-mkOpAppRn :: LHsExpr Name			-- Left operand; already rearranged
-	  -> LHsExpr Name -> Fixity 		-- Operator and fixity
-	  -> LHsExpr Name			-- Right operand (not an OpApp, but might
-						-- be a NegApp)
-	  -> RnM (HsExpr Name)
-
----------------------------
--- (e11 `op1` e12) `op2` e2
-mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
-  | nofix_error
-  = addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
-    returnM (OpApp e1 op2 fix2 e2)
-
-  | associate_right
-  = mkOpAppRn e12 op2 fix2 e2		`thenM` \ new_e ->
-    returnM (OpApp e11 op1 fix1 (L loc' new_e))
-  where
-    loc'= combineLocs e12 e2
-    (nofix_error, associate_right) = compareFixity fix1 fix2
-
----------------------------
---	(- neg_arg) `op` e2
-mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
-  | nofix_error
-  = addErr (precParseErr (pp_prefix_minus,negateFixity) (ppr_op op2,fix2))	`thenM_`
-    returnM (OpApp e1 op2 fix2 e2)
-
-  | associate_right
-  = mkOpAppRn neg_arg op2 fix2 e2	`thenM` \ new_e ->
-    returnM (NegApp (L loc' new_e) neg_name)
-  where
-    loc' = combineLocs neg_arg e2
-    (nofix_error, associate_right) = compareFixity negateFixity fix2
-
----------------------------
---	e1 `op` - neg_arg
-mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp neg_arg _))	-- NegApp can occur on the right
-  | not associate_right				-- We *want* right association
-  = addErr (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))	`thenM_`
-    returnM (OpApp e1 op1 fix1 e2)
-  where
-    (_, associate_right) = compareFixity fix1 negateFixity
-
----------------------------
---	Default case
-mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
-  = ASSERT2( right_op_ok fix (unLoc e2),
-	     ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
-    )
-    returnM (OpApp e1 op fix e2)
-
--- Parser left-associates everything, but 
--- derived instances may have correctly-associated things to
--- in the right operarand.  So we just check that the right operand is OK
-right_op_ok fix1 (OpApp _ _ fix2 _)
-  = not error_please && associate_right
-  where
-    (error_please, associate_right) = compareFixity fix1 fix2
-right_op_ok fix1 other
-  = True
-
--- Parser initially makes negation bind more tightly than any other operator
--- And "deriving" code should respect this (use HsPar if not)
-mkNegAppRn :: LHsExpr id -> SyntaxExpr id -> RnM (HsExpr id)
-mkNegAppRn neg_arg neg_name
-  = ASSERT( not_op_app (unLoc neg_arg) )
-    returnM (NegApp neg_arg neg_name)
-
-not_op_app (OpApp _ _ _ _) = False
-not_op_app other	   = True
-\end{code}
-
-\begin{code}
-checkPrecMatch :: Bool -> Name -> MatchGroup Name -> RnM ()
-	-- True indicates an infix lhs
-	-- See comments with rnExpr (OpApp ...) about "deriving"
-
-checkPrecMatch False fn match 
-  = returnM ()
-checkPrecMatch True op (MatchGroup ms _)	
-  = mapM_ check ms			 	
-  where
-    check (L _ (Match (p1:p2:_) _ _))
-      = checkPrec op (unLoc p1) False	`thenM_`
-        checkPrec op (unLoc p2) True
-
-    check _ = panic "checkPrecMatch"
-
-checkPrec op (ConPatIn op1 (InfixCon _ _)) right
-  = lookupFixityRn op		`thenM` \  op_fix@(Fixity op_prec  op_dir) ->
-    lookupFixityRn (unLoc op1)	`thenM` \ op1_fix@(Fixity op1_prec op1_dir) ->
-    let
-	inf_ok = op1_prec > op_prec || 
-	         (op1_prec == op_prec &&
-		  (op1_dir == InfixR && op_dir == InfixR && right ||
-		   op1_dir == InfixL && op_dir == InfixL && not right))
-
-	info  = (ppr_op op,  op_fix)
-	info1 = (ppr_op op1, op1_fix)
-	(infol, infor) = if right then (info, info1) else (info1, info)
-    in
-    checkErr inf_ok (precParseErr infol infor)
-
-checkPrec op pat right
-  = returnM ()
-
--- Check precedence of (arg op) or (op arg) respectively
--- If arg is itself an operator application, then either
---   (a) its precedence must be higher than that of op
---   (b) its precedency & associativity must be the same as that of op
-checkSectionPrec :: FixityDirection -> HsExpr RdrName
-	-> LHsExpr Name -> LHsExpr Name -> RnM ()
-checkSectionPrec direction section op arg
-  = case unLoc arg of
-	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
-	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
-	other		 -> returnM ()
-  where
-    L _ (HsVar op_name) = op
-    go_for_it pp_arg_op arg_fix@(Fixity arg_prec assoc)
-	= lookupFixityRn op_name	`thenM` \ op_fix@(Fixity op_prec _) ->
-	  checkErr (op_prec < arg_prec
-		     || op_prec == arg_prec && direction == assoc)
-		  (sectionPrecErr (ppr_op op_name, op_fix) 	
-		  (pp_arg_op, arg_fix) section)
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsubsection{Assertion utils}
 %*									*
 %************************************************************************
@@ -1177,30 +921,13 @@ mkAssertErrorExpr
 %************************************************************************
 
 \begin{code}
-ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
-pp_prefix_minus = ptext SLIT("prefix `-'")
-
-nonStdGuardErr guard
-  = hang (ptext
-    SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)")
-    ) 4 (ppr guard)
-
 patSynErr e 
   = sep [ptext SLIT("Pattern syntax in expression context:"),
 	 nest 4 (ppr e)]
 
-#ifdef GHCI 
-checkTH e what = returnM ()	-- OK
-#else
-checkTH e what 	-- Raise an error in a stage-1 compiler
-  = addErr (vcat [ptext SLIT("Template Haskell") <+> text what <+>  
-	          ptext SLIT("illegal in a stage-1 compiler"),
-	          nest 2 (ppr e)])
-#endif   
-
 parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -fglasgow-exts"))
 
-badIpBinds binds
-  = hang (ptext SLIT("Implicit-parameter bindings illegal in a parallel list comprehension:")) 4
-	 (ppr binds)
+badIpBinds what binds
+  = hang (ptext SLIT("Implicit-parameter bindings illegal in") <+> what)
+	 2 (ppr binds)
 \end{code}

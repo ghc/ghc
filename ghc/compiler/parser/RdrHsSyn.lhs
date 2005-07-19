@@ -52,7 +52,7 @@ import HsSyn		-- Lots of it
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
-import BasicTypes	( RecFlag(..), maxPrecedence )
+import BasicTypes	( maxPrecedence )
 import Lexer		( P, failSpanMsgP )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
@@ -125,8 +125,8 @@ extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
 extractGenericPatTyVars binds
   = nubBy eqLocated (foldrBag get [] binds)
   where
-    get (L _ (FunBind _ _ (MatchGroup ms _))) acc = foldr (get_m.unLoc) acc ms
-    get other	    			      acc = acc
+    get (L _ (FunBind _ _ (MatchGroup ms _) _)) acc = foldr (get_m.unLoc) acc ms
+    get other	    			        acc = acc
 
     get_m (Match (L _ (TypePat ty) : _) _ _) acc = extract_lty ty acc
     get_m other			       		   acc = acc
@@ -197,10 +197,10 @@ cvTopDecls decls = go (fromOL decls)
 			    where (L l' b', ds') = getMonoBind (L l b) ds
     go (d : ds)   	    = d : go ds
 
-cvBindGroup :: OrdList (LHsDecl RdrName) -> HsBindGroup RdrName
+cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
 cvBindGroup binding
   = case (cvBindsAndSigs binding) of { (mbs, sigs) ->
-    HsBindGroup mbs sigs Recursive -- just one big group for now
+    ValBindsIn mbs sigs
     }
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
@@ -230,17 +230,16 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 --
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
--- gaw 2004
-getMonoBind (L loc (FunBind lf@(L _ f) inf (MatchGroup mtchs _))) binds
+getMonoBind (L loc (FunBind lf@(L _ f) inf (MatchGroup mtchs _) _)) binds
   | has_args mtchs
   = go mtchs loc binds
   where
-    go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 (MatchGroup mtchs2 _))) : binds)
+    go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 (MatchGroup mtchs2 _) _)) : binds)
 	| f == unLoc f2 = go (mtchs2++mtchs1) loc binds
 	where loc = combineSrcSpans loc1 loc2
     go mtchs1 loc binds
-	= (L loc (FunBind lf inf (mkMatchGroup (reverse mtchs1))), binds)
-	-- reverse the final matches, to get it back in the right order
+	= (L loc (FunBind lf inf (mkMatchGroup (reverse mtchs1)) placeHolderNames), binds)
+	-- Reverse the final matches, to get it back in the right order
 
 getMonoBind bind binds = (bind, binds)
 
@@ -253,12 +252,10 @@ has_args ((L _ (Match args _ _)) : _) = not (null args)
 
 \begin{code}
 findSplice :: [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
-findSplice ds = addl oneEmptyBindGroup ds
+findSplice ds = addl emptyRdrGroup ds
 
 mkGroup :: [LHsDecl a] -> HsGroup a
-mkGroup ds = addImpDecls oneEmptyBindGroup ds
-
-oneEmptyBindGroup = emptyGroup{ hs_valds = [HsBindGroup emptyBag [] Recursive] }
+mkGroup ds = addImpDecls emptyRdrGroup ds
 
 addImpDecls :: HsGroup a -> [LHsDecl a] -> HsGroup a
 -- The decls are imported, and should not have a splice
@@ -309,8 +306,8 @@ add gp@(HsGroup {hs_depds  = ts})  l (DeprecD d) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
 
-add_bind b [HsBindGroup bs sigs r] = [HsBindGroup (bs `snocBag` b) sigs     r]
-add_sig  s [HsBindGroup bs sigs r] = [HsBindGroup bs	           (s:sigs) r]
+add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
+add_sig  s (ValBindsIn bs sigs) = ValBindsIn bs	              (s:sigs) 
 \end{code}
 
 %************************************************************************
@@ -591,12 +588,13 @@ checkValDef lhs opt_sig (L rhs_span grhss)
 					showRdrName (unLoc f))
 	else do ps <- checkPatterns es
 		let match_span = combineSrcSpans (getLoc lhs) rhs_span
-		return (FunBind f inf (mkMatchGroup [L match_span (Match ps opt_sig grhss)]))
+		    matches    = mkMatchGroup [L match_span (Match ps opt_sig grhss)]
+		return (FunBind f inf matches  placeHolderNames)
 	-- The span of the match covers the entire equation.  
 	-- That isn't quite right, but it'll do for now.
   | otherwise = do
 	lhs <- checkPattern lhs
-	return (PatBind lhs grhss placeHolderType)
+	return (PatBind lhs grhss placeHolderType placeHolderNames)
 
 checkValSig
 	:: LHsExpr RdrName

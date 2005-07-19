@@ -28,7 +28,7 @@ module TcUnify (
 
 import HsSyn		( HsExpr(..) , MatchGroup(..), HsMatchContext(..), 
 			  hsLMatchPats, pprMatches, pprMatchContext )
-import TcHsSyn		( mkHsLet, mkHsDictLam,
+import TcHsSyn		( mkHsDictLet, mkHsDictLam,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
 import TypeRep		( Type(..), PredType(..), TyNote(..) )
 
@@ -670,7 +670,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	    -- It's a bit out of place here, but using AbsBind involves inventing
 	    -- a couple of new names which seems worse.
 		dict_ids = map instToId dicts
-		co_fn e  = TyLam forall_tvs (mkHsDictLam dict_ids (mkHsLet inst_binds (noLoc e)))
+		co_fn e  = TyLam forall_tvs (mkHsDictLam dict_ids (mkHsDictLet inst_binds (noLoc e)))
 	; returnM (mkCoercion co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs

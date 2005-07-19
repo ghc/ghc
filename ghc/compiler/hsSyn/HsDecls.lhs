@@ -16,7 +16,7 @@ module HsDecls (
 	CImportSpec(..), FoType(..),
 	ConDecl(..), LConDecl,	
 	DeprecDecl(..),  LDeprecDecl,
-	HsGroup(..),  emptyGroup, appendGroups,
+	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, 
 	countTyClDecls,
@@ -30,15 +30,16 @@ module HsDecls (
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
-import HsBinds		( HsBindGroup(..), HsBind, LHsBinds, 
-			  Sig(..), LSig, LFixitySig, pprLHsBinds )
+import HsBinds		( HsValBinds(..), HsBind, LHsBinds, plusHsValBinds,
+			  Sig(..), LSig, LFixitySig, pprLHsBinds,
+			  emptyValBindsIn, emptyValBindsOut )
 import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
 import HsTypes
 import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
 import Kind		( Kind, pprKind )
-import BasicTypes	( Activation(..), RecFlag(..) )
+import BasicTypes	( Activation(..) )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 			  CExportSpec(..), CLabelString ) 
 
@@ -47,7 +48,6 @@ import FunDeps		( pprFundeps )
 import Class		( FunDep )
 import Outputable	
 import Util		( count )
-import Bag		( emptyBag )
 import SrcLoc		( Located(..), unLoc )
 import FastString
 \end{code}
@@ -90,12 +90,7 @@ data HsDecl id
 -- fed to the renamer.
 data HsGroup id
   = HsGroup {
-	hs_valds  :: [HsBindGroup id],
-		-- Before the renamer, this is a single big HsBindGroup,
-		-- with all the bindings, and all the signatures.
-		-- The renamer does dependency analysis, splitting it up
-		-- into several HsBindGroups.
-
+	hs_valds  :: HsValBinds id,
 	hs_tyclds :: [LTyClDecl id],
 	hs_instds :: [LInstDecl id],
 
@@ -109,8 +104,11 @@ data HsGroup id
 	hs_ruleds :: [LRuleDecl id]
   }
 
-emptyGroup = HsGroup { hs_valds = [],
-		       hs_tyclds = [], hs_instds = [],
+emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
+emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
+emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
+
+emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
 		       hs_depds = [] ,hs_ruleds = [] }
 
@@ -136,7 +134,7 @@ appendGroups
 	hs_ruleds = rulds2 }
   = 
     HsGroup { 
-	hs_valds  = val_groups1 ++ val_groups2,
+	hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
 	hs_tyclds = tyclds1 ++ tyclds2, 
 	hs_instds = instds1 ++ instds2,
 	hs_fixds  = fixds1 ++ fixds2, 

@@ -14,7 +14,8 @@ module IfaceType (
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
-	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, toIfaceTyCon,
+	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, 
+	toIfaceTyCon, toIfaceTyCon_name,
 
 	-- Printing
 	pprIfaceType, pprParendIfaceType, pprIfaceContext, 
@@ -26,12 +27,13 @@ module IfaceType (
 #include "HsVersions.h"
 
 import Kind		( Kind(..) )
-import TypeRep		( Type(..), TyNote(..), PredType(..), ThetaType )
-import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
+import TypeRep		( TyThing(..), Type(..), TyNote(..), PredType(..), ThetaType )
+import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
 import OccName		( OccName, parenSymOcc )
-import Name		( Name, getName, getOccName, nameModule, nameOccName )
+import Name		( Name, getName, getOccName, nameModule, nameOccName,
+			  wiredInNameTyThing_maybe )
 import Module		( Module )
 import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
 import Outputable
@@ -345,8 +347,27 @@ toIfaceType ext (NoteTy (SynNote tc_app) ty) = toIfaceType ext tc_app	-- Retain 
 toIfaceType ext (NoteTy other_note ty)	     = toIfaceType ext ty
 
 ----------------
+-- A little bit of (perhaps optional) trickiness here.  When
+-- compiling Data.Tuple, the tycons are not TupleTyCons, although
+-- they have a wired-in name.  But we'd like to dump them into the Iface
+-- as a tuple tycon, to save lookups when reading the interface
+-- Hence a tuple tycon may 'miss' in toIfaceTyCon, but then
+-- toIfaceTyCon_name will still catch it.
+
 toIfaceTyCon :: (Name -> IfaceExtName) -> TyCon -> IfaceTyCon
 toIfaceTyCon ext tc 
+  | isTupleTyCon tc = IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
+  | otherwise	    = toIfaceTyCon_name ext (tyConName tc)
+
+toIfaceTyCon_name :: (Name -> IfaceExtName) -> Name -> IfaceTyCon
+toIfaceTyCon_name ext nm
+  | Just (ATyCon tc) <- wiredInNameTyThing_maybe nm
+  = toIfaceWiredInTyCon ext tc nm
+  | otherwise
+  = IfaceTc (ext nm)
+
+toIfaceWiredInTyCon :: (Name -> IfaceExtName) -> TyCon -> Name -> IfaceTyCon
+toIfaceWiredInTyCon ext tc nm
   | isTupleTyCon tc     = IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
   | nm == intTyConName  = IfaceIntTc
   | nm == boolTyConName = IfaceBoolTc 
@@ -354,8 +375,6 @@ toIfaceTyCon ext tc
   | nm == listTyConName = IfaceListTc 
   | nm == parrTyConName = IfacePArrTc 
   | otherwise		= IfaceTc (ext nm)
-  where
-    nm = getName tc
 
 ----------------
 toIfaceTypes ext ts = map (toIfaceType ext) ts

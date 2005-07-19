@@ -442,6 +442,9 @@ type InlinePragInfo = Activation
 	--
 	-- If there was an INLINE pragma, then as a separate matter, the
 	-- RHS will have been made to look small with a CoreSyn Inline Note
+
+	-- The default InlinePragInfo is AlwaysActive, so the info serves
+	-- entirely as a way to inhibit inlining until we want it
 \end{code}
 
 
