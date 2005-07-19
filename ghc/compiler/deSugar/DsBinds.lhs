@@ -30,7 +30,7 @@ import OccurAnal	( occurAnalyseExpr )
 import CostCentre	( mkAutoCC, IsCafCC(..) )
 import Id		( Id, idType, idName, isExportedId, mkLocalId, setInlinePragma )
 import Rules		( addIdSpecialisations, mkLocalRule )
-import Var		( Var, isGlobalId )
+import Var		( Var, isGlobalId, setIdNotExported )
 import VarEnv
 import Type		( mkTyVarTy, substTyWith )
 import TysWiredIn	( voidTy )
@@ -183,6 +183,8 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 --
 -- Spec bind:	f_spec = Let f = /\ab \(d1:Eq a)(d2:Ix b). let binds in f_mono 
 --			 /\b.\(d:Ix b). in f Int b dInt d
+--		The idea is that f occurs just once, so it'll be 
+--		inlined and specialised
 
 dsSpec all_tvs dicts tvs poly_id mono_id mono_bind (InlinePrag {})
   = return Nothing
@@ -200,8 +202,11 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 
 	    Just (bndrs', var, args) -> return (Just ((spec_id, spec_rhs), rule))
 		where
+		  local_poly  = setIdNotExported poly_id
+			-- Very important to make the 'f' non-exported,
+			-- else it won't be inlined!
 		  spec_id     = mkLocalId spec_name spec_ty
-		  spec_rhs    = Let (NonRec poly_id poly_f_body) ds_spec_expr
+		  spec_rhs    = Let (NonRec local_poly poly_f_body) ds_spec_expr
 		  poly_f_body = mkLams (tvs ++ dicts) $
 			   	fix_up (Let mono_bind (Var mono_id))
 
