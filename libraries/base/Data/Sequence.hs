@@ -90,7 +90,8 @@ import Test.QuickCheck
 #endif
 
 #if __GLASGOW_HASKELL__
-import Data.Generics.Basics (Data(..), mkNorepType)
+import Data.Generics.Basics (Data(..), Fixity(..),
+			constrIndex, mkConstr, mkDataType)
 #endif
 
 infixr 5 `consTree`
@@ -143,18 +144,26 @@ INSTANCE_TYPEABLE1(Seq,seqTc,"Seq")
 
 #if __GLASGOW_HASKELL__
 instance Data a => Data (Seq a) where
-	gfoldl f z	= gfoldSeq f z id
-	toConstr _	= error "toConstr"
-	gunfold _ _	= error "gunfold"
-	dataTypeOf _	= mkNorepType "Data.Sequence.Seq"
+	gfoldl f z s	= case viewl s of
+		EmptyL	-> z empty
+		x :< xs -> z (<|) `f` x `f` xs
 
--- Treat the type as consisting of constructors of arity 0, 1, 2, ...
-gfoldSeq :: Data a => (forall a b. Data a => c (a -> b) -> a -> c b) ->
-	(forall g. g -> c g) -> (Seq a -> r) -> Seq a -> c r
-gfoldSeq f z k s = case viewr s of
-	EmptyR -> z (k empty)
-	xs :> x -> gfoldSeq f z (snoc k) xs `f` x
-  where	snoc k xs x = k (xs |> x)
+	gunfold k z c	= case constrIndex c of
+		1 -> z empty
+		2 -> k (k (z (<|)))
+		_ -> error "gunfold"
+
+	toConstr xs
+	  | null xs	= emptyConstr
+	  | otherwise	= consConstr
+
+	dataTypeOf _	= seqDataType
+
+	dataCast1	= gcast1
+
+emptyConstr = mkConstr seqDataType "empty" [] Prefix
+consConstr  = mkConstr seqDataType "<|" [] Infix
+seqDataType = mkDataType "Data.Sequence.Seq" [emptyConstr, consConstr]
 #endif
 
 -- Finger trees
