@@ -387,7 +387,7 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
 	<term>
-          <constant><replaceable>os</replaceable>_OS=1</constant>
+          <constant><replaceable>os</replaceable>_HOST_OS=1</constant>
         </term>
 	<listitem>
 	  <para>This define allows conditional compilation based on
@@ -400,7 +400,7 @@ $ cat foo.hspp</screen>
 	
       <varlistentry>
 	<term>
-          <constant><replaceable>arch</replaceable>_ARCH=1</constant>
+          <constant><replaceable>arch</replaceable>_HOST_ARCH=1</constant>
         </term>
 	<listitem>
 	  <para>This define allows conditional compilation based on
