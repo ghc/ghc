@@ -62,6 +62,17 @@ ghcpkg03 :
 	@: # and another update of test.pkg will now hide dep-2.0
 	$(GHC_PKG) update --force test.pkg
 
+
+# Test that importing a module exposed by two packages reports a conflict
+ghcpkg04 :
+	@rm -f $(PKGCONF)
+	@echo "[]" >$(PKGCONF)
+	@$(GHC_PKG) register --force test.pkg >/dev/null 2>&1 
+	@$(GHC_PKG) register --force test2.pkg >/dev/null 2>&1 
+	@$(GHC_PKG) expose testpkg-2.0  >/dev/null 2>&1
+	@: # we now have testpkg-1.2.3.4 and testpkg-2.0 both exposed
+	@$(TEST_HC) -package-conf $(PKGCONF) -c ghcpkg04.hs || true
+
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
 # every package we know about.  This is for testing the pretty printing/parsing
