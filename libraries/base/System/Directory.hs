@@ -194,6 +194,16 @@ setPermissions name (Permissions r w e s) = do
    modifyBit False m b = m .&. (complement b)
    modifyBit True  m b = m .|. b
 
+
+copyPermissions :: FilePath -> FilePath -> IO ()
+copyPermissions source dest = do
+  allocaBytes sizeof_stat $ \ p_stat -> do
+  withCString source $ \p_source -> do
+  withCString dest $ \p_dest -> do
+    throwErrnoIfMinus1_ "copyPermissions" $ c_stat p_source p_stat
+    mode <- st_mode p_stat
+    throwErrnoIfMinus1_ "copyPermissions" $ c_chmod p_dest mode
+
 -----------------------------------------------------------------------------
 -- Implementation
 
@@ -493,14 +503,14 @@ copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
 #if (!(defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ > 600))
 	do readFile fromFPath >>= writeFile toFPath
-	   try (getPermissions fromFPath >>= setPermissions toFPath)
+	   try (copyPermissions fromFPath toFPath)
 	   return ()
 #else
 	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
 	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
 	 allocaBytes bufferSize $ \buffer -> do
 		copyContents hFrom hTo buffer
-		try (getPermissions fromFPath >>= setPermissions toFPath)
+		try (copyPermissions fromFPath toFPath)
 		return ()) `catch` (ioError . changeFunName)
 	where
 		bufferSize = 1024
