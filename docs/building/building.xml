@@ -1220,8 +1220,9 @@ $ cvs checkout nofib/spectral</screen>
           Perl version 5 at least is required.  GHC has been known to
           tickle bugs in Perl, so if you find that Perl crashes when
           running GHC try updating (or downgrading) your Perl
-          installation.  Versions of Perl that we use and are known to
-          be fairly stable are 5.005 and 5.6.1.</para>
+          installation.  Versions of Perl before 5.6 have been known to have
+          various bugs tickled by GHC, so the configure script
+          will look for version 5.6 or later.</para>
 
 	  <para>For Win32 platforms, you should use the binary
           supplied in the InstallShield (copy it to
