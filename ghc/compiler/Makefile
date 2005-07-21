@@ -359,7 +359,7 @@ SRC_HC_OPTS += -Istage$(stage)
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
   specialise simplCore stranal stgSyn simplStg codeGen main \
-  profiling parser cprAnalysis compMan ndpFlatten iface cmm
+  profiling parser cprAnalysis ndpFlatten iface cmm
 
 # Make sure we include Config.hs even if it doesn't exist yet...
 ALL_SRCS += $(CONFIG_HS)
@@ -564,7 +564,6 @@ utils/FastMutInt_HC_OPTS	+= -O
 # DriverMkDepend), causing some of them to be commoned up.  We have a fix for
 # this in 5.00+, but earlier versions of the compiler will need CSE turned off.
 # To be on the safe side, we disable CSE in *all* modules with top-level IORefs.
-compMan/CompManager_HC_OPTS	= -fno-cse
 ghci/InteractiveUI_HC_OPTS	= -fno-cse
 main/CmdLineOpts_HC_OPTS	= -fno-cse
 main/DriverMkDepend_HC_OPTS	= -fno-cse
