@@ -977,13 +977,6 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-fnumbers-strict</option></entry>
-	      <entry>Make numbers strict</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-numbers-strict</option></entry>
-	    </row>
-
-	    <row>
 	      <entry><option>-funbox-strict-fields</option></entry>
 	      <entry>Flatten strict constructor fields</entry>
 	      <entry>dynamic</entry>
