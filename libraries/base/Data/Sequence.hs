@@ -22,7 +22,7 @@
 --
 --    * Ralf Hinze and Ross Paterson,
 --	\"Finger trees: a simple general-purpose data structure\",
---	submitted to /Journal of Functional Programming/.
+--	to appear in /Journal of Functional Programming/.
 --	<http://www.soi.city.ac.uk/~ross/papers/FingerTree.html>
 --
 -- /Note/: Many of these operations have the same names as similar
@@ -177,6 +177,8 @@ data FingerTree a
 #endif
 
 instance Sized a => Sized (FingerTree a) where
+	{-# SPECIALIZE instance Sized (FingerTree (Elem a)) #-}
+	{-# SPECIALIZE instance Sized (FingerTree (Node a)) #-}
 	size Empty		= 0
 	size (Single x)		= size x
 	size (Deep v _ _ _)	= v
@@ -211,6 +213,8 @@ instance Functor Digit where
 	fmap f (Four a b c d) = Four (f a) (f b) (f c) (f d)
 
 instance Sized a => Sized (Digit a) where
+	{-# SPECIALIZE instance Sized (Digit (Elem a)) #-}
+	{-# SPECIALIZE instance Sized (Digit (Node a)) #-}
 	size xs = foldlDigit (\ i x -> i + size x) 0 xs
 
 {-# SPECIALIZE digitToTree :: Digit (Elem a) -> FingerTree (Elem a) #-}
