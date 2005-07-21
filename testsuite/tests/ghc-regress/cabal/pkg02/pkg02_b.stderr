@@ -1,0 +1,4 @@
+
+A.hs:1:0:
+    conflict: module `Network' belongs to the current program/library
+    and also to package network-1.0
