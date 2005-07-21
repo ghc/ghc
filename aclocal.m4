@@ -597,9 +597,6 @@ dnl contains path to perl binary
 dnl
 AC_DEFUN(FPTOOLS_CHECK_PERL_VERSION,
 [$PerlCmd -v >conftest.out 2>&1
-if grep "version 5" conftest.out >/dev/null 2>&1; then
-   :
-else
    if grep "v5.6" conftest.out >/dev/null 2>&1; then
       :
    else
@@ -609,11 +606,10 @@ else
          if grep "version 6" conftest.out >/dev/null 2>&1; then
             :
          else
-            echo "Your version of perl probably won't work."
-         fi  
+            AC_MSG_ERROR([your version of perl probably won't work, try upgrading it.])
+         fi
       fi
    fi
-fi
 rm -fr conftest*
 ])
 
