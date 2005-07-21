@@ -625,7 +625,7 @@ cond_std (gla_exts, tycon)
   where
     data_cons       = tyConDataCons tycon
     no_cons_why	    = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
-    existential_why = quotes (ppr tycon) <+> ptext SLIT("has existentially-quantified constructor(s)")
+    existential_why = quotes (ppr tycon) <+> ptext SLIT("has non-Haskell-98 constructor(s)")
   
 cond_isEnumeration :: Condition
 cond_isEnumeration (gla_exts, tycon)

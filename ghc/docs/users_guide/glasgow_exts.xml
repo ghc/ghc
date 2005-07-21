@@ -3473,9 +3473,10 @@ type above, the type of each constructor must end with <literal> ... -> Term ...
 </para></listitem>
 
 <listitem><para>
-You cannot use a <literal>deriving</literal> clause on a GADT-style data type declaration,
-nor can you use record syntax.  (It's not clear what these constructs would mean.  For example,
-the record selectors might ill-typed.)  However, you can use strictness annotations, in the obvious places
+You cannot use record syntax on a GADT-style data type declaration.  (
+It's not clear what these it would mean.  For example,
+the record selectors might ill-typed.)
+However, you can use strictness annotations, in the obvious places
 in the constructor type:
 <programlisting>
   data Term a where
@@ -3483,6 +3484,23 @@ in the constructor type:
       If     :: Term Bool -> !(Term a) -> !(Term a) -> Term a
       Pair   :: Term a -> Term b -> Term (a,b)
 </programlisting>
+</para></listitem>
+
+<listitem><para>
+You can use a <literal>deriving</literal> clause on a GADT-style data type
+declaration, but only if the data type could also have been declared in
+Haskell-98 syntax.   For example, these two declarations are equivalent
+<programlisting>
+  data Maybe1 a where {
+      Nothing1 :: Maybe a ;
+      Just1    :: a -> Maybe a
+    } deriving( Eq, Ord )
+
+  data Maybe2 a = Nothing2 | Just2 a 
+       deriving( Eq, Ord )
+</programlisting>
+This simply allows you to declare a vanilla Haskell-98 data type using the
+<literal>where</literal> form without losing the <literal>deriving</literal> clause.
 </para></listitem>
 
 <listitem><para>
