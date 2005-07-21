@@ -128,8 +128,7 @@ System/Posix/Types.o Foreign/C/Types.o: include/CTypes.h
 
 # -----------------------------------------------------------------------------
 
-DIST_CLEAN_FILES += base.buildinfo config.cache config.status 
-LATE_DIST_CLEAN_FILES += config.mk
+DIST_CLEAN_FILES += base.buildinfo config.cache config.status config.mk
 
 include $(TOP)/mk/target.mk
 
