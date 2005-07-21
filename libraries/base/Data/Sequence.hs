@@ -120,7 +120,7 @@ instance Ord a => Ord (Seq a) where
 	compare xs ys = compare (toList xs) (toList ys)
 
 #if TESTING
-instance (Show a) => Show (Seq a) where
+instance Show a => Show (Seq a) where
 	showsPrec p (Seq x) = showsPrec p x
 #else
 instance Show a => Show (Seq a) where
@@ -179,6 +179,8 @@ instance Functor FingerTree where
 		Deep v (fmap f pr) (fmap (fmap f) m) (fmap f sf)
 
 {-# INLINE deep #-}
+{-# SPECIALIZE deep :: Digit (Elem a) -> FingerTree (Node (Elem a)) -> Digit (Elem a) -> FingerTree (Elem a) #-}
+{-# SPECIALIZE deep :: Digit (Node a) -> FingerTree (Node (Node a)) -> Digit (Node a) -> FingerTree (Node a) #-}
 deep		:: Sized a => Digit a -> FingerTree (Node a) -> Digit a -> FingerTree a
 deep pr m sf	=  Deep (size pr + size m + size sf) pr m sf
 
@@ -228,10 +230,14 @@ instance Sized (Node a) where
 	size (Node3 v _ _ _)	= v
 
 {-# INLINE node2 #-}
+{-# SPECIALIZE node2 :: Elem a -> Elem a -> Node (Elem a) #-}
+{-# SPECIALIZE node2 :: Node a -> Node a -> Node (Node a) #-}
 node2		:: Sized a => a -> a -> Node a
 node2 a b	=  Node2 (size a + size b) a b
 
 {-# INLINE node3 #-}
+{-# SPECIALIZE node3 :: Elem a -> Elem a -> Elem a -> Node (Elem a) #-}
+{-# SPECIALIZE node3 :: Node a -> Node a -> Node a -> Node (Node a) #-}
 node3		:: Sized a => a -> a -> a -> Node a
 node3 a b c	=  Node3 (size a + size b + size c) a b c
 
