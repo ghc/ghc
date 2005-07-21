@@ -41,6 +41,7 @@ import CLabel           ( CLabel, pprCLabel )
 import Panic		( panic )
 import Outputable
 import FastString
+import Constants       ( wORD_SIZE )
 
 import GLAEXTS
 
@@ -518,8 +519,8 @@ bit or 64 bit precision.
                            -- pretty-prints as
                            --       call 1f
                            -- 1:    popl %reg
-        
-          
+
+
 data Operand
   = OpReg  Reg	        -- register
   | OpImm  Imm	        -- immediate value
@@ -611,11 +612,8 @@ is_G_instr instr
 	      | BI	      Cond Bool Imm -- cond, annul?, target
     	      | BF  	      Cond Bool Imm -- cond, annul?, target
 
-	      | JMP	      DestInfo AddrMode      -- target
+	      | JMP	      AddrMode     -- target
 	      | CALL	      (Either Imm Reg) Int Bool -- target, args, terminal
-
-data RI = RIReg Reg
-	| RIImm Imm
 
 riZero :: RI -> Bool
 
@@ -629,12 +627,12 @@ riZero _			    = False
 -- alas -- can't have fpRelEA here because of module dependencies.
 fpRelEA :: Int -> Reg -> Instr
 fpRelEA n dst
-   = ADD False False fp (RIImm (ImmInt (n * BYTES_PER_WORD))) dst
+   = ADD False False fp (RIImm (ImmInt (n * wORD_SIZE))) dst
 
 -- Code to shift the stack pointer by n words.
 moveSp :: Int -> Instr
 moveSp n
-   = ADD False False sp (RIImm (ImmInt (n * BYTES_PER_WORD))) sp
+   = ADD False False sp (RIImm (ImmInt (n * wORD_SIZE))) sp
 
 -- Produce the second-half-of-a-double register given the first half.
 fPair :: Reg -> Reg

@@ -394,6 +394,9 @@ instance Uniquable Reg where
    getUnique (VirtualRegF u)  = u
    getUnique (VirtualRegD u)  = u
 
+unRealReg (RealReg i) = i
+unRealReg vreg        = pprPanic "unRealReg on VirtualReg" (ppr vreg)
+
 mkVReg :: Unique -> MachRep -> Reg
 mkVReg u rep
    = case rep of

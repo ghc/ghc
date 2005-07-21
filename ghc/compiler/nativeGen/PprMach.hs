@@ -48,6 +48,7 @@ import MutableArray
 
 import MONAD_ST
 import Char		( chr, ord )
+import Maybe            ( isJust )
 
 #if powerpc_TARGET_ARCH
 import DATA_WORD(Word32)
@@ -359,7 +360,7 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 -- -----------------------------------------------------------------------------
 -- pprSize: print a 'Size'
 
-#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
 pprSize :: MachRep -> Doc
 #else
 pprSize :: Size -> Doc
@@ -395,23 +396,19 @@ pprSize x = ptext (case x of
 	F64  -> SLIT("sd")	-- "scalar double-precision float" (SSE2)
 #endif
 #if sparc_TARGET_ARCH
-	B   -> SLIT("sb")
-	Bu  -> SLIT("ub")
-        H   -> SLIT("sh")
-        Hu  -> SLIT("uh")
-	W   -> SLIT("")
-	F   -> SLIT("")
-	DF  -> SLIT("d")
+	I8   -> SLIT("sb")
+        I16   -> SLIT("sh")
+	I32   -> SLIT("")
+	F32   -> SLIT("")
+	F64  -> SLIT("d")
     )
-pprStSize :: Size -> Doc
+pprStSize :: MachRep -> Doc
 pprStSize x = ptext (case x of
-	B   -> SLIT("b")
-	Bu  -> SLIT("b")
-	H   -> SLIT("h")
-	Hu  -> SLIT("h")
-	W   -> SLIT("")
-	F   -> SLIT("")
-	DF  -> SLIT("d")
+	I8   -> SLIT("b")
+	I16  -> SLIT("h")
+	I32  -> SLIT("")
+	F32  -> SLIT("")
+	F64  -> SLIT("d")
 #endif
 #if powerpc_TARGET_ARCH
 	I8   -> SLIT("b")
@@ -485,8 +482,14 @@ pprImm (ImmFloat _) = ptext SLIT("naughty float immediate")
 pprImm (ImmDouble _) = ptext SLIT("naughty double immediate")
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
+#if sparc_TARGET_ARCH
+-- ToDo: This should really be fixed in the PIC support, but only
+-- print a for now.
+pprImm (ImmConstantDiff a b) = pprImm a 
+#else
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
                             <> lparen <> pprImm b <> rparen
+#endif
 
 #if sparc_TARGET_ARCH
 pprImm (LO i)
@@ -1766,7 +1769,8 @@ pprCondInstr name cond arg
 --    ld  [g1],%fn
 --    ld  [g1+4],%f(n+1)
 --    sub g1,g2,g1           -- to restore g1
-pprInstr (LD DF (AddrRegReg g1 g2) reg)
+
+pprInstr (LD F64 (AddrRegReg g1 g2) reg)
   = vcat [
        hcat [ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg],
@@ -1777,7 +1781,7 @@ pprInstr (LD DF (AddrRegReg g1 g2) reg)
 -- Translate to
 --    ld  [addr],%fn
 --    ld  [addr+4],%f(n+1)
-pprInstr (LD DF addr reg) | isJust off_addr
+pprInstr (LD F64 addr reg) | isJust off_addr
   = vcat [
        hcat [pp_ld_lbracket, pprAddr addr, pp_rbracket_comma, pprReg reg],
        hcat [pp_ld_lbracket, pprAddr addr2, pp_rbracket_comma,pprReg (fPair reg)]
@@ -1805,7 +1809,7 @@ pprInstr (LD size addr reg)
 --    st  %fn,[g1]
 --    st  %f(n+1),[g1+4]
 --    sub g1,g2,g1           -- to restore g1
-pprInstr (ST DF reg (AddrRegReg g1 g2))
+pprInstr (ST F64 reg (AddrRegReg g1 g2))
  = vcat [
        hcat [ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
@@ -1818,7 +1822,7 @@ pprInstr (ST DF reg (AddrRegReg g1 g2))
 -- Translate to
 --    st  %fn,[addr]
 --    st  %f(n+1),[addr+4]
-pprInstr (ST DF reg addr) | isJust off_addr 
+pprInstr (ST F64 reg addr) | isJust off_addr 
  = vcat [
       hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
             pprAddr addr, rbrack],
@@ -1893,12 +1897,12 @@ pprInstr (SETHI imm reg)
 
 pprInstr NOP = ptext SLIT("\tnop")
 
-pprInstr (FABS F reg1 reg2) = pprSizeRegReg SLIT("fabs") F reg1 reg2
-pprInstr (FABS DF reg1 reg2)
-  = (<>) (pprSizeRegReg SLIT("fabs") F reg1 reg2)
+pprInstr (FABS F32 reg1 reg2) = pprSizeRegReg SLIT("fabs") F32 reg1 reg2
+pprInstr (FABS F64 reg1 reg2)
+  = (<>) (pprSizeRegReg SLIT("fabs") F32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg SLIT("fmov") F (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg SLIT("fmov") F32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FADD size reg1 reg2 reg3)
   = pprSizeRegRegReg SLIT("fadd") size reg1 reg2 reg3
@@ -1907,22 +1911,22 @@ pprInstr (FCMP e size reg1 reg2)
 pprInstr (FDIV size reg1 reg2 reg3)
   = pprSizeRegRegReg SLIT("fdiv") size reg1 reg2 reg3
 
-pprInstr (FMOV F reg1 reg2) = pprSizeRegReg SLIT("fmov") F reg1 reg2
-pprInstr (FMOV DF reg1 reg2)
-  = (<>) (pprSizeRegReg SLIT("fmov") F reg1 reg2)
+pprInstr (FMOV F32 reg1 reg2) = pprSizeRegReg SLIT("fmov") F32 reg1 reg2
+pprInstr (FMOV F64 reg1 reg2)
+  = (<>) (pprSizeRegReg SLIT("fmov") F32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg SLIT("fmov") F (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg SLIT("fmov") F32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FMUL size reg1 reg2 reg3)
   = pprSizeRegRegReg SLIT("fmul") size reg1 reg2 reg3
 
-pprInstr (FNEG F reg1 reg2) = pprSizeRegReg SLIT("fneg") F reg1 reg2
-pprInstr (FNEG DF reg1 reg2)
-  = (<>) (pprSizeRegReg SLIT("fneg") F reg1 reg2)
+pprInstr (FNEG F32 reg1 reg2) = pprSizeRegReg SLIT("fneg") F32 reg1 reg2
+pprInstr (FNEG F64 reg1 reg2)
+  = (<>) (pprSizeRegReg SLIT("fneg") F32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg SLIT("fmov") F (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg SLIT("fmov") F32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FSQRT size reg1 reg2)     = pprSizeRegReg SLIT("fsqrt") size reg1 reg2
 pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("fsub") size reg1 reg2 reg3
@@ -1931,14 +1935,14 @@ pprInstr (FxTOy size1 size2 reg1 reg2)
     	ptext SLIT("\tf"),
 	ptext
     	(case size1 of
-    	    W  -> SLIT("ito")
-    	    F  -> SLIT("sto")
-    	    DF -> SLIT("dto")),
+    	    I32  -> SLIT("ito")
+    	    F32  -> SLIT("sto")
+    	    F64  -> SLIT("dto")),
 	ptext
     	(case size2 of
-    	    W  -> SLIT("i\t")
-    	    F  -> SLIT("s\t")
-    	    DF -> SLIT("d\t")),
+    	    I32  -> SLIT("i\t")
+    	    F32  -> SLIT("s\t")
+    	    F64  -> SLIT("d\t")),
 	pprReg reg1, comma, pprReg reg2
     ]
 
@@ -1959,41 +1963,38 @@ pprInstr (BF cond b lab)
 	pprImm lab
     ]
 
-pprInstr (JMP dsts addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
+pprInstr (JMP addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
 
 pprInstr (CALL (Left imm) n _)
   = hcat [ ptext SLIT("\tcall\t"), pprImm imm, comma, int n ]
 pprInstr (CALL (Right reg) n _)
   = hcat [ ptext SLIT("\tcall\t"), pprReg reg, comma, int n ]
-\end{code}
 
-Continue with SPARC-only printing bits and bobs:
-\begin{code}
 pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
 pprRI (RIImm r) = pprImm r
 
-pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg :: LitString -> MachRep -> Reg -> Reg -> Doc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
 	ptext name,
     	(case size of
-    	    F  -> ptext SLIT("s\t")
-    	    DF -> ptext SLIT("d\t")),
+    	    F32  -> ptext SLIT("s\t")
+    	    F64 -> ptext SLIT("d\t")),
 	pprReg reg1,
 	comma,
 	pprReg reg2
     ]
 
-pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: LitString -> MachRep -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
 	ptext name,
     	(case size of
-    	    F  -> ptext SLIT("s\t")
-    	    DF -> ptext SLIT("d\t")),
+    	    F32  -> ptext SLIT("s\t")
+    	    F64  -> ptext SLIT("d\t")),
 	pprReg reg1,
 	comma,
 	pprReg reg2,

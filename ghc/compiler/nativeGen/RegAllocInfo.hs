@@ -24,7 +24,7 @@ module RegAllocInfo (
 #include "HsVersions.h"
 
 import Cmm		( BlockId )
-#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
 import MachOp           ( MachRep(..) )
 #endif
 import MachInstrs
@@ -299,7 +299,7 @@ regUsage instr = case instr of
     FxTOy s1 s2 r1 r2 	-> usage ([r1], [r2])
 
     -- We assume that all local jumps will be BI/BF.  JMP must be out-of-line.
-    JMP   dst addr 	-> usage (regAddr addr, [])
+    JMP   addr 	        -> usage (regAddr addr, [])
 
     CALL  (Left imm)  n True  -> noUsage
     CALL  (Left imm)  n False -> usage (argRegs n, callClobberedRegs)
@@ -308,8 +308,8 @@ regUsage instr = case instr of
 
     _ 	    	    	-> noUsage
   where
-    usage (src, dst) = RU (regSetFromList (filter interesting src))
-    	    	    	  (regSetFromList (filter interesting dst))
+    usage (src, dst) = RU (filter interesting src)
+    	    	    	 (filter interesting dst)
 
     regAddr (AddrRegReg r1 r2) = [r1, r2]
     regAddr (AddrRegImm r1 _)  = [r1]
@@ -601,7 +601,7 @@ patchRegs instr env = case instr of
     FSQRT s r1 r2       -> FSQRT s (env r1) (env r2)
     FSUB  s r1 r2 r3    -> FSUB s (env r1) (env r2) (env r3)
     FxTOy s1 s2 r1 r2   -> FxTOy s1 s2 (env r1) (env r2)
-    JMP   dsts addr     -> JMP dsts (fixAddr addr)
+    JMP   addr          -> JMP (fixAddr addr)
     CALL  (Left i) n t  -> CALL (Left i) n t
     CALL  (Right r) n t -> CALL (Right (env r)) n t
     _ -> instr
@@ -724,11 +724,11 @@ mkSpillInstr reg delta slot
 #ifdef sparc_TARGET_ARCH
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
                         let{off_w = 1 + (off `div` 4);
-                            sz = case regClass vreg of {
-                                    RcInteger -> W;
-                                    RcFloat   -> F;
-                                    RcDouble  -> DF}}
-                        in ST sz dyn (fpRel (- off_w))
+                            sz = case regClass reg of {
+                                    RcInteger -> I32;
+				    RcFloat   -> F32;
+                                    RcDouble  -> F64}}
+                        in ST sz reg (fpRel (- off_w))
 #endif
 #ifdef powerpc_TARGET_ARCH
     let sz = case regClass reg of
@@ -765,11 +765,11 @@ mkLoadInstr reg delta slot
 #endif
 #if sparc_TARGET_ARCH
         let{off_w = 1 + (off `div` 4);
-            sz = case regClass vreg of {
-                   RcInteger -> W;
-                   RcFloat   -> F;
-                   RcDouble  -> DF}}
-        in LD sz (fpRel (- off_w)) dyn
+            sz = case regClass reg of {
+                   RcInteger -> I32;
+		   RcFloat   -> F32;
+                   RcDouble  -> F64}}
+        in LD sz (fpRel (- off_w)) reg
 #endif
 #if powerpc_TARGET_ARCH
     let sz = case regClass reg of

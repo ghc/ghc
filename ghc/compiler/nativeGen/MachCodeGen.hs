@@ -272,88 +272,61 @@ iselExpr64 expr
 
 #if sparc_TARGET_ARCH
 
-assignMem_I64Code addrTree valueTree
-   = iselExpr64 valueTree		`thenNat` \ (ChildCode64 vcode vrlo) ->
-     getRegister addrTree		`thenNat` \ register_addr ->
-     getNewRegNat IntRep		`thenNat` \ t_addr ->
-     let rlo = VirtualRegI vrlo
-         rhi = getHiVRegFromLo rlo
-         code_addr = registerCode register_addr t_addr
-         reg_addr  = registerName register_addr t_addr
-         -- Big-endian store
-         mov_hi = ST W rhi (AddrRegImm reg_addr (ImmInt 0))
-         mov_lo = ST W rlo (AddrRegImm reg_addr (ImmInt 4))
-     in
-         return (vcode `appOL` code_addr `snocOL` mov_hi `snocOL` mov_lo)
-
-
-assignReg_I64Code (StixTemp (StixVReg u_dst pk)) valueTree
-   = iselExpr64 valueTree		`thenNat` \ (ChildCode64 vcode vr_src_lo) ->
+assignMem_I64Code addrTree valueTree = do
+     Amode addr addr_code <- getAmode addrTree
+     ChildCode64 vcode rlo <- iselExpr64 valueTree  
+     (src, code) <- getSomeReg addrTree
      let 
-         r_dst_lo = mkVReg u_dst IntRep
-         r_src_lo = VirtualRegI vr_src_lo
+         rhi = getHiVRegFromLo rlo
+         -- Big-endian store
+         mov_hi = ST I32 rhi (AddrRegImm src (ImmInt 0))
+         mov_lo = ST I32 rlo (AddrRegImm src (ImmInt 4))
+     return (vcode `appOL` code `snocOL` mov_hi `snocOL` mov_lo)
+
+assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
+     ChildCode64 vcode r_src_lo <- iselExpr64 valueTree    
+     let 
+         r_dst_lo = mkVReg u_dst pk
          r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo
          mov_hi = mkMOV r_src_hi r_dst_hi
          mkMOV sreg dreg = OR False g0 (RIReg sreg) dreg
-     in
-         return (
-            vcode `snocOL` mov_hi `snocOL` mov_lo
-         )
+     return (vcode `snocOL` mov_hi `snocOL` mov_lo)
 assignReg_I64Code lvalue valueTree
-   = pprPanic "assignReg_I64Code(sparc): invalid lvalue"
-              (pprStixReg lvalue)
+   = panic "assignReg_I64Code(sparc): invalid lvalue"
 
 
 -- Don't delete this -- it's very handy for debugging.
 --iselExpr64 expr 
---   | trace ("iselExpr64: " ++ showSDoc (pprCmmExpr expr)) False
+--   | trace ("iselExpr64: " ++ showSDoc (ppr expr)) False
 --   = panic "iselExpr64(???)"
 
-iselExpr64 (CmmLoad I64 addrTree)
-   = getRegister addrTree		`thenNat` \ register_addr ->
-     getNewRegNat IntRep		`thenNat` \ t_addr ->
-     getNewRegNat IntRep		`thenNat` \ rlo ->
+iselExpr64 (CmmLoad addrTree I64) = do
+     Amode (AddrRegReg r1 r2) addr_code <- getAmode addrTree
+     rlo <- getNewRegNat I32
      let rhi = getHiVRegFromLo rlo
-         code_addr = registerCode register_addr t_addr
-         reg_addr  = registerName register_addr t_addr
-         mov_hi = LD W (AddrRegImm reg_addr (ImmInt 0)) rhi
-         mov_lo = LD W (AddrRegImm reg_addr (ImmInt 4)) rlo
-     in
-         return (
-            ChildCode64 (code_addr `snocOL` mov_hi `snocOL` mov_lo) 
-                        (getVRegUnique rlo)
-         )
+         mov_hi = LD I32 (AddrRegImm r1 (ImmInt 0)) rhi
+         mov_lo = LD I32 (AddrRegImm r1 (ImmInt 4)) rlo
+     return (
+            ChildCode64 (addr_code `snocOL` mov_hi `snocOL` mov_lo) 
+                         rlo
+          )
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg uq I64)))
-   = getNewRegNat IntRep 		`thenNat` \ r_dst_lo ->
+iselExpr64 (CmmReg (CmmLocal (LocalReg uq I64))) = do
+     r_dst_lo <-  getNewRegNat I32
      let r_dst_hi = getHiVRegFromLo r_dst_lo
-         r_src_lo = mkVReg vu IntRep
+         r_src_lo = mkVReg uq I32
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = mkMOV r_src_lo r_dst_lo
          mov_hi = mkMOV r_src_hi r_dst_hi
          mkMOV sreg dreg = OR False g0 (RIReg sreg) dreg
-     in
-         return (
-            ChildCode64 (toOL [mov_hi, mov_lo]) (getVRegUnique r_dst_lo)
+     return (
+            ChildCode64 (toOL [mov_hi, mov_lo]) r_dst_lo
          )
 
-iselExpr64 (StCall fn cconv I64 args)
-  = genCCall fn cconv kind args			`thenNat` \ call ->
-    getNewRegNat IntRep				`thenNat` \ r_dst_lo ->
-    let r_dst_hi = getHiVRegFromLo r_dst_lo
-        mov_lo = mkMOV o0 r_dst_lo
-        mov_hi = mkMOV o1 r_dst_hi
-        mkMOV sreg dreg = OR False g0 (RIReg sreg) dreg
-    in
-    return (
-       ChildCode64 (call `snocOL` mov_hi `snocOL` mov_lo) 
-                   (getVRegUnique r_dst_lo)
-    )
-
 iselExpr64 expr
-   = pprPanic "iselExpr64(sparc)" (pprCmmExpr expr)
+   = pprPanic "iselExpr64(sparc)" (ppr expr)
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -1326,253 +1299,191 @@ reg2reg rep src dst
 
 #if sparc_TARGET_ARCH
 
-getRegister (StFloat d)
-  = getBlockIdNat 	    	    `thenNat` \ lbl ->
-    getNewRegNat PtrRep    	    `thenNat` \ tmp ->
+getRegister (CmmLit (CmmFloat f F32)) = do
+    lbl <- getNewLabelNat
     let code dst = toOL [
-    	    SEGMENT DataSegment,
-	    NEWBLOCK lbl,
-	    DATA F [ImmFloat d],
-	    SEGMENT TextSegment,
-	    SETHI (HI (ImmCLbl lbl)) tmp,
-	    LD F (AddrRegImm tmp (LO (ImmCLbl lbl))) dst]
-    in
-    	return (Any F32 code)
+	    LDATA ReadOnlyData
+	                [CmmDataLabel lbl,
+			 CmmStaticLit (CmmFloat f F32)],
+	    SETHI (HI (ImmCLbl lbl)) dst,
+	    LD F32 (AddrRegImm dst (LO (ImmCLbl lbl))) dst] 
+    return (Any F32 code)
 
-getRegister (StDouble d)
-  = getBlockIdNat 	    	    `thenNat` \ lbl ->
-    getNewRegNat PtrRep    	    `thenNat` \ tmp ->
+getRegister (CmmLit (CmmFloat d F64)) = do
+    lbl <- getNewLabelNat
     let code dst = toOL [
-    	    SEGMENT DataSegment,
-	    NEWBLOCK lbl,
-	    DATA DF [ImmDouble d],
-	    SEGMENT TextSegment,
-	    SETHI (HI (ImmCLbl lbl)) tmp,
-	    LD DF (AddrRegImm tmp (LO (ImmCLbl lbl))) dst]
-    in
-    	return (Any F64 code)
+	    LDATA ReadOnlyData
+	                [CmmDataLabel lbl,
+			 CmmStaticLit (CmmFloat d F64)],
+	    SETHI (HI (ImmCLbl lbl)) dst,
+	    LD F64 (AddrRegImm dst (LO (ImmCLbl lbl))) dst] 
+    return (Any F64 code)
 
-
-getRegister (CmmMachOp mop [x]) -- unary PrimOps
+getRegister (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
-      MO_NatS_Neg      -> trivialUCode (SUB False False g0) x
-      MO_Nat_Not       -> trivialUCode (XNOR False g0) x
-      MO_32U_to_8U     -> trivialCode (AND False) x (StInt 255)
+      MO_S_Neg F32     -> trivialUFCode F32 (FNEG F32) x
+      MO_S_Neg F64     -> trivialUFCode F64 (FNEG F64) x
 
-      MO_F32_Neg       -> trivialUFCode F32 (FNEG F) x
-      MO_F64_Neg       -> trivialUFCode F64 (FNEG DF) x
+      MO_S_Neg rep     -> trivialUCode rep (SUB False False g0) x
+      MO_Not rep       -> trivialUCode rep (XNOR False g0) x
 
-      MO_F64_to_Flt    -> coerceDbl2Flt x
-      MO_F32_to_Dbl    -> coerceFlt2Dbl x
+      MO_U_Conv I32 I8 -> trivialCode I8 (AND False) x (CmmLit (CmmInt 255 I8))
 
-      MO_F32_to_NatS   -> coerceFP2Int F32 x
-      MO_NatS_to_Flt   -> coerceInt2FP F32 x
-      MO_F64_to_NatS   -> coerceFP2Int F64 x
-      MO_NatS_to_Dbl   -> coerceInt2FP F64 x
+      MO_U_Conv F64 F32-> coerceDbl2Flt x
+      MO_U_Conv F32 F64-> coerceFlt2Dbl x
+
+      MO_S_Conv F32 I32-> coerceFP2Int F32 I32 x
+      MO_S_Conv I32 F32-> coerceInt2FP I32 F32 x
+      MO_S_Conv F64 I32-> coerceFP2Int F64 I32 x
+      MO_S_Conv I32 F64-> coerceInt2FP I32 F64 x
 
       -- Conversions which are a nop on sparc
-      MO_32U_to_NatS   -> conversionNop IntRep   x
-      MO_32S_to_NatS  -> conversionNop IntRep   x
-      MO_NatS_to_32U   -> conversionNop WordRep  x
-      MO_32U_to_NatU   -> conversionNop WordRep  x
+      MO_U_Conv from to
+	| from == to   -> conversionNop to   x
+      MO_U_Conv I32 to -> conversionNop to   x
+      MO_S_Conv I32 to -> conversionNop to   x
 
-      MO_NatU_to_NatS -> conversionNop IntRep    x
-      MO_NatS_to_NatU -> conversionNop WordRep   x
-      MO_NatP_to_NatU -> conversionNop WordRep   x
-      MO_NatU_to_NatP -> conversionNop PtrRep    x
-      MO_NatS_to_NatP -> conversionNop PtrRep    x
-      MO_NatP_to_NatS -> conversionNop IntRep    x
+      -- widenings
+      MO_U_Conv I8 I32  -> integerExtend False I8 I32  x
+      MO_U_Conv I16 I32 -> integerExtend False I16 I32 x
+      MO_U_Conv I8 I16  -> integerExtend False I8 I16  x
+      MO_S_Conv I16 I32 -> integerExtend True I16 I32  x
 
-      -- sign-extending widenings
-      MO_8U_to_32U    -> integerExtend False 24 x
-      MO_8U_to_NatU   -> integerExtend False 24 x
-      MO_8S_to_NatS   -> integerExtend True  24 x
-      MO_16U_to_NatU  -> integerExtend False 16 x
-      MO_16S_to_NatS  -> integerExtend True  16 x
-
-      other_op ->
-        let fixed_x = if   is_float_op  -- promote to double
-                      then CmmMachOp MO_F32_to_Dbl [x]
-                      else x
-	in
-	getRegister (StCall (Left fn) CCallConv F64 [fixed_x])
+      other_op -> panic "Unknown unary mach op"
     where
-        integerExtend signed nBits x
-           = getRegister (
-                CmmMachOp (if signed then MO_Nat_Sar else MO_Nat_Shr) 
-                         [CmmMachOp MO_Nat_Shl [x, StInt nBits], StInt nBits]
-             )
+        -- XXX SLL/SRL?
+        integerExtend signed from to expr = do
+           (reg, e_code) <- getSomeReg expr
+	   let
+	       code dst =
+		   e_code `snocOL` 
+		   ((if signed then SRA else SRL)
+		          reg (RIImm (ImmInt 0)) dst)
+	   return (Any to code)
         conversionNop new_rep expr
-            = getRegister expr		`thenNat` \ e_code ->
-              return (swizzleRegisterRep e_code new_rep)
-
-	(is_float_op, fn)
-	  = case mop of
-	      MO_F32_Exp    -> (True,  FSLIT("exp"))
-	      MO_F32_Log    -> (True,  FSLIT("log"))
-	      MO_F32_Sqrt   -> (True,  FSLIT("sqrt"))
-
-	      MO_F32_Sin    -> (True,  FSLIT("sin"))
-	      MO_F32_Cos    -> (True,  FSLIT("cos"))
-	      MO_F32_Tan    -> (True,  FSLIT("tan"))
-
-	      MO_F32_Asin   -> (True,  FSLIT("asin"))
-	      MO_F32_Acos   -> (True,  FSLIT("acos"))
-	      MO_F32_Atan   -> (True,  FSLIT("atan"))
-
-	      MO_F32_Sinh   -> (True,  FSLIT("sinh"))
-	      MO_F32_Cosh   -> (True,  FSLIT("cosh"))
-	      MO_F32_Tanh   -> (True,  FSLIT("tanh"))
-
-	      MO_F64_Exp    -> (False, FSLIT("exp"))
-	      MO_F64_Log    -> (False, FSLIT("log"))
-	      MO_F64_Sqrt   -> (False, FSLIT("sqrt"))
-
-	      MO_F64_Sin    -> (False, FSLIT("sin"))
-	      MO_F64_Cos    -> (False, FSLIT("cos"))
-	      MO_F64_Tan    -> (False, FSLIT("tan"))
-
-	      MO_F64_Asin   -> (False, FSLIT("asin"))
-	      MO_F64_Acos   -> (False, FSLIT("acos"))
-	      MO_F64_Atan   -> (False, FSLIT("atan"))
-
-	      MO_F64_Sinh   -> (False, FSLIT("sinh"))
-	      MO_F64_Cosh   -> (False, FSLIT("cosh"))
-	      MO_F64_Tanh   -> (False, FSLIT("tanh"))
-
-              other -> pprPanic "getRegister(sparc) - binary CmmMachOp (2)" 
-                                (pprMachOp mop)
-
+            = do e_code <- getRegister expr
+                 return (swizzleRegisterRep e_code new_rep)
 
 getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
-      MO_32U_Gt  -> condIntReg GTT x y
-      MO_32U_Ge  -> condIntReg GE x y
-      MO_32U_Eq  -> condIntReg EQQ x y
-      MO_32U_Ne  -> condIntReg NE x y
-      MO_32U_Lt  -> condIntReg LTT x y
-      MO_32U_Le  -> condIntReg LE x y
+      MO_Eq F32 -> condFltReg EQQ x y
+      MO_Ne F32 -> condFltReg NE x y
 
-      MO_Nat_Eq   -> condIntReg EQQ x y
-      MO_Nat_Ne   -> condIntReg NE x y
+      MO_S_Gt F32 -> condFltReg GTT x y
+      MO_S_Ge F32 -> condFltReg GE x y 
+      MO_S_Lt F32 -> condFltReg LTT x y
+      MO_S_Le F32 -> condFltReg LE x y
 
-      MO_NatS_Gt  -> condIntReg GTT x y
-      MO_NatS_Ge  -> condIntReg GE x y
-      MO_NatS_Lt  -> condIntReg LTT x y
-      MO_NatS_Le  -> condIntReg LE x y
+      MO_Eq F64 -> condFltReg EQQ x y
+      MO_Ne F64 -> condFltReg NE x y
 
-      MO_NatU_Gt  -> condIntReg GU  x y
-      MO_NatU_Ge  -> condIntReg GEU x y
-      MO_NatU_Lt  -> condIntReg LU  x y
-      MO_NatU_Le  -> condIntReg LEU x y
+      MO_S_Gt F64 -> condFltReg GTT x y
+      MO_S_Ge F64 -> condFltReg GE x y
+      MO_S_Lt F64 -> condFltReg LTT x y
+      MO_S_Le F64 -> condFltReg LE x y
 
-      MO_F32_Gt -> condFltReg GTT x y
-      MO_F32_Ge -> condFltReg GE x y
-      MO_F32_Eq -> condFltReg EQQ x y
-      MO_F32_Ne -> condFltReg NE x y
-      MO_F32_Lt -> condFltReg LTT x y
-      MO_F32_Le -> condFltReg LE x y
+      MO_Eq rep -> condIntReg EQQ x y
+      MO_Ne rep -> condIntReg NE x y
 
-      MO_F64_Gt -> condFltReg GTT x y
-      MO_F64_Ge -> condFltReg GE x y
-      MO_F64_Eq -> condFltReg EQQ x y
-      MO_F64_Ne -> condFltReg NE x y
-      MO_F64_Lt -> condFltReg LTT x y
-      MO_F64_Le -> condFltReg LE x y
+      MO_S_Gt rep -> condIntReg GTT x y
+      MO_S_Ge rep -> condIntReg GE x y
+      MO_S_Lt rep -> condIntReg LTT x y
+      MO_S_Le rep -> condIntReg LE x y
+	      
+      MO_U_Gt I32  -> condIntReg GTT x y
+      MO_U_Ge I32  -> condIntReg GE x y
+      MO_U_Lt I32  -> condIntReg LTT x y
+      MO_U_Le I32  -> condIntReg LE x y
 
-      MO_Nat_Add -> trivialCode (ADD False False) x y
-      MO_Nat_Sub -> trivialCode (SUB False False) x y
+      MO_U_Gt I16 -> condIntReg GU  x y
+      MO_U_Ge I16 -> condIntReg GEU x y
+      MO_U_Lt I16 -> condIntReg LU  x y
+      MO_U_Le I16 -> condIntReg LEU x y
 
-      MO_NatS_Mul  -> trivialCode (SMUL False) x y
-      MO_NatU_Mul  -> trivialCode (UMUL False) x y
-      MO_NatS_MulMayOflo -> imulMayOflo x y
+      MO_Add I32 -> trivialCode I32 (ADD False False) x y
+      MO_Sub I32 -> trivialCode I32 (SUB False False) x y
 
+      MO_S_MulMayOflo rep -> imulMayOflo rep x y
+{-
       -- ToDo: teach about V8+ SPARC div instructions
-      MO_NatS_Quot -> idiv FSLIT(".div")  x y
-      MO_NatS_Rem  -> idiv FSLIT(".rem")  x y
-      MO_NatU_Quot -> idiv FSLIT(".udiv")  x y
-      MO_NatU_Rem  -> idiv FSLIT(".urem")  x y
+      MO_S_Quot I32 -> idiv FSLIT(".div")  x y
+      MO_S_Rem I32  -> idiv FSLIT(".rem")  x y
+      MO_U_Quot I32 -> idiv FSLIT(".udiv")  x y
+      MO_U_Rem I32  -> idiv FSLIT(".urem")  x y
+-}
+      MO_Add F32  -> trivialFCode F32 FADD  x y
+      MO_Sub F32   -> trivialFCode F32  FSUB x y
+      MO_Mul F32   -> trivialFCode F32  FMUL  x y
+      MO_S_Quot F32   -> trivialFCode F32  FDIV x y
 
-      MO_F32_Add   -> trivialFCode F32  FADD x y
-      MO_F32_Sub   -> trivialFCode F32  FSUB x y
-      MO_F32_Mul   -> trivialFCode F32  FMUL x y
-      MO_F32_Div   -> trivialFCode F32  FDIV x y
+      MO_Add F64   -> trivialFCode F64 FADD  x y
+      MO_Sub F64   -> trivialFCode F64  FSUB x y
+      MO_Mul F64   -> trivialFCode F64  FMUL x y
+      MO_S_Quot F64   -> trivialFCode F64  FDIV x y
 
-      MO_F64_Add   -> trivialFCode F64 FADD x y
-      MO_F64_Sub   -> trivialFCode F64 FSUB x y
-      MO_F64_Mul   -> trivialFCode F64 FMUL x y
-      MO_F64_Div   -> trivialFCode F64 FDIV x y
+      MO_And rep   -> trivialCode rep (AND False) x y
+      MO_Or rep    -> trivialCode rep (OR  False) x y
+      MO_Xor rep   -> trivialCode rep (XOR False) x y
 
-      MO_Nat_And   -> trivialCode (AND False) x y
-      MO_Nat_Or    -> trivialCode (OR  False) x y
-      MO_Nat_Xor   -> trivialCode (XOR False) x y
+      MO_Mul rep -> trivialCode rep (SMUL False) x y
 
-      MO_Nat_Shl   -> trivialCode SLL x y
-      MO_Nat_Shr   -> trivialCode SRL x y
-      MO_Nat_Sar   -> trivialCode SRA x y
+      MO_Shl rep   -> trivialCode rep SLL  x y
+      MO_U_Shr rep   -> trivialCode rep SRL x y
+      MO_S_Shr rep   -> trivialCode rep SRA x y
 
+{-
       MO_F32_Pwr  -> getRegister (StCall (Left FSLIT("pow")) CCallConv F64 
                                          [promote x, promote y])
 		       where promote x = CmmMachOp MO_F32_to_Dbl [x]
       MO_F64_Pwr -> getRegister (StCall (Left FSLIT("pow")) CCallConv F64 
                                         [x, y])
-
+-}
       other -> pprPanic "getRegister(sparc) - binary CmmMachOp (1)" (pprMachOp mop)
   where
-    idiv fn x y = getRegister (StCall (Left fn) CCallConv IntRep [x, y])
+    --idiv fn x y = getRegister (StCall (Left fn) CCallConv I32 [x, y])
 
     --------------------
-    imulMayOflo :: CmmExpr -> CmmExpr -> NatM Register
-    imulMayOflo a1 a2
-       = getNewRegNat IntRep		`thenNat` \ t1 ->
-         getNewRegNat IntRep		`thenNat` \ t2 ->
-         getNewRegNat IntRep		`thenNat` \ res_lo ->
-         getNewRegNat IntRep		`thenNat` \ res_hi ->
-         getRegister a1			`thenNat` \ reg1 ->
-         getRegister a2 		`thenNat` \ reg2 ->
-         let code1 = registerCode reg1 t1
-             code2 = registerCode reg2 t2
-             src1  = registerName reg1 t1
-             src2  = registerName reg2 t2
-             code dst = code1 `appOL` code2 `appOL`
-                        toOL [
-                           SMUL False src1 (RIReg src2) res_lo,
+    imulMayOflo :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
+    imulMayOflo rep a b = do
+         (a_reg, a_code) <- getSomeReg a
+	 (b_reg, b_code) <- getSomeReg b
+	 res_lo <- getNewRegNat I32
+	 res_hi <- getNewRegNat I32
+	 let
+	    shift_amt  = case rep of
+			  I32 -> 31
+			  I64 -> 63
+			  _ -> panic "shift_amt"
+	    code dst = a_code `appOL` b_code `appOL`
+                       toOL [
+                           SMUL False a_reg (RIReg b_reg) res_lo,
                            RDY res_hi,
-                           SRA res_lo (RIImm (ImmInt 31)) res_lo,
+                           SRA res_lo (RIImm (ImmInt shift_amt)) res_lo,
                            SUB False False res_lo (RIReg res_hi) dst
                         ]
-         in
-            return (Any IntRep code)
+         return (Any I32 code)
 
-getRegister (CmmLoad pk mem) = do
+getRegister (CmmLoad mem pk) = do
     Amode src code <- getAmode mem
     let
-    	size = primRepToSize pk
-    	code__2 dst = code `snocOL` LD size src dst
-    --
+    	code__2 dst = code `snocOL` LD pk src dst
     return (Any pk code__2)
 
-getRegister (StInt i)
+getRegister (CmmLit (CmmInt i _))
   | fits13Bits i
   = let
     	src = ImmInt (fromInteger i)
     	code dst = unitOL (OR False g0 (RIImm src) dst)
     in
-    	return (Any IntRep code)
+    	return (Any I32 code)
 
-getRegister leaf
-  | isJust imm
-  = let
+getRegister (CmmLit lit)
+  = let rep = cmmLitRep lit
+	imm = litToImm lit
     	code dst = toOL [
-    	    SETHI (HI imm__2) dst,
-    	    OR False dst (RIImm (LO imm__2)) dst]
-    in
-    	return (Any PtrRep code)
-  | otherwise
-  = ncgPrimopMoan "getRegister(sparc)" (pprCmmExpr leaf)
-  where
-    imm = maybeImm leaf
-    imm__2 = case imm of Just x -> x
+    	    SETHI (HI imm) dst,
+    	    OR False dst (RIImm (LO imm)) dst]
+    in return (Any I32 code)
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -1879,63 +1790,47 @@ getAmode expr = do
 
 #if sparc_TARGET_ARCH
 
-getAmode (CmmMachOp MO_Nat_Sub [x, StInt i])
+getAmode (CmmMachOp (MO_Sub rep) [x, CmmLit (CmmInt i _)])
   | fits13Bits (-i)
-  = getNewRegNat PtrRep		`thenNat` \ tmp ->
-    getRegister x		`thenNat` \ register ->
-    let
-    	code = registerCode register tmp
-    	reg  = registerName register tmp
-    	off  = ImmInt (-(fromInteger i))
-    in
-    return (Amode (AddrRegImm reg off) code)
+  = do
+       (reg, code) <- getSomeReg x
+       let
+         off  = ImmInt (-(fromInteger i))
+       return (Amode (AddrRegImm reg off) code)
 
 
-getAmode (CmmMachOp MO_Nat_Add [x, StInt i])
+getAmode (CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt i _)])
   | fits13Bits i
-  = getNewRegNat PtrRep		`thenNat` \ tmp ->
-    getRegister x		`thenNat` \ register ->
-    let
-    	code = registerCode register tmp
-    	reg  = registerName register tmp
-    	off  = ImmInt (fromInteger i)
-    in
-    return (Amode (AddrRegImm reg off) code)
+  = do
+       (reg, code) <- getSomeReg x
+       let
+     	 off  = ImmInt (fromInteger i)
+       return (Amode (AddrRegImm reg off) code)
 
-getAmode (CmmMachOp MO_Nat_Add [x, y])
-  = getNewRegNat PtrRep    	`thenNat` \ tmp1 ->
-    getNewRegNat IntRep    	`thenNat` \ tmp2 ->
-    getRegister x    	    	`thenNat` \ register1 ->
-    getRegister y    	    	`thenNat` \ register2 ->
+getAmode (CmmMachOp (MO_Add rep) [x, y])
+  = do
+    (regX, codeX) <- getSomeReg x
+    (regY, codeY) <- getSomeReg y
     let
-    	code1 = registerCode register1 tmp1
-    	reg1  = registerName register1 tmp1
-    	code2 = registerCode register2 tmp2
-    	reg2  = registerName register2 tmp2
-    	code__2 = code1 `appOL` code2
-    in
-    return (Amode (AddrRegReg reg1 reg2) code__2)
+    	code = codeX `appOL` codeY
+    return (Amode (AddrRegReg regX regY) code)
 
-getAmode leaf
-  | isJust imm
-  = getNewRegNat PtrRep    	    `thenNat` \ tmp ->
-    let
+-- XXX Is this same as "leaf" in Stix?
+getAmode (CmmLit lit)
+  = do
+      tmp <- getNewRegNat I32
+      let
     	code = unitOL (SETHI (HI imm__2) tmp)
-    in
-    return (Amode (AddrRegImm tmp (LO imm__2)) code)
-  where
-    imm    = maybeImm leaf
-    imm__2 = case imm of Just x -> x
+      return (Amode (AddrRegImm tmp (LO imm__2)) code)
+      where
+         imm__2 = litToImm lit
 
 getAmode other
-  = getNewRegNat PtrRep		`thenNat` \ tmp ->
-    getRegister other		`thenNat` \ register ->
-    let
-    	code = registerCode register tmp
-    	reg  = registerName register tmp
-    	off  = ImmInt 0
-    in
-    return (Amode (AddrRegImm reg off) code)
+  = do
+       (reg, code) <- getSomeReg other
+       let
+    	    off  = ImmInt 0
+       return (Amode (AddrRegImm reg off) code)
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -2268,64 +2163,44 @@ condFltCode cond x y = do
 
 #if sparc_TARGET_ARCH
 
-condIntCode cond x (StInt y)
+condIntCode cond x (CmmLit (CmmInt y rep))
   | fits13Bits y
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat IntRep		`thenNat` \ tmp ->
-    let
-	code = registerCode register tmp
-	src1 = registerName register tmp
-    	src2 = ImmInt (fromInteger y)
-	code__2 = code `snocOL` SUB False True src1 (RIImm src2) g0
-    in
-    return (CondCode False cond code__2)
+  = do
+       (src1, code) <- getSomeReg x
+       let
+           src2 = ImmInt (fromInteger y)
+           code' = code `snocOL` SUB False True src1 (RIImm src2) g0
+       return (CondCode False cond code')
 
-condIntCode cond x y
-  = getRegister x		`thenNat` \ register1 ->
-    getRegister y		`thenNat` \ register2 ->
-    getNewRegNat IntRep		`thenNat` \ tmp1 ->
-    getNewRegNat IntRep		`thenNat` \ tmp2 ->
+condIntCode cond x y = do
+    (src1, code1) <- getSomeReg x
+    (src2, code2) <- getSomeReg y
     let
-	code1 = registerCode register1 tmp1
-	src1  = registerName register1 tmp1
-	code2 = registerCode register2 tmp2
-	src2  = registerName register2 tmp2
 	code__2 = code1 `appOL` code2 `snocOL`
     	    	  SUB False True src1 (RIReg src2) g0
-    in
     return (CondCode False cond code__2)
 
 -----------
-condFltCode cond x y
-  = getRegister x		`thenNat` \ register1 ->
-    getRegister y		`thenNat` \ register2 ->
-    getNewRegNat (registerRep register1)
-      	    	        	`thenNat` \ tmp1 ->
-    getNewRegNat (registerRep register2)
-     	    	        	`thenNat` \ tmp2 ->
-    getNewRegNat F64	`thenNat` \ tmp ->
+condFltCode cond x y = do
+    (src1, code1) <- getSomeReg x
+    (src2, code2) <- getSomeReg y
+    tmp <- getNewRegNat F64
     let
-    	promote x = FxTOy F DF x tmp
+   	promote x = FxTOy F32 F64 x tmp
 
-    	pk1   = registerRep register1
-    	code1 = registerCode register1 tmp1
-    	src1  = registerName register1 tmp1
-
-    	pk2   = registerRep register2
-    	code2 = registerCode register2 tmp2
-    	src2  = registerName register2 tmp2
+    	pk1   = cmmExprRep x
+    	pk2   = cmmExprRep y
 
     	code__2 =
 		if pk1 == pk2 then
     	            code1 `appOL` code2 `snocOL`
-    	    	    FCMP True (primRepToSize pk1) src1 src2
+    	    	    FCMP True pk1 src1 src2
     	    	else if pk1 == F32 then
     	    	    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
-    	    	    FCMP True DF tmp src2
+    	    	    FCMP True F64 tmp src2
     	    	else
     	    	    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
-    	    	    FCMP True DF src1 tmp
-    in
+    	    	    FCMP True F64 src1 tmp
     return (CondCode True cond code__2)
 
 #endif /* sparc_TARGET_ARCH */
@@ -2458,33 +2333,19 @@ assignReg_IntCode pk reg src = do
 
 #if sparc_TARGET_ARCH
 
-assignMem_IntCode pk addr src
-  = getNewRegNat IntRep 	   	    `thenNat` \ tmp ->
-    getAmode addr	    	    	    `thenNat` \ amode ->
-    getRegister src	    	    	    `thenNat` \ register ->
-    let
-    	code1   = amodeCode amode
-    	dst__2  = amodeAddr amode
-    	code2   = registerCode register tmp
-    	src__2  = registerName register tmp
-    	sz      = primRepToSize pk
-    	code__2 = code1 `appOL` code2 `snocOL` ST sz src__2 dst__2
-    in
-    return code__2
+assignMem_IntCode pk addr src = do
+    (srcReg, code) <- getSomeReg src
+    Amode dstAddr addr_code <- getAmode addr
+    return $ code `appOL` addr_code `snocOL` ST pk srcReg dstAddr
 
-assignReg_IntCode pk reg src
-  = getRegister src	    	    	    `thenNat` \ register2 ->
-    getRegisterReg reg	    	    	    `thenNat` \ register1 ->
-    getNewRegNat IntRep    	    	    `thenNat` \ tmp ->
-    let
-    	dst__2  = registerName register1 tmp
-    	code    = registerCode register2 dst__2
-    	src__2  = registerName register2 dst__2
-    	code__2 = if isFixed register2
-		  then code `snocOL` OR False g0 (RIReg src__2) dst__2
-    	    	  else code
-    in
-    return code__2
+assignReg_IntCode pk reg src = do
+    r <- getRegister src
+    return $ case r of
+	Any _ code         -> code dst
+	Fixed _ freg fcode -> fcode `snocOL` OR False g0 (RIReg dst) freg
+    where
+      dst = getRegisterReg reg
+
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -2569,53 +2430,28 @@ assignReg_FltCode pk reg src = do
 #if sparc_TARGET_ARCH
 
 -- Floating point assignment to memory
-assignMem_FltCode pk addr src
-  = getNewRegNat pk        	    `thenNat` \ tmp1 ->
-    getAmode addr    	    	    `thenNat` \ amode ->
-    getRegister src	      	    `thenNat` \ register ->
+assignMem_FltCode pk addr src = do
+    Amode dst__2 code1 <- getAmode addr
+    (src__2, code2) <- getSomeReg src
+    tmp1 <- getNewRegNat pk
     let
-    	sz      = primRepToSize pk
-    	dst__2  = amodeAddr amode
-
-    	code1   = amodeCode amode
-    	code2   = registerCode register tmp1
-
-    	src__2  = registerName register tmp1
-    	pk__2   = registerRep register
-    	sz__2   = primRepToSize pk__2
-
+    	pk__2   = cmmExprRep src
     	code__2 = code1 `appOL` code2 `appOL`
 	    if   pk == pk__2 
-            then unitOL (ST sz src__2 dst__2)
-	    else toOL [FxTOy sz__2 sz src__2 tmp1, ST sz tmp1 dst__2]
-    in
+            then unitOL (ST pk src__2 dst__2)
+	    else toOL [FxTOy pk__2 pk src__2 tmp1, ST pk tmp1 dst__2]
     return code__2
 
 -- Floating point assignment to a register/temporary
--- Why is this so bizarrely ugly?
-assignReg_FltCode pk reg src
-  = getRegisterReg reg	    	    	    `thenNat` \ register1 ->
-    getRegister src	    	    	    `thenNat` \ register2 ->
-    let 
-        pk__2   = registerRep register2 
-        sz__2   = primRepToSize pk__2
-    in
-    getNewRegNat pk__2                      `thenNat` \ tmp ->
-    let
-    	sz     	= primRepToSize pk
-    	dst__2 	= registerName register1 g0    -- must be Fixed
-    	reg__2 	= if pk /= pk__2 then tmp else dst__2
-    	code   	= registerCode register2 reg__2
-    	src__2 	= registerName register2 reg__2
-	code__2 = 
-	        if pk /= pk__2 then
-		     code `snocOL` FxTOy sz__2 sz src__2 dst__2
-    	    	else if isFixed register2 then
-		     code `snocOL` FMOV sz src__2 dst__2
-    	    	else
-		     code
-    in
-    return code__2
+-- ToDo: Verify correctness
+assignReg_FltCode pk reg src = do
+    r <- getRegister src
+    v1 <- getNewRegNat pk
+    return $ case r of
+        Any _ code         -> code dst
+	Fixed _ freg fcode -> fcode `snocOL` FMOV pk freg v1
+    where
+      dst = getRegisterReg reg
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -2682,19 +2518,15 @@ genJump expr = do
 
 #if sparc_TARGET_ARCH
 
-genJump (CmmLabel lbl)
+genJump (CmmLit (CmmLabel lbl))
   = return (toOL [CALL (Left target) 0 True, NOP])
   where
     target = ImmCLbl lbl
 
 genJump tree
-  = getRegister tree	    	    	    `thenNat` \ register ->
-    getNewRegNat PtrRep    	    `thenNat` \ tmp ->
-    let
-    	code   = registerCode register tmp
-    	target = registerName register tmp
-    in
-    return (code `snocOL` JMP dsts (AddrRegReg target g0) `snocOL` NOP)
+  = do
+        (target, code) <- getSomeReg tree
+	return (code `snocOL` JMP (AddrRegReg target g0)  `snocOL` NOP)
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -2723,7 +2555,7 @@ genBranch id = return (unitOL (JXX ALWAYS id))
 #endif
 
 #if sparc_TARGET_ARCH
-genBranch id = return (toOL [BI ALWAYS False id, NOP])
+genBranch (BlockId id) = return (toOL [BI ALWAYS False (ImmCLbl (mkAsmTempLabel id)), NOP])
 #endif
 
 #if powerpc_TARGET_ARCH
@@ -2956,14 +2788,14 @@ genCondJump id bool = do
 
 #if sparc_TARGET_ARCH
 
-genCondJump id bool = do
+genCondJump (BlockId id) bool = do
   CondCode is_float cond code <- getCondCode bool
   return (
        code `appOL` 
        toOL (
          if   is_float
-         then [NOP, BF cond False id, NOP]
-         else [BI cond False id, NOP]
+         then [NOP, BF cond False (ImmCLbl (mkAsmTempLabel id)), NOP]
+         else [BI cond False (ImmCLbl (mkAsmTempLabel id)), NOP]
        )
     )
 
@@ -3450,23 +3282,33 @@ genCCall target dest_regs args vols = do
    stack only immediately prior to the call proper.  Sigh.
 -}
 
-genCCall fn cconv kind args
-  = mapNat arg_to_int_vregs args `thenNat` \ argcode_and_vregs ->
+genCCall target dest_regs argsAndHints vols = do
+    let
+        args = map fst argsAndHints
+    argcode_and_vregs <- mapM arg_to_int_vregs args
     let 
         (argcodes, vregss) = unzip argcode_and_vregs
         n_argRegs          = length allArgRegs
         n_argRegs_used     = min (length vregs) n_argRegs
         vregs              = concat vregss
-    in
     -- deal with static vs dynamic call targets
-    (case fn of
-        Left t_static
-           -> return (unitOL (CALL (Left fn__2) n_argRegs_used False))
-        Right dyn
-           -> arg_to_int_vregs dyn `thenNat` \ (dyn_c, [dyn_r]) ->
-              return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
-    )
-				`thenNat` \ callinsns ->
+    callinsns <- (case target of
+        CmmForeignCall (CmmLit (CmmLabel lbl)) conv -> do
+		return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
+        CmmForeignCall expr conv -> do
+                (dyn_c, [dyn_r]) <- arg_to_int_vregs expr
+                return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
+	CmmPrim mop -> do
+		  (res, reduce) <- outOfLineFloatOp mop
+		  lblOrMopExpr <- case res of
+		       Left lbl -> do
+		            return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
+		       Right mopExpr -> do
+			    (dyn_c, [dyn_r]) <- arg_to_int_vregs mopExpr
+			    return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
+		  if reduce then panic "genCCall(sparc): can not reduce" else return lblOrMopExpr
+
+      )
     let
         argcode = concatOL argcodes
         (move_sp_down, move_sp_up)
@@ -3477,23 +3319,13 @@ genCCall fn cconv kind args
                  else (unitOL (moveSp (-1*nn)), unitOL (moveSp (1*nn)))
         transfer_code
            = toOL (move_final vregs allArgRegs eXTRA_STK_ARGS_HERE)
-    in
-        return (argcode       `appOL`
-                   move_sp_down  `appOL`
-                   transfer_code `appOL`
-                   callinsns     `appOL`
-                   unitOL NOP    `appOL`
-                   move_sp_up)
+    return (argcode       `appOL`
+            move_sp_down  `appOL`
+            transfer_code `appOL`
+            callinsns     `appOL`
+            unitOL NOP    `appOL`
+            move_sp_up)
   where
-     -- function names that begin with '.' are assumed to be special
-     -- internally generated names like '.mul,' which don't get an
-     -- underscore prefix
-     -- ToDo:needed (WDP 96/03) ???
-     fn_static = unLeft fn
-     fn__2 = case (headFS fn_static) of
-	        '.' -> ImmLit (ftext fn_static)
-	        _   -> ImmCLbl (mkForeignLabel fn_static False)
-
      -- move args from the integer vregs into which they have been 
      -- marshalled, into %o0 .. %o5, and the rest onto the stack.
      move_final :: [Reg] -> [Reg] -> Int -> [Instr]
@@ -3502,7 +3334,7 @@ genCCall fn cconv kind args
         = []
 
      move_final (v:vs) [] offset     -- out of aregs; move to stack
-        = ST W v (spRel offset)
+        = ST I32 v (spRel offset)
           : move_final vs [] (offset+1)
 
      move_final (v:vs) (a:az) offset -- move into an arg (%o[0..5]) reg
@@ -3513,49 +3345,93 @@ genCCall fn cconv kind args
      -- or two integer vregs.
      arg_to_int_vregs :: CmmExpr -> NatM (OrdList Instr, [Reg])
      arg_to_int_vregs arg
-        | is64BitRep (repOfCmmExpr arg)
-        = iselExpr64 arg		`thenNat` \ (ChildCode64 code vr_lo) ->
-          let r_lo = VirtualRegI vr_lo
+        | (cmmExprRep arg) == I64
+        = do
+	  (ChildCode64 code r_lo) <- iselExpr64 arg
+          let 
               r_hi = getHiVRegFromLo r_lo
-          in  return (code, [r_hi, r_lo])
+          return (code, [r_hi, r_lo])
         | otherwise
-        = getRegister arg                     `thenNat` \ register ->
-          getNewRegNat (registerRep register) `thenNat` \ tmp ->
-          let code = registerCode register tmp
-              src  = registerName register tmp
-              pk   = registerRep register
-          in
-          -- the value is in src.  Get it into 1 or 2 int vregs.
+        = do
+	  (src, code) <- getSomeReg arg
+          tmp <- getNewRegNat (cmmExprRep arg)
+          let
+              pk   = cmmExprRep arg
           case pk of
-             F64 -> 
-                getNewRegNat WordRep  `thenNat` \ v1 ->
-                getNewRegNat WordRep  `thenNat` \ v2 ->
-                return (
-                   code                          `snocOL`
-                   FMOV DF src f0                `snocOL`
-                   ST   F  f0 (spRel 16)         `snocOL`
-                   LD   W  (spRel 16) v1         `snocOL`
-                   ST   F  (fPair f0) (spRel 16) `snocOL`
-                   LD   W  (spRel 16) v2
-                   ,
-                   [v1,v2]
-                )
-             F32 -> 
-                getNewRegNat WordRep  `thenNat` \ v1 ->
-                return (
-                   code                    `snocOL`
-                   ST   F  src (spRel 16)  `snocOL`
-                   LD   W  (spRel 16) v1
-                   ,
-                   [v1]
-                )
-             other ->
-                getNewRegNat WordRep  `thenNat` \ v1 ->
-                return (
-                   code `snocOL` OR False g0 (RIReg src) v1
-                   , 
-                   [v1]
-                )
+             F64 -> do
+                      v1 <- getNewRegNat I32
+                      v2 <- getNewRegNat I32
+                      return (
+                        code                          `snocOL`
+                        FMOV F64 src f0                `snocOL`
+                        ST   F32  f0 (spRel 16)         `snocOL`
+                        LD   I32  (spRel 16) v1         `snocOL`
+                        ST   F32  (fPair f0) (spRel 16) `snocOL`
+                        LD   I32  (spRel 16) v2
+                        ,
+                        [v1,v2]
+                       )
+             F32 -> do
+                      v1 <- getNewRegNat I32
+                      return (
+                        code                    `snocOL`
+                        ST   F32  src (spRel 16)  `snocOL`
+                        LD   I32  (spRel 16) v1
+                        ,
+                        [v1]
+                       )
+             other -> do
+                        v1 <- getNewRegNat I32
+                        return (
+                          code `snocOL` OR False g0 (RIReg src) v1
+                          , 
+                          [v1]
+                         )
+outOfLineFloatOp mop =
+    do
+      mopExpr <- cmmMakeDynamicReference addImportNat True $
+		  mkForeignLabel functionName Nothing True
+      let mopLabelOrExpr = case mopExpr of
+			CmmLit (CmmLabel lbl) -> Left lbl
+                        _ -> Right mopExpr
+      return (mopLabelOrExpr, reduce)
+            where
+                (reduce, functionName) = case mop of
+	          MO_F32_Exp    -> (True,  FSLIT("exp"))
+	          MO_F32_Log    -> (True,  FSLIT("log"))
+	          MO_F32_Sqrt   -> (True,  FSLIT("sqrt"))
+
+	          MO_F32_Sin    -> (True,  FSLIT("sin"))
+	          MO_F32_Cos    -> (True,  FSLIT("cos"))
+	          MO_F32_Tan    -> (True,  FSLIT("tan"))
+
+	          MO_F32_Asin   -> (True,  FSLIT("asin"))
+	          MO_F32_Acos   -> (True,  FSLIT("acos"))
+	          MO_F32_Atan   -> (True,  FSLIT("atan"))
+
+	          MO_F32_Sinh   -> (True,  FSLIT("sinh"))
+	          MO_F32_Cosh   -> (True,  FSLIT("cosh"))
+	          MO_F32_Tanh   -> (True,  FSLIT("tanh"))
+
+	          MO_F64_Exp    -> (False, FSLIT("exp"))
+	          MO_F64_Log    -> (False, FSLIT("log"))
+	          MO_F64_Sqrt   -> (False, FSLIT("sqrt"))
+
+	          MO_F64_Sin    -> (False, FSLIT("sin"))
+	          MO_F64_Cos    -> (False, FSLIT("cos"))
+	          MO_F64_Tan    -> (False, FSLIT("tan"))
+
+	          MO_F64_Asin   -> (False, FSLIT("asin"))
+	          MO_F64_Acos   -> (False, FSLIT("acos"))
+	          MO_F64_Atan   -> (False, FSLIT("atan"))
+
+	          MO_F64_Sinh   -> (False, FSLIT("sinh"))
+	          MO_F64_Cosh   -> (False, FSLIT("cosh"))
+	          MO_F64_Tanh   -> (False, FSLIT("tanh"))
+
+                  other -> pprPanic "outOfLineFloatOp(sparc) "
+                                (pprCallishMachOp mop)
+
 #endif /* sparc_TARGET_ARCH */
 
 #if powerpc_TARGET_ARCH
@@ -3992,98 +3868,76 @@ condFltReg cond x y = do
 
 #if sparc_TARGET_ARCH
 
-condIntReg EQQ x (StInt 0)
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat IntRep		`thenNat` \ tmp ->
+condIntReg EQQ x (CmmLit (CmmInt 0 d)) = do
+    (src, code) <- getSomeReg x
+    tmp <- getNewRegNat I32
     let
-	code = registerCode register tmp
-	src  = registerName register tmp
 	code__2 dst = code `appOL` toOL [
     	    SUB False True g0 (RIReg src) g0,
     	    SUB True False g0 (RIImm (ImmInt (-1))) dst]
-    in
-    return (Any IntRep code__2)
+    return (Any I32 code__2)
 
-condIntReg EQQ x y
-  = getRegister x		`thenNat` \ register1 ->
-    getRegister y		`thenNat` \ register2 ->
-    getNewRegNat IntRep		`thenNat` \ tmp1 ->
-    getNewRegNat IntRep		`thenNat` \ tmp2 ->
+condIntReg EQQ x y = do
+    (src1, code1) <- getSomeReg x
+    (src2, code2) <- getSomeReg y
+    tmp1 <- getNewRegNat I32
+    tmp2 <- getNewRegNat I32
     let
-    	code1 = registerCode register1 tmp1
-    	src1  = registerName register1 tmp1
-    	code2 = registerCode register2 tmp2
-    	src2  = registerName register2 tmp2
     	code__2 dst = code1 `appOL` code2 `appOL` toOL [
     	    XOR False src1 (RIReg src2) dst,
     	    SUB False True g0 (RIReg dst) g0,
     	    SUB True False g0 (RIImm (ImmInt (-1))) dst]
-    in
-    return (Any IntRep code__2)
+    return (Any I32 code__2)
 
-condIntReg NE x (StInt 0)
-  = getRegister x    	    	`thenNat` \ register ->
-    getNewRegNat IntRep   	`thenNat` \ tmp ->
+condIntReg NE x (CmmLit (CmmInt 0 d)) = do
+    (src, code) <- getSomeReg x
+    tmp <- getNewRegNat I32
     let
-    	code = registerCode register tmp
-    	src  = registerName register tmp
     	code__2 dst = code `appOL` toOL [
     	    SUB False True g0 (RIReg src) g0,
     	    ADD True False g0 (RIImm (ImmInt 0)) dst]
-    in
-    return (Any IntRep code__2)
+    return (Any I32 code__2)
 
-condIntReg NE x y
-  = getRegister x	    	`thenNat` \ register1 ->
-    getRegister y	    	`thenNat` \ register2 ->
-    getNewRegNat IntRep        	`thenNat` \ tmp1 ->
-    getNewRegNat IntRep        	`thenNat` \ tmp2 ->
+condIntReg NE x y = do
+    (src1, code1) <- getSomeReg x
+    (src2, code2) <- getSomeReg y
+    tmp1 <- getNewRegNat I32
+    tmp2 <- getNewRegNat I32
     let
-	code1 = registerCode register1 tmp1
-	src1  = registerName register1 tmp1
-	code2 = registerCode register2 tmp2
-	src2  = registerName register2 tmp2
 	code__2 dst = code1 `appOL` code2 `appOL` toOL [
     	    XOR False src1 (RIReg src2) dst,
     	    SUB False True g0 (RIReg dst) g0,
     	    ADD True False g0 (RIImm (ImmInt 0)) dst]
-    in
-    return (Any IntRep code__2)
+    return (Any I32 code__2)
 
-condIntReg cond x y
-  = getBlockIdNat		`thenNat` \ lbl1 ->
-    getBlockIdNat	    	`thenNat` \ lbl2 ->
-    condIntCode cond x y 	`thenNat` \ condition ->
+condIntReg cond x y = do
+    BlockId lbl1 <- getBlockIdNat
+    BlockId lbl2 <- getBlockIdNat
+    CondCode _ cond cond_code <- condIntCode cond x y
     let
-	code = condCode condition
-	cond = condName condition
-	code__2 dst = code `appOL` toOL [
-	    BI cond False (ImmCLbl lbl1), NOP,
+	code__2 dst = cond_code `appOL` toOL [
+	    BI cond False (ImmCLbl (mkAsmTempLabel lbl1)), NOP,
 	    OR False g0 (RIImm (ImmInt 0)) dst,
-	    BI ALWAYS False (ImmCLbl lbl2), NOP,
-	    NEWBLOCK lbl1,
+	    BI ALWAYS False (ImmCLbl (mkAsmTempLabel lbl2)), NOP,
+	    NEWBLOCK (BlockId lbl1),
 	    OR False g0 (RIImm (ImmInt 1)) dst,
-	    NEWBLOCK lbl2]
-    in
-    return (Any IntRep code__2)
+	    NEWBLOCK (BlockId lbl2)]
+    return (Any I32 code__2)
 
-condFltReg cond x y
-  = getBlockIdNat		`thenNat` \ lbl1 ->
-    getBlockIdNat	    	`thenNat` \ lbl2 ->
-    condFltCode cond x y 	`thenNat` \ condition ->
+condFltReg cond x y = do
+    BlockId lbl1 <- getBlockIdNat
+    BlockId lbl2 <- getBlockIdNat
+    CondCode _ cond cond_code <- condFltCode cond x y
     let
-    	code = condCode condition
-    	cond = condName condition
-    	code__2 dst = code `appOL` toOL [
+    	code__2 dst = cond_code `appOL` toOL [ 
     	    NOP,
-	    BF cond False (ImmCLbl lbl1), NOP,
+	    BF cond False (ImmCLbl (mkAsmTempLabel lbl1)), NOP,
 	    OR False g0 (RIImm (ImmInt 0)) dst,
-	    BI ALWAYS False (ImmCLbl lbl2), NOP,
-	    NEWBLOCK lbl1,
+	    BI ALWAYS False (ImmCLbl (mkAsmTempLabel lbl2)), NOP,
+	    NEWBLOCK (BlockId lbl1),
 	    OR False g0 (RIImm (ImmInt 1)) dst,
-	    NEWBLOCK lbl2]
-    in
-    return (Any IntRep code__2)
+	    NEWBLOCK (BlockId lbl2)]
+    return (Any I32 code__2)
 
 #endif /* sparc_TARGET_ARCH */
 
@@ -4162,7 +4016,7 @@ trivialCode
 trivialFCode
     :: MachRep
     -> IF_ARCH_alpha((Reg -> Reg -> Reg -> Instr)
-      ,IF_ARCH_sparc((Size -> Reg -> Reg -> Reg -> Instr)
+      ,IF_ARCH_sparc((MachRep -> Reg -> Reg -> Reg -> Instr)
       ,IF_ARCH_i386 ((MachRep -> Reg -> Reg -> Reg -> Instr)
       ,IF_ARCH_x86_64 ((MachRep -> Operand -> Operand -> Instr)
       ,))))
@@ -4406,86 +4260,65 @@ trivialUFCode rep instr x = do
 
 #if sparc_TARGET_ARCH
 
-trivialCode instr x (StInt y)
+trivialCode pk instr x (CmmLit (CmmInt y d))
   | fits13Bits y
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat IntRep		`thenNat` \ tmp ->
-    let
-    	code = registerCode register tmp
-    	src1 = registerName register tmp
+  = do
+      (src1, code) <- getSomeReg x
+      tmp <- getNewRegNat I32
+      let
     	src2 = ImmInt (fromInteger y)
     	code__2 dst = code `snocOL` instr src1 (RIImm src2) dst
-    in
-    return (Any IntRep code__2)
+      return (Any I32 code__2)
 
-trivialCode instr x y
-  = getRegister x		`thenNat` \ register1 ->
-    getRegister y		`thenNat` \ register2 ->
-    getNewRegNat IntRep		`thenNat` \ tmp1 ->
-    getNewRegNat IntRep		`thenNat` \ tmp2 ->
+trivialCode pk instr x y = do
+    (src1, code1) <- getSomeReg x
+    (src2, code2) <- getSomeReg y
+    tmp1 <- getNewRegNat I32
+    tmp2 <- getNewRegNat I32
     let
-    	code1 = registerCode register1 tmp1
-    	src1  = registerName register1 tmp1
-    	code2 = registerCode register2 tmp2
-    	src2  = registerName register2 tmp2
     	code__2 dst = code1 `appOL` code2 `snocOL`
     	    	      instr src1 (RIReg src2) dst
-    in
-    return (Any IntRep code__2)
+    return (Any I32 code__2)
 
 ------------
-trivialFCode pk instr x y
-  = getRegister x		`thenNat` \ register1 ->
-    getRegister y		`thenNat` \ register2 ->
-    getNewRegNat (registerRep register1)
-      	    	        	`thenNat` \ tmp1 ->
-    getNewRegNat (registerRep register2)
-     	    	        	`thenNat` \ tmp2 ->
-    getNewRegNat F64   	`thenNat` \ tmp ->
+trivialFCode pk instr x y = do
+    (src1, code1) <- getSomeReg x
+    (src2, code2) <- getSomeReg y
+    tmp1 <- getNewRegNat (cmmExprRep x)
+    tmp2 <- getNewRegNat (cmmExprRep y)
+    tmp <- getNewRegNat F64
     let
-    	promote x = FxTOy F DF x tmp
+    	promote x = FxTOy F32 F64 x tmp
 
-    	pk1   = registerRep register1
-    	code1 = registerCode register1 tmp1
-    	src1  = registerName register1 tmp1
-
-    	pk2   = registerRep register2
-    	code2 = registerCode register2 tmp2
-    	src2  = registerName register2 tmp2
+    	pk1   = cmmExprRep x
+    	pk2   = cmmExprRep y
 
     	code__2 dst =
     	    	if pk1 == pk2 then
     	            code1 `appOL` code2 `snocOL`
-    	    	    instr (primRepToSize pk) src1 src2 dst
+    	    	    instr pk src1 src2 dst
     	    	else if pk1 == F32 then
     	    	    code1 `snocOL` promote src1 `appOL` code2 `snocOL`
-    	    	    instr DF tmp src2 dst
+    	    	    instr F64 tmp src2 dst
     	    	else
     	    	    code1 `appOL` code2 `snocOL` promote src2 `snocOL`
-    	    	    instr DF src1 tmp dst
-    in
+    	    	    instr F64 src1 tmp dst
     return (Any (if pk1 == pk2 then pk1 else F64) code__2)
 
 ------------
-trivialUCode instr x
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat IntRep		`thenNat` \ tmp ->
+trivialUCode pk instr x = do
+    (src, code) <- getSomeReg x
+    tmp <- getNewRegNat pk
     let
-    	code = registerCode register tmp
-    	src  = registerName register tmp
     	code__2 dst = code `snocOL` instr (RIReg src) dst
-    in
-    return (Any IntRep code__2)
+    return (Any pk code__2)
 
 -------------
-trivialUFCode pk instr x
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat pk		`thenNat` \ tmp ->
+trivialUFCode pk instr x = do
+    (src, code) <- getSomeReg x
+    tmp <- getNewRegNat pk
     let
-    	code = registerCode register tmp
-    	src  = registerName register tmp
     	code__2 dst = code `snocOL` instr src dst
-    in
     return (Any pk code__2)
 
 #endif /* sparc_TARGET_ARCH */
@@ -4680,55 +4513,37 @@ coerceFP2FP to x = do
 
 #if sparc_TARGET_ARCH
 
-coerceInt2FP pk x
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat IntRep		`thenNat` \ reg ->
+coerceInt2FP pk1 pk2 x = do
+    (src, code) <- getSomeReg x
     let
-    	code = registerCode register reg
-    	src  = registerName register reg
-
     	code__2 dst = code `appOL` toOL [
-    	    ST W src (spRel (-2)),
-    	    LD W (spRel (-2)) dst,
-    	    FxTOy W (primRepToSize pk) dst dst]
-    in
+    	    ST pk1 src (spRel (-2)),
+    	    LD pk1 (spRel (-2)) dst,
+    	    FxTOy pk1 pk2 dst dst]
+    return (Any pk2 code__2)
+
+------------
+coerceFP2Int pk fprep x = do
+    (src, code) <- getSomeReg x
+    reg <- getNewRegNat fprep
+    tmp <- getNewRegNat pk
+    let
+    	code__2 dst = ASSERT(fprep == F64 || fprep == F32)
+	    code `appOL` toOL [
+    	    FxTOy fprep pk src tmp,
+    	    ST pk tmp (spRel (-2)),
+    	    LD pk (spRel (-2)) dst]
     return (Any pk code__2)
 
 ------------
-coerceFP2Int fprep x
-  = ASSERT(fprep == F64 || fprep == F32)
-    getRegister x		`thenNat` \ register ->
-    getNewRegNat fprep		`thenNat` \ reg ->
-    getNewRegNat F32	`thenNat` \ tmp ->
-    let
-    	code = registerCode register reg
-    	src  = registerName register reg
-    	code__2 dst = code `appOL` toOL [
-    	    FxTOy (primRepToSize fprep) W src tmp,
-    	    ST W tmp (spRel (-2)),
-    	    LD W (spRel (-2)) dst]
-    in
-    return (Any IntRep code__2)
+coerceDbl2Flt x = do
+    (src, code) <- getSomeReg x
+    return (Any F32 (\dst -> code `snocOL` FxTOy F64 F32 src dst)) 
 
 ------------
-coerceDbl2Flt x
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat F64	`thenNat` \ tmp ->
-    let code = registerCode register tmp
-        src  = registerName register tmp
-    in
-        return (Any F32 
-                       (\dst -> code `snocOL` FxTOy DF F src dst)) 
-
-------------
-coerceFlt2Dbl x
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNat F32	`thenNat` \ tmp ->
-    let code = registerCode register tmp
-        src  = registerName register tmp
-    in
-        return (Any F64
-                       (\dst -> code `snocOL` FxTOy F DF src dst)) 
+coerceFlt2Dbl x = do
+    (src, code) <- getSomeReg x
+    return (Any F64 (\dst -> code `snocOL` FxTOy F32 F64 src dst))
 
 #endif /* sparc_TARGET_ARCH */
 
