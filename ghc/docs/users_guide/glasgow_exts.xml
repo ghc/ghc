@@ -4612,7 +4612,7 @@ key_function :: Int -> String -> (Bool, Double)
       overloaded function:</para>
 
 <programlisting>
-hammeredLookup :: Ord key => [(key, value)] -> key -> value
+  hammeredLookup :: Ord key => [(key, value)] -> key -> value
 </programlisting>
 
       <para>If it is heavily used on lists with
@@ -4620,7 +4620,7 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
       follows:</para>
 
 <programlisting>
-{-# SPECIALIZE hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
+  {-# SPECIALIZE hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
 </programlisting>
 
       <para>A <literal>SPECIALIZE</literal> pragma for a function can
@@ -4631,7 +4631,35 @@ hammeredLookup :: Ord key => [(key, value)] -> key -> value
       (see <xref linkend="rewrite-rules"/>) that rewrites a call to the
       un-specialised function into a call to the specialised one.</para>
 
-      <para>In earlier versions of GHC, it was possible to provide your own
+      <para>The type in a SPECIALIZE pragma can be any type that is less
+	polymorphic than the type of the original function.  In concrete terms,
+	if the original function is <literal>f</literal> then the pragma
+<programlisting>
+  {-# SPECIALIZE f :: &lt;type&gt; #-}
+</programlisting>
+      is valid if and only if the defintion
+<programlisting>
+  f_spec :: &lt;type&gt;
+  f_spec = f
+</programlisting>
+      is valid.  Here are some examples (where we only give the type signature
+      for the original function, not its code):
+<programlisting>
+  f :: Eq a => a -> b -> b
+  {-# SPECIALISE g :: Int -> b -> b #-}
+
+  g :: (Eq a, Ix b) => a -> b -> b
+  {-# SPECIALISE g :: (Eq a) => a -> Int -> Int #-}
+
+  h :: Eq a => a -> a -> a
+  {-# SPECIALISE h :: (Eq a) => [a] -> [a] -> [a] #-}
+</programlisting>  
+The last of these examples will generate a 
+RULE with a somewhat-complex left-hand side (try it yourself), so it might not fire very
+well.  If you use this kind of specialisation, let us know how well it works.
+</para>
+
+      <para>Note: In earlier versions of GHC, it was possible to provide your own
       specialised function for a given type:
 
 <programlisting>
