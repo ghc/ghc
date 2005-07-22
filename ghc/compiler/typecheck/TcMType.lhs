@@ -655,6 +655,7 @@ This might not necessarily show up in kind checking.
 \begin{code}
 data UserTypeCtxt 
   = FunSigCtxt Name	-- Function type signature
+			-- Also used for types in SPECIALISE pragmas
   | ExprSigCtxt		-- Expression type signature
   | ConArgCtxt Name	-- Data constructor argument
   | TySynCtxt Name	-- RHS of a type synonym decl
@@ -667,6 +668,7 @@ data UserTypeCtxt
   | ForSigCtxt Name	-- Foreign inport or export signature
   | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
   | DefaultDeclCtxt	-- Types in a default declaration
+  | SpecInstCtxt	-- SPECIALISE instance pragma
 
 -- Notes re TySynCtxt
 -- We allow type synonyms that aren't types; e.g.  type List = []
@@ -693,6 +695,7 @@ pprUserTypeCtxt ty ResSigCtxt      = sep [ptext SLIT("In a result type signature
 pprUserTypeCtxt ty (ForSigCtxt n)  = sep [ptext SLIT("In the foreign declaration:"), pp_sig n ty]
 pprUserTypeCtxt ty (RuleSigCtxt n) = sep [ptext SLIT("In the type signature:"), pp_sig n ty]
 pprUserTypeCtxt ty DefaultDeclCtxt = sep [ptext SLIT("In a type in a `default' declaration:"), nest 2 (ppr ty)]
+pprUserTypeCtxt ty SpecInstCtxt    = sep [ptext SLIT("In a SPECIALISE instance pragma:"), nest 2 (ppr ty)]
 
 pp_sig n ty = nest 2 (ppr n <+> dcolon <+> ppr ty)
 \end{code}
@@ -718,6 +721,7 @@ checkValidType ctxt ty
 						-- constructor, hence rank 1
 		 ForSigCtxt _	-> Rank 1
 		 RuleSigCtxt _	-> Rank 1
+		 SpecInstCtxt   -> Rank 1
 
 	actual_kind = typeKind ty
 
@@ -727,7 +731,7 @@ checkValidType ctxt ty
 			ExprSigCtxt  -> isOpenTypeKind 	 actual_kind
 			GenPatCtxt   -> isLiftedTypeKind actual_kind
 			ForSigCtxt _ -> isLiftedTypeKind actual_kind
-			other	     -> isArgTypeKind       actual_kind
+			other	     -> isArgTypeKind    actual_kind
 	
 	ubx_tup | not gla_exts = UT_NotOk
 		| otherwise    = case ctxt of
@@ -979,6 +983,7 @@ check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
 -------------------------
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
+	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
 	InstHeadCtxt  -> True	-- We check for instance-head 
 				-- formation in checkValidInstHead
 	InstThetaCtxt -> undecidable_ok || all tcIsTyVarTy tys
