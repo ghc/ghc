@@ -14,7 +14,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds,
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcCheckRho )
 
-import DynFlags		( DynFlag(Opt_MonomorphismRestriction) )
+import DynFlags		( DynFlag(Opt_MonomorphismRestriction, Opt_GlasgowExts) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 			  HsLocalBinds(..), HsValBinds(..), HsIPBinds(..),
 			  LSig, Match(..), IPBind(..), Prag(..),
@@ -28,7 +28,7 @@ import TcHsSyn		( zonkId, (<$>) )
 import TcRnMonad
 import Inst		( newDictsAtLoc, newIPDict, instToId )
 import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, 
-			  newLocalName, tcLookupLocalIds, pprBinders,
+			  tcLookupLocalIds, pprBinders,
 			  tcGetGlobalTyVars )
 import TcUnify		( Expected(..), tcInfer, unifyTheta, tcSub,
 			  bleatEscapedTvs, sigCtxt )
@@ -249,20 +249,24 @@ tc_group top_lvl sig_fn prag_fn scc@(AcyclicSCC bind) thing_inside
 					sig_fn prag_fn scc thing_inside
 	; return ([(NonRecursive, b) | b <- binds], thing) }
 
-tc_group top_lvl sig_fn prag_fn (CyclicSCC binds) thing_inside
+tc_group top_lvl sig_fn prag_fn scc@(CyclicSCC binds) thing_inside
   =	-- A recursive strongly-connected component
- 	-- To maximise polymorphism, we do a new strongly-connected 
-	-- component analysis, this time omitting any references to 
-	-- variables with type signatures.
+ 	-- To maximise polymorphism (with -fglasgow-exts), we do a new 
+	-- strongly-connected  component analysis, this time omitting 
+	-- any references to variables with type signatures.
 	--
 	-- Then we bring into scope all the variables with type signatures
     do	{ traceTc (text "tc_group rec" <+> vcat [ppr b $$ text "--and--" | b <- binds])
-	; let { sccs :: [SCC (LHsBind Name)]
-	      ; sccs = stronglyConnComp (mkEdges has_sig binds) }
-	; (binds, thing) <- go sccs
+	; gla_exts     <- doptM Opt_GlasgowExts
+	; (binds,thing) <- if gla_exts 
+			   then go new_sccs
+			   else go1 scc thing_inside
 	; return ([(Recursive, unionManyBags binds)], thing) }
 		-- Rec them all together
   where
+    new_sccs :: [SCC (LHsBind Name)]
+    new_sccs = stronglyConnComp (mkEdges has_sig binds)
+
 --  go :: SCC (LHsBind Name) -> TcM ([LHsBind TcId], thing)
     go (scc:sccs) = do	{ (binds1, (binds2, thing)) <- go1 scc (go sccs)
 			; return (binds1 ++ binds2, thing) }
@@ -286,6 +290,10 @@ tcPolyBinds :: TopLevelFlag -> RecFlag
 -- group, because we use type signatures to maximise polymorphism
 --
 -- Deals with the bindInstsOfLocalFuns thing too
+--
+-- Returns a list because the input may be a single non-recursive binding,
+-- in which case the dependency order of the resulting bindings is
+-- important.  
 
 tcPolyBinds top_lvl is_rec sig_fn prag_fn scc thing_inside
   =	-- NB: polymorphic recursion means that a function
