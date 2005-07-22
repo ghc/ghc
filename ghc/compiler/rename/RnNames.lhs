@@ -221,11 +221,10 @@ importsFromImportDecl this_mod
 	         ASSERT2( not (pkg `elem` dep_pkgs deps), ppr pkg <+> ppr (dep_pkgs deps) )
 	         ([], pkg : dep_pkgs deps)
 
+	-- True <=> import M ()
 	import_all = case imp_details of
-			Just (is_hiding, ls)	 -- Imports are spec'd explicitly
-			  | not is_hiding -> Just (not (null ls))
-			_ -> Nothing		-- Everything is imported, 
-						-- (or almost everything [hiding])
+			Just (is_hiding, ls) -> not is_hiding && null ls	
+			other 		     -> False
 
 	-- unqual_avails is the Avails that are visible in *unqualified* form
 	-- We need to know this so we know what to export when we see
@@ -848,7 +847,7 @@ reportUnusedNames export_decls gbl_env
    
     imports = tcg_imports gbl_env
 
-    direct_import_mods :: [(Module, Maybe Bool, SrcSpan)]
+    direct_import_mods :: [(Module, Bool, SrcSpan)]
 	-- See the type of the imp_mods for this triple
     direct_import_mods = moduleEnvElts (imp_mods imports)
 
@@ -859,11 +858,11 @@ reportUnusedNames export_decls gbl_env
     --
     -- BUG WARNING: does not deal correctly with multiple imports of the same module
     --	 	    becuase direct_import_mods has only one entry per module
-    unused_imp_mods = [(mod,loc) | (mod,imp,loc) <- direct_import_mods,
+    unused_imp_mods = [(mod,loc) | (mod,no_imp,loc) <- direct_import_mods,
     		       not (mod `elemFM` minimal_imports1),
     		       mod /= pRELUDE,
-		       imp /= Just False]
-	-- The Just False part is not to complain about
+		       not no_imp]
+	-- The not no_imp part is not to complain about
 	-- import M (), which is an idiom for importing
 	-- instance declarations
     

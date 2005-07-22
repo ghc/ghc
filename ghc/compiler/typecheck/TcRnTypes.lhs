@@ -487,22 +487,18 @@ data ImportAvails
 		-- So the starting point is all things that are in scope as 'M.x',
 		-- which is what this field tells us.
 
-	imp_mods :: ModuleEnv (Module, Maybe Bool, SrcSpan),
+	imp_mods :: ModuleEnv (Module, Bool, SrcSpan),
 		-- Domain is all directly-imported modules
-		-- Maybe value answers the question "is the import restricted?"
-		--   Nothing    => unrestricted import (e.g., "import Foo")
-		--   Just True  => restricted import, at least one entity (e.g., "import Foo(x)")
-		--   Just False => fully restricted import (e.g., "import Foo ()")
-		--
-		--  A distinction is made between the first and the third in order
-		--  to more precisely emit warnings about unused imports.
+		-- Bool means:
+		--   True => import was "import Foo ()"
+		--   False  => import was some other form
 		--
 		-- We need the Module in the range because we can't get
 		-- 	the keys of a ModuleEnv
 		-- Used 
 		--   (a) to help construct the usage information in 
-		--       the interface file; if we import everything we
-		--       need to recompile if the module version changes
+		--       the interface file; if we import somethign we
+		--       need to recompile if the export version changes
 		--   (b) to specify what child modules to initialise
 
 	imp_dep_mods :: ModuleEnv (Module, IsBootInterface),

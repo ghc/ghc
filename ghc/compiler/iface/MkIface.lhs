@@ -185,7 +185,6 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 import LoadIface	( readIface, loadInterface )
 import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
-import TcRnTypes	( mkModDeps )
 import HscTypes		( ModIface(..), ModDetails(..), 
 			  ModGuts(..), IfaceExport,
 			  HscEnv(..), hscEPS, Dependencies(..), FixItem(..), 
@@ -641,7 +640,7 @@ bump_unless False v = bumpVersion v
 \begin{code}
 mkUsageInfo :: HscEnv 
 	    -> HomeModules
-	    -> ModuleEnv (Module, Maybe Bool, SrcSpan)
+	    -> ModuleEnv (Module, Bool, SrcSpan)
 	    -> [(Module, IsBootInterface)]
 	    -> NameSet -> IO [Usage]
 mkUsageInfo hsc_env hmods dir_imp_mods dep_mods used_names
@@ -676,9 +675,9 @@ mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
     		     mod = nameModule name
     		     add_item occs _ = occ:occs
     
-    import_all mod = case lookupModuleEnv dir_imp_mods mod of
-    			Just (_,imp_all,_) -> isNothing imp_all
-    			Nothing		   -> False
+    depend_on_exports mod = case lookupModuleEnv dir_imp_mods mod of
+    				Just (_,no_imp,_) -> not no_imp
+	    			Nothing		  -> True
     
     -- We want to create a Usage for a home module if 
     --	a) we used something from; has something in used_names
@@ -691,7 +690,7 @@ mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
       |  isNothing maybe_iface	-- We can't depend on it if we didn't
       || not (isHomeModule hmods mod)	-- even open the interface!
       || (null used_occs
-	  && not all_imported
+	  && isNothing export_vers
 	  && not orphan_mod)
       = Nothing			-- Record no usage info
     
@@ -712,9 +711,8 @@ mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
         version_env  = mi_ver_fn    iface
         mod_vers     = mi_mod_vers  iface
         rules_vers   = mi_rule_vers iface
-        all_imported = import_all mod 
-        export_vers | all_imported = Just (mi_exp_vers iface)
-    		    | otherwise    = Nothing
+        export_vers | depend_on_exports mod = Just (mi_exp_vers iface)
+    		    | otherwise 	    = Nothing
     
     	-- The sort is to put them into canonical order
         used_occs = lookupModuleEnv ent_map mod `orElse` []

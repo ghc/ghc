@@ -822,9 +822,16 @@ data Usage
 	-- time round, but if someone has added a new rule you might need it this time
 
 	-- The export list field is (Just v) if we depend on the export list:
-	--	i.e. we imported the module without saying exactly what we imported
-	-- We need to recompile if the module exports changes, because we might
-	-- now have a name clash in the importing module.
+	--	i.e. we imported the module directly, whether or not we
+	--	     enumerated the things we imported, or just imported everything
+	-- We need to recompile if M's exports change, because 
+	-- if the import was	import M, 	we might now have a name clash in the 
+	--					importing module.
+	-- if the import was	import M(x)	M might no longer export x
+	-- The only way we don't depend on the export list is if we have
+	--			import M()
+	-- And of course, for modules that aren't imported directly we don't
+	-- depend on their export lists
 \end{code}
 
 
