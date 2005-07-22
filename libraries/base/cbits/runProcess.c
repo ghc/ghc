@@ -47,7 +47,9 @@ runProcess (char *const args[], char *workingDirectory, char **environment,
 	pPrPr_disableITimers();
 	
 	if (workingDirectory) {
-	    chdir (workingDirectory);
+	    if (chdir (workingDirectory) < 0) {
+		return -1;
+	    }
 	}
 	
 	/* Set the SIGINT/SIGQUIT signal handlers in the child, if requested 
@@ -107,7 +109,9 @@ runInteractiveProcess (char *const args[],
 	pPrPr_disableITimers();
 	
 	if (workingDirectory) {
-	    chdir (workingDirectory);
+	    if (chdir (workingDirectory) < 0) {
+		return -1;
+	    }
 	}
 	
 	dup2 (fdStdInput[0], STDIN_FILENO);
