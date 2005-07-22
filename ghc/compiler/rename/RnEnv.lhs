@@ -33,8 +33,8 @@ module RnEnv (
 import LoadIface	( loadHomeInterface, loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
 import HsSyn		( FixitySig(..), HsExpr(..), SyntaxExpr, SyntaxTable,
-			  HsType(..), HsExplicitForAll(..), LHsTyVarBndr, LHsType, 
-			  LSig, Sig(..), Fixity, hsLTyVarName, hsLTyVarLocNames, replaceTyVarName )
+			  LHsTyVarBndr, LHsType, 
+			  Fixity, hsLTyVarLocNames, replaceTyVarName )
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName		( RdrName, rdrNameModule, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, setRdrNameSpace, rdrNameOcc,

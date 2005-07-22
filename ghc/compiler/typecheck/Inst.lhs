@@ -43,8 +43,7 @@ import {-# SOURCE #-}	TcUnify	( unifyTauTy )	-- Used in checkKind (sigh)
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, mkHsApp,
 		  nlHsLit, nlHsVar )
-import TcHsSyn	( TcId, TcIdSet, 
-		  mkHsTyApp, mkHsDictApp, zonkId, 
+import TcHsSyn	( mkHsTyApp, mkHsDictApp, zonkId, 
 		  mkCoercion, ExprCoFn
 		)
 import TcRnMonad

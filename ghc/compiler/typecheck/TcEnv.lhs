@@ -46,7 +46,6 @@ import HsSyn		( LRuleDecl, LHsBinds, LSig,
 			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds )
 import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
-import TcRnTypes	( pprTcTyThingCategory )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
 import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
