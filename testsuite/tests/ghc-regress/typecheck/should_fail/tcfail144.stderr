@@ -1,0 +1,15 @@
+
+tcfail144.hs:8:2:
+    Couldn't match `{Eq a}' against `{Ord a1}'
+    When matching the contexts of the signatures for
+      f1 :: forall a. (Eq a) => a -> Bool
+      g1 :: forall a. (Ord a) => a -> Bool
+    The signature contexts in a mutually recursive group should all be identical
+    When generalising the type(s) for f1, g1
+
+tcfail144.hs:14:35:
+    Couldn't match `Bool' against `[Char]'
+      Expected type: Bool
+      Inferred type: [Char]
+    In the first argument of `g2', namely `"Yes"'
+    In the second argument of `(||)', namely `g2 "Yes"'
