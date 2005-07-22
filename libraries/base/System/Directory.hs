@@ -250,6 +250,13 @@ createDirectory path = do
     withCString path $ \s -> do
       throwErrnoIfMinus1Retry_ "createDirectory" $
 	mkdir s 0o777
+
+#else /* !__GLASGOW_HASKELL__ */
+
+copyPermissions :: FilePath -> FilePath -> IO ()
+copyPermissions fromFPath toFPath
+  = getPermissions fromFPath >>= setPermissions toFPath
+
 #endif
 
 -- | @'createDirectoryIfMissing' parents dir@ creates a new directory 
