@@ -3413,6 +3413,68 @@ the standard method is used or the one described here.)
 
 </sect2>
 
+<sect2 id="typing-binds">
+<title>Generalised typing of mutually recursive bindings</title>
+
+<para>
+The Haskell Report specifies that a group of bindings (at top level, or in a
+<literal>let</literal> or <literal>where</literal>) should be sorted into
+strongly-connected components, and then type-checked in dependency order
+(<ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.1">Haskell
+Report, Section 4.5.1</ulink>).  
+As each group is type-checked, any binders of the group that
+have
+an explicit type signature are put in the type environment with the specified
+polymorphic type,
+and all others are monomorphic until the group is generalised 
+(<ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.2">Haskell Report, Section 4.5.2</ulink>).
+</para>
+
+<para>Following a suggestion of Mark Jones, in his paper
+<ulink url="http://www.cse.ogi.edu/~mpj/thih/">Typing Haskell in
+Haskell</ulink>,
+GHC implements a more general scheme.  If <option>-fglasgow-exts</option> is
+specified:
+<emphasis>the dependency analysis ignores references to variables that have an explicit
+type signature</emphasis>.
+As a result of this refined dependency analysis, the dependency groups are smaller, and more bindings will
+typecheck.  For example, consider:
+<programlisting>
+  f :: Eq a =&gt; a -> Bool
+  f x = (x == x) || g True || g "Yes"
+  
+  g y = (y &lt;= y) || f True
+</programlisting>
+This is rejected by Haskell 98, but under Jones's scheme the definition for
+<literal>g</literal> is typechecked first, separately from that for
+<literal>f</literal>,
+because the reference to <literal>f</literal> in <literal>g</literal>'s right
+hand side is ingored by the dependency analysis.  Then <literal>g</literal>'s
+type is generalised, to get
+<programlisting>
+  g :: Ord a =&gt; a -> Bool
+</programlisting>
+Now, the defintion for <literal>f</literal> is typechecked, with this type for
+<literal>g</literal> in the type environment.
+</para>
+
+<para>
+The same refined dependency analysis also allows the type signatures of 
+mutually-recursive functions to have different contexts, something that is illegal in
+Haskell 98 (Section 4.5.2, last sentence).  With
+<option>-fglasgow-exts</option>
+GHC only insists that the type signatures of a <emphasis>refined</emphasis> group have identical
+type signatures; in practice this means that only variables bound by the same
+pattern binding must have the same context.  For example, this is fine:
+<programlisting>
+  f :: Eq a =&gt; a -> Bool
+  f x = (x == x) || g True
+  
+  g :: Ord a =&gt; a -> Bool
+  g y = (y &lt;= y) || f True
+</programlisting>
+</para>
+</sect2>
 
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
