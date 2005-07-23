@@ -27,7 +27,9 @@ module System.Process.Internals (
 	runProcessWin32, translate,
 # endif
 #endif
+#ifndef __HUGS__
 	commandToProcess,
+#endif
 	withFilePathException, withCEnvironment
   ) where
 
@@ -269,6 +271,7 @@ translate str = '"' : snd (foldr escape (True,"\"") str)
 
 #endif
 
+#ifndef __HUGS__
 -- ----------------------------------------------------------------------------
 -- commandToProcess
 
@@ -343,6 +346,8 @@ findCommandInterpreter = do
 foreign import stdcall unsafe "__hscore_get_osver"
   c_get_osver :: IO CUInt
 #endif
+
+#endif /* __HUGS__ */
 
 -- ----------------------------------------------------------------------------
 -- Utils
