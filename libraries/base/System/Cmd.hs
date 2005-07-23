@@ -115,21 +115,30 @@ rawSystem cmd args = do
   return r
 #endif
 
-#else /* ! __GLASGOW_HASKELL__ */
+#elif !mingw32_HOST_OS
 -- crude fallback implementation: could do much better than this under Unix
 rawSystem cmd args = system (unwords (map translate (cmd:args)))
 
 translate :: String -> String
-#if defined(mingw32_HOST_OS)
+translate str = '\'' : foldr escape "'" str
+  where	escape '\'' = showString "'\\''"
+	escape c    = showChar c
+#elif __HUGS__
+rawSystem cmd args = system (unwords (cmd : map translate args))
+
+translate :: String -> String
+translate str = '"' : foldr escape "\"" str
+  where	escape '"'  = showString "\\\""
+	escape '\\' = showString "\\\\"
+	escape c    = showChar c
+#else /* mingw32_HOST_OS &&  ! __GLASGOW_HASKELL__ && ! __HUGS__ */
+rawSystem cmd args = system (unwords (map translate (cmd:args)))
+
 -- copied from System.Process (qv)
+translate :: String -> String
 translate str = '"' : snd (foldr escape (True,"\"") str)
   where	escape '"'  (b,     str) = (True,  '\\' : '"'  : str)
 	escape '\\' (True,  str) = (True,  '\\' : '\\' : str)
 	escape '\\' (False, str) = (False, '\\' : str)
 	escape c    (b,     str) = (False, c : str)
-#else /* ! mingw32_HOST_OS */
-translate str = '\'' : foldr escape "'" str
-  where	escape '\'' cs = '\'' : '\\' : '\'' : '\'' : cs
-	escape c    cs = c : cs
-#endif /* ! mingw32_HOST_OS */
-#endif /* ! __GLASGOW_HASKELL__ */
+#endif
