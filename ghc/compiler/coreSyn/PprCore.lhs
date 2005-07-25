@@ -304,7 +304,7 @@ pprTyVarBndr tyvar
 pprIdBndr id = ppr id <+> 
 	       (megaSeqIdInfo (idInfo id) `seq`
 			-- Useful for poking on black holes
-	        ifPprDebug (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
+	        brackets (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
 #ifdef OLD_STRICTNESS
 			    ppr (idDemandInfo id) <+>
 #endif
