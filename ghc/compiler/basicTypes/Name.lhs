@@ -161,7 +161,7 @@ nameParent name = case nameParent_maybe name of
 
 isImplicitName :: Name -> Bool
 -- An Implicit Name is one has a parent; that is, one whose definition
--- derives from tehe paren thing
+-- derives from the parent thing
 isImplicitName name = isJust (nameParent_maybe name)
 
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
