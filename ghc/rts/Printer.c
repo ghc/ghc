@@ -1094,11 +1094,7 @@ findPtr(P_ p, int follow)
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (s = 0; s < generations[g].n_steps; s++) {
-	  if (RtsFlags.GcFlags.generations == 1) {
-	      bd = generations[g].steps[s].to_blocks;
-	  } else {
-	      bd = generations[g].steps[s].blocks;
-	  }
+	  bd = generations[g].steps[s].blocks;
 	  for (; bd; bd = bd->link) {
 	      for (q = bd->start; q < bd->free; q++) {
 		  if (*q == (W_)p) {
