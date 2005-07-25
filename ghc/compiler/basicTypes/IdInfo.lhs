@@ -236,9 +236,9 @@ data GlobalIdDetails
   | DataConWorkId DataCon	-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
 				-- [the only reasons we need to know is so that
-				--  a) we can  suppress printing a definition in the interface file
-				--  b) when typechecking a pattern we can get from the
-				--     Id back to the data con]
+				--  a) to support isImplicitId
+				--  b) when desugaring a RecordCon we can get 
+				--     from the Id back to the data con]
 
   | ClassOpId Class		-- An operation of a class
 
@@ -674,12 +674,12 @@ zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
   where
 	-- The "unsafe" occ info is the ones that say I'm not in a lambda
 	-- because that might not be true for an unsaturated lambda
-    is_safe_occ (OneOcc in_lam once) = in_lam
-    is_safe_occ other		     = True
+    is_safe_occ (OneOcc in_lam _ _) = in_lam
+    is_safe_occ other		    = True
 
     safe_occ = case occ of
-		 OneOcc _ once -> OneOcc insideLam once
-		 other	       -> occ
+		 OneOcc _ once min_args -> OneOcc insideLam once min_args
+		 other	       		-> occ
 
     is_safe_dmd Nothing    = True
     is_safe_dmd (Just dmd) = not (isStrictDmd dmd)

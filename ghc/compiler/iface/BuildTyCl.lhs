@@ -128,8 +128,8 @@ buildDataCon src_name declared_infix vanilla arg_stricts field_lbls
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
-	-- code, which (for Haskell source anyway) will be in the SrcDataName name
-	-- space, and makes it into a "real data constructor name"
+	-- code, which (for Haskell source anyway) will be in the DataName name
+	-- space, and puts it into the VarName name space
 
 	; let
 		stupid_ctxt = mkDataConStupidTheta tycon arg_tys res_tys
