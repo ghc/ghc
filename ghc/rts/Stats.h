@@ -11,7 +11,7 @@ extern void      stat_endInit(void);
 
 extern void      stat_startGC(void);
 extern void      stat_endGC(lnat alloc, lnat collect, lnat live, 
-			    lnat copied, lnat gen);
+			    lnat copied, lnat scavd_copied, lnat gen);
 
 #ifdef PROFILING
 extern void      stat_startRP(void);
