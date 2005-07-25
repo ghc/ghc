@@ -66,18 +66,22 @@ The following variables may be set on the make command line:
 				-- from the config directory [default: ghc]
 	WAY			-- just this way
 
-The following ways are defined (for GHC):
+The following ways are defined (for GHC, also see the file config/ghc):
 
 	normal			-- no special options
 	opt			-- -O
 	optasm			-- -O -fasm
-	prof			-- -prof -auto-all
+	prof			-- -O -prof -auto-all
+	profasm			-- -O -prof -auto-all -fasm
 	unreg			-- -unreg
 	ghci			-- (run only, not compile) run test under GHCi
+	extcore			-- -fext-core
+	optextcore		-- -O -fext-core
+	threaded		-- -threaded
 
 certain ways are enabled automatically if the GHC build in the local
 tree supports them.  Ways that are enabled this way are optasm, prof,
-and ghci.  The unreg way is currently never enabled automatically.
+profasm, unreg, threaded, and ghci.
 
 
 Updating tests when the output changes
@@ -261,11 +265,12 @@ these steps:
 		(usually this will be 'Main').
 
 
-A multi-module test is straightforward.  It must go in a directory of
-its own, and the source files can be named anything you like.  The
-test must have a name, in the same way as a single-module test; and
-the stdin/stdout/stderr files follow the name of the test as before.
-In the same directory, place a file 'test.T' containing a line like
+A multi-module test is straightforward.  It usually goes in a
+directory of its own (although this isn't essential), and the source
+files can be named anything you like.  The test must have a name, in
+the same way as a single-module test; and the stdin/stdout/stderr
+files follow the name of the test as before.  In the same directory,
+place a file 'test.T' containing a line like
 
    test(multimod001, normal, multimod_compile_and_run, \
 		 [ 'Main', '-fglasgow-exts', '', 0 ])
