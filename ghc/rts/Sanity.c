@@ -304,7 +304,6 @@ checkClosure( StgClosure* p )
 #endif
     case BLACKHOLE:
     case CAF_BLACKHOLE:
-    case FOREIGN:
     case STABLE_NAME:
     case MUT_VAR:
     case CONSTR_INTLIKE:

@@ -211,15 +211,11 @@ currentNursery 	  = CmmGlobal CurrentNursery
 
 -- -----------------------------------------------------------------------------
 -- For certain types passed to foreign calls, we adjust the actual
--- value passed to the call.  Two main cases: for ForeignObj# we pass
--- the pointer inside the ForeignObj# closure, and for ByteArray#/Array# we
--- pass the address of the actual array, not the address of the heap object.
+-- value passed to the call.  For ByteArray#/Array# we pass the
+-- address of the actual array, not the address of the heap object.
 
 shimForeignCallArg :: StgArg -> CmmExpr -> CmmExpr
 shimForeignCallArg arg expr
-  | tycon == foreignObjPrimTyCon
-	= cmmLoadIndexW expr fixedHdrSize
-
   | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
 	= cmmOffsetB expr arrPtrsHdrSize
 

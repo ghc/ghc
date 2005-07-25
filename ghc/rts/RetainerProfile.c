@@ -510,7 +510,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
 	// layout.payload.ptrs, no SRT
     case CONSTR:
-    case FOREIGN:
     case STABLE_NAME:
     case BCO:
     case CONSTR_STATIC:
@@ -816,7 +815,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    return;
 
 	case CONSTR:
-	case FOREIGN:
 	case STABLE_NAME:
 	case BCO:
 	case CONSTR_STATIC:
@@ -1045,7 +1043,6 @@ isRetainer( StgClosure *c )
     case CONSTR_STATIC:
     case FUN_STATIC:
 	// misc
-    case FOREIGN:
     case STABLE_NAME:
     case BCO:
     case ARR_WORDS:
@@ -2107,7 +2104,6 @@ sanityCheckHeapClosure( StgClosure *c )
     case IND_PERM:
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
-    case FOREIGN:
     case BCO:
     case STABLE_NAME:
 	return sizeW_fromITBL(info);

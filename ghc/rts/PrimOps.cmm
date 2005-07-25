@@ -240,26 +240,6 @@ atomicModifyMutVarzh_fast
 }
 
 /* -----------------------------------------------------------------------------
-   Foreign Object Primitives
-   -------------------------------------------------------------------------- */
-
-mkForeignObjzh_fast
-{
-  /* R1 = ptr to foreign object,
-  */
-  W_ result;
-
-  ALLOC_PRIM( SIZEOF_StgForeignObj, NO_PTRS, mkForeignObjzh_fast);
-
-  result = Hp - SIZEOF_StgForeignObj + WDS(1);
-  SET_HDR(result,stg_FOREIGN_info,W_[CCCS]);
-  StgForeignObj_data(result) = R1;
-
-  /* returns (# s#, ForeignObj# #) */
-  RET_P(result);
-}
-
-/* -----------------------------------------------------------------------------
    Weak Pointer Primitives
    -------------------------------------------------------------------------- */
 

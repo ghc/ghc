@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.35 2005/03/07 15:16:41 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.36 2005/07/25 14:12:48 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -118,11 +118,7 @@ section "The word size story."
 	 -> Int\#}; otherwise it has type {\tt ByteArr\# -> Int\# ->
 	 Int32\#}.  This approach confines the necessary {\tt
 	 \#if}-defs to this file; no conditional compilation is needed
-	 in the files that expose these primops, namely
-	 \texttt{lib/std/PrelStorable.lhs},
-	 \texttt{hslibs/lang/ArrayBase.hs}, and (in deprecated
-	 fashion) in \texttt{hslibs/lang/ForeignObj.lhs} and
-	 \texttt{hslibs/lang/Addr.lhs}.
+	 in the files that expose these primops.
 
 	 Finally, there are strongly deprecated primops for coercing
          between {\tt Addr\#}, the primitive type of machine
@@ -1120,10 +1116,6 @@ primop  WriteOffAddrOp_Addr "writeAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> Addr# -> State# s -> State# s
    with has_side_effects = True
 
-primop  WriteOffAddrOp_ForeignObj "writeForeignObjOffAddr#" GenPrimOp
-   Addr# -> Int# -> ForeignObj# -> State# s -> State# s
-   with has_side_effects = True
-
 primop  WriteOffAddrOp_Float "writeFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> Float# -> State# s -> State# s
    with has_side_effects = True
@@ -1167,87 +1159,6 @@ primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD64 -> State# s -> State# s
    with has_side_effects = True
-
-------------------------------------------------------------------------
-section "ForeignObj#"
-	{Operations on ForeignObj\#.  The indexing operations are
-	all deprecated.}
-------------------------------------------------------------------------
-
-primop  MkForeignObjOp "mkForeignObj#" GenPrimOp
-   Addr# -> State# RealWorld -> (# State# RealWorld, ForeignObj# #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  WriteForeignObjOp "writeForeignObj#" GenPrimOp
-   ForeignObj# -> Addr# -> State# s -> State# s
-   with
-   has_side_effects = True
-
-primop ForeignObjToAddrOp "foreignObjToAddr#" GenPrimOp
-   ForeignObj# -> Addr#
-
-primop TouchOp "touch#" GenPrimOp
-   o -> State# RealWorld -> State# RealWorld
-   with
-   has_side_effects = True
-
-primop EqForeignObj "eqForeignObj#" GenPrimOp
-   ForeignObj# -> ForeignObj# -> Bool
-   with commutable = True
-
-primop IndexOffForeignObjOp_Char "indexCharOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Char#
-   {Read 8-bit character; offset in bytes.}
-
-primop IndexOffForeignObjOp_WideChar "indexWideCharOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Char#
-   {Read 31-bit character; offset in 4-byte words.}
-
-primop IndexOffForeignObjOp_Int "indexIntOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Int#
-
-primop IndexOffForeignObjOp_Word "indexWordOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Word#
-
-primop IndexOffForeignObjOp_Addr "indexAddrOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Addr#
-
-primop IndexOffForeignObjOp_Float "indexFloatOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Float#
-
-primop IndexOffForeignObjOp_Double "indexDoubleOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Double#
-
-primop IndexOffForeignObjOp_StablePtr "indexStablePtrOffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> StablePtr# a
-
-primop IndexOffForeignObjOp_Int8 "indexInt8OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Int#
-
-primop IndexOffForeignObjOp_Int16 "indexInt16OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Int#
-
-primop IndexOffForeignObjOp_Int32 "indexInt32OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> INT32
-
-primop IndexOffForeignObjOp_Int64 "indexInt64OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> INT64
-
-primop IndexOffForeignObjOp_Word8 "indexWord8OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Word#
-
-primop IndexOffForeignObjOp_Word16 "indexWord16OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> Word#
-
-primop IndexOffForeignObjOp_Word32 "indexWord32OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> WORD32
-
-primop IndexOffForeignObjOp_Word64 "indexWord64OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> WORD64
-
-
 
 ------------------------------------------------------------------------
 section "Mutable variables"
@@ -1588,6 +1499,11 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
                                             [id,id,inFun FinalizeWeakOp mkR mkM])) }
    has_side_effects = True
    out_of_line      = True
+
+primop TouchOp "touch#" GenPrimOp
+   o -> State# RealWorld -> State# RealWorld
+   with
+   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Stable pointers and names"

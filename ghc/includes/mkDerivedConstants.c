@@ -357,9 +357,6 @@ main(int argc, char *argv[])
     closure_field(StgCatchRetryFrame, alt_code);
     closure_field(StgCatchRetryFrame, first_code_trec);
 
-    closure_size(StgForeignObj);
-    closure_field(StgForeignObj,data);
-
     closure_size(StgWeak);
     closure_field(StgWeak,link);
     closure_field(StgWeak,key);

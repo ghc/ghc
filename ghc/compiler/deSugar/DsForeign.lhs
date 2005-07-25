@@ -210,12 +210,6 @@ dsFCall fn_id fcall no_hdrs
     let
 	work_arg_ids  = [v | Var v <- val_args]	-- All guaranteed to be vars
 
-	-- These are the ids we pass to boxResult, which are used to decide
-	-- whether to touch# an argument after the call (used to keep
-	-- ForeignObj#s live across a 'safe' foreign import).
-	maybe_arg_ids | unsafe_call fcall = work_arg_ids
-		      | otherwise	  = []
-
 	forDotnet = 
 	 case fcall of
 	   DNCall{} -> True
@@ -242,7 +236,7 @@ dsFCall fn_id fcall no_hdrs
     in
     augmentResultDs				     `thenDs` \ augment -> 
     topConDs					     `thenDs` \ topCon -> 
-    boxResult maybe_arg_ids augment topCon io_res_ty `thenDs` \ (ccall_result_ty, res_wrapper) ->
+    boxResult augment topCon io_res_ty `thenDs` \ (ccall_result_ty, res_wrapper) ->
 
     newUnique					`thenDs` \ ccall_uniq ->
     newUnique					`thenDs` \ work_uniq ->

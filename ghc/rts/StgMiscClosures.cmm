@@ -474,13 +474,6 @@ INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF_STATIC,"NO_FINALIZER","NO_
 CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
 
 /* ----------------------------------------------------------------------------
-   Foreign Objects are unlifted and therefore never entered.
-   ------------------------------------------------------------------------- */
-
-INFO_TABLE(stg_FOREIGN,0,1,FOREIGN,"FOREIGN","FOREIGN")
-{ foreign "C" barf("FOREIGN object entered!"); }
-
-/* ----------------------------------------------------------------------------
    Stable Names are unlifted too.
    ------------------------------------------------------------------------- */
 

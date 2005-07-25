@@ -380,12 +380,6 @@ printClosure( StgClosure *obj )
 	    /* ToDo: chase 'link' ? */
             break;
 
-    case FOREIGN:
-            debugBelch("FOREIGN("); 
-            printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
-            debugBelch(")\n"); 
-            break;
-
     case STABLE_NAME:
             debugBelch("STABLE_NAME(%ld)\n", ((StgStableName*)obj)->sn); 
             break;

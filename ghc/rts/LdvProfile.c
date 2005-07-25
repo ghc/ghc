@@ -137,7 +137,6 @@ processHeapClosureForDead( StgClosure *c )
 
     case WEAK:
     case MUT_VAR:
-    case FOREIGN:
     case BCO:
     case STABLE_NAME:
 	size = sizeW_fromITBL(info);

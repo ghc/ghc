@@ -115,12 +115,6 @@ emitPrimOp [res] ReadMutVarOp [mutv] live
 emitPrimOp [] WriteMutVarOp [mutv,var] live
    = stmtC (CmmStore (cmmOffsetW mutv fixedHdrSize) var)
 
-emitPrimOp [res] ForeignObjToAddrOp [fo] live
-   = stmtC (CmmAssign res (cmmLoadIndexW fo fixedHdrSize))
-
-emitPrimOp [] WriteForeignObjOp [fo,addr] live
-   = stmtC (CmmStore (cmmOffsetW fo fixedHdrSize) addr)
-
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
 emitPrimOp [res] SizeofByteArrayOp [arg] live
@@ -191,25 +185,6 @@ emitPrimOp [res] UnsafeFreezeByteArrayOp [arg] live
 emitPrimOp [r] ReadArrayOp  [obj,ix]   live  = doReadPtrArrayOp r obj ix
 emitPrimOp [r] IndexArrayOp [obj,ix]   live  = doReadPtrArrayOp r obj ix
 emitPrimOp []  WriteArrayOp [obj,ix,v] live  = doWritePtrArrayOp obj ix v
-
--- IndexXXXoffForeignObj
-
-emitPrimOp res IndexOffForeignObjOp_Char      args live = doIndexOffForeignObjOp (Just mo_u_8ToWord) I8 res args
-emitPrimOp res IndexOffForeignObjOp_WideChar  args live = doIndexOffForeignObjOp (Just mo_u_32ToWord) I32 res args
-emitPrimOp res IndexOffForeignObjOp_Int       args live = doIndexOffForeignObjOp Nothing wordRep res args
-emitPrimOp res IndexOffForeignObjOp_Word      args live = doIndexOffForeignObjOp Nothing wordRep res args
-emitPrimOp res IndexOffForeignObjOp_Addr      args live = doIndexOffForeignObjOp Nothing wordRep res args
-emitPrimOp res IndexOffForeignObjOp_Float     args live = doIndexOffForeignObjOp Nothing F32 res args
-emitPrimOp res IndexOffForeignObjOp_Double    args live = doIndexOffForeignObjOp Nothing F64 res args
-emitPrimOp res IndexOffForeignObjOp_StablePtr args live = doIndexOffForeignObjOp Nothing wordRep res args
-emitPrimOp res IndexOffForeignObjOp_Int8      args live = doIndexOffForeignObjOp (Just mo_s_8ToWord) I8  res args
-emitPrimOp res IndexOffForeignObjOp_Int16     args live = doIndexOffForeignObjOp (Just mo_s_16ToWord) I16 res args
-emitPrimOp res IndexOffForeignObjOp_Int32     args live = doIndexOffForeignObjOp (Just mo_s_32ToWord) I32 res args
-emitPrimOp res IndexOffForeignObjOp_Int64     args live = doIndexOffForeignObjOp Nothing I64 res args
-emitPrimOp res IndexOffForeignObjOp_Word8     args live = doIndexOffForeignObjOp (Just mo_u_8ToWord) I8  res args
-emitPrimOp res IndexOffForeignObjOp_Word16    args live = doIndexOffForeignObjOp (Just mo_u_16ToWord) I16 res args
-emitPrimOp res IndexOffForeignObjOp_Word32    args live = doIndexOffForeignObjOp (Just mo_u_32ToWord) I32 res args
-emitPrimOp res IndexOffForeignObjOp_Word64    args live = doIndexOffForeignObjOp Nothing I64 res args
 
 -- IndexXXXoffAddr
 
@@ -295,7 +270,6 @@ emitPrimOp res WriteOffAddrOp_Int        args live = doWriteOffAddrOp Nothing wo
 emitPrimOp res WriteOffAddrOp_Word       args live = doWriteOffAddrOp Nothing wordRep res args
 emitPrimOp res WriteOffAddrOp_Addr       args live = doWriteOffAddrOp Nothing wordRep res args
 emitPrimOp res WriteOffAddrOp_Float      args live = doWriteOffAddrOp Nothing F32 res args
-emitPrimOp res WriteOffAddrOp_ForeignObj args live = doWriteOffAddrOp Nothing wordRep res args
 emitPrimOp res WriteOffAddrOp_Double     args live = doWriteOffAddrOp Nothing F64 res args
 emitPrimOp res WriteOffAddrOp_StablePtr  args live = doWriteOffAddrOp Nothing wordRep res args
 emitPrimOp res WriteOffAddrOp_Int8       args live = doWriteOffAddrOp (Just mo_WordTo8) I8  res args
@@ -487,7 +461,6 @@ translateOp SameMVarOp             = Just mo_wordEq
 translateOp SameMutableArrayOp     = Just mo_wordEq
 translateOp SameMutableByteArrayOp = Just mo_wordEq
 translateOp SameTVarOp             = Just mo_wordEq
-translateOp EqForeignObj           = Just mo_wordEq
 translateOp EqStablePtrOp          = Just mo_wordEq
 
 translateOp _ = Nothing
@@ -527,12 +500,6 @@ callishOp _ = Nothing
 
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.
-
-doIndexOffForeignObjOp maybe_post_read_cast rep [res] [addr,idx]
-   = mkBasicIndexedRead 0 maybe_post_read_cast rep res 
-	(cmmLoadIndexW addr fixedHdrSize) idx
-doIndexOffForeignObjOp _ _ _ _ 
-   = panic "CgPrimOp: doIndexOffForeignObjOp"
 
 doIndexOffAddrOp maybe_post_read_cast rep [res] [addr,idx]
    = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr idx

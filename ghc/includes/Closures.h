@@ -189,11 +189,6 @@ typedef struct {
   StgHeader  header;
 } StgRetry;
 
-typedef struct _StgForeignObj {
-  StgHeader      header;
-  StgAddr        data;		/* pointer to data in non-haskell-land */
-} StgForeignObj;
-  
 typedef struct _StgStableName {
   StgHeader      header;
   StgWord        sn;

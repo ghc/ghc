@@ -111,7 +111,6 @@ RTS_INFO(stg_FETCH_ME_BQ_info);
 #endif
 RTS_FUN_INFO(stg_BCO_info);
 RTS_INFO(stg_EVACUATED_info);
-RTS_INFO(stg_FOREIGN_info);
 RTS_INFO(stg_WEAK_info);
 RTS_INFO(stg_DEAD_WEAK_info);
 RTS_INFO(stg_STABLE_NAME_info);
@@ -171,7 +170,6 @@ RTS_ENTRY(stg_FETCH_ME_BQ_entry);
 #endif
 RTS_ENTRY(stg_BCO_entry);
 RTS_ENTRY(stg_EVACUATED_entry);
-RTS_ENTRY(stg_FOREIGN_entry);
 RTS_ENTRY(stg_WEAK_entry);
 RTS_ENTRY(stg_DEAD_WEAK_entry);
 RTS_ENTRY(stg_STABLE_NAME_entry);
@@ -566,8 +564,6 @@ RTS_FUN(isCurrentThreadBoundzh_fast);
 RTS_FUN(mkWeakzh_fast);
 RTS_FUN(finalizzeWeakzh_fast);
 RTS_FUN(deRefWeakzh_fast);
-
-RTS_FUN(mkForeignObjzh_fast);
 
 RTS_FUN(newBCOzh_fast);
 RTS_FUN(mkApUpd0zh_fast);

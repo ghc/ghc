@@ -159,7 +159,6 @@ static char *type_names[] = {
     , "MUT_VAR"
 
     , "WEAK"
-    , "FOREIGN"
   
     , "TSO"
 
@@ -914,7 +913,6 @@ heapCensusChain( Census *census, bdescr *bd )
 
 	    case MVAR:
 	    case WEAK:
-	    case FOREIGN:
 	    case STABLE_NAME:
 	    case MUT_VAR:
 		prim = rtsTrue;

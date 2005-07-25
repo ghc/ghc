@@ -33,7 +33,6 @@ module TysPrim(
 	stableNamePrimTyCon,		mkStableNamePrimTy,
 	bcoPrimTyCon,			bcoPrimTy,
 	weakPrimTyCon,  		mkWeakPrimTy,
-	foreignObjPrimTyCon,		foreignObjPrimTy,
 	threadIdPrimTyCon,		threadIdPrimTy,
 	
 	int32PrimTyCon,		int32PrimTy,
@@ -82,7 +81,6 @@ primTyCons
     , intPrimTyCon
     , int32PrimTyCon
     , int64PrimTyCon
-    , foreignObjPrimTyCon
     , bcoPrimTyCon
     , weakPrimTyCon
     , mutableArrayPrimTyCon
@@ -129,7 +127,6 @@ mVarPrimTyConName	      = mkPrimTc FSLIT("MVar#") mVarPrimTyConKey mVarPrimTyCon
 tVarPrimTyConName	      = mkPrimTc FSLIT("TVar#") tVarPrimTyConKey tVarPrimTyCon
 stablePtrPrimTyConName        = mkPrimTc FSLIT("StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
 stableNamePrimTyConName       = mkPrimTc FSLIT("StableName#") stableNamePrimTyConKey stableNamePrimTyCon
-foreignObjPrimTyConName       = mkPrimTc FSLIT("ForeignObj#") foreignObjPrimTyConKey foreignObjPrimTyCon
 bcoPrimTyConName 	      = mkPrimTc FSLIT("BCO#") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName  	      = mkPrimTc FSLIT("Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName  	      = mkPrimTc FSLIT("ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
@@ -349,27 +346,6 @@ mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName vrcsP PtrRep
 
 mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[TysPrim-foreign-objs]{The ``foreign object'' type}
-%*									*
-%************************************************************************
-
-A Foreign Object is just a boxed, unlifted, Addr#.  They're needed
-because finalisers (weak pointers) can't watch Addr#s, they can only
-watch heap-resident objects.  
-
-We can't use a lifted Addr# (such as Addr) because race conditions
-could bite us.  For example, if the program deconstructed the Addr
-before passing its contents to a ccall, and a weak pointer was
-watching the Addr, the weak pointer might deduce that the Addr was
-dead before it really was.
-
-\begin{code}
-foreignObjPrimTy    = mkTyConTy foreignObjPrimTyCon
-foreignObjPrimTyCon = pcPrimTyCon0 foreignObjPrimTyConName PtrRep
 \end{code}
 
 %************************************************************************

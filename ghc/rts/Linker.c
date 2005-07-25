@@ -132,14 +132,11 @@ typedef struct _RtsSymbolVal {
 
 
 #if !defined(PAR)
-#define Maybe_ForeignObj        SymX(mkForeignObjzh_fast)
-
 #define Maybe_Stable_Names      SymX(mkWeakzh_fast)			\
       				SymX(makeStableNamezh_fast)		\
       				SymX(finalizzeWeakzh_fast)
 #else
 /* These are not available in GUM!!! -- HWL */
-#define Maybe_ForeignObj
 #define Maybe_Stable_Names
 #endif
 
@@ -409,7 +406,6 @@ typedef struct _RtsSymbolVal {
 #endif
 
 #define RTS_SYMBOLS				\
-      Maybe_ForeignObj				\
       Maybe_Stable_Names			\
       Sym(StgReturn)				\
       SymX(stg_enter_info)			\

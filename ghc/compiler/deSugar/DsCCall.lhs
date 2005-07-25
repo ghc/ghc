@@ -113,7 +113,7 @@ dsCCall :: CLabelString	-- C routine to invoke
 
 dsCCall lbl args may_gc result_ty
   = mapAndUnzipDs unboxArg args	       `thenDs` \ (unboxed_args, arg_wrappers) ->
-    boxResult [] id Nothing result_ty  `thenDs` \ (ccall_result_ty, res_wrapper) ->
+    boxResult id Nothing result_ty  `thenDs` \ (ccall_result_ty, res_wrapper) ->
     newUnique			       `thenDs` \ uniq ->
     let
 	target = StaticTarget lbl
@@ -257,8 +257,7 @@ unboxArg arg
 
 
 \begin{code}
-boxResult :: [Id]
-	  -> ((Maybe Type, CoreExpr -> CoreExpr) -> (Maybe Type, CoreExpr -> CoreExpr))
+boxResult :: ((Maybe Type, CoreExpr -> CoreExpr) -> (Maybe Type, CoreExpr -> CoreExpr))
 	  -> Maybe Id
 	  -> Type
 	  -> DsM (Type, CoreExpr -> CoreExpr)
@@ -274,7 +273,7 @@ boxResult :: [Id]
 -- the result type will be 
 --	State# RealWorld -> (# State# RealWorld #)
 
-boxResult arg_ids augment mbTopCon result_ty
+boxResult augment mbTopCon result_ty
   = case tcSplitTyConApp_maybe result_ty of
 	-- This split absolutely has to be a tcSplit, because we must
 	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
