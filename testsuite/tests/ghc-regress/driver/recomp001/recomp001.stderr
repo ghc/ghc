@@ -1,0 +1,2 @@
+
+C.hs:3:10: Module `B' does not export `foo'
