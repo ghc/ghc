@@ -124,13 +124,15 @@ StgTSO *resurrected_threads;
  */
 static rtsBool failed_to_evac;
 
-/* Old to-space (used for two-space collector only)
+/* Saved nursery (used for 2-space collector only)
  */
-static bdescr *old_to_blocks;
-
+static bdescr *saved_nursery;
+static nat saved_n_blocks;
+  
 /* Data used for allocation area sizing.
  */
 static lnat new_blocks;		 // blocks allocated during this GC 
+static lnat new_scavd_blocks;	 // ditto, but depth-first blocks
 static lnat g0s0_pcnt_kept = 30; // percentage of g0s0 live at last minor GC 
 
 /* Used to avoid long recursion due to selector thunks
@@ -246,19 +248,47 @@ gc_alloc_block(step *stp)
     }
 
     // Start a new to-space block, chain it on after the previous one.
-    if (stp->hp_bd == NULL) {
-	stp->hp_bd = bd;
-    } else {
+    if (stp->hp_bd != NULL) {
 	stp->hp_bd->free = stp->hp;
 	stp->hp_bd->link = bd;
-	stp->hp_bd = bd;
     }
 
+    stp->hp_bd = bd;
     stp->hp    = bd->start;
     stp->hpLim = stp->hp + BLOCK_SIZE_W;
 
-    stp->n_to_blocks++;
+    stp->n_blocks++;
     new_blocks++;
+
+    return bd;
+}
+
+static bdescr *
+gc_alloc_scavd_block(step *stp)
+{
+    bdescr *bd = allocBlock();
+    bd->gen_no = stp->gen_no;
+    bd->step = stp;
+
+    // blocks in to-space in generations up to and including N
+    // get the BF_EVACUATED flag.
+    if (stp->gen_no <= N) {
+	bd->flags = BF_EVACUATED;
+    } else {
+	bd->flags = 0;
+    }
+
+    bd->link = stp->blocks;
+    stp->blocks = bd;
+
+    if (stp->scavd_hp != NULL) {
+	Bdescr(stp->scavd_hp)->free = stp->scavd_hp;
+    }
+    stp->scavd_hp    = bd->start;
+    stp->scavd_hpLim = stp->scavd_hp + BLOCK_SIZE_W;
+
+    stp->n_blocks++;
+    new_scavd_blocks++;
 
     return bd;
 }
@@ -302,7 +332,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 {
   bdescr *bd;
   step *stp;
-  lnat live, allocated, collected = 0, copied = 0;
+  lnat live, allocated, collected = 0, copied = 0, scavd_copied = 0;
   lnat oldgen_saved_blocks = 0;
   nat g, s;
 
@@ -374,18 +404,22 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   static_objects = END_OF_STATIC_LIST;
   scavenged_static_objects = END_OF_STATIC_LIST;
 
-  /* Save the old to-space if we're doing a two-space collection
+  /* Save the nursery if we're doing a two-space collection.
+   * g0s0->blocks will be used for to-space, so we need to get the
+   * nursery out of the way.
    */
   if (RtsFlags.GcFlags.generations == 1) {
-    old_to_blocks = g0s0->to_blocks;
-    g0s0->to_blocks = NULL;
-    g0s0->n_to_blocks = 0;
+      saved_nursery = g0s0->blocks;
+      saved_n_blocks = g0s0->n_blocks;
+      g0s0->blocks = NULL;
+      g0s0->n_blocks = 0;
   }
 
   /* Keep a count of how many new blocks we allocated during this GC
    * (used for resizing the allocation area, later).
    */
   new_blocks = 0;
+  new_scavd_blocks = 0;
 
   // Initialise to-space in all the generations/steps that we're
   // collecting.
@@ -411,16 +445,22 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       ASSERT(stp->gen_no == g);
 
       // start a new to-space for this step.
-      stp->hp        = NULL;
-      stp->hp_bd     = NULL;
-      stp->to_blocks = NULL;
+      stp->old_blocks   = stp->blocks;
+      stp->n_old_blocks = stp->n_blocks;
 
       // allocate the first to-space block; extra blocks will be
       // chained on as necessary.
+      stp->hp_bd     = NULL;
       bd = gc_alloc_block(stp);
-      stp->to_blocks   = bd;
+      stp->blocks      = bd;
+      stp->n_blocks    = 1;
       stp->scan        = bd->start;
       stp->scan_bd     = bd;
+
+      // allocate a block for "already scavenged" objects.  This goes
+      // on the front of the stp->blocks list, so it won't be
+      // traversed by the scavenging sweep.
+      gc_alloc_scavd_block(stp);
 
       // initialise the large object queues.
       stp->new_large_objects = NULL;
@@ -438,7 +478,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	  bdescr *bitmap_bdescr;
 	  StgWord *bitmap;
 
-	  bitmap_size = stp->n_blocks * BLOCK_SIZE / (sizeof(W_)*BITS_PER_BYTE);
+	  bitmap_size = stp->n_old_blocks * BLOCK_SIZE / (sizeof(W_)*BITS_PER_BYTE);
 
 	  if (bitmap_size > 0) {
 	      bitmap_bdescr = allocGroup((lnat)BLOCK_ROUND_UP(bitmap_size) 
@@ -454,7 +494,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	      
 	      // For each block in this step, point to its bitmap from the
 	      // block descriptor.
-	      for (bd=stp->blocks; bd != NULL; bd = bd->link) {
+	      for (bd=stp->old_blocks; bd != NULL; bd = bd->link) {
 		  bd->u.bitmap = bitmap;
 		  bitmap += BLOCK_SIZE_W / (sizeof(W_)*BITS_PER_BYTE);
 
@@ -482,12 +522,14 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	  stp->blocks = bd;
 	  stp->n_blocks = 1;
       }
+      if (stp->scavd_hp == NULL) {
+	  gc_alloc_scavd_block(stp);
+	  stp->n_blocks++;
+      }
       /* Set the scan pointer for older generations: remember we
        * still have to scavenge objects that have been promoted. */
       stp->scan = stp->hp;
       stp->scan_bd = stp->hp_bd;
-      stp->to_blocks = NULL;
-      stp->n_to_blocks = 0;
       stp->new_large_objects = NULL;
       stp->scavenged_large_objects = NULL;
       stp->n_scavenged_large_blocks = 0;
@@ -681,6 +723,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	  if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
 	      ASSERT(Bdescr(stp->hp) == stp->hp_bd);
 	      stp->hp_bd->free = stp->hp;
+	      Bdescr(stp->scavd_hp)->free = stp->scavd_hp;
 	  }
       }
   }
@@ -697,7 +740,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // Finally: compaction of the oldest generation.
   if (major_gc && oldest_gen->steps[0].is_compacted) {
       // save number of blocks for stats
-      oldgen_saved_blocks = oldest_gen->steps[0].n_blocks;
+      oldgen_saved_blocks = oldest_gen->steps[0].n_old_blocks;
       compact(get_roots);
   }
 
@@ -706,6 +749,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   /* run through all the generations/steps and tidy up 
    */
   copied = new_blocks * BLOCK_SIZE_W;
+  scavd_copied =  new_scavd_blocks * BLOCK_SIZE_W;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 
     if (g <= N) {
@@ -729,6 +773,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	if (g <= N) {
 	  copied -= stp->hp_bd->start + BLOCK_SIZE_W -
 	    stp->hp_bd->free;
+	  scavd_copied -= (P_)(BLOCK_ROUND_UP(stp->scavd_hp)) - stp->scavd_hp;
 	}
       }
 
@@ -737,13 +782,13 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
 	  // rough calculation of garbage collected, for stats output
 	  if (stp->is_compacted) {
-	      collected += (oldgen_saved_blocks - stp->n_blocks) * BLOCK_SIZE_W;
+	      collected += (oldgen_saved_blocks - stp->n_old_blocks) * BLOCK_SIZE_W;
 	  } else {
 	      if (g == 0 && s == 0) {
 		  collected += countNurseryBlocks() * BLOCK_SIZE_W;
 		  collected += alloc_blocks;
 	      } else {
-		  collected += stp->n_blocks * BLOCK_SIZE_W;
+		  collected += stp->n_old_blocks * BLOCK_SIZE_W;
 	      }
 	  }
 
@@ -755,17 +800,15 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	    if (stp->is_compacted) {
 		// for a compacted step, just shift the new to-space
 		// onto the front of the now-compacted existing blocks.
-		for (bd = stp->to_blocks; bd != NULL; bd = bd->link) {
+		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
 		    bd->flags &= ~BF_EVACUATED;  // now from-space 
 		}
 		// tack the new blocks on the end of the existing blocks
-		if (stp->blocks == NULL) {
-		    stp->blocks = stp->to_blocks;
-		} else {
-		    for (bd = stp->blocks; bd != NULL; bd = next) {
+		if (stp->old_blocks != NULL) {
+		    for (bd = stp->old_blocks; bd != NULL; bd = next) {
 			next = bd->link;
 			if (next == NULL) {
-			    bd->link = stp->to_blocks;
+			    bd->link = stp->blocks;
 			}
 			// NB. this step might not be compacted next
 			// time, so reset the BF_COMPACTED flags.
@@ -773,19 +816,18 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 			// compact.  (search for BF_COMPACTED above).
 			bd->flags &= ~BF_COMPACTED;
 		    }
+		    stp->blocks = stp->old_blocks;
 		}
 		// add the new blocks to the block tally
-		stp->n_blocks += stp->n_to_blocks;
+		stp->n_blocks += stp->n_old_blocks;
 	    } else {
-		freeChain(stp->blocks);
-		stp->blocks = stp->to_blocks;
-		stp->n_blocks = stp->n_to_blocks;
+		freeChain(stp->old_blocks);
 		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
 		    bd->flags &= ~BF_EVACUATED;	 // now from-space 
 		}
 	    }
-	    stp->to_blocks = NULL;
-	    stp->n_to_blocks = 0;
+	    stp->old_blocks = NULL;
+	    stp->n_old_blocks = 0;
 	}
 
 	/* LARGE OBJECTS.  The current live large objects are chained on
@@ -820,8 +862,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	}
 
 	// add the new blocks we promoted during this GC 
-	stp->n_blocks += stp->n_to_blocks;
-	stp->n_to_blocks = 0;
 	stp->n_large_blocks += stp->n_scavenged_large_blocks;
       }
     }
@@ -944,12 +984,16 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   if (RtsFlags.GcFlags.generations == 1) {
     nat blocks;
     
-    if (old_to_blocks != NULL) {
-      freeChain(old_to_blocks);
+    if (g0s0->old_blocks != NULL) {
+      freeChain(g0s0->old_blocks);
     }
-    for (bd = g0s0->to_blocks; bd != NULL; bd = bd->link) {
+    for (bd = g0s0->blocks; bd != NULL; bd = bd->link) {
       bd->flags = 0;	// now from-space 
     }
+    g0s0->old_blocks = g0s0->blocks;
+    g0s0->n_old_blocks = g0s0->n_blocks;
+    g0s0->blocks = saved_nursery;
+    g0s0->n_blocks = saved_n_blocks;
 
     /* For a two-space collector, we need to resize the nursery. */
     
@@ -967,7 +1011,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
      * performance we get from 3L bytes, reducing to the same
      * performance at 2L bytes.
      */
-    blocks = g0s0->n_to_blocks;
+    blocks = g0s0->n_old_blocks;
 
     if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
 	 blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
@@ -1096,7 +1140,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(allocated, collected, live, copied, N);
+  stat_endGC(allocated, collected, live, copied, scavd_copied, N);
 
 #if defined(RTS_USER_SIGNALS)
   // unblock signals again
@@ -1466,7 +1510,8 @@ upd_evacuee(StgClosure *p, StgClosure *dest)
 STATIC_INLINE StgClosure *
 copy(StgClosure *src, nat size, step *stp)
 {
-  P_ to, from, dest;
+  StgPtr to, from;
+  nat i;
 #ifdef PROFILING
   // @LDV profiling
   nat size_org = size;
@@ -1493,19 +1538,70 @@ copy(StgClosure *src, nat size, step *stp)
     gc_alloc_block(stp);
   }
 
-  for(to = stp->hp, from = (P_)src; size>0; --size) {
-    *to++ = *from++;
+  to = stp->hp;
+  from = (StgPtr)src;
+  stp->hp = to + size;
+  for (i = 0; i < size; i++) { // unroll for small i
+      to[i] = from[i];
   }
+  upd_evacuee((StgClosure *)from,(StgClosure *)to);
 
-  dest = stp->hp;
-  stp->hp = to;
-  upd_evacuee(src,(StgClosure *)dest);
 #ifdef PROFILING
   // We store the size of the just evacuated object in the LDV word so that
   // the profiler can guess the position of the next object later.
-  SET_EVACUAEE_FOR_LDV(src, size_org);
+  SET_EVACUAEE_FOR_LDV(from, size_org);
 #endif
-  return (StgClosure *)dest;
+  return (StgClosure *)to;
+}
+
+// Same as copy() above, except the object will be allocated in memory
+// that will not be scavenged.  Used for object that have no pointer
+// fields.
+STATIC_INLINE StgClosure *
+copy_noscav(StgClosure *src, nat size, step *stp)
+{
+  StgPtr to, from;
+  nat i;
+#ifdef PROFILING
+  // @LDV profiling
+  nat size_org = size;
+#endif
+
+  TICK_GC_WORDS_COPIED(size);
+  /* Find out where we're going, using the handy "to" pointer in 
+   * the step of the source object.  If it turns out we need to
+   * evacuate to an older generation, adjust it here (see comment
+   * by evacuate()).
+   */
+  if (stp->gen_no < evac_gen) {
+#ifdef NO_EAGER_PROMOTION    
+    failed_to_evac = rtsTrue;
+#else
+    stp = &generations[evac_gen].steps[0];
+#endif
+  }
+
+  /* chain a new block onto the to-space for the destination step if
+   * necessary.
+   */
+  if (stp->scavd_hp + size >= stp->scavd_hpLim) {
+    gc_alloc_scavd_block(stp);
+  }
+
+  to = stp->scavd_hp;
+  from = (StgPtr)src;
+  stp->scavd_hp = to + size;
+  for (i = 0; i < size; i++) { // unroll for small i
+      to[i] = from[i];
+  }
+  upd_evacuee((StgClosure *)from,(StgClosure *)to);
+
+#ifdef PROFILING
+  // We store the size of the just evacuated object in the LDV word so that
+  // the profiler can guess the position of the next object later.
+  SET_EVACUAEE_FOR_LDV(from, size_org);
+#endif
+  return (StgClosure *)to;
 }
 
 /* Special version of copy() for when we only want to copy the info
@@ -1673,65 +1769,128 @@ evacuate(StgClosure *q)
   const StgInfoTable *info;
 
 loop:
-  if (HEAP_ALLOCED(q)) {
-    bd = Bdescr((P_)q);
-
-    if (bd->gen_no > N) {
-	/* Can't evacuate this object, because it's in a generation
-	 * older than the ones we're collecting.  Let's hope that it's
-	 * in evac_gen or older, or we will have to arrange to track
-	 * this pointer using the mutable list.
-	 */
-	if (bd->gen_no < evac_gen) {
-	    // nope 
-	    failed_to_evac = rtsTrue;
-	    TICK_GC_FAILED_PROMOTION();
-	}
-	return q;
-    }
-
-    /* evacuate large objects by re-linking them onto a different list.
-     */
-    if (bd->flags & BF_LARGE) {
-	info = get_itbl(q);
-	if (info->type == TSO && 
-	    ((StgTSO *)q)->what_next == ThreadRelocated) {
-	    q = (StgClosure *)((StgTSO *)q)->link;
-	    goto loop;
-	}
-	evacuate_large((P_)q);
-	return q;
-    }
-
-    /* If the object is in a step that we're compacting, then we
-     * need to use an alternative evacuate procedure.
-     */
-    if (bd->flags & BF_COMPACTED) {
-	if (!is_marked((P_)q,bd)) {
-	    mark((P_)q,bd);
-	    if (mark_stack_full()) {
-		mark_stack_overflowed = rtsTrue;
-		reset_mark_stack();
-	    }
-	    push_mark_stack((P_)q);
-	}
-	return q;
-    }
-
-    /* Object is not already evacuated. */
-    ASSERT((bd->flags & BF_EVACUATED) == 0);
-
-    stp = bd->step->to;
-  }
-#ifdef DEBUG
-  else stp = NULL; // make sure copy() will crash if HEAP_ALLOCED is wrong 
-#endif
-
-  // make sure the info pointer is into text space 
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+
+  if (!HEAP_ALLOCED(q)) {
+
+      if (!major_gc) return q;
+
+      info = get_itbl(q);
+      switch (info->type) {
+
+      case THUNK_STATIC:
+	  if (info->srt_bitmap != 0 && 
+	      *THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
+	      *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
+	      static_objects = (StgClosure *)q;
+	  }
+	  return q;
+	  
+      case FUN_STATIC:
+	  if (info->srt_bitmap != 0 && 
+	      *FUN_STATIC_LINK((StgClosure *)q) == NULL) {
+	      *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
+	      static_objects = (StgClosure *)q;
+	  }
+	  return q;
+	  
+      case IND_STATIC:
+	  /* If q->saved_info != NULL, then it's a revertible CAF - it'll be
+	   * on the CAF list, so don't do anything with it here (we'll
+	   * scavenge it later).
+	   */
+	  if (((StgIndStatic *)q)->saved_info == NULL
+	      && *IND_STATIC_LINK((StgClosure *)q) == NULL) {
+	      *IND_STATIC_LINK((StgClosure *)q) = static_objects;
+	      static_objects = (StgClosure *)q;
+	  }
+	  return q;
+	  
+      case CONSTR_STATIC:
+	  if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
+	      *STATIC_LINK(info,(StgClosure *)q) = static_objects;
+	      static_objects = (StgClosure *)q;
+	  }
+	  return q;
+	  
+      case CONSTR_INTLIKE:
+      case CONSTR_CHARLIKE:
+      case CONSTR_NOCAF_STATIC:
+	  /* no need to put these on the static linked list, they don't need
+	   * to be scavenged.
+	   */
+	  return q;
+	  
+      default:
+	  barf("evacuate(static): strange closure type %d", (int)(info->type));
+      }
+  }
+
+  bd = Bdescr((P_)q);
+
+  if (bd->gen_no > N) {
+      /* Can't evacuate this object, because it's in a generation
+       * older than the ones we're collecting.  Let's hope that it's
+       * in evac_gen or older, or we will have to arrange to track
+       * this pointer using the mutable list.
+       */
+      if (bd->gen_no < evac_gen) {
+	  // nope 
+	  failed_to_evac = rtsTrue;
+	  TICK_GC_FAILED_PROMOTION();
+      }
+      return q;
+  }
+
+  if ((bd->flags & (BF_LARGE | BF_COMPACTED | BF_EVACUATED)) != 0) {
+
+      /* pointer into to-space: just return it.  This normally
+       * shouldn't happen, but alllowing it makes certain things
+       * slightly easier (eg. the mutable list can contain the same
+       * object twice, for example).
+       */
+      if (bd->flags & BF_EVACUATED) {
+	  if (bd->gen_no < evac_gen) {
+	      failed_to_evac = rtsTrue;
+	      TICK_GC_FAILED_PROMOTION();
+	  }
+	  return q;
+      }
+
+      /* evacuate large objects by re-linking them onto a different list.
+       */
+      if (bd->flags & BF_LARGE) {
+	  info = get_itbl(q);
+	  if (info->type == TSO && 
+	      ((StgTSO *)q)->what_next == ThreadRelocated) {
+	      q = (StgClosure *)((StgTSO *)q)->link;
+	      goto loop;
+	  }
+	  evacuate_large((P_)q);
+	  return q;
+      }
+      
+      /* If the object is in a step that we're compacting, then we
+       * need to use an alternative evacuate procedure.
+       */
+      if (bd->flags & BF_COMPACTED) {
+	  if (!is_marked((P_)q,bd)) {
+	      mark((P_)q,bd);
+	      if (mark_stack_full()) {
+		  mark_stack_overflowed = rtsTrue;
+		  reset_mark_stack();
+	      }
+	      push_mark_stack((P_)q);
+	  }
+	  return q;
+      }
+  }
+      
+  stp = bd->step->to;
+
   info = get_itbl(q);
   
-  switch (info -> type) {
+  switch (info->type) {
 
   case MUT_VAR:
   case MVAR:
@@ -1749,11 +1908,12 @@ loop:
 	  (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
 	  return (StgClosure *)INTLIKE_CLOSURE((StgInt)w);
       }
-      // else, fall through ... 
+      // else
+      return copy_noscav(q,sizeofW(StgHeader)+1,stp);
   }
 
-  case FUN_1_0:
   case FUN_0_1:
+  case FUN_1_0:
   case CONSTR_1_0:
     return copy(q,sizeofW(StgHeader)+1,stp);
 
@@ -1762,8 +1922,8 @@ loop:
     return copy(q,sizeofW(StgThunk)+1,stp);
 
   case THUNK_1_1:
-  case THUNK_0_2:
   case THUNK_2_0:
+  case THUNK_0_2:
 #ifdef NO_PROMOTE_THUNKS
     if (bd->gen_no == 0 && 
 	bd->step->no != 0 &&
@@ -1774,12 +1934,14 @@ loop:
     return copy(q,sizeofW(StgThunk)+2,stp);
 
   case FUN_1_1:
-  case FUN_0_2:
   case FUN_2_0:
   case CONSTR_1_1:
-  case CONSTR_0_2:
   case CONSTR_2_0:
+  case FUN_0_2:
     return copy(q,sizeofW(StgHeader)+2,stp);
+
+  case CONSTR_0_2:
+    return copy_noscav(q,sizeofW(StgHeader)+2,stp);
 
   case THUNK:
     return copy(q,thunk_sizeW_fromITBL(info),stp);
@@ -1789,7 +1951,6 @@ loop:
   case IND_PERM:
   case IND_OLDGEN_PERM:
   case WEAK:
-  case FOREIGN:
   case STABLE_NAME:
     return copy(q,sizeW_fromITBL(info),stp);
 
@@ -1837,50 +1998,6 @@ loop:
     q = ((StgInd*)q)->indirectee;
     goto loop;
 
-  case THUNK_STATIC:
-    if (info->srt_bitmap != 0 && major_gc && 
-	*THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
-      *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
-      static_objects = (StgClosure *)q;
-    }
-    return q;
-
-  case FUN_STATIC:
-    if (info->srt_bitmap != 0 && major_gc && 
-	*FUN_STATIC_LINK((StgClosure *)q) == NULL) {
-      *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
-      static_objects = (StgClosure *)q;
-    }
-    return q;
-
-  case IND_STATIC:
-    /* If q->saved_info != NULL, then it's a revertible CAF - it'll be
-     * on the CAF list, so don't do anything with it here (we'll
-     * scavenge it later).
-     */
-    if (major_gc
-	  && ((StgIndStatic *)q)->saved_info == NULL
- 	  && *IND_STATIC_LINK((StgClosure *)q) == NULL) {
-	*IND_STATIC_LINK((StgClosure *)q) = static_objects;
-	static_objects = (StgClosure *)q;
-    }
-    return q;
-
-  case CONSTR_STATIC:
-    if (major_gc && *STATIC_LINK(info,(StgClosure *)q) == NULL) {
-      *STATIC_LINK(info,(StgClosure *)q) = static_objects;
-      static_objects = (StgClosure *)q;
-    }
-    return q;
-
-  case CONSTR_INTLIKE:
-  case CONSTR_CHARLIKE:
-  case CONSTR_NOCAF_STATIC:
-    /* no need to put these on the static linked list, they don't need
-     * to be scavenged.
-     */
-    return q;
-
   case RET_BCO:
   case RET_SMALL:
   case RET_VEC_SMALL:
@@ -1913,7 +2030,14 @@ loop:
      * set the failed_to_evac flag to indicate that we couldn't 
      * manage to promote the object to the desired generation.
      */
-    if (evac_gen > 0) {		// optimisation 
+    /* 
+     * Optimisation: the check is fairly expensive, but we can often
+     * shortcut it if either the required generation is 0, or the
+     * current object (the EVACUATED) is in a high enough generation.
+     * stp is the lowest step that the current object would be
+     * evacuated to, so we only do the full check if stp is too low.
+     */
+    if (evac_gen > 0 && stp->gen_no < evac_gen) {  // optimisation 
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
       if (HEAP_ALLOCED(p) && Bdescr((P_)p)->gen_no < evac_gen) {
 	failed_to_evac = rtsTrue;
@@ -1924,7 +2048,7 @@ loop:
 
   case ARR_WORDS:
       // just copy the block 
-      return copy(q,arr_words_sizeW((StgArrWords *)q),stp);
+      return copy_noscav(q,arr_words_sizeW((StgArrWords *)q),stp);
 
   case MUT_ARR_PTRS:
   case MUT_ARR_PTRS_FROZEN:
@@ -2370,6 +2494,8 @@ scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
 
+    if (!major_gc) return;
+
     thunk_info = itbl_to_thunk_itbl(info);
     scavenge_srt((StgClosure **)GET_SRT(thunk_info), thunk_info->i.srt_bitmap);
 }
@@ -2379,6 +2505,8 @@ scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
 
+    if (!major_gc) return;
+  
     fun_info = itbl_to_fun_itbl(info);
     scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), fun_info->i.srt_bitmap);
 }
@@ -2660,7 +2788,6 @@ scavenge(step *stp)
     gen_obj:
     case CONSTR:
     case WEAK:
-    case FOREIGN:
     case STABLE_NAME:
     {
 	StgPtr end;
@@ -3039,7 +3166,6 @@ linear_scan:
 	gen_obj:
 	case CONSTR:
 	case WEAK:
-	case FOREIGN:
 	case STABLE_NAME:
 	{
 	    StgPtr end;
@@ -3370,7 +3496,6 @@ scavenge_one(StgPtr p)
     case CONSTR_0_2:
     case CONSTR_2_0:
     case WEAK:
-    case FOREIGN:
     case IND_PERM:
     {
 	StgPtr q, end;
@@ -3831,7 +3956,8 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	p = scavenge_small_bitmap(p, size, bitmap);
 
     follow_srt:
-	scavenge_srt((StgClosure **)GET_SRT(info), info->i.srt_bitmap);
+	if (major_gc) 
+	    scavenge_srt((StgClosure **)GET_SRT(info), info->i.srt_bitmap);
 	continue;
 
     case RET_BCO: {

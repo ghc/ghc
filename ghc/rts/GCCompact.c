@@ -842,7 +842,7 @@ update_bkwd_compact( step *stp )
     StgInfoTable *info;
     nat size, free_blocks;
 
-    bd = free_bd = stp->blocks;
+    bd = free_bd = stp->old_blocks;
     free = free_bd->start;
     free_blocks = 1;
 
@@ -917,7 +917,7 @@ update_bkwd_compact( step *stp )
 	freeChain(free_bd->link);
 	free_bd->link = NULL;
     }
-    stp->n_blocks = free_blocks;
+    stp->n_old_blocks = free_blocks;
 
     return free_blocks;
 }
@@ -976,25 +976,26 @@ compact( void (*get_roots)(evac_fn) )
     // 2. update forward ptrs
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 	for (s = 0; s < generations[g].n_steps; s++) {
+	    if (g==0 && s ==0) continue;
 	    stp = &generations[g].steps[s];
 	    IF_DEBUG(gc, debugBelch("update_fwd:  %d.%d\n", stp->gen->no, stp->no););
 
-	    update_fwd(stp->to_blocks);
+	    update_fwd(stp->blocks);
 	    update_fwd_large(stp->scavenged_large_objects);
-	    if (g == RtsFlags.GcFlags.generations-1 && stp->blocks != NULL) {
+	    if (g == RtsFlags.GcFlags.generations-1 && stp->old_blocks != NULL) {
 		IF_DEBUG(gc, debugBelch("update_fwd:  %d.%d (compact)\n", stp->gen->no, stp->no););
-		update_fwd_compact(stp->blocks);
+		update_fwd_compact(stp->old_blocks);
 	    }
 	}
     }
 
     // 3. update backward ptrs
     stp = &oldest_gen->steps[0];
-    if (stp->blocks != NULL) {
+    if (stp->old_blocks != NULL) {
 	blocks = update_bkwd_compact(stp);
 	IF_DEBUG(gc, debugBelch("update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)\n", 
 			     stp->gen->no, stp->no,
-			     stp->n_blocks, blocks););
-	stp->n_blocks = blocks;
+			     stp->n_old_blocks, blocks););
+	stp->n_old_blocks = blocks;
     }
 }

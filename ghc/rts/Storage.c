@@ -71,13 +71,16 @@ initStep (step *stp, int g, int s)
 {
     stp->no = s;
     stp->blocks = NULL;
-    stp->n_to_blocks = 0;
     stp->n_blocks = 0;
+    stp->old_blocks = NULL;
+    stp->n_old_blocks = 0;
     stp->gen = &generations[g];
     stp->gen_no = g;
     stp->hp = NULL;
     stp->hpLim = NULL;
     stp->hp_bd = NULL;
+    stp->scavd_hp = NULL;
+    stp->scavd_hpLim = NULL;
     stp->scan = NULL;
     stp->scan_bd = NULL;
     stp->large_objects = NULL;
@@ -427,8 +430,8 @@ allocNurseries( void )
 	    allocNursery(&nurseries[i], NULL, 
 			 RtsFlags.GcFlags.minAllocAreaSize);
 	nurseries[i].n_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
-	nurseries[i].to_blocks   = NULL;
-	nurseries[i].n_to_blocks = 0;
+	nurseries[i].old_blocks   = NULL;
+	nurseries[i].n_old_blocks = 0;
 	/* hp, hpLim, hp_bd, to_space etc. aren't used in the nursery */
     }
     assignNurseriesToCapabilities();
@@ -872,7 +875,7 @@ calcLive(void)
   step *stp;
 
   if (RtsFlags.GcFlags.generations == 1) {
-    live = (g0s0->n_to_blocks - 1) * BLOCK_SIZE_W + 
+    live = (g0s0->n_blocks - 1) * BLOCK_SIZE_W + 
       ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
     return live;
   }
@@ -890,6 +893,9 @@ calcLive(void)
       if (stp->hp_bd != NULL) {
 	  live += ((lnat)stp->hp_bd->free - (lnat)stp->hp_bd->start) 
 	      / sizeof(W_);
+      }
+      if (stp->scavd_hp != NULL) {
+	  live -= (P_)(BLOCK_ROUND_UP(stp->scavd_hp)) - stp->scavd_hp;
       }
     }
   }
@@ -985,7 +991,7 @@ memInventory(void)
 
   if (RtsFlags.GcFlags.generations == 1) {
       /* two-space collector has a to-space too :-) */
-      total_blocks += g0s0->n_to_blocks;
+      total_blocks += g0s0->n_old_blocks;
   }
 
   /* any blocks held by allocate() */
@@ -1033,7 +1039,7 @@ checkSanity( void )
     nat g, s;
 
     if (RtsFlags.GcFlags.generations == 1) {
-	checkHeap(g0s0->to_blocks);
+	checkHeap(g0s0->blocks);
 	checkChain(g0s0->large_objects);
     } else {
 	

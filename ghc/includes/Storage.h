@@ -62,12 +62,18 @@ typedef struct step_ {
   unsigned int         n_large_blocks;  /* no. of blocks used by large objs */
   int                  is_compacted;	/* compact this step? (old gen only) */
 
+  /* During GC, if we are collecting this step, blocks and n_blocks
+   * are copied into the following two fields.  After GC, these blocks
+   * are freed. */
+  bdescr *     old_blocks;	        /* bdescr of first from-space block */
+  unsigned int n_old_blocks;		/* number of blocks in from-space */
+
   /* temporary use during GC: */
   StgPtr       hp;			/* next free locn in to-space */
   StgPtr       hpLim;			/* end of current to-space block */
   bdescr *     hp_bd;			/* bdescr of current to-space block */
-  bdescr *     to_blocks;		/* bdescr of first to-space block */
-  unsigned int n_to_blocks;		/* number of blocks in to-space */
+  StgPtr       scavd_hp;		/* ... same as above, but already */
+  StgPtr       scavd_hpLim;		/*     scavenged.  */
   bdescr *     scan_bd;			/* block currently being scanned */
   StgPtr       scan;			/* scan pointer in current block */
   bdescr *     new_large_objects;    	/* large objects collected so far */
