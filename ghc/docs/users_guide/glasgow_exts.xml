@@ -3649,9 +3649,11 @@ Tim Sheard is going to expand it.)
 		  </para>
 	      <para> A splice can occur in place of 
 		  <itemizedlist>
-		    <listitem><para> an expression; the spliced expression must have type <literal>Expr</literal></para></listitem>
+		    <listitem><para> an expression; the spliced expression must
+		    have type <literal>Q Exp</literal></para></listitem>
 		    <listitem><para> a list of top-level declarations; ; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
-		    <listitem><para> [Planned, but not implemented yet.] a type; the spliced expression must have type <literal>Type</literal>.</para></listitem>
+		    <listitem><para> [Planned, but not implemented yet.] a
+		    type; the spliced expression must have type <literal>Q Typ</literal>.</para></listitem>
 		    </itemizedlist>
 	   (Note that the syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>" as in
 	the paper. Also the type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>
