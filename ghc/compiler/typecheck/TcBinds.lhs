@@ -60,7 +60,7 @@ import SrcLoc		( Located(..), unLoc, getLoc )
 import Bag
 import ErrUtils		( Message )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
-import Maybes		( fromJust, isJust, orElse )
+import Maybes		( fromJust, isJust, orElse, catMaybes )
 import Util		( singleton )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 			  RecFlag(..), isNonRec )
@@ -882,17 +882,19 @@ Type signatures are tricky.  See Note [Signature skolems] in TcType
 
 \begin{code}
 tcTySigs :: [LSig Name] -> TcM [TcSigInfo]
-tcTySigs sigs = mappM tcTySig (filter isVanillaLSig sigs)
+tcTySigs sigs = do { mb_sigs <- mappM tcTySig (filter isVanillaLSig sigs)
+		   ; return (catMaybes mb_sigs) }
 
-tcTySig :: LSig Name -> TcM TcSigInfo
+tcTySig :: LSig Name -> TcM (Maybe TcSigInfo)
 tcTySig (L span (Sig (L _ name) ty))
-  = setSrcSpan span		$
+  = recoverM (return Nothing)	$
+    setSrcSpan span		$
     do	{ sigma_ty <- tcHsSigType (FunSigCtxt name) ty
 	; (tvs, theta, tau) <- tcInstSigType name scoped_names sigma_ty
 	; loc <- getInstLoc (SigOrigin (SigSkol name))
-	; return (TcSigInfo { sig_id = mkLocalId name sigma_ty, 
-			      sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
-			      sig_scoped = scoped_names, sig_loc = loc }) }
+	; return (Just (TcSigInfo { sig_id = mkLocalId name sigma_ty, 
+				    sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
+				    sig_scoped = scoped_names, sig_loc = loc })) }
   where
 	-- The scoped names are the ones explicitly mentioned
 	-- in the HsForAll.  (There may be more in sigma_ty, because
