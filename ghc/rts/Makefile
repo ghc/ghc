@@ -326,6 +326,8 @@ ifeq "$(Windows)" "YES"
 PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h
 endif
 
+GC_HC_OPTS += -optc-O3
+
 # Cmm must be compiled via-C for now, because the NCG can't handle loops
 SRC_HC_OPTS += -fvia-C
 
