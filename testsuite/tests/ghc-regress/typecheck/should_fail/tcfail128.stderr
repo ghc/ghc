@@ -7,11 +7,11 @@ tcfail128.hs:18:15:
     In a 'do' expression: v <- thaw tmp
     In the definition of `main':
 	main = do
-		 let sL = [1, 4, 6, 3, 2, 5]
-		     dim = length sL
-		     help :: [FlatVector]
-		     help = [... | s <- ...]
+		 let help :: [FlatVector]
 		     tmp :: Vector FlatVector
+		     sL = [1, 4, 6, 3, 2, 5]
+		     dim = length sL
+		     help = [... | s <- ...]
 		     tmp = listVector (1, dim) help
 		 v <- thaw tmp
 		 return ()

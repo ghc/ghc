@@ -5,3 +5,12 @@ tcfail071.hs:8:0:
       f :: forall d. (Ord d) => d -> d
       g :: forall e. e -> e
     The signature contexts in a mutually recursive group should all be identical
+    When generalising the type(s) for f, g
+
+tcfail071.hs:10:21:
+    Couldn't match the rigid variable `e' against `a -> b -> b'
+      `e' is bound by the type signature for `g'
+      Expected type: a -> b -> b
+      Inferred type: e
+    In the first argument of `f', namely `c'
+    In the first argument of `foldr', namely `(f c)'
