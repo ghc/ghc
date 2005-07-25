@@ -167,7 +167,7 @@ gen_Eq_binds tycon
     in
     listToBag [
       mk_FunBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest),
-      mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] emptyLHsBinds (
+      mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] (
 	nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
     ]
   where
@@ -298,8 +298,10 @@ gen_Ord_binds tycon
     tycon_loc = getSrcSpan tycon
     --------------------------------------------------------------------
 
-    compare = mk_easy_FunBind tycon_loc compare_RDR
-				  [a_Pat, b_Pat] (unitBag cmp_eq) compare_rhs
+    compare = L tycon_loc (FunBind (L tycon_loc compare_RDR) False compare_matches placeHolderNames)
+    compare_matches = mkMatchGroup [mkMatch [a_Pat, b_Pat] compare_rhs cmp_eq_binds]
+    cmp_eq_binds    = HsValBinds (ValBindsIn (unitBag cmp_eq) [])
+
     compare_rhs
 	| single_con_type = cmp_eq_Expr a_Expr b_Expr
  	| otherwise
@@ -417,7 +419,7 @@ gen_Enum_binds tycon
     occ_nm    = getOccString tycon
 
     succ_enum
-      = mk_easy_FunBind tycon_loc succ_RDR [a_Pat] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc succ_RDR [a_Pat] $
 	untag_Expr tycon [(a_RDR, ah_RDR)] $
 	nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR tycon),
 			       nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -427,7 +429,7 @@ gen_Enum_binds tycon
 		 			nlHsIntLit 1]))
 		    
     pred_enum
-      = mk_easy_FunBind tycon_loc pred_RDR [a_Pat] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc pred_RDR [a_Pat] $
 	untag_Expr tycon [(a_RDR, ah_RDR)] $
 	nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
 			       nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -437,7 +439,7 @@ gen_Enum_binds tycon
 					       nlHsLit (HsInt (-1))]))
 
     to_enum
-      = mk_easy_FunBind tycon_loc toEnum_RDR [a_Pat] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc toEnum_RDR [a_Pat] $
 	nlHsIf (nlHsApps and_RDR
 		[nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [nlHsVar a_RDR, nlHsVar (maxtag_RDR tycon)]])
@@ -445,7 +447,7 @@ gen_Enum_binds tycon
 	     (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
 
     enum_from
-      = mk_easy_FunBind tycon_loc enumFrom_RDR [a_Pat] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc enumFrom_RDR [a_Pat] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  nlHsApps map_RDR 
 		[nlHsVar (tag2con_RDR tycon),
@@ -454,7 +456,7 @@ gen_Enum_binds tycon
 			    (nlHsVar (maxtag_RDR tycon)))]
 
     enum_from_then
-      = mk_easy_FunBind tycon_loc enumFromThen_RDR [a_Pat, b_Pat] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc enumFromThen_RDR [a_Pat, b_Pat] $
 	  untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
 	  nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
 	    nlHsPar (enum_from_then_to_Expr
@@ -467,7 +469,7 @@ gen_Enum_binds tycon
 			   ))
 
     from_enum
-      = mk_easy_FunBind tycon_loc fromEnum_RDR [a_Pat] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc fromEnum_RDR [a_Pat] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  (nlHsVarApps intDataCon_RDR [ah_RDR])
 \end{code}
@@ -579,8 +581,7 @@ gen_Ix_binds tycon
     enum_ixes = listToBag [ enum_range, enum_index, enum_inRange ]
 
     enum_range
-      = mk_easy_FunBind tycon_loc range_RDR 
-		[nlTuplePat [a_Pat, b_Pat] Boxed] emptyLHsBinds $
+      = mk_easy_FunBind tycon_loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  untag_Expr tycon [(b_RDR, bh_RDR)] $
 	  nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
@@ -592,7 +593,7 @@ gen_Ix_binds tycon
       = mk_easy_FunBind tycon_loc unsafeIndex_RDR 
 		[noLoc (AsPat (noLoc c_RDR) 
 			   (nlTuplePat [a_Pat, nlWildPat] Boxed)), 
-				d_Pat] emptyLHsBinds (
+				d_Pat] (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
 	   untag_Expr tycon [(d_RDR, dh_RDR)] (
 	   let
@@ -605,8 +606,7 @@ gen_Ix_binds tycon
 	)
 
     enum_inRange
-      = mk_easy_FunBind tycon_loc inRange_RDR 
-	  [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] emptyLHsBinds (
+      = mk_easy_FunBind tycon_loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] (
 	  untag_Expr tycon [(b_RDR, bh_RDR)] (
 	  untag_Expr tycon [(c_RDR, ch_RDR)] (
@@ -614,7 +614,7 @@ gen_Ix_binds tycon
 	     (genOpApp (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR))
 	  ) {-else-} (
 	     false_Expr
-	  )))))
+	  ))))
 
     --------------------------------------------------------------
     single_con_ixes 
@@ -640,7 +640,7 @@ gen_Ix_binds tycon
     --------------------------------------------------------------
     single_con_range
       = mk_easy_FunBind tycon_loc range_RDR 
-	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] emptyLHsBinds $
+	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
 	nlHsDo ListComp stmts con_expr
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
@@ -653,7 +653,7 @@ gen_Ix_binds tycon
     single_con_index
       = mk_easy_FunBind tycon_loc unsafeIndex_RDR 
 		[nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
-		 con_pat cs_needed] emptyBag
+		 con_pat cs_needed] 
 		(mk_index (zip3 as_needed bs_needed cs_needed))
       where
 	-- index (l1,u1) i1 + rangeSize (l1,u1) * (index (l2,u2) i2 + ...)
@@ -675,9 +675,8 @@ gen_Ix_binds tycon
     single_con_inRange
       = mk_easy_FunBind tycon_loc inRange_RDR 
 		[nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
-		 con_pat cs_needed]
-			   emptyLHsBinds (
-	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed))
+		 con_pat cs_needed] $
+	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed)
       where
     	in_range a b c = nlHsApps inRange_RDR [nlTuple [nlHsVar a, nlHsVar b] Boxed,
 					       nlHsVar c]
@@ -994,7 +993,7 @@ gen_Typeable_binds tycon
   = unitBag $
 	mk_easy_FunBind tycon_loc 
 		(mk_typeOf_RDR tycon) 	-- Name of appropriate type0f function
-		[nlWildPat] emptyLHsBinds
+		[nlWildPat] 
 		(nlHsApps mkTypeRep_RDR [tycon_rep, nlList []])
   where
     tycon_loc = getSrcSpan tycon
@@ -1100,7 +1099,6 @@ gen_Data_binds fix_env tycon
                         tycon_loc
                         dataTypeOf_RDR
 			[nlWildPat]
-                        emptyLHsBinds
                         (nlHsVar data_type_name)
 
 	------------  $dT

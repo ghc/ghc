@@ -84,7 +84,7 @@ import Outputable
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), 
 			  HsLocalBinds(..), HsValBinds(..),
-			  LStmt, LHsExpr, LHsType, mkVarBind, 
+			  LStmt, LHsExpr, LHsType, mkMatchGroup, mkMatch, emptyLocalBinds,
 			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
 		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
@@ -122,7 +122,7 @@ import HscTypes		( InteractiveContext(..),
 			  ModIface(..), icPrintUnqual,
 			  Dependencies(..) )
 import BasicTypes	( Fixity )
-import SrcLoc		( unLoc, noSrcSpan )
+import SrcLoc		( unLoc )
 #endif
 
 import FastString	( mkFastString )
@@ -950,7 +950,8 @@ mkPlan :: LStmt Name -> TcM PlanResult
 mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
-	      the_bind  = mkVarBind noSrcSpan fresh_it expr
+	      the_bind  = L loc $ FunBind (L loc fresh_it) False matches emptyNameSet
+	      matches   = mkMatchGroup [mkMatch [] expr emptyLocalBinds]
 	      let_stmt  = L loc $ LetStmt (HsValBinds (ValBindsIn (unitBag the_bind) []))
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 

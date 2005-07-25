@@ -221,18 +221,17 @@ nlHsFunTy a b		= noLoc (HsFunTy a b)
 %************************************************************************
 
 \begin{code}
-mkVarBind :: SrcSpan -> name -> LHsExpr name -> LHsBind name
-mkVarBind loc var rhs = mk_easy_FunBind loc var [] emptyLHsBinds rhs
+mkVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
+mkVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
 ------------
-mk_easy_FunBind :: SrcSpan -> name -> [LPat name]
-		-> LHsBinds name -> LHsExpr name
-		-> LHsBind name
+mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
+		-> LHsExpr RdrName -> LHsBind RdrName
 
-mk_easy_FunBind loc fun pats binds expr
+mk_easy_FunBind loc fun pats expr
   = L loc (FunBind (L loc fun) False{-not infix-} matches placeHolderNames)
   where
-    matches = mkMatchGroup [mk_easy_Match pats binds expr]
+    matches = mkMatchGroup [mkMatch pats expr emptyLocalBinds]
 
 ------------
 mk_FunBind :: SrcSpan -> RdrName
@@ -244,10 +243,6 @@ mk_FunBind loc fun pats_and_exprs
   = L loc (FunBind (L loc fun) False{-not infix-} matches placeHolderNames)
   where
     matches = mkMatchGroup [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
-
-------------
-mk_easy_Match pats binds expr
-  = mkMatch pats expr (HsValBinds (ValBindsIn binds []))
 
 ------------
 mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id
@@ -285,7 +280,9 @@ collectLocalBinders EmptyLocalBinds = []
 
 collectHsValBinders :: HsValBinds name -> [Located name]
 collectHsValBinders (ValBindsIn binds sigs) = collectHsBindLocatedBinders binds
-collectHsValBinders (ValBindsOut binds)     = panic "collectHsValBinders"
+collectHsValBinders (ValBindsOut binds)     = foldr collect_one [] binds
+  where
+   collect_one (_,binds) acc = foldrBag (collectAcc . unLoc) acc binds
 
 collectAcc :: HsBind name -> [Located name] -> [Located name]
 collectAcc (PatBind pat _ _ _) acc = collectLocatedPatBinders pat ++ acc
