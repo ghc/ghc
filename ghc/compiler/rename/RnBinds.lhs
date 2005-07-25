@@ -473,14 +473,16 @@ check_sigs :: (LSig Name -> Bool) -> [LSig Name] -> RnM ()
 check_sigs ok_sig sigs 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-  = do	{ mappM_ unknownSigErr (filter bad sigs)
-	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs) }
+  = do	{ mappM_ unknownSigErr sigs'
+	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs') }
   where
+	-- Don't complain about an unbound name again
+    sigs' = filter bad sigs
     bad sig = not (ok_sig sig) && 
 	      case sigName sig of
 		Just n | isUnboundName n -> False
-				-- Don't complain about an unbound name again
 		other			 -> True
+
 -- We use lookupLocatedSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
 --	instance Foo T where
