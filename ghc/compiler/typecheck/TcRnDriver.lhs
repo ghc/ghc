@@ -33,7 +33,7 @@ import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
 			  nlHsApp, nlHsVar, pprLHsBinds )
 import RdrHsSyn		( findSplice )
 
-import PrelNames	( runMainIOName, rootMainName, mAIN,
+import PrelNames	( runMainIOName, rootMainKey, rOOT_MAIN, mAIN,
 			  main_RDR_Unqual )
 import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv )
 import TcHsSyn		( zonkTopDecls )
@@ -63,8 +63,9 @@ import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, elemModuleEnv )
-import OccName		( mkVarOcc )
-import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName )
+import OccName		( mkVarOcc, mkOccFS, varName )
+import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
+			  mkExternalName )
 import NameSet
 import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
@@ -83,7 +84,7 @@ import Outputable
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), 
 			  HsLocalBinds(..), HsValBinds(..),
-			  LStmt, LHsExpr, LHsType, mkVarBind,
+			  LStmt, LHsExpr, LHsType, mkVarBind, 
 			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
 		   	  placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
@@ -764,8 +765,23 @@ check_main ghci_mode tcg_env main_mod main_fn
 	; (main_expr, ty) <- setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
 
-	; let { root_main_id = mkExportedLocalId rootMainName ty ;
-	        main_bind    = noLoc (VarBind root_main_id main_expr) }
+	-- The function that the RTS invokes is always :Main.main,
+	-- which we call root_main_id.  
+	-- (Because GHC allows the user to have a module not called 
+	-- Main as the main module, we can't rely on the main function
+	-- being called "Main.main".  That's why root_main_id has a fixed
+	-- module ":Main".)
+	-- We also make root_main_id an implicit Id, by making main_name
+	-- its parent (hence (Just main_name)).  That has the effect
+	-- of preventing its type and unfolding from getting out into
+	-- the interface file. Otherwise we can end up with two defns
+	-- for 'main' in the interface file!
+
+	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
+				   (mkOccFS varName FSLIT("main")) 
+				   (Just main_name) (getSrcLoc main_name)
+	      ; root_main_id = mkExportedLocalId root_main_name ty
+	      ; main_bind    = noLoc (VarBind root_main_id main_expr) }
 
 	; return (tcg_env { tcg_binds = tcg_binds tcg_env 
 					`snocBag` main_bind,

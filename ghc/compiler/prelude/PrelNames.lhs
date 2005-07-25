@@ -268,7 +268,7 @@ rANDOM		= mkModule "System.Random"
 
 gLA_EXTS	= mkModule "GHC.Exts"
 rOOT_MAIN	= mkModule ":Main"		-- Root module for initialisation 
-	-- The ':xxx' makes a moudle name that the user can never
+	-- The ':xxx' makes a module name that the user can never
 	-- use himself.  The z-encoding for ':' is "ZC", so the z-encoded
 	-- module name still starts with a capital letter, which keeps
 	-- the z-encoded version consistent.
@@ -435,7 +435,6 @@ and it's convenient to write them all down in one place.
 
 
 \begin{code}
-rootMainName  = varQual rOOT_MAIN FSLIT("main") rootMainKey
 runMainIOName = varQual pREL_TOP_HANDLER FSLIT("runMainIO") runMainKey
 
 orderingTyConName = tcQual   pREL_BASE FSLIT("Ordering") orderingTyConKey
