@@ -519,13 +519,20 @@ endif
 # It's an expensive module to recompile!
 prelude/PrimOp_HC_OPTS 		= -H80m
 
-# because the NCG can't handle the 64-bit math in here
-prelude/PrelRules_HC_OPTS	= -fvia-C
 
 main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -fno-warn-incomplete-patterns
+
+ifeq "$(ghc_ge_603)" "NO"
 # Use -fvia-C since the NCG can't handle the narrow16Int# (and intToInt16#?)
 # primops on all platforms.
-parser/Parser_HC_OPTS 		+= -fno-warn-incomplete-patterns -fvia-C
+parser/Parser_HC_OPTS		+= -fvia-C
+# because the NCG can't handle the 64-bit math in here
+prelude/PrelRules_HC_OPTS	+= -fvia-C
+# ByteCodeItbls uses primops that the NCG doesn't support.
+ghci/ByteCodeItbls_HC_OPTS	+= -fvia-C
+ghci/ByteCodeLink_HC_OPTS	+= -fvia-C -monly-3-regs
+endif
 
 # Careful optimisation of the parser: we don't want to throw everything
 # at it, because that takes too long and doesn't buy much, but we do want
@@ -544,10 +551,6 @@ basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
 endif
-
-# ByteCodeItbls uses primops that the NCG doesn't support yet.
-ghci/ByteCodeItbls_HC_OPTS	+= -fvia-C
-ghci/ByteCodeLink_HC_OPTS	+= -fvia-C -monly-3-regs
 
 # BinIface and Binary take ages to both compile and run if you don's use -O
 main/BinIface_HC_OPTS		+= -O
