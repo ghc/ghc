@@ -523,6 +523,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	// StgMutArrPtr.ptrs, no SRT
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 	init_ptrs(&se.info, ((StgMutArrPtrs *)c)->ptrs,
 		  (StgPtr)(((StgMutArrPtrs *)c)->payload));
 	*first_child = find_ptrs(&se.info);
@@ -821,6 +822,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    // StgMutArrPtr.ptrs, no SRT
 	case MUT_ARR_PTRS:
 	case MUT_ARR_PTRS_FROZEN:
+	case MUT_ARR_PTRS_FROZEN0:
 	    *c = find_ptrs(&se->info);
 	    if (*c == NULL) {
 		popOff();
@@ -990,6 +992,7 @@ isRetainer( StgClosure *c )
     case MUT_VAR:
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 
 	// thunks are retainers.
     case THUNK:
@@ -2071,6 +2074,7 @@ sanityCheckHeapClosure( StgClosure *c )
 
     case MUT_ARR_PTRS:
     case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs *)c);
 
     case AP:
