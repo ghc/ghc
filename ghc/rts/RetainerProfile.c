@@ -1780,8 +1780,8 @@ computeRetainerSet( void )
 	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
 	    for (ml = bd->start; ml < bd->free; ml++) {
 
-		maybeInitRetainerSet((StgClosure *)ml);
-		rtl = retainerSetOf((StgClosure *)ml);
+		maybeInitRetainerSet((StgClosure *)*ml);
+		rtl = retainerSetOf((StgClosure *)*ml);
 
 #ifdef DEBUG_RETAINER
 		if (rtl == NULL) {
