@@ -178,6 +178,7 @@ data AlgTyConRhs
 			-- INVARIANT: Kept in order of increasing tag
 			--	      (see the tag assignment in DataCon.mkDataCon)
 	Bool		-- Cached: True <=> an enumeration type
+			--	   Includes data types with no constructors.
 
   | NewTyCon 		-- Newtypes always have exactly one constructor
 	DataCon		-- The unique constructor; it has no existentials
