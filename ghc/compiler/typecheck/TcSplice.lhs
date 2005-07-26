@@ -23,7 +23,7 @@ import LoadIface	( loadHomeInterface )
 import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType, thRdrName )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe, lookupImportedName )
-import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, lookupLocalRdrEnv, isSrcRdrName )
+import RdrName		( RdrName, lookupLocalRdrEnv, isSrcRdrName )
 import RnTypes		( rnLHsType )
 import TcExpr		( tcCheckRho, tcMonoExpr )
 import TcHsSyn		( mkHsDictLet, zonkTopLExpr )
@@ -31,22 +31,22 @@ import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, TcKind, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
 import TcEnv		( spliceOK, tcMetaTy, bracketOK )
-import TcMType		( newTyFlexiVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
+import TcMType		( newTyFlexiVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType )
 import TcHsType		( tcHsSigType, kcHsType )
 import TcIface		( tcImportDecl )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
 import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, 
-			  mkInternalName, nameIsLocalOrFrom )
+			  nameIsLocalOrFrom )
 import NameEnv		( lookupNameEnv )
 import HscTypes		( lookupType, ExternalPackageState(..), emptyModDetails )
 import OccName
 import Var		( Id, TyVar, idType )
-import Module		( moduleUserString, mkModule )
+import Module		( moduleUserString )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
-import TyCon		( TyCon, AlgTyConRhs(..), tyConTyVars, getSynTyConDefn, 
-			  isSynTyCon, isNewTyCon, tyConDataCons, algTyConRhs, isPrimTyCon, isFunTyCon,
+import TyCon		( TyCon, tyConTyVars, getSynTyConDefn, 
+			  isSynTyCon, isNewTyCon, tyConDataCons, isPrimTyCon, isFunTyCon,
 			  tyConArity, tyConStupidTheta, isUnLiftedTyCon )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
 			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix, 
@@ -56,7 +56,7 @@ import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
 import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName, nameTyConName )
 import ErrUtils		( Message )
-import SrcLoc		( noLoc, unLoc, getLoc, noSrcLoc )
+import SrcLoc		( noLoc, unLoc, getLoc )
 import Outputable
 import Unique		( Unique, Uniquable(..), getKey, mkUniqueGrimily )
 
@@ -66,7 +66,6 @@ import FastString	( LitString )
 
 import GHC.Base		( unsafeCoerce#, Int#, Int(..) )	-- Should have a better home in the module hierarchy
 import Monad 		( liftM )
-import Maybes		( orElse )
 
 #ifdef GHCI
 import FastString	( mkFastString )
@@ -525,9 +524,6 @@ tcLookupTh name
 		-- if not, we fail hard in tcImportDecl
     }}}}
 
-mk_uniq :: Int# -> Unique
-mk_uniq u = mkUniqueGrimily (I# u)
-
 notInScope :: TH.Name -> SDoc
 notInScope th_name = quotes (text (TH.pprint th_name)) <+> 
 		     ptext SLIT("is not in scope at a reify")
@@ -583,18 +579,14 @@ reifyTyCon tc
 	; return (TH.TyConI $ TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
 
 reifyTyCon tc
-  = case algTyConRhs tc of
-      NewTyCon data_con _ _ 
-	-> do	{ cxt <- reifyCxt (tyConStupidTheta tc)
-		; con <- reifyDataCon data_con
-		; return (TH.TyConI $ TH.NewtypeD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
-				      		  con [{- Don't know about deriving -}]) }
-
-      DataTyCon cons _
-	-> do	{ cxt <- reifyCxt (tyConStupidTheta tc)
-		; cons <- mapM reifyDataCon (tyConDataCons tc)
-		; return (TH.TyConI $ TH.DataD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
-				      	       cons [{- Don't know about deriving -}]) }
+  = do 	{ cxt <- reifyCxt (tyConStupidTheta tc)
+	; cons <- mapM reifyDataCon (tyConDataCons tc)
+	; let name = reifyName tc
+	      tvs  = reifyTyVars (tyConTyVars tc)
+	      deriv = []	-- Don't know about deriving
+	      decl | isNewTyCon tc = TH.NewtypeD cxt name tvs (head cons) deriv
+		   | otherwise	   = TH.DataD    cxt name tvs cons 	  deriv
+	; return (TH.TyConI decl) }
 
 reifyDataCon :: DataCon -> TcM TH.Con
 reifyDataCon dc
@@ -611,7 +603,7 @@ reifyDataCon dc
 	  else
 	  if dataConIsInfix dc then
 	     ASSERT( length arg_tys == 2 )
-	     return (TH.InfixC (s1,a1) name (s1,a2))
+	     return (TH.InfixC (s1,a1) name (s2,a2))
 	  else
 	     return (TH.NormalC name (stricts `zip` arg_tys)) }
   | otherwise
