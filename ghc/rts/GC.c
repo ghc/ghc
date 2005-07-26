@@ -1977,18 +1977,27 @@ loop:
 	if (p == NULL) {
 	    return copy(q,THUNK_SELECTOR_sizeW(),stp);
 	} else {
+	    StgClosure *val;
 	    // q is still BLACKHOLE'd.
 	    thunk_selector_depth++;
-	    p = evacuate(p);
-	    thunk_selector_depth--;
-	    upd_evacuee(q,p);
+	    val = evacuate(p);
+
+	    // Update the THUNK_SELECTOR with an indirection to the
+	    // EVACUATED closure now at p.  Why do this rather than
+	    // upd_evacuee(q,p)?  Because we have an invariant that an
+	    // EVACUATED closure always points to an object in the
+	    // same or an older generation (required by the short-cut
+	    // test in the EVACUATED case, below).
+	    SET_INFO(q, &stg_IND_info);
+	    ((StgInd *)q)->indirectee = p;
+
 #ifdef PROFILING
 	    // We store the size of the just evacuated object in the
 	    // LDV word so that the profiler can guess the position of
 	    // the next object later.
 	    SET_EVACUAEE_FOR_LDV(q, THUNK_SELECTOR_sizeW());
 #endif
-	    return p;
+	    return val;
 	}
     }
 
@@ -2034,8 +2043,10 @@ loop:
      * Optimisation: the check is fairly expensive, but we can often
      * shortcut it if either the required generation is 0, or the
      * current object (the EVACUATED) is in a high enough generation.
-     * stp is the lowest step that the current object would be
-     * evacuated to, so we only do the full check if stp is too low.
+     * We know that an EVACUATED always points to an object in the
+     * same or an older generation.  stp is the lowest step that the
+     * current object would be evacuated to, so we only do the full
+     * check if stp is too low.
      */
     if (evac_gen > 0 && stp->gen_no < evac_gen) {  // optimisation 
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
