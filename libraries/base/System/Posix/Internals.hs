@@ -120,7 +120,7 @@ statGetType p_stat = do
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
 
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
+#if __GLASGOW_HASKELL__ && (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 closeFd :: Bool -> CInt -> IO CInt
 closeFd isStream fd 
   | isStream  = c_closesocket fd
