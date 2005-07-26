@@ -938,6 +938,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		
 	    case MUT_ARR_PTRS:
 	    case MUT_ARR_PTRS_FROZEN:
+	    case MUT_ARR_PTRS_FROZEN0:
 		prim = rtsTrue;
 		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
 		break;
