@@ -82,13 +82,6 @@ FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 # Check for idiosyncracies in some mingw impls of directory handling.
 FP_READDIR_EOF_ERRNO
 
-case "$host" in
-*-mingw32) EXTRA_LIBS="wsock32" ;;
-*-solaris2) EXTRA_LIBS="nsl socket" ;;
-*)	EXTRA_LIBS= ;;
-esac
-AC_SUBST([EXTRA_LIBS])
-
-AC_CONFIG_FILES([config.mk base.buildinfo])
+AC_CONFIG_FILES([config.mk])
 
 AC_OUTPUT

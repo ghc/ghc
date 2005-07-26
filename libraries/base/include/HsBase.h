@@ -417,6 +417,8 @@ __hscore_setmode( HsInt fd, HsBool toBin )
 #endif
 }
 
+#if __GLASGOW_HASKELL__
+
 INLINE HsInt
 __hscore_PrelHandle_write( HsInt fd, HsAddr ptr, HsInt off, int sz )
 {
@@ -443,6 +445,8 @@ __hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
     return recv(fd,(char *)ptr + off, sz, 0);
 }
 #endif
+
+#endif /* __GLASGOW_HASKELL__ */
 
 #if defined(mingw32_HOST_OS) || defined(_MSC_VER)
 INLINE long *
