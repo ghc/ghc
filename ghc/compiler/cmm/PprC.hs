@@ -69,8 +69,7 @@ pprCs dflags cmms
 
 writeCs :: DynFlags -> Handle -> [Cmm] -> IO ()
 writeCs dflags handle cmms 
-  = printForUser handle alwaysQualify (pprCs dflags cmms)
- 	-- ToDo: should be printForC
+  = printForC handle (pprCs dflags cmms)
 
 -- --------------------------------------------------------------------------
 -- Now do some real work
