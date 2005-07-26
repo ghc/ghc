@@ -208,8 +208,9 @@ getFreeRegs cls f = go f 0
 	-- ToDo: there's no point looking through all the integer registers
 	-- in order to find a floating-point one.
 
-allocateReg :: FreeRegs -> RegNo -> FreeRegs
-allocateReg f r = f .&. complement (1 `shiftL` fromIntegral r)
+allocateReg :: RegNo -> FreeRegs -> FreeRegs
+allocateReg r f = f .&. complement (1 `shiftL` fromIntegral r)
+
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -425,12 +426,11 @@ raInsn block_live new_instrs (instr, r_dying, w_dying) = do
 	other -> genRaInsn block_live new_instrs instr r_dying w_dying
 
 
-genRaInsn block_live new_instrs instr r_dying w_dying = do
+genRaInsn block_live new_instrs instr r_dying w_dying =
+    case regUsage instr              of { RU read written ->
+    case partition isRealReg written of { (real_written1,virt_written) ->
+    do
     let 
-	RU read written = regUsage instr
-
-	(real_written1,virt_written) = partition isRealReg written
-
 	real_written = [ r | RealReg r <- real_written1 ]
 
 	-- we don't need to do anything with real registers that are
@@ -494,6 +494,7 @@ genRaInsn block_live new_instrs instr r_dying w_dying = do
     return (patched_instr : w_spills ++ reverse r_spills
 		 ++ clobber_saves ++ new_instrs,
 	    fixup_blocks)
+  }}
 
 -- -----------------------------------------------------------------------------
 -- releaseRegs
@@ -503,6 +504,7 @@ releaseRegs regs = do
   free <- getFreeRegsR
   loop assig free regs 
  where
+  loop assig free _ | free `seq` False = undefined
   loop assig free [] = do setAssigR assig; setFreeRegsR free; return ()
   loop assig free (RealReg r : rs) = loop assig (releaseReg r free) rs
   loop assig free (r:rs) = 
@@ -556,7 +558,7 @@ clobberRegs :: [RegNo] -> RegM ()
 clobberRegs [] = return () -- common case
 clobberRegs clobbered = do
   freeregs <- getFreeRegsR
-  setFreeRegsR (foldl allocateReg freeregs clobbered)
+  setFreeRegsR $! foldr allocateReg freeregs clobbered
   assig <- getAssigR
   setAssigR $! clobber assig (ufmToList assig)
  where
@@ -622,7 +624,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 		 | Just (InMem slot) <- loc, reading = InBoth my_reg slot
 		 | otherwise		             = InReg my_reg
 	    setAssigR (addToUFM assig r $! new_loc)
-	    setFreeRegsR (allocateReg freeregs my_reg)
+	    setFreeRegsR (allocateReg my_reg freeregs)
     	    allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
 
         -- case (3): we need to push something out to free up a register
@@ -752,7 +754,7 @@ data RA_State
 	ra_blockassig :: BlockAssignment,
 		-- The current mapping from basic blocks to 
 		-- the register assignments at the beginning of that block.
-	ra_freeregs   :: FreeRegs,	-- free machine registers
+	ra_freeregs   :: {-#UNPACK#-}!FreeRegs,	-- free machine registers
 	ra_assig      :: RegMap Loc,	-- assignment of temps to locations
 	ra_delta      :: Int,		-- current stack delta
 	ra_stack      :: FreeStack	-- free stack slots for spilling

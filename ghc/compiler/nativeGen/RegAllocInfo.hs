@@ -161,16 +161,16 @@ regUsage instr = case instr of
     SHL    sz imm dst	-> usageRM imm dst
     SAR    sz imm dst	-> usageRM imm dst
     SHR    sz imm dst	-> usageRM imm dst
-    BT     sz imm src	-> mkRU (use_R src) []
+    BT     sz imm src	-> mkRUR (use_R src)
 
-    PUSH   sz op	-> mkRU (use_R op) []
+    PUSH   sz op	-> mkRUR (use_R op)
     POP    sz op	-> mkRU [] (def_W op)
-    TEST   sz src dst	-> mkRU (use_R src ++ use_R dst) []
-    CMP    sz src dst	-> mkRU (use_R src ++ use_R dst) []
+    TEST   sz src dst	-> mkRUR (use_R src ++ use_R dst)
+    CMP    sz src dst	-> mkRUR (use_R src ++ use_R dst)
     SETCC  cond op	-> mkRU [] (def_W op)
     JXX    cond lbl	-> mkRU [] []
-    JMP    op		-> mkRU (use_R op) []
-    JMP_TBL op ids      -> mkRU (use_R op) []
+    JMP    op		-> mkRUR (use_R op)
+    JMP_TBL op ids      -> mkRUR (use_R op)
     CALL (Left imm)  params -> mkRU params callClobberedRegs
     CALL (Right reg) params -> mkRU (reg:params) callClobberedRegs
     CLTD   sz		-> mkRU [eax] [edx]
@@ -179,7 +179,7 @@ regUsage instr = case instr of
 #if i386_TARGET_ARCH
     GMOV   src dst	-> mkRU [src] [dst]
     GLD    sz src dst	-> mkRU (use_EA src) [dst]
-    GST    sz src dst	-> mkRU (src : use_EA dst) []
+    GST    sz src dst	-> mkRUR (src : use_EA dst)
 
     GLDZ   dst		-> mkRU [] [dst]
     GLD1   dst		-> mkRU [] [dst]
@@ -195,7 +195,7 @@ regUsage instr = case instr of
     GMUL   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
     GDIV   sz s1 s2 dst	-> mkRU [s1,s2] [dst]
 
-    GCMP   sz src1 src2	-> mkRU [src1,src2] []
+    GCMP   sz src1 src2	-> mkRUR [src1,src2]
     GABS   sz src dst	-> mkRU [src] [dst]
     GNEG   sz src dst	-> mkRU [src] [dst]
     GSQRT  sz src dst	-> mkRU [src] [dst]
@@ -232,17 +232,17 @@ regUsage instr = case instr of
     -- 2 operand form; first operand Read; second Written
     usageRW :: Operand -> Operand -> RegUsage
     usageRW op (OpReg reg) = mkRU (use_R op) [reg]
-    usageRW op (OpAddr ea) = mkRU (use_R op ++ use_EA ea) []
+    usageRW op (OpAddr ea) = mkRUR (use_R op ++ use_EA ea)
 
     -- 2 operand form; first operand Read; second Modified
     usageRM :: Operand -> Operand -> RegUsage
     usageRM op (OpReg reg) = mkRU (use_R op ++ [reg]) [reg]
-    usageRM op (OpAddr ea) = mkRU (use_R op ++ use_EA ea) []
+    usageRM op (OpAddr ea) = mkRUR (use_R op ++ use_EA ea)
 
     -- 1 operand form; operand Modified
     usageM :: Operand -> RegUsage
     usageM (OpReg reg)    = mkRU [reg] [reg]
-    usageM (OpAddr ea)    = mkRU (use_EA ea) []
+    usageM (OpAddr ea)    = mkRUR (use_EA ea)
 
     -- Registers defd when an operand is written.
     def_W (OpReg reg)  = [reg]
@@ -262,8 +262,12 @@ regUsage instr = case instr of
 	      use_index EAIndexNone   = []
 	      use_index (EAIndex i _) = [i]
 
-    mkRU src dst = RU (filter interesting src)
-  	    	      (filter interesting dst)
+    mkRUR src = src' `seq` RU src' []
+	where src' = filter interesting src
+
+    mkRU src dst = src' `seq` dst' `seq` RU src' dst'
+	where src' = filter interesting src
+	      dst' = filter interesting dst
 
 #endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
