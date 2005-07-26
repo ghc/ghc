@@ -3063,7 +3063,9 @@ scavenge(step *stp)
      */
     if (failed_to_evac) {
 	failed_to_evac = rtsFalse;
-	recordMutableGen((StgClosure *)q, stp->gen);
+	if (stp->gen_no > 0) {
+	    recordMutableGen((StgClosure *)q, stp->gen);
+	}
     }
   }
 
@@ -3400,7 +3402,9 @@ linear_scan:
 
 	if (failed_to_evac) {
 	    failed_to_evac = rtsFalse;
-	    recordMutableGen((StgClosure *)q, &generations[evac_gen]);
+	    if (evac_gen > 0) {
+		recordMutableGen((StgClosure *)q, &generations[evac_gen]);
+	    }
 	}
 	
 	// mark the next bit to indicate "scavenged"
@@ -4075,7 +4079,9 @@ scavenge_large(step *stp)
 
     p = bd->start;
     if (scavenge_one(p)) {
-	recordMutableGen((StgClosure *)p, stp->gen);
+	if (stp->gen_no > 0) {
+	    recordMutableGen((StgClosure *)p, stp->gen);
+	}
     }
   }
 }
