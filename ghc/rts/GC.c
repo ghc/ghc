@@ -1981,6 +1981,7 @@ loop:
 	    // q is still BLACKHOLE'd.
 	    thunk_selector_depth++;
 	    val = evacuate(p);
+	    thunk_selector_depth--;
 
 	    // Update the THUNK_SELECTOR with an indirection to the
 	    // EVACUATED closure now at p.  Why do this rather than
