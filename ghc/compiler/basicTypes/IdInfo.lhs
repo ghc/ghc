@@ -674,12 +674,12 @@ zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
   where
 	-- The "unsafe" occ info is the ones that say I'm not in a lambda
 	-- because that might not be true for an unsaturated lambda
-    is_safe_occ (OneOcc in_lam _ _) = in_lam
-    is_safe_occ other		    = True
+    is_safe_occ (OneOcc in_lam _) = in_lam
+    is_safe_occ other		  = True
 
     safe_occ = case occ of
-		 OneOcc _ once min_args -> OneOcc insideLam once min_args
-		 other	       		-> occ
+		 OneOcc _ once -> OneOcc insideLam once
+		 other	       -> occ
 
     is_safe_dmd Nothing    = True
     is_safe_dmd (Just dmd) = not (isStrictDmd dmd)
