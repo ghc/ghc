@@ -185,7 +185,7 @@ freeze_ps_array :: MBA s -> Int# -> ST s BA
 #if __GLASGOW_HASKELL__ < 411
 #define NEW_BYTE_ARRAY newCharArray#
 #else 
-#define NEW_BYTE_ARRAY newByteArray#
+#define NEW_BYTE_ARRAY newPinnedByteArray#
 #endif
 
 new_ps_array size = ST $ \ s ->

@@ -177,6 +177,7 @@ module Pretty (
 
 #include "HsVersions.h"
 
+import BufWrite
 import FastString
 import PrimPacked 	( strLength )
 
@@ -508,7 +509,7 @@ reduceDoc (Above  p g q) = above  p g (reduceDoc q)
 reduceDoc p              = p
 
 
-data TextDetails = Chr  Char
+data TextDetails = Chr  {-#UNPACK#-}!Char
                  | Str  String
                  | PStr FastString	-- a hashed string
 		 | LStr Addr# Int#	-- a '\0'-terminated array of bytes
@@ -690,15 +691,15 @@ beside :: Doc -> Bool -> RDoc -> RDoc
 beside NoDoc               g q   = NoDoc
 beside (p1 `Union` p2)     g q   = (beside p1 g q) `union_` (beside p2 g q)
 beside Empty               g q   = q
-beside (Nest k p)          g q   = nest_ k (beside p g q)       -- p non-empty
+beside (Nest k p)          g q   = nest_ k $! beside p g q       -- p non-empty
 beside p@(Beside p1 g1 q1) g2 q2 
            {- (A `op1` B) `op2` C == A `op1` (B `op2` C)  iff op1 == op2 
                                                  [ && (op1 == <> || op1 == <+>) ] -}
-         | g1 == g2              = beside p1 g1 (beside q1 g2 q2)
+         | g1 == g2              = beside p1 g1 $! beside q1 g2 q2
          | otherwise             = beside (reduceDoc p) g2 q2
-beside p@(Above _ _ _)     g q   = beside (reduceDoc p) g q
-beside (NilAbove p)        g q   = nilAbove_ (beside p g q)
-beside (TextBeside s sl p) g q   = textBeside_ s sl rest
+beside p@(Above _ _ _)     g q   = let d = reduceDoc p in d `seq` beside d g q
+beside (NilAbove p)        g q   = nilAbove_ $! beside p g q
+beside (TextBeside s sl p) g q   = textBeside_ s sl $! rest
                                where
                                   rest = case p of
                                            Empty -> nilBeside g q
@@ -1029,26 +1030,6 @@ printDoc mode hdl doc
 
     done = hPutChar hdl '\n'
 
--- basically a specialised version of fullRender for LeftMode with IO output.
-printLeftRender :: Handle -> Doc -> IO ()
-printLeftRender hdl doc = lay (reduceDoc doc)
-  where
-    lay NoDoc               	= cant_fail
-    lay (Union p q) 		= lay (first p q)
-    lay (Nest k p)          	= lay p
-    lay Empty               	= hPutChar hdl '\n'
-    lay (NilAbove p)        	= hPutChar hdl '\n' >> lay p
-    lay (TextBeside s sl p) 	= put s >> lay p
-
-    put (Chr c)    = hPutChar hdl c
-    put (Str s)    = hPutStr  hdl s
-    put (PStr s)   = hPutFS   hdl s
-    put (LStr s l) = hPutLitString hdl s l
-
-#if __GLASGOW_HASKELL__ < 503
-hPutBuf = hPutBufFull
-#endif
-
   -- some versions of hPutBuf will barf if the length is zero
 hPutLitString handle a# 0# = return ()
 hPutLitString handle a# l#
@@ -1057,4 +1038,48 @@ hPutLitString handle a# l#
 #else
   = hPutBuf handle (Ptr a#) (I# l#)
 #endif
+
+-- Printing output in LeftMode is performance critical: it's used when
+-- dumping C and assembly output, so we allow ourselves a few dirty
+-- hacks:
+--
+--	(1) we specialise fullRender for LeftMode with IO output.
+--
+--	(2) we add a layer of buffering on top of Handles.  Handles
+--	    don't perform well with lots of hPutChars, which is mostly
+--	    what we're doing here, because Handles have to be thread-safe
+--	    and async exception-safe.  We only have a single thread and don't
+--	    care about exceptions, so we add a layer of fast buffering
+--	    over the Handle interface.
+--
+--	(3) a few hacks in layLeft below to convince GHC to generate the right
+--	    code.
+
+printLeftRender :: Handle -> Doc -> IO ()
+printLeftRender hdl doc = do
+  b <- newBufHandle hdl
+  layLeft b (reduceDoc doc)
+  bFlush b
+
+-- HACK ALERT!  the "return () >>" below convinces GHC to eta-expand
+-- this function with the IO state lambda.  Otherwise we end up with
+-- closures in all the case branches.
+layLeft b _ | b `seq` False = undefined	-- make it strict in b
+layLeft b NoDoc               	= cant_fail
+layLeft b (Union p q) 		= return () >> layLeft b (first p q)
+layLeft b (Nest k p)          	= return () >> layLeft b p
+layLeft b Empty               	= bPutChar b '\n'
+layLeft b (NilAbove p)        	= bPutChar b '\n' >> layLeft b p
+layLeft b (TextBeside s sl p) 	= put b s >> layLeft b p
+ where
+    put b _ | b `seq` False = undefined
+    put b (Chr c)    = bPutChar b c
+    put b (Str s)    = bPutStr  b s
+    put b (PStr s)   = bPutFS   b s
+    put b (LStr s l) = bPutLitString b s l
+
+#if __GLASGOW_HASKELL__ < 503
+hPutBuf = hPutBufFull
+#endif
+
 \end{code}
