@@ -1,0 +1,5 @@
+
+tcfail145.hs:9:5:
+    Couldn't match `forall a. [a] -> [a]' against `forall a. a -> a'
+    Polymorphic types must match exactly in patterns
+    In the definition of `foo': foo (f :: forall a. [a] -> [a]) = f undefined
