@@ -356,6 +356,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // tell the stats department that we've started a GC 
   stat_startGC();
 
+#ifdef DEBUG
+  // check for memory leaks if DEBUG is on 
+  memInventory();
+#endif
+
   // Init stats and print par specific (timing) info 
   PAR_TICKY_PAR_START();
 
@@ -806,20 +811,21 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 		// tack the new blocks on the end of the existing blocks
 		if (stp->old_blocks != NULL) {
 		    for (bd = stp->old_blocks; bd != NULL; bd = next) {
-			next = bd->link;
-			if (next == NULL) {
-			    bd->link = stp->blocks;
-			}
 			// NB. this step might not be compacted next
 			// time, so reset the BF_COMPACTED flags.
 			// They are set before GC if we're going to
 			// compact.  (search for BF_COMPACTED above).
 			bd->flags &= ~BF_COMPACTED;
+			next = bd->link;
+			if (next == NULL) {
+			    bd->link = stp->blocks;
+			}
 		    }
 		    stp->blocks = stp->old_blocks;
 		}
 		// add the new blocks to the block tally
 		stp->n_blocks += stp->n_old_blocks;
+		ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
 	    } else {
 		freeChain(stp->old_blocks);
 		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
@@ -972,8 +978,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   for (g = 0; g <= N; g++) {
       for (s = 0; s < generations[g].n_steps; s++) {
 	  stp = &generations[g].steps[s];
-	  if (stp->is_compacted && stp->bitmap != NULL) {
+	  if (stp->bitmap != NULL) {
 	      freeGroup(stp->bitmap);
+	      stp->bitmap = NULL;
 	  }
       }
   }
@@ -1130,8 +1137,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   CCCS = prev_CCS;
 #endif
 
-  // check for memory leaks if sanity checking is on 
-  IF_DEBUG(sanity, memInventory());
+#ifdef DEBUG
+  // check for memory leaks if DEBUG is on 
+  memInventory();
+#endif
 
 #ifdef RTS_GTK_FRONTPANEL
   if (RtsFlags.GcFlags.frontpanel) {
@@ -3416,7 +3425,7 @@ linear_scan:
     if (mark_stack_overflowed && oldgen_scan_bd == NULL) {
 	IF_DEBUG(gc, debugBelch("scavenge_mark_stack: starting linear scan"));
 	mark_stack_overflowed = rtsFalse;
-	oldgen_scan_bd = oldest_gen->steps[0].blocks;
+	oldgen_scan_bd = oldest_gen->steps[0].old_blocks;
 	oldgen_scan = oldgen_scan_bd->start;
     }
 
