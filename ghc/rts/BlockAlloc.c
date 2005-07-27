@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-2005
+ * (c) The GHC Team 1998-2000
  * 
  * The block allocator and free list manager.
  *
@@ -44,28 +44,20 @@ void initBlockAllocator(void)
    -------------------------------------------------------------------------- */
 
 STATIC_INLINE void
-initGroupTail(nat n, bdescr *head, bdescr *tail)
-{
-    bdescr *bd;
-    nat i;
-
-    for (i=0, bd = tail; i < n; i++, bd++) {
-      bd->flags  = 0;
-      bd->free   = 0;
-      bd->blocks = 0;
-      bd->link   = head;
-    }
-}
-
-STATIC_INLINE void
 initGroup(nat n, bdescr *head)
 {
+  bdescr *bd;
+  nat i;
+
   if (n != 0) {
     head->blocks = n;
     head->free   = head->start;
     head->link   = NULL;
-    head->flags  = 0;
-    initGroupTail( n-1, head, head+1 );
+    for (i=1, bd = head+1; i < n; i++, bd++) {
+      bd->free = 0;
+      bd->blocks = 0;
+      bd->link = head;
+    }
   }
 }
 
@@ -84,15 +76,11 @@ allocGroup(nat n)
   last = &free_list;
   for (bd = free_list; bd != NULL; bd = bd->link) {
     if (bd->blocks == n) {	/* exactly the right size! */
-      if (bd->link) {
-        bd->link->u.back = bd->u.back;
-      }
       *last = bd->link;
       /* no initialisation necessary - this is already a
        * self-contained block group. */
-      bd->flags = 0;
-      bd->free  = bd->start;
-      bd->link  = NULL;
+      bd->free = bd->start;	/* block isn't free now */
+      bd->link = NULL;
       return bd;
     }
     if (bd->blocks >  n) {	/* block too big... */
@@ -170,23 +158,19 @@ allocMegaGroup(nat n)
     last = bd;
   }
 
-  /* found all the megablocks we need on the free list */
+  /* found all the megablocks we need on the free list
+   */
   if (mbs_found == n) {
     /* remove the megablocks from the free list */
     if (grp_prev == NULL) {	/* bd now points to the last mblock */
       free_list = bd->link;
-      if (free_list) {
-        free_list->u.back = NULL;
-      }
     } else {
       grp_prev->link = bd->link;
-      if (bd->link) {
-        bd->link->u.back = grp_prev;
-      }
     }
   }
 
-  /* the free list wasn't sufficient, allocate all new mblocks. */
+  /* the free list wasn't sufficient, allocate all new mblocks.
+   */
   else {
     void *mblock = getMBlocks(n);
     initMBlock(mblock);		/* only need to init the 1st one */
@@ -203,98 +187,72 @@ allocMegaGroup(nat n)
    De-Allocation
    -------------------------------------------------------------------------- */
 
-/* coalesce the group p with its predecessor and successor groups, if possible
+/* coalesce the group p with p->link if possible.
  *
- * Returns NULL if no coalescing was done, otherwise returns a
+ * Returns p->link if no coalescing was done, otherwise returns a
  * pointer to the newly enlarged group p.
  */
 
 STATIC_INLINE bdescr *
 coalesce(bdescr *p)
 {
-    bdescr *first, *q, *result = NULL;
-    
-    /* Get first megablock descriptor */
-    first = FIRST_BDESCR(MBLOCK_ROUND_DOWN(p->start));
-    
-    /* Attempt to coalesce with predecessor if not the first block */
-    if (p != first) {
-	q = p - 1;
-	if (!q->blocks) {   // not a block head?
-	    q = q->link;    // find the head.
-	}
-	/* Predecessor is free? */
-	if (q->flags & BF_FREE) {
-	    q->blocks += p->blocks;
-	    initGroupTail( p->blocks, q, p );
-	    p = result = q;
-	}
-    }
+  bdescr *bd, *q;
+  nat i, blocks;
 
-    /* Attempt to coalesce with successor if not the last block */
-    q = p + p->blocks;
-    if (q != first + BLOCKS_PER_MBLOCK) {
-	/* Successor is free */
-	if (q->flags & BF_FREE) {
-	    if (result) {
-		/* p is on free_list, q is on free_list, unlink
-		 * q completely and patch up list
-		 */
-		if (q->u.back) {
-		    q->u.back->link = q->link;
-		}
-		if (q->link) {
-		    q->link->u.back = q->u.back;
-		}
-		if (free_list == q) {
-		    free_list = q->link;
-		}
-	    } else {
-		/* p is not on free_list just assume q's links */
-		p->u.back = q->u.back;
-		if (p->u.back) {
-		    p->u.back->link = p;
-		}
-		p->link = q->link;
-		if (p->link) {
-		    p->link->u.back = p;
-		}
-		if (q == free_list) {
-		    free_list = p;
-		    free_list->u.back = NULL;
-		}
-	    }
-	    
-	    p->blocks += q->blocks;
-	    initGroupTail( q->blocks, p, q );
-	    result = p;
-	}
+  q = p->link;
+  if (q != NULL && p->start + p->blocks * BLOCK_SIZE_W == q->start) {
+    /* can coalesce */
+    p->blocks += q->blocks;
+    p->link    = q->link;
+    blocks = q->blocks;
+    for (i = 0, bd = q; i < blocks; bd++, i++) {
+	bd->free = 0;
+	bd->blocks = 0;
+	bd->link = p;
     }
-    
-    return result;
+    return p;
+  }
+  return q;
 }
 
 void
 freeGroup(bdescr *p)
 {
+  bdescr *bd, *last;
+  
   /* are we dealing with a megablock group? */
   if (p->blocks > BLOCKS_PER_MBLOCK) {
     freeMegaGroup(p);
     return;
   }
 
-  p->flags = BF_FREE;
-  p->u.back = NULL;
-  p->link = NULL;
+
+  p->free = (void *)-1;  /* indicates that this block is free */
   p->step = NULL;
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(sanity,memset(p->start, 0xaa, p->blocks * BLOCK_SIZE));
 
-  if (!coalesce(p)) {
-    dbl_link_onto(p, &free_list);
+  /* find correct place in free list to place new group */
+  last = NULL;
+  for (bd = free_list; bd != NULL && bd->start < p->start; 
+       bd = bd->link) {
+    last = bd;
   }
 
+  /* now, last = previous group (or NULL) */
+  if (last == NULL) {
+    p->link = free_list;
+    free_list = p;
+  } else {
+    /* coalesce with previous group if possible */
+    p->link = last->link;
+    last->link = p;
+    p = coalesce(last);
+  }
+
+  /* coalesce with next group if possible */
+  coalesce(p);
   IF_DEBUG(sanity, checkFreeListSanity());
 }
 
@@ -348,7 +306,7 @@ initMBlock(void *mblock)
 
 #ifdef DEBUG
 static void
-checkWellFormedGroup(bdescr *bd)
+checkWellFormedGroup( bdescr *bd )
 {
     nat i;
 
@@ -369,12 +327,11 @@ checkFreeListSanity(void)
 	     debugBelch("group at 0x%x, length %d blocks\n", 
 			(nat)bd->start, bd->blocks));
     ASSERT(bd->blocks > 0);
-    ASSERT(bd->link ? bd->link->u.back == bd : 1);
-    ASSERT(bd->u.back ? bd->u.back->link == bd : 1);
     checkWellFormedGroup(bd);
     if (bd->link != NULL) {
       /* make sure we're fully coalesced */
       ASSERT(bd->start + bd->blocks * BLOCK_SIZE_W != bd->link->start);
+      ASSERT(bd->start < bd->link->start);
     }
   }
 }
