@@ -358,6 +358,7 @@ sub process_stats_file {
 	local($tot_live)    = 0; # for calculating residency stuff
 	local($tot_samples) = 0;
 
+	$GCWork = 0;
 	while (<STATS>) {
 	    if (! /Gen:\s+0/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
 		$max_live = $1 if $max_live < $1;
@@ -366,7 +367,7 @@ sub process_stats_file {
 	    }
 
 	    $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
-	    $GCWork = $1     if /^\s*([0-9,]+) bytes copied during GC/;
+	    $GCWork += $1    if /^\s*([0-9,]+) bytes copied during GC/;
 
 #	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
 #		$MaxResidency = $1; $ResidencySamples = $2;
