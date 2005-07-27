@@ -123,16 +123,12 @@ translate :: String -> String
 translate str = '\'' : foldr escape "'" str
   where	escape '\'' = showString "'\\''"
 	escape c    = showChar c
-#elif __HUGS__
+#else /* mingw32_HOST_OS &&  ! __GLASGOW_HASKELL__ */
+# if __HUGS__
 rawSystem cmd args = system (unwords (cmd : map translate args))
-
-translate :: String -> String
-translate str = '"' : foldr escape "\"" str
-  where	escape '"'  = showString "\\\""
-	escape '\\' = showString "\\\\"
-	escape c    = showChar c
-#else /* mingw32_HOST_OS &&  ! __GLASGOW_HASKELL__ && ! __HUGS__ */
+# else
 rawSystem cmd args = system (unwords (map translate (cmd:args)))
+#endif
 
 -- copied from System.Process (qv)
 translate :: String -> String
