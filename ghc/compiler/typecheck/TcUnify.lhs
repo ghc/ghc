@@ -37,7 +37,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, Expected(..), TcTyVarDetails(..),
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
 			  pprTcTyVar, isTauTy, isSigmaTy, mkFunTy, mkFunTys, mkTyConApp,
-			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
+			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, tcEqType,
 			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
@@ -444,20 +444,31 @@ tcSubPat :: TcSigmaType 		-- Pattern type signature
 -- 	See Note [Pattern coercions] in TcPat
 -- However, we can't call unify directly, because both types might be
 -- polymorphic; hence the call to tcSub, followed by a check for
--- the identity coercion
+-- equal types.  (We can't just check for the identity coercion, because
+-- in the polymorphic case we might get back something eta-equivalent to
+-- the identity coercion, but that's not easy to tell.)
 
 tcSubPat sig_ty (Infer hole) 
   = do { sig_ty' <- zonkTcType sig_ty
 	; writeMutVar hole sig_ty'	-- See notes with tcSubExp above
 	; return () }
 
+-- This tcSub followed by tcEqType checks for identical types
+-- It'd be done more neatly by augmenting the unifier to deal with
+-- (identically shaped) for-all types.
+
 tcSubPat sig_ty (Check exp_ty) 
   = do	{ co_fn <- tcSub sig_ty exp_ty
-
-	; if isIdCoercion co_fn then
+	; sig_ty' <- zonkTcType sig_ty
+	; exp_ty' <- zonkTcType exp_ty
+	; if tcEqType sig_ty' exp_ty' then
 		return ()
-	  else
-		unifyMisMatch sig_ty exp_ty }
+	  else do
+	{ (env, msg) <- misMatchMsg sig_ty' exp_ty'
+	; failWithTcM (env, msg $$ extra) } }
+  where
+    extra | isTauTy sig_ty = empty
+	  | otherwise	   = ptext SLIT("Polymorphic types must match exactly in patterns")
 \end{code}
 
 
@@ -1250,12 +1261,15 @@ unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 infer
     pp2 = ppr ty2' <+> dcolon <+> ppr (typeKind ty2)
 
 unifyMisMatch ty1 ty2
+  = do	{ (env, msg) <- misMatchMsg ty1 ty2
+	; failWithTcM (env, msg) }
+
+misMatchMsg ty1 ty2
   = do	{ (env1, pp1, extra1) <- ppr_ty emptyTidyEnv ty1
 	; (env2, pp2, extra2) <- ppr_ty env1 ty2
-	; let msg = sep [sep [ptext SLIT("Couldn't match") <+> pp1, nest 7 (ptext SLIT("against") <+> pp2)],
-			 nest 2 extra1, nest 2 extra2]
-    in
-    failWithTcM (env2, msg) }
+	; return (env2, sep [sep [ptext SLIT("Couldn't match") <+> pp1, 
+				  nest 7 (ptext SLIT("against") <+> pp2)],
+			     nest 2 extra1, nest 2 extra2]) }
 
 ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
 ppr_ty env ty
