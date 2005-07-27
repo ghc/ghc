@@ -266,11 +266,13 @@ decomposeRuleLhs all_bndrs lhs
 
 	-- Substitute dicts in the LHS args, so that there 
 	-- aren't any lets getting in the way
+	-- Note that we substitute the function too; we might have this as
+	-- a LHS:	let f71 = M.f Int in f71
     go env (Let (NonRec dict rhs) body) 
 	= go (extendVarEnv env dict (simpleSubst env rhs)) body
     go env body 
-	= case collectArgs body of
-	    (Var fn, args) -> Just (all_bndrs', fn, map (simpleSubst env) args)
+	= case collectArgs (simpleSubst env body) of
+	    (Var fn, args) -> Just (all_bndrs', fn, args)
 	    other 	   -> Nothing
 
 simpleSubst :: IdEnv CoreExpr -> CoreExpr -> CoreExpr
