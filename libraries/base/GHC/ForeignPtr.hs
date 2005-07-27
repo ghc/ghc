@@ -102,6 +102,13 @@ newConcForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- in fact there is no guarantee that the finalizer will eventually
 -- run at all.
 --
+-- Note that references from a finalizer do not necessarily prevent
+-- another object from being finalized.  If A's finalizer refers to B
+-- (perhaps using 'touchForeignPtr', then the only guarantee is that
+-- B's finalizer will never be started before A's.  If both A and B
+-- are unreachable, then both finalizers will start together.  See
+-- 'touchForeignPtr' for more on finalizer ordering.
+--
 newConcForeignPtr p finalizer
   = do fObj <- newForeignPtr_ p
        addForeignPtrConcFinalizer fObj finalizer
@@ -203,8 +210,8 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- does a 'touchForeignPtr' after it
 -- executes the user action.
 -- 
--- Note that this function should not be used to express liveness
--- dependencies between 'ForeignPtr's.  For example, if the finalizer
+-- Note that this function should not be used to express dependencies
+-- between finalizers on 'ForeignPtr's.  For example, if the finalizer
 -- for a 'ForeignPtr' @F1@ calls 'touchForeignPtr' on a second
 -- 'ForeignPtr' @F2@, then the only guarantee is that the finalizer
 -- for @F2@ is never started before the finalizer for @F1@.  They
@@ -218,7 +225,8 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- between the finalizers, but even then the runtime sometimes runs
 -- multiple finalizers sequentially in a single thread (for
 -- performance reasons), so synchronisation between finalizers could
--- result in artificial deadlock.
+-- result in artificial deadlock.  Another alternative is to use
+-- explicit reference counting.
 --
 touchForeignPtr (ForeignPtr fo r) = touch r
 
