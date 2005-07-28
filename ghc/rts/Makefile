@@ -326,6 +326,10 @@ ifeq "$(Windows)" "YES"
 PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h
 endif
 
+# -O3 helps unroll some loops (especially in copy() with a constant argument).
+# -fno-strict-aliasing is a hack because we often mix StgPtr and StgClosure pointers
+# to the same object, and gcc will assume these don't alias.  eg. it happens in
+# copy() with gcc 3.4.3, the upd_evacee() assigments get moved before the object copy.
 GC_HC_OPTS += -optc-O3 -optc-fno-strict-aliasing
 
 # Cmm must be compiled via-C for now, because the NCG can't handle loops
