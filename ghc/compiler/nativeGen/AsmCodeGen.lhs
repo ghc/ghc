@@ -111,15 +111,17 @@ The machine-dependent bits break down as follows:
 
 nativeCodeGen :: DynFlags -> [Cmm] -> UniqSupply -> IO Pretty.Doc
 nativeCodeGen dflags cmms us
-  = let ((ppr_cmms, insn_sdoc, imports), _) = initUs us $
+  = let (res, _) = initUs us $
 	   cgCmm (concat (map add_split cmms))
 
 	cgCmm :: [CmmTop] -> UniqSM (Cmm, Pretty.Doc, [CLabel])
 	cgCmm tops = 
 	   lazyMapUs (cmmNativeGen dflags) tops  `thenUs` \ results -> 
-	   let (cmms,docs,imps) = unzip3 results in
+	   case unzip3 results of { (cmms,docs,imps) ->
 	   returnUs (Cmm cmms, my_vcat docs, concat imps)
-    in do
+	   }
+    in 
+    case res of { (ppr_cmms, insn_sdoc, imports) -> do
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm" (pprCmms [ppr_cmms])
     return (insn_sdoc Pretty.$$ dyld_stubs imports
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
@@ -129,6 +131,7 @@ nativeCodeGen dflags cmms us
             Pretty.$$ Pretty.text ".subsections_via_symbols"
 #endif
             )
+   }
 
   where
 
