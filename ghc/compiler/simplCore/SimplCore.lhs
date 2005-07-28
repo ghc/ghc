@@ -18,7 +18,7 @@ import HscTypes		( HscEnv(..), ModGuts(..), ExternalPackageState(..),
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 			  extendRuleBaseList, pprRuleBase, ruleCheckProgram,
-			  mkSpecInfo, addSpecInfo )
+			  addSpecInfo, addIdSpecialisations )
 import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
@@ -33,7 +33,7 @@ import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import Id		( Id, modifyIdInfo, idInfo, isExportedId, isLocalId,
-			  idSpecialisation, setIdSpecialisation, idName )
+			  idSpecialisation, idName )
 import VarSet
 import VarEnv
 import NameEnv		( lookupNameEnv )
@@ -266,7 +266,9 @@ updateBinders local_rules binds
 
     update_bndr bndr = case lookupNameEnv local_rules (idName bndr) of
 			  Nothing    -> bndr
-			  Just rules -> bndr `setIdSpecialisation` mkSpecInfo rules
+			  Just rules -> bndr `addIdSpecialisations` rules
+				-- The binder might have some existing rules,
+				-- arising from specialisation pragmas
 \end{code}
 
 
