@@ -19,7 +19,6 @@ import qualified Language.Haskell.TH.Syntax as TH
 
 import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl, 
 		   	  HsType, LHsType )
-import LoadIface	( loadHomeInterface )
 import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType, thRdrName )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe, lookupImportedName )
@@ -126,13 +125,7 @@ tcBracket brack res_ty
 
 tc_bracket :: HsBracket Name -> TcM TcType
 tc_bracket (VarBr v) 
-  = do	{ loadHomeInterface msg v	-- Reason: deprecation checking asumes the
-					-- home interface is loaded, and this is the
-					-- only way that is going to happen
-	; tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
-	}
-  where
-    msg = ptext SLIT("Need interface for Template Haskell quoted Name")
+  = tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
 
 tc_bracket (ExpBr expr) 
   = newTyFlexiVarTy liftedTypeKind	`thenM` \ any_ty ->
