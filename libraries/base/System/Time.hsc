@@ -455,13 +455,16 @@ throwAwayReturnPointer :: (Ptr CTime -> Ptr CTm -> IO (Ptr CTm))
                        -> (Ptr CTime -> Ptr CTm -> IO (       ))
 throwAwayReturnPointer fun x y = fun x y >> return ()
 
+#if !HAVE_LOCALTIME_R || !HAVE_GMTIME_R
 clockToCalendarTime_static :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
 	 -> IO CalendarTime
 clockToCalendarTime_static fun is_utc (TOD secs psec) = do
   with (fromIntegral secs :: CTime)  $ \ p_timer -> do
     p_tm <- fun p_timer 	-- can't fail, according to POSIX
     clockToCalendarTime_aux is_utc p_tm psec
+#endif
 
+#if HAVE_LOCALTIME_R || HAVE_GMTIME_R
 clockToCalendarTime_reentrant :: (Ptr CTime -> Ptr CTm -> IO ()) -> Bool -> ClockTime
 	 -> IO CalendarTime
 clockToCalendarTime_reentrant fun is_utc (TOD secs psec) = do
@@ -469,6 +472,7 @@ clockToCalendarTime_reentrant fun is_utc (TOD secs psec) = do
     allocaBytes (#const sizeof(struct tm)) $ \ p_tm -> do
       fun p_timer p_tm
       clockToCalendarTime_aux is_utc p_tm psec
+#endif
 
 clockToCalendarTime_aux :: Bool -> Ptr CTm -> Integer -> IO CalendarTime
 clockToCalendarTime_aux is_utc p_tm psec = do
@@ -733,21 +737,19 @@ foreign import ccall unsafe "time.h gmtime"
 #endif
 foreign import ccall unsafe "time.h mktime"
     mktime      :: Ptr CTm   -> IO CTime
-foreign import ccall unsafe "time.h time"
-    time        :: Ptr CTime -> IO CTime
 
 #if HAVE_GETTIMEOFDAY
 type CTimeVal = ()
 foreign import ccall unsafe "time.h gettimeofday"
     gettimeofday :: Ptr CTimeVal -> Ptr () -> IO CInt
-#endif
-
-#if HAVE_FTIME
+#elif HAVE_FTIME
 type CTimeB = ()
 #ifndef mingw32_HOST_OS
 foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO CInt
 #else
 foreign import ccall unsafe "time.h ftime" ftime :: Ptr CTimeB -> IO ()
 #endif
+#else
+foreign import ccall unsafe "time.h time" time :: Ptr CTime -> IO CTime
 #endif
 #endif /* ! __HUGS__ */
