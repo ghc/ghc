@@ -1290,6 +1290,18 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
+            <option>-fno-cse</option>
+            <indexterm><primary><option>-fno-cse</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turns off the common-sub-expression elimination optimisation.
+	      Can be useful if you have some <literal>unsafePerformIO</literal>
+	    expressions that you don't want commoned-up.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
             <option>-fno-strictness</option>
             <indexterm><primary><option>-fno-strictness</option></primary></indexterm>
           </term>
@@ -1301,12 +1313,27 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-fno-cpr-analyse</option>
-            <indexterm><primary><option>-fno-cpr-analyse</option></primary></indexterm>
+            <option>-fno-full-laziness</option>
+            <indexterm><primary><option>-fno-full-laziness</option></primary></indexterm>
           </term>
 	  <listitem>
-	    <para>Turns off the CPR (constructed product result)
-	    analysis; it is somewhat experimental.</para>
+	    <para>Turns off the full laziness optimisation (also known as
+	      let-floating).  Full laziness increases sharing, which can lead
+	      to increased memory residency.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fno-state-hack</option>
+            <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn off the "state hack" whereby any lambda with a
+	      <literal>State#</literal> token as argument is considered to be
+	      single-entry, hence it is considered OK to inline things inside
+	      it.  This can improve performance of IO and ST monad code, but it
+	    runs the risk of reducing sharing.</para> 
 	  </listitem>
 	</varlistentry>
 
