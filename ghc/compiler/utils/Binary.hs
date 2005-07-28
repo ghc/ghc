@@ -458,14 +458,20 @@ instance Binary Int where
 --    getF bh   = getBitsF bh 32
 
 instance Binary a => Binary [a] where
-    put_ bh []     = putByte bh 0
-    put_ bh (x:xs) = do putByte bh 1; put_ bh x; put_ bh xs
-    get bh         = do h <- getWord8 bh
-                        case h of
-                          0 -> return []
-                          _ -> do x  <- get bh
-                                  xs <- get bh
-                                  return (x:xs)
+    put_ bh l = do 
+	let len = length l
+	if (len < 0xff) 
+	  then putByte bh (fromIntegral len :: Word8)
+	  else do putByte bh 0xff; put_ bh (fromIntegral len :: Word32)
+	mapM_ (put_ bh) l
+    get bh = do
+	b <- getByte bh
+	len <- if b == 0xff 
+	  	  then get bh
+		  else return (fromIntegral b :: Word32)
+	let loop 0 = return []
+	    loop n = do a <- get bh; as <- loop (n-1); return (a:as)
+	loop len
 
 instance (Binary a, Binary b) => Binary (a,b) where
     put_ bh (a,b) = do put_ bh a; put_ bh b
