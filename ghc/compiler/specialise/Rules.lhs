@@ -39,10 +39,9 @@ import Name		( Name, NamedThing(..), nameOccName )
 import NameEnv
 import Unify 		( tcMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
-
 import Outputable
 import FastString
-import Maybe		( isJust )
+import Maybes		( isJust, orElse )
 import Bag
 import Util		( singleton )
 import List		( isPrefixOf )
@@ -198,10 +197,13 @@ lookupRule :: (Activation -> Bool) -> InScopeSet
 lookupRule is_active in_scope rule_base fn args
   = matchRules is_active in_scope fn args rules
   where
-    rules | isLocalId fn = idCoreRules fn
-	  | otherwise    = case lookupNameEnv rule_base (idName fn) of
-				Just rules -> rules
-				Nothing    -> []
+	-- The rules for an Id come from two places:
+	--	(a) the ones it is born with (idCoreRules fn)
+	--	(b) rules added in subsequent modules (extra_rules)
+	-- PrimOps, for example, are born with a bunch of rules under (a)
+    rules = extra_rules ++ idCoreRules fn
+    extra_rules | isLocalId fn = []
+	  	| otherwise    = lookupNameEnv rule_base (idName fn) `orElse` []
 
 matchRules :: (Activation -> Bool) -> InScopeSet
 	   -> Id -> [CoreExpr]
