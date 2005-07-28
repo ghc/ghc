@@ -24,6 +24,7 @@ endif
 SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Compat.RawSystem \
 	-optdep--exclude-module=Compat.Directory \
+	-optdep--exclude-module=Distribution.Compat.FilePath \
 	-optdep--exclude-module=Distribution.Compat.ReadP \
 	-optdep--exclude-module=Distribution.Extension \
 	-optdep--exclude-module=Distribution.GetOpt \

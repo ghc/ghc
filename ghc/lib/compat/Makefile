@@ -44,6 +44,7 @@ ifeq "$(ghc_ge_603)" "YES"
 # These modules are all provided in GHC 6.3+
 EXCLUDED_SRCS += \
 	System/Directory/Internals.hs \
+	Distribution/Compat/FilePath.hs \
 	Distribution/Compat/ReadP.hs \
 	Distribution/GetOpt.hs \
 	Distribution/InstalledPackageInfo.hs \
@@ -56,6 +57,7 @@ EXCLUDED_SRCS += \
 
 SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=System.Directory.Internals \
+	-optdep--exclude-module=Distribution.Compat.FilePath \
 	-optdep--exclude-module=Distribution.Compat.ReadP \
 	-optdep--exclude-module=Distribution.GetOpt \
 	-optdep--exclude-module=Distribution.InstalledPackageInfo \
