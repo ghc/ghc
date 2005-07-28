@@ -36,6 +36,7 @@ import PrelNames	( hasKey, assertIdKey, assertErrorName,
 import Name		( Name, nameOccName )
 import NameSet
 import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
+import LoadIface	( loadHomeInterface )
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
@@ -526,14 +527,20 @@ rnRbinds str rbinds
 %************************************************************************
 
 \begin{code}
-rnBracket (VarBr n) = lookupOccRn n		`thenM` \ name -> 
-		      returnM (VarBr name, unitFV name)
-rnBracket (ExpBr e) = rnLExpr e		`thenM` \ (e', fvs) ->
-		      returnM (ExpBr e', fvs)
-rnBracket (PatBr p) = rnLPat p		`thenM` \ (p', fvs) ->
-		      returnM (PatBr p', fvs)
-rnBracket (TypBr t) = rnHsTypeFVs doc t	`thenM` \ (t', fvs) ->
-		      returnM (TypBr t', fvs)
+rnBracket (VarBr n) = do { name <- lookupOccRn n
+			 ; loadHomeInterface msg name	-- Reason: deprecation checking asumes the
+							-- home interface is loaded, and this is the
+							-- only way that is going to happen
+			 ; returnM (VarBr name, unitFV name) }
+		    where
+		      msg = ptext SLIT("Need interface for Template Haskell quoted Name")
+
+rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
+			 ; return (ExpBr e', fvs) }
+rnBracket (PatBr p) = do { (p', fvs) <- rnLPat p
+			 ; return (PatBr p', fvs) }
+rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
+			 ; return (TypBr t', fvs) }
 		    where
 		      doc = ptext SLIT("In a Template-Haskell quoted type")
 rnBracket (DecBr group) 
