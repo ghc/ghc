@@ -60,7 +60,7 @@ doMkDependHS session srcs
 	; targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
 	; GHC.setTargets session targets
 	; excl_mods <- readIORef v_Dep_exclude_mods
-	; r <- GHC.depanal session excl_mods
+	; r <- GHC.depanal session excl_mods True {- Allow dup roots -}
 	; case r of
  	    Left e -> do printErrorsAndWarnings e; exitWith (ExitFailure 1)
 	    Right mod_summaries -> do {

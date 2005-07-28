@@ -422,8 +422,8 @@ guessTarget file Nothing
 
 -- Perform a dependency analysis starting from the current targets
 -- and update the session with the new module graph.
-depanal :: Session -> [Module] -> IO (Either Messages ModuleGraph)
-depanal (Session ref) excluded_mods = do
+depanal :: Session -> [Module] -> Bool -> IO (Either Messages ModuleGraph)
+depanal (Session ref) excluded_mods allow_dup_roots = do
   hsc_env <- readIORef ref
   let
 	 dflags  = hsc_dflags hsc_env
@@ -437,7 +437,7 @@ depanal (Session ref) excluded_mods = do
 		     text "Chasing modules from: ",
 	     		hcat (punctuate comma (map pprTarget targets))]))
 
-  r <- downsweep hsc_env old_graph excluded_mods
+  r <- downsweep hsc_env old_graph excluded_mods allow_dup_roots
   case r of
     Right mod_graph -> writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
     _ -> return ()
@@ -480,7 +480,7 @@ loadMsgs s@(Session ref) how_much msg_act
 	-- even if we don't get a fully successful upsweep, the full module
 	-- graph is still retained in the Session.  We can tell which modules
 	-- were successfully loaded by inspecting the Session's HPT.
-	mb_graph <- depanal s []
+	mb_graph <- depanal s [] False
 	case mb_graph of
 	   Left msgs       -> do msg_act msgs; return Failed
 	   Right mod_graph -> loadMsgs2 s how_much msg_act mod_graph 
@@ -1254,15 +1254,22 @@ nodeMapElts = eltsFM
 
 downsweep :: HscEnv
 	  -> [ModSummary]	-- Old summaries
-	  -> [Module]		-- Ignore dependencies on these; treat them as
-				-- if they were package modules
+	  -> [Module]		-- Ignore dependencies on these; treat
+				-- them as if they were package modules
+	  -> Bool		-- True <=> allow multiple targets to have 
+				-- 	    the same module name; this is 
+				--	    very useful for ghc -M
 	  -> IO (Either Messages [ModSummary])
-downsweep hsc_env old_summaries excl_mods
+		-- The elts of [ModSummary] all have distinct
+		-- (Modules, IsBoot) identifiers, unless the Bool is true
+		-- in which case there can be repeats
+downsweep hsc_env old_summaries excl_mods allow_dup_roots
    = -- catch error messages and return them
      handleDyn (\err_msg -> return (Left (emptyBag, unitBag err_msg))) $ do
        rootSummaries <- mapM getRootSummary roots
-       checkDuplicates rootSummaries
-       summs <- loop (concatMap msDeps rootSummaries) (mkNodeMap rootSummaries)
+       let root_map = mkRootMap rootSummaries
+       checkDuplicates root_map
+       summs <- loop (concatMap msDeps rootSummaries) root_map
        return (Right summs)
      where
 	roots = hsc_targets hsc_env
@@ -1290,36 +1297,43 @@ downsweep hsc_env old_summaries excl_mods
 	-- name, so we have to check that there aren't multiple root files
 	-- defining the same module (otherwise the duplicates will be silently
  	-- ignored, leading to confusing behaviour).
-	checkDuplicates :: [ModSummary] -> IO ()
-	checkDuplicates summaries = mapM_ check summaries
-  	  where check summ = 
-		  case dups of
-			[]     -> return ()
-			[_one] -> return ()
-			many   -> multiRootsErr modl many
-		   where modl = ms_mod summ
-			 dups = 
-			   [ expectJust "checkDup" (ml_hs_file (ms_location summ'))
-			   | summ' <- summaries, ms_mod summ' == modl ]
+	checkDuplicates :: NodeMap [ModSummary] -> IO ()
+	checkDuplicates root_map 
+	   | allow_dup_roots = return ()
+	   | null dup_roots  = return ()
+	   | otherwise	     = multiRootsErr (head dup_roots)
+	   where
+	     dup_roots :: [[ModSummary]]	-- Each at least of length 2
+	     dup_roots = filterOut isSingleton (nodeMapElts root_map)
 
 	loop :: [(Located Module,IsBootInterface)]
 			-- Work list: process these modules
-	     -> NodeMap ModSummary
-		 	-- Visited set
+	     -> NodeMap [ModSummary]
+		 	-- Visited set; the range is a list because
+			-- the roots can have the same module names
+			-- if allow_dup_roots is True
 	     -> IO [ModSummary]
 			-- The result includes the worklist, except
 			-- for those mentioned in the visited set
-	loop [] done 	  = return (nodeMapElts done)
+	loop [] done 	  = return (concat (nodeMapElts done))
 	loop ((wanted_mod, is_boot) : ss) done 
-	  | key `elemFM` done = loop ss done
+	  | Just summs <- lookupFM done key
+	  = if isSingleton summs then
+		loop ss done
+	    else
+		do { multiRootsErr summs; return [] }
 	  | otherwise	      = do { mb_s <- summariseModule hsc_env old_summary_map 
 						 is_boot wanted_mod Nothing excl_mods
 				   ; case mb_s of
 					Nothing -> loop ss done
 					Just s  -> loop (msDeps s ++ ss) 
-							(addToFM done key s) }
+							(addToFM done key [s]) }
 	  where
 	    key = (unLoc wanted_mod, if is_boot then HsBootFile else HsSrcFile)
+
+mkRootMap :: [ModSummary] -> NodeMap [ModSummary]
+mkRootMap summaries = addListToFM_C (++) emptyFM 
+			[ (msKey s, [s]) | s <- summaries ]
 
 msDeps :: ModSummary -> [(Located Module, IsBootInterface)]
 -- (msDeps s) returns the dependencies of the ModSummary s.
@@ -1576,11 +1590,15 @@ packageModErr mod
   = throwDyn $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> text "is a package module"
 
-multiRootsErr mod files
+multiRootsErr :: [ModSummary] -> IO ()
+multiRootsErr summs@(summ1:_)
   = throwDyn $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> 
 	text "is defined in multiple files:" <+>
 	sep (map text files)
+  where
+    mod = ms_mod summ1
+    files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
 
 cyclicModuleErr :: [ModSummary] -> SDoc
 cyclicModuleErr ms
