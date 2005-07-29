@@ -14,8 +14,9 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Queue(
-	Queue,
+module Data.Queue
+{-# DEPRECATED "Use Data.Sequence instead: it's faster and has more operations" #-}
+	(Queue,
 	-- * Primitive operations
 	-- | Each of these requires /O(1)/ time in the worst case.
 	emptyQueue, addToQueue, deQueue,
