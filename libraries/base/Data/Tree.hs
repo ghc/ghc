@@ -29,8 +29,9 @@ import Prelude
 #endif
 
 import Control.Monad
-import Data.Maybe
-import Data.Queue
+import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList,
+			ViewL(..), ViewR(..), viewl, viewr)
+import qualified Data.Sequence as Seq (foldl)
 import Data.Typeable
 
 #include "Typeable.h"
@@ -112,31 +113,32 @@ unfoldForestM f = mapM (unfoldTreeM f)
 -- /Breadth-First Numbering: Lessons from a Small Exercise in Algorithm Design/,
 -- by Chris Okasaki, /ICFP'00/.
 unfoldTreeM_BF :: Monad m => (b -> m (a, [b])) -> b -> m (Tree a)
-unfoldTreeM_BF f b = liftM (fst . fromJust . deQueue) $
-	unfoldForestQ f (listToQueue [b])
+unfoldTreeM_BF f b = liftM getElement $ unfoldForestQ f (singleton b)
+  where getElement xs = case viewl xs of
+		x :< _ -> x
+		EmptyL -> error "unfoldTreeM_BF"
 
 -- | Monadic forest builder, in breadth-first order,
 -- using an algorithm adapted from
 -- /Breadth-First Numbering: Lessons from a Small Exercise in Algorithm Design/,
 -- by Chris Okasaki, /ICFP'00/.
 unfoldForestM_BF :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
-unfoldForestM_BF f = liftM (reverseOnto []) . unfoldForestQ f . listToQueue
-  where reverseOnto :: [a'] -> Queue a' -> [a']
-	reverseOnto as q = case deQueue q of
-		Nothing -> as
-		Just (a, q') -> reverseOnto (a:as) q'
+unfoldForestM_BF f = liftM toRevList . unfoldForestQ f . fromList
+  where toRevList :: Seq c -> [c]
+	toRevList = Seq.foldl (flip (:)) []
 
--- takes a queue of seeds
--- produces a queue of trees of the same length, but in the reverse order
-unfoldForestQ :: Monad m => (b -> m (a, [b])) -> Queue b -> m (Queue (Tree a))
-unfoldForestQ f aQ = case deQueue aQ of
-	Nothing -> return emptyQueue
-	Just (a, aQ) -> do
+-- takes a sequence (queue) of seeds
+-- produces a sequence (reversed queue) of trees of the same length
+unfoldForestQ :: Monad m => (b -> m (a, [b])) -> Seq b -> m (Seq (Tree a))
+unfoldForestQ f aQ = case viewl aQ of
+	EmptyL -> return empty
+	a :< aQ -> do
 		(b, as) <- f a
-		tQ <- unfoldForestQ f (foldl addToQueue aQ as)
-		let (ts, tQ') = splitOnto [] as tQ
-		return (addToQueue tQ' (Node b ts))
-  where splitOnto :: [a'] -> [b'] -> Queue a' -> ([a'], Queue a')
-	splitOnto as [] q = (as, q)
-	splitOnto as (_:bs) q = case fromJust (deQueue q) of
-		(a, q') -> splitOnto (a:as) bs q'
+		tQ <- unfoldForestQ f (foldl (|>) aQ as)
+		let (tQ', ts) = splitOnto [] as tQ
+		return (Node b ts <| tQ')
+  where splitOnto :: [a'] -> [b'] -> Seq a' -> (Seq a', [a'])
+	splitOnto as [] q = (q, as)
+	splitOnto as (_:bs) q = case viewr q of
+		q' :> a -> splitOnto (a:as) bs q'
+		EmptyR -> error "unfoldForestQ"
