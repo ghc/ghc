@@ -8,6 +8,10 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
+-- NOTE: This module is DEPRECATED.
+-- The data structure in "Data.Sequence" is a faster queue and also
+-- supports a wider variety of operations.
+--
 -- Queues with constant time operations, from
 -- /Simple and efficient purely functional queues and deques/,
 -- by Chris Okasaki, /JFP/ 5(4):583-592, October 1995.
