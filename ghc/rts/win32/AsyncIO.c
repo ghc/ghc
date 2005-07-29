@@ -50,6 +50,7 @@ static HANDLE           abandon_req_wait;
 static HANDLE           wait_handles[2];
 static CompletedReq     completedTable[MAX_REQUESTS];
 static int              completed_hw;
+static HANDLE           completed_table_sema;
 static int              issued_reqs;
 
 static void
@@ -59,11 +60,22 @@ onIOComplete(unsigned int reqID,
 	     void* buf STG_UNUSED,
 	     int   errCode)
 {
-    /* Deposit result of request in queue/table */
+    DWORD dwRes;
+    /* Deposit result of request in queue/table..when there's room. */
+    dwRes = WaitForSingleObject(completed_table_sema, INFINITE);
+    switch (dwRes) {
+    case WAIT_OBJECT_0:
+	break;
+    default:
+	/* Not likely */
+	fprintf(stderr, "onIOComplete: failed to grab table semaphore, dropping request 0x%x\n", reqID);
+	fflush(stderr);
+	return;
+    }
     EnterCriticalSection(&queue_lock);
     if (completed_hw == MAX_REQUESTS) {
-	/* Not likely */
-	fprintf(stderr, "Request table overflow (%d); dropping.\n", reqID);
+	/* Shouldn't happen */
+	fprintf(stderr, "onIOComplete: ERROR -- Request table overflow (%d); dropping.\n", reqID);
 	fflush(stderr);
     } else {
 #if 0
@@ -147,8 +159,15 @@ startupAsyncIO()
     wait_handles[0] = completed_req_event;
     wait_handles[1] = abandon_req_wait;
     completed_hw = 0;
-    return ( completed_req_event != INVALID_HANDLE_VALUE &&
-	     abandon_req_wait    != INVALID_HANDLE_VALUE );
+    if ( !(completed_table_sema = CreateSemaphore (NULL, MAX_REQUESTS, MAX_REQUESTS, NULL)) ) {
+	DWORD rc = GetLastError();
+	fprintf(stderr, "startupAsyncIO: CreateSemaphore failed 0x%x\n", rc);
+	fflush(stderr);
+    }
+
+    return ( completed_req_event  != INVALID_HANDLE_VALUE &&
+	     abandon_req_wait     != INVALID_HANDLE_VALUE &&
+	     completed_table_sema != NULL );
 }
 
 void
@@ -274,6 +293,12 @@ start:
 		    }
 		    break;
 		}
+	    }
+	    /* Signal that there's completed table slots available */
+	    if ( !ReleaseSemaphore(completed_table_sema, 1, NULL) ) {
+		DWORD dw = GetLastError();
+		fprintf(stderr, "awaitRequests: failed to signal semaphore (error code=0x%x)\n", dw);
+		fflush(stderr);
 	    }
 	}
 	completed_hw = 0;
