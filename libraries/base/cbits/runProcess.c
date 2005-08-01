@@ -114,16 +114,24 @@ runInteractiveProcess (char *const args[],
 	    }
 	}
 	
-	dup2 (fdStdInput[0], STDIN_FILENO);
-	dup2 (fdStdOutput[1], STDOUT_FILENO);
-	dup2 (fdStdError[1], STDERR_FILENO);
+	if (fdStdInput[0] != STDIN_FILENO) {
+	    dup2 (fdStdInput[0], STDIN_FILENO);
+	    close(fdStdInput[0]);
+	}
+
+	if (fdStdOutput[1] != STDOUT_FILENO) {
+	    dup2 (fdStdOutput[1], STDOUT_FILENO);
+	    close(fdStdOutput[1]);
+	}
+
+	if (fdStdError[1] != STDERR_FILENO) {
+	    dup2 (fdStdError[1], STDERR_FILENO);
+	    close(fdStdError[1]);
+	}
 	
-	close(fdStdInput[0]);
 	close(fdStdInput[1]);
 	close(fdStdOutput[0]);
-	close(fdStdOutput[1]);
 	close(fdStdError[0]);
-	close(fdStdError[1]);
 	
 	/* the child */
 	if (environment) {
