@@ -17,6 +17,7 @@ HC_BOOT_LIBS += -lghccompat
 ifeq "$(Windows)" "YES"
 # not very nice, but required for -lghccompat on Windows
 SRC_LD_OPTS += -lshell32
+HC_BOOT_LIBS += -lshell32
 endif
 
 # This is horrible.  We ought to be able to omit the entire directory
