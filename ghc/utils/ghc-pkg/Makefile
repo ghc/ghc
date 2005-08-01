@@ -19,12 +19,6 @@ include $(GHC_LIB_COMPAT_DIR)/compat.mk
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts)
 
-ifeq "$(Windows)" "YES"
-# not very nice, but required for -lghccompat on Windows
-SRC_LD_OPTS += -lshell32
-HC_BOOT_LIBS += -lshell32
-endif
-
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
 endif
