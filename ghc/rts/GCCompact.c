@@ -917,7 +917,6 @@ update_bkwd_compact( step *stp )
 	freeChain(free_bd->link);
 	free_bd->link = NULL;
     }
-    stp->n_old_blocks = free_blocks;
 
     return free_blocks;
 }
