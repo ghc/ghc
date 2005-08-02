@@ -68,9 +68,9 @@ ghcpkg04 :
 	@rm -f $(PKGCONF)
 	@echo "[]" >$(PKGCONF)
 	@$(GHC_PKG) register --force test.pkg >/dev/null 2>&1 
-	@$(GHC_PKG) register --force test2.pkg >/dev/null 2>&1 
-	@$(GHC_PKG) expose testpkg-2.0  >/dev/null 2>&1
-	@: # we now have testpkg-1.2.3.4 and testpkg-2.0 both exposed
+	@$(GHC_PKG) update --force test5.pkg >/dev/null 2>&1 
+	@$(GHC_PKG) expose testpkg-1.2.3.4  >/dev/null 2>&1
+	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
 	@$(TEST_HC) -package-conf $(PKGCONF) -c ghcpkg04.hs || true
 
 # -----------------------------------------------------------------------------
