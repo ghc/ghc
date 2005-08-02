@@ -950,6 +950,7 @@ stepBlocks (step *stp)
     bdescr *bd;
 
     total_blocks = stp->n_blocks;    
+    total_blocks += stp->n_old_blocks;
     for (bd = stp->large_objects; bd; bd = bd->link) {
 	total_blocks += bd->blocks;
 	/* hack for megablock groups: they have an extra block or two in
@@ -987,11 +988,6 @@ memInventory(void)
 
   for (i = 0; i < n_nurseries; i++) {
       total_blocks += stepBlocks(&nurseries[i]);
-  }
-
-  if (RtsFlags.GcFlags.generations == 1) {
-      /* two-space collector has a to-space too :-) */
-      total_blocks += g0s0->n_old_blocks;
   }
 
   /* any blocks held by allocate() */
