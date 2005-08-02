@@ -41,13 +41,13 @@ INFO_TABLE_RET( stg_ap_0,
     // fn is in R1, no args on the stack
 
     IF_DEBUG(apply,
-	foreign "C" debugBelch(stg_ap_0_ret_str);
-	foreign "C" printClosure(R1 "ptr"));
+	foreign "C" debugBelch(stg_ap_0_ret_str) [R1];
+	foreign "C" printClosure(R1 "ptr") [R1]);
 
     IF_DEBUG(sanity,
 	foreign "C" checkStackChunk(Sp+WDS(1) "ptr",
 				    CurrentTSO + OFFSET_StgTSO_stack +
-				    WDS(StgTSO_stack_size(CurrentTSO)) "ptr"));
+				    WDS(StgTSO_stack_size(CurrentTSO)) "ptr") [R1]);
 
     Sp_adj(1);
     ENTER();

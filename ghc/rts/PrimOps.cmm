@@ -49,7 +49,7 @@ newByteArrayzh_fast
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    "ptr" p = foreign "C" allocateLocal(BaseReg "ptr",words);
+    "ptr" p = foreign "C" allocateLocal(BaseReg "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
@@ -73,7 +73,7 @@ newPinnedByteArrayzh_fast
 	words = words + 1;
     }
 
-    "ptr" p = foreign "C" allocatePinned(words);
+    "ptr" p = foreign "C" allocatePinned(words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
     // Again, if the ArrWords header isn't a multiple of 8 bytes, we
@@ -97,7 +97,7 @@ newArrayzh_fast
     MAYBE_GC(R2_PTR,newArrayzh_fast);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
-    "ptr" arr = foreign "C" allocateLocal(BaseReg "ptr",words);
+    "ptr" arr = foreign "C" allocateLocal(BaseReg "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_info, W_[CCCS]);
@@ -135,7 +135,7 @@ unsafeThawArrayzh_fast
   // maintains this invariant.
   //
   if (%INFO_TYPE(%GET_STD_INFO(R1)) != HALF_W_(MUT_ARR_PTRS_FROZEN0)) {
-	foreign "C" recordMutableLock(R1 "ptr");
+	foreign "C" recordMutableLock(R1 "ptr") [R1];
   }
 
   SET_INFO(R1,stg_MUT_ARR_PTRS_info);
@@ -233,7 +233,7 @@ atomicModifyMutVarzh_fast
    StgThunk_payload(r,0) = z;
 
 #if defined(SMP)
-    foreign "C" RELEASE_LOCK(sm_mutex "ptr");
+    foreign "C" RELEASE_LOCK(sm_mutex "ptr") [];
 #endif
 
    RET_P(r);
@@ -269,7 +269,7 @@ mkWeakzh_fast
   StgWeak_link(w)	= W_[weak_ptr_list];
   W_[weak_ptr_list] 	= w;
 
-  IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w));
+  IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
 
   RET_P(w);
 }
@@ -562,10 +562,10 @@ name                                                                    \
   MP_INT__mp_size(mp_tmp2)  = (s2);                                     \
   MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);                         \
                                                                         \
-  foreign "C" mpz_init(mp_result1 "ptr");                               \
+  foreign "C" mpz_init(mp_result1 "ptr") [];                            \
                                                                         \
   /* Perform the operation */                                           \
-  foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr");   \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr") []; \
                                                                         \
   RET_NP(TO_W_(MP_INT__mp_size(mp_result1)),                            \
          MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);                \
@@ -589,10 +589,10 @@ name                                                                    \
   MP_INT__mp_size(mp_tmp1)	= (s1);                                 \
   MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                     \
                                                                         \
-  foreign "C" mpz_init(mp_result1 "ptr");                               \
+  foreign "C" mpz_init(mp_result1 "ptr") [];                            \
                                                                         \
   /* Perform the operation */                                           \
-  foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1 "ptr");                   \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1 "ptr") [];                \
                                                                         \
   RET_NP(TO_W_(MP_INT__mp_size(mp_result1)),                            \
          MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords);                \
@@ -623,11 +623,11 @@ name                                                                            
   MP_INT__mp_size(mp_tmp2)	= (s2);                                                 \
   MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);                                     \
                                                                                         \
-  foreign "C" mpz_init(mp_result1 "ptr");                                               \
-  foreign "C" mpz_init(mp_result2 "ptr");                                               \
+  foreign "C" mpz_init(mp_result1 "ptr") [];                                               \
+  foreign "C" mpz_init(mp_result2 "ptr") [];                                               \
                                                                                         \
   /* Perform the operation */                                                           \
-  foreign "C" mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr");    \
+  foreign "C" mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr") [];    \
                                                                                         \
   RET_NPNP(TO_W_(MP_INT__mp_size(mp_result1)),                                          \
            MP_INT__mp_d(mp_result1) - SIZEOF_StgArrWords,                               \
@@ -663,7 +663,7 @@ gcdIntzh_fast
     FETCH_MP_TEMP(mp_tmp_w);
 
     W_[mp_tmp_w] = R1;
-    r = foreign "C" mpn_gcd_1(mp_tmp_w "ptr", 1, R2);
+    r = foreign "C" mpn_gcd_1(mp_tmp_w "ptr", 1, R2) [];
 
     R1 = r;
     /* Result parked in R1, return via info-pointer at TOS */
@@ -674,7 +674,7 @@ gcdIntzh_fast
 gcdIntegerIntzh_fast
 {
     /* R1 = s1; R2 = d1; R3 = the int */
-    R1 = foreign "C" mpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3);
+    R1 = foreign "C" mpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3) [];
     
     /* Result parked in R1, return via info-pointer at TOS */
     jump %ENTRY_CODE(Sp(0));
@@ -755,7 +755,7 @@ cmpIntegerzh_fast
     up = BYTE_ARR_CTS(R2);
     vp = BYTE_ARR_CTS(R4);
 
-    cmp = foreign "C" mpn_cmp(up "ptr", vp "ptr", size);
+    cmp = foreign "C" mpn_cmp(up "ptr", vp "ptr", size) [];
 
     if (cmp == 0 :: CInt) {
 	R1 = 0; 
@@ -829,7 +829,7 @@ decodeFloatzh_fast
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
     
     /* Perform the operation */
-    foreign "C" __decodeFloat(mp_tmp1 "ptr",mp_tmp_w "ptr" ,arg);
+    foreign "C" __decodeFloat(mp_tmp1 "ptr",mp_tmp_w "ptr" ,arg) [];
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
     RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
@@ -858,7 +858,7 @@ decodeDoublezh_fast
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
 
     /* Perform the operation */
-    foreign "C" __decodeDouble(mp_tmp1 "ptr", mp_tmp_w "ptr",arg);
+    foreign "C" __decodeDouble(mp_tmp1 "ptr", mp_tmp_w "ptr",arg) [];
     
     /* returns: (Int# (expn), Int#, ByteArray#) */
     RET_NNP(W_[mp_tmp_w], TO_W_(MP_INT__mp_size(mp_tmp1)), p);
@@ -911,7 +911,7 @@ isCurrentThreadBoundzh_fast
 {
   /* no args */
   W_ r;
-  r = foreign "C" isThreadBound(CurrentTSO);
+  r = foreign "C" isThreadBound(CurrentTSO) [];
   RET_N(r);
 }
 
@@ -971,8 +971,8 @@ INFO_TABLE_RET(stg_catch_retry_frame,
 
    frame = Sp;
    trec = StgTSO_trec(CurrentTSO);
-   "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr");
-   r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", trec "ptr");
+   "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+   r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", trec "ptr") [];
    if (r) {
      /* Succeeded (either first branch or second branch) */
      StgTSO_trec(CurrentTSO) = outer;
@@ -982,7 +982,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    } else {
      /* Did not commit: retry */
      W_ new_trec;
-     "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
+     "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr") [];
      StgTSO_trec(CurrentTSO) = new_trec;
      if (StgCatchRetryFrame_running_alt_code(frame)) {
        R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1333,7 +1333,7 @@ readTVarzh_fast
   MAYBE_GC (R1_PTR, readTVarzh_fast); // Call to stmReadTVar may allocate
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
-  "ptr" result = foreign "C" stmReadTVar(BaseReg "ptr", trec "ptr", tvar "ptr");
+  "ptr" result = foreign "C" stmReadTVar(BaseReg "ptr", trec "ptr", tvar "ptr") [];
 
   RET_P(result);
 }
@@ -1352,7 +1352,7 @@ writeTVarzh_fast
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
   new_value = R2;
-  foreign "C" stmWriteTVar(BaseReg "ptr", trec "ptr", tvar "ptr", new_value "ptr");
+  foreign "C" stmWriteTVar(BaseReg "ptr", trec "ptr", tvar "ptr", new_value "ptr") [];
 
   jump %ENTRY_CODE(Sp(0));
 }
@@ -1478,10 +1478,10 @@ takeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
-      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar);
+      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar) [];
       StgMVar_head(mvar) = tso;
 #else
-      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
       StgMVar_head(mvar) = tso;
 #endif
 
@@ -1550,10 +1550,10 @@ tryTakeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1618,10 +1618,10 @@ putMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1683,10 +1683,10 @@ tryPutMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr");
+	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1726,7 +1726,7 @@ makeStableNamezh_fast
 
     ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, makeStableNamezh_fast );
   
-    index = foreign "C" lookupStableName(R1 "ptr");
+    index = foreign "C" lookupStableName(R1 "ptr") [];
 
     /* Is there already a StableName for this heap object?
      *  stable_ptr_table is a pointer to an array of snEntry structs.
@@ -1749,7 +1749,7 @@ makeStablePtrzh_fast
     /* Args: R1 = a */
     W_ sp;
     MAYBE_GC(R1_PTR, makeStablePtrzh_fast);
-    "ptr" sp = foreign "C" getStablePtr(R1 "ptr");
+    "ptr" sp = foreign "C" getStablePtr(R1 "ptr") [];
     RET_N(sp);
 }
 
