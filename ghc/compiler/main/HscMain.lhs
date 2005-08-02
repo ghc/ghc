@@ -573,7 +573,7 @@ myCoreToStg dflags home_mods this_mod prepd_binds
       stg_binds <- {-# SCC "Core2Stg" #-}
 	     coreToStg home_mods prepd_binds
 
-      (stg_binds2, cost_centre_info) <- {-# SCC "Core2Stg" #-}
+      (stg_binds2, cost_centre_info) <- {-# SCC "Stg2Stg" #-}
 	     stg2stg dflags home_mods this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
