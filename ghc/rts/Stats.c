@@ -781,7 +781,9 @@ statDescribeGens(void)
   bdescr *bd;
   step *step;
 
-  debugBelch("     Gen    Steps      Max   Mutable  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                          Objects\n");
+  debugBelch(
+"     Gen    Steps      Max   Mutable  Step   Blocks     Live    Large\n"
+"                     Blocks Closures                          Objects\n");
 
   mut = 0;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -802,7 +804,7 @@ statDescribeGens(void)
 	live += (bd->free - bd->start) * sizeof(W_);
       }
       if (s != 0) {
-	debugBelch("%46s","");
+	debugBelch("%36s","");
       }
       debugBelch("%6d %8d %8d %8d\n", s, step->n_blocks,
 	      live, lge);
