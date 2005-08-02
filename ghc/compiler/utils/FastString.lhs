@@ -127,6 +127,9 @@ instance Ord FastString where
             | otherwise	=  y
     compare a b = cmpFS a b
 
+instance Show FastString where
+   show fs = show (unpackFS fs)
+
 lengthFS :: FastString -> Int
 lengthFS (FastString _ l# _) = I# l#
 lengthFS (UnicodeStr _ s) = length s

@@ -373,8 +373,8 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
 		   ppr w])
 
 instance Outputable FastString where
-    ppr fs = text (unpackFS fs)		-- Prints an unadorned string,
-					-- no double quotes or anything
+    ppr fs = ftext fs		-- Prints an unadorned string,
+				-- no double quotes or anything
 
 instance Outputable PackageId where
    ppr pid = text (packageIdString pid)
@@ -420,9 +420,6 @@ pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: 
 
 pprHsString :: FastString -> SDoc
 pprHsString fs = text (show (unpackFS fs))
-
-instance Show FastString  where
-    showsPrec p fs = showsPrecSDoc p (ppr fs)
 \end{code}
 
 
