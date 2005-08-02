@@ -346,8 +346,14 @@ fixAssign (CmmAssign (CmmGlobal reg) src)
 
 fixAssign (CmmCall target results args vols)
   = mapAndUnzipUs fixResult results `thenUs` \ (results',stores) ->
-    returnUs (CmmCall target results' args vols : concat stores)
+    returnUs (caller_save ++
+	      CmmCall target results' args vols :
+	      caller_restore ++
+	      concat stores)
   where
+	-- we also save/restore any caller-saves STG registers here
+	(caller_save, caller_restore) = callerSaveVolatileRegs vols
+
 	fixResult g@(CmmGlobal reg,hint) = 
 	  case get_GlobalReg_reg_or_addr reg of
 		Left realreg -> returnUs (g, [])
