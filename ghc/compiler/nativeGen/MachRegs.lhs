@@ -33,7 +33,7 @@ module MachRegs (
 
 	-- * Global registers
         get_GlobalReg_reg_or_addr,
-	callerSaves,
+	callerSaves, callerSaveVolatileRegs,
 
 	-- * Machine-dependent register-related stuff
         allocatableRegs, argRegs, allArgRegs, callClobberedRegs,
@@ -341,6 +341,39 @@ get_Regtable_addr_from_offset rep offset
    = case globalRegMaybe BaseReg of
                  Nothing -> regTableOffset offset
                  Just _  -> CmmRegOff (CmmGlobal BaseReg) offset
+
+-- -----------------------------------------------------------------------------
+-- caller-save registers
+
+-- Here we generate the sequence of saves/restores required around a
+-- foreign call instruction.
+
+callerSaveVolatileRegs :: Maybe [GlobalReg] -> ([CmmStmt], [CmmStmt])
+callerSaveVolatileRegs vols = (caller_save, caller_load)
+  where
+    caller_save = foldr ($!) [] (map callerSaveGlobalReg    regs_to_save)
+    caller_load = foldr ($!) [] (map callerRestoreGlobalReg regs_to_save)
+
+    system_regs = [Sp,SpLim,Hp,HpLim,CurrentTSO,CurrentNursery,
+		   {-SparkHd,SparkTl,SparkBase,SparkLim,-}BaseReg ]
+
+    regs_to_save = system_regs ++ vol_list
+
+    vol_list = case vols of Nothing -> []; Just regs -> regs
+
+    callerSaveGlobalReg reg next
+	| callerSaves reg = 
+		CmmStore (get_GlobalReg_addr reg) 
+			 (CmmReg (CmmGlobal reg)) : next
+	| otherwise = next
+
+    callerRestoreGlobalReg reg next
+	| callerSaves reg = 
+		CmmAssign (CmmGlobal reg)
+			  (CmmLoad (get_GlobalReg_addr reg) (globalRegRep reg))
+			: next
+	| otherwise = next
+
 
 -- ---------------------------------------------------------------------------
 -- Registers
