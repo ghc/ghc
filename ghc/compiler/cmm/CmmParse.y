@@ -295,6 +295,7 @@ bool_op :: { ExtFCode BoolExpr }
 -- This is not C-- syntax.  What to do?
 vols 	:: { Maybe [GlobalReg] }
 	: {- empty -}			{ Nothing }
+	| '[' ']'		        { Just [] }
 	| '[' globals ']'		{ Just $2 }
 
 globals :: { [GlobalReg] }
