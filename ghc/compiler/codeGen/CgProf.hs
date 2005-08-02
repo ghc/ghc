@@ -259,6 +259,7 @@ enterCostCentreThunk closure =
     stmtC $ CmmStore curCCSAddr (costCentreFrom closure)
 
 enter_ccs_fun stack = emitRtsCall SLIT("EnterFunCCS") [(stack,PtrHint)]
+			-- ToDo: vols
 
 enter_ccs_fsub = enteringPAP 0
 
