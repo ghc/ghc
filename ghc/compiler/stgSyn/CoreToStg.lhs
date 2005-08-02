@@ -175,7 +175,7 @@ coreTopBindToStg
 coreTopBindToStg hmods env body_fvs (NonRec id rhs)
   = let 
 	env' 	  = extendVarEnv env id how_bound
-	how_bound = LetBound TopLet (manifestArity rhs)
+	how_bound = LetBound TopLet $! manifestArity rhs
 
         (stg_rhs, fvs') = 
 	    initLne env (
@@ -194,7 +194,7 @@ coreTopBindToStg hmods env body_fvs (Rec pairs)
   = let 
 	(binders, rhss) = unzip pairs
 
-	extra_env' = [ (b, LetBound TopLet (manifestArity rhs))
+	extra_env' = [ (b, LetBound TopLet $! manifestArity rhs)
 		     | (b, rhs) <- pairs ]
 	env' = extendVarEnvList env extra_env'
 
