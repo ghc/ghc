@@ -23,9 +23,6 @@ ghcpkg01 :
 	$(GHC_PKG) describe testpkg-*
 	$(GHC_PKG) field testpkg-* version
 
-	@: # cannot use testpkg as a package name, it is ambiguous now
-	if $(GHC_PKG) describe testpkg; then false; else true; fi
-
 	@: # test hiding/exposing
 	$(GHC_PKG) hide testpkg-1.2.3.4
 	$(GHC_PKG) field testpkg-1.2.3.4 exposed | grep False
@@ -85,8 +82,8 @@ copy :
 	cp $(FPTOOLS_TOP)/ghc/driver/package.conf.inplace $(COPY_PACKAGE_CONF)
 
 ghcpkg02 : copy
-	for i in `$(GHC_PKG_COPY) list | sed 's/^.*://;s/[,()]//g'`; do \
+	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \
 		echo Updating $$i; \
-		$(GHC_PKG_COPY) describe $$i | $(GHC_PKG_COPY) update --force -; \
+		$(GHC_PKG_COPY) describe --global $$i | $(GHC_PKG_COPY) update --global --force -; \
 	done
 
