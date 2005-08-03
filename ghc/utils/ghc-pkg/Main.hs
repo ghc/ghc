@@ -32,10 +32,12 @@ import Prelude
 import System.Console.GetOpt
 import Text.PrettyPrint
 import qualified Control.Exception as Exception
+import Data.Maybe
 #else
 import GetOpt
 import Pretty
 import qualified Exception
+import Maybe
 #endif
 
 import Data.Char	( isSpace )
@@ -99,6 +101,7 @@ data Flag
   | FlagForce
   | FlagAutoGHCiLibs
   | FlagDefinedName String String
+  | FlagSimpleOutput
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -120,7 +123,9 @@ flags = [
   Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
   	"define NAME as VALUE",
   Option ['V'] ["version"] (NoArg FlagVersion)
-	"output version information and exit"
+	"output version information and exit",
+  Option [] ["simple-output"] (NoArg FlagSimpleOutput)
+        "print output in easy-to-parse format when running command 'list'"
   ]
  where
   toDefined str = 
@@ -152,9 +157,13 @@ usageHeader prog = substProg prog $
   "  $p hide {pkg-id}\n" ++
   "    Hide the specified package.\n" ++
   "\n" ++
-  "  $p list\n" ++
-  "    List registered packages in the global database, and also the" ++
-  "    user database if --user is given.\n" ++
+  "  $p list [pkg]\n" ++
+  "    List registered packages in the global database, and also the\n" ++
+  "    user database if --user is given. If a package name is given\n" ++
+  "    all the registered versions will be listed in ascending order.\n" ++
+  "\n" ++
+  "  $p latest pkg\n" ++
+  "    Prints the highest registered version of a package.\n" ++
   "\n" ++
   "  $p describe {pkg-id}\n" ++
   "    Give the registered description for the specified package. The\n" ++
@@ -199,7 +208,11 @@ runit cli nonopts = do
 	pkgid <- readGlobPkgId pkgid_str
 	hidePackage pkgid cli
     ["list"] -> do
-	listPackages cli
+	listPackages cli Nothing
+    ["list", package] -> do
+	listPackages cli (Just package)
+    ["latest", package] -> do
+	latestPackage cli package
     ["describe", pkgid_str] -> do
 	pkgid <- readGlobPkgId pkgid_str
 	describePackage cli pkgid
@@ -406,11 +419,18 @@ modifyPackage fn pkgid flags  = do
 -- -----------------------------------------------------------------------------
 -- Listing packages
 
-listPackages ::  [Flag] -> IO ()
-listPackages flags = do
+listPackages ::  [Flag] -> Maybe String -> IO ()
+listPackages flags mPackageName = do
+  let simple_output = FlagSimpleOutput `elem` flags
   db_stack <- getPkgDatabases False flags
-  mapM_ show_pkgconf (reverse db_stack)
-  where show_pkgconf (db_name,pkg_confs) =
+  let doesMatch p = fromJust mPackageName == pkgName (package p)
+      db_stack_filtered -- if a package is given, filter out all other packages
+        | Just p <- mPackageName =
+            map (\(conf,pkgs) -> (conf, filter doesMatch pkgs)) db_stack
+        | otherwise = db_stack
+      show_func = if simple_output then show_easy else mapM_ show_regular
+  show_func (reverse db_stack_filtered)
+  where show_regular (db_name,pkg_confs) =
 	  hPutStrLn stdout (render $
 		text (db_name ++ ":") $$ nest 4 packages
 		)
@@ -419,6 +439,27 @@ listPackages flags = do
 		   | exposed p = doc
 		   | otherwise = parens doc
 		   where doc = text (showPackageId (package p))
+        show_easy db_stack = do
+          let pkgs = map showPackageId $ sortBy compPkgIdVer $
+                          map package (concatMap snd db_stack)
+          when (null pkgs) $ die "no matches"
+          hPutStrLn stdout $ concat $ intersperse " " pkgs
+          where
+            compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
+
+-- -----------------------------------------------------------------------------
+-- Prints the highest (hidden or exposed) version of a package
+
+latestPackage ::  [Flag] -> String -> IO ()
+latestPackage flags packageName = do
+  db_stack <- getPkgDatabases False flags
+  let allPids = map package $ concatMap snd db_stack
+      matches = filter (\p -> packageName == pkgName p) allPids
+  show_pkg (sortBy compPkgIdVer matches)
+  where
+    show_pkg [] = die "no matches"
+    show_pkg pids = hPutStrLn stdout (showPackageId (last pids))
+    compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 -- -----------------------------------------------------------------------------
 -- Describe
@@ -916,8 +957,8 @@ oldRunit clis = do
       defines = [ (nm,val) | OF_DefinedName nm val <- clis ]
 
   case [ c | c <- clis, isAction c ] of
-    [ OF_List ]      -> listPackages new_flags
-    [ OF_ListLocal ] -> listPackages new_flags
+    [ OF_List ]      -> listPackages new_flags Nothing
+    [ OF_ListLocal ] -> listPackages new_flags Nothing
     [ OF_Add upd ]   -> 
 	registerPackage input_file defines new_flags auto_ghci_libs upd force
     [ OF_Remove pkgid_str ]  -> do
