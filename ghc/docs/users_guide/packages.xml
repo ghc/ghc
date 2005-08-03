@@ -371,11 +371,12 @@ exposed-modules: Network.BSD,
     <para>The <literal>ghc-pkg</literal> program may be run in the ways listed
       below.  Where a package name is required, the package can be named in
       full including the version number 
-      (e.g. <literal>network-1.0</literal>), or without the version number if
-      there is only a single version of that package installed.  Additionally,
-      the version may be given as <literal>*</literal>, which means &ldquo;all
-      versions&rdquo;.  For example, <literal>ghc-pkg hide network-*</literal>
-      would hide all versions of the network package.</para>
+      (e.g. <literal>network-1.0</literal>), or without the version number.
+      Naming a package without the version number matches all versions of the
+      package; the specified action will be applied to all the matching
+      packages.  A package specifier that matches all version of the package
+      can also be written <replaceable>pkg</replaceable><literal>-*</literal>,
+      to make it clearer that multiple packages are being matched.</para>
 
     <variablelist>
       <varlistentry>
@@ -426,7 +427,7 @@ exposed-modules: Network.BSD,
       </varlistentry>
 
       <varlistentry>
-	<term><literal>ghc-pkg list</literal></term>
+	<term><literal>ghc-pkg list [<replaceable>P</replaceable>] [<option>--simple-output</option>]</literal></term>
 	<listitem>
 	  <para>This option displays the currently installed
 	    packages, for each of the databases known to
@@ -438,6 +439,24 @@ exposed-modules: Network.BSD,
 	  <para>Hidden packages (those for which the <literal>exposed</literal>
 	    flag is <literal>False</literal>) are shown in parentheses in the
 	    list of packages.</para>
+
+	  <para>If an optional package identifier <replaceable>P</replaceable>
+	    is given, then only packages matching that identifier are
+	    shown.</para>
+	  
+	  <para>If the option <option>--simple-output</option> is given, then
+	    the packages are listed on a single line separated by spaces, and
+	    the database names are not included.  This is intended to make it
+	    easier to parse the output of <literal>ghc-pkg list</literal> using
+	    a script.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg latest <replaceable>P</replaceable></literal></term>
+	<listitem>
+	  <para>Prints the latest available version of package
+	    <replaceable>P</replaceable>.</para>
 	</listitem>
       </varlistentry>
 
