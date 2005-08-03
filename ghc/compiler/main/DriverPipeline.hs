@@ -189,10 +189,12 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 
 	| otherwise	-- Normal source file
 	-> do
-	   maybe_stub_o <- compileStub dflags' stub_c_exists
-	   let stub_unlinked = case maybe_stub_o of
-				  Nothing -> []
-				  Just stub_o -> [ DotO stub_o ]
+	   stub_unlinked <-
+	     if stub_c_exists then do
+		stub_o <- compileStub dflags' object_filename
+		return [ DotO stub_o ]
+	     else
+		return []
 
 	   (hs_unlinked, unlinked_time) <-
 	     case hsc_lang of
@@ -232,14 +234,31 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
 
-compileStub dflags stub_c_exists
-  | not stub_c_exists = return Nothing
-  | stub_c_exists = do
+-- The _stub.c file is derived from the haskell source file (but stored
+-- in hscStubCOutName in the dflags for some reason, probably historical).
+-- Consequently, we derive the _stub.o filename from the haskell object
+-- filename.  
+--
+-- This isn't necessarily the same as the object filename we
+-- would get if we just compiled the _stub.c file using the pipeline.
+-- For example:
+--
+--    ghc src/A.hs -odir obj
+-- 
+-- results in obj/A.o, and src/A_stub.c.  If we compile src/A_stub.c with
+-- -odir obj, we would get obj/src/A_stub.o, which is wrong; we want
+-- obj/A_stub.o.
+
+compileStub dflags object_filename = do
+	let (o_base, o_ext) = splitFilename object_filename
+	    stub_o = o_base ++ "_stub" `joinFileExt` o_ext
+
 	-- compile the _stub.c file w/ gcc
 	let stub_c = hscStubCOutName dflags
-	(_, stub_o) <- runPipeline StopLn dflags
-			    (stub_c,Nothing) Persistent Nothing{-no ModLocation-}
-	return (Just stub_o)
+	runPipeline StopLn dflags (stub_c,Nothing) 
+		(SpecificFile stub_o) Nothing{-no ModLocation-}
+
+	return stub_o
 
 
 -- ---------------------------------------------------------------------------
@@ -737,11 +756,9 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 		      stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
-		-- Deal with stubs 
-		maybe_stub_o <- compileStub dflags' stub_c_exists
-		case maybe_stub_o of
-		      Nothing     -> return ()
-		      Just stub_o -> consIORef v_Ld_inputs stub_o
+		when stub_c_exists $ do
+			stub_o <- compileStub dflags' o_file
+			consIORef v_Ld_inputs stub_o
 
 		-- In the case of hs-boot files, generate a dummy .o-boot 
 		-- stamp file for the benefit of Make
