@@ -209,10 +209,12 @@ runit cli nonopts = do
 	hidePackage pkgid cli
     ["list"] -> do
 	listPackages cli Nothing
-    ["list", package] -> do
-	listPackages cli (Just package)
-    ["latest", package] -> do
-	latestPackage cli package
+    ["list", pkgid_str] -> do
+	pkgid <- readGlobPkgId pkgid_str
+	listPackages cli (Just pkgid)
+    ["latest", pkgid_str] -> do
+	pkgid <- readGlobPkgId pkgid_str
+	latestPackage cli pkgid
     ["describe", pkgid_str] -> do
 	pkgid <- readGlobPkgId pkgid_str
 	describePackage cli pkgid
@@ -419,14 +421,14 @@ modifyPackage fn pkgid flags  = do
 -- -----------------------------------------------------------------------------
 -- Listing packages
 
-listPackages ::  [Flag] -> Maybe String -> IO ()
+listPackages ::  [Flag] -> Maybe PackageIdentifier -> IO ()
 listPackages flags mPackageName = do
   let simple_output = FlagSimpleOutput `elem` flags
   db_stack <- getPkgDatabases False flags
-  let doesMatch p = fromJust mPackageName == pkgName (package p)
-      db_stack_filtered -- if a package is given, filter out all other packages
-        | Just p <- mPackageName =
-            map (\(conf,pkgs) -> (conf, filter doesMatch pkgs)) db_stack
+  let db_stack_filtered -- if a package is given, filter out all other packages
+        | Just this <- mPackageName =
+            map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs)) 
+		db_stack
         | otherwise = db_stack
       show_func = if simple_output then show_easy else mapM_ show_regular
   show_func (reverse db_stack_filtered)
@@ -444,22 +446,18 @@ listPackages flags mPackageName = do
                           map package (concatMap snd db_stack)
           when (null pkgs) $ die "no matches"
           hPutStrLn stdout $ concat $ intersperse " " pkgs
-          where
-            compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
 
-latestPackage ::  [Flag] -> String -> IO ()
-latestPackage flags packageName = do
+latestPackage ::  [Flag] -> PackageIdentifier -> IO ()
+latestPackage flags pkgid = do
   db_stack <- getPkgDatabases False flags
-  let allPids = map package $ concatMap snd db_stack
-      matches = filter (\p -> packageName == pkgName p) allPids
-  show_pkg (sortBy compPkgIdVer matches)
+  ps <- findPackages db_stack pkgid
+  show_pkg (sortBy compPkgIdVer (map package ps))
   where
     show_pkg [] = die "no matches"
     show_pkg pids = hPutStrLn stdout (showPackageId (last pids))
-    compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 -- -----------------------------------------------------------------------------
 -- Describe
@@ -473,27 +471,22 @@ describePackage flags pkgid = do
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageIdentifier -> IO [InstalledPackageInfo]
 findPackages db_stack pkgid
-  = case [ p | p <- all_pkgs, pkgid `matches` p ] of
+  = case [ p | p <- all_pkgs, pkgid `matchesPkg` p ] of
 	[]  -> die ("cannot find package " ++ showPackageId pkgid)
-	[p] -> return [p]
-	 -- if the version is globVersion, then we are allowed to match
-	 -- multiple packages.  So eg. "Cabal-*" matches all Cabal packages,
-	 -- but "Cabal" matches just one Cabal package - if there are more,
-	 -- you get an error.
-	ps | versionTags (pkgVersion pkgid) == versionTags globVersion
-	   -> return ps
-	   | otherwise
-	   -> die ("package " ++ showPackageId pkgid ++ 
-			" matches multiple packages: " ++ 
-			concat (intersperse ", " (
-				 map (showPackageId.package) ps)))
+	ps -> return ps
   where
-	pid `matches` pkg
-	  = (pkgName pid == pkgName p)
-	    && (pkgVersion pid == pkgVersion p || not (realVersion pid))
-	  where p = package pkg
-
 	all_pkgs = concat (map snd db_stack)
+
+matches :: PackageIdentifier -> PackageIdentifier -> Bool
+pid `matches` pid'
+  = (pkgName pid == pkgName pid')
+    && (pkgVersion pid == pkgVersion pid' || not (realVersion pid))
+
+matchesPkg :: PackageIdentifier -> InstalledPackageInfo -> Bool
+pid `matchesPkg` pkg = pid `matches` package pkg
+
+compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
+compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
 -- -----------------------------------------------------------------------------
 -- Field
