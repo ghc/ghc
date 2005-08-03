@@ -520,44 +520,19 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 	  | otherwise = case occ of
 				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
 				IAmALoopBreaker      -> False
-				OneOcc in_lam one_br -> (not in_lam || is_cheap) && consider_safe in_lam True  one_br
-				NoOccInfo	     -> is_cheap 		 && consider_safe True   False False
 
-	consider_safe in_lam once once_in_one_branch
-		-- consider_safe decides whether it's a good idea to inline something,
-		-- given that there's no work-duplication issue (the caller checks that).
-		-- once_in_one_branch = True means there's a unique textual occurrence
+				-- Occurs once in one branch.  These are deal with by
+				-- preInlineUnconditionally, so we ignore them here:
+				OneOcc _ True _      -> False
+
+				OneOcc in_lam False _ -> (not in_lam || is_cheap) && consider_safe True
+				other		     -> is_cheap && consider_safe False
+
+	consider_safe once
+		-- consider_safe decides whether it's a good idea to
+		-- inline something, given that there's no
+		-- work-duplication issue (the caller checks that).
 	  | inline_call  = True
-
-	  | once_in_one_branch
-		-- Be very keen to inline something if this is its unique occurrence:
-		--
-		--   a) Inlining gives a good chance of eliminating the original 
-		--	binding (and hence the allocation) for the thing.  
-		--	(Provided it's not a top level binding, in which case the 
-		--	 allocation costs nothing.)
-		--
-		--   b) Inlining a function that is called only once exposes the 
-		--	body function to the call site.
-		--
-		-- The only time we hold back is when substituting inside a lambda;
-		-- then if the context is totally uninteresting (not applied, not scrutinised)
-		-- there is no point in substituting because it might just increase allocation,
-		-- by allocating the function itself many times
-		-- Note [Jan 2002]: this comment looks out of date.  The actual code
-		-- doesn't inline *ever* in an uninteresting context.  Why not?  I
-		-- think it's just because we don't want to inline top-level constants
-		-- into uninteresting contexts, lest we (for example) re-nest top-level
-		-- literal lists.
-		--
-		-- Note: there used to be a '&& not top_level' in the guard above,
-		--	 but that stopped us inlining top-level functions used only once,
-		--	 which is stupid
-	  = WARN( not is_top && not in_lam, ppr id )
-			-- If (not in_lam) && one_br then PreInlineUnconditionally
-			-- should have caught it, shouldn't it?  Unless it's a top
-			-- level thing.
-	    notNull arg_infos || interesting_cont
 
 	  | otherwise
 	  = case guidance of
@@ -575,19 +550,23 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 		  where
 		    some_benefit = or arg_infos || really_interesting_cont || 
 		    		   (not is_top && (once || (n_vals_wanted > 0 && enough_args)))
-		    	-- If it occurs more than once, there must be something interesting 
-		    	-- about some argument, or the result context, to make it worth inlining
-		    	--
-		    	-- If a function has a nested defn we also record some-benefit,
-		    	-- on the grounds that we are often able to eliminate the binding,
-		    	-- and hence the allocation, for the function altogether; this is good
-		    	-- for join points.  But this only makes sense for *functions*;
-		    	-- inlining a constructor doesn't help allocation unless the result is
-		    	-- scrutinised.  UNLESS the constructor occurs just once, albeit possibly
-		    	-- in multiple case branches.  Then inlining it doesn't increase allocation,
-		    	-- but it does increase the chance that the constructor won't be allocated at all
-		    	-- in the branches that don't use it.
-	    
+		-- If it occurs more than once, there must be
+		-- something interesting about some argument, or the
+		-- result context, to make it worth inlining
+		--
+		-- If a function has a nested defn we also record
+		-- some-benefit, on the grounds that we are often able
+		-- to eliminate the binding, and hence the allocation,
+		-- for the function altogether; this is good for join
+		-- points.  But this only makes sense for *functions*;
+		-- inlining a constructor doesn't help allocation
+		-- unless the result is scrutinised.  UNLESS the
+		-- constructor occurs just once, albeit possibly in
+		-- multiple case branches.  Then inlining it doesn't
+		-- increase allocation, but it does increase the
+		-- chance that the constructor won't be allocated at
+		-- all in the branches that don't use it.
+
 		    enough_args		  = n_val_args >= n_vals_wanted
 		    really_interesting_cont | n_val_args <  n_vals_wanted = False	-- Too few args
 		    			    | n_val_args == n_vals_wanted = interesting_cont

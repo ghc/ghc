@@ -34,7 +34,7 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsValue
 			)
-import Id		( idType, isDataConWorkId, idOccInfo, isDictId,
+import Id		( idType, isDataConWorkId, idOccInfo, isDictId, idArity,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
 			)
@@ -48,7 +48,7 @@ import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConTyVars, dataConArgTys, isVanillaDataCon )
 import Var		( tyVarKind, mkTyVar )
 import VarSet
-import BasicTypes	( TopLevelFlag(..), isTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
+import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
 			  Activation, isAlwaysActive, isActive )
 import Util		( lengthExceeds )
 import Outputable
@@ -531,14 +531,28 @@ better.  Consider
 	xN = eN[xN-1]
 
 We may end up simplifying e1 N times, e2 N-1 times, e3 N-3 times etc.
+This can happen with cascades of functions too:
 
-NB: we don't even look at the RHS to see if it's trivial
-We might have
-			x = y
-where x is used many times, but this is the unique occurrence of y.
-We should NOT inline x at all its uses, because then we'd do the same
-for y -- aargh!  So we must base this pre-rhs-simplification decision
-solely on x's occurrences, not on its rhs.
+	f1 = \x1.e1
+	f2 = \xs.e2[f1]
+	f3 = \xs.e3[f3]
+	...etc...
+
+THE MAIN INVARIANT is this:
+
+	----  preInlineUnconditionally invariant -----
+   IF preInlineUnconditionally chooses to inline x = <rhs>
+   THEN doing the inlining should not change the occurrence
+	info for the free vars of <rhs>
+	----------------------------------------------
+
+For example, it's tempting to look at trivial binding like
+	x = y
+and inline it unconditionally.  But suppose x is used many times,
+but this is the unique occurrence of y.  Then inlining x would change
+y's occurrence info, which breaks the invariant.  It matters: y
+might have a BIG rhs, which will now be dup'd at every occurrenc of x.
+
 
 Evne RHSs labelled InlineMe aren't caught here, because there might be
 no benefit from inlining at the call site.
@@ -563,10 +577,43 @@ Conclusion: inline top level things gaily until Phase 0 (the last
 phase), at which point don't.
 
 \begin{code}
-preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> Bool
-preInlineUnconditionally env top_lvl bndr
-  | isTopLevel top_lvl, SimplPhase 0 <- phase = False
--- If we don't have this test, consider
+preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
+preInlineUnconditionally env top_lvl bndr rhs
+  | not active 		   = False
+  | opt_SimplNoPreInlining = False
+  | otherwise = case idOccInfo bndr of
+		  IAmDead	     	     -> True	-- Happens in ((\x.1) v)
+	  	  OneOcc in_lam True int_cxt -> try_once in_lam int_cxt
+		  other 		     -> False
+  where
+    phase = getMode env
+    active = case phase of
+		   SimplGently  -> isAlwaysActive prag
+		   SimplPhase n -> isActive n prag
+    prag = idInlinePragma bndr
+
+    try_once in_lam int_cxt	-- There's one textual occurrence
+	= not in_lam && (isNotTopLevel top_lvl || early_phase)
+	|| (exprIsValue rhs && int_cxt)
+	-- exprIsValue => free vars of rhs are (Once in_lam) or Many,
+	-- so substituting rhs inside a lambda doesn't change the occ info
+	-- Caveat: except the fn of a PAP, but since it has arity > 0, it
+	-- 	   must be a HNF, so it doesn't matter if we push it inside
+	--	   a lambda
+	--
+	-- 	int_cxt		The context isn't totally boring
+	-- E.g. let f = \ab.BIG in \y. map f xs
+	-- 	Don't want to substitute for f, because then we allocate
+	--	its closure every time the \y is called
+	-- But: let f = \ab.BIG in \y. map (f y) xs
+	--	Now we do want to substitute for f, even though it's not 
+	--	saturated, because we're going to allocate a closure for 
+	--	(f y) every time round the loop anyhow.
+
+    early_phase = case phase of
+			SimplPhase 0 -> False
+			other	     -> True
+-- If we don't have this early_phase test, consider
 --	x = length [1,2,3]
 -- The full laziness pass carefully floats all the cons cells to
 -- top level, and preInlineUnconditionally floats them all back in.
@@ -581,19 +628,6 @@ preInlineUnconditionally env top_lvl bndr
 -- top level things, but then we become more leery about inlining
 -- them.  
 
-  | not active 		   = False
-  | opt_SimplNoPreInlining = False
-  | otherwise = case idOccInfo bndr of
-		  IAmDead	     -> True	-- Happens in ((\x.1) v)
-	  	  OneOcc in_lam once -> not in_lam && once
-			-- Not inside a lambda, one occurrence ==> safe!
-		  other 	     -> False
-  where
-    phase = getMode env
-    active = case phase of
-		   SimplGently  -> isAlwaysActive prag
-		   SimplPhase n -> isActive n prag
-    prag = idInlinePragma bndr
 \end{code}
 
 postInlineUnconditionally
@@ -626,28 +660,12 @@ story for now.
 
 \begin{code}
 postInlineUnconditionally :: SimplEnv -> OutId -> OccInfo -> OutExpr -> Bool
-postInlineUnconditionally env bndr occ_info rhs 
-  =  exprIsTrivial rhs
-  && active
-  && not (isLoopBreaker occ_info)
-  && not (isExportedId bndr)
-	-- We used to have (isOneOcc occ_info) instead of
-	-- not (isLoopBreaker occ_info) && not (isExportedId bndr)
-	-- That was because a rather fragile use of rules got confused
-	-- if you inlined even a binding f=g  e.g. We used to have
-	--	map = mapList
-	-- But now a more precise use of phases has eliminated this problem,
-	-- so the is_active test will do the job.  I think.
-	--
-	-- OLD COMMENT: (delete soon)
-	-- Indeed, you might suppose that
-	-- there is nothing wrong with substituting for a trivial RHS, even
-	-- if it occurs many times.  But consider
-	--	x = y
-	--	h = _inline_me_ (...x...)
-	-- Here we do *not* want to have x inlined, even though the RHS is
-	-- trivial, becuase the contract for an INLINE pragma is "no inlining".
-	-- This is important in the rules for the Prelude 
+postInlineUnconditionally env bndr occ_info rhs
+  | not active		   = False
+  | isLoopBreaker occ_info = False
+  | isExportedId bndr      = False
+  | exprIsTrivial rhs 	   = True
+  | otherwise		   = False
   where
     active = case getMode env of
 		   SimplGently  -> isAlwaysActive prag

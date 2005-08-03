@@ -11,7 +11,7 @@ module CoreUtils (
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
 	-- Taking expressions apart
-	findDefault, findAlt,
+	findDefault, findAlt, isDefaultAlt,
 
 	-- Properties of expressions
 	exprType, coreAltType,
@@ -300,6 +300,10 @@ findAlt con alts
 	  LT -> deflt	-- Missed it already; the alts are in increasing order
 	  EQ -> alt
 	  GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
+
+isDefaultAlt :: CoreAlt -> Bool
+isDefaultAlt (DEFAULT, _, _) = True
+isDefaultAlt other	     = False
 \end{code}
 
 

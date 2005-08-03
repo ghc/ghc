@@ -40,6 +40,7 @@ module BasicTypes(
 
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch,
+	InterestingCxt,
 
         EP(..),
 
@@ -331,23 +332,29 @@ data OccInfo
   | IAmDead		-- Marks unused variables.  Sometimes useful for
 			-- lambda and case-bound variables.
 
-  | OneOcc InsideLam
-
- 	   OneBranch
+  | OneOcc !InsideLam
+ 	   !OneBranch
+	   !InterestingCxt
 
   | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
 			-- in a group of recursive definitions
 
 seqOccInfo :: OccInfo -> ()
-seqOccInfo (OneOcc in_lam once) = in_lam `seq` once `seq` ()
-seqOccInfo occ			= ()
+seqOccInfo occ = occ `seq` ()
 
+-----------------
+type InterestingCxt = Bool	-- True <=> Function: is applied
+				--	    Data value: scrutinised by a case with
+				--			at least one non-DEFAULT branch
+
+-----------------
 type InsideLam = Bool	-- True <=> Occurs inside a non-linear lambda
 			-- Substituting a redex for this occurrence is
 			-- dangerous because it might duplicate work.
 insideLam    = True
 notInsideLam = False
 
+-----------------
 type OneBranch = Bool	-- True <=> Occurs in only one case branch
 			--	so no code-duplication issue to worry about
 oneBranch    = True
@@ -361,12 +368,12 @@ isDeadOcc :: OccInfo -> Bool
 isDeadOcc IAmDead = True
 isDeadOcc other	  = False
 
-isOneOcc (OneOcc _ _) = True
-isOneOcc other	      = False
+isOneOcc (OneOcc _ _ _) = True
+isOneOcc other	        = False
 
 isFragileOcc :: OccInfo -> Bool
-isFragileOcc (OneOcc _ _) = True
-isFragileOcc other	  = False
+isFragileOcc (OneOcc _ _ _) = True
+isFragileOcc other	    = False
 \end{code}
 
 \begin{code}
@@ -375,9 +382,15 @@ instance Outputable OccInfo where
   ppr NoOccInfo  			  	  = empty
   ppr IAmALoopBreaker 				  = ptext SLIT("LoopBreaker")
   ppr IAmDead					  = ptext SLIT("Dead")
-  ppr (OneOcc inside_lam one_branch) | inside_lam = ptext SLIT("OnceInLam")
-				     | one_branch = ptext SLIT("Once")
-				     | otherwise  = ptext SLIT("OnceEachBranch")
+  ppr (OneOcc inside_lam one_branch int_cxt)
+	= ptext SLIT("Once") <> pp_lam <> pp_br <> pp_args
+	where
+	  pp_lam | inside_lam = char 'L'
+		 | otherwise  = empty
+	  pp_br  | one_branch = empty
+		 | otherwise  = char '*'
+	  pp_args | int_cxt   = char '!'
+		  | otherwise = empty
 
 instance Show OccInfo where
   showsPrec p occ = showsPrecSDoc p (ppr occ)

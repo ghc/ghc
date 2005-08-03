@@ -19,14 +19,14 @@ module OccurAnal (
 
 import CoreSyn
 import CoreFVs		( idRuleVars )
-import CoreUtils	( exprIsTrivial )
+import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo, isLocalId,
 			  isExportedId, idArity, idSpecialisation, 
 			  idType, idUnique, Id
 			)
+import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
 import IdInfo		( isEmptySpecInfo )
-import BasicTypes	( OccInfo(..), isOneOcc )
 
 import VarSet
 import VarEnv
@@ -146,8 +146,6 @@ It isn't easy to do a perfect job in one blow.  Consider
 occAnalBind env (Rec pairs) body_usage
   = foldr (_scc_ "occAnalBind.dofinal" do_final_bind) (body_usage, []) sccs
   where
-    binders = map fst pairs
-
     analysed_pairs :: [Details1]
     analysed_pairs  = [ (bndr, rhs_usage, rhs')
 		      | (bndr, rhs) <- pairs,
@@ -385,8 +383,8 @@ occAnalRhs env id rhs
 	-- Crude solution: use rhsCtxt for things that occur just once...
 
     certainly_inline id = case idOccInfo id of
-			    OneOcc in_lam one_br -> not in_lam && one_br
-			    other		 -> False
+			    OneOcc in_lam one_br _ -> not in_lam && one_br
+			    other		   -> False
 
 	-- [March 98] A new wrinkle is that if the binder has specialisations inside
 	-- it then we count the specialised Ids as "extra rhs's".  That way
@@ -415,13 +413,7 @@ occAnal :: OccEnv
 	    CoreExpr)
 
 occAnal env (Type t)  = (emptyDetails, Type t)
-
-occAnal env (Var v) 
-  = (var_uds, Var v)
-  where
-    var_uds | isLocalId v = unitVarEnv v oneOcc
-	    | otherwise	 = emptyDetails
-
+occAnal env (Var v)   = (mkOneOcc env v False, Var v)
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.
     -- Btu that went wrong right after specialisation, when
@@ -511,9 +503,8 @@ occAnal env expr@(Lam _ _)
     is_one_shot b   = isId b && isOneShotBndr b
 
 occAnal env (Case scrut bndr ty alts)
-  = case mapAndUnzip (occAnalAlt env bndr) alts of { (alts_usage_s, alts')   -> 
-    case occAnal vanillaCtxt scrut		    of { (scrut_usage, scrut') ->
-	-- No need for rhsCtxt
+  = case occ_anal_scrut scrut alts		of { (scrut_usage, scrut') ->
+    case mapAndUnzip (occAnalAlt env bndr) alts of { (alts_usage_s, alts')   -> 
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
 	alts_usage' = addCaseBndrUsage alts_usage
@@ -532,6 +523,12 @@ occAnal env (Case scrut bndr ty alts)
     addCaseBndrUsage usage = case lookupVarEnv usage bndr of
 				Nothing  -> usage
 				Just occ -> extendVarEnv usage bndr (markMany occ)
+
+    occ_anal_scrut (Var v) (alt1 : other_alts)
+				| not (null other_alts) || not (isDefaultAlt alt1)
+			        = (mkOneOcc env v True, Var v)
+    occ_anal_scrut scrut alts   = occAnal vanillaCtxt scrut
+					-- No need for rhsCtxt
 
 occAnal env (Let bind body)
   = case occAnal env body     	         of { (body_usage, body') ->
@@ -569,10 +566,7 @@ occAnalApp env (Var fun, args) is_rhs
     (fun_uds `combineUsageDetails` final_args_uds, mkApps (Var fun) args') }
   where
     fun_uniq = idUnique fun
-
-    fun_uds | isLocalId fun = unitVarEnv fun oneOcc
-	    | otherwise	    = emptyDetails
-
+    fun_uds  = mkOneOcc env fun (valArgCount args > 0)
     args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
 		| fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
 		| fun_uniq == foldrIdKey    = appSpecial env 3 [False,True] args
@@ -793,8 +787,10 @@ setBinderOcc usage bndr
 %************************************************************************
 
 \begin{code}
-oneOcc :: OccInfo
-oneOcc = OneOcc False True
+mkOneOcc :: OccEnv -> Id -> InterestingCxt -> UsageDetails
+mkOneOcc env id int_cxt
+  | isLocalId id = unitVarEnv id (OneOcc False True int_cxt)
+  | otherwise    = emptyDetails
 
 markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
 
@@ -803,8 +799,8 @@ markMany other   = NoOccInfo
 
 markInsideSCC occ = markMany occ
 
-markInsideLam (OneOcc _ one_br) = OneOcc True one_br
-markInsideLam occ		= occ
+markInsideLam (OneOcc _ one_br int_cxt) = OneOcc True one_br int_cxt
+markInsideLam occ		 	= occ
 
 addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
@@ -817,10 +813,11 @@ addOccInfo info1 info2   = NoOccInfo
 
 orOccInfo IAmDead info2 = info2
 orOccInfo info1 IAmDead = info1
-orOccInfo (OneOcc in_lam1 one_branch1)
-	  (OneOcc in_lam2 one_branch2)
+orOccInfo (OneOcc in_lam1 one_branch1 int_cxt1)
+	  (OneOcc in_lam2 one_branch2 int_cxt2)
   = OneOcc (in_lam1 || in_lam2)
 	   False	-- False, because it occurs in both branches
+	   (int_cxt1 && int_cxt2)
 
 orOccInfo info1 info2 = NoOccInfo
 \end{code}

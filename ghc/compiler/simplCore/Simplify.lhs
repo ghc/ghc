@@ -299,12 +299,14 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
 #endif
 
 simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
-  | preInlineUnconditionally env NotTopLevel bndr
+  = simplNonRecBind' env bndr rhs rhs_se cont_ty thing_inside
+
+simplNonRecBind' env bndr rhs rhs_se cont_ty thing_inside
+  | preInlineUnconditionally env NotTopLevel bndr rhs
   = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
     thing_inside (extendIdSubst env bndr (mkContEx rhs_se rhs))
 
-
-  | isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)	-- A strict let
+  | isStrictDmd (idNewDemandInfo bndr) || isStrictType bndr_ty	-- A strict let
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence info in the substitution
     simplLetBndr env bndr					`thenSmpl` \ (env, bndr1) ->
@@ -317,7 +319,13 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
 	bndr2  = bndr1 `setIdInfo` simplIdInfo env (idInfo bndr)
 	env2   = modifyInScope env1 bndr2 bndr2
     in
-    completeNonRecX env2 True {- strict -} bndr bndr2 rhs1 thing_inside
+    if needsCaseBinding bndr_ty rhs1
+    then
+      thing_inside env2					`thenSmpl` \ (floats, body) ->
+      returnSmpl (emptyFloats env2, Case rhs1 bndr2 (exprType body) 
+					[(DEFAULT, [], wrapFloats floats body)])
+    else
+      completeNonRecX env2 True {- strict -} bndr bndr2 rhs1 thing_inside
 
   | otherwise							-- Normal, lazy case
   =  	-- Don't use simplBinder because that doesn't keep 
@@ -326,6 +334,9 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
     simplLazyBind env NotTopLevel NonRecursive
 		  bndr bndr' rhs rhs_se 		`thenSmpl` \ (floats, env) ->
     addFloats env floats thing_inside
+
+  where
+    bndr_ty = idType bndr
 \end{code}
 
 A specialised variant of simplNonRec used when the RHS is already simplified, notably
@@ -352,7 +363,7 @@ simplNonRecX env bndr new_rhs thing_inside
     let body' = wrapFloats floats body in 
     returnSmpl (emptyFloats env, Case new_rhs bndr' (exprType body') [(DEFAULT, [], body')])
 
-  | preInlineUnconditionally env NotTopLevel  bndr
+  | preInlineUnconditionally env NotTopLevel bndr new_rhs
   	-- This happens; for example, the case_bndr during case of
 	-- known constructor:  case (a,b) of x { (p,q) -> ... }
 	-- Here x isn't mentioned in the RHS, so we don't want to
@@ -421,8 +432,8 @@ simplRecOrTopPair :: SimplEnv
 	     	  -> SimplM (FloatsWith SimplEnv)
 
 simplRecOrTopPair env top_lvl bndr bndr' rhs
-  | preInlineUnconditionally env top_lvl bndr  	-- Check for unconditional inline
-  = tick (PreInlineUnconditionally bndr)	`thenSmpl_`
+  | preInlineUnconditionally env top_lvl bndr rhs  	-- Check for unconditional inline
+  = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
     returnSmpl (emptyFloats env, extendIdSubst env bndr (mkContEx env rhs))
 
   | otherwise
@@ -635,7 +646,6 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 	-- After inling f at some of its call sites the original binding may
 	-- (for example) be no longer strictly demanded.
 	-- The solution here is a bit ad hoc...
-	unfolding  = mkUnfolding (isTopLevel top_lvl) new_rhs
  	info_w_unf = new_bndr_info `setUnfoldingInfo` unfolding
         final_info | loop_breaker		= new_bndr_info
 		   | isEvaldUnfolding unfolding = zapDemandInfo info_w_unf `orElse` info_w_unf
@@ -649,6 +659,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
     returnSmpl (unitFloat env final_id new_rhs, env)
 
   where 
+    unfolding    = mkUnfolding (isTopLevel top_lvl) new_rhs
     loop_breaker = isLoopBreaker occ_info
     old_info     = idInfo old_bndr
     occ_info     = occInfo old_info
