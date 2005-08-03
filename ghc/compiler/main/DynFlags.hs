@@ -295,9 +295,7 @@ data PackageFlag
   | IgnorePackage  String
 
 defaultHscTarget
-#if defined(i386_TARGET_ARCH) || defined(sparc_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
   | cGhcWithNativeCodeGen == "YES" 	=  HscAsm
-#endif
   | otherwise				=  HscC
 
 initDynFlags dflags = do
