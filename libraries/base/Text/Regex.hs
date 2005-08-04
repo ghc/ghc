@@ -94,7 +94,7 @@ subRegex :: Regex                          -- ^ Search pattern
       -> String                         -- ^ Output string
 subRegex _ "" _ = ""
 subRegex regexp inp repl =
-    let bre = mkRegex "\\\\(\\\\||[0-9]+)"
+    let bre = mkRegex "\\\\(\\\\|[0-9]+)"
         lookup _ [] _ = []
         lookup [] _ _ = []
         lookup match repl groups =
