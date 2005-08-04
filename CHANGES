@@ -1,3 +1,31 @@
+Changes in version 0.7:
+
+  * Changes in the way Haddock decides where to direct hyperlinks.  Each entity
+    is now assigned a single "home" module, and all hyperlinks are directed
+    to that module.  See the docs ("Hyperlinking and re-exported entities")
+    for details.
+
+  * New options --ignore-all-exports, --hide
+
+  * New option --use-package for creating documentation that hyperlinks to
+    the HTML documentation for existing packages on your system.  It works
+    by querying ghc-pkg for the location of the Haddock interface and
+    HTML for the given package.
+
+  * Parts of the HTML documentation, notably lists of instances, are
+    now "collapsible" with a +/- button.  Also, the contents page is now
+    in the form of tree in which subtrees can be collapsed.
+
+  * Support for Microsoft DevHelp and HtmlHelp 2.0 formats.
+
+  * Support for a short description for each module for the contents page.
+
+  * Compiles with GHC 6.4+
+
+  * Various bugfixes
+
+-----------------------------------------------------------------------------
+
 Changes in version 0.6:
 
   * Implicit parameters, zip comprehensions and 'mdo' are now
