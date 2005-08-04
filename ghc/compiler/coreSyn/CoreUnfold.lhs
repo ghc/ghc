@@ -520,13 +520,15 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 	  | otherwise = case occ of
 				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
 				IAmALoopBreaker      -> False
-
-				-- Occurs once in one branch.  These are deal with by
-				-- preInlineUnconditionally, so we ignore them here:
-				OneOcc _ True _      -> False
-
-				OneOcc in_lam False _ -> (not in_lam || is_cheap) && consider_safe True
+				OneOcc in_lam _ _    -> (not in_lam || is_cheap) && consider_safe True
 				other		     -> is_cheap && consider_safe False
+		-- we consider even the once-in-one-branch
+		-- occurrences, because they won't all have been
+		-- caught by preInlineUnconditionally.  In particular,
+		-- if the occurrence is once inside a lambda, and the
+		-- rhs is cheap but not a manifest lambda, then
+		-- pre-inline will not have inlined it for fear of
+		-- invalidating the occurrence info in the rhs.
 
 	consider_safe once
 		-- consider_safe decides whether it's a good idea to
