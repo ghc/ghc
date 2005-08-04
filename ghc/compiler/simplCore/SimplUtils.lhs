@@ -594,12 +594,7 @@ preInlineUnconditionally env top_lvl bndr rhs
 
     try_once in_lam int_cxt	-- There's one textual occurrence
 	= not in_lam && (isNotTopLevel top_lvl || early_phase)
-	|| (exprIsValue rhs && int_cxt)
-	-- exprIsValue => free vars of rhs are (Once in_lam) or Many,
-	-- so substituting rhs inside a lambda doesn't change the occ info
-	-- Caveat: except the fn of a PAP, but since it has arity > 0, it
-	-- 	   must be a HNF, so it doesn't matter if we push it inside
-	--	   a lambda
+	|| (canInlineInLam rhs && int_cxt)
 	--
 	-- 	int_cxt		The context isn't totally boring
 	-- E.g. let f = \ab.BIG in \y. map f xs
@@ -609,6 +604,21 @@ preInlineUnconditionally env top_lvl bndr rhs
 	--	Now we do want to substitute for f, even though it's not 
 	--	saturated, because we're going to allocate a closure for 
 	--	(f y) every time round the loop anyhow.
+
+	-- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
+	-- so substituting rhs inside a lambda doesn't change the occ info.
+	-- Sadly, not quite the same as exprIsValue.
+    canInlineInLam (Var x)  		= occ_info_ok (idOccInfo x)
+    canInlineInLam (Lit l)		= True
+    canInlineInLam (Type ty)		= True
+    canInlineInLam (Lam b e)		= isRuntimeVar b || canInlineInLam e
+    canInlineInLam (App e (Type _)) 	= canInlineInLam e
+    canInlineInLam (Note _ e)		= canInlineInLam e
+    canInlineInLam _			= False
+
+    occ_info_ok (OneOcc in_lam _ _) = in_lam
+    occ_info_ok NoOccInfo	    = True
+    occ_info_ok _		    = False
 
     early_phase = case phase of
 			SimplPhase 0 -> False
