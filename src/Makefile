@@ -28,7 +28,7 @@ endif
 HS_PROG = haddock$(HS_PROG_EXT)
 
 # Why HOST platform, not TARGET platform??? Confusing...
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(Windows)" "YES"
 Main_HC_OPTS += -Dmingw32_HOST_OS=1
 endif
 
@@ -84,7 +84,7 @@ INPLACE_SCRIPT_PROG    = haddock-inplace
 ifeq "$(INSTALLING)" "1"
 TOP_PWD 	:= $(prefix)
 SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(Windows)" "NO"
 LINK	 	=  haddock
 endif
 else
@@ -99,7 +99,7 @@ INTERP=$(SHELL)
 SCRIPT_SUBST_VARS = HADDOCKLIB HADDOCKBIN
 
 # The script isn't installed on MinGW; we run the binary directly
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(Windows)" "NO"
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
 endif
 
