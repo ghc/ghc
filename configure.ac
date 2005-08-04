@@ -1176,6 +1176,24 @@ AC_EGREP_CPP(yes,
   ])    
 AC_SUBST(HaveRtldNext)
 
+dnl ** RTLD_DEFAULT isn't available on cygwin
+AC_MSG_CHECKING(for RTLD_DEFAULT from dlfcn.h)
+AC_EGREP_CPP(yes,
+[
+ #include <dlfcn.h>
+ #ifdef RTLD_DEFAULT
+        yes
+ #endif
+], [
+  AC_MSG_RESULT(yes)
+  AC_DEFINE([HAVE_RTLDDEFAULT], [1], [Define to 1 if RTLD_DEFAULT is available.])
+  HaveRtldDefault=YES
+], [
+  AC_MSG_RESULT(no)
+  HaveRtldDefault=NO
+  ])    
+AC_SUBST(HaveRtldDefault)
+
 dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
 AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
 AC_EGREP_CPP(yes,
