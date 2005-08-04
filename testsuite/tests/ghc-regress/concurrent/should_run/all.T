@@ -25,10 +25,7 @@ test('conc009', compose(only_compiler_types(['ghc']), exit_code(1)),
 test('conc010', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc012', normal, compile_and_run, [''])
 
-# hangs for ever with the threaded RTS
-test('conc013', compose(only_compiler_types(['ghc']),
-			omit_ways(['threaded'])),
-		compile_and_run, [''])
+test('conc013', only_compiler_types(['ghc']), compile_and_run, [''])
 
 test('conc014', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc015', only_compiler_types(['ghc']), compile_and_run, [''])
