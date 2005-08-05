@@ -1,13 +1,37 @@
-Summary: Haddock documentation tool for annotated Haskell source code
-Name: haddock
-Version: 0.7
-Release: 1
-License: BSD-like
-Group: Development/Tools
-Source: http://www.haskell.org/haddock/haddock-%{version}-src.tar.gz
-URL: http://www.haskell.org/haddock/
-BuildRoot: %{_tmppath}/%{name}-%{version}-root
-BuildRequires: ghc alex libxslt docbook-style-xsl
+# This is an RPM spec file that specifies how to package
+# haddock for Red Hat Linux and, possibly, similar systems.
+# It has been tested on Red Hat Linux 7.2 and SuSE Linux 9.1.
+#
+# If this file is part of a tarball, you can build RPMs directly from
+# the tarball by using the following command:
+#
+#    rpm -ta haddock-(VERSION)-src.tar.gz
+#
+# The resulting package will be placed in the RPMS/(arch) subdirectory
+# of your RPM build directory (usually /usr/src/redhat or ~/rpm), with
+# the name haddock-(VERSION)-(RELEASE).noarch.rpm.  A corresponding
+# source RPM package will be in the SRPMS subdirectory.
+#
+# NOTE TO HADDOCK MAINTAINERS: When you release a new version of
+# Haskell mode, update the version definition below to match the
+# version label of your release tarball.
+
+%define name    haddock
+%define version 0.7
+%define release 1
+
+Name:           %{name}
+Version:        %{version}
+Release:        %{release}
+License:        BSD-like
+Group:          Development/Languages/Haskell
+URL:            http://haskell.org/haddock/
+Source:         http://haskell.org/haddock/haddock-%{version}-src.tar.gz
+Packager:       Sven Panne <sven.panne@aedion.de>
+BuildRoot:      %{_tmppath}/%{name}-%{version}-build
+Prefix:         %{_prefix}
+BuildRequires:  alex, happy, ghc, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips
+Summary:        A documentation tool for annotated Haskell source code
 
 %description
 Haddock is a tool for automatically generating documentation from
@@ -28,21 +52,16 @@ browser to view it properly (Mozilla, Konqueror, Opera, and IE 6
 should all be ok).
 
 %prep
-%setup -q
+%setup -n haddock-%{version}
 
 %build
-./configure --prefix=%{_prefix} --libdir=%{_libdir}
+test -f configure || autoreconf
+./configure --prefix=%{prefix}
 make
-(cd haddock/doc ; make html )
+make html
 
 %install
-rm -rf ${RPM_BUILD_ROOT}
-%makeinstall
-
-mkdir ${RPM_BUILD_ROOT}%{_datadir}/%{name}-%{version}
-find ${RPM_BUILD_ROOT}%{_datadir} -type f | xargs mv --target-directory=${RPM_BUILD_ROOT}%{_datadir}/%{name}-%{version}
-
-sed -i -e "s!%{_libdir}/%{name}-%{version}!%{_libexecdir}!" ${RPM_BUILD_ROOT}%{_bindir}/%{name}-%{version}
+make prefix=${RPM_BUILD_ROOT}%{prefix} install
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
@@ -51,35 +70,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %defattr(-,root,root)
 %doc haddock/README
 %doc haddock/doc/haddock
-%{_bindir}/haddock
-%{_bindir}/haddock-%{version}
-%{_libexecdir}/haddock.bin
-%{_datadir}/haddock-%{version}
-
-%changelog
-* Tue Jul  5 2005 Jens Petersen <petersen@haskell.org>
-- update filelist
-- install data files in a subdir
-
-* Wed Dec 15 2004 Jens Petersen <petersen@haskell.org>
-- spec file cleanup
-- only generate docs in html
-
-* Sat Oct 11 2003 Sven Panne <sven_panne@yahoo.com>
-- Include architecture-independent files in file list
-
-* Tue Aug 26 2003 Sven Panne <sven_panne@yahoo.com>
-- Use autoreconf instead of autoconf
-
-* Mon Jul 28 2003 Sven Panne <sven_panne@yahoo.com>
-- Updated to version 0.5
-- Automagically generate configure if it is not there
-
-* Tue Jul 23 2002 Simon Marlow <simonmar@microsoft.com>
-- Updated to version 0.4
-
-* Sun Jun 23 2002 Sven Panne <sven_panne@yahoo.com>
-- Cleaned up build root handling and added more docs
-
-* Wed May 01 2002 Tom Moertel <tom-rpms@moertel.com>
-- Created spec file
+%{prefix}/bin/haddock
+%{prefix}/bin/haddock-%{version}
+%{prefix}/lib/haddock-%{version}
+%{prefix}/share/haddock-%{version}
