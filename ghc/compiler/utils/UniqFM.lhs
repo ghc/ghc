@@ -717,10 +717,10 @@ insert_ele f n@(NodeUFM j p t1 t2) i a
 
 \begin{code}
 map_tree f (NodeUFM j p t1 t2)
-  = mkSSNodeUFM (NodeUFMData j p) (map_tree f t1) (map_tree f t2)
+  = mkLLNodeUFM (NodeUFMData j p) (map_tree f t1) (map_tree f t2)
+	-- NB. lazy! we know the tree is well-formed.
 map_tree f (LeafUFM i obj)
   = mkLeafUFM i (f obj)
-
 map_tree f _ = panic "map_tree failed"
 \end{code}
 
