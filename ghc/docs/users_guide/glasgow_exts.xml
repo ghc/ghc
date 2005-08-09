@@ -3208,6 +3208,20 @@ GHC extends this list with two more classes that may be automatically derived
 modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively, and the
 appropriate class must be in scope before it can be mentioned in the <literal>deriving</literal> clause.
 </para>
+<para>An instance of <literal>Typeable</literal> can only be derived if the
+data type has seven or fewer type parameters, all of kind <literal>*</literal>.
+The reason for this is that the <literal>Typeable</literal> class is derived using the scheme
+described in
+<ulink url="http://research.microsoft.com/%7Esimonpj/papers/hmap/gmap2.ps">
+Scrap More Boilerplate: Reflection, Zips, and Generalised Casts
+</ulink>.
+(Section 7.4 of the paper describes the multiple <literal>Typeable</literal> classes that
+are used, and only <literal>Typeable1</literal> up to
+<literal>Typeable7</literal> are provided in the library.)
+In other cases, there is nothing to stop the programmer writing a <literal>TypableX</literal>
+class, whose kind suits that of the data type constructor, and
+then writing the data type instance by hand.
+</para>
 </sect2>
 
 <sect2 id="newtype-deriving">
