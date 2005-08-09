@@ -33,7 +33,7 @@ import BasicTypes	( FixityDirection(..) )
 import PrelNames	( hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
-import Name		( Name, nameOccName )
+import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
 import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
 import LoadIface	( loadHomeInterface )
@@ -528,9 +528,10 @@ rnRbinds str rbinds
 
 \begin{code}
 rnBracket (VarBr n) = do { name <- lookupOccRn n
-			 ; loadHomeInterface msg name	-- Reason: deprecation checking asumes the
-							-- home interface is loaded, and this is the
-							-- only way that is going to happen
+			 ; this_mod <- getModule
+			 ; checkM (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
+			   do { loadHomeInterface msg name		-- home interface is loaded, and this is the
+			      ; return () }				-- only way that is going to happen
 			 ; returnM (VarBr name, unitFV name) }
 		    where
 		      msg = ptext SLIT("Need interface for Template Haskell quoted Name")

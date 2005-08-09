@@ -40,7 +40,7 @@ import PrelRules	( builtinRules )
 import Rules		( extendRuleBaseList, mkRuleBase )
 import InstEnv		( emptyInstEnv, extendInstEnvList )
 import Name		( Name {-instance NamedThing-}, getOccName,
-			  nameModule, isInternalName, isWiredInName )
+			  nameModule, nameIsLocalOrFrom, isWiredInName )
 import NameEnv
 import MkId		( seqId )
 import Module		( Module, ModLocation(ml_hi_file), emptyModuleEnv, 
@@ -101,8 +101,14 @@ loadOrphanModules mods
 ---------------
 loadHomeInterface :: SDoc -> Name -> TcRn ModIface
 loadHomeInterface doc name
-  = ASSERT2( not (isInternalName name), ppr name <+> parens doc )
-    initIfaceTcRn $ loadSysInterface doc (nameModule name)
+  = do	{ 
+#ifdef DEBUG
+		-- Should not be called with a name from the module being compiled
+	  this_mod <- getModule
+	; ASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc )
+#endif
+	  initIfaceTcRn $ loadSysInterface doc (nameModule name)
+    }
 
 ---------------
 loadWiredInHomeIface :: Name -> IfM lcl ()
