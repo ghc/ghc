@@ -1092,8 +1092,12 @@ because GHC does not allow  unboxed tuples on the left of a function arrow.
 
 <para>
 The idea of using existential quantification in data type declarations
-was suggested by Laufer (I believe, thought doubtless someone will
-correct me), and implemented in Hope+. It's been in Lennart
+was suggested by Perry, and implemented in Hope+ (Nigel Perry, <emphasis>The Implementation
+of Practical Functional Programming Languages</emphasis>, PhD Thesis, University of
+London, 1991). It was later formalised by Laufer and Odersky
+(<emphasis>Polymorphic type inference and abstract data types</emphasis>,
+TOPLAS, 16(5), pp1411-1430, 1994).
+It's been in Lennart
 Augustsson's <command>hbc</command> Haskell compiler for several years, and
 proved very useful.  Here's the idea.  Consider the declaration:
 </para>
