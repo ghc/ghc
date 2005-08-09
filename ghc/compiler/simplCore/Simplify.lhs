@@ -24,7 +24,7 @@ import SimplUtils	( mkCase, mkLam, prepareAlts,
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo, 
-			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
+			  setIdOccInfo, zapLamIdInfo, setOneShotLambda
 			)
 import MkId		( eRROR_ID )
 import Literal		( mkStringLit )

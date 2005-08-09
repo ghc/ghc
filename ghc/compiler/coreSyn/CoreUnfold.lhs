@@ -552,6 +552,7 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 		  where
 		    some_benefit = or arg_infos || really_interesting_cont || 
 		    		   (not is_top && (once || (n_vals_wanted > 0 && enough_args)))
+				-- [was (once && not in_lam)]
 		-- If it occurs more than once, there must be
 		-- something interesting about some argument, or the
 		-- result context, to make it worth inlining
