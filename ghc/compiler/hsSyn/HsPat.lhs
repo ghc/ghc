@@ -166,7 +166,8 @@ pprPat (ConPatOut con tvs dicts binds details _)
     else pprUserCon con details
 
 pprPat (LitPat s)	      = ppr s
-pprPat (NPat l _ _ _)	      = ppr l
+pprPat (NPat l Nothing  _ _)  = ppr l
+pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
