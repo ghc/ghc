@@ -327,34 +327,18 @@ printClosure( StgClosure *obj )
                 putchar(arrWordsGetChar(obj,i));
 		} */
 	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      debugBelch("%lu", ((StgArrWords *)obj)->payload[i]);
+	      debugBelch("%lu", (lnat)((StgArrWords *)obj)->payload[i]);
             debugBelch("\")\n");
             break;
         }
 
     case MUT_ARR_PTRS:
-	debugBelch("MUT_ARR_PTRS(size=%ld)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:
-#if !defined(XMLAMBDA)
-	debugBelch("MUT_ARR_PTRS_FROZEN(size=%ld)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_FROZEN(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
-#else
-          {
-            /* rows are mutarrays in xmlambda, maybe we should make a new type: ROW */
-            StgWord i;
-            StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
-
-            debugBelch("Row<%i>(",p->ptrs);
-            for (i = 0; i < p->ptrs; ++i) {
-                if (i > 0) debugBelch(", ");
-                printPtr((StgPtr)(p->payload[i]));
-            }
-            debugBelch(")\n");
-            break;
-          }
-#endif  
 
     case MVAR:
         {
@@ -381,7 +365,7 @@ printClosure( StgClosure *obj )
             break;
 
     case STABLE_NAME:
-            debugBelch("STABLE_NAME(%ld)\n", ((StgStableName*)obj)->sn); 
+            debugBelch("STABLE_NAME(%lu)\n", (lnat)((StgStableName*)obj)->sn); 
             break;
 
     case TSO:
@@ -498,12 +482,12 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 
     p = payload;
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
-	debugBelch("   stk[%ld] (%p) = ", spBottom-(payload+i), payload+i);
+	debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-(payload+i)), payload+i);
 	if ((bitmap & 1) == 0) {
 	    printPtr((P_)payload[i]);
 	    debugBelch("\n");
 	} else {
-	    debugBelch("Word# %ld\n", payload[i]);
+	    debugBelch("Word# %lu\n", (lnat)payload[i]);
 	}
     }
 }
@@ -519,12 +503,12 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
 	StgWord bitmap = large_bitmap->bitmap[bmp];
 	j = 0;
 	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-	    debugBelch("   stk[%ld] (%p) = ", spBottom-(payload+i), payload+i);
+	    debugBelch("   stk[%lu] (%p) = ", (lnat)(spBottom-(payload+i)), payload+i);
 	    if ((bitmap & 1) == 0) {
 		printPtr((P_)payload[i]);
 		debugBelch("\n");
 	    } else {
-		debugBelch("Word# %ld\n", payload[i]);
+		debugBelch("Word# %lu\n", (lnat)payload[i]);
 	    }
 	}
     }
