@@ -20,7 +20,7 @@ import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 			  LSig, Match(..), IPBind(..), Prag(..),
 			  HsType(..), LHsType, HsExplicitForAll(..), hsLTyVarNames, 
 			  isVanillaLSig, sigName, placeHolderNames, isPragLSig,
-			  LPat, GRHSs, MatchGroup(..), isEmptyLHsBinds,
+			  LPat, GRHSs, MatchGroup(..), isEmptyLHsBinds, pprLHsBinds,
 			  collectHsBindBinders, collectPatBinders, pprPatBind
 			)
 import TcHsSyn		( zonkId, (<$>) )
@@ -59,8 +59,8 @@ import VarSet
 import SrcLoc		( Located(..), unLoc, getLoc )
 import Bag
 import ErrUtils		( Message )
-import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
-import Maybes		( fromJust, isJust, orElse, catMaybes )
+import Digraph		( SCC(..), stronglyConnComp )
+import Maybes		( fromJust, isJust, isNothing, orElse, catMaybes )
 import Util		( singleton )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 			  RecFlag(..), isNonRec )
@@ -105,7 +105,7 @@ tcTopBinds :: HsValBinds Name -> TcM (LHsBinds TcId, TcLclEnv)
 	--       want.  The bit we care about is the local bindings
 	--	 and the free type variables thereof
 tcTopBinds binds
-  = do	{ (ValBindsOut prs, env) <- tcValBinds TopLevel binds getLclEnv
+  = do	{ (ValBindsOut prs _, env) <- tcValBinds TopLevel binds getLclEnv
 	; return (foldr (unionBags . snd) emptyBag prs, env) }
 	-- The top level bindings are flattened into a giant 
 	-- implicitly-mutually-recursive LHsBinds
@@ -157,20 +157,112 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
   	returnM (ip_inst, (IPBind ip' expr'))
 
 ------------------------
-mkEdges :: (Name -> Bool) -> [LHsBind Name]
+tcValBinds :: TopLevelFlag 
+	   -> HsValBinds Name -> TcM thing
+	   -> TcM (HsValBinds TcId, thing) 
+
+tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
+  = tcAddLetBoundTyVars binds  $
+      -- BRING ANY SCOPED TYPE VARIABLES INTO SCOPE
+          -- Notice that they scope over 
+          --       a) the type signatures in the binding group
+          --       b) the bindings in the group
+          --       c) the scope of the binding group (the "in" part)
+ 
+    do 	{   	-- Typecheck the signature
+	  tc_ty_sigs <- recoverM (returnM []) (tcTySigs sigs)
+	; let { prag_fn = mkPragFun sigs
+	      ; sig_fn  = lookupSig tc_ty_sigs
+	      ; sig_ids = map sig_id tc_ty_sigs }
+
+		-- Extend the envt right away with all 
+		-- the Ids declared with type signatures
+  	; (binds', thing) <- tcExtendIdEnv sig_ids $
+			     tc_val_binds top_lvl sig_fn prag_fn 
+					  binds thing_inside
+
+	; return (ValBindsOut binds' sigs, thing) }
+
+------------------------
+tc_val_binds :: TopLevelFlag -> TcSigFun -> TcPragFun
+	     -> [(RecFlag, LHsBinds Name)] -> TcM thing
+	     -> TcM ([(RecFlag, LHsBinds TcId)], thing)
+-- Typecheck a whole lot of value bindings,
+-- one strongly-connected component at a time
+
+tc_val_binds top_lvl sig_fn prag_fn [] thing_inside
+  = do	{ thing <- thing_inside
+	; return ([], thing) }
+
+tc_val_binds top_lvl sig_fn prag_fn (group : groups) thing_inside
+  = do	{ (group', (groups', thing))
+		<- tc_group top_lvl sig_fn prag_fn group $ 
+		   tc_val_binds top_lvl sig_fn prag_fn groups thing_inside
+	; return (group' ++ groups', thing) }
+
+------------------------
+tc_group :: TopLevelFlag -> TcSigFun -> TcPragFun
+	 -> (RecFlag, LHsBinds Name) -> TcM thing
+ 	 -> TcM ([(RecFlag, LHsBinds TcId)], thing)
+
+-- Typecheck one strongly-connected component of the original program.
+-- We get a list of groups back, because there may 
+-- be specialisations etc as well
+
+tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
+  =  	-- A single non-recursive binding
+     	-- We want to keep non-recursive things non-recursive
+        -- so that we desugar unlifted bindings correctly
+    do	{ (binds, thing) <- tcPolyBinds top_lvl NonRecursive NonRecursive
+					sig_fn prag_fn binds thing_inside
+	; return ([(NonRecursive, b) | b <- binds], thing) }
+
+tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
+  =	-- A recursive strongly-connected component
+ 	-- To maximise polymorphism (with -fglasgow-exts), we do a new 
+	-- strongly-connected  component analysis, this time omitting 
+	-- any references to variables with type signatures.
+	--
+	-- Then we bring into scope all the variables with type signatures
+    do	{ traceTc (text "tc_group rec" <+> pprLHsBinds binds)
+	; gla_exts     <- doptM Opt_GlasgowExts
+	; (binds,thing) <- if gla_exts 
+			   then go new_sccs
+			   else tc_binds Recursive binds thing_inside
+	; return ([(Recursive, unionManyBags binds)], thing) }
+		-- Rec them all together
+  where
+    new_sccs :: [SCC (LHsBind Name)]
+    new_sccs = stronglyConnComp (mkEdges sig_fn binds)
+
+--  go :: SCC (LHsBind Name) -> TcM ([LHsBind TcId], thing)
+    go (scc:sccs) = do	{ (binds1, (binds2, thing)) <- go1 scc (go sccs)
+			; return (binds1 ++ binds2, thing) }
+    go [] 	  = do	{ thing <- thing_inside; return ([], thing) }
+
+    go1 (AcyclicSCC bind) = tc_binds NonRecursive (unitBag bind)
+    go1 (CyclicSCC binds) = tc_binds Recursive    (listToBag binds)
+
+    tc_binds rec_tc binds = tcPolyBinds top_lvl Recursive rec_tc sig_fn prag_fn binds
+
+------------------------
+mkEdges :: TcSigFun -> LHsBinds Name
 	-> [(LHsBind Name, BKey, [BKey])]
 
 type BKey  = Int -- Just number off the bindings
 
-mkEdges exclude_fn binds
+mkEdges sig_fn binds
   = [ (bind, key, [fromJust mb_key | n <- nameSetToList (bind_fvs (unLoc bind)),
 				     let mb_key = lookupNameEnv key_map n,
 				     isJust mb_key,
-				     not (exclude_fn n) ])
+				     no_sig n ])
     | (bind, key) <- keyd_binds
     ]
   where
-    keyd_binds = binds `zip` [0::BKey ..]
+    no_sig :: Name -> Bool
+    no_sig n = isNothing (sig_fn n)
+
+    keyd_binds = bagToList binds `zip` [0::BKey ..]
 
     bind_fvs (FunBind _ _ _ fvs) = fvs
     bind_fvs (PatBind _ _ _ fvs) = fvs
@@ -185,103 +277,11 @@ bindersOfHsBind (PatBind pat _ _ _)     = collectPatBinders pat
 bindersOfHsBind (FunBind (L _ f) _ _ _) = [f]
 
 ------------------------
-tcValBinds :: TopLevelFlag 
-	   -> HsValBinds Name -> TcM thing
-	   -> TcM (HsValBinds TcId, thing) 
-
-tcValBinds top_lvl (ValBindsIn binds sigs) thing_inside
-  = tcAddLetBoundTyVars binds  $
-      -- BRING ANY SCOPED TYPE VARIABLES INTO SCOPE
-          -- Notice that they scope over 
-          --       a) the type signatures in the binding group
-          --       b) the bindings in the group
-          --       c) the scope of the binding group (the "in" part)
- 
-    do 	{   	-- Typecheck the signature
-	  tc_ty_sigs <- recoverM (returnM []) (tcTySigs sigs)
-
-    		-- Do the basic strongly-connected component thing
-	; let { sccs :: [SCC (LHsBind Name)]
-	      ; sccs = stronglyConnComp (mkEdges (\n -> False) (bagToList binds))
-	      ; prag_fn = mkPragFun sigs
-	      ; sig_fn  = lookupSig tc_ty_sigs
-	      ; sig_ids = map sig_id tc_ty_sigs }
-
-		-- Extend the envt right away with all 
-		-- the Ids declared with type signatures
-  	; (binds', thing) <- tcExtendIdEnv sig_ids $
-			     tc_val_binds top_lvl sig_fn prag_fn 
-					  sccs thing_inside
-
-	; return (ValBindsOut binds', thing) }
-
-------------------------
-tc_val_binds :: TopLevelFlag -> TcSigFun -> TcPragFun
-	     -> [SCC (LHsBind Name)] -> TcM thing
-	     -> TcM ([(RecFlag, LHsBinds TcId)], thing)
--- Typecheck a whole lot of value bindings,
--- one strongly-connected component at a time
-
-tc_val_binds top_lvl sig_fn prag_fn [] thing_inside
-  = do	{ thing <- thing_inside
-	; return ([], thing) }
-
-tc_val_binds top_lvl sig_fn prag_fn (scc : sccs) thing_inside
-  = do	{ (group', (groups', thing))
-		<- tc_group top_lvl sig_fn prag_fn scc $ 
-		   tc_val_binds top_lvl sig_fn prag_fn sccs thing_inside
-	; return (group' ++ groups', thing) }
-
-------------------------
-tc_group :: TopLevelFlag -> TcSigFun -> TcPragFun
-	 -> SCC (LHsBind Name) -> TcM thing
- 	 -> TcM ([(RecFlag, LHsBinds TcId)], thing)
-
--- Typecheck one strongly-connected component of the original program.
--- We get a list of groups back, because there may 
--- be specialisations etc as well
-
-tc_group top_lvl sig_fn prag_fn scc@(AcyclicSCC bind) thing_inside
-  =  	-- A single non-recursive binding
-     	-- We want to keep non-recursive things non-recursive
-        -- so that we desugar unlifted bindings correctly
-    do	{ (binds, thing) <- tcPolyBinds top_lvl NonRecursive 
-					sig_fn prag_fn scc thing_inside
-	; return ([(NonRecursive, b) | b <- binds], thing) }
-
-tc_group top_lvl sig_fn prag_fn scc@(CyclicSCC binds) thing_inside
-  =	-- A recursive strongly-connected component
- 	-- To maximise polymorphism (with -fglasgow-exts), we do a new 
-	-- strongly-connected  component analysis, this time omitting 
-	-- any references to variables with type signatures.
-	--
-	-- Then we bring into scope all the variables with type signatures
-    do	{ traceTc (text "tc_group rec" <+> vcat [ppr b $$ text "--and--" | b <- binds])
-	; gla_exts     <- doptM Opt_GlasgowExts
-	; (binds,thing) <- if gla_exts 
-			   then go new_sccs
-			   else go1 scc thing_inside
-	; return ([(Recursive, unionManyBags binds)], thing) }
-		-- Rec them all together
-  where
-    new_sccs :: [SCC (LHsBind Name)]
-    new_sccs = stronglyConnComp (mkEdges has_sig binds)
-
---  go :: SCC (LHsBind Name) -> TcM ([LHsBind TcId], thing)
-    go (scc:sccs) = do	{ (binds1, (binds2, thing)) <- go1 scc (go sccs)
-			; return (binds1 ++ binds2, thing) }
-    go [] 	  = do	{ thing <- thing_inside; return ([], thing) }
-
-    go1 scc thing_inside = tcPolyBinds top_lvl Recursive 
-				sig_fn prag_fn scc thing_inside
-
-    has_sig :: Name -> Bool
-    has_sig n = isJust (sig_fn n)
-
-------------------------
-tcPolyBinds :: TopLevelFlag -> RecFlag
+tcPolyBinds :: TopLevelFlag 
+	    -> RecFlag			-- Whether the group is really recursive
+	    -> RecFlag			-- Whether it's recursive for typechecking purposes
 	    -> TcSigFun -> TcPragFun
-	    -> SCC (LHsBind Name)
+	    -> LHsBinds Name
  	    -> TcM thing
 	    -> TcM ([LHsBinds TcId], thing)
 
@@ -295,14 +295,14 @@ tcPolyBinds :: TopLevelFlag -> RecFlag
 -- in which case the dependency order of the resulting bindings is
 -- important.  
 
-tcPolyBinds top_lvl is_rec sig_fn prag_fn scc thing_inside
+tcPolyBinds top_lvl rec_group rec_tc sig_fn prag_fn scc thing_inside
   =	-- NB: polymorphic recursion means that a function
 	-- may use an instance of itself, we must look at the LIE arising
 	-- from the function's own right hand side.  Hence the getLIE
-	-- encloses the tc_poly_binds.
-     do	{ traceTc (text "tcPolyBinds" <+> ppr scc)
+	-- encloses the tc_poly_binds. 
+    do	{ traceTc (text "tcPolyBinds" <+> ppr scc)
 	; ((binds1, poly_ids, thing), lie) <- getLIE $ 
-		do { (binds1, poly_ids) <- tc_poly_binds top_lvl is_rec 
+		do { (binds1, poly_ids) <- tc_poly_binds top_lvl rec_group rec_tc
 							 sig_fn prag_fn scc
 		   ; thing <- tcExtendIdEnv poly_ids thing_inside
 		   ; return (binds1, poly_ids, thing) }
@@ -320,20 +320,20 @@ tcPolyBinds top_lvl is_rec sig_fn prag_fn scc thing_inside
 	 	; return (binds1 ++ [lie_binds], thing) }}
 
 ------------------------
-tc_poly_binds :: TopLevelFlag -> RecFlag
+tc_poly_binds :: TopLevelFlag		-- See comments on tcPolyBinds
+	      -> RecFlag -> RecFlag
 	      -> TcSigFun -> TcPragFun
-	      -> SCC (LHsBind Name)
+	      -> LHsBinds Name
 	      -> TcM ([LHsBinds TcId], [TcId])
 -- Typechecks the bindings themselves
 -- Knows nothing about the scope of the bindings
 
-tc_poly_binds top_lvl is_rec sig_fn prag_fn bind_scc
+tc_poly_binds top_lvl rec_group rec_tc sig_fn prag_fn binds
   = let 
-	non_rec      = case bind_scc of { AcyclicSCC _ -> True; CyclicSCC _ -> False }
-	binds 	     = flattenSCC bind_scc
-        binder_names = collectHsBindBinders (listToBag binds)
+        binder_names = collectHsBindBinders binds
+	bind_list    = bagToList binds
 
-	loc = getLoc (head binds)
+	loc = getLoc (head bind_list)
 		-- TODO: location a bit awkward, but the mbinds have been
 		--	 dependency analysed and may no longer be adjacent
     in
@@ -346,7 +346,7 @@ tc_poly_binds top_lvl is_rec sig_fn prag_fn bind_scc
 
    	-- TYPECHECK THE BINDINGS
   ; ((binds', mono_bind_infos), lie_req) 
-	<- getLIE (tcMonoBinds binds sig_fn non_rec)
+	<- getLIE (tcMonoBinds bind_list sig_fn rec_tc)
 
 	-- CHECK FOR UNLIFTED BINDINGS
 	-- These must be non-recursive etc, and are not generalised
@@ -354,7 +354,7 @@ tc_poly_binds top_lvl is_rec sig_fn prag_fn bind_scc
   ; zonked_mono_tys <- zonkTcTypes (map getMonoType mono_bind_infos)
   ; if any isUnLiftedType zonked_mono_tys then
     do	{ 	-- Unlifted bindings
-	  checkUnliftedBinds top_lvl is_rec binds' mono_bind_infos
+	  checkUnliftedBinds top_lvl rec_group binds' mono_bind_infos
 	; extendLIEs lie_req
 	; let exports  = zipWith mk_export mono_bind_infos zonked_mono_tys
 	      mk_export (name, Nothing,  mono_id) mono_ty = ([], mkLocalId name mono_ty, mono_id, [])
@@ -365,7 +365,7 @@ tc_poly_binds top_lvl is_rec sig_fn prag_fn bind_scc
 		   [poly_id | (_, poly_id, _, _) <- exports]) }	-- Guaranteed zonked
 
     else do	-- The normal lifted case: GENERALISE
-  { is_unres <- isUnRestrictedGroup binds sig_fn
+  { is_unres <- isUnRestrictedGroup bind_list sig_fn
   ; (tyvars_to_gen, dict_binds, dict_ids)
 	<- addErrCtxt (genCtxt (bndrNames mono_bind_infos)) $
 	   generalise top_lvl is_unres mono_bind_infos lie_req
@@ -465,10 +465,10 @@ recoveryCode binder_names sig_fn
 
 checkUnliftedBinds :: TopLevelFlag -> RecFlag
 		   -> LHsBinds TcId -> [MonoBindInfo] -> TcM ()
-checkUnliftedBinds top_lvl is_rec mbind infos
+checkUnliftedBinds top_lvl rec_group mbind infos
   = do 	{ checkTc (isNotTopLevel top_lvl)
 	  	  (unliftedBindErr "Top-level" mbind)
-	; checkTc (isNonRec is_rec)
+	; checkTc (isNonRec rec_group)
 	  	  (unliftedBindErr "Recursive" mbind)
 	; checkTc (isSingletonBag mbind)
 	    	  (unliftedBindErr "Multiple" mbind) 
@@ -492,13 +492,14 @@ The signatures have been dealt with already.
 \begin{code}
 tcMonoBinds :: [LHsBind Name]
 	    -> TcSigFun
-	    -> Bool	-- True <=> either the binders are not mentioned
-			--	    in their RHSs or they have type sigs
+	    -> RecFlag	-- True <=> the binding is recursive for typechecking purposes
+			-- 	    i.e. the binders are mentioned in their RHSs, and
+			--		 we are not resuced by a type signature
 	    -> TcM (LHsBinds TcId, [MonoBindInfo])
 
 tcMonoBinds [L b_loc (FunBind (L nm_loc name) inf matches fvs)]
 	    sig_fn 		-- Single function binding,
-	    True		-- binder isn't mentioned in RHS,
+	    NonRecursive	-- binder isn't mentioned in RHS,
   | Nothing <- sig_fn name	-- ...with no type signature
   = 	-- In this very special case we infer the type of the
 	-- right hand side first (it may have a higher-rank type)

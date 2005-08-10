@@ -100,7 +100,7 @@ mkHsDictLet binds expr
   | isEmptyLHsBinds binds = expr
   | otherwise             = L (getLoc expr) (HsLet (HsValBinds val_binds) expr)
 			  where
-			    val_binds = ValBindsOut [(Recursive, binds)]
+			    val_binds = ValBindsOut [(Recursive, binds)] []
 
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
 -- Used for constructing dictinoary terms etc, so no locations 
@@ -279,8 +279,8 @@ collectLocalBinders (HsIPBinds _)   = []
 collectLocalBinders EmptyLocalBinds = []
 
 collectHsValBinders :: HsValBinds name -> [Located name]
-collectHsValBinders (ValBindsIn binds sigs) = collectHsBindLocatedBinders binds
-collectHsValBinders (ValBindsOut binds)     = foldr collect_one [] binds
+collectHsValBinders (ValBindsIn binds sigs)  = collectHsBindLocatedBinders binds
+collectHsValBinders (ValBindsOut binds sigs) = foldr collect_one [] binds
   where
    collect_one (_,binds) acc = foldrBag (collectAcc . unLoc) acc binds
 
@@ -312,8 +312,8 @@ collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 Get all the pattern type signatures out of a bunch of bindings
 
 \begin{code}
-collectSigTysFromHsBinds :: [LHsBind name] -> [LHsType name]
-collectSigTysFromHsBinds binds = concat (map collectSigTysFromHsBind binds)
+collectSigTysFromHsBinds :: LHsBinds name -> [LHsType name]
+collectSigTysFromHsBinds binds = concatMap collectSigTysFromHsBind (bagToList binds)
 
 collectSigTysFromHsBind :: LHsBind name -> [LHsType name]
 collectSigTysFromHsBind bind

@@ -21,7 +21,6 @@ module RnBinds (
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn
-import HsBinds		( hsSigDoc, eqHsSig )
 import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
@@ -41,9 +40,11 @@ import PrelNames	( isUnboundName )
 import RdrName		( RdrName, rdrNameOcc )
 import SrcLoc		( mkSrcSpan, Located(..), unLoc )
 import ListSetOps	( findDupsEq )
+import BasicTypes	( RecFlag(..) )
+import Digraph		( SCC(..), stronglyConnComp )
 import Bag
 import Outputable
-import Maybes		( orElse )
+import Maybes		( orElse, fromJust, isJust )
 import Monad		( foldM )
 \end{code}
 
@@ -177,7 +178,7 @@ rnTopBindsBoot (ValBindsIn mbinds sigs)
 
 rnTopBindsSrc :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
 rnTopBindsSrc binds@(ValBindsIn mbinds _)
-  = bindPatSigTyVars (collectSigTysFromHsBinds (bagToList mbinds)) $ \ _ -> 
+  = bindPatSigTyVars (collectSigTysFromHsBinds mbinds) $ \ _ -> 
 	-- Hmm; by analogy with Ids, this doesn't look right
 	-- Top-level bound type vars should really scope over 
 	-- everything, but we only scope them over the other bindings
@@ -185,7 +186,7 @@ rnTopBindsSrc binds@(ValBindsIn mbinds _)
     do	{ (binds', dus) <- rnValBinds noTrim binds
 
 		-- Warn about missing signatures, 
-	; let	{ ValBindsIn _ sigs' = binds'
+	; let	{ ValBindsOut _ sigs' = binds'
 		; ty_sig_vars = mkNameSet [ unLoc n | L _ (Sig n _) <- sigs']
 		; un_sigd_bndrs = duDefs dus `minusNameSet` ty_sig_vars }
 
@@ -253,7 +254,7 @@ rnValBindsAndThen binds@(ValBindsIn mbinds sigs) thing_inside
 	-- current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
     bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ bndrs ->
-    bindPatSigTyVarsFV (collectSigTysFromHsBinds (bagToList mbinds))	$ 
+    bindPatSigTyVarsFV (collectSigTysFromHsBinds mbinds)	$ 
 
 	-- Then install local fixity declarations
 	-- Notice that they scope over thing_inside too
@@ -267,12 +268,7 @@ rnValBindsAndThen binds@(ValBindsIn mbinds sigs) thing_inside
 
 	-- Final error checking
     let
-	all_uses     = duUses bind_dus `plusFV` result_fvs
-	unused_bndrs = [ b | b <- bndrs, not (b `elemNameSet` all_uses)]
-    in
-    warnUnusedLocalBinds unused_bndrs	`thenM_`
-
-    returnM (result, delListFromNameSet all_uses bndrs)
+	all_uses = duUses bind_dus `plusFV` result_fvs
 	-- duUses: It's important to return all the uses, not the 'real uses' 
 	-- used for warning about unused bindings.  Otherwise consider:
 	--	x = 3
@@ -280,6 +276,12 @@ rnValBindsAndThen binds@(ValBindsIn mbinds sigs) thing_inside
 	-- If we don't "see" the dependency of 'y' on 'x', we may put the
 	-- bindings in the wrong order, and the type checker will complain
 	-- that x isn't in scope
+
+	unused_bndrs = [ b | b <- bndrs, not (b `elemNameSet` all_uses)]
+    in
+    warnUnusedLocalBinds unused_bndrs	`thenM_`
+
+    returnM (result, delListFromNameSet all_uses bndrs)
   where
     mbinders_w_srclocs = collectHsBindLocatedBinders mbinds
     doc = text "In the binding group for:"
@@ -294,21 +296,46 @@ rnValBinds :: (FreeVars -> FreeVars)
 rnValBinds trim (ValBindsIn mbinds sigs)
   = do	{ sigs' <- rename_sigs sigs
 
-	; let { rn_bind = wrapLocFstM (rnBind sig_fn trim) 
-	      ;	sig_fn = mkSigTvFn sigs' }
+	; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
 
-	; (mbinds', du_bag) <- mapAndUnzipBagM rn_bind mbinds
+	; let (binds', bind_dus) = depAnalBinds binds_w_dus
 
-	; let defs, uses :: NameSet
-	      (defs, uses) = foldrBag plus (emptyNameSet, emptyNameSet) du_bag
-	      plus (ds1,us1) (ds2,us2) = (ds1 `unionNameSets` ds2, 
-					  us1 `unionNameSets` us2)
+	; check_sigs (okBindSig (duDefs bind_dus)) sigs'
 
-	; check_sigs (okBindSig defs) sigs'
+	; return (ValBindsOut binds' sigs', 
+		  usesOnly (hsSigsFVs sigs') `plusDU` bind_dus) }
 
-	; traceRn (text "rnValBind" <+> (ppr defs $$ ppr uses))
-	; return (ValBindsIn mbinds' sigs', 
-		  [(Just defs, uses `plusFV` hsSigsFVs sigs')]) }
+
+---------------------
+depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
+	     -> ([(RecFlag, LHsBinds Name)], DefUses)
+-- Dependency analysis; this is important so that unused-binding
+-- reporting is accurate
+depAnalBinds binds_w_dus
+  = (map get_binds sccs, map get_du sccs)
+  where
+    sccs = stronglyConnComp edges
+
+    keyd_nodes = bagToList binds_w_dus `zip` [0::Int ..]
+
+    edges = [ (node, key, [fromJust mb_key | n <- nameSetToList uses,
+			   let mb_key = lookupNameEnv key_map n,
+			   isJust mb_key ])
+	    | (node@(_,_,uses), key) <- keyd_nodes ]
+
+    key_map :: NameEnv Int	-- Which binding it comes from
+    key_map = mkNameEnv [(bndr, key) | ((_, bndrs, _), key) <- keyd_nodes
+				     , bndr <- bndrs ]
+
+    get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)
+    get_binds (CyclicSCC  binds_w_dus)  = (Recursive, listToBag [b | (b,d,u) <- binds_w_dus])
+
+    get_du (AcyclicSCC (_, bndrs, uses)) = (Just (mkNameSet bndrs), uses)
+    get_du (CyclicSCC  binds_w_dus)      = (Just defs, uses)
+	where
+	  defs = mkNameSet [b | (_,bs,_) <- binds_w_dus, b <- bs]
+	  uses = unionManyNameSets [u | (_,_,u) <- binds_w_dus]
+
 
 ---------------------
 -- Bind the top-level forall'd type variables in the sigs.
@@ -348,31 +375,30 @@ trimWith bndrs = intersectNameSet (mkNameSet bndrs)
 ---------------------
 rnBind :: (Name -> [Name])		-- Signature tyvar function
        -> (FreeVars -> FreeVars)	-- Trimming function for rhs free vars
-       -> HsBind RdrName
-       -> RnM (HsBind Name, (Defs, Uses))
-rnBind sig_fn trim (PatBind pat grhss ty _)
-  = do	{ (pat', pat_fvs) <- rnLPat pat
+       -> LHsBind RdrName
+       -> RnM (LHsBind Name, [Name], Uses)
+rnBind sig_fn trim (L loc (PatBind pat grhss ty _))
+  = setSrcSpan loc $ 
+    do	{ (pat', pat_fvs) <- rnLPat pat
 
 	; let bndrs = collectPatBinders pat'
 
 	; (grhss', fvs) <- bindSigTyVarsFV (concatMap sig_fn bndrs) $
 			   rnGRHSs PatBindRhs grhss
 
-	; return (PatBind pat' grhss' ty (trim fvs),
-		  (mkNameSet bndrs, pat_fvs `plusFV` fvs)) }
+	; return (L loc (PatBind pat' grhss' ty (trim fvs)), bndrs, pat_fvs `plusFV` fvs) }
 
-rnBind sig_fn trim (FunBind name inf matches _)
-  = do	{ new_name <- lookupLocatedBndrRn name
-	; let { plain_name = unLoc new_name
-	      ; bndrs      = unitNameSet plain_name }
+rnBind sig_fn trim (L loc (FunBind name inf matches _))
+  = setSrcSpan loc $ 
+    do	{ new_name <- lookupLocatedBndrRn name
+	; let plain_name = unLoc new_name
 
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 			     rnMatchGroup (FunRhs plain_name) matches
 
 	; checkPrecMatch inf plain_name matches'
 
-	; return (FunBind new_name inf matches' (trim fvs),
-		  (bndrs, fvs))
+	; return (L loc (FunBind new_name inf matches' (trim fvs)), [plain_name], fvs)
       }
 \end{code}
 

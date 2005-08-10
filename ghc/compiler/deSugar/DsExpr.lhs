@@ -83,7 +83,7 @@ dsLocalBinds (HsIPBinds binds)  body = dsIPBinds  binds body
 
 -------------------------
 dsValBinds :: HsValBinds Id -> CoreExpr -> DsM CoreExpr
-dsValBinds (ValBindsOut binds) body = foldrDs ds_val_bind body binds
+dsValBinds (ValBindsOut binds _) body = foldrDs ds_val_bind body binds
 
 -------------------------
 dsIPBinds (IPBinds ip_binds dict_binds) body
@@ -680,7 +680,7 @@ dsMDo tbl stmts body result_ty
 	go (new_bind_stmt : let_stmt : stmts)
       where
         new_bind_stmt = mkBindStmt (mk_tup_pat later_pats) mfix_app
-	let_stmt = LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)]))
+	let_stmt = LetStmt (HsValBinds (ValBindsOut [(Recursive, binds)] []))
 
 	
 		-- Remove the later_ids that appear (without fancy coercions) 

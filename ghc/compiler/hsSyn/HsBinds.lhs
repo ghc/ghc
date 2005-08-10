@@ -20,9 +20,10 @@ import Name		( Name )
 import NameSet		( NameSet, elemNameSet )
 import BasicTypes	( IPName, RecFlag(..), Activation(..), Fixity )
 import Outputable	
-import SrcLoc		( Located(..), unLoc )
+import SrcLoc		( Located(..), SrcSpan, unLoc )
+import Util		( sortLe )
 import Var		( TyVar, DictId, Id )
-import Bag		( Bag, emptyBag, isEmptyBag, bagToList, unionBags )
+import Bag		( Bag, emptyBag, isEmptyBag, bagToList, unionBags, unionManyBags )
 \end{code}
 
 %************************************************************************
@@ -45,9 +46,9 @@ data HsValBinds id	-- Value bindings (not implicit parameters)
 	(LHsBinds id) [LSig id]		-- Not dependency analysed
 					-- Recursive by default
 
-  | ValBindsOut				-- After typechecking
+  | ValBindsOut				-- After renaming
 	[(RecFlag, LHsBinds id)]	-- Dependency analysed
-
+	[LSig Name]
 
 type LHsBinds id  = Bag (LHsBind id)
 type DictBinds id = LHsBinds id		-- Used for dictionary or method bindings
@@ -115,17 +116,32 @@ instance OutputableBndr id => Outputable (HsLocalBinds id) where
 
 instance OutputableBndr id => Outputable (HsValBinds id) where
   ppr (ValBindsIn binds sigs)
-   = vcat [vcat (map ppr sigs),
-	   vcat (map ppr (bagToList binds))
-		--  *not* pprLHsBinds because we don't want braces; 'let' and
-		-- 'where' include a list of HsBindGroups and we don't want
-		-- several groups of bindings each with braces around.
-       ]
-  ppr (ValBindsOut sccs) = vcat (map ppr_scc sccs)
-     where
-       ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
-       pp_rec Recursive    = ptext SLIT("rec")
-       pp_rec NonRecursive = ptext SLIT("nonrec")
+   = pprValBindsForUser binds sigs
+
+  ppr (ValBindsOut sccs sigs) 
+    = getPprStyle $ \ sty ->
+      if debugStyle sty then	-- Print with sccs showing
+	vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
+     else
+	pprValBindsForUser (unionManyBags (map snd sccs)) sigs
+   where
+     ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
+     pp_rec Recursive    = ptext SLIT("rec")
+     pp_rec NonRecursive = ptext SLIT("nonrec")
+
+--  *not* pprLHsBinds because we don't want braces; 'let' and
+-- 'where' include a list of HsBindGroups and we don't want
+-- several groups of bindings each with braces around.
+-- Sort by location before printing
+pprValBindsForUser binds sigs
+  = vcat (map snd (sort_by_loc decls))
+  where
+
+    decls :: [(SrcSpan, SDoc)]
+    decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
+    	    [(loc, ppr bind) | L loc bind <- bagToList binds]
+
+    sort_by_loc decls = sortLe (\(l1,_) (l2,_) -> l1 <= l2) decls
 
 pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
 pprLHsBinds binds 
@@ -142,12 +158,12 @@ isEmptyLocalBinds (HsIPBinds ds)  = isEmptyIPBinds ds
 isEmptyLocalBinds EmptyLocalBinds = True
 
 isEmptyValBinds :: HsValBinds a -> Bool
-isEmptyValBinds (ValBindsIn ds sigs) = isEmptyLHsBinds ds && null sigs
-isEmptyValBinds (ValBindsOut ds)     = null ds
+isEmptyValBinds (ValBindsIn ds sigs)  = isEmptyLHsBinds ds && null sigs
+isEmptyValBinds (ValBindsOut ds sigs) = null ds && null sigs
 
 emptyValBindsIn, emptyValBindsOut :: HsValBinds a
 emptyValBindsIn  = ValBindsIn emptyBag []
-emptyValBindsOut = ValBindsOut []
+emptyValBindsOut = ValBindsOut []      []
 
 emptyLHsBinds :: LHsBinds id
 emptyLHsBinds = emptyBag
@@ -159,8 +175,8 @@ isEmptyLHsBinds = isEmptyBag
 plusHsValBinds :: HsValBinds a -> HsValBinds a -> HsValBinds a
 plusHsValBinds (ValBindsIn ds1 sigs1) (ValBindsIn ds2 sigs2)
   = ValBindsIn (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
-plusHsValBinds (ValBindsOut ds1) (ValBindsOut ds2)
-  = ValBindsOut (ds1 ++ ds2)
+plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
+  = ValBindsOut (ds1 ++ ds2) (sigs1 ++ sigs2)
 \end{code}
 
 What AbsBinds means

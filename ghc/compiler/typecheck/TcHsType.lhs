@@ -55,7 +55,7 @@ import NameEnv
 import PrelNames	( genUnitTyConName )
 import TysWiredIn	( mkListTy, listTyCon, mkPArrTy, parrTyCon, tupleTyCon )
 import Bag		( bagToList )
-import BasicTypes	( Boxity(..) )
+import BasicTypes	( Boxity(..), RecFlag )
 import SrcLoc		( Located(..), unLoc, noLoc, srcSpanStart )
 import UniqSupply	( uniqsFromSupply )
 import Outputable
@@ -762,11 +762,11 @@ tcHsPatSigType ctxt hs_ty
 		; return (tyvars, sig_ty) }
 	}
 
-tcAddLetBoundTyVars :: LHsBinds Name -> TcM a -> TcM a
+tcAddLetBoundTyVars :: [(RecFlag,LHsBinds Name)] -> TcM a -> TcM a
 -- Turgid funciton, used for type variables bound by the patterns of a let binding
 
 tcAddLetBoundTyVars binds thing_inside
-  = go (collectSigTysFromHsBinds (bagToList binds)) thing_inside
+  = go (concatMap (collectSigTysFromHsBinds . snd) binds) thing_inside
   where
     go [] thing_inside = thing_inside
     go (hs_ty:hs_tys) thing_inside

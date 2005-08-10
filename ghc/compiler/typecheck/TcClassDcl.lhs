@@ -60,6 +60,7 @@ import ListSetOps	( equivClassesByUniq, minusList	)
 import SrcLoc		( Located(..), srcSpanStart, unLoc, noLoc )
 import Maybes		( seqMaybe, isJust, mapCatMaybes )
 import List		( partition )
+import BasicTypes	( RecFlag(..) )
 import Bag
 import FastString
 \end{code}
@@ -356,7 +357,7 @@ tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
     tcExtendTyVarEnv inst_tyvars (
 	addErrCtxt (methodCtxt sel_id)			$
 	getLIE 						$
-	tcMonoBinds [meth_bind] lookup_sig True
+	tcMonoBinds [meth_bind] lookup_sig Recursive
     )					`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
 
 	-- Now do context reduction.   We simplify wrt both the local tyvars

@@ -278,9 +278,9 @@ zonkLocalBinds env (HsIPBinds (IPBinds binds dict_binds))
 zonkValBinds :: ZonkEnv -> HsValBinds TcId -> TcM (ZonkEnv, HsValBinds Id)
 zonkValBinds env bs@(ValBindsIn _ _) 
   = panic "zonkValBinds"	-- Not in typechecker output
-zonkValBinds env (ValBindsOut binds) 
+zonkValBinds env (ValBindsOut binds sigs) 
   = do 	{ (env1, new_binds) <- go env binds
-	; return (env1, ValBindsOut new_binds) }
+	; return (env1, ValBindsOut new_binds sigs) }
   where
     go env []         = return (env, [])
     go env ((r,b):bs) = do { (env1, b')  <- zonkRecMonoBinds env b
