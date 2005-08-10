@@ -18,7 +18,7 @@ test('read011', normal, compile, [''])
 # test('read012', normal, compile, [''])
 # test('read013', normal, compile, [''])
 
-test('read014', normal, compile, ['-Wall'])
+test('read014', normal, compile, ['-Wall -fno-warn-orphans'])
 test('read015', normal, compile, [''])
 test('read016', normal, compile, [''])
 test('read017', normal, compile, [''])

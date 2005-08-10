@@ -24,5 +24,3 @@ read014.hs:6:0:
 	     In the instance declaration for `Num (a, b)'
 
 read014.hs:8:52: Warning: Defined but not used: `x'
-Warning: orphan instances: instance GHC.Num.Num [(,)] = $f1
-
