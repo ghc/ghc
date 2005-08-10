@@ -411,18 +411,21 @@ get_used_lits qs = remove_dups' all_literals
 get_used_lits' :: [(EqnNo, EquationInfo)] -> [HsLit]
 get_used_lits' [] = []
 get_used_lits' (q:qs) 
-  | LitPat lit     <- first_pat = lit : get_used_lits qs
-  | NPat lit _ _ _ <- first_pat = over_lit_lit lit : get_used_lits qs
-  | otherwise		        = get_used_lits qs
-  where
-    first_pat = firstPatN q
+  | Just lit <- get_lit (firstPatN q) = lit : get_used_lits' qs
+  | otherwise		              = get_used_lits qs
 
-over_lit_lit :: HsOverLit id -> HsLit
+get_lit :: Pat id -> Maybe HsLit 
 -- Get a representative HsLit to stand for the OverLit
 -- It doesn't matter which one, because they will only be compared
 -- with other HsLits gotten in the same way
-over_lit_lit (HsIntegral i   _) = HsIntPrim   i
-over_lit_lit (HsFractional f _) = HsFloatPrim f
+get_lit (LitPat lit)			 = Just lit
+get_lit (NPat (HsIntegral i   _) mb _ _) = Just (HsIntPrim   (mb_neg mb i))
+get_lit (NPat (HsFractional f _) mb _ _) = Just (HsFloatPrim (mb_neg mb f))
+get_lit other_pat			 = Nothing
+
+mb_neg :: Num a => Maybe b -> a -> a
+mb_neg Nothing  v = v
+mb_neg (Just _) v = -v
 
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = unused_cons
@@ -482,10 +485,10 @@ is_var_con con (ConPatOut (L _ id) _ _ _ _ _) | id == con = True
 is_var_con con _                                    = False
 
 is_var_lit :: HsLit -> Pat Id -> Bool
-is_var_lit lit (WildPat _)	 = True
-is_var_lit lit (LitPat lit')     = lit == lit'
-is_var_lit lit (NPat lit' _ _ _) = lit == over_lit_lit lit'
-is_var_lit lit _                 = False
+is_var_lit lit (WildPat _)   = True
+is_var_lit lit pat 
+  | Just lit' <- get_lit pat = lit == lit'
+  | otherwise		     = False
 \end{code}
 
 The difference beteewn @make_con@ and @make_whole_con@ is that
