@@ -11,7 +11,7 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 import CoreSyn
 import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, exprIsValue )
+import CoreUtils	( exprType, exprIsHNF )
 import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,
 			  setIdWorkerInfo, setInlinePragma,
@@ -244,7 +244,7 @@ tryWW is_rec fn_id rhs
 				     StrictSig (mkTopDmdType wrap_dmds res_info)
 
     is_fun    = notNull wrap_dmds
-    is_thunk  = not is_fun && not (exprIsValue rhs)
+    is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
 splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs

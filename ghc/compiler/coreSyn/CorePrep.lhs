@@ -10,7 +10,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import CoreUtils( exprType, exprIsValue, etaExpand, exprArity, exprOkForSpeculation )
+import CoreUtils( exprType, exprIsHNF, etaExpand, exprArity, exprOkForSpeculation )
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
@@ -544,7 +544,7 @@ maybeSaturate fn expr n_args floats ty
 	-- Ensure that the argument of DataToTagOp is evaluated
     eval_data2tag_arg :: CoreExpr -> UniqSM (Floats, CoreExpr)
     eval_data2tag_arg app@(fun `App` arg)
-	| exprIsValue arg		-- Includes nullary constructors
+	| exprIsHNF arg		-- Includes nullary constructors
 	= returnUs (emptyFloats, app)	-- The arg is evaluated
 	| otherwise			-- Arg not evaluated, so evaluate it
 	= newVar (exprType arg)		`thenUs` \ arg_id ->
@@ -573,7 +573,7 @@ floatRhs :: TopLevelFlag -> RecFlag
 		    CoreExpr)	-- Final Rhs
 
 floatRhs top_lvl is_rec bndr (floats, rhs)
-  | isTopLevel top_lvl || exprIsValue rhs,	-- Float to expose value or 
+  | isTopLevel top_lvl || exprIsHNF rhs,	-- Float to expose value or 
     allLazy top_lvl is_rec floats 		-- at top level
   = 	-- Why the test for allLazy? 
 	--	v = f (x `divInt#` y)
@@ -606,7 +606,7 @@ mkLocalNonRec bndr dem floats rhs
  = let		-- Don't make a case for a value binding,
 		-- even if it's strict.  Otherwise we get
 		-- 	case (\x -> e) of ...!
-	float | exprIsValue rhs = FloatLet (NonRec bndr rhs)
+	float | exprIsHNF rhs = FloatLet (NonRec bndr rhs)
 	      | otherwise	= FloatCase bndr rhs (exprOkForSpeculation rhs)
     in
     returnUs (addFloat floats float, evald_bndr)
@@ -614,7 +614,7 @@ mkLocalNonRec bndr dem floats rhs
   | otherwise
   = floatRhs NotTopLevel NonRecursive bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
     returnUs (addFloat floats' (FloatLet (NonRec bndr rhs')),
-	      if exprIsValue rhs' then evald_bndr else bndr)
+	      if exprIsHNF rhs' then evald_bndr else bndr)
 
   where
     evald_bndr = bndr `setIdUnfolding` evaldUnfolding

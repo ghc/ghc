@@ -43,7 +43,7 @@ import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkOtherCon, mkUnfolding, evaldUnfolding, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
-			  exprType, exprIsValue, 
+			  exprType, exprIsHNF, 
 			  exprOkForSpeculation, exprArity, 
 			  mkCoerce, mkCoerce2, mkSCC, mkInlineMe, applyTypeToArg
 			)
@@ -524,24 +524,24 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
     if isEmptyFloats floats && isNilOL aux_binds then	-- Shortcut a common case
 	completeLazyBind env1 top_lvl bndr bndr2 rhs2
 
-    else if is_top_level || exprIsTrivial rhs2 || exprIsValue rhs2 then
+    else if is_top_level || exprIsTrivial rhs2 || exprIsHNF rhs2 then
 	-- 	WARNING: long dodgy argument coming up
 	--	WANTED: a better way to do this
 	--		
-	-- We can't use "exprIsCheap" instead of exprIsValue, 
+	-- We can't use "exprIsCheap" instead of exprIsHNF, 
 	-- because that causes a strictness bug.
 	--     	   x = let y* = E in case (scc y) of { T -> F; F -> T}
 	-- The case expression is 'cheap', but it's wrong to transform to
 	-- 	   y* = E; x = case (scc y) of {...}
  	-- Either we must be careful not to float demanded non-values, or
-	-- we must use exprIsValue for the test, which ensures that the
-	-- thing is non-strict.  So exprIsValue => bindings are non-strict
+	-- we must use exprIsHNF for the test, which ensures that the
+	-- thing is non-strict.  So exprIsHNF => bindings are non-strict
 	-- I think.  The WARN below tests for this.
 	--
 	-- We use exprIsTrivial here because we want to reveal lone variables.  
 	-- E.g.  let { x = letrec { y = E } in y } in ...
 	-- Here we definitely want to float the y=E defn. 
-	-- exprIsValue definitely isn't right for that.
+	-- exprIsHNF definitely isn't right for that.
 	--
 	-- Again, the floated binding can't be strict; if it's recursive it'll
 	-- be non-strict; if it's non-recursive it'd be inlined.

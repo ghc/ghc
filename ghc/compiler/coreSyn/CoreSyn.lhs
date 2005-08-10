@@ -55,7 +55,6 @@ import OccName		( OccName )
 import Literal	        ( Literal, mkMachInt )
 import DataCon		( DataCon, dataConWorkId, dataConTag )
 import BasicTypes	( Activation )
-import VarSet
 import FastString
 import Outputable
 \end{code}
@@ -254,7 +253,7 @@ data Unfolding
   | CoreUnfolding			-- An unfolding with redundant cached information
 		CoreExpr		-- Template; binder-info is correct
 		Bool			-- True <=> top level binding
-		Bool			-- exprIsValue template (cached); it is ok to discard a `seq` on
+		Bool			-- exprIsHNF template (cached); it is ok to discard a `seq` on
 					--	this variable
 		Bool			-- True <=> doesn't waste (much) work to expand inside an inlining
 					-- 	Basically it's exprIsCheap

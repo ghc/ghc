@@ -38,7 +38,7 @@ import DynFlags		( DynFlags, DynFlag(..), dopt )
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseExpr )
-import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
+import CoreUtils	( exprIsHNF, exprIsCheap, exprIsTrivial )
 import Id		( Id, idType, isId,
 			  idUnfolding, globalIdDetails
 			)
@@ -72,7 +72,7 @@ mkUnfolding top_lvl expr
   = CoreUnfolding (occurAnalyseExpr expr)
 		  top_lvl
 
-		  (exprIsValue expr)
+		  (exprIsHNF expr)
 			-- Already evaluated
 
 		  (exprIsCheap expr)

@@ -18,7 +18,7 @@ import StaticFlags	( opt_MaxWorkerArgs )
 import NewDemand	-- All of it
 import CoreSyn
 import PprCore	
-import CoreUtils	( exprIsValue, exprIsTrivial, exprArity )
+import CoreUtils	( exprIsHNF, exprIsTrivial, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlinePragma,
@@ -593,7 +593,7 @@ mk_sig_ty never_inline thunk_cpr_ok rhs (DmdType fv dmds res)
     res' = case res of
 		RetCPR | ignore_cpr_info -> TopRes
 		other	 		 -> res
-    ignore_cpr_info = not (exprIsValue rhs || thunk_cpr_ok)
+    ignore_cpr_info = not (exprIsHNF rhs || thunk_cpr_ok)
 \end{code}
 
 The unpack strategy determines whether we'll *really* unpack the argument,

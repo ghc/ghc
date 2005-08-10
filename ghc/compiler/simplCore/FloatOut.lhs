@@ -11,7 +11,7 @@ module FloatOut ( floatOutwards ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( mkSCC, exprIsValue, exprIsTrivial )
+import CoreUtils	( mkSCC, exprIsHNF, exprIsTrivial )
 
 import DynFlags	( DynFlags, DynFlag(..), FloatOutSwitches(..) )
 import ErrUtils		( dumpIfSet_dyn )
@@ -243,7 +243,7 @@ floatNonRecRhs lvl arg	-- Used for nested non-rec rhss, and fn args
 	--	bindings just after the '='.  And some of them might (correctly)
 	--	be strict even though the 'let f' is lazy, because f, being a value,
 	--	gets its demand-info zapped by the simplifier.
-    if exprIsValue arg' || exprIsTrivial arg' then
+    if exprIsHNF arg' || exprIsTrivial arg' then
 	(fsa, floats, arg')
     else
     case (partitionByMajorLevel lvl floats) of { (floats', heres) ->

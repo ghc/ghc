@@ -18,7 +18,7 @@ module FloatIn ( floatInwards ) where
 
 import DynFlags	( DynFlags, DynFlag(..) )
 import CoreSyn
-import CoreUtils	( exprIsValue, exprIsDupable )
+import CoreUtils	( exprIsHNF, exprIsDupable )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
 import Id		( isOneShotBndr )
@@ -355,7 +355,7 @@ noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 	-- boxing constructor into it, else we box it every time which is very bad
 	-- news indeed.
 
-noFloatIntoRhs rhs = exprIsValue (deAnnotate' rhs)	-- We'd just float right back out again...
+noFloatIntoRhs rhs = exprIsHNF (deAnnotate' rhs)	-- We'd just float right back out again...
 
 is_one_shot b = isId b && isOneShotBndr b
 \end{code}

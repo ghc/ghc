@@ -14,7 +14,7 @@ module CprAnalyse ( cprAnalyse ) where
 import DynFlags	( DynFlags, DynFlag(..) )
 import CoreLint		( showPass, endPass )
 import CoreSyn
-import CoreUtils	( exprIsValue )
+import CoreUtils	( exprIsHNF )
 import Id               ( Id, setIdCprInfo, idCprInfo, idArity,
 			  isBottomingId, idDemandInfo, isImplicitId )
 import IdInfo           ( CprInfo(..) )
@@ -273,7 +273,7 @@ addIdCprInfo bndr rhs absval
                   Fun _ -> idArity bndr >= n_fun_tys absval
 		      -- Enough visible lambdas
 
-		  Tuple  -> exprIsValue rhs || isStrict (idDemandInfo bndr)
+		  Tuple  -> exprIsHNF rhs || isStrict (idDemandInfo bndr)
 			-- If the rhs is a value, and returns a constructed product,
 			-- it will be inlined at usage sites, so we give it a Tuple absval
 			-- If it isn't a value, we won't inline it (code/work dup worries), so

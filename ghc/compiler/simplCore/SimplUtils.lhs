@@ -32,7 +32,7 @@ import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
-			  findDefault, exprOkForSpeculation, exprIsValue
+			  findDefault, exprOkForSpeculation, exprIsHNF
 			)
 import Id		( idType, isDataConWorkId, idOccInfo, isDictId, idArity,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
@@ -607,7 +607,7 @@ preInlineUnconditionally env top_lvl bndr rhs
 
 	-- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
 	-- so substituting rhs inside a lambda doesn't change the occ info.
-	-- Sadly, not quite the same as exprIsValue.
+	-- Sadly, not quite the same as exprIsHNF.
     canInlineInLam (Var x)  		= occ_info_ok (idOccInfo x)
     canInlineInLam (Lit l)		= True
     canInlineInLam (Type ty)		= True
@@ -796,9 +796,9 @@ tryEtaReduce bndrs body
 
     ok_fun fun =  exprIsTrivial fun
 	       && not (any (`elemVarSet` (exprFreeVars fun)) bndrs)
-	       && (exprIsValue fun || all ok_lam bndrs)
+	       && (exprIsHNF fun || all ok_lam bndrs)
     ok_lam v = isTyVar v || isDictId v
-	-- The exprIsValue is because eta reduction is not 
+	-- The exprIsHNF is because eta reduction is not 
 	-- valid in general:  \x. bot  /=  bot
 	-- So we need to be sure that the "fun" is a value.
 	--
@@ -1471,7 +1471,7 @@ mkCase1 scrut case_bndr ty [(con,bndrs,rhs)]
 		--	x
 		-- This particular example shows up in default methods for
 		-- comparision operations (e.g. in (>=) for Int.Int32)
-	|| exprIsValue scrut			-- It's already evaluated
+	|| exprIsHNF scrut			-- It's already evaluated
 	|| var_demanded_later scrut		-- It'll be demanded later
 
 --      || not opt_SimplPedanticBottoms)	-- Or we don't care!

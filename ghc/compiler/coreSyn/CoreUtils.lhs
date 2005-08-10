@@ -16,7 +16,7 @@ module CoreUtils (
 	-- Properties of expressions
 	exprType, coreAltType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, 
-	exprIsValue,exprOkForSpeculation, exprIsBig, 
+	exprIsHNF,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, exprIsBottom,
 	rhsIsStatic,
 
@@ -557,7 +557,7 @@ idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 \end{code}
 
-@exprIsValue@ returns true for expressions that are certainly *already* 
+@exprIsHNF@ returns true for expressions that are certainly *already* 
 evaluated to *head* normal form.  This is used to decide whether it's ok 
 to change
 
@@ -581,8 +581,8 @@ this form is illegal (see the invariants in CoreSyn).  Args of unboxed
 type must be ok-for-speculation (or trivial).
 
 \begin{code}
-exprIsValue :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
-exprIsValue (Var v) 	-- NB: There are no value args at this point
+exprIsHNF :: CoreExpr -> Bool		-- True => Value-lambda, constructor, PAP
+exprIsHNF (Var v) 	-- NB: There are no value args at this point
   =  isDataConWorkId v 	-- Catches nullary constructors, 
 			--	so that [] and () are values, for example
   || idArity v > 0 	-- Catches (e.g.) primops that don't have unfoldings
@@ -591,14 +591,14 @@ exprIsValue (Var v) 	-- NB: There are no value args at this point
 	-- A worry: what if an Id's unfolding is just itself: 
 	-- then we could get an infinite loop...
 
-exprIsValue (Lit l)	     = True
-exprIsValue (Type ty)	     = True	-- Types are honorary Values; 
+exprIsHNF (Lit l)	     = True
+exprIsHNF (Type ty)	     = True	-- Types are honorary Values; 
 					-- we don't mind copying them
-exprIsValue (Lam b e)  	     = isRuntimeVar b || exprIsValue e
-exprIsValue (Note _ e) 	     = exprIsValue e
-exprIsValue (App e (Type _)) = exprIsValue e
-exprIsValue (App e a)        = app_is_value e [a]
-exprIsValue other	     = False
+exprIsHNF (Lam b e)  	     = isRuntimeVar b || exprIsHNF e
+exprIsHNF (Note _ e) 	     = exprIsHNF e
+exprIsHNF (App e (Type _)) = exprIsHNF e
+exprIsHNF (App e a)        = app_is_value e [a]
+exprIsHNF other	     = False
 
 -- There is at least one value argument
 app_is_value (Var fun) args
@@ -1212,7 +1212,7 @@ rhsIsStatic :: HomeModules -> CoreExpr -> Bool
 --	t = /\a. (:) (case w a of ...) (Nil a)	FALSE (redex)
 --
 --
--- This is a bit like CoreUtils.exprIsValue, with the following differences:
+-- This is a bit like CoreUtils.exprIsHNF, with the following differences:
 --    a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
 --
 --    b) (C x xs), where C is a contructors is updatable if the application is
