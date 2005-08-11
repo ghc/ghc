@@ -1,5 +1,5 @@
 
 gadt10.hs:6:23:
     `RInt' is not applied to enough type arguments
-    Expected kind `?', but `RInt' has kind `k_abO -> *'
+    Expected kind `?', but `RInt' has kind `k -> *'
     In the data type declaration for `RInt'
