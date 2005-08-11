@@ -1,6 +1,5 @@
 
 tcfail132.hs:21:35:
     Kind mis-match
-    Expected kind `k_acI -> k_acM -> k_acQ -> *',
-    but `Object f' f t' has kind `k_acI -> k_acM -> *'
+    Expected kind `k -> k1 -> k2 -> *', but `Object f' f t' has kind `k -> k1 -> *'
     In the type synonym declaration for `LiftObject'

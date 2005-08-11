@@ -1,5 +1,5 @@
 
 tcfail028.hs:4:15:
     `A a' is not applied to enough type arguments
-    Expected kind `?', but `A a' has kind `k_abR -> *'
+    Expected kind `?', but `A a' has kind `k -> *'
     In the data type declaration for `A'

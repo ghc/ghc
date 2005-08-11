@@ -41,6 +41,7 @@ test('tcrun032', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun033', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun034', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun035', only_compiler_types(['ghc']), compile_and_run, [''])
+test('tcrun036', only_compiler_types(['ghc']), compile_and_run, [''])
 
 test('church', normal, compile_and_run, [''])
 test('testeq2', normal, compile_and_run, [''])

@@ -1,6 +1,6 @@
 
 tcfail135.hs:6:22:
     `f' is not applied to enough type arguments
-    Expected kind `?', but `f' has kind `k_abV -> *'
+    Expected kind `?', but `f' has kind `k -> *'
     In the type `f a -> f'
     In the class declaration for `Foo'
