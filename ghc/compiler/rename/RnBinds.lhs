@@ -300,6 +300,8 @@ rnValBinds trim (ValBindsIn mbinds sigs)
 
 	; let (binds', bind_dus) = depAnalBinds binds_w_dus
 
+	-- We do the check-sigs after renaming the bindings,
+	-- so that we have convenient access to the binders
 	; check_sigs (okBindSig (duDefs bind_dus)) sigs'
 
 	; return (ValBindsOut binds' sigs', 
@@ -309,8 +311,8 @@ rnValBinds trim (ValBindsIn mbinds sigs)
 ---------------------
 depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
 	     -> ([(RecFlag, LHsBinds Name)], DefUses)
--- Dependency analysis; this is important so that unused-binding
--- reporting is accurate
+-- Dependency analysis; this is important so that 
+-- unused-binding reporting is accurate
 depAnalBinds binds_w_dus
   = (map get_binds sccs, map get_du sccs)
   where
@@ -499,11 +501,10 @@ check_sigs :: (LSig Name -> Bool) -> [LSig Name] -> RnM ()
 check_sigs ok_sig sigs 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-  = do	{ mappM_ unknownSigErr sigs'
-	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs') }
+  = do	{ mappM_ unknownSigErr (filter bad sigs)
+	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs) }
   where
 	-- Don't complain about an unbound name again
-    sigs' = filter bad sigs
     bad sig = not (ok_sig sig) && 
 	      case sigName sig of
 		Just n | isUnboundName n -> False
