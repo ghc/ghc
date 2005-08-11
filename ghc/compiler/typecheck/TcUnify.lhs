@@ -41,7 +41,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  pprType, tidySkolemTyVar, isSkolemTyVar )
+			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar )
 import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
 			  openTypeKind, liftedTypeKind, mkArrowKind, 
 			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
@@ -1336,6 +1336,9 @@ checkExpectedKind ty act_kind exp_kind
         (act_as, _) = splitKindFunTys act_kind
 	n_exp_as = length exp_as
 	n_act_as = length act_as
+	
+	(env1, tidy_exp_kind) = tidyKind emptyTidyEnv exp_kind
+	(env2, tidy_act_kind) = tidyKind env1	      act_kind
 
 	err | n_exp_as < n_act_as	-- E.g. [Maybe]
 	    = quotes (ppr ty) <+> ptext SLIT("is not applied to enough type arguments")
@@ -1354,11 +1357,11 @@ checkExpectedKind ty act_kind exp_kind
 	    = ptext SLIT("Kind mis-match")
 
 	more_info = sep [ ptext SLIT("Expected kind") <+> 
-				quotes (pprKind exp_kind) <> comma,
+				quotes (pprKind tidy_exp_kind) <> comma,
 		   	  ptext SLIT("but") <+> quotes (ppr ty) <+> 
-			  	ptext SLIT("has kind") <+> quotes (pprKind act_kind)]
+			  	ptext SLIT("has kind") <+> quotes (pprKind tidy_act_kind)]
    in
-   failWithTc (err $$ more_info)
+   failWithTcM (env2, err $$ more_info)
    }
 \end{code}
 

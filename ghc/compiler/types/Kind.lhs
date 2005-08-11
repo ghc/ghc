@@ -4,7 +4,7 @@
 
 \begin{code}
 module Kind (
-	Kind(..), KindVar(..), SimpleKind,
+	Kind(..), SimpleKind, 
 	openTypeKind, liftedTypeKind, unliftedTypeKind, 
 	argTypeKind, ubxTupleKind,
 
@@ -13,7 +13,10 @@ module Kind (
 	mkArrowKind, mkArrowKinds,
 
         isSubKind, defaultKind, 
-	kindFunResult, splitKindFunTys, mkKindVar,
+	kindFunResult, splitKindFunTys, 
+
+	KindVar, mkKindVar, kindVarRef, kindVarUniq, 
+	kindVarOcc, setKindVarOcc,
 
 	pprKind, pprParendKind
      ) where
@@ -21,6 +24,7 @@ module Kind (
 #include "HsVersions.h"
 
 import Unique	( Unique )
+import OccName  ( OccName, mkOccName, tvName )
 import Outputable
 import DATA_IOREF
 \end{code}
@@ -59,7 +63,7 @@ data Kind
   | KindVar KindVar
   deriving( Eq )
 
-data KindVar = KVar Unique (IORef (Maybe SimpleKind))
+data KindVar = KVar Unique OccName (IORef (Maybe SimpleKind))
   -- INVARIANT: a KindVar can only be instantiated by a SimpleKind
 
 type SimpleKind = Kind	
@@ -67,10 +71,26 @@ type SimpleKind = Kind
   -- sk ::= * | sk1 -> sk2 | kvar
 
 instance Eq KindVar where
-  (KVar u1 _) == (KVar u2 _) = u1 == u2
+  (KVar u1 _ _) == (KVar u2 _ _) = u1 == u2
 
 mkKindVar :: Unique -> IORef (Maybe Kind) -> KindVar
-mkKindVar = KVar
+mkKindVar u r = KVar u kind_var_occ r
+
+kindVarRef :: KindVar -> IORef (Maybe Kind)
+kindVarRef (KVar _ _ ref) = ref
+
+kindVarUniq :: KindVar -> Unique
+kindVarUniq (KVar uniq _ _) = uniq
+
+kindVarOcc :: KindVar -> OccName
+kindVarOcc (KVar _ occ _) = occ
+
+setKindVarOcc :: KindVar -> OccName -> KindVar
+setKindVarOcc (KVar u _ r) occ = KVar u occ r
+
+kind_var_occ :: OccName	-- Just one for all KindVars
+			-- They may be jiggled by tidying
+kind_var_occ = mkOccName tvName "k"
 \end{code}
 
 Kind inference
@@ -188,7 +208,7 @@ defaultKind kind	 = kind
 
 \begin{code}
 instance Outputable KindVar where
-  ppr (KVar uniq _) = text "k_" <> ppr uniq
+  ppr (KVar uniq occ _) = ppr occ <> ifPprDebug (ppr uniq)
 
 instance Outputable Kind where
   ppr k = pprKind k
@@ -204,7 +224,5 @@ pprKind OpenTypeKind     = ptext SLIT("?")
 pprKind ArgTypeKind      = ptext SLIT("??")
 pprKind UbxTupleKind     = ptext SLIT("(#)")
 pprKind (FunKind k1 k2)  = sep [ pprParendKind k1, arrow <+> pprKind k2]
+
 \end{code}
-
-
-

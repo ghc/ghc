@@ -54,6 +54,7 @@ module Type (
 	tidyTyVarBndr, tidyFreeTyVars,
 	tidyOpenTyVar, tidyOpenTyVars,
 	tidyTopType,   tidyPred,
+	tidyKind,
 
 	-- Comparison
 	coreEqType, tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
@@ -87,7 +88,7 @@ import TypeRep
 
 -- friends:
 import Kind
-import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
+import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName, mkTyVar )
 import VarEnv
 import VarSet
 
@@ -748,6 +749,43 @@ tidyTopType :: Type -> Type
 tidyTopType ty = tidyType emptyTidyEnv ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Tidying Kinds
+%*									*
+%************************************************************************
+
+We use a grevious hack for tidying KindVars.  A TidyEnv contains
+a (VarEnv Var) substitution, to express the renaming; but
+KindVars are not Vars.  The Right Thing ultimately is to make them
+into Vars (and perhaps make Kinds into Types), but I just do a hack
+here: I make up a TyVar just to remember the new OccName for the
+renamed KindVar
+
+\begin{code}
+tidyKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
+tidyKind env@(tidy_env, subst) (KindVar kvar)
+  | Just tv <- lookupVarEnv_Directly subst uniq
+  = (env, KindVar (setKindVarOcc kvar (getOccName tv)))
+  | otherwise
+  = ((tidy', subst'), KindVar kvar')
+  where
+    uniq = kindVarUniq kvar
+    (tidy', occ') = tidyOccName tidy_env (kindVarOcc kvar)
+    kvar'   = setKindVarOcc kvar occ'
+    fake_tv = mkTyVar tv_name (panic "tidyKind:fake tv kind")
+    tv_name = mkInternalName uniq occ' noSrcLoc
+    subst'  = extendVarEnv subst fake_tv fake_tv
+
+tidyKind env (FunKind k1 k2) 
+  = (env2, FunKind k1' k2')
+  where
+    (env1, k1') = tidyKind env  k1
+    (env2, k2') = tidyKind env1 k2
+
+tidyKind env k = (env, k)	-- Atomic kinds
+\end{code}
 
 
 %************************************************************************

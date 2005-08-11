@@ -105,7 +105,7 @@ module TcType (
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars, tidySkolemTyVar,
-  typeKind, 
+  typeKind, tidyKind,
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 
@@ -138,7 +138,7 @@ import Type		(	-- Re-exports
 			  tidyTopType, tidyType, tidyPred, tidyTypes,
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
-			  tidyOpenTyVars, 
+			  tidyOpenTyVars, tidyKind,
 			  isSubKind, deShadowTy,
 
 			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 

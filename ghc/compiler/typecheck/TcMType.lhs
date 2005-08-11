@@ -63,7 +63,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tyVarsOfPred, getClassPredTys_maybe,
 			  tyVarsOfType, tyVarsOfTypes, 
 			  pprPred, pprTheta, pprClassPred )
-import Kind		( Kind(..), KindVar(..), mkKindVar, isSubKind,
+import Kind		( Kind(..), KindVar, kindVarRef, mkKindVar, isSubKind,
 			  isLiftedTypeKind, isArgTypeKind, isOpenTypeKind,
 			  liftedTypeKind, defaultKind
 			)
@@ -589,8 +589,8 @@ zonkTyVar unbound_var_fn rflag tyvar
 \begin{code}
 readKindVar  :: KindVar -> TcM (Maybe TcKind)
 writeKindVar :: KindVar -> TcKind -> TcM ()
-readKindVar  (KVar _ ref)     = readMutVar ref
-writeKindVar (KVar _ ref) val = writeMutVar ref (Just val)
+readKindVar  kv = readMutVar (kindVarRef kv)
+writeKindVar kv val = writeMutVar (kindVarRef kv) (Just val)
 
 -------------
 zonkTcKind :: TcKind -> TcM TcKind
