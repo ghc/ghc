@@ -174,7 +174,7 @@ rnTopBindsBoot :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
 rnTopBindsBoot (ValBindsIn mbinds sigs)
   = do	{ checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
 	; sigs' <- renameSigs okHsBootSig sigs
-	; return (ValBindsOut emptyLHsBinds sigs', usesOnly (hsSigsFVs sigs')) }
+	; return (ValBindsOut [] sigs', usesOnly (hsSigsFVs sigs')) }
 
 rnTopBindsSrc :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
 rnTopBindsSrc binds@(ValBindsIn mbinds _)
