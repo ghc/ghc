@@ -230,14 +230,13 @@ stgMassageForProfiling pdeps mod_name us stg_binds
 -}
 
     do_rhs (StgRhsClosure _ bi fv u srt args expr)
-      = slurpSCCs currentCCS expr		`thenMM` \ (expr', ccs) ->
-	do_expr expr'				`thenMM` \ expr'' ->
+      = slurpSCCs currentCCS expr	`thenMM` \ (expr', ccs) ->
+	do_expr expr'			`thenMM` \ expr'' ->
 	returnMM (StgRhsClosure ccs bi fv u srt args expr'')
       where
 	slurpSCCs ccs (StgSCC cc e) 
 	     = collectCC cc 			`thenMM_`
-	       slurpSCCs ccs e			`thenMM` \ (e', ccs')  ->
-	       returnMM (e', pushCCOnCCS cc ccs')
+	       slurpSCCs (cc `pushCCOnCCS` ccs) e
 	slurpSCCs ccs e 
 	     = returnMM (e, ccs)
 
