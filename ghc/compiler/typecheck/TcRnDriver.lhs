@@ -121,7 +121,7 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName,
 import HscTypes		( InteractiveContext(..),
 			  ModIface(..), icPrintUnqual,
 			  Dependencies(..) )
-import BasicTypes	( Fixity )
+import BasicTypes	( Fixity, RecFlag(..) )
 import SrcLoc		( unLoc )
 #endif
 
@@ -952,7 +952,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 	; let fresh_it  = itName uniq
 	      the_bind  = L loc $ FunBind (L loc fresh_it) False matches emptyNameSet
 	      matches   = mkMatchGroup [mkMatch [] expr emptyLocalBinds]
-	      let_stmt  = L loc $ LetStmt (HsValBinds (ValBindsIn (unitBag the_bind) []))
+	      let_stmt  = L loc $ LetStmt (HsValBinds (ValBindsOut [(NonRecursive,unitBag the_bind)] []))
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))

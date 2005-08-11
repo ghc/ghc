@@ -20,7 +20,7 @@ import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 			  LSig, Match(..), IPBind(..), Prag(..),
 			  HsType(..), LHsType, HsExplicitForAll(..), hsLTyVarNames, 
 			  isVanillaLSig, sigName, placeHolderNames, isPragLSig,
-			  LPat, GRHSs, MatchGroup(..), isEmptyLHsBinds, pprLHsBinds,
+			  LPat, GRHSs, MatchGroup(..), pprLHsBinds,
 			  collectHsBindBinders, collectPatBinders, pprPatBind
 			)
 import TcHsSyn		( zonkId, (<$>) )
@@ -113,8 +113,8 @@ tcTopBinds binds
 tcHsBootSigs :: HsValBinds Name -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
 -- signatures in it.  The renamer checked all this
-tcHsBootSigs (ValBindsIn binds sigs)
-  = do	{ checkTc (isEmptyLHsBinds binds) badBootDeclErr
+tcHsBootSigs (ValBindsOut binds sigs)
+  = do	{ checkTc (null binds) badBootDeclErr
 	; mapM (addLocM tc_boot_sig) (filter isVanillaLSig sigs) }
   where
     tc_boot_sig (Sig (L _ name) ty)

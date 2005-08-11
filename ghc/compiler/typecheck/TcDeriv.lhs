@@ -209,7 +209,7 @@ tcDeriving  :: [LTyClDecl Name]	-- All type constructors
 		    HsValBinds Name)	-- Extra generated top-level bindings
 
 tcDeriving tycl_decls
-  = recoverM (returnM ([], emptyValBindsIn)) $
+  = recoverM (returnM ([], emptyValBindsOut)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
 	  overlap_flag <- getOverlapFlag
@@ -227,7 +227,7 @@ tcDeriving tycl_decls
 	-- don't generate any derived bindings
 	; is_boot <- tcIsHsBoot
 	; if is_boot then
-		return (inst_info, emptyValBindsIn)
+		return (inst_info, emptyValBindsOut)
 	  else do
 	{
 
