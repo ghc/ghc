@@ -54,7 +54,7 @@ import Maybe	  ( catMaybes )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique, getKey, Uniquable(..) )
 import BasicTypes ( isBoxed ) 
 import Outputable
-import Bag	  ( bagToList )
+import Bag	  ( bagToList, unionManyBags )
 import FastString ( unpackFS )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
 
@@ -697,8 +697,8 @@ repBinds (HsValBinds decs)
 
 rep_val_binds :: HsValBinds Name -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are alrady in the meta-env
-rep_val_binds (ValBindsIn binds sigs)
- = do { core1 <- rep_binds' binds
+rep_val_binds (ValBindsOut binds sigs)
+ = do { core1 <- rep_binds' (unionManyBags (map snd binds))
       ;	core2 <- rep_sigs' sigs
       ;	return (core1 ++ core2) }
 
