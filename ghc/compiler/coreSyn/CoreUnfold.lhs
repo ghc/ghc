@@ -23,7 +23,7 @@ module CoreUnfold (
 	hasUnfolding, hasSomeUnfolding, neverUnfold,
 
 	couldBeSmallEnoughToInline, 
-	certainlyWillInline, 
+	certainlyWillInline, smallEnoughToInline,
 
 	callSiteInline
     ) where
@@ -460,6 +460,12 @@ certainlyWillInline (CoreUnfolding _ _ _ is_cheap (UnfoldIfGoodArgs n_vals _ siz
   = is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
 certainlyWillInline other
   = False
+
+smallEnoughToInline :: Unfolding -> Bool
+smallEnoughToInline (CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ _ size _))
+  = size <= opt_UF_UseThreshold
+smallEnoughToInline other
+  = False
 \end{code}
 
 %************************************************************************
@@ -520,7 +526,7 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 	  | otherwise = case occ of
 				IAmDead		     -> pprTrace "callSiteInline: dead" (ppr id) False
 				IAmALoopBreaker      -> False
-				OneOcc in_lam _ _    -> (not in_lam || is_cheap) && consider_safe True
+				--OneOcc in_lam _ _    -> (not in_lam || is_cheap) && consider_safe True
 				other		     -> is_cheap && consider_safe False
 		-- we consider even the once-in-one-branch
 		-- occurrences, because they won't all have been
@@ -551,7 +557,7 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 
 		  where
 		    some_benefit = or arg_infos || really_interesting_cont || 
-		    		   (not is_top && (once || (n_vals_wanted > 0 && enough_args)))
+		    		   (not is_top && ({- once || -} (n_vals_wanted > 0 && enough_args)))
 				-- [was (once && not in_lam)]
 		-- If it occurs more than once, there must be
 		-- something interesting about some argument, or the

@@ -30,10 +30,11 @@ import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
 			  
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial,
+import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, exprIsCheap,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsHNF
 			)
+import CoreUnfold	( smallEnoughToInline )
 import Id		( idType, isDataConWorkId, idOccInfo, isDictId, idArity,
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
@@ -593,9 +594,18 @@ preInlineUnconditionally env top_lvl bndr rhs
     prag = idInlinePragma bndr
 
     try_once in_lam int_cxt	-- There's one textual occurrence
-	= not in_lam && (isNotTopLevel top_lvl || early_phase)
-	|| (canInlineInLam rhs && int_cxt)
-	--
+	| not in_lam = isNotTopLevel top_lvl || early_phase
+	| otherwise  = int_cxt && canInlineInLam rhs
+
+-- Be very careful before inlining inside a lambda, becuase (a) we must not 
+-- invalidate occurrence information, and (b) we want to avoid pushing a
+-- single allocation (here) into multiple allocations (inside lambda).  
+-- Inlining a *function* with a single *saturated* call would be ok, mind you.
+--	|| (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
+--	where 
+--	 	is_cheap = exprIsCheap rhs
+--		ok = is_cheap && int_cxt
+
 	-- 	int_cxt		The context isn't totally boring
 	-- E.g. let f = \ab.BIG in \y. map f xs
 	-- 	Don't want to substitute for f, because then we allocate
@@ -608,17 +618,10 @@ preInlineUnconditionally env top_lvl bndr rhs
 	-- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
 	-- so substituting rhs inside a lambda doesn't change the occ info.
 	-- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Var x)  		= occ_info_ok (idOccInfo x)
     canInlineInLam (Lit l)		= True
-    canInlineInLam (Type ty)		= True
     canInlineInLam (Lam b e)		= isRuntimeVar b || canInlineInLam e
-    canInlineInLam (App e (Type _)) 	= canInlineInLam e
     canInlineInLam (Note _ e)		= canInlineInLam e
     canInlineInLam _			= False
-
-    occ_info_ok (OneOcc in_lam _ _) = in_lam
-    occ_info_ok NoOccInfo	    = True
-    occ_info_ok _		    = False
 
     early_phase = case phase of
 			SimplPhase 0 -> False
@@ -669,13 +672,54 @@ our new view that inlining is like a RULE, so I'm sticking to the 'active'
 story for now.
 
 \begin{code}
-postInlineUnconditionally :: SimplEnv -> OutId -> OccInfo -> OutExpr -> Bool
-postInlineUnconditionally env bndr occ_info rhs
+postInlineUnconditionally :: SimplEnv -> TopLevelFlag -> OutId -> OccInfo -> OutExpr -> Unfolding -> Bool
+postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | not active		   = False
   | isLoopBreaker occ_info = False
   | isExportedId bndr      = False
   | exprIsTrivial rhs 	   = True
-  | otherwise		   = False
+  | otherwise
+  = case occ_info of
+      OneOcc in_lam one_br int_cxt
+	->     (one_br || smallEnoughToInline unfolding)	-- Small enough to dup
+			-- ToDo: consider discount on smallEnoughToInline if int_cxt is true
+			--
+		 	-- NB: Do we want to inline arbitrarily big things becuase
+			-- one_br is True? that can lead to inline cascades.  But
+			-- preInlineUnconditionlly has dealt with all the common cases
+			-- so perhaps it's worth the risk. Here's an example
+			--	let f = if b then Left (\x.BIG) else Right (\y.BIG)
+			--	in \y. ....f....
+			-- We can't preInlineUnconditionally because that woud invalidate
+			-- the occ info for b.  Yet f is used just once, and duplicating
+			-- the case work is fine (exprIsCheap).
+
+	   &&  ((isNotTopLevel top_lvl && not in_lam) || 
+			-- But outside a lambda, we want to be reasonably aggressive
+			-- about inlining into multiple branches of case
+			-- e.g. let x = <non-value> 
+			--	in case y of { C1 -> ..x..; C2 -> ..x..; C3 -> ... } 
+			-- Inlining can be a big win if C3 is the hot-spot, even if
+			-- the uses in C1, C2 are not 'interesting'
+			-- An example that gets worse if you add int_cxt here is 'clausify'
+
+		(isCheapUnfolding unfolding && int_cxt))
+			-- isCheap => acceptable work duplication; in_lam may be true
+			-- int_cxt to prevent us inlining inside a lambda without some 
+			-- good reason.  See the notes on int_cxt in preInlineUnconditionally
+
+      other -> False
+	-- The point here is that for *non-values* that occur
+	-- outside a lambda, the call-site inliner won't have
+	-- a chance (becuase it doesn't know that the thing
+	-- only occurs once).   The pre-inliner won't have gotten
+	-- it either, if the thing occurs in more than one branch
+	-- So the main target is things like
+	--	let x = f y in
+	--	case v of
+	--	   True  -> case x of ...
+	--	   False -> case x of ...
+	-- I'm not sure how important this is in practice
   where
     active = case getMode env of
 		   SimplGently  -> isAlwaysActive prag

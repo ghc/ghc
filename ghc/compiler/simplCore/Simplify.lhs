@@ -615,7 +615,7 @@ completeLazyBind :: SimplEnv
 --     (as usual) use the in-scope-env from the floats
 
 completeLazyBind env top_lvl old_bndr new_bndr new_rhs
-  | postInlineUnconditionally env new_bndr occ_info new_rhs
+  | postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs unfolding
   = 		-- Drop the binding
     tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
     returnSmpl (emptyFloats env, extendIdSubst env old_bndr (DoneEx new_rhs))
