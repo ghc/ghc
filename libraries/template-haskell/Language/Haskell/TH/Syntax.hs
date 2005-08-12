@@ -146,7 +146,7 @@ reify v = Q (qReify v)
 currentModule :: Q String
 currentModule = Q qCurrentModule
 
--- |The 'runIO' function lest you run an I\/O computation in the 'Q' monad.
+-- |The 'runIO' function lets you run an I\/O computation in the 'Q' monad.
 -- Take care: you are guaranteed the ordering of calls to 'runIO' within 
 -- a single 'Q' computation, but not about the order in which splices are run.  
 --
