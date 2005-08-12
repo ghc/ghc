@@ -45,6 +45,7 @@ import Digraph		( SCC(..), stronglyConnComp )
 import Bag
 import Outputable
 import Maybes		( orElse, fromJust, isJust )
+import Util		( filterOut )
 import Monad		( foldM )
 \end{code}
 
@@ -501,14 +502,14 @@ check_sigs :: (LSig Name -> Bool) -> [LSig Name] -> RnM ()
 check_sigs ok_sig sigs 
 	-- Check for (a) duplicate signatures
 	--	     (b) signatures for things not in this group
-  = do	{ mappM_ unknownSigErr (filter bad sigs)
-	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs) }
+  = do	{ mappM_ unknownSigErr (filter (not . ok_sig) sigs')
+	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs') }
   where
 	-- Don't complain about an unbound name again
-    bad sig = not (ok_sig sig) && 
-	      case sigName sig of
-		Just n | isUnboundName n -> False
-		other			 -> True
+    sigs' = filterOut bad_name sigs
+    bad_name sig = case sigName sig of
+			Just n -> isUnboundName n
+			other  -> False
 
 -- We use lookupLocatedSigOccRn in the signatures, which is a little bit unsatisfactory
 -- because this won't work for:
