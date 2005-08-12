@@ -208,34 +208,40 @@ Compare two equal-length strings for equality:
 \begin{code}
 eqStrPrefix :: Addr# -> ByteArray# -> Int# -> Bool
 eqStrPrefix a# barr# len# = 
-  unsafePerformIO $ do
+  inlinePerformIO $ do
    x <- memcmp_ba a# barr# (I# len#)
    return (x == 0)
 
 #ifdef UNUSED
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
 eqCharStrPrefix a1# a2# len# = 
-  unsafePerformIO $ do
+  inlinePerformIO $ do
    x <- memcmp a1# a2# (I# len#)
    return (x == 0)
 #endif
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
-  unsafePerformIO $ do
+  inlinePerformIO $ do
     x <- memcmp_baoff_ba b2# (I# start#) b1# (I# len#)
     return (x == 0)
 
 #ifdef UNUSED
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
 eqCharStrPrefixBA a# b2# start# len# = 
-  unsafePerformIO $ do
+  inlinePerformIO $ do
     x <- memcmp_baoff b2# (I# start#) a# (I# len#) 
     return (x == 0)
 #endif
 \end{code}
 
 \begin{code}
+-- Just like unsafePerformIO, but we inline it.  This is safe when
+-- there are no side effects, and improves performance.
+{-# INLINE inlinePerformIO #-}
+inlinePerformIO :: IO a -> a
+inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
+
 #if __GLASGOW_HASKELL__ <= 408
 strLength (Ptr a#) = ghc_strlen a#
 foreign import ccall unsafe "ghc_strlen" 
