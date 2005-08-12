@@ -450,17 +450,20 @@ idAppIsCheap id n_val_args
   | n_val_args == 0 = True	-- Just a type application of
 				-- a variable (f t1 t2 t3)
 				-- counts as WHNF
-  | otherwise = case globalIdDetails id of
-		  DataConWorkId _ -> True			
-		  RecordSelId _ _ -> True	-- I'm experimenting with making record selection
-		  ClassOpId _     -> True	-- look cheap, so we will substitute it inside a
-						-- lambda.  Particularly for dictionary field selection
+  | otherwise 
+  = case globalIdDetails id of
+	DataConWorkId _ -> True
+	RecordSelId _ _ -> n_val_args == 1 	-- I'm experimenting with making record selection
+	ClassOpId _     -> n_val_args == 1 	-- look cheap, so we will substitute it inside a
+						-- lambda.  Particularly for dictionary field selection.
+		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
+		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
 
-		  PrimOpId op   -> primOpIsCheap op	-- In principle we should worry about primops
-		 					-- that return a type variable, since the result
-							-- might be applied to something, but I'm not going
-							-- to bother to check the number of args
-		  other	      -> n_val_args < idArity id
+	PrimOpId op   -> primOpIsCheap op	-- In principle we should worry about primops
+						-- that return a type variable, since the result
+						-- might be applied to something, but I'm not going
+						-- to bother to check the number of args
+	other	      -> n_val_args < idArity id
 \end{code}
 
 exprOkForSpeculation returns True of an expression that it is
