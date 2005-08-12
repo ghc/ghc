@@ -85,7 +85,7 @@ import IOExts		( hPutBufBAFull )
 import IO
 import Char             ( chr, ord )
 
-#define hASH_TBL_SIZE 993
+#define hASH_TBL_SIZE  4091
 \end{code} 
 
 @FastString@s are packed representations of strings
@@ -287,12 +287,12 @@ mkFastSubStringBA# barr# start# len# =
           updTbl string_table ft h [f_str]     >>
           -- _trace ("new(b): " ++ show f_str)   $
 	  return f_str
-    ls -> 
+    ls ->
        -- non-empty `bucket', scan the list looking
        -- entry with same length and compare byte by byte. 
        -- _trace ("non-empty bucket(b)"++show ls) $
        case bucket_match ls start# len# barr# of
-	 Nothing -> 
+	 Nothing ->
           case copySubStrBA (BA barr#) (I# start#) (I# len#) of
             BA ba# ->  
               let f_str = FastString uid# len# ba# in
@@ -319,7 +319,7 @@ mkFastStringUnicode s =
  unsafePerformIO  (
   readIORef string_table	>>= \ ft@(FastStringTable uid# tbl#) ->
   let
-   h = hashUnicode s
+   h = hashUnicode s 0#
   in
 --  _trace ("hashed(b): "++show (I# h)) $
   lookupTbl ft h		>>= \ lookup_result ->
@@ -381,49 +381,25 @@ mkFastSubString a# (I# start#) (I# len#) =
 \begin{code}
 hashStr  :: Addr# -> Int# -> Int#
  -- use the Addr to produce a hash value between 0 & m (inclusive)
-hashStr a# len# =
-  case len# of
-   0# -> 0#
-   1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
-   2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
-   _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-  where
-    c0 = indexCharOffAddr# a# 0#
-    c1 = indexCharOffAddr# a# (len# `quotInt#` 2# -# 1#)
-    c2 = indexCharOffAddr# a# (len# -# 1#)
-{-
-    c1 = indexCharOffAddr# a# 1#
-    c2 = indexCharOffAddr# a# 2#
--}
+hashStr a# len# = loop 0# 0#
+   where 
+    loop h n | n ==# len# = h
+	     | otherwise  = loop h2 (n +# 1#)
+	  where c = ord# (indexCharOffAddr# a# n)
+		h2 = (c +# (h *# 128#)) `remInt#` hASH_TBL_SIZE#
 
 hashSubStrBA  :: ByteArray# -> Int# -> Int# -> Int#
  -- use the byte array to produce a hash value between 0 & m (inclusive)
-hashSubStrBA ba# start# len# =
-  case len# of
-   0# -> 0#
-   1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
-   2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
-   _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-  where
-    c0 = indexCharArray# ba# (start# +# 0#)
-    c1 = indexCharArray# ba# (start# +# (len# `quotInt#` 2# -# 1#))
-    c2 = indexCharArray# ba# (start# +# (len# -# 1#))
+hashSubStrBA ba# start# len# = loop 0# 0#
+   where 
+    loop h n | n ==# len# = h
+	     | otherwise  = loop h2 (n +# 1#)
+	  where c = ord# (indexCharArray# ba# (start# +# n))
+		h2 = (c +# (h *# 128#)) `remInt#` hASH_TBL_SIZE#
 
---    c1 = indexCharArray# ba# 1#
---    c2 = indexCharArray# ba# 2#
-
-hashUnicode :: [Int] -> Int#
- -- use the Addr to produce a hash value between 0 & m (inclusive)
-hashUnicode [] = 0#
-hashUnicode [I# c0] = ((c0 *# 631#) +# 1#) `remInt#` hASH_TBL_SIZE#
-hashUnicode [I# c0, I# c1] = ((c0 *# 631#) +# (c1 *# 217#) +# 2#) `remInt#` hASH_TBL_SIZE#
-hashUnicode s = ((c0 *# 631#) +# (c1 *# 217#) +# (c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-  where
-    I# len# = length s
-    I# c0 = s !! 0
-    I# c1 = s !! (I# (len# `quotInt#` 2# -# 1#))
-    I# c2 = s !! (I# (len# -# 1#))
-
+hashUnicode :: [Int] -> Int# -> Int#
+hashUnicode [] h = h
+hashUnicode (I# c : cs) h = hashUnicode cs ((ord# c + (h *# 128)) `remInt#` hASH_TBL_SIZE#)
 \end{code}
 
 \begin{code}
