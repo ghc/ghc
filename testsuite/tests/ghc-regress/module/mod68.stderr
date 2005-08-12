@@ -1,5 +1,5 @@
 
-mod68.hs:3:0:
+mod68.hs:4:0:
     Duplicate type signature:
-      mod68.hs:3:0-15: f :: Int -> Bool
       mod68.hs:4:0-15: f :: Int -> Bool
+      mod68.hs:3:0-15: f :: Int -> Bool
