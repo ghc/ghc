@@ -399,7 +399,7 @@ hashSubStrBA ba# start# len# = loop 0# 0#
 
 hashUnicode :: [Int] -> Int# -> Int#
 hashUnicode [] h = h
-hashUnicode (I# c : cs) h = hashUnicode cs ((ord# c + (h *# 128)) `remInt#` hASH_TBL_SIZE#)
+hashUnicode (I# c : cs) h = hashUnicode cs ((c +# (h *# 128#)) `remInt#` hASH_TBL_SIZE#)
 \end{code}
 
 \begin{code}
