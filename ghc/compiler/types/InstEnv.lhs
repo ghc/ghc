@@ -8,7 +8,7 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module InstEnv (
 	DFunId, OverlapFlag(..),
-	Instance(..), pprInstance, pprInstances, 
+	Instance(..), pprInstance, pprInstanceHdr, pprInstances, 
 	instanceHead, mkLocalInstance, mkImportedInstance,
 	instanceDFunId, setInstanceDFunId, instanceRoughTcs,
 
@@ -153,9 +153,15 @@ instance Outputable Instance where
 pprInstance :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
 pprInstance ispec@(Instance { is_flag = flag })
-  = hang (ptext SLIT("instance") <+> ppr flag
-	  <+> sep [pprThetaArrow theta, pprClassPred clas tys])
+  = hang (pprInstanceHdr ispec)
 	2 (ptext SLIT("--") <+> (pprDefnLoc (getSrcLoc ispec)))
+
+-- * pprInstanceHdr is used in VStudio to populate the ClassView tree
+pprInstanceHdr :: Instance -> SDoc
+-- Prints the Instance as an instance declaration
+pprInstanceHdr ispec@(Instance { is_flag = flag })
+  = ptext SLIT("instance") <+> ppr flag
+    <+> sep [pprThetaArrow theta, pprClassPred clas tys]
   where
     (_, theta, clas, tys) = instanceHead ispec
 	-- Print without the for-all, which the programmer doesn't write

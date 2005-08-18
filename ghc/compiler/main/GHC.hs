@@ -120,7 +120,7 @@ module GHC (
 
 	-- ** Instances
 	Instance, 
-	instanceDFunId, pprInstance,
+	instanceDFunId, pprInstance, pprInstanceHdr,
 
 	-- ** Types and Kinds
 	Type, dropForAlls, splitForAllTys, funResultTy, pprParendType,
@@ -204,7 +204,7 @@ import Name		( Name, nameModule, NamedThing(..), nameParent_maybe,
 			  nameSrcLoc )
 import OccName		( parenSymOcc )
 import NameEnv		( nameEnvElts )
-import InstEnv		( Instance, instanceDFunId, pprInstance )
+import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
 import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
