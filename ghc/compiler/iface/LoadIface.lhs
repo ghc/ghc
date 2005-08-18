@@ -206,7 +206,7 @@ loadInterface doc_str mod from
 		| otherwise ->
 
 	let 
-	    loc_doc = text file_path <+> colon
+	    loc_doc = text file_path
 	in 
 	initIfaceLcl mod loc_doc $ do
 

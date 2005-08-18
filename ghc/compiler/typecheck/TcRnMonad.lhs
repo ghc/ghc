@@ -931,7 +931,7 @@ failIfM :: Message -> IfL a
 -- We use IfL here so that we can get context info out of the local env
 failIfM msg
   = do 	{ env <- getLclEnv
-	; let full_msg = if_loc env $$ nest 2 msg
+	; let full_msg = (if_loc env <> colon) $$ nest 2 msg
 	; ioToIOEnv (printErrs (full_msg defaultErrStyle))
 	; failM }
 
@@ -971,7 +971,8 @@ forkM :: SDoc -> IfL a -> IfL a
 forkM doc thing_inside
  = do	{ mb_res <- forkM_maybe doc thing_inside
 	; return (case mb_res of 
-			Nothing -> pprPanic "forkM" doc
+			Nothing -> pgmError "Cannot continue after interface file error"
+				   -- pprPanic "forkM" doc
 			Just r  -> r) }
 \end{code}
 
