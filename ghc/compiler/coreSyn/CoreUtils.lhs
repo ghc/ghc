@@ -46,7 +46,10 @@ import Var		( Var )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName )
-import Packages		( isDllName, HomeModules )
+import Packages		( HomeModules )
+#if mingw32_TARGET_OS
+import Packages		( isDllName )
+#endif
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
@@ -66,7 +69,6 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy
 			)
 import TyCon		( tyConArity )
--- gaw 2004
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
 import BasicTypes	( Arity )
@@ -754,6 +756,27 @@ consider
 This should diverge!  But if we eta-expand, it won't.   Again, we ignore this
 "problem", because being scrupulous would lose an important transformation for
 many programs.
+
+
+4. Newtypes
+
+Non-recursive newtypes are transparent, and should not get in the way.
+We do (currently) eta-expand recursive newtypes too.  So if we have, say
+
+	newtype T = MkT ([T] -> Int)
+
+Suppose we have
+	e = coerce T f
+where f has arity 1.  Then: etaExpandArity e = 1; 
+that is, etaExpandArity looks through the coerce.
+
+When we eta-expand e to arity 1: eta_expand 1 e T
+we want to get: 		 coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
+
+HOWEVER, note that if you use coerce bogusly you can ge
+	coerce Int negate
+And since negate has arity 2, you might try to eta expand.  But you can't
+decopose Int to a function type.   Hence the final case in eta_expand.
 -}
 
 
@@ -946,7 +969,13 @@ eta_expand n us expr ty
 
     	case splitRecNewType_maybe ty of {
  	  Just ty' -> mkCoerce2 ty ty' (eta_expand n us (mkCoerce2 ty' ty expr) ty') ;
- 	  Nothing  -> pprTrace "Bad eta expand" (ppr n $$ ppr expr $$ ppr ty) expr
+ 	  Nothing  -> 
+
+	-- We have an expression of arity > 0, but its type isn't a function
+	-- This *can* legitmately happen: e.g. 	coerce Int (\x. x)
+	-- Essentially the programmer is playing fast and loose with types
+	-- (Happy does this a lot).  So we simply decline to eta-expand.
+	expr
     	}}}
 \end{code}
 

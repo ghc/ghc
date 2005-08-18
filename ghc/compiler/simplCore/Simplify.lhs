@@ -40,7 +40,7 @@ import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon )
 import TyCon		( tyConArity )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
-import CoreUnfold	( mkOtherCon, mkUnfolding, evaldUnfolding, callSiteInline )
+import CoreUnfold	( mkUnfolding, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsHNF, 
@@ -60,7 +60,6 @@ import BasicTypes	( TopLevelFlag(..), isTopLevel,
 			  RecFlag(..), isNonRec
 			)
 import OrdList
-import Maybe		( Maybe )
 import Maybes		( orElse )
 import Outputable
 import Util             ( notNull )
@@ -844,6 +843,11 @@ mkLamBndrZapper fun n_args
 \begin{code}
 simplNote env (Coerce to from) body cont
   = let
+	addCoerce s1 k1 cont 	-- Drop redundant coerces.  This can happen if a polymoprhic
+				-- (coerce a b e) is instantiated with a=ty1 b=ty2 and the
+				-- two are the same. This happens a lot in Happy-generated parsers
+	  | s1 `coreEqType` k1 = cont
+
 	addCoerce s1 k1 (CoerceIt t1 cont)
 		-- 	coerce T1 S1 (coerce S1 K1 e)
 		-- ==>
@@ -854,9 +858,9 @@ simplNote env (Coerce to from) body cont
 		-- we may find 	(coerce T (coerce S (\x.e))) y
 		-- and we'd like it to simplify to e[y/x] in one round 
 		-- of simplification
-	  | t1 `coreEqType` k1  = cont	 	-- The coerces cancel out
-	  | otherwise       = CoerceIt t1 cont	-- They don't cancel, but 
-						-- the inner one is redundant
+	  | t1 `coreEqType` k1  = cont		 	-- The coerces cancel out
+	  | otherwise           = CoerceIt t1 cont	-- They don't cancel, but 
+							-- the inner one is redundant
 
 	addCoerce t1t2 s1s2 (ApplyTo dup arg arg_se cont)
 	  | not (isTypeArg arg),	-- This whole case only works for value args
