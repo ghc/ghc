@@ -907,6 +907,7 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
+  ,  ( "fno-code",	NoArg (setTarget HscNothing))
   ,  ( "fasm",		AnySuffix (\_ -> setTarget HscAsm) )
   ,  ( "fvia-c",	NoArg (setTarget HscC) )
   ,  ( "fvia-C",	NoArg (setTarget HscC) )
