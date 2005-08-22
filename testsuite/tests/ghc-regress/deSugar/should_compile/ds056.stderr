@@ -1,0 +1,4 @@
+
+ds056.hs:6:0:
+    Warning: Pattern match(es) are overlapped
+	     In the definition of `g': g _ = ...
