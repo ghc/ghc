@@ -189,19 +189,26 @@ There are several cases:
 
 \begin{code}
 
-check' :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat], EqnSet)  
+check' :: [(EqnNo, EquationInfo)] 
+	-> ([ExhaustivePat], 	-- Pattern scheme that might not be matched at all
+	    EqnSet)  		-- Eqns that are used (others are overlapped)
+
 check' [] = ([([],[])],emptyUniqSet)
 
-check' [(n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult CanFail _ })] 
-   | all_vars ps  = ([(takeList ps (repeat nlWildPat),[])],  unitUniqSet n)
+check' ((n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult can_fail _ }) : rs) 
+   | first_eqn_all_vars && case can_fail of { CantFail -> True; CanFail -> False }
+   = ([], unitUniqSet n)	-- One eqn, which can't fail
 
-check' ((n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult CanFail _}) : rs)
-   | all_vars ps  = (pats,  addOneToUniqSet indexs n)
+   | first_eqn_all_vars && null rs	-- One eqn, but it can fail
+   = ([(takeList ps (repeat nlWildPat),[])], unitUniqSet n)
+
+   | first_eqn_all_vars		-- Several eqns, first can fail
+   = (pats, addOneToUniqSet indexs n)
   where
+    first_eqn_all_vars = all_vars ps
     (pats,indexs) = check' rs
 
-check' qs@((n, EqnInfo { eqn_pats = ps }) : _) 
-   | all_vars ps  = ([],  unitUniqSet n)
+check' qs
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
@@ -580,7 +587,31 @@ constraints.
 \begin{code}
 
 simplify_eqn :: EquationInfo -> EquationInfo
-simplify_eqn eqn = eqn { eqn_pats = map simplify_pat (eqn_pats eqn) }
+simplify_eqn eqn = eqn { eqn_pats = map simplify_pat (eqn_pats eqn), 
+		         eqn_rhs  = simplify_rhs (eqn_rhs eqn) }
+  where
+	-- Horrible hack.  The simplify_pat stuff converts NPlusK pats to WildPats
+	-- which of course loses the info that they can fail to match.  So we 
+	-- stick in a CanFail as if it were a guard.
+	-- The Right Thing to do is for the whole system to treat NPlusK pats properly
+    simplify_rhs (MatchResult can_fail body)
+	| any has_nplusk_pat (eqn_pats eqn) = MatchResult CanFail body
+	| otherwise			    = MatchResult can_fail body
+
+has_nplusk_lpat :: LPat Id -> Bool
+has_nplusk_lpat (L _ p) = has_nplusk_pat p
+
+has_nplusk_pat :: Pat Id -> Bool
+has_nplusk_pat (NPlusKPat _ _ _ _) 	 = True
+has_nplusk_pat (ParPat p)  	   	 = has_nplusk_lpat p
+has_nplusk_pat (AsPat _ p) 	   	 = has_nplusk_lpat p
+has_nplusk_pat (SigPatOut p _ )    	 = has_nplusk_lpat p
+has_nplusk_pat (ConPatOut _ _ _ _ ps ty) = any has_nplusk_lpat (hsConArgs ps)
+has_nplusk_pat (ListPat ps _)  		 = any has_nplusk_lpat ps
+has_nplusk_pat (TuplePat ps _) 		 = any has_nplusk_lpat ps
+has_nplusk_pat (PArrPat ps _)  		 = any has_nplusk_lpat ps
+has_nplusk_pat (LazyPat p)     		 = False
+has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat, DictPat
 
 simplify_lpat :: LPat Id -> LPat Id  
 simplify_lpat p = fmap simplify_pat p
