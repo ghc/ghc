@@ -707,12 +707,6 @@ run_thread:
     cap = myCapability();
 #endif
 
-    // We have run some Haskell code: there might be blackhole-blocked
-    // threads to wake up now.
-    if ( blackhole_queue != END_TSO_QUEUE ) {
-	blackholes_need_checking = rtsTrue;
-    }
-
     cap->r.rInHaskell = rtsFalse;
 
     // The TSO might have moved, eg. if it re-entered the RTS and a GC
@@ -731,6 +725,12 @@ run_thread:
 #endif
     
     ACQUIRE_LOCK(&sched_mutex);
+
+    // We have run some Haskell code: there might be blackhole-blocked
+    // threads to wake up now.
+    if ( blackhole_queue != END_TSO_QUEUE ) {
+	blackholes_need_checking = rtsTrue;
+    }
     
 #if defined(RTS_SUPPORTS_THREADS)
     IF_DEBUG(scheduler,debugBelch("sched (task %p): ", osThreadId()););
@@ -2315,6 +2315,8 @@ createThread(nat size)
     StgTSO *tso;
     nat stack_size;
 
+    ACQUIRE_LOCK(&sched_mutex);
+
     /* First check whether we should create a thread at all */
 #if defined(PARALLEL_HASKELL)
   /* check that no more than RtsFlags.ParFlags.maxThreads threads are created */
@@ -2322,6 +2324,7 @@ createThread(nat size)
     threadsIgnored++;
     debugBelch("{createThread}Daq ghuH: refusing to create another thread; no more than %d threads allowed (currently %d)\n",
 	  RtsFlags.ParFlags.maxThreads, advisory_thread_count);
+    RELEASE_LOCK(&sched_mutex);
     return END_TSO_QUEUE;
   }
   threadsCreated++;
@@ -2472,6 +2475,7 @@ createThread(nat size)
   IF_DEBUG(scheduler,sched_belch("created thread %ld, stack size = %lx words", 
 				 (long)tso->id, (long)tso->stack_size));
 #endif    
+  RELEASE_LOCK(&sched_mutex);
   return tso;
 }
 

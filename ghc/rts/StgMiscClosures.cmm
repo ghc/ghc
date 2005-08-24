@@ -341,6 +341,10 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     /* Actually this is not necessary because R1 is about to be destroyed. */
     LDV_ENTER(R1);
 
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+#endif
+
     /* Put ourselves on the blackhole queue */
     StgTSO_link(CurrentTSO) = W_[blackhole_queue];
     W_[blackhole_queue] = CurrentTSO;
@@ -348,6 +352,10 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     /* jot down why and on what closure we are blocked */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
     StgTSO_block_info(CurrentTSO) = R1;
+
+#if defined(SMP)
+    foreign "C" RELEASE_LOCK(sched_mutex "ptr");
+#endif
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     jump stg_block_1;
@@ -398,6 +406,10 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
     TICK_ENT_BH();
     LDV_ENTER(R1);
 
+#if defined(SMP)
+    foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+#endif
+
     /* Put ourselves on the blackhole queue */
     StgTSO_link(CurrentTSO) = W_[blackhole_queue];
     W_[blackhole_queue] = CurrentTSO;
@@ -405,6 +417,10 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
     /* jot down why and on what closure we are blocked */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
     StgTSO_block_info(CurrentTSO) = R1;
+
+#if defined(SMP)
+    foreign "C" RELEASE_LOCK(sched_mutex "ptr");
+#endif
 
     /* stg_gen_block is too heavyweight, use a specialised one */
     jump stg_block_1;
