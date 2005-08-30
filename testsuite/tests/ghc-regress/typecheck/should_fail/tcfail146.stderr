@@ -1,0 +1,4 @@
+
+tcfail146.hs:7:15:
+    Class `SClass' used as a type
+    In the data type declaration for `SData'
