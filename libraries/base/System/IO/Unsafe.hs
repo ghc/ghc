@@ -24,14 +24,14 @@ import GHC.IOBase (unsafePerformIO, unsafeInterleaveIO)
 #endif
 
 #ifdef __HUGS__
-import Hugs.IOExts (unsafePerformIO)
+import Hugs.IOExts (unsafePerformIO, unsafeInterleaveIO)
 #endif
 
 #ifdef __NHC__
 import NHC.Internal (unsafePerformIO)
 #endif
 
-#ifndef __GLASGOW_HASKELL__
+#if !__GLASGOW_HASKELL__ && !__HUGS__
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO f = return (unsafePerformIO f)
 #endif
