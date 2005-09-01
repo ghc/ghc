@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp #-}
+{-# OPTIONS -cpp -fglasgow-exts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Sequence
@@ -83,6 +83,9 @@ import qualified Prelude (foldr)
 import qualified Data.List (foldl', intersperse)
 import Data.FunctorM
 import Data.Typeable
+#ifdef __GLASGOW_HASKELL__
+import GHC.Exts (build)
+#endif
 
 #if TESTING
 import Control.Monad (liftM, liftM2, liftM3, liftM4)
@@ -881,7 +884,12 @@ fromList  	=  Data.List.foldl' (|>) empty
 
 -- | /O(n)/. List of elements of the sequence.
 toList		:: Seq a -> [a]
+#ifdef __GLASGOW_HASKELL__
+{-# INLINE toList #-}
+toList xs	=  build (\ c n -> foldr c n xs)
+#else
 toList		=  foldr (:) []
+#endif
 
 ------------------------------------------------------------------------
 -- Folds
