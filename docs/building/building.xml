@@ -135,7 +135,7 @@
 	  </listitem>
 	  <listitem>
 	    <para>Set your <literal>$CVSROOT</literal> environment variable to
-            <literal>:pserver:anoncvs@glass.cse.ogi.edu:/cvs</literal></para>
+            <literal>:pserver:anoncvs@cvs.haskell.org:/cvs</literal></para>
 	    <para>If you set <literal>$CVSROOT</literal> in a shell script, be sure not to
 	      have any trailing spaces on that line, otherwise CVS will respond with 
 	      a perplexing message like
@@ -4996,7 +4996,7 @@ choices, but it gives a single path that works.</para>
     ; http://www.haskell.org//pipermail/cvs-all/
   - mkdir c:/fptools; cd c:/fptools 
     ; (or whereever you want your cvs tree to be)
-  - export CVSROOT=:pserver:anoncvs@glass.cse.ogi.edu:/cvs
+  - export CVSROOT=:pserver:anoncvs@cvs.haskell.org:/cvs
   - cvs login
     ; pw: cvs
   - cvs checkout fpconfig
