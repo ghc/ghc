@@ -34,6 +34,7 @@ import Control.Monad 	( sequence_ )
 import Foreign.Ptr
 import Foreign.Storable
 
+import GHC.List  	( null )
 import GHC.Base
 import GHC.IOBase
 import GHC.STRef	( STRef(..) )
@@ -69,13 +70,8 @@ data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
 	-- attached to is kept alive.
 
 data ForeignPtrContents 
-  = PlainNoFinalizer
-  | PlainWithFinalizer     !(IORef [IO ()])
-  | MallocPtrNoFinalizer   (MutableByteArray# RealWorld)
-  | MallocPtrWithFinalizer (MutableByteArray# RealWorld) !(IORef [IO ()])
-  -- we optimise the no-finalizer case, which is especially common
-  -- with a MallocPtr.  mallocForeignPtr doesn't have to create an
-  -- IORef, or set up a weak pointer.
+  = PlainForeignPtr !(IORef [IO ()])
+  | MallocPtr (MutableByteArray# RealWorld) !(IORef [IO ()])
 
 instance Eq (ForeignPtr a) where
     p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
@@ -128,10 +124,11 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a = do
+  	  r <- newIORef []
 	  IO $ \s ->
 	    case newPinnedByteArray# size s of { (# s, mbarr# #) ->
 	     (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-		     	      (MallocPtrNoFinalizer mbarr#) #)
+		     	      (MallocPtr mbarr# r) #)
             }
 	    where (I# size) = sizeOf a
 
@@ -139,10 +136,11 @@ mallocForeignPtr = doMalloc undefined
 -- size of the memory required is given explicitly as a number of bytes.
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes (I# size) = do 
+  r <- newIORef []
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
        (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-		        (MallocPtrNoFinalizer mbarr#) #)
+		        (MallocPtr mbarr# r) #)
      }
 
 addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
@@ -171,26 +169,23 @@ addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 addForeignPtrConcFinalizer (ForeignPtr a c) finalizer = 
   addForeignPtrConcFinalizer_ c finalizer
 
-addForeignPtrConcFinalizer_ PlainNoFinalizer finalizer = do
-  r <- newIORef []
-  IO $ \s ->  case r of { IORef (STRef r#) ->
+addForeignPtrConcFinalizer_ f@(PlainForeignPtr r) finalizer = do
+  fs <- readIORef r
+  writeIORef r (finalizer : fs)
+  if (null fs)
+     then IO $ \s ->
+	      case r of { IORef (STRef r#) ->
 	      case mkWeak# r# () (foreignPtrFinalizer r) s of {  (# s1, w #) ->
 	      (# s1, () #) }}
-  addForeignPtrConcFinalizer_ (PlainWithFinalizer r) finalizer
-
-addForeignPtrConcFinalizer_ f@(PlainWithFinalizer r) finalizer = do
+     else return ()
+addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do 
   fs <- readIORef r
   writeIORef r (finalizer : fs)
-
-addForeignPtrConcFinalizer_ f@(MallocPtrNoFinalizer fo) finalizer = do
-  r <- newIORef []
-  IO $ \s -> case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
+  if (null fs)
+     then  IO $ \s -> 
+	       case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
 		  (# s1, w #) -> (# s1, () #)
-  addForeignPtrConcFinalizer_ (MallocPtrWithFinalizer fo r) finalizer
-
-addForeignPtrConcFinalizer_ f@(MallocPtrWithFinalizer fo r) finalizer = do 
-  fs <- readIORef r
-  writeIORef r (finalizer : fs)
+     else return ()
 
 foreign import ccall "dynamic" 
   mkFinalizer :: FinalizerPtr a -> Ptr a -> IO ()
@@ -201,7 +196,9 @@ foreignPtrFinalizer r = do fs <- readIORef r; sequence_ fs
 newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer that may be
 -- associated with finalizers by using 'addForeignPtrFinalizer'.
-newForeignPtr_ (Ptr obj) = return (ForeignPtr obj PlainNoFinalizer)
+newForeignPtr_ (Ptr obj) =  do
+  r <- newIORef []
+  return (ForeignPtr obj (PlainForeignPtr r))
 
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
@@ -257,14 +254,11 @@ castForeignPtr f = unsafeCoerce# f
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
-finalizeForeignPtr (ForeignPtr _ contents) = do
-  case contents of
-    PlainNoFinalizer           -> return ()
-    PlainWithFinalizer r       -> runFinalizers r
-    MallocPtrNoFinalizer _     -> return ()
-    MallocPtrWithFinalizer _ r -> runFinalizers r
- where
-   runFinalizers r = do 
-     fs <- readIORef r
-     sequence_ fs
-     writeIORef r []
+finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
+	finalizers <- readIORef refFinalizers
+	sequence_ finalizers
+	writeIORef refFinalizers []
+	where
+		refFinalizers = case foreignPtr of
+			(PlainForeignPtr ref) -> ref
+			(MallocPtr  _ ref) -> ref
