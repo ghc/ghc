@@ -4,6 +4,3 @@ module ShouldFail where
 class Bar a
 instance Bar a => Bar Bool
 
--- !!! constraining the type variable in a class head is illegal
-class Foo a where
-  op :: Eq a => a -> a

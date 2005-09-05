@@ -1,4 +1,4 @@
-{-# OPTIONS -dcore-lint #-}
+{-# OPTIONS -dcore-lint -fglasgow-exts #-}
 
 -- Fails GHC 5.04.2 with -dcore-lint
 -- The issue ariseswhen you have a method that
