@@ -62,5 +62,5 @@ notArg _       = True
 dieProg :: String -> IO a
 dieProg msg = do
   p <- getProgName
-  hPutStr stderr (p ++ ": " ++ msg)
+  hPutStrLn stderr (p ++ ": " ++ msg)
   exitWith (ExitFailure 1)
