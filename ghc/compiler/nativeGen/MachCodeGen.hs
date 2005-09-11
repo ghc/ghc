@@ -2927,11 +2927,21 @@ genCCall (CmmPrim op) [(r,_)] args vols = do
  	     return (any (getRegisterReg r))
 
 genCCall target dest_regs args vols = do
-    sizes_n_codes <- mapM push_arg (reverse args)
-    delta <- getDeltaNat
-    let 
-	(sizes, push_codes) = unzip sizes_n_codes
+    let
+        sizes               = map (arg_size . cmmExprRep . fst) (reverse args)
+#if !darwin_TARGET_OS        
         tot_arg_size        = sum sizes
+#else
+        raw_arg_size        = sum sizes
+        tot_arg_size        = roundTo 16 raw_arg_size
+        arg_pad_size        = tot_arg_size - raw_arg_size
+    delta0 <- getDeltaNat
+    setDeltaNat (delta0 - arg_pad_size)
+#endif
+
+    push_codes <- mapM push_arg (reverse args)
+    delta <- getDeltaNat
+
     -- in
     -- deal with static vs dynamic call targets
     (callinsns,cconv) <-
@@ -2946,7 +2956,15 @@ genCCall target dest_regs args vols = do
                  ASSERT(dyn_rep == I32)
                   return (dyn_c `snocOL` CALL (Right dyn_r) [], conv)
 
-    let	push_code = concatOL push_codes
+    let	push_code
+#if darwin_TARGET_OS
+            | arg_pad_size /= 0
+            = toOL [SUB I32 (OpImm (ImmInt arg_pad_size)) (OpReg esp),
+                    DELTA (delta0 - arg_pad_size)]
+              `appOL` concatOL push_codes
+            | otherwise
+#endif
+            = concatOL push_codes
 	call = callinsns `appOL`
                toOL (
 			-- Deallocate parameters after call for ccall;
@@ -2982,10 +3000,15 @@ genCCall target dest_regs args vols = do
   where
     arg_size F64 = 8
     arg_size F32 = 4
+    arg_size I64 = 8
     arg_size _   = 4
 
+    roundTo a x | x `mod` a == 0 = x
+                | otherwise = x + a - (x `mod` a)
+
+
     push_arg :: (CmmExpr,MachHint){-current argument-}
-                    -> NatM (Int, InstrBlock)  -- argsz, code
+                    -> NatM InstrBlock  -- code
 
     push_arg (arg,_hint) -- we don't need the hints on x86
       | arg_rep == I64 = do
@@ -2995,7 +3018,7 @@ genCCall target dest_regs args vols = do
         let 
             r_hi = getHiVRegFromLo r_lo
         -- in
-	return (8,     code `appOL`
+	return (       code `appOL`
                        toOL [PUSH I32 (OpReg r_hi), DELTA (delta - 4),
                              PUSH I32 (OpReg r_lo), DELTA (delta - 8),
 			     DELTA (delta-8)]
@@ -3007,16 +3030,14 @@ genCCall target dest_regs args vols = do
         let size = arg_size sz
         setDeltaNat (delta-size)
         if (case sz of F64 -> True; F32 -> True; _ -> False)
-           then return (size,
-                        code `appOL`
+           then return (code `appOL`
                         toOL [SUB I32 (OpImm (ImmInt size)) (OpReg esp),
                               DELTA (delta-size),
                               GST sz reg (AddrBaseIndex (EABaseReg esp) 
                                                         EAIndexNone
                                                         (ImmInt 0))]
                        )
-           else return (size,
-                        code `snocOL`
+           else return (code `snocOL`
                         PUSH I32 (OpReg reg) `snocOL`
                         DELTA (delta-size)
                        )
