@@ -141,13 +141,31 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	 */
 	"movl %3,%%ebx\n\t"
 	/*
-	 * grab the function argument from the stack, and jump to it.
+	 * grab the function argument from the stack
 	 */
         "movl %2,%%eax\n\t"
+        
+#if darwin_TARGET_OS
+	/*
+	 * Darwin: keep the stack aligned
+	 */
+        "subl $12,%%esp\n\t"
+#endif
+
+	/*
+	 * jump to it
+	 */
         "jmp *%%eax\n\t"
 
 	STG_GLOBAL STG_RETURN "\n"
        	STG_RETURN ":\n\t"
+
+#if darwin_TARGET_OS
+	/*
+	 * Darwin: keep the stack aligned
+	 */
+        "addl $12,%%esp\n\t"
+#endif
 
 	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
 
