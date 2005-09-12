@@ -886,30 +886,6 @@ checkBQ (StgTSO *bqe, StgClosure *closure)
     }
   } while (!end);
 }
-#else
-void
-checkBQ (StgTSO *bqe, StgClosure *closure) 
-{  
-  rtsBool end = rtsFalse;
-  StgInfoTable *info = get_itbl(closure);
-
-  ASSERT(info->type == MVAR);
-
-  do {
-    switch (get_itbl(bqe)->type) {
-    case TSO:
-      checkClosure((StgClosure *)bqe);
-      bqe = bqe->link;
-      end = (bqe==END_TSO_QUEUE);
-      break;
-
-    default:
-      barf("checkBQ: strange closure %d in blocking queue for closure %p\n", 
-	   get_itbl(bqe)->type, closure, info->type);
-    }
-  } while (!end);
-}
-    
 #endif
     
 
