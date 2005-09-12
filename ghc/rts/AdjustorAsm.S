@@ -1,5 +1,7 @@
 #include "../includes/ghcconfig.h"
 
+/* ******************************** PowerPC ******************************** */
+
 #if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
 #if !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
     /* The following code applies, with some differences,
@@ -142,5 +144,46 @@ adjustorCode:
     mtlr    r0
     blr
 #endif
+
+/* ********************************* i386 ********************************** */
+
+#elif defined(i386_TARGET_ARCH) && defined(darwin_TARGET_OS)
+
+#define WS              4
+#define RETVAL_OFF      5
+#define HEADER_BYTES    8
+
+#define HPTR_OFF        HEADER_BYTES
+#define WPTR_OFF        (HEADER_BYTES + 1*WS)
+#define FRAMESIZE_OFF   (HEADER_BYTES + 2*WS)
+#define ARGWORDS_OFF    (HEADER_BYTES + 3*WS)
+
+    .globl _adjustorCode
+_adjustorCode:
+    popl    %eax
+    subl    $RETVAL_OFF, %eax
+    
+    pushl   %ebp
+    movl    %esp, %ebp
+    
+    subl    FRAMESIZE_OFF(%eax), %esp
+
+    pushl   %esi
+    pushl   %edi
+        
+    leal    8(%ebp), %esi
+    leal    12(%esp), %edi
+    movl    ARGWORDS_OFF(%eax), %ecx
+    rep
+    movsl
+    
+    popl    %edi
+    popl    %esi
+    
+    pushl   HPTR_OFF(%eax)
+    call    *WPTR_OFF(%eax)
+    
+    leave
+    ret
 #endif
 

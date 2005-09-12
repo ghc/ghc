@@ -55,7 +55,7 @@ Haskell side.
 #else 
 #define UNDERSCORE ""
 #endif
-#if defined(i386_HOST_ARCH)
+#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
 /* 
   Now here's something obscure for you:
 
@@ -196,6 +196,49 @@ typedef struct AdjustorStub {
 #endif
 #endif
 
+#if defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+
+/* !!! !!! WARNING: !!! !!!
+ * This structure is accessed from AdjustorAsm.s
+ * Any changes here have to be mirrored in the offsets there.
+ */
+
+typedef struct AdjustorStub {
+    unsigned char   call[8];
+    StgStablePtr    hptr;
+    StgFunPtr       wptr;
+    StgInt          frame_size;
+    StgInt          argument_size;
+} AdjustorStub;
+#endif
+
+#if defined(darwin_HOST_OS) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+static int totalArgumentSize(char *typeString)
+{
+    int sz = 0;
+    while(*typeString)
+    {
+        char t = *typeString++;
+
+        switch(t)
+        {
+                // on 32-bit platforms, Double and Int64 occupy two words.
+            case 'd':
+            case 'l':
+                if(sizeof(void*) == 4)
+                {
+                    sz += 2;
+                    break;
+                }
+                // everything else is one word.
+            default:
+                sz += 1;
+        }
+    }
+    return sz;
+}
+#endif
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr,
 	       StgFunPtr wptr,
@@ -210,7 +253,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
   switch (cconv)
   {
   case 0: /* _stdcall */
-#if defined(i386_HOST_ARCH)
+#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
     /* Magic constant computed by inspecting the code length of
        the following assembly language snippet
        (offset and machine code prefixed):
@@ -243,7 +286,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
     break;
 
   case 1: /* _ccall */
-#if defined(i386_HOST_ARCH)
+#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
   /* Magic constant computed by inspecting the code length of
      the following assembly language snippet
      (offset and machine code prefixed):
@@ -289,6 +332,30 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
     }
+#elif defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+    {
+        /*
+          What's special about Darwin/Mac OS X on i386?
+          It wants the stack to stay 16-byte aligned.
+          
+          We offload most of the work to AdjustorAsm.S.
+        */
+        AdjustorStub *adjustorStub = stgMallocBytesRWX(sizeof(AdjustorStub));
+        adjustor = adjustorStub;
+
+        extern void adjustorCode(void);
+        int sz = totalArgumentSize(typeString);
+        
+        adjustorStub->call[0] = 0xe8;
+        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)adjustorStub + 5);
+        adjustorStub->hptr = hptr;
+        adjustorStub->wptr = wptr;
+        adjustorStub->frame_size = sz * 4 + 12 /* ebp save + extra args */;
+        adjustorStub->frame_size = (adjustorStub->frame_size + 15) & ~15;  // align to 16 bytes
+        adjustorStub->frame_size -= 12; // we push the extra args separately
+        adjustorStub->argument_size = sz;
+    }
+    
 #elif defined(x86_64_HOST_ARCH)
     /*
       stack at call:
@@ -810,24 +877,8 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 #endif
 
             // Calculate the size of the stack frame, in words.
-        while(*typeString)
-        {
-            char t = *typeString++;
-
-            switch(t)
-            {
-#if defined(powerpc_HOST_ARCH)
-                    // on 32-bit platforms, Double and Int64 occupy two words.
-                case 'd':
-                case 'l':
-                    sz += 2;
-                    break;
-#endif
-                    // everything else is one word.
-                default:
-                    sz += 1;
-            }
-        }
+        sz = totalArgumentSize(typeString);
+        
             // The first eight words of the parameter area
             // are just "backing store" for the parameters passed in
             // the GPRs. extra_sz is the number of words beyond those first

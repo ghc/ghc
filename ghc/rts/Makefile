@@ -58,10 +58,12 @@ EXCLUDED_SRCS += Main.c
 endif
 
 # This file ends up being empty unless we're building for a powerpc
-# system, and it is reported that Solaris ld chokes on it when building
-# HSrts.o.
+# or darwin system, and it is reported that Solaris ld chokes on it when
+# building HSrts.o.
 ifeq "$(findstring $(TargetArch_CPP), powerpc powerpc64)" ""
+ifeq "$(findstring $(TargetOS_CPP), darwin)" ""
 EXCLUDED_SRCS += AdjustorAsm.S
+endif
 endif
 
 EXCLUDED_SRCS += parallel/SysMan.c
