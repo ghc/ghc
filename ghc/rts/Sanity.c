@@ -356,12 +356,9 @@ checkClosure( StgClosure* p )
   	    /* we don't expect to see any of these after GC
 	     * but they might appear during execution
 	     */
-	    P_ q;
 	    StgInd *ind = (StgInd *)p;
 	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
-	    q = (P_)p + sizeofW(StgInd);
-	    while (!*q) { q++; }; /* skip padding words (see GC.c: evacuate())*/
-	    return q - (P_)p;
+	    return sizeofW(StgHeader) + MIN_UPD_SIZE;
 	}
 
     case RET_BCO:
@@ -939,5 +936,16 @@ checkLAGAtable(rtsBool check_closures)
   }
 }
 #endif
+
+int
+onMutList(StgMutClosure *p, StgMutClosure *mut)
+{
+    int i;
+    for (i=0; mut != END_MUT_LIST; i++) {
+	if (mut == p) return i;
+	mut = mut->mut_link;
+    }
+    return -1;
+}
 
 #endif /* DEBUG */
