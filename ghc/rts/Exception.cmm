@@ -323,7 +323,7 @@ catchzh_fast
  * It is used in raisezh_fast to update thunks on the update list
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_raise,1,0,THUNK,"raise","raise")
+INFO_TABLE(stg_raise,1,0,THUNK_1_0,"raise","raise")
 {
   R1 = StgThunk_payload(R1,0);
   jump raisezh_fast;
