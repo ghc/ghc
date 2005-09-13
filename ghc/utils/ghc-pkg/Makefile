@@ -23,10 +23,6 @@ ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
 endif
 
-ifeq "$(ghc_ge_603)" "YES"
-SRC_HC_OPTS +=  -package Cabal
-endif
-
 # On Windows, ghc-pkg is a standalone program
 # ($bindir/ghc-pkg.exe), whereas on Unix it needs a wrapper script
 # to pass the appropriate flag to the real binary

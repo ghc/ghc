@@ -10,6 +10,11 @@
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
+# Do *not* use the installed Cabal:
+ifeq "$(ghc_ge_603)" "YES"
+SRC_HC_OPTS += -ignore-package Cabal
+endif
+
 # And similarly for when booting from .hc files:
 HC_BOOT_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR)
 HC_BOOT_LIBS += -lghccompat

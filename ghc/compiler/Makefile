@@ -491,7 +491,9 @@ PKG_DEPENDS += unix
 endif
 endif
 
-ifneq "$(findstring YES, $(bootstrapped) $(ghc_ge_603))" ""
+# We use the Cabal package in stages 2/3 only; in stage 1 we're using
+# the libcompat library which provides the Cabal modules.
+ifneq "$(stage)" "1"
 SRC_HC_OPTS += -package Cabal
 PKG_DEPENDS += Cabal
 endif

@@ -41,32 +41,15 @@ UseGhcForCc = YES
 SRC_HC_OPTS += $(filter-out -D%, $(GhcHcOpts)) 
 
 ifeq "$(ghc_ge_603)" "YES"
-# These modules are all provided in GHC 6.3+
+# These modules are provided in GHC 6.3+
 EXCLUDED_SRCS += \
-	System/Directory/Internals.hs \
-	Distribution/Compat/FilePath.hs \
-	Distribution/Compat/ReadP.hs \
-	Distribution/GetOpt.hs \
-	Distribution/InstalledPackageInfo.hs \
-	Distribution/License.hs \
-	Distribution/Package.hs \
-	Distribution/ParseUtils.hs \
-	Distribution/Compiler.hs \
-	Distribution/Version.hs \
-	Language/Haskell/Extension.hs
+	System/Directory/Internals.hs
 
 SRC_MKDEPENDHS_OPTS += \
-	-optdep--exclude-module=System.Directory.Internals \
-	-optdep--exclude-module=Distribution.Compat.FilePath \
-	-optdep--exclude-module=Distribution.Compat.ReadP \
-	-optdep--exclude-module=Distribution.GetOpt \
-	-optdep--exclude-module=Distribution.InstalledPackageInfo \
-	-optdep--exclude-module=Distribution.License \
-	-optdep--exclude-module=Distribution.Package \
-	-optdep--exclude-module=Distribution.ParseUtils \
-	-optdep--exclude-module=Distribution.Compiler \
-	-optdep--exclude-module=Distribution.Version \
-	-optdep--exclude-module=Language.Haskell.Extension
+	-optdep--exclude-module=System.Directory.Internals
+
+# GHC 6.3+ has Cabal, but we're replacing it:
+SRC_HC_OPTS += -ignore-package Cabal
 endif
 
 # Some explicit dependencies, needed because ghc -M can't discover the
