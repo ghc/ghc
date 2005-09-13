@@ -147,7 +147,7 @@ adjustorCode:
 
 /* ********************************* i386 ********************************** */
 
-#elif defined(i386_TARGET_ARCH) && defined(darwin_TARGET_OS)
+#elif defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
 
 #define WS              4
 #define RETVAL_OFF      5
