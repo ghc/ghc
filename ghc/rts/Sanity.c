@@ -937,15 +937,4 @@ checkLAGAtable(rtsBool check_closures)
 }
 #endif
 
-int
-onMutList(StgMutClosure *p, StgMutClosure *mut)
-{
-    int i;
-    for (i=0; mut != END_MUT_LIST; i++) {
-	if (mut == p) return i;
-	mut = mut->mut_link;
-    }
-    return -1;
-}
-
 #endif /* DEBUG */
