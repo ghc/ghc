@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [
+]>
+
+  <article id="visual-haskell">
+    
+    <articleinfo>
+
+      <title>Visual Haskell User's Guide</title>
+<!--
+<author><othername></othername></author>
+<address><email>glasgow-haskell-&lcub;users,bugs&rcub;@haskell.org</email></address>
+-->
+
+<!--
+    <abstract>
+      <para></para>
+    </abstract>
+-->
+
+    </articleinfo>
+
+    <section id="sec-introduction">
+      <title>Introduction</title>
+      
+      <para>Visual Haskell is a plugin for Microsoft's Visual Studio
+	development environment to support development of Haskell software.
+	Like the other Visual languages, Visual Haskell integrates with the
+	Visual Studio editor to provide interactive features to aid Haskell
+	development, and it enables the construction of projects consisting of
+	multiple Haskell modules.</para>
+
+      <section id="sec-obtaining">
+	<title>Installing Visual Haskell</title>
+
+	<para>In order to use Visual Haskell, you need <ulink url="http://msdn.microsoft.com/vstudio/productinfo/">Visual Studio .NET
+	  2003</ulink>.  Right now, this is the only supported version of Visual
+	  Studio - unfortunately we haven't yet added support for the 2005
+	  Beta.  The Express languages (Visual C++ Express etc.) also will not
+	  work, because they don't have support for plugins.</para>
+
+	<para>You don't need to install GHC separately: Visual Haskell
+	  is bundled with a complete GHC distribution, and various other tools
+	  (Happy, Alex, Haddock).</para>
+
+	<para>The latest Visual Haskell installer can be obtained from
+	  here:</para>
+
+	<para><ulink
+	  url="http://research.microsoft.com/downloads/"><literal>http://research.microsoft.com/downloads/</literal></ulink></para>
+      </section>
+
+      <section id="release-notes">
+	<title>Release Notes</title>
+
+	<section>
+	  <title>Version 0.0, first release</title>
+	  
+	  <para>This release is a technology preview, and should be considered
+	    alpha quality.  It works for us, but you are fairly likely to
+	    encounter problems.  If you're willing to try it out and report
+	    bugs, we'd be grateful for the feedback.</para>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para>This release of Visual Haskell is bundled with a
+		development snapshot of GHC, version 6.5 from around 14
+		September 2005.  This version of GHC is used to provide the
+		interactive editing features, and will be used to compile all
+		code inside Visual Haskell.  It is possible that in future
+		releases we may be able to relax this tight coupling between
+		Visual Haskell and the bundled GHC.</para>
+
+	      <para>Please note that future releases of Visual
+		Haskell will update the compiler, and hence the
+		packages, and so may break your code.  Also note that because
+		the bundled GHC is not a released version, it may have bugs and
+		quirks itself: please report them as usual to
+		<email>glasgow-haskell-bugs@haskell.org</email>.</para>
+	    </listitem>
+	  </itemizedlist>
+	</section>
+      </section>
+
+      <section id="sec-bugs">
+	<title>Getting support, reporting bugs</title>
+	<para>Please report bugs to
+	  <email>glasgow-haskell-bugs@haskell.org</email> (subscribe <ulink url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs">here</ulink>), clearly indicating
+	  that your bug report relates to Visual Haskell, and giving as much
+	  information as possible so that we can reproduce the bug.  Even if
+	  you can't reproduce the bug reliably, it is still useful to report
+	  what you've seen.</para>
+
+	<para>For help and support, use the
+	  <email>glasgow-haskell-users@haskell.org</email> (subscribe <ulink
+	    url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-users">here</ulink>) mailing list.</para>
+      </section>
+
+      <section id="sec-license">
+	<title>License</title>
+
+	<para>The license is the standard Microsoft Shared Source license.  We may be
+	  able to relax certain aspects of this license in future releases
+	  (please contact us if this license is unsuitable for you).  The
+	  license is as follows:</para>
+
+<blockquote>
+<para>This Microsoft Research Shared Source license agreement ("MSR-SSLA")
+is a legal agreement between you and Microsoft Corporation
+("Microsoft" or "we") for the software or data identified above, which
+may include source code, and any associated materials, text or speech
+files, associated media and "online" or electronic documentation and
+any updates we provide in our discretion (together, the "Software").</para>
+
+<para>By installing, copying, or otherwise using this Software, found at
+http://research.microsoft.com/downloads, you agree to be bound by the
+terms of this MSR-SSLA. If you do not agree, do not install copy or
+use the Software. The Software is protected by copyright and other
+intellectual property laws and is licensed, not sold.
+</para>
+
+<para>SCOPE OF RIGHTS:
+</para>
+
+<para>You may use, copy, reproduce, and distribute this Software for any
+non-commercial purpose, subject to the restrictions in this
+MSR-SSLA. Some purposes which can be non-commercial are teaching,
+academic research, public demonstrations and personal
+experimentation. You may also distribute this Software with books or
+other teaching materials, or publish the Software on websites, that
+are intended to teach the use of the Software for academic or other
+non-commercial purposes.
+</para>
+
+<para>You may not use or distribute this Software or any derivative works in
+any form for commercial purposes. Examples of commercial purposes
+would be running business operations, licensing, leasing, or selling
+the Software, distributing the Software for use with commercial
+products, using the Software in the creation or use of commercial
+products or any other activity which purpose is to procure a
+commercial gain to you or others.
+</para>
+
+<para>If the Software includes source code or data, you may create
+derivative works of such portions of the Software and distribute the
+modified Software for non-commercial purposes, as provided herein.
+</para>
+
+<para>In return, we simply require that you agree: 
+</para>
+
+<para>1. That you will not remove any copyright or other notices from the Software.
+</para>
+
+<para>2. That if any of the Software is in binary format, you will not
+attempt to modify such portions of the Software, or to reverse
+engineer or decompile them, except and only to the extent authorized
+by applicable law.
+</para>
+
+<para>3. That if you distribute the Software or any derivative works of the
+Software, you will distribute them under the same terms and conditions
+as in this license, and you will not grant other rights to the
+Software or derivative works that are different from those provided by
+this MSR-SSLA.
+</para>
+
+<para>4. That if you have created derivative works of the Software, and
+distribute such derivative works, you will cause the modified files to
+carry prominent notices so that recipients know that they are not
+receiving the original Software. Such notices must state: (i) that you
+have changed the Software; and (ii) the date of any changes.
+</para>
+
+<para>5. That Microsoft is granted back, without any restrictions or
+limitations, a non-exclusive, perpetual, irrevocable, royalty-free,
+assignable and sub-licensable license, to reproduce, publicly perform
+or display, install, use, modify, distribute, make and have made, sell
+and transfer your modifications to and/or derivative works of the
+Software source code or data, for any purpose.
+</para>
+
+<para>6. That any feedback about the Software provided by you to us is
+voluntarily given, and Microsoft shall be free to use the feedback as
+it sees fit without obligation or restriction of any kind, even if the
+feedback is designated by you as confidential.
+</para>
+
+<para>7. THAT THE SOFTWARE COMES "AS IS", WITH NO WARRANTIES. THIS MEANS NO
+EXPRESS, IMPLIED OR STATUTORY WARRANTY, INCLUDING WITHOUT LIMITATION,
+WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ANY
+WARRANTY AGAINST INTERFERENCE WITH YOUR ENJOYMENT OF THE SOFTWARE OR
+ANY WARRANTY OF TITLE OR NON-INFRINGEMENT. THERE IS NO WARRANTY THAT
+THIS SOFTWARE WILL FULFILL ANY OF YOUR PARTICULAR PURPOSES OR
+NEEDS. ALSO, YOU MUST PASS THIS DISCLAIMER ON WHENEVER YOU DISTRIBUTE
+THE SOFTWARE OR DERIVATIVE WORKS.
+</para>
+
+<para>8. THAT NEITHER MICROSOFT NOR ANY CONTRIBUTOR TO THE SOFTWARE WILL BE
+LIABLE FOR ANY DAMAGES RELATED TO THE SOFTWARE OR THIS MSR-SSLA,
+INCLUDING DIRECT, INDIRECT, SPECIAL, CONSEQUENTIAL OR INCIDENTAL
+DAMAGES, TO THE MAXIMUM EXTENT THE LAW PERMITS, NO MATTER WHAT LEGAL
+THEORY IT IS BASED ON. ALSO, YOU MUST PASS THIS LIMITATION OF
+LIABILITY ON WHENEVER YOU DISTRIBUTE THE SOFTWARE OR DERIVATIVE WORKS.
+</para>
+
+<para>9. That we have no duty of reasonable care or lack of negligence, and
+we are not obligated to (and will not) provide technical support for
+the Software.
+</para>
+
+<para>10. That if you breach this MSR-SSLA or if you sue anyone over patents
+that you think may apply to or read on the Software or anyone's use of
+the Software, this MSR-SSLA (and your license and rights obtained
+herein) terminate automatically.  Upon any such termination, you shall
+destroy all of your copies of the Software immediately.  Sections 5,
+6, 7, 8, 9, 10, 13 and 14 of this MSR-SSLA shall survive any
+termination of this MSR-SSLA.
+</para>
+
+<para>11. That the patent rights, if any, granted to you in this MSR-SSLA
+only apply to the Software, not to any derivative works you make.
+</para>
+
+<para>12. That the Software may be subject to U.S. export jurisdiction at
+the time it is licensed to you, and it may be subject to additional
+export or import laws in other places. You agree to comply with all
+such laws and regulations that may apply to the Software after
+delivery of the software to you.
+</para>
+
+<para>13. That all rights not expressly granted to you in this MSR-SSLA are
+reserved.
+</para>
+
+<para>14. That this MSR-SSLA shall be construed and controlled by the laws
+of the State of Washington, USA, without regard to conflicts of law.
+If any provision of this MSR-SSLA shall be deemed unenforceable or
+contrary to law, the rest of this MSR-SSLA shall remain in full effect
+and interpreted in an enforceable manner that most nearly captures the
+intent of the original language.
+</para>
+
+<para>Copyright © Microsoft Corporation. All rights reserved.
+</para>
+	</blockquote>
+      </section>
+
+    </section>
+
+    <section id="sec-using">
+      <title>Using Visual Haskell</title>
+
+      <section>
+	<title>Overview of features</title>
+
+	<para>The following features are provided in the Visual Studio editor
+	  when editing Haskell code:</para>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Automatic checking of code as you type, and visual indication
+	      of parse errors, scoping errors and type errors.</para>
+	  </listitem>
+	  
+	  <listitem>
+	  <para>Quick info: hovering the mouse over an identifier pops up
+	    an information box, including the type of the identifier.</para>
+	  </listitem>
+
+	  <listitem>
+	  <para>A drop-down bar at the top of the editing window lists the
+	    top-level declarations in the module, and allows quick navigation
+	    to a declaration.</para>
+	  </listitem>
+
+	  <listitem>
+	  <para>Name completion for identifiers in scope: press Ctrl+Space
+	    after a partial identifier to see the completions.</para>
+	  </listitem>
+
+	  <listitem>
+	  <para>Go to declaration: right clicking on an identifier and
+	    selecting "Go to declaration" will jump the cursor to the
+	    declaration of the identifier.  This works for locally-defined
+	    identifiers and those defined in another module of the project; it
+	    does not work for library functions currently.</para>
+	  </listitem>
+	</itemizedlist>
+      </section>
+
+      <para>The following features are provided by the project system for
+	constructing Haskell projects:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Multi-module Haskell projects are fully supported, based on the
+	    <ulink url="http://www.haskell.org/cabal">Cabal</ulink>
+	    infrastructure.  A project in Visual Haskell <emphasis>is</emphasis>
+	    a Cabal package, and vice-versa.  A Visual Studio project can be
+	    taken to a machine without Visual Haskell and built/installed as a
+	    normal Cabal package, and an existing Cabal package can be edited
+	    directly in Visual Haskell<footnote><para>This works as long as the
+		Cabal package is using Cabal's simple build system; Cabal
+		packages using their own build systems cannot be edited in Visual
+		Haskell.</para>
+	    </footnote>.</para>
+	</listitem>
+
+	<listitem>
+	  <para>Editing of most of the package meta-data is supported through
+	    the project property pages.</para>
+	</listitem>
+
+	<listitem>
+	  <para>The interactive editing features work across multiple modules in
+	    a project.  When one module is edited, changes are automatically
+	    propagated to dependent modules, even if the edited module has not yet
+	    been saved.</para>
+	</listitem>
+
+	<listitem>
+	  <para>Building is supported through the Cabal build system, and build
+	    errors are communicated back to the editor and placed in the task
+	    list.  Use any of the Visual Studio build commands (e.g. Build
+	    Project from the context menu on the project, or Ctrl-Shift-B to
+	    build the whole solution).</para>
+	</listitem>
+
+      </itemizedlist>
+	
+      <section>
+	<title>Getting Started</title>
+	
+	<para>To start using Visual Haskell right away, first create a new
+	  project (File-&gt;New-&gt;Project...).  Select one of the Haskell
+	  project types (Console Application or Library Package), and hit Ok.
+	  The project will be created for you, and an example module
+	  added: <literal>Main.hs</literal> for an application, or
+	  <literal>Module1.hs</literal> for a library.</para>
+
+	<para>You can now start adding code to
+	  <literal>Main.hs</literal>, or adding new modules.  To add a new
+	  module, right-click on the <literal>src</literal> directory, and
+	  select Add-&gt;New Item.  Visual Haskell supports hierarchical
+	  modules too: you can add new folders using the same Add menu to
+	  create new nodes in the hierarchy.</para>
+
+	<para>If you have any errors in your code, they will be underlined with
+	  a red squiggly line.  Select the Tasks window (usually a tab near the
+	  bottom of the Visual Studio window) to see the error messages, and
+	  click on an error message to jump to it in the editor.</para>
+
+	<para>To build the program, hit Ctrl-Shift-B, or select one of the
+	  options from the Build menu.</para>
+      </section>
+
+      <section>
+	<title>Editing Haskell code</title>
+
+	<para>(ToDo: more detail here)</para>
+
+	<para>Your module must be plain Haskell (<literal>.hs</literal>) for the interactive features to
+	fully work.  If your module is pre-processed with CPP or Literate
+	  Haskell, then Visual Haskell will only check the module when it is
+	  saved; between saves the source will not be checked for errors and
+	  the type information will not be updated.  If the source file is
+	  pre-processed with Happy or another pre-processor, then you may have
+	  to build the project before the type information will be updated
+	  (because the pre-processor is only run as part of the build
+	  process).  Pre-processed source files work fine in a multi-module
+	  setting; you can have modules which depend on a pre-processed module
+	  and full interactive checking will still be available in those
+	  modules.</para>
+
+	<para>Because Visual Haskell is using GHC as a backend for its
+	  interactive editing features, it supports the full GHC language,
+	  including all extensions.</para>
+      </section>
+
+      <section>
+	<title>Using Projects</title>
+	<para>(ToDo: more detail here)</para>
+      </section>
+
+    </section>
+  </article>
