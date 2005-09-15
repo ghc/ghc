@@ -808,12 +808,11 @@ depend :: $(STAGE_PLATFORM_H) $(HS_SRCS) $(C_SRCS)
 ifneq "$(BootingFromHc)" "YES"
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
 endif
-	$(SED) -i -e 's:^.*/lib/compat.*$$::' .depend-BASE
 	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
-	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g' <.depend-BASE >.depend-$(stage)
+	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g; s@^.*/lib/compat.*$@@g;' <.depend-BASE >.depend-$(stage)
 # The binmode stuff tells perl not to add stupid ^M's to the output
-
-# The $(SED) command above is a workaround for a bug in the 
+#
+# The /lib/compat replacement is to workaround a bug in the
 # -optdep--exclude-module flag in GHC 6.4.  It is not required for any
 # other version of GHC, but doesn't do any harm.
 
