@@ -4,14 +4,20 @@
 ]>
 
   <article id="visual-haskell">
-    
+  
     <articleinfo>
 
       <title>Visual Haskell User's Guide</title>
-<!--
-<author><othername></othername></author>
-<address><email>glasgow-haskell-&lcub;users,bugs&rcub;@haskell.org</email></address>
--->
+    <author>
+      <firstname>Simon</firstname>
+      <surname>Marlow</surname>
+      <email>simonmar@microsoft.com</email>
+    </author>
+    <author>
+      <firstname>Krasimir</firstname>
+      <surname>Angelov</surname>
+      <email>kr.angelov@gmail.com</email>
+    </author>
 
 <!--
     <abstract>
@@ -242,8 +248,9 @@ and interpreted in an enforceable manner that most nearly captures the
 intent of the original language.
 </para>
 
-<para>Copyright © Microsoft Corporation. All rights reserved.
-</para>
+<para>Copyright © Microsoft Corporation. All rights reserved.</para>
+<para>Copyright © The University of Glasgow.</para>
+<para>Copyright © Krasimir Angelov.</para>
 	</blockquote>
       </section>
 
@@ -329,35 +336,51 @@ intent of the original language.
 	</listitem>
 
       </itemizedlist>
-	
-      <section>
-	<title>Getting Started</title>
-	
-	<para>To start using Visual Haskell right away, first create a new
-	  project (File-&gt;New-&gt;Project...).  Select one of the Haskell
-	  project types (Console Application or Library Package), and hit Ok.
-	  The project will be created for you, and an example module
-	  added: <literal>Main.hs</literal> for an application, or
-	  <literal>Module1.hs</literal> for a library.</para>
+    
+    <para>Additionally, Visual Haskell is bundled with a large collection of
+      documentation: the GHC manual, the hierarchical libraries reference, and
+      other material all of which can be browsed within Visual Studio
+      itself.</para>
 
-	<para>You can now start adding code to
-	  <literal>Main.hs</literal>, or adding new modules.  To add a new
-	  module, right-click on the <literal>src</literal> directory, and
-	  select Add-&gt;New Item.  Visual Haskell supports hierarchical
-	  modules too: you can add new folders using the same Add menu to
-	  create new nodes in the hierarchy.</para>
+    <section>
+      <title>Getting Started</title>
+      
+      <para>After installing Visual Haskell, start up Visual Studio as you
+	would normally, and observe that on the splash screen where it lists
+	the supported languages you should now see an icon for Visual
+	Haskell (if you don't see this, something has gone wrong... please let
+	us know).</para>
+      
+      <para>Firstly, take a look at the bundled documentation.  Go to
+	Help-&gt;Contents, and you should see the &ldquo;Visual Haskell Help
+	Collection&rdquo;, which contains a large collection of GHC and
+	Haskell-related documentaiton, including this document.</para>
 
-	<para>If you have any errors in your code, they will be underlined with
-	  a red squiggly line.  Select the Tasks window (usually a tab near the
-	  bottom of the Visual Studio window) to see the error messages, and
-	  click on an error message to jump to it in the editor.</para>
+      <para>To start using Visual Haskell right away, create a new
+	project (File-&gt;New-&gt;Project...).  Select one of the Haskell
+	project types (Console Application or Library Package), and hit Ok.
+	The project will be created for you, and an example module
+	added: <literal>Main.hs</literal> for an application, or
+	<literal>Module1.hs</literal> for a library.</para>
+      
+      <para>You can now start adding code to
+	<literal>Main.hs</literal>, or adding new modules.  To add a new
+	module, right-click on the <literal>src</literal> directory, and
+	select Add-&gt;New Item.  Visual Haskell supports hierarchical
+	modules too: you can add new folders using the same Add menu to
+	create new nodes in the hierarchy.</para>
+      
+      <para>If you have any errors in your code, they will be underlined with
+	a red squiggly line.  Select the Tasks window (usually a tab near the
+	bottom of the Visual Studio window) to see the error messages, and
+	click on an error message to jump to it in the editor.</para>
+      
+      <para>To build the program, hit Ctrl-Shift-B, or select one of the
+	options from the Build menu.</para>
+    </section>
 
-	<para>To build the program, hit Ctrl-Shift-B, or select one of the
-	  options from the Build menu.</para>
-      </section>
-
-      <section>
-	<title>Editing Haskell code</title>
+    <section>
+      <title>Editing Haskell code</title>
 
 	<para>(ToDo: more detail here)</para>
 
