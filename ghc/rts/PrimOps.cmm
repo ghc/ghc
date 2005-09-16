@@ -874,10 +874,14 @@ forkzh_fast
   
   MAYBE_GC(R1_PTR, forkzh_fast);
 
+  foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+
   // create it right now, return ThreadID in R1
   "ptr" R1 = foreign "C" createIOThread( RtsFlags_GcFlags_initialStkSize(RtsFlags), 
 				   R1 "ptr");
-  foreign "C" scheduleThread(R1 "ptr");
+  foreign "C" scheduleThreadLocked(R1 "ptr");
+
+  foreign "C" RELEASE_LOCK(sched_mutex "ptr");
 
   // switch at the earliest opportunity
   CInt[context_switch] = 1 :: CInt;

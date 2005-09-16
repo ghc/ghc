@@ -2311,11 +2311,8 @@ StgTSO *
 createThread(nat size)
 #endif
 {
-
     StgTSO *tso;
     nat stack_size;
-
-    ACQUIRE_LOCK(&sched_mutex);
 
     /* First check whether we should create a thread at all */
 #if defined(PARALLEL_HASKELL)
@@ -2324,7 +2321,6 @@ createThread(nat size)
     threadsIgnored++;
     debugBelch("{createThread}Daq ghuH: refusing to create another thread; no more than %d threads allowed (currently %d)\n",
 	  RtsFlags.ParFlags.maxThreads, advisory_thread_count);
-    RELEASE_LOCK(&sched_mutex);
     return END_TSO_QUEUE;
   }
   threadsCreated++;
@@ -2475,7 +2471,6 @@ createThread(nat size)
   IF_DEBUG(scheduler,sched_belch("created thread %ld, stack size = %lx words", 
 				 (long)tso->id, (long)tso->stack_size));
 #endif    
-  RELEASE_LOCK(&sched_mutex);
   return tso;
 }
 
@@ -2546,8 +2541,8 @@ activateSpark (rtsSpark spark)
  * on this thread's stack before the scheduler is invoked.
  * ------------------------------------------------------------------------ */
 
-static void
-scheduleThread_(StgTSO *tso)
+void
+scheduleThreadLocked(StgTSO *tso)
 {
   // The thread goes at the *end* of the run-queue, to avoid possible
   // starvation of any threads already on the queue.
@@ -2559,7 +2554,7 @@ void
 scheduleThread(StgTSO* tso)
 {
   ACQUIRE_LOCK(&sched_mutex);
-  scheduleThread_(tso);
+  scheduleThreadLocked(tso);
   RELEASE_LOCK(&sched_mutex);
 }
 

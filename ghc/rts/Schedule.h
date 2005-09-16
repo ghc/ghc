@@ -36,6 +36,9 @@ void awakenBlockedQueue (StgTSO *tso);
 void awakenBlockedQueueNoLock (StgTSO *tso);
 #endif
 
+/* Version of scheduleThread that doesn't take sched_mutex */
+void scheduleThreadLocked(StgTSO *tso);
+
 /* unblockOne()
  *
  * Takes a pointer to the beginning of a blocked TSO queue, and
