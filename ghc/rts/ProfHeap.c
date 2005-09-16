@@ -906,6 +906,17 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = sizeW_fromITBL(info);
 		break;
 		
+	    case IND:
+		// Special case/Delicate Hack: INDs don't normally
+		// appear, since we're doing this heap census right
+		// after GC.  However, GarbageCollect() also does
+		// resurrectThreads(), which can update some
+		// blackholes when it calls raiseAsync() on the
+		// resurrected threads.  So we know that any IND will
+		// be the size of a BLACKHOLE.
+		size = BLACKHOLE_sizeW();
+		break;
+
 	    case BCO:
 		prim = rtsTrue;
 		size = bco_sizeW((StgBCO *)p);
@@ -959,8 +970,28 @@ heapCensusChain( Census *census, bdescr *bd )
 		}
 #endif
 
+	    case TREC_HEADER: 
+		prim = rtsTrue;
+		size = sizeofW(StgTRecHeader);
+		break;
+
+	    case TVAR_WAIT_QUEUE:
+		prim = rtsTrue;
+		size = sizeofW(StgTVarWaitQueue);
+		break;
+		
+	    case TVAR:
+		prim = rtsTrue;
+		size = sizeofW(StgTVar);
+		break;
+		
+	    case TREC_CHUNK:
+		prim = rtsTrue;
+		size = sizeofW(StgTRecChunk);
+		break;
+
 	    default:
-		barf("heapCensus");
+		barf("heapCensus, unknown object: %d", info->type);
 	    }
 	    
 	    identity = NULL;
