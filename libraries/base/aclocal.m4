@@ -40,7 +40,7 @@ m4_define([FP_CHECK_CONSTS_TEMPLATE],
 # FP_CHECK_CONSTS(EXPRESSION..., [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = -1])
 # -----------------------------------------------------------------------------------
 # List version of FP_CHECK_CONST
-AC_DEFUN(FP_CHECK_CONSTS,
+AC_DEFUN([FP_CHECK_CONSTS],
 [FP_CHECK_CONSTS_TEMPLATE([$1])dnl
 for fp_const_name in $1
 do
@@ -53,7 +53,7 @@ dnl ** Map an arithmetic C type to a Haskell type.
 dnl    Based on autconf's AC_CHECK_SIZEOF.
 
 dnl FPTOOLS_CHECK_HTYPE(TYPE [, DEFAULT_VALUE, [, VALUE-FOR-CROSS-COMPILATION])
-AC_DEFUN(FPTOOLS_CHECK_HTYPE,
+AC_DEFUN([FPTOOLS_CHECK_HTYPE],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(htype_$1, [a-z *], [A-Z_P]))dnl
