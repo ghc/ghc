@@ -3057,23 +3057,27 @@ genCCall target dest_regs args vols = do
 outOfLineFloatOp :: CallishMachOp -> CmmReg -> [(CmmExpr,MachHint)]
   -> Maybe [GlobalReg] -> NatM InstrBlock
 outOfLineFloatOp mop res args vols
-  | cmmRegRep res == F64
-  = stmtToInstrs (CmmCall target [(res,FloatHint)] args vols)
-
-  | otherwise
-  = do uq <- getUniqueNat
-       let 
-	 tmp = CmmLocal (LocalReg uq F64)
-       -- in
-       code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] (map promote args) vols)
-       code2 <- stmtToInstrs (CmmAssign res (demote (CmmReg tmp)))
-       return (code1 `appOL` code2)
+  = do
+      targetExpr <- cmmMakeDynamicReference addImportNat True lbl
+      let target = CmmForeignCall targetExpr CCallConv
+        
+      if cmmRegRep res == F64
+        then
+          stmtToInstrs (CmmCall target [(res,FloatHint)] args vols)  
+        else do
+          uq <- getUniqueNat
+          let 
+            tmp = CmmLocal (LocalReg uq F64)
+          -- in
+          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)]
+                                         (map promote args) vols)
+          code2 <- stmtToInstrs (CmmAssign res (demote (CmmReg tmp)))
+          return (code1 `appOL` code2)
   where
         promote (x,hint) = (CmmMachOp (MO_S_Conv F32 F64) [x], hint)
         demote  x = CmmMachOp (MO_S_Conv F64 F32) [x]
 
-	target = CmmForeignCall (CmmLit lbl) CCallConv
-	lbl = CmmLabel (mkForeignLabel fn Nothing False)
+	lbl = mkForeignLabel fn Nothing True
 
 	fn = case mop of
 	      MO_F32_Sqrt  -> FSLIT("sqrt")
