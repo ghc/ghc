@@ -39,7 +39,7 @@ too many people got bitten by space leaks when it was lazy.
 -- by @s@, and returns a value of type @a@.
 -- The @s@ parameter is either
 --
--- * an unstantiated type variable (inside invocations of 'runST'), or
+-- * an uninstantiated type variable (inside invocations of 'runST'), or
 --
 -- * 'RealWorld' (inside invocations of 'Control.Monad.ST.stToIO').
 --
