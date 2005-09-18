@@ -27,7 +27,7 @@ AC_DEFUN([FP_EVAL_STDERR],
 # to check stderr *and* the exit value.
 #
 # Used by ghc.
-AC_DEFUN(FP_CHECK_FLAG,
+AC_DEFUN([FP_CHECK_FLAG],
 [AC_LANG_COMPILER_REQUIRE()dnl
 AC_LANG_CASE([C],          [fp_compiler="$CC"  m4_pushdef([fp_Flags], [CFLAGS])],
              [C++],        [fp_compiler="$CXX" m4_pushdef([fp_Flags], [CXXFLAGS])],
@@ -220,7 +220,7 @@ AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
 dnl
 dnl Check for GreenCard and version.
 dnl
-AC_DEFUN(FPTOOLS_GREENCARD,
+AC_DEFUN([FPTOOLS_GREENCARD],
 [
 AC_PATH_PROG(GreenCardCmd,greencard)
 AC_CACHE_CHECK([for version of greencard], fptools_cv_greencard_version,
@@ -244,7 +244,7 @@ dnl Check for Happy and version.  If we're building GHC, then we need
 dnl at least Happy version 1.14.  If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
 dnl
-AC_DEFUN(FPTOOLS_HAPPY,
+AC_DEFUN([FPTOOLS_HAPPY],
 [
 if test -d $srcdir/happy; then
    SrcTreeHappyCmd=$hardtop/happy/src/happy-inplace
@@ -284,7 +284,7 @@ dnl
 dnl Check for Haddock and version.  If there's no installed Haddock, we look
 dnl for a haddock source tree and point the build system at that instead.
 dnl
-AC_DEFUN(FPTOOLS_HADDOCK,
+AC_DEFUN([FPTOOLS_HADDOCK],
 [
 if test -d $srcdir/haddock; then
    SrcTreeHaddockCmd=$hardtop/haddock/src/haddock-inplace
@@ -311,7 +311,7 @@ dnl Check for Alex and version.  If we're building GHC, then we need
 dnl at least Alex version 2.0.  If there's no installed Alex, we look
 dnl for a alex source tree and point the build system at that instead.
 dnl
-AC_DEFUN(FPTOOLS_ALEX,
+AC_DEFUN([FPTOOLS_ALEX],
 [
 if test -d $srcdir/alex; then
    SrcTreeAlexCmd=$hardtop/alex/src/alex-inplace
@@ -535,7 +535,7 @@ AC_SUBST([ArSupportsInput])
 dnl
 dnl AC_SHEBANG_PERL - can we she-bang perl?
 dnl
-AC_DEFUN(FPTOOLS_SHEBANG_PERL,
+AC_DEFUN([FPTOOLS_SHEBANG_PERL],
 [AC_CACHE_CHECK([if your perl works in shell scripts], fptools_cv_shebang_perl,
 [echo "#!$PerlCmd"'
 exit $1;
@@ -595,7 +595,7 @@ AC_DEFUN([FP_MINGW_GCC],
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary
 dnl
-AC_DEFUN(FPTOOLS_CHECK_PERL_VERSION,
+AC_DEFUN([FPTOOLS_CHECK_PERL_VERSION],
 [$PerlCmd -v >conftest.out 2>&1
    if grep "v5.6" conftest.out >/dev/null 2>&1; then
       :
@@ -670,7 +670,7 @@ dnl the commands given by the third. It does not cache its
 dnl result, so it is suitable for checks which should be
 dnl run every time.
 dnl
-AC_DEFUN(FPTOOLS_NOCACHE_CHECK,
+AC_DEFUN([FPTOOLS_NOCACHE_CHECK],
 [AC_MSG_CHECKING([$1])
  $3
  AC_MSG_RESULT([$][$2])
@@ -684,7 +684,7 @@ dnl
 dnl Test for version of installed ghc.  Uses $GHC.
 dnl [original version pinched from c2hs]
 dnl
-AC_DEFUN(FPTOOLS_GHC_VERSION,
+AC_DEFUN([FPTOOLS_GHC_VERSION],
 [FPTOOLS_NOCACHE_CHECK([version of ghc], [fptools_version_of_ghc],
 ["${WithGhc-ghc}" --version > conftestghc 2>&1
   cat conftestghc >&AS_MESSAGE_LOG_FD
@@ -730,7 +730,7 @@ dnl ** Map an arithmetic C type to a Haskell type.
 dnl    Based on autconf's AC_CHECK_SIZEOF.
 
 dnl FPTOOLS_CHECK_HTYPE(TYPE [, DEFAULT_VALUE, [, VALUE-FOR-CROSS-COMPILATION])
-AC_DEFUN(FPTOOLS_CHECK_HTYPE,
+AC_DEFUN([FPTOOLS_CHECK_HTYPE],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(htype_$1, [a-z *], [A-Z_P]))dnl

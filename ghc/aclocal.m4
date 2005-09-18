@@ -52,7 +52,7 @@ fi])# FP_PROG_GHC_PKG
 
 # FP_GHC_HAS_READLINE
 # -------------------
-AC_DEFUN(FP_GHC_HAS_READLINE,
+AC_DEFUN([FP_GHC_HAS_READLINE],
 [AC_REQUIRE([FP_PROG_GHC_PKG])
 AC_CACHE_CHECK([whether ghc has readline package], [fp_cv_ghc_has_readline],
 [if "${GhcPkgCmd-ghc-pkg}" --show-package readline >/dev/null 2>&1; then
