@@ -555,7 +555,7 @@ getPackageLinkOpts dflags pkgs = do
         -- _dyn to extraLibraries if they already have a _cbits suffix.
         
         hACK_dyn = map hack
-          where hack lib | not static && "_cbits" `isSuffixOf` lib = lib ++ "_dyn"
+          where hack lib | not opt_Static && "_cbits" `isSuffixOf` lib = lib ++ "_dyn"
                          | otherwise = lib
 
   return (concat (map all_opts ps))
