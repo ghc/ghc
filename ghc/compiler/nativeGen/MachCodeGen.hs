@@ -3716,18 +3716,44 @@ genCCall target dest_regs argsAndHints vols
 genSwitch :: CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-genSwitch expr ids = do
-  (reg,e_code) <- getSomeReg expr
-  lbl <- getNewLabelNat
-  let
-	jumpTable = map jumpTableEntry ids
-	op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
-	code = e_code `appOL` toOL [
-		LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
-	        JMP_TBL op [ id | Just id <- ids ]
-	     ]
-  -- in
-  return code
+genSwitch expr ids
+  | opt_PIC
+  = do
+        (reg,e_code) <- getSomeReg expr
+        lbl <- getNewLabelNat
+        dynRef <- cmmMakeDynamicReference addImportNat False lbl
+        (tableReg,t_code) <- getSomeReg $ dynRef
+        let
+            jumpTable = map jumpTableEntryRel ids
+            
+            jumpTableEntryRel Nothing
+                = CmmStaticLit (CmmInt 0 wordRep)
+            jumpTableEntryRel (Just (BlockId id))
+                = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
+                where blockLabel = mkAsmTempLabel id
+
+            op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
+                                       (EAIndex reg wORD_SIZE) (ImmInt 0))
+
+            code = e_code `appOL` t_code `appOL` toOL [
+                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+                            ADD wordRep op (OpReg tableReg),
+                            JMP_TBL (OpReg tableReg) [ id | Just id <- ids ]
+                    ]
+        return code
+  | otherwise
+  = do
+        (reg,e_code) <- getSomeReg expr
+        lbl <- getNewLabelNat
+        let
+            jumpTable = map jumpTableEntry ids
+            op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
+            code = e_code `appOL` toOL [
+                    LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+                    JMP_TBL op [ id | Just id <- ids ]
+                 ]
+        -- in
+        return code
 #elif powerpc_TARGET_ARCH
 genSwitch expr ids 
   | opt_PIC
