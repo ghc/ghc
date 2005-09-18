@@ -71,6 +71,7 @@ import Data.List	( nub, partition, sortBy )
 #ifdef mingw32_TARGET_OS
 import Data.List	( isPrefixOf )
 #endif
+import Data.List        ( isSuffixOf )
 
 import FastString
 import EXCEPTION	( throwDyn )
@@ -538,7 +539,8 @@ getPackageLinkOpts dflags pkgs = do
       rts_tag = rtsBuildTag dflags
   let 
 	imp        = if opt_Static then "" else "_dyn"
-      	libs p     = map ((++imp) . addSuffix) (hACK (hsLibraries p)) ++ extraLibraries p
+      	libs p     = map ((++imp) . addSuffix) (hACK (hsLibraries p))
+      	                 ++ hACK_dyn (extraLibraries p)
 	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 
 	suffix     = if null tag then "" else  '_':tag
@@ -546,6 +548,15 @@ getPackageLinkOpts dflags pkgs = do
 
         addSuffix rts@"HSrts"    = rts       ++ rts_suffix
         addSuffix other_lib      = other_lib ++ suffix
+
+        -- This is a hack that's even more horrible (and hopefully more temporary)
+        -- than the one below. HSbase_cbits and friends require the _dyn suffix
+        -- for dynamic linking, but not _p or other 'way' suffix. So we just add
+        -- _dyn to extraLibraries if they already have a _cbits suffix.
+        
+        hACK_dyn = map hack
+          where hack lib | not static && "_cbits" `isSuffixOf` lib = lib ++ "_dyn"
+                         | otherwise = lib
 
   return (concat (map all_opts ps))
   where
@@ -582,6 +593,7 @@ getPackageLinkOpts dflags pkgs = do
          else 
          libs
 #      endif
+
 
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do
