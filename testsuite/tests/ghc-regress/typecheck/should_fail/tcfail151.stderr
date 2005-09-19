@@ -1,0 +1,5 @@
+
+tcfail151.hs:7:5:
+    `Name a' is not applied to enough type arguments
+    Expected kind `*', but `Name a' has kind `k -> *'
+    In the data type declaration for `Exp'
