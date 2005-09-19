@@ -210,10 +210,10 @@ StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ 
 #ifndef INLINE
 # if defined(_MSC_VER)
 #  define INLINE extern __inline
-# elif defined(__HUGS__)
-#  define INLINE INLINE_ONLY
-# else
+# elif defined(__GNUC__)
 #  define INLINE extern inline
+# else
+#  define INLINE inline
 # endif
 #endif
 
