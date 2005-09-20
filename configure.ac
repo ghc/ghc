@@ -1149,7 +1149,7 @@ dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
 
-dnl ** check for libdl & RTLD_NEXT
+dnl ** check whether we need -ldl to get dlopen()
 
 AC_CHECK_LIB(dl, dlopen, 
     [HaveLibDL=YES
@@ -1157,96 +1157,6 @@ AC_CHECK_LIB(dl, dlopen,
      LIBS="$LIBS -ldl"], 
     [HaveLibDL=NO])
 AC_SUBST(HaveLibDL)
-
-dnl ** sometimes RTLD_NEXT is hidden in #ifdefs we really don't wan to set
-AC_MSG_CHECKING(for RTLD_NEXT from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_NEXT
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE([HAVE_RTLDNEXT], [1], [Define to 1 if we can see RTLD_NEXT in dlfcn.h.])
-  HaveRtldNext=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldNext=NO
-  ])    
-AC_SUBST(HaveRtldNext)
-
-dnl ** RTLD_DEFAULT isn't available on cygwin
-AC_MSG_CHECKING(for RTLD_DEFAULT from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_DEFAULT
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE([HAVE_RTLDDEFAULT], [1], [Define to 1 if RTLD_DEFAULT is available.])
-  HaveRtldDefault=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldDefault=NO
-  ])    
-AC_SUBST(HaveRtldDefault)
-
-dnl ** RTLD_LOCAL isn't available on cygwin or openbsd
-AC_MSG_CHECKING(for RTLD_LOCAL from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_LOCAL
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE([HAVE_RTLDLOCAL], [1], [Define to 1 if RTLD_LOCAL is available.])
-  HaveRtldLocal=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldLocal=NO
-  ])    
-AC_SUBST(HaveRtldLocal)
-
-dnl ** RTLD_GLOBAL isn't available on openbsd
-AC_MSG_CHECKING(for RTLD_GLOBAL from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_GLOBAL
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE([HAVE_RTLDGLOBAL], [1], [Define to 1 if RTLD_GLOBAL is available.])
-  HaveRtldGlobal=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldGlobal=NO
-  ])    
-AC_SUBST(HaveRtldGlobal)
-
-dnl ** RTLD_NOW isn't available on openbsd
-AC_MSG_CHECKING(for RTLD_NOW from dlfcn.h)
-AC_EGREP_CPP(yes,
-[
- #include <dlfcn.h>
- #ifdef RTLD_NOW
-        yes
- #endif
-], [
-  AC_MSG_RESULT(yes)
-  AC_DEFINE([HAVE_RTLDNOW], [1], [Define to 1 if we can see RTLD_NOW in dlfcn.h])
-  HaveRtldNow=YES
-], [
-  AC_MSG_RESULT(no)
-  HaveRtldNow=NO
-  ])    
-AC_SUBST(HaveRtldNow)
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests

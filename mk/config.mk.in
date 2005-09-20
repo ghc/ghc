@@ -265,8 +265,6 @@ endif
 GhcWithJavaGen=NO
 
 HaveLibDL = @HaveLibDL@
-HaveRtldNext = @HaveRtldNext@
-HaveRtldLocal = @HaveRtldLocal@
 
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
