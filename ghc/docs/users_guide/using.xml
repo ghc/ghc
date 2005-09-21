@@ -515,6 +515,30 @@ ghc -c Foo.hs</screen>
       of the compiler, dumping the result in a file.  Note that this
       differs from the previous behaviour of dumping the file to
       standard output.</para>
+
+      <sect3 id="overriding-suffixes">
+	<title>Overriding the default behaviour for a file</title>
+
+	<para>As described above, the way in which a file is processed by GHC
+	  depends on its suffix.  This behaviour can be overriden using the
+	  <option>-x</option> option:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><option>-x</option> <replaceable>suffix</replaceable></term>
+	      <indexterm><primary><option>-x</option></primary>
+	      </indexterm>
+	      <listitem>
+		<para>Causes all files following this option on the command
+		  line to be processed as if they had the suffix
+		  <replaceable>suffix</replaceable>.  For example, to compile a
+		  Haskell module in the file <literal>M.my-hs</literal>,
+		  use <literal>ghc -c -x hs M.my-hs</literal>.</para>
+	      </listitem>
+	  </varlistentry>
+	</variablelist>
+      </sect3>
+
     </sect2>
   </sect1>
 
