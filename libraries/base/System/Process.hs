@@ -228,7 +228,7 @@ fdToHandle pfd mode = do
 
 {- | Waits for the specified process to terminate, and returns its exit code.
    
-     GHC Note: in order to call waitForProcess without blocking all the
+     GHC Note: in order to call @waitForProcess@ without blocking all the
      other threads in the system, you must compile the program with
      @-threaded@.
 -}
@@ -259,8 +259,12 @@ terminateProcess (ProcessHandle pid) =
 -- ----------------------------------------------------------------------------
 -- getProcessExitCode
 
-{- | Verifies whether the process is completed and if it is then returns the exit code.
-   If the process is still running the function returns Nothing
+{- | 
+This is a non-blocking version of 'waitForProcess'.  If the process is
+still running, 'Nothing' is returned.  If the process has exited, then
+@'Just' e@ is returned where @e@ is the exit code of the process.
+Subsequent calls to @getProcessExitStatus@ always return @'Just'
+'ExitSuccess'@, regardless of what the original exit code was.
 -}
 getProcessExitCode :: ProcessHandle -> IO (Maybe ExitCode)
 getProcessExitCode (ProcessHandle handle) =
