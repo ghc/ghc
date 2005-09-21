@@ -898,9 +898,53 @@ x = nfib 25
       information simultaneously.</para>
     </sect2>
 
+    <sect2 id="mem-residency">
+      <title>Actual memory residency</title>
 
+      <para>How does the heap residency reported by the heap profiler relate to
+	the actual memory residency of your program when you run it?  You might
+	see a large discrepancy between the residency reported by the heap
+	profiler, and the residency reported by tools on your system
+	(eg. <literal>ps</literal> or <literal>top</literal> on Unix, or the
+	Task Manager on Windows).  There are several reasons for this:</para>
 
+      <itemizedlist>
+	<listitem>
+	  <para>There is an overhead of profiling itself, which is subtracted
+	    from the residency figures by the profiler.  This overhead goes
+	    away when compiling without profiling support, of course.  The
+	    space overhead is currently 2 extra
+	    words per heap object, which probably results in
+	    about a 30% overhead.</para>
+	</listitem>
 
+	<listitem>
+	  <para>Garbage collection requires more memory than the actual
+	    residency.  The factor depends on the kind of garbage collection
+	    algorithm in use:  a major GC in the standard
+	    generation copying collector will usually require 3L bytes of
+	    memory, where L is the amount of live data.  This is because by
+	    default (see the <option>+RTS -F</option> option) we allow the old
+	    generation to grow to twice its size (2L) before collecting it, and
+	    we require additionally L bytes to copy the live data into.  When
+	    using compacting collection (see the <option>+RTS -c</option>
+	    option), this is reduced to 2L, and can further be reduced by
+	    tweaking the <option>-F</option> option.  Also add the size of the
+	    allocation area (currently a fixed 512Kb).</para>
+	</listitem>
+
+	<listitem>
+	  <para>The stack isn't counted in the heap profile by default.  See the
+    <option>+RTS -xt</option> option.</para>
+	</listitem>
+
+	<listitem>
+	  <para>The program text itself, the C stack, any non-heap data (eg. data
+	    allocated by foreign libraries, and data allocated by the RTS), and
+	    <literal>mmap()</literal>'d memory are not counted in the heap profile.</para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
 
   </sect1>
 
