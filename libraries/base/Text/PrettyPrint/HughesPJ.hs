@@ -127,7 +127,7 @@ Relative to John's original paper, there are the following new features:
     last line of the top argument stops before the first line of the
     second begins.
 
-        For example:  text "hi" $$ nest 5 "there"
+        For example:  text "hi" $$ nest 5 (text "there")
         lays out as
                         hi   there
         rather than
@@ -172,19 +172,20 @@ module Text.PrettyPrint.HughesPJ (
 	-- * The document type
         Doc,            -- Abstract
 
-	-- * Primitive Documents
-        empty,
+	-- * Constructing documents
+	-- ** Converting values into documents
+        char, text, ptext,
+        int, integer, float, double, rational,
+
+	-- ** Simple derived documents
         semi, comma, colon, space, equals,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
-	-- * Converting values into documents
-        text, char, ptext,
-        int, integer, float, double, rational,
-
-	-- * Wrapping documents in delimiters
+	-- ** Wrapping documents in delimiters
         parens, brackets, braces, quotes, doubleQuotes,
 
-	-- * Combining documents
+	-- ** Combining documents
+        empty,
         (<>), (<+>), hcat, hsep, 
         ($$), ($+$), vcat, 
         sep, cat, 
@@ -225,7 +226,11 @@ infixl 5 $$, $+$
 
 isEmpty :: Doc    -> Bool;  -- ^ Returns 'True' if the document is empty
 
-empty   :: Doc;			-- ^ An empty document
+-- | The empty document, with no height and no width.
+-- 'empty' is the identity for '<>', '<+>', '$$' and '$+$', and anywhere
+-- in the argument list for 'sep', 'hcat', 'hsep', 'vcat', 'fcat' etc.
+empty   :: Doc
+
 semi	:: Doc;			-- ^ A ';' character
 comma	:: Doc;			-- ^ A ',' character
 colon	:: Doc;			-- ^ A ':' character
@@ -238,15 +243,28 @@ rbrack	:: Doc;			-- ^ A ']' character
 lbrace	:: Doc;			-- ^ A '{' character
 rbrace	:: Doc;			-- ^ A '}' character
 
-text	 :: String   -> Doc
-ptext	 :: String   -> Doc
+-- | A document of height and width 1, containing a literal character.
 char 	 :: Char     -> Doc
-int      :: Int      -> Doc
-integer  :: Integer  -> Doc
-float    :: Float    -> Doc
-double   :: Double   -> Doc
-rational :: Rational -> Doc
 
+-- | A document of height 1 containing a literal string.
+-- 'text' satisfies the following laws:
+--
+-- * @'text' s '<>' 'text' t = 'text' (s'++'t)@
+--
+-- * @'text' \"\" '<>' x = x@, if @x@ non-empty
+--
+-- The side condition on the last law is necessary because @'text' \"\"@
+-- has height 1, while 'empty' has no height.
+text	 :: String   -> Doc
+
+-- | An obsolete function, now identical to 'text'.
+ptext	 :: String   -> Doc
+
+int      :: Int      -> Doc;	-- ^ @int n = text (show n)@
+integer  :: Integer  -> Doc;	-- ^ @integer n = text (show n)@
+float    :: Float    -> Doc;	-- ^ @float n = text (show n)@
+double   :: Double   -> Doc;	-- ^ @double n = text (show n)@
+rational :: Rational -> Doc;	-- ^ @rational n = text (show n)@
 
 parens       :: Doc -> Doc; 	-- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc;  	-- ^ Wrap document in @[...]@
@@ -256,28 +274,74 @@ doubleQuotes :: Doc -> Doc;	-- ^ Wrap document in @\"...\"@
 
 -- Combining @Doc@ values
 
-(<>)   :: Doc -> Doc -> Doc;     -- ^Beside
-hcat   :: [Doc] -> Doc;          -- ^List version of '<>'
-(<+>)  :: Doc -> Doc -> Doc;     -- ^Beside, separated by space
-hsep   :: [Doc] -> Doc;          -- ^List version of '<+>'
+-- | Beside.
+-- '<>' is associative, with identity 'empty'.
+(<>)   :: Doc -> Doc -> Doc
 
-($$)   :: Doc -> Doc -> Doc;     -- ^Above; if there is no
-                                -- overlap it \"dovetails\" the two
-($+$)   :: Doc -> Doc -> Doc;	 -- ^Above, without dovetailing.
-vcat   :: [Doc] -> Doc;          -- ^List version of '$$'
+-- | Beside, separated by space, unless one of the arguments is 'empty'.
+-- '<+>' is associative, with identity 'empty'.
+(<+>)  :: Doc -> Doc -> Doc
 
-cat    :: [Doc] -> Doc;          -- ^ Either hcat or vcat
-sep    :: [Doc] -> Doc;          -- ^ Either hsep or vcat
-fcat   :: [Doc] -> Doc;          -- ^ \"Paragraph fill\" version of cat
-fsep   :: [Doc] -> Doc;          -- ^ \"Paragraph fill\" version of sep
+-- | Above, except that if the last line of the first argument stops
+-- at least one position before the first line of the second begins,
+-- these two lines are overlapped.  For example:
+--
+-- >    text "hi" $$ nest 5 (text "there")
+--
+-- lays out as
+--
+-- >    hi   there
+--
+-- rather than
+--
+-- >    hi
+-- >         there
+--
+-- '$$' is associative, with identity 'empty', and also satisfies
+--
+-- * @(x '$$' y) '<>' z = x '$$' (y '<>' z)@, if @y@ non-empty.
+--
+($$)   :: Doc -> Doc -> Doc
 
-nest   :: Int -> Doc -> Doc;     -- ^ Nested
+-- | Above, with no overlapping.
+-- '$+$' is associative, with identity 'empty'.
+($+$)   :: Doc -> Doc -> Doc
 
+hcat   :: [Doc] -> Doc;          -- ^List version of '<>'.
+hsep   :: [Doc] -> Doc;          -- ^List version of '<+>'.
+vcat   :: [Doc] -> Doc;          -- ^List version of '$$'.
+
+cat    :: [Doc] -> Doc;          -- ^ Either 'hcat' or 'vcat'.
+sep    :: [Doc] -> Doc;          -- ^ Either 'hsep' or 'vcat'.
+fcat   :: [Doc] -> Doc;          -- ^ \"Paragraph fill\" version of 'cat'.
+fsep   :: [Doc] -> Doc;          -- ^ \"Paragraph fill\" version of 'sep'.
+
+-- | Nest (or indent) a document by a given number of positions
+-- (which may also be negative).  'nest' satisfies the laws:
+--
+-- * @'nest' 0 x = x@
+--
+-- * @'nest' k ('nest' k' x) = 'nest' (k+k') x@
+--
+-- * @'nest' k (x '<>' y) = 'nest' k z '<>' 'nest' k y@
+--
+-- * @'nest' k (x '$$' y) = 'nest' k x '$$' 'nest' k y@
+--
+-- * @'nest' k 'empty' = 'empty'@
+--
+-- * @x '<>' 'nest' k y = x '<>' y@, if @x@ non-empty
+--
+-- The side condition on the last law is needed because
+-- 'empty' is a left identity for '<>'.
+nest   :: Int -> Doc -> Doc
 
 -- GHC-specific ones.
 
-hang :: Doc -> Int -> Doc -> Doc;	-- ^ @hang d1 n d2 = sep [d1, nest n d2]@
-punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
+-- | @hang d1 n d2 = sep [d1, nest n d2]@
+hang :: Doc -> Int -> Doc -> Doc
+
+-- | @punctuate p [d1, ... dn] = [d1 \<> p, d2 \<> p, ... dn-1 \<> p, dn]@
+punctuate :: Doc -> [Doc] -> [Doc]
 
 
 -- Displaying @Doc@ values. 
@@ -285,10 +349,10 @@ punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<
 instance Show Doc where
   showsPrec prec doc cont = showDoc doc cont
 
--- | Renders the document as a string using the default style
+-- | Renders the document as a string using the default 'style'.
 render     :: Doc -> String
 
--- | The general rendering interface
+-- | The general rendering interface.
 fullRender :: Mode			-- ^Rendering mode
            -> Int                       -- ^Line length
            -> Float                     -- ^Ribbons per line
@@ -297,21 +361,21 @@ fullRender :: Mode			-- ^Rendering mode
            -> Doc			-- ^The document
            -> a                         -- ^Result
 
--- | Render the document as a string using a specified style
+-- | Render the document as a string using a specified style.
 renderStyle  :: Style -> Doc -> String
 
--- | A rendering style
+-- | A rendering style.
 data Style
  = Style { mode           :: Mode     -- ^ The rendering mode
  	 , lineLength     :: Int      -- ^ Length of line, in chars
          , ribbonsPerLine :: Float    -- ^ Ratio of ribbon length to line length
          }
 
--- | The default style (@mode=PageMode, lineLength=100, ribbonsPerLine=1.5@)
+-- | The default style (@mode=PageMode, lineLength=100, ribbonsPerLine=1.5@).
 style :: Style
 style = Style { lineLength = 100, ribbonsPerLine = 1.5, mode = PageMode }
 
--- | Rendering mode
+-- | Rendering mode.
 data Mode = PageMode            -- ^Normal 
           | ZigZagMode          -- ^With zig-zag cuts
           | LeftMode            -- ^No indentation, infinitely long lines
@@ -438,7 +502,8 @@ punctuate p (d:ds) = go d ds
 -- A Doc represents a *set* of layouts.  A Doc with
 -- no occurrences of Union or NoDoc represents just one layout.
 
--- | The abstract type of documents
+-- | The abstract type of documents.
+-- The 'Show' instance is equivalent to using 'render'.
 data Doc
  = Empty                                -- empty
  | NilAbove Doc                         -- text "" $$ x
@@ -521,7 +586,7 @@ isEmpty Empty = True
 isEmpty _     = False
 
 char  c = textBeside_ (Chr c) 1 Empty
-text  s = case length   s of {sl -> textBeside_ (Str s)  sl Empty}
+text  s = case length s of {sl -> textBeside_ (Str s)  sl Empty}
 ptext s = case length s of {sl -> textBeside_ (PStr s) sl Empty}
 
 nest k  p = mkNest k (reduceDoc p)        -- Externally callable version
