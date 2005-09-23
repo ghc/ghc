@@ -307,10 +307,26 @@ link BatchCompile dflags batch_attempt_linking hpt
 	          return Succeeded
 	  else do
 
-	debugTraceMsg dflags 1 "Linking ..."
-
 	let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 	    obj_files = concatMap getOfiles linkables
+
+	    exe_file = exeFileName dflags
+
+	-- if the modification time on the executable is later than the
+	-- modification times on all of the objects, then omit linking
+	-- (unless the -no-recomp flag was given).
+	e_exe_time <- IO.try $ getModificationTime exe_file
+	let linking_needed 
+		| Left _  <- e_exe_time = True
+		| Right t <- e_exe_time = 
+			any (t <) (map linkableTime linkables)
+
+	if dopt Opt_RecompChecking dflags && not linking_needed
+	   then do debugTraceMsg dflags 1 (exe_file ++ " is up to date, linking not required.")
+		   return Succeeded
+	   else do
+
+	debugTraceMsg dflags 1 "Linking ..."
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
         staticLink dflags obj_files pkg_deps
@@ -1098,17 +1114,11 @@ getHCFilePackages filename =
 staticLink :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
 staticLink dflags o_files dep_packages = do
     let verb = getVerbFlag dflags
+        output_fn = exeFileName dflags
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
     -- dependencies, and eliminating duplicates.
-
-    let o_file = outputFile dflags
-#if defined(mingw32_HOST_OS)
-    let output_fn = case o_file of { Just s -> s; Nothing -> "main.exe"; }
-#else
-    let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-#endif
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
@@ -1194,6 +1204,17 @@ staticLink dflags o_files dep_packages = do
 	 (do success <- runPhase_MoveBinary output_fn
              if success then return ()
                         else throwDyn (InstallationError ("cannot move binary to PVM dir")))
+
+
+exeFileName :: DynFlags -> FilePath
+exeFileName dflags
+  | Just s <- outputFile dflags = s
+  | otherwise = 
+#if defined(mingw32_HOST_OS)
+	"main.exe"
+#else
+	"a.out"
+#endif
 
 -----------------------------------------------------------------------------
 -- Making a DLL (only for Win32)
