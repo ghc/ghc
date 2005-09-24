@@ -735,12 +735,14 @@ getRegister leaf
 
 getRegister (CmmLit (CmmFloat f F32)) = do
     lbl <- getNewLabelNat
-    let code dst = toOL [
+    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    Amode addr addr_code <- getAmode dynRef
+    let code dst =
 	    LDATA ReadOnlyData
 			[CmmDataLabel lbl,
-			 CmmStaticLit (CmmFloat f F32)],
-	    GLD F32 (ImmAddr (ImmCLbl lbl) 0) dst
-	    ]
+			 CmmStaticLit (CmmFloat f F32)]
+	    `consOL` (addr_code `snocOL`
+	    GLD F32 addr dst)
     -- in
     return (Any F32 code)
 
@@ -756,12 +758,14 @@ getRegister (CmmLit (CmmFloat d F64))
 
   | otherwise = do
     lbl <- getNewLabelNat
-    let code dst = toOL [
+    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    Amode addr addr_code <- getAmode dynRef
+    let code dst =
 	    LDATA ReadOnlyData
 			[CmmDataLabel lbl,
-			 CmmStaticLit (CmmFloat d F64)],
-	    GLD F64 (ImmAddr (ImmCLbl lbl) 0) dst
-	    ]
+			 CmmStaticLit (CmmFloat d F64)]
+	    `consOL` (addr_code `snocOL`
+	    GLD F64 addr dst)
     -- in
     return (Any F64 code)
 
