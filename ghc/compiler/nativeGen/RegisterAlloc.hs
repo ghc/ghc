@@ -157,7 +157,10 @@ allocateReg f r = filter (/= r) f
 
 data FreeRegs = FreeRegs !Word32 !Word32
 
+noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0 0
+
+releaseReg :: RegNo -> FreeRegs -> FreeRegs
 releaseReg r (FreeRegs g f)
     | r > 31    = FreeRegs g (f .|. (1 `shiftL` (fromIntegral r - 32)))
     | otherwise = FreeRegs (g .|. (1 `shiftL` fromIntegral r)) f
@@ -165,6 +168,7 @@ releaseReg r (FreeRegs g f)
 initFreeRegs :: FreeRegs
 initFreeRegs = foldr releaseReg noFreeRegs allocatableRegs
 
+getFreeRegs :: RegClass -> FreeRegs -> [RegNo]	-- lazilly
 getFreeRegs cls (FreeRegs g f)
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31
@@ -173,7 +177,8 @@ getFreeRegs cls (FreeRegs g f)
         go x m i | x .&. m /= 0 = i : (go x (m `shiftR` 1) $! i-1)
                  | otherwise    = go x (m `shiftR` 1) $! i-1
 
-allocateReg (FreeRegs g f) r
+allocateReg :: RegNo -> FreeRegs -> FreeRegs
+allocateReg r (FreeRegs g f) 
     | r > 31    = FreeRegs g (f .&. complement (1 `shiftL` (fromIntegral r - 32)))
     | otherwise = FreeRegs (g .&. complement (1 `shiftL` fromIntegral r)) f
 
