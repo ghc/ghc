@@ -350,9 +350,21 @@ createAdjustor(int cconv, StgStablePtr hptr,
         *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)adjustorStub + 5);
         adjustorStub->hptr = hptr;
         adjustorStub->wptr = wptr;
-        adjustorStub->frame_size = sz * 4 + 12 /* ebp save + extra args */;
-        adjustorStub->frame_size = (adjustorStub->frame_size + 15) & ~15;  // align to 16 bytes
-        adjustorStub->frame_size -= 12; // we push the extra args separately
+        
+            // The adjustor puts the following things on the stack:
+            // 1.) %ebp link
+            // 2.) padding and (a copy of) the arguments
+            // 3.) a dummy argument
+            // 4.) hptr
+            // 5.) return address (for returning to the adjustor)
+            // All these have to add up to a multiple of 16. 
+
+            // first, include everything in frame_size
+        adjustorStub->frame_size = sz * 4 + 16;
+            // align to 16 bytes
+        adjustorStub->frame_size = (adjustorStub->frame_size + 15) & ~15;
+            // only count 2.) and 3.) as part of frame_size
+        adjustorStub->frame_size -= 12; 
         adjustorStub->argument_size = sz;
     }
     
@@ -1002,7 +1014,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 void
 freeHaskellFunctionPtr(void* ptr)
 {
-#if defined(i386_HOST_ARCH)
+#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
  if ( *(unsigned char*)ptr != 0x68 &&
       *(unsigned char*)ptr != 0x58 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
@@ -1015,6 +1027,12 @@ freeHaskellFunctionPtr(void* ptr)
  } else {
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }
+#elif defined(x86_TARGET_ARCH) && defined(darwin_HOST_OS)
+if ( *(unsigned char*)ptr != 0xe8 ) {
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
+ freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #elif defined(x86_64_HOST_ARCH)
  if ( *(StgWord16 *)ptr == 0x894d ) {
      freeStablePtr(*(StgStablePtr*)(ptr+32));
