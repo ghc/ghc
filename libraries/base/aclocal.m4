@@ -111,6 +111,12 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <stdio.h>
 # include <OpenGL/gl.h>
 #endif
 
+#if defined(HAVE_AL_AL_H)
+# include <AL/al.h>
+#elif defined(HAVE_OPENAL_AL_H)
+# include <OpenAL/al.h>
+#endif
+
 #if defined(HAVE_AL_ALC_H)
 # include <AL/alc.h>
 #elif defined(HAVE_OPENAL_ALC_H)
