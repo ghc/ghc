@@ -34,7 +34,7 @@
 
 module Data.Set  ( 
             -- * Set type
-              Set          -- instance Eq,Show
+              Set          -- instance Eq,Ord,Show,Read,Data,Typeable
 
             -- * Operators
             , (\\)
@@ -522,8 +522,20 @@ showSet (x:xs)
   where
     showTail []     = showChar '}'
     showTail (x:xs) = showChar ',' . shows x . showTail xs
-    
 
+{--------------------------------------------------------------------
+  Read
+--------------------------------------------------------------------}
+instance (Read a, Ord a) => Read (Set a) where
+  readsPrec i r = [ (fromList xs, t) | ("{",s) <- lex r,  (xs,t) <- readl s ]
+      where readl s  = [([],t)   | ("}",t) <- lex s] ++
+                       [(x:xs,u) | (x,t)   <- readsPrec i s
+                                 , (xs,u)  <- readl' t]
+            readl' s = [([],t)   | ("}",t) <- lex s] ++
+                       [(x:xs,v) | (",",t) <- lex s
+                                 , (x,u)   <- readsPrec i t
+                                 , (xs,v)  <- readl' u]
+    
 {--------------------------------------------------------------------
   Typeable/Data
 --------------------------------------------------------------------}
