@@ -527,13 +527,15 @@ showSet (x:xs)
   Read
 --------------------------------------------------------------------}
 instance (Read a, Ord a) => Read (Set a) where
-  readsPrec i r = [ (fromList xs, t) | ("{",s) <- lex r,  (xs,t) <- readl s ]
+  readsPrec _ = readParen False $ \ r ->
+            [(fromList xs,t)     | ("{",s) <- lex r,
+                                   (xs,t)  <- readl s]
       where readl s  = [([],t)   | ("}",t) <- lex s] ++
-                       [(x:xs,u) | (x,t)   <- readsPrec i s
+                       [(x:xs,u) | (x,t)   <- reads s
                                  , (xs,u)  <- readl' t]
             readl' s = [([],t)   | ("}",t) <- lex s] ++
                        [(x:xs,v) | (",",t) <- lex s
-                                 , (x,u)   <- readsPrec i t
+                                 , (x,u)   <- reads t
                                  , (xs,v)  <- readl' u]
     
 {--------------------------------------------------------------------
