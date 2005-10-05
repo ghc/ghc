@@ -81,20 +81,19 @@ import Prelude hiding (
 	reverse)
 import qualified Prelude (foldr)
 import qualified Data.List (foldl', intersperse)
+import Control.Monad (MonadPlus(..))
 import Data.FunctorM
 import Data.Typeable
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
+import Data.Generics.Basics (Data(..), Fixity(..),
+			constrIndex, mkConstr, mkDataType)
 #endif
 
 #if TESTING
 import Control.Monad (liftM, liftM2, liftM3, liftM4)
 import Test.QuickCheck
-#endif
-
-#if __GLASGOW_HASKELL__
-import Data.Generics.Basics (Data(..), Fixity(..),
-			constrIndex, mkConstr, mkDataType)
 #endif
 
 infixr 5 `consTree`
@@ -107,15 +106,28 @@ infixl 5 |>, :>
 class Sized a where
 	size :: a -> Int
 
-------------------------------------------------------------------------
--- Random access sequences
-------------------------------------------------------------------------
-
 -- | General-purpose finite sequences.
 newtype Seq a = Seq (FingerTree (Elem a))
 
 instance Functor Seq where
 	fmap f (Seq xs) = Seq (fmap (fmap f) xs)
+
+instance Monad Seq where
+	return = singleton
+	xs >>= f = foldl' add empty xs
+	  where add ys x = ys >< f x
+
+instance MonadPlus Seq where
+	mzero = empty
+	mplus = (><)
+
+instance FunctorM Seq where
+	fmapM f = foldlM f' empty
+	  where f' ys x = do
+			y <- f x
+			return $! (ys |> y)
+	fmapM_ f = foldlM f' ()
+	  where f' _ x = f x >> return ()
 
 instance Eq a => Eq (Seq a) where
 	xs == ys = length xs == length ys && toList xs == toList ys
@@ -133,14 +145,6 @@ instance Show a => Show (Seq a) where
 						(map shows (toList xs))) .
 		showChar '>'
 #endif
-
-instance FunctorM Seq where
-	fmapM f = foldlM f' empty
-	  where f' ys x = do
-			y <- f x
-			return $! (ys |> y)
-	fmapM_ f = foldlM f' ()
-	  where f' _ x = f x >> return ()
 
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(Seq,seqTc,"Seq")
