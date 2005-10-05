@@ -157,6 +157,7 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 
 #endif /* GRAN || PAR */
 
+
 /* -----------------------------------------------------------------------------
    Updates: lower-level macros which update a closure with an
    indirection to another closure.
@@ -193,26 +194,28 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 
 #ifdef CMINUSMINUS
 
-#define DEBUG_FILL_SLOP(p)					\
-  W_ inf;							\
-  W_ np;							\
-  W_ nw;							\
-  W_ i;								\
-  inf = %GET_STD_INFO(p);					\
-  np = TO_W_(%INFO_PTRS(inf));					\
-  nw = TO_W_(%INFO_NPTRS(inf));					\
-  if (%INFO_TYPE(inf) == HALF_W_(THUNK_SELECTOR)) {		\
-	StgThunk_payload(p,0) = 0;				\
-  } else { if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)) {		\
-    i = 0;							\
-    for:							\
-      if (i < np + nw) {					\
-        StgThunk_payload(p,i) = 0;				\
-        i = i + 1;						\
-        goto for;						\
-      }								\
+#define DEBUG_FILL_SLOP(p)						\
+  W_ inf;								\
+  W_ sz;								\
+  W_ i;									\
+  inf = %GET_STD_INFO(p);						\
+  if (%INFO_TYPE(inf) == HALF_W_(THUNK_SELECTOR)) {			\
+	StgThunk_payload(p,0) = 0;					\
+  } else { 								\
+    if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)) {			\
+      if (%INFO_TYPE(inf) == HALF_W_(AP_STACK)) {			\
+          sz = StgAP_STACK_size(p) + BYTES_TO_WDS(SIZEOF_StgAP_STACK_NoHdr); \
+      } else {								\
+          sz = TO_W_(%INFO_PTRS(inf)) + TO_W_(%INFO_NPTRS(inf));	\
+      }									\
+      i = 0;								\
+      for:								\
+        if (i < sz) {							\
+          StgThunk_payload(p,i) = 0;					\
+          i = i + 1;							\
+          goto for;							\
+        }								\
   } }
-
 
 #else /* !CMINUSMINUS */
 
@@ -220,11 +223,13 @@ INLINE_HEADER void
 DEBUG_FILL_SLOP(StgClosure *p)
 {						
     StgInfoTable *inf = get_itbl(p);		
-    nat np = inf->layout.payload.ptrs,		
-	nw = inf->layout.payload.nptrs, i;
+    nat i, sz;
 
     switch (inf->type) {
     case BLACKHOLE:
+	break;
+    case AP_STACK:
+	sz = ((StgAP_STACK *)p)->size + sizeofW(StgAP_STACK) - sizeofW(StgHeader);
 	break;
     case THUNK_SELECTOR:
 #ifdef SMP
@@ -232,9 +237,11 @@ DEBUG_FILL_SLOP(StgClosure *p)
 #endif
 	break;
     default:
-	for (i = 0; i < np + nw; i++) {
-	    ((StgThunk *)p)->payload[i] = 0;
-	}
+	sz = inf->layout.payload.ptrs + inf->layout.payload.nptrs;
+        break;
+    }
+    for (i = 0; i < sz; i++) {
+	((StgThunk *)p)->payload[i] = 0;
     }
 }
 
