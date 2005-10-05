@@ -477,7 +477,25 @@
 	<listitem>
 	  <para>Include links to the source files in the generated
 	  documentation, where <replaceable>URL</replaceable> is the
-	  base URL where the source files can be found.</para>
+	  base URL where the source files can be found.  The following
+	    substitutions are made within the string
+	    <replaceable>URL</replaceable>:</para>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para>The string <literal>%M</literal> is replaced by the module name
+		(with &lsquo;.&rsquo; replaced by &lsquo;/&rsquo;).</para>
+	    </listitem>
+	    <listitem>
+	      <para>The string <literal>%F</literal> is replaced by the
+	      source file name.</para>
+	    </listitem>
+	  </itemizedlist>
+
+	  <para>For example, if your sources are online in a single directory,
+	    you would say <literal>haddock -s
+	      <replaceable>url</replaceable>/%F</literal>.</para>
+
 	</listitem>
       </varlistentry>
 
