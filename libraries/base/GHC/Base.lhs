@@ -700,7 +700,8 @@ lazy x = x
 -- call to 'assert'.
 --
 -- Assertions can normally be turned on or off with a compiler flag
--- (for GHC, assertions are normally on unless the @-fignore-asserts@
+-- (for GHC, assertions are normally on unless optimisation is turned on 
+-- with @-O@ or the @-fignore-asserts@
 -- option is given).  When assertions are turned off, the first
 -- argument to 'assert' is ignored, and the second argument is
 -- returned as the result.
