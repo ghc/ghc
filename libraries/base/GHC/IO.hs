@@ -401,8 +401,8 @@ unpackAcc buf (I# r) (I# len) acc = IO $ \s -> unpack acc (len -# 1#) s
 --  * 'isPermissionError' if another system resource limit would be exceeded.
 
 hPutChar :: Handle -> Char -> IO ()
-hPutChar handle c = 
-    c `seq` do   -- must evaluate c before grabbing the handle lock
+hPutChar handle c = do
+    c `seq` return ()
     wantWritableHandle "hPutChar" handle $ \ handle_  -> do
     let fd = haFD handle_
     case haBufferMode handle_ of
