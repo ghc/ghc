@@ -588,12 +588,6 @@
 	      <entry><option>-fno-glasgow-exts</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fignore-asserts</option></entry>
-	      <entry>Ignore assertions</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-ignore-asserts</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-fimplicit-params</option></entry>
 	      <entry>Enable Implicit Parameters.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
