@@ -1,6 +1,9 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* We don't point module references ("..." in doc strings) to the correct
+  package, they are always assumed to be modules in the current package.
+
 * For a non-home occurrence of an entity, we should point to the home
   location in the doc somehow.  This would help to distinguish
   multiple functions with the same name (eg. we don't know whether
