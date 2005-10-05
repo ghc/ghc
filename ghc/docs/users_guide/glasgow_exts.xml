@@ -4369,12 +4369,13 @@ can still define and use your own versions of
 </para>
 
 <para>
-To have the compiler ignore uses of assert, use the compiler option
-<option>-fignore-asserts</option>. <indexterm><primary>-fignore-asserts
-option</primary></indexterm> That is, expressions of the form
+GHC ignores assertions when optimisation is turned on with the
+      <option>-O</option><indexterm><primary><option>-O</option></primary></indexterm> flag.  That is, expressions of the form
 <literal>assert pred e</literal> will be rewritten to
-<literal>e</literal>.
-</para>
+<literal>e</literal>.  You can also disable assertions using the
+      <option>-fignore-asserts</option>
+      option<indexterm><primary><option>-fignore-asserts</option></primary>
+      </indexterm>.</para>
 
 <para>
 Assertion failures can be caught, see the documentation for the
