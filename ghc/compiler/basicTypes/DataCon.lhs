@@ -12,7 +12,8 @@ module DataCon (
 	dataConTyVars, dataConStupidTheta, 
 	dataConArgTys, dataConOrigArgTys, dataConResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
-	dataConFieldLabels, dataConStrictMarks, dataConExStricts,
+	dataConFieldLabels, dataConFieldType,
+	dataConStrictMarks, dataConExStricts,
 	dataConSourceArity, dataConRepArity,
 	dataConIsInfix,
 	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
@@ -40,6 +41,7 @@ import Outputable
 import Unique		( Unique, Uniquable(..) )
 import ListSetOps	( assoc )
 import Util		( zipEqual, zipWithEqual )
+import Maybes           ( expectJust )
 \end{code}
 
 
@@ -453,6 +455,10 @@ dataConImplicitIds dc = case dcIds dc of
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
+
+dataConFieldType :: DataCon -> FieldLabel -> Type
+dataConFieldType con label = expectJust "unexpected label" $
+    lookup label (dcFields con `zip` dcOrigArgTys con)
 
 dataConStrictMarks :: DataCon -> [StrictnessMark]
 dataConStrictMarks = dcStrictMarks
