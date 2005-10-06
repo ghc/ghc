@@ -162,9 +162,9 @@ nameSpaceString TcClsName = "Type constructor or class"
 
 \begin{code}
 data OccName = OccName 
-			NameSpace
-			EncodedFS
-   {-! derive : Binary !-}
+    { occNameSpace  :: NameSpace
+    , occNameFS     :: EncodedFS
+    }
 \end{code}
 
 
@@ -346,17 +346,11 @@ intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
 %************************************************************************
 
 \begin{code} 
-occNameFS :: OccName -> EncodedFS
-occNameFS (OccName _ s) = s
-
 occNameString :: OccName -> EncodedString
 occNameString (OccName _ s) = unpackFS s
 
 occNameUserString :: OccName -> UserString
 occNameUserString occ = decode (occNameString occ)
-
-occNameSpace :: OccName -> NameSpace
-occNameSpace (OccName sp _) = sp
 
 setOccNameSpace :: NameSpace -> OccName -> OccName
 setOccNameSpace sp (OccName _ occ) = OccName sp occ
