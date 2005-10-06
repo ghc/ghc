@@ -455,7 +455,7 @@ idAppIsCheap id n_val_args
   | otherwise 
   = case globalIdDetails id of
 	DataConWorkId _ -> True
-	RecordSelId _ _ -> n_val_args == 1 	-- I'm experimenting with making record selection
+	RecordSelId {}  -> n_val_args == 1 	-- I'm experimenting with making record selection
 	ClassOpId _     -> n_val_args == 1 	-- look cheap, so we will substitute it inside a
 						-- lambda.  Particularly for dictionary field selection.
 		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
