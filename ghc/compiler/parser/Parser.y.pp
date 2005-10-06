@@ -461,7 +461,7 @@ tycl_decl :: { LTyClDecl RdrName }
 		    (mkTyData DataType $2 Nothing (reverse (unLoc $3)) (unLoc $4)) }
 
         | 'data' tycl_hdr opt_kind_sig 
-		 'where' gadt_constrlist	-- No deriving for GADTs
+		 'where' gadt_constrlist
 		 deriving
 		{ L (comb4 $1 $2 $4 $5)
 		    (mkTyData DataType $2 $3 (reverse (unLoc $5)) (unLoc $6)) }
