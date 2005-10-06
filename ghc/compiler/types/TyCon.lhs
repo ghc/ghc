@@ -102,7 +102,7 @@ data TyCon
 	algTcFields :: [(FieldLabel, Type, Id)],  
 					-- Its fields (empty if none): 
 					--  * field name
-					--  * its type (scoped over tby tyConTyVars)
+					--  * its type (scoped over by tyConTyVars)
 					--  * record selector (name = field name)
 
 	algTcStupidTheta :: [PredType],	-- The "stupid theta" for the data type
