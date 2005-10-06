@@ -17,7 +17,7 @@ module HsTypes (
 	mkExplicitHsForAllTy, mkImplicitHsForAllTy, 
 	hsTyVarName, hsTyVarNames, replaceTyVarName,
 	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
-	splitHsInstDeclTy,
+	splitHsInstDeclTy, splitHsFunType,
 	
 	-- Type place holder
 	PostTcType, placeHolderType,
@@ -235,6 +235,13 @@ splitHsInstDeclTy inst_ty
   where
     split_tau tvs cxt (HsPredTy (HsClassP cls tys)) = (tvs, cxt, cls, tys)
     split_tau tvs cxt (HsParTy (L _ ty))	    = split_tau tvs cxt ty
+
+-- Splits HsType into the (init, last) parts
+splitHsFunType :: LHsType name -> ([LHsType name], LHsType name)
+splitHsFunType (L l (HsFunTy x y)) = (x:args, res)
+  where
+  (args, res) = splitHsFunType y
+splitHsFunType other = ([], other)
 \end{code}
 
 
