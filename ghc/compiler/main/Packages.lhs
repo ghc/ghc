@@ -346,7 +346,8 @@ mkPackageState dflags orig_pkg_db = do
 		  where myname = pkgName (package p)
 			myversion = pkgVersion (package p)
 			a_later_version_is_exposed
-			  = not (null [ p | p <- pkgs1, let pkg = package p,
+			  = not (null [ p | p <- pkgs1, exposed p,
+					    let pkg = package p,
 					    pkgName pkg == myname,
 					    pkgVersion pkg > myversion ])
   --
