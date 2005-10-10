@@ -227,7 +227,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
 
     switch (inf->type) {
     case BLACKHOLE:
-	break;
+	return;
     case AP_STACK:
 	sz = ((StgAP_STACK *)p)->size + sizeofW(StgAP_STACK) - sizeofW(StgHeader);
 	break;
@@ -235,7 +235,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
 #ifdef SMP
 	((StgSelector *)p)->selectee = 0;
 #endif
-	break;
+	return;
     default:
 	sz = inf->layout.payload.ptrs + inf->layout.payload.nptrs;
         break;
