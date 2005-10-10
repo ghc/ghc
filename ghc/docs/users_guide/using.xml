@@ -96,21 +96,47 @@ module X where
   </sect1>
     
   <sect1 id="static-dynamic-flags">
-    <title>Static vs. Dynamic options</title>
+    <title>Static, Dynamic, and Mode options</title>
     <indexterm><primary>static</primary><secondary>options</secondary>
     </indexterm>
     <indexterm><primary>dynamic</primary><secondary>options</secondary>
     </indexterm>
+    <indexterm><primary>mode</primary><secondary>options</secondary>
+    </indexterm>
 
     <para>Each of GHC's command line options is classified as either
-    <firstterm>static</firstterm> or <firstterm>dynamic</firstterm>.
-    A static flag may only be specified on the command line, whereas a
-    dynamic flag may also be given in an <literal>OPTIONS_GHC</literal>
-    pragma in a source file or set from the GHCi command-line with
-    <literal>:set</literal>.</para>
+    <firstterm>static</firstterm> or <firstterm>dynamic</firstterm> or
+      <firstterm>mode</firstterm>:</para>
 
-    <para>As a rule of thumb, options which relate to filenames are
-    static, and the rest are dynamic. The flag reference tables (<xref
+    <variablelist>
+      <varlistentry>
+	<term>Mode flags</term>
+	<listitem>
+	  <para>For example, <option>--make</option> or <option>-E</option>.
+	    There may be only a single mode flag on the command line.  The
+	    available modes are listed in <xref linkend="modes">.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>Dynamic Flags</term>
+	<listitem>
+	  <para>Most non-mode flags fall into this category.  A dynamic flag
+	    may be used on the command line, in a
+	    <literal>GHC_OPTIONS</literal> pragma in a source file, or set
+	    using <literal>:set</literal> in GHCi.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>Static Flags</term>
+	<listitem>
+	  <para>A few flags are "static", which means they can only be used on
+	    the command-line, and remain in force over the entire GHC/GHCi
+	    run.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+    
+    <para>The flag reference tables (<xref
     linkend="flag-reference"/>) lists the status of each flag.</para>
   </sect1>
 
