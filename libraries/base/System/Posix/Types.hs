@@ -34,7 +34,7 @@ module System.Posix.Types (
 #if defined(HTYPE_PID_T)
   CPid,
 #endif
-#if defined(HTYPE_SIZE_T) || defined(HTYPE_SSIZE_T)
+#if defined(HTYPE_SSIZE_T)
   CSsize,
 #endif
 
@@ -119,11 +119,7 @@ INTEGRAL_TYPE(COff,tyConCOff,"COff",HTYPE_OFF_T)
 INTEGRAL_TYPE(CPid,tyConCPid,"CPid",HTYPE_PID_T)
 #endif
 
-#if defined(HTYPE_SIZE_T)
-INTEGRAL_TYPE(CSsize,tyConCSsize,"CSsize",HTYPE_SIZE_T)
-#endif
-
-#if defined(HTYPE_SSIZE_T) && !defined(HTYPE_SIZE_T)
+#if defined(HTYPE_SSIZE_T)
 INTEGRAL_TYPE(CSsize,tyConCSsize,"CSsize",HTYPE_SSIZE_T)
 #endif
 
