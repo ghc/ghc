@@ -26,13 +26,13 @@
 	    <row>
 	      <entry><option>-?</option></entry>
 	      <entry>help</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-help</option></entry>
 	      <entry>help</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -50,25 +50,25 @@
 	    <row>
 	      <entry><option>-V</option></entry>
 	      <entry>display GHC version</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>&ndash;&ndash;version</option></entry>
 	      <entry>display GHC version</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>&ndash;&ndash;numeric-version</option></entry>
 	      <entry>display GHC version (numeric only)</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>&ndash;&ndash;print-libdir</option></entry>
 	      <entry>display GHC library directory</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -101,25 +101,25 @@
 	    <row>
 	      <entry><option>-E</option></entry>
 	      <entry>Stop after preprocessing (<literal>.hspp</literal> file)</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-C</option></entry>
 	      <entry>Stop after generating C (<literal>.hc</literal> file)</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-S</option></entry>
 	      <entry>Stop after generating assembly (<literal>.s</literal> file)</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-c</option></entry>
-	      <entry>Stop after compiling to object code (<literal>.o</literal> file)</entry>
-	      <entry>static</entry>
+	      <entry>Do not link</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -152,31 +152,31 @@
 	    <row>
 	      <entry><option>--interactive</option></entry>
 	      <entry>Interactive mode - normally used by just running <command>ghci</command></entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>--make</option></entry>
 	      <entry>Build a multi-module Haskell program, automatically figuring out dependencies. Likely to be much easier, and faster, than using <command>make</command>.</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-e <replaceable>expr</replaceable></option></entry>
 	      <entry>Evaluate <replaceable>expr</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-M</option></entry>
 	      <entry>Generate dependency information suitable for use in a <filename>Makefile</filename>.</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>--mk-dll</option></entry>
 	      <entry>DLL-creation mode (Windows only)</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -203,43 +203,43 @@
 	    <row>
 	      <entry><option>-hcsuf</option> <replaceable>suffix</replaceable></entry>
 	      <entry>set the suffix to use for intermediate C files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-hidir</option> <replaceable>dir</replaceable></entry>
 	      <entry>set directory for interface files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-hisuf</option> <replaceable>suffix</replaceable></entry>
 	      <entry>set the suffix to use for interface files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-o</option> <replaceable>filename</replaceable></entry>
 	      <entry>set output filename</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-odir</option> <replaceable>dir</replaceable></entry>
 	      <entry>set output directory</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-ohi</option> <replaceable>filename</replaceable></entry>
 	      <entry>set the filename in which to put the interface</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry></entry>
 	    </row>
 	    <row>
 	      <entry><option>-osuf</option> <replaceable>suffix</replaceable></entry>
 	      <entry>set the output file suffix</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -266,25 +266,25 @@
 	    <row>
 	      <entry><option>-keep-hc-file</option></entry>
 	      <entry>retain intermediate <literal>.hc</literal> files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-keep-s-file</option></entry>
 	      <entry>retain intermediate <literal>.s</literal> files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-keep-raw-s-file</option></entry>
 	      <entry>retain intermediate <literal>.raw_s</literal> files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-keep-tmp-files</option></entry>
 	      <entry>retain all intermediate temporary files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -311,7 +311,7 @@
 	    <row>
 	      <entry><option>-tmpdir</option></entry>
 	      <entry>set the directory for temporary files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -340,13 +340,13 @@
 	      <entry><option>-i</option><replaceable>dir1</replaceable>:<replaceable>dir2</replaceable>:...</entry>
 	      <entry>add <replaceable>dir</replaceable>,
 	          <replaceable>dir2</replaceable>, etc. to import path</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-i</option></entry>
 	      <entry>Empty the import directory list</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -394,7 +394,7 @@
 	      <entry>Read the interface in
 	      <replaceable>file</replaceable> and dump it as text to
 	      <literal>stdout</literal>.</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -483,7 +483,7 @@
 	    <row>
 	      <entry><option>-package</option> <replaceable>P</replaceable></entry>
 	      <entry>Expose package <replaceable>P</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -495,25 +495,25 @@
 	    <row>
 	      <entry><option>-hide-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Hide package <replaceable>P</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-ignore-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Ignore package <replaceable>P</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-package-conf</option> <replaceable>file</replaceable></entry>
 	      <entry>Load more packages from <replaceable>file</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-no-user-package-conf</option></entry>
 	      <entry>Don't load the user's package config file.</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -878,7 +878,7 @@
 	    <row>
 	      <entry><option>-fexcess-precision</option></entry>
 	      <entry>Enable excess intermediate precision</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-excess-precision</option></entry>
 	    </row>
 
@@ -893,14 +893,14 @@
 	    <row>
 	      <entry><option>-fignore-asserts</option></entry>
 	      <entry>Ignore assertions in the source</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-ignore-asserts</option></entry>
 	    </row>
 
 	    <row>
 	      <entry><option>-fignore-interface-pragmas</option></entry>
 	      <entry>Ignore pragmas in interface files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-ignore-interface-pragmas</option></entry>
 	    </row>
 
@@ -1151,7 +1151,7 @@
 	      <entry><option>-I</option><replaceable>dir</replaceable></entry>
 	      <entry>Add <replaceable>dir</replaceable> to the
 	      directory search list for <literal>#include</literal> files</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -1217,7 +1217,7 @@
 	    <row>
 	      <entry><option>-fno-code</option></entry>
 	      <entry>Omit code generation</entry>
-	      <entry>static</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -1251,7 +1251,7 @@
 	      <entry><option>-framework</option> <replaceable>name</replaceable></entry>
 	      <entry>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
 		This option corresponds to the <option>-framework</option> option for Apple's Linker.</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -1259,50 +1259,50 @@
 	      <entry>On Darwin/MacOS X only, add <replaceable>dir</replaceable> to the list of
 	        directories searched for frameworks.
 		This option corresponds to the <option>-F</option> option for Apple's Linker.</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-l</option><replaceable>lib</replaceable></entry>
 	      <entry>Link in library <replaceable>lib</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-L</option><replaceable>dir</replaceable></entry>
 	      <entry>Add <replaceable>dir</replaceable> to the list of
 	      directories searched for libraries</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-main-is</option></entry>
 	      <entry>Set main function</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-no-hs-main</option></entry>
 	      <entry>Don't assume this program contains <literal>main</literal></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-no-link</option></entry>
 	      <entry>Omit linking</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Link in package <replaceable>name</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-split-objs</option></entry>
 	      <entry>Split objects (for libraries)</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -1347,50 +1347,51 @@
 	    <row>
 	      <entry><option>-pgmL</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the literate pre-processor</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgmP</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the C
 	      pre-processor (with <option>-cpp</option> only)</entry>
-	      <entry>static</entry> <entry>-</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgmc</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the C compiler</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgma</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the assembler</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgml</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the linker</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgmdll</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the DLL generator</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgmdep</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the dependency generator</entry>
-	      <entry>static</entry>
+	      <entry>dyanmic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-pgmF</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the pre-processor
 	      (with <option>-F</option> only)</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -1458,19 +1459,19 @@
 	    <row>
 	      <entry><option>-optl</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the linker</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-optdll</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the DLL generator</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-optdep</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the dependency generator</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -1538,7 +1539,7 @@
 	</tgroup>
       </informaltable>
     </sect2>
-	
+
 
     <sect2>
       <title>Compiler debugging options</title>
@@ -1822,12 +1823,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-fglobalise-toplev-names</option></entry>
-	      <entry>Make all top-level names global (for <option>-split-objs</option>)</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-fno-hi-version-check</option></entry>
 	      <entry>Don't complain about <literal>.hi</literal> file mismatches</entry>
 	      <entry>static</entry>
@@ -1846,12 +1841,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-fno-prune-decls</option></entry>
-	      <entry>Renamer: don't prune declarations</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-fhistory-size</option></entry>
 	      <entry>Set simplification history size</entry>
 	      <entry>static</entry>
@@ -1866,7 +1855,7 @@
 	    <row>
 	      <entry><option>-fno-asm-mangling</option></entry>
 	      <entry>Turn off assembly mangling (use <option>-unreg</option> instead)</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
