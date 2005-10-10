@@ -827,8 +827,8 @@ extractClassDecl _ _ _ d =
 extractRecSel :: HsName -> Module -> HsName -> [HsName] -> [HsConDecl]
               -> HsDecl
 extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
-extractRecSel _ _ _ _ (d@(HsConDecl{}):_) =
-    error $ "Main.extractRecSel: unexpected (con)decl" ++ show d
+extractRecSel nm mdl t tvs (d@(HsConDecl{}):rest) =
+    extractRecSel nm mdl t tvs rest
 extractRecSel nm mdl t tvs (HsRecDecl loc _ _tvs _ fields _mb_doc : rest)
   | (HsFieldDecl ns ty mb_doc : _) <- matching_fields
 	= HsTypeSig loc [nm] (HsTyFun data_ty (unbang ty)) mb_doc
