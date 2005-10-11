@@ -5004,7 +5004,7 @@ choices, but it gives a single path that works.</para>
   - cvs checkout ghc hslibs libraries
 
 - Build ghc, using cygwin and mingw, targetting mingw
-  - export PATH=/cygdrive/c/ghc/ghc-6.4.1/tools:$PATH
+  - export PATH=/cygdrive/c/ghc/ghc-6.4.1:$PATH
     ; for haddock, alex, happy (*)
   - export PATH=/cygdrive/c/mingw/bin:$PATH
     ; without, we pick up some cygwin tools at best!
@@ -5015,9 +5015,11 @@ choices, but it gives a single path that works.</para>
     ; we use cygwin, but build for windows
   - cp mk/build.mk.sample mk/build.mk
   - in mk/build.mk:
-    uncomment line: BuildFlavour = perf
-    add line:       BIN_DIST=1
     add line:       SplitObjs = NO
+	(MSYS seems slow when there are zillions of object files)
+    uncomment line: BuildFlavour = perf
+	(or BuildFlavour = devel, if you are doing development)
+    add line:       BIN_DIST=1
   - make 2>&amp;1 | tee make.log
     ; always useful to have a log around
 
