@@ -989,6 +989,10 @@ memInventory(void)
   for (i = 0; i < n_nurseries; i++) {
       total_blocks += stepBlocks(&nurseries[i]);
   }
+#ifdef SMP
+  // We put pinned object blocks in g0s0, so better count blocks there too.
+  total_blocks += stepBlocks(g0s0);
+#endif
 
   /* any blocks held by allocate() */
   for (bd = small_alloc_list; bd; bd = bd->link) {
