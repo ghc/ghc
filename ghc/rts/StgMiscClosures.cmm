@@ -343,6 +343,7 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 
 #if defined(SMP)
     foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+    // released in stg_block_blackhole_finally
 #endif
 
     /* Put ourselves on the blackhole queue */
@@ -353,12 +354,7 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
     StgTSO_block_info(CurrentTSO) = R1;
 
-#if defined(SMP)
-    foreign "C" RELEASE_LOCK(sched_mutex "ptr");
-#endif
-
-    /* stg_gen_block is too heavyweight, use a specialised one */
-    jump stg_block_1;
+    jump stg_block_blackhole;
 }
 
 #if defined(PAR) || defined(GRAN)
@@ -408,6 +404,7 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 
 #if defined(SMP)
     foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+    // released in stg_block_blackhole_finally
 #endif
 
     /* Put ourselves on the blackhole queue */
@@ -418,12 +415,7 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
     StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
     StgTSO_block_info(CurrentTSO) = R1;
 
-#if defined(SMP)
-    foreign "C" RELEASE_LOCK(sched_mutex "ptr");
-#endif
-
-    /* stg_gen_block is too heavyweight, use a specialised one */
-    jump stg_block_1;
+    jump stg_block_blackhole;
 }
 
 #ifdef EAGER_BLACKHOLING

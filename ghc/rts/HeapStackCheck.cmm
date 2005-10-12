@@ -881,6 +881,26 @@ stg_block_putmvar
     BLOCK_BUT_FIRST(stg_block_putmvar_finally);
 }
 
+// code fragment executed just before we return to the scheduler
+stg_block_blackhole_finally
+{
+#if defined(SMP)
+    // The last thing we do is release sched_lock, which is
+    // preventing other threads from accessing blackhole_queue and
+    // picking up this thread before we are finished with it.
+    foreign "C" RELEASE_LOCK(sched_mutex "ptr");
+#endif
+    jump StgReturn;
+}
+
+stg_block_blackhole
+{
+    Sp_adj(-2);
+    Sp(1) = R1;
+    Sp(0) = stg_enter_info;
+    BLOCK_BUT_FIRST(stg_block_blackhole_finally);
+}
+
 #ifdef mingw32_HOST_OS
 INFO_TABLE_RET( stg_block_async, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
