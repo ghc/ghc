@@ -75,12 +75,16 @@ class (Ord a) => Ix a where
     unsafeRangeSize     :: (a,a) -> Int
 
 	-- Must specify one of index, unsafeIndex
-    index b i | inRange b i = unsafeIndex b i
+    index b i | inRange b i = unsafeIndex b i	
 	      | otherwise   = error "Error in array index"
     unsafeIndex b i = index b i
 
     rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
-		       | otherwise   = 0
+		       | otherwise   = 0	-- This case is only here to
+						-- check for an empty range
+	-- NB: replacing (inRange b h) by (l <= h) fails for
+	--     tuples.  E.g.  (1,2) <= (2,1) but the range is empty
+
     unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 \end{code}
 
