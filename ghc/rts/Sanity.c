@@ -547,6 +547,12 @@ checkHeap(bdescr *bd)
 {
     StgPtr p;
 
+#if defined(SMP)
+    // heap sanity checking doesn't work with SMP, because we can't
+    // zero the slop (see Updates.h).
+    return;
+#endif
+
     for (; bd != NULL; bd = bd->link) {
 	p = bd->start;
 	while (p < bd->free) {
