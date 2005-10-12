@@ -42,7 +42,7 @@ import DataCon		( DataCon, dataConTyCon, isVanillaDataCon, dataConInstOrigArgTys
 			  dataConFieldLabels, dataConSourceArity, dataConSig )
 import PrelNames	( integralClassName )
 import BasicTypes	( isBoxed )
-import SrcLoc		( Located(..), SrcSpan, noLoc, unLoc )
+import SrcLoc		( Located(..), SrcSpan, noLoc )
 import Maybes		( catMaybes )
 import ErrUtils		( Message )
 import Outputable
@@ -75,13 +75,21 @@ tcPat	:: PatCtxt
 		[TcTyVar], 	-- Existential binders
 		a)		-- Result of thing inside
 
-tcPat ctxt pat exp_ty thing_inside
-  = do	{ err_ctxt <- getErrCtxt
-	; maybeAddErrCtxt (patCtxt (unLoc pat))	$
-	    tc_lpat ctxt pat exp_ty $
-	      setErrCtxt err_ctxt thing_inside }
-	-- Restore error context before doing thing_inside
-	-- See note [Nesting] above
+tcPat ctxt (L span pat) exp_ty thing_inside
+  = do	{ 	-- Restore error context before doing thing_inside
+		-- See note [Nesting] above
+	  err_ctxt <- getErrCtxt
+	; let real_thing_inside = setErrCtxt err_ctxt thing_inside
+
+		-- It's OK to keep setting the SrcSpan; 
+		-- it just overwrites the previous value
+	; (pat', tvs, res) <- setSrcSpan span			$
+			      maybeAddErrCtxt (patCtxt pat)	$
+			      tc_pat ctxt pat exp_ty 		$
+			      real_thing_inside
+
+	; return (L span pat', tvs, res)
+    }
 
 --------------------
 tcPats	:: PatCtxt
@@ -167,21 +175,13 @@ bindInstsOfPatId id thing_inside
 %************************************************************************
 
 \begin{code}
-tc_lpat	:: PatCtxt
-	-> LPat Name -> Expected TcSigmaType
+tc_pat	:: PatCtxt
+	-> Pat Name -> Expected TcSigmaType
 	-> TcM a		-- Thing inside
-	-> TcM (LPat TcId, 	-- Translated pattern
+	-> TcM (Pat TcId, 	-- Translated pattern
 		[TcTyVar], 	-- Existential binders
 		a)		-- Result of thing inside
 
-tc_lpat ctxt (L span pat) pat_ty thing_inside
-  = setSrcSpan span $ 
-	-- It's OK to keep setting the SrcSpan; 
-	-- it just overwrites the previous value
-    do	{ (pat', tvs, res) <- tc_pat ctxt pat pat_ty thing_inside
-	; return (L span pat', tvs, res) }
-
----------------------
 tc_pat ctxt (VarPat name) pat_ty thing_inside
   = do	{ id <- tcPatBndr ctxt name pat_ty
 	; (res, binds) <- bindInstsOfPatId id $
@@ -193,7 +193,7 @@ tc_pat ctxt (VarPat name) pat_ty thing_inside
 	; return (pat', [], res) }
 
 tc_pat ctxt (ParPat pat) pat_ty thing_inside
-  = do	{ (pat', tvs, res) <- tc_lpat ctxt pat pat_ty thing_inside
+  = do	{ (pat', tvs, res) <- tcPat ctxt pat pat_ty thing_inside
 	; return (ParPat pat', tvs, res) }
 
 -- There's a wrinkle with irrefuatable patterns, namely that we
@@ -208,7 +208,7 @@ tc_pat ctxt (ParPat pat) pat_ty thing_inside
 -- because they won't be in scope when we do the desugaring
 tc_pat ctxt lpat@(LazyPat pat) pat_ty thing_inside
   = do	{ reft <- getTypeRefinement
-	; (pat', pat_tvs, res) <- tc_lpat ctxt pat pat_ty $
+	; (pat', pat_tvs, res) <- tcPat ctxt pat pat_ty $
 				  setTypeRefinement reft thing_inside
 	; if (null pat_tvs) then return ()
 	  else lazyPatErr lpat pat_tvs
@@ -229,7 +229,7 @@ tc_pat ctxt (WildPat _) pat_ty thing_inside
 tc_pat ctxt (AsPat (L nm_loc name) pat) pat_ty thing_inside
   = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr ctxt name pat_ty)
 	; (pat', tvs, res) <- tcExtendIdEnv1 name bndr_id $
-			      tc_lpat ctxt pat (Check (idType bndr_id)) thing_inside
+			      tcPat ctxt pat (Check (idType bndr_id)) thing_inside
 	    -- NB: if we do inference on:
 	    --		\ (y@(x::forall a. a->a)) = e
 	    -- we'll fail.  The as-pattern infers a monotype for 'y', which then
@@ -248,7 +248,7 @@ tc_pat ctxt (SigPatIn pat sig) pat_ty thing_inside
 	      sig_ty'  = substTy subst sig_ty
 	; (pat', tvs, res) 
 	      <- tcExtendTyVarEnv2 tv_binds $
-		 tc_lpat ctxt pat (Check sig_ty') thing_inside
+		 tcPat ctxt pat (Check sig_ty') thing_inside
 
 	; return (SigPatOut pat' sig_ty, tvs, res) }
 
@@ -362,6 +362,7 @@ tcConPat ctxt span data_con tycon ty_args arg_pats thing_inside
 
   | otherwise	-- GADT case
   = do	{ let (tvs, theta, arg_tys, _, res_tys) = dataConSig data_con
+	; traceTc (text "tcConPat: GADT" <+> ppr data_con)
 	; span <- getSrcSpanM
 	; let rigid_info = PatSkol data_con span
 	; tvs' <- tcSkolTyVars rigid_info tvs
