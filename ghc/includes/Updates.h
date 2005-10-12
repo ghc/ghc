@@ -185,8 +185,13 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
  * to point to itself, and the closure being updated should not
  * already have been updated (the mutable list will get messed up
  * otherwise).
+ *
+ * NB. We do *not* do this in SMP mode, because when we have the
+ * possibility of multiple threads entering the same closure, zeroing
+ * the slop in one of the threads would have a disastrous effect on
+ * the other (seen in the wild!).
  */
-#if !defined(DEBUG)
+#if !defined(DEBUG) || defined(SMP)
 
 #define DEBUG_FILL_SLOP(p) /* nothing */
 
