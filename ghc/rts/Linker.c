@@ -1212,6 +1212,7 @@ loadObj( char *path )
     // reading the file, and then we misalign oc->image on purpose so
     // that the actual sections end up aligned again.
    misalignment = machoGetMisalignment(f);
+   oc->misalignment = misalignment;
 #else
    misalignment = 0;
 #endif
@@ -1428,6 +1429,10 @@ static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
   int pagesize, n, m;
 #endif
   int aligned;
+  int misalignment = 0;
+#if darwin_HOST_OS
+  misalignment = oc->misalignment;
+#endif
 
   if( count > 0 )
   {
@@ -1462,9 +1467,12 @@ static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
     }
 
 #else
+    oc->image -= misalignment;
     oc->image = stgReallocBytes( oc->image,
+                                 misalignment + 
                                  aligned + sizeof (ppcJumpIsland) * count,
                                  "ocAllocateJumpIslands" );
+    oc->image += misalignment;
 #endif /* USE_MMAP */
 
     oc->jump_islands = (ppcJumpIsland *) (oc->image + aligned);
