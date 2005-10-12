@@ -38,7 +38,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
 			  pprTcTyVar, isTauTy, isSigmaTy, mkFunTy, mkFunTys, mkTyConApp,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, tcEqType,
-			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy,
+			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, isMetaTyVar,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar )
@@ -54,7 +54,7 @@ import TcMType		( condLookupTcTyVar, LookupTyVarResult(..),
 import TcSimplify	( tcSimplifyCheck )
 import TcIface		( checkWiredInTyCon )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
-import TyCon		( TyCon, tyConArity, tyConTyVars )
+import TyCon		( TyCon, tyConArity, tyConTyVars, isFunTyCon )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
@@ -293,11 +293,14 @@ zapToTyConApp :: TyCon			-- T :: k1 -> ... -> kn -> *
 	      -> TcM [TcType]      	-- Element types, a b c
   -- Insists that the Expected type is not a forall-type
   -- It's used for wired-in tycons, so we call checkWiredInTyCOn
+  -- Precondition: never called with FunTyCon
 zapToTyConApp tc (Check ty)
-   = do { checkWiredInTyCon tc ; unifyTyConApp tc ty }	 -- NB: fails for a forall-type
+   = ASSERT( not (isFunTyCon tc) )	-- Never called with FunTyCon
+     do { checkWiredInTyCon tc ; unifyTyConApp tc ty }	 -- NB: fails for a forall-type
 
 zapToTyConApp tc (Infer hole) 
-  = do	{ (tc_app, elt_tys) <- newTyConApp tc
+  = do	{ (_, elt_tys, _) <- tcInstTyVars (tyConTyVars tc)
+	; let tc_app = mkTyConApp tc elt_tys
 	; writeMutVar hole tc_app
 	; traceTc (text "zap" <+> ppr tc)
 	; checkWiredInTyCon tc
@@ -309,40 +312,48 @@ zapToListTy exp_ty = do	{ [elt_ty] <- zapToTyConApp listTyCon exp_ty
 
 ----------------------
 unifyTyConApp :: TyCon -> TcType -> TcM [TcType]
-unifyTyConApp tc ty = unify_tc_app True tc ty
-	-- Add a boolean flag to remember whether to use 
-	-- the type refinement or not
+unifyTyConApp tc ty 
+  = ASSERT( not (isFunTyCon tc) )	-- Never called with FunTyCon
+    unify_tc_app (tyConArity tc) True tc ty
+		-- Add a boolean flag to remember whether 
+		-- to use the type refinement or not
 
 unifyListTy :: TcType -> TcM TcType	-- Special case for lists
 unifyListTy exp_ty = do	{ [elt_ty] <- unifyTyConApp listTyCon exp_ty
 			; return elt_ty }
 
 ----------
-unify_tc_app use_refinement tc (NoteTy _ ty)
-  = unify_tc_app use_refinement tc ty
+unify_tc_app n_args use_refinement tc (NoteTy _ ty)
+  = unify_tc_app n_args use_refinement tc ty
 
-unify_tc_app use_refinement tc ty@(TyVarTy tyvar)
-  = do	{ details <- condLookupTcTyVar use_refinement tyvar
+unify_tc_app n_args use_refinement tc (TyConApp tycon arg_tys)
+  | tycon == tc
+  = ASSERT( n_args == length arg_tys )	-- ty::*
+    mapM (wobblify use_refinement) arg_tys
+  
+unify_tc_app n_args use_refinement tc (AppTy fun_ty arg_ty)
+  = do  { arg_ty' <- wobblify use_refinement arg_ty
+	; arg_tys <- unify_tc_app (n_args - 1) use_refinement tc fun_ty
+	; return (arg_tys ++ [arg_ty']) }
+
+unify_tc_app n_args use_refinement tc ty@(TyVarTy tyvar)
+  = do	{ traceTc (text "unify_tc_app: tyvar" <+> pprTcTyVar tyvar)
+	; details <- condLookupTcTyVar use_refinement tyvar
 	; case details of
-	    IndirectTv use' ty' -> unify_tc_app use' tc ty'
-	    other	 	-> unify_tc_app_help tc ty
+	    IndirectTv use' ty' -> unify_tc_app n_args use' tc ty'
+	    other	 	-> unify_tc_app_help n_args tc ty
 	}
 
-unify_tc_app use_refinement tc ty
-  | Just (tycon, arg_tys) <- tcSplitTyConApp_maybe ty,
-    tycon == tc
-  = ASSERT( tyConArity tycon == length arg_tys )	-- ty::*
-    mapM (wobblify use_refinement) arg_tys		
+unify_tc_app n_args use_refinement tc ty = unify_tc_app_help n_args tc ty
 
-unify_tc_app use_refinement tc ty = unify_tc_app_help tc ty
-
-unify_tc_app_help tc ty		-- Revert to ordinary unification
-  = do	{ (tc_app, arg_tys) <- newTyConApp tc
+unify_tc_app_help n_args tc ty		-- Revert to ordinary unification
+  = do	{ (_, elt_tys, _) <- tcInstTyVars (take n_args (tyConTyVars tc))
+	; let tc_app = mkTyConApp tc elt_tys
 	; if not (isTauTy ty) then	-- Can happen if we call zapToTyConApp tc (forall a. ty)
 	     unifyMisMatch ty tc_app
 	  else do
 	{ unifyTauTy ty tc_app
-	; returnM arg_tys } }
+	; returnM elt_tys } }
 
 
 ----------------------
@@ -382,17 +393,16 @@ wobblify :: Bool	-- True <=> don't wobblify
 	 -> TcM TcTauType	
 -- Return a wobbly type.  At the moment we do that by 
 -- allocating a fresh meta type variable.
-wobblify True  ty = return ty
+wobblify True  ty = return ty		-- Don't wobblify
+
+wobblify False ty@(TyVarTy tv) 
+	 | isMetaTyVar tv = return ty	-- Already wobbly
+
 wobblify False ty = do	{ uniq <- newUnique
     			; tv <- newMetaTyVar (mkSysTvName uniq FSLIT("w")) 
 					     (typeKind ty) 
 					     (Indirect ty)
 			; return (mkTyVarTy tv) }
-
-----------------------
-newTyConApp :: TyCon -> TcM (TcTauType, [TcTauType])
-newTyConApp tc = do { (tvs, args, _) <- tcInstTyVars (tyConTyVars tc)
-		    ; return (mkTyConApp tc args, args) }
 \end{code}
 
 
