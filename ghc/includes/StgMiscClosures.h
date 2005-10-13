@@ -454,6 +454,8 @@ RTS_FUN(stg_yield_to_interpreter);
 RTS_FUN(stg_gen_block);
 RTS_FUN(stg_block_noregs);
 RTS_FUN(stg_block_1);
+RTS_FUN(stg_block_blackhole);
+RTS_FUN(stg_block_blackhole_finally);
 RTS_FUN(stg_block_takemvar);
 RTS_ENTRY(stg_block_takemvar_ret);
 RTS_FUN(stg_block_putmvar);
