@@ -46,6 +46,11 @@ too many people got bitten by space leaks when it was lazy.
 -- It serves to keep the internal states of different invocations
 -- of 'runST' separate from each other and from invocations of
 -- 'Control.Monad.ST.stToIO'.
+--
+-- The '>>=' and '>>' operations are strict in the state (though not in
+-- values stored in the state).  For example,
+--
+-- @'runST' (writeSTRef _|_ v >>= f) = _|_@
 newtype ST s a = ST (STRep s a)
 type STRep s a = State# s -> (# State# s, a #)
 

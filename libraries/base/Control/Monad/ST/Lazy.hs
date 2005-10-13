@@ -9,8 +9,8 @@
 -- Portability :  non-portable (requires universal quantification for runST)
 --
 -- This module presents an identical interface to "Control.Monad.ST",
--- but the underlying implementation of the state thread is /lazy/ (in
--- the sense that (@_|_ >> a@ is not necessarily equal to @_|_@).
+-- except that the monad delays evaluation of state operations until
+-- a value depending on them is required.
 --
 -----------------------------------------------------------------------------
 
@@ -61,6 +61,10 @@ import Hugs.LazyST
 --
 -- It serves to keep the internal states of different invocations of
 -- 'runST' separate from each other and from invocations of 'stToIO'.
+--
+-- The '>>=' and '>>' operations are not strict in the state.  For example,
+--
+-- @'runST' (writeSTRef _|_ v >>= readSTRef _|_ >> return 2) = 2@
 newtype ST s a = ST (State s -> (a, State s))
 data State s = S# (State# s)
 
