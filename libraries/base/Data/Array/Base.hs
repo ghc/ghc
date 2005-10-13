@@ -18,6 +18,8 @@ module Data.Array.Base where
 
 import Prelude
 
+import Control.Monad.ST.Lazy ( strictToLazyST )
+import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import Data.Ix		( Ix, range, index, rangeSize )
 import Data.Int
 import Data.Word
@@ -1070,6 +1072,14 @@ instance MArray (STArray s) e (ST s) where
     unsafeRead  = ArrST.unsafeReadSTArray
     {-# INLINE unsafeWrite #-}
     unsafeWrite = ArrST.unsafeWriteSTArray
+
+instance MArray (STArray s) e (Lazy.ST s) where
+    {-# INLINE newArray #-}
+    newArray (l,u) e    = strictToLazyST (ArrST.newSTArray (l,u) e)
+    {-# INLINE unsafeRead #-}
+    unsafeRead arr i    = strictToLazyST (ArrST.unsafeReadSTArray arr i)
+    {-# INLINE unsafeWrite #-}
+    unsafeWrite arr i e = strictToLazyST (ArrST.unsafeWriteSTArray arr i e)
 
 #ifdef __HUGS__
 INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
