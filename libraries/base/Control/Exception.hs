@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (extended exceptions)
 --
 -- This module provides support for raising and catching both built-in
 -- and user-defined exceptions.

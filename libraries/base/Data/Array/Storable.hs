@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (uses Data.Array.MArray)
 --
 -- A storable array is an IO-mutable array which stores its
 -- contents in a contiguous memory block living in the C

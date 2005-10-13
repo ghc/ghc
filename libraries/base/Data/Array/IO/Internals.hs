@@ -7,7 +7,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (uses Data.Array.Base)
 --
 -- Mutable boxed and unboxed arrays in the IO monad.
 --

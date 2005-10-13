@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (uses Data.Array.MArray)
 --
 -- Mutable boxed and unboxed arrays in the 'Control.Monad.ST.ST' monad.
 --

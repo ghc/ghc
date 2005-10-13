@@ -8,7 +8,7 @@
 -- 
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
--- Portability :  non-portable
+-- Portability :  non-portable (requires POSIX)
 --
 -- POSIX support layer for the standard libraries.
 -- This library is built on *every* platform, including Win32.

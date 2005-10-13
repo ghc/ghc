@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (uses Data.Generics.Basics)
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
 -- See <http://www.cs.vu.nl/boilerplate/>. The present module provides

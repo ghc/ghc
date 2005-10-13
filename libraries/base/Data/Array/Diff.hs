@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (uses Data.Array.IArray)
 --
 -- Functional arrays with constant-time update.
 --

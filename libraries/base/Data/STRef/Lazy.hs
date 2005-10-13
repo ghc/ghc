@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (requires non-portable module ST)
+-- Portability :  non-portable (uses Control.Monad.ST.Lazy)
 --
 -- Mutable references in the lazy ST monad.
 --

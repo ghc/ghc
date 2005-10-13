@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (uses Data.Array.Base)
 --
 -- Immutable arrays, with an overloaded interface.  For array types which
 -- can be used with this interface, see the 'Array' type exported by this

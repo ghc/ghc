@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (local universal quantification)
 --
 -- \"Scrap your boilerplate\" --- Generic programming in Haskell 
 -- See <http://www.cs.vu.nl/boilerplate/>. The present module provides

@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (concurrency).
+-- Portability :  non-portable (concurrency)
 --
 -- Unbounded channels.
 --

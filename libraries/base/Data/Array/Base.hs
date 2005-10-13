@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable
+-- Portability :  non-portable (MPTCs, uses Control.Monad.ST)
 --
 -- Basis for IArray and MArray.  Not intended for external consumption;
 -- use IArray or MArray instead.

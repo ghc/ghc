@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
--- Portability :  non-portable (requires universal quantification for runST)
+-- Portability :  non-portable (uses Control.Monad.ST.Strict)
 --
 -- Mutable references in the (strict) ST monad (re-export of "Data.STRef")
 --
