@@ -23,7 +23,6 @@
 #include "ProfHeap.h"
 #include "Stats.h"
 #include "Hash.h"
-#include "StrHash.h"
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
 #include "Arena.h"
