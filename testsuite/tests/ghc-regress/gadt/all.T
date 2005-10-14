@@ -24,3 +24,6 @@ test('tc', normal, compile_and_run, [''])
 test('arrow', normal, compile, [''])
 test('tdpe', normal, compile, [''])
 test('Nilsson', normal, compile, [''])
+
+test('records', normal, compile_and_run, [''])
+test('records-fail1', normal, compile_fail, [''])

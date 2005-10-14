@@ -1,0 +1,5 @@
+
+records-fail1.hs:7:0:
+    Constructors T1 and T4 have a common field `x',
+      but have different result types
+    In the data type declaration for `T'
