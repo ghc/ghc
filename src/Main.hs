@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fglasgow-exts #-}
 --
 -- Haddock - A Haskell Documentation Tool
 --
@@ -22,6 +23,7 @@ import HsSyn
 import Map ( Map )
 import qualified Map hiding ( Map )
 import Set
+import Paths_Haddock	( getDataDir )
 
 import Control.Exception ( bracket )
 import Control.Monad ( when )
@@ -166,11 +168,7 @@ run flags files = do
       verbose = Flag_Verbose `elem` flags
 
   libdir <- case [str | Flag_Lib str <- flags] of
-		[] -> do maybe_exec_dir <- getBaseDir
-				-- Get directory of executable
-			 case maybe_exec_dir of
-                                       Nothing  -> return "."
-                                       Just dir -> return dir
+		[] -> getDataDir -- provided by Cabal
 		fs -> return (last fs)
 
   let css_file = case [str | Flag_CSS str <- flags] of
@@ -1404,34 +1402,3 @@ toModuleInfo descriptionOpt =
 
 type ErrMsg = String
 type ErrMsgM a = Writer [ErrMsg] a
-
-getBaseDir :: IO (Maybe String)
-#if defined(mingw32_HOST_OS)
-getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
-		buf <- mallocArray len
-                ret <- getModuleFileName nullPtr buf len
-                if ret == 0 then free buf >> return Nothing
-                            else do s <- peekCString buf
-                                    free buf
-                                    return (Just (rootDir s))
-  where
-    rootDir s = reverse (dropList "/haddock.exe" (reverse (normalisePath s)))
-
-foreign import stdcall unsafe "GetModuleFileNameA" 
-  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
-#else
-getBaseDir :: IO (Maybe String) = do return Nothing
-#endif
-normalisePath :: String -> String
--- Just changes '\' to '/'
-
-#if defined(mingw32_HOST_OS)
-normalisePath xs = subst '\\' '/' xs
-subst a b ls = map (\ x -> if x == a then b else x) ls
-#else
-normalisePath xs   = xs
-#endif
-dropList :: [b] -> [a] -> [a]
-dropList [] xs    = xs
-dropList _  xs@[] = xs
-dropList (_:xs) (_:ys) = dropList xs ys

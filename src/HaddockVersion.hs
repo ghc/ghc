@@ -8,10 +8,11 @@ module HaddockVersion (
 	projectName, projectVersion, projectUrl
    ) where
 
-import Version ( version )
+import Paths_Haddock ( version )
+import Data.Version ( showVersion )
 
 projectName, projectUrl :: String
 projectName = "Haddock"
 projectUrl = "http://www.haskell.org/haddock/"
 
-projectVersion = version
+projectVersion = showVersion version

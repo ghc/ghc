@@ -1,0 +1,49 @@
+name: Haddock
+version: 0.8
+license: BSD3
+license-file: LICENSE
+copyright: (c) Simon Marlow
+author: Simon Marlow
+maintainer: Simon Marlow <simonmar@microsoft.com>
+stability: stable
+homepage: http://www.haskell.org/haddock/
+synopsis: Haddock is a documentation-generation tool for Haskell libraries
+build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, network>=1.0
+data-files:
+	html/haddock.css
+	html/haddock.js
+	html/haskell_icon.gif
+	html/minus.gif
+	html/plus.gif
+
+executable: haddock
+hs-source-dirs: src
+main-is: Main.hs
+extensions: CPP
+other-modules:
+	Binary
+	BlockTable
+	Digraph
+	FastMutInt
+	HaddockDB
+	HaddockDevHelp
+	HaddockHH
+	HaddockHH2
+	HaddockHtml
+	HaddockLex
+	HaddockModuleTree
+	HaddockParse
+	HaddockRename
+	HaddockTypes
+	HaddockUtil
+	HaddockVersion
+	HsLexer
+	HsParseMonad
+	HsParseUtils
+	HsParser
+	HsSyn
+	Html
+	Main
+	Map
+	Set
+

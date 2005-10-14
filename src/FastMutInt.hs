@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp #-}
+{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 --
 -- (c) The University of Glasgow 2002
 --
