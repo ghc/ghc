@@ -654,7 +654,7 @@ add_package pkg_db ps p
   | p `elem` ps = return ps	-- Check if we've already added this package
   | otherwise =
       case lookupPackage pkg_db p of
-        Nothing -> Failed (missingPackageErr (packageIdString p))
+        Nothing -> Failed (missingPackageMsg (packageIdString p))
         Just pkg -> do
     	   -- Add the package's dependents also
 	   let deps = map mkPackageId (depends pkg)
@@ -662,7 +662,7 @@ add_package pkg_db ps p
     	   return (p : ps')
 
 missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
-missingPackageMsg p = ptext SLIT("unknown package:") <> text p
+missingPackageMsg p = ptext SLIT("unknown package:") <+> text p
 
 -- -----------------------------------------------------------------------------
 -- The home module set
