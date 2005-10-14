@@ -338,34 +338,49 @@ mkPackageState dflags orig_pkg_db = do
   -- versions of a package exposed, which can happen if you install a
   -- later version of a package in the user database, for example.
   --
-  let
-	pkgs2 = map maybe_hide pkgs1
-	   where maybe_hide p
-		   | a_later_version_is_exposed = p {exposed=False}
-		   | otherwise                  = p
-		  where myname = pkgName (package p)
-			myversion = pkgVersion (package p)
-			a_later_version_is_exposed
-			  = not (null [ p | p <- pkgs1, exposed p,
-					    let pkg = package p,
-					    pkgName pkg == myname,
-					    pkgVersion pkg > myversion ])
+  let maybe_hide p
+	   | not (exposed p) = return p
+	   | (p' : _) <- later_versions = do
+		debugTraceMsg dflags 2 $
+		   ("hiding package " ++ showPackageId (package p) ++
+		    " to avoid conflict with later version " ++
+		    showPackageId (package p'))
+		return (p {exposed=False})
+	   | otherwise = return p
+	  where myname = pkgName (package p)
+		myversion = pkgVersion (package p)
+		later_versions = [ p | p <- pkgs1, exposed p,
+				    let pkg = package p,
+				    pkgName pkg == myname,
+				    pkgVersion pkg > myversion ]
+		a_later_version_is_exposed
+		  = not (null later_versions)
+
+  pkgs2 <- mapM maybe_hide pkgs1
   --
   -- Eliminate any packages which have dangling dependencies (perhaps
   -- because the package was removed by -ignore-package).
   --
   let
 	elimDanglingDeps pkgs = 
-	   case partition (hasDanglingDeps pkgs) pkgs of
-	      ([],ps) -> ps
-	      (ps,qs) -> elimDanglingDeps qs
+	   case partition (not.null.snd) (map (getDanglingDeps pkgs) pkgs) of
+	      ([],ps) -> return (map fst ps)
+	      (ps,qs) -> do
+		 mapM_ reportElim ps
+		 elimDanglingDeps (map fst qs)
 
-	hasDanglingDeps pkgs p = any dangling (depends p)
+	reportElim (p, deps) = 
+		debugTraceMsg dflags 2 $ showSDoc $
+		   (ptext SLIT("package") <+> pprPkg p <+> 
+			ptext SLIT("will be ignored due to missing dependencies:") $$ 
+		    nest 2 (hsep (map (text.showPackageId) deps)))
+
+	getDanglingDeps pkgs p = (p, filter dangling (depends p))
 	  where dangling pid = pid `notElem` all_pids
 		all_pids = map package pkgs
   --
-  let pkgs = elimDanglingDeps pkgs2
-      pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
+  pkgs <- elimDanglingDeps pkgs2
+  let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
   --
   -- Find the transitive closure of dependencies of exposed
   --
@@ -496,7 +511,7 @@ pkgOverlapError overlaps =  vcat (map msg overlaps)
 	msg (mod,pkgs) =
 	   text "conflict: module" <+> quotes (ppr mod)
 		 <+> ptext SLIT("is present in multiple packages:")
-		 <+> hsep (punctuate comma (map (text.showPackageId.package) pkgs))
+		 <+> hsep (punctuate comma (map pprPkg pkgs))
 
 modOverlapError overlaps =   vcat (map msg overlaps)
   where 
@@ -505,7 +520,10 @@ modOverlapError overlaps =   vcat (map msg overlaps)
 		quotes (ppr mod),
 		ptext SLIT("belongs to the current program/library"),
 		ptext SLIT("and also to package"),
-		text (showPackageId (package pkg)) ]
+		pprPkg pkg ]
+
+pprPkg :: PackageConfig -> SDoc
+pprPkg p = text (showPackageId (package p))
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
