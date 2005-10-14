@@ -1,3 +1,7 @@
+Changes in version 0.8:
+
+-----------------------------------------------------------------------------
+
 Changes in version 0.7:
 
   * Changes in the way Haddock decides where to direct hyperlinks.  Each entity
