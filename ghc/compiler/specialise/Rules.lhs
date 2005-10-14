@@ -37,7 +37,7 @@ import VarEnv		( IdEnv, TyVarEnv, InScopeSet, emptyTidyEnv,
 import VarSet
 import Name		( Name, NamedThing(..), nameOccName )
 import NameEnv
-import Unify 		( tcMatchTyX, MatchEnv(..) )
+import Unify 		( ruleMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 import Outputable
 import FastString
@@ -514,7 +514,7 @@ We only want to replace (f T) with f', not (f Int).
 \begin{code}
 ------------------------------------------
 match_ty menv (tv_subst, id_subst) ty1 ty2
-  = do	{ tv_subst' <- Unify.tcMatchTyX menv tv_subst ty1 ty2
+  = do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
 	; return (tv_subst', id_subst) }
 \end{code}
 

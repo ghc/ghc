@@ -43,30 +43,31 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Type		( TyThing(..) )
+import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
-			  mkTyConApp, mkTyVarTys, mkClassPred, tcEqPred,
+			  mkTyConApp, mkTyVarTys, mkClassPred, 
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
-			  tcSplitFunTys, tcSplitForAllTys
+			  tcSplitFunTys, tcSplitForAllTys, dataConsStupidTheta
 			)
 import CoreUtils	( exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
-import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
+import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var )
-import VarSet		( isEmptyVarSet )
+import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
 import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
 import OccName		( mkOccFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, DataConIds(..), dataConTyVars,
-			  dataConFieldLabels, dataConRepArity, 
-			  dataConRepArgTys, dataConRepType, dataConStupidTheta, 
+			  dataConFieldLabels, dataConRepArity, dataConResTys,
+			  dataConRepArgTys, dataConRepType, 
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
-			  splitProductType, isVanillaDataCon
+			  splitProductType, isVanillaDataCon, dataConFieldType,
+			  dataConInstOrigArgTys
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
 			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
@@ -88,8 +89,7 @@ import PrelNames
 import Util             ( dropList, isSingleton )
 import Outputable
 import FastString
-import ListSetOps	( assoc, assocMaybe )
-import List		( nubBy )
+import ListSetOps	( assoc )
 \end{code}		
 
 %************************************************************************
@@ -378,32 +378,81 @@ Similarly for (recursive) newtypes
 	unN :: forall b. N -> b -> b
 	unN = /\b -> \n:N -> (coerce (forall a. a->a) n)
 
-\begin{code}
-mkRecordSelId tycon field_label field_ty
-	-- Assumes that all fields with the same field label have the same type
-  = sel_id
-  where
-    sel_id     = mkGlobalId (RecordSelId tycon field_label) field_label selector_ty info
-    data_cons  = tyConDataCons tycon
-    tyvars     = tyConTyVars tycon	-- These scope over the types in 
-					-- the FieldLabels of constructors of this type
-    data_ty   = mkTyConApp tycon tyvar_tys
-    tyvar_tys = mkTyVarTys tyvars
 
-	-- Very tiresomely, the selectors are (unnecessarily!) overloaded over
+Note [Naughty record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "naughty" field is one for which we can't define a record 
+selector, because an existential type variable would escape.  For example:
+	data T = forall a. MkT { x,y::a }
+We obviously can't define	
+	x (MkT v _) = v
+Nevertheless we *do* put a RecordSelId into the type environment
+so that if the user tries to use 'x' as a selector we can bleat
+helpfully, rather than saying unhelpfully that 'x' is not in scope.
+Hence the sel_naughty flag, to identify record selcectors that don't really exist.
+
+In general, a field is naughty if its type mentions a type variable that
+isn't in the result type of the constructor.
+
+For GADTs, we require that all constructors with a common field 'f' have the same
+result type (modulo alpha conversion).  [Checked in TcTyClsDecls.checkValidTyCon]
+E.g. 
+	data T where
+	  T1 { f :: a } :: T [a]
+	  T2 { f :: a, y :: b  } :: T [a]
+and now the selector takes that type as its argument:
+	f :: forall a. T [a] -> a
+	f t = case t of
+		T1 { f = v } -> v
+		T2 { f = v } -> v
+Note the forall'd tyvars of the selector are just the free tyvars
+of the result type; there may be other tyvars in the constructor's
+type (e.g. 'b' in T2).
+
+\begin{code}
+
+-- XXX - autrijus -
+-- Plan: 1. Determine naughtiness by comparing field type vs result type
+--       2. Install naughty ones with selector_ty of type _|_ and fill in mzero for info
+--       3. If it's not naughty, do the normal plan.
+
+mkRecordSelId :: TyCon -> FieldLabel -> Id
+mkRecordSelId tycon field_label
+	-- Assumes that all fields with the same field label have the same type
+  | is_naughty = naughty_id
+  | otherwise  = sel_id
+  where
+    is_naughty = not (tyVarsOfType field_ty `subVarSet` tyvar_set)
+    sel_id_details = RecordSelId tycon field_label is_naughty
+
+    -- Escapist case here for naughty construcotrs
+    -- We give it no IdInfo, and a type of forall a.a (never looked at)
+    naughty_id = mkGlobalId sel_id_details field_label forall_a_a noCafIdInfo
+    forall_a_a = mkForAllTy alphaTyVar (mkTyVarTy alphaTyVar)
+
+    -- Normal case starts here
+    sel_id = mkGlobalId sel_id_details field_label selector_ty info
+    data_cons  	      = tyConDataCons tycon	
+    data_cons_w_field = filter has_field data_cons	-- Can't be empty!
+    has_field con     = field_label `elem` dataConFieldLabels con
+
+    con1	= head data_cons_w_field
+    res_tys	= dataConResTys con1
+    tyvar_set	= tyVarsOfTypes res_tys
+    tyvars	= varSetElems tyvar_set
+    data_ty	= mkTyConApp tycon res_tys
+    field_ty	= dataConFieldType con1 field_label
+    
+	-- *Very* tiresomely, the selectors are (unnecessarily!) overloaded over
 	-- just the dictionaries in the types of the constructors that contain
 	-- the relevant field.  [The Report says that pattern matching on a
 	-- constructor gives the same constraints as applying it.]  Urgh.  
 	--
 	-- However, not all data cons have all constraints (because of
-	-- TcTyDecls.thinContext).  So we need to find all the data cons 
+	-- BuildTyCl.mkDataConStupidTheta).  So we need to find all the data cons 
 	-- involved in the pattern match and take the union of their constraints.
-	--
-	-- NB: this code relies on the fact that DataCons are quantified over
-	-- the identical type variables as their parent TyCon
-    needed_preds = [pred | (DataAlt dc, _, _) <- the_alts, pred <- dataConStupidTheta dc]
-    dict_tys     = mkPredTys (nubBy tcEqPred needed_preds)
-    n_dict_tys   = length dict_tys
+    stupid_dict_tys = mkPredTys (dataConsStupidTheta data_cons_w_field)
+    n_stupid_dicts  = length stupid_dict_tys
 
     (field_tyvars,field_theta,field_tau) = tcSplitSigmaTy field_ty
     field_dict_tys			 = mkPredTys field_theta
@@ -425,10 +474,10 @@ mkRecordSelId tycon field_label field_ty
 
     selector_ty :: Type
     selector_ty  = mkForAllTys tyvars $ mkForAllTys field_tyvars $
-		   mkFunTys dict_tys  $  mkFunTys field_dict_tys $
+		   mkFunTys stupid_dict_tys  $  mkFunTys field_dict_tys $
 		   mkFunTy data_ty field_tau
       
-    arity = 1 + n_dict_tys + n_field_dict_tys
+    arity = 1 + n_stupid_dicts + n_field_dict_tys
 
     (strict_sig, rhs_w_str) = dmdAnalTopRhs sel_rhs
 	-- Use the demand analyser to work out strictness.
@@ -445,18 +494,18 @@ mkRecordSelId tycon field_label field_ty
  	-- rather than n_dict_tys, because the latter gives an infinite loop:
 	-- n_dict tys depends on the_alts, which depens on arg_ids, which depends
 	-- on arity, which depends on n_dict tys.  Sigh!  Mega sigh!
-    dict_ids	    = mkTemplateLocalsNum  1		   dict_tys
-    max_dict_tys    = length (tyConStupidTheta tycon)
-    field_dict_base = max_dict_tys + 1
-    field_dict_ids  = mkTemplateLocalsNum  field_dict_base field_dict_tys
-    dict_id_base    = field_dict_base + n_field_dict_tys
-    data_id	    = mkTemplateLocal      dict_id_base    data_ty
-    arg_base	    = dict_id_base + 1
+    stupid_dict_ids  = mkTemplateLocalsNum 1 stupid_dict_tys
+    max_stupid_dicts = length (tyConStupidTheta tycon)
+    field_dict_base  = max_stupid_dicts + 1
+    field_dict_ids   = mkTemplateLocalsNum field_dict_base field_dict_tys
+    dict_id_base     = field_dict_base + n_field_dict_tys
+    data_id	     = mkTemplateLocal dict_id_base data_ty
+    arg_base	     = dict_id_base + 1
 
-    alts      = map mk_maybe_alt data_cons
-    the_alts  = catMaybes alts		-- Already sorted by data-con
+    the_alts :: [CoreAlt]
+    the_alts   = map mk_alt data_cons_w_field	-- Already sorted by data-con
+    no_default = length data_cons == length data_cons_w_field	-- No default needed
 
-    no_default = all isJust alts	-- No default needed
     default_alt | no_default = []
 		| otherwise  = [(DEFAULT, [], error_expr)]
 
@@ -465,7 +514,7 @@ mkRecordSelId tycon field_label field_ty
 	        | otherwise  = MayHaveCafRefs
 
     sel_rhs = mkLams tyvars   $ mkLams field_tyvars $ 
-	      mkLams dict_ids $ mkLams field_dict_ids $
+	      mkLams stupid_dict_ids $ mkLams field_dict_ids $
 	      Lam data_id     $ sel_body
 
     sel_body | isNewTyCon tycon = mk_result (mkNewTypeBody tycon field_ty (Var data_id))
@@ -479,30 +528,27 @@ mkRecordSelId tycon field_label field_ty
 	--	foo :: forall a. T -> a -> a
 	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
-    mk_maybe_alt data_con 
-	= ASSERT( dc_tyvars == tyvars )
-		-- The only non-vanilla case we allow is when we have an existential
-		-- context that binds no type variables, thus
-		--	data T a = (?v::Int) => MkT a
-		-- In the non-vanilla case, the pattern must bind type variables and
+    mk_alt data_con 
+      = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
+	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids)
+			(mk_result (Var the_arg_id))
+      where
+	(arg_prefix, arg_ids)
+	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
+	   = ([], mkTemplateLocalsNum arg_base (dataConInstOrigArgTys data_con res_tys))
+	   | otherwise
+	   = (dc_tyvars ++ mkTemplateLocalsNum arg_base (mkPredTys dc_theta),
+	      mkTemplateLocalsNum arg_base' dc_arg_tys)
 
-	  case maybe_the_arg_id of
-		Nothing		-> Nothing
-		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con (arg_prefix ++ arg_src_ids) $
-			    	         mk_result (Var the_arg_id))
-	where
-	    (dc_tyvars, dc_theta, dc_arg_tys, _, _) = dataConSig data_con
-	    arg_src_ids = mkTemplateLocalsNum arg_base dc_arg_tys
-	    arg_base'   = arg_base + length arg_src_ids
-	    arg_prefix	| isVanillaDataCon data_con = []
-			| otherwise = tyvars ++ mkTemplateLocalsNum arg_base' (mkPredTys dc_theta)
+	(dc_tyvars, dc_theta, dc_arg_tys, _, _) = dataConSig data_con
+	arg_base' = arg_base + length dc_theta
 
-	    unpack_base = arg_base' + length dc_theta
-	    uniqs = map mkBuiltinUnique [unpack_base..]
+	unpack_base = arg_base' + length dc_theta
+	uniqs = map mkBuiltinUnique [unpack_base..]
 
-    	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_src_ids) field_label
-    	    field_lbls	      = dataConFieldLabels data_con
+    	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` arg_ids) field_label
+    	field_lbls  = dataConFieldLabels data_con
 
     error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_tau full_msg
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 

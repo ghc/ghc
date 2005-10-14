@@ -9,8 +9,9 @@ module DataCon (
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
-	dataConTyVars, dataConStupidTheta, 
-	dataConArgTys, dataConOrigArgTys, dataConResTy,
+	dataConTyVars, dataConResTys,
+	dataConStupidTheta, 
+	dataConInstArgTys, dataConOrigArgTys, dataConInstResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
@@ -26,12 +27,12 @@ module DataCon (
 
 #include "HsVersions.h"
 
-import Type		( Type, ThetaType, substTyWith, substTy, zipTopTvSubst,
+import Type		( Type, ThetaType, substTyWith, substTy, zipOpenTvSubst,
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  splitTyConApp_maybe, 
 			  mkPredTys, isStrictPred, pprType
 			)
-import TyCon		( TyCon, FieldLabel, tyConDataCons, tyConDataCons, 
+import TyCon		( TyCon, FieldLabel, tyConDataCons, 
 			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
@@ -199,14 +200,24 @@ data DataCon
 				--	    Its type is of form
 				--	        forall a1..an . t1 -> ... tm -> T a1..an
 				-- 	    No existentials, no GADTs, nothing.
+				--
+				-- NB1: the order of the forall'd variables does matter;
+				--	for a vanilla constructor, we assume that if the result
+				--	type is (T t1 ... tn) then we can instantiate the constr
+				--	at types [t1, ..., tn]
+				--
+				-- NB2: a vanilla constructor can still be declared in GADT-style 
+				--	syntax, provided its type looks like the above.
 
 	dcTyVars :: [TyVar],	-- Universally-quantified type vars 
 				-- for the data constructor.
-		-- dcVanilla = True  <=> The [TyVar] are identical to those of the parent tycon
-		-- 	       False <=> The [TyVar] are NOT NECESSARILY THE SAME AS THE TYVARS
-		-- 				     FOR THE PARENT TyCon. (With GADTs the data
-		--				     con might not even have the same number of
-		--				     type variables.)
+		-- See NB1 on dcVanilla for the conneciton between dcTyVars and dcResTys
+		-- 
+		-- In general, the dcTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
+		-- FOR THE PARENT TyCon. With GADTs the data con might not even have 
+		-- the same number of type variables.
+		-- [This is a change (Oct05): previously, vanilla datacons guaranteed to
+		--  have the same type variables as their parent TyCon, but that seems ugly.]
 
 	dcStupidTheta  ::  ThetaType,	-- This is a "thinned" version of 
 					-- the context of the data decl.  
@@ -220,6 +231,11 @@ data DataCon
 		-- longer in the type of the wrapper Id, because
 		-- that makes it harder to use the wrap-id to rebuild
 		-- values after record selection or in generics.
+		--
+		-- Fact: the free tyvars of dcStupidTheta are a subset of
+		--	 the free tyvars of dcResTys
+		-- Reason: dcStupidTeta is gotten by instantiating the 
+		--	   stupid theta from the tycon (see BuildTyCl.mkDataConStupidTheta)
 
 	dcTheta  :: ThetaType,		-- The existentially quantified stuff
 					
@@ -494,33 +510,35 @@ dataConSig (MkData {dcTyVars = tyvars, dcTheta  = theta,
 		    dcOrigArgTys = arg_tys, dcTyCon = tycon, dcResTys = res_tys})
   = (tyvars, theta, arg_tys, tycon, res_tys)
 
-dataConArgTys :: DataCon
-	      -> [Type] 	-- Instantiated at these types
-				-- NB: these INCLUDE the existentially quantified arg types
-	      -> [Type]		-- Needs arguments of these types
+dataConStupidTheta :: DataCon -> ThetaType
+dataConStupidTheta dc = dcStupidTheta dc
+
+dataConResTys :: DataCon -> [Type]
+dataConResTys dc = dcResTys dc
+
+dataConInstArgTys :: DataCon
+	      	  -> [Type] 	-- Instantiated at these types
+	      	  		-- NB: these INCLUDE the existentially quantified arg types
+	      	  -> [Type]	-- Needs arguments of these types
 				-- NB: these INCLUDE the existentially quantified dict args
 				--     but EXCLUDE the data-decl context which is discarded
 				-- It's all post-flattening etc; this is a representation type
-dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
+dataConInstArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
  = ASSERT( length tyvars == length inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
 
-dataConResTy :: DataCon -> [Type] -> Type
-dataConResTy (MkData {dcTyVars = tyvars, dcTyCon = tc, dcResTys = res_tys}) inst_tys
+dataConInstResTy :: DataCon -> [Type] -> Type
+dataConInstResTy (MkData {dcTyVars = tyvars, dcTyCon = tc, dcResTys = res_tys}) inst_tys
  = ASSERT( length tyvars == length inst_tys )
-   substTy (zipTopTvSubst tyvars inst_tys) (mkTyConApp tc res_tys)
-	-- zipTopTvSubst because the res_tys can't contain any foralls
+   substTy (zipOpenTvSubst tyvars inst_tys) (mkTyConApp tc res_tys)
+	-- res_tys can't currently contain any foralls,
+	-- but might in future; hence zipOpenTvSubst
 
 -- And the same deal for the original arg tys
--- This one only works for vanilla DataCons
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
-dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars, dcVanilla = is_vanilla}) inst_tys
- = ASSERT( is_vanilla ) 
-   ASSERT( length tyvars == length inst_tys )
+dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
+ = ASSERT( length tyvars == length inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
-
-dataConStupidTheta :: DataCon -> ThetaType
-dataConStupidTheta dc = dcStupidTheta dc
 \end{code}
 
 These two functions get the real argument types of the constructor,
@@ -587,7 +605,7 @@ splitProductType_maybe ty
 	Just (tycon,ty_args)
 	   | isProductTyCon tycon  	-- Includes check for non-existential,
 					-- and for constructors visible
-	   -> Just (tycon, ty_args, data_con, dataConArgTys data_con ty_args)
+	   -> Just (tycon, ty_args, data_con, dataConInstArgTys data_con ty_args)
 	   where
 	      data_con = head (tyConDataCons tycon)
 	other -> Nothing

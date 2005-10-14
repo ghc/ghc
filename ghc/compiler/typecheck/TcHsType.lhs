@@ -14,7 +14,8 @@ module TcHsType (
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
-	tcTyVarBndrs, dsHsType, tcLHsConSig, tcDataKindSig,
+	tcTyVarBndrs, dsHsType, tcLHsConResTy,
+	tcDataKindSig,
 
 	tcHsPatSigType, tcAddLetBoundTyVars,
 	
@@ -23,9 +24,9 @@ module TcHsType (
 
 #include "HsVersions.h"
 
-import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, HsBang,
+import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, 
 			  LHsContext, HsPred(..), LHsPred, LHsBinds, HsExplicitForAll(..),
-			  getBangStrictness, collectSigTysFromHsBinds )
+			  collectSigTysFromHsBinds )
 import RnHsSyn		( extractHsTyVars )
 import TcRnMonad
 import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnvTvs, 
@@ -54,7 +55,6 @@ import NameSet
 import NameEnv
 import PrelNames	( genUnitTyConName )
 import TysWiredIn	( mkListTy, listTyCon, mkPArrTy, parrTyCon, tupleTyCon )
-import Bag		( bagToList )
 import BasicTypes	( Boxity(..), RecFlag )
 import SrcLoc		( Located(..), unLoc, noLoc, srcSpanStart )
 import UniqSupply	( uniqsFromSupply )
@@ -544,36 +544,12 @@ dsHsPred (HsIParam name ty)
 GADT constructor signatures
 
 \begin{code}
-tcLHsConSig :: LHsType Name 
-	    -> TcM ([TcTyVar], TcThetaType, 
-		    [HsBang], [TcType],
-		    TyCon, [TcType])
--- Take apart the type signature for a data constructor
--- The difference is that there can be bangs at the top of
--- the argument types, and kind-checking is the right place to check
-tcLHsConSig sig@(L span (HsForAllTy exp tv_names ctxt ty))
-  = setSrcSpan span		$
-    addErrCtxt (gadtSigCtxt sig) $
-    tcTyVarBndrs tv_names	$ \ tyvars ->
-    do	{ theta <- mappM dsHsLPred (unLoc ctxt)
-	; (bangs, arg_tys, tc, res_tys) <- tc_con_sig_tau ty
-	; return (tyvars, theta, bangs, arg_tys, tc, res_tys) }
-tcLHsConSig ty 
-  = do	{ (bangs, arg_tys, tc, res_tys) <- tc_con_sig_tau ty
-	; return ([], [], bangs, arg_tys, tc, res_tys) }
+tcLHsConResTy :: LHsType Name -> TcM (TyCon, [TcType])
+tcLHsConResTy ty@(L span _) 
+  = setSrcSpan span $ 
+    addErrCtxt (gadtResCtxt ty) $
+    tc_con_res ty []
 
---------
-tc_con_sig_tau (L _ (HsFunTy arg ty))
-  = do	{ (bangs, arg_tys, tc, res_tys) <- tc_con_sig_tau ty
-	; arg_ty <- tcHsBangType arg
-	; return (getBangStrictness arg : bangs, 
-		  arg_ty : arg_tys, tc, res_tys) }
-
-tc_con_sig_tau ty
-  = do	{ (tc, res_tys) <- tc_con_res ty []
-	; return ([], [], tc, res_tys) }
-
---------
 tc_con_res (L _ (HsAppTy fun res_ty)) res_tys
   = do	{ res_ty' <- dsHsType res_ty
 	; tc_con_res fun (res_ty' : res_tys) }
@@ -587,11 +563,11 @@ tc_con_res ty@(L _ (HsTyVar name)) res_tys
 
 tc_con_res ty _ = failWithTc (badGadtDecl ty)
 
-gadtSigCtxt ty
-  = hang (ptext SLIT("In the signature of a data constructor:"))
+gadtResCtxt ty
+  = hang (ptext SLIT("In the result type of a data constructor:"))
        2 (ppr ty)
 badGadtDecl ty
-  = hang (ptext SLIT("Malformed constructor signature:"))
+  = hang (ptext SLIT("Malformed constructor result type:"))
        2 (ppr ty)
 
 typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)

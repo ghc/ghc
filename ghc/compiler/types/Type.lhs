@@ -71,8 +71,8 @@ module Type (
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst,
 
 	-- Performing substitution on types
-	substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
-	deShadowTy, 
+	substTy, substTys, substTyWith, substTheta, 
+	substPred, substTyVar, substTyVarBndr, deShadowTy, 
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTyThingCategory,
@@ -1168,6 +1168,8 @@ zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendVarEnv env tv ty)
 	-- and so generated a rep type mentioning t not t2.  
 	--
 	-- Simplest fix is to nuke the "optimisation"
+zip_ty_env tvs      tys      env   = pprTrace "Var/Type length mismatch: " (ppr tvs $$ ppr tys) env
+-- zip_ty_env _ _ env = env
 
 instance Outputable TvSubst where
   ppr (TvSubst ins env) 

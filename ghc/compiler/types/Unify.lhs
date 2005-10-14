@@ -1,7 +1,7 @@
 \begin{code}
 module Unify ( 
 	-- Matching and unification
-	tcMatchTys, tcMatchTyX, tcMatchPreds, MatchEnv(..), 
+	tcMatchTys, tcMatchTyX, ruleMatchTyX, tcMatchPreds, MatchEnv(..), 
 
 	tcUnifyTys, 
 
@@ -22,7 +22,7 @@ import Kind		( isSubKind )
 import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, mkTyVarTys,
 			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
-import DataCon 		( DataCon, dataConResTy )
+import DataCon 		( DataCon, dataConInstResTy )
 import Util		( snocView )
 import ErrUtils		( Message )
 import Outputable
@@ -81,6 +81,19 @@ tcMatchTys tmpls tys1 tys2
 	-- We're assuming that all the interesting 
 	-- tyvars in tys1 are in tmpls
 
+-- This is similar, but extends a substitution
+tcMatchTyX :: TyVarSet 		-- Template tyvars
+	   -> TvSubst		-- Substitution to extend
+	   -> Type		-- Template
+	   -> Type		-- Target
+	   -> Maybe TvSubst
+tcMatchTyX tmpls (TvSubst in_scope subst_env) ty1 ty2
+  = case match menv subst_env ty1 ty2 of
+	Just subst_env -> Just (TvSubst in_scope subst_env)
+	Nothing	       -> Nothing
+  where
+    menv = ME {me_tmpls = tmpls, me_env = mkRnEnv2 in_scope}
+
 tcMatchPreds
 	:: [TyVar]			-- Bind these
 	-> [PredType] -> [PredType]
@@ -92,13 +105,13 @@ tcMatchPreds tmpls ps1 ps2
     in_scope_tyvars = mkInScopeSet (tyVarsOfTheta ps1 `unionVarSet` tyVarsOfTheta ps2)
 
 -- This one is called from the expression matcher, which already has a MatchEnv in hand
-tcMatchTyX :: MatchEnv 
+ruleMatchTyX :: MatchEnv 
 	 -> TvSubstEnv		-- Substitution to extend
 	 -> Type		-- Template
 	 -> Type		-- Target
 	 -> Maybe TvSubstEnv
 
-tcMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2	-- Rename for export
+ruleMatchTyX menv subst ty1 ty2 = match menv subst ty1 ty2	-- Rename for export
 \end{code}
 
 Now the internals of matching
@@ -231,7 +244,7 @@ coreRefineTys in_scope con tvs scrut_ty
 		
 	; return (subst_env_fixpt, all_bound_here subst_env) }
   where
-    pat_res_ty = dataConResTy con (mkTyVarTys tvs)
+    pat_res_ty = dataConInstResTy con (mkTyVarTys tvs)
 
 	-- 'tvs' are the tyvars bound by the pattern
     tv_set 	       = mkVarSet tvs

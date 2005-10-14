@@ -36,7 +36,7 @@ module TyCon(
 	tyConTyVars,
 	tyConArgVrcs,
 	algTyConRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
-	tyConFields, tyConSelIds,
+	tyConSelIds,
 	tyConStupidTheta,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
@@ -95,15 +95,10 @@ data TyCon
 	
 	tyConTyVars :: [TyVar],		-- Scopes over (a) the [PredType] in AlgTyConRhs.DataTyCon
 					--	       (b) the cached types in AlgTyConRhs.NewTyCon
-					--	       (c) the types in algTcFields
 					-- But not over the data constructors
 	argVrcs     :: ArgVrcs,
 
-	algTcFields :: [(FieldLabel, Type, Id)],  
-					-- Its fields (empty if none): 
-					--  * field name
-					--  * its type (scoped over by tyConTyVars)
-					--  * record selector (name = field name)
+	algTcSelIds :: [Id],  		-- Its record selectors (empty if none): 
 
 	algTcStupidTheta :: [PredType],	-- The "stupid theta" for the data type
 					-- (always empty for GADTs)
@@ -268,7 +263,7 @@ mkFunTyCon name kind
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars argvrcs stupid rhs flds is_rec gen_info
+mkAlgTyCon name kind tyvars argvrcs stupid rhs sel_ids is_rec gen_info
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
@@ -278,7 +273,7 @@ mkAlgTyCon name kind tyvars argvrcs stupid rhs flds is_rec gen_info
 	argVrcs		 = argvrcs,
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
-	algTcFields	 = flds,
+	algTcSelIds	 = sel_ids,
 	algTcClass	 = Nothing,
 	algTcRec	 = is_rec,
 	hasGenerics = gen_info
@@ -294,7 +289,7 @@ mkClassTyCon name kind tyvars argvrcs rhs clas is_rec
 	argVrcs		 = argvrcs,
 	algTcStupidTheta = [],
 	algTcRhs	 = rhs,
-	algTcFields	 = [],
+	algTcSelIds	 = [],
 	algTcClass	 = Just clas,
 	algTcRec	 = is_rec,
 	hasGenerics = False
@@ -496,12 +491,9 @@ tyConFamilySize (TupleTyCon {})	 			 = 1
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
 
-tyConFields :: TyCon -> [(FieldLabel,Type,Id)]
-tyConFields (AlgTyCon {algTcFields = fs}) = fs
-tyConFields other_tycon		          = []
-
 tyConSelIds :: TyCon -> [Id]
-tyConSelIds tc = [id | (_,_,id) <- tyConFields tc]
+tyConSelIds (AlgTyCon {algTcSelIds = fs}) = fs
+tyConSelIds other_tycon		          = []
 
 algTyConRhs :: TyCon -> AlgTyConRhs
 algTyConRhs (AlgTyCon {algTcRhs = rhs})  = rhs

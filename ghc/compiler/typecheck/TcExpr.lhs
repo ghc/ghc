@@ -40,20 +40,19 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcThingWithSig, TcMa
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( badFieldCon, refineTyVars )
 import TcMType		( tcInstTyVars, tcInstType, newTyFlexiVarTy, zonkTcType )
-import TcType		( Type, TcTyVar, TcType, TcSigmaType, TcRhoType, 
-			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
+import TcType		( TcTyVar, TcType, TcSigmaType, TcRhoType, 
+			  tcSplitFunTys, mkTyVarTys,
 			  isSigmaTy, mkFunTy, mkTyConApp, tyVarsOfTypes, isLinearPred,
 			  tcSplitSigmaTy, tidyOpenType
 			)
 import Kind		( openTypeKind, liftedTypeKind, argTypeKind )
 
-import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector, isNaughtyRecordSelector )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, 
-			  dataConWrapId )
+			  dataConWrapId, isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
 import Name		( Name )
-import TyCon		( TyCon, FieldLabel, tyConTyVars, tyConStupidTheta, 
-			  tyConDataCons, tyConFields )
-import Type		( zipTopTvSubst, substTheta, substTy )
+import TyCon		( TyCon, FieldLabel, tyConStupidTheta, tyConArity, tyConDataCons )
+import Type		( substTheta, substTy )
 import Var		( tyVarKind )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
@@ -61,18 +60,15 @@ import PrelNames	( enumFromName, enumFromThenName,
 			  enumFromToName, enumFromThenToName,
 			  enumFromToPName, enumFromThenToPName, negateName
 			)
-import ListSetOps	( minusList )
 import DynFlags
 import StaticFlags	( opt_NoMethodSharing )
 import HscTypes		( TyThing(..) )
 import SrcLoc		( Located(..), unLoc, getLoc )
 import Util
+import ListSetOps	( assocMaybe )
+import Maybes		( catMaybes )
 import Outputable
 import FastString
-
-#ifdef DEBUG
-import TyCon		( isAlgTyCon )
-#endif
 \end{code}
 
 %************************************************************************
@@ -351,34 +347,25 @@ tcExpr e@(HsArrForm _ _ _) _
 %************************************************************************
 
 \begin{code}
-tcExpr expr@(RecordCon con@(L loc con_name) _ rbinds) res_ty
-  = addErrCtxt (recordConCtxt expr)		$
-    addLocM (tcId (OccurrenceOf con_name)) con	`thenM` \ (con_expr, _, con_tau) ->
-    let
-	(_, record_ty)   = tcSplitFunTys con_tau
-	(tycon, ty_args) = tcSplitTyConApp record_ty
-    in
-    ASSERT( isAlgTyCon tycon )
-    zapExpectedTo res_ty record_ty      `thenM_`
+tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
+  = addErrCtxt (recordConCtxt expr) $
+    do	{ (con_expr, _, con_tau) <- setSrcSpan loc $ 
+				    tcId (OccurrenceOf con_name) con_name
+	; data_con <- tcLookupDataCon con_name
 
-	-- Check that the record bindings match the constructor
-	-- con_name is syntactically constrained to be a data constructor
-    tcLookupDataCon con_name		`thenM` \ data_con ->
-    let
-	bad_fields = badFields rbinds data_con
-    in
-    if notNull bad_fields then
-	mappM (addErrTc . badFieldCon data_con) bad_fields	`thenM_`
-	failM	-- Fail now, because tcRecordBinds will crash on a bad field
-    else
+	; let (arg_tys, record_ty) = tcSplitFunTys con_tau
+	      flds_w_tys = zipEqual "tcExpr RecordCon" (dataConFieldLabels data_con) arg_tys
+
+	-- Make the result type line up
+	; zapExpectedTo res_ty record_ty
 
 	-- Typecheck the record bindings
-    tcRecordBinds tycon ty_args rbinds		`thenM` \ rbinds' ->
+	; rbinds' <- tcRecordBinds data_con flds_w_tys rbinds
     
  	-- Check for missing fields
-    checkMissingFields data_con rbinds		`thenM_` 
+	; checkMissingFields data_con rbinds
 
-    returnM (RecordCon (L loc (dataConWrapId data_con)) con_expr rbinds')
+	; returnM (RecordCon (L loc (dataConWrapId data_con)) con_expr rbinds') }
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -433,25 +420,20 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	sel_id : _   = sel_ids
 	(tycon, _)   = recordSelectorFieldLabel sel_id	-- We've failed already if
 	data_cons    = tyConDataCons tycon		-- it's not a field label
-	tycon_tyvars = tyConTyVars tycon		-- The data cons use the same type vars
     in
-    tcInstTyVars tycon_tyvars		`thenM` \ (_, result_inst_tys, inst_env) ->
+
+	-- Check that all data cons are vanilla.  Doing record updates on GADTs
+	-- and/or existentials is more than my tiny brain can cope with today
+	-- [I think we might be able to manage if none of the selectors is naughty,
+	--  but that's for another day.]
+    checkTc (all isVanillaDataCon data_cons)
+	    (nonVanillaUpd tycon)	`thenM_`
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
     checkTc (any (null . badFields rbinds) data_cons)
 	    (badFieldsUpd rbinds)	`thenM_`
-
-	-- STEP 3
-	-- Typecheck the update bindings.
-	-- (Do this after checking for bad fields in case there's a field that
-	--  doesn't match the constructor.)
-    let
-	result_record_ty = mkTyConApp tycon result_inst_tys
-    in
-    zapExpectedTo res_ty result_record_ty	`thenM_`
-    tcRecordBinds tycon result_inst_tys rbinds	`thenM` \ rbinds' ->
 
 	-- STEP 4
 	-- Use the un-updated fields to find a vector of booleans saying
@@ -461,28 +443,44 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- have FieldLabels abstracted over the same tyvars.
     let
 	upd_field_lbls      = recBindFields rbinds
-	con_field_lbls_s    = map dataConFieldLabels data_cons
 
 		-- A constructor is only relevant to this process if
-		-- it contains all the fields that are being updated
-	relevant_field_lbls_s      = filter is_relevant con_field_lbls_s
-	is_relevant con_field_lbls = all (`elem` con_field_lbls) upd_field_lbls
+		-- it contains *all* the fields that are being updated
+	relevant_cons   = filter is_relevant data_cons
+	is_relevant con = all (`elem` dataConFieldLabels con) upd_field_lbls
+	con1 		= head relevant_cons	-- A representative constructor
+	con1_tyvars 	= dataConTyVars con1
+	con1_fld_tys    = dataConFieldLabels con1 `zip` dataConOrigArgTys con1
+	common_tyvars   = tyVarsOfTypes [ty | (fld,ty) <- con1_fld_tys
+					    , not (fld `elem` upd_field_lbls) ]
 
-	non_upd_field_lbls  = concat relevant_field_lbls_s `minusList` upd_field_lbls
-	common_tyvars       = tyVarsOfTypes [ty | (fld,ty,_) <- tyConFields tycon,
-						  fld `elem` non_upd_field_lbls]
  	is_common_tv tv = tv `elemVarSet` common_tyvars
 
 	mk_inst_ty tv result_inst_ty 
 	  | is_common_tv tv = returnM result_inst_ty		-- Same as result type
 	  | otherwise	    = newTyFlexiVarTy (tyVarKind tv)	-- Fresh type, of correct kind
     in
-    zipWithM mk_inst_ty tycon_tyvars result_inst_tys	`thenM` \ inst_tys ->
+    tcInstTyVars con1_tyvars				`thenM` \ (_, result_inst_tys, inst_env) ->
+    zipWithM mk_inst_ty con1_tyvars result_inst_tys	`thenM` \ inst_tys ->
+
+	-- STEP 3
+	-- Typecheck the update bindings.
+	-- (Do this after checking for bad fields in case there's a field that
+	--  doesn't match the constructor.)
+    let
+	result_record_ty = mkTyConApp tycon result_inst_tys
+	inst_fld_tys     = [(fld, substTy inst_env ty) | (fld, ty) <- con1_fld_tys]
+    in
+    zapExpectedTo res_ty result_record_ty	`thenM_`
+    tcRecordBinds con1 inst_fld_tys rbinds	`thenM` \ rbinds' ->
 
 	-- STEP 5
 	-- Typecheck the expression to be updated
     let
-	record_ty = mkTyConApp tycon inst_tys
+	record_ty = ASSERT( length inst_tys == tyConArity tycon )
+		    mkTyConApp tycon inst_tys
+	-- This is one place where the isVanilla check is important
+	-- So that inst_tys matches the tycon
     in
     tcCheckRho record_expr record_ty		`thenM` \ record_expr' ->
 
@@ -492,7 +490,8 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- do pattern matching over the data cons.
 	--
 	-- What dictionaries do we need?  
-	-- We just take the context of the type constructor
+	-- We just take the context of the first data constructor
+	-- This isn't right, but I just can't bear to union up all the relevant ones
     let
 	theta' = substTheta inst_env (tyConStupidTheta tycon)
     in
@@ -796,6 +795,8 @@ tcId orig id_name	-- Look up the Id and instantiate its type
 		-- Remember to chuck in the constraints from the "silly context"
 		; return (expr, tvs, tau) }
 
+    ;	AGlobal (AnId id) | isNaughtyRecordSelector id 
+			  -> failWithTc (naughtyRecordSel id)
     ;	AGlobal (AnId id) -> instantiate id
 		-- A global cannot possibly be ill-staged
 		-- nor does it need the 'lifting' treatment
@@ -923,35 +924,25 @@ This extends OK when the field types are universally quantified.
 	
 \begin{code}
 tcRecordBinds
-	:: TyCon		-- Type constructor for the record
-	-> [TcType]		-- Args of this type constructor
+	:: DataCon
+	-> [(FieldLabel,TcType)]	-- Expected type for each field
 	-> HsRecordBinds Name
 	-> TcM (HsRecordBinds TcId)
 
-tcRecordBinds tycon ty_args rbinds
-  = mappM do_bind rbinds
+tcRecordBinds data_con flds_w_tys rbinds
+  = do	{ mb_binds <- mappM do_bind rbinds
+	; return (catMaybes mb_binds) }
   where
-    tenv = zipTopTvSubst (tyConTyVars tycon) ty_args
-
     do_bind (L loc field_lbl, rhs)
+      | Just field_ty <- assocMaybe flds_w_tys field_lbl
       = addErrCtxt (fieldCtxt field_lbl)	$
-	let
-	    field_ty  = tyConFieldType tycon field_lbl
-	    field_ty' = substTy tenv field_ty
-	in
-	tcCheckSigma rhs field_ty' 		`thenM` \ rhs' ->
-        tcLookupId field_lbl			`thenM` \ sel_id ->
-	ASSERT( isRecordSelector sel_id )
-	returnM (L loc sel_id, rhs')
-
-tyConFieldType :: TyCon -> FieldLabel -> Type
-tyConFieldType tycon field_lbl
-  = case [ty | (f,ty,_) <- tyConFields tycon, f == field_lbl] of
-	[]	   -> panic "tyConFieldType"
-	(ty:other) -> ASSERT( null other) ty
-		-- This lookup and assertion will surely succeed, because
-		-- we check that the fields are indeed record selectors
-		-- before calling tcRecordBinds
+	do { rhs'   <- tcCheckSigma rhs field_ty
+	   ; sel_id <- tcLookupId field_lbl
+	   ; ASSERT( isRecordSelector sel_id )
+	     return (Just (L loc sel_id, rhs')) }
+      | otherwise
+      = do { addErrTc (badFieldCon data_con field_lbl)
+	   ; return Nothing }
 
 badFields rbinds data_con
   = filter (not . (`elem` field_names)) (recBindFields rbinds)
@@ -1077,12 +1068,21 @@ appCtxt fun args
   where
     the_app = foldl mkHsApp fun args	-- Used in error messages
 
+nonVanillaUpd tycon
+  = vcat [ptext SLIT("Record update for the non-Haskell-98 data type") <+> quotes (ppr tycon)
+		<+> ptext SLIT("is not (yet) supported"),
+	  ptext SLIT("Use pattern-matching instead")]
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))
 	 4 (pprQuotedList (recBindFields rbinds))
 
 recordUpdCtxt expr = ptext SLIT("In the record update:") <+> ppr expr
 recordConCtxt expr = ptext SLIT("In the record construction:") <+> ppr expr
+
+naughtyRecordSel sel_id
+  = ptext SLIT("Cannot use record selector") <+> quotes (ppr sel_id) <+> 
+    ptext SLIT("as a function due to escaped type variables") $$ 
+    ptext SLIT("Probably fix: use pattern-matching syntax instead")
 
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]

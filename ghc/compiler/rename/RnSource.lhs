@@ -16,7 +16,7 @@ import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv )
-import RdrHsSyn		( extractGenericPatTyVars )
+import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
@@ -40,6 +40,7 @@ import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
 import Maybe            ( isNothing )
+import BasicTypes       ( Boxity(..) )
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -445,9 +446,9 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 	     	   deriv_fvs) }
 
   | otherwise	-- GADT
-  = ASSERT( null (unLoc context) )
-    do	{ tycon' <- lookupLocatedTopBndrRn tycon
-	; tyvars' <- bindTyVarsRn data_doc tyvars 
+  = do	{ tycon' <- lookupLocatedTopBndrRn tycon
+	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
+    	; tyvars' <- bindTyVarsRn data_doc tyvars 
 				  (\ tyvars' -> return tyvars')
 		-- For GADTs, the type variables in the declaration 
 		-- do not scope over the constructor signatures
@@ -463,14 +464,13 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
   where
     is_vanilla = case condecls of	-- Yuk
 		     [] 		   -> True
-		     L _ (ConDecl {}) : _  -> True
+		     L _ (ConDecl { con_res = ResTyH98 }) : _  -> True
 		     other		   -> False
 
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
     con_names = map con_names_helper condecls
 
-    con_names_helper (L _ (ConDecl n _ _ _)) = n
-    con_names_helper (L _ (GadtDecl n _)) = n
+    con_names_helper (L _ c) = con_name c
 
     rn_derivs Nothing   = returnM (Nothing, emptyFVs)
     rn_derivs (Just ds) = rnLHsTypes data_doc ds	`thenM` \ ds' -> 
@@ -542,6 +542,10 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
     meth_doc = text "In the default-methods for class"	<+> ppr cname
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
     sig_doc  = text "In the signatures for class"  	<+> ppr cname
+
+badGadtStupidTheta tycon
+  = vcat [ptext SLIT("No context is allowed on a GADT-style data declaration"),
+	  ptext SLIT("(You can put a context on each contructor, though.)")]
 \end{code}
 
 %*********************************************************
@@ -556,24 +560,40 @@ rnConDecls tycon condecls
   = mappM (wrapLocM rnConDecl) condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
-rnConDecl (ConDecl name tvs cxt details)
-  = addLocM checkConName name		`thenM_` 
-    lookupLocatedTopBndrRn name		`thenM` \ new_name ->
+rnConDecl (ConDecl name expl tvs cxt details res_ty)
+  = do	{ addLocM checkConName name
 
-    bindTyVarsRn doc tvs 		$ \ new_tyvars ->
-    rnContext doc cxt			`thenM` \ new_context ->
-    rnConDetails doc details		`thenM` \ new_details -> 
-    returnM (ConDecl new_name new_tyvars new_context new_details)
+	; new_name <- lookupLocatedTopBndrRn name
+	; name_env <- getLocalRdrEnv
+	
+	-- For H98 syntax, the tvs are the existential ones
+	-- For GADT syntax, the tvs are all the quantified tyvars
+	-- Hence the 'filter' in the ResTyH98 case only
+	; let not_in_scope  = not . (`elemLocalRdrEnv` name_env) . unLoc
+	      arg_tys       = hsConArgs details
+	      implicit_tvs  = case res_ty of
+	      	    		ResTyH98 -> filter not_in_scope $
+						get_rdr_tvs arg_tys
+	      	    		ResTyGADT ty -> get_rdr_tvs (ty : arg_tys)
+	      tvs' = case expl of
+	        	Explicit -> tvs
+		    	Implicit -> userHsTyVarBndrs implicit_tvs
+
+	; bindTyVarsRn doc tvs' $ \new_tyvars -> do
+	{ new_context <- rnContext doc cxt
+        ; new_details <- rnConDetails doc details
+        ; new_res_ty  <- rnConResult doc res_ty
+        ; let rv = ConDecl new_name expl new_tyvars new_context new_details new_res_ty
+        ; traceRn (text "****** - autrijus" <> ppr rv)
+        ; return rv } }
   where
     doc = text "In the definition of data constructor" <+> quotes (ppr name)
+    get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy Boxed tys))
 
-rnConDecl (GadtDecl name ty) 
-  = addLocM checkConName name		`thenM_` 
-    lookupLocatedTopBndrRn name		`thenM` \ new_name ->
-    rnHsSigType doc ty                  `thenM` \ new_ty ->
-    returnM (GadtDecl new_name new_ty)
-  where
-    doc = text "In the definition of data constructor" <+> quotes (ppr name)
+rnConResult _ ResTyH98 = return ResTyH98
+rnConResult doc (ResTyGADT ty) = do
+    ty' <- rnHsSigType doc ty
+    return $ ResTyGADT ty'
 
 rnConDetails doc (PrefixCon tys)
   = mappM (rnLHsType doc) tys	`thenM` \ new_tys  ->

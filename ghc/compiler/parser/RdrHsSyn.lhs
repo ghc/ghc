@@ -28,14 +28,15 @@ module RdrHsSyn (
 			      -- -> (FastString, RdrName, RdrNameHsType)
 			      -- -> P RdrNameHsDecl
 	mkExtName,           -- RdrName -> CLabelString
+	mkGadtDecl,          -- Located RdrName -> LHsType RdrName -> ConDecl RdrName
 			      
 	-- Bunch of functions in the parser monad for 
 	-- checking and constructing values
 	checkPrecP, 	      -- Int -> P Int
 	checkContext,	      -- HsType -> P HsContext
 	checkPred,	      -- HsType -> P HsPred
-	checkTyClHdr,
-	checkSynHdr,	
+	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName])
+	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName])
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -603,6 +604,31 @@ checkValSig
 checkValSig (L l (HsVar v)) ty | isUnqual v = return (Sig (L l v) ty)
 checkValSig (L l other)     ty
   = parseError l "Type signature given for an expression"
+
+mkGadtDecl
+        :: Located RdrName
+        -> LHsType RdrName -- assuming HsType
+        -> ConDecl RdrName
+mkGadtDecl name (L _ (HsForAllTy _ qvars cxt ty)) = ConDecl
+  { con_name     = name
+  , con_explicit = Implicit
+  , con_qvars    = qvars
+  , con_cxt      = cxt
+  , con_details  = PrefixCon args
+  , con_res      = ResTyGADT res
+  }
+  where
+  (args, res) = splitHsFunType ty
+mkGadtDecl name ty = ConDecl
+  { con_name     = name
+  , con_explicit = Implicit
+  , con_qvars    = []
+  , con_cxt      = noLoc []
+  , con_details  = PrefixCon args
+  , con_res      = ResTyGADT res
+  }
+  where
+  (args, res) = splitHsFunType ty
 
 -- A variable binding is parsed as a FunBind.
 

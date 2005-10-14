@@ -12,7 +12,7 @@ import {-# SOURCE #-} Match	( match )
 
 import HsSyn		( Pat(..), HsConDetails(..) )
 import DsBinds		( dsLHsBinds )
-import DataCon		( isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
+import DataCon		( isVanillaDataCon, dataConTyVars, dataConInstOrigArgTys )
 import TcType		( tcTyConAppArgs )
 import Type		( substTys, zipTopTvSubst, mkTyVarTys )
 import CoreSyn
@@ -134,8 +134,7 @@ match_con vars ty eqns
      	-- Get the arg types, which we use to type the new vars
 	-- to match on, from the "outside"; the types of pats1 may 
 	-- be more refined, and hence won't do
-    arg_tys = substTys (zipTopTvSubst (dataConTyVars con) inst_tys)
-		       (dataConOrigArgTys con)
+    arg_tys = dataConInstOrigArgTys con inst_tys
     inst_tys | isVanillaDataCon con = tcTyConAppArgs pat_ty	-- Newtypes opaque!
 	     | otherwise	    = mkTyVarTys tvs1
 \end{code}

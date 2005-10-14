@@ -52,7 +52,7 @@ import Packages		( isDllName )
 #endif
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
-import DataCon		( DataCon, dataConRepArity, dataConArgTys,
+import DataCon		( DataCon, dataConRepArity, dataConInstArgTys,
 			  isVanillaDataCon, dataConTyCon )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
@@ -651,7 +651,7 @@ exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
     let
 	arity   	 = tyConArity tc
 	val_args	 = drop arity args
-	to_arg_tys 	 = dataConArgTys dc tc_arg_tys
+	to_arg_tys 	 = dataConInstArgTys dc tc_arg_tys
 	mk_coerce ty arg = mkCoerce ty arg
 	new_val_args	 = zipWith mk_coerce to_arg_tys val_args
     in

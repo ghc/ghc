@@ -141,6 +141,10 @@ unqualSplice = mkRdrUnqual (mkVarOcc FSLIT("splice"))
 		-- identify the splice
 
 mkHsString s = HsString (mkFastString s)
+
+-------------
+userHsTyVarBndrs :: [Located name] -> [Located (HsTyVarBndr name)]
+userHsTyVarBndrs bndrs = [ L loc (UserTyVar v) | L loc v <- bndrs ]
 \end{code}
 
 

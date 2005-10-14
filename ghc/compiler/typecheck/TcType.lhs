@@ -62,6 +62,7 @@ module TcType (
   mkDictTy, tcSplitPredTy_maybe, 
   isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
+  dataConsStupidTheta, 
 
   ---------------------------------
   -- Foreign import and export
@@ -149,7 +150,8 @@ import Type		(	-- Re-exports
 			  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst,
 			  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
 			  extendTvSubst, extendTvSubstList, isInScope,
-		  	  substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
+		  	  substTy, substTys, substTyWith, substTheta, 
+			  substTyVar, substTyVarBndr, substPred,
 
 			  typeKind, repType,
 			  pprKind, pprParendKind,
@@ -157,10 +159,11 @@ import Type		(	-- Re-exports
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, tyConUnique )
-import DataCon		( DataCon )
+import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
 import Class		( Class )
 import Var		( TyVar, Id, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
 import ForeignCall	( Safety, playSafe, DNType(..) )
+import Unify		( tcMatchTys )
 import VarSet
 
 -- others:
@@ -176,6 +179,7 @@ import SrcLoc		( SrcLoc, SrcSpan )
 import Util		( snocView, equalLength )
 import Maybes		( maybeToBool, expectJust, mapCatMaybes )
 import ListSetOps	( hasNoDups )
+import List		( nubBy )
 import Outputable
 import DATA_IOREF
 \end{code}
@@ -647,6 +651,27 @@ isInheritablePred other	     = False
 isLinearPred :: TcPredType -> Bool
 isLinearPred (IParam (Linear n) _) = True
 isLinearPred other		   = False
+\end{code}
+
+--------------------- The stupid theta (sigh) ---------------------------------
+
+\begin{code}
+dataConsStupidTheta :: [DataCon] -> ThetaType
+-- Union the stupid thetas from all the specified constructors (non-empty)
+-- All the constructors should have the same result type, modulo alpha conversion
+-- The resulting ThetaType uses type variables from the *first* constructor in the list
+--
+-- It's here because it's used in MkId.mkRecordSelId, and in TcExpr
+dataConsStupidTheta (con1:cons)
+  = nubBy tcEqPred all_preds
+  where
+    all_preds 	  = dataConStupidTheta con1 ++ other_stupids
+    res_tys1  	  = dataConResTys con1
+    tvs1      	  = tyVarsOfTypes res_tys1
+    other_stupids = [ substPred subst pred
+		    | con <- cons
+		    , let Just subst = tcMatchTys tvs1 res_tys1 (dataConResTys con)
+		    , pred <- dataConStupidTheta con ]
 \end{code}
 
 

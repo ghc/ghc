@@ -11,7 +11,7 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
-			  ConDecl(..),   Sig(..), , NewOrData(..), 
+			  ConDecl(..),   Sig(..), , NewOrData(..), ResType(..),
 			  tyClDeclTyVars, isSynDecl, 
 			  LTyClDecl, tcdName, hsTyVarName, LHsTyVarBndr
 			)
@@ -29,12 +29,12 @@ import TcTyDecls	( calcTyConArgVrcs, calcRecFlags, calcClassCycles, calcSynCycle
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
 			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
-			  kcHsSigType, tcHsBangType, tcLHsConSig, tcDataKindSig )
+			  kcHsSigType, tcHsBangType, tcLHsConResTy, tcDataKindSig )
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcType		( TcKind, TcType, tyVarsOfType, mkPhiTy,
-			  mkArrowKind, liftedTypeKind, mkTyVarTys, tcEqTypes,
-			  tcSplitSigmaTy, tcEqType )
+			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
+			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
 import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
 import Kind		( mkArrowKinds, splitKindFunTys )
 import Generics		( validGenericMethodType, canDoGenerics )
@@ -43,16 +43,19 @@ import TyCon		( TyCon, ArgVrcs, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConStupidTheta, getSynTyConDefn, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, 
-			  dataConFieldLabels, dataConOrigArgTys, dataConTyCon )
-import Type		( zipTopTvSubst, substTys )
+			  dataConFieldLabels, dataConTyCon,
+			  dataConTyVars, dataConFieldType, dataConResTys )
 import Var		( TyVar, idType, idName )
-import VarSet		( elemVarSet )
+import VarSet		( elemVarSet, mkVarSet )
 import Name		( Name )
 import Outputable
+import Maybe		( isJust, fromJust )
+import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition )
 import SrcLoc		( Located(..), unLoc, getLoc )
 import ListSetOps	( equivClasses )
+import List		( delete )
 import Digraph		( SCC(..) )
 import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
 					Opt_UnboxStrictFields ) )
@@ -288,15 +291,14 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	; cons' <- mappM (wrapLocM kc_con_decl) cons
 	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdCons = cons'}) }
   where
-    kc_con_decl (ConDecl name ex_tvs ex_ctxt details)
-      = kcHsTyVars ex_tvs		$ \ ex_tvs' ->
-	do { ex_ctxt' <- kcHsContext ex_ctxt
-	   ; details' <- kc_con_details details 
-	   ; return (ConDecl name ex_tvs' ex_ctxt' details')}
-    kc_con_decl (GadtDecl name ty)
-        = do { ty' <- kcHsSigType ty
-	     ; traceTc (text "kc_con_decl" <+> ppr name <+> ppr ty')
-	     ; return (GadtDecl name ty') }
+    kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res) = do
+      kcHsTyVars ex_tvs $ \ex_tvs' -> do
+        ex_ctxt' <- kcHsContext ex_ctxt
+        details' <- kc_con_details details 
+        res'     <- case res of
+          ResTyH98 -> return ResTyH98
+          ResTyGADT ty -> return . ResTyGADT =<< kcHsSigType ty
+        return (ConDecl name expl ex_tvs' ex_ctxt' details' res')
 
     kc_con_details (PrefixCon btys) 
 	= do { btys' <- mappM kc_larg_ty btys ; return (PrefixCon btys') }
@@ -419,7 +421,7 @@ tcTyClDecl1 calc_vrcs calc_isrec
     arg_vrcs = calc_vrcs tc_name
     is_rec   = calc_isrec tc_name
     h98_syntax = case cons of 	-- All constructors have same shape
-			L _ (GadtDecl {}) : _ -> False
+			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
 			other -> True
 
 tcTyClDecl1 calc_vrcs calc_isrec 
@@ -457,7 +459,7 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> ConDecl Name -> TcM DataCon
 
 tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
-	  (ConDecl name ex_tvs ex_ctxt details)
+	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98)
   = ASSERT( null ex_tvs && null (unLoc ex_ctxt) )	
     do	{ let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
@@ -470,61 +472,57 @@ tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
 	    PrefixCon [arg_ty] -> tc_datacon [] arg_ty
 	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty }
 
-tcConDecl unbox_strict DataType tycon tc_tvs	-- Ordinary data types
-	  (ConDecl name ex_tvs ex_ctxt details)
-  = tcTyVarBndrs ex_tvs		$ \ ex_tvs' -> do 
-    { ex_ctxt' <- tcHsKindedContext ex_ctxt
+tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
+	  (ConDecl name _ tvs ctxt details res_ty)
+  = tcTyVarBndrs tvs		$ \ tvs' -> do 
+    { ctxt' <- tcHsKindedContext ctxt
+    ; (data_tc, res_ty_args) <- tcResultType tycon tc_tvs res_ty
     ; let 
-	is_vanilla = null ex_tvs && null (unLoc ex_ctxt) 
-		-- Vanilla iff no ex_tvs and no context
-		-- Must check the context too because of
-		-- implicit params; e.g.
-		--  data T = (?x::Int) => MkT Int
+	con_tvs = case res_ty of
+		    ResTyH98    -> tc_tvs ++ tvs'
+		    ResTyGADT _ -> tryVanilla tvs' res_ty_args
+
+	-- Vanilla iff result type matches the quantified vars exactly,
+	-- and there is no existential context
+	-- Must check the context too because of implicit params; e.g.
+	--  	data T = (?x::Int) => MkT Int
+	is_vanilla = res_ty_args `tcEqTypes` mkTyVarTys con_tvs
+		     && null (unLoc ctxt)
 
 	tc_datacon is_infix field_lbls btys
-	  = do { let { bangs = map getBangStrictness btys }
+	  = do { let bangs = map getBangStrictness btys
 	       ; arg_tys <- mappM tcHsBangType btys
     	       ; buildDataCon (unLoc name) is_infix is_vanilla
     		    (argStrictness unbox_strict tycon bangs arg_tys)
     		    (map unLoc field_lbls)
-    		    (tc_tvs ++ ex_tvs')
-		    ex_ctxt'
-    		    arg_tys
-		    tycon (mkTyVarTys tc_tvs) }
+    		    con_tvs ctxt' arg_tys
+		    data_tc res_ty_args }
+		-- NB:	we put data_tc, the type constructor gotten from the constructor 
+		--	type signature into the data constructor; that way 
+		--	checkValidDataCon can complain if it's wrong.
+
     ; case details of
 	PrefixCon btys     -> tc_datacon False [] btys
-	InfixCon bty1 bty2 -> tc_datacon True [] [bty1,bty2]
-	RecCon fields      -> do { checkTc (null ex_tvs) (exRecConErr name)
-		-- It's ok to have an implicit-parameter context
-		-- for the data constructor, provided it binds
-		-- no type variables
-				 ; let { (field_names, btys) = unzip fields }
-				 ; tc_datacon False field_names btys } }
+	InfixCon bty1 bty2 -> tc_datacon True  [] [bty1,bty2]
+	RecCon fields      -> tc_datacon False field_names btys
+			   where
+			      (field_names, btys) = unzip fields
+                              
+    }
 
-tcConDecl unbox_strict DataType tycon tc_tvs	-- GADTs
-	  decl@(GadtDecl name con_ty)
-  = do	{ traceTc (text "tcConDecl"  <+> ppr name)
-	; (tvs, theta, bangs, arg_tys, data_tc, res_tys) <- tcLHsConSig con_ty
-		
-	; traceTc (text "tcConDecl1"  <+> ppr name)
-	; let 	-- Now dis-assemble the type, and check its form
-	      is_vanilla = null theta && mkTyVarTys tvs `tcEqTypes` res_tys
+tcResultType :: TyCon -> [TyVar] -> ResType Name -> TcM (TyCon, [TcType])
+tcResultType tycon tvs ResTyH98           = return (tycon, mkTyVarTys tvs)
+tcResultType _     _   (ResTyGADT res_ty) = tcLHsConResTy res_ty
 
-		-- Vanilla datacons guarantee to use the same
-		-- type variables as the parent tycon
-	      (tvs', arg_tys', res_tys') 
-		  | is_vanilla = (tc_tvs, substTys subst arg_tys, substTys subst res_tys)
-		  | otherwise  = (tvs, arg_tys, res_tys)
-	      subst = zipTopTvSubst tvs (mkTyVarTys tc_tvs)
+tryVanilla :: [TyVar] -> [TcType] -> [TyVar]
+-- (tryVanilla tvs tys) returns a permutation of tvs.
+-- It tries to re-order the tvs so that it exactly 
+-- matches the [Type], if that is possible
+tryVanilla tvs (ty:tys) | Just tv <- tcGetTyVar_maybe ty	-- The type is a tyvar
+			, tv `elem` tvs				-- That tyvar is in the list
+			= tv : tryVanilla (delete tv tvs) tys
+tryVanilla tvs tys = tvs	-- Fall through case
 
-	; traceTc (text "tcConDecl3"  <+> ppr name)
-	; buildDataCon (unLoc name) False {- Not infix -} is_vanilla
-    		       (argStrictness unbox_strict tycon bangs arg_tys)
-		       [{- No field labels -}]
-		       tvs' theta arg_tys' data_tc res_tys' }
-		-- NB:	we put data_tc, the type constructor gotten from the constructor 
-		--	type signature into the data constructor; that way checkValidDataCon 
-		--	can complain if it's wrong.
 
 -------------------
 argStrictness :: Bool		-- True <=> -funbox-strict_fields
@@ -587,6 +585,13 @@ checkValidTyCl decl
 	}
 
 -------------------------
+-- For data types declared with record syntax, we require
+-- that each constructor that has a field 'f' 
+--	(a) has the same result type
+--	(b) has the same type for 'f'
+-- module alpha conversion of the quantified type variables
+-- of the constructor.
+
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc
   | isSynTyCon tc 
@@ -609,17 +614,43 @@ checkValidTyCon tc
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)
     cmp_fld (f1,_) (f2,_) = f1 `compare` f2
-    get_fields con = dataConFieldLabels con `zip` dataConOrigArgTys con
+    get_fields con = dataConFieldLabels con `zip` repeat con
 	-- dataConFieldLabels may return the empty list, which is fine
 
-    check_fields fields@((first_field_label, field_ty) : other_fields)
+    -- XXX - autrijus - Make this far more complex to acommodate 
+    --       for different return types.  Add res_ty to the mix,
+    --       comparing them in two steps, all for good error messages.
+    --       Plan: Use Unify.tcMatchTys to compare the first candidate's
+    --             result type against other candidates' types (check bothways).
+    --             If they magically agrees, take the substitution and
+    --             apply them to the latter ones, and see if they match perfectly.
+    -- check_fields fields@((first_field_label, field_ty) : other_fields)
+    check_fields fields@((label, con1) : other_fields)
 	-- These fields all have the same name, but are from
 	-- different constructors in the data type
-	= 	-- Check that all the fields in the group have the same type
+	= recoverM (return ()) $ mapM_ checkOne other_fields
+                -- Check that all the fields in the group have the same type
 		-- NB: this check assumes that all the constructors of a given
 		-- data type use the same type variables
-	  checkTc (all (tcEqType field_ty . snd) other_fields) 
-		  (fieldTypeMisMatch first_field_label)
+        where
+        tvs1 = mkVarSet (dataConTyVars con1)
+        res1 = dataConResTys con1
+        fty1 = dataConFieldType con1 label
+
+        checkOne (_, con2)    -- Do it bothways to ensure they are structurally identical
+	    = do { checkFieldCompat label con1 con2 tvs1 res1 res2 fty1 fty2
+		 ; checkFieldCompat label con2 con1 tvs2 res2 res1 fty2 fty1 }
+	    where        
+                tvs2 = mkVarSet (dataConTyVars con2)
+		res2 = dataConResTys con2 
+                fty2 = dataConFieldType con2 label
+
+checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
+  = do	{ checkTc (isJust mb_subst1) (resultTypeMisMatch fld con1 con2)
+	; checkTc (isJust mb_subst2) (fieldTypeMisMatch fld con1 con2) }
+  where
+    mb_subst1 = tcMatchTys tvs1 res1 res2
+    mb_subst2 = tcMatchTyX tvs1 (fromJust mb_subst1) fty1 fty2
 
 -------------------------------
 checkValidDataCon :: TyCon -> DataCon -> TcM ()
@@ -699,8 +730,13 @@ checkValidClass cls
 
 
 ---------------------------------------------------------------------
-fieldTypeMisMatch field_name
-  = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
+resultTypeMisMatch field_name con1 con2
+  = vcat [sep [ptext SLIT("Constructors") <+> ppr con1 <+> ptext SLIT("and") <+> ppr con2, 
+		ptext SLIT("have a common field") <+> quotes (ppr field_name) <> comma],
+	  nest 2 $ ptext SLIT("but have different result types")]
+fieldTypeMisMatch field_name con1 con2
+  = sep [ptext SLIT("Constructors") <+> ppr con1 <+> ptext SLIT("and") <+> ppr con2, 
+	 ptext SLIT("give different types for field"), quotes (ppr field_name)]
 
 dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
 		       nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]
@@ -762,11 +798,6 @@ sortLocated :: [Located a] -> [Located a]
 sortLocated things = sortLe le things
   where
     le (L l1 _) (L l2 _) = l1 <= l2
-
-exRecConErr name
-  = ptext SLIT("Can't combine named fields with locally-quantified type variables or context")
-    $$
-    (ptext SLIT("In the declaration of data constructor") <+> ppr name)
 
 badDataConTyCon data_con
   = hang (ptext SLIT("Data constructor") <+> quotes (ppr data_con) <+>

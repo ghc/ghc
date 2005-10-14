@@ -94,8 +94,8 @@ trep    :: { OccName -> [LConDecl RdrName] }
         : {- empty -}   { (\ tc_occ -> []) }
         | '=' ty        { (\ tc_occ -> let { dc_name  = mkRdrUnqual (setOccNameSpace dataName tc_occ) ;
 			                     con_info = PrefixCon [toHsType $2] }
-			                in [noLoc $ ConDecl (noLoc dc_name) []
-					   (noLoc []) con_info]) }
+			                in [noLoc $ ConDecl (noLoc dc_name) Explicit []
+					   (noLoc []) con_info ResTyH98]) }
 
 cons1	:: { [LConDecl RdrName] }
 	: con		{ [$1] }
@@ -103,9 +103,15 @@ cons1	:: { [LConDecl RdrName] }
 
 con	:: { LConDecl RdrName }
 	: d_pat_occ attv_bndrs hs_atys 
-		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) $2 (noLoc []) (PrefixCon $3)}
+		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) Explicit $2 (noLoc []) (PrefixCon $3) ResTyH98}
         | d_pat_occ '::' ty
-                { noLoc $ GadtDecl (noLoc (mkRdrUnqual $1)) (toHsType $3) } 
+                -- XXX - autrijus - $3 needs to be split into argument and return types!
+                -- also not sure whether the [] below (quantified vars) appears.
+                -- also the "PrefixCon []" is wrong.
+                -- also we want to munge $3 somehow.
+                -- extractWhatEver to unpack ty into the parts to ConDecl
+                -- XXX - define it somewhere in RdrHsSyn
+		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) Explicit [] (noLoc []) (PrefixCon []) (undefined $3) }
 
 attv_bndrs :: { [LHsTyVarBndr RdrName] }
 	: {- empty -} 	         { [] }

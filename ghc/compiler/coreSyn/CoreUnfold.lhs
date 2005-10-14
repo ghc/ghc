@@ -51,7 +51,6 @@ import PrelNames	( hasKey, buildIdKey, augmentIdKey )
 import Bag
 import FastTypes
 import Outputable
-import Util
 
 #if __GLASGOW_HASKELL__ >= 404
 import GLAEXTS		( Int# )

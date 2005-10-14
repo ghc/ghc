@@ -484,7 +484,7 @@ dsExpr expr@(RecordUpd record_expr rbinds record_in_ty record_out_ty)
 
 	mk_alt con
 	  = newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys) `thenDs` \ arg_ids ->
-		-- This call to dataConArgTys won't work for existentials
+		-- This call to dataConInstOrigArgTys won't work for existentials
 		-- but existentials don't have record types anyway
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg

@@ -14,7 +14,6 @@ module BuildTyCl (
 import IfaceEnv		( newImplicitBinder )
 import TcRnMonad
 
-import Util		( zipLazy )
 import DataCon		( DataCon, isNullarySrcDataCon,
 			  mkDataCon, dataConFieldLabels, dataConOrigArgTys )
 import Var		( tyVarKind, TyVar, Id )
@@ -26,14 +25,14 @@ import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkClassTyConOcc,
 			  mkClassDataConOcc, mkSuperDictSelOcc )
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
-import TyCon		( FieldLabel, mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
+import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
 			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
 			  ArgVrcs, AlgTyConRhs(..), newTyConRhs )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, tyVarsOfTypes, tyVarsOfPred,
 			  splitTyConApp_maybe, mkPredTys, mkTyVarTys, ThetaType, Type,
 			  substTyWith, zipTopTvSubst, substTheta )
 import Outputable
-import List		( nubBy )
+import List		( nub )
 
 \end{code}
 	
@@ -58,7 +57,7 @@ buildAlgTyCon tc_name tvs stupid_theta rhs arg_vrcs is_rec want_generics
   = do	{ let { tycon = mkAlgTyCon tc_name kind tvs arg_vrcs stupid_theta
 				   rhs fields is_rec want_generics
 	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
-	      ; fields  = mkTyConFields tycon rhs
+	      ; fields  = mkTyConSelIds tycon rhs
 	  }
 	; return tycon }
 
@@ -116,7 +115,8 @@ mkNewTyConRep tc
 buildDataCon :: Name -> Bool -> Bool
 	    -> [StrictnessMark] 
 	    -> [Name]			-- Field labels
-	    -> [TyVar] -> ThetaType
+	    -> [TyVar] 
+	    -> ThetaType		-- Does not include the "stupid theta"
 	    -> [Type] -> TyCon -> [Type]
 	    -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
@@ -150,26 +150,20 @@ mkDataConStupidTheta tycon arg_tys res_tys
   where
     tc_subst	    = zipTopTvSubst (tyConTyVars tycon) res_tys
     stupid_theta    = substTheta tc_subst (tyConStupidTheta tycon)
+	-- Start by instantiating the master copy of the 
+	-- stupid theta, taken from the TyCon
+
     arg_tyvars      = tyVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $ 
 			tyVarsOfPred pred `intersectVarSet` arg_tyvars
 
 ------------------------------------------------------
-mkTyConFields :: TyCon -> AlgTyConRhs -> [(FieldLabel,Type,Id)]
-mkTyConFields tycon rhs
-  = 	-- We'll check later that fields with the same name 
+mkTyConSelIds :: TyCon -> AlgTyConRhs -> [Id]
+mkTyConSelIds tycon rhs
+  =  [ mkRecordSelId tycon fld 
+     | fld <- nub (concatMap dataConFieldLabels (visibleDataCons rhs)) ]
+	-- We'll check later that fields with the same name 
 	-- from different constructors have the same type.
-     [ (fld, ty, mkRecordSelId tycon fld ty) 
-     | (fld, ty) <- nubBy eq_fld all_fld_tys ]
-  where
-    all_fld_tys    = concatMap fld_tys_of (visibleDataCons rhs)
-    fld_tys_of con = dataConFieldLabels con `zipLazy` 
-		     dataConOrigArgTys con
-		-- The laziness means that the type isn't sucked in prematurely
-		-- Only vanilla datacons have fields at all, and they
-		-- share the tycon's type variables => datConOrigArgTys will do
-
-    eq_fld (f1,_) (f2,_) = f1 == f2
 \end{code}
 
 

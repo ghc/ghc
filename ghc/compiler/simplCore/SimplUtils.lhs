@@ -46,7 +46,7 @@ import Type		( Type, splitFunTys, dropForAlls, isStrictType,
 			)
 import Name		( mkSysTvName )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
-import DataCon		( dataConRepArity, dataConTyVars, dataConArgTys, isVanillaDataCon )
+import DataCon		( dataConRepArity, dataConTyVars, dataConInstArgTys, isVanillaDataCon )
 import Var		( tyVarKind, mkTyVar )
 import VarSet
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
@@ -1188,7 +1188,7 @@ prepareDefault case_bndr handled_cons Nothing
 mk_args missing_con inst_tys
   = mk_tv_bndrs missing_con inst_tys	`thenSmpl` \ (tv_bndrs, inst_tys') ->
     getUniquesSmpl			`thenSmpl` \ id_uniqs ->
-    let arg_tys = dataConArgTys missing_con inst_tys'
+    let arg_tys = dataConInstArgTys missing_con inst_tys'
 	arg_ids = zipWith (mkSysLocal FSLIT("a")) id_uniqs arg_tys
     in
     returnSmpl (tv_bndrs ++ arg_ids)

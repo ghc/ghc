@@ -117,13 +117,17 @@ hsSigFVs (SpecSig v ty)     = extractHsTyNames ty
 hsSigFVs other		    = emptyFVs
 
 ----------------
-conDeclFVs (L _ (ConDecl _ tyvars context details))
+-- XXX - autrijus - handle return type for GADT
+conDeclFVs (L _ (ConDecl _ _ tyvars context details _))
   = delFVs (map hsLTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     conDetailsFVs details
+
+{-
 -- gaw 2004
 conDeclFVs (L _ (GadtDecl _ ty)) 
   = extractHsTyNames ty
+-}
 
 conDetailsFVs (PrefixCon btys)     = plusFVs (map bangTyFVs btys)
 conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2

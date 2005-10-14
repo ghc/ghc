@@ -48,7 +48,7 @@ import HsUtils		( collectPatBinders, collectPatsBinders )
 import VarSet		( IdSet, mkVarSet, varSetElems,
 			  intersectVarSet, minusVarSet, extendVarSetList, 
 			  unionVarSet, unionVarSets, elemVarSet )
-import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
+import SrcLoc		( Located(..), unLoc, noLoc )
 \end{code}
 
 \begin{code}

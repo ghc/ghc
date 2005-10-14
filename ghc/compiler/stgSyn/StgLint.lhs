@@ -13,7 +13,7 @@ import StgSyn
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import Id		( Id, idType, isLocalId )
 import VarSet
-import DataCon		( DataCon, dataConArgTys, dataConRepType )
+import DataCon		( DataCon, dataConInstArgTys, dataConRepType )
 import CoreSyn		( AltCon(..) )
 import PrimOp		( primOpType )
 import Literal		( literalType )
@@ -259,7 +259,7 @@ lintAlt scrut_ty (DataAlt con, args, _, rhs)
 				  not (isNewTyCon tycon) ->
 	 let
 	   cons    = tyConDataCons tycon
-	   arg_tys = dataConArgTys con tys_applied
+	   arg_tys = dataConInstArgTys con tys_applied
 		-- This almost certainly does not work for existential constructors
 	 in
 	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`

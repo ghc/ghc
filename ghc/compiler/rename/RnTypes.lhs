@@ -99,7 +99,7 @@ rnHsType doc (HsForAllTy Implicit _ ctxt ty)
 	-- class signatures:
 	--	class C a where { op :: a -> a }
 	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env) . unLoc) mentioned
-	tyvar_bndrs = [ L loc (UserTyVar v) | (L loc v) <- forall_tyvars ]
+	tyvar_bndrs   = userHsTyVarBndrs forall_tyvars
     in
     rnForAll doc Implicit tyvar_bndrs ctxt ty
 

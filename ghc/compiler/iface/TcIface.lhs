@@ -46,7 +46,7 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  vanillaIdInfo, newStrictnessInfo )
 import Class		( Class )
 import TyCon		( tyConDataCons, isTupleTyCon, mkForeignTyCon )
-import DataCon		( DataCon, dataConWorkId, dataConTyVars, dataConArgTys, isVanillaDataCon )
+import DataCon		( DataCon, dataConWorkId, dataConTyVars, dataConInstArgTys, isVanillaDataCon )
 import TysWiredIn	( tupleCon, tupleTyCon, listTyCon, intTyCon, boolTyCon, charTyCon, parrTyCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
 import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
@@ -682,7 +682,7 @@ tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_occs, rhs)
 	  arg_names <- newIfaceNames arg_occs
 	; let	tyvars   = [ mkTyVar name (tyVarKind tv) 
 			   | (name,tv) <- arg_names `zip` dataConTyVars con] 
-		arg_tys	 = dataConArgTys con (mkTyVarTys tyvars)
+		arg_tys	 = dataConInstArgTys con (mkTyVarTys tyvars)
 		id_names = dropList tyvars arg_names
 		arg_ids  = ASSERT2( equalLength id_names arg_tys,
 				    ppr (con, arg_names, rhs) $$ ppr tyvars $$ ppr arg_tys )
@@ -700,7 +700,7 @@ tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
 
 tcVanillaAlt data_con inst_tys arg_occs rhs
   = do	{ arg_names <- newIfaceNames arg_occs
-	; let arg_tys = dataConArgTys data_con inst_tys
+	; let arg_tys = dataConInstArgTys data_con inst_tys
 	; let arg_ids = ASSERT2( equalLength arg_names arg_tys,
 				 ppr data_con <+> ppr inst_tys <+> ppr arg_occs $$ ppr rhs )
 			zipWith mkLocalId arg_names arg_tys

@@ -24,12 +24,12 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals, matchNPlusKPats, matchNPats, tidyLitPat, tidyNPat )
 import PrelInfo		( pAT_ERROR_ID )
 import TcType		( Type, tcTyConAppArgs )
-import Type		( splitFunTysN )
+import Type		( splitFunTysN, mkTyVarTys )
 import TysWiredIn	( consDataCon, mkTupleTy, mkListTy,
 			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
 import ListSetOps	( runs )
-import SrcLoc		( noSrcSpan, noLoc, unLoc, Located(..) )
+import SrcLoc		( noLoc, unLoc, Located(..) )
 import Util             ( lengthExceeds, notNull )
 import Name		( Name )
 import Outputable
@@ -434,7 +434,7 @@ tidy1 v wrap (LazyPat pat)
 tidy1 v wrap (ConPatOut (L loc con) ex_tvs dicts binds ps pat_ty)
   = returnDs (wrap, ConPatOut (L loc con) ex_tvs dicts binds tidy_ps pat_ty)
   where
-    tidy_ps = PrefixCon (tidy_con con pat_ty ps)
+    tidy_ps = PrefixCon (tidy_con con ex_tvs pat_ty ps)
 
 tidy1 v wrap (ListPat pats ty)
   = returnDs (wrap, unLoc list_ConPat)
@@ -482,9 +482,9 @@ tidy1 v wrap non_interesting_pat
   = returnDs (wrap, non_interesting_pat)
 
 
-tidy_con data_con pat_ty (PrefixCon ps)   = ps
-tidy_con data_con pat_ty (InfixCon p1 p2) = [p1,p2]
-tidy_con data_con pat_ty (RecCon rpats)
+tidy_con data_con ex_tvs pat_ty (PrefixCon ps)   = ps
+tidy_con data_con ex_tvs pat_ty (InfixCon p1 p2) = [p1,p2]
+tidy_con data_con ex_tvs pat_ty (RecCon rpats)
   | null rpats
   =	-- Special case for C {}, which can be used for 
 	-- a constructor that isn't declared to have
@@ -492,14 +492,13 @@ tidy_con data_con pat_ty (RecCon rpats)
     map (noLoc . WildPat) con_arg_tys'
 
   | otherwise
-  = ASSERT( isVanillaDataCon data_con )
-	-- We're in a record case, so the data con must be vanilla
-	-- and hence no existentials to worry about
-    map mk_pat tagged_arg_tys
+  = map mk_pat tagged_arg_tys
   where
 	-- Boring stuff to find the arg-tys of the constructor
 	
-    inst_tys         = tcTyConAppArgs pat_ty	-- Newtypes must be opaque
+    inst_tys | isVanillaDataCon data_con = tcTyConAppArgs pat_ty	-- Newtypes must be opaque
+	     | otherwise		 = mkTyVarTys ex_tvs
+
     con_arg_tys'     = dataConInstOrigArgTys data_con inst_tys
     tagged_arg_tys   = con_arg_tys' `zip` dataConFieldLabels data_con
 

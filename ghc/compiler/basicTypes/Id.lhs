@@ -26,7 +26,7 @@ module Id (
 	-- Predicates
 	isImplicitId, isDeadBinder, isDictId,
 	isExportedId, isLocalId, isGlobalId,
-	isRecordSelector,
+	isRecordSelector, isNaughtyRecordSelector,
 	isClassOpId_maybe,
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
@@ -230,12 +230,16 @@ idPrimRep id = typePrimRep (idType id)
 \begin{code}
 recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
 recordSelectorFieldLabel id = case globalIdDetails id of
-				 RecordSelId tycon lbl -> (tycon,lbl)
+				 RecordSelId tycon lbl _ -> (tycon,lbl)
 				 other -> panic "recordSelectorFieldLabel"
 
 isRecordSelector id = case globalIdDetails id of
-			RecordSelId _ _ -> True
+			RecordSelId {}  -> True
 			other	  	-> False
+
+isNaughtyRecordSelector id = case globalIdDetails id of
+			RecordSelId { sel_naughty = n } -> n
+			other	  	  	        -> False
 
 isClassOpId_maybe id = case globalIdDetails id of
 			ClassOpId cls -> Just cls
@@ -297,7 +301,7 @@ isImplicitId :: Id -> Bool
 	-- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
   = case globalIdDetails id of
-	RecordSelId _ _ -> True
+	RecordSelId {}  -> True
         FCallId _       -> True
         PrimOpId _      -> True
 	ClassOpId _	-> True

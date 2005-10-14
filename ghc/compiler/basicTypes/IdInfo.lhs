@@ -231,7 +231,12 @@ an IdInfo.hi-boot, but no Id.hi-boot, and GlobalIdDetails is imported
 data GlobalIdDetails
   = VanillaGlobal		-- Imported from elsewhere, a default method Id.
 
-  | RecordSelId TyCon FieldLabel  -- The Id for a record selector
+  | RecordSelId                 -- The Id for a record selector
+    { sel_tycon   :: TyCon
+    , sel_label   :: FieldLabel
+    , sel_naughty :: Bool       -- True <=> naughty
+    }				-- See Note [Naughty record selectors]
+				-- with MkId.mkRecordSelectorId
 
   | DataConWorkId DataCon	-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
@@ -257,7 +262,7 @@ instance Outputable GlobalIdDetails where
     ppr (ClassOpId _)     = ptext SLIT("[ClassOp]")
     ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
     ppr (FCallId _)       = ptext SLIT("[ForeignCall]")
-    ppr (RecordSelId _ _) = ptext SLIT("[RecSel]")
+    ppr (RecordSelId {})  = ptext SLIT("[RecSel]")
 \end{code}
 
 

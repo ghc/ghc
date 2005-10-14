@@ -855,9 +855,9 @@ akind	:: { Kind }
 -- Datatype declarations
 
 newconstr :: { LConDecl RdrName }
-	: conid atype	{ LL $ ConDecl $1 [] (noLoc []) (PrefixCon [$2]) }
+	: conid atype	{ LL $ ConDecl $1 Explicit [] (noLoc []) (PrefixCon [$2]) ResTyH98 }
 	| conid '{' var '::' ctype '}'
-			{ LL $ ConDecl $1 [] (noLoc []) (RecCon [($3, $5)]) }
+			{ LL $ ConDecl $1 Explicit [] (noLoc []) (RecCon [($3, $5)]) ResTyH98 }
 
 gadt_constrlist :: { Located [LConDecl RdrName] }
 	: '{'            gadt_constrs '}'	{ LL (unLoc $2) }
@@ -868,9 +868,30 @@ gadt_constrs :: { Located [LConDecl RdrName] }
         | gadt_constrs ';' 		{ $1 }
         | gadt_constr                   { L1 [$1] } 
 
+-- We allow the following forms:
+--	C :: Eq a => a -> T a
+--	C :: forall a. Eq a => !a -> T a
+--	D { x,y :: a } :: T a
+--	forall a. Eq a => D { x,y :: a } :: T a
+
 gadt_constr :: { LConDecl RdrName }
         : con '::' sigtype
-              { LL (GadtDecl $1 $3) } 
+              { LL (mkGadtDecl $1 $3) } 
+        -- Syntax: Maybe merge the record stuff with the single-case above?
+        --         (to kill the mostly harmless reduce/reduce error)
+        -- XXX revisit autrijus
+	| constr_stuff_record '::' sigtype
+		{ let (con,details) = unLoc $1 in 
+		  LL (ConDecl con Implicit [] (noLoc []) details (ResTyGADT $3)) }
+{-
+	| forall context '=>' constr_stuff_record '::' sigtype
+		{ let (con,details) = unLoc $4 in 
+		  LL (ConDecl con Implicit (unLoc $1) $2 details (ResTyGADT $6)) }
+	| forall constr_stuff_record '::' sigtype
+		{ let (con,details) = unLoc $2 in 
+		  LL (ConDecl con Implicit (unLoc $1) (noLoc []) details (ResTyGADT $4)) }
+-}
+
 
 constrs :: { Located [LConDecl RdrName] }
         : {- empty; a GHC extension -}  { noLoc [] }
@@ -883,10 +904,10 @@ constrs1 :: { Located [LConDecl RdrName] }
 constr :: { LConDecl RdrName }
 	: forall context '=>' constr_stuff	
 		{ let (con,details) = unLoc $4 in 
-		  LL (ConDecl con (unLoc $1) $2 details) }
+		  LL (ConDecl con Explicit (unLoc $1) $2 details ResTyH98) }
 	| forall constr_stuff
 		{ let (con,details) = unLoc $2 in 
-		  LL (ConDecl con (unLoc $1) (noLoc []) details) }
+		  LL (ConDecl con Explicit (unLoc $1) (noLoc []) details ResTyH98) }
 
 forall :: { Located [LHsTyVarBndr RdrName] }
 	: 'forall' tv_bndrs '.'		{ LL $2 }
@@ -904,6 +925,10 @@ constr_stuff :: { Located (Located RdrName, HsConDetails RdrName (LBangType RdrN
 	| oqtycon '{' '}' 		{% mkRecCon $1 [] >>= return.LL }
 	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.LL }
 	| btype conop btype		{ LL ($2, InfixCon $1 $3) }
+
+constr_stuff_record :: { Located (Located RdrName, HsConDetails RdrName (LBangType RdrName)) }
+	: oqtycon '{' '}' 		{% mkRecCon $1 [] >>= return.sL (comb2 $1 $>) }
+	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.sL (comb2 $1 $>) }
 
 fielddecls :: { [([Located RdrName], LBangType RdrName)] }
 	: fielddecl ',' fielddecls	{ unLoc $1 : $3 }
