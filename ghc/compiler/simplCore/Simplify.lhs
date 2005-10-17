@@ -1325,9 +1325,10 @@ rebuildCase env scrut case_bndr alts cont
   = knownCon env (LitAlt lit) [] case_bndr alts cont
 
   | otherwise
-  = prepareAlts scrut case_bndr alts		`thenSmpl` \ (better_alts, handled_cons) -> 
+  = 	-- Prepare the alternatives.
+    prepareAlts scrut case_bndr alts		`thenSmpl` \ (better_alts, handled_cons) -> 
 	
-	-- Deal with the case binder, and prepare the continuation;
+	-- Prepare the continuation;
 	-- The new subst_env is in place
     prepareCaseCont env better_alts cont	`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
     addFloats env floats			$ \ env ->	
@@ -1344,7 +1345,7 @@ rebuildCase env scrut case_bndr alts cont
 	res_ty' = contResultType dup_cont
     in
 
-	-- Deal with variable scrutinee
+	-- Deal with case binder
     simplCaseBinder env scrut case_bndr 	`thenSmpl` \ (alt_env, case_bndr') ->
 
 	-- Deal with the case alternatives
