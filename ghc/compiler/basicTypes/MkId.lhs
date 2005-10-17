@@ -537,14 +537,15 @@ mkRecordSelId tycon field_label
 	(arg_prefix, arg_ids)
 	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
 	   = ([], mkTemplateLocalsNum arg_base (dataConInstOrigArgTys data_con res_tys))
-	   | otherwise
+	   | otherwise		-- The case pattern binds type variables, which are used
+				-- in the types of the arguments of the pattern
 	   = (dc_tyvars ++ mkTemplateLocalsNum arg_base (mkPredTys dc_theta),
 	      mkTemplateLocalsNum arg_base' dc_arg_tys)
 
 	(dc_tyvars, dc_theta, dc_arg_tys, _, _) = dataConSig data_con
 	arg_base' = arg_base + length dc_theta
 
-	unpack_base = arg_base' + length dc_theta
+	unpack_base = arg_base' + length dc_arg_tys
 	uniqs = map mkBuiltinUnique [unpack_base..]
 
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` arg_ids) field_label

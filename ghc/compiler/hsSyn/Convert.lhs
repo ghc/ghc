@@ -105,21 +105,22 @@ cvt_top loc (ForeignD (ExportF callconv as nm typ))
 
 mk_con loc con = L loc $ mk_nlcon con
   where
+	-- Can't handle GADTs yet
     mk_nlcon con = case con of
 	NormalC c strtys
-	 -> ConDecl (L loc (cName c)) noExistentials (noContext loc)
-		  (PrefixCon (map mk_arg strtys))
+	 -> ConDecl (L loc (cName c)) Explicit noExistentials (noContext loc)
+		    (PrefixCon (map mk_arg strtys)) ResTyH98
 	RecC c varstrtys
-	 -> ConDecl (L loc (cName c)) noExistentials (noContext loc)
-		  (RecCon (map mk_id_arg varstrtys))
+	 -> ConDecl (L loc (cName c)) Explicit noExistentials (noContext loc)
+		  (RecCon (map mk_id_arg varstrtys)) ResTyH98
 	InfixC st1 c st2
-	 -> ConDecl (L loc (cName c)) noExistentials (noContext loc)
-		  (InfixCon (mk_arg st1) (mk_arg st2))
+	 -> ConDecl (L loc (cName c)) Explicit noExistentials (noContext loc)
+		  (InfixCon (mk_arg st1) (mk_arg st2)) ResTyH98
 	ForallC tvs ctxt (ForallC tvs' ctxt' con')
 	 -> mk_nlcon (ForallC (tvs ++ tvs') (ctxt ++ ctxt') con')
 	ForallC tvs ctxt con' -> case mk_nlcon con' of
-				ConDecl l [] (L _ []) x ->
-				    ConDecl l (cvt_tvs loc tvs) (cvt_context loc ctxt) x
+				ConDecl l _ [] (L _ []) x ResTyH98 ->
+				    ConDecl l Explicit (cvt_tvs loc tvs) (cvt_context loc ctxt) x ResTyH98
 				c -> panic "ForallC: Can't happen"
     mk_arg (IsStrict, ty)  = L loc $ HsBangTy HsStrict (cvtType loc ty)
     mk_arg (NotStrict, ty) = cvtType loc ty

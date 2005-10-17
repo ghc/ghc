@@ -285,18 +285,18 @@ ds_msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
 -------------------------------------------------------
 
 repC :: LConDecl Name -> DsM (Core TH.ConQ)
-repC (L loc (ConDecl con [] (L _ []) details))
+repC (L loc (ConDecl con expl [] (L _ []) details ResTyH98))
   = do { con1 <- lookupLOcc con ;		-- See note [Binders and occurrences] 
 	 repConstr con1 details }
-repC (L loc (ConDecl con tvs (L cloc ctxt) details))
+repC (L loc (ConDecl con expl tvs (L cloc ctxt) details ResTyH98))
   = do { addTyVarBinds tvs $ \bndrs -> do {
-             c' <- repC (L loc (ConDecl con [] (L cloc []) details));
+             c' <- repC (L loc (ConDecl con expl [] (L cloc []) details ResTyH98));
              ctxt' <- repContext ctxt;
              bndrs' <- coreList nameTyConName bndrs;
              rep2 forallCName [unC bndrs', unC ctxt', unC c']
          }
        }
-repC (L loc con_decl)
+repC (L loc con_decl)		-- GADTs
   = putSrcSpanDs loc $ 
     do	{ dsWarn (hang ds_msg 4 (ppr con_decl))
 	; return (panic "DsMeta:repC") }
