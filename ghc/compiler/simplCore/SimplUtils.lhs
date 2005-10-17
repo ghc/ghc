@@ -34,8 +34,10 @@ import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, exprIsCheap,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsHNF
 			)
+import Literal		( mkStringLit )
 import CoreUnfold	( smallEnoughToInline )
-import Id		( idType, isDataConWorkId, idOccInfo, isDictId, idArity,
+import MkId		( eRROR_ID )
+import Id		( idType, isDataConWorkId, idOccInfo, isDictId, 
 			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
 			)
@@ -49,7 +51,7 @@ import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConTyVars, dataConInstArgTys, isVanillaDataCon )
 import Var		( tyVarKind, mkTyVar )
 import VarSet
-import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
+import BasicTypes	( TopLevelFlag(..), isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
 			  Activation, isAlwaysActive, isActive )
 import Util		( lengthExceeds )
 import Outputable
@@ -1116,7 +1118,7 @@ of the inner case y, which give us nowhere to go!
 
 \begin{code}
 prepareAlts :: OutExpr 		-- Scrutinee
-	    -> InId		-- Case binder
+	    -> InId		-- Case binder (passed only to use in statistics)
 	    -> [InAlt]		-- Increasing order
 	    -> SimplM ([InAlt], 	-- Better alternatives, still incresaing order
 			[AltCon])	-- These cases are handled
@@ -1142,14 +1144,17 @@ prepareAlts scrut case_bndr alts
 	-- Filter out the default, if it can't happen,
 	-- or replace it with "proper" alternative if there
 	-- is only one constructor left
-    prepareDefault case_bndr handled_cons maybe_deflt	`thenSmpl` \ deflt_alt ->
+    prepareDefault scrut case_bndr handled_cons maybe_deflt	`thenSmpl` \ deflt_alt ->
 
     returnSmpl (mergeAlts better_alts deflt_alt, handled_cons)
 	-- We need the mergeAlts in case the new default_alt 
 	-- has turned into a constructor alternative.
 
-prepareDefault case_bndr handled_cons (Just rhs)
-  | Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr),
+prepareDefault scrut case_bndr handled_cons (Just rhs)
+  | Just (tycon, inst_tys) <- splitTyConApp_maybe (exprType scrut),
+	-- Use exprType scrut here, rather than idType case_bndr, because
+	-- case_bndr is an InId, so exprType scrut may have more information
+	-- Test simpl013 is an example
     isAlgTyCon tycon,		-- It's a data type, tuple, or unboxed tuples.  
     not (isNewTyCon tycon),	-- We can have a newtype, if we are just doing an eval:
 				-- 	case x of { DEFAULT -> e }
@@ -1182,7 +1187,7 @@ prepareDefault case_bndr handled_cons (Just rhs)
   | otherwise
   = returnSmpl [(DEFAULT, [], rhs)]
 
-prepareDefault case_bndr handled_cons Nothing
+prepareDefault scrut case_bndr handled_cons Nothing
   = returnSmpl []
 
 mk_args missing_con inst_tys
@@ -1488,11 +1493,14 @@ I don't really know how to improve this situation.
 --	0. Check for empty alternatives
 --------------------------------------------------
 
-#ifdef DEBUG
+-- This isn't strictly an error.  It's possible that the simplifer might "see"
+-- that an inner case has no accessible alternatives before it "sees" that the
+-- entire branch of an outer case is inaccessible.  So we simply
+-- put an error case here insteadd
 mkCase1 scrut case_bndr ty []
   = pprTrace "mkCase1: null alts" (ppr case_bndr <+> ppr scrut) $
-    returnSmpl scrut
-#endif
+    return (mkApps (Var eRROR_ID)
+		   [Type ty, Lit (mkStringLit "Impossible alternative")])
 
 --------------------------------------------------
 --	1. Eliminate the case altogether if poss
