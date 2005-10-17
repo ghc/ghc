@@ -131,8 +131,8 @@ unsafeThawArrayzh_fast
 
   // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
   // either it is on a mut_list, or it isn't.  We adopt the convention that
-  // the mut_link field is NULL if it isn't on a mut_list, and the GC
-  // maintains this invariant.
+  // the closure type is MUT_ARR_PTRS_FROZEN0 if it is on the mutable list,
+  // and MUT_ARR_PTRS_FROZEN otherwise.
   //
   if (%INFO_TYPE(%GET_STD_INFO(R1)) != HALF_W_(MUT_ARR_PTRS_FROZEN0)) {
 	foreign "C" recordMutableLock(R1 "ptr") [R1];
