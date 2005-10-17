@@ -34,6 +34,14 @@ gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
 # definitions to avoid clashes), prepending some make variables specifying cpp
 # platform variables.
 
+ifneq "$(TARGETPLATFORM)"  "$(HOSTPLATFORM)"
+
+$(H_CONFIG) :
+	@echo "*** Cross-compiling: please copy $(H_CONFIG) from the target system"
+	@exit 1
+
+else
+
 $(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 
 $(H_CONFIG) : Makefile
@@ -43,6 +51,8 @@ $(H_CONFIG) : Makefile
 	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$,\1/* #undef \2 */,' $(FPTOOLS_TOP)/mk/config.h >> $@
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
 	@echo "Done."
+
+endif
 
 $(H_PLATFORM) : Makefile
 	@echo "Creating $@..."
@@ -93,6 +103,14 @@ endif
 
 all :: DerivedConstants.h
 
+ifneq "$(TARGETPLATFORM)" "$(HOSTPLATFORM)"
+
+DerivedConstants.h :
+	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
+	@exit 1
+
+else
+
 mkDerivedConstants.c : $(H_CONFIG)
 
 mkDerivedConstantsHdr : mkDerivedConstants.o
@@ -101,12 +119,22 @@ mkDerivedConstantsHdr : mkDerivedConstants.o
 DerivedConstants.h : mkDerivedConstantsHdr
 	./mkDerivedConstantsHdr >$@
 
+endif
+
 CLEAN_FILES += mkDerivedConstantsHdr$(exeext) DerivedConstants.h
 
 # -----------------------------------------------------------------------------
 #
 
 all :: GHCConstants.h
+
+ifneq "$(TARGETPLATFORM)" "$(HOSTPLATFORM)"
+
+GHCConstants.h :
+	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
+	@exit 1
+
+else
 
 mkGHCConstants : mkGHCConstants.o
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkGHCConstants.o
@@ -116,6 +144,8 @@ mkGHCConstants.o : mkDerivedConstants.c
 
 GHCConstants.h : mkGHCConstants
 	./mkGHCConstants >$@
+
+endif
 
 CLEAN_FILES += mkGHCConstants$(exeext) GHCConstants.h
 
