@@ -120,8 +120,8 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
 type FILETIME = ()
 type HANDLE = ()
 -- need proper Haskell names (initial lower-case character)
-foreign import ccall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
-foreign import ccall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
+foreign import stdcall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
+foreign import stdcall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
 
 #endif /* not _WIN32 */
 #endif /* __GLASGOW_HASKELL__ */

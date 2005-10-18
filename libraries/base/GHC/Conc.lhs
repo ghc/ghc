@@ -476,7 +476,7 @@ threadDelay time
 
 -- On Windows, we just make a safe call to 'Sleep' to implement threadDelay.
 #ifdef mingw32_HOST_OS
-foreign import ccall safe "Sleep" c_Sleep :: CInt -> IO ()
+foreign import stdcall safe "Sleep" c_Sleep :: CInt -> IO ()
 #endif
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool

@@ -343,7 +343,7 @@ findCommandInterpreter = do
       Just cmd -> return cmd
 
 
-foreign import stdcall unsafe "__hscore_get_osver"
+foreign import ccall unsafe "__hscore_get_osver"
   c_get_osver :: IO CUInt
 #endif
 

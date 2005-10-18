@@ -552,7 +552,7 @@ canonicalizePath fpath =
        peekCString pOutPath
 
 #if defined(mingw32_HOST_OS)
-foreign import stdcall unsafe "GetFullPathName"
+foreign import stdcall unsafe "GetFullPathNameA"
             c_GetFullPathName :: CString
                               -> CInt
                               -> CString
@@ -983,7 +983,7 @@ foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
 foreign import ccall unsafe "__hscore_CSIDL_WINDOWS"  csidl_WINDOWS  :: CInt
 foreign import ccall unsafe "__hscore_CSIDL_PERSONAL" csidl_PERSONAL :: CInt
 
-foreign import stdcall unsafe "GetTempPath" c_GetTempPath :: CInt -> CString -> IO CInt
+foreign import stdcall unsafe "GetTempPathA" c_GetTempPath :: CInt -> CString -> IO CInt
 
 raiseUnsupported loc = 
    ioException (IOError Nothing UnsupportedOperation loc "unsupported operation" Nothing)
