@@ -114,7 +114,7 @@ module X where
 	<listitem>
 	  <para>For example, <option>--make</option> or <option>-E</option>.
 	    There may be only a single mode flag on the command line.  The
-	    available modes are listed in <xref linkend="modes">.</para>
+	    available modes are listed in <xref linkend="modes"/>.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
