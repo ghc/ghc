@@ -2019,17 +2019,35 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    /* Allocate space for any (local, anonymous) .bss sections. */
 
    for (i = 0; i < hdr->NumberOfSections; i++) {
+      UInt32 bss_sz;
       UChar* zspace;
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
       if (0 != strcmp(sectab_i->Name, ".bss")) continue;
-      if (sectab_i->VirtualSize == 0) continue;
+      /* sof 10/05: the PE spec text isn't too clear regarding what
+       * the SizeOfRawData field is supposed to hold for object
+       * file sections containing just uninitialized data -- for executables,
+       * it is supposed to be zero; unclear what it's supposed to be
+       * for object files. However, VirtualSize is guaranteed to be
+       * zero for object files, which definitely suggests that SizeOfRawData
+       * will be non-zero (where else would the size of this .bss section be
+       * stored?) Looking at the COFF_section info for incoming object files,
+       * this certainly appears to be the case.
+       *
+       * => I suspect we've been incorrectly handling .bss sections in (relocatable)
+       * object files up until now. This turned out to bite us with ghc-6.4.1's use
+       * of gcc-3.4.x, which has started to emit initially-zeroed-out local 'static'
+       * variable decls into to the .bss section. (The specific function in Q which
+       * triggered this is libraries/base/cbits/dirUtils.c:__hscore_getFolderPath())
+       */
+      if (sectab_i->VirtualSize == 0 && sectab_i->SizeOfRawData == 0) continue;
       /* This is a non-empty .bss section.  Allocate zeroed space for
          it, and set its PointerToRawData field such that oc->image +
          PointerToRawData == addr_of_zeroed_space.  */
-      zspace = stgCallocBytes(1, sectab_i->VirtualSize,
-                              "ocGetNames_PEi386(anonymous bss)");
+      bss_sz = sectab_i->VirtualSize;
+      if ( bss_sz < sectab_i->SizeOfRawData) { bss_sz = sectab_i->SizeOfRawData; }
+      zspace = stgCallocBytes(1, bss_sz, "ocGetNames_PEi386(anonymous bss)");
       sectab_i->PointerToRawData = ((UChar*)zspace) - ((UChar*)(oc->image));
       addProddableBlock(oc, zspace, sectab_i->VirtualSize);
       /* debugBelch("BSS anon section at 0x%x\n", zspace); */
