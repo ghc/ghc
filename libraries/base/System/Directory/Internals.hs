@@ -124,15 +124,22 @@ pathParents p =
 -- | The function splits the given string to substrings
 -- using the 'searchPathSeparator'.
 parseSearchPath :: String -> [FilePath]
-parseSearchPath path = split searchPathSeparator path
+parseSearchPath path = split path
   where
-    split :: Char -> String -> [String]
-    split c s =
-      case rest of
-        []      -> [chunk] 
-        _:rest' -> chunk : split c rest'
+    split :: String -> [String]
+    split s =
+      case rest' of
+        []     -> [chunk] 
+        _:rest -> chunk : split rest
       where
-        (chunk, rest) = break (==c) s
+        chunk = 
+          case chunk' of
+#ifdef mingw32_HOST_OS
+            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
+#endif
+            _                                 -> chunk'
+    
+        (chunk', rest') = break (==searchPathSeparator) s
 
 --------------------------------------------------------------
 -- * Separators
