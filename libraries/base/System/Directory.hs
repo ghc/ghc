@@ -576,7 +576,27 @@ canonicalizePath fpath = return fpath
 -- such executable. For example (findExecutable \"ghc\")
 -- gives you the path to GHC.
 findExecutable :: String -> IO (Maybe FilePath)
-findExecutable binary = do
+findExecutable binary =
+#if defined(mingw32_HOST_OS)
+  withCString binary $ \c_binary ->
+  withCString ('.':exeExtension) $ \c_ext ->
+  allocaBytes long_path_size $ \pOutPath ->
+  alloca $ \ppFilePart -> do
+    res <- c_SearchPath nullPtr c_binary c_ext (fromIntegral long_path_size) pOutPath ppFilePart
+    if res > 0 && res < fromIntegral long_path_size
+      then do fpath <- peekCString pOutPath
+              return (Just fpath)
+      else return Nothing
+
+foreign import stdcall unsafe "SearchPath"
+            c_SearchPath :: CString
+                         -> CString
+                         -> CString
+                         -> CInt
+                         -> CString
+                         -> Ptr CString
+                         -> IO CInt
+#else
   path <- getEnv "PATH"
   search (parseSearchPath path)
   where
@@ -589,6 +609,8 @@ findExecutable binary = do
 	b <- doesFileExist path
 	if b then return (Just path)
              else search ds
+#endif
+
 
 #ifdef __GLASGOW_HASKELL__
 {- |@'getDirectoryContents' dir@ returns a list of /all/ entries
