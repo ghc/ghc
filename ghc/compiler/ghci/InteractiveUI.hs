@@ -196,17 +196,6 @@ interactiveUI session srcs maybe_expr = do
    Readline.initialize
 #endif
 
-#if defined(mingw32_HOST_OS)
-    -- The win32 Console API mutates the first character of 
-    -- type-ahead when reading from it in a non-buffered manner. Work
-    -- around this by flushing the input buffer of type-ahead characters,
-    -- but only if stdin is available.
-   flushed <- IO.try (GHC.ConsoleHandler.flushConsole stdin)
-   case flushed of 
-   	Left err | isDoesNotExistError err -> return ()
-   		 | otherwise -> ioError err
-   	Right () -> return ()
-#endif
    startGHCi (runGHCi srcs maybe_expr)
 	GHCiState{ progname = "<interactive>",
 		   args = [],
@@ -269,6 +258,18 @@ runGHCi paths maybe_expr = do
 
   case maybe_expr of
 	Nothing -> 
+#if defined(mingw32_HOST_OS)
+          do
+            -- The win32 Console API mutates the first character of 
+            -- type-ahead when reading from it in a non-buffered manner. Work
+            -- around this by flushing the input buffer of type-ahead characters,
+            -- but only if stdin is available.
+            flushed <- io (IO.try (GHC.ConsoleHandler.flushConsole stdin))
+            case flushed of 
+   	     Left err | isDoesNotExistError err -> return ()
+   		      | otherwise -> io (ioError err)
+   	     Right () -> return ()
+#endif
 	    -- enter the interactive loop
 	    interactiveLoop is_tty show_prompt
 	Just expr -> do
