@@ -1,4 +1,5 @@
 
 mod60.hs:3:3:
     Constructor `Left' should have 1 argument, but has been given 0
+    When checking the pattern: Left
     In the definition of `f': f (Left) = error "foo"
