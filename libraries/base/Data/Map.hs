@@ -28,7 +28,7 @@
 
 module Data.Map  ( 
             -- * Map type
-              Map          -- instance Eq,Show
+              Map          -- instance Eq,Show,Read
 
             -- * Operators
             , (!), (\\)
@@ -1303,6 +1303,28 @@ instance (Ord k, Ord v) => Ord (Map k v) where
 --------------------------------------------------------------------}
 instance Functor (Map k) where
   fmap f m  = map f m
+
+{--------------------------------------------------------------------
+  Read
+--------------------------------------------------------------------}
+instance (Ord k, Read k, Read e) => Read (Map k e) where
+    readsPrec _ = readParen False $ \ r ->
+                  [(fromList xs,t) | ("{",s) <- lex r
+                                   , (xs,t)  <- readl s]
+        where readl s  = [([],t)   | ("}",t) <- lex s] ++
+                         [(x:xs,u) | (x,t)   <- readPair s
+                                   , (xs,u)  <- readl' t]
+              readl' s = [([],t)   | ("}",t) <- lex s] ++
+                         [(x:xs,v) | (",",t) <- lex s
+                                   , (x,u)   <- readPair t
+                                   , (xs,v)  <- readl' u]
+
+-- parses a pair of things with the syntax a:=b
+readPair :: (Read a, Read b) => ReadS (a,b)
+readPair s = do (a, ct1)    <- reads s
+                (":=", ct2) <- lex ct1
+                (b, ct3)    <- reads ct2
+                return ((a,b), ct3)
 
 {--------------------------------------------------------------------
   Show
