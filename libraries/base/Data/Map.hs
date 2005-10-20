@@ -1339,9 +1339,9 @@ showMap (x:xs)
   = showChar '{' . showElem x . showTail xs
   where
     showTail []     = showChar '}'
-    showTail (x:xs) = showChar ',' . showElem x . showTail xs
+    showTail (x:xs) = showString ", " . showElem x . showTail xs
     
-    showElem (k,x)  = shows k . showString ":=" . shows x
+    showElem (k,x)  = shows k . showString " := " . shows x
   
 
 -- | /O(n)/. Show the tree that implements the map. The tree is shown
