@@ -87,6 +87,7 @@ import Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
+import Text.Read (readPrec, lexP, Lexeme(..), (<++), (+++), reset)
 import Data.Generics.Basics (Data(..), Fixity(..),
 			constrIndex, mkConstr, mkDataType)
 #endif
@@ -144,6 +145,49 @@ instance Show a => Show (Seq a) where
 		flip (Prelude.foldr ($)) (Data.List.intersperse (showChar ',')
 						(map shows (toList xs))) .
 		showChar '>'
+#endif
+
+instance Read a => Read (Seq a) where
+#ifdef __GLASGOW_HASKELL__
+	readPrec = parens $ (symbol "<>" >> return empty) <++ do
+		symbol "<"
+		readEnd empty <++ readRest empty
+	  where readEnd xs = do
+			symbol ">"
+			return xs
+		readRest xs = do
+			x <- reset readPrec
+			let xs' = xs |> x
+			readEnd xs' <++ do
+				symbol ","
+				readRest xs'
+		parens p = p +++ do
+			Punc "(" <- lexP
+			x        <- reset (parens p)
+			Punc ")" <- lexP
+			return x
+		symbol s = do
+			Symbol "<" <- lexP
+			return ()
+#else
+	readsPrec _ = readParen False $ \ r -> do
+		(tok,s) <- lex r
+		case tok of
+			"<>" -> return (empty,s)
+			"<"  -> do
+				(tok',t) <- lex s
+				case tok' of
+					">" -> return (empty,t)
+					_   -> readRest empty s
+			_    -> []
+	  where readRest xs s = do
+			(x,t) <- reads s
+			let xs' = xs |> x
+			(tok,u) <- lex t
+			case tok of
+				">" -> return (xs',u)
+				"," -> readRest xs' u
+				_   -> []
 #endif
 
 #include "Typeable.h"
