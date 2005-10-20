@@ -87,9 +87,13 @@ import Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
-import Text.Read (readPrec, lexP, Lexeme(..), (<++), (+++), reset)
+import Text.ParserCombinators.ReadP (char, skipSpaces, between, sepBy, (+++))
+import Text.Read (readPrec, readPrec_to_P, readP_to_Prec, minPrec)
+import Control.Monad (liftM)
 import Data.Generics.Basics (Data(..), Fixity(..),
 			constrIndex, mkConstr, mkDataType)
+#else
+import Data.Char (isSpace)
 #endif
 
 #if TESTING
@@ -148,46 +152,29 @@ instance Show a => Show (Seq a) where
 #endif
 
 instance Read a => Read (Seq a) where
+	-- avoid lex, as < or > might be followed by symbol characters.
 #ifdef __GLASGOW_HASKELL__
-	readPrec = parens $ (symbol "<>" >> return empty) <++ do
-		symbol "<"
-		readEnd empty <++ readRest empty
-	  where readEnd xs = do
-			symbol ">"
-			return xs
-		readRest xs = do
-			x <- reset readPrec
-			let xs' = xs |> x
-			readEnd xs' <++ do
-				symbol ","
-				readRest xs'
-		parens p = p +++ do
-			Punc "(" <- lexP
-			x        <- reset (parens p)
-			Punc ")" <- lexP
-			return x
-		symbol s = do
-			Symbol "<" <- lexP
-			return ()
+	readPrec = readP_to_Prec $ const $
+		parens $
+		between (litChar '<') (litChar '>') $
+		liftM fromList $
+		readPrec_to_P readPrec minPrec `sepBy` litChar ','
+	  where parens p = p +++ between (litChar '(') (litChar ')') (parens p)
+		litChar c = skipSpaces >> char c
 #else
-	readsPrec _ = readParen False $ \ r -> do
-		(tok,s) <- lex r
-		case tok of
-			"<>" -> return (empty,s)
-			"<"  -> do
-				(tok',t) <- lex s
-				case tok' of
-					">" -> return (empty,t)
-					_   -> readRest empty s
-			_    -> []
+	readsPrec _ = readParen False $ \ r ->
+		case dropWhile isSpace r of
+			('<':s) -> case dropWhile isSpace s of
+				('>':t) -> return (empty,t)
+				_       -> readRest empty s
+			_ -> []
 	  where readRest xs s = do
 			(x,t) <- reads s
 			let xs' = xs |> x
-			(tok,u) <- lex t
-			case tok of
-				">" -> return (xs',u)
-				"," -> readRest xs' u
-				_   -> []
+			case dropWhile isSpace t of
+				('>':u) -> return (xs',u)
+				(',':u) -> readRest xs' u
+				_     -> []
 #endif
 
 #include "Typeable.h"
