@@ -587,12 +587,12 @@ pop _span _buf _len = do popLexState; lexToken
 pop_and :: Action -> Action
 pop_and act span buf len = do popLexState; act span buf len
 
-notFollowedBy char _ _ _ (_,buf) = atEnd buf || currentChar buf /= char
+notFollowedBy char _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf /= char
 
-notFollowedBySymbol _ _ _ (_,buf)
+notFollowedBySymbol _ _ _ (AI _ _ buf)
   = atEnd buf || currentChar buf `notElem` "!#$%&*+./<=>?@\\^|-~"
 
-atEOL _ _ _ (_,buf) = atEnd buf || currentChar buf == '\n'
+atEOL _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf == '\n'
 
 ifExtension pred bits _ _ _ = pred bits
 
@@ -622,8 +622,7 @@ nested_comment span _str _len = do
 		    Just (c,input)    -> go n input
 	    	c -> go n input
 
-        err input = do failLocMsgP (srcSpanStart span) (fst input) 
-			"unterminated `{-'"
+        err (AI end _ _) = failLocMsgP (srcSpanStart span) end "unterminated `{-'"
 
 open_brace, close_brace :: Action
 open_brace span _str _len = do 
@@ -653,7 +652,8 @@ check_qvarid span buf len = do
 	token     = L span (ITqvarid (mod,var))
 
 	try_again = do
-		setInput (srcSpanStart span,buf)
+		(AI _ offs _) <- getInput	
+		setInput (AI (srcSpanStart span) (offs-len) buf)
 		pushLexState bad_qvarid
 		lexToken
 
@@ -744,7 +744,7 @@ prim_double      str = ITprimdouble $! readRational str
 -- we're at the first token on a line, insert layout tokens if necessary
 do_bol :: Action
 do_bol span _str _len = do
-	pos <- getOffside (srcSpanEnd span)
+	pos <- getOffside
 	case pos of
 	    LT -> do
                 --trace "layout: inserting '}'" $ do
@@ -780,7 +780,7 @@ maybe_layout _	        = return ()
 --
 new_layout_context strict span _buf _len = do
     popLexState
-    let offset = srcSpanStartCol span
+    (AI _ offset _) <- getInput
     ctx <- getContext
     case ctx of
 	Layout prev_off : _  | 
@@ -887,21 +887,21 @@ lex_char_tok span buf len = do	-- We've seen '
    case alexGetChar i1 of
 	Nothing -> lit_error 
 
-	Just ('\'', i2@(end2,_)) -> do 	-- We've seen ''
+	Just ('\'', i2@(AI end2 _ _)) -> do 	-- We've seen ''
 		  th_exts <- extension thEnabled
 		  if th_exts then do
 			setInput i2
 			return (L (mkSrcSpan loc end2)  ITtyQuote)
 		   else lit_error
 
-	Just ('\\', i2@(end2,_)) -> do 	-- We've seen 'backslash 
+	Just ('\\', i2@(AI end2 _ _)) -> do 	-- We've seen 'backslash 
 		  setInput i2
 		  lit_ch <- lex_escape
 		  mc <- getCharOrFail	-- Trailing quote
 		  if mc == '\'' then finish_char_tok loc lit_ch
 			        else lit_error 
 
-        Just (c, i2@(end2,_)) | not (is_any c) -> lit_error
+        Just (c, i2@(AI end2 _ _)) | not (is_any c) -> lit_error
 			      | otherwise      ->
 
 		-- We've seen 'x, where x is a valid character
@@ -914,17 +914,18 @@ lex_char_tok span buf len = do	-- We've seen '
 		_other -> do 		-- We've seen 'x not followed by quote
 					-- If TH is on, just parse the quote only
 			th_exts <- extension thEnabled	
-			if th_exts then return (L (mkSrcSpan loc (fst i1)) ITvarQuote)
+			let (AI end _ _) = i1
+			if th_exts then return (L (mkSrcSpan loc end) ITvarQuote)
 				   else lit_error
 
 finish_char_tok :: SrcLoc -> Char -> P (Located Token)
 finish_char_tok loc ch	-- We've already seen the closing quote
 			-- Just need to check for trailing #
   = do	glaexts <- extension glaExtsEnabled
-	i@(end,_) <- getInput
+	i@(AI end _ _) <- getInput
 	if glaexts then do
 		case alexGetChar i of
-			Just ('#',i@(end,_)) -> do
+			Just ('#',i@(AI end _ _)) -> do
 				setInput i
 				return (L (mkSrcSpan loc end) (ITprimchar ch))
 			_other ->
@@ -1066,6 +1067,9 @@ data ParseResult a
 data PState = PState { 
 	buffer	   :: StringBuffer,
         last_loc   :: SrcSpan,	-- pos of previous token
+        last_offs  :: !Int, 	-- offset of the previous token from the
+				-- beginning of  the current line.
+				-- \t is equal to 8 spaces.
 	last_len   :: !Int,	-- len of previous token
         loc        :: SrcLoc,   -- current loc (end of prev token + 1)
 	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
@@ -1121,24 +1125,30 @@ getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 setLastToken :: SrcSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s{ last_loc=loc, last_len=len } ()
 
-type AlexInput = (SrcLoc,StringBuffer)
+data AlexInput = AI SrcLoc {-#UNPACK#-}!Int StringBuffer
 
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (_,s) = prevChar s '\n'
+alexInputPrevChar (AI _ _ s) = prevChar s '\n'
 
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar (loc,s) 
+alexGetChar (AI loc ofs s) 
   | atEnd s   = Nothing
-  | otherwise = c `seq` loc' `seq` s' `seq` Just (c, (loc', s'))
-  where c = currentChar s
+  | otherwise = c `seq` loc' `seq` ofs' `seq` s' `seq` Just (c, (AI loc' ofs' s'))
+  where c    = currentChar s
         loc' = advanceSrcLoc loc c
+        ofs' = advanceOffs c ofs
 	s'   = stepOn s
 
+	advanceOffs :: Char -> Int -> Int
+	advanceOffs '\n' offs = 0
+	advanceOffs '\t' offs = (offs `quot` 8 + 1) * 8
+	advanceOffs _    offs = offs + 1
+
 getInput :: P AlexInput
-getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (l,b)
+getInput = P $ \s@PState{ loc=l, last_offs=o, buffer=b } -> POk s (AI l o b)
 
 setInput :: AlexInput -> P ()
-setInput (l,b) = P $ \s -> POk s{ loc=l, buffer=b } ()
+setInput (AI l o b) = P $ \s -> POk s{ loc=l, last_offs=o, buffer=b } ()
 
 pushLexState :: Int -> P ()
 pushLexState ls = P $ \s@PState{ lex_state=l } -> POk s{lex_state=ls:l} ()
@@ -1178,6 +1188,7 @@ mkPState buf loc flags  =
   PState {
       buffer	 = buf,
       last_loc   = mkSrcSpan loc loc,
+      last_offs  = 0,
       last_len   = 0,
       loc        = loc,
       extsBitmap = fromIntegral bitmap,
@@ -1215,13 +1226,13 @@ popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
 -- This is only used at the outer level of a module when the 'module'
 -- keyword is missing.
 pushCurrentContext :: P ()
-pushCurrentContext = P $ \ s@PState{ last_loc=loc, context=ctx } ->
-  POk s{ context = Layout (srcSpanStartCol loc) : ctx} ()
+pushCurrentContext = P $ \ s@PState{ last_offs=offs, last_len=len, context=ctx } ->
+  POk s{context = Layout (offs-len) : ctx} ()
 
-getOffside :: SrcLoc -> P Ordering
-getOffside loc = P $ \s@PState{context=stk} ->
+getOffside :: P Ordering
+getOffside = P $ \s@PState{last_offs=offs, context=stk} ->
 		let ord = case stk of
-			(Layout n:_) -> compare (srcLocCol loc) n
+			(Layout n:_) -> compare offs n
 			_            -> GT
 		in POk s ord
 
@@ -1255,7 +1266,7 @@ srcParseFail = P $ \PState{ buffer = buf, last_len = len,
 lexError :: String -> P a
 lexError str = do
   loc <- getSrcLoc
-  i@(end,_) <- getInput
+  i@(AI end _ _) <- getInput
   failLocMsgP loc end str
 
 -- -----------------------------------------------------------------------------
@@ -1265,23 +1276,23 @@ lexError str = do
 lexer :: (Located Token -> P a) -> P a
 lexer cont = do
   tok@(L _ tok__) <- lexToken
-  --trace ("token: " ++ show tok__) $ do
+  -- trace ("token: " ++ show tok__) $ do
   cont tok
 
 lexToken :: P (Located Token)
 lexToken = do
-  inp@(loc1,buf) <- getInput
+  inp@(AI loc1 _ buf) <- getInput
   sc <- getLexState
   exts <- getExts
   case alexScanUser exts inp sc of
     AlexEOF -> do let span = mkSrcSpan loc1 loc1
 		  setLastToken span 0
 		  return (L span ITeof)
-    AlexError (loc2,_) -> do failLocMsgP loc1 loc2 "lexical error"
+    AlexError (AI loc2 _ _) -> do failLocMsgP loc1 loc2 "lexical error"
     AlexSkip inp2 _ -> do
 	setInput inp2
 	lexToken
-    AlexToken inp2@(end,buf2) len t -> do
+    AlexToken inp2@(AI end _ buf2) len t -> do
 	setInput inp2
 	let span = mkSrcSpan loc1 end
 	span `seq` setLastToken span len
