@@ -12,5 +12,6 @@ include $(TOP)/mk/test.mk
 
 rn.prog006:
 	@$(TEST_HC) --make B.C -no-recomp -v0
+	@sed "s@__IMPORT__@`pwd`@" <pkg.conf.in >pkg.conf
 	@$(TEST_HC) -c -package-conf pkg.conf -package test -no-recomp A.hs -i
 	-@$(TEST_HC) -c -package-conf pkg.conf -package test -no-recomp Main.hs
