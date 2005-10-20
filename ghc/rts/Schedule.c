@@ -2697,9 +2697,62 @@ exitScheduler( void )
 {
     interrupted = rtsTrue;
     shutting_down_scheduler = rtsTrue;
+
 #if defined(RTS_SUPPORTS_THREADS)
     if (threadIsTask(osThreadId())) { taskStop(); }
     stopTaskManager();
+    //
+    // What can we do here?  There are a bunch of worker threads, it
+    // might be nice to let them exit cleanly.  There may be some main
+    // threads in the run queue; we should let them return to their
+    // callers with an Interrupted state.  We can't in general wait
+    // for all the running Tasks to stop, because some might be off in
+    // a C call that is blocked.
+    // 
+    // Letting the run queue drain is the safest thing.  That lets any
+    // main threads return that can return, and cleans up all the
+    // runnable threads.  Then we grab all the Capabilities to stop
+    // anything unexpected happening while we shut down.
+    //
+    // ToDo: this doesn't let us get the time stats from the worker
+    // tasks, because they haven't called taskStop().
+    //
+    ACQUIRE_LOCK(&sched_mutex);
+    { 
+	nat i;
+	for (i = 1000; i > 0; i--) {
+	    if (EMPTY_RUN_QUEUE()) {
+		IF_DEBUG(scheduler, sched_belch("run queue is empty"));
+		break;
+	    }
+	    IF_DEBUG(scheduler, sched_belch("yielding"));
+	    RELEASE_LOCK(&sched_mutex);
+	    prodWorker();
+	    yieldThread();
+	    ACQUIRE_LOCK(&sched_mutex);
+	}
+    }
+
+#ifdef SMP
+    {
+	Capability *cap;
+	int n_capabilities = RtsFlags.ParFlags.nNodes; 
+	Capability *caps[n_capabilities];
+	nat i;
+
+	while (n_capabilities > 0) {
+	    IF_DEBUG(scheduler, sched_belch("exitScheduler: grabbing all the capabilies (%d left)", n_capabilities));
+	    waitForReturnCapability(&sched_mutex, &cap);
+	    n_capabilities--;
+	    caps[n_capabilities] = cap;
+	}
+    }
+#else
+    {
+	Capability *cap;
+	waitForReturnCapability(&sched_mutex, &cap);
+    }
+#endif
 #endif
 }
 

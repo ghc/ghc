@@ -84,36 +84,7 @@ expandTaskTable (void)
 void
 stopTaskManager (void)
 {
-    nat i;
-
     IF_DEBUG(scheduler, sched_belch("stopping task manager, %d tasks still running", tasksRunning));
-    for (i = 1000; i > 0; i--) {
-	if (tasksRunning == 0) {
-	    IF_DEBUG(scheduler, sched_belch("all tasks stopped"));
-	    return;
-	}
-	IF_DEBUG(scheduler, sched_belch("yielding"));
-	prodWorker();
-	yieldThread();
-    }
-    IF_DEBUG(scheduler, sched_belch("%d tasks still running, exiting anyway", tasksRunning));
-
-    /* 
-       OLD CODE follows:
-    */
-#if old_code
-    /* Send 'em all a SIGHUP.  That should shut 'em up. */
-    awaitDeath = taskCount==0 ? 0 : taskCount-1;
-    for (i = 0; i < taskCount; i++) {
-	/* don't cancel the thread running this piece of code. */
-	if ( taskTable[i].id != tid ) {
-	    pthread_kill(taskTable[i].id,SIGTERM);
-	}
-    }
-    while (awaitDeath > 0) {
-	sched_yield();
-    }
-#endif // old_code
 }
 
 
