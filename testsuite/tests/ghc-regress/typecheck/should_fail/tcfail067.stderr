@@ -3,6 +3,7 @@ tcfail067.hs:12:15:
     No instance for (Ord a)
       arising from use of `SubRange' at tcfail067.hs:12:15-43
     Probable fix: add (Ord a) to the type signature(s) for `subRangeValue'
+    When checking the pattern: SubRange (lower, upper) value
     In the definition of `subRangeValue':
 	subRangeValue (SubRange (lower, upper) value) = value
 
@@ -10,12 +11,14 @@ tcfail067.hs:15:10:
     No instance for (Ord a)
       arising from use of `SubRange' at tcfail067.hs:15:10-25
     Probable fix: add (Ord a) to the type signature(s) for `subRange'
+    When checking the pattern: SubRange r value
     In the definition of `subRange': subRange (SubRange r value) = r
 
 tcfail067.hs:46:11:
     Could not deduce (Ord a) from the context (Show a)
       arising from use of `SubRange' at tcfail067.hs:46:11-39
     Probable fix: add (Ord a) to the type signature(s) for `showRange'
+    When checking the pattern: SubRange (lower, upper) value
     In the definition of `showRange':
 	showRange (SubRange (lower, upper) value)
 		    = (show value) ++ (" :" ++ ((show lower) ++ (".." ++ (show upper))))
