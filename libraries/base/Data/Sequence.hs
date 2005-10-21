@@ -80,7 +80,7 @@ import Prelude hiding (
 	null, length, take, drop, splitAt, foldl, foldl1, foldr, foldr1,
 	reverse)
 import qualified Data.List (foldl')
-import Control.Monad (MonadPlus(..))
+import Control.Monad (MonadPlus(..), liftM2)
 import Data.FunctorM
 import Data.Typeable
 
@@ -92,7 +92,7 @@ import Data.Generics.Basics (Data(..), Fixity(..),
 #endif
 
 #if TESTING
-import Control.Monad (liftM, liftM2, liftM3, liftM4)
+import Control.Monad (liftM, liftM3, liftM4)
 import Test.QuickCheck
 #endif
 
@@ -599,12 +599,17 @@ data ViewL a
 	= EmptyL	-- ^ empty sequence
 	| a :< Seq a	-- ^ leftmost element and the rest of the sequence
 #ifndef __HADDOCK__
+# if __GLASGOW_HASKELL__
+	deriving (Eq, Ord, Show, Read, Data)
+# else
 	deriving (Eq, Ord, Show, Read)
+# endif
 #else
 instance Eq a => Eq (ViewL a)
 instance Ord a => Ord (ViewL a)
 instance Show a => Show (ViewL a)
 instance Read a => Read (ViewL a)
+instance Data a => Data (ViewL a)
 #endif
 
 INSTANCE_TYPEABLE1(ViewL,viewLTc,"ViewL")
@@ -612,6 +617,12 @@ INSTANCE_TYPEABLE1(ViewL,viewLTc,"ViewL")
 instance Functor ViewL where
 	fmap _ EmptyL		= EmptyL
 	fmap f (x :< xs)	= f x :< fmap f xs
+
+instance FunctorM ViewL where
+	fmapM _ EmptyL		= return EmptyL
+	fmapM f (x :< xs)	= liftM2 (:<) (f x) (fmapM f xs)
+	fmapM_ _ EmptyL		= return ()
+	fmapM_ f (x :< xs)	= f x >> fmapM_ f xs >> return ()
 
 -- | /O(1)/. Analyse the left end of a sequence.
 viewl		::  Seq a -> ViewL a
@@ -640,12 +651,17 @@ data ViewR a
 	| Seq a :> a	-- ^ the sequence minus the rightmost element,
 			-- and the rightmost element
 #ifndef __HADDOCK__
+# if __GLASGOW_HASKELL__
+	deriving (Eq, Ord, Show, Read, Data)
+# else
 	deriving (Eq, Ord, Show, Read)
+# endif
 #else
 instance Eq a => Eq (ViewR a)
 instance Ord a => Ord (ViewR a)
 instance Show a => Show (ViewR a)
 instance Read a => Read (ViewR a)
+instance Data a => Data (ViewR a)
 #endif
 
 INSTANCE_TYPEABLE1(ViewR,viewRTc,"ViewR")
@@ -653,6 +669,12 @@ INSTANCE_TYPEABLE1(ViewR,viewRTc,"ViewR")
 instance Functor ViewR where
 	fmap _ EmptyR		= EmptyR
 	fmap f (xs :> x)	= fmap f xs :> f x
+
+instance FunctorM ViewR where
+	fmapM _ EmptyR		= return EmptyR
+	fmapM f (xs :> x)	= liftM2 (:>) (fmapM f xs) (f x)
+	fmapM_ _ EmptyR		= return ()
+	fmapM_ f (xs :> x)	= fmapM_ f xs >> f x >> return ()
 
 -- | /O(1)/. Analyse the right end of a sequence.
 viewr		::  Seq a -> ViewR a
