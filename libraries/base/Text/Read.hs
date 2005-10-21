@@ -35,6 +35,7 @@ module Text.Read (
    module Text.ParserCombinators.ReadPrec,
    L.Lexeme(..),	
    lexP,		-- :: ReadPrec Lexeme
+   parens,		-- :: ReadPrec a -> ReadPrec a
 #endif
 #ifdef __GLASGOW_HASKELL__
    readListDefault,	-- :: Read a => ReadS [a]
@@ -56,4 +57,14 @@ import qualified Text.Read.Lex as L
 
 lexP :: ReadPrec L.Lexeme
 lexP = lift L.lex
+
+parens :: ReadPrec a -> ReadPrec a
+parens p = optional
+ where
+  optional  = p +++ mandatory
+  mandatory = do
+    L.Punc "(" <- lexP
+    x          <- reset optional
+    L.Punc ")" <- lexP
+    return x
 #endif
