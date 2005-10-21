@@ -123,6 +123,7 @@ import qualified List
 -}
 
 #if __GLASGOW_HASKELL__
+import Text.Read (Lexeme(Ident), lexP, parens, prec, readPrec)
 import Data.Generics.Basics
 import Data.Generics.Instances
 #endif
@@ -512,7 +513,8 @@ instance Ord a => Ord (Set a) where
   Show
 --------------------------------------------------------------------}
 instance Show a => Show (Set a) where
-  showsPrec d s  = showSet (toAscList s)
+  showsPrec p xs = showParen (p > 10) $
+    showString "fromList " . shows (toList xs)
 
 showSet :: (Show a) => [a] -> ShowS
 showSet []     
@@ -527,17 +529,18 @@ showSet (x:xs)
   Read
 --------------------------------------------------------------------}
 instance (Read a, Ord a) => Read (Set a) where
-  readsPrec _ = readParen False $ \ r ->
-            [(fromList xs,t)     | ("{",s) <- lex r,
-                                   (xs,t)  <- readl s]
-      where readl s  = [([],t)   | ("}",t) <- lex s] ++
-                       [(x:xs,u) | (x,t)   <- reads s
-                                 , (xs,u)  <- readl' t]
-            readl' s = [([],t)   | ("}",t) <- lex s] ++
-                       [(x:xs,v) | (",",t) <- lex s
-                                 , (x,u)   <- reads t
-                                 , (xs,v)  <- readl' u]
-    
+#ifdef __GLASGOW_HASKELL__
+  readPrec = parens $ prec 10 $ do
+    Ident "fromList" <- lexP
+    xs <- readPrec
+    return (fromList xs)
+#else
+  readsPrec p = readParen (p > 10) $ \ r -> do
+    ("fromList",s) <- lex
+    (xs,t) <- reads
+    return (fromList xs,t)
+#endif
+
 {--------------------------------------------------------------------
   Typeable/Data
 --------------------------------------------------------------------}
