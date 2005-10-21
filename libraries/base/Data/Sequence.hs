@@ -79,21 +79,16 @@ module Data.Sequence (
 import Prelude hiding (
 	null, length, take, drop, splitAt, foldl, foldl1, foldr, foldr1,
 	reverse)
-import qualified Prelude (foldr)
-import qualified Data.List (foldl', intersperse)
+import qualified Data.List (foldl')
 import Control.Monad (MonadPlus(..))
 import Data.FunctorM
 import Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
-import Text.ParserCombinators.ReadP (char, skipSpaces, between, sepBy, (+++))
-import Text.Read (readPrec, readPrec_to_P, readP_to_Prec, minPrec)
-import Control.Monad (liftM)
+import Text.Read (Lexeme(..), lexP, parens, prec, readPrec)
 import Data.Generics.Basics (Data(..), Fixity(..),
 			constrIndex, mkConstr, mkDataType)
-#else
-import Data.Char (isSpace)
 #endif
 
 #if TESTING
@@ -145,36 +140,21 @@ instance Show a => Show (Seq a) where
 	showsPrec p (Seq x) = showsPrec p x
 #else
 instance Show a => Show (Seq a) where
-	showsPrec _ xs = showChar '<' .
-		flip (Prelude.foldr ($)) (Data.List.intersperse (showChar ',')
-						(map shows (toList xs))) .
-		showChar '>'
+	showsPrec p xs = showParen (p > 10) $
+		showString "fromList " . shows (toList xs)
 #endif
 
 instance Read a => Read (Seq a) where
-	-- avoid lex, as < or > might be followed by symbol characters.
 #ifdef __GLASGOW_HASKELL__
-	readPrec = readP_to_Prec $ const $
-		parens $
-		between (litChar '<') (litChar '>') $
-		liftM fromList $
-		readPrec_to_P readPrec minPrec `sepBy` litChar ','
-	  where parens p = p +++ between (litChar '(') (litChar ')') (parens p)
-		litChar c = skipSpaces >> char c
+	readPrec = parens $ prec 10 $ do
+		Ident "fromList" <- lexP
+		xs <- readPrec
+		return (fromList xs)
 #else
-	readsPrec _ = readParen False $ \ r ->
-		case dropWhile isSpace r of
-			('<':s) -> case dropWhile isSpace s of
-				('>':t) -> return (empty,t)
-				_       -> readRest empty s
-			_ -> []
-	  where readRest xs s = do
-			(x,t) <- reads s
-			let xs' = xs |> x
-			case dropWhile isSpace t of
-				('>':u) -> return (xs',u)
-				(',':u) -> readRest xs' u
-				_     -> []
+	readsPrec p = readParen (p > 10) $ \ r -> do
+		("fromList",s) <- lex
+		(xs,t) <- reads
+		return (fromList xs,t)
 #endif
 
 #include "Typeable.h"
@@ -619,12 +599,15 @@ data ViewL a
 	= EmptyL	-- ^ empty sequence
 	| a :< Seq a	-- ^ leftmost element and the rest of the sequence
 #ifndef __HADDOCK__
-	deriving (Eq, Show)
+	deriving (Eq, Ord, Show, Read)
 #else
 instance Eq a => Eq (ViewL a)
+instance Ord a => Ord (ViewL a)
 instance Show a => Show (ViewL a)
+instance Read a => Read (ViewL a)
 #endif
 
+INSTANCE_TYPEABLE1(ViewL,viewLTc,"ViewL")
 
 instance Functor ViewL where
 	fmap _ EmptyL		= EmptyL
@@ -657,11 +640,15 @@ data ViewR a
 	| Seq a :> a	-- ^ the sequence minus the rightmost element,
 			-- and the rightmost element
 #ifndef __HADDOCK__
-	deriving (Eq, Show)
+	deriving (Eq, Ord, Show, Read)
 #else
 instance Eq a => Eq (ViewR a)
+instance Ord a => Ord (ViewR a)
 instance Show a => Show (ViewR a)
+instance Read a => Read (ViewR a)
 #endif
+
+INSTANCE_TYPEABLE1(ViewR,viewRTc,"ViewR")
 
 instance Functor ViewR where
 	fmap _ EmptyR		= EmptyR
