@@ -176,8 +176,6 @@ forkOS_createThread ( HsStablePtr entry )
 			   (unsigned*)&pId) == 0);
 }
 
-#endif /* defined(HAVE_PTHREAD_H) */
-
 #else /* !defined(THREADED_RTS) */
 
 int
