@@ -12,4 +12,4 @@ main = do
 	     )
 	     (\e -> print e)
 	   )
-  threadDelay 500000
+  threadDelay 200000
