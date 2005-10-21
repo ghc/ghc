@@ -178,7 +178,7 @@ functions blocks only the thread making the call.
 id2TSO :: ThreadId -> ThreadId#
 id2TSO (ThreadId t) = t
 
-foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> Int
+foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> CInt
 -- Returns -1, 0, 1
 
 cmpThread :: ThreadId -> ThreadId -> Ordering
