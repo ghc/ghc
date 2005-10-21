@@ -99,37 +99,11 @@ typedef struct StgRegTable_ {
   MP_INT          rmp_result1;
   MP_INT          rmp_result2;
 #if defined(SMP) || defined(PAR)
-  StgSparkPool   rSparks;	/* per-task spark pool */
+  StgSparkPool    rSparks;	/* per-task spark pool */
 #endif
-  StgWord        rInHaskell;    /* non-zero if we're in Haskell code */
     // If this flag is set, we are running Haskell code.  Used to detect
     // uses of 'foreign import unsafe' that should be 'safe'.
 } StgRegTable;
-
-
-/* A capability is a combination of a FunTable and a RegTable.  In STG
- * code, BaseReg normally points to the RegTable portion of this
- * structure, so that we can index both forwards and backwards to take
- * advantage of shorter instruction forms on some archs (eg. x86).
- */
-typedef struct Capability_ {
-    StgFunTable f;
-    StgRegTable r;
-#if defined(SMP)
-  struct Capability_ *link;	/* per-task register tables are linked together */
-#endif
-} Capability;
-
-/* No such thing as a MainCapability under SMP - each thread must have
- * its own Capability.
- */
-#ifndef SMP
-#if IN_STG_CODE
-extern W_ MainCapability[];
-#else
-extern DLL_IMPORT_RTS Capability  MainCapability;
-#endif
-#endif
 
 #if IN_STG_CODE
 
@@ -329,13 +303,32 @@ GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
  * concurrent Haskell, MainRegTable otherwise).
  */
 
+/* A capability is a combination of a FunTable and a RegTable.  In STG
+ * code, BaseReg normally points to the RegTable portion of this
+ * structure, so that we can index both forwards and backwards to take
+ * advantage of shorter instruction forms on some archs (eg. x86).
+ * This is a cut-down version of the Capability structure; the full
+ * version is defined in Capability.h.
+ */
+struct PartCapability_ {
+    StgFunTable f;
+    StgRegTable r;
+};
+
+/* No such thing as a MainCapability under SMP - each thread must have
+ * its own Capability.
+ */
+#if IN_STG_CODE && !defined(SMP)
+extern W_ MainCapability[];
+#endif
+
 #if defined(REG_Base) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #else
 #ifdef SMP
 #error BaseReg must be in a register for SMP
 #endif
-#define BaseReg (&((Capability *)MainCapability)[0].r)
+#define BaseReg (&((struct Capability_)MainCapability).r)
 #endif
 
 #if defined(REG_Sp) && !defined(NO_GLOBAL_REG_DECLS)

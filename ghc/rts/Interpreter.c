@@ -1156,7 +1156,7 @@ run_BCO:
 	}
 
 	case bci_CCALL: {
-	    StgInt tok;
+	    void *tok;
 	    int stk_offset            = BCO_NEXT;
 	    int o_itbl                = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
@@ -1164,7 +1164,7 @@ run_BCO:
 		RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE
 		+ sizeofW(StgRetDyn);
 
-#ifdef RTS_SUPPORTS_THREADS
+#ifdef THREADED_RTS
 	    // Threaded RTS:
 	    // Arguments on the TSO stack are not good, because garbage
 	    // collection might move the TSO as soon as we call
@@ -1195,7 +1195,7 @@ run_BCO:
 	    SAVE_STACK_POINTERS;
 	    tok = suspendThread(&cap->r);
 
-#ifndef RTS_SUPPORTS_THREADS
+#ifndef THREADED_RTS
 	    // Careful:
 	    // suspendThread might have shifted the stack
 	    // around (stack squeezing), so we have to grab the real
@@ -1217,7 +1217,7 @@ run_BCO:
 	    // Save the Haskell thread's current value of errno
 	    cap->r.rCurrentTSO->saved_errno = errno;
 		
-#ifdef RTS_SUPPORTS_THREADS
+#ifdef THREADED_RTS
 	    // Threaded RTS:
 	    // Copy the "arguments", which might include a return value,
 	    // back to the TSO stack. It would of course be enough to

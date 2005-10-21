@@ -9,7 +9,9 @@
 #ifndef WEAK_H
 #define WEAK_H
 
-void scheduleFinalizers(StgWeak *w);
+#include "Capability.h"
+
+void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
 
 #endif

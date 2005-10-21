@@ -270,7 +270,8 @@ DEBUG_FILL_SLOP(StgClosure *p)
 								\
 /*    ASSERT( p1 != p2 && !closure_IND(p1) );			\
  */ LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
-    bd = Bdescr(p1);						\
+/*  foreign "C" cas(p1 "ptr", 0, stg_WHITEHOLE_info);		\
+ */ bd = Bdescr(p1);						\
     if (bdescr_gen_no(bd) == 0 :: CInt) {			\
       StgInd_indirectee(p1) = p2;				\
       SET_INFO(p1, ind_info);					\
@@ -292,6 +293,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
   {									\
     bdescr *bd;								\
 									\
+    /* cas(p1, 0, &stg_WHITEHOLE_info); */				\
     ASSERT( (P_)p1 != (P_)p2 && !closure_IND(p1) );			\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);				\
     bd = Bdescr((P_)p1);						\

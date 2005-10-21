@@ -22,6 +22,8 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Storage.h"
+#include "OSThreads.h"
+#include "Capability.h"
 
 #include <stdio.h>
 

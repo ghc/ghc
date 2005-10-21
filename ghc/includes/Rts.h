@@ -104,6 +104,8 @@ extern void _assertFail (char *, unsigned int);
 
 /* Parallel information */
 #include "Parallel.h"
+#include "OSThreads.h"
+#include "SMP.h"
 
 /* STG/Optimised-C related stuff */
 #include "Block.h"

@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2005
  *
  * Include this file into sources which should not need any non-Posix services.
  * That includes most RTS C sources.
@@ -15,4 +15,4 @@
 
 /* Let's be ISO C9X too... */
 
-#endif
+#endif /* POSIXSOURCE_H */

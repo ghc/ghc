@@ -15,21 +15,6 @@
  */
 
 /*
- * Function: initUserSignals()
- *
- * Initialize the console handling substrate.
- */
-extern void initUserSignals(void);
-
-/*
- * Function: initDefaultHandlers()
- *
- * Install any default signal/console handlers. Currently we install a
- * Ctrl+C handler that shuts down the RTS in an orderly manner.
- */
-extern void initDefaultHandlers(void);
-
-/*
  * Function: signals_pending() 
  * 
  * Used by the RTS to check whether new signals have been 'recently' reported.
@@ -52,44 +37,12 @@ extern StgInt stg_pending_events;
 #define anyUserHandlers() (rtsFalse)
 
 /*
- * Function: blockUserSignals()
- *
- * Temporarily block the delivery of further console events. Needed to
- * avoid race conditions when GCing the queue of outstanding handlers or
- * when emptying the queue by running the handlers.
- * 
- */
-extern void blockUserSignals(void);
-
-/*
- * Function: unblockUserSignals()
- *
- * The inverse of blockUserSignals(); re-enable the deliver of console events.
- */
-extern void unblockUserSignals(void);
-
-/*
- * Function: awaitUserSignals()
- *
- * Wait for the next console event. Currently a NOP (returns immediately.)
- */
-extern void awaitUserSignals(void);
-
-/*
  * Function: startSignalHandlers()
  *
  * Run the handlers associated with the queued up console events. Console
  * event delivery is blocked for the duration of this call.
  */
 extern void startSignalHandlers(void);
-
-/*
- * Function: markSignalHandlers()
- *
- * Evacuate the handler queue. _Assumes_ that console event delivery
- * has already been blocked.
- */
-extern void markSignalHandlers (evac_fn evac);
 
 /*
  * Function: handleSignalsInThisThread()

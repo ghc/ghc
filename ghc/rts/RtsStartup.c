@@ -291,7 +291,7 @@ hs_add_root(void (*init_root)(void))
     /* The initialisation stack grows downward, with sp pointing 
        to the last occupied word */
     init_sp = INIT_STACK_BLOCKS*BLOCK_SIZE_W;
-    bd = allocGroup(INIT_STACK_BLOCKS);
+    bd = allocGroup_lock(INIT_STACK_BLOCKS);
     init_stack = (F_ *)bd->start;
     init_stack[--init_sp] = (F_)stg_init_finish;
     if (init_root != NULL) {
@@ -301,7 +301,7 @@ hs_add_root(void (*init_root)(void))
     cap.r.rSp = (P_)(init_stack + init_sp);
     StgRun((StgFunPtr)stg_init, &cap.r);
 
-    freeGroup(bd);
+    freeGroup_lock(bd);
 
 #if defined(PROFILING) || defined(DEBUG)
     // This must be done after module initialisation.

@@ -19,9 +19,11 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Timer.h"
-#include "Itimer.h"
+#include "Ticker.h"
+#include "posix/Itimer.h"
 #include "Proftimer.h"
 #include "Schedule.h"
+#include "posix/Select.h"
 
 /* As recommended in the autoconf manual */
 # ifdef TIME_WITH_SYS_TIME
@@ -65,7 +67,7 @@
  *
  * For now, we're using (1), but this needs a better solution. --SDM
  */
-#ifdef RTS_SUPPORTS_THREADS
+#ifdef THREADED_RTS
 #define ITIMER_FLAVOUR  ITIMER_REAL
 #define ITIMER_SIGNAL   SIGALRM
 #else
@@ -98,7 +100,9 @@ startTicker(nat ms, TickProc handle_tick)
 
     install_vtalrm_handler(handle_tick);
 
+#if !defined(THREADED_RTS)
     timestamp = getourtimeofday();
+#endif
 
     it.it_value.tv_sec = ms / 1000;
     it.it_value.tv_usec = 1000 * (ms - (1000 * it.it_value.tv_sec));
@@ -132,7 +136,9 @@ startTicker(nat ms)
     struct itimerspec it;
     timer_t tid;
 
+#if !defined(THREADED_RTS)
     timestamp = getourtimeofday();
+#endif
 
     se.sigev_notify = SIGEV_SIGNAL;
     se.sigev_signo = ITIMER_SIGNAL;
@@ -153,7 +159,9 @@ stopTicker()
     struct itimerspec it;
     timer_t tid;
 
+#if !defined(THREADED_RTS)
     timestamp = getourtimeofday();
+#endif
 
     se.sigev_notify = SIGEV_SIGNAL;
     se.sigev_signo = ITIMER_SIGNAL;

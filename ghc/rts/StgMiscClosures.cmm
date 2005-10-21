@@ -338,6 +338,10 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 
     TICK_ENT_BH();
 
+#ifdef SMP
+    // foreign "C" debugBelch("BLACKHOLE entry\n");
+#endif
+
     /* Actually this is not necessary because R1 is about to be destroyed. */
     LDV_ENTER(R1);
 
@@ -401,6 +405,10 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 
     TICK_ENT_BH();
     LDV_ENTER(R1);
+
+#if defined(SMP)
+    // foreign "C" debugBelch("BLACKHOLE entry\n");
+#endif
 
 #if defined(SMP)
     foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");

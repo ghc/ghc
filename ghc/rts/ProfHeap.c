@@ -403,7 +403,7 @@ initHeapProfiling(void)
 #ifdef PROFILING
     if (doingLDVProfiling() && doingRetainerProfiling()) {
 	errorBelch("cannot mix -hb and -hr");
-	stg_exit(1);
+	stg_exit(EXIT_FAILURE);
     }
 #endif
 

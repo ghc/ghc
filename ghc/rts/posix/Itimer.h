@@ -9,9 +9,6 @@
 #ifndef ITIMER_H
 #define ITIMER_H
 
-extern int startTicker( nat ms, TickProc handle_tick);
-extern int stopTicker ( void );
-
 extern lnat getourtimeofday   ( void );
 #if 0
 /* unused */

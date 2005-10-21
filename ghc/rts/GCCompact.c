@@ -955,11 +955,13 @@ compact( void (*get_roots)(evac_fn) )
     // any threads resurrected during this GC
     thread((StgPtr)&resurrected_threads);
 
-    // the main threads list
+    // the task list
     {
-	StgMainThread *m;
-	for (m = main_threads; m != NULL; m = m->link) {
-	    thread((StgPtr)&m->tso);
+	Task *task;
+	for (task = all_tasks; task != NULL; task = task->all_link) {
+	    if (task->tso) {
+		thread((StgPtr)&task->tso);
+	    }
 	}
     }
 

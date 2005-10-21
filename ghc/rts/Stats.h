@@ -1,17 +1,22 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2005
  *
  * Statistics and timing-related functions.
  *
  * ---------------------------------------------------------------------------*/
 
+#ifndef STATS_H
+#define STATS_H
+
+#include "Task.h"
+
 extern void      stat_startInit(void);
 extern void      stat_endInit(void);
 
 extern void      stat_startGC(void);
-extern void      stat_endGC(lnat alloc, lnat collect, lnat live, 
-			    lnat copied, lnat scavd_copied, lnat gen);
+extern void      stat_endGC (lnat alloc, lnat collect, lnat live, 
+			     lnat copied, lnat scavd_copied, lnat gen);
 
 #ifdef PROFILING
 extern void      stat_startRP(void);
@@ -49,3 +54,5 @@ extern HsInt64   getAllocations( void );
 extern void      stat_getTimes ( long *currentElapsedTime, 
 				 long *currentUserTime,
 				 long *elapsedGCTime );
+
+#endif /* STATS_H */

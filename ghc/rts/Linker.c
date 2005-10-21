@@ -376,7 +376,6 @@ typedef struct _RtsSymbolVal {
 
 #if !defined(mingw32_HOST_OS)
 #define RTS_USER_SIGNALS_SYMBOLS \
-   SymX(startSignalHandler) \
    SymX(setIOManagerPipe)
 #else
 #define RTS_USER_SIGNALS_SYMBOLS /* nothing */
@@ -583,7 +582,6 @@ typedef struct _RtsSymbolVal {
       SymX(rts_mkWord8)				\
       SymX(rts_unlock)				\
       SymX(rtsSupportsBoundThreads)		\
-      SymX(run_queue_hd)			\
       SymX(__hscore_get_saved_termios)		\
       SymX(__hscore_set_saved_termios)		\
       SymX(setProgArgv)				\
@@ -1064,7 +1062,7 @@ void ghci_enquire ( char* addr )
 	     // debugBelch("ghci_enquire: can't find %s\n", sym);
          }
          else if (addr-DELTA <= a && a <= addr+DELTA) {
-            debugBelch("%p + %3d  ==  `%s'\n", addr, a - addr, sym);
+            debugBelch("%p + %3d  ==  `%s'\n", addr, (int)(a - addr), sym);
          }
       }
    }
@@ -2735,7 +2733,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    }
 
    IF_DEBUG(linker,debugBelch(
-             "\nSection header table: start %d, n_entries %d, ent_size %d\n",
+             "\nSection header table: start %ld, n_entries %d, ent_size %d\n",
              ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
 
    ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
@@ -2801,7 +2799,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       nsymtabs++;
       stab = (Elf_Sym*) (ehdrC + shdr[i].sh_offset);
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
-      IF_DEBUG(linker,debugBelch( "   number of entries is apparently %d (%d rem)\n",
+      IF_DEBUG(linker,debugBelch( "   number of entries is apparently %d (%ld rem)\n",
                nent,
                shdr[i].sh_size % sizeof(Elf_Sym)
              ));
@@ -3112,7 +3110,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          case R_386_PC32: *pP = value - P; break;
 #        endif
          default:
-            errorBelch("%s: unhandled ELF relocation(Rel) type %d\n",
+            errorBelch("%s: unhandled ELF relocation(Rel) type %ld\n",
 		  oc->fileName, ELF_R_TYPE(info));
             return 0;
       }
@@ -3129,7 +3127,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                           Elf_Sym*  stab, char* strtab )
 {
    int j;
-   char *symbol;
+   char *symbol = NULL;
    Elf_Addr targ;
    Elf_Rela* rtab = (Elf_Rela*) (ehdrC + shdr[shnum].sh_offset);
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rela);
@@ -3353,7 +3351,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
          default:
-            errorBelch("%s: unhandled ELF relocation(RelA) type %d\n",
+            errorBelch("%s: unhandled ELF relocation(RelA) type %ld\n",
 		  oc->fileName, ELF_R_TYPE(info));
             return 0;
       }

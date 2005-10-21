@@ -6,6 +6,9 @@
  * 
  * ---------------------------------------------------------------------------*/
 
+#ifndef SPARKS_H
+#define SPARKS_H
+
 #if defined(GRAN)
 
 void      findLocalSpark (rtsEvent *event, rtsBool *found_res, rtsSparkQ *spark_res);
@@ -36,3 +39,5 @@ void         disposeSpark( StgClosure *spark );
 #endif
 
 #endif
+
+#endif /* SPARKS_H */

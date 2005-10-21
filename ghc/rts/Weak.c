@@ -36,7 +36,7 @@ StgWeak *weak_ptr_list;
  */
 
 void
-scheduleFinalizers(StgWeak *list)
+scheduleFinalizers(Capability *cap, StgWeak *list)
 {
     StgWeak *w;
     StgTSO *t;
@@ -72,7 +72,7 @@ scheduleFinalizers(StgWeak *list)
 
     IF_DEBUG(weak,debugBelch("weak: batching %d finalizers\n", n));
 
-    arr = (StgMutArrPtrs *)allocate(sizeofW(StgMutArrPtrs) + n);
+    arr = (StgMutArrPtrs *)allocateLocal(cap, sizeofW(StgMutArrPtrs) + n);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;
@@ -85,12 +85,13 @@ scheduleFinalizers(StgWeak *list)
 	}
     }
 
-    t = createIOThread(RtsFlags.GcFlags.initialStkSize, 
-		       rts_apply(
-			   rts_apply(
+    t = createIOThread(cap, 
+		       RtsFlags.GcFlags.initialStkSize, 
+		       rts_apply(cap,
+			   rts_apply(cap,
 			       (StgClosure *)runFinalizerBatch_closure,
-			       rts_mkInt(n)), 
+			       rts_mkInt(cap,n)), 
 			   (StgClosure *)arr)
 	);
-    scheduleThread(t);
+    scheduleThread(cap,t);
 }

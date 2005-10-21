@@ -20,33 +20,121 @@
  * 
  * --------------------------------------------------------------------------*/
 
-#ifndef __CAPABILITY_H__
-#define __CAPABILITY_H__
+#ifndef CAPABILITY_H
+#define CAPABILITY_H
 
 #include "RtsFlags.h"
+#include "Task.h"
 
-// All the capabilities
+struct Capability_ {
+    // State required by the STG virtual machine when running Haskell
+    // code.  During STG execution, the BaseReg register always points
+    // to the StgRegTable of the current Capability (&cap->r).
+    StgFunTable f;
+    StgRegTable r;
+
+    nat no;  // capability number.
+
+    // The Task currently holding this Capability.  This task has
+    // exclusive access to the contents of this Capability (apart from
+    // returning_tasks_hd/returning_tasks_tl).
+    // Locks required: cap->lock.
+    Task *running_task;
+
+    // true if this Capability is running Haskell code, used for
+    // catching unsafe call-ins.
+    rtsBool in_haskell;
+
+    // The run queue.  The Task owning this Capability has exclusive
+    // access to its run queue, so can wake up threads without
+    // taking a lock, and the common path through the scheduler is
+    // also lock-free.
+    StgTSO *run_queue_hd;
+    StgTSO *run_queue_tl;
+
+    // Tasks currently making safe foreign calls.  Doubly-linked.
+    // When returning, a task first acquires the Capability before
+    // removing itself from this list, so that the GC can find all
+    // the suspended TSOs easily.  Hence, when migrating a Task from
+    // the returning_tasks list, we must also migrate its entry from
+    // this list.
+    Task *suspended_ccalling_tasks;
+
+#if defined(THREADED_RTS)
+    struct Capability_ *next;
+    struct Capability_ *prev;
+
+    // Worker Tasks waiting in the wings.  Singly-linked.
+    Task *spare_workers;
+
+    // This lock protects running_task and returning_tasks_{hd,tl}.
+    Mutex lock;
+
+    // Tasks waiting to return from a foreign call, or waiting to make
+    // a new call-in using this Capability (NULL if empty).
+    // NB. this field needs to be modified by tasks other than the
+    // running_task, so it requires cap->lock to modify.  A task can
+    // check whether it is NULL without taking the lock, however.
+    Task *returning_tasks_hd; // Singly-linked, with head/tail
+    Task *returning_tasks_tl;
+#endif
+}; // typedef Capability, defined in RtsAPI.h
+
+// Converts a *StgRegTable into a *Capability.
+//
+INLINE_HEADER Capability *
+regTableToCapability (StgRegTable *reg)
+{
+    return (Capability *)((void *)((unsigned char*)reg - sizeof(StgFunTable)));
+}
+
+// Initialise the available capabilities.
+//
+void initCapabilities (void);
+
+// Release a capability.  This is called by a Task that is exiting
+// Haskell to make a foreign call, or in various other cases when we
+// want to relinquish a Capability that we currently hold.
+//
+// ASSUMES: cap->running_task is the current Task.
+//
+#if defined(THREADED_RTS)
+void releaseCapability  (Capability* cap);
+void releaseCapability_ (Capability* cap); // assumes cap->lock is held
+#else
+// releaseCapability() is empty in non-threaded RTS
+INLINE_HEADER void releaseCapability  (Capability* cap STG_UNUSED) {};
+INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED) {};
+#endif
+
+#if !IN_STG_CODE && !defined(SMP)
+// for non-SMP, we have one global capability
+extern Capability MainCapability; 
+#endif
+
+// Array of all the capabilities
+//
+extern nat n_capabilities;
 extern Capability *capabilities;
 
-// Initialised the available capabilities.
+// The Capability that was last free.  Used as a good guess for where
+// to assign new threads.
 //
-extern void initCapabilities( void );
+extern Capability *last_free_capability;
 
-// Releases a capability
+// Acquires a capability at a return point.  If *cap is non-NULL, then
+// this is taken as a preference for the Capability we wish to
+// acquire.
 //
-extern void releaseCapability( Capability* cap );
-
-// Signal that a thread has become runnable
+// OS threads waiting in this function get priority over those waiting
+// in waitForCapability().
 //
-extern void threadRunnable ( void );
+// On return, *cap is non-NULL, and points to the Capability acquired.
+//
+void waitForReturnCapability (Capability **cap/*in/out*/, Task *task);
 
-// Return the capability that I own.
-// 
-extern Capability *myCapability (void);
+#if defined(THREADED_RTS)
 
-extern void prodWorker ( void );
-
-#ifdef RTS_SUPPORTS_THREADS
 // Gives up the current capability IFF there is a higher-priority
 // thread waiting for it.  This happens in one of two ways:
 //
@@ -56,79 +144,37 @@ extern void prodWorker ( void );
 //   (b) there is an OS thread waiting to return from a foreign call
 //
 // On return: *pCap is NULL if the capability was released.  The
-// current worker thread should then re-acquire it using
-// waitForCapability().
+// current task should then re-acquire it using waitForCapability().
 //
-extern void yieldCapability( Capability** pCap, Condition *cond );
+void yieldCapability (Capability** pCap, Task *task);
 
 // Acquires a capability for doing some work.
 //
-// If the current OS thread is bound to a particular Haskell thread,
-// then pThreadCond points to a condition variable for waking up this
-// OS thread when its Haskell thread is ready to run.
-//
 // On return: pCap points to the capability.
-extern void waitForCapability( Mutex* pMutex, Capability** pCap, 
-			       Condition *pThreadCond );
-
-// Acquires a capability at a return point.  
 //
-// OS threads waiting in this function get priority over those waiting
-// in waitForWorkCapability().
+void waitForCapability (Task *task, Mutex *mutex, Capability **pCap);
+
+// Wakes up a worker thread on just one Capability, used when we
+// need to service some global event.
 //
-// On return: pCap points to the capability.
-extern void waitForReturnCapability(Mutex* pMutex, Capability** pCap);
+void prodOneCapability (void);
 
-// Signals that the next time a capability becomes free, it should
-// be transfered to a particular OS thread, identified by the
-// condition variable pTargetThreadCond.
+// Similar to prodOneCapability(), but prods all of them.
 //
-extern void passCapability(Condition *pTargetThreadCond);
+void prodAllCapabilities (void);
 
-// Signals that the next time a capability becomes free, it should
-// be transfered to an ordinary worker thread.
+// Waits for a capability to drain of runnable threads and workers,
+// and then acquires it.  Used at shutdown time.
 //
-extern void passCapabilityToWorker( void );
+void shutdownCapability (Capability *cap, Task *task);
 
-extern nat rts_n_free_capabilities;  
-
-extern Capability *free_capabilities;
-
-/* number of worker threads waiting for a return capability
- */
-extern nat rts_n_waiting_workers;
-
-static inline rtsBool needToYieldToReturningWorker(void)
-{
-	return rts_n_waiting_workers > 0;
-}
-
-static inline nat getFreeCapabilities (void)
-{
-  return rts_n_free_capabilities;
-}
-
-static inline rtsBool noCapabilities (void)
-{
-  return (rts_n_free_capabilities == 0);
-}
-
-static inline rtsBool allFreeCapabilities (void)
-{
-#if defined(SMP)
-  return (rts_n_free_capabilities == RTS_DEREF(RtsFlags).ParFlags.nNodes);
-#else
-  return (rts_n_free_capabilities == 1);
-#endif
-}
-
-#else // !RTS_SUPPORTS_THREADS
+#else // !THREADED_RTS
 
 // Grab a capability.  (Only in the non-threaded RTS; in the threaded
 // RTS one of the waitFor*Capability() functions must be used).
 //
-extern void grabCapability( Capability **pCap );
+extern void grabCapability (Capability **pCap);
 
-#endif /* !RTS_SUPPORTS_THREADS */
+#endif /* !THREADED_RTS */
 
-#endif /* __CAPABILITY_H__ */
+#endif /* CAPABILITY_H */

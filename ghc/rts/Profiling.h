@@ -1,10 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2005
  *
  * Support for profiling
  *
  * ---------------------------------------------------------------------------*/
+
+#ifndef PROFILING_H
+#define PROFILING_H
 
 #include <stdio.h>
 
@@ -32,3 +35,5 @@ extern void debugCCS( CostCentreStack *ccs );
 #endif
 
 #endif
+
+#endif /* PROFILING_H */

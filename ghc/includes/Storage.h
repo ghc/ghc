@@ -145,7 +145,7 @@ extern void exitStorage(void);
    -------------------------------------------------------------------------- */
 
 extern StgPtr  allocate        ( nat n );
-extern StgPtr  allocateLocal   ( StgRegTable *reg, nat n );
+extern StgPtr  allocateLocal   ( Capability *cap, nat n );
 extern StgPtr  allocatePinned  ( nat n );
 extern lnat    allocated_bytes ( void );
 
@@ -205,9 +205,11 @@ extern Mutex sm_mutex;
 #if defined(SMP)
 #define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex);
 #define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex);
+#define ASSERT_SM_LOCK()  ASSERT_LOCK_HELD(&sm_mutex);
 #else
 #define ACQUIRE_SM_LOCK
 #define RELEASE_SM_LOCK
+#define ASSERT_SM_LOCK()
 #endif
 
 INLINE_HEADER void

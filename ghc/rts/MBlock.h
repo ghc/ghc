@@ -1,13 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2005
  *
  * MegaBlock Allocator interface.
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef __MBLOCK_H__
-#define __MBLOCK_H__
+#ifndef MBLOCK_H
+#define MBLOCK_H
 
 extern lnat RTS_VAR(mblocks_allocated);
 
@@ -86,4 +86,4 @@ StgBool slowIsHeapAlloced(void *p);
 # error HEAP_ALLOCED not defined
 #endif
 
-#endif /* __MBLOCK_H__ */
+#endif /* MBLOCK_H */

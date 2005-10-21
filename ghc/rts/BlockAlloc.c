@@ -21,6 +21,7 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
+#include "Storage.h"
 
 #include <string.h>
 
@@ -28,6 +29,8 @@ static void    initMBlock(void *mblock);
 static bdescr *allocMegaGroup(nat mblocks);
 static void    freeMegaGroup(bdescr *bd);
 
+// In SMP mode, the free list is protected by sm_mutex.  In the
+// threaded RTS, it is protected by the Capability.
 static bdescr *free_list = NULL;
 
 /* -----------------------------------------------------------------------------
@@ -67,6 +70,7 @@ allocGroup(nat n)
   void *mblock;
   bdescr *bd, **last;
 
+  ASSERT_SM_LOCK();
   ASSERT(n != 0);
 
   if (n > BLOCKS_PER_MBLOCK) {
@@ -104,9 +108,29 @@ allocGroup(nat n)
 }
 
 bdescr *
+allocGroup_lock(nat n)
+{
+    bdescr *bd;
+    ACQUIRE_SM_LOCK;
+    bd = allocGroup(n);
+    RELEASE_SM_LOCK;
+    return bd;
+}
+
+bdescr *
 allocBlock(void)
 {
   return allocGroup(1);
+}
+
+bdescr *
+allocBlock_lock(void)
+{
+    bdescr *bd;
+    ACQUIRE_SM_LOCK;
+    bd = allocBlock();
+    RELEASE_SM_LOCK;
+    return bd;
 }
 
 /* -----------------------------------------------------------------------------
@@ -220,6 +244,8 @@ freeGroup(bdescr *p)
 {
   bdescr *bd, *last;
   
+  ASSERT_SM_LOCK();
+
   /* are we dealing with a megablock group? */
   if (p->blocks > BLOCKS_PER_MBLOCK) {
     freeMegaGroup(p);
@@ -256,6 +282,14 @@ freeGroup(bdescr *p)
   IF_DEBUG(sanity, checkFreeListSanity());
 }
 
+void
+freeGroup_lock(bdescr *p)
+{
+    ACQUIRE_SM_LOCK;
+    freeGroup(p);
+    RELEASE_SM_LOCK;
+}
+
 static void
 freeMegaGroup(bdescr *p)
 {
@@ -279,6 +313,14 @@ freeChain(bdescr *bd)
     freeGroup(bd);
     bd = next_bd;
   }
+}
+
+void
+freeChain_lock(bdescr *bd)
+{
+    ACQUIRE_SM_LOCK;
+    freeChain(bd);
+    RELEASE_SM_LOCK;
 }
 
 static void
@@ -324,8 +366,8 @@ checkFreeListSanity(void)
 
   for (bd = free_list; bd != NULL; bd = bd->link) {
     IF_DEBUG(block_alloc,
-	     debugBelch("group at 0x%x, length %d blocks\n", 
-			(nat)bd->start, bd->blocks));
+	     debugBelch("group at 0x%p, length %d blocks\n", 
+			bd->start, bd->blocks));
     ASSERT(bd->blocks > 0);
     checkWellFormedGroup(bd);
     if (bd->link != NULL) {

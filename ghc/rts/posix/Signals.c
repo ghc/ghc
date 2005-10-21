@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2005
  *
  * Signal processing / handling.
  *
@@ -12,7 +12,8 @@
 #include "Rts.h"
 #include "SchedAPI.h"
 #include "Schedule.h"
-#include "Signals.h"
+#include "RtsSignals.h"
+#include "posix/Signals.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 
@@ -47,7 +48,7 @@ StgInt nocldstop = 0;
 #if defined(RTS_USER_SIGNALS)
 
 /* SUP: The type of handlers is a little bit, well, doubtful... */
-static StgInt *handlers = NULL; /* Dynamically grown array of signal handlers */
+StgInt *signal_handlers = NULL; /* Dynamically grown array of signal handlers */
 static StgInt nHandlers = 0;    /* Size of handlers array */
 
 static nat n_haskell_handlers = 0;
@@ -64,14 +65,14 @@ more_handlers(I_ sig)
     if (sig < nHandlers)
 	return;
 
-    if (handlers == NULL)
-	handlers = (StgInt *)stgMallocBytes((sig + 1) * sizeof(StgInt), "more_handlers");
+    if (signal_handlers == NULL)
+	signal_handlers = (StgInt *)stgMallocBytes((sig + 1) * sizeof(StgInt), "more_handlers");
     else
-	handlers = (StgInt *)stgReallocBytes(handlers, (sig + 1) * sizeof(StgInt), "more_handlers");
+	signal_handlers = (StgInt *)stgReallocBytes(signal_handlers, (sig + 1) * sizeof(StgInt), "more_handlers");
 
     for(i = nHandlers; i <= sig; i++)
 	// Fill in the new slots with default actions
-	handlers[i] = STG_SIG_DFL;
+	signal_handlers[i] = STG_SIG_DFL;
 
     nHandlers = sig + 1;
 }
@@ -80,13 +81,13 @@ more_handlers(I_ sig)
  * Pending Handlers
  *
  * The mechanism for starting handlers differs between the threaded
- * (RTS_SUPPORTS_THREADS) and non-threaded versions of the RTS.
+ * (THREADED_RTS) and non-threaded versions of the RTS.
  *
  * When the RTS is single-threaded, we just write the pending signal
  * handlers into a buffer, and start a thread for each one in the
  * scheduler loop.
  *
- * When RTS_SUPPORTS_THREADS, the problem is that signals might be
+ * When THREADED_RTS, the problem is that signals might be
  * delivered to multiple threads, so we would need to synchronise
  * access to pending_handler_buf somehow.  Using thread
  * synchronisation from a signal handler isn't possible in general
@@ -109,19 +110,19 @@ static int io_manager_pipe = -1;
 void
 setIOManagerPipe (int fd)
 {
-    // only called when RTS_SUPPORTS_THREADS, but unconditionally
+    // only called when THREADED_RTS, but unconditionally
     // compiled here because GHC.Conc depends on it.
     io_manager_pipe = fd;
 }
 
-#if !defined(RTS_SUPPORTS_THREADS)
+#if !defined(THREADED_RTS)
 
 #define N_PENDING_HANDLERS 16
 
 StgPtr pending_handler_buf[N_PENDING_HANDLERS];
 StgPtr *next_pending_handler = pending_handler_buf;
 
-#endif /* RTS_SUPPORTS_THREADS */
+#endif /* THREADED_RTS */
 
 /* -----------------------------------------------------------------------------
  * SIGCONT handler
@@ -151,7 +152,7 @@ generic_handler(int sig)
 {
     sigset_t signals;
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 
     if (io_manager_pipe != -1)
     {
@@ -164,7 +165,7 @@ generic_handler(int sig)
     // of its pipe is, there's not much we can do here, so just ignore
     // the signal..
 
-#else /* not RTS_SUPPORTS_THREADS */
+#else /* not THREADED_RTS */
 
     /* Can't call allocate from here.  Probably can't call malloc
        either.  However, we have to schedule a new thread somehow.
@@ -194,7 +195,7 @@ generic_handler(int sig)
        circumstances, depending on the signal.  
     */
 
-    *next_pending_handler++ = deRefStablePtr((StgStablePtr)handlers[sig]);
+    *next_pending_handler++ = deRefStablePtr((StgStablePtr)signal_handlers[sig]);
 
     // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
@@ -202,7 +203,7 @@ generic_handler(int sig)
 	stg_exit(EXIT_FAILURE);
     }
     
-#endif /* RTS_SUPPORTS_THREADS */
+#endif /* THREADED_RTS */
 
     // re-establish the signal handler, and carry on
     sigemptyset(&signals);
@@ -248,7 +249,7 @@ anyUserHandlers(void)
     return n_haskell_handlers != 0;
 }
 
-#if !defined(RTS_SUPPORTS_THREADS)
+#if !defined(THREADED_RTS)
 void
 awaitUserSignals(void)
 {
@@ -278,26 +279,26 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
     
     more_handlers(sig);
 
-    previous_spi = handlers[sig];
+    previous_spi = signal_handlers[sig];
 
     action.sa_flags = 0;
     
     switch(spi) {
     case STG_SIG_IGN:
-    	handlers[sig] = STG_SIG_IGN;
+    	signal_handlers[sig] = STG_SIG_IGN;
 	sigdelset(&userSignals, sig);
         action.sa_handler = SIG_IGN;
     	break;
     	
     case STG_SIG_DFL:
-    	handlers[sig] = STG_SIG_DFL;
+    	signal_handlers[sig] = STG_SIG_DFL;
 	sigdelset(&userSignals, sig);
         action.sa_handler = SIG_DFL;
     	break;
 
     case STG_SIG_HAN:
     case STG_SIG_RST:
-    	handlers[sig] = (StgInt)*handler;
+    	signal_handlers[sig] = (StgInt)*handler;
 	sigaddset(&userSignals, sig);
     	action.sa_handler = generic_handler;
 	if (spi == STG_SIG_RST) {
@@ -323,7 +324,7 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 	// need to return an error code, so avoid a stable pointer leak
 	// by freeing the previous handler if there was one.
 	if (previous_spi >= 0) {
-	    freeStablePtr(stgCast(StgStablePtr,handlers[sig]));
+	    freeStablePtr(stgCast(StgStablePtr,signal_handlers[sig]));
 	    n_haskell_handlers--;
 	}
 	return STG_SIG_ERR;
@@ -342,40 +343,28 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
  * Creating new threads for signal handlers.
  * -------------------------------------------------------------------------- */
 
-void
-startSignalHandler(int sig)  // called by the IO manager, see GHC.Conc
-{
-#if defined(RTS_SUPPORTS_THREADS)
-    // ToDo: fix race window between the time at which the signal is
-    // delivered and the deRefStablePtr() call here.  There's no way
-    // to safely uninstall a signal handler.
-    scheduleThread(
-	createIOThread(RtsFlags.GcFlags.initialStkSize, 
-		       (StgClosure *)deRefStablePtr((StgStablePtr)handlers[sig]))
-	);
-#else
-    (void)sig;   /* keep gcc -Wall happy */
-#endif
-}
-
+#if !defined(THREADED_RTS)
 void
 startSignalHandlers(void)
 {
-#if !defined(RTS_SUPPORTS_THREADS)
   blockUserSignals();
   
+  ASSERT_LOCK_HELD(&sched_mutex);
+
   while (next_pending_handler != pending_handler_buf) {
 
     next_pending_handler--;
 
-    scheduleThread(
-       createIOThread(RtsFlags.GcFlags.initialStkSize, 
-		      (StgClosure *) *next_pending_handler));
+    scheduleThread (
+	&MainCapability,
+	createIOThread(&MainCapability, 
+		       RtsFlags.GcFlags.initialStkSize, 
+		       (StgClosure *) *next_pending_handler));
   }
 
   unblockUserSignals();
-#endif
 }
+#endif
 
 /* ----------------------------------------------------------------------------
  * Mark signal handlers during GC.
@@ -386,7 +375,7 @@ startSignalHandlers(void)
  * avoid race conditions.
  * -------------------------------------------------------------------------- */
 
-#if !defined(RTS_SUPPORTS_THREADS)
+#if !defined(THREADED_RTS)
 void
 markSignalHandlers (evac_fn evac)
 {

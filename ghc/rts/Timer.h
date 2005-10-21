@@ -1,12 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1995-2003
+ * (c) The GHC Team, 1995-2005
  *
  * Interval timer service for profiling and pre-emptive scheduling.
  *
  * ---------------------------------------------------------------------------*/
-#ifndef __TIMER_H__
-#define __TIMER_H__
+
+#ifndef TIMER_H
+#define TIMER_H
 
 # define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
 
@@ -19,4 +20,5 @@ typedef void (*TickProc)(int);
 
 extern int startTimer(nat ms);
 extern int stopTimer(void);
-#endif /* __TIMER_H__ */
+
+#endif /* TIMER_H */

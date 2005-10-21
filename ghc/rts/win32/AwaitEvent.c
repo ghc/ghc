@@ -16,7 +16,7 @@
 #include "Schedule.h"
 #include <windows.h>
 #include "win32/AsyncIO.h"
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 #include "Capability.h"
 #endif
 
@@ -29,7 +29,7 @@ awaitEvent(rtsBool wait)
 {
   int ret;
 
-#ifdef RTS_SUPPORTS_THREADS
+#ifdef THREADED_RTS
   // Small optimisation: we don't want the waiting thread to wake
   // up straight away just because a previous returning worker has
   // called abandonRequestWait().  If the event is no longer needed,
@@ -55,18 +55,18 @@ awaitEvent(rtsBool wait)
     //
     //  - we were interrupted
     //  - new threads have arrived
-    //  - another worker wants to take over (RTS_SUPPORTS_THREADS)
+    //  - another worker wants to take over (THREADED_RTS)
 
   } while (wait
 	   && !interrupted
 	   && run_queue_hd == END_TSO_QUEUE
-#ifdef RTS_SUPPORTS_THREADS
+#ifdef THREADED_RTS
 	   && !needToYieldToReturningWorker()
 #endif
       );
 }
 
-#ifdef RTS_SUPPORTS_THREADS
+#ifdef THREADED_RTS
 void
 wakeBlockedWorkerThread()
 {

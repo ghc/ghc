@@ -21,10 +21,6 @@
 #define SUPPORT_LONG_LONGS 1
 #endif
 
-#if defined(SMP) || defined(THREADED_RTS)
-#define RTS_SUPPORTS_THREADS 1
-#endif
-
 /*
  * Whether the runtime system will use libbfd for debugging purposes.
  */
@@ -43,6 +39,7 @@
 /* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
  * single-entry thunks.
  */
+//#if defined(TICKY_TICKY) || defined(SMP)
 #if defined(TICKY_TICKY)
 #  define EAGER_BLACKHOLING
 #else

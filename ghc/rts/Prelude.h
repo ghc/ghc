@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2005
  *
  * Prelude identifiers that we sometimes need to refer to in the RTS.
  *

@@ -503,13 +503,15 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
           Nothing    -> text "(StgClosure*)deRefStablePtr(the_stableptr)"
           Just hs_fn -> char '&' <> ppr hs_fn <> text "_closure"
 
+  cap = text "cap" <> comma
+
   -- the expression we give to rts_evalIO
   expr_to_run
      = foldl appArg the_cfun arg_info -- NOT aug_arg_info
        where
           appArg acc (arg_cname, _, arg_hty, _) 
              = text "rts_apply" 
-               <> parens (acc <> comma <> mkHObj arg_hty <> parens arg_cname)
+               <> parens (cap <> acc <> comma <> mkHObj arg_hty <> parens (cap <> arg_cname))
 
   -- various other bits for inside the fn
   declareResult = text "HaskellObj ret;"
@@ -556,13 +558,15 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
     fun_proto  $$
     vcat 
      [ lbrace
-     ,   text "SchedulerStatus rc;"
+     ,   text "Capability *cap;"
      ,   declareResult
      ,   declareCResult
-     ,   text "rts_lock();"
+     ,   text "cap = rts_lock();"
 	  -- create the application + perform it.
-     ,   text "rc=rts_evalIO" <> parens (
+     ,   text "cap=rts_evalIO" <> parens (
+		cap <>
 		text "rts_apply" <> parens (
+		    cap <>
 		    text "(HaskellObj)"
 	         <> text (if is_IO_res_ty 
 				then "runIO_closure" 
@@ -573,9 +577,9 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 	       <> text "&ret"
 	     ) <> semi
      ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ftext c_nm)
-						<> comma <> text "rc") <> semi
+						<> comma <> text "cap") <> semi
      ,   assignCResult
-     ,   text "rts_unlock();"
+     ,   text "rts_unlock(cap);"
      ,   if res_hty_is_unit then empty
             else text "return cret;"
      , rbrace

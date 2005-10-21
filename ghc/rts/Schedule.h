@@ -1,29 +1,32 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team 1998-2005
  *
  * Prototypes for functions in Schedule.c 
  * (RTS internal scheduler interface)
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef __SCHEDULE_H__
-#define __SCHEDULE_H__
-#include "OSThreads.h"
+#ifndef SCHEDULE_H
+#define SCHEDULE_H
 
-/* initScheduler(), exitScheduler(), startTasks()
- * 
+#include "OSThreads.h"
+#include "Capability.h"
+
+/* initScheduler(), exitScheduler()
  * Called from STG :  no
  * Locks assumed   :  none
  */
-extern void initScheduler  ( void );
-extern void exitScheduler  ( void );
+void initScheduler (void);
+void exitScheduler (void);
+
+// Place a new thread on the run queue of the specified Capability
+void scheduleThread (Capability *cap, StgTSO *tso);
 
 /* awakenBlockedQueue()
  *
  * Takes a pointer to the beginning of a blocked TSO queue, and
  * wakes up the entire queue.
- *
  * Called from STG :  yes
  * Locks assumed   :  none
  */
@@ -32,28 +35,16 @@ void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #elif defined(PAR)
 void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 #else
-void awakenBlockedQueue (StgTSO *tso);
-void awakenBlockedQueueNoLock (StgTSO *tso);
+void awakenBlockedQueue (Capability *cap, StgTSO *tso);
 #endif
-
-/* Version of scheduleThread that doesn't take sched_mutex */
-void scheduleThreadLocked(StgTSO *tso);
 
 /* unblockOne()
  *
- * Takes a pointer to the beginning of a blocked TSO queue, and
- * removes the first thread, placing it on the runnable queue.
- *
- * Called from STG : yes
- * Locks assumed   : none
+ * Put the specified thread on the run queue of the given Capability.
+ * Called from STG :  yes
+ * Locks assumed   :  we own the Capability.
  */
-#if defined(GRAN) || defined(PAR)
-StgBlockingQueueElement *unblockOne(StgBlockingQueueElement *bqe, StgClosure *node);
-StgBlockingQueueElement *unblockOneLocked(StgBlockingQueueElement *bqe, StgClosure *node);
-#else
-StgTSO *unblockOne(StgTSO *tso);
-StgTSO *unblockOneLocked(StgTSO *tso);
-#endif
+StgTSO * unblockOne(Capability *cap, StgTSO *tso);
 
 /* raiseAsync()
  *
@@ -62,50 +53,13 @@ StgTSO *unblockOneLocked(StgTSO *tso);
  * Called from STG :  yes
  * Locks assumed   :  none
  */
-void raiseAsync(StgTSO *tso, StgClosure *exception);
-void raiseAsyncWithLock(StgTSO *tso, StgClosure *exception);
+void raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception);
 
 /* raiseExceptionHelper */
-StgWord raiseExceptionHelper (StgTSO *tso, StgClosure *exception);
+StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception);
 
 /* findRetryFrameHelper */
 StgWord findRetryFrameHelper (StgTSO *tso);
-
-/* awaitEvent(rtsBool wait)
- *
- * Checks for blocked threads that need to be woken.
- *
- * Called from STG :  NO
- * Locks assumed   :  sched_mutex
- */
-void awaitEvent(rtsBool wait);  /* In Select.c */
-
-/* wakeUpSleepingThreads(nat ticks)
- *
- * Wakes up any sleeping threads whose timers have expired.
- *
- * Called from STG :  NO
- * Locks assumed   :  sched_mutex
- */
-rtsBool wakeUpSleepingThreads(lnat);  /* In Select.c */
-
-/* wakeBlockedWorkerThread()
- *
- * If a worker thread is currently blocked in awaitEvent(), interrupt it.
- *
- * Called from STG :  NO
- * Locks assumed   :  sched_mutex
- */
-void wakeBlockedWorkerThread(void); /* In Select.c */
-
-/* resetWorkerWakeupPipeAfterFork()
- *
- * Notify Select.c that a fork() has occured
- *
- * Called from STG :  NO
- * Locks assumed   :  don't care, but must be called right after fork()
- */
-void resetWorkerWakeupPipeAfterFork(void); /* In Select.c */
 
 /* GetRoots(evac_fn f)
  *
@@ -115,6 +69,14 @@ void resetWorkerWakeupPipeAfterFork(void); /* In Select.c */
  * Locks assumed   :  ????
  */
 void GetRoots(evac_fn);
+
+/* workerStart()
+ * 
+ * Entry point for a new worker task.
+ * Called from STG :  NO
+ * Locks assumed   :  none
+ */
+void workerStart(Task *task);
 
 // ToDo: check whether all fcts below are used in the SMP version, too
 #if defined(GRAN)
@@ -133,10 +95,19 @@ void    initThread(StgTSO *tso, nat stack_size);
 #endif
 
 /* Context switch flag.
- * Locks required  : sched_mutex
+ * Locks required  : none (conflicts are harmless)
  */
 extern int RTS_VAR(context_switch);
+
+/* Interrupted flag.
+ * Locks required  : none (makes one transition from false->true)
+ */
 extern rtsBool RTS_VAR(interrupted);
+
+/* Shutdown flag.
+ * Locks required  : none (makes one transition from false->true)
+ */
+extern rtsBool shutting_down_scheduler;
 
 /* 
  * flag that tracks whether we have done any execution in this time slice.
@@ -145,10 +116,14 @@ extern rtsBool RTS_VAR(interrupted);
 #define ACTIVITY_MAYBE_NO 1 /* no activity in the current slice */
 #define ACTIVITY_INACTIVE 2 /* a complete slice has passed with no activity */
 #define ACTIVITY_DONE_GC  3 /* like 2, but we've done a GC too */
-extern nat recent_activity;
 
-/* In Select.c */
-extern lnat RTS_VAR(timestamp);
+/* Recent activity flag.
+ * Locks required  : Transition from MAYBE_NO to INACTIVE
+ * happens in the timer signal, so it is atomic.  Trnasition from
+ * INACTIVE to DONE_GC happens under sched_mutex.  No lock required
+ * to set it to ACTIVITY_YES.
+ */
+extern nat recent_activity;
 
 /* Thread queues.
  * Locks required  : sched_mutex
@@ -158,12 +133,16 @@ extern lnat RTS_VAR(timestamp);
 #if defined(GRAN)
 // run_queue_hds defined in GranSim.h
 #else
-extern  StgTSO *RTS_VAR(run_queue_hd), *RTS_VAR(run_queue_tl);
-extern  StgTSO *RTS_VAR(blocked_queue_hd), *RTS_VAR(blocked_queue_tl);
 extern  StgTSO *RTS_VAR(blackhole_queue);
+#if !defined(THREADED_RTS)
+extern  StgTSO *RTS_VAR(blocked_queue_hd), *RTS_VAR(blocked_queue_tl);
 extern  StgTSO *RTS_VAR(sleeping_queue);
 #endif
-/* Linked list of all threads. */
+#endif
+
+/* Linked list of all threads.
+ * Locks required  : sched_mutex
+ */
 extern  StgTSO *RTS_VAR(all_threads);
 
 /* Set to rtsTrue if there are threads on the blackhole_queue, and
@@ -171,72 +150,27 @@ extern  StgTSO *RTS_VAR(all_threads);
  * This flag is set to rtsFalse after we've checked the queue, and
  * set to rtsTrue just before we run some Haskell code.  It is used
  * to decide whether we should yield the Capability or not.
+ * Locks required  : none (see scheduleCheckBlackHoles()).
  */
 extern rtsBool blackholes_need_checking;
 
-#if defined(RTS_SUPPORTS_THREADS)
-/* Schedule.c has detailed info on what these do */
-extern Mutex       RTS_VAR(sched_mutex);
-extern Condition   RTS_VAR(returning_worker_cond);
-extern nat         RTS_VAR(rts_n_waiting_workers);
-extern nat         RTS_VAR(rts_n_waiting_tasks);
+#if defined(THREADED_RTS)
+extern Mutex RTS_VAR(sched_mutex);
 #endif
 
 StgBool isThreadBound(StgTSO *tso);
 
-extern SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
-
+SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
 
 /* Called by shutdown_handler(). */
-void interruptStgRts ( void );
+void interruptStgRts (void);
 
-void raiseAsync(StgTSO *tso, StgClosure *exception);
-nat  run_queue_len(void);
+nat  run_queue_len (void);
 
-void resurrectThreads( StgTSO * );
-
-/* Main threads:
- *
- * These are the threads which clients have requested that we run.  
- *
- * In a 'threaded' build, each of these corresponds to one bound thread.
- * The pointer to the StgMainThread is passed as a parameter to schedule;
- * this invocation of schedule will always pass this main thread's
- * bound_thread_cond to waitForkWorkCapability; OS-thread-switching
- * takes place using passCapability.
- *
- * In non-threaded builds, clients are strictly nested: the first client calls
- * into the RTS, which might call out again to C with a _ccall_GC, and
- * eventually re-enter the RTS.
- *
- * This is non-abstract at the moment because the garbage collector
- * treats pointers to TSOs from the main thread list as "weak" - these
- * pointers won't prevent a thread from receiving a BlockedOnDeadMVar
- * exception.
- *
- * Main threads information is kept in a linked list:
- */
-typedef struct StgMainThread_ {
-  StgTSO *         tso;
-  SchedulerStatus  stat;
-  StgClosure **    ret;
-#if defined(RTS_SUPPORTS_THREADS)
-  Condition        bound_thread_cond;
-#endif
-  struct StgMainThread_ *prev;
-  struct StgMainThread_ *link;
-} StgMainThread;
-
-/* Main thread queue.
- * Locks required: sched_mutex.
- */
-extern StgMainThread *main_threads;
+void resurrectThreads (StgTSO *);
 
 void printAllThreads(void);
-#ifdef COMPILING_SCHEDULER
-static void printThreadBlockage(StgTSO *tso);
-static void printThreadStatus(StgTSO *tso);
-#endif
+
 /* debugging only 
  */
 #ifdef DEBUG
@@ -249,83 +183,109 @@ void print_bqe (StgBlockingQueueElement *bqe);
 void labelThread(StgPtr tso, char *label);
 
 /* -----------------------------------------------------------------------------
- * Some convenient macros...
+ * Some convenient macros/inline functions...
  */
+
+#if !IN_STG_CODE
 
 /* END_TSO_QUEUE and friends now defined in includes/StgMiscClosures.h */
 
 /* Add a thread to the end of the run queue.
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
+ * ASSUMES: cap->running_task is the current task.
  */
-#define APPEND_TO_RUN_QUEUE(tso)		\
-    ASSERT(tso->link == END_TSO_QUEUE);		\
-    if (run_queue_hd == END_TSO_QUEUE) {	\
-      run_queue_hd = tso;			\
-    } else {					\
-      run_queue_tl->link = tso;			\
-    }						\
-    run_queue_tl = tso;
+STATIC_INLINE void
+appendToRunQueue (Capability *cap, StgTSO *tso)
+{
+    ASSERT(tso->link == END_TSO_QUEUE);
+    if (cap->run_queue_hd == END_TSO_QUEUE) {
+	cap->run_queue_hd = tso;
+    } else {
+	cap->run_queue_tl->link = tso;
+    }
+    cap->run_queue_tl = tso;
+}
 
 /* Push a thread on the beginning of the run queue.  Used for
  * newly awakened threads, so they get run as soon as possible.
+ * ASSUMES: cap->running_task is the current task.
  */
-#define PUSH_ON_RUN_QUEUE(tso)			\
-    tso->link = run_queue_hd;			\
-      run_queue_hd = tso;			\
-    if (run_queue_tl == END_TSO_QUEUE) {	\
-      run_queue_tl = tso;			\
+STATIC_INLINE void
+pushOnRunQueue (Capability *cap, StgTSO *tso)
+{
+    tso->link = cap->run_queue_hd;
+    cap->run_queue_hd = tso;
+    if (cap->run_queue_tl == END_TSO_QUEUE) {
+	cap->run_queue_tl = tso;
     }
+}
 
 /* Pop the first thread off the runnable queue.
  */
-#define POP_RUN_QUEUE(pt)			\
-  do { StgTSO *__tmp_t = run_queue_hd;	        \
-    if (__tmp_t != END_TSO_QUEUE) {		\
-      run_queue_hd = __tmp_t->link;		\
-      __tmp_t->link = END_TSO_QUEUE;	        \
-      if (run_queue_hd == END_TSO_QUEUE) {	\
-        run_queue_tl = END_TSO_QUEUE;		\
-      }						\
-    }						\
-    pt = __tmp_t;				\
-  } while(0)
+STATIC_INLINE StgTSO *
+popRunQueue (Capability *cap)
+{ 
+    StgTSO *t = cap->run_queue_hd;
+    ASSERT(t != END_TSO_QUEUE);
+    cap->run_queue_hd = t->link;
+    t->link = END_TSO_QUEUE;
+    if (cap->run_queue_hd == END_TSO_QUEUE) {
+	cap->run_queue_tl = END_TSO_QUEUE;
+    }
+    return t;
+}
 
 /* Add a thread to the end of the blocked queue.
  */
-#define APPEND_TO_BLOCKED_QUEUE(tso)		\
-    ASSERT(tso->link == END_TSO_QUEUE);		\
-    if (blocked_queue_hd == END_TSO_QUEUE) {    \
-      blocked_queue_hd = tso;			\
-    } else {					\
-      blocked_queue_tl->link = tso;		\
-    }						\
+#if !defined(THREADED_RTS)
+STATIC_INLINE void
+appendToBlockedQueue(StgTSO *tso)
+{
+    ASSERT(tso->link == END_TSO_QUEUE);
+    if (blocked_queue_hd == END_TSO_QUEUE) {
+	blocked_queue_hd = tso;
+    } else {
+	blocked_queue_tl->link = tso;
+    }
     blocked_queue_tl = tso;
+}
+#endif
 
 /* Check whether various thread queues are empty
  */
-#define EMPTY_QUEUE(q)         (q == END_TSO_QUEUE)
+STATIC_INLINE rtsBool
+emptyQueue (StgTSO *q)
+{
+    return (q == END_TSO_QUEUE);
+}
 
-#define EMPTY_RUN_QUEUE()      (EMPTY_QUEUE(run_queue_hd))
-#define EMPTY_BLOCKED_QUEUE()  (EMPTY_QUEUE(blocked_queue_hd))
-#define EMPTY_SLEEPING_QUEUE() (EMPTY_QUEUE(sleeping_queue))
+STATIC_INLINE rtsBool
+emptyRunQueue(Capability *cap)
+{
+    return emptyQueue(cap->run_queue_hd);
+}
 
-#define EMPTY_THREAD_QUEUES()  (EMPTY_RUN_QUEUE() && \
-				EMPTY_BLOCKED_QUEUE() && \
-				EMPTY_SLEEPING_QUEUE())
-
-#if defined(RTS_SUPPORTS_THREADS)
-/* If no task is waiting for a capability,
- * and if there is work to be done
- * or if we need to wait for IO or delay requests,
- * spawn a new worker thread.
- */
-void
-startSchedulerTaskIfNecessary(void);
+#if !defined(THREADED_RTS)
+#define EMPTY_BLOCKED_QUEUE()  (emptyQueue(blocked_queue_hd))
+#define EMPTY_SLEEPING_QUEUE() (emptyQueue(sleeping_queue))
 #endif
 
+STATIC_INLINE rtsBool
+emptyThreadQueues(Capability *cap)
+{
+    return emptyRunQueue(cap)
+#if !defined(THREADED_RTS)
+	&& EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
+#endif
+    ;
+}
+
 #ifdef DEBUG
-extern void sched_belch(char *s, ...)
+void sched_belch(char *s, ...)
    GNU_ATTRIBUTE(format (printf, 1, 2));
 #endif
 
-#endif /* __SCHEDULE_H__ */
+#endif /* !IN_STG_CODE */
+
+#endif /* SCHEDULE_H */
+

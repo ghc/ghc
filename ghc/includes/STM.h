@@ -64,8 +64,8 @@ extern void stmPreGCHook(void);
 
 /* Create and enter a new transaction context */
 
-extern StgTRecHeader *stmStartTransaction(StgRegTable *reg, StgTRecHeader *outer);
-extern StgTRecHeader *stmStartNestedTransaction(StgRegTable *reg, StgTRecHeader *outer
+extern StgTRecHeader *stmStartTransaction(Capability *cap, StgTRecHeader *outer);
+extern StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *outer
 );
 
 /*
@@ -158,8 +158,8 @@ extern StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
  * been committed to.
  */
 
-extern StgBool stmCommitTransaction(StgRegTable *reg, StgTRecHeader *trec);
-extern StgBool stmCommitNestedTransaction(StgRegTable *reg, StgTRecHeader *trec);
+extern StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec);
+extern StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -168,7 +168,7 @@ extern StgBool stmCommitNestedTransaction(StgRegTable *reg, StgTRecHeader *trec)
  * if the thread is already waiting.
  */
 
-extern StgBool stmWait(StgRegTable *reg,
+extern StgBool stmWait(Capability *cap,
                        StgTSO *tso, 
                        StgTRecHeader *trec);
 
@@ -188,7 +188,7 @@ extern StgBool stmReWait(StgTSO *tso);
    --------------------------
 */
 
-extern StgTVar *stmNewTVar(StgRegTable *reg,
+extern StgTVar *stmNewTVar(Capability *cap,
                            StgClosure *new_value);
 
 /*----------------------------------------------------------------------
@@ -202,7 +202,7 @@ extern StgTVar *stmNewTVar(StgRegTable *reg,
  * thread's current transaction.
  */
 
-extern StgClosure *stmReadTVar(StgRegTable *reg,
+extern StgClosure *stmReadTVar(Capability *cap,
                                StgTRecHeader *trec, 
 			       StgTVar *tvar);
 
@@ -210,7 +210,7 @@ extern StgClosure *stmReadTVar(StgRegTable *reg,
  * thread's current transaction.
  */
 
-extern void stmWriteTVar(StgRegTable *reg,
+extern void stmWriteTVar(Capability *cap,
                          StgTRecHeader *trec,
 			 StgTVar *tvar, 
 			 StgClosure *new_value);

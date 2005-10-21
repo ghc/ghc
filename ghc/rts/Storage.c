@@ -129,6 +129,8 @@ initStorage( void )
   initMutex(&sm_mutex);
 #endif
 
+  ACQUIRE_SM_LOCK;
+
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations 
 					     * sizeof(struct generation_),
@@ -172,7 +174,7 @@ initStorage( void )
   }
 
 #ifdef SMP
-  n_nurseries = RtsFlags.ParFlags.nNodes;
+  n_nurseries = n_capabilities;
   nurseries = stgMallocBytes (n_nurseries * sizeof(struct step_),
 			      "initStorage: nurseries");
 #else
@@ -220,7 +222,7 @@ initStorage( void )
 #ifdef SMP
   if (RtsFlags.GcFlags.generations == 1) {
       errorBelch("-G1 is incompatible with SMP");
-      stg_exit(1);
+      stg_exit(EXIT_FAILURE);
   }
 #endif
 
@@ -250,6 +252,8 @@ initStorage( void )
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
 
   IF_DEBUG(gc, statDescribeGens());
+
+  RELEASE_SM_LOCK;
 }
 
 void
@@ -625,7 +629,7 @@ tidyAllocateLists (void)
    -------------------------------------------------------------------------- */
 
 StgPtr
-allocateLocal( StgRegTable *reg, nat n )
+allocateLocal (Capability *cap, nat n)
 {
     bdescr *bd;
     StgPtr p;
@@ -652,20 +656,20 @@ allocateLocal( StgRegTable *reg, nat n )
 	/* small allocation (<LARGE_OBJECT_THRESHOLD) */
     } else {
 
-	bd = reg->rCurrentAlloc;
+	bd = cap->r.rCurrentAlloc;
 	if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
 
 	    // The CurrentAlloc block is full, we need to find another
 	    // one.  First, we try taking the next block from the
 	    // nursery:
-	    bd = reg->rCurrentNursery->link;
+	    bd = cap->r.rCurrentNursery->link;
 
 	    if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
 		// The nursery is empty, or the next block is already
 		// full: allocate a fresh block (we can't fail here).
 		ACQUIRE_SM_LOCK;
 		bd = allocBlock();
-		reg->rNursery->n_blocks++;
+		cap->r.rNursery->n_blocks++;
 		RELEASE_SM_LOCK;
 		bd->gen_no = 0;
 		bd->step = g0s0;
@@ -674,14 +678,14 @@ allocateLocal( StgRegTable *reg, nat n )
 		// we have a block in the nursery: take it and put
 		// it at the *front* of the nursery list, and use it
 		// to allocate() from.
-		reg->rCurrentNursery->link = bd->link;
+		cap->r.rCurrentNursery->link = bd->link;
 		if (bd->link != NULL) {
-		    bd->link->u.back = reg->rCurrentNursery;
+		    bd->link->u.back = cap->r.rCurrentNursery;
 		}
 	    }
-	    dbl_link_onto(bd, &reg->rNursery->blocks);
-	    reg->rCurrentAlloc = bd;
-	    IF_DEBUG(sanity, checkNurserySanity(reg->rNursery));
+	    dbl_link_onto(bd, &cap->r.rNursery->blocks);
+	    cap->r.rCurrentAlloc = bd;
+	    IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
 	}
     }
     p = bd->free;
@@ -777,9 +781,9 @@ stgAllocForGMP (size_t size_in_bytes)
   
   /* allocate and fill it in. */
 #if defined(SMP)
-  arr = (StgArrWords *)allocateLocal(&(myCapability()->r), total_size_in_words);
+  arr = (StgArrWords *)allocateLocal(myTask()->cap, total_size_in_words);
 #else
-  arr = (StgArrWords *)allocateLocal(&MainCapability.r, total_size_in_words);
+  arr = (StgArrWords *)allocateLocal(&MainCapability, total_size_in_words);
 #endif
   SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, data_size_in_words);
   

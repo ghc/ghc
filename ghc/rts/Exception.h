@@ -1,10 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2005
  *
  * Exception support
  *
  * ---------------------------------------------------------------------------*/
+
+#ifndef EXCEPTION_H
+#define EXCEPTION_H
 
 extern const StgRetInfoTable stg_blockAsyncExceptionszh_ret_info;
 extern const StgRetInfoTable stg_unblockAsyncExceptionszh_ret_info;
@@ -13,7 +16,7 @@ extern const StgRetInfoTable stg_unblockAsyncExceptionszh_ret_info;
  * indefinitely).  Interruptible threads can be sent an exception with
  * killThread# even if they have async exceptions blocked.
  */
-INLINE_HEADER int
+STATIC_INLINE int
 interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {
@@ -32,4 +35,6 @@ interruptible(StgTSO *t)
     return 0;
   }
 }
+
+#endif /* EXCEPTION_H */
 

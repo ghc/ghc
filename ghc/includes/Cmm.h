@@ -292,6 +292,8 @@
 #error mp_limb_t != StgWord: assumptions in PrimOps.cmm are now false
 #endif
 
+#define MyCapability()  (BaseReg - OFFSET_Capability_r)
+
 /* -------------------------------------------------------------------------
    Allocation and garbage collection
    ------------------------------------------------------------------------- */

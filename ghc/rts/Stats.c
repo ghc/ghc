@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2005
  *
  * Statistics and timing-related functions.
  *
@@ -19,7 +19,6 @@
 #include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
 #include "Storage.h"
-#include "Task.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -373,7 +372,7 @@ stat_startExit(void)
      * calculate the EXIT time.  The real MutUserTime is calculated
      * in stat_exit below.
      */
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
     MutUserTime = user;
 #else
     MutUserTime = user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
@@ -387,7 +386,7 @@ stat_endExit(void)
     TICK_TYPE user, elapsed;
     getTimes( &user, &elapsed );
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
     ExitUserTime = user - MutUserTime;
 #else
     ExitUserTime = user - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
@@ -450,7 +449,8 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat scavd_copied, lnat gen)
+stat_endGC (lnat alloc, lnat collect, lnat live, lnat copied, 
+	    lnat scavd_copied, lnat gen)
 {
     TICK_TYPE user, elapsed;
 
@@ -489,13 +489,12 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat scavd_copied, 
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
 	
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 	{
-	    TaskInfo *task_info = taskOfId(osThreadId());
-	    
-	    if (task_info != NULL) {
-		task_info->gc_time += gc_time;
-		task_info->gc_etime += gc_etime;
+	    Task *task;
+	    if ((task = myTask()) != NULL) {
+		task->gc_time += gc_time;
+		task->gc_etime += gc_etime;
 	    }
 	}
 #endif
@@ -635,15 +634,15 @@ stat_exit(int alloc)
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
 	    total_collections += generations[g].collections;
 
-	/* For SMP, we have to get the user time from each thread
+	/* For THREADED_RTS, we have to get the user time from each Task
 	 * and try to work out the total time.
 	 */
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 	{   
-	    nat i;
+	    Task *task;
 	    MutUserTime = 0.0;
-	    for (i = 0; i < taskCount; i++) {
-		MutUserTime += taskTable[i].mut_time;
+	    for (task = all_tasks; task != NULL; task = task->all_link) {
+		MutUserTime += task->mut_time;
 	    }
 	}
 	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
@@ -692,18 +691,21 @@ stat_exit(int alloc)
 	    statsPrintf("\n%11ld Mb total memory in use\n\n", 
 		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 	    {
 		nat i;
-		for (i = 0; i < taskCount; i++) {
+		Task *task;
+		for (i = 0, task = all_tasks; 
+		     task != NULL; 
+		     i++, task = task->all_link) {
 		    statsPrintf("  Task %2d %-8s :  MUT time: %6.2fs  (%6.2fs elapsed)\n"
 			    "                      GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
 				i,
-				taskTable[i].is_worker ? "(worker)" : "(bound)",
-				TICK_TO_DBL(taskTable[i].mut_time),
-				TICK_TO_DBL(taskTable[i].mut_etime),
-				TICK_TO_DBL(taskTable[i].gc_time),
-				TICK_TO_DBL(taskTable[i].gc_etime));
+				(task->tso == NULL) ? "(worker)" : "(bound)",
+				TICK_TO_DBL(task->mut_time),
+				TICK_TO_DBL(task->mut_etime),
+				TICK_TO_DBL(task->gc_time),
+				TICK_TO_DBL(task->gc_etime));
 		}
 	    }
 #endif

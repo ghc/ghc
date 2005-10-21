@@ -165,13 +165,21 @@ extern void initBlockAllocator(void);
 
 /* Allocation -------------------------------------------------------------- */
 
-extern bdescr *allocGroup(nat n);
-extern bdescr *allocBlock(void);
+bdescr *allocGroup(nat n);
+bdescr *allocBlock(void);
+
+// versions that take the storage manager lock for you:
+bdescr *allocGroup_lock(nat n);
+bdescr *allocBlock_lock(void);
 
 /* De-Allocation ----------------------------------------------------------- */
 
-extern void freeGroup(bdescr *p);
-extern void freeChain(bdescr *p);
+void freeGroup(bdescr *p);
+void freeChain(bdescr *p);
+
+// versions that take the storage manager lock for you:
+void freeGroup_lock(bdescr *p);
+void freeChain_lock(bdescr *p);
 
 /* Round a value to megablocks --------------------------------------------- */
 

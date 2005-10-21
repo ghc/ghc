@@ -49,7 +49,7 @@ newByteArrayzh_fast
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    "ptr" p = foreign "C" allocateLocal(BaseReg "ptr",words) [];
+    "ptr" p = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
@@ -97,7 +97,7 @@ newArrayzh_fast
     MAYBE_GC(R2_PTR,newArrayzh_fast);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
-    "ptr" arr = foreign "C" allocateLocal(BaseReg "ptr",words) [];
+    "ptr" arr = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_info, W_[CCCS]);
@@ -874,14 +874,11 @@ forkzh_fast
   
   MAYBE_GC(R1_PTR, forkzh_fast);
 
-  foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
-
   // create it right now, return ThreadID in R1
-  "ptr" R1 = foreign "C" createIOThread( RtsFlags_GcFlags_initialStkSize(RtsFlags), 
-				   R1 "ptr");
-  foreign "C" scheduleThreadLocked(R1 "ptr");
-
-  foreign "C" RELEASE_LOCK(sched_mutex "ptr");
+  "ptr" R1 = foreign "C" createIOThread( MyCapability() "ptr", 
+				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
+				R1 "ptr");
+  foreign "C" scheduleThread(MyCapability() "ptr", R1 "ptr");
 
   // switch at the earliest opportunity
   CInt[context_switch] = 1 :: CInt;
@@ -976,7 +973,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    frame = Sp;
    trec = StgTSO_trec(CurrentTSO);
    "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
-   r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", trec "ptr") [];
+   r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
    if (r) {
      /* Succeeded (either first branch or second branch) */
      StgTSO_trec(CurrentTSO) = outer;
@@ -986,7 +983,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    } else {
      /* Did not commit: retry */
      W_ new_trec;
-     "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr") [];
+     "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
      StgTSO_trec(CurrentTSO) = new_trec;
      if (StgCatchRetryFrame_running_alt_code(frame)) {
        R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1056,7 +1053,7 @@ INFO_TABLE_RET(stg_atomically_frame,
        jump stg_block_noregs;
      } else {
        /* Previous attempt is no longer valid: try again */
-       "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", NO_TREC "ptr");
+       "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
        StgTSO_trec(CurrentTSO) = trec;
        StgAtomicallyFrame_waiting(frame) = 0 :: CInt; /* false; */
        R1 = StgAtomicallyFrame_code(frame);
@@ -1065,7 +1062,7 @@ INFO_TABLE_RET(stg_atomically_frame,
      }
    } else {
      /* The TSO is not currently waiting: try to commit the transaction */
-     valid = foreign "C" stmCommitTransaction(BaseReg "ptr", trec "ptr");
+     valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr");
      if (valid) {
        /* Transaction was valid: commit succeeded */
        StgTSO_trec(CurrentTSO) = NO_TREC;
@@ -1074,7 +1071,7 @@ INFO_TABLE_RET(stg_atomically_frame,
        jump %ENTRY_CODE(Sp(SP_OFF));
      } else {
        /* Transaction was not valid: try again */
-       "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", NO_TREC "ptr");
+       "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
        StgTSO_trec(CurrentTSO) = trec;
        R1 = StgAtomicallyFrame_code(frame);
        Sp_adj(-1);
@@ -1166,7 +1163,7 @@ atomicallyzh_fast
   /* Start the memory transcation */
   old_trec = StgTSO_trec(CurrentTSO);
   ASSERT(old_trec == NO_TREC);
-  "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", old_trec "ptr");
+  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", old_trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Apply R1 to the realworld token */
@@ -1211,7 +1208,7 @@ catchRetryzh_fast
 
   /* Start a nested transaction within which to run the first code */
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" new_trec = foreign "C" stmStartTransaction(BaseReg "ptr", trec "ptr");
+  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Set up the catch-retry frame */
@@ -1254,7 +1251,7 @@ retry_pop_stack:
     ASSERT(outer != NO_TREC);
     if (!StgCatchRetryFrame_running_alt_code(frame)) {
       // Retry in the first code: try the alternative
-      "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
+      "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
       StgTSO_trec(CurrentTSO) = trec;
       StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
       R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1264,9 +1261,9 @@ retry_pop_stack:
       // Retry in the alternative code: propagate
       W_ other_trec;
       other_trec = StgCatchRetryFrame_first_code_trec(frame);
-      r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", other_trec "ptr");
+      r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", other_trec "ptr");
       if (r) {
-        r = foreign "C" stmCommitNestedTransaction(BaseReg "ptr", trec "ptr");
+        r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr");
       }
       if (r) {
         // Merge between siblings succeeded: commit it back to enclosing transaction
@@ -1276,7 +1273,7 @@ retry_pop_stack:
         goto retry_pop_stack;
       } else {
         // Merge failed: we musn't propagate the retry.  Try both paths again.
-        "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
+        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
         StgCatchRetryFrame_first_code_trec(frame) = trec;
         StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
         StgTSO_trec(CurrentTSO) = trec;
@@ -1290,7 +1287,7 @@ retry_pop_stack:
   // We've reached the ATOMICALLY_FRAME: attempt to wait 
   ASSERT(frame_type == ATOMICALLY_FRAME);
   ASSERT(outer == NO_TREC);
-  r = foreign "C" stmWait(BaseReg "ptr", CurrentTSO "ptr", trec "ptr");
+  r = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
   if (r) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
     StgAtomicallyFrame_waiting(frame) = 1 :: CInt; // true
@@ -1302,7 +1299,7 @@ retry_pop_stack:
     jump stg_block_noregs;
   } else {
     // Transaction was not valid: retry immediately
-    "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", outer "ptr");
+    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
     Sp = frame;
@@ -1321,7 +1318,7 @@ newTVarzh_fast
 
   MAYBE_GC (R1_PTR, newTVarzh_fast); 
   new_value = R1;
-  tv = foreign "C" stmNewTVar(BaseReg "ptr", new_value "ptr");
+  "ptr" tv = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr");
   RET_P(tv);
 }
 
@@ -1337,7 +1334,7 @@ readTVarzh_fast
   MAYBE_GC (R1_PTR, readTVarzh_fast); // Call to stmReadTVar may allocate
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
-  "ptr" result = foreign "C" stmReadTVar(BaseReg "ptr", trec "ptr", tvar "ptr") [];
+  "ptr" result = foreign "C" stmReadTVar(MyCapability() "ptr", trec "ptr", tvar "ptr") [];
 
   RET_P(result);
 }
@@ -1356,7 +1353,7 @@ writeTVarzh_fast
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
   new_value = R2;
-  foreign "C" stmWriteTVar(BaseReg "ptr", trec "ptr", tvar "ptr", new_value "ptr") [];
+  foreign "C" stmWriteTVar(MyCapability() "ptr", trec "ptr", tvar "ptr", new_value "ptr") [];
 
   jump %ENTRY_CODE(Sp(0));
 }
@@ -1485,7 +1482,8 @@ takeMVarzh_fast
       "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar) [];
       StgMVar_head(mvar) = tso;
 #else
-      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
+      "ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", 
+				         StgMVar_head(mvar) "ptr") [];
       StgMVar_head(mvar) = tso;
 #endif
 
@@ -1557,7 +1555,8 @@ tryTakeMVarzh_fast
 	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
+	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr",
+					   StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1622,10 +1621,10 @@ putMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr") [];
+	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
+	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1687,10 +1686,10 @@ tryPutMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr",mvar "ptr") [];
+	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr") [];
+	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1857,7 +1856,7 @@ waitReadzh_fast
     /* args: R1 */
 #ifdef THREADED_RTS
     foreign "C" barf("waitRead# on threaded RTS");
-#endif
+#else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
@@ -1866,6 +1865,7 @@ waitReadzh_fast
     // threaded RTS anyway.
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
     jump stg_block_noregs;
+#endif
 }
 
 waitWritezh_fast
@@ -1873,7 +1873,7 @@ waitWritezh_fast
     /* args: R1 */
 #ifdef THREADED_RTS
     foreign "C" barf("waitWrite# on threaded RTS");
-#endif
+#else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
@@ -1882,6 +1882,7 @@ waitWritezh_fast
     // threaded RTS anyway.
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
     jump stg_block_noregs;
+#endif
 }
 
 
@@ -1897,7 +1898,7 @@ delayzh_fast
 
 #ifdef THREADED_RTS
     foreign "C" barf("delay# on threaded RTS");
-#endif
+#else
 
     /* args: R1 (microsecond delay amount) */
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
@@ -1947,6 +1948,7 @@ while:
     }
     jump stg_block_noregs;
 #endif
+#endif /* !THREADED_RTS */
 }
 
 

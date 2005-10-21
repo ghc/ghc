@@ -1,12 +1,15 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-1999
+ * (c) The GHC Team 1998-2005
  *
  * Compacting garbage collector
  *
  * ---------------------------------------------------------------------------*/
 
-INLINE_HEADER void 
+#ifndef GCCOMPACT_H
+#define GCCOMPACT_H
+
+STATIC_INLINE void 
 mark(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -16,7 +19,7 @@ mark(StgPtr p, bdescr *bd)
     *bitmap_word |= bit_mask;
 }
 
-INLINE_HEADER void 
+STATIC_INLINE void 
 unmark(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -26,7 +29,7 @@ unmark(StgPtr p, bdescr *bd)
     *bitmap_word &= ~bit_mask;
 }
 
-INLINE_HEADER StgWord
+STATIC_INLINE StgWord
 is_marked(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -37,3 +40,5 @@ is_marked(StgPtr p, bdescr *bd)
 }
 
 void compact( void (*get_roots)(evac_fn) );
+
+#endif /* GCCOMPACT_H */

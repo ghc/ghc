@@ -347,7 +347,7 @@ usage_text[] = {
 "  -c<n>    Auto-enable compaction of the oldest generation when live data is",
 "           at least <n>% of the maximum heap size set with -M (default: 30%)",
 "  -c       Enable compaction for all major collections",
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 "  -I<sec>  Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
 #endif
 "",

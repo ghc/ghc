@@ -15,84 +15,22 @@
 #define NO_PRI  0
 #endif
 
-extern SchedulerStatus waitThread(StgTSO *main_thread, /*out*/StgClosure **ret,
-                                  Capability *initialCapability);
-
 /* 
  * Creating threads
  */
 #if defined(GRAN)
-extern StgTSO *createThread(nat stack_size, StgInt pri);
+StgTSO *createThread (Capability *cap, nat stack_size, StgInt pri);
 #else
-extern StgTSO *createThread(nat stack_size);
+StgTSO *createThread (Capability *cap, nat stack_size);
 #endif
-extern void scheduleThread(StgTSO *tso);
-extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret,
-                                          Capability *initialCapability);
 
-INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
-  tso->sp--;
-  tso->sp[0] = (W_) c;
-}
+Capability *scheduleWaitThread (StgTSO *tso, /*out*/HaskellObj* ret,
+				Capability *cap);
 
-INLINE_HEADER StgTSO *
-createGenThread(nat stack_size,  StgClosure *closure) {
-  StgTSO *t;
-#if defined(GRAN)
-  t = createThread(stack_size, NO_PRI);
-#else
-  t = createThread(stack_size);
-#endif
-  pushClosure(t, (W_)closure);
-  pushClosure(t, (W_)&stg_enter_info);
-  return t;
-}
-
-INLINE_HEADER StgTSO *
-createIOThread(nat stack_size,  StgClosure *closure) {
-  StgTSO *t;
-#if defined(GRAN)
-  t = createThread(stack_size, NO_PRI);
-#else
-  t = createThread(stack_size);
-#endif
-  pushClosure(t, (W_)&stg_noforceIO_info);
-  pushClosure(t, (W_)&stg_ap_v_info);
-  pushClosure(t, (W_)closure);
-  pushClosure(t, (W_)&stg_enter_info);
-  return t;
-}
-
-/*
- * Same as above, but also evaluate the result of the IO action
- * to whnf while we're at it.
- */
-
-INLINE_HEADER StgTSO *
-createStrictIOThread(nat stack_size,  StgClosure *closure) {
-  StgTSO *t;
-#if defined(GRAN)
-  t = createThread(stack_size, NO_PRI);
-#else
-  t = createThread(stack_size);
-#endif
-  pushClosure(t, (W_)&stg_forceIO_info);
-  pushClosure(t, (W_)&stg_ap_v_info);
-  pushClosure(t, (W_)closure);
-  pushClosure(t, (W_)&stg_enter_info);
-  return t;
-}
-
-
-/* 
- * Killing threads
- */
-extern void deleteThread(StgTSO *tso);
-extern void deleteAllThreads ( void );
-extern int  howManyThreadsAvail ( void );
-/*
- * Run until there are no more threads.
- */
-extern void finishAllThreads ( void );
-
+StgTSO *createGenThread       (Capability *cap, nat stack_size,  
+			       StgClosure *closure);
+StgTSO *createIOThread        (Capability *cap, nat stack_size,  
+			       StgClosure *closure);
+StgTSO *createStrictIOThread  (Capability *cap, nat stack_size,  
+			       StgClosure *closure);
 #endif

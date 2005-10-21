@@ -231,7 +231,7 @@
 #define BlockedOnGA         9
   /* same as above but without sending a Fetch message */
 #define BlockedOnGA_NoSend  10
-/* Only relevant for RTS_SUPPORTS_THREADS: */
+/* Only relevant for THREADED_RTS: */
 #define BlockedOnCCall      11
 #define BlockedOnCCall_NoUnblockExc 12
    /* same as above but don't unblock async exceptions in resumeThread() */

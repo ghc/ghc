@@ -6,6 +6,9 @@
  *
  * -------------------------------------------------------------------------- */
 
+#ifndef HASH_H
+#define HASH_H
+
 typedef struct hashtable HashTable; /* abstract */
 
 /* Hash table access where the keys are StgWords */
@@ -32,3 +35,6 @@ HashTable * allocStrHashTable ( void );
 /* Freeing hash tables 
  */
 void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
+
+#endif /* HASH_H */
+

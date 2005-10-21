@@ -26,7 +26,7 @@
 #include "Prelude.h"
 #include "ParTicky.h"		// ToDo: move into Rts.h
 #include "GCCompact.h"
-#include "Signals.h"
+#include "RtsSignals.h"
 #include "STM.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
@@ -323,7 +323,7 @@ gc_alloc_scavd_block(step *stp)
       
      - free from-space in each step, and set from-space = to-space.
 
-   Locks held: sched_mutex
+   Locks held: all capabilities are held throughout GarbageCollect().
 
    -------------------------------------------------------------------------- */
 
@@ -335,6 +335,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   lnat live, allocated, collected = 0, copied = 0, scavd_copied = 0;
   lnat oldgen_saved_blocks = 0;
   nat g, s;
+
+  ACQUIRE_SM_LOCK;
 
 #ifdef PROFILING
   CostCentreStack *prev_CCS;
@@ -693,7 +695,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     }
   }
 
-  /* Update the pointers from the "main thread" list - these are
+  /* Update the pointers from the task list - these are
    * treated as weak pointers because we want to allow a main thread
    * to get a BlockedOnDeadMVar exception in the same way as any other
    * thread.  Note that the threads should all have been retained by
@@ -701,14 +703,22 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
    * updating pointers here.
    */
   {
-      StgMainThread *m;
+      Task *task;
       StgTSO *tso;
-      for (m = main_threads; m != NULL; m = m->link) {
-	  tso = (StgTSO *) isAlive((StgClosure *)m->tso);
-	  if (tso == NULL) {
-	      barf("main thread has been GC'd");
+      for (task = all_tasks; task != NULL; task = task->all_link) {
+	  if (!task->stopped && task->tso) {
+	      tso = (StgTSO *) isAlive((StgClosure *)task->tso);
+	      if (tso == NULL) {
+		  barf("task %p: main thread %d has been GC'd", 
+#ifdef THREADED_RTS
+		       (void *)task->id, 
+#else
+		       (void *)task,
+#endif
+		       task->tso->id);
+	      }
+	      task->tso = tso;
 	  }
-	  m->tso = tso;
       }
   }
 
@@ -1108,15 +1118,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // Reset the nursery
   resetNurseries();
 
-  RELEASE_LOCK(&sched_mutex);
-  
   // start any pending finalizers 
-  scheduleFinalizers(old_weak_ptr_list);
+  scheduleFinalizers(last_free_capability, old_weak_ptr_list);
   
   // send exceptions to any threads which were about to die 
   resurrectThreads(resurrected_threads);
-  
-  ACQUIRE_LOCK(&sched_mutex);
 
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);
@@ -1155,6 +1161,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   // unblock signals again
   unblockUserSignals();
 #endif
+
+  RELEASE_SM_LOCK;
 
   //PAR_TICKY_TP();
 }
@@ -4242,7 +4250,7 @@ threadLazyBlackHole(StgTSO *tso)
 	    
 	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		debugBelch("Unexpected lazy BHing required at 0x%04x\n",(int)bh);
+		debugBelch("Unexpected lazy BHing required at 0x%04lx\n",(long)bh);
 #endif
 #ifdef PROFILING
 		// @LDV profiling
@@ -4367,7 +4375,7 @@ threadSqueezeStack(StgTSO *tso)
 		if (bh->header.info != &stg_BLACKHOLE_info &&
 		    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		    debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);
+		    debugBelch("Unexpected lazy BHing required at 0x%04lx",(long)bh);
 #endif
 #ifdef DEBUG
 		    // zero out the slop so that the sanity checker can tell

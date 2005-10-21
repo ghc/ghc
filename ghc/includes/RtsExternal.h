@@ -54,8 +54,11 @@ extern StgInt    isFloatDenormalized(StgFloat f);
 extern StgInt    isFloatNegativeZero(StgFloat f);
 
 /* Suspending/resuming threads around foreign calls */
-extern StgInt        suspendThread ( StgRegTable * );
-extern StgRegTable * resumeThread  ( StgInt );
+extern void *        suspendThread ( StgRegTable * );
+extern StgRegTable * resumeThread  ( void * );
+
+/* scheduler stuff */
+extern void stg_scheduleThread (StgRegTable *reg, struct StgTSO_ *tso);
 
 /* Creating and destroying an adjustor thunk */
 extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
@@ -69,7 +72,9 @@ extern void rts_ConsoleHandlerDone  ( int ev );
 extern int stg_sig_install (int, int, StgStablePtr *, void *);
 #endif
 
-extern void startSignalHandler(int sig);
+#if !defined(mingw32_HOST_OS)
+extern StgInt *signal_handlers;
+#endif
 extern void setIOManagerPipe (int fd);
 
 extern void* stgMallocBytesRWX(int len);

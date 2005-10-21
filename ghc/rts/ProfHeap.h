@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2005
  *
  * Support for heap profiling
  *
@@ -16,4 +16,4 @@ extern rtsBool closureSatisfiesConstraints( StgClosure* p );
 extern void    LDV_recordDead( StgClosure *c, nat size );
 extern rtsBool strMatchesSelector( char* str, char* sel );
 
-#endif
+#endif /* PROFHEAP_H */

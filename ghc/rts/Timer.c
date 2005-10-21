@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1995-2003
+ * (c) The GHC Team, 1995-2005
  *
  * Interval timer service for profiling and pre-emptive scheduling.
  *
@@ -19,6 +19,7 @@
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "Timer.h"
+#include "Ticker.h"
 #include "Capability.h"
 
 #if !defined(mingw32_HOST_OS)
@@ -30,7 +31,7 @@
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 /* idle ticks left before we perform a GC */
 static int ticks_to_gc = 0;
 #endif
@@ -54,7 +55,7 @@ handle_tick(int unused STG_UNUSED)
 	  ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
 	  context_switch = 1;	/* schedule a context switch */
 
-#if defined(RTS_SUPPORTS_THREADS)
+#if defined(THREADED_RTS)
 	  /* 
 	   * If we've been inactive for idleGCDelayTicks (set by +RTS
 	   * -I), tell the scheduler to wake up and do a GC, to check
@@ -73,10 +74,13 @@ handle_tick(int unused STG_UNUSED)
 		  recent_activity = ACTIVITY_INACTIVE;
 		  blackholes_need_checking = rtsTrue;
 		  /* hack: re-use the blackholes_need_checking flag */
-		  threadRunnable();
-		  /* ToDo: this threadRunnable only works if there's
-		   * another thread (not this one) waiting to be woken up
+
+		  /* ToDo: this doesn't work.  Can't invoke
+		   * pthread_cond_signal from a signal handler.
+		   * Furthermore, we can't prod a capability that we
+		   * might be holding.  What can we do?
 		   */
+		  prodOneCapability();
 	      }
 	      break;
 	  default:

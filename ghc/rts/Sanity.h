@@ -6,6 +6,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#ifndef SANITY_H
+
 #ifdef DEBUG
 
 # if defined(PAR)
@@ -50,3 +52,5 @@ extern rtsBool isBlackhole( StgTSO* tso, StgClosure* p );
 
 #endif /* DEBUG */
  
+#endif /* SANITY_H */
+

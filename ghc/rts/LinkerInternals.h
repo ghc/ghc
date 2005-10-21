@@ -6,6 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#ifndef LINKERINTERNALS_H
+#define LINKERINTERNALS_H
+
 typedef enum { OBJECT_LOADED, OBJECT_RESOLVED } OStatus;
 
 /* Indication of section kinds for loaded objects.  Needed by
@@ -97,3 +100,5 @@ typedef struct _ObjectCode {
 } ObjectCode;
 
 extern ObjectCode *objects;
+
+#endif /* LINKERINTERNALS_H */

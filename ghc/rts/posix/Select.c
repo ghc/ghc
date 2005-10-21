@@ -17,6 +17,7 @@
 #include "Itimer.h"
 #include "Signals.h"
 #include "Capability.h"
+#include "posix/Select.h"
 
 # ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>
@@ -33,10 +34,10 @@
 #include <unistd.h>
 #endif
 
+#if !defined(THREADED_RTS)
 /* last timestamp */
 lnat timestamp = 0;
 
-#if !defined(RTS_SUPPORTS_THREADS)
 /* 
  * The threaded RTS uses an IO-manager thread in Haskell instead (see GHC.Conc) 
  */
@@ -52,7 +53,7 @@ lnat timestamp = 0;
  * if this is true, then our time has expired.
  * (idea due to Andy Gill).
  */
-rtsBool
+static rtsBool
 wakeUpSleepingThreads(lnat ticks)
 {
     StgTSO *tso;
@@ -65,7 +66,8 @@ wakeUpSleepingThreads(lnat ticks)
 	tso->why_blocked = NotBlocked;
 	tso->link = END_TSO_QUEUE;
 	IF_DEBUG(scheduler,debugBelch("Waking up sleeping thread %d\n", tso->id));
-	PUSH_ON_RUN_QUEUE(tso);
+	// MainCapability: this code is !THREADED_RTS
+	pushOnRunQueue(&MainCapability,tso);
 	flag = rtsTrue;
     }
     return flag;
@@ -218,7 +220,7 @@ awaitEvent(rtsBool wait)
 	  /* If new runnable threads have arrived, stop waiting for
 	   * I/O and run them.
 	   */
-	  if (run_queue_hd != END_TSO_QUEUE) {
+	  if (!emptyRunQueue(&MainCapability)) {
 	      return; /* still hold the lock */
 	  }
       }
@@ -246,7 +248,7 @@ awaitEvent(rtsBool wait)
 		  IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %d\n", tso->id));
 		  tso->why_blocked = NotBlocked;
 		  tso->link = END_TSO_QUEUE;
-		  PUSH_ON_RUN_QUEUE(tso);
+		  pushOnRunQueue(&MainCapability,tso);
 	      } else {
 		  if (prev == NULL)
 		      blocked_queue_hd = tso;
@@ -264,7 +266,7 @@ awaitEvent(rtsBool wait)
 	  }
       }
       
-    } while (wait && !interrupted && run_queue_hd == END_TSO_QUEUE);
+    } while (wait && !interrupted && emptyRunQueue(&MainCapability));
 }
 
-#endif /* RTS_SUPPORTS_THREADS */
+#endif /* THREADED_RTS */

@@ -15,6 +15,8 @@ ifeq "$(GhcUnregisterised)" "YES"
 SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
 endif
 
+SRC_CC_OPTS += -I. -I../rts
+
 #
 # Header file built from the configure script's findings
 #
@@ -140,7 +142,7 @@ mkGHCConstants : mkGHCConstants.o
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkGHCConstants.o
 
 mkGHCConstants.o : mkDerivedConstants.c
-	$(CC) -o $@ -c $<  -DGEN_HASKELL
+	$(CC) -o $@ $(CC_OPTS) -c $<  -DGEN_HASKELL
 
 GHCConstants.h : mkGHCConstants
 	./mkGHCConstants >$@

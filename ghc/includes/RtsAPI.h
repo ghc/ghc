@@ -27,6 +27,12 @@ typedef enum {
 
 typedef StgClosure *HaskellObj;
 
+/*
+ * An abstract type representing the token returned by rts_lock() and
+ * used when allocating objects and threads in the RTS.
+ */
+typedef struct Capability_ Capability;
+
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
    ------------------------------------------------------------------------- */
@@ -41,39 +47,39 @@ extern void setProgArgv            ( int argc, char *argv[] );
 /* ----------------------------------------------------------------------------
    Locking.
    
-   In a multithreaded environments, you have to surround all access to the
-   RtsAPI with these calls.
+   You have to surround all access to the RtsAPI with these calls.
    ------------------------------------------------------------------------- */
    
-void
-rts_lock ( void );
+// acquires a token which may be used to create new objects and
+// evaluate them.
+Capability *rts_lock (void);
 
-void
-rts_unlock ( void );
+// releases the token acquired with rts_lock().
+void rts_unlock (Capability *token);
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
-HaskellObj   rts_mkChar       ( HsChar   c );
-HaskellObj   rts_mkInt        ( HsInt    i );
-HaskellObj   rts_mkInt8       ( HsInt8   i );
-HaskellObj   rts_mkInt16      ( HsInt16  i );
-HaskellObj   rts_mkInt32      ( HsInt32  i );
-HaskellObj   rts_mkInt64      ( HsInt64  i );
-HaskellObj   rts_mkWord       ( HsWord   w );
-HaskellObj   rts_mkWord8      ( HsWord8  w );
-HaskellObj   rts_mkWord16     ( HsWord16 w );
-HaskellObj   rts_mkWord32     ( HsWord32 w );
-HaskellObj   rts_mkWord64     ( HsWord64 w );
-HaskellObj   rts_mkPtr        ( HsPtr    a );
-HaskellObj   rts_mkFunPtr     ( HsFunPtr a );
-HaskellObj   rts_mkFloat      ( HsFloat  f );
-HaskellObj   rts_mkDouble     ( HsDouble f );
-HaskellObj   rts_mkStablePtr  ( HsStablePtr s );
-HaskellObj   rts_mkBool       ( HsBool   b );
-HaskellObj   rts_mkString     ( char    *s );
+HaskellObj   rts_mkChar       ( Capability *, HsChar   c );
+HaskellObj   rts_mkInt        ( Capability *, HsInt    i );
+HaskellObj   rts_mkInt8       ( Capability *, HsInt8   i );
+HaskellObj   rts_mkInt16      ( Capability *, HsInt16  i );
+HaskellObj   rts_mkInt32      ( Capability *, HsInt32  i );
+HaskellObj   rts_mkInt64      ( Capability *, HsInt64  i );
+HaskellObj   rts_mkWord       ( Capability *, HsWord   w );
+HaskellObj   rts_mkWord8      ( Capability *, HsWord8  w );
+HaskellObj   rts_mkWord16     ( Capability *, HsWord16 w );
+HaskellObj   rts_mkWord32     ( Capability *, HsWord32 w );
+HaskellObj   rts_mkWord64     ( Capability *, HsWord64 w );
+HaskellObj   rts_mkPtr        ( Capability *, HsPtr    a );
+HaskellObj   rts_mkFunPtr     ( Capability *, HsFunPtr a );
+HaskellObj   rts_mkFloat      ( Capability *, HsFloat  f );
+HaskellObj   rts_mkDouble     ( Capability *, HsDouble f );
+HaskellObj   rts_mkStablePtr  ( Capability *, HsStablePtr s );
+HaskellObj   rts_mkBool       ( Capability *, HsBool   b );
+HaskellObj   rts_mkString     ( Capability *, char    *s );
 
-HaskellObj   rts_apply        ( HaskellObj, HaskellObj );
+HaskellObj   rts_apply        ( Capability *, HaskellObj, HaskellObj );
 
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects
@@ -103,26 +109,31 @@ HsBool       rts_getBool      ( HaskellObj );
    Note that these calls may cause Garbage Collection, so all HaskellObj
    references are rendered invalid by these calls.
    ------------------------------------------------------------------------- */
-SchedulerStatus 
-rts_eval ( HaskellObj p, /*out*/HaskellObj *ret );
+Capability * 
+rts_eval (Capability *, HaskellObj p, /*out*/HaskellObj *ret);
 
-SchedulerStatus 
-rts_eval_ ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
+Capability * 
+rts_eval_ (Capability *, HaskellObj p, unsigned int stack_size, 
+	   /*out*/HaskellObj *ret);
 
-SchedulerStatus 
-rts_evalIO ( HaskellObj p, /*out*/HaskellObj *ret );
+Capability * 
+rts_evalIO (Capability *, HaskellObj p, /*out*/HaskellObj *ret);
 
-SchedulerStatus
-rts_evalStableIO ( HsStablePtr s, /*out*/HsStablePtr *ret );
+Capability *
+rts_evalStableIO (Capability *, HsStablePtr s, /*out*/HsStablePtr *ret);
 
-SchedulerStatus 
-rts_evalLazyIO ( HaskellObj p, /*out*/HaskellObj *ret );
+Capability * 
+rts_evalLazyIO (Capability *, HaskellObj p, /*out*/HaskellObj *ret);
 
-SchedulerStatus 
-rts_evalLazyIO_ ( HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret );
+Capability * 
+rts_evalLazyIO_ (Capability *, HaskellObj p, unsigned int stack_size, 
+		 /*out*/HaskellObj *ret);
 
 void
-rts_checkSchedStatus ( char* site, SchedulerStatus rc);
+rts_checkSchedStatus (char* site, Capability *);
+
+SchedulerStatus
+rts_getSchedStatus (Capability *cap);
 
 /* --------------------------------------------------------------------------
    Wrapper closures

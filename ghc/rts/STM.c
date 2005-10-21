@@ -316,36 +316,32 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec,
 // Helper functions for thread blocking and unblocking
 
 static void park_tso(StgTSO *tso) {
-  ACQUIRE_LOCK(&sched_mutex);
   ASSERT(tso -> why_blocked == NotBlocked);
   tso -> why_blocked = BlockedOnSTM;
   tso -> block_info.closure = (StgClosure *) END_TSO_QUEUE;
-  RELEASE_LOCK(&sched_mutex);
   TRACE("park_tso on tso=%p\n", tso);
 }
 
-static void unpark_tso(StgTSO *tso) {
+static void unpark_tso(Capability *cap, StgTSO *tso) {
   // We will continue unparking threads while they remain on one of the wait
   // queues: it's up to the thread itself to remove it from the wait queues
   // if it decides to do so when it is scheduled.
   if (tso -> why_blocked == BlockedOnSTM) {
     TRACE("unpark_tso on tso=%p\n", tso);
-    ACQUIRE_LOCK(&sched_mutex);
     tso -> why_blocked = NotBlocked;
-    PUSH_ON_RUN_QUEUE(tso);
-    RELEASE_LOCK(&sched_mutex);
+    pushOnRunQueue(cap,tso);
   } else {
     TRACE("spurious unpark_tso on tso=%p\n", tso);
   }
 }
 
-static void unpark_waiters_on(StgTVar *s) {
+static void unpark_waiters_on(Capability *cap, StgTVar *s) {
   StgTVarWaitQueue *q;
   TRACE("unpark_waiters_on tvar=%p\n", s);
   for (q = s -> first_wait_queue_entry; 
        q != END_STM_WAIT_QUEUE; 
        q = q -> next_queue_entry) {
-    unpark_tso(q -> waiting_tso);
+    unpark_tso(cap, q -> waiting_tso);
   }
 }
 
@@ -353,32 +349,32 @@ static void unpark_waiters_on(StgTVar *s) {
 
 // Helper functions for allocation and initialization
 
-static StgTVarWaitQueue *new_stg_tvar_wait_queue(StgRegTable *reg,
+static StgTVarWaitQueue *new_stg_tvar_wait_queue(Capability *cap,
                                                  StgTSO *waiting_tso) {
   StgTVarWaitQueue *result;
-  result = (StgTVarWaitQueue *)allocateLocal(reg, sizeofW(StgTVarWaitQueue));
+  result = (StgTVarWaitQueue *)allocateLocal(cap, sizeofW(StgTVarWaitQueue));
   SET_HDR (result, &stg_TVAR_WAIT_QUEUE_info, CCS_SYSTEM);
   result -> waiting_tso = waiting_tso;
   return result;
 }
 
-static StgTRecChunk *new_stg_trec_chunk(StgRegTable *reg) {
+static StgTRecChunk *new_stg_trec_chunk(Capability *cap) {
   StgTRecChunk *result;
-  result = (StgTRecChunk *)allocateLocal(reg, sizeofW(StgTRecChunk));
+  result = (StgTRecChunk *)allocateLocal(cap, sizeofW(StgTRecChunk));
   SET_HDR (result, &stg_TREC_CHUNK_info, CCS_SYSTEM);
   result -> prev_chunk = END_STM_CHUNK_LIST;
   result -> next_entry_idx = 0;
   return result;
 }
 
-static StgTRecHeader *new_stg_trec_header(StgRegTable *reg,
+static StgTRecHeader *new_stg_trec_header(Capability *cap,
                                           StgTRecHeader *enclosing_trec) {
   StgTRecHeader *result;
-  result = (StgTRecHeader *) allocateLocal(reg, sizeofW(StgTRecHeader));
+  result = (StgTRecHeader *) allocateLocal(cap, sizeofW(StgTRecHeader));
   SET_HDR (result, &stg_TREC_HEADER_info, CCS_SYSTEM);
 
   result -> enclosing_trec = enclosing_trec;
-  result -> current_chunk = new_stg_trec_chunk(reg);
+  result -> current_chunk = new_stg_trec_chunk(cap);
 
   if (enclosing_trec == NO_TREC) {
     result -> state = TREC_ACTIVE;
@@ -391,10 +387,10 @@ static StgTRecHeader *new_stg_trec_header(StgRegTable *reg,
   return result;  
 }
 
-static StgTVar *new_tvar(StgRegTable *reg,
+static StgTVar *new_tvar(Capability *cap,
                          StgClosure *new_value) {
   StgTVar *result;
-  result = (StgTVar *)allocateLocal(reg, sizeofW(StgTVar));
+  result = (StgTVar *)allocateLocal(cap, sizeofW(StgTVar));
   SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
   result -> current_value = new_value;
   result -> first_wait_queue_entry = END_STM_WAIT_QUEUE;
@@ -408,7 +404,7 @@ static StgTVar *new_tvar(StgRegTable *reg,
 
 // Helper functions for managing waiting lists
 
-static void build_wait_queue_entries_for_trec(StgRegTable *reg,
+static void build_wait_queue_entries_for_trec(Capability *cap,
                                       StgTSO *tso, 
                                       StgTRecHeader *trec) {
   ASSERT(trec != NO_TREC);
@@ -426,7 +422,7 @@ static void build_wait_queue_entries_for_trec(StgRegTable *reg,
     ACQ_ASSERT(s -> current_value == trec);
     NACQ_ASSERT(s -> current_value == e -> expected_value);
     fq = s -> first_wait_queue_entry;
-    q = new_stg_tvar_wait_queue(reg, tso);
+    q = new_stg_tvar_wait_queue(cap, tso);
     q -> next_queue_entry = fq;
     q -> prev_queue_entry = END_STM_WAIT_QUEUE;
     if (fq != END_STM_WAIT_QUEUE) {
@@ -472,7 +468,7 @@ static void remove_wait_queue_entries_for_trec(StgTRecHeader *trec) {
  
 /*......................................................................*/
  
-static TRecEntry *get_new_entry(StgRegTable *reg,
+static TRecEntry *get_new_entry(Capability *cap,
                                 StgTRecHeader *t) {
   TRecEntry *result;
   StgTRecChunk *c;
@@ -489,7 +485,7 @@ static TRecEntry *get_new_entry(StgRegTable *reg,
   } else {
     // Current chunk is full: allocate a fresh one
     StgTRecChunk *nc;
-    nc = new_stg_trec_chunk(reg);
+    nc = new_stg_trec_chunk(cap);
     nc -> prev_chunk = c;
     nc -> next_entry_idx = 1;
     t -> current_chunk = nc;
@@ -501,7 +497,7 @@ static TRecEntry *get_new_entry(StgRegTable *reg,
 
 /*......................................................................*/
 
-static void merge_update_into(StgRegTable *reg,
+static void merge_update_into(Capability *cap,
                               StgTRecHeader *t,
                               StgTVar *tvar,
                               StgClosure *expected_value,
@@ -529,7 +525,7 @@ static void merge_update_into(StgRegTable *reg,
   if (!found) {
     // No entry so far in this trec
     TRecEntry *ne;
-    ne = get_new_entry(reg, t);
+    ne = get_new_entry(cap, t);
     ne -> tvar = tvar;
     ne -> expected_value = expected_value;
     ne -> new_value = new_value;
@@ -699,11 +695,11 @@ void initSTM() {
 
 /*......................................................................*/
 
-StgTRecHeader *stmStartTransaction(StgRegTable *reg,
+StgTRecHeader *stmStartTransaction(Capability *cap,
                                    StgTRecHeader *outer) {
   StgTRecHeader *t;
   TRACE("%p : stmStartTransaction\n", outer);
-  t = new_stg_trec_header(reg, outer);
+  t = new_stg_trec_header(cap, outer);
   TRACE("%p : stmStartTransaction()=%p\n", outer, t);
   return t;
 }
@@ -793,8 +789,9 @@ StgBool stmValidateNestOfTransactions(StgTRecHeader *trec) {
 
 /*......................................................................*/
 
-StgBool stmCommitTransaction(StgRegTable *reg STG_UNUSED, StgTRecHeader *trec) {
+StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   int result;
+
   TRACE("%p : stmCommitTransaction()\n", trec);
   ASSERT (trec != NO_TREC);
   ASSERT (trec -> enclosing_trec == NO_TREC);
@@ -827,7 +824,7 @@ StgBool stmCommitTransaction(StgRegTable *reg STG_UNUSED, StgTRecHeader *trec) {
 
           ACQ_ASSERT(tvar_is_locked(s, trec));
           TRACE("%p : writing %p to %p, waking waiters\n", trec, e -> new_value, s);
-          unpark_waiters_on(s);
+          unpark_waiters_on(cap,s);
           IF_STM_FG_LOCKS({
             s -> last_update_by = trec;
           });
@@ -849,7 +846,7 @@ StgBool stmCommitTransaction(StgRegTable *reg STG_UNUSED, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
-StgBool stmCommitNestedTransaction(StgRegTable *reg, StgTRecHeader *trec) {
+StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *et;
   int result;
   ASSERT (trec != NO_TREC && trec -> enclosing_trec != NO_TREC);
@@ -883,7 +880,7 @@ StgBool stmCommitNestedTransaction(StgRegTable *reg, StgTRecHeader *trec) {
           if (entry_is_update(e)) {
             unlock_tvar(trec, s, e -> expected_value, FALSE);
           }
-          merge_update_into(reg, et, s, e -> expected_value, e -> new_value);
+          merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
           ACQ_ASSERT(s -> current_value != trec);
         });
       } else {
@@ -901,7 +898,7 @@ StgBool stmCommitNestedTransaction(StgRegTable *reg, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
-StgBool stmWait(StgRegTable *reg, StgTSO *tso, StgTRecHeader *trec) {
+StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
   int result;
   TRACE("%p : stmWait(%p)\n", trec, tso);
   ASSERT (trec != NO_TREC);
@@ -919,7 +916,7 @@ StgBool stmWait(StgRegTable *reg, StgTSO *tso, StgTRecHeader *trec) {
     // Put ourselves to sleep.  We retain locks on all the TVars involved
     // until we are sound asleep : (a) on the wait queues, (b) BlockedOnSTM
     // in the TSO, (c) TREC_WAITING in the Trec.  
-    build_wait_queue_entries_for_trec(reg, tso, trec);
+    build_wait_queue_entries_for_trec(cap, tso, trec);
     park_tso(tso);
     trec -> state = TREC_WAITING;
 
@@ -1011,7 +1008,7 @@ static StgClosure *read_current_value(StgTRecHeader *trec STG_UNUSED, StgTVar *t
 
 /*......................................................................*/
 
-StgClosure *stmReadTVar(StgRegTable *reg,
+StgClosure *stmReadTVar(Capability *cap,
                         StgTRecHeader *trec, 
 			StgTVar *tvar) {
   StgTRecHeader *entry_in;
@@ -1030,7 +1027,7 @@ StgClosure *stmReadTVar(StgRegTable *reg,
       result = entry -> new_value;
     } else {
       // Entry found in another trec
-      TRecEntry *new_entry = get_new_entry(reg, trec);
+      TRecEntry *new_entry = get_new_entry(cap, trec);
       new_entry -> tvar = tvar;
       new_entry -> expected_value = entry -> expected_value;
       new_entry -> new_value = entry -> new_value;
@@ -1039,7 +1036,7 @@ StgClosure *stmReadTVar(StgRegTable *reg,
   } else {
     // No entry found
     StgClosure *current_value = read_current_value(trec, tvar);
-    TRecEntry *new_entry = get_new_entry(reg, trec);
+    TRecEntry *new_entry = get_new_entry(cap, trec);
     new_entry -> tvar = tvar;
     new_entry -> expected_value = current_value;
     new_entry -> new_value = current_value;
@@ -1052,7 +1049,7 @@ StgClosure *stmReadTVar(StgRegTable *reg,
 
 /*......................................................................*/
 
-void stmWriteTVar(StgRegTable *reg,
+void stmWriteTVar(Capability *cap,
                   StgTRecHeader *trec,
 		  StgTVar *tvar, 
 		  StgClosure *new_value) {
@@ -1072,7 +1069,7 @@ void stmWriteTVar(StgRegTable *reg,
       entry -> new_value = new_value;
     } else {
       // Entry found in another trec
-      TRecEntry *new_entry = get_new_entry(reg, trec);
+      TRecEntry *new_entry = get_new_entry(cap, trec);
       new_entry -> tvar = tvar;
       new_entry -> expected_value = entry -> expected_value;
       new_entry -> new_value = new_value;
@@ -1080,7 +1077,7 @@ void stmWriteTVar(StgRegTable *reg,
   } else {
     // No entry found
     StgClosure *current_value = read_current_value(trec, tvar);
-    TRecEntry *new_entry = get_new_entry(reg, trec);
+    TRecEntry *new_entry = get_new_entry(cap, trec);
     new_entry -> tvar = tvar;
     new_entry -> expected_value = current_value;
     new_entry -> new_value = new_value;
@@ -1091,10 +1088,10 @@ void stmWriteTVar(StgRegTable *reg,
 
 /*......................................................................*/
 
-StgTVar *stmNewTVar(StgRegTable *reg,
+StgTVar *stmNewTVar(Capability *cap,
                     StgClosure *new_value) {
   StgTVar *result;
-  result = new_tvar(reg, new_value);
+  result = new_tvar(cap, new_value);
   return result;
 }
 

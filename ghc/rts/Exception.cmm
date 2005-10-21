@@ -55,10 +55,10 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
     // Not true: see comments above
     // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
 #if defined(GRAN) || defined(PAR)
-    foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
+    foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
 				   NULL "ptr"); 
 #else
-    foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr");
+    foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr");
 #endif
     StgTSO_blocked_exceptions(CurrentTSO) = NULL;
 #ifdef REG_R1
@@ -115,10 +115,10 @@ unblockAsyncExceptionszh_fast
 
     if (StgTSO_blocked_exceptions(CurrentTSO) != NULL) {
 #if defined(GRAN) || defined(PAR)
-      foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
+      foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
 	          		     StgTSO_block_info(CurrentTSO) "ptr");
 #else
-      foreign "C" awakenBlockedQueue(StgTSO_blocked_exceptions(CurrentTSO) "ptr");
+      foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr");
 #endif
       StgTSO_blocked_exceptions(CurrentTSO) = NULL;
 
@@ -191,7 +191,7 @@ killThreadzh_fast
    */
   if (R1 == CurrentTSO) {
 	SAVE_THREAD_STATE();
-	foreign "C" raiseAsyncWithLock(R1 "ptr", R2 "ptr");
+	foreign "C" raiseAsync(MyCapability() "ptr", R1 "ptr", R2 "ptr");
 	if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
 		R1 = ThreadFinished;
 		jump StgReturn;
@@ -201,7 +201,7 @@ killThreadzh_fast
 		jump %ENTRY_CODE(Sp(0));
 	}
   } else {
-	foreign "C" raiseAsyncWithLock(R1 "ptr", R2 "ptr");
+	foreign "C" raiseAsync(MyCapability() "ptr", R1 "ptr", R2 "ptr");
   }
 
   jump %ENTRY_CODE(Sp(0));
@@ -350,7 +350,7 @@ raisezh_fast
 
 retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;
-    frame_type = foreign "C" raiseExceptionHelper(CurrentTSO "ptr", R1 "ptr");
+    frame_type = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", R1 "ptr");
     Sp = StgTSO_sp(CurrentTSO);
     if (frame_type == ATOMICALLY_FRAME) {
       /* The exception has reached the edge of a memory transaction.  Check that 

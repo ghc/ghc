@@ -20,33 +20,31 @@
 
 #include <stdlib.h>
 
-static Capability *rtsApiCapability = NULL;
-
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
 HaskellObj
-rts_mkChar (HsChar c)
+rts_mkChar (Capability *cap, HsChar c)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap, CONSTR_sizeW(0,1));
   SET_HDR(p, Czh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
   return p;
 }
 
 HaskellObj
-rts_mkInt (HsInt i)
+rts_mkInt (Capability *cap, HsInt i)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, Izh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
 
 HaskellObj
-rts_mkInt8 (HsInt8 i)
+rts_mkInt8 (Capability *cap, HsInt8 i)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the bits above the lowest 8 */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xff);
@@ -54,9 +52,9 @@ rts_mkInt8 (HsInt8 i)
 }
 
 HaskellObj
-rts_mkInt16 (HsInt16 i)
+rts_mkInt16 (Capability *cap, HsInt16 i)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the relevant bits */
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffff);
@@ -64,19 +62,19 @@ rts_mkInt16 (HsInt16 i)
 }
 
 HaskellObj
-rts_mkInt32 (HsInt32 i)
+rts_mkInt32 (Capability *cap, HsInt32 i)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgInt)((unsigned)i & 0xffffffff);
   return p;
 }
 
 HaskellObj
-rts_mkInt64 (HsInt64 i)
+rts_mkInt64 (Capability *cap, HsInt64 i)
 {
   llong *tmp;
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
   SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
   tmp  = (llong*)&(p->payload[0]);
   *tmp = (StgInt64)i;
@@ -84,50 +82,50 @@ rts_mkInt64 (HsInt64 i)
 }
 
 HaskellObj
-rts_mkWord (HsWord i)
+rts_mkWord (Capability *cap, HsWord i)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, Wzh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)i;
   return p;
 }
 
 HaskellObj
-rts_mkWord8 (HsWord8 w)
+rts_mkWord8 (Capability *cap, HsWord8 w)
 {
   /* see rts_mkInt* comments */
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W8zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
   return p;
 }
 
 HaskellObj
-rts_mkWord16 (HsWord16 w)
+rts_mkWord16 (Capability *cap, HsWord16 w)
 {
   /* see rts_mkInt* comments */
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W16zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
   return p;
 }
 
 HaskellObj
-rts_mkWord32 (HsWord32 w)
+rts_mkWord32 (Capability *cap, HsWord32 w)
 {
   /* see rts_mkInt* comments */
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W32zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
   return p;
 }
 
 HaskellObj
-rts_mkWord64 (HsWord64 w)
+rts_mkWord64 (Capability *cap, HsWord64 w)
 {
   ullong *tmp;
 
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
   tmp  = (ullong*)&(p->payload[0]);
@@ -136,52 +134,52 @@ rts_mkWord64 (HsWord64 w)
 }
 
 HaskellObj
-rts_mkFloat (HsFloat f)
+rts_mkFloat (Capability *cap, HsFloat f)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, Fzh_con_info, CCS_SYSTEM);
   ASSIGN_FLT((P_)p->payload, (StgFloat)f);
   return p;
 }
 
 HaskellObj
-rts_mkDouble (HsDouble d)
+rts_mkDouble (Capability *cap, HsDouble d)
 {
-  StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,sizeofW(StgDouble)));
+  StgClosure *p = (StgClosure *)allocateLocal(cap,CONSTR_sizeW(0,sizeofW(StgDouble)));
   SET_HDR(p, Dzh_con_info, CCS_SYSTEM);
   ASSIGN_DBL((P_)p->payload, (StgDouble)d);
   return p;
 }
 
 HaskellObj
-rts_mkStablePtr (HsStablePtr s)
+rts_mkStablePtr (Capability *cap, HsStablePtr s)
 {
-  StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
+  StgClosure *p = (StgClosure *)allocateLocal(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, StablePtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)s;
   return p;
 }
 
 HaskellObj
-rts_mkPtr (HsPtr a)
+rts_mkPtr (Capability *cap, HsPtr a)
 {
-  StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
+  StgClosure *p = (StgClosure *)allocateLocal(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
   return p;
 }
 
 HaskellObj
-rts_mkFunPtr (HsFunPtr a)
+rts_mkFunPtr (Capability *cap, HsFunPtr a)
 {
-  StgClosure *p = (StgClosure *)allocate(sizeofW(StgHeader)+1);
+  StgClosure *p = (StgClosure *)allocateLocal(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, FunPtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
   return p;
 }
 
 HaskellObj
-rts_mkBool (HsBool b)
+rts_mkBool (Capability *cap STG_UNUSED, HsBool b)
 {
   if (b) {
     return (StgClosure *)True_closure;
@@ -191,17 +189,17 @@ rts_mkBool (HsBool b)
 }
 
 HaskellObj
-rts_mkString (char *s)
+rts_mkString (Capability *cap, char *s)
 {
-  return rts_apply((StgClosure *)unpackCString_closure, rts_mkPtr(s));
+  return rts_apply(cap, (StgClosure *)unpackCString_closure, rts_mkPtr(cap,s));
 }
 
 HaskellObj
-rts_apply (HaskellObj f, HaskellObj arg)
+rts_apply (Capability *cap, HaskellObj f, HaskellObj arg)
 {
     StgThunk *ap;
 
-    ap = (StgThunk *)allocate(sizeofW(StgThunk) + 2);
+    ap = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk) + 2);
     SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_SYSTEM);
     ap->payload[0] = f;
     ap->payload[1] = arg;
@@ -353,7 +351,7 @@ rts_getPtr (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Ptr_con_info ||
     //        p->header.info == Ptr_static_info);
-    return (void *)(p->payload[0]);
+    return (Capability *)(p->payload[0]);
 }
 
 HsFunPtr
@@ -378,28 +376,86 @@ rts_getBool (HaskellObj p)
     }
 }
 
+/* -----------------------------------------------------------------------------
+   Creating threads
+   -------------------------------------------------------------------------- */
+
+INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
+  tso->sp--;
+  tso->sp[0] = (W_) c;
+}
+
+StgTSO *
+createGenThread (Capability *cap, nat stack_size,  StgClosure *closure)
+{
+  StgTSO *t;
+#if defined(GRAN)
+  t = createThread (cap, stack_size, NO_PRI);
+#else
+  t = createThread (cap, stack_size);
+#endif
+  pushClosure(t, (W_)closure);
+  pushClosure(t, (W_)&stg_enter_info);
+  return t;
+}
+
+StgTSO *
+createIOThread (Capability *cap, nat stack_size,  StgClosure *closure)
+{
+  StgTSO *t;
+#if defined(GRAN)
+  t = createThread (cap, stack_size, NO_PRI);
+#else
+  t = createThread (cap, stack_size);
+#endif
+  pushClosure(t, (W_)&stg_noforceIO_info);
+  pushClosure(t, (W_)&stg_ap_v_info);
+  pushClosure(t, (W_)closure);
+  pushClosure(t, (W_)&stg_enter_info);
+  return t;
+}
+
+/*
+ * Same as above, but also evaluate the result of the IO action
+ * to whnf while we're at it.
+ */
+
+StgTSO *
+createStrictIOThread(Capability *cap, nat stack_size,  StgClosure *closure)
+{
+  StgTSO *t;
+#if defined(GRAN)
+  t = createThread(cap, stack_size, NO_PRI);
+#else
+  t = createThread(cap, stack_size);
+#endif
+  pushClosure(t, (W_)&stg_forceIO_info);
+  pushClosure(t, (W_)&stg_ap_v_info);
+  pushClosure(t, (W_)closure);
+  pushClosure(t, (W_)&stg_enter_info);
+  return t;
+}
+
 /* ----------------------------------------------------------------------------
    Evaluating Haskell expressions
    ------------------------------------------------------------------------- */
-SchedulerStatus
-rts_eval (HaskellObj p, /*out*/HaskellObj *ret)
+
+Capability *
+rts_eval (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
-    Capability *cap = rtsApiCapability;
-    rtsApiCapability = NULL;
-
-    tso = createGenThread(RtsFlags.GcFlags.initialStkSize, p);
+    
+    tso = createGenThread(cap, RtsFlags.GcFlags.initialStkSize, p);
     return scheduleWaitThread(tso,ret,cap);
 }
 
-SchedulerStatus
-rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
+Capability *
+rts_eval_ (Capability *cap, HaskellObj p, unsigned int stack_size, 
+	   /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
-    Capability *cap = rtsApiCapability;
-    rtsApiCapability = NULL;
-    
-    tso = createGenThread(stack_size, p);
+
+    tso = createGenThread(cap, stack_size, p);
     return scheduleWaitThread(tso,ret,cap);
 }
 
@@ -407,14 +463,12 @@ rts_eval_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
  * rts_evalIO() evaluates a value of the form (IO a), forcing the action's
  * result to WHNF before returning.
  */
-SchedulerStatus
-rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
+Capability *
+rts_evalIO (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO* tso; 
-    Capability *cap = rtsApiCapability;
-    rtsApiCapability = NULL;
     
-    tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
+    tso = createStrictIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
     return scheduleWaitThread(tso,ret,cap);
 }
 
@@ -424,57 +478,54 @@ rts_evalIO (HaskellObj p, /*out*/HaskellObj *ret)
  * action's result to WHNF before returning.  The result is returned
  * in a StablePtr.
  */
-SchedulerStatus
-rts_evalStableIO (HsStablePtr s, /*out*/HsStablePtr *ret)
+Capability *
+rts_evalStableIO (Capability *cap, HsStablePtr s, /*out*/HsStablePtr *ret)
 {
     StgTSO* tso;
     StgClosure *p, *r;
     SchedulerStatus stat;
-    Capability *cap = rtsApiCapability;
-    rtsApiCapability = NULL;
     
     p = (StgClosure *)deRefStablePtr(s);
-    tso = createStrictIOThread(RtsFlags.GcFlags.initialStkSize, p);
-    stat = scheduleWaitThread(tso,&r,cap);
+    tso = createStrictIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
+    cap = scheduleWaitThread(tso,&r,cap);
+    stat = rts_getSchedStatus(cap);
 
     if (stat == Success && ret != NULL) {
 	ASSERT(r != NULL);
 	*ret = getStablePtr((StgPtr)r);
     }
 
-    return stat;
+    return cap;
 }
 
 /*
  * Like rts_evalIO(), but doesn't force the action's result.
  */
-SchedulerStatus
-rts_evalLazyIO (HaskellObj p, /*out*/HaskellObj *ret)
+Capability *
+rts_evalLazyIO (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
-    Capability *cap = rtsApiCapability;
-    rtsApiCapability = NULL;
 
-    tso = createIOThread(RtsFlags.GcFlags.initialStkSize, p);
+    tso = createIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
     return scheduleWaitThread(tso,ret,cap);
 }
 
-SchedulerStatus
-rts_evalLazyIO_ (HaskellObj p, unsigned int stack_size, /*out*/HaskellObj *ret)
+Capability *
+rts_evalLazyIO_ (Capability *cap, HaskellObj p, unsigned int stack_size, 
+		 /*out*/HaskellObj *ret)
 {
     StgTSO *tso;
-    Capability *cap = rtsApiCapability;
-    rtsApiCapability = NULL;
 
-    tso = createIOThread(stack_size, p);
+    tso = createIOThread(cap, stack_size, p);
     return scheduleWaitThread(tso,ret,cap);
 }
 
 /* Convenience function for decoding the returned status. */
 
 void
-rts_checkSchedStatus ( char* site, SchedulerStatus rc )
+rts_checkSchedStatus (char* site, Capability *cap)
 {
+    SchedulerStatus rc = cap->running_task->stat;
     switch (rc) {
     case Success:
 	return;
@@ -490,30 +541,57 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc )
     }
 }
 
-void
-rts_lock()
+SchedulerStatus
+rts_getSchedStatus (Capability *cap)
 {
-#ifdef RTS_SUPPORTS_THREADS
-    ACQUIRE_LOCK(&sched_mutex);
-	
-    // we request to get the capability immediately, in order to
-    // a) stop other threads from using allocate()
-    // b) wake the current worker thread from awaitEvent()
-    //       (so that a thread started by rts_eval* will start immediately)
-    waitForReturnCapability(&sched_mutex,&rtsApiCapability);
-#else
-    grabCapability(&rtsApiCapability);
-#endif
+    return cap->running_task->stat;
 }
 
-void
-rts_unlock()
+Capability *
+rts_lock (void)
 {
-#ifdef RTS_SUPPORTS_THREADS
-    if (rtsApiCapability) {
-	releaseCapability(rtsApiCapability);
-    }
-    rtsApiCapability = NULL;
+    Capability *cap;
+    Task *task;
+
+    // ToDo: get rid of this lock in the common case.  We could store
+    // a free Task in thread-local storage, for example.  That would
+    // leave just one lock on the path into the RTS: cap->lock when
+    // acquiring the Capability.
+    ACQUIRE_LOCK(&sched_mutex);
+    task = newBoundTask();
     RELEASE_LOCK(&sched_mutex);
-#endif
+
+    cap = NULL;
+    waitForReturnCapability(&cap, task);
+    return (Capability *)cap;
+}
+
+// Exiting the RTS: we hold a Capability that is not necessarily the
+// same one that was originally returned by rts_lock(), because
+// rts_evalIO() etc. may return a new one.  Now that we have
+// investigated the return value, we can release the Capability,
+// and free the Task (in that order).
+
+void
+rts_unlock (Capability *cap)
+{
+    Task *task;
+
+    task = cap->running_task;
+    ASSERT(task == myTask());
+
+    // slightly delicate ordering of operations below, pay attention!
+
+    // We are no longer a bound task/thread.  This is important,
+    // because the GC can run when we release the Capability below,
+    // and we don't want it to treat this as a live TSO pointer.
+    task->tso = NULL;
+
+    // Now release the Capability.  With the capability released, GC
+    // may happen.  NB. does not try to put the current Task on the
+    // worker queue.
+    releaseCapability(cap);
+
+    // Finally, we can release the Task to the free list.
+    boundTaskExiting(task);
 }

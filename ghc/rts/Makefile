@@ -48,7 +48,8 @@ ALL_DIRS = hooks parallel
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 ALL_DIRS += win32
-EXCLUDED_SRCS += Itimer.c Select.c Signals.c
+else
+ALL_DIRS += posix
 endif
 
 ifneq "$(DLLized)" "YES"
@@ -107,10 +108,6 @@ WARNING_OPTS += -Wbad-function-cast
 STANDARD_OPTS += -I../includes -I. -Iparallel
 # COMPILING_RTS is only used when building Win32 DLL support.
 STANDARD_OPTS += -DCOMPILING_RTS
-
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-STANDARD_OPTS += -Iwin32
-endif
 
 # HC_OPTS is included in both .c and .cmm compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which

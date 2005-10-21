@@ -51,11 +51,6 @@ int main(int argc, char *argv[])
 
     startupHaskell(argc,argv,__stginit_ZCMain);
 
-    /* Register this thread as a task, so we can get timing stats about it */
-#if defined(RTS_SUPPORTS_THREADS)
-    threadIsTask(osThreadId());
-#endif
-
     /* kick off the computation by creating the main thread with a pointer
        to mainIO_closure representing the computation of the overall program;
        then enter the scheduler with this thread and off we go;
@@ -106,9 +101,12 @@ int main(int argc, char *argv[])
 #  else /* !PAR && !GRAN */
 
     /* ToDo: want to start with a larger stack size */
-    rts_lock();
-    status = rts_evalLazyIO((HaskellObj)mainIO_closure, NULL);
-    rts_unlock();
+    { 
+	void *cap = rts_lock();
+	cap = rts_evalLazyIO(cap,(HaskellObj)mainIO_closure, NULL);
+	status = rts_getSchedStatus(cap);
+	rts_unlock(cap);
+    }
 
 #  endif /* !PAR && !GRAN */
 

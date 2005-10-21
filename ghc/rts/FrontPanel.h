@@ -1,10 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 2000
+ * (c) The GHC Team 2000-2005
  *
  * RTS GTK Front Panel
  *
  * ---------------------------------------------------------------------------*/
+
+#ifndef FRONTPANEL_H
+#define FRONTPANEL_H
 
 #ifdef RTS_GTK_FRONTPANEL
 
@@ -27,4 +30,6 @@ extern UpdateMode update_mode;
 extern gboolean continue_now, stop_now, quit;
 
 #endif /* RTS_GTK_FRONTPANEL */
+
+#endif /* FRONTPANEL_H */
 

@@ -133,7 +133,7 @@ typedef struct StgTSO_ {
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
   int                saved_errno;
-  struct StgMainThread_* main;
+  struct Task_*      bound;          // non-NULL for a bound thread
   struct StgTRecHeader_ *trec;       /* STM transaction record */
   
 #ifdef TICKY_TICKY
