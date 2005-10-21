@@ -22,12 +22,6 @@
 #include "Ticker.h"
 #include "Capability.h"
 
-#if !defined(mingw32_HOST_OS)
-#include "Itimer.h"
-#else
-#include "win32/Ticker.h"
-#endif
-
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
