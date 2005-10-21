@@ -1961,7 +1961,7 @@ asyncReadzh_fast
 
 #ifdef THREADED_RTS
     foreign "C" barf("asyncRead# on threaded RTS");
-#endif
+#else
 
     /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
@@ -1977,6 +1977,7 @@ asyncReadzh_fast
     StgTSO_block_info(CurrentTSO)  = ares;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
     jump stg_block_async;
+#endif
 }
 
 STRING(stg_asyncWritezh_malloc_str, "asyncWritezh_fast")
@@ -1987,7 +1988,7 @@ asyncWritezh_fast
 
 #ifdef THREADED_RTS
     foreign "C" barf("asyncWrite# on threaded RTS");
-#endif
+#else
 
     /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
@@ -2003,6 +2004,7 @@ asyncWritezh_fast
     StgTSO_block_info(CurrentTSO)  = ares;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
     jump stg_block_async;
+#endif
 }
 
 STRING(stg_asyncDoProczh_malloc_str, "asyncDoProczh_fast")
@@ -2010,6 +2012,10 @@ asyncDoProczh_fast
 {
     W_ ares;
     CInt reqID;
+
+#ifdef THREADED_RTS
+    foreign "C" barf("asyncDoProc# on threaded RTS");
+#else
 
     /* args: R1 = proc, R2 = param */
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
@@ -2025,6 +2031,7 @@ asyncDoProczh_fast
     StgTSO_block_info(CurrentTSO) = ares;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
     jump stg_block_async;
+#endif
 }
 #endif
 
