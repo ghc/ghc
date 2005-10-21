@@ -576,7 +576,7 @@ canonicalizePath fpath = return fpath
 -- such executable. For example (findExecutable \"ghc\")
 -- gives you the path to GHC.
 findExecutable :: String -> IO (Maybe FilePath)
-findExecutable binary =
+findExecutable binary = do
 #if defined(mingw32_HOST_OS)
   withCString binary $ \c_binary ->
   withCString ('.':exeExtension) $ \c_ext ->
