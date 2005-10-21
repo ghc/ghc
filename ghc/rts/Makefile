@@ -313,7 +313,6 @@ SRC_HC_OPTS += \
   -\#include Storage.h \
   -\#include SchedAPI.h \
   -\#include Timer.h \
-  -\#include Itimer.h \
   -\#include ProfHeap.h \
   -\#include LdvProfile.h \
   -\#include Profiling.h \
@@ -323,6 +322,8 @@ SRC_HC_OPTS += \
 
 ifeq "$(Windows)" "YES"
 PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h
+else
+PrimOps_HC_OPTS += -\#include posix/Itimer.h
 endif
 
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
