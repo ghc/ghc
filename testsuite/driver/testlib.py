@@ -65,6 +65,7 @@ class TestConfig:
 
         # Lists of flags for each way
         self.way_flags = {}
+        self.way_rts_flags = {}
 
         # the timeout program
         self.timeout_prog = ''
@@ -426,10 +427,10 @@ def framework_fail( name ):
 # run_command.
 
 def run_command( name, way, cmd ):
-    return simple_run( name, cmd, '', 0 )
+    return simple_run( name, '', cmd, '', 0 )
 
 def run_command_ignore_output( name, way, cmd ):
-    return simple_run( name, cmd, '', 1 )
+    return simple_run( name, '', cmd, '', 1 )
 
 # -----------------------------------------------------------------------------
 # GHCi tests
@@ -448,7 +449,7 @@ def ghci_script( name, way, script ):
           join(flags,' ')
 
     testopts.stdin = script
-    return simple_run( name, cmd, '', 0 )
+    return simple_run( name, way, cmd, '', 0 )
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
@@ -517,7 +518,7 @@ def compile_and_run( name, way, extra_hc_opts ):
             return 'fail'
 
         # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name, './'+name, testopts.extra_run_opts, 0 )
+        return simple_run( name, way, './'+name, testopts.extra_run_opts, 0 )
 
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
@@ -534,7 +535,7 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
         return 'fail'
 
     # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name, './'+name, testopts.extra_run_opts, 0 )
+    return simple_run( name, way, './'+name, testopts.extra_run_opts, 0 )
 
 # -----------------------------------------------------------------------------
 # Build a single-module program
@@ -587,7 +588,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 # from /dev/null.  Route output to testname.run.stdout and 
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run( name, prog, args, ignore_output_files ):
+def simple_run( name, way, prog, args, ignore_output_files ):
    # figure out what to use for stdin
    if testopts.stdin != '':
        use_stdin = testopts.stdin
@@ -606,9 +607,10 @@ def simple_run( name, prog, args, ignore_output_files ):
 
    cmd = 'cd ' + testdir + ' && ' \
 	  + prog + ' ' + args + ' ' \
-          + ' < ' + use_stdin \
-          + ' > ' + run_stdout \
-          + ' 2> ' + run_stderr
+          + rts_flags(way) + ' ' \
+          + ' <' + use_stdin \
+          + ' >' + run_stdout \
+          + ' 2>' + run_stderr
 
    # run the command
    result = runCmd(cmd)
@@ -625,6 +627,17 @@ def simple_run( name, prog, args, ignore_output_files ):
        return 'pass'
    else:
        return 'fail'
+
+def rts_flags(way):
+    if (way == ''):
+        return ''
+    else:
+        args = config.way_rts_flags[way]
+
+    if args == []:
+        return ''
+    else:
+        return '+RTS ' + join(args,' ') + ' -RTS'
 
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
@@ -814,7 +827,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail ( qcorefilename )
     rm_no_fail ( depsfilename )
     
-    return simple_run ( name, './'+name, testopts.extra_run_opts, 0 )
+    return simple_run ( name, way, './'+name, testopts.extra_run_opts, 0 )
 
 # -----------------------------------------------------------------------------
 # Utils
