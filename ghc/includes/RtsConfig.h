@@ -39,7 +39,7 @@
 /* TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
  * single-entry thunks.
  */
-//#if defined(TICKY_TICKY) || defined(SMP)
+/* #if defined(TICKY_TICKY) || defined(SMP) */
 #if defined(TICKY_TICKY)
 #  define EAGER_BLACKHOLING
 #else
