@@ -10,6 +10,7 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "AsyncIO.h"
+#include "RtsSignals.h"
 
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
 
@@ -156,10 +157,13 @@ void startSignalHandlers(void)
     handler = deRefStablePtr((StgStablePtr)console_handler);
     while (stg_pending_events > 0) {
 	stg_pending_events--;
-	scheduleThread(
-	    createIOThread(RtsFlags.GcFlags.initialStkSize, 
-			   rts_apply((StgClosure *)handler,
-				     rts_mkInt(stg_pending_buf[stg_pending_events]))));
+	scheduleThread(&MainCapability,
+	    createIOThread(&MainCapability,
+			   RtsFlags.GcFlags.initialStkSize, 
+			   rts_apply(&MainCapability,
+				     (StgClosure *)handler,
+				     rts_mkInt(&MainCapability,
+					       stg_pending_buf[stg_pending_events]))));
     }
     unblockUserSignals();
 }

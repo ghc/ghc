@@ -14,11 +14,9 @@
  */
 #include "Rts.h"
 #include "Schedule.h"
+#include "AwaitEvent.h"
 #include <windows.h>
 #include "win32/AsyncIO.h"
-#if defined(THREADED_RTS)
-#include "Capability.h"
-#endif
 
 // Used to avoid calling abandonRequestWait() if we don't need to.
 // Protected by sched_mutex.
@@ -29,23 +27,11 @@ awaitEvent(rtsBool wait)
 {
   int ret;
 
-#ifdef THREADED_RTS
-  // Small optimisation: we don't want the waiting thread to wake
-  // up straight away just because a previous returning worker has
-  // called abandonRequestWait().  If the event is no longer needed,
-  // reset it.  We must do this inside the sched_mutex.
-  if (!needToYieldToReturningWorker()) {
-      resetAbandonRequestWait();
-  }
-#endif
-
   do {
     /* Try to de-queue completed IO requests
      */
     workerWaitingForRequests = 1;
-    RELEASE_LOCK(&sched_mutex);
     ret = awaitRequests(wait);
-    ACQUIRE_LOCK(&sched_mutex);
     workerWaitingForRequests = 0;
     if (!ret) { 
       return; /* still hold the lock */
@@ -55,23 +41,9 @@ awaitEvent(rtsBool wait)
     //
     //  - we were interrupted
     //  - new threads have arrived
-    //  - another worker wants to take over (THREADED_RTS)
 
   } while (wait
 	   && !interrupted
-	   && run_queue_hd == END_TSO_QUEUE
-#ifdef THREADED_RTS
-	   && !needToYieldToReturningWorker()
-#endif
+	   && emptyRunQueue(&MainCapability)
       );
 }
-
-#ifdef THREADED_RTS
-void
-wakeBlockedWorkerThread()
-{
-    if (workerWaitingForRequests) {
-	abandonRequestWait();
-    }
-}
-#endif
