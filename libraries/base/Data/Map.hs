@@ -1316,8 +1316,8 @@ instance (Ord k, Read k, Read e) => Read (Map k e) where
     return (fromList xs)
 #else
   readsPrec p = readParen (p > 10) $ \ r -> do
-    ("fromList",s) <- lex
-    (xs,t) <- reads
+    ("fromList",s) <- lex r
+    (xs,t) <- reads s
     return (fromList xs,t)
 #endif
 
