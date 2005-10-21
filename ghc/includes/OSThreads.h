@@ -82,21 +82,15 @@ typedef DWORD ThreadLocalKey;
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
 
-INLINE_HEADER void
-ACQUIRE_LOCK(Mutex *mutex)
-{
-    if (WaitForSingleObject(*mutex,INFINITE) == WAIT_FAILED) {
-	barf("WaitForSingleObject: %d", GetLastError());
+#define ACQUIRE_LOCK(mutex)					\
+    if (WaitForSingleObject(*mutex,INFINITE) == WAIT_FAILED) {	\
+	barf("WaitForSingleObject: %d", GetLastError());	\
     }
-}
 
-INLINE_HEADER void
-RELEASE_LOCK(Mutex *mutex)
-{
-    if (ReleaseMutex(*mutex) == 0) {
-	barf("ReleaseMutex: %d", GetLastError());
+#define RELEASE_LOCK(mutex)				\
+    if (ReleaseMutex(*mutex) == 0) {			\
+	barf("ReleaseMutex: %d", GetLastError());	\
     }
-}
 
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
 
