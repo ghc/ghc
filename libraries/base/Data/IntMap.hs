@@ -147,6 +147,7 @@ import qualified List
 -}  
 
 #if __GLASGOW_HASKELL__
+import Text.Read (Lexeme(Ident), lexP, parens, prec, readPrec)
 import Data.Generics.Basics
 import Data.Generics.Instances
 #endif
@@ -978,8 +979,8 @@ instance Functor IntMap where
 --------------------------------------------------------------------}
 
 instance Show a => Show (IntMap a) where
-  showsPrec d t   = showMap (toList t)
-
+  showsPrec d m   = showParen (d > 10) $
+    showString "fromList " . shows (toList m)
 
 showMap :: (Show a) => [(Key,a)] -> ShowS
 showMap []     
@@ -991,7 +992,23 @@ showMap (x:xs)
     showTail (x:xs) = showChar ',' . showElem x . showTail xs
     
     showElem (k,x)  = shows k . showString ":=" . shows x
-  
+
+{--------------------------------------------------------------------
+  Read
+--------------------------------------------------------------------}
+instance (Read e) => Read (IntMap e) where
+#ifdef __GLASGOW_HASKELL__
+  readPrec = parens $ prec 10 $ do
+    Ident "fromList" <- lexP
+    xs <- readPrec
+    return (fromList xs)
+#else
+  readsPrec p = readParen (p > 10) $ \ r -> do
+    ("fromList",s) <- lex
+    (xs,t) <- reads
+    return (fromList xs,t)
+#endif
+
 {--------------------------------------------------------------------
   Typeable
 --------------------------------------------------------------------}

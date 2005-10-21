@@ -161,6 +161,7 @@ import List(nub,sort)
 -}
 
 #if __GLASGOW_HASKELL__
+import Text.Read (Lexeme(Ident), lexP, parens, prec, readPrec)
 import Data.Generics.Basics
 import Data.Generics.Instances
 #endif
@@ -1308,16 +1309,17 @@ instance Functor (Map k) where
   Read
 --------------------------------------------------------------------}
 instance (Ord k, Read k, Read e) => Read (Map k e) where
-    readsPrec _ = readParen False $ \ r ->
-                  [(fromList xs,t) | ("{",s) <- lex r
-                                   , (xs,t)  <- readl s]
-        where readl s  = [([],t)   | ("}",t) <- lex s] ++
-                         [(x:xs,u) | (x,t)   <- readPair s
-                                   , (xs,u)  <- readl' t]
-              readl' s = [([],t)   | ("}",t) <- lex s] ++
-                         [(x:xs,v) | (",",t) <- lex s
-                                   , (x,u)   <- readPair t
-                                   , (xs,v)  <- readl' u]
+#ifdef __GLASGOW_HASKELL__
+  readPrec = parens $ prec 10 $ do
+    Ident "fromList" <- lexP
+    xs <- readPrec
+    return (fromList xs)
+#else
+  readsPrec p = readParen (p > 10) $ \ r -> do
+    ("fromList",s) <- lex
+    (xs,t) <- reads
+    return (fromList xs,t)
+#endif
 
 -- parses a pair of things with the syntax a:=b
 readPair :: (Read a, Read b) => ReadS (a,b)
@@ -1330,7 +1332,8 @@ readPair s = do (a, ct1)    <- reads s
   Show
 --------------------------------------------------------------------}
 instance (Show k, Show a) => Show (Map k a) where
-  showsPrec d m  = showMap (toAscList m)
+  showsPrec d m  = showParen (d > 10) $
+    showString "fromList " . shows (toList m)
 
 showMap :: (Show k,Show a) => [(k,a)] -> ShowS
 showMap []     
