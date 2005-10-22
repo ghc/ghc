@@ -133,25 +133,45 @@ readParen b g   =  if b then mandatory else optional
 -- > infixr 5 :^:
 -- > data Tree a =  Leaf a  |  Tree a :^: Tree a
 --
--- the derived instance of 'Read' is equivalent to
+-- the derived instance of 'Read' in Haskell 98 is equivalent to
 --
 -- > instance (Read a) => Read (Tree a) where
 -- >
--- >         readsPrec d r =  readParen (d > up_prec)
+-- >         readsPrec d r =  readParen (d > app_prec)
+-- >                          (\r -> [(Leaf m,t) |
+-- >                                  ("Leaf",s) <- lex r,
+-- >                                  (m,t) <- readsPrec (app_prec+1) s]) r
+-- >
+-- >                       ++ readParen (d > up_prec)
 -- >                          (\r -> [(u:^:v,w) |
 -- >                                  (u,s) <- readsPrec (up_prec+1) r,
 -- >                                  (":^:",t) <- lex s,
 -- >                                  (v,w) <- readsPrec (up_prec+1) t]) r
 -- >
--- >                       ++ readParen (d > app_prec)
--- >                          (\r -> [(Leaf m,t) |
--- >                                  ("Leaf",s) <- lex r,
--- >                                  (m,t) <- readsPrec (app_prec+1) s]) r
--- >
--- >           where up_prec = 5
--- >                 app_prec = 10
+-- >           where app_prec = 10
+-- >                 up_prec = 5
 --
 -- Note that right-associativity of @:^:@ is unused.
+--
+-- The derived instance in GHC is equivalent to
+--
+-- > instance (Read a) => Read (Tree a) where
+-- >
+-- >         readPrec = parens $ (prec app_prec $ do
+-- >                                  Ident "Leaf" <- lexP
+-- >                                  m <- step readPrec
+-- >                                  return (Leaf m))
+-- >
+-- >                      +++ (prec up_prec $ do
+-- >                                  u <- step readPrec
+-- >                                  Symbol ":^:" <- lexP
+-- >                                  v <- step readPrec
+-- >                                  return (u :^: v))
+-- >
+-- >           where app_prec = 10
+-- >                 up_prec = 5
+-- >
+-- >         readListPrec = readListPrecDefault
 
 class Read a where
   -- | attempts to parse a value from the front of the string, returning
@@ -183,6 +203,8 @@ class Read a where
   readPrec     :: ReadPrec a
 
   -- | Proposed replacement for 'readList' using new-style parsers (GHC only).
+  -- The default definition uses 'readList'.  Instances that define 'readPrec'
+  -- should also define 'readListPrec' as 'readListPrecDefault'.
   readListPrec :: ReadPrec [a]
   
   -- default definitions
@@ -192,13 +214,14 @@ class Read a where
   readListPrec = readS_to_Prec (\_ -> readList)
 
 readListDefault :: Read a => ReadS [a]
--- ^ Use this to define the 'readList' method, if you don't want a special
---   case (GHC only; for other systems the default suffices).
+-- ^ A possible replacement definition for the 'readList' method (GHC only).
+--   This is only needed for GHC, and even then only for 'Read' instances
+--   where 'readListPrec' isn't defined as 'readListPrecDefault'.
 readListDefault = readPrec_to_S readListPrec 0
 
 readListPrecDefault :: Read a => ReadPrec [a]
--- ^ Use this to define the 'readListPrec' method, if you
---   don't want a special case (GHC only).
+-- ^ A possible replacement definition for the 'readListPrec' method,
+--   defined using 'readPrec' (GHC only).
 readListPrecDefault = list readPrec
 
 ------------------------------------------------------------------------
@@ -291,7 +314,7 @@ paren p = do L.Punc "(" <- lexP
 parens :: ReadPrec a -> ReadPrec a
 -- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc, 
 --	where @p@ parses \"P\"  in the current precedence context
---	        parses \"P0\" in precedence context zero
+--	    and parses \"P0\" in precedence context zero
 parens p = optional
  where
   optional  = p +++ mandatory
