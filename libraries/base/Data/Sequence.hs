@@ -86,7 +86,8 @@ import Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
-import Text.Read (Lexeme(..), lexP, parens, prec, readPrec)
+import Text.Read (Lexeme(Ident), lexP, parens, prec,
+	readPrec, readListPrec, readListPrecDefault)
 import Data.Generics.Basics (Data(..), Fixity(..),
 			constrIndex, mkConstr, mkDataType)
 #endif
@@ -150,6 +151,8 @@ instance Read a => Read (Seq a) where
 		Ident "fromList" <- lexP
 		xs <- readPrec
 		return (fromList xs)
+
+	readListPrec = readListPrecDefault
 #else
 	readsPrec p = readParen (p > 10) $ \ r -> do
 		("fromList",s) <- lex r

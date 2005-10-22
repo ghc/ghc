@@ -104,7 +104,7 @@ import qualified List
 -}
 
 #if __GLASGOW_HASKELL__
-import Text.Read (Lexeme(Ident), lexP, parens, prec, readPrec)
+import Text.Read
 import Data.Generics.Basics
 import Data.Generics.Instances
 #endif
@@ -604,6 +604,8 @@ instance Read IntSet where
     Ident "fromList" <- lexP
     xs <- readPrec
     return (fromList xs)
+
+  readListPrec = readListPrecDefault
 #else
   readsPrec p = readParen (p > 10) $ \ r -> do
     ("fromList",s) <- lex r
