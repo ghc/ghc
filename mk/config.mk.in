@@ -1041,7 +1041,7 @@ WAY_u_HC_OPTS=-unreg
 
 # Way `s':
 WAY_s_NAME=threads (for SMP)
-WAY_s_HC_OPTS=-smp
+WAY_s_HC_OPTS=-smp -optc-DTHREADED_RTS
 
 # Way `mp': 
 WAY_mp_NAME=parallel
@@ -1077,7 +1077,7 @@ WAY_debug_u_HC_OPTS=-optc-DDEBUG -unreg
 
 # Way 'debug_s':
 WAY_debug_s_NAME=debug SMP
-WAY_debug_s_HC_OPTS=-optc-DDEBUG -smp
+WAY_debug_s_HC_OPTS=-optc-DDEBUG -optc-DTHREADED_RTS -smp
 
 # Way 'thr_debug':
 WAY_thr_debug_NAME=threaded
