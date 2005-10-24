@@ -196,6 +196,9 @@ shutdownAsyncIO()
 int
 awaitRequests(rtsBool wait)
 {
+#ifndef THREADED_RTS
+  // none of this is actually used in the threaded RTS
+
 start:
 #if 0
     fprintf(stderr, "awaitRequests(): %d %d %d\n", issued_reqs, completed_hw, wait);
@@ -306,6 +309,7 @@ start:
 	LeaveCriticalSection(&queue_lock);
 	return 1;
     }
+#endif /* !THREADED_RTS */
 }
 
 /*
