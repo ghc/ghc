@@ -85,11 +85,11 @@ register double fake_f9 __asm__("$f9");
 StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
     while (f) {
-	if (RtsFlags[0].DebugFlags.interpreter) {
+	IF_DEBUG(interpreter,
 	    debugBelch("Jumping to ");
 	    printPtr((P_)f); fflush(stdout);
 	    debugBelch("\n");
-	}
+	    );
 	f = (StgFunPtr) (f)();
     }
     return (StgThreadReturnCode)R1.i;
