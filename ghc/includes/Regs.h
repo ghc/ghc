@@ -328,7 +328,7 @@ GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #ifdef SMP
 #error BaseReg must be in a register for SMP
 #endif
-#define BaseReg (&((struct Capability_)MainCapability).r)
+#define BaseReg (&((struct PartCapability_ *)MainCapability)->r)
 #endif
 
 #if defined(REG_Sp) && !defined(NO_GLOBAL_REG_DECLS)
