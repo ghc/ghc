@@ -30,21 +30,41 @@ if (ghc_with_unreg == 1):
 	config.compile_ways.append('unreg')
 	config.run_ways.append('unreg')
 
+if (ghc_with_smp == 1):
+	config.compile_ways.append('smp')
+	config.run_ways.append('smp')
+
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
 
 if (ghc_with_threaded_rts == 1):
 	config.run_ways.append('threaded')
 
-config.way_flags = { 'normal' : [],
-		     'opt'    : ['-O'],
-		     'optasm' : ['-O -fasm'],
-	  	     'prof'   : ['-O -prof -auto-all'],
-	  	     'profasm': ['-O -prof -auto-all -fasm'],
-		     'unreg'  : ['-unreg'],
-		     'ghci'   : ['--interactive', '-v0'],
-		     'extcore' : ['-fext-core'],
-		     'optextcore' : ['-O -fext-core'],
-		     'threaded'   : ['-threaded']
-		   }
+config.way_flags = {
+	'normal'     : [],
+	'opt'        : ['-O'],
+	'optasm'     : ['-O -fasm'],
+	'prof'       : ['-O -prof -auto-all'],
+	'profasm'    : ['-O -prof -auto-all -fasm'],
+	'smp'        : ['-O -smp'],
+	'unreg'      : ['-unreg'],
+	'ghci'       : ['--interactive', '-v0'],
+	'extcore'    : ['-fext-core'],
+	'optextcore' : ['-O -fext-core'],
+	'threaded'   : ['-threaded']
+	}
+
+config.way_rts_flags = { 
+	'normal'     : [],
+	'opt'        : [],
+	'optasm'     : [],
+	'prof'       : ['-p'],
+	'profasm'    : [],
+	'smp'        : ['-N2'],
+	'unreg'      : [],
+	'ghci'       : [],
+	'extcore'    : [],
+	'optextcore' : [],
+	'threaded'   : []
+    	}
 
