@@ -67,7 +67,7 @@ endPass dflags pass_name dump_flag binds
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
 	debugTraceMsg dflags 2 $
-		"    Result size = " ++ show (coreBindsSize binds)
+		(text "    Result size =" <+> int (coreBindsSize binds))
 
 	-- Report verbosely, if required
 	dumpIfSet_core dflags dump_flag pass_name (pprCoreBindings binds)
@@ -120,7 +120,7 @@ lintCoreBindings dflags whoDunnit binds
   = case (initL (lint_binds binds)) of
       Nothing       -> showPass dflags ("Core Linted result of " ++ whoDunnit)
       Just bad_news -> printDump (display bad_news)	>>
-		       ghcExit 1
+		       ghcExit dflags 1
   where
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something

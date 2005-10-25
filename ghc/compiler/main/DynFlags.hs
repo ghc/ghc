@@ -56,6 +56,7 @@ import Config
 import CmdLineParser
 import Panic		( panic, GhcException(..) )
 import Util		( notNull, splitLongestPrefix, split, normalisePath )
+import SrcLoc           ( SrcSpan )
 
 import DATA_IOREF	( readIORef )
 import EXCEPTION	( throwDyn )
@@ -66,6 +67,9 @@ import Data.List	( isPrefixOf )
 import Maybe		( fromJust )
 import Char		( isDigit, isUpper )
 import Outputable
+import System.IO        ( hPutStrLn, stderr )
+import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
+
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -180,7 +184,7 @@ data DynFlag
    | Opt_KeepTmpFiles
 
    deriving (Eq)
-
+ 
 data DynFlags = DynFlags {
   ghcMode		:: GhcMode,
   ghcLink		:: GhcLink,
@@ -254,7 +258,10 @@ data DynFlags = DynFlags {
   pkgState		:: PackageState,
 
   -- hsc dynamic flags
-  flags      		:: [DynFlag]
+  flags      		:: [DynFlag],
+  
+  -- message output
+  log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO ()
  }
 
 data HscTarget
@@ -395,7 +402,13 @@ defaultDynFlags =
     	    Opt_IgnoreInterfacePragmas,
     	    Opt_OmitInterfacePragmas
     
-               ] ++ standardWarnings
+               ] ++ standardWarnings,
+               
+        log_action = \severity srcSpan style msg -> 
+                        case severity of
+                          SevInfo  -> hPutStrLn stderr (show (msg style))
+                          SevFatal -> hPutStrLn stderr (show (msg style))
+                          _        -> hPutStrLn stderr ('\n':show ((mkLocMessage srcSpan msg) style))
       }
 
 {- 
@@ -602,7 +615,6 @@ getCoreToDo dflags
 	    MaxSimplifierIterations max_iter
 	]
       ]
-
      else {- opt_level >= 1 -} [ 
 
 	-- initial simplify: mk specialiser happy: minimum effort please

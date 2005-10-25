@@ -62,15 +62,15 @@ doMkDependHS session srcs
 	; excl_mods <- readIORef v_Dep_exclude_mods
 	; r <- GHC.depanal session excl_mods True {- Allow dup roots -}
 	; case r of
- 	    Left e -> do printErrorsAndWarnings e; exitWith (ExitFailure 1)
-	    Right mod_summaries -> do {
+ 	    Nothing -> exitWith (ExitFailure 1)
+	    Just mod_summaries -> do {
 
 		-- Sort into dependency order
 		-- There should be no cycles
 	  let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
 
 		-- Print out the dependencies if wanted
-	; debugTraceMsg dflags 2 (showSDoc (text "Module dependencies" $$ ppr sorted))
+	; debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
 
 		-- Prcess them one by one, dumping results into makefile
 		-- and complaining about cycles

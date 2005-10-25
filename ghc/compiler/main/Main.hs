@@ -32,6 +32,7 @@ import Packages		( dumpPackages, initPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
 import StaticFlags	( staticFlags, v_Ld_inputs )
+import DynFlags         ( defaultDynFlags )
 import BasicTypes	( failed )
 import Util
 import Panic
@@ -58,7 +59,7 @@ import Maybe
 -- GHC's command-line interface
 
 main =
-  GHC.defaultErrorHandler $ do
+  GHC.defaultErrorHandler defaultDynFlags $ do
   
   argv0 <- getArgs
   argv1 <- GHC.init argv0

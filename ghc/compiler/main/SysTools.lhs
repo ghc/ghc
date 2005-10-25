@@ -47,7 +47,7 @@ module SysTools (
 import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
-import ErrUtils		( putMsg, debugTraceMsg )
+import ErrUtils		( putMsg, debugTraceMsg, showPass, Severity(..), Messages )
 import Panic		( GhcException(..) )
 import Util		( Suffix, global, notNull, consIORef, joinFileName,
 			  normalisePath, pgmPath, platformPath, joinFileExt )
@@ -91,7 +91,13 @@ import Compat.RawSystem	( rawSystem )
 import GHC.IOBase       ( IOErrorType(..) ) 
 import System.IO.Error  ( ioeGetErrorType )
 #else
-import System.Cmd	( rawSystem )
+import System.Process	( runInteractiveProcess, getProcessExitCode )
+import System.IO        ( hSetBuffering, hGetLine, BufferMode(..) )
+import Control.Concurrent( forkIO, newChan, readChan, writeChan )
+import Text.Regex
+import Data.Char        ( isSpace )
+import FastString       ( mkFastString )
+import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 #endif
 \end{code}
 
@@ -492,7 +498,7 @@ touch dflags purpose arg =  do
 
 copy :: DynFlags -> String -> String -> String -> IO ()
 copy dflags purpose from to = do
-  debugTraceMsg dflags 2 ("*** " ++ purpose)
+  showPass dflags purpose
 
   h <- openFile to WriteMode
   ls <- readFile from -- inefficient, but it'll do for now.
@@ -573,14 +579,14 @@ removeTmpFiles dflags fs
     warnNon act
      | null non_deletees = act
      | otherwise         = do
-        putMsg ("WARNING - NOT deleting source files: " ++ unwords non_deletees)
+        putMsg dflags (text "WARNING - NOT deleting source files:" <+> hsep (map text non_deletees))
 	act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
     rm f = removeFile f `IO.catch` 
 		(\_ignored -> 
-		    debugTraceMsg dflags 2 ("Warning: deleting non-existent " ++ f)
+		    debugTraceMsg dflags 2 (ptext SLIT("Warning: deleting non-existent") <+> text f)
 		)
 
 
@@ -600,7 +606,7 @@ runSomething dflags phase_name pgm args = do
   traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
   (exit_code, doesn'tExist) <- 
      IO.catch (do
-         rc <- rawSystem pgm real_args
+         rc <- builderMainLoop dflags pgm real_args
 	 case rc of
 	   ExitSuccess{} -> return (rc, False)
 	   ExitFailure n 
@@ -629,6 +635,97 @@ runSomething dflags phase_name pgm args = do
      (_, ExitSuccess) -> return ()
      _                -> throwDyn (PhaseFailed phase_name exit_code)
 
+
+
+#if __GLASGOW_HASKELL__ < 603
+builderMainLoop dflags pgm real_args = do
+  rawSystem pgm real_args
+#else
+builderMainLoop dflags pgm real_args = do
+  chan <- newChan
+  (hStdIn, hStdOut, hStdErr, hProcess) <- runInteractiveProcess pgm real_args Nothing Nothing
+
+  -- and run a loop piping the output from the compiler to the log_action in DynFlags
+  hSetBuffering hStdOut LineBuffering
+  hSetBuffering hStdErr LineBuffering
+  forkIO (readerProc chan hStdOut)
+  forkIO (readerProc chan hStdErr)
+  rc <- loop chan hProcess 2 1 ExitSuccess
+  hClose hStdIn
+  hClose hStdOut
+  hClose hStdErr
+  return rc
+  where
+    -- status starts at zero, and increments each time either
+    -- a reader process gets EOF, or the build proc exits.  We wait
+    -- for all of these to happen (status==3).
+    -- ToDo: we should really have a contingency plan in case any of
+    -- the threads dies, such as a timeout.
+    loop chan hProcess 0 0 exitcode = return exitcode
+    loop chan hProcess t p exitcode = do
+      mb_code <- if p > 0
+                   then getProcessExitCode hProcess
+                   else return Nothing
+      case mb_code of
+        Just code -> loop chan hProcess t (p-1) code
+	Nothing 
+	  | t > 0 -> do 
+	      msg <- readChan chan
+              case msg of
+                BuildMsg msg -> do
+                  log_action dflags SevInfo noSrcSpan defaultUserStyle msg
+                  loop chan hProcess t p exitcode
+                BuildError loc msg -> do
+                  log_action dflags SevError (mkSrcSpan loc loc) defaultUserStyle msg
+                  loop chan hProcess t p exitcode
+                EOF ->
+                  loop chan hProcess (t-1) p exitcode
+          | otherwise -> loop chan hProcess t p exitcode
+
+readerProc chan hdl = loop Nothing `catch` \e -> writeChan chan EOF
+	-- ToDo: check errors more carefully
+    where
+         loop in_err = do
+	        l <- hGetLine hdl `catch` \e -> do
+			case in_err of
+			  Just err -> writeChan chan err
+			  Nothing  -> return ()
+			ioError e
+		case in_err of
+		  Just err@(BuildError srcLoc msg)
+		    | leading_whitespace l -> do
+			loop (Just (BuildError srcLoc (msg $$ text l)))
+		    | otherwise -> do
+			writeChan chan err
+			checkError l
+		  Nothing -> do
+			checkError l
+
+	 checkError l
+	   = case matchRegex errRegex l of
+		Nothing -> do
+		    writeChan chan (BuildMsg (text l))
+		    loop Nothing
+		Just (file':lineno':colno':msg:_) -> do
+		    let file   = mkFastString file'
+		        lineno = read lineno'::Int
+		        colno  = case colno' of
+		                   "" -> 0
+		                   _  -> read (init colno') :: Int
+		        srcLoc = mkSrcLoc file lineno colno
+		    loop (Just (BuildError srcLoc (text msg)))
+
+	 leading_whitespace []    = False
+	 leading_whitespace (x:_) = isSpace x
+
+errRegex = mkRegex "^([^:]*):([0-9]+):([0-9]+:)?(.*)"
+
+data BuildMessage
+  = BuildMsg   !SDoc
+  | BuildError !SrcLoc !SDoc
+  | EOF
+#endif
+
 showOpt (FileOption pre f) = pre ++ platformPath f
 showOpt (Option "") = ""
 showOpt (Option s)  = s
@@ -638,8 +735,8 @@ traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- b) don't do it at all if dry-run is set
 traceCmd dflags phase_name cmd_line action
  = do	{ let verb = verbosity dflags
-	; debugTraceMsg dflags 2 ("*** " ++ phase_name)
-	; debugTraceMsg dflags 3 cmd_line
+	; showPass dflags phase_name
+	; debugTraceMsg dflags 3 (text cmd_line)
 	; hFlush stderr
 	
 	   -- Test for -n flag
@@ -649,8 +746,8 @@ traceCmd dflags phase_name cmd_line action
 	; action `IO.catch` handle_exn verb
 	}}
   where
-    handle_exn verb exn = do { debugTraceMsg dflags 2 "\n"
-			     ; debugTraceMsg dflags 2 ("Failed: " ++ cmd_line ++ (show exn))
+    handle_exn verb exn = do { debugTraceMsg dflags 2 (char '\n')
+			     ; debugTraceMsg dflags 2 (ptext SLIT("Failed:") <+> text cmd_line <+> text (show exn))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 

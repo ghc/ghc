@@ -17,7 +17,7 @@ module Outputable (
 	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper, pprSetDepth,
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, unqualStyle, 
-	mkErrStyle, defaultErrStyle,
+	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
 
 	SDoc, 		-- Abstract
 	docToSDoc,

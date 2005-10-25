@@ -37,7 +37,6 @@ import StaticFlags	( opt_IgnoreDotGhci )
 import Linker		( showLinkerState )
 import Util		( removeSpaces, handle, global, toArgs,
 			  looksLikeModuleName, prefixMatch, sortLe )
-import ErrUtils		( printErrorsAndWarnings )
 
 #ifndef mingw32_HOST_OS
 import System.Posix
@@ -675,7 +674,7 @@ checkModule :: String -> GHCi ()
 checkModule m = do
   let modl = mkModule m
   session <- getSession
-  result <- io (GHC.checkModule session modl printErrorsAndWarnings)
+  result <- io (GHC.checkModule session modl)
   case result of
     Nothing -> io $ putStrLn "Nothing"
     Just r  -> io $ putStrLn (showSDoc (

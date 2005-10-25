@@ -623,12 +623,9 @@ unload dflags linkables
 	new_pls <- unload_wkr dflags linkables pls
 	writeIORef v_PersistentLinkerState new_pls
 
-	debugTraceMsg dflags 3 (showSDoc
-		(text "unload: retaining objs" <+> ppr (objs_loaded new_pls)))
-	debugTraceMsg dflags 3 (showSDoc
-		(text "unload: retaining bcos" <+> ppr (bcos_loaded new_pls)))
-
-       	return ()
+	debugTraceMsg dflags 3 (text "unload: retaining objs" <+> ppr (objs_loaded new_pls))
+	debugTraceMsg dflags 3 (text "unload: retaining bcos" <+> ppr (bcos_loaded new_pls))
+	return ()
 
 unload_wkr :: DynFlags
            -> [Linkable]		-- stable linkables

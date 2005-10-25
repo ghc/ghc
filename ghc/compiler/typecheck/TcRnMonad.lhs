@@ -28,7 +28,7 @@ import InstEnv		( emptyInstEnv )
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  mkWarnMsg, printErrorsAndWarnings, pprBagOfErrors,
+			  mkWarnMsg, printErrorsAndWarnings,
 			  mkLocMessage, mkLongErrMsg )
 import Packages		( mkHomeModules )
 import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
@@ -159,7 +159,7 @@ initTcPrintErrors	-- Used from the interactive loop only
        -> IO (Maybe r)
 initTcPrintErrors env mod todo = do
   (msgs, res) <- initTc env HsSrcFile mod todo
-  printErrorsAndWarnings msgs
+  printErrorsAndWarnings (hsc_dflags env) msgs
   return res
 
 -- mkImpTypeEnv makes the imported symbol table
@@ -452,8 +452,10 @@ addLongErrAt loc msg extra
 	 rdr_env <- getGlobalRdrEnv ;
 	 let { err = mkLongErrMsg loc (unQualInScope rdr_env) msg extra } ;
 	 (warns, errs) <- readMutVar errs_var ;
-	 traceTc (ptext SLIT("Adding error:") <+> \ _ -> pprBagOfErrors (unitBag err)) ;	
-		-- Ugh!  traceTc is too specific; unitBag is horrible
+	 
+	 let style = mkErrStyle (unQualInScope rdr_env)
+	     doc   = mkLocMessage loc (msg $$ extra)
+	 in traceTc (ptext SLIT("Adding error:") <+> doc) ;	
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
 addErrs :: [(SrcSpan,Message)] -> TcRn ()

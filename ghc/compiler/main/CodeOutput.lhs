@@ -71,7 +71,7 @@ codeOutput dflags this_mod foreign_stubs pkg_deps flat_abstractC
 		; let lints = map cmmLint flat_abstractC
 		; case firstJust lints of
 			Just err -> do { printDump err
-				       ; ghcExit 1
+				       ; ghcExit dflags 1
 				       }
 			Nothing  -> return ()
 		}

@@ -15,12 +15,11 @@ module GHC (
 	newSession,
 
 	-- * Flags and settings
-	DynFlags(..), DynFlag(..), GhcMode(..), HscTarget(..), dopt,
+	DynFlags(..), DynFlag(..), Severity(..), GhcMode(..), HscTarget(..), dopt,
 	parseDynamicFlags,
 	initPackages,
 	getSessionDynFlags,
 	setSessionDynFlags,
-	setMsgHandler,
 
 	-- * Targets
 	Target(..), TargetId(..), Phase,
@@ -33,7 +32,6 @@ module GHC (
 	-- * Loading\/compiling the program
 	depanal,
 	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
-	loadMsgs,
 	workingDirectoryChanged,
 	checkModule, CheckedModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,
@@ -220,9 +218,9 @@ import Module
 import FiniteMap
 import Panic
 import Digraph
-import Bag		( unitBag, emptyBag )
-import ErrUtils		( showPass, Messages, putMsg, debugTraceMsg,
-			  mkPlainErrMsg, pprBagOfErrors )
+import Bag		( unitBag )
+import ErrUtils		( Severity(..), showPass, Messages, fatalErrorMsg, debugTraceMsg,
+			  mkPlainErrMsg, printBagOfErrors, printErrorsAndWarnings )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
@@ -252,23 +250,25 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: IO a -> IO a
-defaultErrorHandler inner = 
+defaultErrorHandler :: DynFlags -> IO a -> IO a
+defaultErrorHandler dflags inner = 
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   handle (\exception -> do
   	   hFlush stdout
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
-		IOException _ ->  putMsg (show exception)
+		IOException _ ->
+		  fatalErrorMsg dflags (text (show exception))
 		AsyncException StackOverflow ->
-			putMsg "stack overflow: use +RTS -K<size> to increase it"
-		_other ->  putMsg (show (Panic (show exception)))
+		  fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
+		_other ->
+		  fatalErrorMsg dflags (text (show (Panic (show exception))))
 	   exitWith (ExitFailure 1)
          ) $
 
   -- program errors: messages with locations attached.  Sometimes it is
   -- convenient to just throw these as exceptions.
-  handleDyn (\dyn -> do printErrs (pprBagOfErrors (unitBag dyn))
+  handleDyn (\dyn -> do printBagOfErrors dflags (unitBag dyn)
 			exitWith (ExitFailure 1)) $
 
   -- error messages propagated as exceptions
@@ -277,7 +277,7 @@ defaultErrorHandler inner =
   		case dyn of
 		     PhaseFailed _ code -> exitWith code
 		     Interrupted -> exitWith (ExitFailure 1)
-		     _ -> do putMsg (show (dyn :: GhcException))
+		     _ -> do fatalErrorMsg dflags (text (show (dyn :: GhcException)))
 			     exitWith (ExitFailure 1)
 	    ) $
   inner
@@ -353,12 +353,6 @@ getSessionDynFlags s = withSession s (return . hsc_dflags)
 setSessionDynFlags :: Session -> DynFlags -> IO ()
 setSessionDynFlags s dflags = modifySession s (\h -> h{ hsc_dflags = dflags })
 
--- | Messages during compilation (eg. warnings and progress messages)
--- are reported using this callback.  By default, these messages are
--- printed to stderr.
-setMsgHandler :: (String -> IO ()) -> IO ()
-setMsgHandler = ErrUtils.setMsgHandler
-
 -- -----------------------------------------------------------------------------
 -- Targets
 
@@ -422,7 +416,7 @@ guessTarget file Nothing
 
 -- Perform a dependency analysis starting from the current targets
 -- and update the session with the new module graph.
-depanal :: Session -> [Module] -> Bool -> IO (Either Messages ModuleGraph)
+depanal :: Session -> [Module] -> Bool -> IO (Maybe ModuleGraph)
 depanal (Session ref) excluded_mods allow_dup_roots = do
   hsc_env <- readIORef ref
   let
@@ -433,13 +427,13 @@ depanal (Session ref) excluded_mods allow_dup_roots = do
 	
   showPass dflags "Chasing dependencies"
   when (gmode == BatchCompile) $
-	debugTraceMsg dflags 1 (showSDoc (hcat [
+	debugTraceMsg dflags 1 (hcat [
 		     text "Chasing modules from: ",
-	     		hcat (punctuate comma (map pprTarget targets))]))
+	     		hcat (punctuate comma (map pprTarget targets))])
 
   r <- downsweep hsc_env old_graph excluded_mods allow_dup_roots
   case r of
-    Right mod_graph -> writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
+    Just mod_graph -> writeIORef ref hsc_env{ hsc_mod_graph = mod_graph }
     _ -> return ()
   return r
 
@@ -468,24 +462,18 @@ data LoadHowMuch
 -- attempt to load up to this target.  If no Module is supplied,
 -- then try to load all targets.
 load :: Session -> LoadHowMuch -> IO SuccessFlag
-load session how_much = 
-   loadMsgs session how_much ErrUtils.printErrorsAndWarnings
-
--- | Version of 'load' that takes a callback function to be invoked
--- on compiler errors and warnings as they occur during compilation.
-loadMsgs :: Session -> LoadHowMuch -> (Messages-> IO ()) -> IO SuccessFlag
-loadMsgs s@(Session ref) how_much msg_act
+load s@(Session ref) how_much
    = do 
 	-- Dependency analysis first.  Note that this fixes the module graph:
 	-- even if we don't get a fully successful upsweep, the full module
 	-- graph is still retained in the Session.  We can tell which modules
 	-- were successfully loaded by inspecting the Session's HPT.
 	mb_graph <- depanal s [] False
-	case mb_graph of
-	   Left msgs       -> do msg_act msgs; return Failed
-	   Right mod_graph -> loadMsgs2 s how_much msg_act mod_graph 
+	case mb_graph of	   
+	   Just mod_graph -> load2 s how_much mod_graph 
+	   Nothing        -> return Failed
 
-loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
+load2 s@(Session ref) how_much mod_graph = do
 	hsc_env <- readIORef ref
 
         let hpt1      = hsc_HPT hsc_env
@@ -524,8 +512,8 @@ loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 
 	evaluate pruned_hpt
 
-	debugTraceMsg dflags 2 (showSDoc (text "Stable obj:" <+> ppr stable_obj $$
-				text "Stable BCO:" <+> ppr stable_bco))
+	debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
+				text "Stable BCO:" <+> ppr stable_bco)
 
 	-- Unload any modules which are going to be re-linked this time around.
 	let stable_linkables = [ linkable
@@ -587,7 +575,7 @@ loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 
         (upsweep_ok, hsc_env1, modsUpswept)
            <- upsweep (hsc_env { hsc_HPT = emptyHomePackageTable })
-			   pruned_hpt stable_mods cleanup msg_act mg
+			   pruned_hpt stable_mods cleanup mg
 
 	-- Make modsDone be the summaries for each home module now
 	-- available; this should equal the domain of hpt3.
@@ -602,7 +590,7 @@ loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 
          then 
            -- Easy; just relink it all.
-           do debugTraceMsg dflags 2 "Upsweep completely successful."
+           do debugTraceMsg dflags 2 (text "Upsweep completely successful.")
 
 	      -- Clean up after ourselves
 	      cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
@@ -624,9 +612,9 @@ loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
 		do_linking = a_root_is_Main || no_hs_main
 
 	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking) $
-	        debugTraceMsg dflags 1 ("Warning: output was redirected with -o, " ++
-				   "but no output will be generated\n" ++
-				   "because there is no " ++ main_mod ++ " module.")
+	        debugTraceMsg dflags 1 (text ("Warning: output was redirected with -o, " ++
+				              "but no output will be generated\n" ++
+				              "because there is no " ++ main_mod ++ " module."))
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env1)
@@ -637,7 +625,7 @@ loadMsgs2 s@(Session ref) how_much msg_act mod_graph = do
            -- Tricky.  We need to back out the effects of compiling any
            -- half-done cycles, both so as to clean up the top level envs
            -- and to avoid telling the interactive linker to link them.
-           do debugTraceMsg dflags 2 "Upsweep partially successful."
+           do debugTraceMsg dflags 2 (text "Upsweep partially successful.")
 
               let modsDone_names
                      = map ms_mod modsDone
@@ -730,11 +718,10 @@ type TypecheckedSource = LHsBinds Id
 -- for a module.  'checkModule' loads all the dependencies of the specified
 -- module in the Session, and then attempts to typecheck the module.  If
 -- successful, it returns the abstract syntax for the module.
-checkModule :: Session -> Module -> (Messages -> IO ()) 
-	-> IO (Maybe CheckedModule)
-checkModule session@(Session ref) mod msg_act = do
+checkModule :: Session -> Module -> IO (Maybe CheckedModule)
+checkModule session@(Session ref) mod = do
 	-- load up the dependencies first
-   r <- loadMsgs session (LoadDependenciesOf mod) msg_act
+   r <- load session (LoadDependenciesOf mod)
    if (failed r) then return Nothing else do
 
 	-- now parse & typecheck the module
@@ -749,15 +736,15 @@ checkModule session@(Session ref) mod msg_act = do
 	   -- ml_hspp_file field, say
 	   let dflags0 = hsc_dflags hsc_env
 	       hspp_buf = expectJust "GHC.checkModule" (ms_hspp_buf ms)
-	       opts = getOptionsFromStringBuffer hspp_buf
+	       filename = fromJust (ml_hs_file (ms_location ms))
+	       opts = getOptionsFromStringBuffer hspp_buf filename
 	   (dflags1,leftovers) <- parseDynamicFlags dflags0 (map snd opts)
 	   if (not (null leftovers))
-		then do let filename = fromJust (ml_hs_file (ms_location ms))
-			msg_act (optionsErrorMsgs leftovers opts filename)
+		then do printErrorsAndWarnings dflags1 (optionsErrorMsgs leftovers opts filename)
 		        return Nothing
 		else do
 
-	   r <- hscFileCheck hsc_env{hsc_dflags=dflags1} msg_act ms
+	   r <- hscFileCheck hsc_env{hsc_dflags=dflags1} ms
 	   case r of
 		HscFail -> 
 		   return Nothing
@@ -981,31 +968,30 @@ upsweep
     -> HomePackageTable		-- HPT from last time round (pruned)
     -> ([Module],[Module])	-- stable modules (see checkStability)
     -> IO ()			-- How to clean up unwanted tmp files
-    -> (Messages -> IO ())	-- Compiler error message callback
     -> [SCC ModSummary]		-- Mods to do (the worklist)
     -> IO (SuccessFlag,
            HscEnv,		-- With an updated HPT
            [ModSummary])	-- Mods which succeeded
 
-upsweep hsc_env old_hpt stable_mods cleanup msg_act mods
-   = upsweep' hsc_env old_hpt stable_mods cleanup msg_act mods 1 (length mods)
+upsweep hsc_env old_hpt stable_mods cleanup mods
+   = upsweep' hsc_env old_hpt stable_mods cleanup mods 1 (length mods)
 
-upsweep' hsc_env old_hpt stable_mods cleanup msg_act
+upsweep' hsc_env old_hpt stable_mods cleanup
      [] _ _
    = return (Succeeded, hsc_env, [])
 
-upsweep' hsc_env old_hpt stable_mods cleanup msg_act
+upsweep' hsc_env old_hpt stable_mods cleanup
      (CyclicSCC ms:_) _ _
-   = do putMsg (showSDoc (cyclicModuleErr ms))
+   = do fatalErrorMsg (hsc_dflags hsc_env) (cyclicModuleErr ms)
         return (Failed, hsc_env, [])
 
-upsweep' hsc_env old_hpt stable_mods cleanup msg_act
+upsweep' hsc_env old_hpt stable_mods cleanup
      (AcyclicSCC mod:mods) mod_index nmods
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
 	--		       (moduleEnvElts (hsc_HPT hsc_env)))
 
-        mb_mod_info <- upsweep_mod hsc_env old_hpt stable_mods msg_act mod 
+        mb_mod_info <- upsweep_mod hsc_env old_hpt stable_mods mod 
                        mod_index nmods
 
 	cleanup		-- Remove unwanted tmp files between compilations
@@ -1031,7 +1017,7 @@ upsweep' hsc_env old_hpt stable_mods cleanup msg_act
 
 		; (restOK, hsc_env2, modOKs) 
 			<- upsweep' hsc_env1 old_hpt1 stable_mods cleanup 
-				msg_act mods (mod_index+1) nmods
+				mods (mod_index+1) nmods
 		; return (restOK, hsc_env2, mod:modOKs)
 		}
 
@@ -1041,13 +1027,12 @@ upsweep' hsc_env old_hpt stable_mods cleanup msg_act
 upsweep_mod :: HscEnv
             -> HomePackageTable
 	    -> ([Module],[Module])
-	    -> (Messages -> IO ())
             -> ModSummary
             -> Int  -- index of module
             -> Int  -- total number of modules
             -> IO (Maybe HomeModInfo)	-- Nothing => Failed
 
-upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary mod_index nmods
+upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
    = do 
         let 
 	    this_mod    = ms_mod summary
@@ -1057,7 +1042,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary mod_index n
 
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
 	    compile_it  = upsweep_compile hsc_env old_hpt this_mod 
-				msg_act summary mod_index nmods
+				summary mod_index nmods
 
 	case ghcMode (hsc_dflags hsc_env) of
 	    BatchCompile ->
@@ -1110,7 +1095,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) msg_act summary mod_index n
 		    old_hmi = lookupModuleEnv old_hpt this_mod
 
 -- Run hsc to compile a module
-upsweep_compile hsc_env old_hpt this_mod msg_act summary
+upsweep_compile hsc_env old_hpt this_mod summary
                 mod_index nmods
                 mb_old_linkable = do
   let
@@ -1132,7 +1117,7 @@ upsweep_compile hsc_env old_hpt this_mod msg_act summary
 				   where 
 				     iface = hm_iface hm_info
 
-  compresult <- compile hsc_env msg_act summary mb_old_linkable mb_old_iface
+  compresult <- compile hsc_env summary mb_old_linkable mb_old_iface
                         mod_index nmods
 
   case compresult of
@@ -1259,18 +1244,18 @@ downsweep :: HscEnv
 	  -> Bool		-- True <=> allow multiple targets to have 
 				-- 	    the same module name; this is 
 				--	    very useful for ghc -M
-	  -> IO (Either Messages [ModSummary])
+	  -> IO (Maybe [ModSummary])
 		-- The elts of [ModSummary] all have distinct
 		-- (Modules, IsBoot) identifiers, unless the Bool is true
 		-- in which case there can be repeats
 downsweep hsc_env old_summaries excl_mods allow_dup_roots
    = -- catch error messages and return them
-     handleDyn (\err_msg -> return (Left (emptyBag, unitBag err_msg))) $ do
+     handleDyn (\err_msg -> printBagOfErrors (hsc_dflags hsc_env) (unitBag err_msg) >> return Nothing) $ do
        rootSummaries <- mapM getRootSummary roots
        let root_map = mkRootMap rootSummaries
        checkDuplicates root_map
        summs <- loop (concatMap msDeps rootSummaries) root_map
-       return (Right summs)
+       return (Just summs)
      where
 	roots = hsc_targets hsc_env
 
@@ -1555,7 +1540,7 @@ preprocessFile dflags src_fn mb_phase (Just (buf, time))
   = do
 	-- case we bypass the preprocessing stage?
 	let 
-	    local_opts = getOptionsFromStringBuffer buf
+	    local_opts = getOptionsFromStringBuffer buf src_fn
 	--
 	(dflags', errs) <- parseDynamicFlags dflags (map snd local_opts)
 

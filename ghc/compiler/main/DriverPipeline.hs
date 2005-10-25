@@ -55,6 +55,8 @@ import FastString	( mkFastString )
 import Bag		( listToBag, emptyBag )
 import SrcLoc		( Located(..) )
 
+import Distribution.Compiler ( extensionsToGHCFlag )
+
 import EXCEPTION
 import DATA_IOREF	( readIORef, writeIORef, IORef )
 import GLAEXTS		( Int(..) )
@@ -93,7 +95,6 @@ preprocess dflags (filename, mb_phase) =
 -- NB.  No old interface can also mean that the source has changed.
 
 compile :: HscEnv
-	-> (Messages -> IO ())	-- error message callback
 	-> ModSummary
 	-> Maybe Linkable	-- Just linkable <=> source unchanged
         -> Maybe ModIface       -- Old interface, if available
@@ -108,7 +109,7 @@ data CompResult
    | CompErrs 
 
 
-compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods = do 
+compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do 
 
    let dflags0     = hsc_dflags hsc_env
        this_mod    = ms_mod mod_summary
@@ -124,16 +125,16 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = expectJust "compile:hspp" (ms_hspp_file mod_summary)
 
-   debugTraceMsg dflags0 2 ("compile: input file " ++ input_fnpp)
+   debugTraceMsg dflags0 2 (text "compile: input file" <+> text input_fnpp)
 
    -- Add in the OPTIONS from the source file
    -- This is nasty: we've done this once already, in the compilation manager
    -- It might be better to cache the flags in the ml_hspp_file field,say
    let hspp_buf = expectJust "compile:hspp_buf" (ms_hspp_buf mod_summary)
-       opts = getOptionsFromStringBuffer hspp_buf
+       opts = getOptionsFromStringBuffer hspp_buf input_fn
    (dflags1,unhandled_flags) <- parseDynamicFlags dflags0 (map snd opts)
    if (not (null unhandled_flags))
-	then do msg_act (optionsErrorMsgs unhandled_flags opts input_fn)
+	then do printErrorsAndWarnings dflags1 (optionsErrorMsgs unhandled_flags opts input_fn)
 		return CompErrs
 	else do
 
@@ -167,7 +168,7 @@ compile hsc_env msg_act mod_summary maybe_old_linkable old_iface mod_index nmods
        object_filename = ml_obj_file location
 
    -- run the compiler
-   hsc_result <- hscMain hsc_env' msg_act mod_summary
+   hsc_result <- hscMain hsc_env' mod_summary
 			 source_unchanged have_object old_iface
                          (Just (mod_index, nmods))
 
@@ -298,14 +299,15 @@ link BatchCompile dflags batch_attempt_linking hpt
 	    -- the linkables to link
 	    linkables = map (fromJust.hm_linkable) home_mod_infos
 
-        debugTraceMsg dflags 3 "link: linkables are ..."
-        debugTraceMsg dflags 3 (showSDoc (vcat (map ppr linkables)))
+        debugTraceMsg dflags 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
 
 	-- check for the -no-link flag
 	if isNoLink (ghcLink dflags)
-	  then do debugTraceMsg dflags 3 "link(batch): linking omitted (-c flag given)."
+	  then do debugTraceMsg dflags 3 (text "link(batch): linking omitted (-c flag given).")
 	          return Succeeded
 	  else do
+
+	debugTraceMsg dflags 1 (text "Linking ...")
 
 	let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 	    obj_files = concatMap getOfiles linkables
@@ -322,23 +324,23 @@ link BatchCompile dflags batch_attempt_linking hpt
 			any (t <) (map linkableTime linkables)
 
 	if dopt Opt_RecompChecking dflags && not linking_needed
-	   then do debugTraceMsg dflags 1 (exe_file ++ " is up to date, linking not required.")
+	   then do debugTraceMsg dflags 1 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
 		   return Succeeded
 	   else do
 
-	debugTraceMsg dflags 1 "Linking ..."
+	debugTraceMsg dflags 1 (ptext SLIT("Linking ..."))
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
         staticLink dflags obj_files pkg_deps
 
-        debugTraceMsg dflags 3 "link: done"
+        debugTraceMsg dflags 3 (text "link: done")
 
 	-- staticLink only returns if it succeeds
         return Succeeded
 
    | otherwise
-   = do debugTraceMsg dflags 3 "link(batch): upsweep (partially) failed OR"
-        debugTraceMsg dflags 3 "   Main.main not exported; not linking."
+   = do debugTraceMsg dflags 3 (text "link(batch): upsweep (partially) failed OR" $$
+                                text "   Main.main not exported; not linking.")
         return Succeeded
       
 
@@ -751,7 +753,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 	addHomeModuleToFinder hsc_env mod_name location4
 
   -- run the compiler!
-	result <- hscMain hsc_env printErrorsAndWarnings
+	result <- hscMain hsc_env
 			  mod_summary source_unchanged 
 			  False		-- No object file
 			  Nothing	-- No iface
@@ -1341,14 +1343,19 @@ hsSourceCppOpts =
 -----------------------------------------------------------------------------
 -- Reading OPTIONS pragmas
 
+-- This is really very ugly and should be rewritten.
+--   - some error messages are thrown as exceptions (should return)
+--   - we ignore LINE pragmas
+--   - parsing is horrible, combination of prefixMatch and 'read'.
+
 getOptionsFromSource 
 	:: String		-- input file
 	-> IO [String]		-- options, if any
 getOptionsFromSource file
   = do h <- openFile file ReadMode
-       look h `finally` hClose h
+       look h 1 `finally` hClose h
   where
-	look h = do
+	look h i = do
 	    r <- tryJust ioErrors (hGetLine h)
 	    case r of
 	      Left e | isEOFError e -> return []
@@ -1356,16 +1363,16 @@ getOptionsFromSource file
 	      Right l' -> do
 	    	let l = removeSpaces l'
 	    	case () of
-		    () | null l -> look h
-		       | prefixMatch "#" l -> look h
-		       | prefixMatch "{-# LINE" l -> look h   -- -}
-		       | Just opts <- matchOptions l
-		       	-> do rest <- look h
+		    () | null l -> look h (i+1)
+		       | prefixMatch "#" l -> look h (i+1)
+		       | prefixMatch "{-# LINE" l -> look h (i+1)  -- -} wrong!
+		       | Just opts <- matchOptions i file l
+		       	-> do rest <- look h (i+1)
                               return (opts ++ rest)
 		       | otherwise -> return []
 
-getOptionsFromStringBuffer :: StringBuffer -> [(Int,String)]
-getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) = 
+getOptionsFromStringBuffer :: StringBuffer -> FilePath -> [(Int,String)]
+getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) fn = 
   let 
 	ls = lines (lexemeToString buffer (I# len#))  -- lazy, so it's ok
   in
@@ -1377,35 +1384,55 @@ getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) =
 	    case () of
 		() | null l -> look (i+1) ls
 		   | prefixMatch "#" l -> look (i+1) ls
-		   | prefixMatch "{-# LINE" l -> look (i+1) ls   -- -}
-		   | Just opts <- matchOptions l
+		   | prefixMatch "{-# LINE" l -> look (i+1) ls   -- -} wrong!
+		   | Just opts <- matchOptions i fn l
 			-> zip (repeat i) opts ++ look (i+1) ls
 		   | otherwise -> []
 
 -- detect {-# OPTIONS_GHC ... #-}.  For the time being, we accept OPTIONS
 -- instead of OPTIONS_GHC, but that is deprecated.
-matchOptions s
+matchOptions i fn s
   | Just s1 <- maybePrefixMatch "{-#" s -- -} 
-  = matchOptions1 (removeSpaces s1)
+  = matchOptions1 i fn (removeSpaces s1)
   | otherwise
   = Nothing
  where
-  matchOptions1 s
+  matchOptions1 i fn s
     | Just s2 <- maybePrefixMatch "OPTIONS" s
     = case () of
 	_ | Just s3 <- maybePrefixMatch "_GHC" s2, not (is_ident (head s3))
-	  -> matchOptions2 s3
+	  -> matchOptions2 i fn s3
 	  | not (is_ident (head s2))
-	  -> matchOptions2 s2
+	  -> matchOptions2 i fn s2
 	  | otherwise
 	  -> Just []  -- OPTIONS_anything is ignored, not treated as start of source
     | Just s2 <- maybePrefixMatch "INCLUDE" s, not (is_ident (head s2)),
       Just s3 <- maybePrefixMatch "}-#" (reverse s2)
     = Just ["-#include", removeSpaces (reverse s3)]
+
+    | Just s2 <- maybePrefixMatch "LANGUAGE" s, not (is_ident (head s2)),
+      Just s3 <- maybePrefixMatch "}-#" (reverse s2)
+    = case [ exts | (exts,"") <- reads ('[' : reverse (']':s3))] of
+	[] -> languagePragParseError i fn
+	exts:_ -> case extensionsToGHCFlag exts of
+			([], opts) -> Just opts
+			(unsup,_) -> unsupportedExtnError i fn unsup
     | otherwise = Nothing
-  matchOptions2 s
+  matchOptions2 i fn s
     | Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (words (reverse s3))
     | otherwise = Nothing
+
+
+languagePragParseError i fn = 
+  pgmError (showSDoc (mkLocMessage loc (
+		text "cannot parse LANGUAGE pragma")))
+  where loc = srcLocSpan (mkSrcLoc (mkFastString fn) i 0)
+
+unsupportedExtnError i fn unsup = 
+  pgmError (showSDoc (mkLocMessage loc (
+		text "unsupported extensions: " <>
+		hcat (punctuate comma (map (text.show) unsup)))))
+  where loc = srcLocSpan (mkSrcLoc (mkFastString fn) i 0)
 
 
 optionsErrorMsgs :: [String] -> [(Int,String)] -> FilePath -> Messages

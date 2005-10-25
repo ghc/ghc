@@ -12,7 +12,7 @@ import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
 import StaticFlags	( opt_SccProfilingOn )
 import DriverPhases	( isHsBoot )
 import HscTypes		( ModGuts(..), HscEnv(..), 
-			  Dependencies(..), TypeEnv, IsBootInterface )
+			  Dependencies(..), ForeignStubs(..), TypeEnv, IsBootInterface )
 import HsSyn		( RuleDecl(..), RuleBndr(..), LHsExpr, LRuleDecl )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
 import MkIface		( mkUsageInfo )
@@ -35,7 +35,7 @@ import Rules		( roughTopNames )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars, exprsFreeNames )
 import Packages	  	( PackageState(thPackageId), PackageIdH(..) )
-import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, 
+import ErrUtils		( doIfSet, dumpIfSet_dyn, printBagOfWarnings, 
 			  errorsFound, WarnMsg )
 import ListSetOps	( insertList )
 import Outputable
@@ -79,13 +79,16 @@ deSugar hsc_env
 
 	-- Desugar the program
 	; ((all_prs, ds_rules, ds_fords), warns) 
-		<- initDs hsc_env mod rdr_env type_env $ do
-		{ core_prs <- dsTopLHsBinds auto_scc binds
-		; (ds_fords, foreign_prs) <- dsForeigns fords
-		; let all_prs = foreign_prs ++ core_prs
-		      local_bndrs = mkVarSet (map fst all_prs)
-		; ds_rules <- mappM (dsRule mod local_bndrs) rules
-		; return (all_prs, catMaybes ds_rules, ds_fords) }
+		<- case ghcMode (hsc_dflags hsc_env) of
+	             JustTypecheck -> return (([], [], NoStubs), emptyBag)
+	             _             -> initDs hsc_env mod rdr_env type_env $ do
+		                        { core_prs <- dsTopLHsBinds auto_scc binds
+		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
+		                        ; let all_prs = foreign_prs ++ core_prs
+		                              local_bndrs = mkVarSet (map fst all_prs)
+		                        ; ds_rules <- mappM (dsRule mod local_bndrs) rules
+		                        ; return (all_prs, catMaybes ds_rules, ds_fords)
+		                        }
 
 	-- If warnings are considered errors, leave.
 	; if errorsFound dflags (warns, emptyBag)
@@ -185,7 +188,7 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 	-- Display any warnings 
 	-- Note: if -Werror is used, we don't signal an error here.
         ; doIfSet (not (isEmptyBag ds_warns))
-		  (printErrs (pprBagOfWarnings ds_warns))
+		  (printBagOfWarnings dflags ds_warns)
 
 	-- Dump output
 	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)

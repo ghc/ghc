@@ -13,7 +13,8 @@ module Packages (
 
 	-- * Reading the package config, and processing cmdline args
 	PackageIdH(..), isHomePackage,
-	PackageState(..), 
+	PackageState(..),
+	mkPackageState,
 	initPackages,
 	getPackageDetails,
 	checkForPackageConflicts,
@@ -238,7 +239,7 @@ readPackageConfigs dflags = do
 readPackageConfig
    :: DynFlags -> PackageConfigMap -> FilePath -> IO PackageConfigMap
 readPackageConfig dflags pkg_map conf_file = do
-  debugTraceMsg dflags 2 ("Using package config file: " ++ conf_file)
+  debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
   proto_pkg_configs <- loadPackageConfig conf_file
   top_dir 	    <- getTopDir
   let pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs
@@ -342,9 +343,9 @@ mkPackageState dflags orig_pkg_db = do
 	   | not (exposed p) = return p
 	   | (p' : _) <- later_versions = do
 		debugTraceMsg dflags 2 $
-		   ("hiding package " ++ showPackageId (package p) ++
-		    " to avoid conflict with later version " ++
-		    showPackageId (package p'))
+		   (ptext SLIT("hiding package") <+> text (showPackageId (package p)) <+>
+		    ptext SLIT("to avoid conflict with later version") <+>
+		    text (showPackageId (package p')))
 		return (p {exposed=False})
 	   | otherwise = return p
 	  where myname = pkgName (package p)
@@ -370,7 +371,7 @@ mkPackageState dflags orig_pkg_db = do
 		 elimDanglingDeps (map fst qs)
 
 	reportElim (p, deps) = 
-		debugTraceMsg dflags 2 $ showSDoc $
+		debugTraceMsg dflags 2 $
 		   (ptext SLIT("package") <+> pprPkg p <+> 
 			ptext SLIT("will be ignored due to missing dependencies:") $$ 
 		    nest 2 (hsep (map (text.showPackageId) deps)))
@@ -710,6 +711,6 @@ dumpPackages :: DynFlags -> IO ()
 -- Show package info on console, if verbosity is >= 3
 dumpPackages dflags
   = do  let pkg_map = pkgIdMap (pkgState dflags)
-	putMsg $ showSDoc $
+	putMsg dflags $
 	      vcat (map (text.showInstalledPackageInfo) (eltsUFM pkg_map))
 \end{code}

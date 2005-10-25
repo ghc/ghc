@@ -6,24 +6,25 @@
 \begin{code}
 module ErrUtils (
 	Message, mkLocMessage, printError,
+	Severity(..),
 
 	ErrMsg, WarnMsg,
 	errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
 	Messages, errorsFound, emptyMessages,
 	mkErrMsg, mkWarnMsg, mkPlainErrMsg, mkLongErrMsg,
-	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
+	printErrorsAndWarnings, printBagOfErrors, printBagOfWarnings,
 
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
-	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc,
-	showPass,
+	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc,	
 
 	--  * Messages during compilation
-	setMsgHandler,
 	putMsg,
-	compilationProgressMsg,
-	debugTraceMsg,
 	errorMsg,
+	fatalErrorMsg,
+	compilationProgressMsg,
+	showPass,
+	debugTraceMsg,	
     ) where
 
 #include "HsVersions.h"
@@ -33,7 +34,7 @@ import SrcLoc		( SrcSpan )
 import Util		( sortLe, global )
 import Outputable
 import qualified Pretty
-import SrcLoc		( srcSpanStart )
+import SrcLoc		( srcSpanStart, noSrcSpan )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
 import System		( ExitCode(..), exitWith )
@@ -46,6 +47,12 @@ import DYNAMIC
 -- Basic error messages: just render a message with a source location.
 
 type Message = SDoc
+
+data Severity
+  = SevInfo
+  | SevWarning
+  | SevError
+  | SevFatal
 
 mkLocMessage :: SrcSpan -> Message -> Message
 mkLocMessage locn msg
@@ -117,22 +124,20 @@ errorsFound dflags (warns, errs)
   | dopt Opt_WarnIsError dflags = not (isEmptyBag errs) || not (isEmptyBag warns)
   | otherwise  		        = not (isEmptyBag errs)
 
-printErrorsAndWarnings :: Messages -> IO ()
-printErrorsAndWarnings (warns, errs)
+printErrorsAndWarnings :: DynFlags -> Messages -> IO ()
+printErrorsAndWarnings dflags (warns, errs)
   | no_errs && no_warns  = return ()
-  | no_errs		 = printErrs (pprBagOfWarnings warns)
+  | no_errs		 = printBagOfWarnings dflags warns
 			    -- Don't print any warnings if there are errors
-  | otherwise		 = printErrs (pprBagOfErrors   errs)
+  | otherwise		 = printBagOfErrors   dflags errs
   where
     no_warns = isEmptyBag warns
     no_errs  = isEmptyBag errs
 
-pprBagOfErrors :: Bag ErrMsg -> Pretty.Doc
-pprBagOfErrors bag_of_errors
-  = Pretty.vcat [ let style = mkErrStyle unqual
-		      doc = mkLocMessage s (d $$ e)
-		  in
-		  Pretty.text "" Pretty.$$ doc style
+printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
+printBagOfErrors dflags bag_of_errors
+  = sequence_   [ let style = mkErrStyle unqual
+		  in log_action dflags SevError s style (d $$ e)
 		| ErrMsg { errMsgSpans = s:ss,
 			   errMsgShortDoc = d,
 			   errMsgExtraInfo = e,
@@ -147,15 +152,30 @@ pprBagOfErrors bag_of_errors
 		EQ -> True
 		GT -> False
 
-pprBagOfWarnings :: Bag WarnMsg -> Pretty.Doc
-pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
+printBagOfWarnings :: DynFlags -> Bag ErrMsg -> IO ()
+printBagOfWarnings dflags bag_of_warns
+  = sequence_   [ let style = mkErrStyle unqual
+		  in log_action dflags SevWarning s style (d $$ e)
+		| ErrMsg { errMsgSpans = s:ss,
+			   errMsgShortDoc = d,
+			   errMsgExtraInfo = e,
+			   errMsgContext = unqual } <- sorted_errs ]
+    where
+      bag_ls	  = bagToList bag_of_warns
+      sorted_errs = sortLe occ'ed_before bag_ls
+
+      occ'ed_before err1 err2 = 
+         case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
+		LT -> True
+		EQ -> True
+		GT -> False
 \end{code}
 
 \begin{code}
-ghcExit :: Int -> IO ()
-ghcExit val
+ghcExit :: DynFlags -> Int -> IO ()
+ghcExit dflags val
   | val == 0  = exitWith ExitSuccess
-  | otherwise = do errorMsg "\nCompilation had errors\n\n"
+  | otherwise = do errorMsg dflags (text "\nCompilation had errors\n\n")
 	           exitWith (ExitFailure val)
 \end{code}
 
@@ -170,9 +190,6 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 \end{code}
 
 \begin{code}
-showPass :: DynFlags -> String -> IO ()
-showPass dflags what = compilationPassMsg dflags ("*** "++what++":")
-
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag   = return ()
@@ -220,26 +237,24 @@ ifVerbose dflags val act
   | verbosity dflags >= val = act
   | otherwise               = return ()
 
-errorMsg :: String -> IO ()
-errorMsg = putMsg
+putMsg :: DynFlags -> Message -> IO ()
+putMsg dflags msg = log_action dflags SevInfo noSrcSpan defaultUserStyle msg
+
+errorMsg :: DynFlags -> Message -> IO ()
+errorMsg dflags msg = log_action dflags SevError noSrcSpan defaultErrStyle msg
+
+fatalErrorMsg :: DynFlags -> Message -> IO ()
+fatalErrorMsg dflags msg = log_action dflags SevFatal noSrcSpan defaultErrStyle msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 (putMsg msg)
+  = ifVerbose dflags 1 (log_action dflags SevInfo noSrcSpan defaultUserStyle (text msg))
 
-compilationPassMsg :: DynFlags -> String -> IO ()
-compilationPassMsg dflags msg
-  = ifVerbose dflags 2 (putMsg msg)
+showPass :: DynFlags -> String -> IO ()
+showPass dflags what 
+  = ifVerbose dflags 2 (log_action dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
 
-debugTraceMsg :: DynFlags -> Int -> String -> IO ()
+debugTraceMsg :: DynFlags -> Int -> Message -> IO ()
 debugTraceMsg dflags val msg
-  = ifVerbose dflags val (putMsg msg)
-
-GLOBAL_VAR(msgHandler, hPutStrLn stderr, (String -> IO ()))
-
-setMsgHandler :: (String -> IO ()) -> IO ()
-setMsgHandler handle_msg = writeIORef msgHandler handle_msg
-
-putMsg :: String -> IO ()
-putMsg msg = do h <- readIORef msgHandler; h msg
+  = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
 \end{code}

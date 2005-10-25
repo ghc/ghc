@@ -157,7 +157,6 @@ type MessageAction = Messages -> IO ()
 
 hscMain
   :: HscEnv
-  -> MessageAction	-- What to do with errors/warnings
   -> ModSummary
   -> Bool		-- True <=> source unchanged
   -> Bool		-- True <=> have an object file (for msgs only)
@@ -165,7 +164,7 @@ hscMain
   -> Maybe (Int, Int)   -- Just (i,n) <=> module i of n (for msgs)
   -> IO HscResult
 
-hscMain hsc_env msg_act mod_summary
+hscMain hsc_env mod_summary
 	source_unchanged have_object maybe_old_iface
         mb_mod_index
  = do {
@@ -178,14 +177,14 @@ hscMain hsc_env msg_act mod_summary
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
 
-      ; what_next hsc_env msg_act mod_summary have_object 
+      ; what_next hsc_env mod_summary have_object 
 		  maybe_checked_iface
                   mb_mod_index
       }
 
 
 ------------------------------
-hscNoRecomp hsc_env msg_act mod_summary 
+hscNoRecomp hsc_env mod_summary 
 	    have_object (Just old_iface)
             mb_mod_index
  | isOneShot (ghcMode (hsc_dflags hsc_env))
@@ -210,36 +209,38 @@ hscNoRecomp hsc_env msg_act mod_summary
 	; return (HscNoRecomp new_details old_iface)
     }
 
-hscNoRecomp hsc_env msg_act mod_summary 
+hscNoRecomp hsc_env mod_summary 
 	    have_object Nothing
 	    mb_mod_index
   = panic "hscNoRecomp"	-- hscNoRecomp definitely expects to 
 			-- have the old interface available
 
 ------------------------------
-hscRecomp hsc_env msg_act mod_summary
+hscRecomp hsc_env mod_summary
 	  have_object maybe_old_iface
           mb_mod_index
  = case ms_hsc_src mod_summary of
-     HsSrcFile -> do 
-	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index
-	hscBackEnd hsc_env mod_summary maybe_old_iface front_res
+     HsSrcFile -> do
+	front_res <- hscFileFrontEnd hsc_env mod_summary mb_mod_index
+	case ghcMode (hsc_dflags hsc_env) of
+	  JustTypecheck -> hscBootBackEnd hsc_env mod_summary maybe_old_iface front_res
+	  _             -> hscBackEnd     hsc_env mod_summary maybe_old_iface front_res
 
      HsBootFile -> do
-	front_res <- hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index
+	front_res <- hscFileFrontEnd hsc_env mod_summary mb_mod_index
 	hscBootBackEnd hsc_env mod_summary maybe_old_iface front_res
 
      ExtCoreFile -> do
-	front_res <- hscCoreFrontEnd hsc_env msg_act mod_summary
+	front_res <- hscCoreFrontEnd hsc_env mod_summary
 	hscBackEnd hsc_env mod_summary maybe_old_iface front_res
 
-hscCoreFrontEnd hsc_env msg_act mod_summary = do {
+hscCoreFrontEnd hsc_env mod_summary = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
 	; inp <- readFile (expectJust "hscCoreFrontEnd" (ms_hspp_file mod_summary))
 	; case parseCore inp 1 of
-	    FailP s        -> putMsg s{-ToDo: wrong-} >> return Nothing
+	    FailP s        -> errorMsg (hsc_dflags hsc_env) (text s{-ToDo: wrong-}) >> return Nothing
 	    OkP rdr_module -> do {
     
  	    -------------------
@@ -247,20 +248,20 @@ hscCoreFrontEnd hsc_env msg_act mod_summary = do {
  	    -------------------
 	; (tc_msgs, maybe_tc_result) <- {-# SCC "TypeCheck" #-}
 			      tcRnExtCore hsc_env rdr_module
-	; msg_act tc_msgs
+	; printErrorsAndWarnings (hsc_dflags hsc_env) tc_msgs
 	; case maybe_tc_result of
       	     Nothing       -> return Nothing
       	     Just mod_guts -> return (Just mod_guts)	-- No desugaring to do!
 	}}
 	 
 
-hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
+hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
  	    -------------------
  	    -- DISPLAY PROGRESS MESSAGE
  	    -------------------
-	  let one_shot  = isOneShot (ghcMode (hsc_dflags hsc_env))
-      	; let dflags    = hsc_dflags hsc_env
-	; let toInterp  = hscTarget dflags == HscInterpreted
+	; let dflags    = hsc_dflags hsc_env
+	      one_shot  = isOneShot (ghcMode dflags)
+	      toInterp  = hscTarget dflags == HscInterpreted
       	; when (not one_shot) $
 		 compilationProgressMsg dflags $
 		 (showModuleIndex mb_mod_index ++
@@ -272,10 +273,10 @@ hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
 	; let hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
 	      hspp_buf  = ms_hspp_buf  mod_summary
 
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env) hspp_file hspp_buf
+	; maybe_parsed <- myParseModule dflags hspp_file hspp_buf
 
 	; case maybe_parsed of {
-      	     Left err -> do { msg_act (unitBag err, emptyBag)
+      	     Left err -> do { printBagOfErrors dflags (unitBag err)
 			    ; return Nothing } ;
       	     Right rdr_module -> do {
 
@@ -286,7 +287,7 @@ hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
 		<- {-# SCC "Typecheck-Rename" #-}
 		   tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
 
-	; msg_act tc_msgs
+	; printErrorsAndWarnings dflags tc_msgs
 	; case maybe_tc_result of {
       	     Nothing -> return Nothing ;
       	     Just tc_result -> do {
@@ -296,24 +297,25 @@ hscFileFrontEnd hsc_env msg_act mod_summary mb_mod_index = do {
  	    -------------------
 	; (warns, maybe_ds_result) <- {-# SCC "DeSugar" #-}
 		 	     deSugar hsc_env tc_result
-	; msg_act (warns, emptyBag)
+	; printBagOfWarnings dflags warns
 	; return maybe_ds_result
 	}}}}}
 
 ------------------------------
 
-hscFileCheck :: HscEnv -> MessageAction -> ModSummary -> IO HscResult
-hscFileCheck hsc_env msg_act mod_summary = do {
+hscFileCheck :: HscEnv -> ModSummary -> IO HscResult
+hscFileCheck hsc_env mod_summary = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; let hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
+	; let dflags    = hsc_dflags hsc_env
+	      hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
 	      hspp_buf  = ms_hspp_buf  mod_summary
 
-	; maybe_parsed <- myParseModule (hsc_dflags hsc_env) hspp_file hspp_buf
+	; maybe_parsed <- myParseModule dflags hspp_file hspp_buf
 
 	; case maybe_parsed of {
-      	     Left err -> do { msg_act (unitBag err, emptyBag)
+      	     Left err -> do { printBagOfErrors dflags (unitBag err)
 			    ; return HscFail } ;
       	     Right rdr_module -> do {
 
@@ -326,7 +328,7 @@ hscFileCheck hsc_env msg_act mod_summary = do {
 			True{-save renamed syntax-}
 			rdr_module
 
-	; msg_act tc_msgs
+	; printErrorsAndWarnings dflags tc_msgs
 	; case maybe_tc_result of {
       	     Nothing -> return (HscChecked rdr_module Nothing Nothing);
       	     Just tc_result -> do
@@ -655,7 +657,7 @@ hscTcExpr hsc_env expr
 	     Nothing      -> return Nothing ;	-- Parse error
 	     Just (Just (L _ (ExprStmt expr _ _)))
 			-> tcRnExpr hsc_env icontext expr ;
-	     Just other -> do { errorMsg ("not an expression: `" ++ expr ++ "'") ;
+	     Just other -> do { errorMsg (hsc_dflags hsc_env) (text "not an expression:" <+> quotes (text expr)) ;
 			        return Nothing } ;
       	     } }
 
@@ -669,7 +671,7 @@ hscKcType hsc_env str
 	; let icontext = hsc_IC hsc_env
 	; case maybe_type of {
 	     Just ty	-> tcRnType hsc_env icontext ty ;
-	     Just other -> do { errorMsg ("not an type: `" ++ str ++ "'") ;
+	     Just other -> do { errorMsg (hsc_dflags hsc_env) (text "not an type:" <+> quotes (text str)) ;
 			        return Nothing } ;
       	     Nothing    -> return Nothing } }
 #endif
