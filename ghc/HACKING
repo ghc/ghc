@@ -81,6 +81,35 @@ SplitObjs = NO
   memory-consuming, so turn it off when you're hacking.
 
 
+Actually building the bits
+--------------------------
+
+To just build everything, from the top level:
+
+  $ autoreconf
+  $ ./configure
+  $ make
+  $ make install
+
+
+Building individual parts of the tree
+-------------------------------------
+
+The first thing to understand is that the source tree is built in two
+passes.  First 'make boot' builds dependencies and any other tools
+required as part of the build itself.  For example,
+ghc/utils/genprimopcode is built as part of 'make boot', because it is
+required to preprocess ghc/compiler/prelude/primops.txt.pp.
+
+After 'make boot', 'make' will build everything.
+
+If you say 'make' from the very top-level, the build system will
+arrange to do the appropriate 'make boot' steps for you.  If you just
+want to build in a subdirectory (eg. ghc), you have to do 'make boot'
+yourself.  You don't need to 'make boot' after every single change,
+but you might want to do it to update dependencies, for example.
+
+
 Refining the setup
 ------------------
 
