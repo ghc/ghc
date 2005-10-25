@@ -146,7 +146,13 @@ target thread.  The calling thread can thus be certain that the target
 thread has received the exception.  This is a useful property to know
 when dealing with race conditions: eg. if there are two threads that
 can kill each other, it is guaranteed that only one of the threads
-will get to kill the other. -}
+will get to kill the other.
+
+If the target thread is currently making a foreign call, then the
+exception will not be raised (and hence 'throwTo' will not return)
+until the call has completed.  This is the case regardless of whether
+the call is inside a 'block' or not.
+ -}
 throwTo :: ThreadId -> Exception -> IO ()
 throwTo (ThreadId id) ex = IO $ \ s ->
    case (killThread# id ex s) of s1 -> (# s1, () #)
