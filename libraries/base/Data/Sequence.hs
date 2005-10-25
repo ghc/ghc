@@ -81,6 +81,7 @@ import Prelude hiding (
 	reverse)
 import qualified Data.List (foldl')
 import Control.Monad (MonadPlus(..), liftM2)
+import Data.Monoid (Monoid(..))
 import Data.FunctorM
 import Data.Typeable
 
@@ -159,6 +160,10 @@ instance Read a => Read (Seq a) where
 		(xs,t) <- reads s
 		return (fromList xs,t)
 #endif
+
+instance Monoid (Seq a) where
+	mempty = empty
+	mappend = (><)
 
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(Seq,seqTc,"Seq")
