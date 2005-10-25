@@ -108,14 +108,9 @@ srcLocCol (SrcLoc _ l c) = c
 srcLocCol other	  = panic "srcLocCol: unknown col"
 
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
-advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (tab c)
 advanceSrcLoc (SrcLoc f l c) '\n' = SrcLoc f  (l + 1) 0
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 advanceSrcLoc loc	     _	  = loc	-- Better than nothing
-
--- Advance to the next tab stop.  Tabs are at column positions 0, 8, 16, etc.
-tab :: Int -> Int
-tab c = (c `quot` 8 + 1) * 8
 \end{code}
 
 %************************************************************************
