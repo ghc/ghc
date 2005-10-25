@@ -672,7 +672,7 @@ allocateLocal (Capability *cap, nat n)
 		cap->r.rNursery->n_blocks++;
 		RELEASE_SM_LOCK;
 		bd->gen_no = 0;
-		bd->step = g0s0;
+		bd->step = cap->r.rNursery;
 		bd->flags = 0;
 	    } else {
 		// we have a block in the nursery: take it and put
