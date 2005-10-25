@@ -1,27 +1,23 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [
+  <!ENTITY hacking SYSTEM "../../ghc/HACKING">
+]>
 
 <article id="building-guide">
 
 <articleinfo>
 
-<title>Building the Glasgow Functional Programming Tools Suite</title>
+<title>Building and developing GHC</title>
 <author><othername>The GHC Team</othername></author>
 <address><email>glasgow-haskell-&lcub;users,bugs&rcub;@haskell.org</email></address>
 
     <abstract>
-      <para>The Glasgow fptools suite is a collection of Functional
-      Programming related tools, including the Glasgow Haskell
-      Compiler (GHC).  The source code for the whole suite is kept in
-      a single CVS repository and shares a common build and
-      installation system.</para>
-
-      <para>This guide is intended for people who want to build or
-      modify programs from the Glasgow <literal>fptools</literal>
-      suite (as distinct from those who merely want to
-      <emphasis>run</emphasis> them). Installation instructions are
-      now provided in the user guide.</para>
+      <para>This Guide is primarily aimed at those who want to build and/or
+	hack on GHC.  It describes how to get started with building GHC on your
+	machine, and how to tweak the settings to get the kind of build you
+	want.  It also describes the inner workings of the build system, so you
+	can extend it, modify it, and use it to build your code.</para>
 
       <para>The bulk of this guide applies to building on Unix
       systems; see <xref linkend="winbuild"/> for Windows notes.</para>
@@ -33,8 +29,7 @@
   <sect1 id="sec-getting">
     <title>Getting the sources</title>
     
-    <para>You can get your hands on the <literal>fptools</literal>
-    in two ways:</para>
+    <para>You can get your hands on the GHC sources in two ways:</para>
 
     <variablelist>
 
@@ -49,8 +44,7 @@
           (c)&nbsp;you want to hack on GHC yourself.</para>
 
 	  <para>A source distribution contains complete sources for
-          one or more projects in the <literal>fptools</literal>
-          suite.  Not only that, but the more awkward
+          GHC.  Not only that, but the more awkward
           machine-independent steps are done for you.  For example, if
           you don't have
           <command>happy</command><indexterm><primary>happy</primary></indexterm>
@@ -71,7 +65,7 @@
           up-to-the minute (but less tested) source code then you need
           to get access to our CVS repository.</para>
 
-	  <para>All the <literal>fptools</literal> source code is held
+	  <para>All the GHC source code is held
           in a CVS repository. CVS is a pretty good source-code
           control system, and best of all it works over the
           network.</para>
@@ -87,10 +81,6 @@
 	</listitem>
       </varlistentry>
     </variablelist>
-
-    <para>If you are going to do any building from sources (either
-    from a source distribution or the CVS repository) then you need to
-    read all of this manual in detail.</para>
   </sect1>
 
   <sect1 id="sec-cvs">
@@ -903,7 +893,7 @@ $ cvs checkout nofib/spectral</screen>
   </sect1>
 
   <sect1 id="sec-port-info">
-    <title>What machines the Glasgow tools run on</title>
+    <title>What machines GHC runs on</title>
 
 <indexterm><primary>ports</primary><secondary>GHC</secondary></indexterm>
 <indexterm><primary>GHC</primary><secondary>ports</secondary></indexterm>
@@ -1090,20 +1080,11 @@ $ cvs checkout nofib/spectral</screen>
 	  <term>x86_64-unknown-linux
             <indexterm><primary>x86_64-unknown-linux</primary></indexterm>
           </term>
-	  <listitem>
-	    <para>GHC currently works unregisterised.  A registerised
-	    port is in progress.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>amd64-unknown-openbsd
+<term>amd64-unknown-openbsd
             <indexterm><primary>amd64-unknown-linux</primary></indexterm>
           </term>
 	  <listitem>
-            <para>(This is the same as x86_64-unknown-openbsd). GHC
-                currently works unregisterised.  A registerised port is in
-                progress.</para>
+	    <para>Fully supported, with a native code generator and GHCi.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1166,15 +1147,7 @@ $ cvs checkout nofib/spectral</screen>
       support still remains, but porting to one of these systems will
       certainly be a non-trivial task.</para>
     </sect2>
-
-    <sect2>
-      <title>What machines the other tools run on</title>
-
-      <para>Unless you hear otherwise, the other tools work if GHC
-      works.</para>
-    </sect2>
   </sect1>
-
 
   <sect1 id="sec-pre-supposed">
     <title>Installing pre-supposed utilities</title>
@@ -1242,16 +1215,12 @@ $ cvs checkout nofib/spectral</screen>
           <indexterm><primary>GCC (GNU C compiler), pre-supposed</primary></indexterm>
         </term>
 	<listitem>
-	  <para>We recommend using GCC version 2.95.2 on all
-          platforms.  Failing that, version 2.7.2 is stable on most
-          platforms.  Earlier versions of GCC can be assumed not to
-          work, and versions in between 2.7.2 and 2.95.2 (including
-          <command>egcs</command>) have varying degrees of stability
-          depending on the platform.</para>
+	  <para>Most GCC versions should work with the most recent GHC
+	    sources.  Expect trouble if you use a recent GCC with
+	    an older GHC, though (trouble in the form of mis-compiled code,
+	    link errors, and errors from the <literal>ghc-asm</literal>
+	    script).</para>
 
-	  <para>GCC 3.2 is currently known to have problems building
-	  GHC on Sparc, but is stable on x86.</para>
-	  
 	  <para>If your GCC dies with &ldquo;internal error&rdquo; on
           some GHC source file, please let us know, so we can report
           it and get things improved.  (Exception: on x86
@@ -1279,14 +1248,23 @@ $ cvs checkout nofib/spectral</screen>
         </term>
 	<listitem>
 	  <para>Happy is a parser generator tool for Haskell, and is
-          used to generate GHC's parsers.  Happy is written in
+          used to generate GHC's parsers.</para>
+
+	  <para>If you start from a source tarball of GHC (i.e. not a CVS
+	    checkout), then you don't need Happy, because we supply the
+	    pre-processed versions of the Happy parsers.  If you intend to
+	    modify the compiler and/or you're using a CVS checkout, then you
+	    need Happy.</para>
+
+	  <para>Happy version 1.15 is currently required to build GHC.</para>
+
+	  <para>Happy is written in
           Haskell, and is a project in the CVS repository
           (<literal>fptools/happy</literal>).  It can be built from
           source, but bear in mind that you'll need GHC installed in
           order to build it.  To avoid the chicken/egg problem,
           install a binary distribution of either Happy or GHC to get
-          started.  Happy distributions are available from <ulink
-          url="http://www.haskell.org/happy/">Happy's Web
+          started.  Happy distributions are available from <ulink url="http://www.haskell.org/happy/">Happy's Web
           Page</ulink>.</para>
 	</listitem>
       </varlistentry>
@@ -1297,10 +1275,15 @@ $ cvs checkout nofib/spectral</screen>
         </term>
 	<listitem>
 	  <para>Alex is a lexical-analyser generator for Haskell,
-	  which GHC uses to generate its lexer.  Like Happy, Alex is
+	  which GHC uses to generate its lexer.</para>
+
+	  <para>Like Happy, you don't need Alex if you're building GHC from a
+	    source tarball, but you do need it if you're modifying GHC and/or
+	    building a CVS checkout.</para>
+
+	  <para>Alex is
 	  written in Haskell and is a project in the CVS repository.
-	  Alex distributions are available from <ulink
-	  url="http://www.haskell.org/alex/">Alex's Web
+	  Alex distributions are available from <ulink url="http://www.haskell.org/alex/">Alex's Web
 	  Page</ulink>.</para>
 	</listitem>
       </varlistentry>
@@ -1425,41 +1408,54 @@ $ cvs checkout nofib/spectral</screen>
     <indexterm><primary>Building from source</primary></indexterm>
     <indexterm><primary>Source, building from</primary></indexterm>
 
-    <para>You've been rash enough to want to build some of the Glasgow
-    Functional Programming tools (GHC, Happy, nofib, etc.) from
-    source.  You've slurped the source, from the CVS repository or
-    from a source distribution, and now you're sitting looking at a
-    huge mound of bits, wondering what to do next.</para>
+    <para>&ldquo;I just want to build it!&rdquo;</para>
 
-    <para>Gingerly, you type <command>make</command>.  Wrong
-    already!</para>
+    <para>No problem.  This recipe should build and install a working GHC with
+      all the default settings.  (unless you're
+      on Windows, in which case go to <xref linkend="winbuild" />).</para>
 
-    <para>This rest of this guide is intended for duffers like me, who
-    aren't really interested in Makefiles and systems configurations,
-    but who need a mental model of the interlocking pieces so that
-    they can make them work, extend them consistently when adding new
-    software, and lay hands on them gently when they don't
-    work.</para>
-
-    <sect2 id="quick-start">
-      <title>Quick Start</title>
-
-      <para>If you are starting from a source distribution, and just
-      want a completely standard build, then the following procedure should 
-      work (unless you're on Windows, in which case go to <xref linkend="winbuild" />).</para>
-
-<screen>$ autoreconf
+<screen>$ autoreconf<footnote><para>not necessary if you started from a source tarball</para>
+      </footnote>
 $ ./configure
 $ make
 $ make install</screen>
 
       <para>For GHC, this will do a 2-stage bootstrap build of the
       compiler, with profiling libraries, and install the
-      results.</para>
+      results in the default location (under <filename>/usr/local</filename> on
+      Unix, for example).</para>
+
+    <para>The <literal>configure</literal> script is a standard GNU
+      <literal>autoconf</literal> script, and accepts the usual options for
+      changing install locations and the like.  Run
+      <literal>./configure&nbsp;--help</literal> for a list of options.</para>
 
       <para>If you want to do anything at all non-standard, or you
       want to do some development, read on...</para>
-    </sect2>
+    </sect1>
+    
+    <sect1 id="quick-start">
+      <title>Quick start for GHC developers</title>
+      
+      <para>This section is a copy of the file
+	<literal>ghc/HACKING</literal> from the GHC source tree.  It describes
+	how to get started with setting up your build tree for developing GHC
+	or its libraries, and how to start building.</para>
+
+<screen>     
+&hacking;
+      </screen>
+    </sect1>
+
+  <sect1 id="sec-working-with-the-build-system">
+    <title>Working with the build system</title>
+    
+    <para>This rest of this guide is intended for duffers like me, who
+    aren't really interested in Makefiles and systems configurations,
+    but who need a mental model of the interlocking pieces so that
+    they can make them work, extend them consistently when adding new
+    software, and lay hands on them gently when they don't
+    work.</para>
 
     <sect2 id="sec-source-tree">
       <title>Your source tree</title>
