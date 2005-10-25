@@ -35,3 +35,5 @@ test('read026', normal, compile_fail, [''])
 test('read027', expect_fail_if_compiler_type('ghc'), compile_fail, [''])
 
 test('read028', normal, compile_fail, [''])
+test('read029', normal, compile_fail, [''])
+test('read030', normal, compile_fail, [''])
