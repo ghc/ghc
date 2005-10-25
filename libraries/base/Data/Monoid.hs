@@ -7,9 +7,9 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (requires extended type classes)
+-- Portability :  portable
 --
--- Declaration of the Monoid class, and instances for list and functions.
+-- The Monoid class with various general-purpose instances.
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and
@@ -19,7 +19,11 @@
 -----------------------------------------------------------------------------
 
 module Data.Monoid (
- 	Monoid(..)
+ 	Monoid(..),
+	Endo(..),
+	Dual(..),
+	Sum(..),
+	Product(..)
   ) where
 
 import Prelude
@@ -57,9 +61,9 @@ instance Monoid [a] where
 	mempty  = []
 	mappend = (++)
 
-instance Monoid (a -> a) where
-	mempty  = id
-	mappend = (.)
+instance Monoid b => Monoid (a -> b) where
+	mempty _ = mempty
+	mappend f g x = f x `mappend` g x
 
 instance Monoid () where
 	-- Should it be strict?
@@ -96,6 +100,34 @@ instance Monoid Ordering where
 	LT `mappend` _ = LT
 	EQ `mappend` y = y
 	GT `mappend` _ = GT
+
+-- | The monoid of endomorphisms under composition.
+newtype Endo a = Endo { appEndo :: a -> a }
+
+instance Monoid (Endo a) where
+	mempty = Endo id
+	Endo f `mappend` Endo g = Endo (f . g)
+
+-- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
+newtype Dual a = Dual { getDual :: a }
+
+instance Monoid a => Monoid (Dual a) where
+	mempty = Dual mempty
+	Dual x `mappend` Dual y = Dual (y `mappend` x)
+
+-- | Monoid under addition.
+newtype Sum a = Sum { getSum :: a }
+
+instance Num a => Monoid (Sum a) where
+	mempty = Sum 0
+	Sum x `mappend` Sum y = Sum (x + y)
+
+-- | Monoid under multiplication.
+newtype Product a = Product { getProduct :: a }
+
+instance Num a => Monoid (Product a) where
+	mempty = Product 1
+	Product x `mappend` Product y = Product (x * y)
 
 instance (Ord k) => Monoid (Map k v) where
     mempty  = Map.empty
