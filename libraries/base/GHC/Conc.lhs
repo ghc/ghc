@@ -619,7 +619,9 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 	    s <- peek p		
 	    if (s == 0xff) 
 	      then return ()
-	      else c_startSignalHandler (fromIntegral s)
+	      else do sp <- peekElemOff handlers (fromIntegral s)
+		      quickForkIO (deRefStablePtr sp)
+		      return ()
 
   takeMVar prodding
   putMVar prodding False
@@ -644,8 +646,7 @@ prodServiceThread = do
     else return ()
   putMVar prodding True
 
-foreign import ccall unsafe "startSignalHandler"
-  c_startSignalHandler :: CInt -> IO ()
+foreign import ccall "&signal_handlers" handlers :: Ptr (StablePtr (IO ()))
 
 foreign import ccall "setIOManagerPipe"
   c_setIOManagerPipe :: CInt -> IO ()
