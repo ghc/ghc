@@ -27,14 +27,6 @@ module Data.Monoid (
   ) where
 
 import Prelude
-import Data.Map ( Map )
-import qualified Data.Map as Map hiding ( Map )
-import Data.IntMap ( IntMap )
-import qualified Data.IntMap as IntMap hiding ( IntMap )
-import Data.Set ( Set )
-import qualified Data.Set as Set hiding ( Set )
-import Data.IntSet ( IntSet )
-import qualified Data.IntSet as IntSet hiding ( IntSet )
 
 -- ---------------------------------------------------------------------------
 -- | The monoid class.
@@ -128,23 +120,3 @@ newtype Product a = Product { getProduct :: a }
 instance Num a => Monoid (Product a) where
 	mempty = Product 1
 	Product x `mappend` Product y = Product (x * y)
-
-instance (Ord k) => Monoid (Map k v) where
-    mempty  = Map.empty
-    mappend = Map.union
-    mconcat = Map.unions
-
-instance Ord a => Monoid (IntMap a) where
-    mempty  = IntMap.empty
-    mappend = IntMap.union
-    mconcat = IntMap.unions
-
-instance Ord a => Monoid (Set a) where
-    mempty  = Set.empty
-    mappend = Set.union
-    mconcat = Set.unions
-
-instance Monoid IntSet where
-    mempty  = IntSet.empty
-    mappend = IntSet.union
-    mconcat = IntSet.unions

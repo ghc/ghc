@@ -113,6 +113,7 @@ module Data.Set  (
 
 import Prelude hiding (filter,foldr,null,map)
 import qualified Data.List as List
+import Data.Monoid (Monoid(..))
 import Data.Typeable
 
 {-
@@ -145,6 +146,11 @@ data Set a    = Tip
               | Bin {-# UNPACK #-} !Size a !(Set a) !(Set a) 
 
 type Size     = Int
+
+instance Ord a => Monoid (Set a) where
+    mempty  = empty
+    mappend = union
+    mconcat = unions
 
 #if __GLASGOW_HASKELL__
 

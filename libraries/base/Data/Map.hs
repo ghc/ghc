@@ -150,6 +150,7 @@ module Data.Map  (
 import Prelude hiding (lookup,map,filter,foldr,foldl,null)
 import qualified Data.Set as Set
 import qualified Data.List as List
+import Data.Monoid (Monoid(..))
 import Data.Typeable
 
 {-
@@ -188,6 +189,11 @@ data Map k a  = Tip
               | Bin {-# UNPACK #-} !Size !k a !(Map k a) !(Map k a) 
 
 type Size     = Int
+
+instance (Ord k) => Monoid (Map k v) where
+    mempty  = empty
+    mappend = union
+    mconcat = unions
 
 #if __GLASGOW_HASKELL__
 

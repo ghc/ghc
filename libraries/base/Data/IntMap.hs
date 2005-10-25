@@ -136,6 +136,7 @@ import Prelude hiding (lookup,map,filter,foldr,foldl,null)
 import Data.Bits 
 import Data.Int
 import qualified Data.IntSet as IntSet
+import Data.Monoid (Monoid(..))
 import Data.Typeable
 
 {-
@@ -209,6 +210,11 @@ data IntMap a = Nil
 type Prefix = Int
 type Mask   = Int
 type Key    = Int
+
+instance Ord a => Monoid (IntMap a) where
+    mempty  = empty
+    mappend = union
+    mconcat = unions
 
 #if __GLASGOW_HASKELL__
 

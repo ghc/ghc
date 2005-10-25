@@ -94,6 +94,7 @@ import Data.Bits
 import Data.Int
 
 import qualified Data.List as List
+import Data.Monoid (Monoid(..))
 import Data.Typeable
 
 {-
@@ -158,6 +159,11 @@ data IntSet = Nil
 
 type Prefix = Int
 type Mask   = Int
+
+instance Monoid IntSet where
+    mempty  = empty
+    mappend = union
+    mconcat = unions
 
 #if __GLASGOW_HASKELL__
 
