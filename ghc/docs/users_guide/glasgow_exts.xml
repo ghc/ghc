@@ -4638,6 +4638,29 @@ key_function :: Int -> String -> (Bool, Double)
       </sect3>
     </sect2>
 
+    <sect2 id="language-pragma">
+      <title>LANGUAGE pragma</title>
+
+      <indexterm><primary>LANGUAGE</primary><secondary>pragma</secondary></indexterm>
+      <indexterm><primary>pragma</primary><secondary>LANGUAGE</secondary></indexterm>
+
+      <para>This allows language extensions to be enabled in a portable way.
+	It is the intention that all Haskell compilers support the
+	<literal>LANGUAGE</literal> pragma with the same syntax, although not
+	all extensions are supported by all compilers, of
+	course.  The <literal>LANGUAGE</literal> pragma should be used instead
+	of <literal>OPTIONS_GHC</literal>, if possible.</para>
+
+      <para>For example, to enable the FFI and preprocessing with CPP:</para>
+
+<programlisting>{-# LANGUAGE ForeignFunctionInterface, CPP #-}</programlisting>
+
+      <para>Any extension from the <literal>Extension</literal> type defined in
+	<ulink
+	  url="../libraries/Cabal/Language-Haskell-Extension.html"><literal>Language.Haskell.Extension</literal></ulink> may be used.  GHC will report an error if any of the requested extensions are not supported.</para>
+    </sect2>
+
+
     <sect2 id="line-pragma">
       <title>LINE pragma</title>
 
@@ -4648,9 +4671,7 @@ key_function :: Int -> String -> (Bool, Double)
       code.  It lets you specify the line number and filename of the
       original code; for example</para>
 
-<programlisting>
-{-# LINE 42 "Foo.vhs" #-}
-</programlisting>
+<programlisting>{-# LINE 42 "Foo.vhs" #-}</programlisting>
 
       <para>if you'd generated the current file from something called
       <filename>Foo.vhs</filename> and this line corresponds to line
