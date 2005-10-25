@@ -70,6 +70,12 @@ typedef struct _ObjectCode {
     /* ptr to malloc'd lump of memory holding the obj file */
     char*      image;
 
+#ifdef darwin_HOST_OS
+    /* record by how much image has been deliberately misaligned
+       after allocation, so that we can use realloc */
+    int        misalignment;
+#endif
+
     /* The section-kind entries for this object module.  Linked
        list. */
     Section* sections;
