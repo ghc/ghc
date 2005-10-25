@@ -57,6 +57,12 @@ else
 RUNTEST_OPTS += -e ghc_with_unreg=0
 endif
 
+ifeq "$(filter s, $(GhcLibWays))" "s"
+RUNTEST_OPTS += -e ghc_with_smp=1
+else
+RUNTEST_OPTS += -e ghc_with_smp=0
+endif
+
 ifeq "$(GhcWithInterpreter)" "YES"
 RUNTEST_OPTS += -e ghc_with_interpreter=1
 else
