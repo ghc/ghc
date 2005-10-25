@@ -1,0 +1,11 @@
+module ErrUtils where
+
+data Severity
+  = SevInfo
+  | SevWarning
+  | SevError
+  | SevFatal
+
+type Message = Outputable.SDoc
+
+mkLocMessage :: SrcLoc.SrcSpan -> Message -> Message

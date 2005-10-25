@@ -1,0 +1,16 @@
+\begin{code}
+module ErrUtils where
+
+import Outputable (SDoc)
+import SrcLoc (SrcSpan)
+
+data Severity
+  = SevInfo
+  | SevWarning
+  | SevError
+  | SevFatal
+
+type Message = SDoc
+
+mkLocMessage :: SrcSpan -> Message -> Message
+\end{code}
