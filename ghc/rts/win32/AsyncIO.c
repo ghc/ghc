@@ -280,7 +280,7 @@ start:
 			    blocked_queue_hd = tso->link;
 			}
 			if (blocked_queue_tl == tso) {
-			    blocked_queue_tl = prev;
+			    blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
 			}
 		    
 			/* Terminates the run queue + this inner for-loop. */
