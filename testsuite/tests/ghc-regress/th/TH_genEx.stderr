@@ -1,3 +1,9 @@
+<<<<<<< TH_genEx.stderr
+Chasing modules from: TH_genEx.hs
+[1 of 2] Compiling TH_genExLib      ( ./TH_genExLib.hs, ./TH_genExLib.o )
+[2 of 2] Compiling TH_genEx         ( TH_genEx.hs, TH_genEx.o )
+=======
+>>>>>>> 1.2
 TH_genEx.hs:1:0:
     TH_genEx.hs:1:0: Splicing declarations
 	genAny (reify 'MyInterface)

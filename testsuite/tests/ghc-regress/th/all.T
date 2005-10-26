@@ -16,6 +16,9 @@ test('TH_repGuard', normal, compile, [''])
 test('TH_repGuardOutput', normal, compile_and_run, [''])
 test('TH_repPatSig', normal, compile, [''])
 
+test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0'])
+clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o'])
+
 test('TH_reifyDecl1', normal, compile, [''])
 
 test('TH_reifyType1', normal, compile, [''])
@@ -25,6 +28,8 @@ test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3', normal, multimod_compile, ['TH_spliceDecl3', '-v0'])
 clean(['TH_spliceDecl3_Lib.hi', 'TH_spliceDecl3_Lib.o'])
+test('TH_spliceDecl4', normal, multimod_compile, ['TH_spliceDecl4', '-v0'])
+clean(['TH_spliceDecl4_Lib.hi', 'TH_spliceDecl4_Lib.o'])
 
 test('TH_spliceE1', normal, compile_and_run, [''])
 test('TH_spliceExpr1', normal, compile, ['-v0'])
