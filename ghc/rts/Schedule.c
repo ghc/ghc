@@ -1934,6 +1934,7 @@ forkProcess(HsStablePtr *entry
     if (pid) { // parent
 	
 	// just return the pid
+	rts_unlock(cap);
 	return pid;
 	
     } else { // child
@@ -2462,6 +2463,8 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
     cap = schedule(cap,task);
 
     ASSERT(task->stat != NoStatus);
+    ASSERT(cap->running_task == task);
+    ASSERT(task->cap == cap);
 
     IF_DEBUG(scheduler, sched_belch("bound thread (%d) finished", task->tso->id));
     return cap;
