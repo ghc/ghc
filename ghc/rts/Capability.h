@@ -78,6 +78,12 @@ struct Capability_ {
 }; // typedef Capability, defined in RtsAPI.h
 
 
+#if defined(THREADED_RTS)
+#define ASSERT_TASK_ID(task) ASSERT(task->id == osThreadId())
+#else
+#define ASSERT_TASK_ID(task) /*empty*/
+#endif
+
 // These properties should be true when a Task is holding a Capability
 #define ASSERT_CAPABILITY_INVARIANTS(cap,task)				\
   ASSERT(cap->running_task != NULL && cap->running_task == task);	\
@@ -85,8 +91,7 @@ struct Capability_ {
   ASSERT(cap->run_queue_hd == END_TSO_QUEUE ? 				\
 	    cap->run_queue_tl == END_TSO_QUEUE : 1);			\
   ASSERT(myTask() == task);						\
-  ASSERT(task->id == osThreadId());
-
+  ASSERT_TASK_ID(task);
 
 // Converts a *StgRegTable into a *Capability.
 //
