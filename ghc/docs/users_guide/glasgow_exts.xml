@@ -1429,19 +1429,20 @@ declarations.  Define your own instances!
 <title>Class declarations</title>
 
 <para>
-This section documents GHC's implementation of multi-parameter type
-classes.  There's lots of background in the paper <ulink
+This section, and the next one, documents GHC's type-class extensions.
+There's lots of background in the paper <ulink
 url="http://research.microsoft.com/~simonpj/Papers/type-class-design-space" >Type
 classes: exploring the design space</ulink > (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
 </para>
 <para>
-There are the following constraints on class declarations:
-<orderedlist>
-<listitem>
+All the extensions are enabled by the <option>-fglasgow-exts</option> flag.
+</para>
 
+<sect3>
+<title>Multi-parameter type classes</title>
 <para>
- <emphasis>Multi-parameter type classes are permitted</emphasis>. For example:
+Multi-parameter type classes are permitted. For example:
 
 
 <programlisting>
@@ -1450,14 +1451,30 @@ There are the following constraints on class declarations:
     ...etc.
 </programlisting>
 
+</para>
+</sect3>
+
+<sect3>
+<title>The superclasses of a class declaration</title>
+
+<para>
+There are no restrictions on the context in a class declaration
+(which introduces superclasses), except that the class hierarchy must
+be acyclic.  So these class declarations are OK:
+
+
+<programlisting>
+  class Functor (m k) => FiniteMap m k where
+    ...
+
+  class (Monad m, Monad (t m)) => Transform t m where
+    lift :: m a -> (t m) a
+</programlisting>
 
 
 </para>
-</listitem>
-<listitem>
-
 <para>
- <emphasis>The class hierarchy must be acyclic</emphasis>.  However, the definition
+As in Haskell 98, The class hierarchy must be acyclic.  However, the definition
 of "acyclic" involves only the superclass relationships.  For example,
 this is OK:
 
@@ -1474,37 +1491,58 @@ this is OK:
 Here, <literal>C</literal> is a superclass of <literal>D</literal>, but it's OK for a
 class operation <literal>op</literal> of <literal>C</literal> to mention <literal>D</literal>.  (It
 would not be OK for <literal>D</literal> to be a superclass of <literal>C</literal>.)
-
 </para>
-</listitem>
-<listitem>
+</sect3>
+
+
+
+
+<sect3 id="class-method-types">
+<title>Class method types</title>
 
 <para>
- <emphasis>There are no restrictions on the context in a class declaration
-(which introduces superclasses), except that the class hierarchy must
-be acyclic</emphasis>.  So these class declarations are OK:
-
-
+Haskell 98 prohibits class method types to mention constraints on the
+class type variable, thus:
 <programlisting>
-  class Functor (m k) => FiniteMap m k where
-    ...
-
-  class (Monad m, Monad (t m)) => Transform t m where
-    lift :: m a -> (t m) a
+  class Seq s a where
+    fromList :: [a] -> s a
+    elem     :: Eq a => a -> s a -> Bool
 </programlisting>
-
-
+The type of <literal>elem</literal> is illegal in Haskell 98, because it
+contains the constraint <literal>Eq a</literal>, constrains only the 
+class type variable (in this case <literal>a</literal>).
+GHC lifts this restriction.
 </para>
-</listitem>
 
-<listitem>
 
+</sect3>
+
+
+<sect3 id="functional-dependencies">
+<title>Functional dependencies
+</title>
+
+<para> Functional dependencies are implemented as described by Mark Jones
+in &ldquo;<ulink url="http://www.cse.ogi.edu/~mpj/pubs/fundeps.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones, 
+In Proceedings of the 9th European Symposium on Programming, 
+ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782,
+.
+</para>
 <para>
- <emphasis>All of the class type variables must be reachable (in the sense 
-mentioned in <xref linkend="type-restrictions"/>)
-from the free variables of each method type
-</emphasis>.  For example:
+Functional dependencies are introduced by a vertical bar in the syntax of a 
+class declaration;  e.g. 
+<programlisting>
+  class (Monad m) => MonadState s m | m -> s where ...
 
+  class Foo a b c | a b -> c where ...
+</programlisting>
+There should be more documentation, but there isn't (yet).  Yell if you need it.
+</para>
+<para>
+In a class declaration, all of the class type variables must be reachable (in the sense 
+mentioned in <xref linkend="type-restrictions"/>)
+from the free variables of each method type.
+For example:
 
 <programlisting>
   class Coll s a where
@@ -1512,14 +1550,16 @@ from the free variables of each method type
     insert :: s -> a -> s
 </programlisting>
 
-
 is not OK, because the type of <literal>empty</literal> doesn't mention
-<literal>a</literal>.  This rule is a consequence of Rule 1(a), above, for
-types, and has the same motivation.
+<literal>a</literal>.  Functional dependencies can make the type variable
+reachable:
+<programlisting>
+  class Coll s a | s -> a where
+    empty  :: s
+    insert :: s -> a -> s
+</programlisting>
 
-Sometimes, offending class declarations exhibit misunderstandings.  For
-example, <literal>Coll</literal> might be rewritten
-
+Alternatively <literal>Coll</literal> might be rewritten
 
 <programlisting>
   class Coll s a where
@@ -1541,33 +1581,286 @@ class like this:
   class CollE s => Coll s a where
     insert :: s -> a -> s
 </programlisting>
+</para>
+</sect3>
 
 
+
+
+
+</sect2>
+
+<sect2 id="instance-decls">
+<title>Instance declarations</title>
+
+<sect3 id="instance-heads">
+<title>Instance heads</title>
+
+<para>
+The <emphasis>head</emphasis> of an instance declaration is the part to the
+right of the "<literal>=&gt;</literal>".  In Haskell 98 the head of an instance
+declaration
+must be of the form <literal>C (T a1 ... an)</literal>, where
+<literal>C</literal> is the class, <literal>T</literal> is a type constructor,
+and the <literal>a1 ... an</literal> are distinct type variables.
+</para>
+<para>
+The <option>-fglasgow-exts</option> flag lifts this restriction and allows the
+instance head to be of form <literal>C t1 ... tn</literal> where <literal>t1
+... tn</literal> are arbitrary types (provided, of course, everything is
+well-kinded).  In particular, types <literal>ti</literal> can be type variables
+or structured types, and can contain repeated occurrences of a single type
+variable.
+Examples:
+<programlisting>
+  instance Eq (T a a) where ...
+	-- Repeated type variable
+
+  instance Eq (S [a]) where ...
+	-- Structured type
+
+  instance C Int [a] where ...
+	-- Multiple parameters
+</programlisting>
+</para>
+</sect3>
+
+<sect3 id="instance-overlap">
+<title>Overlapping instances</title>
+<para>
+In general, <emphasis>GHC requires that that it be unambiguous which instance
+declaration
+should be used to resolve a type-class constraint</emphasis>. This behaviour
+can be modified by two flags: <option>-fallow-overlapping-instances</option>
+<indexterm><primary>-fallow-overlapping-instances
+</primary></indexterm> 
+and <option>-fallow-incoherent-instances</option>
+<indexterm><primary>-fallow-incoherent-instances
+</primary></indexterm>, as this section discusses.</para>
+<para>
+When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
+it tries to match every instance declaration against the
+constraint,
+by instantiating the head of the instance declaration.  For example, consider
+these declarations:
+<programlisting>
+  instance context1 => C Int a     where ...  -- (A)
+  instance context2 => C a   Bool  where ...  -- (B)
+  instance context3 => C Int [a]   where ...  -- (C)
+  instance context4 => C Int [Int] where ...  -- (D)
+</programlisting>
+The instances (A) and (B) match the constraint <literal>C Int Bool</literal>, 
+but (C) and (D) do not.  When matching, GHC takes
+no account of the context of the instance declaration
+(<literal>context1</literal> etc).
+GHC's default behaviour is that <emphasis>exactly one instance must match the
+constraint it is trying to resolve</emphasis>.  
+It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
+including both declarations (A) and (B), say); an error is only reported if a 
+particular constraint matches more than one.
+</para>
+
+<para>
+The <option>-fallow-overlapping-instances</option> flag instructs GHC to allow
+more than one instance to match, provided there is a most specific one.  For
+example, the constraint <literal>C Int [Int]</literal> matches instances (A),
+(C) and (D), but the last is more specific, and hence is chosen.  If there is no
+most-specific match, the program is rejected.
+</para>
+<para>
+However, GHC is conservative about committing to an overlapping instance.  For example:
+<programlisting>
+  f :: [b] -> [b]
+  f x = ...
+</programlisting>
+Suppose that from the RHS of <literal>f</literal> we get the constraint
+<literal>C Int [b]</literal>.  But
+GHC does not commit to instance (C), because in a particular
+call of <literal>f</literal>, <literal>b</literal> might be instantiate 
+to <literal>Int</literal>, in which case instance (D) would be more specific still.
+So GHC rejects the program.  If you add the flag <option>-fallow-incoherent-instances</option>,
+GHC will instead pick (C), without complaining about 
+the problem of subsequent instantiations.
+</para>
+<para>
+The willingness to be overlapped or incoherent is a property of 
+the <emphasis>instance declaration</emphasis> itself, controlled by the
+presence or otherwise of the <option>-fallow-overlapping-instances</option> 
+and <option>-fallow-incoherent-instances</option> flags when that mdodule is
+being defined.  Neither flag is required in a module that imports and uses the
+instance declaration.  Specifically, during the lookup process:
+<itemizedlist>
+<listitem><para>
+An instance declaration is ignored during the lookup process if (a) a more specific
+match is found, and (b) the instance declaration was compiled with 
+<option>-fallow-overlapping-instances</option>.  The flag setting for the
+more-specific instance does not matter.
+</para></listitem>
+<listitem><para>
+Suppose an instance declaration does not matche the constraint being looked up, but
+does unify with it, so that it might match when the constraint is further 
+instantiated.  Usually GHC will regard this as a reason for not committing to
+some other constraint.  But if the instance declaration was compiled with
+<option>-fallow-incoherent-instances</option>, GHC will skip the "does-it-unify?" 
+check for that declaration.
+</para></listitem>
+</itemizedlist>
+All this makes it possible for a library author to design a library that relies on 
+overlapping instances without the library client having to know.
+</para>
+<para>The <option>-fallow-incoherent-instances</option> flag implies the
+<option>-fallow-overlapping-instances</option> flag, but not vice versa.
+</para>
+</sect3>
+
+<sect3>
+<title>Type synonyms in the instance head</title>
+
+<para>
+<emphasis>Unlike Haskell 98, instance heads may use type
+synonyms</emphasis>.  (The instance "head" is the bit after the "=>" in an instance decl.)
+As always, using a type synonym is just shorthand for
+writing the RHS of the type synonym definition.  For example:
+
+
+<programlisting>
+  type Point = (Int,Int)
+  instance C Point   where ...
+  instance C [Point] where ...
+</programlisting>
+
+
+is legal.  However, if you added
+
+
+<programlisting>
+  instance C (Int,Int) where ...
+</programlisting>
+
+
+as well, then the compiler will complain about the overlapping
+(actually, identical) instance declarations.  As always, type synonyms
+must be fully applied.  You cannot, for example, write:
+
+
+<programlisting>
+  type P a = [[a]]
+  instance Monad P where ...
+</programlisting>
+
+
+This design decision is independent of all the others, and easily
+reversed, but it makes sense to me.
+
+</para>
+</sect3>
+
+<sect3 id="undecidable-instances">
+<title>Undecidable instances</title>
+
+<para>An instance declaration must normally obey the following rules:
+<orderedlist>
+<listitem><para>At least one of the types in the <emphasis>head</emphasis> of
+an instance declaration <emphasis>must not</emphasis> be a type variable.
+For example, these are OK:
+
+<programlisting>
+  instance C Int a where ...
+
+  instance D (Int, Int) where ...
+
+  instance E [[a]] where ...
+</programlisting>
+but this is not:
+<programlisting>
+  instance F a where ...
+</programlisting>
+Note that instance heads may contain repeated type variables (<xref linkend="instance-heads"/>).
+For example, this is OK:
+<programlisting>
+  instance Stateful (ST s) (MutVar s) where ...
+</programlisting>
 </para>
 </listitem>
 
-</orderedlist>
-</para>
 
-<sect3 id="class-method-types">
-<title>Class method types</title>
-<para>
-Haskell 98 prohibits class method types to mention constraints on the
-class type variable, thus:
+<listitem>
+<para>All of the types in the <emphasis>context</emphasis> of
+an instance declaration <emphasis>must</emphasis> be type variables.
+Thus
 <programlisting>
-  class Seq s a where
-    fromList :: [a] -> s a
-    elem     :: Eq a => a -> s a -> Bool
+instance C a b => Eq (a,b) where ...
 </programlisting>
-The type of <literal>elem</literal> is illegal in Haskell 98, because it
-contains the constraint <literal>Eq a</literal>, constrains only the 
-class type variable (in this case <literal>a</literal>).
+is OK, but
+<programlisting>
+instance C Int b => Foo b where ...
+</programlisting>
+is not OK.
+</para>
+</listitem>
+</orderedlist>
+These restrictions ensure that 
+context reduction terminates: each reduction step removes one type
+constructor.  For example, the following would make the type checker
+loop if it wasn't excluded:
+<programlisting>
+  instance C a => C a where ...
+</programlisting>
+There are two situations in which the rule is a bit of a pain. First,
+if one allows overlapping instance declarations then it's quite
+convenient to have a "default instance" declaration that applies if
+something more specific does not:
+
+
+<programlisting>
+  instance C a where
+    op = ... -- Default
+</programlisting>
+
+
+Second, sometimes you might want to use the following to get the
+effect of a "class synonym":
+
+
+<programlisting>
+  class (C1 a, C2 a, C3 a) => C a where { }
+
+  instance (C1 a, C2 a, C3 a) => C a where { }
+</programlisting>
+
+
+This allows you to write shorter signatures:
+
+
+<programlisting>
+  f :: C a => ...
+</programlisting>
+
+
+instead of
+
+
+<programlisting>
+  f :: (C1 a, C2 a, C3 a) => ...
+</programlisting>
+
+
+Voluminous correspondence on the Haskell mailing list has convinced me
+that it's worth experimenting with more liberal rules.  If you use
+the experimental flag <option>-fallow-undecidable-instances</option>
+<indexterm><primary>-fallow-undecidable-instances
+option</primary></indexterm>, you can use arbitrary
+types in both an instance context and instance head.  Termination is ensured by having a
+fixed-depth recursion stack.  If you exceed the stack depth you get a
+sort of backtrace, and the opportunity to increase the stack depth
+with <option>-fcontext-stack</option><emphasis>N</emphasis>.
 </para>
 <para>
-With the <option>-fglasgow-exts</option> GHC lifts this restriction.
+I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
+allowing these idioms interesting idioms.  
 </para>
-
 </sect3>
+
 
 </sect2>
 
@@ -1733,248 +2026,6 @@ means
 <programlisting>
   g :: (?x::Int) => Bool -> Bool -> Int
 </programlisting>
-</para>
-</sect3>
-
-
-</sect2>
-
-<sect2 id="instance-decls">
-<title>Instance declarations</title>
-
-<sect3 id="instance-overlap">
-<title>Overlapping instances</title>
-<para>
-In general, <emphasis>GHC requires that that it be unambiguous which instance
-declaration
-should be used to resolve a type-class constraint</emphasis>. This behaviour
-can be modified by two flags: <option>-fallow-overlapping-instances</option>
-<indexterm><primary>-fallow-overlapping-instances
-</primary></indexterm> 
-and <option>-fallow-incoherent-instances</option>
-<indexterm><primary>-fallow-incoherent-instances
-</primary></indexterm>, as this section discusses.</para>
-<para>
-When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
-it tries to match every instance declaration against the
-constraint,
-by instantiating the head of the instance declaration.  For example, consider
-these declarations:
-<programlisting>
-  instance context1 => C Int a     where ...  -- (A)
-  instance context2 => C a   Bool  where ...  -- (B)
-  instance context3 => C Int [a]   where ...  -- (C)
-  instance context4 => C Int [Int] where ...  -- (D)
-</programlisting>
-The instances (A) and (B) match the constraint <literal>C Int Bool</literal>, 
-but (C) and (D) do not.  When matching, GHC takes
-no account of the context of the instance declaration
-(<literal>context1</literal> etc).
-GHC's default behaviour is that <emphasis>exactly one instance must match the
-constraint it is trying to resolve</emphasis>.  
-It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
-including both declarations (A) and (B), say); an error is only reported if a 
-particular constraint matches more than one.
-</para>
-
-<para>
-The <option>-fallow-overlapping-instances</option> flag instructs GHC to allow
-more than one instance to match, provided there is a most specific one.  For
-example, the constraint <literal>C Int [Int]</literal> matches instances (A),
-(C) and (D), but the last is more specific, and hence is chosen.  If there is no
-most-specific match, the program is rejected.
-</para>
-<para>
-However, GHC is conservative about committing to an overlapping instance.  For example:
-<programlisting>
-  f :: [b] -> [b]
-  f x = ...
-</programlisting>
-Suppose that from the RHS of <literal>f</literal> we get the constraint
-<literal>C Int [b]</literal>.  But
-GHC does not commit to instance (C), because in a particular
-call of <literal>f</literal>, <literal>b</literal> might be instantiate 
-to <literal>Int</literal>, in which case instance (D) would be more specific still.
-So GHC rejects the program.  If you add the flag <option>-fallow-incoherent-instances</option>,
-GHC will instead pick (C), without complaining about 
-the problem of subsequent instantiations.
-</para>
-<para>
-The willingness to be overlapped or incoherent is a property of 
-the <emphasis>instance declaration</emphasis> itself, controlled by the
-presence or otherwise of the <option>-fallow-overlapping-instances</option> 
-and <option>-fallow-incoherent-instances</option> flags when that mdodule is
-being defined.  Neither flag is required in a module that imports and uses the
-instance declaration.  Specifically, during the lookup process:
-<itemizedlist>
-<listitem><para>
-An instance declaration is ignored during the lookup process if (a) a more specific
-match is found, and (b) the instance declaration was compiled with 
-<option>-fallow-overlapping-instances</option>.  The flag setting for the
-more-specific instance does not matter.
-</para></listitem>
-<listitem><para>
-Suppose an instance declaration does not matche the constraint being looked up, but
-does unify with it, so that it might match when the constraint is further 
-instantiated.  Usually GHC will regard this as a reason for not committing to
-some other constraint.  But if the instance declaration was compiled with
-<option>-fallow-incoherent-instances</option>, GHC will skip the "does-it-unify?" 
-check for that declaration.
-</para></listitem>
-</itemizedlist>
-All this makes it possible for a library author to design a library that relies on 
-overlapping instances without the library client having to know.
-</para>
-<para>The <option>-fallow-incoherent-instances</option> flag implies the
-<option>-fallow-overlapping-instances</option> flag, but not vice versa.
-</para>
-</sect3>
-
-<sect3>
-<title>Type synonyms in the instance head</title>
-
-<para>
-<emphasis>Unlike Haskell 98, instance heads may use type
-synonyms</emphasis>.  (The instance "head" is the bit after the "=>" in an instance decl.)
-As always, using a type synonym is just shorthand for
-writing the RHS of the type synonym definition.  For example:
-
-
-<programlisting>
-  type Point = (Int,Int)
-  instance C Point   where ...
-  instance C [Point] where ...
-</programlisting>
-
-
-is legal.  However, if you added
-
-
-<programlisting>
-  instance C (Int,Int) where ...
-</programlisting>
-
-
-as well, then the compiler will complain about the overlapping
-(actually, identical) instance declarations.  As always, type synonyms
-must be fully applied.  You cannot, for example, write:
-
-
-<programlisting>
-  type P a = [[a]]
-  instance Monad P where ...
-</programlisting>
-
-
-This design decision is independent of all the others, and easily
-reversed, but it makes sense to me.
-
-</para>
-</sect3>
-
-<sect3 id="undecidable-instances">
-<title>Undecidable instances</title>
-
-<para>An instance declaration must normally obey the following rules:
-<orderedlist>
-<listitem><para>At least one of the types in the <emphasis>head</emphasis> of
-an instance declaration <emphasis>must not</emphasis> be a type variable.
-For example, these are OK:
-
-<programlisting>
-  instance C Int a where ...
-
-  instance D (Int, Int) where ...
-
-  instance E [[a]] where ...
-</programlisting>
-but this is not:
-<programlisting>
-  instance F a where ...
-</programlisting>
-Note that instance heads <emphasis>may</emphasis> contain repeated type variables.
-For example, this is OK:
-<programlisting>
-  instance Stateful (ST s) (MutVar s) where ...
-</programlisting>
-</para>
-</listitem>
-
-
-<listitem>
-<para>All of the types in the <emphasis>context</emphasis> of
-an instance declaration <emphasis>must</emphasis> be type variables.
-Thus
-<programlisting>
-instance C a b => Eq (a,b) where ...
-</programlisting>
-is OK, but
-<programlisting>
-instance C Int b => Foo b where ...
-</programlisting>
-is not OK.
-</para>
-</listitem>
-</orderedlist>
-These restrictions ensure that 
-context reduction terminates: each reduction step removes one type
-constructor.  For example, the following would make the type checker
-loop if it wasn't excluded:
-<programlisting>
-  instance C a => C a where ...
-</programlisting>
-There are two situations in which the rule is a bit of a pain. First,
-if one allows overlapping instance declarations then it's quite
-convenient to have a "default instance" declaration that applies if
-something more specific does not:
-
-
-<programlisting>
-  instance C a where
-    op = ... -- Default
-</programlisting>
-
-
-Second, sometimes you might want to use the following to get the
-effect of a "class synonym":
-
-
-<programlisting>
-  class (C1 a, C2 a, C3 a) => C a where { }
-
-  instance (C1 a, C2 a, C3 a) => C a where { }
-</programlisting>
-
-
-This allows you to write shorter signatures:
-
-
-<programlisting>
-  f :: C a => ...
-</programlisting>
-
-
-instead of
-
-
-<programlisting>
-  f :: (C1 a, C2 a, C3 a) => ...
-</programlisting>
-
-
-Voluminous correspondence on the Haskell mailing list has convinced me
-that it's worth experimenting with more liberal rules.  If you use
-the experimental flag <option>-fallow-undecidable-instances</option>
-<indexterm><primary>-fallow-undecidable-instances
-option</primary></indexterm>, you can use arbitrary
-types in both an instance context and instance head.  Termination is ensured by having a
-fixed-depth recursion stack.  If you exceed the stack depth you get a
-sort of backtrace, and the opportunity to increase the stack depth
-with <option>-fcontext-stack</option><emphasis>N</emphasis>.
-</para>
-<para>
-I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
-allowing these idioms interesting idioms.  
 </para>
 </sect3>
 
@@ -2377,30 +2428,6 @@ and you'd be right.  That is why they are an experimental feature.
 </sect3>
 
 </sect2>
-
-<sect2 id="functional-dependencies">
-<title>Functional dependencies
-</title>
-
-<para> Functional dependencies are implemented as described by Mark Jones
-in &ldquo;<ulink url="http://www.cse.ogi.edu/~mpj/pubs/fundeps.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones, 
-In Proceedings of the 9th European Symposium on Programming, 
-ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782,
-.
-</para>
-<para>
-Functional dependencies are introduced by a vertical bar in the syntax of a 
-class declaration;  e.g. 
-<programlisting>
-  class (Monad m) => MonadState s m | m -> s where ...
-
-  class Foo a b c | a b -> c where ...
-</programlisting>
-There should be more documentation, but there isn't (yet).  Yell if you need it.
-</para>
-</sect2>
-
-
 
 <sect2 id="sec-kinding">
 <title>Explicitly-kinded quantification</title>
