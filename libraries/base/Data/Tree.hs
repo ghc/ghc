@@ -29,9 +29,8 @@ import Prelude
 #endif
 
 import Control.Monad
-import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList,
+import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList, toList,
 			ViewL(..), ViewR(..), viewl, viewr)
-import qualified Data.Sequence as Seq (foldl)
 import Data.Typeable
 
 #include "Typeable.h"
@@ -123,9 +122,7 @@ unfoldTreeM_BF f b = liftM getElement $ unfoldForestQ f (singleton b)
 -- /Breadth-First Numbering: Lessons from a Small Exercise in Algorithm Design/,
 -- by Chris Okasaki, /ICFP'00/.
 unfoldForestM_BF :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
-unfoldForestM_BF f = liftM toRevList . unfoldForestQ f . fromList
-  where toRevList :: Seq c -> [c]
-	toRevList = Seq.foldl (flip (:)) []
+unfoldForestM_BF f = liftM toList . unfoldForestQ f . fromList
 
 -- takes a sequence (queue) of seeds
 -- produces a sequence (reversed queue) of trees of the same length
