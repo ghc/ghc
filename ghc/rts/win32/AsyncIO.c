@@ -286,7 +286,7 @@ start:
 			/* Terminates the run queue + this inner for-loop. */
 			tso->link = END_TSO_QUEUE;
 			tso->why_blocked = NotBlocked;
-			PUSH_ON_RUN_QUEUE(tso);
+			pushOnRunQueue(&MainCapability, tso);
 			break;
 		    }
 		    break;
