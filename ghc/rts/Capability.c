@@ -227,12 +227,11 @@ releaseCapability_ (Capability* cap)
 {
     Task *task;
 
-    ASSERT(cap->running_task != NULL && myTask() == cap->running_task);
-
     task = cap->running_task;
-    cap->running_task = NULL;
 
-    ASSERT(task->id == osThreadId());
+    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+
+    cap->running_task = NULL;
 
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
@@ -398,7 +397,7 @@ waitForReturnCapability (Capability **pCap,
 
     }
 
-    ASSERT(cap->running_task == task);
+    ASSERT_CAPABILITY_INVARIANTS(cap,task);
 
     IF_DEBUG(scheduler, 
 	     sched_belch("returning; got capability %d", cap->no));
@@ -465,6 +464,9 @@ yieldCapability (Capability** pCap, Task *task)
     }
 
     *pCap = cap;
+
+    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+
     return;
 }
 

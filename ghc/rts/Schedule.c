@@ -379,16 +379,13 @@ schedule (Capability *initialCapability, Task *task)
 	  // thread for a bit, even if there are others banging at the
 	  // door.
 	  first = rtsFalse;
+	  ASSERT_CAPABILITY_INVARIANTS(cap,task);
       } else {
 	  // Yield the capability to higher-priority tasks if necessary.
 	  yieldCapability(&cap, task);
       }
 #endif
       
-      ASSERT(cap->running_task == task);
-      ASSERT(task->cap == cap);
-      ASSERT(myTask() == task);
-
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
     // call).
@@ -612,9 +609,7 @@ run_thread:
     if (ret == ThreadBlocked) continue;
 #endif
 
-    ASSERT(cap->running_task == task);
-    ASSERT(task->cap == cap);
-    ASSERT(myTask() == task);
+    ASSERT_CAPABILITY_INVARIANTS(cap,task);
 
     // The TSO might have moved, eg. if it re-entered the RTS and a GC
     // happened.  So find the new location:
@@ -2463,8 +2458,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
     cap = schedule(cap,task);
 
     ASSERT(task->stat != NoStatus);
-    ASSERT(cap->running_task == task);
-    ASSERT(task->cap == cap);
+    ASSERT_CAPABILITY_INVARIANTS(cap,task);
 
     IF_DEBUG(scheduler, sched_belch("bound thread (%d) finished", task->tso->id));
     return cap;
