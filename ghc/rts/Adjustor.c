@@ -403,24 +403,27 @@ createAdjustor(int cconv, StgStablePtr hptr,
    9:   48 89 f2                mov    %rsi,%rdx
    c:   48 89 fe                mov    %rdi,%rsi
    f:   48 8b 3d 0a 00 00 00    mov    10(%rip),%rdi
-  16:   e9 00 00 00 00          jmpq   stub_function
+  16:   ff 25 0c 00 00 00       jmpq   *12(%rip)
   ... 
   20: .quad 0  # aligned on 8-byte boundary
+  28: .quad 0  # aligned on 8-byte boundary
 
 
   And the version for >=6 integer arguments:
 
    0:   41 51                   push   %r9
-   2:   68 00 00 00 00          pushq  $obscure_ccall_ret_code
-   7:   4d 89 c1                mov    %r8,%r9
-   a:   49 89 c8                mov    %rcx,%r8
-   d:   48 89 d1                mov    %rdx,%rcx
-  10:   48 89 f2                mov    %rsi,%rdx
-  13:   48 89 fe                mov    %rdi,%rsi
-  16:   48 8b 3d 0b 00 00 00    mov    11(%rip),%rdi
-  1d:   e9 00 00 00 00          jmpq   stub_function
+   2:   ff 35 20 00 00 00       pushq  32(%rip)        # 28 <ccall_adjustor+0x28>
+   8:   4d 89 c1                mov    %r8,%r9
+   b:   49 89 c8                mov    %rcx,%r8
+   e:   48 89 d1                mov    %rdx,%rcx
+  11:   48 89 f2                mov    %rsi,%rdx
+  14:   48 89 fe                mov    %rdi,%rsi
+  17:   48 8b 3d 12 00 00 00    mov    18(%rip),%rdi        # 30 <ccall_adjustor+0x30>
+  1e:   ff 25 14 00 00 00       jmpq   *20(%rip)        # 38 <ccall_adjustor+0x38>
   ...
   28: .quad 0  # aligned on 8-byte boundary
+  30: .quad 0  # aligned on 8-byte boundary
+  38: .quad 0  # aligned on 8-byte boundary
     */
 
     /* we assume the small code model (gcc -mcmmodel=small) where
@@ -440,37 +443,35 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 
 	if (i < 6) {
-	    adjustor = stgMallocBytesRWX(40);
+	    adjustor = stgMallocBytesRWX(0x30);
 
-	    *(StgInt32 *)adjustor      = 0x49c1894d;
-	    *(StgInt32 *)(adjustor+4)  = 0x8948c889;
-	    *(StgInt32 *)(adjustor+8)  = 0xf28948d1;
-	    *(StgInt32 *)(adjustor+12) = 0x48fe8948;
-	    *(StgInt32 *)(adjustor+16) = 0x000a3d8b;
-	    *(StgInt32 *)(adjustor+20) = 0x00e90000;
-	    
-	    *(StgInt32 *)(adjustor+23) = 
-		(StgInt32)((StgInt64)wptr - (StgInt64)adjustor - 27);
-	    *(StgInt64 *)(adjustor+32) = (StgInt64)hptr;
+	    *(StgInt32 *)adjustor        = 0x49c1894d;
+	    *(StgInt32 *)(adjustor+0x4)  = 0x8948c889;
+	    *(StgInt32 *)(adjustor+0x8)  = 0xf28948d1;
+	    *(StgInt32 *)(adjustor+0xc)  = 0x48fe8948;
+	    *(StgInt32 *)(adjustor+0x10) = 0x000a3d8b;
+	    *(StgInt32 *)(adjustor+0x14) = 0x25ff0000;
+	    *(StgInt32 *)(adjustor+0x18) = 0x0000000c;
+	    *(StgInt64 *)(adjustor+0x20) = (StgInt64)hptr;
+	    *(StgInt64 *)(adjustor+0x28) = (StgInt64)wptr;
 	}
 	else
 	{
-	    adjustor = stgMallocBytesRWX(48);
+	    adjustor = stgMallocBytesRWX(0x40);
 
-	    *(StgInt32 *)adjustor      = 0x00685141;
-	    *(StgInt32 *)(adjustor+4)  = 0x4d000000;
-	    *(StgInt32 *)(adjustor+8)  = 0x8949c189;
-	    *(StgInt32 *)(adjustor+12) = 0xd18948c8;
-	    *(StgInt32 *)(adjustor+16) = 0x48f28948;
-	    *(StgInt32 *)(adjustor+20) = 0x8b48fe89;
-	    *(StgInt32 *)(adjustor+24) = 0x00000b3d;
-	    *(StgInt32 *)(adjustor+28) = 0x0000e900;
+	    *(StgInt32 *)adjustor        = 0x35ff5141;
+	    *(StgInt32 *)(adjustor+0x4)  = 0x00000020;
+	    *(StgInt32 *)(adjustor+0x8)  = 0x49c1894d;
+	    *(StgInt32 *)(adjustor+0xc)  = 0x8948c889;
+	    *(StgInt32 *)(adjustor+0x10) = 0xf28948d1;
+	    *(StgInt32 *)(adjustor+0x14) = 0x48fe8948;
+	    *(StgInt32 *)(adjustor+0x18) = 0x00123d8b;
+	    *(StgInt32 *)(adjustor+0x1c) = 0x25ff0000;
+	    *(StgInt32 *)(adjustor+0x20) = 0x00000014;
 	    
-	    *(StgInt32 *)(adjustor+3) = 
-		(StgInt32)(StgInt64)obscure_ccall_ret_code;
-	    *(StgInt32 *)(adjustor+30) = 
-		(StgInt32)((StgInt64)wptr - (StgInt64)adjustor - 34);
-	    *(StgInt64 *)(adjustor+40) = (StgInt64)hptr;
+	    *(StgInt64 *)(adjustor+0x28) = (StgInt64)obscure_ccall_ret_code;
+	    *(StgInt64 *)(adjustor+0x30) = (StgInt64)hptr;
+	    *(StgInt64 *)(adjustor+0x38) = (StgInt64)wptr;
 	}
     }
 #elif defined(sparc_HOST_ARCH)
@@ -1035,9 +1036,9 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
  freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #elif defined(x86_64_HOST_ARCH)
  if ( *(StgWord16 *)ptr == 0x894d ) {
-     freeStablePtr(*(StgStablePtr*)(ptr+32));
+     freeStablePtr(*(StgStablePtr*)(ptr+0x20));
  } else if ( *(StgWord16 *)ptr == 0x5141 ) {
-     freeStablePtr(*(StgStablePtr*)(ptr+40));
+     freeStablePtr(*(StgStablePtr*)(ptr+0x30));
  } else {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
