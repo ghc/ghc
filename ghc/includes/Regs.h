@@ -98,11 +98,10 @@ typedef struct StgRegTable_ {
   MP_INT          rmp_tmp2;      
   MP_INT          rmp_result1;
   MP_INT          rmp_result2;
+  StgWord         rRet;  // holds the return code of the thread
 #if defined(SMP) || defined(PAR)
   StgSparkPool    rSparks;	/* per-task spark pool */
 #endif
-    // If this flag is set, we are running Haskell code.  Used to detect
-    // uses of 'foreign import unsafe' that should be 'safe'.
 } StgRegTable;
 
 #if IN_STG_CODE

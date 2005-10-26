@@ -42,6 +42,11 @@
  * at all, it won't yield.  Hopefully this won't be a problem in practice.
  */
  
+#define PRE_RETURN(why,what_next)			\
+  StgTSO_what_next(CurrentTSO) = what_next::I16;	\
+  StgRegTable_rRet(BaseReg) = why;           	        \
+  R1 = BaseReg;
+
 /* Remember that the return address is *removed* when returning to a
  * ThreadRunGHC thread.
  */
@@ -69,12 +74,8 @@
         R1 = StackOverflow;					\
     }								\
   sched:							\
-    StgTSO_what_next(CurrentTSO) = ThreadRunGHC::I16;		\
+    PRE_RETURN(R1,ThreadRunGHC);				\
     jump stg_returnToSched;
-
-#define PRE_RETURN(why,what_next)			\
-  StgTSO_what_next(CurrentTSO) = what_next::I16;	\
-  R1 = why;
 
 #define HP_GENERIC				\
    PRE_RETURN(HeapOverflow, ThreadRunGHC)	\

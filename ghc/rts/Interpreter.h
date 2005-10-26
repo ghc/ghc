@@ -9,6 +9,6 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 
-extern StgThreadReturnCode interpretBCO (Capability* cap);
+extern Capability *interpretBCO (Capability* cap);
 
 #endif /* INTERPRETER_H */

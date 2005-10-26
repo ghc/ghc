@@ -92,8 +92,9 @@ INFO_TABLE_RET( stg_stop_thread, STOP_THREAD_WORDS, STOP_THREAD_BITMAP,
 
     SAVE_THREAD_STATE();
 
-    /* R1 contains the return value of the thread */
-    R1 = ThreadFinished;
+    /* The return code goes in BaseReg->rRet, and BaseReg is returned in R1 */
+    StgRegTable_rRet(BaseReg) = ThreadFinished;
+    R1 = BaseReg;
 
     jump StgReturn;
 }

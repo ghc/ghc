@@ -367,10 +367,6 @@ schedule (Capability *initialCapability, Task *task)
 
   while (TERMINATION_CONDITION) {
 
-      ASSERT(cap->running_task == task);
-      ASSERT(task->cap == cap);
-      ASSERT(myTask() == task);
-
 #if defined(GRAN)
       /* Choose the processor with the next event */
       CurrentProc = event->proc;
@@ -388,6 +384,10 @@ schedule (Capability *initialCapability, Task *task)
 	  yieldCapability(&cap, task);
       }
 #endif
+      
+      ASSERT(cap->running_task == task);
+      ASSERT(task->cap == cap);
+      ASSERT(myTask() == task);
 
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
@@ -408,11 +408,6 @@ schedule (Capability *initialCapability, Task *task)
 	deleteRunQueue(cap);
 	if (shutting_down_scheduler) {
 	    IF_DEBUG(scheduler, sched_belch("shutting down"));
-	    if (task->tso) { // we are bound
-		task->stat = Interrupted;
-		task->ret  = NULL;
-	    }
-	    return cap;
 	} else {
 	    IF_DEBUG(scheduler, sched_belch("interrupted"));
 	}
@@ -574,31 +569,46 @@ run_thread:
     recent_activity = ACTIVITY_YES;
 
     switch (prev_what_next) {
-
+	
     case ThreadKilled:
     case ThreadComplete:
 	/* Thread already finished, return to scheduler. */
 	ret = ThreadFinished;
 	break;
-
+	
     case ThreadRunGHC:
-	ret = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
+    {
+	StgRegTable *r;
+	r = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
+	cap = regTableToCapability(r);
+	ret = r->rRet;
 	break;
-
+    }
+    
     case ThreadInterpret:
-	ret = interpretBCO(cap);
+	cap = interpretBCO(cap);
+	ret = cap->r.rRet;
 	break;
-
+	
     default:
-      barf("schedule: invalid what_next field");
+	barf("schedule: invalid what_next field");
     }
 
-    // in SMP mode, we might return with a different capability than
-    // we started with, if the Haskell thread made a foreign call.  So
-    // let's find out what our current Capability is:
-    cap = task->cap;
-
     cap->in_haskell = rtsFalse;
+
+#ifdef SMP
+    // If ret is ThreadBlocked, and this Task is bound to the TSO that
+    // blocked, we are in limbo - the TSO is now owned by whatever it
+    // is blocked on, and may in fact already have been woken up,
+    // perhaps even on a different Capability.  It may be the case
+    // that task->cap != cap.  We better yield this Capability
+    // immediately and return to normaility.
+    if (ret == ThreadBlocked) continue;
+#endif
+
+    ASSERT(cap->running_task == task);
+    ASSERT(task->cap == cap);
+    ASSERT(myTask() == task);
 
     // The TSO might have moved, eg. if it re-entered the RTS and a GC
     // happened.  So find the new location:

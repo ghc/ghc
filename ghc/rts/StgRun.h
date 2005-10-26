@@ -9,7 +9,7 @@
 #ifndef STGRUN_H
 #define STGRUN_H
 
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
+extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
 RTS_FUN(StgReturn);
 

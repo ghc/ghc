@@ -242,6 +242,7 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rCurrentTSO);
     field_offset(StgRegTable, rCurrentNursery);
     field_offset(StgRegTable, rHpAlloc);
+    struct_field(StgRegTable, rRet);
 
     // Needed for SMP builds
     field_offset(StgRegTable, rmp_tmp_w);

@@ -58,12 +58,14 @@
    SAVE_STACK_POINTERS;				\
    cap->r.rCurrentTSO->what_next = (todo);	\
    threadPaused(cap->r.rCurrentTSO);		\
-   return (retcode);
+   cap->r.rRet = (retcode);			\
+   return cap;
 
 #define RETURN_TO_SCHEDULER_NO_PAUSE(todo,retcode)	\
-   SAVE_STACK_POINTERS;				\
-   cap->r.rCurrentTSO->what_next = (todo);	\
-   return (retcode);
+   SAVE_STACK_POINTERS;					\
+   cap->r.rCurrentTSO->what_next = (todo);		\
+   cap->r.rRet = (retcode);				\
+   return cap;
 
 
 STATIC_INLINE StgPtr
@@ -170,7 +172,7 @@ static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_pppppp_info,
 };
 
-StgThreadReturnCode
+Capability *
 interpretBCO (Capability* cap)
 {
     // Use of register here is primarily to make it clear to compilers

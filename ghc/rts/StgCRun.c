@@ -82,7 +82,7 @@ register double fake_f9 __asm__("$f9");
    any architecture (using miniinterpreter)
    -------------------------------------------------------------------------- */
 
-StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
+StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
     while (f) {
 	IF_DEBUG(interpreter,
@@ -92,7 +92,7 @@ StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 	    );
 	f = (StgFunPtr) (f)();
     }
-    return (StgThreadReturnCode)R1.i;
+    return (StgRegTable *)R1.p;
 }
 
 StgFunPtr StgReturn(void)
@@ -120,11 +120,11 @@ StgFunPtr StgReturn(void)
 #define STG_GLOBAL ".global "
 #endif
 
-StgThreadReturnCode
+StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
     unsigned char space[ RESERVED_C_STACK_BYTES + 4*sizeof(void *) ];
-    StgThreadReturnCode r;
+    StgRegTable * r;
 
     __asm__ volatile (
 	/*
@@ -201,7 +201,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #ifdef x86_64_HOST_ARCH
 
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
+extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
 static void StgRunIsImplementedInAssembler(void)
 {
@@ -321,7 +321,7 @@ static void StgRunIsImplementedInAssembler(void)
 
 #ifdef sparc_HOST_ARCH
 
-StgThreadReturnCode
+StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
     unsigned char space[RESERVED_C_STACK_BYTES];
@@ -354,7 +354,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     __asm__ volatile ("ld %1,%0"
 		      : "=r" (i7) : "m" (((void **)(space))[100]));
 #endif
-    return (StgThreadReturnCode)R1.i;
+    return (StgRegTable *)R1.i;
 }
 
 #endif
@@ -389,7 +389,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #ifdef alpha_HOST_ARCH
 
-StgThreadReturnCode
+StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     register long   real_ra __asm__("$26"); volatile long   save_ra;
@@ -418,7 +418,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
     register StgFunPtr real_pv __asm__("$27");
 
-    StgThreadReturnCode ret;
+    StgRegTable * ret;
 
     save_ra = real_ra;
     save_gp = real_gp;
@@ -491,11 +491,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
 #ifdef hppa1_1_HOST_ARCH
 
-StgThreadReturnCode
+StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
-    StgThreadReturnCode ret;
+    StgRegTable * ret;
 
     __asm__ volatile ("ldo %0(%%r30),%%r19\n"
 		      "\tstw %%r3, 0(0,%%r19)\n"
@@ -587,7 +587,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
 #ifdef powerpc_HOST_ARCH
 
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
+extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
 #ifdef darwin_HOST_OS
 static void StgRunIsImplementedInAssembler(void)
@@ -705,7 +705,7 @@ static void StgRunIsImplementedInAssembler(void)
 #ifdef powerpc64_HOST_ARCH
 
 #ifdef linux_HOST_OS
-extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
+extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
 static void StgRunIsImplementedInAssembler(void)
 {
