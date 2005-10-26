@@ -408,6 +408,12 @@ schedule (Capability *initialCapability, Task *task)
 	deleteRunQueue(cap);
 	if (shutting_down_scheduler) {
 	    IF_DEBUG(scheduler, sched_belch("shutting down"));
+	    // If we are a worker, just exit.  If we're a bound thread
+	    // then we will exit below when we've removed our TSO from
+	    // the run queue.
+	    if (task->tso == NULL) {
+		return cap;
+	    }
 	} else {
 	    IF_DEBUG(scheduler, sched_belch("interrupted"));
 	}
