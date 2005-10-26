@@ -139,14 +139,15 @@ tc_bracket (TypBr typ)
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
-  = tcTopSrcDecls emptyModDetails decls		`thenM_`
+  = do	{ tcTopSrcDecls emptyModDetails decls
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
 
-    tcMetaTy decTyConName	`thenM` \ decl_ty ->
-    tcMetaTy qTyConName		`thenM` \ q_ty ->
-    returnM (mkAppTy q_ty (mkListTy decl_ty))
+	; decl_ty <- tcMetaTy decTyConName
+	; q_ty    <- tcMetaTy qTyConName
+	; return (mkAppTy q_ty (mkListTy decl_ty))
 	-- Result type is Q [Dec]
+    }
 \end{code}
 
 

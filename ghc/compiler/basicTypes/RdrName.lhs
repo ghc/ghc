@@ -451,7 +451,7 @@ data Provenance
   = LocalDef		-- Defined locally
 	Module
 
-  | Imported 				-- Imported
+  | Imported 		-- Imported
 	[ImportSpec]	-- INVARIANT: non-empty
 
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
