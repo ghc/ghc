@@ -386,9 +386,9 @@ pickGREs rdr_name gres
     mod	      = rdrNameModule rdr_name
 
     pick :: GlobalRdrElt -> Maybe GlobalRdrElt
-    pick gre@(GRE {gre_prov = LocalDef m}) 	-- Local def
-	| is_unqual || m == mod = Just gre
-	| otherwise		= Nothing
+    pick gre@(GRE {gre_prov = LocalDef, gre_name = n}) 	-- Local def
+	| is_unqual || nameModule n == mod = Just gre
+	| otherwise			   = Nothing
     pick gre@(GRE {gre_prov = Imported [is]})	-- Single import (efficiency)
 	| is_unqual     = if not (is_qual (is_decl is)) then Just gre
 						        else Nothing
@@ -402,12 +402,12 @@ pickGREs rdr_name gres
 		      | otherwise = filter ((== mod) . is_as . is_decl) is
 
 isLocalGRE :: GlobalRdrElt -> Bool
-isLocalGRE (GRE {gre_prov = LocalDef _}) = True
-isLocalGRE other    		         = False
+isLocalGRE (GRE {gre_prov = LocalDef}) = True
+isLocalGRE other    		       = False
 
 unQualOK :: GlobalRdrElt -> Bool
 -- An unqualifed version of this thing is in scope
-unQualOK (GRE {gre_prov = LocalDef _})  = True
+unQualOK (GRE {gre_prov = LocalDef})    = True
 unQualOK (GRE {gre_prov = Imported is}) = not (all (is_qual . is_decl) is)
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
@@ -449,8 +449,6 @@ It's quite elaborate so that we can give accurate unused-name warnings.
 \begin{code}
 data Provenance
   = LocalDef		-- Defined locally
-	Module
-
   | Imported 		-- Imported
 	[ImportSpec]	-- INVARIANT: non-empty
 
@@ -504,9 +502,9 @@ instance Eq ImpItemSpec where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
 
 instance Ord Provenance where
-   compare (LocalDef _) (LocalDef _)   	 = EQ
-   compare (LocalDef _) (Imported _) 	 = LT
-   compare (Imported _ ) (LocalDef _)    = GT
+   compare LocalDef      LocalDef   	 = EQ
+   compare LocalDef      (Imported _) 	 = LT
+   compare (Imported _ ) LocalDef	 = GT
    compare (Imported is1) (Imported is2) = compare (head is1) 
 	{- See Note [Comparing provenance] -}	   (head is2)
 
@@ -526,14 +524,14 @@ plusProv :: Provenance -> Provenance -> Provenance
 -- defined, and one might refer to it with a qualified name from
 -- the import -- but I'm going to ignore that because it makes
 -- the isLocalGRE predicate so much nicer this way
-plusProv (LocalDef m1) (LocalDef m2)     = pprPanic "plusProv" (ppr m1 <+> ppr m2)
-plusProv p1@(LocalDef _) p2		 = p1
-plusProv p1 		 p2@(LocalDef _) = p2
+plusProv LocalDef 	 LocalDef        = panic "plusProv"
+plusProv LocalDef	 p2		 = LocalDef
+plusProv p1 		 LocalDef 	 = LocalDef
 plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
 -- Print out the place where the name was imported
-pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef _})
+pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys)})
   = sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]

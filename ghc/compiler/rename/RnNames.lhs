@@ -300,21 +300,21 @@ importsFromLocalDecls group
 	    ; this_mod = tcg_mod gbl_env
 	    ; imports = emptyImportAvails {
 			  imp_env = unitModuleEnv this_mod $
-				  mkNameSet filtered_names
+				    mkNameSet filtered_names
 		        }
 	    }
 
-	; rdr_env' <- extendRdrEnvRn this_mod (tcg_rdr_env gbl_env) names
+	; rdr_env' <- extendRdrEnvRn (tcg_rdr_env gbl_env) names
 
 	; returnM (gbl_env { tcg_rdr_env = rdr_env',
 			     tcg_imports = imports `plusImportAvails` tcg_imports gbl_env }) 
 	}
 
-extendRdrEnvRn :: Module -> GlobalRdrEnv -> [Name] -> RnM GlobalRdrEnv
+extendRdrEnvRn :: GlobalRdrEnv -> [Name] -> RnM GlobalRdrEnv
 -- Add the new locally-bound names one by one, checking for duplicates as
 -- we do so.  Remember that in Template Haskell the duplicates
 -- might *already be* in the GlobalRdrEnv from higher up the module
-extendRdrEnvRn mod rdr_env names
+extendRdrEnvRn rdr_env names
   = foldlM add_local rdr_env names
   where
     add_local rdr_env name
@@ -325,9 +325,7 @@ extendRdrEnvRn mod rdr_env names
 	| otherwise
 	= return (extendGlobalRdrEnv rdr_env new_gre)
 	where
-	  new_gre = GRE {gre_name = name, gre_prov = prov}
-
-    prov = LocalDef mod
+	  new_gre = GRE {gre_name = name, gre_prov = LocalDef}
 \end{code}
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's

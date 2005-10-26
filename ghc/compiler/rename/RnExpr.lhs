@@ -554,7 +554,7 @@ rnBracket (DecBr group)
 	-- By using a pretend module, thFAKE, we keep them safely out of the way.
 
 	; names    <- getLocalDeclBinders gbl_env1 group
-	; rdr_env' <- extendRdrEnvRn thFAKE emptyGlobalRdrEnv names
+	; rdr_env' <- extendRdrEnvRn emptyGlobalRdrEnv names
 	-- Furthermore, the names in the bracket shouldn't conflict with
 	-- existing top-level names E.g.
 	--	foo = 1
