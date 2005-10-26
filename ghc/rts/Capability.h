@@ -61,9 +61,6 @@ struct Capability_ {
     Task *suspended_ccalling_tasks;
 
 #if defined(THREADED_RTS)
-    struct Capability_ *next;
-    struct Capability_ *prev;
-
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
 

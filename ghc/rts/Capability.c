@@ -138,8 +138,6 @@ initCapability( Capability *cap, nat i )
     cap->suspended_ccalling_tasks = NULL;
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
-    cap->next = NULL;
-    cap->prev = NULL;
 #endif
 
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
