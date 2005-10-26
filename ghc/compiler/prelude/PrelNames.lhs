@@ -274,6 +274,7 @@ rOOT_MAIN	= mkModule ":Main"		-- Root module for initialisation
 	-- the z-encoded version consistent.
 
 iNTERACTIVE    = mkModule ":Interactive"
+thFAKE         = mkModule ":THFake"
 \end{code}
 
 %************************************************************************

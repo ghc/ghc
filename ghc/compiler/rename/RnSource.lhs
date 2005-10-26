@@ -15,7 +15,8 @@ module RnSource (
 import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import HsSyn
-import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv )
+import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, globalRdrEnvElts,
+			  GlobalRdrElt(..), isLocalGRE )
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
@@ -35,6 +36,7 @@ import Class		( FunDep )
 import Name		( Name, nameOccName )
 import NameSet
 import NameEnv
+import OccName		( occEnvElts )
 import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import DynFlags	( DynFlag(..) )
@@ -661,14 +663,41 @@ rnHsTyvar doc tyvar = lookupOccRn tyvar
 %*							*
 %*********************************************************
 
+Note [Splices]
+~~~~~~~~~~~~~~
+Consider
+	f = ...
+	h = ...$(thing "f")...
+
+The splice can expand into literally anything, so when we do dependency
+analysis we must assume that it might mention 'f'.  So we simply treat
+all locally-defined names as mentioned by any splice.  This is terribly
+brutal, but I don't see what else to do.  For example, it'll mean
+that every locally-defined thing will appear to be used, so no unused-binding
+warnings.  But if we miss the dependency, then we might typecheck 'h' before 'f',
+and that will crash the type checker because 'f' isn't in scope.
+
+Currently, I'm not treating a splice as also mentioning every import,
+which is a bit inconsistent -- but there are a lot of them.  We might
+thereby get some bogus unused-import warnings, but we won't crash the
+type checker.  Not very satisfactory really.
+
 \begin{code}
 rnSplice :: HsSplice RdrName -> RnM (HsSplice Name, FreeVars)
 rnSplice (HsSplice n expr)
-  = checkTH expr "splice"	`thenM_`
-    getSrcSpanM 		`thenM` \ loc ->
-    newLocalsRn [L loc n]	`thenM` \ [n'] ->
-    rnLExpr expr 		`thenM` \ (expr', fvs) ->
-    returnM (HsSplice n' expr', fvs)
+  = do	{ checkTH expr "splice"
+	; loc  <- getSrcSpanM
+	; [n'] <- newLocalsRn [L loc n]
+	; (expr', fvs) <- rnLExpr expr
+
+	-- Ugh!  See Note [Splices] above
+	; lcl_rdr <- getLocalRdrEnv
+	; gbl_rdr <- getGlobalRdrEnv
+	; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr, 
+						    isLocalGRE gre]
+	      lcl_names = mkNameSet (occEnvElts lcl_rdr)
+
+	; return (HsSplice n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
 
 #ifdef GHCI 
 checkTH e what = returnM ()	-- OK

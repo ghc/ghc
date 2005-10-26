@@ -30,12 +30,12 @@ import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  dupFieldErr, checkTupSize )
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
-import PrelNames	( hasKey, assertIdKey, assertErrorName,
+import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
-import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
+import RdrName		( RdrName, emptyGlobalRdrEnv, plusGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
 import LoadIface	( loadHomeInterface )
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
@@ -546,17 +546,32 @@ rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
 		      doc = ptext SLIT("In a Template-Haskell quoted type")
 rnBracket (DecBr group) 
   = do 	{ gbl_env  <- getGblEnv
-	; names    <- getLocalDeclBinders gbl_env group
-	; rdr_env' <- extendRdrEnvRn (tcg_mod gbl_env) emptyGlobalRdrEnv names
 
-	; setGblEnv (gbl_env { tcg_rdr_env = tcg_rdr_env gbl_env `plusOccEnv` rdr_env',
+	; let gbl_env1 = gbl_env { tcg_mod = thFAKE }
+	-- Note the thFAKE.  The top-level names from the bracketed 
+	-- declarations will go into the name cache, and we don't want them to 
+	-- confuse the Names for the current module.  
+	-- By using a pretend module, thFAKE, we keep them safely out of the way.
+
+	; names    <- getLocalDeclBinders gbl_env1 group
+	; rdr_env' <- extendRdrEnvRn thFAKE emptyGlobalRdrEnv names
+	-- Furthermore, the names in the bracket shouldn't conflict with
+	-- existing top-level names E.g.
+	--	foo = 1
+	--	bar = [d| foo = 1|]
+	-- But both 'foo's get a LocalDef provenance, so we'd get a complaint unless
+	-- we start with an emptyGlobalRdrEnv
+
+	; setGblEnv (gbl_env { tcg_rdr_env = tcg_rdr_env gbl_env1 `plusOccEnv` rdr_env',
 			       tcg_dus = emptyDUs }) $ do
 		-- Notice plusOccEnv, not plusGlobalRdrEnv.  In this situation we want
-		-- to *shadow* top-level bindings.  E.g.
-		--	foo = 1
-		--	bar = [d| foo = 1|]
-		-- So we drop down to plusOccEnv.  (Perhaps there should be a fn in RdrName.)
-		--	
+		-- to *shadow* top-level bindings.  (See the 'foo' example above.)
+		-- If we don't shadow, we'll get an ambiguity complaint when we do 
+		-- a lookupTopBndrRn (which uses lookupGreLocalRn) on the binder of the 'foo'
+		--
+		-- Furthermore, arguably if the splice does define foo, that should hide
+		-- any foo's further out
+		--
 		-- The emptyDUs is so that we just collect uses for this group alone
 
 	{ (tcg_env, group') <- rnSrcDecls group
