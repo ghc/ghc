@@ -171,17 +171,7 @@ library-dirs:	LIB_DIR
 		, LIB_DIR"/cbits"
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
 hs-libraries:   "HSbase"
-#else
-/*
- This splitting is the subject of a totally 
- horrible hack, which glues HSbase{1,2,3}
- back into HSbaase for the purposes of static linking.
- See DriverState.getPackageLibraries for details.
-*/
-hs-libraries:	"HSbase1", "HSbase2", "HSbase3"
-#endif
 
 extra-libraries:  "HSbase_cbits"
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)

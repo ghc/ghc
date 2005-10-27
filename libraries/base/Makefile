@@ -97,11 +97,11 @@ endif
 ifeq "$(OBJECT_FILEFORMAT)" "PEi"
 
 # Turn off standard rule which creates HSbase.o from LIBOBJS.
-DONT_WANT_STD_GHCI_LIB_RULE=YES
+#DONT_WANT_STD_GHCI_LIB_RULE=YES
 
 GHCI_LIBOBJS = $(HS_OBJS)
 
-INSTALL_LIBS += HSbase1.o HSbase2.o HSbase3.o
+INSTALL_LIBS += HSbase.o
 
 endif # OBJECT_FILEFORMAT = PEi
 
@@ -131,12 +131,3 @@ System/Posix/Types.o Foreign/C/Types.o: include/CTypes.h
 DIST_CLEAN_FILES += base.buildinfo config.cache config.status config.mk
 
 include $(TOP)/mk/target.mk
-
-ifeq "$(OBJECT_FILEFORMAT)" "PEi"
-HSbase.o : $(GHCI_LIBOBJS)
-	$(LD) -r $(LD_X) -o HSbase1.o $(filter     GHC/%, $(GHCI_LIBOBJS))
-	$(LD) -r $(LD_X) -o HSbase2.o $(filter     Text/%, $(GHCI_LIBOBJS))
-	$(LD) -r $(LD_X) -o HSbase3.o $(filter-out GHC/% Text/%, $(GHCI_LIBOBJS) $(STUBOBJS))
-	@touch HSbase.o
-endif # OBJECT_FILEFORMAT = PEi
-
