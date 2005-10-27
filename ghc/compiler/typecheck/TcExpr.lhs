@@ -392,6 +392,13 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 -- its RHS is simply an error, so it doesn't impose any type constraints
 --
 -- All this is done in STEP 4 below.
+--
+-- Note about GADTs
+-- ~~~~~~~~~~~~~~~~
+-- For record update we require that every constructor involved in the
+-- update (i.e. that has all the specified fields) is "vanilla".  I
+-- don't know how to do the update otherwise.
+
 
 tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
   = addErrCtxt (recordUpdCtxt	expr)		$
@@ -417,23 +424,24 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 		-- It's OK to use the non-tc splitters here (for a selector)
-	sel_id : _   = sel_ids
-	(tycon, _)   = recordSelectorFieldLabel sel_id	-- We've failed already if
-	data_cons    = tyConDataCons tycon		-- it's not a field label
+	upd_field_lbls  = recBindFields rbinds
+	sel_id : _   	= sel_ids
+	(tycon, _)   	= recordSelectorFieldLabel sel_id	-- We've failed already if
+	data_cons    	= tyConDataCons tycon		-- it's not a field label
+	relevant_cons   = filter is_relevant data_cons
+	is_relevant con = all (`elem` dataConFieldLabels con) upd_field_lbls
     in
-
-	-- Check that all data cons are vanilla.  Doing record updates on GADTs
-	-- and/or existentials is more than my tiny brain can cope with today
-	-- [I think we might be able to manage if none of the selectors is naughty,
-	--  but that's for another day.]
-    checkTc (all isVanillaDataCon data_cons)
-	    (nonVanillaUpd tycon)	`thenM_`
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
-    checkTc (any (null . badFields rbinds) data_cons)
+    checkTc (not (null relevant_cons))
 	    (badFieldsUpd rbinds)	`thenM_`
+
+	-- Check that all relevant data cons are vanilla.  Doing record updates on 
+	-- GADTs and/or existentials is more than my tiny brain can cope with today
+    checkTc (all isVanillaDataCon relevant_cons)
+	    (nonVanillaUpd tycon)	`thenM_`
 
 	-- STEP 4
 	-- Use the un-updated fields to find a vector of booleans saying
@@ -442,12 +450,8 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- WARNING: this code assumes that all data_cons in a common tycon
 	-- have FieldLabels abstracted over the same tyvars.
     let
-	upd_field_lbls      = recBindFields rbinds
-
 		-- A constructor is only relevant to this process if
 		-- it contains *all* the fields that are being updated
-	relevant_cons   = filter is_relevant data_cons
-	is_relevant con = all (`elem` dataConFieldLabels con) upd_field_lbls
 	con1 		= head relevant_cons	-- A representative constructor
 	con1_tyvars 	= dataConTyVars con1
 	con1_fld_tys    = dataConFieldLabels con1 `zip` dataConOrigArgTys con1
