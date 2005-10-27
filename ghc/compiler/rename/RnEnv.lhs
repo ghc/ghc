@@ -709,10 +709,13 @@ warnUnusedModules mods
   = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where
     bleat (mod,loc) = setSrcSpan loc $ addWarn (mk_warn mod)
-    mk_warn m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
-			 text "is imported, but nothing from it is used",
-			 parens (ptext SLIT("except perhaps instances visible in") <+>
-				   quotes (ppr m))]
+    mk_warn m = vcat [ptext SLIT("Module") <+> quotes (ppr m)
+			<+> text "is imported, but nothing from it is used,",
+		      nest 2 (ptext SLIT("except perhaps instances visible in") 
+			<+> quotes (ppr m)),
+		      ptext SLIT("To suppress this warning, use:") 
+			<+> ptext SLIT("import") <+> ppr m <> parens empty ]
+
 
 warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedImports gres  = ifOptM Opt_WarnUnusedImports (warnUnusedGREs gres)
