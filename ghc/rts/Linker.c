@@ -2258,8 +2258,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
         COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, 0 );
 	noRelocs = rel->VirtualAddress;
+
+	/* 10/05: we now assume (and check for) a GNU ld that is capable
+	 * of handling object files with (>2^16) of relocs.
+	 */
+#if 0
 	debugBelch("WARNING: Overflown relocation field (# relocs found: %u)\n",
 		   noRelocs);
+#endif
 	j = 1;
       } else {
 	noRelocs = sectab_i->NumberOfRelocations;

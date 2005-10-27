@@ -559,7 +559,7 @@ getPackageLinkOpts dflags pkgs = do
       rts_tag = rtsBuildTag dflags
   let 
 	imp        = if opt_Static then "" else "_dyn"
-      	libs p     = map ((++imp) . addSuffix) (hACK (hsLibraries p))
+      	libs p     = map ((++imp) . addSuffix) (hsLibraries p)
       	                 ++ hACK_dyn (extraLibraries p)
 	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 
@@ -570,7 +570,8 @@ getPackageLinkOpts dflags pkgs = do
         addSuffix other_lib      = other_lib ++ suffix
 
         -- This is a hack that's even more horrible (and hopefully more temporary)
-        -- than the one below. HSbase_cbits and friends require the _dyn suffix
+        -- than the one below [referring to previous splittage of HSbase into chunks
+	-- to work around GNU ld bug]. HSbase_cbits and friends require the _dyn suffix
         -- for dynamic linking, but not _p or other 'way' suffix. So we just add
         -- _dyn to extraLibraries if they already have a _cbits suffix.
         
@@ -579,41 +580,6 @@ getPackageLinkOpts dflags pkgs = do
                          | otherwise = lib
 
   return (concat (map all_opts ps))
-  where
-
-     -- This is a totally horrible (temporary) hack, for Win32.  Problem is
-     -- that package.conf for Win32 says that the main prelude lib is 
-     -- split into HSbase1, HSbase2 and HSbase3, which is needed due to a bug
-     -- in the GNU linker (PEi386 backend). However, we still only
-     -- have HSbase.a for static linking, not HSbase{1,2,3}.a
-     -- getPackageLibraries is called to find the .a's to add to the static
-     -- link line.  On Win32, this hACK detects HSbase{1,2,3} and 
-     -- replaces them with HSbase, so static linking still works.
-     -- Libraries needed for dynamic (GHCi) linking are discovered via
-     -- different route (in InteractiveUI.linkPackage).
-     -- See driver/PackageSrc.hs for the HSbase1/HSbase2 split definition.
-     -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
-     -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
-     -- KAA 29 Mar  02: Same appalling hack for HSobjectio[1,2,3,4]
-     --
-     -- [sof 03/05: Renamed the (moribund) HSwin32 to HSwin_32 so as to
-     --  avoid filename conflicts with the 'Win32' package on a case-insensitive filesystem]
-     hACK libs
-#      if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
-       = libs
-#      else
-       = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs && "HSbase3" `elem` libs
-         then "HSbase" : filter (not.(isPrefixOf "HSbase")) libs
-         else
-         if   "HSwin_321" `elem` libs && "HSwin_322" `elem` libs
-         then "HSwin_32" : filter (not.(isPrefixOf "HSwin_32")) libs
-         else 
-         if   "HSobjectio1" `elem` libs && "HSobjectio2" `elem` libs && "HSobjectio3" `elem` libs && "HSobjectio4" `elem` libs
-	 then "HSobjectio" : filter (not.(isPrefixOf "HSobjectio")) libs
-         else 
-         libs
-#      endif
-
 
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do

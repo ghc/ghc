@@ -363,6 +363,12 @@ case $HostPlatform in
  	      LdCmd="`cygpath -w ${fp_prog_ld_raw} | sed -e 's@\\\\@/@g'`"
               AC_MSG_NOTICE([normalized ld command to $LdCmd])
             fi
+	    # Insist on >= ld-2.15.x, since earlier versions doesn't handle
+	    # the generation of relocatable object files with large amounts
+	    # of relocations correctly. (cf. HSbase.o splittage-hack)
+	    fp_prog_ld_version=`${LdCmd} --version | sed -n '/GNU ld/p' | tr -cd 0-9 | cut -b1-3`
+	    FP_COMPARE_VERSIONS([$fp_prog_ld_version],[-lt],[214],
+                                [AC_MSG_ERROR([GNU ld version later than 2.14 required to compile GHC on Windows.])])[]dnl
             ;;
 esac
 AC_SUBST([LdCmd])
