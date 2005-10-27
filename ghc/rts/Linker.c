@@ -2047,7 +2047,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if ( bss_sz < sectab_i->SizeOfRawData) { bss_sz = sectab_i->SizeOfRawData; }
       zspace = stgCallocBytes(1, bss_sz, "ocGetNames_PEi386(anonymous bss)");
       sectab_i->PointerToRawData = ((UChar*)zspace) - ((UChar*)(oc->image));
-      addProddableBlock(oc, zspace, sectab_i->VirtualSize);
+      addProddableBlock(oc, zspace, bss_sz);
       /* debugBelch("BSS anon section at 0x%x\n", zspace); */
    }
 
