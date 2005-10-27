@@ -139,7 +139,8 @@ rtsFatalInternalErrorFn(char *s, va_list ap)
      fflush(stderr);
   }
 
-  stg_exit(EXIT_INTERNAL_ERROR);
+  abort();
+  // stg_exit(EXIT_INTERNAL_ERROR);
 }
 
 void
