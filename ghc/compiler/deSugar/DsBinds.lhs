@@ -28,9 +28,9 @@ import StaticFlags	( opt_AutoSccsOnAllToplevs,
 			  opt_AutoSccsOnExportedToplevs )
 import OccurAnal	( occurAnalyseExpr )
 import CostCentre	( mkAutoCC, IsCafCC(..) )
-import Id		( Id, idType, idName, isExportedId, mkLocalId, setInlinePragma )
+import Id		( Id, DictId, idType, idName, isExportedId, mkLocalId, setInlinePragma )
 import Rules		( addIdSpecialisations, mkLocalRule )
-import Var		( Var, isGlobalId, setIdNotExported )
+import Var		( TyVar, Var, isGlobalId, setIdNotExported )
 import VarEnv
 import Type		( mkTyVarTy, substTyWith )
 import TysWiredIn	( voidTy )
@@ -38,7 +38,7 @@ import Outputable
 import SrcLoc		( Located(..) )
 import Maybes		( isJust, catMaybes, orElse )
 import Bag		( bagToList )
-import BasicTypes	( Activation(..), isAlwaysActive )
+import BasicTypes	( Activation(..), InlineSpec(..), isAlwaysActive, defaultInlineSpec )
 import Monad		( foldM )
 import FastString	( mkFastString )
 import List		( (\\) )
@@ -117,7 +117,6 @@ dsHsBind auto_scc rest
 	-- Always treat the binds as recursive, because the typechecker
 	-- makes rather mixed-up dictionary bindings
 	core_bind = Rec core_prs
-	inline_env = mkVarEnv [(global, prag) | prag <- prags, isInlinePrag prag]
     in
     mappM (dsSpec all_tyvars dicts tyvars global local core_bind) 
 	  prags				`thenDs` \ mb_specs ->
@@ -125,8 +124,11 @@ dsHsBind auto_scc rest
 	(spec_binds, rules) = unzip (catMaybes mb_specs)
 	global' = addIdSpecialisations global rules
 	rhs'    = mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
+	inl 	= case [inl | InlinePrag inl <- prags] of
+	    	 	[]      -> defaultInlineSpec 
+	    	 	(inl:_) -> inl
     in
-    returnDs (addInlineInfo inline_env (global', rhs') : spec_binds ++ rest)
+    returnDs (addInlineInfo inl global' rhs' : spec_binds ++ rest)
 
 dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
   = ds_lhs_binds (addSccs auto_scc exports) binds 	`thenDs` \ core_prs ->
@@ -171,8 +173,15 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 
     returnDs ((poly_tup_id, poly_tup_expr) : (concat export_binds_s ++ rest))
 
+dsSpec :: [TyVar] -> [DictId] -> [TyVar]
+       -> Id -> Id		-- Global, local
+       -> CoreBind -> Prag
+       -> DsM (Maybe ((Id,CoreExpr), 	-- Binding for specialised Id
+		      CoreRule))	-- Rule for the Global Id
+
 -- Example:
 --	f :: (Eq a, Ix b) => a -> b -> b
+--	{-# SPECIALISE f :: Ix b => Int -> b -> b #-}
 --
 --	AbsBinds [ab] [d1,d2] [([ab], f, f_mono, prags)] binds
 -- 
@@ -190,9 +199,9 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind (InlinePrag {})
   = return Nothing
 
 dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
-       (SpecPrag spec_expr spec_ty const_dicts)
+       (SpecPrag spec_expr spec_ty const_dicts inl)
   = do	{ let poly_name = idName poly_id
-	; spec_name <- newLocalName (idName poly_id)
+	; spec_name <- newLocalName poly_name
 	; ds_spec_expr  <- dsExpr spec_expr
 	; let (bndrs, body) = collectBinders ds_spec_expr
 	      mb_lhs  	    = decomposeRuleLhs (bndrs ++ const_dicts) body
@@ -200,7 +209,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 	; case mb_lhs of
 	    Nothing -> do { dsWarn msg; return Nothing }
 
-	    Just (bndrs', var, args) -> return (Just ((spec_id, spec_rhs), rule))
+	    Just (bndrs', var, args) -> return (Just (addInlineInfo inl spec_id spec_rhs, rule))
 		where
 		  local_poly  = setIdNotExported poly_id
 			-- Very important to make the 'f' non-exported,
@@ -296,18 +305,19 @@ simpleSubst subst expr
 					   [(c,bs,go r) | (c,bs,r) <- alts]
 
 addLocalInlines exports core_prs
-  = map (addInlineInfo inline_env) core_prs
+  = map add_inline core_prs
   where
+    add_inline (bndr,rhs) | Just inl <- lookupVarEnv inline_env bndr
+			  = addInlineInfo inl bndr rhs
+			  | otherwise 
+			  = (bndr,rhs)
     inline_env = mkVarEnv [(mono_id, prag) 
 			  | (_, _, mono_id, prags) <- exports,
-			    prag <- prags, isInlinePrag prag]
+			    InlinePrag prag <- prags]
 					   
-addInlineInfo :: IdEnv Prag -> (Id,CoreExpr) -> (Id,CoreExpr)
-addInlineInfo inline_env (bndr,rhs)
-  | Just (InlinePrag is_inline phase) <- lookupVarEnv inline_env bndr
+addInlineInfo :: InlineSpec -> Id -> CoreExpr -> (Id,CoreExpr)
+addInlineInfo (Inline phase is_inline) bndr rhs
   = (attach_phase bndr phase, wrap_inline is_inline rhs)
-  | otherwise
-  = (bndr, rhs)
   where
     attach_phase bndr phase 
 	| isAlwaysActive phase = bndr	-- Default phase

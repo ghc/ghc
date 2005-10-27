@@ -175,12 +175,17 @@ $white_no_nl+ 				;
   "{-#" $whitechar* (RULES|rules)	{ token ITrules_prag }
 
 <0,glaexts> {
-  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
-  					{ token ITspecialise_prag }
-  "{-#" $whitechar* (SOURCE|source)	{ token ITsource_prag }
-  "{-#" $whitechar* (INLINE|inline)	{ token ITinline_prag }
+  "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
-  					{ token ITnoinline_prag }
+  					{ token (ITinline_prag False) }
+  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
+  					{ token ITspec_prag }
+  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
+	$whitechar* (INLINE|inline)	{ token (ITspec_inline_prag True) }
+  "{-#" $whitechar* (SPECIALI[SZ]E|speciali[sz]e)
+	$whitechar* (NO(T?)INLINE|no(t?)inline)
+					{ token (ITspec_inline_prag False) }
+  "{-#" $whitechar* (SOURCE|source)	{ token ITsource_prag }
   "{-#" $whitechar* (DEPRECATED|deprecated)
   					{ token ITdeprecated_prag }
   "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
@@ -350,10 +355,11 @@ data Token
   | ITdotnet
   | ITmdo
 
-  | ITspecialise_prag		-- Pragmas
+	-- Pragmas
+  | ITinline_prag Bool		-- True <=> INLINE, False <=> NOINLINE
+  | ITspec_prag			-- SPECIALISE	
+  | ITspec_inline_prag Bool	-- SPECIALISE INLINE (or NOINLINE)
   | ITsource_prag
-  | ITinline_prag
-  | ITnoinline_prag
   | ITrules_prag
   | ITdeprecated_prag
   | ITline_prag

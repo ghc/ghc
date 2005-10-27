@@ -188,7 +188,7 @@ rnTopBindsSrc binds@(ValBindsIn mbinds _)
 
 		-- Warn about missing signatures, 
 	; let	{ ValBindsOut _ sigs' = binds'
-		; ty_sig_vars = mkNameSet [ unLoc n | L _ (Sig n _) <- sigs']
+		; ty_sig_vars = mkNameSet [ unLoc n | L _ (TypeSig n _) <- sigs']
 		; un_sigd_bndrs = duDefs dus `minusNameSet` ty_sig_vars }
 
 	; warn_missing_sigs <- doptM Opt_WarnMissingSigs
@@ -361,8 +361,8 @@ mkSigTvFn sigs
   where
     env :: NameEnv [Name]
     env = mkNameEnv [ (name, map hsLTyVarName ltvs)
-		    | L _ (Sig (L _ name) 
-			       (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs]
+		    | L _ (TypeSig (L _ name) 
+			           (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs]
 	-- Note the pattern-match on "Explicit"; we only bind
 	-- type variables from signatures with an explicit top-level for-all
 				
@@ -522,23 +522,23 @@ check_sigs ok_sig sigs
 
 renameSig :: Sig RdrName -> RnM (Sig Name)
 -- FixitSig is renamed elsewhere.
-renameSig (Sig v ty)
+renameSig (TypeSig v ty)
   = lookupLocatedSigOccRn v			`thenM` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty		`thenM` \ new_ty ->
-    returnM (Sig new_v new_ty)
+    returnM (TypeSig new_v new_ty)
 
 renameSig (SpecInstSig ty)
   = rnLHsType (text "A SPECIALISE instance pragma") ty `thenM` \ new_ty ->
     returnM (SpecInstSig new_ty)
 
-renameSig (SpecSig v ty)
+renameSig (SpecSig v ty inl)
   = lookupLocatedSigOccRn v		`thenM` \ new_v ->
     rnHsSigType (quotes (ppr v)) ty	`thenM` \ new_ty ->
-    returnM (SpecSig new_v new_ty)
+    returnM (SpecSig new_v new_ty inl)
 
-renameSig (InlineSig b v p)
+renameSig (InlineSig v s)
   = lookupLocatedSigOccRn v		`thenM` \ new_v ->
-    returnM (InlineSig b new_v p)
+    returnM (InlineSig new_v s)
 \end{code}
 
 

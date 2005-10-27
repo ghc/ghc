@@ -34,7 +34,7 @@ import Module
 import StaticFlags	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  Activation(..) )
+			  Activation(..), InlineSpec(..), defaultInlineSpec )
 import OrdList
 import Panic
 
@@ -184,10 +184,10 @@ incorrect.
  'proc'		{ L _ ITproc }		-- for arrow notation extension
  'rec'		{ L _ ITrec }		-- for arrow notation extension
 
- '{-# SPECIALISE'  { L _ ITspecialise_prag }
+ '{-# INLINE'      	  { L _ (ITinline_prag _) }
+ '{-# SPECIALISE'  	  { L _ ITspec_prag }
+ '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _) }
  '{-# SOURCE'	   { L _ ITsource_prag }
- '{-# INLINE'      { L _ ITinline_prag }
- '{-# NOINLINE'    { L _ ITnoinline_prag }
  '{-# RULES'	   { L _ ITrules_prag }
  '{-# CORE'        { L _ ITcore_prag }              -- hdaume: annotated core
  '{-# SCC'	   { L _ ITscc_prag }
@@ -535,10 +535,6 @@ rule  	:: { LHsDecl RdrName }
 
 activation :: { Activation }           -- Omitted means AlwaysActive
         : {- empty -}                           { AlwaysActive }
-        | explicit_activation                   { $1 }
-
-inverse_activation :: { Activation }   -- Omitted means NeverActive
-        : {- empty -}                           { NeverActive }
         | explicit_activation                   { $1 }
 
 explicit_activation :: { Activation }  -- In brackets
@@ -996,16 +992,17 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 				      return (LL $ unitOL (LL $ SigD s)) }
 		-- See the above notes for why we need infixexp here
 	| var ',' sig_vars '::' sigtype	
-				{ LL $ toOL [ LL $ SigD (Sig n $5) | n <- $1 : unLoc $3 ] }
+				{ LL $ toOL [ LL $ SigD (TypeSig n $5) | n <- $1 : unLoc $3 ] }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      
-				{ LL $ unitOL (LL $ SigD (InlineSig True  $3 $2)) }
-	| '{-# NOINLINE' inverse_activation qvar '#-}' 
-				{ LL $ unitOL (LL $ SigD (InlineSig False $3 $2)) }
+				{ LL $ unitOL (LL $ SigD (InlineSig $3 (Inline $2 (getINLINE $1)))) }
 	| '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
-			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t)
+			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlineSpec)
 					    | t <- $4] }
+	| '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
+			 	{ LL $ toOL [ LL $ SigD (SpecSig $3 t (Inline $2 (getSPEC_INLINE $1)))
+					    | t <- $5] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'
 				{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
 
@@ -1573,6 +1570,8 @@ getPRIMINTEGER	(L _ (ITprimint    x)) = x
 getPRIMFLOAT	(L _ (ITprimfloat  x)) = x
 getPRIMDOUBLE	(L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (L _ (ITidEscape x)) = x
+getINLINE	(L _ (ITinline_prag b)) = b
+getSPEC_INLINE	(L _ (ITspec_inline_prag b)) = b
 
 -- Utilities for combining source spans
 comb2 :: Located a -> Located b -> SrcSpan

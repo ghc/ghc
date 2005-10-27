@@ -48,6 +48,7 @@ module BasicTypes(
 
 	CompilerPhase, 
 	Activation(..), isActive, isNeverActive, isAlwaysActive,
+	InlineSpec(..), defaultInlineSpec, alwaysInlineSpec,
 
 	SuccessFlag(..), succeeded, failed, successIf
    ) where
@@ -466,12 +467,26 @@ data Activation = NeverActive
 		| ActiveAfter CompilerPhase	-- Active in this phase and later
 		deriving( Eq )			-- Eq used in comparing rules in HsDecls
 
+data InlineSpec
+  = Inline 
+	Activation	-- Says during which phases inlining is allowed
+	Bool 		-- True <=> make the RHS look small, so that when inlining
+			--	    is enabled, it will definitely actually happen
+  deriving( Eq )
+
+defaultInlineSpec = Inline AlwaysActive False	-- Inlining is OK, but not forced
+alwaysInlineSpec  = Inline AlwaysActive True	-- Inline unconditionally
+
 instance Outputable Activation where
    ppr AlwaysActive     = empty		-- The default
    ppr (ActiveBefore n) = brackets (char '~' <> int n)
    ppr (ActiveAfter n)  = brackets (int n)
    ppr NeverActive      = ptext SLIT("NEVER")
     
+instance Outputable InlineSpec where
+   ppr (Inline act True)  = ptext SLIT("INLINE") <> ppr act
+   ppr (Inline act False) = ptext SLIT("NOINLINE") <> ppr act
+
 isActive :: CompilerPhase -> Activation -> Bool
 isActive p NeverActive      = False
 isActive p AlwaysActive     = True

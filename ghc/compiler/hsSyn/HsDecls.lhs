@@ -405,7 +405,7 @@ tyClDeclNames (TySynonym   {tcdLName = name})  = [name]
 tyClDeclNames (ForeignType {tcdLName = name})  = [name]
 
 tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs})
-  = cls_name : [n | L _ (Sig n _) <- sigs]
+  = cls_name : [n | L _ (TypeSig n _) <- sigs]
 
 tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
   = tc_name : conDeclsNames (map unLoc cons)

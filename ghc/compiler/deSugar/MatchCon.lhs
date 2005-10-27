@@ -12,9 +12,9 @@ import {-# SOURCE #-} Match	( match )
 
 import HsSyn		( Pat(..), HsConDetails(..) )
 import DsBinds		( dsLHsBinds )
-import DataCon		( isVanillaDataCon, dataConTyVars, dataConInstOrigArgTys )
+import DataCon		( isVanillaDataCon, dataConInstOrigArgTys )
 import TcType		( tcTyConAppArgs )
-import Type		( substTys, zipTopTvSubst, mkTyVarTys )
+import Type		( mkTyVarTys )
 import CoreSyn
 import DsMonad
 import DsUtils

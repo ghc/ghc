@@ -105,11 +105,11 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
-    sig_info (FixSig _)		  = (1,0,0,0)
-    sig_info (Sig _ _)            = (0,1,0,0)
-    sig_info (SpecSig _ _)        = (0,0,1,0)
-    sig_info (InlineSig _ _ _)    = (0,0,0,1)
-    sig_info _                    = (0,0,0,0)
+    sig_info (FixSig _)		= (1,0,0,0)
+    sig_info (TypeSig _ _)      = (0,1,0,0)
+    sig_info (SpecSig _ _ _)    = (0,0,1,0)
+    sig_info (InlineSig _ _)    = (0,0,0,1)
+    sig_info _                  = (0,0,0,0)
 
     import_info (L _ (ImportDecl _ _ qual as spec))
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)

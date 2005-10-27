@@ -343,8 +343,8 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
-rep_sig (L loc (Sig nm ty)) = rep_proto nm ty loc
-rep_sig other		    = return []
+rep_sig (L loc (TypeSig nm ty)) = rep_proto nm ty loc
+rep_sig other		        = return []
 
 rep_proto :: Located Name -> LHsType Name -> SrcSpan -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_proto nm ty loc = do { nm1 <- lookupLOcc nm ; 

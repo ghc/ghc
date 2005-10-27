@@ -118,8 +118,8 @@ tcClassSigs clas sigs def_methods
   = do { dm_env <- checkDefaultBinds clas op_names def_methods
        ; mappM (tcClassSig dm_env) op_sigs }
   where
-    op_sigs  = [sig | sig@(L _ (Sig _ _))       <- sigs]
-    op_names = [n   | sig@(L _ (Sig (L _ n) _)) <- op_sigs]
+    op_sigs  = [sig | sig@(L _ (TypeSig _ _))       <- sigs]
+    op_names = [n   | sig@(L _ (TypeSig (L _ n) _)) <- op_sigs]
 
 
 checkDefaultBinds :: Name -> [Name] -> LHsBinds Name -> TcM (NameEnv Bool)
@@ -151,7 +151,7 @@ tcClassSig :: NameEnv Bool		-- Info about default methods;
 	   -> LSig Name
 	   -> TcM TcMethInfo
 
-tcClassSig dm_env (L loc (Sig (L _ op_name) op_hs_ty))
+tcClassSig dm_env (L loc (TypeSig (L _ op_name) op_hs_ty))
   = setSrcSpan loc $ do
     { op_ty <- tcHsKindedType op_hs_ty	-- Class tyvars already in scope
     ; let dm = case lookupNameEnv dm_env op_name of

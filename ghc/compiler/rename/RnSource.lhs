@@ -504,7 +504,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
     let
-	sig_rdr_names_w_locs   = [op | L _ (Sig op _) <- sigs]
+	sig_rdr_names_w_locs   = [op | L _ (TypeSig op _) <- sigs]
     in
     checkDupNames sig_doc sig_rdr_names_w_locs	`thenM_` 
 	-- Typechecker is responsible for checking that we only

@@ -35,7 +35,7 @@ import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  negateName, thenMName, bindMName, failMName )
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
-import RdrName		( RdrName, emptyGlobalRdrEnv, plusGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
+import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
 import LoadIface	( loadHomeInterface )
 import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )

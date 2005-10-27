@@ -47,7 +47,7 @@ convertToHsDecls loc ds = map (cvt_top loc) ds
 cvt_top :: SrcSpan -> TH.Dec -> Either (LHsDecl RdrName) Message
 cvt_top loc d@(TH.ValD _ _ _) = Left $ L loc $ Hs.ValD (unLoc (cvtd loc d))
 cvt_top loc d@(TH.FunD _ _)   = Left $ L loc $ Hs.ValD (unLoc (cvtd loc d))
-cvt_top loc (TH.SigD nm typ) = Left $ L loc $ Hs.SigD (Sig (L loc (vName nm)) (cvtType loc typ))
+cvt_top loc (TH.SigD nm typ) = Left $ L loc $ Hs.SigD (TypeSig (L loc (vName nm)) (cvtType loc typ))
  
 cvt_top loc (TySynD tc tvs rhs)
   = Left $ L loc $ TyClD (TySynonym (L loc (tconName tc)) (cvt_tvs loc tvs) (cvtType loc rhs))
@@ -233,7 +233,7 @@ cvtBindsAndSigs loc ds
   where 
     (sigs, non_sigs) = partition sigP ds
 
-cvtSig loc (TH.SigD nm typ) = L loc (Hs.Sig (L loc (vName nm)) (cvtType loc typ))
+cvtSig loc (TH.SigD nm typ) = L loc (Hs.TypeSig (L loc (vName nm)) (cvtType loc typ))
 
 cvtds :: SrcSpan -> [TH.Dec] -> LHsBinds RdrName
 cvtds loc []     = emptyBag

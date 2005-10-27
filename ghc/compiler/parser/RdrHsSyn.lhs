@@ -601,7 +601,7 @@ checkValSig
 	:: LHsExpr RdrName
 	-> LHsType RdrName
 	-> P (Sig RdrName)
-checkValSig (L l (HsVar v)) ty | isUnqual v = return (Sig (L l v) ty)
+checkValSig (L l (HsVar v)) ty | isUnqual v = return (TypeSig (L l v) ty)
 checkValSig (L l other)     ty
   = parseError l "Type signature given for an expression"
 

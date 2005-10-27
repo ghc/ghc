@@ -41,7 +41,7 @@ import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
 import Bag
-import BasicTypes	( Activation( AlwaysActive ) )
+import BasicTypes	( Activation( AlwaysActive ), InlineSpec(..) )
 import FastString
 \end{code}
 
@@ -383,7 +383,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 	scs_and_meths = map instToId sc_dicts ++ meth_ids
 	this_dict_id  = instToId this_dict
 	inline_prag | null dfun_arg_dicts = []
-		    | otherwise	= [InlinePrag True AlwaysActive]
+		    | otherwise	= [InlinePrag (Inline AlwaysActive True)]
 		-- Always inline the dfun; this is an experimental decision
 		-- because it makes a big performance difference sometimes.
 		-- Often it means we can do the method selection, and then

@@ -324,8 +324,8 @@ kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt,  tcdSigs = sigs})
 	; sigs' <- mappM (wrapLocM kc_sig) sigs
 	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs'}) }
   where
-    kc_sig (Sig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
-				; return (Sig nm op_ty') }
+    kc_sig (TypeSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
+				   ; return (TypeSig nm op_ty') }
     kc_sig other_sig	      = return other_sig
 
 kcTyClDecl decl@(ForeignType {})

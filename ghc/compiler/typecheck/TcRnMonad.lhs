@@ -41,7 +41,7 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupp
 import Unique		( Unique )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set, GhcMode )
 import StaticFlags	( opt_PprStyle_Debug )
-import Bag		( snocBag, unionBags, unitBag )
+import Bag		( snocBag, unionBags )
 import Panic		( showException )
  
 import IO		( stderr )
@@ -448,14 +448,12 @@ addErrAt loc msg = addLongErrAt loc msg empty
 
 addLongErrAt :: SrcSpan -> Message -> Message -> TcRn ()
 addLongErrAt loc msg extra
- = do {  errs_var <- getErrsVar ;
+  = do { traceTc (ptext SLIT("Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
+
+	 errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
 	 let { err = mkLongErrMsg loc (unQualInScope rdr_env) msg extra } ;
 	 (warns, errs) <- readMutVar errs_var ;
-	 
-	 let style = mkErrStyle (unQualInScope rdr_env)
-	     doc   = mkLocMessage loc (msg $$ extra)
-	 in traceTc (ptext SLIT("Adding error:") <+> doc) ;	
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
 addErrs :: [(SrcSpan,Message)] -> TcRn ()

@@ -111,9 +111,9 @@ In all cases this is set up for interface-file declarations:
 hsSigsFVs :: [LSig Name] -> FreeVars
 hsSigsFVs sigs = plusFVs (map (hsSigFVs.unLoc) sigs)
 
-hsSigFVs (Sig v ty) 	    = extractHsTyNames ty
+hsSigFVs (TypeSig v ty)     = extractHsTyNames ty
 hsSigFVs (SpecInstSig ty)   = extractHsTyNames ty
-hsSigFVs (SpecSig v ty)     = extractHsTyNames ty
+hsSigFVs (SpecSig v ty inl) = extractHsTyNames ty
 hsSigFVs other		    = emptyFVs
 
 ----------------

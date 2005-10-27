@@ -63,7 +63,7 @@ import Digraph		( SCC(..), stronglyConnComp )
 import Maybes		( fromJust, isJust, isNothing, orElse, catMaybes )
 import Util		( singleton )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel,
-			  RecFlag(..), isNonRec )
+			  RecFlag(..), isNonRec, InlineSpec, defaultInlineSpec )
 import Outputable
 \end{code}
 
@@ -117,7 +117,7 @@ tcHsBootSigs (ValBindsOut binds sigs)
   = do	{ checkTc (null binds) badBootDeclErr
 	; mapM (addLocM tc_boot_sig) (filter isVanillaLSig sigs) }
   where
-    tc_boot_sig (Sig (L _ name) ty)
+    tc_boot_sig (TypeSig (L _ name) ty)
       = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
 	   ; return (mkVanillaGlobal name sigma_ty vanillaIdInfo) }
 	-- Notice that we make GlobalIds, not LocalIds
@@ -160,6 +160,9 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
 tcValBinds :: TopLevelFlag 
 	   -> HsValBinds Name -> TcM thing
 	   -> TcM (HsValBinds TcId, thing) 
+
+tcValBinds top_lvl (ValBindsIn binds sigs) thing_inside
+  = pprPanic "tcValBinds" (ppr binds)
 
 tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
   = tcAddLetBoundTyVars binds  $
@@ -431,18 +434,18 @@ tcPrags poly_id prags = mapM tc_prag prags
 pragSigCtxt prag = hang (ptext SLIT("In the pragma")) 2 (ppr prag)
 
 tcPrag :: TcId -> Sig Name -> TcM Prag
-tcPrag poly_id (SpecSig orig_name hs_ty) = tcSpecPrag poly_id hs_ty
-tcPrag poly_id (SpecInstSig hs_ty)	 = tcSpecPrag poly_id hs_ty
-tcPrag poly_id (InlineSig inl _ act)     = return (InlinePrag inl act)
+tcPrag poly_id (SpecSig orig_name hs_ty inl) = tcSpecPrag poly_id hs_ty inl
+tcPrag poly_id (SpecInstSig hs_ty)	     = tcSpecPrag poly_id hs_ty defaultInlineSpec
+tcPrag poly_id (InlineSig v inl)             = return (InlinePrag inl)
 
 
-tcSpecPrag :: TcId -> LHsType Name -> TcM Prag
-tcSpecPrag poly_id hs_ty
+tcSpecPrag :: TcId -> LHsType Name -> InlineSpec -> TcM Prag
+tcSpecPrag poly_id hs_ty inl
   = do	{ spec_ty <- tcHsSigType (FunSigCtxt (idName poly_id)) hs_ty
 	; (co_fn, lie)   <- getLIE (tcSub spec_ty (idType poly_id))
 	; extendLIEs lie
 	; let const_dicts = map instToId lie
-	; return (SpecPrag (co_fn <$> (HsVar poly_id)) spec_ty const_dicts) }
+	; return (SpecPrag (co_fn <$> (HsVar poly_id)) spec_ty const_dicts inl) }
   
 --------------
 -- If typechecking the binds fails, then return with each
@@ -887,7 +890,7 @@ tcTySigs sigs = do { mb_sigs <- mappM tcTySig (filter isVanillaLSig sigs)
 		   ; return (catMaybes mb_sigs) }
 
 tcTySig :: LSig Name -> TcM (Maybe TcSigInfo)
-tcTySig (L span (Sig (L _ name) ty))
+tcTySig (L span (TypeSig (L _ name) ty))
   = recoverM (return Nothing)	$
     setSrcSpan span		$
     do	{ sigma_ty <- tcHsSigType (FunSigCtxt name) ty

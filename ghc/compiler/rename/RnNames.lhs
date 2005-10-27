@@ -351,7 +351,7 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
 
     new_simple rdr_name = newTopSrcBinder mod Nothing rdr_name
 
-    sig_hs_bndrs = [nm | L _ (Sig nm _) <- val_sigs]
+    sig_hs_bndrs = [nm | L _ (TypeSig nm _) <- val_sigs]
     val_hs_bndrs = collectHsBindLocatedBinders val_decls
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 

@@ -340,11 +340,11 @@ zonk_bind env (AbsBinds tyvars dicts exports val_binds)
 	  zonkIdBndr env global		`thenM` \ new_global ->
 	  mapM zonk_prag prags		`thenM` \ new_prags -> 
 	  returnM (new_tyvars, new_global, zonkIdOcc env local, new_prags)
-    zonk_prag prag@(InlinePrag _ _) = return prag
-    zonk_prag (SpecPrag expr ty ds) = do { expr' <- zonkExpr env expr 
-					 ; ty'   <- zonkTcTypeToType env ty
-					 ; let ds' = zonkIdOccs env ds
-					 ; return (SpecPrag expr' ty' ds') }
+    zonk_prag prag@(InlinePrag {})  = return prag
+    zonk_prag (SpecPrag expr ty ds inl) = do { expr' <- zonkExpr env expr 
+					     ; ty'   <- zonkTcTypeToType env ty
+					     ; let ds' = zonkIdOccs env ds
+					     ; return (SpecPrag expr' ty' ds' inl) }
 \end{code}
 
 %************************************************************************

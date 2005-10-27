@@ -18,7 +18,7 @@ import {-# SOURCE #-} HsPat  ( LPat )
 import HsTypes		( LHsType, PostTcType )
 import Name		( Name )
 import NameSet		( NameSet, elemNameSet )
-import BasicTypes	( IPName, RecFlag(..), Activation(..), Fixity )
+import BasicTypes	( IPName, RecFlag(..), InlineSpec(..), Fixity )
 import Outputable	
 import SrcLoc		( Located(..), SrcSpan, unLoc )
 import Util		( sortLe )
@@ -277,15 +277,15 @@ serves for both.
 type LSig name = Located (Sig name)
 
 data Sig name
-  = Sig		(Located name)	-- a bog-std type signature
+  = TypeSig	(Located name)	-- A bog-std type signature
 		(LHsType name)
 
-  | SpecSig 	(Located name)	-- specialise a function or datatype ...
+  | SpecSig 	(Located name)	-- Specialise a function or datatype ...
 		(LHsType name)	-- ... to these types
+		InlineSpec
 
-  | InlineSig	Bool		-- True <=> INLINE f, False <=> NOINLINE f
-	 	(Located name)	-- Function name
-		Activation	-- When inlining is *active*
+  | InlineSig	(Located name)	-- Function name
+		InlineSpec
 
   | SpecInstSig (LHsType name)	-- (Class tys); should be a specialisation of the 
 				-- current instance decl
@@ -297,20 +297,20 @@ data FixitySig name = FixitySig (Located name) Fixity
 
 -- A Prag conveys pragmas from the type checker to the desugarer
 data Prag 
-  = InlinePrag 	
-	Bool 		-- True <=> INLINE, False <=> NOINLINE
-	Activation
+  = InlinePrag 
+	InlineSpec
 
   | SpecPrag   
 	(HsExpr Id)	-- An expression, of the given specialised type, which
 	PostTcType 	-- specialises the polymorphic function
 	[Id]		-- Dicts mentioned free in the expression
+	InlineSpec 	-- Inlining spec for the specialised function
 
-isInlinePrag (InlinePrag _ _) = True
-isInlinePrag prag	      = False
+isInlinePrag (InlinePrag _) = True
+isInlinePrag prag	    = False
 
-isSpecPrag (SpecPrag _ _ _) = True
-isSpecPrag prag		    = False
+isSpecPrag (SpecPrag _ _ _ _) = True
+isSpecPrag prag		      = False
 \end{code}
 
 \begin{code}
@@ -318,9 +318,9 @@ okBindSig :: NameSet -> LSig Name -> Bool
 okBindSig ns sig = sigForThisGroup ns sig
 
 okHsBootSig :: LSig Name -> Bool
-okHsBootSig (L _ (Sig  _ _)) = True
-okHsBootSig (L _ (FixSig _)) = True
-okHsBootSig sig	      	     = False
+okHsBootSig (L _ (TypeSig  _ _)) = True
+okHsBootSig (L _ (FixSig _)) 	 = True
+okHsBootSig sig	      	     	 = False
 
 okClsDclSig :: LSig Name -> Bool
 okClsDclSig (L _ (SpecInstSig _)) = False
@@ -329,7 +329,7 @@ okClsDclSig sig 	          = True	-- All others OK
 okInstDclSig :: NameSet -> LSig Name -> Bool
 okInstDclSig ns lsig@(L _ sig) = ok ns sig
   where
-    ok ns (Sig _ _)	  = False
+    ok ns (TypeSig _ _)	  = False
     ok ns (FixSig _)	  = False
     ok ns (SpecInstSig _) = True
     ok ns sig		  = sigForThisGroup ns lsig
@@ -343,9 +343,9 @@ sigForThisGroup ns sig
 sigName :: LSig name -> Maybe name
 sigName (L _ sig) = f sig
  where
-    f (Sig         n _)        = Just (unLoc n)
-    f (SpecSig     n _)        = Just (unLoc n)
-    f (InlineSig _ n _)        = Just (unLoc n)
+    f (TypeSig   n _)          = Just (unLoc n)
+    f (SpecSig   n _ _)        = Just (unLoc n)
+    f (InlineSig n _)          = Just (unLoc n)
     f (FixSig (FixitySig n _)) = Just (unLoc n)
     f other			= Nothing
 
@@ -354,26 +354,25 @@ isFixityLSig (L _ (FixSig _)) = True
 isFixityLSig _	              = False
 
 isVanillaLSig :: LSig name -> Bool
-isVanillaLSig (L _(Sig name _)) = True
-isVanillaLSig sig	        = False
+isVanillaLSig (L _(TypeSig name _)) = True
+isVanillaLSig sig	            = False
 
 isSpecLSig :: LSig name -> Bool
-isSpecLSig (L _(SpecSig name _)) = True
-isSpecLSig sig	     		 = False
+isSpecLSig (L _(SpecSig name _ _)) = True
+isSpecLSig sig	     		   = False
 
 isSpecInstLSig (L _ (SpecInstSig _)) = True
 isSpecInstLSig sig	       	     = False
 
 isPragLSig :: LSig name -> Bool
 	-- Identifies pragmas 
-isPragLSig (L _ (SpecSig _ _))     = True
-isPragLSig (L _ (InlineSig _ _ _)) = True
-isPragLSig other		   = False
+isPragLSig (L _ (SpecSig _ _ _)) = True
+isPragLSig (L _ (InlineSig _ _)) = True
+isPragLSig other		 = False
 
-hsSigDoc (Sig        _ _) 	  = ptext SLIT("type signature")
-hsSigDoc (SpecSig    _ _) 	  = ptext SLIT("SPECIALISE pragma")
-hsSigDoc (InlineSig True  _ _)    = ptext SLIT("INLINE pragma")
-hsSigDoc (InlineSig False _ _)    = ptext SLIT("NOINLINE pragma")
+hsSigDoc (TypeSig    _ _) 	  = ptext SLIT("type signature")
+hsSigDoc (SpecSig    _ _ _) 	  = ptext SLIT("SPECIALISE pragma")
+hsSigDoc (InlineSig _ spec)   	  = ppr spec <+> ptext SLIT("pragma")
 hsSigDoc (SpecInstSig _)	  = ptext SLIT("SPECIALISE instance pragma")
 hsSigDoc (FixSig (FixitySig _ _)) = ptext SLIT("fixity declaration")
 \end{code}
@@ -383,8 +382,8 @@ Signature equality is used when checking for duplicate signatures
 \begin{code}
 eqHsSig :: LSig Name -> LSig Name -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
-eqHsSig (L _ (Sig n1 _))         	(L _ (Sig n2 _))                = unLoc n1 == unLoc n2
-eqHsSig (L _ (InlineSig b1 n1 _))	(L _ (InlineSig b2 n2 _))       = b1 == b2 && unLoc n1 == unLoc n2
+eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
+eqHsSig (L _ (InlineSig n1 s1))	(L _ (InlineSig n2 s2))    	        = s1 == s2 && unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
 	-- specialisations here.  Check for this later, when we're in Type land
@@ -396,10 +395,10 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (Sig var ty)		  = pprVarSig (unLoc var) ty
+ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) ty
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
-ppr_sig (SpecSig var ty) 	  = pragBrackets (pprSpec var ty)
-ppr_sig (InlineSig inl var phase) = pragBrackets (pprInline var inl phase)
+ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var ty inl)
+ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
 ppr_sig (SpecInstSig ty) 	  = pragBrackets (ptext SLIT("SPECIALIZE instance") <+> ppr ty)
 
 instance Outputable name => Outputable (FixitySig name) where
@@ -408,17 +407,13 @@ instance Outputable name => Outputable (FixitySig name) where
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = ptext SLIT("{-#") <+> doc <+> ptext SLIT("#-}") 
 
-pprInline :: Outputable id => id -> Bool -> Activation -> SDoc
-pprInline var True  phase = hsep [ptext SLIT("INLINE"),   ppr phase, ppr var]
-pprInline var False phase = hsep [ptext SLIT("NOINLINE"), ppr phase, ppr var]
-
 pprVarSig :: (Outputable id, Outputable ty) => id -> ty -> SDoc
 pprVarSig var ty = sep [ppr var <+> dcolon, nest 2 (ppr ty)]
 
-pprSpec :: (Outputable id, Outputable ty) => id -> ty -> SDoc
-pprSpec var ty = sep [ptext SLIT("SPECIALIZE") <+> pprVarSig var ty]
+pprSpec :: (Outputable id, Outputable ty) => id -> ty -> InlineSpec -> SDoc
+pprSpec var ty inl = sep [ptext SLIT("SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
 
 pprPrag :: Outputable id => id -> Prag -> SDoc
-pprPrag var (InlinePrag inl act) = pprInline var inl act
-pprPrag var (SpecPrag expr ty _) = pprSpec var ty
+pprPrag var (InlinePrag inl)         = ppr inl <+> ppr var
+pprPrag var (SpecPrag expr ty _ inl) = pprSpec var ty inl
 \end{code}
