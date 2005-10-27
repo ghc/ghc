@@ -328,8 +328,7 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
   // if it decides to do so when it is scheduled.
   if (tso -> why_blocked == BlockedOnSTM) {
     TRACE("unpark_tso on tso=%p\n", tso);
-    tso -> why_blocked = NotBlocked;
-    pushOnRunQueue(cap,tso);
+    unblockOne(cap,tso);
   } else {
     TRACE("spurious unpark_tso on tso=%p\n", tso);
   }
