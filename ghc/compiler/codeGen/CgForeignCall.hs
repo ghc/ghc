@@ -79,7 +79,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
     id <- newTemp wordRep
     emitSaveThreadState
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
-			[(id,NoHint)]
+			[(id,PtrHint)]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
 			(Just vols)
 			)
@@ -90,7 +90,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 				-- a different Capability!  Small optimisation:
 				-- only do this in SMP mode, where there are >1
 				-- Capabilities.
-			[ (CmmReg id, NoHint) ]
+			[ (CmmReg id, PtrHint) ]
 			(Just vols)
 			)
     emitLoadThreadState
