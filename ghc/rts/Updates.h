@@ -280,8 +280,9 @@ DEBUG_FILL_SLOP(StgClosure *p)
       and_then;							\
     } else {							\
       DEBUG_FILL_SLOP(p1);					\
-      foreign "C" recordMutableGenLock(p1 "ptr",		\
-		 generation(TO_W_(bdescr_gen_no(bd))) "ptr");	\
+      foreign "C" recordMutableCap(p1 "ptr", 			\
+				   MyCapability() "ptr", 	\
+		                   bdescr_gen_no(bd));		\
       StgInd_indirectee(p1) = p2;				\
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
       LDV_RECORD_CREATE(p1);					\

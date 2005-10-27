@@ -334,7 +334,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   step *stp;
   lnat live, allocated, collected = 0, copied = 0, scavd_copied = 0;
   lnat oldgen_saved_blocks = 0;
-  nat g, s;
+  nat g, s, i;
 
   ACQUIRE_SM_LOCK;
 
@@ -439,6 +439,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     if (g != 0) {
 	freeChain(generations[g].mut_list);
 	generations[g].mut_list = allocBlock();
+	for (i = 0; i < n_capabilities; i++) {
+	    freeChain(capabilities[i].mut_lists[g]);
+	    capabilities[i].mut_lists[g] = allocBlock();
+	}
     }
 
     for (s = 0; s < generations[g].n_steps; s++) {
@@ -540,6 +544,19 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       stp->new_large_objects = NULL;
       stp->scavenged_large_objects = NULL;
       stp->n_scavenged_large_blocks = 0;
+    }
+
+    /* Move the private mutable lists from each capability onto the
+     * main mutable list for the generation.
+     */
+    for (i = 0; i < n_capabilities; i++) {
+	for (bd = capabilities[i].mut_lists[g]; 
+	     bd->link != NULL; bd = bd->link) {
+	    /* nothing */
+	}
+	bd->link = generations[g].mut_list;
+	generations[g].mut_list = capabilities[i].mut_lists[g];
+	capabilities[i].mut_lists[g] = allocBlock();
     }
   }
 

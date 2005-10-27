@@ -60,6 +60,12 @@ struct Capability_ {
     // this list.
     Task *suspended_ccalling_tasks;
 
+    // One mutable list per generation, so we don't need to take any
+    // locks when updating an old-generation thunk.  These
+    // mini-mut-lists are moved onto the respective gen->mut_list at
+    // each GC.
+    bdescr **mut_lists;
+
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
@@ -146,6 +152,8 @@ extern Capability *last_free_capability;
 //
 void waitForReturnCapability (Capability **cap/*in/out*/, Task *task);
 
+INLINE_HEADER void recordMutableCap (StgClosure *p, Capability *cap, nat gen);
+
 #if defined(THREADED_RTS)
 
 // Gives up the current capability IFF there is a higher-priority
@@ -181,6 +189,10 @@ void prodAllCapabilities (void);
 //
 void shutdownCapability (Capability *cap, Task *task);
 
+// Attempt to gain control of a Capability if it is free.
+//
+rtsBool tryGrabCapability (Capability *cap, Task *task);
+
 #else // !THREADED_RTS
 
 // Grab a capability.  (Only in the non-threaded RTS; in the threaded
@@ -189,5 +201,25 @@ void shutdownCapability (Capability *cap, Task *task);
 extern void grabCapability (Capability **pCap);
 
 #endif /* !THREADED_RTS */
+
+/* -----------------------------------------------------------------------------
+ * INLINE functions... private below here
+ * -------------------------------------------------------------------------- */
+
+INLINE_HEADER void
+recordMutableCap (StgClosure *p, Capability *cap, nat gen)
+{
+    bdescr *bd;
+
+    bd = cap->mut_lists[gen];
+    if (bd->free >= bd->start + BLOCK_SIZE_W) {
+	bdescr *new_bd;
+	new_bd = allocBlock_lock();
+	new_bd->link = bd;
+	bd = new_bd;
+	cap->mut_lists[gen] = bd;
+    }
+    *bd->free++ = (StgWord)p;
+}
 
 #endif /* CAPABILITY_H */

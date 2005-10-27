@@ -980,6 +980,11 @@ memInventory(void)
   /* count the blocks we current have */
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (i = 0; i < n_capabilities; i++) {
+	  for (bd = capabilities[i].mut_lists[g]; bd != NULL; bd = bd->link) {
+	      total_blocks += bd->blocks;
+	  }
+      }	  
       for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
 	  total_blocks += bd->blocks;
       }

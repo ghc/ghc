@@ -142,6 +142,10 @@ initCapability( Capability *cap, nat i )
 
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
     cap->f.stgGCFun        = (F_)__stg_gc_fun;
+
+    cap->mut_lists  = stgMallocBytes(sizeof(bdescr *) * 
+				     RtsFlags.GcFlags.generations,
+				     "initCapability");
 }
 
 /* ---------------------------------------------------------------------------
@@ -571,6 +575,29 @@ shutdownCapability (Capability *cap, Task *task)
     // we now have the Capability, its run queue and spare workers
     // list are both empty.
 }
+
+/* ----------------------------------------------------------------------------
+ * tryGrabCapability
+ *
+ * Attempt to gain control of a Capability if it is free.
+ * 
+ * ------------------------------------------------------------------------- */
+
+rtsBool
+tryGrabCapability (Capability *cap, Task *task)
+{
+    if (cap->running_task != NULL) return rtsFalse;
+    ACQUIRE_LOCK(&cap->lock);
+    if (cap->running_task != NULL) {
+	RELEASE_LOCK(&cap->lock);
+	return rtsFalse;
+    }
+    task->cap = cap;
+    cap->running_task = task;
+    RELEASE_LOCK(&cap->lock);
+    return rtsTrue;
+}
+
 
 #endif /* THREADED_RTS */
 
