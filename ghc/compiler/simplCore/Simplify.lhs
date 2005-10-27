@@ -53,12 +53,13 @@ import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
 			  splitFunTy_maybe, splitFunTy, coreEqType 
 			)
-import VarEnv		( elemVarEnv )
+import VarEnv		( elemVarEnv, emptyVarEnv )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
 			  RecFlag(..), isNonRec
 			)
+import StaticFlags	( opt_PprStyle_Debug )
 import OrdList
 import Maybes		( orElse )
 import Outputable
@@ -1472,20 +1473,22 @@ simplAlts :: SimplEnv
 	  -> SimplM [OutAlt]		-- Includes the continuation
 
 simplAlts env handled_cons case_bndr' alts cont'
-  = mapSmpl simpl_alt alts
+  = do	{ mb_alts <- mapSmpl simpl_alt alts
+	; return [alt' | Just (_, alt') <- mb_alts] }
+	-- Filter out the alternatives that are inaccessible
   where
-    simpl_alt alt = simplAlt env handled_cons case_bndr' alt cont'	`thenSmpl` \ (_, alt') ->
-	 	    returnSmpl alt'
+    simpl_alt alt = simplAlt env handled_cons case_bndr' alt cont'
 
 simplAlt :: SimplEnv -> [AltCon] -> OutId -> InAlt -> SimplCont
-	 -> SimplM (Maybe TvSubstEnv, OutAlt)
+	 -> SimplM (Maybe (TvSubstEnv, OutAlt))
 -- Simplify an alternative, returning the type refinement for the 
 -- alternative, if the alternative does any refinement at all
+-- Nothing => the alternative is inaccessible
 
 simplAlt env handled_cons case_bndr' (DEFAULT, bndrs, rhs) cont'
   = ASSERT( null bndrs )
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
-    returnSmpl (Nothing, (DEFAULT, [], rhs'))
+    returnSmpl (Just (emptyVarEnv, (DEFAULT, [], rhs')))
   where
     env' = mk_rhs_env env case_bndr' (mkOtherCon handled_cons)
 	-- Record the constructors that the case-binder *can't* be.
@@ -1493,7 +1496,7 @@ simplAlt env handled_cons case_bndr' (DEFAULT, bndrs, rhs) cont'
 simplAlt env handled_cons case_bndr' (LitAlt lit, bndrs, rhs) cont'
   = ASSERT( null bndrs )
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
-    returnSmpl (Nothing, (LitAlt lit, [], rhs'))
+    returnSmpl (Just (emptyVarEnv, (LitAlt lit, [], rhs')))
   where
     env' = mk_rhs_env env case_bndr' (mkUnfolding False (Lit lit))
 
@@ -1514,7 +1517,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	env'      = mk_rhs_env env case_bndr' unf
     in
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
-    returnSmpl (Nothing, (DataAlt con, vs', rhs'))
+    returnSmpl (Just (emptyVarEnv, (DataAlt con, vs', rhs')))
 
   | otherwise	-- GADT case
   = let
@@ -1522,14 +1525,18 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
     in
     simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
     case coreRefineTys (getInScope env1) con tvs' (idType case_bndr') of {
-	Nothing 	-- Dead code; for now, I'm just going to put in an
-			-- error case so I can see them
+	Nothing 	-- Inaccessible
+	    | opt_PprStyle_Debug	-- Hack: if debugging is on, generate an error case 
+					--  	 so we can see it
 	    ->	let rhs' = mkApps (Var eRROR_ID) 
 				[Type (substTy env (exprType rhs)),
 				 Lit (mkStringLit "Impossible alternative (GADT)")]
 		in 
 		simplBinders env1 ids		`thenSmpl` \ (env2, ids') -> 
-		returnSmpl (Nothing, (DataAlt con, tvs' ++ ids', rhs')) ;
+		returnSmpl (Just (emptyVarEnv, (DataAlt con, tvs' ++ ids', rhs'))) 
+
+	    | otherwise	-- Filter out the inaccessible branch
+	    -> return Nothing ;	
 
 	Just refine@(tv_subst_env, _) -> 	-- The normal case
 
@@ -1548,7 +1555,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	vs'	   = tvs' ++ ids'
     in
     simplExprC env_w_unf rhs cont'	`thenSmpl` \ rhs' ->
-    returnSmpl (Just tv_subst_env, (DataAlt con, vs', rhs')) }
+    returnSmpl (Just (tv_subst_env, (DataAlt con, vs', rhs'))) }
 
   where
 	-- add_evals records the evaluated-ness of the bound variables of
@@ -1745,7 +1752,6 @@ mkDupableCont env (ApplyTo _ arg se cont)
 	-- This has been this way for a long time, so I'll leave it,
 	-- but I can't convince myself that it's right.
 
--- gaw 2004
 mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })
 	--	===>
@@ -1784,17 +1790,24 @@ mkDupableAlts env case_bndr' alts dupable_cont
   where
     go env [] = returnSmpl (emptyFloats env, [])
     go env (alt:alts)
-	= mkDupableAlt env case_bndr' dupable_cont alt	`thenSmpl` \ (floats1, alt') ->
-	  addFloats env floats1				$ \ env ->
-	  go env alts					`thenSmpl` \ (floats2, alts') ->
-	  returnSmpl (floats2, alt' : alts')
+	= do { (floats1, mb_alt') <- mkDupableAlt env case_bndr' dupable_cont alt
+	     ; addFloats env floats1	$ \ env -> do
+	     { (floats2, alts') <- go env alts
+	     ; returnSmpl (floats2, case mb_alt' of
+					Just alt' -> alt' : alts'
+					Nothing   -> alts'
+			  )}}
 					
 mkDupableAlt env case_bndr' cont alt
-  = simplAlt env [] case_bndr' alt cont		`thenSmpl` \ (mb_reft, (con, bndrs', rhs')) ->
+  = simplAlt env [] case_bndr' alt cont		`thenSmpl` \ mb_stuff ->
+    case mb_stuff of {
+	Nothing -> returnSmpl (emptyFloats env, Nothing) ;
+
+	Just (reft, (con, bndrs', rhs')) ->
 	-- Safe to say that there are no handled-cons for the DEFAULT case
 
     if exprIsDupable rhs' then
-	returnSmpl (emptyFloats env, (con, bndrs', rhs'))
+	returnSmpl (emptyFloats env, Just (con, bndrs', rhs'))
    	-- It is worth checking for a small RHS because otherwise we
 	-- get extra let bindings that may cause an extra iteration of the simplifier to
 	-- inline back in place.  Quite often the rhs is just a variable or constructor.
@@ -1816,13 +1829,11 @@ mkDupableAlt env case_bndr' cont alt
 	rhs_ty'     = exprType rhs'
         used_bndrs' = filter abstract_over (case_bndr' : bndrs')
 	abstract_over bndr
-	  | isTyVar bndr = not (mb_reft `refines` bndr)
+	  | isTyVar bndr = not (bndr `elemVarEnv` reft)
 		-- Don't abstract over tyvar binders which are refined away
+		-- See Note [Refinement] below
 	  | otherwise	 = not (isDeadBinder bndr)
 		-- The deadness info on the new Ids is preserved by simplBinders
-	refines Nothing	        bndr = False
-	refines (Just tv_subst) bndr = bndr `elemVarEnv` tv_subst	
-		-- See Note [Refinement] below
     in
 	-- If we try to lift a primitive-typed something out
 	-- for let-binding-purposes, we will *caseify* it (!),
@@ -1890,7 +1901,7 @@ mkDupableAlt env case_bndr' cont alt
 	join_rhs  = mkLams really_final_bndrs rhs'
 	join_call = mkApps (Var join_bndr) final_args
     in
-    returnSmpl (unitFloat env join_bndr join_rhs, (con, bndrs', join_call))
+    returnSmpl (unitFloat env join_bndr join_rhs, Just (con, bndrs', join_call)) }
 \end{code}
 
 Note [Refinement]
