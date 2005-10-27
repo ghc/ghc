@@ -137,9 +137,13 @@ getThreadLocalVar (ThreadLocalKey *key)
 {
     void *r;
     r = TlsGetValue(*key);
-    if (r == NULL) {
+#ifdef DEBUG
+    // r is allowed to be NULL - it can mean that either there was an
+    // error or the stored value is in fact NULL.
+    if (GetLastError() != NO_ERROR) {
 	barf("getThreadLocalVar: key not found");
     }
+#endif
     return r;
 }
 
