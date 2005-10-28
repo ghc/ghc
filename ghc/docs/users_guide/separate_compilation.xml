@@ -253,6 +253,23 @@
           <filename>Main.hs</filename>, and put the resulting
           executable in <filename>foo.exe</filename> (not
           <filename>foo</filename>).</para>
+
+          <para>If you use <command>ghc --make</command> and you don't
+          use the <option>-o</option>, the name GHC will choose
+          for the executable will be based on the name of the file
+          containing the module <literal>Main</literal>. 
+          Note that with GHC the <literal>Main</literal> module doesn't
+          have to be put in file <filename>Main.hs</filename>.
+          Thus both
+<programlisting>
+   ghc --make Prog
+</programlisting>
+          and
+<programlisting>
+   ghc --make Prog.hs
+</programlisting>
+          will produce <filename>Prog</filename> (or
+          <filename>Prog.exe</filename> if you are on Windows).</para>
 	  </listitem>
 	</varlistentry>
 
@@ -321,6 +338,23 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	    <para>Redirects all generated interface files into
 	    <replaceable>dir</replaceable>, instead of the
 	    default.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-stubdir</option>  <replaceable>dir</replaceable>
+            <indexterm><primary><option>-stubdir</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Redirects all generated FFI stub files into
+	    <replaceable>dir</replaceable>.  Stub files are generated when the
+	    Haskell source contains a <literal>foreign export</literal> or
+	    <literal>foreign import "&amp;wrapper"</literal> declaration (see <xref
+	      linkend="foreign-export-ghc" />).  The <option>-stubdir</option>
+	      option behaves in exactly the same way as <option>-odir</option>
+	      and <option>-hidir</option> with respect to hierarchical
+	    modules.</para>
 	  </listitem>
 	</varlistentry>
 

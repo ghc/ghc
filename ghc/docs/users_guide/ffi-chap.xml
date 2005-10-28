@@ -107,6 +107,11 @@ extern HsInt foo(HsInt a0);</programlisting>
       invoke <literal>foo()</literal> from C, just <literal>#include
       "Foo_stub.h"</literal> and call <literal>foo()</literal>.</para>
 
+      <para>The <filename>foo_stub.c</filename> and
+	<filename>foo_stub.h</filename> files can be redirected using the
+	<option>-stubdir</option> option; see <xref linkend="options-output"
+	  />.</para>
+
       <sect3 id="using-own-main"> 
 	<title>Using your own <literal>main()</literal></title>
 
