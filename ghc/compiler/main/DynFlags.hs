@@ -48,6 +48,8 @@ module DynFlags (
 
 #include "HsVersions.h"
 
+import Module		( Module, mkModule )
+import PrelNames	( mAIN )
 import StaticFlags	( opt_Static, opt_PIC, 
 			  WayName(..), v_Ways, v_Build_tag, v_RTS_Build_tag )
 import {-# SOURCE #-} Packages (PackageState)
@@ -202,7 +204,7 @@ data DynFlags = DynFlags {
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
   importPaths		:: [FilePath],
-  mainModIs		:: Maybe String,
+  mainModIs		:: Module,
   mainFunIs		:: Maybe String,
 
   -- ways
@@ -334,7 +336,7 @@ defaultDynFlags =
 	stolen_x86_regs		= 4,
 	cmdlineHcIncludes	= [],
 	importPaths		= ["."],
-	mainModIs		= Nothing,
+	mainModIs		= mAIN,
 	mainFunIs		= Nothing,
 	
 	wayNames		= panic "ways",
@@ -1056,10 +1058,10 @@ setMainIs :: String -> DynP ()
 setMainIs arg
   | not (null main_fn)		-- The arg looked like "Foo.baz"
   = upd $ \d -> d{ mainFunIs = Just main_fn,
-	  	   mainModIs = Just main_mod }
+	  	   mainModIs = mkModule main_mod }
 
   | isUpper (head main_mod)	-- The arg looked like "Foo"
-  = upd $ \d -> d{ mainModIs = Just main_mod }
+  = upd $ \d -> d{ mainModIs = mkModule main_mod }
   
   | otherwise			-- The arg looked like "baz"
   = upd $ \d -> d{ mainFunIs = Just main_mod }

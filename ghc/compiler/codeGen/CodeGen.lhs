@@ -74,7 +74,7 @@ codeGen dflags hmods this_mod data_tycons foreign_stubs imported_mods
   = do	
   { showPass dflags "CodeGen"
   ; let way = buildTag dflags
-        mb_main_mod = mainModIs dflags
+        main_mod = mainModIs dflags
 
 -- Why?
 --   ; mapM_ (\x -> seq x (return ())) data_tycons
@@ -83,7 +83,7 @@ codeGen dflags hmods this_mod data_tycons foreign_stubs imported_mods
 		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags hmods) stg_binds
 		; cmm_tycons <- mapM cgTyCon data_tycons
 		; cmm_init   <- getCmm (mkModuleInit dflags hmods way cost_centre_info 
-					     this_mod mb_main_mod
+					     this_mod main_mod
 				  	     foreign_stubs imported_mods)
 		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
 		}
@@ -147,11 +147,11 @@ mkModuleInit
 	-> String		-- the "way"
 	-> CollectedCCs         -- cost centre info
 	-> Module
-	-> Maybe String		-- Just m ==> we have flag: -main-is Foo.baz 
+	-> Module		-- name of the Main module
 	-> ForeignStubs
 	-> [Module]
 	-> Code
-mkModuleInit dflags hmods way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
+mkModuleInit dflags hmods way cost_centre_info this_mod main_mod foreign_stubs imported_mods
   = do	{ 	
         if opt_SccProfilingOn
             then do { -- Allocate the static boolean that records if this
@@ -191,10 +191,6 @@ mkModuleInit dflags hmods way cost_centre_info this_mod mb_main_mod foreign_stub
     jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
 
     mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) wordRep
-
-    main_mod = case mb_main_mod of
-			Just mod_name -> mkModule mod_name
-			Nothing	      -> mAIN
 
     -- Main refers to GHC.TopHandler.runIO, so make sure we call the
     -- init function for GHC.TopHandler.

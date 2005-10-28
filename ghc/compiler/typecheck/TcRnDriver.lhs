@@ -732,9 +732,7 @@ checkMain
   = do { ghci_mode <- getGhciMode ;
 	 tcg_env   <- getGblEnv ;
 	 dflags    <- getDOpts ;
-	 let { main_mod = case mainModIs dflags of {
-				Just mod -> mkModule mod ;
-				Nothing  -> mAIN } ;
+	 let { main_mod = mainModIs dflags ;
 	       main_fn  = case mainFunIs dflags of {
 				Just fn -> mkRdrUnqual (mkVarOcc (mkFastString fn)) ;
 				Nothing -> main_RDR_Unqual } } ;

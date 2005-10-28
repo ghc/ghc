@@ -222,6 +222,7 @@ import Bag		( unitBag )
 import ErrUtils		( Severity(..), showPass, Messages, fatalErrorMsg, debugTraceMsg,
 			  mkPlainErrMsg, printBagOfErrors, printErrorsAndWarnings )
 import qualified ErrUtils
+import PrelNames	( mAIN )
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
@@ -353,6 +354,23 @@ getSessionDynFlags s = withSession s (return . hsc_dflags)
 setSessionDynFlags :: Session -> DynFlags -> IO ()
 setSessionDynFlags s dflags = modifySession s (\h -> h{ hsc_dflags = dflags })
 
+-- | If there is no -o option, guess the name of target executable
+-- by using top-level source file name as a base.
+guessOutputFile :: Session -> IO ()
+guessOutputFile s = modifySession s $ \env ->
+    let dflags = hsc_dflags env
+        mod_graph = hsc_mod_graph env
+        mainModuleSrcPath, guessedName :: Maybe String
+        mainModuleSrcPath = do
+            let isMain = (== mainModIs dflags) . ms_mod
+            [ms] <- return (filter isMain mod_graph)
+            ml_hs_file (ms_location ms)
+        guessedName = fmap basenameOf mainModuleSrcPath
+    in
+    case outputFile dflags of
+        Just _ -> env
+        Nothing -> env { hsc_dflags = dflags { outputFile = guessedName } }
+
 -- -----------------------------------------------------------------------------
 -- Targets
 
@@ -474,6 +492,7 @@ load s@(Session ref) how_much
 	   Nothing        -> return Failed
 
 load2 s@(Session ref) how_much mod_graph = do
+        guessOutputFile s
 	hsc_env <- readIORef ref
 
         let hpt1      = hsc_HPT hsc_env
@@ -603,18 +622,15 @@ load2 s@(Session ref) how_much mod_graph = do
 	      --
 	      let ofile = outputFile dflags
 	      let no_hs_main = dopt Opt_NoHsMain dflags
-	      let mb_main_mod = mainModIs dflags
 	      let 
-	 	main_mod = mb_main_mod `orElse` "Main"
-		a_root_is_Main 
-               	    = any ((==main_mod).moduleUserString.ms_mod) 
-                    	  mod_graph
+	 	main_mod = mainModIs dflags
+		a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
 		do_linking = a_root_is_Main || no_hs_main
 
 	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking) $
 	        debugTraceMsg dflags 1 (text ("Warning: output was redirected with -o, " ++
 				              "but no output will be generated\n" ++
-				              "because there is no " ++ main_mod ++ " module."))
+				              "because there is no " ++ moduleUserString main_mod ++ " module."))
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env1)
