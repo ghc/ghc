@@ -142,6 +142,7 @@ typedef struct _RtsSymbolVal {
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
+      SymX(signal_handlers)			\
       SymX(stg_sig_install)			\
       Sym(nocldstop)
 #endif
@@ -2740,7 +2741,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    IF_DEBUG(linker,debugBelch(
              "\nSection header table: start %ld, n_entries %d, ent_size %d\n",
-             ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
+             (long)ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
 
    ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
 
@@ -2807,7 +2808,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
       IF_DEBUG(linker,debugBelch( "   number of entries is apparently %d (%ld rem)\n",
                nent,
-               shdr[i].sh_size % sizeof(Elf_Sym)
+               (long)shdr[i].sh_size % sizeof(Elf_Sym)
              ));
       if (0 != shdr[i].sh_size % sizeof(Elf_Sym)) {
          errorBelch("%s: non-integral number of symbol table entries", oc->fileName);
@@ -3116,8 +3117,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          case R_386_PC32: *pP = value - P; break;
 #        endif
          default:
-            errorBelch("%s: unhandled ELF relocation(Rel) type %ld\n",
-		  oc->fileName, ELF_R_TYPE(info));
+            errorBelch("%s: unhandled ELF relocation(Rel) type %lu\n",
+		  oc->fileName, (lnat)ELF_R_TYPE(info));
             return 0;
       }
 
@@ -3357,8 +3358,8 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
          default:
-            errorBelch("%s: unhandled ELF relocation(RelA) type %ld\n",
-		  oc->fileName, ELF_R_TYPE(info));
+            errorBelch("%s: unhandled ELF relocation(RelA) type %lu\n",
+		  oc->fileName, (lnat)ELF_R_TYPE(info));
             return 0;
       }
 
