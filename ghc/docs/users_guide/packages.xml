@@ -21,7 +21,7 @@ Packages
     a package.  All you need to do is write a simple configuration file, put a
     few files in the right places, and you have a package.  See the
     <ulink url="../Cabal/index.html">Cabal documentation</ulink>
-    for details, and also the Cabal libraries (<ulink url="../libraries/Cabal/Distribution.Simple.html">Distribution.Simple</ulink>,
+    for details, and also the Cabal libraries (<ulink url="../libraries/Cabal/Distribution-Simple.html">Distribution.Simple</ulink>,
     for example).</para>
 
   <sect2 id="using-packages">
@@ -616,7 +616,7 @@ exposed-modules: Network.BSD,
 
     <para>A package specification is a Haskell record; in particular, it is the
       record <ulink
-	url="../libraries/Cabal/Distribution.InstalledPackageInfo.html#%tInstalledPackageInfo">InstalledPackageInfo</ulink> in the module Distribution.InstalledPackageInfo, which is part of the Cabal package distributed with GHC.</para>
+	url="../libraries/Cabal/Distribution-InstalledPackageInfo.html#%tInstalledPackageInfo">InstalledPackageInfo</ulink> in the module Distribution.InstalledPackageInfo, which is part of the Cabal package distributed with GHC.</para>
 
     <para>An <literal>InstalledPackageInfo</literal> has a human
       readable/writable syntax.  The functions
@@ -736,7 +736,7 @@ depends: base-1.0
 	<listitem>
 	  <para>(string) The type of license under which this package is distributed.
 	    This field is a value of the <ulink
-	url="../libraries/Cabal/Distribution.License.html#t:License"><literal>License</literal></ulink> type.</para>
+	url="../libraries/Cabal/Distribution-License.html#t:License"><literal>License</literal></ulink> type.</para>
 	</listitem>
       </varlistentry>
 

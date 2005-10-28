@@ -3875,7 +3875,7 @@ What follows is a brief introduction to the notation;
 it won't make much sense unless you've read Hughes's paper.
 This notation is translated to ordinary Haskell,
 using combinators from the
-<ulink url="../libraries/base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module.
 </para>
 
@@ -3988,7 +3988,7 @@ the arrow <literal>f</literal>, and matches its output against
 <literal>y</literal>.
 In the next line, the output is discarded.
 The arrow <function>returnA</function> is defined in the
-<ulink url="../libraries/base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module as <literal>arr id</literal>.
 The above example is treated as an abbreviation for
 <screen>
@@ -4005,7 +4005,7 @@ arr (\ x -> (x, x)) >>>
 Note that variables not used later in the composition are projected out.
 After simplification using rewrite rules (see <xref linkend="rewrite-rules"/>)
 defined in the
-<ulink url="../libraries/base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>
+<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>
 module, this reduces to
 <screen>
 arr (\ x -> (x+1, x)) >>>
@@ -4300,7 +4300,7 @@ additional restrictions:
 <listitem>
 <para>
 The module must import
-<ulink url="../libraries/base/Control.Arrow.html"><literal>Control.Arrow</literal></ulink>.
+<ulink url="../libraries/base/Control-Arrow.html"><literal>Control.Arrow</literal></ulink>.
 </para>
 </listitem>
 
