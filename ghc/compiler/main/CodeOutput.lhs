@@ -23,11 +23,11 @@ import qualified PrintJava
 import OccurAnal	( occurAnalyseBinds )
 #endif
 
-import Distribution.Package	( showPackageId )
+import Finder		( mkStubPaths )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
-import Util		( filenameOf )
+import Util
 import FastString	( unpackFS )
 import Cmm		( Cmm )
 import HscTypes
@@ -35,10 +35,11 @@ import DynFlags
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
-import Module		( Module )
+import Module		( Module, ModLocation(..) )
 import List		( nub )
 import Maybes		( firstJust )
 
+import Distribution.Package	( showPackageId )
 import Directory	( doesFileExist )
 import Monad		( when )
 import IO
@@ -53,12 +54,13 @@ import IO
 \begin{code}
 codeOutput :: DynFlags
 	   -> Module
+	   -> ModLocation
 	   -> ForeignStubs
 	   -> [PackageId]
 	   -> [Cmm]			-- Compiled C--
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 
-codeOutput dflags this_mod foreign_stubs pkg_deps flat_abstractC
+codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
   = 
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
@@ -78,12 +80,13 @@ codeOutput dflags this_mod foreign_stubs pkg_deps flat_abstractC
 
 	; showPass dflags "CodeOutput"
 	; let filenm = hscOutName dflags 
-	; stubs_exist <- outputForeignStubs dflags foreign_stubs
+	; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
 	; case hscTarget dflags of {
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
-             HscC           -> outputC dflags filenm flat_abstractC stubs_exist
-					pkg_deps foreign_stubs;
+             HscC           -> outputC dflags filenm this_mod location 
+				 flat_abstractC stubs_exist pkg_deps
+				 foreign_stubs;
              HscJava        -> 
 #ifdef JAVA
 			       outputJava dflags filenm mod_name tycons core_binds;
@@ -113,7 +116,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 %************************************************************************
 
 \begin{code}
-outputC dflags filenm flat_absC 
+outputC dflags filenm mod location flat_absC 
 	(stub_h_exists, _) packages foreign_stubs
   = do 
        -- figure out which header files to #include in the generated .hc file:
@@ -150,8 +153,10 @@ outputC dflags filenm flat_absC
 	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
 	  hPutStr h cc_injects
 	  when stub_h_exists $ 
-	     hPutStrLn h ("#include \"" ++ (filenameOf (hscStubHOutName dflags)) ++ "\"")
+	     hPutStrLn h ("#include \"" ++ (filenameOf stub_h) ++ "\"")
 	  writeCs dflags h flat_absC
+  where
+    (_, stub_h) = mkStubPaths dflags mod location
 \end{code}
 
 
@@ -226,17 +231,30 @@ outputIlx dflags filename mod tycons stg_binds
 %************************************************************************
 
 \begin{code}
-outputForeignStubs :: DynFlags -> ForeignStubs
+outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
 		   -> IO (Bool, 	-- Header file created
 			  Bool)		-- C file created
-outputForeignStubs dflags NoStubs = do
--- When compiling External Core files, may need to use stub files from a 
--- previous compilation
-   hFileExists <- doesFileExist (hscStubHOutName dflags)
-   cFileExists <- doesFileExist (hscStubCOutName dflags)
-   return (hFileExists, cFileExists)
-outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
+outputForeignStubs dflags mod location stubs
+  | NoStubs <- stubs = do
+	-- When compiling External Core files, may need to use stub
+	-- files from a previous compilation
+	stub_c_exists <- doesFileExist stub_c
+	stub_h_exists <- doesFileExist stub_h
+	return (stub_h_exists, stub_c_exists)
+
+  | ForeignStubs h_code c_code _ _ <- stubs
   = do
+	let
+	    stub_c_output_d = pprCode CStyle c_code
+	    stub_c_output_w = showSDoc stub_c_output_d
+	
+	    -- Header file protos for "foreign export"ed functions.
+	    stub_h_output_d = pprCode CStyle h_code
+	    stub_h_output_w = showSDoc stub_h_output_d
+	-- in
+
+	createDirectoryHierarchy (directoryOf stub_c)
+
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
 
@@ -250,14 +268,14 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
 	    mk_include i = "#include \"" ++ i ++ "\"\n"
 
 	stub_h_file_exists
-           <- outputForeignStubs_help (hscStubHOutName dflags) stub_h_output_w
+           <- outputForeignStubs_help stub_h stub_h_output_w
 		("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
 
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
 
 	stub_c_file_exists
-           <- outputForeignStubs_help (hscStubCOutName dflags) stub_c_output_w
+           <- outputForeignStubs_help stub_c stub_c_output_w
 		("#define IN_STG_CODE 0\n" ++ 
 		 "#include \"Rts.h\"\n" ++
 		 rts_includes ++
@@ -269,13 +287,7 @@ outputForeignStubs dflags (ForeignStubs h_code c_code _ _)
 
         return (stub_h_file_exists, stub_c_file_exists)
   where
-    -- C stubs for "foreign export"ed functions.
-    stub_c_output_d = pprCode CStyle c_code
-    stub_c_output_w = showSDoc stub_c_output_d
-
-    -- Header file protos for "foreign export"ed functions.
-    stub_h_output_d = pprCode CStyle h_code
-    stub_h_output_w = showSDoc stub_h_output_d
+   (stub_c, stub_h) = mkStubPaths dflags mod location
 
 cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
 cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"

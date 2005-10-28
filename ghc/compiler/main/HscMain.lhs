@@ -456,7 +456,7 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
  	    -------------------
  	    -- CONVERT TO STG and COMPLETE CODE GENERATION
 	; (stub_h_exists, stub_c_exists, maybe_bcos)
-		<- hscCodeGen dflags cg_guts
+		<- hscCodeGen dflags (ms_location mod_summary) cg_guts
 
       	  -- And the answer is ...
 	; dumpIfaceStats hsc_env
@@ -469,7 +469,7 @@ hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
 
 
 
-hscCodeGen dflags 
+hscCodeGen dflags location
     CgGuts{  -- This is the last use of the ModGuts in a compilation.
 	      -- From now on, we just use the bits we need.
         cg_module   = this_mod,
@@ -500,7 +500,7 @@ hscCodeGen dflags
 	
 	    ------------------ Create f-x-dynamic C-side stuff ---
 	    (istub_h_exists, istub_c_exists) 
-	       <- outputForeignStubs dflags foreign_stubs
+	       <- outputForeignStubs dflags this_mod location foreign_stubs
 	    
 	    return ( istub_h_exists, istub_c_exists, Just comp_bc )
 #else
@@ -521,7 +521,7 @@ hscCodeGen dflags
 
 	    ------------------  Code output -----------------------
 	    (stub_h_exists, stub_c_exists)
-		     <- codeOutput dflags this_mod foreign_stubs 
+		     <- codeOutput dflags this_mod location foreign_stubs 
 				dependencies abstractC
 
 	    return (stub_h_exists, stub_c_exists, Nothing)
@@ -534,10 +534,11 @@ hscCmmFile dflags filename = do
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-	codeOutput dflags no_mod NoStubs [] [cmm]
+	codeOutput dflags no_mod no_loc NoStubs [] [cmm]
 	return True
   where
 	no_mod = panic "hscCmmFile: no_mod"
+	no_loc = panic "hscCmmFile: no_location"
 
 
 myParseModule dflags src_filename maybe_src_buf

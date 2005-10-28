@@ -240,7 +240,7 @@ checkOptions cli_mode dflags srcs objs = do
 -- 
 verifyOutputFiles :: DynFlags -> IO ()
 verifyOutputFiles dflags = do
-  let odir = outputDir dflags
+  let odir = objectDir dflags
   when (isJust odir) $ do
      let dir = fromJust odir
      flg <- doesDirectoryExist dir

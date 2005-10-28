@@ -13,6 +13,7 @@ module Finder (
     mkHomeModLocation2,		-- :: ModuleName -> FilePath -> String -> IO ModLocation
     addHomeModuleToFinder, 	-- :: HscEnv -> Module -> ModLocation -> IO ()
     uncacheModule,		-- :: HscEnv -> Module -> IO ()
+    mkStubPaths,
 
     findObjectLinkableMaybe,
     findObjectLinkable,
@@ -30,6 +31,7 @@ import FastString
 import Util
 import DynFlags		( DynFlags(..), isOneShot, GhcMode(..) )
 import Outputable
+import Maybes		( expectJust )
 
 import DATA_IOREF	( IORef, writeIORef, readIORef )
 
@@ -347,8 +349,8 @@ mkHomeModLocation2 :: DynFlags
 mkHomeModLocation2 dflags mod src_basename ext = do
    let mod_basename = dots_to_slashes (moduleUserString mod)
 
-   obj_fn <- mkObjPath dflags src_basename mod_basename
-   hi_fn  <- mkHiPath  dflags src_basename mod_basename
+   obj_fn  <- mkObjPath  dflags src_basename mod_basename
+   hi_fn   <- mkHiPath   dflags src_basename mod_basename
 
    return (ModLocation{ ml_hs_file   = Just (src_basename `joinFileExt` ext),
 			ml_hi_file   = hi_fn,
@@ -357,7 +359,7 @@ mkHomeModLocation2 dflags mod src_basename ext = do
 hiOnlyModLocation :: DynFlags -> FilePath -> String -> Suffix -> IO ModLocation
 hiOnlyModLocation dflags path basename hisuf 
  = do let full_basename = path `joinFileName` basename
-      obj_fn <- mkObjPath dflags full_basename basename
+      obj_fn  <- mkObjPath  dflags full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
  	        	     ml_hi_file   = full_basename  `joinFileExt` hisuf,
 		 		-- Remove the .hi-boot suffix from
@@ -376,7 +378,7 @@ mkObjPath
   -> IO FilePath
 mkObjPath dflags basename mod_basename
   = do  let
-		odir = outputDir dflags
+		odir = objectDir dflags
 		osuf = objectSuf dflags
 	
 		obj_basename | Just dir <- odir = dir `joinFileName` mod_basename
@@ -401,6 +403,36 @@ mkHiPath dflags basename mod_basename
 
         return (hi_basename `joinFileExt` hisuf)
 
+
+-- -----------------------------------------------------------------------------
+-- Filenames of the stub files
+
+-- We don't have to store these in ModLocations, because they can be derived
+-- from other available information, and they're only rarely needed.
+
+mkStubPaths
+  :: DynFlags
+  -> Module
+  -> ModLocation
+  -> (FilePath,FilePath)
+
+mkStubPaths dflags mod location
+  = let
+		stubdir = stubDir dflags
+
+		mod_basename = dots_to_slashes (moduleUserString mod)
+		src_basename = basenameOf (expectJust "mkStubPaths" 
+						(ml_hs_file location))
+
+		stub_basename0
+			| Just dir <- stubdir = dir `joinFileName` mod_basename
+			| otherwise           = src_basename
+
+		stub_basename = stub_basename0 ++ "_stub"
+     in
+        (stub_basename `joinFileExt` "c",
+	 stub_basename `joinFileExt` "h")
+	-- the _stub.o filename is derived from the ml_obj_file.
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 

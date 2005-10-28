@@ -194,8 +194,6 @@ data DynFlags = DynFlags {
   stgToDo    		:: Maybe [StgToDo],  -- similarly
   hscTarget    		:: HscTarget,
   hscOutName 		:: String,  	-- name of the output file
-  hscStubHOutName	:: String,  	-- name of the .stub_h output file
-  hscStubCOutName	:: String,  	-- name of the .stub_c output file
   extCoreName		:: String,	-- name of the .core output file
   verbosity  		:: Int,	 	-- verbosity level
   optLevel		:: Int,		-- optimisation level
@@ -213,13 +211,17 @@ data DynFlags = DynFlags {
   rtsBuildTag		:: String,	-- the RTS "way"
   
   -- paths etc.
-  outputDir		:: Maybe String,
-  outputFile		:: Maybe String,
-  outputHi		:: Maybe String,
+  objectDir		:: Maybe String,
+  hiDir			:: Maybe String,
+  stubDir		:: Maybe String,
+
   objectSuf		:: String,
   hcSuf			:: String,
-  hiDir			:: Maybe String,
   hiSuf			:: String,
+
+  outputFile		:: Maybe String,
+  outputHi		:: Maybe String,
+
   includePaths		:: [String],
   libraryPaths		:: [String],
   frameworkPaths	:: [String],  	-- used on darwin only
@@ -326,8 +328,6 @@ defaultDynFlags =
 	stgToDo			= Nothing, 
 	hscTarget		= defaultHscTarget, 
 	hscOutName		= "", 
-	hscStubHOutName 	= "",
-	hscStubCOutName 	= "",
 	extCoreName		= "",
 	verbosity		= 0, 
 	optLevel		= 0,
@@ -343,13 +343,16 @@ defaultDynFlags =
 	buildTag		= panic "buildTag",
 	rtsBuildTag		= panic "rtsBuildTag",
 
-	outputDir		= Nothing,
-	outputFile		= Nothing,
-	outputHi		= Nothing,
+	objectDir		= Nothing,
+	hiDir			= Nothing,
+	stubDir			= Nothing,
+
 	objectSuf		= phaseInputExt StopLn,
 	hcSuf			= phaseInputExt HCc,
-	hiDir			= Nothing,
 	hiSuf			= "hi",
+
+	outputFile		= Nothing,
+	outputHi		= Nothing,
 	includePaths		= [],
 	libraryPaths		= [],
 	frameworkPaths		= [],
@@ -442,13 +445,16 @@ getVerbFlag dflags
   | verbosity dflags >= 3  = "-v" 
   | otherwise =  ""
 
-setOutputDir  f d = d{ outputDir  = f}
+setObjectDir  f d = d{ objectDir  = f}
+setHiDir      f d = d{ hiDir      = f}
+setStubDir    f d = d{ stubDir    = f}
+
+setObjectSuf  f d = d{ objectSuf  = f}
+setHiSuf      f d = d{ hiSuf      = f}
+setHcSuf      f d = d{ hcSuf      = f}
+
 setOutputFile f d = d{ outputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
-setObjectSuf  f d = d{ objectSuf  = f}
-setHcSuf      f d = d{ hcSuf      = f}
-setHiSuf      f d = d{ hiSuf      = f}
-setHiDir      f d = d{ hiDir      = f}
 
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
@@ -805,7 +811,7 @@ dynamic_flags = [
   ,  ( "framework"	, HasArg (upd . addCmdlineFramework) )
 
 	------- Output Redirection ------------------------------------------
-  ,  ( "odir"		, HasArg (upd . setOutputDir  . Just))
+  ,  ( "odir"		, HasArg (upd . setObjectDir  . Just))
   ,  ( "o"		, SepArg (upd . setOutputFile . Just))
   ,  ( "ohi"		, HasArg (upd . setOutputHi   . Just ))
   ,  ( "osuf"		, HasArg (upd . setObjectSuf))
@@ -813,6 +819,7 @@ dynamic_flags = [
   ,  ( "hisuf"		, HasArg (upd . setHiSuf))
   ,  ( "hidir"		, HasArg (upd . setHiDir . Just))
   ,  ( "tmpdir"		, HasArg (upd . setTmpDir))
+  ,  ( "stubdir"	, HasArg (upd . setStubDir . Just))
 
 	------- Keeping temporary files -------------------------------------
   ,  ( "keep-hc-file"   , AnySuffix (\_ -> setDynFlag Opt_KeepHcFiles))

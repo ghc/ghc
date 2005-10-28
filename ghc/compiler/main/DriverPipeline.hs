@@ -157,8 +157,6 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 
    let dflags' = dflags { hscTarget = hsc_lang,
 				hscOutName = output_fn,
-				hscStubCOutName = basename ++ "_stub.c",
-				hscStubHOutName = basename ++ "_stub.h",
 				extCoreName = basename ++ ".hcr" }
 
    -- -no-recomp should also work with --make
@@ -192,7 +190,7 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 	-> do
 	   stub_unlinked <-
 	     if stub_c_exists then do
-		stub_o <- compileStub dflags' object_filename
+		stub_o <- compileStub dflags' this_mod location
 		return [ DotO stub_o ]
 	     else
 		return []
@@ -235,8 +233,9 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
 
--- The _stub.c file is derived from the haskell source file (but stored
--- in hscStubCOutName in the dflags for some reason, probably historical).
+-- The _stub.c file is derived from the haskell source file, possibly taking
+-- into account the -stubdir option.
+--
 -- Consequently, we derive the _stub.o filename from the haskell object
 -- filename.  
 --
@@ -250,12 +249,13 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 -- -odir obj, we would get obj/src/A_stub.o, which is wrong; we want
 -- obj/A_stub.o.
 
-compileStub dflags object_filename = do
-	let (o_base, o_ext) = splitFilename object_filename
+compileStub :: DynFlags -> Module -> ModLocation -> IO FilePath
+compileStub dflags mod location = do
+	let (o_base, o_ext) = splitFilename (ml_obj_file location)
 	    stub_o = o_base ++ "_stub" `joinFileExt` o_ext
 
 	-- compile the _stub.c file w/ gcc
-	let stub_c = hscStubCOutName dflags
+	let (stub_c,_) = mkStubPaths dflags mod location
 	runPipeline StopLn dflags (stub_c,Nothing) 
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
@@ -509,7 +509,7 @@ getOutputFilename dflags stop_phase output basename
  = func
  where
 	hcsuf      = hcSuf dflags
-	odir       = outputDir dflags
+	odir       = objectDir dflags
 	osuf       = objectSuf dflags
 	keep_hc    = dopt Opt_KeepHcFiles dflags
 	keep_raw_s = dopt Opt_KeepRawSFiles dflags
@@ -742,8 +742,6 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 
         let dflags' = dflags { hscTarget = hsc_lang,
 			       hscOutName = output_fn,
-		   	       hscStubCOutName = basename ++ "_stub.c",
-			       hscStubHOutName = basename ++ "_stub.h",
 			       extCoreName = basename ++ ".hcr" }
 
 	hsc_env <- newHscEnv dflags'
@@ -774,7 +772,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 		      _maybe_interpreted_code -> do
 
 		when stub_c_exists $ do
-			stub_o <- compileStub dflags' o_file
+			stub_o <- compileStub dflags' mod_name location4
 			consIORef v_Ld_inputs stub_o
 
 		-- In the case of hs-boot files, generate a dummy .o-boot 
@@ -802,8 +800,6 @@ runPhase Cmm stop dflags basename suff input_fn get_output_fn maybe_loc
 
         let dflags' = dflags { hscTarget = hsc_lang,
 			       hscOutName = output_fn,
-		   	       hscStubCOutName = basename ++ "_stub.c",
-			       hscStubHOutName = basename ++ "_stub.h",
 			       extCoreName = basename ++ ".hcr" }
 
 	ok <- hscCmmFile dflags' input_fn
@@ -969,7 +965,7 @@ runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
 	(split_s_prefix, n) <- readIORef v_Split_info
 
 	let real_odir
-		| Just d <- outputDir dflags = d
+		| Just d <- objectDir dflags = d
 		| otherwise                  = basename ++ "_split"
 
 	let assemble_file n
