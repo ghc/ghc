@@ -307,8 +307,6 @@ link BatchCompile dflags batch_attempt_linking hpt
 	          return Succeeded
 	  else do
 
-	debugTraceMsg dflags 1 (text "Linking ...")
-
 	let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 	    obj_files = concatMap getOfiles linkables
 
@@ -328,7 +326,8 @@ link BatchCompile dflags batch_attempt_linking hpt
 		   return Succeeded
 	   else do
 
-	debugTraceMsg dflags 1 (ptext SLIT("Linking ..."))
+	debugTraceMsg dflags 1 (ptext SLIT("Linking") <+> text exe_file
+				 <+> text "...")
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
         staticLink dflags obj_files pkg_deps
