@@ -13,7 +13,7 @@
  * Only in an SMP build will there be multiple capabilities, for
  * the threaded RTS and other non-threaded builds, there is only
  * one global capability, namely MainCapability.
- * 
+ *
  * --------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
@@ -81,7 +81,7 @@ anyWorkForMe( Capability *cap, Task *task )
 
 /* -----------------------------------------------------------------------------
  * Manage the returning_tasks lists.
- * 
+ *
  * These functions require cap->lock
  * -------------------------------------------------------------------------- */
 
@@ -125,6 +125,8 @@ popReturningTask (Capability *cap)
 static void
 initCapability( Capability *cap, nat i )
 {
+	nat g;
+
     cap->no = i;
     cap->in_haskell        = rtsFalse;
 
@@ -143,9 +145,12 @@ initCapability( Capability *cap, nat i )
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
     cap->f.stgGCFun        = (F_)__stg_gc_fun;
 
-    cap->mut_lists  = stgMallocBytes(sizeof(bdescr *) * 
+    cap->mut_lists  = stgMallocBytes(sizeof(bdescr *) *
 				     RtsFlags.GcFlags.generations,
 				     "initCapability");
+	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	      cap->mut_lists[g] = NULL;
+    }
 }
 
 /* ---------------------------------------------------------------------------
@@ -168,7 +173,7 @@ initCapabilities( void )
     for (i = 0; i < n; i++) {
 	initCapability(&capabilities[i], i);
     }
-    
+
     IF_DEBUG(scheduler, sched_belch("allocated %d capabilities", n));
 #else
     n_capabilities = 1;
@@ -203,9 +208,9 @@ giveCapabilityToTask (Capability *cap, Task *task)
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
     // We are not modifying task->cap, so we do not need to take task->lock.
-    IF_DEBUG(scheduler, 
+    IF_DEBUG(scheduler,
 	     sched_belch("passing capability %d to %s %p",
-			 cap->no, task->tso ? "bound task" : "worker", 
+			 cap->no, task->tso ? "bound task" : "worker",
 			 (void *)task->id));
     ACQUIRE_LOCK(&task->lock);
     task->wakeup = rtsTrue;
@@ -243,7 +248,7 @@ releaseCapability_ (Capability* cap)
 	giveCapabilityToTask(cap,cap->returning_tasks_hd);
 	// The Task pops itself from the queue (see waitForReturnCapability())
 	return;
-    } 
+    }
 
     // If the next thread on the run queue is a bound thread,
     // give this Capability to the appropriate Task.
@@ -253,7 +258,7 @@ releaseCapability_ (Capability* cap)
 	task = cap->run_queue_hd->bound;
 	giveCapabilityToTask(cap,task);
 	return;
-    } 
+    }
 
     // If we have an unbound thread on the run queue, or if there's
     // anything else to do, give the Capability to a worker thread.
@@ -262,14 +267,14 @@ releaseCapability_ (Capability* cap)
 	    giveCapabilityToTask(cap,cap->spare_workers);
 	    // The worker Task pops itself from the queue;
 	    return;
-	} 
+	}
 
 	// Create a worker thread if we don't have one.  If the system
 	// is interrupted, we only create a worker task if there
 	// are threads that need to be completed.  If the system is
 	// shutting down, we never create a new worker.
 	if (!shutting_down_scheduler) {
-	    IF_DEBUG(scheduler, 
+	    IF_DEBUG(scheduler,
 		     sched_belch("starting new worker on capability %d", cap->no));
 	    startWorkerTask(cap, workerStart);
 	    return;
@@ -327,7 +332,7 @@ releaseCapabilityAndQueueWorker (Capability* cap UNUSED_IF_NOT_THREADS)
  *
  * ------------------------------------------------------------------------- */
 void
-waitForReturnCapability (Capability **pCap, 
+waitForReturnCapability (Capability **pCap,
 			 Task *task UNUSED_IF_NOT_THREADS)
 {
 #if !defined(THREADED_RTS)
@@ -364,7 +369,7 @@ waitForReturnCapability (Capability **pCap,
 
     ACQUIRE_LOCK(&cap->lock);
 
-    IF_DEBUG(scheduler, 
+    IF_DEBUG(scheduler,
 	     sched_belch("returning; I want capability %d", cap->no));
 
     if (!cap->running_task) {
@@ -403,7 +408,7 @@ waitForReturnCapability (Capability **pCap,
 
     ASSERT_CAPABILITY_INVARIANTS(cap,task);
 
-    IF_DEBUG(scheduler, 
+    IF_DEBUG(scheduler,
 	     sched_belch("returning; got capability %d", cap->no));
 
     *pCap = cap;
@@ -428,7 +433,7 @@ yieldCapability (Capability** pCap, Task *task)
 	IF_DEBUG(scheduler, sched_belch("giving up capability %d", cap->no));
 
 	// We must now release the capability and wait to be woken up
-	// again.  
+	// again.
 	releaseCapabilityAndQueueWorker(cap);
 
 	for (;;) {
@@ -488,7 +493,7 @@ prodCapabilities(rtsBool all)
     nat i;
     Capability *cap;
     Task *task;
-    
+
     for (i=0; i < n_capabilities; i++) {
 	cap = &capabilities[i];
 	ACQUIRE_LOCK(&cap->lock);
@@ -525,7 +530,7 @@ void
 prodOneCapability (void)
 {
     prodCapabilities(rtsFalse);
-}	    
+}
 
 /* ----------------------------------------------------------------------------
  * shutdownCapability
@@ -539,7 +544,7 @@ prodOneCapability (void)
  * will exit the scheduler and call taskStop(), and any bound thread
  * that wakes up will return to its caller.  Runnable threads are
  * killed.
- * 
+ *
  * ------------------------------------------------------------------------- */
 
 void
@@ -580,7 +585,7 @@ shutdownCapability (Capability *cap, Task *task)
  * tryGrabCapability
  *
  * Attempt to gain control of a Capability if it is free.
- * 
+ *
  * ------------------------------------------------------------------------- */
 
 rtsBool
