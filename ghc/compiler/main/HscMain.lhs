@@ -38,7 +38,7 @@ import VarEnv		( emptyTidyEnv )
 #endif
 
 import Var		( Id )
-import Module		( emptyModuleEnv )
+import Module		( emptyModuleEnv, ModLocation(..) )
 import RdrName		( GlobalRdrEnv, RdrName )
 import HsSyn		( HsModule, LHsBinds, HsGroup )
 import SrcLoc		( Located(..) )
@@ -538,7 +538,9 @@ hscCmmFile dflags filename = do
 	return True
   where
 	no_mod = panic "hscCmmFile: no_mod"
-	no_loc = panic "hscCmmFile: no_location"
+	no_loc = ModLocation{ ml_hs_file  = Just filename,
+                              ml_hi_file  = panic "hscCmmFile: no hi file",
+                              ml_obj_file = panic "hscCmmFile: no obj file" }
 
 
 myParseModule dflags src_filename maybe_src_buf
