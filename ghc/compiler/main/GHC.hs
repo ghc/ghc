@@ -365,7 +365,11 @@ guessOutputFile s = modifySession s $ \env ->
             let isMain = (== mainModIs dflags) . ms_mod
             [ms] <- return (filter isMain mod_graph)
             ml_hs_file (ms_location ms)
+#if defined(mingw32_HOST_OS)
+        guessedName = fmap (\fname -> basenameOf fname `joinFileExt` "exe") mainModuleSrcPath
+#else
         guessedName = fmap basenameOf mainModuleSrcPath
+#endif
     in
     case outputFile dflags of
         Just _ -> env
