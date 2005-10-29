@@ -1,7 +1,6 @@
-TOP=..
-include $(TOP)/mk/boilerplate.mk
+include config.mk
 
 XML_DOC = haddock
 INSTALL_XML_DOC = haddock
 
-include $(TOP)/mk/target.mk
+include docbook-xml.mk

@@ -1,0 +1,15 @@
+#-----------------------------------------------------------------------------
+# DocBook XML stuff
+
+XSLTPROC		= @XsltprocCmd@
+XMLLINT			= @XmllintCmd@
+FOP			= @FopCmd@
+XMLTEX			= @XmltexCmd@
+PDFXMLTEX		= @PdfxmltexCmd@
+DVIPS			= @DvipsCmd@
+
+DIR_DOCBOOK_XSL		= @DIR_DOCBOOK_XSL@
+
+XSLTPROC_LABEL_OPTS	= --stringparam toc.section.depth 3 \
+			  --stringparam section.autolabel 1 \
+			  --stringparam section.label.includes.component.label 1
