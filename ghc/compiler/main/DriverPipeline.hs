@@ -1205,7 +1205,14 @@ staticLink dflags o_files dep_packages = do
 
 exeFileName :: DynFlags -> FilePath
 exeFileName dflags
-  | Just s <- outputFile dflags = s
+  | Just s <- outputFile dflags = 
+#if defined(mingw32_HOST_OS)
+      if null (suffixOf s)
+        then s `joinFileExt` "exe"
+        else s
+#else
+      s
+#endif
   | otherwise = 
 #if defined(mingw32_HOST_OS)
 	"main.exe"
