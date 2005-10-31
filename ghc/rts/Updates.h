@@ -272,13 +272,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
  */ LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
 /*  foreign "C" cas(p1 "ptr", 0, stg_WHITEHOLE_info);		\
  */ bd = Bdescr(p1);						\
-    if (bdescr_gen_no(bd) == 0 :: CInt) {			\
-      StgInd_indirectee(p1) = p2;				\
-      SET_INFO(p1, ind_info);					\
-      LDV_RECORD_CREATE(p1);					\
-      TICK_UPD_NEW_IND();					\
-      and_then;							\
-    } else {							\
+    if (bdescr_gen_no(bd) != 0 :: CInt) {			\
       DEBUG_FILL_SLOP(p1);					\
       foreign "C" recordMutableCap(p1 "ptr", 			\
 				   MyCapability() "ptr", 	\
@@ -287,6 +281,12 @@ DEBUG_FILL_SLOP(StgClosure *p)
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
       LDV_RECORD_CREATE(p1);					\
       TICK_UPD_OLD_IND();					\
+      and_then;							\
+    } else {							\
+      StgInd_indirectee(p1) = p2;				\
+      SET_INFO(p1, ind_info);					\
+      LDV_RECORD_CREATE(p1);					\
+      TICK_UPD_NEW_IND();					\
       and_then;							\
   }
 #else
@@ -298,18 +298,18 @@ DEBUG_FILL_SLOP(StgClosure *p)
     ASSERT( (P_)p1 != (P_)p2 && !closure_IND(p1) );			\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);				\
     bd = Bdescr((P_)p1);						\
-    if (bd->gen_no == 0) {						\
-      ((StgInd *)p1)->indirectee = p2;					\
-      SET_INFO(p1, ind_info);						\
-      LDV_RECORD_CREATE(p1);						\
-      TICK_UPD_NEW_IND();						\
-      and_then;								\
-    } else {								\
+    if (bd->gen_no != 0) {						\
       DEBUG_FILL_SLOP(p1);						\
       recordMutableGenLock(p1, &generations[bd->gen_no]);		\
       ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1, &stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
+      and_then;								\
+    } else {								\
+      ((StgInd *)p1)->indirectee = p2;					\
+      SET_INFO(p1, ind_info);						\
+      LDV_RECORD_CREATE(p1);						\
+      TICK_UPD_NEW_IND();						\
       and_then;								\
     }									\
   }
@@ -335,16 +335,7 @@ updateWithPermIndirection(StgClosure *p1,
   LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);
 
   bd = Bdescr((P_)p1);
-  if (bd->gen_no == 0) {
-    ((StgInd *)p1)->indirectee = p2;
-    SET_INFO(p1, &stg_IND_PERM_info);
-    /*
-     * @LDV profiling
-     * We have just created a new closure.
-     */
-    LDV_RECORD_CREATE(p1);
-    TICK_UPD_NEW_PERM_IND(p1);
-  } else {
+  if (bd->gen_no != 0) {
     recordMutableGenLock(p1, &generations[bd->gen_no]);
     ((StgInd *)p1)->indirectee = p2;
     SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
@@ -354,6 +345,15 @@ updateWithPermIndirection(StgClosure *p1,
      */
     LDV_RECORD_CREATE(p1);
     TICK_UPD_OLD_PERM_IND();
+  } else {
+    ((StgInd *)p1)->indirectee = p2;
+    SET_INFO(p1, &stg_IND_PERM_info);
+    /*
+     * @LDV profiling
+     * We have just created a new closure.
+     */
+    LDV_RECORD_CREATE(p1);
+    TICK_UPD_NEW_PERM_IND(p1);
   }
 }
 #endif
