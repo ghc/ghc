@@ -11,7 +11,7 @@ module RdrHsSyn (
 	mkHsOpApp, mkClassDecl, 
 	mkHsNegApp, mkHsIntegral, mkHsFractional,
 	mkHsDo, mkHsSplice,
-        mkTyData, mkPrefixCon, mkRecCon,
+        mkTyData, mkPrefixCon, mkRecCon, mkInlineSpec,	
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
 
 	cvBindGroup,
@@ -53,7 +53,7 @@ import HsSyn		-- Lots of it
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
-import BasicTypes	( maxPrecedence )
+import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
 import Lexer		( P, failSpanMsgP )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
@@ -670,6 +670,13 @@ mkRecConstrOrUpdate exp loc fs@(_:_)
   = return (RecordUpd exp fs placeHolderType placeHolderType)
 mkRecConstrOrUpdate _ loc []
   = parseError loc "Empty record update"
+
+mkInlineSpec :: Maybe Activation -> Bool -> InlineSpec
+-- The Maybe is becuase the user can omit the activation spec (and usually does)
+mkInlineSpec Nothing 	True  = alwaysInlineSpec	-- INLINE
+mkInlineSpec Nothing 	False = neverInlineSpec		-- NOINLINE
+mkInlineSpec (Just act) inl   = Inline act inl
+
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations

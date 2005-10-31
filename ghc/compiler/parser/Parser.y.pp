@@ -531,11 +531,13 @@ rules	:: { OrdList (LHsDecl RdrName) }	-- Reversed
 
 rule  	:: { LHsDecl RdrName }
 	: STRING activation rule_forall infixexp '=' exp
-	     { LL $ RuleD (HsRule (getSTRING $1) $2 $3 $4 $6) }
+	     { LL $ RuleD (HsRule (getSTRING $1) 
+				  ($2 `orElse` AlwaysActive) 
+				  $3 $4 $6) }
 
-activation :: { Activation }           -- Omitted means AlwaysActive
-        : {- empty -}                           { AlwaysActive }
-        | explicit_activation                   { $1 }
+activation :: { Maybe Activation } 
+        : {- empty -}                           { Nothing }
+        | explicit_activation                   { Just $1 }
 
 explicit_activation :: { Activation }  -- In brackets
         : '[' INTEGER ']'		{ ActiveAfter  (fromInteger (getINTEGER $2)) }
@@ -996,12 +998,12 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      
-				{ LL $ unitOL (LL $ SigD (InlineSig $3 (Inline $2 (getINLINE $1)))) }
+				{ LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlineSpec $2 (getINLINE $1)))) }
 	| '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
 			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlineSpec)
 					    | t <- $4] }
 	| '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-			 	{ LL $ toOL [ LL $ SigD (SpecSig $3 t (Inline $2 (getSPEC_INLINE $1)))
+			 	{ LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlineSpec $2 (getSPEC_INLINE $1)))
 					    | t <- $5] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'
 				{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }

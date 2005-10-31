@@ -48,7 +48,7 @@ module BasicTypes(
 
 	CompilerPhase, 
 	Activation(..), isActive, isNeverActive, isAlwaysActive,
-	InlineSpec(..), defaultInlineSpec, alwaysInlineSpec,
+	InlineSpec(..), defaultInlineSpec, alwaysInlineSpec, neverInlineSpec,
 
 	SuccessFlag(..), succeeded, failed, successIf
    ) where
@@ -475,7 +475,8 @@ data InlineSpec
   deriving( Eq )
 
 defaultInlineSpec = Inline AlwaysActive False	-- Inlining is OK, but not forced
-alwaysInlineSpec  = Inline AlwaysActive True	-- Inline unconditionally
+alwaysInlineSpec  = Inline AlwaysActive True	-- INLINE always
+neverInlineSpec   = Inline NeverActive  False	-- NOINLINE 
 
 instance Outputable Activation where
    ppr AlwaysActive     = empty		-- The default
