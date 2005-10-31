@@ -1,4 +1,0 @@
-
-ds052.hs:6:0:
-    Warning: Pattern match(es) are non-exhaustive
-	     In the definition of `lazyZip': Patterns not matched: (_ : _) []
