@@ -1246,11 +1246,16 @@ machdepCCOpts dflags
 
 #elif x86_64_TARGET_ARCH
 	= ( [], ["-fomit-frame-pointer",
-		 "-fno-asynchronous-unwind-tables"
+		 "-fno-asynchronous-unwind-tables",
 			-- the unwind tables are unnecessary for HC code,
 			-- and get in the way of -split-objs.  Another option
 			-- would be to throw them away in the mangler, but this
 			-- is easier.
+		 "-fno-unit-at-a-time"
+			-- unit-at-a-time doesn't do us any good, and screws
+			-- up -split-objs by moving the split markers around.
+			-- It's only turned on with -O2, but put it here just
+			-- in case someone uses -optc-O2.
 		] )
 
 #elif mips_TARGET_ARCH
