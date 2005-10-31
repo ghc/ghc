@@ -1,11 +1,13 @@
 
-tcfail076.hs:18:81:
-    Couldn't match the rigid variable `res' against the rigid variable `res1'
-      `res' is bound by the polymorphic type `forall res. (a -> m res) -> m res'
-			  at tcfail076.hs:18:63-87
+tcfail076.hs:18:67:
+    Couldn't match the rigid variable `res'
+	   against the rigid variable `res1'
+      `res' is bound by the polymorphic type `forall res.
+					      (a -> m res) -> m res'
+			  at tcfail076.hs:18:49-73
       `res1' is bound by the polymorphic type `forall res1.
 					       (a1 -> m1 res1) -> m1 res1'
-			   at tcfail076.hs:18:27-95
+			   at tcfail076.hs:18:13-81
       Expected type: m2 res
       Inferred type: m2 res1
     In the application `cont a'

@@ -1,5 +1,5 @@
 
-tcfail104.hs:9:14:
+tcfail104.hs:9:7:
     Inferred type is less polymorphic than expected
       Quantified type variable `a' escapes
       Expected type: forall a1. a1 -> a1
@@ -7,7 +7,7 @@ tcfail104.hs:9:14:
     When checking the pattern: x :: forall a. a -> a
     In a lambda abstraction: \ (x :: forall a. a -> a) -> x
 
-tcfail104.hs:15:14:
+tcfail104.hs:15:7:
     Inferred type is less polymorphic than expected
       Quantified type variable `a' escapes
       Expected type: forall a1. a1 -> a1

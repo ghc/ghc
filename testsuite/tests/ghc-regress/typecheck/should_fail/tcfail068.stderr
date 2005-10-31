@@ -1,29 +1,34 @@
 
-tcfail068.hs:14:8:
-    Couldn't match the rigid variable `s' against the rigid variable `s1'
+tcfail068.hs:14:1:
+    Couldn't match the rigid variable `s'
+	   against the rigid variable `s1'
       `s' is bound by the type signature for `itgen'
       `s1' is bound by the polymorphic type `forall s1. GHC.ST.ST s1 a'
-			 at tcfail068.hs:(13,8)-(14,30)
+			 at tcfail068.hs:(13,1)-(14,23)
       Expected type: GHC.ST.ST s1 (IndTree s a1)
       Inferred type: GHC.ST.ST s1 (STArray s1 i e)
     In the application `newSTArray ((1, 1), n) x'
-    In the first argument of `runST', namely `(newSTArray ((1, 1), n) x)'
+    In the first argument of `runST', namely
+	`(newSTArray ((1, 1), n) x)'
 
-tcfail068.hs:19:8:
-    Couldn't match the rigid variable `s' against the rigid variable `s1'
+tcfail068.hs:19:1:
+    Couldn't match the rigid variable `s'
+	   against the rigid variable `s1'
       `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
-			at tcfail068.hs:(18,8)-(21,18)
+			at tcfail068.hs:(18,1)-(21,11)
       `s1' is bound by the type signature for `itiap'
       Expected type: GHC.ST.ST s (IndTree s1 a1)
       Inferred type: GHC.ST.ST s1 (IndTree s1 a1)
     In the expression:
-	(readSTArray arr i) >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr))
+	(readSTArray arr i)
+	>>= (\ val -> (writeSTArray arr i (f val)) >> (return arr))
     In the first argument of `runST', namely
 	`((readSTArray arr i)
 	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
 
 tcfail068.hs:24:34:
-    Couldn't match the rigid variable `s' against the rigid variable `s1'
+    Couldn't match the rigid variable `s'
+	   against the rigid variable `s1'
       `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
 			at tcfail068.hs:24:28-44
       `s1' is bound by the type signature for `itrap'
@@ -33,7 +38,8 @@ tcfail068.hs:24:34:
     In the first argument of `runST', namely `(itrap' i k)'
 
 tcfail068.hs:36:45:
-    Couldn't match the rigid variable `s' against the rigid variable `s1'
+    Couldn't match the rigid variable `s'
+	   against the rigid variable `s1'
       `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
 			at tcfail068.hs:36:39-62
       `s1' is bound by the type signature for `itrapstate'

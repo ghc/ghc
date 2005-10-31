@@ -1,9 +1,11 @@
 
-tcfail128.hs:18:15:
+tcfail128.hs:18:8:
     No instance for (Data.Array.Base.MArray b FlatVector IO)
-      arising from use of `thaw' at tcfail128.hs:18:15-18
+      arising from use of `thaw' at tcfail128.hs:18:8-11
     Probable fix:
-      add an instance declaration for (Data.Array.Base.MArray b FlatVector IO)
+      add an instance declaration for (Data.Array.Base.MArray b
+							      FlatVector
+							      IO)
     In a 'do' expression: v <- thaw tmp
     In the definition of `main':
 	main = do
