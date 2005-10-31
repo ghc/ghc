@@ -1430,12 +1430,24 @@ sub hppa_mash_prologue { # OK, epilogue, too
 sub print_doctored {
     local($_, $need_fallthru_patch) = @_;
 
+    if ( $TargetPlatform =~ /^x86_64-/ ) {
+	    # Catch things like
+	    #	
+	    #    movq -4(%ebp), %rax
+	    #    jmp  *%rax
+	    # 
+	    # and optimise:
+	    #
+	    s/^\tmovq\s+(-?\d*\(\%r(bx|bp)\)),\s*(\%r(ax|cx|dx|10|11))\n\tjmp\s+\*\3/\tjmp\t\*$1/g;
+    }
+
     if ( $TargetPlatform !~ /^i386-/ 
       || ! /^\t[a-z]/  # no instructions in here, apparently
       || /^${T_US}__stginit_[A-Za-z0-9_]+${T_POST_LBL}/) {
 	print OUTASM $_;
 	return;
     }
+
     # OK, must do some x86 **HACKING**
 
     local($entry_patch)	= '';
