@@ -1,6 +1,7 @@
 
 rn046.hs:2:0:
-    Warning: Module `List' is imported, but nothing from it is used
-	     (except perhaps instances visible in `List')
+    Warning: Module `List' is imported, but nothing from it is used,
+	       except perhaps instances visible in `List'
+	     To suppress this warning, use: import List()
 
 rn046.hs:3:13: Warning: Imported from `Char' but not used: `ord'
