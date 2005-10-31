@@ -1438,7 +1438,8 @@ sub print_doctored {
 	    # 
 	    # and optimise:
 	    #
-	    s/^\tmovq\s+(-?\d*\(\%r(bx|bp)\)),\s*(\%r(ax|cx|dx|10|11))\n\tjmp\s+\*\3/\tjmp\t\*$1/g;
+	    s/^\tmovq\s+(-?\d*\(\%r(bx|bp|13)\)),\s*(\%r(ax|cx|dx|10|11))\n\tjmp\s+\*\3/\tjmp\t\*$1/g;
+	    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e(ax|cx|si|di))\n\tjmp\s+\*\%r\3/\tjmp\t$T_US$1/g;
     }
 
     if ( $TargetPlatform !~ /^i386-/ 
