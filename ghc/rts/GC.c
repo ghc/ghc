@@ -1137,7 +1137,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   resetNurseries();
 
   // start any pending finalizers 
+  RELEASE_SM_LOCK;
   scheduleFinalizers(last_free_capability, old_weak_ptr_list);
+  ACQUIRE_SM_LOCK;
   
   // send exceptions to any threads which were about to die 
   resurrectThreads(resurrected_threads);
