@@ -210,7 +210,9 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 // scheduler clearer.
 //
 static void schedulePreLoop (void);
+#if defined(SMP)
 static void schedulePushWork(Capability *cap, Task *task);
+#endif
 static void scheduleStartSignalHandlers (void);
 static void scheduleCheckBlockedThreads (Capability *cap);
 static void scheduleCheckBlackHoles (Capability *cap);
@@ -340,7 +342,9 @@ schedule (Capability *initialCapability, Task *task)
 #endif
   nat prev_what_next;
   rtsBool ready_to_gc;
+#if defined(THREADED_RTS)
   rtsBool first = rtsTrue;
+#endif
   
   cap = initialCapability;
 
@@ -722,10 +726,11 @@ schedulePreLoop(void)
  * Push work to other Capabilities if we have some.
  * -------------------------------------------------------------------------- */
 
-static void
-schedulePushWork(Capability *cap, Task *task)
-{
 #ifdef SMP
+static void
+schedulePushWork(Capability *cap USED_WHEN_SMP, 
+		 Task *task      USED_WHEN_SMP)
+{
     Capability *free_caps[n_capabilities], *cap0;
     nat i, n_free_caps;
 
@@ -794,8 +799,8 @@ schedulePushWork(Capability *cap, Task *task)
 	}
     }
     task->cap = cap; // reset to point to our Capability.
-#endif
 }
+#endif
 
 /* ----------------------------------------------------------------------------
  * Start any pending signal handlers
@@ -1554,11 +1559,10 @@ scheduleHandleStackOverflow (Capability *cap, Task *task, StgTSO *t)
 	/* enlarge the stack */
 	StgTSO *new_t = threadStackOverflow(cap, t);
 	
-	/* This TSO has moved, so update any pointers to it from the
-	 * main thread stack.  It better not be on any other queues...
-	 * (it shouldn't be).
+	/* The TSO attached to this Task may have moved, so update the
+	 * pointer to it.
 	 */
-	if (task->tso != NULL) {
+	if (task->tso == t) {
 	    task->tso = new_t;
 	}
 	pushOnRunQueue(cap,new_t);
@@ -2863,7 +2867,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   new_tso_size = round_to_mblocks(new_tso_size);  /* Be MBLOCK-friendly */
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
 
-  IF_DEBUG(scheduler, sched_belch("increasing stack size from %ld words to %d.\n", tso->stack_size, new_stack_size));
+  IF_DEBUG(scheduler, sched_belch("increasing stack size from %ld words to %d.\n", (long)tso->stack_size, new_stack_size));
 
   dest = (StgTSO *)allocate(new_tso_size);
   TICK_ALLOC_TSO(new_stack_size,0);
