@@ -8,4 +8,4 @@ main = do
 	  "one" "fish") "two") "fish") "red") "fish") "blue") "fish")
    hPutStr stdout
 	(trace (trace (trace (trace (trace (trace (trace
-	  "one" "fish") "two") "fish") "red") "fish") "blue") "fish")
+	  "ONE" "FISH") "TWO") "FISH") "RED") "FISH") "BLUE") "FISH")

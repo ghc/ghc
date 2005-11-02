@@ -9,7 +9,7 @@ test('hTell002', expect_fail_if_platform("i386-unknown-mingw32"), \
 test('performGC001', normal, compile_and_run, [''])
 
 # optimisation screws up this test because some of the traces get commoned up
-test('trace001', omit_ways(['opt','optasm','optextcore']), compile_and_run, [''])
+test('trace001', normal, compile_and_run, [''])
 
 test('hGetBuf001', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
