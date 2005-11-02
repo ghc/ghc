@@ -114,7 +114,7 @@ tcImportDecl name
   = do	{ initIfaceTcRn (loadWiredInHomeIface name) 
 	; return thing }
   | otherwise
-  = do 	{ traceIf (text "tcLookupGlobal" <+> ppr name)
+  = do 	{ traceIf (text "tcImportDecl" <+> ppr name)
 	; mb_thing <- initIfaceTcRn (importDecl name)
 	; case mb_thing of
 	    Succeeded thing -> return thing
