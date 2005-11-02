@@ -34,6 +34,7 @@ import TcMType		( newTyFlexiVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTc
 import TcHsType		( tcHsSigType, kcHsType )
 import TcIface		( tcImportDecl )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
+import PrelNames	( thFAKE )
 import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, 
 			  nameIsLocalOrFrom )
 import NameEnv		( lookupNameEnv )
@@ -139,9 +140,13 @@ tc_bracket (TypBr typ)
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
-  = do	{ tcTopSrcDecls emptyModDetails decls
+  = do	{ setModule thFAKE $ tcTopSrcDecls emptyModDetails decls
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
+	-- See comments with RnExpr.rnBracket for the thFAKE stuff;
+	--	the type checker uses the module name to decide which
+	--	names are local (and hence can be found in the local
+	--	type envt), so we do need to set the module here too.
 
 	; decl_ty <- tcMetaTy decTyConName
 	; q_ty    <- tcMetaTy qTyConName

@@ -373,6 +373,9 @@ dumpOptTcRn flag doc = ifOptM flag (dumpTcRn doc)
 getModule :: TcRn Module
 getModule = do { env <- getGblEnv; return (tcg_mod env) }
 
+setModule :: Module -> TcRn a -> TcRn a
+setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
+
 tcIsHsBoot :: TcRn Bool
 tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
 
