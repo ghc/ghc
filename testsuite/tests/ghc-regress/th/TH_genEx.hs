@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fth  -ddump-splices #-}
 
 module TH_genEx where
 
