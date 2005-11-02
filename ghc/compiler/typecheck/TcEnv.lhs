@@ -63,7 +63,8 @@ import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, nameIsLocalOrFrom )
+import Name		( Name, NamedThing(..), getSrcLoc, nameModule )
+import PrelNames	( thFAKE )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
 import HscTypes		( extendTypeEnvList, lookupType,
@@ -93,20 +94,29 @@ tcLookupLocatedGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
 tcLookupGlobal name
-  = do	{ env <- getGblEnv
-	; if nameIsLocalOrFrom (tcg_mod env) name
-
-	  then	-- It's defined in this module
-	      case lookupNameEnv (tcg_type_env env) name of
-		Just thing -> return thing
-		Nothing	   -> notFound  name	-- Panic!
+  = ASSERT( isGlobalName name )
+    do	{ env <- getGblEnv
+	
+		-- Try local envt
+	; case lookupNameEnv (tcg_type_env env) name of {
+		Just thing -> return thing ;
+		Nothing	   -> do 
 	 
-	  else do 		-- It's imported
+		-- Try global envt
 	{ (eps,hpt) <- getEpsAndHpt
-	; case lookupType hpt (eps_PTE eps) name of 
-	    Just thing -> return thing 
-	    Nothing    -> tcImportDecl name
-    }}
+	; case lookupType hpt (eps_PTE eps) name of  {
+	    Just thing -> return thing ;
+	    Nothing    -> do
+
+		-- Should it have been in the local envt?
+	{ let mod = nameModule name
+	; if mod == tcg_mod env || mod == thFAKE then
+		notFound name	-- It should be local, so panic
+				-- The thFAKE possibility is because it
+				-- might be in a declaration bracket
+	  else
+		tcImportDecl name	-- Go find it in an interface
+	}}}}}
 
 tcLookupGlobalId :: Name -> TcM Id
 -- Never used for Haskell-source DataCons, hence no ADataCon case
