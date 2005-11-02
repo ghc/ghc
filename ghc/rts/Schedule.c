@@ -417,7 +417,7 @@ schedule (Capability *initialCapability, Task *task)
 	    // If we are a worker, just exit.  If we're a bound thread
 	    // then we will exit below when we've removed our TSO from
 	    // the run queue.
-	    if (task->tso == NULL) {
+	    if (task->tso == NULL && emptyRunQueue(cap)) {
 		return cap;
 	    }
 	} else {
