@@ -724,6 +724,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       StgTSO *tso;
       for (task = all_tasks; task != NULL; task = task->all_link) {
 	  if (!task->stopped && task->tso) {
+	      ASSERT(task->tso->bound == task);
 	      tso = (StgTSO *) isAlive((StgClosure *)task->tso);
 	      if (tso == NULL) {
 		  barf("task %p: main thread %d has been GC'd", 
