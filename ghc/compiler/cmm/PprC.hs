@@ -654,6 +654,7 @@ isStrangeTypeGlobal r 			= isPtrGlobalReg r
 strangeRegType :: CmmReg -> Maybe SDoc
 strangeRegType (CmmGlobal CurrentTSO) = Just (ptext SLIT("struct StgTSO_ *"))
 strangeRegType (CmmGlobal CurrentNursery) = Just (ptext SLIT("struct bdescr_ *"))
+strangeRegType (CmmGlobal BaseReg) = Just (ptext SLIT("struct StgRegTable_ *"))
 strangeRegType _ = Nothing
 
 -- pprReg just prints the register name.
@@ -707,6 +708,9 @@ pprCall ppr_fn cconv results args vols
   where 
      ppr_results []     = empty
      ppr_results [(one,hint)] 
+	 | Just ty <- strangeRegType one
+	 = pprReg one <> ptext SLIT(" = ") <> parens ty
+	 | otherwise
 	 = pprReg one <> ptext SLIT(" = ")
 		 <> pprUnHint hint (cmmRegRep one)
      ppr_results _other = panic "pprCall: multiple results"
