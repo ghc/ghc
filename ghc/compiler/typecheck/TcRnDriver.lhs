@@ -62,7 +62,7 @@ import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
-import Module           ( Module, ModuleEnv, mkModule, moduleEnvElts, elemModuleEnv )
+import Module           ( Module, ModuleEnv, moduleEnvElts, elemModuleEnv )
 import OccName		( mkVarOcc, mkOccFS, varName )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
 			  mkExternalName )

@@ -51,7 +51,7 @@ import Id		( idType, recordSelectorFieldLabel, isRecordSelector, isNaughtyRecord
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, 
 			  dataConWrapId, isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
 import Name		( Name )
-import TyCon		( TyCon, FieldLabel, tyConStupidTheta, tyConArity, tyConDataCons )
+import TyCon		( FieldLabel, tyConStupidTheta, tyConDataCons )
 import Type		( substTheta, substTy )
 import Var		( tyVarKind )
 import VarSet		( emptyVarSet, elemVarSet )
@@ -69,6 +69,10 @@ import ListSetOps	( assocMaybe )
 import Maybes		( catMaybes )
 import Outputable
 import FastString
+
+#ifdef DEBUG
+import TyCon		( tyConArity )
+#endif
 \end{code}
 
 %************************************************************************
@@ -947,11 +951,6 @@ tcRecordBinds data_con flds_w_tys rbinds
       | otherwise
       = do { addErrTc (badFieldCon data_con field_lbl)
 	   ; return Nothing }
-
-badFields rbinds data_con
-  = filter (not . (`elem` field_names)) (recBindFields rbinds)
-  where
-    field_names = dataConFieldLabels data_con
 
 checkMissingFields :: DataCon -> HsRecordBinds Name -> TcM ()
 checkMissingFields data_con rbinds
