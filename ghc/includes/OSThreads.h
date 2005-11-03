@@ -82,13 +82,15 @@ typedef DWORD ThreadLocalKey;
 #define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
 
+// casting to (Mutex *) here required due to use in .cmm files where
+// the argument has (void *) type.
 #define ACQUIRE_LOCK(mutex)					\
-    if (WaitForSingleObject(*mutex,INFINITE) == WAIT_FAILED) {	\
+    if (WaitForSingleObject(*((Mutex *)mutex),INFINITE) == WAIT_FAILED) { \
 	barf("WaitForSingleObject: %d", GetLastError());	\
     }
 
 #define RELEASE_LOCK(mutex)				\
-    if (ReleaseMutex(*mutex) == 0) {			\
+    if (ReleaseMutex(*((Mutex *)mutex)) == 0) {		\
 	barf("ReleaseMutex: %d", GetLastError());	\
     }
 
