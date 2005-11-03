@@ -6,10 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* Alas, no.  This source is non-posix.
-   #include "PosixSource.h" 
-*/
-
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
@@ -19,88 +15,39 @@
 #include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
 #include "Storage.h"
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
-#ifndef mingw32_HOST_OS
-# ifdef HAVE_SYS_TIMES_H
-#  include <sys/times.h>
-# endif
-#endif
-
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-
-#ifdef __CYGWIN32__
-# ifdef HAVE_TIME_H
-#  include <time.h>
-# endif
-#endif
-
-#if ! irix_HOST_OS && ! defined(mingw32_HOST_OS)
-# if defined(HAVE_SYS_RESOURCE_H)
-#  include <sys/resource.h>
-# endif
-#endif
-
-#ifdef HAVE_SYS_TIMEB_H
-#include <sys/timeb.h>
-#endif
-
-#if HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-
-#if HAVE_WINDOWS_H
-#include <windows.h>
-#endif
-
-#if defined(PAR) || !(!defined(HAVE_GETRUSAGE) || irix_HOST_OS || defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS))
-#include <sys/resource.h>
-#endif
+#include "GetTime.h"
 
 /* huh? */
 #define BIG_STRING_LEN              512
 
-/* We're not trying to be terribly accurate here, using the 
- * basic times() function to get a resolution of about 100ths of a 
- * second, depending on the OS.  A long int will do fine for holding
- * these values.
- */
-#define TICK_TYPE long int
-#define TICK_TO_DBL(t) ((double)(t) / TicksPerSecond)
+#define TICK_TO_DBL(t) ((double)(t) / TICKS_PER_SECOND)
 
-static int TicksPerSecond = 0;
+static Ticks ElapsedTimeStart = 0;
 
-static TICK_TYPE ElapsedTimeStart = 0;
+static Ticks InitUserTime     = 0;
+static Ticks InitElapsedTime  = 0;
+static Ticks InitElapsedStamp = 0;
 
-static TICK_TYPE InitUserTime     = 0;
-static TICK_TYPE InitElapsedTime  = 0;
-static TICK_TYPE InitElapsedStamp = 0;
+static Ticks MutUserTime      = 0;
+static Ticks MutElapsedTime   = 0;
+static Ticks MutElapsedStamp  = 0;
 
-static TICK_TYPE MutUserTime      = 0;
-static TICK_TYPE MutElapsedTime   = 0;
-static TICK_TYPE MutElapsedStamp  = 0;
-
-static TICK_TYPE ExitUserTime     = 0;
-static TICK_TYPE ExitElapsedTime  = 0;
+static Ticks ExitUserTime     = 0;
+static Ticks ExitElapsedTime  = 0;
 
 static ullong GC_tot_alloc        = 0;
 static ullong GC_tot_copied       = 0;
 static ullong GC_tot_scavd_copied = 0;
 
-static TICK_TYPE GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
-static TICK_TYPE GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
+static Ticks GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
+static Ticks GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
 
 #ifdef PROFILING
-static TICK_TYPE RP_start_time  = 0, RP_tot_time  = 0;  /* retainer prof user time */
-static TICK_TYPE RPe_start_time = 0, RPe_tot_time = 0;  /* retainer prof elap time */
+static Ticks RP_start_time  = 0, RP_tot_time  = 0;  /* retainer prof user time */
+static Ticks RPe_start_time = 0, RPe_tot_time = 0;  /* retainer prof elap time */
 
-static TICK_TYPE HC_start_time, HC_tot_time = 0;     // heap census prof user time
-static TICK_TYPE HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
+static Ticks HC_start_time, HC_tot_time = 0;     // heap census prof user time
+static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
 #ifdef PROFILING
@@ -115,10 +62,7 @@ static lnat ResidencySamples = 0; // for stats only
 
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
-static TICK_TYPE *GC_coll_times;
-
-static void  getTimes( long *elapsed, long *user );
-static nat   pageFaults(void);
+static Ticks *GC_coll_times;
 
 static void statsPrintf( char *s, ... ) 
     GNUC3_ATTRIBUTE(format (printf, 1, 2));
@@ -126,94 +70,10 @@ static void statsPrintf( char *s, ... )
 static void statsFlush( void );
 static void statsClose( void );
 
-/* elapsedtime() -- The current elapsed time in seconds */
-
-#if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
-#define HNS_PER_SEC 10000000LL /* FILETIMES are in units of 100ns */
-/* Convert FILETIMEs into secs */
-#define FT2longlong(ll,ft)    \
-    (ll)=(ft).dwHighDateTime; \
-    (ll) <<= 32;              \
-    (ll) |= (ft).dwLowDateTime; \
-    (ll) /= (unsigned long long) (HNS_PER_SEC / CLOCKS_PER_SEC)
-#endif
-
-#if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
-/* cygwin32 or mingw32 version */
-static void
-getTimes( TICK_TYPE *elapsed, TICK_TYPE *user )
+Ticks stat_getElapsedGCTime(void)
 {
-    static int is_win9x = -1;
-
-    FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
-    long long int kT, uT;
-    
-    if (is_win9x < 0) {
-      /* figure out whether we're on a Win9x box or not. */
-      OSVERSIONINFO oi;
-      BOOL b;
-
-      /* Need to init the size field first.*/
-      oi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-      b = GetVersionEx(&oi);
-      
-      is_win9x = ( (b && (oi.dwPlatformId & VER_PLATFORM_WIN32_WINDOWS)) ? 1 : 0);
-    }
- 
-    if (is_win9x) {
-      /* On Win9x, just attribute all running time to the user. */
-      SYSTEMTIME st;
-
-      GetSystemTime(&st);
-      SystemTimeToFileTime(&st,&userTime);
-    } else {
-      /* ToDo: pin down elapsed times to just the OS thread(s) that
-	 are evaluating/managing Haskell code.
-      */
-      if (!GetProcessTimes (GetCurrentProcess(), &creationTime,
-		          &exitTime, &kernelTime, &userTime)) {
-	/* Probably on a Win95 box..*/
-	*elapsed = 0;
-	*user = 0;
-	return;
-      }
-    }
-
-    FT2longlong(kT,kernelTime);
-    FT2longlong(uT,userTime);
-    *elapsed = uT + kT;
-    *user = uT;
-
-    if (is_win9x) {
-      /* Adjust for the fact that we're using system time & not
-	 process time on Win9x. */
-      *user    -= ElapsedTimeStart;
-      *elapsed -= ElapsedTimeStart;
-    }
+    return GCe_tot_time;
 }
-
-#else /* !win32 */
-
-static void
-getTimes( TICK_TYPE *user, TICK_TYPE *elapsed )
-{
-
-#ifndef HAVE_TIMES
-    /* We will #ifdef around the fprintf for machines
-       we *know* are unsupported. (WDP 94/05)
-    */
-    debugBelch("NOTE: `getTimes' does nothing!\n");
-    return 0.0;
-
-#else /* not stumped */
-    struct tms t;
-    clock_t r = times(&t);
-
-    *elapsed = r;
-    *user = t.tms_utime;
-#endif
-}
-#endif /* !win32 */
 
 /* mut_user_time_during_GC() and mut_user_time()
  *
@@ -236,8 +96,8 @@ mut_user_time_during_GC( void )
 double
 mut_user_time( void )
 {
-    TICK_TYPE user, elapsed;
-    getTimes(&user, &elapsed);
+    Ticks user;
+    user = getProcessCPUTime();
     return TICK_TO_DBL(user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time));
 }
 
@@ -260,21 +120,6 @@ mut_user_time_during_heap_census( void )
 }
 #endif /* PROFILING */
 
-static nat
-pageFaults(void)
-{
-  /* ToDo (on NT): better, get this via the performance data
-     that's stored in the registry. */
-# if !defined(HAVE_GETRUSAGE) || irix_HOST_OS || defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS)
-    return 0;
-# else
-    struct rusage t;
-
-    getrusage(RUSAGE_SELF, &t);
-    return(t.ru_majflt);
-# endif
-}
-
 void
 initStats(void)
 {
@@ -285,8 +130,8 @@ initStats(void)
 	statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
     }
     GC_coll_times = 
-	(TICK_TYPE *)stgMallocBytes(
-	    sizeof(TICK_TYPE)*RtsFlags.GcFlags.generations,
+	(Ticks *)stgMallocBytes(
+	    sizeof(Ticks)*RtsFlags.GcFlags.generations,
 	    "initStats");
     for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
 	GC_coll_times[i] = 0;
@@ -300,46 +145,19 @@ initStats(void)
 void
 stat_startInit(void)
 {
-    TICK_TYPE user, elapsed;
+    Ticks elapsed;
 
-    /* Determine TicksPerSecond ... */
-#if defined(CLK_TCK)		/* defined by POSIX */
-    TicksPerSecond = CLK_TCK;
-
-#elif defined(HAVE_SYSCONF)
-    long ticks;
-
-    ticks = sysconf(_SC_CLK_TCK);
-    if ( ticks == -1 ) {
-	debugBelch("stat_init: bad call to 'sysconf'!\n");
-    	stg_exit(EXIT_FAILURE);
-    }
-    TicksPerSecond = ticks;
-
-/* no "sysconf" or CLK_TCK; had better guess */
-#elif defined(HZ)
-    TicksPerSecond = HZ;
-
-#elif defined(CLOCKS_PER_SEC)
-    TicksPerSecond = CLOCKS_PER_SEC;
-
-#else /* had better guess wildly */
-    /* We will #ifdef around the fprintf for machines
-       we *know* are unsupported. (WDP 94/05)
-    */
-    debugBelch("NOTE: Guessing `TicksPerSecond = 60'!\n");
-    TicksPerSecond = 60;
-#endif
-
-    getTimes( &user, &elapsed );
+    elapsed = getProcessElapsedTime();
     ElapsedTimeStart = elapsed;
 }
 
 void 
 stat_endInit(void)
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
+
+    getProcessTimes(&user, &elapsed);
+
     InitUserTime = user;
     InitElapsedStamp = elapsed; 
     if (ElapsedTimeStart > elapsed) {
@@ -358,39 +176,27 @@ stat_endInit(void)
 void
 stat_startExit(void)
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
+
+    getProcessTimes(&user, &elapsed);
 
     MutElapsedStamp = elapsed;
     MutElapsedTime = elapsed - GCe_tot_time -
 	PROF_VAL(RPe_tot_time + HCe_tot_time) - InitElapsedStamp;
     if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
 
-    /* for threads, we don't know the mutator time yet, we have to inspect
-     * all the running threads to find out, and they haven't stopped
-     * yet.  So we just timestamp MutUserTime at this point so we can
-     * calculate the EXIT time.  The real MutUserTime is calculated
-     * in stat_exit below.
-     */
-#if defined(THREADED_RTS)
-    MutUserTime = user;
-#else
     MutUserTime = user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
     if (MutUserTime < 0) { MutUserTime = 0; }
-#endif
 }
 
 void
 stat_endExit(void)
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
 
-#if defined(THREADED_RTS)
-    ExitUserTime = user - MutUserTime;
-#else
+    getProcessTimes(&user, &elapsed);
+
     ExitUserTime = user - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
-#endif
     ExitElapsedTime = elapsed - MutElapsedStamp;
     if (ExitUserTime < 0) {
 	ExitUserTime = 0;
@@ -415,8 +221,6 @@ void
 stat_startGC(void)
 {
     nat bell = RtsFlags.GcFlags.ringBell;
-    TICK_TYPE user, elapsed;
-
 
     if (bell) {
 	if (bell > 1) {
@@ -428,18 +232,16 @@ stat_startGC(void)
     }
 
 #if defined(PROFILING) || defined(DEBUG)
-    getTimes( &user, &elapsed );
-    GC_start_time = user;  /* needed in mut_user_time_during_GC() */
+    GC_start_time = getProcessCPUTime();  // needed in mut_user_time_during_GC()
 #endif
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 #if !defined(PROFILING) && !defined(DEBUG)
-	getTimes( &user, &elapsed );
-        GC_start_time = user;
+        GC_start_time = getProcessCPUTime();
 #endif
-	GCe_start_time = elapsed;
+	GCe_start_time = getProcessElapsedTime();
 	if (RtsFlags.GcFlags.giveStats) {
-	    GC_start_faults = pageFaults();
+	    GC_start_faults = getPageFaults();
 	}
     }
 }
@@ -452,19 +254,15 @@ void
 stat_endGC (lnat alloc, lnat collect, lnat live, lnat copied, 
 	    lnat scavd_copied, lnat gen)
 {
-    TICK_TYPE user, elapsed;
-
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
-	TICK_TYPE time, etime, gc_time, gc_etime;
+	Ticks time, etime, gc_time, gc_etime;
 	
-	getTimes( &user, &elapsed );
-	time     = user;
-	etime    = elapsed;
+	getProcessTimes(&time, &etime);
 	gc_time  = time - GC_start_time;
 	gc_etime = etime - GCe_start_time;
 	
 	if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
-	    nat faults = pageFaults();
+	    nat faults = getPageFaults();
 	    
 	    statsPrintf("%9ld %9ld %9ld",
 		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_));
@@ -521,8 +319,8 @@ stat_endGC (lnat alloc, lnat collect, lnat live, lnat copied,
 void
 stat_startRP(void)
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
+    getProcessTimes( &user, &elapsed );
 
     RP_start_time = user;
     RPe_start_time = elapsed;
@@ -543,8 +341,8 @@ stat_endRP(
 #endif
   double averageNumVisit)
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
+    getProcessTimes( &user, &elapsed );
 
     RP_tot_time += user - RP_start_time;
     RPe_tot_time += elapsed - RPe_start_time;
@@ -566,8 +364,8 @@ stat_endRP(
 void
 stat_startHeapCensus(void)
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
+    getProcessTimes( &user, &elapsed );
 
     HC_start_time = user;
     HCe_start_time = elapsed;
@@ -581,29 +379,13 @@ stat_startHeapCensus(void)
 void
 stat_endHeapCensus(void) 
 {
-    TICK_TYPE user, elapsed;
-    getTimes( &user, &elapsed );
+    Ticks user, elapsed;
+    getProcessTimes( &user, &elapsed );
 
     HC_tot_time += user - HC_start_time;
     HCe_tot_time += elapsed - HCe_start_time;
 }
 #endif /* PROFILING */
-
-/* -----------------------------------------------------------------------------
-   stat_workerStop
-
-   Called under SMP when a worker thread finishes.  We drop the timing
-   stats for this thread into the taskTable struct for that thread.
-   -------------------------------------------------------------------------- */
-
-void
-stat_getTimes ( long *currentElapsedTime, 
-		long *currentUserTime,
-		long *elapsedGCTime )
-{
-  getTimes(currentUserTime, currentElapsedTime);
-  *elapsedGCTime = GCe_tot_time;
-}
 
 /* -----------------------------------------------------------------------------
    Called at the end of execution
@@ -616,40 +398,21 @@ stat_getTimes ( long *currentElapsedTime,
 void
 stat_exit(int alloc)
 {
-    TICK_TYPE user, elapsed;
-
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 
 	char temp[BIG_STRING_LEN];
-	TICK_TYPE time;
-	TICK_TYPE etime;
+	Ticks time;
+	Ticks etime;
 	nat g, total_collections = 0;
 
-	getTimes( &user, &elapsed );
-	etime = elapsed - ElapsedTimeStart;
+	getProcessTimes( &time, &etime );
+	etime -= ElapsedTimeStart;
 
 	GC_tot_alloc += alloc;
 
 	/* Count total garbage collections */
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
 	    total_collections += generations[g].collections;
-
-	/* For THREADED_RTS, we have to get the user time from each Task
-	 * and try to work out the total time.
-	 */
-#if defined(THREADED_RTS)
-	{   
-	    Task *task;
-	    MutUserTime = 0.0;
-	    for (task = all_tasks; task != NULL; task = task->all_link) {
-		MutUserTime += task->mut_time;
-	    }
-	}
-	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
-	if (MutUserTime < 0) { MutUserTime = 0; }
-#else
-	time = user;
-#endif
 
 	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
 	if (time  == 0.0)  time = 1;

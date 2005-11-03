@@ -36,6 +36,9 @@ extra-libraries:		"m"		/* for ldexp() */
 			      , "dl"
 #endif
 #endif
+#ifdef HAVE_LIBRT
+			      , "rt"
+#endif
 #ifdef mingw32_HOST_OS
 			      ,"wsock32"	/* for the linker */
 #endif

@@ -9,6 +9,8 @@
 #ifndef TASK_H
 #define TASK_H
 
+#include "GetTime.h"
+
 /* 
    Definition of a Task
    --------------------
@@ -132,12 +134,12 @@ typedef struct Task_ {
     // really want separate stats for each call in a nested chain of
     // foreign->haskell->foreign->haskell calls, but we'll get a
     // separate Task for each of the haskell calls.
-    long       elapsedtimestart;
-    long       muttimestart;
-    long       mut_time;
-    long       mut_etime;
-    long       gc_time;
-    long       gc_etime;
+    Ticks       elapsedtimestart;
+    Ticks       muttimestart;
+    Ticks       mut_time;
+    Ticks       mut_etime;
+    Ticks       gc_time;
+    Ticks       gc_etime;
 
     // Links tasks onto various lists. (ToDo: do we need double
     // linking now?)

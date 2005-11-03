@@ -77,7 +77,7 @@ static Task*
 newTask (void)
 {
 #if defined(THREADED_RTS)
-    long currentElapsedTime, currentUserTime, elapsedGCTime;
+    Ticks currentElapsedTime, currentUserTime;
 #endif
     Task *task;
 
@@ -97,7 +97,7 @@ newTask (void)
 #endif
 
 #if defined(THREADED_RTS)
-    stat_getTimes(&currentElapsedTime, &currentUserTime, &elapsedGCTime);
+    getProcessTimes(&currentUserTime, &currentElapsedTime);
     task->mut_time = 0.0;
     task->mut_etime = 0.0;
     task->gc_time = 0.0;
@@ -188,13 +188,17 @@ taskStop (Task *task)
 {
 #if defined(THREADED_RTS)
     OSThreadId id;
-    long currentElapsedTime, currentUserTime, elapsedGCTime;
+    Ticks currentElapsedTime, currentUserTime, elapsedGCTime;
 
     id = osThreadId();
     ASSERT(task->id == id);
     ASSERT(myTask() == task);
 
-    stat_getTimes(&currentElapsedTime, &currentUserTime, &elapsedGCTime);
+    getProcessTimes(&currentUserTime, &currentElapsedTime);
+
+    // XXX this is wrong; we want elapsed GC time since the
+    // Task started.
+    elapsedGCTime = stat_getElapsedGCTime();
     
     task->mut_time = 
 	currentUserTime - task->muttimestart - task->gc_time;
