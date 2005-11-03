@@ -1,3 +1,4 @@
+#if !defined(THREADED_RTS) /* to the end */
 /*
  * Wait/check for external events. Periodically, the
  * Scheduler checks for the completion of external operations,
@@ -47,3 +48,4 @@ awaitEvent(rtsBool wait)
 	   && emptyRunQueue(&MainCapability)
       );
 }
+#endif

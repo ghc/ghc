@@ -47,6 +47,9 @@
 #include "Capability.h"
 #include "Task.h"
 #include "AwaitEvent.h"
+#if defined(mingw32_HOST_OS)
+#include "win32/IOManager.h"
+#endif
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -213,7 +216,7 @@ static void schedulePreLoop (void);
 #if defined(SMP)
 static void schedulePushWork(Capability *cap, Task *task);
 #endif
-static void scheduleStartSignalHandlers (void);
+static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
 static void scheduleCheckBlackHoles (Capability *cap);
 static void scheduleDetectDeadlock (Capability *cap, Task *task);
@@ -447,7 +450,7 @@ schedule (Capability *initialCapability, Task *task)
     }
 #endif // SMP
 
-    scheduleStartSignalHandlers();
+    scheduleStartSignalHandlers(cap);
 
     // Only check the black holes here if we've nothing else to do.
     // During normal execution, the black hole list only gets checked
@@ -807,11 +810,11 @@ schedulePushWork(Capability *cap USED_WHEN_SMP,
  * ------------------------------------------------------------------------- */
 
 static void
-scheduleStartSignalHandlers(void)
+scheduleStartSignalHandlers(Capability *cap)
 {
-#if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
+#if defined(RTS_USER_SIGNALS) && (!defined(THREADED_RTS) || defined(mingw32_HOST_OS))
     if (signals_pending()) { // safe outside the lock
-	startSignalHandlers();
+	startSignalHandlers(cap);
     }
 #endif
 }
@@ -897,7 +900,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	
 	if ( !emptyRunQueue(cap) ) return;
 
-#if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
+#if defined(RTS_USER_SIGNALS) && (!defined(THREADED_RTS) || defined(mingw32_HOST_OS))
 	/* If we have user-installed signal handlers, then wait
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
@@ -909,7 +912,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	    awaitUserSignals();
 
 	    if (signals_pending()) {
-		startSignalHandlers();
+		startSignalHandlers(cap);
 	    }
 
 	    // either we have threads to run, or we were interrupted:

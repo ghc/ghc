@@ -349,8 +349,6 @@ startSignalHandlers(void)
 {
   blockUserSignals();
   
-  ASSERT_LOCK_HELD(&sched_mutex);
-
   while (next_pending_handler != pending_handler_buf) {
 
     next_pending_handler--;

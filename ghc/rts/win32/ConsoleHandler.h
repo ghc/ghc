@@ -42,7 +42,7 @@ extern StgInt stg_pending_events;
  * Run the handlers associated with the queued up console events. Console
  * event delivery is blocked for the duration of this call.
  */
-extern void startSignalHandlers(void);
+extern void startSignalHandlers(Capability *cap);
 
 /*
  * Function: handleSignalsInThisThread()

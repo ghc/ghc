@@ -22,7 +22,6 @@
 #else /* PAR */
 
 #define signals_pending() (rtsFalse)
-#define handleSignalsInThisThread() /* nothing */
 
 #endif /* PAR */
 

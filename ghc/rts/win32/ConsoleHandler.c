@@ -145,29 +145,32 @@ void awaitUserSignals(void)
  * Run the handlers associated with the stacked up console events. Console
  * event delivery is blocked for the duration of this call.
  */
-void startSignalHandlers(void)
+void startSignalHandlers(Capability *cap)
 {
     StgStablePtr handler;
 
     if (console_handler < 0) {
 	return;
     }
+
     blockUserSignals();
+    ACQUIRE_LOCK(&sched_mutex);
     
     handler = deRefStablePtr((StgStablePtr)console_handler);
     while (stg_pending_events > 0) {
 	stg_pending_events--;
-	scheduleThread(&MainCapability,
-	    createIOThread(&MainCapability,
+	scheduleThread(cap,
+	    createIOThread(cap,
 			   RtsFlags.GcFlags.initialStkSize, 
-			   rts_apply(&MainCapability,
+			   rts_apply(cap,
 				     (StgClosure *)handler,
-				     rts_mkInt(&MainCapability,
+				     rts_mkInt(cap,
 					       stg_pending_buf[stg_pending_events]))));
     }
+    
+    RELEASE_LOCK(&sched_mutex);
     unblockUserSignals();
 }
-
 
 /*
  * Function: markSignalHandlers()
@@ -184,17 +187,6 @@ void markSignalHandlers (evac_fn evac)
 }
 
 
-/*
- * Function: handleSignalsInThisThread()
- * 
- * Have current (OS) thread assume responsibility of handling console events/signals.
- * Currently not used (by the console event handling code.)
- */
-void handleSignalsInThisThread(void)
-{
-    return;
-}
-
 /* 
  * Function: generic_handler()
  *
@@ -203,6 +195,8 @@ void handleSignalsInThisThread(void)
  */
 static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 {
+    ACQUIRE_LOCK(&sched_mutex);
+
     /* Ultra-simple -- up the counter + signal a switch. */
     switch(dwCtrlType) {
     case CTRL_CLOSE_EVENT:
@@ -225,6 +219,8 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 	resetAbandonRequestWait();
 	return TRUE;
     }
+
+    RELEASE_LOCK(&sched_mutex);
 }
 
 
