@@ -779,7 +779,8 @@ schedulePushWork(Capability *cap USED_WHEN_SMP,
 	for (; t != END_TSO_QUEUE; t = next) {
 	    next = t->link;
 	    t->link = END_TSO_QUEUE;
-	    if (t->what_next == ThreadRelocated) {
+	    if (t->what_next == ThreadRelocated
+		|| t->bound == task) { // don't move my bound thread
 		prev->link = t;
 		prev = t;
 	    } else if (i == n_free_caps) {
