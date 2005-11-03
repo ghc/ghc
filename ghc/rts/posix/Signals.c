@@ -345,7 +345,7 @@ stg_sig_install(int sig, int spi, StgStablePtr *handler, void *mask)
 
 #if !defined(THREADED_RTS)
 void
-startSignalHandlers(void)
+startSignalHandlers(Capability *cap)
 {
   blockUserSignals();
   
@@ -353,9 +353,8 @@ startSignalHandlers(void)
 
     next_pending_handler--;
 
-    scheduleThread (
-	&MainCapability,
-	createIOThread(&MainCapability, 
+    scheduleThread (cap,
+	createIOThread(cap,
 		       RtsFlags.GcFlags.initialStkSize, 
 		       (StgClosure *) *next_pending_handler));
   }

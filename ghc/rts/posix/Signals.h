@@ -16,7 +16,8 @@ extern rtsBool anyUserHandlers(void);
 extern StgPtr pending_handler_buf[];
 extern StgPtr *next_pending_handler;
 #define signals_pending() (next_pending_handler != pending_handler_buf)
-void startSignalHandlers(void);
+void startSignalHandlers(Capability *cap);
+
 
 #endif
 
