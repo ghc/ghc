@@ -125,7 +125,7 @@ popReturningTask (Capability *cap)
 static void
 initCapability( Capability *cap, nat i )
 {
-	nat g;
+    nat g;
 
     cap->no = i;
     cap->in_haskell        = rtsFalse;
@@ -148,8 +148,9 @@ initCapability( Capability *cap, nat i )
     cap->mut_lists  = stgMallocBytes(sizeof(bdescr *) *
 				     RtsFlags.GcFlags.generations,
 				     "initCapability");
-	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	      cap->mut_lists[g] = NULL;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	cap->mut_lists[g] = NULL;
     }
 }
 
