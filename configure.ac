@@ -1198,6 +1198,10 @@ AC_TRY_COMPILE(,[__asm__ (".subsections_via_symbols");],
             [Define to 1 if Apple-style dead-stripping is supported.])
     ])
 
+dnl ** check for librt
+AC_CHECK_LIB(rt, clock_gettime)
+AC_CHECK_FUNCS(clock_gettime)
+
 dnl ** check for Apple's "interesting" long double compatibility scheme
 AC_MSG_CHECKING(for printf$LDBLStub)
 AC_TRY_LINK_FUNC(printf$LSBLStub,
