@@ -119,7 +119,7 @@ Ticks getThreadCPUTime(void)
     struct timespec ts;
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
     return (ts.tv_sec * TICKS_PER_SECOND + 
-	    ts.tv_nsec / (1000000000/TICKS_PER_SECOND));
+	    ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
 #else
     return getProcessCPUTime();
 #endif
