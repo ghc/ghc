@@ -11,6 +11,10 @@
 
 #include <windows.h>
 
+#ifdef HAVE_TIME_H
+# include <time.h>
+#endif
+
 /* elapsedtime() -- The current elapsed time in seconds */
 
 #define HNS_PER_SEC 10000000LL /* FILETIMES are in units of 100ns */
@@ -20,13 +24,13 @@
     (ll) <<= 32;              \
     (ll) |= (ft).dwLowDateTime; \
     (ll) /= (unsigned long long) (HNS_PER_SEC / CLOCKS_PER_SEC)
-#endif
 
 /* cygwin32 or mingw32 version */
-static void
+void
 getProcessTimes( Ticks *user, Ticks *elapsed )
 {
     static int is_win9x = -1;
+    static Ticks elapsed_start = 0;
 
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
     long long int kT, uT;
@@ -68,10 +72,12 @@ getProcessTimes( Ticks *user, Ticks *elapsed )
     *user = uT;
 
     if (is_win9x) {
-      /* Adjust for the fact that we're using system time & not
-	 process time on Win9x. */
-      *user    -= ElapsedTimeStart;
-      *elapsed -= ElapsedTimeStart;
+	/* User time is assumed to start at zero, so adjust for the fact
+	   that we're using system time & not process time on Win9x.  */
+	if (elapsed_start == 0) {
+	    elapsed_start = *elapsed;
+	}
+	*user -= elapsed_start;
     }
 }
 
@@ -82,7 +88,7 @@ Ticks getProcessCPUTime(void)
     return user;
 }
 
-Ticks getProcessElapsedTime(void);
+Ticks getProcessElapsedTime(void)
 {
     Ticks user, elapsed;
     getProcessTimes(&user,&elapsed);
