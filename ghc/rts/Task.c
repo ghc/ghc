@@ -97,7 +97,8 @@ newTask (void)
 #endif
 
 #if defined(THREADED_RTS)
-    getProcessTimes(&currentUserTime, &currentElapsedTime);
+    currentUserTime = getThreadCPUTime();
+    currentElapsedTime = getProcessElapsedTime();
     task->mut_time = 0.0;
     task->mut_etime = 0.0;
     task->gc_time = 0.0;
@@ -194,7 +195,8 @@ taskStop (Task *task)
     ASSERT(task->id == id);
     ASSERT(myTask() == task);
 
-    getProcessTimes(&currentUserTime, &currentElapsedTime);
+    currentUserTime = getThreadCPUTime();
+    currentElapsedTime = getProcessElapsedTime();
 
     // XXX this is wrong; we want elapsed GC time since the
     // Task started.
