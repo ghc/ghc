@@ -98,7 +98,7 @@ createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
   
   return (_beginthreadex ( NULL,  /* default security attributes */
 			   0,
-			   startProc,
+			   (unsigned (__stdcall *)(void *)) startProc,
 			   param,
 			   0,
 			   (unsigned*)pId) == 0);
