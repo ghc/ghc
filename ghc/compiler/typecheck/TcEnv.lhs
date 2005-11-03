@@ -63,7 +63,7 @@ import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, nameModule )
+import Name		( Name, NamedThing(..), getSrcLoc, nameModule, isExternalName )
 import PrelNames	( thFAKE )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
@@ -94,7 +94,7 @@ tcLookupLocatedGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
 tcLookupGlobal name
-  = ASSERT( isGlobalName name )
+  = ASSERT( isExternalName name )
     do	{ env <- getGblEnv
 	
 		-- Try local envt
