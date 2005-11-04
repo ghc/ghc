@@ -2021,9 +2021,9 @@ forkProcess(HsStablePtr *entry
            )
 {
 #ifdef FORKPROCESS_PRIMOP_SUPPORTED
+    Task *task;
     pid_t pid;
     StgTSO* t,*next;
-    Task *task;
     Capability *cap;
     
     IF_DEBUG(scheduler,sched_belch("forking!"));
@@ -2052,12 +2052,16 @@ forkProcess(HsStablePtr *entry
 	    deleteThreadImmediately(cap,t);
 	}
 	
-	// wipe the main thread list
-	while ((task = all_tasks) != NULL) {
-	    all_tasks = task->all_link;
-	    discardTask(task);
+	// wipe the task list
+	ACQUIRE_LOCK(&sched_mutex);
+	for (task = all_tasks; task != NULL; task=task->all_link) {
+	    if (task != cap->running_task) discardTask(task);
 	}
-	
+	RELEASE_LOCK(&sched_mutex);
+
+	// wipe our spare workers list.
+	cap->spare_workers = NULL;
+
 	cap = rts_evalStableIO(cap, entry, NULL);  // run the action
 	rts_checkSchedStatus("forkProcess",cap);
 	
