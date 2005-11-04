@@ -70,6 +70,7 @@ module Util (
 	replaceFilenameSuffix, directoryOf, filenameOf,
 	replaceFilenameDirectory,
 	escapeSpaces, isPathSeparator,
+	parseSearchPath,
 	normalisePath, platformPath, pgmPath,
     ) where
 
@@ -948,6 +949,40 @@ isPathSeparator ch =
   ch == '/' || ch == '\\'
 #else
   ch == '/'
+#endif
+
+--------------------------------------------------------------
+-- * Search path
+--------------------------------------------------------------
+
+-- | The function splits the given string to substrings
+-- using the 'searchPathSeparator'.
+parseSearchPath :: String -> [FilePath]
+parseSearchPath path = split path
+  where
+    split :: String -> [String]
+    split s =
+      case rest' of
+        []     -> [chunk] 
+        _:rest -> chunk : split rest
+      where
+        chunk = 
+          case chunk' of
+#ifdef mingw32_HOST_OS
+            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
+#endif
+            _                                 -> chunk'
+
+        (chunk', rest') = break (==searchPathSeparator) s
+
+-- | A platform-specific character used to separate search path strings in 
+-- environment variables. The separator is a colon (\":\") on Unix and Macintosh, 
+-- and a semicolon (\";\") on the Windows operating system.
+searchPathSeparator :: Char
+#if mingw32_HOST_OS || mingw32_TARGET_OS
+searchPathSeparator = ';'
+#else
+searchPathSeparator = ':'
 #endif
 
 -----------------------------------------------------------------------------

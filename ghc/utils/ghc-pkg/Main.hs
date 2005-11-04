@@ -47,6 +47,7 @@ import System	( getArgs, getProgName, getEnv,
 		  exitWith, ExitCode(..)
 		)
 import System.IO
+import System.IO.Error (try)
 import Data.List ( isPrefixOf, isSuffixOf, intersperse, groupBy, sortBy )
 
 #ifdef mingw32_HOST_OS
@@ -294,36 +295,53 @@ getPkgDatabases modify flags = do
 	user_conf = archdir `joinFileName` "package.conf"
   user_exists <- doesFileExist user_conf
 
-  let
-	-- The semantics here are slightly strange.  If we are
-	-- *modifying* the database, then the default is to modify
-	-- the global database by default, unless you say --user.
-	-- If we are not modifying (eg. list, describe etc.) then
-	-- the user database is included by default.
-	databases
-	  | modify          = foldl addDB [global_conf] flags
-	  | not user_exists = foldl addDB [global_conf] flags
-	  | otherwise       = foldl addDB [user_conf,global_conf] flags
+  -- If the user database doesn't exist, and this command isn't a
+  -- "modify" command, then we won't attempt to create or use it.
+  let sys_databases
+	| modify || user_exists = [user_conf,global_conf]
+	| otherwise             = [global_conf]
 
-	-- implement the following rules:
-	-- 	--user means overlap with the user database
-	-- 	--global means reset to just the global database
-	--	-f <file> means overlap with <file>
-	addDB dbs FlagUser
-	   | user_conf `elem` dbs     = dbs
-	   | modify || user_exists    = user_conf : dbs
-	addDB dbs FlagGlobal     = [global_conf]
-	addDB dbs (FlagConfig f) = f : dbs
-	addDB dbs _		 = dbs
+  e_pkg_path <- try (getEnv "GHC_PACKAGE_PATH")
+  let env_stack =
+	case e_pkg_path of
+		Left  _ -> sys_databases
+		Right path
+		  | last cs == ""  -> init cs ++ sys_databases
+		  | otherwise      -> cs
+		  where cs = parseSearchPath path
+
+  -- -f flags on the command line add to the database stack, unless any
+  -- of them are present in the stack already.
+  let flag_stack = filter (`notElem` env_stack) 
+			[ f | FlagConfig f <- reverse flags ] ++ env_stack
+
+  -- Now we have the full stack of databases.  Next, if the current
+  -- command is a "modify" type command, then we truncate the stack
+  -- so that the topmost element is the database being modified.
+  final_stack <-
+     if not modify 
+        then return flag_stack
+	else let
+	      	go (FlagUser : fs)     = modifying user_conf
+	      	go (FlagGlobal : fs)   = modifying global_conf
+	      	go (FlagConfig f : fs) = modifying f
+	      	go (_ : fs)            = go fs
+	      	go []                  = modifying global_conf
+		
+		modifying f 
+		  | f `elem` flag_stack = return (dropWhile (/= f) flag_stack)
+		  | otherwise           = die ("requesting modification of database:\n\t" ++ f ++ "\n\twhich is not in the database stack.")
+	     in
+		go flags
 
   -- we create the user database iff (a) we're modifying, and (b) the
   -- user asked to use it by giving the --user flag.
-  when (not user_exists && user_conf `elem` databases) $ do
+  when (not user_exists && user_conf `elem` final_stack) $ do
 	putStrLn ("Creating user package database in " ++ user_conf)
 	createDirectoryIfMissing True archdir
 	writeFile user_conf emptyPackageConfig
 
-  db_stack <- mapM readParseDatabase databases
+  db_stack <- mapM readParseDatabase final_stack
   return db_stack
 
 readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
@@ -1101,3 +1119,34 @@ pathSeparator = '\\'
 #else
 pathSeparator = '/'
 #endif
+
+-- | The function splits the given string to substrings
+-- using the 'searchPathSeparator'.
+parseSearchPath :: String -> [FilePath]
+parseSearchPath path = split path
+  where
+    split :: String -> [String]
+    split s =
+      case rest' of
+        []     -> [chunk] 
+        _:rest -> chunk : split rest
+      where
+        chunk = 
+          case chunk' of
+#ifdef mingw32_HOST_OS
+            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
+#endif
+            _                                 -> chunk'
+
+        (chunk', rest') = break (==searchPathSeparator) s
+
+-- | A platform-specific character used to separate search path strings in 
+-- environment variables. The separator is a colon (\":\") on Unix and Macintosh, 
+-- and a semicolon (\";\") on the Windows operating system.
+searchPathSeparator :: Char
+#if mingw32_HOST_OS || mingw32_TARGET_OS
+searchPathSeparator = ';'
+#else
+searchPathSeparator = ':'
+#endif
+

@@ -61,6 +61,7 @@ import System.Directory	( getAppUserDataDirectory )
 import Compat.Directory	( getAppUserDataDirectory )
 #endif
 
+import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
@@ -207,33 +208,46 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO PackageConfigMap
 readPackageConfigs dflags = do
+   e_pkg_path <- try (getEnv "GHC_PACKAGE_PATH")
+   system_pkgconfs <- getSystemPackageConfigs dflags
+
+   let pkgconfs = case e_pkg_path of
+		    Left _   -> system_pkgconfs
+		    Right path
+		     | last cs == "" -> init cs ++ system_pkgconfs
+		     | otherwise     -> cs
+		     where cs = parseSearchPath path
+		     -- if the path ends in a separator (eg. "/foo/bar:")
+		     -- the we tack on the system paths.
+
+	-- Read all the ones mentioned in -package-conf flags
+   pkg_map <- foldM (readPackageConfig dflags) emptyPackageConfigMap
+		 (reverse pkgconfs ++ extraPkgConfs dflags)
+
+   return pkg_map
+
+
+getSystemPackageConfigs :: DynFlags -> IO [FilePath]
+getSystemPackageConfigs dflags = do
 	-- System one always comes first
    system_pkgconf <- getPackageConfigPath
-   pkg_map1 <- readPackageConfig dflags emptyPackageConfigMap system_pkgconf
 
 	-- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
 	-- unless the -no-user-package-conf flag was given.
 	-- We only do this when getAppUserDataDirectory is available 
 	-- (GHC >= 6.3).
-   (exists, pkgconf) <- catch (do
+   user_pkgconf <- handle (\_ -> return []) $ do
       appdir <- getAppUserDataDirectory "ghc"
       let 
      	 pkgconf = appdir
 		   `joinFileName` (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
 		   `joinFileName` "package.conf"
       flg <- doesFileExist pkgconf
-      return (flg, pkgconf))
-       -- gobble them all up and turn into False.
-      (\ _ -> return (False, ""))
-   pkg_map2 <- if (dopt Opt_ReadUserPackageConf dflags && exists)
-		  then readPackageConfig dflags pkg_map1 pkgconf
-		  else return pkg_map1
+      if (flg && dopt Opt_ReadUserPackageConf dflags)
+	then return [pkgconf]
+	else return []
 
-	-- Read all the ones mentioned in -package-conf flags
-   pkg_map <- foldM (readPackageConfig dflags) pkg_map2
-		 (extraPkgConfs dflags)
-
-   return pkg_map
+   return (user_pkgconf ++ [system_pkgconf])
 
 
 readPackageConfig
