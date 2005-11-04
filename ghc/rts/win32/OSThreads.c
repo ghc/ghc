@@ -110,6 +110,13 @@ osThreadId()
   return GetCurrentThreadId();
 }
 
+#ifdef USE_CRITICAL_SECTIONS
+void
+initMutex (Mutex* pMut)
+{
+    InitializeCriticalSectionAndSpinCount(pMut,4000);
+}
+#else
 void
 initMutex (Mutex* pMut)
 {
@@ -120,6 +127,7 @@ initMutex (Mutex* pMut)
   *pMut = h;
   return;
 }
+#endif
 
 void
 newThreadLocalKey (ThreadLocalKey *key)

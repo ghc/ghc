@@ -56,7 +56,7 @@ step *nurseries         = NULL; /* array of nurseries, >1 only if SMP */
  * simultaneous access by two STG threads.
  */
 #ifdef SMP
-Mutex sm_mutex = INIT_MUTEX_VAR;
+Mutex sm_mutex;
 #endif
 
 /*

@@ -192,7 +192,7 @@ rtsBool shutting_down_scheduler = rtsFalse;
  * the THREADED_RTS and (inc. SMP) runtime.
  */
 #if defined(THREADED_RTS)
-Mutex sched_mutex = INIT_MUTEX_VAR;
+Mutex sched_mutex;
 #endif
 
 #if defined(PARALLEL_HASKELL)

@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001
+ * (c) The GHC Team, 2001-2005
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
  * manner. 
@@ -23,7 +23,6 @@ typedef pthread_key_t   ThreadLocalKey;
 
 #define OSThreadProcAttr /* nothing */
 
-#define INIT_MUTEX_VAR      PTHREAD_MUTEX_INITIALIZER
 #define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
 
 #ifdef LOCK_DEBUG
@@ -73,14 +72,34 @@ typedef pthread_key_t   ThreadLocalKey;
 #include <windows.h>
 
 typedef HANDLE Condition;
-typedef HANDLE Mutex;
 typedef DWORD OSThreadId;
 typedef DWORD ThreadLocalKey;
 
 #define OSThreadProcAttr __stdcall
 
-#define INIT_MUTEX_VAR 0
 #define INIT_COND_VAR  0
+
+// We have a choice for implementing Mutexes on Windows.  Standard
+// Mutexes are kernel objects that require kernel calls to
+// acquire/release, whereas CriticalSections are spin-locks that block
+// in the kernel after spinning for a configurable number of times.
+// CriticalSections are *much* faster, so we use those.  The Mutex
+// implementation is left here for posterity.
+#define USE_CRITICAL_SECTIONS 1
+
+#if USE_CRITICAL_SECTIONS
+
+typedef CRITICAL_SECTION Mutex;
+#define ACQUIRE_LOCK(mutex)  EnterCriticalSection(mutex)
+#define RELEASE_LOCK(mutex)  LeaveCriticalSection(mutex)
+
+// I don't know how to do this.  TryEnterCriticalSection() doesn't do
+// the right thing.
+#define ASSERT_LOCK_HELD(mutex) /* nothing */
+
+#else
+
+typedef HANDLE Mutex;
 
 // casting to (Mutex *) here required due to use in .cmm files where
 // the argument has (void *) type.
@@ -95,6 +114,7 @@ typedef DWORD ThreadLocalKey;
     }
 
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
+#endif
 
 # else
 #  error "Threads not supported"
@@ -140,6 +160,6 @@ void  setThreadLocalVar (ThreadLocalKey *key, void *value);
 #define RELEASE_LOCK(l)
 #define ASSERT_LOCK_HELD(l)
 
-#endif /* defined(RTS_SUPPORTS_THREADS) */
+#endif /* defined(THREADED_RTS) */
 
 #endif /* __OSTHREADS_H__ */
