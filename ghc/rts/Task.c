@@ -175,9 +175,6 @@ void
 discardTask (Task *task)
 {
     ASSERT_LOCK_HELD(&sched_mutex);
-#if defined(THREADED_RTS)
-    closeCondition(&task->cond);
-#endif
     task->stopped = rtsTrue;
     task->cap = NULL;
     task->next = task_free_list;
