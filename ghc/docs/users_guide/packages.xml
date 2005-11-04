@@ -55,9 +55,9 @@ $ ghc-pkg list
       <literal>ghc-pkg list</literal>.  To expose a package which is hidden by
       default, use the <option>-package</option>
       flag (see below).</para>
-
-   <para>To see which modules are exposed by a package:</para>
-
+    
+    <para>To see which modules are exposed by a package:</para>
+    
 <screen>
 $ ghc-pkg field network exposed-modules
 exposed-modules: Network.BSD,
@@ -223,8 +223,7 @@ exposed-modules: Network.BSD,
 	  Windows it will be something like
 	  <filename>C:\Documents&nbsp;And&nbsp;Settings\<replaceable>user</replaceable>\ghc</filename>.
 	  The <literal>ghc-pkg</literal> tool knows where this file should be
-	  located, and will create it if it doesn't exist (see <xref
-	    linkend="package-management" />).</para>
+	  located, and will create it if it doesn't exist (see <xref linkend="package-management" />).</para>
       </listitem>
     </itemizedlist>
 
@@ -272,6 +271,34 @@ exposed-modules: Network.BSD,
       added to the file using the
       <literal>ghc-pkg</literal> tool, described in <xref
       linkend="package-management"/>.</para>
+
+    <sect3 id="ghc-package-path">
+      <title>The <literal>GHC_PACKAGE_PATH</literal> environment variable</title>
+      <indexterm><primary>Environment variable</primary><secondary><literal>GHC_PACKAGE_PATH</literal></secondary>
+      </indexterm>
+      <indexterm><primary><literal>GHC_PACKAGE_PATH</literal></primary></indexterm>
+      <para>The <literal>GHC_PACKAGE_PATH</literal> environment variable may be
+	set to a <literal>:</literal>-separated (<literal>;</literal>-separated
+	on Windows) list of files containing package databases.  This list of
+	package databases is used by GHC and ghc-pkg, with earlier databases in
+	the list overriding later ones.  This order was chosen to match the
+	behaviour of the <literal>PATH</literal> environment variable; think of
+	it as a list of package databases that are searched left-to-right for
+	packages.</para>
+
+      <para>If <literal>GHC_PACKAGE_PATH</literal> ends in a separator, then
+	the default user and system package databases are appended, in that
+	order. e.g. to augment the usual set of packages with a database of
+	your own, you could say (on Unix):
+<screen>
+$ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
+	(use <literal>;</literal> instead of <literal>:</literal> on
+	Windows).</para>
+
+      <para>To check whether your <literal>GHC_PACKAGE_PATH</literal> setting
+	is doing the right thing, <literal>ghc-pkg list</literal> will list all
+	the databases in use, in the reverse order they are searched.</para>
+    </sect3>
   </sect2>
 
   <sect2 id="building-packages">
@@ -361,12 +388,20 @@ exposed-modules: Network.BSD,
       the user's local package database or another specified
       file can be used.</para>
 
-    <para>Commands which only inspect the database (<literal>list</literal>,
-      <literal>describe</literal>, <literal>field</literal>) will take into
-      account the user's local package database too, unless the
-      <literal>--global</literal> option is given.  This matches the behaviour
-      of GHC, which automatically reads the user's local database if it is
-      available.</para>
+    <para>To see what package databases are in use, say
+      <literal>ghc-pkg&nbsp;list</literal>.  The stack of databases that
+      <literal>ghc-pkg</literal> knows about can be modified using the
+      <literal>GHC_PACKAGE_PATH</literal> environment variable (see <xref
+	linkend="ghc-package-path" />, and using
+	<literal>--package-conf</literal> options on the
+	<literal>ghc-pkg</literal> command line.</para>
+
+    <para>When asked to modify a database, <literal>ghc-pkg</literal> modifies
+      the global database by default.  Specifying <option>--user</option>
+      causes it to act on the user database, or <option>--package-conf</option>
+      can be used to act on another database entirely.  When multiple of these
+      options are given, the rightmost one is used as the database to act
+      upon.</para>
 
     <para>The <literal>ghc-pkg</literal> program may be run in the ways listed
       below.  Where a package name is required, the package can be named in
@@ -432,9 +467,8 @@ exposed-modules: Network.BSD,
 	  <para>This option displays the currently installed
 	    packages, for each of the databases known to
 	    <literal>ghc-pkg</literal>.  That includes the global database, the
-	    user's local database (if <option>--user</option> is given), and
-	    any further files specified using the <option>-f</option> option on
-	    the command line.</para>
+	    user's local database, and any further files specified using the
+	    <option>-f</option> option on the command line.</para>
 
 	  <para>Hidden packages (those for which the <literal>exposed</literal>
 	    flag is <literal>False</literal>) are shown in parentheses in the
@@ -486,7 +520,7 @@ exposed-modules: Network.BSD,
     <variablelist>
       <varlistentry>
 	<term>
-	  <option>&ndash;&ndash;auto-ghci-libs</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  <option>&ndash;&ndash;auto-ghci-libs</option><indexterm><primary><option>&ndash;&ndash;auto-ghci-libs</option></primary>
 	  </indexterm>
 	</term>
 	<listitem>
@@ -518,13 +552,13 @@ exposed-modules: Network.BSD,
 	  </indexterm>
 	</term>
 	<listitem>
-	  <para>Operate on the package database in
-	    <replaceable>file</replaceable>.</para>
-
-	  <para>When multiple <option>-f</option> options are given, or
-	    <option>-f</option> is used in conjunction with
-	    <option>--user</option> or <option>--global</option>, the last
-	    one on the command-line is the one that will be modified.</para>
+	  <para>Adds <replaceable>file</replaceable> to the stack of package
+	    databases.  Additionally, <replaceable>file</replaceable> will
+	    also be the database modified by a <literal>register</literal>,
+	    <literal>unregister</literal>, <literal>expose</literal> or
+	    <literal>hide</literal> command, unless it is overriden by a later
+	    <option>--package-conf</option>, <option>--user</option> or
+	    <option>--global</option> option.</para>
 	</listitem>
       </varlistentry>
 
@@ -546,7 +580,7 @@ exposed-modules: Network.BSD,
 
       <varlistentry>
 	<term>
-	  <option>&ndash;&ndash;global</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  <option>&ndash;&ndash;global</option><indexterm><primary><option>&ndash;&ndash;global</option></primary>
 	  </indexterm>
 	</term>
 	<listitem>
@@ -560,7 +594,7 @@ exposed-modules: Network.BSD,
 
       <varlistentry>
 	<term>
-	  <option>&ndash;&ndash;help</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  <option>&ndash;&ndash;help</option><indexterm><primary><option>&ndash;&ndash;help</option></primary>
 	  </indexterm>
 	</term>
 	<term>
@@ -592,7 +626,7 @@ exposed-modules: Network.BSD,
 	  </indexterm>
 	</term>
 	<term>
-	  <option>&ndash;&ndash;version</option><indexterm><primary><option>&ndash;&ndash;user</option></primary>
+	  <option>&ndash;&ndash;version</option><indexterm><primary><option>&ndash;&ndash;version</option></primary>
 	  </indexterm>
 	</term>
 	<listitem>
