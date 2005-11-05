@@ -47,7 +47,11 @@ import System	( getArgs, getProgName, getEnv,
 		  exitWith, ExitCode(..)
 		)
 import System.IO
+#if __GLASGOW_HASKELL__ >= 600
 import System.IO.Error (try)
+#else
+import System.IO (try)
+#endif
 import Data.List ( isPrefixOf, isSuffixOf, intersperse, groupBy, sortBy )
 
 #ifdef mingw32_HOST_OS
