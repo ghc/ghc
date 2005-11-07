@@ -2953,10 +2953,14 @@ scavenge(step *stp)
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
-	// it's tempting to recordMutable() if failed_to_evac is
-	// false, but that breaks some assumptions (eg. every
-	// closure on the mutable list is supposed to have the MUT
-	// flag set, and MUT_ARR_PTRS_FROZEN doesn't).
+
+	// If we're going to put this object on the mutable list, then
+	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
+	if (failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
+	}
 	break;
     }
 
@@ -3307,11 +3311,19 @@ linear_scan:
 	case MUT_ARR_PTRS_FROZEN0:
 	    // follow everything 
 	{
-	    StgPtr next;
+	    StgPtr next, q = p;
 	    
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    }
+
+	    // If we're going to put this object on the mutable list, then
+	    // set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
+	    if (failed_to_evac) {
+		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+	    } else {
+		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
 	    }
 	    break;
 	}
@@ -3621,11 +3633,19 @@ scavenge_one(StgPtr p)
     case MUT_ARR_PTRS_FROZEN0:
     {
 	// follow everything 
-	StgPtr next;
+	StgPtr next, q=p;
       
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	}
+
+	// If we're going to put this object on the mutable list, then
+	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
+	if (failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
 	}
 	break;
     }
