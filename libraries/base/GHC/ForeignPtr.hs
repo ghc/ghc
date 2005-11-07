@@ -121,6 +121,14 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 -- although it may be implemented differently internally: you may not
 -- assume that the memory returned by 'mallocForeignPtr' has been
 -- allocated with 'Foreign.Marshal.Alloc.malloc'.
+--
+-- GHC notes: 'mallocForeignPtr' has a heavily optimised
+-- implementation in GHC.  It uses pinned memory in the garbage
+-- collected heap, so the 'ForeignPtr' does not require a finalizer to
+-- free the memory.  Use of 'mallocForeignPtr' and associated
+-- functions is strongly recommended in preference to 'newForeignPtr'
+-- with a finalizer.
+-- 
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a = do
