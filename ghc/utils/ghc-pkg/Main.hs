@@ -314,6 +314,10 @@ getPkgDatabases modify flags = do
 		  | otherwise      -> cs
 		  where cs = parseSearchPath path
 
+	-- The "global" database is always the one at the bottom of the stack.
+	-- This is the database we modify by default.
+      virt_global_conf = last env_stack
+
   -- -f flags on the command line add to the database stack, unless any
   -- of them are present in the stack already.
   let flag_stack = filter (`notElem` env_stack) 
@@ -327,10 +331,10 @@ getPkgDatabases modify flags = do
         then return flag_stack
 	else let
 	      	go (FlagUser : fs)     = modifying user_conf
-	      	go (FlagGlobal : fs)   = modifying global_conf
+	      	go (FlagGlobal : fs)   = modifying virt_global_conf
 	      	go (FlagConfig f : fs) = modifying f
 	      	go (_ : fs)            = go fs
-	      	go []                  = modifying global_conf
+	      	go []                  = modifying virt_global_conf
 		
 		modifying f 
 		  | f `elem` flag_stack = return (dropWhile (/= f) flag_stack)
