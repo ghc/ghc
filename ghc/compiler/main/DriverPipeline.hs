@@ -872,7 +872,9 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		       ++ cc_opts
 		       ++ split_opt
+#if x86_TARGET_ARCH
 		       ++ (if excessPrecision then [] else [ "-ffloat-store" ])
+#endif
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
 		       ))
