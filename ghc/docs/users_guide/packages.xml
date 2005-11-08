@@ -298,6 +298,7 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       <para>To check whether your <literal>GHC_PACKAGE_PATH</literal> setting
 	is doing the right thing, <literal>ghc-pkg list</literal> will list all
 	the databases in use, in the reverse order they are searched.</para>
+      
     </sect3>
   </sect2>
 
@@ -402,6 +403,15 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       can be used to act on another database entirely.  When multiple of these
       options are given, the rightmost one is used as the database to act
       upon.</para>
+
+    <para>If the environment variable <literal>GHC_PACKAGE_PATH</literal> is
+      set, and its value does not end in a separator (<literal>:</literal> on
+      Unix, <literal>;</literal> on Windows), then the last database is
+      considered to be the global database, and will be modified by default by
+      <literal>ghc-pkg</literal>.  The intention here is that
+      <literal>GHC_PACKAGE_PATH</literal> can be used to create a virtual
+      package environment into which Cabal packages can be installed without
+      setting anything other than <literal>GHC_PACKAGE_PATH</literal>.</para>
 
     <para>The <literal>ghc-pkg</literal> program may be run in the ways listed
       below.  Where a package name is required, the package can be named in
