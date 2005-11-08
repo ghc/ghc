@@ -852,6 +852,23 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		| otherwise         = As
 	output_fn <- get_output_fn next_phase maybe_loc
 
+	let
+	  more_hcc_opts =
+#if x86_TARGET_ARCH
+	   	-- on x86 the floating point regs have greater precision
+	     	-- than a double, which leads to unpredictable results.
+		-- By default, we turn this off with -ffloat-store unless
+		-- the user specified -fexcess-precision.
+		(if excessPrecision then [] else [ "-ffloat-store" ]) ++
+#endif
+		-- gcc's -fstrict-aliasing allows two accesses to memory
+		-- to be considered non-aliasing if they have different types.
+		-- This interacts badly with the C code we generate, which is
+		-- very weakly typed, being derived from C--.
+		["-fno-strict-aliasing"]
+
+
+
 	SysTools.runCc dflags (
 		-- force the C compiler to interpret this file as C when
 		-- compiling .hc files, by adding the -x c option.
@@ -868,13 +885,13 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ (if hcc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])
+		       ++ (if hcc 
+			     then more_hcc_opts
+			     else [])
 		       ++ [ verb, "-S", "-Wimplicit", "-O" ]
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		       ++ cc_opts
 		       ++ split_opt
-#if x86_TARGET_ARCH
-		       ++ (if excessPrecision then [] else [ "-ffloat-store" ])
-#endif
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
 		       ))
