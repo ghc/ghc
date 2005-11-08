@@ -3802,9 +3802,8 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 	
 	case STOP_FRAME:
 	    // We've stripped the entire stack, the thread is now dead.
-	    sp += sizeofW(StgStopFrame);
 	    tso->what_next = ThreadKilled;
-	    tso->sp = sp;
+	    tso->sp = frame + sizeofW(StgStopFrame);
 	    return;
 	    
 	default:
