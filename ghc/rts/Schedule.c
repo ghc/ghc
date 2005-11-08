@@ -615,6 +615,18 @@ run_thread:
     // happened.  So find the new location:
     t = cap->r.rCurrentTSO;
 
+    // We have run some Haskell code: there might be blackhole-blocked
+    // threads to wake up now.
+    // Lock-free test here should be ok, we're just setting a flag.
+    if ( blackhole_queue != END_TSO_QUEUE ) {
+	blackholes_need_checking = rtsTrue;
+    }
+    
+    // And save the current errno in this thread.
+    // XXX: possibly bogus for SMP because this thread might already
+    // be running again, see code below.
+    t->saved_errno = errno;
+
 #ifdef SMP
     // If ret is ThreadBlocked, and this Task is bound to the TSO that
     // blocked, we are in limbo - the TSO is now owned by whatever it
@@ -632,9 +644,6 @@ run_thread:
 
     ASSERT_CAPABILITY_INVARIANTS(cap,task);
 
-    // And save the current errno in this thread.
-    t->saved_errno = errno;
-
     // ----------------------------------------------------------------------
     
     // Costs for the scheduler are assigned to CCS_SYSTEM
@@ -642,13 +651,6 @@ run_thread:
     stopHeapProfTimer();
     CCCS = CCS_SYSTEM;
 #endif
-    
-    // We have run some Haskell code: there might be blackhole-blocked
-    // threads to wake up now.
-    // Lock-free test here should be ok, we're just setting a flag.
-    if ( blackhole_queue != END_TSO_QUEUE ) {
-	blackholes_need_checking = rtsTrue;
-    }
     
 #if defined(THREADED_RTS)
     IF_DEBUG(scheduler,debugBelch("sched (task %p): ", (void *)(unsigned long)(unsigned int)osThreadId()););
