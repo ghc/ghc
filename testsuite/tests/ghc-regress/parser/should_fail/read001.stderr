@@ -1,5 +1,5 @@
 
-read001.hs:25:10: Not in scope: `+#'
+read001.hs:25:9: Not in scope: `+#'
 
 read001.hs:38:47: Not in scope: type constructor or class `EqLeaf'
 
@@ -7,7 +7,7 @@ read001.hs:38:58: Not in scope: type constructor or class `EqLeaf'
 
 read001.hs:87:10: Not in scope: `x'
 
-read001.hs:88:18: Not in scope: `x'
+read001.hs:88:11: Not in scope: `x'
 
 read001.hs:94:18: Not in scope: `isSpace'
 

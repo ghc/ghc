@@ -1,2 +1,2 @@
 
-read012.hs:7:8: parse error (possibly incorrect indentation)
+read012.hs:7:1: parse error (possibly incorrect indentation)
