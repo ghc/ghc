@@ -29,7 +29,7 @@
     ASSERT(Sp != 0);			\
     ASSERT(SpLim != 0);			\
     ASSERT(HpLim != 0);			\
-    ASSERT(SpLim - RESERVED_STACK_WORDS <= Sp); \
+    ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp); \
     ASSERT(HpLim >= Hp);
 
 /* -----------------------------------------------------------------------------
