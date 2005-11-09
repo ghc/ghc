@@ -854,7 +854,7 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 
 	let
 	  more_hcc_opts =
-#if x86_TARGET_ARCH
+#if i386_TARGET_ARCH
 	   	-- on x86 the floating point regs have greater precision
 	     	-- than a double, which leads to unpredictable results.
 		-- By default, we turn this off with -ffloat-store unless
