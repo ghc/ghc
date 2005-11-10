@@ -551,9 +551,9 @@ ghc -c Foo.hs</screen>
 
 	<variablelist>
 	  <varlistentry>
-	    <term><option>-x</option> <replaceable>suffix</replaceable></term>
-	      <indexterm><primary><option>-x</option></primary>
-	      </indexterm>
+	    <term><option>-x</option> <replaceable>suffix</replaceable>
+	    	      <indexterm><primary><option>-x</option></primary>
+	      </indexterm></term>
 	      <listitem>
 		<para>Causes all files following this option on the command
 		  line to be processed as if they had the suffix
