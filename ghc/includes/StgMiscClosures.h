@@ -466,6 +466,7 @@ RTS_ENTRY(stg_block_async_ret);
 RTS_FUN(stg_block_async_void);
 RTS_ENTRY(stg_block_async_void_ret);
 #endif
+RTS_FUN(stg_block_stmwait);
 
 /* Entry/exit points from StgStartup.cmm */
 

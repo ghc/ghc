@@ -116,7 +116,11 @@
 
 #if defined(DEBUG)
 #define SHAKE
+#if defined(THREADED_RTS)
+#define TRACE(_x...) IF_DEBUG(stm, debugBelch("STM  (task %p): ", (void *)(unsigned long)(unsigned int)osThreadId()); debugBelch ( _x ))
+#else
 #define TRACE(_x...) IF_DEBUG(stm, debugBelch ( _x ))
+#endif
 #else
 #define TRACE(_x...) /*Nothing*/
 #endif
@@ -384,19 +388,6 @@ static StgTRecHeader *new_stg_trec_header(Capability *cap,
   }
 
   return result;  
-}
-
-static StgTVar *new_tvar(Capability *cap,
-                         StgClosure *new_value) {
-  StgTVar *result;
-  result = (StgTVar *)allocateLocal(cap, sizeofW(StgTVar));
-  SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
-  result -> current_value = new_value;
-  result -> first_wait_queue_entry = END_STM_WAIT_QUEUE;
-#if defined(SMP)
-  result -> last_update_by = NO_TREC;
-#endif
-  return result;
 }
 
 /*......................................................................*/
@@ -793,11 +784,13 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
   TRACE("%p : stmCommitTransaction()\n", trec);
   ASSERT (trec != NO_TREC);
+
+  lock_stm(trec);
+
   ASSERT (trec -> enclosing_trec == NO_TREC);
   ASSERT ((trec -> state == TREC_ACTIVE) || 
           (trec -> state == TREC_CONDEMNED));
 
-  lock_stm(trec);
   result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
   if (result) {
     // We now know that all the updated locations hold their expected values.
@@ -919,16 +912,27 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
     park_tso(tso);
     trec -> state = TREC_WAITING;
 
-    // As soon as we start releasing ownership, another thread may find us 
-    // and wake us up.  This may happen even before we have finished 
-    // releasing ownership.
-    revert_ownership(trec, TRUE);
-  }  
+    // We haven't released ownership of the transaction yet.  The TSO
+    // has been put on the wait queue for the TVars it is waiting for,
+    // but we haven't yet tidied up the TSO's stack and made it safe
+    // to wake up the TSO.  Therefore, we must wait until the TSO is
+    // safe to wake up before we release ownership - when all is well,
+    // the runtime will call stmWaitUnlock() below, with the same
+    // TRec.
 
-  unlock_stm(trec);
+  } else {
+    unlock_stm(trec);
+  }
 
   TRACE("%p : stmWait(%p)=%d\n", trec, tso, result);
   return result;
+}
+
+
+void
+stmWaitUnlock(Capability *cap, StgTRecHeader *trec) {
+    revert_ownership(trec, TRUE);
+    unlock_stm(trec);
 }
 
 /*......................................................................*/
@@ -1090,9 +1094,14 @@ void stmWriteTVar(Capability *cap,
 StgTVar *stmNewTVar(Capability *cap,
                     StgClosure *new_value) {
   StgTVar *result;
-  result = new_tvar(cap, new_value);
+  result = (StgTVar *)allocateLocal(cap, sizeofW(StgTVar));
+  SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
+  result -> current_value = new_value;
+  result -> first_wait_queue_entry = END_STM_WAIT_QUEUE;
+#if defined(SMP)
+  result -> last_update_by = NO_TREC;
+#endif
   return result;
 }
 
 /*......................................................................*/
-

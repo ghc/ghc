@@ -947,3 +947,18 @@ stg_block_async_void
 }
 
 #endif
+
+/* -----------------------------------------------------------------------------
+   STM-specific waiting
+   -------------------------------------------------------------------------- */
+
+stg_block_stmwait_finally
+{
+    foreign "C" stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
+    jump StgReturn;
+}
+
+stg_block_stmwait
+{
+    BLOCK_BUT_FIRST(stg_block_stmwait_finally);
+}

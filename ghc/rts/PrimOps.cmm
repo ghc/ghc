@@ -1300,7 +1300,8 @@ retry_pop_stack:
     IF_NOT_REG_R1(Sp_adj(-2); 
 		  Sp(1) = stg_NO_FINALIZER_closure;
 		  Sp(0) = stg_ut_1_0_unreg_info;)
-    jump stg_block_noregs;
+    R3 = trec; // passing to stmWaitUnblock()
+    jump stg_block_stmwait;
   } else {
     // Transaction was not valid: retry immediately
     "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
