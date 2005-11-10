@@ -14,7 +14,7 @@ main = do
   -- test should run quickly, but arrange to kill it if it hangs for any reason:
   main_t <- myThreadId
   forkIO $ do
-	threadDelay 2000000
+	threadDelay 10000000
 	throwTo main_t (ErrorCall "killed")
 
   zipWithM_ ($) 
@@ -169,5 +169,6 @@ writeProcNB m1 m2 h = do
   takeMVar m2
   withCString "end" $ \s -> do
     hPutBuf h s 3
+    hFlush h
     putMVar m1 ()
   hClose h
