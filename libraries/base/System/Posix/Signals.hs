@@ -264,6 +264,8 @@ fileSizeLimitExceeded = sigXFSZ
 -- -----------------------------------------------------------------------------
 -- Signal-related functions
 
+-- | @signalProcess int pid@ calls @kill@ to signal process @pid@ 
+--   with interrupt signal @int@.
 signalProcess :: Signal -> ProcessID -> IO ()
 signalProcess sig pid 
  = throwErrnoIfMinus1_ "signalProcess" (c_kill (fromIntegral pid) sig)
@@ -271,6 +273,9 @@ signalProcess sig pid
 foreign import ccall unsafe "kill"
   c_kill :: CPid -> CInt -> IO CInt
 
+
+-- | @signalProcessGroup int pgid@ calls @kill@ to signal 
+--  all processes in group @pgid@ with interrupt signal @int@.
 signalProcessGroup :: Signal -> ProcessGroupID -> IO ()
 signalProcessGroup sig pgid 
   = throwErrnoIfMinus1_ "signalProcessGroup" (c_killpg (fromIntegral pgid) sig)
@@ -278,6 +283,8 @@ signalProcessGroup sig pgid
 foreign import ccall unsafe "killpg"
   c_killpg :: CPid -> CInt -> IO CInt
 
+-- | @raiseSignal int@ calls @kill@ to signal the current process
+--   with interrupt signal @int@. 
 raiseSignal :: Signal -> IO ()
 raiseSignal sig = throwErrnoIfMinus1_ "raiseSignal" (c_raise sig)
 
@@ -296,10 +303,19 @@ data Handler = Default
              | Catch (IO ())
              | CatchOnce (IO ())
 
+-- | @installHandler int handler iset@ calls @sigaction@ to install an
+--   interrupt handler for signal @int@.  If @handler@ is @Default@,
+--   @SIG_DFL@ is installed; if @handler@ is @Ignore@, @SIG_IGN@ is
+--   installed; if @handler@ is @Catch action@, a handler is installed
+--   which will invoke @action@ in a new thread when (or shortly after) the
+--   signal is received.
+--   If @iset@ is @Just s@, then the @sa_mask@ of the @sigaction@ structure
+--   is set to @s@; otherwise it is cleared.  The previously installed
+--   signal handler for @int@ is returned
 installHandler :: Signal
                -> Handler
-               -> Maybe SignalSet	-- other signals to block
-               -> IO Handler		-- old handler
+               -> Maybe SignalSet	-- ^ other signals to block
+               -> IO Handler		-- ^ old handler
 
 #ifdef __PARALLEL_HASKELL__
 installHandler = 
@@ -357,6 +373,8 @@ foreign import ccall unsafe
 -- -----------------------------------------------------------------------------
 -- Alarms
 
+-- | @scheduleAlarm i@ calls @alarm@ to schedule a real time
+--   alarm at least @i@ seconds in the future.
 scheduleAlarm :: Int -> IO Int
 scheduleAlarm secs = do
    r <- c_alarm (fromIntegral secs)
@@ -428,6 +446,8 @@ inSignalSet sig (SignalSet fp) = unsafePerformIO $
     r <- throwErrnoIfMinus1 "inSignalSet" (c_sigismember p sig)
     return (r /= 0)
 
+-- | @getSignalMask@ calls @sigprocmask@ to determine the
+--   set of interrupts which are currently being blocked.
 getSignalMask :: IO SignalSet
 getSignalMask = do
   fp <- mallocForeignPtrBytes sizeof_sigset_t
@@ -439,16 +459,26 @@ sigProcMask :: String -> CInt -> SignalSet -> IO ()
 sigProcMask fn how (SignalSet set) =
   withForeignPtr set $ \p_set ->
     throwErrnoIfMinus1_ fn (c_sigprocmask how p_set nullPtr)
-  
+
+-- | @setSignalMask mask@ calls @sigprocmask@ with
+--   @SIG_SETMASK@ to block all interrupts in @mask@.
 setSignalMask :: SignalSet -> IO ()
 setSignalMask set = sigProcMask "setSignalMask" (CONST_SIG_SETMASK :: CInt) set
 
+-- | @blockSignals mask@ calls @sigprocmask@ with
+--   @SIG_BLOCK@ to add all interrupts in @mask@ to the
+--  set of blocked interrupts.
 blockSignals :: SignalSet -> IO ()
 blockSignals set = sigProcMask "blockSignals" (CONST_SIG_BLOCK :: CInt) set
 
+-- | @unblockSignals mask@ calls @sigprocmask@ with
+--   @SIG_UNBLOCK@ to remove all interrupts in @mask@ from the
+--   set of blocked interrupts. 
 unblockSignals :: SignalSet -> IO ()
 unblockSignals set = sigProcMask "unblockSignals" (CONST_SIG_UNBLOCK :: CInt) set
 
+-- | @getPendingSignals@ calls @sigpending@ to obtain
+--   the set of interrupts which have been received but are currently blocked.
 getPendingSignals :: IO SignalSet
 getPendingSignals = do
   fp <- mallocForeignPtrBytes sizeof_sigset_t
@@ -457,6 +487,14 @@ getPendingSignals = do
   return (SignalSet fp)
 
 #ifndef cygwin32_HOST_OS
+
+-- | @awaitSignal iset@ suspends execution until an interrupt is received.
+-- If @iset@ is @Just s@, @awaitSignal@ calls @sigsuspend@, installing
+-- @s@ as the new signal mask before suspending execution; otherwise, it
+-- calls @pause@.  @awaitSignal@ returns on receipt of a signal.  If you
+-- have installed any signal handlers with @installHandler@, it may be
+-- wise to call @yield@ directly after @awaitSignal@ to ensure that the
+-- signal handler runs as promptly as possible.
 awaitSignal :: Maybe SignalSet -> IO ()
 awaitSignal maybe_sigset = do
   fp <- case maybe_sigset of
