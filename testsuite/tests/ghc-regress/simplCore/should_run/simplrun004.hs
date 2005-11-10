@@ -8,7 +8,7 @@ expensive 0 = True
 expensive 1 = False
 expensive n = expensive (n-2)
 
-f g = if expensive (10*(fst g)) then odd else even
+f g = if expensive (1000000*(fst g)) then odd else even
 
 ---------------------------------------------------------
 -- The key point is that the (c g) call should not get pushed inside the \x,
