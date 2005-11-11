@@ -619,8 +619,9 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 	    s <- peek p		
 	    if (s == 0xff) 
 	      then return ()
-	      else do sp <- peekElemOff handlers (fromIntegral s)
-		      quickForkIO (deRefStablePtr sp)
+	      else do handler_tbl <- peek handlers
+		      sp <- peekElemOff handler_tbl (fromIntegral s)
+		      quickForkIO (do io <- deRefStablePtr sp; io)
 		      return ()
 
   takeMVar prodding
@@ -646,7 +647,7 @@ prodServiceThread = do
     else return ()
   putMVar prodding True
 
-foreign import ccall "&signal_handlers" handlers :: Ptr (StablePtr (IO ()))
+foreign import ccall "&signal_handlers" handlers :: Ptr (Ptr (StablePtr (IO ())))
 
 foreign import ccall "setIOManagerPipe"
   c_setIOManagerPipe :: CInt -> IO ()
