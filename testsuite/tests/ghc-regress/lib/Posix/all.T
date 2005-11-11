@@ -9,5 +9,5 @@ test('signals002',  compose(only_compiler_types(['ghc']), conf),
 test('fileexist01', conf, compile_and_run, ['-package unix'])
 test('forkprocess01', compose(only_compiler_types(['ghc']), conf),
 	compile_and_run, ['-package unix'])
-test('queryfdoption01', compose(only_compiler_types(['ghc']), conf),
+test('queryfdoption01', compose(omit_ways(['ghci']), compose(only_compiler_types(['ghc']), conf)),
 	compile_and_run, ['-package unix'])
