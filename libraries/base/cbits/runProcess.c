@@ -216,7 +216,7 @@ int waitForProcess (ProcHandle handle)
     else
 	if (WIFSIGNALED(wstat))
 	{
-	    errno = EINTR;
+	    return wstat;
 	}
 	else
 	{
