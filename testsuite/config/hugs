@@ -14,3 +14,4 @@ config.run_ways		     = ['normal']
 config.other_ways            = []
 
 config.way_flags = { 'normal' : [] }
+config.way_rts_flags = { 'normal' : [] }
