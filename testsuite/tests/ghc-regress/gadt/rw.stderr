@@ -1,5 +1,5 @@
 
-rw.hs:14:46:
+rw.hs:14:32:
     Couldn't match the rigid variable `a' against `Int'
       `a' is bound by the type signature for `writeInt'
       Expected type: a
@@ -7,7 +7,7 @@ rw.hs:14:46:
     In the expression: 1 :: Int
     In the second argument of `writeIORef', namely `(1 :: Int)'
 
-rw.hs:19:42:
+rw.hs:19:28:
     Couldn't match the rigid variable `a' against `Bool'
       `a' is bound by the type signature for `readBool'
       Expected type: a -> IO b
