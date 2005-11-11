@@ -27,9 +27,9 @@ test011:
 # test -o
 test012:
 	@$(RM) A.hi
-	@$(RM) A.ooo
-	$(TEST_HC) -c A.hs -o A.ooo
-	test -f A.ooo
+	@$(RM) A$(OBJSUFFIX)oo
+	$(TEST_HC) -c A.hs -o A$(OBJSUFFIX)oo
+	test -f A$(OBJSUFFIX)oo
 
 # test -ohi
 test013:
@@ -54,6 +54,29 @@ test015:
 	$(TEST_HC) -c A.hs -hidir hi
 	test -f hi/A.hi
 
+# test stub generation
+test016:
+	@$(RM) F.hi F$(OBJSUFFIX) F_stub.c F_stub.h
+	@$(TEST_HC) -c F.hs
+	test -f F_stub$(OBJSUFFIX)
+	test -f F_stub.c
+	test -f F_stub.h
+
+# test -stubdir (filename differs from module name)
+test017:
+	@$(RM) F.hi F$(OBJSUFFIX) stub/TestStub_stub.c stub/TestStub_stub.h stub/TestStub_stub$(OBJSUFFIX) F_stub$(OBJSUFFIX) 
+	@$(TEST_HC) -c F.hs -stubdir stub
+	test -f F_stub$(OBJSUFFIX)
+	test -f stub/TestStub_stub.c
+	test -f stub/TestStub_stub.h
+
+# test -odir with stubs (filename differs from module name)
+test018:
+	@$(RM) F.hi F$(OBJSUFFIX) F_stub.c F_stub.h obj/TestStub_stub$(OBJSUFFIX)
+	@$(MKDIRHIER) obj
+	@$(TEST_HC) -c F.hs -odir obj
+	test -f obj/TestStub_stub$(OBJSUFFIX)
+
 # -----------------------------------------------------------------------------
 # One-shot compilation, hierarchical modules
 
@@ -67,9 +90,9 @@ test021:
 # test -o
 test022:
 	@$(RM) B/C.hi
-	@$(RM) B/C.ooo
-	$(TEST_HC) -c B/C.hs -o B/C.ooo
-	test -f B/C.ooo
+	@$(RM) B/C$(OBJSUFFIX)oo
+	$(TEST_HC) -c B/C.hs -o B/C$(OBJSUFFIX)oo
+	test -f B/C$(OBJSUFFIX)oo
 
 # test -ohi
 test023:
@@ -113,6 +136,20 @@ test026:
 	test -f d1/P/Q.hi
 	test -f d1/P/Q$(OBJSUFFIX)
 
+# test stub generation
+test027:
+	@$(RM) B/F.hi B/F$(OBJSUFFIX) B/F_stub.c B/F_stub.h
+	@$(TEST_HC) -c B/F.hs
+	test -f B/F_stub.c
+	test -f B/F_stub.h
+
+# test -stubdir
+test028:
+	@$(RM) B/F.hi B/F$(OBJSUFFIX) stub/B/F_stub.c stub/B/F_stub.h
+	@$(TEST_HC) -c B/F.hs -stubdir stub
+	test -f stub/B/F_stub.c
+	test -f stub/B/F_stub.h
+
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, flat modules
 
@@ -139,6 +176,20 @@ test033:
 	$(TEST_HC) --make A.hs -hidir hi
 	test -f hi/A.hi
 
+# test stub generation
+test034:
+	@$(RM) F.hi F$(OBJSUFFIX) F_stub.c F_stub.h
+	@$(TEST_HC) --make F.hs
+	test -f F_stub.c
+	test -f F_stub.h
+
+# test -stubdir (filename differs from module name)
+test035:
+	@$(RM) F.hi F$(OBJSUFFIX) stub/Stubs_stub.c stub/Stubs_stub.h
+	@$(TEST_HC) --make F.hs -stubdir stub
+	test -f stub/TestStub_stub.c
+	test -f stub/TestStub_stub.h
+
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, hierarchical modules
 
@@ -164,6 +215,20 @@ test043:
 	@$(RM) B/C$(OBJSUFFIX)
 	$(TEST_HC) --make B/C.hs -hidir hi
 	test -f hi/B/C.hi
+
+# test stub generation
+test044:
+	@$(RM) B/F.hi B/F$(OBJSUFFIX) B/F_stub.c B/F_stub.h
+	@$(TEST_HC) --make B/F.hs
+	test -f B/F_stub.c
+	test -f B/F_stub.h
+
+# test -stubdir
+test045:
+	@$(RM) B/F.hi B/F$(OBJSUFFIX) stub/B/F_stub.c stub/B/F_stub.h
+	@$(TEST_HC) --make B/F.hs -stubdir stub
+	test -f stub/B/F_stub.c
+	test -f stub/B/F_stub.h
 
 # -----------------------------------------------------------------------------
 # Compilation-manager compilations, hierarchical modules, non-root modules
@@ -208,29 +273,29 @@ test053:
 
 # Test the -keep-hc-files works without --make
 test060:
-	@$(RM) A.hi A.o A.hc
+	@$(RM) A.hi A$(OBJSUFFIX) A.hc
 	$(TEST_HC) -c -keep-hc-files -fvia-C A.hs
 	test -f A.hc
 
 # Test the -keep-hc-files works with --make
 test061:
-	@$(RM) A.hi A.o A.hc
+	@$(RM) A.hi A$(OBJSUFFIX) A.hc
 	$(TEST_HC) --make -keep-hc-files -fvia-C A.hs
 	test -f A.hc
 
 # Test that -main-is works with --make
 test062.1:
-	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
+	@$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
 	echo "module Hello where { hello = putStrLn \"ok\" }" >Hello.hs
 	$(TEST_HC) --make -main-is Hello.hello Hello -o hello
 	./hello
 test062.2:
-	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
+	@$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
 	echo "module Hello where { main = putStrLn \"ok\" }" >Hello.hs
 	$(TEST_HC) --make -main-is Hello Hello -o hello
 	./hello
 test062.3:
-	@$(RM) Hello.hs Hello.hi Hello.o Hello.hc hello
+	@$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
 	echo "module Main (hello) where { hello = putStrLn \"ok\" }" >Hello.hs
 	$(TEST_HC) --make -main-is hello Hello.hs -o hello
 	./hello
@@ -239,7 +304,7 @@ test062.3:
 # The compilation will fail, but we ignore the failure and just
 # compare the output, because make might give us a different exit code.
 test063:
-	@$(RM) A.hi A.o A.hc D.hi D.o D.hc
+	@$(RM) A.hi A$(OBJSUFFIX) A.hc D.hi D$(OBJSUFFIX) D.hc
 	-@$(TEST_HC) --make -i -v0 D.hs
 
 # Test -E
@@ -293,9 +358,9 @@ test071:
 # No recompilation required, but we requested a .hc file --> should recompile
 # Broken briefy in ghc-6.3.
 test080:
-	@$(RM) A.hi A.o A.hc
+	@$(RM) A.hi A$(OBJSUFFIX) A.hc
 	$(TEST_HC) -c A.hs
-	test -f A.o
+	test -f A$(OBJSUFFIX)
 	$(TEST_HC) -C A.hs
 	test -f A.hc
 
@@ -306,7 +371,7 @@ test080:
 
 # Test for overlap between home module and package module
 test100:
-	@$(RM) A.hi A.o A.hc
+	@$(RM) A.hi A$(OBJSUFFIX) A.hc
 	$(TEST_HC) --make -ioverlap Overlap
 
 # -----------------------------------------------------------------------------
