@@ -518,8 +518,6 @@ terminateProcess (ProcHandle handle)
 	maperrno();
 	return -1;
     }
-
-    CloseHandle((HANDLE) handle);
     return 0;
 }
 
@@ -535,8 +533,6 @@ getProcessExitCode (ProcHandle handle, int *pExitCode)
 	    maperrno();
 	    return -1;
 	}
-	
-	CloseHandle((HANDLE) handle);
 	return 1;
     }
     
@@ -555,8 +551,6 @@ waitForProcess (ProcHandle handle)
 	    maperrno();
 	    return -1;
 	}
-	
-	CloseHandle((HANDLE) handle);
 	return retCode;
     }
     

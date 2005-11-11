@@ -167,7 +167,8 @@ runInteractiveProcess1 fun cmd args mb_cwd mb_env = do
      hndStdInput  <- fdToHandle pfdStdInput  WriteMode
      hndStdOutput <- fdToHandle pfdStdOutput ReadMode
      hndStdError  <- fdToHandle pfdStdError  ReadMode
-     return (hndStdInput, hndStdOutput, hndStdError, ProcessHandle proc_handle)
+     ph <- mkProcessHandle proc_handle
+     return (hndStdInput, hndStdOutput, hndStdError, ph)
 
 foreign import ccall unsafe "runInteractiveProcess" 
   c_runInteractiveProcess
@@ -201,8 +202,8 @@ runInteractiveProcess1 fun cmd args workDir env extra_cmdline
   	hndStdInput  <- fdToHandle pfdStdInput  WriteMode
   	hndStdOutput <- fdToHandle pfdStdOutput ReadMode
   	hndStdError  <- fdToHandle pfdStdError  ReadMode
-  	return (hndStdInput, hndStdOutput, hndStdError, 
-		ProcessHandle proc_handle)
+	ph <- mkProcessHandle proc_handle
+  	return (hndStdInput, hndStdOutput, hndStdError, ph)
 
 foreign import ccall unsafe "runInteractiveProcess" 
   c_runInteractiveProcess
@@ -235,7 +236,8 @@ fdToHandle pfd mode = do
 waitForProcess
   :: ProcessHandle
   -> IO ExitCode
-waitForProcess (ProcessHandle handle) = do
+waitForProcess ph = do
+  handle <- getProcessHandle ph
   code <- throwErrnoIfMinus1 "waitForProcess" (c_waitForProcess handle)
   if (code == 0) 
     then return ExitSuccess
@@ -253,7 +255,8 @@ waitForProcess (ProcessHandle handle) = do
 -- On Windows systems, the Win32 @TerminateProcess@ function is called, passing
 -- an exit code of 1.
 terminateProcess :: ProcessHandle -> IO ()
-terminateProcess (ProcessHandle pid) =
+terminateProcess ph = do
+  pid <- getProcessHandle ph
   throwErrnoIfMinus1_ "terminateProcess" (c_terminateProcess pid)
 
 -- ----------------------------------------------------------------------------
@@ -267,7 +270,8 @@ Subsequent calls to @getProcessExitStatus@ always return @'Just'
 'ExitSuccess'@, regardless of what the original exit code was.
 -}
 getProcessExitCode :: ProcessHandle -> IO (Maybe ExitCode)
-getProcessExitCode (ProcessHandle handle) =
+getProcessExitCode ph = do
+  handle <- getProcessHandle ph
   alloca $ \pExitCode -> do
     res <- throwErrnoIfMinus1 "getProcessExitCode" (c_getProcessExitCode handle pExitCode)
     code <- peek pExitCode

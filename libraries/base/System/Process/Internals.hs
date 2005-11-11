@@ -15,7 +15,7 @@
 
 -- #hide
 module System.Process.Internals (
-	ProcessHandle(..), PHANDLE,
+	ProcessHandle(..), PHANDLE, getProcessHandle, mkProcessHandle,
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 	 pPrPr_disableITimers, c_execvpe,
 # ifdef __GLASGOW_HASKELL__
@@ -40,6 +40,7 @@ import System.Posix.Types ( CPid )
 import System.IO 	( Handle )
 #else
 import Data.Word ( Word32 )
+import Data.IORef
 #endif
 
 import Data.Maybe	( fromMaybe )
@@ -81,12 +82,38 @@ import System.Directory.Internals ( parseSearchPath, joinFileName )
      to wait for the process later.
 -}
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-type PHANDLE = CPid
-#else
-type PHANDLE = Word32
-#endif
 
+type PHANDLE = CPid
 newtype ProcessHandle = ProcessHandle PHANDLE
+
+getProcessHandle :: ProcessHandle -> IO PHANDLE
+getProcessHandle (ProcessHandle p) = return p
+
+mkProcessHandle :: PHANDLE -> IO ProcessHandle
+mkProcessHandle p = return (ProcessHandle p)
+
+#else
+
+type PHANDLE = Word32
+newtype ProcessHandle = ProcessHandle (IORef PHANDLE)
+
+getProcessHandle :: ProcessHandle -> IO PHANDLE
+getProcessHandle (ProcessHandle ior) = readIORef ior
+
+-- On Windows, we have to close this HANDLE when it is no longer required,
+-- hence we add a finalizer to it, using an IORef as the box on which to
+-- attach the finalizer.
+mkProcessHandle :: PHANDLE -> IO ProcessHandle
+mkProcessHandle h = do
+   ioref <- newIORef h
+   mkWeakIORef ioref (c_CloseHandle h)
+   return (ProcessHandle ioref)
+
+foreign import stdcall unsafe "CloseHandle"
+  c_CloseHandle
+	:: PHANDLE
+	-> IO ()
+#endif
 
 -- ----------------------------------------------------------------------------
 
@@ -145,7 +172,7 @@ runProcessPosix fun cmd args mb_cwd mb_env mb_stdin mb_stdout mb_stderr
 		 c_runProcess pargs pWorkDir pEnv 
 			fd_stdin fd_stdout fd_stderr
 			set_int inthand set_quit quithand
-	 return (ProcessHandle ph)
+	 mkProcessHandle ph
 
 foreign import ccall unsafe "runProcess" 
   c_runProcess
@@ -187,7 +214,7 @@ runProcessWin32 fun cmd args mb_cwd mb_env
          proc_handle <- throwErrnoIfMinus1 fun
 	                  (c_runProcess pcmdline pWorkDir pEnv 
 				fd_stdin fd_stdout fd_stderr)
-         return (ProcessHandle proc_handle)
+	 mkProcessHandle proc_handle
 
 foreign import ccall unsafe "runProcess" 
   c_runProcess
