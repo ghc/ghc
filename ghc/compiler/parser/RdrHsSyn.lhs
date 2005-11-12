@@ -158,7 +158,7 @@ mkClassDecl (cxt, cname, tyvars) fds sigs mbinds
 		tcdMeths = mbinds
 		}
 
-mkTyData new_or_data (L _ (context, tname, tyvars)) ksig data_cons maybe_deriv
+mkTyData new_or_data (context, tname, tyvars) ksig data_cons maybe_deriv
   = TyData { tcdND = new_or_data, tcdCtxt = context, tcdLName = tname,
 	     tcdTyVars = tyvars,  tcdCons = data_cons, 
 	     tcdKindSig = ksig, tcdDerivs = maybe_deriv }

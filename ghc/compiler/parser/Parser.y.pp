@@ -458,17 +458,17 @@ tycl_decl :: { LTyClDecl RdrName }
 	| 'data' tycl_hdr constrs deriving
 		{ L (comb4 $1 $2 $3 $4)	-- We need the location on tycl_hdr 
 					-- in case constrs and deriving are both empty
-		    (mkTyData DataType $2 Nothing (reverse (unLoc $3)) (unLoc $4)) }
+		    (mkTyData DataType (unLoc $2) Nothing (reverse (unLoc $3)) (unLoc $4)) }
 
         | 'data' tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
 		{ L (comb4 $1 $2 $4 $5)
-		    (mkTyData DataType $2 $3 (reverse (unLoc $5)) (unLoc $6)) }
+		    (mkTyData DataType (unLoc $2) $3 (reverse (unLoc $5)) (unLoc $6)) }
 
 	| 'newtype' tycl_hdr '=' newconstr deriving
 		{ L (comb3 $1 $4 $5)
-		    (mkTyData NewType $2 Nothing [$4] (unLoc $5)) }
+		    (mkTyData NewType (unLoc $2) Nothing [$4] (unLoc $5)) }
 
 	| 'class' tycl_hdr fds where
 		{ let 

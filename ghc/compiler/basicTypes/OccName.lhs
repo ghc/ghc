@@ -162,8 +162,8 @@ nameSpaceString TcClsName = "Type constructor or class"
 
 \begin{code}
 data OccName = OccName 
-    { occNameSpace  :: NameSpace
-    , occNameFS     :: EncodedFS
+    { occNameSpace  :: !NameSpace
+    , occNameFS     :: !EncodedFS
     }
 \end{code}
 

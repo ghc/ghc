@@ -56,7 +56,7 @@ import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
 import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName, nameTyConName )
 import ErrUtils		( Message )
-import SrcLoc		( noLoc, unLoc, getLoc )
+import SrcLoc		( SrcSpan, noLoc, unLoc, getLoc )
 import Outputable
 import Unique		( Unique, Uniquable(..), getKey, mkUniqueGrimily )
 
@@ -207,14 +207,8 @@ tcTopSplice expr res_ty
 
 	-- Run the expression
     traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`
-    runMetaE zonked_q_expr		`thenM` \ simple_expr ->
+    runMetaE convertToHsExpr zonked_q_expr	`thenM` \ expr2 ->
   
-    let 
-	-- simple_expr :: TH.Exp
-
-	expr2 :: LHsExpr RdrName
-	expr2 = convertToHsExpr (getLoc expr) simple_expr 
-    in
     traceTc (text "Got result" <+> ppr expr2) 	`thenM_`
 
     showSplice "expression" 
@@ -297,12 +291,8 @@ kcTopSpliceType expr
 
 	-- Run the expression
 	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-	; simple_ty <- runMetaT zonked_q_expr
+	; hs_ty2 <- runMetaT convertToHsType zonked_q_expr
   
-	; let 	-- simple_ty :: TH.Type
-		hs_ty2 :: LHsType RdrName
-		hs_ty2 = convertToHsType (getLoc expr) simple_ty
-	 
 	; traceTc (text "Got result" <+> ppr hs_ty2)
 
 	; showSplice "type" zonked_q_expr (ppr hs_ty2)
@@ -333,11 +323,8 @@ tcSpliceDecls expr
 
 		-- Run the expression
 	; traceTc (text "About to run" <+> ppr zonked_q_expr)
-	; simple_expr <- runMetaD zonked_q_expr
+	; decls <- runMetaD convertToHsDecls zonked_q_expr
 
-	    -- simple_expr :: [TH.Dec]
-	    -- decls :: [RdrNameHsDecl]
-	; decls <- handleErrors (convertToHsDecls (getLoc expr) simple_expr)
 	; traceTc (text "Got result" <+> vcat (map ppr decls))
 	; showSplice "declarations"
 	  	     zonked_q_expr 
@@ -359,21 +346,25 @@ tcSpliceDecls expr
 %************************************************************************
 
 \begin{code}
-runMetaE :: LHsExpr Id 	-- Of type (Q Exp)
-	 -> TcM TH.Exp	-- Of type Exp
-runMetaE e = runMeta e
+runMetaE :: (SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName))
+	 -> LHsExpr Id 		-- Of type (Q Exp)
+	 -> TcM (LHsExpr RdrName)
+runMetaE  = runMeta
 
-runMetaT :: LHsExpr Id 		-- Of type (Q Type)
-	 -> TcM TH.Type		-- Of type Type
-runMetaT e = runMeta e
+runMetaT :: (SrcSpan -> TH.Type -> Either Message (LHsType RdrName))
+	 -> LHsExpr Id 		-- Of type (Q Type)
+	 -> TcM (LHsType RdrName)	
+runMetaT = runMeta
 
-runMetaD :: LHsExpr Id 		-- Of type Q [Dec]
-	 -> TcM [TH.Dec]	-- Of type [Dec]
-runMetaD e = runMeta e
+runMetaD :: (SrcSpan -> [TH.Dec] -> Either Message [LHsDecl RdrName])
+	 -> LHsExpr Id 		-- Of type Q [Dec]
+	 -> TcM [LHsDecl RdrName]
+runMetaD = runMeta 
 
-runMeta :: LHsExpr Id 		-- Of type X
-	-> TcM t		-- Of type t
-runMeta expr
+runMeta :: (SrcSpan -> th_syn -> Either Message hs_syn)
+	-> LHsExpr Id 		-- Of type X
+	-> TcM hs_syn		-- Of type t
+runMeta convert expr
   = do	{ hsc_env <- getTopEnv
 	; tcg_env <- getGblEnv
 	; this_mod <- getModule
@@ -392,11 +383,21 @@ runMeta expr
 	{ 	-- Coerce it to Q t, and run it
 		-- Running might fail if it throws an exception of any kind (hence tryAllM)
 		-- including, say, a pattern-match exception in the code we are running
-	  either_tval <- tryAllM (TH.runQ (unsafeCoerce# hval))
+		--
+		-- We also do the TH -> HS syntax conversion inside the same
+		-- exception-cacthing thing so that if there are any lurking 
+		-- exceptions in the data structure returned by hval, we'll
+		-- encounter them inside the tryALlM
+	  either_tval <- tryAllM $ do
+		{ th_syn <- TH.runQ (unsafeCoerce# hval)
+		; case convert (getLoc expr) th_syn of
+		    Left err     -> do { addErrTc err; return Nothing }
+		    Right hs_syn -> return (Just hs_syn) }
 
 	; case either_tval of
-	      Left exn -> failWithTc (mk_msg "run" exn)
-	      Right v  -> returnM v
+	      Right (Just v) -> return v
+	      Right Nothing  -> failM	-- Error already in Tc monad
+	      Left exn       -> failWithTc (mk_msg "run" exn)	-- Exception
 	}}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",

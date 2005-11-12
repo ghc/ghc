@@ -500,6 +500,18 @@ instance Outputable NewOrData where
 \begin{code}
 type LConDecl name = Located (ConDecl name)
 
+-- data T b = forall a. Eq a => MkT a b
+--   MkT :: forall b a. Eq a => MkT a b
+
+-- data T b where
+--	MkT1 :: Int -> T Int
+
+-- data T = Int `MkT` Int
+--	  | MkT2
+
+-- data T a where
+--	Int `MkT` Int :: T Int
+
 data ConDecl name
   = ConDecl
     { con_name      :: Located name	    -- Constructor name; this is used for the
