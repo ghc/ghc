@@ -461,8 +461,24 @@ split :: Int -> IntSet -> (IntSet,IntSet)
 split x t
   = case t of
       Bin p m l r
-        | zero x m  -> let (lt,gt) = split x l in (lt,union gt r)
-        | otherwise -> let (lt,gt) = split x r in (union l lt,gt)
+        | m < 0       -> if x >= 0 then let (lt,gt) = split' x l in (union r lt, gt)
+                                   else let (lt,gt) = split' x r in (lt, union gt l)
+                                   -- handle negative numbers.
+        | otherwise   -> split' x t
+      Tip y 
+        | x>y         -> (t,Nil)
+        | x<y         -> (Nil,t)
+        | otherwise   -> (Nil,Nil)
+      Nil             -> (Nil, Nil)
+
+split' :: Int -> IntSet -> (IntSet,IntSet)
+split' x t
+  = case t of
+      Bin p m l r
+        | match x p m -> if zero x m then let (lt,gt) = split' x l in (lt,union gt r)
+                                     else let (lt,gt) = split' x r in (union l lt,gt)
+        | otherwise   -> if x < p then (Nil, t)
+                                  else (t, Nil)
       Tip y 
         | x>y       -> (t,Nil)
         | x<y       -> (Nil,t)
@@ -475,8 +491,24 @@ splitMember :: Int -> IntSet -> (IntSet,Bool,IntSet)
 splitMember x t
   = case t of
       Bin p m l r
-        | zero x m  -> let (lt,found,gt) = splitMember x l in (lt,found,union gt r)
-        | otherwise -> let (lt,found,gt) = splitMember x r in (union l lt,found,gt)
+        | m < 0       -> if x >= 0 then let (lt,found,gt) = splitMember' x l in (union r lt, found, gt)
+                                   else let (lt,found,gt) = splitMember' x r in (lt, found, union gt l)
+                                   -- handle negative numbers.
+        | otherwise   -> splitMember' x t
+      Tip y 
+        | x>y       -> (t,False,Nil)
+        | x<y       -> (Nil,False,t)
+        | otherwise -> (Nil,True,Nil)
+      Nil -> (Nil,False,Nil)
+
+splitMember' :: Int -> IntSet -> (IntSet,Bool,IntSet)
+splitMember' x t
+  = case t of
+      Bin p m l r
+         | match x p m ->  if zero x m then let (lt,found,gt) = splitMember x l in (lt,found,union gt r)
+                                       else let (lt,found,gt) = splitMember x r in (union l lt,found,gt)
+         | otherwise   -> if x < p then (Nil, False, t)
+                                   else (t, False, Nil)
       Tip y 
         | x>y       -> (t,False,Nil)
         | x<y       -> (Nil,False,t)
@@ -505,7 +537,12 @@ map f = fromList . List.map f . toList
 -- > elems set == fold (:) [] set
 fold :: (Int -> b -> b) -> b -> IntSet -> b
 fold f z t
-  = foldr f z t
+  = case t of
+      Bin 0 m l r | m < 0 -> foldr f (foldr f z l) r  
+      -- put negative numbers before.
+      Bin p m l r -> foldr f z t
+      Tip x       -> f x z
+      Nil         -> z
 
 foldr :: (Int -> b -> b) -> b -> IntSet -> b
 foldr f z t
@@ -532,9 +569,7 @@ toList t
 
 -- | /O(n)/. Convert the set to an ascending list of elements.
 toAscList :: IntSet -> [Int]
-toAscList t   
-  = -- NOTE: the following algorithm only works for big-endian trees
-    let (pos,neg) = span (>=0) (foldr (:) [] t) in neg ++ pos
+toAscList t = toList t
 
 -- | /O(n*min(n,W))/. Create a set from a list of integers.
 fromList :: [Int] -> IntSet

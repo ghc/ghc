@@ -301,11 +301,19 @@ insert kx x t
                EQ -> Bin sz kx x l r
 
 -- | /O(log n)/. Insert with a combining function.
+-- @'insertWith' f key value mp@ 
+-- will insert the pair (key, value) into @mp@ if key does
+-- not exist in the map. If the key does exist, the function will
+-- insert @f new_value old_value@.
 insertWith :: Ord k => (a -> a -> a) -> k -> a -> Map k a -> Map k a
 insertWith f k x m          
   = insertWithKey (\k x y -> f x y) k x m
 
 -- | /O(log n)/. Insert with a combining function.
+-- @'insertWithKey' f key value mp@ 
+-- will insert the pair (key, value) into @mp@ if key does
+-- not exist in the map. If the key does exist, the function will
+-- insert @f key new_value old_value@.
 insertWithKey :: Ord k => (k -> a -> a -> a) -> k -> a -> Map k a -> Map k a
 insertWithKey f kx x t
   = case t of

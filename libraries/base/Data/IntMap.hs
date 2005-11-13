@@ -322,11 +322,19 @@ insert k x t
 
 -- right-biased insertion, used by 'union'
 -- | /O(min(n,W))/. Insert with a combining function.
+-- @'insertWith' f key value mp@ 
+-- will insert the pair (key, value) into @mp@ if key does
+-- not exist in the map. If the key does exist, the function will
+-- insert @f new_value old_value@.
 insertWith :: (a -> a -> a) -> Key -> a -> IntMap a -> IntMap a
 insertWith f k x t
   = insertWithKey (\k x y -> f x y) k x t
 
 -- | /O(min(n,W))/. Insert with a combining function.
+-- @'insertWithKey' f key value mp@ 
+-- will insert the pair (key, value) into @mp@ if key does
+-- not exist in the map. If the key does exist, the function will
+-- insert @f key new_value old_value@.
 insertWithKey :: (Key -> a -> a -> a) -> Key -> a -> IntMap a -> IntMap a
 insertWithKey f k x t
   = case t of
@@ -804,6 +812,20 @@ partitionWithKey pred t
 split :: Key -> IntMap a -> (IntMap a,IntMap a)
 split k t
   = case t of
+      Bin p m l r 
+          | m < 0 -> (if k >= 0 -- handle negative numbers.
+                      then let (lt,gt) = split' k l in (union r lt, gt)
+                      else let (lt,gt) = split' k r in (lt, union gt l))
+          | otherwise   -> split' k t
+      Tip ky y 
+        | k>ky      -> (t,Nil)
+        | k<ky      -> (Nil,t)
+        | otherwise -> (Nil,Nil)
+      Nil -> (Nil,Nil)
+
+split' :: Key -> IntMap a -> (IntMap a,IntMap a)
+split' k t
+  = case t of
       Bin p m l r
         | nomatch k p m -> if k>p then (t,Nil) else (Nil,t)
         | zero k m  -> let (lt,gt) = split k l in (lt,union gt r)
@@ -818,6 +840,20 @@ split k t
 -- key was found in the original map.
 splitLookup :: Key -> IntMap a -> (IntMap a,Maybe a,IntMap a)
 splitLookup k t
+  = case t of
+      Bin p m l r
+          | m < 0 -> (if k >= 0 -- handle negative numbers.
+                      then let (lt,found,gt) = splitLookup' k l in (union r lt,found, gt)
+                      else let (lt,found,gt) = splitLookup' k r in (lt,found, union gt l))
+          | otherwise   -> splitLookup' k t
+      Tip ky y 
+        | k>ky      -> (t,Nothing,Nil)
+        | k<ky      -> (Nil,Nothing,t)
+        | otherwise -> (Nil,Just y,Nil)
+      Nil -> (Nil,Nothing,Nil)
+
+splitLookup' :: Key -> IntMap a -> (IntMap a,Maybe a,IntMap a)
+splitLookup' k t
   = case t of
       Bin p m l r
         | nomatch k p m -> if k>p then (t,Nothing,Nil) else (Nil,Nothing,t)
@@ -855,9 +891,19 @@ foldWithKey f z t
 foldr :: (Key -> a -> b -> b) -> b -> IntMap a -> b
 foldr f z t
   = case t of
-      Bin p m l r -> foldr f (foldr f z r) l
+      Bin 0 m l r | m < 0 -> foldr' f (foldr' f z l) r  -- put negative numbers before.
+      Bin _ _ _ _ -> foldr' f z t
       Tip k x     -> f k x z
       Nil         -> z
+
+foldr' :: (Key -> a -> b -> b) -> b -> IntMap a -> b
+foldr' f z t
+  = case t of
+      Bin p m l r -> foldr' f (foldr' f z r) l
+      Tip k x     -> f k x z
+      Nil         -> z
+
+
 
 {--------------------------------------------------------------------
   List variations 
