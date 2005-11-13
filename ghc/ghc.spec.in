@@ -115,11 +115,11 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files -f rpm-noprof-lib-files
 %defattr(-,root,root)
-%doc docs/building/building
 %doc docs/docbook-cheat-sheet/docbook-cheat-sheet
 %doc ghc/ANNOUNCE
 %doc ghc/LICENSE
 %doc ghc/README
+%doc ghc/docs/building/building
 %doc ghc/docs/ext-core/core.ps
 %doc ghc/docs/storage-mgt/ldv.ps
 %doc ghc/docs/storage-mgt/rp.ps
