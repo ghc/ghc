@@ -344,7 +344,8 @@ instance Outputable name => OutputableBndr (IPName name) where
 ppr_type :: Prec -> Type -> SDoc
 ppr_type p (TyVarTy tv)      	      = ppr tv
 ppr_type p (PredTy pred)     	      = braces (ppr pred)
-ppr_type p (NoteTy (SynNote ty1) ty2) = ppr_type p ty1
+ppr_type p (NoteTy (SynNote ty1) ty2) = ppr_type p ty1 
+				  	<+> ifPprDebug (braces $ ptext SLIT("Syn:") <+> pprType ty2)
 ppr_type p (NoteTy other         ty2) = ppr_type p ty2
 
 ppr_type p (TyConApp tc tys) = ppr_tc_app p tc tys
