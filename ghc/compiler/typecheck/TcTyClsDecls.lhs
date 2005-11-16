@@ -12,7 +12,7 @@ module TcTyClsDecls (
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), , NewOrData(..), ResType(..),
-			  tyClDeclTyVars, isSynDecl, 
+			  tyClDeclTyVars, isSynDecl, hsConArgs,
 			  LTyClDecl, tcdName, hsTyVarName, LHsTyVarBndr
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
@@ -400,6 +400,9 @@ tcTyClDecl1 calc_vrcs calc_isrec
   ; checkTc (not (null cons) || gla_exts || is_boot)
 	    (emptyConDeclsErr tc_name)
     
+  ; checkTc (new_or_data == DataType || isSingleton cons) 
+	    (newtypeConError tc_name (length cons))
+
   ; tycon <- fixM (\ tycon -> do 
 	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
 						 tycon final_tvs)) 
@@ -470,7 +473,10 @@ tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
 				    tycon (mkTyVarTys tc_tvs) }
 	; case details of
 	    PrefixCon [arg_ty] -> tc_datacon [] arg_ty
-	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty }
+	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty
+	    other -> failWithTc (newTypeFieldErr name (length (hsConArgs details)))
+			-- Check that the constructor has exactly one field
+	}
 
 tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty)
@@ -808,9 +814,17 @@ badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow GADTs")) ]
 
+newtypeConError tycon n
+  = sep [ptext SLIT("A newtype must have exactly one constructor"),
+	 nest 2 $ ptext SLIT("but") <+> quotes (ppr tycon) <+> ptext SLIT("has") <+> speakN n ]
+
+newTypeFieldErr con_name n_flds
+  = sep [ptext SLIT("The constructor of a newtype must have exactly one field"), 
+	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con_name) <+> ptext SLIT("has") <+> speakN n_flds]
+
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
-	 nest 4 (ptext SLIT("(-fglasgow-exts permits this)"))]
+	 nest 2 $ ptext SLIT("(-fglasgow-exts permits this)")]
 
 badBootClassDeclErr = ptext SLIT("Illegal class declaration in hs-boot file")
 \end{code}

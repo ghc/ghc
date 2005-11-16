@@ -34,9 +34,8 @@ import Module
 import StaticFlags	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
-			  Activation(..), InlineSpec(..), defaultInlineSpec )
+			  Activation(..), defaultInlineSpec )
 import OrdList
-import Panic
 
 import FastString
 import Maybes		( orElse )
@@ -455,20 +454,16 @@ tycl_decl :: { LTyClDecl RdrName }
  		{% do { (tc,tvs) <- checkSynHdr $2
 		      ; return (LL (TySynonym tc tvs $4)) } }
 
-	| 'data' tycl_hdr constrs deriving
+	| data_or_newtype tycl_hdr constrs deriving
 		{ L (comb4 $1 $2 $3 $4)	-- We need the location on tycl_hdr 
 					-- in case constrs and deriving are both empty
-		    (mkTyData DataType (unLoc $2) Nothing (reverse (unLoc $3)) (unLoc $4)) }
+		    (mkTyData (unLoc $1) (unLoc $2) Nothing (reverse (unLoc $3)) (unLoc $4)) }
 
-        | 'data' tycl_hdr opt_kind_sig 
+        | data_or_newtype tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
 		{ L (comb4 $1 $2 $4 $5)
-		    (mkTyData DataType (unLoc $2) $3 (reverse (unLoc $5)) (unLoc $6)) }
-
-	| 'newtype' tycl_hdr '=' newconstr deriving
-		{ L (comb3 $1 $4 $5)
-		    (mkTyData NewType (unLoc $2) Nothing [$4] (unLoc $5)) }
+		    (mkTyData (unLoc $1) (unLoc $2) $3 (reverse (unLoc $5)) (unLoc $6)) }
 
 	| 'class' tycl_hdr fds where
 		{ let 
@@ -476,6 +471,10 @@ tycl_decl :: { LTyClDecl RdrName }
 		  in
 	 	  L (comb4 $1 $2 $3 $4) (mkClassDecl (unLoc $2) (unLoc $3) sigs 
 					  binds) }
+
+data_or_newtype :: { Located NewOrData }
+	: 'data'	{ L1 DataType }
+	| 'newtype'	{ L1 NewType }
 
 opt_kind_sig :: { Maybe Kind }
 	: 				{ Nothing }
@@ -851,11 +850,6 @@ akind	:: { Kind }
 
 -----------------------------------------------------------------------------
 -- Datatype declarations
-
-newconstr :: { LConDecl RdrName }
-	: conid atype	{ LL $ ConDecl $1 Explicit [] (noLoc []) (PrefixCon [$2]) ResTyH98 }
-	| conid '{' var '::' ctype '}'
-			{ LL $ ConDecl $1 Explicit [] (noLoc []) (RecCon [($3, $5)]) ResTyH98 }
 
 gadt_constrlist :: { Located [LConDecl RdrName] }
 	: '{'            gadt_constrs '}'	{ LL (unLoc $2) }

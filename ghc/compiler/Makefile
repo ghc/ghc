@@ -733,6 +733,7 @@ endif
 # typecheck/TcUnify_HC_OPTS += -auto-all
 
 coreSyn/CorePrep_HC_OPTS += -auto-all
+# parser/Parser_HC_OPTS += -fasm
 
 #-----------------------------------------------------------------------------
 # Building the GHC package
