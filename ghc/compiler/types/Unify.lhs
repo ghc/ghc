@@ -20,7 +20,8 @@ import VarEnv
 import VarSet
 import Kind		( isSubKind )
 import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, mkTyVarTys,
-			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX )
+			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX,
+			  tcView )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
 import DataCon 		( DataCon, dataConInstResTy )
 import Util		( snocView )
@@ -127,8 +128,8 @@ match :: MatchEnv	-- For the most part this is pushed downwards
 -- This matcher works on source types; that is, 
 -- it respects NewTypes and PredType
 
-match menv subst (NoteTy _ ty1) ty2 = match menv subst ty1 ty2
-match menv subst ty1 (NoteTy _ ty2) = match menv subst ty1 ty2
+match menv subst ty1 ty2 | Just ty1' <- tcView ty1 = match menv subst ty1' ty2
+match menv subst ty1 ty2 | Just ty2' <- tcView ty2 = match menv subst ty1 ty2'
 
 match menv subst (TyVarTy tv1) ty2
   | tv1 `elemVarSet` me_tmpls menv
@@ -294,8 +295,8 @@ unify subst ty1 ty2 = -- pprTrace "unify" (ppr subst <+> pprParendType ty1 <+> p
 unify_ subst (TyVarTy tv1) ty2  = uVar False subst tv1 ty2
 unify_ subst ty1 (TyVarTy tv2)  = uVar True  subst tv2 ty1
 
-unify_ subst (NoteTy _ ty1) ty2  = unify subst ty1 ty2
-unify_ subst ty1 (NoteTy _ ty2)  = unify subst ty1 ty2
+unify_ subst ty1 ty2 | Just ty1' <- tcView ty1 = unify subst ty1' ty2
+unify_ subst ty1 ty2 | Just ty2' <- tcView ty2 = unify subst ty1 ty2'
 
 unify_ subst (PredTy p1) (PredTy p2) = unify_pred subst p1 p2
 
@@ -368,8 +369,9 @@ uUnrefined :: TvSubstEnv          -- An existing substitution to extend
 
 -- We know that tv1 isn't refined
 
-uUnrefined subst tv1 ty2 (NoteTy _ ty2')
-  = uUnrefined subst tv1 ty2 ty2'	-- Unwrap synonyms
+uUnrefined subst tv1 ty2 ty2'
+  | Just ty2'' <- tcView ty2'
+  = uUnrefined subst tv1 ty2 ty2''	-- Unwrap synonyms
 		-- This is essential, in case we have
 		--	type Foo a = a
 		-- and then unify a :=: Foo a

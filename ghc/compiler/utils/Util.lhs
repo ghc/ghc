@@ -29,7 +29,7 @@ module Util (
 
 	-- accumulating
 	mapAccumL, mapAccumR, mapAccumB, 
-	foldl2, count,
+	foldl2, count, all2,
 	
 	takeList, dropList, splitAtList, split,
 
@@ -572,6 +572,13 @@ A combination of foldl with zip.  It works with equal length lists.
 foldl2 :: (acc -> a -> b -> acc) -> acc -> [a] -> [b] -> acc
 foldl2 k z [] [] = z
 foldl2 k z (a:as) (b:bs) = foldl2 k (k z a b) as bs
+
+all2 :: (a -> b -> Bool) -> [a] -> [b] -> Bool
+-- True if the lists are the same length, and 
+-- all corresponding elements satisfy the predicate
+all2 p []     []     = True
+all2 p (x:xs) (y:ys) = p x y && all2 p xs ys
+all2 p xs     ys     = False
 \end{code}
 
 Count the number of times a predicate is true

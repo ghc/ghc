@@ -34,6 +34,7 @@ module TcType (
   --------------------------------
   -- Splitters  
   -- These are important because they do not look through newtypes
+  tcView,
   tcSplitForAllTys, tcSplitPhiTy, 
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
@@ -119,7 +120,7 @@ module TcType (
 #include "HsVersions.h"
 
 -- friends:
-import TypeRep		( Type(..), TyNote(..), funTyCon )  -- friend
+import TypeRep		( Type(..), funTyCon )  -- friend
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
@@ -140,7 +141,7 @@ import Type		(	-- Re-exports
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
 			  tidyOpenTyVars, tidyKind,
-			  isSubKind, deShadowTy,
+			  isSubKind, deShadowTy, tcView,
 
 			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
 			  tcEqPred, tcCmpPred, tcEqTypeX, 
@@ -409,22 +410,22 @@ mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 
 \begin{code}
 isTauTy :: Type -> Bool
+isTauTy ty | Just ty' <- tcView ty = isTauTy ty'
 isTauTy (TyVarTy v)	 = True
 isTauTy (TyConApp _ tys) = all isTauTy tys
 isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
 isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
 isTauTy (PredTy p)	 = True		-- Don't look through source types
-isTauTy (NoteTy _ ty)	 = isTauTy ty
 isTauTy other		 = False
 \end{code}
 
 \begin{code}
 getDFunTyKey :: Type -> OccName	-- Get some string from a type, to be used to 
 				-- construct a dictionary function name
+getDFunTyKey ty | Just ty' <- tcView ty = getDFunTyKey ty'
 getDFunTyKey (TyVarTy tv)    = getOccName tv
 getDFunTyKey (TyConApp tc _) = getOccName tc
 getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
-getDFunTyKey (NoteTy _ t)    = getDFunTyKey t
 getDFunTyKey (FunTy arg _)   = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
 getDFunTyKey ty		     = pprPanic "getDFunTyKey" (pprType ty)
@@ -450,21 +451,21 @@ variables.  It's up to you to make sure this doesn't matter.
 tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty = split ty ty []
    where
+     split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
      split orig_ty (ForAllTy tv ty) tvs = split ty ty (tv:tvs)
-     split orig_ty (NoteTy n  ty)   tvs = split orig_ty ty tvs
      split orig_ty t		    tvs = (reverse tvs, orig_ty)
 
+tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
 tcIsForAllTy (ForAllTy tv ty) = True
-tcIsForAllTy (NoteTy n ty)    = tcIsForAllTy ty
 tcIsForAllTy t		      = False
 
 tcSplitPhiTy :: Type -> ([PredType], Type)
 tcSplitPhiTy ty = split ty ty []
  where
+  split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
   split orig_ty (FunTy arg res) ts = case tcSplitPredTy_maybe arg of
 					Just p  -> split res res (p:ts)
 					Nothing -> (reverse ts, orig_ty)
-  split orig_ty (NoteTy n ty)	ts = split orig_ty ty ts
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
@@ -483,26 +484,24 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
 			Nothing	   -> pprPanic "tcSplitTyConApp" (pprType ty)
 
 tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
 tcSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-tcSplitTyConApp_maybe (NoteTy n ty)     = tcSplitTyConApp_maybe ty
 	-- Newtypes are opaque, so they may be split
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
-tcSplitTyConApp_maybe other	        	= Nothing
+tcSplitTyConApp_maybe other	      	= Nothing
 
 tcValidInstHeadTy :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must not be type synonyms, but everywhere else type synonyms
 -- are transparent, so we need a special function here
-tcValidInstHeadTy ty 
+tcValidInstHeadTy ty
   = case ty of
-	TyConApp tc tys -> ASSERT( not (isSynTyCon tc) ) ok tys
-			   -- A synonym would be a NoteTy
-	FunTy arg res        -> ok [arg, res]
-	NoteTy (SynNote _) _ -> False
-	NoteTy other_note ty -> tcValidInstHeadTy ty
-	other		     -> False
+	NoteTy _ ty     -> tcValidInstHeadTy ty
+	TyConApp tc tys -> not (isSynTyCon tc) && ok tys
+	FunTy arg res   -> ok [arg, res]
+	other		-> False
   where
 	-- Check that all the types are type variables,
 	-- and that each is distinct
@@ -510,10 +509,9 @@ tcValidInstHeadTy ty
 	   where
 	     tvs = mapCatMaybes get_tv tys
 
-    get_tv (TyVarTy tv) 	  = Just tv	  -- Again, do not look
-    get_tv (NoteTy (SynNote _) _) = Nothing  	-- through synonyms
-    get_tv (NoteTy other_note ty) = get_tv ty
-    get_tv other  		  = Nothing
+    get_tv (NoteTy _ ty) = get_tv ty 	-- through synonyms
+    get_tv (TyVarTy tv)  = Just tv	-- Again, do not look
+    get_tv other  	 = Nothing
 
 tcSplitFunTys :: Type -> ([Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
@@ -523,8 +521,8 @@ tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
 					  (args,res') = tcSplitFunTys res
 
 tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
+tcSplitFunTy_maybe ty | Just ty' <- tcView ty = tcSplitFunTy_maybe ty'
 tcSplitFunTy_maybe (FunTy arg res)  = Just (arg, res)
-tcSplitFunTy_maybe (NoteTy n ty)    = tcSplitFunTy_maybe ty
 tcSplitFunTy_maybe other	    = Nothing
 
 tcFunArgTy    ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> arg }
@@ -532,9 +530,9 @@ tcFunResultTy ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> res }
 
 
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
+tcSplitAppTy_maybe ty | Just ty' <- tcView ty = tcSplitAppTy_maybe ty'
 tcSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 tcSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
-tcSplitAppTy_maybe (NoteTy n ty)     = tcSplitAppTy_maybe ty
 tcSplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
 					Just (tys', ty') -> Just (TyConApp tc tys', ty')
 					Nothing		 -> Nothing
@@ -553,8 +551,8 @@ tcSplitAppTys ty
 		   Nothing	   -> (ty,args)
 
 tcGetTyVar_maybe :: Type -> Maybe TyVar
+tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
 tcGetTyVar_maybe (TyVarTy tv) 	= Just tv
-tcGetTyVar_maybe (NoteTy _ t) 	= tcGetTyVar_maybe t
 tcGetTyVar_maybe other	        = Nothing
 
 tcGetTyVar :: String -> Type -> TyVar
@@ -587,7 +585,7 @@ tcSplitDFunHead tau
 \begin{code}
 tcSplitPredTy_maybe :: Type -> Maybe PredType
    -- Returns Just for predicates only
-tcSplitPredTy_maybe (NoteTy _ ty) = tcSplitPredTy_maybe ty
+tcSplitPredTy_maybe ty | Just ty' <- tcView ty = tcSplitPredTy_maybe ty'
 tcSplitPredTy_maybe (PredTy p)    = Just p
 tcSplitPredTy_maybe other	  = Nothing
 	
@@ -624,8 +622,8 @@ mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)
 
 isDictTy :: Type -> Bool
+isDictTy ty | Just ty' <- tcView ty = isDictTy ty'
 isDictTy (PredTy p)   = isClassPred p
-isDictTy (NoteTy _ ty)	= isDictTy ty
 isDictTy other		= False
 \end{code}
 
@@ -687,20 +685,20 @@ any foralls.  E.g.
 
 \begin{code}
 isSigmaTy :: Type -> Bool
+isSigmaTy ty | Just ty' <- tcView ty = isSigmaTy ty'
 isSigmaTy (ForAllTy tyvar ty) = True
 isSigmaTy (FunTy a b)	      = isPredTy a
-isSigmaTy (NoteTy n ty)	      = isSigmaTy ty
 isSigmaTy _		      = False
 
 isOverloadedTy :: Type -> Bool
+isOverloadedTy ty | Just ty' <- tcView ty = isOverloadedTy ty'
 isOverloadedTy (ForAllTy tyvar ty) = isOverloadedTy ty
 isOverloadedTy (FunTy a b)	   = isPredTy a
-isOverloadedTy (NoteTy n ty)	   = isOverloadedTy ty
 isOverloadedTy _		   = False
 
 isPredTy :: Type -> Bool	-- Belongs in TcType because it does 
 				-- not look through newtypes, or predtypes (of course)
-isPredTy (NoteTy _ ty) = isPredTy ty
+isPredTy ty | Just ty' <- tcView ty = isPredTy ty'
 isPredTy (PredTy sty)  = True
 isPredTy _	       = False
 \end{code}
@@ -753,28 +751,30 @@ tied.)
 \begin{code}
 hoistForAllTys :: Type -> Type
 hoistForAllTys ty
-  = go (deShadowTy ty)
-	-- Running over ty with an empty substitution gives it the
-	-- no-shadowing property.  This is important.  For example:
-	--	type Foo r = forall a. a -> r
-	--	foo :: Foo (Foo ())
-	-- Here the hoisting should give
-	--	foo :: forall a a1. a -> a1 -> ()
-	--
-	-- What about type vars that are lexically in scope in the envt?
-	-- We simply rely on them having a different unique to any
-	-- binder in 'ty'.  Otherwise we'd have to slurp the in-scope-tyvars
-	-- out of the envt, which is boring and (I think) not necessary.
+  = go ty
 
   where
-    go (TyVarTy tv)   		   = TyVarTy tv
-    go (TyConApp tc tys)	   = TyConApp tc (map go tys)
-    go (PredTy pred)  		   = PredTy pred    -- No nested foralls 
-    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote (go ty1)) (go ty2)
-    go (NoteTy (FTVNote _) ty2)    = go ty2	    -- Discard the free tyvar note
-    go (FunTy arg res)   	   = mk_fun_ty (go arg) (go res)
-    go (AppTy fun arg)   	   = AppTy (go fun) (go arg)
-    go (ForAllTy tv ty)		   = ForAllTy tv (go ty)
+    go	:: Type -> Type
+
+    go (TyVarTy tv)   	 = TyVarTy tv
+    go ty@(TyConApp tc tys) 
+	| isSynTyCon tc, any isSigmaTy tys'
+	= go (expectJust "hoistForAllTys" (tcView ty))
+		-- Revolting special case.  If a type synonym has foralls
+		-- at the top of its argument, then expanding the type synonym
+		-- might lead to more hositing.  So we just abandon the synonym
+		-- altogether right here.
+		-- Note that we must go back to hoistForAllTys, because
+		-- expanding the type synonym may expose new binders. Yuk.
+	| otherwise
+	= TyConApp tc tys'
+	where
+	  tys' = map go tys
+    go (PredTy pred)     = PredTy pred	-- No nested foralls 
+    go (NoteTy _ ty2)    = go ty2	-- Discard the free tyvar note
+    go (FunTy arg res)   = mk_fun_ty (go arg) (go res)
+    go (AppTy fun arg)   = AppTy (go fun) (go arg)
+    go (ForAllTy tv ty)  = ForAllTy tv (go ty)
 
  	-- mk_fun_ty does all the work.  
 	-- It's building t1 -> t2: 
@@ -784,14 +784,25 @@ hoistForAllTys ty
 	| not (isSigmaTy ty2)	 	-- No forall's, or context => 
 	= FunTy ty1 ty2 	
 	| PredTy p1 <- ty1		-- ty1 is a predicate
-	= if p1 `elem` theta then 	-- so check for duplicates
+	= if p1 `elem` theta2 then 	-- so check for duplicates
 		ty2
 	  else
-		mkSigmaTy tvs (p1:theta) tau
+		mkSigmaTy tvs2 (p1:theta2) tau2
 	| otherwise 	
-	= mkSigmaTy tvs theta (FunTy ty1 tau)
+	= mkSigmaTy tvs2 theta2 (FunTy ty1 tau2)
 	where
-	  (tvs, theta, tau) = tcSplitSigmaTy ty2
+	  (tvs2, theta2, tau2) = tcSplitSigmaTy $
+				 deShadowTy (tyVarsOfType ty1) $
+				 deNoteType ty2
+
+	-- deShadowTy is important.  For example:
+	--	type Foo r = forall a. a -> r
+	--	foo :: Foo (Foo ())
+	-- Here the hoisting should give
+	--	foo :: forall a a1. a -> a1 -> ()
+
+	-- deNoteType is important too, so that the deShadow sees that
+	-- synonym expanded!  Sigh
 \end{code}
 
 
@@ -804,8 +815,8 @@ hoistForAllTys ty
 \begin{code}
 deNoteType :: Type -> Type
 -- Remove *outermost* type synonyms and other notes
-deNoteType (NoteTy _ ty) = deNoteType ty
-deNoteType ty		 = ty
+deNoteType ty | Just ty' <- tcView ty = deNoteType ty'
+deNoteType ty = ty
 \end{code}
 
 Find the free tycons and classes of a type.  This is used in the front
@@ -815,8 +826,7 @@ end of the compiler.
 tyClsNamesOfType :: Type -> NameSet
 tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
 tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (NoteTy (SynNote ty1) ty2) = tyClsNamesOfType ty1
-tyClsNamesOfType (NoteTy other_note    ty2) = tyClsNamesOfType ty2
+tyClsNamesOfType (NoteTy _ ty2) 	    = tyClsNamesOfType ty2
 tyClsNamesOfType (PredTy (IParam n ty))     = tyClsNamesOfType ty
 tyClsNamesOfType (PredTy (ClassP cl tys))   = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res

@@ -63,6 +63,8 @@ import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
 		     mk'indexOfP,mk'eq,mk'neq) 
 
 -- GHC
+import TcType	    ( tcIsForAllTy, tcView )
+import TypeRep	    ( Type(..) )
 import StaticFlags  (opt_Flatten)
 import Panic        (panic)
 import ErrUtils     (dumpIfSet_dyn)
@@ -72,7 +74,6 @@ import Literal      (Literal, literalType)
 import Var	    (Var(..), idType, isTyVar)
 import Id	    (setIdType)
 import DataCon	    (DataCon, dataConTag)
-import TypeRep      (Type(..))
 import HscTypes	    ( ModGuts(..), ModGuts, HscEnv(..), hscEPS )
 import CoreFVs	    (exprFreeVars)
 import CoreSyn	    (Expr(..), Bind(..), Alt(..), AltCon(..), Note(..),
@@ -246,7 +247,7 @@ vectorise (App expr arg) =
     (vexpr, vexprTy) <-  vectorise expr
     (varg,  vargTy)  <-  vectorise arg
 
-    if (isPolyType vexprTy)
+    if (tcIsForAllTy vexprTy)
       then do
         let resTy =  applyTypeToArg vexprTy varg
         return (App vexpr varg, resTy)
@@ -256,13 +257,6 @@ vectorise (App expr arg) =
         let resTy    = applyTypeToArg t1 varg   
         return  ((App vexpr' varg), resTy)  -- apply the first component of
                                             -- the vectorized function
-  where
-    isPolyType t =  
-        (case t  of
-           (ForAllTy _ _)  -> True
-           (NoteTy _ nt)   -> isPolyType nt
-           _               -> False)
-    
 
 vectorise  e@(Lam b expr)
   | isTyVar b
@@ -317,6 +311,10 @@ myShowTy (TyConApp _ t) =
 -}
 
 vectoriseTy :: Type -> Type 
+vectoriseTy ty | Just ty' <- tcView ty = vectoriseTy ty'
+	-- Look through notes and synonyms
+	-- NB: This will discard notes and synonyms, of course
+	-- ToDo: retain somehow?
 vectoriseTy t@(TyVarTy v)      =  t
 vectoriseTy t@(AppTy t1 t2)    = 
   AppTy (vectoriseTy t1) (vectoriseTy t2)
@@ -327,8 +325,6 @@ vectoriseTy t@(FunTy t1 t2)    =
                      (liftTy t)]
 vectoriseTy  t@(ForAllTy v ty)  = 
   ForAllTy v (vectoriseTy  ty)
-vectoriseTy t@(NoteTy note ty) =  -- FIXME: is the note still valid after
-  NoteTy note  (vectoriseTy ty)   --   this or should we just throw it away
 vectoriseTy  t =  t
 
 
@@ -336,9 +332,9 @@ vectoriseTy  t =  t
 --    on the *top level* (is this sufficient???)
 
 liftTy:: Type -> Type
+liftTy ty | Just ty' <- tcView ty = liftTy ty'
 liftTy (FunTy t1 t2)   = FunTy (liftTy t1) (liftTy t2)
 liftTy (ForAllTy tv t) = ForAllTy tv (liftTy t)
-liftTy (NoteTy n t)    = NoteTy n $ liftTy t
 liftTy  t              = mkPArrTy t
 
 

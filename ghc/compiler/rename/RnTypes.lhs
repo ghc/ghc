@@ -47,7 +47,7 @@ import SrcLoc		( SrcSpan, Located(..), unLoc, noLoc, combineLocs )
 import NameSet
 
 import Literal		( inIntRange, inCharRange )
-import BasicTypes	( compareFixity, funTyFixity, negateFixity, compareFixity,
+import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
 			  Fixity(..), FixityDirection(..) )
 import ListSetOps	( removeDups )
 import Outputable

@@ -30,18 +30,18 @@ import HsSyn		( HsExpr(..) , MatchGroup(..), HsMatchContext(..),
 			  hsLMatchPats, pprMatches, pprMatchContext )
 import TcHsSyn		( mkHsDictLet, mkHsDictLam,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
-import TypeRep		( Type(..), PredType(..), TyNote(..) )
+import TypeRep		( Type(..), PredType(..) )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  TcTyVarSet, TcThetaType, Expected(..), TcTyVarDetails(..),
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
 			  pprTcTyVar, isTauTy, isSigmaTy, mkFunTy, mkFunTys, mkTyConApp,
-			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, tcEqType,
+			  tcSplitAppTy_maybe, tcEqType,
 			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, isMetaTyVar,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar )
+			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, tcView )
 import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
 			  openTypeKind, liftedTypeKind, mkArrowKind, 
 			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
@@ -54,7 +54,8 @@ import TcMType		( condLookupTcTyVar, LookupTyVarResult(..),
 import TcSimplify	( tcSimplifyCheck )
 import TcIface		( checkWiredInTyCon )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
-import TyCon		( TyCon, tyConArity, tyConTyVars, isFunTyCon )
+import TyCon		( TyCon, tyConArity, tyConTyVars, isFunTyCon, isSynTyCon,
+			  getSynTyConDefn )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind )
@@ -245,8 +246,9 @@ unify_fun_ty use_refinement arity ty
   = do	{ res_ty <- wobblify use_refinement ty
 	; return (True, [], ty) }
 
-unify_fun_ty use_refinement arity (NoteTy _ ty)
-  = unify_fun_ty use_refinement arity ty
+unify_fun_ty use_refinement arity ty
+  | Just ty' <- tcView ty
+  = unify_fun_ty use_refinement arity ty'
 
 unify_fun_ty use_refinement arity ty@(TyVarTy tv)
   = do	{ details <- condLookupTcTyVar use_refinement tv
@@ -323,8 +325,9 @@ unifyListTy exp_ty = do	{ [elt_ty] <- unifyTyConApp listTyCon exp_ty
 			; return elt_ty }
 
 ----------
-unify_tc_app n_args use_refinement tc (NoteTy _ ty)
-  = unify_tc_app n_args use_refinement tc ty
+unify_tc_app n_args use_refinement tc ty
+  | Just ty' <- tcView ty
+  = unify_tc_app n_args use_refinement tc ty'
 
 unify_tc_app n_args use_refinement tc (TyConApp tycon arg_tys)
   | tycon == tc
@@ -363,7 +366,8 @@ unifyAppTy :: TcType			-- Type to split: m a
 
 unifyAppTy ty = unify_app_ty True ty
 
-unify_app_ty use (NoteTy _ ty) = unify_app_ty use ty
+unify_app_ty use ty
+  | Just ty' <- tcView ty = unify_app_ty use ty'
 
 unify_app_ty use ty@(TyVarTy tyvar)
   = do	{ details <- condLookupTcTyVar use tyvar
@@ -513,8 +517,10 @@ tc_sub :: TcSigmaType		-- expected_ty, before expanding synonyms
 
 -----------------------------------
 -- Expand synonyms
-tc_sub exp_sty (NoteTy _ exp_ty) act_sty act_ty = tc_sub exp_sty exp_ty act_sty act_ty
-tc_sub exp_sty exp_ty act_sty (NoteTy _ act_ty) = tc_sub exp_sty exp_ty act_sty act_ty
+tc_sub exp_sty exp_ty act_sty act_ty 
+  | Just exp_ty' <- tcView exp_ty = tc_sub exp_sty exp_ty' act_sty act_ty
+tc_sub exp_sty exp_ty act_sty act_ty
+  | Just act_ty' <- tcView act_ty = tc_sub exp_sty exp_ty act_sty act_ty'
 
 -----------------------------------
 -- Generalisation case
@@ -784,8 +790,10 @@ uTys :: Bool                    -- Allow refinements to ty1
 
 	-- Always expand synonyms (see notes at end)
         -- (this also throws away FTVs)
-uTys r1 ps_ty1 (NoteTy n1 ty1) r2 ps_ty2 ty2 = uTys r1 ps_ty1 ty1 r2 ps_ty2 ty2
-uTys r1 ps_ty1 ty1 r2 ps_ty2 (NoteTy n2 ty2) = uTys r1 ps_ty1 ty1 r2 ps_ty2 ty2
+uTys r1 ps_ty1 ty1 r2 ps_ty2 ty2 
+  | Just ty1' <- tcView ty1 = uTys r1 ps_ty1 ty1' r2 ps_ty2 ty2
+uTys r1 ps_ty1 ty1 r2 ps_ty2 ty2
+  | Just ty2' <- tcView ty2 = uTys r1 ps_ty1 ty1 r2 ps_ty2 ty2'
 
 	-- Variables; go for uVar
 uTys r1 ps_ty1 (TyVarTy tyvar1) r2 ps_ty2 ty2 = uVar False r1 tyvar1 r2 ps_ty2 ty2
@@ -931,9 +939,10 @@ uDoneVar :: Bool 			-- Args are swapped
      	 -> TcM ()
 -- Invariant: tyvar 1 is not unified with anything
 
-uDoneVar swapped tv1 details1 r2 ps_ty2 (NoteTy n2 ty2)
+uDoneVar swapped tv1 details1 r2 ps_ty2 ty2
+  | Just ty2' <- tcView ty2
   = 	-- Expand synonyms; ignore FTVs
-    uDoneVar swapped tv1 details1 r2 ps_ty2 ty2
+    uDoneVar swapped tv1 details1 r2 ps_ty2 ty2'
 
 uDoneVar swapped tv1 details1 r2 ps_ty2 ty2@(TyVarTy tv2)
 	-- Same type variable => no-op
@@ -1084,20 +1093,21 @@ okToUnifyWith tv ty
   where
     ok (TyVarTy tv') | tv == tv' = Just OccurCheck
 		     | otherwise = Nothing
-    ok (AppTy t1 t2)   		= ok t1 `and` ok t2
-    ok (FunTy t1 t2)   		= ok t1 `and` ok t2
-    ok (TyConApp _ ts) 		= oks ts
-    ok (ForAllTy _ _)  		= Just NotMonoType
-    ok (PredTy st)   		= ok_st st
-    ok (NoteTy (FTVNote _) t)   = ok t
-    ok (NoteTy (SynNote t1) t2) = ok t1 `and` ok t2
-		-- Type variables may be free in t1 but not t2
-		-- A forall may be in t2 but not t1
+    ok (AppTy t1 t2)   	= ok t1 `and` ok t2
+    ok (FunTy t1 t2)   	= ok t1 `and` ok t2
+    ok (TyConApp tc ts) = oks ts `and` ok_syn tc
+    ok (ForAllTy _ _)  	= Just NotMonoType
+    ok (PredTy st)   	= ok_st st
+    ok (NoteTy _ t)     = ok t
 
     oks ts = foldr (and . ok) Nothing ts
 
     ok_st (ClassP _ ts) = oks ts
     ok_st (IParam _ t)  = ok t
+
+	-- Check that a type synonym doesn't have a forall in the RHS
+    ok_syn tc | not (isSynTyCon tc) = Nothing
+	      | otherwise = ok (snd (getSynTyConDefn tc))
 
     Nothing `and` m = m
     Just p  `and` m = Just p

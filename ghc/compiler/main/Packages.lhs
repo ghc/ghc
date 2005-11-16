@@ -65,16 +65,9 @@ import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
-import Data.Maybe	( isNothing )
 import System.Directory	( doesFileExist )
 import Control.Monad	( foldM )
-import Data.List	( nub, partition, sortBy )
-
-#ifdef mingw32_TARGET_OS
-import Data.List	( isPrefixOf )
-#endif
-import Data.List        ( isSuffixOf )
-
+import Data.List	( nub, partition, sortBy, isSuffixOf )
 import FastString
 import EXCEPTION	( throwDyn )
 import ErrUtils         ( debugTraceMsg, putMsg, Message )

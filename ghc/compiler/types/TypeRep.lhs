@@ -152,13 +152,15 @@ data Type
 	Type		-- It must be another AppTy, or TyVarTy
 			-- (or NoteTy of these)
 
-  | TyConApp		-- Application of a TyCon, including newtypes
+  | TyConApp		-- Application of a TyCon, including newtypes *and* synonyms
 	TyCon		--  *Invariant* saturated appliations of FunTyCon and
 			-- 	synonyms have their own constructors, below.
-			-- However, *unsaturated* type synonyms, and FunTyCons
-			-- 	do appear as TyConApps.  (Unsaturated type synonyms
-			--	can appear as the RHS of a type synonym, for exmaple.)
+			-- However, *unsaturated* FunTyCons do appear as TyConApps.  
+			-- 
 	[Type]		-- Might not be saturated.
+			-- Even type synonyms are not necessarily saturated;
+			-- for example unsaturated type synonyms can appear as the 
+			-- RHS of a type synonym.
 
   | FunTy		-- Special case of TyConApp: TyConApp FunTyCon [t1,t2]
 	Type
@@ -175,12 +177,7 @@ data Type
 	TyNote
 	Type		-- The expanded version
 
-data TyNote
-  = FTVNote TyVarSet	-- The free type variables of the noted expression
-
-  | SynNote Type	-- Used for type synonyms
-			-- The Type is always a TyConApp, and is the un-expanded form.
-			-- The type to which the note is attached is the expanded form.
+data TyNote = FTVNote TyVarSet	-- The free type variables of the noted expression
 \end{code}
 
 -------------------------------------
@@ -342,13 +339,10 @@ instance Outputable name => OutputableBndr (IPName name) where
 	-- OK, here's the main printer
 
 ppr_type :: Prec -> Type -> SDoc
-ppr_type p (TyVarTy tv)      	      = ppr tv
-ppr_type p (PredTy pred)     	      = braces (ppr pred)
-ppr_type p (NoteTy (SynNote ty1) ty2) = ppr_type p ty1 
-				  	<+> ifPprDebug (braces $ ptext SLIT("Syn:") <+> pprType ty2)
-ppr_type p (NoteTy other         ty2) = ppr_type p ty2
-
-ppr_type p (TyConApp tc tys) = ppr_tc_app p tc tys
+ppr_type p (TyVarTy tv)       = ppr tv
+ppr_type p (PredTy pred)      = braces (ppr pred)
+ppr_type p (NoteTy other ty2) = ppr_type p ty2
+ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
 			   pprType t1 <+> ppr_type TyConPrec t2
@@ -372,14 +366,14 @@ ppr_forall_type p ty
     (tvs,  rho) = split1 [] ty
     (ctxt, tau) = split2 [] rho
 
-    split1 tvs (ForAllTy tv ty)        = split1 (tv:tvs) ty
-    split1 tvs (NoteTy (FTVNote _) ty) = split1 tvs ty
-    split1 tvs ty		       = (reverse tvs, ty)
+    split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
+    split1 tvs (NoteTy _ ty)    = split1 tvs ty
+    split1 tvs ty		= (reverse tvs, ty)
  
-    split2 ps (NoteTy (FTVNote _) arg 	-- Rather a disgusting case
+    split2 ps (NoteTy _ arg 	-- Rather a disgusting case
 	       `FunTy` res) 	      = split2 ps (arg `FunTy` res)
     split2 ps (PredTy p `FunTy` ty)   = split2 (p:ps) ty
-    split2 ps (NoteTy (FTVNote _) ty) = split2 ps ty
+    split2 ps (NoteTy _ ty) 	      = split2 ps ty
     split2 ps ty		      = (reverse ps, ty)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc

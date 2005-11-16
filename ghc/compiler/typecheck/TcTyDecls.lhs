@@ -22,7 +22,7 @@ module TcTyDecls(
 import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
 import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
 import RnHsSyn		( extractHsTyNames )
-import Type		( predTypeRep )
+import Type		( predTypeRep, tcView )
 import HscTypes		( TyThing(..), ModDetails(..) )
 import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars,
                           getSynTyConDefn, isSynTyCon, isAlgTyCon, 
@@ -94,18 +94,13 @@ synTyConsOfType ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TyVarTy v)	  	  = emptyNameEnv
-     go (TyConApp tc tys) 	  = go_tc tc tys	-- See note (a)
+     go (TyConApp tc tys) 	  = go_tc tc tys
      go (AppTy a b)	  	  = go a `plusNameEnv` go b
      go (FunTy a b)	  	  = go a `plusNameEnv` go b
      go (PredTy (IParam _ ty))    = go ty	
      go (PredTy (ClassP cls tys)) = go_s tys	-- Ignore class
-     go (NoteTy (SynNote ty) _)	  = go ty	-- Don't look through it!
-     go (NoteTy other ty)	  = go ty	
+     go (NoteTy _ ty)		  = go ty	
      go (ForAllTy _ ty)	  	  = go ty
-
-	-- Note (a): the unexpanded branch of a SynNote has a
-	--	     TyConApp for the synonym, so the tc of
-	--	     a TyConApp must be tested for possible synonyms
 
      go_tc tc tys | isSynTyCon tc = extendNameEnv (go_s tys) (tyConName tc) tc
 		  | otherwise	  = go_s tys
@@ -313,14 +308,14 @@ tcTyConsOfType ty
   = nameEnvElts (go ty)
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
-     go (TyVarTy v)	  	  = emptyNameEnv
-     go (TyConApp tc tys) 	  = go_tc tc tys
-     go (AppTy a b)	  	  = go a `plusNameEnv` go b
-     go (FunTy a b)	  	  = go a `plusNameEnv` go b
-     go (PredTy (IParam _ ty))    = go ty
-     go (PredTy (ClassP cls tys)) = go_tc (classTyCon cls) tys
-     go (NoteTy _ ty)		  = go ty
-     go (ForAllTy _ ty)	  	  = go ty
+     go ty | Just ty' <- tcView ty = go ty'
+     go (TyVarTy v)	  	   = emptyNameEnv
+     go (TyConApp tc tys) 	   = go_tc tc tys
+     go (AppTy a b)	  	   = go a `plusNameEnv` go b
+     go (FunTy a b)	  	   = go a `plusNameEnv` go b
+     go (PredTy (IParam _ ty))     = go ty
+     go (PredTy (ClassP cls tys))  = go_tc (classTyCon cls) tys
+     go (ForAllTy _ ty)	  	   = go ty
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
@@ -421,10 +416,6 @@ vrcInTy :: (TyCon -> ArgVrcs)  -- function to get argVrcs of a tycon (break out 
         -> TyVar               -- tyvar to check Vrcs of
         -> Type                -- type to check for occ in
         -> (Bool,Bool)         -- (occurs positively, occurs negatively)
-
-vrcInTy fao v (NoteTy (SynNote _)   ty) = vrcInTy fao v ty
-    			-- SynTyCon doesn't neccessarily have vrcInfo at this point,
-    			-- so don't try and use it
 
 vrcInTy fao v (NoteTy (FTVNote ftv) ty) = if elemVarSet v ftv
     					  then vrcInTy fao v ty

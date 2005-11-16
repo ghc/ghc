@@ -1712,7 +1712,7 @@ reduceList (n,stack) try_me wanteds state
 #ifdef DEBUG
    (if n > 8 then
 	pprTrace "Interesting! Context reduction stack deeper than 8:" 
-		 (nest 2 (pprStack stack))
+		(int n $$ ifPprDebug (nest 2 (pprStack stack)))
     else (\x->x))
 #endif
     go wanteds state

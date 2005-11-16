@@ -16,7 +16,10 @@ module TyCon(
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
 	isEnumerationTyCon, 
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
-	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConRhs_maybe, isHiBootTyCon,
+	isRecursiveTyCon, newTyConRep, newTyConRhs, 
+	isHiBootTyCon,
+
+	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 
 	makeTyConAbstract, isAbstractTyCon,
 
@@ -65,7 +68,6 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..) )
 import Maybes		( orElse )
-import Util		( equalLength )
 import Outputable
 import FastString
 \end{code}
@@ -150,7 +152,7 @@ data TyCon
 	tyConArity  :: Arity,
 
 	tyConTyVars     :: [TyVar],	-- Bound tyvars
-	synTyConDefn    :: Type,	-- Right-hand side, mentioning these type vars.
+	synTcRhs    :: Type,	-- Right-hand side, mentioning these type vars.
 					-- Acts as a template for the expansion when
 					-- the tycon is applied to some types.
 	argVrcs :: ArgVrcs
@@ -167,39 +169,78 @@ data AlgTyConRhs
 			-- Used when we export a data type abstractly into
 			-- an hi file
 
-  | DataTyCon 
-	[DataCon]	-- The constructors; can be empty if the user declares
+  | DataTyCon {
+	data_cons :: [DataCon],
+			-- The constructors; can be empty if the user declares
 			--   the type to have no constructors
 			-- INVARIANT: Kept in order of increasing tag
 			--	      (see the tag assignment in DataCon.mkDataCon)
-	Bool		-- Cached: True <=> an enumeration type
-			--	   Includes data types with no constructors.
+	is_enum :: Bool 	-- Cached: True <=> an enumeration type
+    }			--	   Includes data types with no constructors.
 
-  | NewTyCon 		-- Newtypes always have exactly one constructor
-	DataCon		-- The unique constructor; it has no existentials
-	Type		-- Cached: the argument type of the constructor
-			--  = the representation type of the tycon
+  | NewTyCon {
+	data_con :: DataCon,	-- The unique constructor; it has no existentials
 
-	Type		-- Cached: the *ultimate* representation type
-			-- By 'ultimate' I mean that the rep type is not itself
-			-- a newtype or type synonym.
+	nt_rhs :: Type,		-- Cached: the argument type of the constructor
+				--  = the representation type of the tycon
+
+	nt_etad_rhs :: ([TyVar], Type) ,
+			-- The same again, but this time eta-reduced
+			-- hence the [TyVar] which may be shorter than the declared 
+			-- arity of the TyCon.  See Note [Newtype eta]
+
+	nt_rep :: Type	-- Cached: the *ultimate* representation type
+			-- By 'ultimate' I mean that the top-level constructor
+			-- of the rep type is not itself a newtype or type synonym.
 			-- The rep type isn't entirely simple:
 			--  for a recursive newtype we pick () as the rep type
 			--	newtype T = MkT T
-			--
-			-- The rep type has free type variables the tyConTyVars
+			-- 
+			-- This one does not need to be eta reduced; hence its
+			-- free type variables are conveniently tyConTyVars
 			-- Thus:
 			-- 	newtype T a = MkT [(a,Int)]
 			-- The rep type is [(a,Int)]
-	-- NB: the rep type isn't necessarily the original RHS of the
-	--     newtype decl, because the rep type looks through other
-	--     newtypes.
+			-- NB: the rep type isn't necessarily the original RHS of the
+			--     newtype decl, because the rep type looks through other
+    }			--     newtypes.
 
 visibleDataCons :: AlgTyConRhs -> [DataCon]
-visibleDataCons AbstractTyCon    = []
-visibleDataCons (DataTyCon cs _) = cs
-visibleDataCons (NewTyCon c _ _) = [c]
+visibleDataCons AbstractTyCon      	      = []
+visibleDataCons (DataTyCon{ data_cons = cs }) = cs
+visibleDataCons (NewTyCon{ data_con = c })    = [c]
 \end{code}
+
+Note [Newtype eta]
+~~~~~~~~~~~~~~~~~~
+Consider
+	newtype Parser m a = MkParser (Foogle m a)
+Are these two types equal (to Core)?
+	Monad (Parser m) 
+	Monad (Foogle m)
+Well, yes.  But to see that easily we eta-reduce the RHS type of
+Parser, in this case to ([], Froogle), so that even unsaturated applications
+of Parser will work right.  This eta reduction is done when the type 
+constructor is built, and cached in NewTyCon.  The cached field is
+only used in coreExpandTyCon_maybe.
+ 
+Here's an example that I think showed up in practice
+Source code:
+	newtype T a = MkT [a]
+	newtype Foo m = MkFoo (forall a. m a -> Int)
+
+	w1 :: Foo []
+	w1 = ...
+	
+	w2 :: Foo T
+	w2 = MkFoo (\(MkT x) -> case w1 of MkFoo f -> f x)
+
+After desugaring, and discading the data constructors for the newtypes,
+we get:
+	w2 :: Foo T
+	w2 = w1
+And now Lint complains unless Foo T == Foo [], and that requires T==[]
+
 
 %************************************************************************
 %*									*
@@ -352,7 +393,7 @@ mkSynTyCon name kind tyvars rhs argvrcs
 	tyConKind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
-	synTyConDefn = rhs,
+	synTcRhs = rhs,
 	argVrcs      = argvrcs
     }
 \end{code}
@@ -395,16 +436,16 @@ isDataTyCon :: TyCon -> Bool
 --		  unboxed tuples
 isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})  
   = case rhs of
-	DataTyCon _ _  -> True
-	NewTyCon _ _ _ -> False
-	AbstractTyCon  -> pprPanic "isDataTyCon" (ppr tc)
+	DataTyCon {}  -> True
+	NewTyCon {}   -> False
+	AbstractTyCon -> pprPanic "isDataTyCon" (ppr tc)
 
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon :: TyCon -> Bool
-isNewTyCon (AlgTyCon {algTcRhs = NewTyCon _ _ _}) = True 
-isNewTyCon other			          = False
+isNewTyCon (AlgTyCon {algTcRhs = NewTyCon {}}) = True 
+isNewTyCon other			       = False
 
 isProductTyCon :: TyCon -> Bool
 -- A "product" tycon
@@ -415,9 +456,10 @@ isProductTyCon :: TyCon -> Bool
 -- 	may be  unboxed or not, 
 --	may be  recursive or not
 isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
-				    DataTyCon [data_con] _ -> isVanillaDataCon data_con
-				    NewTyCon _ _ _         -> True
-				    other		   -> False
+				    DataTyCon{ data_cons = [data_con] } 
+						-> isVanillaDataCon data_con
+				    NewTyCon {}	-> True
+				    other	-> False
 isProductTyCon (TupleTyCon {})  = True   
 isProductTyCon other		= False
 
@@ -426,8 +468,8 @@ isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
 
 isEnumerationTyCon :: TyCon -> Bool
-isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon _ is_enum}) = is_enum
-isEnumerationTyCon other				       = False
+isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
+isEnumerationTyCon other				       	       = False
 
 isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
@@ -466,6 +508,47 @@ isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
 isForeignTyCon other				   = False
 \end{code}
 
+
+-----------------------------------------------
+--	Expand type-constructor applications
+-----------------------------------------------
+
+\begin{code}
+tcExpandTyCon_maybe, coreExpandTyCon_maybe 
+	:: TyCon 
+	-> [Type]			-- Args to tycon
+	-> Maybe ([(TyVar,Type)], 	-- Substitution
+		  Type,			-- Body type (not yet substituted)
+		  [Type])		-- Leftover args
+
+-- For the *typechecker* view, we expand synonyms only
+tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, synTcRhs = rhs }) tys
+   = expand tvs rhs tys
+tcExpandTyCon_maybe other_tycon tys = Nothing
+
+---------------
+-- For the *Core* view, we expand synonyms *and* non-recursive newtypes
+coreExpandTyCon_maybe (AlgTyCon {algTcRec = NonRecursive,	-- Not recursive
+         algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs }}) tys
+   = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
+			-- match the etad_rhs of a *recursive* newtype
+	(tvs,rhs) -> expand tvs rhs tys
+	
+coreExpandTyCon_maybe tycon tys = tcExpandTyCon_maybe tycon tys
+
+----------------
+expand	:: [TyVar] -> Type 			-- Template
+	-> [Type]				-- Args
+	-> Maybe ([(TyVar,Type)], Type, [Type])	-- Expansion
+expand tvs rhs tys
+  = case n_tvs `compare` length tys of
+	LT -> Just (tvs `zip` tys, rhs, drop n_tvs tys)
+	EQ -> Just (tvs `zip` tys, rhs, [])
+	GT -> Nothing
+   where
+     n_tvs = length tvs
+\end{code}
+
 \begin{code}
 tyConHasGenerics :: TyCon -> Bool
 tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
@@ -478,15 +561,15 @@ tyConDataCons :: TyCon -> [DataCon]
 tyConDataCons tycon = tyConDataCons_maybe tycon `orElse` []
 
 tyConDataCons_maybe :: TyCon -> Maybe [DataCon]
-tyConDataCons_maybe (AlgTyCon {algTcRhs = DataTyCon cons _}) = Just cons
-tyConDataCons_maybe (AlgTyCon {algTcRhs = NewTyCon con _ _}) = Just [con]
-tyConDataCons_maybe (TupleTyCon {dataCon = con})	     = Just [con]
-tyConDataCons_maybe other			             = Nothing
+tyConDataCons_maybe (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons }}) = Just cons
+tyConDataCons_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = con }})    = Just [con]
+tyConDataCons_maybe (TupleTyCon {dataCon = con})	       		   = Just [con]
+tyConDataCons_maybe other			               		   = Nothing
 
 tyConFamilySize  :: TyCon -> Int
-tyConFamilySize (AlgTyCon {algTcRhs = DataTyCon cons _}) = length cons
-tyConFamilySize (AlgTyCon {algTcRhs = NewTyCon _ _ _})   = 1
-tyConFamilySize (TupleTyCon {})	 			 = 1
+tyConFamilySize (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons }}) = length cons
+tyConFamilySize (AlgTyCon {algTcRhs = NewTyCon {}}) = 1
+tyConFamilySize (TupleTyCon {})	 		    = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
@@ -497,33 +580,17 @@ tyConSelIds other_tycon		          = []
 
 algTyConRhs :: TyCon -> AlgTyConRhs
 algTyConRhs (AlgTyCon {algTcRhs = rhs})  = rhs
-algTyConRhs (TupleTyCon {dataCon = con}) = DataTyCon [con] False
+algTyConRhs (TupleTyCon {dataCon = con}) = DataTyCon { data_cons = [con], is_enum = False }
 algTyConRhs other = pprPanic "algTyConRhs" (ppr other)
 \end{code}
 
 \begin{code}
 newTyConRhs :: TyCon -> ([TyVar], Type)
-newTyConRhs (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ rhs _}) = (tvs, rhs)
+newTyConRhs (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rhs = rhs }}) = (tvs, rhs)
 newTyConRhs tycon = pprPanic "newTyConRhs" (ppr tycon)
 
-newTyConRhs_maybe :: TyCon 
-		  -> [Type]			-- Args to tycon
-		  -> Maybe ([(TyVar,Type)], 	-- Substitution
-			    Type)		-- Body type (not yet substituted)
--- Non-recursive newtypes are transparent to Core; 
--- Given an application to some types, return Just (tenv, ty)
--- if it's a saturated, non-recursive newtype.
-newTyConRhs_maybe (AlgTyCon {tyConTyVars = tvs, 
-			     algTcRec = NonRecursive,	-- Not recursive
-			     algTcRhs = NewTyCon _ rhs _}) tys
-   | tvs `equalLength` tys 	-- Saturated
-   = Just (tvs `zip` tys, rhs)
-	
-newTyConRhs_maybe other_tycon tys = Nothing
-
-
 newTyConRep :: TyCon -> ([TyVar], Type)
-newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ _ rep}) = (tvs, rep)
+newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rep = rep }}) = (tvs, rep)
 newTyConRep tycon = pprPanic "newTyConRep" (ppr tycon)
 
 tyConPrimRep :: TyCon -> PrimRep
@@ -553,18 +620,18 @@ tyConArgVrcs (SynTyCon   {argVrcs = oi})       = oi
 
 \begin{code}
 getSynTyConDefn :: TyCon -> ([TyVar], Type)
-getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTyConDefn = ty}) = (tyvars,ty)
+getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTcRhs = ty}) = (tyvars,ty)
 getSynTyConDefn tycon = pprPanic "getSynTyConDefn" (ppr tycon)
 \end{code}
 
 \begin{code}
 maybeTyConSingleCon :: TyCon -> Maybe DataCon
-maybeTyConSingleCon (AlgTyCon {algTcRhs = DataTyCon [c] _}) = Just c
-maybeTyConSingleCon (AlgTyCon {algTcRhs = NewTyCon c _ _})  = Just c
-maybeTyConSingleCon (AlgTyCon {})	        	    = Nothing
-maybeTyConSingleCon (TupleTyCon {dataCon = con}) 	    = Just con
-maybeTyConSingleCon (PrimTyCon {})               	    = Nothing
-maybeTyConSingleCon (FunTyCon {})                	    = Nothing  -- case at funty
+maybeTyConSingleCon (AlgTyCon {algTcRhs = DataTyCon {data_cons = [c] }}) = Just c
+maybeTyConSingleCon (AlgTyCon {algTcRhs = NewTyCon { data_con = c }})    = Just c
+maybeTyConSingleCon (AlgTyCon {})	         = Nothing
+maybeTyConSingleCon (TupleTyCon {dataCon = con}) = Just con
+maybeTyConSingleCon (PrimTyCon {})               = Nothing
+maybeTyConSingleCon (FunTyCon {})                = Nothing  -- case at funty
 maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $ ppr tc
 \end{code}
 

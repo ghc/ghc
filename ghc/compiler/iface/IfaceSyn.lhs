@@ -518,9 +518,9 @@ tyThingToIfaceDecl ext (ATyCon tycon)
     tyvars      = tyConTyVars tycon
     (_, syn_ty) = getSynTyConDefn tycon
 
-    ifaceConDecls (NewTyCon con _ _) = IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon cons _) = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls AbstractTyCon	     = IfAbstractTyCon
+    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
+    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls AbstractTyCon			   = IfAbstractTyCon
 	-- The last case happens when a TyCon has been trimmed during tidying
 	-- Furthermore, tyThingToIfaceDecl is also used
 	-- in TcRnDriver for GHCi, when browsing a module, in which case the

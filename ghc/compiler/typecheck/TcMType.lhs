@@ -47,7 +47,7 @@ module TcMType (
 
 -- friends:
 import HsSyn		( LHsType )
-import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see representation
+import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
 			  ThetaType
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
@@ -61,7 +61,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  typeKind, isFlexi, isSkolemTyVar,
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
-			  tyVarsOfType, tyVarsOfTypes, 
+			  tyVarsOfType, tyVarsOfTypes, tcView,
 			  pprPred, pprTheta, pprClassPred )
 import Kind		( Kind(..), KindVar, kindVarRef, mkKindVar, isSubKind,
 			  isLiftedTypeKind, isArgTypeKind, isOpenTypeKind,
@@ -527,11 +527,7 @@ zonkType unbound_var_fn rflag ty
     go (TyConApp tycon tys)	  = mappM go tys	`thenM` \ tys' ->
 				    returnM (TyConApp tycon tys')
 
-    go (NoteTy (SynNote ty1) ty2) = go ty1		`thenM` \ ty1' ->
-				    go ty2		`thenM` \ ty2' ->
-				    returnM (NoteTy (SynNote ty1') ty2')
-
-    go (NoteTy (FTVNote _) ty2)   = go ty2	-- Discard free-tyvar annotations
+    go (NoteTy _ ty2) 		  = go ty2	-- Discard free-tyvar annotations
 
     go (PredTy p)		  = go_pred p		`thenM` \ p' ->
 				    returnM (PredTy p')
@@ -825,29 +821,6 @@ check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
 check_tau_type rank ubx_tup (AppTy ty1 ty2)
   = check_arg_type ty1 `thenM_` check_arg_type ty2
 
-check_tau_type rank ubx_tup (NoteTy (SynNote syn) ty)
-	-- Synonym notes are built only when the synonym is 
-	-- saturated (see Type.mkSynTy)
-  = doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
-    (if gla_exts then
-	-- If -fglasgow-exts then don't check the 'note' part.
-	-- This  allows us to instantiate a synonym defn with a 
-	-- for-all type, or with a partially-applied type synonym.
-	-- 	e.g.   type T a b = a
-	--	       type S m   = m ()
-	--	       f :: S (T Int)
-	-- Here, T is partially applied, so it's illegal in H98.
-	-- But if you expand S first, then T we get just 
-	--	       f :: Int
-	-- which is fine.
-	returnM ()
-    else
-	-- For H98, do check the un-expanded part
-	check_tau_type rank ubx_tup syn		
-    )						`thenM_`
-
-    check_tau_type rank ubx_tup ty
-
 check_tau_type rank ubx_tup (NoteTy other_note ty)
   = check_tau_type rank ubx_tup ty
 
@@ -856,8 +829,31 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   = 	-- NB: Type.mkSynTy builds a TyConApp (not a NoteTy) for an unsaturated
 	-- synonym application, leaving it to checkValidType (i.e. right here)
 	-- to find the error
-    checkTc syn_arity_ok arity_msg	`thenM_`
-    mappM_ check_arg_type tys
+    do	{ 	-- It's OK to have an *over-applied* type synonym
+		--	data Tree a b = ...
+		--	type Foo a = Tree [a]
+		--	f :: Foo a b -> ...
+	; case tcView ty of
+	     Just ty' -> check_tau_type rank ubx_tup ty'	-- Check expansion
+	     Nothing  -> failWithTc arity_msg
+
+	; gla_exts <- doptM Opt_GlasgowExts
+	; if gla_exts then
+	-- If -fglasgow-exts then don't check the type arguments
+	-- This allows us to instantiate a synonym defn with a 
+	-- for-all type, or with a partially-applied type synonym.
+	-- 	e.g.   type T a b = a
+	--	       type S m   = m ()
+	--	       f :: S (T Int)
+	-- Here, T is partially applied, so it's illegal in H98.
+	-- But if you expand S first, then T we get just 
+	--	       f :: Int
+	-- which is fine.
+		returnM ()
+	  else
+		-- For H98, do check the type args
+		mappM_ check_arg_type tys
+	}
     
   | isUnboxedTupleTyCon tc
   = doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
@@ -872,11 +868,6 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   where
     ubx_tup_ok gla_exts = case ubx_tup of { UT_Ok -> gla_exts; other -> False }
 
-    syn_arity_ok = tc_arity <= n_args
-		-- It's OK to have an *over-applied* type synonym
-		--	data Tree a b = ...
-		--	type Foo a = Tree [a]
-		--	f :: Foo a b -> ...
     n_args    = length tys
     tc_arity  = tyConArity tc
 

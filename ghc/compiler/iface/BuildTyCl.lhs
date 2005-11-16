@@ -14,10 +14,10 @@ module BuildTyCl (
 import IfaceEnv		( newImplicitBinder )
 import TcRnMonad
 
-import DataCon		( DataCon, isNullarySrcDataCon,
+import DataCon		( DataCon, isNullarySrcDataCon, dataConTyVars,
 			  mkDataCon, dataConFieldLabels, dataConOrigArgTys )
 import Var		( tyVarKind, TyVar, Id )
-import VarSet		( isEmptyVarSet, intersectVarSet )
+import VarSet		( isEmptyVarSet, intersectVarSet, elemVarSet )
 import TysWiredIn  	( unitTy )
 import BasicTypes	( RecFlag, StrictnessMark(..) )
 import Name		( Name )
@@ -27,9 +27,12 @@ import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
 			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
+			  isRecursiveTyCon,
 			  ArgVrcs, AlgTyConRhs(..), newTyConRhs )
-import Type		( mkArrowKinds, liftedTypeKind, typeKind, tyVarsOfTypes, tyVarsOfPred,
-			  splitTyConApp_maybe, mkPredTys, mkTyVarTys, ThetaType, Type,
+import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
+			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
+			  splitTyConApp_maybe, splitAppTy_maybe, getTyVar_maybe,
+			  mkPredTys, mkTyVarTys, ThetaType, Type, 
 			  substTyWith, zipTopTvSubst, substTheta )
 import Outputable
 import List		( nub )
@@ -67,19 +70,36 @@ mkAbstractTyConRhs = AbstractTyCon
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons
-  = DataTyCon cons (all isNullarySrcDataCon cons)
+  = DataTyCon { data_cons = cons, is_enum = all isNullarySrcDataCon cons }
 
 mkNewTyConRhs :: TyCon -> DataCon -> AlgTyConRhs
 mkNewTyConRhs tycon con 
-  = NewTyCon con rhs_ty (mkNewTyConRep tycon)
+  = NewTyCon { data_con = con, 
+	       nt_rhs = rhs_ty,
+	       nt_etad_rhs = eta_reduce tvs rhs_ty,
+	       nt_rep = mkNewTyConRep tycon rhs_ty }
   where
+    tvs    = dataConTyVars con
     rhs_ty = head (dataConOrigArgTys con)
 	-- Newtypes are guaranteed vanilla, so OrigArgTys will do
+
+    eta_reduce [] ty = ([], ty)
+    eta_reduce (a:as) ty | null as', 
+			   Just (fun, arg) <- splitAppTy_maybe ty',
+			   Just tv <- getTyVar_maybe arg,
+			   tv == a,
+			   not (a `elemVarSet` tyVarsOfType fun)
+			 = ([], fun)	-- Successful eta reduction
+			 | otherwise
+			 = (a:as', ty')
+	where
+  	  (as', ty') = eta_reduce as ty
 				
 mkNewTyConRep :: TyCon		-- The original type constructor
+	      -> Type		-- The arg type of its constructor
 	      -> Type		-- Chosen representation type
-				-- (guaranteed not to be another newtype)
-				-- Free vars of rep = tyConTyVars tc
+-- The "representation type" is guaranteed not to be another newtype
+-- at the outermost level; but it might have newtypes in type arguments
 
 -- Find the representation type for this newtype TyCon
 -- Remember that the representation type is the *ultimate* representation
@@ -92,24 +112,24 @@ mkNewTyConRep :: TyCon		-- The original type constructor
 -- The trick is to to deal correctly with recursive newtypes
 -- such as	newtype T = MkT T
 
-mkNewTyConRep tc
+mkNewTyConRep tc rhs_ty
   | null (tyConDataCons tc) = unitTy
 	-- External Core programs can have newtypes with no data constructors
-  | otherwise		    = go [] tc
+  | otherwise		    = go [tc] rhs_ty
   where
-	-- Invariant: tc is a NewTyCon
-	-- 	      tcs have been seen before
-    go tcs tc 
-	| tc `elem` tcs = unitTy
-	| otherwise
-	= case splitTyConApp_maybe rhs_ty of
-	    Just (tc1, tys) | isNewTyCon tc1
-			   -> ASSERT( length (tyConTyVars tc1) == length tys )
-			      substTyWith (tyConTyVars tc1) tys (go (tc:tcs) tc1)
-	    other 	   -> rhs_ty 
-	where
-	  (_tc_tvs, rhs_ty) = newTyConRhs tc
+	-- Invariant: tcs have been seen before
+    go tcs rep_ty 
+	= case splitTyConApp_maybe rep_ty of
+	    Just (tc, tys)
+		| tc `elem` tcs -> unitTy	-- Recursive loop
+		| isNewTyCon tc -> ASSERT( isRecursiveTyCon tc )
+					-- Non-recursive ones have been 
+					-- dealt with by splitTyConApp_maybe
+				   go (tc:tcs) (substTyWith tvs tys rhs_ty)
+		where
+		  (tvs, rhs_ty) = newTyConRhs tc
 
+	    other -> rep_ty 
 
 ------------------------------------------------------
 buildDataCon :: Name -> Bool -> Bool

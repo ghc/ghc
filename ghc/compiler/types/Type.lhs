@@ -29,7 +29,7 @@ module Type (
 
 	mkSynTy, 
 
-	repType, typePrimRep, coreView, deepCoreView,
+	repType, typePrimRep, coreView, tcView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -97,15 +97,16 @@ import Class	( Class, classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
-		  isAlgTyCon, isSynTyCon, tyConArity, newTyConRhs_maybe,
-	          tyConKind, getSynTyConDefn, PrimRep(..), tyConPrimRep,
+		  isAlgTyCon, tyConArity, 
+		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
+	          tyConKind, PrimRep(..), tyConPrimRep,
 		)
 
 -- others
 import StaticFlags	( opt_DictsStrict )
 import SrcLoc		( noSrcLoc )
 import Unique		( Uniquable(..) )
-import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual )
+import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual, all2 )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
@@ -127,27 +128,7 @@ coreView :: Type -> Maybe Type
 -- its underlying representation type. 
 -- Returns Nothing if there is nothing to look through.
 --
--- By being non-recursive and inlined, this case analysis gets efficiently
--- joined onto the case analysis that the caller is already doing
-coreView (NoteTy _ ty) 	   = Just ty
-coreView (PredTy p)    	   = Just (predTypeRep p)
-coreView (TyConApp tc tys) = expandNewTcApp tc tys
-coreView ty		   = Nothing
-
-deepCoreView :: Type -> Type
--- Apply coreView recursively
-deepCoreView ty
-  | Just ty' <- coreView ty    = deepCoreView ty'
-deepCoreView (TyVarTy tv)      = TyVarTy tv
-deepCoreView (TyConApp tc tys) = TyConApp tc (map deepCoreView tys)
-deepCoreView (AppTy t1 t2)     = AppTy (deepCoreView t1) (deepCoreView t2)
-deepCoreView (FunTy t1 t2)     = FunTy (deepCoreView t1) (deepCoreView t2)
-deepCoreView (ForAllTy tv ty)  = ForAllTy tv (deepCoreView ty)
-	-- No NoteTy, no PredTy
-
-expandNewTcApp :: TyCon -> [Type] -> Maybe Type
--- A local helper function (not exported)
--- Expands *the outermoset level of* a newtype application to 
+-- In the case of newtypes, it returns
 --	*either* a vanilla TyConApp (recursive newtype, or non-saturated)
 --	*or*     the newtype representation (otherwise), meaning the
 --			type written in the RHS of the newtype decl,
@@ -160,9 +141,25 @@ expandNewTcApp :: TyCon -> [Type] -> Maybe Type
 --	            on S gives Just T
 --		    on T gives Nothing	 (no expansion)
 
-expandNewTcApp tc tys = case newTyConRhs_maybe tc tys of
-			  Nothing          -> Nothing
-			  Just (tenv, rhs) -> Just (substTy (mkTopTvSubst tenv) rhs)
+-- By being non-recursive and inlined, this case analysis gets efficiently
+-- joined onto the case analysis that the caller is already doing
+coreView (NoteTy _ ty) 	   = Just ty
+coreView (PredTy p)    	   = Just (predTypeRep p)
+coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys 
+			   = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+				-- Its important to use mkAppTys, rather than (foldl AppTy),
+				-- because the function part might well return a 
+				-- partially-applied type constructor; indeed, usually will!
+coreView ty		   = Nothing
+
+-----------------------------------------------
+{-# INLINE tcView #-}
+tcView :: Type -> Maybe Type
+-- Same, but for the type checker, which just looks through synonyms
+tcView (NoteTy _ ty) 	 = Just ty
+tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
+			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+tcView ty		 = Nothing
 \end{code}
 
 
@@ -330,18 +327,15 @@ as apppropriate.
 \begin{code}
 mkGenTyConApp :: TyCon -> [Type] -> Type
 mkGenTyConApp tc tys
-  | isSynTyCon tc = mkSynTy tc tys
-  | otherwise     = mkTyConApp tc tys
+  = mkTyConApp tc tys
 
 mkTyConApp :: TyCon -> [Type] -> Type
--- Assumes TyCon is not a SynTyCon; use mkSynTy instead for those
 mkTyConApp tycon tys
   | isFunTyCon tycon, [ty1,ty2] <- tys
   = FunTy ty1 ty2
 
   | otherwise
-  = ASSERT(not (isSynTyCon tycon))
-    TyConApp tycon tys
+  = TyConApp tycon tys
 
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = mkTyConApp tycon []
@@ -374,7 +368,8 @@ splitTyConApp_maybe other	      = Nothing
 				~~~~~
 
 \begin{code}
-mkSynTy tycon tys
+mkSynTy tycon tys = panic "No longer used"
+{-	Delete in due course
   | n_args == arity	-- Exactly saturated
   = mk_syn tys
   | n_args >  arity	-- Over-saturated
@@ -397,6 +392,7 @@ mkSynTy tycon tys
     (tyvars, body) = ASSERT( isSynTyCon tycon ) getSynTyConDefn tycon
     arity 	   = tyConArity tycon
     n_args	   = length tys
+-}
 \end{code}
 
 Notes on type synonyms
@@ -627,7 +623,6 @@ tyVarsOfType :: Type -> TyVarSet
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
-tyVarsOfType (NoteTy (SynNote ty1) ty2)	= tyVarsOfType ty2	-- See note [Syn] below
 tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
@@ -721,7 +716,6 @@ tidyType env@(tidy_env, subst) ty
 			      where
 			        (envp, tvp) = tidyTyVarBndr env tv
 
-    go_note (SynNote ty)        = SynNote $! (go ty)
     go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
 
 tidyTypes env tys = map (tidyType env) tys
@@ -875,7 +869,6 @@ seqTypes []       = ()
 seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
 
 seqNote :: TyNote -> ()
-seqNote (SynNote ty)  = seqType ty
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 
 seqPred :: PredType -> ()
@@ -886,30 +879,58 @@ seqPred (IParam n ty)  = n  `seq` seqType ty
 
 %************************************************************************
 %*									*
-		Comparison of types
+		Equality for Core types 
 	(We don't use instances so that we know where it happens)
 %*									*
 %************************************************************************
 
-Two flavours:
-
-* tcEqType, tcCmpType do *not* look through newtypes, PredTypes
-* coreEqType *does* look through them
-
-Note that eqType can respond 'False' for partial applications of newtypes.
-Consider
-	newtype Parser m a = MkParser (Foogle m a)
-Does 	
-	Monad (Parser m) `eqType` Monad (Foogle m)
-Well, yes, but eqType won't see that they are the same. 
-I don't think this is harmful, but it's soemthing to watch out for.
-
-First, the external interface
+Note that eqType works right even for partial applications of newtypes.
+See Note [Newtype eta] in TyCon.lhs
 
 \begin{code}
 coreEqType :: Type -> Type -> Bool
-coreEqType t1 t2 = isEqual $ cmpType (deepCoreView t1) (deepCoreView t2)
+coreEqType t1 t2
+  = eq rn_env t1 t2
+  where
+    rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfType t1 `unionVarSet` tyVarsOfType t2))
 
+    eq env (TyVarTy tv1)       (TyVarTy tv2)     = rnOccL env tv1 == rnOccR env tv2
+    eq env (ForAllTy tv1 t1)   (ForAllTy tv2 t2) = eq (rnBndr2 env tv1 tv2) t1 t2
+    eq env (AppTy s1 t1)       (AppTy s2 t2)     = eq env s1 s2 && eq env t1 t2
+    eq env (FunTy s1 t1)       (FunTy s2 t2)     = eq env s1 s2 && eq env t1 t2
+    eq env (TyConApp tc1 tys1) (TyConApp tc2 tys2) 
+	| tc1 == tc2, all2 (eq env) tys1 tys2 = True
+			-- The lengths should be equal because
+			-- the two types have the same kind
+	-- NB: if the type constructors differ that does not 
+	--     necessarily mean that the types aren't equal
+	--     (synonyms, newtypes)
+	-- Even if the type constructors are the same, but the arguments
+	-- differ, the two types could be the same (e.g. if the arg is just
+	-- ignored in the RHS).  In both these cases we fall through to an 
+	-- attempt to expand one side or the other.
+
+	-- Now deal with newtypes, synonyms, pred-tys
+    eq env t1 t2 | Just t1' <- coreView t1 = eq env t1' t2
+		 | Just t2' <- coreView t2 = eq env t1 t2'
+
+	-- Fall through case; not equal!
+    eq env t1 t2 = False
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Comparision for source types 
+	(We don't use instances so that we know where it happens)
+%*									*
+%************************************************************************
+
+Note that 
+	tcEqType, tcCmpType 
+do *not* look through newtypes, PredTypes
+
+\begin{code}
 tcEqType :: Type -> Type -> Bool
 tcEqType t1 t2 = isEqual $ cmpType t1 t2
 
@@ -951,23 +972,8 @@ cmpPred p1 p2 = cmpPredX rn_env p1 p2
     rn_env = mkRnEnv2 (mkInScopeSet (tyVarsOfPred p1 `unionVarSet` tyVarsOfPred p2))
 
 cmpTypeX :: RnEnv2 -> Type -> Type -> Ordering	-- Main workhorse
-
--- NB: we *cannot* short-cut the newtype comparison thus:
--- eqTypeX env (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) 
---	| (tc1 == tc2) = (eqTypeXs env tys1 tys2)
---
--- Consider:
---	newtype T a = MkT [a]
---	newtype Foo m = MkFoo (forall a. m a -> Int)
---	w1 :: Foo []
---	w1 = ...
---	
---	w2 :: Foo T
---	w2 = MkFoo (\(MkT x) -> case w1 of MkFoo f -> f x)
---
--- We end up with w2 = w1; so we need that Foo T = Foo []
--- but we can only expand saturated newtypes, so just comparing
--- T with [] won't do. 
+cmpTypeX env t1 t2 | Just t1' <- tcView t1 = cmpTypeX env t1' t2
+		   | Just t2' <- tcView t2 = cmpTypeX env t1 t2'
 
 cmpTypeX env (TyVarTy tv1)       (TyVarTy tv2)       = rnOccL env tv1 `compare` rnOccR env tv2
 cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
@@ -975,7 +981,6 @@ cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenC
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (PredTy p1)         (PredTy p2)         = cmpPredX env p1 p2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
-cmpTypeX env (NoteTy _ t1)	t2		     = cmpTypeX env t1 t2
 cmpTypeX env t1			(NoteTy _ t2)	     = cmpTypeX env t1 t2
 
     -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
@@ -1081,6 +1086,7 @@ composeTvSubst in_scope env1 env2
     subst1 = TvSubst in_scope env1
 
 emptyTvSubst = TvSubst emptyInScopeSet emptyVarEnv
+
 isEmptyTvSubst :: TvSubst -> Bool
 isEmptyTvSubst (TvSubst _ env) = isEmptyVarEnv env
 
@@ -1197,9 +1203,6 @@ substTys :: TvSubst -> [Type] -> [Type]
 substTys subst tys | isEmptyTvSubst subst = tys
 	           | otherwise	          = map (subst_ty subst) tys
 
-deShadowTy :: Type -> Type		-- Remove any shadowing from the type
-deShadowTy ty = subst_ty emptyTvSubst ty
-
 substTheta :: TvSubst -> ThetaType -> ThetaType
 substTheta subst theta
   | isEmptyTvSubst subst = theta
@@ -1208,6 +1211,12 @@ substTheta subst theta
 substPred :: TvSubst -> PredType -> PredType
 substPred subst (IParam n ty)     = IParam n (subst_ty subst ty)
 substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
+
+deShadowTy :: TyVarSet -> Type -> Type	-- Remove any nested binders mentioning tvs
+deShadowTy tvs ty 
+  = subst_ty (mkTvSubst in_scope emptyTvSubstEnv) ty
+  where
+    in_scope = mkInScopeSet tvs
 
 -- Note that the in_scope set is poked only if we hit a forall
 -- so it may often never be fully computed 
@@ -1220,7 +1229,6 @@ subst_ty subst ty
 
     go (PredTy p)  		   = PredTy $! (substPred subst p)
 
-    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
     go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
 
     go (FunTy arg res)   	   = (FunTy $! (go arg)) $! (go res)

@@ -547,9 +547,11 @@ mkIfTcApp :: TyCon -> [Type] -> Type
 -- foralls to the right of an arrow), so we must be careful to hoist them here.
 -- This hack should go away when we get rid of hoisting.
 -- Then we should go back to mkGenTyConApp or something like it
-mkIfTcApp tc tys
-  | isSynTyCon tc = hoistForAllTys (mkSynTy tc tys)
-  | otherwise	  = mkTyConApp tc tys
+-- 
+-- Nov 05: the type is now hoisted before being put into an interface file
+mkIfTcApp tc tys = mkTyConApp tc tys
+--  | isSynTyCon tc = hoistForAllTys (mkSynTy tc tys)
+--   | otherwise	  = mkTyConApp tc tys
 
 -----------------------------------------
 tcIfacePredType :: IfacePredType -> IfL PredType
