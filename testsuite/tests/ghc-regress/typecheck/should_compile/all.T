@@ -209,6 +209,7 @@ test('tc196', normal, compile, [''])
 test('tc197', normal, compile, [''])
 test('tc198', normal, compile, [''])
 
+test('syn-perf', normal, compile, [''])
 test('LoopOfTheDay1', normal, compile, [''])
 test('LoopOfTheDay2', normal, compile, [''])
 test('LoopOfTheDay3', normal, compile, [''])
