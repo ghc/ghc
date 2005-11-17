@@ -372,7 +372,7 @@ endif
 
 # For an optimised RTS (you probably don't want to change these; we build
 # a debugging RTS by default now.  Use -debug to get it).
-GhcRtsHcOpts=-O2
+GhcRtsHcOpts=-optc-O2
 GhcRtsCcOpts=-fomit-frame-pointer
 
 # Include the front panel code?  Needs GTK+.
