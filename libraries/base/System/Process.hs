@@ -237,11 +237,23 @@ waitForProcess
   :: ProcessHandle
   -> IO ExitCode
 waitForProcess ph = do
-  handle <- getProcessHandle ph
-  code <- throwErrnoIfMinus1 "waitForProcess" (c_waitForProcess handle)
-  if (code == 0) 
-    then return ExitSuccess
-    else return (ExitFailure (fromIntegral code))
+  p_ <- withProcessHandle ph $ \p_ -> return (p_,p_)
+  case p_ of
+    ClosedHandle e -> return e
+    OpenHandle h  -> do
+	-- don't hold the MVar while we call c_waitForProcess...
+	-- (XXX but there's a small race window here during which another
+	-- thread could close the handle or call waitForProcess)
+	code <- throwErrnoIfMinus1 "waitForProcess" (c_waitForProcess h)
+	withProcessHandle ph $ \p_ ->
+	  case p_ of
+	    ClosedHandle e -> return (p_,e)
+	    OpenHandle ph  -> do
+	      closePHANDLE ph
+	      let e = if (code == 0)
+	  	   then ExitSuccess
+		   else (ExitFailure (fromIntegral code))
+	      return (ClosedHandle e, e)
 
 -- ----------------------------------------------------------------------------
 -- terminateProcess
@@ -256,8 +268,14 @@ waitForProcess ph = do
 -- an exit code of 1.
 terminateProcess :: ProcessHandle -> IO ()
 terminateProcess ph = do
-  pid <- getProcessHandle ph
-  throwErrnoIfMinus1_ "terminateProcess" (c_terminateProcess pid)
+  withProcessHandle_ ph $ \p_ ->
+    case p_ of 
+      ClosedHandle _ -> return p_
+      OpenHandle h -> do
+	throwErrnoIfMinus1_ "terminateProcess" $ c_terminateProcess h
+	return p_
+	-- does not close the handle, we might want to try terminating it
+	-- again, or get its exit code.
 
 -- ----------------------------------------------------------------------------
 -- getProcessExitCode
@@ -271,15 +289,21 @@ Subsequent calls to @getProcessExitStatus@ always return @'Just'
 -}
 getProcessExitCode :: ProcessHandle -> IO (Maybe ExitCode)
 getProcessExitCode ph = do
-  handle <- getProcessHandle ph
-  alloca $ \pExitCode -> do
-    res <- throwErrnoIfMinus1 "getProcessExitCode" (c_getProcessExitCode handle pExitCode)
-    code <- peek pExitCode
-    if res == 0
-      then return Nothing
-      else if code == 0
-             then return (Just ExitSuccess)
-             else return (Just (ExitFailure (fromIntegral code)))
+  withProcessHandle ph $ \p_ ->
+    case p_ of
+      ClosedHandle e -> return (p_, Just e)
+      OpenHandle h ->
+	alloca $ \pExitCode -> do
+	    res <- throwErrnoIfMinus1 "getProcessExitCode" $
+	        	c_getProcessExitCode h pExitCode
+	    code <- peek pExitCode
+	    if res == 0
+	      then return (p_, Nothing)
+	      else do
+		   closePHANDLE h
+		   let e  | code == 0 = ExitSuccess
+			  | otherwise = ExitFailure (fromIntegral code)
+		   return (ClosedHandle e, Just e)
 
 -- ----------------------------------------------------------------------------
 -- Interface to C bits

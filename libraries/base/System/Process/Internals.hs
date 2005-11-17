@@ -15,7 +15,9 @@
 
 -- #hide
 module System.Process.Internals (
-	ProcessHandle(..), PHANDLE, getProcessHandle, mkProcessHandle,
+	ProcessHandle(..), ProcessHandle__(..), 
+	PHANDLE, closePHANDLE, mkProcessHandle, 
+	withProcessHandle, withProcessHandle_,
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 	 pPrPr_disableITimers, c_execvpe,
 # ifdef __GLASGOW_HASKELL__
@@ -43,6 +45,7 @@ import Data.Word ( Word32 )
 import Data.IORef
 #endif
 
+import System.Exit	( ExitCode )
 import Data.Maybe	( fromMaybe )
 # ifdef __GLASGOW_HASKELL__
 import GHC.IOBase	( haFD, FD, Exception(..), IOException(..) )
@@ -51,6 +54,7 @@ import GHC.Handle 	( stdin, stdout, stderr, withHandle_ )
 import Hugs.Exception	( Exception(..), IOException(..) )
 # endif
 
+import Control.Concurrent
 import Control.Exception ( handle, throwIO )
 import Foreign.C
 import Foreign
@@ -81,33 +85,55 @@ import System.Directory.Internals ( parseSearchPath, joinFileName )
      termination: they all return a 'ProcessHandle' which may be used
      to wait for the process later.
 -}
+data ProcessHandle__ = OpenHandle PHANDLE | ClosedHandle ExitCode
+newtype ProcessHandle = ProcessHandle (MVar ProcessHandle__)
+
+withProcessHandle
+	:: ProcessHandle 
+	-> (ProcessHandle__ -> IO (ProcessHandle__, a))
+	-> IO a
+withProcessHandle (ProcessHandle m) io = modifyMVar m io
+
+withProcessHandle_
+	:: ProcessHandle 
+	-> (ProcessHandle__ -> IO ProcessHandle__)
+	-> IO ()
+withProcessHandle_ (ProcessHandle m) io = modifyMVar_ m io
+
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 
 type PHANDLE = CPid
-newtype ProcessHandle = ProcessHandle PHANDLE
-
-getProcessHandle :: ProcessHandle -> IO PHANDLE
-getProcessHandle (ProcessHandle p) = return p
 
 mkProcessHandle :: PHANDLE -> IO ProcessHandle
-mkProcessHandle p = return (ProcessHandle p)
+mkProcessHandle p = do
+  m <- newMVar (OpenHandle p)
+  return (ProcessHandle m)
+
+closePHANDLE :: PHANDLE -> IO ()
+closePHANDLE _ = return ()
 
 #else
 
 type PHANDLE = Word32
-newtype ProcessHandle = ProcessHandle (IORef PHANDLE)
-
-getProcessHandle :: ProcessHandle -> IO PHANDLE
-getProcessHandle (ProcessHandle ior) = readIORef ior
 
 -- On Windows, we have to close this HANDLE when it is no longer required,
 -- hence we add a finalizer to it, using an IORef as the box on which to
 -- attach the finalizer.
 mkProcessHandle :: PHANDLE -> IO ProcessHandle
 mkProcessHandle h = do
-   ioref <- newIORef h
-   mkWeakIORef ioref (c_CloseHandle h)
-   return (ProcessHandle ioref)
+   m <- newMVar (OpenHandle h)
+   addMVarFinalizer m (processHandleFinaliser m)
+   return (ProcessHandle m)
+
+processHandleFinaliser m =
+   modifyMVar_ m $ \p_ -> do 
+	case p_ of
+	  OpenHandle ph -> closePHANDLE ph
+	  _ -> return ()
+	return (error "closed process handle")
+
+closePHANDLE :: PHANDLE -> IO ()
+closePHANDLE ph = c_CloseHandle ph
 
 foreign import stdcall unsafe "CloseHandle"
   c_CloseHandle
