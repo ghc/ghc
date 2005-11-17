@@ -1478,38 +1478,47 @@ f "2"    = 2
   &phases;  
   
   <sect1 id="sec-using-concurrent">
-<title>Using Concurrent Haskell</title>
+    <title>Using Concurrent Haskell</title>
+    <indexterm><primary>Concurrent Haskell</primary><secondary>using</secondary></indexterm>
 
-	     <indexterm><primary>Concurrent Haskell&mdash;use</primary></indexterm>
+    <para>GHC supports Concurrent Haskell by default, without requiring a
+      special option or libraries compiled in a certain way.  To get access to
+      the support libraries for Concurrent Haskell, just import
+      <ulink
+	url="../libraries/base/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>.  More information on Concurrent Haskell is provided in the documentation for that module.</para>
 
-<para>
-GHC supports Concurrent Haskell by default, without requiring a
-special option or libraries compiled in a certain way.  To get access
-to the support libraries for Concurrent Haskell, just import
-<literal>Control.Concurrent</literal> (details are in the accompanying
-library documentation).</para>
+    <para>The following RTS option(s) affect the behaviour of Concurrent
+      Haskell programs:<indexterm><primary>RTS options, concurrent</primary></indexterm></para>
 
-<para>
-RTS options are provided for modifying the behaviour of the threaded
-runtime system.  See <xref linkend="parallel-rts-opts"/>.
-</para>
-
-<para>
-Concurrent Haskell is described in more detail in the documentation
-for the <literal>Control.Concurrent</literal> module.
-</para>
-
-</sect1>
+    <variablelist>
+      <varlistentry>
+	<term><option>-C<replaceable>s</replaceable></option></term>
+	<listitem>
+	  <para><indexterm><primary><option>-C<replaceable>s</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
+	    Sets the context switch interval to <replaceable>s</replaceable>
+	    seconds.  A context switch will occur at the next heap block
+	    allocation after the timer expires (a heap block allocation occurs
+	    every 4k of allocation).  With <option>-C0</option> or
+	    <option>-C</option>, context switches will occur as often as
+	    possible (at every heap block allocation).  By default, context
+	    switches occur every 20ms.  Note that GHC's internal timer ticks
+	    every 20ms, and the context switch timer is always a multiple of
+	    this timer, so 20ms is the maximum granularity available for timed
+	    context switches.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </sect1>
 
 <sect1 id="sec-using-parallel">
 <title>Using parallel Haskell</title>
 
 <para>
-<indexterm><primary>parallel Haskell&mdash;use</primary></indexterm>
-</para>
-
-<para>
-&lsqb;You won't be able to execute parallel Haskell programs unless PVM3
+<indexterm><primary>Parallel Haskell</primary><secondary>using</secondary></indexterm>
+&lsqb;NOTE: GHC does not support Parallel Haskell by default, you need to
+      obtain a special version of GHC from the <ulink
+	url="http://www.cee.hw.ac.uk/~dsg/gph/">GPH</ulink> site.  Also,
+you won't be able to execute parallel Haskell programs unless PVM3
 (parallel Virtual Machine, version 3) is installed at your site.&rsqb;
 </para>
 
@@ -1518,7 +1527,7 @@ To compile a Haskell program for parallel execution under PVM, use the
 <option>-parallel</option> option,<indexterm><primary>-parallel
 option</primary></indexterm> both when compiling <emphasis>and
 linking</emphasis>.  You will probably want to <literal>import
-parallel</literal> into your Haskell modules.
+Control.Parallel</literal> into your Haskell modules.
 </para>
 
 <para>
@@ -1650,7 +1659,7 @@ results&mdash;only with &ldquo;how parallel&rdquo; it was!  We want pretty pictu
 
 <para>
 parallelism profiles (&agrave; la <command>hbcpp</command>) can be generated with the
-<option>-qP</option><indexterm><primary>-qP RTS option (concurrent, parallel)</primary></indexterm> RTS option.  The
+<option>-qP</option><indexterm><primary>-qP RTS option</primary></indexterm> RTS option.  The
 per-processor profiling info is dumped into files named
 <filename>&lt;full-path&gt;&lt;program&gt;.gr</filename>.  These are then munged into a PostScript picture,
 which you can then display.  For example, to run your program
@@ -1695,20 +1704,18 @@ what's happening overall is: <command>tail -f /tmp/pvml.nnn</command>.
 </sect2>
 
 <sect2 id="parallel-rts-opts">
-<title>RTS options for Concurrent/parallel Haskell
+<title>RTS options for Parallel Haskell
 </title>
 
 <para>
-<indexterm><primary>RTS options, concurrent</primary></indexterm>
 <indexterm><primary>RTS options, parallel</primary></indexterm>
-<indexterm><primary>Concurrent Haskell&mdash;RTS options</primary></indexterm>
 <indexterm><primary>parallel Haskell&mdash;RTS options</primary></indexterm>
 </para>
 
 <para>
 Besides the usual runtime system (RTS) options
 (<xref linkend="runtime-control"/>), there are a few options particularly
-for concurrent/parallel execution.
+for parallel execution.
 </para>
 
 <para>
@@ -1763,7 +1770,7 @@ check (with <option>-C</option>).
 <listitem>
 <para>
 <indexterm><primary>-qt&lt;num&gt; RTS option</primary></indexterm>
-(paraLLEL ONLY) Limit the thread pool size, i.e. the number of concurrent
+(paraLLEL ONLY) Limit the thread pool size, i.e. the number of 
 threads per processor to <literal>&lt;num&gt;</literal>.  The default is
 32.  Each thread requires slightly over 1K <emphasis>words</emphasis> in
 the heap for thread state and stack objects.  (For 32-bit machines, this
