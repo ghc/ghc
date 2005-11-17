@@ -20,8 +20,10 @@
 
 module Data.Monoid (
  	Monoid(..),
-	Endo(..),
 	Dual(..),
+	Endo(..),
+	All(..),
+	Any(..),
 	Sum(..),
 	Product(..)
   ) where
@@ -93,6 +95,13 @@ instance Monoid Ordering where
 	EQ `mappend` y = y
 	GT `mappend` _ = GT
 
+-- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
+newtype Dual a = Dual { getDual :: a }
+
+instance Monoid a => Monoid (Dual a) where
+	mempty = Dual mempty
+	Dual x `mappend` Dual y = Dual (y `mappend` x)
+
 -- | The monoid of endomorphisms under composition.
 newtype Endo a = Endo { appEndo :: a -> a }
 
@@ -100,12 +109,19 @@ instance Monoid (Endo a) where
 	mempty = Endo id
 	Endo f `mappend` Endo g = Endo (f . g)
 
--- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
-newtype Dual a = Dual { getDual :: a }
+-- | Boolean monoid under conjunction.
+newtype All = All { getAll :: Bool }
 
-instance Monoid a => Monoid (Dual a) where
-	mempty = Dual mempty
-	Dual x `mappend` Dual y = Dual (y `mappend` x)
+instance Monoid All where
+	mempty = All True
+	All x `mappend` All y = All (x && y)
+
+-- | Boolean monoid under disjunction.
+newtype Any = Any { getAny :: Bool }
+
+instance Monoid Any where
+	mempty = Any False
+	Any x `mappend` Any y = Any (x || y)
 
 -- | Monoid under addition.
 newtype Sum a = Sum { getSum :: a }
