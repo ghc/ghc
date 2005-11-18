@@ -392,7 +392,7 @@ extern lnat     countNurseryBlocks   ( void );
    Functions from GC.c 
    -------------------------------------------------------------------------- */
 
-extern void         threadPaused ( StgTSO * );
+extern void         threadPaused ( Capability *cap, StgTSO * );
 extern StgClosure * isAlive      ( StgClosure *p );
 extern void         markCAFs     ( evac_fn evac );
 

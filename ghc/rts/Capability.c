@@ -23,6 +23,7 @@
 #include "OSThreads.h"
 #include "Capability.h"
 #include "Schedule.h"
+#include "Sparks.h"
 
 #if !defined(SMP)
 Capability MainCapability;     // for non-SMP, we have one global capability
@@ -74,6 +75,8 @@ anyWorkForMe( Capability *cap, Task *task )
 	} else {
 	    return (cap->run_queue_hd->bound == task);
 	}
+    } else if (task->tso == NULL && !emptySparkPoolCap(cap)) {
+	return rtsTrue;
     }
     return globalWorkToDo();
 }
@@ -263,7 +266,7 @@ releaseCapability_ (Capability* cap)
 
     // If we have an unbound thread on the run queue, or if there's
     // anything else to do, give the Capability to a worker thread.
-    if (!emptyRunQueue(cap) || globalWorkToDo()) {
+    if (!emptyRunQueue(cap) || !emptySparkPoolCap(cap) || globalWorkToDo()) {
 	if (cap->spare_workers) {
 	    giveCapabilityToTask(cap,cap->spare_workers);
 	    // The worker Task pops itself from the queue;

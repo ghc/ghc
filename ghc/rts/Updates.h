@@ -204,16 +204,14 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
   W_ sz;								\
   W_ i;									\
   inf = %GET_STD_INFO(p);						\
-  if (%INFO_TYPE(inf) == HALF_W_(THUNK_SELECTOR)) {			\
-	StgThunk_payload(p,0) = 0;					\
-  } else { 								\
+  if (%INFO_TYPE(inf) != HALF_W_(THUNK_SELECTOR)) {			\
     if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)) {			\
       if (%INFO_TYPE(inf) == HALF_W_(AP_STACK)) {			\
           sz = StgAP_STACK_size(p) + BYTES_TO_WDS(SIZEOF_StgAP_STACK_NoHdr); \
       } else {								\
           sz = TO_W_(%INFO_PTRS(inf)) + TO_W_(%INFO_NPTRS(inf));	\
       }									\
-      i = 0;								\
+      i = 1; /* skip over indirectee */					\
       for:								\
         if (i < sz) {							\
           StgThunk_payload(p,i) = 0;					\
@@ -232,20 +230,17 @@ DEBUG_FILL_SLOP(StgClosure *p)
 
     switch (inf->type) {
     case BLACKHOLE:
+    case THUNK_SELECTOR:
 	return;
     case AP_STACK:
 	sz = ((StgAP_STACK *)p)->size + sizeofW(StgAP_STACK) - sizeofW(StgHeader);
 	break;
-    case THUNK_SELECTOR:
-#ifdef SMP
-	((StgSelector *)p)->selectee = 0;
-#endif
-	return;
     default:
 	sz = inf->layout.payload.ptrs + inf->layout.payload.nptrs;
         break;
     }
-    for (i = 0; i < sz; i++) {
+    // start at one to skip over the indirectee
+    for (i = 1; i < sz; i++) {
 	((StgThunk *)p)->payload[i] = 0;
     }
 }

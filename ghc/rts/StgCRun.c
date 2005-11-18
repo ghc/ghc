@@ -203,7 +203,8 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
-static void StgRunIsImplementedInAssembler(void)
+void StgRunIsImplementedInAssembler(void);
+void StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
 	/*

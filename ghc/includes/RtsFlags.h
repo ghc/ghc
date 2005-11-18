@@ -62,6 +62,7 @@ struct DEBUG_FLAGS {
     rtsBool linker;         /* 'l'   the object linker */
     rtsBool apply;          /* 'a' */
     rtsBool stm;            /* 'm' */
+    rtsBool squeeze;        /* 'z'  stack squeezing & lazy blackholing */
 };
 
 struct COST_CENTRE_FLAGS {

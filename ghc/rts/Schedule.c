@@ -250,7 +250,7 @@ static void AllRoots(evac_fn evac);
 static StgTSO *threadStackOverflow(Capability *cap, StgTSO *tso);
 
 static void raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception, 
-			rtsBool stop_at_atomically);
+			rtsBool stop_at_atomically, StgPtr stop_here);
 
 static void deleteThread (Capability *cap, StgTSO *tso);
 static void deleteRunQueue (Capability *cap);
@@ -396,7 +396,7 @@ schedule (Capability *initialCapability, Task *task)
       
 #ifdef SMP
       schedulePushWork(cap,task);
-#endif		
+#endif
 
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
@@ -415,6 +415,9 @@ schedule (Capability *initialCapability, Task *task)
     //
     if (interrupted) {
 	deleteRunQueue(cap);
+#if defined(SMP)
+	discardSparksCap(cap);
+#endif
 	if (shutting_down_scheduler) {
 	    IF_DEBUG(scheduler, sched_belch("shutting down"));
 	    // If we are a worker, just exit.  If we're a bound thread
@@ -428,23 +431,17 @@ schedule (Capability *initialCapability, Task *task)
 	}
     }
 
-#if defined(not_yet) && defined(SMP)
-    //
-    // Top up the run queue from our spark pool.  We try to make the
-    // number of threads in the run queue equal to the number of
-    // free capabilities.
-    //
+#if defined(SMP)
+    // If the run queue is empty, take a spark and turn it into a thread.
     {
-	StgClosure *spark;
-	if (emptyRunQueue()) {
-	    spark = findSpark(rtsFalse);
-	    if (spark == NULL) {
-		break; /* no more sparks in the pool */
-	    } else {
-		createSparkThread(spark);	  
+	if (emptyRunQueue(cap)) {
+	    StgClosure *spark;
+	    spark = findSpark(cap);
+	    if (spark != NULL) {
 		IF_DEBUG(scheduler,
-			 sched_belch("==^^ turning spark of closure %p into a thread",
+			 sched_belch("turning spark of closure %p into a thread",
 				     (StgClosure *)spark));
+		createSparkThread(cap,spark);	  
 	    }
 	}
     }
@@ -739,9 +736,10 @@ schedulePushWork(Capability *cap USED_WHEN_SMP,
     Capability *free_caps[n_capabilities], *cap0;
     nat i, n_free_caps;
 
-    // Check whether we have more threads on our run queue that we
-    // could hand to another Capability.
-    if (emptyRunQueue(cap) || cap->run_queue_hd->link == END_TSO_QUEUE) {
+    // Check whether we have more threads on our run queue, or sparks
+    // in our pool, that we could hand to another Capability.
+    if ((emptyRunQueue(cap) || cap->run_queue_hd->link == END_TSO_QUEUE)
+	&& sparkPoolSizeCap(cap) < 2) {
 	return;
     }
 
@@ -772,31 +770,54 @@ schedulePushWork(Capability *cap USED_WHEN_SMP,
 
     if (n_free_caps > 0) {
 	StgTSO *prev, *t, *next;
+	rtsBool pushed_to_all;
+
 	IF_DEBUG(scheduler, sched_belch("excess threads on run queue and %d free capabilities, sharing...", n_free_caps));
 
-	prev = cap->run_queue_hd;
-	t = prev->link;
-	prev->link = END_TSO_QUEUE;
 	i = 0;
-	for (; t != END_TSO_QUEUE; t = next) {
-	    next = t->link;
-	    t->link = END_TSO_QUEUE;
-	    if (t->what_next == ThreadRelocated
-		|| t->bound == task) { // don't move my bound thread
-		prev->link = t;
-		prev = t;
-	    } else if (i == n_free_caps) {
-		i = 0;
-		// keep one for us
-		prev->link = t;
-		prev = t;
-	    } else {
-		appendToRunQueue(free_caps[i],t);
-		if (t->bound) { t->bound->cap = free_caps[i]; }
-		i++;
+	pushed_to_all = rtsFalse;
+
+	if (cap->run_queue_hd != END_TSO_QUEUE) {
+	    prev = cap->run_queue_hd;
+	    t = prev->link;
+	    prev->link = END_TSO_QUEUE;
+	    for (; t != END_TSO_QUEUE; t = next) {
+		next = t->link;
+		t->link = END_TSO_QUEUE;
+		if (t->what_next == ThreadRelocated
+		    || t->bound == task) { // don't move my bound thread
+		    prev->link = t;
+		    prev = t;
+		} else if (i == n_free_caps) {
+		    pushed_to_all = rtsTrue;
+		    i = 0;
+		    // keep one for us
+		    prev->link = t;
+		    prev = t;
+		} else {
+		    appendToRunQueue(free_caps[i],t);
+		    if (t->bound) { t->bound->cap = free_caps[i]; }
+		    i++;
+		}
+	    }
+	    cap->run_queue_tl = prev;
+	}
+
+	// If there are some free capabilities that we didn't push any
+	// threads to, then try to push a spark to each one.
+	if (!pushed_to_all) {
+	    StgClosure *spark;
+	    // i is the next free capability to push to
+	    for (; i < n_free_caps; i++) {
+		if (emptySparkPoolCap(free_caps[i])) {
+		    spark = findSpark(cap);
+		    if (spark != NULL) {
+			IF_DEBUG(scheduler, sched_belch("pushing spark %p to capability %d", spark, free_caps[i]->no));
+			newSpark(&(free_caps[i]->r), spark);
+		    }
+		}
 	    }
 	}
-	cap->run_queue_tl = prev;
 
 	// release the capabilities
 	for (i = 0; i < n_free_caps; i++) {
@@ -812,15 +833,20 @@ schedulePushWork(Capability *cap USED_WHEN_SMP,
  * Start any pending signal handlers
  * ------------------------------------------------------------------------- */
 
+#if defined(RTS_USER_SIGNALS) && (!defined(THREADED_RTS) || defined(mingw32_HOST_OS))
 static void
 scheduleStartSignalHandlers(Capability *cap)
 {
-#if defined(RTS_USER_SIGNALS) && (!defined(THREADED_RTS) || defined(mingw32_HOST_OS))
     if (signals_pending()) { // safe outside the lock
 	startSignalHandlers(cap);
     }
-#endif
 }
+#else
+static void
+scheduleStartSignalHandlers(Capability *cap STG_UNUSED)
+{
+}
+#endif
 
 /* ----------------------------------------------------------------------------
  * Check for blocked threads that can be woken up.
@@ -1926,7 +1952,7 @@ scheduleDoGC( Capability *cap, Task *task USED_WHEN_SMP, rtsBool force_major )
 			// ATOMICALLY_FRAME, aborting the (nested)
 			// transaction, and saving the stack of any
 			// partially-evaluated thunks on the heap.
-			raiseAsync_(cap, t, NULL, rtsTrue);
+			raiseAsync_(cap, t, NULL, rtsTrue, NULL);
 			
 #ifdef REG_R1
 			ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
@@ -2165,7 +2191,7 @@ suspendThread (StgRegTable *reg)
   // XXX this might not be necessary --SDM
   tso->what_next = ThreadRunGHC;
 
-  threadPaused(tso);
+  threadPaused(cap,tso);
 
   if(tso->blocked_exceptions == NULL)  {
       tso->why_blocked = BlockedOnCCall;
@@ -2660,6 +2686,10 @@ initScheduler(void)
 
   initTaskManager();
 
+#if defined(SMP) || defined(PARALLEL_HASKELL)
+  initSparkPools();
+#endif
+
 #if defined(SMP)
   /*
    * Eagerly start one worker to run each Capability, except for
@@ -2677,10 +2707,6 @@ initScheduler(void)
 	  RELEASE_LOCK(&cap->lock);
       }
   }
-#endif
-
-#if /* defined(SMP) ||*/ defined(PARALLEL_HASKELL)
-  initSparkPools();
 #endif
 
   RELEASE_LOCK(&sched_mutex);
@@ -2772,7 +2798,7 @@ GetRoots( evac_fn evac )
 
     evac((StgClosure **)&blackhole_queue);
 
-#if defined(PARALLEL_HASKELL) || defined(GRAN)
+#if defined(SMP) || defined(PARALLEL_HASKELL) || defined(GRAN)
     markSparkQueue(evac);
 #endif
     
@@ -3607,15 +3633,22 @@ checkBlackHoles (Capability *cap)
 void
 raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception)
 {
-    raiseAsync_(cap, tso, exception, rtsFalse);
+    raiseAsync_(cap, tso, exception, rtsFalse, NULL);
+}
+
+void
+suspendComputation(Capability *cap, StgTSO *tso, StgPtr stop_here)
+{
+    raiseAsync_(cap, tso, NULL, rtsFalse, stop_here);
 }
 
 static void
 raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception, 
-	    rtsBool stop_at_atomically)
+	    rtsBool stop_at_atomically, StgPtr stop_here)
 {
     StgRetInfoTable *info;
-    StgPtr sp;
+    StgPtr sp, frame;
+    nat i;
   
     // Thread already dead?
     if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
@@ -3640,8 +3673,8 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 	sp[0] = (W_)&stg_dummy_ret_closure;
     }
 
-    while (1) {
-	nat i;
+    frame = sp + 1;
+    while (stop_here == NULL || frame < stop_here) {
 
 	// 1. Let the top of the stack be the "current closure"
 	//
@@ -3661,95 +3694,10 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
         // NB: if we pass an ATOMICALLY_FRAME then abort the associated 
         // transaction
        
-	
-	StgPtr frame;
-	
-	frame = sp + 1;
 	info = get_ret_itbl((StgClosure *)frame);
-	
-	while (info->i.type != UPDATE_FRAME
-	       && (info->i.type != CATCH_FRAME || exception == NULL)
-	       && info->i.type != STOP_FRAME
-	       && (info->i.type != ATOMICALLY_FRAME || stop_at_atomically == rtsFalse))
-	{
-            if (info->i.type == CATCH_RETRY_FRAME || info->i.type == ATOMICALLY_FRAME) {
-              // IF we find an ATOMICALLY_FRAME then we abort the
-              // current transaction and propagate the exception.  In
-              // this case (unlike ordinary exceptions) we do not care
-              // whether the transaction is valid or not because its
-              // possible validity cannot have caused the exception
-              // and will not be visible after the abort.
-              IF_DEBUG(stm,
-                       debugBelch("Found atomically block delivering async exception\n"));
-              stmAbortTransaction(tso -> trec);
-              tso -> trec = stmGetEnclosingTRec(tso -> trec);
-            }
-	    frame += stack_frame_sizeW((StgClosure *)frame);
-	    info = get_ret_itbl((StgClosure *)frame);
-	}
-	
-	switch (info->i.type) {
-	    
-	case ATOMICALLY_FRAME:
-	    ASSERT(stop_at_atomically);
-	    ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
-	    stmCondemnTransaction(tso -> trec);
-#ifdef REG_R1
-	    tso->sp = frame;
-#else
-	    // R1 is not a register: the return convention for IO in
-	    // this case puts the return value on the stack, so we
-	    // need to set up the stack to return to the atomically
-	    // frame properly...
-	    tso->sp = frame - 2;
-	    tso->sp[1] = (StgWord) &stg_NO_FINALIZER_closure; // why not?
-	    tso->sp[0] = (StgWord) &stg_ut_1_0_unreg_info;
-#endif
-	    tso->what_next = ThreadRunGHC;
-	    return;
 
-	case CATCH_FRAME:
-	    // If we find a CATCH_FRAME, and we've got an exception to raise,
-	    // then build the THUNK raise(exception), and leave it on
-	    // top of the CATCH_FRAME ready to enter.
-	    //
-	{
-#ifdef PROFILING
-	    StgCatchFrame *cf = (StgCatchFrame *)frame;
-#endif
-	    StgThunk *raise;
-	    
-	    // we've got an exception to raise, so let's pass it to the
-	    // handler in this frame.
-	    //
-	    raise = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+MIN_UPD_SIZE);
-	    TICK_ALLOC_SE_THK(1,0);
-	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
-	    raise->payload[0] = exception;
-	    
-	    // throw away the stack from Sp up to the CATCH_FRAME.
-	    //
-	    sp = frame - 1;
-	    
-	    /* Ensure that async excpetions are blocked now, so we don't get
-	     * a surprise exception before we get around to executing the
-	     * handler.
-	     */
-	    if (tso->blocked_exceptions == NULL) {
-		tso->blocked_exceptions = END_TSO_QUEUE;
-	    }
-	    
-	    /* Put the newly-built THUNK on top of the stack, ready to execute
-	     * when the thread restarts.
-	     */
-	    sp[0] = (W_)raise;
-	    sp[-1] = (W_)&stg_enter_info;
-	    tso->sp = sp-1;
-	    tso->what_next = ThreadRunGHC;
-	    IF_DEBUG(sanity, checkTSO(tso));
-	    return;
-	}
-	
+	switch (info->i.type) {
+
 	case UPDATE_FRAME:
 	{
 	    StgAP_STACK * ap;
@@ -3780,9 +3728,7 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 		     printObj((StgClosure *)ap);
 		);
 
-	    // Replace the updatee with an indirection - happily
-	    // this will also wake up any threads currently
-	    // waiting on the result.
+	    // Replace the updatee with an indirection
 	    //
 	    // Warning: if we're in a loop, more than one update frame on
 	    // the stack may point to the same object.  Be careful not to
@@ -3799,20 +3745,104 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    }
 	    sp += sizeofW(StgUpdateFrame) - 1;
 	    sp[0] = (W_)ap; // push onto stack
+	    frame = sp + 1;
 	    break;
 	}
-	
+
 	case STOP_FRAME:
 	    // We've stripped the entire stack, the thread is now dead.
 	    tso->what_next = ThreadKilled;
 	    tso->sp = frame + sizeofW(StgStopFrame);
 	    return;
+
+	case CATCH_FRAME:
+	    // If we find a CATCH_FRAME, and we've got an exception to raise,
+	    // then build the THUNK raise(exception), and leave it on
+	    // top of the CATCH_FRAME ready to enter.
+	    //
+	{
+#ifdef PROFILING
+	    StgCatchFrame *cf = (StgCatchFrame *)frame;
+#endif
+	    StgThunk *raise;
+	    
+	    if (exception == NULL) break;
+
+	    // we've got an exception to raise, so let's pass it to the
+	    // handler in this frame.
+	    //
+	    raise = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+MIN_UPD_SIZE);
+	    TICK_ALLOC_SE_THK(1,0);
+	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
+	    raise->payload[0] = exception;
+	    
+	    // throw away the stack from Sp up to the CATCH_FRAME.
+	    //
+	    sp = frame - 1;
+	    
+	    /* Ensure that async excpetions are blocked now, so we don't get
+	     * a surprise exception before we get around to executing the
+	     * handler.
+	     */
+	    if (tso->blocked_exceptions == NULL) {
+		tso->blocked_exceptions = END_TSO_QUEUE;
+	    }
+
+	    /* Put the newly-built THUNK on top of the stack, ready to execute
+	     * when the thread restarts.
+	     */
+	    sp[0] = (W_)raise;
+	    sp[-1] = (W_)&stg_enter_info;
+	    tso->sp = sp-1;
+	    tso->what_next = ThreadRunGHC;
+	    IF_DEBUG(sanity, checkTSO(tso));
+	    return;
+	}
+	    
+	case ATOMICALLY_FRAME:
+	    if (stop_at_atomically) {
+		ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
+		stmCondemnTransaction(tso -> trec);
+#ifdef REG_R1
+		tso->sp = frame;
+#else
+		// R1 is not a register: the return convention for IO in
+		// this case puts the return value on the stack, so we
+		// need to set up the stack to return to the atomically
+		// frame properly...
+		tso->sp = frame - 2;
+		tso->sp[1] = (StgWord) &stg_NO_FINALIZER_closure; // why not?
+		tso->sp[0] = (StgWord) &stg_ut_1_0_unreg_info;
+#endif
+		tso->what_next = ThreadRunGHC;
+		return;
+	    }
+	    // Not stop_at_atomically... fall through and abort the
+	    // transaction.
+	    
+	case CATCH_RETRY_FRAME:
+	    // IF we find an ATOMICALLY_FRAME then we abort the
+	    // current transaction and propagate the exception.  In
+	    // this case (unlike ordinary exceptions) we do not care
+	    // whether the transaction is valid or not because its
+	    // possible validity cannot have caused the exception
+	    // and will not be visible after the abort.
+	    IF_DEBUG(stm,
+		     debugBelch("Found atomically block delivering async exception\n"));
+	    stmAbortTransaction(tso -> trec);
+	    tso -> trec = stmGetEnclosingTRec(tso -> trec);
+	    break;
 	    
 	default:
-	    barf("raiseAsync");
+	    break;
 	}
+
+	// move on to the next stack frame
+	frame += stack_frame_sizeW((StgClosure *)frame);
     }
-    barf("raiseAsync");
+
+    // if we got here, then we stopped at stop_here
+    ASSERT(stop_here != NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -4156,6 +4186,7 @@ printAllThreads(void)
       }
   }
 
+  debugBelch("other threads:\n");
   for (t = all_threads; t != END_TSO_QUEUE; t = next) {
       if (t->why_blocked != NotBlocked) {
 	  printThreadStatus(t);

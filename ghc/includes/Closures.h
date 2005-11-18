@@ -339,6 +339,11 @@ typedef struct {
  *   - In StgTRecHeader, it might be worthwhile having separate chunks
  *     of read-only and read-write locations.  This would save a
  *     new_value field in the read-only locations.
+ *
+ *   - In StgAtomicallyFrame, we could combine the waiting bit into
+ *     the header (maybe a different info tbl for a waiting transaction).
+ *     This means we can specialise the code for the atomically frame
+ *     (it immediately switches on frame->waiting anyway).
  */
 
 typedef struct StgTVarWaitQueue_ {

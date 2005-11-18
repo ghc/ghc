@@ -37,6 +37,7 @@
 
 /* Stack frames */
 RTS_RET_INFO(stg_upd_frame_info);
+RTS_RET_INFO(stg_marked_upd_frame_info);
 RTS_RET_INFO(stg_noupd_frame_info);
 RTS_RET_INFO(stg_seq_frame_info);
 RTS_RET_INFO(stg_catch_frame_info);
@@ -45,6 +46,7 @@ RTS_RET_INFO(stg_atomically_frame_info);
 RTS_RET_INFO(stg_catch_stm_frame_info);
 
 RTS_ENTRY(stg_upd_frame_ret);
+RTS_ENTRY(stg_marked_upd_frame_ret);
 RTS_ENTRY(stg_seq_frame_ret);
 
 /* Entry code for constructors created by the bytecode interpreter */

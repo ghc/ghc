@@ -24,21 +24,29 @@
 
 #include "gmp.h" // Needs MP_INT definition 
 
-/* 
- * This is the table that holds shadow-locations for all the STG
- * registers.  The shadow locations are used when:
- *
- *     1) the particular register isn't mapped to a real machine
- *        register, probably because there's a shortage of real registers.
- *     2) caller-saves registers are saved across a CCall
+/*
+ * Spark pools: used to store pending sparks (SMP & PARALLEL_HASKELL only)
+ * This is a circular buffer.  Invariants:
+ *    - base <= hd < lim
+ *    - base <= tl < lim
+ *    - if hd==tl, then the pool is empty.
+ *    - if hd == tl+1, then the pool is full.
+ * Adding to the pool is done by assigning to *tl++ (wrapping round as
+ * necessary).  When adding to a full pool, we have the option of
+ * throwing away either the oldest (hd++) or the most recent (tl--) entry.
  */
-
 typedef struct StgSparkPool_ {
   StgClosure **base;
   StgClosure **lim;
   StgClosure **hd;
   StgClosure **tl;
 } StgSparkPool;
+
+#define ASSERT_SPARK_POOL_INVARIANTS(p)		\
+  ASSERT((p)->base <= (p)->hd);			\
+  ASSERT((p)->hd < (p)->lim);			\
+  ASSERT((p)->base <= (p)->tl);			\
+  ASSERT((p)->tl < (p)->lim);
 
 typedef struct {
   StgFunPtr      stgGCEnter1;
@@ -64,6 +72,14 @@ typedef union {
     StgTSOPtr      t;
 } StgUnion;
 
+/* 
+ * This is the table that holds shadow-locations for all the STG
+ * registers.  The shadow locations are used when:
+ *
+ *     1) the particular register isn't mapped to a real machine
+ *        register, probably because there's a shortage of real registers.
+ *     2) caller-saves registers are saved across a CCall
+ */
 typedef struct StgRegTable_ {
   StgUnion 	  rR1;
   StgUnion   	  rR2;

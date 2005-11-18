@@ -102,6 +102,20 @@ INFO_TABLE_RET( stg_upd_frame,
 	    )
 UPD_FRAME_ENTRY_TEMPLATE(,stg_IND_direct_info,%ENTRY_CODE(Sp(0)))
 
+
+INFO_TABLE_RET( stg_marked_upd_frame, 
+	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME,
+	    stg_upd_frame_0_ret,
+	    stg_upd_frame_1_ret,
+	    stg_upd_frame_2_ret,
+	    stg_upd_frame_3_ret,
+	    stg_upd_frame_4_ret,
+	    stg_upd_frame_5_ret,
+	    stg_upd_frame_6_ret,
+	    stg_upd_frame_7_ret
+	    )
+UPD_FRAME_ENTRY_TEMPLATE(,stg_IND_direct_info,%ENTRY_CODE(Sp(0)))
+
 /*-----------------------------------------------------------------------------
   Seq frames 
 

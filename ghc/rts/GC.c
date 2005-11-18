@@ -4250,74 +4250,6 @@ gcCAFs(void)
 
 
 /* -----------------------------------------------------------------------------
-   Lazy black holing.
-
-   Whenever a thread returns to the scheduler after possibly doing
-   some work, we have to run down the stack and black-hole all the
-   closures referred to by update frames.
-   -------------------------------------------------------------------------- */
-
-static void
-threadLazyBlackHole(StgTSO *tso)
-{
-    StgClosure *frame;
-    StgRetInfoTable *info;
-    StgClosure *bh;
-    StgPtr stack_end;
-    
-    stack_end = &tso->stack[tso->stack_size];
-    
-    frame = (StgClosure *)tso->sp;
-
-    while (1) {
-	info = get_ret_itbl(frame);
-	
-	switch (info->i.type) {
-	    
-	case UPDATE_FRAME:
-	    bh = ((StgUpdateFrame *)frame)->updatee;
-	    
-	    /* if the thunk is already blackholed, it means we've also
-	     * already blackholed the rest of the thunks on this stack,
-	     * so we can stop early.
-	     *
-	     * The blackhole made for a CAF is a CAF_BLACKHOLE, so they
-	     * don't interfere with this optimisation.
-	     */
-	    if (bh->header.info == &stg_BLACKHOLE_info) {
-		return;
-	    }
-	    
-	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
-#if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		debugBelch("Unexpected lazy BHing required at 0x%04lx\n",(long)bh);
-#endif
-#ifdef PROFILING
-		// @LDV profiling
-		// We pretend that bh is now dead.
-		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
-#endif
-		SET_INFO(bh,&stg_BLACKHOLE_info);
-
-		// We pretend that bh has just been created.
-		LDV_RECORD_CREATE(bh);
-	    }
-	    
-	    frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
-	    break;
-	    
-	case STOP_FRAME:
-	    return;
-	    
-	    // normal stack frames; do nothing except advance the pointer
-	default:
-	    frame = (StgClosure *)((StgPtr)frame + stack_frame_sizeW(frame));
-	}
-    }
-}
-
-
-/* -----------------------------------------------------------------------------
  * Stack squeezing
  *
  * Code largely pinched from old RTS, then hacked to bits.  We also do
@@ -4328,12 +4260,11 @@ threadLazyBlackHole(StgTSO *tso)
 struct stack_gap { StgWord gap_size; struct stack_gap *next_gap; };
 
 static void
-threadSqueezeStack(StgTSO *tso)
+stackSqueeze(StgTSO *tso, StgPtr bottom)
 {
     StgPtr frame;
     rtsBool prev_was_update_frame;
     StgClosure *updatee = NULL;
-    StgPtr bottom;
     StgRetInfoTable *info;
     StgWord current_gap_size;
     struct stack_gap *gap;
@@ -4343,8 +4274,6 @@ threadSqueezeStack(StgTSO *tso)
     //    with a single update frame and a "stack gap".  A stack gap
     //    contains two values: the size of the gap, and the distance
     //    to the next gap (or the stack top).
-
-    bottom = &(tso->stack[tso->stack_size]);
 
     frame = tso->sp;
 
@@ -4362,20 +4291,6 @@ threadSqueezeStack(StgTSO *tso)
 	case UPDATE_FRAME:
 	{ 
 	    StgUpdateFrame *upd = (StgUpdateFrame *)frame;
-
-	    if (upd->updatee->header.info == &stg_BLACKHOLE_info) {
-
-		// found a BLACKHOLE'd update frame; we've been here
-		// before, in a previous GC, so just break out.
-
-		// Mark the end of the gap, if we're in one.
-		if (current_gap_size != 0) {
-		    gap = (struct stack_gap *)(frame-sizeofW(StgUpdateFrame));
-		}
-		
-		frame += sizeofW(StgUpdateFrame);
-		goto done_traversing;
-	    }
 
 	    if (prev_was_update_frame) {
 
@@ -4409,31 +4324,6 @@ threadSqueezeStack(StgTSO *tso)
 
 	    // single update frame, or the topmost update frame in a series
 	    else {
-		StgClosure *bh = upd->updatee;
-
-		// Do lazy black-holing
-		if (bh->header.info != &stg_BLACKHOLE_info &&
-		    bh->header.info != &stg_CAF_BLACKHOLE_info) {
-#if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		    debugBelch("Unexpected lazy BHing required at 0x%04lx",(long)bh);
-#endif
-#ifdef DEBUG
-		    // zero out the slop so that the sanity checker can tell
-		    // where the next closure is.
-		    DEBUG_FILL_SLOP(bh);
-#endif
-#ifdef PROFILING
-		    // We pretend that bh is now dead.
-		    // ToDo: is the slop filling the same as DEBUG_FILL_SLOP?
-		    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
-#endif
-		    // Todo: maybe use SET_HDR() and remove LDV_RECORD_CREATE()?
-		    SET_INFO(bh,&stg_BLACKHOLE_info);
-
-		    // We pretend that bh has just been created.
-		    LDV_RECORD_CREATE(bh);
-		}
-
 		prev_was_update_frame = rtsTrue;
 		updatee = upd->updatee;
 		frame += sizeofW(StgUpdateFrame);
@@ -4456,8 +4346,10 @@ threadSqueezeStack(StgTSO *tso)
 	}
     }
 
-done_traversing:
-	    
+    if (current_gap_size != 0) {
+	gap = (struct stack_gap *) (frame - sizeofW(StgUpdateFrame));
+    }
+
     // Now we have a stack with gaps in it, and we have to walk down
     // shoving the stack up to fill in the gaps.  A diagram might
     // help:
@@ -4515,12 +4407,110 @@ done_traversing:
  * turned on.
  * -------------------------------------------------------------------------- */
 void
-threadPaused(StgTSO *tso)
+threadPaused(Capability *cap, StgTSO *tso)
 {
-  if ( RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue )
-    threadSqueezeStack(tso);	// does black holing too 
-  else
-    threadLazyBlackHole(tso);
+    StgClosure *frame;
+    StgRetInfoTable *info;
+    StgClosure *bh;
+    StgPtr stack_end;
+    nat words_to_squeeze = 0;
+    nat weight           = 0;
+    nat weight_pending   = 0;
+    rtsBool prev_was_update_frame;
+    
+    stack_end = &tso->stack[tso->stack_size];
+    
+    frame = (StgClosure *)tso->sp;
+
+    while (1) {
+	// If we've already marked this frame, then stop here.
+	if (frame->header.info == (StgInfoTable *)&stg_marked_upd_frame_info) {
+	    goto end;
+	}
+
+	info = get_ret_itbl(frame);
+	
+	switch (info->i.type) {
+	    
+	case UPDATE_FRAME:
+
+	    SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
+
+	    bh = ((StgUpdateFrame *)frame)->updatee;
+
+	    if (closure_IND(bh) || bh->header.info == &stg_BLACKHOLE_info) {
+		IF_DEBUG(squeeze, debugBelch("suspending duplicate work: %d words of stack\n", (StgPtr)frame - tso->sp));
+
+		// If this closure is already an indirection, then
+		// suspend the computation up to this point:
+		suspendComputation(cap,tso,(StgPtr)frame);
+
+		// Now drop the update frame, and arrange to return
+		// the value to the frame underneath:
+		tso->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - 2;
+		tso->sp[1] = (StgWord)bh;
+		tso->sp[0] = (W_)&stg_enter_info;
+
+		// And continue with threadPaused; there might be
+		// yet more computation to suspend.
+		threadPaused(cap,tso);
+		return;
+	    }
+
+	    if (bh->header.info != &stg_CAF_BLACKHOLE_info) {
+#if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
+		debugBelch("Unexpected lazy BHing required at 0x%04lx\n",(long)bh);
+#endif
+		// zero out the slop so that the sanity checker can tell
+		// where the next closure is.
+		DEBUG_FILL_SLOP(bh);
+#ifdef PROFILING
+		// @LDV profiling
+		// We pretend that bh is now dead.
+		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+#endif
+		SET_INFO(bh,&stg_BLACKHOLE_info);
+
+		// We pretend that bh has just been created.
+		LDV_RECORD_CREATE(bh);
+	    }
+	    
+	    frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
+	    if (prev_was_update_frame) {
+		words_to_squeeze += sizeofW(StgUpdateFrame);
+		weight += weight_pending;
+		weight_pending = 0;
+	    }
+	    prev_was_update_frame = rtsTrue;
+	    break;
+	    
+	case STOP_FRAME:
+	    goto end;
+	    
+	    // normal stack frames; do nothing except advance the pointer
+	default:
+	{
+	    nat frame_size = stack_frame_sizeW(frame);
+	    weight_pending += frame_size;
+	    frame = (StgClosure *)((StgPtr)frame + frame_size);
+	    prev_was_update_frame = rtsFalse;
+	}
+	}
+    }
+
+end:
+    IF_DEBUG(squeeze, 
+	     debugBelch("words_to_squeeze: %d, weight: %d, squeeze: %s\n", 
+			words_to_squeeze, weight, 
+			weight < words_to_squeeze ? "YES" : "NO"));
+
+    // Should we squeeze or not?  Arbitrary heuristic: we squeeze if
+    // the number of words we have to shift down is less than the
+    // number of stack words we squeeze away by doing so.
+    if (1 /*RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
+	    weight < words_to_squeeze*/) {
+	stackSqueeze(tso, (StgPtr)frame);
+    }
 }
 
 /* -----------------------------------------------------------------------------

@@ -118,7 +118,7 @@ stg_returnToStackTop
 stg_returnToSched
 {
   SAVE_THREAD_STATE();
-  foreign "C" threadPaused(CurrentTSO);
+  foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
   jump StgReturn;
 }
 
@@ -139,7 +139,7 @@ stg_returnToSchedNotPaused
 stg_returnToSchedButFirst
 {
   SAVE_THREAD_STATE();
-  foreign "C" threadPaused(CurrentTSO);
+  foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
   jump R2;
 }
 

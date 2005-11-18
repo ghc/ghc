@@ -190,6 +190,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.gran		= rtsFalse;
     RtsFlags.DebugFlags.par		= rtsFalse;
     RtsFlags.DebugFlags.linker		= rtsFalse;
+    RtsFlags.DebugFlags.squeeze		= rtsFalse;
 #endif
 
 #if defined(PROFILING) || defined(PAR)
@@ -431,6 +432,7 @@ usage_text[] = {
 "  -DP  DEBUG: par",
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
+"  -Dz  DEBUG: stack squezing",
 "",
 #endif /* DEBUG */
 #if defined(SMP)
@@ -725,6 +727,9 @@ error = rtsTrue;
 			  break;
 		      case 'm':
 			  RtsFlags.DebugFlags.stm = rtsTrue;
+			  break;
+		      case 'z':
+			  RtsFlags.DebugFlags.squeeze = rtsTrue;
 			  break;
 		      default:
 			  bad_option( rts_argv[arg] );

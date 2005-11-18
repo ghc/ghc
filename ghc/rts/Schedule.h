@@ -55,6 +55,14 @@ StgTSO * unblockOne(Capability *cap, StgTSO *tso);
  */
 void raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception);
 
+/* suspendComputation()
+ *
+ * A variant of raiseAsync(), this strips the stack of the specified
+ * thread down to the stop_here point, leaving a current closure on
+ * top of the stack at [stop_here - 1].
+ */
+void suspendComputation(Capability *cap, StgTSO *tso, StgPtr stop_here);
+
 /* raiseExceptionHelper */
 StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception);
 

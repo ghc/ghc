@@ -57,7 +57,7 @@
 #define RETURN_TO_SCHEDULER(todo,retcode)	\
    SAVE_STACK_POINTERS;				\
    cap->r.rCurrentTSO->what_next = (todo);	\
-   threadPaused(cap->r.rCurrentTSO);		\
+   threadPaused(cap,cap->r.rCurrentTSO);		\
    cap->r.rRet = (retcode);			\
    return cap;
 
