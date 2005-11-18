@@ -90,6 +90,12 @@ discardSparksCap (Capability *cap)
 { return discardSparks(&cap->r.rSparks); }
 
 
+#elif defined(THREADED_RTS) 
+
+INLINE_HEADER rtsBool
+emptySparkPoolCap (Capability *cap STG_UNUSED)
+{ return rtsTrue; }
+
 #endif
 
 #endif /* SPARKS_H */
