@@ -822,22 +822,26 @@ sub mangle_asm {
 			}
 		    }
 
-		    $p =~ s/^\tpushl\s+\%edi\n//;
-		    $p =~ s/^\tpushl\s+\%esi\n//;
-		    $p =~ s/^\tpushl\s+\%ebx\n//;
-		    $p =~ s/^\tmovl\s+\%esi,\s*\d*\(\%esp\)\n//;
-		    $p =~ s/^\tmovl\s+\%edi,\s*\d*\(\%esp\)\n//;
+		# gcc 3.4.3 puts this kind of stuff in the prologue, eg.
+		# when compiling PrimOps.cmm with -optc-O2:
+		#        xorl    %ecx, %ecx
+		#        xorl    %edx, %edx
+		#        movl    %ecx, 16(%esp)
+		#        movl    %edx, 20(%esp)
+		# but then the code of the function doesn't assume
+		# anything about the contnets of these stack locations.
+		# I think it's to do with the use of inline functions for
+		# PK_Word64() and friends, where gcc is initialising the
+		# contents of the struct to zero, and failing to optimise
+		# away the initialisation.  Let's live dangerously and
+		# discard these initalisations.
+
+		    $p =~ s/^\tpushl\s+\%e(di|si|bx)\n//g;
+		    $p =~ s/^\txorl\s+\%e(ax|cx|dx),\s*\%e(ax|cx|dx)\n//g;
+		    $p =~ s/^\tmovl\s+\%e(ax|cx|dx|si|di),\s*\d*\(\%esp\)\n//g;
+		    $p =~ s/^\tmovl\s+\$\d+,\s*\d*\(\%esp\)\n//g;
 		    $p =~ s/^\tsubl\s+\$\d+,\s*\%esp\n//;
                     $p =~ s/^\tmovl\s+\$\d+,\s*\%eax\n\tcall\s+__alloca\n// if ($TargetPlatform =~ /^.*-(cygwin32|mingw32)/);
-
-		    # GCC 3.1 is in the habit of adding spurious writes to the
-		    # stack in the prologue.  Just to be on the safe side,
-		    # chuck these over the fence into the main code.
-		    while ($p =~ /^\tmovl\s+\$\d+,\s*\d*\(\%esp\)\n/) {
-			  # print "Spurious instruction: $&";
-			  $p = $` . $';
-			  $r = $& . $r;
-		    }
 
                     if ($TargetPlatform =~ /^i386-apple-darwin/) {
                         $pcrel_label = $p;
