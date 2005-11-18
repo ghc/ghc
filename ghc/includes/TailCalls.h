@@ -87,10 +87,8 @@ extern void __DISCARD__(void);
 
 #define JMP_(cont)			\
     { 					\
-      void *__target;			\
       __DISCARD__();			\
-      __target = (void *)(cont);    	\
-      goto *__target; 	    	    	\
+      goto *(void *)(cont); 	    	    	\
     }
 
 #endif /* x86_64_HOST_ARCH */
