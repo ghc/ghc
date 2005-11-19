@@ -423,13 +423,10 @@ It's useful in the back end.
 \begin{code}
 repType :: Type -> Type
 -- Only applied to types of kind *; hence tycons are saturated
-repType (ForAllTy _ ty)   = repType ty
-repType (NoteTy   _ ty)   = repType ty
-repType (PredTy  p)       = repType (predTypeRep p)
-repType (TyConApp tc tys) 
-  | isNewTyCon tc 	  = ASSERT( tys `lengthIs` tyConArity tc )
-			    repType (new_type_rep tc tys)
-repType ty	 	  = ty
+repType (ForAllTy _ ty)   	     = repType ty
+repType (NoteTy   _ ty)   	     = repType ty
+repType ty | Just ty' <- coreView ty = repType ty'
+  	   | otherwise		     = ty
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
