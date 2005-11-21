@@ -217,8 +217,6 @@ hs_init(int *argc, char **argv[])
     startupAsyncIO();
 #endif
 
-    initSTM();
-
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {
 	initFrontPanel();

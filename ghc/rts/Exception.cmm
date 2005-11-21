@@ -360,7 +360,7 @@ retry_pop_stack:
       W_ r;
       trec = StgTSO_trec(CurrentTSO);
       r = foreign "C" stmValidateNestOfTransactions(trec "ptr");
-      foreign "C" stmAbortTransaction(trec "ptr");
+      foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       StgTSO_trec(CurrentTSO) = NO_TREC;
       if (r) {
         // Transaction was valid: continue searching for a catch frame
@@ -369,7 +369,7 @@ retry_pop_stack:
       } else {
         // Transaction was not valid: we retry the exception (otherwise continue
         // with a further call to raiseExceptionHelper)
-        "ptr" trec = foreign "C" stmStartTransaction(BaseReg "ptr", NO_TREC "ptr");
+        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgAtomicallyFrame_code(Sp);
         Sp_adj(-1);

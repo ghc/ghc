@@ -81,6 +81,12 @@ struct Capability_ {
     Task *returning_tasks_hd; // Singly-linked, with head/tail
     Task *returning_tasks_tl;
 #endif
+
+    // Per-capability STM-related data
+    StgTVarWaitQueue *free_tvar_wait_queues;
+    StgTRecChunk *free_trec_chunks;
+    StgTRecHeader *free_trec_headers;
+    nat transaction_tokens;
 }; // typedef Capability, defined in RtsAPI.h
 
 

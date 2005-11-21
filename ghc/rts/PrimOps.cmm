@@ -1048,7 +1048,7 @@ INFO_TABLE_RET(stg_atomically_frame,
    trec = StgTSO_trec(CurrentTSO);
    if (StgAtomicallyFrame_waiting(frame)) {
      /* The TSO is currently waiting: should we stop waiting? */
-     valid = foreign "C" stmReWait(CurrentTSO "ptr");
+     valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr");
      if (valid) {
        /* Previous attempt is still valid: no point trying again yet */
 	  IF_NOT_REG_R1(Sp_adj(-2);
@@ -1268,6 +1268,8 @@ retry_pop_stack:
       r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", other_trec "ptr");
       if (r) {
         r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr");
+      } else {
+        foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       }
       if (r) {
         // Merge between siblings succeeded: commit it back to enclosing transaction
