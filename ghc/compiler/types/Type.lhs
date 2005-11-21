@@ -423,10 +423,23 @@ It's useful in the back end.
 \begin{code}
 repType :: Type -> Type
 -- Only applied to types of kind *; hence tycons are saturated
-repType (ForAllTy _ ty)   	     = repType ty
-repType (NoteTy   _ ty)   	     = repType ty
 repType ty | Just ty' <- coreView ty = repType ty'
-  	   | otherwise		     = ty
+repType (ForAllTy _ ty)  = repType ty
+repType (TyConApp tc tys)
+  | isNewTyCon tc 	 = -- Recursive newtypes are opaque to coreView
+			   -- but we must expand them here.  Sure to
+			   -- be saturated because repType is only applied
+			   -- to types of kind *
+			   ASSERT( isRecursiveTyCon tc && 
+				   tys `lengthIs` tyConArity tc )
+			   repType (new_type_rep tc tys)
+repType ty = ty
+
+-- new_type_rep doesn't ask any questions: 
+-- it just expands newtype, whether recursive or not
+new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
+			     case newTyConRep new_tycon of
+				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
@@ -443,11 +456,6 @@ typePrimRep ty = case repType ty of
 	-- (we claim) there is no way to constrain f's kind any other
 	-- way.
 
--- new_type_rep doesn't ask any questions: 
--- it just expands newtype, whether recursive or not
-new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
-			     case newTyConRep new_tycon of
-				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 \end{code}
 
 
