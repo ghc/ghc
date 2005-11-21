@@ -46,12 +46,9 @@ extern "C" {
 
 /*----------------------------------------------------------------------
 
-   Start of day
-   ------------
-
+   GC interaction
+   --------------
 */
-
-extern void initSTM(void);
 
 extern void stmPreGCHook(void);
 
@@ -76,7 +73,7 @@ extern StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *
  * transaction contexts doomed to abort.
  */
 
-extern void stmAbortTransaction(StgTRecHeader *trec);
+extern void stmAbortTransaction(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Ensure that a subsequent commit / validation will fail.  We use this 
@@ -87,7 +84,7 @@ extern void stmAbortTransaction(StgTRecHeader *trec);
  * in case other threads' updates make it valid in the mean time.
  */
 
-extern void stmCondemnTransaction(StgTRecHeader *trec);
+extern void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Return the trec within which the specified trec was created (not
@@ -165,12 +162,14 @@ extern StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec);
  * Test whether the current transaction context is valid and, if so,
  * start the thread waiting for updates to any of the tvars it has
  * ready from and mark it as blocked.  It is an error to call stmWait
- * if the thread is already waiting.
+ * if the thread is already waiting.  
  */
 
 extern StgBool stmWait(Capability *cap,
                        StgTSO *tso, 
                        StgTRecHeader *trec);
+
+extern void stmWaitUnlock(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Test whether the current transaction context is valid and, if so,
@@ -180,7 +179,7 @@ extern StgBool stmWait(Capability *cap,
  * thread is not waiting.
  */
 
-extern StgBool stmReWait(StgTSO *tso);
+extern StgBool stmReWait(Capability *cap, StgTSO *tso);
 
 /*----------------------------------------------------------------------
 

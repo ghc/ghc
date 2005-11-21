@@ -358,7 +358,7 @@ typedef struct {
   StgClosure                *volatile current_value;
   StgTVarWaitQueue          *volatile first_wait_queue_entry;
 #if defined(SMP)
-  struct StgTRecHeader_     *volatile last_update_by;
+  StgInt                     volatile num_updates;
 #endif
 } StgTVar;
 
@@ -369,11 +369,11 @@ typedef struct {
   StgClosure                *expected_value;
   StgClosure                *new_value; 
 #if defined(SMP)
-  struct StgTRecHeader_     *saw_update_by;
+  StgInt                     num_updates;
 #endif
 } TRecEntry;
 
-#define TREC_CHUNK_NUM_ENTRIES 256
+#define TREC_CHUNK_NUM_ENTRIES 16
 
 typedef struct StgTRecChunk_ {
   StgHeader                  header;
