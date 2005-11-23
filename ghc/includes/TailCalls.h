@@ -249,6 +249,8 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
   function and these markers is shredded by the mangler.
   -------------------------------------------------------------------------- */
 
+#ifndef FB_
+#if __GNUC__ < 3
 /*  The following __DISCARD__() has become necessary with gcc 2.96 on x86.
  *  It prevents gcc from moving stack manipulation code from the function
  *  body (aka the Real Code) into the function prologue, ie, from moving it
@@ -258,9 +260,17 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
  *  it just doesn't choose to do it at the moment.
  *  -= chak
  */
- 
-#ifndef FB_
 #define FB_    __asm__ volatile ("--- BEGIN ---"); __DISCARD__ ();
+#else
+/* The __DISCARD__() doesn't appear to be necessary with gcc >= 3.2 at
+ * least, and it does cause some difficulty, preventing gcc from
+ * optimising around the beginning of the function.  In particular,
+ * gcc leaves some stack assignments in the prologue when the call is
+ * present. --SDM
+
+ */
+#define FB_    __asm__ volatile ("--- BEGIN ---");
+#endif
 #endif
 
 #ifndef FE_
