@@ -330,7 +330,10 @@ link BatchCompile dflags batch_attempt_linking hpt
 				 <+> text "...")
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
-        staticLink dflags obj_files pkg_deps
+	let link = case ghcLink dflags of
+	        MkDLL       -> doMkDLL
+	        StaticLink  -> staticLink
+	link dflags obj_files pkg_deps
 
         debugTraceMsg dflags 3 (text "link: done")
 

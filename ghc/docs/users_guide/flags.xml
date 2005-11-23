@@ -173,12 +173,6 @@
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
-	    <row>
-	      <entry><option>--mk-dll</option></entry>
-	      <entry>DLL-creation mode (Windows only)</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
@@ -1284,6 +1278,12 @@
 	    <row>
 	      <entry><option>-main-is</option></entry>
 	      <entry>Set main function</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>--mk-dll</option></entry>
+	      <entry>DLL-creation mode (Windows only)</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
