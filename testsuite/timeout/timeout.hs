@@ -11,7 +11,7 @@ import System.IO (hPutStrLn, stderr)
 import System.Process
 import Control.Monad (when)
 #if !defined(mingw32_HOST_OS)
-import System.Process.Internals (ProcessHandle(ProcessHandle))
+import System.Process.Internals (mkProcessHandle)
 import System.Posix.Process (forkProcess, createSession)
 import System.Posix.Signals (installHandler, Handler(Catch),
                              signalProcessGroup, sigINT, sigTERM, sigKILL )
@@ -30,36 +30,37 @@ main = do
         forkIO (do threadDelay (read secs * 1000000)
                    putMVar m Nothing
                )
-        forkIO (do try (do p <- forkProcess $ do
+        forkIO (do try (do pid <- forkProcess $ do
                                createSession
                                r <- system cmd
                                exitWith r
-                           putMVar mp p
-                           r <- waitForProcess (ProcessHandle p)
+			   ph <- mkProcessHandle pid
+                           putMVar mp (pid,ph)
+                           r <- waitForProcess ph
                            putMVar m (Just r))
                    return ())
 
-        p <- takeMVar mp
+        (pid,ph) <- takeMVar mp
         r <- takeMVar m
         case r of
           Nothing -> do
-                killProcess p
+                killProcess pid ph
                 exitWith (ExitFailure 99)
           Just r -> do
                 exitWith r
     _other -> do hPutStrLn stderr "timeout: bad arguments"
                  exitWith (ExitFailure 1)
 
-killProcess p = do
-  try (signalProcessGroup sigTERM p)
+killProcess pid ph = do
+  try (signalProcessGroup sigTERM pid)
   checkReallyDead 10
   where
     checkReallyDead 0 = hPutStrLn stderr "checkReallyDead: Giving up"
     checkReallyDead (n+1) =
       do threadDelay (3*100000) -- 3/10 sec
-         m <- getProcessExitCode (ProcessHandle p)
+         m <- getProcessExitCode ph
          when (isNothing m) $ do
-             try (signalProcessGroup sigKILL p)
+             try (signalProcessGroup sigKILL pid)
              checkReallyDead n
 
 #else
