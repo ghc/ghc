@@ -507,6 +507,15 @@ GHCi runtime linker: fatal error: I found a duplicate definition for symbol
       </listitem>
     </varlistentry>
 
+    <varlistentry>
+      <term>Why doesn't GHC have a .NET back end?</term>
+
+      <listitem>
+	<para>See <ulink
+	    url="http://www.haskell.org/pipermail/glasgow-haskell-users/2005-January/007594.html">this message</ulink> for a detailed answer to this question.</para>
+      </listitem>
+    </varlistentry>
+      
   </variablelist>
 
 </chapter>
