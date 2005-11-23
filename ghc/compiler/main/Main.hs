@@ -405,7 +405,12 @@ showBanner cli_mode dflags = do
 	do hPutStr stderr "Glasgow Haskell Compiler, Version "
  	   hPutStr stderr cProjectVersion
 	   hPutStr stderr ", for Haskell 98, compiled by GHC version "
+#ifdef GHCI
+	   -- GHCI is only set when we are bootstrapping...
+ 	   hPutStrLn stderr cProjectVersion
+#else
 	   hPutStrLn stderr cBooterVersion
+#endif
 
 showVersion :: IO ()
 showVersion = do
