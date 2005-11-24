@@ -264,8 +264,8 @@ DEBUG_FILL_SLOP(StgClosure *p)
     W_ bd;							\
 								\
     DEBUG_FILL_SLOP(p1);					\
-    StgInd_indirectee(p1) = p2;					\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
+    StgInd_indirectee(p1) = p2;					\
     bd = Bdescr(p1);						\
     if (bdescr_gen_no(bd) != 0 :: CInt) {			\
       foreign "C" recordMutableCap(p1 "ptr",			\
