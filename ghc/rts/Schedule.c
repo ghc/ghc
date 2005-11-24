@@ -3746,7 +3746,7 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    sp += sizeofW(StgUpdateFrame) - 1;
 	    sp[0] = (W_)ap; // push onto stack
 	    frame = sp + 1;
-	    break;
+	    continue; //no need to bump frame
 	}
 
 	case STOP_FRAME:
