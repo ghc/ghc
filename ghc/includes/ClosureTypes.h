@@ -70,7 +70,7 @@
 #define BLACKHOLE	        46
 #define SE_BLACKHOLE		47
 #define SE_CAF_BLACKHOLE	48
-#define MVAR		        59
+#define MVAR		        49
 #define ARR_WORDS	        50
 #define MUT_ARR_PTRS	        51
 #define MUT_ARR_PTRS_FROZEN0    52
@@ -79,8 +79,8 @@
 #define WEAK		        55
 #define STABLE_NAME	        56
 #define TSO		        57
-#define BLOCKED_FETCH	        68
-#define FETCH_ME                69
+#define BLOCKED_FETCH	        58
+#define FETCH_ME                59
 #define FETCH_ME_BQ             60
 #define RBH                     61
 #define EVACUATED               62
@@ -89,8 +89,8 @@
 #define TVAR                    65
 #define TREC_CHUNK              66
 #define TREC_HEADER             67
-#define ATOMICALLY_FRAME        78
-#define CATCH_RETRY_FRAME       79
+#define ATOMICALLY_FRAME        68
+#define CATCH_RETRY_FRAME       69
 #define CATCH_STM_FRAME         70
 #define N_CLOSURE_TYPES         71
 
