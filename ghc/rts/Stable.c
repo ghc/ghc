@@ -17,6 +17,7 @@
 #include "Storage.h"
 #include "RtsAPI.h"
 #include "RtsFlags.h"
+#include "OSThreads.h"
 
 /* Comment from ADR's implementation in old RTS:
 
@@ -79,6 +80,8 @@ static snEntry *stable_ptr_free = NULL;
 
 static unsigned int SPT_size = 0;
 
+static Mutex stable_mutex;
+
 /* This hash table maps Haskell objects to stable names, so that every
  * call to lookupStableName on a given object will return the same
  * stable name.
@@ -140,6 +143,7 @@ initStablePtrTable(void)
     //
     // Also, getStablePtr is now called from __attribute__((constructor))
     // functions, so initialising things here wouldn't work anyway.
+    initMutex(&stable_mutex);
 }
 
 /*
@@ -163,8 +167,8 @@ removeIndirections(StgClosure* p)
   return q;
 }
 
-StgWord
-lookupStableName(StgPtr p)
+static StgWord
+lookupStableName_(StgPtr p)
 {
   StgWord sn;
   void* sn_tmp;
@@ -184,6 +188,7 @@ lookupStableName(StgPtr p)
   if (sn != 0) {
     ASSERT(stable_ptr_table[sn].addr == p);
     IF_DEBUG(stable,debugBelch("cached stable name %ld at %p\n",sn,p));
+    RELEASE_LOCK(&stable_mutex);
     return sn;
   } else {
     sn = stable_ptr_free - stable_ptr_table;
@@ -198,6 +203,16 @@ lookupStableName(StgPtr p)
 
     return sn;
   }
+}
+
+StgWord
+lookupStableName(StgPtr p)
+{
+    StgWord res;
+    ACQUIRE_LOCK(&stable_mutex);
+    res = lookupStableName_(p);
+    RELEASE_LOCK(&stable_mutex);
+    return res;
 }
 
 STATIC_INLINE void
@@ -216,15 +231,21 @@ getStablePtr(StgPtr p)
 {
   StgWord sn;
 
-  sn = lookupStableName(p);
+  ACQUIRE_LOCK(&stable_mutex);
+  sn = lookupStableName_(p);
   stable_ptr_table[sn].ref++;
+  RELEASE_LOCK(&stable_mutex);
   return (StgStablePtr)(sn);
 }
 
 void
 freeStablePtr(StgStablePtr sp)
 {
-    snEntry *sn = &stable_ptr_table[(StgWord)sp];
+    snEntry *sn;
+
+    ACQUIRE_LOCK(&stable_mutex);
+
+    sn = &stable_ptr_table[(StgWord)sp];
     
     ASSERT((StgWord)sp < SPT_size  &&  sn->addr != NULL  &&  sn->ref > 0);
 
@@ -236,6 +257,8 @@ freeStablePtr(StgStablePtr sp)
     if (sn->sn_obj == NULL && sn->ref == 0) {
 	freeStableName(sn);
     }
+
+    RELEASE_LOCK(&stable_mutex);
 }
 
 void
@@ -376,13 +399,13 @@ gcStablePtrTable( void )
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
-		    IF_DEBUG(stable, debugBelch("GC'd Stable name %d\n", 
+		    IF_DEBUG(stable, debugBelch("GC'd Stable name %ld\n", 
 						p - stable_ptr_table));
 		    continue;
 		    
 		} else {
 		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-		    IF_DEBUG(stable, debugBelch("Stable name %d still alive at %p, ref %ld\n", p - stable_ptr_table, p->addr, p->ref));
+		    IF_DEBUG(stable, debugBelch("Stable name %ld still alive at %p, ref %ld\n", p - stable_ptr_table, p->addr, p->ref));
 		}
 	    }
 	}
