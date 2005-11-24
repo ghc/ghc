@@ -257,14 +257,29 @@ dsExpr (HsCoreAnn fs expr)
     returnDs (Note (CoreNote $ unpackFS fs) core_expr)
 
 -- Special case to handle unboxed tuple patterns; they can't appear nested
+-- The idea is that 
+--	case e of (# p1, p2 #) -> rhs
+-- should desugar to
+--	case e of (# x1, x2 #) -> ... match p1, p2 ...
+-- NOT
+--	let x = e in case x of ....
+--
+-- But there may be a big 
+--	let fail = ... in case e of ...
+-- wrapping the whole case, which complicates matters slightly
+-- It all seems a bit fragile.  Test is dsrun013.
+
 dsExpr (HsCase discrim matches@(MatchGroup _ ty))
  | isUnboxedTupleType (funArgTy ty)
  =  dsLExpr discrim			`thenDs` \ core_discrim ->
     matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
-    case matching_code of
-	Case (Var x) bndr ty alts | x == discrim_var -> 
-		returnDs (Case core_discrim bndr ty alts)
-	_ -> panic ("dsLExpr: tuple pattern:\n" ++ showSDoc (ppr matching_code))
+    let
+	scrungle (Case (Var x) bndr ty alts) 
+		| x == discrim_var = Case core_discrim bndr ty alts
+	scrungle (Let binds body)  = Let binds (scrungle body)
+	scrungle other = panic ("dsLExpr: tuple pattern:\n" ++ showSDoc (ppr other))
+    in
+    returnDs (scrungle matching_code)
 
 dsExpr (HsCase discrim matches)
   = dsLExpr discrim			`thenDs` \ core_discrim ->
