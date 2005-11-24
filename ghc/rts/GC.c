@@ -3999,6 +3999,32 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     switch (info->i.type) {
 	
     case UPDATE_FRAME:
+	// In SMP, we can get update frames that point to indirections
+	// when two threads evaluate the same thunk.  We do attempt to
+	// discover this situation in threadPaused(), but it's
+	// possible that the following sequence occurs:
+	//
+	//        A             B
+	//                  enter T
+	//     enter T
+	//     blackhole T
+	//                  update T
+	//     GC
+	//
+	// Now T is an indirection, and the update frame is already
+	// marked on A's stack, so we won't traverse it again in
+	// threadPaused().  We could traverse the whole stack again
+	// before GC, but that seems like overkill.
+	//
+	// Scavenging this update frame as normal would be disastrous;
+	// the updatee would end up pointing to the value.  So we turn
+	// the indirection into an IND_PERM, so that evacuate will
+	// copy the indirection into the old generation instead of
+	// discarding it.
+	if (get_itbl(((StgUpdateFrame *)p)->updatee)->type == IND) {
+	    ((StgUpdateFrame *)p)->updatee->header.info = 
+		(StgInfoTable *)&stg_IND_PERM_info;
+	}
 	((StgUpdateFrame *)p)->updatee 
 	    = evacuate(((StgUpdateFrame *)p)->updatee);
 	p += sizeofW(StgUpdateFrame);
@@ -4430,7 +4456,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 	    bh = ((StgUpdateFrame *)frame)->updatee;
 
 	    if (closure_IND(bh) || bh->header.info == &stg_BLACKHOLE_info) {
-		IF_DEBUG(squeeze, debugBelch("suspending duplicate work: %d words of stack\n", (StgPtr)frame - tso->sp));
+		IF_DEBUG(squeeze, debugBelch("suspending duplicate work: %ld words of stack\n", (StgPtr)frame - tso->sp));
 
 		// If this closure is already an indirection, then
 		// suspend the computation up to this point:
