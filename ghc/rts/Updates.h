@@ -266,6 +266,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
     DEBUG_FILL_SLOP(p1);					\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
     StgInd_indirectee(p1) = p2;					\
+    foreign "C" wb() [];					\
     bd = Bdescr(p1);						\
     if (bdescr_gen_no(bd) != 0 :: CInt) {			\
       foreign "C" recordMutableCap(p1 "ptr",			\
@@ -291,6 +292,7 @@ DEBUG_FILL_SLOP(StgClosure *p)
     DEBUG_FILL_SLOP(p1);						\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);				\
     ((StgInd *)p1)->indirectee = p2;					\
+    wb();								\
     bd = Bdescr((P_)p1);						\
     if (bd->gen_no != 0) {						\
       recordMutableGenLock(p1, &generations[bd->gen_no]);		\
