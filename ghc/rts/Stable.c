@@ -80,7 +80,9 @@ static snEntry *stable_ptr_free = NULL;
 
 static unsigned int SPT_size = 0;
 
+#ifdef THREADED_RTS
 static Mutex stable_mutex;
+#endif
 
 /* This hash table maps Haskell objects to stable names, so that every
  * call to lookupStableName on a given object will return the same
@@ -143,7 +145,9 @@ initStablePtrTable(void)
     //
     // Also, getStablePtr is now called from __attribute__((constructor))
     // functions, so initialising things here wouldn't work anyway.
+#ifdef THREADED_RTS
     initMutex(&stable_mutex);
+#endif
 }
 
 /*
