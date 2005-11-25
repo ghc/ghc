@@ -192,7 +192,6 @@ lookupStableName_(StgPtr p)
   if (sn != 0) {
     ASSERT(stable_ptr_table[sn].addr == p);
     IF_DEBUG(stable,debugBelch("cached stable name %ld at %p\n",sn,p));
-    RELEASE_LOCK(&stable_mutex);
     return sn;
   } else {
     sn = stable_ptr_free - stable_ptr_table;
