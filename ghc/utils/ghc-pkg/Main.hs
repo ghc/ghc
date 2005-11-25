@@ -456,8 +456,21 @@ listPackages flags mPackageName = do
             map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs)) 
 		db_stack
         | otherwise = db_stack
+
+      db_stack_sorted 
+          = [ (db, sort_pkgs pkgs) | (db,pkgs) <- db_stack_filtered ]
+	  where sort_pkgs = sortBy cmpPkgIds
+		cmpPkgIds pkg1 pkg2 = 
+		   case pkgName p1 `compare` pkgName p2 of
+			LT -> LT
+			GT -> GT
+			EQ -> pkgVersion p1 `compare` pkgVersion p2
+		   where (p1,p2) = (package pkg1, package pkg2)
+
       show_func = if simple_output then show_easy else mapM_ show_regular
-  show_func (reverse db_stack_filtered)
+
+  show_func (reverse db_stack_sorted)
+
   where show_regular (db_name,pkg_confs) =
 	  hPutStrLn stdout (render $
 		text (db_name ++ ":") $$ nest 4 packages
@@ -467,6 +480,7 @@ listPackages flags mPackageName = do
 		   | exposed p = doc
 		   | otherwise = parens doc
 		   where doc = text (showPackageId (package p))
+
         show_easy db_stack = do
           let pkgs = map showPackageId $ sortBy compPkgIdVer $
                           map package (concatMap snd db_stack)
