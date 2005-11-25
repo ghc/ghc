@@ -55,8 +55,8 @@
       an <firstterm>interface file</firstterm>. </para>
 
       <para>The object file, which normally ends in a
-      <literal>.o</literal> suffix (or <literal>.obj</literal> if
-      you're on Windows), contains the compiled code for the module.</para>
+      <literal>.o</literal> suffix, contains the compiled code for the
+      module.</para>
 
       <para>The interface file,
       which normally ends in a <literal>.hi</literal> suffix, contains
