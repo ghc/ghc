@@ -2088,9 +2088,13 @@ forkProcess(HsStablePtr *entry
 	}
 	RELEASE_LOCK(&sched_mutex);
 
+	cap->suspended_ccalling_tasks = NULL;
+
 #if defined(THREADED_RTS)
 	// wipe our spare workers list.
 	cap->spare_workers = NULL;
+	cap->returning_tasks_hd = NULL;
+	cap->returning_tasks_tl = NULL;
 #endif
 
 	cap = rts_evalStableIO(cap, entry, NULL);  // run the action
