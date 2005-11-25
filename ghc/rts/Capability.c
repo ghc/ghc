@@ -217,7 +217,6 @@ giveCapabilityToTask (Capability *cap, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
-    // We are not modifying task->cap, so we do not need to take task->lock.
     IF_DEBUG(scheduler,
 	     sched_belch("passing capability %d to %s %p",
 			 cap->no, task->tso ? "bound task" : "worker",
@@ -248,7 +247,7 @@ releaseCapability_ (Capability* cap)
 
     task = cap->running_task;
 
-    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
 
     cap->running_task = NULL;
 
@@ -416,7 +415,7 @@ waitForReturnCapability (Capability **pCap,
 
     }
 
-    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     IF_DEBUG(scheduler,
 	     sched_belch("returning; got capability %d", cap->no));
@@ -435,15 +434,14 @@ yieldCapability (Capability** pCap, Task *task)
 {
     Capability *cap = *pCap;
 
-    // The fast path; no locking
-    if ( cap->returning_tasks_hd == NULL && anyWorkForMe(cap,task) )
-	return;
+    // The fast path has no locking, if we don't enter this while loop
 
     while ( cap->returning_tasks_hd != NULL || !anyWorkForMe(cap,task) ) {
 	IF_DEBUG(scheduler, sched_belch("giving up capability %d", cap->no));
 
 	// We must now release the capability and wait to be woken up
 	// again.
+	task->wakeup = rtsFalse;
 	releaseCapabilityAndQueueWorker(cap);
 
 	for (;;) {
@@ -457,6 +455,7 @@ yieldCapability (Capability** pCap, Task *task)
 	    IF_DEBUG(scheduler, sched_belch("woken up on capability %d", cap->no));
 	    ACQUIRE_LOCK(&cap->lock);
 	    if (cap->running_task != NULL) {
+		IF_DEBUG(scheduler, sched_belch("capability %d is owned by another task", cap->no));
 		RELEASE_LOCK(&cap->lock);
 		continue;
 	    }
@@ -484,7 +483,7 @@ yieldCapability (Capability** pCap, Task *task)
 
     *pCap = cap;
 
-    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     return;
 }

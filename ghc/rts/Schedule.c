@@ -387,7 +387,7 @@ schedule (Capability *initialCapability, Task *task)
 	  // thread for a bit, even if there are others banging at the
 	  // door.
 	  first = rtsFalse;
-	  ASSERT_CAPABILITY_INVARIANTS(cap,task);
+	  ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
       } else {
 	  // Yield the capability to higher-priority tasks if necessary.
 	  yieldCapability(&cap, task);
@@ -639,7 +639,7 @@ run_thread:
     }
 #endif
 
-    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     // ----------------------------------------------------------------------
     
@@ -681,7 +681,7 @@ run_thread:
 
     case ThreadFinished:
 	if (scheduleHandleThreadFinished(cap, task, t)) return cap;
-	ASSERT_CAPABILITY_INVARIANTS(cap,task);
+	ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 	break;
 
     default:
@@ -795,6 +795,7 @@ schedulePushWork(Capability *cap USED_WHEN_SMP,
 		    prev->link = t;
 		    prev = t;
 		} else {
+		    IF_DEBUG(scheduler, sched_belch("pushing thread %d to capability %d", t->id, free_caps[i]->no));
 		    appendToRunQueue(free_caps[i],t);
 		    if (t->bound) { t->bound->cap = free_caps[i]; }
 		    i++;
@@ -2599,7 +2600,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
     cap = schedule(cap,task);
 
     ASSERT(task->stat != NoStatus);
-    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     IF_DEBUG(scheduler, sched_belch("bound thread (%d) finished", task->tso->id));
     return cap;

@@ -578,7 +578,7 @@ rts_unlock (Capability *cap)
     Task *task;
 
     task = cap->running_task;
-    ASSERT_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     // slightly delicate ordering of operations below, pay attention!
 

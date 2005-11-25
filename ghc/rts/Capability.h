@@ -97,12 +97,20 @@ struct Capability_ {
 #endif
 
 // These properties should be true when a Task is holding a Capability
-#define ASSERT_CAPABILITY_INVARIANTS(cap,task)				\
+#define ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task)			\
   ASSERT(cap->running_task != NULL && cap->running_task == task);	\
   ASSERT(task->cap == cap);						\
-  ASSERT(cap->run_queue_hd == END_TSO_QUEUE ? 				\
-	    cap->run_queue_tl == END_TSO_QUEUE : 1);			\
-  ASSERT(myTask() == task);						\
+  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)
+
+// Sometimes a Task holds a Capability, but the Task is not associated
+// with that Capability (ie. task->cap != cap).  This happens when
+// (a) a Task holds multiple Capabilities, and (b) when the current
+// Task is bound, its thread has just blocked, and it may have been
+// moved to another Capability.
+#define ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)	\
+  ASSERT(cap->run_queue_hd == END_TSO_QUEUE ?		\
+	    cap->run_queue_tl == END_TSO_QUEUE : 1);	\
+  ASSERT(myTask() == task);				\
   ASSERT_TASK_ID(task);
 
 // Converts a *StgRegTable into a *Capability.
