@@ -113,6 +113,18 @@ unlockClosure(StgClosure *p, StgInfoTable *info)
 #endif
 }
 
-#endif /* SMP */
+#else /* !SMP */
+
+#define wb() /* nothing */
+
+INLINE_HEADER StgWord
+xchg(StgPtr p, StgWord w)
+{
+    StgWord old = *p;
+    *p = w;
+    return old;
+}
+
+#endif /* !SMP */
 
 #endif /* SMP_H */
