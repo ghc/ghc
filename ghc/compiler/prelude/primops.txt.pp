@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.36 2005/07/25 14:12:48 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.37 2005/11/25 09:46:19 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -24,8 +24,8 @@
 --		  abstract C operations.
 --		
 --	- or, for an out-of-line primop:
---	        ghc/includes/PrimOps.h (just add the declaration)
---		ghc/rts/PrimOps.hc     (define it here)
+--	        ghc/includes/StgMiscClosures.h (just add the declaration)
+--		ghc/rts/PrimOps.cmm     (define it here)
 --		ghc/rts/Linker.c       (declare the symbol for GHCi)
 --
 --	- the User's Guide 
