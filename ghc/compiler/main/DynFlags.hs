@@ -891,7 +891,7 @@ dynamic_flags = [
   ,  ( "dverbose-stg2stg",       setDumpFlag Opt_D_verbose_stg2stg)
   ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs))
   ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
-  ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
+  ,  ( "ddump-minimal-imports",  NoArg (setDynFlag Opt_D_dump_minimal_imports))
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
