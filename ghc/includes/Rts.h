@@ -84,6 +84,9 @@ extern void _assertFail (char *, unsigned int);
 /* Global constaints */
 #include "Constants.h"
 
+/* SMP definitions */
+#include "SMP.h"
+
 /* Profiling information */
 #include "StgProf.h"
 #include "StgLdvProf.h"
