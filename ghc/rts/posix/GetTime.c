@@ -113,7 +113,7 @@ void getProcessTimes(Ticks *user, Ticks *elapsed)
 
 Ticks getThreadCPUTime(void)
 {
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_THREAD_CPUTIME_ID)
     // clock_gettime() gives us per-thread CPU time.  It isn't
     // reliable on Linux, but it's the best we have.
     struct timespec ts;
