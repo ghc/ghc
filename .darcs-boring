@@ -1,6 +1,24 @@
 #Top-level dirs:
+^alex/
+^common-rts/
 ^compiler/
 ^CONTRIB/
+^dll/
+^greencard/
+^green-card/
+^haddock/
+^haggis/
+^happy/
+^hdirect/
+^hood/
+^hslibs/
+^hws/
+^hx/
+^libraries/
+^literate/
+^mhms/
+^mkworld/
+^nofib/
 ^includes/
 ^lib/
 ^misc/
@@ -8,6 +26,7 @@
 ^runtime/
 ^utils/
 ^driver/
+^testsuite/
 # Boring file regexps:
 #\.hi$
 \.o$
