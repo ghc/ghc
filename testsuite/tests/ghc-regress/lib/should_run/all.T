@@ -18,9 +18,10 @@ test('enum02', 		normal, compile_and_run, ['-cpp'])
 test('enum03', 		normal, compile_and_run, ['-cpp'])
 test('enum04', 		expect_fail, compile_and_run, [ ''])
 test('exceptions001', 	normal, compile_and_run, [''])
+test('exceptions002', 	normal, compile_and_run, [''])
 test('list001'	,	normal, compile_and_run, [''])
 
-test('memo001', extra_run_opts('+RTS -A10k -G1 -RTS'), \
+test('memo001', extra_run_opts('+RTS -A10k -RTS'), \
 	compile_and_run, ['-package util'])
 
 test('memo002', extra_run_opts('20'), \
