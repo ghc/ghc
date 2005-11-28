@@ -1021,11 +1021,11 @@ ATOMICALLY_FRAME_ERROR(stg_atomically_frame_7_ret)
 #endif
 
 #if defined(PROFILING)
-#define ATOMICALLY_FRAME_BITMAP 7
-#define ATOMICALLY_FRAME_WORDS  4
+#define ATOMICALLY_FRAME_BITMAP 3
+#define ATOMICALLY_FRAME_WORDS  3
 #else
-#define ATOMICALLY_FRAME_BITMAP 1
-#define ATOMICALLY_FRAME_WORDS  2
+#define ATOMICALLY_FRAME_BITMAP 0
+#define ATOMICALLY_FRAME_WORDS  1
 #endif
 
 
@@ -1041,49 +1041,65 @@ INFO_TABLE_RET(stg_atomically_frame,
 	       stg_atomically_frame_6_ret,
 	       stg_atomically_frame_7_ret)
 {
-   W_ frame, trec, valid;
-   IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
+  W_ frame, trec, valid;
+  IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
 
-   frame = Sp;
-   trec = StgTSO_trec(CurrentTSO);
-   if (StgAtomicallyFrame_waiting(frame)) {
-     /* The TSO is currently waiting: should we stop waiting? */
-     valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr");
-     if (valid) {
-       /* Previous attempt is still valid: no point trying again yet */
+  frame = Sp;
+  trec = StgTSO_trec(CurrentTSO);
+
+  /* The TSO is not currently waiting: try to commit the transaction */
+  valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr");
+  if (valid) {
+    /* Transaction was valid: commit succeeded */
+    StgTSO_trec(CurrentTSO) = NO_TREC;
+    Sp = Sp + SIZEOF_StgAtomicallyFrame;
+    IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)
+    jump %ENTRY_CODE(Sp(SP_OFF));
+  } else {
+    /* Transaction was not valid: try again */
+    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+    StgTSO_trec(CurrentTSO) = trec;
+    R1 = StgAtomicallyFrame_code(frame);
+    Sp_adj(-1);
+    jump RET_LBL(stg_ap_v);
+  }
+}
+
+INFO_TABLE_RET(stg_atomically_waiting_frame,
+	       ATOMICALLY_FRAME_WORDS, ATOMICALLY_FRAME_BITMAP,
+	       ATOMICALLY_FRAME,
+	       stg_atomically_frame_0_ret,
+	       stg_atomically_frame_1_ret,
+	       stg_atomically_frame_2_ret,
+	       stg_atomically_frame_3_ret,
+	       stg_atomically_frame_4_ret,
+	       stg_atomically_frame_5_ret,
+	       stg_atomically_frame_6_ret,
+	       stg_atomically_frame_7_ret)
+{
+  W_ frame, trec, valid;
+  IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
+
+  frame = Sp;
+
+  /* The TSO is currently waiting: should we stop waiting? */
+  valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr");
+  if (valid) {
+    /* Previous attempt is still valid: no point trying again yet */
 	  IF_NOT_REG_R1(Sp_adj(-2);
 			Sp(1) = stg_NO_FINALIZER_closure;
 		  	Sp(0) = stg_ut_1_0_unreg_info;)
-       jump stg_block_noregs;
-     } else {
-       /* Previous attempt is no longer valid: try again */
-       "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
-       StgTSO_trec(CurrentTSO) = trec;
-       StgAtomicallyFrame_waiting(frame) = 0 :: CInt; /* false; */
-       R1 = StgAtomicallyFrame_code(frame);
-       Sp_adj(-1);
-       jump RET_LBL(stg_ap_v);
-     }
-   } else {
-     /* The TSO is not currently waiting: try to commit the transaction */
-     valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr");
-     if (valid) {
-       /* Transaction was valid: commit succeeded */
-       StgTSO_trec(CurrentTSO) = NO_TREC;
-       Sp = Sp + SIZEOF_StgAtomicallyFrame;
-       IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)
-       jump %ENTRY_CODE(Sp(SP_OFF));
-     } else {
-       /* Transaction was not valid: try again */
-       "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
-       StgTSO_trec(CurrentTSO) = trec;
-       R1 = StgAtomicallyFrame_code(frame);
-       Sp_adj(-1);
-       jump RET_LBL(stg_ap_v);
-     }
-   }
+    jump stg_block_noregs;
+  } else {
+    /* Previous attempt is no longer valid: try again */
+    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+    StgTSO_trec(CurrentTSO) = trec;
+    StgHeader_info(frame) = stg_atomically_frame_info;
+    R1 = StgAtomicallyFrame_code(frame);
+    Sp_adj(-1);
+    jump RET_LBL(stg_ap_v);
+  }
 }
-
 
 // STM catch frame --------------------------------------------------------------
 
@@ -1161,7 +1177,6 @@ atomicallyzh_fast
   frame = Sp;
 
   SET_HDR(frame,stg_atomically_frame_info, W_[CCCS]);
-  StgAtomicallyFrame_waiting(frame) = 0 :: CInt; // False
   StgAtomicallyFrame_code(frame) = R1;
 
   /* Start the memory transcation */
@@ -1296,7 +1311,7 @@ retry_pop_stack:
   r = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
   if (r) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
-    StgAtomicallyFrame_waiting(frame) = 1 :: CInt; // true
+    StgHeader_info(frame) = stg_atomically_waiting_frame_info;
     Sp = frame;
     // Fix up the stack in the unregisterised case: the return convention is different.
     IF_NOT_REG_R1(Sp_adj(-2); 

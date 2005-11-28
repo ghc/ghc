@@ -348,7 +348,6 @@ main(int argc, char *argv[])
     closure_field(StgMutVar, var);
 
     closure_size(StgAtomicallyFrame);
-    closure_field(StgAtomicallyFrame, waiting);
     closure_field(StgAtomicallyFrame, code);
 
     closure_size(StgCatchSTMFrame);

@@ -399,7 +399,6 @@ typedef struct StgTRecHeader_ {
 
 typedef struct {
     StgHeader   header;
-    StgBool     waiting;
     StgClosure *code;
 } StgAtomicallyFrame;
 
