@@ -1,1 +1,1 @@
-{-# LANGUAGE ExtensibleRecords, RestrictedTypeSynonyms, HereDocuments, UnsafeOverlappingInstances, NamedFieldPuns #-}
+{-# LANGUAGE ExtensibleRecords, RestrictedTypeSynonyms, HereDocuments, NamedFieldPuns #-}
