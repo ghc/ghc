@@ -1209,7 +1209,7 @@ adding a new existential quantification construct.
 <title>Type classes</title>
 
 <para>
-An easy extension (implemented in <command>hbc</command>) is to allow
+An easy extension is to allow
 arbitrary contexts before the constructor.  For example:
 </para>
 
@@ -1266,6 +1266,86 @@ universal quantification earlier.
 </para>
 
 </sect4>
+
+<sect4>
+<title>Record Constructors</title>
+
+<para>
+GHC allows existentials to be used with records syntax as well.  For example:
+
+<programlisting>
+data Counter a = forall self. NewCounter
+    { _this    :: self
+    , _inc     :: self -> self
+    , _display :: self -> IO ()
+    , tag      :: a
+    }
+</programlisting>
+Here <literal>tag</literal> is a public field, with a well-typed selector
+function <literal>tag :: Counter a -> a</literal>.  The <literal>self</literal>
+type is hidden from the outside; any attempt to apply <literal>_this</literal>,
+<literal>_inc</literal> or <literal>_output</literal> as functions will raise a
+compile-time error.  In other words, <emphasis>GHC defines a record selector function
+only for fields whose type does not mention the existentially-quantified variables</emphasis>.
+(This example used an underscore in the fields for which record selectors
+will not be defined, but that is only programming style; GHC ignores them.)
+</para>
+
+<para>
+To make use of these hidden fields, we need to create some helper functions:
+
+<programlisting>
+inc :: Counter a -> Counter a
+inc (NewCounter x i d t) = NewCounter
+    { _this = i x, _inc = i, _display = d, tag = t } 
+
+display :: Counter a -> IO ()
+display NewCounter{ _this = x, _display = d } = d x
+</programlisting>
+
+Now we can define counters with different underlying implementations:
+
+<programlisting>
+counterA :: Counter String 
+counterA = NewCounter
+    { _this = 0, _inc = (1+), _display = print, tag = "A" }
+
+counterB :: Counter String 
+counterB = NewCounter
+    { _this = "", _inc = ('#':), _display = putStrLn, tag = "B" }
+
+main = do
+    display (inc counterA)         -- prints "1"
+    display (inc (inc counterB))   -- prints "##"
+</programlisting>
+
+In GADT declarations (see <xref linkend="gadt"/>), the explicit
+<literal>forall</literal> may be omitted.  For example, we can express
+the same <literal>Counter a</literal> using GADT:
+
+<programlisting>
+data Counter a where
+    NewCounter { _this    :: self
+               , _inc     :: self -> self
+               , _display :: self -> IO ()
+               , tag      :: a
+               }
+        :: Counter a
+</programlisting>
+
+At the moment, record update syntax is only supported for Haskell 98 data types,
+so the following function does <emphasis>not</emphasis> work:
+
+<programlisting>
+-- This is invalid; use explicit NewCounter instead for now
+setTag :: Counter a -> a -> Counter a
+setTag obj t = obj{ tag = t }
+</programlisting>
+
+</para>
+
+</sect4>
+
 
 <sect4>
 <title>Restrictions</title>
@@ -3546,9 +3626,9 @@ for these <literal>Terms</literal>:
   eval :: Term a -> a
   eval (Lit i) 	    = i
   eval (Succ t)     = 1 + eval t
-  eval (IsZero i)   = eval i == 0
+  eval (IsZero t)   = eval t == 0
   eval (If b e1 e2) = if eval b then eval e1 else eval e2
-  eval (Pair e1 e2) = (eval e2, eval e2)
+  eval (Pair e1 e2) = (eval e1, eval e2)
 </programlisting>
 These and many other examples are given in papers by Hongwei Xi, and Tim Sheard.
 </para>
@@ -3580,10 +3660,55 @@ type above, the type of each constructor must end with <literal> ... -> Term ...
 </para></listitem>
 
 <listitem><para>
-You cannot use record syntax on a GADT-style data type declaration.  (
-It's not clear what these it would mean.  For example,
-the record selectors might ill-typed.)
-However, you can use strictness annotations, in the obvious places
+You can use record syntax on a GADT-style data type declaration:
+
+<programlisting>
+  data Term a where
+      Lit    { val  :: Int }      :: Term Int
+      Succ   { num  :: Term Int } :: Term Int
+      Pred   { num  :: Term Int } :: Term Int
+      IsZero { arg  :: Term Int } :: Term Bool	
+      Pair   { arg1 :: Term a
+             , arg2 :: Term b
+             }                    :: Term (a,b)
+      If     { cnd  :: Term Bool
+             , tru  :: Term a
+             , fls  :: Term a
+             }                    :: Term a
+</programlisting>
+For every constructor that has a field <literal>f</literal>, (a) the type of
+field <literal>f</literal> must be the same; and (b) the
+result type of the constructor must be the same; both modulo alpha conversion.
+Hence, in our example, we cannot merge the <literal>num</literal> and <literal>arg</literal>
+fields above into a 
+single name.  Although their field types are both <literal>Term Int</literal>,
+their selector functions actually have different types:
+
+<programlisting>
+  num :: Term Int -> Term Int
+  arg :: Term Bool -> Term Int
+</programlisting>
+
+At the moment, record updates are not yet possible with GADT, so support is 
+limited to record construction, selection and pattern matching:
+
+<programlisting>
+  someTerm :: Term Bool
+  someTerm = IsZero { arg = Succ { num = Lit { val = 0 } } }
+
+  eval :: Term a -> a
+  eval Lit    { val = i } = i
+  eval Succ   { num = t } = eval t + 1
+  eval Pred   { num = t } = eval t - 1
+  eval IsZero { arg = t } = eval t == 0
+  eval Pair   { arg1 = t1, arg2 = t2 } = (eval t1, eval t2)
+  eval t@If{} = if eval (cnd t) then eval (tru t) else eval (fls t)
+</programlisting>
+
+</para></listitem>
+
+<listitem><para>
+You can use strictness annotations, in the obvious places
 in the constructor type:
 <programlisting>
   data Term a where
