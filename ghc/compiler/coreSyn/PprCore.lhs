@@ -101,7 +101,7 @@ ppr_bind (Rec binds)  	       = vcat (map pp binds)
 ppr_binding :: OutputableBndr b => (b, Expr b) -> SDoc
 ppr_binding (val_bdr, expr)
   = pprBndr LetBind val_bdr $$ 
-    (ppr val_bdr <+> equals <+> pprCoreExpr expr)
+    hang (ppr val_bdr <+> equals) 2 (pprCoreExpr expr)
 \end{code}
 
 \begin{code}
