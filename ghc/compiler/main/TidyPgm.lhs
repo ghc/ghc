@@ -21,7 +21,7 @@ import VarEnv
 import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, idCoreRules, isGlobalId,
-			  isExportedId, mkVanillaGlobal, isLocalId, 
+			  isExportedId, mkVanillaGlobal, isLocalId, isNaughtyRecordSelector,
 			  idArity, idCafInfo, idUnfolding, isImplicitId, setIdInfo
 			) 
 import IdInfo		{- loads of stuff -}
@@ -383,7 +383,10 @@ getImplicitBinds type_env
   where
     implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
     
-    other_implicit_ids (ATyCon tc) = tyConSelIds tc
+    other_implicit_ids (ATyCon tc) = filter (not . isNaughtyRecordSelector) (tyConSelIds tc)
+	-- The "naughty" ones are not real functions at all
+	-- They are there just so we can get decent error messages
+	-- See Note  [Naughty record selectors] in MkId.lhs
     other_implicit_ids (AClass cl) = classSelIds cl
     other_implicit_ids other       = []
     
