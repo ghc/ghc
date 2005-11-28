@@ -633,8 +633,8 @@ run_thread:
     // immediately and return to normaility.
     if (ret == ThreadBlocked) {
 	IF_DEBUG(scheduler,
-		 debugBelch("--<< thread %d (%s) stopped: blocked\n",
-			    t->id, whatNext_strs[t->what_next]));
+		 sched_belch("--<< thread %d (%s) stopped: blocked\n",
+			     t->id, whatNext_strs[t->what_next]));
 	continue;
     }
 #endif
