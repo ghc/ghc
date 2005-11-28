@@ -1,5 +1,15 @@
+#Top-level dirs:
+^compiler/
+^CONTRIB/
+^includes/
+^lib/
+^misc/
+^mkworld/
+^runtime/
+^utils/
+^driver/
 # Boring file regexps:
-\.hi$
+#\.hi$
 \.o$
 \.o\.cmd$
 # *.ko files aren't boring by default because they might
