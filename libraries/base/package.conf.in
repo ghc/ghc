@@ -7,6 +7,7 @@ maintainer:	libraries@haskell.org
 exposed:	True
 
 exposed-modules:
+	Control.Applicative,
 	Control.Arrow,
 	Control.Concurrent,
 	Control.Concurrent.Chan,
@@ -40,6 +41,7 @@ exposed-modules:
 	Data.Either,
 	Data.Eq,
 	Data.FiniteMap,
+	Data.Foldable,
 	Data.FunctorM,
 	Data.Generics,
 	Data.Generics.Aliases,
@@ -68,6 +70,7 @@ exposed-modules:
 	Data.STRef.Strict,
 	Data.Sequence,
 	Data.Set,
+	Data.Traversable,
 	Data.Tree,
 	Data.Tuple,
 	Data.Typeable,

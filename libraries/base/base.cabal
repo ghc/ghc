@@ -9,6 +9,7 @@ description:
 	and a large collection of useful libraries ranging from data
 	structures to parsing combinators and debugging utilities.
 exposed-modules:
+	Control.Applicative,
 	Control.Arrow,
 	Control.Concurrent,
 	Control.Concurrent.Chan,
@@ -41,6 +42,7 @@ exposed-modules:
 	Data.Dynamic,
 	Data.Either,
 	Data.Eq,
+	Data.Foldable,
 	Data.FiniteMap,
 	Data.FunctorM,
 	-- Data.Generics,
@@ -71,6 +73,7 @@ exposed-modules:
 	Data.Sequence,
 	Data.Set,
 	Data.Tree,
+	Data.Traversable,
 	Data.Tuple,
 	Data.Typeable,
 	Data.Unique,

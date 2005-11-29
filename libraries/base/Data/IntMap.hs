@@ -138,6 +138,7 @@ import Data.Int
 import qualified Data.IntSet as IntSet
 import Data.Monoid (Monoid(..))
 import Data.Typeable
+import Data.Foldable (Foldable(foldMap))
 
 {-
 -- just for testing
@@ -215,6 +216,11 @@ instance Ord a => Monoid (IntMap a) where
     mempty  = empty
     mappend = union
     mconcat = unions
+
+instance Foldable IntMap where
+    foldMap f Nil = mempty
+    foldMap f (Tip _k v) = f v
+    foldMap f (Bin _ _ l r) = foldMap f l `mappend` foldMap f r
 
 #if __GLASGOW_HASKELL__
 

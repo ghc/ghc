@@ -39,6 +39,7 @@ module Data.Sequence (
 	(<|),		-- :: a -> Seq a -> Seq a
 	(|>),		-- :: Seq a -> a -> Seq a
 	(><),		-- :: Seq a -> Seq a -> Seq a
+	fromList,	-- :: [a] -> Seq a
 	-- * Deconstruction
 	-- ** Queries
 	null,		-- :: Seq a -> Bool
@@ -55,20 +56,6 @@ module Data.Sequence (
 	take,		-- :: Int -> Seq a -> Seq a
 	drop,		-- :: Int -> Seq a -> Seq a
 	splitAt,	-- :: Int -> Seq a -> (Seq a, Seq a)
-	-- * Lists
-	fromList,	-- :: [a] -> Seq a
-	toList,		-- :: Seq a -> [a]
-	-- * Folds
-	-- ** Right associative
-	foldr,		-- :: (a -> b -> b) -> b -> Seq a -> b
-	foldr1,		-- :: (a -> a -> a) -> Seq a -> a
-	foldr',		-- :: (a -> b -> b) -> b -> Seq a -> b
-	foldrM,		-- :: Monad m => (a -> b -> m b) -> b -> Seq a -> m b
-	-- ** Left associative
-	foldl,		-- :: (a -> b -> a) -> a -> Seq b -> a
-	foldl1,		-- :: (a -> a -> a) -> Seq a -> a
-	foldl',		-- :: (a -> b -> a) -> a -> Seq b -> a
-	foldlM,		-- :: Monad m => (a -> b -> m a) -> a -> Seq b -> m a
 	-- * Transformations
 	reverse,	-- :: Seq a -> Seq a
 #if TESTING
@@ -80,13 +67,14 @@ import Prelude hiding (
 	null, length, take, drop, splitAt, foldl, foldl1, foldr, foldr1,
 	reverse)
 import qualified Data.List (foldl')
-import Control.Monad (MonadPlus(..), liftM2)
+import Control.Applicative (Applicative(..))
+import Control.Monad (MonadPlus(..))
 import Data.Monoid (Monoid(..))
-import Data.FunctorM
+import Data.Foldable
+import Data.Traversable
 import Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Exts (build)
 import Text.Read (Lexeme(Ident), lexP, parens, prec,
 	readPrec, readListPrec, readListPrecDefault)
 import Data.Generics.Basics (Data(..), Fixity(..),
@@ -112,7 +100,20 @@ class Sized a where
 newtype Seq a = Seq (FingerTree (Elem a))
 
 instance Functor Seq where
-	fmap f (Seq xs) = Seq (fmap (fmap f) xs)
+	fmap = fmapDefault
+
+instance Foldable Seq where
+	foldr f z (Seq xs) = foldr (flip (foldr f)) z xs
+	foldl f z (Seq xs) = foldl (foldl f) z xs
+
+	foldr1 f (Seq xs) = getElem (foldr1 f' xs)
+	  where f' (Elem x) (Elem y) = Elem (f x y)
+
+	foldl1 f (Seq xs) = getElem (foldl1 f' xs)
+	  where f' (Elem x) (Elem y) = Elem (f x y)
+
+instance Traversable Seq where
+	traverse f (Seq xs) = Seq <$> traverse (traverse f) xs
 
 instance Monad Seq where
 	return = singleton
@@ -122,14 +123,6 @@ instance Monad Seq where
 instance MonadPlus Seq where
 	mzero = empty
 	mplus = (><)
-
-instance FunctorM Seq where
-	fmapM f = foldlM f' empty
-	  where f' ys x = do
-			y <- f x
-			return $! (ys |> y)
-	fmapM_ f = foldlM f' ()
-	  where f' _ x = f x >> return ()
 
 instance Eq a => Eq (Seq a) where
 	xs == ys = length xs == length ys && toList xs == toList ys
@@ -209,11 +202,33 @@ instance Sized a => Sized (FingerTree a) where
 	size (Single x)		= size x
 	size (Deep v _ _ _)	= v
 
-instance Functor FingerTree where
-	fmap _ Empty = Empty
-	fmap f (Single x) = Single (f x)
-	fmap f (Deep v pr m sf) =
-		Deep v (fmap f pr) (fmap (fmap f) m) (fmap f sf)
+instance Foldable FingerTree where
+	foldr _ z Empty = z
+	foldr f z (Single x) = x `f` z
+	foldr f z (Deep _ pr m sf) =
+		foldr f (foldr (flip (foldr f)) (foldr f z sf) m) pr
+
+	foldl _ z Empty = z
+	foldl f z (Single x) = z `f` x
+	foldl f z (Deep _ pr m sf) =
+		foldl f (foldl (foldl f) (foldl f z pr) m) sf
+
+	foldr1 _ Empty = error "foldr1: empty sequence"
+	foldr1 _ (Single x) = x
+	foldr1 f (Deep _ pr m sf) =
+		foldr f (foldr (flip (foldr f)) (foldr1 f sf) m) pr
+
+	foldl1 _ Empty = error "foldl1: empty sequence"
+	foldl1 _ (Single x) = x
+	foldl1 f (Deep _ pr m sf) =
+		foldl f (foldl (foldl f) (foldl1 f pr) m) sf
+
+instance Traversable FingerTree where
+	traverse _ Empty = pure Empty
+	traverse f (Single x) = Single <$> f x
+	traverse f (Deep v pr m sf) =
+		Deep v <$> traverse f pr <*> traverse (traverse f) m <*>
+			traverse f sf
 
 {-# INLINE deep #-}
 {-# SPECIALIZE deep :: Digit (Elem a) -> FingerTree (Node (Elem a)) -> Digit (Elem a) -> FingerTree (Elem a) #-}
@@ -232,16 +247,37 @@ data Digit a
 	deriving Show
 #endif
 
-instance Functor Digit where
-	fmap f (One a) = One (f a)
-	fmap f (Two a b) = Two (f a) (f b)
-	fmap f (Three a b c) = Three (f a) (f b) (f c)
-	fmap f (Four a b c d) = Four (f a) (f b) (f c) (f d)
+instance Foldable Digit where
+	foldr f z (One a) = a `f` z
+	foldr f z (Two a b) = a `f` (b `f` z)
+	foldr f z (Three a b c) = a `f` (b `f` (c `f` z))
+	foldr f z (Four a b c d) = a `f` (b `f` (c `f` (d `f` z)))
+
+	foldl f z (One a) = z `f` a
+	foldl f z (Two a b) = (z `f` a) `f` b
+	foldl f z (Three a b c) = ((z `f` a) `f` b) `f` c
+	foldl f z (Four a b c d) = (((z `f` a) `f` b) `f` c) `f` d
+
+	foldr1 f (One a) = a
+	foldr1 f (Two a b) = a `f` b
+	foldr1 f (Three a b c) = a `f` (b `f` c)
+	foldr1 f (Four a b c d) = a `f` (b `f` (c `f` d))
+
+	foldl1 f (One a) = a
+	foldl1 f (Two a b) = a `f` b
+	foldl1 f (Three a b c) = (a `f` b) `f` c
+	foldl1 f (Four a b c d) = ((a `f` b) `f` c) `f` d
+
+instance Traversable Digit where
+	traverse f (One a) = One <$> f a
+	traverse f (Two a b) = Two <$> f a <*> f b
+	traverse f (Three a b c) = Three <$> f a <*> f b <*> f c
+	traverse f (Four a b c d) = Four <$> f a <*> f b <*> f c <*> f d
 
 instance Sized a => Sized (Digit a) where
 	{-# SPECIALIZE instance Sized (Digit (Elem a)) #-}
 	{-# SPECIALIZE instance Sized (Digit (Node a)) #-}
-	size xs = foldlDigit (\ i x -> i + size x) 0 xs
+	size xs = foldl (\ i x -> i + size x) 0 xs
 
 {-# SPECIALIZE digitToTree :: Digit (Elem a) -> FingerTree (Elem a) #-}
 {-# SPECIALIZE digitToTree :: Digit (Node a) -> FingerTree (Node a) #-}
@@ -260,9 +296,16 @@ data Node a
 	deriving Show
 #endif
 
-instance Functor (Node) where
-	fmap f (Node2 v a b) = Node2 v (f a) (f b)
-	fmap f (Node3 v a b c) = Node3 v (f a) (f b) (f c)
+instance Foldable Node where
+	foldr f z (Node2 _ a b) = a `f` (b `f` z)
+	foldr f z (Node3 _ a b c) = a `f` (b `f` (c `f` z))
+
+	foldl f z (Node2 _ a b) = (z `f` a) `f` b
+	foldl f z (Node3 _ a b c) = ((z `f` a) `f` b) `f` c
+
+instance Traversable Node where
+	traverse f (Node2 v a b) = Node2 v <$> f a <*> f b
+	traverse f (Node3 v a b c) = Node3 v <$> f a <*> f b <*> f c
 
 instance Sized (Node a) where
 	size (Node2 v _ _)	= v
@@ -293,6 +336,13 @@ instance Sized (Elem a) where
 
 instance Functor Elem where
 	fmap f (Elem x) = Elem (f x)
+
+instance Foldable Elem where
+	foldr f z (Elem x) = f x z
+	foldl f z (Elem x) = f z x
+
+instance Traversable Elem where
+	traverse f (Elem x) = Elem <$> f x
 
 #ifdef TESTING
 instance (Show a) => Show (Elem a) where
@@ -623,14 +673,21 @@ instance Data a => Data (ViewL a)
 INSTANCE_TYPEABLE1(ViewL,viewLTc,"ViewL")
 
 instance Functor ViewL where
-	fmap _ EmptyL		= EmptyL
-	fmap f (x :< xs)	= f x :< fmap f xs
+	fmap = fmapDefault
 
-instance FunctorM ViewL where
-	fmapM _ EmptyL		= return EmptyL
-	fmapM f (x :< xs)	= liftM2 (:<) (f x) (fmapM f xs)
-	fmapM_ _ EmptyL		= return ()
-	fmapM_ f (x :< xs)	= f x >> fmapM_ f xs >> return ()
+instance Foldable ViewL where
+	foldr f z EmptyL = z
+	foldr f z (x :< xs) = f x (foldr f z xs)
+
+	foldl f z EmptyL = z
+	foldl f z (x :< xs) = foldl f (f z x) xs
+
+	foldl1 f EmptyL = error "foldl1: empty view"
+	foldl1 f (x :< xs) = foldl f x xs
+
+instance Traversable ViewL where
+	traverse _ EmptyL	= pure EmptyL
+	traverse f (x :< xs)	= (:<) <$> f x <*> traverse f xs
 
 -- | /O(1)/. Analyse the left end of a sequence.
 viewl		::  Seq a -> ViewL a
@@ -675,14 +732,21 @@ instance Data a => Data (ViewR a)
 INSTANCE_TYPEABLE1(ViewR,viewRTc,"ViewR")
 
 instance Functor ViewR where
-	fmap _ EmptyR		= EmptyR
-	fmap f (xs :> x)	= fmap f xs :> f x
+	fmap = fmapDefault
 
-instance FunctorM ViewR where
-	fmapM _ EmptyR		= return EmptyR
-	fmapM f (xs :> x)	= liftM2 (:>) (fmapM f xs) (f x)
-	fmapM_ _ EmptyR		= return ()
-	fmapM_ f (xs :> x)	= fmapM_ f xs >> f x >> return ()
+instance Foldable ViewR where
+	foldr f z EmptyR = z
+	foldr f z (xs :> x) = foldr f (f x z) xs
+
+	foldl f z EmptyR = z
+	foldl f z (xs :> x) = f (foldl f z xs) x
+
+	foldr1 f EmptyR = error "foldr1: empty view"
+	foldr1 f (xs :> x) = foldr f x xs
+
+instance Traversable ViewR where
+	traverse _ EmptyR	= pure EmptyR
+	traverse f (xs :> x)	= (:>) <$> traverse f xs <*> f x
 
 -- | /O(1)/. Analyse the right end of a sequence.
 viewr		::  Seq a -> ViewR a
@@ -933,127 +997,6 @@ splitDigit i (Four a b c d)
 -- | /O(n)/. Create a sequence from a finite list of elements.
 fromList  	:: [a] -> Seq a
 fromList  	=  Data.List.foldl' (|>) empty
-
--- | /O(n)/. List of elements of the sequence.
-toList		:: Seq a -> [a]
-#ifdef __GLASGOW_HASKELL__
-{-# INLINE toList #-}
-toList xs	=  build (\ c n -> foldr c n xs)
-#else
-toList		=  foldr (:) []
-#endif
-
-------------------------------------------------------------------------
--- Folds
-------------------------------------------------------------------------
-
--- | /O(n*t)/. Fold over the elements of a sequence,
--- associating to the right.
-foldr :: (a -> b -> b) -> b -> Seq a -> b
-foldr f z (Seq xs) = foldrTree f' z xs
-  where f' (Elem x) y = f x y
-
-foldrTree :: (a -> b -> b) -> b -> FingerTree a -> b
-foldrTree _ z Empty = z
-foldrTree f z (Single x) = x `f` z
-foldrTree f z (Deep _ pr m sf) =
-	foldrDigit f (foldrTree (flip (foldrNode f)) (foldrDigit f z sf) m) pr
-
-foldrDigit :: (a -> b -> b) -> b -> Digit a -> b
-foldrDigit f z (One a) = a `f` z
-foldrDigit f z (Two a b) = a `f` (b `f` z)
-foldrDigit f z (Three a b c) = a `f` (b `f` (c `f` z))
-foldrDigit f z (Four a b c d) = a `f` (b `f` (c `f` (d `f` z)))
-
-foldrNode :: (a -> b -> b) -> b -> Node a -> b
-foldrNode f z (Node2 _ a b) = a `f` (b `f` z)
-foldrNode f z (Node3 _ a b c) = a `f` (b `f` (c `f` z))
-
--- | /O(n*t)/. A variant of 'foldr' that has no base case,
--- and thus may only be applied to non-empty sequences.
-foldr1 :: (a -> a -> a) -> Seq a -> a
-foldr1 f (Seq xs) = getElem (foldr1Tree f' xs)
-  where f' (Elem x) (Elem y) = Elem (f x y)
-
-foldr1Tree :: (a -> a -> a) -> FingerTree a -> a
-foldr1Tree _ Empty = error "foldr1: empty sequence"
-foldr1Tree _ (Single x) = x
-foldr1Tree f (Deep _ pr m sf) =
-	foldrDigit f (foldrTree (flip (foldrNode f)) (foldr1Digit f sf) m) pr
-
-foldr1Digit :: (a -> a -> a) -> Digit a -> a
-foldr1Digit f (One a) = a
-foldr1Digit f (Two a b) = a `f` b
-foldr1Digit f (Three a b c) = a `f` (b `f` c)
-foldr1Digit f (Four a b c d) = a `f` (b `f` (c `f` d))
-
--- | /O(n*t)/. Fold over the elements of a sequence,
--- associating to the left.
-foldl :: (a -> b -> a) -> a -> Seq b -> a
-foldl f z (Seq xs) = foldlTree f' z xs
-  where f' x (Elem y) = f x y
-
-foldlTree :: (a -> b -> a) -> a -> FingerTree b -> a
-foldlTree _ z Empty = z
-foldlTree f z (Single x) = z `f` x
-foldlTree f z (Deep _ pr m sf) =
-	foldlDigit f (foldlTree (foldlNode f) (foldlDigit f z pr) m) sf
-
-foldlDigit :: (a -> b -> a) -> a -> Digit b -> a
-foldlDigit f z (One a) = z `f` a
-foldlDigit f z (Two a b) = (z `f` a) `f` b
-foldlDigit f z (Three a b c) = ((z `f` a) `f` b) `f` c
-foldlDigit f z (Four a b c d) = (((z `f` a) `f` b) `f` c) `f` d
-
-foldlNode :: (a -> b -> a) -> a -> Node b -> a
-foldlNode f z (Node2 _ a b) = (z `f` a) `f` b
-foldlNode f z (Node3 _ a b c) = ((z `f` a) `f` b) `f` c
-
--- | /O(n*t)/. A variant of 'foldl' that has no base case,
--- and thus may only be applied to non-empty sequences.
-foldl1 :: (a -> a -> a) -> Seq a -> a
-foldl1 f (Seq xs) = getElem (foldl1Tree f' xs)
-  where f' (Elem x) (Elem y) = Elem (f x y)
-
-foldl1Tree :: (a -> a -> a) -> FingerTree a -> a
-foldl1Tree _ Empty = error "foldl1: empty sequence"
-foldl1Tree _ (Single x) = x
-foldl1Tree f (Deep _ pr m sf) =
-	foldlDigit f (foldlTree (foldlNode f) (foldl1Digit f pr) m) sf
-
-foldl1Digit :: (a -> a -> a) -> Digit a -> a
-foldl1Digit f (One a) = a
-foldl1Digit f (Two a b) = a `f` b
-foldl1Digit f (Three a b c) = (a `f` b) `f` c
-foldl1Digit f (Four a b c d) = ((a `f` b) `f` c) `f` d
-
-------------------------------------------------------------------------
--- Derived folds
-------------------------------------------------------------------------
-
--- | /O(n*t)/. Fold over the elements of a sequence,
--- associating to the right, but strictly.
-foldr' :: (a -> b -> b) -> b -> Seq a -> b
-foldr' f z xs = foldl f' id xs z
-  where f' k x z = k $! f x z
-
--- | /O(n*t)/. Monadic fold over the elements of a sequence,
--- associating to the right, i.e. from right to left.
-foldrM :: Monad m => (a -> b -> m b) -> b -> Seq a -> m b
-foldrM f z xs = foldl f' return xs z
-  where f' k x z = f x z >>= k
-
--- | /O(n*t)/. Fold over the elements of a sequence,
--- associating to the left, but strictly.
-foldl' :: (a -> b -> a) -> a -> Seq b -> a
-foldl' f z xs = foldr f' id xs z
-  where f' x k z = k $! f z x
-
--- | /O(n*t)/. Monadic fold over the elements of a sequence,
--- associating to the left, i.e. from left to right.
-foldlM :: Monad m => (a -> b -> m a) -> a -> Seq b -> m a
-foldlM f z xs = foldr f' return xs z
-  where f' x k z = f z x >>= k
 
 ------------------------------------------------------------------------
 -- Reverse

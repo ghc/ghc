@@ -115,6 +115,7 @@ import Prelude hiding (filter,foldr,null,map)
 import qualified Data.List as List
 import Data.Monoid (Monoid(..))
 import Data.Typeable
+import Data.Foldable (Foldable(foldMap))
 
 {-
 -- just for testing
@@ -151,6 +152,10 @@ instance Ord a => Monoid (Set a) where
     mempty  = empty
     mappend = union
     mconcat = unions
+
+instance Foldable Set where
+    foldMap f Tip = mempty
+    foldMap f (Bin _s k l r) = foldMap f l `mappend` f k `mappend` foldMap f r
 
 #if __GLASGOW_HASKELL__
 

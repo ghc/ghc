@@ -28,9 +28,13 @@ module Data.Tree(
 import Prelude
 #endif
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
-import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList, toList,
+import Data.Monoid (Monoid(..))
+import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList,
 			ViewL(..), ViewR(..), viewl, viewr)
+import Data.Foldable (Foldable(foldMap), toList)
+import Data.Traversable (Traversable(traverse))
 import Data.Typeable
 
 #include "Typeable.h"
@@ -56,6 +60,12 @@ instance Functor Tree where
 
 mapTree              :: (a -> b) -> (Tree a -> Tree b)
 mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
+
+instance Traversable Tree where
+  traverse f (Node x ts) = Node <$> f x <*> traverse (traverse f) ts
+
+instance Foldable Tree where
+  foldMap f (Node x ts) = f x `mappend` foldMap (foldMap f) ts
 
 -- | Neat 2-dimensional drawing of a tree.
 drawTree :: Tree String -> String

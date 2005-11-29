@@ -152,6 +152,9 @@ import qualified Data.Set as Set
 import qualified Data.List as List
 import Data.Monoid (Monoid(..))
 import Data.Typeable
+import Control.Applicative (Applicative(..))
+import Data.Traversable (Traversable(traverse))
+import Data.Foldable (Foldable(foldMap))
 
 {-
 -- for quick check
@@ -1318,6 +1321,16 @@ instance (Ord k, Ord v) => Ord (Map k v) where
 --------------------------------------------------------------------}
 instance Functor (Map k) where
   fmap f m  = map f m
+
+instance Traversable (Map k) where
+  traverse f Tip = pure Tip
+  traverse f (Bin s k v l r)
+    = flip (Bin s k) <$> traverse f l <*> f v <*> traverse f r
+
+instance Foldable (Map k) where
+  foldMap _f Tip = mempty
+  foldMap f (Bin _s _k v l r)
+    = foldMap f l `mappend` f v `mappend` foldMap f r
 
 {--------------------------------------------------------------------
   Read
