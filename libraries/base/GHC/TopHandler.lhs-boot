@@ -1,0 +1,10 @@
+\begin{code}
+{-# OPTIONS -fno-implicit-prelude #-}
+module GHC.TopHandler ( reportError, reportStackOverflow ) where
+
+import GHC.Exception ( Exception )
+import GHC.IOBase    ( IO )
+
+reportError :: Exception -> IO a
+reportStackOverflow :: IO a
+\end{code}

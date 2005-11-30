@@ -24,6 +24,7 @@ module GHC.Conc
 	( ThreadId(..)
 
 	-- Forking and suchlike
+	, forkIO	-- :: IO a -> IO ThreadId
 	, myThreadId 	-- :: IO ThreadId
 	, killThread	-- :: ThreadId -> IO ()
 	, throwTo       -- :: ThreadId -> Exception -> IO ()
@@ -80,6 +81,8 @@ import System.Posix.Internals
 import Foreign
 import Foreign.C
 
+import {-# SOURCE #-} GHC.TopHandler ( reportError, reportStackOverflow )
+
 import Data.Maybe
 
 import GHC.Base
@@ -87,7 +90,7 @@ import GHC.IOBase
 import GHC.Num		( Num(..) )
 import GHC.Real		( fromIntegral, quot )
 import GHC.Base		( Int(..) )
-import GHC.Exception    ( Exception(..), AsyncException(..) )
+import GHC.Exception    ( catchException, Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
@@ -125,7 +128,34 @@ This misfeature will hopefully be corrected at a later date.
 it defines 'ThreadId' as a synonym for ().
 -}
 
---forkIO has now been hoisted out into the Concurrent library.
+{- |
+This sparks off a new thread to run the 'IO' computation passed as the
+first argument, and returns the 'ThreadId' of the newly created
+thread.
+
+The new thread will be a lightweight thread; if you want to use a foreign
+library that uses thread-local storage, use 'forkOS' instead.
+-}
+forkIO :: IO () -> IO ThreadId
+forkIO action = IO $ \ s -> 
+   case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
+ where
+  action_plus = catchException action childHandler
+
+childHandler :: Exception -> IO ()
+childHandler err = catchException (real_handler err) childHandler
+
+real_handler :: Exception -> IO ()
+real_handler ex =
+  case ex of
+	-- ignore thread GC and killThread exceptions:
+	BlockedOnDeadMVar            -> return ()
+	BlockedIndefinitely          -> return ()
+	AsyncException ThreadKilled  -> return ()
+
+	-- report all others:
+	AsyncException StackOverflow -> reportStackOverflow
+	other       -> reportError other
 
 {- | 'killThread' terminates the given thread (GHC only).
 Any work already done by the thread isn\'t
@@ -564,16 +594,12 @@ startIOManagerThread = do
 	wr_end <- peekElemOff fds 1
 	writeIORef stick (fromIntegral wr_end)
 	c_setIOManagerPipe wr_end
-	quickForkIO $ do
+	forkIO $ do
 	    allocaBytes sizeofFdSet   $ \readfds -> do
 	    allocaBytes sizeofFdSet   $ \writefds -> do 
 	    allocaBytes sizeofTimeVal $ \timeval -> do
 	    service_loop (fromIntegral rd_end) readfds writefds timeval [] []
 	return ()
-
--- XXX: move real forkIO here from Control.Concurrent?
-quickForkIO action = IO $ \s ->
-   case (fork# action s) of (# s1, id #) -> (# s1, ThreadId id #)
 
 service_loop
    :: Fd		-- listen to this for wakeup calls
@@ -631,7 +657,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 	      then return ()
 	      else do handler_tbl <- peek handlers
 		      sp <- peekElemOff handler_tbl (fromIntegral s)
-		      quickForkIO (do io <- deRefStablePtr sp; io)
+		      forkIO (do io <- deRefStablePtr sp; io)
 		      return ()
 
   takeMVar prodding
@@ -666,12 +692,16 @@ foreign import ccall "setIOManagerPipe"
 -- IO requests
 
 buildFdSets maxfd readfds writefds [] = return maxfd
-buildFdSets maxfd readfds writefds (Read fd m : reqs) = do
-  fdSet fd readfds
-  buildFdSets (max maxfd fd) readfds writefds reqs
-buildFdSets maxfd readfds writefds (Write fd m : reqs) = do
-  fdSet fd writefds
-  buildFdSets (max maxfd fd) readfds writefds reqs
+buildFdSets maxfd readfds writefds (Read fd m : reqs)
+  | fd >= fD_SETSIZE =  error "buildFdSets: file descriptor out of range"
+  | otherwise        =  do
+	fdSet fd readfds
+        buildFdSets (max maxfd fd) readfds writefds reqs
+buildFdSets maxfd readfds writefds (Write fd m : reqs)
+  | fd >= fD_SETSIZE =  error "buildFdSets: file descriptor out of range"
+  | otherwise        =  do
+	fdSet fd writefds
+	buildFdSets (max maxfd fd) readfds writefds reqs
 
 completeRequests [] _ _ reqs' = return reqs'
 completeRequests (Read fd m : reqs) readfds writefds reqs' = do
@@ -776,6 +806,9 @@ newtype CFdSet = CFdSet ()
 foreign import ccall safe "select"
   c_select :: Fd -> Ptr CFdSet -> Ptr CFdSet -> Ptr CFdSet -> Ptr CTimeVal
            -> IO CInt
+
+foreign import ccall unsafe "hsFD_SETSIZE"
+  fD_SETSIZE :: Fd
 
 foreign import ccall unsafe "hsFD_CLR"
   fdClr :: Fd -> Ptr CFdSet -> IO ()
