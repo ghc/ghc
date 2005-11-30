@@ -144,6 +144,9 @@ awaitEvent(rtsBool wait)
 	case BlockedOnRead:
 	  { 
 	    int fd = tso->block_info.fd;
+	    if (fd >= FD_SETSIZE) {
+		barf("awaitEvent: descriptor out of range");
+	    }
 	    maxfd = (fd > maxfd) ? fd : maxfd;
 	    FD_SET(fd, &rfd);
 	    continue;
@@ -152,6 +155,9 @@ awaitEvent(rtsBool wait)
 	case BlockedOnWrite:
 	  { 
 	    int fd = tso->block_info.fd;
+	    if (fd >= FD_SETSIZE) {
+		barf("awaitEvent: descriptor out of range");
+	    }
 	    maxfd = (fd > maxfd) ? fd : maxfd;
 	    FD_SET(fd, &wfd);
 	    continue;
