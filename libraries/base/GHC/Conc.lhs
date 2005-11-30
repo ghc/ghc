@@ -34,6 +34,7 @@ module GHC.Conc
 
 	-- Waiting
 	, threadDelay	  	-- :: Int -> IO ()
+	, registerDelay		-- :: Int -> IO (TVar Bool)
 	, threadWaitRead	-- :: Int -> IO ()
 	, threadWaitWrite	-- :: Int -> IO ()
 
@@ -480,6 +481,14 @@ threadDelay time
 	case delay# time# s of { s -> (# s, () #)
 	}}
 
+registerDelay usecs 
+#ifndef mingw32_HOST_OS
+  | threaded = waitForDelayEventSTM usecs
+  | otherwise = error "registerDelay: requires -threaded"
+#else
+  = error "registerDelay: not currently supported on Windows"
+#endif
+
 -- On Windows, we just make a safe call to 'Sleep' to implement threadDelay.
 #ifdef mingw32_HOST_OS
 foreign import stdcall safe "Sleep" c_Sleep :: CInt -> IO ()
@@ -526,7 +535,8 @@ data IOReq
   | Write  {-# UNPACK #-} !Fd {-# UNPACK #-} !(MVar ())
 
 data DelayReq
-  = Delay  {-# UNPACK #-} !Int {-# UNPACK #-} !(MVar ())
+  = Delay    {-# UNPACK #-} !Int {-# UNPACK #-} !(MVar ())
+  | DelaySTM {-# UNPACK #-} !Int {-# UNPACK #-} !(TVar Bool)
 
 pendingEvents :: IORef [IOReq]
 pendingDelays :: IORef [DelayReq]
@@ -705,24 +715,41 @@ waitForDelayEvent usecs = do
   prodServiceThread
   takeMVar m
 
+-- Delays for use in STM
+waitForDelayEventSTM :: Int -> IO (TVar Bool)
+waitForDelayEventSTM usecs = do
+   t <- atomically $ newTVar False
+   now <- getTicksOfDay
+   let target = now + usecs `quot` tick_usecs
+   atomicModifyIORef pendingDelays (\xs -> (DelaySTM target t : xs, ()))
+   prodServiceThread
+   return t  
+    
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
 -- delays is kept ordered.
 getDelay :: Ticks -> Ptr CTimeVal -> [DelayReq] -> IO ([DelayReq], Ptr CTimeVal)
 getDelay now ptimeval [] = return ([],nullPtr)
-getDelay now ptimeval all@(Delay time m : rest)
-  | now >= time = do
+getDelay now ptimeval all@(d : rest) 
+  = case d of
+     Delay time m | now >= time -> do
 	putMVar m ()
 	getDelay now ptimeval rest
-  | otherwise = do
-	setTimevalTicks ptimeval (time - now)
+     DelaySTM time t | now >= time -> do
+	atomically $ writeTVar t True
+	getDelay now ptimeval rest
+     _otherwise -> do
+	setTimevalTicks ptimeval (delayTime d - now)
     	return (all,ptimeval)
 
 insertDelay :: DelayReq -> [DelayReq] -> [DelayReq]
-insertDelay d@(Delay time m) [] = [d]
-insertDelay d1@(Delay time m) ds@(d2@(Delay time' m') : rest)
-  | time <= time' = d1 : ds
-  | otherwise     = d2 : insertDelay d1 rest
+insertDelay d [] = [d]
+insertDelay d1 ds@(d2 : rest)
+  | delayTime d1 <= delayTime d2 = d1 : ds
+  | otherwise                    = d2 : insertDelay d1 rest
+
+delayTime (Delay t _) = t
+delayTime (DelaySTM t _) = t
 
 type Ticks = Int
 tick_freq  = 50 :: Ticks  -- accuracy of threadDelay (ticks per sec)
