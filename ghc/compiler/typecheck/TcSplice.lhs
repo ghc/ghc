@@ -472,8 +472,8 @@ reify th_name
     ppr_ns (TH.Name _ (TH.NameG TH.VarName mod)) = text "var"
 
 lookupThName :: TH.Name -> TcM Name
-lookupThName th_name
-  =  do { let rdr_name = thRdrName guessed_ns th_name
+lookupThName th_name@(TH.Name occ flavour)
+  =  do { let rdr_name = thRdrName guessed_ns occ_str flavour
 
 	-- Repeat much of lookupOccRn, becase we want
 	-- to report errors in a TH-relevant way
@@ -491,9 +491,9 @@ lookupThName th_name
 	}
   where
 	-- guessed_ns is the name space guessed from looking at the TH name
-    guessed_ns | isLexCon occ_fs = OccName.dataName
-	       | otherwise	 = OccName.varName
-    occ_fs = mkFastString (TH.nameBase th_name)
+    guessed_ns | isLexCon (mkFastString occ_str) = OccName.dataName
+	       | otherwise			 = OccName.varName
+    occ_str = TH.occString occ
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of TcEnv.tcLookup; specialised mainly in that

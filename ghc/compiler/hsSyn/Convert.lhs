@@ -16,13 +16,14 @@ import Language.Haskell.TH.Syntax as TH
 import HsSyn as Hs
 import qualified Class (FunDep)
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, getRdrName, nameRdrName )
-import Name	( mkInternalName )
+import qualified Name	( Name, mkInternalName, getName )
 import Module   ( Module, mkModule )
 import RdrHsSyn	( mkClassDecl, mkTyData )
 import qualified OccName
+import OccName	( startsVarId, startsVarSym, startsConId, startsConSym )
 import SrcLoc	( Located(..), SrcSpan )
 import Type	( Type )
-import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon )
+import TysWiredIn ( unitTyCon, tupleTyCon, tupleCon, trueDataCon, nilDataCon, consDataCon )
 import BasicTypes( Boxity(..) ) 
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
@@ -521,35 +522,78 @@ vNameL, cNameL, tconNameL :: TH.Name -> CvtM (Located RdrName)
 vName,  cName,  tName,  tconName  :: TH.Name -> CvtM RdrName
 
 vNameL n = wrapL (vName n)
-vName n = force (thRdrName OccName.varName n)
+vName n = cvtName OccName.varName n
 
 -- Constructor function names; this is Haskell source, hence srcDataName
 cNameL n = wrapL (cName n)
-cName n = force (thRdrName OccName.srcDataName n)
+cName n = cvtName OccName.dataName n 
 
 -- Type variable names
-tName n = force (thRdrName OccName.tvName n)
+tName n = cvtName OccName.tvName n
 
 -- Type Constructor names
 tconNameL n = wrapL (tconName n)
-tconName n = force (thRdrName OccName.tcName n)
+tconName n = cvtName OccName.tcClsName n
 
-thRdrName :: OccName.NameSpace -> TH.Name -> RdrName
+cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
+cvtName ctxt_ns (TH.Name occ flavour)
+  | not (okOcc ctxt_ns occ_str) = failWith (badOcc ctxt_ns occ_str)
+  | otherwise 		        = force (thRdrName ctxt_ns occ_str flavour)
+  where
+    occ_str = TH.occString occ
+
+okOcc :: OccName.NameSpace -> String -> Bool
+okOcc _  []      = False
+okOcc ns str@(c:_) 
+  | OccName.isVarName ns = startsVarId c || startsVarSym c
+  | otherwise 	 	 = startsConId c || startsConSym c || str == "[]"
+
+badOcc :: OccName.NameSpace -> String -> SDoc
+badOcc ctxt_ns occ 
+  = ptext SLIT("Illegal") <+> text (OccName.nameSpaceString ctxt_ns) 
+	<+> ptext SLIT("name:") <+> quotes (text occ)
+
+thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- This turns a Name into a RdrName
 -- The passed-in name space tells what the context is expecting;
 --	use it unless the TH name knows what name-space it comes
 -- 	from, in which case use the latter
+--
+-- ToDo: we may generate silly RdrNames, by passing a name space
+--       that doesn't match the string, like VarName ":+", 
+-- 	 which will give confusing error messages later
 -- 
 -- The strict applications ensure that any buried exceptions get forced
-thRdrName ctxt_ns (TH.Name occ (TH.NameG th_ns mod)) = (mkOrig      $! (mk_mod mod)) $! (mk_occ (mk_ghc_ns th_ns) occ)
-thRdrName ctxt_ns (TH.Name occ (TH.NameL uniq))      = nameRdrName $! (((mkInternalName $! (mk_uniq uniq)) $! (mk_occ ctxt_ns occ)) noSrcLoc)
-thRdrName ctxt_ns (TH.Name occ (TH.NameQ mod))       = (mkRdrQual   $! (mk_mod mod)) $! (mk_occ ctxt_ns occ)
-thRdrName ctxt_ns (TH.Name occ TH.NameS)             = mkRdrUnqual $! (mk_occ ctxt_ns occ)
-thRdrName ctxt_ns (TH.Name occ (TH.NameU uniq))      = mkRdrUnqual $! (mk_uniq_occ ctxt_ns occ uniq)
+thRdrName ctxt_ns occ (TH.NameG th_ns mod) = (mkOrig     $! (mk_mod mod)) $! (mk_occ (mk_ghc_ns th_ns) occ)
+thRdrName ctxt_ns occ (TH.NameL uniq)      = nameRdrName $! (((Name.mkInternalName $! (mk_uniq uniq)) $! (mk_occ ctxt_ns occ)) noSrcLoc)
+thRdrName ctxt_ns occ (TH.NameQ mod)       = (mkRdrQual  $! (mk_mod mod)) $! (mk_occ ctxt_ns occ)
+thRdrName ctxt_ns occ (TH.NameU uniq)      = mkRdrUnqual $! (mk_uniq_occ ctxt_ns occ uniq)
+thRdrName ctxt_ns occ TH.NameS
+  | Just name <- isBuiltInOcc ctxt_ns occ  = nameRdrName $! name
+  | otherwise			           = mkRdrUnqual $! (mk_occ ctxt_ns occ)
 
-mk_uniq_occ :: OccName.NameSpace -> TH.OccName -> Int# -> OccName.OccName
+isBuiltInOcc :: OccName.NameSpace -> String -> Maybe Name.Name
+-- Built in syntax isn't "in scope" so an Unqual RdrName won't do
+-- We must generate an Exact name, just as the parser does
+isBuiltInOcc ctxt_ns occ
+  = case occ of
+	":" 		 -> Just (Name.getName consDataCon)
+	"[]"		 -> Just (Name.getName nilDataCon)
+	"()"		 -> Just (tup_name 0)
+	'(' : ',' : rest -> go_tuple 2 rest
+	other		 -> Nothing
+  where
+    go_tuple n ")" 	    = Just (tup_name n)
+    go_tuple n (',' : rest) = go_tuple (n+1) rest
+    go_tuple n other	    = Nothing
+
+    tup_name n 
+	| OccName.isTcClsName ctxt_ns = Name.getName (tupleTyCon Boxed n)
+	| otherwise 		      = Name.getName (tupleCon Boxed n)
+
+mk_uniq_occ :: OccName.NameSpace -> String -> Int# -> OccName.OccName
 mk_uniq_occ ns occ uniq 
-  = OccName.mkOccName ns (TH.occString occ ++ '[' : shows (mk_uniq uniq) "]")
+  = OccName.mkOccName ns (occ ++ '[' : shows (mk_uniq uniq) "]")
 	-- The idea here is to make a name that 
 	-- a) the user could not possibly write, and
 	-- b) cannot clash with another NameU
@@ -559,14 +603,14 @@ mk_uniq_occ ns occ uniq
 	-- rapidly baked into data constructors and the like.  Baling out
 	-- and generating an unqualified RdrName here is the simple solution
 
+-- The packing and unpacking is rather turgid :-(
+mk_occ :: OccName.NameSpace -> String -> OccName.OccName
+mk_occ ns occ = OccName.mkOccFS ns (mkFastString occ)
+
 mk_ghc_ns :: TH.NameSpace -> OccName.NameSpace
-mk_ghc_ns DataName     = OccName.dataName
+mk_ghc_ns TH.DataName  = OccName.dataName
 mk_ghc_ns TH.TcClsName = OccName.tcClsName
 mk_ghc_ns TH.VarName   = OccName.varName
-
--- The packing and unpacking is rather turgid :-(
-mk_occ :: OccName.NameSpace -> TH.OccName -> OccName.OccName
-mk_occ ns occ = OccName.mkOccFS ns (mkFastString (TH.occString occ))
 
 mk_mod :: TH.ModName -> Module
 mk_mod mod = mkModule (TH.modString mod)

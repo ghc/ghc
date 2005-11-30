@@ -35,7 +35,7 @@ module OccName (
 	mkDataConWrapperOcc, mkDataConWorkerOcc,
 	
 	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
-	parenSymOcc, reportIfUnused,
+	parenSymOcc, reportIfUnused, isTcClsName, isVarName,
 
 	occNameFS, occNameString, occNameUserString, occNameSpace, 
 	occNameFlavour, briefOccNameFlavour,
@@ -52,8 +52,8 @@ module OccName (
 	-- The basic form of names
 	isLexCon, isLexVar, isLexId, isLexSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-	isLowerISO, isUpperISO
-
+	isLowerISO, isUpperISO,
+	startsVarSym, startsVarId, startsConSym, startsConId
     ) where
 
 #include "HsVersions.h"
@@ -146,11 +146,21 @@ srcDataName = DataName	-- Haskell-source data constructors should be
 tvName      = TvName
 varName     = VarName
 
+isTcClsName :: NameSpace -> Bool
+isTcClsName TcClsName = True
+isTcClsName _	      = False
+
+isVarName :: NameSpace -> Bool	-- Variables or type variables, but not constructors
+isVarName TvName  = True
+isVarName VarName = True
+isVarName other   = False
+
+
 nameSpaceString :: NameSpace -> String
-nameSpaceString DataName  = "Data constructor"
-nameSpaceString VarName   = "Variable"
-nameSpaceString TvName    = "Type variable"
-nameSpaceString TcClsName = "Type constructor or class"
+nameSpaceString DataName  = "data constructor"
+nameSpaceString VarName   = "variable"
+nameSpaceString TvName    = "type variable"
+nameSpaceString TcClsName = "type constructor or class"
 \end{code}
 
 
