@@ -384,7 +384,11 @@ retry_pop_stack:
 	Sp(0) = R1;		/* save the exception */
 	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
 	SAVE_THREAD_STATE();	/* inline! */
-	R1 = ThreadFinished;
+
+	/* The return code goes in BaseReg->rRet, and BaseReg is returned in R1 */
+	StgRegTable_rRet(BaseReg) = ThreadFinished;
+	R1 = BaseReg;
+
 	jump StgReturn;
     }
 
