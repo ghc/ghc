@@ -92,7 +92,8 @@ import Control.Exception as Exception
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Conc		( ThreadId(..), myThreadId, killThread, yield,
-			  threadDelay, threadWaitRead, threadWaitWrite )
+			  threadDelay, threadWaitRead, threadWaitWrite,
+			  forkIO, childHandler )
 import GHC.TopHandler   ( reportStackOverflow, reportError )
 import GHC.IOBase	( IO(..) )
 import GHC.IOBase	( unsafeInterleaveIO )
@@ -203,35 +204,6 @@ instance Show ThreadId where
    showsPrec d t = 
    	showString "ThreadId " . 
         showsPrec d (getThreadId (id2TSO t))
-
-{- |
-This sparks off a new thread to run the 'IO' computation passed as the
-first argument, and returns the 'ThreadId' of the newly created
-thread.
-
-The new thread will be a lightweight thread; if you want to use a foreign
-library that uses thread-local storage, use 'forkOS' instead.
--}
-forkIO :: IO () -> IO ThreadId
-forkIO action = IO $ \ s -> 
-   case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
- where
-  action_plus = Exception.catch action childHandler
-
-childHandler :: Exception -> IO ()
-childHandler err = Exception.catch (real_handler err) childHandler
-
-real_handler :: Exception -> IO ()
-real_handler ex =
-  case ex of
-	-- ignore thread GC and killThread exceptions:
-	BlockedOnDeadMVar            -> return ()
-	BlockedIndefinitely          -> return ()
-	AsyncException ThreadKilled  -> return ()
-
-	-- report all others:
-	AsyncException StackOverflow -> reportStackOverflow
-	other       -> reportError other
 
 #endif /* __GLASGOW_HASKELL__ */
 
