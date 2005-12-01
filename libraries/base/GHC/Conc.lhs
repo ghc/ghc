@@ -25,6 +25,7 @@ module GHC.Conc
 
 	-- Forking and suchlike
 	, forkIO	-- :: IO a -> IO ThreadId
+	, childHandler  -- :: Exception -> IO ()
 	, myThreadId 	-- :: IO ThreadId
 	, killThread	-- :: ThreadId -> IO ()
 	, throwTo       -- :: ThreadId -> Exception -> IO ()
