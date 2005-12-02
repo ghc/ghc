@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: main.c,v 1.3 2004/08/13 13:11:23 simonmar Exp $
+ * $Id: main.c,v 1.4 2005/12/02 12:45:16 simonmar Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -32,6 +32,12 @@
 #include "cgprof.h"
 #include "matrix.h"
 #include "daVinci.h"
+
+#if HAVE_WINDOWS_H
+#include <windows.h>
+#define sleep(x) Sleep((x)*1000)
+#endif
+
 
 #define NoDeletes 80
 
