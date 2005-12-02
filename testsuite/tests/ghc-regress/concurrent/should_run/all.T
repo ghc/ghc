@@ -113,4 +113,4 @@ test('conc050', skip, compile_and_run, ['-package stm'])
 test('conc051', normal, compile_and_run, [''])
 
 test('conc052', normal, compile_and_run, ['-package stm'])
-test('conc053', normal, compile_and_run, ['-package stm'])
+test('conc053', only_ways(['threaded','smp']), compile_and_run, ['-package stm'])
