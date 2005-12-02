@@ -1,0 +1,40 @@
+>> CAUGHT return
+>> CAUGHT return undefined
+>> CAUGHT return Control.Exception.throw
+>> CAUGHT return error
+>> MISSED fail
+>> MISSED error
+>> MISSED Control.Exception.throw
+>> MISSED ioError ErrorCall
+>> MISSED ioError IOException
+>> MISSED undefined
+Prelude.catch MISSED return
+Prelude.catch MISSED return undefined
+Prelude.catch MISSED return Control.Exception.throw
+Prelude.catch MISSED return error
+Prelude.catch CAUGHT fail
+Prelude.catch MISSED error
+Prelude.catch MISSED Control.Exception.throw
+Prelude.catch MISSED ioError ErrorCall
+Prelude.catch CAUGHT ioError IOException
+Prelude.catch MISSED undefined
+Control.Exception.catch MISSED return
+Control.Exception.catch MISSED return undefined
+Control.Exception.catch MISSED return Control.Exception.throw
+Control.Exception.catch MISSED return error
+Control.Exception.catch CAUGHT fail
+Control.Exception.catch CAUGHT error
+Control.Exception.catch CAUGHT Control.Exception.throw
+Control.Exception.catch CAUGHT ioError ErrorCall
+Control.Exception.catch CAUGHT ioError IOException
+Control.Exception.catch CAUGHT undefined
+Control.Exception.finally CAUGHT return
+Control.Exception.finally CAUGHT return undefined
+Control.Exception.finally CAUGHT return Control.Exception.throw
+Control.Exception.finally CAUGHT return error
+Control.Exception.finally CAUGHT fail
+Control.Exception.finally CAUGHT error
+Control.Exception.finally CAUGHT Control.Exception.throw
+Control.Exception.finally CAUGHT ioError ErrorCall
+Control.Exception.finally CAUGHT ioError IOException
+Control.Exception.finally CAUGHT undefined
