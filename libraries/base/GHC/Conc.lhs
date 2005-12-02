@@ -82,7 +82,9 @@ import System.Posix.Internals
 import Foreign
 import Foreign.C
 
+#ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.TopHandler ( reportError, reportStackOverflow )
+#endif
 
 import Data.Maybe
 
