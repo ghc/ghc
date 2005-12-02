@@ -5009,7 +5009,7 @@ choices, but it gives a single path that works.</para>
     ; pw: cvs
   - cvs checkout fpconfig
   - cd fptools
-  - cvs checkout ghc hslibs libraries
+  - cvs checkout ghc libraries
 
 - Build ghc, using cygwin and mingw, targetting mingw
   - export PATH=/cygdrive/c/ghc/ghc-6.4.1:$PATH
