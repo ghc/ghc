@@ -212,7 +212,7 @@ type Prefix = Int
 type Mask   = Int
 type Key    = Int
 
-instance Ord a => Monoid (IntMap a) where
+instance Monoid (IntMap a) where
     mempty  = empty
     mappend = union
     mconcat = unions
