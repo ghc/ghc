@@ -208,6 +208,7 @@ test('tc195', only_compiler_types(['ghc']), compile, [''])
 test('tc196', normal, compile, [''])
 test('tc197', normal, compile, [''])
 test('tc198', normal, compile, [''])
+test('tc199', expect_fail_if_compiler_type('ghc'), compile, [''])
 
 test('syn-perf', normal, compile, ['-fcontext-stack=30'])
 test('LoopOfTheDay1', normal, compile, [''])
