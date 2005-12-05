@@ -59,6 +59,7 @@ module GHC.Conc
         , catchSTM      -- :: STM a -> (Exception -> STM a) -> STM a
 	, TVar          -- abstract
 	, newTVar 	-- :: a -> STM (TVar a)
+	, newTVarIO 	-- :: a -> STM (TVar a)
 	, readTVar	-- :: TVar a -> STM a
 	, writeTVar	-- :: a -> TVar a -> STM ()
 	, unsafeIOToSTM	-- :: IO a -> STM a
@@ -318,6 +319,15 @@ instance Eq (TVar a) where
 -- |Create a new TVar holding a value supplied
 newTVar :: a -> STM (TVar a)
 newTVar val = STM $ \s1# ->
+    case newTVar# val s1# of
+	 (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
+
+-- |@IO@ version of 'newTVar'.  This is useful for creating top-level
+-- 'TVar's using 'System.IO.Unsafe.unsafePerformIO', because using
+-- 'atomically' inside 'System.IO.Unsafe.unsafePerformIO' isn't
+-- possible.
+newTVarIO :: a -> IO (TVar a)
+newTVarIO val = IO $ \s1# ->
     case newTVar# val s1# of
 	 (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
