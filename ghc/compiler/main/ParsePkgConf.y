@@ -82,6 +82,7 @@ field	:: { PackageConfig -> PackageConfig }
 		        "libraryDirs"       -> p{libraryDirs       = $3}
 		        "hsLibraries"       -> p{hsLibraries       = $3}
 		        "extraLibraries"    -> p{extraLibraries    = $3}
+		        "extraGHCiLibraries"-> p{extraGHCiLibraries= $3}
 		        "includeDirs"       -> p{includeDirs       = $3}
 		        "includes"          -> p{includes          = $3}
 		        "hugsOptions"       -> p{hugsOptions       = $3}

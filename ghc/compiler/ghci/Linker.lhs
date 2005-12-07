@@ -756,8 +756,19 @@ linkPackage :: DynFlags -> PackageConfig -> IO ()
 linkPackage dflags pkg
    = do 
         let dirs      =  Packages.libraryDirs pkg
-        let libs      =  Packages.hsLibraries pkg ++ Packages.extraLibraries pkg
-				++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
+
+        let libs      =  Packages.hsLibraries pkg
+        -- Because of slight differences between the GHC dynamic linker and
+        -- the native system linker some packages have to link with a
+        -- different list of libraries when using GHCi. Examples include: libs
+        -- that are actually gnu ld scripts, and the possability that the .a
+        -- libs do not exactly match the .so/.dll equivalents. So if the
+        -- package file provides an "extra-ghci-libraries" field then we use
+        -- that instead of the "extra-libraries" field.
+                      ++ (if null (Packages.extraGHCiLibraries pkg)
+                            then Packages.extraLibraries pkg
+                            else Packages.extraGHCiLibraries pkg)
+                      ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
         classifieds   <- mapM (locateOneObj dirs) libs
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
