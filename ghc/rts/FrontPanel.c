@@ -20,9 +20,9 @@
 #include "RtsFlags.h"
 #include "Schedule.h"
 
-#include <unistd.h>
-#include <gdk/gdktypes.h>
 #include <gtk/gtk.h>
+#include <unistd.h>
+#include <string.h>
 
 #include "VisSupport.h"
 #include "VisWindow.h"
@@ -605,7 +605,7 @@ residencyCensus( void )
 		g == 0 && s == 0) continue;
 
 	    if (RtsFlags.GcFlags.generations == 1) {
-		bd = generations[g].steps[s].to_blocks;
+/*		bd = generations[g].steps[s].to_blocks; FIXME to_blocks does not exist */
 	    } else {
 		bd = generations[g].steps[s].blocks;
 	    }
@@ -668,7 +668,7 @@ residencyCensus( void )
 		    case SE_CAF_BLACKHOLE:
 		    case SE_BLACKHOLE:
 		    case BLACKHOLE:
-		    case BLACKHOLE_BQ:
+/*		    case BLACKHOLE_BQ: FIXME: case does not exist */
 			size = sizeW_fromITBL(info);
 			type = BlackHole;
 			break;
@@ -703,7 +703,7 @@ residencyCensus( void )
 		    case STABLE_NAME:
 		    case MVAR:
 		    case MUT_VAR:
-		    case MUT_CONS:
+/*		    case MUT_CONS: FIXME: case does not exist */
 		    case IND_PERM:
 		    case IND_OLDGEN_PERM:
 			size = sizeW_fromITBL(info);
