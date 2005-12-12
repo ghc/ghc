@@ -407,6 +407,9 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 SRC_HC_OPTS += -DGHCI -package template-haskell
 PKG_DEPENDS += template-haskell
 
+# Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
+SRC_HC_OPTS += -threaded
+
 ALL_DIRS += ghci
 
 # If we are going to use dynamic libraries instead of .o files for ghci,
