@@ -109,7 +109,7 @@ $white_no_nl+ 				;
 -- have to exclude those.
 -- The regex says: "munch all the characters after the dashes, as long as
 -- the first one is not a symbol".
-"--"\-* [^$symbol] .*			;
+"--"\-* [^$symbol :] .*			;
 "--"\-* / { atEOL }			;
 
 -- 'bol' state: beginning of a line.  Slurp up all the whitespace (including
