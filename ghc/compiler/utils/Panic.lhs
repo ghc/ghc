@@ -124,7 +124,7 @@ showGhcException (Panic s)
 		 ++ cProjectVersion ++ "):\n\t"
 	         ++ s ++ "\n\n"
 	         ++ "Please report this as a compiler bug.  See:\n"
-		 ++ "  http://www.haskell.org/ghc/docs/latest/html/users_guide/bug-reporting.html\n")
+		 ++ "  http://www.haskell.org/ghc/reportabug\n")
 
 #if __GLASGOW_HASKELL__ < 603
 myMkTyConApp = mkAppTy

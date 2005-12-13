@@ -135,7 +135,7 @@ rtsFatalInternalErrorFn(char *s, va_list ap)
      }
      vfprintf(stderr, s, ap);
      fprintf(stderr, "\n");
-     fprintf(stderr, "    Please report this as a bug to glasgow-haskell-bugs@haskell.org,\n    or http://www.sourceforge.net/projects/ghc/\n");
+     fprintf(stderr, "    Please report this as a compiler bug.  See:\nhttp://www.haskell.org/ghc/reportabug\n");
      fflush(stderr);
   }
 
