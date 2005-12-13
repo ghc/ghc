@@ -20,7 +20,6 @@
 &utils;
 &win32-dll;
 &bugs;
-&faq;
 
 <index/>
 <!-- Emacs stuff:
