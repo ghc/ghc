@@ -602,6 +602,10 @@ data Exception
 	-- ^The current thread was waiting to retry an atomic memory transaction
 	-- that could never become possible to complete because there are no other
 	-- threads referring to any of teh TVars involved.
+  | NestedAtomically
+	-- ^The runtime detected an attempt to nest one STM transaction
+	-- inside another one, presumably due to the use of 
+	-- 'unsafePeformIO' with 'atomically'.
   | Deadlock
 	-- ^There are no runnable threads, so the program is
 	-- deadlocked.  The 'Deadlock' exception is
@@ -740,6 +744,7 @@ instance Show Exception where
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (BlockedIndefinitely)	 = showString "thread blocked indefinitely"
+  showsPrec _ (NestedAtomically)	 = showString "Control.Concurrent.STM.atomically was nested"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (Deadlock)                 = showString "<<deadlock>>"
 
@@ -759,6 +764,7 @@ instance Eq Exception where
   AsyncException e1   == AsyncException e2   = e1 == e2
   BlockedOnDeadMVar   == BlockedOnDeadMVar   = True
   NonTermination      == NonTermination      = True
+  NestedAtomically    == NestedAtomically    = True
   Deadlock            == Deadlock            = True
   _                   == _                   = False
 
