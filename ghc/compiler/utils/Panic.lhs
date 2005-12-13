@@ -123,9 +123,8 @@ showGhcException (Panic s)
    = showString ("panic! (the `impossible' happened, GHC version "
 		 ++ cProjectVersion ++ "):\n\t"
 	         ++ s ++ "\n\n"
-	         ++ "Please report it as a compiler bug "
-	         ++ "to glasgow-haskell-bugs@haskell.org,\n"
-		 ++ "or http://sourceforge.net/projects/ghc/.\n\n")
+	         ++ "Please report this as a compiler bug.  See:\n"
+		 ++ "  http://www.haskell.org/ghc/docs/latest/html/users_guide/bug-reporting.html\n")
 
 #if __GLASGOW_HASKELL__ < 603
 myMkTyConApp = mkAppTy
