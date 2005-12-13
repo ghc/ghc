@@ -82,7 +82,9 @@
 	<listitem>
 	  <para>This list is for GHC users to chat among themselves.
 	  If you have a specific question about GHC, please check the
-	  FAQ first (<xref linkend="faq"/>).</para>
+	  <ulink
+	  url="http://hackage.haskell.org/trac/ghc/FAQ">FAQ</ulink>
+	  first.</para>
 
 	  <variablelist>
 	    <varlistentry>
@@ -244,18 +246,17 @@
     <sect2>
       <title>How do I tell if I should report my bug?</title>
 
-      <para>Take a look at the FAQ (<xref linkend="faq"/>) and <xref
+      <para>Take a look at the <ulink
+      url="http://hackage.haskell.org/trac/ghc/FAQ">FAQ</ulink> and <xref
       linkend="wrong"/>, which will give you some guidance as to
       whether the behaviour you're seeing is really a bug or
       not.</para>
 
       <para>If it is a bug, then it might have been reported before:
-      try searching the mailing list archives.  The archives don't
-      have a built-in search facility, but we find that <ulink
-      url="http://www.google.com/">Google</ulink>'s site search works
-      pretty well: enter
-      <quote><literal>site:www.haskell.org</literal></quote> followed
-      by your search term into Google.</para>
+      try searching on the <ulink
+      url="http://hackage.haskell.org/trac/ghc">bug tracker</ulink>,
+      and failing that, try <ulink
+      url="http://www.google.com">Google</ulink>.</para>
 
       <para>If in doubt, just report it.</para>
     </sect2>
@@ -271,44 +272,44 @@
       <orderedlist>
 	<listitem>
 	  <para>What kind of machine are you running on, and exactly
-          what version of the operating system are you using?
-          (on a Unix system, <command>uname -a</command> or <command>cat
-          /etc/motd</command> will show the desired information.)</para>
+          what version of the operating system are you using?  (on a
+          Unix system, <command>uname -a</command> or <command>cat
+          /etc/motd</command> will show the desired information.)  In
+          the bug tracker, this information can be given in the
+          &ldquo;Architecture&rdquo; and &ldquo;Operating
+          system&rdquo; fields.</para>
 	</listitem>
 
 	<listitem>
-	  <para> What version of GCC are you using? <command>gcc
-	  -v</command> will tell you.</para>
+	  <para>What version of GCC are you using? <command>gcc&nbsp;-v</command> will tell you.</para>
 	</listitem>
 
 	<listitem>
-	  <para> Run the sequence of compiles/runs that caused the
-          offending behaviour, capturing all the input/output in a
-          &ldquo;script&rdquo; (a UNIX command) or in an Emacs shell
-          window.  We'd prefer to see the whole thing.</para>
+	  <para>Run the sequence of compiles/runs that caused the
+          offending behaviour, cut-and-paste the whole session into
+          the bug report.  We'd prefer to see the whole thing.</para>
 	</listitem>
 
 	<listitem>
-	  <para> Be sure any Haskell compilations are run with a
-          <option>-v</option> (verbose) flag, so we can see exactly
+	  <para>Add the -v flag when running GHC, so we can see exactly
           what was run, what versions of things you have, etc.</para>
 	</listitem>
 
 	<listitem>
-	  <para> What is the program behaviour that is wrong, in your
+	  <para>What is the program behaviour that is wrong, in your
 	  opinion?</para>
 	</listitem>
 
 	<listitem>
-	  <para> If practical, please send enough source files for us
-          to duplicate the problem.</para>
+	  <para>If practical, please attach or send enough source
+          files for us to duplicate the problem.</para>
 	</listitem>
 
 	<listitem>
-	  <para> If you are a Hero and track down the problem in the
-          compilation-system sources, please send us patches relative
-          to a known released version of GHC, or whole files if you
-          prefer.</para>
+	  <para>If you are a Hero and track down the problem in the
+          compilation-system sources, please send us patches (either
+          <literal>darcs send</literal>, plain patches, or just whole
+          files if you prefer).</para>
 	</listitem>
       </orderedlist>
     </sect2>
