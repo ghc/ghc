@@ -40,6 +40,7 @@ PRELUDE_CLOSURE(GHCziIOBase_heapOverflow_closure);
 PRELUDE_CLOSURE(GHCziIOBase_BlockedOnDeadMVar_closure);
 PRELUDE_CLOSURE(GHCziIOBase_BlockedIndefinitely_closure);
 PRELUDE_CLOSURE(GHCziIOBase_NonTermination_closure);
+PRELUDE_CLOSURE(GHCziIOBase_NestedAtomically_closure);
 
 PRELUDE_INFO(GHCziBase_Czh_static_info);
 PRELUDE_INFO(GHCziBase_Izh_static_info);
@@ -87,6 +88,7 @@ PRELUDE_INFO(GHCziStable_StablePtr_con_info);
 #define BlockedOnDeadMVar_closure (&GHCziIOBase_BlockedOnDeadMVar_closure)
 #define BlockedIndefinitely_closure (&GHCziIOBase_BlockedIndefinitely_closure)
 #define NonTermination_closure    (&GHCziIOBase_NonTermination_closure)
+#define NestedAtomically_closure  (&GHCziIOBase_NestedAtomically_closure)
 
 #define Czh_static_info           (&GHCziBase_Czh_static_info)
 #define Fzh_static_info           (&GHCziFloat_Fzh_static_info)

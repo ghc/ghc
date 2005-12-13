@@ -1172,6 +1172,14 @@ atomicallyzh_fast
   /* Args: R1 = m :: STM a */
   STK_CHK_GEN(SIZEOF_StgAtomicallyFrame + WDS(1), R1_PTR, atomicallyzh_fast);
 
+  old_trec = StgTSO_trec(CurrentTSO);
+
+  /* Nested transactions are not allowed; raise an exception */
+  if (old_trec != NO_TREC) {
+     R1 = GHCziIOBase_NestedAtomically_closure;
+     jump raisezh_fast;
+  }
+
   /* Set up the atomically frame */
   Sp = Sp - SIZEOF_StgAtomicallyFrame;
   frame = Sp;
@@ -1180,8 +1188,6 @@ atomicallyzh_fast
   StgAtomicallyFrame_code(frame) = R1;
 
   /* Start the memory transcation */
-  old_trec = StgTSO_trec(CurrentTSO);
-  ASSERT(old_trec == NO_TREC);
   "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", old_trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
