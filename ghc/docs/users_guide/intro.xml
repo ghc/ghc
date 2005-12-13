@@ -228,15 +228,15 @@
 
     <itemizedlist>
       <listitem>
-	<para>Go to the <ulink
-    url="http://sourceforge.net/projects/ghc/">SourceForge GHC
-    page</ulink>, go to the <quote>bugs</quote> section, click on
-    <quote>submit</quote>, and enter your bug report.  You can also
-    check the outstanding bugs here and search the archives to make
-    sure it hasn't already been reported.  Or:</para>
+	<para>Preferred: <ulink
+    url="http://hackage.haskell.org/trac/ghc/newticket?type=bug">Create
+    a new bug</ulink>, and enter your bug report.  You can also
+    search the bug database here to make sure your bug hasn't already
+    been reported (if it has, it might still help to add information
+    from your experience to the existing report).</para>
       </listitem>
       <listitem>
-	<para>Email your bug report to
+	<para>Bug reports can also be emailed to
     <email>glasgow-haskell-bugs@haskell.org</email>. </para>
       </listitem>
     </itemizedlist>
