@@ -924,16 +924,21 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 				   "file is locked" Nothing)
 #endif
 	   mkFileHandle fd is_socket filepath ha_type binary
-	 -- Stream or RawDevice
-	Stream    -> mkIt ha_type
-	RawDevice -> mkIt ha_type
+
+	Stream
+	   -- only *Streams* can be DuplexHandles.  Other read/write
+	   -- Handles must share a buffer.
+	   | ReadWriteHandle <- ha_type -> 
+		mkDuplexHandle fd is_socket filepath binary
+	   | otherwise ->
+		mkFileHandle   fd is_socket filepath ha_type binary
+
+	RawDevice -> 
+		mkFileHandle fd is_socket filepath ha_type binary
+
 	_ ->
 	  ioException (IOError Nothing UnsupportedOperation "openFd"
 			           "unknown file type" Nothing) 
-     where
-      mkIt ht
-       | isReadWriteHandleType ht = mkDuplexHandle fd is_socket filepath binary
-       | otherwise                = mkFileHandle   fd is_socket filepath ht binary
 
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
