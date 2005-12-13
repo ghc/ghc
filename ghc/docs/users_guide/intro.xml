@@ -83,7 +83,7 @@
 	  <para>This list is for GHC users to chat among themselves.
 	  If you have a specific question about GHC, please check the
 	  <ulink
-	  url="http://hackage.haskell.org/trac/ghc/FAQ">FAQ</ulink>
+	  url="http://hackage.haskell.org/trac/ghc/wiki/FAQ">FAQ</ulink>
 	  first.</para>
 
 	  <variablelist>
@@ -247,7 +247,7 @@
       <title>How do I tell if I should report my bug?</title>
 
       <para>Take a look at the <ulink
-      url="http://hackage.haskell.org/trac/ghc/FAQ">FAQ</ulink> and <xref
+      url="http://hackage.haskell.org/trac/ghc/wiki/FAQ">FAQ</ulink> and <xref
       linkend="wrong"/>, which will give you some guidance as to
       whether the behaviour you're seeing is really a bug or
       not.</para>
