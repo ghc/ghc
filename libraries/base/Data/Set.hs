@@ -171,6 +171,7 @@ instance (Data a, Ord a) => Data (Set a) where
   toConstr _     = error "toConstr"
   gunfold _ _    = error "gunfold"
   dataTypeOf _   = mkNorepType "Data.Set.Set"
+  dataCast1      = gcast1
 
 #endif
 

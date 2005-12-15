@@ -236,6 +236,7 @@ instance Data a => Data (IntMap a) where
   toConstr _    = error "toConstr"
   gunfold _ _   = error "gunfold"
   dataTypeOf _  = mkNorepType "Data.IntMap.IntMap"
+  dataCast1      = gcast1
 
 #endif
 

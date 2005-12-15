@@ -212,6 +212,7 @@ instance (Data k, Data a, Ord k) => Data (Map k a) where
   toConstr _     = error "toConstr"
   gunfold _ _    = error "gunfold"
   dataTypeOf _   = mkNorepType "Data.Map.Map"
+  dataCast2      = gcast2
 
 #endif
 
