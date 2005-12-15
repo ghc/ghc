@@ -1447,22 +1447,37 @@ static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
     n = ROUND_UP( oc->fileSize, pagesize );
     m = ROUND_UP( aligned + sizeof (ppcJumpIsland) * count, pagesize );
 
-    /* The effect of this mremap() call is only the ensure that we have
-     * a sufficient number of virtually contiguous pages.  As returned from
-     * mremap, the pages past the end of the file are not backed.  We give
-     * them a backing by using MAP_FIXED to map in anonymous pages.
+    /* If we have a half-page-size file and map one page of it then
+     * the part of the page after the size of the file remains accessible.
+     * If, however, we map in 2 pages, the 2nd page is not accessible
+     * and will give a "Bus Error" on access.  To get around this, we check
+     * if we need any extra pages for the jump islands and map them in
+     * anonymously.  We must check that we actually require extra pages
+     * otherwise the attempt to mmap 0 pages of anonymous memory will
+     * fail -EINVAL.
      */
-    if( (oc->image = mremap( oc->image, n, m, MREMAP_MAYMOVE )) == MAP_FAILED )
-    {
-      errorBelch( "Unable to mremap for Jump Islands\n" );
-      return 0;
-    }
 
-    if( mmap( oc->image + n, m - n, PROT_READ | PROT_WRITE | PROT_EXEC,
-              MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0 ) == MAP_FAILED )
+    if( m > n )
     {
-      errorBelch( "Unable to mmap( MAP_FIXED ) for Jump Islands\n" );
-      return 0;
+      /* The effect of this mremap() call is only the ensure that we have
+       * a sufficient number of virtually contiguous pages.  As returned from
+       * mremap, the pages past the end of the file are not backed.  We give
+       * them a backing by using MAP_FIXED to map in anonymous pages.
+       */
+      oc->image = mremap( oc->image, n, m, MREMAP_MAYMOVE );
+
+      if( oc->image == MAP_FAILED )
+      {
+        errorBelch( "Unable to mremap for Jump Islands\n" );
+        return 0;
+      }
+
+      if( mmap( oc->image + n, m - n, PROT_READ | PROT_WRITE | PROT_EXEC,
+                MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0 ) == MAP_FAILED )
+      {
+        errorBelch( "Unable to mmap( MAP_FIXED ) for Jump Islands\n" );
+        return 0;
+      }
     }
 
 #else
