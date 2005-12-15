@@ -101,6 +101,7 @@ ld-options:
          , "-u", "_GHCziIOBase_BlockedOnDeadMVar_closure"
          , "-u", "_GHCziIOBase_BlockedIndefinitely_closure"
          , "-u", "_GHCziIOBase_Deadlock_closure"
+         , "-u", "_GHCziIOBase_NestedAtomically_closure"
          , "-u", "_GHCziWeak_runFinalizzerBatch_closure"
 #else
            "-u", "GHCziBase_Izh_static_info"
@@ -134,6 +135,7 @@ ld-options:
          , "-u", "GHCziIOBase_BlockedOnDeadMVar_closure"
          , "-u", "GHCziIOBase_BlockedIndefinitely_closure"
          , "-u", "GHCziIOBase_Deadlock_closure"
+         , "-u", "GHCziIOBase_NestedAtomically_closure"
          , "-u", "GHCziWeak_runFinalizzerBatch_closure"
 #endif
 
