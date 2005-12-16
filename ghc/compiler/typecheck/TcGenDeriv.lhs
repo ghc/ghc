@@ -756,9 +756,9 @@ gen_Read_binds get_fixity tycon
             _     -> [nlHsApp (nlHsVar choose_RDR) 
     		   	    (nlList (map mk_pair nullary_cons))]
     
-    mk_pair con = nlTuple [nlHsLit (data_con_str con),
-    		   		 nlHsApp (nlHsVar returnM_RDR) (nlHsVar (getRdrName con))]
-				Boxed
+    mk_pair con = nlTuple [nlHsLit (mkHsString (data_con_str con)),
+    		   		   nlHsApp (nlHsVar returnM_RDR) (nlHsVar (getRdrName con))]
+				   Boxed
     
     read_non_nullary_con data_con
       = nlHsApps prec_RDR [nlHsIntLit prec, nlHsDo DoExpr stmts body]
@@ -768,18 +768,21 @@ gen_Read_binds get_fixity tycon
      	      | otherwise	  = prefix_stmts
      
 	body = result_expr data_con as_needed
+	con_str = data_con_str data_con
 	
        	prefix_stmts		-- T a b c
-       	  = [bindLex (ident_pat (data_con_str_w_parens data_con))]
+       	  = [bindLex (ident_pat (wrapOpParens con_str))]
        	    ++ read_args
      	 
-       	infix_stmts 		-- a %% b
-       	  = [read_a1, 
-   	     bindLex (symbol_pat (data_con_str data_con)),
-     	     read_a2]
+       	infix_stmts 		-- a %% b, or  a `T` b 
+       	  = [read_a1]
+   	    ++	if isSym con_str
+		then [bindLex (symbol_pat con_str)]
+		else [read_punc "`", bindLex (ident_pat con_str), read_punc "`"]
+	    ++ [read_a2]
      
        	lbl_stmts		-- T { f1 = a, f2 = b }
-       	  = [bindLex (ident_pat (data_con_str_w_parens data_con)),
+       	  = [bindLex (ident_pat (wrapOpParens con_str)),
        	     read_punc "{"]
        	    ++ concat (intersperse [read_punc ","] field_stmts)
        	    ++ [read_punc "}"]
@@ -803,12 +806,11 @@ gen_Read_binds get_fixity tycon
     con_app c as     = nlHsVarApps (getRdrName c) as
     result_expr c as = nlHsApp (nlHsVar returnM_RDR) (con_app c as)
     
-    punc_pat s   = nlConPat punc_RDR  [nlLitPat (mkHsString s)]	  -- Punc 'c'
-    ident_pat s  = nlConPat ident_RDR [nlLitPat s]		  -- Ident "foo"
-    symbol_pat s = nlConPat symbol_RDR [nlLitPat s]		  -- Symbol ">>"
+    punc_pat s   = nlConPat punc_RDR   [nlLitPat (mkHsString s)]  -- Punc 'c'
+    ident_pat s  = nlConPat ident_RDR  [nlLitPat (mkHsString s)]  -- Ident "foo"
+    symbol_pat s = nlConPat symbol_RDR [nlLitPat (mkHsString s)]  -- Symbol ">>"
     
-    data_con_str          con = mkHsString (occNameUserString (getOccName con))
-    data_con_str_w_parens con = mkHsString (occNameUserString_with_parens (getOccName con))
+    data_con_str con = occNameUserString (getOccName con)
     
     read_punc c = bindLex (punc_pat c)
     read_arg a ty 
@@ -824,16 +826,14 @@ gen_Read_binds get_fixity tycon
 	-- 	_a = 3
 	-- or	(#) = 4
 	-- Note the parens!
-    read_lbl lbl | is_id_start (head lbl_str) 
-		 = [bindLex (ident_pat lbl_lit)]
-		 | otherwise
+    read_lbl lbl | isSym lbl_str 
 		 = [read_punc "(", 
-		    bindLex (symbol_pat lbl_lit),
+		    bindLex (symbol_pat lbl_str),
 		    read_punc ")"]
+		 | otherwise
+		 = [bindLex (ident_pat lbl_str)]
 		 where	
 		   lbl_str = occNameUserString (getOccName lbl) 
-		   lbl_lit = mkHsString lbl_str
-		   is_id_start c = isAlpha c || c == '_'
 \end{code}
 
 
@@ -901,10 +901,11 @@ gen_Show_binds get_fixity tycon
 	     dc_nm	    = getName data_con
 	     dc_occ_nm	    = getOccName data_con
              con_str        = occNameUserString dc_occ_nm
-	     op_con_str     = occNameUserString_with_parens dc_occ_nm
+	     op_con_str     = wrapOpParens con_str
+	     backquote_str  = wrapOpBackquotes con_str
 
 	     show_thingies 
-		| is_infix     	= [show_arg1, mk_showString_app (" " ++ con_str ++ " "), show_arg2]
+		| is_infix     	= [show_arg1, mk_showString_app (" " ++ backquote_str ++ " "), show_arg2]
 		| record_syntax = mk_showString_app (op_con_str ++ " {") : 
 				  show_record_args ++ [mk_showString_app "}"]
 		| otherwise	= mk_showString_app (op_con_str ++ " ") : show_prefix_args
@@ -916,7 +917,7 @@ gen_Show_binds get_fixity tycon
 			-- it seems tidier to have them both sides.
 		 where
 		   occ_nm   = getOccName l
-		   nm       = occNameUserString_with_parens occ_nm
+		   nm       = wrapOpParens (occNameUserString occ_nm)
 
              show_args 		     = zipWith show_arg bs_needed arg_tys
 	     (show_arg1:show_arg2:_) = show_args
@@ -942,12 +943,17 @@ gen_Show_binds get_fixity tycon
 	     arg_prec | record_syntax = 0	-- Record fields don't need parens
 		      | otherwise     = con_prec_plus_one
 
-occNameUserString_with_parens :: OccName -> String
-occNameUserString_with_parens occ
-  | isSymOcc occ = '(':nm ++ ")"
-  | otherwise    = nm
-  where
-   nm = occNameUserString occ
+wrapOpParens :: String -> String
+wrapOpParens s | isSym s   = '(' : s ++ ")"
+	       | otherwise = s
+
+wrapOpBackquotes :: String -> String
+wrapOpBackquotes s | isSym s   = s
+		   | otherwise = '`' : s ++ "`"
+
+isSym :: String -> Bool
+isSym ""     = False
+isSym (c:cs) = startsVarSym c || startsConSym c
 
 mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString str))
 \end{code}
