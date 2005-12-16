@@ -91,11 +91,14 @@ stgReallocBytes (void *p, int n, char *msg)
 void *
 stgCallocBytes (int n, int m, char *msg)
 {
-  int   i;
-  int   sz = n * m;
-  char* p  = stgMallocBytes(sz, msg);
-  for (i = 0; i < sz; i++) p[i] = 0;
-  return p;
+    char *space;
+
+    if ((space = (char *) calloc((size_t) n, (size_t) m)) == NULL) {
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+      MallocFailHook((W_) n*m, msg); /*msg*/
+      stg_exit(EXIT_INTERNAL_ERROR);
+    }
+    return space;
 }
 
 /* To simplify changing the underlying allocator used
