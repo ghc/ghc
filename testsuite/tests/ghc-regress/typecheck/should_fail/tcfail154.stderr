@@ -1,0 +1,8 @@
+
+tcfail154.hs:12:0:
+    Non-type variables, or repeated type variables,
+      in the constraint: C a a
+    (Use -fallow-undecidable-instances to permit this)
+    In the context: (C a a)
+    While checking the context of an instance declaration
+    In the instance declaration for `Eq (T a)'
