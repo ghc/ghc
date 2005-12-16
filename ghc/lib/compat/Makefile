@@ -17,6 +17,9 @@ LIBRARY = libghccompat.a
 # We don't want this installed
 NO_INSTALL_LIBRARY = YES
 
+# Avoid building the GHCi lib, since we don't need it
+GhcWithInterpreter = NO
+
 # Needed so that the libraries can #include relative to this directory.
 INCLUDE_DIRS=-I. -Iinclude
 
