@@ -53,7 +53,7 @@ import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
 			  MetaDetails(..), SkolemInfo(..), isMetaTyVar, metaTvRef,
-			  tcCmpPred, isClassPred, 
+			  tcCmpPred, tcEqType, isClassPred, 
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcValidInstHeadTy, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
@@ -83,7 +83,7 @@ import VarEnv
 import DynFlags	( dopt, DynFlag(..) )
 import UniqSupply	( uniqsFromSupply )
 import Util		( nOfThem, isSingleton, notNull )
-import ListSetOps	( removeDups )
+import ListSetOps	( removeDups, findDupsEq )
 import SrcLoc		( unLoc )
 import Outputable
 \end{code}
@@ -977,11 +977,15 @@ check_class_pred_tys dflags ctxt tys
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
 	InstHeadCtxt  -> True	-- We check for instance-head 
 				-- formation in checkValidInstHead
-	InstThetaCtxt -> undecidable_ok || all tcIsTyVarTy tys
+	InstThetaCtxt -> undecidable_ok || distinct_tyvars tys
 	other	      -> gla_exts       || all tyvar_head tys
   where
     undecidable_ok = dopt Opt_AllowUndecidableInstances dflags 
     gla_exts 	   = dopt Opt_GlasgowExts dflags
+
+-------------------------
+distinct_tyvars tys	-- Check that the types are all distinct type variables
+  = all tcIsTyVarTy tys && null (findDupsEq tcEqType tys)
 
 -------------------------
 tyvar_head ty			-- Haskell 98 allows predicates of form 
@@ -1074,7 +1078,8 @@ checkThetaCtxt ctxt theta
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
 
 badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
-predTyVarErr pred  = ptext SLIT("Non-type variables in constraint:") <+> pprPred pred
+predTyVarErr pred  = sep [ptext SLIT("Non-type variables, or repeated type variables,"),
+			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
 arityErr kind name n m
