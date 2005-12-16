@@ -5,7 +5,7 @@
 
 module Misc where
 
-import IOExts
+import Debug.Trace
 
 debug s v = trace (s ++" : "++ show v ++ "\n") v
 -- debug s v = v

@@ -14,7 +14,6 @@ module Illumination
 
 import Array
 import Char(chr)
-import IOExts
 import Maybe
 
 import Geometry

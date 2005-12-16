@@ -6,7 +6,7 @@
 module Parse where
 
 import Char
-import Parsec hiding (token)
+import Text.ParserCombinators.Parsec hiding (token)
 
 import Data
 

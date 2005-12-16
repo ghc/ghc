@@ -7,8 +7,6 @@ module Eval where
 
 import Array
 
-import IOExts
-
 import Geometry
 import CSG
 import Surface

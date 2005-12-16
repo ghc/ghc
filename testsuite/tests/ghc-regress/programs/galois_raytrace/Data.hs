@@ -6,13 +6,14 @@
 module Data where
 
 import Array
-import IOExts
 
 import CSG      
 import Geometry
 import Illumination
 import Primitives
 import Surface
+
+import Debug.Trace
 
 -- Now the parsed (expresssion) language
 
