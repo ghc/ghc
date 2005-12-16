@@ -1866,16 +1866,21 @@ For example, this is OK:
 
 <listitem>
 <para>All of the types in the <emphasis>context</emphasis> of
-an instance declaration <emphasis>must</emphasis> be type variables.
+an instance declaration <emphasis>must</emphasis> be type variables, and
+there must be no repeated type variables in any one constraint.
 Thus
 <programlisting>
 instance C a b => Eq (a,b) where ...
 </programlisting>
 is OK, but
 <programlisting>
-instance C Int b => Foo b where ...
+instance C Int b => Foo [b] where ...
 </programlisting>
-is not OK.
+is not OK (because of the non-type-variable <literal>Int</literal> in the context), and nor is
+<programlisting>
+instance C b b => Foo [b] where ...
+</programlisting>
+(because of the repeated type variable).
 </para>
 </listitem>
 </orderedlist>
