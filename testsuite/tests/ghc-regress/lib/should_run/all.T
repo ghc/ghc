@@ -22,10 +22,10 @@ test('exceptions002', 	normal, compile_and_run, [''])
 test('list001'	,	normal, compile_and_run, [''])
 
 test('memo001', extra_run_opts('+RTS -A10k -RTS'), \
-	compile_and_run, ['-package util'])
+	multimod_compile_and_run, ['memo001',''])
 
 test('memo002', extra_run_opts('20'), \
-	compile_and_run, ['-package util'])
+	multimod_compile_and_run, ['memo002',''])
 
 test('packedstring001', normal, compile_and_run, [''])
 
