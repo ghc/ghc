@@ -250,7 +250,7 @@ tc_pat ctxt (SigPatIn pat sig) pat_ty thing_inside
 	      <- tcExtendTyVarEnv2 tv_binds $
 		 tcPat ctxt pat (Check sig_ty') thing_inside
 
-	; return (SigPatOut pat' sig_ty, tvs, res) }
+	; return (SigPatOut pat' sig_ty', tvs, res) }
 
 tc_pat ctxt pat@(TypePat ty) pat_ty thing_inside
   = failWithTc (badTypePat pat)
