@@ -875,7 +875,7 @@ lookupBinder n
   = do { mb_val <- dsLookupMetaEnv n;
 	 case mb_val of
 	    Just (Bound x) -> return (coreVar x)
-	    other	   -> pprPanic "Failed binder lookup:" (ppr n) }
+	    other	   -> pprPanic "DsMeta: failed binder lookup when desugaring a TH bracket:" (ppr n) }
 
 -- Look up a name that is either locally bound or a global name
 --
