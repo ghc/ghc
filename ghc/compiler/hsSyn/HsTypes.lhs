@@ -237,11 +237,14 @@ splitHsInstDeclTy inst_ty
     split_tau tvs cxt (HsParTy (L _ ty))	    = split_tau tvs cxt ty
 
 -- Splits HsType into the (init, last) parts
+-- Breaks up any parens in the result type: 
+--	splitHsFunType (a -> (b -> c)) = ([a,b], c)
 splitHsFunType :: LHsType name -> ([LHsType name], LHsType name)
 splitHsFunType (L l (HsFunTy x y)) = (x:args, res)
   where
   (args, res) = splitHsFunType y
-splitHsFunType other = ([], other)
+splitHsFunType (L _ (HsParTy ty))  = splitHsFunType ty
+splitHsFunType other 	   	   = ([], other)
 \end{code}
 
 
