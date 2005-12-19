@@ -54,7 +54,6 @@ import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon,
 			  intDataCon_RDR, true_RDR, false_RDR )
 import Util		( zipWithEqual, isSingleton,
 			  zipWith3Equal, nOfThem, zipEqual )
-import Char		( isAlpha )
 import Constants
 import List		( partition, intersperse )
 import Outputable
@@ -776,9 +775,9 @@ gen_Read_binds get_fixity tycon
      	 
        	infix_stmts 		-- a %% b, or  a `T` b 
        	  = [read_a1]
-   	    ++	if isSym con_str
-		then [bindLex (symbol_pat con_str)]
-		else [read_punc "`", bindLex (ident_pat con_str), read_punc "`"]
+   	    ++	(if isSym con_str
+		 then [bindLex (symbol_pat con_str)]
+		 else [read_punc "`", bindLex (ident_pat con_str), read_punc "`"])
 	    ++ [read_a2]
      
        	lbl_stmts		-- T { f1 = a, f2 = b }
