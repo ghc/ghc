@@ -13,6 +13,8 @@ test('gadt9', normal, compile, [''])
 test('gadt10', normal, compile_fail, [''])
 test('gadt11', normal, compile_fail, [''])
 test('gadt13', normal, compile_fail, [''])
+test('gadt14', normal, compile, [''])
+
 test('red-black', normal, compile, [''])
 test('type-rep', normal, compile_and_run, [''])
 test('equal', normal, compile, [''])
