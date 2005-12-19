@@ -67,7 +67,8 @@ pprTyThingHdr exts (AClass cls)       = pprClassHdr   exts cls
 pprTyConHdr exts tyCon =
   ptext keyword <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
-    vars | GHC.isPrimTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
+    vars | GHC.isPrimTyCon tyCon || 
+	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
 	 | otherwise = GHC.tyConTyVars tyCon
 
     keyword | GHC.isSynTyCon tyCon = SLIT("type")

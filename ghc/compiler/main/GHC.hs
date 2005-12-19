@@ -97,7 +97,7 @@ module GHC (
 	-- ** Type constructors
 	TyCon, 
 	tyConTyVars, tyConDataCons, tyConArity,
-	isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
+	isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
 	getSynTyConDefn,
 
 	-- ** Type variables
@@ -191,7 +191,7 @@ import Id		( Id, idType, isImplicitId, isDeadBinder,
 import Var		( TyVar )
 import TysPrim		( alphaTyVars )
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon,
-			  isPrimTyCon, tyConArity,
+			  isPrimTyCon, isFunTyCon, tyConArity,
 			  tyConTyVars, tyConDataCons, getSynTyConDefn )
 import Class		( Class, classSCTheta, classTvsFds, classMethods )
 import FunDeps		( pprFundeps )
@@ -219,21 +219,19 @@ import FiniteMap
 import Panic
 import Digraph
 import Bag		( unitBag )
-import ErrUtils		( Severity(..), showPass, Messages, fatalErrorMsg, debugTraceMsg,
+import ErrUtils		( Severity(..), showPass, fatalErrorMsg, debugTraceMsg,
 			  mkPlainErrMsg, printBagOfErrors, printErrorsAndWarnings )
 import qualified ErrUtils
-import PrelNames	( mAIN )
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes
 import TcType           ( tcSplitSigmaTy, isDictTy )
-import FastString	( mkFastString )
 
 import Directory        ( getModificationTime, doesFileExist )
 import Maybe		( isJust, isNothing, fromJust )
-import Maybes		( orElse, expectJust, mapCatMaybes )
+import Maybes		( expectJust, mapCatMaybes )
 import List		( partition, nub )
 import qualified List
 import Monad		( unless, when )
