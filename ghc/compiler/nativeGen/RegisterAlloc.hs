@@ -156,6 +156,7 @@ allocateReg f r = filter (/= r) f
 -- 32-bit words).
 
 data FreeRegs = FreeRegs !Word32 !Word32
+	      deriving( Show )	-- The Show is used in an ASSERT
 
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0 0
