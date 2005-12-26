@@ -537,6 +537,23 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     # we don't check the compiler's stderr for a compile-and-run test
     return simple_run( name, way, './'+name, testopts.extra_run_opts, 0 )
 
+def multimod_compile_and_run_ignore_output( name, way, top_mod, extra_hc_opts ):
+    pretest_cleanup(name)
+
+    if way == 'ghci': # interpreted...
+        # not supported: exit code is too difficult to check.
+	return 'pass'
+    elif way == 'extcore' or way == 'optextcore' :
+        return extcore_run( name, way, extra_hc_opts, 0, top_mod )
+    else: # compiled...
+        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
+
+    if result != 0:
+        return 'fail'
+
+    # we don't check the compiler's stderr for a compile-and-run test
+    return simple_run( name, way, './'+name, testopts.extra_run_opts, 1 )
+
 # -----------------------------------------------------------------------------
 # Build a single-module program
 
