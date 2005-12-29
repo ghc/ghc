@@ -37,7 +37,7 @@ import Var		( setVarUnique, isId )
 import Id		( idType, setIdType, maybeModifyIdInfo, isLocalId )
 import IdInfo		( IdInfo, SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo,
 			  unfoldingInfo, setUnfoldingInfo, seqSpecInfo,
-			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
+			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo
 			)
 import Unique		( Unique )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )

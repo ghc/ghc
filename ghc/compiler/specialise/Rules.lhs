@@ -22,14 +22,14 @@ import CoreFVs		( exprFreeVars, exprsFreeVars, rulesRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX )
 import PprCore		( pprRules )
-import Type		( Type )
+import Type		( TvSubstEnv )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
 import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName,
 			  idSpecialisation, idCoreRules, setIdSpecialisation ) 
 import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
-import VarEnv		( IdEnv, TyVarEnv, InScopeSet, emptyTidyEnv,
+import VarEnv		( IdEnv, InScopeSet, emptyTidyEnv,
 			  emptyInScopeSet, mkInScopeSet, extendInScopeSetList, 
 			  emptyVarEnv, lookupVarEnv, extendVarEnv, 
 			  nukeRnEnvL, mkRnEnv2, rnOccR, rnOccL, inRnEnvR,
@@ -352,7 +352,6 @@ matchN in_scope tmpl_vars tmpl_es target_es
 -- for uniformity with IdSubstEnv
 type SubstEnv   = (TvSubstEnv, IdSubstEnv)	
 type IdSubstEnv = IdEnv    CoreExpr		
-type TvSubstEnv = TyVarEnv Type
 
 emptySubstEnv :: SubstEnv
 emptySubstEnv = (emptyVarEnv, emptyVarEnv)

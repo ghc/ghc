@@ -28,10 +28,8 @@ import Name		( nameOccName, nameSrcLoc )
 import Rules		( addIdSpecialisations, mkLocalRule, rulesOfBinds )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
-import DynFlags	( DynFlags, DynFlag(..) )
+import DynFlags		( DynFlags, DynFlag(..) )
 import BasicTypes	( Activation(..) )
-import Outputable
-
 import Maybes		( orElse )
 import Util		( mapAccumL, lengthAtLeast, notNull )
 import List		( nubBy, partition )
