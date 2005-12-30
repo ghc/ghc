@@ -37,7 +37,9 @@ import Data.Foldable (Foldable(foldMap), toList)
 import Data.Traversable (Traversable(traverse))
 import Data.Typeable
 
-#include "Typeable.h"
+#ifdef __GLASGOW_HASKELL__
+import Data.Generics.Basics (Data)
+#endif
 
 -- | Multi-way trees, also known as /rose trees/.
 data Tree a   = Node {
@@ -45,14 +47,20 @@ data Tree a   = Node {
 		subForest :: Forest a	-- ^ zero or more child trees
 	}
 #ifndef __HADDOCK__
+# ifdef __GLASGOW_HASKELL__
+  deriving (Eq, Read, Show, Data)
+# else
   deriving (Eq, Read, Show)
+# endif
 #else /* __HADDOCK__ (which can't figure these out by itself) */
 instance Eq a => Eq (Tree a)
 instance Read a => Read (Tree a)
 instance Show a => Show (Tree a)
+instance Data a => Data (Tree a)
 #endif
 type Forest a = [Tree a]
 
+#include "Typeable.h"
 INSTANCE_TYPEABLE1(Tree,treeTc,"Tree")
 
 instance Functor Tree where
