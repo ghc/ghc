@@ -50,5 +50,5 @@ generateDriver test = "test('" ++ test ++ "', normal, multimod_compile_and_run_i
 
 main = 
     do tests <- mapM processOneFile =<< getArgs
-       writeFile "generated.T" $ unlines $ map generateDriver $ concat tests
+       putStrLn $ unlines $ map generateDriver $ concat tests
        

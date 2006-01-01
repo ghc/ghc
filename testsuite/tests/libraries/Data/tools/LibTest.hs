@@ -4,23 +4,59 @@ module LibTest (
                 run,
                 runTests, 
                 module Test.QuickCheck,
-                
+                Nasty, Nasty' (..),
+                StructEq (..)
                ) where
 
 import Test.QuickCheck
 import Test.QuickCheck.Batch hiding (runTests)
 import Data.List
 import System.Exit
+import Control.Monad
 
+class StructEq a where
+    structEq :: a -> a -> Bool
+
+instance StructEq Int where
+    structEq = (==)
+
+instance StructEq Bool where
+    structEq = (==)
+
+
+instance (StructEq a, StructEq b) => StructEq (a,b) where
+    structEq (a1,b1) (a2,b2) = structEq a1 a2 && structEq b1 b2
+
+instance (StructEq a, StructEq b) => StructEq (Nasty' a b) where
+    structEq (Nasty' a1 b1) (Nasty' a2 b2) = structEq a1 a2 && structEq b1 b2
+
+instance (StructEq a) => StructEq [a] where
+    structEq l1 l2 = and (zipWith structEq l1 l2)
+
+instance (StructEq a) => StructEq (Maybe a) where
+    structEq Nothing Nothing = True
+    structEq (Just x) (Just y) = structEq x y
+    structEq _ _ = False
+
+
+type Nasty = Nasty' Int Int
 
 -- a type with a non-structural equality.
-data Nasty k v = Nasty k v
+data Nasty' k v = Nasty' {nastyKey :: k, nastyValue :: v}
 
-instance Eq k => Eq (Nasty k v) where
-    Nasty k1 _ == Nasty k2 _ = k1 == k2
 
-instance Ord k => Ord (Nasty k v) where
-    compare (Nasty k1 _) (Nasty k2 _) = compare k1 k2
+instance (Show k, Show v) => Show (Nasty' k v) where
+    show (Nasty' k v) = show k ++ ":>" ++ show v
+
+instance Eq k => Eq (Nasty' k v) where
+    Nasty' k1 _ == Nasty' k2 _ = k1 == k2
+
+instance Ord k => Ord (Nasty' k v) where
+    compare (Nasty' k1 _) (Nasty' k2 _) = compare k1 k2
+
+instance (Arbitrary k, Arbitrary v) => Arbitrary (Nasty' k v) where
+    arbitrary = return Nasty' `ap` arbitrary `ap` arbitrary
+
 
 options = 
     TestOptions 

@@ -13,7 +13,6 @@ import Data.List
 import Control.Monad.State
 import Control.Monad.Writer
 
-
 hsType name args = foldl HsTyApp (HsTyCon (UnQual name)) (map HsTyVar args)
 
 hsTyId :: HsType
@@ -36,7 +35,7 @@ hsVar' name = (HsVar (UnQual name))
 hsVar = hsVar' . HsIdent
 
 -- In the future we might want a 'real' unfication. 
--- Now it's lame stuff that works only for the input we feed it with.
+-- Now it's lame stuff that works only for some inputs
 unify (HsTyApp t1 u1) (HsTyApp t2 u2) = unify t1 t2  && unify u1 u2
 unify (HsTyCon name1) (HsTyCon name2) = name1 == name2
 unify (HsTyVar v1) (HsTyVar v2) = True
@@ -52,7 +51,7 @@ prefixName  (HsIdent s) p = (HsIdent (p++s))
 mkTester invalids loc pivot (HsQualType context typ0) (HsIdent name)
     = if invalid then [] else [HsTypeSig loc [propName] (HsQualType [] propType),
                                HsFunBind [HsMatch loc propName points (HsUnGuardedRhs rhs) []]]
-        where rhs = hsVar "(==)" `hsApp` l `hsApp` r
+        where rhs = hsVar "structEq" `hsApp` l `hsApp` r
               (l, vars)  = mkTesterSide loc "lIn" "lOut" pivot typ0 (HsIdent ("L."++ name))
               (r, vars') = mkTesterSide loc "rIn" "rOut" pivot typ0 (HsIdent ("R."++ name))
               points = map HsPVar $ map fst vars
@@ -86,7 +85,6 @@ mkTesterSide loc cvtIn cvtOut  pivot typ0 name = runAllocater $ reduce (hsVar' n
           expand fctr exp t@(HsTyVar n) = return hsVar' `ap` allocate fctr True t
           expand fctr exp (HsTyCon n) = return $ hsVar (prettyPrint n)
           expand fctr exp (HsTyApp (HsTyCon n) t) = expand (HsTyCon n:fctr) (hsMap exp) t -- pray it's a functor :)
-                                               --FIX: types of the inside allocated variables shall be adjusted.
           expand fctr exp t = return $ hsVar $ toFunName $ prettyPrint t
 
           allocate :: [HsType] -> Bool -> HsType -> Allocater HsName
@@ -100,7 +98,7 @@ mkTesterSide loc cvtIn cvtOut  pivot typ0 name = runAllocater $ reduce (hsVar' n
 
           hsPivotType = hsType (HsIdent "REFCOLL") []
 
-toFunName = map toLower . map head . group . map toUsc
+toFunName = map toLower . map head . groupBy (\c d -> c == '_' && d == '_') . map toUsc
 
 toUsc c | isAlphaNum c = c
         | otherwise = '_'
@@ -116,7 +114,7 @@ delimiter = "-- !!! EVERYTHING BELOW THIS LINE WILL BE DELETED !!! --"
 main = do [sourceName, targetName,invalids] <- getArgs
           sourceContents <- readFile sourceName
           targetContents <- readFile targetName
-          print $ length targetContents -- lame way to force reading the whole file
+          print $ length targetContents -- HACK: lame way to force reading the whole file
           let ParseOk fileST = parseModuleWithMode (ParseMode sourceName) sourceContents
               result = processModule fileST (read invalids)
           writeFile targetName $ unlines $ takeWhile (/= delimiter) (lines targetContents) ++ delimiter : result

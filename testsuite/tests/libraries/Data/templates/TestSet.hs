@@ -3,10 +3,11 @@
 
 Test instanciations.
 
-: SETMODULE    :   SET         : EL  :
---------------------------------------
-: Data.Set     :   S.Set Int   : Int :
-: Data.IntSet  :   S.IntSet    : Int :
+: SETMODULE    :   SET         : EL    :
+----------------------------------------
+: Data.Set     :   S.Set Int   : Int   :
+: Data.Set     :   S.Set Nasty : Nasty :
+: Data.IntSet  :   S.IntSet    : Int   :
 
 -}
 
@@ -54,17 +55,15 @@ prop_UnionComm t1 t2
 prop_Diff :: [EL] -> [EL] -> Bool
 prop_Diff xs ys
   =  S.toAscList (S.difference (S.fromList xs) (S.fromList ys))
-    == List.sort ((List.\\) (List.nub xs)  (List.nub ys))
+    == List.sort ((List.\\) (List.nub xs) (List.nub ys))
 
 prop_Int :: [EL] -> [EL] -> Bool
 prop_Int xs ys
   =  S.toAscList (S.intersection (S.fromList xs) (S.fromList ys))
     == List.sort (List.nub ((List.intersect) (xs)  (ys)))
 
-prop_Ordered
-  = forAll (choose (5,100)) $ \n ->
-    let xs = [0..n::EL]
-    in S.fromAscList xs == S.fromList xs
+prop_Ordered :: [EL] -> Bool
+prop_Ordered xs = S.fromAscList (List.sort xs) == S.fromList xs
 
 prop_toAscList :: [EL] -> Bool
 prop_toAscList xs
