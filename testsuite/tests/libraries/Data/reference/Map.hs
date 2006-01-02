@@ -102,8 +102,8 @@ unionWith = withoutKey2 unionWithKey
 
 unionWithKey :: Ord k => (k -> a -> a -> a) -> Map k a -> Map k a -> Map k a
 unionWithKey f m1 m2 = L.map coalese $ L.groupBy (testing fst) $ L.sortBy (comparing fst) (m1 ++ m2)
-    where coalese group = let key = fst (head group) in (key, foldl1 (f key) (L.map snd group))
-          --coalese :: [(k,a)] -> (k,a)
+    where coalese [(k,a)] = (k,a)
+          coalese [(k1,a1),(k2,a2)] = (k1, f k1 a1 a2)
 
 unions :: Ord k => [Map k a] -> Map k a
 unions = unionsWith const
@@ -133,7 +133,7 @@ intersectionWith :: Ord k => (a -> b -> c) -> Map k a -> Map k b -> Map k c
 intersectionWith = withoutKey2 intersectionWithKey
             
 intersectionWithKey :: Ord k => (k -> a -> b -> c) -> Map k a -> Map k b -> Map k c
-intersectionWithKey f m1 m2 = [(k,f k x y) | (k,x) <- m1, (k',y) <- m2, k == k']
+intersectionWithKey f m1 m2 = [(k,f k x y) | (k,x) <- m1, y <- lookup k m2]
 
 -- * Traversal
 -- ** Map
