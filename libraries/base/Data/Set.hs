@@ -26,7 +26,7 @@
 --	SIAM journal of computing 2(1), March 1973.
 --
 -- Note that the implementation is /left-biased/ -- the elements of a
--- first argument are always perferred to the second, for example in
+-- first argument are always preferred to the second, for example in
 -- 'union' or 'insert'.  Of course, left-biasing can only be observed
 -- when equality is an equivalence relation instead of structural
 -- equality.
@@ -311,9 +311,7 @@ unions ts
 union :: Ord a => Set a -> Set a -> Set a
 union Tip t2  = t2
 union t1 Tip  = t1
-union t1 t2
-  | size t1 >= size t2  = hedgeUnion (const LT) (const GT) t1 t2
-  | otherwise           = hedgeUnion (const LT) (const GT) t2 t1
+union t1 t2 = hedgeUnion (const LT) (const GT) t1 t2
 
 hedgeUnion cmplo cmphi t1 Tip 
   = t1
@@ -349,24 +347,23 @@ hedgeDiff cmplo cmphi t (Bin _ x l r)
   Intersection
 --------------------------------------------------------------------}
 -- | /O(n+m)/. The intersection of two sets.
--- Intersection is more efficient on (bigset `intersection` smallset).
+-- Elements of the result come from the first set.
 intersection :: Ord a => Set a -> Set a -> Set a
 intersection Tip t = Tip
 intersection t Tip = Tip
-intersection t1 t2
-  | size t1 >= size t2  = intersect' t1 t2
-  | otherwise           = intersect' t2 t1
-
-intersect' Tip t = Tip
-intersect' t Tip = Tip
-intersect' t (Bin _ x l r)
-  | found     = join x tl tr
-  | otherwise = merge tl tr
-  where
-    (lt,found,gt) = splitMember x t
-    tl            = intersect' lt l
-    tr            = intersect' gt r
-
+intersection t1@(Bin s1 x1 l1 r1) t2@(Bin s2 x2 l2 r2) =
+   if s1 >= s2 then
+      let (lt,found,gt) = splitLookup x2 t1
+          tl            = intersection lt l2
+          tr            = intersection gt r2
+      in case found of
+      Just x -> join x tl tr
+      Nothing -> merge tl tr
+   else let (lt,found,gt) = splitMember x1 t2
+            tl            = intersection l1 lt
+            tr            = intersection r1 gt
+        in if found then join x1 tl tr
+           else merge tl tr
 
 {--------------------------------------------------------------------
   Filter and partition
@@ -642,12 +639,18 @@ split x (Bin sy y l r)
 -- | /O(log n)/. Performs a 'split' but also returns whether the pivot
 -- element was found in the original set.
 splitMember :: Ord a => a -> Set a -> (Set a,Bool,Set a)
-splitMember x Tip = (Tip,False,Tip)
-splitMember x (Bin sy y l r)
-  = case compare x y of
-      LT -> let (lt,found,gt) = splitMember x l in (lt,found,join y gt r)
-      GT -> let (lt,found,gt) = splitMember x r in (join y l lt,found,gt)
-      EQ -> (l,True,r)
+splitMember x t = let (l,m,r) = splitLookup x t in
+     (l,maybe False (const True) m,r)
+
+-- | /O(log n)/. Performs a 'split' but also returns the pivot
+-- element that was found in the original set.
+splitLookup :: Ord a => a -> Set a -> (Set a,Maybe a,Set a)
+splitLookup x Tip = (Tip,Nothing,Tip)
+splitLookup x (Bin sy y l r)
+   = case compare x y of
+       LT -> let (lt,found,gt) = splitLookup x l in (lt,found,join y gt r)
+       GT -> let (lt,found,gt) = splitLookup x r in (join y l lt,found,gt)
+       EQ -> (l,Just y,r)
 
 {--------------------------------------------------------------------
   Utility functions that maintain the balance properties of the tree.
