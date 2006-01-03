@@ -1239,6 +1239,9 @@ $ cvs checkout nofib/spectral</screen>
 	  specific to GNU <command>make</command>, so you must have
 	  this installed in order to build any of the fptools
 	  suite.</para>
+
+	  <para>NB. it has been reported that version 3.79 no longer
+	  works to build GHC, and 3.80 is required.</para>
 	</listitem>
       </varlistentry>
 
