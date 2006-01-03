@@ -169,21 +169,27 @@
     thunk_field_offset_(str,s_type,field) \
     field_type_(str, s_type, field); \
     thunk_field_macro(str)
-/*
- * Byte offset and MachRep for a TSO field, minus the header and
- * variable prof bit.
- */
-#define tso_offset(s_type, field) \
+
+/* Byte offset for a TSO field, minus the header and variable prof bit. */
+#define tso_payload_offset(s_type, field) \
     def_offset(str(s_type,field), OFFSET(s_type,field) - sizeof(StgHeader) - sizeof(StgTSOProfInfo));
 
+/* Full byte offset for a TSO field, for use from Cmm */
+#define tso_field_offset_macro(str) \
+    printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+SIZEOF_OPT_StgTSOParInfo+SIZEOF_OPT_StgTSOGranInfo+SIZEOF_OPT_StgTSODistInfo+OFFSET_" str ")\n");
+
+#define tso_field_offset(s_type, field) \
+    tso_payload_offset(s_type, field);  	\
+    tso_field_offset_macro(str(s_type,field));
+
 #define tso_field_macro(str) \
-    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+SIZEOF_OPT_StgTSOParInfo+SIZEOF_OPT_StgTSOGranInfo+SIZEOF_OPT_StgTSODistInfo+OFFSET_" str "]\n");
-
+    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+TSO_OFFSET_" str "]\n")
 #define tso_field(s_type, field)		\
-    tso_offset(s_type, field);			\
+    tso_payload_offset(s_type, field);		\
     field_type(s_type, field);			\
+    tso_field_offset(s_type,field);		\
     tso_field_macro(str(s_type,field))
-
+  
 #define opt_struct_size(s_type, option)					\
     printf("#ifdef " #option "\n");					\
     printf("#define SIZEOF_OPT_" #s_type " SIZEOF_" #s_type "\n");	\
@@ -308,7 +314,7 @@ main(int argc, char *argv[])
     closure_field(StgTSO, trec);
     closure_field_("StgTSO_CCCS", StgTSO, prof.CCCS);
     tso_field(StgTSO, sp);
-    tso_offset(StgTSO, stack);
+    tso_field_offset(StgTSO, stack);
     tso_field(StgTSO, stack_size);
 
     struct_size(StgTSOProfInfo);
