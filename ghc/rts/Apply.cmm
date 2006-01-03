@@ -46,7 +46,7 @@ INFO_TABLE_RET( stg_ap_0,
 
     IF_DEBUG(sanity,
 	foreign "C" checkStackChunk(Sp+WDS(1) "ptr",
-				    CurrentTSO + OFFSET_StgTSO_stack +
+				    CurrentTSO + TSO_OFFSET_StgTSO_stack +
 				    WDS(StgTSO_stack_size(CurrentTSO)) "ptr") [R1]);
 
     Sp_adj(1);
