@@ -15,7 +15,8 @@ module InteractiveUI (
 
 -- The GHC interface
 import qualified GHC
-import GHC		( Session, verbosity, dopt, DynFlag(..),
+import GHC		( Session, verbosity, dopt, DynFlag(..), Target(..),
+			  TargetId(..),
 			  mkModule, pprModule, Type, Module, SuccessFlag(..),
 			  TyThing(..), Name, LoadHowMuch(..), Phase,
 			  GhcException(..), showGhcException,
@@ -30,6 +31,7 @@ import OccName( pprOccName )
 import SrcLoc( isGoodSrcLoc, srcLocFile, srcLocLine, srcLocCol )
 
 -- Other random utilities
+import Digraph		( flattenSCCs )
 import BasicTypes	( failed, successIf )
 import Panic 		( panic, installSignalHandlers )
 import Config
@@ -592,7 +594,7 @@ changeDirectory dir = do
 	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
   io (GHC.setTargets session [])
   io (GHC.load session LoadAllTargets)
-  setContextAfterLoad []
+  setContextAfterLoad session []
   io (GHC.workingDirectoryChanged session)
   dir <- expandPath dir
   io (setCurrentDirectory dir)
@@ -703,19 +705,39 @@ reloadModule m = do
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
   graph <- io (GHC.getModuleGraph session)
-  let mods = map GHC.ms_mod graph
-  mods' <- filterM (io . GHC.isLoaded session) mods
-  setContextAfterLoad mods'
-  modulesLoadedMsg ok mods'
+  graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod) graph
+  setContextAfterLoad session graph'
+  modulesLoadedMsg ok (map GHC.ms_mod graph')
 
-setContextAfterLoad [] = do
-  session <- getSession
+setContextAfterLoad session [] = do
   io (GHC.setContext session [] [prelude_mod])
-setContextAfterLoad (m:_) = do
-  session <- getSession
-  b <- io (GHC.moduleIsInterpreted session m)
-  if b then io (GHC.setContext session [m] []) 
-       else io (GHC.setContext session []  [prelude_mod,m])
+setContextAfterLoad session ms = do
+  -- load a target if one is available, otherwise load the topmost module.
+  targets <- io (GHC.getTargets session)
+  case [ m | Just m <- map (findTarget ms) targets ] of
+	[]    -> 
+	  let graph' = flattenSCCs (GHC.topSortModuleGraph True ms Nothing) in
+	  load_this (last graph')	  
+	(m:_) -> 
+	  load_this m
+ where
+   findTarget ms t
+    = case filter (`matches` t) ms of
+	[]    -> Nothing
+	(m:_) -> Just m
+
+   summary `matches` Target (TargetModule m) _
+	= GHC.ms_mod summary == m
+   summary `matches` Target (TargetFile f _) _ 
+	| Just f' <- GHC.ml_hs_file (GHC.ms_location summary)	= f == f'
+   summary `matches` target
+	= False
+
+   load_this summary | m <- GHC.ms_mod summary = do
+	b <- io (GHC.moduleIsInterpreted session m)
+	if b then io (GHC.setContext session [m] []) 
+       	     else io (GHC.setContext session []  [prelude_mod,m])
+
 
 modulesLoadedMsg :: SuccessFlag -> [Module] -> GHCi ()
 modulesLoadedMsg ok mods = do
