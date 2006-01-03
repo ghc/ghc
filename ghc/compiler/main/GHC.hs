@@ -37,7 +37,7 @@ module GHC (
 	TypecheckedSource, ParsedSource, RenamedSource,
 
 	-- * Inspecting the module structure of the program
-	ModuleGraph, ModSummary(..),
+	ModuleGraph, ModSummary(..), ModLocation(..),
 	getModuleGraph,
 	isLoaded,
 	topSortModuleGraph,
