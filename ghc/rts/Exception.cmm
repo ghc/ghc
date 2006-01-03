@@ -378,10 +378,15 @@ retry_pop_stack:
     }
 
     if (frame_type == STOP_FRAME) {
-	/* We've stripped the entire stack, the thread is now dead. */
-	Sp = CurrentTSO + OFFSET_StgTSO_stack 
-		+ WDS(StgTSO_stack_size(CurrentTSO)) - WDS(1);
-	Sp(0) = R1;		/* save the exception */
+	/*
+	 * We've stripped the entire stack, the thread is now dead.
+	 * We will leave the stack in a GC'able state, see the stg_stop_thread
+	 * entry code in StgStartup.cmm.
+	 */
+	Sp = CurrentTSO + TSO_OFFSET_StgTSO_stack 
+		+ WDS(StgTSO_stack_size(CurrentTSO)) - WDS(2);
+	Sp(1) = R1;		/* save the exception */
+	Sp(0) = stg_enter_info; /* so that GC can traverse this stack */
 	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
 	SAVE_THREAD_STATE();	/* inline! */
 
