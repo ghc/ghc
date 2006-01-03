@@ -32,6 +32,9 @@
 # a section corresponding to each of the main .mk files 
 # included by boilerplate.mk (see boilerplate.mk for a list).
 
+ifneq "$(findstring 3.7, $(MAKE_VERSION))" ""
+$(error GNU make version 3.80 or later is required.)
+endif
 
 ################################################################################
 #
