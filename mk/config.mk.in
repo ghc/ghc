@@ -33,7 +33,9 @@
 # included by boilerplate.mk (see boilerplate.mk for a list).
 
 ifneq "$(findstring 3.7, $(MAKE_VERSION))" ""
-$(error GNU make version 3.80 or later is required.)
+ifeq "$(findstring 3.79.1, $(MAKE_VERSION))" ""
+$(error GNU make version 3.79.1 or later is required.)
+endif
 endif
 
 ################################################################################
