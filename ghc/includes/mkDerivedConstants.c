@@ -185,7 +185,6 @@
 #define tso_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+TSO_OFFSET_" str "]\n")
 #define tso_field(s_type, field)		\
-    tso_payload_offset(s_type, field);		\
     field_type(s_type, field);			\
     tso_field_offset(s_type,field);		\
     tso_field_macro(str(s_type,field))
