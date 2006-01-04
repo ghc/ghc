@@ -30,30 +30,34 @@ import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
 			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
 			  kcHsSigType, tcHsBangType, tcLHsConResTy, tcDataKindSig )
-import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
+import TcMType		( newKindVar, checkValidTheta, checkValidType, 
+			  -- checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcType		( TcKind, TcType, tyVarsOfType, mkPhiTy,
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
 			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
-import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
+import Type		( splitTyConApp_maybe, 
+			  -- pprParendType, pprThetaArrow
+			)
 import Kind		( mkArrowKinds, splitKindFunTys )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, ArgVrcs, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConStupidTheta, getSynTyConDefn, isSynTyCon, tyConName )
-import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, 
+import DataCon		( DataCon, dataConWrapId, dataConName, 
+			  -- dataConSig, 
 			  dataConFieldLabels, dataConTyCon,
 			  dataConTyVars, dataConFieldType, dataConResTys )
 import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet, mkVarSet )
-import Name		( Name )
+import Name		( Name, getSrcLoc )
 import Outputable
 import Maybe		( isJust, fromJust )
 import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition )
-import SrcLoc		( Located(..), unLoc, getLoc )
+import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan )
 import ListSetOps	( equivClasses )
 import List		( delete )
 import Digraph		( SCC(..) )
@@ -661,7 +665,8 @@ checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
 -------------------------------
 checkValidDataCon :: TyCon -> DataCon -> TcM ()
 checkValidDataCon tc con
-  = addErrCtxt (dataConCtxt con) $ 
+  = setSrcSpan (srcLocSpan (getSrcLoc con))	$
+    addErrCtxt (dataConCtxt con)		$ 
     do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
 	; checkValidType ctxt (idType (dataConWrapId con)) }
 
@@ -744,8 +749,11 @@ fieldTypeMisMatch field_name con1 con2
   = sep [ptext SLIT("Constructors") <+> ppr con1 <+> ptext SLIT("and") <+> ppr con2, 
 	 ptext SLIT("give different types for field"), quotes (ppr field_name)]
 
-dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
-		       nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]
+dataConCtxt con = ptext SLIT("In the definition of data constructor") <+> quotes (ppr con)
+{- 	If the data constructor returns the wrong data type, then we get
+	zip_ty_env failures when printing its argument types; so best
+	to be less ambitious about complaining here 
+    nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]
   where
     (ex_tvs, ex_theta, arg_tys, _, _) = dataConSig con
     ex_part | null ex_tvs = empty
@@ -759,6 +767,7 @@ dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
 	     | otherwise   = braces (sep (punctuate comma 
 			     [ ppr n <+> dcolon <+> ppr ty 
 			     | (n,ty) <- fields `zip` arg_tys]))
+-}
 
 classOpCtxt sel_id tau = sep [ptext SLIT("When checking the class method:"),
 			      nest 2 (ppr sel_id <+> dcolon <+> ppr tau)]
