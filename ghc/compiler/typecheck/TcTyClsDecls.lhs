@@ -404,6 +404,7 @@ tcTyClDecl1 calc_vrcs calc_isrec
   ; checkTc (not (null cons) || gla_exts || is_boot)
 	    (emptyConDeclsErr tc_name)
     
+	-- Check that a newtype has exactly one constructor
   ; checkTc (new_or_data == DataType || isSingleton cons) 
 	    (newtypeConError tc_name (length cons))
 
@@ -467,18 +468,21 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 
 tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
 	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98)
-  = ASSERT( null ex_tvs && null (unLoc ex_ctxt) )	
-    do	{ let tc_datacon field_lbls arg_ty
+  = do	{ let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
 		     ; buildDataCon (unLoc name) False {- Prefix -} 
 				    True {- Vanilla -} [NotMarkedStrict]
 		    		    (map unLoc field_lbls)
 			   	    tc_tvs [] [arg_ty']
 				    tycon (mkTyVarTys tc_tvs) }
+
+		-- Check that a newtype has no existential stuff
+	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
+
 	; case details of
 	    PrefixCon [arg_ty] -> tc_datacon [] arg_ty
 	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty
-	    other -> failWithTc (newTypeFieldErr name (length (hsConArgs details)))
+	    other -> failWithTc (newtypeFieldErr name (length (hsConArgs details)))
 			-- Check that the constructor has exactly one field
 	}
 
@@ -824,10 +828,14 @@ badGadtDecl tc_name
 	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow GADTs")) ]
 
 newtypeConError tycon n
-  = sep [ptext SLIT("A newtype must have exactly one constructor"),
+  = sep [ptext SLIT("A newtype must have exactly one constructor,"),
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr tycon) <+> ptext SLIT("has") <+> speakN n ]
 
-newTypeFieldErr con_name n_flds
+newtypeExError con
+  = sep [ptext SLIT("A newtype constructor cannot have an existential context,"),
+	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
+
+newtypeFieldErr con_name n_flds
   = sep [ptext SLIT("The constructor of a newtype must have exactly one field"), 
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con_name) <+> ptext SLIT("has") <+> speakN n_flds]
 
