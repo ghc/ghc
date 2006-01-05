@@ -6,7 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+// Not POSIX, due to use of ru_majflt in getPageFaults()
+// #include "PosixSource.h"
+
 #include "Rts.h"
 #include "GetTime.h"
 
