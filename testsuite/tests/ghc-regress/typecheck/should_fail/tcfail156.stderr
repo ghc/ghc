@@ -1,0 +1,5 @@
+
+tcfail156.hs:7:14:
+    A newtype constructor cannot have an existential context,
+      but `Foo' does
+    In the newtype declaration for `Foo'
