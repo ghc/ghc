@@ -746,6 +746,19 @@ ghc -c Foo.hs</screen>
 	  it).</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term><option>-Rghc-timing</option>
+        <indexterm><primary><option>-Rghc-timing</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Prints a one-line summary of timing statistics for the
+          GHC run.  This option is equivalent to
+          <literal>+RTS&nbsp;-tstderr</literal>, see <xref
+          linkend="rts-options-gc" />.
+          </para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect1>
 

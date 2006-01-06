@@ -77,6 +77,12 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-Rghc-timing</option></entry>
+	      <entry>Summarise timing stats for GHC (same as <literal>+RTS -tstderr</literal>)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
@@ -1876,7 +1882,6 @@ Still to document:
 
 Misc:
   ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
-  ,  ( "Rghc-timing"	   , NoArg  (enableTimingStats) )
 
   -Bdir
 -->
