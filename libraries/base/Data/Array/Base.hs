@@ -202,48 +202,61 @@ listUArrayST (l,u) es = do
 -- the type looks like constrained over 's', which runST doesn't
 -- like. In fact all MArray (STUArray s) instances are polymorphic
 -- wrt. 's', but runST can't know that.
+--
+-- More precisely, we'd like to write this:
+--   listUArray :: (forall s. MArray (STUArray s) e (ST s), Ix i)
+--	        => (i,i) -> [e] -> UArray i e
+--   listUArray lu = runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
+--   {-# RULES listArray = listUArray
+-- Then we could call listUArray at any type 'e' that had a suitable
+-- MArray instance.  But sadly we can't, because we don't have quantified 
+-- constraints.  Hence the mass of rules below.
 
--- I would like to write a rule for listUArrayST (or listArray or
+-- I would like also to write a rule for listUArrayST (or listArray or
 -- whatever) applied to unpackCString#. Unfortunately unpackCString#
 -- calls seem to be floated out, then floated back into the middle
 -- of listUArrayST, so I was not able to do this.
 
+#ifdef __GLASGOW_HASKELL__
+type ListUArray e = forall i . Ix i => (i,i) -> [e] -> UArray i e
+
 {-# RULES
-"listArray/UArray/Bool"      listArray = \lu (es :: [Bool])        ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Char"      listArray = \lu (es :: [Char])        ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Int"       listArray = \lu (es :: [Int])         ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Word"      listArray = \lu (es :: [Word])        ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Ptr"       listArray = \lu (es :: [Ptr a])       ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/FunPtr"    listArray = \lu (es :: [FunPtr a])    ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Float"     listArray = \lu (es :: [Float])       ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Double"    listArray = \lu (es :: [Double])      ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/StablePtr" listArray = \lu (es :: [StablePtr a]) ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Int8"      listArray = \lu (es :: [Int8])        ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Int16"     listArray = \lu (es :: [Int16])       ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Int32"     listArray = \lu (es :: [Int32])       ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Int64"     listArray = \lu (es :: [Int64])       ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Word8"     listArray = \lu (es :: [Word8])       ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Word16"    listArray = \lu (es :: [Word16])      ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Word32"    listArray = \lu (es :: [Word32])      ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
-"listArray/UArray/Word64"    listArray = \lu (es :: [Word64])      ->
-    runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
+"listArray/UArray/Bool"      listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Bool
+"listArray/UArray/Char"      listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Char
+"listArray/UArray/Int"       listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Int
+"listArray/UArray/Word"      listArray	
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Word
+"listArray/UArray/Ptr"       listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray (Ptr a)
+"listArray/UArray/FunPtr"    listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray (FunPtr a)
+"listArray/UArray/Float"     listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Float
+"listArray/UArray/Double"    listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Double
+"listArray/UArray/StablePtr" listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray (StablePtr a)
+"listArray/UArray/Int8"      listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Int8
+"listArray/UArray/Int16"     listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Int16
+"listArray/UArray/Int32"     listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Int32
+"listArray/UArray/Int64"     listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Int64
+"listArray/UArray/Word8"     listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Word8
+"listArray/UArray/Word16"    listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Word16
+"listArray/UArray/Word32"    listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Word32
+"listArray/UArray/Word64"    listArray
+   = (\lu es -> runST (listUArrayST lu es >>= unsafeFreezeSTUArray)) :: ListUArray Word64
     #-}
+#endif
 
 {-# INLINE (!) #-}
 -- | Returns the element of an immutable array at the specified index.
