@@ -37,7 +37,6 @@ import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
 import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
 import LoadIface	( loadHomeInterface )
-import UnicodeUtil	( stringToUtf8 )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
 import List		( nub )
@@ -932,7 +931,7 @@ mkAssertErrorExpr
   = getSrcSpanM    			`thenM` \ sloc ->
     let
 	expr = HsApp (L sloc (HsVar assertErrorName)) (L sloc (HsLit msg))
-	msg  = HsStringPrim (mkFastString (stringToUtf8 (showSDoc (ppr sloc))))
+	msg  = HsStringPrim (mkFastString (showSDoc (ppr sloc)))
     in
     returnM (expr, emptyFVs)
 \end{code}

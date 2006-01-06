@@ -227,10 +227,10 @@ tok_decimal span buf len
   = return (L span (CmmT_Int  $! parseInteger buf len 10 octDecDigit))
 
 tok_octal span buf len 
-  = return (L span (CmmT_Int  $! parseInteger (stepOn buf) (len-1) 8 octDecDigit))
+  = return (L span (CmmT_Int  $! parseInteger (offsetBytes 1 buf) (len-1) 8 octDecDigit))
 
 tok_hexadecimal span buf len 
-  = return (L span (CmmT_Int  $! parseInteger (stepOnBy 2 buf) (len-2) 16 hexDigit))
+  = return (L span (CmmT_Int  $! parseInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
 
 tok_float str = CmmT_Float $! readRational str
 

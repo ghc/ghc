@@ -7,62 +7,66 @@
 
 \begin{code}
 module OccName (
-	-- The NameSpace type; abstact
+	-- * The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, 
-	tvName, srcDataName, nameSpaceString, 
+	tvName, srcDataName,
 
-	-- The OccName type
+	-- ** Printing
+	pprNameSpace, pprNonVarNameSpace, pprNameSpaceBrief,
+
+	-- * The OccName type
 	OccName, 	-- Abstract, instance of Outputable
 	pprOccName, 
+
+	-- ** Construction	
+	mkOccName, mkOccNameFS, 
+	mkVarOcc, mkVarOccFS,
+	mkTyVarOcc,
+	mkDFunOcc,
+	mkTupleOcc, 
+	setOccNameSpace,
+
+	-- ** Derived OccNames
+	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
+  	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
+ 	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
+	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc,
+
+	-- ** Deconstruction
+	occNameFS, occNameString, occNameSpace, 
+
+	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
+	parenSymOcc, reportIfUnused, isTcClsName, isVarName,
+
+	isTupleOcc_maybe,
 
 	-- The OccEnv type
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv,
 	lookupOccEnv, mkOccEnv, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
 
-
 	-- The OccSet type
-	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, extendOccSetList,
+	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
+	extendOccSetList,
 	unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts, 
 	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
-
-	mkOccName, mkOccFS, mkSysOcc, mkSysOccFS, mkFCallOcc, mkKindOccFS,
-	mkVarOcc, mkVarOccEncoded, mkTyVarOcc,
-	mkSuperDictSelOcc, mkDFunOcc, mkForeignExportOcc,
-	mkDictOcc, mkIPOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
- 	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc,
-	mkGenOcc1, mkGenOcc2, mkLocalOcc, mkDataTOcc, mkDataCOcc,
-	mkDataConWrapperOcc, mkDataConWorkerOcc,
-	
-	isVarOcc, isTvOcc, isTcOcc, isDataOcc, isDataSymOcc, isSymOcc, isValOcc,
-	parenSymOcc, reportIfUnused, isTcClsName, isVarName,
-
-	occNameFS, occNameString, occNameUserString, occNameSpace, 
-	occNameFlavour, briefOccNameFlavour,
-	setOccNameSpace,
-
-	mkTupleOcc, isTupleOcc_maybe,
 
 	-- Tidying up
 	TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
 
-	-- Encoding
-	EncodedString, EncodedFS, UserString, UserFS, encode, encodeFS, decode, pprEncodedFS,
-
 	-- The basic form of names
 	isLexCon, isLexVar, isLexId, isLexSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym,
-	isLowerISO, isUpperISO,
 	startsVarSym, startsVarId, startsConSym, startsConId
     ) where
 
 #include "HsVersions.h"
 
-import Char	( isDigit, isUpper, isLower, isAlphaNum, ord, chr, digitToInt )
-import Util	( thenCmp )
-import Unique	( Unique, mkUnique, Uniquable(..) )
-import BasicTypes ( Boxity(..), Arity )
-import StaticFlags ( opt_PprStyle_Debug )
+import Util		( thenCmp )
+import Unique		( Unique, mkUnique, Uniquable(..) )
+import BasicTypes 	( Boxity(..), Arity )
+import StaticFlags 	( opt_PprStyle_Debug )
 import UniqFM
 import UniqSet
 import FastString
@@ -70,34 +74,16 @@ import Outputable
 import Binary
 
 import GLAEXTS
-\end{code}
 
-We hold both module names and identifier names in a 'Z-encoded' form
-that makes them acceptable both as a C identifier and as a Haskell
-(prefix) identifier. 
+import Data.Char	( isUpper, isLower, ord )
 
-They can always be decoded again when printing error messages
-or anything else for the user, but it does make sense for it
-to be represented here in encoded form, so that when generating
-code the encoding operation is not performed on each occurrence.
+-- Unicode TODO: put isSymbol in libcompat
+#if __GLASGOW_HASKELL__ > 604
+import Data.Char	( isSymbol )
+#else
+isSymbol = const False
+#endif
 
-These type synonyms help documentation.
-
-\begin{code}
-type UserFS    = FastString	-- As the user typed it
-type EncodedFS = FastString	-- Encoded form
-
-type UserString = String	-- As the user typed it
-type EncodedString = String	-- Encoded form
-
-
-pprEncodedFS :: EncodedFS -> SDoc
-pprEncodedFS fs
-  = getPprStyle 	$ \ sty ->
-    if userStyle sty || dumpStyle sty
-	-- ftext (decodeFS fs) would needlessly pack the string again
-	then text (decode (unpackFS fs))
-        else ftext fs
 \end{code}
 
 %************************************************************************
@@ -155,12 +141,20 @@ isVarName TvName  = True
 isVarName VarName = True
 isVarName other   = False
 
+pprNameSpace :: NameSpace -> SDoc
+pprNameSpace DataName  = ptext SLIT("data constructor")
+pprNameSpace VarName   = ptext SLIT("variable")
+pprNameSpace TvName    = ptext SLIT("type variable")
+pprNameSpace TcClsName = ptext SLIT("type constructor or class")
 
-nameSpaceString :: NameSpace -> String
-nameSpaceString DataName  = "data constructor"
-nameSpaceString VarName   = "variable"
-nameSpaceString TvName    = "type variable"
-nameSpaceString TcClsName = "type constructor or class"
+pprNonVarNameSpace :: NameSpace -> SDoc
+pprNonVarNameSpace VarName = empty
+pprNonVarNameSpace ns = pprNameSpace ns
+
+pprNameSpaceBrief DataName  = char 'd'
+pprNameSpaceBrief VarName   = char 'v'
+pprNameSpaceBrief TvName    = ptext SLIT("tv")
+pprNameSpaceBrief TcClsName = ptext SLIT("tc")
 \end{code}
 
 
@@ -173,7 +167,7 @@ nameSpaceString TcClsName = "type constructor or class"
 \begin{code}
 data OccName = OccName 
     { occNameSpace  :: !NameSpace
-    , occNameFS     :: !EncodedFS
+    , occNameFS     :: !FastString
     }
 \end{code}
 
@@ -201,9 +195,11 @@ instance Outputable OccName where
 pprOccName :: OccName -> SDoc
 pprOccName (OccName sp occ) 
   = getPprStyle $ \ sty ->
-    pprEncodedFS occ <> if debugStyle sty then
-			   braces (text (briefNameSpaceFlavour sp))
-			else empty
+    if codeStyle sty 
+	then ftext (zEncodeFS occ)
+	else ftext occ <> if debugStyle sty 
+			    then braces (pprNameSpaceBrief sp)
+			    else empty
 \end{code}
 
 
@@ -211,54 +207,24 @@ pprOccName (OccName sp occ)
 %*									*
 \subsection{Construction}
 %*									*
-%*****p*******************************************************************
-
-*Sys* things do no encoding; the caller should ensure that the thing is
-already encoded
+%************************************************************************
 
 \begin{code}
-mkSysOcc :: NameSpace -> EncodedString -> OccName
-mkSysOcc occ_sp str = ASSERT2( alreadyEncoded str, text str )
-		      OccName occ_sp (mkFastString str)
-
-mkSysOccFS :: NameSpace -> EncodedFS -> OccName
-mkSysOccFS occ_sp fs = ASSERT2( alreadyEncodedFS fs, ppr fs )
-		       OccName occ_sp fs
-
-mkFCallOcc :: EncodedString -> OccName
--- This version of mkSysOcc doesn't check that the string is already encoded,
--- because it will be something like "{__ccall f dyn Int# -> Int#}" 
--- This encodes a lot into something that then parses like an Id.
--- But then alreadyEncoded complains about the braces!
-mkFCallOcc str = OccName varName (mkFastString str)
-
--- Kind constructors get a special function.  Uniquely, they are not encoded,
--- so that they have names like '*'.  This means that *even in interface files*
--- we'll get kinds like (* -> (* -> *)).  We can't use mkSysOcc because it
--- has an ASSERT that doesn't hold.
-mkKindOccFS :: NameSpace -> EncodedFS -> OccName
-mkKindOccFS occ_sp fs = OccName occ_sp fs
-\end{code}
-
-*Source-code* things are encoded.
-
-\begin{code}
-mkOccFS :: NameSpace -> UserFS -> OccName
-mkOccFS occ_sp fs = mkSysOccFS occ_sp (encodeFS fs)
-
 mkOccName :: NameSpace -> String -> OccName
-mkOccName ns s = mkSysOcc ns (encode s)
+mkOccName occ_sp str = OccName occ_sp (mkFastString str)
 
-mkVarOcc :: UserFS -> OccName
-mkVarOcc fs = mkSysOccFS varName (encodeFS fs)
+mkOccNameFS :: NameSpace -> FastString -> OccName
+mkOccNameFS occ_sp fs = OccName occ_sp fs
 
-mkTyVarOcc :: UserFS -> OccName
-mkTyVarOcc fs = mkSysOccFS tvName (encodeFS fs)
+mkVarOcc :: String -> OccName
+mkVarOcc s = mkOccName varName s
 
-mkVarOccEncoded :: EncodedFS -> OccName
-mkVarOccEncoded fs = mkSysOccFS varName fs
+mkVarOccFS :: FastString -> OccName
+mkVarOccFS fs = mkOccNameFS varName fs
+
+mkTyVarOcc :: FastString -> OccName
+mkTyVarOcc fs = mkOccNameFS tvName fs
 \end{code}
-
 
 
 %************************************************************************
@@ -355,34 +321,13 @@ intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
 %*									*
 %************************************************************************
 
-\begin{code} 
-occNameString :: OccName -> EncodedString
+\begin{code}
+occNameString :: OccName -> String
 occNameString (OccName _ s) = unpackFS s
-
-occNameUserString :: OccName -> UserString
-occNameUserString occ = decode (occNameString occ)
 
 setOccNameSpace :: NameSpace -> OccName -> OccName
 setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
--- occNameFlavour is used only to generate good error messages
-occNameFlavour :: OccName -> SDoc
-occNameFlavour (OccName DataName _)  = ptext SLIT("data constructor")
-occNameFlavour (OccName TvName _)    = ptext SLIT("type variable")
-occNameFlavour (OccName TcClsName _) = ptext SLIT("type constructor or class")
-occNameFlavour (OccName VarName s)   = empty
-
--- briefOccNameFlavour is used in debug-printing of names
-briefOccNameFlavour :: OccName -> String
-briefOccNameFlavour (OccName sp _) = briefNameSpaceFlavour sp
-
-briefNameSpaceFlavour DataName  = "d"
-briefNameSpaceFlavour VarName   = "v"
-briefNameSpaceFlavour TvName    = "tv"
-briefNameSpaceFlavour TcClsName = "tc"
-\end{code}
-
-\begin{code}
 isVarOcc, isTvOcc, isDataSymOcc, isSymOcc, isTcOcc :: OccName -> Bool
 
 isVarOcc (OccName VarName _) = True
@@ -400,19 +345,19 @@ isValOcc other		      = False
 
 -- Data constructor operator (starts with ':', or '[]')
 -- Pretty inefficient!
-isDataSymOcc (OccName DataName s) = isLexConSym (decodeFS s)
-isDataSymOcc (OccName VarName s)  = isLexConSym (decodeFS s)
+isDataSymOcc (OccName DataName s) = isLexConSym s
+isDataSymOcc (OccName VarName s)  = isLexConSym s
 isDataSymOcc other		  = False
 
 isDataOcc (OccName DataName _) = True
-isDataOcc (OccName VarName s)  = isLexCon (decodeFS s)
+isDataOcc (OccName VarName s)  = isLexCon s
 isDataOcc other		       = False
 
 -- Any operator (data constructor or variable)
 -- Pretty inefficient!
-isSymOcc (OccName DataName s)  = isLexConSym (decodeFS s)
-isSymOcc (OccName TcClsName s) = isLexConSym (decodeFS s)
-isSymOcc (OccName VarName s)   = isLexSym (decodeFS s)
+isSymOcc (OccName DataName s)  = isLexConSym s
+isSymOcc (OccName TcClsName s) = isLexConSym s
+isSymOcc (OccName VarName s)   = isLexSym s
 isSymOcc other		       = False
 
 parenSymOcc :: OccName -> SDoc -> SDoc
@@ -426,11 +371,10 @@ parenSymOcc occ doc | isSymOcc occ = parens doc
 reportIfUnused :: OccName -> Bool
   -- Haskell 98 encourages compilers to suppress warnings about
   -- unused names in a pattern if they start with "_".
-reportIfUnused occ = case occNameUserString occ of
+reportIfUnused occ = case occNameString occ of
 			('_' : _) -> False
-			zz_other  -> True
+			_other    -> True
 \end{code}
-
 
 
 %************************************************************************
@@ -466,16 +410,17 @@ NB: The string must already be encoded!
 \begin{code}
 mk_deriv :: NameSpace 
 	 -> String		-- Distinguishes one sort of derived name from another
-	 -> EncodedString	-- Must be already encoded!!  We don't want to encode it a 
-				-- second time because encoding isn't idempotent
+	 -> String
 	 -> OccName
 
-mk_deriv occ_sp sys_prefix str = mkSysOcc occ_sp (encode sys_prefix ++ str)
+mk_deriv occ_sp sys_prefix str = mkOccName occ_sp (sys_prefix ++ str)
 \end{code}
 
 \begin{code}
-mkDictOcc, mkIPOcc, mkWorkerOcc, mkDefaultMethodOcc,
- 	   mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc
+mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
+  	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
+ 	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -503,7 +448,6 @@ mkDataCOcc = mk_simple_deriv varName  "$c"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
-
 -- Data constructor workers are made by setting the name space
 -- of the data constructor OccName (which should be a DataName)
 -- to VarName
@@ -528,7 +472,7 @@ mkLocalOcc uniq occ
 
 
 \begin{code}
-mkDFunOcc :: EncodedString	-- Typically the class and type glommed together e.g. "OrdMaybe"
+mkDFunOcc :: String		-- Typically the class and type glommed together e.g. "OrdMaybe"
 				-- Only used in debug mode, for extra clarity
 	  -> Bool		-- True <=> hs-boot instance dfun
 	  -> Int		-- Unique index
@@ -609,192 +553,8 @@ tidyOccName in_scope occ@(OccName occ_sp fs)
 	Just n  -> 	-- Already used: make a new guess, 
 			-- change the guess base, and try again
 		   tidyOccName  (extendOccEnv in_scope occ (n+1))
-				(mkSysOcc occ_sp (unpackFS fs ++ show n))
+				(mkOccName occ_sp (unpackFS fs ++ show n))
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{The 'Z' encoding}
-%*									*
-%************************************************************************
-
-This is the main name-encoding and decoding function.  It encodes any
-string into a string that is acceptable as a C name.  This is the name
-by which things are known right through the compiler.
-
-The basic encoding scheme is this.  
-
-* Tuples (,,,) are coded as Z3T
-
-* Alphabetic characters (upper and lower) and digits
-	all translate to themselves; 
-	except 'Z', which translates to 'ZZ'
-	and    'z', which translates to 'zz'
-  We need both so that we can preserve the variable/tycon distinction
-
-* Most other printable characters translate to 'zx' or 'Zx' for some
-	alphabetic character x
-
-* The others translate as 'znnnU' where 'nnn' is the decimal number
-        of the character
-
-	Before		After
-	--------------------------
-	Trak		Trak
-	foo_wib		foozuwib
-	>		zg
-	>1		zg1
-	foo#		foozh
-	foo##		foozhzh
-	foo##1		foozhzh1
-	fooZ		fooZZ	
-	:+		ZCzp
-	()		Z0T	0-tuple
-	(,,,,)		Z5T	5-tuple  
-	(# #)           Z1H     unboxed 1-tuple	(note the space)
-	(#,,,,#)	Z5H	unboxed 5-tuple
-		(NB: There is no Z1T nor Z0H.)
-
-\begin{code}
--- alreadyEncoded is used in ASSERTs to check for encoded
--- strings.  It isn't fail-safe, of course, because, say 'zh' might
--- be encoded or not.
-alreadyEncoded :: String -> Bool
-alreadyEncoded s = all ok s
-		 where
-		   ok ' ' = True
-			-- This is a bit of a lie; if we really wanted spaces
-			-- in names we'd have to encode them.  But we do put
-			-- spaces in ccall "occurrences", and we don't want to
-			-- reject them here
-		   ok ch  = isAlphaNum ch
-
-alreadyEncodedFS :: FastString -> Bool
-alreadyEncodedFS fs = alreadyEncoded (unpackFS fs)
-
-encode :: UserString -> EncodedString
-encode cs = case maybe_tuple cs of
-		Just n  -> n		-- Tuples go to Z2T etc
-		Nothing -> go cs
-	  where
-		go []     = []
-		go (c:cs) = encode_ch c ++ go cs
-
-encodeFS :: UserFS -> EncodedFS
-encodeFS fast_str  | all unencodedChar str = fast_str
-		   | otherwise	           = mkFastString (encode str)
-		   where
-		     str = unpackFS fast_str
-
-unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
-unencodedChar 'Z' = False
-unencodedChar 'z' = False
-unencodedChar c   =  c >= 'a' && c <= 'z'
-	          || c >= 'A' && c <= 'Z'
-		  || c >= '0' && c <= '9'
-
-encode_ch :: Char -> EncodedString
-encode_ch c | unencodedChar c = [c]	-- Common case first
-
--- Constructors
-encode_ch '('  = "ZL"	-- Needed for things like (,), and (->)
-encode_ch ')'  = "ZR"	-- For symmetry with (
-encode_ch '['  = "ZM"
-encode_ch ']'  = "ZN"
-encode_ch ':'  = "ZC"
-encode_ch 'Z'  = "ZZ"
-
--- Variables
-encode_ch 'z'  = "zz"
-encode_ch '&'  = "za"
-encode_ch '|'  = "zb"
-encode_ch '^'  = "zc"
-encode_ch '$'  = "zd"
-encode_ch '='  = "ze"
-encode_ch '>'  = "zg"
-encode_ch '#'  = "zh"
-encode_ch '.'  = "zi"
-encode_ch '<'  = "zl"
-encode_ch '-'  = "zm"
-encode_ch '!'  = "zn"
-encode_ch '+'  = "zp"
-encode_ch '\'' = "zq"
-encode_ch '\\' = "zr"
-encode_ch '/'  = "zs"
-encode_ch '*'  = "zt"
-encode_ch '_'  = "zu"
-encode_ch '%'  = "zv"
-encode_ch c    = 'z' : shows (ord c) "U"
-\end{code}
-
-Decode is used for user printing.
-
-\begin{code}
-decodeFS :: FastString -> FastString
-decodeFS fs = mkFastString (decode (unpackFS fs))
-
-decode :: EncodedString -> UserString
-decode [] = []
-decode ('Z' : d : rest) | isDigit d = decode_tuple   d rest
-			| otherwise = decode_upper   d : decode rest
-decode ('z' : d : rest) | isDigit d = decode_num_esc d rest
-			| otherwise = decode_lower   d : decode rest
-decode (c   : rest) = c : decode rest
-
-decode_upper, decode_lower :: Char -> Char
-
-decode_upper 'L' = '('
-decode_upper 'R' = ')'
-decode_upper 'M' = '['
-decode_upper 'N' = ']'
-decode_upper 'C' = ':'
-decode_upper 'Z' = 'Z'
-decode_upper ch  = pprTrace "decode_upper" (char ch) ch
-	     	
-decode_lower 'z' = 'z'
-decode_lower 'a' = '&'
-decode_lower 'b' = '|'
-decode_lower 'c' = '^'
-decode_lower 'd' = '$'
-decode_lower 'e' = '='
-decode_lower 'g' = '>'
-decode_lower 'h' = '#'
-decode_lower 'i' = '.'
-decode_lower 'l' = '<'
-decode_lower 'm' = '-'
-decode_lower 'n' = '!'
-decode_lower 'p' = '+'
-decode_lower 'q' = '\''
-decode_lower 'r' = '\\'
-decode_lower 's' = '/'
-decode_lower 't' = '*'
-decode_lower 'u' = '_'
-decode_lower 'v' = '%'
-decode_lower ch  = pprTrace "decode_lower" (char ch) ch
-
--- Characters not having a specific code are coded as z224U
-decode_num_esc d rest
-  = go (digitToInt d) rest
-  where
-    go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
-    go n ('U' : rest)           = chr n : decode rest
-    go n other = pprPanic "decode_num_esc" (ppr n <+> text other)
-
-decode_tuple :: Char -> EncodedString -> UserString
-decode_tuple d rest
-  = go (digitToInt d) rest
-  where
-	-- NB. recurse back to decode after decoding the tuple, because
-	-- the tuple might be embedded in a longer name.
-    go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
-    go 0 ('T':rest)	= "()" ++ decode rest
-    go n ('T':rest)	= '(' : replicate (n-1) ',' ++ ")" ++ decode rest
-    go 1 ('H':rest)	= "(# #)" ++ decode rest
-    go n ('H':rest)	= '(' : '#' : replicate (n-1) ',' ++ "#)" ++ decode rest
-    go n other = pprPanic "decode_tuple" (ppr n <+> text other)
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -802,55 +562,28 @@ decode_tuple d rest
 %*									*
 %************************************************************************
 
-Tuples are encoded as
-	Z3T or Z3H
-for 3-tuples or unboxed 3-tuples respectively.  No other encoding starts 
-	Z<digit>
-
-* "(# #)" is the tycon for an unboxed 1-tuple (not 0-tuple)
-  There are no unboxed 0-tuples.  
-
-* "()" is the tycon for a boxed 0-tuple.
-  There are no boxed 1-tuples.
-
-
-\begin{code}
-maybe_tuple :: UserString -> Maybe EncodedString
-
-maybe_tuple "(# #)" = Just("Z1H")
-maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-				 (n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
-				 other		     -> Nothing
-maybe_tuple "()" = Just("Z0T")
-maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-				 (n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
-				 other	       -> Nothing
-maybe_tuple other    	     = Nothing
-
-count_commas :: Int -> String -> (Int, String)
-count_commas n (',' : cs) = count_commas (n+1) cs
-count_commas n cs	  = (n,cs)
-\end{code}
-
 \begin{code}
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
-mkTupleOcc ns bx ar
-  = OccName ns (mkFastString ('Z' : (show ar ++ bx_char)))
+mkTupleOcc ns bx ar = OccName ns (mkFastString str)
   where
-    bx_char = case bx of
-		Boxed   -> "T"
-		Unboxed -> "H"
+ 	-- no need to cache these, the caching is done in the caller
+	-- (TysWiredIn.mk_tuple)
+    str = case bx of
+		Boxed   -> '(' : commas ++ ")"
+		Unboxed -> '(' : '#' : commas ++ "#)"
+
+    commas = take (ar-1) (repeat ',')
 
 isTupleOcc_maybe :: OccName -> Maybe (NameSpace, Boxity, Arity)
 -- Tuples are special, because there are so many of them!
 isTupleOcc_maybe (OccName ns fs)
   = case unpackFS fs of
-	('Z':d:rest) | isDigit d -> Just (decode_tup (digitToInt d) rest)
-	other			 -> Nothing
+	'(':'#':',':rest -> Just (ns, Unboxed, 2 + count_commas rest)
+	'(':',':rest     -> Just (ns, Boxed,   2 + count_commas rest)
+	_other           -> Nothing
   where
-    decode_tup n "H" 	  = (ns, Unboxed, n)
-    decode_tup n "T" 	  = (ns, Boxed, n)
-    decode_tup n (d:rest) = decode_tup (n*10 + digitToInt d) rest
+    count_commas (',':rest) = 1 + count_commas rest
+    count_commas _          = 0
 \end{code}
 
 %************************************************************************
@@ -875,37 +608,31 @@ isLexSym cs = isLexConSym cs || isLexVarSym cs
 -------------
 
 isLexConId cs				-- Prefix type or data constructors
-  | nullFastString cs = False		-- 	e.g. "Foo", "[]", "(,)" 
+  | nullFS cs	      = False		-- 	e.g. "Foo", "[]", "(,)" 
   | cs == FSLIT("[]") = True
   | otherwise	      = startsConId (headFS cs)
 
 isLexVarId cs				-- Ordinary prefix identifiers
-  | nullFastString cs = False		-- 	e.g. "x", "_x"
+  | nullFS cs	      = False		-- 	e.g. "x", "_x"
   | otherwise         = startsVarId (headFS cs)
 
 isLexConSym cs				-- Infix type or data constructors
-  | nullFastString cs = False		--	e.g. ":-:", ":", "->"
+  | nullFS cs	      = False		--	e.g. ":-:", ":", "->"
   | cs == FSLIT("->") = True
   | otherwise	      = startsConSym (headFS cs)
 
 isLexVarSym cs				-- Infix identifiers
-  | nullFastString cs = False		-- 	e.g. "+"
+  | nullFS cs	      = False		-- 	e.g. "+"
   | otherwise         = startsVarSym (headFS cs)
 
 -------------
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = isSymbolASCII c || isSymbolISO c	-- Infix Ids
+startsVarSym c = isSymbolASCII c || (ord c > 0x7f && isSymbol c) -- Infix Ids
 startsConSym c = c == ':'				-- Infix data constructors
-startsVarId c  = isLower c || isLowerISO c || c == '_'	-- Ordinary Ids
-startsConId c  = isUpper c || isUpperISO c || c == '('	-- Ordinary type constructors and data constructors
-
+startsVarId c  = isLower c || c == '_'	-- Ordinary Ids
+startsConId c  = isUpper c || c == '('	-- Ordinary type constructors and data constructors
 
 isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
-isSymbolISO   c = ord c `elem` (0xd7 : 0xf7 : [0xa1 .. 0xbf])
-isUpperISO    (C# c#) = c# `geChar#` '\xc0'# && c# `leChar#` '\xde'# && c# `neChar#` '\xd7'#
-	--0xc0 <= oc && oc <= 0xde && oc /= 0xd7 where oc = ord c
-isLowerISO    (C# c#) = c# `geChar#` '\xdf'# && c# `leChar#` '\xff'# && c# `neChar#` '\xf7'#
-	--0xdf <= oc && oc <= 0xff && oc /= 0xf7 where oc = ord c
 \end{code}
 
 %************************************************************************

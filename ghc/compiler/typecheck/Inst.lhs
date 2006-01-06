@@ -79,7 +79,7 @@ import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName, dataCo
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
 import PrelInfo	( isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
-		  isInternalName, setNameUnique, mkSystemVarNameEncoded )
+		  isInternalName, setNameUnique, mkSystemVarName )
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind, setIdType )
@@ -398,9 +398,7 @@ newLitInst orig lit expected_ty	-- Make a LitInst
   = do 	{ loc <- getInstLoc orig
 	; new_uniq <- newUnique
 	; let
-		lit_nm   = mkSystemVarNameEncoded new_uniq FSLIT("lit")
-		-- The "encoded" bit means that we don't need to
-		-- z-encode the string every time we call this!
+		lit_nm   = mkSystemVarName new_uniq FSLIT("lit")
 		lit_inst = LitInst lit_nm lit expected_ty loc
 	; extendLIE lit_inst
 	; return (HsVar (instToId lit_inst)) }

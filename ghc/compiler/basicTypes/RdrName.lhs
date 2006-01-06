@@ -40,24 +40,16 @@ module RdrName (
 
 #include "HsVersions.h"
 
-import OccName	( NameSpace, varName,
-		  OccName, UserFS, 
-		  setOccNameSpace,
-		  mkOccFS, occNameFlavour,
-		  isDataOcc, isTvOcc, isTcOcc,
-		  OccEnv, emptyOccEnv, extendOccEnvList, lookupOccEnv, 
-		  elemOccEnv, plusOccEnv_C, extendOccEnv_C, foldOccEnv,
-		  occEnvElts
-		)
+import OccName
 import Module   ( Module, mkModuleFS )
 import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( mapCatMaybes )
 import SrcLoc	( isGoodSrcLoc, SrcSpan )
+import FastString ( FastString )
 import Outputable
 import Util	( thenCmp )
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -147,14 +139,14 @@ mkDerivedRdrName parent mk_occ
 ---------------
 	-- These two are used when parsing source files
 	-- They do encode the module and occurrence names
-mkUnqual :: NameSpace -> UserFS -> RdrName
-mkUnqual sp n = Unqual (mkOccFS sp n)
+mkUnqual :: NameSpace -> FastString -> RdrName
+mkUnqual sp n = Unqual (mkOccNameFS sp n)
 
-mkVarUnqual :: UserFS -> RdrName
-mkVarUnqual n = Unqual (mkOccFS varName n)
+mkVarUnqual :: FastString -> RdrName
+mkVarUnqual n = Unqual (mkVarOccFS n)
 
-mkQual :: NameSpace -> (UserFS, UserFS) -> RdrName
-mkQual sp (m, n) = Qual (mkModuleFS m) (mkOccFS sp n)
+mkQual :: NameSpace -> (FastString, FastString) -> RdrName
+mkQual sp (m, n) = Qual (mkModuleFS m) (mkOccNameFS sp n)
 
 getRdrName :: NamedThing thing => thing -> RdrName
 getRdrName name = nameRdrName (getName name)
@@ -213,7 +205,7 @@ instance Outputable RdrName where
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
     ppr (Orig mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
 
-ppr_name_space occ = ifPprDebug (parens (occNameFlavour occ))
+ppr_name_space occ = ifPprDebug (parens (pprNonVarNameSpace (occNameSpace occ)))
 
 instance OutputableBndr RdrName where
     pprBndr _ n 

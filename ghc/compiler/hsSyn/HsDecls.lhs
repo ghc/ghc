@@ -721,8 +721,8 @@ instance Outputable ForeignImport where
         ptext SLIT("dynamic")
       pprCEntity _      _   (CWrapper) = ptext SLIT("wrapper")
       --
-      pprLib lib | nullFastString lib = empty
-		 | otherwise	      = char '[' <> ppr lib <> char ']'
+      pprLib lib | nullFS lib = empty
+		 | otherwise  = char '[' <> ppr lib <> char ']'
 
 instance Outputable ForeignExport where
   ppr (CExport  (CExportStatic lbl cconv)) = 

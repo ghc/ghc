@@ -20,7 +20,7 @@ import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
 import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( Module, ModLocation(..), mkModule, moduleUserString,
+import Module		( Module, ModLocation(..), mkModule, 
 			  addBootSuffix_maybe )
 import Digraph		( SCC(..) )
 import Finder		( findModule, FindResult(..) )

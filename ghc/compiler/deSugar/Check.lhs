@@ -18,7 +18,8 @@ import DsUtils		( EquationInfo(..), MatchResult(..),
 import MatchLit		( tidyLitPat, tidyNPat )
 import Id		( Id, idType )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConFieldLabels )
-import Name             ( Name, mkInternalName, getOccName, isDataSymOcc, getName, mkVarOcc )
+import Name             ( Name, mkInternalName, getOccName, isDataSymOcc,
+			  getName, mkVarOccFS )
 import TysWiredIn
 import PrelNames	( unboundKey )
 import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
@@ -382,7 +383,7 @@ make_row_vars used_lits (_, EqnInfo { eqn_pats = pats})
      new_var = hash_x
 
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
-		     (mkVarOcc FSLIT("#x"))
+		     (mkVarOccFS FSLIT("#x"))
 		     noSrcLoc
 
 make_row_vars_for_constructor :: (EqnNo, EquationInfo) -> [WarningPat]

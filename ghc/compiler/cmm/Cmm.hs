@@ -30,6 +30,7 @@ import CLabel		( CLabel )
 import ForeignCall	( CCallConv )
 import Unique		( Unique, Uniquable(..) )
 import FastString	( FastString )
+import DATA_WORD	( Word8 )
 
 -----------------------------------------------------------------------------
 --		Cmm, CmmTop, CmmBasicBlock
@@ -251,9 +252,8 @@ data CmmStatic
 	-- align to next N-byte boundary (N must be a power of 2).
   | CmmDataLabel CLabel
 	-- label the current position in this section.
-  | CmmString String
+  | CmmString [Word8]
 	-- string of 8-bit values only, not zero terminated.
-	-- ToDo: might be more honest to use [Word8] here?
 
 -----------------------------------------------------------------------------
 --		Global STG registers

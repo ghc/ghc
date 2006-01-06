@@ -50,9 +50,8 @@ module PrelNames (
 #include "HsVersions.h"
 
 import Module	  ( Module, mkModule )
-import OccName	  ( dataName, tcName, clsName, varName, mkOccFS
-		  )
-		  
+import OccName	  ( dataName, tcName, clsName, varName, mkOccNameFS,
+		    mkVarOccFS )
 import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -75,7 +74,7 @@ import FastString
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName uniq = mkInternalName uniq (mkOccFS varName FSLIT("it")) noSrcLoc
+itName uniq = mkInternalName uniq (mkOccNameFS varName FSLIT("it")) noSrcLoc
 \end{code}
 
 \begin{code}
@@ -415,10 +414,10 @@ inrDataCon_RDR     = dataQual_RDR pREL_BASE FSLIT("Inr")
 genUnitDataCon_RDR = dataQual_RDR pREL_BASE FSLIT("Unit")
 
 ----------------------
-varQual_RDR  mod str = mkOrig mod (mkOccFS varName str)
-tcQual_RDR   mod str = mkOrig mod (mkOccFS tcName str)
-clsQual_RDR  mod str = mkOrig mod (mkOccFS clsName str)
-dataQual_RDR mod str = mkOrig mod (mkOccFS dataName str)
+varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
+tcQual_RDR   mod str = mkOrig mod (mkOccNameFS tcName str)
+clsQual_RDR  mod str = mkOrig mod (mkOccNameFS clsName str)
+dataQual_RDR mod str = mkOrig mod (mkOccNameFS dataName str)
 \end{code}
 
 %************************************************************************
@@ -656,17 +655,17 @@ tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
 
 mk_known_key_name space mod str uniq 
-  = mkExternalName uniq mod (mkOccFS space str) 
+  = mkExternalName uniq mod (mkOccNameFS space str) 
 		   Nothing noSrcLoc
 
 conName :: Name -> FastString -> Unique -> Name
 conName tycon occ uniq
-  = mkExternalName uniq (nameModule tycon) (mkOccFS dataName occ) 
+  = mkExternalName uniq (nameModule tycon) (mkOccNameFS dataName occ) 
 		   (Just tycon) noSrcLoc
 
 methName :: Name -> FastString -> Unique -> Name
 methName cls occ uniq
-  = mkExternalName uniq (nameModule cls) (mkOccFS varName occ) 
+  = mkExternalName uniq (nameModule cls) (mkVarOccFS occ) 
 		   (Just cls) noSrcLoc
 \end{code}
 

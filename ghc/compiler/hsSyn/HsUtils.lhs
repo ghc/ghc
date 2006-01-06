@@ -27,7 +27,7 @@ import RdrName		( RdrName, getRdrName, mkRdrUnqual )
 import Var		( Id )
 import Type		( Type )
 import DataCon		( DataCon, dataConWrapId, dataConSourceArity )
-import OccName		( mkVarOcc )
+import OccName		( mkVarOccFS )
 import Name		( Name )
 import BasicTypes	( RecFlag(..) )
 import SrcLoc
@@ -136,7 +136,7 @@ mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 
 mkHsSplice e = HsSplice unqualSplice e
 
-unqualSplice = mkRdrUnqual (mkVarOcc FSLIT("splice"))
+unqualSplice = mkRdrUnqual (mkVarOccFS FSLIT("splice"))
 		-- A name (uniquified later) to
 		-- identify the splice
 

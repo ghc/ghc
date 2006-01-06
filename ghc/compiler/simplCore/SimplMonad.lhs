@@ -34,7 +34,6 @@ import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			)
 import DynFlags		( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt )
 import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
-import OccName		( EncodedFS )
 import Unique		( Unique )
 import Maybes		( expectJust )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, lookupFM, addToFM, plusFM_C, fmToList )
@@ -160,7 +159,7 @@ getDOptsSmpl :: SimplM DynFlags
 getDOptsSmpl 
    = SM (\dflags us sc -> (dflags, us, sc))
 
-newId :: EncodedFS -> Type -> SimplM Id
+newId :: FastString -> Type -> SimplM Id
 newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
 	      returnSmpl (mkSysLocal fs uniq ty)
 \end{code}

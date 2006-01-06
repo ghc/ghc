@@ -28,7 +28,6 @@ import Id		( Id, idType, idInfo, idArity, isDataConWorkId,
 			)
 import MkId		( eRROR_ID )
 import Literal		( mkStringLit )
-import OccName		( encodeFS )
 import IdInfo		( OccInfo(..), isLoopBreaker,
 			  setArityInfo, zapDemandInfo,
 			  setUnfoldingInfo, 
@@ -1875,7 +1874,7 @@ mkDupableAlt env case_bndr' cont alt
     )							`thenSmpl` \ (final_bndrs', final_args) ->
 
 	-- See comment about "$j" name above
-    newId (encodeFS FSLIT("$j")) (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
+    newId FSLIT("$j") (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
 	-- Notice the funky mkPiTypes.  If the contructor has existentials
 	-- it's possible that the join point will be abstracted over
 	-- type varaibles as well as term variables.

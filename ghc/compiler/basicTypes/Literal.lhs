@@ -35,7 +35,6 @@ import FastTypes
 import FastString
 import Binary
 
-import UnicodeUtil	( stringToUtf8 )
 import Ratio 		( numerator )
 import FastString	( uniqueOfFS, lengthFS )
 import DATA_INT		( Int8,  Int16,  Int32 )
@@ -95,7 +94,11 @@ data Literal
   =	------------------
 	-- First the primitive guys
     MachChar	Char             -- Char#        At least 31 bits
-  | MachStr	FastString
+
+  | MachStr	FastString	-- A string-literal: stored and emitted
+				-- UTF-8 encoded, we'll arrange to decode it
+				-- at runtime.  Also emitted with a '\0'
+				-- terminator.
 
   | MachNullAddr                -- the NULL pointer, the only pointer value
                                 -- that can be represented as a Literal.
@@ -206,7 +209,7 @@ mkMachInt64  x = MachInt64 x
 mkMachWord64 x = MachWord64 x
 
 mkStringLit :: String -> Literal
-mkStringLit s = MachStr (mkFastString (stringToUtf8 s))
+mkStringLit s = MachStr (mkFastString s) -- stored UTF-8 encoded
 
 inIntRange, inWordRange :: Integer -> Bool
 inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT

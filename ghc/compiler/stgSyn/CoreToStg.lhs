@@ -30,7 +30,7 @@ import VarSet
 import VarEnv
 import Maybes		( maybeToBool )
 import Name		( getOccName, isExternalName, nameOccName )
-import OccName		( occNameUserString, occNameFS )
+import OccName		( occNameString, occNameFS )
 import BasicTypes       ( Arity )
 import Packages		( HomeModules )
 import StaticFlags	( opt_RuntimeTypes )
@@ -688,7 +688,7 @@ coreToStgLet let_no_escape bind body
 is_join_var :: Id -> Bool
 -- A hack (used only for compiler debuggging) to tell if
 -- a variable started life as a join point ($j)
-is_join_var j = occNameUserString (getOccName j) == "$j"
+is_join_var j = occNameString (getOccName j) == "$j"
 \end{code}
 
 \begin{code}

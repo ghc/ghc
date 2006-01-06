@@ -90,11 +90,19 @@ name = Util.global (value) :: IORef (ty); \
 -- when compiling FastString itself
 #ifndef COMPILING_FAST_STRING
 -- 
-import qualified FastString 
+import qualified FastString as FS 
 #endif
 
-#define SLIT(x)	 (FastString.mkLitString# (x#))
-#define FSLIT(x) (FastString.mkFastString# (x#))
+#define SLIT(x)	 (FS.mkLitString# (x#))
+#define FSLIT(x) (FS.mkFastString# (x#))
+
+-- Useful for declaring arguments to be strict
+#define STRICT1(f) f a b c | a `seq` False = undefined
+#define STRICT2(f) f a b | a `seq` b `seq` False = undefined
+#define STRICT3(f) f a b c | a `seq` b `seq` c `seq` False = undefined
+#define STRICT4(f) f a b c d | a `seq` b `seq` c `seq` d `seq` False = undefined
+#define STRICT5(f) f a b c d e | a `seq` b `seq` c `seq` d `seq` e `seq` False = undefined
+#define STRICT6(f) f a b c d e f | a `seq` b `seq` c `seq` d `seq` e `seq` f `seq` False = undefined
 
 #endif /* HsVersions.h */
 

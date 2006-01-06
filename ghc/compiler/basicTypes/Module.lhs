@@ -4,7 +4,7 @@
 
 Module
 ~~~~~~~~~~
-Simply the name of a module, represented as a Z-encoded FastString.
+Simply the name of a module, represented as a FastString.
 These are Uniquable, hence we can build FiniteMaps with ModuleNames as
 the keys.
 
@@ -17,13 +17,11 @@ module Module
     , ModLocation(..)
     , addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn
 
-    , moduleString		-- :: ModuleName -> EncodedString
-    , moduleUserString		-- :: ModuleName -> UserString
-    , moduleFS			-- :: ModuleName -> EncodedFS
+    , moduleString		-- :: ModuleName -> String
+    , moduleFS			-- :: ModuleName -> FastString
 
-    , mkModule			-- :: UserString -> ModuleName
-    , mkModuleFS		-- :: UserFS    -> ModuleName
-    , mkSysModuleFS		-- :: EncodedFS -> ModuleName
+    , mkModule			-- :: String -> ModuleName
+    , mkModuleFS		-- :: FastString -> ModuleName
  
     , ModuleEnv
     , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
@@ -108,7 +106,7 @@ addBootSuffixLocn locn
 %************************************************************************
 
 \begin{code}
-newtype Module = Module EncodedFS
+newtype Module = Module FastString
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
@@ -131,30 +129,26 @@ instance Ord Module where
 instance Outputable Module where
   ppr = pprModule
 
-
 pprModule :: Module -> SDoc
-pprModule (Module nm) = pprEncodedFS nm
+pprModule (Module nm) = 
+    getPprStyle $ \ sty ->
+    if codeStyle sty 
+	then ftext (zEncodeFS nm)
+	else ftext nm
 
-moduleFS :: Module -> EncodedFS
+moduleFS :: Module -> FastString
 moduleFS (Module mod) = mod
 
-moduleString :: Module -> EncodedString
+moduleString :: Module -> String
 moduleString (Module mod) = unpackFS mod
 
-moduleUserString :: Module -> UserString
-moduleUserString (Module mod) = decode (unpackFS mod)
-
 -- used to be called mkSrcModule
-mkModule :: UserString -> Module
-mkModule s = Module (mkFastString (encode s))
+mkModule :: String -> Module
+mkModule s = Module (mkFastString s)
 
 -- used to be called mkSrcModuleFS
-mkModuleFS :: UserFS -> Module
-mkModuleFS s = Module (encodeFS s)
-
--- used to be called mkSysModuleFS
-mkSysModuleFS :: EncodedFS -> Module
-mkSysModuleFS s = Module s 
+mkModuleFS :: FastString -> Module
+mkModuleFS s = Module s
 \end{code}
 
 %************************************************************************

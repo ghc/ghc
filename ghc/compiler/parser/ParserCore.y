@@ -72,7 +72,7 @@ module	:: { HsExtCore RdrName }
          : '%module' modid tdefs vdefgs { HsExtCore $2 $3 $4 }
 
 modid	:: { Module }
-	: CNAME	                 { mkSysModuleFS (mkFastString $1) }
+	: CNAME	                 { mkModuleFS (mkFastString $1) }
 
 -------------------------------------------------------------
 --     Type and newtype declarations are in HsSyn syntax
@@ -262,25 +262,25 @@ lit	:: { Literal }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
 tv_occ	:: { OccName }
-	: NAME	{ mkSysOcc tvName $1 }
+	: NAME	{ mkOccName tvName $1 }
 
 var_occ	:: { OccName }
-	: NAME	{ mkSysOcc varName $1 }
+	: NAME	{ mkVarOcc $1 }
 
 
 -- Type constructor
 q_tc_name	:: { IfaceExtName }
-        : modid '.' CNAME	{ ExtPkg $1 (mkSysOcc tcName $3) }
+        : modid '.' CNAME	{ ExtPkg $1 (mkOccName tcName $3) }
 
 -- Data constructor in a pattern or data type declaration; use the dataName, 
 -- because that's what we expect in Core case patterns
 d_pat_occ :: { OccName }
-        : CNAME      { mkSysOcc dataName $1 }
+        : CNAME      { mkOccName dataName $1 }
 
 -- Data constructor occurrence in an expression;
 -- use the varName because that's the worker Id
 d_occ :: { OccName }
-       : CNAME { mkSysOcc varName $1 }
+       : CNAME { mkVarOcc $1 }
 
 {
 

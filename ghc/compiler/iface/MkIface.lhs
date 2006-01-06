@@ -214,7 +214,7 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
 import Module		( Module, moduleFS,
-			  ModLocation(..), mkSysModuleFS, moduleUserString,
+			  ModLocation(..), mkModuleFS, moduleString,
 			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
 			  extendModuleEnv_C
 			)
@@ -726,7 +726,7 @@ mkIfaceExports :: NameSet -> [(Module, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
 mkIfaceExports exports 
-  = [ (mkSysModuleFS fs, eltsFM avails)
+  = [ (mkModuleFS fs, eltsFM avails)
     | (fs, avails) <- fmToList groupFM
     ]
   where
@@ -768,7 +768,7 @@ checkOldIface :: HscEnv
 
 checkOldIface hsc_env mod_summary source_unchanged maybe_iface
   = do	{ showPass (hsc_dflags hsc_env) 
-	           ("Checking old interface for " ++ moduleUserString (ms_mod mod_summary)) ;
+	           ("Checking old interface for " ++ moduleString (ms_mod mod_summary)) ;
 
 	; initIfaceCheck hsc_env $
 	  check_old_iface mod_summary source_unchanged maybe_iface

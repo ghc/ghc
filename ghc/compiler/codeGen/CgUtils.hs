@@ -54,11 +54,12 @@ import ListSetOps	( assocDefault )
 import Util		( filterOut, sortLe )
 import DynFlags		( DynFlags(..), HscTarget(..) )
 import Packages		( HomeModules )
-import FastString	( LitString, FastString, unpackFS )
+import FastString	( LitString, FastString, bytesFS )
 import Outputable
 
 import Char		( ord )
 import DATA_BITS
+import DATA_WORD	( Word8 )
 import Maybe		( isNothing )
 
 -------------------------------------------------------------------------
@@ -77,7 +78,8 @@ addIdReps ids = [(idCgRep id, id) | id <- ids]
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (MachStr s) = mkStringCLit (unpackFS s)
+cgLit (MachStr s) = mkByteStringCLit (bytesFS s)
+ -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit   = return (mkSimpleLit other_lit)
 
 mkSimpleLit :: Literal -> CmmLit
@@ -308,10 +310,13 @@ emitRODataLits lbl lits
 mkStringCLit :: String -> FCode CmmLit
 -- Make a global definition for the string,
 -- and return its label
-mkStringCLit str 
+mkStringCLit str = mkByteStringCLit (map (fromIntegral.ord) str)
+
+mkByteStringCLit :: [Word8] -> FCode CmmLit
+mkByteStringCLit bytes
   = do 	{ uniq <- newUnique
 	; let lbl = mkStringLitLabel uniq
-	; emitData ReadOnlyData [CmmDataLabel lbl, CmmString str]
+	; emitData ReadOnlyData [CmmDataLabel lbl, CmmString bytes]
 	; return (CmmLabel lbl) }
 
 -------------------------------------------------------------------------

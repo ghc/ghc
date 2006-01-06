@@ -67,7 +67,6 @@ import Monad	    (mplus)
 import Panic        (panic)
 import Outputable   (Outputable(ppr), pprPanic)
 import UniqSupply   (UniqSupply, splitUniqSupply, uniqFromSupply)
-import OccName	    (UserFS)
 import Var          (Var, idType)
 import Id	    (Id, mkSysLocal)
 import Name	    (Name)
@@ -86,6 +85,7 @@ import PrimOp	    ( PrimOp(..) )
 import PrelInfo	    ( primOpId )
 import CoreSyn      (Expr(..), Bind(..), CoreBndr, CoreExpr, CoreBind, mkApps)
 import CoreUtils    (exprType)
+import FastString   (FastString)
 
 -- friends
 import NDPCoreUtils (parrElemTy)
@@ -176,7 +176,7 @@ runFlatten hsc_env eps us m
 -- generate a new local variable whose name is based on the given lexeme and
 -- whose type is as specified in the second argument (EXPORTED)
 --
-newVar           :: UserFS -> Type -> Flatten Var
+newVar           :: FastString -> Type -> Flatten Var
 newVar lexeme ty  = Flatten $ \state ->
   let
     (us1, us2) = splitUniqSupply (us state)
@@ -187,7 +187,7 @@ newVar lexeme ty  = Flatten $ \state ->
 -- generate a non-recursive binding using a new binder whose name is derived
 -- from the given lexeme (EXPORTED)
 --
-mkBind          :: UserFS -> CoreExpr -> Flatten (CoreBndr, CoreBind)
+mkBind          :: FastString -> CoreExpr -> Flatten (CoreBndr, CoreBind)
 mkBind lexeme e  =
   do
     v <- newVar lexeme (exprType e)

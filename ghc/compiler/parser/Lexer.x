@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- (c) The University of Glasgow, 2003
+-- (c) The University of Glasgow, 2006
 --
 -- GHC's lexer.
 --
@@ -43,35 +43,38 @@ import Ctype
 import Util		( maybePrefixMatch, readRational )
 
 import DATA_BITS
-import Char
+import Data.Char
 import Ratio
 --import TRACE
 }
 
-$whitechar   = [\ \t\n\r\f\v\xa0]
+$unispace    = \x05
+$whitechar   = [\ \t\n\r\f\v\xa0 $unispace]
 $white_no_nl = $whitechar # \n
 
 $ascdigit  = 0-9
-$unidigit  = \x01
+$unidigit  = \x03
+$decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
 $ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~]
-$unisymbol = \x02
+$unisymbol = \x04
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\:\"\']
 
-$unilarge  = \x03
+$unilarge  = \x01
 $asclarge  = [A-Z \xc0-\xd6 \xd8-\xde]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x04
+$unismall  = \x02
 $ascsmall  = [a-z \xdf-\xf6 \xf8-\xff]
 $small     = [$ascsmall $unismall \_]
 
-$graphic   = [$small $large $symbol $digit $special \:\"\']
+$unigraphic = \x06
+$graphic   = [$small $large $symbol $digit $special $unigraphic \:\"\']
 
 $octit	   = 0-7
-$hexit     = [$digit A-F a-f]
+$hexit     = [$decdigit A-F a-f]
 $symchar   = [$symbol \:]
 $nl        = [\n\r]
 $idchar    = [$small $large $digit \']
@@ -82,7 +85,7 @@ $idchar    = [$small $large $digit \']
 @varsym    = $symbol $symchar*
 @consym    = \: $symchar*
 
-@decimal     = $digit+
+@decimal     = $decdigit+
 @octal       = $octit+
 @hexadecimal = $hexit+
 @exponent    = [eE] [\-\+]? @decimal
@@ -154,13 +157,13 @@ $white_no_nl+ 				;
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
-<line_prag1> $digit+			{ setLine line_prag1a }
+<line_prag1> $decdigit+			{ setLine line_prag1a }
 <line_prag1a> \" [$graphic \ ]* \"	{ setFile line_prag1b }
 <line_prag1b> .*			{ pop }
 
 -- Haskell-style line pragmas, of the form
 --    {-# LINE <line> "<file>" #-}
-<line_prag2> $digit+			{ setLine line_prag2a }
+<line_prag2> $decdigit+			{ setLine line_prag2a }
 <line_prag2a> \" [$graphic \ ]* \"	{ setFile line_prag2b }
 <line_prag2b> "#-}"|"-}"		{ pop }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
@@ -554,6 +557,13 @@ reservedSymsFM = listToUFM $
        ,(">-",	ITrarrowtail,	bit arrowsBit)
        ,("-<<",	ITLarrowtail,	bit arrowsBit)
        ,(">>-",	ITRarrowtail,	bit arrowsBit)
+
+#if __GLASGOW_HASKELL__ >= 605
+       ,("∀",	ITforall,	bit tvBit)
+       ,("→",   ITrarrow,	0)
+       ,("←",   ITlarrow,	0)
+       ,("⋯", 	ITdotdot,	0)
+#endif
        ]
 
 -- -----------------------------------------------------------------------------
@@ -670,23 +680,29 @@ splitQualName :: StringBuffer -> Int -> (FastString,FastString)
 -- takes a StringBuffer and a length, and returns the module name
 -- and identifier parts of a qualified name.  Splits at the *last* dot,
 -- because of hierarchical module names.
-splitQualName orig_buf len = split orig_buf 0 0
+splitQualName orig_buf len = split orig_buf orig_buf
   where
-    split buf dot_off n
-	| n == len		  = done dot_off
-	| lookAhead buf n == '.'  = split2 buf n (n+1)
-	| otherwise 		  = split buf dot_off (n+1)	
+    split buf dot_buf
+	| orig_buf `byteDiff` buf >= len  = done dot_buf
+	| c == '.'                	  = found_dot buf'
+	| otherwise               	  = split buf' dot_buf
+      where
+       (c,buf') = nextChar buf
   
     -- careful, we might get names like M....
     -- so, if the character after the dot is not upper-case, this is
     -- the end of the qualifier part.
-    split2 buf dot_off n
-	| isUpper (lookAhead buf n) = split buf dot_off (n+1)
-	| otherwise 		    = done dot_off
+    found_dot buf -- buf points after the '.'
+	| isUpper c    = split buf' buf
+	| otherwise    = done buf
+      where
+       (c,buf') = nextChar buf
 
-    done dot_off =
-	(lexemeToFastString orig_buf dot_off, 
-	 lexemeToFastString (stepOnBy (dot_off+1) orig_buf) (len - dot_off -1))
+    done dot_buf =
+	(lexemeToFastString orig_buf (qual_size - 1),
+	 lexemeToFastString dot_buf (len - qual_size))
+      where
+	qual_size = orig_buf `byteDiff` dot_buf
 
 varid span buf len = 
   case lookupUFM reservedWordsFM fs of
@@ -726,19 +742,19 @@ tok_decimal span buf len
   = return (L span (ITinteger  $! parseInteger buf len 10 octDecDigit))
 
 tok_octal span buf len 
-  = return (L span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 8 octDecDigit))
+  = return (L span (ITinteger  $! parseInteger (offsetBytes 2 buf) (len-2) 8 octDecDigit))
 
 tok_hexadecimal span buf len 
-  = return (L span (ITinteger  $! parseInteger (stepOnBy 2 buf) (len-2) 16 hexDigit))
+  = return (L span (ITinteger  $! parseInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
 
 prim_decimal span buf len 
   = return (L span (ITprimint  $! parseInteger buf (len-1) 10 octDecDigit))
 
 prim_octal span buf len 
-  = return (L span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 8 octDecDigit))
+  = return (L span (ITprimint  $! parseInteger (offsetBytes 2 buf) (len-3) 8 octDecDigit))
 
 prim_hexadecimal span buf len 
-  = return (L span (ITprimint  $! parseInteger (stepOnBy 2 buf) (len-3) 16 hexDigit))
+  = return (L span (ITprimint  $! parseInteger (offsetBytes 2 buf) (len-3) 16 hexDigit))
 
 tok_float        str = ITrational   $! readRational str
 prim_float       str = ITprimfloat  $! readRational str
@@ -839,7 +855,7 @@ lex_string_tok span buf len = do
 lex_string :: String -> P Token
 lex_string s = do
   i <- getInput
-  case alexGetChar i of
+  case alexGetChar' i of
     Nothing -> lit_error
 
     Just ('"',i)  -> do
@@ -848,14 +864,15 @@ lex_string s = do
 	if glaexts
 	  then do
 	    i <- getInput
-	    case alexGetChar i of
+	    case alexGetChar' i of
 	      Just ('#',i) -> do
 		   setInput i
 		   if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
-                    else let s' = mkFastStringNarrow (reverse s) in
-			 -- always a narrow string/byte array
+                    else let s' = mkZFastString (reverse s) in
 			 return (ITprimstring s')
+			-- mkZFastString is a hack to avoid encoding the
+			-- string in UTF-8.  We just want the exact bytes.
 	      _other ->
 		return (ITstring (mkFastString (reverse s)))
 	  else
@@ -866,11 +883,11 @@ lex_string s = do
 		setInput i; lex_string s
 	| Just (c,i) <- next, is_space c -> do 
 		setInput i; lex_stringgap s
-	where next = alexGetChar i
+	where next = alexGetChar' i
 
-    Just _ -> do
-	c <- lex_char
-	lex_string (c:s)
+    Just (c, i) -> do
+	c' <- lex_char c i
+	lex_string (c':s)
 
 lex_stringgap s = do
   c <- getCharOrFail
@@ -890,7 +907,7 @@ lex_char_tok :: Action
 lex_char_tok span buf len = do	-- We've seen '
    i1 <- getInput	-- Look ahead to first character
    let loc = srcSpanStart span
-   case alexGetChar i1 of
+   case alexGetChar' i1 of
 	Nothing -> lit_error 
 
 	Just ('\'', i2@(AI end2 _ _)) -> do 	-- We've seen ''
@@ -905,14 +922,15 @@ lex_char_tok span buf len = do	-- We've seen '
 		  lit_ch <- lex_escape
 		  mc <- getCharOrFail	-- Trailing quote
 		  if mc == '\'' then finish_char_tok loc lit_ch
-			        else lit_error 
+			        else do setInput i2; lit_error 
 
-        Just (c, i2@(AI end2 _ _)) | not (is_any c) -> lit_error
-			      | otherwise      ->
+        Just (c, i2@(AI end2 _ _)) 
+		| not (isAny c) -> lit_error
+		| otherwise ->
 
 		-- We've seen 'x, where x is a valid character
 		--  (i.e. not newline etc) but not a quote or backslash
-	   case alexGetChar i2 of	-- Look ahead one more character
+	   case alexGetChar' i2 of	-- Look ahead one more character
 		Nothing -> lit_error
 		Just ('\'', i3) -> do 	-- We've seen 'x'
 			setInput i3 
@@ -922,7 +940,7 @@ lex_char_tok span buf len = do	-- We've seen '
 			th_exts <- extension thEnabled	
 			let (AI end _ _) = i1
 			if th_exts then return (L (mkSrcSpan loc end) ITvarQuote)
-				   else lit_error
+				   else do setInput i2; lit_error
 
 finish_char_tok :: SrcLoc -> Char -> P (Located Token)
 finish_char_tok loc ch	-- We've already seen the closing quote
@@ -930,7 +948,7 @@ finish_char_tok loc ch	-- We've already seen the closing quote
   = do	glaexts <- extension glaExtsEnabled
 	i@(AI end _ _) <- getInput
 	if glaexts then do
-		case alexGetChar i of
+		case alexGetChar' i of
 			Just ('#',i@(AI end _ _)) -> do
 				setInput i
 				return (L (mkSrcSpan loc end) (ITprimchar ch))
@@ -939,13 +957,15 @@ finish_char_tok loc ch	-- We've already seen the closing quote
 	        else do
 		   return (L (mkSrcSpan loc end) (ITchar ch))
 
-lex_char :: P Char
-lex_char = do
-  mc <- getCharOrFail
-  case mc of
-      '\\' -> lex_escape
-      c | is_any c -> return c
+lex_char :: Char -> AlexInput -> P Char
+lex_char c inp = do
+  case c of
+      '\\' -> do setInput inp; lex_escape
+      c | isAny c -> do setInput inp; return c
       _other -> lit_error
+
+isAny c | c > '\xff' = isPrint c
+	| otherwise  = is_any c
 
 lex_escape :: P Char
 lex_escape = do
@@ -972,11 +992,11 @@ lex_escape = do
 
 	c1 ->  do
 	   i <- getInput
-	   case alexGetChar i of
+	   case alexGetChar' i of
 	    Nothing -> lit_error
 	    Just (c2,i2) -> 
-              case alexGetChar i2 of
-		Nothing	-> lit_error
+              case alexGetChar' i2 of
+		Nothing	-> do setInput i2; lit_error
 		Just (c3,i3) -> 
 		   let str = [c1,c2,c3] in
 		   case [ (c,rest) | (p,c) <- silly_escape_chars,
@@ -991,22 +1011,22 @@ lex_escape = do
 
 readNum :: (Char -> Bool) -> Int -> (Char -> Int) -> P Char
 readNum is_digit base conv = do
+  i <- getInput
   c <- getCharOrFail
   if is_digit c 
 	then readNum2 is_digit base conv (conv c)
-	else lit_error
+	else do setInput i; lit_error
 
 readNum2 is_digit base conv i = do
   input <- getInput
   read i input
   where read i input = do
-	  case alexGetChar input of
+	  case alexGetChar' input of
 	    Just (c,input') | is_digit c -> do
 		read (i*base + conv c) input'
 	    _other -> do
-		setInput input
 		if i >= 0 && i <= 0x10FFFF
-		   then return (chr i)
+		   then do setInput input; return (chr i)
 		   else lit_error
 
 silly_escape_chars = [
@@ -1046,12 +1066,16 @@ silly_escape_chars = [
 	("DEL", '\DEL')
 	]
 
+-- before calling lit_error, ensure that the current input is pointing to
+-- the position of the error in the buffer.  This is so that we can report
+-- a correct location to the user, but also so we can detect UTF-8 decoding
+-- errors if they occur.
 lit_error = lexError "lexical error in string/character literal"
 
 getCharOrFail :: P Char
 getCharOrFail =  do
   i <- getInput
-  case alexGetChar i of
+  case alexGetChar' i of
 	Nothing -> lexError "unexpected end-of-file in string/character literal"
 	Just (c,i)  -> do setInput i; return c
 
@@ -1134,21 +1158,74 @@ setLastToken loc len = P $ \s -> POk s{ last_loc=loc, last_len=len } ()
 data AlexInput = AI SrcLoc {-#UNPACK#-}!Int StringBuffer
 
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (AI _ _ s) = prevChar s '\n'
+alexInputPrevChar (AI _ _ buf) = prevChar buf '\n'
 
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
 alexGetChar (AI loc ofs s) 
   | atEnd s   = Nothing
-  | otherwise = c `seq` loc' `seq` ofs' `seq` s' `seq` Just (c, (AI loc' ofs' s'))
-  where c    = currentChar s
-        loc' = advanceSrcLoc loc c
-        ofs' = advanceOffs c ofs
-	s'   = stepOn s
+  | otherwise = adj_c `seq` loc' `seq` ofs' `seq` s' `seq` 
+		Just (adj_c, (AI loc' ofs' s'))
+  where (c,s') = nextChar s
+        loc'   = advanceSrcLoc loc c
+        ofs'   = advanceOffs c ofs
 
-	advanceOffs :: Char -> Int -> Int
-	advanceOffs '\n' offs = 0
-	advanceOffs '\t' offs = (offs `quot` 8 + 1) * 8
-	advanceOffs _    offs = offs + 1
+	non_graphic     = '\x0'
+	upper 		= '\x1'
+	lower		= '\x2'
+	digit		= '\x3'
+	symbol		= '\x4'
+	space		= '\x5'
+	other_graphic	= '\x6'
+
+	adj_c 
+#if __GLASGOW_HASKELL__ < 605
+	  = c  -- no Unicode support
+#else
+	  | c <= '\x04' = non_graphic
+	  | c <= '\xff' = c
+	  | otherwise = 
+		case generalCategory c of
+		  UppercaseLetter       -> upper
+		  LowercaseLetter       -> lower
+		  TitlecaseLetter       -> upper
+		  ModifierLetter        -> other_graphic
+		  OtherLetter           -> other_graphic
+		  NonSpacingMark        -> other_graphic
+		  SpacingCombiningMark  -> other_graphic
+		  EnclosingMark         -> other_graphic
+		  DecimalNumber         -> digit
+		  LetterNumber          -> other_graphic
+		  OtherNumber           -> other_graphic
+		  ConnectorPunctuation  -> other_graphic
+		  DashPunctuation       -> other_graphic
+		  OpenPunctuation       -> other_graphic
+		  ClosePunctuation      -> other_graphic
+		  InitialQuote          -> other_graphic
+		  FinalQuote            -> other_graphic
+		  OtherPunctuation      -> other_graphic
+		  MathSymbol            -> symbol
+		  CurrencySymbol        -> symbol
+		  ModifierSymbol        -> symbol
+		  OtherSymbol           -> symbol
+		  Space                 -> space
+		  _other		-> non_graphic
+#endif
+
+-- This version does not squash unicode characters, it is used when
+-- lexing strings.
+alexGetChar' :: AlexInput -> Maybe (Char,AlexInput)
+alexGetChar' (AI loc ofs s) 
+  | atEnd s   = Nothing
+  | otherwise = c `seq` loc' `seq` ofs' `seq` s' `seq` 
+		Just (c, (AI loc' ofs' s'))
+  where (c,s') = nextChar s
+        loc'   = advanceSrcLoc loc c
+        ofs'   = advanceOffs c ofs
+
+advanceOffs :: Char -> Int -> Int
+advanceOffs '\n' offs = 0
+advanceOffs '\t' offs = (offs `quot` 8 + 1) * 8
+advanceOffs _    offs = offs + 1
 
 getInput :: P AlexInput
 getInput = P $ \s@PState{ loc=l, last_offs=o, buffer=b } -> POk s (AI l o b)
@@ -1255,7 +1332,7 @@ srcParseErr buf len
 	     else hcat [ptext SLIT("parse error on input "),
           	  	char '`', text token, char '\'']
     ]
-  where token = lexemeToString (stepOnBy (-len) buf) len
+  where token = lexemeToString (offsetBytes (-len) buf) len
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
@@ -1266,14 +1343,12 @@ srcParseFail = P $ \PState{ buffer = buf, last_len = len,
     PFailed last_loc (srcParseErr buf len)
 
 -- A lexical error is reported at a particular position in the source file,
--- not over a token range.  TODO: this is slightly wrong, because we record
--- the error at the character position following the one which caused the
--- error.  We should somehow back up by one character.
+-- not over a token range.
 lexError :: String -> P a
 lexError str = do
   loc <- getSrcLoc
-  i@(AI end _ _) <- getInput
-  failLocMsgP loc end str
+  i@(AI end _ buf) <- getInput
+  reportLexError loc end buf False str
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
@@ -1282,7 +1357,7 @@ lexError str = do
 lexer :: (Located Token -> P a) -> P a
 lexer cont = do
   tok@(L _ tok__) <- lexToken
-  -- trace ("token: " ++ show tok__) $ do
+  --trace ("token: " ++ show tok__) $ do
   cont tok
 
 lexToken :: P (Located Token)
@@ -1294,13 +1369,24 @@ lexToken = do
     AlexEOF -> do let span = mkSrcSpan loc1 loc1
 		  setLastToken span 0
 		  return (L span ITeof)
-    AlexError (AI loc2 _ _) -> do failLocMsgP loc1 loc2 "lexical error"
+    AlexError (AI loc2 _ buf) -> do 
+	reportLexError loc1 loc2 buf True "lexical error"
     AlexSkip inp2 _ -> do
 	setInput inp2
 	lexToken
     AlexToken inp2@(AI end _ buf2) len t -> do
 	setInput inp2
 	let span = mkSrcSpan loc1 end
-	span `seq` setLastToken span len
-	t span buf len
+	let bytes = byteDiff buf buf2
+	span `seq` setLastToken span bytes
+	t span buf bytes
+
+reportLexError loc1 loc2 buf is_prev str = 
+  let 
+	c | is_prev   = prevChar buf '\0'
+	  | otherwise = fst (nextChar buf)
+  in
+  if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
+    then failLocMsgP loc2 loc2 "UTF-8 decoding error"
+    else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
 }

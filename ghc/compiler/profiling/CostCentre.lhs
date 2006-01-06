@@ -32,9 +32,7 @@ module CostCentre (
 #include "HsVersions.h"
 
 import Var		( Id )
-import Name		( UserFS, EncodedFS, encodeFS, decode,
-			  getOccName, occNameFS
-			)
+import Name		( getOccName, occNameFS )
 import Module		( Module )
 import Outputable	
 import FastTypes
@@ -120,7 +118,7 @@ data CostCentre
 		cc_mod  :: Module	-- Name of module defining this CC.
     }
 
-type CcName = EncodedFS
+type CcName = FastString
 
 data IsDupdCC
   = OriginalCC	-- This says how the CC is *used*.  Saying that
@@ -200,9 +198,9 @@ maybeSingletonCCS _			= Nothing
 Building cost centres
 
 \begin{code}
-mkUserCC :: UserFS -> Module -> CostCentre
+mkUserCC :: FastString -> Module -> CostCentre
 mkUserCC cc_name mod
-  = NormalCC { cc_name = encodeFS cc_name, cc_mod =  mod,
+  = NormalCC { cc_name = cc_name, cc_mod =  mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = NotCafCC {-might be changed-}
     }
 
@@ -370,5 +368,5 @@ ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf})
 costCentreUserName (NoCostCentre)  = "NO_CC"
 costCentreUserName (AllCafsCC {})  = "CAF"
 costCentreUserName cc@(NormalCC {cc_name = name, cc_is_caf = is_caf})
-  =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ decode (unpackFS name)
+  =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ unpackFS name
 \end{code}

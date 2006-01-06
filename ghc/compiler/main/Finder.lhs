@@ -267,7 +267,7 @@ searchPathExts paths mod exts
 	return result
 
   where
-    basename = dots_to_slashes (moduleUserString mod)
+    basename = dots_to_slashes (moduleString mod)
 
     to_search :: [(FilePath, IO FinderCacheEntry)]
     to_search = [ (file, fn path basename)
@@ -347,7 +347,7 @@ mkHomeModLocation2 :: DynFlags
 		   -> String 	-- Suffix
 		   -> IO ModLocation
 mkHomeModLocation2 dflags mod src_basename ext = do
-   let mod_basename = dots_to_slashes (moduleUserString mod)
+   let mod_basename = dots_to_slashes (moduleString mod)
 
    obj_fn  <- mkObjPath  dflags src_basename mod_basename
    hi_fn   <- mkHiPath   dflags src_basename mod_basename
@@ -420,7 +420,7 @@ mkStubPaths dflags mod location
   = let
 		stubdir = stubDir dflags
 
-		mod_basename = dots_to_slashes (moduleUserString mod)
+		mod_basename = dots_to_slashes (moduleString mod)
 		src_basename = basenameOf (expectJust "mkStubPaths" 
 						(ml_hs_file location))
 

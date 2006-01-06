@@ -45,6 +45,7 @@ import Data.Bits        ( shiftR )
 import Char             ( ord, chr )
 import IO               ( Handle )
 import DATA_BITS
+import Data.Word	( Word8 )
 
 #ifdef DEBUG
 import PprCmm		() -- instances only
@@ -881,24 +882,20 @@ machRepSignedCType r | r == wordRep = ptext SLIT("I_")
 -- ---------------------------------------------------------------------
 -- print strings as valid C strings
 
--- Assumes it contains only characters '\0'..'\xFF'!
-pprFSInCStyle :: FastString -> SDoc
-pprFSInCStyle fs = pprStringInCStyle (unpackFS fs)
-
-pprStringInCStyle :: String -> SDoc
+pprStringInCStyle :: [Word8] -> SDoc
 pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))
 
-charToC :: Char -> String
-charToC '\"' = "\\\""
-charToC '\'' = "\\\'"
-charToC '\\' = "\\\\"
-charToC c | c >= ' ' && c <= '~' = [c]
-          | c > '\xFF' = panic ("charToC "++show c)
-          | otherwise = ['\\',
+charToC :: Word8 -> String
+charToC w = 
+  case chr (fromIntegral w) of
+	'\"' -> "\\\""
+	'\'' -> "\\\'"
+	'\\' -> "\\\\"
+	c | c >= ' ' && c <= '~' -> [c]
+          | otherwise -> ['\\',
                          chr (ord '0' + ord c `div` 64),
                          chr (ord '0' + ord c `div` 8 `mod` 8),
                          chr (ord '0' + ord c         `mod` 8)]
-
 
 -- ---------------------------------------------------------------------------
 -- Initialising static objects with floating-point numbers.  We can't

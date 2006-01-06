@@ -628,7 +628,7 @@ load2 s@(Session ref) how_much mod_graph = do
 	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking) $
 	        debugTraceMsg dflags 1 (text ("Warning: output was redirected with -o, " ++
 				              "but no output will be generated\n" ++
-				              "because there is no " ++ moduleUserString main_mod ++ " module."))
+				              "because there is no " ++ moduleString main_mod ++ " module."))
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env1)

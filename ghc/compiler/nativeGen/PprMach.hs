@@ -697,17 +697,11 @@ pprLabel :: CLabel -> Doc
 pprLabel lbl = pprGloblDecl lbl $$ (pprCLabel_asm lbl <> char ':')
 
 
--- Assume we want to backslash-convert the string
 pprASCII str
-  = vcat (map do1 (str ++ [chr 0]))
+  = vcat (map do1 str) $$ do1 0
     where
-       do1 :: Char -> Doc
-       do1 c = ptext SLIT("\t.byte\t0x") <> hshow (ord c)
-
-       hshow :: Int -> Doc
-       hshow n | n >= 0 && n <= 255
-               = char (tab !! (n `div` 16)) <> char (tab !! (n `mod` 16))
-       tab = "0123456789ABCDEF"
+       do1 :: Word8 -> Doc
+       do1 w = ptext SLIT("\t.byte\t") <> int (fromIntegral w)
 
 pprAlign bytes =
 	IF_ARCH_alpha(ptextSLIT(".align ") <> int pow2,

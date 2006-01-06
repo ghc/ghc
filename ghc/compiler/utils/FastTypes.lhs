@@ -9,7 +9,7 @@ module FastTypes (
     (+#), (-#), (*#), quotFastInt, negateFastInt,
     (==#), (<#), (<=#), (>=#), (>#),
 
-    FastBool, fastBool, isFastTrue, fastOr
+    FastBool, fastBool, isFastTrue, fastOr, fastAnd
   ) where
 
 #include "HsVersions.h"

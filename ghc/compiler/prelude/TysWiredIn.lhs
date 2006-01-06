@@ -62,16 +62,18 @@ import Module		( Module )
 import RdrName		( nameRdrName )
 import Name		( Name, BuiltInSyntax(..), nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
-import OccName		( mkOccFS, tcName, dataName, mkTupleOcc, mkDataConWorkerOcc )
+import OccName		( mkOccNameFS, tcName, dataName, mkTupleOcc,
+			  mkDataConWorkerOcc )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
-			  mkTupleTyCon, mkAlgTyCon, tyConName
-			)
+			  mkTupleTyCon, mkAlgTyCon, tyConName )
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed,
+			  StrictnessMark(..) )
 
-import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, TyThing(..) )
+import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys,
+			  TyThing(..) )
 import Kind		( mkArrowKinds, liftedTypeKind, ubxTupleKind )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
@@ -114,14 +116,14 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
 \begin{code}
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
 mkWiredInTyConName built_in mod fs uniq tycon
-  = mkWiredInName mod (mkOccFS tcName fs) uniq
+  = mkWiredInName mod (mkOccNameFS tcName fs) uniq
 		  Nothing 		-- No parent object
 		  (ATyCon tycon)	-- Relevant TyCon
 		  built_in
 
 mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name -> Name
 mkWiredInDataConName built_in mod fs uniq datacon parent
-  = mkWiredInName mod (mkOccFS dataName fs) uniq
+  = mkWiredInName mod (mkOccNameFS dataName fs) uniq
 		  (Just parent) 	-- Name of parent TyCon
 		  (ADataCon datacon)	-- Relevant DataCon
 		  built_in
@@ -535,7 +537,7 @@ mkPArrFakeCon arity  = data_con
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName pREL_PARR (mkOccFS dataName nameStr) uniq
+	name      = mkWiredInName pREL_PARR (mkOccNameFS dataName nameStr) uniq
 				  Nothing (ADataCon data_con) UserSyntax
 	uniq      = mkPArrDataConUnique arity
 

@@ -33,7 +33,7 @@ import Kind
 import Var	  ( Var, Id, TyVar, tyVarKind )
 import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
-import OccName	  ( mkOccFS, tcName, parenSymOcc )
+import OccName	  ( mkOccNameFS, tcName, parenSymOcc )
 import BasicTypes ( IPName, tupleParens )
 import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon, isNewTyCon )
 import Class	  ( Class )
@@ -273,7 +273,7 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] lif
 	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
 
 funTyConName = mkWiredInName gHC_PRIM
-			(mkOccFS tcName FSLIT("(->)"))
+			(mkOccNameFS tcName FSLIT("(->)"))
 			funTyConKey
 			Nothing 		-- No parent object
 			(ATyCon funTyCon)	-- Relevant TyCon

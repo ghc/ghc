@@ -9,7 +9,7 @@ module Id (
 
 	-- Simple construction
 	mkGlobalId, mkLocalId, mkLocalIdWithInfo, 
-	mkSysLocal, mkSysLocalUnencoded, mkUserLocal, mkVanillaGlobal,
+	mkSysLocal, mkUserLocal, mkVanillaGlobal,
 	mkTemplateLocals, mkTemplateLocalsNum, mkWildId, mkTemplateLocal,
 	mkWorkerId, mkExportedLocalId,
 
@@ -105,15 +105,15 @@ import qualified Demand	( Demand )
 import DataCon		( DataCon, isUnboxedTupleCon )
 import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
 import Name	 	( Name, OccName, nameIsLocalOrFrom, 
-			  mkSystemVarName, mkSystemVarNameEncoded, mkInternalName,
-			  getOccName, getSrcLoc
-			) 
+			  mkSystemVarName, mkInternalName, getOccName,
+			  getSrcLoc ) 
 import Module		( Module )
-import OccName		( EncodedFS, mkWorkerOcc )
+import OccName		( mkWorkerOcc )
 import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
 import Outputable
 import Unique		( Unique, mkBuiltinUnique )
+import FastString	( FastString )
 import StaticFlags	( opt_NoStateHack )
 
 -- infixl so you can say (id `set` a `set` b)
@@ -162,15 +162,10 @@ mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
 mkUserLocal :: OccName -> Unique -> Type -> SrcLoc -> Id
-mkSysLocal  :: EncodedFS  -> Unique -> Type -> Id
+mkSysLocal  :: FastString  -> Unique -> Type -> Id
 mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
--- for SysLocal, we assume the base name is already encoded, to avoid
--- re-encoding the same string over and over again.
-mkSysLocal fs uniq ty = mkLocalId (mkSystemVarNameEncoded uniq fs) ty
-
--- version to use when the faststring needs to be encoded
-mkSysLocalUnencoded fs uniq ty = mkLocalId (mkSystemVarName uniq fs)  ty
+mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
 
 mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
 mkVanillaGlobal 	    = mkGlobalId VanillaGlobal

@@ -9,6 +9,7 @@ module Ctype
 	, is_lower	-- Char# -> Bool
 	, is_upper	-- Char# -> Bool
 	, is_digit	-- Char# -> Bool
+	, is_alphanum   -- Char# -> Bool
 
 	, is_hexdigit, is_octdigit
 	, hexDigit, octDecDigit
@@ -50,6 +51,7 @@ is_space  = is_ctype cSpace
 is_lower  = is_ctype cLower
 is_upper  = is_ctype cUpper
 is_digit  = is_ctype cDigit
+is_alphanum = is_ctype (cLower+cUpper+cDigit)
 \end{code}
 
 Utils
@@ -241,99 +243,99 @@ charType c = case c of
    '\158' -> 0                         -- \236
    '\159' -> 0                         -- \237
    '\160' -> cSpace                    --
-   '\161' -> cAny + cSymbol            -- ¡
-   '\162' -> cAny + cSymbol            -- ¢
-   '\163' -> cAny + cSymbol            -- £
-   '\164' -> cAny + cSymbol            -- ¤
-   '\165' -> cAny + cSymbol            -- ¥
-   '\166' -> cAny + cSymbol            -- ¦
-   '\167' -> cAny + cSymbol            -- §
-   '\168' -> cAny + cSymbol            -- ¨
-   '\169' -> cAny + cSymbol            -- ©
-   '\170' -> cAny + cSymbol            -- ª
-   '\171' -> cAny + cSymbol            -- «
-   '\172' -> cAny + cSymbol            -- ¬
-   '\173' -> cAny + cSymbol            -- ­
-   '\174' -> cAny + cSymbol            -- ®
-   '\175' -> cAny + cSymbol            -- ¯
-   '\176' -> cAny + cSymbol            -- °
-   '\177' -> cAny + cSymbol            -- ±
-   '\178' -> cAny + cSymbol            -- ²
-   '\179' -> cAny + cSymbol            -- ³
-   '\180' -> cAny + cSymbol            -- ´
-   '\181' -> cAny + cSymbol            -- µ
-   '\182' -> cAny + cSymbol            -- ¶
-   '\183' -> cAny + cSymbol            -- ·
-   '\184' -> cAny + cSymbol            -- ¸
-   '\185' -> cAny + cSymbol            -- ¹
-   '\186' -> cAny + cSymbol            -- º
-   '\187' -> cAny + cSymbol            -- »
-   '\188' -> cAny + cSymbol            -- ¼
-   '\189' -> cAny + cSymbol            -- ½
-   '\190' -> cAny + cSymbol            -- ¾
-   '\191' -> cAny + cSymbol            -- ¿
-   '\192' -> cAny + cIdent  + cUpper   -- À
-   '\193' -> cAny + cIdent  + cUpper   -- Á
-   '\194' -> cAny + cIdent  + cUpper   -- Â
-   '\195' -> cAny + cIdent  + cUpper   -- Ã
-   '\196' -> cAny + cIdent  + cUpper   -- Ä
-   '\197' -> cAny + cIdent  + cUpper   -- Å
-   '\198' -> cAny + cIdent  + cUpper   -- Æ
-   '\199' -> cAny + cIdent  + cUpper   -- Ç
-   '\200' -> cAny + cIdent  + cUpper   -- È
-   '\201' -> cAny + cIdent  + cUpper   -- É
-   '\202' -> cAny + cIdent  + cUpper   -- Ê
-   '\203' -> cAny + cIdent  + cUpper   -- Ë
-   '\204' -> cAny + cIdent  + cUpper   -- Ì
-   '\205' -> cAny + cIdent  + cUpper   -- Í
-   '\206' -> cAny + cIdent  + cUpper   -- Î
-   '\207' -> cAny + cIdent  + cUpper   -- Ï
-   '\208' -> cAny + cIdent  + cUpper   -- Ð
-   '\209' -> cAny + cIdent  + cUpper   -- Ñ
-   '\210' -> cAny + cIdent  + cUpper   -- Ò
-   '\211' -> cAny + cIdent  + cUpper   -- Ó
-   '\212' -> cAny + cIdent  + cUpper   -- Ô
-   '\213' -> cAny + cIdent  + cUpper   -- Õ
-   '\214' -> cAny + cIdent  + cUpper   -- Ö
-   '\215' -> cAny + cSymbol + cLower   -- ×
-   '\216' -> cAny + cIdent  + cUpper   -- Ø
-   '\217' -> cAny + cIdent  + cUpper   -- Ù
-   '\218' -> cAny + cIdent  + cUpper   -- Ú
-   '\219' -> cAny + cIdent  + cUpper   -- Û
-   '\220' -> cAny + cIdent  + cUpper   -- Ü
-   '\221' -> cAny + cIdent  + cUpper   -- Ý
-   '\222' -> cAny + cIdent  + cUpper   -- Þ
-   '\223' -> cAny + cIdent             -- ß
-   '\224' -> cAny + cIdent  + cLower   -- à
-   '\225' -> cAny + cIdent  + cLower   -- á
-   '\226' -> cAny + cIdent  + cLower   -- â
-   '\227' -> cAny + cIdent  + cLower   -- ã
-   '\228' -> cAny + cIdent  + cLower   -- ä
-   '\229' -> cAny + cIdent  + cLower   -- å
-   '\230' -> cAny + cIdent  + cLower   -- æ
-   '\231' -> cAny + cIdent  + cLower   -- ç
-   '\232' -> cAny + cIdent  + cLower   -- è
-   '\233' -> cAny + cIdent  + cLower   -- é
-   '\234' -> cAny + cIdent  + cLower   -- ê
-   '\235' -> cAny + cIdent  + cLower   -- ë
-   '\236' -> cAny + cIdent  + cLower   -- ì
-   '\237' -> cAny + cIdent  + cLower   -- í
-   '\238' -> cAny + cIdent  + cLower   -- î
-   '\239' -> cAny + cIdent  + cLower   -- ï
-   '\240' -> cAny + cIdent  + cLower   -- ð
-   '\241' -> cAny + cIdent  + cLower   -- ñ
-   '\242' -> cAny + cIdent  + cLower   -- ò
-   '\243' -> cAny + cIdent  + cLower   -- ó
-   '\244' -> cAny + cIdent  + cLower   -- ô
-   '\245' -> cAny + cIdent  + cLower   -- õ
-   '\246' -> cAny + cIdent  + cLower   -- ö
-   '\247' -> cAny + cSymbol            -- ÷
-   '\248' -> cAny + cIdent             -- ø
-   '\249' -> cAny + cIdent  + cLower   -- ù
-   '\250' -> cAny + cIdent  + cLower   -- ú
-   '\251' -> cAny + cIdent  + cLower   -- û
-   '\252' -> cAny + cIdent  + cLower   -- ü
-   '\253' -> cAny + cIdent  + cLower   -- ý
-   '\254' -> cAny + cIdent  + cLower   -- þ
-   '\255' -> cAny + cIdent  + cLower   -- ÿ
+   '\161' -> cAny + cSymbol            -- Â¡
+   '\162' -> cAny + cSymbol            -- Â¢
+   '\163' -> cAny + cSymbol            -- Â£
+   '\164' -> cAny + cSymbol            -- Â¤
+   '\165' -> cAny + cSymbol            -- Â¥
+   '\166' -> cAny + cSymbol            -- Â¦
+   '\167' -> cAny + cSymbol            -- Â§
+   '\168' -> cAny + cSymbol            -- Â¨
+   '\169' -> cAny + cSymbol            -- Â©
+   '\170' -> cAny + cSymbol            -- Âª
+   '\171' -> cAny + cSymbol            -- Â«
+   '\172' -> cAny + cSymbol            -- Â¬
+   '\173' -> cAny + cSymbol            -- Â­
+   '\174' -> cAny + cSymbol            -- Â®
+   '\175' -> cAny + cSymbol            -- Â¯
+   '\176' -> cAny + cSymbol            -- Â°
+   '\177' -> cAny + cSymbol            -- Â±
+   '\178' -> cAny + cSymbol            -- Â²
+   '\179' -> cAny + cSymbol            -- Â³
+   '\180' -> cAny + cSymbol            -- Â´
+   '\181' -> cAny + cSymbol            -- Âµ
+   '\182' -> cAny + cSymbol            -- Â¶
+   '\183' -> cAny + cSymbol            -- Â·
+   '\184' -> cAny + cSymbol            -- Â¸
+   '\185' -> cAny + cSymbol            -- Â¹
+   '\186' -> cAny + cSymbol            -- Âº
+   '\187' -> cAny + cSymbol            -- Â»
+   '\188' -> cAny + cSymbol            -- Â¼
+   '\189' -> cAny + cSymbol            -- Â½
+   '\190' -> cAny + cSymbol            -- Â¾
+   '\191' -> cAny + cSymbol            -- Â¿
+   '\192' -> cAny + cIdent  + cUpper   -- Ã€
+   '\193' -> cAny + cIdent  + cUpper   -- Ã
+   '\194' -> cAny + cIdent  + cUpper   -- Ã‚
+   '\195' -> cAny + cIdent  + cUpper   -- Ãƒ
+   '\196' -> cAny + cIdent  + cUpper   -- Ã„
+   '\197' -> cAny + cIdent  + cUpper   -- Ã…
+   '\198' -> cAny + cIdent  + cUpper   -- Ã†
+   '\199' -> cAny + cIdent  + cUpper   -- Ã‡
+   '\200' -> cAny + cIdent  + cUpper   -- Ãˆ
+   '\201' -> cAny + cIdent  + cUpper   -- Ã‰
+   '\202' -> cAny + cIdent  + cUpper   -- ÃŠ
+   '\203' -> cAny + cIdent  + cUpper   -- Ã‹
+   '\204' -> cAny + cIdent  + cUpper   -- ÃŒ
+   '\205' -> cAny + cIdent  + cUpper   -- Ã
+   '\206' -> cAny + cIdent  + cUpper   -- ÃŽ
+   '\207' -> cAny + cIdent  + cUpper   -- Ã
+   '\208' -> cAny + cIdent  + cUpper   -- Ã
+   '\209' -> cAny + cIdent  + cUpper   -- Ã‘
+   '\210' -> cAny + cIdent  + cUpper   -- Ã’
+   '\211' -> cAny + cIdent  + cUpper   -- Ã“
+   '\212' -> cAny + cIdent  + cUpper   -- Ã”
+   '\213' -> cAny + cIdent  + cUpper   -- Ã•
+   '\214' -> cAny + cIdent  + cUpper   -- Ã–
+   '\215' -> cAny + cSymbol + cLower   -- Ã—
+   '\216' -> cAny + cIdent  + cUpper   -- Ã˜
+   '\217' -> cAny + cIdent  + cUpper   -- Ã™
+   '\218' -> cAny + cIdent  + cUpper   -- Ãš
+   '\219' -> cAny + cIdent  + cUpper   -- Ã›
+   '\220' -> cAny + cIdent  + cUpper   -- Ãœ
+   '\221' -> cAny + cIdent  + cUpper   -- Ã
+   '\222' -> cAny + cIdent  + cUpper   -- Ãž
+   '\223' -> cAny + cIdent             -- ÃŸ
+   '\224' -> cAny + cIdent  + cLower   -- Ã 
+   '\225' -> cAny + cIdent  + cLower   -- Ã¡
+   '\226' -> cAny + cIdent  + cLower   -- Ã¢
+   '\227' -> cAny + cIdent  + cLower   -- Ã£
+   '\228' -> cAny + cIdent  + cLower   -- Ã¤
+   '\229' -> cAny + cIdent  + cLower   -- Ã¥
+   '\230' -> cAny + cIdent  + cLower   -- Ã¦
+   '\231' -> cAny + cIdent  + cLower   -- Ã§
+   '\232' -> cAny + cIdent  + cLower   -- Ã¨
+   '\233' -> cAny + cIdent  + cLower   -- Ã©
+   '\234' -> cAny + cIdent  + cLower   -- Ãª
+   '\235' -> cAny + cIdent  + cLower   -- Ã«
+   '\236' -> cAny + cIdent  + cLower   -- Ã¬
+   '\237' -> cAny + cIdent  + cLower   -- Ã­
+   '\238' -> cAny + cIdent  + cLower   -- Ã®
+   '\239' -> cAny + cIdent  + cLower   -- Ã¯
+   '\240' -> cAny + cIdent  + cLower   -- Ã°
+   '\241' -> cAny + cIdent  + cLower   -- Ã±
+   '\242' -> cAny + cIdent  + cLower   -- Ã²
+   '\243' -> cAny + cIdent  + cLower   -- Ã³
+   '\244' -> cAny + cIdent  + cLower   -- Ã´
+   '\245' -> cAny + cIdent  + cLower   -- Ãµ
+   '\246' -> cAny + cIdent  + cLower   -- Ã¶
+   '\247' -> cAny + cSymbol            -- Ã·
+   '\248' -> cAny + cIdent             -- Ã¸
+   '\249' -> cAny + cIdent  + cLower   -- Ã¹
+   '\250' -> cAny + cIdent  + cLower   -- Ãº
+   '\251' -> cAny + cIdent  + cLower   -- Ã»
+   '\252' -> cAny + cIdent  + cLower   -- Ã¼
+   '\253' -> cAny + cIdent  + cLower   -- Ã½
+   '\254' -> cAny + cIdent  + cLower   -- Ã¾
+   '\255' -> cAny + cIdent  + cLower   -- Ã¿
 \end{code}

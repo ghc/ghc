@@ -45,7 +45,7 @@ import NameEnv
 import MkId		( seqId )
 import Module		( Module, ModLocation(ml_hi_file), emptyModuleEnv, 
 			  addBootSuffix_maybe,
-			  extendModuleEnv, lookupModuleEnv, moduleUserString
+			  extendModuleEnv, lookupModuleEnv, moduleString
 			)
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
 			  mkSuperDictSelOcc, mkDataConWrapperOcc, mkDataConWorkerOcc )
@@ -312,7 +312,7 @@ loadDecl ignore_prags mod (_version, decl)
 	-- imported name, to fix the module correctly in the cache
     mk_new_bndr mod mb_parent occ 
 	= newGlobalBinder mod occ mb_parent 
-			  (importedSrcLoc (moduleUserString mod))
+			  (importedSrcLoc (moduleString mod))
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 

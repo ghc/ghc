@@ -63,7 +63,7 @@ import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( Module, ModuleEnv, moduleEnvElts, elemModuleEnv )
-import OccName		( mkVarOcc, mkOccFS, varName )
+import OccName		( mkVarOccFS )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
 			  mkExternalName )
 import NameSet
@@ -734,7 +734,7 @@ checkMain
 	 dflags    <- getDOpts ;
 	 let { main_mod = mainModIs dflags ;
 	       main_fn  = case mainFunIs dflags of {
-				Just fn -> mkRdrUnqual (mkVarOcc (mkFastString fn)) ;
+				Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn)) ;
 				Nothing -> main_RDR_Unqual } } ;
 	
 	 check_main ghci_mode tcg_env main_mod main_fn
@@ -776,7 +776,7 @@ check_main ghci_mode tcg_env main_mod main_fn
 	-- for 'main' in the interface file!
 
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
-				   (mkOccFS varName FSLIT("main")) 
+				   (mkVarOccFS FSLIT("main")) 
 				   (Just main_name) (getSrcLoc main_name)
 	      ; root_main_id = mkExportedLocalId root_main_name ty
 	      ; main_bind    = noLoc (VarBind root_main_id main_expr) }

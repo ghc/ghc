@@ -26,15 +26,17 @@ import TcRnMonad
 
 import FiniteMap
 import PrelNames	( pRELUDE, isUnboundName, main_RDR_Unqual )
-import Module		( Module, moduleUserString, unitModuleEnv, 
+import Module		( Module, moduleString, unitModuleEnv, 
 			  lookupModuleEnv, moduleEnvElts, foldModuleEnv )
 import Name		( Name, nameSrcLoc, nameOccName, nameModule, isWiredInName,
 			  nameParent, nameParent_maybe, isExternalName,
 			  isBuiltInSyntax )
 import NameSet
 import NameEnv
-import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
-			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
+import OccName		( srcDataName, isTcOcc, pprNonVarNameSpace,
+			  occNameSpace,
+			  OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
+			  extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo,
 			  HomePackageTable, PackageIfaceTable, 
 			  unQualInScope, 
@@ -683,7 +685,7 @@ reportDeprecations tcg_env
       ,	Just deprec_txt <- lookupDeprec hpt pit name
       = setSrcSpan (importSpecLoc imp_spec) $
 	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
-			occNameFlavour (nameOccName name) <+> 
+			pprNonVarNameSpace (occNameSpace (nameOccName name)) <+> 
 		 	quotes (ppr name),
 		      (parens imp_msg) <> colon,
 		      (ppr deprec_txt) ])
@@ -958,7 +960,7 @@ printMinimalImports imps
 				 (vcat (map ppr_mod_ie mod_ies)) })
    }
   where
-    mkFilename this_mod = moduleUserString this_mod ++ ".imports"
+    mkFilename this_mod = moduleString this_mod ++ ".imports"
     ppr_mod_ie (mod_name, ies) 
 	| mod_name == pRELUDE 
 	= empty

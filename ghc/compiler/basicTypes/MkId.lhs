@@ -59,7 +59,7 @@ import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
 import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
-import OccName		( mkOccFS, varName )
+import OccName		( mkOccNameFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, DataConIds(..), dataConTyVars,
@@ -847,7 +847,7 @@ another gun with which to shoot yourself in the foot.
 
 \begin{code}
 mkWiredInIdName mod fs uniq id
- = mkWiredInName mod (mkOccFS varName fs) uniq Nothing (AnId id) UserSyntax
+ = mkWiredInName mod (mkOccNameFS varName fs) uniq Nothing (AnId id) UserSyntax
 
 unsafeCoerceName = mkWiredInIdName gHC_PRIM FSLIT("unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName     = mkWiredInIdName gHC_PRIM FSLIT("nullAddr#")	   nullAddrIdKey      nullAddrId

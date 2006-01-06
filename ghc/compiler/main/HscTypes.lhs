@@ -996,7 +996,7 @@ showModMsg use_object mod_summary
 		    char ')'])
  where 
     mod     = ms_mod mod_summary 
-    mod_str = moduleUserString mod ++ hscSourceString (ms_hsc_src mod_summary)
+    mod_str = moduleString mod ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
 
 

@@ -35,7 +35,6 @@ import Var		( Id, idName, idType )
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Name		( Name, getSrcLoc )
-import UnicodeUtil	( stringToUtf8 )
 import Maybe		( catMaybes )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
@@ -405,7 +404,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 		-- Hardly beautiful, but only three extra lines.
 	    nlHsApp (noLoc $ TyApp (nlHsVar rUNTIME_ERROR_ID) 
 				   [idType this_dict_id])
-		  (nlHsLit (HsStringPrim (mkFastString (stringToUtf8 msg))))
+		  (nlHsLit (HsStringPrim (mkFastString msg)))
 
 	  | otherwise	-- The common case
 	  = mkHsConApp dict_constr inst_tys' (map HsVar scs_and_meths)

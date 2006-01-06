@@ -22,7 +22,7 @@ import TysWiredIn
 
 import NewDemand
 import Var		( TyVar )
-import OccName		( OccName, pprOccName, mkVarOcc )
+import OccName		( OccName, pprOccName, mkVarOccFS )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
 			  typePrimRep )
@@ -113,10 +113,10 @@ data PrimOpInfo
 		[Type] 
 		Type 
 
-mkDyadic str  ty = Dyadic  (mkVarOcc str) ty
-mkMonadic str ty = Monadic (mkVarOcc str) ty
-mkCompare str ty = Compare (mkVarOcc str) ty
-mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOcc str) tvs tys ty
+mkDyadic str  ty = Dyadic  (mkVarOccFS str) ty
+mkMonadic str ty = Monadic (mkVarOccFS str) ty
+mkCompare str ty = Compare (mkVarOccFS str) ty
+mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
 \end{code}
 
 %************************************************************************

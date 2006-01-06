@@ -48,6 +48,7 @@ import Constants	( wORD_SIZE )
 import Outputable
 
 import Monad		( when )
+import Data.Char	( ord )
 
 #include "HsVersions.h"
 }
@@ -177,7 +178,7 @@ static 	:: { ExtFCode [CmmStatic] }
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised
 							(machRepByteWidth $1)] }
-        | 'bits8' '[' ']' STRING ';'	{ return [CmmString $4] }
+        | 'bits8' '[' ']' STRING ';'	{ return [mkString $4] }
         | 'bits8' '[' INT ']' ';'	{ return [CmmUninitialised 
 							(fromIntegral $3)] }
         | typenot8 '[' INT ']' ';'	{ return [CmmUninitialised 
@@ -426,6 +427,9 @@ section "data" 	 = Data
 section "rodata" = ReadOnlyData
 section "bss"	 = UninitialisedData
 section s	 = OtherSection s
+
+mkString :: String -> CmmStatic
+mkString s = CmmString (map (fromIntegral.ord) s)
 
 -- mkMachOp infers the type of the MachOp from the type of its first
 -- argument.  We assume that this is correct: for MachOps that don't have

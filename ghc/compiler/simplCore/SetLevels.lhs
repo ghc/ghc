@@ -60,8 +60,8 @@ import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendIdSubst,
 			  cloneIdBndr, cloneRecIdBndrs )
-import Id		( Id, idType, mkSysLocalUnencoded, 
-			  isOneShotLambda, zapDemandIdInfo,
+import Id		( Id, idType, mkSysLocal, isOneShotLambda,
+			  zapDemandIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
 import IdInfo		( workerExists, vanillaIdInfo, isEmptySpecInfo )
@@ -69,7 +69,7 @@ import Var		( Var )
 import VarSet
 import VarEnv
 import Name		( getOccName )
-import OccName		( occNameUserString )
+import OccName		( occNameString )
 import Type		( isUnLiftedType, Type )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply
@@ -796,9 +796,9 @@ newPolyBndrs dest_lvl env abs_vars bndrs
     in
     returnLvl (extendPolyLvlEnv dest_lvl env abs_vars (bndrs `zip` new_bndrs), new_bndrs)
   where
-    mk_poly_bndr bndr uniq = mkSysLocalUnencoded (mkFastString str) uniq poly_ty
+    mk_poly_bndr bndr uniq = mkSysLocal (mkFastString str) uniq poly_ty
 			   where
-			     str     = "poly_" ++ occNameUserString (getOccName bndr)
+			     str     = "poly_" ++ occNameString (getOccName bndr)
 			     poly_ty = mkPiTypes abs_vars (idType bndr)
 	
 
@@ -807,7 +807,7 @@ newLvlVar :: String
 	  -> LvlM Id
 newLvlVar str vars body_ty 	
   = getUniqueUs	`thenLvl` \ uniq ->
-    returnUs (mkSysLocalUnencoded (mkFastString str) uniq (mkPiTypes vars body_ty))
+    returnUs (mkSysLocal (mkFastString str) uniq (mkPiTypes vars body_ty))
     
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.

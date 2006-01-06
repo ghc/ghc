@@ -69,11 +69,12 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  plusIntegerName, timesIntegerName, smallIntegerDataConName, 
 			  lengthPName, indexPName )
 import Outputable
-import UnicodeUtil      ( intsToUtf8 )
 import SrcLoc		( Located(..), unLoc )
 import Util             ( isSingleton, notNull, zipEqual, sortWith )
 import ListSetOps	( assocDefault )
 import FastString
+
+import Data.Char	( ord )
 \end{code}
 
 
@@ -469,7 +470,7 @@ mkSmallIntegerLit small_integer_data_con i = mkConApp small_integer_data_con [mk
 mkStringExpr str = mkStringExprFS (mkFastString str)
 
 mkStringExprFS str
-  | nullFastString str
+  | nullFS str
   = returnDs (mkNilExpr charTy)
 
   | lengthFS str == 1
@@ -478,17 +479,17 @@ mkStringExprFS str
     in
     returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
 
-  | all safeChar int_chars
+  | all safeChar chars
   = dsLookupGlobalId unpackCStringName	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
   | otherwise
   = dsLookupGlobalId unpackCStringUtf8Name	`thenDs` \ unpack_id ->
-    returnDs (App (Var unpack_id) (Lit (MachStr (mkFastString (intsToUtf8 int_chars)))))
+    returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
   where
-    int_chars = unpackIntFS str
-    safeChar c = c >= 1 && c <= 0xFF
+    chars = unpackFS str
+    safeChar c = ord c >= 1 && ord c <= 0xFF
 \end{code}
 
 

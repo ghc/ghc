@@ -740,10 +740,10 @@ pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
 pprCLbl (ModuleInitLabel mod way _)	
-   = ptext SLIT("__stginit_") <> ftext (moduleFS mod)
+   = ptext SLIT("__stginit_") <> ppr mod
 	<> char '_' <> text way
 pprCLbl (PlainModuleInitLabel mod _)	
-   = ptext SLIT("__stginit_") <> ftext (moduleFS mod)
+   = ptext SLIT("__stginit_") <> ppr mod
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <>

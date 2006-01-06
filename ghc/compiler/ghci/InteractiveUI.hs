@@ -25,10 +25,10 @@ import PprTyThing
 import Outputable
 
 -- for createtags (should these come via GHC?)
-import Module( moduleUserString )
-import Name( nameSrcLoc, nameModule, nameOccName )
-import OccName( pprOccName )
-import SrcLoc( isGoodSrcLoc, srcLocFile, srcLocLine, srcLocCol )
+import Module		( moduleString )
+import Name		( nameSrcLoc, nameModule, nameOccName )
+import OccName		( pprOccName )
+import SrcLoc		( isGoodSrcLoc, srcLocFile, srcLocLine, srcLocCol )
 
 -- Other random utilities
 import Digraph		( flattenSCCs )
@@ -813,7 +813,7 @@ createTagsFile session tagskind tagFile = do
         is_interpreted <- GHC.moduleIsInterpreted session m
         -- should we just skip these?
         when (not is_interpreted) $
-          throwDyn (CmdLineError ("module '" ++ moduleUserString m ++ "' is not interpreted"))
+          throwDyn (CmdLineError ("module '" ++ moduleString m ++ "' is not interpreted"))
 
         mbModInfo <- GHC.getModuleInfo session m
         let unqual 

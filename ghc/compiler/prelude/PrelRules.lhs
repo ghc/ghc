@@ -36,7 +36,7 @@ import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils	( cheapEqExpr, exprIsConApp_maybe )
 import Type		( tyConAppTyCon, coreEqType )
-import OccName		( occNameUserString)
+import OccName		( occNameFS )
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
 			  eqStringName, unpackCStringIdKey )
 import Maybes		( orElse )
@@ -58,7 +58,7 @@ import DATA_WORD	( Word64 )
 primOpRules :: PrimOp -> Name -> [CoreRule]
 primOpRules op op_name = primop_rule op
   where
-    rule_name = mkFastString (occNameUserString (primOpOcc op))
+    rule_name = occNameFS (primOpOcc op)
     rule_name_case = rule_name `appendFS` FSLIT("->case")
 
 	-- A useful shorthand

@@ -30,16 +30,16 @@ import qualified Language.Haskell.TH as TH
 import HsSyn
 import Class (FunDep)
 import PrelNames  ( rationalTyConName, integerTyConName, negateName )
-import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
+import OccName	  ( isDataOcc, isTvOcc, occNameString )
 -- To avoid clashes with DsMeta.varName we must make a local alias for OccName.varName
 -- we do this by removing varName from the import of OccName above, making
 -- a qualified instance of OccName and using OccNameAlias.varName where varName
 -- ws previously used in this file.
 import qualified OccName
 
-import Module	  ( Module, mkModule, moduleUserString )
+import Module	  ( Module, mkModule, moduleString )
 import Id         ( Id, mkLocalId )
-import OccName	  ( mkOccFS )
+import OccName	  ( mkOccNameFS )
 import Name       ( Name, mkExternalName, localiseName, nameOccName, nameModule, 
 		    isExternalName, getSrcLoc )
 import NameEnv
@@ -911,7 +911,7 @@ globalVar name
 	; MkC uni <- coreIntLit (getKey (getUnique name))
 	; rep2 mkNameLName [occ,uni] }
   where
-      name_mod = moduleUserString (nameModule name)
+      name_mod = moduleString (nameModule name)
       name_occ = nameOccName name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
 	      | OccName.isVarOcc  name_occ = mkNameG_vName
@@ -963,7 +963,7 @@ wrapNongenSyms binds (MkC body)
 	     ; return (NonRec id var) }
 
 occNameLit :: Name -> DsM (Core String)
-occNameLit n = coreStringLit (occNameUserString (nameOccName n))
+occNameLit n = coreStringLit (occNameString (nameOccName n))
 
 
 -- %*********************************************************************
@@ -1390,7 +1390,7 @@ thSyn = mkModule "Language.Haskell.TH.Syntax"
 thLib = mkModule "Language.Haskell.TH.Lib"
 
 mk_known_key_name mod space str uniq 
-  = mkExternalName uniq mod (mkOccFS space str) 
+  = mkExternalName uniq mod (mkOccNameFS space str) 
 	           Nothing noSrcLoc
 
 libFun = mk_known_key_name thLib OccName.varName

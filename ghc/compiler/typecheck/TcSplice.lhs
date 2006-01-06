@@ -41,7 +41,7 @@ import NameEnv		( lookupNameEnv )
 import HscTypes		( lookupType, ExternalPackageState(..), emptyModDetails )
 import OccName
 import Var		( Id, TyVar, idType )
-import Module		( moduleUserString )
+import Module		( moduleString )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
@@ -416,7 +416,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
   qReport True msg  = addErr (text msg)
   qReport False msg = addReport (text msg)
 
-  qCurrentModule = do { m <- getModule; return (moduleUserString m) }
+  qCurrentModule = do { m <- getModule; return (moduleString m) }
   qReify v = reify v
   qRecover = recoverM
 
@@ -659,8 +659,8 @@ reifyName thing
 	-- have free variables, we may need to generate NameL's for them.
   where
     name    = getName thing
-    mod     = moduleUserString (nameModule name)
-    occ_str = occNameUserString occ
+    mod     = moduleString (nameModule name)
+    occ_str = occNameString occ
     occ     = nameOccName name
     mk_varg | OccName.isDataOcc occ = TH.mkNameG_d
 	    | OccName.isVarOcc  occ = TH.mkNameG_v

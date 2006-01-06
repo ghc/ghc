@@ -179,26 +179,16 @@ module Pretty (
 
 import BufWrite
 import FastString
-import PrimPacked 	( strLength )
 
 import GLAEXTS
 
 import Numeric (fromRat)
 import IO
 
-#if __GLASGOW_HASKELL__ < 503
-import IOExts		( hPutBufFull )
-#else
 import System.IO	( hPutBuf )
-#endif
 
-#if __GLASGOW_HASKELL__ < 503
-import PrelBase		( unpackCString# )
-#else
 import GHC.Base		( unpackCString# )
-#endif
-
-import PrimPacked	( Ptr(..) )
+import GHC.Ptr		( Ptr(..) )
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 

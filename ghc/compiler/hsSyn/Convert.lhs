@@ -20,7 +20,8 @@ import qualified Name	( Name, mkInternalName, getName )
 import Module   ( Module, mkModule )
 import RdrHsSyn	( mkClassDecl, mkTyData )
 import qualified OccName
-import OccName	( startsVarId, startsVarSym, startsConId, startsConSym )
+import OccName	( startsVarId, startsVarSym, startsConId, startsConSym,
+		  pprNameSpace )
 import SrcLoc	( Located(..), SrcSpan )
 import Type	( Type )
 import TysWiredIn ( unitTyCon, tupleTyCon, tupleCon, trueDataCon, nilDataCon, consDataCon )
@@ -550,7 +551,7 @@ okOcc ns str@(c:_)
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ 
-  = ptext SLIT("Illegal") <+> text (OccName.nameSpaceString ctxt_ns) 
+  = ptext SLIT("Illegal") <+> pprNameSpace ctxt_ns
 	<+> ptext SLIT("name:") <+> quotes (text occ)
 
 thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
@@ -605,7 +606,7 @@ mk_uniq_occ ns occ uniq
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> String -> OccName.OccName
-mk_occ ns occ = OccName.mkOccFS ns (mkFastString occ)
+mk_occ ns occ = OccName.mkOccNameFS ns (mkFastString occ)
 
 mk_ghc_ns :: TH.NameSpace -> OccName.NameSpace
 mk_ghc_ns TH.DataName  = OccName.dataName

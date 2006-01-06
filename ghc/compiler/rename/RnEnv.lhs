@@ -50,7 +50,8 @@ import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameOccName, nameModule, nameParent, isExternalName )
 import NameSet
-import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
+import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
+			  reportIfUnused )
 import Module		( Module )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey )
 import UniqSupply
@@ -747,7 +748,8 @@ warnUnusedName :: (Name, Maybe Provenance) -> RnM ()
 warnUnusedName (name, prov)
   = addWarnAt loc $
     sep [msg <> colon, 
-	 nest 2 $ occNameFlavour (nameOccName name) <+> quotes (ppr name)]
+	 nest 2 $ pprNonVarNameSpace (occNameSpace (nameOccName name))
+			<+> quotes (ppr name)]
 	-- TODO should be a proper span
   where
     (loc,msg) = case prov of
@@ -778,7 +780,8 @@ shadowedNameWarn doc shadow
 
 unknownNameErr rdr_name
   = sep [ptext SLIT("Not in scope:"), 
-	 nest 2 $ occNameFlavour (rdrNameOcc rdr_name) <+> quotes (ppr rdr_name)]
+	 nest 2 $ pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
+		  <+> quotes (ppr rdr_name)]
 
 unknownInstBndrErr cls op
   = quotes (ppr op) <+> ptext SLIT("is not a (visible) method of class") <+> quotes (ppr cls)

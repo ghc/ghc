@@ -58,26 +58,7 @@ import UniqFM
 import FastMutInt
 import PackageConfig		( PackageId, packageIdFS, fsToPackageId )
 
-#if __GLASGOW_HASKELL__ < 503
-import DATA_IOREF
-import DATA_BITS
-import DATA_INT
-import DATA_WORD
-import Char
-import Monad
-import Exception
-import GlaExts hiding (ByteArray, newByteArray, freezeByteArray)
-import Array
-import IO
-import PrelIOBase		( IOError(..), IOErrorType(..)
-#if __GLASGOW_HASKELL__ > 411
-				, IOException(..)
-#endif
-				)
-import PrelReal			( Ratio(..) )
-import PrelIOBase	 	( IO(..) )
-import IOExts			( openFileEx, IOModeEx(..) )
-#else
+import Foreign
 import Data.Array.IO
 import Data.Array
 import Data.Bits
@@ -102,44 +83,12 @@ import GHC.Handle		( openFileEx, IOModeEx(..) )
 #else
 import System.IO		( openBinaryFile )
 #endif
-#endif
 
 #if __GLASGOW_HASKELL__ < 601
 openBinaryFile f mode = openFileEx f (BinaryMode mode)
 #endif
 
-#if __GLASGOW_HASKELL__ < 503
-type BinArray = MutableByteArray RealWorld Int
-newArray_ bounds     = stToIO (newCharArray bounds)
-unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
-unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
-#if __GLASGOW_HASKELL__ < 411
-newByteArray#        = newCharArray#
-#endif
-hPutArray h arr sz   = hPutBufBAFull h arr sz
-hGetArray h sz       = hGetBufBAFull h sz
-
-mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> Exception
-mkIOError t location maybe_hdl maybe_filename
-  = IOException (IOError maybe_hdl t location ""
-#if __GLASGOW_HASKELL__ > 411
-		         maybe_filename
-#endif
-  		)
-
-eofErrorType = EOF
-
-#ifndef SIZEOF_HSINT
-#define SIZEOF_HSINT  INT_SIZE_IN_BYTES
-#endif
-
-#ifndef SIZEOF_HSWORD
-#define SIZEOF_HSWORD WORD_SIZE_IN_BYTES
-#endif
-
-#else
 type BinArray = IOUArray Int Word8
-#endif
 
 ---------------------------------------------------------------
 --		BinHandle
@@ -741,13 +690,17 @@ constructDictionary j fm = array (0,j-1) (eltsUFM fm)
 --		Reading and writing FastStrings
 ---------------------------------------------------------
 
-putFS bh (FastString id l ba) = do
-  put_ bh (I# l)
-  putByteArray bh ba l
-putFS bh s = error ("Binary.put_(FastString): " ++ unpackFS s)
-	-- Note: the length of the FastString is *not* the same as
-	-- the size of the ByteArray: the latter is rounded up to a
-	-- multiple of the word size.
+putFS bh (FastString id l _ buf _) = do
+  put_ bh l
+  withForeignPtr buf $ \ptr -> 
+    let 
+	go n | n == l    = return ()
+	     | otherwise = do
+		b <- peekElemOff ptr n
+		putByte bh b
+		go (n+1)
+   in 
+   go 0
   
 {- -- possible faster version, not quite there yet:
 getFS bh@BinMem{} = do
@@ -757,16 +710,24 @@ getFS bh@BinMem{} = do
   return $! (mkFastSubStringBA# arr off l)
 -}
 getFS bh = do
-  (I# l) <- get bh
-  (BA ba) <- getByteArray bh (I# l)
-  return $! (mkFastSubStringBA# ba 0# l)
+  l <- get bh
+  fp <- mallocForeignPtrBytes l
+  withForeignPtr fp $ \ptr -> do
+  let 
+	go n | n == l = mkFastStringForeignPtr ptr fp l
+	     | otherwise = do
+		b <- getByte bh
+		pokeElemOff ptr n b
+		go (n+1)
+  --
+  go 0
 
 instance Binary PackageId where
   put_ bh pid = put_ bh (packageIdFS pid)
   get bh = do { fs <- get bh; return (fsToPackageId fs) }
 
 instance Binary FastString where
-  put_ bh f@(FastString id l ba) =
+  put_ bh f@(FastString id l _ fp _) =
     case getUserData bh of { 
 	UserData { ud_next = j_r, ud_map = out_r, ud_dict = dict} -> do
     out <- readIORef out_r

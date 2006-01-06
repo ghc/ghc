@@ -6,27 +6,32 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
+{-# OPTIONS_GHC -O #-}
+-- always optimise this module, it's critical
+
 module StringBuffer
        (
         StringBuffer(..),
 	-- non-abstract for vs\/HaskellService
 
 	 -- * Creation\/destruction
-        hGetStringBuffer,     -- :: FilePath     -> IO StringBuffer
-	stringToStringBuffer, -- :: String       -> IO StringBuffer
+        hGetStringBuffer,
+	stringToStringBuffer,
 
-         -- * Lookup
-	currentChar,       -- :: StringBuffer -> Char
-	prevChar,          -- :: StringBuffer -> Char -> Char
-	lookAhead,         -- :: StringBuffer -> Int  -> Char
-	atEnd,		   -- :: StringBuffer -> Bool
+	-- * Inspection
+	nextChar,
+	currentChar,
+	prevChar,
+	atEnd,
 
-	-- * Moving
-	stepOn, stepOnBy,
+	-- * Moving and comparison
+	stepOn,
+	offsetBytes,
+	byteDiff,
 
         -- * Conversion
-        lexemeToString,     -- :: StringBuffer -> Int -> String
-        lexemeToFastString, -- :: StringBuffer -> Int -> FastString
+        lexemeToString,
+        lexemeToFastString,
 
 	 -- * Parsing integers
 	parseInteger,
@@ -34,22 +39,19 @@ module StringBuffer
 
 #include "HsVersions.h"
 
-import FastString
-import Panic
+import Encoding
+import FastString	(FastString,mkFastString,mkFastStringBytes)
 
 import GLAEXTS
 
 import Foreign
 
-#if __GLASGOW_HASKELL__ < 503
-import PrelIOBase
-import PrelHandle
-#else
-import GHC.IOBase
-import GHC.IO		( slurpFile )
-#endif
+import GHC.IOBase		( IO(..) )
+import GHC.Base			( unsafeChr )
 
-import IO			( openFile, hFileSize, IOMode(ReadMode),
+import System.IO		( hGetBuf )
+
+import IO			( hFileSize, IOMode(ReadMode),
 				  hClose )
 #if __GLASGOW_HASKELL__ >= 601
 import System.IO		( openBinaryFile )
@@ -57,37 +59,35 @@ import System.IO		( openBinaryFile )
 import IOExts                   ( openFileEx, IOModeEx(..) )
 #endif
 
-#if __GLASGOW_HASKELL__ < 503
-import IArray			( listArray )
-import ArrayBase		( UArray(..) )
-import MutableArray
-import IOExts			( hGetBufBA )
-#else
-import Data.Array.IArray	( listArray )
-import Data.Array.MArray 	( unsafeFreeze, newArray_ )
-import Data.Array.Base		( UArray(..)  )
-import Data.Array.IO		( IOArray, hGetArray )
-#endif
-
-import Char			( ord )
-
 #if __GLASGOW_HASKELL__ < 601
 openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
 #endif
+
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type
 
--- A StringBuffer is a ByteArray# with a pointer into it.  We also cache
--- the length of the ByteArray# for speed.
-
+-- |A StringBuffer is an internal pointer to a sized chunk of bytes.
+-- The bytes are intended to be *immutable*.  There are pure
+-- operations to read the contents of a StringBuffer.
+--
+-- A StringBuffer may have a finalizer, depending on how it was
+-- obtained.
+--
 data StringBuffer
- = StringBuffer
-     ByteArray#
-     Int#         -- length
-     Int#         -- current pos
+ = StringBuffer {
+     buf :: {-# UNPACK #-} !(ForeignPtr Word8),
+     len :: {-# UNPACK #-} !Int, 	-- length
+     cur :: {-# UNPACK #-} !Int		-- current pos
+  }
+	-- The buffer is assumed to be UTF-8 encoded, and furthermore
+	-- we add three '\0' bytes to the end as sentinels so that the
+	-- decoder doesn't have to check for overflow at every single byte
+	-- of a multibyte sequence.
 
 instance Show StringBuffer where
-	showsPrec _ s = showString "<stringbuffer>"
+	showsPrec _ s = showString "<stringbuffer(" 
+		      . shows (len s) . showString "," . shows (cur s)
+		      . showString ">"
 
 -- -----------------------------------------------------------------------------
 -- Creation / Destruction
@@ -95,97 +95,108 @@ instance Show StringBuffer where
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
    h <- openBinaryFile fname ReadMode
-   size <- hFileSize h
-   let size_i@(I# sz#) = fromIntegral size
-#if __GLASGOW_HASKELL__ < 503
-   arr <- stToIO (newCharArray (0,size_i-1))
-   r <- hGetBufBA h arr size_i
-#else
-   arr <- newArray_ (0,size_i-1)
-   r <- if size_i == 0 then return 0 else hGetArray h arr size_i
-#endif
-   hClose h
-   if (r /= size_i)
+   size_i <- hFileSize h
+   let size = fromIntegral size_i
+   buf <- mallocForeignPtrArray (size+3)
+   withForeignPtr buf $ \ptr -> do
+     r <- if size == 0 then return 0 else hGetBuf h ptr size
+     hClose h
+     if (r /= size)
 	then ioError (userError "short read of file")
 	else do
-#if __GLASGOW_HASKELL__ < 503
-   frozen <- stToIO (unsafeFreezeByteArray arr)
-   case frozen of
-      ByteArray _ _ bytearr# -> return (StringBuffer bytearr# sz# 0#)
-#else
-   frozen <- unsafeFreeze arr
-   case frozen of
-      UArray _ _ bytearr# -> return (StringBuffer bytearr# sz# 0#)
-#endif
+	  pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
+		 -- sentinels for UTF-8 decoding
+	  return (StringBuffer buf size 0)
 
-#if __GLASGOW_HASKELL__ >= 502
+stringToStringBuffer :: String -> IO StringBuffer
 stringToStringBuffer str = do
-  let size@(I# sz#) = length str
-      arr = listArray (0,size-1) (map (fromIntegral.ord) str)
-		 :: UArray Int Word8
-  case arr of
-	UArray _ _ bytearr# -> return (StringBuffer bytearr# sz# 0#)
-#else
-stringToStringBuffer = panic "stringToStringBuffer: not implemented"
-#endif
+  let size = utf8EncodedLength str
+  buf <- mallocForeignPtrArray (size+3)
+  withForeignPtr buf $ \ptr -> do
+    utf8EncodeString ptr str
+    pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
+	 -- sentinels for UTF-8 decoding
+  return (StringBuffer buf size 0)
 
 -- -----------------------------------------------------------------------------
--- Lookup
+-- Grab a character
 
-currentChar  :: StringBuffer -> Char
-currentChar (StringBuffer arr# l# current#) =
-  ASSERT(current# <# l#)
-  C# (indexCharArray# arr# current#)
+-- Getting our fingers dirty a little here, but this is performance-critical
+{-# INLINE nextChar #-}
+nextChar :: StringBuffer -> (Char,StringBuffer)
+nextChar (StringBuffer buf len (I# cur#)) =
+  inlinePerformIO $ do
+    withForeignPtr buf $ \(Ptr a#) -> do
+	case utf8DecodeChar# (a# `plusAddr#` cur#) of
+	  (# c#, b# #) ->
+	     let cur' = I# (b# `minusAddr#` a#) in
+	     return (C# c#, StringBuffer buf len cur')
+
+currentChar :: StringBuffer -> Char
+currentChar = fst . nextChar
 
 prevChar :: StringBuffer -> Char -> Char
-prevChar (StringBuffer _ _ 0#) deflt = deflt
-prevChar s deflt = lookAhead s (-1)
-
-lookAhead :: StringBuffer -> Int  -> Char
-lookAhead (StringBuffer arr# l# c#) (I# i#) =
-  ASSERT(off <# l#  && off >=# 0#)
-  C# (indexCharArray# arr# off)
- where 
-   off = c# +# i#
+prevChar (StringBuffer buf len 0)   deflt = deflt
+prevChar (StringBuffer buf len cur) deflt = 
+  inlinePerformIO $ do
+    withForeignPtr buf $ \p -> do
+      p' <- utf8PrevChar (p `plusPtr` cur)
+      return (fst (utf8DecodeChar p'))
 
 -- -----------------------------------------------------------------------------
 -- Moving
 
 stepOn :: StringBuffer -> StringBuffer
-stepOn s = stepOnBy 1 s
+stepOn s = snd (nextChar s)
 
-stepOnBy :: Int -> StringBuffer -> StringBuffer
-stepOnBy (I# i#) (StringBuffer fo# l# c#) = StringBuffer fo# l# (c# +# i#)
+offsetBytes :: Int -> StringBuffer -> StringBuffer
+offsetBytes i s = s { cur = cur s + i }
+
+byteDiff :: StringBuffer -> StringBuffer -> Int
+byteDiff s1 s2 = cur s2 - cur s1
 
 atEnd :: StringBuffer -> Bool
-atEnd (StringBuffer _ l# c#) = l# ==# c#
+atEnd (StringBuffer _ l c) = l == c
 
 -- -----------------------------------------------------------------------------
 -- Conversion
 
-lexemeToString :: StringBuffer -> Int -> String
+lexemeToString :: StringBuffer -> Int {-bytes-} -> String
 lexemeToString _ 0 = ""
-lexemeToString (StringBuffer arr# _ current#) (I# len#) = unpack current#
- where
-    end = current# +# len#
+lexemeToString (StringBuffer buf _ cur) bytes =
+  inlinePerformIO $ 
+    withForeignPtr buf $ \ptr -> 
+      utf8DecodeString (ptr `plusPtr` cur) bytes
 
-    unpack nh
-      | nh >=# end  = []
-      | otherwise   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharArray# arr# nh
-
-lexemeToFastString :: StringBuffer -> Int -> FastString
+lexemeToFastString :: StringBuffer -> Int {-bytes-} -> FastString
 lexemeToFastString _ 0 = mkFastString ""
-lexemeToFastString (StringBuffer fo _ current#) (I# len) =
-    mkFastSubStringBA# fo current# len
+lexemeToFastString (StringBuffer buf _ cur) len =
+   inlinePerformIO $
+     withForeignPtr buf $ \ptr ->
+       return $! mkFastStringBytes (ptr `plusPtr` cur) len
 
 -- -----------------------------------------------------------------------------
 -- Parsing integer strings in various bases
 
+byteOff :: StringBuffer -> Int -> Char
+byteOff (StringBuffer buf _ cur) i = 
+  inlinePerformIO $ withForeignPtr buf $ \ptr -> do
+    w <- peek (ptr `plusPtr` (cur+i))
+    return (unsafeChr (fromIntegral (w::Word8)))
+
+-- | XXX assumes ASCII digits only
 parseInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
 parseInteger buf len radix to_int 
   = go 0 0
   where go i x | i == len  = x
-	       | otherwise = go (i+1) (x * radix + toInteger (to_int (lookAhead buf i)))
+	       | otherwise = go (i+1) (x * radix + toInteger (to_int (byteOff buf i)))
+
+-- -----------------------------------------------------------------------------
+-- under the carpet
+
+-- Just like unsafePerformIO, but we inline it.
+{-# INLINE inlinePerformIO #-}
+inlinePerformIO :: IO a -> a
+inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
+
 \end{code}

@@ -43,7 +43,7 @@ import MachOp
 import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
 import CLabel		( mkCCLabel, mkCCSLabel, mkRtsDataLabel )
 
-import Module		( moduleUserString )
+import Module		( moduleString )
 import Id		( Id )
 import CostCentre
 import StgSyn		( GenStgExpr(..), StgExpr )
@@ -292,7 +292,7 @@ emitCostCentreDecl
    -> Code
 emitCostCentreDecl cc = do 
   { label <- mkStringCLit (costCentreUserName cc)
-  ; modl  <- mkStringCLit (moduleUserString (cc_mod cc))
+  ; modl  <- mkStringCLit (moduleString (cc_mod cc))
   ; let
      lits = [ zero,   	-- StgInt ccID,
 	      label,	-- char *label,

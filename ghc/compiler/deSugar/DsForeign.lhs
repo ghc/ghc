@@ -28,9 +28,8 @@ import SMRep		( argMachRep, typeCgRep )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..), mkStringLit )
-import Module		( moduleString )
+import Module		( moduleFS )
 import Name		( getOccString, NamedThing(..) )
-import OccName		( encodeFS )
 import Type		( repType, coreEqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, tcSplitTyConApp_maybe, 
@@ -146,7 +145,7 @@ dsFImport id (CImport cconv safety header lib spec)
   = dsCImport id spec cconv safety no_hdrs	  `thenDs` \(ids, h, c) ->
     returnDs (ids, h, c, if no_hdrs then Nothing else Just header)
   where
-    no_hdrs = nullFastString header
+    no_hdrs = nullFS header
 
   -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
   --	    routines that are external to the .NET runtime, but GHC doesn't
@@ -246,7 +245,7 @@ dsFCall fn_id fcall no_hdrs
  	the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
 	work_id       = setImpInline no_hdrs $	-- See comments with setImpInline
-			mkSysLocal (encodeFS FSLIT("$wccall")) work_uniq worker_ty
+			mkSysLocal FSLIT("$wccall") work_uniq worker_ty
 
 	-- Build the wrapper
 	work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
@@ -356,7 +355,7 @@ dsFExportDynamic id cconv
      getModuleDs				`thenDs` \ mod_name -> 
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = mkFastString (moduleString mod_name ++ "_" ++ toCName fe_id)
+       fe_nm	   = mkFastString (unpackFS (zEncodeFS (moduleFS mod_name)) ++ "_" ++ toCName fe_id)
      in
      newSysLocalDs arg_ty			`thenDs` \ cback ->
      dsLookupGlobalId newStablePtrName		`thenDs` \ newStablePtrId ->

@@ -1396,9 +1396,9 @@ getOptionsFromSource file
 		       | otherwise -> return []
 
 getOptionsFromStringBuffer :: StringBuffer -> FilePath -> [(Int,String)]
-getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) fn = 
+getOptionsFromStringBuffer buffer@(StringBuffer _ len _) fn = 
   let 
-	ls = lines (lexemeToString buffer (I# len#))  -- lazy, so it's ok
+	ls = lines (lexemeToString buffer len)  -- lazy, so it's ok
   in
   look 1 ls
   where

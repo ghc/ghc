@@ -46,7 +46,7 @@ module TysPrim(
 
 import Var		( TyVar, mkTyVar )
 import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
-import OccName		( mkOccFS, tcName, mkTyVarOcc )
+import OccName		( mkOccNameFS, tcName, mkTyVarOcc )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
@@ -100,7 +100,7 @@ primTyCons
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
 mkPrimTc fs uniq tycon
-  = mkWiredInName gHC_PRIM (mkOccFS tcName fs) 
+  = mkWiredInName gHC_PRIM (mkOccNameFS tcName fs) 
 		  uniq
 		  Nothing 		-- No parent object
 		  (ATyCon tycon)	-- Relevant TyCon

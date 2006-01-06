@@ -31,17 +31,11 @@ import Char		( ord )
 import Foreign
 import IO
 
-#if __GLASGOW_HASKELL__ < 503
-import PrelIOBase	( IO(..) )
-import IOExts		( hPutBufFull )
-#else
 import GHC.IOBase	( IO(..) )
 import System.IO	( hPutBuf )
-#endif
+import GHC.Ptr		( Ptr(..) )
 
-import GLAEXTS		( touch#, byteArrayContents#, Int(..), Int#, Addr# )
-
-import PrimPacked	( Ptr(..) )
+import GLAEXTS		( Int(..), Int#, Addr# )
 
 -- -----------------------------------------------------------------------------
 
@@ -88,22 +82,17 @@ bPutStr b@(BufHandle buf r hdl) str = do
 		loop cs (i+1)
   
 bPutFS :: BufHandle -> FastString -> IO ()
-bPutFS b@(BufHandle buf r hdl) fs@(FastString _ len# arr#) = do
-  let len = I# len#
+bPutFS b@(BufHandle buf r hdl) fs@(FastString _ len _ fp _) =
+ withForeignPtr fp $ \ptr -> do
   i <- readFastMutInt r
   if (i + len) >= buf_size
 	then do hPutBuf hdl buf i
 		writeFastMutInt r 0
 		if (len >= buf_size) 
-		    then do
-			 let a# = byteArrayContents# arr#
-			 hPutBuf hdl (Ptr a#) len
-			 touch fs
+		    then hPutBuf hdl ptr len
 		    else bPutFS b fs
 	else do
-		let a# = byteArrayContents# arr#
-		copyBytes (buf `plusPtr` i) (Ptr a#) len
-		touch fs
+		copyBytes (buf `plusPtr` i) ptr len
 		writeFastMutInt r (i+len)
 bPutFS _ _ = panic "bPutFS"
 
@@ -127,8 +116,6 @@ bFlush b@(BufHandle buf r hdl) = do
   when (i > 0) $ hPutBuf hdl buf i
   free buf
   return ()
-
-touch r = IO $ \s -> case touch# r s of s -> (# s, () #)
 
 #if 0
 myPutBuf s hdl buf i = 

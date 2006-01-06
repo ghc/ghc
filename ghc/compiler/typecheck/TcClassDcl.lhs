@@ -52,7 +52,6 @@ import RdrName		( RdrName, mkDerivedRdrName )
 import Outputable
 import PrelNames	( genericTyConNames )
 import DynFlags
-import UnicodeUtil	( stringToUtf8 )
 import ErrUtils		( dumpIfSet_dyn )
 import Util		( count, lengthIs, isSingleton, lengthExceeds )
 import Unique		( Uniquable(..) )
@@ -487,7 +486,7 @@ mkDefMethRhs origin clas inst_tys sel_id loc NoDefMeth
   where
     error_rhs  = noLoc $ HsLam (mkMatchGroup [mkSimpleMatch wild_pats simple_rhs])
     simple_rhs = nlHsApp (nlHsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
-	    	       (nlHsLit (HsStringPrim (mkFastString (stringToUtf8 error_msg))))
+	    	       (nlHsLit (HsStringPrim (mkFastString error_msg)))
     error_msg = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
 
 	-- When the type is of form t1 -> t2 -> t3

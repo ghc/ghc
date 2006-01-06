@@ -12,7 +12,7 @@ module Name (
 	Name,					-- Abstract
 	BuiltInSyntax(..), 
 	mkInternalName, mkSystemName,
-	mkSystemVarName, mkSystemVarNameEncoded, mkSysTvName, 
+	mkSystemVarName, mkSysTvName, 
 	mkFCallName, mkIPName,
 	mkExternalName, mkWiredInName,
 
@@ -38,10 +38,11 @@ module Name (
 import {-# SOURCE #-} TypeRep( TyThing )
 
 import OccName		-- All of it
-import Module		( Module )
+import Module		( Module, moduleFS )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
 import Maybes		( orElse, isJust )
+import FastString	( FastString, zEncodeFS )
 import Outputable
 \end{code}
 
@@ -215,21 +216,16 @@ mkSystemName :: Unique -> OccName -> Name
 mkSystemName uniq occ = Name { n_uniq = uniq, n_sort = System, 
 			       n_occ = occ, n_loc = noSrcLoc }
 
-mkSystemVarName :: Unique -> UserFS -> Name
-mkSystemVarName uniq fs = mkSystemName uniq (mkVarOcc fs)
+mkSystemVarName :: Unique -> FastString -> Name
+mkSystemVarName uniq fs = mkSystemName uniq (mkVarOccFS fs)
 
--- Use this version when the string is already encoded.  Avoids duplicating
--- the string each time a new name is created.
-mkSystemVarNameEncoded :: Unique -> EncodedFS -> Name
-mkSystemVarNameEncoded uniq fs = mkSystemName uniq (mkSysOccFS varName fs) 
+mkSysTvName :: Unique -> FastString -> Name
+mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs) 
 
-mkSysTvName :: Unique -> EncodedFS -> Name
-mkSysTvName uniq fs = mkSystemName uniq (mkSysOccFS tvName fs) 
-
-mkFCallName :: Unique -> EncodedString -> Name
+mkFCallName :: Unique -> String -> Name
 	-- The encoded string completely describes the ccall
 mkFCallName uniq str =  Name { n_uniq = uniq, n_sort = Internal, 
-			       n_occ = mkFCallOcc str, n_loc = noSrcLoc }
+			       n_occ = mkVarOcc str, n_loc = noSrcLoc }
 
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
@@ -317,13 +313,13 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       Internal    	      -> pprInternal sty uniq occ
 
 pprExternal sty uniq mod occ is_wired is_builtin
-  | codeStyle sty        = ppr mod <> char '_' <> ppr_occ_name occ
+  | codeStyle sty        = ppr_z_module mod <> char '_' <> ppr_z_occ_name occ
 	-- In code style, always qualify
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
   | debugStyle sty       = ppr mod <> dot <> ppr_occ_name occ
 			   <> braces (hsep [if is_wired then ptext SLIT("(w)") else empty,
-					    text (briefOccNameFlavour occ), 
+					    pprNameSpaceBrief (occNameSpace occ), 
 		 			    pprUnique uniq])
   | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
 	-- never qualify builtin syntax
@@ -332,7 +328,7 @@ pprExternal sty uniq mod occ is_wired is_builtin
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = ppr_occ_name occ <> braces (hsep [text (briefOccNameFlavour occ), 
+  | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ), 
 				 		       pprUnique uniq])
   | dumpStyle sty  = ppr_occ_name occ <> char '_' <> pprUnique uniq
 			-- For debug dumps, we're not necessarily dumping
@@ -343,15 +339,21 @@ pprInternal sty uniq occ
 pprSystem sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = ppr_occ_name occ <> char '_' <> pprUnique uniq
-		     <> braces (text (briefOccNameFlavour occ))
+		     <> braces (pprNameSpaceBrief (occNameSpace occ))
   | otherwise	   = ppr_occ_name occ <> char '_' <> pprUnique uniq
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
 
-ppr_occ_name occ = pprEncodedFS (occNameFS occ)
+ppr_occ_name occ = ftext (occNameFS occ)
 	-- Don't use pprOccName; instead, just print the string of the OccName; 
 	-- we print the namespace in the debug stuff above
+
+-- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
+-- cached behind the scenes in the FastString implementation.
+ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
+ppr_z_module   mod = ftext (zEncodeFS (moduleFS mod))
+
 \end{code}
 
 %************************************************************************

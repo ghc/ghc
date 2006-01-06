@@ -21,10 +21,10 @@ import ObjLink		( lookupSymbol )
 
 import Name		( Name,  nameModule, nameOccName, isExternalName )
 import NameEnv
-import OccName		( occNameString )
+import OccName		( occNameFS )
 import PrimOp		( PrimOp, primOpOcc )
-import Module		( moduleString  )
-import FastString	( FastString(..), unpackFS )
+import Module		( moduleFS )
+import FastString	( FastString(..), unpackFS, zEncodeFS )
 import Outputable
 import Panic            ( GhcException(..) )
 
@@ -256,12 +256,12 @@ linkFail who what
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
 nameToCLabel n suffix
-   = moduleString (nameModule n)
-     ++ '_':occNameString (nameOccName n) ++ '_':suffix
+   = unpackFS (zEncodeFS (moduleFS (nameModule n)))
+     ++ '_': unpackFS (zEncodeFS (occNameFS (nameOccName n))) ++ '_':suffix
 
 primopToCLabel :: PrimOp -> String{-suffix-} -> String
 primopToCLabel primop suffix
-   = let str = "GHCziPrimopWrappers_" ++ occNameString (primOpOcc primop) ++ '_':suffix
+   = let str = "GHCziPrimopWrappers_" ++ unpackFS (zEncodeFS (occNameFS (primOpOcc primop))) ++ '_':suffix
      in --trace ("primopToCLabel: " ++ str)
         str
 \end{code}

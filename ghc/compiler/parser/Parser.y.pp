@@ -25,7 +25,7 @@ import Type		( funTyCon )
 import ForeignCall	( Safety(..), CExportSpec(..), CLabelString,
 			  CCallConv(..), CCallTarget(..), defaultCCallConv
 			)
-import OccName		( UserFS, varName, dataName, tcClsName, tvName )
+import OccName		( varName, dataName, tcClsName, tvName )
 import DataCon		( DataCon, dataConName )
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 			  SrcSpan, combineLocs, srcLocFile, 
@@ -1469,7 +1469,7 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   'special_id' collects all these
 -- except 'unsafe' and 'forall' whose treatment differs depending on context
-special_id :: { Located UserFS }
+special_id :: { Located FastString }
 special_id
 	: 'as'			{ L1 FSLIT("as") }
 	| 'qualified'		{ L1 FSLIT("qualified") }
@@ -1480,7 +1480,7 @@ special_id
 	| 'stdcall'             { L1 FSLIT("stdcall") }
 	| 'ccall'               { L1 FSLIT("ccall") }
 
-special_sym :: { Located UserFS }
+special_sym :: { Located FastString }
 special_sym : '!'	{ L1 FSLIT("!") }
 	    | '.' 	{ L1 FSLIT(".") }
  	    | '*' 	{ L1 FSLIT("*") }

@@ -809,7 +809,7 @@ gen_Read_binds get_fixity tycon
     ident_pat s  = nlConPat ident_RDR  [nlLitPat (mkHsString s)]  -- Ident "foo"
     symbol_pat s = nlConPat symbol_RDR [nlLitPat (mkHsString s)]  -- Symbol ">>"
     
-    data_con_str con = occNameUserString (getOccName con)
+    data_con_str con = occNameString (getOccName con)
     
     read_punc c = bindLex (punc_pat c)
     read_arg a ty 
@@ -832,7 +832,7 @@ gen_Read_binds get_fixity tycon
 		 | otherwise
 		 = [bindLex (ident_pat lbl_str)]
 		 where	
-		   lbl_str = occNameUserString (getOccName lbl) 
+		   lbl_str = occNameString (getOccName lbl) 
 \end{code}
 
 
@@ -899,7 +899,7 @@ gen_Show_binds get_fixity tycon
 
 	     dc_nm	    = getName data_con
 	     dc_occ_nm	    = getOccName data_con
-             con_str        = occNameUserString dc_occ_nm
+             con_str        = occNameString dc_occ_nm
 	     op_con_str     = wrapOpParens con_str
 	     backquote_str  = wrapOpBackquotes con_str
 
@@ -916,7 +916,7 @@ gen_Show_binds get_fixity tycon
 			-- it seems tidier to have them both sides.
 		 where
 		   occ_nm   = getOccName l
-		   nm       = wrapOpParens (occNameUserString occ_nm)
+		   nm       = wrapOpParens (occNameString occ_nm)
 
              show_args 		     = zipWith show_arg bs_needed arg_tys
 	     (show_arg1:show_arg2:_) = show_args
@@ -1128,7 +1128,7 @@ gen_Data_binds fix_env tycon
     constr_args dc =
 	 [ -- nlHsIntLit (toInteger (dataConTag dc)),		-- Tag
 	   nlHsVar data_type_name,				-- DataType
-	   nlHsLit (mkHsString (occNameUserString dc_occ)),	-- String name
+	   nlHsLit (mkHsString (occNameString dc_occ)),	-- String name
            nlList  labels,					-- Field labels
 	   nlHsVar fixity]					-- Fixity
 	where
@@ -1458,7 +1458,7 @@ mk_tc_deriv_name tycon str
   = mkDerivedRdrName tc_name mk_occ
   where
     tc_name = tyConName tycon
-    mk_occ tc_occ = mkOccFS varName (mkFastString new_str)
+    mk_occ tc_occ = mkVarOccFS (mkFastString new_str)
 		  where
 		    new_str = str ++ occNameString tc_occ ++ "#"
 \end{code}

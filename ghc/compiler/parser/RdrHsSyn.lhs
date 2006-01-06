@@ -59,7 +59,7 @@ import TysWiredIn	( unitTyCon )
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
-			  occNameUserString )
+			  occNameString )
 import SrcLoc
 import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
@@ -800,8 +800,8 @@ mkExport :: CallConv
 mkExport (CCall  cconv) (L loc entity, v, ty) = return $ 
   ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)) False)
   where
-    entity' | nullFastString entity = mkExtName (unLoc v)
-	    | otherwise		    = entity
+    entity' | nullFS entity = mkExtName (unLoc v)
+	    | otherwise     = entity
 mkExport DNCall (L loc entity, v, ty) =
   parseError (getLoc v){-TODO: not quite right-}
 	"Foreign export is not yet supported for .NET"
@@ -811,10 +811,9 @@ mkExport DNCall (L loc entity, v, ty) =
 -- of the Haskell name is then performed, so if you foreign export (++),
 -- it's external name will be "++". Too bad; it's important because we don't
 -- want z-encoding (e.g. names with z's in them shouldn't be doubled)
--- (This is why we use occNameUserString.)
 --
 mkExtName :: RdrName -> CLabelString
-mkExtName rdrNm = mkFastString (occNameUserString (rdrNameOcc rdrNm))
+mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
 \end{code}
 
 

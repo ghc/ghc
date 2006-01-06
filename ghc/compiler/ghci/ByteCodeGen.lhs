@@ -53,7 +53,8 @@ import OrdList
 import Constants	( wORD_SIZE )
 
 import Data.List	( intersperse, sortBy, zip4, zip5, partition )
-import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8 )
+import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
+			  withForeignPtr )
 import Foreign.C	( CInt )
 import Control.Exception	( throwDyn )
 
@@ -1084,18 +1085,18 @@ pushAtom d p (AnnLit lit)
         pushStr s 
            = let getMallocvilleAddr
                     = case s of
-                         FastString _ l ba -> 
-                            -- sigh, a string in the heap is no good to us.
-                            -- We need a static C pointer, since the type of 
-                            -- a string literal is Addr#.  So, copy the string 
-                            -- into C land and remember the pointer so we can
-			    -- free it later.
-                            let n = I# l
-                            -- CAREFUL!  Chars are 32 bits in ghc 4.09+
-                            in  ioToBc (mallocBytes (n+1)) `thenBc` \ ptr ->
+                         FastString _ n _ fp _ -> 
+			    -- we could grab the Ptr from the ForeignPtr,
+			    -- but then we have no way to control its lifetime.
+			    -- In reality it'll probably stay alive long enoungh
+			    -- by virtue of the global FastString table, but
+			    -- to be on the safe side we copy the string into
+			    -- a malloc'd area of memory.
+                                ioToBc (mallocBytes (n+1)) `thenBc` \ ptr ->
                                 recordMallocBc ptr         `thenBc_`
                                 ioToBc (
-                                   do memcpy ptr ba (fromIntegral n)
+                                   withForeignPtr fp $ \p -> do
+				      memcpy ptr p (fromIntegral n)
 				      pokeByteOff ptr n (fromIntegral (ord '\0') :: Word8)
                                       return ptr
                                    )
@@ -1110,7 +1111,7 @@ pushAtom d p other
               (pprCoreExpr (deAnnotate (undefined, other)))
 
 foreign import ccall unsafe "memcpy"
- memcpy :: Ptr a -> ByteArray# -> CInt -> IO ()
+ memcpy :: Ptr a -> Ptr b -> CInt -> IO ()
 
 
 -- -----------------------------------------------------------------------------

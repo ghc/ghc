@@ -69,7 +69,7 @@ import StaticFlags	( opt_SccProfilingOn, opt_OmitBlackHoling,
 import Id		( Id, idType, idArity, idName )
 import DataCon		( DataCon, dataConTyCon, isNullaryRepDataCon, dataConName )
 import Name		( Name, nameUnique, getOccName, getOccString )
-import OccName		( occNameUserString )
+import OccName		( occNameString )
 import Type		( isUnLiftedType, Type, repType, splitTyConApp_maybe )
 import TcType		( tcSplitSigmaTy )
 import TyCon		( isFunTyCon, isAbstractTyCon )
@@ -930,12 +930,12 @@ closureValDescr, closureTypeDescr :: ClosureInfo -> String
 closureValDescr (ClosureInfo {closureDescr = descr}) 
   = descr
 closureValDescr (ConInfo {closureCon = con})
-  = occNameUserString (getOccName con)
+  = occNameString (getOccName con)
 
 closureTypeDescr (ClosureInfo { closureType = ty })
   = getTyDescription ty
 closureTypeDescr (ConInfo { closureCon = data_con })
-  = occNameUserString (getOccName (dataConTyCon data_con))
+  = occNameString (getOccName (dataConTyCon data_con))
 
 getTyDescription :: Type -> String
 getTyDescription ty
