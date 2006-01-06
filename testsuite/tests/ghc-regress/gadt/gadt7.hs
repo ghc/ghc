@@ -18,15 +18,16 @@ i2 :: T a -> a -> Int
 i2 t (y::b)  = case t of { K -> y+(1::Int) }
 
 i3 :: forall a. T a -> a -> Int
-i3 t y = let (t :: T b) = t in
-  let (y :: b) = y in
-   case t of K -> y
+i3 t y 
+  = let t1 = t in
+    let y1 = y in
+    case t1 of K -> y1
 
 i4 :: forall a. T a -> a -> Int
-i4 (t :: T c) (y :: c) = 
-    let (t :: T b) = t in
-    let (y :: b) = y in
-  case t of K -> y
+i4 (t :: T a) (y :: a)
+  = let t1 = t in
+    let y1 = y in
+    case t1 of K -> y1
 
 
 

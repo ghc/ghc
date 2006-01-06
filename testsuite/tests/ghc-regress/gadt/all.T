@@ -30,3 +30,15 @@ test('Nilsson', normal, compile, [''])
 
 test('records', normal, compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
+
+# New ones from Dimitrios
+
+# test('gadt-dim1', normal, compile, [''])
+# test('gadt-dim2', normal, compile_fail, [''])
+# test('gadt-dim3', normal, compile_fail, [''])
+# test('gadt-dim4', normal, compile, [''])
+# test('gadt-dim5', normal, compile, [''])
+# test('gadt-dim6', normal, compile, [''])
+# test('gadt-dim7', normal, compile, [''])
+# test('gadt-dim8', normal, compile, [''])
+# test('Arith', normal, compile, [''])
