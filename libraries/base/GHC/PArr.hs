@@ -216,7 +216,7 @@ scanlP     :: (a -> b -> a) -> a -> [:b:] -> [:a:]
 scanlP f z  = fst . loop (scanEFL (flip f)) z
 
 scanl1P        :: (a -> a -> a) -> [:a:] -> [:a:]
-acanl1P f [::]  = error "Prelude.scanl1P: empty array"
+scanl1P f [::]  = error "Prelude.scanl1P: empty array"
 scanl1P f a     = fst $ loopFromTo 1 (lengthP a - 1) (scanEFL f) (a!:0) a
 
 foldrP :: (a -> b -> b) -> b -> [:a:] -> b
