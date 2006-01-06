@@ -234,15 +234,13 @@ couples of immediate subterms from the two given input terms.)
 
 geq x y = geq' x y
   where
-    geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
+    geq' :: GenericQ (GenericQ Bool)
     geq' x y =     (toConstr x == toConstr y)
                 && and (gzipWithQ geq' x y)
 
 
 -- | Generic zip controlled by a function with type-specific branches
-gzip :: (forall a b. (Data a, Data b) => a -> b -> Maybe b)
-     -> (forall a b. (Data a, Data b) => a -> b -> Maybe b)
-
+gzip :: GenericQ (GenericM Maybe) -> GenericQ (GenericM Maybe)
 -- See testsuite/.../Generics/gzip.hs for an illustration
 gzip f x y = 
   f x y

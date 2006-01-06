@@ -178,7 +178,7 @@ instance Data a => Data (Seq a) where
 
 	dataTypeOf _	= seqDataType
 
-	dataCast1	= gcast1
+	dataCast1 f	= gcast1 f
 
 emptyConstr = mkConstr seqDataType "empty" [] Prefix
 consConstr  = mkConstr seqDataType "<|" [] Infix

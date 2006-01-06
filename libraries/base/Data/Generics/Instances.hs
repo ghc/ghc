@@ -279,7 +279,7 @@ instance Data a => Data [a] where
                     2 -> k (k (z (:)))
                     _ -> error "gunfold"
   dataTypeOf _ = listDataType
-  dataCast1    = gcast1
+  dataCast1 f  = gcast1 f
 
 --
 -- The gmaps are given as an illustration.
@@ -310,7 +310,7 @@ instance Data a => Data (Maybe a) where
                     2 -> k (z Just)
                     _ -> error "gunfold"
   dataTypeOf _ = maybeDataType
-  dataCast1    = gcast1
+  dataCast1 f  = gcast1 f
 
 
 ------------------------------------------------------------------------------
@@ -353,7 +353,7 @@ instance (Data a, Data b) => Data (Either a b) where
                     2 -> k (z Right)
                     _ -> error "gunfold"
   dataTypeOf _ = eitherDataType
-  dataCast2    = gcast2
+  dataCast2 f  = gcast2 f
 
 
 ------------------------------------------------------------------------------
@@ -367,7 +367,7 @@ instance (Data a, Data b) => Data (a -> b) where
   toConstr _   = error "toConstr"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNorepType "Prelude.(->)"
-  dataCast2    = gcast2
+  dataCast2 f  = gcast2 f
 
 
 ------------------------------------------------------------------------------
@@ -395,7 +395,7 @@ instance (Data a, Data b) => Data (a,b) where
   gunfold k z c | constrIndex c == 1 = k (k (z (,)))
   gunfold _ _ _ = error "gunfold"
   dataTypeOf _  = tuple2DataType
-  dataCast2     = gcast2
+  dataCast2 f   = gcast2 f
 
 
 ------------------------------------------------------------------------------
