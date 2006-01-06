@@ -18,10 +18,12 @@ import Data.Generics.Twins(gzipWithQ)
 geq :: Data a => a -> a -> Bool
 geq x y = geq' x y
   where
-    geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
+--    This type signature no longer works, because it is
+--    insufficiently polymoprhic.
+--    geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
+    geq' :: GenericQ (GenericQ Bool)
     geq' x y =     (toConstr x == toConstr y)
                 && and (gzipWithQ geq' x y)
-
 
 
 
