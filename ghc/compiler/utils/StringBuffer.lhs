@@ -1,14 +1,11 @@
 %
-% (c) The University of Glasgow, 1997-2003
+% (c) The University of Glasgow, 1997-2006
 %
 \section{String buffers}
 
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-{-# OPTIONS_GHC -O #-}
--- always optimise this module, it's critical
-
 module StringBuffer
        (
         StringBuffer(..),
@@ -40,19 +37,16 @@ module StringBuffer
 #include "HsVersions.h"
 
 import Encoding
-import FastString	(FastString,mkFastString,mkFastStringBytes)
-
-import GLAEXTS
+import FastString		( FastString,mkFastString,mkFastStringBytes )
 
 import Foreign
+import System.IO		( hGetBuf, hFileSize,IOMode(ReadMode), hClose )
 
+import GHC.Ptr			( Ptr(..) )
+import GHC.Exts
 import GHC.IOBase		( IO(..) )
 import GHC.Base			( unsafeChr )
 
-import System.IO		( hGetBuf )
-
-import IO			( hFileSize, IOMode(ReadMode),
-				  hClose )
 #if __GLASGOW_HASKELL__ >= 601
 import System.IO		( openBinaryFile )
 #else
@@ -199,4 +193,19 @@ parseInteger buf len radix to_int
 inlinePerformIO :: IO a -> a
 inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 
+#if __GLASGOW_HASKELL__ < 600
+mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
+mallocForeignPtrArray  = doMalloc undefined
+  where
+    doMalloc            :: Storable b => b -> Int -> IO (ForeignPtr b)
+    doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
+
+mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
+mallocForeignPtrBytes n = do
+  r <- mallocBytes n
+  newForeignPtr r (finalizerFree r)
+
+foreign import ccall unsafe "stdlib.h free" 
+  finalizerFree :: Ptr a -> IO ()
+#endif
 \end{code}

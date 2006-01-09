@@ -2,8 +2,6 @@
 % (c) The University of Glasgow, 1997-2006
 %
 \begin{code}
-{-# OPTIONS -fglasgow-exts -O #-}
-
 {-
 FastString:	A compact, hash-consed, representation of character strings.
 		Comparison is O(1), and you can get a Unique from them.
@@ -68,16 +66,15 @@ import Encoding
 
 import Foreign
 import Foreign.C
-import GLAEXTS
-import UNSAFE_IO	( unsafePerformIO )
-import MONAD_ST		( stToIO )
-import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
+import GHC.Exts
+import System.IO.Unsafe ( unsafePerformIO )
+import Control.Monad.ST	( stToIO )
+import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 import System.IO	( hPutBuf )
 
 import GHC.Arr		( STArray(..), newSTArray )
 import GHC.IOBase	( IO(..) )
-
-import IO
+import GHC.Ptr		( Ptr(..) )
 
 #define hASH_TBL_SIZE  4091
 
@@ -448,12 +445,24 @@ foreign import ccall unsafe "ghc_strlen"
 inlinePerformIO :: IO a -> a
 inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 
+-- NB. does *not* add a '\0'-terminator.
 pokeCAString :: Ptr CChar -> String -> IO ()
 pokeCAString ptr str =
   let
-	go [] n     = pokeElemOff ptr n 0
+	go [] n     = return ()
     	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
   in
   go str 0
 
+#if __GLASGOW_HASKELL__ < 600
+mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
+mallocForeignPtrBytes n = do
+  r <- mallocBytes n
+  newForeignPtr r (finalizerFree r)
+
+foreign import ccall unsafe "stdlib.h free" 
+  finalizerFree :: Ptr a -> IO ()
+
+peekCAStringLen = peekCStringLen
+#endif
 \end{code}

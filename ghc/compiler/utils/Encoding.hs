@@ -1,7 +1,6 @@
-{-# OPTIONS_GHC -O #-}
 -- -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow, 1997-2003
+-- (c) The University of Glasgow, 1997-2006
 --
 -- Character encodings 
 --
@@ -19,10 +18,6 @@ module Encoding (
 	utf8EncodedLength,
 	countUTF8Chars,
 
-	-- * Latin-1
-	latin1DecodeChar,
-	latin1EncodeChar,
-
 	-- * Z-encoding
 	zEncodeString,
 	zDecodeString
@@ -34,19 +29,9 @@ import Foreign
 import Data.Char	( ord, chr, isDigit, digitToInt, isHexDigit )
 import Numeric		( showHex )
 
+import Data.Bits
 import GHC.Ptr		( Ptr(..) )
 import GHC.Base
-
--- -----------------------------------------------------------------------------
--- Latin-1
-
-latin1DecodeChar ptr = do
-  w <- peek ptr
-  return (unsafeChr (fromIntegral w), ptr `plusPtr` 1)
-
-latin1EncodeChar c ptr = do
-  poke ptr (fromIntegral (ord c))
-  return (ptr `plusPtr` 1)
 
 -- -----------------------------------------------------------------------------
 -- UTF-8
@@ -200,8 +185,10 @@ utf8EncodedLength str = go 0 str
 
 {-
 This is the main name-encoding and decoding function.  It encodes any
-string into a string that is acceptable as a C name.  This is the name
-by which things are known right through the compiler.
+string into a string that is acceptable as a C name.  This is done
+right before we emit a symbol name into the compiled C or asm code.
+Z-encoding of strings is cached in the FastString interface, so we
+never encode the same string more than once.
 
 The basic encoding scheme is this.  
 

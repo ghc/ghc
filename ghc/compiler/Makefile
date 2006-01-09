@@ -557,11 +557,14 @@ ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
 endif
 
-# BinIface and Binary take ages to both compile and run if you don's use -O
+# We always optimise some low-level modules, otherwise performance of
+# a non-optimised compiler is severely affected.
 main/BinIface_HC_OPTS		+= -O
 utils/Binary_HC_OPTS		+= -O
 utils/FastMutInt_HC_OPTS	+= -O
-
+utils/Encoding_HC_OPTS		+= -O
+utils/StringBuffer_HC_OPTS	+= -O
+utils/FastString_HC_OPTS	+= -O
 
 # ---- Profiling ----
 #simplCore/Simplify_HC_OPTS = -auto-all
