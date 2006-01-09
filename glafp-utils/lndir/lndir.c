@@ -44,6 +44,7 @@ in this Software without prior written authorization from the X Consortium.
 */
 
 #include "lndir-Xos.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/param.h>
