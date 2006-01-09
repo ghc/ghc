@@ -4,7 +4,7 @@
 #
 config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
-config.compiler_always_flags = ['-no-recomp', '-dcore-lint']
+config.compiler_always_flags = ['-no-recomp', '-dcore-lint', '-dcmm-lint']
 
 # By default, we test the 'normal' and 'opt' ways.
 # 'optasm' is added by mk/test.mk if the compiler has a native code gen,
