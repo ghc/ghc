@@ -110,7 +110,8 @@ emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
-		       hs_depds = [] ,hs_ruleds = [] }
+		       hs_depds = [], hs_ruleds = [],
+		       hs_valds = error "emptyGroup hs_valds: Can't happen" }
 
 appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
 appendGroups 
