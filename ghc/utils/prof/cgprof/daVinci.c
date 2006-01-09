@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: daVinci.c,v 1.4 2003/08/01 15:10:34 panne Exp $
+ * $Id: daVinci.c,v 1.5 2006/01/09 14:38:01 simonmar Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -631,6 +631,7 @@ davinciCmd parseDaVinciCmd(char *input) {
   int i;
   
   result.size=1;
+  result.list=NULL;
   for(crp=input;*crp;crp++)
     if (*crp==',') result.size++;
 
