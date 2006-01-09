@@ -92,8 +92,8 @@ utf8DecodeChar# a# =
 	-- will signal a lexer error immediately.
 
 utf8DecodeChar :: Ptr Word8 -> (Char, Ptr Word8)
-utf8DecodeChar (Ptr a#) = ( C# c#, Ptr b# )
-  where (# c#, b# #) = utf8DecodeChar# a#
+utf8DecodeChar (Ptr a#) = 
+  case utf8DecodeChar# a# of (# c#, b# #) -> ( C# c#, Ptr b# )
 
 -- UTF-8 is cleverly designed so that we can always figure out where
 -- the start of the current character is, given any position in a
