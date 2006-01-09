@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------------
- * $Id: matrix.c,v 1.2 2001/07/24 06:01:21 ken Exp $
+ * $Id: matrix.c,v 1.3 2006/01/09 14:32:31 simonmar Exp $
  *									
  *	Copyright (C) 1995-2000 University of Oxford
  *									
@@ -70,7 +70,7 @@ void *_Mat(Matrix *mat,int x, int y,int lineno, char *filename) {
   /* Not in list */
   ptr = (Matrix_element*) malloc(sizeof(Matrix_element));
   if (ptr==NULL) {
-    fprintf(stderr,"{_Mat} failed to allocate %d bytes\n",
+    fprintf(stderr,"{_Mat} failed to allocate %zd bytes\n",
 	    sizeof(Matrix_element));
     exit(1);
   }
