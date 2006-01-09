@@ -40,6 +40,7 @@
  * And \begin{pseudocode} ... \end{pseudocode}.  -- LA
  */
 
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
