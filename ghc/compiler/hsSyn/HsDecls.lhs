@@ -573,7 +573,6 @@ pprConDecl (ConDecl con expl tvs cxt details (ResTyGADT res_ty))
   where
     ppr_details (PrefixCon arg_tys) = dcolon <+> ppr (foldr mk_fun_ty res_ty arg_tys)
     ppr_details (RecCon fields)     = ppr fields <+> dcolon <+> ppr res_ty
-    ppr_details (PrefixCon _)       = pprPanic "pprConDecl" (ppr con)
 
     mk_fun_ty a b = noLoc (HsFunTy a b)
 
