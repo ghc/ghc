@@ -929,10 +929,10 @@ compact( void (*get_roots)(evac_fn) )
 
     // the weak pointer lists...
     if (weak_ptr_list != NULL) {
-	thread((StgPtr)&weak_ptr_list);
+	thread((StgPtr)(void *)&weak_ptr_list);
     }
     if (old_weak_ptr_list != NULL) {
-	thread((StgPtr)&old_weak_ptr_list); // tmp
+	thread((StgPtr)(void *)&old_weak_ptr_list); // tmp
     }
 
     // mutable lists
@@ -947,10 +947,10 @@ compact( void (*get_roots)(evac_fn) )
     }
 
     // the global thread list
-    thread((StgPtr)&all_threads);
+    thread((StgPtr)(void *)&all_threads);
 
     // any threads resurrected during this GC
-    thread((StgPtr)&resurrected_threads);
+    thread((StgPtr)(void *)&resurrected_threads);
 
     // the task list
     {
