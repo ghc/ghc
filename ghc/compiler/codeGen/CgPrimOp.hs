@@ -330,6 +330,8 @@ nopOp Int2WordOp     = True
 nopOp Word2IntOp     = True
 nopOp Int2AddrOp     = True
 nopOp Addr2IntOp     = True
+nopOp ChrOp	     = True  -- Int# and Char# are rep'd the same
+nopOp OrdOp	     = True
 nopOp _		     = False
 
 -- These PrimOps turn into double casts
@@ -450,9 +452,6 @@ translateOp Float2IntOp    = Just (MO_S_Conv F32 wordRep)
 
 translateOp Float2DoubleOp = Just (MO_S_Conv F32 F64)
 translateOp Double2FloatOp = Just (MO_S_Conv F64 F32)
-
-translateOp OrdOp          = Just (MO_U_Conv I32 wordRep)
-translateOp ChrOp          = Just (MO_U_Conv wordRep I32)
 
 -- Word comparisons masquerading as more exotic things.
 
