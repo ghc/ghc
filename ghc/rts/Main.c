@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     /* ToDo: want to start with a larger stack size */
     { 
 	void *cap = rts_lock();
-	cap = rts_evalLazyIO(cap,(HaskellObj)mainIO_closure, NULL);
+	cap = rts_evalLazyIO(cap,(HaskellObj)(void *)mainIO_closure, NULL);
 	status = rts_getSchedStatus(cap);
 	rts_unlock(cap);
     }
