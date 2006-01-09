@@ -621,6 +621,7 @@ static StgBool entry_is_update(TRecEntry *e) {
   return result;
 } 
 
+#if defined(STM_FG_LOCKS)
 static StgBool entry_is_read_only(TRecEntry *e) {
   StgBool result;
   result = (e -> expected_value == e -> new_value);
@@ -634,6 +635,7 @@ static StgBool tvar_is_locked(StgTVar *s, StgTRecHeader *h) {
   result = (c == (StgClosure *) h);
   return result;  
 }
+#endif
 
 // revert_ownership : release a lock on a TVar, storing back
 // the value that it held when the lock was acquired.  "revert_all"
