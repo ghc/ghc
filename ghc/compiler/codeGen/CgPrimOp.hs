@@ -405,12 +405,12 @@ translateOp AddrLtOp       = Just mo_wordULt
 
 -- 32-bit unsigned ops
 
-translateOp CharEqOp       = Just (MO_Eq I32)
-translateOp CharNeOp       = Just (MO_Ne I32)
-translateOp CharGeOp       = Just (MO_U_Ge I32)
-translateOp CharLeOp       = Just (MO_U_Le I32)
-translateOp CharGtOp       = Just (MO_U_Gt I32)
-translateOp CharLtOp       = Just (MO_U_Lt I32)
+translateOp CharEqOp       = Just (MO_Eq wordRep)
+translateOp CharNeOp       = Just (MO_Ne wordRep)
+translateOp CharGeOp       = Just (MO_U_Ge wordRep)
+translateOp CharLeOp       = Just (MO_U_Le wordRep)
+translateOp CharGtOp       = Just (MO_U_Gt wordRep)
+translateOp CharLtOp       = Just (MO_U_Lt wordRep)
 
 -- Double ops
 
