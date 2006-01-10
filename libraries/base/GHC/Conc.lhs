@@ -377,16 +377,34 @@ newMVar value =
 -- empty, 'takeMVar' will wait until it is full.  After a 'takeMVar', 
 -- the 'MVar' is left empty.
 -- 
--- If several threads are competing to take the same 'MVar', one is chosen
--- to continue at random when the 'MVar' becomes full.
+-- There are two further important properties of 'takeMVar':
+--
+--   * 'takeMVar' is single-wakeup.  That is, if there are multiple
+--     threads blocked in 'takeMVar', and the 'MVar' becomes full,
+--     only one thread will be woken up.  The runtime guarantees that
+--     the woken thread completes its 'takeMVar' operation.
+--
+--   * When multiple threads are blocked on an 'MVar', they are
+--     woken up in FIFO order.  This is useful for providing
+--     fairness properties of abstractions built using 'MVar's.
+--
 takeMVar :: MVar a -> IO a
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
 -- |Put a value into an 'MVar'.  If the 'MVar' is currently full,
 -- 'putMVar' will wait until it becomes empty.
 --
--- If several threads are competing to fill the same 'MVar', one is
--- chosen to continue at random when the 'MVar' becomes empty.
+-- There are two further important properties of 'putMVar':
+--
+--   * 'putMVar' is single-wakeup.  That is, if there are multiple
+--     threads blocked in 'putMVar', and the 'MVar' becomes empty,
+--     only one thread will be woken up.  The runtime guarantees that
+--     the woken thread completes its 'putMVar' operation.
+--
+--   * When multiple threads are blocked on an 'MVar', they are
+--     woken up in FIFO order.  This is useful for providing
+--     fairness properties of abstractions built using 'MVar's.
+--
 putMVar  :: MVar a -> a -> IO ()
 putMVar (MVar mvar#) x = IO $ \ s# ->
     case putMVar# mvar# x s# of
