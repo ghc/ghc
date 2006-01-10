@@ -377,13 +377,20 @@
 
       <varlistentry>
 	<term>
-          <option>-t</option>
+          <option>-t<replaceable>file</replaceable></option>
           <indexterm><primary><option>-t</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
 	<listitem>
 	  <para>Write a one-line GC stats summary after running the
 	  program.  This output is in the same format as that produced
 	  by the <option>-Rghc-timing</option> option.</para>
+
+	  <para>As with <option>-s</option>, the default
+          <replaceable>file</replaceable> is
+          <filename><replaceable>program</replaceable>.stat</filename>. The
+          <replaceable>file</replaceable> <constant>stderr</constant>
+          is treated specially, with the output really being sent to
+          <constant>stderr</constant>.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
