@@ -455,6 +455,7 @@ pokeCAString ptr str =
   go str 0
 
 #if __GLASGOW_HASKELL__ < 600
+
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes n = do
   r <- mallocBytes n
@@ -464,5 +465,10 @@ foreign import ccall unsafe "stdlib.h free"
   finalizerFree :: Ptr a -> IO ()
 
 peekCAStringLen = peekCStringLen
+
+#elif __GLASGOW_HASKELL__ <= 602
+
+peekCAStringLen = peekCStringLen
+
 #endif
 \end{code}
