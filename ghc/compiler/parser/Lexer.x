@@ -1381,6 +1381,10 @@ lexToken = do
 	span `seq` setLastToken span bytes
 	t span buf bytes
 
+-- ToDo: Alex reports the buffer at the start of the erroneous lexeme,
+-- but it would be more informative to report the location where the
+-- error was actually discovered, especially if this is a decoding
+-- error.
 reportLexError loc1 loc2 buf str = 
   let 
 	c = fst (nextChar buf)
