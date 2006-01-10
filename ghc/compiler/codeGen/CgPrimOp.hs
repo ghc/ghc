@@ -403,7 +403,7 @@ translateOp AddrLeOp       = Just mo_wordULe
 translateOp AddrGtOp       = Just mo_wordUGt
 translateOp AddrLtOp       = Just mo_wordULt
 
--- 32-bit unsigned ops
+-- Char# ops
 
 translateOp CharEqOp       = Just (MO_Eq wordRep)
 translateOp CharNeOp       = Just (MO_Ne wordRep)
