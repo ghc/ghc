@@ -1181,7 +1181,7 @@ alexGetChar (AI loc ofs s)
 #if __GLASGOW_HASKELL__ < 605
 	  = c  -- no Unicode support
 #else
-	  | c <= '\x04' = non_graphic
+	  | c <= '\x06' = non_graphic
 	  | c <= '\xff' = c
 	  | otherwise = 
 		case generalCategory c of
@@ -1348,7 +1348,7 @@ lexError :: String -> P a
 lexError str = do
   loc <- getSrcLoc
   i@(AI end _ buf) <- getInput
-  reportLexError loc end buf False str
+  reportLexError loc end buf str
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
@@ -1370,7 +1370,7 @@ lexToken = do
 		  setLastToken span 0
 		  return (L span ITeof)
     AlexError (AI loc2 _ buf) -> do 
-	reportLexError loc1 loc2 buf True "lexical error"
+	reportLexError loc1 loc2 buf "lexical error"
     AlexSkip inp2 _ -> do
 	setInput inp2
 	lexToken
@@ -1381,10 +1381,9 @@ lexToken = do
 	span `seq` setLastToken span bytes
 	t span buf bytes
 
-reportLexError loc1 loc2 buf is_prev str = 
+reportLexError loc1 loc2 buf str = 
   let 
-	c | is_prev   = prevChar buf '\0'
-	  | otherwise = fst (nextChar buf)
+	c = fst (nextChar buf)
   in
   if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
     then failLocMsgP loc2 loc2 "UTF-8 decoding error"
