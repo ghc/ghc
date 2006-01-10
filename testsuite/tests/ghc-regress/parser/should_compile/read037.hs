@@ -1,6 +1,6 @@
-module ShouldCompile where
+moduleÂ ShouldCompileÂ where
 
--- This file contains several ISO 8859-1 non-breaking space characters,
--- aka '\xa0'.  The compiler should recognise these as whitespace.
-                          
-f = ( + ) 
+--Â ThisÂ fileÂ containsÂ severalÂ ISOÂ 8859-1Â non-breakingÂ spaceÂ characters,
+--Â akaÂ '\xa0'.Â Â TheÂ compilerÂ shouldÂ recogniseÂ theseÂ asÂ whitespace.
+Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â Â 
+fÂ =Â (Â +Â )Â 
