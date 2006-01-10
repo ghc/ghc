@@ -105,7 +105,7 @@ utf8PrevChar p = utf8CharStart (p `plusPtr` (-1))
 utf8CharStart :: Ptr Word8 -> IO (Ptr Word8)
 utf8CharStart p = go p
  where go p = do w <- peek p
-		 if (w .&. 0xC0) == 0x80
+		 if w >= 0x80 && w < 0xC0
 			then go (p `plusPtr` (-1))
 			else return p
 
