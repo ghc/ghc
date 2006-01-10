@@ -1,2 +1,3 @@
 
-read002.hs:6:0: lexical error in string/character literal
+read002.hs:5:5:
+    lexical error in string/character literal at character '\n'
