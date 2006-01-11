@@ -1673,14 +1673,20 @@ thawSTUArray (UArray l u arr) = do
 
    Note that because the array is possibly not copied, any subsequent
    modifications made to the mutable version of the array may be
-   shared with the immutable version.  It is safe to use, therefore, if
-   the immutable version is never referenced again.
+   shared with the immutable version.  It is only safe to use,
+   therefore, if the immutable array is never referenced again in this
+   thread, and there is no possibility that it can be also referenced
+   in another thread.  If you use an unsafeThaw/write/unsafeFreeze
+   sequence in a multi-threaded setting, then you must ensure that
+   this sequence is atomic with respect to other threads, or a garbage
+   collector crash may result (because the write may be writing to a
+   frozen array).
 
    The non-copying implementation is supported between certain pairs
    of array types only; one constraint is that the array types must
    have identical representations.  In GHC, The following pairs of
    array types have a non-copying O(1) implementation of
-   'unsafeFreeze'.  Because the optimised versions are enabled by
+   'unsafeThaw'.  Because the optimised versions are enabled by
    specialisations, you will need to compile with optimisation (-O) to
    get them.
 
