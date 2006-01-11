@@ -489,7 +489,7 @@ mkStringExprFS str
 
   where
     chars = unpackFS str
-    safeChar c = ord c >= 1 && ord c <= 0xFF
+    safeChar c = ord c >= 1 && ord c <= 0x7F
 \end{code}
 
 
