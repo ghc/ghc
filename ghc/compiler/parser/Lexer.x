@@ -559,11 +559,11 @@ reservedSymsFM = listToUFM $
        ,(">>-",	ITRarrowtail,	bit arrowsBit)
 
 #if __GLASGOW_HASKELL__ >= 605
-       ,("λ",	ITlam,          0)
-       ,("∀",	ITforall,	bit tvBit)
-       ,("→",   ITrarrow,	0)
-       ,("←",   ITlarrow,	0)
-       ,("⋯", 	ITdotdot,	0)
+       ,("λ",	ITlam,          bit glaExtsBit)
+       ,("∀",	ITforall,	bit glaExtsBit)
+       ,("→",   ITrarrow,	bit glaExtsBit)
+       ,("←",   ITlarrow,	bit glaExtsBit)
+       ,("⋯", 	ITdotdot,	bit glaExtsBit)
 #endif
        ]
 
