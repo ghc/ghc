@@ -793,7 +793,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     // stats.  Every mutable list is copied during every GC.
     if (g > 0) {
 	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	    copied += (bd->free - bd->start) * sizeof(StgWord);
+	    copied += bd->free - bd->start;
 	}
     }
 
