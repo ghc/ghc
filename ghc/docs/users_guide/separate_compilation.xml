@@ -30,16 +30,30 @@
     <sect2 id="source-files">
       <title>Haskell source files</title>
 
+      <indexterm><primary>filenames</primary></indexterm>
+
       <para>Each Haskell source module should be placed in a file on
       its own.</para>
 
-      <para>The file should usually be named after the module name, by
+      <para>Usually, the file should be named after the module name,
       replacing dots in the module name by directory separators.  For
       example, on a Unix system, the module <literal>A.B.C</literal>
       should be placed in the file <literal>A/B/C.hs</literal>,
-      relative to some base directory.  GHC's behaviour if this rule
-      is not followed is fully defined by the following section (<xref
-      linkend="output-files"/>).</para>
+      relative to some base directory.  If the module is not going to
+      be imported by another module (<literal>Main</literal>, for
+      example), then you are free to use any filename for it.</para>
+
+      <indexterm><primary>unicode</primary></indexterm>
+
+      <para> GHC assumes that source files are
+      ASCII<indexterm><primary>ASCII</primary></indexterm> or
+      UTF-8<indexterm><primary>UTF-8</primary></indexterm> only, other
+      encodings<indexterm><primary>encoding</primary></indexterm> are
+      not recognised.  However, invalid UTF-8 sequences will be
+      ignored in comments, so it is possible to use other encodings
+      such as
+      Latin-1<indexterm><primary>Latin-1</primary></indexterm>, as
+      long as the non-comment source code is ASCII only.</para>
     </sect2>
 
     <sect2 id="output-files">

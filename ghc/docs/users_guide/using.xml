@@ -153,19 +153,19 @@ module X where
     <variablelist>
 
       <varlistentry>
+	<term><filename>.hs</filename></term>
+	<listitem>
+	  <para>A Haskell module.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term>
           <filename>.lhs</filename>
           <indexterm><primary><literal>lhs</literal> suffix</primary></indexterm>
 	</term>
 	<listitem>
 	  <para>A &ldquo;literate Haskell&rdquo; module.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><filename>.hs</filename></term>
-	<listitem>
-	  <para>A not-so-literate Haskell module.</para>
 	</listitem>
       </varlistentry>
 
@@ -368,7 +368,7 @@ ghc &ndash;&ndash;make Main.hs
 	  file.</para>
 	</listitem>
 	<listitem>
-	  <para>You don't have to write a<literal>Makefile</literal>.</para>
+	  <para>You don't have to write a <literal>Makefile</literal>.</para>
           <indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary></indexterm>
 	</listitem>
 	<listitem>
