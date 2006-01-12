@@ -19,7 +19,7 @@ module Panic
      Exception.Exception(..), showException, try, tryJust, tryMost, tryUser,
      catchJust, ioErrors, throwTo,
 
-     installSignalHandlers, 
+     installSignalHandlers, interruptTargetThread
    ) where
 
 #include "HsVersions.h"
@@ -49,7 +49,7 @@ import EXCEPTION	( throwTo )
 import EXCEPTION	( catchJust, tryJust, ioErrors )
 #endif
 
-import CONCURRENT	( myThreadId )
+import CONCURRENT	( myThreadId, MVar, ThreadId, withMVar, newEmptyMVar )
 import DYNAMIC
 import qualified EXCEPTION as Exception
 import TRACE		( trace )
@@ -209,16 +209,21 @@ throwTo   = Exception.raiseInThread
 \end{code}
 
 Standard signal handlers for catching ^C, which just throw an
-exception in the main thread.  NOTE: must be called from the main
-thread.
+exception in the target thread.  The current target thread is
+the thread at the head of the list in the MVar passed to
+installSignalHandlers.
 
 \begin{code}
 installSignalHandlers :: IO ()
 installSignalHandlers = do
-  main_thread <- myThreadId
   let
       interrupt_exn = Exception.DynException (toDyn Interrupted)
-      interrupt = throwTo main_thread interrupt_exn
+
+      interrupt = do
+	withMVar interruptTargetThread $ \targets ->
+	  case targets of
+	   [] -> return ()
+	   (thread:_) -> throwTo thread interrupt_exn
   --
 #if !defined(mingw32_HOST_OS)
   installHandler sigQUIT (Catch interrupt) Nothing 
@@ -239,4 +244,8 @@ installSignalHandlers = do
 #else
   return () -- nothing
 #endif
+
+{-# NOINLINE interruptTargetThread #-}
+interruptTargetThread :: MVar [ThreadId]
+interruptTargetThread = unsafePerformIO newEmptyMVar
 \end{code}

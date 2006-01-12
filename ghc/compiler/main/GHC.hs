@@ -228,18 +228,21 @@ import Outputable
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes
 import TcType           ( tcSplitSigmaTy, isDictTy )
-
-import Directory        ( getModificationTime, doesFileExist )
-import Maybe		( isJust, isNothing, fromJust )
 import Maybes		( expectJust, mapCatMaybes )
-import List		( partition, nub )
-import qualified List
-import Monad		( unless, when )
-import System		( exitWith, ExitCode(..) )
-import Time		( ClockTime )
-import EXCEPTION as Exception hiding (handle)
-import DATA_IOREF
-import IO
+
+import Control.Concurrent
+import System.Directory ( getModificationTime, doesFileExist )
+import Data.Maybe	( isJust, isNothing, fromJust )
+import Data.List	( partition, nub )
+import qualified Data.List as List
+import Control.Monad	( unless, when )
+import System.Exit	( exitWith, ExitCode(..) )
+import System.Time	( ClockTime )
+import Control.Exception as Exception hiding (handle)
+import Data.IORef
+import System.IO
+import System.IO.Error	( try, isDoesNotExistError )
+import System.IO.Unsafe	( unsafePerformIO )
 import Prelude hiding (init)
 
 -- -----------------------------------------------------------------------------
@@ -303,6 +306,8 @@ defaultCleanupHandler dflags inner =
 init :: [String] -> IO [String]
 init args = do
    -- catch ^C
+   main_thread <- myThreadId
+   putMVar interruptTargetThread [main_thread]
    installSignalHandlers
 
    -- Grab the -B option if there is one
@@ -1458,7 +1463,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	case maybe_buf of
 	   Just (_,t) -> check_timestamp old_summary location src_fn t
 	   Nothing    -> do
-		m <- IO.try (getModificationTime src_fn)
+		m <- System.IO.Error.try (getModificationTime src_fn)
 		case m of
 		   Right t -> check_timestamp old_summary location src_fn t
 		   Left e | isDoesNotExistError e -> find_it
@@ -1980,14 +1985,17 @@ runStmt (Session ref) expr
 			writeIORef ref new_hsc_env
 			return (RunOk names)
 
-
--- We run the statement in a "sandbox" to protect the rest of the
--- system from anything the expression might do.  For now, this
--- consists of just wrapping it in an exception handler, but see below
--- for another version.
-
+-- When running a computation, we redirect ^C exceptions to the running
+-- thread.  ToDo: we might want a way to continue even if the target
+-- thread doesn't die when it receives the exception... "this thread
+-- is not responding".
 sandboxIO :: IO a -> IO (Either Exception a)
-sandboxIO thing = Exception.try thing
+sandboxIO thing = do
+  m <- newEmptyMVar
+  ts <- takeMVar interruptTargetThread
+  child <- forkIO (do res <- Exception.try thing; putMVar m res)
+  putMVar interruptTargetThread (child:ts)
+  takeMVar m `finally` modifyMVar_ interruptTargetThread (return.tail)
 
 {-
 -- This version of sandboxIO runs the expression in a completely new

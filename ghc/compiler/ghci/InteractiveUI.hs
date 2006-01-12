@@ -282,15 +282,18 @@ runGHCi paths maybe_expr = do
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
 
 
-interactiveLoop is_tty show_prompt = do
+interactiveLoop is_tty show_prompt =
   -- Ignore ^C exceptions caught here
   ghciHandleDyn (\e -> case e of 
-			Interrupted -> ghciUnblock (
+			Interrupted -> do
 #if defined(mingw32_HOST_OS)
-						io (putStrLn "") >> 
+				io (putStrLn "")
 #endif
-						interactiveLoop is_tty show_prompt)
-			_other      -> return ()) $ do
+				interactiveLoop is_tty show_prompt
+			_other      -> return ()) $ 
+
+  ghciUnblock $ do -- unblock necessary if we recursed from the 
+		   -- exception handler above.
 
   -- read commands from stdin
 #ifdef USE_READLINE
