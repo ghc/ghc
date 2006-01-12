@@ -126,7 +126,7 @@ initStats(void)
     nat i;
   
     if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	statsPrintf("    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
+	statsPrintf("    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts\n");
 	statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
     }
     GC_coll_times = 
@@ -251,7 +251,7 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (lnat alloc, lnat collect, lnat live, lnat copied, 
+stat_endGC (lnat alloc, lnat live, lnat copied, 
 	    lnat scavd_copied, lnat gen)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
@@ -265,7 +265,7 @@ stat_endGC (lnat alloc, lnat collect, lnat live, lnat copied,
 	    nat faults = getPageFaults();
 	    
 	    statsPrintf("%9ld %9ld %9ld",
-		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_));
+		    alloc*sizeof(W_), copied*sizeof(W_), live*sizeof(W_));
 	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
 		    TICK_TO_DBL(gc_time),
 		    TICK_TO_DBL(gc_etime),

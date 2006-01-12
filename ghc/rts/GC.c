@@ -140,6 +140,14 @@ static lnat g0s0_pcnt_kept = 30; // percentage of g0s0 live at last minor GC
 static lnat thunk_selector_depth = 0;
 #define MAX_THUNK_SELECTOR_DEPTH 8
 
+/* Mut-list stats */
+#ifdef DEBUG
+static nat 
+    mutlist_MUTVARS,
+    mutlist_MUTARRS,
+    mutlist_OTHERS;
+#endif
+
 /* -----------------------------------------------------------------------------
    Static function declarations
    -------------------------------------------------------------------------- */
@@ -332,7 +340,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 {
   bdescr *bd;
   step *stp;
-  lnat live, allocated, collected = 0, copied = 0, scavd_copied = 0;
+  lnat live, allocated, copied = 0, scavd_copied = 0;
   lnat oldgen_saved_blocks = 0;
   nat g, s, i;
 
@@ -361,6 +369,12 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 #ifdef DEBUG
   // check for memory leaks if DEBUG is on 
   memInventory();
+#endif
+
+#ifdef DEBUG
+  mutlist_MUTVARS = 0;
+  mutlist_MUTARRS = 0;
+  mutlist_OTHERS = 0;
 #endif
 
   // Init stats and print par specific (timing) info 
@@ -792,9 +806,13 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     // Count the mutable list as bytes "copied" for the purposes of
     // stats.  Every mutable list is copied during every GC.
     if (g > 0) {
+	nat mut_list_size = 0;
 	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	    copied += bd->free - bd->start;
+	    mut_list_size += bd->free - bd->start;
 	}
+	copied +=  mut_list_size;
+
+	IF_DEBUG(gc, debugBelch("mut_list_size: %d (%d vars, %d arrays, %d others)\n", mut_list_size * sizeof(W_), mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS));
     }
 
     for (s = 0; s < generations[g].n_steps; s++) {
@@ -812,18 +830,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
       // for generations we collected... 
       if (g <= N) {
-
-	  // rough calculation of garbage collected, for stats output
-	  if (stp->is_compacted) {
-	      collected += (oldgen_saved_blocks - stp->n_old_blocks) * BLOCK_SIZE_W;
-	  } else {
-	      if (g == 0 && s == 0) {
-		  collected += countNurseryBlocks() * BLOCK_SIZE_W;
-		  collected += alloc_blocks;
-	      } else {
-		  collected += stp->n_old_blocks * BLOCK_SIZE_W;
-	      }
-	  }
 
 	/* free old memory and shift to-space into from-space for all
 	 * the collected steps (except the allocation area).  These
@@ -1175,7 +1181,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(allocated, collected, live, copied, scavd_copied, N);
+  stat_endGC(allocated, live, copied, scavd_copied, N);
 
 #if defined(RTS_USER_SIGNALS)
   // unblock signals again
@@ -3834,6 +3840,20 @@ scavenge_mutable_list(generation *gen)
 	for (q = bd->start; q < bd->free; q++) {
 	    p = (StgPtr)*q;
 	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+
+#ifdef DEBUG	    
+	    switch (get_itbl((StgClosure *)p)->type) {
+	    case MUT_VAR:
+		mutlist_MUTVARS++; break;
+	    case MUT_ARR_PTRS:
+	    case MUT_ARR_PTRS_FROZEN:
+	    case MUT_ARR_PTRS_FROZEN0:
+		mutlist_MUTARRS++; break;
+	    default:
+		mutlist_OTHERS++; break;
+	    }
+#endif
+
 	    if (scavenge_one(p)) {
 		/* didn't manage to promote everything, so put the
 		 * object back on the list.
