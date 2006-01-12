@@ -1068,7 +1068,7 @@ fi
 
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
-AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times])
+AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r])
 dnl ** For ghc/rts/gmp:
 AC_CHECK_FUNCS([getpagesize])
 
