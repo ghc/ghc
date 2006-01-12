@@ -189,9 +189,13 @@ time_str(void)
 
     if (now == 0) {
 	time(&now);
+#if HAVE_CTIME_R
+	ctime_r(&now, nowstr);
+#else
 	strcpy(nowstr, ctime(&now));
-	strcpy(nowstr+16,nowstr+19);
-	nowstr[21] = '\0';
+#endif
+	memmove(nowstr+16,nowstr+19,7);
+	nowstr[21] = '\0';  // removes the \n
     }
     return nowstr;
 }
