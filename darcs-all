@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 top_dirs="nofib testsuite"
 
 default_repo_root="http://darcs.haskell.org/"
@@ -58,7 +60,6 @@ if test ! -d _darcs -o ! -d ghc; then
 fi
 
 case $1 in
-  push|pull|wh*) darcsall $*;;
   get)  shift; darcsget $*;;
-  *)    echo "syntax: ./darcs-all push|pull|whatsnew|get"; exit 1;;
+  *) darcsall $*;;
 esac
