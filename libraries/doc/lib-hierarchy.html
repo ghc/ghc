@@ -1,0 +1,286 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>Haskell Library Hierarchy</title>
+</head>
+
+<body>
+
+<h1>The Haskell Library Hierarchy</h1>
+
+<pre>
+Algebra
+    DomainConstructor   -- formerly DoCon
+    Geometric           -- formerly BasGeomAlg
+
+Control
+    Exception           -- (opt, inc. error & undefined)
+    Concurrent          -- as hslibs/concurrent
+        Chan            -- these could all be moved under Data
+        MVar
+        Merge
+        QSem
+        QSemN
+        SampleVar
+        Semaphore
+    Parallel            -- as hslibs/concurrent/Parallel
+        Strategies
+    Monad               -- Haskell 98 Monad library
+        ST              -- ST defaults to Strict variant?
+            Strict      -- renaming for ST
+            Lazy        -- renaming for LazyST
+        State
+        Error
+        Identity
+        Monoid
+        Reader
+        Writer
+        Cont
+        Fix              -- to be renamed to Rec?
+        List
+        RWS
+
+Data
+    Binary              -- Binary I/O
+    Bits
+    Bool                -- &&, ||, not, otherwise
+    Tuple               -- fst, snd
+    Char                -- H98
+    Complex             -- H98
+    Dynamic
+    Either
+    Int
+    Maybe               -- H98
+    List                -- H98
+    PackedString
+    Ratio               -- H98
+    Word
+    LargeWord		-- Word128 etc., from crypto
+    IORef
+    STRef		-- Same as Data.STRef.Strict
+	Strict		
+	Lazy		-- The lazy version (for Control.Monad.ST.Lazy)
+    Binary              -- Haskell binary I/O
+    Digest
+        MD5
+        ...             -- others (CRC ?)
+    Array               -- Haskell 98 Array library
+        Unboxed
+        IArray
+        MArray
+        IO              -- mutable arrays in the IO/ST monads
+        ST
+    Tree
+        AVL
+        RedBlack
+        BTree
+    Queue
+        Bankers
+        FIFO
+    Collection
+    Graph		-- start with GHC's DiGraph?
+    FiniteMap
+    Set
+    Memo                -- (opt)
+    Unique
+
+Database
+    MySQL
+    PostgreSQL
+    ODBC
+
+Dotnet
+    ...			-- Mirrors the MS .NET class hierarchy
+
+Debug
+    Trace
+    Observe             -- choose a default amongst the variants
+        Textual            -- Andy Gill's release 1
+        ToXmlFile          -- Andy Gill's XML browser variant
+        GHood              -- Claus Reinke's animated variant
+
+Edison                  -- (opt, uses multi-param type classes)
+    Prelude             -- large self-contained packages should have
+    Collection          -- their own hierarchy?  Like a vendor branch.
+    Queue               -- Or should the whole Edison tree be placed
+    ...                 -- under [Data.]Structures?
+
+Codec			-- Coders/Decoders for various data formats
+    ASN.1
+       BER
+       TLV
+    Audio
+       Wav
+       MP3
+       ...
+    Compression
+       Gzip
+       Bzip2
+       ...
+    Encryption
+       DES
+       RSA
+       BlowFish
+       ...
+    Image
+       GIF
+       PNG
+       JPEG
+       TIFF
+       ...
+    Text
+       UTF8
+       UTF16
+       ISO8859
+       ...
+    Video
+       Mpeg
+       QuickTime
+       Avi
+       ...
+    Binary                 -- these are for encoding binary data into text
+       Base64
+       Yenc
+
+DSP    			-- Digital Signal Processing libraries
+
+Foreign
+    Ptr
+    StablePtr
+    ForeignPtr  -- rename to FinalisedPtr?  to void confusion with Foreign.Ptr
+    Storable
+    Marshal
+        Alloc
+        Array
+        Errors
+        Utils
+    C
+        Types
+        Errors
+        Strings
+
+GHC
+    Exts                -- hslibs/lang/GlaExts
+    ...
+
+Graphics
+    HGL
+    Rendering
+       Direct3D
+       FRAN
+       Metapost
+       Inventor
+       Haven
+       OpenGL
+          GL
+          GLU
+       Pan
+    UI
+       FranTk
+       Fudgets
+       GLUT
+       Gtk
+       Motif
+       ObjectIO
+       TkHaskell
+    X11
+       Xt
+       Xlib
+       Xmu
+       Xaw
+
+Hugs
+    ...
+
+Language
+    Haskell             -- hslibs/hssource
+        Syntax
+        Lexer
+        Parser
+        Pretty
+    HaskellCore
+    Python
+    C
+    ...
+
+Nhc
+    ...
+
+Numeric                 -- exports std. H98 numeric type classes
+    Statistics
+
+Network                 -- (== hslibs/net/Socket), depends on FFI only
+    Socket              -- or rename to Posix?
+    URI                 -- general URI parsing
+    CGI                 -- one in hslibs is ok?
+    Protocol
+        HTTP
+        FTP
+        SMTP
+
+Prelude                 -- Haskell98 Prelude (mostly just re-exports
+                           other parts of the tree).
+
+System                  -- Interaction with the "system"
+    Cmd                 -- ( system )
+    CPUTime             -- H98
+    Directory           -- H98
+    Exit                -- ( ExitCode(..), exitWith, exitFailure )
+    Environment         -- ( getArgs, getProgName, getEnv ... )
+    Info                -- info about the host system
+    IO                  -- H98 + IOExts - IOArray - IORef
+        Select
+        Unsafe          -- unsafePerformIO, unsafeInterleaveIO
+    Console
+        GetOpt
+        Readline
+    Locale              -- H98
+    Posix
+        Console
+        Directory
+        DynamicLinker
+            Prim
+            Module
+        IO
+        Process
+        Time
+    Mem                 -- rename from cryptic 'GC'
+        Weak            -- (opt)
+        StableName      -- (opt)
+    Time                -- H98 + extensions
+    Win32               -- the full win32 operating system API
+
+Test
+    HUnit
+    QuickCheck
+
+Text
+    Encoding
+        QuotedPrintable
+        Rot13
+    Read
+        Lex		-- cut down lexer for "read"
+    Show
+        Functions       -- optional instance of Show for functions.
+    Regex               -- previously RegexString
+        Posix           -- Posix regular expression interface
+    PrettyPrint         -- default (HughesPJ?)
+        HughesPJ
+        Wadler
+        Chitil
+        ...
+    HTML                -- HTML combinator lib
+    XML
+        Combinators
+        Parse
+        Pretty
+        Types
+    ParserCombinators   -- no default
+        ReadP		-- a more efficient "ReadS"
+        Parsec
+        Hutton_Meijer
+        ...
+</pre>
+
+</html>

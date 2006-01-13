@@ -1,0 +1,815 @@
+<row>
+<entry><literal>Control.Arrow</literal></entry>
+<entry><email>ross@soi.city.ac.uk</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Arrow.hs">Arrow.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Concurrent</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Concurrent.hs">Concurrent.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Concurrent.Chan</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Concurrent/Chan.hs">Chan.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Concurrent.MVar</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Concurrent/MVar.hs">MVar.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Concurrent.QSem</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Concurrent/QSem.hs">QSem.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Concurrent.QSemN</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Concurrent/QSemN.hs">QSemN.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Concurrent.SampleVar</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Concurrent/SampleVar.hs">SampleVar.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Exception</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Exception.hs">Exception.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad.hs">Monad.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Cont</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Cont.hs">Cont.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Error</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Error.hs">Error.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Fix</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Fix.hs">Fix.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Identity</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Identity.hs">Identity.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.List</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/List.hs">List.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Reader</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Reader.hs">Reader.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.RWS</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/RWS.hs">RWS.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.State</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/State.hs">State.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.ST</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/ST.hs">ST.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.ST.Lazy</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/ST/Lazy.hs">Lazy.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.ST.Strict</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/ST/Strict.hs">Strict.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Trans</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Trans.hs">Trans.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Monad.Writer</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Monad/Writer.hs">Writer.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Parallel</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Parallel.hs">Parallel.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Control.Parallel.Strategies</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Control/Parallel/Strategies.hs">Strategies.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array.hs">Array.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.Base</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/Base.hs">Base.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.Diff</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/Diff.hs">Diff.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.IArray</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/IArray.hs">IArray.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.IO</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/IO.hs">IO.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.IO.Internal</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/IO/Internals.hs">Internals.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.MArray</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/MArray.hs">MArray.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.ST</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/ST.hs">ST.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.Storable</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/Storable.hs">Storable.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Array.Unboxed</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Array/Unboxed.hs">Unboxed.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Bits</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Bits.hs">Bits.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Bool</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Bool.hs">Bool.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Char</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Char.hs">Char.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Complex</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Complex.hs">Complex.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Dynamic</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Dynamic.hs">Dynamic.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Either</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Either.hs">Either.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.FiniteMap</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/FiniteMap.hs">FiniteMap.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Generics</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Generics.hs">Generics.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Graph</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Graph.hs">Graph.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.HashTable</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/HashTable.hs">HashTable.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Int</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Int.hs">Int.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.IORef</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/IORef.hs">IORef.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Ix</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Ix.hs">Ix.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.List</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/List.hs">List.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Maybe</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Maybe.hs">Maybe.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Monoid</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Monoid.hs">Monoid.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.PackedString</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/PackedString.hs">PackedString.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Ratio</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Ratio.hs">Ratio.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Set</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Set.hs">Set.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.STRef</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/STRef.hs">STRef.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.STRef.Lazy</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/STRef/Lazy.hs">Lazy.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.STRef.Strict</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/STRef/Strict.hs">Strict.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Tree</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Tree.hs">Tree.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Tuple</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Tuple.hs">Tuple.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Unique</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Unique.hs">Unique.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Data.Word</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Data/Word.hs">Word.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Debug.QuickCheck</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Debug/QuickCheck.hs">QuickCheck.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Debug.QuickCheck.Batch</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Debug/QuickCheck/Batch.hs">Batch.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Debug.QuickCheck.Poly</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Debug/QuickCheck/Poly.hs">Poly.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Debug.QuickCheck.Utils</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Debug/QuickCheck/Utils.hs">Utils.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Debug.Trace</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Debug/Trace.hs">Trace.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>DSP</literal> (hierarchy)</entry>
+<entry>Matthew Donadio <email>m.p.donadio@ieee.org</email></entry>
+<entry><ulink url="http://users.snip.net/~donadio/haskell/proposal.html">Proposal</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign.hs">Foreign.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.C</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/C.hs">C.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.C.Error</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/C/Error.hs">Error.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.C.String</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/C/String.hs">String.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.C.Types</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/C/Types.hs">Types.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Concurrent</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Concurrent.hs">Concurrent.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.ForeignPtr</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/ForeignPtr.hs">ForeignPtr.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Marshal</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Marshal.hs">Marshal.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Marshal.Alloc</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Marshal/Alloc.hs">Alloc.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Marshal.Array</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Marshal/Array.hs">Array.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Marshal.Error</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Marshal/Error.hs">Error.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Marshal.Pool</literal></entry>
+<entry><email>sven.panne@aedion.de</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Marshal/Pool.hs">Pool.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Marshal.Utils</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Marshal/Utils.hs">Utils.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Ptr</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Ptr.hs">Ptr.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.StablePtr</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/StablePtr.hs">StablePtr.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Foreign.Storable</literal></entry>
+<entry><email>ffi@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Foreign/Storable.hs">Storable.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Graphics.HGL (hierarchy)</literal></entry>
+<entry>Alastair Reid<email>reid-consulting-uk.ltd.uk</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/HGL/Graphics/HGL">HGL.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Graphics.Rendering.OpenGL (hierarchy)</literal></entry>
+<entry><email>sven.panne@aedion.de</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/OpenGL/Graphics/Rendering/OpenGL.hs">OpenGL.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Graphics.UI.GLUT (hierarchy)</literal></entry>
+<entry><email>sven.panne@aedion.de</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/GLUT/Graphics/UI/GLUT.hs">GLUT.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Graphics.UI.ObjectIO (hierarchy)</literal></entry>
+<entry><email>ka2_mail@yahoo.com</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/ObjectIO/Graphics/UI/ObjectIO.hs">ObjectIO.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Graphics.X11 (hierarchy)</literal></entry>
+<entry>Alastair Reid<email>reid-consulting-uk.ltd.uk</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/X11/Graphics/X11">X11.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.Lexer</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/Lexer.hs">Lexer.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.ParseMonad</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/ParseMonad.hs">ParseMonad.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.Parser</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/Parser.hs">Parser.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.ParseUtils</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/ParseUtils.hs">ParseUtils.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.Pretty</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/Pretty.hs">Pretty.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.Syntax</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/Syntax.hs">Syntax.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.TH</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/template-haskell/Language/Haskell/TH.hs">TH.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.TH.Syntax</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/template-haskell/Language/Haskell/TH/Syntax.hs">Syntax.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.TH.Lib</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/template-haskell/Language/Haskell/TH/Lib.hs">Lib.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.TH.Ppr</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/template-haskell/Language/Haskell/TH/Ppr.hs">Ppr.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Language.Haskell.TH.PprLib</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/template-haskell/Language/Haskell/TH/PprLib.hs">PprLib.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Network</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/network/Network.hs">Network.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Network.BSD</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/network/Network/BSD.hsc">BSD.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>Network.CGI</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/network/Network/CGI.hs">CGI.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Network.Socket</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/network/Network/Socket.hsc">Socket.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>Network.URI</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/network/Network/URI.hs">URI.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Numeric</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Numeric.hs">Numeric.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Prelude</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Prelude.hs">Prelude.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Cmd</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Cmd.hs">Cmd.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Console.GetOpt</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Console/GetOpt.hs">GetOpt.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Console.Readline</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/readline/System/Console/Readline.hsc">Readline.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>System.CPUTime</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/CPUTime.hs">CPUTime.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Directory</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Directory.hs">Directory.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.DynamicLinker</literal></entry>
+<entry><email>vs@foldr.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/DynamicLinker.hsc">DynamicLinker.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.DynamicLinker.Prim</literal></entry>
+<entry><email>vs@foldr.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/DynamicLinker/Prim.hsc">Prim.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.DynamicLinker.Module</literal></entry>
+<entry><email>vs@foldr.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/DynamicLinker/Module.hsc">Module.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Environment</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Environment.hs">Environment.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Exit</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Exit.hs">Exit.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Info</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Info.hs">Info.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.IO</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/IO.hs">IO.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.IO.Error</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/IO/Error.hs">Error.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.IO.Unsafe</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/IO/Unsafe.hs">Unsafe.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Locale</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Locale.hs">Locale.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Mem</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Mem.hs">Mem.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Mem.StableName</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Mem/StableName.hs">StableName.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Mem.Weak</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Mem/Weak.hs">Weak.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix.hs">Posix.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Env</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Env.hs">Env.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Files</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Files.hs">Files.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Internals</literal></entry>
+<entry><email>cvs-ghc@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Posix/Internals.hs">Internals.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.IO</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/IO.hs">IO.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Process</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Process.hs">Process.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Resource</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Resource.hs">Resource.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Terminal</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Terminal.hs">Terminal.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Time</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Time.hs">Time.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Unistd</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/Unistd.hs">Unistd.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.User</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Posix/User.hs">User.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Signals</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Posix/Signals.hs">Signals.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Posix.Types</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Posix/Types.hs">Types.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Random</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Random.hs">Random.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Sendfile</literal></entry>
+<entry><email>vs@foldr.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/unix/System/Sendfile.hsc">Sendfile.hsc</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Time</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/System/Time.hs">Time.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>System.Win32</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/Win32/System/Win32.hs">Win32.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Html</literal></entry>
+<entry>Andy Gill <email>andy@galconn.com</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Html.hs">Html.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Html.BlockTable</literal></entry>
+<entry>Andy Gill <email>andy@galconn.com</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Html/BlockTable.hs">BlockTable.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec.hs">Parsec.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Char</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Char.hs">Char.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Combinator</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Combinator.hs">Combinator.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Error</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Error.hs">Error.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Expr</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Expr.hs">Expr.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Language</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Language.hs">Language.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Perm</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Perm.hs">Perm.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Pos</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Pos.hs">Pos.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Prim</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Prim.hs">Prim.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.Parsec.Token</literal></entry>
+<entry><email>daan@cs.uu.nl</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/Parsec/Token.hs">Token.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.ReadP</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/ReadP.hs">ReadP.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.ParserCombinators.ReadPrec</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/ParserCombinators/ReadPrec.hs">ReadPrec.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.PrettyPrint</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/PrettyPrint.hs">PrettyPrint.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.PrettyPrint.HughesPJ</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/PrettyPrint/HughesPJ.hs">HughesPJ.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Read</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Read.hs">Read.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Read.Lex</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Read/Lex.hs">Lex.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Regex</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Regex.hs">Regex.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Regex.Posix</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Regex/Posix.hs">Posix.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Show</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Show.hs">Show.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.Show.Functions</literal></entry>
+<entry><email>libraries@haskell.org</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/base/Text/Show/Functions.hs">Functions.hs</ulink></entry>
+</row>
+<row>
+<entry><literal>Text.XML.HaXml (hierarchy)</literal></entry>
+<entry><email>Malcolm.Wallace@cs.york.ac.uk</email></entry>
+<entry><ulink url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/HaXml">HaXml</ulink></entry>
+</row>

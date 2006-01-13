@@ -1,0 +1,118 @@
+# This Makefile.common is used only in an nhc98 build of the libraries.
+# It is included from each package's individual Makefile.nhc98.
+# We assume the following definitions have already been made in
+# the importing Makefile.
+#
+# THISPKG = e.g. mypkg
+# SEARCH  = e.g. -P../IO -P../PreludeIO -package base
+# SRCS    = all .hs .gc and .c files
+#
+# EXTRA_H_FLAGS = e.g. -prelude
+# EXTRA_C_FLAGS = e.g. -I../Binary
+include ../Makefile.inc
+
+# nasty hack - replace flags for ghc, nhc98, with hbc specific ones
+ifeq "hbc" "${BUILDCOMP}"
+EXTRA_H_FLAGS := ${EXTRA_HBC_FLAGS}
+endif
+
+DIRS     = $(shell ${LOCAL}pkgdirlist ${THISPKG})
+
+OBJDIR   = ${BUILDDIR}/${OBJ}/libraries/${THISPKG}
+OBJDIRS  = $(patsubst %, ${OBJDIR}/%, ${DIRS})
+FINALLIB = ${DST}/libHS${THISPKG}.$A
+INCDIRS  = ${INCDIR}/packages/${THISPKG} \
+	   $(patsubst %, ${INCDIR}/packages/${THISPKG}/%, ${DIRS})
+.SUFFIXES: .hi .hs .lhs .o .gc .c .hc .p.o .p.c .z.o .z.c .hsc
+
+SRCS_HS  = $(filter %.hs, ${SRCS})
+SRCS_LHS = $(filter %.lhs,${SRCS})
+SRCS_GC  = $(filter %.gc, ${SRCS})
+SRCS_HSC = $(filter %.hsc,${SRCS})
+SRCS_C   = $(filter %.c,  ${SRCS})
+SRCS_HASK= $(SRCS_HS) $(SRCS_LHS) $(SRCS_GC) $(SRCS_HSC)
+
+OBJS_HS  = $(patsubst %.hs, ${OBJDIR}/%.$O, ${SRCS_HS})
+OBJS_LHS = $(patsubst %.lhs,${OBJDIR}/%.$O, ${SRCS_LHS})
+OBJS_GC  = $(patsubst %.gc, ${OBJDIR}/%.$O, ${SRCS_GC})
+OBJS_HSC = $(patsubst %.hsc,${OBJDIR}/%.$O, ${SRCS_HSC})
+OBJS_C   = $(patsubst %.c,  ${OBJDIR}/%.$O, ${SRCS_C})
+OBJS_HASK= ${OBJS_HS} ${OBJS_LHS} ${OBJS_GC} ${OBJS_HSC}
+OBJS     = $(OBJS_HASK) $(OBJS_C)
+
+CFILES_HS  = $(patsubst %.hs, %.$C,  ${SRCS_HS})
+CFILES_LHS = $(patsubst %.lhs,%.$C,  ${SRCS_LHS})
+CFILES_GC  = $(patsubst %.gc, %.$C,  ${SRCS_GC})
+CFILES_XS  = $(patsubst %.gc, %_.$C, ${SRCS_GC}) \
+             $(patsubst %.gc, %_.hs, ${SRCS_GC})
+CFILES_HSC = $(patsubst %.hsc,%.$C,  ${SRCS_HSC})
+CFILES_GEN = ${CFILES_HS} ${CFILES_LHS} ${CFILES_GC} ${CFILES_HSC}
+
+ifeq "p" "${PROFILING}"
+HC += -p
+endif
+ 
+ifeq "z" "${TPROF}"
+HC += -z
+endif
+
+all: ${OBJDIR} ${OBJDIRS} ${INCDIRS} extra ${OBJS} ${FINALLIB}
+extra:
+cfiles: extracfiles ${CFILES_GEN}
+extracfiles:
+fromC: ${OBJDIR} ${OBJS_C} ${OBJDIRS}
+	$(HC) -c -d $(OBJDIR) $(EXTRA_C_FLAGS) ${SEARCH} ${CFILES_GEN}
+	echo $(OBJS) | xargs ar cr ${FINALLIB}
+objdir: ${OBJDIR} ${OBJDIRS} ${INCDIRS}
+${OBJDIR} ${OBJDIRS} ${INCDIRS}:
+	mkdir -p $@
+${FINALLIB}: ${OBJS}
+	echo $(OBJS) | xargs ar cr $@
+cleanhi:
+	-rm -f $(patsubst %, %/*.hi, ${DIRS})
+cleanC: cleanExtraC
+	-rm -f ${CFILES_GEN} ${CFILES_XS}
+clean:	cleanhi
+	-rm -f $(patsubst %, ${OBJDIR}/%/*.$O, ${DIRS})
+	-rm -f $(patsubst %.gc, %_.hs, $(filter %.gc, $(SRCS)))
+	-rm -f $(patsubst %.gc, %_.$C,  $(filter %.gc, $(SRCS)))
+cleanExtraC:
+
+# general build rules for making objects from Haskell files
+$(OBJS_HASK): #$(OBJDIR) $(OBJDIRS) $(SRCS_HASK)
+	$(LOCAL)hmake -hc=$(HC) -hidir $(INCDIR)/packages/$(THISPKG) \
+		$(SEARCH) $(EXTRA_H_FLAGS) -d$(OBJDIR) \
+		$(SRCS_HASK)
+${OBJS_HS}: ${OBJDIR}/%.$O : %.hs
+${OBJS_LHS}: ${OBJDIR}/%.$O : %.lhs
+${OBJS_GC}: ${OBJDIR}/%.$O : %.gc
+${OBJS_HSC}: ${OBJDIR}/%.$O : %.hsc
+
+# general build rule for making objects from C files
+${OBJS_C}: ${OBJDIR}/%.$O : cbits/%.c
+	$(CC) -c -I$(INCDIR) $(ENDIAN) $(filter -I%, ${SEARCH}) \
+		$(EXTRA_C_FLAGS) -o $@ $<
+
+# general build rules for making bootstrap C files from Haskell files
+$(CFILES_GEN):
+	$(LOCAL)hmake -hc=$(HC) -C -hidir $(INCDIR)/packages/$(THISPKG) \
+		$(SEARCH) $(EXTRA_H_FLAGS) \
+		$(SRCS_HASK)
+${CFILES_HS}: %.$C : %.hs
+${CFILES_LHS}: %.$C : %.lhs
+${CFILES_GC}: %.$C : %.gc
+${CFILES_HSC}: %.$C : %.hsc
+
+# hack to get round mutual recursion between libraries
+HIFILES = $(patsubst %.hs,../${THISLIB}/%.${HISUFFIX},$(filter %.hs, ${SRCS}))
+${HIFILES}: ../${THISLIB}/%.${HISUFFIX} : %.hs
+	$(HC) -c $(PART_FLAGS) -o /dev/null $<
+
+# The importing Makefile may now define extra individual dependencies
+#    e.g.
+# ${OBJDIR}/Function.$O: Function.hs ${OBJDIR}/Other.$O
+#
+# and C-files dependencies likewise
+#    e.g.
+# AlignBin.c:    BinHandle.c
+
