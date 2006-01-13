@@ -2,22 +2,25 @@
 
 top_dirs="nofib testsuite"
 
+default_repo_root="http://darcs.haskell.org/"
+default_lib_repo_root=$default_repo_root/packages
+
 function darcsall()
 {
+  echo == running darcs $* at the top level
+  darcs $*
   for dir in $top_dirs; do
     if test -d $dir -a -d $dir/_darcs; then
 	echo "== running darcs $* in $dir"
-	(cd $dir && darcs $*)
+	darcs $* --repodir $dir
     else
 	echo "== $dir not present or not a repository; skipping"
     fi
   done
-  cd libraries
-  for repo in `cat default-packages`; do
-    dir=`basename $repo`
-    if test -d $dir; then
-	echo "== running darcs $* in libraries/$dir"
-	(cd $dir && darcs $*)
+  for pkg in `cat libraries/default-packages`; do
+    if test -d libraries/$pkg; then
+	echo "== running darcs $* in libraries/$pkg"
+	darcs $* --repodir libraries/$pkg
     else
 	echo "warning: $dir doesn't seem to exist, use 'darcs-all get' to get it"
     fi
@@ -31,11 +34,18 @@ function darcsget()
     *) echo "warning: adding --partial, to override use --complete"
   esac
 
+  repo_root=`cat _darcs/prefs/defaultrepo`
+  case $repo_root in
+    /*) lib_repos=$repo_root/libraries;;
+    *)  lib_repos=$default_lib_repo_root;;
+  esac
+
   cd libraries
-  for repo in `cat default-packages`; do
-    if test -d `basename $repo`; then
-	echo "warning: `basename $repo` already present; omitting"
+  for pkg in `cat default-packages`; do
+    if test -d $pkg; then
+	echo "warning: $pkg already present; omitting"
     else
+	repo=$lib_repos/$pkg
 	echo "== running darcs get --partial $* $repo"
 	darcs get --partial $* $repo
     fi
@@ -48,8 +58,7 @@ if test ! -d _darcs -o ! -d ghc; then
 fi
 
 case $1 in
-  push) darcsall $*;;
-  pull) darcsall $*;;
+  push|pull|wh*) darcsall $*;;
   get)  shift; darcsget $*;;
-  *)    echo "syntax: ./darcs-all push|pull"; exit 1;;
+  *)    echo "syntax: ./darcs-all push|pull|whatsnew|get"; exit 1;;
 esac
