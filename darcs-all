@@ -1,0 +1,55 @@
+#!/bin/sh
+
+top_dirs="nofib testsuite"
+
+function darcsall()
+{
+  for dir in $top_dirs; do
+    if test -d $dir -a -d $dir/_darcs; then
+	echo "== running darcs $* in $dir"
+	(cd $dir && darcs $*)
+    else
+	echo "== $dir not present or not a repository; skipping"
+    fi
+  done
+  cd libraries
+  for repo in `cat default-packages`; do
+    dir=`basename $repo`
+    if test -d $dir; then
+	echo "== running darcs $* in libraries/$dir"
+	(cd $dir && darcs $*)
+    else
+	echo "warning: $dir doesn't seem to exist, use 'darcs-all get' to get it"
+    fi
+  done
+}
+
+function darcsget()
+{
+  case $* in
+    *--partial*) ;;
+    *) echo "warning: adding --partial, to override use --complete"
+  esac
+
+  cd libraries
+  for repo in `cat default-packages`; do
+    if test -d `basename $repo`; then
+	echo "warning: `basename $repo` already present; omitting"
+    else
+	echo "== running darcs get --partial $* $repo"
+	darcs get --partial $* $repo
+    fi
+  done
+}
+
+if test ! -d _darcs -o ! -d ghc; then
+  echo "error: darcs-all must be run from the top level of the ghc tree."
+  exit 1;
+fi
+
+case $1 in
+  push) darcsall $*;;
+  pull) darcsall $*;;
+  get)  shift; darcsget $*;;
+  *)    echo "syntax: ./darcs-all push|pull"; exit 1;;
+esac
