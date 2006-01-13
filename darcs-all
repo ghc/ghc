@@ -61,5 +61,7 @@ fi
 
 case $1 in
   get)  shift; darcsget $*;;
+  # Hack around whatsnew failing if there are no changes
+  w|wh|wha|what|whats|whatsn|whatsne|whatsnew) set +e; darcsall $*;;
   *) darcsall $*;;
 esac
