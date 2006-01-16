@@ -78,4 +78,12 @@
 #define RET_LBL(f) f##_ret
 #endif
 
+/* -----------------------------------------------------------------------------
+   Signals - supported on non-PAR versions of the runtime.  See RtsSignals.h.
+   -------------------------------------------------------------------------- */
+
+#if !defined(PAR)
+#define RTS_USER_SIGNALS 1
+#endif
+
 #endif /* RTSCONFIG_H */

@@ -11,12 +11,10 @@
 
 #if !defined(PAR) && !defined(mingw32_HOST_OS)
 
-#define RTS_USER_SIGNALS 1
 #include "posix/Signals.h"
 
 #elif defined(mingw32_HOST_OS)
 
-#define RTS_USER_SIGNALS 1
 #include "win32/ConsoleHandler.h"
 
 #else /* PAR */

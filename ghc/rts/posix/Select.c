@@ -208,7 +208,7 @@ awaitEvent(rtsBool wait)
 	   */
 #if defined(RTS_USER_SIGNALS)
 	  if (signals_pending()) {
-	      startSignalHandlers();
+	      startSignalHandlers(&MainCapability);
 	      return; /* still hold the lock */
 	  }
 #endif
