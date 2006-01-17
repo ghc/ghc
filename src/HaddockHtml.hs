@@ -39,16 +39,18 @@ import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 
 ppHtml	:: String
 	-> Maybe String				-- package
-	-> Maybe String
 	-> [Interface]
 	-> FilePath			-- destination directory
 	-> Maybe Doc			-- prologue text, maybe
 	-> Maybe String		-- the Html Help format (--html-help)
+	-> Maybe String			-- the source URL (--source)
+	-> Maybe String			-- the wiki URL (--wiki)
 	-> Maybe String			-- the contents URL (--use-contents)
 	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
 
-ppHtml doctitle maybe_package source_url ifaces odir prologue maybe_html_help_format
+ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
+	maybe_source_url maybe_wiki_url
 	maybe_contents_url maybe_index_url =  do
   let
 	visible_ifaces = filter visible ifaces
@@ -66,7 +68,8 @@ ppHtml doctitle maybe_package source_url ifaces odir prologue maybe_html_help_fo
   when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
 	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
 
-  mapM_ (ppHtmlModule odir doctitle source_url 
+  mapM_ (ppHtmlModule odir doctitle
+	   maybe_source_url maybe_wiki_url
 	   maybe_contents_url maybe_index_url) visible_ifaces
 
 ppHtmlHelpFiles	
@@ -130,9 +133,9 @@ footer =
 	)
    
 
-src_button :: Maybe String -> String -> Interface -> HtmlTable
-src_button source_url _ iface
-  | Just u <- source_url = 
+srcButton :: Maybe String -> String -> Interface -> HtmlTable
+srcButton maybe_source_url _ iface
+  | Just u <- maybe_source_url =
 	let src_url = spliceSrcURL iface u
 	in
 	topButBox (anchor ! [href src_url] << toHtml "Source code")
@@ -148,6 +151,13 @@ spliceSrcURL iface url = run url
 	
 	modl_str = case iface_module iface of { Module m -> 
 		   map (\x -> if x == '.' then '/' else x) m }
+
+wikiButton :: Maybe String -> Interface -> HtmlTable
+wikiButton Nothing _ = Html.emptyTable
+wikiButton (Just wiki_base_url) iface
+  = topButBox (anchor ! [href url] << toHtml "Wiki")
+  where url = pathJoin [wiki_base_url, mod]
+	Module mod = iface_module iface
 
 contentsButton :: Maybe String -> HtmlTable
 contentsButton maybe_contents_url 
@@ -175,15 +185,19 @@ simpleHeader doctitle maybe_contents_url maybe_index_url =
    ))
 
 pageHeader :: String -> Interface -> String
-    -> Maybe String -> Maybe String -> Maybe String -> HtmlTable
-pageHeader mdl iface doctitle source_url maybe_contents_url maybe_index_url =
+    -> Maybe String -> Maybe String
+    -> Maybe String -> Maybe String -> HtmlTable
+pageHeader mdl iface doctitle
+           maybe_source_url maybe_wiki_url
+           maybe_contents_url maybe_index_url =
   (tda [theclass "topbar"] << 
     vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	src_button source_url mdl iface <->
+	srcButton maybe_source_url mdl iface <->
+	wikiButton maybe_wiki_url iface <->
 	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
@@ -453,9 +467,12 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
 -- Generate the HTML page for a module
 
 ppHtmlModule
-	:: FilePath -> String -> Maybe String -> Maybe String -> Maybe String
+	:: FilePath -> String
+	-> Maybe String -> Maybe String
+	-> Maybe String -> Maybe String
 	-> Interface -> IO ()
-ppHtmlModule odir doctitle source_url 
+ppHtmlModule odir doctitle
+  maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url iface = do
   let 
       Module mdl = iface_module iface
@@ -465,7 +482,8 @@ ppHtmlModule odir doctitle source_url
 		styleSheet +++
 		(script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
-	    pageHeader mdl iface doctitle source_url 
+	    pageHeader mdl iface doctitle
+		maybe_source_url maybe_wiki_url
 		maybe_contents_url maybe_index_url </> s15 </>
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer

@@ -79,6 +79,7 @@ data Flag
   | Flag_Prologue FilePath
   | Flag_ReadInterface FilePath
   | Flag_SourceURL String
+  | Flag_WikiURL String
   | Flag_Help
   | Flag_Verbose
   | Flag_Version
@@ -110,6 +111,8 @@ options =
 	"produce index and table of contents in mshelp, mshelp2 or devhelp format (with -h)",
     Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
 	"base URL for links to source code",
+    Option []     ["wiki"]     (ReqArg Flag_WikiURL "URL")
+	"base URL for links to a wiki",
     Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"the CSS file to use for HTML output",
     Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
@@ -161,7 +164,11 @@ run flags files = do
 		[] -> Nothing
 		(t:_) -> Just t
 
-      source_url = case [str | Flag_SourceURL str <- flags] of
+      maybe_source_url = case [str | Flag_SourceURL str <- flags] of
+			[] -> Nothing
+			(t:_) -> Just t
+
+      maybe_wiki_url = case [str | Flag_WikiURL str <- flags] of
 			[] -> Nothing
 			(t:_) -> Just t
 
@@ -292,8 +299,9 @@ run flags files = do
 			     | i <-  these_ifaces ])
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title package source_url these_ifaces odir
+    ppHtml title package these_ifaces odir
 		prologue maybe_html_help_format
+		maybe_source_url maybe_wiki_url
 		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
