@@ -91,5 +91,6 @@ extern void performMajorGC(void);
 extern void performGCWithRoots(void (*get_roots)(evac_fn));
 extern HsInt64 getAllocations( void );
 extern void revertCAFs( void );
+extern void dirty_MUT_VAR(StgClosure *);
 
 #endif /*  RTSEXTERNAL_H */

@@ -598,7 +598,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case CONSTR:
     case STABLE_NAME:
     case IND_PERM:
-    case MUT_VAR:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
     case SE_BLACKHOLE:

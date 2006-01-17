@@ -263,6 +263,15 @@ recordMutableLock(StgClosure *p)
 extern rtsBool keepCAFs;
 
 /* -----------------------------------------------------------------------------
+   This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
+   MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
+   is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
+   and is put on the mutable list.
+   -------------------------------------------------------------------------- */
+
+void dirty_MUT_VAR(StgClosure *p);
+
+/* -----------------------------------------------------------------------------
    DEBUGGING predicates for pointers
 
    LOOKS_LIKE_INFO_PTR(p)    returns False if p is definitely not an info ptr

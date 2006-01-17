@@ -463,7 +463,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	return;
 
 	// one child (fixed), no SRT
-    case MUT_VAR:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
 	*first_child = ((StgMutVar *)c)->var;
 	return;
     case THUNK_SELECTOR:
@@ -891,7 +892,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case SE_CAF_BLACKHOLE:
 	case ARR_WORDS:
 	    // one child (fixed), no SRT
-	case MUT_VAR:
+	case MUT_VAR_CLEAN:
+	case MUT_VAR_DIRTY:
 	case THUNK_SELECTOR:
 	case IND_PERM:
 	case IND_OLDGEN_PERM:
@@ -991,7 +993,8 @@ isRetainer( StgClosure *c )
 
 	// mutable objects
     case MVAR:
-    case MUT_VAR:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
@@ -2104,7 +2107,8 @@ sanityCheckHeapClosure( StgClosure *c )
     case FUN_1_1:
     case FUN_0_2:
     case WEAK:
-    case MUT_VAR:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
     case CAF_BLACKHOLE:
     case BLACKHOLE:
     case SE_BLACKHOLE:

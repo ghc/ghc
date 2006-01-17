@@ -759,6 +759,22 @@ allocatePinned( nat n )
 }
 
 /* -----------------------------------------------------------------------------
+   This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
+   MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
+   is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
+   and is put on the mutable list.
+   -------------------------------------------------------------------------- */
+
+void
+dirty_MUT_VAR(StgClosure *p)
+{
+    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
+	p->header.info = &stg_MUT_VAR_DIRTY_info;
+	recordMutable(p);
+    }
+}
+
+/* -----------------------------------------------------------------------------
    Allocation functions for GMP.
 
    These all use the allocate() interface - we can't have any garbage

@@ -305,7 +305,8 @@ checkClosure( StgClosure* p )
     case BLACKHOLE:
     case CAF_BLACKHOLE:
     case STABLE_NAME:
-    case MUT_VAR:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
     case CONSTR_INTLIKE:
     case CONSTR_CHARLIKE:
     case CONSTR_STATIC:

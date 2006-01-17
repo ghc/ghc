@@ -598,8 +598,10 @@ INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN0, 0, 0, MUT_ARR_PTRS_FROZEN0, "MUT_ARR_PTRS_F
    Mutable Variables
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_MUT_VAR, 1, 0, MUT_VAR, "MUT_VAR", "MUT_VAR")
-{ foreign "C" barf("MUT_VAR object entered!"); }
+INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN")
+{ foreign "C" barf("MUT_VAR_CLEAN object entered!"); }
+INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY")
+{ foreign "C" barf("MUT_VAR_DIRTY object entered!"); }
 
 /* ----------------------------------------------------------------------------
    Dummy return closure

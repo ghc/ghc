@@ -159,7 +159,7 @@ newMutVarzh_fast
     ALLOC_PRIM( SIZEOF_StgMutVar, R1_PTR, newMutVarzh_fast);
 
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
-    SET_HDR(mv,stg_MUT_VAR_info,W_[CCCS]);
+    SET_HDR(mv,stg_MUT_VAR_DIRTY_info,W_[CCCS]);
     StgMutVar_var(mv) = R1;
     
     RET_P(mv);
@@ -207,7 +207,7 @@ atomicModifyMutVarzh_fast
    HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
 
 #if defined(SMP)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr");
+    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr") [R1,R2];
 #endif
 
    x = StgMutVar_var(R1);
@@ -228,6 +228,7 @@ atomicModifyMutVarzh_fast
    StgThunk_payload(y,0) = z;
 
    StgMutVar_var(R1) = y;
+   foreign "C" dirty_MUT_VAR(R1) [R1];
 
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);

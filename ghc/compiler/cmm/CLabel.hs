@@ -46,6 +46,7 @@ module CLabel (
 	mkPlainModuleInitLabel,
 
 	mkSplitMarkerLabel,
+	mkDirty_MUT_VAR_Label,
 	mkUpdInfoLabel,
 	mkSeqInfoLabel,
 	mkIndStaticInfoLabel,
@@ -343,6 +344,7 @@ mkPlainModuleInitLabel hmods mod
 	-- Some fixed runtime system labels
 
 mkSplitMarkerLabel		= RtsLabel (RtsCode SLIT("__stg_split_marker"))
+mkDirty_MUT_VAR_Label		= RtsLabel (RtsCode SLIT("dirty_MUT_VAR"))
 mkUpdInfoLabel			= RtsLabel (RtsInfo SLIT("stg_upd_frame"))
 mkSeqInfoLabel			= RtsLabel (RtsInfo SLIT("stg_seq_frame"))
 mkIndStaticInfoLabel		= RtsLabel (RtsInfo SLIT("stg_IND_STATIC"))

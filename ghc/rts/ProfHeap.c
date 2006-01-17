@@ -156,7 +156,8 @@ static char *type_names[] = {
     , "MUT_ARR_PTRS_CLEAN"
     , "MUT_ARR_PTRS_DIRTY"
     , "MUT_ARR_PTRS_FROZEN"
-    , "MUT_VAR"
+    , "MUT_VAR_CLEAN"
+    , "MUT_VAR_DIRTY"
 
     , "WEAK"
   
@@ -925,7 +926,8 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case MVAR:
 	    case WEAK:
 	    case STABLE_NAME:
-	    case MUT_VAR:
+	    case MUT_VAR_CLEAN:
+	    case MUT_VAR_DIRTY:
 		prim = rtsTrue;
 		size = sizeW_fromITBL(info);
 		break;

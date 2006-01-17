@@ -1941,7 +1941,8 @@ loop:
   
   switch (info->type) {
 
-  case MUT_VAR:
+  case MUT_VAR_CLEAN:
+  case MUT_VAR_DIRTY:
   case MVAR:
       return copy(q,sizeW_fromITBL(info),stp);
 
@@ -2894,13 +2895,22 @@ scavenge(step *stp)
 	p += sizeofW(StgInd);
 	break;
 
-    case MUT_VAR:
-	evac_gen = 0;
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY: {
+	rtsBool saved_eager_promotion = eager_promotion;
+
+	eager_promotion = rtsFalse;
 	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable anyhow
+	eager_promotion = saved_eager_promotion;
+
+	if (failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+	}
 	p += sizeofW(StgMutVar);
 	break;
+    }
 
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
@@ -3277,12 +3287,21 @@ linear_scan:
 		evacuate(((StgInd *)p)->indirectee);
 	    break;
 
-	case MUT_VAR:
-	    evac_gen = 0;
+	case MUT_VAR_CLEAN:
+	case MUT_VAR_DIRTY: {
+	    rtsBool saved_eager_promotion = eager_promotion;
+	    
+	    eager_promotion = rtsFalse;
 	    ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue;
+	    eager_promotion = saved_eager_promotion;
+	    
+	    if (failed_to_evac) {
+		((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+	    } else {
+		((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+	    }
 	    break;
+	}
 
 	case CAF_BLACKHOLE:
 	case SE_CAF_BLACKHOLE:
@@ -3607,12 +3626,22 @@ scavenge_one(StgPtr p)
 	break;
     }
     
-    case MUT_VAR:
-	evac_gen = 0;
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY: {
+	StgPtr q = p;
+	rtsBool saved_eager_promotion = eager_promotion;
+
+	eager_promotion = rtsFalse;
 	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable anyhow
+	eager_promotion = saved_eager_promotion;
+
+	if (failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+	}
 	break;
+    }
 
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
@@ -3892,7 +3921,9 @@ scavenge_mutable_list(generation *gen)
 
 #ifdef DEBUG	    
 	    switch (get_itbl((StgClosure *)p)->type) {
-	    case MUT_VAR:
+	    case MUT_VAR_CLEAN:
+		barf("MUT_VAR_CLEAN on mutable list");
+	    case MUT_VAR_DIRTY:
 		mutlist_MUTVARS++; break;
 	    case MUT_ARR_PTRS_CLEAN:
 	    case MUT_ARR_PTRS_DIRTY:

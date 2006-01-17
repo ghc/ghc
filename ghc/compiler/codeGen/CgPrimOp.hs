@@ -10,13 +10,15 @@ module CgPrimOp (
    cgPrimOp
  ) where
 
+import ForeignCall	( CCallConv(CCallConv) )
 import StgSyn		( StgLiveVars, StgArg )
 import CgBindery	( getVolatileRegs, getArgAmodes )
 import CgMonad
 import CgInfoTbls	( getConstrTag )
 import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW )
 import Cmm
-import CLabel		( mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel )
+import CLabel		( mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel,
+			  mkDirty_MUT_VAR_Label )
 import CmmUtils
 import MachOp
 import SMRep
@@ -113,7 +115,14 @@ emitPrimOp [res] ReadMutVarOp [mutv] live
    = stmtC (CmmAssign res (cmmLoadIndexW mutv fixedHdrSize))
 
 emitPrimOp [] WriteMutVarOp [mutv,var] live
-   = stmtC (CmmStore (cmmOffsetW mutv fixedHdrSize) var)
+   = do
+	stmtC (CmmStore (cmmOffsetW mutv fixedHdrSize) var)
+	vols <- getVolatileRegs live
+	stmtC (CmmCall (CmmForeignCall (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
+				CCallConv) 
+			[{-no results-}]
+			[(mutv,PtrHint)]
+			(Just vols))
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
