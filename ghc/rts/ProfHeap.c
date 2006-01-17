@@ -153,7 +153,8 @@ static char *type_names[] = {
 
     , "ARR_WORDS"
 
-    , "MUT_ARR_PTRS"
+    , "MUT_ARR_PTRS_CLEAN"
+    , "MUT_ARR_PTRS_DIRTY"
     , "MUT_ARR_PTRS_FROZEN"
     , "MUT_VAR"
 
@@ -946,7 +947,8 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = arr_words_sizeW(stgCast(StgArrWords*,p));
 		break;
 		
-	    case MUT_ARR_PTRS:
+	    case MUT_ARR_PTRS_CLEAN:
+	    case MUT_ARR_PTRS_DIRTY:
 	    case MUT_ARR_PTRS_FROZEN:
 	    case MUT_ARR_PTRS_FROZEN0:
 		prim = rtsTrue;

@@ -16,7 +16,7 @@ import CgMonad
 import CgInfoTbls	( getConstrTag )
 import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW )
 import Cmm
-import CLabel		( mkMAP_FROZEN_infoLabel )
+import CLabel		( mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel )
 import CmmUtils
 import MachOp
 import SMRep
@@ -525,7 +525,8 @@ doWriteByteArrayOp _ _ _ _
    = panic "CgPrimOp: doWriteByteArrayOp"
 
 doWritePtrArrayOp addr idx val
-   = mkBasicIndexedWrite arrPtrsHdrSize Nothing wordRep addr idx val
+   = do stmtC (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+        mkBasicIndexedWrite arrPtrsHdrSize Nothing wordRep addr idx val
 
 
 mkBasicIndexedRead off Nothing read_rep res base idx

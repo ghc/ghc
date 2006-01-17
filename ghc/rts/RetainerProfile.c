@@ -521,7 +521,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	break;
 
 	// StgMutArrPtr.ptrs, no SRT
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	init_ptrs(&se.info, ((StgMutArrPtrs *)c)->ptrs,
@@ -820,7 +821,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case BCO:
 	case CONSTR_STATIC:
 	    // StgMutArrPtr.ptrs, no SRT
-	case MUT_ARR_PTRS:
+	case MUT_ARR_PTRS_CLEAN:
+	case MUT_ARR_PTRS_DIRTY:
 	case MUT_ARR_PTRS_FROZEN:
 	case MUT_ARR_PTRS_FROZEN0:
 	    *c = find_ptrs(&se->info);
@@ -990,7 +992,8 @@ isRetainer( StgClosure *c )
 	// mutable objects
     case MVAR:
     case MUT_VAR:
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 
@@ -2072,7 +2075,8 @@ sanityCheckHeapClosure( StgClosure *c )
     case MVAR:
 	return sizeofW(StgMVar);
 
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs *)c);

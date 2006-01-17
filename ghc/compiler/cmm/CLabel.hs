@@ -51,6 +51,7 @@ module CLabel (
 	mkIndStaticInfoLabel,
         mkMainCapabilityLabel,
 	mkMAP_FROZEN_infoLabel,
+	mkMAP_DIRTY_infoLabel,
         mkEMPTY_MVAR_infoLabel,
 
 	mkTopTickyCtrLabel,
@@ -347,6 +348,7 @@ mkSeqInfoLabel			= RtsLabel (RtsInfo SLIT("stg_seq_frame"))
 mkIndStaticInfoLabel		= RtsLabel (RtsInfo SLIT("stg_IND_STATIC"))
 mkMainCapabilityLabel		= RtsLabel (RtsData SLIT("MainCapability"))
 mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_FROZEN0"))
+mkMAP_DIRTY_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_DIRTY"))
 mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo SLIT("stg_EMPTY_MVAR"))
 
 mkTopTickyCtrLabel		= RtsLabel (RtsData SLIT("top_ct"))

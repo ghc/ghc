@@ -104,6 +104,10 @@ static rtsBool major_gc;
  */
 static nat evac_gen;
 
+/* Whether to do eager promotion or not.
+ */
+static rtsBool eager_promotion;
+
 /* Weak pointers
  */
 StgWeak *old_weak_ptr_list; // also pending finaliser list
@@ -584,6 +588,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   } else {
       mark_stack_bdescr = NULL;
   }
+
+  eager_promotion = rtsTrue; // for now
 
   /* -----------------------------------------------------------------------
    * follow all the roots that we know about:
@@ -1567,11 +1573,11 @@ copy(StgClosure *src, nat size, step *stp)
    * by evacuate()).
    */
   if (stp->gen_no < evac_gen) {
-#ifdef NO_EAGER_PROMOTION    
-    failed_to_evac = rtsTrue;
-#else
-    stp = &generations[evac_gen].steps[0];
-#endif
+      if (eager_promotion) {
+	  stp = &generations[evac_gen].steps[0];
+      } else {
+	  failed_to_evac = rtsTrue;
+      }
   }
 
   /* chain a new block onto the to-space for the destination step if
@@ -1617,11 +1623,11 @@ copy_noscav(StgClosure *src, nat size, step *stp)
    * by evacuate()).
    */
   if (stp->gen_no < evac_gen) {
-#ifdef NO_EAGER_PROMOTION    
-    failed_to_evac = rtsTrue;
-#else
-    stp = &generations[evac_gen].steps[0];
-#endif
+      if (eager_promotion) {
+	  stp = &generations[evac_gen].steps[0];
+      } else {
+	  failed_to_evac = rtsTrue;
+      }
   }
 
   /* chain a new block onto the to-space for the destination step if
@@ -1664,11 +1670,11 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 
   TICK_GC_WORDS_COPIED(size_to_copy);
   if (stp->gen_no < evac_gen) {
-#ifdef NO_EAGER_PROMOTION    
-    failed_to_evac = rtsTrue;
-#else
-    stp = &generations[evac_gen].steps[0];
-#endif
+      if (eager_promotion) {
+	  stp = &generations[evac_gen].steps[0];
+      } else {
+	  failed_to_evac = rtsTrue;
+      }
   }
 
   if (stp->hp + size_to_reserve >= stp->hpLim) {
@@ -1745,11 +1751,11 @@ evacuate_large(StgPtr p)
    */
   stp = bd->step->to;
   if (stp->gen_no < evac_gen) {
-#ifdef NO_EAGER_PROMOTION    
-    failed_to_evac = rtsTrue;
-#else
-    stp = &generations[evac_gen].steps[0];
-#endif
+      if (eager_promotion) {
+	  stp = &generations[evac_gen].steps[0];
+      } else {
+	  failed_to_evac = rtsTrue;
+      }
   }
 
   bd->step = stp;
@@ -2105,7 +2111,8 @@ loop:
       // just copy the block 
       return copy_noscav(q,arr_words_sizeW((StgArrWords *)q),stp);
 
-  case MUT_ARR_PTRS:
+  case MUT_ARR_PTRS_CLEAN:
+  case MUT_ARR_PTRS_DIRTY:
   case MUT_ARR_PTRS_FROZEN:
   case MUT_ARR_PTRS_FROZEN0:
       // just copy the block 
@@ -2934,18 +2941,32 @@ scavenge(step *stp)
 	p += arr_words_sizeW((StgArrWords *)p);
 	break;
 
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
 	// follow everything 
     {
 	StgPtr next;
+	rtsBool saved_eager;
 
-	evac_gen = 0;		// repeatedly mutable 
+	// We don't eagerly promote objects pointed to by a mutable
+	// array, but if we find the array only points to objects in
+	// the same or an older generation, we mark it "clean" and
+	// avoid traversing it during minor GCs.
+	saved_eager = eager_promotion;
+	eager_promotion = rtsFalse;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable anyhow.
+	eager_promotion = saved_eager;
+
+	if (failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+	}
+
+	failed_to_evac = rtsTrue; // always put it on the mutable list.
 	break;
     }
 
@@ -3295,17 +3316,31 @@ linear_scan:
 	    scavenge_AP((StgAP *)p);
 	    break;
       
-	case MUT_ARR_PTRS:
+	case MUT_ARR_PTRS_CLEAN:
+	case MUT_ARR_PTRS_DIRTY:
 	    // follow everything 
 	{
 	    StgPtr next;
-	    
-	    evac_gen = 0;		// repeatedly mutable 
+	    rtsBool saved_eager;
+
+	    // We don't eagerly promote objects pointed to by a mutable
+	    // array, but if we find the array only points to objects in
+	    // the same or an older generation, we mark it "clean" and
+	    // avoid traversing it during minor GCs.
+	    saved_eager = eager_promotion;
+	    eager_promotion = rtsFalse;
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
-	    evac_gen = saved_evac_gen;
+	    eager_promotion = saved_eager;
+
+	    if (failed_to_evac) {
+		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+	    } else {
+		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+	    }
+
 	    failed_to_evac = rtsTrue; // mutable anyhow.
 	    break;
 	}
@@ -3614,17 +3649,31 @@ scavenge_one(StgPtr p)
 	// nothing to follow 
 	break;
 
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     {
-	// follow everything 
-	StgPtr next;
-      
-	evac_gen = 0;		// repeatedly mutable 
+	StgPtr next, q;
+	rtsBool saved_eager;
+
+	// We don't eagerly promote objects pointed to by a mutable
+	// array, but if we find the array only points to objects in
+	// the same or an older generation, we mark it "clean" and
+	// avoid traversing it during minor GCs.
+	saved_eager = eager_promotion;
+	eager_promotion = rtsFalse;
+	q = p;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
-	evac_gen = saved_evac_gen;
+	eager_promotion = saved_eager;
+
+	if (failed_to_evac) {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+	} else {
+	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+	}
+
 	failed_to_evac = rtsTrue;
 	break;
     }
@@ -3845,7 +3894,8 @@ scavenge_mutable_list(generation *gen)
 	    switch (get_itbl((StgClosure *)p)->type) {
 	    case MUT_VAR:
 		mutlist_MUTVARS++; break;
-	    case MUT_ARR_PTRS:
+	    case MUT_ARR_PTRS_CLEAN:
+	    case MUT_ARR_PTRS_DIRTY:
 	    case MUT_ARR_PTRS_FROZEN:
 	    case MUT_ARR_PTRS_FROZEN0:
 		mutlist_MUTARRS++; break;
@@ -3853,6 +3903,13 @@ scavenge_mutable_list(generation *gen)
 		mutlist_OTHERS++; break;
 	    }
 #endif
+
+	    // We don't need to scavenge clean arrays.  This is the
+	    // Whole Point of MUT_ARR_PTRS_CLEAN.
+	    if (get_itbl((StgClosure *)p)->type == MUT_ARR_PTRS_CLEAN) {
+		recordMutableGen((StgClosure *)p,gen);
+		continue;
+	    }
 
 	    if (scavenge_one(p)) {
 		/* didn't manage to promote everything, so put the

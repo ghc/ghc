@@ -332,8 +332,12 @@ printClosure( StgClosure *obj )
             break;
         }
 
-    case MUT_ARR_PTRS:
-	debugBelch("MUT_ARR_PTRS(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+    case MUT_ARR_PTRS_CLEAN:
+	debugBelch("MUT_ARR_PTRS_CLEAN(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	break;
+
+    case MUT_ARR_PTRS_DIRTY:
+	debugBelch("MUT_ARR_PTRS_DIRTY(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:

@@ -138,7 +138,8 @@ obj_sizeW( StgClosure *p, StgInfoTable *info )
 	return pap_sizeW((StgPAP *)p);
     case ARR_WORDS:
 	return arr_words_sizeW((StgArrWords *)p);
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
@@ -478,7 +479,8 @@ update_fwd_large( bdescr *bd )
       // nothing to follow 
       continue;
 
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
       // follow everything 
@@ -657,7 +659,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case ARR_WORDS:
 	return p + arr_words_sizeW((StgArrWords *)p);
 	
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	// follow everything 

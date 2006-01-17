@@ -100,7 +100,7 @@ newArrayzh_fast
     "ptr" arr = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
-    SET_HDR(arr, stg_MUT_ARR_PTRS_info, W_[CCCS]);
+    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(arr) = n;
 
     // Initialise all elements of the the array with the value in R2
@@ -137,12 +137,12 @@ unsafeThawArrayzh_fast
   // multiple times during GC, which would be unnecessarily slow.
   //
   if (StgHeader_info(R1) != stg_MUT_ARR_PTRS_FROZEN0_info) {
-	SET_INFO(R1,stg_MUT_ARR_PTRS_info);
+	SET_INFO(R1,stg_MUT_ARR_PTRS_DIRTY_info);
 	foreign "C" recordMutableLock(R1 "ptr") [R1];
 	// must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
 	RET_P(R1);
   } else {
-	SET_INFO(R1,stg_MUT_ARR_PTRS_info);
+	SET_INFO(R1,stg_MUT_ARR_PTRS_DIRTY_info);
 	RET_P(R1);
   }
 }

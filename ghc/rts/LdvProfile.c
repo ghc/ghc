@@ -126,7 +126,8 @@ processHeapClosureForDead( StgClosure *c )
 	size = sizeofW(StgMVar);
 	return size;
 
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)c);

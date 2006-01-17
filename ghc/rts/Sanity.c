@@ -400,7 +400,8 @@ checkClosure( StgClosure* p )
     case ARR_WORDS:
 	    return arr_words_sizeW((StgArrWords *)p);
 
-    case MUT_ARR_PTRS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	{
