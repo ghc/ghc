@@ -543,7 +543,8 @@ stat_exit(int alloc)
 void
 statDescribeGens(void)
 {
-  nat g, s, mut, lge, live;
+  nat g, s, mut, lge;
+  lnat live;
   bdescr *bd;
   step *step;
 
@@ -562,10 +563,15 @@ statDescribeGens(void)
 
     for (s = 0; s < generations[g].n_steps; s++) {
       step = &generations[g].steps[s];
-      for (bd = step->large_objects, lge = 0; bd; bd = bd->link)
-	lge++;
       live = 0;
+      for (bd = step->large_objects, lge = 0; bd; bd = bd->link) {
+	lge++;
+      }
+      live = step->n_large_blocks * BLOCK_SIZE;
       bd = step->blocks;
+      // This live figure will be slightly less that the "live" figure
+      // given by +RTS -Sstderr, because we take don't count the
+      // slop at the end of each block.
       for (; bd; bd = bd->link) {
 	live += (bd->free - bd->start) * sizeof(W_);
       }
