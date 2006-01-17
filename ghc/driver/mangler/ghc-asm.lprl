@@ -953,16 +953,6 @@ sub mangle_asm {
   		    $p =~ s/^\tstdu 1,-\d+\(1\)\n//; 
   		    $p =~ s/^\tstd \d+,-?\d+\(1\)\n//g; 
                     
-                        # GCC's "large-model" PIC (-fPIC)
-		    $pcrel_label = $p;
-		    $pcrel_label =~ s/(.|\n)*^.LCF(\d+):\n(.|\n)*/$2/ or $pcrel_label = "";
-
-                    $p =~ s/^\tbcl 20,31,.LCF\d+\n//;
-                    $p =~ s/^.LCF\d+:\n//;
-                    $p =~ s/^\tmflr 30\n//;
-                    $p =~ s/^\tlwz 0,\.LCL\d+-\.LCF\d+\(30\)\n//;
-                    $p =~ s/^\tadd 30,0,30\n//;
-
 		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
 		    # under some circumstances, only when generating position dependent code.
 		    # I have no idea why, and I don't think it is necessary, so let's toss it.
