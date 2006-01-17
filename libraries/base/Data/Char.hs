@@ -56,6 +56,7 @@ module Data.Char
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import GHC.Arr (Ix)
 import GHC.Real (fromIntegral)
 import GHC.Show
 import GHC.Read (Read, readLitChar, lexLitChar)
@@ -65,6 +66,7 @@ import GHC.Enum
 #endif
 
 #ifdef __HUGS__
+import Hugs.Prelude (Ix)
 import Hugs.Char
 #endif
 
@@ -72,6 +74,7 @@ import Hugs.Char
 import Prelude
 import Prelude(Char,String)
 import Char
+import Ix (Ix)
 import NHC.FFI (CInt)
 foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> Int
 #endif
@@ -127,7 +130,7 @@ data GeneralCategory
         | Surrogate             -- ^ Cs: Other, Surrogate
         | PrivateUse            -- ^ Co: Other, Private Use
         | NotAssigned           -- ^ Cn: Other, Not Assigned
-        deriving (Eq, Ord, Enum, Read, Show, Bounded)
+        deriving (Eq, Ord, Enum, Read, Show, Bounded, Ix)
 
 -- | The Unicode general category of the character.
 generalCategory :: Char -> GeneralCategory
