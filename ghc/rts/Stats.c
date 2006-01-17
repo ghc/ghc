@@ -265,7 +265,8 @@ stat_endGC (lnat alloc, lnat live, lnat copied,
 	    nat faults = getPageFaults();
 	    
 	    statsPrintf("%9ld %9ld %9ld",
-		    alloc*sizeof(W_), copied*sizeof(W_), live*sizeof(W_));
+		    alloc*sizeof(W_), (copied+scavd_copied)*sizeof(W_), 
+			live*sizeof(W_));
 	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
 		    TICK_TO_DBL(gc_time),
 		    TICK_TO_DBL(gc_etime),
