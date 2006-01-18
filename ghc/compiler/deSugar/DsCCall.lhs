@@ -196,7 +196,6 @@ unboxArg arg
     maybeToBool maybe_arg3_tycon &&
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
-    -- and, of course, it is an instance of CCallable
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[l_var, r_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,

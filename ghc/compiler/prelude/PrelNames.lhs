@@ -1040,8 +1040,6 @@ standardClassKeys = derivableClassKeys ++ numericClassKeys
 		  ++ [randomClassKey, randomGenClassKey,
 		      functorClassKey, 
 		      monadClassKey, monadPlusClassKey]
-
-noDictClassKeys = [] -- ToDo: remove?
 \end{code}
 
 @derivableClassKeys@ is also used in checking \tr{deriving} constructs

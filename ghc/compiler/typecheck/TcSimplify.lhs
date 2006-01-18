@@ -31,7 +31,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
-			  instBindingRequired, fdPredsOfInst,
+			  fdPredsOfInst,
 			  newDictsAtLoc, tcInstClassOp,
 			  getDictClassTys, isTyVarDict, instLoc,
 			  zonkInst, tidyInsts, tidyMoreInsts,
@@ -1350,10 +1350,6 @@ data Avail
 			-- e.g. those "given" in a signature
 	  Bool		-- True <=> actually consumed (splittable IPs only)
 
-  | NoRhs 		-- Used for Insts like (CCallable f)
-			-- where no witness is required.
-			-- ToDo: remove?
-
   | Rhs 		-- Used when there is a RHS
 	(LHsExpr TcId) 	-- The RHS
 	[Inst]		-- Insts free in the RHS; we need these too
@@ -1375,7 +1371,6 @@ pprAvails avails = vcat [sep [ppr inst, nest 2 (equals <+> pprAvail avail)]
 instance Outputable Avail where
     ppr = pprAvail
 
-pprAvail NoRhs	       	= text "<no rhs>"
 pprAvail IsFree	       	= text "Free"
 pprAvail Irred	       	= text "Irred"
 pprAvail (Given x b)   	= text "Given" <+> ppr x <+> 
@@ -1409,7 +1404,6 @@ extractResults avails wanteds
 	  Nothing    -> pprTrace "Urk: extractResults" (ppr w) $
 			go avails binds irreds frees ws
 
-	  Just NoRhs  -> go avails		 binds irreds     frees     ws
 	  Just IsFree -> go (add_free avails w)  binds irreds     (w:frees) ws
 	  Just Irred  -> go (add_given avails w) binds (w:irreds) frees     ws
 
@@ -1443,11 +1437,7 @@ extractResults avails wanteds
     get_root irreds frees IsFree       w = cloneDict w	`thenM` \ w' ->
 					   returnM (irreds, w':frees, instToId w')
 
-    add_given avails w 
-	| instBindingRequired w = addToFM avails w (Given (instToId w) True)
-	| otherwise		= addToFM avails w NoRhs
-	-- NB: make sure that CCallable/CReturnable use NoRhs rather
-	--	than Given, else we end up with bogus bindings.
+    add_given avails w = addToFM avails w (Given (instToId w) True)
 
     add_free avails w | isMethod w = avails
 		      | otherwise  = add_given avails w
@@ -1828,8 +1818,7 @@ addWanted :: WantSCs -> Avails -> Inst -> LHsExpr TcId -> [Inst] -> TcM Avails
 addWanted want_scs avails wanted rhs_expr wanteds
   = addAvailAndSCs want_scs avails wanted avail
   where
-    avail | instBindingRequired wanted = Rhs rhs_expr wanteds
-	  | otherwise		       = ASSERT( null wanteds ) NoRhs
+    avail = Rhs rhs_expr wanteds
 
 addGiven :: Avails -> Inst -> TcM Avails
 addGiven avails given = addAvailAndSCs AddSCs avails given (Given (instToId given) False)
@@ -2197,9 +2186,7 @@ get_default_tys
 
 When typechecking _ccall_s, TcExpr ensures that the external
 function is only passed arguments (and in the other direction,
-results) of a restricted set of 'native' types. This is
-implemented via the help of the pseudo-type classes,
-@CReturnable@ (CR) and @CCallable@ (CC.)
+results) of a restricted set of 'native' types.
 
 The interaction between the defaulting mechanism for numeric
 values and CC & CR can be a bit puzzling to the user at times.
@@ -2217,10 +2204,6 @@ of (Integer, Double), 'x' has type Double, since Integer
 is not an instance of CR. If the default list is equal to
 Haskell 1.4's default-default of (Int, Double), 'x' has type
 Int.
-
-To try to minimise the potential for surprises here, the
-defaulting mechanism is turned off in the presence of
-CCallable and CReturnable.
 
 End of aside]
 

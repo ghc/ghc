@@ -179,10 +179,6 @@ tcLocalInstDecl1 :: LInstDecl Name
 	-- Type-check all the stuff before the "where"
 	--
 	-- We check for respectable instance type, and context
-	-- but only do this for non-imported instance decls.
-	-- Imported ones should have been checked already, and may indeed
-	-- contain something illegal in normal Haskell, notably
-	--	instance CCallable [Char] 
 tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
   =	-- Prime error recovery, set source location
     recoverM (returnM Nothing)		$
@@ -395,18 +391,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 		--	See Note [Inline dfuns] below
 
 	dict_rhs
-	  | null scs_and_meths
-	  = 	-- Blatant special case for CCallable, CReturnable
-		-- If the dictionary is empty then we should never
-		-- select anything from it, so we make its RHS just
-		-- emit an error message.  This in turn means that we don't
-		-- mention the constructor, which doesn't exist for CCallable, CReturnable
-		-- Hardly beautiful, but only three extra lines.
-	    nlHsApp (noLoc $ TyApp (nlHsVar rUNTIME_ERROR_ID) 
-				   [idType this_dict_id])
-		  (nlHsLit (HsStringPrim (mkFastString msg)))
-
-	  | otherwise	-- The common case
 	  = mkHsConApp dict_constr inst_tys' (map HsVar scs_and_meths)
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application

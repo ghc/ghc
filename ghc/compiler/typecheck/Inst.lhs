@@ -28,7 +28,6 @@ module Inst (
 	isDict, isClassDict, isMethod, 
 	isLinearInst, linearInstType, isIPDict, isInheritableInst,
 	isTyVarDict, isMethodFor, 
-	instBindingRequired,
 
 	zonkInst, zonkInsts,
 	instToId, instName,
@@ -77,7 +76,6 @@ import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName, dataConWrapId )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
-import PrelInfo	( isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique, mkSystemVarName )
 import NameSet	( addOneToNameSet )
@@ -195,16 +193,6 @@ linearInstType :: Inst -> TcType	-- %x::t  -->  t
 linearInstType (Dict _ (IParam _ ty) _) = ty
 \end{code}
 
-Two predicates which deal with the case where class constraints don't
-necessarily result in bindings.  The first tells whether an @Inst@
-must be witnessed by an actual binding; the second tells whether an
-@Inst@ can be generalised over.
-
-\begin{code}
-instBindingRequired :: Inst -> Bool
-instBindingRequired (Dict _ (ClassP clas _) _) = not (isNoDictClass clas)
-instBindingRequired other		       = True
-\end{code}
 
 
 %************************************************************************

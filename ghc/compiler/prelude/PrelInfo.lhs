@@ -15,7 +15,7 @@ module PrelInfo (
 	maybeCharLikeCon, maybeIntLikeCon,
 
 	-- Class categories
-	isNoDictClass, isNumericClass, isStandardClass
+	isNumericClass, isStandardClass
 
     ) where
 
@@ -23,8 +23,7 @@ module PrelInfo (
 
 import PrelNames	( basicKnownKeyNames, 
 			  hasKey, charDataConKey, intDataConKey,
-			  numericClassKeys, standardClassKeys,
-			  noDictClassKeys )
+			  numericClassKeys, standardClassKeys )
 
 import PrimOp		( PrimOp, allThePrimOps, primOpOcc, primOpTag, maxPrimOpTag )
 import DataCon		( DataCon )
@@ -132,10 +131,9 @@ maybeIntLikeCon  con = con `hasKey` intDataConKey
 %************************************************************************
 
 \begin{code}
-isNoDictClass, isNumericClass, isStandardClass :: Class -> Bool
+isNumericClass, isStandardClass :: Class -> Bool
 
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
-isNoDictClass      clas = classKey clas `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
 \end{code}
