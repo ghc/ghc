@@ -104,6 +104,7 @@ builtin_commands = [
   ("info",      keepGoing info),
   ("load",	keepGoingPaths loadModule_),
   ("module",	keepGoing setContext),
+  ("main",	keepGoing runMain),
   ("reload",	keepGoing reloadModule),
   ("check",	keepGoing checkModule),
   ("set",	keepGoing setCmd),
@@ -138,6 +139,7 @@ helpText =
  "   :info [<name> ...]          display information about the given names\n" ++
  "   :load <filename> ...        load module(s) and their dependents\n" ++
  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
+ "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
  "   :reload                     reload the current module set\n" ++
  "\n" ++
  "   :set <option> ...           set options\n" ++
@@ -487,14 +489,13 @@ specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   cmds <- io (readIORef commands)
-  case [ (s,f) | (s,f) <- cmds, prefixMatch cmd s ] of
-     []      -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
+  -- look for exact match first, then the first prefix match
+  case [ (s,f) | (s,f) <- cmds, cmd == s ] of
+     (_,f):_ -> f (dropWhile isSpace rest)
+     [] -> case [ (s,f) | (s,f) <- cmds, prefixMatch cmd s ] of
+     		[] -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
 		                    ++ shortHelpText) >> return False)
-     [(_,f)] -> f (dropWhile isSpace rest)
-     cs      -> io (hPutStrLn stdout ("prefix " ++ cmd ++ 
-			    	      " matches multiple commands (" ++ 
-	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs)
-					 ++ ")") >> return False)
+     		(_,f):_ -> f (dropWhile isSpace rest)
 
 -----------------------------------------------------------------------------
 -- To flush buffers for the *interpreted* computation we need
@@ -579,6 +580,12 @@ pprInfo exts (thing, fixity, insts)
 -----------------------------------------------------------------------------
 -- Commands
 
+runMain :: String -> GHCi ()
+runMain args = do
+  let ss = concat $ intersperse "," (map (\ s -> ('"':s)++"\"") (toArgs args))
+  runCommand $ '[': ss ++ "] `System.Environment.withArgs` main"
+  return ()
+
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
   io (revertCAFs)			-- always revert CAFs on load/add.
@@ -624,7 +631,7 @@ defineMacro s = do
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
-		    ((macro_name, keepGoing (runMacro hv)) : cmds))
+		    (cmds ++ [(macro_name, keepGoing (runMacro hv))]))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
