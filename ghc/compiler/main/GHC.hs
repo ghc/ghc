@@ -241,9 +241,15 @@ import System.Time	( ClockTime )
 import Control.Exception as Exception hiding (handle)
 import Data.IORef
 import System.IO
-import System.IO.Error	( try, isDoesNotExistError )
+import System.IO.Error	( isDoesNotExistError )
 import System.IO.Unsafe	( unsafePerformIO )
 import Prelude hiding (init)
+
+#if __GLASGOW_HASKELL__ < 600
+import System.IO as System.IO.Error ( try )
+#else
+import System.IO.Error	( try )
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Exception handlers
