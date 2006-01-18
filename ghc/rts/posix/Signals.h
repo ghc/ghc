@@ -18,7 +18,6 @@ extern StgPtr *next_pending_handler;
 #define signals_pending() (next_pending_handler != pending_handler_buf)
 void startSignalHandlers(Capability *cap);
 
-
 #endif
 
 extern StgInt *signal_handlers;

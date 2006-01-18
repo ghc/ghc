@@ -70,6 +70,30 @@ extern void _assertFail (char *, unsigned int);
 
 #define doNothing() do { } while (0)
 
+#ifdef SMP
+#define USED_IF_SMP
+#define USED_IF_NOT_SMP STG_UNUSED
+#else
+#define USED_IF_SMP STG_UNUSED
+#define USED_IF_NOT_SMP
+#endif
+
+#ifdef DEBUG
+#define USED_IF_DEBUG
+#define USED_IF_NOT_DEBUG STG_UNUSED
+#else
+#define USED_IF_DEBUG STG_UNUSED
+#define USED_IF_NOT_DEBUG
+#endif
+
+#ifdef THREADED_RTS
+#define USED_IF_THREADS
+#define USED_IF_NOT_THREADS STG_UNUSED
+#else
+#define USED_IF_THREADS STG_UNUSED
+#define USED_IF_NOT_THREADS
+#endif
+
 /* -----------------------------------------------------------------------------
    Include everything STG-ish
    -------------------------------------------------------------------------- */

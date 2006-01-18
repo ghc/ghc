@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2003-2005
+ * (c) The GHC Team, 2003-2006
  *
  * Capabilities
  *
@@ -39,29 +39,15 @@ Capability *capabilities = NULL;
 // locking, so we don't do that.
 Capability *last_free_capability;
 
-#ifdef SMP
-#define UNUSED_IF_NOT_SMP
-#else
-#define UNUSED_IF_NOT_SMP STG_UNUSED
-#endif
-
-#ifdef RTS_USER_SIGNALS
-#define UNUSED_IF_NOT_THREADS
-#else
-#define UNUSED_IF_NOT_THREADS STG_UNUSED
-#endif
-
-
+#if defined(THREADED_RTS)
 STATIC_INLINE rtsBool
 globalWorkToDo (void)
 {
     return blackholes_need_checking
 	|| interrupted
-#if defined(RTS_USER_SIGNALS)
-	|| signals_pending()
-#endif
 	;
 }
+#endif
 
 #if defined(THREADED_RTS)
 STATIC_INLINE rtsBool
@@ -213,7 +199,7 @@ initCapabilities( void )
 
 #if defined(THREADED_RTS)
 STATIC_INLINE void
-giveCapabilityToTask (Capability *cap, Task *task)
+giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
@@ -295,7 +281,7 @@ releaseCapability_ (Capability* cap)
 }
 
 void
-releaseCapability (Capability* cap UNUSED_IF_NOT_THREADS)
+releaseCapability (Capability* cap USED_IF_THREADS)
 {
     ACQUIRE_LOCK(&cap->lock);
     releaseCapability_(cap);
@@ -303,7 +289,7 @@ releaseCapability (Capability* cap UNUSED_IF_NOT_THREADS)
 }
 
 static void
-releaseCapabilityAndQueueWorker (Capability* cap UNUSED_IF_NOT_THREADS)
+releaseCapabilityAndQueueWorker (Capability* cap USED_IF_THREADS)
 {
     Task *task;
 
@@ -341,8 +327,7 @@ releaseCapabilityAndQueueWorker (Capability* cap UNUSED_IF_NOT_THREADS)
  *
  * ------------------------------------------------------------------------- */
 void
-waitForReturnCapability (Capability **pCap,
-			 Task *task UNUSED_IF_NOT_THREADS)
+waitForReturnCapability (Capability **pCap, Task *task)
 {
 #if !defined(THREADED_RTS)
 

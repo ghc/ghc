@@ -72,20 +72,6 @@
 # define STATIC_INLINE static
 #endif
 
-#ifdef THREADED_RTS
-#define USED_WHEN_THREADED_RTS
-#define USED_WHEN_NON_THREADED_RTS STG_UNUSED
-#else
-#define USED_WHEN_THREADED_RTS     STG_UNUSED
-#define USED_WHEN_NON_THREADED_RTS
-#endif
-
-#ifdef SMP
-#define USED_WHEN_SMP
-#else
-#define USED_WHEN_SMP STG_UNUSED
-#endif
-
 /* -----------------------------------------------------------------------------
  * Global variables
  * -------------------------------------------------------------------------- */
@@ -730,8 +716,8 @@ schedulePreLoop(void)
 
 #ifdef SMP
 static void
-schedulePushWork(Capability *cap USED_WHEN_SMP, 
-		 Task *task      USED_WHEN_SMP)
+schedulePushWork(Capability *cap USED_IF_SMP, 
+		 Task *task      USED_IF_SMP)
 {
     Capability *free_caps[n_capabilities], *cap0;
     nat i, n_free_caps;
@@ -854,7 +840,7 @@ scheduleStartSignalHandlers(Capability *cap STG_UNUSED)
  * ------------------------------------------------------------------------- */
 
 static void
-scheduleCheckBlockedThreads(Capability *cap USED_WHEN_NON_THREADED_RTS)
+scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
 {
 #if !defined(THREADED_RTS)
     //
@@ -1882,7 +1868,7 @@ scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
  * -------------------------------------------------------------------------- */
 
 static void
-scheduleDoGC( Capability *cap, Task *task USED_WHEN_SMP, rtsBool force_major )
+scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
 {
     StgTSO *t;
 #ifdef SMP
@@ -2022,7 +2008,7 @@ rtsSupportsBoundThreads(void)
  * ------------------------------------------------------------------------- */
  
 StgBool
-isThreadBound(StgTSO* tso USED_WHEN_THREADED_RTS)
+isThreadBound(StgTSO* tso USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
   return (tso->bound != NULL);
