@@ -474,6 +474,7 @@ typedef struct _RtsSymbolVal {
       SymX(delayzh_fast)			\
       SymX(deRefWeakzh_fast)			\
       SymX(deRefStablePtrzh_fast)		\
+      SymX(dirty_MUT_VAR)			\
       SymX(divExactIntegerzh_fast)		\
       SymX(divModIntegerzh_fast)		\
       SymX(forkzh_fast)				\
@@ -597,6 +598,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_EMPTY_MVAR_info)			\
       SymX(stg_IND_STATIC_info)			\
       SymX(stg_INTLIKE_closure)			\
+      SymX(stg_MUT_ARR_PTRS_DIRTY_info)		\
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
       SymX(stg_MUT_ARR_PTRS_FROZEN0_info)	\
       SymX(stg_WEAK_info)                       \
