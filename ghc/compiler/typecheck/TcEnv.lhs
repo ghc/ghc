@@ -93,9 +93,11 @@ tcLookupLocatedGlobal name
   = addLocM tcLookupGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
+-- The Name is almost always an ExternalName, but not always
+-- In GHCi, we may make command-line bindings (ghci> let x = True)
+-- that bind a GlobalId, but with an InternalName
 tcLookupGlobal name
-  = ASSERT( isExternalName name )
-    do	{ env <- getGblEnv
+  = do	{ env <- getGblEnv
 	
 		-- Try local envt
 	; case lookupNameEnv (tcg_type_env env) name of {
