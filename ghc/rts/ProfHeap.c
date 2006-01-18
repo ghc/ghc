@@ -520,8 +520,6 @@ static void
 fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 {
     char buf[max_length+1], *p, *buf_end;
-    nat next_offset = 0;
-    nat written;
 
     // MAIN on its own gets printed as "MAIN", otherwise we ignore MAIN.
     if (ccs == CCS_MAIN) {
@@ -553,8 +551,6 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 	if (p >= buf_end) {
 	    sprintf(buf+max_length-4, "...");
 	    break;
-	} else {
-	    next_offset += written;
 	}
     }
     fprintf(fp, "%s", buf);
