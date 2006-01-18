@@ -25,7 +25,7 @@ test('cg024', normal, compile_and_run, [''])
 test('cg025', compose(extra_run_opts('cg025.hs'),exit_code(1)), \
 	compile_and_run, [''])
 
-test('cg026', only_compiler_types(['ghc']), compile_and_run, [''])
+test('cg026', compose(skip_if_fast,only_compiler_types(['ghc'])), compile_and_run, [''])
 test('cg027', normal, compile_and_run, [''])
 test('cg028', normal, compile_and_run, [''])
 test('cg031', only_compiler_types(['ghc']), compile_and_run, ['-fglasgow-exts'])

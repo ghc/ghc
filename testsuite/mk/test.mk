@@ -85,9 +85,21 @@ RUNTEST_OPTS +=  \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
 	$(EXTRA_RUNTEST_OPTS)
 
+ifeq "$(fast)" "YES"
+setfast = -e config.fast=1
+else
+setfast = 
+endif
+
+ifeq "$(accept)" "YES"
+setaccept = -e config.accept=1
+else
+setaccept = 
+endif
+
 TESTS	     = 
 TEST	     = 
-WAY          =
+WAY =
 
 all :: test
 
@@ -95,14 +107,15 @@ test:
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
-		$(patsubst %, --way=%, $(WAY))
+		$(patsubst %, --way=%, $(WAY)) \
+		$(setfast)
+		$(setaccept)
 
 verbose: test
 
 accept:
-	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
-		$(patsubst %, --only=%, $(TEST)) \
-		$(patsubst %, --only=%, $(TESTS)) \
-		$(patsubst %, --way=%, $(WAY)) \
-		-e config.accept=1
+	$(MAKE) accept=YES
+
+fast:
+	$(MAKE) fast=YES
 

@@ -15,5 +15,5 @@ test('simpl011', normal, compile, [''])
 test('simpl012', normal, compile, [''])
 test('simpl013', normal, compile, [''])
 
-test('spec001', normal, compile, [''])
+test('spec001', skip_if_fast, compile, [''])
 

@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test( 'gzip',
-      normal,
+      skip_if_fast,
       multimod_compile_and_run,
       ['Main','']
     )

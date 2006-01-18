@@ -6,5 +6,5 @@ if config.platform == 'i386-unknown-openbsd' or config.platform == 'x86_64-unkno
 else:
 	ways = expect_fail_for(['optasm','profasm'])
 
-test('cholewo-eval', ways, multimod_compile_and_run, ['Main', ''])
+test('cholewo-eval', compose(skip_if_fast,ways), multimod_compile_and_run, ['Main', ''])
 clean_o_hi()

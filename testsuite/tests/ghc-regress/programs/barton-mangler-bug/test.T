@@ -8,6 +8,6 @@ else:
 	ways = normal
 
 test('barton-mangler-bug',
-	compose(ways, omit_compiler_types(['hugs'])),
+	compose(ways, compose(skip_if_fast, omit_compiler_types(['hugs']))),
 	multimod_compile_and_run, ['Main', ''])
 clean_o_hi()

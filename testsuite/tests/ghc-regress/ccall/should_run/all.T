@@ -49,7 +49,7 @@ elif config.platform.startswith('i386-'):
 else:
 	ways = expect_fail_for(['extcore','optextcore'])
 
-test('ffi009', ways ,compile_and_run, [''])
+test('ffi009', compose(skip_if_fast,ways) ,compile_and_run, [''])
 
 # Doesn't work with External Core due to __labels
 test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])

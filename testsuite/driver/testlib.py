@@ -48,6 +48,9 @@ class TestConfig:
         # Verbosity level
         self.verbose = 1
 
+        # run the "fast" version of the test suite
+        self.fast = 0
+
         # Compiler type (ghc, hugs, nhc, etc.)
         self.compiler_type = ''
 
@@ -290,6 +293,12 @@ def skip_if_no_ghci(opts):
       opts.skip = 1
 
 # ----
+
+def skip_if_fast(opts):
+  if config.fast:
+      opts.skip = 1
+
+# ----
 # Function for composing two opt-fns together
 
 def compose( f, g ):
@@ -322,6 +331,12 @@ def getTestDir():
 def test( name, setup, func, args ):
     t.total_tests = t.total_tests + 1
 
+    # Reset the test-local options to the options for this "set"
+    resetTestOpts()
+
+    # Set our test-local options
+    setup(testopts)
+    
     if func == compile or func == multimod_compile:
         ways = config.compile_ways
     elif func == compile_and_run or func == multimod_compile_and_run:
@@ -335,7 +350,15 @@ def test( name, setup, func, args ):
         ways = ['normal']
 
     for way in ways:
-        do_test( name, way, setup, func, args )
+        if testopts.skip \
+               or (config.only != [] and name not in config.only) \
+               or (testopts.only_ways != [] and way not in testopts.only_ways) \
+               or way in testopts.omit_ways:
+            skiptest(name)
+        else:
+            do_test( name, way, func, args )
+            if config.fast:
+                break # just do the first way in fast mode
 
     clean(map (lambda suff: name + suff,
               ['', '.genscript', '.run.stderr', '.run.stdout',
@@ -356,24 +379,11 @@ def clean_full_paths(names):
             if os.access(name, os.F_OK) :
                 os.remove(name)
 
-def do_test(name, way, setup, func, args):
+def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
     t.total_test_cases = t.total_test_cases + 1
 
     try:
-        # Reset the test-local options to the options for this "set"
-        resetTestOpts()
-
-        # Set our test-local options
-        setup(testopts)
-
-        if testopts.skip \
-           or (config.only != [] and name not in config.only) \
-           or (testopts.only_ways != [] and way not in testopts.only_ways) \
-           or way in testopts.omit_ways:
-            skiptest(name)
-            return
-
         print '=====>', full_name
         
         result = apply(func, [name,way] + args)

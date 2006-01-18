@@ -1,21 +1,33 @@
-# Args to compile_and_run are:
-#	extra compile flags
-#	extra run flags
-#	expected process return value, if not zero
+# -----------------------------------------------------------------------------
+# These tests we do even for 'make fast'
 
 def f( opts ):
   opts.extra_hc_opts = '-fglasgow-exts'
 
 setTestOpts(f)
 
+test('conc003', normal, compile_and_run, [''])
+test('conc006', normal, compile_and_run, [''])
+test('conc027', normal, compile_and_run, [''])
+test('conc049', only_compiler_types(['ghc']), compile_and_run, ['-package stm'])
+test('conc051', normal, compile_and_run, [''])
+
+# -----------------------------------------------------------------------------
+# These tests we only do for a full run
+
+def f( opts ):
+  opts.extra_hc_opts = '-fglasgow-exts'
+  if config.fast:
+  	opts.skip = 1
+
+setTestOpts(f)
+
 test('conc001', normal, compile_and_run, [''])
 test('conc002', normal, compile_and_run, [''])
-test('conc003', normal, compile_and_run, [''])
 
 # Omit GHCi way - it blows up to 0.5G.  Something to do with the threaded RTS?
 test('conc004', omit_ways(['ghci']), compile_and_run, [''])
 
-test('conc006', normal, compile_and_run, [''])
 test('conc007', compose(only_compiler_types(['ghc']),
 			extra_run_opts('+RTS -H128M -RTS')),
 		compile_and_run, [''])
@@ -39,11 +51,10 @@ test('conc020', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc021', compose(omit_ways(['ghci']), exit_code(1)),
 	compile_and_run, [''])
 test('conc022', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc023', only_compiler_types(['ghc']), compile_and_run, [''])
+test('conc023', compose(skip_if_fast,only_compiler_types(['ghc'])), compile_and_run, [''])
 test('conc024', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc025', normal, compile_and_run, [''])
 test('conc026', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc027', normal, compile_and_run, [''])
 test('conc028', normal, compile_and_run, [''])
 test('conc029', normal, compile_and_run, [''])
 test('conc030', compose(only_compiler_types(['ghc']),
@@ -72,7 +83,8 @@ test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 # it is waiting for a ^C interrupt.
 # Omit for threaded: deadlock detection isn't working properly.
 test('conc036', compose(omit_ways(['ghci','threaded']),
-			only_compiler_types(['ghc'])), compile_and_run, [''])
+		compose(skip_if_fast,
+		  only_compiler_types(['ghc']))), compile_and_run, [''])
 
 test('conc037', only_ways(['threaded','smp']), compile_and_run, [''])
 test('conc038', only_ways(['threaded','smp']), compile_and_run, [''])
@@ -103,8 +115,6 @@ test('conc047', compose(only_compiler_types(['ghc']),
 test('conc048', compose(only_compiler_types(['ghc']), 
                         omit_ways(['threaded','ghci'])), compile_and_run, [''])
 
-test('conc049', only_compiler_types(['ghc']), compile_and_run, ['-package stm'])
-
 # skip this test right now - for some reason it goes on for ever in the 
 # 'opt' ways. (ToDo)
 # test('conc050', compose(only_compiler_types(['ghc']), extra_run_opts('10000')), compile_and_run, ['-package stm'])
@@ -117,3 +127,4 @@ test('conc053', only_ways(['threaded','smp']), compile_and_run, ['-package stm']
 test('conc054', normal, compile_and_run, ['-package stm'])
 test('conc055', exit_code(1), compile_and_run, ['-package stm'])
 test('conc056', only_ways(['threaded']), compile_and_run, ['-package stm -package network'])
+

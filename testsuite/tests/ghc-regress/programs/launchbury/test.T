@@ -1,4 +1,4 @@
 
-test('launchbury', normal, multimod_compile_and_run, ['Main', ''])
+test('launchbury', skip_if_fast, multimod_compile_and_run, ['Main', ''])
 clean_o_hi()
 

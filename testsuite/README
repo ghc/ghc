@@ -9,6 +9,12 @@ To run the test suite against a GHC build in the same source tree:
 	cd fptools/testsuite/tests/ghc-regress
 	make
 
+To run a fast version of the testsuite, which should complete in under
+5 minutes on a fast machine with an optimised GHC build:
+
+	cd fptools/testsuite/tests/ghc-regress
+	make fast
+
 To run the test suite against a different GHC, say ghc-5.04:
 
 	cd fptools/testsuite/tests/ghc-regress

@@ -3,11 +3,23 @@
 #	extra run flags
 #	expected process return value, if not zero
 
+# -----------------------------------------------------------------------------
+# Pick an arbitrary few to run when 'fast' is on
+
 test('tcrun001', normal, compile_and_run, [''])
 test('tcrun002', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun003', normal, compile_and_run, ['-fglasgow-exts'])
 test('tcrun004', normal, compile_and_run, ['-fglasgow-exts'])
 test('tcrun005', normal, compile_and_run, [''])
+
+# -----------------------------------------------------------------------------
+# Skip everything else if fast is on
+
+def f(opts):
+  if config.fast:
+	opts.skip = 1
+setTestOpts(f)
+
 test('tcrun006', normal, compile_and_run, [''])
 test('tcrun007', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun008', normal, compile_and_run, [''])

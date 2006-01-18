@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
-test( 'gshow',
-      normal,
+test( 'gshow', 
+      skip_if_fast,
       multimod_compile_and_run,
       ['Main','']
     )

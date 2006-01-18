@@ -1,4 +1,4 @@
 
-test('record_upd', normal, multimod_compile_and_run, ['Main', ''])
+test('record_upd', skip_if_fast, multimod_compile_and_run, ['Main', ''])
 clean_o_hi()
 
