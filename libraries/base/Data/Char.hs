@@ -74,7 +74,7 @@ import Hugs.Char
 import Prelude
 import Prelude(Char,String)
 import Char
-import Ix (Ix)
+import Ix
 import NHC.FFI (CInt)
 foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> Int
 #endif
