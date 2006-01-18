@@ -601,9 +601,11 @@ checkValSig
 	:: LHsExpr RdrName
 	-> LHsType RdrName
 	-> P (Sig RdrName)
-checkValSig (L l (HsVar v)) ty | isUnqual v = return (TypeSig (L l v) ty)
+checkValSig (L l (HsVar v)) ty 
+  | isUnqual v && not (isDataOcc (rdrNameOcc v))
+  = return (TypeSig (L l v) ty)
 checkValSig (L l other)     ty
-  = parseError l "Type signature given for an expression"
+  = parseError l "Invalid type signature"
 
 mkGadtDecl
         :: Located RdrName

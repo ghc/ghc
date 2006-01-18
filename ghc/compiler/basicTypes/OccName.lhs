@@ -346,11 +346,15 @@ isValOcc other		      = False
 -- Data constructor operator (starts with ':', or '[]')
 -- Pretty inefficient!
 isDataSymOcc (OccName DataName s) = isLexConSym s
-isDataSymOcc (OccName VarName s)  = isLexConSym s
+isDataSymOcc (OccName VarName s)  
+  | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
+		-- Jan06: I don't think this should happen
 isDataSymOcc other		  = False
 
 isDataOcc (OccName DataName _) = True
-isDataOcc (OccName VarName s)  = isLexCon s
+isDataOcc (OccName VarName s)  
+  | isLexCon s = pprPanic "isDataOcc: check me" (ppr s)
+		-- Jan06: I don't think this should happen
 isDataOcc other		       = False
 
 -- Any operator (data constructor or variable)
