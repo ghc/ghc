@@ -750,7 +750,6 @@ instance Binary FastString where
 	   writeIORef j_r (j+1)
 	   writeIORef out_r (addToUFM out uniq (j,f))
     }
-  put_ bh s = error ("Binary.put_(FastString): " ++ show (unpackFS s))
 
   get bh = do 
 	j <- get bh
