@@ -94,7 +94,6 @@ bPutFS b@(BufHandle buf r hdl) fs@(FastString _ len _ fp _) =
 	else do
 		copyBytes (buf `plusPtr` i) ptr len
 		writeFastMutInt r (i+len)
-bPutFS _ _ = panic "bPutFS"
 
 bPutLitString :: BufHandle -> Addr# -> Int# -> IO ()
 bPutLitString b@(BufHandle buf r hdl) a# len# = do
