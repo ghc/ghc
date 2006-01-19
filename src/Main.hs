@@ -235,11 +235,13 @@ run flags files = do
 	die ("-h cannot be used with --gen-index or --gen-contents")
 
   when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title package maybe_html_help_format maybe_index_url visible_read_ifaces prologue
+	ppHtmlContents odir title package maybe_html_help_format
+            maybe_index_url maybe_wiki_url visible_read_ifaces prologue
         copyHtmlBits odir libdir css_file
 
   when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title package maybe_html_help_format maybe_contents_url visible_read_ifaces
+	ppHtmlIndex odir title package maybe_html_help_format
+            maybe_contents_url maybe_wiki_url visible_read_ifaces
         copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do

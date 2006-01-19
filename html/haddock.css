@@ -76,6 +76,31 @@ TD.decl {
   vertical-align: top;
   }
 
+TD.topdecl {
+  padding: 2px;
+  background-color: #f0f0f0;
+  font-family: monospace;
+  vertical-align: top;
+}
+
+TABLE.declbar {
+  border-spacing: 0px;
+ }
+
+TD.declname {
+  width: 100%;
+ }
+
+TD.declbut {
+  padding-left: 5px;
+  padding-right: 5px;
+  border-left-width: 1px;
+  border-left-color: #000099;
+  border-left-style: solid;
+  white-space: nowrap;
+  font-size: small;
+ }
+
 /* 
   arg is just like decl, except that wrapping is not allowed.  It is
   used for function and constructor arguments which have a text box
