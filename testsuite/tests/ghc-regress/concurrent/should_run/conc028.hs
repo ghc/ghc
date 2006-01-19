@@ -6,3 +6,6 @@ main = do
   m <- newMVar ()
   r <- tryPutMVar m ()
   print r
+  takeMVar m
+  r <- tryPutMVar m ()
+  print r
