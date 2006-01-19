@@ -50,6 +50,7 @@ exposed-modules:
 	CmmUtils
 	CodeGen
 	CodeOutput
+	Config
 	Constants
 	Convert
 	CoreFVs
