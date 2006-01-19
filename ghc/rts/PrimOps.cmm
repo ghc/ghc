@@ -1729,7 +1729,6 @@ tryPutMVarzh_fast
 #if defined(SMP)
     	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
-	jump %ENTRY_CODE(Sp(0));
     }
     else
     {
@@ -1741,9 +1740,9 @@ tryPutMVarzh_fast
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
-	jump %ENTRY_CODE(Sp(0));
     }
     
+    RET_N(1);
     /* ToDo: yield afterward for better communication performance? */
 }
 
