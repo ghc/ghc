@@ -1,5 +1,5 @@
-fptools build system
-====================
+GHC build system
+================
 
 This is the top-level directory of the fptools build system.  Several
 packages are part of this build system; if you got this as part of a
