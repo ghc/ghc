@@ -403,10 +403,13 @@ subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
            | otherwise = show (ord a)
 
 pathJoin :: [FilePath] -> FilePath
-pathJoin = concat . intersperse pathSeparatorStr
-
-pathSeparatorStr :: String
-pathSeparatorStr = [pathSeparator]
+pathJoin = foldr join []
+  where join :: FilePath -> FilePath -> FilePath
+        join path1 ""    = path1
+	join ""    path2 = path2
+	join path1 path2
+          | isPathSeparator (last path1) = path1++path2
+          | otherwise                    = path1++pathSeparator:path2
 
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir
