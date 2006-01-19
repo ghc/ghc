@@ -7,16 +7,25 @@ top_dirs="nofib testsuite"
 default_repo_root="http://darcs.haskell.org/"
 default_lib_repo_root=$default_repo_root/packages
 
+quiet=NO
+
+function message()
+{
+  if [ "$quiet" = "NO" ]; then
+     echo $*
+  fi
+}
+
 function darcsall()
 {
-  echo == running darcs $* at the top level
+  message "== running darcs $* at the top level"
   darcs $*
   for dir in $top_dirs; do
     if test -d $dir -a -d $dir/_darcs; then
-	echo "== running darcs $* in $dir"
+	message "== running darcs $* in $dir"
 	darcs $* --repodir $dir
     else
-	echo "== $dir not present or not a repository; skipping"
+	message "== $dir not present or not a repository; skipping"
     fi
   done
   for pkg in `cat libraries/default-packages`; do
@@ -48,7 +57,7 @@ function darcsget()
 	echo "warning: $pkg already present; omitting"
     else
 	repo=$lib_repos/$pkg
-	echo "== running darcs get --partial $* $repo"
+	message "== running darcs get --partial $* $repo"
 	darcs get --partial $* $repo
     fi
   done
@@ -58,6 +67,10 @@ if test ! -d _darcs -o ! -d ghc; then
   echo "error: darcs-all must be run from the top level of the ghc tree."
   exit 1;
 fi
+
+case $* in
+  *-q*) quiet=YES;;
+esac
 
 case $1 in
   get)  shift; darcsget $*;;
