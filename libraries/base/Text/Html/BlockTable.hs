@@ -21,6 +21,7 @@ module Text.Html.BlockTable (
 -- Contruction Functions: 
 
       single,
+      empty,
       above,
       beside,
 
@@ -98,7 +99,7 @@ infixr 3 `above`
 -- to show boxes aka the above ascii renditions.
 
 instance (Show a) => Show (BlockTable a) where
-      showsPrec p = showsTable
+      showsPrec _ = showsTable
 
 type TableI a = [[(a,(Int,Int))]] -> [[(a,(Int,Int))]]
 
@@ -108,7 +109,10 @@ data BlockTable a = Table (Int -> Int -> TableI a) Int Int
 -- You can create a (1x1) table entry
 
 single :: a -> BlockTable a
-single a = Table (\ x y z -> [(a,(x+1,y+1))] : z) 1 1
+single a = Table (\ x y r -> [(a,(x+1,y+1))] : r) 1 1
+
+empty :: BlockTable a
+empty = Table (\ _ _ r -> r) 0 0
 
 
 -- You can compose tables, horizonally and vertically
@@ -127,12 +131,12 @@ t1 `beside` t2 = combine t1 t2 (\ lst1 lst2 r ->
       -- but is always true for these combinators.
       -- I should assert this!
       -- I should even prove this.
-      beside (x:xs) (y:ys) = (x ++ y) : beside xs ys
-      beside (x:xs) []     = x        : xs ++ r
-      beside []     (y:ys) = y        : ys ++ r
-      beside []     []     =                  r
+      beside' (x:xs) (y:ys) = (x ++ y) : beside' xs ys
+      beside' (x:xs) []     = x        : xs ++ r
+      beside' []     (y:ys) = y        : ys ++ r
+      beside' []     []     =                  r
     in
-      beside (lst1 []) (lst2 []))
+      beside' (lst1 []) (lst2 []))
 
 -- trans flips (transposes) over the x and y axis of
 -- the table. It is only used internally, and typically
