@@ -59,782 +59,25 @@
       </varlistentry>
 
       <varlistentry>
-	<term>The CVS repository.<indexterm><primary>CVS repository</primary></indexterm></term>
+	<term>The darcs repository.<indexterm><primary>darcs repository</primary></indexterm></term>
 	<listitem>
 	  <para>We make releases infrequently.  If you want more
           up-to-the minute (but less tested) source code then you need
-          to get access to our CVS repository.</para>
+          to get access to our darcs repository.</para>
 
-	  <para>All the GHC source code is held
-          in a CVS repository. CVS is a pretty good source-code
-          control system, and best of all it works over the
-          network.</para>
+	  <para>Information on accessing the darcs repository is on
+	    the wiki: <ulink
+	    url="http://hackage.haskell.org/trac/ghc/wiki/GhcDarcs"
+	    />.</para>
 
 	  <para>The repository holds source code only. It holds no
           mechanically generated files at all.  So if you check out a
-          source tree from CVS you will need to install every utility
+          source tree from darcs you will need to install every utility
           so that you can build all the derived files from
           scratch.</para>
-
-	  <para>More information about our CVS repository can be found
-          in <xref linkend="sec-cvs"/>.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
-  </sect1>
-
-  <sect1 id="sec-cvs">
-    <title>Using the CVS repository</title>
-
-    <para>We use <ulink url="http://www.cvshome.org/">CVS</ulink> (Concurrent Version System) to keep track of our
-    sources for various software projects. CVS lets several people
-    work on the same software at the same time, allowing changes to be
-    checked in incrementally. </para>
-
-    <para>This section is a set of guidelines for how to use our CVS
-    repository, and will probably evolve in time. The main thing to
-    remember is that most mistakes can be undone, but if there's
-    anything you're not sure about feel free to bug the local CVS
-    meister (namely Jeff Lewis
-    <email>jlewis@galois.com</email>). </para>
-
-    <sect2 id="cvs-access">
-      <title>Getting access to the CVS Repository</title>
-
-      <para>You can access the repository in one of two ways:
-      read-only (<xref linkend="cvs-read-only"/>), or read-write (<xref
-      linkend="cvs-read-write"/>).</para>
-
-      <sect3 id="cvs-read-only">
-	<title>Remote Read-only CVS Access</title>
-
-	<para>Read-only access is available to anyone - there's no
-        need to ask us first.  With read-only CVS access you can do
-        anything except commit changes to the repository.  You can
-        make changes to your local tree, and still use CVS's merge
-        facility to keep your tree up to date, and you can generate
-        patches using 'cvs diff' in order to send to us for
-        inclusion. </para>
-
-	<para>To get read-only access to the repository:</para>
-
-	<orderedlist>
-	  <listitem>
-	    <para>Make sure that <application>cvs</application> is
-            installed on your machine.</para>
-	  </listitem>
-	  <listitem>
-	    <para>Set your <literal>$CVSROOT</literal> environment variable to
-            <literal>:pserver:anoncvs@cvs.haskell.org:/cvs</literal></para>
-	    <para>If you set <literal>$CVSROOT</literal> in a shell script, be sure not to
-	      have any trailing spaces on that line, otherwise CVS will respond with 
-	      a perplexing message like
-	      <screen>/cvs : no such repository</screen></para>
-	  </listitem>
-	  <listitem>
-            <para>Run the command</para>
-<screen>$ cvs login</screen>
-	    <para>The password is simply <literal>cvs</literal>.  This
-            sets up a file in your home directory called
-            <literal>.cvspass</literal>, which squirrels away the
-            dummy password, so you only need to do this step once.</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>Now go to <xref linkend="cvs-first"/>.</para>
-	  </listitem>
-	</orderedlist>
-      </sect3>
-
-      <sect3 id="cvs-read-write">
-	<title>Remote Read-Write CVS Access</title>
-
-	<para>We generally supply read-write access to folk doing
-        serious development on some part of the source tree, when
-        going through us would be a pain. If you're developing some
-        feature, or think you have the time and inclination to fix
-        bugs in our sources, feel free to ask for read-write
-        access. There is a certain amount of responsibility that goes
-        with commit privileges; we are more likely to grant you access
-        if you've demonstrated your competence by sending us patches
-        via mail in the past.</para>
-
-	<para>To get remote read-write CVS access, you need to do the
-	following steps.</para>
-
-	<orderedlist>
-	  <listitem>
-	    <para>Make sure that <literal>cvs</literal> and
-            <literal>ssh</literal> are both installed on your
-            machine.</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>Generate a DSA private-key/public-key pair, thus:</para>
-<screen>$ ssh-keygen -d</screen>
-	    <para>(<literal>ssh-keygen</literal> comes with
-            <literal>ssh</literal>.)  Running <literal>ssh-keygen
-            -d</literal> creates the private and public keys in
-            <literal>$HOME/.ssh/id_dsa</literal> and
-            <literal>$HOME/.ssh/id_dsa.pub</literal> respectively
-            (assuming you accept the standard defaults).</para>
-
-	    <para><literal>ssh-keygen -d</literal> will only work if
-            you have Version 2 <literal>ssh</literal> installed; it
-            will fail harmlessly otherwise.  If you only have Version
-            1 you can instead generate an RSA key pair using plain</para>
-<screen>$ ssh-keygen</screen>
-
-	    <para>Doing so creates the private and public RSA keys in
-            <literal>$HOME/.ssh/identity</literal> and
-            <literal>$HOME/.ssh/identity.pub</literal>
-            respectively.</para>
-
-            <para>[Deprecated.]  Incidentally, you can force a Version
-            2 <literal>ssh</literal> to use the Version 1 protocol by
-            creating <literal>$HOME/config</literal> with the
-            following in it:</para>
-<programlisting>BatchMode Yes
-
-Host cvs.haskell.org
-Protocol 1</programlisting>
-
-	    <para>In both cases, <literal>ssh-keygen</literal> will
-            ask for a <firstterm>passphrase</firstterm>.  The
-            passphrase is a password that protects your private key.
-            In response to the 'Enter passphrase' question, you can
-            either:</para>
-	    <itemizedlist>
-	      <listitem>
-		<para>[Recommended.]  Enter a passphrase, which you
-                will quote each time you use CVS.
-                <literal>ssh-agent</literal> makes this entirely
-                un-tiresome.</para>
-	      </listitem>
-	      <listitem>
-		<para>[Deprecated.] Just hit return (i.e. use an empty
-                passphrase); then you won't need to quote the
-                passphrase when using CVS.  The downside is that
-                anyone who can see into your <literal>.ssh</literal>
-                directory, and thereby get your private key, can mess
-                up the repository.  So you must keep the
-                <literal>.ssh</literal> directory with draconian
-                no-access permissions.</para>
-	      </listitem>
-	    </itemizedlist>
-
-
-       <para>
-       <emphasis>Windows users: see the notes in <xref linkend="configure-ssh"/> about <command>ssh</command> wrinkles!</emphasis>
-         </para>
-
-
-	  </listitem>
-
-	  <listitem>
-	    <para>Send a message to to the CVS repository
-            administrator (currently Jeff Lewis
-            <email>jeff@galois.com</email>), containing:</para>
-	    <itemizedlist>
-	      <listitem>
-		<para>Your desired user-name.</para>
-	      </listitem>
-	      <listitem>
-		<para>Your <literal>.ssh/id_dsa.pub</literal> (or
-                <literal>.ssh/identity.pub</literal>).</para>
-	      </listitem>
-	    </itemizedlist>
-	    <para>He will set up your account.</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>Set the following environment variables:</para>
-	   <itemizedlist>
-	   <listitem>
-	   <para>
-	   <constant>$HOME</constant>: points to your home directory.  This is where CVS
-	   will look for its <filename>.cvsrc</filename> file.
-	   </para>
-	   </listitem>
-
-	   <listitem>
-	   <para>
-	   <constant>$CVS_RSH</constant> to <filename>ssh</filename>
-	   </para>
-  	   <para>[Windows users.] Setting your <literal>CVS_RSH</literal> to
-            <literal>ssh</literal> assumes that your CVS client
-            understands how to execute shell script
-            (&quot;#!&quot;s,really), which is what
-            <literal>ssh</literal> is. This may not be the case on
-            Win32 platforms, so in that case set <literal>CVS_RSH</literal> to
-            <literal>ssh1</literal>.</para>
-	   </listitem>
-
-             <listitem>
-		<para><literal>$CVSROOT</literal> to
-		<literal>:ext:</literal><replaceable>your-username</replaceable>
-                <literal>@cvs.haskell.org:/home/cvs/root</literal>
-		where <replaceable>your-username</replaceable> is your user name on
-		<literal>cvs.haskell.org</literal>.
-		</para>
-	<para>The <literal>CVSROOT</literal> environment variable will
-        be recorded in the checked-out tree, so you don't need to set
-        this every time. </para>
-
-	     </listitem>
-
-	<listitem>
-	<para>
-	<constant>$CVSEDITOR</constant>: <filename>bin/gnuclient.exe</filename> 
-	if you want to use an Emacs buffer for typing in those long commit messages.
-	</para>
-	</listitem>
-
-	<listitem>
-	<para>
-	<constant>$SHELL</constant>: To use bash as the shell in Emacs, you need to
-	set this to point to <filename>bash.exe</filename>.
-	</para>
-	</listitem>
-
-       </itemizedlist>
-
-
-	  </listitem>
-
-	  <listitem>
-	  <para>
-	  Put the following in <filename>$HOME/.cvsrc</filename>:
-	  </para>
-	  
-<programlisting>checkout -P
-release -d
-update -P
-diff -u</programlisting>
-	  
-	  <para>
-	  These are the default options for the specified CVS commands,
-	  and represent better defaults than the usual ones.  (Feel
-	  free to change them.)
-	  </para>
-	  
-	  <para>
-	  [Windows users.]  Filenames starting with <filename>.</filename> were illegal in 
-	  the 8.3 DOS filesystem, but that restriction should have
-	  been lifted by now (i.e., you're using VFAT or later filesystems.) If
-	  you're still having problems creating it, don't worry; <filename>.cvsrc</filename> is entirely
-	  optional.
-	  </para>
-	  </listitem>
-
-	</orderedlist>
-
-
-	<para>[Experts.]  Once your account is set up, you can get
-        access from other machines without bothering Jeff, thus:</para>
-	<orderedlist>
-	  <listitem>
-	    <para>Generate a public/private key pair on the new
-            machine.</para>
-	  </listitem>
-	  <listitem>
-	    <para>Use ssh to log in to
-            <literal>cvs.haskell.org</literal>, from your old
-            machine.</para>
-	  </listitem>
-	  <listitem>
-	    <para>Add the public key for the new machine to the file
-            <literal>$HOME/ssh/authorized_keys</literal> on
-            <literal>cvs.haskell.org</literal>.
-            (<literal>authorized_keys2</literal>, I think, for Version
-            2 protocol.)</para>
-	  </listitem>
-	  <listitem>
-	    <para>Make sure that the new version of
-            <literal>authorized_keys</literal> still has 600 file
-            permissions.</para>
-	  </listitem>
-	</orderedlist>
-      </sect3>
-    </sect2>
-
-
-
-    <sect2 id="cvs-first">
-      <title>Checking Out a Source Tree</title>
-
-      <itemizedlist>
-	<listitem>
-	  <para>Make sure you set your <literal>CVSROOT</literal>
-          environment variable according to either of the remote
-          methods above. The Approved Way to check out a source tree
-          is as follows:</para>
-
-<screen>$ cvs checkout fpconfig</screen>
-
-	  <para>At this point you have a new directory called
-          <literal>fptools</literal> which contains the basic stuff
-          for the fptools suite, including the configuration files and
-          some other junk. </para>
-
-<para>[Windows users.]  The following messages appear to be harmless:
-<screen>setsockopt IPTOS_LOWDELAY: Invalid argument
-setsockopt IPTOS_THROUGHPUT: Invalid argument</screen>
-</para>
-
-
-	  <para>You can call the fptools directory whatever you like,
-          CVS won't mind: </para>
-	  
-<screen>$ mv fptools <replaceable>directory</replaceable></screen>
-
-	  <para> NB: after you've read the CVS manual you might be
-          tempted to try</para>
-<screen>$ cvs checkout -d <replaceable>directory</replaceable> fpconfig</screen>
-
-	  <para>instead of checking out <literal>fpconfig</literal>
-          and then renaming it.  But this doesn't work, and will
-          result in checking out the entire repository instead of just
-          the <literal>fpconfig</literal> bit.</para>
-<screen>$ cd <replaceable>directory</replaceable>
-$ cvs checkout ghc libraries</screen>
-
-	  <para>The second command here checks out the relevant
-          modules you want to work on. For a GHC build, for instance,
-          you need at least the <literal>ghc</literal>,
-          and <literal>libraries</literal>
-          modules (for a full list of the projects available, see
-          <xref linkend="projects"/>).</para>
-
-	  <para>Remember that if you do not have
-          <literal>happy</literal> and/or <literal>Alex</literal>
-          installed, you need to check them out as well.</para>
-	</listitem>
-      </itemizedlist>
-    </sect2>
-
-    <sect2 id="cvs-committing">
-      <title>Committing Changes</title>
-
-      <para>This is only if you have read-write access to the
-      repository. For anoncvs users, CVS will issue a &quot;read-only
-      repository&quot; error if you try to commit changes.</para>
-
-      <itemizedlist>
-	<listitem>
-	  <para>Build the software, if necessary. Unless you're just
-          working on documentation, you'll probably want to build the
-          software in order to test any changes you make.</para>
-	</listitem>
-
-	<listitem>
-	  <para>Make changes. Preferably small ones first.</para>
-	</listitem>
-
-	<listitem>
-	  <para>Test them. You can see exactly what changes you've
-          made by using the <literal>cvs diff</literal> command:</para>
-<screen>$ cvs diff</screen>
-	  <para>lists all the changes (using the
-          <literal>diff</literal> command) in and below the current
-          directory. In emacs, <literal>C-c C-v =</literal> runs
-          <literal>cvs diff</literal> on the current buffer and shows
-          you the results.</para>
-	</listitem>
-
-	<listitem>
-	  <para>If you changed something in the 
-          <literal>fptools/libraries</literal> subdirectories, also run
-          <literal>make html</literal> to check if the documentation can
-          be generated successfully, too.</para>
-	</listitem>
-
-	<listitem>
-	  <para>Before checking in a change, you need to update your
-          source tree:</para>
-
-<screen>$ cd fptools
-$ cvs update</screen>
-	  <para>This pulls in any changes that other people have made,
-          and merges them with yours. If there are any conflicts, CVS
-          will tell you, and you'll have to resolve them before you
-          can check your changes in. The documentation describes what
-          to do in the event of a conflict.</para>
-
-	  <para>It's not always necessary to do a full cvs update
-          before checking in a change, since CVS will always tell you
-          if you try to check in a file that someone else has changed.
-          However, you should still update at regular intervals to
-          avoid making changes that don't work in conjuction with
-          changes that someone else made. Keeping an eye on what goes
-          by on the mailing list can help here.</para>
-	</listitem>
-
-	<listitem>
-	  <para>When you're happy that your change isn't going to
-          break anything, check it in. For a one-file change:</para>
-
-<screen>$ cvs commit <replaceable>filename</replaceable></screen>
-
-	  <para>CVS will then pop up an editor for you to enter a
-          &quot;commit message&quot;, this is just a short description
-          of what your change does, and will be kept in the history of
-          the file.</para>
-
-	  <para>If you're using emacs, simply load up the file into a
-          buffer and type <literal>C-x C-q</literal>, and emacs will
-          prompt for a commit message and then check in the file for
-          you.</para>
-
-	  <para>For a multiple-file change, things are a bit
-          trickier. There are several ways to do this, but this is the
-          way I find easiest. First type the commit message into a
-          temporary file. Then either</para>
-
-<screen>$ cvs commit -F <replaceable>commit-message</replaceable> <replaceable>file_1</replaceable> .... <replaceable>file_n</replaceable></screen>
-
-	  <para>or, if nothing else has changed in this part of the
-          source tree, </para>
-
-<screen>$ cvs commit -F <replaceable>commit-message</replaceable> <replaceable>directory</replaceable></screen>
-
-          <para>where <replaceable>directory</replaceable> is a common
-          parent directory for all your changes, and
-          <replaceable>commit-message</replaceable> is the name of the
-          file containing the commit message.</para>
-
-	  <para>Shortly afterwards, you'll get some mail from the
-          relevant mailing list saying which files changed, and giving
-          the commit message. For a multiple-file change, you should
-          still get only <emphasis>one</emphasis> message.</para>
-	</listitem>
-      </itemizedlist>
-    </sect2>
-
-    <sect2 id="cvs-update">
-      <title>Updating Your Source Tree</title>
-
-      <para>It can be tempting to cvs update just part of a source
-      tree to bring in some changes that someone else has made, or
-      before committing your own changes. This is NOT RECOMMENDED!
-      Quite often changes in one part of the tree are dependent on
-      changes in another part of the tree (the
-      <literal>mk/*.mk</literal> files are a good example where
-      problems crop up quite often). Having an inconsistent tree is a
-      major cause of headaches. </para>
-
-      <para>So, to avoid a lot of hassle, follow this recipe for
-      updating your tree:</para>
-
-<screen>$ cd fptools
-$ cvs update -P 2&gt;&amp;1 | tee log</screen>
-
-      <para>Look at the log file, and fix any conflicts (denoted by a
-      <quote>C</quote> in the first column).  New directories may have
-      appeared in the repository; CVS doesn't check these out by
-      default, so to get new directories you have to explicitly do
-<screen>$ cvs update -d</screen>
-      in each project subdirectory.  Don't do this at the top level,
-      because then <emphasis>all</emphasis> the projects will be
-      checked out.</para>
-
-      <para>If you're using multiple build trees, then for every build
-      tree you have pointing at this source tree, you need to update
-      the links in case any new files have appeared: </para>
-
-<screen>$ cd <replaceable>build-tree</replaceable>
-$ lndir <replaceable>source-tree</replaceable></screen>
-
-      <para>Some files might have been removed, so you need to remove
-      the links pointing to these non-existent files:</para>
-
-<screen>$ find . -xtype l -exec rm '{}' \;</screen>
-
-      <para>To be <emphasis>really</emphasis> safe, you should do
-      </para>
-
-<screen>$ gmake all</screen>
-
-      <para>from the top-level, to update the dependencies and build
-      any changed files. </para>
-    </sect2>
-
-    <sect2 id="cvs-tags">
-      <title>GHC Tag Policy</title>
-
-      <para>If you want to check out a particular version of GHC,
-      you'll need to know how we tag versions in the repository.  The
-      policy (as of 4.04) is:</para>
-
-      <itemizedlist>
-	<listitem>
-	  <para>The tree is branched before every major release.  The
-          branch tag is <literal>ghc-x-xx-branch</literal>, where
-          <literal>x-xx</literal> is the version number of the release
-          with the <literal>'.'</literal> replaced by a
-          <literal>'-'</literal>.  For example, the 4.04 release lives
-          on <literal>ghc-4-04-branch</literal>.</para>
-	</listitem>
-
-	<listitem>
-	  <para>The release itself is tagged with
-          <literal>ghc-x-xx</literal> (on the branch).  eg. 4.06 is
-          called <literal>ghc-4-06</literal>.</para>
-	</listitem>
-
-	<listitem>
-	  <para>We didn't always follow these guidelines, so to see
-          what tags there are for previous versions, do <literal>cvs
-          log</literal> on a file that's been around for a while (like
-          <literal>fptools/ghc/README</literal>).</para>
-	</listitem>
-      </itemizedlist>
-
-      <para>So, to check out a fresh GHC 4.06 tree you would
-      do:</para>
-
-<screen>$ cvs co -r ghc-4-06 fpconfig
-$ cd fptools
-$ cvs co -r ghc-4-06 ghc libraries</screen>
-    </sect2>
-
-    <sect2 id="cvs-hints">
-      <title>General Hints</title>
-
-      <itemizedlist>
-	<listitem>
-	  <para>As a general rule: commit changes in small units,
-          preferably addressing one issue or implementing a single
-          feature.  Provide a descriptive log message so that the
-          repository records exactly which changes were required to
-          implement a given feature/fix a bug. I've found this
-          <emphasis>very</emphasis> useful in the past for finding out
-          when a particular bug was introduced: you can just wind back
-          the CVS tree until the bug disappears.</para>
-	</listitem>
-
-	<listitem>
-	  <para>Keep the sources at least *buildable* at any given
-          time. No doubt bugs will creep in, but it's quite easy to
-          ensure that any change made at least leaves the tree in a
-          buildable state. We do nightly builds of GHC to keep an eye
-          on what things work/don't work each day and how we're doing
-          in relation to previous verions. This idea is truely wrecked
-          if the compiler won't build in the first place!</para>
-	</listitem>
-
-	<listitem>
-	  <para>To check out extra bits into an already-checked-out
-          tree, use the following procedure.  Suppose you have a
-          checked-out fptools tree containing just ghc, and you want
-          to add nofib to it:</para>
-
-<screen>$ cd fptools
-$ cvs checkout nofib</screen>
-
-	  <para>or: </para>
-
-<screen>$ cd fptools
-$ cvs update -d nofib</screen>
-	  
-	  <para>(the -d flag tells update to create a new
-          directory). If you just want part of the nofib suite, you
-          can do </para>
-
-<screen>$ cd fptools
-$ cvs checkout nofib/spectral</screen>
-
-	  <para>This works because <literal>nofib</literal> is a
-          module in its own right, and spectral is a subdirectory of
-          the nofib module. The path argument to checkout must always
-          start with a module name. There's no equivalent form of this
-          command using <literal>update</literal>.</para>
-	</listitem>
-      </itemizedlist>
-    </sect2>
-  </sect1>
-
-  <sect1 id="projects">
-    <title>What projects are there?</title>
-
-    <para>The <literal>fptools</literal> suite consists of several
-    <firstterm>projects</firstterm>, most of which can be downloaded,
-    built and installed individually.  Each project corresponds to a
-    subdirectory in the source tree, and if checking out from CVS then
-    each project can be checked out individually by sitting in the top
-    level of your source tree and typing <command>cvs checkout
-    <replaceable>project</replaceable></command>.</para>
-
-    <para>Here is a list of the projects currently available:</para>
-
-    <variablelist>
-      <varlistentry>
-	<term>
-          <literal>alex</literal>
-          <indexterm><primary><literal>alex</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink
-	  url="http://www.haskell.org/alex/">Alex</ulink> lexical
-	  analyser generator for Haskell.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>ghc</literal>
-          <indexterm><primary><literal>ghc</literal></primary>
-          <secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink url="http://www.haskell.org/ghc/">Glasgow
-	  Haskell Compiler</ulink> (minus libraries).  Absolutely
-	  required for building GHC.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>glafp-utils</literal>
-          <indexterm><primary><literal>glafp-utils</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>Utility programs, some of which are used by the
-	  build/installation system.  Required for pretty much
-	  everything.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>greencard</literal>
-	  <indexterm><primary><literal>greencard</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink
-	  url="http://www.haskell.org/greencard/">GreenCard</ulink>
-	  system for generating Haskell foreign function
-	  interfaces.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>haggis</literal>
-	  <indexterm><primary><literal>haggis</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink
-	  url="http://www.dcs.gla.ac.uk/fp/software/haggis/">Haggis</ulink>
-	  Haskell GUI framework.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>haddock</literal>
-	  <indexterm><primary><literal>haddock</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink
-	  url="http://www.haskell.org/haddock/">Haddock</ulink>
-	  documentation tool.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>happy</literal>
-          <indexterm><primary><literal>happy</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink
-	  url="http://www.haskell.org/happy/">Happy</ulink> Parser
-	  generator.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>hdirect</literal>
-          <indexterm><primary><literal>hdirect</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink
-	  url="http://www.haskell.org/hdirect/">H/Direct</ulink>
-	  Haskell interoperability tool.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>hood</literal>
-          <indexterm><primary><literal>hood</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <ulink url="http://www.haskell.org/hood/">Haskell
-	  Object Observation Debugger</ulink>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>hslibs</literal>
-          <indexterm><primary><literal>hslibs</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>Old, now deprecated, libraries.  Everything in here is in <literal>libraries</literal>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>libraries</literal>
-          <indexterm><primary><literal></literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>Hierarchical Haskell library suite
-	  (<emphasis>required</emphasis> for building GHC).</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>mhms</literal>
-          <indexterm><primary><literal></literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The Modular Haskell Metric System.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>nofib</literal>
-          <indexterm><primary><literal>nofib</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>The NoFib suite: A collection of Haskell programs used
-	  primarily for benchmarking.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>testsuite</literal>
-          <indexterm><primary><literal>testsuite</literal></primary><secondary>project</secondary></indexterm>
-        </term>
-	<listitem>
-	  <para>A testing framework, including GHC's regression test
-	  suite.</para>
-	</listitem>
-      </varlistentry>
-    </variablelist>
-
-    <para>So, to build GHC you need at least the
-    <literal>ghc</literal> and <literal>libraries</literal>
-    projects (a GHC source distribution will
-    already include the bits you need).</para>
   </sect1>
 
   <sect1 id="sec-build-checks">
@@ -1246,17 +489,17 @@ $ cvs checkout nofib/spectral</screen>
       </varlistentry>
 
       <varlistentry>
-	<term>Happy
+	<term><ulink url="http://www.haskell.org/happy">Happy</ulink>
           <indexterm><primary>Happy</primary></indexterm>
         </term>
 	<listitem>
 	  <para>Happy is a parser generator tool for Haskell, and is
           used to generate GHC's parsers.</para>
 
-	  <para>If you start from a source tarball of GHC (i.e. not a CVS
+	  <para>If you start from a source tarball of GHC (i.e. not a darcs
 	    checkout), then you don't need Happy, because we supply the
 	    pre-processed versions of the Happy parsers.  If you intend to
-	    modify the compiler and/or you're using a CVS checkout, then you
+	    modify the compiler and/or you're using a darcs checkout, then you
 	    need Happy.</para>
 
 	  <para>Happy version 1.15 is currently required to build GHC.</para>
@@ -1282,10 +525,10 @@ $ cvs checkout nofib/spectral</screen>
 
 	  <para>Like Happy, you don't need Alex if you're building GHC from a
 	    source tarball, but you do need it if you're modifying GHC and/or
-	    building a CVS checkout.</para>
+	    building a darcs checkout.</para>
 
 	  <para>Alex is
-	  written in Haskell and is a project in the CVS repository.
+	  written in Haskell and is a project in the darcs repository.
 	  Alex distributions are available from <ulink url="http://www.haskell.org/alex/">Alex's Web
 	  Page</ulink>.</para>
 	</listitem>
@@ -1298,7 +541,7 @@ $ cvs checkout nofib/spectral</screen>
         </term>
 	<listitem>
 	  <para>GNU autoconf is needed if you intend to build from the
-          CVS sources, it is <emphasis>not</emphasis> needed if you
+          darcs sources, it is <emphasis>not</emphasis> needed if you
           just intend to build a standard source distribution.</para>
 
 	  <para>Version 2.52 or later of the autoconf package is required.
@@ -1614,7 +857,7 @@ $ make install</screen>
 	  <term>Step 1: get ready for configuration.</term>
 	  <listitem>
 	    <para>NOTE: if you're starting from a source distribution,
-	    rather than CVS sources, you can skip this step.</para>
+	    rather than darcs sources, you can skip this step.</para>
 
 	    <para>Change directory to
             <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
@@ -1858,7 +1101,7 @@ $ make install</screen>
 
       <orderedlist>
 	<listitem>
-	  <para> Get your source tree from somewhere (CVS repository
+	  <para> Get your source tree from somewhere (darcs repository
           or source distribution).  Say you call the root directory
           <filename>myfptools</filename> (it does not have to be
           called <filename>fptools</filename>).  Make sure that you
@@ -4286,7 +3529,7 @@ Posix interface.
 
 <para>You can't use the MinGW to <emphasis>build</emphasis> GHC, because MinGW doesn't have a shell,
 or the standard Unix commands such as <command>mv</command>, <command>rm</command>,
-<command>ls</command>, nor build-system stuff such as <command>make</command> and <command>cvs</command>.
+<command>ls</command>, nor build-system stuff such as <command>make</command> and <command>darcs</command>.
 For that, there are two choices: <ulink url="http://www.cygwin.com">Cygwin</ulink> 
 and <ulink url="http://www.mingw.org/msys.shtml">MSYS</ulink>:
 
@@ -4309,7 +3552,7 @@ through fewer layers, so MSYS is quite a bit faster too.
 <para>Furthermore, MSYS provides no compilation tools; it relies instead on the MinGW tools. These
 compile binaries that run with no DLL support, on any Win32 system.
 However, MSYS does come with all the make-system tools, such as <command>make</command>, <command>autoconf</command>, 
-<command>cvs</command>, <command>ssh</command> etc.  To get these, you have to download the 
+<command>darcs</command>, <command>ssh</command> etc.  To get these, you have to download the 
 MsysDTK (Developer Tool Kit) package, as well as the base MSYS package.
 </para>
 <para>MSYS does have a DLL, but it's only used by MSYS commands (<command>sh</command>, <command>rm</command>, 
@@ -4508,7 +3751,7 @@ download the following (of course, the version numbers will differ):
   </para></listitem>
   <listitem><para>The MSYS developer's toolkit (binary is sufficient): <literal>msysDTK-1.0.1.exe</literal>.
 		    This provides <command>make</command>, <command>autoconf</command>, 
-		    <command>ssh</command>, <command>cvs</command> and probably more besides.
+		    <command>ssh</command> and probably more besides.
   </para></listitem>
 </itemizedlist>
 Run both executables (in the order given above) to install them.  I put them in <literal>c:/msys</literal>
@@ -4859,8 +4102,7 @@ so you will need to add <filename>emacs/bin</filename> to your <literal>PATH</li
 
 <listitem>
 <para> Finally, check out a copy of GHC sources from
-the CVS repository, following the instructions above (<xref linkend="cvs-access"/>).
-</para>
+the darcs repository, following the instructions at <ulink url="http://hackage.haskell.org/trac/ghc/wiki/GhcDarcs" />.</para>
 </listitem>
 </itemizedlist>
 </para>
@@ -5001,18 +4243,16 @@ choices, but it gives a single path that works.</para>
   - add C:\ghc\ghc-6.4.1\bin to %PATH%
     (Start->Control Panel->System->Advanced->Environment Variables)
 
-- Get cvs version of ghc
+- Get darcs version of ghc
     ; also, subscribe to cvs-all@haskell.org, or follow the mailing list
     ; archive, in case you checkout a version with problems
     ; http://www.haskell.org//pipermail/cvs-all/
   - mkdir c:/fptools; cd c:/fptools 
-    ; (or whereever you want your cvs tree to be)
-  - export CVSROOT=:pserver:anoncvs@cvs.haskell.org:/cvs
-  - cvs login
-    ; pw: cvs
-  - cvs checkout fpconfig
-  - cd fptools
-  - cvs checkout ghc libraries
+    ; (or whereever you want your darcs tree to be)
+  - darcs get http://darcs.haskell.org/ghc
+  - cd ghc
+  - chmod +x darcs-all
+  - ./darcs-all get
 
 - Build ghc, using cygwin and mingw, targetting mingw
   - export PATH=/cygdrive/c/ghc/ghc-6.4.1:$PATH
