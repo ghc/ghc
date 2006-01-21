@@ -142,7 +142,7 @@ ident str sc cont =
 
 strToHsQNames :: String -> Maybe [HsQName]
 strToHsQNames str0
- = case lexer (\t -> returnP t) str0 (SrcLoc 1 1) 1 1 [] of
+ = case lexer (\t -> returnP t) str0 (SrcLoc 1 1 "") 1 1 "" [] of
 	Ok _ (VarId str)
 	   -> Just [ UnQual (HsVarName (HsIdent str)) ]
         Ok _ (QVarId (mod0,str))

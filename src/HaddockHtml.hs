@@ -148,7 +148,8 @@ spliceSrcURL :: Interface -> String -> String
 spliceSrcURL iface url = run url
   where run "" = ""
         run ('%':'M':rest) = modl_str ++ run rest
-        run ('%':'F':rest) = iface_filename iface ++ run rest
+        run ('%':'N':rest) = run rest
+        run ('%':'F':rest) = iface_orig_filename iface ++ run rest
 	run (c:rest) = c : run rest
 	
 	modl_str = case iface_module iface of { Module m -> 
@@ -492,13 +493,13 @@ ppHtmlModule odir doctitle
 	    pageHeader mdl iface doctitle
 		maybe_source_url maybe_wiki_url
 		maybe_contents_url maybe_index_url </> s15 </>
-	    ifaceToHtml mdl maybe_wiki_url iface </> s15 </>
+	    ifaceToHtml maybe_source_url maybe_wiki_url iface </> s15 </>
 	    footer
          )
   writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderHtml html)
 
-ifaceToHtml :: String -> Maybe String -> Interface -> HtmlTable
-ifaceToHtml _ maybe_wiki_url iface 
+ifaceToHtml :: Maybe String -> Maybe String -> Interface -> HtmlTable
+ifaceToHtml maybe_source_url maybe_wiki_url iface
   = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
   where 
 	exports = numberSectionHeadings (iface_exports iface)
@@ -526,7 +527,7 @@ ifaceToHtml _ maybe_wiki_url iface
 	  = (tda [theclass "section1"] << toHtml "Synopsis") </>
 	    s15 </>
             (tda [theclass "body"] << vanillaTable <<
-  	        abovesSep s8 (map (processExport True Nothing)
+  	        abovesSep s8 (map (processExport True linksInfo)
 			(filter forSummary exports))
 	    )
 
@@ -538,10 +539,8 @@ ifaceToHtml _ maybe_wiki_url iface
 		   ExportGroup _ _ _ : _ -> Html.emptyTable
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 
-	bdy  = map (processExport False wiki_info) exports
-	wiki_info = case maybe_wiki_url of
-		      Nothing -> Nothing
-		      Just wiki_url -> Just (wiki_url, iface_module iface)
+	bdy  = map (processExport False linksInfo) exports
+	linksInfo = (maybe_source_url, maybe_wiki_url, iface)
 
 ppModuleContents :: [ExportItem] -> HtmlTable
 ppModuleContents exports
@@ -577,14 +576,14 @@ numberSectionHeadings exports = go 1 exports
 	go n (other:es)
 	  = other : go n es
 
--- The base URL for wiki links, and the current module
-type WikiInfo = Maybe (String, Module)
+-- The URL for source and wiki links, and the current module
+type LinksInfo = (Maybe String, Maybe String, Interface)
 
-processExport :: Bool -> WikiInfo -> ExportItem -> HtmlTable
+processExport :: Bool -> LinksInfo -> ExportItem -> HtmlTable
 processExport _ _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
-processExport summary wiki (ExportDecl x decl insts)
-  = doDecl summary wiki x decl insts
+processExport summary links (ExportDecl x decl insts)
+  = doDecl summary links x decl insts
 processExport summmary _ (ExportNoDecl _ y [])
   = declBox (ppHsQName y)
 processExport summmary _ (ExportNoDecl _ y subs)
@@ -609,36 +608,36 @@ ppDocGroup lev doc
 -- -----------------------------------------------------------------------------
 -- Converting declarations to HTML
 
-declWithDoc :: Bool -> WikiInfo -> HsName -> Maybe Doc -> Html -> HtmlTable
-declWithDoc True  _    _  _          html_decl = declBox html_decl
-declWithDoc False wiki nm Nothing    html_decl = topDeclBox wiki nm html_decl
-declWithDoc False wiki nm (Just doc) html_decl = 
-		topDeclBox wiki nm html_decl </> docBox (docToHtml doc)
+declWithDoc :: Bool -> LinksInfo -> SrcLoc -> HsName -> Maybe Doc -> Html -> HtmlTable
+declWithDoc True  _     _   _  _          html_decl = declBox html_decl
+declWithDoc False links loc nm Nothing    html_decl = topDeclBox links loc nm html_decl
+declWithDoc False links loc nm (Just doc) html_decl = 
+		topDeclBox links loc nm html_decl </> docBox (docToHtml doc)
 
-doDecl :: Bool -> WikiInfo -> HsQName -> HsDecl -> [InstHead] -> HtmlTable
-doDecl summary wiki x d instances = do_decl d
+doDecl :: Bool -> LinksInfo -> HsQName -> HsDecl -> [InstHead] -> HtmlTable
+doDecl summary links x d instances = do_decl d
   where
-     do_decl (HsTypeSig _ [nm] ty doc) 
-	= ppFunSig summary wiki nm ty doc
+     do_decl (HsTypeSig loc [nm] ty doc) 
+	= ppFunSig summary links loc nm ty doc
 
-     do_decl (HsForeignImport _ _ _ _ n ty doc)
-	= ppFunSig summary wiki n ty doc
+     do_decl (HsForeignImport loc _ _ _ n ty doc)
+	= ppFunSig summary links loc n ty doc
 
-     do_decl (HsTypeDecl _ nm args ty doc)
-	= declWithDoc summary wiki nm doc (
+     do_decl (HsTypeDecl loc nm args ty doc)
+	= declWithDoc summary links loc nm doc (
 	      hsep ([keyword "type", ppHsBinder summary nm]
 		 ++ map ppHsName args) <+> equals <+> ppHsType ty)
 
      do_decl (HsNewTypeDecl loc ctx nm args con drv doc)
-	= ppHsDataDecl summary wiki instances True{-is newtype-} x
+	= ppHsDataDecl summary links instances True{-is newtype-} x
 		(HsDataDecl loc ctx nm args [con] drv doc)
 	  -- print it as a single-constructor datatype
 
      do_decl d0@(HsDataDecl{})
-	= ppHsDataDecl summary wiki instances False{-not newtype-} x d0
+	= ppHsDataDecl summary links instances False{-not newtype-} x d0
 
      do_decl d0@(HsClassDecl{})
-	= ppHsClassDecl summary wiki instances x d0
+	= ppHsClassDecl summary links instances x d0
 
      do_decl (HsDocGroup _ lev str)
 	= if summary then Html.emptyTable 
@@ -653,7 +652,7 @@ ppTypeSig summary nm ty = ppHsBinder summary nm <+> dcolon <+> ppHsType ty
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
 
-ppShortDataDecl :: Bool -> WikiInfo -> Bool -> HsDecl -> Html
+ppShortDataDecl :: Bool -> LinksInfo -> Bool -> HsDecl -> Html
 ppShortDataDecl summary _ is_newty 
 	(HsDataDecl _ _ nm args [con] _ _doc) =
    ppHsDataHeader summary is_newty nm args      
@@ -661,10 +660,10 @@ ppShortDataDecl summary _ is_newty
 ppShortDataDecl summary _ is_newty
 	(HsDataDecl _ _ nm args [] _ _doc) = 
    ppHsDataHeader summary is_newty nm args
-ppShortDataDecl summary wiki is_newty
-	(HsDataDecl _ _ nm args cons _ _doc) = 
+ppShortDataDecl summary links is_newty
+	(HsDataDecl loc _ nm args cons _ _doc) = 
    vanillaTable << (
-	(if summary then declBox else topDeclBox wiki nm)
+	(if summary then declBox else topDeclBox links loc nm)
           (ppHsDataHeader summary is_newty nm args) </>
 	tda [theclass "body"] << vanillaTable << (
 	  aboves (zipWith do_constr ('=':repeat '|') cons)
@@ -675,10 +674,10 @@ ppShortDataDecl _ _ _ d =
     error $ "HaddockHtml.ppShortDataDecl: unexpected decl " ++ show d
 
 -- The rest of the cases:
-ppHsDataDecl :: Ord key => Bool	-> WikiInfo -> [InstHead] -> Bool -> key -> HsDecl -> HtmlTable
-ppHsDataDecl summary wiki instances is_newty 
-     x decl@(HsDataDecl _ _ nm args cons _ doc)
-  | summary = declWithDoc summary wiki nm doc (ppShortDataDecl summary wiki is_newty decl)
+ppHsDataDecl :: Ord key => Bool	-> LinksInfo -> [InstHead] -> Bool -> key -> HsDecl -> HtmlTable
+ppHsDataDecl summary links instances is_newty 
+     x decl@(HsDataDecl loc _ nm args cons _ doc)
+  | summary = declWithDoc summary links loc nm doc (ppShortDataDecl summary links is_newty decl)
 
   | otherwise
         = dataheader </> 
@@ -688,7 +687,7 @@ ppHsDataDecl summary wiki instances is_newty
 		instances_bit
             )
   where
-	dataheader = topDeclBox wiki nm (ppHsDataHeader False is_newty nm args)
+	dataheader = topDeclBox links loc nm (ppHsDataHeader False is_newty nm args)
 
 	constr_table
 	 	| any isRecDecl cons  = spacedTable5
@@ -835,15 +834,15 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppHsName vars1) <+> toHtml "->" <+>
 			       hsep (map ppHsName vars2)
 
-ppShortClassDecl :: Bool -> WikiInfo -> HsDecl -> HtmlTable
-ppShortClassDecl summary wiki (HsClassDecl _ ctxt nm tvs fds decls _) = 
+ppShortClassDecl :: Bool -> LinksInfo -> HsDecl -> HtmlTable
+ppShortClassDecl summary links (HsClassDecl loc ctxt nm tvs fds decls _) = 
   if null decls
-    then (if summary then declBox else topDeclBox wiki nm) hdr
-    else (if summary then declBox else topDeclBox wiki nm) (hdr <+> keyword "where")
+    then (if summary then declBox else topDeclBox links loc nm) hdr
+    else (if summary then declBox else topDeclBox links loc nm) (hdr <+> keyword "where")
 	    </> 
            (tda [theclass "body"] << 
 	     vanillaTable << 
-	       aboves [ ppFunSig summary wiki n ty doc 
+	       aboves [ ppFunSig summary links loc n ty doc 
 		      | HsTypeSig _ [n] ty doc <- decls
 		      ]
           )
@@ -853,10 +852,10 @@ ppShortClassDecl summary wiki (HsClassDecl _ ctxt nm tvs fds decls _) =
 ppShortClassDecl _ _ d =
     error $ "HaddockHtml.ppShortClassDecl: unexpected decl: " ++ show d
 
-ppHsClassDecl :: Ord key => Bool -> WikiInfo -> [InstHead] -> key -> HsDecl -> HtmlTable
-ppHsClassDecl summary wiki instances orig_c
-	decl@(HsClassDecl _ ctxt nm tvs fds decls doc)
-  | summary = ppShortClassDecl summary wiki decl
+ppHsClassDecl :: Ord key => Bool -> LinksInfo -> [InstHead] -> key -> HsDecl -> HtmlTable
+ppHsClassDecl summary links instances orig_c
+	decl@(HsClassDecl loc ctxt nm tvs fds decls doc)
+  | summary = ppShortClassDecl summary links decl
 
   | otherwise
         = classheader </>
@@ -866,8 +865,8 @@ ppHsClassDecl summary wiki instances orig_c
 
    where 
 	classheader
-	   | null decls = topDeclBox wiki nm hdr
-	   | otherwise  = topDeclBox wiki nm (hdr <+> keyword "where")
+	   | null decls = topDeclBox links loc nm hdr
+	   | otherwise  = topDeclBox links loc nm (hdr <+> keyword "where")
 
 	hdr = ppClassHdr summary ctxt nm tvs fds
 
@@ -880,7 +879,7 @@ ppHsClassDecl summary wiki instances orig_c
 	   | otherwise  = 
 		s8 </> meth_hdr </>
 		tda [theclass "body"] << vanillaTable << (
-	       		abovesSep s8 [ ppFunSig summary wiki n ty doc0
+	       		abovesSep s8 [ ppFunSig summary links loc n ty doc0
 			             | HsTypeSig _ [n] ty doc0 <- decls
 			             ]
 			)
@@ -907,13 +906,13 @@ ppInstHead (ctxt,asst) =  ppHsContext ctxt <+> darrow <+> ppHsAsst asst
 -- ----------------------------------------------------------------------------
 -- Type signatures
 
-ppFunSig :: Bool -> WikiInfo -> HsName -> HsType -> Maybe Doc -> HtmlTable
-ppFunSig summary wiki nm ty0 doc
+ppFunSig :: Bool -> LinksInfo -> SrcLoc -> HsName -> HsType -> Maybe Doc -> HtmlTable
+ppFunSig summary links loc nm ty0 doc
   | summary || no_arg_docs ty0 = 
-      declWithDoc summary wiki nm doc (ppTypeSig summary nm ty0)
+      declWithDoc summary links loc nm doc (ppTypeSig summary nm ty0)
 
   | otherwise   = 
-	topDeclBox wiki nm (ppHsBinder False nm) </>
+	topDeclBox links loc nm (ppHsBinder False nm) </>
 	(tda [theclass "body"] << vanillaTable <<  (
 	   do_args dcolon ty0 </>
 	   (if (isJust doc) 
@@ -1157,18 +1156,38 @@ declBox :: Html -> HtmlTable
 declBox html = tda [theclass "decl"] << html
 
 -- a box for top level documented names
--- it adds a wiki link at the right hand side of the box
-topDeclBox :: Maybe (String, Module) -> HsName -> Html -> HtmlTable
-topDeclBox Nothing name html = declBox html
-topDeclBox (Just (base_url, Module mod)) name html =
+-- it adds a source and wiki link at the right hand side of the box
+topDeclBox :: LinksInfo -> SrcLoc -> HsName -> Html -> HtmlTable
+topDeclBox (Nothing, Nothing, _) srcloc name html = declBox html
+topDeclBox (maybe_src_url, maybe_wiki_url, iface) (SrcLoc _ _ fname) name html =
   tda [theclass "topdecl"] <<
   (        table ! [theclass "declbar"] <<
-	    ((tda [theclass "declname"] << html) <->
-             (tda [theclass "declbut"] << link))
+	    ((tda [theclass "declname"] << html)
+             <-> srcLink
+             <-> wikiLink)
   )
-  where link = anchor ! [href url] << toHtml "Comments"
-        url = pathJoin [base_url, mod] ++ nameAnchor
-        nameAnchor = '#' : escapeStr (hsNameStr name)
+  where srcLink =
+          case maybe_src_url of
+            Nothing  -> Html.emptyTable
+            Just url -> tda [theclass "declbut"] <<
+                          (anchor ! [href (spliceURL url)]
+                            << toHtml "Source")
+        wikiLink =
+          case maybe_wiki_url of
+            Nothing  -> Html.emptyTable
+            Just url -> tda [theclass "declbut"] <<
+                          (anchor ! [href (spliceURL url)]
+                            << toHtml "Comments")
+  
+        spliceURL url = run url
+          where run "" = ""
+                run ('%':'M':rest) = mod ++ run rest
+                run ('%':'N':rest) = escapeStr (hsNameStr name) ++ run rest
+                run ('%':'F':rest) = fname ++ run rest
+	        run (c:rest) = c : run rest
+
+        Module mod = iface_module iface
+        mod' = map (\x -> if x == '.' then '/' else x) mod
 
 -- a box for displaying an 'argument' (some code which has text to the
 -- right of it).  Wrapping is not allowed in these boxes, whereas it is

@@ -25,6 +25,11 @@ data Interface
 	iface_filename :: FilePath,
 		-- ^ the filename that contains the source code for this module
 
+	iface_orig_filename :: FilePath,
+		-- ^ the original filename for this module, which may be
+                -- different to the 'iface_filename' (for example the original
+                -- file may have had a .lhs or .hs.pp extension).
+
 	iface_module :: Module,
 
 	iface_package :: Maybe String,

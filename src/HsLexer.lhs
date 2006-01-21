@@ -218,45 +218,49 @@ tAB_LENGTH = 8
 
 
 lexer :: (Token -> P a) -> P a
-lexer cont input (SrcLoc _ x0) y0 col =
+lexer cont input (SrcLoc _ x0 _) y0 col f =
         if col == 0
-           then tab y0 x0  True  input
-           else tab y0 col False input -- throw away old x
+           then tab y0 x0  f True  input
+           else tab y0 col f False input -- throw away old x
   where
    	-- move past whitespace and comments
-        tab y x _ [] = 
-        	cont EOF [] (SrcLoc y x) col y
-        tab y x bol ('\t':s) =
-        	tab y (nextTab x) bol s
-        tab y _ _  ('\n':s) =
-                newLine cont s y
+        tab y x f _ [] = 
+        	cont EOF [] (SrcLoc y x f) y col f
+        tab y x f bol ('\t':s) =
+        	tab y (nextTab x) f bol s
+        tab y _ f _  ('\n':s) =
+                newLine cont s y f
 
-        tab y _ True ('#':s)
+        tab y _ f True ('#':s)
             | "pragma GCC set_debug_pwd" `isPrefixOf` s
-            = newLine cont (tail $ dropWhile (/= '\n') s) y
+            = newLine cont (tail $ dropWhile (/= '\n') s) y f
+
+	tab y x f True ('#':' ':s@(d:_))
+	    | isDigit d = parseLinePragma tab y f s
 
 	-- single-line comments
-        tab y x bol s@('-':'-':' ':c:_) | doc c = 
-	 	is_a_token bol s y x
-        tab y _ _ ('-':'-':s) | null s || not (isSymbol (head (dropWhile (== '-') s)))  =
-        	newLine cont (drop 1 (dropWhile (/= '\n') s)) y
+        tab y x f bol s@('-':'-':' ':c:_) | doc c = 
+	 	is_a_token bol s y x f
+        tab y _ f _ ('-':'-':s) | null s || not (isSymbol (head (dropWhile (== '-') s)))  =
+        	newLine cont (drop 1 (dropWhile (/= '\n') s)) y f
 
-	-- multi-line nested comments
-	tab y x bol s@('{':'-':c:_) | doc c && c /= '#' = 
-		is_a_token bol s y x
-	tab y x bol s@('{':'-':' ':c:_) | doc c = 
-		is_a_token bol s y x
-        tab y x bol ('{':'-':s) = nestedComment tab y x bol s
+	-- multi-line nested comments and pragmas
+	tab y x f bol ('{':'-':'#':s) = pragma tab y (x+3) f bol s
+	tab y x f bol s@('{':'-':c:_) | doc c = 
+		is_a_token bol s y x f
+	tab y x f bol s@('{':'-':' ':c:_) | doc c = 
+		is_a_token bol s y x f
+        tab y x f bol ('{':'-':s) = nestedComment (\y x -> tab y x f) y (x+2) bol s
 
-        tab y x bol (c:s)
-        	| isWhite c = tab y (x+1) bol s
-        	| otherwise = is_a_token bol (c:s) y x
+        tab y x f bol (c:s)
+        	| isWhite c = tab y (x+1) f bol s
+        	| otherwise = is_a_token bol (c:s) y x f
 
- 	is_a_token bol s y x
-	   | bol       = lexBOL   cont s (SrcLoc y x) y x
-	   | otherwise = lexToken cont s (SrcLoc y x) y x
+ 	is_a_token bol s y x f
+	   | bol       = lexBOL   cont s (SrcLoc y x f) y x f
+	   | otherwise = lexToken cont s (SrcLoc y x f) y x f
 
-	newLine _ s y =  tab (y+1) 1 True s
+	newLine _ s y f =  tab (y+1) 1 f True s
 
 	doc '|' = True
 	doc '/' = True
@@ -273,19 +277,19 @@ nextTab x = x + (tAB_LENGTH - (x-1) `mod` tAB_LENGTH)
 -- insert virtual semicolons or close braces due to layout.
 
 lexBOL :: (Token -> P a) -> P a
-lexBOL cont s loc y x context =
+lexBOL cont s loc y x f context =
         if need_close_curly then 
                 -- trace "layout: inserting '}'\n" $
         	-- Set col to 0, indicating that we're still at the
         	-- beginning of the line, in case we need a semi-colon too.
         	-- Also pop the context here, so that we don't insert
         	-- another close brace before the parser can pop it.
-        	cont VRightCurly s loc y 0 (tail context)
+        	cont VRightCurly s loc y 0 f (tail context)
         else if need_semi_colon then
                 --trace "layout: inserting ';'\n" $
-        	cont SemiColon s loc y x context
+        	cont SemiColon s loc y x f context
         else
-        	lexToken cont s loc y x context
+        	lexToken cont s loc y x f context
  where
         need_close_curly =
         	case context of
@@ -303,7 +307,7 @@ lexBOL cont s loc y x context =
 lexToken :: (Token -> P a) -> P a
 --lexToken _    [] loc _ _ =
 --    error $ "Internal error: empty input in lexToken at " ++ show loc
-lexToken cont s0 loc y x =
+lexToken cont s0 loc y x f =
    -- trace ("lexer: y="++show y++" x="++show x++"\n") $ 
    case s0 of
         []            -> error $ "Internal error: empty input in lexToken at "
@@ -330,20 +334,20 @@ lexToken cont s0 loc y x =
                                []       -> error "Internal error: empty context in lexToken"
 
         '?':s:ss  
-	  | isIdentInitial s -> lexToken ( \ (VarId x) -> cont (IPVarId x)) (s:ss) loc y x
-        '\'':s -> lexChar cont s loc y (x+1)
-        '\"':s{-"-} -> lexString cont s loc y (x+1)
+	  | isIdentInitial s -> lexToken ( \ (VarId x) -> cont (IPVarId x)) (s:ss) loc y x f
+        '\'':s -> lexChar cont s loc y (x+1) f
+        '\"':s{-"-} -> lexString cont s loc y (x+1) f
 
         '0':'x':c:s | isHexDigit c -> 
 	   let (num, rest) = span isHexDigit (c:s)
 	       [(i,_)] = readHex num
 	   in
-	   afterNum cont i rest loc y (x+length num)
+	   afterNum cont i rest loc y (x+length num) f
         '0':'o':c:s | isOctDigit c -> 
 	   let (num, rest) = span isOctDigit (c:s)
 	       [(i,_)] = readOct num
 	   in
-	   afterNum cont i rest loc y (x+length num)
+	   afterNum cont i rest loc y (x+length num) f
 
         c:s | isIdentInitial c ->
         	let 
@@ -355,7 +359,7 @@ lexToken cont s0 loc y x =
         		Just keyword -> forward l_id keyword rest
         		Nothing      -> forward l_id (VarId id0) rest
 
-          | isUpper c -> lexCon "" cont (c:s) loc y x
+          | isUpper c -> lexCon "" cont (c:s) loc y x f
           | isSymbol c ->
         	let
         	    (symtail, rest) = span isSymbol s
@@ -368,42 +372,42 @@ lexToken cont s0 loc y x =
         			':' -> forward l_sym (ConSym sym) rest
         			_   -> forward l_sym (VarSym sym) rest
 
-          | isDigit c -> lexNum cont c s loc y x
+          | isDigit c -> lexNum cont c s loc y x f
 
           | otherwise ->
         	parseError ("illegal character \'" ++ show c ++ "\'\n") 
-        		  s loc y x
+        		  s loc y x f
 
-  where forward n t str = cont t str loc y (x+n)
+  where forward n t str = cont t str loc y (x+n) f
 
 	-- this is all terribly ugly, sorry :(
-	do_doc ('|':s) nested  = multi nested DocCommentNext  cont s loc y x
-	do_doc ('/':s) nested  = multi nested DocCommentNext  cont s loc y x
-	do_doc ('^':s) nested  = multi nested DocCommentPrev  cont s loc y x
-	do_doc ('$':s) nested  = multi nested DocCommentNamed cont s loc y x
-	do_doc ('#':s) nested  = multi nested DocOptions      cont s loc y x
+	do_doc ('|':s) nested  = multi nested DocCommentNext  cont s loc y x f
+	do_doc ('/':s) nested  = multi nested DocCommentNext  cont s loc y x f
+	do_doc ('^':s) nested  = multi nested DocCommentPrev  cont s loc y x f
+	do_doc ('$':s) nested  = multi nested DocCommentNamed cont s loc y x f
+	do_doc ('#':s) nested  = multi nested DocOptions      cont s loc y x f
 	do_doc ('*':s) nested  = section 1 s
 	  where section n ('*':s1) = section (n+1) s1
 		section n s1 
-		 | nested    = nestedDocComment  (DocSection n) cont s1 loc y x
-		 | otherwise = oneLineDocComment (DocSection n) cont s1 loc y x
+		 | nested    = nestedDocComment  (DocSection n) cont s1 loc y x f
+		 | otherwise = oneLineDocComment (DocSection n) cont s1 loc y x f
 	do_doc _       _ = error "Internal error: HsLexer.do_doc"
         
 
-multi :: Num a => Bool -> ([Char] -> b)
-      -> (b -> [Char] -> c -> a -> Int -> d)
-      -> [Char] -> c -> a -> Int -> d
+multi :: Bool -> ([Char] -> b)
+      -> (b -> [Char] -> c -> Int -> Int -> d)
+      -> [Char] -> c -> Int -> Int -> d
 multi True  = nestedDocComment
 multi False = multiLineDocComment
 
-afterNum :: Num a => (Token -> [Char] -> b -> c -> a -> d)
-	 -> Integer -> [Char] -> b -> c -> a -> d
-afterNum cont i ('#':s) loc y x = cont (PrimInt i) s loc y (x+1)
-afterNum cont i s loc y x = cont (IntTok i) s loc y x
+afterNum :: Num a => (Token -> [Char] -> b -> c -> a -> d -> e)
+	 -> Integer -> [Char] -> b -> c -> a -> d -> e
+afterNum cont i ('#':s) loc y x f = cont (PrimInt i) s loc y (x+1) f
+afterNum cont i s loc y x f = cont (IntTok i) s loc y x f
 
-lexNum :: (Token -> [Char] -> a -> b -> Int -> c)
-       -> Char -> [Char] -> a -> b -> Int -> c
-lexNum cont c0 s0 loc y x = 
+lexNum :: (Token -> [Char] -> a -> b -> Int -> c -> d)
+       -> Char -> [Char] -> a -> b -> Int -> c -> d
+lexNum cont c0 s0 loc y x fname = 
   let (num, after_num) = span isDigit (c0:s0)
   in
   case after_num of
@@ -433,11 +437,11 @@ lexNum cont c0 s0 loc y x =
 	    x' = x + length f
 
 	in case after_exp of -- glasgow exts only
-		'#':'#':s -> cont (PrimDouble f) s loc y x'
-		'#':s     -> cont (PrimFloat f)  s loc y x'
-		s         -> cont (FloatTok f)   s loc y x'
+		'#':'#':s -> cont (PrimDouble f) s loc y x' fname
+		'#':s     -> cont (PrimFloat f)  s loc y x' fname
+		s         -> cont (FloatTok f)   s loc y x' fname
 
-    _ -> afterNum cont (parseInteger 10 num) after_num loc y (x + length num)
+    _ -> afterNum cont (parseInteger 10 num) after_num loc y (x + length num) fname
 
 		
 -- GHC extension: allow trailing '#'s in an identifier. 
@@ -455,11 +459,11 @@ slurphashes [] i = (reverse i, [])
 slurphashes ('#':cs) i = slurphashes cs ('#':i)
 slurphashes s i = (reverse i, s)
 
-lexCon :: [Char] -> (Token -> String -> a -> b -> Int -> c)
-       -> String -> a -> b -> Int -> c
-lexCon qual cont s0 loc y x =
+lexCon :: [Char] -> (Token -> String -> a -> b -> Int -> c -> d)
+       -> String -> a -> b -> Int -> c -> d
+lexCon qual cont s0 loc y x f =
   let
-    forward n t s = cont t s loc y (x+n)
+    forward n t s = cont t s loc y (x+n) f
 
     (con, rest) = slurpIdent s0
     l_con = length con
@@ -485,7 +489,7 @@ lexCon qual cont s0 loc y x =
 	   _ -> forward (l_con+1+l_id) (QVarId (qual', id0)) rest1
 
      | isUpper c1 ->	-- qualified conid?
-	lexCon qual' cont (c1:s1) loc y (x+l_con+1)
+	lexCon qual' cont (c1:s1) loc y (x+l_con+1) f
 
      | isSymbol c1 ->	-- qualified symbol?
 	let
@@ -505,28 +509,28 @@ lexCon qual cont s0 loc y x =
 
 
 lexChar :: (Token -> P a) -> P a
-lexChar cont s0 loc0 y x = case s0 of
-                    '\\':s1 -> (escapeChar s1 `thenP` \(e,s,i) _ _ _ _ ->
-                               charEnd e s loc0 y (x+i)) s1 loc0 y x
-                    c:s     -> charEnd c s loc0 y (x+1)
+lexChar cont s0 loc0 y x f = case s0 of
+                    '\\':s1 -> (escapeChar s1 `thenP` \(e,s,i) _ _ _ _ _ ->
+                               charEnd e s loc0 y (x+i) f) s1 loc0 y x f
+                    c:s     -> charEnd c s loc0 y (x+1) f
                     []      -> error "Internal error: lexChar"
 
-  where charEnd c ('\'':'#':s) = \loc y0 x0 -> cont (PrimChar c) s loc y0 (x0+2)
-	charEnd c ('\'':s) = \loc y0 x0 -> cont (Character c) s loc y0 (x0+1)
+  where charEnd c ('\'':'#':s) = \loc y0 x0 f0 -> cont (PrimChar c) s loc y0 (x0+2) f0
+	charEnd c ('\'':s) = \loc y0 x0 f0 -> cont (Character c) s loc y0 (x0+1) f0
         charEnd _ s = parseError "Improperly terminated character constant" s
 
 lexString :: (Token -> P a) -> P a
-lexString cont s0 loc y0 x0 = loop "" s0 x0 y0
+lexString cont s0 loc y0 x0 f0 = loop "" s0 x0 y0 f0
   where
-     loop e s1 x y = case s1 of
-            '\\':'&':s  -> loop e s (x+2) y
-            '\\':c:s | isSpace c -> stringGap e s (x+2) y
+     loop e s1 x y f = case s1 of
+            '\\':'&':s  -> loop e s (x+2) y f
+            '\\':c:s | isSpace c -> stringGap e s (x+2) y f
         	     | otherwise -> (escapeChar (c:s) `thenP` \(e',s2,i) _ _ _ _ ->
-        		             loop (e':e) s2 (x+i) y) s loc y x
-            '\"':'#':s  -> cont (PrimString (reverse e)) s loc y (x+2)
-            '\"':s{-"-} -> cont (StringTok (reverse e)) s loc y (x+1)
-            c:s		-> loop (c:e) s (x+1) y
-            []          -> parseError "Improperly terminated string" s1 loc y x
+        		             loop (e':e) s2 (x+i) y) s loc y x f
+            '\"':'#':s  -> cont (PrimString (reverse e)) s loc y (x+2) f
+            '\"':s{-"-} -> cont (StringTok (reverse e)) s loc y (x+1) f
+            c:s		-> loop (c:e) s (x+1) y f
+            []          -> parseError "Improperly terminated string" s1 loc y x f
 
      stringGap e s1 x y = case s1 of
         	'\n':s -> stringGap e s 1 (y+1)
@@ -617,8 +621,35 @@ cntrl :: String -> P (Char,String,Int)
 cntrl (c:s) | c >= '@' && c <= '_' = returnP (chr (ord c - ord '@'), s,2)
 cntrl _                            = parseError "Illegal control character"
 
-nestedComment :: Num a => (a -> Int -> Bool -> [Char] -> b)
-	      -> a -> Int -> Bool -> [Char] -> b
+
+pragma :: (Int -> Int -> FilePath -> Bool -> [Char] -> b)
+       -> Int -> Int -> FilePath -> Bool -> [Char] -> b
+pragma cont y x f bol s0 =
+   case span (==' ') s0 of
+      (_, 'L':'I':'N':'E':' ':s) -> parseLinePragma cont y f s
+      (_, 'l':'i':'n':'e':' ':s) -> parseLinePragma cont y f s
+      (sp,s) -> nestedComment (\y x -> cont y x f) y (x+length sp) bol s
+
+parseLinePragma :: (Int -> Int -> FilePath -> Bool -> [Char] -> b)
+                -> Int -> FilePath -> [Char] -> b
+parseLinePragma cont y fname s0 =
+		cont y' 1 fname' True (drop 1 (dropWhile (/= '\n') s0))
+
+  where  s1            = dropWhite s0
+         (lineStr, s2) = span isDigit s1
+         y'            = case reads lineStr of
+	                   ((y',_):_) -> y'
+			   _          -> y
+         s3            = dropWhite s2
+	 fnameStr      = takeWhile (\c -> c /= '"') (tail s3)
+         fname'        | null s3 || head s3 /= '"' = fname
+                       -- try and get more sharing of file name strings
+                       | fnameStr == fname         = fname
+                       | otherwise                 = fnameStr
+         dropWhite = dropWhile (\c -> c == ' ' || c == '\t')
+
+nestedComment :: (Int -> Int -> Bool -> [Char] -> b)
+	      -> Int -> Int -> Bool -> [Char] -> b
 nestedComment cont y x bol s0 =
    case s0 of
       '-':'}':s -> cont y (x+2) bol s
@@ -628,9 +659,9 @@ nestedComment cont y x bol s0 =
       _:s       -> nestedComment cont y (x+1) bol s
       []        -> error "Internal error: nestedComment"
 
-nestedDocComment :: Num a => ([Char] -> b)
-		 -> (b -> [Char] -> c -> a -> Int -> d)
-                 -> [Char] -> c -> a -> Int -> d
+nestedDocComment :: ([Char] -> b)
+		 -> (b -> [Char] -> c -> Int -> Int -> d)
+                 -> [Char] -> c -> Int -> Int -> d
 nestedDocComment f0 cont0 s0 loc y0 x0 = go f0 cont0 "" y0 x0 s0
  where
   go f cont acc y1 x1 s1 = 

@@ -334,7 +334,7 @@ parse_file file = do
     (openFile file ReadMode)
     (\h -> hClose h)
     (\h -> do stuff <- hGetContents h 
-	      case parse stuff (SrcLoc 1 1) 1 0 [] of
+	      case parse stuff (SrcLoc 1 1 file) 1 0 file [] of
 	        Ok _ e -> return e
 	        Failed err -> die (file ++ ':':err ++ "\n")
     )
@@ -425,7 +425,8 @@ mkInterfacePhase1
    -> ErrMsgM Interface			-- the "interface" of the module
 
 mkInterfacePhase1 flags verbose mod_map filename package
-	(HsModule mdl exps imps decls maybe_opts maybe_info maybe_doc) = do  
+	(HsModule (SrcLoc _ _ orig_filename) mdl exps imps decls
+                  maybe_opts maybe_info maybe_doc) = do
 
   let
       no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
@@ -466,7 +467,7 @@ mkInterfacePhase1 flags verbose mod_map filename package
 	| no_implicit_prelude || any is_prel_import imps = imps
 	| otherwise = HsImportDecl loc prelude_mod False Nothing Nothing : imps
 	where 
-		loc = SrcLoc 0 0
+		loc = SrcLoc 0 0 ""
 	 	is_prel_import (HsImportDecl _ mdl0 _ _ _ ) = mdl0 == prelude_mod
   -- in
 
@@ -542,6 +543,7 @@ mkInterfacePhase1 flags verbose mod_map filename package
 
   return (Interface { 
 		   iface_filename     = filename,
+                   iface_orig_filename= orig_filename,
 		   iface_module	      = mdl,
 		   iface_package      = package,
 		   iface_env          = name_env,
@@ -1182,12 +1184,12 @@ sortModules mdls = mapM for_each_scc sccs
 
 	edges :: [((HsModule,FilePath), Module, [Module])]
 	edges = [ ((hsmod,file), mdl, get_imps impdecls)
-		| (hsmod@(HsModule mdl _ impdecls _ _ _ _), file) <- mdls
+		| (hsmod@(HsModule _ mdl _ impdecls _ _ _ _), file) <- mdls
 		]
 
         get_imps impdecls  = [ imp | HsImportDecl _ imp _ _ _ <- impdecls  ]
 
-	get_mods hsmodules = [ mdl | HsModule mdl _ _ _ _ _ _ <- hsmodules ]
+	get_mods hsmodules = [ mdl | HsModule _ mdl _ _ _ _ _ _ <- hsmodules ]
 
 	for_each_scc (AcyclicSCC hsmodule) = return hsmodule
 	for_each_scc (CyclicSCC  hsmodules) = 
@@ -1351,6 +1353,7 @@ to_interface1 (mdl,descriptionOpt,package, hide, env, _, sub) =
    Interface { 
       iface_module	 = mdl,
       iface_filename     = "",
+      iface_orig_filename= "",
       iface_package      = package,
       iface_env          = Map.fromList env,
       iface_sub          = Map.fromList sub,
@@ -1369,6 +1372,7 @@ to_interface2 (mdl,descriptionOpt,package, hide, env, sub) =
    Interface { 
       iface_module	 = mdl,
       iface_filename     = "",
+      iface_orig_filename= "",
       iface_package      = package,
       iface_env          = 
 	Map.fromList [(n,Qual mdl n) | (n,mdl) <- env],
@@ -1388,6 +1392,7 @@ nullVersion_to_interface (mdl, package, hide, env, reexported, sub) =
    Interface { 
       iface_module	 = mdl,
       iface_filename     = "",
+      iface_orig_filename= "",
       iface_package      = package,
       iface_env          = Map.fromList env,
       iface_sub          = Map.fromList sub,

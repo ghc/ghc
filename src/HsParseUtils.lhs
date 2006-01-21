@@ -43,8 +43,8 @@ import Ratio
 
 \begin{code}
 parseError :: String -> P a
-parseError s = \r (SrcLoc y x) -> 
-    failP (show y ++ ":" ++ show x ++ ": " ++ s) r (SrcLoc y x)
+parseError s = \r (SrcLoc y x f) -> 
+    failP (show f ++ ": " ++ show y ++ ":" ++ show x ++ ": " ++ s) r (SrcLoc y x f)
 
 splitTyConApp :: HsType -> P (HsName,[HsType])
 splitTyConApp t0 = split t0 []

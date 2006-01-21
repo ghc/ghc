@@ -41,7 +41,7 @@ module HsSyn (
 
 import Char (isSpace)
 
-data SrcLoc = SrcLoc Int Int -- (Line, Indentation)
+data SrcLoc = SrcLoc !Int !Int FilePath -- (Line, Indentation, FileName)
   deriving (Eq,Ord,Show)
 
 newtype Module = Module String
@@ -80,7 +80,7 @@ instance Show HsIdentifier where
    showsPrec _ (HsSymbol s) = showString s
    showsPrec _ (HsSpecial s) = showString s
 
-data HsModule = HsModule Module (Maybe [HsExportSpec])
+data HsModule = HsModule SrcLoc Module (Maybe [HsExportSpec])
                         [HsImportDecl] [HsDecl] 
 			(Maybe String)		-- the doc options
 			ModuleInfo      	-- the info (portability etc.)

@@ -149,12 +149,12 @@ Reserved Ids
 Module Header
 
 > module :: { HsModule }
-> 	: optdoc 'module' modid maybeexports 'where' body
+> 	: optdoc 'module' srcloc modid maybeexports 'where' body
 >	    { case $1 of { (opts,info,doc) ->
->	      HsModule $3 $4 (reverse (fst $6)) (snd $6)
+>	      HsModule $3 $4 $5 (reverse (fst $7)) (snd $7)
 >		opts info doc } }
->	| body
->	    { HsModule main_mod Nothing (reverse (fst $1)) (snd $1)
+>	| body srcloc
+>	    { HsModule $2 main_mod Nothing (reverse (fst $1)) (snd $1)
 >		Nothing emptyModuleInfo Nothing }
 
 > optdoc :: { (Maybe String,ModuleInfo,Maybe Doc) }
@@ -951,7 +951,7 @@ Layout
 >	: vccurly		{ () } -- context popped in lexer.
 >	| error			{% popContext }
 
-> layout_on  :: { () }	:	{% getSrcLoc `thenP` \(SrcLoc r c) ->
+> layout_on  :: { () }	:	{% getSrcLoc `thenP` \(SrcLoc r c f) ->
 >				   pushContext (Layout c) }
 
 -----------------------------------------------------------------------------
