@@ -1,5 +1,0 @@
-:unset +s
-:unset +t
-:set -package lang -fglasgow-exts
-:l Parser
-parser (lexer "a>b")

@@ -1,8 +1,0 @@
-Compiling Parser           ( Parser.hs, interpreted )
-state: 0,	token: 1,	action: shift, enter state 2
-state: 2,	token: 2,	action: reduce (rule 1), goto state 3
-state: 3,	token: 2,	action: shift, enter state 4
-state: 4,	token: 1,	action: shift, enter state 2
-state: 2,	token: 4,	action: reduce (rule 1), goto state 7
-state: 7,	token: 4,	action: reduce (rule 2), goto state 3
-state: 3,	token: 4,	action: accept.
