@@ -359,7 +359,7 @@ endif # $(LIBRARY) /= ""
 ifneq "$(PACKAGE)" ""
 ifneq "$(NO_HADDOCK_DOCS)" "YES"
 
-HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
+HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS)))) $(EXTRA_HADDOCK_SRCS)
 
 HTML_DIR = ../html/$(PACKAGE)
 HTML_DOC = $(HTML_DIR)/haddock.css $(HTML_DIR)/haddock.js

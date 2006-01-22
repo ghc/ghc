@@ -82,6 +82,9 @@ main = getArgs >>= \args ->
                       "--make-haskell-wrappers" 
                          -> putStr (gen_wrappers p_o_specs)
 			
+                      "--make-haskell-source" 
+                         -> putStr (gen_hs_source p_o_specs)
+
 		      "--make-latex-doc"
 			 -> putStr (gen_latex_doc p_o_specs)
                    )
@@ -100,12 +103,63 @@ known_args
        "--primop-tag",
        "--primop-list",
        "--make-haskell-wrappers",
+       "--make-haskell-source",
        "--make-latex-doc"
      ]
 
 ------------------------------------------------------------------
 -- Code generators -----------------------------------------------
 ------------------------------------------------------------------
+
+gen_hs_source (Info defaults entries)
+   = "module GHC.Prim (\n"
+	    ++ unlines (map (("\t" ++) . hdr) entries)
+            ++ ") where\n\n{-\n"
+	    ++ unlines (map opt defaults) ++ "-}\n"
+            ++ unlines (map ent entries) ++ "\n\n\n"
+     where opt (OptionFalse n) = n ++ " = False"
+           opt (OptionTrue n) = n ++ " = True"
+	   opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
+
+	   hdr s@(Section {}) = sec s
+	   hdr o@(PrimOpSpec {}) = wrap (name o) ++ ","
+
+	   ent s@(Section {}) = ""
+	   ent o@(PrimOpSpec {}) = spec o
+
+	   sec s = "\n-- * " ++ escape (title s) ++ "\n"
+			++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
+
+	   spec o = comm ++ decl
+	     where decl = wrap (name o) ++ " :: " ++ pty (ty o)
+		   comm = case (desc o) of
+		   	[] -> ""
+			d -> "\n" ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ d)
+
+		   pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+		   pty t = pbty t
+
+		   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
+		   pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
+		   pbty t = paty t
+
+		   paty (TyVar tv) = tv
+		   paty t = "(" ++ pty t ++ ")"
+
+	   wrap nm | isLower (head nm) = nm
+		   | otherwise = "(" ++ nm ++ ")"
+	   unlatex s = case s of
+	   	'\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
+		'{':'\\':'t':'t':cs -> markup "@" "@" cs
+		c : cs -> c : unlatex cs
+		[] -> []
+	   markup s t cs = s ++ mk (dropWhile isSpace cs)
+	   	where mk "" = t
+	              mk ('\n':cs) = ' ' : mk cs
+	              mk ('}':cs) = t ++ unlatex cs
+	              mk (c:cs) = c : mk cs
+	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
+	   	where special = "/'`\"@<"
 
 gen_latex_doc (Info defaults entries)
    = "\\primopdefaults{" 
