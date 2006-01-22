@@ -30,7 +30,7 @@ import Control.Exception ( bracket )
 import Control.Monad ( when, unless )
 import Data.Char ( isUpper, toUpper )
 import Data.List ( sortBy )
-import Data.Maybe ( fromJust, isJust, mapMaybe, maybeToList )
+import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 
@@ -58,14 +58,14 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
 
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
-        maybe_html_help_format maybe_index_url maybe_wiki_url
+        maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
 	[ iface{iface_package=Nothing} | iface <- visible_ifaces ]
 	-- we don't want to display the packages in a single-package contents
 	prologue
 
   when (not (isJust maybe_index_url)) $ 
-    ppHtmlIndex odir doctitle maybe_package
-        maybe_html_help_format maybe_contents_url maybe_wiki_url visible_ifaces
+    ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
+      maybe_contents_url maybe_source_url maybe_wiki_url visible_ifaces
     
   when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
 	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
@@ -135,31 +135,67 @@ footer =
 	)
    
 
-srcButton :: Maybe String -> Interface -> HtmlTable
+srcButton :: Maybe String -> Maybe Interface -> HtmlTable
 srcButton maybe_source_url iface
   | Just u <- maybe_source_url =
-	let src_url = spliceSrcURL iface u
+	let src_url = spliceURL (fmap iface_orig_filename iface)
+                                (fmap iface_module iface) Nothing u
 	in
 	topButBox (anchor ! [href src_url] << toHtml "Source code")
   | otherwise =
 	Html.emptyTable
   
-spliceSrcURL :: Interface -> String -> String
-spliceSrcURL iface url = run url
-  where run "" = ""
-        run ('%':'M':rest) = modl_str ++ run rest
-        run ('%':'N':rest) = run rest
-        run ('%':'F':rest) = iface_orig_filename iface ++ run rest
-	run (c:rest) = c : run rest
-	
-	modl_str = case iface_module iface of { Module m -> 
-		   map (\x -> if x == '.' then '/' else x) m }
+spliceURL :: Maybe FilePath -> Maybe Module -> Maybe HsName -> String -> String
+spliceURL maybe_file maybe_mod maybe_name url = run url
+ where
+  file = fromMaybe "" maybe_file
+  mod = case maybe_mod of
+          Nothing           -> ""
+          Just (Module mod) -> mod  
+  
+  (name, kind) =
+    case maybe_name of
+      Nothing                  -> ("","")
+      Just (n@(HsTyClsName _)) -> (escapeStr (hsNameStr n), "t")
+      Just (n@(HsVarName _))   -> (escapeStr (hsNameStr n), "v")
 
-wikiButton :: Maybe String -> Maybe String -> HtmlTable
+  run "" = ""
+  run ('%':'M':rest) = mod ++ run rest
+  run ('%':'F':rest) = file ++ run rest
+  run ('%':'N':rest) = name ++ run rest
+  run ('%':'K':rest) = kind ++ run rest
+
+  run ('%':'{':'M':'O':'D':'U':'L':'E':'}':rest) = mod ++ run rest
+  run ('%':'{':'F':'I':'L':'E':'}':rest)         = file ++ run rest
+  run ('%':'{':'N':'A':'M':'E':'}':rest)         = name ++ run rest
+  run ('%':'{':'K':'I':'N':'D':'}':rest)         = kind ++ run rest
+
+  run ('%':'{':'M':'O':'D':'U':'L':'E':'|':rest) = subst mod rest
+  run ('%':'{':'F':'I':'L':'E':'|':rest)         = subst file rest
+  run ('%':'{':'N':'A':'M':'E':'|':rest)         = subst name rest
+  run ('%':'{':'K':'I':'N':'D':'|':rest)         = subst kind rest
+
+  run ('%':'{':'M':'O':'D':'U':'L':'E':'/':'.':'/':c:'}':rest) =
+    map (\x -> if x == '.' then c else x) mod ++ run rest
+  run ('%':'{':'M':'O':'D':'U':'L':'E':'/':'.':'/':c:'|':rest) =
+    subst (map (\x -> if x == '.' then c else x) mod) rest
+
+  run (c:rest) = c : run rest
+  
+  subst ""     rest  = skip rest
+  subst s ('%':rest) = s ++ subst s rest
+  subst s ('}':rest) = run rest
+  subst s ( c :rest) = c : subst s rest
+  subst s         [] = error "malformed URL substitution"
+
+  skip ('}':rest) = run rest
+  skip ( _ :rest) = skip rest
+
+wikiButton :: Maybe String -> Maybe Module -> HtmlTable
 wikiButton Nothing _ = Html.emptyTable
-wikiButton (Just wiki_base_url) maybe_mod
-  = topButBox (anchor ! [href url] << toHtml "User Comments")
-  where url = pathJoin (wiki_base_url : maybeToList maybe_mod)
+wikiButton (Just url) maybe_mod
+  = topButBox (anchor ! [href url'] << toHtml "User Comments")
+  where url' = spliceURL Nothing maybe_mod Nothing url
 
 contentsButton :: Maybe String -> HtmlTable
 contentsButton maybe_contents_url 
@@ -176,15 +212,17 @@ indexButton maybe_index_url
 			Just url -> url
 
 simpleHeader :: String -> Maybe String -> Maybe String
-             -> Maybe String -> HtmlTable
-simpleHeader doctitle maybe_contents_url maybe_index_url maybe_wiki_url = 
+             -> Maybe String -> Maybe String -> HtmlTable
+simpleHeader doctitle maybe_contents_url maybe_index_url
+  maybe_source_url maybe_wiki_url = 
   (tda [theclass "topbar"] << 
      vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " " ]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	wikiButton maybe_wiki_url Nothing <->
+	srcButton maybe_source_url Nothing <->
+        wikiButton maybe_wiki_url Nothing <->
 	contentsButton maybe_contents_url <-> indexButton maybe_index_url
    ))
 
@@ -200,8 +238,8 @@ pageHeader mdl iface doctitle
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	srcButton maybe_source_url iface <->
-	wikiButton maybe_wiki_url (Just mdl) <->
+	srcButton maybe_source_url (Just iface) <->
+	wikiButton maybe_wiki_url (Just $ iface_module iface) <->
 	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
@@ -246,11 +284,12 @@ ppHtmlContents
    -> Maybe String
    -> Maybe String
    -> Maybe String
+   -> Maybe String
    -> [Interface] -> Maybe Doc
    -> IO ()
 ppHtmlContents odir doctitle
-  maybe_package maybe_html_help_format maybe_index_url maybe_wiki_url
-  mdls prologue = do
+  maybe_package maybe_html_help_format maybe_index_url
+  maybe_source_url maybe_wiki_url mdls prologue = do
   let tree = mkModuleTree 
          [(iface_module iface,
 	   iface_package iface,
@@ -262,7 +301,8 @@ ppHtmlContents odir doctitle
 		 styleSheet +++
 		 (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
-   	    simpleHeader doctitle Nothing maybe_index_url maybe_wiki_url </>
+   	    simpleHeader doctitle Nothing maybe_index_url
+                         maybe_source_url maybe_wiki_url </>
 	    ppPrologue doctitle prologue </>
 	    ppModuleTree doctitle tree </>
 	    s15 </>
@@ -354,16 +394,18 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> Maybe String
             -> Maybe String
+            -> Maybe String
             -> [Interface] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
-  maybe_contents_url maybe_wiki_url ifaces = do
+  maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
   let html = 
 	header (documentCharacterEncoding +++
 		thetitle (toHtml (doctitle ++ " (Index)")) +++
 		styleSheet) +++
         body << vanillaTable << (
-	    simpleHeader doctitle maybe_contents_url Nothing maybe_wiki_url </>
+	    simpleHeader doctitle maybe_contents_url Nothing
+                         maybe_source_url maybe_wiki_url </>
 	    index_html
 	   )
 
@@ -406,7 +448,8 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 		thetitle (toHtml (doctitle ++ " (Index)")) +++
 		styleSheet) +++
              body << vanillaTable << (
-	        simpleHeader doctitle maybe_contents_url Nothing maybe_wiki_url </>
+	        simpleHeader doctitle maybe_contents_url Nothing
+                             maybe_source_url maybe_wiki_url </>
 		indexInitialLetterLinks </>
 	        tda [theclass "section1"] << 
 	      	toHtml ("Index (" ++ c:")") </>
@@ -1159,7 +1202,7 @@ declBox html = tda [theclass "decl"] << html
 -- it adds a source and wiki link at the right hand side of the box
 topDeclBox :: LinksInfo -> SrcLoc -> HsName -> Html -> HtmlTable
 topDeclBox (Nothing, Nothing, _) srcloc name html = declBox html
-topDeclBox (maybe_src_url, maybe_wiki_url, iface) (SrcLoc _ _ fname) name html =
+topDeclBox (maybe_source_url, maybe_wiki_url, iface) (SrcLoc _ _ fname) name html =
   tda [theclass "topdecl"] <<
   (        table ! [theclass "declbar"] <<
 	    ((tda [theclass "declname"] << html)
@@ -1167,27 +1210,21 @@ topDeclBox (maybe_src_url, maybe_wiki_url, iface) (SrcLoc _ _ fname) name html =
              <-> wikiLink)
   )
   where srcLink =
-          case maybe_src_url of
+          case maybe_source_url of
             Nothing  -> Html.emptyTable
             Just url -> tda [theclass "declbut"] <<
-                          (anchor ! [href (spliceURL url)]
-                            << toHtml "Source")
+                          let url' = spliceURL (Just fname) (Just mod)
+                                               (Just name) url
+                           in anchor ! [href url'] << toHtml "Source"
         wikiLink =
           case maybe_wiki_url of
             Nothing  -> Html.emptyTable
             Just url -> tda [theclass "declbut"] <<
-                          (anchor ! [href (spliceURL url)]
-                            << toHtml "Comments")
+                          let url' = spliceURL (Just fname) (Just mod)
+                                               (Just name) url
+                           in anchor ! [href url'] << toHtml "Comments"
   
-        spliceURL url = run url
-          where run "" = ""
-                run ('%':'M':rest) = mod ++ run rest
-                run ('%':'N':rest) = escapeStr (hsNameStr name) ++ run rest
-                run ('%':'F':rest) = fname ++ run rest
-	        run (c:rest) = c : run rest
-
-        Module mod = iface_module iface
-        mod' = map (\x -> if x == '.' then '/' else x) mod
+        mod = iface_module iface
 
 -- a box for displaying an 'argument' (some code which has text to the
 -- right of it).  Wrapping is not allowed in these boxes, whereas it is

@@ -641,7 +641,7 @@ parseLinePragma cont y fname s0 =
 	                   ((y',_):_) -> y'
 			   _          -> y
          s3            = dropWhite s2
-	 fnameStr      = takeWhile (\c -> c /= '"') (tail s3)
+	 fnameStr      = takeWhile (\c -> c /= '"' && c/='\n') (tail s3)
          fname'        | null s3 || head s3 /= '"' = fname
                        -- try and get more sharing of file name strings
                        | fnameStr == fname         = fname
