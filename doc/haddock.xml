@@ -16,7 +16,7 @@
       <holder>Simon Marlow</holder>
     </copyright>
     <abstract>
-      <para>This document describes Haddock version 0.6, a Haskell
+      <para>This document describes Haddock version 0.8, a Haskell
       documentation tool.</para>
     </abstract>
   </bookinfo>
@@ -467,6 +467,80 @@
 
       <varlistentry>
 	<term>
+	  <indexterm><primary><option>--source-base</option></primary></indexterm>
+          <option>--source-base</option>=<replaceable>URL</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--source-module</option></primary></indexterm>
+          <option>--source-module</option>=<replaceable>URL</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--source-entity</option></primary></indexterm>
+          <option>--source-entity</option>=<replaceable>URL</replaceable>
+        </term>
+	<listitem>
+	  <para>Include links to the source files in the generated
+	  documentation. Use the <option>--source-base</option> option to add a
+	  source code link in the header bar of the contents and index pages.
+	  Use the <option>--source-module</option> to add a source code link in
+	  the header bar of each module page. Use the
+	  <option>--source-entity</option> option to add a source code link
+	  next to the documentation for every value and type in each module.
+	  </para>
+	  
+	  <para>In each case <replaceable>URL</replaceable> is the base URL
+	  where the source files can be found.  For the per-module and
+	  per-entity URLs, the following substitutions are made within the
+	  string <replaceable>URL</replaceable>:</para>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para>The string <literal>%M</literal> or <literal>%{MODULE}</literal>
+	      is replaced by the module name. Note that for the per-entity URLs
+	      this is the name of the <emphasis>exporting</emphasis> module.</para>
+	    </listitem>
+	    <listitem>
+	      <para>The string <literal>%F</literal> or <literal>%{FILE}</literal>
+	      is replaced by the original source file name. Note that for the
+	      per-entity URLs this is the name of the <emphasis>defining</emphasis>
+	      module.</para>
+	    </listitem>
+	    <listitem>
+	      <para>The string <literal>%N</literal> or <literal>%{NAME}</literal>
+	      is replaced by the name of the exported value or type. This is
+	      only valid for the <option>--source-entity</option> option.</para>
+	    </listitem>
+	    <listitem>
+	      <para>The string <literal>%K</literal> or <literal>%{KIND}</literal>
+	      is replaced by a flag indicating whether the exported name is a value
+	      '<literal>v</literal>' or a type '<literal>t</literal>'. This is
+	      only valid for the <option>--source-entity</option> option.</para>
+	    </listitem>
+	  </itemizedlist>
+
+	  <para>For example, if your sources are online under some directory,
+	  you would say
+	  <literal>haddock --source-base=<replaceable>url</replaceable>/
+	  --source-module=<replaceable>url</replaceable>/%F</literal></para>
+	  
+	  <para>If you have html versions of your sources online with anchors
+	  for each type and function name, you would say
+	  <literal>haddock --source-base=<replaceable>url</replaceable>/
+	  --source-module=<replaceable>url</replaceable>/%M.html</literal>
+	  --source-entity=<replaceable>url</replaceable>/%M.html#%N</literal></para>
+
+	  <para>For the <literal>%{MODULE}</literal> substitution you may want to
+	  replace the '<literal>.</literal>' character in the module names with
+	  some other character (some web servers are known to get confused by
+	  multiple '<literal>.</literal>' characters in a file name). To
+	  replace it with a character <replaceable>c</replaceable> use
+	  <literal>%{MODULE/./<replaceable>c</replaceable>}</literal>.</para>
+
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
 	  <indexterm><primary><option>-s</option></primary></indexterm>
           <option>-s</option> <replaceable>URL</replaceable>
         </term>
@@ -475,26 +549,54 @@
           <option>--source</option>=<replaceable>URL</replaceable>
         </term>
 	<listitem>
-	  <para>Include links to the source files in the generated
-	  documentation, where <replaceable>URL</replaceable> is the
-	  base URL where the source files can be found.  The following
-	    substitutions are made within the string
-	    <replaceable>URL</replaceable>:</para>
+	  <para>Deprecated aliases for <option>--source-module</option></para>
+	</listitem>
+      </varlistentry>
 
-	  <itemizedlist>
-	    <listitem>
-	      <para>The string <literal>%M</literal> is replaced by the module name
-		(with &lsquo;.&rsquo; replaced by &lsquo;/&rsquo;).</para>
-	    </listitem>
-	    <listitem>
-	      <para>The string <literal>%F</literal> is replaced by the
-	      source file name.</para>
-	    </listitem>
-	  </itemizedlist>
+      <varlistentry>
+	<term>
+	  <indexterm><primary><option>--comments-base</option></primary></indexterm>
+          <option>--comments-base</option>=<replaceable>URL</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--comments-module</option></primary></indexterm>
+          <option>--comments-module</option>=<replaceable>URL</replaceable>
+        </term>
+	<term>
+	  <indexterm><primary><option>--comments-entity</option></primary></indexterm>
+          <option>--comments-entity</option>=<replaceable>URL</replaceable>
+        </term>
+	<listitem>
+	  <para>Include links to pages where readers may comment on the
+	  documentation. This feature would typically be used in conjunction
+	  with a Wiki system.</para>
+	  
+	  <para>Use the <option>--comments-base</option> option to add a
+	  user comments link in the header bar of the contents and index pages.
+	  Use the <option>--comments-module</option> to add a user comments
+	  link in the header bar of each module page. Use the
+	  <option>--comments-entity</option> option to add a comments link
+	  next to the documentation for every value and type in each module.
+	  </para>
+	  
+	  <para>In each case <replaceable>URL</replaceable> is the base URL
+	  where the corresponding comments page can be found.  For the
+	  per-module and per-entity URLs the same substitutions are made as
+	  with the <option>--source-module</option> and
+	  <option>--source-entity</option> options above.
 
-	  <para>For example, if your sources are online in a single directory,
-	    you would say <literal>haddock -s
-	      <replaceable>url</replaceable>/%F</literal>.</para>
+	  <para>For example, if you want to link the contents page to a wiki
+	  page, and every module to subpages, you would say
+	  <literal>haddock --comments-base=<replaceable>url</replaceable>
+	  --comments-module=<replaceable>url</replaceable>/%M</literal></para>
+	  
+	  <para>If your Wiki system doesn't like the '<literal>.</literal>'
+	  character in Haskell module names, you can replace it with a
+	  different character. For example to replace the
+	  '<literal>.</literal>' characters with '<literal>_</literal>' use
+	  <literal>haddock --comments-base=<replaceable>url</replaceable>
+	  --comments-module=<replaceable>url</replaceable>/%{MODULE/./_}</literal>
+	  </para>
 
 	</listitem>
       </varlistentry>
