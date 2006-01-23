@@ -526,7 +526,7 @@
 	  <para>If you have html versions of your sources online with anchors
 	  for each type and function name, you would say
 	  <literal>haddock --source-base=<replaceable>url</replaceable>/
-	  --source-module=<replaceable>url</replaceable>/%M.html</literal>
+	  --source-module=<replaceable>url</replaceable>/%M.html
 	  --source-entity=<replaceable>url</replaceable>/%M.html#%N</literal></para>
 
 	  <para>For the <literal>%{MODULE}</literal> substitution you may want to
@@ -583,7 +583,7 @@
 	  where the corresponding comments page can be found.  For the
 	  per-module and per-entity URLs the same substitutions are made as
 	  with the <option>--source-module</option> and
-	  <option>--source-entity</option> options above.
+	  <option>--source-entity</option> options above.</para>
 
 	  <para>For example, if you want to link the contents page to a wiki
 	  page, and every module to subpages, you would say
