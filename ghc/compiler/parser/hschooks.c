@@ -39,25 +39,6 @@ defaultsHook (void)
 }
 
 void
-enableTimingStats( void )	/* called from the driver */
-{
-#if __GLASGOW_HASKELL__ >= 411
-    RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
-#endif
-    /* ignored when bootstrapping with an older GHC */
-}
-
-void
-setHeapSize( HsInt size )
-{
-    RtsFlags.GcFlags.heapSizeSuggestion = size / BLOCK_SIZE;
-    if (RtsFlags.GcFlags.maxHeapSize != 0 &&
-	RtsFlags.GcFlags.heapSizeSuggestion > RtsFlags.GcFlags.maxHeapSize) {
-	RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
-    }
-}
-
-void
 OutOfHeapHook (unsigned long request_size/* always zero these days */,
 	       unsigned long heap_size)
     /* both in bytes */
@@ -72,20 +53,3 @@ StackOverflowHook (unsigned long stack_size)    /* in bytes */
     fprintf(stderr, "GHC stack-space overflow: current limit is %ld bytes.\nUse the `-K<size>' option to increase it.\n", stack_size);
 }
 
-HsInt
-ghc_strlen( HsAddr a )
-{
-    return (strlen((char *)a));
-}
-
-HsInt
-ghc_memcmp( HsAddr a1, HsAddr a2, HsInt len )
-{
-    return (memcmp((char *)a1, a2, len));
-}
-
-HsInt
-ghc_memcmp_off( HsAddr a1, HsInt i, HsAddr a2, HsInt len )
-{
-    return (memcmp((char *)a1 + i, a2, len));
-}

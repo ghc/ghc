@@ -656,6 +656,19 @@ typedef struct _RtsSymbolVal {
       SymX(writeTVarzh_fast)			\
       SymX(xorIntegerzh_fast)			\
       SymX(yieldzh_fast)                        \
+      SymX(stg_interp_constr_entry)             \
+      SymX(stg_interp_constr1_entry)            \
+      SymX(stg_interp_constr2_entry)            \
+      SymX(stg_interp_constr3_entry)            \
+      SymX(stg_interp_constr4_entry)            \
+      SymX(stg_interp_constr5_entry)            \
+      SymX(stg_interp_constr6_entry)            \
+      SymX(stg_interp_constr7_entry)            \
+      SymX(stg_interp_constr8_entry)            \
+      SymX(stgMallocBytesRWX)                   \
+      SymX(getAllocations)                      \
+      SymX(revertCAFs)                          \
+      SymX(RtsFlags)                            \
       RTS_USER_SIGNALS_SYMBOLS
 
 #ifdef SUPPORT_LONG_LONGS

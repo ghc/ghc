@@ -756,7 +756,7 @@ PKG_DEPENDS += base haskell98
 PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
 
 # Omit Main from the library, the client will want to plug their own Main in
-LIBOBJS = $(filter-out $(odir)/main/Main.o, $(OBJS))
+LIBOBJS = $(filter-out $(odir)/main/Main.o $(odir)/parser/hschooks.o, $(OBJS))
 
 # disable splitting: it won't really help with GHC, and the specialised
 # build system for ghc/compiler isn't set up to handle it.
