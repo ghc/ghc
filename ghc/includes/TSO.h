@@ -117,10 +117,6 @@ typedef union {
  * field.
  */
 
-/* 
- * ToDo: make this structure sensible on a non-32-bit arch.
- */
-
 typedef struct StgTSO_ {
   StgHeader          header;
 
