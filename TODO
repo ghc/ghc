@@ -1,8 +1,6 @@
 -- ---------------------------------------------------------------------------
 -- Before next release
 
-* Document --wiki
-
 -----------------------------------------------------------------------------
 -- bugs
 
@@ -80,9 +78,6 @@
 * Comments on components of a tuple, for argument or return types.
 
 * Add a search feature which just invokes Google?
-
-* Do the unlitting/CPPing from Haddock itself so we get the source file
-  links right.
 
 * attributes for individual declarations, eg.
     -- #abstract
