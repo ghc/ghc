@@ -5,6 +5,10 @@ include $(TOP)/mk/boilerplate.mk
 
 # -----------------------------------------------------------------------------
 
+# The Cabal package has a GNUmakefile for standalone building, but we
+# want the Makefile.
+MFLAGS += -f Makefile
+
 SUBDIRS = base haskell98 template-haskell
 
 ifeq "$(GhcLibsWithUnix)" "YES"
