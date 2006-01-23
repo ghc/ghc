@@ -55,11 +55,11 @@ import Control.Concurrent
 main :: IO ()
 main = do
   cmdline <- getArgs
-  case getOpt Permute options cmdline of
+  case getOpt Permute (options True) cmdline of
     (flags, args, []    ) -> run flags args
     (_,     _,    errors) -> do prog <- getProgramName
                                 die (concat errors ++
-                                     usageInfo (usageHeader prog) options)
+                                     usageInfo (usageHeader prog) (options False))
 
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
@@ -96,8 +96,8 @@ data Flag
   | Flag_UsePackage String
   deriving (Eq)
 
-options :: [OptDescr Flag]
-options =
+options :: Bool -> [OptDescr Flag]
+options backwardsCompat =
   [ 
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
@@ -112,10 +112,11 @@ options =
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
     Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
-	"produce index and table of contents in mshelp, mshelp2 or devhelp format (with -h)",
+	"produce index and table of contents in\nmshelp, mshelp2 or devhelp format (with -h)",
     Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL") 
 	"URL for a source code link on the contents\nand index pages",
-    Option ['s'] ["source", "source-module"] (ReqArg Flag_SourceModuleURL "URL")
+    Option ['s'] (if backwardsCompat then ["source", "source-module"] else ["source-module"])
+        (ReqArg Flag_SourceModuleURL "URL")
 	"URL for a source code link for each module\n(using the %{FILE} or %{MODULE} vars)",
     Option []  ["source-entity"]  (ReqArg Flag_SourceEntityURL "URL") 
 	"URL for a source code link for each entity\n(using the %{FILE}, %{MODULE} or %{NAME} vars)",
@@ -131,7 +132,7 @@ options =
 	"file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
 	"page heading",
-    Option ['k']  ["package"]  (ReqArg Flag_Package "PACKAGE")
+    Option ['k']  ["package"]  (ReqArg Flag_Package "NAME")
 	"package name (optional)",
     Option ['n']  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
  	"do not assume Prelude is imported",
@@ -146,24 +147,24 @@ options =
     Option [] ["use-contents"] (ReqArg Flag_UseContents "URL")
 	"use a separately-generated HTML contents page",
     Option [] ["gen-contents"] (NoArg Flag_GenContents)
-	"generate an HTML contents from specified interfaces",
+	"generate an HTML contents from specified\ninterfaces",
     Option [] ["use-index"] (ReqArg Flag_UseIndex "URL")
 	"use a separately-generated HTML index",
     Option [] ["gen-index"] (NoArg Flag_GenIndex)
-	"generate an HTML index from specified interfaces",
+	"generate an HTML index from specified\ninterfaces",
     Option [] ["ignore-all-exports"] (NoArg Flag_IgnoreAllExports)
-	"behave as if all modules have the ignore-exports atribute",
-    Option [] ["hide"] (ReqArg Flag_HideModule "M")
-	"behave as if module M has the hide attribute",
-    Option [] ["use-package"] (ReqArg Flag_UsePackage "P")
-	"the modules being processed depend on package P"
+	"behave as if all modules have the\nignore-exports atribute",
+    Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
+	"behave as if MODULE has the hide attribute",
+    Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
+	"the modules being processed depend on PACKAGE"
   ]
 
 run :: [Flag] -> [FilePath] -> IO ()
 run flags files = do
   when (Flag_Help `elem` flags) $ do
      prog <- getProgramName
-     bye (usageInfo (usageHeader prog) options)
+     bye (usageInfo (usageHeader prog) (options False))
 
   when (Flag_Version `elem` flags) $
      bye ("Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2003\n")
