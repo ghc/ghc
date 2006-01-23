@@ -3004,10 +3004,19 @@ scavenge(step *stp)
     case TSO:
     { 
 	StgTSO *tso = (StgTSO *)p;
-	evac_gen = 0;
+	rtsBool saved_eager = eager_promotion;
+
+	eager_promotion = rtsFalse;
 	scavengeTSO(tso);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable anyhow.
+	eager_promotion = saved_eager;
+
+	if (failed_to_evac) {
+	    tso->flags |= TSO_DIRTY;
+	} else {
+	    tso->flags &= ~TSO_DIRTY;
+	}
+
+	failed_to_evac = rtsTrue; // always on the mutable list
 	p += tso_sizeW(tso);
 	break;
     }
@@ -3388,10 +3397,19 @@ linear_scan:
 	case TSO:
 	{ 
 	    StgTSO *tso = (StgTSO *)p;
-	    evac_gen = 0;
+	    rtsBool saved_eager = eager_promotion;
+
+	    eager_promotion = rtsFalse;
 	    scavengeTSO(tso);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue;
+	    eager_promotion = saved_eager;
+	    
+	    if (failed_to_evac) {
+		tso->flags |= TSO_DIRTY;
+	    } else {
+		tso->flags &= ~TSO_DIRTY;
+	    }
+	    
+	    failed_to_evac = rtsTrue; // always on the mutable list
 	    break;
 	}
 
@@ -3731,11 +3749,19 @@ scavenge_one(StgPtr p)
     case TSO:
     {
 	StgTSO *tso = (StgTSO *)p;
-      
-	evac_gen = 0;		// repeatedly mutable 
+	rtsBool saved_eager = eager_promotion;
+
+	eager_promotion = rtsFalse;
 	scavengeTSO(tso);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue;
+	eager_promotion = saved_eager;
+
+	if (failed_to_evac) {
+	    tso->flags |= TSO_DIRTY;
+	} else {
+	    tso->flags &= ~TSO_DIRTY;
+	}
+
+	failed_to_evac = rtsTrue; // always on the mutable list
 	break;
     }
   
@@ -3935,17 +3961,38 @@ scavenge_mutable_list(generation *gen)
 	    }
 #endif
 
-	    // We don't need to scavenge clean arrays.  This is the
-	    // Whole Point of MUT_ARR_PTRS_CLEAN.
-	    if (get_itbl((StgClosure *)p)->type == MUT_ARR_PTRS_CLEAN) {
+	    // Check whether this object is "clean", that is it
+	    // definitely doesn't point into a young generation.
+	    // Clean objects don't need to be scavenged.  Some clean
+	    // objects (MUT_VAR_CLEAN) are not kept on the mutable
+	    // list at all; others, such as MUT_ARR_PTRS_CLEAN and
+	    // TSO, are always on the mutable list.
+	    //
+	    switch (get_itbl((StgClosure *)p)->type) {
+	    case MUT_ARR_PTRS_CLEAN:
 		recordMutableGen((StgClosure *)p,gen);
 		continue;
+	    case TSO: {
+		StgTSO *tso = (StgTSO *)p;
+		if ((tso->flags & TSO_DIRTY) == 0) {
+		    // A clean TSO: we don't have to traverse its
+		    // stack.  However, we *do* follow the link field:
+		    // we don't want to have to mark a TSO dirty just
+		    // because we put it on a different queue.
+		    if (tso->why_blocked != BlockedOnBlackHole) {
+			tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
+		    }
+		    recordMutableGen((StgClosure *)p,gen);
+		    continue;
+		}
+	    }
+	    default:
+		;
 	    }
 
 	    if (scavenge_one(p)) {
-		/* didn't manage to promote everything, so put the
-		 * object back on the list.
-		 */
+		// didn't manage to promote everything, so put the
+		// object back on the list.
 		recordMutableGen((StgClosure *)p,gen);
 	    }
 	}

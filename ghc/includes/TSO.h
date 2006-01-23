@@ -77,6 +77,22 @@ typedef StgTSOStatBuf StgTSOGranInfo;
  */
 typedef StgWord32 StgThreadID;
 
+/* 
+ * Flags for the tso->flags field.
+ *
+ * The TSO_DIRTY flag indicates that this TSO's stack should be
+ * scanned during garbage collection.  The link field of a TSO is
+ * always scanned, so we don't have to dirty a TSO just for linking
+ * it on a different list.
+ *
+ * TSO_DIRTY is set by 
+ *    - schedule(), just before running a thread,
+ *    - raiseAsync(), because it modifies a thread's stack
+ *    - resumeThread(), just before running the thread again
+ * and unset by the garbage collector (only).
+ */
+#define TSO_DIRTY   1
+
 /*
  * Type returned after running a thread.  Values of this type
  * include HeapOverflow, StackOverflow etc.  See Constants.h for the
@@ -123,8 +139,9 @@ typedef struct StgTSO_ {
   struct StgTSO_*    link;	     /* Links threads onto blocking queues */
   struct StgTSO_*    global_link;    /* Links all threads together */
   
-  StgWord16           what_next;  /* Values defined in Constants.h */
-  StgWord16           why_blocked;  /* Values defined in Constants.h */
+  StgWord16          what_next;      /* Values defined in Constants.h */
+  StgWord16          why_blocked;    /* Values defined in Constants.h */
+  StgWord32          flags;
   StgTSOBlockInfo    block_info;
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;

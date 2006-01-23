@@ -564,6 +564,8 @@ run_thread:
     errno = t->saved_errno;
     cap->in_haskell = rtsTrue;
 
+    dirtyTSO(t);
+
     recent_activity = ACTIVITY_YES;
 
     switch (prev_what_next) {
@@ -2248,6 +2250,9 @@ resumeThread (void *task_)
     cap->in_haskell = rtsTrue;
     errno = saved_errno;
 
+    /* We might have GC'd, mark the TSO dirty again */
+    dirtyTSO(tso);
+
     return &cap->r;
 }
 
@@ -2361,6 +2366,7 @@ createThread(Capability *cap, nat size)
 
     tso->why_blocked  = NotBlocked;
     tso->blocked_exceptions = NULL;
+    tso->flags = TSO_DIRTY;
     
     tso->saved_errno = 0;
     tso->bound = NULL;
@@ -3651,6 +3657,9 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
     
     // Remove it from any blocking queues
     unblockThread(cap,tso);
+
+    // mark it dirty; we're about to change its stack.
+    dirtyTSO(tso);
 
     sp = tso->sp;
     
