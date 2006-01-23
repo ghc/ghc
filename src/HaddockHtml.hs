@@ -34,6 +34,10 @@ import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 
+-- the base, module and entity URLs for the source code and wiki links.
+type SourceURLs = (Maybe String, Maybe String, Maybe String)
+type WikiURLs = (Maybe String, Maybe String, Maybe String)
+
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
 
@@ -43,8 +47,8 @@ ppHtml	:: String
 	-> FilePath			-- destination directory
 	-> Maybe Doc			-- prologue text, maybe
 	-> Maybe String		-- the Html Help format (--html-help)
-	-> Maybe String			-- the source URL (--source)
-	-> Maybe String			-- the wiki URL (--wiki)
+	-> SourceURLs			-- the source URL (--source)
+	-> WikiURLs			-- the wiki URL (--wiki)
 	-> Maybe String			-- the contents URL (--use-contents)
 	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
@@ -135,16 +139,18 @@ footer =
 	)
    
 
-srcButton :: Maybe String -> Maybe Interface -> HtmlTable
-srcButton maybe_source_url iface
-  | Just u <- maybe_source_url =
-	let src_url = spliceURL (fmap iface_orig_filename iface)
-                                (fmap iface_module iface) Nothing u
-	in
-	topButBox (anchor ! [href src_url] << toHtml "Source code")
-  | otherwise =
-	Html.emptyTable
-  
+srcButton :: SourceURLs -> Maybe Interface -> HtmlTable
+srcButton (Just src_base_url, _, _) Nothing =
+  topButBox (anchor ! [href src_base_url] << toHtml "Source code")
+
+srcButton (_, Just src_module_url, _) (Just iface) =
+  let url = spliceURL (Just $ iface_orig_filename iface)
+                      (Just $ iface_module iface) Nothing src_module_url
+   in topButBox (anchor ! [href url] << toHtml "Source code")
+
+srcButton _ _ =
+  Html.emptyTable
+ 
 spliceURL :: Maybe FilePath -> Maybe Module -> Maybe HsName -> String -> String
 spliceURL maybe_file maybe_mod maybe_name url = run url
  where
@@ -170,32 +176,22 @@ spliceURL maybe_file maybe_mod maybe_name url = run url
   run ('%':'{':'N':'A':'M':'E':'}':rest)         = name ++ run rest
   run ('%':'{':'K':'I':'N':'D':'}':rest)         = kind ++ run rest
 
-  run ('%':'{':'M':'O':'D':'U':'L':'E':'|':rest) = subst mod rest
-  run ('%':'{':'F':'I':'L':'E':'|':rest)         = subst file rest
-  run ('%':'{':'N':'A':'M':'E':'|':rest)         = subst name rest
-  run ('%':'{':'K':'I':'N':'D':'|':rest)         = subst kind rest
-
   run ('%':'{':'M':'O':'D':'U':'L':'E':'/':'.':'/':c:'}':rest) =
     map (\x -> if x == '.' then c else x) mod ++ run rest
-  run ('%':'{':'M':'O':'D':'U':'L':'E':'/':'.':'/':c:'|':rest) =
-    subst (map (\x -> if x == '.' then c else x) mod) rest
 
   run (c:rest) = c : run rest
   
-  subst ""     rest  = skip rest
-  subst s ('%':rest) = s ++ subst s rest
-  subst s ('}':rest) = run rest
-  subst s ( c :rest) = c : subst s rest
-  subst s         [] = error "malformed URL substitution"
+wikiButton :: WikiURLs -> Maybe Module -> HtmlTable
+wikiButton (Just wiki_base_url, _, _) Nothing =
+  topButBox (anchor ! [href wiki_base_url] << toHtml "User Comments")
 
-  skip ('}':rest) = run rest
-  skip ( _ :rest) = skip rest
+wikiButton (_, Just wiki_module_url, _) (Just mod) =
+  let url = spliceURL Nothing (Just mod) Nothing wiki_module_url
+   in topButBox (anchor ! [href url] << toHtml "User Comments")
 
-wikiButton :: Maybe String -> Maybe Module -> HtmlTable
-wikiButton Nothing _ = Html.emptyTable
-wikiButton (Just url) maybe_mod
-  = topButBox (anchor ! [href url'] << toHtml "User Comments")
-  where url' = spliceURL Nothing maybe_mod Nothing url
+wikiButton _ _ =
+  Html.emptyTable
+
 
 contentsButton :: Maybe String -> HtmlTable
 contentsButton maybe_contents_url 
@@ -212,7 +208,7 @@ indexButton maybe_index_url
 			Just url -> url
 
 simpleHeader :: String -> Maybe String -> Maybe String
-             -> Maybe String -> Maybe String -> HtmlTable
+             -> SourceURLs -> WikiURLs -> HtmlTable
 simpleHeader doctitle maybe_contents_url maybe_index_url
   maybe_source_url maybe_wiki_url = 
   (tda [theclass "topbar"] << 
@@ -227,7 +223,7 @@ simpleHeader doctitle maybe_contents_url maybe_index_url
    ))
 
 pageHeader :: String -> Interface -> String
-    -> Maybe String -> Maybe String
+    -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String -> HtmlTable
 pageHeader mdl iface doctitle
            maybe_source_url maybe_wiki_url
@@ -283,8 +279,8 @@ ppHtmlContents
    -> Maybe String
    -> Maybe String
    -> Maybe String
-   -> Maybe String
-   -> Maybe String
+   -> SourceURLs
+   -> WikiURLs
    -> [Interface] -> Maybe Doc
    -> IO ()
 ppHtmlContents odir doctitle
@@ -393,8 +389,8 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> Maybe String
             -> Maybe String
-            -> Maybe String
-            -> Maybe String
+            -> SourceURLs
+            -> WikiURLs
             -> [Interface] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
@@ -519,7 +515,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 
 ppHtmlModule
 	:: FilePath -> String
-	-> Maybe String -> Maybe String
+	-> SourceURLs -> WikiURLs
 	-> Maybe String -> Maybe String
 	-> Interface -> IO ()
 ppHtmlModule odir doctitle
@@ -541,7 +537,7 @@ ppHtmlModule odir doctitle
          )
   writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderHtml html)
 
-ifaceToHtml :: Maybe String -> Maybe String -> Interface -> HtmlTable
+ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
 ifaceToHtml maybe_source_url maybe_wiki_url iface
   = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
   where 
@@ -620,7 +616,7 @@ numberSectionHeadings exports = go 1 exports
 	  = other : go n es
 
 -- The URL for source and wiki links, and the current module
-type LinksInfo = (Maybe String, Maybe String, Interface)
+type LinksInfo = (SourceURLs, WikiURLs, Interface)
 
 processExport :: Bool -> LinksInfo -> ExportItem -> HtmlTable
 processExport _ _ (ExportGroup lev id0 doc)
@@ -1201,8 +1197,9 @@ declBox html = tda [theclass "decl"] << html
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
 topDeclBox :: LinksInfo -> SrcLoc -> HsName -> Html -> HtmlTable
-topDeclBox (Nothing, Nothing, _) srcloc name html = declBox html
-topDeclBox (maybe_source_url, maybe_wiki_url, iface) (SrcLoc _ _ fname) name html =
+topDeclBox ((_,_,Nothing), (_,_,Nothing), _) _ _ html = declBox html
+topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
+           (SrcLoc _ _ fname) name html =
   tda [theclass "topdecl"] <<
   (        table ! [theclass "declbar"] <<
 	    ((tda [theclass "declname"] << html)

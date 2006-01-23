@@ -31,7 +31,7 @@ import Control.Monad.Writer ( Writer, runWriter, tell )
 import Data.Char ( isSpace )
 import Data.IORef ( writeIORef )
 import Data.List ( nub, (\\), foldl', sortBy )
-import Data.Maybe ( isJust, isNothing, maybeToList )
+import Data.Maybe ( isJust, isNothing, maybeToList, listToMaybe )
 --import Debug.Trace
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
 import System.Environment ( getArgs )
@@ -78,8 +78,12 @@ data Flag
   | Flag_OutputDir FilePath
   | Flag_Prologue FilePath
   | Flag_ReadInterface FilePath
-  | Flag_SourceURL String
-  | Flag_WikiURL String
+  | Flag_SourceBaseURL   String
+  | Flag_SourceModuleURL String
+  | Flag_SourceEntityURL String
+  | Flag_WikiBaseURL   String
+  | Flag_WikiModuleURL String
+  | Flag_WikiEntityURL String
   | Flag_Help
   | Flag_Verbose
   | Flag_Version
@@ -109,10 +113,18 @@ options =
 	"output in HTML",
     Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
 	"produce index and table of contents in mshelp, mshelp2 or devhelp format (with -h)",
-    Option ['s']  ["source"]   (ReqArg Flag_SourceURL "URL") 
-	"base URL for links to source code",
-    Option []     ["wiki"]     (ReqArg Flag_WikiURL "URL")
-	"base URL for links to a wiki",
+    Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL") 
+	"URL for a source code link on the contents\nand index pages",
+    Option ['s'] ["source", "source-module"] (ReqArg Flag_SourceModuleURL "URL")
+	"URL for a source code link for each module\n(using the %{FILE} or %{MODULE} vars)",
+    Option []  ["source-entity"]  (ReqArg Flag_SourceEntityURL "URL") 
+	"URL for a source code link for each entity\n(using the %{FILE}, %{MODULE} or %{NAME} vars)",
+    Option []  ["comments-base"]   (ReqArg Flag_WikiBaseURL "URL")
+	"URL for a comments link on the contents\nand index pages",
+    Option []  ["comments-module"]  (ReqArg Flag_WikiModuleURL "URL") 
+	"URL for a comments link for each module\n(using the %{MODULE} var)",
+    Option []  ["comments-entity"]  (ReqArg Flag_WikiEntityURL "URL") 
+	"URL for a comments link for each entity\n(using the %{FILE}, %{MODULE} or %{NAME} vars)",
     Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"the CSS file to use for HTML output",
     Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")
@@ -160,17 +172,15 @@ run flags files = do
 		[] -> ""
 		(t:_) -> t
 
-      package = case [str | Flag_Package str <- flags] of
-		[] -> Nothing
-		(t:_) -> Just t
+      package = listToMaybe [str | Flag_Package str <- flags]
 
-      maybe_source_url = case [str | Flag_SourceURL str <- flags] of
-			[] -> Nothing
-			(t:_) -> Just t
+      maybe_source_urls = (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
+                          ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
+                          ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
 
-      maybe_wiki_url = case [str | Flag_WikiURL str <- flags] of
-			[] -> Nothing
-			(t:_) -> Just t
+      maybe_wiki_urls = (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
+                        ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
+                        ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
 
       verbose = Flag_Verbose `elem` flags
 
@@ -236,13 +246,13 @@ run flags files = do
 
   when (Flag_GenContents `elem` flags) $ do
 	ppHtmlContents odir title package maybe_html_help_format
-            maybe_index_url maybe_source_url maybe_wiki_url
+            maybe_index_url maybe_source_urls maybe_wiki_urls
             visible_read_ifaces prologue
         copyHtmlBits odir libdir css_file
 
   when (Flag_GenIndex `elem` flags) $ do
 	ppHtmlIndex odir title package maybe_html_help_format
-            maybe_contents_url maybe_source_url maybe_wiki_url
+            maybe_contents_url maybe_source_urls maybe_wiki_urls
             visible_read_ifaces
         copyHtmlBits odir libdir css_file
         
@@ -305,7 +315,7 @@ run flags files = do
   when (Flag_Html `elem` flags) $ do
     ppHtml title package these_ifaces odir
 		prologue maybe_html_help_format
-		maybe_source_url maybe_wiki_url
+		maybe_source_urls maybe_wiki_urls
 		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
