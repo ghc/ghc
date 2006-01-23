@@ -149,6 +149,9 @@ tc_bracket (DecBr decls)
 	; return (mkAppTy q_ty (mkListTy decl_ty))
 	-- Result type is Q [Dec]
     }
+
+tc_bracket (PatBr _)
+  = failWithTc (ptext SLIT("Tempate Haskell pattern brackets are not supported yet"))
 \end{code}
 
 
