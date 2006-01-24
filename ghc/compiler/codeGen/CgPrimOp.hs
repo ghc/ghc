@@ -10,21 +10,25 @@ module CgPrimOp (
    cgPrimOp
  ) where
 
+#include "HsVersions.h"
+
 import ForeignCall	( CCallConv(CCallConv) )
 import StgSyn		( StgLiveVars, StgArg )
 import CgBindery	( getVolatileRegs, getArgAmodes )
 import CgMonad
 import CgInfoTbls	( getConstrTag )
 import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW )
+import ForeignCall
 import Cmm
 import CLabel		( mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel,
-			  mkDirty_MUT_VAR_Label )
+			  mkDirty_MUT_VAR_Label, mkRtsCodeLabel )
 import CmmUtils
 import MachOp
 import SMRep
 import PrimOp		( PrimOp(..) )
 import SMRep		( tablesNextToCode )
 import Constants 	( wORD_SIZE, wORD_SIZE_IN_BITS )
+import StaticFlags	( opt_Parallel, opt_SMP )
 import Outputable
 
 -- ---------------------------------------------------------------------------
@@ -109,7 +113,19 @@ emitPrimOp [res_r,res_c] IntSubCOp [aa,bb] live
 
 
 emitPrimOp [res] ParOp [arg] live
-   = stmtC (CmmAssign res (CmmLit (mkIntCLit 1)))
+  | not (opt_Parallel || opt_SMP)
+  = stmtC (CmmAssign res (CmmLit (mkIntCLit 1)))
+  | otherwise
+  = do
+	-- for now, just implement this in a C function
+	-- later, we might want to inline it.
+    vols <- getVolatileRegs live
+    stmtC (CmmCall (CmmForeignCall newspark CCallConv) [(res,NoHint)]
+		[(CmmReg (CmmGlobal BaseReg), PtrHint), 
+		 (arg,PtrHint)] 
+		(Just vols))
+  where
+	newspark = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("newSpark")))
 
 emitPrimOp [res] ReadMutVarOp [mutv] live
    = stmtC (CmmAssign res (cmmLoadIndexW mutv fixedHdrSize))
