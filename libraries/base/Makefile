@@ -56,13 +56,20 @@ SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CPP_OPTS += ${GhcCppOpts}
 
 ifeq "$(BootingFromHc)" "YES"
-GHC/PrimopWrappers.hs:
+GHC/PrimopWrappers.hs: GHC/Prim.hs
 	touch GHC/PrimopWrappers.hs
 else
-GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
+GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt GHC/Prim.hs
 	@$(RM) $@
 	$(GHC_GENPRIMOP) --make-haskell-wrappers < $< > $@
 endif
+
+GHC/Prim.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
+	@$(RM) $@
+	$(GHC_GENPRIMOP) --make-haskell-source < $< > $@
+
+EXCLUDED_SRCS = GHC/Prim.hs
+EXTRA_HADDOCK_SRCS = GHC/Prim.hs
 
 boot :: GHC/PrimopWrappers.hs
 
