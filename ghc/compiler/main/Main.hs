@@ -427,8 +427,8 @@ showGhcUsage cli_mode = do
   exitWith ExitSuccess
   where
      dump ""	      = return ()
-     dump ('$':'$':s) = hPutStr stderr progName >> dump s
-     dump (c:s)	      = hPutChar stderr c >> dump s
+     dump ('$':'$':s) = putStr progName >> dump s
+     dump (c:s)	      = putChar c >> dump s
 
 -- -----------------------------------------------------------------------------
 -- Util
