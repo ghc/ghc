@@ -22,12 +22,10 @@ import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder,
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
-import TcType		( hoistForAllTys )	-- TEMPORARY HACK
-import Type		( liftedTypeKind, splitTyConApp, mkSynTy, mkTyConApp,
-			  mkTyVarTys, ThetaType, 
-			  mkGenTyConApp )	-- Don't remove this... see mkIfTcApp
+import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
+			  mkTyVarTys, ThetaType )
 import TypeRep		( Type(..), PredType(..) )
-import TyCon		( TyCon, tyConName, isSynTyCon )
+import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), 
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
@@ -535,23 +533,11 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)        = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
 tcIfaceType (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
 tcIfaceType (IfaceFunTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
-tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkIfTcApp tc' ts') }
+tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkTyConApp tc' ts') }
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
 tcIfaceType (IfacePredTy st)      = do { st' <- tcIfacePredType st; return (PredTy st') }
 
 tcIfaceTypes tys = mapM tcIfaceType tys
-
-mkIfTcApp :: TyCon -> [Type] -> Type
--- In interface files we retain type synonyms (for brevity and better error
--- messages), but type synonyms can expand into non-hoisted types (ones with
--- foralls to the right of an arrow), so we must be careful to hoist them here.
--- This hack should go away when we get rid of hoisting.
--- Then we should go back to mkGenTyConApp or something like it
--- 
--- Nov 05: the type is now hoisted before being put into an interface file
-mkIfTcApp tc tys = mkTyConApp tc tys
---  | isSynTyCon tc = hoistForAllTys (mkSynTy tc tys)
---   | otherwise	  = mkTyConApp tc tys
 
 -----------------------------------------
 tcIfacePredType :: IfacePredType -> IfL PredType

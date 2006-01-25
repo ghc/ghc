@@ -36,7 +36,7 @@ module BasicTypes(
 	TupCon(..), tupleParens,
 
 	OccInfo(..), seqOccInfo, isFragileOcc, isOneOcc, 
-	isDeadOcc, isLoopBreaker,
+	isDeadOcc, isLoopBreaker, isNoOcc,
 
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch,
@@ -339,6 +339,10 @@ data OccInfo
 
   | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
 			-- in a group of recursive definitions
+
+isNoOcc :: OccInfo -> Bool
+isNoOcc NoOccInfo = True
+isNoOcc other     = False
 
 seqOccInfo :: OccInfo -> ()
 seqOccInfo occ = occ `seq` ()

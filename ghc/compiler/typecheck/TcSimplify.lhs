@@ -20,7 +20,7 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TcUnify( unifyTauTy )
+import {-# SOURCE #-} TcUnify( unifyType )
 import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
 import TcHsSyn		( mkHsApp, mkHsTyApp, mkHsDictApp )
 
@@ -1661,7 +1661,7 @@ tcImprove avails
 	 = addErrCtxt doc			$
 	   tcInstTyVars (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
 	   mapM_ (unif_pr tenv) pairs
-    unif_pr tenv (ty1,ty2) =  unifyTauTy (substTy tenv ty1) (substTy tenv ty2)
+    unif_pr tenv (ty1,ty2) =  unifyType (substTy tenv ty1) (substTy tenv ty2)
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
@@ -2159,7 +2159,7 @@ disambigGroup dicts
 
     choose_default default_ty	-- Commit to tyvar = default_ty
       =	-- Bind the type variable 
-	unifyTauTy default_ty (mkTyVarTy tyvar)	`thenM_`
+	unifyType default_ty (mkTyVarTy tyvar)	`thenM_`
 	-- and reduce the context, for real this time
 	simpleReduceLoop (text "disambig" <+> ppr dicts)
 		         reduceMe dicts			`thenM` \ (frees, binds, ambigs) ->
@@ -2345,8 +2345,9 @@ addTopIPErrs bndrs ips
   = addErrTcM (tidy_env, mk_msg tidy_ips)
   where
     (tidy_env, tidy_ips) = tidyInsts ips
-    mk_msg ips = vcat [sep [ptext SLIT("Implicit parameters escape from the monomorphic top-level binding(s) of"),
-			    pprBinders bndrs <> colon],
+    mk_msg ips = vcat [sep [ptext SLIT("Implicit parameters escape from"),
+			    nest 2 (ptext SLIT("the monomorphic top-level binding(s) of")
+					    <+> pprBinders bndrs <> colon)],
 		       nest 2 (vcat (map ppr_ip ips)),
 		       monomorphism_fix]
     ppr_ip ip = pprPred (dictPred ip) <+> pprInstLoc (instLoc ip)
@@ -2426,7 +2427,7 @@ addNoInstanceErrs mb_what givens dicts
     	ispecs = [ispec | (_, ispec) <- matches]
 
     mk_probable_fix tidy_env dicts	
-      = returnM (tidy_env, sep [ptext SLIT("Probable fix:"), nest 2 (vcat fixes)])
+      = returnM (tidy_env, sep [ptext SLIT("Possible fix:"), nest 2 (vcat fixes)])
       where
 	fixes = add_ors (fix1 ++ fix2)
 

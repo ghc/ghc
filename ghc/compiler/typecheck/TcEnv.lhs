@@ -19,10 +19,11 @@ module TcEnv(
 	tcExtendKindEnv, tcExtendKindEnvTvs,
 	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
-	tcLookup, tcLookupLocated, tcLookupLocalIds,
-	tcLookupId, tcLookupTyVar,
+	tcLookup, tcLookupLocated, tcLookupLocalIds, tcLookupLocalId_maybe,
+	tcLookupId, tcLookupTyVar, getScopedTyVarBinds,
 	lclEnvElts, getInLocalScope, findGlobals, 
 	wrongThingErr, pprBinders,
+	refineEnvironment,
 
 	tcExtendRecEnv,    	-- For knot-tying
 
@@ -48,13 +49,13 @@ import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
-import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType,
-			  tyVarsOfType, tyVarsOfTypes, mkGenTyConApp,
+import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, TvSubst,
+			  substTy, substTyVar, tyVarsOfType, tcTyVarsOfTypes, mkTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
-			  tidyOpenType 
+			  tidyOpenType, isRefineableTy
 			)
 import qualified Type	( getTyVar_maybe )
-import Id		( idName, isLocalId )
+import Id		( idName, isLocalId, setIdType )
 import Var		( TyVar, Id, idType, tyVarName )
 import VarSet
 import VarEnv
@@ -210,7 +211,7 @@ tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATyVar _ ty -> returnM (tcGetTyVar "tcLookupTyVar" ty)
+	ATyVar _ ty -> return (tcGetTyVar "tcLookupTyVar" ty)
 	other	    -> pprPanic "tcLookupTyVar" (ppr name)
 
 tcLookupId :: Name -> TcM Id
@@ -219,9 +220,16 @@ tcLookupId :: Name -> TcM Id
 tcLookupId name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id _	  -> returnM tc_id
+	ATcId tc_id _ _	  -> returnM tc_id
 	AGlobal (AnId id) -> returnM id
 	other		  -> pprPanic "tcLookupId" (ppr name)
+
+tcLookupLocalId_maybe :: Name -> TcM (Maybe Id)
+tcLookupLocalId_maybe name
+  = getLclEnv 		`thenM` \ local_env ->
+    case lookupNameEnv (tcl_env local_env) name of
+	Just (ATcId tc_id _ _) -> return (Just tc_id)
+	other	 	       -> return Nothing
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
@@ -232,8 +240,8 @@ tcLookupLocalIds ns
   where
     lookup lenv lvl name 
 	= case lookupNameEnv lenv name of
-		Just (ATcId id lvl1) -> ASSERT( lvl == lvl1 ) id
-		other		     -> pprPanic "tcLookupLocalIds" (ppr name)
+		Just (ATcId id lvl1 _) -> ASSERT( lvl == lvl1 ) id
+		other		       -> pprPanic "tcLookupLocalIds" (ppr name)
 
 lclEnvElts :: TcLclEnv -> [TcTyThing]
 lclEnvElts env = nameEnvElts (tcl_env env)
@@ -274,7 +282,7 @@ tcExtendTyVarEnv2 binds thing_inside
 					    tcl_rdr = rdr_env}) ->
     let
 	rdr_env'   = extendLocalRdrEnv rdr_env (map fst binds)
-	new_tv_set = tyVarsOfTypes (map snd binds)
+	new_tv_set = tcTyVarsOfTypes (map snd binds)
  	le'        = extendNameEnvList le [(name, ATyVar name ty) | (name, ty) <- binds]
     in
 	-- It's important to add the in-scope tyvars to the global tyvar set
@@ -285,6 +293,11 @@ tcExtendTyVarEnv2 binds thing_inside
 	-- when typechecking the methods.
     tc_extend_gtvs gtvs new_tv_set		`thenM` \ gtvs' ->
     setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
+
+getScopedTyVarBinds :: TcM [(Name, TcType)]
+getScopedTyVarBinds
+  = do	{ lcl_env <- getLclEnv
+	; return [(name, ty) | ATyVar name ty <- nameEnvElts (tcl_env lcl_env)] }
 \end{code}
 
 
@@ -306,14 +319,18 @@ tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 tcExtendIdEnv2 names_w_ids thing_inside
   = getLclEnv		`thenM` \ env ->
     let
-	extra_global_tyvars = tyVarsOfTypes [idType id | (name,id) <- names_w_ids]
-	th_lvl		    = thLevel    (tcl_th_ctxt   env)
-	extra_env	    = [(name, ATcId id th_lvl) | (name,id) <- names_w_ids]
+	extra_global_tyvars = tcTyVarsOfTypes [idType id | (_,id) <- names_w_ids]
+	th_lvl		    = thLevel (tcl_th_ctxt   env)
+	extra_env	    = [ (name, ATcId id th_lvl (isRefineableTy (idType id)))
+			      | (name,id) <- names_w_ids]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
-	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) (map fst names_w_ids)
+	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) [name | (name,_) <- names_w_ids]
     in
+    traceTc (text "env2") `thenM_`
+    traceTc (text "env3" <+> ppr extra_env) `thenM_`
     tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
-    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
+    (traceTc (text "env4") `thenM_`
+    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside)
 \end{code}
 
 
@@ -342,7 +359,7 @@ findGlobals tvs tidy_env
     ignore_it ty = not (tvs `intersectsVarSet` tyVarsOfType ty)
 
 -----------------------
-find_thing ignore_it tidy_env (ATcId id _)
+find_thing ignore_it tidy_env (ATcId id _ _)
   = zonkTcType  (idType id)	`thenM` \ id_ty ->
     if ignore_it id_ty then
 	returnM (tidy_env, Nothing)
@@ -372,6 +389,18 @@ find_thing ignore_it tidy_env (ATyVar tv ty)
     returnM (tidy_env1, Just msg)
 \end{code}
 
+\begin{code}
+refineEnvironment :: TvSubst -> TcM a -> TcM a
+refineEnvironment reft thing_inside
+  = do	{ env <- getLclEnv
+	; let le' = mapNameEnv refine (tcl_env env)
+	; gtvs' <- refineGlobalTyVars reft (tcl_tyvars env) 
+ 	; setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs'}) thing_inside }
+  where
+    refine (ATcId id lvl True) = ATcId (setIdType id (substTy reft (idType id))) lvl True
+    refine (ATyVar tv ty)      = ATyVar tv (substTy reft ty)
+    refine elt		       = elt
+\end{code}
 
 %************************************************************************
 %*									*
@@ -383,6 +412,11 @@ find_thing ignore_it tidy_env (ATyVar tv ty)
 tc_extend_gtvs gtvs extra_global_tvs
   = readMutVar gtvs		`thenM` \ global_tvs ->
     newMutVar (global_tvs `unionVarSet` extra_global_tvs)
+
+refineGlobalTyVars :: GadtRefinement -> TcRef TcTyVarSet -> TcM (TcRef TcTyVarSet)
+refineGlobalTyVars reft gtv_var
+  = readMutVar gtv_var				`thenM` \ gbl_tvs ->
+    newMutVar (tcTyVarsOfTypes (map (substTyVar reft) (varSetElems gbl_tvs)))
 \end{code}
 
 @tcGetGlobalTyVars@ returns a fully-zonked set of tyvars free in the environment.
@@ -490,8 +524,7 @@ tcMetaTy :: Name -> TcM Type
 -- E.g. given the name "Expr" return the type "Expr"
 tcMetaTy tc_name
   = tcLookupTyCon tc_name	`thenM` \ t ->
-    returnM (mkGenTyConApp t [])
-	-- Use mkGenTyConApp because it might be a synonym
+    returnM (mkTyConApp t [])
 \end{code}
 
 

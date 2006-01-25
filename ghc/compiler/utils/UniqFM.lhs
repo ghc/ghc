@@ -33,7 +33,7 @@ module UniqFM (
 	intersectUFM_C,
 	foldUFM,
 	mapUFM,
-	elemUFM,
+	elemUFM, elemUFM_Directly,
 	filterUFM, filterUFM_Directly,
 	sizeUFM,
 	hashUFM,
@@ -47,7 +47,7 @@ module UniqFM (
 #include "HsVersions.h"
 
 import Unique		( Uniquable(..), Unique, getKey#, mkUniqueGrimily )
-import Panic
+import Maybes		( maybeToBool )
 import FastTypes
 import Outputable
 
@@ -115,6 +115,7 @@ filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
 sizeUFM		:: UniqFM elt -> Int
 hashUFM		:: UniqFM elt -> Int
 elemUFM		:: Uniquable key => key -> UniqFM elt -> Bool
+elemUFM_Directly:: Unique -> UniqFM elt -> Bool
 
 lookupUFM	:: Uniquable key => UniqFM elt -> key -> Maybe elt
 lookupUFM_Directly  -- when you've got the Unique already
@@ -560,9 +561,8 @@ looking up in a hurry is the {\em whole point} of this binary tree lark.
 Lookup up a binary tree is easy (and fast).
 
 \begin{code}
-elemUFM key fm = case lookUp fm (getKey# (getUnique key)) of
-			Nothing -> False
-			Just _  -> True
+elemUFM          key fm = maybeToBool (lookupUFM fm key)
+elemUFM_Directly key fm = maybeToBool (lookupUFM_Directly fm key)
 
 lookupUFM	   fm key = lookUp fm (getKey# (getUnique key))
 lookupUFM_Directly fm key = lookUp fm (getKey# key)

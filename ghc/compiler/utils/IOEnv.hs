@@ -157,8 +157,8 @@ foldlM        :: (a -> b -> IOEnv env a)  -> a -> [b] -> IOEnv env a
 foldrM        :: (b -> a -> IOEnv env a)  -> a -> [b] -> IOEnv env a
 mapAndUnzipM  :: (a -> IOEnv env (b,c))   -> [a] -> IOEnv env ([b],[c])
 mapAndUnzip3M :: (a -> IOEnv env (b,c,d)) -> [a] -> IOEnv env ([b],[c],[d])
-checkM	      :: Bool -> IOEnv env () -> IOEnv env ()	-- Perform arg if bool is False
-ifM	      :: Bool -> IOEnv env () -> IOEnv env ()	-- Perform arg if bool is True
+checkM	      :: Bool -> IOEnv env a -> IOEnv env ()	-- Perform arg if bool is False
+ifM	      :: Bool -> IOEnv env a -> IOEnv env ()	-- Perform arg if bool is True
 
 mappM f []     = return []
 mappM f (x:xs) = do { r <- f x; rs <- mappM f xs; return (r:rs) }
@@ -202,7 +202,7 @@ mapAndUnzip3M f (x:xs) = do { (r,s,t) <- f x;
 			      return (r:rs, s:ss, t:ts) }
 
 checkM True  err = return ()
-checkM False err = err
+checkM False err = do { err; return () }
 
-ifM True  do_it = do_it
+ifM True  do_it = do { do_it; return () }
 ifM False do_it = return ()

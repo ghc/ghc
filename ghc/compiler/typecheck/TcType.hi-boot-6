@@ -1,3 +1,5 @@
 module TcType where
 
 data TcTyVarDetails 
+
+pprTcTyVarDetails :: TcTyVarDetails -> Outputable.SDoc

@@ -774,7 +774,7 @@ gentype :: { LHsType RdrName }
         : btype                         { $1 }
         | btype qtyconop gentype        { LL $ HsOpTy $1 $2 $3 }
         | btype tyvarop  gentype  	{ LL $ HsOpTy $1 $2 $3 }
-	| btype '->' gentype		{ LL $ HsFunTy $1 $3 }
+ 	| btype '->' ctype		{ LL $ HsFunTy $1 $3 }
 
 btype :: { LHsType RdrName }
 	: btype atype			{ LL $ HsAppTy $1 $2 }
@@ -784,10 +784,10 @@ atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
 	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
 	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }
-	| '(' type ',' comma_types1 ')'	{ LL $ HsTupleTy Boxed  ($2:$4) }
+	| '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy Boxed  ($2:$4) }
 	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy Unboxed $2     }
-	| '[' type ']'			{ LL $ HsListTy  $2 }
-	| '[:' type ':]'		{ LL $ HsPArrTy  $2 }
+	| '[' ctype ']'			{ LL $ HsListTy  $2 }
+	| '[:' ctype ':]'		{ LL $ HsPArrTy  $2 }
 	| '(' ctype ')'		        { LL $ HsParTy   $2 }
 	| '(' ctype '::' kind ')'	{ LL $ HsKindSig $2 $4 }
 -- Generics
@@ -809,8 +809,8 @@ comma_types0  :: { [LHsType RdrName] }
 	| {- empty -}			{ [] }
 
 comma_types1	:: { [LHsType RdrName] }
-	: type				{ [$1] }
-	| type  ',' comma_types1	{ $1 : $3 }
+	: ctype				{ [$1] }
+	| ctype  ',' comma_types1	{ $1 : $3 }
 
 tv_bndrs :: { [LHsTyVarBndr RdrName] }
 	 : tv_bndr tv_bndrs		{ $1 : $2 }
@@ -1260,7 +1260,7 @@ stmt  :: { LStmt RdrName }
   	| 'rec' stmtlist		{ LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName }
-	: infixexp '<-' exp		{% checkPattern $1 >>= \p ->
+	: exp '<-' exp			{% checkPattern $1 >>= \p ->
 					   return (LL $ mkBindStmt p $3) }
 	| exp				{ L1 $ mkExprStmt $1 }
   	| 'let' binds			{ LL $ LetStmt (unLoc $2) }

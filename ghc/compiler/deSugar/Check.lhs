@@ -147,7 +147,7 @@ untidy b (L loc p) = L loc (untidy' b p)
     untidy' _ (ListPat pats ty)      = ListPat (map untidy_no_pars pats) ty
     untidy' _ (TuplePat pats boxed)  = TuplePat (map untidy_no_pars pats) boxed
     untidy' _ (PArrPat _ _)	     = panic "Check.untidy: Shouldn't get a parallel array here!"
-    untidy' _ (SigPatIn _ _) 	= panic "Check.untidy: SigPat"
+    untidy' _ (SigPatIn _ _) 	     = panic "Check.untidy: SigPat"
 
 untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats) 
 untidy_con (InfixCon p1 p2) = InfixCon  (untidy_pars p1) (untidy_pars p2)

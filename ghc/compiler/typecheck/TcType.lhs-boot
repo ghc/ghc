@@ -1,5 +1,7 @@
 \begin{code}
 module TcType where
+import Outputable( SDoc )
 
 data TcTyVarDetails 
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 \end{code}

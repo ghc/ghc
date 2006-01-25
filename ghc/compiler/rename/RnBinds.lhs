@@ -179,12 +179,7 @@ rnTopBindsBoot (ValBindsIn mbinds sigs)
 
 rnTopBindsSrc :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
 rnTopBindsSrc binds@(ValBindsIn mbinds _)
-  = bindPatSigTyVars (collectSigTysFromHsBinds mbinds) $ \ _ -> 
-	-- Hmm; by analogy with Ids, this doesn't look right
-	-- Top-level bound type vars should really scope over 
-	-- everything, but we only scope them over the other bindings
-
-    do	{ (binds', dus) <- rnValBinds noTrim binds
+  = do	{ (binds', dus) <- rnValBinds noTrim binds
 
 		-- Warn about missing signatures, 
 	; let	{ ValBindsOut _ sigs' = binds'
@@ -255,7 +250,6 @@ rnValBindsAndThen binds@(ValBindsIn mbinds sigs) thing_inside
 	-- current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
     bindLocatedLocalsRn doc mbinders_w_srclocs			$ \ bndrs ->
-    bindPatSigTyVarsFV (collectSigTysFromHsBinds mbinds)	$ 
 
 	-- Then install local fixity declarations
 	-- Notice that they scope over thing_inside too
@@ -380,7 +374,7 @@ rnBind :: (Name -> [Name])		-- Signature tyvar function
        -> (FreeVars -> FreeVars)	-- Trimming function for rhs free vars
        -> LHsBind RdrName
        -> RnM (LHsBind Name, [Name], Uses)
-rnBind sig_fn trim (L loc (PatBind pat grhss ty _))
+rnBind sig_fn trim (L loc (PatBind { pat_lhs = pat, pat_rhs = grhss }))
   = setSrcSpan loc $ 
     do	{ (pat', pat_fvs) <- rnLPat pat
 
@@ -389,9 +383,11 @@ rnBind sig_fn trim (L loc (PatBind pat grhss ty _))
 	; (grhss', fvs) <- bindSigTyVarsFV (concatMap sig_fn bndrs) $
 			   rnGRHSs PatBindRhs grhss
 
-	; return (L loc (PatBind pat' grhss' ty (trim fvs)), bndrs, pat_fvs `plusFV` fvs) }
+	; return (L loc (PatBind { pat_lhs = pat', pat_rhs = grhss', 
+				   pat_rhs_ty = placeHolderType, bind_fvs = trim fvs }), 
+		  bndrs, pat_fvs `plusFV` fvs) }
 
-rnBind sig_fn trim (L loc (FunBind name inf matches _))
+rnBind sig_fn trim (L loc (FunBind { fun_id = name, fun_infix = inf, fun_matches = matches }))
   = setSrcSpan loc $ 
     do	{ new_name <- lookupLocatedBndrRn name
 	; let plain_name = unLoc new_name
@@ -401,7 +397,9 @@ rnBind sig_fn trim (L loc (FunBind name inf matches _))
 
 	; checkPrecMatch inf plain_name matches'
 
-	; return (L loc (FunBind new_name inf matches' (trim fvs)), [plain_name], fvs)
+	; return (L loc (FunBind { fun_id = new_name, fun_infix = inf, fun_matches = matches',
+				   bind_fvs = trim fvs, fun_co_fn = idCoercion }), 
+		  [plain_name], fvs)
       }
 \end{code}
 
@@ -433,7 +431,8 @@ rnMethodBinds cls gen_tyvars binds
 	   (bind', fvs_bind) <- rnMethodBind cls gen_tyvars bind
 	   return (bind' `unionBags` binds, fvs_bind `plusFV` fvs)
 
-rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _) _))
+rnMethodBind cls gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
+					      fun_matches = MatchGroup matches _ }))
   =  setSrcSpan loc $ 
      lookupLocatedInstDeclBndr cls name			`thenM` \ sel_name -> 
      let plain_name = unLoc sel_name in
@@ -444,7 +443,9 @@ rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _) _))
 	new_group = MatchGroup new_matches placeHolderType
     in
     checkPrecMatch inf plain_name new_group		`thenM_`
-    returnM (unitBag (L loc (FunBind sel_name inf new_group fvs)), fvs `addOneFV` plain_name)
+    returnM (unitBag (L loc (FunBind { fun_id = sel_name, fun_infix = inf, fun_matches = new_group,
+				       bind_fvs = fvs, fun_co_fn = idCoercion })), 
+	     fvs `addOneFV` plain_name)
 	-- The 'fvs' field isn't used for method binds
   where
 	-- Truly gruesome; bring into scope the correct members of the generic 

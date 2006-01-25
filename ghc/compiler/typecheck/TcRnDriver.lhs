@@ -67,7 +67,7 @@ import OccName		( mkVarOccFS )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
 			  mkExternalName )
 import NameSet
-import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
+import TyCon		( tyConHasGenerics, isSynTyCon, synTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import DriverPhases	( HscSource(..), isHsBoot )
 import HscTypes		( ModGuts(..), ModDetails(..), emptyModDetails,
@@ -84,9 +84,9 @@ import Outputable
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), 
 			  HsLocalBinds(..), HsValBinds(..),
-			  LStmt, LHsExpr, LHsType, mkMatchGroup, mkMatch, emptyLocalBinds,
+			  LStmt, LHsExpr, LHsType, mkMatch, emptyLocalBinds,
 			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
-		   	  placeHolderType, noSyntaxExpr )
+		   	  mkFunBind, placeHolderType, noSyntaxExpr )
 import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
 			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
 import RnSource		( addTcgDUs )
@@ -386,6 +386,7 @@ tcRnSrcDecls decls
 	      TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
 		         tcg_rules = rules, tcg_fords = fords } = tcg_env } ;
 
+	tcDump tcg_env ;
 	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `unionBags` inst_binds)
 							   rules fords ;
 
@@ -560,8 +561,8 @@ check_thing (ATyCon boot_tc) (ATyCon real_tc)
   | tyConKind boot_tc == tyConKind real_tc
   = return ()
   where
-    (tvs1, defn1) = getSynTyConDefn boot_tc
-    (tvs2, defn2) = getSynTyConDefn boot_tc
+    (tvs1, defn1) = synTyConDefn boot_tc
+    (tvs2, defn2) = synTyConDefn boot_tc
 
 check_thing (AnId boot_id) (AnId real_id)
   | idType boot_id `tcEqType` idType real_id
@@ -948,8 +949,8 @@ mkPlan :: LStmt Name -> TcM PlanResult
 mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
-	      the_bind  = L loc $ FunBind (L loc fresh_it) False matches emptyNameSet
-	      matches   = mkMatchGroup [mkMatch [] expr emptyLocalBinds]
+	      the_bind  = L loc $ mkFunBind (L loc fresh_it) matches
+	      matches   = [mkMatch [] expr emptyLocalBinds]
 	      let_stmt  = L loc $ LetStmt (HsValBinds (ValBindsOut [(NonRecursive,unitBag the_bind)] []))
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
@@ -1028,7 +1029,7 @@ tcGhciStmts stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((tc_stmts, ids), lie) <- getLIE $ 
-				  tcStmts DoExpr (tcDoStmt io_ty io_ret_ty) stmts $ 
+				  tcStmts DoExpr (tcDoStmt io_ty) stmts io_ret_ty $ \ _ ->
 				  mappM tcLookupId names ;
 					-- Look up the names right in the middle,
 					-- where they will all be in scope

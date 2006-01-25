@@ -14,11 +14,6 @@ module TcHsSyn (
 	nlHsIntLit, 
 	
 
-	-- Coercions
-	Coercion, ExprCoFn, PatCoFn, 
-	(<$>), (<.>), mkCoercion, 
-	idCoercion, isIdCoercion,
-
 	-- re-exported from TcMonad
 	TcId, TcIdSet, TcDictBinds,
 
@@ -36,10 +31,10 @@ import Id	( idType, setIdType, Id )
 
 import TcRnMonad
 import Type	  ( Type )
-import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar, tcGetTyVar )
+import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar )
 import Kind	  ( isLiftedTypeKind, liftedTypeKind, isSubKind )
 import qualified  Type
-import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, zonkTcTyVars, putMetaTyVar )
+import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, writeMetaTyVar )
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		    doublePrimTy, addrPrimTy
 		  )
@@ -54,7 +49,6 @@ import VarSet
 import VarEnv
 import BasicTypes ( Boxity(..), IPName(..), ipNameName, mapIPName )
 import Maybes	  ( orElse )
-import Maybe  	  ( isNothing )
 import Unique	  ( Uniquable(..) )
 import SrcLoc	  ( noSrcLoc, noLoc, Located(..), unLoc )
 import Util	  ( mapSnd )
@@ -106,39 +100,6 @@ hsLitType (HsInteger i ty) = ty
 hsLitType (HsRat _ ty)	   = ty
 hsLitType (HsFloatPrim f)  = floatPrimTy
 hsLitType (HsDoublePrim d) = doublePrimTy
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Coercion functions}
-%*									*
-%************************************************************************
-
-\begin{code}
-type Coercion a = Maybe (a -> a)
-	-- Nothing => identity fn
-
-type ExprCoFn = Coercion (HsExpr TcId)
-type PatCoFn  = Coercion (Pat    TcId)
-
-(<.>) :: Coercion a -> Coercion a -> Coercion a	-- Composition
-Nothing <.> Nothing = Nothing
-Nothing <.> Just f  = Just f
-Just f  <.> Nothing = Just f
-Just f1 <.> Just f2 = Just (f1 . f2)
-
-(<$>) :: Coercion a -> a -> a
-Just f  <$> e = f e
-Nothing <$> e = e
-
-mkCoercion :: (a -> a) -> Coercion a
-mkCoercion f = Just f
-
-idCoercion :: Coercion a
-idCoercion = Nothing
-
-isIdCoercion :: Coercion a -> Bool
-isIdCoercion = isNothing
 \end{code}
 
 
@@ -300,23 +261,25 @@ zonkMonoBinds :: ZonkEnv -> LHsBinds TcId -> TcM (LHsBinds Id)
 zonkMonoBinds env binds = mapBagM (wrapLocM (zonk_bind env)) binds
 
 zonk_bind :: ZonkEnv -> HsBind TcId -> TcM (HsBind Id)
-zonk_bind env (PatBind pat grhss ty fvs)
+zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty})
   = do	{ (_env, new_pat) <- zonkPat env pat		-- Env already extended
 	; new_grhss <- zonkGRHSs env grhss
 	; new_ty    <- zonkTcTypeToType env ty
-	; return (PatBind new_pat new_grhss new_ty fvs) }
+	; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss, pat_rhs_ty = new_ty }) }
 
-zonk_bind env (VarBind var expr)
+zonk_bind env (VarBind { var_id = var, var_rhs = expr })
   = zonkIdBndr env var 			`thenM` \ new_var ->
     zonkLExpr env expr			`thenM` \ new_expr ->
-    returnM (VarBind new_var new_expr)
+    returnM (VarBind { var_id = new_var, var_rhs = new_expr })
 
-zonk_bind env (FunBind var inf ms fvs)
+zonk_bind env bind@(FunBind { fun_id = var, fun_matches = ms, fun_co_fn = co_fn })
   = wrapLocM (zonkIdBndr env) var	`thenM` \ new_var ->
-    zonkMatchGroup env ms		`thenM` \ new_ms ->
-    returnM (FunBind new_var inf new_ms fvs)
+    zonkCoFn env co_fn			`thenM` \ (env1, new_co_fn) ->
+    zonkMatchGroup env1 ms		`thenM` \ new_ms ->
+    returnM (bind { fun_id = new_var, fun_matches = new_ms, fun_co_fn = new_co_fn })
 
-zonk_bind env (AbsBinds tyvars dicts exports val_binds)
+zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_dicts = dicts, 
+			  abs_exports = exports, abs_binds = val_binds })
   = ASSERT( all isImmutableTyVar tyvars )
     zonkIdBndrs env dicts		`thenM` \ new_dicts ->
     fixM (\ ~(new_val_binds, _) ->
@@ -328,18 +291,13 @@ zonk_bind env (AbsBinds tyvars dicts exports val_binds)
         mappM (zonkExport env2) exports		`thenM` \ new_exports ->
 	returnM (new_val_binds, new_exports)
     )						`thenM` \ (new_val_bind, new_exports) ->
-    returnM (AbsBinds tyvars new_dicts new_exports new_val_bind)
+    returnM (AbsBinds { abs_tvs = tyvars, abs_dicts = new_dicts, 
+			abs_exports = new_exports, abs_binds = new_val_bind })
   where
     zonkExport env (tyvars, global, local, prags)
-	= zonkTcTyVars tyvars		`thenM` \ tys ->
-	  let
-		new_tyvars = map (tcGetTyVar "zonkExport") tys
-		-- This isn't the binding occurrence of these tyvars
-		-- but they should *be* tyvars.  Hence tcGetTyVar.
-	  in
-	  zonkIdBndr env global		`thenM` \ new_global ->
-	  mapM zonk_prag prags		`thenM` \ new_prags -> 
-	  returnM (new_tyvars, new_global, zonkIdOcc env local, new_prags)
+	= zonkIdBndr env global			`thenM` \ new_global ->
+	  mapM zonk_prag prags			`thenM` \ new_prags -> 
+	  returnM (tyvars, new_global, zonkIdOcc env local, new_prags)
     zonk_prag prag@(InlinePrag {})  = return prag
     zonk_prag (SpecPrag expr ty ds inl) = do { expr' <- zonkExpr env expr 
 					     ; ty'   <- zonkTcTypeToType env ty
@@ -569,6 +527,11 @@ zonkExpr env (HsArrForm op fixity args)
     mappM (zonkCmdTop env) args		`thenM` \ new_args ->
     returnM (HsArrForm new_op fixity new_args)
 
+zonkExpr env (HsCoerce co_fn expr)
+  = zonkCoFn env co_fn	`thenM` \ (env1, new_co_fn) ->
+    zonkExpr env1 expr	`thenM` \ new_expr ->
+    return (HsCoerce new_co_fn new_expr)
+
 zonkExpr env other = pprPanic "zonkExpr" (ppr other)
 
 zonkCmdTop :: ZonkEnv -> LHsCmdTop TcId -> TcM (LHsCmdTop Id)
@@ -580,6 +543,29 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
     zonkTcTypeToType env ty 		`thenM` \ new_ty ->
     mapSndM (zonkExpr env) ids		`thenM` \ new_ids ->
     returnM (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
+
+-------------------------------------------------------------------------
+zonkCoFn :: ZonkEnv -> ExprCoFn -> TcM (ZonkEnv, ExprCoFn)
+zonkCoFn env CoHole = return (env, CoHole)
+zonkCoFn env (CoCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
+				    ; (env2, c2') <- zonkCoFn env1 c2
+				    ; return (env2, CoCompose c1' c2') }
+zonkCoFn env (CoLams ids c) = do { ids' <- zonkIdBndrs env ids
+				 ; let env1 = extendZonkEnv env ids'
+				 ; (env2, c') <- zonkCoFn env1 c
+				 ; return (env2, CoLams ids' c') }
+zonkCoFn env (CoTyLams tvs c) = ASSERT( all isImmutableTyVar tvs )
+				do { (env1, c') <- zonkCoFn env c
+				   ; return (env1, CoTyLams tvs c') }
+zonkCoFn env (CoApps c ids)   = do { (env1, c') <- zonkCoFn env c
+				   ; return (env1, CoApps c' (zonkIdOccs env ids)) }
+zonkCoFn env (CoTyApps c tys) = do { tys' <- zonkTcTypeToTypes env tys
+				   ; (env1, c') <- zonkCoFn env c
+				   ; return (env1, CoTyApps c' tys') }
+zonkCoFn env (CoLet bs c)     = do { (env1, bs') <- zonkRecMonoBinds env bs
+			 	   ; (env2, c')  <- zonkCoFn env1 c
+				   ; return (env2, CoLet bs' c') }
+
 
 -------------------------------------------------------------------------
 zonkDo :: ZonkEnv -> HsStmtContext Name -> HsStmtContext Name
@@ -887,7 +873,7 @@ zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
 zonkTypeCollecting :: TcRef TyVarSet -> TcType -> TcM Type
 -- This variant collects unbound type variables in a mutable variable
 zonkTypeCollecting unbound_tv_set
-  = zonkType zonk_unbound_tyvar True
+  = zonkType zonk_unbound_tyvar
   where
     zonk_unbound_tyvar tv 
 	= zonkQuantifiedTyVar tv				`thenM` \ tv' ->
@@ -899,7 +885,7 @@ zonkTypeZapping :: TcType -> TcM Type
 -- This variant is used for everything except the LHS of rules
 -- It zaps unbound type variables to (), or some other arbitrary type
 zonkTypeZapping ty 
-  = zonkType zonk_unbound_tyvar True ty 
+  = zonkType zonk_unbound_tyvar ty 
   where
 	-- Zonk a mutable but unbound type variable to an arbitrary type
 	-- We know it's unbound even though we don't carry an environment,
@@ -907,7 +893,7 @@ zonkTypeZapping ty
 	-- mutable tyvar to a fresh immutable one.  So the mutable store
 	-- plays the role of an environment.  If we come across a mutable
 	-- type variable that isn't so bound, it must be completely free.
-    zonk_unbound_tyvar tv = do { putMetaTyVar tv ty; return ty }
+    zonk_unbound_tyvar tv = do { writeMetaTyVar tv ty; return ty }
 			  where 
 			    ty = mkArbitraryType tv
 

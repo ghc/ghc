@@ -107,7 +107,7 @@ pprType False ty = ppr (GHC.dropForAlls ty)
 
 pprTyCon exts tyCon
   | GHC.isSynTyCon tyCon
-  = let (_,rhs_type) = GHC.getSynTyConDefn tyCon
+  = let rhs_type = GHC.synTyConRhs tyCon
     in hang (pprTyConHdr exts tyCon <+> equals) 2 (pprType exts rhs_type)
   | otherwise
   = pprAlgTyCon exts tyCon (const True) (const True)

@@ -18,7 +18,7 @@ module Name (
 
 	nameUnique, setNameUnique,
 	nameOccName, nameModule, nameModule_maybe,
-	setNameOcc, 
+	tidyNameOcc, 
 	hashName, localiseName,
 
 	nameSrcLoc, nameParent, nameParent_maybe, isImplicitName, 
@@ -241,8 +241,12 @@ mkIPName uniq occ
 -- one in the thing it's the name of.  If you know what I mean.
 setNameUnique name uniq = name {n_uniq = uniq}
 
-setNameOcc :: Name -> OccName -> Name
-setNameOcc name occ = name {n_occ = occ}
+tidyNameOcc :: Name -> OccName -> Name
+-- We set the OccName of a Name when tidying
+-- In doing so, we change System --> Internal, so that when we print
+-- it we don't get the unique by default.  It's tidy now!
+tidyNameOcc name@(Name { n_sort = System }) occ = name { n_occ = occ, n_sort = Internal}
+tidyNameOcc name 			    occ = name { n_occ = occ }
 
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }

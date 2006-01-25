@@ -44,9 +44,8 @@ import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, ArgVrcs, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
-			  tyConStupidTheta, getSynTyConDefn, isSynTyCon, tyConName )
+			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, 
-			  -- dataConSig, 
 			  dataConFieldLabels, dataConTyCon,
 			  dataConTyVars, dataConFieldType, dataConResTys )
 import Var		( TyVar, idType, idName )
@@ -621,10 +620,10 @@ checkValidTyCon tc
     mappM_ check_fields groups
 
   where
-    syn_ctxt	 = TySynCtxt name
-    name         = tyConName tc
-    (_, syn_rhs) = getSynTyConDefn tc
-    data_cons    = tyConDataCons tc
+    syn_ctxt  = TySynCtxt name
+    name      = tyConName tc
+    syn_rhs   = synTyConRhs tc
+    data_cons = tyConDataCons tc
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)
     cmp_fld (f1,_) (f2,_) = f1 `compare` f2
@@ -754,24 +753,6 @@ fieldTypeMisMatch field_name con1 con2
 	 ptext SLIT("give different types for field"), quotes (ppr field_name)]
 
 dataConCtxt con = ptext SLIT("In the definition of data constructor") <+> quotes (ppr con)
-{- 	If the data constructor returns the wrong data type, then we get
-	zip_ty_env failures when printing its argument types; so best
-	to be less ambitious about complaining here 
-    nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]
-  where
-    (ex_tvs, ex_theta, arg_tys, _, _) = dataConSig con
-    ex_part | null ex_tvs = empty
-	    | otherwise   = ptext SLIT("forall") <+> hsep (map ppr ex_tvs) <> dot
-	-- The 'ex_theta' part could be non-empty, if the user (bogusly) wrote
-	--	data T a = Eq a => T a a
-	-- So we make sure to print it
-
-    fields = dataConFieldLabels con
-    arg_part | null fields = sep (map pprParendType arg_tys)
-	     | otherwise   = braces (sep (punctuate comma 
-			     [ ppr n <+> dcolon <+> ppr ty 
-			     | (n,ty) <- fields `zip` arg_tys]))
--}
 
 classOpCtxt sel_id tau = sep [ptext SLIT("When checking the class method:"),
 			      nest 2 (ppr sel_id <+> dcolon <+> ppr tau)]

@@ -8,7 +8,10 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, AutoScc(..) ) where
+module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, 
+		 dsCoercion,
+		 AutoScc(..)
+  ) where
 
 #include "HsVersions.h"
 
@@ -84,12 +87,13 @@ dsHsBind auto_scc rest (VarBind var expr)
     addDictScc var core_expr	`thenDs` \ core_expr' ->
     returnDs ((var, core_expr') : rest)
 
-dsHsBind auto_scc rest (FunBind (L _ fun) _ matches _)
+dsHsBind auto_scc rest (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn })
   = matchWrapper (FunRhs (idName fun)) matches		`thenDs` \ (args, body) ->
-    addAutoScc auto_scc (fun, mkLams args body)		`thenDs` \ pair ->
+    dsCoercion co_fn (return (mkLams args body))	`thenDs` \ rhs ->
+    addAutoScc auto_scc (fun, rhs)			`thenDs` \ pair ->
     returnDs (pair : rest)
 
-dsHsBind auto_scc rest (PatBind pat grhss ty _)
+dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
   = dsGuarded grhss ty				`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr		`thenDs` \ sel_binds ->
     mappM (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
@@ -384,3 +388,30 @@ addDictScc var rhs = returnDs rhs
     returnDs (Note (SCC (mkAllDictsCC mod grp False)) rhs)
 -}
 \end{code}
+
+
+%************************************************************************
+%*									*
+		Desugaring coercions
+%*									*
+%************************************************************************
+
+
+\begin{code}
+dsCoercion :: ExprCoFn -> DsM CoreExpr -> DsM CoreExpr
+dsCoercion CoHole 	     thing_inside = thing_inside
+dsCoercion (CoCompose c1 c2) thing_inside = dsCoercion c1 (dsCoercion c2 thing_inside)
+dsCoercion (CoLams ids c)    thing_inside = do { expr <- dsCoercion c thing_inside
+					       ; return (mkLams ids expr) }
+dsCoercion (CoTyLams tvs c)  thing_inside = do { expr <- dsCoercion c thing_inside
+					       ; return (mkLams tvs expr) }
+dsCoercion (CoApps c ids)    thing_inside = do { expr <- dsCoercion c thing_inside
+					       ; return (mkVarApps expr ids) }
+dsCoercion (CoTyApps c tys)  thing_inside = do { expr <- dsCoercion c thing_inside
+					       ; return (mkTyApps expr tys) }
+dsCoercion (CoLet bs c)      thing_inside = do { prs <- dsLHsBinds bs
+					       ; expr <- dsCoercion c thing_inside
+					       ; return (Let (Rec prs) expr) }
+\end{code}
+
+

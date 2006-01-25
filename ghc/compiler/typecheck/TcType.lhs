@@ -20,35 +20,40 @@ module TcType (
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType, 
   TcTyVar, TcTyVarSet, TcKind, 
 
+  BoxyTyVar, BoxySigmaType, BoxyRhoType, BoxyThetaType, BoxyType,
+
   --------------------------------
   -- MetaDetails
-  Expected(..), TcRef, TcTyVarDetails(..),
-  MetaDetails(Flexi, Indirect), SkolemInfo(..), pprTcTyVar, pprSkolInfo,
-  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isExistentialTyVar, metaTvRef,
+  UserTypeCtxt(..), pprUserTypeCtxt,
+  TcTyVarDetails(..), BoxInfo(..), pprTcTyVarDetails,
+  MetaDetails(Flexi, Indirect), SkolemInfo(..), pprSkolTvBinding, pprSkolInfo,
+  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isBoxyTyVar, isSigTyVar, isExistentialTyVar, 
+  metaTvRef, 
   isFlexi, isIndirect, 
 
   --------------------------------
   -- Builders
-  mkPhiTy, mkSigmaTy, hoistForAllTys,
+  mkPhiTy, mkSigmaTy, 
 
   --------------------------------
   -- Splitters  
   -- These are important because they do not look through newtypes
   tcView,
   tcSplitForAllTys, tcSplitPhiTy, 
-  tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy,
+  tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
-  tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitSigmaTy,
+  tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, 
   tcValidInstHeadTy, tcGetTyVar_maybe, tcGetTyVar,
+  tcSplitSigmaTy, tcMultiSplitSigmaTy, 
 
   ---------------------------------
   -- Predicates. 
   -- Again, newtypes are opaque
   tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred, tcEqTypeX,
-  isSigmaTy, isOverloadedTy, 
+  isSigmaTy, isOverloadedTy, isRigidTy, isBoxyTy,
   isDoubleTy, isFloatTy, isIntTy, isStringTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy,
-  isTauTy, tcIsTyVarTy, tcIsForAllTy,
+  isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
 
   ---------------------------------
   -- Misc type manipulators
@@ -63,7 +68,7 @@ module TcType (
   mkDictTy, tcSplitPredTy_maybe, 
   isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
-  dataConsStupidTheta, 
+  dataConsStupidTheta, isRefineableTy,
 
   ---------------------------------
   -- Foreign import and export
@@ -90,15 +95,15 @@ module TcType (
   Type, PredType(..), ThetaType, 
   mkForAllTy, mkForAllTys, 
   mkFunTy, mkFunTys, zipFunTys, 
-  mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
+  mkTyConApp, mkAppTy, mkAppTys, applyTy, applyTys,
   mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys, 
 
   -- Type substitutions
   TvSubst(..), 	-- Representation visible to a few friends
   TvSubstEnv, emptyTvSubst,
-  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst,
-  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
-  extendTvSubst, extendTvSubstList, isInScope,
+  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
+  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope, lookupTyVar,
+  extendTvSubst, extendTvSubstList, isInScope, mkTvSubst, zipTyEnv,
   substTy, substTys, substTyWith, substTheta, substTyVar, substTyVarBndr,
 
   isUnLiftedType,	-- Source types are always lifted
@@ -110,6 +115,7 @@ module TcType (
   typeKind, tidyKind,
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
+  tcTyVarsOfType, tcTyVarsOfTypes, exactTyVarsOfType, exactTyVarsOfTypes,
 
   pprKind, pprParendKind,
   pprType, pprParendType, pprTyThingCategory,
@@ -131,8 +137,8 @@ import Type		(	-- Re-exports
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
 			  defaultKind, isArgTypeKind, isOpenTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
-			  mkTyConApp, mkGenTyConApp, mkAppTy,
-			  mkAppTys, mkSynTy, applyTy, applyTys,
+			  mkTyConApp, mkAppTy,
+			  mkAppTys, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
 			  mkPredTys, isUnLiftedType, 
 			  isUnboxedTupleType, isPrimitiveType,
@@ -141,25 +147,25 @@ import Type		(	-- Re-exports
 			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar,
 			  tidyOpenTyVars, tidyKind,
-			  isSubKind, deShadowTy, tcView,
+			  isSubKind, tcView,
 
 			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
 			  tcEqPred, tcCmpPred, tcEqTypeX, 
 
 			  TvSubst(..),
-			  TvSubstEnv, emptyTvSubst,
+			  TvSubstEnv, emptyTvSubst, mkTvSubst, zipTyEnv,
 			  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst,
 			  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
-			  extendTvSubst, extendTvSubstList, isInScope,
+			  extendTvSubst, extendTvSubstList, isInScope, notElemTvSubst,
 		  	  substTy, substTys, substTyWith, substTheta, 
-			  substTyVar, substTyVarBndr, substPred,
+			  substTyVar, substTyVarBndr, substPred, lookupTyVar,
 
 			  typeKind, repType,
 			  pprKind, pprParendKind,
 			  pprType, pprParendType, pprTyThingCategory,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
-import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, tyConUnique )
+import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, synTyConDefn, tyConUnique )
 import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
 import Class		( Class )
 import Var		( TyVar, Id, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
@@ -175,7 +181,7 @@ import VarEnv		( TidyEnv )
 import OccName		( OccName, mkDictOcc )
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
-import BasicTypes	( IPName(..), ipNameName )
+import BasicTypes	( IPName(..), Arity, ipNameName )
 import SrcLoc		( SrcLoc, SrcSpan )
 import Util		( snocView, equalLength )
 import Maybes		( maybeToBool, expectJust, mapCatMaybes )
@@ -222,12 +228,14 @@ tau ::= tyvar
 -- provided it expands to the required form.
 
 \begin{code}
-type TcType = Type 		-- A TcType can have mutable type variables
+type TcTyVar = TyVar  	-- Used only during type inference
+type TcType = Type 	-- A TcType can have mutable type variables
 	-- Invariant on ForAllTy in TcTypes:
 	-- 	forall a. T
 	-- a cannot occur inside a MutTyVar in T; that is,
 	-- T is "flattened" before quantifying over a
 
+-- These types do not have boxy type variables in them
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
@@ -236,9 +244,12 @@ type TcTauType      = TcType
 type TcKind         = Kind
 type TcTyVarSet     = TyVarSet
 
-type TcRef a 	 = IORef a
-data Expected ty = Infer (TcRef ty)	-- The hole to fill in for type inference
-		 | Check ty		-- The type to check during type checking
+-- These types may have boxy type variables in them
+type BoxyTyVar	    = TcTyVar
+type BoxyRhoType    = TcType	
+type BoxyThetaType  = TcThetaType	
+type BoxySigmaType  = TcType		
+type BoxyType       = TcType		
 \end{code}
 
 
@@ -252,6 +263,7 @@ TyVarDetails gives extra info about type variables, used during type
 checking.  It's attached to mutable type variables only.
 It's knot-tied back to Var.lhs.  There is no reason in principle
 why Var.lhs shouldn't actually have the definition, but it "belongs" here.
+
 
 Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -274,7 +286,7 @@ with each other.  Alas.
 On the other hand, we *must* use skolems for signature type variables, 
 becuase GADT type refinement refines skolems only.  
 
-One solution woudl be insist that in the above defn the programmer uses
+One solution would be insist that in the above defn the programmer uses
 the same type variable in both type signatures.  But that takes explanation.
 
 The alternative (currently implemented) is to have a special kind of skolem
@@ -282,19 +294,49 @@ constant, SigSkokTv, which can unify with other SigSkolTvs.
 
 
 \begin{code}
-type TcTyVar = TyVar  	-- Used only during type inference
-
 -- A TyVarDetails is inside a TyVar
 data TcTyVarDetails
-  = MetaTv (IORef MetaDetails)		-- A meta type variable stands for a tau-type
-  | SkolemTv SkolemInfo			-- A skolem constant
-  | SigSkolTv Name (IORef MetaDetails)	-- Ditto, but from a type signature;
-					-- 	see Note [Signature skolems]
-					--	The MetaDetails, if filled in, will 
-					-- 	always be another SigSkolTv
+  = SkolemTv SkolemInfo			-- A skolem constant
+
+  | MetaTv BoxInfo (IORef MetaDetails)
+
+data BoxInfo 
+   = BoxTv	-- The contents is a (non-boxy) sigma-type
+		-- That is, this MetaTv is a "box"
+
+   | TauTv	-- The contents is a (non-boxy) tau-type
+		-- That is, this MetaTv is an ordinary unification variable
+
+   | SigTv SkolemInfo	-- A variant of TauTv, except that it should not be
+			-- unified with a type, only with a type variable
+			-- SigTvs are only distinguished to improve error messages
+			--      see Note [Signature skolems]        
+			--      The MetaDetails, if filled in, will 
+			--      always be another SigTv or a SkolemTv
+
+-- INVARIANTS:
+--  	A TauTv is always filled in with a tau-type, which
+--	never contains any BoxTvs, nor any ForAlls 
+--
+--	However, a BoxTv can contain a type that contains further BoxTvs
+--	Notably, when typechecking an explicit list, say [e1,e2], with
+--	expected type being a box b1, we fill in b1 with (List b2), where
+--	b2 is another (currently empty) box.
+
+data MetaDetails
+  = Flexi          -- Flexi type variables unify to become 
+                   -- Indirects.  
+
+  | Indirect TcType  -- INVARIANT:
+		     --   For a BoxTv, this type must be non-boxy
+                     --   For a TauTv, this type must be a tau-type
 
 data SkolemInfo
-  = SigSkol Name	-- Bound at a type signature
+  = SigSkol UserTypeCtxt	-- A skolem that is created by instantiating
+				-- a programmer-supplied type signature
+				-- Location of the binding site is on the TyVar
+
+	-- The rest are for non-scoped skolems
   | ClsSkol Class	-- Bound at a class decl
   | InstSkol Id		-- Bound at an instance decl
   | PatSkol DataCon	-- An existential type variable bound by a pattern for
@@ -309,13 +351,71 @@ data SkolemInfo
 	    TcType	-- 	(forall tvs. ty)
 	    SrcSpan
 
-data MetaDetails
-  = Flexi          -- Flexi type variables unify to become 
-                   -- Indirects.  
+  | UnkSkol		-- Unhelpful info (until I improve it)
 
-  | Indirect TcType  -- Type indirections, treated as wobbly 
-                     -- for the purpose of GADT unification.
+-------------------------------------
+-- UserTypeCtxt describes the places where a 
+-- programmer-written type signature can occur
+data UserTypeCtxt 
+  = FunSigCtxt Name	-- Function type signature
+			-- Also used for types in SPECIALISE pragmas
+  | ExprSigCtxt		-- Expression type signature
+  | ConArgCtxt Name	-- Data constructor argument
+  | TySynCtxt Name	-- RHS of a type synonym decl
+  | GenPatCtxt		-- Pattern in generic decl
+			-- 	f{| a+b |} (Inl x) = ...
+  | LamPatSigCtxt		-- Type sig in lambda pattern
+			-- 	f (x::t) = ...
+  | BindPatSigCtxt	-- Type sig in pattern binding pattern
+			--	(x::t, y) = e
+  | ResSigCtxt		-- Result type sig
+			-- 	f x :: t = ....
+  | ForSigCtxt Name	-- Foreign inport or export signature
+  | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
+  | DefaultDeclCtxt	-- Types in a default declaration
+  | SpecInstCtxt	-- SPECIALISE instance pragma
 
+-- Notes re TySynCtxt
+-- We allow type synonyms that aren't types; e.g.  type List = []
+--
+-- If the RHS mentions tyvars that aren't in scope, we'll 
+-- quantify over them:
+--	e.g. 	type T = a->a
+-- will become	type T = forall a. a->a
+--
+-- With gla-exts that's right, but for H98 we should complain. 
+\end{code}
+
+%************************************************************************
+%*									*
+		Pretty-printing
+%*									*
+%************************************************************************
+
+\begin{code}
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+-- For debugging
+pprTcTyVarDetails (SkolemTv _)         = ptext SLIT("sk")
+pprTcTyVarDetails (MetaTv BoxTv _)     = ptext SLIT("box")
+pprTcTyVarDetails (MetaTv TauTv _)     = ptext SLIT("tau")
+pprTcTyVarDetails (MetaTv (SigTv _) _) = ptext SLIT("sig")
+
+pprUserTypeCtxt :: UserTypeCtxt -> SDoc
+pprUserTypeCtxt (FunSigCtxt n)  = ptext SLIT("the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt     = ptext SLIT("an expression type signature")
+pprUserTypeCtxt (ConArgCtxt c)  = ptext SLIT("the type of the constructor") <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)   = ptext SLIT("the RHS of the type synonym") <+> quotes (ppr c)
+pprUserTypeCtxt GenPatCtxt      = ptext SLIT("the type pattern of a generic definition")
+pprUserTypeCtxt LamPatSigCtxt   = ptext SLIT("a pattern type signature")
+pprUserTypeCtxt BindPatSigCtxt  = ptext SLIT("a pattern type signature")
+pprUserTypeCtxt ResSigCtxt      = ptext SLIT("a result type signature")
+pprUserTypeCtxt (ForSigCtxt n)  = ptext SLIT("the foreign declaration for") <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n) = ptext SLIT("the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt = ptext SLIT("a type in a `default' declaration")
+pprUserTypeCtxt SpecInstCtxt    = ptext SLIT("a SPECIALISE instance pragma")
+
+
+--------------------------------
 tidySkolemTyVar :: TidyEnv -> TcTyVar -> (TidyEnv, TcTyVar)
 -- Tidy the type inside a GenSkol, preparatory to printing it
 tidySkolemTyVar env tv
@@ -329,31 +429,51 @@ tidySkolemTyVar env tv
 			      (env2, ty1)  = tidyOpenType env1 ty
 		      info -> (env, info)
 		     
-pprTcTyVar :: TcTyVar -> SDoc
--- Print tyvar with info about its binding
-pprTcTyVar tv
-  = quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
+pprSkolTvBinding :: TcTyVar -> SDoc
+-- Print info about the binding of a skolem tyvar, 
+-- or nothing if we don't have anything useful to say
+pprSkolTvBinding tv
+  = ppr_details (tcTyVarDetails tv)
   where
-    ppr_details (MetaTv _)	 = ptext SLIT("is a meta type variable")
-    ppr_details (SigSkolTv id _) = ptext SLIT("is bound by") <+> pprSkolInfo (SigSkol id)
-    ppr_details (SkolemTv info)  = ptext SLIT("is bound by") <+> pprSkolInfo info
+    ppr_details (MetaTv TauTv _)   = quotes (ppr tv) <+> ptext SLIT("is a meta type variable")
+    ppr_details (MetaTv BoxTv _)   = quotes (ppr tv) <+> ptext SLIT("is a boxy type variable")
+    ppr_details (MetaTv (SigTv info) _) = ppr_skol info
+    ppr_details (SkolemTv info)		= ppr_skol info
+
+    ppr_skol UnkSkol 	     = empty	-- Unhelpful; omit
+    ppr_skol (SigSkol ctxt)  = sep [quotes (ppr tv) <+> ptext SLIT("is bound by") <+> pprUserTypeCtxt ctxt,
+				    nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
+    ppr_skol info            = quotes (ppr tv) <+> pprSkolInfo info
  
 pprSkolInfo :: SkolemInfo -> SDoc
-pprSkolInfo (SigSkol id)     = ptext SLIT("the type signature for") <+> quotes (ppr id)
-pprSkolInfo (ClsSkol cls)    = ptext SLIT("the class declaration for") <+> quotes (ppr cls)
-pprSkolInfo (InstSkol df)    = ptext SLIT("the instance declaration at") <+> ppr (getSrcLoc df)
-pprSkolInfo (ArrowSkol loc)  = ptext SLIT("the arrow form at") <+> ppr loc
-pprSkolInfo (PatSkol dc loc) = sep [ptext SLIT("the pattern for") <+> quotes (ppr dc),
+pprSkolInfo (SigSkol ctxt)   = ptext SLIT("is bound by") <+> pprUserTypeCtxt ctxt
+pprSkolInfo (ClsSkol cls)    = ptext SLIT("is bound by the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo (InstSkol df)    = ptext SLIT("is bound by the instance declaration at") <+> ppr (getSrcLoc df)
+pprSkolInfo (ArrowSkol loc)  = ptext SLIT("is bound by the arrow form at") <+> ppr loc
+pprSkolInfo (PatSkol dc loc) = sep [ptext SLIT("is bound by the pattern for") <+> quotes (ppr dc),
            		            nest 2 (ptext SLIT("at") <+> ppr loc)]
-pprSkolInfo (GenSkol tvs ty loc) = sep [ptext SLIT("the polymorphic type") 
-				   	<+> quotes (ppr (mkForAllTys tvs ty)),
+pprSkolInfo (GenSkol tvs ty loc) = sep [sep [ptext SLIT("is bound by the polymorphic type"), 
+				   	     nest 2 (quotes (ppr (mkForAllTys tvs ty)))],
 				        nest 2 (ptext SLIT("at") <+> ppr loc)]
+-- UnkSkol, SigSkol
+-- For type variables the others are dealt with by pprSkolTvBinding.  
+-- For Insts, these cases should not happen
+pprSkolInfo UnkSkol = panic "UnkSkol"
 
 instance Outputable MetaDetails where
   ppr Flexi 	    = ptext SLIT("Flexi")
   ppr (Indirect ty) = ptext SLIT("Indirect") <+> ppr ty
+\end{code}
 
-isImmutableTyVar, isSkolemTyVar, isExistentialTyVar, isMetaTyVar :: TyVar -> Bool
+
+%************************************************************************
+%*									*
+		Predicates
+%*									*
+%************************************************************************
+
+\begin{code}
+isImmutableTyVar, isSkolemTyVar, isExistentialTyVar, isBoxyTyVar, isMetaTyVar :: TyVar -> Bool
 isImmutableTyVar tv
   | isTcTyVar tv = isSkolemTyVar tv
   | otherwise    = True
@@ -361,9 +481,8 @@ isImmutableTyVar tv
 isSkolemTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	SkolemTv _    -> True
-	SigSkolTv _ _ -> True
-	MetaTv _      -> False
+	SkolemTv _         -> True
+ 	MetaTv _ _         -> False
 
 isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
   = ASSERT( isTcTyVar tv )
@@ -372,16 +491,28 @@ isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
 	other 		       -> False
 
 isMetaTyVar tv 
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+	MetaTv _ _ -> True
+	other      -> False
+
+isBoxyTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	MetaTv _   -> True
-	other      -> False
+	MetaTv BoxTv _ -> True
+	other          -> False
+
+isSigTyVar tv 
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+	MetaTv (SigTv _) _ -> True
+	other              -> False
 
 metaTvRef :: TyVar -> IORef MetaDetails
 metaTvRef tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	MetaTv ref -> ref
+	MetaTv _ ref -> ref
 	other	   -> pprPanic "metaTvRef" (ppr tv)
 
 isFlexi, isIndirect :: MetaDetails -> Bool
@@ -406,20 +537,41 @@ mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
 \end{code}
 
-@isTauTy@ tests for nested for-alls.
+@isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
 
 \begin{code}
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- tcView ty = isTauTy ty'
-isTauTy (TyVarTy v)	 = True
-isTauTy (TyConApp _ tys) = all isTauTy tys
-isTauTy (AppTy a b)	 = isTauTy a && isTauTy b
-isTauTy (FunTy a b)	 = isTauTy a && isTauTy b
-isTauTy (PredTy p)	 = True		-- Don't look through source types
-isTauTy other		 = False
-\end{code}
+isTauTy (TyVarTy tv)	 = ASSERT( not (isTcTyVar tv && isBoxyTyVar tv) )
+			   True
+isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
+isTauTy (AppTy a b)	  = isTauTy a && isTauTy b
+isTauTy (FunTy a b)	  = isTauTy a && isTauTy b
+isTauTy (PredTy p)	  = True		-- Don't look through source types
+isTauTy other		  = False
 
-\begin{code}
+
+isTauTyCon :: TyCon -> Bool
+-- Returns False for type synonyms whose expansion is a polytype
+isTauTyCon tc | isSynTyCon tc = isTauTy (snd (synTyConDefn tc))
+	      | otherwise     = True
+
+---------------
+isBoxyTy :: TcType -> Bool
+isBoxyTy ty = any isBoxyTyVar (varSetElems (tcTyVarsOfType ty))
+
+isRigidTy :: TcType -> Bool
+-- A type is rigid if it has no meta type variables in it
+isRigidTy ty = all isSkolemTyVar (varSetElems (tcTyVarsOfType ty))
+
+isRefineableTy :: TcType -> Bool
+-- A type should have type refinements applied to it if it has
+-- free type variables, and they are all rigid
+isRefineableTy ty = not (null tc_tvs) && all isSkolemTyVar tc_tvs
+		    where
+		      tc_tvs = varSetElems (tcTyVarsOfType ty)
+
+---------------
 getDFunTyKey :: Type -> OccName	-- Get some string from a type, to be used to 
 				-- construct a dictionary function name
 getDFunTyKey ty | Just ty' <- tcView ty = getDFunTyKey ty'
@@ -472,6 +624,25 @@ tcSplitSigmaTy ty = case tcSplitForAllTys ty of
 			(tvs, rho) -> case tcSplitPhiTy rho of
 					(theta, tau) -> (tvs, theta, tau)
 
+-----------------------
+tcMultiSplitSigmaTy
+	:: TcSigmaType
+	-> ( [([TyVar], ThetaType)],	-- forall as.C => forall bs.D
+	     TcSigmaType)		-- The rest of the type
+
+-- We need a loop here because we are now prepared to entertain
+-- types like
+-- 	f:: forall a. Eq a => forall b. Baz b => tau
+-- We want to instantiate this to
+-- 	f2::tau		{f2 = f1 b (Baz b), f1 = f a (Eq a)}
+
+tcMultiSplitSigmaTy sigma
+  = case (tcSplitSigmaTy sigma) of
+	([],[],ty) -> ([], sigma)
+	(tvs, theta, ty) -> case tcMultiSplitSigmaTy ty of
+				(pairs, rest) -> ((tvs,theta):pairs, rest)
+
+-----------------------
 tcTyConAppTyCon :: Type -> TyCon
 tcTyConAppTyCon ty = fst (tcSplitTyConApp ty)
 
@@ -492,27 +663,7 @@ tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 	-- as tycon applications by the type checker
 tcSplitTyConApp_maybe other	      	= Nothing
 
-tcValidInstHeadTy :: Type -> Bool
--- Used in Haskell-98 mode, for the argument types of an instance head
--- These must not be type synonyms, but everywhere else type synonyms
--- are transparent, so we need a special function here
-tcValidInstHeadTy ty
-  = case ty of
-	NoteTy _ ty     -> tcValidInstHeadTy ty
-	TyConApp tc tys -> not (isSynTyCon tc) && ok tys
-	FunTy arg res   -> ok [arg, res]
-	other		-> False
-  where
-	-- Check that all the types are type variables,
-	-- and that each is distinct
-    ok tys = equalLength tvs tys && hasNoDups tvs
-	   where
-	     tvs = mapCatMaybes get_tv tys
-
-    get_tv (NoteTy _ ty) = get_tv ty 	-- through synonyms
-    get_tv (TyVarTy tv)  = Just tv	-- Again, do not look
-    get_tv other  	 = Nothing
-
+-----------------------
 tcSplitFunTys :: Type -> ([Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
 			Nothing	       -> ([], ty)
@@ -525,10 +676,26 @@ tcSplitFunTy_maybe ty | Just ty' <- tcView ty = tcSplitFunTy_maybe ty'
 tcSplitFunTy_maybe (FunTy arg res)  = Just (arg, res)
 tcSplitFunTy_maybe other	    = Nothing
 
+tcSplitFunTysN
+	:: TcRhoType 
+	-> Arity		-- N: Number of desired args
+	-> ([TcSigmaType], 	-- Arg types (N or fewer)
+	    TcSigmaType)	-- The rest of the type
+
+tcSplitFunTysN ty n_args
+  | n_args == 0
+  = ([], ty)
+  | Just (arg,res) <- tcSplitFunTy_maybe ty
+  = case tcSplitFunTysN res (n_args - 1) of
+	(args, res) -> (arg:args, res)
+  | otherwise
+  = ([], ty)
+
 tcFunArgTy    ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> arg }
 tcFunResultTy ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> res }
 
 
+-----------------------
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
 tcSplitAppTy_maybe ty | Just ty' <- tcView ty = tcSplitAppTy_maybe ty'
 tcSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
@@ -550,6 +717,7 @@ tcSplitAppTys ty
 		   Just (ty', arg) -> go ty' (arg:args)
 		   Nothing	   -> (ty,args)
 
+-----------------------
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
 tcGetTyVar_maybe (TyVarTy tv) 	= Just tv
@@ -561,6 +729,7 @@ tcGetTyVar msg ty = expectJust msg (tcGetTyVar_maybe ty)
 tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty = maybeToBool (tcGetTyVar_maybe ty)
 
+-----------------------
 tcSplitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
 -- Split the type of a dictionary function
 tcSplitDFunTy ty 
@@ -572,6 +741,27 @@ tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead tau  
   = case tcSplitPredTy_maybe tau of 
 	Just (ClassP clas tys) -> (clas, tys)
+
+tcValidInstHeadTy :: Type -> Bool
+-- Used in Haskell-98 mode, for the argument types of an instance head
+-- These must not be type synonyms, but everywhere else type synonyms
+-- are transparent, so we need a special function here
+tcValidInstHeadTy ty
+  = case ty of
+	NoteTy _ ty     -> tcValidInstHeadTy ty
+	TyConApp tc tys -> not (isSynTyCon tc) && ok tys
+	FunTy arg res   -> ok [arg, res]
+	other		-> False
+  where
+	-- Check that all the types are type variables,
+	-- and that each is distinct
+    ok tys = equalLength tvs tys && hasNoDups tvs
+	   where
+	     tvs = mapCatMaybes get_tv tys
+
+    get_tv (NoteTy _ ty) = get_tv ty 	-- through synonyms
+    get_tv (TyVarTy tv)  = Just tv	-- Again, do not look
+    get_tv other  	 = Nothing
 \end{code}
 
 
@@ -720,92 +910,6 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 \end{code}
 
 
-
-
-%************************************************************************
-%*									*
-		Hoisting for-alls
-%*									*
-%************************************************************************
-
-hoistForAllTys is used for user-written type signatures only
-We want to 'look through' type synonyms when doing this
-so it's better done on the Type than the HsType
-
-It moves all the foralls and constraints to the top
-e.g.	T -> forall a. a        ==>   forall a. T -> a
-	T -> (?x::Int) -> Int   ==>   (?x::Int) -> T -> Int
-
-Also: it eliminates duplicate constraints.  These can show up
-when hoisting constraints, notably implicit parameters.
-
-It tries hard to retain type synonyms if hoisting does not break one
-up.  Not only does this improve error messages, but there's a tricky
-interaction with Haskell 98.  H98 requires no unsaturated type
-synonyms, which is checked by checkValidType.  This runs after
-hoisting, so we don't want hoisting to remove the SynNotes!  (We can't
-run validity checking before hoisting because in mutually-recursive
-type definitions we postpone validity checking until after the knot is
-tied.)
-
-\begin{code}
-hoistForAllTys :: Type -> Type
-hoistForAllTys ty
-  = go ty
-
-  where
-    go	:: Type -> Type
-
-    go (TyVarTy tv)   	 = TyVarTy tv
-    go ty@(TyConApp tc tys) 
-	| isSynTyCon tc, any isSigmaTy tys'
-	= go (expectJust "hoistForAllTys" (tcView ty))
-		-- Revolting special case.  If a type synonym has foralls
-		-- at the top of its argument, then expanding the type synonym
-		-- might lead to more hositing.  So we just abandon the synonym
-		-- altogether right here.
-		-- Note that we must go back to hoistForAllTys, because
-		-- expanding the type synonym may expose new binders. Yuk.
-	| otherwise
-	= TyConApp tc tys'
-	where
-	  tys' = map go tys
-    go (PredTy pred)     = PredTy pred	-- No nested foralls 
-    go (NoteTy _ ty2)    = go ty2	-- Discard the free tyvar note
-    go (FunTy arg res)   = mk_fun_ty (go arg) (go res)
-    go (AppTy fun arg)   = AppTy (go fun) (go arg)
-    go (ForAllTy tv ty)  = ForAllTy tv (go ty)
-
- 	-- mk_fun_ty does all the work.  
-	-- It's building t1 -> t2: 
-	--	if t2 is a for-all type, push t1 inside it
-	--	if t2 is (pred -> t3), check for duplicates
-    mk_fun_ty ty1 ty2
-	| not (isSigmaTy ty2)	 	-- No forall's, or context => 
-	= FunTy ty1 ty2 	
-	| PredTy p1 <- ty1		-- ty1 is a predicate
-	= if p1 `elem` theta2 then 	-- so check for duplicates
-		ty2
-	  else
-		mkSigmaTy tvs2 (p1:theta2) tau2
-	| otherwise 	
-	= mkSigmaTy tvs2 theta2 (FunTy ty1 tau2)
-	where
-	  (tvs2, theta2, tau2) = tcSplitSigmaTy $
-				 deShadowTy (tyVarsOfType ty1) $
-				 deNoteType ty2
-
-	-- deShadowTy is important.  For example:
-	--	type Foo r = forall a. a -> r
-	--	foo :: Foo (Foo ())
-	-- Here the hoisting should give
-	--	foo :: forall a a1. a -> a1 -> ()
-
-	-- deNoteType is important too, so that the deShadow sees that
-	-- synonym expanded!  Sigh
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsection{Misc}
@@ -814,9 +918,71 @@ hoistForAllTys ty
 
 \begin{code}
 deNoteType :: Type -> Type
--- Remove *outermost* type synonyms and other notes
+-- Remove all *outermost* type synonyms and other notes
 deNoteType ty | Just ty' <- tcView ty = deNoteType ty'
 deNoteType ty = ty
+\end{code}
+
+\begin{code}
+tcTyVarsOfType :: Type -> TcTyVarSet
+-- Just the tc type variables free in the type
+tcTyVarsOfType (TyVarTy tv)	    = if isTcTyVar tv then unitVarSet tv
+						      else emptyVarSet
+tcTyVarsOfType (TyConApp tycon tys) = tcTyVarsOfTypes tys
+tcTyVarsOfType (NoteTy _ ty)	    = tcTyVarsOfType ty
+tcTyVarsOfType (PredTy sty)	    = tcTyVarsOfPred sty
+tcTyVarsOfType (FunTy arg res)	    = tcTyVarsOfType arg `unionVarSet` tcTyVarsOfType res
+tcTyVarsOfType (AppTy fun arg)	    = tcTyVarsOfType fun `unionVarSet` tcTyVarsOfType arg
+tcTyVarsOfType (ForAllTy tyvar ty)  = tcTyVarsOfType ty `delVarSet` tyvar
+	-- We do sometimes quantify over skolem TcTyVars
+
+tcTyVarsOfTypes :: [Type] -> TyVarSet
+tcTyVarsOfTypes tys = foldr (unionVarSet.tcTyVarsOfType) emptyVarSet tys
+
+tcTyVarsOfPred :: PredType -> TyVarSet
+tcTyVarsOfPred (IParam _ ty)  = tcTyVarsOfType ty
+tcTyVarsOfPred (ClassP _ tys) = tcTyVarsOfTypes tys
+\end{code}
+
+Note [Silly type synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	type T a = Int
+What are the free tyvars of (T x)?  Empty, of course!  
+Here's the example that Ralf Laemmel showed me:
+	foo :: (forall a. C u a -> C u a) -> u
+	mappend :: Monoid u => u -> u -> u
+
+	bar :: Monoid u => u
+	bar = foo (\t -> t `mappend` t)
+We have to generalise at the arg to f, and we don't
+want to capture the constraint (Monad (C u a)) because
+it appears to mention a.  Pretty silly, but it was useful to him.
+
+exactTyVarsOfType is used by the type checker to figure out exactly
+which type variables are mentioned in a type.  It's also used in the
+smart-app checking code --- see TcExpr.tcIdApp
+
+\begin{code}
+exactTyVarsOfType :: TcType -> TyVarSet
+-- Find the free type variables (of any kind)
+-- but *expand* type synonyms.  See Note [Silly type synonym] belos.
+exactTyVarsOfType ty
+  = go ty
+  where
+    go ty | Just ty' <- tcView ty = go ty'	-- This is the key line
+    go (TyVarTy tv)         	  = unitVarSet tv
+    go (TyConApp tycon tys) 	  = exactTyVarsOfTypes tys
+    go (PredTy ty)	    	  = go_pred ty
+    go (FunTy arg res)	    	  = go arg `unionVarSet` go res
+    go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
+    go (ForAllTy tyvar ty)  	  = delVarSet (go ty) tyvar
+
+    go_pred (IParam _ ty)  = go ty
+    go_pred (ClassP _ tys) = exactTyVarsOfTypes tys
+
+exactTyVarsOfTypes :: [TcType] -> TyVarSet
+exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys
 \end{code}
 
 Find the free tycons and classes of a type.  This is used in the front
@@ -1034,5 +1200,3 @@ isByteArrayLikeTyCon :: TyCon -> Bool
 isByteArrayLikeTyCon tc = 
   getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
 \end{code}
-
-

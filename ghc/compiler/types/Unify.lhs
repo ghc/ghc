@@ -251,18 +251,30 @@ coreRefineTys in_scope con tvs scrut_ty
     tv_set 	       = mkVarSet tvs
     all_bound_here env = all bound_here (varEnvKeys env)
     bound_here uniq    = elemVarSetByKey uniq tv_set
-    
 
-----------------------------
-gadtRefineTys
-	:: (TyVar -> BindFlag)		-- Try to unify these
-	-> TvSubstEnv			-- Not idempotent
-	-> [Type] -> [Type]
-   	-> MaybeErr Message TvSubstEnv	-- Not idempotent
--- This one is used by the type checker.  Neither the input nor result
--- substitition is idempotent
-gadtRefineTys bind_fn subst tys1 tys2
-  = initUM bind_fn (unify_tys subst tys1 tys2)
+-- This version is used by the type checker
+gadtRefineTys :: TvSubst 
+	      -> DataCon -> [TyVar]
+	      -> [Type] -> [Type]	
+	      -> MaybeErr Message (TvSubst, Bool)
+-- The bool is True <=> the only *new* bindings are for pat_tvs
+
+gadtRefineTys (TvSubst in_scope env1) con pat_tvs pat_tys ctxt_tys
+  = initUM (tryToBind tv_set) $
+    do	{ 	-- Run the unifier, starting with an empty env
+	; env2 <- unify_tys env1 pat_tys ctxt_tys
+
+	-- Find the fixed point of the resulting non-idempotent substitution
+	; let subst2  	      = TvSubst in_scope subst_env_fixpt
+	      subst_env_fixpt = mapVarEnv (substTy subst2) env2
+		
+	; return (subst2, all_bound_here env2) }
+  where
+	-- 'tvs' are the tyvars bound by the pattern
+    tv_set 	       = mkVarSet pat_tvs
+    all_bound_here env = all bound_here (varEnvKeys env)
+    bound_here uniq    = elemVarEnvByKey uniq env1 || elemVarSetByKey uniq tv_set
+	-- The bool is True <=> the only *new* bindings are for pat_tvs
 
 ----------------------------
 tryToBind :: TyVarSet -> TyVar -> BindFlag

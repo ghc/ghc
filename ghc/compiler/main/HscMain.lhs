@@ -79,7 +79,7 @@ import ParserCore
 import ParserCoreUtils
 import FastString
 import Maybes		( expectJust )
-import Bag		( unitBag, emptyBag )
+import Bag		( unitBag )
 import Monad		( when )
 import Maybe		( isJust )
 import IO

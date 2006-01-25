@@ -51,7 +51,7 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCon,
 			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
-			  tyConHasGenerics, tyConArgVrcs, getSynTyConDefn,
+			  tyConHasGenerics, tyConArgVrcs, synTyConRhs,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, isVanillaDataCon )
@@ -515,8 +515,8 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
-    tyvars      = tyConTyVars tycon
-    (_, syn_ty) = getSynTyConDefn tycon
+    tyvars = tyConTyVars tycon
+    syn_ty = synTyConRhs tycon
 
     ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)

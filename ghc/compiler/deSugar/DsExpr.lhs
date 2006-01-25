@@ -11,7 +11,7 @@ module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 import Match		( matchWrapper, matchSimply, matchSinglePat )
 import MatchLit		( dsLit, dsOverLit )
-import DsBinds		( dsLHsBinds )
+import DsBinds		( dsLHsBinds, dsCoercion )
 import DsGRHSs		( dsGuarded )
 import DsListComp	( dsListComp, dsPArrComp )
 import DsUtils		( mkErrorAppDs, mkStringExpr, mkConsExpr, mkNilExpr,
@@ -121,13 +121,14 @@ ds_val_bind (is_rec, hsbinds) body
 				    (showSDoc (ppr pat))
     in
     case bagToList binds of
-      [L loc (FunBind (L _ fun) _ matches _)]
+      [L loc (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn })]
 	-> putSrcSpanDs loc					$
 	   matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
+	   ASSERT( isIdCoercion co_fn )
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
-      [L loc (PatBind pat grhss ty _)]
+      [L loc (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })]
 	-> putSrcSpanDs loc			$
 	   dsGuarded grhss ty 			`thenDs` \ rhs ->
 	   mk_error_app pat			`thenDs` \ error_expr ->
@@ -563,6 +564,8 @@ dsExpr (DictLam dictvars expr)
 dsExpr (DictApp expr dicts)	-- becomes a curried application
   = dsLExpr expr			`thenDs` \ core_expr ->
     returnDs (foldl (\f d -> f `App` (Var d)) core_expr dicts)
+
+dsExpr (HsCoerce co_fn e) = dsCoercion co_fn (dsExpr e)
 \end{code}
 
 Here is where we desugar the Template Haskell brackets and escapes

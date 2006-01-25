@@ -14,13 +14,13 @@ import HsPat		( LPat )
 import HsLit		( HsLit(..), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import HsImpExp		( isOperator, pprHsVar )
-import HsBinds		( HsLocalBinds, DictBinds, isEmptyLocalBinds )
+import HsBinds		( HsLocalBinds, DictBinds, ExprCoFn, isEmptyLocalBinds )
 
 -- others:
 import Type		( Type, pprParendType )
 import Var		( TyVar, Id )
 import Name		( Name )
-import BasicTypes	( IPName, Boxity, tupleParens, Fixity(..) )
+import BasicTypes	( IPName, Boxity, tupleParens, Arity, Fixity(..) )
 import SrcLoc		( Located(..), unLoc )
 import Outputable	
 import FastString
@@ -254,6 +254,9 @@ Everything from here on appears only in typechecker output.
 		(LHsExpr id)
 		[id]
 
+  |  HsCoerce	ExprCoFn 	-- TRANSLATION
+		(HsExpr id)
+
 type PendingSplice = (Name, LHsExpr Id)	-- Typechecked splices, waiting to be 
 					-- pasted back in by the desugarer
 \end{code}
@@ -414,6 +417,8 @@ ppr_expr (DictApp expr [dname])
 ppr_expr (DictApp expr dnames)
   = hang (ppr_lexpr expr)
 	 4 (brackets (interpp'SP dnames))
+
+ppr_expr (HsCoerce co_fn e) = ppr_expr e
 
 ppr_expr (HsType id) = ppr id
 
@@ -612,6 +617,14 @@ data Match id
 	(Maybe (LHsType id))	-- A type signature for the result of the match
 				--	Nothing after typechecking
 	(GRHSs id)
+
+matchGroupArity :: MatchGroup id -> Arity
+matchGroupArity (MatchGroup (match:matches) _)
+  = ASSERT( all ((== n_pats) . length . hsLMatchPats) matches )
+	-- Assertion just checks that all the matches have the same number of pats
+    n_pats
+  where
+    n_pats = length (hsLMatchPats match)
 
 hsLMatchPats :: LMatch id -> [LPat id]
 hsLMatchPats (L _ (Match pats _ _)) = pats

@@ -5,16 +5,16 @@ import Var	( Id )
 import Name	( Name )
 import RdrName	( RdrName )
 import TcRnTypes( TcM )
-import TcType	( TcType, TcKind, Expected )
+import TcType	( TcKind, BoxyRhoType )
 
 tcSpliceExpr :: HsSplice Name
-	     -> Expected TcType
+	     -> BoxyRhoType
 	     -> TcM (HsExpr Id)
 
 kcSpliceType :: HsSplice Name -> TcM (HsType Name, TcKind)
 
 tcBracket :: HsBracket Name 
-	  -> Expected TcType
+	  -> BoxyRhoType
 	  -> TcM (LHsExpr Id)
 
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]

@@ -15,7 +15,7 @@ module VarEnv (
 	mapVarEnv, zipVarEnv,
 	modifyVarEnv, modifyVarEnv_Directly,
 	isEmptyVarEnv, foldVarEnv, 
-	lookupVarEnv_Directly,
+	elemVarEnvByKey, lookupVarEnv_Directly,
 	filterVarEnv_Directly,
 
 	-- InScopeSet
@@ -297,11 +297,13 @@ lookupVarEnv	  :: VarEnv a -> Var -> Maybe a
 lookupVarEnv_NF   :: VarEnv a -> Var -> a
 lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv	  :: Var -> VarEnv a -> Bool
+elemVarEnvByKey   :: Unique -> VarEnv a -> Bool
 foldVarEnv	  :: (a -> b -> b) -> b -> VarEnv a -> b
 \end{code}
 
 \begin{code}
 elemVarEnv       = elemUFM
+elemVarEnvByKey  = elemUFM_Directly
 extendVarEnv	 = addToUFM
 extendVarEnv_C	 = addToUFM_C
 extendVarEnvList = addListToUFM

@@ -12,21 +12,26 @@ module TcMType (
   --------------------------------
   -- Creating new mutable type variables
   newFlexiTyVar,
-  newTyFlexiVarTy,		-- Kind -> TcM TcType
-  newTyFlexiVarTys,		-- Int -> Kind -> TcM [TcType]
+  newFlexiTyVarTy,		-- Kind -> TcM TcType
+  newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
   newKindVar, newKindVars, 
-  lookupTcTyVar, condLookupTcTyVar, LookupTyVarResult(..),
-  newMetaTyVar, readMetaTyVar, writeMetaTyVar, putMetaTyVar, 
+  lookupTcTyVar, LookupTyVarResult(..),
+  newMetaTyVar, readMetaTyVar, writeMetaTyVar, 
+
+  --------------------------------
+  -- Boxy type variables
+  newBoxyTyVar, newBoxyTyVars, readFilledBox, 
 
   --------------------------------
   -- Instantiation
-  tcInstTyVar, tcInstTyVars, tcInstType, 
-  tcSkolType, tcSkolTyVars, tcInstSigType,
+  tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxy, tcInstBoxyTyVar,
+  tcInstSigTyVars, zonkSigTyVar,
+  tcInstSkolTyVar, tcInstSkolTyVars, tcInstSkolType, 
   tcSkolSigType, tcSkolSigTyVars,
 
   --------------------------------
   -- Checking type validity
-  Rank, UserTypeCtxt(..), checkValidType, pprHsSigCtxt,
+  Rank, UserTypeCtxt(..), checkValidType, 
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, instTypeErr, checkAmbiguity,
   arityErr, 
@@ -46,200 +51,65 @@ module TcMType (
 
 
 -- friends:
-import HsSyn		( LHsType )
 import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
 			  ThetaType
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
-			  MetaDetails(..), SkolemInfo(..), isMetaTyVar, metaTvRef,
-			  tcCmpPred, tcEqType, isClassPred, 
+			  MetaDetails(..), SkolemInfo(..), BoxInfo(..), 
+			  BoxyTyVar, BoxyThetaType, BoxySigmaType, 
+			  UserTypeCtxt(..),
+			  isMetaTyVar, isSigTyVar, metaTvRef,
+			  tcCmpPred, isClassPred, tcEqType, tcGetTyVar,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcValidInstHeadTy, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
-			  isUnLiftedType, isIPPred, isImmutableTyVar,
-			  typeKind, isFlexi, isSkolemTyVar,
+			  isUnLiftedType, isIPPred, 
+			  typeKind, isSkolemTyVar,
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
 			  tyVarsOfType, tyVarsOfTypes, tcView,
 			  pprPred, pprTheta, pprClassPred )
-import Kind		( Kind(..), KindVar, kindVarRef, mkKindVar, isSubKind,
+import Kind		( Kind(..), KindVar, kindVarRef, mkKindVar, 
 			  isLiftedTypeKind, isArgTypeKind, isOpenTypeKind,
-			  liftedTypeKind, defaultKind
+			  liftedTypeKind, openTypeKind, defaultKind
 			)
 import Type		( TvSubst, zipTopTvSubst, substTy )
 import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
 			  tyConArity, tyConName )
-import Var		( TyVar, tyVarKind, tyVarName, 
-			  mkTyVar, mkTcTyVar, tcTyVarDetails, isTcTyVar )
+import Var		( TyVar, tyVarKind, tyVarName, isTcTyVar, 
+			  mkTyVar, mkTcTyVar, tcTyVarDetails )
+
+	-- Assertions
+#ifdef DEBUG
+import TcType		( isFlexi, isBoxyTyVar, isImmutableTyVar )
+import Kind		( isSubKind )
+#endif
 
 -- others:
 import TcRnMonad          -- TcType, amongst others
 import FunDeps		( grow )
 import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
-import VarEnv
 import DynFlags	( dopt, DynFlag(..) )
-import UniqSupply	( uniqsFromSupply )
 import Util		( nOfThem, isSingleton, notNull )
 import ListSetOps	( removeDups, findDupsEq )
-import SrcLoc		( unLoc )
 import Outputable
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{New type variables}
+	Instantiation in general
 %*									*
 %************************************************************************
 
 \begin{code}
-newMetaTyVar :: Name -> Kind -> MetaDetails -> TcM TyVar
-newMetaTyVar name kind details
-  = do { ref <- newMutVar details ;
-	 return (mkTcTyVar name kind (MetaTv ref)) }
-
-readMetaTyVar :: TyVar -> TcM MetaDetails
-readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
-		      readMutVar (metaTvRef tyvar)
-
-writeMetaTyVar :: TyVar -> MetaDetails -> TcM ()
-writeMetaTyVar tyvar val = ASSERT2( isMetaTyVar tyvar, ppr tyvar ) 
-			   writeMutVar (metaTvRef tyvar) val
-
-newFlexiTyVar :: Kind -> TcM TcTyVar
-newFlexiTyVar kind
-  = newUnique 	`thenM` \ uniq ->
-    newMetaTyVar (mkSysTvName uniq FSLIT("t")) kind Flexi
-
-newTyFlexiVarTy  :: Kind -> TcM TcType
-newTyFlexiVarTy kind
-  = newFlexiTyVar kind	`thenM` \ tc_tyvar ->
-    returnM (TyVarTy tc_tyvar)
-
-newTyFlexiVarTys :: Int -> Kind -> TcM [TcType]
-newTyFlexiVarTys n kind = mappM newTyFlexiVarTy (nOfThem n kind)
-
-newKindVar :: TcM TcKind
-newKindVar = do	{ uniq <- newUnique
-		; ref <- newMutVar Nothing
-		; return (KindVar (mkKindVar uniq ref)) }
-
-newKindVars :: Int -> TcM [TcKind]
-newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Type instantiation}
-%*									*
-%************************************************************************
-
-Instantiating a bunch of type variables
-
-Note [TyVarName]
-~~~~~~~~~~~~~~~~
-Note that we don't change the print-name
-This won't confuse the type checker but there's a chance
-that two different tyvars will print the same way 
-in an error message.  -dppr-debug will show up the difference
-Better watch out for this.  If worst comes to worst, just
-use mkSystemName.
-
-
-\begin{code}
------------------------
-tcInstTyVars :: [TyVar] -> TcM ([TcTyVar], [TcType], TvSubst)
-tcInstTyVars tyvars
-  = do	{ tc_tvs <- mappM tcInstTyVar tyvars
-	; let tys = mkTyVarTys tc_tvs
-	; returnM (tc_tvs, tys, zipTopTvSubst tyvars tys) }
-		-- Since the tyvars are freshly made,
-		-- they cannot possibly be captured by
-		-- any existing for-alls.  Hence zipTopTvSubst
-
-tcInstTyVar tyvar	-- Freshen the Name of the tyvar
-  = do	{ uniq <- newUnique
-        ; newMetaTyVar (setNameUnique (tyVarName tyvar) uniq)
-		       (tyVarKind tyvar) Flexi }
-
-tcInstType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
--- tcInstType instantiates the outer-level for-alls of a TcType with
--- fresh (mutable) type variables, splits off the dictionary part, 
--- and returns the pieces.
-tcInstType ty = tc_inst_type (mappM tcInstTyVar) ty
-
-
----------------------------------------------
-tcInstSigType :: Name -> [Name] -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type with fresh SigSkol variables
--- See Note [Signature skolems] in TcType.
--- 
--- Tne new type variables have the sane Name as the original *iff* they are scoped.
--- For scoped tyvars, we don't need a fresh unique, because the renamer has made them
--- unique, and it's better not to do so because we extend the envt
--- with them as scoped type variables, and we'd like to avoid spurious
--- 's = s' bindings in error messages
---
--- For non-scoped ones, we *must* instantiate fresh ones:
---	
---	type T = forall a. [a] -> [a]
---	f :: T; 
---	f = g where { g :: T; g = <rhs> }
---
--- We must not use the same 'a' from the defn of T at both places!!
-
-tcInstSigType id_name scoped_names ty = tc_inst_type (tcInstSigTyVars id_name scoped_names) ty
-
-tcInstSigTyVars :: Name -> [Name] -> [TyVar] -> TcM [TcTyVar]
-tcInstSigTyVars id_name scoped_names tyvars
-  = mapM new_tv tyvars
-  where
-    new_tv tv 
-      = do { let name = tyVarName tv
-	   ; ref <- newMutVar Flexi
-	   ; name' <- if name `elem` scoped_names 
-		      then return name
-		      else do { uniq <- newUnique; return (setNameUnique name uniq) }
-	   ; return (mkTcTyVar name' (tyVarKind tv) 
-			       (SigSkolTv id_name ref)) }
-			    
-
----------------------------------------------
-tcSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type with fresh skolem constants
-tcSkolType info ty = tc_inst_type (tcSkolTyVars info) ty
-
-tcSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
-tcSkolTyVars info tyvars
-  = do	{ us <- newUniqueSupply
-	; return (zipWith skol_tv tyvars (uniqsFromSupply us)) }
-  where
-    skol_tv tv uniq = mkTcTyVar (setNameUnique (tyVarName tv) uniq)
-				(tyVarKind tv) (SkolemTv info)
-	-- See Note [TyVarName]
-			    
-
----------------------------------------------
-tcSkolSigType :: SkolemInfo -> Type -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type signature with skolem constants, but 
--- do *not* give them fresh names, because we want the name to
--- be in the type environment -- it is lexically scoped.
-tcSkolSigType info ty
-  = tc_inst_type (\tvs -> return (tcSkolSigTyVars info tvs)) ty
-
-tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
-tcSkolSigTyVars info tyvars = [ mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv info) 
-			      | tv <- tyvars ]
-
------------------------
-tc_inst_type :: ([TyVar] -> TcM [TcTyVar]) 		-- How to instantiate the type variables
-	     -> TcType 					-- Type to instantiate
-	     -> TcM ([TcTyVar], TcThetaType, TcType)	-- Result
-tc_inst_type inst_tyvars ty
+tcInstType :: ([TyVar] -> TcM [TcTyVar]) 		-- How to instantiate the type variables
+	   -> TcType 					-- Type to instantiate
+	   -> TcM ([TcTyVar], TcThetaType, TcType)	-- Result
+tcInstType inst_tyvars ty
   = case tcSplitForAllTys ty of
 	([],     rho) -> let	-- There may be overloading despite no type variables;
 				-- 	(?x :: Int) => Int -> Int
@@ -261,30 +131,209 @@ tc_inst_type inst_tyvars ty
 
 %************************************************************************
 %*									*
-\subsection{Putting and getting  mutable type variables}
+	Kind variables
 %*									*
 %************************************************************************
 
 \begin{code}
-putMetaTyVar :: TcTyVar -> TcType -> TcM ()
+newKindVar :: TcM TcKind
+newKindVar = do	{ uniq <- newUnique
+		; ref <- newMutVar Nothing
+		; return (KindVar (mkKindVar uniq ref)) }
+
+newKindVars :: Int -> TcM [TcKind]
+newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
+\end{code}
+
+
+%************************************************************************
+%*									*
+	SkolemTvs (immutable)
+%*									*
+%************************************************************************
+
+\begin{code}
+mkSkolTyVar :: Name -> Kind -> SkolemInfo -> TcTyVar
+mkSkolTyVar name kind info = mkTcTyVar name kind (SkolemTv info)
+
+tcSkolSigType :: SkolemInfo -> Type -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type signature with skolem constants, but 
+-- do *not* give them fresh names, because we want the name to
+-- be in the type environment -- it is lexically scoped.
+tcSkolSigType info ty = tcInstType (\tvs -> return (tcSkolSigTyVars info tvs)) ty
+
+tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
+-- Make skolem constants, but do *not* give them new names, as above
+tcSkolSigTyVars info tyvars = [ mkSkolTyVar (tyVarName tv) (tyVarKind tv) info
+			      | tv <- tyvars ]
+
+tcInstSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type with fresh skolem constants
+tcInstSkolType info ty = tcInstType (tcInstSkolTyVars info) ty
+
+tcInstSkolTyVar :: SkolemInfo -> TyVar -> TcM TcTyVar
+tcInstSkolTyVar info tyvar
+  = do	{ uniq <- newUnique
+	; let name = setNameUnique (tyVarName tyvar) uniq
+	      kind = tyVarKind tyvar
+	; return (mkSkolTyVar name kind info) }
+
+tcInstSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
+tcInstSkolTyVars info tyvars = mapM (tcInstSkolTyVar info) tyvars
+\end{code}
+
+
+%************************************************************************
+%*									*
+	MetaTvs (meta type variables; mutable)
+%*									*
+%************************************************************************
+
+\begin{code}
+newMetaTyVar :: BoxInfo -> Kind -> TcM TcTyVar
+-- Make a new meta tyvar out of thin air
+newMetaTyVar box_info kind
+  = do	{ uniq <- newUnique
+ 	; ref <- newMutVar Flexi ;
+	; let name = mkSysTvName uniq fs 
+	      fs = case box_info of
+			BoxTv   -> FSLIT("bx")
+			TauTv   -> FSLIT("t")
+			SigTv _ -> FSLIT("a")
+	; return (mkTcTyVar name kind (MetaTv box_info ref)) }
+
+instMetaTyVar :: BoxInfo -> TyVar -> TcM TcTyVar
+-- Make a new meta tyvar whose Name and Kind 
+-- come from an existing TyVar
+instMetaTyVar box_info tyvar
+  = do	{ uniq <- newUnique
+ 	; ref <- newMutVar Flexi ;
+	; let name = setNameUnique (tyVarName tyvar) uniq
+	      kind = tyVarKind tyvar
+	; return (mkTcTyVar name kind (MetaTv box_info ref)) }
+
+readMetaTyVar :: TyVar -> TcM MetaDetails
+readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
+		      readMutVar (metaTvRef tyvar)
+
+writeMetaTyVar :: TcTyVar -> TcType -> TcM ()
 #ifndef DEBUG
-putMetaTyVar tyvar ty = writeMetaTyVar tyvar (Indirect ty)
+writeMetaTyVar tyvar ty = writeMutVar (metaTvRef tyvar) (Indirect ty)
 #else
-putMetaTyVar tyvar ty
+writeMetaTyVar tyvar ty
   | not (isMetaTyVar tyvar)
-  = pprTrace "putTcTyVar" (ppr tyvar) $
+  = pprTrace "writeMetaTyVar" (ppr tyvar) $
     returnM ()
 
   | otherwise
   = ASSERT( isMetaTyVar tyvar )
     ASSERT2( k2 `isSubKind` k1, (ppr tyvar <+> ppr k1) $$ (ppr ty <+> ppr k2) )
-    do	{ ASSERTM( do { details <- readMetaTyVar tyvar; return (isFlexi details) } )
-	; writeMetaTyVar tyvar (Indirect ty) }
+    do	{ ASSERTM2( do { details <- readMetaTyVar tyvar; return (isFlexi details) }, ppr tyvar )
+	; writeMutVar (metaTvRef tyvar) (Indirect ty) }
   where
     k1 = tyVarKind tyvar
     k2 = typeKind ty
 #endif
 \end{code}
+
+
+%************************************************************************
+%*									*
+	MetaTvs: TauTvs
+%*									*
+%************************************************************************
+
+\begin{code}
+newFlexiTyVar :: Kind -> TcM TcTyVar
+newFlexiTyVar kind = newMetaTyVar TauTv kind
+
+newFlexiTyVarTy  :: Kind -> TcM TcType
+newFlexiTyVarTy kind
+  = newFlexiTyVar kind	`thenM` \ tc_tyvar ->
+    returnM (TyVarTy tc_tyvar)
+
+newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
+newFlexiTyVarTys n kind = mappM newFlexiTyVarTy (nOfThem n kind)
+
+tcInstTyVar :: TyVar -> TcM TcTyVar
+-- Instantiate with a META type variable
+tcInstTyVar tyvar = instMetaTyVar TauTv tyvar
+
+tcInstTyVars :: [TyVar] -> TcM ([TcTyVar], [TcType], TvSubst)
+-- Instantiate with META type variables
+tcInstTyVars tyvars
+  = do	{ tc_tvs <- mapM tcInstTyVar tyvars
+	; let tys = mkTyVarTys tc_tvs
+	; returnM (tc_tvs, tys, zipTopTvSubst tyvars tys) }
+		-- Since the tyvars are freshly made,
+		-- they cannot possibly be captured by
+		-- any existing for-alls.  Hence zipTopTvSubst
+\end{code}
+
+
+%************************************************************************
+%*									*
+	MetaTvs: SigTvs
+%*									*
+%************************************************************************
+
+\begin{code}
+tcInstSigTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
+-- Instantiate with meta SigTvs
+tcInstSigTyVars skol_info tyvars 
+  = mapM (instMetaTyVar (SigTv skol_info)) tyvars
+
+zonkSigTyVar :: TcTyVar -> TcM TcTyVar
+zonkSigTyVar sig_tv 
+  | isSkolemTyVar sig_tv 
+  = return sig_tv	-- Happens in the call in TcBinds.checkDistinctTyVars
+  | otherwise
+  = ASSERT( isSigTyVar sig_tv )
+    do { ty <- zonkTcTyVar sig_tv
+       ; return (tcGetTyVar "zonkSigTyVar" ty) }
+	-- 'ty' is bound to be a type variable, because SigTvs
+	-- can only be unified with type variables
+\end{code}
+
+
+%************************************************************************
+%*									*
+	MetaTvs: BoxTvs
+%*									*
+%************************************************************************
+
+\begin{code}
+newBoxyTyVar :: TcM BoxyTyVar		-- Of openTypeKind
+newBoxyTyVar = newMetaTyVar BoxTv openTypeKind
+
+newBoxyTyVars :: Int -> TcM [BoxyTyVar]		-- Of openTypeKind
+newBoxyTyVars n = sequenceM [newMetaTyVar BoxTv openTypeKind | i <- [1..n]]
+
+readFilledBox :: BoxyTyVar -> TcM TcType
+-- Read the contents of the box, which should be filled in by now
+readFilledBox box_tv = ASSERT( isBoxyTyVar box_tv )
+		       do { cts <- readMetaTyVar box_tv
+		 	  ; case cts of
+				Flexi 	    -> pprPanic "readFilledBox" (ppr box_tv)
+				Indirect ty -> return ty }
+
+tcInstBoxyTyVar :: TyVar -> TcM BoxyTyVar
+-- Instantiate with a BOXY type variable
+tcInstBoxyTyVar tyvar = instMetaTyVar BoxTv tyvar
+
+tcInstBoxy :: TcType -> TcM ([BoxyTyVar], BoxyThetaType, BoxySigmaType)
+-- tcInstType instantiates the outer-level for-alls of a TcType with
+-- fresh BOXY type variables, splits off the dictionary part, 
+-- and returns the pieces.
+tcInstBoxy ty = tcInstType (mapM tcInstBoxyTyVar) ty
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Putting and getting  mutable type variables}
+%*									*
+%************************************************************************
 
 But it's more fun to short out indirections on the way: If this
 version returns a TyVar, then that TyVar is unbound.  If it returns
@@ -294,58 +343,19 @@ We return Nothing iff the original box was unbound.
 
 \begin{code}
 data LookupTyVarResult	-- The result of a lookupTcTyVar call
-  = DoneTv TcTyVarDetails	-- Unrefined SkolemTv or virgin MetaTv/SigSkolTv
-  | IndirectTv Bool TcType
-	-- 	True  => This is a non-wobbly type refinement, 
-	--		 gotten from GADT match unification
-	--	False => This is a wobbly type, 
-	--		 gotten from inference unification
+  = DoneTv TcTyVarDetails	-- SkolemTv or virgin MetaTv
+  | IndirectTv TcType
 
 lookupTcTyVar :: TcTyVar -> TcM LookupTyVarResult
--- This function is the ONLY PLACE that we consult the 
--- type refinement carried by the monad
 lookupTcTyVar tyvar 
-  = let 
-	details =  tcTyVarDetails tyvar
-    in
-    case details of
-      MetaTv ref -> lookup_wobbly details ref
-
-      SkolemTv _ -> do	{ type_reft <- getTypeRefinement
-			; case lookupVarEnv type_reft tyvar of
-			    Just ty -> return (IndirectTv True ty)
-			    Nothing -> return (DoneTv details)
-			}
-
-	-- For SigSkolTvs try the refinement, and, failing that
-	-- see if it's been unified to anything.  It's a combination
-	-- of SkolemTv and MetaTv
-      SigSkolTv _  ref -> do { type_reft <- getTypeRefinement
-			     ; case lookupVarEnv type_reft tyvar of
-				Just ty -> return (IndirectTv True ty)
-				Nothing -> lookup_wobbly details ref
-			     }
-
--- Look up a meta type variable, conditionally consulting 
--- the current type refinement
-condLookupTcTyVar :: Bool -> TcTyVar -> TcM LookupTyVarResult
-condLookupTcTyVar use_refinement tyvar 
-  | use_refinement = lookupTcTyVar tyvar
-  | otherwise
   = case details of
-      MetaTv ref      -> lookup_wobbly details ref
-      SkolemTv _      -> return (DoneTv details)
-      SigSkolTv _ ref -> lookup_wobbly details ref
-  where 
-    details = tcTyVarDetails tyvar
-
-lookup_wobbly :: TcTyVarDetails -> IORef MetaDetails -> TcM LookupTyVarResult
-lookup_wobbly details ref
-  = do	{ meta_details <- readMutVar ref
-	; case meta_details of
-	    Indirect ty -> return (IndirectTv False ty)
-	    Flexi       -> return (DoneTv details)
-	}
+      SkolemTv _   -> return (DoneTv details)
+      MetaTv _ ref -> do { meta_details <- readMutVar ref
+			 ; case meta_details of
+			    Indirect ty -> return (IndirectTv ty)
+			    Flexi       -> return (DoneTv details) }
+  where
+    details =  tcTyVarDetails tyvar
 
 {- 
 -- gaw 2004 We aren't shorting anything out anymore, at least for now
@@ -400,14 +410,15 @@ zonkTcTyVarsAndFV tyvars = mappM zonkTcTyVar tyvars	`thenM` \ tys ->
 			   returnM (tyVarsOfTypes tys)
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
-zonkTcTyVar tyvar = zonkTyVar (\ tv -> returnM (TyVarTy tv)) True tyvar
+zonkTcTyVar tyvar = ASSERT( isTcTyVar tyvar )
+		    zonk_tc_tyvar (\ tv -> returnM (TyVarTy tv)) tyvar
 \end{code}
 
 -----------------  Types
 
 \begin{code}
 zonkTcType :: TcType -> TcM TcType
-zonkTcType ty = zonkType (\ tv -> returnM (TyVarTy tv)) True ty
+zonkTcType ty = zonkType (\ tv -> returnM (TyVarTy tv)) ty
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
 zonkTcTypes tys = mappM zonkTcType tys
@@ -461,7 +472,7 @@ zonkQuantifiedTyVar tv
 		-- [Sept 04] I don't think this should happen
 		-- See note [Silly Type Synonym]
 
-	    other -> writeMetaTyVar tv (Indirect (mkTyVarTy final_tv))
+	    Flexi -> writeMetaTyVar tv (mkTyVarTy final_tv)
 
 	-- Return the new tyvar
 	; return final_tv }
@@ -486,7 +497,7 @@ Consider this:
   where a is fresh.
 
 * Now abstract over the 'a', but float out the Num (C d a) constraint
-  because it does not 'really' mention a.  (see Type.tyVarsOfType)
+  because it does not 'really' mention a.  (see exactTyVarsOfType)
   The arg to foo becomes
 	/\a -> \t -> t+t
 
@@ -518,33 +529,34 @@ a /\a in the final result but all the occurrences of a will be zonked to ()
 
 zonkType :: (TcTyVar -> TcM Type) 	-- What to do with unbound mutable type variables
 					-- see zonkTcType, and zonkTcTypeToType
-	 -> Bool                        -- Should we consult the current type refinement?
          -> TcType
 	 -> TcM Type
-zonkType unbound_var_fn rflag ty
+zonkType unbound_var_fn ty
   = go ty
   where
-    go (TyConApp tycon tys)	  = mappM go tys	`thenM` \ tys' ->
-				    returnM (TyConApp tycon tys')
-
-    go (NoteTy _ ty2) 		  = go ty2	-- Discard free-tyvar annotations
-
-    go (PredTy p)		  = go_pred p		`thenM` \ p' ->
-				    returnM (PredTy p')
-
-    go (FunTy arg res)      	  = go arg		`thenM` \ arg' ->
-				    go res		`thenM` \ res' ->
-				    returnM (FunTy arg' res')
- 
-    go (AppTy fun arg)	 	  = go fun		`thenM` \ fun' ->
-				    go arg		`thenM` \ arg' ->
-				    returnM (mkAppTy fun' arg')
+    go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
+			 
+    go (TyConApp tc tys) = mappM go tys	`thenM` \ tys' ->
+			   returnM (TyConApp tc tys')
+			    
+    go (PredTy p)	 = go_pred p		`thenM` \ p' ->
+			   returnM (PredTy p')
+			 
+    go (FunTy arg res)   = go arg		`thenM` \ arg' ->
+			   go res		`thenM` \ res' ->
+			   returnM (FunTy arg' res')
+ 			 
+    go (AppTy fun arg)	 = go fun		`thenM` \ fun' ->
+			   go arg		`thenM` \ arg' ->
+			   returnM (mkAppTy fun' arg')
 		-- NB the mkAppTy; we might have instantiated a
 		-- type variable to a type constructor, so we need
 		-- to pull the TyConApp to the top.
 
 	-- The two interesting cases!
-    go (TyVarTy tyvar)     = zonkTyVar unbound_var_fn rflag tyvar
+    go (TyVarTy tyvar) | isTcTyVar tyvar = zonk_tc_tyvar unbound_var_fn tyvar
+		       | otherwise	 = return (TyVarTy tyvar)
+		-- Ordinary (non Tc) tyvars occur inside quantified types
 
     go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar )
 			     go ty		`thenM` \ ty' ->
@@ -555,23 +567,17 @@ zonkType unbound_var_fn rflag ty
     go_pred (IParam n ty)  = go ty		`thenM` \ ty' ->
 			     returnM (IParam n ty')
 
-zonkTyVar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variable
-          -> Bool                               -- Consult the type refinement?
- 	  -> TcTyVar -> TcM TcType
-zonkTyVar unbound_var_fn rflag tyvar 
-  | not (isTcTyVar tyvar)	-- When zonking (forall a.  ...a...), the occurrences of 
-				-- the quantified variable 'a' are TyVars not TcTyVars
+zonk_tc_tyvar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variable
+ 	      -> TcTyVar -> TcM TcType
+zonk_tc_tyvar unbound_var_fn tyvar 
+  | not (isMetaTyVar tyvar)	-- Skolems
   = returnM (TyVarTy tyvar)
 
-  | otherwise
-  =  condLookupTcTyVar rflag tyvar  `thenM` \ details ->
-     case details of
-          -- If b is true, the variable was refined, and therefore it is okay
-          -- to continue refining inside.  Otherwise it was wobbly and we should
-          -- not refine further inside.
-	  IndirectTv b ty   -> zonkType unbound_var_fn b ty -- Bound flexi/refined rigid
-          DoneTv (MetaTv _) -> unbound_var_fn tyvar 	    -- Unbound meta type variable
-          DoneTv other      -> return (TyVarTy tyvar)       -- Rigid, no zonking necessary
+  | otherwise			-- Mutables
+  = do	{ cts <- readMetaTyVar tyvar
+	; case cts of
+	    Flexi       -> unbound_var_fn tyvar    -- Unbound meta type variable
+	    Indirect ty -> zonkType unbound_var_fn ty  }
 \end{code}
 
 
@@ -649,54 +655,6 @@ This might not necessarily show up in kind checking.
 
 	
 \begin{code}
-data UserTypeCtxt 
-  = FunSigCtxt Name	-- Function type signature
-			-- Also used for types in SPECIALISE pragmas
-  | ExprSigCtxt		-- Expression type signature
-  | ConArgCtxt Name	-- Data constructor argument
-  | TySynCtxt Name	-- RHS of a type synonym decl
-  | GenPatCtxt		-- Pattern in generic decl
-			-- 	f{| a+b |} (Inl x) = ...
-  | PatSigCtxt		-- Type sig in pattern
-			-- 	f (x::t) = ...
-  | ResSigCtxt		-- Result type sig
-			-- 	f x :: t = ....
-  | ForSigCtxt Name	-- Foreign inport or export signature
-  | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
-  | DefaultDeclCtxt	-- Types in a default declaration
-  | SpecInstCtxt	-- SPECIALISE instance pragma
-
--- Notes re TySynCtxt
--- We allow type synonyms that aren't types; e.g.  type List = []
---
--- If the RHS mentions tyvars that aren't in scope, we'll 
--- quantify over them:
---	e.g. 	type T = a->a
--- will become	type T = forall a. a->a
---
--- With gla-exts that's right, but for H98 we should complain. 
-
-
-pprHsSigCtxt :: UserTypeCtxt -> LHsType Name -> SDoc
-pprHsSigCtxt ctxt hs_ty = pprUserTypeCtxt (unLoc hs_ty) ctxt
-
-pprUserTypeCtxt ty (FunSigCtxt n)  = sep [ptext SLIT("In the type signature:"), pp_sig n ty]
-pprUserTypeCtxt ty ExprSigCtxt     = sep [ptext SLIT("In an expression type signature:"), nest 2 (ppr ty)]
-pprUserTypeCtxt ty (ConArgCtxt c)  = sep [ptext SLIT("In the type of the constructor"), pp_sig c ty]
-pprUserTypeCtxt ty (TySynCtxt c)   = sep [ptext SLIT("In the RHS of the type synonym") <+> quotes (ppr c) <> comma,
-				          nest 2 (ptext SLIT(", namely") <+> ppr ty)]
-pprUserTypeCtxt ty GenPatCtxt      = sep [ptext SLIT("In the type pattern of a generic definition:"), nest 2 (ppr ty)]
-pprUserTypeCtxt ty PatSigCtxt      = sep [ptext SLIT("In a pattern type signature:"), nest 2 (ppr ty)]
-pprUserTypeCtxt ty ResSigCtxt      = sep [ptext SLIT("In a result type signature:"), nest 2 (ppr ty)]
-pprUserTypeCtxt ty (ForSigCtxt n)  = sep [ptext SLIT("In the foreign declaration:"), pp_sig n ty]
-pprUserTypeCtxt ty (RuleSigCtxt n) = sep [ptext SLIT("In the type signature:"), pp_sig n ty]
-pprUserTypeCtxt ty DefaultDeclCtxt = sep [ptext SLIT("In a type in a `default' declaration:"), nest 2 (ppr ty)]
-pprUserTypeCtxt ty SpecInstCtxt    = sep [ptext SLIT("In a SPECIALISE instance pragma:"), nest 2 (ppr ty)]
-
-pp_sig n ty = nest 2 (ppr n <+> dcolon <+> ppr ty)
-\end{code}
-
-\begin{code}
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty
@@ -707,7 +665,8 @@ checkValidType ctxt ty
 	     | otherwise
 	     = case ctxt of	-- Haskell 98
 		 GenPatCtxt	-> Rank 0
-		 PatSigCtxt	-> Rank 0
+		 LamPatSigCtxt	-> Rank 0
+		 BindPatSigCtxt	-> Rank 0
 		 DefaultDeclCtxt-> Rank 0
 		 ResSigCtxt	-> Rank 0
 		 TySynCtxt _    -> Rank 0
@@ -777,7 +736,7 @@ check_poly_type rank ubx_tup ty
 check_arg_type :: Type -> TcM ()
 -- The sort of type that can instantiate a type variable,
 -- or be the argument of a type constructor.
--- Not an unboxed tuple, not a forall.
+-- Not an unboxed tuple, but now *can* be a forall (since impredicativity)
 -- Other unboxed types are very occasionally allowed as type
 -- arguments depending on the kind of the type constructor
 -- 
@@ -794,7 +753,7 @@ check_arg_type :: Type -> TcM ()
 -- Anyway, they are dealt with by a special case in check_tau_type
 
 check_arg_type ty 
-  = check_tau_type (Rank 0) UT_NotOk ty		`thenM_` 
+  = check_poly_type Arbitrary UT_NotOk ty	`thenM_` 
     checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty)
 
 ----------------------------------------
@@ -816,7 +775,7 @@ check_tau_type rank ubx_tup (PredTy sty) = getDOpts		`thenM` \ dflags ->
 check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
 check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
   = check_poly_type rank UT_NotOk arg_ty	`thenM_`
-    check_tau_type  rank UT_Ok    res_ty
+    check_poly_type rank UT_Ok    res_ty
 
 check_tau_type rank ubx_tup (AppTy ty1 ty2)
   = check_arg_type ty1 `thenM_` check_arg_type ty2
@@ -826,10 +785,7 @@ check_tau_type rank ubx_tup (NoteTy other_note ty)
 
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc	
-  = 	-- NB: Type.mkSynTy builds a TyConApp (not a NoteTy) for an unsaturated
-	-- synonym application, leaving it to checkValidType (i.e. right here)
-	-- to find the error
-    do	{ 	-- It's OK to have an *over-applied* type synonym
+  = do	{ 	-- It's OK to have an *over-applied* type synonym
 		--	data Tree a b = ...
 		--	type Foo a = Tree [a]
 		--	f :: Foo a b -> ...
@@ -929,10 +885,6 @@ check_valid_theta ctxt []
 check_valid_theta ctxt theta
   = getDOpts					`thenM` \ dflags ->
     warnTc (notNull dups) (dupPredWarn dups)	`thenM_`
-	-- Actually, in instance decls and type signatures, 
-	-- duplicate constraints are eliminated by TcHsType.hoistForAllTys,
-	-- so this error can only fire for the context of a class or
-	-- data type decl.
     mappM_ (check_source_ty dflags ctxt) theta
   where
     (_,dups) = removeDups tcCmpPred theta

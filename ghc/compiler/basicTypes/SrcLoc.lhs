@@ -381,6 +381,6 @@ instance Functor Located where
   fmap f (L l e) = L l (f e)
 
 instance Outputable e => Outputable (Located e) where
-  ppr (L span e) = ppr e
+  ppr (L span e) =  ppr e
 	-- do we want to dump the span in debugSty mode?    
 \end{code}

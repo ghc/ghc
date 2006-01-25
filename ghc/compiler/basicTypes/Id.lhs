@@ -30,7 +30,7 @@ module Id (
 	isClassOpId_maybe,
 	isPrimOpId, isPrimOpId_maybe, 
 	isFCallId, isFCallId_maybe,
-	isDataConWorkId, isDataConWorkId_maybe, idDataCon,
+	isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
 	isBottomingId, idIsFrom,
 	hasNoBinding, 
 
@@ -264,8 +264,11 @@ isDataConWorkId_maybe id = case globalIdDetails id of
 			  DataConWorkId con -> Just con
 			  other	            -> Nothing
 
-isDictId :: Id -> Bool
-isDictId id = isDictTy (idType id)
+isDataConId_maybe :: Id -> Maybe DataCon
+isDataConId_maybe id = case globalIdDetails id of
+		 	 DataConWorkId con -> Just con
+			 DataConWrapId con -> Just con
+			 other		    -> Nothing
 
 idDataCon :: Id -> DataCon
 -- Get from either the worker or the wrapper to the DataCon
@@ -277,6 +280,9 @@ idDataCon id = case globalIdDetails id of
 		  DataConWrapId con -> con
 		  other		    -> pprPanic "idDataCon" (ppr id)
 
+
+isDictId :: Id -> Bool
+isDictId id = isDictTy (idType id)
 
 -- hasNoBinding returns True of an Id which may not have a
 -- binding, even though it is defined in this module.  

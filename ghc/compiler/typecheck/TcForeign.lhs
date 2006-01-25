@@ -23,7 +23,7 @@ import HsSyn
 
 import TcRnMonad
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcExpr		( tcCheckSigma )			
+import TcExpr		( tcPolyExpr )			
 
 import ForeignCall	( CCallConv(..) )
 import ErrUtils		( Message )
@@ -216,7 +216,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec isDeprec) =
    addErrCtxt (foreignDeclCtxt fo)	$
 
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenM` \ sig_ty ->
-   tcCheckSigma (nlHsVar nm) sig_ty	`thenM` \ rhs ->
+   tcPolyExpr (nlHsVar nm) sig_ty	`thenM` \ rhs ->
 
    tcCheckFEType sig_ty spec		`thenM_`
 

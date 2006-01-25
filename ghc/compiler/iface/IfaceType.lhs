@@ -27,7 +27,7 @@ module IfaceType (
 #include "HsVersions.h"
 
 import Kind		( Kind(..) )
-import TypeRep		( TyThing(..), Type(..), TyNote(..), PredType(..), ThetaType )
+import TypeRep		( TyThing(..), Type(..), PredType(..), ThetaType )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )

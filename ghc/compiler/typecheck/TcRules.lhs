@@ -11,10 +11,10 @@ module TcRules ( tcRules ) where
 import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), mkHsDictLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
-import TcMType		( newTyFlexiVarTy, zonkQuantifiedTyVar )
-import TcType		( tyVarsOfTypes, openTypeKind )
+import TcMType		( newFlexiTyVarTy, zonkQuantifiedTyVar, tcSkolSigTyVars )
+import TcType		( tyVarsOfTypes, openTypeKind, SkolemInfo(..), substTyWith, mkTyVarTys )
 import TcHsType		( UserTypeCtxt(..), tcHsPatSigType )
-import TcExpr		( tcCheckRho )
+import TcExpr		( tcMonoExpr )
 import TcEnv		( tcExtendIdEnv, tcExtendTyVarEnv )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
@@ -32,13 +32,13 @@ tcRule (HsRule name act vars lhs rhs)
   = addErrCtxt (ruleCtxt name)			$
     traceTc (ptext SLIT("---- Rule ------")
 		 <+> ppr name)			`thenM_` 
-    newTyFlexiVarTy openTypeKind		`thenM` \ rule_ty ->
+    newFlexiTyVarTy openTypeKind		`thenM` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
     tcRuleBndrs vars (\ ids ->
 		-- Now LHS and RHS
-	getLIE (tcCheckRho lhs rule_ty)	`thenM` \ (lhs', lhs_lie) ->
-	getLIE (tcCheckRho rhs rule_ty)	`thenM` \ (rhs', rhs_lie) ->
+	getLIE (tcMonoExpr lhs rule_ty)	`thenM` \ (lhs', lhs_lie) ->
+	getLIE (tcMonoExpr rhs rule_ty)	`thenM` \ (rhs', rhs_lie) ->
 	returnM (ids, lhs', rhs', lhs_lie, rhs_lie)
     )				`thenM` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
@@ -90,14 +90,20 @@ tcRule (HsRule name act vars lhs rhs)
 
 tcRuleBndrs [] thing_inside = thing_inside []
 tcRuleBndrs (RuleBndr var : vars) thing_inside
-  = do 	{ ty <- newTyFlexiVarTy openTypeKind
+  = do 	{ ty <- newFlexiTyVarTy openTypeKind
 	; let id = mkLocalId (unLoc var) ty
 	; tcExtendIdEnv [id] $
 	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
 tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
-  = do	{ (tyvars, ty) <- tcHsPatSigType (RuleSigCtxt (unLoc var)) rn_ty
-	; let id = mkLocalId (unLoc var) ty
-	; tcExtendTyVarEnv tyvars $
+--  e.g 	x :: a->a
+--  The tyvar 'a' is brought into scope first, just as if you'd written
+--		a::*, x :: a->a
+  = do	{ let ctxt = RuleSigCtxt (unLoc var)
+	; (tyvars, ty) <- tcHsPatSigType ctxt rn_ty
+	; let skol_tvs = tcSkolSigTyVars (SigSkol ctxt) tyvars
+	      id_ty = substTyWith tyvars (mkTyVarTys skol_tvs) ty
+	      id = mkLocalId (unLoc var) id_ty
+	; tcExtendTyVarEnv skol_tvs $
 	  tcExtendIdEnv [id] $
 	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
 

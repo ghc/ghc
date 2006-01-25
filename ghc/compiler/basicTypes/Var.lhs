@@ -7,7 +7,7 @@
 module Var (
 	Var, 
 	varName, varUnique, 
-	setVarName, setVarUnique, setVarOcc,
+	setVarName, setVarUnique, 
 
 	-- TyVars
 	TyVar, mkTyVar, mkTcTyVar,
@@ -33,11 +33,11 @@ module Var (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TypeRep( Type )
-import {-# SOURCE #-}	TcType( TcTyVarDetails )
+import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
 
-import Name		( Name, OccName, NamedThing(..),
-			  setNameUnique, setNameOcc, nameUnique
+import Name		( Name, NamedThing(..),
+			  setNameUnique, nameUnique
 			)
 import Kind		( Kind )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey# )
@@ -111,7 +111,13 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 
 \begin{code}
 instance Outputable Var where
-  ppr var = ppr (varName var)
+  ppr var = ppr (varName var) <+> ifPprDebug (brackets extra)
+	where
+	  extra = case var of
+			GlobalId {} -> ptext SLIT("gid")
+			LocalId  {} -> ptext SLIT("lid")
+			TyVar    {} -> ptext SLIT("tv")
+			TcTyVar {tcTyVarDetails = details} -> pprTcTyVarDetails details
 
 instance Show Var where
   showsPrec p var = showsPrecSDoc p (ppr var)
@@ -147,10 +153,6 @@ setVarName :: Var -> Name -> Var
 setVarName var new_name
   = var { realUnique = getKey# (getUnique new_name), 
    	  varName = new_name }
-
-setVarOcc :: Var -> OccName -> Var
-setVarOcc var new_occ
-  = var { varName = setNameOcc (varName var) new_occ }
 \end{code}
 
 

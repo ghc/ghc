@@ -126,8 +126,8 @@ extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
 extractGenericPatTyVars binds
   = nubBy eqLocated (foldrBag get [] binds)
   where
-    get (L _ (FunBind _ _ (MatchGroup ms _) _)) acc = foldr (get_m.unLoc) acc ms
-    get other	    			        acc = acc
+    get (L _ (FunBind { fun_matches = MatchGroup ms _ })) acc = foldr (get_m.unLoc) acc ms
+    get other	 	   			          acc = acc
 
     get_m (Match (L _ (TypePat ty) : _) _ _) acc = extract_lty ty acc
     get_m other			       		   acc = acc
@@ -231,15 +231,15 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 --
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
-getMonoBind (L loc (FunBind lf@(L _ f) inf (MatchGroup mtchs _) _)) binds
+getMonoBind (L loc bind@(FunBind { fun_id = L _ f, fun_matches = MatchGroup mtchs _ })) binds
   | has_args mtchs
   = go mtchs loc binds
   where
-    go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 (MatchGroup mtchs2 _) _)) : binds)
-	| f == unLoc f2 = go (mtchs2++mtchs1) loc binds
+    go mtchs1 loc1 (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_matches = MatchGroup mtchs2 _ })) : binds)
+	| f == f2 = go (mtchs2++mtchs1) loc binds
 	where loc = combineSrcSpans loc1 loc2
     go mtchs1 loc binds
-	= (L loc (FunBind lf inf (mkMatchGroup (reverse mtchs1)) placeHolderNames), binds)
+	= (L loc (bind { fun_matches = mkMatchGroup (reverse mtchs1) }), binds)
 	-- Reverse the final matches, to get it back in the right order
 
 getMonoBind bind binds = (bind, binds)
@@ -583,14 +583,15 @@ checkValDef
 	-> P (HsBind RdrName)
 
 checkValDef lhs opt_sig (L rhs_span grhss)
-  | Just (f,inf,es)  <- isFunLhs lhs []
+  | Just (f,inf,es)  <- isFunLhs lhs
   = if isQual (unLoc f)
 	then parseError (getLoc f) ("Qualified name in function definition: "  ++ 
 					showRdrName (unLoc f))
 	else do ps <- checkPatterns es
 		let match_span = combineSrcSpans (getLoc lhs) rhs_span
 		    matches    = mkMatchGroup [L match_span (Match ps opt_sig grhss)]
-		return (FunBind f inf matches  placeHolderNames)
+		return (FunBind { fun_id = f, fun_infix = inf, fun_matches = matches,
+				  fun_co_fn = idCoercion, bind_fvs = placeHolderNames })
 	-- The span of the match covers the entire equation.  
 	-- That isn't quite right, but it'll do for now.
   | otherwise = do
@@ -634,23 +635,23 @@ mkGadtDecl name ty = ConDecl
 
 -- A variable binding is parsed as a FunBind.
 
-isFunLhs :: LHsExpr RdrName -> [LHsExpr RdrName]
+isFunLhs :: LHsExpr RdrName
   -> Maybe (Located RdrName, Bool, [LHsExpr RdrName])
-isFunLhs (L loc e) = isFunLhs' loc e
+isFunLhs e = go e []
  where
-   isFunLhs' loc (HsVar f) es 
+   go (L loc (HsVar f)) es 
 	| not (isRdrDataCon f)	 	= Just (L loc f, False, es)
-   isFunLhs' loc (HsApp f e) es 	= isFunLhs f (e:es)
-   isFunLhs' loc (HsPar e)   es@(_:_) 	= isFunLhs e es
-   isFunLhs' loc (OpApp l (L loc' (HsVar op)) fix r) es
+   go (L _ (HsApp f e)) es 	 = go f (e:es)
+   go (L _ (HsPar e))   es@(_:_) = go e es
+   go (L loc (OpApp l (L loc' (HsVar op)) fix r)) es
 	| not (isRdrDataCon op) = Just (L loc' op, True, (l:r:es))
 	| otherwise		= 
-		case isFunLhs l es of
+		case go l es of
 		    Just (op', True, j : k : es') ->
 		      Just (op', True, 
 			    j : L loc (OpApp k (L loc' (HsVar op)) fix r) : es')
 		    _ -> Nothing
-   isFunLhs' _ _ _ = Nothing
+   go _ _ = Nothing
 
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities

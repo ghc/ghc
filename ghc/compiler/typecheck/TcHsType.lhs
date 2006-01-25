@@ -17,46 +17,46 @@ module TcHsType (
 	tcTyVarBndrs, dsHsType, tcLHsConResTy,
 	tcDataKindSig,
 
-	tcHsPatSigType, tcAddLetBoundTyVars,
-	
-	TcSigInfo(..), TcSigFun, lookupSig 
+		-- Pattern type signatures
+	tcHsPatSigType, tcPatSig
    ) where
 
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, 
-			  LHsContext, HsPred(..), LHsPred, LHsBinds, HsExplicitForAll(..),
-			  collectSigTysFromHsBinds )
+			  LHsContext, HsPred(..), LHsPred, HsExplicitForAll(..) )
 import RnHsSyn		( extractHsTyVars )
 import TcRnMonad
 import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnvTvs, 
 			  tcLookup, tcLookupClass, tcLookupTyCon,
-		 	  TyThing(..), getInLocalScope, wrongThingErr
+		 	  TyThing(..), getInLocalScope, getScopedTyVarBinds,
+			  wrongThingErr
 			)
-import TcMType		( newKindVar, newMetaTyVar, zonkTcKindToKind, 
-			  checkValidType, UserTypeCtxt(..), pprHsSigCtxt
+import TcMType		( newKindVar, 
+			  zonkTcKindToKind, 
+			  tcInstBoxyTyVar, readFilledBox,
+			  checkValidType
 			)
-import TcUnify		( unifyFunKind, checkExpectedKind )
+import TcUnify		( boxyUnify, unifyFunKind, checkExpectedKind )
 import TcIface		( checkWiredInTyCon )
-import TcType		( Type, PredType(..), ThetaType, 
-			  MetaDetails(Flexi), hoistForAllTys,
-			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
-		 	  mkFunTy, mkSigmaTy, mkPredTy, mkGenTyConApp, 
+import TcType		( Type, PredType(..), ThetaType, BoxySigmaType,
+			  TcType, TcKind, isRigidTy,
+			  UserTypeCtxt(..), pprUserTypeCtxt,
+			  substTyWith, mkTyVarTys, tcEqType,
+		 	  tcIsTyVarTy, mkFunTy, mkSigmaTy, mkPredTy, 
 			  mkTyConApp, mkAppTys, typeKind )
 import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
 			  openTypeKind, argTypeKind, splitKindFunTys )
-import Id		( idName )
-import Var		( TyVar, mkTyVar )
+import Var		( TyVar, mkTyVar, tyVarName )
 import TyCon		( TyCon, tyConKind )
 import Class		( Class, classTyCon )
 import Name		( Name, mkInternalName )
 import OccName		( mkOccName, tvName )
 import NameSet
-import NameEnv
 import PrelNames	( genUnitTyConName )
 import TysWiredIn	( mkListTy, listTyCon, mkPArrTy, parrTyCon, tupleTyCon )
-import BasicTypes	( Boxity(..), RecFlag )
-import SrcLoc		( Located(..), unLoc, noLoc, srcSpanStart )
+import BasicTypes	( Boxity(..) )
+import SrcLoc		( Located(..), unLoc, noLoc, getLoc, srcSpanStart )
 import UniqSupply	( uniqsFromSupply )
 import Outputable
 \end{code}
@@ -196,9 +196,7 @@ tcHsKindedType :: LHsType Name -> TcM Type
   -- This is used in type and class decls, where kinding is
   -- done in advance, and validity checking is done later
   -- [Validity checking done later because of knot-tying issues.]
-tcHsKindedType hs_ty 
-  = do	{ ty <- dsHsType hs_ty
-	; return (hoistForAllTys ty) }
+tcHsKindedType hs_ty = dsHsType hs_ty
 
 tcHsBangType :: LHsType Name -> TcM Type
 -- Permit a bang, but discard it
@@ -519,7 +517,7 @@ ds_var_app name arg_tys
  = tcLookup name			`thenM` \ thing ->
     case thing of
 	ATyVar _ ty 	    -> returnM (mkAppTys ty arg_tys)
-	AGlobal (ATyCon tc) -> returnM (mkGenTyConApp tc arg_tys)
+	AGlobal (ATyCon tc) -> returnM (mkTyConApp tc arg_tys)
 	other		    -> wrongThingErr "type" thing name
 \end{code}
 
@@ -605,10 +603,10 @@ tcTyVarBndrs bndrs thing_inside
   = mapM (zonk . unLoc) bndrs	`thenM` \ tyvars ->
     tcExtendTyVarEnv tyvars (thing_inside tyvars)
   where
-    zonk (KindedTyVar name kind) = zonkTcKindToKind kind	`thenM` \ kind' ->
-				   returnM (mkTyVar name kind')
+    zonk (KindedTyVar name kind) = do { kind' <- zonkTcKindToKind kind
+				      ; return (mkTyVar name kind') }
     zonk (UserTyVar name) = pprTrace "Un-kinded tyvar" (ppr name) $
-			    returnM (mkTyVar name liftedTypeKind)
+			    return (mkTyVar name liftedTypeKind)
 
 -----------------------------------
 tcDataKindSig :: Maybe Kind -> TcM [TyVar]
@@ -682,138 +680,137 @@ Historical note:
 	   it with expected_ty afterwards
 
 \begin{code}
-tcPatSigBndrs :: LHsType Name
-	      -> TcM ([TcTyVar],	-- Brought into scope
-		      LHsType Name)	-- Kinded, but not yet desugared
-
-tcPatSigBndrs hs_ty
-  = do	{ in_scope <- getInLocalScope
-	; span <- getSrcSpanM
-	; let sig_tvs = [ L span (UserTyVar n) 
-			| n <- nameSetToList (extractHsTyVars hs_ty),
-			  not (in_scope n) ]
-		-- The tyvars we want are the free type variables of 
-		-- the type that are not already in scope
-
-	-- Behave like kcHsType on a ForAll type
-	-- i.e. make kinded tyvars with mutable kinds, 
-	--      and kind-check the enclosed types
-	; (kinded_tvs, kinded_ty) <- kcHsTyVars sig_tvs $ \ kinded_tvs -> do
-				    { kinded_ty <- kcTypeType hs_ty
-				    ; return (kinded_tvs, kinded_ty) }
-
-	-- Zonk the mutable kinds and bring the tyvars into scope
-	-- Just like the call to tcTyVarBndrs in ds_type (HsForAllTy case), 
-	-- except that it brings *meta* tyvars into scope, not regular ones
-	--
-	-- 	[Out of date, but perhaps should be resurrected]
-	-- Furthermore, the tyvars are PatSigTvs, which means that we get better
-	-- error messages when type variables escape:
-	--      Inferred type is less polymorphic than expected
-	--   	Quantified type variable `t' escapes
-	--   	It is mentioned in the environment:
-	--	t is bound by the pattern type signature at tcfail103.hs:6
-	; tyvars <- mapM (zonk . unLoc) kinded_tvs
-	; return (tyvars, kinded_ty) }
-  where
-    zonk (KindedTyVar name kind) = zonkTcKindToKind kind	`thenM` \ kind' ->
-				   newMetaTyVar name kind' Flexi
-	-- Scoped type variables are bound to a *type*, hence Flexi
-    zonk (UserTyVar name) = pprTrace "Un-kinded tyvar" (ppr name) $
-			    returnM (mkTyVar name liftedTypeKind)
-
 tcHsPatSigType :: UserTypeCtxt
 	       -> LHsType Name 		-- The type signature
-	       -> TcM ([TcTyVar], 	-- Newly in-scope type variables
-			TcType)		-- The signature
+	       -> TcM ([TyVar], 	-- Newly in-scope type variables
+			Type)		-- The signature
+-- Used for type-checking type signatures in
+-- (a) patterns 	  e.g  f (x::Int) = e
+-- (b) result signatures  e.g. g x :: Int = e
+-- (c) RULE forall bndrs  e.g. forall (x::Int). f x = x
 
 tcHsPatSigType ctxt hs_ty 
   = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
-    do	{ (tyvars, kinded_ty) <- tcPatSigBndrs hs_ty
+    do	{ 	-- Find the type variables that are mentioned in the type
+		-- but not already in scope.  These are the ones that
+		-- should be bound by the pattern signature
+ 	  in_scope <- getInLocalScope
+	; let span = getLoc hs_ty
+	      sig_tvs = [ L span (UserTyVar n) 
+			| n <- nameSetToList (extractHsTyVars hs_ty),
+			  not (in_scope n) ]
 
-	 -- Complete processing of the type, and check its validity
-	; tcExtendTyVarEnv tyvars $ do
-		{ sig_ty <- tcHsKindedType kinded_ty	
-		; checkValidType ctxt sig_ty 
-		; return (tyvars, sig_ty) }
-	}
+	-- Behave very like type-checking (HsForAllTy sig_tvs hs_ty),
+	-- except that we want to keep the tvs separate
+	; (kinded_tvs, kinded_ty) <- kcHsTyVars sig_tvs $ \ kinded_tvs -> do
+				    { kinded_ty <- kcTypeType hs_ty
+				    ; return (kinded_tvs, kinded_ty) }
+	; tcTyVarBndrs kinded_tvs $ \ tyvars -> do
+	{ sig_ty <- dsHsType kinded_ty
+	; checkValidType ctxt sig_ty 
+	; return (tyvars, sig_ty)
+      } }
 
-tcAddLetBoundTyVars :: [(RecFlag,LHsBinds Name)] -> TcM a -> TcM a
--- Turgid funciton, used for type variables bound by the patterns of a let binding
+tcPatSig :: UserTypeCtxt
+	 -> LHsType Name
+	 -> BoxySigmaType
+	 -> TcM (TcType,	   -- The type to use for "inside" the signature
+		 [(Name,TcType)])  -- The new bit of type environment, binding
+				   -- the scoped type variables
+tcPatSig ctxt sig res_ty
+  = do	{ (sig_tvs, sig_ty) <- tcHsPatSigType ctxt sig
 
-tcAddLetBoundTyVars binds thing_inside
-  = go (concatMap (collectSigTysFromHsBinds . snd) binds) thing_inside
+	; if null sig_tvs then do {
+		-- The type signature binds no type variables, 
+		-- and hence is rigid, so use it to zap the res_ty
+		  boxyUnify sig_ty res_ty
+		; return (sig_ty, [])
+
+	} else do {
+		-- Type signature binds at least one scoped type variable
+	
+		-- A pattern binding cannot bind scoped type variables
+		-- The renamer fails with a name-out-of-scope error 
+		-- if a pattern binding tries to bind a type variable,
+		-- So we just have an ASSERT here
+	; let in_pat_bind = case ctxt of
+				BindPatSigCtxt -> True
+				other	       -> False
+	; ASSERT( not in_pat_bind || null sig_tvs ) return ()
+
+	  	-- Check that pat_ty is rigid
+	; checkTc (isRigidTy res_ty) (wobblyPatSig sig_tvs)
+
+		-- Now match the pattern signature against res_ty
+		-- For convenience, and uniform-looking error messages
+		-- we do the matching by allocating meta type variables, 
+		-- unifying, and reading out the results.
+		-- This is a strictly local operation.
+	; box_tvs <- mapM tcInstBoxyTyVar sig_tvs
+	; boxyUnify (substTyWith sig_tvs (mkTyVarTys box_tvs) sig_ty) res_ty
+	; sig_tv_tys <- mapM readFilledBox box_tvs
+
+		-- Check that each is bound to a distinct type variable,
+		-- and one that is not already in scope
+	; let tv_binds = map tyVarName sig_tvs `zip` sig_tv_tys
+	; binds_in_scope <- getScopedTyVarBinds
+	; check binds_in_scope tv_binds
+	
+		-- Phew!
+	; return (res_ty, tv_binds)
+	} }
   where
-    go [] thing_inside = thing_inside
-    go (hs_ty:hs_tys) thing_inside
-	= do { (tyvars, _kinded_ty) <- tcPatSigBndrs hs_ty
-	     ; tcExtendTyVarEnv tyvars (go hs_tys thing_inside) }
+    check in_scope []		 = return ()
+    check in_scope ((n,ty):rest) = do { check_one in_scope n ty
+				      ; check ((n,ty):in_scope) rest }
+
+    check_one in_scope n ty
+	= do { checkTc (tcIsTyVarTy ty) (scopedNonVar n ty)
+		-- Must bind to a type variable
+
+	     ; checkTc (null dups) (dupInScope n (head dups) ty)
+		-- Must not bind to the same type variable
+		-- as some other in-scope type variable
+
+	     ; return () }
+	where
+	  dups = [n' | (n',ty') <- in_scope, tcEqType ty' ty]
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Signatures}
+		Scoped type variables
 %*									*
 %************************************************************************
 
-@tcSigs@ checks the signatures for validity, and returns a list of
-{\em freshly-instantiated} signatures.  That is, the types are already
-split up, and have fresh type variables installed.  All non-type-signature
-"RenamedSigs" are ignored.
-
-The @TcSigInfo@ contains @TcTypes@ because they are unified with
-the variable's type, and after that checked to see whether they've
-been instantiated.
-
 \begin{code}
-data TcSigInfo
-  = TcSigInfo {
-	sig_id     :: TcId,		--  *Polymorphic* binder for this value...
-
-	sig_scoped :: [Name],		-- Names for any scoped type variables
-					-- Invariant: correspond 1-1 with an initial
-					-- segment of sig_tvs (see Note [Scoped])
-
-	sig_tvs    :: [TcTyVar],	-- Instantiated type variables
-					-- See Note [Instantiate sig]
-
-	sig_theta  :: TcThetaType,	-- Instantiated theta
-	sig_tau    :: TcTauType,	-- Instantiated tau
-	sig_loc    :: InstLoc	 	-- The location of the signature
-    }
-
--- 	Note [Scoped]
--- There may be more instantiated type variables than scoped 
--- ones.  For example:
---	type T a = forall b. b -> (a,b)
---	f :: forall c. T c
--- Here, the signature for f will have one scoped type variable, c,
--- but two instantiated type variables, c' and b'.  
---
--- We assume that the scoped ones are at the *front* of sig_tvs,
--- and remember the names from the original HsForAllTy in sig_scoped
-
--- 	Note [Instantiate sig]
--- It's vital to instantiate a type signature with fresh variable.
--- For example:
---	type S = forall a. a->a
---	f,g :: S
---	f = ...
---	g = ...
--- Here, we must use distinct type variables when checking f,g's right hand sides.
--- (Instantiation is only necessary because of type synonyms.  Otherwise,
--- it's all cool; each signature has distinct type variables from the renamer.)
-
-type TcSigFun = Name -> Maybe TcSigInfo
-
-instance Outputable TcSigInfo where
-    ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
-	= ppr id <+> ptext SLIT("::") <+> ppr tyvars <+> ppr theta <+> ptext SLIT("=>") <+> ppr tau
-
-lookupSig :: [TcSigInfo] -> TcSigFun	-- Search for a particular signature
-lookupSig sigs = lookupNameEnv env
+pprHsSigCtxt :: UserTypeCtxt -> LHsType Name -> SDoc
+pprHsSigCtxt ctxt hs_ty = vcat [ ptext SLIT("In") <+> pprUserTypeCtxt ctxt <> colon, 
+				 nest 2 (pp_sig ctxt) ]
   where
-    env = mkNameEnv [(idName (sig_id sig), sig) | sig <- sigs]
+    pp_sig (FunSigCtxt n)  = pp_n_colon n
+    pp_sig (ConArgCtxt n)  = pp_n_colon n
+    pp_sig (ForSigCtxt n)  = pp_n_colon n
+    pp_sig (RuleSigCtxt n) = pp_n_colon n
+    pp_sig other	   = ppr (unLoc hs_ty)
+
+    pp_n_colon n = ppr n <+> dcolon <+> ppr (unLoc hs_ty)
+
+
+wobblyPatSig sig_tvs
+  = hang (ptext SLIT("A pattern type signature cannot bind scoped type variables") 
+		<+> pprQuotedList sig_tvs)
+       2 (ptext SLIT("unless the pattern has a rigid type context"))
+		
+scopedNonVar n ty
+  = vcat [sep [ptext SLIT("The scoped type variable") <+> quotes (ppr n),
+	       nest 2 (ptext SLIT("is bound to the type") <+> quotes (ppr ty))],
+	  nest 2 (ptext SLIT("You can only bind scoped type variables to type variables"))]
+
+dupInScope n n' ty
+  = hang (ptext SLIT("The scoped type variables") <+> quotes (ppr n) <+> ptext SLIT("and") <+> quotes (ppr n'))
+       2 (vcat [ptext SLIT("are bound to the same type (variable)"),
+		ptext SLIT("Distinct scoped type variables must be distinct")])
 \end{code}
 

@@ -19,17 +19,17 @@ import RnEnv		( lookupTopBndrRn, lookupImportedName )
 import Inst		( instToId, newDicts, newDictsAtLoc, newMethod, getOverlapFlag )
 import InstEnv		( mkLocalInstance )
 import TcEnv		( tcLookupLocatedClass, 
-			  tcExtendTyVarEnv, 
+			  tcExtendTyVarEnv, tcExtendIdEnv,
 			  InstInfo(..), pprInstInfoDetails,
 			  simpleInstInfoTyCon, simpleInstInfoTy,
 			  InstBindings(..), newDFunName
 			)
-import TcBinds		( TcPragFun, tcMonoBinds, tcPrags, mkPragFun )
-import TcHsType		( TcSigInfo(..), tcHsKindedType, tcHsSigType )
+import TcBinds		( TcPragFun, tcMonoBinds, tcPrags, mkPragFun, TcSigInfo(..) )
+import TcHsType		( tcHsKindedType, tcHsSigType )
 import TcSimplify	( tcSimplifyCheck )
 import TcUnify		( checkSigTyVars, sigCtxt )
-import TcMType		( tcSkolSigTyVars, UserTypeCtxt( GenPatCtxt ), tcSkolType )
-import TcType		( Type, SkolemInfo(ClsSkol, InstSkol, SigSkol), 
+import TcMType		( tcSkolSigTyVars )
+import TcType		( Type, SkolemInfo(ClsSkol, InstSkol), UserTypeCtxt( GenPatCtxt ),
 			  TcType, TcThetaType, TcTyVar, mkTyVarTys,
 			  mkClassPred, tcSplitSigmaTy, tcSplitFunTys,
 			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitForAllTys, tcSplitPhiTy,
@@ -59,7 +59,7 @@ import ListSetOps	( equivClassesByUniq, minusList	)
 import SrcLoc		( Located(..), srcSpanStart, unLoc, noLoc )
 import Maybes		( seqMaybe, isJust, mapCatMaybes )
 import List		( partition )
-import BasicTypes	( RecFlag(..) )
+import BasicTypes	( RecFlag(..), Boxity(..) )
 import Bag
 import FastString
 \end{code}
@@ -131,7 +131,7 @@ checkDefaultBinds clas ops binds
   = do dm_infos <- mapM (addLocM (checkDefaultBind clas ops)) (bagToList binds)
        return (mkNameEnv dm_infos)
 
-checkDefaultBind clas ops (FunBind (L _ op) _ (MatchGroup matches _) _)
+checkDefaultBind clas ops (FunBind {fun_id = L _ op, fun_matches = MatchGroup matches _ })
   = do {  	-- Check that the op is from this class
 	checkTc (op `elem` ops) (badMethodErr clas op)
 
@@ -286,13 +286,18 @@ tcDefMeth clas tyvars binds_in prag_fn sel_id
 	-- Simplification can do unification
 	; checkSigTyVars clas_tyvars
     
-	; let
-		(_,dm_inst_id,_) = meth_info
-	        full_bind = AbsBinds
-		    		    clas_tyvars
+	-- Inline pragmas 
+	-- We'll have an inline pragma on the local binding, made by tcMethodBind
+	-- but that's not enough; we want one on the global default method too
+	-- Specialisations, on the other hand, belong on the thing inside only, I think
+	; let (_,dm_inst_id,_) = meth_info
+	      sel_name	       = idName sel_id
+	      inline_prags     = filter isInlineLSig (prag_fn sel_name)
+	; prags <- tcPrags dm_inst_id inline_prags
+
+	; let full_bind = AbsBinds  clas_tyvars
 		    		    [instToId this_dict]
-		    		    [(clas_tyvars, local_dm_id, dm_inst_id, [])]
-			    		    -- No inlines (yet)
+		    		    [(clas_tyvars, local_dm_id, dm_inst_id, prags)]
 		    		    (dict_binds `unionBags` defm_bind)
 	; returnM (noLoc full_bind, [local_dm_id]) }}
 
@@ -343,19 +348,16 @@ tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
 	-- so that we don't quantify over them in nested places
 
 	
-    let -- Fake up a TcSigInfo to pass to tcMonoBinds
-	rigid_info = SigSkol (idName meth_id)
-    in
-    tcSkolType rigid_info (idType meth_id)	`thenM` \ (tyvars', theta', tau') ->
-    getInstLoc (SigOrigin rigid_info)		`thenM` \ loc ->
-    let meth_sig = TcSigInfo { sig_id = meth_id, sig_tvs = tyvars', sig_scoped = [],
-			       sig_theta = theta', sig_tau = tau', sig_loc = loc }
+    let meth_sig = noLoc (TypeSig (noLoc (idName meth_id)) (noLoc bogus_ty))
+	bogus_ty = HsTupleTy Boxed []	-- *Only* used to extract scoped type
+					-- variables... and there aren't any
         lookup_sig name = ASSERT( name == idName meth_id ) 
 			  Just meth_sig
     in
     tcExtendTyVarEnv inst_tyvars (
-	addErrCtxt (methodCtxt sel_id)			$
-	getLIE 						$
+	tcExtendIdEnv [meth_id] 	$	-- In scope for tcInstSig
+	addErrCtxt (methodCtxt sel_id)	$
+	getLIE 				$
 	tcMonoBinds [meth_bind] lookup_sig Recursive
     )					`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
 
@@ -367,10 +369,14 @@ tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
 	--
 	-- We do this for each method independently to localise error messages
 
-    addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
-    newDictsAtLoc (sig_loc meth_sig) (sig_theta meth_sig)	`thenM` \ meth_dicts ->
     let
-	meth_tvs   = sig_tvs meth_sig
+	[(_, Just sig, local_meth_id)] = mono_bind_infos
+    in
+
+    addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
+    newDictsAtLoc (sig_loc sig) (sig_theta sig)		`thenM` \ meth_dicts ->
+    let
+	meth_tvs   = sig_tvs sig
 	all_tyvars = meth_tvs ++ inst_tyvars
 	all_insts  = avail_insts ++ meth_dicts
 	sel_name   = idName sel_id
@@ -383,7 +389,6 @@ tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
 
     tcPrags meth_id (prag_fn sel_name)		`thenM` \ prags -> 
     let
-	[(_,_,local_meth_id)] = mono_bind_infos
 	poly_meth_bind = noLoc $ AbsBinds meth_tvs
 				  (map instToId meth_dicts)
      				  [(meth_tvs, meth_id, local_meth_id, prags)]
@@ -414,9 +419,7 @@ mkMethodBind origin clas inst_tys meth_binds (sel_id, dm_info)
 	Nothing	       -> 
 	   mkDefMethRhs origin clas inst_tys sel_id loc dm_info	`thenM` \ rhs ->
 		-- Not infix decl
-	   returnM (noLoc $ FunBind (noLoc meth_name) False
-		            	    (mkMatchGroup [mkSimpleMatch [] rhs]) 
-				    placeHolderNames)
+	   returnM (noLoc $ mkFunBind (noLoc meth_name) [mkSimpleMatch [] rhs])
     )						`thenM` \ meth_bind ->
 
     returnM (mb_inst, (sel_id, meth_id, meth_bind))
@@ -442,8 +445,8 @@ mkMethId origin clas sel_id inst_tys
     )
     if isSingleton preds then
 	-- If it's the only one, make a 'method'
-	getInstLoc origin				`thenM` \ inst_loc ->
-    	newMethod inst_loc sel_id inst_tys preds tau	`thenM` \ meth_inst ->
+	getInstLoc origin			`thenM` \ inst_loc ->
+    	newMethod inst_loc sel_id inst_tys 	`thenM` \ meth_inst ->
 	returnM (Just meth_inst, instToId meth_inst)
     else
 	-- If it's not the only one we need to be careful
@@ -555,8 +558,8 @@ isInstDecl (SigOrigin (ClsSkol _))  = False
 find_bind sel_name meth_name binds
   = foldlBag seqMaybe Nothing (mapBag f binds)
   where 
-	f (L loc1 (FunBind (L loc2 op_name) fix matches fvs)) | op_name == sel_name
-		= Just (L loc1 (FunBind (L loc2 meth_name) fix matches fvs))
+	f (L loc1 bind@(FunBind { fun_id = L loc2 op_name })) | op_name == sel_name
+		 = Just (L loc1 (bind { fun_id = L loc2 meth_name }))
 	f _other = Nothing
 \end{code}
 
@@ -656,10 +659,10 @@ getGenericBinds :: LHsBinds Name -> [(HsType Name, LHsBind Name)]
   -- them in finite map indexed by the type parameter in the definition.
 getGenericBinds binds = concat (map getGenericBind (bagToList binds))
 
-getGenericBind (L loc (FunBind id infixop (MatchGroup matches ty) fvs))
+getGenericBind (L loc bind@(FunBind { fun_matches = MatchGroup matches ty }))
   = groupWith wrap (mapCatMaybes maybeGenericMatch matches)
   where
-    wrap ms = L loc (FunBind id infixop (MatchGroup ms ty) fvs)
+    wrap ms = L loc (bind { fun_matches = MatchGroup ms ty })
 getGenericBind _
   = []
 

@@ -9,7 +9,7 @@ This module exports some utility functions of no great interest.
 module DsUtils (
 	EquationInfo(..), 
 	firstPat, shiftEqns,
-
+	
 	mkDsLet, mkDsLets,
 
 	MatchResult(..), CanItFail(..), 
@@ -70,11 +70,14 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  lengthPName, indexPName )
 import Outputable
 import SrcLoc		( Located(..), unLoc )
-import Util             ( isSingleton, notNull, zipEqual, sortWith )
+import Util             ( isSingleton, zipEqual, sortWith )
 import ListSetOps	( assocDefault )
 import FastString
-
 import Data.Char	( ord )
+
+#ifdef DEBUG
+import Util		( notNull )	-- Used in an assertion
+#endif
 \end{code}
 
 

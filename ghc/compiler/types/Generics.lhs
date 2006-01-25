@@ -255,15 +255,12 @@ type FromAlt = (LPat RdrName, LHsExpr RdrName)
 
 mkTyConGenericBinds :: TyCon -> LHsBinds RdrName
 mkTyConGenericBinds tycon
-  = unitBag (L loc (FunBind (L loc from_RDR) False {- Not infix -}
-		 	    from_matches placeHolderNames))
-
+  = unitBag (L loc (mkFunBind (L loc from_RDR) from_matches))
 	`unionBags`
-    unitBag (L loc (FunBind (L loc to_RDR) False 
-			    to_matches placeHolderNames))
+    unitBag (L loc (mkFunBind (L loc to_RDR) to_matches))
   where
-    from_matches = mkMatchGroup [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
-    to_matches   = mkMatchGroup [mkSimpleHsAlt to_pat to_body]
+    from_matches = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
+    to_matches   = [mkSimpleHsAlt to_pat to_body]
     loc	     = srcLocSpan (getSrcLoc tycon)
     datacons = tyConDataCons tycon
     (from_RDR, to_RDR) = mkGenericNames tycon

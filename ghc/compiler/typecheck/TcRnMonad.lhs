@@ -20,13 +20,15 @@ import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 import Module		( Module, unitModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
 			  LocalRdrEnv, emptyLocalRdrEnv )
-import Name		( Name, isInternalName, mkInternalName, getOccName, getSrcLoc )
+import Name		( Name, isInternalName, mkInternalName, tidyNameOcc, nameOccName, getSrcLoc )
 import Type		( Type )
-import NameEnv		( extendNameEnvList )
+import TcType		( tcIsTyVarTy, tcGetTyVar )
+import NameEnv		( extendNameEnvList, nameEnvElts )
 import InstEnv		( emptyInstEnv )
 
+import Var		( setTyVarName )
 import VarSet		( emptyVarSet )
-import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
+import VarEnv		( TidyEnv, emptyTidyEnv, extendVarEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
 			  mkWarnMsg, printErrorsAndWarnings,
 			  mkLocMessage, mkLongErrMsg )
@@ -34,7 +36,7 @@ import Packages		( mkHomeModules )
 import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
 import NameSet		( NameSet, emptyDUs, emptyNameSet, unionNameSets, addOneToNameSet )
-import OccName		( emptyOccEnv )
+import OccName		( emptyOccEnv, tidyOccName )
 import Bag		( emptyBag )
 import Outputable
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupply )
@@ -114,8 +116,7 @@ initTc hsc_env hsc_src mod do_this
 		tcl_arrow_ctxt = NoArrowCtxt,
 		tcl_env        = emptyNameEnv,
 		tcl_tyvars     = tvs_var,
-		tcl_lie	       = panic "initTc:LIE",	-- LIE only valid inside a getLIE
-		tcl_gadt       = emptyVarEnv
+		tcl_lie	       = panic "initTc:LIE"	-- LIE only valid inside a getLIE
 	     } ;
 	} ;
    
@@ -320,7 +321,7 @@ newUniqueSupply
 newLocalName :: Name -> TcRnIf gbl lcl Name
 newLocalName name	-- Make a clone
   = newUnique		`thenM` \ uniq ->
-    returnM (mkInternalName uniq (getOccName name) (getSrcLoc name))
+    returnM (mkInternalName uniq (nameOccName name) (getSrcLoc name))
 \end{code}
 
 
@@ -350,7 +351,8 @@ traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
 traceOptTcRn flag doc = ifOptM flag $ do
 			{ ctxt <- getErrCtxt
 			; loc  <- getSrcSpanM
-			; ctxt_msgs <- do_ctxt emptyTidyEnv ctxt 
+			; env0 <- tcInitTidyEnv
+			; ctxt_msgs <- do_ctxt env0 ctxt 
 			; let real_doc = mkLocMessage loc (vcat (doc : ctxt_to_use ctxt_msgs))
 			; dumpTcRn real_doc }
 
@@ -452,7 +454,6 @@ addErrAt loc msg = addLongErrAt loc msg empty
 addLongErrAt :: SrcSpan -> Message -> Message -> TcRn ()
 addLongErrAt loc msg extra
   = do { traceTc (ptext SLIT("Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
-
 	 errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
 	 let { err = mkLongErrMsg loc (unQualInScope rdr_env) msg extra } ;
@@ -646,11 +647,11 @@ getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
 setErrCtxt :: ErrCtxt -> TcM a -> TcM a
 setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
-addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, Message)) -> TcM a -> TcM a
-addErrCtxtM msg = updCtxt (\ msgs -> msg : msgs)
-
 addErrCtxt :: Message -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> returnM (env, msg))
+
+addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, Message)) -> TcM a -> TcM a
+addErrCtxtM msg = updCtxt (\ msgs -> msg : msgs)
 
 -- Helper function for the above
 updCtxt :: (ErrCtxt -> ErrCtxt) -> TcM a -> TcM a
@@ -683,7 +684,8 @@ addInstCtxt (InstLoc _ src_loc ctxt) thing_inside
 
 \begin{code}
 addErrTc :: Message -> TcM ()
-addErrTc err_msg = addErrTcM (emptyTidyEnv, err_msg)
+addErrTc err_msg = do { env0 <- tcInitTidyEnv
+		      ; addErrTcM (env0, err_msg) }
 
 addErrsTc :: [Message] -> TcM ()
 addErrsTc err_msgs = mappM_ addErrTc err_msgs
@@ -717,7 +719,8 @@ checkTc False err = failWithTc err
 addWarnTc :: Message -> TcM ()
 addWarnTc msg
  = do { ctxt <- getErrCtxt ;
-	ctxt_msgs <- do_ctxt emptyTidyEnv ctxt ;
+	env0 <- tcInitTidyEnv ;
+	ctxt_msgs <- do_ctxt env0 ctxt ;
 	addWarn (vcat (msg : ctxt_to_use ctxt_msgs)) }
 
 warnTc :: Bool -> Message -> TcM ()
@@ -726,7 +729,32 @@ warnTc warn_if_true warn_msg
   | otherwise	 = return ()
 \end{code}
 
- 	Helper functions
+-----------------------------------
+	 Tidying
+
+We initialise the "tidy-env", used for tidying types before printing,
+by building a reverse map from the in-scope type variables to the
+OccName that the programmer originally used for them
+
+\begin{code}
+tcInitTidyEnv :: TcM TidyEnv
+tcInitTidyEnv
+  = do	{ lcl_env <- getLclEnv
+	; let nm_tv_prs = [ (name, tcGetTyVar "tcInitTidyEnv" ty)
+			  | ATyVar name ty <- nameEnvElts (tcl_env lcl_env)
+			  , tcIsTyVarTy ty ]
+	; return (foldl add emptyTidyEnv nm_tv_prs) }
+  where
+    add (env,subst) (name, tyvar)
+	= case tidyOccName env (nameOccName name) of
+	    (env', occ') ->  (env', extendVarEnv subst tyvar tyvar')
+		where
+		  tyvar' = setTyVarName tyvar name'
+		  name'  = tidyNameOcc name occ'
+\end{code}
+
+-----------------------------------
+ 	Other helper functions
 
 \begin{code}
 add_err_tcm tidy_env err_msg loc ctxt
@@ -744,7 +772,7 @@ ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
 		 | otherwise	      = take 3 ctxt
 \end{code}
 
-debugTc is useful for monadi debugging code
+debugTc is useful for monadic debugging code
 
 \begin{code}
 debugTc :: TcM () -> TcM ()
@@ -979,16 +1007,4 @@ forkM doc thing_inside
 			Just r  -> r) }
 \end{code}
 
-%************************************************************************
-%*									*
-	     Stuff for GADTs
-%*									*
-%************************************************************************
 
-\begin{code}
-getTypeRefinement :: TcM GadtRefinement
-getTypeRefinement = do { lcl_env <- getLclEnv; return (tcl_gadt lcl_env) }
-
-setTypeRefinement :: GadtRefinement -> TcM a -> TcM a
-setTypeRefinement gadt = updLclEnv (\env -> env { tcl_gadt = gadt })
-\end{code}

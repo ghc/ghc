@@ -225,6 +225,12 @@ nlHsFunTy a b		= noLoc (HsFunTy a b)
 %************************************************************************
 
 \begin{code}
+mkFunBind :: Located id -> [LMatch id] -> HsBind id
+-- Not infix, with place holders for coercion and free vars
+mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False, fun_matches = mkMatchGroup ms,
+			    fun_co_fn = idCoercion, bind_fvs = placeHolderNames }
+
+
 mkVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
 mkVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
@@ -233,9 +239,7 @@ mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
 		-> LHsExpr RdrName -> LHsBind RdrName
 
 mk_easy_FunBind loc fun pats expr
-  = L loc (FunBind (L loc fun) False{-not infix-} matches placeHolderNames)
-  where
-    matches = mkMatchGroup [mkMatch pats expr emptyLocalBinds]
+  = L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds]
 
 ------------
 mk_FunBind :: SrcSpan -> RdrName
@@ -244,9 +248,9 @@ mk_FunBind :: SrcSpan -> RdrName
 
 mk_FunBind loc fun [] = panic "TcGenDeriv:mk_FunBind"
 mk_FunBind loc fun pats_and_exprs
-  = L loc (FunBind (L loc fun) False{-not infix-} matches placeHolderNames)
+  = L loc $ mkFunBind (L loc fun) matches
   where
-    matches = mkMatchGroup [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
+    matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
 
 ------------
 mkMatch :: [LPat id] -> LHsExpr id -> HsLocalBinds id -> LMatch id
@@ -289,10 +293,10 @@ collectHsValBinders (ValBindsOut binds sigs) = foldr collect_one [] binds
    collect_one (_,binds) acc = foldrBag (collectAcc . unLoc) acc binds
 
 collectAcc :: HsBind name -> [Located name] -> [Located name]
-collectAcc (PatBind pat _ _ _) acc = collectLocatedPatBinders pat ++ acc
-collectAcc (FunBind f _ _ _) acc   = f : acc
-collectAcc (VarBind f _) acc       = noLoc f : acc
-collectAcc (AbsBinds _ _ dbinds binds) acc
+collectAcc (PatBind { pat_lhs = p }) acc = collectLocatedPatBinders p ++ acc
+collectAcc (FunBind { fun_id = f })  acc    = f : acc
+collectAcc (VarBind { var_id = f })  acc    = noLoc f : acc
+collectAcc (AbsBinds { abs_exports = dbinds, abs_binds = binds }) acc
   = [noLoc dp | (_,dp,_,_) <- dbinds] ++ acc
 	-- ++ foldr collectAcc acc binds
 	-- I don't think we want the binders from the nested binds
@@ -306,32 +310,6 @@ collectHsBindLocatedBinders :: LHsBinds name -> [Located name]
 collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 \end{code}
 
-
-%************************************************************************
-%*									*
-	Getting pattern signatures out of bindings
-%*									*
-%************************************************************************
-
-Get all the pattern type signatures out of a bunch of bindings
-
-\begin{code}
-collectSigTysFromHsBinds :: LHsBinds name -> [LHsType name]
-collectSigTysFromHsBinds binds = concatMap collectSigTysFromHsBind (bagToList binds)
-
-collectSigTysFromHsBind :: LHsBind name -> [LHsType name]
-collectSigTysFromHsBind bind
-  = go (unLoc bind)
-  where
-    go (PatBind pat _ _ _) 
-	= collectSigTysFromPat pat
-    go (FunBind f _ (MatchGroup ms _) _)
-	= [sig | L _ (Match [] (Just sig) _) <- ms]
-	-- A binding like    x :: a = f y
-	-- is parsed as FunMonoBind, but for this purpose we 	
-	-- want to treat it as a pattern binding
-    go out_bind = panic "collectSigTysFromHsBind"
-\end{code}
 
 %************************************************************************
 %*									*

@@ -297,8 +297,8 @@ gen_Ord_binds tycon
     tycon_loc = getSrcSpan tycon
     --------------------------------------------------------------------
 
-    compare = L tycon_loc (FunBind (L tycon_loc compare_RDR) False compare_matches placeHolderNames)
-    compare_matches = mkMatchGroup [mkMatch [a_Pat, b_Pat] compare_rhs cmp_eq_binds]
+    compare = L tycon_loc (mkFunBind (L tycon_loc compare_RDR) compare_matches)
+    compare_matches = [mkMatch [a_Pat, b_Pat] compare_rhs cmp_eq_binds]
     cmp_eq_binds    = HsValBinds (ValBindsIn (unitBag cmp_eq) [])
 
     compare_rhs

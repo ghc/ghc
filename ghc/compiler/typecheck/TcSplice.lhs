@@ -24,13 +24,13 @@ import RnExpr		( rnLExpr )
 import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe, lookupImportedName )
 import RdrName		( RdrName, lookupLocalRdrEnv, isSrcRdrName )
 import RnTypes		( rnLHsType )
-import TcExpr		( tcCheckRho, tcMonoExpr )
+import TcExpr		( tcMonoExpr )
 import TcHsSyn		( mkHsDictLet, zonkTopLExpr )
 import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
-import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
-import TcType		( TcType, TcKind, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
+import TcUnify		( boxyUnify, unBox )
+import TcType		( TcType, TcKind, BoxyRhoType, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
 import TcEnv		( spliceOK, tcMetaTy, bracketOK )
-import TcMType		( newTyFlexiVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType )
+import TcMType		( newFlexiTyVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType )
 import TcHsType		( tcHsSigType, kcHsType )
 import TcIface		( tcImportDecl )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
@@ -45,7 +45,7 @@ import Module		( moduleString )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
-import TyCon		( TyCon, tyConTyVars, getSynTyConDefn, 
+import TyCon		( TyCon, tyConTyVars, synTyConDefn, 
 			  isSynTyCon, isNewTyCon, tyConDataCons, isPrimTyCon, isFunTyCon,
 			  tyConArity, tyConStupidTheta, isUnLiftedTyCon )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
@@ -81,7 +81,7 @@ import FastString	( mkFastString )
 
 \begin{code}
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
-tcSpliceExpr  :: HsSplice Name -> Expected TcType -> TcM (HsExpr TcId)
+tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
 kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
 
 #ifndef GHCI
@@ -97,7 +97,7 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 %************************************************************************
 
 \begin{code}
-tcBracket :: HsBracket Name -> Expected TcType -> TcM (LHsExpr Id)
+tcBracket :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr Id)
 tcBracket brack res_ty
   = getStage 				`thenM` \ level ->
     case bracketOK level of {
@@ -117,7 +117,7 @@ tcBracket brack res_ty
     tcSimplifyBracket lie 		`thenM_`  
 
 	-- Make the expected type have the right shape
-    zapExpectedTo res_ty meta_ty	`thenM_`
+    boxyUnify meta_ty res_ty		`thenM_`
 
 	-- Return the original expression, not the type-decorated one
     readMutVar pending_splices		`thenM` \ pendings ->
@@ -129,8 +129,8 @@ tc_bracket (VarBr v)
   = tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
 
 tc_bracket (ExpBr expr) 
-  = newTyFlexiVarTy liftedTypeKind	`thenM` \ any_ty ->
-    tcCheckRho expr any_ty		`thenM_`
+  = newFlexiTyVarTy liftedTypeKind	`thenM` \ any_ty ->
+    tcMonoExpr expr any_ty		`thenM_`
     tcMetaTy expQTyConName
 	-- Result type is Expr (= Q Exp)
 
@@ -180,11 +180,11 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-    zapExpectedType res_ty liftedTypeKind	`thenM_`
+    unBox res_ty				`thenM_`
     tcMetaTy expQTyConName			`thenM` \ meta_exp_ty ->
     setStage (Splice next_level) (
 	setLIEVar lie_var	   $
-	tcCheckRho expr meta_exp_ty
+	tcMonoExpr expr meta_exp_ty
     )						`thenM` \ expr' ->
 
 	-- Write the pending splice into the bucket
@@ -201,7 +201,7 @@ tcSpliceExpr (HsSplice name expr) res_ty
 -- The recursive call to tcMonoExpr will simply expand the 
 -- inner escape before dealing with the outer one
 
-tcTopSplice :: LHsExpr Name -> Expected TcType -> TcM (LHsExpr Id)
+tcTopSplice :: LHsExpr Name -> BoxyRhoType -> TcM (LHsExpr Id)
 tcTopSplice expr res_ty
   = tcMetaTy expQTyConName		`thenM` \ meta_exp_ty ->
 
@@ -237,7 +237,7 @@ tcTopSpliceExpr expr meta_ty
     do	{ recordThUse	-- Record that TH is used (for pkg depdendency)
 
 	-- Typecheck the expression
-	; (expr', lie) <- getLIE (tcCheckRho expr meta_ty)
+	; (expr', lie) <- getLIE (tcMonoExpr expr meta_ty)
 	
 	-- Solve the constraints
 	; const_binds <- tcSimplifyTop lie
@@ -272,7 +272,7 @@ kcSpliceType (HsSplice name hs_expr)
 	; meta_ty <- tcMetaTy typeQTyConName
 	; expr' <- setStage (Splice next_level) $
 		   setLIEVar lie_var	   	$
-		   tcCheckRho hs_expr meta_ty
+		   tcMonoExpr hs_expr meta_ty
 
 		-- Write the pending splice into the bucket
 	; ps <- readMutVar ps_var
@@ -555,7 +555,7 @@ reifyThing (AGlobal (ADataCon dc))
 	; fix <- reifyFixity name
 	; return (TH.DataConI (reifyName name) ty (reifyName (dataConTyCon dc)) fix) }
 
-reifyThing (ATcId id _) 
+reifyThing (ATcId id _ _) 
   = do	{ ty1 <- zonkTcType (idType id)	-- Make use of all the info we have, even
 					-- though it may be incomplete
 	; ty2 <- reifyType ty1
@@ -573,7 +573,7 @@ reifyTyCon tc
   | isFunTyCon tc  = return (TH.PrimTyConI (reifyName tc) 2 		  False)
   | isPrimTyCon tc = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
   | isSynTyCon tc
-  = do	{ let (tvs, rhs) = getSynTyConDefn tc
+  = do	{ let (tvs, rhs) = synTyConDefn tc
 	; rhs' <- reifyType rhs
 	; return (TH.TyConI $ TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
 

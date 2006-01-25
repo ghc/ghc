@@ -43,7 +43,7 @@ module TyCon(
 	tyConStupidTheta,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
-	getSynTyConDefn,
+	synTyConDefn, synTyConRhs,
 	tyConExtName,		-- External name for foreign types
 
         maybeTyConSingleCon,
@@ -619,9 +619,12 @@ tyConArgVrcs (SynTyCon   {argVrcs = oi})       = oi
 \end{code}
 
 \begin{code}
-getSynTyConDefn :: TyCon -> ([TyVar], Type)
-getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTcRhs = ty}) = (tyvars,ty)
-getSynTyConDefn tycon = pprPanic "getSynTyConDefn" (ppr tycon)
+synTyConDefn :: TyCon -> ([TyVar], Type)
+synTyConDefn (SynTyCon {tyConTyVars = tyvars, synTcRhs = ty}) = (tyvars,ty)
+synTyConDefn tycon = pprPanic "getSynTyConDefn" (ppr tycon)
+
+synTyConRhs :: TyCon -> Type
+synTyConRhs tc = synTcRhs tc
 \end{code}
 
 \begin{code}

@@ -25,7 +25,7 @@ import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep, tcView )
 import HscTypes		( TyThing(..), ModDetails(..) )
 import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars,
-                          getSynTyConDefn, isSynTyCon, isAlgTyCon, 
+                          synTyConDefn, isSynTyCon, isAlgTyCon, 
 			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs, newTyConRhs )
 import Class		( classTyCon )
 import DataCon          ( dataConOrigArgTys )
@@ -392,7 +392,7 @@ calcTyConArgVrcs tyclss
        	argtys    = concatMap dataConOrigArgTys data_cons	-- Rep? or Orig?
 
     tcaoIter oi tc | isSynTyCon tc
-      = let (tyvs,ty) = getSynTyConDefn tc
+      = let (tyvs,ty) = synTyConDefn tc
                         -- we use the already-computed result for tycons not in this SCC
         in  map (\v -> vrcInTy (lookup oi) v ty) tyvs
 

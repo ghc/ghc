@@ -1,10 +1,11 @@
 \begin{code}
 module TcUnify where
-import TcType	( TcTauType )
+import TcType	( TcTauType, BoxyType )
 import TcRnTypes( TcM )
 
 -- This boot file exists only to tie the knot between
 --		TcUnify and TcSimplify
 
-unifyTauTy :: TcTauType -> TcTauType -> TcM ()
+unifyType :: TcTauType -> TcTauType -> TcM ()
+zapToMonotype :: BoxyType -> TcM TcTauType
 \end{code}

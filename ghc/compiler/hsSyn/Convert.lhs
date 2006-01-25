@@ -292,23 +292,23 @@ cvtBind :: TH.Dec -> CvtM (LHsBind RdrName)
 cvtBind (TH.ValD (TH.VarP s) body ds) 
   = do	{ s' <- vNameL s
 	; cl' <- cvtClause (Clause [] body ds)
-	; returnL $ FunBind s' False (mkMatchGroup [cl']) placeHolderNames }
+	; returnL $ mkFunBind s' [cl'] }
 
 cvtBind (TH.FunD nm cls)
   = do	{ nm' <- vNameL nm
 	; cls' <- mapM cvtClause cls
-	; returnL $ FunBind nm' False (mkMatchGroup cls') placeHolderNames }
+	; returnL $ mkFunBind nm' cls' }
 
 cvtBind (TH.ValD p body ds)
   = do	{ p' <- cvtPat p
 	; g' <- cvtGuard body
 	; ds' <- cvtDecs ds
-	; returnL $ PatBind p' (GRHSs g' ds') void placeHolderNames }
+	; returnL $ PatBind { pat_lhs = p', pat_rhs = GRHSs g' ds', 
+			      pat_rhs_ty = void, bind_fvs = placeHolderNames } }
 
 cvtBind d 
   = failWith (sep [ptext SLIT("Illegal kind of declaration in where clause"),
 		   nest 2 (text (TH.pprint d))])
-
 
 cvtClause :: TH.Clause -> CvtM (Hs.LMatch RdrName)
 cvtClause (Clause ps body wheres)

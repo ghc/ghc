@@ -8,21 +8,22 @@ module TcArrows ( tcProc ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcCheckRho, tcInferRho )
+import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho )
 
 import HsSyn
 import TcHsSyn	(  mkHsDictLet )
 
-import TcMatches ( tcMatchPats, matchCtxt, tcStmts, tcMDoStmt, tcGuardStmt,
+import TcMatches ( matchCtxt, tcStmts, tcMDoStmt, tcGuardStmt,
 		   TcMatchCtxt(..), tcMatchesCase )
 
-import TcType	( TcType, TcTauType, TcRhoType, mkFunTys, mkTyConApp,
+import TcType	( TcType, TcTauType, BoxyRhoType, mkFunTys, mkTyConApp,
 		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType, 
 		  SkolemInfo(..) )
-import TcMType	( newTyFlexiVarTy, newTyFlexiVarTys, tcSkolTyVars, zonkTcType )
+import TcMType	( newFlexiTyVarTy, tcInstSkolTyVars, zonkTcType )
 import TcBinds	( tcLocalBinds )
 import TcSimplify ( tcSimplifyCheck )
-import TcUnify	( Expected(..), checkSigTyVarsWrt, zapExpectedTo )
+import TcPat	( tcPat, tcPats, PatCtxt(..) )
+import TcUnify	( checkSigTyVarsWrt, boxySplitAppTy )
 import TcRnMonad
 import Inst	( tcSyntaxName )
 import Name	( Name )
@@ -45,23 +46,16 @@ import Util	( lengthAtLeast )
 
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
-       -> Expected TcRhoType			-- Expected type of whole proc expression
+       -> BoxyRhoType				-- Expected type of whole proc expression
        -> TcM (OutPat TcId, LHsCmdTop TcId)
 
 tcProc pat cmd exp_ty
--- gaw 2004 FIX?
- = newArrowScope $ do
-	{ arr_ty <- newTyFlexiVarTy arrowTyConKind
-	; [arg_ty, res_ty] <- newTyFlexiVarTys 2 liftedTypeKind
-	; zapExpectedTo exp_ty (mkAppTys arr_ty [arg_ty,res_ty])
-
+  = newArrowScope $
+    do	{ (exp_ty1, res_ty) <- boxySplitAppTy exp_ty 
+	; (arr_ty, arg_ty)  <- boxySplitAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; ([pat'], cmd') <- tcMatchPats [pat] [Check arg_ty] (Check res_ty) $
-			    tcCmdTop cmd_env cmd ([], res_ty)
-		-- The False says don't do GADT type refinement
-		-- This is a conservative choice, but I'm not sure of the consequences
-		-- of type refinement in the arrow world!
-
+	; (pat', cmd') <- tcPat LamPat pat arg_ty res_ty $ \ res_ty' ->
+			  tcCmdTop cmd_env cmd ([], res_ty')
 	; return (pat', cmd') }
 \end{code}
 
@@ -120,16 +114,16 @@ tc_cmd env in_cmd@(HsCase scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd)		$
     addErrCtxt (caseScrutCtxt scrut)	(
       tcInferRho scrut 
-    )								`thenM`	\ (scrut', scrut_ty) ->
-    tcMatchesCase match_ctxt scrut_ty matches (Check res_ty)	`thenM`	\ matches' ->
+    )							`thenM`	\ (scrut', scrut_ty) ->
+    tcMatchesCase match_ctxt scrut_ty matches res_ty	`thenM`	\ matches' ->
     returnM (HsCase scrut' matches')
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
-    mc_body body (Check res_ty') = tcCmd env body (stk, res_ty')
+    mc_body body res_ty' = tcCmd env body (stk, res_ty')
 
 tc_cmd env (HsIf pred b1 b2) res_ty
-  = do 	{ pred' <- tcCheckRho pred boolTy
+  = do 	{ pred' <- tcMonoExpr pred boolTy
 	; b1'   <- tcCmd env b1 res_ty
 	; b2'   <- tcCmd env b2 res_ty
 	; return (HsIf pred' b1' b2')
@@ -141,12 +135,12 @@ tc_cmd env (HsIf pred b1 b2) res_ty
 
 tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
-    do  { arg_ty <- newTyFlexiVarTy openTypeKind
+    do  { arg_ty <- newFlexiTyVarTy openTypeKind
 	; let fun_ty = mkCmdArrTy env (foldl mkPairTy arg_ty cmd_stk) res_ty
 
-	; fun' <- select_arrow_scope (tcCheckRho fun fun_ty)
+	; fun' <- select_arrow_scope (tcMonoExpr fun fun_ty)
 
-	; arg' <- tcCheckRho arg arg_ty
+	; arg' <- tcMonoExpr arg arg_ty
 
 	; return (HsArrApp fun' arg' fun_ty ho_app lr) }
   where
@@ -164,11 +158,11 @@ tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
 tc_cmd env cmd@(HsApp fun arg) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
 -- gaw 2004 FIX?
-    do  { arg_ty <- newTyFlexiVarTy openTypeKind
+    do  { arg_ty <- newFlexiTyVarTy openTypeKind
 
 	; fun' <- tcCmd env fun (arg_ty:cmd_stk, res_ty)
 
-	; arg' <- tcCheckRho arg arg_ty
+	; arg' <- tcMonoExpr arg arg_ty
 
 	; return (HsApp fun' arg') }
 
@@ -185,8 +179,8 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
 		  (kappaUnderflow cmd)
 
 		-- Check the patterns, and the GRHSs inside
-	; (pats', grhss') <- setSrcSpan mtch_loc					$
-			     tcMatchPats pats (map Check cmd_stk) (Check res_ty)	$
+	; (pats', grhss') <- setSrcSpan mtch_loc		$
+			     tcPats LamPat pats cmd_stk res_ty	$
 			     tc_grhss grhss
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')
@@ -199,16 +193,15 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
     match_ctxt = LambdaExpr 	-- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
-    tc_grhss (GRHSs grhss binds)
+    tc_grhss (GRHSs grhss binds) res_ty
 	= do { (binds', grhss') <- tcLocalBinds binds $
-				   mappM (wrapLocM tc_grhs) grhss
+				   mapM (wrapLocM (tc_grhs res_ty)) grhss
 	     ; return (GRHSs grhss' binds') }
 
-    tc_grhs (GRHS guards body)
-	= do { (guards', rhs') <- tcStmts pg_ctxt
-					  (tcGuardStmt res_ty)
-					  guards
-					  (tcCmd env body (stk', res_ty))
+    tc_grhs res_ty (GRHS guards body)
+	= do { (guards', rhs') <- tcStmts pg_ctxt tcGuardStmt
+					  guards res_ty
+					  (\res_ty' -> tcCmd env body (stk', res_ty'))
 	     ; return (GRHS guards' rhs') }
 
 -------------------------------------------
@@ -216,12 +209,12 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
 
 tc_cmd env cmd@(HsDo do_or_lc stmts body ty) (cmd_stk, res_ty)
   = do 	{ checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
-	; (stmts', body') <- tcStmts do_or_lc tc_stmt stmts $
-			     tcCmd env body ([], res_ty)
+	; (stmts', body') <- tcStmts do_or_lc tc_stmt stmts res_ty $ \ res_ty' ->
+			     tcCmd env body ([], res_ty')
 	; return (HsDo do_or_lc stmts' body' res_ty) }
   where
-    tc_stmt = tcMDoStmt res_ty tc_rhs
-    tc_rhs rhs = do { ty <- newTyFlexiVarTy liftedTypeKind
+    tc_stmt = tcMDoStmt tc_rhs
+    tc_rhs rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
 		    ; rhs' <- tcCmd env rhs ([], ty)
 		    ; return (rhs', ty) }
 
@@ -240,7 +233,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
     do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
 	; span       <- getSrcSpanM
-	; [w_tv]     <- tcSkolTyVars (ArrowSkol span) [alphaTyVar]
+	; [w_tv]     <- tcInstSkolTyVars (ArrowSkol span) [alphaTyVar]
 	; let w_ty = mkTyVarTy w_tv 	-- Just a convenient starting point
 
 		--  a ((w,t1) .. tn) t
@@ -252,7 +245,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 			      e_res_ty
 
 		-- Check expr
-	; (expr', lie) <- escapeArrowScope (getLIE (tcCheckRho expr e_ty))
+	; (expr', lie) <- escapeArrowScope (getLIE (tcMonoExpr expr e_ty))
 	; inst_binds <- tcSimplifyCheck sig_msg [w_tv] [] lie
 
 		-- Check that the polymorphic variable hasn't been unified with anything
@@ -272,11 +265,11 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 	       -> TcM (LHsCmdTop Name, Int, TcType, TcType, TcType)
     new_cmd_ty cmd i
 -- gaw 2004 FIX?
-	  = do	{ b_ty   <- newTyFlexiVarTy arrowTyConKind
-		; tup_ty <- newTyFlexiVarTy liftedTypeKind
+	  = do	{ b_ty   <- newFlexiTyVarTy arrowTyConKind
+		; tup_ty <- newFlexiTyVarTy liftedTypeKind
 			-- We actually make a type variable for the tuple
 			-- because we don't know how deeply nested it is yet    
-		; s_ty   <- newTyFlexiVarTy liftedTypeKind
+		; s_ty   <- newFlexiTyVarTy liftedTypeKind
 		; return (cmd, i, b_ty, tup_ty, s_ty)
 		}
 

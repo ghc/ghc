@@ -16,6 +16,7 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
 import {-# SOURCE #-} HsPat  ( LPat )
 
 import HsTypes		( LHsType, PostTcType )
+import Type		( Type )
 import Name		( Name )
 import NameSet		( NameSet, elemNameSet )
 import BasicTypes	( IPName, RecFlag(..), InlineSpec(..), Fixity )
@@ -55,41 +56,61 @@ type DictBinds id = LHsBinds id		-- Used for dictionary or method bindings
 type LHsBind  id  = Located (HsBind id)
 
 data HsBind id
-  = FunBind     (Located id)
-			-- Used for both functions 	f x = e
-			-- and variables		f = \x -> e
-			-- Reason: the Match stuff lets us have an optional
-			--	   result type sig	f :: a->a = ...mentions a...
-			--
-			-- This also means that instance decls can only have
-			-- FunBinds, so if you change this, you'll need to
-			-- change e.g. rnMethodBinds
-		Bool	-- True => infix declaration
-		(MatchGroup id)
-		NameSet		-- After the renamer, this contains a superset of the 
+  = FunBind {	-- FunBind is used for both functions 	f x = e
+		-- and variables			f = \x -> e
+		-- Reason: the Match stuff lets us have an optional
+		--	   result type sig	f :: a->a = ...mentions a...
+		--
+		-- This also means that instance decls can only have
+		-- FunBinds, so if you change this, you'll need to
+		-- change e.g. rnMethodBinds
+
+	fun_id :: Located id,
+
+	fun_infix :: Bool,	-- True => infix declaration
+
+	fun_matches :: MatchGroup id,	-- The payload
+
+	fun_co_fn :: ExprCoFn,	-- Coercion from the type of the MatchGroup to the type of
+				-- the Id.  Example:
+				--	f :: Int -> forall a. a -> a
+				--	f x y = y
+				-- Then the MatchGroup will have type (Int -> a' -> a')
+				-- (with a free type variable a').  The coercion will take
+				-- a CoreExpr of this type and convert it to a CoreExpr of
+				-- type 	Int -> forall a'. a' -> a'
+				-- Notice that the coercion captures the free a'.  That's
+				-- why coercions are (CoreExpr -> CoreExpr), rather than
+				-- just CoreExpr (with a functional type)
+
+	bind_fvs :: NameSet	-- After the renamer, this contains a superset of the 
 				-- Names of the other binders in this binding group that 
 				-- are free in the RHS of the defn
 				-- Before renaming, and after typechecking, 
 				-- the field is unused; it's just an error thunk
+    }
 
-  | PatBind     (LPat id)	-- The pattern is never a simple variable;
-				-- That case is done by FunBind
-		(GRHSs id)
-		PostTcType	-- Type of the GRHSs
-		NameSet		-- Same as for FunBind
+  | PatBind {	-- The pattern is never a simple variable;
+		-- That case is done by FunBind
+	pat_lhs    :: LPat id,
+	pat_rhs    :: GRHSs id,
+	pat_rhs_ty :: PostTcType,	-- Type of the GRHSs
+	bind_fvs   :: NameSet		-- Same as for FunBind
+    }
 
-  | VarBind id (Located (HsExpr id))	-- Dictionary binding and suchlike 
-					-- All VarBinds are introduced by the type checker
-					-- Located only for consistency
+  | VarBind {	-- Dictionary binding and suchlike 
+	var_id :: id,		-- All VarBinds are introduced by the type checker
+	var_rhs :: LHsExpr id	-- Located only for consistency
+    }
 
-  | AbsBinds					-- Binds abstraction; TRANSLATION
-		[TyVar]	  			-- Type variables
-		[DictId]			-- Dicts
-		[([TyVar], id, id, [Prag])]	-- (tvs, poly_id, mono_id, prags)
-		(LHsBinds id)	 		-- The dictionary bindings and typechecked user bindings
+  | AbsBinds {					-- Binds abstraction; TRANSLATION
+	abs_tvs     :: [TyVar],  
+	abs_dicts   :: [DictId],
+	abs_exports :: [([TyVar], id, id, [Prag])],	-- (tvs, poly_id, mono_id, prags)
+	abs_binds   :: LHsBinds id		-- The dictionary bindings and typechecked user bindings
 						-- mixed up together; you can tell the dict bindings because
 						-- they are all VarBinds
-
+    }
 	-- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
 	-- 
 	-- Creates bindings for (polymorphic, overloaded) poly_f
@@ -209,12 +230,13 @@ instance OutputableBndr id => Outputable (HsBind id) where
 
 ppr_monobind :: OutputableBndr id => HsBind id -> SDoc
 
-ppr_monobind (PatBind pat grhss _ _)     = pprPatBind pat grhss
-ppr_monobind (VarBind var rhs)           = ppr var <+> equals <+> pprExpr (unLoc rhs)
-ppr_monobind (FunBind fun inf matches _) = pprFunBind (unLoc fun) matches
+ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat grhss
+ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = ppr var <+> equals <+> pprExpr (unLoc rhs)
+ppr_monobind (FunBind { fun_id = fun, fun_matches = matches }) = pprFunBind (unLoc fun) matches
       -- ToDo: print infix if appropriate
 
-ppr_monobind (AbsBinds tyvars dictvars exports val_binds)
+ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars, 
+			 abs_exports = exports, abs_binds = val_binds })
      = sep [ptext SLIT("AbsBinds"),
 	    brackets (interpp'SP tyvars),
 	    brackets (interpp'SP dictvars),
@@ -259,6 +281,37 @@ instance (OutputableBndr id) => Outputable (HsIPBinds id) where
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
   ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Coercion functions}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- A Coercion is an expression with a hole in it
+-- We need coercions to have concrete form so that we can zonk them
+
+data ExprCoFn
+  = CoHole			-- The identity coercion
+  | CoCompose ExprCoFn ExprCoFn
+  | CoApps ExprCoFn [Id]		-- Non-empty list
+  | CoTyApps ExprCoFn [Type]		--   in all of these
+  | CoLams [Id] ExprCoFn		--   so that the identity coercion
+  | CoTyLams [TyVar] ExprCoFn		--   is just Hole
+  | CoLet (LHsBinds Id) ExprCoFn	-- Would be nicer to be core bindings
+
+(<.>) :: ExprCoFn -> ExprCoFn -> ExprCoFn
+(<.>) = CoCompose
+
+idCoercion :: ExprCoFn
+idCoercion = CoHole
+
+isIdCoercion :: ExprCoFn -> Bool
+isIdCoercion CoHole = True
+isIdCoercion other  = False
 \end{code}
 
 
@@ -350,31 +403,36 @@ sigName (L _ sig) = f sig
     f other			= Nothing
 
 isFixityLSig :: LSig name -> Bool
-isFixityLSig (L _ (FixSig _)) = True
-isFixityLSig _	              = False
+isFixityLSig (L _ (FixSig {})) = True
+isFixityLSig _	               = False
 
 isVanillaLSig :: LSig name -> Bool
-isVanillaLSig (L _(TypeSig name _)) = True
-isVanillaLSig sig	            = False
+isVanillaLSig (L _(TypeSig {})) = True
+isVanillaLSig sig	        = False
 
 isSpecLSig :: LSig name -> Bool
-isSpecLSig (L _(SpecSig name _ _)) = True
-isSpecLSig sig	     		   = False
+isSpecLSig (L _(SpecSig {})) = True
+isSpecLSig sig	     	     = False
 
-isSpecInstLSig (L _ (SpecInstSig _)) = True
-isSpecInstLSig sig	       	     = False
+isSpecInstLSig (L _ (SpecInstSig {})) = True
+isSpecInstLSig sig	       	      = False
 
 isPragLSig :: LSig name -> Bool
 	-- Identifies pragmas 
-isPragLSig (L _ (SpecSig _ _ _)) = True
-isPragLSig (L _ (InlineSig _ _)) = True
-isPragLSig other		 = False
+isPragLSig (L _ (SpecSig {}))   = True
+isPragLSig (L _ (InlineSig {})) = True
+isPragLSig other		= False
 
-hsSigDoc (TypeSig    _ _) 	  = ptext SLIT("type signature")
-hsSigDoc (SpecSig    _ _ _) 	  = ptext SLIT("SPECIALISE pragma")
-hsSigDoc (InlineSig _ spec)   	  = ppr spec <+> ptext SLIT("pragma")
-hsSigDoc (SpecInstSig _)	  = ptext SLIT("SPECIALISE instance pragma")
-hsSigDoc (FixSig (FixitySig _ _)) = ptext SLIT("fixity declaration")
+isInlineLSig :: LSig name -> Bool
+	-- Identifies inline pragmas 
+isInlineLSig (L _ (InlineSig {})) = True
+isInlineLSig other		  = False
+
+hsSigDoc (TypeSig {}) 		= ptext SLIT("type signature")
+hsSigDoc (SpecSig {})	 	= ptext SLIT("SPECIALISE pragma")
+hsSigDoc (InlineSig _ spec)   	= ppr spec <+> ptext SLIT("pragma")
+hsSigDoc (SpecInstSig {})	= ptext SLIT("SPECIALISE instance pragma")
+hsSigDoc (FixSig {}) 		= ptext SLIT("fixity declaration")
 \end{code}
 
 Signature equality is used when checking for duplicate signatures

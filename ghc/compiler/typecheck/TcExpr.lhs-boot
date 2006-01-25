@@ -3,27 +3,22 @@ module TcExpr where
 import HsSyn	( HsExpr, LHsExpr )
 import Name	( Name )
 import Var	( Id )
-import TcType	( TcType, Expected )
+import TcType	( TcType, BoxySigmaType, BoxyRhoType )
 import TcRnTypes( TcM, InstOrigin )
 
-tcCheckSigma :: 
+tcPolyExpr :: 
 	  LHsExpr Name
-       -> TcType
+       -> BoxySigmaType
        -> TcM (LHsExpr Id)
 
-tcCheckRho :: 
+tcMonoExpr :: 
   	  LHsExpr Name
-       -> TcType
+       -> BoxyRhoType
        -> TcM (LHsExpr Id)
 
 tcInferRho :: 
   	  LHsExpr Name
        -> TcM (LHsExpr Id, TcType)
-
-tcMonoExpr :: 
-  	  LHsExpr Name
-       -> Expected TcType
-       -> TcM (LHsExpr Id)
 
 tcSyntaxOp :: 
 	  InstOrigin

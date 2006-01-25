@@ -35,7 +35,6 @@ module Module
     ) where
 
 #include "HsVersions.h"
-import OccName
 import Outputable
 import Unique		( Uniquable(..) )
 import UniqFM

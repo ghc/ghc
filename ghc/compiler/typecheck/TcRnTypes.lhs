@@ -20,7 +20,8 @@ module TcRnTypes(
 	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
-	TcTyThing(..), pprTcTyThingCategory, GadtRefinement,
+	TcTyThing(..), pprTcTyThingCategory, 
+	GadtRefinement,
 
 	-- Template Haskell
 	ThStage(..), topStage, topSpliceStage,
@@ -48,8 +49,8 @@ import HscTypes		( FixityEnv,
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
 			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageId, HomeModules )
-import Type		( Type, TvSubstEnv, pprParendType, pprTyThingCategory )
-import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
+import Type		( Type, pprTyThingCategory )
+import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo, TvSubst,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes, pprSkolInfo )
 import InstEnv		( Instance, InstEnv )
 import IOEnv
@@ -320,16 +321,10 @@ data TcLclEnv		-- Changes as we move inside an expression
 			-- plus the tyvars mentioned in the types of Ids bound in tcl_lenv
 			-- Why mutable? see notes with tcGetGlobalTyVars
 
-	tcl_lie   :: TcRef LIE,		-- Place to accumulate type constraints
-	tcl_gadt  :: GadtRefinement	-- The current type refinement for GADTs
-
------------------------------------------------------------
--- Not yet; it's a new complication and I want to see whether it bites
---	tcl_given :: [Inst]		-- Insts available in the current context (see Note [Given Insts])
------------------------------------------------------------
+	tcl_lie   :: TcRef LIE		-- Place to accumulate type constraints
     }
 
-type GadtRefinement = TvSubstEnv	-- Binds rigid type variables to their refinements
+type GadtRefinement = TvSubst
 
 {- Note [Given Insts]
    ~~~~~~~~~~~~~~~~~~
@@ -420,31 +415,31 @@ escapeArrowScope
 ---------------------------
 
 data TcTyThing
-  = AGlobal TyThing			-- Used only in the return type of a lookup
+  = AGlobal TyThing		-- Used only in the return type of a lookup
 
-  | ATcId   TcId ThLevel	 	-- Ids defined in this module; may not be fully zonked
+  | ATcId   TcId 	 	-- Ids defined in this module; may not be fully zonked
+	    ThLevel 
+	    Bool		-- True <=> apply the type refinement to me
 
-  | ATyVar  Name TcType			-- Type variables; tv -> type.  It can't just be a TyVar
-					-- that is mutated to point to the type it is bound to,
-					-- because that would make it a wobbly type, and we
-					-- want pattern-bound lexically-scoped type variables to
-					-- be able to stand for rigid types
+  | ATyVar  Name TcType		-- The type to which the lexically scoped type vaiable
+				-- is currently refined. We only need the Name
+				-- for error-message purposes
 
-  | AThing  TcKind 			-- Used temporarily, during kind checking, for the
-					--	tycons and clases in this recursive group
+  | AThing  TcKind 		-- Used temporarily, during kind checking, for the
+				--	tycons and clases in this recursive group
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = ppr g
-   ppr (ATcId g tl)     = text "Identifier" <> 
-			  ifPprDebug (brackets (ppr g <> comma <> ppr tl))
-   ppr (ATyVar tv ty)   = text "Type variable" <+> quotes (ppr tv) <+> pprParendType ty
+   ppr (ATcId g tl rig) = text "Identifier" <> 
+			  ifPprDebug (brackets (ppr g <> comma <> ppr tl <+> ppr rig))
+   ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
-pprTcTyThingCategory (ATyVar _ _)    = ptext SLIT("Type variable")
-pprTcTyThingCategory (ATcId _ _)     = ptext SLIT("Local identifier")
-pprTcTyThingCategory (AThing _)	     = ptext SLIT("Kinded thing")
+pprTcTyThingCategory (ATyVar {})     = ptext SLIT("Type variable")
+pprTcTyThingCategory (ATcId {})      = ptext SLIT("Local identifier")
+pprTcTyThingCategory (AThing {})     = ptext SLIT("Kinded thing")
 \end{code}
 
 \begin{code}
@@ -676,8 +671,6 @@ data Inst
 	TcThetaType	-- The (types of the) dictionaries to which the function
 			-- must be applied to get the method
 
-	TcTauType	-- The tau-type of the method
-
 	InstLoc
 
 	-- INVARIANT 1: in (Method u f tys theta tau loc)
@@ -713,16 +706,16 @@ instance Eq Inst where
 	         EQ    -> True
 		 other -> False
 
-cmpInst (Dict _ pred1 _)     	  (Dict _ pred2 _)	    = pred1 `tcCmpPred` pred2
-cmpInst (Dict _ _ _)	     	  other 		    = LT
+cmpInst (Dict _ pred1 _)     	(Dict _ pred2 _)	= pred1 `tcCmpPred` pred2
+cmpInst (Dict _ _ _)	     	other 		    	= LT
 
-cmpInst (Method _ _ _ _ _ _) 	  (Dict _ _ _)	  	    = GT
-cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2) `thenCmp` (tys1 `tcCmpTypes` tys2)
-cmpInst (Method _ _ _ _ _ _)      other			    = LT
+cmpInst (Method _ _ _ _ _) 	(Dict _ _ _)	  	= GT
+cmpInst (Method _ id1 tys1 _ _) (Method _ id2 tys2 _ _) = (id1 `compare` id2) `thenCmp` (tys1 `tcCmpTypes` tys2)
+cmpInst (Method _ _ _ _ _)      other			= LT
 
-cmpInst (LitInst _ _ _ _)	  (Dict _ _ _) 		    = GT
-cmpInst (LitInst _ _ _ _)	  (Method _ _ _ _ _ _)	    = GT
-cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `compare` lit2) `thenCmp` (ty1 `tcCmpType` ty2)
+cmpInst (LitInst _ _ _ _)	(Dict _ _ _) 		= GT
+cmpInst (LitInst _ _ _ _)	(Method _ _ _ _ _)	= GT
+cmpInst (LitInst _ lit1 ty1 _)	(LitInst _ lit2 ty2 _)  = (lit1 `compare` lit2) `thenCmp` (ty1 `tcCmpType` ty2)
 \end{code}
 
 

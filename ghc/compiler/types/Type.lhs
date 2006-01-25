@@ -23,11 +23,9 @@ module Type (
 	splitFunTys, splitFunTysN,
 	funResultTy, funArgTy, zipFunTys, isFunTy,
 
-	mkGenTyConApp, mkTyConApp, mkTyConTy, 
+	mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
 	splitTyConApp_maybe, splitTyConApp,
-
-	mkSynTy, 
 
 	repType, typePrimRep, coreView, tcView,
 
@@ -68,11 +66,11 @@ module Type (
 	TvSubst(..), emptyTvSubst,	-- Representation visible to a few friends
 	mkTvSubst, mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
 	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
- 	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst,
+ 	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst, zipTyEnv,
 
 	-- Performing substitution on types
 	substTy, substTys, substTyWith, substTheta, 
-	substPred, substTyVar, substTyVarBndr, deShadowTy, 
+	substPred, substTyVar, substTyVarBndr, deShadowTy, lookupTyVar,
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTyThingCategory,
@@ -92,7 +90,8 @@ import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName, mkTyVar )
 import VarEnv
 import VarSet
 
-import Name	( NamedThing(..), mkInternalName, tidyOccName )
+import OccName	( tidyOccName )
+import Name	( NamedThing(..), mkInternalName, tidyNameOcc )
 import Class	( Class, classTyCon )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
@@ -105,7 +104,6 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 -- others
 import StaticFlags	( opt_DictsStrict )
 import SrcLoc		( noSrcLoc )
-import Unique		( Uniquable(..) )
 import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual, all2 )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
@@ -207,9 +205,9 @@ mkAppTy orig_ty1 orig_ty2
   = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
-    mk_app (TyConApp tc tys) = mkGenTyConApp tc (tys ++ [orig_ty2])
+    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
     mk_app ty1		     = AppTy orig_ty1 orig_ty2
-	-- We call mkGenTyConApp because the TyConApp could be an 
+	-- Note that the TyConApp could be an 
 	-- under-saturated type synonym.  GHC allows that; e.g.
 	--	type Foo k = k a -> k a
 	--	type Id x = x
@@ -229,8 +227,8 @@ mkAppTys orig_ty1 orig_tys2
   = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
-    mk_app (TyConApp tc tys) = mkGenTyConApp tc (tys ++ orig_tys2)
-				-- mkGenTyConApp: see notes with mkAppTy
+    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
+				-- mkTyConApp: see notes with mkAppTy
     mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
 
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -325,10 +323,6 @@ funArgTy ty		   = pprPanic "funArgTy" (ppr ty)
 as apppropriate.
 
 \begin{code}
-mkGenTyConApp :: TyCon -> [Type] -> Type
-mkGenTyConApp tc tys
-  = mkTyConApp tc tys
-
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon, [ty1,ty2] <- tys
@@ -366,34 +360,6 @@ splitTyConApp_maybe other	      = Nothing
 ---------------------------------------------------------------------
 				SynTy
 				~~~~~
-
-\begin{code}
-mkSynTy tycon tys = panic "No longer used"
-{-	Delete in due course
-  | n_args == arity	-- Exactly saturated
-  = mk_syn tys
-  | n_args >  arity	-- Over-saturated
-  = case splitAt arity tys of { (as,bs) -> mkAppTys (mk_syn as) bs }
-	-- Its important to use mkAppTys, rather than (foldl AppTy),
-	-- because (mk_syn as) might well return a partially-applied
-	-- type constructor; indeed, usually will!
-  | otherwise		-- Un-saturated
-  = TyConApp tycon tys
-	-- For the un-saturated case we build TyConApp directly
-	-- (mkTyConApp ASSERTs that the tc isn't a SynTyCon).
-	-- Here we are relying on checkValidType to find
-	-- the error.  What we can't do is use mkSynTy with
-	-- too few arg tys, because that is utterly bogus.
-
-  where
-    mk_syn tys = NoteTy (SynNote (TyConApp tycon tys))
-			(substTyWith tyvars tys body)
-
-    (tyvars, body) = ASSERT( isSynTyCon tycon ) getSynTyConDefn tycon
-    arity 	   = tyConArity tycon
-    n_args	   = length tys
--}
-\end{code}
 
 Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -625,28 +591,14 @@ typeKind (ForAllTy tv ty)	= typeKind ty
 		~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 tyVarsOfType :: Type -> TyVarSet
+-- NB: for type synonyms tyVarsOfType does *not* expand the synonym
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
 tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
 tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
-tyVarsOfType (ForAllTy tyvar ty)	= tyVarsOfType ty `minusVarSet` unitVarSet tyvar
-
--- 			Note [Syn]
--- Consider
---	type T a = Int
--- What are the free tyvars of (T x)?  Empty, of course!  
--- Here's the example that Ralf Laemmel showed me:
---	foo :: (forall a. C u a -> C u a) -> u
---	mappend :: Monoid u => u -> u -> u
---
---	bar :: Monoid u => u
---	bar = foo (\t -> t `mappend` t)
--- We have to generalise at the arg to f, and we don't
--- want to capture the constraint (Monad (C u a)) because
--- it appears to mention a.  Pretty silly, but it was useful to him.
-
+tyVarsOfType (ForAllTy tyvar ty)	= delVarSet (tyVarsOfType ty) tyvar
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
@@ -663,6 +615,7 @@ addFreeTyVars :: Type -> Type
 addFreeTyVars ty@(NoteTy (FTVNote _) _)      = ty
 addFreeTyVars ty			     = NoteTy (FTVNote (tyVarsOfType ty)) ty
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -683,9 +636,7 @@ tidyTyVarBndr (tidy_env, subst) tyvar
 		    where
 			subst' = extendVarEnv subst tyvar tyvar'
 			tyvar' = setTyVarName tyvar name'
-			name'  = mkInternalName (getUnique name) occ' noSrcLoc
-				-- Note: make a *user* tyvar, so it printes nicely
-				-- Could extract src loc, but no need.
+			name'  = tidyNameOcc name occ'
   where
     name = tyVarName tyvar
 
@@ -1245,10 +1196,13 @@ subst_ty subst ty
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
 
 substTyVar :: TvSubst -> TyVar  -> Type
-substTyVar (TvSubst in_scope env) tv
-  = case (lookupVarEnv env tv) of
+substTyVar subst tv
+  = case lookupTyVar subst tv of
 	Nothing  -> TyVarTy tv
        	Just ty' -> ty'	-- See Note [Apply Once]
+
+lookupTyVar :: TvSubst -> TyVar  -> Maybe Type
+lookupTyVar (TvSubst in_scope env) tv = lookupVarEnv env tv
 
 substTyVarBndr :: TvSubst -> TyVar -> (TvSubst, TyVar)	
 substTyVarBndr subst@(TvSubst in_scope env) old_var

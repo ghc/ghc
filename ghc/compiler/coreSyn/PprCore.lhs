@@ -19,19 +19,19 @@ module PprCore (
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import Var		( Var )
-import Id		( Id, idType, isDataConWorkId_maybe, idLBVarInfo, idArity,
-			  idInfo, idInlinePragma, idOccInfo,
-			  globalIdDetails, isGlobalId, isExportedId, 
-			  idNewDemandInfo
+import Id		( Id, idType, isDataConWorkId_maybe, idArity,
+			  idInfo, globalIdDetails, isGlobalId, isExportedId 
 			)
 import Var		( TyVar, isTyVar, tyVarKind )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
+			  inlinePragInfo, occInfo, newDemandInfo, 
+			  lbvarInfo, hasNoLBVarInfo,
 			  arityInfo, ppArityInfo, 
 			  specInfo, pprNewStrictness,
 			  workerInfo, ppWorkerInfo,
 			  newStrictnessInfo, cafInfo, ppCafInfo, specInfoRules
 			)
-
+import NewDemand	( isTop )
 #ifdef OLD_STRICTNESS
 import Id		( idDemandInfo )
 import IdInfo		( cprInfo, ppCprInfo, strictnessInfo, ppStrictnessInfo ) 
@@ -40,7 +40,7 @@ import IdInfo		( cprInfo, ppCprInfo, strictnessInfo, ppStrictnessInfo )
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
 import Type		( pprParendType, pprType, pprParendKind )
-import BasicTypes	( tupleParens )
+import BasicTypes	( tupleParens, isNoOcc, isAlwaysActive )
 import Util             ( lengthIs )
 import Outputable
 import FastString       ( mkFastString )
@@ -301,15 +301,28 @@ pprTyVarBndr tyvar
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
-pprIdBndr id = ppr id <+> 
-	       (megaSeqIdInfo (idInfo id) `seq`
-			-- Useful for poking on black holes
-	        brackets (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
+pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
+
+pprIdBndrInfo info 
+  = megaSeqIdInfo `seq` doc -- The seq is useful for poking on black holes
+  where
+    prag_info = inlinePragInfo info
+    occ_info  = occInfo info
+    dmd_info  = newDemandInfo info
+    lbv_info  = lbvarInfo info
+
+    no_info = isAlwaysActive prag_info && isNoOcc occ_info && 
+	      (case dmd_info of { Nothing -> True; Just d -> isTop d }) &&
+	      hasNoLBVarInfo lbv_info
+
+    doc | no_info = empty
+ 	| otherwise
+        = brackets $ hcat [ppr prag_info, ppr occ_info, 
+			   ppr dmd_info, ppr lbv_info
 #ifdef OLD_STRICTNESS
-			    ppr (idDemandInfo id) <+>
+			   , ppr (demandInfo id)
 #endif
-			    ppr (idNewDemandInfo id) <+>
-			    ppr (idLBVarInfo id)))
+			  ]
 \end{code}
 
 

@@ -43,7 +43,7 @@ import OccName	  ( mkOccNameFS )
 import Name       ( Name, mkExternalName, localiseName, nameOccName, nameModule, 
 		    isExternalName, getSrcLoc )
 import NameEnv
-import Type       ( Type, mkGenTyConApp )
+import Type       ( Type, mkTyConApp )
 import TcType	  ( tcTyConAppArgs )
 import TyCon	  ( tyConName )
 import TysWiredIn ( parrTyCon )
@@ -715,7 +715,8 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- Note GHC treats declarations of a variable (not a pattern) 
 -- e.g.  x = g 5 as a Fun MonoBinds. This is indicated by a single match 
 -- with an empty list of patterns
-rep_bind (L loc (FunBind fn infx (MatchGroup [L _ (Match [] ty (GRHSs guards wheres))] _) _))
+rep_bind (L loc (FunBind { fun_id = fn, 
+			   fun_matches = MatchGroup [L _ (Match [] ty (GRHSs guards wheres))] _ }))
  = do { (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
 	; fn'  <- lookupLBinder fn
@@ -724,13 +725,13 @@ rep_bind (L loc (FunBind fn infx (MatchGroup [L _ (Match [] ty (GRHSs guards whe
 	; ans' <- wrapGenSyns ss ans
 	; return (loc, ans') }
 
-rep_bind (L loc (FunBind fn infx (MatchGroup ms _) _))
+rep_bind (L loc (FunBind { fun_id = fn, fun_matches = MatchGroup ms _ }))
  =   do { ms1 <- mapM repClauseTup ms
 	; fn' <- lookupLBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (loc, ans) }
 
-rep_bind (L loc (PatBind pat (GRHSs guards wheres) ty2 _))
+rep_bind (L loc (PatBind { pat_lhs = pat, pat_rhs = GRHSs guards wheres }))
  =   do { patcore <- repLP pat 
         ; (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
@@ -738,7 +739,7 @@ rep_bind (L loc (PatBind pat (GRHSs guards wheres) ty2 _))
 	; ans' <- wrapGenSyns ss ans
         ; return (loc, ans') }
 
-rep_bind (L loc (VarBind v e))
+rep_bind (L loc (VarBind { var_id = v, var_rhs = e}))
  =   do { v' <- lookupBinder v 
 	; e2 <- repLE e
         ; x <- repNormal e2
@@ -921,7 +922,7 @@ globalVar name
 lookupType :: Name 	-- Name of type constructor (e.g. TH.ExpQ)
 	   -> DsM Type	-- The type
 lookupType tc_name = do { tc <- dsLookupTyCon tc_name ;
-		          return (mkGenTyConApp tc []) }
+		          return (mkTyConApp tc []) }
 
 wrapGenSyns :: [GenSymBind] 
 	    -> Core (TH.Q a) -> DsM (Core (TH.Q a))
