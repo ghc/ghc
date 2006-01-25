@@ -43,6 +43,7 @@ clean(['Rn043_A.hi', 'Rn043_A.o', 'Rn043_B.hi', 'Rn043_B.o'])
 test('rn045', normal, compile, [''])
 test('rn046', normal, compile, ['-W'])
 test('rn047', normal, compile, ['-W'])
+test('rn048', normal, compile, ['-W'])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
