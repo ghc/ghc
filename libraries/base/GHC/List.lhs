@@ -254,6 +254,7 @@ repeatFB c x = xs where xs = x `c` xs
 -- every element.
 -- It is an instance of the more general 'Data.List.genericReplicate',
 -- in which @n@ may be of any integral type.
+{-# INLINE replicate #-}
 replicate               :: Int -> a -> [a]
 replicate n x           =  take n (repeat x)
 
@@ -311,6 +312,23 @@ drop n (_:xs)          =  drop (n-1) xs
 splitAt n xs           =  (take n xs, drop n xs)
 
 #else /* hack away */
+{-# RULES
+"take"	   [~1] forall n xs . take n xs = case n of I# n# -> build (\c nil -> foldr (takeFB c nil) (takeConst nil) xs n#)
+"takeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n = takeUInt n xs
+ #-}
+
+{-# NOINLINE [0] takeConst #-}
+-- just a version of const that doesn't get inlined too early, so we
+-- can spot it in rules.  Also we need a type sig due to the unboxed Int#.
+takeConst :: a -> Int# -> a
+takeConst x _ = x
+
+{-# NOINLINE [0] takeFB #-}
+takeFB :: (a -> b -> c) -> c -> a -> (Int# -> b) -> Int# -> c
+takeFB c n x xs m | m <=# 0#  = n
+		  | otherwise = x `c` xs (m -# 1#)
+
+{-# INLINE [0] take #-}
 take (I# n#) xs = takeUInt n# xs
 
 -- The general code for take, below, checks n <= maxInt
