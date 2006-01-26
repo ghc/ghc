@@ -1081,17 +1081,19 @@ AC_SUBST(LibGmp)
 
 dnl ** (Mac OS X only: check for GMP.framework)
 HaveFrameworkGMP=NO
-if test $HostPlatform = "powerpc-apple-darwin"; then
- AC_MSG_CHECKING([for GMP.framework])
- save_libs="$LIBS"
- LIBS="-framework GMP"
- AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkGMP=YES,)
- if test $HaveFrameworkGMP = YES; then
-  AC_DEFINE([HAVE_FRAMEWORK_GMP], [1], [Define to 1 if GMP.framework is installed (Mac OS X only).])
- fi;
- LIBS="$save_libs"
- AC_MSG_RESULT([$HaveFrameworkGMP])
-fi;
+case $HostPlatform in
+*-apple-darwin)
+    AC_MSG_CHECKING([for GMP.framework])
+    save_libs="$LIBS"
+    LIBS="-framework GMP"
+    AC_TRY_LINK_FUNC(__gmpz_fdiv_qr, HaveFrameworkGMP=YES,)
+    if test $HaveFrameworkGMP = YES; then
+      AC_DEFINE([HAVE_FRAMEWORK_GMP], [1], [Define to 1 if GMP.framework is installed (Mac OS X only).])
+    fi;
+    LIBS="$save_libs"
+    AC_MSG_RESULT([$HaveFrameworkGMP])
+    ;;
+esac
 AC_SUBST(HaveFrameworkGMP)
 
 dnl ** check for mingwex library
