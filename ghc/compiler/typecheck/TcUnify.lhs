@@ -452,7 +452,7 @@ boxyLub orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
   where
     go (AppTy f1 a1) (AppTy f2 a2) = AppTy (boxyLub f1 f2) (boxyLub a1 a2)
-    go (FunTy f1 a1) (FunTy f2 a2) = AppTy (boxyLub f1 f2) (boxyLub a1 a2)
+    go (FunTy f1 a1) (FunTy f2 a2) = FunTy (boxyLub f1 f2) (boxyLub a1 a2)
     go (TyConApp tc1 ts1) (TyConApp tc2 ts2) 
       | tc1 == tc2, length ts1 == length ts2
       = TyConApp tc1 (zipWith boxyLub ts1 ts2)
