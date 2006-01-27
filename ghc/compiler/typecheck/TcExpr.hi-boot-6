@@ -1,23 +1,18 @@
 module TcExpr where
 
-tcCheckSigma :: 
+tcPolyExpr :: 
 	  HsExpr.LHsExpr Name.Name
-       -> TcType.TcType
+       -> TcType.BoxySigmaType
        -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
-tcCheckRho :: 
+tcMonoExpr :: 
   	  HsExpr.LHsExpr Name.Name
-       -> TcType.TcType
+       -> TcType.BoxyRhoType
        -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
 tcInferRho :: 
   	  HsExpr.LHsExpr Name.Name
        -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id, TcType.TcType)
-
-tcMonoExpr :: 
-  	  HsExpr.LHsExpr Name.Name
-       -> TcType.Expected TcType.TcType
-       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
 tcSyntaxOp :: 
 	  TcRnTypes.InstOrigin
