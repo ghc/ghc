@@ -21,7 +21,8 @@ import qualified DsMeta
 #endif
 
 import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..), HsRecordBinds, mkHsApp, mkHsDictApp, mkHsTyApp )
+			  HsMatchContext(..), HsRecordBinds, 
+			  mkHsCoerce, mkHsApp, mkHsDictApp, mkHsTyApp )
 import TcHsSyn		( hsLitType )
 import TcRnMonad
 import TcUnify		( tcInfer, tcSubExp, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
@@ -105,7 +106,7 @@ tcPolyExprNC expr res_ty
   = do	{ (gen_fn, expr') <- tcGen res_ty emptyVarSet (tcPolyExprNC expr)
 		-- Note the recursive call to tcPolyExpr, because the
 		-- type may have multiple layers of for-alls
-	; return (L (getLoc expr') (HsCoerce gen_fn (unLoc expr'))) }
+	; return (L (getLoc expr') (mkHsCoerce gen_fn (unLoc expr'))) }
 
   | otherwise
   = tcMonoExpr expr res_ty
@@ -181,7 +182,7 @@ tcExpr (HsIPVar ip) res_ty
 	; co_fn <- tcSubExp ip_ty res_ty
 	; (ip', inst) <- newIPDict (IPOccOrigin ip) ip ip_ty
 	; extendLIE inst
-	; return (HsCoerce co_fn (HsIPVar ip')) }
+	; return (mkHsCoerce co_fn (HsIPVar ip')) }
 
 tcExpr (HsApp e1 e2) res_ty 
   = go e1 [e2]
@@ -195,13 +196,13 @@ tcExpr (HsApp e1 e2) res_ty
 
 tcExpr (HsLam match) res_ty
   = do	{ (co_fn, match') <- tcMatchLambda match res_ty
-	; return (HsCoerce co_fn (HsLam match')) }
+	; return (mkHsCoerce co_fn (HsLam match')) }
 
 tcExpr in_expr@(ExprWithTySig expr sig_ty) res_ty
  = do	{ sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
 	; expr' <- tcPolyExpr expr sig_tc_ty
 	; co_fn <- tcSubExp sig_tc_ty res_ty
-	; return (HsCoerce co_fn (ExprWithTySigOut expr' sig_ty)) }
+	; return (mkHsCoerce co_fn (ExprWithTySigOut expr' sig_ty)) }
 
 tcExpr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)
@@ -247,7 +248,7 @@ tcExpr in_expr@(SectionL arg1 lop@(L loc op)) res_ty
 tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
   = do	{ (co_fn, (op', arg2')) <- subFunTys doc 1 res_ty $ \ [arg1_ty'] res_ty' ->
 				   tcApp op 2 (tc_args arg1_ty') res_ty'
-	; return (HsCoerce co_fn (SectionR (L loc op') arg2')) }
+	; return (mkHsCoerce co_fn (SectionR (L loc op') arg2')) }
   where
     doc = ptext SLIT("The section") <+> quotes (ppr in_expr)
 		<+> ptext SLIT("takes one argument")
@@ -489,7 +490,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
     extendLIEs dicts			`thenM_`
 
 	-- Phew!
-    returnM (HsCoerce co_fn (RecordUpd record_expr' rbinds' record_ty result_record_ty))
+    returnM (mkHsCoerce co_fn (RecordUpd record_expr' rbinds' record_ty result_record_ty))
 \end{code}
 
 
@@ -694,7 +695,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	-- tcFun work nicely for OpApp and Sections too
 	; fun' <- instFun fun_id qtvs qtys'' tv_theta_prs
 	; co_fn' <- wrapFunResCoercion fun_arg_tys' co_fn
-	; return (HsCoerce co_fn' fun', args') }
+	; return (mkHsCoerce co_fn' fun', args') }
 \end{code}
 
 Note [Silly type synonyms in smart-app]
@@ -742,7 +743,7 @@ tcId orig fun_name res_ty
 
 	-- And pack up the results
 	; fun' <- instFun fun_id qtvs qtv_tys tv_theta_prs 
-	; return (HsCoerce co_fn fun') }
+	; return (mkHsCoerce co_fn fun') }
 
 -- 	Note [Push result type in]
 --

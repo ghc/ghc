@@ -17,7 +17,7 @@ import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRho, tcMonoExpr, tcPolyExpr )
 import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
 			  Match(..), LMatch, GRHSs(..), GRHS(..), 
 			  Stmt(..), LStmt, HsMatchContext(..), HsStmtContext(..),
-			  pprMatch, isIrrefutableHsPat,
+			  pprMatch, isIrrefutableHsPat, mkHsCoerce,
 			  pprMatchContext, pprStmtContext, 
 			  noSyntaxExpr, matchGroupArity, pprMatches,
 			  ExprCoFn )
@@ -471,7 +471,7 @@ tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _) res_ty thing_insid
 		-- poly_id may have a polymorphic type
 		-- but mono_ty is just a monomorphic type variable
 	     ; co_fn <- tcSubExp (idType poly_id) mono_ty
-	     ; return (HsCoerce co_fn (HsVar poly_id)) }
+	     ; return (mkHsCoerce co_fn (HsVar poly_id)) }
 
 tcMDoStmt tc_rhs ctxt stmt res_ty thing_inside
   = pprPanic "tcMDoStmt: unexpected Stmt" (ppr stmt)

@@ -90,12 +90,16 @@ matchGuards [] ctx rhs rhs_ty
 	; return (cantFailMatchResult core_rhs) }
 
 	-- ExprStmts must be guards
-	-- Turn an "otherwise" guard is a no-op
+	-- Turn an "otherwise" guard is a no-op.  This ensures that 
+	-- you don't get a "non-exhaustive eqns" message when the guards 
+	-- finish in "otherwise".
+	-- NB:	The success of this clause depends on the typechecker not
+	-- 	wrapping the 'otherwise' in empty HsTyApp or HsCoerce constructors
+	--	If it does, you'll get bogus overlap warnings
 matchGuards (ExprStmt (L _ (HsVar v)) _ _ : stmts) ctx rhs rhs_ty
   |  v `hasKey` otherwiseIdKey
   || v `hasKey` getUnique trueDataConId	
-	-- trueDataConId doesn't have the same 
-	-- unique as trueDataCon
+	-- trueDataConId doesn't have the same unique as trueDataCon
   = matchGuards stmts ctx rhs rhs_ty
 
 matchGuards (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty

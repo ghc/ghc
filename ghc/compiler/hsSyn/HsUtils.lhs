@@ -79,6 +79,10 @@ mkHsDictApp :: LHsExpr name -> [name] -> LHsExpr name
 mkHsDictApp expr []	 = expr
 mkHsDictApp expr dict_vars = L (getLoc expr) (DictApp expr dict_vars)
 
+mkHsCoerce :: ExprCoFn -> HsExpr id -> HsExpr id
+mkHsCoerce co_fn e | isIdCoercion co_fn = e
+		   | otherwise		= HsCoerce co_fn e
+
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
 	where
