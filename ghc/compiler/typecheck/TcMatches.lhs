@@ -42,12 +42,9 @@ import TysWiredIn	( stringTy, boolTy, parrTyCon, listTyCon, mkListTy, mkPArrTy )
 import PrelNames	( bindMName, returnMName, mfixName, thenMName, failMName )
 import Id		( idType, mkLocalId )
 import TyCon		( TyCon )
-import Util		( isSingleton )
 import Outputable
 import SrcLoc		( Located(..), getLoc )
 import ErrUtils		( Message )
-
-import List		( nub )
 \end{code}
 
 %************************************************************************
@@ -115,7 +112,7 @@ tcMatchLambda match res_ty
     doc = sep [ ptext SLIT("The lambda expression")
 		 <+> quotes (pprSetDepth 1 $ pprMatches LambdaExpr match),
 			-- The pprSetDepth makes the abstraction print briefly
-		ptext SLIT("has") <+> speakNOf n_pats (ptext SLIT("arguments"))]
+		ptext SLIT("has") <+> speakNOf n_pats (ptext SLIT("argument"))]
     match_ctxt = MC { mc_what = LambdaExpr,
 		      mc_body = tcPolyExpr }
 \end{code}
