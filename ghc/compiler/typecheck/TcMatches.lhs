@@ -44,7 +44,7 @@ import Id		( idType, mkLocalId )
 import TyCon		( TyCon )
 import Util		( isSingleton )
 import Outputable
-import SrcLoc		( Located(..) )
+import SrcLoc		( Located(..), getLoc )
 import ErrUtils		( Message )
 
 import List		( nub )
@@ -74,7 +74,7 @@ tcMatchesFun fun_name matches exp_ty
 	   -- sensible location.	Note: we have to do this odd
 	   -- ann-grabbing, because we don't always have annotations in
 	   -- hand when we call tcMatchesFun...
-	  checkTc (sameNoOfArgs matches) (varyingArgsErr fun_name matches)
+	  checkArgs fun_name matches
 
 	-- ToDo: Don't use "expected" stuff if there ain't a type signature
 	-- because inconsistency between branches
@@ -489,18 +489,23 @@ tcMDoStmt tc_rhs ctxt stmt res_ty thing_inside
 number of args are used in each equation.
 
 \begin{code}
-sameNoOfArgs :: MatchGroup Name -> Bool
-sameNoOfArgs (MatchGroup matches _)
-   = isSingleton (nub (map args_in_match matches))
+checkArgs :: Name -> MatchGroup Name -> TcM ()
+checkArgs fun (MatchGroup (match1:matches) _)
+    | null bad_matches = return ()
+    | otherwise
+    = failWithTc (vcat [ptext SLIT("Equations for") <+> quotes (ppr fun) <+> 
+			  ptext SLIT("have different numbers of arguments"),
+			nest 2 (ppr (getLoc match1)),
+			nest 2 (ppr (getLoc (head bad_matches)))])
   where
+    n_args1 = args_in_match match1
+    bad_matches = [m | m <- matches, args_in_match m /= n_args1]
+
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
 \end{code}
 
 \begin{code}
-varyingArgsErr name matches
-  = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
-
 matchCtxt ctxt match  = hang (ptext SLIT("In") <+> pprMatchContext ctxt <> colon) 
 			   4 (pprMatch ctxt match)
 
