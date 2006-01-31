@@ -227,4 +227,7 @@ clean(['Mod170_A.hi', 'Mod170_A.o'])
 test('mod171', normal, multimod_compile, ['mod171', '-v0 -Wall'])
 clean(['Mod171_A.hi', 'Mod171_A.o', 'Mod171_B.hi', 'Mod171_B.o'])
 
+test('mod172', normal, multimod_compile, ['mod172', '-v0'])
+clean(['Mod172_B.hi', 'Mod172_B.o', 'Mod172_C.hi', 'Mod172_C.o'])
+
 # After here we have GHC-only tests (the ones above are copied from Hugs)
