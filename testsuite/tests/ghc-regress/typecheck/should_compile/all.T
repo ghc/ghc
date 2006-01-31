@@ -210,6 +210,7 @@ test('tc197', normal, compile, [''])
 test('tc198', normal, compile, [''])
 test('tc199', expect_fail_if_compiler_type('ghc'), compile, [''])
 test('tc200', normal, compile, [''])
+test('tc201', normal, compile, [''])
 
 # Omitting temporarily
 # test('syn-perf', normal, compile, ['-fcontext-stack=30'])
