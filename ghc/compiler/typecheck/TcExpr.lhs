@@ -26,7 +26,8 @@ import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
 import TcHsSyn		( hsLitType )
 import TcRnMonad
 import TcUnify		( tcInfer, tcSubExp, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
-			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, boxySubMatchType, unBox )
+			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, boxySubMatchType, 
+			  unBox )
 import BasicTypes	( Arity, isMarkedStrict )
 import Inst		( newMethodFromName, newIPDict, instToId,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta )
@@ -992,8 +993,14 @@ thBrackId orig id_name id ps_var lie_var
 	       -- solve this, and it's probably unimportant, so I'm
 	       -- just going to flag an error for now
    
+	; id_ty' <- zapToMonotype id_ty
+		-- The id_ty might have an OpenTypeKind, but we
+		-- can't instantiate the Lift class at that kind,
+		-- so we zap it to a LiftedTypeKind monotype
+		-- C.f. the call in TcPat.newLitInst
+
 	; setLIEVar lie_var	$ do
-	{ lift <- newMethodFromName orig id_ty DsMeta.liftName
+	{ lift <- newMethodFromName orig id_ty' DsMeta.liftName
 		   -- Put the 'lift' constraint into the right LIE
 	   
 		   -- Update the pending splices
