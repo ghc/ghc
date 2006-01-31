@@ -1,10 +1,10 @@
 module TcMatches where
 
 tcGRHSsPat    :: HsExpr.GRHSs Name.Name
-	      -> TcType.Expected TcType.TcType
+	      -> TcType.BoxyRhoType
 	      -> TcRnTypes.TcM (HsExpr.GRHSs Var.Id)
 
 tcMatchesFun :: Name.Name
 	     -> HsExpr.MatchGroup Name.Name
-	     -> TcType.Expected TcType.TcType
+	     -> TcType.BoxyRhoType
 	     -> TcRnTypes.TcM (HsExpr.MatchGroup Var.Id)
