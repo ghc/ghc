@@ -112,11 +112,18 @@ dmdAnalTopRhs :: CoreExpr -> (StrictSig, CoreExpr)
 --	a) appropriate strictness info
 --	b) the unfolding (decorated with stricntess info)
 dmdAnalTopRhs rhs
-  = (sig, rhs')
+  = (sig, rhs2)
   where
-    arity	   = exprArity rhs
-    (rhs_ty, rhs') = dmdAnal emptySigEnv (vanillaCall arity) rhs
+    call_dmd	   = vanillaCall (exprArity rhs)
+    (_,      rhs1) = dmdAnal emptySigEnv call_dmd rhs
+    (rhs_ty, rhs2) = dmdAnal emptySigEnv call_dmd rhs1
     sig		   = mkTopSigTy rhs rhs_ty
+	-- Do two passes; see notes with extendSigsWithLam
+	-- Otherwise we get bogus CPR info for constructors like
+	-- 	newtype T a = MkT a
+	-- The constructor looks like (\x::T a -> x), modulo the coerce
+	-- extendSigsWithLam will optimistically give x a CPR tag the 
+	-- first time, which is wrong in the end.
 \end{code}
 
 %************************************************************************
@@ -761,8 +768,6 @@ extendSigsWithLam :: SigEnv -> Id -> SigEnv
 --				(a,b)
 -- We want f to have the CPR property because x does, by the time f has been w/w'd
 --
--- 	NOTE: see notes [CPR-AND-STRICTNESS]
---
 -- Also note that we only want to do this for something that
 -- definitely has product type, else we may get over-optimistic 
 -- CPR results (e.g. from \x -> x!).
@@ -770,6 +775,8 @@ extendSigsWithLam :: SigEnv -> Id -> SigEnv
 extendSigsWithLam sigs id
   = case idNewDemandInfo_maybe id of
 	Nothing	              -> extendVarEnv sigs id (cprSig, NotTopLevel)
+		-- Optimistic in the Nothing case;
+		-- See notes [CPR-AND-STRICTNESS]
 	Just (Eval (Prod ds)) -> extendVarEnv sigs id (cprSig, NotTopLevel)
 	other                 -> sigs
 
