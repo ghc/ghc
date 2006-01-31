@@ -20,7 +20,7 @@ module TcMType (
 
   --------------------------------
   -- Boxy type variables
-  newBoxyTyVar, newBoxyTyVars, readFilledBox, 
+  newBoxyTyVar, newBoxyTyVars, newBoxyTyVarTys, readFilledBox, 
 
   --------------------------------
   -- Instantiation
@@ -57,7 +57,7 @@ import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
 			  MetaDetails(..), SkolemInfo(..), BoxInfo(..), 
-			  BoxyTyVar, BoxyThetaType, BoxySigmaType, 
+			  BoxyTyVar, BoxyType, BoxyThetaType, BoxySigmaType, 
 			  UserTypeCtxt(..),
 			  isMetaTyVar, isSigTyVar, metaTvRef,
 			  tcCmpPred, isClassPred, tcEqType, tcGetTyVar,
@@ -72,7 +72,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  pprPred, pprTheta, pprClassPred )
 import Kind		( Kind(..), KindVar, kindVarRef, mkKindVar, 
 			  isLiftedTypeKind, isArgTypeKind, isOpenTypeKind,
-			  liftedTypeKind, openTypeKind, defaultKind
+			  liftedTypeKind, defaultKind
 			)
 import Type		( TvSubst, zipTopTvSubst, substTy )
 import Class		( Class, classArity, className )
@@ -303,11 +303,14 @@ zonkSigTyVar sig_tv
 %************************************************************************
 
 \begin{code}
-newBoxyTyVar :: TcM BoxyTyVar		-- Of openTypeKind
-newBoxyTyVar = newMetaTyVar BoxTv openTypeKind
+newBoxyTyVar :: Kind -> TcM BoxyTyVar
+newBoxyTyVar kind = newMetaTyVar BoxTv kind
 
-newBoxyTyVars :: Int -> TcM [BoxyTyVar]		-- Of openTypeKind
-newBoxyTyVars n = sequenceM [newMetaTyVar BoxTv openTypeKind | i <- [1..n]]
+newBoxyTyVars :: [Kind] -> TcM [BoxyTyVar]
+newBoxyTyVars kinds = mapM newBoxyTyVar kinds
+
+newBoxyTyVarTys :: [Kind] -> TcM [BoxyType]
+newBoxyTyVarTys kinds = do { tvs <- mapM newBoxyTyVar kinds; return (mkTyVarTys tvs) }
 
 readFilledBox :: BoxyTyVar -> TcM TcType
 -- Read the contents of the box, which should be filled in by now

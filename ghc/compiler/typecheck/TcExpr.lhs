@@ -608,7 +608,7 @@ tcApp (HsVar fun_name) n_args arg_checker res_ty
   = tcIdApp fun_name n_args arg_checker res_ty
 
 tcApp fun n_args arg_checker res_ty	-- The vanilla case (rula APP)
-  = do	{ arg_boxes <- newBoxyTyVars n_args
+  = do	{ arg_boxes <- newBoxyTyVars (replicate n_args argTypeKind)
 	; fun'      <- tcExpr fun (mkFunTys (mkTyVarTys arg_boxes) res_ty)
 	; arg_tys'  <- mapM readFilledBox arg_boxes
 	; args'     <- arg_checker arg_tys'
@@ -648,7 +648,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 
 	-- Match the result type of the function with the
 	-- result type of the context, to get an inital substitution
-	; extra_arg_boxes <- newBoxyTyVars n_missing_args
+	; extra_arg_boxes <- newBoxyTyVars (replicate n_missing_args argTypeKind)
 	; let extra_arg_tys' = mkTyVarTys extra_arg_boxes
 	      res_ty' 	     = mkFunTys extra_arg_tys' res_ty
 	      subst   	     = boxySubMatchType arg_qtvs fun_res_ty res_ty'

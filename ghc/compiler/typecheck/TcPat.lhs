@@ -35,7 +35,7 @@ import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
 			  mkFunTy, mkFunTys, exactTyVarsOfTypes,
 			  tidyOpenTypes )
 import VarSet		( elemVarSet, mkVarSet )
-import Kind		( liftedTypeKind )
+import Kind		( liftedTypeKind, openTypeKind )
 import TcUnify		( boxySplitTyConApp, boxySplitListTy, 
 			  unBox, stripBoxyType, zapToMonotype,
 		  	  boxyMatchTypes, boxyUnify, boxyUnifyList, checkSigTyVarsWrt )
@@ -580,7 +580,7 @@ refineAlt pstate con pat_tvs arg_flags pat_res_tys ctxt_res_tys thing_inside
 	      find_inst tv 
 		| not (tv `elemVarSet` res_tvs)        = return (mkTyVarTy tv)
 		| Just boxy_ty <- lookupTyVar subst tv = return boxy_ty
-		| otherwise			       = do { tv <- newBoxyTyVar
+		| otherwise			       = do { tv <- newBoxyTyVar openTypeKind
 							    ; return (mkTyVarTy tv) }
 	; pat_tys' <- mapM find_inst pat_tvs
 

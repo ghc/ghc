@@ -30,7 +30,7 @@ import TypeRep		( Type(..), PredType(..) )
 
 import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
                           tcInstSkolType, newKindVar, newMetaTyVar,
-			  tcInstBoxy, newBoxyTyVar, readFilledBox, 
+			  tcInstBoxy, newBoxyTyVar, newBoxyTyVarTys, readFilledBox, 
 			  readMetaTyVar, writeMetaTyVar, newFlexiTyVarTy,
 			  tcInstSkolTyVars, 
 			  zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
@@ -67,7 +67,7 @@ import VarSet		( emptyVarSet, mkVarSet, unitVarSet, unionVarSet, elemVarSet, var
 import VarEnv
 import Name		( isSystemName )
 import ErrUtils		( Message )
-import Maybes		( fromJust )
+import Maybes		( fromJust, isNothing )
 import BasicTypes	( Arity )
 import UniqSupply	( uniqsFromSupply )
 import Util		( notNull, equalLength )
@@ -88,7 +88,7 @@ import TcType		( isBoxyTy, isFlexi )
 \begin{code}
 tcInfer :: (BoxyType -> TcM a) -> TcM (a, TcType)
 tcInfer tc_infer
-  = do	{ box <- newBoxyTyVar 
+  = do	{ box <- newBoxyTyVar openTypeKind
 	; res <- tc_infer (mkTyVarTy box)
 	; res_ty <- readFilledBox box	-- Guaranteed filled-in by now
 	; return (res, res_ty) }
@@ -143,18 +143,30 @@ subFunTys error_herald n_pats res_ty thing_inside
 	| Just res_ty' <- tcView res_ty  = loop n args_so_far res_ty'
 
     loop n args_so_far res_ty
-	| isSigmaTy res_ty 	-- Do this first, because we guarantee to return
-				-- a BoxyRhoType, not a BoxySigmaType
+	| isSigmaTy res_ty 	-- Do this before checking n==0, because we 
+				-- guarantee to return a BoxyRhoType, not a BoxySigmaType
 	= do { (gen_fn, (co_fn, res)) <- tcGen res_ty emptyVarSet $ \ res_ty' ->
 					 loop n args_so_far res_ty'
 	     ; return (gen_fn <.> co_fn, res) }
 
-    loop 0 args_so_far res_ty = do { res <- thing_inside (reverse args_so_far) res_ty
-			           ; return (idCoercion, res) }
+    loop 0 args_so_far res_ty 
+	= do { res <- thing_inside (reverse args_so_far) res_ty
+	     ; return (idCoercion, res) }
+
     loop n args_so_far (FunTy arg_ty res_ty) 
 	= do { (co_fn, res) <- loop (n-1) (arg_ty:args_so_far) res_ty
 	     ; co_fn' <- wrapFunResCoercion [arg_ty] co_fn
 	     ; return (co_fn', res) }
+
+	-- res_ty might have a type variable at the head, such as (a b c),
+	-- in which case we must fill in with (->).  Simplest thing to do
+	-- is to use boxyUnify, but we catch failure and generate our own
+	-- error message on failure
+    loop n args_so_far res_ty@(AppTy _ _)
+	= do { [arg_ty',res_ty'] <- newBoxyTyVarTys [argTypeKind, openTypeKind]
+	     ; (_, mb_unit) <- tryTcErrs $ boxyUnify res_ty (FunTy arg_ty' res_ty')
+	     ; if isNothing mb_unit then bale_out args_so_far res_ty
+	       else loop n args_so_far (FunTy arg_ty' res_ty') }
 
     loop n args_so_far (TyVarTy tv)
         | not (isImmutableTyVar tv)
@@ -170,10 +182,15 @@ subFunTys error_herald n_pats res_ty thing_inside
 		-- Note argTypeKind: the args can have an unboxed type,
 		-- but not an unboxed tuple.
 
-    loop n args_so_far res_ty
-	= failWithTc (mk_msg (length args_so_far))
+    loop n args_so_far res_ty = bale_out args_so_far res_ty
 
-    mk_msg n_actual 
+    bale_out args_so_far res_ty
+	= do { env0 <- tcInitTidyEnv
+	     ; res_ty' <- zonkTcType res_ty
+	     ; let (env1, res_ty'') = tidyOpenType env0 res_ty'
+	     ; failWithTcM (env1, mk_msg res_ty'' (length args_so_far)) }
+
+    mk_msg res_ty n_actual 
       = error_herald <> comma $$ 
 	sep [ptext SLIT("but its type") <+> quotes (pprType res_ty), 
 	     if n_actual == 0 then ptext SLIT("has none") 
