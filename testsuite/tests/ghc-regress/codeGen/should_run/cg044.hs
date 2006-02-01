@@ -26,7 +26,7 @@ main = do
    float_tests  = run_tests float_numbers  
 
    run_tests nums =
-    map ($nums)
+    map ($ nums)
         [ denorm
         , pos_inf
         , neg_inf
@@ -177,12 +177,12 @@ doubleOrFloat ls
 -- (caller deals with byte ordering.)
 mkDouble :: [Word8] -> Double
 mkDouble ls = 
- runST ( do
+ runST (( do
    arr <- newArray_ (0,7)
    sequence (zipWith (writeArray arr) [(0::Int)..] (take 8 ls))
    arr' <- castSTUArray arr
    readArray arr' 0
- )
+ ) :: ST s Double )
 
 showAndPerform :: (Show a, Show b)
 	       => (a -> b)
@@ -191,4 +191,5 @@ showAndPerform :: (Show a, Show b)
 	       -> String
 showAndPerform fun name_fun val =
   name_fun ++ ' ':show val ++ " = " ++ show (fun val)
+
 
