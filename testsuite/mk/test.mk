@@ -108,7 +108,7 @@ test:
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \
-		$(setfast)
+		$(setfast) \
 		$(setaccept)
 
 verbose: test
