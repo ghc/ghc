@@ -25,7 +25,7 @@ import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
 			  mkHsCoerce, mkHsApp, mkHsDictApp, mkHsTyApp )
 import TcHsSyn		( hsLitType )
 import TcRnMonad
-import TcUnify		( tcInfer, tcSubExp, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
+import TcUnify		( tcInfer, tcSubExp, tcFunResTy, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
 			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, boxySubMatchType, 
 			  unBox )
 import BasicTypes	( Arity, isMarkedStrict )
@@ -688,8 +688,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	; let res_subst = zipOpenTvSubst qtvs qtys''
 	      fun_res_ty'' = substTy res_subst fun_res_ty
 	      res_ty'' = mkFunTys extra_arg_tys'' res_ty
-	; co_fn <- addErrCtxtM (checkFunResCtxt fun_name res_ty fun_res_ty'') $
-		   tcSubExp fun_res_ty'' res_ty''
+	; co_fn <- tcFunResTy fun_name fun_res_ty'' res_ty''
 			    
 	-- And pack up the results
 	-- By applying the coercion just to the *function* we can make
@@ -739,8 +738,7 @@ tcId orig fun_name res_ty
 	; let res_subst   = zipTopTvSubst qtvs qtv_tys
 	      fun_tau' = substTy res_subst fun_tau
 
-	; co_fn <- addErrCtxtM (checkFunResCtxt fun_name res_ty fun_tau') $
-		   tcSubExp fun_tau' res_ty
+	; co_fn <- tcFunResTy fun_name fun_tau' res_ty
 
 	-- And pack up the results
 	; fun' <- instFun fun_id qtvs qtv_tys tv_theta_prs 
@@ -895,29 +893,6 @@ tcArg :: LHsExpr Name				-- The function (for error messages)
        -> TcM (LHsExpr TcId)			-- Resulting argument
 tcArg fun (arg, ty, arg_no) = addErrCtxt (funAppCtxt fun arg arg_no) $
 			      tcPolyExprNC arg ty
-
-
-----------------
--- If an error happens we try to figure out whether the
--- function has been given too many or too few arguments,
--- and say so.
-checkFunResCtxt fun expected_res_ty actual_res_ty tidy_env
-  = zonkTcType expected_res_ty	  `thenM` \ exp_ty' ->
-    zonkTcType actual_res_ty	  `thenM` \ act_ty' ->
-    let
-      (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
-      (env2, act_ty'') = tidyOpenType env1     act_ty'
-      (exp_args, _)    = tcSplitFunTys exp_ty''
-      (act_args, _)    = tcSplitFunTys act_ty''
-
-      len_act_args     = length act_args
-      len_exp_args     = length exp_args
-
-      message | len_exp_args < len_act_args = wrongArgsCtxt "too few"  fun
-              | len_exp_args > len_act_args = wrongArgsCtxt "too many" fun
-	      | otherwise		    = empty
-    in
-    returnM (env2, message)
 \end{code}
 
 
@@ -1190,11 +1165,6 @@ missingFields con fields
 
 callCtxt fun args
   = ptext SLIT("In the call") <+> parens (ppr (foldl mkHsApp fun args))
-
-wrongArgsCtxt too_many_or_few fun
-  = ptext SLIT("Probable cause:") <+> quotes (ppr fun)
-	<+> ptext SLIT("is applied to") <+> text too_many_or_few 
-	<+> ptext SLIT("arguments")
 
 #ifdef GHCI
 polySpliceErr :: Id -> SDoc

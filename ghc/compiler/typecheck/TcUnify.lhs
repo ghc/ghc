@@ -6,7 +6,7 @@
 \begin{code}
 module TcUnify (
 	-- Full-blown subsumption
-  tcSubExp, tcGen, 
+  tcSubExp, tcFunResTy, tcGen, 
   checkSigTyVars, checkSigTyVarsWrt, bleatEscapedTvs, sigCtxt, 
 
 	-- Various unifications
@@ -45,10 +45,10 @@ import TcType		( TcKind, TcType, TcTyVar, TcTauType,
 			  SkolemInfo( GenSkol, UnkSkol ), MetaDetails(..), isImmutableTyVar,
 			  pprSkolTvBinding, isTauTy, isTauTyCon, isSigmaTy, 
 			  mkFunTy, mkFunTys, mkTyConApp, isMetaTyVar,
-			  tcSplitForAllTys, tcSplitAppTy_maybe, mkTyVarTys,
+			  tcSplitForAllTys, tcSplitAppTy_maybe, tcSplitFunTys, mkTyVarTys,
 			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, 
 			  typeKind, mkForAllTys, mkAppTy, isBoxyTyVar,
-			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
+			  tidyOpenType, tidyOpenTyVar, tidyOpenTyVars,
 			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, tcView, 
 			  TvSubst, mkTvSubst, zipTyEnv, substTy, emptyTvSubst, 
 			  lookupTyVar, extendTvSubst )
@@ -65,7 +65,7 @@ import Var		( Var, varName, tyVarKind, isTcTyVar, tcTyVarDetails )
 import VarSet		( emptyVarSet, mkVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems,
 			  extendVarSet, intersectsVarSet )
 import VarEnv
-import Name		( isSystemName )
+import Name		( Name, isSystemName )
 import ErrUtils		( Message )
 import Maybes		( fromJust, isNothing )
 import BasicTypes	( Arity )
@@ -279,7 +279,9 @@ boxySplitAppTy orig_ty
 
 ------------------
 boxySplitFailure actual_ty expected_ty
-  = unifyMisMatch False actual_ty expected_ty
+  = unifyMisMatch False False actual_ty expected_ty
+	-- "outer" is False, so we don't pop the context
+	-- which is what we want since we have not pushed one!
 \end{code}
 
 
@@ -513,31 +515,33 @@ tcSubExp :: BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
 	-- (tcSub act exp) checks that 
 	--	act <= exp
 tcSubExp actual_ty expected_ty
-  = traceTc (text "tcSub" <+> details)		`thenM_`
-    addErrCtxtM (unifyCtxt "type" actual_ty expected_ty)
-		(tc_sub actual_ty actual_ty expected_ty expected_ty)
-  where
-    details = vcat [text "Expected:" <+> ppr expected_ty,
-		    text "Actual:  " <+> ppr actual_ty]
+  = addErrCtxtM (unifyCtxt actual_ty expected_ty)
+		(tc_sub True actual_ty actual_ty expected_ty expected_ty)
 
+tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
+tcFunResTy fun actual_ty expected_ty
+  = addErrCtxtM (checkFunResCtxt fun actual_ty expected_ty) $
+		(tc_sub True actual_ty actual_ty expected_ty expected_ty)
+		   
 -----------------
-tc_sub :: BoxySigmaType		-- actual_ty, before expanding synonyms
+tc_sub :: Outer			-- See comments with uTys
+       -> BoxySigmaType		-- actual_ty, before expanding synonyms
        -> BoxySigmaType		-- 		..and after
        -> BoxySigmaType		-- expected_ty, before
        -> BoxySigmaType		-- 		..and after
        -> TcM ExprCoFn
 
-tc_sub act_sty act_ty exp_sty exp_ty
-  | Just exp_ty' <- tcView exp_ty = tc_sub act_sty act_ty exp_sty exp_ty'
-tc_sub act_sty act_ty exp_sty exp_ty
-  | Just act_ty' <- tcView act_ty = tc_sub act_sty act_ty' exp_sty exp_ty
+tc_sub outer act_sty act_ty exp_sty exp_ty
+  | Just exp_ty' <- tcView exp_ty = tc_sub False act_sty act_ty exp_sty exp_ty'
+tc_sub outer act_sty act_ty exp_sty exp_ty
+  | Just act_ty' <- tcView act_ty = tc_sub False act_sty act_ty' exp_sty exp_ty
 
 -----------------------------------
 -- Rule SBOXY, plus other cases when act_ty is a type variable
 -- Just defer to boxy matching
 -- This rule takes precedence over SKOL!
-tc_sub act_sty (TyVarTy tv) exp_sty exp_ty
-  = do	{ uVar False tv False exp_sty exp_ty
+tc_sub outer act_sty (TyVarTy tv) exp_sty exp_ty
+  = do	{ uVar outer False tv False exp_sty exp_ty
 	; return idCoercion }
 
 -----------------------------------
@@ -551,10 +555,10 @@ tc_sub act_sty (TyVarTy tv) exp_sty exp_ty
 --	     g :: Ord b => b->b
 -- Consider  f g !
 
-tc_sub act_sty act_ty exp_sty exp_ty
+tc_sub outer act_sty act_ty exp_sty exp_ty
   | isSigmaTy exp_ty
   = do	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ body_exp_ty ->
-			     tc_sub act_sty act_ty body_exp_ty body_exp_ty
+			     tc_sub False act_sty act_ty body_exp_ty body_exp_ty
 	; return (gen_fn <.> co_fn) }
   where
     act_tvs = tyVarsOfType act_ty
@@ -567,27 +571,27 @@ tc_sub act_sty act_ty exp_sty exp_ty
 --	expected_ty: Int -> Int
 --	co_fn e =    e Int dOrdInt
 
-tc_sub act_sty actual_ty exp_sty expected_ty
+tc_sub outer act_sty actual_ty exp_sty expected_ty
   | isSigmaTy actual_ty
   = do	{ (tyvars, theta, tau) <- tcInstBoxy actual_ty
 	; dicts <- newDicts InstSigOrigin theta
 	; extendLIEs dicts
 	; let inst_fn = CoApps (CoTyApps CoHole (mkTyVarTys tyvars)) 
 			       (map instToId dicts)
-	; co_fn <- tc_sub tau tau exp_sty expected_ty
+	; co_fn <- tc_sub False tau tau exp_sty expected_ty
 	; return (co_fn <.> inst_fn) }
 
 -----------------------------------
 -- Function case (rule F1)
-tc_sub _ (FunTy act_arg act_res) _ (FunTy exp_arg exp_res)
+tc_sub _ _ (FunTy act_arg act_res) _ (FunTy exp_arg exp_res)
   = tc_sub_funs act_arg act_res exp_arg exp_res
 
 -- Function case (rule F2)
-tc_sub act_sty act_ty@(FunTy act_arg act_res) exp_sty (TyVarTy exp_tv)
+tc_sub outer act_sty act_ty@(FunTy act_arg act_res) exp_sty (TyVarTy exp_tv)
   | isBoxyTyVar exp_tv
   = do	{ cts <- readMetaTyVar exp_tv
 	; case cts of
-	    Indirect ty -> do { u_tys False act_sty act_ty True exp_sty ty
+	    Indirect ty -> do { u_tys outer False act_sty act_ty True exp_sty ty
 			      ; return idCoercion }
 	    Flexi       -> do { [arg_ty,res_ty] <- withMetaTvs exp_tv fun_kinds mk_res_ty
  			      ; tc_sub_funs act_arg act_res arg_ty res_ty } }
@@ -596,15 +600,15 @@ tc_sub act_sty act_ty@(FunTy act_arg act_res) exp_sty (TyVarTy exp_tv)
     fun_kinds = [argTypeKind, openTypeKind]
 
 -- Everything else: defer to boxy matching
-tc_sub act_sty actual_ty exp_sty expected_ty
-  = do	{ u_tys False act_sty actual_ty False exp_sty expected_ty
+tc_sub outer act_sty actual_ty exp_sty expected_ty
+  = do	{ u_tys outer False act_sty actual_ty False exp_sty expected_ty
 	; return idCoercion }
 
 
 -----------------------------------
 tc_sub_funs act_arg act_res exp_arg exp_res
   = do	{ uTys False act_arg False exp_arg
-	; co_fn_res <- tc_sub act_res act_res exp_res exp_res
+	; co_fn_res <- tc_sub False act_res act_res exp_res exp_res
 	; wrapFunResCoercion [exp_arg] co_fn_res }
 
 -----------------------------------
@@ -705,8 +709,8 @@ non-exported generic functions.
 boxyUnify :: BoxyType -> BoxyType -> TcM ()
 -- Acutal and expected, respectively
 boxyUnify ty1 ty2 
-  = addErrCtxtM (unifyCtxt "type" ty1 ty2) $
-    uTys False ty1 False ty2
+  = addErrCtxtM (unifyCtxt ty1 ty2) $
+    uTysOuter False ty1 False ty2
 
 ---------------
 boxyUnifyList :: [BoxyType] -> [BoxyType] -> TcM ()
@@ -721,14 +725,14 @@ unifyType :: TcTauType -> TcTauType -> TcM ()
 unifyType ty1 ty2 	-- ty1 expected, ty2 inferred
   = ASSERT2( not (isBoxyTy ty1), ppr ty1 )
     ASSERT2( not (isBoxyTy ty2), ppr ty2 )
-    addErrCtxtM (unifyCtxt "type" ty1 ty2) $
-    uTys True ty1 True ty2
+    addErrCtxtM (unifyCtxt ty1 ty2) $
+    uTysOuter True ty1 True ty2
 
 ---------------
 unifyPred :: PredType -> PredType -> TcM ()
 -- Acutal and expected types
-unifyPred p1 p2 = addErrCtxtM (unifyCtxt "type constraint" (mkPredTy p1) (mkPredTy p2)) $
-		  uPred True p1 True p2
+unifyPred p1 p2 = addErrCtxtM (unifyCtxt (mkPredTy p1) (mkPredTy p2)) $
+		  uPred True True p1 True p2
 
 unifyTheta :: TcThetaType -> TcThetaType -> TcM ()
 -- Acutal and expected types
@@ -778,10 +782,19 @@ We call the first one \tr{ps_ty1}, \tr{ps_ty2} for ``possible synomym''.
 type NoBoxes = Bool	-- True  <=> definitely no boxes in this type
 			-- False <=> there might be boxes (always safe)
 
-uTys :: NoBoxes -> TcType	-- ty1 is the *expected* type
+type Outer = Bool	-- True <=> this is the outer level of a unification
+			--	    so that the types being unified are the
+			--	    very ones we began with, not some sub
+			--	    component or synonym expansion
+-- The idea is that if Outer is true then unifyMisMatch should
+-- pop the context to remove the "Expected/Acutal" context
+
+uTysOuter, uTys
+     :: NoBoxes -> TcType	-- ty1 is the *expected* type
      -> NoBoxes -> TcType	-- ty2 is the *actual* type
      -> TcM ()
-uTys nb1 ty1 nb2 ty2 = u_tys nb1 ty1 ty1 nb2 ty2 ty2
+uTysOuter nb1 ty1 nb2 ty2 = u_tys True nb1 ty1 ty1 nb2 ty2 ty2
+uTys      nb1 ty1 nb2 ty2 = u_tys False nb1 ty1 ty1 nb2 ty2 ty2
 
 
 --------------
@@ -790,38 +803,39 @@ uTys_s :: NoBoxes -> [TcType]	-- ty1 is the *actual* types
        -> TcM ()
 uTys_s nb1 []	 	nb2 []	       = returnM ()
 uTys_s nb1 (ty1:tys1) nb2 (ty2:tys2) = do { uTys nb1 ty1 nb2 ty2
-					    ; uTys_s nb1 tys1 nb2 tys2 }
+					  ; uTys_s nb1 tys1 nb2 tys2 }
 uTys_s nb1 ty1s nb2 ty2s = panic "Unify.uTys_s: mismatched type lists!"
 
 --------------
-u_tys :: NoBoxes -> TcType -> TcType	-- ty1 is the *actual* type
+u_tys :: Outer
+      -> NoBoxes -> TcType -> TcType	-- ty1 is the *actual* type
       -> NoBoxes -> TcType -> TcType	-- ty2 is the *expected* type
       -> TcM ()
 
-u_tys nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
-  = go ty1 ty2
+u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
+  = go outer ty1 ty2
   where 
 
 	-- Always expand synonyms (see notes at end)
         -- (this also throws away FTVs)
-    go ty1 ty2 
-      | Just ty1' <- tcView ty1 = go ty1' ty2
-      | Just ty2' <- tcView ty2 = go ty1 ty2'
+    go outer ty1 ty2 
+      | Just ty1' <- tcView ty1 = go False ty1' ty2
+      | Just ty2' <- tcView ty2 = go False ty1 ty2'
 
 	-- Variables; go for uVar
-    go (TyVarTy tyvar1) ty2 = uVar False tyvar1 nb2 orig_ty2 ty2
-    go ty1 (TyVarTy tyvar2) = uVar True  tyvar2 nb1 orig_ty1 ty1
+    go outer (TyVarTy tyvar1) ty2 = uVar outer False tyvar1 nb2 orig_ty2 ty2
+    go outer ty1 (TyVarTy tyvar2) = uVar outer True  tyvar2 nb1 orig_ty1 ty1
 				-- "True" means args swapped
 	-- Predicates
-    go (PredTy p1) (PredTy p2) = uPred nb1 p1 nb2 p2
+    go outer (PredTy p1) (PredTy p2) = uPred outer nb1 p1 nb2 p2
 
 	-- Type constructors must match
-    go (TyConApp con1 tys1) (TyConApp con2 tys2)
+    go _ (TyConApp con1 tys1) (TyConApp con2 tys2)
       | con1 == con2 = uTys_s nb1 tys1 nb2 tys2
 	-- See Note [TyCon app]
 
 	-- Functions; just check the two parts
-    go (FunTy fun1 arg1) (FunTy fun2 arg2)
+    go _ (FunTy fun1 arg1) (FunTy fun2 arg2)
       = do { uTys nb1 fun1 nb2 fun2
 	   ; uTys nb1 arg1 nb2 arg2 }
 
@@ -829,19 +843,17 @@ u_tys nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
 	-- NB: we've already dealt with type variables and Notes,
 	-- so if one type is an App the other one jolly well better be too
-    go (AppTy s1 t1) ty2
-      = case tcSplitAppTy_maybe ty2 of
-	  Just (s2,t2) -> do { uTys nb1 s1 nb2 s2; uTys nb1 t1 nb2 t2 }
-	  Nothing      -> unifyMisMatch False orig_ty1 orig_ty2
+    go outer (AppTy s1 t1) ty2
+      | Just (s2,t2) <- tcSplitAppTy_maybe ty2
+      = do { uTys nb1 s1 nb2 s2; uTys nb1 t1 nb2 t2 }
 
 	-- Now the same, but the other way round
 	-- Don't swap the types, because the error messages get worse
-    go ty1 (AppTy s2 t2)
-      = case tcSplitAppTy_maybe ty1 of
-	  Just (s1,t1) -> do { uTys nb1 s1 nb2 s2; uTys nb1 t1 nb2 t2 }
-	  Nothing      -> unifyMisMatch False orig_ty1 orig_ty2
+    go outer ty1 (AppTy s2 t2)
+      | Just (s1,t1) <- tcSplitAppTy_maybe ty1
+      = do { uTys nb1 s1 nb2 s2; uTys nb1 t1 nb2 t2 }
 
-    go ty1@(ForAllTy _ _) ty2@(ForAllTy _ _)
+    go _ ty1@(ForAllTy _ _) ty2@(ForAllTy _ _)
       | length tvs1 == length tvs2
       = do   { tvs <- tcInstSkolTyVars UnkSkol tvs1	-- Not a helpful SkolemInfo
 	     ; let tys      = mkTyVarTys tvs
@@ -860,14 +872,14 @@ u_tys nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	(tvs2, body2) = tcSplitForAllTys ty2
 
 	-- Anything else fails
-    go _ _ = unifyMisMatch False orig_ty1 orig_ty2
+    go outer _ _ = unifyMisMatch outer False orig_ty1 orig_ty2
 
 ----------
-uPred nb1 (IParam n1 t1) nb2 (IParam n2 t2)
+uPred outer nb1 (IParam n1 t1) nb2 (IParam n2 t2)
   | n1 == n2 = uTys nb1 t1 nb2 t2
-uPred nb1 (ClassP c1 tys1) nb2 (ClassP c2 tys2)
+uPred outer nb1 (ClassP c1 tys1) nb2 (ClassP c2 tys2)
   | c1 == c2 = uTys_s nb1 tys1 nb2 tys2		-- Guaranteed equal lengths because the kinds check
-uPred _ p1 _ p2 = unifyMisMatch False (mkPredTy p1) (mkPredTy p2)
+uPred outer _ p1 _ p2 = unifyMisMatch outer False (mkPredTy p1) (mkPredTy p2)
 \end{code}
 
 Note [Tycon app]
@@ -945,14 +957,15 @@ of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
 
 \begin{code}
-uVar :: Bool		-- False => tyvar is the "expected"
+uVar :: Outer
+     -> Bool		-- False => tyvar is the "expected"
 			-- True  => ty    is the "expected" thing
      -> TcTyVar
      -> NoBoxes		-- True <=> definitely no boxes in t2
      -> TcTauType -> TcTauType	-- printing and real versions
      -> TcM ()
 
-uVar swapped tv1 nb2 ps_ty2 ty2
+uVar outer swapped tv1 nb2 ps_ty2 ty2
   = do 	{ let expansion | showSDoc (ppr ty2) == showSDoc (ppr ps_ty2) = empty
 			| otherwise = brackets (equals <+> ppr ty2)
 	; traceTc (text "uVar" <+> ppr swapped <+> 
@@ -962,26 +975,27 @@ uVar swapped tv1 nb2 ps_ty2 ty2
 	; details <- lookupTcTyVar tv1
 	; case details of
 	    IndirectTv ty1 
-		| swapped   -> u_tys nb2  ps_ty2 ty2 True ty1    ty1	-- Swap back
-		| otherwise -> u_tys True ty1    ty1 nb2  ps_ty2 ty2	-- Same order
+		| swapped   -> u_tys outer nb2  ps_ty2 ty2 True ty1    ty1	-- Swap back
+		| otherwise -> u_tys outer True ty1    ty1 nb2  ps_ty2 ty2	-- Same order
 			-- The 'True' here says that ty1 
 			-- is definitely box-free
-	    DoneTv details1 -> uUnfilledVar swapped tv1 details1 nb2 ps_ty2 ty2
+	    DoneTv details1 -> uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2
 	}
 
 ----------------
-uUnfilledVar :: Bool 				-- Args are swapped
+uUnfilledVar :: Outer
+	     -> Bool 				-- Args are swapped
      	     -> TcTyVar -> TcTyVarDetails		-- Tyvar 1
      	     -> NoBoxes -> TcTauType -> TcTauType	-- Type 2
      	     -> TcM ()
 -- Invariant: tyvar 1 is not unified with anything
 
-uUnfilledVar swapped tv1 details1 nb2 ps_ty2 ty2
+uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2
   | Just ty2' <- tcView ty2
   = 	-- Expand synonyms; ignore FTVs
-    uUnfilledVar swapped tv1 details1 nb2 ps_ty2 ty2'
+    uUnfilledVar False swapped tv1 details1 nb2 ps_ty2 ty2'
 
-uUnfilledVar swapped tv1 details1 nb2 ps_ty2 ty2@(TyVarTy tv2)
+uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2@(TyVarTy tv2)
 	-- Same type variable => no-op
   | tv1 == tv2
   = returnM ()
@@ -990,17 +1004,17 @@ uUnfilledVar swapped tv1 details1 nb2 ps_ty2 ty2@(TyVarTy tv2)
   | otherwise
   = do	{ lookup2 <- lookupTcTyVar tv2
 	; case lookup2 of
-	    IndirectTv ty2' -> uUnfilledVar  swapped tv1 details1 True ty2' ty2'
-	    DoneTv details2 -> uUnfilledVars swapped tv1 details1 tv2 details2
+	    IndirectTv ty2' -> uUnfilledVar  outer swapped tv1 details1 True ty2' ty2'
+	    DoneTv details2 -> uUnfilledVars outer swapped tv1 details1 tv2 details2
 	}
 
-uUnfilledVar swapped tv1 details1 nb2 ps_ty2 non_var_ty2	-- ty2 is not a type variable
+uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 non_var_ty2	-- ty2 is not a type variable
   = case details1 of
 	MetaTv (SigTv _) ref1 -> mis_match	-- Can't update a skolem with a non-type-variable
 	MetaTv info ref1      -> uMetaVar swapped tv1 info ref1 nb2 ps_ty2 non_var_ty2
 	skolem_details        -> mis_match
   where
-    mis_match = unifyMisMatch swapped (TyVarTy tv1) ps_ty2
+    mis_match = unifyMisMatch outer swapped (TyVarTy tv1) ps_ty2
 
 ----------------
 uMetaVar :: Bool
@@ -1017,7 +1031,8 @@ uMetaVar swapped tv1 info1 ref1 nb2 ps_ty2 non_var_ty2
 	; checkUpdateMeta swapped tv1 ref1 final_ty }
 
 ----------------
-uUnfilledVars :: Bool 			-- Args are swapped
+uUnfilledVars :: Outer
+	      -> Bool 			-- Args are swapped
       	      -> TcTyVar -> TcTyVarDetails	-- Tyvar 1
       	      -> TcTyVar -> TcTyVarDetails	-- Tyvar 2
       	      -> TcM ()
@@ -1025,16 +1040,16 @@ uUnfilledVars :: Bool 			-- Args are swapped
 -- 	     Neither is filled in yet
 --    	     They might be boxy or not
 
-uUnfilledVars swapped tv1 (SkolemTv _) tv2 (SkolemTv _)
-  = unifyMisMatch swapped (mkTyVarTy tv1) (mkTyVarTy tv2)
+uUnfilledVars outer swapped tv1 (SkolemTv _) tv2 (SkolemTv _)
+  = unifyMisMatch outer swapped (mkTyVarTy tv1) (mkTyVarTy tv2)
 
-uUnfilledVars swapped tv1 (MetaTv info1 ref1) tv2 (SkolemTv _)
+uUnfilledVars outer swapped tv1 (MetaTv info1 ref1) tv2 (SkolemTv _)
   = checkUpdateMeta swapped tv1 ref1 (mkTyVarTy tv2)
-uUnfilledVars swapped tv1 (SkolemTv _) tv2 (MetaTv info2 ref2)
+uUnfilledVars outer swapped tv1 (SkolemTv _) tv2 (MetaTv info2 ref2)
   = checkUpdateMeta (not swapped) tv2 ref2 (mkTyVarTy tv1)
 
 -- ToDo: this function seems too long for what it acutally does!
-uUnfilledVars swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2)
+uUnfilledVars outer swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2)
   = case (info1, info2) of
 	(BoxTv,   BoxTv)   -> box_meets_box
 
@@ -1274,6 +1289,122 @@ unBoxPred (IParam ip ty)   = do { ty' <- unBox ty; return (IParam ip ty') }
 
 %************************************************************************
 %*									*
+\subsection[Unify-context]{Errors and contexts}
+%*									*
+%************************************************************************
+
+Errors
+~~~~~~
+
+\begin{code}
+unifyCtxt act_ty exp_ty tidy_env
+  = do	{ act_ty' <- zonkTcType act_ty
+	; exp_ty' <- zonkTcType exp_ty
+	; let (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
+	      (env2, act_ty'') = tidyOpenType env1     act_ty'
+	; return (env2, mkExpectedActualMsg act_ty'' exp_ty'') }
+
+----------------
+mkExpectedActualMsg act_ty exp_ty
+  = nest 2 (vcat [ text "Expected type" <> colon <+> ppr exp_ty,
+		   text "Inferred type" <> colon <+> ppr act_ty ])
+
+----------------
+-- If an error happens we try to figure out whether the function
+-- function has been given too many or too few arguments, and say so.
+checkFunResCtxt fun actual_res_ty expected_res_ty tidy_env
+  = do	{ exp_ty' <- zonkTcType expected_res_ty
+	; act_ty' <- zonkTcType actual_res_ty
+	; let
+	      (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
+	      (env2, act_ty'') = tidyOpenType env1     act_ty'
+	      (exp_args, _)    = tcSplitFunTys exp_ty''
+	      (act_args, _)    = tcSplitFunTys act_ty''
+	
+	      len_act_args     = length act_args
+	      len_exp_args     = length exp_args
+
+	      message | len_exp_args < len_act_args = wrongArgsCtxt "too few"  fun
+	              | len_exp_args > len_act_args = wrongArgsCtxt "too many" fun
+		      | otherwise		    = mkExpectedActualMsg act_ty'' exp_ty''
+	; return (env2, message) }
+
+  where
+    wrongArgsCtxt too_many_or_few fun
+      = ptext SLIT("Probable cause:") <+> quotes (ppr fun)
+	<+> ptext SLIT("is applied to") <+> text too_many_or_few 
+	<+> ptext SLIT("arguments")
+
+------------------
+unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
+	-- tv1 and ty2 are zonked already
+  = returnM msg
+  where
+    msg = (env2, ptext SLIT("When matching the kinds of") <+> 
+		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
+
+    (pp_expected, pp_actual) | swapped   = (pp2, pp1)
+		             | otherwise = (pp1, pp2)
+    (env1, tv1') = tidyOpenTyVar tidy_env tv1
+    (env2, ty2') = tidyOpenType  env1 ty2
+    pp1 = ppr tv1' <+> dcolon <+> ppr (tyVarKind tv1)
+    pp2 = ppr ty2' <+> dcolon <+> ppr (typeKind ty2)
+
+unifyMisMatch outer swapped ty1 ty2
+  = do	{ (env, msg) <- if swapped then misMatchMsg ty1 ty2
+				   else misMatchMsg ty2 ty1
+
+	-- This is the whole point of the 'outer' stuff
+	; if outer then popErrCtxt (failWithTcM (env, msg))
+	  	   else failWithTcM (env, msg)
+	} 
+
+misMatchMsg ty1 ty2
+  = do	{ env0 <- tcInitTidyEnv
+	; (env1, pp1, extra1) <- ppr_ty env0 ty1
+	; (env2, pp2, extra2) <- ppr_ty env1 ty2
+	; return (env2, sep [sep [ptext SLIT("Couldn't match expected type") <+> pp1, 
+				  nest 7 (ptext SLIT("against inferred type") <+> pp2)],
+			     nest 2 extra1, nest 2 extra2]) }
+
+ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
+ppr_ty env ty
+  = do { ty' <- zonkTcType ty
+       ; let (env1,tidy_ty) = tidyOpenType env ty'
+	     simple_result  = (env1, quotes (ppr tidy_ty), empty)
+       ; case tidy_ty of
+	   TyVarTy tv 
+		| isSkolemTyVar tv -> return (env2, pp_rigid tv',
+					      pprSkolTvBinding tv')
+		| otherwise -> return simple_result
+		where
+		  (env2, tv') = tidySkolemTyVar env1 tv
+	   other -> return simple_result }
+  where
+    pp_rigid tv = quotes (ppr tv) <+> parens (ptext SLIT("a rigid variable"))
+
+
+notMonoType ty
+  = do	{ ty' <- zonkTcType ty
+	; env0 <- tcInitTidyEnv
+	; let (env1, tidy_ty) = tidyOpenType env0 ty'
+	      msg = ptext SLIT("Cannot match a monotype with") <+> ppr tidy_ty
+	; failWithTcM (env1, msg) }
+
+occurCheck tyvar ty
+  = do	{ env0 <- tcInitTidyEnv
+	; ty'  <- zonkTcType ty
+	; let (env1, tidy_tyvar) = tidyOpenTyVar env0 tyvar
+	      (env2, tidy_ty)    = tidyOpenType  env1 ty'
+	      extra = sep [ppr tidy_tyvar, char '=', ppr tidy_ty]
+	; failWithTcM (env2, hang msg 2 extra) }
+  where
+    msg = ptext SLIT("Occurs check: cannot construct the infinite type:")
+\end{code}
+
+
+%************************************************************************
+%*									*
 		Kind unification
 %*									*
 %************************************************************************
@@ -1399,93 +1530,6 @@ unifyFunKind (KindVar kvar)
 unifyFunKind (FunKind arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
 unifyFunKind other	   	         = returnM Nothing
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[Unify-context]{Errors and contexts}
-%*									*
-%************************************************************************
-
-Errors
-~~~~~~
-
-\begin{code}
-unifyCtxt s ty1 ty2 tidy_env	-- ty1 inferred, ty2 expected
-  = zonkTcType ty1	`thenM` \ ty1' ->
-    zonkTcType ty2	`thenM` \ ty2' ->
-    returnM (err ty1' ty2')
-  where
-    err ty1 ty2 = (env1, 
-		   nest 2 
-			(vcat [
-			   text "Expected" <+> text s <> colon <+> ppr tidy_ty2,
-			   text "Inferred" <+> text s <> colon <+> ppr tidy_ty1
-		        ]))
-		  where
-		    (env1, [tidy_ty1,tidy_ty2]) = tidyOpenTypes tidy_env [ty1,ty2]
-
-unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
-	-- tv1 and ty2 are zonked already
-  = returnM msg
-  where
-    msg = (env2, ptext SLIT("When matching the kinds of") <+> 
-		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
-
-    (pp_expected, pp_actual) | swapped   = (pp2, pp1)
-		             | otherwise = (pp1, pp2)
-    (env1, tv1') = tidyOpenTyVar tidy_env tv1
-    (env2, ty2') = tidyOpenType  env1 ty2
-    pp1 = ppr tv1' <+> dcolon <+> ppr (tyVarKind tv1)
-    pp2 = ppr ty2' <+> dcolon <+> ppr (typeKind ty2)
-
-unifyMisMatch swapped ty1 ty2
-  = do	{ (env, msg) <- if swapped then misMatchMsg ty2 ty1
-				   else misMatchMsg ty1 ty2
-	; failWithTcM (env, msg) }
-
-misMatchMsg ty1 ty2
-  = do	{ env0 <- tcInitTidyEnv
-	; (env1, pp1, extra1) <- ppr_ty env0 ty1
-	; (env2, pp2, extra2) <- ppr_ty env1 ty2
-	; return (env2, sep [sep [ptext SLIT("Couldn't match") <+> pp1, 
-				  nest 7 (ptext SLIT("against") <+> pp2)],
-			     nest 2 extra1, nest 2 extra2]) }
-
-ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
-ppr_ty env ty
-  = do { ty' <- zonkTcType ty
-       ; let (env1,tidy_ty) = tidyOpenType env ty'
-	     simple_result  = (env1, quotes (ppr tidy_ty), empty)
-       ; case tidy_ty of
-	   TyVarTy tv 
-		| isSkolemTyVar tv -> return (env2, pp_rigid tv',
-					      pprSkolTvBinding tv')
-		| otherwise -> return simple_result
-		where
-		  (env2, tv') = tidySkolemTyVar env1 tv
-	   other -> return simple_result }
-  where
-    pp_rigid tv = ptext SLIT("the rigid variable") <+> quotes (ppr tv)
-
-
-notMonoType ty
-  = do	{ ty' <- zonkTcType ty
-	; env0 <- tcInitTidyEnv
-	; let (env1, tidy_ty) = tidyOpenType env0 ty'
-	      msg = ptext SLIT("Cannot match a monotype with") <+> ppr tidy_ty
-	; failWithTcM (env1, msg) }
-
-occurCheck tyvar ty
-  = do	{ env0 <- tcInitTidyEnv
-	; ty'  <- zonkTcType ty
-	; let (env1, tidy_tyvar) = tidyOpenTyVar env0 tyvar
-	      (env2, tidy_ty)    = tidyOpenType  env1 ty
-	      extra = sep [ppr tidy_tyvar, char '=', ppr tidy_ty]
-	; failWithTcM (env2, hang msg 2 extra) }
-  where
-    msg = ptext SLIT("Occurs check: cannot construct the infinite type:")
-\end{code}
-
 
 %************************************************************************
 %*									*
