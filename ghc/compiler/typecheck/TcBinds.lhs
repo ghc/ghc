@@ -54,7 +54,7 @@ import TysPrim		( alphaTyVar )
 import Id		( Id, mkLocalId, mkVanillaGlobal )
 import IdInfo		( vanillaIdInfo )
 import Var		( TyVar, idType, idName )
-import Name		( Name, getSrcLoc )
+import Name		( Name )
 import NameSet
 import NameEnv
 import VarSet
