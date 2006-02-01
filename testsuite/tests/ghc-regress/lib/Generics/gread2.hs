@@ -45,23 +45,21 @@ parseConstr ty = D (\s ->
       n = length (showConstr con)
 
 
-readM :: Data a => DecM a
+readM :: forall a. Data a => DecM a
 readM = read
-    where
-      read = do { let val = argOf read
-                ; let ty  = dataTypeOf val
-                ; constr <- parseConstr ty
-                ; let con::a = fromConstr constr
-                ; gmapM (\_ -> readM) con }
+      where
+	read :: DecM a
+	read = do { let val = argOf read
+           	  ; let ty  = dataTypeOf val
+           	  ; constr <- parseConstr ty
+           	  ; let con::a = fromConstr constr
+           	  ; gmapM (\_ -> readM) con }
 
 argOf :: c a -> a
 argOf = undefined
 
-yareadM :: Data a => DecM a
-yareadM = readM'
-    where
-      readM' :: DecM a
-        = do { let ty = dataTypeOf (undefined::a)
+yareadM :: forall a. Data a => DecM a
+yareadM = do { let ty = dataTypeOf (undefined::a)
              ; constr <- parseConstr ty
              ; let con::a = fromConstr constr
              ; gmapM (\_ -> yareadM) con }

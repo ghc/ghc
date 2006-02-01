@@ -95,7 +95,7 @@ type GTypeFun r  = forall a. Data a => TypeFun a r
 
 -- | Extend a type function
 extType :: (Data a, Typeable r) => GTypeFun r -> TypeFun a r -> GTypeFun r
-extType f = maybe f id . cast
+extType f x = maybe f id (cast x)
 
 
 
@@ -324,21 +324,24 @@ depthOfConstr p (t::TypeVal a) c
 ------------------------------------------------------------------------------
 
 shallowTerm :: (forall a. Data a => Maybe a) -> (forall b. Data b => b)
-shallowTerm cust
+shallowTerm cust :: b
   =
     maybe gdefault id cust
 
  where
 
   -- The worker, also used for type disambiguation
+  gdefault :: b
   gdefault = case con of
               Just (con, Just _) -> fromConstrB (shallowTerm cust) con
               _ -> error "no shallow term!"
 
   -- The type to be constructed
+  typeVal :: TypeVal b
   typeVal = val2type gdefault
 
   -- The most shallow constructor if any 
+  con :: Maybe (Constr, Maybe Int)
   con = depthOfType (const True) typeVal
 
 

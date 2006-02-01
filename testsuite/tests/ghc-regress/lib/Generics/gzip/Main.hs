@@ -27,6 +27,8 @@ main = print $ gzip (mkTT maxS) genCom1 genCom2
     maxS (S x) (S y) = S (max x y)
 
     -- Make a two-arguments, generic function transformer
+    mkTT :: (Typeable a, Typeable b, Typeable c)
+	=> (a -> a -> a) -> b -> c -> Maybe c
     mkTT (f::a -> a -> a) x y =
       case (cast x,cast y) of
         (Just (x'::a),Just (y'::a)) -> cast (f x' y')

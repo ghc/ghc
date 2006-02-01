@@ -35,10 +35,8 @@ unwrap y = case gmapQ (Nothing `mkQ` Just) y of
 
 
 -- Eliminate a constructor if feasible; 2nd try
-elim :: (Data y, Data x) => (x -> y) -> y -> Maybe x
-elim c y = x
-  where
-    x::Maybe x = elim' (toConstr (c (undefined::x))) y
+elim :: forall x y. (Data y, Data x) => (x -> y) -> y -> Maybe x
+elim c y = elim' (toConstr (c (undefined::x))) y
 
 
 -- Visit a data structure

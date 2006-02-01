@@ -32,6 +32,7 @@ gzipWithQ f t1 t2
 gApplyQ :: Data a => [GQ r] -> a -> [r]
 gApplyQ qs t = reverse (snd (gfoldlQ k z t))
     where
+      k :: ([GQ r], [r]) -> GenericQ ([GQ r], [r])
       k (GQ q : qs, rs) child = (qs, q child : rs)
       z = (qs, [])
 
@@ -69,6 +70,7 @@ gApplyQ' :: Data a => [XQ r] -> a -> [r]
 gApplyQ' qs t = reverse (snd (gfoldlQ k z t))
     where
       z = (qs, [])
+      k :: ([XQ r], [r]) -> GenericQ ([XQ r], [r])
       k (XQ q : qs, rs) child = (qs, q' child : rs)
         where
           q' = error "Twin mismatch" `extQ` q
