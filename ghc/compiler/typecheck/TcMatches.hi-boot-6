@@ -7,4 +7,4 @@ tcGRHSsPat    :: HsExpr.GRHSs Name.Name
 tcMatchesFun :: Name.Name
 	     -> HsExpr.MatchGroup Name.Name
 	     -> TcType.BoxyRhoType
-	     -> TcRnTypes.TcM (HsExpr.MatchGroup Var.Id)
+	     -> TcRnTypes.TcM (HsBinds.ExprCoFn, HsExpr.MatchGroup Var.Id)
