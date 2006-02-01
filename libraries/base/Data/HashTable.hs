@@ -41,7 +41,7 @@ import Prelude	hiding	( lookup )
 import Data.Tuple	( fst )
 import Data.Bits
 import Data.Maybe
-import Data.List	( maximumBy, filter, length, concat, foldl )
+import Data.List	( maximumBy, filter, length, concat, foldl, reverse )
 import Data.Int		( Int32 )
 
 #if defined(__GLASGOW_HASKELL__)
@@ -295,9 +295,9 @@ expandHashTable
    let
     split_bucket old new [] = do
 	segment <- myReadArray dir oldsegment
-	myWriteArray segment oldindex old
+	myWriteArray segment oldindex (reverse old)
 	segment <- myReadArray dir newsegment
-	myWriteArray segment newindex new
+	myWriteArray segment newindex (reverse new)
     split_bucket old new ((k,v):xs) = do
 	h <- bucketIndex table' k
 	if h == newbucket
