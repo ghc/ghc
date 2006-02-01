@@ -1,6 +1,7 @@
 
 tcfail002.hs:4:6:
-    Occurs check: cannot construct the infinite type: a = [a]
-	Expected type: a
-	Inferred type: [a]
+    Occurs check: cannot construct the infinite type: t = [t]
+      Expected type: t
+      Inferred type: [t]
+    In the expression: z
     In the definition of `c': c z = z

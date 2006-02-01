@@ -1,10 +1,10 @@
 
 tcfail072.hs:23:12:
-    Ambiguous type variable `p' in the constraint:
-      `Ord p' arising from use of `g' at tcfail072.hs:23:12
+    Ambiguous type variable `t' in the constraint:
+      `Ord t' arising from use of `g' at tcfail072.hs:23:12-14
     Probable fix: add a type signature that fixes these type variable(s)
 
 tcfail072.hs:23:12:
-    Ambiguous type variable `q' in the constraint:
-      `Ord q' arising from use of `g' at tcfail072.hs:23:12
+    Ambiguous type variable `t1' in the constraint:
+      `Ord t1' arising from use of `g' at tcfail072.hs:23:12-14
     Probable fix: add a type signature that fixes these type variable(s)

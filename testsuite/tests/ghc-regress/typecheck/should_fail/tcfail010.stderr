@@ -1,8 +1,8 @@
 
-tcfail010.hs:3:17:
-    No instance for (Num [a])
-      arising from the literal `2' at tcfail010.hs:3:17
-    Probable fix: add an instance declaration for (Num [a])
-    In the second argument of `(+)', namely `2'
+tcfail010.hs:3:15:
+    No instance for (Num [t])
+      arising from use of `+' at tcfail010.hs:3:15-17
+    Possible fix: add an instance declaration for (Num [t])
+    In the expression: z + 2
     In a lambda abstraction: \ (y : z) -> z + 2
-    In the definition of `q': q = \ (y : z) -> z + 2
+    In the expression: \ (y : z) -> z + 2

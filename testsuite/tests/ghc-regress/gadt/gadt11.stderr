@@ -1,5 +1,5 @@
 
-gadt11.hs:8:0:
+gadt11.hs:9:2:
     Data constructor `B1' returns type `X' instead of its parent type
-    When checking the data constructor: B1
+    In the definition of data constructor `B1'
     In the data type declaration for `B'

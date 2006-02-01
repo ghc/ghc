@@ -1,7 +1,8 @@
 
-tcfail016.hs:9:19:
-    Couldn't match `Expr a' against `AnnExpr a'
-	Expected type: Expr a
-	Inferred type: AnnExpr a
-    In the first argument of `g', namely `e1'
+tcfail016.hs:9:17:
+    Couldn't match expected type `AnnExpr t'
+	   against inferred type `Expr t'
+      Expected type: AnnExpr t -> [a]
+      Inferred type: Expr t -> [[Char]]
+    In the call (g e1)
     In the first argument of `(++)', namely `(g e1)'

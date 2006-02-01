@@ -3,22 +3,22 @@ tcfail075.hs:11:0:
     Top-level bindings for unlifted types aren't allowed: x = 1#
 
 tcfail075.hs:14:4:
-    Couldn't match kind `#' against `*'
-    When matching the kinds of `Int# :: #' and `a :: *'
+    Couldn't match kind `*' against `#'
+    When matching the kinds of `a :: *' and `Int# :: #'
       Expected type: Int#
       Inferred type: a
     In the first argument of `(+#)', namely `x'
 
 tcfail075.hs:17:7:
-    Couldn't match kind `#' against `*'
-    When matching the kinds of `Int# :: #' and `a :: *'
+    Couldn't match kind `*' against `#'
+    When matching the kinds of `a :: *' and `Int# :: #'
       Expected type: Int#
       Inferred type: a
     In the first argument of `(-#)', namely `x'
 
 tcfail075.hs:19:4:
-    Couldn't match kind `#' against `*'
-    When matching the kinds of `Int# :: #' and `a :: *'
+    Couldn't match kind `*' against `#'
+    When matching the kinds of `a :: *' and `Int# :: #'
       Expected type: Int#
       Inferred type: a
     In the first argument of `(>#)', namely `z'

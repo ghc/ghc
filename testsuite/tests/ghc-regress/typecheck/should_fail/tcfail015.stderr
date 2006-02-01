@@ -2,5 +2,6 @@
 tcfail015.hs:7:12:
     No instance for (Num Bool)
       arising from the literal `2' at tcfail015.hs:7:12
-    Probable fix: add an instance declaration for (Num Bool)
+    Possible fix: add an instance declaration for (Num Bool)
+    In the expression: 2
     In the definition of `g': g (ANull) = 2

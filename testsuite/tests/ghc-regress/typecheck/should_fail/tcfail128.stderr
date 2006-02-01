@@ -1,19 +1,20 @@
 
 tcfail128.hs:18:8:
-    No instance for (Data.Array.Base.MArray b FlatVector IO)
-      arising from use of `thaw' at tcfail128.hs:18:8-11
-    Probable fix:
-      add an instance declaration for (Data.Array.Base.MArray b
+    No instance for (Data.Array.Base.MArray t FlatVector IO)
+      arising from use of `thaw' at tcfail128.hs:18:8-15
+    Possible fix:
+      add an instance declaration for (Data.Array.Base.MArray t
 							      FlatVector
 							      IO)
+    In the call (thaw tmp)
     In a 'do' expression: v <- thaw tmp
-    In the definition of `main':
-	main = do
-		 let sL = [1, 4, 6, 3, 2, 5]
-		     dim = length sL
-		     help :: [FlatVector]
-		     help = [... | s <- ...]
-		     tmp :: Vector FlatVector
-		     tmp = listVector (1, dim) help
-		 v <- thaw tmp
-		 return ()
+    In the expression:
+	do
+	  let sL = [1, 4, 6, 3, 2, 5]
+	      dim = length sL
+	      help :: [FlatVector]
+	      help = [listFlatVector (1, s) ([... | i <- ...]) | s <- sL]
+	      tmp :: Vector FlatVector
+	      tmp = listVector (1, dim) help
+	  v <- thaw tmp
+	  return ()

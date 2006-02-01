@@ -1,8 +1,8 @@
 
 tcfail122.hs:8:1:
-    Couldn't match kind `* -> *' against `(* -> *) -> *'
-    When matching the kinds of `a :: * -> *' and `c :: (* -> *) -> *'
-      Expected type: a b
-      Inferred type: c d
+    Couldn't match kind `(* -> *) -> *' against `* -> *'
+    When matching the kinds of `c :: (* -> *) -> *' and `t :: * -> *'
+      Expected type: t t1
+      Inferred type: forall (c1 :: (* -> *) -> *) (d :: * -> *). c1 d
     In the expression:
 	  undefined :: forall c :: ((* -> *) -> *) d :: (* -> *). c d

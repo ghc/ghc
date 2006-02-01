@@ -2,6 +2,7 @@
 tcfail003.hs:3:9:
     No instance for (Num Char)
       arising from the literal `1' at tcfail003.hs:3:9
-    Probable fix: add an instance declaration for (Num Char)
-    In the list element: 1
+    Possible fix: add an instance declaration for (Num Char)
+    In the expression: 1
+    In the expression: [1, 'a']
     In a pattern binding: (d : e) = [1, 'a']

@@ -2,7 +2,8 @@
 rnfail020.hs:12:3:
     All of the type variables in the constraint `Eq a' are already in scope
 	(at least one must be universally quantified here)
-    In the type signature: unionSets :: (Eq a) => Set a -> Set a -> Set a
+    In the type signature for `unionSets':
+      unionSets :: (Eq a) => Set a -> Set a -> Set a
     In the definition of `unionSetB':
 	unionSetB (s1 :: Set a) s2
 		    = unionSets s1 s2

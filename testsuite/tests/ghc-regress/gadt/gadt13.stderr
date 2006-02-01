@@ -1,7 +1,5 @@
 
 gadt13.hs:13:5:
-    Couldn't match `Bool' against `Int'
-      Expected boxy type: Int
-      Inferred boxy type: Bool
+    Couldn't match expected type `Int' against inferred type `Bool'
     In the pattern: B t
     In the definition of `shw': shw (B t) = (("B " ++)) . (shows t)

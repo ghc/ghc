@@ -1,5 +1,5 @@
 
 tcfail084.hs:10:4:
     Constructor `F' does not have field `y'
-    In the record construction: F {y = 2}
+    In the expression: F {y = 2}
     In the definition of `z': z = F {y = 2}

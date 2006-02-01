@@ -1,9 +1,9 @@
 
 read003.hs:4:23:
-    Occurs check: cannot construct the infinite type: a = (a, [a1], c)
-      Expected type: (a, [a1], c)
-      Inferred type: a
-    In the right-hand side of a pattern binding: a
+    Occurs check: cannot construct the infinite type: t = (t, [t2], t1)
+      Expected type: (t, [t2], t1)
+      Inferred type: t
+    In the expression: a
     In a pattern binding:
 	~(a, b, c)
 	    | nullity b = a

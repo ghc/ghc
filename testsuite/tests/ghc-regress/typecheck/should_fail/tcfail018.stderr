@@ -1,6 +1,7 @@
 
 tcfail018.hs:5:9:
-    No instance for (Num [a])
+    No instance for (Num [t])
       arising from the literal `1' at tcfail018.hs:5:9
-    Probable fix: add an instance declaration for (Num [a])
+    Possible fix: add an instance declaration for (Num [t])
+    In the expression: 1
     In a pattern binding: (a : []) = 1

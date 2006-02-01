@@ -1,9 +1,10 @@
 
-tcfail007.hs:3:14:
+tcfail007.hs:3:15:
     No instance for (Num Bool)
-      arising from use of `+' at tcfail007.hs:3:14
-    Probable fix: add an instance declaration for (Num Bool)
-    In a right-hand side of function `n': x + 1
+      arising from the literal `1' at tcfail007.hs:3:15
+    Possible fix: add an instance declaration for (Num Bool)
+    In the second argument of `(+)', namely `1'
+    In the expression: x + 1
     In the definition of `n':
 	n x | True = x + 1
 	    | False = True

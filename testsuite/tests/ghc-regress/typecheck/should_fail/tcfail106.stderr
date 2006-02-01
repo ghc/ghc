@@ -2,11 +2,11 @@
 tcfail106.hs:11:0:
     No instance for (S Int)
       arising from the superclasses of an instance declaration at tcfail106.hs:11:0
-    Probable fix: add an instance declaration for (S Int)
+    Possible fix: add an instance declaration for (S Int)
     In the instance declaration for `C Int'
 
 tcfail106.hs:14:0:
     No instance for (S Int)
       arising from the superclasses of an instance declaration at tcfail106.hs:14:0
-    Probable fix: add an instance declaration for (S Int)
+    Possible fix: add an instance declaration for (S Int)
     In the instance declaration for `D Int'

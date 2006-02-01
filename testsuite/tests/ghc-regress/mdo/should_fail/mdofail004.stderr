@@ -2,5 +2,6 @@
 mdofail004.hs:17:4:
     No instance for (MonadFix X)
       arising from a do statement at mdofail004.hs:17:4-23
-    Probable fix: add an instance declaration for (MonadFix X)
+    Possible fix: add an instance declaration for (MonadFix X)
+    In the expression: mdo return [1, 2, 3, 4]
     In the definition of `z': z = mdo return [1, 2, 3, 4]

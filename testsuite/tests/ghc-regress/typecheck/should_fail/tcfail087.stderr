@@ -1,5 +1,5 @@
 
-tcfail087.hs:6:0:
+tcfail087.hs:6:10:
     Illegal unboxed tuple type as function argument: (# Int, Int #)
-    When checking the data constructor: Ex (# Int, Int #)
+    In the definition of data constructor `Ex'
     In the data type declaration for `Ex'

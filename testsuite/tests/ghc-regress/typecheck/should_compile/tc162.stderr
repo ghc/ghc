@@ -1,15 +1,18 @@
 
 tc162.hs:16:8:
-    Couldn't match `forall s. Bug s a' against `Bug s a1'
-    When checking the pattern: Bug _
+    Couldn't match expected type `forall s. Bug s a'
+	   against inferred type `Bug s a1'
+    In the pattern: Bug _
     In the definition of `runBug': runBug (Bug _) = undefined
 
 tc162.hs:21:9:
-    Couldn't match `forall s. BugN s a' against `BugN s a1'
-    When checking the pattern: BugN _
+    Couldn't match expected type `forall s. BugN s a'
+	   against inferred type `BugN s a1'
+    In the pattern: BugN _
     In the definition of `runBugN': runBugN (BugN _) = undefined
 
 tc162.hs:26:7:
-    Couldn't match `forall a b. Foo a b' against `Foo a b'
-    When checking the pattern: Foo {foo = foo}
+    Couldn't match expected type `forall a b. Foo a b'
+	   against inferred type `Foo a b'
+    In the pattern: Foo {foo = foo}
     In the definition of `baz': baz s (Foo {foo = foo}) = putStrLn s

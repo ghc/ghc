@@ -1,5 +1,5 @@
 
 ds041.hs:15:6:
     Warning: Fields of `Foo' not initialised: x
-	     In the record construction: Foo {}
+	     In the expression: Foo {}
 	     In the definition of `foo': foo = Foo {}

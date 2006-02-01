@@ -1,15 +1,18 @@
 
 tcfail124.hs:6:7:
-    Couldn't match `forall a. (Eq a) => [a]' against `[a]'
-    When checking the pattern: x : _
+    Couldn't match expected type `forall a. (Eq a) => [a]'
+	   against inferred type `[a]'
+    In the pattern: x : _
     In the definition of `f1': f1 (xs@(x : _)) = x
 
 tcfail124.hs:9:3:
-    Couldn't match `forall a. (Eq a) => [a]' against `[a]'
-    When checking the pattern: [x]
+    Couldn't match expected type `forall a. (Eq a) => [a]'
+	   against inferred type `[a]'
+    In the pattern: [x]
     In the definition of `f2': f2 [x] = x
 
 tcfail124.hs:12:4:
-    Couldn't match `forall a. (Eq a) => [a]' against `[a]'
-    When checking the pattern: x : []
+    Couldn't match expected type `forall a. (Eq a) => [a]'
+	   against inferred type `[a]'
+    In the pattern: x : []
     In the definition of `f3': f3 (x : []) = x

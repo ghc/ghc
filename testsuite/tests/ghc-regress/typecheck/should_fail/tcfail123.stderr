@@ -1,7 +1,7 @@
 
 tcfail123.hs:11:9:
-    Couldn't match kind `*' against `#'
-    When matching the kinds of `t :: *' and `GHC.Prim.Int# :: #'
+    Couldn't match kind `#' against `*'
+    When matching the kinds of `GHC.Prim.Int# :: #' and `t :: *'
       Expected type: t
       Inferred type: GHC.Prim.Int#
     In the first argument of `f', namely `3#'

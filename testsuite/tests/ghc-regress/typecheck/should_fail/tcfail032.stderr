@@ -3,5 +3,6 @@ tcfail032.hs:14:7:
     Inferred type is less polymorphic than expected
       Quantified type variable `a' is mentioned in the environment:
 	x :: a -> Int (bound at tcfail032.hs:14:2)
-    In the expression: x :: (Eq a) => a -> Int
+    In the expression: x
+    In the expression: (x :: (Eq a) => a -> Int)
     In the definition of `f': f x = (x :: (Eq a) => a -> Int)

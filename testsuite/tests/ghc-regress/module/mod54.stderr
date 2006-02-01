@@ -2,5 +2,5 @@
 mod54.hs:3:5:
     No instance for (Eq T)
       arising from the superclasses of an instance declaration at mod54.hs:3:5
-    Probable fix: add an instance declaration for (Eq T)
+    Possible fix: add an instance declaration for (Eq T)
     In the instance declaration for `Ord T'

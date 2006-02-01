@@ -2,5 +2,5 @@
 drvfail003.hs:13:5:
     No instance for (Show (v (v a)))
       arising from the 'deriving' clause of a data type declaration at drvfail003.hs:13:5
-    Probable fix: add an instance declaration for (Show (v (v a)))
+    Possible fix: add an instance declaration for (Show (v (v a)))
     When deriving the `Show' instance for type `Square_'

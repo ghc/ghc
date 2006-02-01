@@ -2,8 +2,8 @@
 tcfail102.hs:8:6:
     Could not deduce (Integral (Ratio a)) from the context (Integral a)
       arising from a record update at tcfail102.hs:8:6-18
-    Probable fix:
+    Possible fix:
       add (Integral (Ratio a)) to the type signature(s) for `f'
       or add an instance declaration for (Integral (Ratio a))
-    In the record update: x {p = p x}
+    In the expression: x {p = p x}
     In the definition of `f': f x = x {p = p x}

@@ -1,7 +1,7 @@
 
 tcfail033.hs:4:11:
-    Occurs check: cannot construct the infinite type: a = (a, b)
-      Expected type: (a, b)
-      Inferred type: a
-    In the result of a list comprehension: x
-    In the definition of `buglet': buglet = [x | (x, y) <- buglet]
+    Occurs check: cannot construct the infinite type: t = (t, t1)
+      Expected type: (t, t1)
+      Inferred type: t
+    In the expression: x
+    In the expression: [x | (x, y) <- buglet]

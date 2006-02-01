@@ -1,14 +1,14 @@
 
 tcfail076.hs:18:67:
-    Couldn't match the rigid variable `res'
-	   against the rigid variable `res1'
-      `res' is bound by the polymorphic type `forall res.
-					      (a -> m res) -> m res'
-			  at tcfail076.hs:18:49-73
-      `res1' is bound by the polymorphic type `forall res1.
-					       (a1 -> m1 res1) -> m1 res1'
-			   at tcfail076.hs:18:13-81
-      Expected type: m2 res
-      Inferred type: m2 res1
-    In the application `cont a'
-    In a lambda abstraction: \ cont' -> cont a
+    Couldn't match expected type `res' (a rigid variable)
+	   against inferred type `res1' (a rigid variable)
+      `res' is bound by the polymorphic type
+	      `forall res. (b -> m res) -> m res'
+	      at tcfail076.hs:18:49-73
+      `res1' is bound by the polymorphic type
+	       `forall res1. (a -> m res1) -> m res1'
+	       at tcfail076.hs:18:13-81
+      Expected type: m res
+      Inferred type: m res1
+    In the call (cont a)
+    In the expression: cont a

@@ -1,7 +1,6 @@
 
 tcfail009.hs:3:16:
-    Couldn't match `Int' against `Integer'
-      Expected type: Int
-      Inferred type: Integer
-    In the expression: 2 :: Integer
-    In an arithmetic sequence: [(1 :: Int) .. (2 :: Integer)]
+    Couldn't match expected type `Int' against inferred type `Integer'
+    In the expression: (2 :: Integer)
+    In the expression: [(1 :: Int) .. (2 :: Integer)]
+    In the definition of `p': p = [(1 :: Int) .. (2 :: Integer)]

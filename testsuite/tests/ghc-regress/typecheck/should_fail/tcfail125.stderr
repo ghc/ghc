@@ -2,6 +2,6 @@
 tcfail125.hs:11:3:
     No instance for (Show a)
       arising from use of `LiftObs' at tcfail125.hs:11:3-13
-    Probable fix: add (Show a) to the type signature(s) for `f'
-    When checking the pattern: LiftObs _ _
+    Possible fix: add (Show a) to the type signature(s) for `f'
+    In the pattern: LiftObs _ _
     In the definition of `f': f (LiftObs _ _) = "yes"

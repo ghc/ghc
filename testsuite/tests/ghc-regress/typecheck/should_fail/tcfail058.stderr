@@ -2,4 +2,5 @@
 tcfail058.hs:6:5:
     Type constructor `Array' used as a class
     In the type `(Array a) => a -> b'
-    In the type signature: f :: (Array a) => a -> b
+    In the type signature for `f':
+      f :: (Array a) => a -> b

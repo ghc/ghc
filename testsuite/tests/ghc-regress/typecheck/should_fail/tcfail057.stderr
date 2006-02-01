@@ -3,4 +3,5 @@ tcfail057.hs:5:6:
     Class `RealFrac' used as a type
     In the type `RealFrac a'
     In the type `(RealFrac a) -> a -> a'
-    In the type signature: f :: (RealFrac a) -> a -> a
+    In the type signature for `f':
+      f :: (RealFrac a) -> a -> a

@@ -1,6 +1,9 @@
 
 tcfail145.hs:9:5:
-    Couldn't match `forall a. [a] -> [a]' against `forall a. a -> a'
-    Polymorphic types must match exactly in patterns
-    When checking the pattern: f :: forall a. [a] -> [a]
-    In the definition of `foo': foo (f :: forall a. [a] -> [a]) = f undefined
+    Couldn't match expected type `a' (a rigid variable)
+	   against inferred type `[a]'
+      Expected type: forall a1. a1 -> a1
+      Inferred type: forall a1. [a1] -> [a1]
+    In the pattern: f :: forall a. [a] -> [a]
+    In the definition of `foo':
+	foo (f :: forall a. [a] -> [a]) = f undefined

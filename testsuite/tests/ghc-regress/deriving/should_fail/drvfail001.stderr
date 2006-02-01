@@ -2,11 +2,11 @@
 drvfail001.hs:15:5:
     No instance for (Show (f (f a)))
       arising from the 'deriving' clause of a data type declaration at drvfail001.hs:15:5
-    Probable fix: add an instance declaration for (Show (f (f a)))
+    Possible fix: add an instance declaration for (Show (f (f a)))
     When deriving the `Show' instance for type `SM'
 
 drvfail001.hs:21:5:
     No instance for (Show (f a))
       arising from the 'deriving' clause of a data type declaration at drvfail001.hs:21:5
-    Probable fix: add an instance declaration for (Show (f a))
+    Possible fix: add an instance declaration for (Show (f a))
     When deriving the `Show' instance for type `Cons'

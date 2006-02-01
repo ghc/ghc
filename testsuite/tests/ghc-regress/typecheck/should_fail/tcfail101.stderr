@@ -1,4 +1,5 @@
 
 tcfail101.hs:9:0:
     Type synonym `A' should have 1 argument, but has been given 0
-    In the type signature: f :: T A
+    In the type signature for `f':
+      f :: T A

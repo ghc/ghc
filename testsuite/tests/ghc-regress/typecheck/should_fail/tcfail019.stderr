@@ -2,7 +2,7 @@
 tcfail019.hs:18:0:
     No instances for (B [a], C [a])
       arising from the superclasses of an instance declaration at tcfail019.hs:18:0
-    Probable fix:
+    Possible fix:
       add (B [a], C [a]) to the instance declaration superclass context
       or add an instance declaration for (B [a], C [a])
     In the instance declaration for `D [a]'

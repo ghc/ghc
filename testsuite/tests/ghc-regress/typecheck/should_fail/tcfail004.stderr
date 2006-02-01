@@ -1,6 +1,6 @@
 
 tcfail004.hs:3:8:
-    Couldn't match `(a, b)' against `(a1, b1, c)'
-      Expected type: (a, b)
-      Inferred type: (a1, b1, c)
+    Couldn't match expected type `(t, t1)'
+	   against inferred type `(a, b, c)'
+    In the expression: (1, 2, 3)
     In a pattern binding: (f, g) = (1, 2, 3)

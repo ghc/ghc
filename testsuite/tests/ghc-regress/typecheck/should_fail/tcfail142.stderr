@@ -1,5 +1,5 @@
 
 tcfail142.hs:21:11:
-    Ambiguous type variables `r', `a' in the constraint:
-      `Bar a r' arising from use of `bar' at tcfail142.hs:21:11-13
+    Ambiguous type variables `t', `a' in the constraint:
+      `Bar a t' arising from use of `bar' at tcfail142.hs:21:11-13
     Probable fix: add a type signature that fixes these type variable(s)

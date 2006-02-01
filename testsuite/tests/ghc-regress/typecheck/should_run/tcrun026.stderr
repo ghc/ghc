@@ -1,6 +1,7 @@
 
 tcrun026.hs:17:28:
-    Couldn't match `forall x. L x' against `L x'
-    When checking the pattern: L x
-    When checking the pattern: FA (L x)
+    Couldn't match expected type `forall x. L x'
+	   against inferred type `L x'
+    In the pattern: L x
+    In the pattern: FA (L x)
     In a case alternative: FA (L x) -> "foo" ++ x

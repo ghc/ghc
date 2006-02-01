@@ -1,2 +1,5 @@
 
-mod63.hs:3:0: Varying number of arguments for function `f'
+mod63.hs:3:0:
+    Equations for `f' have different numbers of arguments
+      mod63.hs:3:0-7
+      mod63.hs:4:0-10

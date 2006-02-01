@@ -1,6 +1,10 @@
 
 tcfail126.hs:20:14:
-    Couldn't match `forall (m :: * -> *). (Monad m) => Bar m' against `Bar m'
-    When checking the pattern: Bar run op
-    When checking the pattern: Foo (Bar run op)
-    In the definition of `runProg': runProg (Foo (Bar run op)) = run (prog op)
+    Couldn't match expected type `forall (m :: * -> *).
+				  (Monad m) =>
+				  Bar m'
+	   against inferred type `Bar m'
+    In the pattern: Bar run op
+    In the pattern: Foo (Bar run op)
+    In the definition of `runProg':
+	runProg (Foo (Bar run op)) = run (prog op)

@@ -2,5 +2,6 @@
 tcfail138.hs:27:0:
     Could not deduce (C a b') from the context (C a b)
       arising from the superclasses of an instance declaration at tcfail138.hs:27:0
-    Probable fix: add (C a b') to the instance declaration superclass context
+    Possible fix:
+      add (C a b') to the instance declaration superclass context
     In the instance declaration for `C (Maybe a) a'
