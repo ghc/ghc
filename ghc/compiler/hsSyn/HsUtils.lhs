@@ -200,7 +200,7 @@ nlWildConPat :: DataCon -> LPat RdrName
 nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
 				   (PrefixCon (nOfThem (dataConSourceArity con) nlWildPat)))
 
-nlTuplePat pats box = noLoc (TuplePat pats box)
+nlTuplePat pats box = noLoc (TuplePat pats box placeHolderType)
 nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
 nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> LHsExpr id
@@ -381,7 +381,7 @@ collectl (L l pat) bndrs
 				  
     go (ListPat pats _)    	  = foldr collectl bndrs pats
     go (PArrPat pats _)    	  = foldr collectl bndrs pats
-    go (TuplePat pats _)  	  = foldr collectl bndrs pats
+    go (TuplePat pats _ _)  	  = foldr collectl bndrs pats
 				  
     go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConArgs ps)
     go (ConPatOut c _ ds bs ps _) = map noLoc ds
@@ -407,15 +407,15 @@ collectSigTysFromPat pat = collect_lpat pat []
 
 collect_lpat pat acc = collect_pat (unLoc pat) acc
 
-collect_pat (SigPatIn pat ty)  acc = collect_lpat pat (ty:acc)
-collect_pat (TypePat ty)       acc = ty:acc
+collect_pat (SigPatIn pat ty)  	acc = collect_lpat pat (ty:acc)
+collect_pat (TypePat ty)       	acc = ty:acc
 
-collect_pat (LazyPat pat)      acc = collect_lpat pat acc
-collect_pat (AsPat a pat)      acc = collect_lpat pat acc
-collect_pat (ParPat  pat)      acc = collect_lpat pat acc
-collect_pat (ListPat pats _)   acc = foldr collect_lpat acc pats
-collect_pat (PArrPat pats _)   acc = foldr collect_lpat acc pats
-collect_pat (TuplePat pats _)  acc = foldr collect_lpat acc pats
-collect_pat (ConPatIn c ps)    acc = foldr collect_lpat acc (hsConArgs ps)
-collect_pat other	       acc = acc 	-- Literals, vars, wildcard
+collect_pat (LazyPat pat)      	acc = collect_lpat pat acc
+collect_pat (AsPat a pat)      	acc = collect_lpat pat acc
+collect_pat (ParPat  pat)      	acc = collect_lpat pat acc
+collect_pat (ListPat pats _)   	acc = foldr collect_lpat acc pats
+collect_pat (PArrPat pats _)   	acc = foldr collect_lpat acc pats
+collect_pat (TuplePat pats _ _) acc = foldr collect_lpat acc pats
+collect_pat (ConPatIn c ps)    	acc = foldr collect_lpat acc (hsConArgs ps)
+collect_pat other	       	acc = acc 	-- Literals, vars, wildcard
 \end{code}

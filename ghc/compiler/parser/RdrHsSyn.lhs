@@ -557,7 +557,7 @@ checkAPat loc e = case e of
    			 return (PArrPat ps placeHolderType)
    
    ExplicitTuple es b -> mapM (\e -> checkLPat e) es >>= \ps ->
-   			 return (TuplePat ps b)
+   			 return (TuplePat ps b placeHolderType)
    
    RecordCon c _ fs   -> mapM checkPatField fs >>= \fs ->
 			 return (ConPatIn c (RecCon fs))

@@ -617,10 +617,11 @@ rnPat (PArrPat pats _)
   where
     implicit_fvs = mkFVs [lengthPName, indexPName]
 
-rnPat (TuplePat pats boxed)
+rnPat (TuplePat pats boxed _)
   = checkTupSize tup_size	`thenM_`
     rnLPats pats			`thenM` \ (patslist, fvs) ->
-    returnM (TuplePat patslist boxed, fvs `addOneFV` tycon_name)
+    returnM (TuplePat patslist boxed placeHolderType, 
+	     fvs `addOneFV` tycon_name)
   where
     tup_size   = length pats
     tycon_name = tupleTyCon_name boxed tup_size

@@ -437,7 +437,7 @@ cvtp (TH.LitP l)
   | otherwise	      = do { l' <- cvtLit l; return $ Hs.LitPat l' }
 cvtp (TH.VarP s)      = do { s' <- vName s; return $ Hs.VarPat s' }
 cvtp (TupP [p])       = cvtp p
-cvtp (TupP ps)        = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed }
+cvtp (TupP ps)        = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
 cvtp (ConP s ps)      = do { s' <- cNameL s; ps' <- cvtPats ps; return $ ConPatIn s' (PrefixCon ps') }
 cvtp (InfixP p1 s p2) = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
 			   ; return $ ConPatIn s' (InfixCon p1' p2') }

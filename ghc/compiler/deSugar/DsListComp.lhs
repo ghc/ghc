@@ -12,7 +12,7 @@ import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
 
 import BasicTypes	( Boxity(..) )
 import HsSyn
-import TcHsSyn		( hsPatType )
+import TcHsSyn		( hsPatType, mkVanillaTuplePat )
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
@@ -157,7 +157,7 @@ deListComp (ParStmt stmtss_w_bndrs : quals) body list
 	bndrs_s = map snd stmtss_w_bndrs
 
 	-- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
-	pat	 = noLoc (TuplePat pats Boxed)
+	pat	 = mkTuplePat pats
 	pats	 = map mk_hs_tuple_pat bndrs_s
 
 	-- Types of (x1,..,xn), (y1,..,yn) etc
@@ -263,8 +263,7 @@ mk_hs_tuple_expr [id] = nlHsVar id
 mk_hs_tuple_expr ids  = noLoc $ ExplicitTuple [ nlHsVar i | i <- ids ] Boxed
 
 mk_hs_tuple_pat :: [Id] -> LPat Id
-mk_hs_tuple_pat [b] = nlVarPat b
-mk_hs_tuple_pat bs  = noLoc $ TuplePat (map nlVarPat bs) Boxed
+mk_hs_tuple_pat bs  = mkTuplePat (map nlVarPat bs)
 \end{code}
 
 
@@ -505,9 +504,9 @@ parrElemType e  =
 
 -- Smart constructor for source tuple patterns
 --
-mkTuplePat :: [LPat id] -> LPat id
+mkTuplePat :: [LPat Id] -> LPat Id
 mkTuplePat [lpat] = lpat
-mkTuplePat lpats  = noLoc $ TuplePat lpats Boxed
+mkTuplePat lpats  = noLoc $ mkVanillaTuplePat lpats Boxed
 
 -- Smart constructor for source tuple expressions
 --

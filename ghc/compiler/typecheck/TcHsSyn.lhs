@@ -11,7 +11,7 @@ module TcHsSyn (
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsDictLet, mkHsApp,
 	hsLitType, hsPatType, mkHsAppTy, mkSimpleHsAlt,
-	nlHsIntLit, 
+	nlHsIntLit, mkVanillaTuplePat,
 	
 
 	-- re-exported from TcMonad
@@ -66,6 +66,11 @@ import Outputable
 Note: If @hsPatType@ doesn't bear a strong resemblance to @exprType@,
 then something is wrong.
 \begin{code}
+mkVanillaTuplePat :: [OutPat Id] -> Boxity -> Pat Id
+-- A vanilla tuple pattern simply gets its type from its sub-patterns
+mkVanillaTuplePat pats box 
+  = TuplePat pats box (mkTupleTy box (length pats) (map hsPatType pats))
+
 hsPatType :: OutPat Id -> Type
 hsPatType pat = pat_type (unLoc pat)
 
@@ -78,7 +83,7 @@ pat_type (LitPat lit)		   = hsLitType lit
 pat_type (AsPat var pat)	   = idType (unLoc var)
 pat_type (ListPat _ ty)		   = mkListTy ty
 pat_type (PArrPat _ ty)		   = mkPArrTy ty
-pat_type (TuplePat pats box)	   = mkTupleTy box (length pats) (map hsPatType pats)
+pat_type (TuplePat pats box ty)	   = ty
 pat_type (ConPatOut _ _ _ _ _ ty)  = ty
 pat_type (SigPatOut pat ty)	   = ty
 pat_type (NPat lit _ _ ty)	   = ty
@@ -723,9 +728,10 @@ zonk_pat env (PArrPat pats ty)
 	; (env', pats') <- zonkPats env pats
 	; return (env', PArrPat pats' ty') }
 
-zonk_pat env (TuplePat pats boxed)
-  = do	{ (env', pats') <- zonkPats env pats
-	; return (env', TuplePat pats' boxed) }
+zonk_pat env (TuplePat pats boxed ty)
+  = do	{ ty' <- zonkTcTypeToType env ty
+	; (env', pats') <- zonkPats env pats
+	; return (env', TuplePat pats' boxed ty') }
 
 zonk_pat env (ConPatOut n tvs dicts binds stuff ty)
   = ASSERT( all isImmutableTyVar tvs )

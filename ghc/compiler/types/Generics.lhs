@@ -523,7 +523,7 @@ bimapTuple eps
 	 toEP   = mkHsLam [noLoc tuple_pat] (noLoc to_body) }
   where
     names	= takeList eps gs_RDR
-    tuple_pat	= TuplePat (map nlVarPat names) Boxed
+    tuple_pat	= TuplePat (map nlVarPat names) Boxed placeHolderType
     eps_w_names = eps `zip` names
     to_body     = ExplicitTuple [toEP   ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names] Boxed
     from_body   = ExplicitTuple [fromEP ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names] Boxed

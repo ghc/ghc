@@ -586,7 +586,7 @@ mkSelectorBinds pat val_expr
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 
-    is_simple_pat (TuplePat ps Boxed)      = all is_triv_lpat ps
+    is_simple_pat (TuplePat ps Boxed _)    = all is_triv_lpat ps
     is_simple_pat (ConPatOut _ _ _ _ ps _) = all is_triv_lpat (hsConArgs ps)
     is_simple_pat (VarPat _)	       	   = True
     is_simple_pat (ParPat p)		   = is_simple_lpat p

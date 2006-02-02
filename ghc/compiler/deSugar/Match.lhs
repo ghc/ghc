@@ -10,7 +10,7 @@ module Match ( match, matchWrapper, matchSimply, matchSinglePat ) where
 
 import DynFlags	( DynFlag(..), dopt )
 import HsSyn		
-import TcHsSyn		( hsPatType )
+import TcHsSyn		( mkVanillaTuplePat )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
 import CoreUtils	( bindNonRec, exprType )
@@ -25,7 +25,7 @@ import MatchLit		( matchLiterals, matchNPlusKPats, matchNPats, tidyLitPat, tidyN
 import PrelInfo		( pAT_ERROR_ID )
 import TcType		( Type, tcTyConAppArgs )
 import Type		( splitFunTysN, mkTyVarTys )
-import TysWiredIn	( consDataCon, mkTupleTy, mkListTy,
+import TysWiredIn	( consDataCon, mkListTy, unitTy,
 			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
 import ListSetOps	( runs )
@@ -452,18 +452,17 @@ tidy1 v wrap (PArrPat pats ty)
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
-tidy1 v wrap (TuplePat pats boxity)
+tidy1 v wrap (TuplePat pats boxity ty)
   = returnDs (wrap, unLoc tuple_ConPat)
   where
     arity = length pats
-    tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats
-				  (mkTupleTy boxity arity (map hsPatType pats))
+    tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
 
 tidy1 v wrap (DictPat dicts methods)
   = case num_of_d_and_ms of
-	0 -> tidy1 v wrap (TuplePat [] Boxed) 
+	0 -> tidy1 v wrap (TuplePat [] Boxed unitTy) 
 	1 -> tidy1 v wrap (unLoc (head dict_and_method_pats))
-	_ -> tidy1 v wrap (TuplePat dict_and_method_pats Boxed)
+	_ -> tidy1 v wrap (mkVanillaTuplePat dict_and_method_pats Boxed)
   where
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map nlVarPat (dicts ++ methods)

@@ -336,7 +336,7 @@ tc_pat pstate (PArrPat pats _) pat_ty thing_inside
 	; ifM (null pats) (zapToMonotype pat_ty)	-- c.f. ExplicitPArr in TcExpr
 	; return (PArrPat pats' elt_ty, pats_tvs, res) }
 
-tc_pat pstate (TuplePat pats boxity) pat_ty thing_inside
+tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
   = do	{ arg_tys <- boxySplitTyConApp (tupleTyCon boxity (length pats)) pat_ty
 	; (pats', pats_tvs, res) <- tc_lpats pstate pats arg_tys thing_inside
 
@@ -344,7 +344,7 @@ tc_pat pstate (TuplePat pats boxity) pat_ty thing_inside
 	-- so that we can experiment with lazy tuple-matching.
 	-- This is a pretty odd place to make the switch, but
 	-- it was easy to do.
-	; let unmangled_result = TuplePat pats' boxity
+	; let unmangled_result = TuplePat pats' boxity pat_ty
 	      possibly_mangled_result
 	        | opt_IrrefutableTuples && isBoxed boxity = LazyPat (noLoc unmangled_result)
 	        | otherwise			          = unmangled_result

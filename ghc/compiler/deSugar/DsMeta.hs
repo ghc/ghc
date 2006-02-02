@@ -799,14 +799,14 @@ repLP :: LPat Name -> DsM (Core TH.PatQ)
 repLP (L _ p) = repP p
 
 repP :: Pat Name -> DsM (Core TH.PatQ)
-repP (WildPat _)     = repPwild 
-repP (LitPat l)      = do { l2 <- repLiteral l; repPlit l2 }
-repP (VarPat x)      = do { x' <- lookupBinder x; repPvar x' }
-repP (LazyPat p)     = do { p1 <- repLP p; repPtilde p1 }
-repP (AsPat x p)     = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
-repP (ParPat p)      = repLP p 
-repP (ListPat ps _)  = do { qs <- repLPs ps; repPlist qs }
-repP (TuplePat ps _) = do { qs <- repLPs ps; repPtup qs }
+repP (WildPat _)       = repPwild 
+repP (LitPat l)        = do { l2 <- repLiteral l; repPlit l2 }
+repP (VarPat x)        = do { x' <- lookupBinder x; repPvar x' }
+repP (LazyPat p)       = do { p1 <- repLP p; repPtilde p1 }
+repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
+repP (ParPat p)        = repLP p 
+repP (ListPat ps _)    = do { qs <- repLPs ps; repPlist qs }
+repP (TuplePat ps _ _) = do { qs <- repLPs ps; repPtup qs }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of

@@ -8,6 +8,8 @@ module MatchCon ( matchConFamily ) where
 
 #include "HsVersions.h"
 
+import Id( idType )
+
 import {-# SOURCE #-} Match	( match )
 
 import HsSyn		( Pat(..), HsConDetails(..) )

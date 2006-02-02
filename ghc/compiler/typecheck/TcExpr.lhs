@@ -40,14 +40,12 @@ import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, TcMatchCtxt(..) )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( tcOverloadedLit, badFieldCon )
 import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars, readFilledBox, 
-			  tcInstBoxyTyVar, tcInstTyVar, zonkTcType )
+			  tcInstBoxyTyVar, tcInstTyVar )
 import TcType		( TcType, TcSigmaType, TcRhoType, 
 			  BoxySigmaType, BoxyRhoType, ThetaType,
-			  tcSplitFunTys, mkTyVarTys, mkFunTys, 
-			  tcMultiSplitSigmaTy, tcSplitFunTysN, 
+			  mkTyVarTys, mkFunTys, tcMultiSplitSigmaTy, tcSplitFunTysN, 
 			  isSigmaTy, mkFunTy, mkTyConApp, isLinearPred,
 			  exactTyVarsOfType, exactTyVarsOfTypes, mkTyVarTy, 
-			  tidyOpenType,
 			  zipTopTvSubst, zipOpenTvSubst, substTys, substTyVar, lookupTyVar
 			)
 import Kind		( argTypeKind )

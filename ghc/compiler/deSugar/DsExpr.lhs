@@ -26,7 +26,7 @@ import DsMeta		( dsBracket )
 #endif
 
 import HsSyn
-import TcHsSyn		( hsPatType )
+import TcHsSyn		( hsPatType, mkVanillaTuplePat )
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -736,7 +736,7 @@ dsMDo tbl stmts body result_ty
 
  	mk_tup_pat :: [LPat Id] -> LPat Id
   	mk_tup_pat [p] = p
-	mk_tup_pat ps  = noLoc $ TuplePat ps Boxed
+	mk_tup_pat ps  = noLoc $ mkVanillaTuplePat ps Boxed
 
 	mk_ret_tup :: [LHsExpr Id] -> LHsExpr Id
 	mk_ret_tup [r] = r

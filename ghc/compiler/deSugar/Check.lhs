@@ -11,7 +11,7 @@ module Check ( check , ExhaustivePat ) where
 
 
 import HsSyn		
-import TcHsSyn		( hsPatType )
+import TcHsSyn		( hsPatType, mkVanillaTuplePat )
 import TcType		( tcTyConAppTyCon )
 import DsUtils		( EquationInfo(..), MatchResult(..), 
 			  CanItFail(..), firstPat )
@@ -145,7 +145,7 @@ untidy b (L loc p) = L loc (untidy' b p)
     untidy' _ p@(ConPatIn name (PrefixCon [])) = p
     untidy' b (ConPatIn name ps)     = pars b (L loc (ConPatIn name (untidy_con ps)))
     untidy' _ (ListPat pats ty)      = ListPat (map untidy_no_pars pats) ty
-    untidy' _ (TuplePat pats boxed)  = TuplePat (map untidy_no_pars pats) boxed
+    untidy' _ (TuplePat pats box ty) = TuplePat (map untidy_no_pars pats) box ty
     untidy' _ (PArrPat _ _)	     = panic "Check.untidy: Shouldn't get a parallel array here!"
     untidy' _ (SigPatIn _ _) 	     = panic "Check.untidy: SigPat"
 
@@ -557,9 +557,9 @@ make_con (ConPatOut (L _ id) _ _ _ _ _) (lp:lq:ps, constraints)
      | isInfixCon id    = (nlInfixConPat (getName id) lp lq : ps, constraints) 
    where q  = unLoc lq	
 
-make_con (ConPatOut (L _ id) _ _ _ (PrefixCon pats) _) (ps, constraints) 
-      | isTupleTyCon tc  = (noLoc (TuplePat pats_con (tupleTyConBoxity tc)) : rest_pats, constraints) 
-      | isPArrFakeCon id = (noLoc (PArrPat pats_con placeHolderType)        : rest_pats, constraints) 
+make_con (ConPatOut (L _ id) _ _ _ (PrefixCon pats) ty) (ps, constraints) 
+      | isTupleTyCon tc  = (noLoc (TuplePat pats_con (tupleTyConBoxity tc) ty) : rest_pats, constraints) 
+      | isPArrFakeCon id = (noLoc (PArrPat pats_con placeHolderType)           : rest_pats, constraints) 
       | otherwise        = (nlConPat name pats_con      : rest_pats, constraints)
     where 
 	name     	      = getName id
@@ -609,7 +609,7 @@ has_nplusk_pat (AsPat _ p) 	   	 = has_nplusk_lpat p
 has_nplusk_pat (SigPatOut p _ )    	 = has_nplusk_lpat p
 has_nplusk_pat (ConPatOut _ _ _ _ ps ty) = any has_nplusk_lpat (hsConArgs ps)
 has_nplusk_pat (ListPat ps _)  		 = any has_nplusk_lpat ps
-has_nplusk_pat (TuplePat ps _) 		 = any has_nplusk_lpat ps
+has_nplusk_pat (TuplePat ps _ _) 	 = any has_nplusk_lpat ps
 has_nplusk_pat (PArrPat ps _)  		 = any has_nplusk_lpat ps
 has_nplusk_pat (LazyPat p)     		 = False
 has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat, DictPat
@@ -643,10 +643,10 @@ simplify_pat (PArrPat ps ty)
 		      (PrefixCon (map simplify_lpat ps)) 
 		      (mkPArrTy ty)
 
-simplify_pat (TuplePat ps boxity)
+simplify_pat (TuplePat ps boxity ty)
   = mk_simple_con_pat (tupleCon boxity arity)
 		      (PrefixCon (map simplify_lpat ps))
-		      (mkTupleTy boxity arity (map hsPatType ps))
+		      ty
   where
     arity = length ps
 
@@ -667,9 +667,9 @@ simplify_pat (NPlusKPat id hslit hsexpr1 hsexpr2)
 
 simplify_pat (DictPat dicts methods)
   = case num_of_d_and_ms of
-       0 -> simplify_pat (TuplePat [] Boxed) 
+       0 -> simplify_pat (TuplePat [] Boxed unitTy) 
        1 -> simplify_pat (head dict_and_method_pats) 
-       _ -> simplify_pat (TuplePat (map noLoc dict_and_method_pats) Boxed)
+       _ -> simplify_pat (mkVanillaTuplePat (map noLoc dict_and_method_pats) Boxed)
     where
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)

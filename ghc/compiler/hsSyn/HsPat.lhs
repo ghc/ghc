@@ -60,6 +60,18 @@ data Pat id
    	    	    
   | TuplePat	[LPat id]		-- Tuple
 		Boxity			-- UnitPat is TuplePat []
+		PostTcType
+	-- You might think that the PostTcType was redundant, but it's essential
+	--	data T a where
+	--	  T1 :: Int -> T Int
+	--	f :: (T a, a) -> Int
+	--	f (T1 x, z) = z
+	-- When desugaring, we must generate
+	--	f = /\a. \v::a.  case v of (t::T a, w::a) ->
+	--			 case t of (T1 (x::Int)) -> 
+	-- Note the (w::a), NOT (w::Int), because we have not yet
+	-- refined 'a' to Int.  So we must know that the second component
+	-- of the tuple is of type 'a' not Int.  See selectMatchVar
 
   | PArrPat	[LPat id]		-- Syntactic parallel array
 		PostTcType		-- The type of the elements
@@ -145,16 +157,16 @@ pprPatBndr var		  	-- Print with type info if -dppr-debug is on
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
 
-pprPat (VarPat var)  	  = pprPatBndr var
-pprPat (VarPatOut var bs) = parens (pprPatBndr var <+> braces (ppr bs))
-pprPat (WildPat _)	  = char '_'
-pprPat (LazyPat pat)      = char '~' <> ppr pat
-pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
-pprPat (ParPat pat)	  = parens (ppr pat)
+pprPat (VarPat var)  	    = pprPatBndr var
+pprPat (VarPatOut var bs)   = parens (pprPatBndr var <+> braces (ppr bs))
+pprPat (WildPat _)	    = char '_'
+pprPat (LazyPat pat)        = char '~' <> ppr pat
+pprPat (AsPat name pat)     = parens (hcat [ppr name, char '@', ppr pat])
+pprPat (ParPat pat)	    = parens (ppr pat)
 
-pprPat (ListPat pats _)   = brackets (interpp'SP pats)
-pprPat (PArrPat pats _)   = pabrackets (interpp'SP pats)
-pprPat (TuplePat pats bx) = tupleParens bx (interpp'SP pats)
+pprPat (ListPat pats _)     = brackets (interpp'SP pats)
+pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
+pprPat (TuplePat pats bx _) = tupleParens bx (interpp'SP pats)
 
 pprPat (ConPatIn con details) = pprUserCon con details
 pprPat (ConPatOut con tvs dicts binds details _) 
@@ -253,7 +265,7 @@ isConPat (ConPatIn _ _)		 = True
 isConPat (ConPatOut _ _ _ _ _ _) = True
 isConPat (ListPat _ _)		 = True
 isConPat (PArrPat _ _)		 = True
-isConPat (TuplePat _ _)		 = True
+isConPat (TuplePat _ _ _)	 = True
 isConPat (DictPat ds ms)	 = (length ds + length ms) > 1
 isConPat other			 = False
 
@@ -279,17 +291,17 @@ isIrrefutableHsPat pat
   where
     go (L _ pat)	 = go1 pat
 
-    go1 (WildPat _)       = True
-    go1 (VarPat _)        = True
-    go1 (VarPatOut _ _)   = True
-    go1 (LazyPat pat)     = True
-    go1 (ParPat pat)      = go pat
-    go1 (AsPat _ pat)     = go pat
-    go1 (SigPatIn pat _)  = go pat
-    go1 (SigPatOut pat _) = go pat
-    go1 (TuplePat pats _) = all go pats
-    go1 (ListPat pats _)  = False
-    go1 (PArrPat pats _)  = False	-- ?
+    go1 (WildPat _)         = True
+    go1 (VarPat _)          = True
+    go1 (VarPatOut _ _)     = True
+    go1 (LazyPat pat)       = True
+    go1 (ParPat pat)        = go pat
+    go1 (AsPat _ pat)       = go pat
+    go1 (SigPatIn pat _)    = go pat
+    go1 (SigPatOut pat _)   = go pat
+    go1 (TuplePat pats _ _) = all go pats
+    go1 (ListPat pats _)    = False
+    go1 (PArrPat pats _)    = False	-- ?
 
     go1 (ConPatIn _ _) = False	-- Conservative
     go1 (ConPatOut (L _ con) _ _ _ details _) 
