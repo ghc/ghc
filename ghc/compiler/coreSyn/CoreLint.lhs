@@ -235,7 +235,7 @@ lintCoreExpr (Let (Rec pairs) body)
   where
     bndrs = map fst pairs
 
-lintCoreExpr (App fun (Type ty))
+lintCoreExpr e@(App fun (Type ty))
 -- This is like 'let' for types
 -- It's needed when dealing with desugarer output for GADTs. Consider
 --   data T = forall a. T a (a->Int) Bool
@@ -260,7 +260,8 @@ lintCoreExpr (App fun (Type ty))
 --					 	False -> fail)
 --				  ) a
 -- Now the inner case look as though it has incompatible branches.
-  = go fun [ty]
+  = addLoc (AnExpr e) $
+    go fun [ty]
   where
     go (App fun (Type ty)) tys
 	= do { go fun (ty:tys) }
@@ -278,9 +279,9 @@ lintCoreExpr (App fun (Type ty))
 	      ; lintCoreArgs fun_ty (map Type tys) }
 
 lintCoreExpr e@(App fun arg)
-  = do	{ ty <- lintCoreExpr fun
+  = do	{ fun_ty <- lintCoreExpr fun
 	; addLoc (AnExpr e) $
-          lintCoreArg ty arg }
+          lintCoreArg fun_ty arg }
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
@@ -336,14 +337,14 @@ lintCoreArgs ty (a : args) =
   do { res <- lintCoreArg ty a
      ; lintCoreArgs res args }
 
-lintCoreArg ty a@(Type arg_ty) = 
+lintCoreArg fun_ty a@(Type arg_ty) = 
   do { arg_ty <- lintTy arg_ty	
-     ; lintTyApp ty arg_ty }
+     ; lintTyApp fun_ty arg_ty }
 
 lintCoreArg fun_ty arg = 
        -- Make sure function type matches argument
   do { arg_ty <- lintCoreExpr arg
-     ; let err = mkAppMsg fun_ty arg_ty
+     ; let err = mkAppMsg fun_ty arg_ty arg
      ; case splitFunTy_maybe fun_ty of
         Just (arg,res) -> 
           do { checkTys arg arg_ty err 
@@ -449,7 +450,8 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
     addInScopeVars args $	-- Put the args in scope before lintBinder,
 				-- because the Ids mention the type variables
     if isVanillaDataCon con then
-    do	{ mapM lintBinder args 
+    do	{ addLoc (CasePat alt) $ do
+	  { mapM lintBinder args 
          	-- FIX! Add check that all args are Ids.
 		 -- Check the pattern
 		 -- Scrutinee type must be a tycon applicn; checked by caller
@@ -457,11 +459,12 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 		 -- NB: args must be in scope here so that the lintCoreArgs line works.
 	         -- NB: relies on existential type args coming *after* ordinary type args
 
-	; con_type <- lintTyApps (dataConRepType con) tycon_arg_tys
+	  ; con_type <- lintTyApps (dataConRepType con) tycon_arg_tys
                  -- Can just map Var as we know that this is a vanilla datacon
-	; con_result_ty <- lintCoreArgs con_type (map Var args)
-	; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
- 	         -- Check the RHS
+	  ; con_result_ty <- lintCoreArgs con_type (map Var args)
+	  ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
+ 	  }
+	       -- Check the RHS
 	; checkAltExpr rhs alt_ty }
 
     else 	-- GADT
@@ -472,10 +475,13 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
         ; case coreRefineTys in_scope con tvs scrut_ty of {
              Nothing          -> return () ;	-- Alternative is dead code
              Just (refine, _) -> updateTvSubstEnv (composeTvSubst in_scope refine subst_env) $
-    do 	{ tvs'     <- mapM lintTy (mkTyVarTys tvs)
-	; con_type <- lintTyApps (dataConRepType con) tvs'
-	; mapM lintBinder ids	-- Lint Ids in the refined world
-	; lintCoreArgs con_type (map Var ids)
+    do 	{ addLoc (CasePat alt) $ do
+	  { tvs'     <- mapM lintTy (mkTyVarTys tvs)
+	  ; con_type <- lintTyApps (dataConRepType con) tvs'
+	  ; mapM lintBinder ids	-- Lint Ids in the refined world
+	  ; lintCoreArgs con_type (map Var ids)
+	  }
+
 	; let refined_alt_ty = substTy (mkTvSubst in_scope refine) alt_ty
 		-- alt_ty is already an OutType, so don't re-apply 
 		-- the current substitution.  But we must apply the
@@ -545,7 +551,8 @@ data LintLocInfo
   = RhsOf Id		-- The variable bound
   | LambdaBodyOf Id	-- The lambda-binder
   | BodyOfLetRec [Id]	-- One of the binders
-  | CaseAlt CoreAlt	-- Pattern of a case alternative
+  | CaseAlt CoreAlt	-- Case alternative
+  | CasePat CoreAlt	-- *Pattern* of the case alternative
   | AnExpr CoreExpr	-- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
 \end{code}
@@ -656,7 +663,10 @@ dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
 
 dumpLoc (CaseAlt (con, args, rhs))
-  = (noSrcLoc, text "In a case alternative:" <+> parens (ppr con <+> ppr args))
+  = (noSrcLoc, text "In a case alternative:" <+> parens (ppr con <+> pp_binders args))
+
+dumpLoc (CasePat (con, args, rhs))
+  = (noSrcLoc, text "In the pattern of a case alternative:" <+> parens (ppr con <+> pp_binders args))
 
 dumpLoc (ImportedUnfolding locn)
   = (locn, brackets (ptext SLIT("in an imported unfolding")))
@@ -721,11 +731,12 @@ mkBadAltMsg scrut_ty alt
 ------------------------------------------------------
 --	Other error messages
 
-mkAppMsg :: Type -> Type -> Message
-mkAppMsg fun arg
+mkAppMsg :: Type -> Type -> CoreExpr -> Message
+mkAppMsg fun_ty arg_ty arg
   = vcat [ptext SLIT("Argument value doesn't match argument type:"),
-	      hang (ptext SLIT("Fun type:")) 4 (ppr fun),
-	      hang (ptext SLIT("Arg type:")) 4 (ppr arg)]
+	      hang (ptext SLIT("Fun type:")) 4 (ppr fun_ty),
+	      hang (ptext SLIT("Arg type:")) 4 (ppr arg_ty),
+	      hang (ptext SLIT("Arg:")) 4 (ppr arg)]
 
 mkKindErrMsg :: TyVar -> Type -> Message
 mkKindErrMsg tyvar arg_ty
