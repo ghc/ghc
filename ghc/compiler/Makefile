@@ -680,7 +680,11 @@ $(odir)/ghc-inplace : $(HS_PROG)
 ghc-inplace : stage1/ghc-inplace
 	$(LN_S) -f $< $@
 
-CLEAN_FILES += $(odir)/ghc-inplace ghc-inplace
+ifeq "$(stage)" "1"
+CLEAN_FILES += ghc-inplace
+endif
+
+CLEAN_FILES += $(odir)/ghc-inplace
 
 #-----------------------------------------------------------------------------
 # 		install
