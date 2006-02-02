@@ -14,7 +14,10 @@ import Data.Generics
 import CompanyDatatypes
 
 -- The main function which prints the result of zipping
-main = print $ gzip (mkTT maxS) genCom1 genCom2
+main = print $ gzip (\x y -> mkTT maxS x y) genCom1 genCom2
+	-- NB: the argument has to be eta-expanded to match
+	--     the type of gzip's argument type, which is
+	-- 	  GenericQ (GenericM Maybe)
   where
 
     -- Variations on the show case company "genCom"
