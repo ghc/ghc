@@ -1,5 +1,5 @@
 def f( opts ):
-  opts.extra_hc_opts = '-fglasgow-exts -package lang'
+  opts.extra_hc_opts = '-fglasgow-exts'
 
 setTestOpts(f)
 
