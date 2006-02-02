@@ -88,7 +88,8 @@ tcPats ctxt pats tys res_ty thing_inside
   =  do	{ let init_state = PS { pat_ctxt = ctxt, pat_reft = emptyTvSubst }
 
 	; (pats', ex_tvs, res) <- tc_lpats init_state pats tys $ \ pstate' ->
-				  thing_inside (refineType (pat_reft pstate') res_ty)
+				  refineEnvironment (pat_reft pstate') $
+	     			  thing_inside (refineType (pat_reft pstate') res_ty)
 
 	; tcCheckExistentialPat ctxt pats' ex_tvs tys res_ty
 
@@ -605,10 +606,10 @@ refineAlt pstate con pat_tvs arg_flags pat_res_tys ctxt_res_tys thing_inside
 				-- to refine the environment or pstate
 	  -> do  { traceTc trace_msg
 		 ; thing_inside pstate pat_tvs' }
-	  | otherwise 		-- New bindings affect the context, so refine
-				-- the environment and pstate
-	  -> refineEnvironment (pat_reft pstate') $
-	     do { traceTc trace_msg
+	  | otherwise 	-- New bindings affect the context, so pass down pstate'.  
+			-- DO NOT refine the envt, because we might be inside a
+			-- lazy pattern
+	  -> do { traceTc trace_msg
 		; thing_inside pstate' pat_tvs' }
 	  where
   	     pat_tvs' = map (substTyVar new_subst) pat_tvs
