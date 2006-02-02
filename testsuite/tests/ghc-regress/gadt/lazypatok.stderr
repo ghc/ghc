@@ -1,8 +1,0 @@
-
-lazypatok.hs:14:17:
-    Couldn't match the rigid variable `a' against `Int'
-      `a' is bound by the type signature for `f'
-      Expected type: Int
-      Inferred type: a
-    In the second argument of `(+)', namely `y'
-    In the definition of `f': f ~(T1 x, y) = x + y
