@@ -255,14 +255,9 @@ Since all the symbols are reservedops we can simply reject them.
 We return a (bogus) EWildPat in each case.
 
 \begin{code}
-rnExpr e@EWildPat = addErr (patSynErr e)	`thenM_`
-		    returnM (EWildPat, emptyFVs)
-
-rnExpr e@(EAsPat _ _) = addErr (patSynErr e)	`thenM_`
-		        returnM (EWildPat, emptyFVs)
-
-rnExpr e@(ELazyPat _) = addErr (patSynErr e)	`thenM_`
-		        returnM (EWildPat, emptyFVs)
+rnExpr e@EWildPat      = patSynErr e
+rnExpr e@(EAsPat {})   = patSynErr e
+rnExpr e@(ELazyPat {}) = patSynErr e
 \end{code}
 
 %************************************************************************
@@ -943,9 +938,9 @@ mkAssertErrorExpr
 %************************************************************************
 
 \begin{code}
-patSynErr e 
-  = sep [ptext SLIT("Pattern syntax in expression context:"),
-	 nest 4 (ppr e)]
+patSynErr e = do { addErr (sep [ptext SLIT("Pattern syntax in expression context:"),
+			 	nest 4 (ppr e)])
+		 ; return (EWildPat, emptyFVs) }
 
 parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -fglasgow-exts"))
 

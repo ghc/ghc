@@ -26,7 +26,8 @@ module Lexer (
    P(..), ParseResult(..), getSrcLoc, 
    failLocMsgP, failSpanMsgP, srcParseFail,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
-   getLexState, popLexState, pushLexState
+   getLexState, popLexState, pushLexState,
+   extension, bangPatEnabled
   ) where
 
 #include "HsVersions.h"
@@ -1257,6 +1258,8 @@ arrowsBit  = 4
 thBit	   = 5
 ipBit      = 6
 tvBit	   = 7	-- Scoped type variables enables 'forall' keyword
+bangPatBit = 8	-- Tells the parser to understand bang-patterns
+		-- (doesn't affect the lexer)
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled flags = testBit flags glaExtsBit
@@ -1266,6 +1269,7 @@ arrowsEnabled  flags = testBit flags arrowsBit
 thEnabled      flags = testBit flags thBit
 ipEnabled      flags = testBit flags ipBit
 tvEnabled      flags = testBit flags tvBit
+bangPatEnabled flags = testBit flags bangPatBit
 
 -- create a parse state
 --
@@ -1290,6 +1294,7 @@ mkPState buf loc flags  =
 	       .|. thBit      `setBitIf` dopt Opt_TH          flags
 	       .|. ipBit      `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. tvBit      `setBitIf` dopt Opt_ScopedTypeVariables flags
+	       .|. bangPatBit `setBitIf` dopt Opt_BangPatterns flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

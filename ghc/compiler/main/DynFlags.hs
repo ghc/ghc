@@ -152,6 +152,7 @@ data DynFlag
    | Opt_Generics
    | Opt_ImplicitPrelude 
    | Opt_ScopedTypeVariables
+   | Opt_BangPatterns
 
    -- optimisation opts
    | Opt_Strictness
@@ -968,6 +969,7 @@ fFlags = [
   ( "th",				Opt_TH ),
   ( "implicit-prelude",  		Opt_ImplicitPrelude ),
   ( "scoped-type-variables",  		Opt_ScopedTypeVariables ),
+  ( "bang-patterns",	  		Opt_BangPatterns ),
   ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
   ( "implicit-params",			Opt_ImplicitParams ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
@@ -993,7 +995,8 @@ glasgowExtsFlags = [
   Opt_FFI, 
   Opt_TH, 
   Opt_ImplicitParams, 
-  Opt_ScopedTypeVariables ]
+  Opt_ScopedTypeVariables,
+  Opt_BangPatterns ]
 
 isFFlag f = f `elem` (map fst fFlags)
 getFFlag f = fromJust (lookup f fFlags)

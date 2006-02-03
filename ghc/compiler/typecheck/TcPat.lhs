@@ -274,6 +274,10 @@ tc_pat pstate (ParPat pat) pat_ty thing_inside
   = do	{ (pat', tvs, res) <- tc_lpat pstate pat pat_ty thing_inside
 	; return (ParPat pat', tvs, res) }
 
+tc_pat pstate (BangPat pat) pat_ty thing_inside
+  = do	{ (pat', tvs, res) <- tc_lpat pstate pat pat_ty thing_inside
+	; return (BangPat pat', tvs, res) }
+
 -- There's a wrinkle with irrefuatable patterns, namely that we
 -- must not propagate type refinement from them.  For example
 --	data T a where { T1 :: Int -> T Int; ... }

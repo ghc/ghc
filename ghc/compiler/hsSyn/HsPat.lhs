@@ -11,8 +11,8 @@ module HsPat (
 
 	mkPrefixConPat, mkCharLitPat, mkNilPat, 
 
-	isWildPat, 
-	patsAreAllCons, isConPat, isSigPat,
+	isBangHsBind,	
+	patsAreAllCons, isConPat, isSigPat, isWildPat,
 	patsAreAllLits,	isLitPat, isIrrefutableHsPat
     ) where
 
@@ -22,7 +22,7 @@ module HsPat (
 import {-# SOURCE #-} HsExpr		( SyntaxExpr )
 
 -- friends:
-import HsBinds		( DictBinds, emptyLHsBinds, pprLHsBinds )
+import HsBinds		( DictBinds, HsBind(..), emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import BasicTypes	( Boxity, tupleParens )
@@ -53,6 +53,7 @@ data Pat id
   | LazyPat	(LPat id)		-- Lazy pattern
   | AsPat	(Located id) (LPat id)  -- As pattern
   | ParPat      (LPat id)		-- Parenthesised pattern
+  | BangPat	(LPat id)		-- Bang patterng
 
 	------------ Lists, tuples, arrays ---------------
   | ListPat	[LPat id]		-- Syntactic list
@@ -156,14 +157,13 @@ pprPatBndr var		  	-- Print with type info if -dppr-debug is on
 	ppr var
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
-
-pprPat (VarPat var)  	    = pprPatBndr var
-pprPat (VarPatOut var bs)   = parens (pprPatBndr var <+> braces (ppr bs))
-pprPat (WildPat _)	    = char '_'
-pprPat (LazyPat pat)        = char '~' <> ppr pat
-pprPat (AsPat name pat)     = parens (hcat [ppr name, char '@', ppr pat])
-pprPat (ParPat pat)	    = parens (ppr pat)
-
+pprPat (VarPat var)  	  = pprPatBndr var
+pprPat (VarPatOut var bs) = parens (pprPatBndr var <+> braces (ppr bs))
+pprPat (WildPat _)	  = char '_'
+pprPat (LazyPat pat)      = char '~' <> ppr pat
+pprPat (BangPat pat)      = char '!' <> ppr pat
+pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
+pprPat (ParPat pat)	  = parens (ppr pat)
 pprPat (ListPat pats _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
 pprPat (TuplePat pats bx _) = tupleParens bx (interpp'SP pats)
@@ -282,6 +282,11 @@ isLitPat (NPat _ _ _ _)	        = True
 isLitPat (NPlusKPat _ _ _ _)    = True
 isLitPat other		        = False
 
+isBangHsBind :: HsBind id -> Bool
+-- In this module because HsPat is above HsBinds in the import graph
+isBangHsBind (PatBind { pat_lhs = L _ (BangPat p) }) = True
+isBangHsBind bind				     = False
+
 isIrrefutableHsPat :: LPat id -> Bool
 -- This function returns False if it's in doubt; specifically
 -- on a ConPatIn it doesn't know the size of the constructor family
@@ -295,6 +300,7 @@ isIrrefutableHsPat pat
     go1 (VarPat _)          = True
     go1 (VarPatOut _ _)     = True
     go1 (LazyPat pat)       = True
+    go1 (BangPat pat)       = go pat
     go1 (ParPat pat)        = go pat
     go1 (AsPat _ pat)       = go pat
     go1 (SigPatIn pat _)    = go pat

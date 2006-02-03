@@ -410,6 +410,8 @@ tidy1 v wrap (VarPatOut var binds)
 tidy1 v wrap (AsPat (L _ var) pat)
   = tidy1 v (wrap . wrapBind var v) (unLoc pat)
 
+tidy1 v wrap (BangPat pat)
+  = tidy1 v (wrap . seqVar v) (unLoc pat)
 
 {- now, here we handle lazy patterns:
     tidy1 v ~p bs = (v, v1 = case v of p -> v1 :

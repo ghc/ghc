@@ -8,7 +8,6 @@ module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
 
-
 import Match		( matchWrapper, matchSimply, matchSinglePat )
 import MatchLit		( dsLit, dsOverLit )
 import DsBinds		( dsLHsBinds, dsCoercion )
@@ -60,20 +59,9 @@ import FastString
 
 %************************************************************************
 %*									*
-\subsection{dsLet}
+		dsLocalBinds, dsValBinds
 %*									*
 %************************************************************************
-
-@dsLet@ is a match-result transformer, taking the @MatchResult@ for the body
-and transforming it into one for the let-bindings enclosing the body.
-
-This may seem a bit odd, but (source) let bindings can contain unboxed
-binds like
-\begin{verbatim}
-	C x# = e
-\end{verbatim}
-This must be transformed to a case expression and, if the type has
-more than one constructor, may fail.
 
 \begin{code}
 dsLocalBinds :: HsLocalBinds Id -> CoreExpr -> DsM CoreExpr
@@ -101,45 +89,48 @@ ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
-ds_val_bind (is_rec, hsbinds) body
+ds_val_bind (NonRecursive, hsbinds) body
   | [L _ (AbsBinds [] [] exports binds)] <- bagToList hsbinds,
+    (L loc bind : null_binds) <- bagToList binds,
     or [isUnLiftedType (idType g) | (_, g, _, _) <- exports]
-  = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
-	-- Unlifted bindings are always non-recursive
-	-- and are always a Fun or Pat monobind
-	--
-	-- ToDo: in some bizarre case it's conceivable that there
-	--       could be dict binds in the 'binds'.  (See the notes
-	--	 below.  Then pattern-match would fail.  Urk.)
-    let
+    || isBangHsBind bind
+  = let
       body_w_exports		      = foldr bind_export body exports
       bind_export (tvs, g, l, _) body = ASSERT( null tvs )
 				        bindNonRec g (Var l) body
-
-      mk_error_app pat = mkErrorAppDs iRREFUT_PAT_ERROR_ID
-				    (exprType body)
-				    (showSDoc (ppr pat))
     in
-    case bagToList binds of
-      [L loc (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn })]
-	-> putSrcSpanDs loc					$
-	   matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
+    ASSERT (null null_binds)
+	-- Non-recursive, non-overloaded bindings only come in ones
+	-- ToDo: in some bizarre case it's conceivable that there
+	--       could be dict binds in the 'binds'.  (See the notes
+	--	 below.  Then pattern-match would fail.  Urk.)
+    putSrcSpanDs loc	$
+    case bind of
+      FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn }
+	-> matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
 	   ASSERT( isIdCoercion co_fn )
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
-      [L loc (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })]
+      PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }
 	-> putSrcSpanDs loc			$
 	   dsGuarded grhss ty 			`thenDs` \ rhs ->
 	   mk_error_app pat			`thenDs` \ error_expr ->
 	   matchSimply rhs PatBindRhs pat body_w_exports error_expr
 
       other -> pprPanic "dsLet: unlifted" (pprLHsBinds hsbinds $$ ppr body)
+  where
+      mk_error_app pat = mkErrorAppDs iRREFUT_PAT_ERROR_ID
+				    (exprType body)
+				    (showSDoc (ppr pat))
 
--- Ordinary case for bindings
+-- Ordinary case for bindings; none should be unlifted
 ds_val_bind (is_rec, binds) body
-  = dsLHsBinds binds	`thenDs` \ prs ->
-    returnDs (Let (Rec prs) body)
+  = do	{ prs <- dsLHsBinds binds
+	; ASSERT( not (any (isUnLiftedType . idType . fst) prs) )
+	  case prs of
+	    []    -> return body
+	    other -> return (Let (Rec prs) body) }
 	-- Use a Rec regardless of is_rec. 
 	-- Why? Because it allows the binds to be all
 	-- mixed up, which is what happens in one rare case

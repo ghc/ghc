@@ -78,6 +78,7 @@ pat_type (ParPat pat)		   = hsPatType pat
 pat_type (WildPat ty)		   = ty
 pat_type (VarPat var)		   = idType var
 pat_type (VarPatOut var _)	   = idType var
+pat_type (BangPat pat)		   = hsPatType pat
 pat_type (LazyPat pat)		   = hsPatType pat
 pat_type (LitPat lit)		   = hsLitType lit
 pat_type (AsPat var pat)	   = idType (unLoc var)
@@ -712,6 +713,10 @@ zonk_pat env (VarPatOut v binds)
 zonk_pat env (LazyPat pat)
   = do	{ (env', pat') <- zonkPat env pat
 	; return (env',  LazyPat pat') }
+
+zonk_pat env (BangPat pat)
+  = do	{ (env', pat') <- zonkPat env pat
+	; return (env',  BangPat pat') }
 
 zonk_pat env (AsPat (L loc v) pat)
   = do	{ v' <- zonkIdBndr env v

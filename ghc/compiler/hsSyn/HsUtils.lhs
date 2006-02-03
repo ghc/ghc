@@ -376,6 +376,7 @@ collectl (L l pat) bndrs
 				    ++ bndrs
     go (WildPat _)	      	  = bndrs
     go (LazyPat pat)     	  = collectl pat bndrs
+    go (BangPat pat)     	  = collectl pat bndrs
     go (AsPat a pat)     	  = a : collectl pat bndrs
     go (ParPat  pat)     	  = collectl pat bndrs
 				  
@@ -411,11 +412,12 @@ collect_pat (SigPatIn pat ty)  	acc = collect_lpat pat (ty:acc)
 collect_pat (TypePat ty)       	acc = ty:acc
 
 collect_pat (LazyPat pat)      	acc = collect_lpat pat acc
+collect_pat (BangPat pat)      	acc = collect_lpat pat acc
 collect_pat (AsPat a pat)      	acc = collect_lpat pat acc
 collect_pat (ParPat  pat)      	acc = collect_lpat pat acc
 collect_pat (ListPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (PArrPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (TuplePat pats _ _) acc = foldr collect_lpat acc pats
-collect_pat (ConPatIn c ps)    	acc = foldr collect_lpat acc (hsConArgs ps)
-collect_pat other	       	acc = acc 	-- Literals, vars, wildcard
+collect_pat (ConPatIn c ps)     acc = foldr collect_lpat acc (hsConArgs ps)
+collect_pat other	        acc = acc 	-- Literals, vars, wildcard
 \end{code}

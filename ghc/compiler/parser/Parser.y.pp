@@ -968,6 +968,10 @@ deriving :: { Located (Maybe [LHsType RdrName]) }
 
 decl 	:: { Located (OrdList (LHsDecl RdrName)) }
 	: sigdecl			{ $1 }
+	| '!' infixexp rhs		{% do { pat <- checkPattern $2;
+					        return (LL $ unitOL $ LL $ ValD $ 
+							PatBind (LL $ BangPat pat) (unLoc $3)
+								placeHolderType placeHolderNames) } }
 	| infixexp opt_sig rhs		{% do { r <- checkValDef $1 $2 $3;
 						return (LL $ unitOL (LL $ ValD r)) } }
 
@@ -1063,6 +1067,7 @@ aexps 	:: { [LHsExpr RdrName] }
 aexp	:: { LHsExpr RdrName }
 	: qvar '@' aexp			{ LL $ EAsPat $1 $3 }
 	| '~' aexp			{ LL $ ELazyPat $2 }
+--	| '!' aexp			{ LL $ EBangPat $2 }
 	| aexp1				{ $1 }
 
 aexp1	:: { LHsExpr RdrName }
@@ -1086,7 +1091,7 @@ aexp2	:: { LHsExpr RdrName }
 	| INTEGER			{ L1 (HsOverLit $! mkHsIntegral (getINTEGER $1)) }
 	| RATIONAL			{ L1 (HsOverLit $! mkHsFractional (getRATIONAL $1)) }
 	| '(' exp ')'			{ LL (HsPar $2) }
-	| '(' exp ',' texps ')'		{ LL $ ExplicitTuple ($2 : reverse $4) Boxed }
+	| '(' texp ',' texps ')'	{ LL $ ExplicitTuple ($2 : reverse $4) Boxed }
 	| '(#' texps '#)'		{ LL $ ExplicitTuple (reverse $2)      Unboxed }
 	| '[' list ']'                  { LL (unLoc $2) }
 	| '[:' parr ':]'                { LL (unLoc $2) }
@@ -1128,9 +1133,15 @@ cvtopdecls0 :: { [LHsDecl RdrName] }
 	: {- empty -}		{ [] }
 	| cvtopdecls		{ $1 }
 
+texp :: { LHsExpr RdrName }
+	: exp				{ $1 }
+	| qopm infixexp			{ LL $ SectionR $1 $2 }
+	-- The second production is really here only for bang patterns
+	-- but 
+
 texps :: { [LHsExpr RdrName] }
-	: texps ',' exp			{ $3 : $1 }
-	| exp				{ [$1] }
+	: texps ',' texp		{ $3 : $1 }
+	| texp				{ [$1] }
 
 
 -----------------------------------------------------------------------------
@@ -1140,17 +1151,17 @@ texps :: { [LHsExpr RdrName] }
 -- avoiding another shift/reduce-conflict.
 
 list :: { LHsExpr RdrName }
-	: exp			{ L1 $ ExplicitList placeHolderType [$1] }
+	: texp			{ L1 $ ExplicitList placeHolderType [$1] }
 	| lexps 		{ L1 $ ExplicitList placeHolderType (reverse (unLoc $1)) }
-	| exp '..'		{ LL $ ArithSeq noPostTcExpr (From $1) }
-	| exp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
-	| exp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
-	| exp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| exp pquals		{ sL (comb2 $1 $>) $ mkHsDo ListComp (reverse (unLoc $2)) $1 }
+	| texp '..'		{ LL $ ArithSeq noPostTcExpr (From $1) }
+	| texp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
+	| texp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
+	| texp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
+	| texp pquals		{ sL (comb2 $1 $>) $ mkHsDo ListComp (reverse (unLoc $2)) $1 }
 
 lexps :: { Located [LHsExpr RdrName] }
-	: lexps ',' exp 		{ LL ($3 : unLoc $1) }
-	| exp ',' exp			{ LL [$3,$1] }
+	: lexps ',' texp 		{ LL ($3 : unLoc $1) }
+	| texp ',' texp			{ LL [$3,$1] }
 
 -----------------------------------------------------------------------------
 -- List Comprehensions

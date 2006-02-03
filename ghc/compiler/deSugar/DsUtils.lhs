@@ -27,7 +27,7 @@ module DsUtils (
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
 	mkTupleType, mkTupleCase, mkBigCoreTup,
-	mkCoreTup, mkCoreTupTy,
+	mkCoreTup, mkCoreTupTy, seqVar,
 	
 	dsSyntaxTable, lookupEvidence,
 
@@ -169,6 +169,7 @@ selectMatchVars (p:ps) (ty:tys) = do { v  <- selectMatchVar  p  ty
 				     ; vs <- selectMatchVars ps tys
 				     ; return (v:vs) }
 
+selectMatchVar (BangPat pat)   pat_ty  = selectMatchVar (unLoc pat) pat_ty
 selectMatchVar (LazyPat pat)   pat_ty  = selectMatchVar (unLoc pat) pat_ty
 selectMatchVar (VarPat var)    pat_ty  = try_for var 	     pat_ty
 selectMatchVar (AsPat var pat) pat_ty  = try_for (unLoc var) pat_ty
@@ -254,6 +255,10 @@ wrapBind new old body
   | new==old    = body
   | isTyVar new = App (Lam new body) (Type (mkTyVarTy old))
   | otherwise   = Let (NonRec new (Var old)) body
+
+seqVar :: Var -> CoreExpr -> CoreExpr
+seqVar var body = Case (Var var) var (exprType body)
+			[(DEFAULT, [], body)]
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind match_result

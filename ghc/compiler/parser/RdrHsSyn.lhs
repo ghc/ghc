@@ -54,7 +54,7 @@ import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc,
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
-import Lexer		( P, failSpanMsgP )
+import Lexer		( P, failSpanMsgP, extension, bangPatEnabled )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
@@ -499,12 +499,16 @@ checkLPat e@(L l _) = checkPat l e []
 checkPat :: SrcSpan -> LHsExpr RdrName -> [LPat RdrName] -> P (LPat RdrName)
 checkPat loc (L l (HsVar c)) args
   | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
-checkPat loc (L _ (HsApp f x)) args = do
-  x <- checkLPat x
-  checkPat loc f (x:args)
-checkPat loc (L _ e) [] = do
-  p <- checkAPat loc e
-  return (L loc p)
+checkPat loc e args 	-- OK to let this happen even if bang-patterns
+			-- are not enabled, because there is no valid
+			-- non-bang-pattern parse of (C ! e)
+  | Just (e', args') <- splitBang e
+  = do	{ args'' <- checkPatterns args'
+	; checkPat loc e' (args'' ++ args) }
+checkPat loc (L _ (HsApp f x)) args
+  = do { x <- checkLPat x; checkPat loc f (x:args) }
+checkPat loc (L _ e) []
+  = do { p <- checkAPat loc e; return (L loc p) }
 checkPat loc pat _some_args
   = patFail loc
 
@@ -523,8 +527,10 @@ checkAPat loc e = case e of
    NegApp (L _ (HsOverLit pos_lit)) _ 
 			-> return (mkNPat pos_lit (Just noSyntaxExpr))
    
-   ELazyPat e	   -> checkLPat e >>= (return . LazyPat)
-   EAsPat n e	   -> checkLPat e >>= (return . AsPat n)
+   SectionR (L _ (HsVar bang)) e 
+ 	| bang == bang_RDR -> checkLPat e >>= (return . BangPat)
+   ELazyPat e	      -> checkLPat e >>= (return . LazyPat)
+   EAsPat n e	      -> checkLPat e >>= (return . AsPat n)
    ExprWithTySig e t  -> checkLPat e >>= \e ->
    			 -- Pattern signatures are parsed as sigtypes,
    			 -- but they aren't explicit forall points.  Hence
@@ -540,8 +546,6 @@ checkAPat loc e = case e of
 	(L _ (HsOverLit lit@(HsIntegral _ _)))
    		      | plus == plus_RDR
    		      -> return (mkNPlusKPat (L nloc n) lit)
-   		      where
-   			 plus_RDR = mkUnqual varName FSLIT("+")	-- Hack
    
    OpApp l op fix r   -> checkLPat l >>= \l ->
    			 checkLPat r >>= \r ->
@@ -565,6 +569,10 @@ checkAPat loc e = case e of
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
 
+plus_RDR, bang_RDR :: RdrName
+plus_RDR = mkUnqual varName FSLIT("+")	-- Hack
+bang_RDR = mkUnqual varName FSLIT("!")	-- Hack
+
 checkPatField :: (Located RdrName, LHsExpr RdrName) -> P (Located RdrName, LPat RdrName)
 checkPatField (n,e) = do
   p <- checkLPat e
@@ -576,27 +584,34 @@ patFail loc = parseError loc "Parse error in pattern"
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
-checkValDef 
-	:: LHsExpr RdrName
-	-> Maybe (LHsType RdrName)
-	-> Located (GRHSs RdrName)
-	-> P (HsBind RdrName)
+checkValDef :: LHsExpr RdrName
+	    -> Maybe (LHsType RdrName)
+	    -> Located (GRHSs RdrName)
+	    -> P (HsBind RdrName)
 
-checkValDef lhs opt_sig (L rhs_span grhss)
-  | Just (f,inf,es)  <- isFunLhs lhs
-  = if isQual (unLoc f)
-	then parseError (getLoc f) ("Qualified name in function definition: "  ++ 
-					showRdrName (unLoc f))
-	else do ps <- checkPatterns es
-		let match_span = combineSrcSpans (getLoc lhs) rhs_span
-		    matches    = mkMatchGroup [L match_span (Match ps opt_sig grhss)]
-		return (FunBind { fun_id = f, fun_infix = inf, fun_matches = matches,
-				  fun_co_fn = idCoercion, bind_fvs = placeHolderNames })
+checkValDef lhs opt_sig grhss
+  = do	{ mb_fun <- isFunLhs lhs
+	; case mb_fun of
+	    Just (fun, is_infix, pats) -> checkFunBind (getLoc lhs)
+						fun is_infix pats opt_sig grhss
+	    Nothing -> checkPatBind lhs grhss }
+
+checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
+  | isQual (unLoc fun)
+  = parseError (getLoc fun) ("Qualified name in function definition: "  ++ 
+			     showRdrName (unLoc fun))
+  | otherwise
+  = do	ps <- checkPatterns pats
+	let match_span = combineSrcSpans lhs_loc rhs_span
+	    matches    = mkMatchGroup [L match_span (Match ps opt_sig grhss)]
+	return (FunBind { fun_id = fun, fun_infix = is_infix, fun_matches = matches,
+			  fun_co_fn = idCoercion, bind_fvs = placeHolderNames })
 	-- The span of the match covers the entire equation.  
 	-- That isn't quite right, but it'll do for now.
-  | otherwise = do
-	lhs <- checkPattern lhs
-	return (PatBind lhs grhss placeHolderType placeHolderNames)
+
+checkPatBind lhs (L _ grhss)
+  = do	{ lhs <- checkPattern lhs
+	; return (PatBind lhs grhss placeHolderType placeHolderNames) }
 
 checkValSig
 	:: LHsExpr RdrName
@@ -635,23 +650,45 @@ mkGadtDecl name ty = ConDecl
 
 -- A variable binding is parsed as a FunBind.
 
-isFunLhs :: LHsExpr RdrName
-  -> Maybe (Located RdrName, Bool, [LHsExpr RdrName])
+
+	-- The parser left-associates, so there should 
+	-- not be any OpApps inside the e's
+splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
+-- Splits (f ! g a b) into (f, [(! g), a, g])
+splitBang (L loc (OpApp l_arg bang@(L loc' (HsVar op)) _ r_arg))
+  | op == bang_RDR = Just (l_arg, L loc (SectionR bang arg1) : argns)
+  where
+    (arg1,argns) = split_bang r_arg []
+    split_bang (L _ (HsApp f e)) es = split_bang f (e:es)
+    split_bang e	   	 es = (e,es)
+splitBang other = Nothing
+
+isFunLhs :: LHsExpr RdrName 
+	 -> P (Maybe (Located RdrName, Bool, [LHsExpr RdrName]))
+-- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e []
  where
    go (L loc (HsVar f)) es 
-	| not (isRdrDataCon f)	 	= Just (L loc f, False, es)
+	| not (isRdrDataCon f)	 = return (Just (L loc f, False, es))
    go (L _ (HsApp f e)) es 	 = go f (e:es)
    go (L _ (HsPar e))   es@(_:_) = go e es
-   go (L loc (OpApp l (L loc' (HsVar op)) fix r)) es
-	| not (isRdrDataCon op) = Just (L loc' op, True, (l:r:es))
-	| otherwise		= 
-		case go l es of
-		    Just (op', True, j : k : es') ->
-		      Just (op', True, 
-			    j : L loc (OpApp k (L loc' (HsVar op)) fix r) : es')
-		    _ -> Nothing
-   go _ _ = Nothing
+   go e@(L loc (OpApp l (L loc' (HsVar op)) fix r)) es
+	| Just (e',es') <- splitBang e
+	= do { bang_on <- extension bangPatEnabled
+	     ; if bang_on then go e' (es' ++ es)
+	       else return (Just (L loc' op, True, (l:r:es))) }
+		-- No bangs; behave just like the next case
+	| not (isRdrDataCon op) 
+	= return (Just (L loc' op, True, (l:r:es)))
+	| otherwise
+	= do { mb_l <- go l es
+	     ; case mb_l of
+		 Just (op', True, j : k : es')
+		    -> return (Just (op', True, j : op_app : es'))
+		    where
+		      op_app = L loc (OpApp k (L loc' (HsVar op)) fix r)
+		 _ -> return Nothing }
+   go _ _ = return Nothing
 
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities

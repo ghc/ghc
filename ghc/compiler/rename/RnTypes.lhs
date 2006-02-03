@@ -185,6 +185,10 @@ rnHsType doc (HsPredTy pred)
   = rnPred doc pred	`thenM` \ pred' ->
     returnM (HsPredTy pred')
 
+rnHsType doc (HsSpliceTy _)
+  = do	{ addErr (ptext SLIT("Type splices are not yet implemented"))
+ 	; failM }
+
 rnLHsTypes doc tys = mappM (rnLHsType doc) tys
 \end{code}
 
@@ -593,6 +597,10 @@ rnPat (NPlusKPat name lit _ _)
 rnPat (LazyPat pat)
   = rnLPat pat		`thenM` \ (pat', fvs) ->
     returnM (LazyPat pat', fvs)
+
+rnPat (BangPat pat)
+  = rnLPat pat		`thenM` \ (pat', fvs) ->
+    returnM (BangPat pat', fvs)
 
 rnPat (AsPat name pat)
   = rnLPat pat			`thenM` \ (pat', fvs) ->

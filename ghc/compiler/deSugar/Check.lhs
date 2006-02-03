@@ -611,7 +611,8 @@ has_nplusk_pat (ConPatOut _ _ _ _ ps ty) = any has_nplusk_lpat (hsConArgs ps)
 has_nplusk_pat (ListPat ps _)  		 = any has_nplusk_lpat ps
 has_nplusk_pat (TuplePat ps _ _) 	 = any has_nplusk_lpat ps
 has_nplusk_pat (PArrPat ps _)  		 = any has_nplusk_lpat ps
-has_nplusk_pat (LazyPat p)     		 = False
+has_nplusk_pat (LazyPat p)     		 = False	-- Why?
+has_nplusk_pat (BangPat p)     		 = has_nplusk_lpat p	-- I think
 has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat, DictPat
 
 simplify_lpat :: LPat Id -> LPat Id  
@@ -623,6 +624,7 @@ simplify_pat (VarPat id)      = WildPat (idType id)
 simplify_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
 simplify_pat (ParPat p)       = unLoc (simplify_lpat p)
 simplify_pat (LazyPat p)      = unLoc (simplify_lpat p)
+simplify_pat (BangPat p)      = unLoc (simplify_lpat p)
 simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
 simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
 

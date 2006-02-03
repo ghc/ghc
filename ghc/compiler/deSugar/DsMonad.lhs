@@ -83,7 +83,7 @@ idWrapper e = e
 
 -- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
 --	\fail. wrap (case vs of { pats -> rhs fail })
--- where vs are not in the domain of wrap
+-- where vs are not bound by wrap
 
 
 -- A MatchResult is an expression with a hole in it
