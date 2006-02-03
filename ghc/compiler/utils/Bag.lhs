@@ -11,7 +11,7 @@ module Bag (
 	mapBag,
 	elemBag,
 	filterBag, partitionBag, concatBag, foldBag, foldrBag, foldlBag,
-	isEmptyBag, isSingletonBag, consBag, snocBag,
+	isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
 	listToBag, bagToList, 
 	mapBagM, mapAndUnzipBagM
     ) where
@@ -74,6 +74,12 @@ filterBag pred (TwoBags b1 b2) = sat1 `unionBags` sat2
 				 sat1 = filterBag pred b1
 				 sat2 = filterBag pred b2
 filterBag pred (ListBag vs)    = listToBag (filter pred vs)
+
+anyBag :: (a -> Bool) -> Bag a -> Bool
+anyBag p EmptyBag        = False
+anyBag p (UnitBag v)     = p v
+anyBag p (TwoBags b1 b2) = anyBag p b1 || anyBag p b2
+anyBag p (ListBag xs)    = any p xs
 
 concatBag :: Bag (Bag a) -> Bag a
 concatBag EmptyBag 	    = EmptyBag
