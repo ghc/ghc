@@ -588,7 +588,8 @@ sub mangle_asm {
 		|| /^\s*\.section __TEXT,__symbol_stub\d,.*/
 		|| /^\s*\.section __TEXT,__symbolstub\d,.*/
 		|| /^\s*\.lazy_symbol_pointer/
-		|| /^\s*\.non_lazy_symbol_pointer/ ))
+		|| /^\s*\.non_lazy_symbol_pointer/
+		|| /^\s*\.section __IMPORT.*/))
 	{
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
