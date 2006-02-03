@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -fno-implicit-prelude -fno-bang-patterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Arr

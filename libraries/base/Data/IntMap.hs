@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp -fglasgow-exts #-} 
+{-# OPTIONS -cpp -fglasgow-exts -fno-bang-patterns #-} 
 -----------------------------------------------------------------------------
 -- Module      :  Data.IntMap
 -- Copyright   :  (c) Daan Leijen 2002
