@@ -50,7 +50,7 @@ import MONAD_ST
 import Char		( chr, ord )
 import Maybe            ( isJust )
 
-#if powerpc_TARGET_ARCH
+#if powerpc_TARGET_ARCH || darwin_TARGET_OS
 import DATA_WORD(Word32)
 import DATA_BITS
 #endif
@@ -743,6 +743,14 @@ pprDataItem lit
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 	ppr_item I16  x = [ptext SLIT("\t.word\t") <> pprImm imm]
+#endif
+#if i386_TARGET_ARCH && darwin_TARGET_OS
+        ppr_item I64 (CmmInt x _)  =
+                [ptext SLIT("\t.long\t")
+                    <> int (fromIntegral (fromIntegral x :: Word32)),
+                 ptext SLIT("\t.long\t")
+                    <> int (fromIntegral
+                        (fromIntegral (x `shiftR` 32) :: Word32))]
 #endif
 #if i386_TARGET_ARCH
 	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
