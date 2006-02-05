@@ -594,10 +594,17 @@ sub mangle_asm {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
+	    $dyld_section = $_;
 
 	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' && /^\s*\.data/)
 	{	# non_lazy_symbol_ptrs that point to local symbols
 	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'dyld';
+	    $chksymb[$i] = '';
+	    $dyld_section = $_;
+	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' && /^L_.*:$/)
+	{	# non_lazy_symbol_ptrs that point to local symbols
+	    $chk[++$i]   = $dyld_section . $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
 
