@@ -64,10 +64,7 @@ type Forest a = [Tree a]
 INSTANCE_TYPEABLE1(Tree,treeTc,"Tree")
 
 instance Functor Tree where
-  fmap = mapTree
-
-mapTree              :: (a -> b) -> (Tree a -> Tree b)
-mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
+  fmap f (Node x ts) = Node (f x) (map (fmap f) ts)
 
 instance Traversable Tree where
   traverse f (Node x ts) = Node <$> f x <*> traverse (traverse f) ts
