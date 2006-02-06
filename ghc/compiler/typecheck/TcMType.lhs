@@ -866,14 +866,11 @@ data SourceTyCtxt
 			-- 	f :: N a -> N a
   | InstThetaCtxt	-- Context of an instance decl
 			--	instance <S> => C [a] where ...
-  | InstHeadCtxt	-- Head of an instance decl
-			-- 	instance ... => Eq a where ...
 		
 pprSourceTyCtxt (ClassSCCtxt c) = ptext SLIT("the super-classes of class") <+> quotes (ppr c)
 pprSourceTyCtxt SigmaCtxt       = ptext SLIT("the context of a polymorphic type")
 pprSourceTyCtxt (DataTyCtxt tc) = ptext SLIT("the context of the data type declaration for") <+> quotes (ppr tc)
 pprSourceTyCtxt InstThetaCtxt   = ptext SLIT("the context of an instance declaration")
-pprSourceTyCtxt InstHeadCtxt    = ptext SLIT("the head of an instance declaration")
 pprSourceTyCtxt TypeCtxt        = ptext SLIT("the context of a type")
 \end{code}
 
@@ -909,7 +906,6 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
     arity_err  = arityErr "Class" class_name arity n_tys
 
     how_to_allow = case ctxt of
-		     InstHeadCtxt  -> empty	-- Should not happen
 		     InstThetaCtxt -> parens undecidableMsg
 		     other	   -> parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
@@ -930,8 +926,6 @@ check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
-	InstHeadCtxt  -> True	-- We check for instance-head 
-				-- formation in checkValidInstHead
 	InstThetaCtxt -> undecidable_ok || distinct_tyvars tys
 	other	      -> gla_exts       || all tyvar_head tys
   where
