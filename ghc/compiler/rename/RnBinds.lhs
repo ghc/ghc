@@ -604,11 +604,12 @@ rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
 
 rnGRHS' ctxt (GRHS guards rhs)
   = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
-	; checkM (opt_GlasgowExts || is_standard_guard guards)
-	  	 (addWarn (nonStdGuardErr guards))
-
 	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
 				    rnLExpr rhs
+
+	; checkM (opt_GlasgowExts || is_standard_guard guards')
+	  	 (addWarn (nonStdGuardErr guards'))
+
 	; return (GRHS guards' rhs', fvs) }
   where
 	-- Standard Haskell 1.4 guards are just a single boolean
@@ -654,8 +655,7 @@ bindsInHsBootFile mbinds
   = hang (ptext SLIT("Bindings in hs-boot files are not allowed"))
        2 (ppr mbinds)
 
-nonStdGuardErr guard
-  = hang (ptext
-    SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)")
-    ) 4 (ppr guard)
+nonStdGuardErr guards
+  = hang (ptext SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)"))
+       4 (interpp'SP guards)
 \end{code}
