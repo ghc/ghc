@@ -16,11 +16,14 @@ module InteractiveUI (
 -- The GHC interface
 import qualified GHC
 import GHC		( Session, verbosity, dopt, DynFlag(..), Target(..),
-			  TargetId(..),
-			  mkModule, pprModule, Type, Module, SuccessFlag(..),
+			  TargetId(..), DynFlags(..),
+			  pprModule, Type, Module, SuccessFlag(..),
 			  TyThing(..), Name, LoadHowMuch(..), Phase,
 			  GhcException(..), showGhcException,
 			  CheckedModule(..), SrcLoc )
+import Packages		( PackageState(..) )
+import PackageConfig	( InstalledPackageInfo(..) )
+import UniqFM		( eltsUFM )
 import PprTyThing
 import Outputable
 
@@ -74,6 +77,7 @@ import System.IO.Error as IO
 import Data.Char
 import Control.Monad as Monad
 import Foreign.StablePtr	( newStablePtr )
+import Text.Printf
 
 import GHC.Exts		( unsafeCoerce# )
 import GHC.IOBase	( IOErrorType(InvalidArgument) )
@@ -91,31 +95,34 @@ ghciWelcomeMsg =
  "/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n"++
  "\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
 
-GLOBAL_VAR(commands, builtin_commands, [(String, String -> GHCi Bool)])
+type Command = (String, String -> GHCi Bool, String -> IO [String])
+cmdName (n,_,_) = n
 
-builtin_commands :: [(String, String -> GHCi Bool)]
+GLOBAL_VAR(commands, builtin_commands, [Command])
+
+builtin_commands :: [Command]
 builtin_commands = [
-  ("add",	keepGoingPaths addModule),
-  ("browse",    keepGoing browseCmd),
-  ("cd",    	keepGoing changeDirectory),
-  ("def",	keepGoing defineMacro),
-  ("help",	keepGoing help),
-  ("?",		keepGoing help),
-  ("info",      keepGoing info),
-  ("load",	keepGoingPaths loadModule_),
-  ("module",	keepGoing setContext),
-  ("main",	keepGoing runMain),
-  ("reload",	keepGoing reloadModule),
-  ("check",	keepGoing checkModule),
-  ("set",	keepGoing setCmd),
-  ("show",	keepGoing showCmd),
-  ("etags",	keepGoing createETagsFileCmd),
-  ("ctags",	keepGoing createCTagsFileCmd),
-  ("type",	keepGoing typeOfExpr),
-  ("kind",	keepGoing kindOfType),
-  ("unset",	keepGoing unsetOptions),
-  ("undef",     keepGoing undefineMacro),
-  ("quit",	quit)
+  ("add",	keepGoingPaths addModule,	completeFilename),
+  ("browse",    keepGoing browseCmd,		completeModule),
+  ("cd",    	keepGoing changeDirectory, 	completeFilename),
+  ("def",	keepGoing defineMacro,		completeIdentifier),
+  ("help",	keepGoing help,			completeNone),
+  ("?",		keepGoing help,			completeNone),
+  ("info",      keepGoing info,			completeIdentifier),
+  ("load",	keepGoingPaths loadModule_,	completeHomeModuleOrFile),
+  ("module",	keepGoing setContext,		completeModule),
+  ("main",	keepGoing runMain,		completeIdentifier),
+  ("reload",	keepGoing reloadModule,		completeNone),
+  ("check",	keepGoing checkModule,		completeHomeModule),
+  ("set",	keepGoing setCmd,		completeNone), -- ToDo
+  ("show",	keepGoing showCmd,		completeNone),
+  ("etags",	keepGoing createETagsFileCmd,	completeFilename),
+  ("ctags",	keepGoing createCTagsFileCmd, 	completeFilename),
+  ("type",	keepGoing typeOfExpr,		completeIdentifier),
+  ("kind",	keepGoing kindOfType,		completeIdentifier),
+  ("unset",	keepGoing unsetOptions,		completeNone), -- ToDo
+  ("undef",     keepGoing undefineMacro,	completeNone), -- ToDo
+  ("quit",	quit,				completeNone)
   ]
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
@@ -197,6 +204,16 @@ interactiveUI session srcs maybe_expr = do
 
 #ifdef USE_READLINE
    Readline.initialize
+   Readline.setAttemptedCompletionFunction (Just completeWord)
+   --Readline.parseAndBind "set show-all-if-ambiguous 1"
+
+   let symbols = "!#$%&*+/<=>?@\\^|-~"
+       specials = "(),;[]`{}"
+       spaces = " \t\n"
+       word_break_chars = spaces ++ specials ++ symbols
+
+   Readline.setBasicWordBreakCharacters word_break_chars
+   Readline.setCompleterWordBreakCharacters word_break_chars
 #endif
 
    startGHCi (runGHCi srcs maybe_expr)
@@ -378,10 +395,12 @@ readlineLoop = do
    session <- getSession
    (mod,imports) <- io (GHC.getContext session)
    io yield
+   saveSession -- for use by completion
    l <- io (readline (mkPrompt mod imports)
 	  	`finally` setNonBlockingFD 0)
 		-- readline sometimes puts stdin into blocking mode,
 		-- so we need to put it back for the IO library
+   splatSavedSession
    case l of
 	Nothing -> return ()
 	Just l  ->
@@ -488,14 +507,21 @@ specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
-  cmds <- io (readIORef commands)
-  -- look for exact match first, then the first prefix match
-  case [ (s,f) | (s,f) <- cmds, cmd == s ] of
-     (_,f):_ -> f (dropWhile isSpace rest)
-     [] -> case [ (s,f) | (s,f) <- cmds, prefixMatch cmd s ] of
-     		[] -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
+  maybe_cmd <- io (lookupCommand cmd)
+  case maybe_cmd of
+    Nothing -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
 		                    ++ shortHelpText) >> return False)
-     		(_,f):_ -> f (dropWhile isSpace rest)
+    Just (_,f,_) -> f (dropWhile isSpace rest)
+
+lookupCommand :: String -> IO (Maybe Command)
+lookupCommand str = do
+  cmds <- readIORef commands
+  -- look for exact match first, then the first prefix match
+  case [ c | c <- cmds, str == cmdName c ] of
+     c:_ -> return (Just c)
+     [] -> case [ c | c@(s,_,_) <- cmds, prefixMatch str s ] of
+     		[] -> return Nothing
+     		c:_ -> return (Just c)
 
 -----------------------------------------------------------------------------
 -- To flush buffers for the *interpreted* computation we need
@@ -616,7 +642,7 @@ defineMacro s = do
   if (null macro_name) 
 	then throwDyn (CmdLineError "invalid macro name") 
 	else do
-  if (macro_name `elem` map fst cmds) 
+  if (macro_name `elem` map cmdName cmds)
 	then throwDyn (CmdLineError 
 		("command '" ++ macro_name ++ "' is already defined"))
 	else do
@@ -631,7 +657,7 @@ defineMacro s = do
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
-		    (cmds ++ [(macro_name, keepGoing (runMacro hv))]))
+		    (cmds ++ [(macro_name, keepGoing (runMacro hv), completeNone)]))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
@@ -641,15 +667,15 @@ runMacro fun s = do
 undefineMacro :: String -> GHCi ()
 undefineMacro macro_name = do
   cmds <- io (readIORef commands)
-  if (macro_name `elem` map fst builtin_commands) 
+  if (macro_name `elem` map cmdName builtin_commands) 
 	then throwDyn (CmdLineError
 		("command '" ++ macro_name ++ "' cannot be undefined"))
 	else do
-  if (macro_name `notElem` map fst cmds) 
+  if (macro_name `notElem` map cmdName cmds) 
 	then throwDyn (CmdLineError 
 		("command '" ++ macro_name ++ "' not defined"))
 	else do
-  io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
+  io (writeIORef commands (filter ((/= macro_name) . cmdName) cmds))
 
 
 loadModule :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
@@ -684,7 +710,7 @@ loadModule' files = do
 
 checkModule :: String -> GHCi ()
 checkModule m = do
-  let modl = mkModule m
+  let modl = GHC.mkModule m
   session <- getSession
   result <- io (GHC.checkModule session modl)
   case result of
@@ -709,7 +735,7 @@ reloadModule "" = do
 reloadModule m = do
   io (revertCAFs)		-- always revert CAFs on reload.
   session <- getSession
-  ok <- io (GHC.load session (LoadUpTo (mkModule m)))
+  ok <- io (GHC.load session (LoadUpTo (GHC.mkModule m)))
   afterLoad ok session
 
 afterLoad ok session = do
@@ -913,7 +939,7 @@ browseCmd m =
 browseModule m exports_only = do
   s <- getSession
 
-  let modl = mkModule m
+  let modl = GHC.mkModule m
   is_interpreted <- io (GHC.moduleIsInterpreted s modl)
   when (not is_interpreted && not exports_only) $
 	throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
@@ -972,13 +998,13 @@ separate :: Session -> [String] -> [Module] -> [Module]
   -> GHCi ([Module],[Module])
 separate session []           as bs = return (as,bs)
 separate session (('*':m):ms) as bs = do
-   let modl = mkModule m
+   let modl = GHC.mkModule m
    b <- io (GHC.moduleIsInterpreted session modl)
    if b then separate session ms (modl:as) bs
    	else throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
-separate session (m:ms)       as bs = separate session ms as (mkModule m:bs)
+separate session (m:ms)       as bs = separate session ms as (GHC.mkModule m:bs)
 
-prelude_mod = mkModule "Prelude"
+prelude_mod = GHC.mkModule "Prelude"
 
 
 addToContext mods = do
@@ -1156,6 +1182,88 @@ cleanType ty = do
 	then return ty
 	else return $! GHC.dropForAlls ty
 
+-- -----------------------------------------------------------------------------
+-- Completion
+
+#ifdef USE_READLINE
+completeWord :: String -> Int -> Int -> IO (Maybe (String, [String]))
+completeWord w start end = do
+  line <- Readline.getLineBuffer
+  case w of 
+     ':':_ | all isSpace (take (start-1) line) -> wrapCompleter completeCmd w
+     _other
+	| Just c <- is_cmd line -> do
+	   maybe_cmd <- lookupCommand c
+	   case maybe_cmd of
+	     Nothing -> return Nothing
+	     Just (_,_,complete) -> wrapCompleter complete w
+	| otherwise     -> do
+		--printf "complete %s, start = %d, end = %d\n" w start end
+		wrapCompleter completeIdentifier w
+
+is_cmd line 
+ | ((':':w) : _) <- words (dropWhile isSpace line) = Just w
+ | otherwise = Nothing
+
+completeNone w = return []
+
+completeCmd w = do
+  cmds <- readIORef commands
+  return (filter (w `isPrefixOf`) (map (':':) (map cmdName cmds)))
+
+completeIdentifier w = do
+  s <- restoreSession
+  rdrs <- GHC.getRdrNamesInScope s
+  return (filter (w `isPrefixOf`) (map (showSDoc.ppr) rdrs))
+
+completeModule w = do
+  s <- restoreSession
+  dflags <- GHC.getSessionDynFlags s
+  let pkg_mods = allExposedModules dflags
+  return (filter (w `isPrefixOf`) (map (showSDoc.ppr) pkg_mods))
+
+completeHomeModule w = do
+  s <- restoreSession
+  g <- GHC.getModuleGraph s
+  let home_mods = map GHC.ms_mod g
+  return (filter (w `isPrefixOf`) (map (showSDoc.ppr) home_mods))
+
+completeFilename = Readline.filenameCompletionFunction
+
+completeHomeModuleOrFile = unionComplete completeHomeModule completeFilename
+
+unionComplete :: (String -> IO [String]) -> (String -> IO [String]) -> String -> IO [String]
+unionComplete f1 f2 w = do
+  s1 <- f1 w
+  s2 <- f2 w
+  return (s1 ++ s2)
+
+wrapCompleter :: (String -> IO [String]) -> String -> IO (Maybe (String,[String]))
+wrapCompleter fun w =  do
+  strs <- fun w
+  case strs of
+    []  -> return Nothing
+    [x] -> return (Just (x,[]))
+    xs  -> case getCommonPrefix xs of
+		""   -> return (Just ("",xs))
+		pref -> return (Just (pref,xs))
+
+getCommonPrefix :: [String] -> String
+getCommonPrefix [] = ""
+getCommonPrefix (s:ss) = foldl common s ss
+  where common s "" = s
+	common "" s = ""
+	common (c:cs) (d:ds)
+	   | c == d = c : common cs ds
+	   | otherwise = ""
+
+allExposedModules :: DynFlags -> [Module]
+allExposedModules dflags 
+ = map GHC.mkModule (concat (map exposedModules (filter exposed (eltsUFM pkg_db))))
+ where
+  pkg_db = pkgIdMap (pkgState dflags)
+#endif
+
 -----------------------------------------------------------------------------
 -- GHCi monad
 
@@ -1191,6 +1299,12 @@ setGHCiState s = GHCi $ \r -> writeIORef r s
 
 -- for convenience...
 getSession = getGHCiState >>= return . session
+
+GLOBAL_VAR(saved_sess, no_saved_sess, Session)
+no_saved_sess = error "no saved_ses"
+saveSession = getSession >>= io . writeIORef saved_sess
+splatSavedSession = io (writeIORef saved_sess no_saved_sess)
+restoreSession = readIORef saved_sess
 
 getDynFlags = do
   s <- getSession

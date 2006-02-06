@@ -62,6 +62,7 @@ module GHC (
 #ifdef GHCI
 	setContext, getContext,	
 	getNamesInScope,
+	getRdrNamesInScope,
 	moduleIsInterpreted,
 	getInfo,
 	exprType,
@@ -83,6 +84,7 @@ module GHC (
 	Name, 
 	nameModule, nameParent_maybe, pprParenSymName, nameSrcLoc,
 	NamedThing(..),
+	RdrName(Qual,Unqual),
 	
 	-- ** Identifiers
 	Id, idType,
@@ -176,7 +178,7 @@ import GHC.Exts		( unsafeCoerce# )
 
 import Packages		( initPackages )
 import NameSet		( NameSet, nameSetToList, elemNameSet )
-import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName, 
+import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName(..), 
 			  globalRdrEnvElts )
 import HsSyn
 import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
@@ -199,7 +201,7 @@ import DataCon		( DataCon, dataConWrapId, dataConSig, dataConTyCon,
 			  dataConFieldLabels, dataConStrictMarks, 
 			  dataConIsInfix, isVanillaDataCon )
 import Name		( Name, nameModule, NamedThing(..), nameParent_maybe,
-			  nameSrcLoc )
+			  nameSrcLoc, nameOccName )
 import OccName		( parenSymOcc )
 import NameEnv		( nameEnvElts )
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
@@ -1886,6 +1888,25 @@ getInfo s name = withSession s $ \hsc_env -> tcRnGetInfo hsc_env name
 getNamesInScope :: Session -> IO [Name]
 getNamesInScope s = withSession s $ \hsc_env -> do
   return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
+
+getRdrNamesInScope :: Session -> IO [RdrName]
+getRdrNamesInScope  s = withSession s $ \hsc_env -> do
+  let env = ic_rn_gbl_env (hsc_IC hsc_env)
+  return (concat (map greToRdrNames (globalRdrEnvElts env)))
+
+-- ToDo: move to RdrName
+greToRdrNames :: GlobalRdrElt -> [RdrName]
+greToRdrNames GRE{ gre_name = name, gre_prov = prov }
+  = case prov of
+     LocalDef -> [unqual]
+     Imported specs -> concat (map do_spec (map is_decl specs))
+  where
+    occ = nameOccName name
+    unqual = Unqual occ
+    do_spec decl_spec
+	| is_qual decl_spec = [qual]
+	| otherwise         = [unqual,qual]
+	where qual = Qual (is_as decl_spec) occ
 
 -- | Parses a string as an identifier, and returns the list of 'Name's that
 -- the identifier can refer to in the current interactive context.
