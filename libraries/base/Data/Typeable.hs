@@ -1,4 +1,11 @@
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -fno-implicit-prelude -fallow-overlapping-instances #-}
+
+-- The -fallow-overlapping-instances flag allows the user to over-ride
+-- the instances for Typeable given here.  In particular, we provide an instance
+--	instance ... => Typeable (s a) 
+-- But a user might want to say
+--	instance ... => Typeable (MyType a b)
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Typeable
