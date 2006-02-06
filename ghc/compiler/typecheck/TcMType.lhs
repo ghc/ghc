@@ -34,6 +34,7 @@ module TcMType (
   Rank, UserTypeCtxt(..), checkValidType, 
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, instTypeErr, checkAmbiguity,
+  checkInstTermination,
   arityErr, 
 
   --------------------------------
@@ -60,7 +61,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  BoxyTyVar, BoxyType, BoxyThetaType, BoxySigmaType, 
 			  UserTypeCtxt(..),
 			  isMetaTyVar, isSigTyVar, metaTvRef,
-			  tcCmpPred, isClassPred, tcEqType, tcGetTyVar,
+			  tcCmpPred, isClassPred, tcGetTyVar,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcValidInstHeadTy, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
@@ -94,8 +95,10 @@ import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
 import DynFlags	( dopt, DynFlag(..) )
 import Util		( nOfThem, isSingleton, notNull )
-import ListSetOps	( removeDups, findDupsEq )
+import ListSetOps	( removeDups )
 import Outputable
+
+import Data.List	( (\\) )
 \end{code}
 
 
@@ -906,6 +909,7 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
     arity_err  = arityErr "Class" class_name arity n_tys
 
     how_to_allow = case ctxt of
+		     InstHeadCtxt  -> empty	-- Should not happen
 		     InstThetaCtxt -> parens undecidableMsg
 		     other	   -> parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
@@ -926,15 +930,12 @@ check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
+	InstHeadCtxt  -> True	-- We check for instance-head 
+				-- formation in checkValidInstHead
 	InstThetaCtxt -> undecidable_ok || distinct_tyvars tys
 	other	      -> gla_exts       || all tyvar_head tys
   where
-    undecidable_ok = dopt Opt_AllowUndecidableInstances dflags 
     gla_exts 	   = dopt Opt_GlasgowExts dflags
-
--------------------------
-distinct_tyvars tys	-- Check that the types are all distinct type variables
-  = all tcIsTyVarTy tys && null (findDupsEq tcEqType tys)
 
 -------------------------
 tyvar_head ty			-- Haskell 98 allows predicates of form 
@@ -1027,7 +1028,7 @@ checkThetaCtxt ctxt theta
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
 
 badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
-predTyVarErr pred  = sep [ptext SLIT("Non-type variables, or repeated type variables,"),
+predTyVarErr pred  = sep [ptext SLIT("Non-type variable argument"),
 			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
@@ -1077,7 +1078,7 @@ checkValidInstHead ty	-- Should be a source type
 check_inst_head dflags clas tys
 	-- If GlasgowExts then check at least one isn't a type variable
   | dopt Opt_GlasgowExts dflags
-  = check_tyvars dflags clas tys
+  = returnM ()
 
 	-- WITH HASKELL 98, MUST HAVE C (T a b c)
   | isSingleton tys,
@@ -1092,22 +1093,92 @@ check_inst_head dflags clas tys
 
     head_shape_msg = parens (text "The instance type must be of form (T a b c)" $$
 			     text "where T is not a synonym, and a,b,c are distinct type variables")
-
-check_tyvars dflags clas tys
-   	-- Check that at least one isn't a type variable
-	-- unless -fallow-undecideable-instances
-  | dopt Opt_AllowUndecidableInstances dflags = returnM ()
-  | not (all tcIsTyVarTy tys)	  	      = returnM ()
-  | otherwise 				      = failWithTc (instTypeErr (pprClassPred clas tys) msg)
-  where
-    msg =  parens (ptext SLIT("There must be at least one non-type-variable in the instance head")
-		   $$ undecidableMsg)
-
-undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
 \end{code}
 
 \begin{code}
 instTypeErr pp_ty msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes pp_ty, 
 	 nest 4 msg]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Checking instance for termination}
+%*									*
+%************************************************************************
+
+Termination test: each assertion in the context satisfies
+ (1) no variable has more occurrences in the assertion than in the head, and
+ (2) the assertion has fewer constructors and variables (taken together
+     and counting repetitions) than the head.
+This is only needed with -fglasgow-exts, as Haskell 98 restrictions
+(which have already been checked) guarantee termination.
+
+\begin{code}
+checkInstTermination :: ThetaType -> [TcType] -> TcM ()
+checkInstTermination theta tys
+  = do
+    dflags <- getDOpts
+    check_inst_termination dflags theta tys
+
+check_inst_termination dflags theta tys
+  | not (dopt Opt_GlasgowExts dflags)         = returnM ()
+  | dopt Opt_AllowUndecidableInstances dflags = returnM ()
+  | otherwise = do
+    mappM_ (check_nomore (fvTypes tys)) theta
+    mappM_ (check_smaller (sizeTypes tys)) theta
+
+check_nomore :: [TyVar] -> PredType -> TcM ()
+check_nomore fvs pred
+  = checkTc (null (fvPred pred \\ fvs))
+	    (predUndecErr pred nomoreMsg $$ parens undecidableMsg)
+
+check_smaller :: Int -> PredType -> TcM ()
+check_smaller n pred
+  = checkTc (sizePred pred < n)
+	    (predUndecErr pred smallerMsg $$ parens undecidableMsg)
+
+predUndecErr pred msg = sep [msg,
+			nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
+
+nomoreMsg = ptext SLIT("Variable occurs more often in a constraint than in the instance head")
+smallerMsg = ptext SLIT("Constraint is no smaller than the instance head")
+undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
+
+-- free variables of a type, retaining repetitions
+fvType :: Type -> [TyVar]
+fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
+fvType (TyVarTy tv)        = [tv]
+fvType (TyConApp _ tys)    = fvTypes tys
+fvType (NoteTy _ ty)       = fvType ty
+fvType (PredTy pred)       = fvPred pred
+fvType (FunTy arg res)     = fvType arg ++ fvType res
+fvType (AppTy fun arg)     = fvType fun ++ fvType arg
+fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
+
+fvTypes :: [Type] -> [TyVar]
+fvTypes tys                = concat (map fvType tys)
+
+fvPred :: PredType -> [TyVar]
+fvPred (ClassP _ tys')     = fvTypes tys'
+fvPred (IParam _ ty)       = fvType ty
+
+-- size of a type: the number of variables and constructors
+sizeType :: Type -> Int
+sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
+sizeType (TyVarTy _)       = 1
+sizeType (TyConApp _ tys)  = sizeTypes tys + 1
+sizeType (NoteTy _ ty)     = sizeType ty
+sizeType (PredTy pred)     = sizePred pred
+sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
+sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
+sizeType (ForAllTy _ ty)   = sizeType ty
+
+sizeTypes :: [Type] -> Int
+sizeTypes xs               = sum (map sizeType xs)
+
+sizePred :: PredType -> Int
+sizePred (ClassP _ tys')   = sizeTypes tys'
+sizePred (IParam _ ty)     = sizeType ty
 \end{code}
