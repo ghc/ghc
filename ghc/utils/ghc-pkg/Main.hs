@@ -410,7 +410,7 @@ parsePackageInfo
 	-> IO InstalledPackageInfo
 parsePackageInfo str defines force =
   case parseInstalledPackageInfo str of
-    ParseOk ok -> return ok
+    ParseOk _warns ok -> return ok
     ParseFailed err -> die (showError err)
 
 -- -----------------------------------------------------------------------------
