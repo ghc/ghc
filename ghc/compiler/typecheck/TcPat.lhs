@@ -98,7 +98,7 @@ tcPats ctxt pats tys res_ty thing_inside
 
 -----------------
 tcPat :: PatCtxt 
-      -> LPat Name -> TcType 
+      -> LPat Name -> BoxySigmaType 
       -> BoxyRhoType		-- Result type
       -> (BoxyRhoType -> TcM a)	-- Checker for body, given its result type
       -> TcM (LPat TcId, a)
