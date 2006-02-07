@@ -228,7 +228,7 @@ atomicModifyMutVarzh_fast
    StgThunk_payload(y,0) = z;
 
    StgMutVar_var(R1) = y;
-   foreign "C" dirty_MUT_VAR(R1) [R1];
+   foreign "C" dirty_MUT_VAR(R1 "ptr") [R1];
 
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);
