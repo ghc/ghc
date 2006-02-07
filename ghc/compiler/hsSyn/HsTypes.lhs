@@ -177,10 +177,14 @@ mkHsForAllTy exp tvs (L _ []) ty = mk_forall_ty exp tvs ty
 mkHsForAllTy exp tvs ctxt ty = HsForAllTy exp tvs ctxt ty
 
 -- mk_forall_ty makes a pure for-all type (no context)
-mk_forall_ty Explicit [] ty 			      = unLoc ty	-- Explicit for-all with no tyvars
-mk_forall_ty exp  tvs  (L _ (HsParTy ty))		      = mk_forall_ty exp tvs ty
+mk_forall_ty exp  tvs  (L _ (HsParTy ty))		    = mk_forall_ty exp tvs ty
 mk_forall_ty exp1 tvs1 (L _ (HsForAllTy exp2 tvs2 ctxt ty)) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ tvs2) ctxt ty
-mk_forall_ty exp  tvs  ty			      = HsForAllTy exp tvs (L noSrcSpan []) ty
+mk_forall_ty exp  tvs  ty			            = HsForAllTy exp tvs (L noSrcSpan []) ty
+	-- Even if tvs is empty, we still make a HsForAll!
+	-- In the Implicit case, this signals the place to do implicit quantification
+	-- In the Explicit case, it prevents implicit quantification	
+	--	(see the sigtype production in Parser.y.pp)
+	-- 	so that (forall. ty) isn't implicitly quantified
 
 Implicit `plus` Implicit = Implicit
 exp1     `plus` exp2     = Explicit
