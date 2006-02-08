@@ -106,60 +106,6 @@ move(StgPtr to, StgPtr from, nat size)
     }
 }
 
-STATIC_INLINE nat
-obj_sizeW( StgClosure *p, StgInfoTable *info )
-{
-    switch (info->type) {
-    case THUNK_0_1:
-    case THUNK_1_0:
-	return sizeofW(StgThunk) + 1;
-    case FUN_0_1:
-    case CONSTR_0_1:
-    case FUN_1_0:
-    case CONSTR_1_0:
-	return sizeofW(StgHeader) + 1;
-    case THUNK_0_2:
-    case THUNK_1_1:
-    case THUNK_2_0:
-	return sizeofW(StgThunk) + 2;
-    case FUN_0_2:
-    case CONSTR_0_2:
-    case FUN_1_1:
-    case CONSTR_1_1:
-    case FUN_2_0:
-    case CONSTR_2_0:
-	return sizeofW(StgHeader) + 2;
-    case THUNK_SELECTOR:
-	return THUNK_SELECTOR_sizeW();
-    case AP_STACK:
-	return ap_stack_sizeW((StgAP_STACK *)p);
-    case AP:
-    case PAP:
-	return pap_sizeW((StgPAP *)p);
-    case ARR_WORDS:
-	return arr_words_sizeW((StgArrWords *)p);
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
-	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-    case TSO:
-	return tso_sizeW((StgTSO *)p);
-    case BCO:
-	return bco_sizeW((StgBCO *)p);
-    case TVAR_WAIT_QUEUE:
-        return sizeofW(StgTVarWaitQueue);
-    case TVAR:
-        return sizeofW(StgTVar);
-    case TREC_CHUNK:
-        return sizeofW(StgTRecChunk);
-    case TREC_HEADER:
-        return sizeofW(StgTRecHeader);
-    default:
-	return sizeW_fromITBL(info);
-    }
-}
-
 static void
 thread_static( StgClosure* p )
 {
@@ -893,7 +839,7 @@ update_bkwd_compact( step *stp )
 	    unthread(p,free);
 	    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)p)->header.info));
 	    info = get_itbl((StgClosure *)p);
-	    size = obj_sizeW((StgClosure *)p,info);
+	    size = closure_sizeW_((StgClosure *)p,info);
 
 	    if (free != p) {
 		move(free,p,size);

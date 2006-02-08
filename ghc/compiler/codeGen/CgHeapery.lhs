@@ -23,7 +23,6 @@ module CgHeapery (
 
 #include "HsVersions.h"
 
-import Constants	( mIN_UPD_SIZE )
 import StgSyn		( AltType(..) )
 import CLabel		( CLabel, mkRtsCodeLabel )
 import CgUtils		( mkWordCLit, cmmRegOffW, cmmOffsetW,
@@ -212,8 +211,7 @@ mkStaticClosureFields cl_info ccs caf_refs payload
 
     padding_wds
 	| not is_caf = []
-	| otherwise  = replicate n (mkIntCLit 0) -- a bunch of 0s
-	where n = max 0 (mIN_UPD_SIZE - length payload)
+	| otherwise  = ASSERT(null payload) [mkIntCLit 0]
 
     static_link_field
 	| is_caf || staticClosureNeedsLink cl_info = [static_link_value]

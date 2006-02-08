@@ -61,11 +61,10 @@ import SMRep		-- all of it
 
 import CLabel
 
-import Constants	( mIN_UPD_SIZE, mIN_SIZE_NonUpdHeapObject )
+import Constants	( mIN_PAYLOAD_SIZE )
 import Packages		( isDllName, HomeModules )
 import StaticFlags	( opt_SccProfilingOn, opt_OmitBlackHoling,
-			  opt_Parallel, opt_DoTickyProfiling,
-			  opt_SMP )
+			  opt_Parallel, opt_DoTickyProfiling )
 import Id		( Id, idType, idArity, idName )
 import DataCon		( DataCon, dataConTyCon, isNullaryRepDataCon, dataConName )
 import Name		( Name, nameUnique, getOccName, getOccString )
@@ -387,16 +386,8 @@ Computing slop size.  WARNING: this looks dodgy --- it has deep
 knowledge of what the storage manager does with the various
 representations...
 
-Slop Requirements:
-
- - Updatable closures must be mIN_UPD_SIZE.
-
- - Heap-resident Closures must be mIN_SIZE_NonUpdHeapObject
-   (to make room for an StgEvacuated during GC).
-
-In SMP mode, we don't play the mIN_UPD_SIZE game.  Instead, every
-thunk gets an extra padding word in the header, which takes the
-the updated value.
+Slop Requirements: every thunk gets an extra padding word in the
+header, which takes the the updated value.
 
 \begin{code}
 slopSize cl_info = computeSlopSize payload_size cl_info
@@ -423,16 +414,14 @@ minPayloadSize smrep updatable
 	BlackHoleRep		 		-> min_upd_size
 	GenericRep _ _ _ _      | updatable     -> min_upd_size
 	GenericRep True _ _ _                   -> 0 -- static
-	GenericRep False _ _ _                  -> mIN_SIZE_NonUpdHeapObject
+	GenericRep False _ _ _                  -> mIN_PAYLOAD_SIZE
           --       ^^^^^___ dynamic
   where
-   min_upd_size
-	| opt_SMP   = ASSERT(mIN_SIZE_NonUpdHeapObject <= 
-				sIZEOF_StgSMPThunkHeader)
-		      0 	-- check that we already have enough
-				-- room for mIN_SIZE_NonUpdHeapObject,
-				-- due to the extra header word in SMP
-	| otherwise = mIN_UPD_SIZE
+   min_upd_size =
+	ASSERT(mIN_PAYLOAD_SIZE <= sIZEOF_StgSMPThunkHeader)
+	0 	-- check that we already have enough
+		-- room for mIN_SIZE_NonUpdHeapObject,
+		-- due to the extra header word in SMP
 \end{code}
 
 %************************************************************************
@@ -600,9 +589,11 @@ getCallMethod hmods name (LFThunk _ _ updatable std_form_info is_fun) n_args
 		-- is the fast-entry code]
 
   | updatable || opt_DoTickyProfiling  -- to catch double entry
-	      || opt_SMP    -- Always enter via node on SMP, since the
-			    -- thunk might have been blackholed in the 
-			    -- meantime.
+      {- OLD: || opt_SMP
+	 I decided to remove this, because in SMP mode it doesn't matter
+	 if we enter the same thunk multiple times, so the optimisation
+	 of jumping directly to the entry code is still valid.  --SDM
+	-}
   = ASSERT( n_args == 0 ) EnterIt
 
   | otherwise	-- Jump direct to code for single-entry thunks

@@ -9,12 +9,15 @@
 #ifndef SPARKS_H
 #define SPARKS_H
 
+#if !defined(GRAN)
+StgInt newSpark (StgRegTable *reg, StgClosure *p);
+#endif
+
 #if defined(PARALLEL_HASKELL) || defined(SMP)
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
 void         markSparkQueue    (evac_fn evac);
 void         createSparkThread (Capability *cap, StgClosure *p);
-StgInt       newSpark          (StgRegTable *reg, StgClosure *p);
 
 INLINE_HEADER void     discardSparks  (StgSparkPool *pool);
 INLINE_HEADER nat      sparkPoolSize  (StgSparkPool *pool);

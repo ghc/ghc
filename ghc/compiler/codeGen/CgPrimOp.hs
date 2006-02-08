@@ -28,7 +28,7 @@ import SMRep
 import PrimOp		( PrimOp(..) )
 import SMRep		( tablesNextToCode )
 import Constants 	( wORD_SIZE, wORD_SIZE_IN_BITS )
-import StaticFlags	( opt_Parallel, opt_SMP )
+import StaticFlags	( opt_Parallel )
 import Outputable
 
 -- ---------------------------------------------------------------------------
@@ -113,9 +113,6 @@ emitPrimOp [res_r,res_c] IntSubCOp [aa,bb] live
 
 
 emitPrimOp [res] ParOp [arg] live
-  | not (opt_Parallel || opt_SMP)
-  = stmtC (CmmAssign res (CmmLit (mkIntCLit 1)))
-  | otherwise
   = do
 	-- for now, just implement this in a C function
 	-- later, we might want to inline it.

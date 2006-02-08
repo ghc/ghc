@@ -89,7 +89,8 @@ data BCInstr
    -- To do with the heap
    | ALLOC_AP  Int	-- make an AP with this many payload words
    | ALLOC_PAP Int Int	-- make a PAP with this arity / payload words
-   | MKAP      Int{-ptr to AP/PAP is this far down stack-} Int{-# words-}
+   | MKAP      Int{-ptr to AP is this far down stack-} Int{-# words-}
+   | MKPAP     Int{-ptr to PAP is this far down stack-} Int{-# words-}
    | UNPACK    Int	-- unpack N words from t.o.s Constr
    | PACK      DataCon Int
 			-- after assembly, the DataCon is an index into the
@@ -250,5 +251,6 @@ bciStackUse SWIZZLE{}    	  = 0
 -- so can't use this info.  Not that it matters much.
 bciStackUse SLIDE{}		  = 0
 bciStackUse MKAP{}		  = 0
+bciStackUse MKPAP{}		  = 0
 bciStackUse PACK{}		  = 1 -- worst case is PACK 0 words
 \end{code}

@@ -340,11 +340,7 @@
  * the value from GHC, but it seems like too much trouble to do that
  * for StgThunkHeader.
  */
-#ifdef SMP
 #define SIZEOF_StgThunkHeader SIZEOF_StgHeader+SIZEOF_StgSMPThunkHeader
-#else
-#define SIZEOF_StgThunkHeader SIZEOF_StgHeader
-#endif
 
 #define StgThunk_payload(__ptr__,__ix__) \
     W_[__ptr__+SIZEOF_StgThunkHeader+ WDS(__ix__)]

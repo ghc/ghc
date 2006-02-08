@@ -43,7 +43,7 @@ import Type		( Type, typePrimRep, PrimRep(..) )
 import TyCon		( TyCon, tyConPrimRep )
 import MachOp--		( MachRep(..), MachHint(..), wordRep )
 import StaticFlags	( opt_SccProfilingOn, opt_GranMacros,
-			  opt_Unregisterised, opt_SMP )
+			  opt_Unregisterised )
 import Constants
 import Outputable
 
@@ -289,8 +289,7 @@ arrPtrsHdrSize    = fixedHdrSize*wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
 -- Thunks have an extra header word on SMP, so the update doesn't 
 -- splat the payload.
 thunkHdrSize :: WordOff
-thunkHdrSize | opt_SMP 	 = fixedHdrSize + smp_hdr
-	     | otherwise = fixedHdrSize
+thunkHdrSize = fixedHdrSize + smp_hdr
 	where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
 \end{code}
 

@@ -69,15 +69,9 @@
 
 
 STATIC_INLINE StgPtr
-allocate_UPD (int n_words)
-{
-   return allocate(stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, n_words));
-}
-
-STATIC_INLINE StgPtr
 allocate_NONUPD (int n_words)
 {
-    return allocate(stg_max(sizeofW(StgHeader)+MIN_NONUPD_SIZE, n_words));
+    return allocate(stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
 
@@ -560,9 +554,7 @@ do_apply:
 	    else /* arity > n */ {
 		// build a new PAP and return it.
 		StgPAP *new_pap;
-		nat size;
-		size = PAP_sizeW(pap->n_args + m);
-		new_pap = (StgPAP *)allocate(size);
+		new_pap = (StgPAP *)allocate(PAP_sizeW(pap->n_args + m));
 		SET_HDR(new_pap,&stg_PAP_info,CCCS);
 		new_pap->arity = pap->arity - n;
 		new_pap->n_args = pap->n_args + m;
@@ -606,9 +598,8 @@ do_apply:
 	    else /* arity > n */ {
 		// build a PAP and return it.
 		StgPAP *pap;
-		nat size, i;
-		size = PAP_sizeW(m);
-		pap = (StgPAP *)allocate(size);
+		nat i;
+		pap = (StgPAP *)allocate(PAP_sizeW(m));
 		SET_HDR(pap, &stg_PAP_info,CCCS);
 		pap->arity = arity - n;
 		pap->fun = obj;
@@ -932,8 +923,7 @@ run_BCO:
 	case bci_ALLOC_AP: {
 	    StgAP* ap; 
 	    int n_payload = BCO_NEXT;
-	    int request   = PAP_sizeW(n_payload);
-	    ap = (StgAP*)allocate_UPD(request);
+	    ap = (StgAP*)allocate(AP_sizeW(n_payload));
 	    Sp[-1] = (W_)ap;
 	    ap->n_args = n_payload;
 	    SET_HDR(ap, &stg_AP_info, CCS_SYSTEM/*ToDo*/)
@@ -945,8 +935,7 @@ run_BCO:
 	    StgPAP* pap; 
 	    int arity = BCO_NEXT;
 	    int n_payload = BCO_NEXT;
-	    int request   = PAP_sizeW(n_payload);
-	    pap = (StgPAP*)allocate_NONUPD(request);
+	    pap = (StgPAP*)allocate(PAP_sizeW(n_payload));
 	    Sp[-1] = (W_)pap;
 	    pap->n_args = n_payload;
 	    pap->arity = arity;
@@ -962,19 +951,39 @@ run_BCO:
 	    StgAP* ap = (StgAP*)Sp[stkoff];
 	    ASSERT((int)ap->n_args == n_payload);
 	    ap->fun = (StgClosure*)Sp[0];
-
+	    
 	    // The function should be a BCO, and its bitmap should
 	    // cover the payload of the AP correctly.
 	    ASSERT(get_itbl(ap->fun)->type == BCO
-		   && (get_itbl(ap)->type == PAP || 
-		       BCO_BITMAP_SIZE(ap->fun) == ap->n_args));
-
+		   && BCO_BITMAP_SIZE(ap->fun) == ap->n_args);
+	    
 	    for (i = 0; i < n_payload; i++)
 		ap->payload[i] = (StgClosure*)Sp[i+1];
 	    Sp += n_payload+1;
 	    IF_DEBUG(interpreter,
 		     debugBelch("\tBuilt "); 
 		     printObj((StgClosure*)ap);
+		);
+	    goto nextInsn;
+	}
+
+	case bci_MKPAP: {
+	    int i;
+	    int stkoff = BCO_NEXT;
+	    int n_payload = BCO_NEXT;
+	    StgPAP* pap = (StgPAP*)Sp[stkoff];
+	    ASSERT((int)pap->n_args == n_payload);
+	    pap->fun = (StgClosure*)Sp[0];
+	    
+	    // The function should be a BCO
+	    ASSERT(get_itbl(pap->fun)->type == BCO);
+	    
+	    for (i = 0; i < n_payload; i++)
+		pap->payload[i] = (StgClosure*)Sp[i+1];
+	    Sp += n_payload+1;
+	    IF_DEBUG(interpreter,
+		     debugBelch("\tBuilt "); 
+		     printObj((StgClosure*)pap);
 		);
 	    goto nextInsn;
 	}

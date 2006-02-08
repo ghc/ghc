@@ -220,7 +220,17 @@ newSpark (StgRegTable *reg, StgClosure *p)
     return 1;
 }
 
+#else
+
+StgInt
+newSpark (StgRegTable *reg, StgClosure *p)
+{
+    /* nothing */
+    return 1;
+}
+
 #endif /* PARALLEL_HASKELL || SMP */
+
 
 /* -----------------------------------------------------------------------------
  * 

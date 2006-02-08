@@ -37,51 +37,22 @@ void
 LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
 {
     StgInfoTable *info;
-    nat nw, i;
+    nat size, i;
 
 #if defined(__GNUC__) && __GNUC__ < 3 && defined(DEBUG)
 #error Please use gcc 3.0+ to compile this file with DEBUG; gcc < 3.0 miscompiles it
 #endif
 
     if (era > 0) {
-	info = get_itbl((p));
-	switch (info->type) {
-	case THUNK_1_0:
-	case THUNK_0_1:
-	    nw = stg_max(MIN_UPD_SIZE,1);
-	    break;
+	// very like FILL_SLOP(), except that we call LDV_recordDead().
+	size = closure_sizeW(p);
 
-	case THUNK_2_0:
-	case THUNK_1_1:
-	case THUNK_0_2:
-	case THUNK_SELECTOR:
-	    nw = stg_max(MIN_UPD_SIZE,2);
-	    break;
+	LDV_recordDead((StgClosure *)(p), size);
 
-	case THUNK:
-	    nw = stg_max(info->layout.payload.ptrs + info->layout.payload.nptrs,
-			 MIN_UPD_SIZE);
-	    break;
-	case AP:
-	    nw = sizeofW(StgAP) - sizeofW(StgThunkHeader) + ((StgPAP *)p)->n_args;
-	    break;
-	case AP_STACK:
-	    nw = sizeofW(StgAP_STACK) - sizeofW(StgThunkHeader)
-		+ ((StgAP_STACK *)p)->size;
-	    break;
-	case CAF_BLACKHOLE:
-	case BLACKHOLE:
-	case SE_BLACKHOLE:
-	case SE_CAF_BLACKHOLE:
-	    nw = info->layout.payload.ptrs + info->layout.payload.nptrs;
-	    break;
-	default:
-	    barf("Unexpected closure type %u in LDV_recordDead_FILL_SLOP_DYNAMIC()", info->type);
-	    break;
-	}
-	LDV_recordDead((StgClosure *)(p), nw + sizeofW(StgHeader));
-	for (i = 0; i < nw; i++) {
-	    ((StgClosure *)(p))->payload[i] = 0;
+	if (size > sizeofW(StgThunkHeader)) {
+	    for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
+		((StgThunk *)(p))->payload[i] = 0;
+	    }
 	}
     }
 }
@@ -113,96 +84,64 @@ processHeapClosureForDead( StgClosure *c )
 		   ));
     }
 
+    if (info->type == EVACUATED) {
+	// The size of the evacuated closure is currently stored in
+	// the LDV field.  See SET_EVACUAEE_FOR_LDV() in
+	// includes/StgLdvProf.h.
+	return LDVW(c);
+    }
+
+    size = closure_sizeW(c);
+
     switch (info->type) {
 	/*
 	  'inherently used' cases: do nothing.
 	*/
-
     case TSO:
-	size = tso_sizeW((StgTSO *)c);
-	return size;
-
     case MVAR:
-	size = sizeofW(StgMVar);
-	return size;
-
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-	size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)c);
-	return size;
-
     case ARR_WORDS:
-	size = arr_words_sizeW((StgArrWords *)c);
-	return size;
-
     case WEAK:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case BCO:
     case STABLE_NAME:
-	size = sizeW_fromITBL(info);
 	return size;
 
 	/*
 	  ordinary cases: call LDV_recordDead().
 	*/
-
     case THUNK:
-	size = stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
-	break;
-
     case THUNK_1_0:
     case THUNK_0_1:
     case THUNK_SELECTOR:
-	size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE, 1);
-	break;
-
     case THUNK_2_0:
     case THUNK_1_1:
     case THUNK_0_2:
-	size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE, 2);
-	break;
-
     case AP:
-	size = ap_sizeW((StgAP *)c);
-	break;
-
     case PAP:
-	size = pap_sizeW((StgPAP *)c);
-	break;
-
     case AP_STACK:
-	size = ap_stack_sizeW((StgAP_STACK *)c);
-	break;
-
     case CONSTR:
     case CONSTR_1_0:
     case CONSTR_0_1:
     case CONSTR_2_0:
     case CONSTR_1_1:
     case CONSTR_0_2:
-
     case FUN:
     case FUN_1_0:
     case FUN_0_1:
     case FUN_2_0:
     case FUN_1_1:
     case FUN_0_2:
-
     case BLACKHOLE:
     case SE_BLACKHOLE:
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
-	size = sizeW_fromITBL(info);
-	break;
-
     case IND_PERM:
     case IND_OLDGEN_PERM:
-	size = sizeofW(StgInd);
-	break;
-
 	/*
 	  'Ingore' cases
 	*/
@@ -214,14 +153,9 @@ processHeapClosureForDead( StgClosure *c )
 	// rate.
     case IND:
     case IND_OLDGEN:
-	size = sizeofW(StgInd);
+	// Found a dead closure: record its size
+	LDV_recordDead(c, size);
 	return size;
-
-    case EVACUATED:
-	// The size of the evacuated closure is currently stored in
-	// the LDV field.  See SET_EVACUAEE_FOR_LDV() in
-	// includes/StgLdvProf.h.
-	return LDVW(c);
 
 	/*
 	  Error case
@@ -255,10 +189,6 @@ processHeapClosureForDead( StgClosure *c )
 	barf("Invalid object in processHeapClosureForDead(): %d", info->type);
 	return 0;
     }
-
-    // Found a dead closure: record its size
-    LDV_recordDead(c, size);
-    return size;
 }
 
 /* --------------------------------------------------------------------------

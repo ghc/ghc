@@ -3771,7 +3771,7 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    // we've got an exception to raise, so let's pass it to the
 	    // handler in this frame.
 	    //
-	    raise = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+MIN_UPD_SIZE);
+	    raise = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+1);
 	    TICK_ALLOC_SE_THK(1,0);
 	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
 	    raise->payload[0] = exception;
@@ -3904,7 +3904,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
     // thunks which are currently under evaluataion.
     //
 
-    //    
+    // OLD COMMENT (we don't have MIN_UPD_SIZE now):
     // LDV profiling: stg_raise_info has THUNK as its closure
     // type. Since a THUNK takes at least MIN_UPD_SIZE words in its
     // payload, MIN_UPD_SIZE is more approprate than 1.  It seems that
@@ -3932,7 +3932,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
 	    // Only create raise_closure if we need to.
 	    if (raise_closure == NULL) {
 		raise_closure = 
-		    (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+MIN_UPD_SIZE);
+		    (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+1);
 		SET_HDR(raise_closure, &stg_raise_info, CCCS);
 		raise_closure->payload[0] = exception;
 	    }

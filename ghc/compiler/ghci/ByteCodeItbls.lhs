@@ -16,7 +16,7 @@ import NameEnv
 import SMRep		( typeCgRep )
 import DataCon		( DataCon, dataConRepArgTys )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import Constants	( mIN_SIZE_NonUpdHeapObject, wORD_SIZE )
+import Constants	( mIN_PAYLOAD_SIZE, wORD_SIZE )
 import CgHeapery	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 import Util             ( lengthIs, listLengthCmp )
@@ -94,8 +94,8 @@ make_constr_itbls cons
                  ptrs  = ptr_wds
                  nptrs = tot_wds - ptr_wds
                  nptrs_really
-                    | ptrs + nptrs >= mIN_SIZE_NonUpdHeapObject = nptrs
-                    | otherwise = mIN_SIZE_NonUpdHeapObject - ptrs
+                    | ptrs + nptrs >= mIN_PAYLOAD_SIZE = nptrs
+                    | otherwise = mIN_PAYLOAD_SIZE - ptrs
                  itbl  = StgInfoTable {
                            ptrs  = fromIntegral ptrs, 
                            nptrs = fromIntegral nptrs_really,

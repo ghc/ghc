@@ -36,9 +36,15 @@ typedef struct {
 
 /* -----------------------------------------------------------------------------
    The SMP header
+   
+   A thunk has a padding word to take the updated value.  This is so
+   that the update doesn't overwrite the payload, so we can avoid
+   needing to lock the thunk during entry and update.
+   
+   Note: this doesn't apply to THUNK_STATICs, which have no payload.
 
-   In SMP mode, we have an extra word of padding in a thunk's header.
-   (Note: thunks only; other closures do not have this padding word).
+   Note: we leave this padding word in all ways, rather than just SMP,
+   so that we don't have to recompile all our libraries for SMP.
    -------------------------------------------------------------------------- */
 
 typedef struct {
@@ -62,13 +68,6 @@ typedef struct {
 #endif
 } StgHeader;
 
-/*
- * In SMP mode, a thunk has a padding word to take the updated value.
- * This is so that the update doesn't overwrite the payload, so we can
- * avoid needing to lock the thunk during entry and update.
- *
- * Note: this doesn't apply to THUNK_STATICs, which have no payload.
- */
 typedef struct {
     const struct _StgInfoTable* info;
 #ifdef PROFILING
@@ -77,10 +76,10 @@ typedef struct {
 #ifdef GRAN
     StgGranHeader         gran;
 #endif
-#ifdef SMP
     StgSMPThunkHeader     smp;
-#endif
 } StgThunkHeader;
+
+#define THUNK_EXTRA_HEADER_W (sizeofW(StgThunkHeader)-sizeofW(StgHeader))
 
 /* -----------------------------------------------------------------------------
    Closure Types

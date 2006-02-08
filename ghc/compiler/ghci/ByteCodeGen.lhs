@@ -52,7 +52,7 @@ import Bitmap		( intsToReverseBitmap, mkBitmap )
 import OrdList
 import Constants	( wORD_SIZE )
 
-import Data.List	( intersperse, sortBy, zip4, zip5, partition )
+import Data.List	( intersperse, sortBy, zip4, zip6, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
 			  withForeignPtr )
 import Foreign.C	( CInt )
@@ -361,26 +361,28 @@ schemeE d s p (AnnLet binds (_,body))
          zipE  = zipEqual "schemeE"
 
          -- ToDo: don't build thunks for things with no free variables
-         build_thunk dd [] size bco off
-            = returnBc (PUSH_BCO bco
-                        `consOL` unitOL (MKAP (off+size) size))
-         build_thunk dd (fv:fvs) size bco off = do
+         build_thunk dd [] size bco off arity
+            = returnBc (PUSH_BCO bco `consOL` unitOL (mkap (off+size) size))
+	   where 
+		mkap | arity == 0 = MKAP
+		     | otherwise  = MKPAP
+         build_thunk dd (fv:fvs) size bco off arity = do
               (push_code, pushed_szw) <- pushAtom dd p' (AnnVar fv) 
-              more_push_code <- build_thunk (dd+pushed_szw) fvs size bco off
+              more_push_code <- build_thunk (dd+pushed_szw) fvs size bco off arity
               returnBc (push_code `appOL` more_push_code)
 
          alloc_code = toOL (zipWith mkAlloc sizes arities)
 	   where mkAlloc sz 0     = ALLOC_AP sz
 		 mkAlloc sz arity = ALLOC_PAP arity sz
 
-	 compile_bind d' fvs x rhs size off = do
+	 compile_bind d' fvs x rhs size arity off = do
 		bco <- schemeR fvs (x,rhs)
-		build_thunk d' fvs size bco off
+		build_thunk d' fvs size bco off arity
 
 	 compile_binds = 
-	    [ compile_bind d' fvs x rhs size n
-	    | (fvs, x, rhs, size, n) <- 
-		zip5 fvss xs rhss sizes [n_binds, n_binds-1 .. 1]
+	    [ compile_bind d' fvs x rhs size arity n
+	    | (fvs, x, rhs, size, arity, n) <- 
+		zip6 fvss xs rhss sizes arities [n_binds, n_binds-1 .. 1]
 	    ]
      in do
      body_code <- schemeE d' s p' body

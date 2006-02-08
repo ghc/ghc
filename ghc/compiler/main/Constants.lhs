@@ -40,8 +40,7 @@ mAX_SPEC_SELECTEE_SIZE	= (MAX_SPEC_SELECTEE_SIZE :: Int)
 mAX_SPEC_AP_SIZE        = (MAX_SPEC_AP_SIZE :: Int)
 
 -- closure sizes: these do NOT include the header (see below for header sizes)
-mIN_UPD_SIZE			= (MIN_UPD_SIZE::Int)
-mIN_SIZE_NonUpdHeapObject	= (MIN_NONUPD_SIZE::Int)
+mIN_PAYLOAD_SIZE	= (MIN_PAYLOAD_SIZE::Int)
 \end{code}
 
 \begin{code}

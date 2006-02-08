@@ -312,10 +312,10 @@ INLINE_HEADER StgOffset CONSTR_sizeW( nat p, nat np )
 { return sizeofW(StgHeader) + p + np; }
 
 INLINE_HEADER StgOffset THUNK_SELECTOR_sizeW ( void )
-{ return stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, sizeofW(StgSelector)); }
+{ return sizeofW(StgSelector); }
 
 INLINE_HEADER StgOffset BLACKHOLE_sizeW ( void )
-{ return sizeofW(StgHeader)+MIN_UPD_SIZE; }
+{ return sizeofW(StgHeader)+MIN_PAYLOAD_SIZE; }
 
 /* --------------------------------------------------------------------------
    Sizes of closures
@@ -351,6 +351,71 @@ INLINE_HEADER StgWord tso_sizeW ( StgTSO *tso )
 
 INLINE_HEADER StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
+
+STATIC_INLINE nat
+closure_sizeW_ (StgClosure *p, StgInfoTable *info)
+{
+    switch (info->type) {
+    case THUNK_0_1:
+    case THUNK_1_0:
+	return sizeofW(StgThunk) + 1;
+    case FUN_0_1:
+    case CONSTR_0_1:
+    case FUN_1_0:
+    case CONSTR_1_0:
+	return sizeofW(StgHeader) + 1;
+    case THUNK_0_2:
+    case THUNK_1_1:
+    case THUNK_2_0:
+	return sizeofW(StgThunk) + 2;
+    case FUN_0_2:
+    case CONSTR_0_2:
+    case FUN_1_1:
+    case CONSTR_1_1:
+    case FUN_2_0:
+    case CONSTR_2_0:
+	return sizeofW(StgHeader) + 2;
+    case THUNK_SELECTOR:
+	return THUNK_SELECTOR_sizeW();
+    case AP_STACK:
+	return ap_stack_sizeW((StgAP_STACK *)p);
+    case AP:
+    case PAP:
+	return pap_sizeW((StgPAP *)p);
+    case IND:
+    case IND_PERM:
+    case IND_OLDGEN:
+    case IND_OLDGEN_PERM:
+	return sizeofW(StgInd);
+    case ARR_WORDS:
+	return arr_words_sizeW((StgArrWords *)p);
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
+	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+    case TSO:
+	return tso_sizeW((StgTSO *)p);
+    case BCO:
+	return bco_sizeW((StgBCO *)p);
+    case TVAR_WAIT_QUEUE:
+        return sizeofW(StgTVarWaitQueue);
+    case TVAR:
+        return sizeofW(StgTVar);
+    case TREC_CHUNK:
+        return sizeofW(StgTRecChunk);
+    case TREC_HEADER:
+        return sizeofW(StgTRecHeader);
+    default:
+	return sizeW_fromITBL(info);
+    }
+}
+
+STATIC_INLINE nat
+closure_sizeW (StgClosure *p)
+{
+    return closure_sizeW_(p, get_itbl(p));
+}
 
 /* -----------------------------------------------------------------------------
    Sizes of stack frames

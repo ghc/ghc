@@ -32,7 +32,6 @@ module StaticFlags (
         opt_MaxContextReductionDepth,
 	opt_IrrefutableTuples,
 	opt_Parallel,
-	opt_SMP,
 	opt_RuntimeTypes,
 	opt_Flatten,
 
@@ -256,7 +255,6 @@ opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_Parallel			= lookUp  FSLIT("-fparallel")
-opt_SMP				= lookUp  FSLIT("-fsmp")
 opt_Flatten			= lookUp  FSLIT("-fflatten")
 
 -- optimisation opts
@@ -315,7 +313,6 @@ isStaticFlag f =
 	"fdicts-strict",
 	"firrefutable-tuples",
 	"fparallel",
-	"fsmp",
 	"fflatten",
 	"fsemi-tagging",
 	"flet-no-escape",
@@ -558,15 +555,15 @@ way_details =
 	, "-optc-DGRAN"
 	, "-package concurrent" ]),
 
-    (WaySMP, Way  "s" False "SMP"
-	[ "-fsmp"
+    (WaySMP, Way  "s" True "SMP"
+	[ 
 #if !defined(mingw32_TARGET_OS)
-	, "-optc-pthread"
+	  "-optc-pthread"
 #endif
 #if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS)
 	, "-optl-pthread"
 #endif
-	, "-optc-DSMP" ]),
+	]),
 
     (WayNDP, Way  "ndp" False "Nested data parallelism"
 	[ "-fparr"

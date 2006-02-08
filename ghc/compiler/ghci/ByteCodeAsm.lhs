@@ -254,6 +254,7 @@ mkBits findLabel st proto_insns
                ALLOC_AP  n        -> instr2 st bci_ALLOC_AP n
                ALLOC_PAP arity n  -> instr3 st bci_ALLOC_PAP arity n
                MKAP      off sz   -> instr3 st bci_MKAP off sz
+               MKPAP     off sz   -> instr3 st bci_MKPAP off sz
                UNPACK    n        -> instr2 st bci_UNPACK n
                PACK      dcon sz  -> do (itbl_no,st2) <- itbl st dcon
                                         instr3 st2 bci_PACK itbl_no sz
@@ -398,6 +399,7 @@ instrSize16s instr
         ALLOC_AP{}		-> 2
         ALLOC_PAP{}		-> 3
         MKAP{}			-> 3
+        MKPAP{}			-> 3
         UNPACK{}		-> 2
         PACK{}			-> 3
         LABEL{}			-> 0	-- !!

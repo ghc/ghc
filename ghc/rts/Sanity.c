@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2001
+ * (c) The GHC Team, 1998-2006
  *
  * Sanity checking code for the heap and stack.
  *
@@ -280,7 +280,7 @@ checkClosure( StgClosure* p )
 	for (i = 0; i < info->layout.payload.ptrs; i++) {
 	  ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
 	}
-	return stg_max(thunk_sizeW_fromITBL(info), sizeofW(StgHeader)+MIN_UPD_SIZE);
+	return thunk_sizeW_fromITBL(info);
       }
 
     case FUN:
@@ -359,7 +359,7 @@ checkClosure( StgClosure* p )
 	     */
 	    StgInd *ind = (StgInd *)p;
 	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
-	    return sizeofW(StgHeader) + MIN_UPD_SIZE;
+	    return sizeofW(StgInd);
 	}
 
     case RET_BCO:
@@ -560,7 +560,7 @@ checkHeap(bdescr *bd)
 	while (p < bd->free) {
 	    nat size = checkClosure((StgClosure *)p);
 	    /* This is the smallest size of closure that can live in the heap */
-	    ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+	    ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
 	    p += size;
 	    
 	    /* skip over slop */
@@ -590,11 +590,11 @@ checkHeapChunk(StgPtr start, StgPtr end)
       size = sizeofW(StgFetchMe);
     } else if (get_itbl((StgClosure*)p)->type == IND) {
       *(p+2) = 0x0000ee11; /* mark slop in IND as garbage */
-      size = MIN_UPD_SIZE;
+      size = sizeofW(StgInd);
     } else {
       size = checkClosure((StgClosure *)p);
       /* This is the smallest size of closure that can live in the heap. */
-      ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+      ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
     }
   }
 }
@@ -609,7 +609,7 @@ checkHeapChunk(StgPtr start, StgPtr end)
     ASSERT(LOOKS_LIKE_INFO_PTR((void*)*p));
     size = checkClosure((StgClosure *)p);
     /* This is the smallest size of closure that can live in the heap. */
-    ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
+    ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
   }
 }
 #endif

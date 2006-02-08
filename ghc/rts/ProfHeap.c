@@ -870,13 +870,13 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case THUNK_1_1:
 	    case THUNK_0_2:
 	    case THUNK_2_0:
-		size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE,2);
+		size = sizeofW(StgThunkHeader) + 2;
 		break;
 
 	    case THUNK_1_0:
 	    case THUNK_0_1:
 	    case THUNK_SELECTOR:
-		size = sizeofW(StgHeader) + stg_max(MIN_UPD_SIZE,1);
+		size = sizeofW(StgThunkHeader) + 1;
 		break;
 
 	    case CONSTR:
@@ -902,7 +902,7 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case CONSTR_2_0:
 		size = sizeW_fromITBL(info);
 		break;
-		
+
 	    case IND:
 		// Special case/Delicate Hack: INDs don't normally
 		// appear, since we're doing this heap census right

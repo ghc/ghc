@@ -191,62 +191,69 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
  * the slop in one of the threads would have a disastrous effect on
  * the other (seen in the wild!).
  */
-#if !defined(DEBUG) || defined(SMP)
-
-#define DEBUG_FILL_SLOP(p) /* nothing */
-
-#else  /* DEBUG */
-
 #ifdef CMINUSMINUS
 
-#define DEBUG_FILL_SLOP(p)						\
+#define FILL_SLOP(p)							\
   W_ inf;								\
   W_ sz;								\
   W_ i;									\
   inf = %GET_STD_INFO(p);						\
-  if (%INFO_TYPE(inf) != HALF_W_(THUNK_SELECTOR)) {			\
-    if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)) {			\
+  if (%INFO_TYPE(inf) != HALF_W_(THUNK_SELECTOR)			\
+	&& %INFO_TYPE(inf) != HALF_W_(BLACKHOLE)			\
+	&& %INFO_TYPE(inf) != HALF_W_(CAF_BLACKHOLE)) {			\
       if (%INFO_TYPE(inf) == HALF_W_(AP_STACK)) {			\
-          sz = StgAP_STACK_size(p) + BYTES_TO_WDS(SIZEOF_StgAP_STACK_NoHdr); \
+          sz = StgAP_STACK_size(p) + BYTES_TO_WDS(SIZEOF_StgAP_STACK_NoThunkHdr); \
       } else {								\
-          sz = TO_W_(%INFO_PTRS(inf)) + TO_W_(%INFO_NPTRS(inf));	\
+          if (%INFO_TYPE(inf) == HALF_W_(AP)) {				\
+	      sz = TO_W_(StgAP_n_args(p)) +  BYTES_TO_WDS(SIZEOF_StgAP_NoThunkHdr);	\
+          } else {							\
+              sz = TO_W_(%INFO_PTRS(inf)) + TO_W_(%INFO_NPTRS(inf));	\
+	  }								\
       }									\
-      i = 1; /* skip over indirectee */					\
+      i = 0;								\
       for:								\
         if (i < sz) {							\
           StgThunk_payload(p,i) = 0;					\
           i = i + 1;							\
           goto for;							\
         }								\
-  } }
+  }
 
 #else /* !CMINUSMINUS */
 
 INLINE_HEADER void
-DEBUG_FILL_SLOP(StgClosure *p)
+FILL_SLOP(StgClosure *p)
 {						
     StgInfoTable *inf = get_itbl(p);		
     nat i, sz;
 
     switch (inf->type) {
     case BLACKHOLE:
+    case CAF_BLACKHOLE:
     case THUNK_SELECTOR:
 	return;
+    case AP:
+	sz = ((StgAP *)p)->n_args + sizeofW(StgAP) - sizeofW(StgThunkHeader);
+	break;
     case AP_STACK:
-	sz = ((StgAP_STACK *)p)->size + sizeofW(StgAP_STACK) - sizeofW(StgHeader);
+	sz = ((StgAP_STACK *)p)->size + sizeofW(StgAP_STACK) - sizeofW(StgThunkHeader);
 	break;
     default:
 	sz = inf->layout.payload.ptrs + inf->layout.payload.nptrs;
         break;
     }
-    // start at one to skip over the indirectee
-    for (i = 1; i < sz; i++) {
+    for (i = 0; i < sz; i++) {
 	((StgThunk *)p)->payload[i] = 0;
     }
 }
 
 #endif /* CMINUSMINUS */
-#endif /* DEBUG */
+
+#if !defined(DEBUG) || defined(SMP)
+#define DEBUG_FILL_SLOP(p) /* do nothing */
+#else
+#define DEBUG_FILL_SLOP(p) FILL_SLOP(p)
+#endif
 
 /* We have two versions of this macro (sadly), one for use in C-- code,
  * and the other for C.

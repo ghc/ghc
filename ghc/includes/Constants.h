@@ -20,29 +20,12 @@
 /* -----------------------------------------------------------------------------
    Minimum closure sizes
 
-   Here we define the minimum size for updatable closures. All updates
-   will be performed on closures of this size. For non-updatable closures
-   the minimum size is 1 to allow for a forwarding pointer.
-
-   When we used to keep the mutable list threaded through closures on
-   the heap, MIN_UPD_SIZE used to be 2.  Now it's 1.
-
-   o MIN_UPD_SIZE doesn't apply to stack closures, static closures
-     or non-updateable objects like PAPs or CONSTRs
-   o MIN_UPD_SIZE is big enough to contain any of the following:
-     o EVACUATED
-     o BLACKHOLE
-     o BLOCKING QUEUE
-     o IND, IND_PERM, IND_OLDGEN and IND_OLDGEN_PERM
-       (it need not be big enough for IND_STATIC - but it is)
-   o MIN_NONUPD_SIZE doesn't apply to stack closures, static closures
-     or updateable objects like APs, THUNKS or THUNK_SELECTORs
-   o MIN_NONUPD_SIZE is big enough to contain any of the following:
-     o EVACUATED
+   This is the minimum number of words in the payload of a
+   heap-allocated closure, so that the closure has enough room to be
+   overwritten with a forwarding pointer during garbage collection.
    -------------------------------------------------------------------------- */
 
-#define MIN_UPD_SIZE	1
-#define MIN_NONUPD_SIZE 1
+#define MIN_PAYLOAD_SIZE 1
 
 /* -----------------------------------------------------------------------------
    Constants to do with specialised closure types.

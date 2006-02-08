@@ -311,8 +311,10 @@ endif
 # 
 #   thr         : threaded
 #   thr_p       : threaded profiled
+#   s		: smp
 #   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
 #   debug_p     : debugging profiled
+#   debug_s     : debugging smp
 #   debug_u     : debugging unregisterised
 #   thr_debug   : debugging threaded
 #   thr_debug_p : debugging threaded profiled
@@ -320,7 +322,7 @@ endif
 ifeq "$(BootingFromHc)" "YES"
 GhcRTSWays=
 else
-GhcRTSWays=thr thr_p debug thr_debug
+GhcRTSWays=thr thr_p s debug debug_s thr_debug
 endif
 
 # Option flags to pass to GHC when it's compiling modules in
@@ -1048,10 +1050,6 @@ WAY_t_HC_OPTS= -ticky
 WAY_u_NAME=unregisterized (using portable C only)
 WAY_u_HC_OPTS=-unreg
 
-# Way `s':
-WAY_s_NAME=threads (for SMP)
-WAY_s_HC_OPTS=-smp -optc-DTHREADED_RTS
-
 # Way `mp': 
 WAY_mp_NAME=parallel
 WAY_mp_HC_OPTS=-parallel
@@ -1072,6 +1070,10 @@ WAY_thr_HC_OPTS=-optc-DTHREADED_RTS
 WAY_thr_p_NAME=threaded profiled
 WAY_thr_p_HC_OPTS=-optc-DTHREADED_RTS -prof
 
+# Way `s':
+WAY_s_NAME=threads (for SMP)
+WAY_s_HC_OPTS=-optc-DSMP -optc-DTHREADED_RTS
+
 # Way 'debug':
 WAY_debug_NAME=debug
 WAY_debug_HC_OPTS=-optc-DDEBUG
@@ -1086,7 +1088,7 @@ WAY_debug_u_HC_OPTS=-optc-DDEBUG -unreg
 
 # Way 'debug_s':
 WAY_debug_s_NAME=debug SMP
-WAY_debug_s_HC_OPTS=-optc-DDEBUG -optc-DTHREADED_RTS -smp
+WAY_debug_s_HC_OPTS=-optc-DDEBUG -optc-DTHREADED_RTS -optc-DSMP
 
 # Way 'thr_debug':
 WAY_thr_debug_NAME=threaded

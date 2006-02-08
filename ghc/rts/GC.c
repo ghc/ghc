@@ -1696,7 +1696,7 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
   SET_EVACUAEE_FOR_LDV(src, size_to_reserve);
   // fill the slop
   if (size_to_reserve - size_to_copy_org > 0)
-    FILL_SLOP(stp->hp - 1, (int)(size_to_reserve - size_to_copy_org)); 
+    LDV_FILL_SLOP(stp->hp - 1, (int)(size_to_reserve - size_to_copy_org)); 
 #endif
   return (StgClosure *)dest;
 }
@@ -2164,7 +2164,7 @@ loop:
     }
 
   case BLOCKED_FETCH:
-    ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
+    ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOD_SIZE);
     to = copy(q,sizeofW(StgBlockedFetch),stp);
     IF_DEBUG(gc,
 	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
@@ -2175,7 +2175,7 @@ loop:
   case REMOTE_REF:
 # endif
   case FETCH_ME:
-    ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
+    ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOAD_SIZE);
     to = copy(q,sizeofW(StgFetchMe),stp);
     IF_DEBUG(gc,
 	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
@@ -2183,7 +2183,7 @@ loop:
     return to;
 
   case FETCH_ME_BQ:
-    ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
+    ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOAD_SIZE);
     to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
     IF_DEBUG(gc,
 	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
@@ -3555,12 +3555,12 @@ linear_scan:
 
 	    // already scavenged?
 	    if (is_marked(oldgen_scan+1,oldgen_scan_bd)) {
-		oldgen_scan += sizeofW(StgHeader) + MIN_NONUPD_SIZE;
+		oldgen_scan += sizeofW(StgHeader) + MIN_PAYLOAD_SIZE;
 		goto loop;
 	    }
 	    push_mark_stack(oldgen_scan);
 	    // ToDo: bump the linear scan by the actual size of the object
-	    oldgen_scan += sizeofW(StgHeader) + MIN_NONUPD_SIZE;
+	    oldgen_scan += sizeofW(StgHeader) + MIN_PAYLOAD_SIZE;
 	    goto linear_scan;
 	}
 

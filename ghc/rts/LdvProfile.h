@@ -24,7 +24,7 @@ extern void LdvCensusKillAll ( void );
 // Invoked when: 
 //   1) Hp is incremented and exceeds HpLim (in Updates.hc).
 //   2) copypart() is called (in GC.c).
-#define FILL_SLOP(from, howManyBackwards)	\
+#define LDV_FILL_SLOP(from, howManyBackwards)	\
   if (era > 0) {				\
     int i;					\
     for (i = 0;i < (howManyBackwards); i++)	\

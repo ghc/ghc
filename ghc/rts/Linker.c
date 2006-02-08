@@ -26,6 +26,7 @@
 #include "RtsUtils.h"
 #include "Schedule.h"
 #include "Storage.h"
+#include "Sparks.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -527,6 +528,7 @@ typedef struct _RtsSymbolVal {
       SymX(newTVarzh_fast)			\
       SymX(atomicModifyMutVarzh_fast)		\
       SymX(newPinnedByteArrayzh_fast)		\
+      SymX(newSpark)				\
       SymX(orIntegerzh_fast)			\
       SymX(performGC)				\
       SymX(performMajorGC)			\
