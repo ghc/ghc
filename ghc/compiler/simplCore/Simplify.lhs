@@ -1523,7 +1523,7 @@ simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
 	(tvs,ids) = span isTyVar vs
     in
     simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
-    case coreRefineTys (getInScope env1) con tvs' (idType case_bndr') of {
+    case coreRefineTys con tvs' (idType case_bndr') of {
 	Nothing 	-- Inaccessible
 	    | opt_PprStyle_Debug	-- Hack: if debugging is on, generate an error case 
 					--  	 so we can see it

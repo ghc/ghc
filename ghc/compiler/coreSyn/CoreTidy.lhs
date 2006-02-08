@@ -18,7 +18,7 @@ import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique,
 import IdInfo		( setArityInfo, vanillaIdInfo,
 			  newStrictnessInfo, setAllStrictnessInfo,
 			  newDemandInfo, setNewDemandInfo )
-import Type		( Type, tidyType, tidyTyVarBndr, substTy, mkTvSubst )
+import Type		( Type, tidyType, tidyTyVarBndr, substTy, mkOpenTvSubst )
 import Var		( Var, TyVar, varName )
 import VarEnv
 import UniqFM		( lookupUFM )
@@ -96,7 +96,7 @@ tidyAlt case_bndr env (con, vs, rhs)
 refineTidyEnv :: TidyEnv -> DataCon -> [TyVar] -> Type -> TidyEnv
 -- Refine the TidyEnv in the light of the type refinement from coreRefineTys
 refineTidyEnv tidy_env@(occ_env, var_env)  con tvs scrut_ty
-  = case coreRefineTys in_scope con tvs scrut_ty of
+  = case coreRefineTys con tvs scrut_ty of
 	Nothing -> tidy_env
 	Just (tv_subst, all_bound_here)
 	    | all_bound_here 	-- Local type refinement only
@@ -106,12 +106,10 @@ refineTidyEnv tidy_env@(occ_env, var_env)  con tvs scrut_ty
 				-- And that means that exprType will work right everywhere
 	    -> (occ_env, mapVarEnv (refine subst) var_env)
 	    where
-	      subst = mkTvSubst in_scope tv_subst
+	      subst = mkOpenTvSubst tv_subst
   where
     refine subst var | isId var  = setIdType var (substTy subst (idType var)) 
 		     | otherwise = var
-
-    in_scope = mkInScopeSet var_env	-- Seldom used
 
 ------------  Notes  --------------
 tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)

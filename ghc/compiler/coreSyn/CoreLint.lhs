@@ -472,7 +472,7 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
         ; subst <- getTvSubst 
 	; let in_scope  = getTvInScope subst
 	      subst_env = getTvSubstEnv subst
-        ; case coreRefineTys in_scope con tvs scrut_ty of {
+        ; case coreRefineTys con tvs scrut_ty of {
              Nothing          -> return () ;	-- Alternative is dead code
              Just (refine, _) -> updateTvSubstEnv (composeTvSubst in_scope refine subst_env) $
     do 	{ addLoc (CasePat alt) $ do

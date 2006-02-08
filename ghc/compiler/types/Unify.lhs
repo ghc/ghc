@@ -21,7 +21,7 @@ import VarSet
 import Kind		( isSubKind )
 import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, mkTyVarTys,
 			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX,
-			  tcView )
+			  mkOpenTvSubst, tcView )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
 import DataCon 		( DataCon, dataConInstResTy )
 import Util		( snocView )
@@ -222,8 +222,7 @@ tcUnifyTys bind_fn tys1 tys2
     tvs2 = tyVarsOfTypes tys2
 
 ----------------------------
-coreRefineTys :: InScopeSet		-- Superset of free vars of either type
-	      -> DataCon -> [TyVar]	-- Case pattern (con tv1 .. tvn ...)
+coreRefineTys :: DataCon -> [TyVar]	-- Case pattern (con tv1 .. tvn ...)
 	      -> Type			-- Type of scrutinee
 	      -> Maybe TypeRefinement
 
@@ -234,13 +233,13 @@ type TypeRefinement = (TvSubstEnv, Bool)
 	-- for already-in-scope type variables
 
 -- Used by Core Lint and the simplifier.
-coreRefineTys in_scope con tvs scrut_ty
+coreRefineTys con tvs scrut_ty
   = maybeErrToMaybe $ initUM (tryToBind tv_set) $
     do	{ 	-- Run the unifier, starting with an empty env
 	; subst_env <- unify emptyTvSubstEnv pat_res_ty scrut_ty
 
 	-- Find the fixed point of the resulting non-idempotent substitution
-	; let subst  	      = TvSubst in_scope subst_env_fixpt
+	; let subst  	      = mkOpenTvSubst subst_env_fixpt
 	      subst_env_fixpt = mapVarEnv (substTy subst) subst_env
 		
 	; return (subst_env_fixpt, all_bound_here subst_env) }

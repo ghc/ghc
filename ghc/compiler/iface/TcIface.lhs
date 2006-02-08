@@ -17,7 +17,7 @@ import LoadIface	( loadInterface, loadWiredInHomeIface,
 			  loadDecls, findAndReadIface )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
-			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, 
+			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, refineIfaceIdEnv,
 			  newIfaceName, newIfaceNames, ifaceExportNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
@@ -31,6 +31,7 @@ import HscTypes		( ExternalPackageState(..),
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
 			  emptyModDetails, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( Instance(..), mkImportedInstance )
+import Unify		( coreRefineTys )
 import CoreSyn
 import CoreUtils	( exprType )
 import CoreUnfold
@@ -676,8 +677,16 @@ tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_occs, rhs)
 				    ppr (con, arg_names, rhs) $$ ppr tyvars $$ ppr arg_tys )
 			   zipWith mkLocalId id_names arg_tys
 
+		Just refine = coreRefineTys con tyvars (mkTyConApp tycon inst_tys)
+		
 	; rhs' <- extendIfaceTyVarEnv tyvars	$
 		  extendIfaceIdEnv arg_ids	$
+		  refineIfaceIdEnv refine	$
+			-- You might think that we don't need to refine the envt here,
+			-- but we do: \(x::a) -> case y of 
+			--			     MkT -> case x of { True -> ... }
+			-- In the "case x" we need to know x's type, because we use that
+			-- to find which module to look for "True" in. Sigh.
 		  tcIfaceExpr rhs
 	; return (DataAlt con, tyvars ++ arg_ids, rhs') }}
 

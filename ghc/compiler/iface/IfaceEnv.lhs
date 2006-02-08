@@ -6,7 +6,7 @@ module IfaceEnv (
 	lookupIfaceTop, lookupIfaceExt,
 	lookupOrig, lookupIfaceTc,
 	newIfaceName, newIfaceNames,
-	extendIfaceIdEnv, extendIfaceTyVarEnv,
+	extendIfaceIdEnv, extendIfaceTyVarEnv, refineIfaceIdEnv,
 	tcIfaceLclId,     tcIfaceTyVar, 
 
 	lookupAvail, ifaceExportNames,
@@ -22,16 +22,18 @@ import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
 import TysWiredIn	( tupleTyCon, tupleCon )
 import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), 
 			  IfaceExport, OrigNameCache )
+import Type		( mkOpenTvSubst, substTy )
 import TyCon		( TyCon, tyConName )
+import Unify		( TypeRefinement )
 import DataCon		( dataConWorkId, dataConName )
-import Var		( TyVar, Id, varName )
+import Var		( TyVar, Id, varName, setIdType, idType )
 import Name		( Name, nameUnique, nameModule, 
 			  nameOccName, nameSrcLoc, 
 			  getOccName, nameParent_maybe,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
 import NameSet		( NameSet, emptyNameSet, addListToNameSet )
-import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
+import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, mapOccEnv,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM, pREL_TUP )
 import Module		( Module, emptyModuleEnv, 
@@ -290,6 +292,14 @@ tcIfaceLclId occ
 		  `orElse` 
 		  pprPanic "tcIfaceLclId" (ppr occ)) }
 
+refineIfaceIdEnv :: TypeRefinement -> IfL a -> IfL a
+refineIfaceIdEnv (tv_subst, _) thing_inside
+  = do	{ env <- getLclEnv
+	; let { id_env' = mapOccEnv refine_id (if_id_env env)
+	      ;	refine_id id = setIdType id (substTy subst (idType id))
+	      ;	subst = mkOpenTvSubst tv_subst }
+	; setLclEnv (env { if_id_env = id_env' }) thing_inside }
+	
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a
 extendIfaceIdEnv ids thing_inside
   = do	{ env <- getLclEnv
