@@ -1,3 +1,12 @@
+package = ghc
+version = 6.5.20060205
+PACKAGE_SH_SCRIPTS = ghc-6.5.20060205 ghci-6.5.20060205 ghc-pkg-6.5.20060205 hsc2hs
+PACKAGE_PRL_SCRIPTS = ghcprof
+PACKAGE_LIB_PRL_SCRIPTS = ghc-asm ghc-split
+PACKAGE_LIB_SPLICED_FILES = package.conf
+PACKAGE_BINS = hp2ps runghc
+PACKAGE_OPT_BINS = runhaskell
+PACKAGE_LINKS = ghc ghci ghc-pkg
 #
 # @configure_input@
 #
@@ -272,7 +281,9 @@ show-install-setup:
 install-docs : install-dirs-docs
 	if test -d share/html ; then $(CP) -r share/html/* $(htmldir) ; fi
 	for i in share/*.ps; do \
-		$(CP) $$i $(psdir) ; \
+		if test -f "$$i"; then \
+		      $(CP) $$i $(psdir) ; \
+		fi \
 	done
 
 install-dirs-docs:
