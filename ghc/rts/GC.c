@@ -2016,10 +2016,14 @@ loop:
   case THUNK_SELECTOR:
     {
 	StgClosure *p;
+	const StgInfoTable *info_ptr;
 
 	if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
 	    return copy(q,THUNK_SELECTOR_sizeW(),stp);
 	}
+
+	// stashed away for LDV profiling, see below
+	info_ptr = q->header.info;
 
 	p = eval_thunk_selector(info->layout.selector_offset,
 				(StgSelector *)q);
@@ -2033,6 +2037,13 @@ loop:
 	    val = evacuate(p);
 	    thunk_selector_depth--;
 
+#ifdef PROFILING
+	    // For the purposes of LDV profiling, we have destroyed
+	    // the original selector thunk.
+	    SET_INFO(q, info_ptr);
+	    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(q);
+#endif
+
 	    // Update the THUNK_SELECTOR with an indirection to the
 	    // EVACUATED closure now at p.  Why do this rather than
 	    // upd_evacuee(q,p)?  Because we have an invariant that an
@@ -2042,12 +2053,10 @@ loop:
 	    SET_INFO(q, &stg_IND_info);
 	    ((StgInd *)q)->indirectee = p;
 
-#ifdef PROFILING
-	    // We store the size of the just evacuated object in the
-	    // LDV word so that the profiler can guess the position of
-	    // the next object later.
-	    SET_EVACUAEE_FOR_LDV(q, THUNK_SELECTOR_sizeW());
-#endif
+	    // For the purposes of LDV profiling, we have created an
+	    // indirection.
+	    LDV_RECORD_CREATE(q);
+
 	    return val;
 	}
     }
