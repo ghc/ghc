@@ -26,7 +26,9 @@ endif
 export MAKE
 
 # ghastly hack, because the driver requires that $tool be an absolute path name.
-GHC_INPLACE_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-inplace
+GHC_STAGE1_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/stage1/ghc-inplace
+GHC_STAGE2_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/stage2/ghc-inplace
+GHC_STAGE3_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/stage3/ghc-inplace
 
 EXTRA_HC_OPTS += -D$(HostPlatform_CPP)
   # ideally TargetPlatform_CPP, but that doesn't exist; they're always the same anyway
@@ -35,7 +37,11 @@ COMPILER     = ghc
 CONFIG       = $(TOP)/config/$(COMPILER)
 
 # can be overriden from the command line
-TEST_HC = $(GHC_INPLACE_ABS)
+ifneq "$(stage)" ""
+TEST_HC = $(GHC_STAGE$(stage)_ABS)
+else
+TEST_HC = $(GHC_STAGE1_ABS)
+endif
 
 RUNTEST_OPTS =
 
