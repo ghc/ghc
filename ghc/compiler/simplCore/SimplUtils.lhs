@@ -27,7 +27,6 @@ import DynFlags		( SimplifierSwitch(..), SimplifierMode(..),
 			  DynFlag(..), dopt )
 import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
 			  opt_RulesOff )
-			  
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, exprIsCheap,
@@ -107,7 +106,7 @@ instance Outputable LetRhsFlag where
   ppr AnRhs = ptext SLIT("rhs")
 
 instance Outputable SimplCont where
-  ppr (Stop _ is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs)
+  ppr (Stop ty is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs) <+> ppr ty
   ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
   ppr (ArgOf _ _ _ _)   	     = ptext SLIT("ArgOf...")
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
