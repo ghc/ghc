@@ -19,6 +19,9 @@ test('gadt14', normal, compile, [''])
 test('gadt15', normal, compile, [''])
 test('gadt16', normal, compile, [''])
 
+clean(['Gadt17_help.hi', 'Gadt17_help.o'])
+test('gadt17', normal, run_command_ignore_output, ['$MAKE gadt17'])
+
 test('red-black', normal, compile, [''])
 test('type-rep', skip_if_fast, compile_and_run, [''])
 test('equal', normal, compile, [''])
