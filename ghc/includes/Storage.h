@@ -375,6 +375,8 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     case FUN_2_0:
     case CONSTR_2_0:
 	return sizeofW(StgHeader) + 2;
+    case THUNK:
+	return thunk_sizeW_fromITBL(info);
     case THUNK_SELECTOR:
 	return THUNK_SELECTOR_sizeW();
     case AP_STACK:
@@ -411,6 +413,7 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     }
 }
 
+// The definitive way to find the size, in words, of a heap-allocated closure
 STATIC_INLINE nat
 closure_sizeW (StgClosure *p)
 {
