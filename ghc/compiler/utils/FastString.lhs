@@ -51,6 +51,10 @@ module FastString
 	-- ** Outputing
         hPutFS,
 
+	-- ** Internal
+	getFastStringTable,
+	hasZEncoding,
+
 	-- * LitStrings
 	LitString, 
 	mkLitString#,
@@ -71,6 +75,7 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad.ST	( stToIO )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 import System.IO	( hPutBuf )
+import Data.Maybe	( isJust )
 
 import GHC.Arr		( STArray(..), newSTArray )
 import GHC.IOBase	( IO(..) )
@@ -343,6 +348,17 @@ isZEncoded :: FastString -> Bool
 isZEncoded fs | ZEncoded <- enc fs = True
 		| otherwise          = False
 
+-- | Returns 'True' if this 'FastString' is not Z-encoded but already has
+-- a Z-encoding cached (used in producing stats).
+hasZEncoding :: FastString -> Bool
+hasZEncoding fs@(FastString uid n_bytes _ fp enc) =
+  case enc of
+    ZEncoded -> False
+    UTF8Encoded ref ->
+      inlinePerformIO $ do
+        m <- readIORef ref
+	return (isJust m)
+
 -- | Returns 'True' if the 'FastString' is empty
 nullFS :: FastString -> Bool
 nullFS f  =  n_bytes f == 0
@@ -413,6 +429,15 @@ uniqueOfFS :: FastString -> Int#
 uniqueOfFS (FastString (I# u#) _ _ _ _) = u#
 
 nilFS = mkFastString ""
+
+-- -----------------------------------------------------------------------------
+-- Stats
+
+getFastStringTable :: IO [[FastString]]
+getFastStringTable = do
+  tbl <- readIORef string_table
+  buckets <- mapM (lookupTbl tbl) [0..hASH_TBL_SIZE]
+  return buckets
 
 -- -----------------------------------------------------------------------------
 -- Outputting 'FastString's

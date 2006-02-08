@@ -14,7 +14,7 @@ module Main (main) where
 -- The official GHC API
 import qualified GHC
 import GHC		( Session, DynFlags(..), GhcMode(..), HscTarget(..),
-			  LoadHowMuch(..) )
+			  LoadHowMuch(..), dopt, DynFlag(..) )
 import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
@@ -34,6 +34,9 @@ import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 import StaticFlags	( staticFlags, v_Ld_inputs )
 import DynFlags         ( defaultDynFlags )
 import BasicTypes	( failed )
+import ErrUtils		( Message, debugTraceMsg, putMsg )
+import FastString	( getFastStringTable, isZEncoded, hasZEncoding )
+import Outputable
 import Util
 import Panic
 
@@ -148,6 +151,7 @@ main =
 	DoInteractive   -> interactiveUI session srcs Nothing
 	DoEval expr     -> interactiveUI session srcs (Just expr)
 
+  dumpFinalStats dflags
   exitWith ExitSuccess
 
 #ifndef GHCI
@@ -429,6 +433,41 @@ showGhcUsage cli_mode = do
      dump ""	      = return ()
      dump ('$':'$':s) = putStr progName >> dump s
      dump (c:s)	      = putChar c >> dump s
+
+dumpFinalStats :: DynFlags -> IO ()
+dumpFinalStats dflags = 
+  when (dopt Opt_D_faststring_stats dflags) $ dumpFastStringStats dflags
+
+dumpFastStringStats :: DynFlags -> IO ()
+dumpFastStringStats dflags = do
+  buckets <- getFastStringTable
+  let (entries, longest, is_z, has_z) = countFS 0 0 0 0 buckets
+      msg = text "FastString stats:" $$
+	    nest 4 (vcat [text "size:           " <+> int (length buckets),
+			  text "entries:        " <+> int entries,
+			  text "longest chain:  " <+> int longest,
+			  text "z-encoded:      " <+> (is_z `pcntOf` entries),
+			  text "has z-encoding: " <+> (has_z `pcntOf` entries)
+			 ])
+	-- we usually get more "has z-encoding" than "z-encoded", because
+	-- when we z-encode a string it might hash to the exact same string,
+	-- which will is not counted as "z-encoded".  Only strings whose
+	-- Z-encoding is different from the original string are counted in
+	-- the "z-encoded" total.
+  putMsg dflags msg
+  where
+   x `pcntOf` y = int ((x * 100) `quot` y) <> char '%'
+  
+countFS entries longest is_z has_z [] = (entries, longest, is_z, has_z)
+countFS entries longest is_z has_z (b:bs) = 
+  let
+	len = length b
+	longest' = max len longest
+	entries' = entries + len
+	is_zs = length (filter isZEncoded b)
+	has_zs = length (filter hasZEncoding b)
+  in
+	countFS entries' longest' (is_z + is_zs) (has_z + has_zs) bs
 
 -- -----------------------------------------------------------------------------
 -- Util

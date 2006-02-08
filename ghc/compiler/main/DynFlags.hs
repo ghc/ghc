@@ -115,6 +115,7 @@ data DynFlag
    | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_minimal_imports
+   | Opt_D_faststring_stats
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
@@ -899,6 +900,7 @@ dynamic_flags = [
   ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
   ,  ( "dshow-passes",           NoArg (do unSetDynFlag Opt_RecompChecking
 				           setVerbosity "2") )
+  ,  ( "dfaststring-stats",	 NoArg (setDynFlag Opt_D_faststring_stats))
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 
