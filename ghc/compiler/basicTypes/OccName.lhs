@@ -42,7 +42,7 @@ module OccName (
 	isTupleOcc_maybe,
 
 	-- The OccEnv type
-	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv,
+	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
 	lookupOccEnv, mkOccEnv, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
 
@@ -266,6 +266,7 @@ occEnvElts   :: OccEnv a -> [a]
 extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
 plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
 plusOccEnv_C   :: (a->a->a) -> OccEnv a -> OccEnv a -> OccEnv a
+mapOccEnv      :: (a->b) -> OccEnv a -> OccEnv b
 
 emptyOccEnv  	 = emptyUFM
 unitOccEnv   	 = unitUFM
@@ -279,7 +280,7 @@ occEnvElts 	 = eltsUFM
 plusOccEnv	 = plusUFM
 plusOccEnv_C	 = plusUFM_C
 extendOccEnv_C   = addToUFM_C
-
+mapOccEnv	 = mapUFM
 
 type OccSet = UniqFM OccName
 
