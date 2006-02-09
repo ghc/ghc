@@ -425,8 +425,8 @@ dist ::
 	-$(RM) $(SRC_DIST_NAME).tar.gz
 	mkdir $(SRC_DIST_DIR)
 	mkdir $(SRC_DIST_DIR)/mk
-	$(FIND) $(SRC_DIST_DIRS) -type d \( -name CVS -prune -o -name SRC -prune -o -name "autom4te*" -prune -o -print \) | sed -e 's!.*!mkdir "$(SRC_DIST_DIR)/&"!' | sh
-	$(FIND) $(SRC_DIST_DIRS) $(SRC_DIST_FILES) -name CVS -prune -o -name SRC -prune -o -name "autom4te*" -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -name "log" -prune -o -name "*-SAVE" -prune -o -name "*.orig" -prune -o -name "*.rej" -prune -o ! -type d -print | sed -e 's!.*!$(LN_S) "$(FPTOOLS_TOP_ABS)/&" "$(SRC_DIST_DIR)/&"!' | sh
+	$(FIND) $(SRC_DIST_DIRS) -type d \( -name _darcs -prune -o -name SRC -prune -o -name "autom4te*" -prune -o -print \) | sed -e 's!.*!mkdir "$(SRC_DIST_DIR)/&"!' | sh
+	$(FIND) $(SRC_DIST_DIRS) $(SRC_DIST_FILES) -name _darcs -prune -o -name SRC -prune -o -name "autom4te*" -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -name "log" -prune -o -name "*-SAVE" -prune -o -name "*.orig" -prune -o -name "*.rej" -prune -o ! -type d -print | sed -e 's!.*!$(LN_S) "$(FPTOOLS_TOP_ABS)/&" "$(SRC_DIST_DIR)/&"!' | sh
 
 # Automatic generation of a MANIFEST file for a source distribution
 # tree that is ready to go.
