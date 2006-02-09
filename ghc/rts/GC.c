@@ -1154,7 +1154,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   ACQUIRE_SM_LOCK;
   
   // send exceptions to any threads which were about to die 
+  RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
+  ACQUIRE_SM_LOCK;
 
   // Update the stable pointer hash table.
   updateStablePtrTable(major_gc);

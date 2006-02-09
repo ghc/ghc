@@ -2,25 +2,24 @@
  *
  * (c) The GHC Team, 2005
  *
- * Macros for SMP support
+ * Macros for THREADED_RTS support
  *
  * -------------------------------------------------------------------------- */
 
 #ifndef SMP_H
 #define SMP_H
 
-/* SMP is currently not compatible with the following options:
+/* THREADED_RTS is currently not compatible with the following options:
  *
- *      INTERPRETER
- *      PROFILING
+ *      PROFILING (but only 1 CPU supported)
  *      TICKY_TICKY
- *      and unregisterised builds.
+ *      Unregisterised builds are ok, but only 1 CPU supported.
  */
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
 
-#if  defined(PROFILING)  || defined(TICKY_TICKY)
-#error Build options incompatible with SMP.
+#if  defined(TICKY_TICKY)
+#error Build options incompatible with THREADED_RTS.
 #endif
 
 /* 
@@ -113,7 +112,7 @@ unlockClosure(StgClosure *p, StgInfoTable *info)
 #endif
 }
 
-#else /* !SMP */
+#else /* !THREADED_RTS */
 
 #define wb() /* nothing */
 
@@ -125,6 +124,6 @@ xchg(StgPtr p, StgWord w)
     return old;
 }
 
-#endif /* !SMP */
+#endif /* !THREADED_RTS */
 
 #endif /* SMP_H */

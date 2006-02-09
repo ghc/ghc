@@ -124,7 +124,7 @@ static_flags = [
   ,  ( "ticky"		, NoArg (addWay WayTicky) )
   ,  ( "parallel"	, NoArg (addWay WayPar) )
   ,  ( "gransim"	, NoArg (addWay WayGran) )
-  ,  ( "smp"		, NoArg (addWay WaySMP) )
+  ,  ( "smp"		, NoArg (addWay WayThreaded) ) -- backwards compat.
   ,  ( "debug"		, NoArg (addWay WayDebug) )
   ,  ( "ndp"		, NoArg (addWay WayNDP) )
   ,  ( "threaded"	, NoArg (addWay WayThreaded) )
@@ -416,7 +416,6 @@ data WayName
   | WayTicky
   | WayPar
   | WayGran
-  | WaySMP
   | WayNDP
   | WayUser_a
   | WayUser_b
@@ -553,16 +552,6 @@ way_details =
 	, "-D__GRANSIM__"
 	, "-optc-DGRAN"
 	, "-package concurrent" ]),
-
-    (WaySMP, Way  "s" True "SMP"
-	[ 
-#if !defined(mingw32_TARGET_OS)
-	  "-optc-pthread"
-#endif
-#if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS)
-	, "-optl-pthread"
-#endif
-	]),
 
     (WayNDP, Way  "ndp" False "Nested data parallelism"
 	[ "-fparr"

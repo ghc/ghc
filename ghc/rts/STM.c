@@ -28,7 +28,7 @@
  * in STM.h:
  * 
  * STM_UNIPROC assumes that the caller serialises invocations on the STM interface.
- * In the Haskell RTS this means it is suitable only for non-SMP builds.
+ * In the Haskell RTS this means it is suitable only for non-THREADED_RTS builds.
  *
  * STM_CG_LOCK uses coarse-grained locking -- a single 'stm lock' is acquired during
  * an invocation on the STM interface.  Note that this does not mean that 
@@ -97,8 +97,8 @@
 #define TRUE 1
 #define FALSE 0
 
-// ACQ_ASSERT is used for assertions which are only required for SMP builds with
-// fine-grained locking. 
+// ACQ_ASSERT is used for assertions which are only required for
+// THREADED_RTS builds with fine-grained locking.
 
 #if defined(STM_FG_LOCKS)
 #define ACQ_ASSERT(_X) ASSERT(_X)
@@ -794,7 +794,7 @@ static volatile StgInt64 max_commits = 0;
 
 static volatile StgBool token_locked = FALSE;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
 static void getTokenBatch(Capability *cap) {
   while (cas(&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
   max_commits += TOKEN_BATCH_SIZE;
@@ -1252,7 +1252,7 @@ StgTVar *stmNewTVar(Capability *cap,
   SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
   result -> current_value = new_value;
   result -> first_wait_queue_entry = END_STM_WAIT_QUEUE;
-#if defined(SMP)
+#if defined(THREADED_RTS)
   result -> num_updates = 0;
 #endif
   return result;

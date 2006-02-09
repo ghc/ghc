@@ -17,6 +17,7 @@
 #include "Stats.h"      /* initStats */
 #include "STM.h"        /* initSTM */
 #include "Signals.h"
+#include "RtsSignals.h"
 #include "Timer.h"      /* startTimer, stopTimer */
 #include "Weak.h"
 #include "Ticky.h"
@@ -275,12 +276,8 @@ void
 hs_add_root(void (*init_root)(void))
 {
     bdescr *bd;
-#ifdef SMP
-    Capability cap;
-#else
-#define cap MainCapability
-#endif
     nat init_sp;
+    Capability *cap = &MainCapability;
 
     if (hs_init_count <= 0) {
 	barf("hs_add_root() must be called after hs_init()");
@@ -296,8 +293,8 @@ hs_add_root(void (*init_root)(void))
 	init_stack[--init_sp] = (F_)init_root;
     }
     
-    cap.r.rSp = (P_)(init_stack + init_sp);
-    StgRun((StgFunPtr)stg_init, &cap.r);
+    cap->r.rSp = (P_)(init_stack + init_sp);
+    StgRun((StgFunPtr)stg_init, &cap->r);
 
     freeGroup_lock(bd);
 

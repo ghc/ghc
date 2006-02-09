@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2000-2005
+ * (c) The GHC Team, 2000-2006
  *
- * Sparking support for PARALLEL_HASKELL and SMP versions of the RTS.
+ * Sparking support for PARALLEL_HASKELL and THREADED_RTS versions of the RTS.
  *
  * -------------------------------------------------------------------------*/
 
@@ -22,7 +22,7 @@
 # endif
 #include "Sparks.h"
 
-#if defined(SMP) || defined(PARALLEL_HASKELL)
+#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
 
 static INLINE_ME void bump_hd (StgSparkPool *p)
 { p->hd++; if (p->hd == p->lim) p->hd = p->base; }
@@ -50,7 +50,7 @@ initSparkPool(StgSparkPool *pool)
 void
 initSparkPools( void )
 {
-#ifdef SMP
+#ifdef THREADED_RTS
     /* walk over the capabilities, allocating a spark pool for each one */
     nat i;
     for (i = 0; i < n_capabilities; i++) {
@@ -229,7 +229,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
     return 1;
 }
 
-#endif /* PARALLEL_HASKELL || SMP */
+#endif /* PARALLEL_HASKELL || THREADED_RTS */
 
 
 /* -----------------------------------------------------------------------------
@@ -300,7 +300,7 @@ void
 disposeSpark(spark)
 StgClosure *spark;
 {
-#if !defined(SMP)
+#if !defined(THREADED_RTS)
   Capability *cap;
   StgSparkPool *pool;
 

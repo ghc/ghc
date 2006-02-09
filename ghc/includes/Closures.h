@@ -356,7 +356,7 @@ typedef struct {
   StgHeader                  header;
   StgClosure                *volatile current_value;
   StgTVarWaitQueue          *volatile first_wait_queue_entry;
-#if defined(SMP)
+#if defined(THREADED_RTS)
   StgInt                     volatile num_updates;
 #endif
 } StgTVar;
@@ -367,7 +367,7 @@ typedef struct {
   StgTVar                   *tvar;
   StgClosure                *expected_value;
   StgClosure                *new_value; 
-#if defined(SMP)
+#if defined(THREADED_RTS)
   StgInt                     num_updates;
 #endif
 } TRecEntry;

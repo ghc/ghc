@@ -25,7 +25,8 @@
 #include "gmp.h" // Needs MP_INT definition 
 
 /*
- * Spark pools: used to store pending sparks (SMP & PARALLEL_HASKELL only)
+ * Spark pools: used to store pending sparks 
+ *  (THREADED_RTS & PARALLEL_HASKELL only)
  * This is a circular buffer.  Invariants:
  *    - base <= hd < lim
  *    - base <= tl < lim
@@ -107,15 +108,16 @@ typedef struct StgRegTable_ {
   struct bdescr_ *rCurrentNursery; /* Hp/HpLim point into this block */
   struct bdescr_ *rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
-  // rmp_tmp1..rmp_result2 are only used in SMP builds to avoid per-thread temps
-  // in bss, but currently always incldue here so we just run mkDerivedConstants once
+  // rmp_tmp1..rmp_result2 are only used in THREADED_RTS builds to
+  // avoid per-thread temps in bss, but currently always incldue here
+  // so we just run mkDerivedConstants once
   StgInt          rmp_tmp_w;
   MP_INT          rmp_tmp1;      
   MP_INT          rmp_tmp2;      
   MP_INT          rmp_result1;
   MP_INT          rmp_result2;
   StgWord         rRet;  // holds the return code of the thread
-#if defined(SMP) || defined(PAR)
+#if defined(THREADED_RTS) || defined(PAR)
   StgSparkPool    rSparks;	/* per-task spark pool */
 #endif
 } StgRegTable;
@@ -330,10 +332,10 @@ struct PartCapability_ {
     StgRegTable r;
 };
 
-/* No such thing as a MainCapability under SMP - each thread must have
+/* No such thing as a MainCapability under THREADED_RTS - each thread must have
  * its own Capability.
  */
-#if IN_STG_CODE && !defined(SMP)
+#if IN_STG_CODE && !defined(THREADED_RTS)
 extern W_ MainCapability[];
 #endif
 
@@ -349,8 +351,8 @@ extern W_ MainCapability[];
 GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #define ASSIGN_BaseReg(e) (BaseReg = (e))
 #else
-#ifdef SMP
-#error BaseReg must be in a register for SMP
+#ifdef THREADED_RTS
+#error BaseReg must be in a register for THREADED_RTS
 #endif
 #define BaseReg (&((struct PartCapability_ *)MainCapability)->r)
 #define ASSIGN_BaseReg(e) /*nothing*/
@@ -628,8 +630,8 @@ GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
 #endif
 
 #ifdef CALLER_SAVES_Base
-#ifdef SMP
-#error "Can't have caller-saved BaseReg with SMP"
+#ifdef THREADED_RTS
+#error "Can't have caller-saved BaseReg with THREADED_RTS"
 #endif
 #define CALLER_SAVE_Base	/* nothing */
 #define CALLER_RESTORE_Base	BaseReg = &MainRegTable;

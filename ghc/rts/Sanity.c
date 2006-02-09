@@ -549,7 +549,7 @@ checkHeap(bdescr *bd)
 {
     StgPtr p;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     // heap sanity checking doesn't work with SMP, because we can't
     // zero the slop (see Updates.h).
     return;

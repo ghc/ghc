@@ -186,7 +186,7 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
  * already have been updated (the mutable list will get messed up
  * otherwise).
  *
- * NB. We do *not* do this in SMP mode, because when we have the
+ * NB. We do *not* do this in THREADED_RTS mode, because when we have the
  * possibility of multiple threads entering the same closure, zeroing
  * the slop in one of the threads would have a disastrous effect on
  * the other (seen in the wild!).
@@ -249,7 +249,7 @@ FILL_SLOP(StgClosure *p)
 
 #endif /* CMINUSMINUS */
 
-#if !defined(DEBUG) || defined(SMP)
+#if !defined(DEBUG) || defined(THREADED_RTS)
 #define DEBUG_FILL_SLOP(p) /* do nothing */
 #else
 #define DEBUG_FILL_SLOP(p) FILL_SLOP(p)

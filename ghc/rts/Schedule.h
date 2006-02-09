@@ -86,7 +86,6 @@ void GetRoots(evac_fn);
  */
 void workerStart(Task *task);
 
-// ToDo: check whether all fcts below are used in the SMP version, too
 #if defined(GRAN)
 void    awaken_blocked_queue(StgBlockingQueueElement *q, StgClosure *node);
 void    unlink_from_bq(StgTSO* tso, StgClosure* node);

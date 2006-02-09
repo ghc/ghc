@@ -161,12 +161,12 @@ struct PAR_FLAGS {
 };
 #endif /* PAR */
 
-#ifdef SMP
+#ifdef THREADED_RTS
 struct PAR_FLAGS {
   nat            nNodes;         /* number of threads to run simultaneously */
   unsigned int	 maxLocalSparks;
 };
-#endif /* SMP */
+#endif /* THREADED_RTS */
 
 #ifdef GRAN
 struct GRAN_STATS_FLAGS {
@@ -240,7 +240,7 @@ struct GRAN_FLAGS {
   struct GRAN_COST_FLAGS Costs;          /* cost metric for simulation */
   struct GRAN_DEBUG_FLAGS Debug;         /* debugging options */
 
-  nat  maxThreads;              /* ToDo: share with SMP and GUM */
+  nat  maxThreads;              /* ToDo: share with THREADED_RTS and GUM */
   /* rtsBool labelling; */
   nat  packBufferSize;
   nat  packBufferSize_internal;
@@ -300,7 +300,7 @@ typedef struct _RTS_FLAGS {
     struct PROFILING_FLAGS   ProfFlags;
     struct TICKY_FLAGS	     TickyFlags;
 
-#if defined(SMP) || defined(PAR)
+#if defined(THREADED_RTS) || defined(PAR)
     struct PAR_FLAGS	ParFlags;
 #endif
 #ifdef GRAN

@@ -175,7 +175,7 @@ rtsBool shutting_down_scheduler = rtsFalse;
 
 /*
  * This mutex protects most of the global scheduler data in
- * the THREADED_RTS and (inc. SMP) runtime.
+ * the THREADED_RTS runtime.
  */
 #if defined(THREADED_RTS)
 Mutex sched_mutex;
@@ -199,7 +199,7 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 // scheduler clearer.
 //
 static void schedulePreLoop (void);
-#if defined(SMP)
+#if defined(THREADED_RTS)
 static void schedulePushWork(Capability *cap, Task *task);
 #endif
 static void scheduleStartSignalHandlers (Capability *cap);
@@ -227,7 +227,8 @@ static void scheduleHandleThreadBlocked( StgTSO *t );
 static rtsBool scheduleHandleThreadFinished( Capability *cap, Task *task,
 					     StgTSO *t );
 static rtsBool scheduleDoHeapProfile(rtsBool ready_to_gc);
-static void scheduleDoGC(Capability *cap, Task *task, rtsBool force_major);
+static void scheduleDoGC(Capability *cap, Task *task, rtsBool force_major,
+			 void (*get_roots)(evac_fn));
 
 static void unblockThread(Capability *cap, StgTSO *tso);
 static rtsBool checkBlackHoles(Capability *cap);
@@ -380,7 +381,7 @@ schedule (Capability *initialCapability, Task *task)
       }
 #endif
       
-#ifdef SMP
+#if defined(THREADED_RTS)
       schedulePushWork(cap,task);
 #endif
 
@@ -401,7 +402,7 @@ schedule (Capability *initialCapability, Task *task)
     //
     if (interrupted) {
 	deleteRunQueue(cap);
-#if defined(SMP)
+#if defined(THREADED_RTS)
 	discardSparksCap(cap);
 #endif
 	if (shutting_down_scheduler) {
@@ -417,7 +418,7 @@ schedule (Capability *initialCapability, Task *task)
 	}
     }
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     // If the run queue is empty, take a spark and turn it into a thread.
     {
 	if (emptyRunQueue(cap)) {
@@ -431,7 +432,7 @@ schedule (Capability *initialCapability, Task *task)
 	    }
 	}
     }
-#endif // SMP
+#endif // THREADED_RTS
 
     scheduleStartSignalHandlers(cap);
 
@@ -677,7 +678,7 @@ run_thread:
     }
 
     if (scheduleDoHeapProfile(ready_to_gc)) { ready_to_gc = rtsFalse; }
-    if (ready_to_gc) { scheduleDoGC(cap,task,rtsFalse); }
+    if (ready_to_gc) { scheduleDoGC(cap,task,rtsFalse,GetRoots); }
   } /* end of while() */
 
   IF_PAR_DEBUG(verbose,
@@ -716,10 +717,10 @@ schedulePreLoop(void)
  * Push work to other Capabilities if we have some.
  * -------------------------------------------------------------------------- */
 
-#ifdef SMP
+#if defined(THREADED_RTS)
 static void
-schedulePushWork(Capability *cap USED_IF_SMP, 
-		 Task *task      USED_IF_SMP)
+schedulePushWork(Capability *cap USED_IF_THREADS, 
+		 Task *task      USED_IF_THREADS)
 {
     Capability *free_caps[n_capabilities], *cap0;
     nat i, n_free_caps;
@@ -884,7 +885,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 {
 
 #if defined(PARALLEL_HASKELL)
-    // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
+    // ToDo: add deadlock detection in GUM (similar to THREADED_RTS) -- HWL
     return;
 #endif
 
@@ -913,7 +914,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	// they are unreachable and will therefore be sent an
 	// exception.  Any threads thus released will be immediately
 	// runnable.
-	scheduleDoGC( cap, task, rtsTrue/*force  major GC*/ );
+	scheduleDoGC( cap, task, rtsTrue/*force  major GC*/, GetRoots );
 	recent_activity = ACTIVITY_DONE_GC;
 	
 	if ( !emptyRunQueue(cap) ) return;
@@ -1503,7 +1504,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    if (cap->r.rCurrentNursery->u.back != NULL) {
 		cap->r.rCurrentNursery->u.back->link = bd;
 	    } else {
-#if !defined(SMP)
+#if !defined(THREADED_RTS)
 		ASSERT(g0s0->blocks == cap->r.rCurrentNursery &&
 		       g0s0 == cap->r.rNursery);
 #endif
@@ -1708,9 +1709,9 @@ scheduleHandleThreadBlocked( StgTSO *t
       // has tidied up its stack and placed itself on whatever queue
       // it needs to be on.
 
-#if !defined(SMP)
+#if !defined(THREADED_RTS)
     ASSERT(t->why_blocked != NotBlocked);
-	     // This might not be true under SMP: we don't have
+	     // This might not be true under THREADED_RTS: we don't have
 	     // exclusive access to this TSO, so someone might have
 	     // woken it up by now.  This actually happens: try
 	     // conc023 +RTS -N2.
@@ -1870,16 +1871,17 @@ scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
  * -------------------------------------------------------------------------- */
 
 static void
-scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
+scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
+	      rtsBool force_major, void (*get_roots)(evac_fn))
 {
     StgTSO *t;
-#ifdef SMP
+#ifdef THREADED_RTS
     static volatile StgWord waiting_for_gc;
     rtsBool was_waiting;
     nat i;
 #endif
 
-#ifdef SMP
+#ifdef THREADED_RTS
     // In order to GC, there must be no threads running Haskell code.
     // Therefore, the GC thread needs to hold *all* the capabilities,
     // and release them after the GC has completed.  
@@ -1895,7 +1897,7 @@ scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
     if (was_waiting) {
 	do {
 	    IF_DEBUG(scheduler, sched_belch("someone else is trying to GC..."));
-	    yieldCapability(&cap,task);
+	    if (cap) yieldCapability(&cap,task);
 	} while (waiting_for_gc);
 	return;
     }
@@ -1941,7 +1943,7 @@ scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
 			// ATOMICALLY_FRAME, aborting the (nested)
 			// transaction, and saving the stack of any
 			// partially-evaluated thunks on the heap.
-			raiseAsync_(cap, t, NULL, rtsTrue, NULL);
+			raiseAsync_(&capabilities[0], t, NULL, rtsTrue, NULL);
 			
 #ifdef REG_R1
 			ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
@@ -1953,7 +1955,7 @@ scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
     }
     
     // so this happens periodically:
-    scheduleCheckBlackHoles(cap);
+    if (cap) scheduleCheckBlackHoles(cap);
     
     IF_DEBUG(scheduler, printAllThreads());
 
@@ -1965,9 +1967,9 @@ scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
 #if defined(THREADED_RTS)
     IF_DEBUG(scheduler,sched_belch("doing GC"));
 #endif
-    GarbageCollect(GetRoots, force_major);
+    GarbageCollect(get_roots, force_major);
     
-#if defined(SMP)
+#if defined(THREADED_RTS)
     // release our stash of capabilities.
     for (i = 0; i < n_capabilities; i++) {
 	if (cap != &capabilities[i]) {
@@ -1975,7 +1977,11 @@ scheduleDoGC( Capability *cap, Task *task USED_IF_SMP, rtsBool force_major )
 	    releaseCapability(&capabilities[i]);
 	}
     }
-    task->cap = cap;
+    if (cap) {
+	task->cap = cap;
+    } else {
+	task->cap = NULL;
+    }
 #endif
 
 #if defined(GRAN)
@@ -2022,7 +2028,7 @@ isThreadBound(StgTSO* tso USED_IF_THREADS)
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
-#if !defined(mingw32_HOST_OS) && !defined(SMP)
+#if !defined(mingw32_HOST_OS)
 #define FORKPROCESS_PRIMOP_SUPPORTED
 #endif
 
@@ -2043,6 +2049,13 @@ forkProcess(HsStablePtr *entry
     StgTSO* t,*next;
     Capability *cap;
     
+#if defined(THREADED_RTS)
+    if (RtsFlags.ParFlags.nNodes > 1) {
+	errorBelch("forking not supported with +RTS -N<n> greater than 1");
+	stg_exit(EXIT_FAILURE);
+    }
+#endif
+
     IF_DEBUG(scheduler,sched_belch("forking!"));
     
     // ToDo: for SMP, we should probably acquire *all* the capabilities
@@ -2677,17 +2690,17 @@ initScheduler(void)
 
   /* A capability holds the state a native thread needs in
    * order to execute STG code. At least one capability is
-   * floating around (only SMP builds have more than one).
+   * floating around (only THREADED_RTS builds have more than one).
    */
   initCapabilities();
 
   initTaskManager();
 
-#if defined(SMP) || defined(PARALLEL_HASKELL)
+#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
   initSparkPools();
 #endif
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
   /*
    * Eagerly start one worker to run each Capability, except for
    * Capability 0.  The idea is that we're probably going to start a
@@ -2787,15 +2800,15 @@ GetRoots( evac_fn evac )
     }
     
 #if !defined(THREADED_RTS)
-    evac((StgClosure **)&blocked_queue_hd);
-    evac((StgClosure **)&blocked_queue_tl);
-    evac((StgClosure **)&sleeping_queue);
+    evac((StgClosure **)(void *)&blocked_queue_hd);
+    evac((StgClosure **)(void *)&blocked_queue_tl);
+    evac((StgClosure **)(void *)&sleeping_queue);
 #endif 
 #endif
 
-    evac((StgClosure **)&blackhole_queue);
+    // evac((StgClosure **)&blackhole_queue);
 
-#if defined(SMP) || defined(PARALLEL_HASKELL) || defined(GRAN)
+#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL) || defined(GRAN)
     markSparkQueue(evac);
 #endif
     
@@ -2820,26 +2833,32 @@ GetRoots( evac_fn evac )
 
 static void (*extra_roots)(evac_fn);
 
+static void
+performGC_(rtsBool force_major, void (*get_roots)(evac_fn))
+{
+    Task *task = myTask();
+
+    if (task == NULL) {
+	ACQUIRE_LOCK(&sched_mutex);
+	task = newBoundTask();
+	RELEASE_LOCK(&sched_mutex);
+	scheduleDoGC(NULL,task,force_major, get_roots);
+	boundTaskExiting(task);
+    } else {
+	scheduleDoGC(NULL,task,force_major, get_roots);
+    }
+}
+
 void
 performGC(void)
 {
-#ifdef THREADED_RTS
-    // ToDo: we have to grab all the capabilities here.
-    errorBelch("performGC not supported in threaded RTS (yet)");
-    stg_exit(EXIT_FAILURE);
-#endif
-    /* Obligated to hold this lock upon entry */
-    GarbageCollect(GetRoots,rtsFalse);
+    performGC_(rtsFalse, GetRoots);
 }
 
 void
 performMajorGC(void)
 {
-#ifdef THREADED_RTS
-    errorBelch("performMayjorGC not supported in threaded RTS (yet)");
-    stg_exit(EXIT_FAILURE);
-#endif
-    GarbageCollect(GetRoots,rtsTrue);
+    performGC_(rtsTrue, GetRoots);
 }
 
 static void
@@ -2852,12 +2871,8 @@ AllRoots(evac_fn evac)
 void
 performGCWithRoots(void (*get_roots)(evac_fn))
 {
-#ifdef THREADED_RTS
-    errorBelch("performGCWithRoots not supported in threaded RTS (yet)");
-    stg_exit(EXIT_FAILURE);
-#endif
     extra_roots = get_roots;
-    GarbageCollect(AllRoots,rtsFalse);
+    performGC_(rtsFalse, AllRoots);
 }
 
 /* -----------------------------------------------------------------------------
@@ -3621,9 +3636,10 @@ checkBlackHoles (Capability *cap)
  * CATCH_FRAME on the stack.  In either case, we strip the entire
  * stack and replace the thread with a zombie.
  *
- * ToDo: in SMP mode, this function is only safe if either (a) we hold
- * all the Capabilities (eg. in GC), or (b) we own the Capability that
- * the TSO is currently blocked on or on the run queue of.
+ * ToDo: in THREADED_RTS mode, this function is only safe if either
+ * (a) we hold all the Capabilities (eg. in GC, or if there is only
+ * one Capability), or (b) we own the Capability that the TSO is
+ * currently blocked on or on the run queue of.
  *
  * -------------------------------------------------------------------------- */
  

@@ -27,7 +27,7 @@
 #include <string.h>
 
 /* 
- * All these globals require sm_mutex to access in SMP mode.
+ * All these globals require sm_mutex to access in THREADED_RTS mode.
  */
 StgClosure    *caf_list         = NULL;
 StgClosure    *revertible_caf_list = NULL;
@@ -49,13 +49,13 @@ step *g0s0 		= NULL; /* generation 0, step 0, for convenience */
 ullong total_allocated = 0;	/* total memory allocated during run */
 
 nat n_nurseries         = 0;    /* == RtsFlags.ParFlags.nNodes, convenience */
-step *nurseries         = NULL; /* array of nurseries, >1 only if SMP */
+step *nurseries         = NULL; /* array of nurseries, >1 only if THREADED_RTS */
 
 /*
  * Storage manager mutex:  protects all the above state from
  * simultaneous access by two STG threads.
  */
-#ifdef SMP
+#ifdef THREADED_RTS
 Mutex sm_mutex;
 #endif
 
@@ -125,7 +125,7 @@ initStorage( void )
 
   initBlockAllocator();
   
-#if defined(SMP)
+#if defined(THREADED_RTS)
   initMutex(&sm_mutex);
 #endif
 
@@ -173,7 +173,7 @@ initStorage( void )
     g0->steps = stgMallocBytes (sizeof(struct step_), "initStorage: steps");
   }
 
-#ifdef SMP
+#ifdef THREADED_RTS
   n_nurseries = n_capabilities;
   nurseries = stgMallocBytes (n_nurseries * sizeof(struct step_),
 			      "initStorage: nurseries");
@@ -189,7 +189,7 @@ initStorage( void )
     }
   }
   
-#ifdef SMP
+#ifdef THREADED_RTS
   for (s = 0; s < n_nurseries; s++) {
       initStep(&nurseries[s], 0, s);
   }
@@ -204,7 +204,7 @@ initStorage( void )
   }
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
   
-#ifdef SMP
+#ifdef THREADED_RTS
   for (s = 0; s < n_nurseries; s++) {
       nurseries[s].to = generations[0].steps[0].to;
   }
@@ -219,9 +219,9 @@ initStorage( void )
       }
   }
 
-#ifdef SMP
+#ifdef THREADED_RTS
   if (RtsFlags.GcFlags.generations == 1) {
-      errorBelch("-G1 is incompatible with SMP");
+      errorBelch("-G1 is incompatible with -threaded");
       stg_exit(EXIT_FAILURE);
   }
 #endif
@@ -409,7 +409,7 @@ allocNursery (step *stp, bdescr *tail, nat blocks)
 static void
 assignNurseriesToCapabilities (void)
 {
-#ifdef SMP
+#ifdef THREADED_RTS
     nat i;
 
     for (i = 0; i < n_nurseries; i++) {
@@ -417,7 +417,7 @@ assignNurseriesToCapabilities (void)
 	capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
 	capabilities[i].r.rCurrentAlloc   = NULL;
     }
-#else /* SMP */
+#else /* THREADED_RTS */
     MainCapability.r.rNursery        = &nurseries[0];
     MainCapability.r.rCurrentNursery = nurseries[0].blocks;
     MainCapability.r.rCurrentAlloc   = NULL;
@@ -797,7 +797,7 @@ stgAllocForGMP (size_t size_in_bytes)
   total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
   
   /* allocate and fill it in. */
-#if defined(SMP)
+#if defined(THREADED_RTS)
   arr = (StgArrWords *)allocateLocal(myTask()->cap, total_size_in_words);
 #else
   arr = (StgArrWords *)allocateLocal(&MainCapability, total_size_in_words);
@@ -853,7 +853,7 @@ calcAllocated( void )
   allocated += countNurseryBlocks() * BLOCK_SIZE_W;
   
   {
-#ifdef SMP
+#ifdef THREADED_RTS
   nat i;
   for (i = 0; i < n_nurseries; i++) {
       Capability *cap;
@@ -1015,7 +1015,7 @@ memInventory(void)
   for (i = 0; i < n_nurseries; i++) {
       total_blocks += stepBlocks(&nurseries[i]);
   }
-#ifdef SMP
+#ifdef THREADED_RTS
   // We put pinned object blocks in g0s0, so better count blocks there too.
   total_blocks += stepBlocks(g0s0);
 #endif

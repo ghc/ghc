@@ -140,7 +140,7 @@ extern void exitStorage(void);
                                 via allocate() since the last GC.
 				Used in the reporting of statistics.
 
-   SMP: allocate and doYouWantToGC can be used from STG code, they are
+   THREADED_RTS: allocate and doYouWantToGC can be used from STG code, they are
    surrounded by a mutex.
    -------------------------------------------------------------------------- */
 
@@ -198,11 +198,11 @@ extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
 /*
  * Storage manager mutex
  */
-#if defined(SMP)
+#if defined(THREADED_RTS)
 extern Mutex sm_mutex;
 #endif
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
 #define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex);
 #define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex);
 #define ASSERT_SM_LOCK()  ASSERT_LOCK_HELD(&sm_mutex);

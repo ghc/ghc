@@ -27,21 +27,15 @@
      build        Tasks   Capabilities
      ---------------------------------
      normal         1          1
-     -threaded      N          1
-     -smp           N          N
+     -threaded      N          N
 
    The non-threaded build has a single Task and a single global
    Capability.
    
-   The 'threaded' build has multiple Tasks, but a single Capability.
-   At any one time only one task executing STG code, other tasks are
-   either busy executing code outside the RTS (e.g., a C call) or
-   waiting for their turn to (again) evaluate some STG code. A task
-   relinquishes its RTS token when it is asked to evaluate an external
+   The THREADED_RTS build allows multiple tasks and mulitple Capabilities.
+   Multiple Tasks may all be running Haskell code simultaneously. A task
+   relinquishes its Capability when it is asked to evaluate an external
    (C) call.
-   
-   The SMP build allows multiple tasks and mulitple Capabilities.
-   Multiple Tasks may all be running Haskell code simultaneously.
 
    In general, there may be multiple Tasks for an OS thread.  This
    happens if one Task makes a foreign call from Haskell, and

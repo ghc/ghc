@@ -1,8 +1,8 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2000
+ * (c) The GHC Team, 2000-2006
  *
- * Sparking support for GRAN, PAR and SMP versions of the RTS.
+ * Sparking support for GRAN, PAR and THREADED_RTS versions of the RTS.
  * 
  * ---------------------------------------------------------------------------*/
 
@@ -13,7 +13,7 @@
 StgInt newSpark (StgRegTable *reg, StgClosure *p);
 #endif
 
-#if defined(PARALLEL_HASKELL) || defined(SMP)
+#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
 void         markSparkQueue    (evac_fn evac);
@@ -56,7 +56,7 @@ void      markSparkQueue(void);
  * PRIVATE below here
  * -------------------------------------------------------------------------- */
 
-#if defined(PARALLEL_HASKELL) || defined(SMP)
+#if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
 
 INLINE_HEADER rtsBool
 emptySparkPool (StgSparkPool *pool)

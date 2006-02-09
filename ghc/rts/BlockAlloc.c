@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-2000
+ * (c) The GHC Team 1998-2006
  * 
  * The block allocator and free list manager.
  *
@@ -29,8 +29,7 @@ static void    initMBlock(void *mblock);
 static bdescr *allocMegaGroup(nat mblocks);
 static void    freeMegaGroup(bdescr *bd);
 
-// In SMP mode, the free list is protected by sm_mutex.  In the
-// threaded RTS, it is protected by the Capability.
+// In THREADED_RTS mode, the free list is protected by sm_mutex.
 static bdescr *free_list = NULL;
 
 /* -----------------------------------------------------------------------------

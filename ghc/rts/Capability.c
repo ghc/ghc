@@ -10,9 +10,9 @@
  * STG execution, a pointer to the capabilitity is kept in a
  * register (BaseReg; actually it is a pointer to cap->r).
  *
- * Only in an SMP build will there be multiple capabilities, for
- * the threaded RTS and other non-threaded builds, there is only
- * one global capability, namely MainCapability.
+ * Only in an THREADED_RTS build will there be multiple capabilities,
+ * for non-threaded builds there is only one global capability, namely
+ * MainCapability.
  *
  * --------------------------------------------------------------------------*/
 
@@ -26,9 +26,9 @@
 #include "Schedule.h"
 #include "Sparks.h"
 
-#if !defined(SMP)
-Capability MainCapability;     // for non-SMP, we have one global capability
-#endif
+// one global capability, this is the Capability for non-threaded
+// builds, and for +RTS -N1
+Capability MainCapability;
 
 nat n_capabilities;
 Capability *capabilities = NULL;
@@ -152,7 +152,7 @@ initCapability( Capability *cap, nat i )
 /* ---------------------------------------------------------------------------
  * Function:  initCapabilities()
  *
- * Purpose:   set up the Capability handling. For the SMP build,
+ * Purpose:   set up the Capability handling. For the THREADED_RTS build,
  *            we keep a table of them, the size of which is
  *            controlled by the user via the RTS flag -N.
  *
@@ -160,8 +160,8 @@ initCapability( Capability *cap, nat i )
 void
 initCapabilities( void )
 {
-#if defined(SMP)
-    nat i,n;
+#if defined(THREADED_RTS)
+    nat i;
 
 #ifndef REG_BaseReg
     // We can't support multiple CPUs if BaseReg is not a register
@@ -171,18 +171,31 @@ initCapabilities( void )
     }
 #endif
 
-    n_capabilities = n = RtsFlags.ParFlags.nNodes;
-    capabilities = stgMallocBytes(n * sizeof(Capability), "initCapabilities");
+    n_capabilities = RtsFlags.ParFlags.nNodes;
 
-    for (i = 0; i < n; i++) {
+    if (n_capabilities == 1) {
+	capabilities = &MainCapability;
+	// THREADED_RTS must work on builds that don't have a mutable
+	// BaseReg (eg. unregisterised), so in this case
+	// capabilities[0] must coincide with &MainCapability.
+    } else {
+	capabilities = stgMallocBytes(n_capabilities * sizeof(Capability),
+				      "initCapabilities");
+    }
+
+    for (i = 0; i < n_capabilities; i++) {
 	initCapability(&capabilities[i], i);
     }
 
-    IF_DEBUG(scheduler, sched_belch("allocated %d capabilities", n));
-#else
+    IF_DEBUG(scheduler, sched_belch("allocated %d capabilities", 
+				    n_capabilities));
+
+#else /* !THREADED_RTS */
+
     n_capabilities = 1;
     capabilities = &MainCapability;
     initCapability(&MainCapability, 0);
+
 #endif
 
     // There are no free capabilities to begin with.  We will start
@@ -263,15 +276,7 @@ releaseCapability_ (Capability* cap)
 	return;
     }
 
-    // If we have an unbound thread on the run queue, or if there's
-    // anything else to do, give the Capability to a worker thread.
-    if (!emptyRunQueue(cap) || !emptySparkPoolCap(cap) || globalWorkToDo()) {
-	if (cap->spare_workers) {
-	    giveCapabilityToTask(cap,cap->spare_workers);
-	    // The worker Task pops itself from the queue;
-	    return;
-	}
-
+    if (!cap->spare_workers) {
 	// Create a worker thread if we don't have one.  If the system
 	// is interrupted, we only create a worker task if there
 	// are threads that need to be completed.  If the system is
@@ -280,6 +285,16 @@ releaseCapability_ (Capability* cap)
 	    IF_DEBUG(scheduler,
 		     sched_belch("starting new worker on capability %d", cap->no));
 	    startWorkerTask(cap, workerStart);
+	    return;
+	}
+    }
+
+    // If we have an unbound thread on the run queue, or if there's
+    // anything else to do, give the Capability to a worker thread.
+    if (!emptyRunQueue(cap) || !emptySparkPoolCap(cap) || globalWorkToDo()) {
+	if (cap->spare_workers) {
+	    giveCapabilityToTask(cap,cap->spare_workers);
+	    // The worker Task pops itself from the queue;
 	    return;
 	}
     }
@@ -512,6 +527,7 @@ prodCapabilities(rtsBool all)
 	}
 	RELEASE_LOCK(&cap->lock);
     }
+    return;
 }
 
 void

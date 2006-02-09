@@ -70,14 +70,6 @@ extern void _assertFail (char *, unsigned int);
 
 #define doNothing() do { } while (0)
 
-#ifdef SMP
-#define USED_IF_SMP
-#define USED_IF_NOT_SMP STG_UNUSED
-#else
-#define USED_IF_SMP STG_UNUSED
-#define USED_IF_NOT_SMP
-#endif
-
 #ifdef DEBUG
 #define USED_IF_DEBUG
 #define USED_IF_NOT_DEBUG STG_UNUSED

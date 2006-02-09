@@ -33,7 +33,7 @@
 #ifndef STM_H
 #define STM_H
 
-#ifdef SMP
+#ifdef THREADED_RTS
 //#define STM_CG_LOCK
 #define STM_FG_LOCKS
 #else

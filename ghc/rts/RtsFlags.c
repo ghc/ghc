@@ -217,7 +217,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
 
-#ifdef SMP
+#ifdef THREADED_RTS
     RtsFlags.ParFlags.nNodes	        = 1;
 #endif
 
@@ -244,9 +244,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.fishDelay         = FISH_DELAY;
 #endif
 
-#if defined(PAR) || defined(SMP)
+#if defined(PAR) || defined(THREADED_RTS)
     RtsFlags.ParFlags.maxLocalSparks	= 4096;
-#endif /* PAR || SMP */
+#endif /* PAR || THREADED_RTS */
 
 #if defined(GRAN)
     /* ToDo: check defaults for GranSim and GUM */
@@ -435,10 +435,10 @@ usage_text[] = {
 "  -Dz  DEBUG: stack squezing",
 "",
 #endif /* DEBUG */
-#if defined(SMP)
+#if defined(THREADED_RTS)
 "  -N<n>     Use <n> OS threads (default: 1)",
 #endif
-#if defined(SMP) || defined(PAR)
+#if defined(THREADED_RTS) || defined(PAR)
 "  -e<size>  Size of spark pools (default 100)",
 #endif
 #if defined(PAR)
@@ -448,7 +448,7 @@ usage_text[] = {
 "  -qd       Turn on PVM-ish debugging",
 "  -qO       Disable output for performance measurement",
 #endif
-#if defined(SMP) || defined(PAR)
+#if defined(THREADED_RTS) || defined(PAR)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
 #if defined(PAR)
@@ -611,14 +611,6 @@ errorBelch("not built for: -prof"); \
 error = rtsTrue;
 #endif
 
-#ifdef SMP
-# define SMP_BUILD_ONLY(x)      x
-#else
-# define SMP_BUILD_ONLY(x) \
-errorBelch("not built for: -smp"); \
-error = rtsTrue;
-#endif
-
 #ifdef PAR
 # define PAR_BUILD_ONLY(x)      x
 #else
@@ -627,10 +619,18 @@ errorBelch("not built for: -parallel"); \
 error = rtsTrue;
 #endif
 
-#if defined(SMP) || defined(PAR)
-# define PAR_OR_SMP_BUILD_ONLY(x)      x
+#ifdef THREADED_RTS
+# define THREADED_BUILD_ONLY(x)      x
 #else
-# define PAR_OR_SMP_BUILD_ONLY(x) \
+# define THREADED_BUILD_ONLY(x) \
+errorBelch("not built for: -smp"); \
+error = rtsTrue;
+#endif
+
+#if defined(THREADED_RTS) || defined(PAR)
+# define PAR_OR_THREADED_BUILD_ONLY(x)      x
+#else
+# define PAR_OR_THREADED_BUILD_ONLY(x) \
 errorBelch("not built for: -parallel or -smp"); \
 error = rtsTrue;
 #endif
@@ -1037,9 +1037,9 @@ error = rtsTrue;
 		}
     	    	break;
 
-#ifdef SMP
+#ifdef THREADED_RTS
 	      case 'N':
-		SMP_BUILD_ONLY(
+		THREADED_BUILD_ONLY(
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.nNodes
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
@@ -1052,7 +1052,7 @@ error = rtsTrue;
 #endif
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
-		PAR_OR_SMP_BUILD_ONLY(
+		PAR_OR_THREADED_BUILD_ONLY(
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.maxLocalSparks
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);

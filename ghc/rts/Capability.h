@@ -1,19 +1,19 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001-2003
+ * (c) The GHC Team, 2001-2006
  *
  * Capabilities
  *
  * The notion of a capability is used when operating in multi-threaded
- * environments (which the SMP and Threads builds of the RTS do), to
+ * environments (which the THREADED_RTS build of the RTS does), to
  * hold all the state an OS thread/task needs to run Haskell code:
  * its STG registers, a pointer to its  TSO, a nursery etc. During
  * STG execution, a pointer to the capabilitity is kept in a 
  * register (BaseReg).
  *
- * Only in an SMP build will there be multiple capabilities, the threaded
- * RTS and other non-threaded builds, there is one global capability,
- * namely MainRegTable.
+ * Only in an THREADED_RTS build will there be multiple capabilities,
+ * in the non-threaded builds there is one global capability, namely
+ * MainCapability.
  *
  * This header file contains the functions for working with capabilities.
  * (the main, and only, consumer of this interface is the scheduler).
@@ -140,8 +140,8 @@ INLINE_HEADER void releaseCapability  (Capability* cap STG_UNUSED) {};
 INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED) {};
 #endif
 
-#if !IN_STG_CODE && !defined(SMP)
-// for non-SMP, we have one global capability
+#if !IN_STG_CODE
+// one global capability
 extern Capability MainCapability; 
 #endif
 
