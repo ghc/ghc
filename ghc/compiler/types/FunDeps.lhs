@@ -9,7 +9,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 module FunDeps (
  	Equation, pprEquation, pprEquationDoc,
 	oclose, grow, improve, 
-	checkInstFDs, checkFunDeps,
+	checkInstCoverage, checkFunDeps,
 	pprFundeps
     ) where
 
@@ -20,7 +20,7 @@ import Var		( TyVar )
 import Class		( Class, FunDep, classTvsFds )
 import Unify		( tcUnifyTys, BindFlag(..) )
 import Type		( substTys, notElemTvSubst )
-import TcType		( Type, ThetaType, PredType(..), tcEqType, 
+import TcType		( Type, PredType(..), tcEqType, 
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
 import InstEnv		( Instance(..), InstEnv, instanceHead, classInstances,
 			  instanceCantMatch, roughMatchTcs )
@@ -370,21 +370,43 @@ instFD (ls,rs) tvs tys
 \end{code}
 
 \begin{code}
-checkInstFDs :: ThetaType -> Class -> [Type] -> Bool
--- Check that functional dependencies are obeyed in an instance decl
+checkInstCoverage :: Class -> [Type] -> Bool
+-- Check that the Coverage Condition is obeyed in an instance decl
 -- For example, if we have 
 --	class theta => C a b | a -> b
 -- 	instance C t1 t2 
--- Then we require fv(t2) `subset` oclose(fv(t1), theta)
+-- Then we require fv(t2) `subset` fv(t1)
+-- See Note [Coverage Condition] below
 
-checkInstFDs theta clas inst_taus
+checkInstCoverage clas inst_taus
   = all fundep_ok fds
   where
     (tyvars, fds) = classTvsFds clas
-    fundep_ok fd  = tyVarsOfTypes rs `subVarSet` oclose theta (tyVarsOfTypes ls)
+    fundep_ok fd  = tyVarsOfTypes rs `subVarSet` tyVarsOfTypes ls
 		 where
 		   (ls,rs) = instFD fd tyvars inst_taus
 \end{code}
+
+Note [Coverage condition]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+For the coverage condition, we used to require only that 
+	fv(t2) `subset` oclose(fv(t1), theta)
+
+Example:
+	class Mul a b c | a b -> c where
+		(.*.) :: a -> b -> c
+
+	instance Mul Int Int Int where (.*.) = (*)
+	instance Mul Int Float Float where x .*. y = fromIntegral x * y
+	instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
+
+In the third instance, it's not the case that fv([c]) `subset` fv(a,[b]).
+But it is the case that fv([c]) `subset` oclose( theta, fv(a,[b]) )
+
+But it is a mistake to accept the instance because then this defn:
+	f = \ b x y -> if b then x .*. [y] else y
+makes instance inference go into a loop, because it requires the constraint
+	Mul a [b] b
 
 
 %************************************************************************

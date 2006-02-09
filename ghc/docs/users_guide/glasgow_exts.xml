@@ -1596,9 +1596,9 @@ GHC lifts this restriction.
 
 
 </sect3>
+</sect2>
 
-
-<sect3 id="functional-dependencies">
+<sect2 id="functional-dependencies">
 <title>Functional dependencies
 </title>
 
@@ -1618,6 +1618,8 @@ class declaration;  e.g.
 </programlisting>
 There should be more documentation, but there isn't (yet).  Yell if you need it.
 </para>
+
+<sect3><title>Rules for functional dependencies </title>
 <para>
 In a class declaration, all of the class type variables must be reachable (in the sense 
 mentioned in <xref linkend="type-restrictions"/>)
@@ -1665,9 +1667,250 @@ class like this:
 </sect3>
 
 
+<sect3>
+<title>Background on functional dependencies</title>
 
+<para>The following description of the motivation and use of functional dependencies is taken
+from the Hugs user manual, reproduced here (with minor changes) by kind
+permission of Mark Jones.
+</para>
+<para> 
+Consider the following class, intended as part of a
+library for collection types:
+<programlisting>
+   class Collects e ce where
+       empty  :: ce
+       insert :: e -> ce -> ce
+       member :: e -> ce -> Bool
+</programlisting>
+The type variable e used here represents the element type, while ce is the type
+of the container itself. Within this framework, we might want to define
+instances of this class for lists or characteristic functions (both of which
+can be used to represent collections of any equality type), bit sets (which can
+be used to represent collections of characters), or hash tables (which can be
+used to represent any collection whose elements have a hash function). Omitting
+standard implementation details, this would lead to the following declarations: 
+<programlisting>
+   instance Eq e => Collects e [e] where ...
+   instance Eq e => Collects e (e -> Bool) where ...
+   instance Collects Char BitSet where ...
+   instance (Hashable e, Collects a ce)
+              => Collects e (Array Int ce) where ...
+</programlisting>
+All this looks quite promising; we have a class and a range of interesting
+implementations. Unfortunately, there are some serious problems with the class
+declaration. First, the empty function has an ambiguous type: 
+<programlisting>
+   empty :: Collects e ce => ce
+</programlisting>
+By "ambiguous" we mean that there is a type variable e that appears on the left
+of the <literal>=&gt;</literal> symbol, but not on the right. The problem with
+this is that, according to the theoretical foundations of Haskell overloading,
+we cannot guarantee a well-defined semantics for any term with an ambiguous
+type.
+</para>
+<para>
+We can sidestep this specific problem by removing the empty member from the
+class declaration. However, although the remaining members, insert and member,
+do not have ambiguous types, we still run into problems when we try to use
+them. For example, consider the following two functions: 
+<programlisting>
+   f x y = insert x . insert y
+   g     = f True 'a'
+</programlisting>
+for which GHC infers the following types: 
+<programlisting>
+   f :: (Collects a c, Collects b c) => a -> b -> c -> c
+   g :: (Collects Bool c, Collects Char c) => c -> c
+</programlisting>
+Notice that the type for f allows the two parameters x and y to be assigned
+different types, even though it attempts to insert each of the two values, one
+after the other, into the same collection. If we're trying to model collections
+that contain only one type of value, then this is clearly an inaccurate
+type. Worse still, the definition for g is accepted, without causing a type
+error. As a result, the error in this code will not be flagged at the point
+where it appears. Instead, it will show up only when we try to use g, which
+might even be in a different module.
+</para>
 
+<sect4><title>An attempt to use constructor classes</title>
 
+<para>
+Faced with the problems described above, some Haskell programmers might be
+tempted to use something like the following version of the class declaration: 
+<programlisting>
+   class Collects e c where
+      empty  :: c e
+      insert :: e -> c e -> c e
+      member :: e -> c e -> Bool
+</programlisting>
+The key difference here is that we abstract over the type constructor c that is
+used to form the collection type c e, and not over that collection type itself,
+represented by ce in the original class declaration. This avoids the immediate
+problems that we mentioned above: empty has type <literal>Collects e c => c
+e</literal>, which is not ambiguous. 
+</para>
+<para>
+The function f from the previous section has a more accurate type: 
+<programlisting>
+   f :: (Collects e c) => e -> e -> c e -> c e
+</programlisting>
+The function g from the previous section is now rejected with a type error as
+we would hope because the type of f does not allow the two arguments to have
+different types. 
+This, then, is an example of a multiple parameter class that does actually work
+quite well in practice, without ambiguity problems.
+There is, however, a catch. This version of the Collects class is nowhere near
+as general as the original class seemed to be: only one of the four instances
+for <literal>Collects</literal>
+given above can be used with this version of Collects because only one of
+them---the instance for lists---has a collection type that can be written in
+the form c e, for some type constructor c, and element type e.
+</para>
+</sect4>
+
+<sect4><title>Adding functional dependencies</title>
+
+<para>
+To get a more useful version of the Collects class, Hugs provides a mechanism
+that allows programmers to specify dependencies between the parameters of a
+multiple parameter class (For readers with an interest in theoretical
+foundations and previous work: The use of dependency information can be seen
+both as a generalization of the proposal for `parametric type classes' that was
+put forward by Chen, Hudak, and Odersky, or as a special case of Mark Jones's
+later framework for "improvement" of qualified types. The
+underlying ideas are also discussed in a more theoretical and abstract setting
+in a manuscript [implparam], where they are identified as one point in a
+general design space for systems of implicit parameterization.).
+
+To start with an abstract example, consider a declaration such as: 
+<programlisting>
+   class C a b where ...
+</programlisting>
+which tells us simply that C can be thought of as a binary relation on types
+(or type constructors, depending on the kinds of a and b). Extra clauses can be
+included in the definition of classes to add information about dependencies
+between parameters, as in the following examples: 
+<programlisting>
+   class D a b | a -> b where ...
+   class E a b | a -> b, b -> a where ...
+</programlisting>
+The notation <literal>a -&gt; b</literal> used here between the | and where
+symbols --- not to be
+confused with a function type --- indicates that the a parameter uniquely
+determines the b parameter, and might be read as "a determines b." Thus D is
+not just a relation, but actually a (partial) function. Similarly, from the two
+dependencies that are included in the definition of E, we can see that E
+represents a (partial) one-one mapping between types.
+</para>
+<para>
+More generally, dependencies take the form <literal>x1 ... xn -&gt; y1 ... ym</literal>,
+where x1, ..., xn, and y1, ..., yn are type variables with n&gt;0 and
+m&gt;=0, meaning that the y parameters are uniquely determined by the x
+parameters. Spaces can be used as separators if more than one variable appears
+on any single side of a dependency, as in <literal>t -&gt; a b</literal>. Note that a class may be
+annotated with multiple dependencies using commas as separators, as in the
+definition of E above. Some dependencies that we can write in this notation are
+redundant, and will be rejected because they don't serve any useful
+purpose, and may instead indicate an error in the program. Examples of
+dependencies like this include  <literal>a -&gt; a </literal>,  
+<literal>a -&gt; a a </literal>,  
+<literal>a -&gt; </literal>, etc. There can also be
+some redundancy if multiple dependencies are given, as in  
+<literal>a-&gt;b</literal>, 
+ <literal>b-&gt;c </literal>,  <literal>a-&gt;c </literal>, and
+in which some subset implies the remaining dependencies. Examples like this are
+not treated as errors. Note that dependencies appear only in class
+declarations, and not in any other part of the language. In particular, the
+syntax for instance declarations, class constraints, and types is completely
+unchanged.
+</para>
+<para>
+By including dependencies in a class declaration, we provide a mechanism for
+the programmer to specify each multiple parameter class more precisely. The
+compiler, on the other hand, is responsible for ensuring that the set of
+instances that are in scope at any given point in the program is consistent
+with any declared dependencies. For example, the following pair of instance
+declarations cannot appear together in the same scope because they violate the
+dependency for D, even though either one on its own would be acceptable: 
+<programlisting>
+   instance D Bool Int where ...
+   instance D Bool Char where ...
+</programlisting>
+Note also that the following declaration is not allowed, even by itself: 
+<programlisting>
+   instance D [a] b where ...
+</programlisting>
+The problem here is that this instance would allow one particular choice of [a]
+to be associated with more than one choice for b, which contradicts the
+dependency specified in the definition of D. More generally, this means that,
+in any instance of the form: 
+<programlisting>
+   instance D t s where ...
+</programlisting>
+for some particular types t and s, the only variables that can appear in s are
+the ones that appear in t, and hence, if the type t is known, then s will be
+uniquely determined.
+</para>
+<para>
+The benefit of including dependency information is that it allows us to define
+more general multiple parameter classes, without ambiguity problems, and with
+the benefit of more accurate types. To illustrate this, we return to the
+collection class example, and annotate the original definition of <literal>Collects</literal>
+with a simple dependency: 
+<programlisting>
+   class Collects e ce | ce -> e where
+      empty  :: ce
+      insert :: e -> ce -> ce
+      member :: e -> ce -> Bool
+</programlisting>
+The dependency <literal>ce -&gt; e</literal> here specifies that the type e of elements is uniquely
+determined by the type of the collection ce. Note that both parameters of
+Collects are of kind *; there are no constructor classes here. Note too that
+all of the instances of Collects that we gave earlier can be used
+together with this new definition.
+</para>
+<para>
+What about the ambiguity problems that we encountered with the original
+definition? The empty function still has type Collects e ce => ce, but it is no
+longer necessary to regard that as an ambiguous type: Although the variable e
+does not appear on the right of the => symbol, the dependency for class
+Collects tells us that it is uniquely determined by ce, which does appear on
+the right of the => symbol. Hence the context in which empty is used can still
+give enough information to determine types for both ce and e, without
+ambiguity. More generally, we need only regard a type as ambiguous if it
+contains a variable on the left of the => that is not uniquely determined
+(either directly or indirectly) by the variables on the right.
+</para>
+<para>
+Dependencies also help to produce more accurate types for user defined
+functions, and hence to provide earlier detection of errors, and less cluttered
+types for programmers to work with. Recall the previous definition for a
+function f: 
+<programlisting>
+   f x y = insert x y = insert x . insert y
+</programlisting>
+for which we originally obtained a type: 
+<programlisting>
+   f :: (Collects a c, Collects b c) => a -> b -> c -> c
+</programlisting>
+Given the dependency information that we have for Collects, however, we can
+deduce that a and b must be equal because they both appear as the second
+parameter in a Collects constraint with the same first parameter c. Hence we
+can infer a shorter and more accurate type for f: 
+<programlisting>
+   f :: (Collects a c) => a -> a -> c -> c
+</programlisting>
+In a similar way, the earlier definition of g will now be flagged as a type error.
+</para>
+<para>
+Although we have given only a few examples here, it should be clear that the
+addition of dependency information can help to make multiple parameter classes
+more useful in practice, avoiding ambiguity problems, and allowing more general
+sets of instance declarations.
+</para>
+</sect4>
+</sect3>
 </sect2>
 
 <sect2 id="instance-decls">
@@ -1697,12 +1940,27 @@ the form <literal>C a</literal> where <literal>a</literal> is a type variable.
 The <option>-fglasgow-exts</option> flag loosens these restrictions
 considerably.  Firstly, multi-parameter type classes are permitted.  Secondly,
 the context and head of the instance declaration can each consist of arbitrary
-(well-kinded) assertions <literal>(C t1 ... tn)</literal> subject only to the following rule:
-for each assertion in the context
+(well-kinded) assertions <literal>(C t1 ... tn)</literal> subject only to the
+following rules:
+<orderedlist>
+<listitem><para>
+For each assertion in the context:
 <orderedlist>
 <listitem><para>No type variable has more occurrences in the assertion than in the head</para></listitem>
-<listitem><para>Tthe assertion has fewer constructors and variables (taken together
+<listitem><para>The assertion has fewer constructors and variables (taken together
       and counting repetitions) than the head</para></listitem>
+</orderedlist>
+</para></listitem>
+
+<listitem><para>The coverage condition.  For each functional dependency,
+<replaceable>tvs</replaceable><subscript>left</subscript> <literal>-&gt;</literal>
+<replaceable>tvs</replaceable><subscript>right</subscript>,  of the class,
+every type variable in
+S(<replaceable>tvs</replaceable><subscript>right</subscript>) must appear in 
+S(<replaceable>tvs</replaceable><subscript>left</subscript>), where S is the
+substitution mapping each type variable in the class declaration to the
+corresponding type in the instance declaration.
+</para></listitem>
 </orderedlist>
 These restrictions ensure that context reduction terminates: each reduction
 step makes the problem smaller
@@ -1774,8 +2032,46 @@ instead of
 
 <para>
 Sometimes even the rules of <xref linkend="instance-rules"/> are too onerous.
-Voluminous correspondence on the Haskell mailing list has convinced me
-that it's worth experimenting with more liberal rules.  If you use
+For example, with functional dependencies (<xref
+linkend="functional-dependencies"/>)
+it is tempting to introduce type variables in the context that do not appear in
+the head, something that is excluded by the normal rules. For example:
+<programlisting>
+  class HasConverter a b | a -> b where
+     convert :: a -> b
+   
+  data Foo a = MkFoo a
+
+  instance (HasConverter a b,Show b) => Show (Foo a) where
+     show (MkFoo value) = show (convert value)
+</programlisting>
+This is dangerous territory, however. Here, for example, is a program that would make the
+typechecker loop:
+<programlisting>
+  class D a
+  class F a b | a->b
+  instance F [a] [[a]]
+  instance (D c, F a c) => D [a]   -- 'c' is not mentioned in the head
+</programlisting>  
+Similarly, it can be tempting to lift the coverage condition:
+<programlisting>
+  class Mul a b c | a b -> c where
+  	(.*.) :: a -> b -> c
+
+  instance Mul Int Int Int where (.*.) = (*)
+  instance Mul Int Float Float where x .*. y = fromIntegral x * y
+  instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
+</programlisting>
+The third instance declaration does not obey the coverage condition;
+and indeed the (somewhat strange) definition:
+<programlisting>
+  f = \ b x y -> if b then x .*. [y] else y
+</programlisting>
+makes instance inference go into a loop, because it requires the constraint
+<literal>(Mul a [b] b)</literal>.
+</para>
+<para>
+Nevertheless, GHC allows you to experiment with more liberal rules.  If you use
 the experimental flag <option>-fallow-undecidable-instances</option>
 <indexterm><primary>-fallow-undecidable-instances
 option</primary></indexterm>, you can use arbitrary
@@ -1784,10 +2080,7 @@ fixed-depth recursion stack.  If you exceed the stack depth you get a
 sort of backtrace, and the opportunity to increase the stack depth
 with <option>-fcontext-stack</option><emphasis>N</emphasis>.
 </para>
-<para>
-I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
-allowing these idioms interesting idioms.  
-</para>
+
 </sect3>
 
 

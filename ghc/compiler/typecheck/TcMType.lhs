@@ -89,7 +89,7 @@ import Kind		( isSubKind )
 
 -- others:
 import TcRnMonad          -- TcType, amongst others
-import FunDeps		( grow, checkInstFDs )
+import FunDeps		( grow, checkInstCoverage )
 import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
 import DynFlags		( dopt, DynFlag(..), DynFlags )
@@ -1117,7 +1117,8 @@ checkValidInstance tyvars theta clas inst_tys
 	; checkInstTermination dflags theta inst_tys
 	
 	-- The Coverage Condition
-	; checkTc (checkInstFDs theta clas inst_tys)
+	; checkTc (dopt Opt_AllowUndecideableInstances dflags ||
+		   checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
 	}
   where
