@@ -1117,7 +1117,7 @@ checkValidInstance tyvars theta clas inst_tys
 	; checkInstTermination dflags theta inst_tys
 	
 	-- The Coverage Condition
-	; checkTc (dopt Opt_AllowUndecideableInstances dflags ||
+	; checkTc (dopt Opt_AllowUndecidableInstances dflags ||
 		   checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
 	}
