@@ -21,6 +21,7 @@
 #include "Timer.h"
 #include "Ticker.h"
 #include "Capability.h"
+#include "OSThreads.h"
 
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
@@ -28,6 +29,10 @@ static int ticks_to_ctxt_switch = 0;
 #if defined(THREADED_RTS)
 /* idle ticks left before we perform a GC */
 static int ticks_to_gc = 0;
+#endif
+
+#if defined(THREADED_RTS)
+static void OSThreadProcAttr proddingThread(void *p);
 #endif
 
 /*
@@ -60,7 +65,8 @@ handle_tick(int unused STG_UNUSED)
 	      recent_activity = ACTIVITY_MAYBE_NO;
 	      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
 	      break;
-	  case ACTIVITY_MAYBE_NO:
+	  case ACTIVITY_MAYBE_NO: {
+	      OSThreadId id;
 	      if (ticks_to_gc == 0) break; /* 0 ==> no idle GC */
 	      ticks_to_gc--;
 	      if (ticks_to_gc == 0) {
@@ -69,14 +75,15 @@ handle_tick(int unused STG_UNUSED)
 		  blackholes_need_checking = rtsTrue;
 		  /* hack: re-use the blackholes_need_checking flag */
 
-		  /* ToDo: this doesn't work.  Can't invoke
-		   * pthread_cond_signal from a signal handler.
-		   * Furthermore, we can't prod a capability that we
-		   * might be holding.  What can we do?
+		  /* We can't prod the Capability from inside the
+		   * signal handler, because pthread_cond_signal()
+		   * doesn't work from signal handlers.  Let's hope
+		   * that pthread_create() works:
 		   */
-		  prodOneCapability();
+		  createOSThread(&id, proddingThread, NULL);
 	      }
 	      break;
+	  }
 	  default:
 	      break;
 	  }
@@ -84,6 +91,15 @@ handle_tick(int unused STG_UNUSED)
       }
   }
 }
+
+#if defined(THREADED_RTS)
+static void OSThreadProcAttr
+proddingThread(void *p STG_UNUSED)
+{
+    prodOneCapability();
+    // and exit again.
+}
+#endif
 
 int
 startTimer(nat ms)
