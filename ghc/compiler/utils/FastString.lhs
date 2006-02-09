@@ -436,7 +436,7 @@ nilFS = mkFastString ""
 getFastStringTable :: IO [[FastString]]
 getFastStringTable = do
   tbl <- readIORef string_table
-  buckets <- mapM (lookupTbl tbl) [0..hASH_TBL_SIZE]
+  buckets <- mapM (lookupTbl tbl) [0 .. hASH_TBL_SIZE]
   return buckets
 
 -- -----------------------------------------------------------------------------
