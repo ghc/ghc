@@ -72,7 +72,7 @@ mkVanillaTuplePat pats box
   = TuplePat pats box (mkTupleTy box (length pats) (map hsPatType pats))
 
 hsPatType :: OutPat Id -> Type
-hsPatType pat = pat_type (unLoc pat)
+hsPatType (L _ pat) = pat_type pat
 
 pat_type (ParPat pat)		   = hsPatType pat
 pat_type (WildPat ty)		   = ty

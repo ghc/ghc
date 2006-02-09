@@ -31,7 +31,7 @@ module DsUtils (
 	
 	dsSyntaxTable, lookupEvidence,
 
-	selectSimpleMatchVarL, selectMatchVars
+	selectSimpleMatchVarL, selectMatchVars, selectMatchVar
     ) where
 
 #include "HsVersions.h"

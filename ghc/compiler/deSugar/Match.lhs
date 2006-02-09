@@ -4,7 +4,7 @@
 \section[Main_match]{The @match@ function}
 
 \begin{code}
-module Match ( match, matchWrapper, matchSimply, matchSinglePat ) where
+module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"
 
@@ -69,7 +69,7 @@ matchCheck_really dflags ctx vars ty qs
   where (pats, eqns_shadow) = check qs
         incomplete    = want_incomplete && (notNull pats)
         want_incomplete = case ctx of
-                              DsMatchContext RecUpd _ _ ->
+                              DsMatchContext RecUpd _ ->
                                   dopt Opt_WarnIncompletePatternsRecUpd dflags
                               _ ->
                                   dopt Opt_WarnIncompletePatterns       dflags
@@ -90,7 +90,7 @@ The next two functions create the warning message.
 
 \begin{code}
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
-dsShadowWarn ctx@(DsMatchContext kind _ loc) qs
+dsShadowWarn ctx@(DsMatchContext kind loc) qs
   = putSrcSpanDs loc (dsWarn warn)
   where
     warn | qs `lengthExceeds` maximum_output
@@ -103,7 +103,7 @@ dsShadowWarn ctx@(DsMatchContext kind _ loc) qs
 
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
-dsIncompleteWarn ctx@(DsMatchContext kind _ loc) pats 
+dsIncompleteWarn ctx@(DsMatchContext kind loc) pats 
   = putSrcSpanDs loc (dsWarn warn)
 	where
 	  warn = pp_context ctx (ptext SLIT("are non-exhaustive"))
@@ -115,7 +115,7 @@ dsIncompleteWarn ctx@(DsMatchContext kind _ loc) pats
 	  dots | pats `lengthExceeds` maximum_output = ptext SLIT("...")
 	       | otherwise                           = empty
 
-pp_context (DsMatchContext kind pats _loc) msg rest_of_msg_fun
+pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
   = vcat [ptext SLIT("Pattern match(es)") <+> msg,
 	  sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]]
   where
@@ -650,19 +650,11 @@ JJQC 30-Nov-1997
 
 \begin{code}
 matchWrapper ctxt (MatchGroup matches match_ty)
-  = do	{ eqns_info <- mapM mk_eqn_info matches
-	; dflags <- getDOptsDs
-	; locn <- getSrcSpanDs
-	; let   ds_ctxt      = DsMatchContext ctxt arg_pats locn
-		error_string = matchContextErrString ctxt
-
-	; new_vars     <- selectMatchVars arg_pats pat_tys
-	; match_result <- match_fun dflags ds_ctxt new_vars rhs_ty eqns_info
-
-	; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_string
-	; result_expr <- extractMatchResult match_result fail_expr
+  = do	{ eqns_info   <- mapM mk_eqn_info matches
+	; new_vars    <- selectMatchVars arg_pats pat_tys
+	; result_expr <- matchEquations ctxt new_vars eqns_info rhs_ty
 	; return (new_vars, result_expr) }
-  where 
+  where
     arg_pats          = map unLoc (hsLMatchPats (head matches))
     n_pats	      = length arg_pats
     (pat_tys, rhs_ty) = splitFunTysN n_pats match_ty
@@ -672,8 +664,23 @@ matchWrapper ctxt (MatchGroup matches match_ty)
 	   ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
 	   ; return (EqnInfo { eqn_wrap = idWrapper,
 			       eqn_pats = upats, 
-			       eqn_rhs = match_result}) }
+			       eqn_rhs  = match_result}) }
 
+
+matchEquations  :: HsMatchContext Name
+		-> [Id]	-> [EquationInfo] -> Type
+		-> DsM CoreExpr
+matchEquations ctxt vars eqns_info rhs_ty
+  = do	{ dflags <- getDOptsDs
+	; locn   <- getSrcSpanDs
+	; let   ds_ctxt      = DsMatchContext ctxt locn
+		error_string = matchContextErrString ctxt
+
+	; match_result <- match_fun dflags ds_ctxt vars rhs_ty eqns_info
+
+	; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_string
+	; extractMatchResult match_result fail_expr }
+  where 
     match_fun dflags ds_ctxt
        = case ctxt of 
            LambdaExpr | dopt Opt_WarnSimplePatterns dflags -> matchCheck ds_ctxt
@@ -719,7 +726,7 @@ matchSinglePat (Var var) hs_ctx (L _ pat) ty match_result
            | dopt Opt_WarnSimplePatterns dflags = matchCheck ds_ctx
   	   | otherwise	       		        = match
 	   where
-	     ds_ctx = DsMatchContext hs_ctx [pat] locn
+	     ds_ctx = DsMatchContext hs_ctx locn
     in
     match_fn dflags [var] ty [EqnInfo { eqn_wrap = idWrapper,
 					eqn_pats = [pat],

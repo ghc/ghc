@@ -69,7 +69,7 @@ infixr 9 `thenDs`
 
 \begin{code}
 data DsMatchContext
-  = DsMatchContext (HsMatchContext Name) [Pat Id] SrcSpan
+  = DsMatchContext (HsMatchContext Name) SrcSpan
   | NoMatchContext
   deriving ()
 

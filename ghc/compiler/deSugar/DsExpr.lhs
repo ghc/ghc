@@ -8,14 +8,14 @@ module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
 
-import Match		( matchWrapper, matchSimply, matchSinglePat )
+import Match		( matchWrapper, matchSinglePat, matchEquations )
 import MatchLit		( dsLit, dsOverLit )
 import DsBinds		( dsLHsBinds, dsCoercion )
 import DsGRHSs		( dsGuarded )
 import DsListComp	( dsListComp, dsPArrComp )
 import DsUtils		( mkErrorAppDs, mkStringExpr, mkConsExpr, mkNilExpr,
 			  extractMatchResult, cantFailMatchResult, matchCanFail,
-			  mkCoreTupTy, selectSimpleMatchVarL, lookupEvidence )
+			  mkCoreTupTy, selectSimpleMatchVarL, lookupEvidence, selectMatchVar )
 import DsArrows		( dsProcExpr )
 import DsMonad
 
@@ -92,8 +92,9 @@ ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
 ds_val_bind (NonRecursive, hsbinds) body
   | [L _ (AbsBinds [] [] exports binds)] <- bagToList hsbinds,
     (L loc bind : null_binds) <- bagToList binds,
-    or [isUnLiftedType (idType g) | (_, g, _, _) <- exports]
-    || isBangHsBind bind
+    isBangHsBind bind
+    || isUnboxedTupleBind bind
+    || or [isUnLiftedType (idType g) | (_, g, _, _) <- exports]
   = let
       body_w_exports		      = foldr bind_export body exports
       bind_export (tvs, g, l, _) body = ASSERT( null tvs )
@@ -113,16 +114,19 @@ ds_val_bind (NonRecursive, hsbinds) body
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
       PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }
-	-> putSrcSpanDs loc			$
-	   dsGuarded grhss ty 			`thenDs` \ rhs ->
-	   mk_error_app pat			`thenDs` \ error_expr ->
-	   matchSimply rhs PatBindRhs pat body_w_exports error_expr
+	-> 	-- let C x# y# = rhs in body
+		-- ==> case rhs of C x# y# -> body
+	   putSrcSpanDs loc			$
+	   do { rhs <- dsGuarded grhss ty
+	      ; let upat = unLoc pat
+		    eqn = EqnInfo { eqn_wrap = idWrapper, eqn_pats = [upat], 
+				    eqn_rhs = cantFailMatchResult body_w_exports }
+	      ; var    <- selectMatchVar upat ty
+	      ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
+	      ; return (scrungleMatch var rhs result) }
 
       other -> pprPanic "dsLet: unlifted" (pprLHsBinds hsbinds $$ ppr body)
-  where
-      mk_error_app pat = mkErrorAppDs iRREFUT_PAT_ERROR_ID
-				    (exprType body)
-				    (showSDoc (ppr pat))
+
 
 -- Ordinary case for bindings; none should be unlifted
 ds_val_bind (is_rec, binds) body
@@ -141,6 +145,35 @@ ds_val_bind (is_rec, binds) body
 	--
 	-- NB The previous case dealt with unlifted bindings, so we
 	--    only have to deal with lifted ones now; so Rec is ok
+
+isUnboxedTupleBind :: HsBind Id -> Bool
+isUnboxedTupleBind (PatBind { pat_rhs_ty = ty }) = isUnboxedTupleType ty
+isUnboxedTupleBind other			 = False
+
+scrungleMatch :: Id -> CoreExpr -> CoreExpr -> CoreExpr
+-- Returns something like (let var = scrut in body)
+-- but if var is an unboxed-tuple type, it inlines it in a fragile way
+-- Special case to handle unboxed tuple patterns; they can't appear nested
+-- The idea is that 
+--	case e of (# p1, p2 #) -> rhs
+-- should desugar to
+--	case e of (# x1, x2 #) -> ... match p1, p2 ...
+-- NOT
+--	let x = e in case x of ....
+--
+-- But there may be a big 
+--	let fail = ... in case e of ...
+-- wrapping the whole case, which complicates matters slightly
+-- It all seems a bit fragile.  Test is dsrun013.
+
+scrungleMatch var scrut body
+  | isUnboxedTupleType (idType var) = scrungle body
+  | otherwise			    = bindNonRec var scrut body
+  where
+    scrungle (Case (Var x) bndr ty alts)
+		    | x == var = Case scrut bndr ty alts
+    scrungle (Let binds body)  = Let binds (scrungle body)
+    scrungle other = panic ("scrungleMatch: tuple pattern:\n" ++ showSDoc (ppr other))
 \end{code}	
 
 %************************************************************************
@@ -248,35 +281,10 @@ dsExpr (HsCoreAnn fs expr)
   = dsLExpr expr        `thenDs` \ core_expr ->
     returnDs (Note (CoreNote $ unpackFS fs) core_expr)
 
--- Special case to handle unboxed tuple patterns; they can't appear nested
--- The idea is that 
---	case e of (# p1, p2 #) -> rhs
--- should desugar to
---	case e of (# x1, x2 #) -> ... match p1, p2 ...
--- NOT
---	let x = e in case x of ....
---
--- But there may be a big 
---	let fail = ... in case e of ...
--- wrapping the whole case, which complicates matters slightly
--- It all seems a bit fragile.  Test is dsrun013.
-
-dsExpr (HsCase discrim matches@(MatchGroup _ ty))
- | isUnboxedTupleType (funArgTy ty)
- =  dsLExpr discrim			`thenDs` \ core_discrim ->
-    matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
-    let
-	scrungle (Case (Var x) bndr ty alts) 
-		| x == discrim_var = Case core_discrim bndr ty alts
-	scrungle (Let binds body)  = Let binds (scrungle body)
-	scrungle other = panic ("dsLExpr: tuple pattern:\n" ++ showSDoc (ppr other))
-    in
-    returnDs (scrungle matching_code)
-
 dsExpr (HsCase discrim matches)
   = dsLExpr discrim			`thenDs` \ core_discrim ->
     matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
-    returnDs (bindNonRec discrim_var core_discrim matching_code)
+    returnDs (scrungleMatch discrim_var core_discrim matching_code)
 
 dsExpr (HsLet binds body)
   = dsLExpr body		`thenDs` \ body' ->
