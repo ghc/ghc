@@ -697,7 +697,7 @@ pprCall :: SDoc -> CCallConv -> [(CmmReg,MachHint)] -> [(CmmExpr,MachHint)]
 
 pprCall ppr_fn cconv results args vols
   | not (is_cish cconv)
-  = panic "pprForeignCall: unknown calling convention"
+  = panic "pprCall: unknown calling convention"
 
   | otherwise
   = save vols $$
