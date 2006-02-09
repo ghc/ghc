@@ -1113,12 +1113,14 @@ getRegister e@(CmmMachOp mop [x, y]) -- dyadic MachOps
 
     --------------------
     add_code :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
-    add_code rep x (CmmLit (CmmInt y _)) = add_int rep x y
+    add_code rep x (CmmLit (CmmInt y _))
+	| not (is64BitInteger y) = add_int rep x y
     add_code rep x y = trivialCode rep (ADD rep) (Just (ADD rep)) x y
 
     --------------------
     sub_code :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
-    sub_code rep x (CmmLit (CmmInt y _)) = add_int rep x (-y)
+    sub_code rep x (CmmLit (CmmInt y _))
+	| not (is64BitInteger (-y)) = add_int rep x (-y)
     sub_code rep x y = trivialCode rep (SUB rep) Nothing x y
 
     -- our three-operand add instruction:
@@ -1972,12 +1974,15 @@ getRegOrMem e = do
     return (OpReg reg, code)
 
 #if x86_64_TARGET_ARCH
-is64BitLit (CmmInt i I64) = i > 0x7fffffff || i < -0x80000000
+is64BitLit (CmmInt i I64) = is64BitInteger i
    -- assume that labels are in the range 0-2^31-1: this assumes the
    -- small memory model (see gcc docs, -mcmodel=small).
 #endif
 is64BitLit x = False
 #endif
+
+is64BitInteger :: Integer -> Bool
+is64BitInteger i = i > 0x7fffffff || i < -0x80000000
 
 -- -----------------------------------------------------------------------------
 --  The 'CondCode' type:  Condition codes passed up the tree.
