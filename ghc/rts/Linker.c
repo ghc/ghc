@@ -3682,8 +3682,19 @@ static int resolveImports(
     struct nlist *nlist)
 {
     unsigned i;
+    size_t itemSize = 4;
 
-    for(i=0;i*4<sect->size;i++)
+#if i386_HOST_ARCH
+    int isJumpTable = 0;
+    if(!strcmp(sect->sectname,"__jump_table"))
+    {
+        isJumpTable = 1;
+        itemSize = 5;
+        ASSERT(sect->reserved2 == itemSize);
+    }
+#endif
+
+    for(i=0; i*itemSize < sect->size;i++)
     {
 	// according to otool, reserved1 contains the first index into the indirect symbol table
 	struct nlist *symbol = &nlist[indirectSyms[sect->reserved1+i]];
@@ -3703,8 +3714,21 @@ static int resolveImports(
 	    return 0;
 	}
 	ASSERT(addr);
-	checkProddableBlock(oc,((void**)(image + sect->offset)) + i);
-	((void**)(image + sect->offset))[i] = addr;
+
+#if i386_HOST_ARCH
+        if(isJumpTable)
+        {
+            checkProddableBlock(oc,image + sect->offset + i*itemSize);
+            *(image + sect->offset + i*itemSize) = 0xe9; // jmp
+            *(unsigned*)(image + sect->offset + i*itemSize + 1)
+                = (char*)addr - (image + sect->offset + i*itemSize + 5);
+        }
+        else
+#endif
+	{
+	    checkProddableBlock(oc,((void**)(image + sect->offset)) + i);
+	    ((void**)(image + sect->offset))[i] = addr;
+        }
     }
 
     return 1;
@@ -4167,7 +4191,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
     unsigned i;
     struct segment_command *segLC = NULL;
-    struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL;
+    struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL, *jump_table = NULL;
     struct symtab_command *symLC = NULL;
     struct dysymtab_command *dsymLC = NULL;
     struct nlist *nlist;
@@ -4197,6 +4221,10 @@ static int ocResolve_MachO(ObjectCode* oc)
 	    la_ptrs = &sections[i];
         else if(!strcmp(sections[i].sectname,"__la_sym_ptr3"))
 	    la_ptrs = &sections[i];
+        else if(!strcmp(sections[i].sectname,"__pointers"))
+	    nl_ptrs = &sections[i];
+        else if(!strcmp(sections[i].sectname,"__jump_table"))
+	    jump_table = &sections[i];
     }
 
     if(dsymLC)
@@ -4209,6 +4237,9 @@ static int ocResolve_MachO(ObjectCode* oc)
                 return 0;
         if(nl_ptrs)
             if(!resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist))
+                return 0;
+        if(jump_table)
+            if(!resolveImports(oc,image,symLC,jump_table,indirectSyms,nlist))
                 return 0;
     }
     
