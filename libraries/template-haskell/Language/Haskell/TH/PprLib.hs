@@ -37,7 +37,7 @@ module Language.Haskell.TH.PprLib (
 
 import Language.Haskell.TH.Syntax (Name(..), NameFlavour(..))
 import qualified Text.PrettyPrint.HughesPJ as HPJ
-import Monad (liftM, liftM2)
+import Control.Monad (liftM, liftM2)
 import Data.Map ( Map )
 import qualified Data.Map as Map ( lookup, insert, empty )
 import GHC.Base (Int(..))

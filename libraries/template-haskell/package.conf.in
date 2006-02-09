@@ -19,7 +19,7 @@ hs-libraries:   "HStemplate-haskell"
 extra-libraries:
 include-dirs:
 includes:		
-depends:	base, haskell98	
+depends:	base
 hugs-options:
 cc-options:
 ld-options:

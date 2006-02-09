@@ -45,10 +45,10 @@ module Language.Haskell.TH.Syntax(
 import Data.PackedString
 import GHC.Base		( Int(..), Int#, (<#), (==#) )
 
-import IO		( hPutStrLn, stderr )
 import Data.IORef
 import GHC.IOBase	( unsafePerformIO )
 import Control.Monad (liftM)
+import System.IO	( hPutStrLn, stderr )
 
 -----------------------------------------------------
 --
