@@ -134,7 +134,8 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 	stmtC (CmmCall (CmmForeignCall (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
 				CCallConv) 
 			[{-no results-}]
-			[(mutv,PtrHint)]
+			[(CmmReg (CmmGlobal BaseReg), PtrHint),
+			 (mutv,PtrHint)]
 			(Just vols))
 
 --  #define sizzeofByteArrayzh(r,a) \

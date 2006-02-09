@@ -269,7 +269,7 @@ extern rtsBool keepCAFs;
    and is put on the mutable list.
    -------------------------------------------------------------------------- */
 
-void dirty_MUT_VAR(StgClosure *p);
+void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
 
 /* -----------------------------------------------------------------------------
    DEBUGGING predicates for pointers

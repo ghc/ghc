@@ -766,11 +766,12 @@ allocatePinned( nat n )
    -------------------------------------------------------------------------- */
 
 void
-dirty_MUT_VAR(StgClosure *p)
+dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
+    Capability *cap = regTableToCapability(reg);
     if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
 	p->header.info = &stg_MUT_VAR_DIRTY_info;
-	recordMutable(p);
+	recordMutableCap(p,cap,Bdescr(p)->gen_no);
     }
 }
 
