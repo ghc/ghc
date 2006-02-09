@@ -33,8 +33,7 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, 
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
-  checkValidInstHead, instTypeErr, checkAmbiguity,
-  checkInstTermination,
+  checkValidInstHead, checkValidInstance, checkAmbiguity,
   arityErr, 
 
   --------------------------------
@@ -90,10 +89,10 @@ import Kind		( isSubKind )
 
 -- others:
 import TcRnMonad          -- TcType, amongst others
-import FunDeps		( grow )
+import FunDeps		( grow, checkInstFDs )
 import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
-import DynFlags	( dopt, DynFlag(..) )
+import DynFlags		( dopt, DynFlag(..), DynFlags )
 import Util		( nOfThem, isSingleton, notNull )
 import ListSetOps	( removeDups )
 import Outputable
@@ -907,11 +906,7 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
     arity      = classArity cls
     n_tys      = length tys
     arity_err  = arityErr "Class" class_name arity n_tys
-
-    how_to_allow = case ctxt of
-		     InstHeadCtxt  -> empty	-- Should not happen
-		     InstThetaCtxt -> parens undecidableMsg
-		     other	   -> parens (ptext SLIT("Use -fglasgow-exts to permit this"))
+    how_to_allow = parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
 check_source_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 	-- Implicit parameters only allows in type
@@ -930,10 +925,10 @@ check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
-	InstHeadCtxt  -> True	-- We check for instance-head 
-				-- formation in checkValidInstHead
-	InstThetaCtxt -> undecidable_ok || distinct_tyvars tys
-	other	      -> gla_exts       || all tyvar_head tys
+	InstThetaCtxt -> gla_exts || all tcIsTyVarTy tys
+				-- Further checks on head and theta in
+				-- checkInstTermination
+	other	      -> gla_exts || all tyvar_head tys
   where
     gla_exts 	   = dopt Opt_GlasgowExts dflags
 
@@ -1108,6 +1103,27 @@ instTypeErr pp_ty msg
 %*									*
 %************************************************************************
 
+
+\begin{code}
+checkValidInstance :: [TyVar] -> ThetaType -> Class -> [TcType] -> TcM ()
+checkValidInstance tyvars theta clas inst_tys
+  = do	{ dflags <- getDOpts
+
+	; checkValidTheta InstThetaCtxt theta
+	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
+
+	-- Check that instance inference will termainate
+	-- For Haskell 98, checkValidTheta has already done that
+	; checkInstTermination dflags theta inst_tys
+	
+	-- The Coverage Condition
+	; checkTc (checkInstFDs theta clas inst_tys)
+	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
+	}
+  where
+    msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
+\end{code}
+
 Termination test: each assertion in the context satisfies
  (1) no variable has more occurrences in the assertion than in the head, and
  (2) the assertion has fewer constructors and variables (taken together
@@ -1116,13 +1132,8 @@ This is only needed with -fglasgow-exts, as Haskell 98 restrictions
 (which have already been checked) guarantee termination.
 
 \begin{code}
-checkInstTermination :: ThetaType -> [TcType] -> TcM ()
-checkInstTermination theta tys
-  = do
-    dflags <- getDOpts
-    check_inst_termination dflags theta tys
-
-check_inst_termination dflags theta tys
+checkInstTermination :: DynFlags -> ThetaType -> [TcType] -> TcM ()
+checkInstTermination dflags theta tys
   | not (dopt Opt_GlasgowExts dflags)         = returnM ()
   | dopt Opt_AllowUndecidableInstances dflags = returnM ()
   | otherwise = do
@@ -1146,7 +1157,7 @@ nomoreMsg = ptext SLIT("Variable occurs more often in a constraint than in the i
 smallerMsg = ptext SLIT("Constraint is no smaller than the instance head")
 undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
 
--- free variables of a type, retaining repetitions
+-- Free variables of a type, retaining repetitions, and expanding synonyms
 fvType :: Type -> [TyVar]
 fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
 fvType (TyVarTy tv)        = [tv]
@@ -1164,7 +1175,7 @@ fvPred :: PredType -> [TyVar]
 fvPred (ClassP _ tys')     = fvTypes tys'
 fvPred (IParam _ ty)       = fvType ty
 
--- size of a type: the number of variables and constructors
+-- Size of a type: the number of variables and constructors
 sizeType :: Type -> Int
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
 sizeType (TyVarTy _)       = 1

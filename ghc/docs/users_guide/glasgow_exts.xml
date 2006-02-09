@@ -1673,37 +1673,123 @@ class like this:
 <sect2 id="instance-decls">
 <title>Instance declarations</title>
 
-<sect3 id="instance-heads">
-<title>Instance heads</title>
+<sect3 id="instance-rules">
+<title>Relaxed rules for instance declarations</title>
+
+<para>An instance declaration has the form
+<screen>
+  instance ( <replaceable>assertion</replaceable><subscript>1</subscript>, ..., <replaceable>assertion</replaceable><subscript>n</subscript>) =&gt; <replaceable>class</replaceable> <replaceable>type</replaceable><subscript>1</subscript> ... <replaceable>type</replaceable><subscript>m</subscript> where ...
+</screen>
+The part before the "<literal>=&gt;</literal>" is the
+<emphasis>context</emphasis>, while the part after the
+"<literal>=&gt;</literal>" is the <emphasis>head</emphasis> of the instance declaration.
+</para>
 
 <para>
-The <emphasis>head</emphasis> of an instance declaration is the part to the
-right of the "<literal>=&gt;</literal>".  In Haskell 98 the head of an instance
-declaration
+In Haskell 98 the head of an instance declaration
 must be of the form <literal>C (T a1 ... an)</literal>, where
 <literal>C</literal> is the class, <literal>T</literal> is a type constructor,
 and the <literal>a1 ... an</literal> are distinct type variables.
+Furthermore, the assertions in the context of the instance declaration be of
+the form <literal>C a</literal> where <literal>a</literal> is a type variable.
 </para>
 <para>
-The <option>-fglasgow-exts</option> flag lifts this restriction and allows the
-instance head to be of form <literal>C t1 ... tn</literal> where <literal>t1
-... tn</literal> are arbitrary types (provided, of course, everything is
-well-kinded).  In particular, types <literal>ti</literal> can be type variables
-or structured types, and can contain repeated occurrences of a single type
-variable.
-Examples:
+The <option>-fglasgow-exts</option> flag loosens these restrictions
+considerably.  Firstly, multi-parameter type classes are permitted.  Secondly,
+the context and head of the instance declaration can each consist of arbitrary
+(well-kinded) assertions <literal>(C t1 ... tn)</literal> subject only to the following rule:
+for each assertion in the context
+<orderedlist>
+<listitem><para>No type variable has more occurrences in the assertion than in the head</para></listitem>
+<listitem><para>Tthe assertion has fewer constructors and variables (taken together
+      and counting repetitions) than the head</para></listitem>
+</orderedlist>
+These restrictions ensure that context reduction terminates: each reduction
+step makes the problem smaller
+constructor.  For example, the following would make the type checker
+loop if it wasn't excluded:
 <programlisting>
-  instance Eq (T a a) where ...
-	-- Repeated type variable
+  instance C a => C a where ...
+</programlisting>
+For example, these are OK:
+<programlisting>
+  instance C Int [a]          -- Multiple parameters
+  instance Eq (S [a])         -- Structured type in head
 
-  instance Eq (S [a]) where ...
-	-- Structured type
+      -- Repeated type variable in head
+  instance C4 a a => C4 [a] [a] 
+  instance Stateful (ST s) (MutVar s)
 
-  instance C Int [a] where ...
-	-- Multiple parameters
+      -- Head can consist of type variables only
+  instance C a
+  instance (Eq a, Show b) => C2 a b
+
+      -- Non-type variables in context
+  instance Show (s a) => Show (Sized s a)
+  instance C2 Int a => C3 Bool [a]
+  instance C2 Int a => C3 [a] b
+</programlisting>
+But these are not:
+<programlisting>
+  instance C a => C a where ...
+      -- Context assertion no smaller than head
+  instance C b b => Foo [b] where ...
+      -- (C b b) has more more occurrences of b than the head
+</programlisting>
+</para>
+
+<para>
+A couple of useful idioms are these.  First, 
+if one allows overlapping instance declarations then it's quite
+convenient to have a "default instance" declaration that applies if
+something more specific does not:
+<programlisting>
+  instance C a where
+    op = ... -- Default
+</programlisting>
+
+Second, sometimes you might want to use the following to get the
+effect of a "class synonym":
+
+
+<programlisting>
+  class (C1 a, C2 a, C3 a) => C a where { }
+
+  instance (C1 a, C2 a, C3 a) => C a where { }
+</programlisting>
+This allows you to write shorter signatures:
+
+<programlisting>
+  f :: C a => ...
+</programlisting>
+instead of
+<programlisting>
+  f :: (C1 a, C2 a, C3 a) => ...
 </programlisting>
 </para>
 </sect3>
+
+<sect3 id="undecidable-instances">
+<title>Undecidable instances</title>
+
+<para>
+Sometimes even the rules of <xref linkend="instance-rules"/> are too onerous.
+Voluminous correspondence on the Haskell mailing list has convinced me
+that it's worth experimenting with more liberal rules.  If you use
+the experimental flag <option>-fallow-undecidable-instances</option>
+<indexterm><primary>-fallow-undecidable-instances
+option</primary></indexterm>, you can use arbitrary
+types in both an instance context and instance head.  Termination is ensured by having a
+fixed-depth recursion stack.  If you exceed the stack depth you get a
+sort of backtrace, and the opportunity to increase the stack depth
+with <option>-fcontext-stack</option><emphasis>N</emphasis>.
+</para>
+<para>
+I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
+allowing these idioms interesting idioms.  
+</para>
+</sect3>
+
 
 <sect3 id="instance-overlap">
 <title>Overlapping instances</title>
@@ -1832,117 +1918,6 @@ must be fully applied.  You cannot, for example, write:
 This design decision is independent of all the others, and easily
 reversed, but it makes sense to me.
 
-</para>
-</sect3>
-
-<sect3 id="undecidable-instances">
-<title>Undecidable instances</title>
-
-<para>An instance declaration must normally obey the following rules:
-<orderedlist>
-<listitem><para>At least one of the types in the <emphasis>head</emphasis> of
-an instance declaration <emphasis>must not</emphasis> be a type variable.
-For example, these are OK:
-
-<programlisting>
-  instance C Int a where ...
-
-  instance D (Int, Int) where ...
-
-  instance E [[a]] where ...
-</programlisting>
-but this is not:
-<programlisting>
-  instance F a where ...
-</programlisting>
-Note that instance heads may contain repeated type variables (<xref linkend="instance-heads"/>).
-For example, this is OK:
-<programlisting>
-  instance Stateful (ST s) (MutVar s) where ...
-</programlisting>
-</para>
-</listitem>
-
-
-<listitem>
-<para>All of the types in the <emphasis>context</emphasis> of
-an instance declaration <emphasis>must</emphasis> be type variables, and
-there must be no repeated type variables in any one constraint.
-Thus
-<programlisting>
-instance C a b => Eq (a,b) where ...
-</programlisting>
-is OK, but
-<programlisting>
-instance C Int b => Foo [b] where ...
-</programlisting>
-is not OK (because of the non-type-variable <literal>Int</literal> in the context), and nor is
-<programlisting>
-instance C b b => Foo [b] where ...
-</programlisting>
-(because of the repeated type variable).
-</para>
-</listitem>
-</orderedlist>
-These restrictions ensure that 
-context reduction terminates: each reduction step removes one type
-constructor.  For example, the following would make the type checker
-loop if it wasn't excluded:
-<programlisting>
-  instance C a => C a where ...
-</programlisting>
-There are two situations in which the rule is a bit of a pain. First,
-if one allows overlapping instance declarations then it's quite
-convenient to have a "default instance" declaration that applies if
-something more specific does not:
-
-
-<programlisting>
-  instance C a where
-    op = ... -- Default
-</programlisting>
-
-
-Second, sometimes you might want to use the following to get the
-effect of a "class synonym":
-
-
-<programlisting>
-  class (C1 a, C2 a, C3 a) => C a where { }
-
-  instance (C1 a, C2 a, C3 a) => C a where { }
-</programlisting>
-
-
-This allows you to write shorter signatures:
-
-
-<programlisting>
-  f :: C a => ...
-</programlisting>
-
-
-instead of
-
-
-<programlisting>
-  f :: (C1 a, C2 a, C3 a) => ...
-</programlisting>
-
-
-Voluminous correspondence on the Haskell mailing list has convinced me
-that it's worth experimenting with more liberal rules.  If you use
-the experimental flag <option>-fallow-undecidable-instances</option>
-<indexterm><primary>-fallow-undecidable-instances
-option</primary></indexterm>, you can use arbitrary
-types in both an instance context and instance head.  Termination is ensured by having a
-fixed-depth recursion stack.  If you exceed the stack depth you get a
-sort of backtrace, and the opportunity to increase the stack depth
-with <option>-fcontext-stack</option><emphasis>N</emphasis>.
-</para>
-<para>
-I'm on the lookout for a less brutal solution: a simple rule that preserves decidability while
-allowing these idioms interesting idioms.  
 </para>
 </sect3>
 

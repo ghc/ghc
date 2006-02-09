@@ -13,12 +13,9 @@ import TcBinds		( mkPragFun, tcPrags, badBootDeclErr )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
-import TcMType		( tcSkolSigType, checkValidTheta, checkValidInstHead,
-			  checkInstTermination, instTypeErr, 
-			  checkAmbiguity, SourceTyCtxt(..) )
-import TcType		( mkClassPred, tyVarsOfType, 
-			  tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
-			  SkolemInfo(InstSkol), tcSplitDFunTy, pprClassPred )
+import TcMType		( tcSkolSigType, checkValidInstance, checkValidInstHead )
+import TcType		( mkClassPred, tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
+			  SkolemInfo(InstSkol), tcSplitDFunTy )
 import Inst		( tcInstClassOp, newDicts, instToId, showLIE, 
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
@@ -33,8 +30,7 @@ import Type		( zipOpenTvSubst, substTheta, substTys )
 import DataCon		( classDataCon )
 import Class		( classBigSig )
 import Var		( Id, idName, idType )
-import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
-import FunDeps		( checkInstFDs )
+import MkId		( mkDictFunId )
 import Name		( Name, getSrcLoc )
 import Maybe		( catMaybes )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
@@ -186,32 +182,25 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
     setSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$
 
+    do	{ is_boot <- tcIsHsBoot
+	; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
+		  badBootDeclErr
+
 	-- Typecheck the instance type itself.  We can't use 
 	-- tcHsSigType, because it's not a valid user type.
-    kcHsSigType poly_ty			`thenM` \ kinded_ty ->
-    tcHsKindedType kinded_ty		`thenM` \ poly_ty' ->
-    let
-	(tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
-    in
-    checkValidTheta InstThetaCtxt theta			`thenM_`
-    checkAmbiguity tyvars theta (tyVarsOfType tau)	`thenM_`
-    checkValidInstHead tau				`thenM` \ (clas,inst_tys) ->
-    checkInstTermination theta inst_tys			`thenM_`
-    checkTc (checkInstFDs theta clas inst_tys)
-	    (instTypeErr (pprClassPred clas inst_tys) msg)	`thenM_`
-    newDFunName clas inst_tys (srcSpanStart loc)		`thenM` \ dfun_name ->
-    getOverlapFlag						`thenM` \ overlap_flag ->
-    let dfun  = mkDictFunId dfun_name tyvars theta clas inst_tys
-	ispec = mkLocalInstance dfun overlap_flag
-    in
+	; kinded_ty <- kcHsSigType poly_ty
+	; poly_ty'  <- tcHsKindedType kinded_ty
+	; let (tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
+	
+	; (clas, inst_tys) <- checkValidInstHead tau
+	; checkValidInstance tyvars theta clas inst_tys
 
-    tcIsHsBoot						`thenM` \ is_boot ->
-    checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
-	    badBootDeclErr				`thenM_`
+	; dfun_name <- newDFunName clas inst_tys (srcSpanStart loc)
+	; overlap_flag <- getOverlapFlag
+	; let dfun  = mkDictFunId dfun_name tyvars theta clas inst_tys
+	      ispec = mkLocalInstance dfun overlap_flag
 
-    returnM (Just (InstInfo { iSpec = ispec, iBinds = VanillaInst binds uprags }))
-  where
-    msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
+	; return (Just (InstInfo { iSpec = ispec, iBinds = VanillaInst binds uprags })) }
 \end{code}
 
 
@@ -400,9 +389,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 		-- it means that the special cases (e.g. dictionary with only one
 		-- member) are dealt with by the common MkId.mkDataConWrapId code rather
 		-- than needing to be repeated here.
-
-	  where
-	    msg = "Compiler error: bad dictionary " ++ showSDoc (ppr clas)
 
 	dict_bind  = noLoc (VarBind this_dict_id dict_rhs)
 	all_binds  = dict_bind `consBag` (sc_binds `unionBags` meth_binds)
