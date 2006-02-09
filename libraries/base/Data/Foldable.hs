@@ -69,7 +69,7 @@ import GHC.Exts (build)
 -- > instance Foldable Tree
 -- >    foldMap f Empty = mempty
 -- >    foldMap f (Leaf x) = f x
--- >    foldMap f (Node l k r) = foldMap f l `mappend` f k `mappend foldMap` f r
+-- >    foldMap f (Node l k r) = foldMap f l `mappend` f k `mappend` foldMap f r
 --
 -- This is suitable even for abstract types, as the monoid is assumed
 -- to satisfy the monoid laws.
