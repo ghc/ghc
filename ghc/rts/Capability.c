@@ -163,6 +163,14 @@ initCapabilities( void )
 #if defined(SMP)
     nat i,n;
 
+#ifndef REG_BaseReg
+    // We can't support multiple CPUs if BaseReg is not a register
+    if (RtsFlags.ParFlags.nNodes > 1) {
+	errorBelch("warning: multiple CPUs not supported in this build, reverting to 1");
+	RtsFlags.ParFlags.nNodes = 1;
+    }
+#endif
+
     n_capabilities = n = RtsFlags.ParFlags.nNodes;
     capabilities = stgMallocBytes(n * sizeof(Capability), "initCapabilities");
 

@@ -702,19 +702,23 @@ pprCall ppr_fn cconv results args vols
   | otherwise
   = save vols $$
     ptext SLIT("CALLER_SAVE_SYSTEM") $$
-    hcat [ ppr_results results, ppr_fn, 
-	   parens (commafy (map pprArg args)), semi ] $$
+    ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi $$
     ptext SLIT("CALLER_RESTORE_SYSTEM") $$
     restore vols
   where 
-     ppr_results []     = empty
-     ppr_results [(one,hint)] 
+     ppr_assign []           rhs = rhs
+     ppr_assign [(reg@(CmmGlobal BaseReg), hint)] rhs
+	 | Just ty <- strangeRegType reg
+	 = ptext SLIT("ASSIGN_BaseReg") <> parens (parens ty <> rhs)
+	 -- BaseReg is special, sometimes it isn't an lvalue and we
+	 -- can't assign to it.
+     ppr_assign [(one,hint)] rhs
 	 | Just ty <- strangeRegType one
-	 = pprReg one <> ptext SLIT(" = ") <> parens ty
+	 = pprReg one <> ptext SLIT(" = ") <> parens ty <> rhs
 	 | otherwise
 	 = pprReg one <> ptext SLIT(" = ")
-		 <> pprUnHint hint (cmmRegRep one)
-     ppr_results _other = panic "pprCall: multiple results"
+		 <> pprUnHint hint (cmmRegRep one) <> rhs
+     ppr_assign _other _rhs = panic "pprCall: multiple results"
 
      pprArg (expr, PtrHint)
    	= cCast (ptext SLIT("void *")) expr

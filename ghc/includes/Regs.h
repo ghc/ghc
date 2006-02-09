@@ -337,13 +337,23 @@ struct PartCapability_ {
 extern W_ MainCapability[];
 #endif
 
+/*
+ * Assigning to BaseReg (the ASSIGN_BaseReg macro): this happens on
+ * return from a "safe" foreign call, when the thread might be running
+ * on a new Capability.  Obviously if BaseReg is not a register, then
+ * we are restricted to a single Capability (this invariant is enforced
+ * in Capability.c:initCapabilities), and assigning to BaseReg can be omitted.
+ */
+
 #if defined(REG_Base) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
+#define ASSIGN_BaseReg(e) (BaseReg = (e))
 #else
 #ifdef SMP
 #error BaseReg must be in a register for SMP
 #endif
 #define BaseReg (&((struct PartCapability_ *)MainCapability)->r)
+#define ASSIGN_BaseReg(e) /*nothing*/
 #endif
 
 #if defined(REG_Sp) && !defined(NO_GLOBAL_REG_DECLS)
