@@ -320,8 +320,8 @@ normalizeTimeDiff td =
                + 60 * (tdMin td 
                     + 60 * (tdHour td 
                          + 24 * (tdDay td 
-                              + 30 * (tdMonth td 
-                                   + 365 * tdYear td))))
+                              + 30 * tdMonth td 
+                              + 365 * tdYear td)))
 
       (diffYears,  rest1)    = rest0 `quotRem` (365 * 24 * 3600)
       (diffMonths, rest2)    = rest1 `quotRem` (30 * 24 * 3600)
