@@ -30,15 +30,12 @@ if (ghc_with_unreg == 1):
 	config.compile_ways.append('unreg')
 	config.run_ways.append('unreg')
 
-if (ghc_with_smp == 1):
-	config.compile_ways.append('smp')
-	config.run_ways.append('smp')
-
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
 
 if (ghc_with_threaded_rts == 1):
-	config.run_ways.append('threaded')
+	config.run_ways.append('threaded1')
+	config.run_ways.append('threaded2')
 
 config.way_flags = {
 	'normal'     : [],
@@ -46,12 +43,12 @@ config.way_flags = {
 	'optasm'     : ['-O -fasm'],
 	'prof'       : ['-O -prof -auto-all'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
-	'smp'        : ['-O -smp'],
 	'unreg'      : ['-unreg'],
 	'ghci'       : ['--interactive', '-v0'],
 	'extcore'    : ['-fext-core'],
 	'optextcore' : ['-O -fext-core'],
-	'threaded'   : ['-threaded']
+	'threaded1'  : ['-threaded', '-debug'],
+	'threaded2'  : ['-O', '-threaded']
 	}
 
 config.way_rts_flags = { 
@@ -59,12 +56,12 @@ config.way_rts_flags = {
 	'opt'        : [],
 	'optasm'     : [],
 	'prof'       : ['-p'],
-	'profasm'    : [],
-	'smp'        : ['-N2'],
+	'profasm'    : ['-hc'], # test heap profiling too
 	'unreg'      : [],
 	'ghci'       : [],
 	'extcore'    : [],
 	'optextcore' : [],
-	'threaded'   : []
+	'threaded1'  : [],
+	'threaded2'  : ['-N2']
     	}
 
