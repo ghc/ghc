@@ -999,7 +999,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   lock_stm(trec);
 
   et = trec -> enclosing_trec;
-  result = validate_and_acquire_ownership(trec, FALSE, TRUE);
+  result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
   if (result) {
     // We now know that all the updated locations hold their expected values.
 
