@@ -316,12 +316,12 @@ normalizeTimeDiff :: TimeDiff -> TimeDiff
 -- errors
 normalizeTimeDiff td =
   let
-      rest0 = tdSec td 
-               + 60 * (tdMin td 
-                    + 60 * (tdHour td 
-                         + 24 * (tdDay td 
-                              + 30 * tdMonth td 
-                              + 365 * tdYear td)))
+      rest0 = toInteger (tdSec td)
+               + 60 * (toInteger (tdMin td)
+                    + 60 * (toInteger (tdHour td)
+                         + 24 * (toInteger (tdDay td)
+                              + 30 * toInteger (tdMonth td)
+                              + 365 * toInteger (tdYear td))))
 
       (diffYears,  rest1)    = rest0 `quotRem` (365 * 24 * 3600)
       (diffMonths, rest2)    = rest1 `quotRem` (30 * 24 * 3600)
@@ -329,12 +329,12 @@ normalizeTimeDiff td =
       (diffHours,  rest4)    = rest3 `quotRem` 3600
       (diffMins,   diffSecs) = rest4 `quotRem` 60
   in
-      td{ tdYear = diffYears
-        , tdMonth = diffMonths
-        , tdDay   = diffDays
-        , tdHour  = diffHours
-        , tdMin   = diffMins
-        , tdSec   = diffSecs
+      td{ tdYear  = fromInteger diffYears
+        , tdMonth = fromInteger diffMonths
+        , tdDay   = fromInteger diffDays
+        , tdHour  = fromInteger diffHours
+        , tdMin   = fromInteger diffMins
+        , tdSec   = fromInteger diffSecs
         }
 
 #ifndef __HUGS__
