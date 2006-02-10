@@ -11,7 +11,7 @@ module GHC (
 	Session,
 	defaultErrorHandler,
 	defaultCleanupHandler,
-	init,
+	init, initFromArgs,
 	newSession,
 
 	-- * Flags and settings
@@ -308,24 +308,32 @@ defaultCleanupHandler dflags inner =
 
 
 -- | Initialises GHC.  This must be done /once/ only.  Takes the
--- command-line arguments.  All command-line arguments which aren't
--- understood by GHC will be returned.
+-- TopDir path without the '-B' prefix.
 
-init :: [String] -> IO [String]
-init args = do
+init :: Maybe String -> IO ()
+init mbMinusB = do
    -- catch ^C
    main_thread <- myThreadId
    putMVar interruptTargetThread [main_thread]
    installSignalHandlers
 
-   -- Grab the -B option if there is one
-   let (minusB_args, argv1) = partition (prefixMatch "-B") args
-   dflags0 <- initSysTools minusB_args defaultDynFlags
+   dflags0 <- initSysTools mbMinusB defaultDynFlags
    writeIORef v_initDynFlags dflags0
 
-   -- Parse the static flags
-   argv2 <- parseStaticFlags argv1
-   return argv2
+-- | Initialises GHC. This must be done /once/ only. Takes the
+-- command-line arguments.  All command-line arguments which aren't
+-- understood by GHC will be returned.
+
+initFromArgs :: [String] -> IO [String]
+initFromArgs args
+    = do init mbMinusB
+         return argv1
+    where -- Grab the -B option if there is one
+          (minusB_args, argv1) = partition (prefixMatch "-B") args
+          mbMinusB | null minusB_args
+                       = Nothing
+                   | otherwise
+                       = Just (drop 2 (last minusB_args))
 
 GLOBAL_VAR(v_initDynFlags, error "initDynFlags", DynFlags)
 	-- stores the DynFlags between the call to init and subsequent

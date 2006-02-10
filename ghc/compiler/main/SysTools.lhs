@@ -198,7 +198,7 @@ getTopDir	     = readIORef v_TopDir
 %************************************************************************
 
 \begin{code}
-initSysTools :: [String]	-- Command-line arguments starting "-B"
+initSysTools :: Maybe String	-- Maybe TopDir path (without the '-B' prefix)
 
 	     -> DynFlags
 	     -> IO DynFlags	-- Set all the mutable variables above, holding 
@@ -207,8 +207,8 @@ initSysTools :: [String]	-- Command-line arguments starting "-B"
 				--	(c) the GHC usage message
 
 
-initSysTools minusB_args dflags
-  = do  { (am_installed, top_dir) <- findTopDir minusB_args
+initSysTools mbMinusB dflags
+  = do  { (am_installed, top_dir) <- findTopDir mbMinusB
 	; writeIORef v_TopDir top_dir
 		-- top_dir
 		-- 	for "installed" this is the root of GHC's support files
@@ -399,9 +399,8 @@ foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO
 --
 -- Plan of action:
 -- 1. Set proto_top_dir
--- 	a) look for (the last) -B flag, and use it
---	b) if there are no -B flags, get the directory 
---	   where GHC is running (only on Windows)
+--	if there is no given TopDir path, get the directory 
+--	where GHC is running (only on Windows)
 --
 -- 2. If package.conf exists in proto_top_dir, we are running
 --	installed; and TopDir = proto_top_dir
@@ -412,11 +411,11 @@ foreign import stdcall unsafe "GetTempPathA" getTempPath :: Int -> CString -> IO
 --
 -- This is very gruesome indeed
 
-findTopDir :: [String]
-	  -> IO (Bool, 		-- True <=> am installed, False <=> in-place
-	         String)	-- TopDir (in Unix format '/' separated)
+findTopDir :: Maybe String   -- Maybe TopDir path (without the '-B' prefix).
+           -> IO (Bool,      -- True <=> am installed, False <=> in-place
+                  String)    -- TopDir (in Unix format '/' separated)
 
-findTopDir minusbs
+findTopDir mbMinusB
   = do { top_dir <- get_proto
         -- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
@@ -426,15 +425,14 @@ findTopDir minusbs
        }
   where
     -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
-    get_proto | notNull minusbs
-	      = return (normalisePath (drop 2 (last minusbs)))	-- 2 for "-B"
-	      | otherwise	   
-	      = do { maybe_exec_dir <- getBaseDir -- Get directory of executable
-		   ; case maybe_exec_dir of	  -- (only works on Windows; 
-						  --  returns Nothing on Unix)
-			Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
-			Just dir -> return dir
-		   }
+    get_proto = case mbMinusB of
+                  Just minusb -> return (normalisePath minusb)
+                  Nothing
+                      -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
+		            case maybe_exec_dir of       -- (only works on Windows; 
+                                                         --  returns Nothing on Unix)
+                              Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
+                              Just dir -> return dir
 \end{code}
 
 

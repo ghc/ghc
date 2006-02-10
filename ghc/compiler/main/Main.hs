@@ -31,7 +31,7 @@ import Config		( cProjectVersion, cBooterVersion, cProjectName )
 import Packages		( dumpPackages, initPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
-import StaticFlags	( staticFlags, v_Ld_inputs )
+import StaticFlags	( staticFlags, v_Ld_inputs, parseStaticFlags )
 import DynFlags         ( defaultDynFlags )
 import BasicTypes	( failed )
 import ErrUtils		( Message, debugTraceMsg, putMsg )
@@ -65,7 +65,7 @@ main =
   GHC.defaultErrorHandler defaultDynFlags $ do
   
   argv0 <- getArgs
-  argv1 <- GHC.init argv0
+  argv1 <- parseStaticFlags =<< GHC.initFromArgs argv0
 
   -- 2. Parse the "mode" flags (--make, --interactive etc.)
   (cli_mode, argv2) <- parseModeFlags argv1
