@@ -163,7 +163,7 @@ initCapabilities( void )
 #if defined(THREADED_RTS)
     nat i;
 
-#ifndef REG_BaseReg
+#ifndef REG_Base
     // We can't support multiple CPUs if BaseReg is not a register
     if (RtsFlags.ParFlags.nNodes > 1) {
 	errorBelch("warning: multiple CPUs not supported in this build, reverting to 1");
